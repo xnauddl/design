@@ -88,8 +88,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
   return summary;
 }
 
-function setGlobalLiteral(v: Variable, modeId: string, t: DraftToken, type: ResolvedType): void {
-  if (type === 'COLOR') {
+function setGlobalLiteral(v: Variable, modeId: string, t: DraftToken, type: ResolvedType): void {  if (type === 'COLOR') {
     const { r, g, b } = hexToRgb(String(t.value));
     v.setValueForMode(modeId, { r, g, b, a: 1 });
   } else if (type === 'STRING') {
@@ -103,4 +102,45 @@ function setGlobalLiteral(v: Variable, modeId: string, t: DraftToken, type: Reso
     // FLOAT
     v.setValueForMode(modeId, Number(t.value));
   }
+}
+
+/* ============================================================
+   Phase 2 — 시맨틱 별칭 매핑
+   의미 토큰(예: surface, text, primary)을 Global 원시 변수에 별칭으로 연결.
+   Component → Semantic → Global 단방향 규칙 준수. 리터럴 금지(별칭만).
+   ============================================================ */
+export interface SemanticSummary {
+  created: number;
+  updated: number;
+  aliased: number;
+  /** 참조 대상 Global 변수가 없어 건너뛴 이름들. */
+  missing: string[];
+}
+
+/** map: 시맨틱 이름 → Global 변수 이름(예: {'surface':'color/neutral/50'}). */
+export async function createSemanticAliases(map: Record<string, string>): Promise<SemanticSummary> {
+  const summary: SemanticSummary = { created: 0, updated: 0, aliased: 0, missing: [] };
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const globalCol = cols.find((c) => c.name === GLOBAL);
+  if (!globalCol) {
+    summary.missing = Object.values(map);
+    return summary; // Global이 없으면 먼저 토큰을 생성해야 함
+  }
+  const semanticCol = await getOrCreateCollection(SEMANTIC);
+  const sMode = semanticCol.defaultModeId;
+  const globals = await figma.variables.getLocalVariablesAsync();
+
+  for (const [semName, globalName] of Object.entries(map)) {
+    const g = globals.find((v) => v.name === globalName && v.variableCollectionId === globalCol.id);
+    if (!g) {
+      summary.missing.push(globalName);
+      continue;
+    }
+    const { variable, created } = await upsertVariable(semName, semanticCol, g.resolvedType);
+    variable.setValueForMode(sMode, figma.variables.createVariableAlias(g)); // 별칭만
+    variable.scopes = g.scopes; // 원시 스코프 상속
+    summary[created ? 'created' : 'updated']++;
+    summary.aliased++;
+  }
+  return summary;
 }

@@ -3,7 +3,7 @@
    ============================================================ */
 import type { UiToCode, CodeToUi } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
-import { generatePalette, paletteToDraftTokens, type Harmony } from './lib/palette';
+import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
 
 function send(msg: UiToCode): void {
   parent.postMessage({ pluginMessage: msg }, '*');
@@ -74,6 +74,10 @@ $('btnPalette').addEventListener('click', () => {
   });
   tokens = paletteToDraftTokens(p);
   renderTokens();
+  // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능)
+  ($('semMap') as HTMLTextAreaElement).value = Object.entries(suggestSemanticMap(p))
+    .map(([role, global]) => `${role} = ${global}`)
+    .join('\n');
   $('paletteInfo').textContent = `${p.scales.length}계열 · ${tokens.length}색 생성`;
   setStatus(
     'paletteStatus',
@@ -92,6 +96,19 @@ $('btnCreate').addEventListener('click', () => {
   }
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   send({ type: 'CREATE_TOKENS', tokens, base });
+});
+
+$('btnSemantics').addEventListener('click', () => {
+  const map: Record<string, string> = {};
+  for (const line of ($('semMap') as HTMLTextAreaElement).value.split('\n')) {
+    const m = /^\s*([^=]+?)\s*=\s*(\S+)\s*$/.exec(line);
+    if (m) map[m[1]] = m[2];
+  }
+  if (!Object.keys(map).length) {
+    setStatus('semStatus', '매핑을 한 줄에 “역할 = Global변수이름” 형식으로 입력하세요.', 'warn');
+    return;
+  }
+  send({ type: 'CREATE_SEMANTICS', map });
 });
 
 $('btnApply').addEventListener('click', () => {
@@ -129,6 +146,14 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'RENAME_RESULT':
       renderDiff(msg.changes, msg.applied);
+      break;
+    case 'SEMANTICS_RESULT':
+      setStatus(
+        'semStatus',
+        `시맨틱 ${msg.aliased}개 별칭 (생성 ${msg.created} / 갱신 ${msg.updated})` +
+          (msg.missing.length ? ` · 누락: ${msg.missing.join(', ')}` : ''),
+        msg.missing.length ? 'warn' : 'ok',
+      );
       break;
     case 'ERROR':
       setStatus('extractStatus', `오류: ${msg.message}`, 'warn');

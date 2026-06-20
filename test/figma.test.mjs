@@ -7,6 +7,7 @@ import { rgbToHex } from '../dist/pure.mjs';
 import {
   extractFromSelection,
   createTokens,
+  createSemanticAliases,
   bindSelection,
   renameSelection,
 } from '../dist/figma-lib.mjs';
@@ -208,6 +209,47 @@ test('createTokens — 재실행 멱등(upsert): 두 번째는 모두 updated', 
     { created: 0, updated: 4 },
   );
   assert.equal(beforeCount, afterCount); // 변수 개수 불변 → 중복 생성 없음
+});
+
+test('createSemanticAliases — Global 참조 별칭 생성 + 누락 보고 + 멱등', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'color/neutral/50', category: 'color', sources: ['fill'], value: '#fafafa' },
+      { name: 'color/neutral/900', category: 'color', sources: ['fill'], value: '#1a1a1a' },
+    ],
+    16,
+  );
+
+  const map = {
+    surface: 'color/neutral/50',
+    text: 'color/neutral/900',
+    'border/oops': 'color/neutral/999', // 없는 Global → 누락
+  };
+  const s1 = await createSemanticAliases(map);
+  assert.equal(s1.aliased, 2);
+  assert.equal(s1.created, 2);
+  assert.deepEqual(s1.missing, ['color/neutral/999']);
+
+  // Semantic 'surface'가 Global neutral/50을 별칭
+  const gNeutral50 = findVar(figma, 'Global', 'color/neutral/50');
+  const surface = findVar(figma, 'Semantic', 'surface');
+  assert.equal(surface.valuesByMode['mode:Semantic'].type, 'VARIABLE_ALIAS');
+  assert.equal(surface.valuesByMode['mode:Semantic'].id, gNeutral50.id);
+  assert.deepEqual(surface.scopes, ['ALL_FILLS']); // 원시 스코프 상속
+
+  // 재실행 → 모두 updated, 변수 개수 불변
+  const before = figma._state.variables.length;
+  const s2 = await createSemanticAliases(map);
+  assert.deepEqual({ created: s2.created, updated: s2.updated, aliased: s2.aliased }, { created: 0, updated: 2, aliased: 2 });
+  assert.equal(figma._state.variables.length, before);
+});
+
+test('createSemanticAliases — Global 컬렉션 없으면 전부 누락', async () => {
+  installFigma();
+  const s = await createSemanticAliases({ surface: 'color/neutral/50' });
+  assert.equal(s.aliased, 0);
+  assert.deepEqual(s.missing, ['color/neutral/50']);
 });
 
 /* ================= bind.ts ================= */

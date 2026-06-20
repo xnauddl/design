@@ -136,6 +136,33 @@ export function generatePalette(input: PaletteInput): PaletteResult {
   return { scales, warnings };
 }
 
+/**
+ * 생성된 팔레트로부터 시맨틱 역할 → Global 변수 이름 매핑 제안(Phase 2 입력).
+ * 존재하는 패밀리에 대해서만 역할을 배정한다.
+ */
+export function suggestSemanticMap(p: PaletteResult): Record<string, string> {
+  const families = new Set(p.scales.map((s) => s.family));
+  const map: Record<string, string> = {};
+  if (families.has('primary')) {
+    map['primary'] = 'color/primary/500';
+    map['primary/strong'] = 'color/primary/700';
+    map['primary/subtle'] = 'color/primary/100';
+  }
+  if (families.has('secondary')) map['secondary'] = 'color/secondary/500';
+  for (const f of families) if (f.startsWith('accent-')) map[f] = `color/${f}/500`;
+  if (families.has('neutral')) {
+    map['surface'] = 'color/neutral/50';
+    map['surface/muted'] = 'color/neutral/100';
+    map['text'] = 'color/neutral/900';
+    map['text/muted'] = 'color/neutral/600';
+    map['border'] = 'color/neutral/200';
+  }
+  for (const f of ['success', 'warning', 'error', 'info']) {
+    if (families.has(f)) map[f] = `color/${f}/500`;
+  }
+  return map;
+}
+
 /** 팔레트 → DraftToken[]. 이름 `color/{family}/{step}`, 카테고리 color, scope는 채움(fill). */
 export function paletteToDraftTokens(p: PaletteResult): DraftToken[] {
   const tokens: DraftToken[] = [];

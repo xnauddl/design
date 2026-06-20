@@ -20,6 +20,7 @@ export type UiToCode =
   | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number }
   | { type: 'APPLY'; tolerance: number }
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
+  | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   | { type: 'GET_COLLECTIONS' };
 
 /** code → UI 응답. */
@@ -28,6 +29,7 @@ export type CodeToUi =
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string }
   | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[] }
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; applied: boolean }
+  | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   | { type: 'ERROR'; message: string };
 

@@ -4,7 +4,7 @@
 import type { UiToCode } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens } from './lib/variables';
+import { createTokens, createSemanticAliases } from './lib/variables';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 
@@ -35,6 +35,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'RENAME': {
         const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
         post({ type: 'RENAME_RESULT', changes: r.changes, applied: r.applied });
+        break;
+      }
+      case 'CREATE_SEMANTICS': {
+        const s = await createSemanticAliases(msg.map);
+        post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
         break;
       }
       case 'GET_COLLECTIONS': {

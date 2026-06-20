@@ -80,6 +80,16 @@
   </div>
 
   <div class="step">
+    <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
+    <div class="muted">먼저 ‘2 · 토큰 생성’으로 Global 변수를 만든 뒤 실행하세요. 형식: <code>역할 = Global변수이름</code></div>
+    <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+    <div class="row" style="margin-top:6px;">
+      <button id="btnSemantics">시맨틱 별칭 생성</button>
+    </div>
+    <div class="status" id="semStatus"></div>
+  </div>
+
+  <div class="step">
     <h2>3 · 적용 (바인딩)</h2>
     <div class="row">
       <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>

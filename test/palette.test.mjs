@@ -23,6 +23,7 @@ import {
   statusScales,
   generatePalette,
   paletteToDraftTokens,
+  suggestSemanticMap,
 } from '../dist/pure.mjs';
 
 const close = (a, b, tol = 0.01) => Math.abs(a - b) <= tol;
@@ -129,4 +130,22 @@ test('generatePalette + paletteToDraftTokens — DraftToken 형식', () => {
     assert.match(t.name, /^color\/[a-z0-9-]+\/\d+$/);
     assert.match(String(t.value), /^#[0-9a-f]{6}$/);
   }
+});
+
+test('suggestSemanticMap — 존재 패밀리에만 역할 배정', () => {
+  const p = generatePalette({ brand: { primary: '#3366ff' }, includeNeutral: true, includeStatus: true });
+  const map = suggestSemanticMap(p);
+  assert.equal(map['primary'], 'color/primary/500');
+  assert.equal(map['surface'], 'color/neutral/50');
+  assert.equal(map['text'], 'color/neutral/900');
+  assert.equal(map['success'], 'color/success/500');
+  // secondary 미생성 → 매핑 없음
+  assert.equal(map['secondary'], undefined);
+
+  // neutral/status 제외 시 역할도 빠짐
+  const p2 = generatePalette({ brand: { primary: '#3366ff' } });
+  const map2 = suggestSemanticMap(p2);
+  assert.equal(map2['surface'], undefined);
+  assert.equal(map2['success'], undefined);
+  assert.equal(map2['primary'], 'color/primary/500');
 });
