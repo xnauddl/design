@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    :root { color-scheme: light dark; }
+    body { font: 12px -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif; margin: 0; padding: 12px; color: var(--figma-color-text, #111); }
+    h2 { font-size: 12px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+    .step { border: 1px solid var(--figma-color-border, #e5e5e5); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    button { font: inherit; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--figma-color-border, #d5d5d5); background: var(--figma-color-bg, #fff); cursor: pointer; }
+    button.primary { background: #0d99ff; color: #fff; border-color: #0d99ff; }
+    button:disabled { opacity: .5; cursor: default; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    label.inline { display: inline-flex; gap: 4px; align-items: center; }
+    input[type="number"] { width: 56px; font: inherit; padding: 3px 5px; }
+    .muted { opacity: .65; }
+    .status { margin-top: 6px; min-height: 16px; }
+    .warn { color: #b00; }
+    .ok { color: #0a7d28; }
+    #tokenList { max-height: 180px; overflow: auto; margin-top: 8px; }
+    .tk { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
+    .tk input { font: inherit; padding: 2px 4px; width: 100%; }
+    .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
+    .cat { font-size: 10px; opacity: .6; }
+    #diff { max-height: 160px; overflow: auto; margin-top: 8px; font-family: ui-monospace, monospace; font-size: 11px; }
+    .diff-row { padding: 1px 0; }
+    .before { opacity: .55; text-decoration: line-through; }
+    .after { color: #0a7d28; }
+  </style>
+</head>
+<body>
+  <div class="step">
+    <h2>1 · 추출</h2>
+    <div class="row">
+      <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
+      <span class="muted" id="selInfo"></span>
+    </div>
+    <div id="tokenList"></div>
+    <div class="status" id="extractStatus"></div>
+  </div>
+
+  <div class="step">
+    <h2>2 · 토큰 생성 (Global + Semantic)</h2>
+    <div class="row">
+      <label class="inline">base(rem)px <input id="base" type="number" value="16" min="1" /></label>
+      <button id="btnCreate">변수 생성/갱신</button>
+    </div>
+    <div class="status" id="createStatus"></div>
+  </div>
+
+  <div class="step">
+    <h2>3 · 적용 (바인딩)</h2>
+    <div class="row">
+      <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
+      <button id="btnApply">선택에 변수 바인딩</button>
+    </div>
+    <div class="status" id="applyStatus"></div>
+  </div>
+
+  <div class="step">
+    <h2>4 · 리네임</h2>
+    <div class="row">
+      <label class="inline">맥락 최대단계 <input id="depth" type="number" value="3" min="1" /></label>
+      <button id="btnPreview">미리보기</button>
+      <button id="btnRename" disabled>이름 적용</button>
+    </div>
+    <div id="diff"></div>
+    <div class="status" id="renameStatus"></div>
+  </div>
+
+  <!-- UI_SCRIPT -->
+</body>
+</html>
