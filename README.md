@@ -58,8 +58,11 @@ src/
     variables.ts 3계층 변수 생성/갱신(upsert)
     bind.ts     resolved 값 매칭 → 변수 바인딩
     rename.ts   boundVariables·역할 추론 → 리네임
-test/pure.test.mjs   순수 로직 단위 테스트
-build.mjs            esbuild 빌드(코드 번들 + UI 인라인 + 테스트 번들)
+    pure.ts        순수 로직 배럴(→ dist/pure.mjs)
+    figma-lib.ts   figma 의존 모듈 배럴(→ dist/figma-lib.mjs, 테스트용)
+test/pure.test.mjs    순수 로직 단위 테스트(tokens·naming)
+test/figma.test.mjs   figma 의존 모듈 테스트(extract·variables·bind·rename, 전역 figma 목 주입)
+build.mjs             esbuild 빌드(코드 번들 + UI 인라인 + 테스트 번들 2종)
 ```
 
 빌드 메모: Figma UI는 단일 HTML만 로드(외부 `<script src>` 불가)하므로, `ui.ts` 번들 결과를

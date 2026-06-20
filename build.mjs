@@ -59,11 +59,20 @@ const pureCtx = await esbuild.context({
   platform: 'node',
 });
 
+// (4) figma 의존 모듈 테스트 번들 — 전역 `figma`는 테스트가 목으로 주입한다.
+const figmaLibCtx = await esbuild.context({
+  ...shared,
+  entryPoints: ['src/lib/figma-lib.ts'],
+  outfile: path.join(outdir, 'figma-lib.mjs'),
+  format: 'esm',
+  platform: 'node',
+});
+
 if (watch) {
-  await Promise.all([codeCtx.watch(), uiCtx.watch(), pureCtx.watch()]);
+  await Promise.all([codeCtx.watch(), uiCtx.watch(), pureCtx.watch(), figmaLibCtx.watch()]);
   console.log('watching…');
 } else {
-  await Promise.all([codeCtx.rebuild(), uiCtx.rebuild(), pureCtx.rebuild()]);
-  await Promise.all([codeCtx.dispose(), uiCtx.dispose(), pureCtx.dispose()]);
+  await Promise.all([codeCtx.rebuild(), uiCtx.rebuild(), pureCtx.rebuild(), figmaLibCtx.rebuild()]);
+  await Promise.all([codeCtx.dispose(), uiCtx.dispose(), pureCtx.dispose(), figmaLibCtx.dispose()]);
   console.log('build done');
 }
