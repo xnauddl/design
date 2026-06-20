@@ -24,6 +24,8 @@ import {
   generatePalette,
   paletteToDraftTokens,
   suggestSemanticMap,
+  mod360,
+  scopeForSemanticRole,
 } from '../dist/pure.mjs';
 
 const close = (a, b, tol = 0.01) => Math.abs(a - b) <= tol;
@@ -85,6 +87,28 @@ test('buildScale — 스텝 수·hex 유효·L 단조감소·인게멋', () => {
 test('buildScale — anchor면 브랜드색 원본 포함', () => {
   const sc = buildScale('primary', '#3366ff', { anchor: true });
   assert.ok(sc.swatches.some((s) => s.hex === '#3366ff'));
+});
+
+test('buildScale — anchor 채도 스파이크 없음(브랜드가 최대 채도)', () => {
+  // 어둡고 진한 브랜드: 이웃 스텝이 과채도였다면 한 스텝만 튐 → 브랜드가 유일 최대여야 정상
+  const sc = buildScale('primary', '#1a00ff', { anchor: true });
+  const cmax = Math.max(...sc.swatches.map((s) => s.oklch.c));
+  const brand = sc.swatches.find((s) => s.hex === '#1a00ff');
+  assert.equal(brand.oklch.c, cmax);
+});
+
+test('mod360 — 음수·360+ 래핑', () => {
+  assert.equal(mod360(370), 10);
+  assert.equal(mod360(-30), 330);
+  assert.equal(mod360(0), 0);
+});
+
+test('scopeForSemanticRole — 역할별 스코프(미지정은 undefined)', () => {
+  assert.deepEqual(scopeForSemanticRole('text'), ['TEXT_FILL']);
+  assert.deepEqual(scopeForSemanticRole('text/muted'), ['TEXT_FILL']);
+  assert.deepEqual(scopeForSemanticRole('border'), ['STROKE_COLOR']);
+  assert.deepEqual(scopeForSemanticRole('surface/muted'), ['FRAME_FILL']);
+  assert.equal(scopeForSemanticRole('primary'), undefined);
 });
 
 test('harmonyHexes — complementary는 hue ≈ +180', () => {

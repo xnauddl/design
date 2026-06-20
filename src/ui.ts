@@ -101,7 +101,7 @@ $('btnCreate').addEventListener('click', () => {
 $('btnSemantics').addEventListener('click', () => {
   const map: Record<string, string> = {};
   for (const line of ($('semMap') as HTMLTextAreaElement).value.split('\n')) {
-    const m = /^\s*([^=]+?)\s*=\s*(\S+)\s*$/.exec(line);
+    const m = /^\s*([^=]+?)\s*=\s*(.+?)\s*$/.exec(line);
     if (m) map[m[1]] = m[2];
   }
   if (!Object.keys(map).length) {
@@ -154,6 +154,9 @@ window.onmessage = (event: MessageEvent) => {
           (msg.missing.length ? ` · 누락: ${msg.missing.join(', ')}` : ''),
         msg.missing.length ? 'warn' : 'ok',
       );
+      break;
+    case 'COLLECTIONS':
+      // 현재는 존재 확인용 프로브(별도 UI 없음). 추후 컬렉션 상태 표시에 사용.
       break;
     case 'ERROR':
       setStatus('extractStatus', `오류: ${msg.message}`, 'warn');

@@ -2,7 +2,7 @@
    palette.ts — 브랜드 색 → 톤 스케일·하모니·중립·상태색 생성 (순수, figma 의존 없음)
    출력은 기존 DraftToken[] 형식 → variables.ts(createTokens)로 그대로 커밋.
    ============================================================ */
-import { Oklch, hexToOklch, oklchToHex, clampToGamut } from './color';
+import { Oklch, hexToOklch, oklchToHex, clampToGamut, mod360 } from './color';
 import type { DraftToken } from './tokens';
 
 /** 토큰 스텝(머티리얼/테일윈드 관례). */
@@ -26,32 +26,43 @@ export interface ScaleOptions {
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+/** 채도가 가장자리로 갈수록 감쇠하는 정도(피크 대비). */
+const CHROMA_FALLOFF = 0.6;
 /** 거의 무채색으로 보는 채도 임계(이하면 hue 불안정). */
 export const LOW_CHROMA = 0.03;
 
+/** 한 스텝의 스와치 생성(게멋 보장). */
+function swatchAt(step: number, l: number, c: number, h: number): Swatch {
+  const lch = clampToGamut({ l, c, h });
+  return { step, hex: oklchToHex(lch), oklch: lch };
+}
+
 /**
- * 톤 스케일 생성 — hue 고정, 스텝별 목표 L 적용, c는 게멋 클램프로 양끝에서 자연 감쇠.
+ * 톤 스케일 생성 — hue 고정, 스텝별 목표 L 적용, c는 피크에서 멀수록 감쇠 + 게멋 클램프.
+ * anchor 시 브랜드색 원본을 피크 스텝에 그대로 넣고 다른 스텝의 채도가 그보다 높지 않도록 감쇠
+ * → 한 스텝만 튀는 채도 스파이크 없이 매끄러운 램프.
  * 예: buildScale('primary', '#3366ff') → primary/50…primary/950.
  */
 export function buildScale(family: string, brandHex: string, opts: ScaleOptions = {}): ColorScale {
   const base = hexToOklch(brandHex);
   const [lLight, lDark] = opts.lightRange ?? [0.97, 0.16];
   const n = STEPS.length;
+  const targetL = STEPS.map((_, i) => lerp(lLight, lDark, i / (n - 1)));
+
+  // 채도 피크 위치: anchor면 브랜드 L에 가장 가까운 스텝, 아니면 중앙.
+  let peak = Math.round((n - 1) / 2);
+  if (opts.anchor) {
+    peak = 0;
+    for (let i = 1; i < n; i++) {
+      if (Math.abs(targetL[i] - base.l) < Math.abs(targetL[peak] - base.l)) peak = i;
+    }
+  }
 
   const swatches: Swatch[] = STEPS.map((step, i) => {
-    const l = lerp(lLight, lDark, i / (n - 1));
-    const lch = clampToGamut({ l, c: base.c, h: base.h });
-    return { step, hex: oklchToHex(lch), oklch: lch };
+    if (opts.anchor && i === peak) return { step, hex: brandHex.toLowerCase(), oklch: base };
+    const falloff = 1 - CHROMA_FALLOFF * (Math.abs(i - peak) / (n - 1));
+    return swatchAt(step, targetL[i], base.c * falloff, base.h);
   });
-
-  if (opts.anchor) {
-    // 브랜드색 L에 가장 가까운 스텝을 브랜드색 원본으로 교체(신뢰: 내 색이 그대로 있다).
-    let best = 0;
-    for (let i = 1; i < swatches.length; i++) {
-      if (Math.abs(swatches[i].oklch.l - base.l) < Math.abs(swatches[best].oklch.l - base.l)) best = i;
-    }
-    swatches[best] = { step: swatches[best].step, hex: brandHex.toLowerCase(), oklch: base };
-  }
 
   return { family, swatches };
 }
@@ -66,7 +77,7 @@ const HARMONY_OFFSETS: Record<Harmony, number[]> = {
   tetradic: [90, 180, 270],
 };
 
-const rotate = (lch: Oklch, deg: number): Oklch => ({ l: lch.l, c: lch.c, h: (((lch.h + deg) % 360) + 360) % 360 });
+const rotate = (lch: Oklch, deg: number): Oklch => ({ l: lch.l, c: lch.c, h: mod360(lch.h + deg) });
 
 /** 브랜드색 기준 조화 색(베이스 hue 회전). 베이스는 제외하고 파생색만 반환. */
 export function harmonyHexes(brandHex: string, scheme: Harmony): string[] {
@@ -79,11 +90,9 @@ export function neutralScale(brandHex: string, tint = 0.008): ColorScale {
   const base = hexToOklch(brandHex);
   const [lLight, lDark] = [0.985, 0.15];
   const n = STEPS.length;
-  const swatches: Swatch[] = STEPS.map((step, i) => {
-    const l = lerp(lLight, lDark, i / (n - 1));
-    const lch = clampToGamut({ l, c: tint, h: base.h });
-    return { step, hex: oklchToHex(lch), oklch: lch };
-  });
+  const swatches: Swatch[] = STEPS.map((step, i) =>
+    swatchAt(step, lerp(lLight, lDark, i / (n - 1)), tint, base.h),
+  );
   return { family: 'neutral', swatches };
 }
 

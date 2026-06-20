@@ -85,9 +85,16 @@ function matchColor(entries: VarEntry[], hex: string): Variable | null {
 }
 function matchFloat(entries: VarEntry[], value: number, tol: number): Variable | null {
   let best: VarEntry | null = null;
+  let bestDist = Infinity;
   for (const e of entries) {
     if (e.num == null) continue;
-    if (Math.abs(e.num - value) <= tol && (!best || best.tier < e.tier)) best = e;
+    const dist = Math.abs(e.num - value);
+    if (dist > tol) continue;
+    // 가장 가까운 값 우선, 동률이면 높은 tier 우선.
+    if (dist < bestDist || (dist === bestDist && best !== null && best.tier < e.tier)) {
+      best = e;
+      bestDist = dist;
+    }
   }
   return best ? best.variable : null;
 }

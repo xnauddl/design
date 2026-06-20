@@ -3,7 +3,7 @@
    sRGB ↔ 선형 sRGB ↔ OKLab ↔ OKLCH, WCAG 대비비.
    OKLCH를 쓰는 이유: L(명도)을 균등히 움직여도 지각적으로 균일한 스케일이 나온다.
    ============================================================ */
-import { hexToRgb, rgbToHex } from './tokens';
+import { hexToRgb, rgbToHex, clamp01 } from './tokens';
 
 export interface Rgb {
   r: number;
@@ -23,8 +23,8 @@ interface Oklab {
   b: number;
 }
 
-const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
-const mod360 = (h: number) => ((h % 360) + 360) % 360;
+/** 각도 0~360 정규화(음수·360+ 모두 래핑). */
+export const mod360 = (h: number) => ((h % 360) + 360) % 360;
 
 /* ---------- 감마(sRGB) ↔ 선형 ---------- */
 export function srgbToLinear(c: number): number {

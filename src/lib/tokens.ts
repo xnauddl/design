@@ -73,6 +73,7 @@ export interface DraftToken {
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 const to255 = (c: number) => Math.round(clamp01(c) * 255);
+export { clamp01 };
 
 /** {r,g,b} (0~1) → 소문자 6자리 hex. dedup 키 & Global 색 토큰 값으로 사용. */
 export function rgbToHex(rgb: { r: number; g: number; b: number }): string {
@@ -163,6 +164,24 @@ export function scopesForSources(sources: SourceField[]): ScopeName[] {
   const set = new Set<ScopeName>();
   for (const s of sources) for (const sc of scopesFor(s)) set.add(sc);
   return [...set];
+}
+
+/**
+ * 시맨틱 역할 이름 → 속성에 맞는 스코프. 역할 머리말(슬래시 앞)로 판단.
+ * 미지정 역할(primary/secondary/accent/상태색 등)은 undefined → 호출자가 원시 스코프를 상속.
+ */
+export function scopeForSemanticRole(role: string): ScopeName[] | undefined {
+  switch (role.split('/')[0].toLowerCase()) {
+    case 'text':
+      return ['TEXT_FILL'];
+    case 'border':
+      return ['STROKE_COLOR'];
+    case 'surface':
+    case 'background':
+      return ['FRAME_FILL'];
+    default:
+      return undefined;
+  }
 }
 
 /* ---------- 단위 환산 (%/em/rem → px) ---------- */
