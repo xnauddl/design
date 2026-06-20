@@ -3,10 +3,13 @@
    ============================================================ */
 import type { UiToCode, CodeToUi } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
+import { generatePalette, paletteToDraftTokens, type Harmony } from './lib/palette';
 
 function send(msg: UiToCode): void {
   parent.postMessage({ pluginMessage: msg }, '*');
 }
+
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
   document.getElementById(id) as T;
@@ -43,6 +46,41 @@ function renderTokens(): void {
     box.appendChild(row);
   });
 }
+
+/* ---------- 0 · 브랜드 팔레트 ---------- */
+const brandColor = $('brand') as HTMLInputElement;
+const brandHex = $('brandHex') as HTMLInputElement;
+// 컬러 피커 ↔ HEX 텍스트 동기화
+brandColor.addEventListener('input', () => {
+  brandHex.value = brandColor.value;
+});
+brandHex.addEventListener('input', () => {
+  if (HEX6.test(brandHex.value)) brandColor.value = brandHex.value.toLowerCase();
+});
+
+$('btnPalette').addEventListener('click', () => {
+  const primary = brandHex.value.trim();
+  if (!HEX6.test(primary)) {
+    setStatus('paletteStatus', '브랜드색을 #RRGGBB 형식으로 입력하세요.', 'warn');
+    return;
+  }
+  const useSecondary = ($('useBrand2') as HTMLInputElement).checked;
+  const harmonyVal = ($('harmony') as HTMLSelectElement).value as Harmony | '';
+  const p = generatePalette({
+    brand: { primary, secondary: useSecondary ? ($('brand2') as HTMLInputElement).value : undefined },
+    harmony: harmonyVal || undefined,
+    includeNeutral: ($('incNeutral') as HTMLInputElement).checked,
+    includeStatus: ($('incStatus') as HTMLInputElement).checked,
+  });
+  tokens = paletteToDraftTokens(p);
+  renderTokens();
+  $('paletteInfo').textContent = `${p.scales.length}계열 · ${tokens.length}색 생성`;
+  setStatus(
+    'paletteStatus',
+    (p.warnings.join(' ') ? p.warnings.join(' ') + ' ' : '') + '아래 ‘2 · 토큰 생성’에서 변수로 만드세요.',
+    p.warnings.length ? 'warn' : 'ok',
+  );
+});
 
 /* ---------- 버튼 ---------- */
 $('btnExtract').addEventListener('click', () => send({ type: 'EXTRACT' }));

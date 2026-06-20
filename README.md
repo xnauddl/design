@@ -53,6 +53,8 @@ src/
   lib/
     tokens.ts   토큰 모델 + 순수 헬퍼(hex·스코프·단위 환산)
     naming.ts   레이어 네이밍 규칙(kebab·역할·맥락) — 순수
+    color.ts    색공간 변환(sRGB↔OKLab↔OKLCH)·WCAG 대비 — 순수
+    palette.ts  브랜드색→톤 스케일·하모니·중립·상태색 생성 — 순수
     pure.ts     테스트용 순수 배럴(→ dist/pure.mjs)
     extract.ts  선택 노드에서 토큰 추출
     variables.ts 3계층 변수 생성/갱신(upsert)
@@ -60,10 +62,18 @@ src/
     rename.ts   boundVariables·역할 추론 → 리네임
     pure.ts        순수 로직 배럴(→ dist/pure.mjs)
     figma-lib.ts   figma 의존 모듈 배럴(→ dist/figma-lib.mjs, 테스트용)
-test/pure.test.mjs    순수 로직 단위 테스트(tokens·naming)
-test/figma.test.mjs   figma 의존 모듈 테스트(extract·variables·bind·rename, 전역 figma 목 주입)
-build.mjs             esbuild 빌드(코드 번들 + UI 인라인 + 테스트 번들 2종)
+test/pure.test.mjs     순수 로직 단위 테스트(tokens·naming)
+test/palette.test.mjs  색공간·팔레트 생성 테스트(color·palette)
+test/figma.test.mjs    figma 의존 모듈 테스트(extract·variables·bind·rename, 전역 figma 목 주입)
+build.mjs              esbuild 빌드(코드 번들 + UI 인라인 + 테스트 번들 2종)
 ```
+
+## 브랜드 팔레트 생성 (UI 0단계)
+
+브랜드 색상을 선택하면 OKLCH 기반으로 **톤 스케일(50–950)**, 선택적 **하모니(보색·유사·삼각·분할·사각)**,
+**중립(gray)·상태색(success/warning/error/info)** 을 생성해 토큰 목록에 채웁니다. 이후 `2 · 토큰 생성`으로
+기존 3계층 변수 파이프라인(Global 리터럴 → Semantic 별칭)에 그대로 커밋됩니다. 생성 로직은 전부 순수
+함수(`color.ts`/`palette.ts`)라 UI 스레드에서 동작하며 `node --test`로 검증됩니다.
 
 빌드 메모: Figma UI는 단일 HTML만 로드(외부 `<script src>` 불가)하므로, `ui.ts` 번들 결과를
 `ui.html`의 인라인 `<script>`로 주입합니다(`build.mjs`).

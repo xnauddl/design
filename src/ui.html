@@ -30,6 +30,37 @@
 </head>
 <body>
   <div class="step">
+    <h2>0 · 브랜드 팔레트 생성</h2>
+    <div class="row">
+      <label class="inline">브랜드색 <input id="brand" type="color" value="#3366ff" /></label>
+      <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:84px; font:inherit; padding:3px 5px;" />
+    </div>
+    <div class="row">
+      <label class="inline"><input id="useBrand2" type="checkbox" /> 보조색</label>
+      <input id="brand2" type="color" value="#ff5722" />
+    </div>
+    <div class="row">
+      <label class="inline">하모니
+        <select id="harmony">
+          <option value="">없음</option>
+          <option value="complementary">보색</option>
+          <option value="analogous">유사</option>
+          <option value="triadic">삼각</option>
+          <option value="split">분할보색</option>
+          <option value="tetradic">사각</option>
+        </select>
+      </label>
+      <label class="inline"><input id="incNeutral" type="checkbox" checked /> 중립</label>
+      <label class="inline"><input id="incStatus" type="checkbox" checked /> 상태색</label>
+    </div>
+    <div class="row">
+      <button id="btnPalette" class="primary">팔레트 생성</button>
+      <span class="muted" id="paletteInfo"></span>
+    </div>
+    <div class="status" id="paletteStatus"></div>
+  </div>
+
+  <div class="step">
     <h2>1 · 추출</h2>
     <div class="row">
       <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
