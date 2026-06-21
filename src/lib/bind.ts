@@ -25,6 +25,34 @@ export interface BindResult {
   reasons: Record<string, number>;
   /** 사용량 한도로 일부만 적용되었는가(Free 티어). */
   limited?: boolean;
+  /** UX6: 사용자가 취소해 중단되었는가(이미 처리한 만큼은 유지). */
+  cancelled?: boolean;
+}
+
+/** UX6: 진행률 보고·취소·이벤트 루프 양보 훅. */
+export interface BindHooks {
+  onProgress?: (done: number, total: number) => void;
+  shouldCancel?: () => boolean;
+  /** 주기적으로 매크로태스크에 양보(취소 메시지 수신/진행률 반영용). */
+  yieldToEvents?: () => Promise<void>;
+}
+
+interface Progress {
+  done: number;
+  total: number;
+  every: number;
+}
+
+/** 선택 하위 전체 노드 수(진행률 분모). 처리 없이 셈만. */
+function countNodes(sel: readonly SceneNode[]): number {
+  let n = 0;
+  const stack: SceneNode[] = sel.slice();
+  while (stack.length) {
+    const x = stack.pop() as SceneNode;
+    n++;
+    if ('children' in x) for (const c of (x as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
+  }
+  return n;
 }
 
 /** 사유 1건 집계(스킵 카운트는 증가시키지 않는 '건너뜀' 사유에도 사용). */
@@ -54,6 +82,7 @@ export async function bindSelection(
   tolerance: number,
   limits: BindLimits = {},
   apply = true, // UX1: false면 dry-run(미리보기) — 변경 없이 동일 집계만.
+  hooks: BindHooks = {}, // UX6: 진행률·취소.
 ): Promise<BindResult> {
   const entries = await buildIndex();
   const res: BindResult = { bound: 0, skipped: 0, flags: [], reasons: {} };
@@ -63,9 +92,14 @@ export async function bindSelection(
     maxBindings: limits.maxBindings ?? Infinity,
     limited: false,
   };
-  for (const node of selection) await walk(node, entries, tolerance, res, flagSet, budget, apply);
+  const prog: Progress = { done: 0, total: hooks.onProgress ? countNodes(selection) : 0, every: 50 };
+  for (const node of selection) {
+    await walk(node, entries, tolerance, res, flagSet, budget, apply, hooks, prog);
+    if (res.cancelled) break;
+  }
   if (budget.limited) res.limited = true;
   res.flags = [...flagSet];
+  hooks.onProgress?.(prog.done, prog.total); // 최종 진행률(100%)
   return res;
 }
 
@@ -142,7 +176,10 @@ async function walk(
   flags: Set<string>,
   budget: Budget,
   apply: boolean,
+  hooks: BindHooks,
+  prog: Progress,
 ): Promise<void> {
+  if (res.cancelled) return;
   // 사용량 한도(노드 수 / 누적 바인딩 수) 초과 시 비파괴 중단 — 처리한 만큼만 적용.
   if (budget.nodes <= 0 || res.bound >= budget.maxBindings) {
     budget.limited = true;
@@ -154,7 +191,21 @@ async function walk(
   bindRadius(node, entries, tol, res, apply);
   bindEffects(node, entries, res, apply);
   await bindText(node, entries, tol, res, apply);
-  if ('children' in node) for (const c of node.children) await walk(c, entries, tol, res, flags, budget, apply);
+  // UX6: 주기적으로 진행률 보고 + 이벤트 루프 양보(취소 메시지 수신 가능) + 취소 확인.
+  prog.done++;
+  if (hooks.onProgress && prog.done % prog.every === 0) {
+    hooks.onProgress(prog.done, prog.total);
+    if (hooks.yieldToEvents) await hooks.yieldToEvents();
+    if (hooks.shouldCancel?.()) {
+      res.cancelled = true;
+      return;
+    }
+  }
+  if ('children' in node)
+    for (const c of node.children) {
+      await walk(c, entries, tol, res, flags, budget, apply, hooks, prog);
+      if (res.cancelled) return;
+    }
 }
 
 function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply: boolean): void {

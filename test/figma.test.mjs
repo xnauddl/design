@@ -417,6 +417,47 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
   assert.equal(node2.fills[0].boundVariables.color.type, 'VARIABLE_ALIAS');
 });
 
+test('bindSelection — 진행률 보고 + 취소(UX6)', async () => {
+  installFigma();
+  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
+  const mk = (id) => ({
+    type: 'FRAME',
+    id,
+    name: id,
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }], // 매칭 → 노드당 1 바인딩
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    layoutMode: 'NONE',
+    setBoundVariable() {},
+  });
+
+  // 진행률: onProgress 호출, 마지막엔 total 도달
+  const sel = Array.from({ length: 120 }, (_, i) => mk('n' + i));
+  let lastDone = 0;
+  let total = 0;
+  const res = await bindSelection(sel, 0.5, {}, true, {
+    onProgress: (d, t) => {
+      lastDone = d;
+      total = t;
+    },
+    yieldToEvents: () => Promise.resolve(),
+  });
+  assert.equal(total, 120);
+  assert.equal(lastDone, 120);
+  assert.equal(res.cancelled, undefined);
+  assert.equal(res.bound, 120);
+
+  // 취소: shouldCancel true → 첫 양보 지점(50)에서 중단, 처리한 만큼만 적용
+  const sel2 = Array.from({ length: 120 }, (_, i) => mk('m' + i));
+  const res2 = await bindSelection(sel2, 0.5, {}, true, {
+    onProgress: () => {},
+    shouldCancel: () => true,
+    yieldToEvents: () => Promise.resolve(),
+  });
+  assert.equal(res2.cancelled, true);
+  assert.equal(res2.bound, 50);
+});
+
 test('previewCreateTokens — 변수 생성 없이 생성/갱신 예정 집계', async () => {
   const figma = installFigma();
   const tokens = [

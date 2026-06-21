@@ -144,12 +144,19 @@ $('btnSemantics').addEventListener('click', () => {
 
 $('btnApply').addEventListener('click', () => {
   const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
+  showApplyProgress('미리보기 계산 중…'); // UX6
   send({ type: 'APPLY', tolerance, preview: true }); // UX1: dry-run 미리보기 먼저
 });
 
 $('btnApplyConfirm').addEventListener('click', () => {
   const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
+  showApplyProgress('바인딩 중…'); // UX6
   send({ type: 'APPLY', tolerance }); // 확인 후 실제 바인딩
+});
+
+$('btnApplyCancel').addEventListener('click', () => {
+  send({ type: 'CANCEL' }); // UX6: 취소 요청
+  setStatus('applyStatus', '취소 요청됨 — 다음 지점에서 중단합니다.', 'warn');
 });
 
 $('btnPreview').addEventListener('click', () => {
@@ -425,12 +432,20 @@ window.onmessage = (event: MessageEvent) => {
       }
       break;
     }
+    case 'PROGRESS':
+      if (msg.op === 'bind') updateApplyProgress(msg.done, msg.total); // UX6
+      break;
     case 'APPLY_RESULT': {
+      hideApplyProgress(); // UX6
       const confirmBtn = $('btnApplyConfirm') as HTMLButtonElement;
       const rt = reasonsText(msg.reasons); // UX3: 사유별 스킵
       const limitNote = msg.limited ? ' · ⚠ Free 한도 도달 — 일부만 적용(업그레이드 필요)' : '';
       const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}${limitNote}`;
-      if (msg.preview) {
+      if (msg.cancelled) {
+        // UX6: 취소 — 처리한 만큼만 적용(비파괴).
+        setStatus('applyStatus', `취소됨 — 바인딩 ${msg.bound}건만 적용${detail}`, 'warn');
+        confirmBtn.style.display = 'none';
+      } else if (msg.preview) {
         setStatus('applyStatus', `미리보기 — 바인딩 ${msg.bound}건 예정${detail} · ‘선택에 바인딩’으로 반영`, msg.limited || msg.skipped ? 'warn' : '');
         confirmBtn.style.display = '';
       } else {
@@ -577,6 +592,22 @@ function reasonsText(reasons: Record<string, number>): string {
     .filter(([, n]) => n > 0)
     .map(([k, n]) => `${REASON_LABELS[k] ?? k} ${n}`)
     .join(' · ');
+}
+
+/* ---------- UX6: 진행률 바 ---------- */
+function showApplyProgress(label: string): void {
+  $('applyProgress').style.display = '';
+  ($('applyBarFill') as HTMLElement).style.width = '0%';
+  $('applyProgressText').textContent = label;
+}
+function updateApplyProgress(done: number, total: number): void {
+  $('applyProgress').style.display = '';
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  ($('applyBarFill') as HTMLElement).style.width = `${pct}%`;
+  $('applyProgressText').textContent = total > 0 ? `${done} / ${total} 처리 중… (${pct}%)` : `${done}개 처리 중…`;
+}
+function hideApplyProgress(): void {
+  $('applyProgress').style.display = 'none';
 }
 
 /** UX5: 선택 동기화 바 갱신. */
