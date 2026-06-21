@@ -36,6 +36,9 @@
     .selbar { position: sticky; top: 33px; z-index: 1; background: var(--figma-color-bg, #fff); font-size: 11px; padding: 4px 0 8px; margin: -2px 0 6px; border-bottom: 1px solid var(--figma-color-border, #eee); }
     .selbar.muted { opacity: .6; }
     .empty { padding: 12px 10px; border: 1px dashed var(--figma-color-border, #ddd); border-radius: 6px; opacity: .8; line-height: 1.5; }
+    /* UX6 진행률 바 */
+    .bar { height: 8px; border-radius: 4px; background: var(--figma-color-bg-secondary, #eee); border: 1px solid var(--figma-color-border, #ddd); overflow: hidden; }
+    .bar-fill { height: 100%; width: 0%; background: #0d99ff; transition: width .1s linear; }
   </style>
 </head>
 <body>
@@ -117,6 +120,13 @@
         <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
         <button id="btnApply">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none">선택에 바인딩</button>
+      </div>
+      <div id="applyProgress" style="display:none; margin-top:8px;">
+        <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
+        <div class="row" style="margin-top:4px;">
+          <span class="muted" id="applyProgressText"></span>
+          <button id="btnApplyCancel">취소</button>
+        </div>
       </div>
       <div class="status" id="applyStatus"></div>
     </div>
