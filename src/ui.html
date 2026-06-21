@@ -164,6 +164,32 @@
     <div class="status" id="historyStatus"></div>
   </div>
 
+  <div class="step">
+    <h2>내보내기 (코드)</h2>
+    <div class="muted">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
+    <div class="row" style="margin-top:6px;">
+      <label class="inline">형식
+        <select id="exportFormat">
+          <option value="w3c">W3C 토큰 JSON</option>
+          <option value="css">CSS 변수</option>
+        </select>
+      </label>
+      <label class="inline">폰트 크기
+        <select id="exportFontUnit">
+          <option value="px">px</option>
+          <option value="rem">rem</option>
+        </select>
+      </label>
+      <label class="inline"><input id="exportSnap" type="checkbox" /> px 스냅샷 포함</label>
+    </div>
+    <div class="row" style="margin-top:6px;">
+      <button id="btnExport" class="primary">내보내기</button>
+      <button id="btnDownloadExport">다운로드</button>
+    </div>
+    <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+    <div class="status" id="exportStatus"></div>
+  </div>
+
   <!-- UI_SCRIPT -->
 </body>
 </html>

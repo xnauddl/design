@@ -6,6 +6,7 @@ import type { Tier } from '../lib/entitlements';
 import type { LicenseStatus, VerifyResult } from '../lib/license';
 import type { Preset } from '../lib/presets';
 import type { HistoryEntry } from '../lib/history';
+import type { ExportFormat } from '../lib/exporters';
 
 export interface CollectionInfo {
   id: string;
@@ -34,7 +35,8 @@ export type UiToCode =
   | { type: 'SAVE_PRESET'; preset: Preset } // M3(Team): 프리셋 저장/갱신
   | { type: 'DELETE_PRESET'; name: string } // M3(Team): 프리셋 삭제
   | { type: 'GET_HISTORY' } // M3.1(Team): 변경 이력 조회
-  | { type: 'CLEAR_HISTORY' }; // M3.1(Team): 변경 이력 비우기
+  | { type: 'CLEAR_HISTORY' } // M3.1(Team): 변경 이력 비우기
+  | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number; includeSnapshots: boolean }; // 토큰 코드 내보내기
 
 /** code → UI 응답. */
 export type CodeToUi =
@@ -61,6 +63,7 @@ export type CodeToUi =
   | { type: 'REQUEST_VERIFY'; key: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서)
   | { type: 'PRESETS'; presets: Preset[] } // M3(Team): 프리셋 목록
   | { type: 'HISTORY'; entries: HistoryEntry[] } // M3.1(Team): 변경 이력
+  | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'ERROR'; message: string };
 
 /** code → UI 안전 전송. */

@@ -8,3 +8,4 @@ export * from './license';
 export * from './licenseToken';
 export * from './presets';
 export * from './history';
+export * from './exporters';
