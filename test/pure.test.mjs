@@ -35,6 +35,10 @@ import {
   upsertPreset,
   semanticMapToText,
   textToSemanticMap,
+  pushHistory,
+  formatHistory,
+  formatTime,
+  HISTORY_CAP,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -271,6 +275,25 @@ test('semanticMap 텍스트 ↔ 객체', () => {
   assert.deepEqual(textToSemanticMap(semanticMapToText(map)), map);
   // 공백 포함 값 보존
   assert.deepEqual(textToSemanticMap('a = b c'), { a: 'b c' });
+});
+
+/* ================= history.ts (M3.1 Team) ================= */
+test('pushHistory — 최신 앞 + cap', () => {
+  let list = [];
+  list = pushHistory(list, { at: 1, action: 'create', summary: 'a' });
+  list = pushHistory(list, { at: 2, action: 'bind', summary: 'b' });
+  assert.deepEqual(list.map((e) => e.summary), ['b', 'a']); // 최신 앞
+  // cap 적용
+  let big = [];
+  for (let i = 0; i < HISTORY_CAP + 10; i++) big = pushHistory(big, { at: i, action: 'create', summary: String(i) });
+  assert.equal(big.length, HISTORY_CAP);
+  assert.equal(big[0].summary, String(HISTORY_CAP + 9)); // 가장 최신
+});
+
+test('formatTime / formatHistory — 결정적(UTC)', () => {
+  const at = Date.UTC(2026, 5, 21, 9, 5); // 2026-06-21 09:05 UTC
+  assert.equal(formatTime(at), '2026-06-21 09:05');
+  assert.equal(formatHistory({ at, action: 'bind', summary: '바인딩 3' }), '2026-06-21 09:05 · 바인딩 · 바인딩 3');
 });
 
 test('verifyLicenseToken — 서명 검증 주입 + alg=none 거부', async () => {
