@@ -120,7 +120,13 @@ $('btnCreate').addEventListener('click', () => {
     return;
   }
   const base = Number(($('base') as HTMLInputElement).value) || 16;
-  send({ type: 'CREATE_TOKENS', tokens, base });
+  send({ type: 'CREATE_TOKENS', tokens, base, preview: true }); // UX1: 미리보기 먼저
+});
+
+$('btnCreateApply').addEventListener('click', () => {
+  if (!tokens.length) return;
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
+  send({ type: 'CREATE_TOKENS', tokens, base }); // 확인 후 실제 적용
 });
 
 $('btnSemantics').addEventListener('click', () => {
@@ -138,7 +144,12 @@ $('btnSemantics').addEventListener('click', () => {
 
 $('btnApply').addEventListener('click', () => {
   const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
-  send({ type: 'APPLY', tolerance });
+  send({ type: 'APPLY', tolerance, preview: true }); // UX1: dry-run 미리보기 먼저
+});
+
+$('btnApplyConfirm').addEventListener('click', () => {
+  const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
+  send({ type: 'APPLY', tolerance }); // 확인 후 실제 바인딩
 });
 
 $('btnPreview').addEventListener('click', () => {
@@ -390,6 +401,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
       renderTokens();
+      ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
       $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
       setStatus('extractStatus', msg.warnings.join(' ') || `${tokens.length}개 후보 추출 완료.`, msg.warnings.length ? 'warn' : 'ok');
       break;
@@ -397,19 +409,34 @@ window.onmessage = (event: MessageEvent) => {
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
+      ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none'; // 선택 변경 → 바인딩 미리보기 무효화
       if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
       break;
     }
-    case 'CREATE_RESULT':
-      setStatus('createStatus', msg.summary, msg.limited ? 'warn' : 'ok');
+    case 'CREATE_RESULT': {
+      const applyBtn = $('btnCreateApply') as HTMLButtonElement;
+      if (msg.preview) {
+        // UX1: 변경 요약을 먼저 보여주고 ‘적용’ 버튼 노출.
+        setStatus('createStatus', `미리보기 — ${msg.summary} · ‘적용’으로 반영`, msg.limited ? 'warn' : '');
+        applyBtn.style.display = '';
+      } else {
+        setStatus('createStatus', msg.summary, msg.limited ? 'warn' : 'ok');
+        applyBtn.style.display = 'none';
+      }
       break;
+    }
     case 'APPLY_RESULT': {
+      const confirmBtn = $('btnApplyConfirm') as HTMLButtonElement;
+      const rt = reasonsText(msg.reasons); // UX3: 사유별 스킵
       const limitNote = msg.limited ? ' · ⚠ Free 한도 도달 — 일부만 적용(업그레이드 필요)' : '';
-      setStatus(
-        'applyStatus',
-        `바인딩 ${msg.bound} · 스킵 ${msg.skipped}${msg.flags.length ? ' — ' + msg.flags.join(' ') : ''}${limitNote}`,
-        msg.limited || msg.flags.length ? 'warn' : 'ok',
-      );
+      const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}${limitNote}`;
+      if (msg.preview) {
+        setStatus('applyStatus', `미리보기 — 바인딩 ${msg.bound}건 예정${detail} · ‘선택에 바인딩’으로 반영`, msg.limited || msg.skipped ? 'warn' : '');
+        confirmBtn.style.display = '';
+      } else {
+        setStatus('applyStatus', `바인딩 ${msg.bound}${detail}`, msg.limited || msg.skipped ? 'warn' : 'ok');
+        confirmBtn.style.display = 'none';
+      }
       break;
     }
     case 'RENAME_RESULT':
@@ -534,6 +561,22 @@ function renderDiff(changes: { before: string; after: string }[], applied: boole
     applied ? `${changes.length}개 이름 적용 완료.` : changes.length ? `${changes.length}개 변경 예정 — 확인 후 ‘이름 적용’.` : '변경할 이름이 없습니다.',
     applied ? 'ok' : '',
   );
+}
+
+/** UX3: 스킵 사유 키 → 한글 라벨. */
+const REASON_LABELS: Record<string, string> = {
+  'no-match': '매칭 없음',
+  'empty-text': '빈 텍스트',
+  error: '바인딩 실패',
+  'hug-fill': 'HUG/FILL',
+  'no-autolayout': '오토레이아웃 아님',
+  font: '폰트 미로드',
+};
+function reasonsText(reasons: Record<string, number>): string {
+  return Object.entries(reasons)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${REASON_LABELS[k] ?? k} ${n}`)
+    .join(' · ');
 }
 
 /** UX5: 선택 동기화 바 갱신. */

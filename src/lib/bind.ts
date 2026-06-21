@@ -21,8 +21,20 @@ export interface BindResult {
   bound: number;
   skipped: number;
   flags: string[];
+  /** UX3: 스킵/건너뜀 사유별 집계(키→건수). 예: { 'no-match': 2, 'hug-fill': 3 }. */
+  reasons: Record<string, number>;
   /** 사용량 한도로 일부만 적용되었는가(Free 티어). */
   limited?: boolean;
+}
+
+/** 사유 1건 집계(스킵 카운트는 증가시키지 않는 '건너뜀' 사유에도 사용). */
+function note(res: BindResult, key: string): void {
+  res.reasons[key] = (res.reasons[key] ?? 0) + 1;
+}
+/** 매칭 실패 등 실제 스킵 — skipped++ 와 사유 집계를 함께. */
+function skip(res: BindResult, key: string): void {
+  res.skipped++;
+  note(res, key);
 }
 
 /** 1회 실행 사용량 한도(미지정 시 무제한). */
@@ -41,16 +53,17 @@ export async function bindSelection(
   selection: readonly SceneNode[],
   tolerance: number,
   limits: BindLimits = {},
+  apply = true, // UX1: false면 dry-run(미리보기) — 변경 없이 동일 집계만.
 ): Promise<BindResult> {
   const entries = await buildIndex();
-  const res: BindResult = { bound: 0, skipped: 0, flags: [] };
+  const res: BindResult = { bound: 0, skipped: 0, flags: [], reasons: {} };
   const flagSet = new Set<string>();
   const budget: Budget = {
     nodes: limits.maxNodes ?? Infinity,
     maxBindings: limits.maxBindings ?? Infinity,
     limited: false,
   };
-  for (const node of selection) await walk(node, entries, tolerance, res, flagSet, budget);
+  for (const node of selection) await walk(node, entries, tolerance, res, flagSet, budget, apply);
   if (budget.limited) res.limited = true;
   res.flags = [...flagSet];
   return res;
@@ -128,6 +141,7 @@ async function walk(
   res: BindResult,
   flags: Set<string>,
   budget: Budget,
+  apply: boolean,
 ): Promise<void> {
   // 사용량 한도(노드 수 / 누적 바인딩 수) 초과 시 비파괴 중단 — 처리한 만큼만 적용.
   if (budget.nodes <= 0 || res.bound >= budget.maxBindings) {
@@ -135,15 +149,15 @@ async function walk(
     return;
   }
   budget.nodes--;
-  bindPaints(node, entries, res);
-  bindFrame(node, entries, tol, res, flags);
-  bindRadius(node, entries, tol, res);
-  bindEffects(node, entries, res);
-  await bindText(node, entries, tol, res);
-  if ('children' in node) for (const c of node.children) await walk(c, entries, tol, res, flags, budget);
+  bindPaints(node, entries, res, apply);
+  bindFrame(node, entries, tol, res, flags, apply);
+  bindRadius(node, entries, tol, res, apply);
+  bindEffects(node, entries, res, apply);
+  await bindText(node, entries, tol, res, apply);
+  if ('children' in node) for (const c of node.children) await walk(c, entries, tol, res, flags, budget, apply);
 }
 
-function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult): void {
+function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply: boolean): void {
   for (const key of ['fills', 'strokes'] as const) {
     if (!(key in node)) continue;
     const paints = (node as unknown as Record<string, Paint[] | typeof figma.mixed>)[key];
@@ -153,14 +167,14 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult): void
       if (p.type !== 'SOLID') return p;
       const v = matchColor(entries, rgbToHex(p.color));
       if (!v) {
-        res.skipped++;
+        skip(res, 'no-match');
         return p;
       }
       changed = true;
       res.bound++;
-      return figma.variables.setBoundVariableForPaint(p, 'color', v);
+      return apply ? figma.variables.setBoundVariableForPaint(p, 'color', v) : p;
     });
-    if (changed) (node as unknown as Record<string, Paint[]>)[key] = next;
+    if (changed && apply) (node as unknown as Record<string, Paint[]>)[key] = next;
   }
 }
 
@@ -170,73 +184,78 @@ function bindFrame(
   tol: number,
   res: BindResult,
   flags: Set<string>,
+  apply: boolean,
 ): void {
   if (node.type !== 'FRAME' && node.type !== 'COMPONENT' && node.type !== 'INSTANCE') return;
 
   // 크기: Fixed일 때만
-  if (node.layoutSizingHorizontal === 'FIXED') tryBind(node, 'width', node.width, entries, tol, res);
-  else if (node.layoutSizingHorizontal === 'HUG' || node.layoutSizingHorizontal === 'FILL')
+  if (node.layoutSizingHorizontal === 'FIXED') tryBind(node, 'width', node.width, entries, tol, res, apply);
+  else if (node.layoutSizingHorizontal === 'HUG' || node.layoutSizingHorizontal === 'FILL') {
     flags.add('일부 크기는 HUG/FILL이라 width/height 바인딩을 건너뜀(Fixed 필요).');
-  if (node.layoutSizingVertical === 'FIXED') tryBind(node, 'height', node.height, entries, tol, res);
+    note(res, 'hug-fill');
+  }
+  if (node.layoutSizingVertical === 'FIXED') tryBind(node, 'height', node.height, entries, tol, res, apply);
 
   // 여백/간격: 오토레이아웃에만
   if (node.layoutMode === 'NONE') {
     flags.add('오토레이아웃이 아닌 프레임은 padding/gap 바인딩 불가.');
+    note(res, 'no-autolayout');
     return;
   }
-  tryBind(node, 'itemSpacing', node.itemSpacing, entries, tol, res);
-  tryBind(node, 'paddingLeft', node.paddingLeft, entries, tol, res);
-  tryBind(node, 'paddingRight', node.paddingRight, entries, tol, res);
-  tryBind(node, 'paddingTop', node.paddingTop, entries, tol, res);
-  tryBind(node, 'paddingBottom', node.paddingBottom, entries, tol, res);
+  tryBind(node, 'itemSpacing', node.itemSpacing, entries, tol, res, apply);
+  tryBind(node, 'paddingLeft', node.paddingLeft, entries, tol, res, apply);
+  tryBind(node, 'paddingRight', node.paddingRight, entries, tol, res, apply);
+  tryBind(node, 'paddingTop', node.paddingTop, entries, tol, res, apply);
+  tryBind(node, 'paddingBottom', node.paddingBottom, entries, tol, res, apply);
 }
 
-function bindRadius(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult): void {
+function bindRadius(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean): void {
   if (!('cornerRadius' in node)) return;
   const r = (node as { cornerRadius: number | typeof figma.mixed }).cornerRadius;
   const corners = ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'] as const;
   if (r !== figma.mixed && typeof r === 'number' && r > 0) {
-    for (const c of corners) tryBind(node, c, r, entries, tol, res);
+    for (const c of corners) tryBind(node, c, r, entries, tol, res, apply);
   } else if (r === figma.mixed) {
     for (const c of corners) {
       const cv = (node as unknown as Record<string, number>)[c];
-      if (typeof cv === 'number' && cv > 0) tryBind(node, c, cv, entries, tol, res);
+      if (typeof cv === 'number' && cv > 0) tryBind(node, c, cv, entries, tol, res, apply);
     }
   }
 }
 
-function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult): void {
+function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, apply: boolean): void {
   if (!('effects' in node)) return;
   let changed = false;
   const next = (node as { effects: readonly Effect[] }).effects.map((e) => {
     if (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW') return e;
     const v = matchColor(entries, rgbToHex(e.color));
     if (!v) {
-      res.skipped++;
+      skip(res, 'no-match');
       return e;
     }
     changed = true;
     res.bound++;
-    return figma.variables.setBoundVariableForEffect(e, 'color', v);
+    return apply ? figma.variables.setBoundVariableForEffect(e, 'color', v) : e;
   });
-  if (changed) (node as unknown as { effects: readonly Effect[] }).effects = next;
+  if (changed && apply) (node as unknown as { effects: readonly Effect[] }).effects = next;
 }
 
-async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult): Promise<void> {
+async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean): Promise<void> {
   if (node.type !== 'TEXT') return;
   if (node.fontName === figma.mixed) return;
   try {
-    await figma.loadFontAsync(node.fontName); // 텍스트 속성 변경 전 폰트 로드 필수
+    await figma.loadFontAsync(node.fontName); // 텍스트 속성 변경 전 폰트 로드 필수(미리보기에서도 가용성 확인)
   } catch {
+    note(res, 'font');
     return;
   }
-  if (node.fontSize !== figma.mixed) tryBindText(node, 'fontSize', node.fontSize, entries, tol, res);
+  if (node.fontSize !== figma.mixed) tryBindText(node, 'fontSize', node.fontSize, entries, tol, res, apply);
   // lineHeight/letterSpacing은 px일 때만 직접 바인딩(비-px는 STRING 토큰만 보존)
   if (node.lineHeight !== figma.mixed && node.lineHeight.unit === 'PIXELS') {
-    tryBindText(node, 'lineHeight', node.lineHeight.value, entries, tol, res);
+    tryBindText(node, 'lineHeight', node.lineHeight.value, entries, tol, res, apply);
   }
   if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === 'PIXELS') {
-    tryBindText(node, 'letterSpacing', node.letterSpacing.value, entries, tol, res);
+    tryBindText(node, 'letterSpacing', node.letterSpacing.value, entries, tol, res, apply);
   }
 }
 
@@ -247,18 +266,27 @@ function tryBindText(
   entries: VarEntry[],
   tol: number,
   res: BindResult,
+  apply: boolean,
 ): void {
   const v = matchFloat(entries, value, tol);
   const len = node.characters.length;
-  if (!v || len === 0) {
-    res.skipped++;
+  if (len === 0) {
+    skip(res, 'empty-text');
+    return;
+  }
+  if (!v) {
+    skip(res, 'no-match');
+    return;
+  }
+  if (!apply) {
+    res.bound++;
     return;
   }
   try {
     node.setRangeBoundVariable(0, len, field, v);
     res.bound++;
   } catch {
-    res.skipped++;
+    skip(res, 'error');
   }
 }
 
@@ -269,16 +297,21 @@ function tryBind(
   entries: VarEntry[],
   tol: number,
   res: BindResult,
+  apply: boolean,
 ): void {
   const v = matchFloat(entries, value, tol);
   if (!v) {
-    res.skipped++;
+    skip(res, 'no-match');
+    return;
+  }
+  if (!apply) {
+    res.bound++;
     return;
   }
   try {
     (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(field, v);
     res.bound++;
   } catch {
-    res.skipped++;
+    skip(res, 'error');
   }
 }

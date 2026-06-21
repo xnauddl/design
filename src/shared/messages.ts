@@ -22,8 +22,8 @@ export interface RenameChange {
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT' }
-  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number }
-  | { type: 'APPLY'; tolerance: number }
+  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean } // preview: UX1 미리보기(쓰기 없음)
+  | { type: 'APPLY'; tolerance: number; preview?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   | { type: 'GET_COLLECTIONS' }
@@ -47,8 +47,8 @@ export type CodeToUi =
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean }
-  | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; limited?: boolean }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; limited?: boolean }
+  | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; limited?: boolean; preview?: boolean }
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; limited?: boolean; preview?: boolean }
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; applied: boolean }
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }

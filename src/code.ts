@@ -4,7 +4,7 @@
 import type { UiToCode } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, createSemanticAliases, GLOBAL, SEMANTIC } from './lib/variables';
+import { createTokens, previewCreateTokens, createSemanticAliases, GLOBAL, SEMANTIC } from './lib/variables';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
@@ -208,18 +208,21 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // Free 사용량 한도: 초과분은 적용하지 않음(비파괴) + 업그레이드 안내.
         const limit = limitsForTier(currentTier()).tokens;
         const c = clampCount(msg.tokens.length, limit);
-        const s = await createTokens(msg.tokens.slice(0, c.allowed), msg.base);
+        const slice = msg.tokens.slice(0, c.allowed);
+        // UX1: preview면 변수를 만들지 않고 예정 수만 집계.
+        const s = msg.preview ? await previewCreateTokens(slice) : await createTokens(slice, msg.base);
         let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
         if (c.limited) summary += ` · ⚠ ${msg.tokens.length}개 중 ${c.allowed}개만 적용(Free 한도 ${limit}) — 업그레이드 필요`;
-        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited });
-        record('create', summary);
+        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
+        if (!msg.preview) record('create', summary);
         break;
       }
       case 'APPLY': {
         const lim = limitsForTier(currentTier());
-        const r = await bindSelection(selection(), msg.tolerance, { maxNodes: lim.nodes, maxBindings: lim.bindings });
-        post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, flags: r.flags, limited: !!r.limited });
-        record('bind', `바인딩 ${r.bound} · 스킵 ${r.skipped}${r.limited ? ' · 한도 도달' : ''}`);
+        // UX1: preview면 dry-run(바인딩 없이 집계). UX3: 사유별 스킵(reasons).
+        const r = await bindSelection(selection(), msg.tolerance, { maxNodes: lim.nodes, maxBindings: lim.bindings }, !msg.preview);
+        post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, flags: r.flags, reasons: r.reasons, limited: !!r.limited, preview: msg.preview });
+        if (!msg.preview) record('bind', `바인딩 ${r.bound} · 스킵 ${r.skipped}${r.limited ? ' · 한도 도달' : ''}`);
         break;
       }
       case 'RENAME': {
