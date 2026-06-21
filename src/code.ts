@@ -9,7 +9,7 @@ import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { classifyVariants, missingVariants, variantGrid } from './lib/components';
+import { classifyVariants, missingVariants, variantGrid, inferComponentProperties } from './lib/components';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
@@ -405,6 +405,37 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (missing.length) arrangeSet(set); // 추가 후 그리드 정렬 + 리사이즈
         }
         post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
+        break;
+      }
+      case 'EXPOSE_PROPERTIES': {
+        if (!requirePro()) break;
+        let created = 0;
+        const props: string[] = [];
+        // 단일 컴포넌트 대상(세트는 변형 충돌 방지 위해 개별 변형을 선택).
+        for (const node of selection()) {
+          if (node.type !== 'COMPONENT') continue;
+          const layers = node.findAll(() => true);
+          const plan = inferComponentProperties(layers.map((l) => ({ name: l.name, type: l.type })));
+          for (const p of plan) {
+            const target = layers.find((l) => l.name === p.layerName);
+            if (!target) continue;
+            try {
+              let def: string | boolean = '';
+              if (p.type === 'TEXT') def = target.type === 'TEXT' ? target.characters : '';
+              else if (p.type === 'BOOLEAN') def = target.visible;
+              else def = target.type === 'INSTANCE' && target.mainComponent ? target.mainComponent.key : '';
+              const id = node.addComponentProperty(p.propName, p.type, def);
+              const refs = { ...(target.componentPropertyReferences ?? {}) };
+              refs[p.field] = id;
+              target.componentPropertyReferences = refs;
+              created++;
+              props.push(`${p.propName}:${p.type}`);
+            } catch {
+              /* 속성 추가/연결 실패 시 스킵(예: 미발행 INSTANCE_SWAP) */
+            }
+          }
+        }
+        post({ type: 'PROPERTIES_RESULT', created, props });
         break;
       }
     }
