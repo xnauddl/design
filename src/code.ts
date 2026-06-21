@@ -14,6 +14,7 @@ import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/e
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
 import { HistoryEntry, HistoryAction, pushHistory } from './lib/history';
+import { commitUndo } from './lib/undo';
 
 figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
 
@@ -215,7 +216,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
         if (c.limited) summary += ` · ⚠ ${msg.tokens.length}개 중 ${c.allowed}개만 적용(Free 한도 ${limit}) — 업그레이드 필요`;
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
-        if (!msg.preview) record('create', summary);
+        if (!msg.preview) {
+          record('create', summary);
+          commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
+        }
         break;
       }
       case 'APPLY': {
@@ -243,7 +247,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           preview: msg.preview,
           cancelled: r.cancelled,
         });
-        if (!msg.preview && !r.cancelled) record('bind', `바인딩 ${r.bound} · 스킵 ${r.skipped}${r.limited ? ' · 한도 도달' : ''}`);
+        if (!msg.preview) {
+          if (!r.cancelled) record('bind', `바인딩 ${r.bound} · 스킵 ${r.skipped}${r.limited ? ' · 한도 도달' : ''}`);
+          commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
+        }
         break;
       }
       case 'CANCEL': {
@@ -253,13 +260,17 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'RENAME': {
         const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
         post({ type: 'RENAME_RESULT', changes: r.changes, applied: r.applied });
-        if (r.applied && r.changes.length) record('rename', `${r.changes.length}개 레이어 이름 적용`);
+        if (r.applied && r.changes.length) {
+          record('rename', `${r.changes.length}개 레이어 이름 적용`);
+          commitUndo(figma); // UX2: 리네임 전체를 단일 Undo로
+        }
         break;
       }
       case 'CREATE_SEMANTICS': {
         const s = await createSemanticAliases(msg.map);
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
         record('semantics', `별칭 ${s.aliased} (생성 ${s.created} / 갱신 ${s.updated})`);
+        commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
         break;
       }
       case 'GET_COLLECTIONS': {
@@ -412,6 +423,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           }
         }
         post({ type: 'COMPONENTS_RESULT', registered, skipped });
+        if (registered) commitUndo(figma); // UX2
         break;
       }
       case 'CLASSIFY_VARIANTS': {
@@ -444,6 +456,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           }
         }
         post({ type: 'VARIANTS_RESULT', sets, missing, singles: result.singles });
+        if (sets) commitUndo(figma); // UX2
         break;
       }
       case 'GENERATE_MISSING_VARIANTS': {
@@ -470,6 +483,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (missing.length) arrangeSet(set); // 추가 후 그리드 정렬 + 리사이즈
         }
         post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
+        if (generated) commitUndo(figma); // UX2
         break;
       }
       case 'EXPOSE_PROPERTIES': {
@@ -502,6 +516,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           }
         }
         post({ type: 'PROPERTIES_RESULT', created, props });
+        if (created) commitUndo(figma); // UX2
         break;
       }
     }

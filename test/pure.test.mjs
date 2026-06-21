@@ -48,6 +48,7 @@ import {
   variantGrid,
   inferProp,
   inferComponentProperties,
+  commitUndo,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -488,4 +489,14 @@ test('verifyLicenseToken — 서명 검증 주입 + alg=none 거부', async () =
   // 서명 OK라도 만료면 거부
   const expired = makeToken({ alg: 'ES256' }, { tier: 'pro', exp: (now - 1) / 1000 });
   assert.equal((await verifyLicenseToken(expired, now, {}, yes)).ok, false);
+});
+
+/* ================= undo.ts (UX2) ================= */
+test('commitUndo — 지원 시 호출, 미지원 시 무시', () => {
+  let n = 0;
+  commitUndo({ commitUndo: () => (n += 1) });
+  assert.equal(n, 1);
+  // commitUndo 없는 환경(구버전 Figma) — 예외 없이 무시
+  assert.doesNotThrow(() => commitUndo({}));
+  assert.doesNotThrow(() => commitUndo({ commitUndo: undefined }));
 });
