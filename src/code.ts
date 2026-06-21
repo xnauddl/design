@@ -10,6 +10,7 @@ import { renameSelection } from './lib/rename';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
+import { HistoryEntry, HistoryAction, pushHistory } from './lib/history';
 
 figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
 
@@ -22,10 +23,12 @@ const selection = () => figma.currentPage.selection;
 const DEV_TIER_KEY = 'dsl.devTier';
 const CACHE_KEY = 'dsl.licenseCache';
 const PRESETS_KEY = 'dsl.presets';
+const HISTORY_KEY = 'dsl.history';
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
 let presets: Preset[] = []; // M3(Team): 공유 프리셋
+let history: HistoryEntry[] = []; // M3.1(Team): 변경 이력
 
 function effective(): {
   tier: Tier;
@@ -64,9 +67,17 @@ async function loadLicense(): Promise<void> {
     if (c && isTier(c.tier) && typeof c.expiresAt === 'number') cache = c;
     const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
     if (Array.isArray(ps)) presets = ps as Preset[];
+    const h = await figma.clientStorage.getAsync(HISTORY_KEY);
+    if (Array.isArray(h)) history = h as HistoryEntry[];
   } catch {
     /* 저장소 접근 실패 시 free 유지 */
   }
+}
+
+/** 변경 이력 기록(항상 로컬). 조회/비우기만 Team 게이팅. */
+function record(action: HistoryAction, summary: string): void {
+  history = pushHistory(history, { at: Date.now(), action, summary });
+  void figma.clientStorage.setAsync(HISTORY_KEY, history).catch(() => {});
 }
 
 /** Team 전용 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. */
@@ -107,22 +118,26 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
         if (c.limited) summary += ` · ⚠ ${msg.tokens.length}개 중 ${c.allowed}개만 적용(Free 한도 ${limit}) — 업그레이드 필요`;
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited });
+        record('create', summary);
         break;
       }
       case 'APPLY': {
         const lim = limitsForTier(currentTier());
         const r = await bindSelection(selection(), msg.tolerance, { maxNodes: lim.nodes, maxBindings: lim.bindings });
         post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, flags: r.flags, limited: !!r.limited });
+        record('bind', `바인딩 ${r.bound} · 스킵 ${r.skipped}${r.limited ? ' · 한도 도달' : ''}`);
         break;
       }
       case 'RENAME': {
         const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
         post({ type: 'RENAME_RESULT', changes: r.changes, applied: r.applied });
+        if (r.applied && r.changes.length) record('rename', `${r.changes.length}개 레이어 이름 적용`);
         break;
       }
       case 'CREATE_SEMANTICS': {
         const s = await createSemanticAliases(msg.map);
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
+        record('semantics', `별칭 ${s.aliased} (생성 ${s.created} / 갱신 ${s.updated})`);
         break;
       }
       case 'GET_COLLECTIONS': {
@@ -193,6 +208,22 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         presets = presets.filter((p) => p.name !== msg.name);
         await savePresets();
         post({ type: 'PRESETS', presets });
+        break;
+      }
+      case 'GET_HISTORY': {
+        if (!requireTeam()) break;
+        post({ type: 'HISTORY', entries: history });
+        break;
+      }
+      case 'CLEAR_HISTORY': {
+        if (!requireTeam()) break;
+        history = [];
+        try {
+          await figma.clientStorage.deleteAsync(HISTORY_KEY);
+        } catch {
+          /* 무시 */
+        }
+        post({ type: 'HISTORY', entries: history });
         break;
       }
     }

@@ -8,6 +8,7 @@ import { parseVerifyResponse, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
+import { type HistoryEntry, formatHistory, serializeHistory } from './lib/history';
 import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
 
 function send(msg: UiToCode): void {
@@ -21,8 +22,9 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
+let history: HistoryEntry[] = [];
 let isTeam = false;
-let presetsRequested = false;
+let teamDataRequested = false;
 
 /* ---------- 토큰 목록 렌더 ---------- */
 function renderTokens(): void {
@@ -194,15 +196,21 @@ async function verifyAndReport(key: string): Promise<void> {
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
 
-/* ---------- 팀 공유 프리셋 (M3, Team) ---------- */
-const PRESET_FIELDS = ['presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson'];
+/* ---------- 팀 기능 게이트 (M3 프리셋 · M3.1 이력, Team) ---------- */
+const TEAM_FIELDS = [
+  'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
+  'btnRefreshHistory', 'btnExportHistory', 'btnClearHistory', 'historyJson',
+];
 
-function updatePresetGate(): void {
-  for (const id of PRESET_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
-  $('presetLock').textContent = isTeam ? '' : '🔒 Team 전용';
-  if (isTeam && !presetsRequested) {
-    presetsRequested = true;
+function updateTeamGate(): void {
+  for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
+  const lock = isTeam ? '' : '🔒 Team 전용';
+  $('presetLock').textContent = lock;
+  $('historyLock').textContent = lock;
+  if (isTeam && !teamDataRequested) {
+    teamDataRequested = true;
     send({ type: 'GET_PRESETS' });
+    send({ type: 'GET_HISTORY' });
   }
 }
 
@@ -277,6 +285,30 @@ $('btnImportPreset').addEventListener('click', () => {
   send({ type: 'SAVE_PRESET', preset: parsed.preset });
 });
 
+/* ---------- 변경 이력 (M3.1, Team) ---------- */
+function renderHistory(): void {
+  const box = $('historyList');
+  box.innerHTML = '';
+  if (!history.length) {
+    box.textContent = '이력 없음';
+    return;
+  }
+  for (const e of history) {
+    const row = document.createElement('div');
+    row.textContent = formatHistory(e);
+    box.appendChild(row);
+  }
+}
+
+$('btnRefreshHistory').addEventListener('click', () => send({ type: 'GET_HISTORY' }));
+
+$('btnExportHistory').addEventListener('click', () => {
+  ($('historyJson') as HTMLTextAreaElement).value = serializeHistory(history);
+  setStatus('historyStatus', `이력 ${history.length}건 내보냄(복사해 공유).`, 'ok');
+});
+
+$('btnClearHistory').addEventListener('click', () => send({ type: 'CLEAR_HISTORY' }));
+
 $('btnClearLicense').addEventListener('click', () => {
   ($('licenseKey') as HTMLInputElement).value = '';
   send({ type: 'CLEAR_LICENSE' });
@@ -339,13 +371,18 @@ window.onmessage = (event: MessageEvent) => {
         setStatus('licenseStatus', msg.note, cls);
       }
       isTeam = msg.tier === 'team';
-      updatePresetGate();
+      updateTeamGate();
       break;
     }
     case 'PRESETS':
       presets = msg.presets;
       renderPresetList();
       setStatus('presetStatus', `프리셋 ${presets.length}개`, 'ok');
+      break;
+    case 'HISTORY':
+      history = msg.entries;
+      renderHistory();
+      setStatus('historyStatus', `이력 ${history.length}건`, 'ok');
       break;
     case 'PREMIUM_REQUIRED':
       setStatus('createStatus', `${msg.message} (유료 기능: ${msg.feature})`, 'warn');
@@ -387,7 +424,7 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
 }
 
-// 초기: 컬렉션 조회(존재 확인용) + 라이선스 상태 조회. 프리셋 카드는 Team 확인 전까지 잠금.
-updatePresetGate();
+// 초기: 컬렉션 조회(존재 확인용) + 라이선스 상태 조회. 팀 카드는 Team 확인 전까지 잠금.
+updateTeamGate();
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_LICENSE' });
