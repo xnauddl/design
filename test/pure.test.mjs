@@ -17,6 +17,10 @@ import {
   layerNameFromToken,
   layerNameFromRole,
   dedupeName,
+  hasEntitlement,
+  limitsForTier,
+  clampCount,
+  isTier,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -109,4 +113,33 @@ test('멱등성 — 같은 입력은 같은 출력', () => {
     layerNameFromToken('button/primary/background'),
     layerNameFromToken('button/primary/background'),
   );
+});
+
+/* ================= entitlements.ts ================= */
+test('hasEntitlement — 티어 위계로 기능 해금', () => {
+  assert.equal(hasEntitlement('free', 'components'), false);
+  assert.equal(hasEntitlement('pro', 'components'), true);
+  assert.equal(hasEntitlement('free', 'unlimited'), false);
+  assert.equal(hasEntitlement('pro', 'unlimited'), true);
+  // teamPresets는 team에서만
+  assert.equal(hasEntitlement('pro', 'teamPresets'), false);
+  assert.equal(hasEntitlement('team', 'teamPresets'), true);
+});
+
+test('limitsForTier — Free는 한도, Pro/Team은 무제한', () => {
+  assert.deepEqual(limitsForTier('free'), { nodes: 50, tokens: 100, bindings: 200 });
+  assert.equal(limitsForTier('pro').tokens, Infinity);
+  assert.equal(limitsForTier('team').nodes, Infinity);
+});
+
+test('clampCount — 한도까지 자르고 초과 보고', () => {
+  assert.deepEqual(clampCount(120, 100), { allowed: 100, limited: true, overflow: 20 });
+  assert.deepEqual(clampCount(80, 100), { allowed: 80, limited: false, overflow: 0 });
+  assert.deepEqual(clampCount(5, Infinity), { allowed: 5, limited: false, overflow: 0 });
+});
+
+test('isTier — 유효 티어 검증', () => {
+  assert.equal(isTier('pro'), true);
+  assert.equal(isTier('enterprise'), false);
+  assert.equal(isTier(undefined), false);
 });

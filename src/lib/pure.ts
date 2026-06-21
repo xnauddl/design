@@ -3,3 +3,4 @@ export * from './tokens';
 export * from './naming';
 export * from './color';
 export * from './palette';
+export * from './entitlements';
