@@ -41,6 +41,10 @@ import {
   HISTORY_CAP,
   exportTokens,
   splitWeightStyle,
+  parseVariantName,
+  formatVariant,
+  classifyVariants,
+  inferProp,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -367,6 +371,54 @@ test('exportTokens — 동일 이름 Semantic 미러 제거(Global 우선)', () 
 test('exportTokens — 빈 입력', () => {
   assert.equal(exportTokens([], OPTS), ':root {\n}');
   assert.equal(exportTokens([], { ...OPTS, format: 'w3c' }), '{}');
+});
+
+/* ================= components.ts (Phase 3) ================= */
+test('inferProp / parseVariantName — 어휘·경로·명시형', () => {
+  assert.equal(inferProp('hover'), 'state');
+  assert.equal(inferProp('lg'), 'size');
+  assert.equal(inferProp('primary'), 'type');
+  assert.equal(inferProp('zzz'), null);
+  // 경로형: 어휘 추론
+  assert.deepEqual(parseVariantName('button/primary/hover'), {
+    base: 'button',
+    props: { type: 'primary', state: 'hover' },
+  });
+  // 미지정 값 → variant
+  assert.deepEqual(parseVariantName('chip/foo'), { base: 'chip', props: { variant: 'foo' } });
+  // 명시형 prop=value
+  assert.deepEqual(parseVariantName('button, size=lg, state=hover'), {
+    base: 'button',
+    props: { size: 'lg', state: 'hover' },
+  });
+});
+
+test('formatVariant — 속성명 정렬', () => {
+  assert.equal(formatVariant({ type: 'primary', state: 'hover' }), 'state=hover, type=primary');
+});
+
+test('classifyVariants — 그룹/속성/빈 조합/단일', () => {
+  const r = classifyVariants([
+    'button/primary/default',
+    'button/primary/hover',
+    'button/secondary/default',
+    'card', // 단일
+  ]);
+  assert.deepEqual(r.singles, ['card']);
+  assert.equal(r.groups.length, 1);
+  const g = r.groups[0];
+  assert.equal(g.base, 'button');
+  assert.deepEqual(g.properties, { type: ['primary', 'secondary'], state: ['default', 'hover'] });
+  assert.equal(g.members.length, 3);
+  // 빈 조합: secondary + hover 없음
+  assert.deepEqual(g.missing, ['state=hover, type=secondary']);
+});
+
+test('classifyVariants — 멤버 1개 베이스는 단일', () => {
+  const r = classifyVariants(['icon/sm', 'badge/lg']);
+  // 서로 다른 베이스, 각 1개 → 모두 단일
+  assert.deepEqual(r.groups, []);
+  assert.deepEqual(r.singles.sort(), ['badge/lg', 'icon/sm']);
 });
 
 test('verifyLicenseToken — 서명 검증 주입 + alg=none 거부', async () => {

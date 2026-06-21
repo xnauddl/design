@@ -9,6 +9,7 @@ import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
+import { classifyVariants } from './lib/components';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
@@ -85,7 +86,14 @@ function record(action: HistoryAction, summary: string): void {
 /** Team 전용 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireTeam(): boolean {
   if (hasEntitlement(currentTier(), 'teamPresets')) return true;
-  post({ type: 'PREMIUM_REQUIRED', feature: 'teamPresets', message: '팀 공유 프리셋은 Team 요금제 기능입니다.' });
+  post({ type: 'PREMIUM_REQUIRED', feature: 'teamPresets', message: '팀 공유 프리셋/이력은 Team 요금제 기능입니다.' });
+  return false;
+}
+
+/** Pro 이상 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
+function requirePro(): boolean {
+  if (hasEntitlement(currentTier(), 'components')) return true;
+  post({ type: 'PREMIUM_REQUIRED', feature: 'components', message: '컴포넌트 등록·베리언트 분류는 Pro 요금제 기능입니다.' });
   return false;
 }
 
@@ -290,6 +298,64 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           includeSnapshots: msg.includeSnapshots,
         });
         post({ type: 'EXPORT_RESULT', format: msg.format, content });
+        break;
+      }
+      case 'REGISTER_COMPONENTS': {
+        if (!requirePro()) break;
+        let registered = 0;
+        let skipped = 0;
+        for (const node of selection()) {
+          if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') {
+            skipped++; // 이미 컴포넌트(멱등)
+            continue;
+          }
+          if (node.type === 'INSTANCE' || node.type === 'TEXT' || node.locked) {
+            skipped++;
+            continue;
+          }
+          if (node.type !== 'FRAME' && node.type !== 'GROUP') {
+            skipped++;
+            continue;
+          }
+          try {
+            figma.createComponentFromNode(node); // 이름 유지(리네임 단계에서 정함)
+            registered++;
+          } catch {
+            skipped++;
+          }
+        }
+        post({ type: 'COMPONENTS_RESULT', registered, skipped });
+        break;
+      }
+      case 'CLASSIFY_VARIANTS': {
+        if (!requirePro()) break;
+        const comps = selection().filter((n): n is ComponentNode => n.type === 'COMPONENT');
+        const byName = new Map<string, ComponentNode>();
+        for (const c of comps) if (!byName.has(c.name)) byName.set(c.name, c);
+        const result = classifyVariants(comps.map((c) => c.name));
+        let sets = 0;
+        const missing: string[] = [];
+        for (const g of result.groups) {
+          // 아직 세트에 속하지 않은 멤버만(멱등)
+          const nodes = g.members
+            .map((m) => byName.get(m.name))
+            .filter((n): n is ComponentNode => !!n && n.parent?.type !== 'COMPONENT_SET');
+          if (nodes.length < 2) continue;
+          try {
+            const parent = nodes[0].parent ?? figma.currentPage;
+            const set = figma.combineAsVariants(nodes, parent);
+            set.name = g.base;
+            for (const m of g.members) {
+              const node = byName.get(m.name);
+              if (node) node.name = m.variant; // 'prop=value, ...'
+            }
+            sets++;
+            if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(' / ')}`);
+          } catch {
+            /* 결합 실패 시 스킵 */
+          }
+        }
+        post({ type: 'VARIANTS_RESULT', sets, missing, singles: result.singles });
         break;
       }
     }
