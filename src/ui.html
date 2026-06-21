@@ -26,182 +26,200 @@
     .diff-row { padding: 1px 0; }
     .before { opacity: .55; text-decoration: line-through; }
     .after { color: #0a7d28; }
+    /* 탭 내비게이션 (UI 개편) */
+    .tabs { display: flex; gap: 4px; position: sticky; top: 0; background: var(--figma-color-bg, #fff); padding: 2px 0 8px; margin: -2px 0 4px; z-index: 1; }
+    .tab-btn { flex: 1; }
+    .tab-btn.active { background: #0d99ff; color: #fff; border-color: #0d99ff; }
+    .tab-section { display: none; }
+    .tab-section.active { display: block; }
   </style>
 </head>
 <body>
-  <div class="step">
-    <h2>0 · 브랜드 팔레트 생성</h2>
-    <div class="row">
-      <label class="inline">브랜드색 <input id="brand" type="color" value="#3366ff" /></label>
-      <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:84px; font:inherit; padding:3px 5px;" />
-    </div>
-    <div class="row">
-      <label class="inline"><input id="useBrand2" type="checkbox" /> 보조색</label>
-      <input id="brand2" type="color" value="#ff5722" />
-    </div>
-    <div class="row">
-      <label class="inline">하모니
-        <select id="harmony">
-          <option value="">없음</option>
-          <option value="complementary">보색</option>
-          <option value="analogous">유사</option>
-          <option value="triadic">삼각</option>
-          <option value="split">분할보색</option>
-          <option value="tetradic">사각</option>
-        </select>
-      </label>
-      <label class="inline"><input id="incNeutral" type="checkbox" checked /> 중립</label>
-      <label class="inline"><input id="incStatus" type="checkbox" checked /> 상태색</label>
-    </div>
-    <div class="row">
-      <button id="btnPalette" class="primary">팔레트 생성</button>
-      <span class="muted" id="paletteInfo"></span>
-    </div>
-    <div class="status" id="paletteStatus"></div>
+  <div class="tabs" role="tablist">
+    <button class="tab-btn" id="tabbtn-tokens" role="tab">만들기</button>
+    <button class="tab-btn" id="tabbtn-apply" role="tab">적용</button>
+    <button class="tab-btn" id="tabbtn-settings" role="tab">관리</button>
   </div>
 
-  <div class="step">
-    <h2>1 · 추출</h2>
-    <div class="row">
-      <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
-      <span class="muted" id="selInfo"></span>
+  <section class="tab-section" id="tab-tokens" role="tabpanel">
+    <div class="step">
+      <h2>0 · 브랜드 팔레트 생성</h2>
+      <div class="row">
+        <label class="inline">브랜드색 <input id="brand" type="color" value="#3366ff" /></label>
+        <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:84px; font:inherit; padding:3px 5px;" />
+      </div>
+      <div class="row">
+        <label class="inline"><input id="useBrand2" type="checkbox" /> 보조색</label>
+        <input id="brand2" type="color" value="#ff5722" />
+      </div>
+      <div class="row">
+        <label class="inline">하모니
+          <select id="harmony">
+            <option value="">없음</option>
+            <option value="complementary">보색</option>
+            <option value="analogous">유사</option>
+            <option value="triadic">삼각</option>
+            <option value="split">분할보색</option>
+            <option value="tetradic">사각</option>
+          </select>
+        </label>
+        <label class="inline"><input id="incNeutral" type="checkbox" checked /> 중립</label>
+        <label class="inline"><input id="incStatus" type="checkbox" checked /> 상태색</label>
+      </div>
+      <div class="row">
+        <button id="btnPalette" class="primary">팔레트 생성</button>
+        <span class="muted" id="paletteInfo"></span>
+      </div>
+      <div class="status" id="paletteStatus"></div>
     </div>
-    <div id="tokenList"></div>
-    <div class="status" id="extractStatus"></div>
-  </div>
 
-  <div class="step">
-    <h2>2 · 토큰 생성 (Global + Semantic)</h2>
-    <div class="row">
-      <label class="inline">base(rem)px <input id="base" type="number" value="16" min="1" /></label>
-      <button id="btnCreate">변수 생성/갱신</button>
+    <div class="step">
+      <h2>1 · 추출</h2>
+      <div class="row">
+        <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
+        <span class="muted" id="selInfo"></span>
+      </div>
+      <div id="tokenList"></div>
+      <div class="status" id="extractStatus"></div>
     </div>
-    <div class="status" id="createStatus"></div>
-  </div>
 
-  <div class="step">
-    <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
-    <div class="muted">먼저 ‘2 · 토큰 생성’으로 Global 변수를 만든 뒤 실행하세요. 형식: <code>역할 = Global변수이름</code></div>
-    <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
-    <div class="row" style="margin-top:6px;">
-      <button id="btnSemantics">시맨틱 별칭 생성</button>
+    <div class="step">
+      <h2>2 · 토큰 생성 (Global + Semantic)</h2>
+      <div class="row">
+        <label class="inline">base(rem)px <input id="base" type="number" value="16" min="1" /></label>
+        <button id="btnCreate">변수 생성/갱신</button>
+      </div>
+      <div class="status" id="createStatus"></div>
     </div>
-    <div class="status" id="semStatus"></div>
-  </div>
 
-  <div class="step">
-    <h2>3 · 적용 (바인딩)</h2>
-    <div class="row">
-      <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
-      <button id="btnApply">선택에 변수 바인딩</button>
+    <div class="step">
+      <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
+      <div class="muted">먼저 ‘2 · 토큰 생성’으로 Global 변수를 만든 뒤 실행하세요. 형식: <code>역할 = Global변수이름</code></div>
+      <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnSemantics">시맨틱 별칭 생성</button>
+      </div>
+      <div class="status" id="semStatus"></div>
     </div>
-    <div class="status" id="applyStatus"></div>
-  </div>
+  </section>
 
-  <div class="step">
-    <h2>4 · 리네임</h2>
-    <div class="row">
-      <label class="inline">맥락 최대단계 <input id="depth" type="number" value="3" min="1" /></label>
-      <button id="btnPreview">미리보기</button>
-      <button id="btnRename" disabled>이름 적용</button>
+  <section class="tab-section" id="tab-apply" role="tabpanel">
+    <div class="step">
+      <h2>3 · 적용 (바인딩)</h2>
+      <div class="row">
+        <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
+        <button id="btnApply">선택에 변수 바인딩</button>
+      </div>
+      <div class="status" id="applyStatus"></div>
     </div>
-    <div id="diff"></div>
-    <div class="status" id="renameStatus"></div>
-  </div>
 
-  <div class="step">
-    <h2>요금제 / 라이선스</h2>
-    <div class="row">
-      <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px; font:inherit; padding:3px 5px;" />
-      <button id="btnVerify">검증</button>
-      <button id="btnClearLicense">해제</button>
+    <div class="step">
+      <h2>4 · 리네임</h2>
+      <div class="row">
+        <label class="inline">맥락 최대단계 <input id="depth" type="number" value="3" min="1" /></label>
+        <button id="btnPreview">미리보기</button>
+        <button id="btnRename" disabled>이름 적용</button>
+      </div>
+      <div id="diff"></div>
+      <div class="status" id="renameStatus"></div>
     </div>
-    <div class="muted" id="licenseInfo" style="margin-top:4px;"></div>
-    <div class="muted" id="limitsInfo" style="margin-top:2px;"></div>
-    <div class="row" style="margin-top:6px;">
-      <label class="inline">개발용 강제 티어
-        <select id="tier">
-          <option value="free">Free</option>
-          <option value="pro">Pro</option>
-          <option value="team">Team</option>
-        </select>
-      </label>
-      <span class="muted">(검증된 키가 없을 때만 적용)</span>
-    </div>
-    <div class="status" id="licenseStatus"></div>
-  </div>
 
-  <div class="step" id="presetCard">
-    <h2>팀 공유 프리셋 <span class="muted" id="presetLock"></span></h2>
-    <div class="muted">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Team 전용)</div>
-    <div class="row" style="margin-top:6px;">
-      <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px; font:inherit; padding:3px 5px;" />
-      <button id="btnSavePreset">현재 설정 저장</button>
+    <div class="step" id="componentCard">
+      <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
+      <div class="muted">선택 프레임 → 메인 컴포넌트. 같은 베이스 이름(예: <code>button/primary</code>) 컴포넌트들 → 베리언트 세트. (Pro 전용)</div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnRegisterComp">컴포넌트 등록</button>
+        <button id="btnClassifyVariants">베리언트 분류</button>
+        <button id="btnGenMissing">누락 조합 생성</button>
+        <button id="btnExposeProps">속성 노출</button>
+      </div>
+      <div id="variantReport" style="max-height:120px; overflow:auto; margin-top:6px; font-family:ui-monospace, monospace; font-size:11px;"></div>
+      <div class="status" id="componentStatus"></div>
     </div>
-    <div class="row" style="margin-top:6px;">
-      <select id="presetList" style="flex:1; min-width:120px; font:inherit; padding:3px 5px;"></select>
-      <button id="btnLoadPreset">불러오기</button>
-      <button id="btnDeletePreset">삭제</button>
-    </div>
-    <div class="row" style="margin-top:6px;">
-      <button id="btnExportPreset">내보내기(JSON)</button>
-      <button id="btnImportPreset">가져오기(JSON)</button>
-    </div>
-    <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
-    <div class="status" id="presetStatus"></div>
-  </div>
+  </section>
 
-  <div class="step" id="historyCard">
-    <h2>변경 이력 <span class="muted" id="historyLock"></span></h2>
-    <div class="muted">토큰 생성·바인딩·리네임·시맨틱 적용 기록(로컬). (Team 전용 조회)</div>
-    <div class="row" style="margin-top:6px;">
-      <button id="btnRefreshHistory">새로고침</button>
-      <button id="btnExportHistory">내보내기</button>
-      <button id="btnClearHistory">비우기</button>
+  <section class="tab-section" id="tab-settings" role="tabpanel">
+    <div class="step">
+      <h2>내보내기 (코드)</h2>
+      <div class="muted">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
+      <div class="row" style="margin-top:6px;">
+        <label class="inline">형식
+          <select id="exportFormat">
+            <option value="w3c">W3C 토큰 JSON</option>
+            <option value="css">CSS 변수</option>
+          </select>
+        </label>
+        <label class="inline">폰트 크기
+          <select id="exportFontUnit">
+            <option value="px">px</option>
+            <option value="rem">rem</option>
+          </select>
+        </label>
+        <label class="inline"><input id="exportSnap" type="checkbox" /> px 스냅샷 포함</label>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnExport" class="primary">내보내기</button>
+        <button id="btnDownloadExport">다운로드</button>
+      </div>
+      <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+      <div class="status" id="exportStatus"></div>
     </div>
-    <div id="historyList" style="max-height:140px; overflow:auto; margin-top:6px; font-family:ui-monospace, monospace; font-size:11px;"></div>
-    <textarea id="historyJson" spellcheck="false" rows="3" placeholder="내보낸 이력이 여기에 표시됩니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
-    <div class="status" id="historyStatus"></div>
-  </div>
 
-  <div class="step">
-    <h2>내보내기 (코드)</h2>
-    <div class="muted">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
-    <div class="row" style="margin-top:6px;">
-      <label class="inline">형식
-        <select id="exportFormat">
-          <option value="w3c">W3C 토큰 JSON</option>
-          <option value="css">CSS 변수</option>
-        </select>
-      </label>
-      <label class="inline">폰트 크기
-        <select id="exportFontUnit">
-          <option value="px">px</option>
-          <option value="rem">rem</option>
-        </select>
-      </label>
-      <label class="inline"><input id="exportSnap" type="checkbox" /> px 스냅샷 포함</label>
+    <div class="step">
+      <h2>요금제 / 라이선스</h2>
+      <div class="row">
+        <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px; font:inherit; padding:3px 5px;" />
+        <button id="btnVerify">검증</button>
+        <button id="btnClearLicense">해제</button>
+      </div>
+      <div class="muted" id="licenseInfo" style="margin-top:4px;"></div>
+      <div class="muted" id="limitsInfo" style="margin-top:2px;"></div>
+      <div class="row" style="margin-top:6px;">
+        <label class="inline">개발용 강제 티어
+          <select id="tier">
+            <option value="free">Free</option>
+            <option value="pro">Pro</option>
+            <option value="team">Team</option>
+          </select>
+        </label>
+        <span class="muted">(검증된 키가 없을 때만 적용)</span>
+      </div>
+      <div class="status" id="licenseStatus"></div>
     </div>
-    <div class="row" style="margin-top:6px;">
-      <button id="btnExport" class="primary">내보내기</button>
-      <button id="btnDownloadExport">다운로드</button>
-    </div>
-    <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
-    <div class="status" id="exportStatus"></div>
-  </div>
 
-  <div class="step" id="componentCard">
-    <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
-    <div class="muted">선택 프레임 → 메인 컴포넌트. 같은 베이스 이름(예: <code>button/primary</code>) 컴포넌트들 → 베리언트 세트. (Pro 전용)</div>
-    <div class="row" style="margin-top:6px;">
-      <button id="btnRegisterComp">컴포넌트 등록</button>
-      <button id="btnClassifyVariants">베리언트 분류</button>
-      <button id="btnGenMissing">누락 조합 생성</button>
-      <button id="btnExposeProps">속성 노출</button>
+    <div class="step" id="presetCard">
+      <h2>팀 공유 프리셋 <span class="muted" id="presetLock"></span></h2>
+      <div class="muted">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Team 전용)</div>
+      <div class="row" style="margin-top:6px;">
+        <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px; font:inherit; padding:3px 5px;" />
+        <button id="btnSavePreset">현재 설정 저장</button>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <select id="presetList" style="flex:1; min-width:120px; font:inherit; padding:3px 5px;"></select>
+        <button id="btnLoadPreset">불러오기</button>
+        <button id="btnDeletePreset">삭제</button>
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnExportPreset">내보내기(JSON)</button>
+        <button id="btnImportPreset">가져오기(JSON)</button>
+      </div>
+      <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+      <div class="status" id="presetStatus"></div>
     </div>
-    <div id="variantReport" style="max-height:120px; overflow:auto; margin-top:6px; font-family:ui-monospace, monospace; font-size:11px;"></div>
-    <div class="status" id="componentStatus"></div>
-  </div>
+
+    <div class="step" id="historyCard">
+      <h2>변경 이력 <span class="muted" id="historyLock"></span></h2>
+      <div class="muted">토큰 생성·바인딩·리네임·시맨틱 적용 기록(로컬). (Team 전용 조회)</div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnRefreshHistory">새로고침</button>
+        <button id="btnExportHistory">내보내기</button>
+        <button id="btnClearHistory">비우기</button>
+      </div>
+      <div id="historyList" style="max-height:140px; overflow:auto; margin-top:6px; font-family:ui-monospace, monospace; font-size:11px;"></div>
+      <textarea id="historyJson" spellcheck="false" rows="3" placeholder="내보낸 이력이 여기에 표시됩니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+      <div class="status" id="historyStatus"></div>
+    </div>
+  </section>
 
   <!-- UI_SCRIPT -->
 </body>

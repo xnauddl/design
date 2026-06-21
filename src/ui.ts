@@ -532,3 +532,16 @@ function escapeHtml(s: string): string {
 updateTeamGate();
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_LICENSE' });
+
+/* ---------- 탭 내비게이션 (UI 개편) ---------- */
+const TABS = ['tokens', 'apply', 'settings'] as const;
+function showTab(name: (typeof TABS)[number]): void {
+  for (const t of TABS) {
+    $(`tab-${t}`).classList.toggle('active', t === name);
+    const btn = $(`tabbtn-${t}`);
+    btn.classList.toggle('active', t === name);
+    btn.setAttribute('aria-selected', String(t === name));
+  }
+}
+for (const t of TABS) $(`tabbtn-${t}`).addEventListener('click', () => showTab(t));
+showTab('tokens');
