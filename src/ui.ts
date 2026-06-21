@@ -552,9 +552,12 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('componentStatus', `컴포넌트 속성 ${msg.created}개 노출`, msg.created ? 'ok' : 'warn');
       break;
     }
-    case 'PREMIUM_REQUIRED':
-      setStatus('createStatus', `${msg.message} (유료 기능: ${msg.feature})`, 'warn');
+    case 'PREMIUM_REQUIRED': {
+      // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 팀 기능은 ‘관리’ 탭).
+      const statusId = msg.feature === 'components' ? 'componentStatus' : msg.feature === 'teamPresets' ? 'presetStatus' : 'createStatus';
+      setStatus(statusId, `${msg.message} (유료 기능: ${msg.feature})`, 'warn');
       break;
+    }
     case 'REQUEST_VERIFY':
       // code가 캐시된 키의 (재)검증을 요청 — UI에서 수행 후 결과 보고.
       void verifyAndReport(msg.key);
@@ -589,6 +592,7 @@ const OP_STATUS: Record<string, string> = {
   SET_LICENSE: 'licenseStatus',
   LICENSE_VERIFIED: 'licenseStatus',
   CLEAR_LICENSE: 'licenseStatus',
+  GET_LICENSE: 'licenseStatus',
 };
 
 function showError(id: string, f: FriendlyError): void {

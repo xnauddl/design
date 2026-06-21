@@ -69,7 +69,8 @@ async function loadLicense(): Promise<void> {
     const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
     if (isTier(dt)) devTier = dt;
     const c = (await figma.clientStorage.getAsync(CACHE_KEY)) as LicenseCache | undefined;
-    if (c && isTier(c.tier) && typeof c.expiresAt === 'number') cache = c;
+    // 손상/구형 캐시 방어: 모든 필드 형식을 확인(특히 key는 REQUEST_VERIFY에서 사용).
+    if (c && typeof c.key === 'string' && isTier(c.tier) && typeof c.expiresAt === 'number' && typeof c.lastVerified === 'number') cache = c;
     const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
     if (Array.isArray(ps)) presets = ps as Preset[];
     const h = await figma.clientStorage.getAsync(HISTORY_KEY);
