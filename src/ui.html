@@ -42,15 +42,15 @@
   </style>
 </head>
 <body>
-  <div class="tabs" role="tablist">
-    <button class="tab-btn" id="tabbtn-tokens" role="tab">만들기</button>
-    <button class="tab-btn" id="tabbtn-apply" role="tab">적용</button>
-    <button class="tab-btn" id="tabbtn-settings" role="tab">관리</button>
+  <div class="tabs" role="tablist" aria-label="작업 탭">
+    <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens">만들기</button>
+    <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply">적용</button>
+    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings">관리</button>
   </div>
 
   <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
 
-  <section class="tab-section" id="tab-tokens" role="tabpanel">
+  <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
     <div class="step">
       <h2>0 · 브랜드 팔레트 생성</h2>
       <div class="row">
@@ -113,7 +113,7 @@
     </div>
   </section>
 
-  <section class="tab-section" id="tab-apply" role="tabpanel">
+  <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
       <h2>3 · 적용 (바인딩)</h2>
       <div class="row">
@@ -158,7 +158,7 @@
     </div>
   </section>
 
-  <section class="tab-section" id="tab-settings" role="tabpanel">
+  <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
     <div class="step">
       <h2>내보내기 (코드)</h2>
       <div class="muted">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
