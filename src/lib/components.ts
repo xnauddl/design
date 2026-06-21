@@ -110,6 +110,43 @@ function cartesian(props: Record<string, string[]>): Record<string, string>[] {
  * 컴포넌트 이름 목록 → 베이스별 그룹/속성/빈 조합 + 단일 목록.
  * 빈 조합은 그룹 멤버들이 동일 속성 키 집합을 가질 때만 계산(키가 섞이면 생략).
  */
+export interface GridCell {
+  name: string;
+  row: number;
+  col: number;
+}
+
+/**
+ * 베리언트 이름들 → 속성 기반 2D 그리드 좌표(행/열). 세트 정렬용(순수).
+ * - 속성 0개: 한 줄 나열.
+ * - 1~2개: 첫 속성=행, 둘째 속성=열(값 정렬 인덱스) → 매트릭스.
+ * - 3개+: √n 칸 흐름 그리드(겹침 방지).
+ */
+export function variantGrid(names: string[]): GridCell[] {
+  const parsed = names.map((n) => ({ name: n, props: parseVariantName(n).props }));
+  const keys = [...new Set(parsed.flatMap((p) => Object.keys(p.props)))].sort();
+
+  if (keys.length === 0) return parsed.map((p, i) => ({ name: p.name, row: 0, col: i }));
+
+  if (keys.length <= 2) {
+    // 1속성: 한 줄(열 축). 2속성: 첫=행, 둘째=열.
+    const rowKey = keys.length === 2 ? keys[0] : null;
+    const colKey = keys.length === 2 ? keys[1] : keys[0];
+    const rowVals = rowKey
+      ? [...new Set(parsed.map((p) => p.props[rowKey]).filter((v): v is string => v != null))].sort()
+      : [''];
+    const colVals = [...new Set(parsed.map((p) => p.props[colKey]).filter((v): v is string => v != null))].sort();
+    return parsed.map((p) => ({
+      name: p.name,
+      row: rowKey ? Math.max(0, rowVals.indexOf(p.props[rowKey])) : 0,
+      col: Math.max(0, colVals.indexOf(p.props[colKey])),
+    }));
+  }
+
+  const cols = Math.ceil(Math.sqrt(parsed.length));
+  return parsed.map((p, i) => ({ name: p.name, row: Math.floor(i / cols), col: i % cols }));
+}
+
 /**
  * 이미 베리언트인 자식 이름들(`prop=value, ...`) → 빠진 조합(variant 문자열).
  * Phase 4 누락 조합 자동 생성의 순수 계산. 멤버들이 동일 속성 키 집합일 때만.
