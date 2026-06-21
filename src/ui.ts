@@ -205,7 +205,7 @@ const TEAM_FIELDS = [
   'btnRefreshHistory', 'btnExportHistory', 'btnClearHistory', 'historyJson',
 ];
 
-const PRO_FIELDS = ['btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
+const PRO_FIELDS = ['btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps'];
 
 function updateTeamGate(): void {
   for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
@@ -235,6 +235,11 @@ $('btnClassifyVariants').addEventListener('click', () => {
 $('btnGenMissing').addEventListener('click', () => {
   setStatus('componentStatus', '누락 조합 생성 중…', '');
   send({ type: 'GENERATE_MISSING_VARIANTS' });
+});
+
+$('btnExposeProps').addEventListener('click', () => {
+  setStatus('componentStatus', '속성 노출 중…', '');
+  send({ type: 'EXPOSE_PROPERTIES' });
 });
 
 function renderPresetList(): void {
@@ -470,6 +475,17 @@ window.onmessage = (event: MessageEvent) => {
         box.appendChild(d);
       }
       setStatus('componentStatus', `누락 조합 ${msg.generated}개 생성(세트 ${msg.sets})`, msg.generated ? 'ok' : 'warn');
+      break;
+    }
+    case 'PROPERTIES_RESULT': {
+      const box = $('variantReport');
+      box.innerHTML = '';
+      for (const p of msg.props) {
+        const d = document.createElement('div');
+        d.textContent = `+ ${p}`;
+        box.appendChild(d);
+      }
+      setStatus('componentStatus', `컴포넌트 속성 ${msg.created}개 노출`, msg.created ? 'ok' : 'warn');
       break;
     }
     case 'PREMIUM_REQUIRED':

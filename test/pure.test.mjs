@@ -47,6 +47,7 @@ import {
   missingVariants,
   variantGrid,
   inferProp,
+  inferComponentProperties,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -441,6 +442,23 @@ test('variantGrid — 1속성은 한 축, 속성 없으면 한 줄', () => {
   const single = variantGrid(['size=sm', 'size=lg']);
   assert.deepEqual(single.map((c) => [c.row, c.col]).sort(), [[0, 0], [0, 1]].sort());
   assert.deepEqual(variantGrid([]), []);
+});
+
+test('inferComponentProperties — 레이어 → 속성 계획(Phase 4.1)', () => {
+  const plan = inferComponentProperties([
+    { name: 'label', type: 'TEXT' },
+    { name: 'icon', type: 'INSTANCE' },
+    { name: 'badge?', type: 'FRAME' }, // 가시성 토글
+    { name: 'label', type: 'TEXT' }, // 이름 충돌 → -2
+  ]);
+  assert.deepEqual(plan, [
+    { propName: 'label', type: 'TEXT', layerName: 'label', field: 'characters' },
+    { propName: 'icon', type: 'INSTANCE_SWAP', layerName: 'icon', field: 'mainComponent' },
+    { propName: 'badge', type: 'BOOLEAN', layerName: 'badge?', field: 'visible' },
+    { propName: 'label-2', type: 'TEXT', layerName: 'label', field: 'characters' },
+  ]);
+  // 텍스트가 ?로 끝나면 BOOLEAN 우선
+  assert.equal(inferComponentProperties([{ name: 'caption?', type: 'TEXT' }])[0].type, 'BOOLEAN');
 });
 
 test('missingVariants — 베리언트 자식 이름에서 빠진 조합(Phase 4)', () => {

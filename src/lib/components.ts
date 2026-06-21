@@ -116,6 +116,48 @@ export interface GridCell {
   col: number;
 }
 
+/* ---------- Phase 4.1: 컴포넌트 속성 노출 추론(순수) ---------- */
+export type CompPropType = 'TEXT' | 'INSTANCE_SWAP' | 'BOOLEAN';
+
+export interface CompPropPlan {
+  /** 컴포넌트 속성 이름(kebab). */
+  propName: string;
+  type: CompPropType;
+  /** 대상 레이어 이름(매칭용). */
+  layerName: string;
+  /** 연결할 노드 필드. */
+  field: 'characters' | 'mainComponent' | 'visible';
+}
+
+/**
+ * 자식 레이어 → 노출할 컴포넌트 속성 계획(순수, 규칙 기반).
+ * - 이름이 `?`로 끝나면 → BOOLEAN(가시성). 예: `badge?` → 속성 `badge`(visible).
+ * - TEXT 레이어 → TEXT(characters).
+ * - INSTANCE 레이어 → INSTANCE_SWAP(mainComponent).
+ * 속성 이름 충돌은 `-2` 접미사로 회피.
+ */
+export function inferComponentProperties(layers: { name: string; type: string }[]): CompPropPlan[] {
+  const out: CompPropPlan[] = [];
+  const taken = new Set<string>();
+  const uniq = (base: string): string => {
+    let n = base || 'prop';
+    let i = 2;
+    while (taken.has(n)) n = `${base || 'prop'}-${i++}`;
+    taken.add(n);
+    return n;
+  };
+  for (const l of layers) {
+    if (l.name.trim().endsWith('?')) {
+      out.push({ propName: uniq(kebab(l.name.replace(/\?+$/, '')) || 'show'), type: 'BOOLEAN', layerName: l.name, field: 'visible' });
+    } else if (l.type === 'TEXT') {
+      out.push({ propName: uniq(kebab(l.name) || 'text'), type: 'TEXT', layerName: l.name, field: 'characters' });
+    } else if (l.type === 'INSTANCE') {
+      out.push({ propName: uniq(kebab(l.name) || 'swap'), type: 'INSTANCE_SWAP', layerName: l.name, field: 'mainComponent' });
+    }
+  }
+  return out;
+}
+
 /**
  * 베리언트 이름들 → 속성 기반 2D 그리드 좌표(행/열). 세트 정렬용(순수).
  * - 속성 0개: 한 줄 나열.
