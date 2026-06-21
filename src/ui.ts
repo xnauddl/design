@@ -9,6 +9,7 @@ import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import { type HistoryEntry, formatHistory, serializeHistory } from './lib/history';
+import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
 
 function send(msg: UiToCode): void {
@@ -25,6 +26,7 @@ let presets: Preset[] = [];
 let history: HistoryEntry[] = [];
 let isTeam = false;
 let teamDataRequested = false;
+let lastExportFormat: ExportFormat = 'w3c';
 
 /* ---------- 토큰 목록 렌더 ---------- */
 function renderTokens(): void {
@@ -309,6 +311,34 @@ $('btnExportHistory').addEventListener('click', () => {
 
 $('btnClearHistory').addEventListener('click', () => send({ type: 'CLEAR_HISTORY' }));
 
+/* ---------- 내보내기 (코드) ---------- */
+$('btnExport').addEventListener('click', () => {
+  const format = ($('exportFormat') as HTMLSelectElement).value as ExportFormat;
+  const fontSizeUnit = ($('exportFontUnit') as HTMLSelectElement).value as 'px' | 'rem';
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
+  const includeSnapshots = ($('exportSnap') as HTMLInputElement).checked;
+  setStatus('exportStatus', '내보내는 중…', '');
+  send({ type: 'EXPORT', format, fontSizeUnit, base, includeSnapshots });
+});
+
+$('btnDownloadExport').addEventListener('click', () => {
+  const content = ($('exportOut') as HTMLTextAreaElement).value;
+  if (!content) {
+    setStatus('exportStatus', '먼저 내보내기를 실행하세요.', 'warn');
+    return;
+  }
+  const css = lastExportFormat === 'css';
+  const blob = new Blob([content], { type: css ? 'text/css' : 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = css ? 'tokens.css' : 'tokens.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
 $('btnClearLicense').addEventListener('click', () => {
   ($('licenseKey') as HTMLInputElement).value = '';
   send({ type: 'CLEAR_LICENSE' });
@@ -383,6 +413,11 @@ window.onmessage = (event: MessageEvent) => {
       history = msg.entries;
       renderHistory();
       setStatus('historyStatus', `이력 ${history.length}건`, 'ok');
+      break;
+    case 'EXPORT_RESULT':
+      lastExportFormat = msg.format;
+      ($('exportOut') as HTMLTextAreaElement).value = msg.content;
+      setStatus('exportStatus', `${msg.format === 'css' ? 'CSS' : 'W3C JSON'} 내보냄 — 복사 또는 다운로드.`, 'ok');
       break;
     case 'PREMIUM_REQUIRED':
       setStatus('createStatus', `${msg.message} (유료 기능: ${msg.feature})`, 'warn');

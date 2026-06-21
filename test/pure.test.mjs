@@ -39,6 +39,8 @@ import {
   formatHistory,
   formatTime,
   HISTORY_CAP,
+  exportTokens,
+  splitWeightStyle,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -294,6 +296,59 @@ test('formatTime / formatHistory — 결정적(UTC)', () => {
   const at = Date.UTC(2026, 5, 21, 9, 5); // 2026-06-21 09:05 UTC
   assert.equal(formatTime(at), '2026-06-21 09:05');
   assert.equal(formatHistory({ at, action: 'bind', summary: '바인딩 3' }), '2026-06-21 09:05 · 바인딩 · 바인딩 3');
+});
+
+/* ================= exporters.ts (코드 내보내기) ================= */
+const OPTS = { format: 'css', fontSizeUnit: 'px', base: 16, includeSnapshots: false };
+
+test('splitWeightStyle — weight/italic 분리', () => {
+  assert.deepEqual(splitWeightStyle(600), { weight: 600, italic: false });
+  assert.deepEqual(splitWeightStyle('Bold'), { weight: 700, italic: false });
+  assert.deepEqual(splitWeightStyle('Semi Bold Italic'), { weight: 600, italic: true });
+  assert.deepEqual(splitWeightStyle('Italic'), { weight: 400, italic: true });
+});
+
+test('exportTokens CSS — 색·별칭·단위·italic·스냅샷 제외', () => {
+  const tokens = [
+    { name: 'color/primary/500', collection: 'Global', type: 'COLOR', kind: 'color', value: '#2563eb' },
+    { name: 'primary', collection: 'Semantic', type: 'COLOR', kind: 'color', aliasOf: 'color/primary/500' },
+    { name: 'font-size/16', collection: 'Global', type: 'FLOAT', kind: 'fontSize', value: 16 },
+    { name: 'line-height/150', collection: 'Global', type: 'STRING', kind: 'lineHeight', value: '150%' },
+    { name: 'line-height/150-percent-px', collection: 'Global', type: 'FLOAT', kind: 'lineHeight', value: 24 },
+    { name: 'weight/heading', collection: 'Global', type: 'STRING', kind: 'fontWeight', value: 'Bold Italic' },
+  ];
+  const css = exportTokens(tokens, OPTS);
+  assert.match(css, /--color-primary-500: #2563eb;/);
+  assert.match(css, /--primary: var\(--color-primary-500\);/);
+  assert.match(css, /--font-size-16: 16px;/); // px
+  assert.match(css, /--line-height-150: 150%;/); // 단위 보존
+  assert.doesNotMatch(css, /150-percent-px/); // 스냅샷 제외(기본)
+  assert.match(css, /--weight-heading: 700;/);
+  assert.match(css, /--weight-heading-style: italic;/); // italic 동반
+
+  // 폰트 크기 rem 옵션
+  const remCss = exportTokens(tokens, { ...OPTS, fontSizeUnit: 'rem' });
+  assert.match(remCss, /--font-size-16: 1rem;/);
+  // 스냅샷 포함 옵션
+  const withSnap = exportTokens(tokens, { ...OPTS, includeSnapshots: true });
+  assert.match(withSnap, /--line-height-150-percent-px: 24px;/);
+});
+
+test('exportTokens W3C — 중첩·$type·별칭 참조', () => {
+  const tokens = [
+    { name: 'color/primary/500', collection: 'Global', type: 'COLOR', kind: 'color', value: '#2563eb' },
+    { name: 'primary', collection: 'Semantic', type: 'COLOR', kind: 'color', aliasOf: 'color/primary/500' },
+    { name: 'spacing/16', collection: 'Global', type: 'FLOAT', kind: 'spacing', value: 16 },
+  ];
+  const json = JSON.parse(exportTokens(tokens, { ...OPTS, format: 'w3c' }));
+  assert.deepEqual(json.color.primary['500'], { $type: 'color', $value: '#2563eb' });
+  assert.equal(json.primary.$value, '{color.primary.500}'); // 별칭 참조
+  assert.deepEqual(json.spacing['16'], { $type: 'dimension', $value: '16px' });
+});
+
+test('exportTokens — 빈 입력', () => {
+  assert.equal(exportTokens([], OPTS), ':root {\n}');
+  assert.equal(exportTokens([], { ...OPTS, format: 'w3c' }), '{}');
 });
 
 test('verifyLicenseToken — 서명 검증 주입 + alg=none 거부', async () => {

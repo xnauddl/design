@@ -4,9 +4,11 @@
 import type { UiToCode } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, createSemanticAliases } from './lib/variables';
+import { createTokens, createSemanticAliases, GLOBAL, SEMANTIC } from './lib/variables';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
+import { rgbToHex } from './lib/tokens';
+import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
@@ -93,6 +95,32 @@ async function savePresets(): Promise<void> {
   } catch {
     /* 무시 */
   }
+}
+
+/** 변수 → 내보내기 kind 분류(scope 우선, 이름 폴백 — STRING line-height 등 scope 비어있음 대비). */
+function kindOf(v: Variable): TokenKind {
+  if (v.resolvedType === 'COLOR') return 'color';
+  const sc = v.scopes;
+  if (sc.includes('FONT_SIZE')) return 'fontSize';
+  if (sc.includes('GAP')) return 'spacing';
+  if (sc.includes('CORNER_RADIUS')) return 'radius';
+  if (sc.includes('WIDTH_HEIGHT')) return 'size';
+  if (sc.includes('LINE_HEIGHT')) return 'lineHeight';
+  if (sc.includes('LETTER_SPACING')) return 'letterSpacing';
+  if (sc.includes('OPACITY')) return 'opacity';
+  if (sc.includes('FONT_WEIGHT')) return 'fontWeight';
+  if (sc.includes('FONT_FAMILY')) return 'fontFamily';
+  const n = v.name;
+  if (n.startsWith('line-height')) return 'lineHeight';
+  if (n.startsWith('letter-spacing')) return 'letterSpacing';
+  if (n.startsWith('font-size')) return 'fontSize';
+  if (n.startsWith('spacing')) return 'spacing';
+  if (n.startsWith('radius')) return 'radius';
+  if (n.startsWith('size')) return 'size';
+  if (n.includes('font') && n.includes('weight')) return 'fontWeight';
+  if (n.includes('font') && n.includes('family')) return 'fontFamily';
+  if (n.includes('opacity')) return 'opacity';
+  return 'other';
 }
 
 loadLicense().then(() => {
@@ -224,6 +252,44 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           /* 무시 */
         }
         post({ type: 'HISTORY', entries: history });
+        break;
+      }
+      case 'EXPORT': {
+        // 모든 디자인 시스템 변수(Global+Semantic)를 코드로 내보내기. (현재 Free; 추후 게이팅 가능)
+        const cols = await figma.variables.getLocalVariableCollectionsAsync();
+        const colById = new Map(cols.map((c) => [c.id, c]));
+        const vars = await figma.variables.getLocalVariablesAsync();
+        const nameById = new Map(vars.map((v) => [v.id, v.name]));
+        const tokens: ExportToken[] = [];
+        for (const v of vars) {
+          const col = colById.get(v.variableCollectionId);
+          if (!col || (col.name !== GLOBAL && col.name !== SEMANTIC)) continue;
+          const raw = v.valuesByMode[col.defaultModeId];
+          const t: ExportToken = {
+            name: v.name,
+            collection: col.name as 'Global' | 'Semantic',
+            type: v.resolvedType,
+            kind: kindOf(v),
+          };
+          if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+            const target = nameById.get((raw as VariableAlias).id);
+            if (!target) continue; // 대상 불명 → 스킵
+            t.aliasOf = target;
+          } else if (v.resolvedType === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) {
+            t.value = rgbToHex(raw as RGB);
+          } else {
+            t.value = raw as string | number;
+          }
+          tokens.push(t);
+        }
+        tokens.sort((a, b) => a.name.localeCompare(b.name));
+        const content = exportTokens(tokens, {
+          format: msg.format,
+          fontSizeUnit: msg.fontSizeUnit,
+          base: msg.base,
+          includeSnapshots: msg.includeSnapshots,
+        });
+        post({ type: 'EXPORT_RESULT', format: msg.format, content });
         break;
       }
     }
