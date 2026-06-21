@@ -11,8 +11,11 @@ import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSem
 import { type HistoryEntry, formatHistory, serializeHistory } from './lib/history';
 import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
+import { explainError, type FriendlyError } from './lib/errors';
 
+let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
+  if (msg.type !== 'CANCEL') lastSentMsg = msg;
   parent.postMessage({ pluginMessage: msg }, '*');
 }
 
@@ -555,11 +558,52 @@ window.onmessage = (event: MessageEvent) => {
       // code가 캐시된 키의 (재)검증을 요청 — UI에서 수행 후 결과 보고.
       void verifyAndReport(msg.key);
       break;
-    case 'ERROR':
-      setStatus('extractStatus', `오류: ${msg.message}`, 'warn');
+    case 'ERROR': {
+      // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
+      const statusId = (msg.op && OP_STATUS[msg.op]) || 'extractStatus';
+      if (msg.op === 'APPLY') hideApplyProgress();
+      showError(statusId, explainError(msg.message));
       break;
+    }
   }
 };
+
+/* ---------- UX7: 오류 라우팅/표시 ---------- */
+const OP_STATUS: Record<string, string> = {
+  EXTRACT: 'extractStatus',
+  CREATE_TOKENS: 'createStatus',
+  CREATE_SEMANTICS: 'semStatus',
+  APPLY: 'applyStatus',
+  RENAME: 'renameStatus',
+  EXPORT: 'exportStatus',
+  REGISTER_COMPONENTS: 'componentStatus',
+  CLASSIFY_VARIANTS: 'componentStatus',
+  GENERATE_MISSING_VARIANTS: 'componentStatus',
+  EXPOSE_PROPERTIES: 'componentStatus',
+  GET_PRESETS: 'presetStatus',
+  SAVE_PRESET: 'presetStatus',
+  DELETE_PRESET: 'presetStatus',
+  GET_HISTORY: 'historyStatus',
+  CLEAR_HISTORY: 'historyStatus',
+  SET_LICENSE: 'licenseStatus',
+  LICENSE_VERIFIED: 'licenseStatus',
+  CLEAR_LICENSE: 'licenseStatus',
+};
+
+function showError(id: string, f: FriendlyError): void {
+  const el = $(id);
+  el.className = 'status warn';
+  el.textContent = `오류: ${f.message}${f.action ? ` — ${f.action}` : ''}`;
+  if (f.retryable && lastSentMsg) {
+    const retry = lastSentMsg;
+    const btn = document.createElement('button');
+    btn.textContent = '다시 시도';
+    btn.style.marginLeft = '6px';
+    btn.addEventListener('click', () => send(retry));
+    el.appendChild(document.createTextNode(' '));
+    el.appendChild(btn);
+  }
+}
 
 function renderDiff(changes: { before: string; after: string }[], applied: boolean): void {
   const box = $('diff');
