@@ -7,6 +7,7 @@ import { rgbToHex } from '../dist/pure.mjs';
 import {
   extractFromSelection,
   createTokens,
+  previewCreateTokens,
   createSemanticAliases,
   bindSelection,
   renameSelection,
@@ -369,6 +370,74 @@ test('bindSelection — 사용량 한도(maxNodes) 초과 시 부분 적용 + li
   const res2 = await bindSelection([mk('d'), mk('e')], 0.5);
   assert.equal(res2.limited, undefined);
   assert.equal(res2.bound, 2);
+});
+
+test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + 사유', async () => {
+  installFigma();
+  await createTokens(
+    [
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+    ],
+    16,
+  );
+  const mk = () => ({
+    type: 'FRAME',
+    id: 'box',
+    name: 'box',
+    fills: [
+      { type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }, // #0066ff → 매칭
+      { type: 'SOLID', color: { r: 0, g: 1, b: 0 } }, // 미매칭 → skip(no-match)
+    ],
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: 200,
+    height: 50,
+    layoutMode: 'NONE', // → 사유 no-autolayout
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  });
+
+  const node = mk();
+  const dry = await bindSelection([node], 0.5, {}, false);
+  assert.equal(dry.bound, 2); // 색1 + width1 예정
+  assert.equal(dry.skipped, 1); // 미매칭 색1
+  assert.equal(dry.reasons['no-match'], 1);
+  assert.ok(dry.reasons['no-autolayout'] >= 1);
+  // 변경 없음(dry-run): 채움 바인딩/노드 필드 미설정
+  assert.equal(node.fills[0].boundVariables, undefined);
+  assert.equal(node._bound, undefined);
+
+  // 실제 적용은 동일 수치 + 변경 발생
+  const node2 = mk();
+  const real = await bindSelection([node2], 0.5, {}, true);
+  assert.equal(real.bound, 2);
+  assert.equal(real.skipped, 1);
+  assert.equal(node2.fills[0].boundVariables.color.type, 'VARIABLE_ALIAS');
+});
+
+test('previewCreateTokens — 변수 생성 없이 생성/갱신 예정 집계', async () => {
+  const figma = installFigma();
+  const tokens = [
+    { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+    { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+  ];
+  // 컬렉션/변수 없는 초기 상태 — 모두 생성 예정.
+  const before = figma._state.variables.length;
+  const p = await previewCreateTokens(tokens);
+  assert.equal(figma._state.variables.length, before); // 미생성(읽기 전용)
+  // 토큰 2개 → Global 2 + Semantic 2
+  assert.equal(p.globals, 2);
+  assert.equal(p.semantics, 2);
+  assert.equal(p.created, 4);
+  assert.equal(p.updated, 0);
+
+  // 실제 생성 후 다시 미리보기 → 모두 갱신 예정.
+  await createTokens(tokens, 16);
+  const p2 = await previewCreateTokens(tokens);
+  assert.equal(p2.created, 0);
+  assert.equal(p2.updated, 4);
 });
 
 /* ================= rename.ts ================= */
