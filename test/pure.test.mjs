@@ -45,6 +45,7 @@ import {
   formatVariant,
   classifyVariants,
   missingVariants,
+  variantGrid,
   inferProp,
 } from '../dist/pure.mjs';
 
@@ -420,6 +421,26 @@ test('classifyVariants — 멤버 1개 베이스는 단일', () => {
   // 서로 다른 베이스, 각 1개 → 모두 단일
   assert.deepEqual(r.groups, []);
   assert.deepEqual(r.singles.sort(), ['badge/lg', 'icon/sm']);
+});
+
+test('variantGrid — 2속성 매트릭스 좌표(행=첫 속성, 열=둘째)', () => {
+  const cells = variantGrid([
+    'state=default, type=primary',
+    'state=hover, type=primary',
+    'state=default, type=secondary',
+    'state=disabled, type=secondary',
+  ]);
+  const at = (n) => cells.find((c) => c.name === n);
+  // keys 정렬: state(행), type(열). state: default,disabled,hover / type: primary,secondary
+  assert.deepEqual(at('state=default, type=primary'), { name: 'state=default, type=primary', row: 0, col: 0 });
+  assert.deepEqual(at('state=hover, type=primary'), { name: 'state=hover, type=primary', row: 2, col: 0 });
+  assert.deepEqual(at('state=disabled, type=secondary'), { name: 'state=disabled, type=secondary', row: 1, col: 1 });
+});
+
+test('variantGrid — 1속성은 한 축, 속성 없으면 한 줄', () => {
+  const single = variantGrid(['size=sm', 'size=lg']);
+  assert.deepEqual(single.map((c) => [c.row, c.col]).sort(), [[0, 0], [0, 1]].sort());
+  assert.deepEqual(variantGrid([]), []);
 });
 
 test('missingVariants — 베리언트 자식 이름에서 빠진 조합(Phase 4)', () => {

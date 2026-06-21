@@ -9,7 +9,7 @@ import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { classifyVariants, missingVariants } from './lib/components';
+import { classifyVariants, missingVariants, variantGrid } from './lib/components';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
@@ -88,6 +88,28 @@ function requireTeam(): boolean {
   if (hasEntitlement(currentTier(), 'teamPresets')) return true;
   post({ type: 'PREMIUM_REQUIRED', feature: 'teamPresets', message: '팀 공유 프리셋/이력은 Team 요금제 기능입니다.' });
   return false;
+}
+
+/** 베리언트 세트를 속성 기반 2D 그리드로 정렬하고 자식에 맞게 리사이즈. */
+function arrangeSet(set: ComponentSetNode): void {
+  const children = set.children.filter((c): c is ComponentNode => c.type === 'COMPONENT');
+  if (!children.length) return;
+  const cellW = Math.max(...children.map((c) => c.width));
+  const cellH = Math.max(...children.map((c) => c.height));
+  const gap = 16;
+  const pad = 16;
+  const pos = new Map(variantGrid(children.map((c) => c.name)).map((g) => [g.name, g]));
+  let maxCol = 0;
+  let maxRow = 0;
+  for (const c of children) {
+    const g = pos.get(c.name);
+    if (!g) continue;
+    c.x = pad + g.col * (cellW + gap);
+    c.y = pad + g.row * (cellH + gap);
+    maxCol = Math.max(maxCol, g.col);
+    maxRow = Math.max(maxRow, g.row);
+  }
+  set.resizeWithoutConstraints(pad * 2 + (maxCol + 1) * cellW + maxCol * gap, pad * 2 + (maxRow + 1) * cellH + maxRow * gap);
 }
 
 /** Pro 이상 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
@@ -349,6 +371,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               const node = byName.get(m.name);
               if (node) node.name = m.variant; // 'prop=value, ...'
             }
+            arrangeSet(set); // 속성 기반 그리드 정렬 + 리사이즈
             sets++;
             if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(' / ')}`);
           } catch {
@@ -368,21 +391,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (!children.length) continue;
           const missing = missingVariants(children.map((c) => c.name));
           const src = children[0];
-          let i = 0;
           for (const combo of missing) {
             try {
               const clone = src.clone();
               clone.name = combo; // 빠진 prop=value 조합
               set.appendChild(clone);
-              clone.x = i * (src.width + 20);
-              clone.y = src.height + 20; // 기존 행 아래에 배치
               generated++;
               combos.push(`${set.name}: ${combo}`);
-              i++;
             } catch {
               /* 클론 실패 시 스킵 */
             }
           }
+          if (missing.length) arrangeSet(set); // 추가 후 그리드 정렬 + 리사이즈
         }
         post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
         break;
