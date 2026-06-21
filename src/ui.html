@@ -110,18 +110,25 @@
   </div>
 
   <div class="step">
-    <h2>요금제 / 라이선스 (개발용)</h2>
+    <h2>요금제 / 라이선스</h2>
     <div class="row">
-      <label class="inline">티어
+      <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px; font:inherit; padding:3px 5px;" />
+      <button id="btnVerify">검증</button>
+      <button id="btnClearLicense">해제</button>
+    </div>
+    <div class="muted" id="licenseInfo" style="margin-top:4px;"></div>
+    <div class="muted" id="limitsInfo" style="margin-top:2px;"></div>
+    <div class="row" style="margin-top:6px;">
+      <label class="inline">개발용 강제 티어
         <select id="tier">
           <option value="free">Free</option>
           <option value="pro">Pro</option>
           <option value="team">Team</option>
         </select>
       </label>
-      <span class="muted" id="licenseInfo"></span>
+      <span class="muted">(검증된 키가 없을 때만 적용)</span>
     </div>
-    <div class="muted" id="limitsInfo" style="margin-top:4px;"></div>
+    <div class="status" id="licenseStatus"></div>
   </div>
 
   <!-- UI_SCRIPT -->

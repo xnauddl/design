@@ -4,3 +4,4 @@ export * from './naming';
 export * from './color';
 export * from './palette';
 export * from './entitlements';
+export * from './license';
