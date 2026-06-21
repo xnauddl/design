@@ -10,3 +10,4 @@ export * from './presets';
 export * from './history';
 export * from './exporters';
 export * from './components';
+export * from './undo';
