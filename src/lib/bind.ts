@@ -21,16 +21,37 @@ export interface BindResult {
   bound: number;
   skipped: number;
   flags: string[];
+  /** 사용량 한도로 일부만 적용되었는가(Free 티어). */
+  limited?: boolean;
+}
+
+/** 1회 실행 사용량 한도(미지정 시 무제한). */
+export interface BindLimits {
+  maxNodes?: number;
+  maxBindings?: number;
+}
+
+interface Budget {
+  nodes: number;
+  maxBindings: number;
+  limited: boolean;
 }
 
 export async function bindSelection(
   selection: readonly SceneNode[],
   tolerance: number,
+  limits: BindLimits = {},
 ): Promise<BindResult> {
   const entries = await buildIndex();
   const res: BindResult = { bound: 0, skipped: 0, flags: [] };
   const flagSet = new Set<string>();
-  for (const node of selection) await walk(node, entries, tolerance, res, flagSet);
+  const budget: Budget = {
+    nodes: limits.maxNodes ?? Infinity,
+    maxBindings: limits.maxBindings ?? Infinity,
+    limited: false,
+  };
+  for (const node of selection) await walk(node, entries, tolerance, res, flagSet, budget);
+  if (budget.limited) res.limited = true;
   res.flags = [...flagSet];
   return res;
 }
@@ -106,13 +127,20 @@ async function walk(
   tol: number,
   res: BindResult,
   flags: Set<string>,
+  budget: Budget,
 ): Promise<void> {
+  // 사용량 한도(노드 수 / 누적 바인딩 수) 초과 시 비파괴 중단 — 처리한 만큼만 적용.
+  if (budget.nodes <= 0 || res.bound >= budget.maxBindings) {
+    budget.limited = true;
+    return;
+  }
+  budget.nodes--;
   bindPaints(node, entries, res);
   bindFrame(node, entries, tol, res, flags);
   bindRadius(node, entries, tol, res);
   bindEffects(node, entries, res);
   await bindText(node, entries, tol, res);
-  if ('children' in node) for (const c of node.children) await walk(c, entries, tol, res, flags);
+  if ('children' in node) for (const c of node.children) await walk(c, entries, tol, res, flags, budget);
 }
 
 function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult): void {

@@ -3,6 +3,7 @@
    ============================================================ */
 import type { UiToCode, CodeToUi } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
+import { FREE_LIMITS, type Tier } from './lib/entitlements';
 import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
 
 function send(msg: UiToCode): void {
@@ -126,6 +127,10 @@ $('btnRename').addEventListener('click', () => {
   send({ type: 'RENAME', apply: true, maxDepth });
 });
 
+$('tier').addEventListener('change', () => {
+  send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
+});
+
 /* ---------- code → ui ---------- */
 window.onmessage = (event: MessageEvent) => {
   const msg = event.data.pluginMessage as CodeToUi | undefined;
@@ -139,11 +144,17 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'CREATE_RESULT':
-      setStatus('createStatus', msg.summary, 'ok');
+      setStatus('createStatus', msg.summary, msg.limited ? 'warn' : 'ok');
       break;
-    case 'APPLY_RESULT':
-      setStatus('applyStatus', `바인딩 ${msg.bound} · 스킵 ${msg.skipped}${msg.flags.length ? ' — ' + msg.flags.join(' ') : ''}`, msg.flags.length ? 'warn' : 'ok');
+    case 'APPLY_RESULT': {
+      const limitNote = msg.limited ? ' · ⚠ Free 한도 도달 — 일부만 적용(업그레이드 필요)' : '';
+      setStatus(
+        'applyStatus',
+        `바인딩 ${msg.bound} · 스킵 ${msg.skipped}${msg.flags.length ? ' — ' + msg.flags.join(' ') : ''}${limitNote}`,
+        msg.limited || msg.flags.length ? 'warn' : 'ok',
+      );
       break;
+    }
     case 'RENAME_RESULT':
       renderDiff(msg.changes, msg.applied);
       break;
@@ -157,6 +168,17 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'COLLECTIONS':
       // 현재는 존재 확인용 프로브(별도 UI 없음). 추후 컬렉션 상태 표시에 사용.
+      break;
+    case 'LICENSE_STATUS': {
+      ($('tier') as HTMLSelectElement).value = msg.tier;
+      $('licenseInfo').textContent = `현재: ${msg.tier.toUpperCase()}`;
+      const cap = (n: number) => (msg.unlimited ? '∞' : String(n));
+      $('limitsInfo').textContent =
+        `1회 한도 — 노드 ${cap(FREE_LIMITS.nodes)} · 토큰 ${cap(FREE_LIMITS.tokens)} · 바인딩 ${cap(FREE_LIMITS.bindings)}`;
+      break;
+    }
+    case 'PREMIUM_REQUIRED':
+      setStatus('createStatus', `${msg.message} (유료 기능: ${msg.feature})`, 'warn');
       break;
     case 'ERROR':
       setStatus('extractStatus', `오류: ${msg.message}`, 'warn');
@@ -191,5 +213,6 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
 }
 
-// 초기: 컬렉션 조회(존재 확인용)
+// 초기: 컬렉션 조회(존재 확인용) + 라이선스 상태 조회
 send({ type: 'GET_COLLECTIONS' });
+send({ type: 'GET_LICENSE' });
