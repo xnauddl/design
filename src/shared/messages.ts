@@ -38,7 +38,8 @@ export type UiToCode =
   | { type: 'CLEAR_HISTORY' } // M3.1(Team): 변경 이력 비우기
   | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number; includeSnapshots: boolean } // 토큰 코드 내보내기
   | { type: 'REGISTER_COMPONENTS' } // Phase 3(Pro): 선택 프레임 → 메인 컴포넌트
-  | { type: 'CLASSIFY_VARIANTS' }; // Phase 3(Pro): 같은 베이스 컴포넌트 → 베리언트 세트
+  | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Pro): 같은 베이스 컴포넌트 → 베리언트 세트
+  | { type: 'GENERATE_MISSING_VARIANTS' }; // Phase 4(Pro): 선택 세트의 빠진 조합 자동 생성
 
 /** code → UI 응답. */
 export type CodeToUi =
@@ -68,6 +69,7 @@ export type CodeToUi =
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number } // Phase 3
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[] } // Phase 3
+  | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'ERROR'; message: string };
 
 /** code → UI 안전 전송. */

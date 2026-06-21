@@ -9,7 +9,7 @@ import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { classifyVariants } from './lib/components';
+import { classifyVariants, missingVariants } from './lib/components';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
@@ -356,6 +356,35 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           }
         }
         post({ type: 'VARIANTS_RESULT', sets, missing, singles: result.singles });
+        break;
+      }
+      case 'GENERATE_MISSING_VARIANTS': {
+        if (!requirePro()) break;
+        const sets = selection().filter((n): n is ComponentSetNode => n.type === 'COMPONENT_SET');
+        let generated = 0;
+        const combos: string[] = [];
+        for (const set of sets) {
+          const children = set.children.filter((c): c is ComponentNode => c.type === 'COMPONENT');
+          if (!children.length) continue;
+          const missing = missingVariants(children.map((c) => c.name));
+          const src = children[0];
+          let i = 0;
+          for (const combo of missing) {
+            try {
+              const clone = src.clone();
+              clone.name = combo; // 빠진 prop=value 조합
+              set.appendChild(clone);
+              clone.x = i * (src.width + 20);
+              clone.y = src.height + 20; // 기존 행 아래에 배치
+              generated++;
+              combos.push(`${set.name}: ${combo}`);
+              i++;
+            } catch {
+              /* 클론 실패 시 스킵 */
+            }
+          }
+        }
+        post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
         break;
       }
     }

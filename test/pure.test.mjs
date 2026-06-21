@@ -44,6 +44,7 @@ import {
   parseVariantName,
   formatVariant,
   classifyVariants,
+  missingVariants,
   inferProp,
 } from '../dist/pure.mjs';
 
@@ -419,6 +420,15 @@ test('classifyVariants — 멤버 1개 베이스는 단일', () => {
   // 서로 다른 베이스, 각 1개 → 모두 단일
   assert.deepEqual(r.groups, []);
   assert.deepEqual(r.singles.sort(), ['badge/lg', 'icon/sm']);
+});
+
+test('missingVariants — 베리언트 자식 이름에서 빠진 조합(Phase 4)', () => {
+  const names = ['state=default, type=primary', 'state=hover, type=primary', 'state=default, type=secondary'];
+  assert.deepEqual(missingVariants(names), ['state=hover, type=secondary']);
+  // 완전한 매트릭스 → 없음
+  assert.deepEqual(missingVariants([...names, 'state=hover, type=secondary']), []);
+  // 멤버 1개 → 없음
+  assert.deepEqual(missingVariants(['state=default, type=primary']), []);
 });
 
 test('verifyLicenseToken — 서명 검증 주입 + alg=none 거부', async () => {
