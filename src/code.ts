@@ -521,6 +521,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
     }
   } catch (err) {
-    post({ type: 'ERROR', message: err instanceof Error ? err.message : String(err) });
+    // UX7: 실패한 작업 종류(op)도 함께 보내 UI가 해당 영역에 친절한 메시지를 띄운다.
+    post({ type: 'ERROR', message: err instanceof Error ? err.message : String(err), op: msg?.type });
   }
 };

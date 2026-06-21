@@ -49,6 +49,7 @@ import {
   inferProp,
   inferComponentProperties,
   commitUndo,
+  explainError,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -499,4 +500,24 @@ test('commitUndo — 지원 시 호출, 미지원 시 무시', () => {
   // commitUndo 없는 환경(구버전 Figma) — 예외 없이 무시
   assert.doesNotThrow(() => commitUndo({}));
   assert.doesNotThrow(() => commitUndo({ commitUndo: undefined }));
+});
+
+/* ================= errors.ts (UX7) ================= */
+test('explainError — 패턴별 친절 메시지 + 재시도 가능 여부', () => {
+  const font = explainError('in loadFontAsync: font has not been loaded');
+  assert.match(font.message, /글꼴/);
+  assert.equal(font.retryable, true);
+
+  const scope = explainError('Invalid scope for this variable type');
+  assert.match(scope.message, /스코프/);
+  assert.equal(scope.retryable, true);
+
+  // 권한/읽기전용·미발행 호환 오류는 재시도로 해결 불가
+  assert.equal(explainError('The document is read-only').retryable, false);
+  assert.equal(explainError('Property value is incompatible').retryable, false);
+
+  // 알 수 없는 오류는 원문 보존 + 재시도 허용
+  const unknown = explainError('totally weird boom');
+  assert.match(unknown.message, /totally weird boom/);
+  assert.equal(unknown.retryable, true);
 });
