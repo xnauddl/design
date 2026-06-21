@@ -21,6 +21,11 @@ import {
   limitsForTier,
   clampCount,
   isTier,
+  evaluateLicense,
+  parseVerifyResponse,
+  cacheFromVerify,
+  REVERIFY_MS,
+  GRACE_MS,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -142,4 +147,54 @@ test('isTier — 유효 티어 검증', () => {
   assert.equal(isTier('pro'), true);
   assert.equal(isTier('enterprise'), false);
   assert.equal(isTier(undefined), false);
+});
+
+/* ================= license.ts ================= */
+test('evaluateLicense — 캐시 없음/만료/활성', () => {
+  const now = 1_000_000_000_000;
+  assert.deepEqual(evaluateLicense(null, now), { tier: 'free', status: 'none', stale: false });
+  // 만료(now > expiresAt) → free/expired
+  assert.deepEqual(
+    evaluateLicense({ key: 'k', tier: 'pro', expiresAt: now - 1, lastVerified: now }, now),
+    { tier: 'free', status: 'expired', stale: true },
+  );
+  // 만료 전 + 최근 검증 → active
+  assert.deepEqual(
+    evaluateLicense({ key: 'k', tier: 'pro', expiresAt: now + GRACE_MS, lastVerified: now }, now),
+    { tier: 'pro', status: 'active', stale: false },
+  );
+});
+
+test('evaluateLicense — 오프라인 grace 유지 후 강등', () => {
+  const now = 2_000_000_000_000;
+  const base = { key: 'k', tier: 'team', expiresAt: now + GRACE_MS * 2 };
+  // 검증이 REVERIFY 경과·grace 이내 → 티어 유지(grace, stale)
+  assert.deepEqual(
+    evaluateLicense({ ...base, lastVerified: now - (REVERIFY_MS + 1000) }, now),
+    { tier: 'team', status: 'grace', stale: true },
+  );
+  // grace 초과(장기 미검증) → 강등 free
+  assert.deepEqual(
+    evaluateLicense({ ...base, lastVerified: now - (GRACE_MS + 1000) }, now),
+    { tier: 'free', status: 'expired', stale: true },
+  );
+});
+
+test('parseVerifyResponse — 성공/실패/형식오류', () => {
+  const ok = parseVerifyResponse({ valid: true, tier: 'pro', expiresAt: 123 });
+  assert.deepEqual(ok, { ok: true, tier: 'pro', expiresAt: 123 });
+  assert.equal(parseVerifyResponse({ valid: false, error: '만료됨' }).error, '만료됨');
+  assert.equal(parseVerifyResponse({ tier: 'gold', expiresAt: 1 }).ok, false); // 알 수 없는 티어
+  assert.equal(parseVerifyResponse({ valid: true, tier: 'pro' }).ok, false); // 만료시각 없음
+  assert.equal(parseVerifyResponse('nope').ok, false);
+});
+
+test('cacheFromVerify — 응답+키+now → 캐시', () => {
+  const v = { ok: true, tier: 'pro', expiresAt: 999 };
+  assert.deepEqual(cacheFromVerify('KEY-1', v, 500), {
+    key: 'KEY-1',
+    tier: 'pro',
+    expiresAt: 999,
+    lastVerified: 500,
+  });
 });

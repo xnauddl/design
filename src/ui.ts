@@ -131,6 +131,21 @@ $('tier').addEventListener('change', () => {
   send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
 });
 
+$('btnVerify').addEventListener('click', () => {
+  const key = ($('licenseKey') as HTMLInputElement).value.trim();
+  if (!key) {
+    setStatus('licenseStatus', '라이선스 키를 입력하세요.', 'warn');
+    return;
+  }
+  setStatus('licenseStatus', '검증 중…', '');
+  send({ type: 'SET_LICENSE_KEY', key });
+});
+
+$('btnClearLicense').addEventListener('click', () => {
+  ($('licenseKey') as HTMLInputElement).value = '';
+  send({ type: 'CLEAR_LICENSE' });
+});
+
 /* ---------- code → ui ---------- */
 window.onmessage = (event: MessageEvent) => {
   const msg = event.data.pluginMessage as CodeToUi | undefined;
@@ -170,11 +185,23 @@ window.onmessage = (event: MessageEvent) => {
       // 현재는 존재 확인용 프로브(별도 UI 없음). 추후 컬렉션 상태 표시에 사용.
       break;
     case 'LICENSE_STATUS': {
-      ($('tier') as HTMLSelectElement).value = msg.tier;
-      $('licenseInfo').textContent = `현재: ${msg.tier.toUpperCase()}`;
+      const srcLabel =
+        msg.source === 'key'
+          ? `라이선스 키${msg.status ? ` · ${msg.status}` : ''}`
+          : msg.source === 'dev'
+            ? '개발용 강제'
+            : '없음';
+      const exp = msg.expiresAt ? ` · 만료 ${new Date(msg.expiresAt).toISOString().slice(0, 10)}` : '';
+      $('licenseInfo').textContent = `현재: ${msg.tier.toUpperCase()} (${srcLabel})${exp}`;
       const cap = (n: number) => (msg.unlimited ? '∞' : String(n));
       $('limitsInfo').textContent =
         `1회 한도 — 노드 ${cap(FREE_LIMITS.nodes)} · 토큰 ${cap(FREE_LIMITS.tokens)} · 바인딩 ${cap(FREE_LIMITS.bindings)}`;
+      // 개발용 토글은 검증 키가 없을 때만 의미가 있으므로, 키가 적용 중이면 표시만 동기화
+      if (msg.source !== 'key') ($('tier') as HTMLSelectElement).value = msg.tier;
+      if (msg.note) {
+        const cls = /실패|오프라인/.test(msg.note) ? 'warn' : 'ok';
+        setStatus('licenseStatus', msg.note, cls);
+      }
       break;
     }
     case 'PREMIUM_REQUIRED':
