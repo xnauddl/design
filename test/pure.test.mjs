@@ -26,6 +26,10 @@ import {
   cacheFromVerify,
   REVERIFY_MS,
   GRACE_MS,
+  base64UrlToString,
+  decodeJwt,
+  validateLicenseClaims,
+  verifyLicenseToken,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -197,4 +201,59 @@ test('cacheFromVerify — 응답+키+now → 캐시', () => {
     expiresAt: 999,
     lastVerified: 500,
   });
+});
+
+/* ================= licenseToken.ts (M2.1 서명 검증 코어) ================= */
+const b64url = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
+const makeToken = (header, payload) => `${b64url(header)}.${b64url(payload)}.SIG`;
+
+test('base64UrlToString — base64url 디코드(ASCII JSON)', () => {
+  const json = '{"tier":"pro","exp":123}';
+  const enc = Buffer.from(json).toString('base64url');
+  assert.equal(base64UrlToString(enc), json);
+});
+
+test('decodeJwt — 헤더/페이로드/서명 분해', () => {
+  const t = makeToken({ alg: 'ES256', typ: 'JWT' }, { tier: 'team', exp: 42 });
+  const jwt = decodeJwt(t);
+  assert.equal(jwt.header.alg, 'ES256');
+  assert.equal(jwt.payload.tier, 'team');
+  assert.equal(jwt.signatureB64, 'SIG');
+  assert.equal(jwt.signingInput, t.slice(0, t.lastIndexOf('.')));
+  assert.throws(() => decodeJwt('a.b')); // 형식 오류
+});
+
+test('validateLicenseClaims — 만료·iss·aud·tier', () => {
+  const now = 1_000_000;
+  const exp = (now + 60_000) / 1000; // 초 단위
+  const base = { tier: 'pro', exp, iss: 'srv', aud: 'plugin' };
+  assert.deepEqual(validateLicenseClaims(base, now, { issuer: 'srv', audience: 'plugin' }), {
+    ok: true,
+    tier: 'pro',
+    expiresAt: exp * 1000,
+  });
+  assert.equal(validateLicenseClaims({ tier: 'pro', exp: (now - 1) / 1000 }, now).ok, false); // 만료
+  assert.equal(validateLicenseClaims(base, now, { issuer: 'other' }).ok, false); // iss 불일치
+  assert.equal(validateLicenseClaims({ tier: 'gold', exp }, now).ok, false); // 알 수 없는 티어
+  assert.equal(validateLicenseClaims({ tier: 'pro' }, now).ok, false); // exp 없음
+});
+
+test('verifyLicenseToken — 서명 검증 주입 + alg=none 거부', async () => {
+  const now = 1_000_000;
+  const exp = (now + 60_000) / 1000;
+  const tok = makeToken({ alg: 'ES256' }, { tier: 'pro', exp });
+  const yes = async () => true;
+  const no = async () => false;
+
+  const ok = await verifyLicenseToken(tok, now, {}, yes);
+  assert.deepEqual(ok, { ok: true, tier: 'pro', expiresAt: exp * 1000 });
+
+  // 서명 실패 → 거부
+  assert.equal((await verifyLicenseToken(tok, now, {}, no)).ok, false);
+  // alg=none → 서명 검증 호출 없이 거부
+  const none = makeToken({ alg: 'none' }, { tier: 'pro', exp });
+  assert.equal((await verifyLicenseToken(none, now, {}, yes)).ok, false);
+  // 서명 OK라도 만료면 거부
+  const expired = makeToken({ alg: 'ES256' }, { tier: 'pro', exp: (now - 1) / 1000 });
+  assert.equal((await verifyLicenseToken(expired, now, {}, yes)).ok, false);
 });
