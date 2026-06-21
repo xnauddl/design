@@ -6,6 +6,7 @@
 - **에셋 Figma 파일**: https://www.figma.com/design/DxdfUfaSZnZtc8MJtepYTc (DSL — Figma Community Assets)
   - `icon-128` 프레임 → **아이콘 128×128 PNG**
   - `cover-1920x960` 프레임 → **커버 1920×960 PNG**
+  - `carousel-1` / `carousel-2` / `carousel-3` → **캐러셀 스크린샷 1920×960 PNG** (만들기 / 적용 / 관리)
   - 내보내기: 프레임 선택 → 우측 Export 패널 → PNG → 1x → Export
 
 ---
@@ -69,4 +70,4 @@ design systems, design tokens, variables, tokens, styles, automation, naming, co
 - [ ] `manifest.json`의 `networkAccess.allowedDomains`를 실제 도메인으로 교체 (licenseConfig와 일치)
 - [ ] `npm run build` 후 `manifest.json`(main=`dist/code.js`, ui=`dist/ui.html`)로 Figma 데스크톱에서 “Import plugin from manifest”로 동작 확인
 - [ ] 아이콘 128×128 PNG, 커버 1920×960 PNG 내보내기
-- [ ] (선택) 캐러셀 스크린샷 추가 — 만들기/적용/관리 탭 캡처
+- [ ] 캐러셀 스크린샷 3장(`carousel-1/2/3`, 만들기·적용·관리) 1920×960 PNG 내보내기
