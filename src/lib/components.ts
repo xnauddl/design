@@ -110,6 +110,33 @@ function cartesian(props: Record<string, string[]>): Record<string, string>[] {
  * 컴포넌트 이름 목록 → 베이스별 그룹/속성/빈 조합 + 단일 목록.
  * 빈 조합은 그룹 멤버들이 동일 속성 키 집합을 가질 때만 계산(키가 섞이면 생략).
  */
+/**
+ * 이미 베리언트인 자식 이름들(`prop=value, ...`) → 빠진 조합(variant 문자열).
+ * Phase 4 누락 조합 자동 생성의 순수 계산. 멤버들이 동일 속성 키 집합일 때만.
+ */
+export function missingVariants(variantNames: string[]): string[] {
+  const parsed = variantNames
+    .map((n) => parseVariantName(n).props)
+    .filter((p) => Object.keys(p).length > 0);
+  if (parsed.length < 2) return [];
+  const keySig = (p: Record<string, string>) => Object.keys(p).sort().join(',');
+  if (new Set(parsed.map(keySig)).size !== 1) return [];
+
+  const properties: Record<string, string[]> = {};
+  for (const p of parsed) {
+    for (const [k, v] of Object.entries(p)) {
+      const arr = (properties[k] ??= []);
+      if (!arr.includes(v)) arr.push(v);
+    }
+  }
+  for (const k of Object.keys(properties)) properties[k].sort();
+
+  const existing = new Set(parsed.map(formatVariant));
+  return cartesian(properties)
+    .map(formatVariant)
+    .filter((v) => !existing.has(v));
+}
+
 export function classifyVariants(names: string[]): ClassifyResult {
   const byBase = new Map<string, { name: string; props: Record<string, string> }[]>();
   for (const name of names) {
