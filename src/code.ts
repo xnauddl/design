@@ -9,6 +9,7 @@ import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
+import { Preset, upsertPreset } from './lib/presets';
 
 figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
 
@@ -20,9 +21,11 @@ const selection = () => figma.currentPage.selection;
    결과(LICENSE_VERIFIED)만 받아 캐시·적용한다. 여기서는 fetch/crypto를 직접 하지 않는다. */
 const DEV_TIER_KEY = 'dsl.devTier';
 const CACHE_KEY = 'dsl.licenseCache';
+const PRESETS_KEY = 'dsl.presets';
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
+let presets: Preset[] = []; // M3(Team): 공유 프리셋
 
 function effective(): {
   tier: Tier;
@@ -59,8 +62,25 @@ async function loadLicense(): Promise<void> {
     if (isTier(dt)) devTier = dt;
     const c = (await figma.clientStorage.getAsync(CACHE_KEY)) as LicenseCache | undefined;
     if (c && isTier(c.tier) && typeof c.expiresAt === 'number') cache = c;
+    const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
+    if (Array.isArray(ps)) presets = ps as Preset[];
   } catch {
     /* 저장소 접근 실패 시 free 유지 */
+  }
+}
+
+/** Team 전용 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. */
+function requireTeam(): boolean {
+  if (hasEntitlement(currentTier(), 'teamPresets')) return true;
+  post({ type: 'PREMIUM_REQUIRED', feature: 'teamPresets', message: '팀 공유 프리셋은 Team 요금제 기능입니다.' });
+  return false;
+}
+
+async function savePresets(): Promise<void> {
+  try {
+    await figma.clientStorage.setAsync(PRESETS_KEY, presets);
+  } catch {
+    /* 무시 */
   }
 }
 
@@ -154,6 +174,25 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           /* 무시 */
         }
         postLicense('라이선스 키 제거됨');
+        break;
+      }
+      case 'GET_PRESETS': {
+        if (!requireTeam()) break;
+        post({ type: 'PRESETS', presets });
+        break;
+      }
+      case 'SAVE_PRESET': {
+        if (!requireTeam()) break;
+        presets = upsertPreset(presets, msg.preset);
+        await savePresets();
+        post({ type: 'PRESETS', presets });
+        break;
+      }
+      case 'DELETE_PRESET': {
+        if (!requireTeam()) break;
+        presets = presets.filter((p) => p.name !== msg.name);
+        await savePresets();
+        post({ type: 'PRESETS', presets });
         break;
       }
     }

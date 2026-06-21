@@ -131,6 +131,26 @@
     <div class="status" id="licenseStatus"></div>
   </div>
 
+  <div class="step" id="presetCard">
+    <h2>팀 공유 프리셋 <span class="muted" id="presetLock"></span></h2>
+    <div class="muted">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Team 전용)</div>
+    <div class="row" style="margin-top:6px;">
+      <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px; font:inherit; padding:3px 5px;" />
+      <button id="btnSavePreset">현재 설정 저장</button>
+    </div>
+    <div class="row" style="margin-top:6px;">
+      <select id="presetList" style="flex:1; min-width:120px; font:inherit; padding:3px 5px;"></select>
+      <button id="btnLoadPreset">불러오기</button>
+      <button id="btnDeletePreset">삭제</button>
+    </div>
+    <div class="row" style="margin-top:6px;">
+      <button id="btnExportPreset">내보내기(JSON)</button>
+      <button id="btnImportPreset">가져오기(JSON)</button>
+    </div>
+    <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+    <div class="status" id="presetStatus"></div>
+  </div>
+
   <!-- UI_SCRIPT -->
 </body>
 </html>
