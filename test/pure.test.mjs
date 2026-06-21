@@ -30,6 +30,11 @@ import {
   decodeJwt,
   validateLicenseClaims,
   verifyLicenseToken,
+  serializePreset,
+  parsePreset,
+  upsertPreset,
+  semanticMapToText,
+  textToSemanticMap,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -236,6 +241,36 @@ test('validateLicenseClaims — 만료·iss·aud·tier', () => {
   assert.equal(validateLicenseClaims(base, now, { issuer: 'other' }).ok, false); // iss 불일치
   assert.equal(validateLicenseClaims({ tier: 'gold', exp }, now).ok, false); // 알 수 없는 티어
   assert.equal(validateLicenseClaims({ tier: 'pro' }, now).ok, false); // exp 없음
+});
+
+/* ================= presets.ts (M3 Team) ================= */
+test('serializePreset / parsePreset — 라운드트립 + 검증', () => {
+  const p = { name: 'mobile', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: { surface: 'color/neutral/50' } };
+  const round = parsePreset(serializePreset(p));
+  assert.deepEqual(round, { ok: true, preset: p });
+  // name 누락 → 에러
+  assert.equal(parsePreset(JSON.stringify({ base: 16 })).ok, false);
+  // 깨진 JSON → 에러
+  assert.equal(parsePreset('{nope').ok, false);
+  // 누락 필드는 기본값으로 정규화
+  const def = parsePreset(JSON.stringify({ name: 'x' }));
+  assert.deepEqual(def, { ok: true, preset: { name: 'x', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: {} } });
+});
+
+test('upsertPreset — 이름 키 교체(최신 앞)', () => {
+  const a = { name: 'a', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: {} };
+  const a2 = { ...a, base: 10 };
+  const b = { name: 'b', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: {} };
+  const list = upsertPreset(upsertPreset([], a), b); // [b, a]
+  const next = upsertPreset(list, a2); // a 교체 → [a2, b]
+  assert.deepEqual(next, [a2, b]);
+});
+
+test('semanticMap 텍스트 ↔ 객체', () => {
+  const map = { surface: 'color/neutral/50', text: 'color/neutral/900' };
+  assert.deepEqual(textToSemanticMap(semanticMapToText(map)), map);
+  // 공백 포함 값 보존
+  assert.deepEqual(textToSemanticMap('a = b c'), { a: 'b c' });
 });
 
 test('verifyLicenseToken — 서명 검증 주입 + alg=none 거부', async () => {

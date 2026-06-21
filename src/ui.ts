@@ -7,6 +7,7 @@ import { FREE_LIMITS, type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
+import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
 
 function send(msg: UiToCode): void {
@@ -19,6 +20,9 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
   document.getElementById(id) as T;
 
 let tokens: DraftToken[] = [];
+let presets: Preset[] = [];
+let isTeam = false;
+let presetsRequested = false;
 
 /* ---------- 토큰 목록 렌더 ---------- */
 function renderTokens(): void {
@@ -190,6 +194,89 @@ async function verifyAndReport(key: string): Promise<void> {
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
 
+/* ---------- 팀 공유 프리셋 (M3, Team) ---------- */
+const PRESET_FIELDS = ['presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson'];
+
+function updatePresetGate(): void {
+  for (const id of PRESET_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
+  $('presetLock').textContent = isTeam ? '' : '🔒 Team 전용';
+  if (isTeam && !presetsRequested) {
+    presetsRequested = true;
+    send({ type: 'GET_PRESETS' });
+  }
+}
+
+function renderPresetList(): void {
+  const sel = $('presetList') as HTMLSelectElement;
+  sel.innerHTML = '';
+  for (const p of presets) {
+    const o = document.createElement('option');
+    o.value = p.name;
+    o.textContent = p.name;
+    sel.appendChild(o);
+  }
+}
+
+const gatherPreset = (name: string): Preset => ({
+  name,
+  base: Number(($('base') as HTMLInputElement).value) || 16,
+  tolerance: Number(($('tol') as HTMLInputElement).value) || 0,
+  maxDepth: Number(($('depth') as HTMLInputElement).value) || 3,
+  semanticMap: textToSemanticMap(($('semMap') as HTMLTextAreaElement).value),
+});
+
+function applyPreset(p: Preset): void {
+  ($('base') as HTMLInputElement).value = String(p.base);
+  ($('tol') as HTMLInputElement).value = String(p.tolerance);
+  ($('depth') as HTMLInputElement).value = String(p.maxDepth);
+  ($('semMap') as HTMLTextAreaElement).value = semanticMapToText(p.semanticMap);
+}
+
+$('btnSavePreset').addEventListener('click', () => {
+  const name = ($('presetName') as HTMLInputElement).value.trim();
+  if (!name) {
+    setStatus('presetStatus', '프리셋 이름을 입력하세요.', 'warn');
+    return;
+  }
+  send({ type: 'SAVE_PRESET', preset: gatherPreset(name) });
+});
+
+$('btnLoadPreset').addEventListener('click', () => {
+  const name = ($('presetList') as HTMLSelectElement).value;
+  const p = presets.find((x) => x.name === name);
+  if (!p) {
+    setStatus('presetStatus', '선택된 프리셋이 없습니다.', 'warn');
+    return;
+  }
+  applyPreset(p);
+  setStatus('presetStatus', `‘${name}’ 적용됨 — 아래 단계에서 실행하세요.`, 'ok');
+});
+
+$('btnDeletePreset').addEventListener('click', () => {
+  const name = ($('presetList') as HTMLSelectElement).value;
+  if (name) send({ type: 'DELETE_PRESET', name });
+});
+
+$('btnExportPreset').addEventListener('click', () => {
+  const name = ($('presetList') as HTMLSelectElement).value;
+  const p = presets.find((x) => x.name === name);
+  if (!p) {
+    setStatus('presetStatus', '내보낼 프리셋을 선택하세요.', 'warn');
+    return;
+  }
+  ($('presetJson') as HTMLTextAreaElement).value = serializePreset(p);
+  setStatus('presetStatus', `‘${name}’ JSON을 내보냈습니다(복사해 공유).`, 'ok');
+});
+
+$('btnImportPreset').addEventListener('click', () => {
+  const parsed = parsePreset(($('presetJson') as HTMLTextAreaElement).value.trim());
+  if (!parsed.ok) {
+    setStatus('presetStatus', `가져오기 실패: ${parsed.error}`, 'warn');
+    return;
+  }
+  send({ type: 'SAVE_PRESET', preset: parsed.preset });
+});
+
 $('btnClearLicense').addEventListener('click', () => {
   ($('licenseKey') as HTMLInputElement).value = '';
   send({ type: 'CLEAR_LICENSE' });
@@ -251,8 +338,15 @@ window.onmessage = (event: MessageEvent) => {
         const cls = /실패|오프라인/.test(msg.note) ? 'warn' : 'ok';
         setStatus('licenseStatus', msg.note, cls);
       }
+      isTeam = msg.tier === 'team';
+      updatePresetGate();
       break;
     }
+    case 'PRESETS':
+      presets = msg.presets;
+      renderPresetList();
+      setStatus('presetStatus', `프리셋 ${presets.length}개`, 'ok');
+      break;
     case 'PREMIUM_REQUIRED':
       setStatus('createStatus', `${msg.message} (유료 기능: ${msg.feature})`, 'warn');
       break;
@@ -293,6 +387,7 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
 }
 
-// 초기: 컬렉션 조회(존재 확인용) + 라이선스 상태 조회
+// 초기: 컬렉션 조회(존재 확인용) + 라이선스 상태 조회. 프리셋 카드는 Team 확인 전까지 잠금.
+updatePresetGate();
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_LICENSE' });
