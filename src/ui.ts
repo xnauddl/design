@@ -28,11 +28,23 @@ let isTeam = false;
 let isPro = false;
 let teamDataRequested = false;
 let lastExportFormat: ExportFormat = 'w3c';
+let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 
 /* ---------- 토큰 목록 렌더 ---------- */
 function renderTokens(): void {
   const box = $('tokenList');
   box.innerHTML = '';
+  if (!tokens.length) {
+    // UX4: 빈 상태 — 선택 여부에 따라 안내 문구를 바꾼다.
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.innerHTML =
+      lastSelCount > 0
+        ? '선택에서 색·폰트·간격을 뽑습니다. <b>‘선택에서 토큰 추출’</b>을 누르세요.'
+        : '프레임을 선택한 뒤 <b>‘선택에서 토큰 추출’</b>을 누르면 색·폰트·간격이 후보로 잡힙니다. 예) 버튼·카드';
+    box.appendChild(empty);
+    return;
+  }
   tokens.forEach((t, i) => {
     const row = document.createElement('div');
     row.className = 'tk';
@@ -382,6 +394,12 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('extractStatus', msg.warnings.join(' ') || `${tokens.length}개 후보 추출 완료.`, msg.warnings.length ? 'warn' : 'ok');
       break;
     }
+    case 'SELECTION_STATE': {
+      lastSelCount = msg.count;
+      renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
+      if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
+      break;
+    }
     case 'CREATE_RESULT':
       setStatus('createStatus', msg.summary, msg.limited ? 'warn' : 'ok');
       break;
@@ -518,6 +536,17 @@ function renderDiff(changes: { before: string; after: string }[], applied: boole
   );
 }
 
+/** UX5: 선택 동기화 바 갱신. */
+function renderSelBar(count: number, scanned: number, bindable: number, capped: boolean): void {
+  const el = $('selBar');
+  const plus = capped ? '+' : '';
+  el.textContent =
+    count > 0
+      ? `● 선택 ${count}개 · 요소 ${scanned}${plus}개 · 바인딩 후보 ${bindable}${plus}개`
+      : '● 선택 없음 — 프레임을 선택하면 추출·바인딩할 수 있어요';
+  el.className = count > 0 ? 'selbar' : 'selbar muted';
+}
+
 function setStatus(id: string, text: string, cls: 'ok' | 'warn' | ''): void {
   const el = $(id);
   el.textContent = text;
@@ -530,6 +559,7 @@ function escapeHtml(s: string): string {
 
 // 초기: 컬렉션 조회(존재 확인용) + 라이선스 상태 조회. 팀 카드는 Team 확인 전까지 잠금.
 updateTeamGate();
+renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_LICENSE' });
 

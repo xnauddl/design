@@ -45,6 +45,8 @@ export type UiToCode =
 /** code → UI 응답. */
 export type CodeToUi =
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
+  // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
+  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean }
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; limited?: boolean }
   | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; limited?: boolean }
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; applied: boolean }

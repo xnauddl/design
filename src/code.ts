@@ -159,6 +159,42 @@ loadLicense().then(() => {
   if (cache && evaluateLicense(cache, Date.now()).stale) post({ type: 'REQUEST_VERIFY', key: cache.key });
 });
 
+/* ---------- UX5: 실시간 선택 동기화 ----------
+   선택이 바뀔 때마다 선택 수·하위 요소 수·바인딩 후보 수를 UI에 알린다.
+   대규모 선택에서도 안전하도록 스캔을 상한(SCAN_CAP)으로 제한한다. */
+const SCAN_CAP = 1500;
+function isBindableCandidate(n: SceneNode): boolean {
+  const fills = (n as { fills?: unknown }).fills;
+  const hasFills = Array.isArray(fills) && fills.some((p) => (p as Paint).type === 'SOLID' && (p as Paint).visible !== false);
+  const strokes = (n as { strokes?: unknown }).strokes;
+  const hasStrokes = Array.isArray(strokes) && strokes.length > 0;
+  const r = (n as { cornerRadius?: unknown }).cornerRadius;
+  const hasRadius = typeof r === 'number' && r > 0;
+  const hasFont = typeof (n as { fontSize?: unknown }).fontSize === 'number';
+  const lm = (n as { layoutMode?: string }).layoutMode;
+  const hasGap = !!lm && lm !== 'NONE' && typeof (n as { itemSpacing?: number }).itemSpacing === 'number';
+  return hasFills || hasStrokes || hasRadius || hasFont || hasGap;
+}
+function postSelection(): void {
+  const sel = selection();
+  let scanned = 0;
+  let bindable = 0;
+  let capped = false;
+  const stack: SceneNode[] = sel.slice();
+  while (stack.length) {
+    if (scanned >= SCAN_CAP) {
+      capped = true;
+      break;
+    }
+    const n = stack.pop() as SceneNode;
+    scanned++;
+    if (isBindableCandidate(n)) bindable++;
+    if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
+  }
+  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped });
+}
+figma.on('selectionchange', postSelection);
+
 figma.ui.onmessage = async (msg: UiToCode) => {
   try {
     switch (msg.type) {
@@ -201,6 +237,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'GET_COLLECTIONS': {
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
         post({ type: 'COLLECTIONS', collections: cols.map((c) => ({ id: c.id, name: c.name })) });
+        postSelection(); // UI 초기화 시점 — 현재 선택 상태도 함께 전송(UX5).
         break;
       }
       case 'GET_LICENSE': {
