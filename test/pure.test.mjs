@@ -7,6 +7,7 @@ import {
   hexToRgb,
   scopesFor,
   scopesForSources,
+  scopesForType,
   resolvedTypeForToken,
   stringValueForUnit,
   toPx,
@@ -31,6 +32,16 @@ test('scopesFor — 속성별 스코프', () => {
   assert.deepEqual(scopesFor('gap'), ['GAP']);
   assert.deepEqual(scopesFor('size'), ['WIDTH_HEIGHT']);
   assert.deepEqual(scopesFor('opacity'), ['OPACITY']);
+});
+
+test('scopesForType — 타입에 유효한 스코프만 통과', () => {
+  // STRING은 FLOAT 전용 스코프(LINE_HEIGHT/LETTER_SPACING) 거부, FONT_FAMILY는 통과
+  assert.deepEqual(scopesForType(['LINE_HEIGHT'], 'STRING'), []);
+  assert.deepEqual(scopesForType(['FONT_FAMILY'], 'STRING'), ['FONT_FAMILY']);
+  // FLOAT은 LINE_HEIGHT 유지, COLOR 스코프는 제거
+  assert.deepEqual(scopesForType(['LINE_HEIGHT', 'ALL_FILLS'], 'FLOAT'), ['LINE_HEIGHT']);
+  // COLOR는 fill/stroke 유지, FONT_SIZE 제거
+  assert.deepEqual(scopesForType(['ALL_FILLS', 'FONT_SIZE'], 'COLOR'), ['ALL_FILLS']);
 });
 
 test('scopesForSources — union 중복 제거', () => {
