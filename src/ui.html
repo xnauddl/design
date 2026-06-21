@@ -32,6 +32,10 @@
     .tab-btn.active { background: #0d99ff; color: #fff; border-color: #0d99ff; }
     .tab-section { display: none; }
     .tab-section.active { display: block; }
+    /* UX5 선택 동기화 바 / UX4 빈 상태 */
+    .selbar { position: sticky; top: 33px; z-index: 1; background: var(--figma-color-bg, #fff); font-size: 11px; padding: 4px 0 8px; margin: -2px 0 6px; border-bottom: 1px solid var(--figma-color-border, #eee); }
+    .selbar.muted { opacity: .6; }
+    .empty { padding: 12px 10px; border: 1px dashed var(--figma-color-border, #ddd); border-radius: 6px; opacity: .8; line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -40,6 +44,8 @@
     <button class="tab-btn" id="tabbtn-apply" role="tab">적용</button>
     <button class="tab-btn" id="tabbtn-settings" role="tab">관리</button>
   </div>
+
+  <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel">
     <div class="step">
