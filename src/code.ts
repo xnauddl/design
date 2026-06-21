@@ -423,7 +423,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               let def: string | boolean = '';
               if (p.type === 'TEXT') def = target.type === 'TEXT' ? target.characters : '';
               else if (p.type === 'BOOLEAN') def = target.visible;
-              else def = target.type === 'INSTANCE' && target.mainComponent ? target.mainComponent.key : '';
+              // INSTANCE_SWAP 기본값: 발행된 컴포넌트는 key, 로컬(미발행)은 빈 key라 id 사용.
+              else def = target.type === 'INSTANCE' && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : '';
               const id = node.addComponentProperty(p.propName, p.type, def);
               const refs = { ...(target.componentPropertyReferences ?? {}) };
               refs[p.field] = id;
