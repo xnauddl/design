@@ -50,6 +50,7 @@ import {
   inferComponentProperties,
   commitUndo,
   explainError,
+  nextTabIndex,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -520,4 +521,17 @@ test('explainError — 패턴별 친절 메시지 + 재시도 가능 여부', ()
   const unknown = explainError('totally weird boom');
   assert.match(unknown.message, /totally weird boom/);
   assert.equal(unknown.retryable, true);
+});
+
+/* ================= a11y.ts (UX8) ================= */
+test('nextTabIndex — 화살표 순환 + Home/End, 그 외 -1', () => {
+  assert.equal(nextTabIndex('ArrowRight', 0, 3), 1);
+  assert.equal(nextTabIndex('ArrowRight', 2, 3), 0); // 순환
+  assert.equal(nextTabIndex('ArrowDown', 1, 3), 2);
+  assert.equal(nextTabIndex('ArrowLeft', 0, 3), 2); // 순환
+  assert.equal(nextTabIndex('ArrowUp', 2, 3), 1);
+  assert.equal(nextTabIndex('Home', 2, 3), 0);
+  assert.equal(nextTabIndex('End', 0, 3), 2);
+  assert.equal(nextTabIndex('Enter', 0, 3), -1); // 내비 키 아님
+  assert.equal(nextTabIndex('ArrowRight', 0, 0), -1); // 빈 목록
 });

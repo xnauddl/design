@@ -12,6 +12,7 @@ import { type HistoryEntry, formatHistory, serializeHistory } from './lib/histor
 import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
 import { explainError, type FriendlyError } from './lib/errors';
+import { nextTabIndex } from './lib/a11y';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -681,15 +682,29 @@ renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_LICENSE' });
 
-/* ---------- 탭 내비게이션 (UI 개편) ---------- */
+/* ---------- 탭 내비게이션 (UI 개편 + UX8 키보드) ---------- */
 const TABS = ['tokens', 'apply', 'settings'] as const;
 function showTab(name: (typeof TABS)[number]): void {
   for (const t of TABS) {
     $(`tab-${t}`).classList.toggle('active', t === name);
     const btn = $(`tabbtn-${t}`);
-    btn.classList.toggle('active', t === name);
-    btn.setAttribute('aria-selected', String(t === name));
+    const on = t === name;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-selected', String(on));
+    btn.tabIndex = on ? 0 : -1; // UX8: roving tabindex — 탭 묶음은 한 번의 Tab 정지점
   }
 }
-for (const t of TABS) $(`tabbtn-${t}`).addEventListener('click', () => showTab(t));
+TABS.forEach((t, i) => {
+  const btn = $(`tabbtn-${t}`);
+  btn.addEventListener('click', () => showTab(t));
+  // UX8: 화살표/Home/End로 탭 이동(포커스 따라가며 활성화).
+  btn.addEventListener('keydown', (e) => {
+    const ni = nextTabIndex(e.key, i, TABS.length);
+    if (ni < 0) return;
+    e.preventDefault();
+    const target = TABS[ni];
+    showTab(target);
+    $(`tabbtn-${target}`).focus();
+  });
+});
 showTab('tokens');

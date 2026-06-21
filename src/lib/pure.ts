@@ -12,3 +12,4 @@ export * from './exporters';
 export * from './components';
 export * from './undo';
 export * from './errors';
+export * from './a11y';
