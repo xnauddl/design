@@ -346,6 +346,24 @@ test('exportTokens W3C — 중첩·$type·별칭 참조', () => {
   assert.deepEqual(json.spacing['16'], { $type: 'dimension', $value: '16px' });
 });
 
+test('exportTokens — 동일 이름 Semantic 미러 제거(Global 우선)', () => {
+  // Global 리터럴 + 같은 이름 Semantic 미러 → 미러 제외(충돌/자기참조 방지)
+  const tokens = [
+    { name: 'color/primary/500', collection: 'Semantic', type: 'COLOR', kind: 'color', aliasOf: 'color/primary/500' },
+    { name: 'color/primary/500', collection: 'Global', type: 'COLOR', kind: 'color', value: '#2563eb' },
+    { name: 'primary', collection: 'Semantic', type: 'COLOR', kind: 'color', aliasOf: 'color/primary/500' }, // 고유 역할 → 유지
+  ];
+  const css = exportTokens(tokens, OPTS);
+  // 리터럴 1줄만(자기참조 var(...) 미러 없음)
+  assert.match(css, /--color-primary-500: #2563eb;/);
+  assert.doesNotMatch(css, /--color-primary-500: var\(--color-primary-500\);/);
+  assert.match(css, /--primary: var\(--color-primary-500\);/); // 고유 역할은 유지
+
+  const j = JSON.parse(exportTokens(tokens, { ...OPTS, format: 'w3c' }));
+  assert.equal(j.color.primary['500'].$value, '#2563eb'); // 자기참조 아님
+  assert.equal(j.primary.$value, '{color.primary.500}');
+});
+
 test('exportTokens — 빈 입력', () => {
   assert.equal(exportTokens([], OPTS), ':root {\n}');
   assert.equal(exportTokens([], { ...OPTS, format: 'w3c' }), '{}');

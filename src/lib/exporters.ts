@@ -199,8 +199,23 @@ function toW3C(tokens: ExportToken[], opts: ExportOptions): string {
   return JSON.stringify(root, null, 2);
 }
 
+/**
+ * 이름 중복 제거 — Semantic은 Global의 1:1 미러(동일 이름)라 그대로 두면
+ * 충돌/자기참조가 생긴다. 같은 이름이면 Global(리터럴) 우선, Semantic 미러는 버린다.
+ * 이름이 고유한 시맨틱 역할(primary·surface·space/md 등)은 유지된다.
+ */
+function dedupeByName(tokens: ExportToken[]): ExportToken[] {
+  const seen = new Map<string, ExportToken>();
+  for (const t of tokens) {
+    const prev = seen.get(t.name);
+    if (!prev || (prev.collection === 'Semantic' && t.collection === 'Global')) seen.set(t.name, t);
+  }
+  return [...seen.values()];
+}
+
 /** 형식에 따라 토큰을 코드 문자열로 내보낸다. */
 export function exportTokens(tokens: ExportToken[], opts: ExportOptions): string {
-  const list = opts.includeSnapshots ? tokens : tokens.filter((t) => !isSnapshot(t.name));
+  let list = opts.includeSnapshots ? tokens : tokens.filter((t) => !isSnapshot(t.name));
+  list = dedupeByName(list);
   return opts.format === 'css' ? toCss(list, opts) : toW3C(list, opts);
 }
