@@ -187,9 +187,13 @@ test('createTokens — Global 리터럴 + Semantic 별칭 + scopes/hidden + px �
   const gLh = findVar(figma, 'Global', 'line-height/150');
   assert.equal(gLh.resolvedType, 'STRING');
   assert.equal(gLh.valuesByMode['mode:Global'], '150%');
+  // STRING엔 LINE_HEIGHT(FLOAT 전용) 스코프를 못 줌 → 필터되어 빈 배열 (실 Figma 거부 방지)
+  assert.deepEqual(gLh.scopes, []);
   const gLhPx = findVar(figma, 'Global', 'line-height/150-percent-px');
   assert.equal(gLhPx.resolvedType, 'FLOAT');
   assert.equal(gLhPx.valuesByMode['mode:Global'], 24);
+  // px 스냅샷(FLOAT)은 LINE_HEIGHT 스코프 유지
+  assert.deepEqual(gLhPx.scopes, ['LINE_HEIGHT']);
   // px 스냅샷은 Semantic 미러(별칭)도 있어 바인딩 가능
   const sLhPx = findVar(figma, 'Semantic', 'line-height/150-percent-px');
   assert.equal(sLhPx.resolvedType, 'FLOAT');

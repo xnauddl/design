@@ -166,6 +166,24 @@ export function scopesForSources(sources: SourceField[]): ScopeName[] {
   return [...set];
 }
 
+/** resolvedType별 Figma가 허용하는 스코프. 이외 스코프를 변수에 지정하면 런타임 거부됨. */
+const VALID_SCOPES: Record<ResolvedType, ReadonlySet<ScopeName>> = {
+  COLOR: new Set(['ALL_SCOPES', 'ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL', 'STROKE_COLOR', 'EFFECT_COLOR']),
+  FLOAT: new Set(['ALL_SCOPES', 'GAP', 'WIDTH_HEIGHT', 'CORNER_RADIUS', 'FONT_SIZE', 'LINE_HEIGHT', 'LETTER_SPACING', 'FONT_WEIGHT', 'EFFECT_FLOAT', 'OPACITY']),
+  STRING: new Set(['ALL_SCOPES', 'FONT_FAMILY']),
+  BOOLEAN: new Set(['ALL_SCOPES']),
+};
+
+/**
+ * 스코프 목록을 변수 타입에 유효한 것만 남긴다. 비-px lineHeight/letterSpacing은 STRING이라
+ * LINE_HEIGHT/LETTER_SPACING(FLOAT 전용) 스코프를 못 받는다 — Figma가 거부하므로 사전 차단.
+ * (px 스냅샷 FLOAT 변수는 그대로 LINE_HEIGHT 스코프를 가진다.)
+ */
+export function scopesForType(scopes: ScopeName[], type: ResolvedType): ScopeName[] {
+  const ok = VALID_SCOPES[type];
+  return scopes.filter((s) => ok.has(s));
+}
+
 /**
  * 시맨틱 역할 이름 → 속성에 맞는 스코프. 역할 머리말(슬래시 앞)로 판단.
  * 미지정 역할(primary/secondary/accent/상태색 등)은 undefined → 호출자가 원시 스코프를 상속.
