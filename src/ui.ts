@@ -534,7 +534,7 @@ send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_LICENSE' });
 
 /* ---------- 탭 내비게이션 (UI 개편) ---------- */
-const TABS = ['tokens', 'components', 'settings'] as const;
+const TABS = ['tokens', 'apply', 'settings'] as const;
 function showTab(name: (typeof TABS)[number]): void {
   for (const t of TABS) {
     $(`tab-${t}`).classList.toggle('active', t === name);
