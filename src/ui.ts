@@ -25,6 +25,7 @@ let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
 let history: HistoryEntry[] = [];
 let isTeam = false;
+let isPro = false;
 let teamDataRequested = false;
 let lastExportFormat: ExportFormat = 'w3c';
 
@@ -204,17 +205,32 @@ const TEAM_FIELDS = [
   'btnRefreshHistory', 'btnExportHistory', 'btnClearHistory', 'historyJson',
 ];
 
+const PRO_FIELDS = ['btnRegisterComp', 'btnClassifyVariants'];
+
 function updateTeamGate(): void {
   for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
+  for (const id of PRO_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPro;
   const lock = isTeam ? '' : '🔒 Team 전용';
   $('presetLock').textContent = lock;
   $('historyLock').textContent = lock;
+  $('componentLock').textContent = isPro ? '' : '🔒 Pro 전용';
   if (isTeam && !teamDataRequested) {
     teamDataRequested = true;
     send({ type: 'GET_PRESETS' });
     send({ type: 'GET_HISTORY' });
   }
 }
+
+/* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
+$('btnRegisterComp').addEventListener('click', () => {
+  setStatus('componentStatus', '컴포넌트 등록 중…', '');
+  send({ type: 'REGISTER_COMPONENTS' });
+});
+
+$('btnClassifyVariants').addEventListener('click', () => {
+  setStatus('componentStatus', '베리언트 분류 중…', '');
+  send({ type: 'CLASSIFY_VARIANTS' });
+});
 
 function renderPresetList(): void {
   const sel = $('presetList') as HTMLSelectElement;
@@ -401,6 +417,7 @@ window.onmessage = (event: MessageEvent) => {
         setStatus('licenseStatus', msg.note, cls);
       }
       isTeam = msg.tier === 'team';
+      isPro = msg.tier === 'pro' || msg.tier === 'team';
       updateTeamGate();
       break;
     }
@@ -419,6 +436,26 @@ window.onmessage = (event: MessageEvent) => {
       ($('exportOut') as HTMLTextAreaElement).value = msg.content;
       setStatus('exportStatus', `${msg.format === 'css' ? 'CSS' : 'W3C JSON'} 내보냄 — 복사 또는 다운로드.`, 'ok');
       break;
+    case 'COMPONENTS_RESULT':
+      setStatus('componentStatus', `컴포넌트 등록 ${msg.registered} · 스킵 ${msg.skipped}`, msg.registered ? 'ok' : 'warn');
+      break;
+    case 'VARIANTS_RESULT': {
+      const box = $('variantReport');
+      box.innerHTML = '';
+      if (msg.missing.length) {
+        const h = document.createElement('div');
+        h.textContent = '빈 조합(미생성):';
+        box.appendChild(h);
+        for (const m of msg.missing) {
+          const d = document.createElement('div');
+          d.textContent = `  ${m}`;
+          box.appendChild(d);
+        }
+      }
+      const extra = `${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.missing.length ? ' · 빈 조합 있음' : ''}`;
+      setStatus('componentStatus', `베리언트 세트 ${msg.sets}개 생성${extra}`, 'ok');
+      break;
+    }
     case 'PREMIUM_REQUIRED':
       setStatus('createStatus', `${msg.message} (유료 기능: ${msg.feature})`, 'warn');
       break;
