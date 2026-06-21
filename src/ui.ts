@@ -4,6 +4,9 @@
 import type { UiToCode, CodeToUi } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
 import { FREE_LIMITS, type Tier } from './lib/entitlements';
+import { parseVerifyResponse, type VerifyResult } from './lib/license';
+import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
+import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
 import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
 
 function send(msg: UiToCode): void {
@@ -138,8 +141,54 @@ $('btnVerify').addEventListener('click', () => {
     return;
   }
   setStatus('licenseStatus', '검증 중…', '');
-  send({ type: 'SET_LICENSE_KEY', key });
+  void verifyAndReport(key);
 });
+
+/* ---------- 라이선스 검증 (UI에서 수행 — WebCrypto·fetch 가용) ---------- */
+function b64urlToBytes(s: string): Uint8Array<ArrayBuffer> {
+  const bin = base64UrlToString(s);
+  const out = new Uint8Array(new ArrayBuffer(bin.length));
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 0xff;
+  return out;
+}
+
+/** ES256(JWT) 서명 검증 — UI 아이프레임의 WebCrypto 사용. */
+async function subtleVerify(signingInput: string, signatureB64: string, alg: string): Promise<boolean> {
+  if (alg !== LICENSE_ALG) return false;
+  const key = await crypto.subtle.importKey(
+    'jwk',
+    LICENSE_PUBLIC_JWK as JsonWebKey,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['verify'],
+  );
+  const data = new TextEncoder().encode(signingInput);
+  return crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, b64urlToBytes(signatureB64), data);
+}
+
+/** 검증 서버 호출 + 서명/클레임 검증 → 결과를 code로 보고(code가 캐시·적용). */
+async function verifyAndReport(key: string): Promise<void> {
+  let result: VerifyResult;
+  try {
+    const resp = await fetch(VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, pluginId: PLUGIN_ID }),
+    });
+    const json: unknown = await resp.json();
+    // 서명 토큰({ token }) 우선, 없으면 평문 응답(개발/하위호환).
+    const signed = !!json && typeof json === 'object' && typeof (json as { token?: unknown }).token === 'string';
+    const parsed = signed
+      ? await verifyLicenseToken((json as { token: string }).token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify)
+      : parseVerifyResponse(json);
+    result = parsed.ok
+      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt }
+      : { ok: false, error: parsed.error };
+  } catch {
+    result = { ok: false, error: '검증 서버 연결 실패(오프라인)', offline: true };
+  }
+  send({ type: 'LICENSE_VERIFIED', key, result });
+}
 
 $('btnClearLicense').addEventListener('click', () => {
   ($('licenseKey') as HTMLInputElement).value = '';
@@ -206,6 +255,10 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'PREMIUM_REQUIRED':
       setStatus('createStatus', `${msg.message} (유료 기능: ${msg.feature})`, 'warn');
+      break;
+    case 'REQUEST_VERIFY':
+      // code가 캐시된 키의 (재)검증을 요청 — UI에서 수행 후 결과 보고.
+      void verifyAndReport(msg.key);
       break;
     case 'ERROR':
       setStatus('extractStatus', `오류: ${msg.message}`, 'warn');

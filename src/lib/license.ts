@@ -59,6 +59,9 @@ export interface VerifyErr {
   error: string;
 }
 
+/** UI(검증 수행) → code(캐시·적용)로 전달되는 검증 결과. offline은 grace 폴백 신호. */
+export type VerifyResult = VerifyOk | (VerifyErr & { offline?: boolean });
+
 /**
  * 검증 서버 응답(JSON) 파싱. 기대 형식:
  *   성공: { valid:true, tier:'pro', expiresAt: <ms> }
