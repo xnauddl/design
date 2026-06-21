@@ -5,3 +5,4 @@ export * from './color';
 export * from './palette';
 export * from './entitlements';
 export * from './license';
+export * from './licenseToken';
