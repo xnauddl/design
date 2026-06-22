@@ -17,6 +17,7 @@ import {
   layerNameFromToken,
   layerNameFromRole,
   isDefaultName,
+  isTokenEchoName,
   parseTokenName,
   dedupeName,
   hasEntitlement,
@@ -146,6 +147,17 @@ test('isDefaultName — Figma 기본명만 교체 대상', () => {
   // 사람이 지은 의미 있는 이름 → 보존
   for (const n of ['button', 'card-header', 'Root', 'icon', 'OriginalName', 'frame-wrapper', 'rectangle-bg']) {
     assert.equal(isDefaultName(n), false, n);
+  }
+});
+
+test('isTokenEchoName — 구 리네임의 원시 토큰 베낌 이름만 교체 대상', () => {
+  // 원시 토큰 경로를 그대로 베낀 이름 → 교체 대상
+  for (const n of ['color-121210', 'color-0066ff', 'spacing-16', 'line-height-1-5', 'opacity-50', 'radius-9999']) {
+    assert.equal(isTokenEchoName(n), true, n);
+  }
+  // 같은 네임스페이스라도 값이 단어면 사람 이름 → 보존
+  for (const n of ['color-picker', 'size-large', 'radius-full', 'spacing-control', 'button-primary', 'card-header']) {
+    assert.equal(isTokenEchoName(n), false, n);
   }
 });
 

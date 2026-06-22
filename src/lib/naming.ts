@@ -149,6 +149,28 @@ export function parseTokenName(tokenName: string): ParsedToken {
   return { roleLeaf, context, primitive: false };
 }
 
+/** 토큰 값 꼴(색 6자리 hex 또는 숫자 세그먼트)인지. */
+function isTokenValue(v: string): boolean {
+  if (/^[0-9a-f]{6}$/.test(v)) return true; // 색: 121210, 0066ff
+  return v.split('-').every((s) => /^\d+$/.test(s)); // 숫자: 16, 1-5
+}
+
+/**
+ * 구(舊) 리네임이 원시 토큰 경로를 그대로 베껴 만든 의미 없는 이름인지(교체 대상).
+ * 예: 'color-121210'(=color/121210) · 'spacing-16' · 'line-height-1-5'.
+ * 'color-picker'·'size-large'처럼 값이 단어면 사람 이름으로 보고 보존(false).
+ */
+export function isTokenEchoName(name: string): boolean {
+  const n = name.trim().toLowerCase();
+  for (const ns of PRIMITIVE_NS) {
+    if (n.startsWith(ns + '-')) {
+      const value = n.slice(ns.length + 1);
+      if (value && isTokenValue(value)) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * 같은 부모 내 이름 충돌 해소 — 순서대로 -2, -3 … 접미사.
  * `taken`은 이미 확정된 이름 집합(호출자가 누적).

@@ -29,7 +29,7 @@
 **원칙: 레이어의 "역할(role)"이 이름을 정한다. 토큰은 이름을 짓는 "신호"로만 쓰고 경로를 그대로 복사하지 않는다.**
 
 - 형식: **kebab-case 소문자**, 구분자 `-`. 구조: `{상위 맥락}-{로컬 역할}`(기본 최대 3단계).
-- **보존형** — Figma가 자동으로 붙인 기본명(`Frame 12`·`Rectangle`·`Vector`·`Group 5`…)만 교체한다. 사람이 지은 의미 있는 이름은 **그대로 보존**하고 자식의 맥락으로만 쓴다.
+- **보존형** — Figma 기본명(`Frame 12`·`Rectangle`·`Vector`·`Group 5`…)과 구(舊) 리네임이 원시 토큰 경로를 베껴 만든 이름(`color-121210`·`spacing-16`·`line-height-1-5`…)만 교체한다. 사람이 지은 의미 있는 이름(`color-picker`·`size-large` 등 값이 단어인 경우 포함)은 **그대로 보존**하고 자식의 맥락으로만 쓴다.
 - **역할 판정 순서**: ① 바인딩 토큰의 **말단(leaf)** 이 역할 어휘면 그것(`button/primary/background`의 `background`) → ② 노드 타입·기하(VECTOR=`icon`, 얇은 막대=`divider`, 이미지 타원=`avatar`, 채움 사각형=`background`, 외곽선만=`border`, 프레임=`container`/단일자식 `wrapper`).
   - 핵심 역할 어휘: `icon`·`background`·`border`·`divider`·`container`·`wrapper`·`image`·`avatar`·`badge`.
   - **원시(Global) 토큰**(`color/blue-500`·`spacing/16`…)은 이름 신호가 없다 → 기하로 폴백(역할 오염 방지).

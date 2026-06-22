@@ -7,7 +7,7 @@
    - 맥락: 가장 가까운 의미 있는 조상 이름 → (없으면) 토큰 경로 접두사.
    - 제외: Component/ComponentSet · Text · Instance · 잠긴 레이어.
    ============================================================ */
-import { isDefaultName, parseTokenName, layerNameFromRole, dedupeName, kebab } from './naming';
+import { isDefaultName, isTokenEchoName, parseTokenName, layerNameFromRole, dedupeName, kebab } from './naming';
 import type { ParsedToken } from './naming';
 import type { RenameChange } from '../shared/messages';
 
@@ -68,7 +68,8 @@ async function decide(
   if (node.locked) return { skip: true };
 
   // 보존형: 사람이 지은 의미 있는 이름은 그대로 두고 맥락으로만 쓴다.
-  if (!isDefaultName(node.name)) return { skip: true };
+  // 단, Figma 기본명과 구 리네임이 남긴 토큰 베낌 이름(color-121210 등)은 교체.
+  if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
 
   const token = await primaryToken(node);
   const role = resolveRole(node, token);
