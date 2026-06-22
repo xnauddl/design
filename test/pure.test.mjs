@@ -68,6 +68,7 @@ import {
   familyRole,
   suggestTokenRoles,
   pipelineSteps,
+  t,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -783,4 +784,16 @@ test('pipelineSteps — 전제에 따른 단계 상태', () => {
   assert.deepEqual(both.map((s) => s.status), ['done', 'ready', 'ready']);
   assert.equal(both[1].hint, undefined);
   assert.equal(both[2].hint, undefined);
+});
+
+/* ================= i18n.ts (런타임 문자열 외부화) ================= */
+test('t — 키 조회·보간·폴백', () => {
+  assert.equal(t('rename.none'), '변경할 이름이 없습니다.');
+  assert.equal(t('rename.applied', { count: 3 }), '3개 이름 적용 완료.');
+  assert.equal(t('preset.applied', { name: 'A' }), '‘A’ 적용됨 — 아래 단계에서 실행하세요.');
+  // 누락 변수는 자리표시자 유지
+  assert.equal(t('rename.applied', {}), '{count}개 이름 적용 완료.');
+  // 누락 키는 key 그대로 폴백
+  assert.equal(t('no.such.key'), 'no.such.key');
+  assert.equal(t('no.such.key', { a: 1 }), 'no.such.key');
 });
