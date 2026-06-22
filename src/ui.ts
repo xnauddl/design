@@ -8,7 +8,6 @@ import { parseVerifyResponse, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
-import { type HistoryEntry, formatHistory, serializeHistory } from './lib/history';
 import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
 import { explainError, type FriendlyError } from './lib/errors';
@@ -29,7 +28,6 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
-let history: HistoryEntry[] = [];
 let isTeam = false;
 let isPro = false;
 let teamDataRequested = false;
@@ -512,10 +510,9 @@ async function verifyAndReport(key: string): Promise<void> {
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
 
-/* ---------- 팀 기능 게이트 (M3 프리셋 · M3.1 이력, Team) ---------- */
+/* ---------- 팀 기능 게이트 (M3 프리셋, Team) ---------- */
 const TEAM_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
-  'btnRefreshHistory', 'btnExportHistory', 'btnClearHistory', 'historyJson',
 ];
 
 const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps'];
@@ -523,9 +520,7 @@ const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'bt
 function updateTeamGate(): void {
   for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
   for (const id of PRO_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPro;
-  const lock = isTeam ? '' : '🔒 Team 전용';
-  $('presetLock').textContent = lock;
-  $('historyLock').textContent = lock;
+  $('presetLock').textContent = isTeam ? '' : '🔒 Team 전용';
   $('componentLock').textContent = isPro ? '' : '🔒 Pro 전용';
   // 마법사의 컴포넌트화 옵션도 Pro 게이팅(미Pro면 체크 불가).
   $('wizComponentLock').textContent = isPro ? '' : '🔒 Pro';
@@ -533,7 +528,6 @@ function updateTeamGate(): void {
   if (isTeam && !teamDataRequested) {
     teamDataRequested = true;
     send({ type: 'GET_PRESETS' });
-    send({ type: 'GET_HISTORY' });
   }
 }
 
@@ -653,30 +647,6 @@ $('btnImportPreset').addEventListener('click', () => {
   }
   send({ type: 'SAVE_PRESET', preset: parsed.preset });
 });
-
-/* ---------- 변경 이력 (M3.1, Team) ---------- */
-function renderHistory(): void {
-  const box = $('historyList');
-  box.innerHTML = '';
-  if (!history.length) {
-    box.textContent = '이력 없음';
-    return;
-  }
-  for (const e of history) {
-    const row = document.createElement('div');
-    row.textContent = formatHistory(e);
-    box.appendChild(row);
-  }
-}
-
-$('btnRefreshHistory').addEventListener('click', () => send({ type: 'GET_HISTORY' }));
-
-$('btnExportHistory').addEventListener('click', () => {
-  ($('historyJson') as HTMLTextAreaElement).value = serializeHistory(history);
-  setStatus('historyStatus', `이력 ${history.length}건 내보냄(복사해 공유).`, 'ok');
-});
-
-$('btnClearHistory').addEventListener('click', () => send({ type: 'CLEAR_HISTORY' }));
 
 /* ---------- 내보내기 (코드) ---------- */
 $('btnExport').addEventListener('click', () => {
@@ -819,11 +789,6 @@ window.onmessage = (event: MessageEvent) => {
       renderPresetList();
       setStatus('presetStatus', `프리셋 ${presets.length}개`, 'ok');
       break;
-    case 'HISTORY':
-      history = msg.entries;
-      renderHistory();
-      setStatus('historyStatus', `이력 ${history.length}건`, 'ok');
-      break;
     case 'EXPORT_RESULT':
       lastExportFormat = msg.format;
       ($('exportOut') as HTMLTextAreaElement).value = msg.content;
@@ -920,8 +885,6 @@ const OP_STATUS: Record<string, string> = {
   GET_PRESETS: 'presetStatus',
   SAVE_PRESET: 'presetStatus',
   DELETE_PRESET: 'presetStatus',
-  GET_HISTORY: 'historyStatus',
-  CLEAR_HISTORY: 'historyStatus',
   SET_LICENSE: 'licenseStatus',
   LICENSE_VERIFIED: 'licenseStatus',
   CLEAR_LICENSE: 'licenseStatus',

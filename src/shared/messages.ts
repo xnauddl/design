@@ -5,7 +5,6 @@ import type { DraftToken } from '../lib/tokens';
 import type { Tier } from '../lib/entitlements';
 import type { LicenseStatus, VerifyResult } from '../lib/license';
 import type { Preset } from '../lib/presets';
-import type { HistoryEntry } from '../lib/history';
 import type { ExportFormat } from '../lib/exporters';
 import type { WcagLevel, ContrastFinding } from '../lib/contrast';
 
@@ -93,8 +92,6 @@ export type UiToCode =
   | { type: 'GET_PRESETS' } // M3(Team): 저장된 프리셋 목록 요청
   | { type: 'SAVE_PRESET'; preset: Preset } // M3(Team): 프리셋 저장/갱신
   | { type: 'DELETE_PRESET'; name: string } // M3(Team): 프리셋 삭제
-  | { type: 'GET_HISTORY' } // M3.1(Team): 변경 이력 조회
-  | { type: 'CLEAR_HISTORY' } // M3.1(Team): 변경 이력 비우기
   | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number; includeSnapshots: boolean } // 토큰 코드 내보내기
   | { type: 'SCAN_COMPONENT_CANDIDATES' } // #1(Pro): 선택 하위 순회 → 등록 후보 트리
   | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[] } // Phase 3(Pro): 선택/지정 노드 → 메인 컴포넌트(nodeIds 미지정 시 최상위 선택)
@@ -130,7 +127,6 @@ export type CodeToUi =
   | { type: 'PREMIUM_REQUIRED'; feature: string; message: string }
   | { type: 'REQUEST_VERIFY'; key: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서)
   | { type: 'PRESETS'; presets: Preset[] } // M3(Team): 프리셋 목록
-  | { type: 'HISTORY'; entries: HistoryEntry[] } // M3.1(Team): 변경 이력
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number } // Phase 3

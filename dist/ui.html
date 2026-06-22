@@ -396,22 +396,6 @@
       </div>
     </div>
 
-    <div class="step" id="historyCard">
-      <h2>변경 이력 <span class="muted" id="historyLock"></span></h2>
-      <div class="muted">토큰 생성·바인딩·리네임·시맨틱 적용 기록(로컬). (Team 전용 조회)</div>
-      <div class="row">
-        <button id="btnRefreshHistory">새로고침</button>
-        <button id="btnExportHistory">내보내기</button>
-        <button id="btnClearHistory">비우기</button>
-      </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX3</span><span class="ux-t">사유별 그룹 + 시간</span></div>
-        <div id="historyList" style="max-height:140px; overflow:auto; font-family:ui-monospace, monospace; font-size:11px;"></div>
-        <div class="status" id="historyStatus"></div>
-      </div>
-      <textarea id="historyJson" spellcheck="false" rows="3" placeholder="내보낸 이력이 여기에 표시됩니다." style="width:100%; font-family:ui-monospace, monospace;"></textarea>
-    </div>
-
     <!-- UX8 · 접근성 / 국제화 -->
     <div class="ux">
       <div class="ux-h"><span class="badge">UX8</span><span class="ux-t">접근성 · 국제화</span></div>
@@ -579,25 +563,6 @@
       if (m) map[m[1]] = m[2];
     }
     return map;
-  }
-
-  // src/lib/history.ts
-  var pad = (n) => String(n).padStart(2, "0");
-  function formatTime(at) {
-    const d = new Date(at);
-    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-  }
-  var ACTION_LABEL = {
-    create: "\uD1A0\uD070 \uC0DD\uC131",
-    bind: "\uBC14\uC778\uB529",
-    rename: "\uB9AC\uB124\uC784",
-    semantics: "\uC2DC\uB9E8\uD2F1"
-  };
-  function formatHistory(e) {
-    return `${formatTime(e.at)} \xB7 ${ACTION_LABEL[e.action]} \xB7 ${e.summary}`;
-  }
-  function serializeHistory(list) {
-    return list.map(formatHistory).join("\n");
   }
 
   // src/lib/tokens.ts
@@ -885,7 +850,6 @@
   var $ = (id) => document.getElementById(id);
   var tokens = [];
   var presets = [];
-  var history = [];
   var isTeam = false;
   var isPro = false;
   var teamDataRequested = false;
@@ -1294,26 +1258,19 @@
     "btnDeletePreset",
     "btnExportPreset",
     "btnImportPreset",
-    "presetJson",
-    "btnRefreshHistory",
-    "btnExportHistory",
-    "btnClearHistory",
-    "historyJson"
+    "presetJson"
   ];
   var PRO_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnExposeProps"];
   function updateTeamGate() {
     for (const id of TEAM_FIELDS) $(id).disabled = !isTeam;
     for (const id of PRO_FIELDS) $(id).disabled = !isPro;
-    const lock = isTeam ? "" : "\u{1F512} Team \uC804\uC6A9";
-    $("presetLock").textContent = lock;
-    $("historyLock").textContent = lock;
+    $("presetLock").textContent = isTeam ? "" : "\u{1F512} Team \uC804\uC6A9";
     $("componentLock").textContent = isPro ? "" : "\u{1F512} Pro \uC804\uC6A9";
     $("wizComponentLock").textContent = isPro ? "" : "\u{1F512} Pro";
     $("wizOptComponentize").disabled = !isPro;
     if (isTeam && !teamDataRequested) {
       teamDataRequested = true;
       send({ type: "GET_PRESETS" });
-      send({ type: "GET_HISTORY" });
     }
   }
   $("btnScanComp").addEventListener("click", () => {
@@ -1418,25 +1375,6 @@
     }
     send({ type: "SAVE_PRESET", preset: parsed.preset });
   });
-  function renderHistory() {
-    const box = $("historyList");
-    box.innerHTML = "";
-    if (!history.length) {
-      box.textContent = "\uC774\uB825 \uC5C6\uC74C";
-      return;
-    }
-    for (const e of history) {
-      const row = document.createElement("div");
-      row.textContent = formatHistory(e);
-      box.appendChild(row);
-    }
-  }
-  $("btnRefreshHistory").addEventListener("click", () => send({ type: "GET_HISTORY" }));
-  $("btnExportHistory").addEventListener("click", () => {
-    $("historyJson").value = serializeHistory(history);
-    setStatus("historyStatus", `\uC774\uB825 ${history.length}\uAC74 \uB0B4\uBCF4\uB0C4(\uBCF5\uC0AC\uD574 \uACF5\uC720).`, "ok");
-  });
-  $("btnClearHistory").addEventListener("click", () => send({ type: "CLEAR_HISTORY" }));
   $("btnExport").addEventListener("click", () => {
     const format = $("exportFormat").value;
     const fontSizeUnit = $("exportFontUnit").value;
@@ -1561,11 +1499,6 @@
         renderPresetList();
         setStatus("presetStatus", `\uD504\uB9AC\uC14B ${presets.length}\uAC1C`, "ok");
         break;
-      case "HISTORY":
-        history = msg.entries;
-        renderHistory();
-        setStatus("historyStatus", `\uC774\uB825 ${history.length}\uAC74`, "ok");
-        break;
       case "EXPORT_RESULT":
         lastExportFormat = msg.format;
         $("exportOut").value = msg.content;
@@ -1656,8 +1589,6 @@
     GET_PRESETS: "presetStatus",
     SAVE_PRESET: "presetStatus",
     DELETE_PRESET: "presetStatus",
-    GET_HISTORY: "historyStatus",
-    CLEAR_HISTORY: "historyStatus",
     SET_LICENSE: "licenseStatus",
     LICENSE_VERIFIED: "licenseStatus",
     CLEAR_LICENSE: "licenseStatus",

@@ -1482,12 +1482,6 @@
     return [p, ...list.filter((x) => x.name !== p.name)];
   }
 
-  // src/lib/history.ts
-  var HISTORY_CAP = 100;
-  function pushHistory(list, entry, cap = HISTORY_CAP) {
-    return [entry, ...list].slice(0, cap);
-  }
-
   // src/lib/undo.ts
   function commitUndo(f) {
     if (typeof f.commitUndo === "function") f.commitUndo();
@@ -1499,11 +1493,9 @@
   var DEV_TIER_KEY = "dsl.devTier";
   var CACHE_KEY = "dsl.licenseCache";
   var PRESETS_KEY = "dsl.presets";
-  var HISTORY_KEY = "dsl.history";
   var devTier = "free";
   var cache = null;
   var presets = [];
-  var history = [];
   var bindCancel = false;
   function effective() {
     if (cache) {
@@ -1534,15 +1526,8 @@
       if (c && typeof c.key === "string" && isTier(c.tier) && typeof c.expiresAt === "number" && typeof c.lastVerified === "number") cache = c;
       const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
       if (Array.isArray(ps)) presets = ps;
-      const h = await figma.clientStorage.getAsync(HISTORY_KEY);
-      if (Array.isArray(h)) history = h;
     } catch (e) {
     }
-  }
-  function record(action, summary) {
-    history = pushHistory(history, { at: Date.now(), action, summary });
-    void figma.clientStorage.setAsync(HISTORY_KEY, history).catch(() => {
-    });
   }
   function requireTeam() {
     if (hasEntitlement(currentTier(), "teamPresets")) return true;
@@ -1759,7 +1744,6 @@
           if (c.limited) summary += ` \xB7 \u26A0 ${msg.tokens.length}\uAC1C \uC911 ${c.allowed}\uAC1C\uB9CC \uC801\uC6A9(Free \uD55C\uB3C4 ${limit}) \u2014 \uC5C5\uADF8\uB808\uC774\uB4DC \uD544\uC694`;
           post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
           if (!msg.preview) {
-            record("create", summary);
             commitUndo(figma);
           }
           break;
@@ -1793,7 +1777,6 @@
             // #13: 미리보기 트리 맥락
           });
           if (!msg.preview) {
-            if (!r.cancelled) record("bind", `\uBC14\uC778\uB529 ${r.bound} \xB7 \uC2A4\uD0B5 ${r.skipped}${r.limited ? " \xB7 \uD55C\uB3C4 \uB3C4\uB2EC" : ""}`);
             commitUndo(figma);
           }
           break;
@@ -1811,7 +1794,6 @@
           }
           post({ type: "APPLY_RESULT", bound, skipped, flags: [], reasons: {} });
           if (bound) {
-            record("bind", `\uBC14\uC778\uB529 ${bound}\uAC74 \uC801\uC6A9${skipped ? ` \xB7 \uC2A4\uD0B5 ${skipped}` : ""}`);
             commitUndo(figma);
           }
           break;
@@ -1820,7 +1802,6 @@
           const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
           post({ type: "RENAME_RESULT", changes: r.changes, nodes: r.nodes, applied: r.applied });
           if (r.applied && r.changes.length) {
-            record("rename", `${r.changes.length}\uAC1C \uB808\uC774\uC5B4 \uC774\uB984 \uC801\uC6A9`);
             commitUndo(figma);
           }
           break;
@@ -1837,7 +1818,6 @@
           }
           post({ type: "RENAME_RESULT", changes, nodes: [], applied: true });
           if (changes.length) {
-            record("rename", `${changes.length}\uAC1C \uB808\uC774\uC5B4 \uC774\uB984 \uC801\uC6A9`);
             commitUndo(figma);
           }
           break;
@@ -1845,7 +1825,6 @@
         case "CREATE_SEMANTICS": {
           const s = await createSemanticAliases(msg.map);
           post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
-          record("semantics", `\uBCC4\uCE6D ${s.aliased} (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated})`);
           commitUndo(figma);
           break;
         }
@@ -1911,21 +1890,6 @@
           presets = presets.filter((p) => p.name !== msg.name);
           await savePresets();
           post({ type: "PRESETS", presets });
-          break;
-        }
-        case "GET_HISTORY": {
-          if (!requireTeam()) break;
-          post({ type: "HISTORY", entries: history });
-          break;
-        }
-        case "CLEAR_HISTORY": {
-          if (!requireTeam()) break;
-          history = [];
-          try {
-            await figma.clientStorage.deleteAsync(HISTORY_KEY);
-          } catch (e) {
-          }
-          post({ type: "HISTORY", entries: history });
           break;
         }
         case "EXPORT": {

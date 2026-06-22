@@ -14,7 +14,6 @@ import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
-import { HistoryEntry, HistoryAction, pushHistory } from './lib/history';
 import { commitUndo } from './lib/undo';
 
 figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
@@ -28,12 +27,10 @@ const selection = () => figma.currentPage.selection;
 const DEV_TIER_KEY = 'dsl.devTier';
 const CACHE_KEY = 'dsl.licenseCache';
 const PRESETS_KEY = 'dsl.presets';
-const HISTORY_KEY = 'dsl.history';
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
 let presets: Preset[] = []; // M3(Team): 공유 프리셋
-let history: HistoryEntry[] = []; // M3.1(Team): 변경 이력
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
 
 function effective(): {
@@ -74,17 +71,9 @@ async function loadLicense(): Promise<void> {
     if (c && typeof c.key === 'string' && isTier(c.tier) && typeof c.expiresAt === 'number' && typeof c.lastVerified === 'number') cache = c;
     const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
     if (Array.isArray(ps)) presets = ps as Preset[];
-    const h = await figma.clientStorage.getAsync(HISTORY_KEY);
-    if (Array.isArray(h)) history = h as HistoryEntry[];
   } catch {
     /* 저장소 접근 실패 시 free 유지 */
   }
-}
-
-/** 변경 이력 기록(항상 로컬). 조회/비우기만 Team 게이팅. */
-function record(action: HistoryAction, summary: string): void {
-  history = pushHistory(history, { at: Date.now(), action, summary });
-  void figma.clientStorage.setAsync(HISTORY_KEY, history).catch(() => {});
 }
 
 /** Team 전용 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. */
@@ -335,7 +324,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (c.limited) summary += ` · ⚠ ${msg.tokens.length}개 중 ${c.allowed}개만 적용(Free 한도 ${limit}) — 업그레이드 필요`;
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
         if (!msg.preview) {
-          record('create', summary);
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
         }
         break;
@@ -368,7 +356,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           nodes: r.nodes, // #13: 미리보기 트리 맥락
         });
         if (!msg.preview) {
-          if (!r.cancelled) record('bind', `바인딩 ${r.bound} · 스킵 ${r.skipped}${r.limited ? ' · 한도 도달' : ''}`);
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
         }
         break;
@@ -387,7 +374,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'APPLY_RESULT', bound, skipped, flags: [], reasons: {} });
         if (bound) {
-          record('bind', `바인딩 ${bound}건 적용${skipped ? ` · 스킵 ${skipped}` : ''}`);
           commitUndo(figma); // UX2: 선택 바인딩 전체를 단일 Undo로
         }
         break;
@@ -396,7 +382,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
         post({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied });
         if (r.applied && r.changes.length) {
-          record('rename', `${r.changes.length}개 레이어 이름 적용`);
           commitUndo(figma); // UX2: 리네임 전체를 단일 Undo로
         }
         break;
@@ -414,7 +399,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true });
         if (changes.length) {
-          record('rename', `${changes.length}개 레이어 이름 적용`);
           commitUndo(figma); // UX2: 선택 리네임 전체를 단일 Undo로
         }
         break;
@@ -422,7 +406,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'CREATE_SEMANTICS': {
         const s = await createSemanticAliases(msg.map);
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
-        record('semantics', `별칭 ${s.aliased} (생성 ${s.created} / 갱신 ${s.updated})`);
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
         break;
       }
@@ -495,22 +478,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         presets = presets.filter((p) => p.name !== msg.name);
         await savePresets();
         post({ type: 'PRESETS', presets });
-        break;
-      }
-      case 'GET_HISTORY': {
-        if (!requireTeam()) break;
-        post({ type: 'HISTORY', entries: history });
-        break;
-      }
-      case 'CLEAR_HISTORY': {
-        if (!requireTeam()) break;
-        history = [];
-        try {
-          await figma.clientStorage.deleteAsync(HISTORY_KEY);
-        } catch {
-          /* 무시 */
-        }
-        post({ type: 'HISTORY', entries: history });
         break;
       }
       case 'EXPORT': {
