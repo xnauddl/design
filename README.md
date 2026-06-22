@@ -7,6 +7,8 @@
 > 만든 변수는 **코드로 내보내기(W3C 토큰 JSON · CSS 변수)** 도 가능.
 > 설계 배경과 규칙은 저장소 계획 문서를 따릅니다. (마지막 단계는 Phase 3 계획)
 
+> **🛠 v2 재설계 진행 중** — UI/IA · 결과 표면화(선택형 트리 미리보기) · **색 계층 정렬(Global=hue / Semantic=role)** · 단위 토큰 단일화 등 확정된 방향은 [`REDESIGN.md`](REDESIGN.md)에 정리돼 있습니다(요약은 `ROADMAP.md` §8). 아래 본문은 **현재 구현** 기준이며, v2 적용 시 일부가 갱신됩니다.
+
 ## 핵심 규칙
 
 ### 디자인 토큰 3계층 (별도 컬렉션 + 별칭)
@@ -20,6 +22,7 @@
 - 색은 **불투명 hex(RGB)** 토큰 + **별도 opacity 토큰**(scope `OPACITY`)으로 분리.
 - `lineHeight`/`letterSpacing`의 `%`·`em`·`rem` 의도는 Figma 변수로 바인딩 불가 → **STRING 토큰으로 보존**하고,
   필요 시 `base`(기본 16px)로 환산한 **`-px` FLOAT 스냅샷**을 추가 생성(폰트 크기 변경 시 비례하지 않는 스냅샷).
+  - → **v2 예정(#16)**: STRING·`-px` 이중 생성을 폐기하고 **px FLOAT 단일** + 원본 단위는 `Variable.description`("160%")에 저장. 내보내기는 description 우선.
 
 ### 프레임 크기·여백 바인딩
 - 크기(`width`/`height`)는 **Fixed**일 때만 바인딩(HUG/FILL 충돌 시 스킵·플래그).
