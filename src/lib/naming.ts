@@ -89,6 +89,66 @@ function limitDepth(segs: string[], maxDepth = 3): string[] {
   return segs.slice(segs.length - maxDepth);
 }
 
+/* ---------- 보존형 리네임: 기본/자동 생성 이름 판별 ---------- */
+/**
+ * Figma가 자동으로 붙인 의미 없는 기본명(교체 대상)인지.
+ * 사람이 지은 이름은 보존하고 맥락으로만 쓰기 위한 게이트.
+ * 대소문자는 Figma 기본 표기(PascalCase)에 맞춰 정확히 일치 — 의도적 소문자명은 보존.
+ */
+const DEFAULT_NAME_RE =
+  /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( \d+)?( copy( \d+)?)?$/;
+
+export function isDefaultName(name: string): boolean {
+  const n = name.trim();
+  if (!n) return true; // 빈 이름도 교체 대상
+  return DEFAULT_NAME_RE.test(n);
+}
+
+/* ---------- 토큰 이름 → 역할/맥락 신호 파싱 ---------- */
+/** Global/원시 토큰 네임스페이스 — 이름 신호 없음(레이어명에 쓰지 않음). */
+const PRIMITIVE_NS = new Set([
+  'color', 'colour', 'spacing', 'space', 'gap', 'padding', 'size', 'sizing',
+  'radius', 'border-radius', 'opacity', 'font', 'font-size', 'font-weight',
+  'line-height', 'letter-spacing', 'number', 'dimension', 'width', 'height',
+  'elevation', 'shadow', 'z',
+]);
+
+/** 토큰 경로 말단(leaf)이 역할 어휘일 때의 매핑(핵심 어휘). */
+const LEAF_ROLE: Record<string, Role> = {
+  background: 'background', bg: 'background', fill: 'background', surface: 'background',
+  border: 'border', stroke: 'border', outline: 'border',
+  icon: 'icon', glyph: 'icon',
+  divider: 'divider', separator: 'divider', rule: 'divider',
+  image: 'image', img: 'image', picture: 'image', thumbnail: 'image',
+  avatar: 'avatar',
+  badge: 'badge', dot: 'badge', indicator: 'badge',
+};
+
+export interface ParsedToken {
+  /** 토큰 말단이 역할 어휘이면 그 역할(아니면 null). */
+  roleLeaf: Role | null;
+  /** 역할 말단을 뗀 경로 접두사의 kebab(맥락 폴백용, 없으면 null). */
+  context: string | null;
+  /** Global/원시 토큰(첫 세그먼트가 원시 네임스페이스)이면 true — 이름 신호 없음. */
+  primitive: boolean;
+}
+
+/**
+ * 바인딩된 변수 이름을 레이어 네이밍 "신호"로만 파싱한다(경로 복사 금지).
+ * 예: 'button/primary/background' → {roleLeaf:'background', context:'button-primary'}.
+ *     'color/blue-500' → {primitive:true} (역할·맥락 신호 없음).
+ */
+export function parseTokenName(tokenName: string): ParsedToken {
+  const segs = tokenName.split('/').map((s) => s.trim()).filter(Boolean);
+  if (!segs.length) return { roleLeaf: null, context: null, primitive: false };
+  if (PRIMITIVE_NS.has(kebab(segs[0]))) return { roleLeaf: null, context: null, primitive: true };
+
+  const roleLeaf = LEAF_ROLE[kebab(segs[segs.length - 1])] ?? null;
+  const ctxSegs = roleLeaf ? segs.slice(0, -1) : segs;
+  const context = ctxSegs.length ? ctxSegs.map(kebab).filter(Boolean).join('-') : null;
+  return { roleLeaf, context, primitive: false };
+}
+
 /**
  * 같은 부모 내 이름 충돌 해소 — 순서대로 -2, -3 … 접미사.
  * `taken`은 이미 확정된 이름 집합(호출자가 누적).

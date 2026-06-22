@@ -9,7 +9,7 @@ export type WizardStepId =
   | 'create' // CREATE_TOKENS (쓰기)
   | 'semantics' // CREATE_SEMANTICS (쓰기, 선택)
   | 'bind' // APPLY (쓰기)
-  | 'rename' // RENAME (쓰기) — bind 이후라야 토큰 경로명 사용 가능
+  | 'rename' // RENAME (쓰기) — bind 이후라야 토큰을 역할 신호로 활용 가능
   | 'contrast' // CHECK_CONTRAST (읽기, 선택)
   | 'componentize'; // REGISTER_COMPONENTS → CLASSIFY_VARIANTS (쓰기, 선택, Pro)
 

@@ -482,11 +482,12 @@ test('previewCreateTokens — 변수 생성 없이 생성/갱신 예정 집계',
 });
 
 /* ================= rename.ts ================= */
-test('renameSelection — 토큰명/역할명/제외규칙/형제 dedup', async () => {
+test('renameSelection — 역할 기반·보존형·맥락 전파·형제 dedup', async () => {
   const figma = installFigma();
   const col = figma.variables.createVariableCollection('Semantic');
   const tokenVar = figma.variables.createVariable('button/primary/background', col, 'COLOR');
 
+  // 의미 있는 이름 → 보존하고 자식 맥락으로 사용.
   const bg = {
     type: 'RECTANGLE',
     id: 'bg',
@@ -503,7 +504,7 @@ test('renameSelection — 토큰명/역할명/제외규칙/형제 dedup', async 
   const root = {
     type: 'FRAME',
     id: 'root',
-    name: 'Root',
+    name: 'button', // 사람이 지은 이름 → 보존
     children: [bg, icon1, icon2, txt, inst, bg2],
   };
 
@@ -511,15 +512,16 @@ test('renameSelection — 토큰명/역할명/제외규칙/형제 dedup', async 
   assert.equal(applied, true);
 
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  // 루트 FRAME → role 'container'
-  assert.equal(after.get('root'), 'container');
-  // 토큰 보유 → 변수 전체 경로
-  assert.equal(after.get('bg'), 'button-primary-background');
-  // 역할명 + 상위 맥락 + 형제 dedup
-  assert.equal(after.get('ic1'), 'container-icon');
-  assert.equal(after.get('ic2'), 'container-icon-2');
-  // 토큰 없는 채움 사각형 → background
-  assert.equal(after.get('bg2'), 'container-background');
+  // 의미 있는 루트 이름은 보존(변경 없음) → 자식 맥락 'button'
+  assert.equal(after.has('root'), false);
+  assert.equal(root.name, 'button');
+  // 토큰 말단(background)이 역할 신호 → 토큰 경로 복사가 아니라 맥락(button)+역할
+  assert.equal(after.get('bg'), 'button-background');
+  // VECTOR → icon, 맥락 button, 형제 dedup
+  assert.equal(after.get('ic1'), 'button-icon');
+  assert.equal(after.get('ic2'), 'button-icon-2');
+  // 토큰 없는 채움 사각형 → background, bg와 dedup
+  assert.equal(after.get('bg2'), 'button-background-2');
   // 제외: Text·Instance는 변경 없음(이름 유지)
   assert.equal(after.has('tx'), false);
   assert.equal(after.has('in'), false);
@@ -527,12 +529,74 @@ test('renameSelection — 토큰명/역할명/제외규칙/형제 dedup', async 
   assert.equal(inst.name, 'KeepInstance');
 });
 
-test('renameSelection — apply:false면 미리보기만(노드 이름 불변)', async () => {
+test('renameSelection — 의미 있는 이름은 보존(교체 안 함)', async () => {
   installFigma();
   const node = { type: 'FRAME', id: 'f', name: 'OriginalName', children: [] };
+  const { changes } = await renameSelection([node], { apply: true, maxDepth: 3 });
+  assert.equal(changes.length, 0); // 기본명이 아니므로 보존
+  assert.equal(node.name, 'OriginalName');
+});
+
+test('renameSelection — 토큰 신호로 맥락/역할 결정(조상 없음 → 토큰 접두사 폴백, 원시 토큰은 무시)', async () => {
+  const figma = installFigma();
+  const col = figma.variables.createVariableCollection('Semantic');
+  const semantic = figma.variables.createVariable('button/primary/background', col, 'COLOR');
+  const glob = figma.variables.createVariableCollection('Global');
+  const primitive = figma.variables.createVariable('color/blue-500', glob, 'COLOR');
+
+  // 단독 선택(조상 없음) + 시맨틱 토큰 → 토큰 접두사(button-primary)가 맥락, leaf가 역할
+  const a = {
+    type: 'RECTANGLE',
+    id: 'a',
+    name: 'Rectangle 1',
+    boundVariables: { fills: [{ type: 'VARIABLE_ALIAS', id: semantic.id }] },
+    fills: [{ type: 'SOLID', visible: true }],
+  };
+  // 원시(Global) 토큰 → 이름 신호 없음 → 기하 폴백(채움 → background), 맥락 없음
+  const b = {
+    type: 'RECTANGLE',
+    id: 'b',
+    name: 'Rectangle 1',
+    boundVariables: { fills: [{ type: 'VARIABLE_ALIAS', id: primitive.id }] },
+    fills: [{ type: 'SOLID', visible: true }],
+  };
+
+  const { changes } = await renameSelection([a, b], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('a'), 'button-primary-background');
+  assert.equal(after.get('b'), 'background');
+});
+
+test('renameSelection — 기하 신호: 얇은 막대→divider, 이미지 타원→avatar', async () => {
+  installFigma();
+  const divider = { type: 'RECTANGLE', id: 'd', name: 'Rectangle 1', width: 200, height: 1, fills: [{ type: 'SOLID', visible: true }] };
+  const avatar = { type: 'ELLIPSE', id: 'av', name: 'Ellipse 1', width: 40, height: 40, fills: [{ type: 'IMAGE', visible: true }] };
+  const { changes } = await renameSelection([divider, avatar], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('d'), 'divider');
+  assert.equal(after.get('av'), 'avatar');
+});
+
+test('renameSelection — 멱등: 한 번 정돈한 이름은 재실행에도 불변', async () => {
+  installFigma();
+  const icon1 = { type: 'VECTOR', id: 'ic1', name: 'Vector 1' };
+  const icon2 = { type: 'VECTOR', id: 'ic2', name: 'Vector 2' };
+  const root = { type: 'FRAME', id: 'root', name: 'card', children: [icon1, icon2] };
+
+  await renameSelection([root], { apply: true, maxDepth: 3 });
+  assert.equal(icon1.name, 'card-icon');
+  assert.equal(icon2.name, 'card-icon-2');
+  // 2회차: 역할명은 기본명이 아니므로 보존 → 변경 0
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  assert.equal(changes.length, 0);
+});
+
+test('renameSelection — apply:false면 미리보기만(노드 이름 불변)', async () => {
+  installFigma();
+  const node = { type: 'FRAME', id: 'f', name: 'Frame 1', children: [] };
   const { changes, applied } = await renameSelection([node], { apply: false, maxDepth: 3 });
   assert.equal(applied, false);
   assert.equal(changes.length, 1);
   assert.equal(changes[0].after, 'container');
-  assert.equal(node.name, 'OriginalName'); // 적용 안 함
+  assert.equal(node.name, 'Frame 1'); // 적용 안 함
 });

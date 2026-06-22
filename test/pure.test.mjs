@@ -16,6 +16,8 @@ import {
   kebab,
   layerNameFromToken,
   layerNameFromRole,
+  isDefaultName,
+  parseTokenName,
   dedupeName,
   hasEntitlement,
   limitsForTier,
@@ -134,6 +136,35 @@ test('layerNameFromRole — 상위 맥락 + 역할', () => {
   assert.equal(layerNameFromRole('button-primary', 'icon'), 'button-primary-icon');
   assert.equal(layerNameFromRole(null, 'container'), 'container');
   assert.equal(layerNameFromRole('a-b-c', 'icon', { maxDepth: 2 }), 'c-icon');
+});
+
+test('isDefaultName — Figma 기본명만 교체 대상', () => {
+  // 기본/자동 생성명 → 교체 대상
+  for (const n of ['Frame 12', 'Frame', 'Rectangle', 'Ellipse 3', 'Vector 7', 'Group 5 copy', 'Group 5 copy 2', 'Union', 'Line 2', '', '   ']) {
+    assert.equal(isDefaultName(n), true, n);
+  }
+  // 사람이 지은 의미 있는 이름 → 보존
+  for (const n of ['button', 'card-header', 'Root', 'icon', 'OriginalName', 'frame-wrapper', 'rectangle-bg']) {
+    assert.equal(isDefaultName(n), false, n);
+  }
+});
+
+test('parseTokenName — 역할 말단/맥락 접두사/원시 토큰', () => {
+  // 시맨틱: 말단 background가 역할, 접두사가 맥락
+  assert.deepEqual(parseTokenName('button/primary/background'), {
+    roleLeaf: 'background', context: 'button-primary', primitive: false,
+  });
+  // 말단 별칭(fill→background, stroke→border)
+  assert.equal(parseTokenName('card/title/fill').roleLeaf, 'background');
+  assert.equal(parseTokenName('field/outline/stroke').roleLeaf, 'border');
+  assert.equal(parseTokenName('nav/avatar').roleLeaf, 'avatar');
+  // 역할 아닌 말단 → roleLeaf 없음, 전체 경로가 맥락
+  assert.deepEqual(parseTokenName('text/heading'), {
+    roleLeaf: null, context: 'text-heading', primitive: false,
+  });
+  // 원시(Global) 토큰 → 신호 없음
+  assert.deepEqual(parseTokenName('color/blue-500'), { roleLeaf: null, context: null, primitive: true });
+  assert.deepEqual(parseTokenName('spacing/16'), { roleLeaf: null, context: null, primitive: true });
 });
 
 test('dedupeName — 형제 충돌 -2/-3', () => {

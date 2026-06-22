@@ -26,11 +26,16 @@
 - `padding`·`gap`은 **오토레이아웃 프레임**에만 존재 → 일반 프레임은 스킵·안내.
 
 ### 레이어 네이밍
+**원칙: 레이어의 "역할(role)"이 이름을 정한다. 토큰은 이름을 짓는 "신호"로만 쓰고 경로를 그대로 복사하지 않는다.**
+
 - 형식: **kebab-case 소문자**, 구분자 `-`. 구조: `{상위 맥락}-{로컬 역할}`(기본 최대 3단계).
-- 토큰 보유 레이어 → 변수 전체 경로(`button/primary/background` → `button-primary-background`).
-- 토큰 없는 비텍스트 레이어 → 역할/해부학 어휘(`button-primary-icon`, `-background`, `-container`).
+- **보존형** — Figma가 자동으로 붙인 기본명(`Frame 12`·`Rectangle`·`Vector`·`Group 5`…)만 교체한다. 사람이 지은 의미 있는 이름은 **그대로 보존**하고 자식의 맥락으로만 쓴다.
+- **역할 판정 순서**: ① 바인딩 토큰의 **말단(leaf)** 이 역할 어휘면 그것(`button/primary/background`의 `background`) → ② 노드 타입·기하(VECTOR=`icon`, 얇은 막대=`divider`, 이미지 타원=`avatar`, 채움 사각형=`background`, 외곽선만=`border`, 프레임=`container`/단일자식 `wrapper`).
+  - 핵심 역할 어휘: `icon`·`background`·`border`·`divider`·`container`·`wrapper`·`image`·`avatar`·`badge`.
+  - **원시(Global) 토큰**(`color/blue-500`·`spacing/16`…)은 이름 신호가 없다 → 기하로 폴백(역할 오염 방지).
+- **맥락(context)** 출처: ① 가장 가까운 *의미 있는* 조상 이름 → ② (없으면) 토큰 경로 접두사(`button/primary/background` → `button-primary`).
 - **제외**(이름 유지): Component/ComponentSet · **Text** · Instance · 잠긴 레이어. *텍스트는 이름만 제외하고 변수 바인딩은 정상 수행.*
-- 형제 충돌은 `-2`/`-3` 접미사, 토큰/역할에서 매번 재계산하므로 **멱등**.
+- 형제 충돌은 `-2`/`-3` 접미사. 정돈된 역할명은 기본명이 아니므로 재실행 시 보존된다 → **멱등**.
 
 ### 컴포넌트 등록 / 베리언트 분류 (Phase 3 · 구현됨, Pro)
 선택 레이어를 **메인 컴포넌트로 등록**하고, 같은 베이스 이름을 공유하는 컴포넌트들을 **베리언트 세트(ComponentSet)** 로 묶어 분류한다. 토큰/리네임과 동일하게 **kebab·멱등** 규칙을 따르며, 구조/이름만 바꾸고 토큰 바인딩은 건드리지 않는다.
