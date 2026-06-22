@@ -100,7 +100,7 @@
 - [x] 추출 색 **편집표**(hue·역할 표시·역할 확정·반영) + **추출 Global hue 버킷팅**(`nameColorsByHue`, 충돌 접미사) `(PR #37)`
 - [ ] **기존 Global 스캔**(재방문 매핑) — code.ts가 기존 색 변수 공급
 - [ ] 전 토큰 역할 어휘 확장 (색 우선→spacing/radius/size; **size=icon 최소·effects=후순위 보류**)
-- [ ] **단위 토큰 단일화** — px FLOAT + `description`("160%"), 내보내기는 description 우선
+- [x] **단위 토큰 단일화** — 비-px lineHeight/letterSpacing을 px FLOAT 단일로(스냅샷 폐기) + 원본 단위는 `Variable.description`("160%"), 내보내기 우선(`unitDescription`) `(PR #38)`
 
 ### 8.4 IA · UX
 - [x] 시스템화 마법사 **별도 탭(시작)** `(PR #37)`

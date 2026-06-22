@@ -355,7 +355,7 @@ async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: 
     return;
   }
   if (node.fontSize !== figma.mixed) tryBindText(node, 'fontSize', node.fontSize, entries, tol, res, apply, preview);
-  // lineHeight/letterSpacing은 px일 때만 직접 바인딩(비-px는 STRING 토큰만 보존)
+  // lineHeight/letterSpacing은 노드 단위가 px일 때만 직접 바인딩(비-px 노드는 변수 바인딩 불가)
   if (node.lineHeight !== figma.mixed && node.lineHeight.unit === 'PIXELS') {
     tryBindText(node, 'lineHeight', node.lineHeight.value, entries, tol, res, apply, preview);
   }

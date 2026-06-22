@@ -94,7 +94,7 @@ export type UiToCode =
   | { type: 'GET_PRESETS' } // M3(Team): 저장된 프리셋 목록 요청
   | { type: 'SAVE_PRESET'; preset: Preset } // M3(Team): 프리셋 저장/갱신
   | { type: 'DELETE_PRESET'; name: string } // M3(Team): 프리셋 삭제
-  | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number; includeSnapshots: boolean } // 토큰 코드 내보내기
+  | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number } // 토큰 코드 내보내기
   | { type: 'SCAN_COMPONENT_CANDIDATES' } // #1(Pro): 선택 하위 순회 → 등록 후보 트리
   | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[] } // Phase 3(Pro): 선택/지정 노드 → 메인 컴포넌트(nodeIds 미지정 시 최상위 선택)
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Pro): 같은 베이스 컴포넌트 → 베리언트 세트

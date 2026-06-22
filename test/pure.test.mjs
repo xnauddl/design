@@ -9,6 +9,7 @@ import {
   scopesForSources,
   scopesForType,
   resolvedTypeForToken,
+  unitDescription,
   stringValueForUnit,
   toPx,
   colorTokenName,
@@ -90,12 +91,20 @@ test('scopesForSources — union 중복 제거', () => {
   assert.deepEqual(scopesForSources(['fill', 'stroke', 'fill']), ['ALL_FILLS', 'STROKE_COLOR']);
 });
 
-test('resolvedTypeForToken — 비-px lineHeight는 STRING', () => {
+test('resolvedTypeForToken(#16) — lineHeight/letterSpacing은 단위 무관 FLOAT', () => {
   assert.equal(resolvedTypeForToken({ category: 'lineHeight', unit: 'px' }), 'FLOAT');
-  assert.equal(resolvedTypeForToken({ category: 'lineHeight', unit: 'percent' }), 'STRING');
+  assert.equal(resolvedTypeForToken({ category: 'lineHeight', unit: 'percent' }), 'FLOAT'); // 더는 STRING 아님
+  assert.equal(resolvedTypeForToken({ category: 'letterSpacing', unit: 'em' }), 'FLOAT');
   assert.equal(resolvedTypeForToken({ category: 'color' }), 'COLOR');
   assert.equal(resolvedTypeForToken({ category: 'fontFamily' }), 'STRING');
   assert.equal(resolvedTypeForToken({ category: 'gap' }), 'FLOAT');
+});
+
+test('unitDescription(#16) — 비-px lh/ls만 원본 단위 문자열', () => {
+  assert.equal(unitDescription({ category: 'lineHeight', unit: 'percent', value: 160 }), '160%');
+  assert.equal(unitDescription({ category: 'letterSpacing', unit: 'em', value: 0.02 }), '0.02em');
+  assert.equal(unitDescription({ category: 'lineHeight', unit: 'px', value: 24 }), undefined); // px는 없음
+  assert.equal(unitDescription({ category: 'gap', unit: 'percent', value: 50 }), undefined); // 대상 아님
 });
 
 test('stringValueForUnit', () => {
@@ -352,7 +361,7 @@ test('semanticMap 텍스트 ↔ 객체', () => {
 });
 
 /* ================= exporters.ts (코드 내보내기) ================= */
-const OPTS = { format: 'css', fontSizeUnit: 'px', base: 16, includeSnapshots: false };
+const OPTS = { format: 'css', fontSizeUnit: 'px', base: 16 };
 
 test('splitWeightStyle — weight/italic 분리', () => {
   assert.deepEqual(splitWeightStyle(600), { weight: 600, italic: false });
@@ -361,30 +370,28 @@ test('splitWeightStyle — weight/italic 분리', () => {
   assert.deepEqual(splitWeightStyle('Italic'), { weight: 400, italic: true });
 });
 
-test('exportTokens CSS — 색·별칭·단위·italic·스냅샷 제외', () => {
+test('exportTokens CSS — 색·별칭·단위(description #16)·italic', () => {
   const tokens = [
     { name: 'color/primary/500', collection: 'Global', type: 'COLOR', kind: 'color', value: '#2563eb' },
     { name: 'primary', collection: 'Semantic', type: 'COLOR', kind: 'color', aliasOf: 'color/primary/500' },
     { name: 'font-size/16', collection: 'Global', type: 'FLOAT', kind: 'fontSize', value: 16 },
-    { name: 'line-height/150', collection: 'Global', type: 'STRING', kind: 'lineHeight', value: '150%' },
-    { name: 'line-height/150-percent-px', collection: 'Global', type: 'FLOAT', kind: 'lineHeight', value: 24 },
+    // #16: px FLOAT 단일 + 원본 단위는 description
+    { name: 'line-height/150', collection: 'Global', type: 'FLOAT', kind: 'lineHeight', value: 24, description: '150%' },
+    { name: 'line-height/24', collection: 'Global', type: 'FLOAT', kind: 'lineHeight', value: 24 }, // description 없음 → px
     { name: 'weight/heading', collection: 'Global', type: 'STRING', kind: 'fontWeight', value: 'Bold Italic' },
   ];
   const css = exportTokens(tokens, OPTS);
   assert.match(css, /--color-primary-500: #2563eb;/);
   assert.match(css, /--primary: var\(--color-primary-500\);/);
   assert.match(css, /--font-size-16: 16px;/); // px
-  assert.match(css, /--line-height-150: 150%;/); // 단위 보존
-  assert.doesNotMatch(css, /150-percent-px/); // 스냅샷 제외(기본)
+  assert.match(css, /--line-height-150: 150%;/); // #16: description 우선
+  assert.match(css, /--line-height-24: 24px;/); // description 없으면 px
   assert.match(css, /--weight-heading: 700;/);
   assert.match(css, /--weight-heading-style: italic;/); // italic 동반
 
   // 폰트 크기 rem 옵션
   const remCss = exportTokens(tokens, { ...OPTS, fontSizeUnit: 'rem' });
   assert.match(remCss, /--font-size-16: 1rem;/);
-  // 스냅샷 포함 옵션
-  const withSnap = exportTokens(tokens, { ...OPTS, includeSnapshots: true });
-  assert.match(withSnap, /--line-height-150-percent-px: 24px;/);
 });
 
 test('exportTokens W3C — 중첩·$type·별칭 참조', () => {
