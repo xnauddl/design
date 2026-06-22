@@ -459,6 +459,22 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
         break;
       }
+      case 'GET_GLOBAL_COLORS': {
+        // #10: 기존 Global 색 변수(리터럴 COLOR)를 이름+hex로 수집 → 재방문 시맨틱 매핑 추천.
+        const cols = await figma.variables.getLocalVariableCollectionsAsync();
+        const globalCol = cols.find((c) => c.name === GLOBAL);
+        const colors: { name: string; hex: string }[] = [];
+        if (globalCol) {
+          const mode = globalCol.defaultModeId;
+          for (const v of await figma.variables.getLocalVariablesAsync()) {
+            if (v.variableCollectionId !== globalCol.id || v.resolvedType !== 'COLOR') continue;
+            const raw = v.valuesByMode[mode];
+            if (raw && typeof raw === 'object' && 'r' in raw) colors.push({ name: v.name, hex: rgbToHex(raw as RGB) });
+          }
+        }
+        post({ type: 'GLOBAL_COLORS', colors });
+        break;
+      }
       case 'RESIZE': {
         // #14: 드래그 중엔 즉시 리사이즈, commit(드롭) 시 크기 저장.
         const c = clampSize(msg.width, msg.height);

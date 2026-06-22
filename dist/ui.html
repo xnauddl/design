@@ -263,6 +263,7 @@
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; font-family:ui-monospace, monospace;"></textarea>
       <div class="row">
         <button id="btnSemantics">시맨틱 별칭 생성</button>
+        <button id="btnScanGlobals">기존 색에서 추천</button>
       </div>
       <div class="status" id="semStatus"></div>
     </div>
@@ -1172,6 +1173,10 @@
     send({ type: "CREATE_TOKENS", tokens, base });
   });
   $("btnColorRoles").addEventListener("click", applyColorRoles);
+  $("btnScanGlobals").addEventListener("click", () => {
+    setStatus("semStatus", "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026", "");
+    send({ type: "GET_GLOBAL_COLORS" });
+  });
   $("btnSemantics").addEventListener("click", () => {
     const map = {};
     for (const line of $("semMap").value.split("\n")) {
@@ -1704,6 +1709,14 @@
         );
         break;
       case "COLLECTIONS":
+        break;
+      case "GLOBAL_COLORS":
+        if (!msg.colors.length) {
+          setStatus("semStatus", "\uAE30\uC874 Global \uC0C9 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.", "warn");
+        } else {
+          setSemMapText(suggestSemanticMap(msg.colors));
+          setStatus("semStatus", `\uAE30\uC874 \uC0C9 ${msg.colors.length}\uAC1C\uC5D0\uC11C \uC5ED\uD560 \uCD94\uCC9C \u2014 \uD655\uC778 \uD6C4 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019.`, "ok");
+        }
         break;
       case "PREREQ_STATE":
         hasGlobal = msg.hasGlobal;
