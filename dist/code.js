@@ -202,6 +202,13 @@
   var STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
   var lerp = (a, b, t) => a + (b - a) * t;
   var LOW_CHROMA = 0.03;
+  var PALETTE_FAMILIES = ["primary", "secondary", "neutral", "success", "warning", "error", "info"];
+  function isPaletteColorName(name) {
+    var _a;
+    if (!name.startsWith("color/")) return false;
+    const family = (_a = name.split("/")[1]) != null ? _a : "";
+    return PALETTE_FAMILIES.includes(family) || /^accent-\d+$/.test(family);
+  }
   function colorScaleName(family, step) {
     return `color/${family}/${step}`;
   }
@@ -526,7 +533,7 @@
   var GLOBAL = "Global";
   var SEMANTIC = "Semantic";
   var COMPONENT = "Component";
-  var vkey = (collectionId, name) => `${collectionId}\0${name}`;
+  var vkey = (collectionId, name) => `${collectionId}${name}`;
   async function buildVarIndex() {
     const idx = /* @__PURE__ */ new Map();
     for (const v of await figma.variables.getLocalVariablesAsync()) {
@@ -631,6 +638,20 @@
     } else {
       v.setValueForMode(modeId, Number(t.value));
     }
+  }
+  async function prunePaletteColors(keep) {
+    const keepSet = new Set(keep);
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const palIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC).map((c) => c.id));
+    let removed = 0;
+    for (const v of await figma.variables.getLocalVariablesAsync()) {
+      if (!palIds.has(v.variableCollectionId)) continue;
+      if (isPaletteColorName(v.name) && !keepSet.has(v.name)) {
+        v.remove();
+        removed++;
+      }
+    }
+    return removed;
   }
   async function createSemanticAliases(map) {
     var _a, _b;
@@ -1879,7 +1900,9 @@
           const c = clampCount(msg.tokens.length, limit);
           const slice = msg.tokens.slice(0, c.allowed);
           const s = msg.preview ? await previewCreateTokens(slice) : await createTokens(slice, msg.base);
+          const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
           let summary = `Global ${s.globals}\uAC1C \xB7 Semantic ${s.semantics}\uAC1C (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated})`;
+          if (pruned) summary += ` \xB7 \uC774\uC804 \uC0C9 ${pruned}\uAC1C \uC815\uB9AC`;
           if (c.limited) summary += ` \xB7 \u26A0 ${msg.tokens.length}\uAC1C \uC911 ${c.allowed}\uAC1C\uB9CC \uC801\uC6A9(Free \uD55C\uB3C4 ${limit}) \u2014 \uC5C5\uADF8\uB808\uC774\uB4DC \uD544\uC694`;
           post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
           if (!msg.preview) {

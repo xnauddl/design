@@ -26,6 +26,7 @@ import {
   suggestSemanticMap,
   colorScaleName,
   classifyColorScale,
+  isPaletteColorName,
   mod360,
   scopeForSemanticRole,
 } from '../dist/pure.mjs';
@@ -198,4 +199,14 @@ test('classifyColorScale — 추출 색을 팔레트와 동일한 family/step로
   const draft = paletteToDraftTokens(generatePalette({ brand: { primary: '#3366ff' } }));
   const p500 = draft.find((t) => t.name === 'color/primary/500');
   assert.ok(p500); // 팔레트가 colorScaleName으로 명명
+});
+
+test('isPaletteColorName — 팔레트 색만 정리 대상', () => {
+  assert.equal(isPaletteColorName('color/primary/500'), true);
+  assert.equal(isPaletteColorName('color/secondary/50'), true);
+  assert.equal(isPaletteColorName('color/accent-2/700'), true);
+  assert.equal(isPaletteColorName('color/success/500'), true);
+  assert.equal(isPaletteColorName('color/brandish/500'), false); // 사용자 패밀리
+  assert.equal(isPaletteColorName('color/0066ff'), false); // 추출 hex 색
+  assert.equal(isPaletteColorName('spacing/16'), false); // 비색
 });

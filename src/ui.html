@@ -162,10 +162,9 @@
       </div>
       <div class="row">
         <label class="inline"><input id="useBrand2" type="checkbox" /> 보조색</label>
-        <input id="brand2" type="color" value="#ff5722" />
+        <input id="brand2" type="color" value="#ff5722" disabled />
         <label class="inline">하모니
-          <select id="harmony">
-            <option value="">없음</option>
+          <select id="harmony" disabled>
             <option value="complementary">보색</option>
             <option value="analogous">유사</option>
             <option value="triadic">삼각</option>
@@ -177,9 +176,10 @@
         <label class="inline"><input id="incStatus" type="checkbox" checked /> 상태색</label>
       </div>
       <div class="ux">
-        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">적용 전 미리보기</span></div>
+        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">생성으로 미리보고 적용으로 변수에 반영</span></div>
         <div class="row">
           <button id="btnPalette" class="primary">팔레트 생성</button>
+          <button id="btnPaletteApply" style="display:none">적용 (변수 생성)</button>
           <span class="muted" id="paletteInfo"></span>
         </div>
         <div class="status" id="paletteStatus"></div>

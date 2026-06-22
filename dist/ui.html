@@ -162,10 +162,9 @@
       </div>
       <div class="row">
         <label class="inline"><input id="useBrand2" type="checkbox" /> 보조색</label>
-        <input id="brand2" type="color" value="#ff5722" />
+        <input id="brand2" type="color" value="#ff5722" disabled />
         <label class="inline">하모니
-          <select id="harmony">
-            <option value="">없음</option>
+          <select id="harmony" disabled>
             <option value="complementary">보색</option>
             <option value="analogous">유사</option>
             <option value="triadic">삼각</option>
@@ -177,9 +176,10 @@
         <label class="inline"><input id="incStatus" type="checkbox" checked /> 상태색</label>
       </div>
       <div class="ux">
-        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">적용 전 미리보기</span></div>
+        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">생성으로 미리보고 적용으로 변수에 반영</span></div>
         <div class="row">
           <button id="btnPalette" class="primary">팔레트 생성</button>
+          <button id="btnPaletteApply" style="display:none">적용 (변수 생성)</button>
           <span class="muted" id="paletteInfo"></span>
         </div>
         <div class="status" id="paletteStatus"></div>
@@ -935,6 +935,7 @@
   var teamDataRequested = false;
   var lastExportFormat = "w3c";
   var lastSelCount = 0;
+  var createFrom = "tokens";
   function renderTokens() {
     const box = $("tokenList");
     box.innerHTML = "";
@@ -985,19 +986,37 @@
     const harmonyVal = $("harmony").value;
     const p = generatePalette({
       brand: { primary, secondary: useSecondary ? $("brand2").value : void 0 },
-      harmony: harmonyVal || void 0,
+      harmony: useSecondary ? harmonyVal : void 0,
       includeNeutral: $("incNeutral").checked,
       includeStatus: $("incStatus").checked
     });
     tokens = paletteToDraftTokens(p);
     renderTokens();
     $("semMap").value = Object.entries(suggestSemanticMap(p)).map(([role, global]) => `${role} = ${global}`).join("\n");
+    $("btnPaletteApply").style.display = "";
     $("paletteInfo").textContent = `${p.scales.length}\uACC4\uC5F4 \xB7 ${tokens.length}\uC0C9 \uC0DD\uC131`;
     setStatus(
       "paletteStatus",
-      (p.warnings.join(" ") ? p.warnings.join(" ") + " " : "") + "\uC544\uB798 \u20182 \xB7 \uD1A0\uD070 \uC0DD\uC131\u2019\uC5D0\uC11C \uBCC0\uC218\uB85C \uB9CC\uB4DC\uC138\uC694.",
+      (p.warnings.join(" ") ? p.warnings.join(" ") + " " : "") + "\uD558\uBAA8\uB2C8\uB97C \uBC14\uAFD4 \uB2E4\uC2DC \uC0DD\uC131\uD558\uAC70\uB098, \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBCC0\uC218\uC5D0 \uBC18\uC601\uD558\uC138\uC694.",
       p.warnings.length ? "warn" : "ok"
     );
+  });
+  function syncSecondaryControls() {
+    const on = $("useBrand2").checked;
+    $("brand2").disabled = !on;
+    $("harmony").disabled = !on;
+  }
+  $("useBrand2").addEventListener("change", syncSecondaryControls);
+  syncSecondaryControls();
+  $("btnPaletteApply").addEventListener("click", () => {
+    if (!tokens.length) {
+      setStatus("paletteStatus", "\uBA3C\uC800 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uB9CC\uB4DC\uC138\uC694.", "warn");
+      return;
+    }
+    const base = Number($("base").value) || 16;
+    createFrom = "palette";
+    send({ type: "CREATE_TOKENS", tokens, base, replacePalette: true });
+    setStatus("paletteStatus", "\uBCC0\uC218\uC5D0 \uC801\uC6A9 \uC911\u2026", "");
   });
   $("btnOnboardClose").addEventListener("click", () => {
     $("onboardCard").style.display = "none";
@@ -1014,11 +1033,13 @@
       return;
     }
     const base = Number($("base").value) || 16;
+    createFrom = "tokens";
     send({ type: "CREATE_TOKENS", tokens, base, preview: true });
   });
   $("btnCreateApply").addEventListener("click", () => {
     if (!tokens.length) return;
     const base = Number($("base").value) || 16;
+    createFrom = "tokens";
     send({ type: "CREATE_TOKENS", tokens, base });
   });
   $("btnSemantics").addEventListener("click", () => {
@@ -1521,6 +1542,7 @@
         tokens = msg.tokens;
         renderTokens();
         $("btnCreateApply").style.display = "none";
+        $("btnPaletteApply").style.display = "none";
         $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
         setStatus("extractStatus", msg.warnings.join(" ") || `${tokens.length}\uAC1C \uD6C4\uBCF4 \uCD94\uCD9C \uC644\uB8CC.`, msg.warnings.length ? "warn" : "ok");
         break;
@@ -1537,6 +1559,9 @@
         if (msg.preview) {
           setStatus("createStatus", `\uBBF8\uB9AC\uBCF4\uAE30 \u2014 ${msg.summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601`, msg.limited ? "warn" : "");
           applyBtn.style.display = "";
+        } else if (createFrom === "palette") {
+          setStatus("paletteStatus", msg.summary, msg.limited ? "warn" : "ok");
+          createFrom = "tokens";
         } else {
           setStatus("createStatus", msg.summary, msg.limited ? "warn" : "ok");
           applyBtn.style.display = "none";

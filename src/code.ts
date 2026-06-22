@@ -4,7 +4,7 @@
 import type { UiToCode } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, createSemanticTextStyles, GLOBAL, SEMANTIC } from './lib/variables';
+import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, createSemanticTextStyles, prunePaletteColors, GLOBAL, SEMANTIC } from './lib/variables';
 import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
@@ -283,7 +283,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const slice = msg.tokens.slice(0, c.allowed);
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계.
         const s = msg.preview ? await previewCreateTokens(slice) : await createTokens(slice, msg.base);
+        // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
+        const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
+        if (pruned) summary += ` · 이전 색 ${pruned}개 정리`;
         if (c.limited) summary += ` · ⚠ ${msg.tokens.length}개 중 ${c.allowed}개만 적용(Free 한도 ${limit}) — 업그레이드 필요`;
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
         if (!msg.preview) {

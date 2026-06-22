@@ -145,6 +145,16 @@ export function generatePalette(input: PaletteInput): PaletteResult {
   return { scales, warnings };
 }
 
+/** 팔레트가 생성하는 색 패밀리(accent-N은 접두사로 별도 판정). */
+export const PALETTE_FAMILIES = ['primary', 'secondary', 'neutral', 'success', 'warning', 'error', 'info'] as const;
+
+/** 팔레트가 만든 색 변수 이름인지(재적용 시 이전 색 정리 대상 판별). 예: 'color/accent-2/500', 'color/secondary/50'. */
+export function isPaletteColorName(name: string): boolean {
+  if (!name.startsWith('color/')) return false;
+  const family = name.split('/')[1] ?? '';
+  return (PALETTE_FAMILIES as readonly string[]).includes(family) || /^accent-\d+$/.test(family);
+}
+
 /**
  * 생성된 팔레트로부터 시맨틱 역할 → Global 변수 이름 매핑 제안(Phase 2 입력).
  * 존재하는 패밀리에 대해서만 역할을 배정한다.

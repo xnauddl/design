@@ -11,6 +11,7 @@ import {
   createSemanticAliases,
   scanTextStyles,
   createSemanticTextStyles,
+  prunePaletteColors,
   bindSelection,
   renameSelection,
 } from '../dist/figma-lib.mjs';
@@ -44,6 +45,10 @@ function installFigma() {
       valuesByMode: {},
       setValueForMode(modeId, value) {
         this.valuesByMode[modeId] = value;
+      },
+      remove() {
+        const i = variables.indexOf(this);
+        if (i >= 0) variables.splice(i, 1);
       },
     };
     variables.push(v);
@@ -842,4 +847,32 @@ test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 적용 
   assert.equal(r2.created, 0);
   assert.equal(r2.updated, 1);
   assert.equal(figma._state.textStyles.length, 1); // 중복 생성 없음
+});
+
+/* ================= prunePaletteColors (팔레트 재적용 정리) ================= */
+test('prunePaletteColors — keep에 없는 팔레트 색만 삭제(사용자 변수 보존)', async () => {
+  const figma = installFigma();
+  // 이전 팔레트(사각=accent-1·2·3) + 사용자 커스텀 색 + 비색
+  await createTokens(
+    [
+      { name: 'color/accent-1/500', category: 'color', sources: ['fill'], value: '#111111' },
+      { name: 'color/accent-2/500', category: 'color', sources: ['fill'], value: '#222222' },
+      { name: 'color/accent-3/500', category: 'color', sources: ['fill'], value: '#333333' },
+      { name: 'color/secondary/500', category: 'color', sources: ['fill'], value: '#444444' },
+      { name: 'color/brandish/500', category: 'color', sources: ['fill'], value: '#555555' }, // 사용자 색(팔레트 패밀리 아님)
+      { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+    ],
+    16,
+  );
+  // 새 팔레트(보색=accent-1만) 재적용 → accent-2·3 정리, accent-1·secondary·사용자색·간격 보존
+  const keep = ['color/accent-1/500', 'color/secondary/500'];
+  const removed = await prunePaletteColors(keep);
+
+  assert.equal(removed, 4); // Global+Semantic 각각 accent-2, accent-3 = 4개
+  assert.ok(!findVar(figma, 'Global', 'color/accent-2/500'));
+  assert.ok(!findVar(figma, 'Global', 'color/accent-3/500'));
+  assert.ok(findVar(figma, 'Global', 'color/accent-1/500')); // keep
+  assert.ok(findVar(figma, 'Global', 'color/secondary/500')); // keep
+  assert.ok(findVar(figma, 'Global', 'color/brandish/500')); // 사용자 색 보존
+  assert.ok(findVar(figma, 'Global', 'spacing/16')); // 비색 보존
 });

@@ -36,6 +36,7 @@ let isPro = false;
 let teamDataRequested = false;
 let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
+let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
 
 /* ---------- 토큰 목록 렌더 ---------- */
 function renderTokens(): void {
@@ -97,11 +98,12 @@ $('btnPalette').addEventListener('click', () => {
     setStatus('paletteStatus', '브랜드색을 #RRGGBB 형식으로 입력하세요.', 'warn');
     return;
   }
+  // 보조색 체크박스가 보조색 + 하모니 사용 여부를 함께 결정(미체크 시 둘 다 미적용).
   const useSecondary = ($('useBrand2') as HTMLInputElement).checked;
-  const harmonyVal = ($('harmony') as HTMLSelectElement).value as Harmony | '';
+  const harmonyVal = ($('harmony') as HTMLSelectElement).value as Harmony;
   const p = generatePalette({
     brand: { primary, secondary: useSecondary ? ($('brand2') as HTMLInputElement).value : undefined },
-    harmony: harmonyVal || undefined,
+    harmony: useSecondary ? harmonyVal : undefined,
     includeNeutral: ($('incNeutral') as HTMLInputElement).checked,
     includeStatus: ($('incStatus') as HTMLInputElement).checked,
   });
@@ -111,12 +113,34 @@ $('btnPalette').addEventListener('click', () => {
   ($('semMap') as HTMLTextAreaElement).value = Object.entries(suggestSemanticMap(p))
     .map(([role, global]) => `${role} = ${global}`)
     .join('\n');
+  ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
   $('paletteInfo').textContent = `${p.scales.length}계열 · ${tokens.length}색 생성`;
   setStatus(
     'paletteStatus',
-    (p.warnings.join(' ') ? p.warnings.join(' ') + ' ' : '') + '아래 ‘2 · 토큰 생성’에서 변수로 만드세요.',
+    (p.warnings.join(' ') ? p.warnings.join(' ') + ' ' : '') + '하모니를 바꿔 다시 생성하거나, ‘적용’으로 변수에 반영하세요.',
     p.warnings.length ? 'warn' : 'ok',
   );
+});
+
+// 보조색 사용 토글 → 보조색·하모니 입력 활성/비활성 동기화.
+function syncSecondaryControls(): void {
+  const on = ($('useBrand2') as HTMLInputElement).checked;
+  ($('brand2') as HTMLInputElement).disabled = !on;
+  ($('harmony') as HTMLSelectElement).disabled = !on;
+}
+$('useBrand2').addEventListener('change', syncSecondaryControls);
+syncSecondaryControls();
+
+// 팔레트 ‘적용’ — 생성된 팔레트를 변수에 직접 커밋(생성=미리보기 / 적용=커밋).
+$('btnPaletteApply').addEventListener('click', () => {
+  if (!tokens.length) {
+    setStatus('paletteStatus', '먼저 ‘팔레트 생성’으로 색을 만드세요.', 'warn');
+    return;
+  }
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
+  createFrom = 'palette';
+  send({ type: 'CREATE_TOKENS', tokens, base, replacePalette: true }); // 바로 변수 생성 + 이전 팔레트 색 정리
+  setStatus('paletteStatus', '변수에 적용 중…', '');
 });
 
 /* ---------- UX4: 온보딩 카드 ---------- */
@@ -138,12 +162,14 @@ $('btnCreate').addEventListener('click', () => {
     return;
   }
   const base = Number(($('base') as HTMLInputElement).value) || 16;
+  createFrom = 'tokens';
   send({ type: 'CREATE_TOKENS', tokens, base, preview: true }); // UX1: 미리보기 먼저
 });
 
 $('btnCreateApply').addEventListener('click', () => {
   if (!tokens.length) return;
   const base = Number(($('base') as HTMLInputElement).value) || 16;
+  createFrom = 'tokens';
   send({ type: 'CREATE_TOKENS', tokens, base }); // 확인 후 실제 적용
 });
 
@@ -714,6 +740,7 @@ window.onmessage = (event: MessageEvent) => {
       tokens = msg.tokens;
       renderTokens();
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
+      ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
       $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
       setStatus('extractStatus', msg.warnings.join(' ') || `${tokens.length}개 후보 추출 완료.`, msg.warnings.length ? 'warn' : 'ok');
       break;
@@ -731,6 +758,10 @@ window.onmessage = (event: MessageEvent) => {
         // UX1: 변경 요약을 먼저 보여주고 ‘적용’ 버튼 노출.
         setStatus('createStatus', `미리보기 — ${msg.summary} · ‘적용’으로 반영`, msg.limited ? 'warn' : '');
         applyBtn.style.display = '';
+      } else if (createFrom === 'palette') {
+        // 팔레트 카드의 ‘적용’에서 온 결과 → 팔레트 상태에 표시.
+        setStatus('paletteStatus', msg.summary, msg.limited ? 'warn' : 'ok');
+        createFrom = 'tokens';
       } else {
         setStatus('createStatus', msg.summary, msg.limited ? 'warn' : 'ok');
         applyBtn.style.display = 'none';
