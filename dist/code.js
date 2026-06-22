@@ -144,12 +144,15 @@
         return fontSize * value;
     }
   }
-  function colorTokenName(hex) {
-    return `color/${hex.replace("#", "").toLowerCase()}`;
+  function colorTokenName(hex, group = "color") {
+    return `${group}/${hex.replace("#", "").toLowerCase()}`;
   }
   function numberTokenName(group, value) {
-    const v = Number.isInteger(value) ? String(value) : String(value).replace(".", "_");
+    const v = Number.isInteger(value) ? String(value) : String(value).replace(".", "-");
     return `${group}/${v}`;
+  }
+  function opacityTokenName(value) {
+    return `opacity/${Math.round(value * 100)}`;
   }
 
   // src/lib/extract.ts
@@ -175,7 +178,7 @@
         add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source);
         if (p.opacity != null && p.opacity < 1) {
           const o = round(p.opacity);
-          add(acc, { name: numberTokenName("opacity", o), category: "opacity", value: o }, "opacity");
+          add(acc, { name: opacityTokenName(o), category: "opacity", value: o }, "opacity");
         }
       } else if (p.type.startsWith("GRADIENT") || p.type === "IMAGE" || p.type === "VIDEO") {
         acc.warnings.add("\uADF8\uB77C\uB514\uC5B8\uD2B8/\uC774\uBBF8\uC9C0 \uCC44\uC6C0\uC740 \uBCC0\uC218 \uBC14\uC778\uB529 \uBD88\uAC00 \u2014 \uC2A4\uD0B5\uD588\uC2B5\uB2C8\uB2E4.");
@@ -247,12 +250,12 @@
       if (e.visible === false) continue;
       if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") {
         const hex = rgbToHex(e.color);
-        add(acc, { name: colorTokenName(hex), category: "effectColor", value: hex }, "effectColor");
+        add(acc, { name: colorTokenName(hex, "shadow/color"), category: "effectColor", value: hex }, "effectColor");
         for (const [g, val] of [
-          ["shadow-blur", e.radius],
-          ["shadow-spread", (_a = e.spread) != null ? _a : 0],
-          ["shadow-x", e.offset.x],
-          ["shadow-y", e.offset.y]
+          ["shadow/blur", e.radius],
+          ["shadow/spread", (_a = e.spread) != null ? _a : 0],
+          ["shadow/x", e.offset.x],
+          ["shadow/y", e.offset.y]
         ]) {
           const v = round(val);
           add(acc, { name: numberTokenName(g, v), category: "effectFloat", value: v }, "effectFloat");

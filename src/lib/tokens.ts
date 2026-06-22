@@ -234,13 +234,26 @@ export function toPx(
 
 /* ---------- 토큰 자동 이름 (중립; 사용자가 개명) ---------- */
 
-/** 임의 색 → 중립 이름 `color/0066ff` (hex 6자리, # 제거). */
-export function colorTokenName(hex: string): string {
-  return `color/${hex.replace('#', '').toLowerCase()}`;
+/**
+ * 임의 색 → 중립 이름 `color/0066ff` (hex 6자리, # 제거).
+ * group으로 네임스페이스를 분리한다 — 그림자색은 'shadow/color'를 넘겨 채움색과 충돌(이름 같음 →
+ * Global 변수 1개로 합쳐져 스코프가 덮어써짐)을 막는다.
+ */
+export function colorTokenName(hex: string, group = 'color'): string {
+  return `${group}/${hex.replace('#', '').toLowerCase()}`;
 }
 
-/** 숫자 토큰 이름 — 그룹 접두사 + 정수/소수 정규화. 예: numberTokenName('spacing',16)='spacing/16'. */
+/**
+ * 숫자 토큰 이름 — 그룹 접두사 + 정수/소수 정규화. 소수점은 '-'로(kebab 일관, `_`는 kebab이 다시
+ * '-'로 바꿔 표기가 두 번 바뀌는 문제 회피). 그룹에 '/'를 넣어 계층화 가능(예: 'shadow/blur').
+ * 예: numberTokenName('spacing',16)='spacing/16' · numberTokenName('line-height',1.5)='line-height/1-5'.
+ */
 export function numberTokenName(group: string, value: number): string {
-  const v = Number.isInteger(value) ? String(value) : String(value).replace('.', '_');
+  const v = Number.isInteger(value) ? String(value) : String(value).replace('.', '-');
   return `${group}/${v}`;
+}
+
+/** 불투명도 토큰 이름 — 0~1 값을 0~100 정수 백분율로(값은 그대로 0~1). 예: opacityTokenName(0.8)='opacity/80'. */
+export function opacityTokenName(value: number): string {
+  return `opacity/${Math.round(value * 100)}`;
 }

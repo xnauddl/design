@@ -9,6 +9,7 @@ import {
   rgbToHex,
   colorTokenName,
   numberTokenName,
+  opacityTokenName,
 } from './tokens';
 
 interface Accumulator {
@@ -50,7 +51,7 @@ function collectPaints(
       add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source);
       if (p.opacity != null && p.opacity < 1) {
         const o = round(p.opacity);
-        add(acc, { name: numberTokenName('opacity', o), category: 'opacity', value: o }, 'opacity');
+        add(acc, { name: opacityTokenName(o), category: 'opacity', value: o }, 'opacity');
       }
     } else if (p.type.startsWith('GRADIENT') || p.type === 'IMAGE' || p.type === 'VIDEO') {
       acc.warnings.add('그라디언트/이미지 채움은 변수 바인딩 불가 — 스킵했습니다.');
@@ -132,12 +133,14 @@ function collectEffects(acc: Accumulator, node: SceneNode): void {
     if (e.visible === false) continue;
     if (e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW') {
       const hex = rgbToHex(e.color);
-      add(acc, { name: colorTokenName(hex), category: 'effectColor', value: hex }, 'effectColor');
+      // 그림자색은 'shadow/color' 네임스페이스로 분리 — 같은 hex의 채움색과 이름이 겹치면
+      // Global 변수 1개로 합쳐져 스코프(ALL_FILLS↔EFFECT_COLOR)가 덮어써지므로.
+      add(acc, { name: colorTokenName(hex, 'shadow/color'), category: 'effectColor', value: hex }, 'effectColor');
       for (const [g, val] of [
-        ['shadow-blur', e.radius],
-        ['shadow-spread', e.spread ?? 0],
-        ['shadow-x', e.offset.x],
-        ['shadow-y', e.offset.y],
+        ['shadow/blur', e.radius],
+        ['shadow/spread', e.spread ?? 0],
+        ['shadow/x', e.offset.x],
+        ['shadow/y', e.offset.y],
       ] as const) {
         const v = round(val);
         add(acc, { name: numberTokenName(g, v), category: 'effectFloat', value: v }, 'effectFloat');

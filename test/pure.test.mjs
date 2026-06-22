@@ -13,6 +13,7 @@ import {
   toPx,
   colorTokenName,
   numberTokenName,
+  opacityTokenName,
   kebab,
   layerNameFromToken,
   layerNameFromRole,
@@ -120,8 +121,16 @@ test('toPx — 단위 환산', () => {
 
 test('토큰 자동 이름', () => {
   assert.equal(colorTokenName('#0066FF'), 'color/0066ff');
+  // P1: 그림자색은 group으로 네임스페이스 분리 → 같은 hex의 채움색과 충돌하지 않음
+  assert.equal(colorTokenName('#0066FF', 'shadow/color'), 'shadow/color/0066ff');
   assert.equal(numberTokenName('spacing', 16), 'spacing/16');
-  assert.equal(numberTokenName('line-height', 1.5), 'line-height/1_5');
+  // P3: 소수점은 '-'로(kebab 일관)
+  assert.equal(numberTokenName('line-height', 1.5), 'line-height/1-5');
+  // P2: 그룹에 '/'로 계층화
+  assert.equal(numberTokenName('shadow/blur', 4), 'shadow/blur/4');
+  // P3: 불투명도는 0~1 → 0~100 정수 백분율
+  assert.equal(opacityTokenName(0.8), 'opacity/80');
+  assert.equal(opacityTokenName(0.05), 'opacity/5');
 });
 
 test('kebab 정규화', () => {

@@ -164,6 +164,37 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
   assert.equal(byName.get('radius/4')?.category, 'radius');
 });
 
+test('extractFromSelection — 그림자색은 채움색과 이름 분리(P1) + 불투명도 백분율(P3)', () => {
+  installFigma();
+  const rect = {
+    type: 'RECTANGLE',
+    id: 's1',
+    name: 'Shadowed',
+    // 채움 검정 + 50% 불투명
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, visible: true, opacity: 0.5 }],
+    // 그림자도 같은 검정 — 옛 동작에선 이름이 'color/000000'으로 겹쳐 Global 변수 1개로 합쳐졌다
+    // 수치는 서로 달라야 값 기준 dedup(category|value|unit)으로 합쳐지지 않음
+    effects: [
+      { type: 'DROP_SHADOW', visible: true, color: { r: 0, g: 0, b: 0 }, radius: 4, spread: 1, offset: { x: 3, y: 2 } },
+    ],
+  };
+
+  const { tokens } = extractFromSelection([rect]);
+  const byName = new Map(tokens.map((t) => [t.name, t]));
+
+  // 채움색과 그림자색이 서로 다른 이름 → upsert 충돌/스코프 덮어쓰기 없음
+  assert.equal(byName.get('color/000000')?.category, 'color');
+  assert.equal(byName.get('shadow/color/000000')?.category, 'effectColor');
+  assert.notEqual('color/000000', 'shadow/color/000000');
+  // P2: 그림자 수치는 'shadow/' 계층
+  assert.equal(byName.get('shadow/blur/4')?.category, 'effectFloat');
+  assert.equal(byName.get('shadow/spread/1')?.category, 'effectFloat');
+  assert.equal(byName.get('shadow/x/3')?.category, 'effectFloat');
+  assert.equal(byName.get('shadow/y/2')?.category, 'effectFloat');
+  // P3: 불투명도 0.5 → 'opacity/50'(값은 그대로 0.5)
+  assert.equal(byName.get('opacity/50')?.value, 0.5);
+});
+
 test('extractFromSelection — 그라디언트 채움은 경고', () => {
   installFigma();
   const node = {
