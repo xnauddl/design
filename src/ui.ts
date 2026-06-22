@@ -3,6 +3,7 @@
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
+import { t } from './lib/i18n';
 import { FREE_LIMITS, type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
@@ -130,7 +131,7 @@ brandHex.addEventListener('input', () => {
 $('btnPalette').addEventListener('click', () => {
   const primary = brandHex.value.trim();
   if (!HEX6.test(primary)) {
-    setStatus('paletteStatus', '브랜드색을 #RRGGBB 형식으로 입력하세요.', 'warn');
+    setStatus('paletteStatus', t('palette.invalidHex'), 'warn');
     return;
   }
   // 보조색 체크박스가 보조색 + 하모니 사용 여부를 함께 결정(미체크 시 둘 다 미적용).
@@ -148,10 +149,10 @@ $('btnPalette').addEventListener('click', () => {
   setSemMapText(paletteSemanticMap(p));
   renderColorTable(); // #3: 색 편집표(hue·역할) 표시
   ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
-  $('paletteInfo').textContent = `${p.scales.length}계열 · ${tokens.length}색 생성`;
+  $('paletteInfo').textContent = t('palette.summary', { count: p.scales.length, tokens: tokens.length });
   setStatus(
     'paletteStatus',
-    (p.warnings.join(' ') ? p.warnings.join(' ') + ' ' : '') + '하모니를 바꿔 다시 생성하거나, ‘적용’으로 변수에 반영하세요.',
+    t('palette.hint', { warn: p.warnings.join(' ') ? p.warnings.join(' ') + ' ' : '' }),
     p.warnings.length ? 'warn' : 'ok',
   );
 });
@@ -231,7 +232,7 @@ function applyColorRoles(): void {
     if (role) map[role] = inp.dataset.name as string; // 같은 역할 중복 시 뒤가 우선
   });
   setSemMapText(map);
-  setStatus('semStatus', `${Object.keys(map).length}개 역할 반영됨 — ‘시맨틱 별칭 생성’으로 적용.`, 'ok');
+  setStatus('semStatus', t('semantic.rolesApplied', { count: Object.keys(map).length }), 'ok');
 }
 
 // 보조색 사용 토글 → 보조색·하모니 입력 활성/비활성 동기화.
@@ -246,13 +247,13 @@ syncSecondaryControls();
 // 팔레트 ‘적용’ — 생성된 팔레트를 변수에 직접 커밋(생성=미리보기 / 적용=커밋).
 $('btnPaletteApply').addEventListener('click', () => {
   if (!tokens.length) {
-    setStatus('paletteStatus', '먼저 ‘팔레트 생성’으로 색을 만드세요.', 'warn');
+    setStatus('paletteStatus', t('palette.needGenerate'), 'warn');
     return;
   }
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'palette';
   send({ type: 'CREATE_TOKENS', tokens, base, replacePalette: true }); // 바로 변수 생성 + 이전 팔레트 색 정리
-  setStatus('paletteStatus', '변수에 적용 중…', '');
+  setStatus('paletteStatus', t('common.applyingVars'), '');
 });
 
 /* ---------- UX4: 온보딩 카드 ---------- */
@@ -270,7 +271,7 @@ $('btnExtract').addEventListener('click', () => send({ type: 'EXTRACT' }));
 
 $('btnCreate').addEventListener('click', () => {
   if (!tokens.length) {
-    setStatus('createStatus', '먼저 토큰을 추출하세요.', 'warn');
+    setStatus('createStatus', t('create.needExtract'), 'warn');
     return;
   }
   const base = Number(($('base') as HTMLInputElement).value) || 16;
@@ -289,7 +290,7 @@ $('btnColorRoles').addEventListener('click', applyColorRoles); // #3 색 편집�
 
 $('btnScanGlobals').addEventListener('click', () => {
   // #10: 기존 Global 색에서 시맨틱 역할 추천(재방문 매핑).
-  setStatus('semStatus', '기존 색 스캔 중…', '');
+  setStatus('semStatus', t('semantic.scanningGlobals'), '');
   send({ type: 'GET_GLOBAL_COLORS' });
 });
 
@@ -300,7 +301,7 @@ $('btnSemantics').addEventListener('click', () => {
     if (m) map[m[1]] = m[2];
   }
   if (!Object.keys(map).length) {
-    setStatus('semStatus', '매핑을 한 줄에 “역할 = Global변수이름” 형식으로 입력하세요.', 'warn');
+    setStatus('semStatus', t('semantic.formatHint'), 'warn');
     return;
   }
   send({ type: 'CREATE_SEMANTICS', map });
@@ -336,7 +337,7 @@ $('bindHideCtx').addEventListener('change', (e) => {
 
 $('btnApplyCancel').addEventListener('click', () => {
   send({ type: 'CANCEL' }); // UX6: 취소 요청
-  setStatus('applyStatus', '취소 요청됨 — 다음 지점에서 중단합니다.', 'warn');
+  setStatus('applyStatus', t('apply.cancelRequested'), 'warn');
 });
 
 $('btnPreview').addEventListener('click', () => {
@@ -346,7 +347,7 @@ $('btnPreview').addEventListener('click', () => {
 
 $('btnContrast').addEventListener('click', () => {
   const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
-  setStatus('contrastStatus', '대비 검사 중…', '');
+  setStatus('contrastStatus', t('contrast.checking'), '');
   send({ type: 'CHECK_CONTRAST', level });
 });
 
@@ -462,7 +463,7 @@ function setWizardStep(id: WizardStepId, state: 'active' | 'done' | 'fail', note
 async function runWizard(): Promise<void> {
   if (wizardRunning) return;
   if (lastSelCount <= 0) {
-    setStatus('wizardSummary', '먼저 프레임을 선택하세요 — 선택한 레이어에서 토큰을 추출합니다.', 'warn');
+    setStatus('wizardSummary', t('wizard.needSelect'), 'warn');
     return;
   }
   // 설정값은 각 단계의 기존 입력 필드에서 읽는다(단일 출처).
@@ -483,7 +484,7 @@ async function runWizard(): Promise<void> {
   wizardRunning = true;
   ($('btnWizardRun') as HTMLButtonElement).disabled = true;
   $('btnWizardCancel').style.display = '';
-  setStatus('wizardSummary', '실행 중…', '');
+  setStatus('wizardSummary', t('common.running'), '');
   renderWizardSteps(plan);
 
   const totals: WizardTotals = {};
@@ -567,7 +568,7 @@ async function runWizard(): Promise<void> {
   wizardRunning = false;
   ($('btnWizardRun') as HTMLButtonElement).disabled = false;
   $('btnWizardCancel').style.display = 'none';
-  setStatus('wizardSummary', `${stopped ? '중단' : '완료'} — ${summarize(totals)}`, stopped ? 'warn' : 'ok');
+  setStatus('wizardSummary', t('wizard.result', { state: stopped ? t('wizard.stopped') : t('wizard.completed'), summary: summarize(totals) }), stopped ? 'warn' : 'ok');
 }
 
 $('btnWizardRun').addEventListener('click', () => void runWizard());
@@ -580,10 +581,10 @@ $('tier').addEventListener('change', () => {
 $('btnVerify').addEventListener('click', () => {
   const key = ($('licenseKey') as HTMLInputElement).value.trim();
   if (!key) {
-    setStatus('licenseStatus', '라이선스 키를 입력하세요.', 'warn');
+    setStatus('licenseStatus', t('license.needKey'), 'warn');
     return;
   }
-  setStatus('licenseStatus', '검증 중…', '');
+  setStatus('licenseStatus', t('common.verifying'), '');
   void verifyAndReport(key);
 });
 
@@ -735,7 +736,7 @@ function renderPipeline(): void {
 
 /* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
 $('btnScanComp').addEventListener('click', () => {
-  setStatus('componentStatus', '후보 스캔 중…', '');
+  setStatus('componentStatus', t('component.scanning'), '');
   send({ type: 'SCAN_COMPONENT_CANDIDATES' });
 });
 
@@ -744,10 +745,10 @@ $('btnRegisterComp').addEventListener('click', () => {
   if (compCandidates.length) {
     const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
     if (!nodeIds.length) return;
-    setStatus('componentStatus', '컴포넌트 등록 중…', '');
+    setStatus('componentStatus', t('component.registering'), '');
     send({ type: 'REGISTER_COMPONENTS', nodeIds });
   } else {
-    setStatus('componentStatus', '컴포넌트 등록 중…', '');
+    setStatus('componentStatus', t('component.registering'), '');
     send({ type: 'REGISTER_COMPONENTS' });
   }
 });
@@ -765,17 +766,17 @@ $('compHideCtx').addEventListener('change', (e) => {
 });
 
 $('btnClassifyVariants').addEventListener('click', () => {
-  setStatus('componentStatus', '베리언트 분류 중…', '');
+  setStatus('componentStatus', t('component.classifying'), '');
   send({ type: 'CLASSIFY_VARIANTS' });
 });
 
 $('btnGenMissing').addEventListener('click', () => {
-  setStatus('componentStatus', '누락 조합 생성 중…', '');
+  setStatus('componentStatus', t('component.generating'), '');
   send({ type: 'GENERATE_MISSING_VARIANTS' });
 });
 
 $('btnExposeProps').addEventListener('click', () => {
-  setStatus('componentStatus', '속성 노출 중…', '');
+  setStatus('componentStatus', t('component.exposing'), '');
   send({ type: 'EXPOSE_PROPERTIES' });
 });
 
@@ -808,7 +809,7 @@ function applyPreset(p: Preset): void {
 $('btnSavePreset').addEventListener('click', () => {
   const name = ($('presetName') as HTMLInputElement).value.trim();
   if (!name) {
-    setStatus('presetStatus', '프리셋 이름을 입력하세요.', 'warn');
+    setStatus('presetStatus', t('preset.needName'), 'warn');
     return;
   }
   send({ type: 'SAVE_PRESET', preset: gatherPreset(name) });
@@ -818,11 +819,11 @@ $('btnLoadPreset').addEventListener('click', () => {
   const name = ($('presetList') as HTMLSelectElement).value;
   const p = presets.find((x) => x.name === name);
   if (!p) {
-    setStatus('presetStatus', '선택된 프리셋이 없습니다.', 'warn');
+    setStatus('presetStatus', t('preset.noneSelected'), 'warn');
     return;
   }
   applyPreset(p);
-  setStatus('presetStatus', `‘${name}’ 적용됨 — 아래 단계에서 실행하세요.`, 'ok');
+  setStatus('presetStatus', t('preset.applied', { name }), 'ok');
 });
 
 $('btnDeletePreset').addEventListener('click', () => {
@@ -834,17 +835,17 @@ $('btnExportPreset').addEventListener('click', () => {
   const name = ($('presetList') as HTMLSelectElement).value;
   const p = presets.find((x) => x.name === name);
   if (!p) {
-    setStatus('presetStatus', '내보낼 프리셋을 선택하세요.', 'warn');
+    setStatus('presetStatus', t('preset.needExport'), 'warn');
     return;
   }
   ($('presetJson') as HTMLTextAreaElement).value = serializePreset(p);
-  setStatus('presetStatus', `‘${name}’ JSON을 내보냈습니다(복사해 공유).`, 'ok');
+  setStatus('presetStatus', t('preset.exported', { name }), 'ok');
 });
 
 $('btnImportPreset').addEventListener('click', () => {
   const parsed = parsePreset(($('presetJson') as HTMLTextAreaElement).value.trim());
   if (!parsed.ok) {
-    setStatus('presetStatus', `가져오기 실패: ${parsed.error}`, 'warn');
+    setStatus('presetStatus', t('preset.importFail', { error: parsed.error }), 'warn');
     return;
   }
   send({ type: 'SAVE_PRESET', preset: parsed.preset });
@@ -855,14 +856,14 @@ $('btnExport').addEventListener('click', () => {
   const format = ($('exportFormat') as HTMLSelectElement).value as ExportFormat;
   const fontSizeUnit = ($('exportFontUnit') as HTMLSelectElement).value as 'px' | 'rem';
   const base = Number(($('base') as HTMLInputElement).value) || 16;
-  setStatus('exportStatus', '내보내는 중…', '');
+  setStatus('exportStatus', t('common.exporting'), '');
   send({ type: 'EXPORT', format, fontSizeUnit, base });
 });
 
 $('btnDownloadExport').addEventListener('click', () => {
   const content = ($('exportOut') as HTMLTextAreaElement).value;
   if (!content) {
-    setStatus('exportStatus', '먼저 내보내기를 실행하세요.', 'warn');
+    setStatus('exportStatus', t('export.needFirst'), 'warn');
     return;
   }
   const css = lastExportFormat === 'css';
@@ -897,7 +898,7 @@ window.onmessage = (event: MessageEvent) => {
       suggestSemMapFrom(tokens);
       renderColorTable(); // #3: 색 편집표(hue·역할) 표시
       $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
-      setStatus('extractStatus', msg.warnings.join(' ') || `${tokens.length}개 후보 추출 완료.`, msg.warnings.length ? 'warn' : 'ok');
+      setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
       break;
     }
     case 'SELECTION_STATE': {
@@ -911,7 +912,7 @@ window.onmessage = (event: MessageEvent) => {
       const applyBtn = $('btnCreateApply') as HTMLButtonElement;
       if (msg.preview) {
         // UX1: 변경 요약을 먼저 보여주고 ‘적용’ 버튼 노출.
-        setStatus('createStatus', `미리보기 — ${msg.summary} · ‘적용’으로 반영`, msg.limited ? 'warn' : '');
+        setStatus('createStatus', t('create.preview', { summary: msg.summary }), msg.limited ? 'warn' : '');
         applyBtn.style.display = '';
       } else if (createFrom === 'palette') {
         // 팔레트 카드의 ‘적용’에서 온 결과 → 팔레트 상태에 표시.
@@ -935,7 +936,7 @@ window.onmessage = (event: MessageEvent) => {
       if (msg.cancelled) {
         // UX6: 취소 — 처리한 만큼만 적용(비파괴).
         clearBindPreview();
-        setStatus('applyStatus', `취소됨 — 바인딩 ${msg.bound}건만 적용${detail}`, 'warn');
+        setStatus('applyStatus', t('apply.cancelled', { bound: msg.bound, detail }), 'warn');
         confirmBtn.style.display = 'none';
       } else if (msg.preview) {
         // #6: 후보를 선택형 미리보기 트리로. 기본 전체 체크.
@@ -944,10 +945,10 @@ window.onmessage = (event: MessageEvent) => {
         bindChecked.clear();
         for (const c of bindCandidates) bindChecked.add(candKey(c));
         renderBindTree();
-        setStatus('applyStatus', `미리보기 — 바인딩 ${msg.bound}건 후보${detail} · 체크 후 ‘선택에 바인딩’`, msg.limited || msg.skipped ? 'warn' : '');
+        setStatus('applyStatus', t('apply.preview', { bound: msg.bound, detail }), msg.limited || msg.skipped ? 'warn' : '');
       } else {
         clearBindPreview();
-        setStatus('applyStatus', `바인딩 ${msg.bound}${detail}`, msg.limited || msg.skipped ? 'warn' : 'ok');
+        setStatus('applyStatus', t('apply.done', { bound: msg.bound, detail }), msg.limited || msg.skipped ? 'warn' : 'ok');
         confirmBtn.style.display = 'none';
       }
       break;
@@ -958,8 +959,8 @@ window.onmessage = (event: MessageEvent) => {
     case 'SEMANTICS_RESULT':
       setStatus(
         'semStatus',
-        `시맨틱 ${msg.aliased}개 별칭 (생성 ${msg.created} / 갱신 ${msg.updated})` +
-          (msg.missing.length ? ` · 누락: ${msg.missing.join(', ')}` : ''),
+        t('semantic.result', { aliased: msg.aliased, created: msg.created, updated: msg.updated }) +
+          (msg.missing.length ? t('semantic.missing', { names: msg.missing.join(', ') }) : ''),
         msg.missing.length ? 'warn' : 'ok',
       );
       break;
@@ -969,10 +970,10 @@ window.onmessage = (event: MessageEvent) => {
     case 'GLOBAL_COLORS':
       // #10: 기존 Global 색에서 역할 추천 → 시맨틱 매핑 textarea 채움(재방문 매핑).
       if (!msg.colors.length) {
-        setStatus('semStatus', '기존 Global 색 변수가 없습니다 — 먼저 토큰을 생성하세요.', 'warn');
+        setStatus('semStatus', t('semantic.noGlobals'), 'warn');
       } else {
         setSemMapText(suggestSemanticMap(msg.colors));
-        setStatus('semStatus', `기존 색 ${msg.colors.length}개에서 역할 추천 — 확인 후 ‘시맨틱 별칭 생성’.`, 'ok');
+        setStatus('semStatus', t('semantic.suggested', { count: msg.colors.length }), 'ok');
       }
       break;
     case 'PREREQ_STATE':
@@ -1008,12 +1009,12 @@ window.onmessage = (event: MessageEvent) => {
     case 'PRESETS':
       presets = msg.presets;
       renderPresetList();
-      setStatus('presetStatus', `프리셋 ${presets.length}개`, 'ok');
+      setStatus('presetStatus', t('preset.count', { count: presets.length }), 'ok');
       break;
     case 'EXPORT_RESULT':
       lastExportFormat = msg.format;
       ($('exportOut') as HTMLTextAreaElement).value = msg.content;
-      setStatus('exportStatus', `${msg.format === 'css' ? 'CSS' : 'W3C JSON'} 내보냄 — 복사 또는 다운로드.`, 'ok');
+      setStatus('exportStatus', t('export.done', { format: msg.format === 'css' ? 'CSS' : 'W3C JSON' }), 'ok');
       break;
     case 'COMPONENT_CANDIDATES': {
       // #1: 하위 등록 후보를 트리로. 등록 가능 노드 기본 전체 체크.
@@ -1021,12 +1022,12 @@ window.onmessage = (event: MessageEvent) => {
       compChecked.clear();
       for (const c of msg.nodes) if (c.eligible) compChecked.add(c.id);
       renderCompTree();
-      if (!compEligibleCount()) setStatus('componentStatus', '선택 하위에 등록 가능한 프레임이 없습니다.', 'warn');
+      if (!compEligibleCount()) setStatus('componentStatus', t('component.noEligible'), 'warn');
       break;
     }
     case 'COMPONENTS_RESULT':
       clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
-      setStatus('componentStatus', `컴포넌트 등록 ${msg.registered} · 스킵 ${msg.skipped}`, msg.registered ? 'ok' : 'warn');
+      setStatus('componentStatus', t('component.registered', { registered: msg.registered, skipped: msg.skipped }), msg.registered ? 'ok' : 'warn');
       break;
     case 'VARIANTS_RESULT': {
       const box = $('variantReport');
@@ -1042,7 +1043,7 @@ window.onmessage = (event: MessageEvent) => {
         }
       }
       const extra = `${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.missing.length ? ' · 빈 조합 있음' : ''}`;
-      setStatus('componentStatus', `베리언트 세트 ${msg.sets}개 생성${extra}`, 'ok');
+      setStatus('componentStatus', t('component.variants', { sets: msg.sets, extra }), 'ok');
       break;
     }
     case 'GENERATE_RESULT': {
@@ -1053,7 +1054,7 @@ window.onmessage = (event: MessageEvent) => {
         d.textContent = `+ ${c}`;
         box.appendChild(d);
       }
-      setStatus('componentStatus', `누락 조합 ${msg.generated}개 생성(세트 ${msg.sets})`, msg.generated ? 'ok' : 'warn');
+      setStatus('componentStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
       break;
     }
     case 'PROPERTIES_RESULT': {
@@ -1064,7 +1065,7 @@ window.onmessage = (event: MessageEvent) => {
         d.textContent = `+ ${p}`;
         box.appendChild(d);
       }
-      setStatus('componentStatus', `컴포넌트 속성 ${msg.created}개 노출`, msg.created ? 'ok' : 'warn');
+      setStatus('componentStatus', t('component.exposed', { created: msg.created }), msg.created ? 'ok' : 'warn');
       break;
     }
     case 'CONTRAST_RESULT':
@@ -1073,7 +1074,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 팀 기능은 ‘관리’ 탭).
       const statusId = msg.feature === 'components' ? 'componentStatus' : msg.feature === 'teamPresets' ? 'presetStatus' : 'createStatus';
-      setStatus(statusId, `${msg.message} (유료 기능: ${msg.feature})`, 'warn');
+      setStatus(statusId, t('premium.required', { message: msg.message, feature: msg.feature }), 'warn');
       break;
     }
     case 'REQUEST_VERIFY':
@@ -1229,7 +1230,7 @@ function updateRenameApply(): void {
   all.indeterminate = sel > 0 && sel < total;
   setStatus(
     'renameStatus',
-    total === 0 ? '변경할 이름이 없습니다.' : `${total}개 변경 예정 · ${sel}개 선택 — ‘이름 적용’.`,
+    total === 0 ? t('rename.none') : t('rename.previewCount', { total, sel }),
     '',
   );
 }
@@ -1248,7 +1249,7 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
   renameChecked.clear();
   $('diff').innerHTML = '';
   ($('btnRename') as HTMLButtonElement).disabled = true;
-  setStatus('renameStatus', `${msg.changes.length}개 이름 적용 완료.`, 'ok');
+  setStatus('renameStatus', t('rename.applied', { count: msg.changes.length }), 'ok');
 }
 
 /* ---------- 바인딩(#6): 미리보기 트리 + 선택 적용 ---------- */
@@ -1364,7 +1365,7 @@ function updateCompRegister(): void {
     const all = $('compAll') as HTMLInputElement;
     all.checked = sel === total && total > 0;
     all.indeterminate = sel > 0 && sel < total;
-    setStatus('componentStatus', total === 0 ? '등록 가능한 프레임이 없습니다.' : `등록 후보 ${total}개 · ${sel}개 선택`, '');
+    setStatus('componentStatus', total === 0 ? t('component.noEligibleShort') : t('component.candidates', { total, sel }), '');
   }
 }
 
@@ -1418,7 +1419,7 @@ function contrastFixBtn(label: string, hex: string, nodeId: string): HTMLButtonE
     send({ type: 'APPLY_CONTRAST_FIX', nodeId, hex });
     btn.disabled = true;
     btn.textContent = '✓ 적용';
-    setStatus('contrastStatus', '보정 적용됨 — ‘대비 검사’로 다시 확인하세요.', 'ok');
+    setStatus('contrastStatus', t('contrast.fixApplied'), 'ok');
   });
   return btn;
 }
@@ -1465,11 +1466,11 @@ function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): vo
   const skip = contrastSkipText(msg.skipped);
   const skipNote = skip ? ` · 건너뜀: ${skip}` : '';
   if (msg.checked === 0) {
-    setStatus('contrastStatus', `검사할 텍스트가 없습니다.${skip ? ` (건너뜀: ${skip})` : ' 텍스트가 있는 프레임을 선택하세요.'}`, 'warn');
+    setStatus('contrastStatus', t('contrast.none', { detail: skip ? t('contrast.noneSkip', { skip }) : t('contrast.noneSelect') }), 'warn');
   } else if (fails.length === 0) {
-    setStatus('contrastStatus', `${msg.checked}개 모두 ${msg.level} 통과 ✓${skipNote}`, 'ok');
+    setStatus('contrastStatus', t('contrast.allPass', { checked: msg.checked, level: msg.level, skip: skipNote }), 'ok');
   } else {
-    setStatus('contrastStatus', `${msg.checked}개 중 ${fails.length}개 ${msg.level} 미달${skipNote}`, 'warn');
+    setStatus('contrastStatus', t('contrast.someFail', { checked: msg.checked, fails: fails.length, level: msg.level, skip: skipNote }), 'warn');
   }
 }
 

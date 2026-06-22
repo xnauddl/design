@@ -485,6 +485,88 @@
     return a;
   };
 
+  // src/lib/i18n.ts
+  var STRINGS = {
+    // 공통 진행/상태
+    "common.applyingVars": "\uBCC0\uC218\uC5D0 \uC801\uC6A9 \uC911\u2026",
+    "common.exporting": "\uB0B4\uBCF4\uB0B4\uB294 \uC911\u2026",
+    "common.verifying": "\uAC80\uC99D \uC911\u2026",
+    "common.running": "\uC2E4\uD589 \uC911\u2026",
+    // 팔레트
+    "palette.invalidHex": "\uBE0C\uB79C\uB4DC\uC0C9\uC744 #RRGGBB \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
+    "palette.needGenerate": "\uBA3C\uC800 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uB9CC\uB4DC\uC138\uC694.",
+    "palette.summary": "{count}\uACC4\uC5F4 \xB7 {tokens}\uC0C9 \uC0DD\uC131",
+    "palette.hint": "{warn}\uD558\uBAA8\uB2C8\uB97C \uBC14\uAFD4 \uB2E4\uC2DC \uC0DD\uC131\uD558\uAC70\uB098, \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBCC0\uC218\uC5D0 \uBC18\uC601\uD558\uC138\uC694.",
+    // 추출 / 토큰 생성
+    "extract.done": "{count}\uAC1C \uD6C4\uBCF4 \uCD94\uCD9C \uC644\uB8CC.",
+    "create.needExtract": "\uBA3C\uC800 \uD1A0\uD070\uC744 \uCD94\uCD9C\uD558\uC138\uC694.",
+    "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
+    // 시맨틱 매핑
+    "semantic.rolesApplied": "{count}\uAC1C \uC5ED\uD560 \uBC18\uC601\uB428 \u2014 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019\uC73C\uB85C \uC801\uC6A9.",
+    "semantic.scanningGlobals": "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026",
+    "semantic.formatHint": "\uB9E4\uD551\uC744 \uD55C \uC904\uC5D0 \u201C\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984\u201D \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
+    "semantic.noGlobals": "\uAE30\uC874 Global \uC0C9 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.",
+    "semantic.suggested": "\uAE30\uC874 \uC0C9 {count}\uAC1C\uC5D0\uC11C \uC5ED\uD560 \uCD94\uCC9C \u2014 \uD655\uC778 \uD6C4 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019.",
+    "semantic.result": "\uC2DC\uB9E8\uD2F1 {aliased}\uAC1C \uBCC4\uCE6D (\uC0DD\uC131 {created} / \uAC31\uC2E0 {updated})",
+    "semantic.missing": " \xB7 \uB204\uB77D: {names}",
+    // 바인딩(적용)
+    "apply.cancelRequested": "\uCDE8\uC18C \uC694\uCCAD\uB428 \u2014 \uB2E4\uC74C \uC9C0\uC810\uC5D0\uC11C \uC911\uB2E8\uD569\uB2C8\uB2E4.",
+    "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 \uBC14\uC778\uB529 {bound}\uAC74\uB9CC \uC801\uC6A9{detail}",
+    "apply.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uBC14\uC778\uB529 {bound}\uAC74 \uD6C4\uBCF4{detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uC5D0 \uBC14\uC778\uB529\u2019",
+    "apply.done": "\uBC14\uC778\uB529 {bound}{detail}",
+    // 리네임
+    "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
+    "rename.none": "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "rename.applied": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.",
+    // 명도 대비
+    "contrast.checking": "\uB300\uBE44 \uAC80\uC0AC \uC911\u2026",
+    "contrast.fixApplied": "\uBCF4\uC815 \uC801\uC6A9\uB428 \u2014 \u2018\uB300\uBE44 \uAC80\uC0AC\u2019\uB85C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694.",
+    "contrast.none": "\uAC80\uC0AC\uD560 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.{detail}",
+    "contrast.noneSkip": " (\uAC74\uB108\uB700: {skip})",
+    "contrast.noneSelect": " \uD14D\uC2A4\uD2B8\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694.",
+    "contrast.allPass": "{checked}\uAC1C \uBAA8\uB450 {level} \uD1B5\uACFC \u2713{skip}",
+    "contrast.someFail": "{checked}\uAC1C \uC911 {fails}\uAC1C {level} \uBBF8\uB2EC{skip}",
+    // 컴포넌트 / 베리언트
+    "component.scanning": "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026",
+    "component.registering": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026",
+    "component.classifying": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958 \uC911\u2026",
+    "component.generating": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131 \uC911\u2026",
+    "component.exposing": "\uC18D\uC131 \uB178\uCD9C \uC911\u2026",
+    "component.noEligible": "\uC120\uD0DD \uD558\uC704\uC5D0 \uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "component.noEligibleShort": "\uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "component.candidates": "\uB4F1\uB85D \uD6C4\uBCF4 {total}\uAC1C \xB7 {sel}\uAC1C \uC120\uD0DD",
+    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D {registered} \xB7 \uC2A4\uD0B5 {skipped}",
+    "component.variants": "\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}\uAC1C \uC0DD\uC131{extra}",
+    "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
+    "component.exposed": "\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131 {created}\uAC1C \uB178\uCD9C",
+    // 마법사
+    "wizard.needSelect": "\uBA3C\uC800 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C \uD1A0\uD070\uC744 \uCD94\uCD9C\uD569\uB2C8\uB2E4.",
+    "wizard.result": "{state} \u2014 {summary}",
+    "wizard.stopped": "\uC911\uB2E8",
+    "wizard.completed": "\uC644\uB8CC",
+    // 프리셋
+    "preset.needName": "\uD504\uB9AC\uC14B \uC774\uB984\uC744 \uC785\uB825\uD558\uC138\uC694.",
+    "preset.noneSelected": "\uC120\uD0DD\uB41C \uD504\uB9AC\uC14B\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "preset.applied": "\u2018{name}\u2019 \uC801\uC6A9\uB428 \u2014 \uC544\uB798 \uB2E8\uACC4\uC5D0\uC11C \uC2E4\uD589\uD558\uC138\uC694.",
+    "preset.needExport": "\uB0B4\uBCF4\uB0BC \uD504\uB9AC\uC14B\uC744 \uC120\uD0DD\uD558\uC138\uC694.",
+    "preset.exported": "\u2018{name}\u2019 JSON\uC744 \uB0B4\uBCF4\uB0C8\uC2B5\uB2C8\uB2E4(\uBCF5\uC0AC\uD574 \uACF5\uC720).",
+    "preset.importFail": "\uAC00\uC838\uC624\uAE30 \uC2E4\uD328: {error}",
+    "preset.count": "\uD504\uB9AC\uC14B {count}\uAC1C",
+    // 내보내기
+    "export.needFirst": "\uBA3C\uC800 \uB0B4\uBCF4\uB0B4\uAE30\uB97C \uC2E4\uD589\uD558\uC138\uC694.",
+    "export.done": "{format} \uB0B4\uBCF4\uB0C4 \u2014 \uBCF5\uC0AC \uB610\uB294 \uB2E4\uC6B4\uB85C\uB4DC.",
+    // 라이선스
+    "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
+    // 유료 게이팅
+    "premium.required": "{message} (\uC720\uB8CC \uAE30\uB2A5: {feature})"
+  };
+  function t(key, vars) {
+    var _a;
+    const tpl = (_a = STRINGS[key]) != null ? _a : key;
+    if (!vars) return tpl;
+    return tpl.replace(/\{(\w+)\}/g, (_, k) => k in vars ? String(vars[k]) : `{${k}}`);
+  }
+
   // src/lib/entitlements.ts
   var TIERS = ["free", "pro", "team"];
   var FREE_LIMITS = { nodes: 50, tokens: 100, bindings: 200 };
@@ -777,7 +859,7 @@
 
   // src/lib/palette.ts
   var STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
-  var lerp = (a, b, t) => a + (b - a) * t;
+  var lerp = (a, b, t2) => a + (b - a) * t2;
   var CHROMA_FALLOFF = 0.6;
   var LOW_CHROMA = 0.03;
   function swatchAt(step, l, c, h) {
@@ -999,14 +1081,14 @@
   }
   function numericEntries(tokens2, category) {
     const byVal = /* @__PURE__ */ new Map();
-    for (const t of tokens2) {
-      if (t.category === category && typeof t.value === "number" && !byVal.has(t.value)) byVal.set(t.value, t.name);
+    for (const t2 of tokens2) {
+      if (t2.category === category && typeof t2.value === "number" && !byVal.has(t2.value)) byVal.set(t2.value, t2.name);
     }
     return [...byVal.keys()].sort((a, b) => a - b).map((value) => ({ value, name: byVal.get(value) }));
   }
   function suggestTokenRoles(tokens2, base = 16) {
     const map = {};
-    const colors = tokens2.filter((t) => t.category === "color" && typeof t.value === "string").map((t) => ({ name: t.name, hex: t.value }));
+    const colors = tokens2.filter((t2) => t2.category === "color" && typeof t2.value === "string").map((t2) => ({ name: t2.name, hex: t2.value }));
     Object.assign(map, suggestSemanticMap(colors));
     const scale = (category, prefix, roleFn) => {
       const entries = numericEntries(tokens2, category);
@@ -1020,9 +1102,9 @@
     scale("size", "size", tshirtRoles);
     scale("fontSize", "font-size", (vals) => fontSizeRoles(vals, base));
     for (const e of numericEntries(tokens2, "fontWeight")) map[`font-weight/${weightRole(e.value)}`] = e.name;
-    const families = tokens2.filter((t) => t.category === "fontFamily" && typeof t.value === "string");
-    families.forEach((t, i) => {
-      map[`font-family/${familyRole(String(t.value), i)}`] = t.name;
+    const families = tokens2.filter((t2) => t2.category === "fontFamily" && typeof t2.value === "string");
+    families.forEach((t2, i) => {
+      map[`font-family/${familyRole(String(t2.value), i)}`] = t2.name;
     });
     return map;
   }
@@ -1103,17 +1185,17 @@
       return { step, run: true };
     });
   }
-  function summarize(t) {
+  function summarize(t2) {
     var _a;
     const parts = [];
-    if (t.created != null) parts.push(`\uD1A0\uD070 ${t.created}`);
-    if (t.bound != null) parts.push(`\uBC14\uC778\uB529 ${t.bound}`);
-    if (t.renamed != null) parts.push(`\uB9AC\uB124\uC784 ${t.renamed}`);
-    if (t.contrastChecked != null) {
-      const passed = t.contrastChecked - ((_a = t.contrastFailed) != null ? _a : 0);
-      parts.push(`\uB300\uBE44 ${passed}/${t.contrastChecked} \uD1B5\uACFC`);
+    if (t2.created != null) parts.push(`\uD1A0\uD070 ${t2.created}`);
+    if (t2.bound != null) parts.push(`\uBC14\uC778\uB529 ${t2.bound}`);
+    if (t2.renamed != null) parts.push(`\uB9AC\uB124\uC784 ${t2.renamed}`);
+    if (t2.contrastChecked != null) {
+      const passed = t2.contrastChecked - ((_a = t2.contrastFailed) != null ? _a : 0);
+      parts.push(`\uB300\uBE44 ${passed}/${t2.contrastChecked} \uD1B5\uACFC`);
     }
-    if (t.components != null && t.components > 0) parts.push(`\uCEF4\uD3EC\uB10C\uD2B8 ${t.components}`);
+    if (t2.components != null && t2.components > 0) parts.push(`\uCEF4\uD3EC\uB10C\uD2B8 ${t2.components}`);
     return parts.length ? parts.join(" \xB7 ") : "\uC644\uB8CC\uB41C \uC791\uC5C5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4";
   }
 
@@ -1161,24 +1243,24 @@
     };
     chunkPending.set(mount, requestAnimationFrame(step));
   }
-  function makeTokenRow(t, i) {
+  function makeTokenRow(t2, i) {
     const row = document.createElement("div");
     row.className = "tk";
     const sw = document.createElement("span");
-    if ((t.category === "color" || t.category === "effectColor") && typeof t.value === "string") {
+    if ((t2.category === "color" || t2.category === "effectColor") && typeof t2.value === "string") {
       sw.className = "swatch";
-      sw.style.background = t.value;
+      sw.style.background = t2.value;
     }
     row.appendChild(sw);
     const input = document.createElement("input");
-    input.value = t.name;
+    input.value = t2.name;
     input.addEventListener("input", () => {
       tokens[i].name = input.value;
     });
     row.appendChild(input);
     const cat = document.createElement("span");
     cat.className = "cat";
-    cat.textContent = t.unit && t.unit !== "px" ? `${t.category}\xB7${t.unit}` : t.category;
+    cat.textContent = t2.unit && t2.unit !== "px" ? `${t2.category}\xB7${t2.unit}` : t2.category;
     row.appendChild(cat);
     return row;
   }
@@ -1205,7 +1287,7 @@
   $("btnPalette").addEventListener("click", () => {
     const primary = brandHex.value.trim();
     if (!HEX6.test(primary)) {
-      setStatus("paletteStatus", "\uBE0C\uB79C\uB4DC\uC0C9\uC744 #RRGGBB \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.", "warn");
+      setStatus("paletteStatus", t("palette.invalidHex"), "warn");
       return;
     }
     const useSecondary = $("useBrand2").checked;
@@ -1221,10 +1303,10 @@
     setSemMapText(paletteSemanticMap(p));
     renderColorTable();
     $("btnPaletteApply").style.display = "";
-    $("paletteInfo").textContent = `${p.scales.length}\uACC4\uC5F4 \xB7 ${tokens.length}\uC0C9 \uC0DD\uC131`;
+    $("paletteInfo").textContent = t("palette.summary", { count: p.scales.length, tokens: tokens.length });
     setStatus(
       "paletteStatus",
-      (p.warnings.join(" ") ? p.warnings.join(" ") + " " : "") + "\uD558\uBAA8\uB2C8\uB97C \uBC14\uAFD4 \uB2E4\uC2DC \uC0DD\uC131\uD558\uAC70\uB098, \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBCC0\uC218\uC5D0 \uBC18\uC601\uD558\uC138\uC694.",
+      t("palette.hint", { warn: p.warnings.join(" ") ? p.warnings.join(" ") + " " : "" }),
       p.warnings.length ? "warn" : "ok"
     );
   });
@@ -1240,10 +1322,10 @@
   function huefyTokenColors(toks) {
     const idx = [];
     const hexes = [];
-    toks.forEach((t, i) => {
-      if (t.category === "color" && typeof t.value === "string") {
+    toks.forEach((t2, i) => {
+      if (t2.category === "color" && typeof t2.value === "string") {
         idx.push(i);
-        hexes.push(t.value);
+        hexes.push(t2.value);
       }
     });
     if (!idx.length) return;
@@ -1254,7 +1336,7 @@
   }
   function renderColorTable() {
     const card = $("colorTableCard");
-    const colors = tokens.filter((t) => t.category === "color" && typeof t.value === "string");
+    const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
     if (!colors.length) {
       card.style.display = "none";
       return;
@@ -1264,22 +1346,22 @@
     for (const [role, name] of Object.entries(textToSemanticMap($("semMap").value))) {
       if (!roleByName.has(name)) roleByName.set(name, role);
     }
-    renderChunked($("colorTable"), colors, (t) => {
+    renderChunked($("colorTable"), colors, (t2) => {
       var _a;
       const row = document.createElement("div");
       row.className = "crow";
       const sw = document.createElement("span");
       sw.className = "swatch";
-      sw.style.background = t.value;
+      sw.style.background = t2.value;
       const name = document.createElement("span");
       name.className = "cn";
-      name.textContent = t.name;
-      name.title = `${t.name} \xB7 ${classifyColor(t.value).achromatic ? "\uBB34\uCC44" : "hue"}`;
+      name.textContent = t2.name;
+      name.title = `${t2.name} \xB7 ${classifyColor(t2.value).achromatic ? "\uBB34\uCC44" : "hue"}`;
       const role = document.createElement("input");
       role.setAttribute("list", "roleList");
       role.placeholder = "\uC5ED\uD560(\uC120\uD0DD)";
-      role.value = (_a = roleByName.get(t.name)) != null ? _a : "";
-      role.dataset.name = t.name;
+      role.value = (_a = roleByName.get(t2.name)) != null ? _a : "";
+      role.dataset.name = t2.name;
       row.append(sw, name, role);
       return row;
     });
@@ -1291,7 +1373,7 @@
       if (role) map[role] = inp.dataset.name;
     });
     setSemMapText(map);
-    setStatus("semStatus", `${Object.keys(map).length}\uAC1C \uC5ED\uD560 \uBC18\uC601\uB428 \u2014 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019\uC73C\uB85C \uC801\uC6A9.`, "ok");
+    setStatus("semStatus", t("semantic.rolesApplied", { count: Object.keys(map).length }), "ok");
   }
   function syncSecondaryControls() {
     const on = $("useBrand2").checked;
@@ -1302,13 +1384,13 @@
   syncSecondaryControls();
   $("btnPaletteApply").addEventListener("click", () => {
     if (!tokens.length) {
-      setStatus("paletteStatus", "\uBA3C\uC800 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uB9CC\uB4DC\uC138\uC694.", "warn");
+      setStatus("paletteStatus", t("palette.needGenerate"), "warn");
       return;
     }
     const base = Number($("base").value) || 16;
     createFrom = "palette";
     send({ type: "CREATE_TOKENS", tokens, base, replacePalette: true });
-    setStatus("paletteStatus", "\uBCC0\uC218\uC5D0 \uC801\uC6A9 \uC911\u2026", "");
+    setStatus("paletteStatus", t("common.applyingVars"), "");
   });
   $("btnOnboardClose").addEventListener("click", () => {
     $("onboardCard").style.display = "none";
@@ -1321,7 +1403,7 @@
   $("btnExtract").addEventListener("click", () => send({ type: "EXTRACT" }));
   $("btnCreate").addEventListener("click", () => {
     if (!tokens.length) {
-      setStatus("createStatus", "\uBA3C\uC800 \uD1A0\uD070\uC744 \uCD94\uCD9C\uD558\uC138\uC694.", "warn");
+      setStatus("createStatus", t("create.needExtract"), "warn");
       return;
     }
     const base = Number($("base").value) || 16;
@@ -1336,7 +1418,7 @@
   });
   $("btnColorRoles").addEventListener("click", applyColorRoles);
   $("btnScanGlobals").addEventListener("click", () => {
-    setStatus("semStatus", "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026", "");
+    setStatus("semStatus", t("semantic.scanningGlobals"), "");
     send({ type: "GET_GLOBAL_COLORS" });
   });
   $("btnSemantics").addEventListener("click", () => {
@@ -1346,7 +1428,7 @@
       if (m) map[m[1]] = m[2];
     }
     if (!Object.keys(map).length) {
-      setStatus("semStatus", "\uB9E4\uD551\uC744 \uD55C \uC904\uC5D0 \u201C\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984\u201D \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.", "warn");
+      setStatus("semStatus", t("semantic.formatHint"), "warn");
       return;
     }
     send({ type: "CREATE_SEMANTICS", map });
@@ -1374,7 +1456,7 @@
   });
   $("btnApplyCancel").addEventListener("click", () => {
     send({ type: "CANCEL" });
-    setStatus("applyStatus", "\uCDE8\uC18C \uC694\uCCAD\uB428 \u2014 \uB2E4\uC74C \uC9C0\uC810\uC5D0\uC11C \uC911\uB2E8\uD569\uB2C8\uB2E4.", "warn");
+    setStatus("applyStatus", t("apply.cancelRequested"), "warn");
   });
   $("btnPreview").addEventListener("click", () => {
     const maxDepth = Number($("depth").value) || 3;
@@ -1382,7 +1464,7 @@
   });
   $("btnContrast").addEventListener("click", () => {
     const level = $("contrastLevel").value;
-    setStatus("contrastStatus", "\uB300\uBE44 \uAC80\uC0AC \uC911\u2026", "");
+    setStatus("contrastStatus", t("contrast.checking"), "");
     send({ type: "CHECK_CONTRAST", level });
   });
   $("btnRename").addEventListener("click", () => {
@@ -1478,7 +1560,7 @@
   async function runWizard() {
     if (wizardRunning) return;
     if (lastSelCount <= 0) {
-      setStatus("wizardSummary", "\uBA3C\uC800 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C \uD1A0\uD070\uC744 \uCD94\uCD9C\uD569\uB2C8\uB2E4.", "warn");
+      setStatus("wizardSummary", t("wizard.needSelect"), "warn");
       return;
     }
     const base = Number($("base").value) || 16;
@@ -1496,7 +1578,7 @@
     wizardRunning = true;
     $("btnWizardRun").disabled = true;
     $("btnWizardCancel").style.display = "";
-    setStatus("wizardSummary", "\uC2E4\uD589 \uC911\u2026", "");
+    setStatus("wizardSummary", t("common.running"), "");
     renderWizardSteps(plan);
     const totals = {};
     let stopped = false;
@@ -1576,7 +1658,7 @@
     wizardRunning = false;
     $("btnWizardRun").disabled = false;
     $("btnWizardCancel").style.display = "none";
-    setStatus("wizardSummary", `${stopped ? "\uC911\uB2E8" : "\uC644\uB8CC"} \u2014 ${summarize(totals)}`, stopped ? "warn" : "ok");
+    setStatus("wizardSummary", t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }), stopped ? "warn" : "ok");
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
   $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
@@ -1586,10 +1668,10 @@
   $("btnVerify").addEventListener("click", () => {
     const key = $("licenseKey").value.trim();
     if (!key) {
-      setStatus("licenseStatus", "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.", "warn");
+      setStatus("licenseStatus", t("license.needKey"), "warn");
       return;
     }
-    setStatus("licenseStatus", "\uAC80\uC99D \uC911\u2026", "");
+    setStatus("licenseStatus", t("common.verifying"), "");
     void verifyAndReport(key);
   });
   function b64urlToBytes(s) {
@@ -1712,17 +1794,17 @@
     });
   }
   $("btnScanComp").addEventListener("click", () => {
-    setStatus("componentStatus", "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026", "");
+    setStatus("componentStatus", t("component.scanning"), "");
     send({ type: "SCAN_COMPONENT_CANDIDATES" });
   });
   $("btnRegisterComp").addEventListener("click", () => {
     if (compCandidates.length) {
       const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
       if (!nodeIds.length) return;
-      setStatus("componentStatus", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026", "");
+      setStatus("componentStatus", t("component.registering"), "");
       send({ type: "REGISTER_COMPONENTS", nodeIds });
     } else {
-      setStatus("componentStatus", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026", "");
+      setStatus("componentStatus", t("component.registering"), "");
       send({ type: "REGISTER_COMPONENTS" });
     }
   });
@@ -1739,15 +1821,15 @@
     renderCompTree();
   });
   $("btnClassifyVariants").addEventListener("click", () => {
-    setStatus("componentStatus", "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958 \uC911\u2026", "");
+    setStatus("componentStatus", t("component.classifying"), "");
     send({ type: "CLASSIFY_VARIANTS" });
   });
   $("btnGenMissing").addEventListener("click", () => {
-    setStatus("componentStatus", "\uB204\uB77D \uC870\uD569 \uC0DD\uC131 \uC911\u2026", "");
+    setStatus("componentStatus", t("component.generating"), "");
     send({ type: "GENERATE_MISSING_VARIANTS" });
   });
   $("btnExposeProps").addEventListener("click", () => {
-    setStatus("componentStatus", "\uC18D\uC131 \uB178\uCD9C \uC911\u2026", "");
+    setStatus("componentStatus", t("component.exposing"), "");
     send({ type: "EXPOSE_PROPERTIES" });
   });
   function renderPresetList() {
@@ -1776,7 +1858,7 @@
   $("btnSavePreset").addEventListener("click", () => {
     const name = $("presetName").value.trim();
     if (!name) {
-      setStatus("presetStatus", "\uD504\uB9AC\uC14B \uC774\uB984\uC744 \uC785\uB825\uD558\uC138\uC694.", "warn");
+      setStatus("presetStatus", t("preset.needName"), "warn");
       return;
     }
     send({ type: "SAVE_PRESET", preset: gatherPreset(name) });
@@ -1785,11 +1867,11 @@
     const name = $("presetList").value;
     const p = presets.find((x) => x.name === name);
     if (!p) {
-      setStatus("presetStatus", "\uC120\uD0DD\uB41C \uD504\uB9AC\uC14B\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.", "warn");
+      setStatus("presetStatus", t("preset.noneSelected"), "warn");
       return;
     }
     applyPreset(p);
-    setStatus("presetStatus", `\u2018${name}\u2019 \uC801\uC6A9\uB428 \u2014 \uC544\uB798 \uB2E8\uACC4\uC5D0\uC11C \uC2E4\uD589\uD558\uC138\uC694.`, "ok");
+    setStatus("presetStatus", t("preset.applied", { name }), "ok");
   });
   $("btnDeletePreset").addEventListener("click", () => {
     const name = $("presetList").value;
@@ -1799,16 +1881,16 @@
     const name = $("presetList").value;
     const p = presets.find((x) => x.name === name);
     if (!p) {
-      setStatus("presetStatus", "\uB0B4\uBCF4\uB0BC \uD504\uB9AC\uC14B\uC744 \uC120\uD0DD\uD558\uC138\uC694.", "warn");
+      setStatus("presetStatus", t("preset.needExport"), "warn");
       return;
     }
     $("presetJson").value = serializePreset(p);
-    setStatus("presetStatus", `\u2018${name}\u2019 JSON\uC744 \uB0B4\uBCF4\uB0C8\uC2B5\uB2C8\uB2E4(\uBCF5\uC0AC\uD574 \uACF5\uC720).`, "ok");
+    setStatus("presetStatus", t("preset.exported", { name }), "ok");
   });
   $("btnImportPreset").addEventListener("click", () => {
     const parsed = parsePreset($("presetJson").value.trim());
     if (!parsed.ok) {
-      setStatus("presetStatus", `\uAC00\uC838\uC624\uAE30 \uC2E4\uD328: ${parsed.error}`, "warn");
+      setStatus("presetStatus", t("preset.importFail", { error: parsed.error }), "warn");
       return;
     }
     send({ type: "SAVE_PRESET", preset: parsed.preset });
@@ -1817,13 +1899,13 @@
     const format = $("exportFormat").value;
     const fontSizeUnit = $("exportFontUnit").value;
     const base = Number($("base").value) || 16;
-    setStatus("exportStatus", "\uB0B4\uBCF4\uB0B4\uB294 \uC911\u2026", "");
+    setStatus("exportStatus", t("common.exporting"), "");
     send({ type: "EXPORT", format, fontSizeUnit, base });
   });
   $("btnDownloadExport").addEventListener("click", () => {
     const content = $("exportOut").value;
     if (!content) {
-      setStatus("exportStatus", "\uBA3C\uC800 \uB0B4\uBCF4\uB0B4\uAE30\uB97C \uC2E4\uD589\uD558\uC138\uC694.", "warn");
+      setStatus("exportStatus", t("export.needFirst"), "warn");
       return;
     }
     const css = lastExportFormat === "css";
@@ -1855,7 +1937,7 @@
         suggestSemMapFrom(tokens);
         renderColorTable();
         $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
-        setStatus("extractStatus", msg.warnings.join(" ") || `${tokens.length}\uAC1C \uD6C4\uBCF4 \uCD94\uCD9C \uC644\uB8CC.`, msg.warnings.length ? "warn" : "ok");
+        setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");
         break;
       }
       case "SELECTION_STATE": {
@@ -1868,7 +1950,7 @@
       case "CREATE_RESULT": {
         const applyBtn = $("btnCreateApply");
         if (msg.preview) {
-          setStatus("createStatus", `\uBBF8\uB9AC\uBCF4\uAE30 \u2014 ${msg.summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601`, msg.limited ? "warn" : "");
+          setStatus("createStatus", t("create.preview", { summary: msg.summary }), msg.limited ? "warn" : "");
           applyBtn.style.display = "";
         } else if (createFrom === "palette") {
           setStatus("paletteStatus", msg.summary, msg.limited ? "warn" : "ok");
@@ -1890,7 +1972,7 @@
         const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}${limitNote}`;
         if (msg.cancelled) {
           clearBindPreview();
-          setStatus("applyStatus", `\uCDE8\uC18C\uB428 \u2014 \uBC14\uC778\uB529 ${msg.bound}\uAC74\uB9CC \uC801\uC6A9${detail}`, "warn");
+          setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail }), "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
           bindCandidates = (_a = msg.candidates) != null ? _a : [];
@@ -1898,10 +1980,10 @@
           bindChecked.clear();
           for (const c of bindCandidates) bindChecked.add(candKey(c));
           renderBindTree();
-          setStatus("applyStatus", `\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uBC14\uC778\uB529 ${msg.bound}\uAC74 \uD6C4\uBCF4${detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uC5D0 \uBC14\uC778\uB529\u2019`, msg.limited || msg.skipped ? "warn" : "");
+          setStatus("applyStatus", t("apply.preview", { bound: msg.bound, detail }), msg.limited || msg.skipped ? "warn" : "");
         } else {
           clearBindPreview();
-          setStatus("applyStatus", `\uBC14\uC778\uB529 ${msg.bound}${detail}`, msg.limited || msg.skipped ? "warn" : "ok");
+          setStatus("applyStatus", t("apply.done", { bound: msg.bound, detail }), msg.limited || msg.skipped ? "warn" : "ok");
           confirmBtn.style.display = "none";
         }
         break;
@@ -1912,7 +1994,7 @@
       case "SEMANTICS_RESULT":
         setStatus(
           "semStatus",
-          `\uC2DC\uB9E8\uD2F1 ${msg.aliased}\uAC1C \uBCC4\uCE6D (\uC0DD\uC131 ${msg.created} / \uAC31\uC2E0 ${msg.updated})` + (msg.missing.length ? ` \xB7 \uB204\uB77D: ${msg.missing.join(", ")}` : ""),
+          t("semantic.result", { aliased: msg.aliased, created: msg.created, updated: msg.updated }) + (msg.missing.length ? t("semantic.missing", { names: msg.missing.join(", ") }) : ""),
           msg.missing.length ? "warn" : "ok"
         );
         break;
@@ -1920,10 +2002,10 @@
         break;
       case "GLOBAL_COLORS":
         if (!msg.colors.length) {
-          setStatus("semStatus", "\uAE30\uC874 Global \uC0C9 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.", "warn");
+          setStatus("semStatus", t("semantic.noGlobals"), "warn");
         } else {
           setSemMapText(suggestSemanticMap(msg.colors));
-          setStatus("semStatus", `\uAE30\uC874 \uC0C9 ${msg.colors.length}\uAC1C\uC5D0\uC11C \uC5ED\uD560 \uCD94\uCC9C \u2014 \uD655\uC778 \uD6C4 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019.`, "ok");
+          setStatus("semStatus", t("semantic.suggested", { count: msg.colors.length }), "ok");
         }
         break;
       case "PREREQ_STATE":
@@ -1951,24 +2033,24 @@
       case "PRESETS":
         presets = msg.presets;
         renderPresetList();
-        setStatus("presetStatus", `\uD504\uB9AC\uC14B ${presets.length}\uAC1C`, "ok");
+        setStatus("presetStatus", t("preset.count", { count: presets.length }), "ok");
         break;
       case "EXPORT_RESULT":
         lastExportFormat = msg.format;
         $("exportOut").value = msg.content;
-        setStatus("exportStatus", `${msg.format === "css" ? "CSS" : "W3C JSON"} \uB0B4\uBCF4\uB0C4 \u2014 \uBCF5\uC0AC \uB610\uB294 \uB2E4\uC6B4\uB85C\uB4DC.`, "ok");
+        setStatus("exportStatus", t("export.done", { format: msg.format === "css" ? "CSS" : "W3C JSON" }), "ok");
         break;
       case "COMPONENT_CANDIDATES": {
         compCandidates = msg.nodes;
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible) compChecked.add(c.id);
         renderCompTree();
-        if (!compEligibleCount()) setStatus("componentStatus", "\uC120\uD0DD \uD558\uC704\uC5D0 \uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.", "warn");
+        if (!compEligibleCount()) setStatus("componentStatus", t("component.noEligible"), "warn");
         break;
       }
       case "COMPONENTS_RESULT":
         clearCompPreview();
-        setStatus("componentStatus", `\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D ${msg.registered} \xB7 \uC2A4\uD0B5 ${msg.skipped}`, msg.registered ? "ok" : "warn");
+        setStatus("componentStatus", t("component.registered", { registered: msg.registered, skipped: msg.skipped }), msg.registered ? "ok" : "warn");
         break;
       case "VARIANTS_RESULT": {
         const box = $("variantReport");
@@ -1984,7 +2066,7 @@
           }
         }
         const extra = `${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.missing.length ? " \xB7 \uBE48 \uC870\uD569 \uC788\uC74C" : ""}`;
-        setStatus("componentStatus", `\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 ${msg.sets}\uAC1C \uC0DD\uC131${extra}`, "ok");
+        setStatus("componentStatus", t("component.variants", { sets: msg.sets, extra }), "ok");
         break;
       }
       case "GENERATE_RESULT": {
@@ -1995,7 +2077,7 @@
           d.textContent = `+ ${c}`;
           box.appendChild(d);
         }
-        setStatus("componentStatus", `\uB204\uB77D \uC870\uD569 ${msg.generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 ${msg.sets})`, msg.generated ? "ok" : "warn");
+        setStatus("componentStatus", t("component.generated", { generated: msg.generated, sets: msg.sets }), msg.generated ? "ok" : "warn");
         break;
       }
       case "PROPERTIES_RESULT": {
@@ -2006,7 +2088,7 @@
           d.textContent = `+ ${p}`;
           box.appendChild(d);
         }
-        setStatus("componentStatus", `\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131 ${msg.created}\uAC1C \uB178\uCD9C`, msg.created ? "ok" : "warn");
+        setStatus("componentStatus", t("component.exposed", { created: msg.created }), msg.created ? "ok" : "warn");
         break;
       }
       case "CONTRAST_RESULT":
@@ -2014,7 +2096,7 @@
         break;
       case "PREMIUM_REQUIRED": {
         const statusId = msg.feature === "components" ? "componentStatus" : msg.feature === "teamPresets" ? "presetStatus" : "createStatus";
-        setStatus(statusId, `${msg.message} (\uC720\uB8CC \uAE30\uB2A5: ${msg.feature})`, "warn");
+        setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }
       case "REQUEST_VERIFY":
@@ -2127,7 +2209,7 @@
     all.indeterminate = sel > 0 && sel < total;
     setStatus(
       "renameStatus",
-      total === 0 ? "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." : `${total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 ${sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.`,
+      total === 0 ? t("rename.none") : t("rename.previewCount", { total, sel }),
       ""
     );
   }
@@ -2143,7 +2225,7 @@
     renameChecked.clear();
     $("diff").innerHTML = "";
     $("btnRename").disabled = true;
-    setStatus("renameStatus", `${msg.changes.length}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.`, "ok");
+    setStatus("renameStatus", t("rename.applied", { count: msg.changes.length }), "ok");
   }
   var bindCandidates = [];
   var bindNodes = [];
@@ -2238,7 +2320,7 @@
       const all = $("compAll");
       all.checked = sel === total && total > 0;
       all.indeterminate = sel > 0 && sel < total;
-      setStatus("componentStatus", total === 0 ? "\uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." : `\uB4F1\uB85D \uD6C4\uBCF4 ${total}\uAC1C \xB7 ${sel}\uAC1C \uC120\uD0DD`, "");
+      setStatus("componentStatus", total === 0 ? t("component.noEligibleShort") : t("component.candidates", { total, sel }), "");
     }
   }
   function clearCompPreview() {
@@ -2285,7 +2367,7 @@
       send({ type: "APPLY_CONTRAST_FIX", nodeId, hex });
       btn.disabled = true;
       btn.textContent = "\u2713 \uC801\uC6A9";
-      setStatus("contrastStatus", "\uBCF4\uC815 \uC801\uC6A9\uB428 \u2014 \u2018\uB300\uBE44 \uAC80\uC0AC\u2019\uB85C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694.", "ok");
+      setStatus("contrastStatus", t("contrast.fixApplied"), "ok");
     });
     return btn;
   }
@@ -2325,11 +2407,11 @@
     const skip = contrastSkipText(msg.skipped);
     const skipNote = skip ? ` \xB7 \uAC74\uB108\uB700: ${skip}` : "";
     if (msg.checked === 0) {
-      setStatus("contrastStatus", `\uAC80\uC0AC\uD560 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.${skip ? ` (\uAC74\uB108\uB700: ${skip})` : " \uD14D\uC2A4\uD2B8\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694."}`, "warn");
+      setStatus("contrastStatus", t("contrast.none", { detail: skip ? t("contrast.noneSkip", { skip }) : t("contrast.noneSelect") }), "warn");
     } else if (fails.length === 0) {
-      setStatus("contrastStatus", `${msg.checked}\uAC1C \uBAA8\uB450 ${msg.level} \uD1B5\uACFC \u2713${skipNote}`, "ok");
+      setStatus("contrastStatus", t("contrast.allPass", { checked: msg.checked, level: msg.level, skip: skipNote }), "ok");
     } else {
-      setStatus("contrastStatus", `${msg.checked}\uAC1C \uC911 ${fails.length}\uAC1C ${msg.level} \uBBF8\uB2EC${skipNote}`, "warn");
+      setStatus("contrastStatus", t("contrast.someFail", { checked: msg.checked, fails: fails.length, level: msg.level, skip: skipNote }), "warn");
     }
   }
   function showApplyProgress(label) {
@@ -2369,10 +2451,10 @@
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
   var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {
-    for (const t of TABS) {
-      $(`tab-${t}`).classList.toggle("active", t === name);
-      const btn = $(`tabbtn-${t}`);
-      const on = t === name;
+    for (const t2 of TABS) {
+      $(`tab-${t2}`).classList.toggle("active", t2 === name);
+      const btn = $(`tabbtn-${t2}`);
+      const on = t2 === name;
       btn.classList.toggle("active", on);
       btn.setAttribute("aria-selected", String(on));
       btn.tabIndex = on ? 0 : -1;
@@ -2380,9 +2462,9 @@
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
     if (name !== "settings") send({ type: "GET_PREREQ" });
   }
-  TABS.forEach((t, i) => {
-    const btn = $(`tabbtn-${t}`);
-    btn.addEventListener("click", () => showTab(t));
+  TABS.forEach((t2, i) => {
+    const btn = $(`tabbtn-${t2}`);
+    btn.addEventListener("click", () => showTab(t2));
     btn.addEventListener("keydown", (e) => {
       const ni = nextTabIndex(e.key, i, TABS.length);
       if (ni < 0) return;
