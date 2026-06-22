@@ -283,8 +283,76 @@
   }
 
   // src/lib/color.ts
+  var mod360 = (h) => (h % 360 + 360) % 360;
   function srgbToLinear(c) {
     return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+  function linearToSrgb(c) {
+    return c <= 31308e-7 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  }
+  function linearRgbToOklab(r, g, b) {
+    const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+    const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+    const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+    const l_ = Math.cbrt(l);
+    const m_ = Math.cbrt(m);
+    const s_ = Math.cbrt(s);
+    return {
+      L: 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
+      a: 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
+      b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_
+    };
+  }
+  function oklabToLinearRgb(lab) {
+    const l_ = lab.L + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
+    const m_ = lab.L - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
+    const s_ = lab.L - 0.0894841775 * lab.a - 1.291485548 * lab.b;
+    const l = l_ ** 3;
+    const m = m_ ** 3;
+    const s = s_ ** 3;
+    return {
+      r: 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      g: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      b: -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
+    };
+  }
+  function oklabToOklch(lab) {
+    const c = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
+    const h = c < 1e-7 ? 0 : mod360(Math.atan2(lab.b, lab.a) * 180 / Math.PI);
+    return { l: lab.L, c, h };
+  }
+  function oklchToOklab(lch) {
+    const hr = lch.h * Math.PI / 180;
+    return { L: lch.l, a: lch.c * Math.cos(hr), b: lch.c * Math.sin(hr) };
+  }
+  function rgbToOklch(rgb) {
+    return oklabToOklch(linearRgbToOklab(srgbToLinear(rgb.r), srgbToLinear(rgb.g), srgbToLinear(rgb.b)));
+  }
+  function oklchToRgb(lch) {
+    const lin = oklabToLinearRgb(oklchToOklab(lch));
+    return { r: clamp01(linearToSrgb(lin.r)), g: clamp01(linearToSrgb(lin.g)), b: clamp01(linearToSrgb(lin.b)) };
+  }
+  function hexToOklch(hex) {
+    return rgbToOklch(hexToRgb(hex));
+  }
+  function oklchToHex(lch) {
+    return rgbToHex(oklchToRgb(lch));
+  }
+  function inGamut(lch) {
+    const lin = oklabToLinearRgb(oklchToOklab(lch));
+    const eps = 1e-4;
+    return lin.r >= -eps && lin.r <= 1 + eps && lin.g >= -eps && lin.g <= 1 + eps && lin.b >= -eps && lin.b <= 1 + eps;
+  }
+  function clampToGamut(lch) {
+    if (inGamut(lch)) return lch;
+    let lo = 0;
+    let hi = lch.c;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (inGamut({ l: lch.l, c: mid, h: lch.h })) lo = mid;
+      else hi = mid;
+    }
+    return { l: lch.l, c: lo, h: lch.h };
   }
   function relativeLuminance(rgb) {
     const r = srgbToLinear(rgb.r);
@@ -300,13 +368,33 @@
     return (hi + 0.05) / (lo + 0.05);
   }
 
+  // src/lib/colorName.ts
+  var STEP_LIST = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+  var STEP_L = STEP_LIST.map((_, i) => 0.97 + (0.16 - 0.97) * (i / (STEP_LIST.length - 1)));
+  var HUE_CENTERS = [
+    { name: "red", h: 25 },
+    { name: "orange", h: 65 },
+    { name: "yellow", h: 100 },
+    { name: "green", h: 145 },
+    { name: "teal", h: 190 },
+    { name: "blue", h: 250 },
+    { name: "indigo", h: 285 },
+    { name: "purple", h: 320 },
+    { name: "pink", h: 355 }
+  ];
+  var HUE_FAMILIES = [...HUE_CENTERS.map((c) => c.name), "gray"];
+
   // src/lib/palette.ts
-  var PALETTE_FAMILIES = ["primary", "secondary", "neutral", "success", "warning", "error", "info"];
   function isPaletteColorName(name) {
-    var _a;
     if (!name.startsWith("color/")) return false;
-    const family = (_a = name.split("/")[1]) != null ? _a : "";
-    return PALETTE_FAMILIES.includes(family) || /^accent-\d+$/.test(family);
+    const parts = name.split("/");
+    if (parts.length !== 3) return false;
+    const base = parts[1].replace(/-\d+$/, "");
+    return HUE_FAMILIES.includes(base);
+  }
+  function paletteFamilyOf(name) {
+    if (!isPaletteColorName(name)) return null;
+    return name.split("/")[1];
   }
 
   // src/lib/variables.ts
@@ -421,12 +509,14 @@
   }
   async function prunePaletteColors(keep) {
     const keepSet = new Set(keep);
+    const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f) => f !== null));
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const palIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC).map((c) => c.id));
     let removed = 0;
     for (const v of await figma.variables.getLocalVariablesAsync()) {
       if (!palIds.has(v.variableCollectionId)) continue;
-      if (isPaletteColorName(v.name) && !keepSet.has(v.name)) {
+      const fam = paletteFamilyOf(v.name);
+      if (fam && keepFamilies.has(fam) && !keepSet.has(v.name)) {
         v.remove();
         removed++;
       }
@@ -462,6 +552,25 @@
 
   // src/lib/bind.ts
   var TIER = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
+  function addColorCand(preview, node, field, index, hex, e) {
+    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
+  }
+  function addFloatCand(preview, node, field, value, e) {
+    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : void 0 });
+  }
+  function pruneToAffected(nodeIndex, candidates) {
+    var _a, _b, _c, _d;
+    const byId = new Map(nodeIndex.map((n) => [n.id, n]));
+    const keep = new Set(candidates.map((c) => c.nodeId));
+    for (const c of candidates) {
+      let p = (_b = (_a = byId.get(c.nodeId)) == null ? void 0 : _a.parentId) != null ? _b : null;
+      while (p && !keep.has(p)) {
+        keep.add(p);
+        p = (_d = (_c = byId.get(p)) == null ? void 0 : _c.parentId) != null ? _d : null;
+      }
+    }
+    return nodeIndex.filter((n) => keep.has(n.id));
+  }
   function countNodes(sel) {
     let n = 0;
     const stack = sel.slice();
@@ -491,12 +600,17 @@
       limited: false
     };
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
+    const preview = apply ? null : { candidates: [], nodeIndex: [] };
     for (const node of selection2) {
-      await walk2(node, entries, tolerance, res, flagSet, budget, apply, hooks, prog);
+      await walk2(node, entries, tolerance, res, flagSet, budget, apply, hooks, prog, preview, 0, null);
       if (res.cancelled) break;
     }
     if (budget.limited) res.limited = true;
     res.flags = [...flagSet];
+    if (preview) {
+      res.candidates = preview.candidates;
+      res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates);
+    }
     (_c = hooks.onProgress) == null ? void 0 : _c.call(hooks, prog.done, prog.total);
     return res;
   }
@@ -541,7 +655,7 @@
     return typeof v === "object" && v !== null && "r" in v && "g" in v && "b" in v;
   }
   function matchColor(entries, hex) {
-    for (const e of entries) if (e.colorHex === hex) return e.variable;
+    for (const e of entries) if (e.colorHex === hex) return e;
     return null;
   }
   function matchFloat(entries, value, tol) {
@@ -556,9 +670,9 @@
         bestDist = dist;
       }
     }
-    return best ? best.variable : null;
+    return best;
   }
-  async function walk2(node, entries, tol, res, flags, budget, apply, hooks, prog) {
+  async function walk2(node, entries, tol, res, flags, budget, apply, hooks, prog, preview, depth, parentId) {
     var _a;
     if (res.cancelled) return;
     if (budget.nodes <= 0 || res.bound >= budget.maxBindings) {
@@ -566,11 +680,12 @@
       return;
     }
     budget.nodes--;
-    bindPaints(node, entries, res, apply);
-    bindFrame(node, entries, tol, res, flags, apply);
-    bindRadius(node, entries, tol, res, apply);
-    bindEffects(node, entries, res, apply);
-    await bindText(node, entries, tol, res, apply);
+    preview == null ? void 0 : preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
+    bindPaints(node, entries, res, apply, preview);
+    bindFrame(node, entries, tol, res, flags, apply, preview);
+    bindRadius(node, entries, tol, res, apply, preview);
+    bindEffects(node, entries, res, apply, preview);
+    await bindText(node, entries, tol, res, apply, preview);
     prog.done++;
     if (hooks.onProgress && prog.done % prog.every === 0) {
       hooks.onProgress(prog.done, prog.total);
@@ -582,79 +697,89 @@
     }
     if ("children" in node)
       for (const c of node.children) {
-        await walk2(c, entries, tol, res, flags, budget, apply, hooks, prog);
+        await walk2(c, entries, tol, res, flags, budget, apply, hooks, prog, preview, depth + 1, node.id);
         if (res.cancelled) return;
       }
   }
-  function bindPaints(node, entries, res, apply) {
+  function bindPaints(node, entries, res, apply, preview) {
     for (const key of ["fills", "strokes"]) {
       if (!(key in node)) continue;
       const paints2 = node[key];
       if (paints2 === figma.mixed || !Array.isArray(paints2)) continue;
       let changed = false;
-      const next = paints2.map((p) => {
+      const next = paints2.map((p, i) => {
         if (p.type !== "SOLID") return p;
-        const v = matchColor(entries, rgbToHex(p.color));
-        if (!v) {
+        const hex = rgbToHex(p.color);
+        const e = matchColor(entries, hex);
+        if (!e) {
           skip(res, "no-match");
           return p;
         }
-        changed = true;
         res.bound++;
-        return apply ? figma.variables.setBoundVariableForPaint(p, "color", v) : p;
+        if (!apply) {
+          addColorCand(preview, node, key, i, hex, e);
+          return p;
+        }
+        changed = true;
+        return figma.variables.setBoundVariableForPaint(p, "color", e.variable);
       });
       if (changed && apply) node[key] = next;
     }
   }
-  function bindFrame(node, entries, tol, res, flags, apply) {
+  function bindFrame(node, entries, tol, res, flags, apply, preview) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
-    if (node.layoutSizingHorizontal === "FIXED") tryBind(node, "width", node.width, entries, tol, res, apply);
+    if (node.layoutSizingHorizontal === "FIXED") tryBind(node, "width", node.width, entries, tol, res, apply, preview);
     else if (node.layoutSizingHorizontal === "HUG" || node.layoutSizingHorizontal === "FILL") {
       flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
       note(res, "hug-fill");
     }
-    if (node.layoutSizingVertical === "FIXED") tryBind(node, "height", node.height, entries, tol, res, apply);
+    if (node.layoutSizingVertical === "FIXED") tryBind(node, "height", node.height, entries, tol, res, apply, preview);
     if (node.layoutMode === "NONE") {
       flags.add("\uC624\uD1A0\uB808\uC774\uC544\uC6C3\uC774 \uC544\uB2CC \uD504\uB808\uC784\uC740 padding/gap \uBC14\uC778\uB529 \uBD88\uAC00.");
       note(res, "no-autolayout");
       return;
     }
-    tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply);
-    tryBind(node, "paddingLeft", node.paddingLeft, entries, tol, res, apply);
-    tryBind(node, "paddingRight", node.paddingRight, entries, tol, res, apply);
-    tryBind(node, "paddingTop", node.paddingTop, entries, tol, res, apply);
-    tryBind(node, "paddingBottom", node.paddingBottom, entries, tol, res, apply);
+    tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply, preview);
+    tryBind(node, "paddingLeft", node.paddingLeft, entries, tol, res, apply, preview);
+    tryBind(node, "paddingRight", node.paddingRight, entries, tol, res, apply, preview);
+    tryBind(node, "paddingTop", node.paddingTop, entries, tol, res, apply, preview);
+    tryBind(node, "paddingBottom", node.paddingBottom, entries, tol, res, apply, preview);
   }
-  function bindRadius(node, entries, tol, res, apply) {
+  function bindRadius(node, entries, tol, res, apply, preview) {
     if (!("cornerRadius" in node)) return;
     const r = node.cornerRadius;
     const corners = ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"];
     if (r !== figma.mixed && typeof r === "number" && r > 0) {
-      for (const c of corners) tryBind(node, c, r, entries, tol, res, apply);
+      for (const c of corners) tryBind(node, c, r, entries, tol, res, apply, preview);
     } else if (r === figma.mixed) {
       for (const c of corners) {
         const cv = node[c];
-        if (typeof cv === "number" && cv > 0) tryBind(node, c, cv, entries, tol, res, apply);
+        if (typeof cv === "number" && cv > 0) tryBind(node, c, cv, entries, tol, res, apply, preview);
       }
     }
   }
-  function bindEffects(node, entries, res, apply) {
+  function bindEffects(node, entries, res, apply, preview) {
     if (!("effects" in node)) return;
     let changed = false;
-    const next = node.effects.map((e) => {
+    const next = node.effects.map((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return e;
-      const v = matchColor(entries, rgbToHex(e.color));
-      if (!v) {
+      const hex = rgbToHex(e.color);
+      const ent = matchColor(entries, hex);
+      if (!ent) {
         skip(res, "no-match");
         return e;
       }
-      changed = true;
       res.bound++;
-      return apply ? figma.variables.setBoundVariableForEffect(e, "color", v) : e;
+      if (!apply) {
+        addColorCand(preview, node, "effects", i, hex, ent);
+        return e;
+      }
+      changed = true;
+      return figma.variables.setBoundVariableForEffect(e, "color", ent.variable);
     });
     if (changed && apply) node.effects = next;
   }
-  async function bindText(node, entries, tol, res, apply) {
+  async function bindText(node, entries, tol, res, apply, preview) {
     if (node.type !== "TEXT") return;
     if (node.fontName === figma.mixed) return;
     try {
@@ -663,50 +788,52 @@
       note(res, "font");
       return;
     }
-    if (node.fontSize !== figma.mixed) tryBindText(node, "fontSize", node.fontSize, entries, tol, res, apply);
+    if (node.fontSize !== figma.mixed) tryBindText(node, "fontSize", node.fontSize, entries, tol, res, apply, preview);
     if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS") {
-      tryBindText(node, "lineHeight", node.lineHeight.value, entries, tol, res, apply);
+      tryBindText(node, "lineHeight", node.lineHeight.value, entries, tol, res, apply, preview);
     }
     if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") {
-      tryBindText(node, "letterSpacing", node.letterSpacing.value, entries, tol, res, apply);
+      tryBindText(node, "letterSpacing", node.letterSpacing.value, entries, tol, res, apply, preview);
     }
   }
-  function tryBindText(node, field, value, entries, tol, res, apply) {
-    const v = matchFloat(entries, value, tol);
+  function tryBindText(node, field, value, entries, tol, res, apply, preview) {
+    const e = matchFloat(entries, value, tol);
     const len = node.characters.length;
     if (len === 0) {
       skip(res, "empty-text");
       return;
     }
-    if (!v) {
+    if (!e) {
       skip(res, "no-match");
       return;
     }
     if (!apply) {
       res.bound++;
+      addFloatCand(preview, node, field, value, e);
       return;
     }
     try {
-      node.setRangeBoundVariable(0, len, field, v);
+      node.setRangeBoundVariable(0, len, field, e.variable);
       res.bound++;
-    } catch (e) {
+    } catch (e2) {
       skip(res, "error");
     }
   }
-  function tryBind(node, field, value, entries, tol, res, apply) {
-    const v = matchFloat(entries, value, tol);
-    if (!v) {
+  function tryBind(node, field, value, entries, tol, res, apply, preview) {
+    const e = matchFloat(entries, value, tol);
+    if (!e) {
       skip(res, "no-match");
       return;
     }
     if (!apply) {
       res.bound++;
+      addFloatCand(preview, node, field, value, e);
       return;
     }
     try {
-      node.setBoundVariable(field, v);
+      node.setBoundVariable(field, e.variable);
       res.bound++;
-    } catch (e) {
+    } catch (e2) {
       skip(res, "error");
     }
   }
@@ -835,7 +962,7 @@
     if (/^[0-9a-f]{6}$/.test(v)) return true;
     return v.split("-").every((s) => /^\d+$/.test(s) || UNIT_WORDS.has(s));
   }
-  var GENERIC_ROLES = /* @__PURE__ */ new Set(["container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
+  var GENERIC_ROLES = /* @__PURE__ */ new Set(["frame", "container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
   function pickScope(name) {
     const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
     if (!segs.length) return null;
@@ -855,26 +982,30 @@
 
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
-    const changes = [];
-    await recurse(selection2, null, opts, changes, 0, null);
-    return { changes, applied: opts.apply };
+    const col = { changes: [], nodes: [] };
+    await recurse(selection2, null, opts, col, 0, null, null);
+    return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
   }
-  async function recurse(nodes, ancestorName, opts, out, depth, parentLayout) {
+  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId) {
     const total = nodes.length;
     for (let i = 0; i < total; i++) {
       const node = nodes[i];
+      const before = node.name;
       const pos = { index: i, total, parentLayout, depth };
       const decided = await decide(node, ancestorName, pos, opts);
-      let contextForChildren = node.name;
+      let contextForChildren = before;
+      let after;
       if (!decided.skip && decided.name) {
-        if (decided.name !== node.name) {
-          out.push({ id: node.id, before: node.name, after: decided.name });
-          if (opts.apply) node.name = decided.name;
-        }
         contextForChildren = decided.name;
+        if (decided.name !== before) {
+          after = decided.name;
+          col.changes.push({ id: node.id, before, after });
+          if (opts.apply) node.name = after;
+        }
       }
-      if ("children" in node) {
-        await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node));
+      col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
+      if ("children" in node && node.type !== "INSTANCE") {
+        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id);
       }
     }
   }
@@ -884,6 +1015,7 @@
     if (node.type === "TEXT") return { skip: true };
     if (node.type === "INSTANCE") return { skip: true };
     if (node.locked) return { skip: true };
+    if (pos.depth === 0 && isContainerType(node)) return { skip: true };
     if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
     const token = await primaryToken(node);
     const role = resolveRole(node, token, pos);
@@ -1346,6 +1478,29 @@
     }
     return { groups, singles };
   }
+  function componentEligible(node) {
+    return (node.type === "FRAME" || node.type === "GROUP") && !node.locked;
+  }
+  function scanComponentCandidates(selection2) {
+    var _a, _b;
+    const all = [];
+    const visit = (n, depth, parentId) => {
+      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: componentEligible(n) });
+      if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
+    };
+    for (const n of selection2) visit(n, 0, null);
+    const byId = new Map(all.map((c) => [c.id, c]));
+    const keep = new Set(all.filter((c) => c.eligible).map((c) => c.id));
+    for (const c of all) {
+      if (!c.eligible) continue;
+      let p = c.parentId;
+      while (p && !keep.has(p)) {
+        keep.add(p);
+        p = (_b = (_a = byId.get(p)) == null ? void 0 : _a.parentId) != null ? _b : null;
+      }
+    }
+    return all.filter((c) => keep.has(c.id));
+  }
 
   // src/lib/contrast.ts
   function isLargeText(fontSizePx, bold) {
@@ -1357,11 +1512,52 @@
     return large ? 3 : 4.5;
   }
   var round2 = (n) => Math.round(n * 100) / 100;
+  var clamp012 = (n) => Math.min(1, Math.max(0, n));
+  function adjustLForContrast(srcHex, otherHex, required) {
+    const src = hexToOklch(srcHex);
+    const otherRgb = hexToRgb(otherHex);
+    const at = (L) => {
+      const hex = oklchToHex(clampToGamut({ l: clamp012(L), c: src.c, h: src.h }));
+      return { hex, ratio: contrastRatio(hexToRgb(hex), otherRgb) };
+    };
+    if (at(src.l).ratio >= required) return srcHex;
+    const solve = (toL) => {
+      if (at(toL).ratio < required) return { ok: false, L: toL, hex: at(toL).hex };
+      let lo = src.l;
+      let hi = toL;
+      for (let i = 0; i < 24; i++) {
+        const mid = (lo + hi) / 2;
+        if (at(mid).ratio >= required) hi = mid;
+        else lo = mid;
+      }
+      return { ok: true, L: hi, hex: at(hi).hex };
+    };
+    const dark = solve(0);
+    const light = solve(1);
+    const ok = [dark, light].filter((c) => c.ok).sort((a, b) => Math.abs(a.L - src.l) - Math.abs(b.L - src.l));
+    if (ok.length) return ok[0].hex;
+    return at(0).ratio >= at(1).ratio ? at(0).hex : at(1).hex;
+  }
+  function suggestContrastFix(fg, bg, required) {
+    return {
+      suggestedFg: adjustLForContrast(fg, bg, required),
+      // 텍스트색 명도 조정(국소·파급 적음)
+      suggestedBg: adjustLForContrast(bg, fg, required)
+      // 배경색 명도 조정(옵션)
+    };
+  }
   function evaluateSample(s, level) {
     const large = isLargeText(s.fontSize, s.bold);
     const required = requiredRatio(level, large);
     const ratio = round2(contrastRatio(hexToRgb(s.fg), hexToRgb(s.bg)));
-    return { id: s.id, name: s.name, fg: s.fg, bg: s.bg, ratio, required, large, pass: ratio >= required };
+    const pass = ratio >= required;
+    const f = { id: s.id, name: s.name, fg: s.fg, bg: s.bg, bgId: s.bgId, ratio, required, large, pass };
+    if (!pass) {
+      const fix = suggestContrastFix(s.fg, s.bg, required);
+      f.suggestedFg = fix.suggestedFg;
+      f.suggestedBg = fix.suggestedBg;
+    }
+    return f;
   }
   function checkContrast(samples, level) {
     const findings = samples.map((s) => evaluateSample(s, level));
@@ -1417,28 +1613,36 @@
     return [p, ...list.filter((x) => x.name !== p.name)];
   }
 
-  // src/lib/history.ts
-  var HISTORY_CAP = 100;
-  function pushHistory(list, entry, cap = HISTORY_CAP) {
-    return [entry, ...list].slice(0, cap);
-  }
-
   // src/lib/undo.ts
   function commitUndo(f) {
     if (typeof f.commitUndo === "function") f.commitUndo();
   }
 
   // src/code.ts
-  figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
+  var UI_SIZE_KEY = "dsl.uiSize";
+  var UI_MIN = { w: 360, h: 480 };
+  var UI_MAX = { w: 900, h: 1200 };
+  var UI_DEFAULT = { w: 460, h: 660 };
+  var clampSize = (w, h) => ({
+    w: Math.round(Math.min(UI_MAX.w, Math.max(UI_MIN.w, w))),
+    h: Math.round(Math.min(UI_MAX.h, Math.max(UI_MIN.h, h)))
+  });
+  figma.showUI(__html__, { width: UI_DEFAULT.w, height: UI_DEFAULT.h, themeColors: true });
+  figma.clientStorage.getAsync(UI_SIZE_KEY).then((s) => {
+    const v = s;
+    if (v && typeof v.w === "number" && typeof v.h === "number") {
+      const c = clampSize(v.w, v.h);
+      figma.ui.resize(c.w, c.h);
+    }
+  }).catch(() => {
+  });
   var selection = () => figma.currentPage.selection;
   var DEV_TIER_KEY = "dsl.devTier";
   var CACHE_KEY = "dsl.licenseCache";
   var PRESETS_KEY = "dsl.presets";
-  var HISTORY_KEY = "dsl.history";
   var devTier = "free";
   var cache = null;
   var presets = [];
-  var history = [];
   var bindCancel = false;
   function effective() {
     if (cache) {
@@ -1469,15 +1673,20 @@
       if (c && typeof c.key === "string" && isTier(c.tier) && typeof c.expiresAt === "number" && typeof c.lastVerified === "number") cache = c;
       const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
       if (Array.isArray(ps)) presets = ps;
-      const h = await figma.clientStorage.getAsync(HISTORY_KEY);
-      if (Array.isArray(h)) history = h;
     } catch (e) {
     }
   }
-  function record(action, summary) {
-    history = pushHistory(history, { at: Date.now(), action, summary });
-    void figma.clientStorage.setAsync(HISTORY_KEY, history).catch(() => {
-    });
+  async function postPrereq() {
+    try {
+      const cols = await figma.variables.getLocalVariableCollectionsAsync();
+      const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
+      const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+      const vars = await figma.variables.getLocalVariablesAsync();
+      const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
+      const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
+      post({ type: "PREREQ_STATE", hasGlobal, hasBindable });
+    } catch (e) {
+    }
   }
   function requireTeam() {
     if (hasEntitlement(currentTier(), "teamPresets")) return true;
@@ -1508,6 +1717,52 @@
     if (hasEntitlement(currentTier(), "components")) return true;
     post({ type: "PREMIUM_REQUIRED", feature: "components", message: "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
     return false;
+  }
+  var TEXT_BIND_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing"]);
+  async function applySelectedBinding(item) {
+    var _a, _b;
+    const node = await figma.getNodeByIdAsync(item.nodeId);
+    if (!node || !("type" in node)) return false;
+    const variable = await figma.variables.getVariableByIdAsync(item.variableId);
+    if (!variable) return false;
+    const sn = node;
+    try {
+      if (item.field === "fills" || item.field === "strokes") {
+        if (!(item.field in sn)) return false;
+        const paints2 = sn[item.field];
+        if (paints2 === figma.mixed || !Array.isArray(paints2)) return false;
+        const i = (_a = item.index) != null ? _a : 0;
+        const p = paints2[i];
+        if (!p || p.type !== "SOLID") return false;
+        const arr = paints2.slice();
+        arr[i] = figma.variables.setBoundVariableForPaint(p, "color", variable);
+        sn[item.field] = arr;
+        return true;
+      }
+      if (item.field === "effects") {
+        if (!("effects" in sn)) return false;
+        const effects = sn.effects;
+        const i = (_b = item.index) != null ? _b : 0;
+        const e = effects[i];
+        if (!e || e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return false;
+        const arr = effects.slice();
+        arr[i] = figma.variables.setBoundVariableForEffect(e, "color", variable);
+        sn.effects = arr;
+        return true;
+      }
+      if (TEXT_BIND_FIELDS.has(item.field)) {
+        if (sn.type !== "TEXT" || sn.fontName === figma.mixed) return false;
+        await figma.loadFontAsync(sn.fontName);
+        const len = sn.characters.length;
+        if (len === 0) return false;
+        sn.setRangeBoundVariable(0, len, item.field, variable);
+        return true;
+      }
+      sn.setBoundVariable(item.field, variable);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
   async function savePresets() {
     try {
@@ -1585,11 +1840,11 @@
     }
     return null;
   }
-  function effectiveBgHex(node) {
+  function effectiveBg(node) {
     let cur = node.parent;
     while (cur && cur.type !== "PAGE" && cur.type !== "DOCUMENT") {
       const hex = solidFillHex(cur);
-      if (hex) return hex;
+      if (hex) return { hex, id: cur.id };
       cur = cur.parent;
     }
     return null;
@@ -1614,12 +1869,12 @@
         const fg = solidFillHex(n);
         if (!fg) note2("no-fill");
         else {
-          const bg = effectiveBgHex(n);
+          const bg = effectiveBg(n);
           if (!bg) note2("no-bg");
           else {
             const fontSize = typeof n.fontSize === "number" ? n.fontSize : 16;
             const bold = typeof n.fontWeight === "number" ? n.fontWeight >= 700 : false;
-            samples.push({ id: n.id, name: n.name, fg, bg, fontSize, bold });
+            samples.push({ id: n.id, name: n.name, fg, bg: bg.hex, bgId: bg.id, fontSize, bold });
           }
         }
       }
@@ -1648,8 +1903,8 @@
           if (c.limited) summary += ` \xB7 \u26A0 ${msg.tokens.length}\uAC1C \uC911 ${c.allowed}\uAC1C\uB9CC \uC801\uC6A9(Free \uD55C\uB3C4 ${limit}) \u2014 \uC5C5\uADF8\uB808\uC774\uB4DC \uD544\uC694`;
           post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
           if (!msg.preview) {
-            record("create", summary);
             commitUndo(figma);
+            await postPrereq();
           }
           break;
         }
@@ -1675,10 +1930,13 @@
             reasons: r.reasons,
             limited: !!r.limited,
             preview: msg.preview,
-            cancelled: r.cancelled
+            cancelled: r.cancelled,
+            candidates: r.candidates,
+            // #6: 미리보기 후보(dry-run만)
+            nodes: r.nodes
+            // #13: 미리보기 트리 맥락
           });
           if (!msg.preview) {
-            if (!r.cancelled) record("bind", `\uBC14\uC778\uB529 ${r.bound} \xB7 \uC2A4\uD0B5 ${r.skipped}${r.limited ? " \xB7 \uD55C\uB3C4 \uB3C4\uB2EC" : ""}`);
             commitUndo(figma);
           }
           break;
@@ -1687,11 +1945,39 @@
           bindCancel = true;
           break;
         }
+        case "APPLY_SELECTED": {
+          let bound = 0;
+          let skipped = 0;
+          for (const item of msg.items) {
+            if (await applySelectedBinding(item)) bound++;
+            else skipped++;
+          }
+          post({ type: "APPLY_RESULT", bound, skipped, flags: [], reasons: {} });
+          if (bound) {
+            commitUndo(figma);
+          }
+          break;
+        }
         case "RENAME": {
           const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
-          post({ type: "RENAME_RESULT", changes: r.changes, applied: r.applied });
+          post({ type: "RENAME_RESULT", changes: r.changes, nodes: r.nodes, applied: r.applied });
           if (r.applied && r.changes.length) {
-            record("rename", `${r.changes.length}\uAC1C \uB808\uC774\uC5B4 \uC774\uB984 \uC801\uC6A9`);
+            commitUndo(figma);
+          }
+          break;
+        }
+        case "RENAME_APPLY": {
+          const changes = [];
+          for (const { id, after } of msg.items) {
+            const node = await figma.getNodeByIdAsync(id);
+            if (!node || !("name" in node)) continue;
+            const before = node.name;
+            if (before === after) continue;
+            node.name = after;
+            changes.push({ id, before, after });
+          }
+          post({ type: "RENAME_RESULT", changes, nodes: [], applied: true });
+          if (changes.length) {
             commitUndo(figma);
           }
           break;
@@ -1699,14 +1985,25 @@
         case "CREATE_SEMANTICS": {
           const s = await createSemanticAliases(msg.map);
           post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
-          record("semantics", `\uBCC4\uCE6D ${s.aliased} (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated})`);
           commitUndo(figma);
+          await postPrereq();
           break;
         }
         case "GET_COLLECTIONS": {
           const cols = await figma.variables.getLocalVariableCollectionsAsync();
           post({ type: "COLLECTIONS", collections: cols.map((c) => ({ id: c.id, name: c.name })) });
           postSelection();
+          break;
+        }
+        case "GET_PREREQ": {
+          await postPrereq();
+          break;
+        }
+        case "RESIZE": {
+          const c = clampSize(msg.width, msg.height);
+          figma.ui.resize(c.w, c.h);
+          if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { w: c.w, h: c.h }).catch(() => {
+          });
           break;
         }
         case "GET_LICENSE": {
@@ -1767,21 +2064,6 @@
           post({ type: "PRESETS", presets });
           break;
         }
-        case "GET_HISTORY": {
-          if (!requireTeam()) break;
-          post({ type: "HISTORY", entries: history });
-          break;
-        }
-        case "CLEAR_HISTORY": {
-          if (!requireTeam()) break;
-          history = [];
-          try {
-            await figma.clientStorage.deleteAsync(HISTORY_KEY);
-          } catch (e) {
-          }
-          post({ type: "HISTORY", entries: history });
-          break;
-        }
         case "EXPORT": {
           const cols = await figma.variables.getLocalVariableCollectionsAsync();
           const colById = new Map(cols.map((c) => [c.id, c]));
@@ -1819,11 +2101,27 @@
           post({ type: "EXPORT_RESULT", format: msg.format, content });
           break;
         }
+        case "SCAN_COMPONENT_CANDIDATES": {
+          if (!requirePro()) break;
+          post({ type: "COMPONENT_CANDIDATES", nodes: scanComponentCandidates(selection()) });
+          break;
+        }
         case "REGISTER_COMPONENTS": {
           if (!requirePro()) break;
           let registered = 0;
           let skipped = 0;
-          for (const node of selection()) {
+          let targets;
+          if (msg.nodeIds && msg.nodeIds.length) {
+            targets = [];
+            for (const id of msg.nodeIds) {
+              const n = await figma.getNodeByIdAsync(id);
+              if (n && "type" in n) targets.push(n);
+              else skipped++;
+            }
+          } else {
+            targets = [...selection()];
+          }
+          for (const node of targets) {
             if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") {
               skipped++;
               continue;
@@ -1947,6 +2245,25 @@
             findings: report.findings,
             skipped
           });
+          break;
+        }
+        case "APPLY_CONTRAST_FIX": {
+          const node = await figma.getNodeByIdAsync(msg.nodeId);
+          if (node && "fills" in node) {
+            const fills = node.fills;
+            if (Array.isArray(fills)) {
+              const i = fills.findIndex((p) => {
+                var _a2;
+                return p.type === "SOLID" && p.visible !== false && ((_a2 = p.opacity) != null ? _a2 : 1) > 0;
+              });
+              if (i >= 0) {
+                const next = fills.slice();
+                next[i] = __spreadProps(__spreadValues({}, next[i]), { color: hexToRgb(msg.hex) });
+                node.fills = next;
+                commitUndo(figma);
+              }
+            }
+          }
           break;
         }
       }

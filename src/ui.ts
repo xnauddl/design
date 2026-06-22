@@ -1,16 +1,16 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
 import { FREE_LIMITS, type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
-import { type HistoryEntry, formatHistory, serializeHistory } from './lib/history';
 import type { ExportFormat } from './lib/exporters';
-import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
+import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
+import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import type { WcagLevel } from './lib/contrast';
@@ -29,10 +29,12 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
-let history: HistoryEntry[] = [];
 let isTeam = false;
 let isPro = false;
 let teamDataRequested = false;
+// #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩).
+let hasGlobal = false;
+let hasBindable = false;
 let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
@@ -108,10 +110,9 @@ $('btnPalette').addEventListener('click', () => {
   });
   tokens = paletteToDraftTokens(p);
   renderTokens();
-  // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능)
-  ($('semMap') as HTMLTextAreaElement).value = Object.entries(suggestSemanticMap(p))
-    .map(([role, global]) => `${role} = ${global}`)
-    .join('\n');
+  // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
+  setSemMapText(paletteSemanticMap(p));
+  renderColorTable(); // #3: 색 편집표(hue·역할) 표시
   ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
   $('paletteInfo').textContent = `${p.scales.length}계열 · ${tokens.length}색 생성`;
   setStatus(
@@ -120,6 +121,88 @@ $('btnPalette').addEventListener('click', () => {
     p.warnings.length ? 'warn' : 'ok',
   );
 });
+
+/** 시맨틱 매핑 textarea를 `역할 = 변수명` 줄로 채움. */
+function setSemMapText(map: Record<string, string>): void {
+  ($('semMap') as HTMLTextAreaElement).value = Object.entries(map)
+    .map(([role, global]) => `${role} = ${global}`)
+    .join('\n');
+}
+
+/** #10: 색 토큰에서 시맨틱 역할을 추천(매핑이 비어 있을 때만 — 사용자 편집 보존). */
+function suggestSemMapFrom(toks: DraftToken[]): void {
+  if (($('semMap') as HTMLTextAreaElement).value.trim()) return;
+  const colors = toks
+    .filter((t) => t.category === 'color' && typeof t.value === 'string')
+    .map((t) => ({ name: t.name, hex: t.value as string }));
+  if (!colors.length) return;
+  setSemMapText(suggestSemanticMap(colors));
+}
+
+/** #3: 색 토큰 이름을 hue-Global(`color/blue/500`, 충돌 접미사)로 변환 — 추출 hex명 정규화. */
+function huefyTokenColors(toks: DraftToken[]): void {
+  const idx: number[] = [];
+  const hexes: string[] = [];
+  toks.forEach((t, i) => {
+    if (t.category === 'color' && typeof t.value === 'string') {
+      idx.push(i);
+      hexes.push(t.value);
+    }
+  });
+  if (!idx.length) return;
+  const names = nameColorsByHue(hexes);
+  idx.forEach((ti, k) => {
+    toks[ti].name = names[k];
+  });
+}
+
+/* ---------- #3 색 편집표 (hue → 역할) ---------- */
+/** 색 토큰을 표로: 스와치 · hue 이름 · 역할 입력(현 semMap에서 prefill). */
+function renderColorTable(): void {
+  const card = $('colorTableCard');
+  const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
+  if (!colors.length) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+  // 현 semMap을 역할→이름으로 읽어 이름→역할로 뒤집어 prefill.
+  const roleByName = new Map<string, string>();
+  for (const [role, name] of Object.entries(textToSemanticMap(($('semMap') as HTMLTextAreaElement).value))) {
+    if (!roleByName.has(name)) roleByName.set(name, role);
+  }
+  const box = $('colorTable');
+  box.innerHTML = '';
+  for (const t of colors) {
+    const row = document.createElement('div');
+    row.className = 'crow';
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = t.value as string;
+    const name = document.createElement('span');
+    name.className = 'cn';
+    name.textContent = t.name;
+    name.title = `${t.name} · ${classifyColor(t.value as string).achromatic ? '무채' : 'hue'}`;
+    const role = document.createElement('input');
+    role.setAttribute('list', 'roleList');
+    role.placeholder = '역할(선택)';
+    role.value = roleByName.get(t.name) ?? '';
+    role.dataset.name = t.name;
+    row.append(sw, name, role);
+    box.appendChild(row);
+  }
+}
+
+/** 색 편집표의 역할 입력 → 시맨틱 매핑 textarea로 반영(역할=이름). */
+function applyColorRoles(): void {
+  const map: Record<string, string> = {};
+  $('colorTable').querySelectorAll<HTMLInputElement>('input[data-name]').forEach((inp) => {
+    const role = inp.value.trim();
+    if (role) map[role] = inp.dataset.name as string; // 같은 역할 중복 시 뒤가 우선
+  });
+  setSemMapText(map);
+  setStatus('semStatus', `${Object.keys(map).length}개 역할 반영됨 — ‘시맨틱 별칭 생성’으로 적용.`, 'ok');
+}
 
 // 보조색 사용 토글 → 보조색·하모니 입력 활성/비활성 동기화.
 function syncSecondaryControls(): void {
@@ -147,7 +230,7 @@ $('btnOnboardClose').addEventListener('click', () => {
   $('onboardCard').style.display = 'none';
 });
 $('btnGuide').addEventListener('click', () => {
-  showTab('tokens');
+  showTab('wizard');
   $('btnWizardRun').focus();
   $('wizardCard').scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
@@ -172,6 +255,8 @@ $('btnCreateApply').addEventListener('click', () => {
   send({ type: 'CREATE_TOKENS', tokens, base }); // 확인 후 실제 적용
 });
 
+$('btnColorRoles').addEventListener('click', applyColorRoles); // #3 색 편집표 → 시맨틱 매핑
+
 $('btnSemantics').addEventListener('click', () => {
   const map: Record<string, string> = {};
   for (const line of ($('semMap') as HTMLTextAreaElement).value.split('\n')) {
@@ -192,9 +277,25 @@ $('btnApply').addEventListener('click', () => {
 });
 
 $('btnApplyConfirm').addEventListener('click', () => {
-  const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
+  // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG).
+  const items = bindCandidates
+    .filter((c) => bindChecked.has(candKey(c)))
+    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
+  if (!items.length) return;
   showApplyProgress('바인딩 중…'); // UX6
-  send({ type: 'APPLY', tolerance }); // 확인 후 실제 바인딩
+  send({ type: 'APPLY_SELECTED', items });
+});
+
+$('bindAll').addEventListener('change', (e) => {
+  const on = (e.target as HTMLInputElement).checked;
+  bindChecked.clear();
+  if (on) for (const c of bindCandidates) bindChecked.add(candKey(c));
+  renderBindTree();
+});
+
+$('bindHideCtx').addEventListener('change', (e) => {
+  bindHideContext = (e.target as HTMLInputElement).checked;
+  renderBindTree();
 });
 
 $('btnApplyCancel').addEventListener('click', () => {
@@ -214,8 +315,24 @@ $('btnContrast').addEventListener('click', () => {
 });
 
 $('btnRename').addEventListener('click', () => {
-  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 3;
-  send({ type: 'RENAME', apply: true, maxDepth });
+  // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG).
+  const items = renameNodes
+    .filter((n) => n.after !== undefined && renameChecked.has(n.id))
+    .map((n) => ({ id: n.id, after: n.after as string }));
+  if (!items.length) return;
+  send({ type: 'RENAME_APPLY', items });
+});
+
+$('renameAll').addEventListener('change', (e) => {
+  const on = (e.target as HTMLInputElement).checked;
+  renameChecked.clear();
+  if (on) for (const n of renameNodes) if (n.after !== undefined) renameChecked.add(n.id);
+  renderRenameTree();
+});
+
+$('renameHideCtx').addEventListener('change', (e) => {
+  renameHideContext = (e.target as HTMLInputElement).checked;
+  renderRenameTree();
 });
 
 /* ============================================================
@@ -480,35 +597,82 @@ async function verifyAndReport(key: string): Promise<void> {
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
 
-/* ---------- 팀 기능 게이트 (M3 프리셋 · M3.1 이력, Team) ---------- */
+/* ---------- 팀 기능 게이트 (M3 프리셋, Team) ---------- */
 const TEAM_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
-  'btnRefreshHistory', 'btnExportHistory', 'btnClearHistory', 'historyJson',
 ];
 
-const PRO_FIELDS = ['btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps'];
+const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps'];
 
-function updateTeamGate(): void {
+/**
+ * 통합 게이트(#11·#12) — 유료 잠금(Pro/Team)과 전제 미충족(Global/바인딩 변수 없음)을
+ * 한 메커니즘으로: 해당 버튼 disabled + 배지/안내(+바로가기) 표시.
+ */
+function updateGates(): void {
+  // 유료 잠금(#12)
   for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
   for (const id of PRO_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPro;
-  const lock = isTeam ? '' : '🔒 Team 전용';
-  $('presetLock').textContent = lock;
-  $('historyLock').textContent = lock;
+  $('presetLock').textContent = isTeam ? '' : '🔒 Team 전용';
   $('componentLock').textContent = isPro ? '' : '🔒 Pro 전용';
-  // 마법사의 컴포넌트화 옵션도 Pro 게이팅(미Pro면 체크 불가).
   $('wizComponentLock').textContent = isPro ? '' : '🔒 Pro';
   ($('wizOptComponentize') as HTMLInputElement).disabled = !isPro;
+
+  // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
+  setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
+  setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 바인딩할 변수를 만드세요.');
+  if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
+
   if (isTeam && !teamDataRequested) {
     teamDataRequested = true;
     send({ type: 'GET_PRESETS' });
-    send({ type: 'GET_HISTORY' });
   }
 }
 
+/** 전제 충족 여부로 버튼 활성/안내(+바로가기) 토글. */
+function setPrereq(btnId: string, noticeId: string, ok: boolean, msg: string): void {
+  ($(btnId) as HTMLButtonElement).disabled = !ok;
+  const notice = $(noticeId);
+  notice.style.display = ok ? 'none' : '';
+  const text = notice.querySelector('.prereq-text');
+  if (text) text.textContent = ok ? '' : msg;
+}
+
+/** 전제 미충족 안내의 ‘토큰 생성으로’ 바로가기 — 토큰 탭으로 이동 + 생성 카드 포커스. */
+function goToCreate(): void {
+  showTab('tokens');
+  $('createCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  ($('btnCreate') as HTMLButtonElement).focus();
+}
+
 /* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
+$('btnScanComp').addEventListener('click', () => {
+  setStatus('componentStatus', '후보 스캔 중…', '');
+  send({ type: 'SCAN_COMPONENT_CANDIDATES' });
+});
+
 $('btnRegisterComp').addEventListener('click', () => {
-  setStatus('componentStatus', '컴포넌트 등록 중…', '');
-  send({ type: 'REGISTER_COMPONENTS' });
+  // #1: 스캔 후보가 있으면 체크한 노드만, 없으면 최상위 선택(폴백).
+  if (compCandidates.length) {
+    const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
+    if (!nodeIds.length) return;
+    setStatus('componentStatus', '컴포넌트 등록 중…', '');
+    send({ type: 'REGISTER_COMPONENTS', nodeIds });
+  } else {
+    setStatus('componentStatus', '컴포넌트 등록 중…', '');
+    send({ type: 'REGISTER_COMPONENTS' });
+  }
+});
+
+$('compAll').addEventListener('change', (e) => {
+  const on = (e.target as HTMLInputElement).checked;
+  compChecked.clear();
+  if (on) for (const c of compCandidates) if (c.eligible) compChecked.add(c.id);
+  renderCompTree();
+});
+
+$('compHideCtx').addEventListener('change', (e) => {
+  compHideContext = (e.target as HTMLInputElement).checked;
+  renderCompTree();
 });
 
 $('btnClassifyVariants').addEventListener('click', () => {
@@ -597,30 +761,6 @@ $('btnImportPreset').addEventListener('click', () => {
   send({ type: 'SAVE_PRESET', preset: parsed.preset });
 });
 
-/* ---------- 변경 이력 (M3.1, Team) ---------- */
-function renderHistory(): void {
-  const box = $('historyList');
-  box.innerHTML = '';
-  if (!history.length) {
-    box.textContent = '이력 없음';
-    return;
-  }
-  for (const e of history) {
-    const row = document.createElement('div');
-    row.textContent = formatHistory(e);
-    box.appendChild(row);
-  }
-}
-
-$('btnRefreshHistory').addEventListener('click', () => send({ type: 'GET_HISTORY' }));
-
-$('btnExportHistory').addEventListener('click', () => {
-  ($('historyJson') as HTMLTextAreaElement).value = serializeHistory(history);
-  setStatus('historyStatus', `이력 ${history.length}건 내보냄(복사해 공유).`, 'ok');
-});
-
-$('btnClearHistory').addEventListener('click', () => send({ type: 'CLEAR_HISTORY' }));
-
 /* ---------- 내보내기 (코드) ---------- */
 $('btnExport').addEventListener('click', () => {
   const format = ($('exportFormat') as HTMLSelectElement).value as ExportFormat;
@@ -661,9 +801,13 @@ window.onmessage = (event: MessageEvent) => {
   switch (msg.type) {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
+      huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
       renderTokens();
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
       ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
+      // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
+      suggestSemMapFrom(tokens);
+      renderColorTable(); // #3: 색 편집표(hue·역할) 표시
       $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
       setStatus('extractStatus', msg.warnings.join(' ') || `${tokens.length}개 후보 추출 완료.`, msg.warnings.length ? 'warn' : 'ok');
       break;
@@ -671,7 +815,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
-      ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none'; // 선택 변경 → 바인딩 미리보기 무효화
+      clearBindPreview(); // 선택 변경 → 바인딩 미리보기 무효화
       if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
       break;
     }
@@ -702,19 +846,26 @@ window.onmessage = (event: MessageEvent) => {
       const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}${limitNote}`;
       if (msg.cancelled) {
         // UX6: 취소 — 처리한 만큼만 적용(비파괴).
+        clearBindPreview();
         setStatus('applyStatus', `취소됨 — 바인딩 ${msg.bound}건만 적용${detail}`, 'warn');
         confirmBtn.style.display = 'none';
       } else if (msg.preview) {
-        setStatus('applyStatus', `미리보기 — 바인딩 ${msg.bound}건 예정${detail} · ‘선택에 바인딩’으로 반영`, msg.limited || msg.skipped ? 'warn' : '');
-        confirmBtn.style.display = '';
+        // #6: 후보를 선택형 미리보기 트리로. 기본 전체 체크.
+        bindCandidates = msg.candidates ?? [];
+        bindNodes = msg.nodes ?? [];
+        bindChecked.clear();
+        for (const c of bindCandidates) bindChecked.add(candKey(c));
+        renderBindTree();
+        setStatus('applyStatus', `미리보기 — 바인딩 ${msg.bound}건 후보${detail} · 체크 후 ‘선택에 바인딩’`, msg.limited || msg.skipped ? 'warn' : '');
       } else {
+        clearBindPreview();
         setStatus('applyStatus', `바인딩 ${msg.bound}${detail}`, msg.limited || msg.skipped ? 'warn' : 'ok');
         confirmBtn.style.display = 'none';
       }
       break;
     }
     case 'RENAME_RESULT':
-      renderDiff(msg.changes, msg.applied);
+      renderRenameResult(msg);
       break;
     case 'SEMANTICS_RESULT':
       setStatus(
@@ -725,7 +876,13 @@ window.onmessage = (event: MessageEvent) => {
       );
       break;
     case 'COLLECTIONS':
-      // 현재는 존재 확인용 프로브(별도 UI 없음). 추후 컬렉션 상태 표시에 사용.
+      // 존재 확인용 프로브(별도 UI 없음).
+      break;
+    case 'PREREQ_STATE':
+      // #11: 단계 전제 갱신 → 통합 게이트 재평가.
+      hasGlobal = msg.hasGlobal;
+      hasBindable = msg.hasBindable;
+      updateGates();
       break;
     case 'LICENSE_STATUS': {
       const srcLabel =
@@ -747,7 +904,7 @@ window.onmessage = (event: MessageEvent) => {
       }
       isTeam = msg.tier === 'team';
       isPro = msg.tier === 'pro' || msg.tier === 'team';
-      updateTeamGate();
+      updateGates();
       break;
     }
     case 'PRESETS':
@@ -755,17 +912,22 @@ window.onmessage = (event: MessageEvent) => {
       renderPresetList();
       setStatus('presetStatus', `프리셋 ${presets.length}개`, 'ok');
       break;
-    case 'HISTORY':
-      history = msg.entries;
-      renderHistory();
-      setStatus('historyStatus', `이력 ${history.length}건`, 'ok');
-      break;
     case 'EXPORT_RESULT':
       lastExportFormat = msg.format;
       ($('exportOut') as HTMLTextAreaElement).value = msg.content;
       setStatus('exportStatus', `${msg.format === 'css' ? 'CSS' : 'W3C JSON'} 내보냄 — 복사 또는 다운로드.`, 'ok');
       break;
+    case 'COMPONENT_CANDIDATES': {
+      // #1: 하위 등록 후보를 트리로. 등록 가능 노드 기본 전체 체크.
+      compCandidates = msg.nodes;
+      compChecked.clear();
+      for (const c of msg.nodes) if (c.eligible) compChecked.add(c.id);
+      renderCompTree();
+      if (!compEligibleCount()) setStatus('componentStatus', '선택 하위에 등록 가능한 프레임이 없습니다.', 'warn');
+      break;
+    }
     case 'COMPONENTS_RESULT':
+      clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
       setStatus('componentStatus', `컴포넌트 등록 ${msg.registered} · 스킵 ${msg.skipped}`, msg.registered ? 'ok' : 'warn');
       break;
     case 'VARIANTS_RESULT': {
@@ -846,8 +1008,6 @@ const OP_STATUS: Record<string, string> = {
   GET_PRESETS: 'presetStatus',
   SAVE_PRESET: 'presetStatus',
   DELETE_PRESET: 'presetStatus',
-  GET_HISTORY: 'historyStatus',
-  CLEAR_HISTORY: 'historyStatus',
   SET_LICENSE: 'licenseStatus',
   LICENSE_VERIFIED: 'licenseStatus',
   CLEAR_LICENSE: 'licenseStatus',
@@ -869,21 +1029,249 @@ function showError(id: string, f: FriendlyError): void {
   }
 }
 
-function renderDiff(changes: { before: string; after: string }[], applied: boolean): void {
-  const box = $('diff');
-  box.innerHTML = '';
-  for (const c of changes) {
+/* ============================================================
+   선택형 미리보기 트리 (#13) — 공통 컴포넌트.
+   선택 서브트리 전체를 Figma 레이어 패널처럼 들여쓰기로 표시하고,
+   영향 노드(change 보유)만 체크박스로 골라 적용한다. 나머지는 회색 맥락.
+   #6(바인딩)·#1(컴포넌트) 미리보기도 이 컴포넌트를 재사용한다.
+   ============================================================ */
+interface TreeRow {
+  id: string;
+  name: string;
+  type: string;
+  depth: number;
+  parentId: string | null;
+  /** 적용 후 라벨(리네임=after, 바인딩=변수명…). 존재 시 영향 노드(체크 가능). */
+  change?: string;
+  /** 영향 후보를 가진 노드의 헤더(맥락 숨김에도 유지, 체크 불가). */
+  header?: boolean;
+  /** false면 name을 교체(취소선)가 아니라 그대로 유지(예: 컴포넌트 등록은 이름 보존). 기본 true. */
+  replace?: boolean;
+}
+
+/** 선택 서브트리의 최소 depth(루트 기준)로 들여쓰기를 정규화한다. */
+function baseDepth(rows: TreeRow[]): number {
+  return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
+}
+
+function renderSelectableTree(
+  mount: HTMLElement,
+  rows: TreeRow[],
+  checked: Set<string>,
+  opts: { onChange: () => void; hideContext: boolean },
+): void {
+  mount.innerHTML = '';
+  const base = rows.length ? baseDepth(rows) : 0;
+  for (const r of rows) {
+    const affected = r.change !== undefined;
+    if (!affected && !r.header && opts.hideContext) continue; // 헤더는 맥락 숨김에도 유지
     const row = document.createElement('div');
-    row.className = 'diff-row';
-    row.innerHTML = `<span class="before">${escapeHtml(c.before)}</span> → <span class="after">${escapeHtml(c.after)}</span>`;
-    box.appendChild(row);
+    row.className = affected ? 'tree-row affected' : r.header ? 'tree-row header' : 'tree-row context';
+    row.style.paddingLeft = `${(r.depth - base) * 12}px`;
+
+    if (affected) {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = checked.has(r.id);
+      cb.addEventListener('change', () => {
+        if (cb.checked) checked.add(r.id);
+        else checked.delete(r.id);
+        opts.onChange();
+      });
+      row.appendChild(cb);
+      const label = document.createElement('span');
+      const nameCls = r.replace === false ? 'tree-name' : 'before'; // 이름 보존(컴포넌트)은 취소선 없음
+      label.innerHTML = ` <span class="${nameCls}">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change as string)}</span>`;
+      row.appendChild(label);
+    } else {
+      const label = document.createElement('span');
+      label.className = 'tree-ctx';
+      label.textContent = r.name;
+      row.appendChild(label);
+    }
+    mount.appendChild(row);
   }
-  ($('btnRename') as HTMLButtonElement).disabled = applied || changes.length === 0;
+}
+
+/* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
+let renameNodes: RenameNode[] = []; // 마지막 미리보기 서브트리
+const renameChecked = new Set<string>(); // 체크된 영향 노드 id
+let renameHideContext = false; // 맥락(비영향) 숨기기 토글
+
+function affectedRenameCount(): number {
+  return renameNodes.reduce((n, r) => n + (r.after !== undefined ? 1 : 0), 0);
+}
+
+function renderRenameTree(): void {
+  const rows: TreeRow[] = renameNodes.map((n) => ({
+    id: n.id,
+    name: n.name,
+    type: n.type,
+    depth: n.depth,
+    parentId: n.parentId,
+    change: n.after,
+  }));
+  renderSelectableTree($('diff'), rows, renameChecked, {
+    hideContext: renameHideContext,
+    onChange: updateRenameApply,
+  });
+  updateRenameApply();
+}
+
+/** 적용 버튼 활성/라벨 + 전체선택 마스터 상태를 체크 수에 맞춰 갱신. */
+function updateRenameApply(): void {
+  const total = affectedRenameCount();
+  const sel = renameChecked.size;
+  ($('btnRename') as HTMLButtonElement).disabled = sel === 0;
+  const all = $('renameAll') as HTMLInputElement;
+  all.checked = total > 0 && sel === total;
+  all.indeterminate = sel > 0 && sel < total;
   setStatus(
     'renameStatus',
-    applied ? `${changes.length}개 이름 적용 완료.` : changes.length ? `${changes.length}개 변경 예정 — 확인 후 ‘이름 적용’.` : '변경할 이름이 없습니다.',
-    applied ? 'ok' : '',
+    total === 0 ? '변경할 이름이 없습니다.' : `${total}개 변경 예정 · ${sel}개 선택 — ‘이름 적용’.`,
+    '',
   );
+}
+
+function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): void {
+  if (!msg.applied) {
+    // 미리보기: 전체 서브트리 + 영향 노드 기본 체크.
+    renameNodes = msg.nodes;
+    renameChecked.clear();
+    for (const n of msg.nodes) if (n.after !== undefined) renameChecked.add(n.id);
+    renderRenameTree();
+    return;
+  }
+  // 적용 완료(선택 적용 또는 마법사): 트리 비우고 결과만.
+  renameNodes = [];
+  renameChecked.clear();
+  $('diff').innerHTML = '';
+  ($('btnRename') as HTMLButtonElement).disabled = true;
+  setStatus('renameStatus', `${msg.changes.length}개 이름 적용 완료.`, 'ok');
+}
+
+/* ---------- 바인딩(#6): 미리보기 트리 + 선택 적용 ---------- */
+let bindCandidates: BindCandidate[] = [];
+let bindNodes: BindNode[] = [];
+const bindChecked = new Set<string>(); // 체크된 후보 키
+let bindHideContext = false;
+
+/** 후보 고유 키(노드+필드+인덱스). */
+function candKey(c: { nodeId: string; field: string; index?: number }): string {
+  return `${c.nodeId}|${c.field}|${c.index ?? ''}`;
+}
+
+/** 미리보기 후보를 트리에 표시 가능 여부. */
+function hasBindPreview(): boolean {
+  return bindCandidates.length > 0;
+}
+
+/** code의 후보/노드를 트리 행으로: 노드 헤더 + 후보(체크) 행. */
+function bindRows(): TreeRow[] {
+  const byNode = new Map<string, BindCandidate[]>();
+  for (const c of bindCandidates) {
+    const arr = byNode.get(c.nodeId);
+    if (arr) arr.push(c);
+    else byNode.set(c.nodeId, [c]);
+  }
+  const rows: TreeRow[] = [];
+  for (const n of bindNodes) {
+    const cands = byNode.get(n.id);
+    rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands });
+    if (cands) {
+      for (const c of cands) {
+        const dist = c.distance && c.distance > 0 ? ` ~${Math.round(c.distance * 100) / 100}` : '';
+        rows.push({
+          id: candKey(c),
+          name: `${c.field} ${c.currentValue}`,
+          type: c.field,
+          depth: n.depth + 1,
+          parentId: n.id,
+          change: `${c.variableName}${dist}`,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+function renderBindTree(): void {
+  ($('bindTreeCtrls') as HTMLElement).style.display = hasBindPreview() ? '' : 'none';
+  renderSelectableTree($('bindTree'), bindRows(), bindChecked, {
+    hideContext: bindHideContext,
+    onChange: updateBindApply,
+  });
+  updateBindApply();
+}
+
+/** 선택에 바인딩 버튼 활성/라벨 + 전체선택 마스터 동기화. */
+function updateBindApply(): void {
+  const total = bindCandidates.length;
+  const sel = bindChecked.size;
+  const confirm = $('btnApplyConfirm') as HTMLButtonElement;
+  confirm.style.display = hasBindPreview() ? '' : 'none';
+  confirm.disabled = sel === 0;
+  if (hasBindPreview()) {
+    const all = $('bindAll') as HTMLInputElement;
+    all.checked = sel === total && total > 0;
+    all.indeterminate = sel > 0 && sel < total;
+  }
+}
+
+/** 바인딩 미리보기/적용 상태를 초기화(선택 변경·적용 완료 시). */
+function clearBindPreview(): void {
+  bindCandidates = [];
+  bindNodes = [];
+  bindChecked.clear();
+  $('bindTree').innerHTML = '';
+  ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
+  ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
+}
+
+/* ---------- 컴포넌트 등록(#1): 하위 후보 트리 + 선택 등록 ---------- */
+let compCandidates: ComponentCandidate[] = [];
+const compChecked = new Set<string>(); // 체크된 등록 후보(노드 id)
+let compHideContext = false;
+
+function compEligibleCount(): number {
+  return compCandidates.reduce((n, c) => n + (c.eligible ? 1 : 0), 0);
+}
+
+function compRows(): TreeRow[] {
+  return compCandidates.map((n) =>
+    n.eligible
+      ? { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, change: '컴포넌트', replace: false }
+      : { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId },
+  );
+}
+
+function renderCompTree(): void {
+  const has = compCandidates.length > 0;
+  ($('compTreeCtrls') as HTMLElement).style.display = has ? '' : 'none';
+  renderSelectableTree($('compTree'), compRows(), compChecked, {
+    hideContext: compHideContext,
+    onChange: updateCompRegister,
+  });
+  updateCompRegister();
+}
+
+/** 등록 버튼 라벨/상태 + 전체선택 마스터 동기화. */
+function updateCompRegister(): void {
+  const total = compEligibleCount();
+  const sel = compChecked.size;
+  if (compCandidates.length) {
+    const all = $('compAll') as HTMLInputElement;
+    all.checked = sel === total && total > 0;
+    all.indeterminate = sel > 0 && sel < total;
+    setStatus('componentStatus', total === 0 ? '등록 가능한 프레임이 없습니다.' : `등록 후보 ${total}개 · ${sel}개 선택`, '');
+  }
+}
+
+function clearCompPreview(): void {
+  compCandidates = [];
+  compChecked.clear();
+  $('compTree').innerHTML = '';
+  ($('compTreeCtrls') as HTMLElement).style.display = 'none';
 }
 
 /** UX3: 스킵 사유 키 → 한글 라벨. */
@@ -915,6 +1303,25 @@ function contrastSkipText(skipped: Record<string, number>): string {
     .join(' · ');
 }
 
+/** #2: 보정 적용 버튼(색 미리보기 + 라벨). 클릭 → 해당 노드 채움 교체 + ‘다시 검사’ 안내. */
+function contrastFixBtn(label: string, hex: string, nodeId: string): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.className = 'fixbtn';
+  btn.title = `${label} 색을 ${hex}로 보정`;
+  const sw = document.createElement('span');
+  sw.className = 'swatch';
+  sw.style.background = hex;
+  btn.appendChild(sw);
+  btn.appendChild(document.createTextNode(` ${label}`));
+  btn.addEventListener('click', () => {
+    send({ type: 'APPLY_CONTRAST_FIX', nodeId, hex });
+    btn.disabled = true;
+    btn.textContent = '✓ 적용';
+    setStatus('contrastStatus', '보정 적용됨 — ‘대비 검사’로 다시 확인하세요.', 'ok');
+  });
+  return btn;
+}
+
 function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): void {
   const box = $('contrastList');
   box.innerHTML = '';
@@ -934,6 +1341,7 @@ function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): vo
     row.appendChild(pair);
 
     const name = document.createElement('span');
+    name.className = 'cname';
     name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
     row.appendChild(name);
 
@@ -941,6 +1349,15 @@ function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): vo
     ratio.className = 'ratio warn';
     ratio.textContent = `${f.ratio} / ${f.required}`;
     row.appendChild(ratio);
+
+    // #2: 보정 제안 — 텍스트색(기본)·배경색(옵션). 클릭 시 해당 노드에 적용.
+    if (f.suggestedFg || f.suggestedBg) {
+      const fix = document.createElement('span');
+      fix.className = 'cfix';
+      if (f.suggestedFg) fix.appendChild(contrastFixBtn('텍스트', f.suggestedFg, f.id));
+      if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn('배경', f.suggestedBg, f.bgId));
+      row.appendChild(fix);
+    }
 
     box.appendChild(row);
   }
@@ -992,14 +1409,18 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
 }
 
-// 초기: 컬렉션 조회(존재 확인용) + 라이선스 상태 조회. 팀 카드는 Team 확인 전까지 잠금.
-updateTeamGate();
+// 초기: 컬렉션·전제·라이선스 조회. 팀 카드는 Team 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
+updateGates();
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
 send({ type: 'GET_COLLECTIONS' });
+send({ type: 'GET_PREREQ' }); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
 
+// #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
+document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
+
 /* ---------- 탭 내비게이션 (UI 개편 + UX8 키보드) ---------- */
-const TABS = ['tokens', 'apply', 'settings'] as const;
+const TABS = ['wizard', 'tokens', 'apply', 'settings'] as const;
 function showTab(name: (typeof TABS)[number]): void {
   for (const t of TABS) {
     $(`tab-${t}`).classList.toggle('active', t === name);
@@ -1011,6 +1432,7 @@ function showTab(name: (typeof TABS)[number]): void {
   }
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
+  if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
 }
 TABS.forEach((t, i) => {
   const btn = $(`tabbtn-${t}`);
@@ -1025,4 +1447,37 @@ TABS.forEach((t, i) => {
     $(`tabbtn-${target}`).focus();
   });
 });
-showTab('tokens');
+showTab('wizard'); // #4: 첫 화면은 ‘시작’(시스템화 마법사)
+
+/* ---------- #14: 창 리사이즈(우하단 핸들 드래그) ---------- */
+(() => {
+  const handle = $('resizeHandle');
+  let resizing = false;
+  let pending: { w: number; h: number } | null = null;
+  let raf = 0;
+  const flush = (commit: boolean): void => {
+    if (!pending) return;
+    send({ type: 'RESIZE', width: pending.w, height: pending.h, commit });
+    pending = null;
+  };
+  handle.addEventListener('pointerdown', (e) => {
+    resizing = true;
+    handle.setPointerCapture((e as PointerEvent).pointerId);
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!resizing) return;
+    const pe = e as PointerEvent;
+    pending = { w: Math.ceil(pe.clientX + 6), h: Math.ceil(pe.clientY + 6) };
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; flush(false); }); // rAF 스로틀
+  });
+  const end = (e: Event): void => {
+    if (!resizing) return;
+    resizing = false;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    flush(true); // 드롭 시 최종 크기 저장
+    try { handle.releasePointerCapture((e as PointerEvent).pointerId); } catch { /* 무시 */ }
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+})();

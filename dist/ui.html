@@ -51,6 +51,13 @@
     .warn { color: var(--warn); }
     .ok { color: var(--ok); }
     code { font-family: ui-monospace, monospace; color: var(--muted); }
+    /* #14 리사이즈 핸들(우하단) */
+    #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
+    #resizeHandle::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 0; height: 0; border-left: 7px solid transparent; border-bottom: 7px solid var(--muted); opacity: 0.6; }
+    /* #11 전제 미충족 안내 + 바로가기 */
+    .prereq { margin: 6px 0; font-size: 11px; color: var(--warn); display: flex; align-items: center; gap: 6px; }
+    button.link { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; width: auto; }
+    button.link:hover { opacity: 0.8; }
 
     /* 토큰 목록 / diff / 결과 표시 */
     #tokenList { max-height: 180px; overflow: auto; margin-top: 7px; }
@@ -58,10 +65,24 @@
     .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
     .cat { font-size: 10px; color: var(--muted); }
-    #diff { max-height: 160px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
-    .diff-row { padding: 1px 0; }
+    /* #3 색 편집표 */
+    #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
+    .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 2px 0; }
+    .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0003; }
+    .crow .cn { font-family: ui-monospace, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .crow input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
+    #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
+    .tree-row.header { opacity: 1; color: var(--muted); }
     .before { color: var(--muted); text-decoration: line-through; }
+    .tree-name { color: inherit; }
     .after { color: var(--ok); }
+    /* 선택형 미리보기 트리(#13) */
+    .tree-ctrls { font-size: 11px; margin-top: 6px; }
+    .tree-row { display: flex; align-items: center; gap: 4px; padding: 1px 0; white-space: nowrap; }
+    .tree-row.affected { font-weight: 500; }
+    .tree-row.context { opacity: 0.5; }
+    .tree-row .tree-ctx { color: var(--muted); }
+    .tree-row input { margin: 0; }
 
     /* 탭바 */
     .tabs { display: flex; gap: 8px; position: sticky; top: 0; background: #fff; padding: 0 0 10px; margin: 0 0 2px; z-index: 2; }
@@ -103,16 +124,22 @@
     #wizardBar { margin-top: 7px; }
 
     /* 명도 대비 점검 결과 */
-    .cfind { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
+    .cfind { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 3px 0; }
+    .cfind .cname { flex: 1 1 70px; min-width: 70px; }
     .cpair { display: inline-flex; }
     .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid #0003; }
     .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
     .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
     .cfind .ratio { font-variant-numeric: tabular-nums; }
+    /* #2 대비 보정 제안 버튼 */
+    .cfix { display: inline-flex; gap: 4px; }
+    .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 1px 5px; font-size: 10px; width: auto; }
+    .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid #0003; }
   </style>
 </head>
 <body>
   <div class="tabs" role="tablist" aria-label="작업 탭">
+    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard">시작</button>
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply">적용</button>
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings">관리</button>
@@ -124,11 +151,11 @@
     <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
   </div>
 
-  <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
+  <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
     <div class="step" id="wizardCard">
       <div class="ux-h"><span class="badge">NEW</span><span class="ux-t">시스템화 마법사</span></div>
-      <div class="muted">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>합니다. 세부 설정값은 아래 각 단계 입력(base·허용오차·맥락단계·시맨틱·대비 기준)을 그대로 사용합니다.</div>
+      <div class="muted">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" /> 시맨틱 매핑</label>
         <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> 접근성 검수</label>
@@ -147,13 +174,15 @@
     <!-- UX4 · 온보딩 / 가이드 -->
     <div class="ux" id="onboardCard">
       <div class="ux-h"><span class="badge">UX4</span><span class="ux-t">온보딩 / 가이드</span></div>
-      <div>처음이세요? 위 <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 아래 섹션을 차례로 사용하세요.</div>
+      <div>처음이세요? <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 ‘만들기·적용’ 탭을 차례로 사용하세요.</div>
       <div class="row">
-        <button id="btnGuide">마법사로 시작</button>
+        <button id="btnGuide">전체 실행</button>
         <button id="btnOnboardClose">닫기</button>
       </div>
     </div>
+  </section>
 
+  <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
     <div class="step">
       <h2>0 · 브랜드 팔레트 생성</h2>
       <div class="row">
@@ -196,7 +225,23 @@
       <div class="status" id="extractStatus"></div>
     </div>
 
-    <div class="step">
+    <!-- #3 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
+    <div class="step" id="colorTableCard" style="display:none">
+      <h2>1.5 · 색 편집 (hue → 역할)</h2>
+      <div class="muted">Global은 <b>hue 패밀리</b>(<code>color/blue/500</code>), 역할은 Semantic만. 역할을 확정해 ‘반영’하세요.</div>
+      <div id="colorTable"></div>
+      <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
+      <datalist id="roleList">
+        <option value="surface"></option><option value="surface/muted"></option>
+        <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
+        <option value="border"></option>
+        <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
+        <option value="secondary"></option><option value="accent"></option>
+        <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
+      </datalist>
+    </div>
+
+    <div class="step" id="createCard">
       <h2>2 · 토큰 생성 (Global + Semantic)</h2>
       <div class="row">
         <label class="inline">base(rem)px <input id="base" type="number" value="16" min="1" /></label>
@@ -213,7 +258,8 @@
 
     <div class="step">
       <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
-      <div class="muted">먼저 ‘2 · 토큰 생성’으로 Global 변수를 만든 뒤 실행하세요. 형식: <code>역할 = Global변수이름</code></div>
+      <div class="muted">형식: <code>역할 = Global변수이름</code></div>
+      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; font-family:ui-monospace, monospace;"></textarea>
       <div class="row">
         <button id="btnSemantics">시맨틱 별칭 생성</button>
@@ -225,11 +271,17 @@
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
       <h2>3 · 적용 (바인딩)</h2>
+      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
         <button id="btnApply">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none">선택에 바인딩</button>
       </div>
+      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
+        <label class="inline"><input type="checkbox" id="bindAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="bindHideCtx" /> 맥락 숨기기</label>
+      </div>
+      <div id="bindTree"></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="badge">UX6</span><span class="ux-t">진행률 / 취소</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
@@ -251,6 +303,10 @@
         <button id="btnPreview">미리보기</button>
         <button id="btnRename" disabled>이름 적용</button>
       </div>
+      <div class="row tree-ctrls">
+        <label class="inline"><input type="checkbox" id="renameAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="renameHideCtx" /> 맥락 숨기기</label>
+      </div>
       <div id="diff"></div>
       <div class="ux">
         <div class="ux-h"><span class="badge">UX2</span><span class="ux-t">되돌리기 안전장치</span></div>
@@ -261,7 +317,7 @@
 
     <div class="step" id="contrastCard">
       <h2>5 · 명도 대비 점검</h2>
-      <div class="muted">선택 안 텍스트의 글자색 ↔ 배경색 대비를 WCAG 기준으로 검사합니다. 배경은 가장 가까운 상위 프레임의 단색 채움을 사용합니다(읽기 전용 · 변경 없음).</div>
+      <div class="muted">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
       <div class="row">
         <label class="inline">기준
           <select id="contrastLevel">
@@ -280,13 +336,19 @@
 
     <div class="step" id="componentCard">
       <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
-      <div class="muted">선택 프레임 → 메인 컴포넌트. 같은 베이스 이름(예: <code>button/primary</code>) 컴포넌트들 → 베리언트 세트. (Pro 전용)</div>
+      <div class="muted">하위에서 <b>후보 스캔</b> → 골라 등록. 같은 베이스 이름(<code>button/primary</code>) → 베리언트 세트.</div>
       <div class="row">
+        <button id="btnScanComp">후보 스캔</button>
         <button id="btnRegisterComp">컴포넌트 등록</button>
         <button id="btnClassifyVariants">베리언트 분류</button>
         <button id="btnGenMissing">누락 조합 생성</button>
         <button id="btnExposeProps">속성 노출</button>
       </div>
+      <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
+        <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="compHideCtx" /> 맥락 숨기기</label>
+      </div>
+      <div id="compTree"></div>
       <div class="ux">
         <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">적용 전 미리보기</span></div>
         <div id="variantReport" style="max-height:120px; overflow:auto; font-family:ui-monospace, monospace; font-size:11px;"></div>
@@ -373,28 +435,15 @@
       </div>
     </div>
 
-    <div class="step" id="historyCard">
-      <h2>변경 이력 <span class="muted" id="historyLock"></span></h2>
-      <div class="muted">토큰 생성·바인딩·리네임·시맨틱 적용 기록(로컬). (Team 전용 조회)</div>
-      <div class="row">
-        <button id="btnRefreshHistory">새로고침</button>
-        <button id="btnExportHistory">내보내기</button>
-        <button id="btnClearHistory">비우기</button>
-      </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX3</span><span class="ux-t">사유별 그룹 + 시간</span></div>
-        <div id="historyList" style="max-height:140px; overflow:auto; font-family:ui-monospace, monospace; font-size:11px;"></div>
-        <div class="status" id="historyStatus"></div>
-      </div>
-      <textarea id="historyJson" spellcheck="false" rows="3" placeholder="내보낸 이력이 여기에 표시됩니다." style="width:100%; font-family:ui-monospace, monospace;"></textarea>
-    </div>
-
     <!-- UX8 · 접근성 / 국제화 -->
     <div class="ux">
       <div class="ux-h"><span class="badge">UX8</span><span class="ux-t">접근성 · 국제화</span></div>
       <div>키보드 전용 조작 · 명도 대비 AA · i18n</div>
     </div>
   </section>
+
+  <!-- #14 창 리사이즈 핸들(우하단) -->
+  <div id="resizeHandle" title="드래그해 크기 조절"></div>
 
   <script>
 "use strict";
@@ -558,25 +607,6 @@
     return map;
   }
 
-  // src/lib/history.ts
-  var pad = (n) => String(n).padStart(2, "0");
-  function formatTime(at) {
-    const d = new Date(at);
-    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-  }
-  var ACTION_LABEL = {
-    create: "\uD1A0\uD070 \uC0DD\uC131",
-    bind: "\uBC14\uC778\uB529",
-    rename: "\uB9AC\uB124\uC784",
-    semantics: "\uC2DC\uB9E8\uD2F1"
-  };
-  function formatHistory(e) {
-    return `${formatTime(e.at)} \xB7 ${ACTION_LABEL[e.action]} \xB7 ${e.summary}`;
-  }
-  function serializeHistory(list) {
-    return list.map(formatHistory).join("\n");
-  }
-
   // src/lib/tokens.ts
   var clamp01 = (n) => Math.min(1, Math.max(0, n));
   var to255 = (c) => Math.round(clamp01(c) * 255);
@@ -664,6 +694,67 @@
     return { l: lch.l, c: lo, h: lch.h };
   }
 
+  // src/lib/colorName.ts
+  var STEP_LIST = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+  var STEP_L = STEP_LIST.map((_, i) => 0.97 + (0.16 - 0.97) * (i / (STEP_LIST.length - 1)));
+  var ACHROMATIC_C = 0.03;
+  var HUE_CENTERS = [
+    { name: "red", h: 25 },
+    { name: "orange", h: 65 },
+    { name: "yellow", h: 100 },
+    { name: "green", h: 145 },
+    { name: "teal", h: 190 },
+    { name: "blue", h: 250 },
+    { name: "indigo", h: 285 },
+    { name: "purple", h: 320 },
+    { name: "pink", h: 355 }
+  ];
+  var HUE_FAMILIES = [...HUE_CENTERS.map((c) => c.name), "gray"];
+  function angularDist(a, b) {
+    const d = Math.abs(((a - b) % 360 + 360) % 360);
+    return Math.min(d, 360 - d);
+  }
+  function hueName(h) {
+    let best = HUE_CENTERS[0];
+    let bestD = Infinity;
+    for (const c of HUE_CENTERS) {
+      const d = angularDist(h, c.h);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return best.name;
+  }
+  function stepForL(l) {
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < STEP_LIST.length; i++) {
+      const d = Math.abs(STEP_L[i] - l);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    return STEP_LIST[best];
+  }
+  function classifyColor(hex) {
+    const o = hexToOklch(hex);
+    const achromatic = o.c < ACHROMATIC_C;
+    return { family: achromatic ? "gray" : hueName(o.h), step: stepForL(o.l), achromatic };
+  }
+  function nameColorsByHue(hexes) {
+    const seen = /* @__PURE__ */ new Map();
+    return hexes.map((hex) => {
+      var _a;
+      const { family, step } = classifyColor(hex);
+      const base = `${family}/${step}`;
+      const n = ((_a = seen.get(base)) != null ? _a : 0) + 1;
+      seen.set(base, n);
+      return n === 1 ? `color/${base}` : `color/${family}/${step}-${n}`;
+    });
+  }
+
   // src/lib/palette.ts
   var STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
   var lerp = (a, b, t) => a + (b - a) * t;
@@ -726,44 +817,81 @@
       return buildScale(family, seed);
     });
   }
+  function scaleHue(scale) {
+    var _a;
+    const mid = (_a = scale.swatches.find((s) => s.step === 500)) != null ? _a : scale.swatches[Math.floor(scale.swatches.length / 2)];
+    return classifyColor(mid.hex).family;
+  }
   function generatePalette(input) {
-    const scales = [];
+    var _a;
     const warnings = [];
     const base = hexToOklch(input.brand.primary);
     if (base.c < LOW_CHROMA) {
       warnings.push("\uBE0C\uB79C\uB4DC\uC0C9\uC758 \uCC44\uB3C4\uAC00 \uB9E4\uC6B0 \uB0AE\uC544 hue\uAC00 \uBD88\uC548\uC815\uD569\uB2C8\uB2E4 \u2014 \uC911\uB9BD(neutral) \uC2A4\uCF00\uC77C\uB85C \uB2E4\uB8E8\uB294 \uAC83\uC744 \uAD8C\uC7A5\uD569\uB2C8\uB2E4.");
     }
-    scales.push(buildScale("primary", input.brand.primary, { anchor: true }));
-    if (input.brand.secondary) scales.push(buildScale("secondary", input.brand.secondary, { anchor: true }));
+    const built = [];
+    built.push({ role: "primary", scale: buildScale("primary", input.brand.primary, { anchor: true }) });
+    if (input.brand.secondary) built.push({ role: "secondary", scale: buildScale("secondary", input.brand.secondary, { anchor: true }) });
     if (input.harmony) {
       harmonyHexes(input.brand.primary, input.harmony).forEach((hex, i) => {
-        scales.push(buildScale(`accent-${i + 1}`, hex));
+        built.push({ role: `accent-${i + 1}`, scale: buildScale(`accent-${i + 1}`, hex) });
       });
     }
-    if (input.includeNeutral) scales.push(neutralScale(input.brand.primary));
-    if (input.includeStatus) scales.push(...statusScales());
-    return { scales, warnings };
+    if (input.includeNeutral) built.push({ role: "neutral", scale: neutralScale(input.brand.primary) });
+    if (input.includeStatus) for (const s of statusScales()) built.push({ role: roleForStatusHue(s), scale: s });
+    const used = /* @__PURE__ */ new Map();
+    const scales = [];
+    const roles = [];
+    for (const b of built) {
+      const hue = scaleHue(b.scale);
+      const n = ((_a = used.get(hue)) != null ? _a : 0) + 1;
+      used.set(hue, n);
+      const family = n === 1 ? hue : `${hue}-${n}`;
+      scales.push({ family, swatches: b.scale.swatches });
+      roles.push({ role: b.role, family });
+    }
+    return { scales, roles, warnings };
   }
-  function suggestSemanticMap(p) {
-    const families = new Set(p.scales.map((s) => s.family));
+  function roleForStatusHue(scale) {
+    return scale.family;
+  }
+  function paletteSemanticMap(p) {
+    const byRole = new Map(p.roles.map((r) => [r.role, r.family]));
     const map = {};
-    if (families.has("primary")) {
-      map["primary"] = "color/primary/500";
-      map["primary/strong"] = "color/primary/700";
-      map["primary/subtle"] = "color/primary/100";
+    const primary = byRole.get("primary");
+    if (primary) {
+      map["primary"] = `color/${primary}/500`;
+      map["primary/strong"] = `color/${primary}/700`;
+      map["primary/subtle"] = `color/${primary}/100`;
     }
-    if (families.has("secondary")) map["secondary"] = "color/secondary/500";
-    for (const f of families) if (f.startsWith("accent-")) map[f] = `color/${f}/500`;
-    if (families.has("neutral")) {
-      map["surface"] = "color/neutral/50";
-      map["surface/muted"] = "color/neutral/100";
-      map["text"] = "color/neutral/900";
-      map["text/muted"] = "color/neutral/600";
-      map["border"] = "color/neutral/200";
+    const secondary = byRole.get("secondary");
+    if (secondary) map["secondary"] = `color/${secondary}/500`;
+    for (const r of p.roles) if (r.role.startsWith("accent-")) map[r.role] = `color/${r.family}/500`;
+    const neutral = byRole.get("neutral");
+    if (neutral) {
+      map["surface"] = `color/${neutral}/50`;
+      map["surface/muted"] = `color/${neutral}/100`;
+      map["text"] = `color/${neutral}/900`;
+      map["text/muted"] = `color/${neutral}/600`;
+      map["border"] = `color/${neutral}/200`;
     }
-    for (const f of ["success", "warning", "error", "info"]) {
-      if (families.has(f)) map[f] = `color/${f}/500`;
+    for (const role of ["success", "warning", "error", "info"]) {
+      const f = byRole.get(role);
+      if (f) map[role] = `color/${f}/500`;
     }
+    return map;
+  }
+  function suggestSemanticMap(colors) {
+    const classed = colors.map((c) => ({ name: c.name, o: hexToOklch(c.hex), achromatic: hexToOklch(c.hex).c < LOW_CHROMA }));
+    const map = {};
+    const neutrals = classed.filter((c) => c.achromatic).sort((a, b) => b.o.l - a.o.l);
+    if (neutrals.length) {
+      map["surface"] = neutrals[0].name;
+      map["text"] = neutrals[neutrals.length - 1].name;
+      if (neutrals.length >= 3) map["border"] = neutrals[Math.floor(neutrals.length / 2)].name;
+    }
+    const chroma = classed.filter((c) => !c.achromatic).sort((a, b) => b.o.c - a.o.c);
+    if (chroma.length) map["primary"] = chroma[0].name;
     return map;
   }
   function paletteToDraftTokens(p) {
@@ -862,10 +990,11 @@
   var $ = (id) => document.getElementById(id);
   var tokens = [];
   var presets = [];
-  var history = [];
   var isTeam = false;
   var isPro = false;
   var teamDataRequested = false;
+  var hasGlobal = false;
+  var hasBindable = false;
   var lastExportFormat = "w3c";
   var lastSelCount = 0;
   var createFrom = "tokens";
@@ -925,7 +1054,8 @@
     });
     tokens = paletteToDraftTokens(p);
     renderTokens();
-    $("semMap").value = Object.entries(suggestSemanticMap(p)).map(([role, global]) => `${role} = ${global}`).join("\n");
+    setSemMapText(paletteSemanticMap(p));
+    renderColorTable();
     $("btnPaletteApply").style.display = "";
     $("paletteInfo").textContent = `${p.scales.length}\uACC4\uC5F4 \xB7 ${tokens.length}\uC0C9 \uC0DD\uC131`;
     setStatus(
@@ -934,6 +1064,73 @@
       p.warnings.length ? "warn" : "ok"
     );
   });
+  function setSemMapText(map) {
+    $("semMap").value = Object.entries(map).map(([role, global]) => `${role} = ${global}`).join("\n");
+  }
+  function suggestSemMapFrom(toks) {
+    if ($("semMap").value.trim()) return;
+    const colors = toks.filter((t) => t.category === "color" && typeof t.value === "string").map((t) => ({ name: t.name, hex: t.value }));
+    if (!colors.length) return;
+    setSemMapText(suggestSemanticMap(colors));
+  }
+  function huefyTokenColors(toks) {
+    const idx = [];
+    const hexes = [];
+    toks.forEach((t, i) => {
+      if (t.category === "color" && typeof t.value === "string") {
+        idx.push(i);
+        hexes.push(t.value);
+      }
+    });
+    if (!idx.length) return;
+    const names = nameColorsByHue(hexes);
+    idx.forEach((ti, k) => {
+      toks[ti].name = names[k];
+    });
+  }
+  function renderColorTable() {
+    var _a;
+    const card = $("colorTableCard");
+    const colors = tokens.filter((t) => t.category === "color" && typeof t.value === "string");
+    if (!colors.length) {
+      card.style.display = "none";
+      return;
+    }
+    card.style.display = "";
+    const roleByName = /* @__PURE__ */ new Map();
+    for (const [role, name] of Object.entries(textToSemanticMap($("semMap").value))) {
+      if (!roleByName.has(name)) roleByName.set(name, role);
+    }
+    const box = $("colorTable");
+    box.innerHTML = "";
+    for (const t of colors) {
+      const row = document.createElement("div");
+      row.className = "crow";
+      const sw = document.createElement("span");
+      sw.className = "swatch";
+      sw.style.background = t.value;
+      const name = document.createElement("span");
+      name.className = "cn";
+      name.textContent = t.name;
+      name.title = `${t.name} \xB7 ${classifyColor(t.value).achromatic ? "\uBB34\uCC44" : "hue"}`;
+      const role = document.createElement("input");
+      role.setAttribute("list", "roleList");
+      role.placeholder = "\uC5ED\uD560(\uC120\uD0DD)";
+      role.value = (_a = roleByName.get(t.name)) != null ? _a : "";
+      role.dataset.name = t.name;
+      row.append(sw, name, role);
+      box.appendChild(row);
+    }
+  }
+  function applyColorRoles() {
+    const map = {};
+    $("colorTable").querySelectorAll("input[data-name]").forEach((inp) => {
+      const role = inp.value.trim();
+      if (role) map[role] = inp.dataset.name;
+    });
+    setSemMapText(map);
+    setStatus("semStatus", `${Object.keys(map).length}\uAC1C \uC5ED\uD560 \uBC18\uC601\uB428 \u2014 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019\uC73C\uB85C \uC801\uC6A9.`, "ok");
+  }
   function syncSecondaryControls() {
     const on = $("useBrand2").checked;
     $("brand2").disabled = !on;
@@ -955,7 +1152,7 @@
     $("onboardCard").style.display = "none";
   });
   $("btnGuide").addEventListener("click", () => {
-    showTab("tokens");
+    showTab("wizard");
     $("btnWizardRun").focus();
     $("wizardCard").scrollIntoView({ block: "start", behavior: "smooth" });
   });
@@ -975,6 +1172,7 @@
     createFrom = "tokens";
     send({ type: "CREATE_TOKENS", tokens, base });
   });
+  $("btnColorRoles").addEventListener("click", applyColorRoles);
   $("btnSemantics").addEventListener("click", () => {
     const map = {};
     for (const line of $("semMap").value.split("\n")) {
@@ -993,9 +1191,20 @@
     send({ type: "APPLY", tolerance, preview: true });
   });
   $("btnApplyConfirm").addEventListener("click", () => {
-    const tolerance = Number($("tol").value) || 0;
+    const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
+    if (!items.length) return;
     showApplyProgress("\uBC14\uC778\uB529 \uC911\u2026");
-    send({ type: "APPLY", tolerance });
+    send({ type: "APPLY_SELECTED", items });
+  });
+  $("bindAll").addEventListener("change", (e) => {
+    const on = e.target.checked;
+    bindChecked.clear();
+    if (on) for (const c of bindCandidates) bindChecked.add(candKey(c));
+    renderBindTree();
+  });
+  $("bindHideCtx").addEventListener("change", (e) => {
+    bindHideContext = e.target.checked;
+    renderBindTree();
   });
   $("btnApplyCancel").addEventListener("click", () => {
     send({ type: "CANCEL" });
@@ -1011,8 +1220,21 @@
     send({ type: "CHECK_CONTRAST", level });
   });
   $("btnRename").addEventListener("click", () => {
-    const maxDepth = Number($("depth").value) || 3;
-    send({ type: "RENAME", apply: true, maxDepth });
+    const items = renameNodes.filter((n) => n.after !== void 0 && renameChecked.has(n.id)).map((n) => ({ id: n.id, after: n.after }));
+    if (!items.length) return;
+    send({ type: "RENAME_APPLY", items });
+  });
+  $("renameAll").addEventListener("change", (e) => {
+    const on = e.target.checked;
+    renameChecked.clear();
+    if (on) {
+      for (const n of renameNodes) if (n.after !== void 0) renameChecked.add(n.id);
+    }
+    renderRenameTree();
+  });
+  $("renameHideCtx").addEventListener("change", (e) => {
+    renameHideContext = e.target.checked;
+    renderRenameTree();
   });
   var wizardRunning = false;
   var wizardWaiter = null;
@@ -1247,31 +1469,62 @@
     "btnDeletePreset",
     "btnExportPreset",
     "btnImportPreset",
-    "presetJson",
-    "btnRefreshHistory",
-    "btnExportHistory",
-    "btnClearHistory",
-    "historyJson"
+    "presetJson"
   ];
-  var PRO_FIELDS = ["btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnExposeProps"];
-  function updateTeamGate() {
+  var PRO_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnExposeProps"];
+  function updateGates() {
     for (const id of TEAM_FIELDS) $(id).disabled = !isTeam;
     for (const id of PRO_FIELDS) $(id).disabled = !isPro;
-    const lock = isTeam ? "" : "\u{1F512} Team \uC804\uC6A9";
-    $("presetLock").textContent = lock;
-    $("historyLock").textContent = lock;
+    $("presetLock").textContent = isTeam ? "" : "\u{1F512} Team \uC804\uC6A9";
     $("componentLock").textContent = isPro ? "" : "\u{1F512} Pro \uC804\uC6A9";
     $("wizComponentLock").textContent = isPro ? "" : "\u{1F512} Pro";
     $("wizOptComponentize").disabled = !isPro;
+    setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
+    setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
+    if (!hasBindable) $("btnApplyConfirm").disabled = true;
     if (isTeam && !teamDataRequested) {
       teamDataRequested = true;
       send({ type: "GET_PRESETS" });
-      send({ type: "GET_HISTORY" });
     }
   }
+  function setPrereq(btnId, noticeId, ok, msg) {
+    $(btnId).disabled = !ok;
+    const notice = $(noticeId);
+    notice.style.display = ok ? "none" : "";
+    const text = notice.querySelector(".prereq-text");
+    if (text) text.textContent = ok ? "" : msg;
+  }
+  function goToCreate() {
+    showTab("tokens");
+    $("createCard").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("btnCreate").focus();
+  }
+  $("btnScanComp").addEventListener("click", () => {
+    setStatus("componentStatus", "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026", "");
+    send({ type: "SCAN_COMPONENT_CANDIDATES" });
+  });
   $("btnRegisterComp").addEventListener("click", () => {
-    setStatus("componentStatus", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026", "");
-    send({ type: "REGISTER_COMPONENTS" });
+    if (compCandidates.length) {
+      const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
+      if (!nodeIds.length) return;
+      setStatus("componentStatus", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026", "");
+      send({ type: "REGISTER_COMPONENTS", nodeIds });
+    } else {
+      setStatus("componentStatus", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026", "");
+      send({ type: "REGISTER_COMPONENTS" });
+    }
+  });
+  $("compAll").addEventListener("change", (e) => {
+    const on = e.target.checked;
+    compChecked.clear();
+    if (on) {
+      for (const c of compCandidates) if (c.eligible) compChecked.add(c.id);
+    }
+    renderCompTree();
+  });
+  $("compHideCtx").addEventListener("change", (e) => {
+    compHideContext = e.target.checked;
+    renderCompTree();
   });
   $("btnClassifyVariants").addEventListener("click", () => {
     setStatus("componentStatus", "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958 \uC911\u2026", "");
@@ -1348,25 +1601,6 @@
     }
     send({ type: "SAVE_PRESET", preset: parsed.preset });
   });
-  function renderHistory() {
-    const box = $("historyList");
-    box.innerHTML = "";
-    if (!history.length) {
-      box.textContent = "\uC774\uB825 \uC5C6\uC74C";
-      return;
-    }
-    for (const e of history) {
-      const row = document.createElement("div");
-      row.textContent = formatHistory(e);
-      box.appendChild(row);
-    }
-  }
-  $("btnRefreshHistory").addEventListener("click", () => send({ type: "GET_HISTORY" }));
-  $("btnExportHistory").addEventListener("click", () => {
-    $("historyJson").value = serializeHistory(history);
-    setStatus("historyStatus", `\uC774\uB825 ${history.length}\uAC74 \uB0B4\uBCF4\uB0C4(\uBCF5\uC0AC\uD574 \uACF5\uC720).`, "ok");
-  });
-  $("btnClearHistory").addEventListener("click", () => send({ type: "CLEAR_HISTORY" }));
   $("btnExport").addEventListener("click", () => {
     const format = $("exportFormat").value;
     const fontSizeUnit = $("exportFontUnit").value;
@@ -1397,14 +1631,18 @@
     send({ type: "CLEAR_LICENSE" });
   });
   window.onmessage = (event) => {
+    var _a, _b;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
       case "EXTRACT_RESULT": {
         tokens = msg.tokens;
+        huefyTokenColors(tokens);
         renderTokens();
         $("btnCreateApply").style.display = "none";
         $("btnPaletteApply").style.display = "none";
+        suggestSemMapFrom(tokens);
+        renderColorTable();
         $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
         setStatus("extractStatus", msg.warnings.join(" ") || `${tokens.length}\uAC1C \uD6C4\uBCF4 \uCD94\uCD9C \uC644\uB8CC.`, msg.warnings.length ? "warn" : "ok");
         break;
@@ -1412,7 +1650,7 @@
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
-        $("btnApplyConfirm").style.display = "none";
+        clearBindPreview();
         if (!tokens.length) renderTokens();
         break;
       }
@@ -1440,19 +1678,25 @@
         const limitNote = msg.limited ? " \xB7 \u26A0 Free \uD55C\uB3C4 \uB3C4\uB2EC \u2014 \uC77C\uBD80\uB9CC \uC801\uC6A9(\uC5C5\uADF8\uB808\uC774\uB4DC \uD544\uC694)" : "";
         const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}${limitNote}`;
         if (msg.cancelled) {
+          clearBindPreview();
           setStatus("applyStatus", `\uCDE8\uC18C\uB428 \u2014 \uBC14\uC778\uB529 ${msg.bound}\uAC74\uB9CC \uC801\uC6A9${detail}`, "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
-          setStatus("applyStatus", `\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uBC14\uC778\uB529 ${msg.bound}\uAC74 \uC608\uC815${detail} \xB7 \u2018\uC120\uD0DD\uC5D0 \uBC14\uC778\uB529\u2019\uC73C\uB85C \uBC18\uC601`, msg.limited || msg.skipped ? "warn" : "");
-          confirmBtn.style.display = "";
+          bindCandidates = (_a = msg.candidates) != null ? _a : [];
+          bindNodes = (_b = msg.nodes) != null ? _b : [];
+          bindChecked.clear();
+          for (const c of bindCandidates) bindChecked.add(candKey(c));
+          renderBindTree();
+          setStatus("applyStatus", `\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uBC14\uC778\uB529 ${msg.bound}\uAC74 \uD6C4\uBCF4${detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uC5D0 \uBC14\uC778\uB529\u2019`, msg.limited || msg.skipped ? "warn" : "");
         } else {
+          clearBindPreview();
           setStatus("applyStatus", `\uBC14\uC778\uB529 ${msg.bound}${detail}`, msg.limited || msg.skipped ? "warn" : "ok");
           confirmBtn.style.display = "none";
         }
         break;
       }
       case "RENAME_RESULT":
-        renderDiff(msg.changes, msg.applied);
+        renderRenameResult(msg);
         break;
       case "SEMANTICS_RESULT":
         setStatus(
@@ -1462,6 +1706,11 @@
         );
         break;
       case "COLLECTIONS":
+        break;
+      case "PREREQ_STATE":
+        hasGlobal = msg.hasGlobal;
+        hasBindable = msg.hasBindable;
+        updateGates();
         break;
       case "LICENSE_STATUS": {
         const srcLabel = msg.source === "key" ? `\uB77C\uC774\uC120\uC2A4 \uD0A4${msg.status ? ` \xB7 ${msg.status}` : ""}` : msg.source === "dev" ? "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C" : "\uC5C6\uC74C";
@@ -1476,7 +1725,7 @@
         }
         isTeam = msg.tier === "team";
         isPro = msg.tier === "pro" || msg.tier === "team";
-        updateTeamGate();
+        updateGates();
         break;
       }
       case "PRESETS":
@@ -1484,17 +1733,21 @@
         renderPresetList();
         setStatus("presetStatus", `\uD504\uB9AC\uC14B ${presets.length}\uAC1C`, "ok");
         break;
-      case "HISTORY":
-        history = msg.entries;
-        renderHistory();
-        setStatus("historyStatus", `\uC774\uB825 ${history.length}\uAC74`, "ok");
-        break;
       case "EXPORT_RESULT":
         lastExportFormat = msg.format;
         $("exportOut").value = msg.content;
         setStatus("exportStatus", `${msg.format === "css" ? "CSS" : "W3C JSON"} \uB0B4\uBCF4\uB0C4 \u2014 \uBCF5\uC0AC \uB610\uB294 \uB2E4\uC6B4\uB85C\uB4DC.`, "ok");
         break;
+      case "COMPONENT_CANDIDATES": {
+        compCandidates = msg.nodes;
+        compChecked.clear();
+        for (const c of msg.nodes) if (c.eligible) compChecked.add(c.id);
+        renderCompTree();
+        if (!compEligibleCount()) setStatus("componentStatus", "\uC120\uD0DD \uD558\uC704\uC5D0 \uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.", "warn");
+        break;
+      }
       case "COMPONENTS_RESULT":
+        clearCompPreview();
         setStatus("componentStatus", `\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D ${msg.registered} \xB7 \uC2A4\uD0B5 ${msg.skipped}`, msg.registered ? "ok" : "warn");
         break;
       case "VARIANTS_RESULT": {
@@ -1570,8 +1823,6 @@
     GET_PRESETS: "presetStatus",
     SAVE_PRESET: "presetStatus",
     DELETE_PRESET: "presetStatus",
-    GET_HISTORY: "historyStatus",
-    CLEAR_HISTORY: "historyStatus",
     SET_LICENSE: "licenseStatus",
     LICENSE_VERIFIED: "licenseStatus",
     CLEAR_LICENSE: "licenseStatus",
@@ -1591,21 +1842,190 @@
       el.appendChild(btn);
     }
   }
-  function renderDiff(changes, applied) {
-    const box = $("diff");
-    box.innerHTML = "";
-    for (const c of changes) {
+  function baseDepth(rows) {
+    return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
+  }
+  function renderSelectableTree(mount, rows, checked, opts) {
+    mount.innerHTML = "";
+    const base = rows.length ? baseDepth(rows) : 0;
+    for (const r of rows) {
+      const affected = r.change !== void 0;
+      if (!affected && !r.header && opts.hideContext) continue;
       const row = document.createElement("div");
-      row.className = "diff-row";
-      row.innerHTML = `<span class="before">${escapeHtml(c.before)}</span> \u2192 <span class="after">${escapeHtml(c.after)}</span>`;
-      box.appendChild(row);
+      row.className = affected ? "tree-row affected" : r.header ? "tree-row header" : "tree-row context";
+      row.style.paddingLeft = `${(r.depth - base) * 12}px`;
+      if (affected) {
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = checked.has(r.id);
+        cb.addEventListener("change", () => {
+          if (cb.checked) checked.add(r.id);
+          else checked.delete(r.id);
+          opts.onChange();
+        });
+        row.appendChild(cb);
+        const label = document.createElement("span");
+        const nameCls = r.replace === false ? "tree-name" : "before";
+        label.innerHTML = ` <span class="${nameCls}">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
+        row.appendChild(label);
+      } else {
+        const label = document.createElement("span");
+        label.className = "tree-ctx";
+        label.textContent = r.name;
+        row.appendChild(label);
+      }
+      mount.appendChild(row);
     }
-    $("btnRename").disabled = applied || changes.length === 0;
+  }
+  var renameNodes = [];
+  var renameChecked = /* @__PURE__ */ new Set();
+  var renameHideContext = false;
+  function affectedRenameCount() {
+    return renameNodes.reduce((n, r) => n + (r.after !== void 0 ? 1 : 0), 0);
+  }
+  function renderRenameTree() {
+    const rows = renameNodes.map((n) => ({
+      id: n.id,
+      name: n.name,
+      type: n.type,
+      depth: n.depth,
+      parentId: n.parentId,
+      change: n.after
+    }));
+    renderSelectableTree($("diff"), rows, renameChecked, {
+      hideContext: renameHideContext,
+      onChange: updateRenameApply
+    });
+    updateRenameApply();
+  }
+  function updateRenameApply() {
+    const total = affectedRenameCount();
+    const sel = renameChecked.size;
+    $("btnRename").disabled = sel === 0;
+    const all = $("renameAll");
+    all.checked = total > 0 && sel === total;
+    all.indeterminate = sel > 0 && sel < total;
     setStatus(
       "renameStatus",
-      applied ? `${changes.length}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.` : changes.length ? `${changes.length}\uAC1C \uBCC0\uACBD \uC608\uC815 \u2014 \uD655\uC778 \uD6C4 \u2018\uC774\uB984 \uC801\uC6A9\u2019.` : "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
-      applied ? "ok" : ""
+      total === 0 ? "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." : `${total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 ${sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.`,
+      ""
     );
+  }
+  function renderRenameResult(msg) {
+    if (!msg.applied) {
+      renameNodes = msg.nodes;
+      renameChecked.clear();
+      for (const n of msg.nodes) if (n.after !== void 0) renameChecked.add(n.id);
+      renderRenameTree();
+      return;
+    }
+    renameNodes = [];
+    renameChecked.clear();
+    $("diff").innerHTML = "";
+    $("btnRename").disabled = true;
+    setStatus("renameStatus", `${msg.changes.length}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.`, "ok");
+  }
+  var bindCandidates = [];
+  var bindNodes = [];
+  var bindChecked = /* @__PURE__ */ new Set();
+  var bindHideContext = false;
+  function candKey(c) {
+    var _a;
+    return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}`;
+  }
+  function hasBindPreview() {
+    return bindCandidates.length > 0;
+  }
+  function bindRows() {
+    const byNode = /* @__PURE__ */ new Map();
+    for (const c of bindCandidates) {
+      const arr = byNode.get(c.nodeId);
+      if (arr) arr.push(c);
+      else byNode.set(c.nodeId, [c]);
+    }
+    const rows = [];
+    for (const n of bindNodes) {
+      const cands = byNode.get(n.id);
+      rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands });
+      if (cands) {
+        for (const c of cands) {
+          const dist = c.distance && c.distance > 0 ? ` ~${Math.round(c.distance * 100) / 100}` : "";
+          rows.push({
+            id: candKey(c),
+            name: `${c.field} ${c.currentValue}`,
+            type: c.field,
+            depth: n.depth + 1,
+            parentId: n.id,
+            change: `${c.variableName}${dist}`
+          });
+        }
+      }
+    }
+    return rows;
+  }
+  function renderBindTree() {
+    $("bindTreeCtrls").style.display = hasBindPreview() ? "" : "none";
+    renderSelectableTree($("bindTree"), bindRows(), bindChecked, {
+      hideContext: bindHideContext,
+      onChange: updateBindApply
+    });
+    updateBindApply();
+  }
+  function updateBindApply() {
+    const total = bindCandidates.length;
+    const sel = bindChecked.size;
+    const confirm = $("btnApplyConfirm");
+    confirm.style.display = hasBindPreview() ? "" : "none";
+    confirm.disabled = sel === 0;
+    if (hasBindPreview()) {
+      const all = $("bindAll");
+      all.checked = sel === total && total > 0;
+      all.indeterminate = sel > 0 && sel < total;
+    }
+  }
+  function clearBindPreview() {
+    bindCandidates = [];
+    bindNodes = [];
+    bindChecked.clear();
+    $("bindTree").innerHTML = "";
+    $("bindTreeCtrls").style.display = "none";
+    $("btnApplyConfirm").style.display = "none";
+  }
+  var compCandidates = [];
+  var compChecked = /* @__PURE__ */ new Set();
+  var compHideContext = false;
+  function compEligibleCount() {
+    return compCandidates.reduce((n, c) => n + (c.eligible ? 1 : 0), 0);
+  }
+  function compRows() {
+    return compCandidates.map(
+      (n) => n.eligible ? { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, change: "\uCEF4\uD3EC\uB10C\uD2B8", replace: false } : { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId }
+    );
+  }
+  function renderCompTree() {
+    const has = compCandidates.length > 0;
+    $("compTreeCtrls").style.display = has ? "" : "none";
+    renderSelectableTree($("compTree"), compRows(), compChecked, {
+      hideContext: compHideContext,
+      onChange: updateCompRegister
+    });
+    updateCompRegister();
+  }
+  function updateCompRegister() {
+    const total = compEligibleCount();
+    const sel = compChecked.size;
+    if (compCandidates.length) {
+      const all = $("compAll");
+      all.checked = sel === total && total > 0;
+      all.indeterminate = sel > 0 && sel < total;
+      setStatus("componentStatus", total === 0 ? "\uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." : `\uB4F1\uB85D \uD6C4\uBCF4 ${total}\uAC1C \xB7 ${sel}\uAC1C \uC120\uD0DD`, "");
+    }
+  }
+  function clearCompPreview() {
+    compCandidates = [];
+    compChecked.clear();
+    $("compTree").innerHTML = "";
+    $("compTreeCtrls").style.display = "none";
   }
   var REASON_LABELS = {
     "no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
@@ -1632,6 +2052,23 @@
       return `${(_a = CONTRAST_SKIP_LABELS[k]) != null ? _a : k} ${n}`;
     }).join(" \xB7 ");
   }
+  function contrastFixBtn(label, hex, nodeId) {
+    const btn = document.createElement("button");
+    btn.className = "fixbtn";
+    btn.title = `${label} \uC0C9\uC744 ${hex}\uB85C \uBCF4\uC815`;
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = hex;
+    btn.appendChild(sw);
+    btn.appendChild(document.createTextNode(` ${label}`));
+    btn.addEventListener("click", () => {
+      send({ type: "APPLY_CONTRAST_FIX", nodeId, hex });
+      btn.disabled = true;
+      btn.textContent = "\u2713 \uC801\uC6A9";
+      setStatus("contrastStatus", "\uBCF4\uC815 \uC801\uC6A9\uB428 \u2014 \u2018\uB300\uBE44 \uAC80\uC0AC\u2019\uB85C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694.", "ok");
+    });
+    return btn;
+  }
   function renderContrast(msg) {
     const box = $("contrastList");
     box.innerHTML = "";
@@ -1649,12 +2086,20 @@
       }
       row.appendChild(pair);
       const name = document.createElement("span");
+      name.className = "cname";
       name.textContent = `${f.name}${f.large ? " \xB7 \uD070\uAE00\uC790" : ""}`;
       row.appendChild(name);
       const ratio = document.createElement("span");
       ratio.className = "ratio warn";
       ratio.textContent = `${f.ratio} / ${f.required}`;
       row.appendChild(ratio);
+      if (f.suggestedFg || f.suggestedBg) {
+        const fix = document.createElement("span");
+        fix.className = "cfix";
+        if (f.suggestedFg) fix.appendChild(contrastFixBtn("\uD14D\uC2A4\uD2B8", f.suggestedFg, f.id));
+        if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn("\uBC30\uACBD", f.suggestedBg, f.bgId));
+        row.appendChild(fix);
+      }
       box.appendChild(row);
     }
     const skip = contrastSkipText(msg.skipped);
@@ -1695,11 +2140,13 @@
   function escapeHtml(s) {
     return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
   }
-  updateTeamGate();
+  updateGates();
   renderTokens();
   send({ type: "GET_COLLECTIONS" });
+  send({ type: "GET_PREREQ" });
   send({ type: "GET_LICENSE" });
-  var TABS = ["tokens", "apply", "settings"];
+  document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
+  var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {
     for (const t of TABS) {
       $(`tab-${t}`).classList.toggle("active", t === name);
@@ -1710,6 +2157,7 @@
       btn.tabIndex = on ? 0 : -1;
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
+    if (name !== "settings") send({ type: "GET_PREREQ" });
   }
   TABS.forEach((t, i) => {
     const btn = $(`tabbtn-${t}`);
@@ -1723,7 +2171,47 @@
       $(`tabbtn-${target}`).focus();
     });
   });
-  showTab("tokens");
+  showTab("wizard");
+  (() => {
+    const handle = $("resizeHandle");
+    let resizing = false;
+    let pending = null;
+    let raf = 0;
+    const flush = (commit) => {
+      if (!pending) return;
+      send({ type: "RESIZE", width: pending.w, height: pending.h, commit });
+      pending = null;
+    };
+    handle.addEventListener("pointerdown", (e) => {
+      resizing = true;
+      handle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    handle.addEventListener("pointermove", (e) => {
+      if (!resizing) return;
+      const pe = e;
+      pending = { w: Math.ceil(pe.clientX + 6), h: Math.ceil(pe.clientY + 6) };
+      if (!raf) raf = requestAnimationFrame(() => {
+        raf = 0;
+        flush(false);
+      });
+    });
+    const end = (e) => {
+      if (!resizing) return;
+      resizing = false;
+      if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+      flush(true);
+      try {
+        handle.releasePointerCapture(e.pointerId);
+      } catch (e2) {
+      }
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  })();
 })();
 
 </script>

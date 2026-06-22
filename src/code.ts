@@ -1,23 +1,41 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode } from './shared/messages';
+import type { UiToCode, RenameChange } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, prunePaletteColors, GLOBAL, SEMANTIC } from './lib/variables';
+import { createTokens, previewCreateTokens, createSemanticAliases, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
-import { rgbToHex } from './lib/tokens';
+import { rgbToHex, hexToRgb } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { classifyVariants, missingVariants, variantGrid, inferComponentProperties } from './lib/components';
+import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
-import { HistoryEntry, HistoryAction, pushHistory } from './lib/history';
 import { commitUndo } from './lib/undo';
 
-figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
+// #14: 기본 창을 키우고(트리·편집표 수용) 사용자 리사이즈를 허용. 마지막 크기는 clientStorage에 기억.
+const UI_SIZE_KEY = 'dsl.uiSize';
+const UI_MIN = { w: 360, h: 480 };
+const UI_MAX = { w: 900, h: 1200 };
+const UI_DEFAULT = { w: 460, h: 660 };
+const clampSize = (w: number, h: number) => ({
+  w: Math.round(Math.min(UI_MAX.w, Math.max(UI_MIN.w, w))),
+  h: Math.round(Math.min(UI_MAX.h, Math.max(UI_MIN.h, h))),
+});
+
+figma.showUI(__html__, { width: UI_DEFAULT.w, height: UI_DEFAULT.h, themeColors: true });
+
+// 저장된 창 크기 복원(있으면).
+figma.clientStorage.getAsync(UI_SIZE_KEY).then((s) => {
+  const v = s as { w?: number; h?: number } | undefined;
+  if (v && typeof v.w === 'number' && typeof v.h === 'number') {
+    const c = clampSize(v.w, v.h);
+    figma.ui.resize(c.w, c.h);
+  }
+}).catch(() => {});
 
 const selection = () => figma.currentPage.selection;
 
@@ -28,12 +46,10 @@ const selection = () => figma.currentPage.selection;
 const DEV_TIER_KEY = 'dsl.devTier';
 const CACHE_KEY = 'dsl.licenseCache';
 const PRESETS_KEY = 'dsl.presets';
-const HISTORY_KEY = 'dsl.history';
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
 let presets: Preset[] = []; // M3(Team): 공유 프리셋
-let history: HistoryEntry[] = []; // M3.1(Team): 변경 이력
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
 
 function effective(): {
@@ -74,17 +90,28 @@ async function loadLicense(): Promise<void> {
     if (c && typeof c.key === 'string' && isTier(c.tier) && typeof c.expiresAt === 'number' && typeof c.lastVerified === 'number') cache = c;
     const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
     if (Array.isArray(ps)) presets = ps as Preset[];
-    const h = await figma.clientStorage.getAsync(HISTORY_KEY);
-    if (Array.isArray(h)) history = h as HistoryEntry[];
   } catch {
     /* 저장소 접근 실패 시 free 유지 */
   }
 }
 
-/** 변경 이력 기록(항상 로컬). 조회/비우기만 Team 게이팅. */
-function record(action: HistoryAction, summary: string): void {
-  history = pushHistory(history, { at: Date.now(), action, summary });
-  void figma.clientStorage.setAsync(HISTORY_KEY, history).catch(() => {});
+/**
+ * #11: 단계 전제 상태를 UI에 보고 — Global 변수 존재(시맨틱 매핑 가능) ·
+ * 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능). 전제 미충족 카드는
+ * UI가 비활성+안내로 가드한다. 토큰/시맨틱 변경 후·시작 시·요청 시 호출.
+ */
+async function postPrereq(): Promise<void> {
+  try {
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
+    const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
+    const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
+    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable });
+  } catch {
+    /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
+  }
 }
 
 /** Team 전용 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. */
@@ -121,6 +148,59 @@ function requirePro(): boolean {
   if (hasEntitlement(currentTier(), 'components')) return true;
   post({ type: 'PREMIUM_REQUIRED', feature: 'components', message: '컴포넌트 등록·베리언트 분류는 Pro 요금제 기능입니다.' });
   return false;
+}
+
+/** #6: 텍스트 범위 바인딩 필드(나머지는 노드 스칼라 필드). */
+const TEXT_BIND_FIELDS = new Set(['fontSize', 'lineHeight', 'letterSpacing']);
+
+/**
+ * #6: 미리보기에서 체크한 후보 1건을 재매칭 없이 그대로 바인딩한다.
+ * 노드/변수 소실·미스매치는 false(graceful skip). 성공 시 true.
+ */
+async function applySelectedBinding(item: { nodeId: string; field: string; index?: number; variableId: string }): Promise<boolean> {
+  const node = await figma.getNodeByIdAsync(item.nodeId);
+  if (!node || !('type' in node)) return false;
+  const variable = await figma.variables.getVariableByIdAsync(item.variableId);
+  if (!variable) return false;
+  const sn = node as SceneNode;
+  try {
+    if (item.field === 'fills' || item.field === 'strokes') {
+      if (!(item.field in sn)) return false;
+      const paints = (sn as unknown as Record<string, Paint[] | typeof figma.mixed>)[item.field];
+      if (paints === figma.mixed || !Array.isArray(paints)) return false;
+      const i = item.index ?? 0;
+      const p = paints[i];
+      if (!p || p.type !== 'SOLID') return false;
+      const arr = paints.slice();
+      arr[i] = figma.variables.setBoundVariableForPaint(p, 'color', variable);
+      (sn as unknown as Record<string, Paint[]>)[item.field] = arr;
+      return true;
+    }
+    if (item.field === 'effects') {
+      if (!('effects' in sn)) return false;
+      const effects = (sn as unknown as { effects: readonly Effect[] }).effects;
+      const i = item.index ?? 0;
+      const e = effects[i];
+      if (!e || (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW')) return false;
+      const arr = effects.slice();
+      arr[i] = figma.variables.setBoundVariableForEffect(e, 'color', variable);
+      (sn as unknown as { effects: readonly Effect[] }).effects = arr;
+      return true;
+    }
+    if (TEXT_BIND_FIELDS.has(item.field)) {
+      if (sn.type !== 'TEXT' || sn.fontName === figma.mixed) return false;
+      await figma.loadFontAsync(sn.fontName);
+      const len = sn.characters.length;
+      if (len === 0) return false;
+      sn.setRangeBoundVariable(0, len, item.field as VariableBindableTextField, variable);
+      return true;
+    }
+    // 스칼라 노드 필드(width/height/padding…/cornerRadius…)
+    (sn as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(item.field as VariableBindableNodeField, variable);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function savePresets(): Promise<void> {
@@ -215,12 +295,12 @@ function solidFillHex(node: SceneNode): string | null {
   return null;
 }
 
-/** 텍스트 위로 올라가며 가장 가까운 상위의 단색 배경 hex. 없으면 null. */
-function effectiveBgHex(node: SceneNode): string | null {
+/** 텍스트 위로 올라가며 가장 가까운 상위의 단색 배경(hex + 노드 id). 없으면 null. */
+function effectiveBg(node: SceneNode): { hex: string; id: string } | null {
   let cur: BaseNode | null = node.parent;
   while (cur && cur.type !== 'PAGE' && cur.type !== 'DOCUMENT') {
     const hex = solidFillHex(cur as SceneNode);
-    if (hex) return hex;
+    if (hex) return { hex, id: cur.id };
     cur = cur.parent;
   }
   return null;
@@ -245,12 +325,12 @@ function collectContrastSamples(sel: readonly SceneNode[]): { samples: ContrastS
       const fg = solidFillHex(n);
       if (!fg) note('no-fill'); // 단색 글자색 없음(혼합/이미지/그라데이션 등)
       else {
-        const bg = effectiveBgHex(n);
+        const bg = effectiveBg(n);
         if (!bg) note('no-bg'); // 상위에 단색 배경이 없음
         else {
           const fontSize = typeof n.fontSize === 'number' ? n.fontSize : 16; // 혼합이면 보수적 기본값
           const bold = typeof n.fontWeight === 'number' ? n.fontWeight >= 700 : false;
-          samples.push({ id: n.id, name: n.name, fg, bg, fontSize, bold });
+          samples.push({ id: n.id, name: n.name, fg, bg: bg.hex, bgId: bg.id, fontSize, bold });
         }
       }
     }
@@ -282,8 +362,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (c.limited) summary += ` · ⚠ ${msg.tokens.length}개 중 ${c.allowed}개만 적용(Free 한도 ${limit}) — 업그레이드 필요`;
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
         if (!msg.preview) {
-          record('create', summary);
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
+          await postPrereq(); // #11: 토큰 생성 → 시맨틱/바인딩 전제 충족 갱신
         }
         break;
       }
@@ -311,9 +391,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           limited: !!r.limited,
           preview: msg.preview,
           cancelled: r.cancelled,
+          candidates: r.candidates, // #6: 미리보기 후보(dry-run만)
+          nodes: r.nodes, // #13: 미리보기 트리 맥락
         });
         if (!msg.preview) {
-          if (!r.cancelled) record('bind', `바인딩 ${r.bound} · 스킵 ${r.skipped}${r.limited ? ' · 한도 도달' : ''}`);
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
         }
         break;
@@ -322,26 +403,67 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         bindCancel = true; // UX6: 다음 양보 지점에서 중단
         break;
       }
+      case 'APPLY_SELECTED': {
+        // #6: 미리보기 트리에서 체크한 후보만 재매칭 없이 그대로 바인딩(WYSIWYG).
+        let bound = 0;
+        let skipped = 0;
+        for (const item of msg.items) {
+          if (await applySelectedBinding(item)) bound++;
+          else skipped++; // 노드/변수 소실·실패는 graceful skip
+        }
+        post({ type: 'APPLY_RESULT', bound, skipped, flags: [], reasons: {} });
+        if (bound) {
+          commitUndo(figma); // UX2: 선택 바인딩 전체를 단일 Undo로
+        }
+        break;
+      }
       case 'RENAME': {
         const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
-        post({ type: 'RENAME_RESULT', changes: r.changes, applied: r.applied });
+        post({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied });
         if (r.applied && r.changes.length) {
-          record('rename', `${r.changes.length}개 레이어 이름 적용`);
           commitUndo(figma); // UX2: 리네임 전체를 단일 Undo로
+        }
+        break;
+      }
+      case 'RENAME_APPLY': {
+        // #7: 미리보기 트리에서 체크한 항목만 직접 적용(재계산 없이 id→after 그대로).
+        const changes: RenameChange[] = [];
+        for (const { id, after } of msg.items) {
+          const node = await figma.getNodeByIdAsync(id);
+          if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
+          const before = node.name;
+          if (before === after) continue;
+          node.name = after;
+          changes.push({ id, before, after });
+        }
+        post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true });
+        if (changes.length) {
+          commitUndo(figma); // UX2: 선택 리네임 전체를 단일 Undo로
         }
         break;
       }
       case 'CREATE_SEMANTICS': {
         const s = await createSemanticAliases(msg.map);
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
-        record('semantics', `별칭 ${s.aliased} (생성 ${s.created} / 갱신 ${s.updated})`);
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
+        await postPrereq(); // #11: 시맨틱 별칭(바인딩 가능 변수) 생성 → 전제 갱신
         break;
       }
       case 'GET_COLLECTIONS': {
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
         post({ type: 'COLLECTIONS', collections: cols.map((c) => ({ id: c.id, name: c.name })) });
         postSelection(); // UI 초기화 시점 — 현재 선택 상태도 함께 전송(UX5).
+        break;
+      }
+      case 'GET_PREREQ': {
+        await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
+        break;
+      }
+      case 'RESIZE': {
+        // #14: 드래그 중엔 즉시 리사이즈, commit(드롭) 시 크기 저장.
+        const c = clampSize(msg.width, msg.height);
+        figma.ui.resize(c.w, c.h);
+        if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { w: c.w, h: c.h }).catch(() => {});
         break;
       }
       case 'GET_LICENSE': {
@@ -409,22 +531,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'PRESETS', presets });
         break;
       }
-      case 'GET_HISTORY': {
-        if (!requireTeam()) break;
-        post({ type: 'HISTORY', entries: history });
-        break;
-      }
-      case 'CLEAR_HISTORY': {
-        if (!requireTeam()) break;
-        history = [];
-        try {
-          await figma.clientStorage.deleteAsync(HISTORY_KEY);
-        } catch {
-          /* 무시 */
-        }
-        post({ type: 'HISTORY', entries: history });
-        break;
-      }
       case 'EXPORT': {
         // 모든 디자인 시스템 변수(Global+Semantic)를 코드로 내보내기. (현재 Free; 추후 게이팅 가능)
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
@@ -463,11 +569,28 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'EXPORT_RESULT', format: msg.format, content });
         break;
       }
+      case 'SCAN_COMPONENT_CANDIDATES': {
+        if (!requirePro()) break;
+        post({ type: 'COMPONENT_CANDIDATES', nodes: scanComponentCandidates(selection()) });
+        break;
+      }
       case 'REGISTER_COMPONENTS': {
         if (!requirePro()) break;
         let registered = 0;
         let skipped = 0;
-        for (const node of selection()) {
+        // #1: nodeIds 지정 시 해당 노드만(미리보기 트리 선택), 아니면 최상위 선택(마법사·폴백).
+        let targets: SceneNode[];
+        if (msg.nodeIds && msg.nodeIds.length) {
+          targets = [];
+          for (const id of msg.nodeIds) {
+            const n = await figma.getNodeByIdAsync(id);
+            if (n && 'type' in n) targets.push(n as SceneNode);
+            else skipped++; // 소실 노드 graceful skip
+          }
+        } else {
+          targets = [...selection()];
+        }
+        for (const node of targets) {
           if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') {
             skipped++; // 이미 컴포넌트(멱등)
             continue;
@@ -597,6 +720,23 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           findings: report.findings,
           skipped,
         });
+        break;
+      }
+      case 'APPLY_CONTRAST_FIX': {
+        // #2: 보정색을 대상 노드(텍스트=글자색 / 배경=배경 노드)의 첫 단색 채움에 적용.
+        const node = await figma.getNodeByIdAsync(msg.nodeId);
+        if (node && 'fills' in node) {
+          const fills = (node as { fills?: readonly Paint[] | typeof figma.mixed }).fills;
+          if (Array.isArray(fills)) {
+            const i = fills.findIndex((p) => p.type === 'SOLID' && p.visible !== false && (p.opacity ?? 1) > 0);
+            if (i >= 0) {
+              const next = fills.slice();
+              next[i] = { ...(next[i] as SolidPaint), color: hexToRgb(msg.hex) };
+              (node as unknown as { fills: Paint[] }).fills = next;
+              commitUndo(figma); // UX2: 보정 적용을 단일 Undo로
+            }
+          }
+        }
         break;
       }
     }

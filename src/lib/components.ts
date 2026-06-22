@@ -267,3 +267,53 @@ export function classifyVariants(names: string[]): ClassifyResult {
 
   return { groups, singles };
 }
+
+/* ---------- #1: 컴포넌트 등록 후보 스캔(순수) ---------- */
+/** 스캔 입력 노드(figma SceneNode와 구조적으로 호환되는 최소 형태). */
+export interface ScanNode {
+  id: string;
+  name: string;
+  type: string;
+  locked?: boolean;
+  children?: readonly ScanNode[];
+}
+
+export interface ComponentCandidateNode {
+  id: string;
+  name: string;
+  type: string;
+  depth: number;
+  parentId: string | null;
+  /** 등록 가능(FRAME/GROUP, 잠금/컴포넌트/인스턴스/텍스트 아님). */
+  eligible: boolean;
+}
+
+/** 컴포넌트로 등록 가능한 노드인가(FRAME/GROUP, 잠금 제외). */
+export function componentEligible(node: ScanNode): boolean {
+  return (node.type === 'FRAME' || node.type === 'GROUP') && !node.locked;
+}
+
+/**
+ * 선택 하위를 순회해 등록 후보 트리를 만든다 — 영향(eligible) + 그 조상 체인만 유지.
+ * 비-eligible 말단(텍스트·벡터…)은 잡음이라 제외하되, 위치 맥락은 조상으로 보존.
+ */
+export function scanComponentCandidates(selection: readonly ScanNode[]): ComponentCandidateNode[] {
+  const all: ComponentCandidateNode[] = [];
+  const visit = (n: ScanNode, depth: number, parentId: string | null): void => {
+    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: componentEligible(n) });
+    if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
+  };
+  for (const n of selection) visit(n, 0, null);
+
+  const byId = new Map(all.map((c) => [c.id, c]));
+  const keep = new Set<string>(all.filter((c) => c.eligible).map((c) => c.id));
+  for (const c of all) {
+    if (!c.eligible) continue;
+    let p = c.parentId;
+    while (p && !keep.has(p)) {
+      keep.add(p);
+      p = byId.get(p)?.parentId ?? null;
+    }
+  }
+  return all.filter((c) => keep.has(c.id));
+}

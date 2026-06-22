@@ -39,10 +39,6 @@ import {
   upsertPreset,
   semanticMapToText,
   textToSemanticMap,
-  pushHistory,
-  formatHistory,
-  formatTime,
-  HISTORY_CAP,
   exportTokens,
   splitWeightStyle,
   parseVariantName,
@@ -52,6 +48,7 @@ import {
   variantGrid,
   inferProp,
   inferComponentProperties,
+  scanComponentCandidates,
   commitUndo,
   explainError,
   nextTabIndex,
@@ -60,6 +57,8 @@ import {
   checkPair,
   evaluateSample,
   checkContrast,
+  suggestContrastFix,
+  contrastRatio,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -352,25 +351,6 @@ test('semanticMap 텍스트 ↔ 객체', () => {
   assert.deepEqual(textToSemanticMap('a = b c'), { a: 'b c' });
 });
 
-/* ================= history.ts (M3.1 Team) ================= */
-test('pushHistory — 최신 앞 + cap', () => {
-  let list = [];
-  list = pushHistory(list, { at: 1, action: 'create', summary: 'a' });
-  list = pushHistory(list, { at: 2, action: 'bind', summary: 'b' });
-  assert.deepEqual(list.map((e) => e.summary), ['b', 'a']); // 최신 앞
-  // cap 적용
-  let big = [];
-  for (let i = 0; i < HISTORY_CAP + 10; i++) big = pushHistory(big, { at: i, action: 'create', summary: String(i) });
-  assert.equal(big.length, HISTORY_CAP);
-  assert.equal(big[0].summary, String(HISTORY_CAP + 9)); // 가장 최신
-});
-
-test('formatTime / formatHistory — 결정적(UTC)', () => {
-  const at = Date.UTC(2026, 5, 21, 9, 5); // 2026-06-21 09:05 UTC
-  assert.equal(formatTime(at), '2026-06-21 09:05');
-  assert.equal(formatHistory({ at, action: 'bind', summary: '바인딩 3' }), '2026-06-21 09:05 · 바인딩 · 바인딩 3');
-});
-
 /* ================= exporters.ts (코드 내보내기) ================= */
 const OPTS = { format: 'css', fontSizeUnit: 'px', base: 16, includeSnapshots: false };
 
@@ -464,6 +444,42 @@ test('inferProp / parseVariantName — 어휘·경로·명시형', () => {
 
 test('formatVariant — 속성명 정렬', () => {
   assert.equal(formatVariant({ type: 'primary', state: 'hover' }), 'state=hover, type=primary');
+});
+
+test('scanComponentCandidates(#1) — 영향(FRAME/GROUP)+조상만, 잠금/인스턴스/텍스트 제외', () => {
+  // page(FRAME) > card(FRAME, 잠금) ... 실제로는: root(FRAME) > [text, btn(FRAME), inst(INSTANCE), grp(GROUP, 잠금)]
+  const text = { id: 't', name: 'Label', type: 'TEXT' };
+  const icon = { id: 'i', name: 'Vector', type: 'VECTOR' };
+  const btn = { id: 'b', name: 'btn', type: 'FRAME', children: [icon] }; // eligible
+  const inst = { id: 'in', name: 'Inst', type: 'INSTANCE' }; // 제외
+  const lockedGrp = { id: 'g', name: 'grp', type: 'GROUP', locked: true }; // 잠금 → 제외
+  const root = { id: 'r', name: 'root', type: 'FRAME', children: [text, btn, inst, lockedGrp] }; // eligible
+
+  const out = scanComponentCandidates([root]);
+  const byId = new Map(out.map((c) => [c.id, c]));
+
+  // 유지: root(eligible) + btn(eligible). icon은 비-eligible 말단이지만 btn의 자식이라 잡음 → 제외.
+  assert.deepEqual(out.map((c) => c.id).sort(), ['b', 'r']);
+  assert.equal(byId.get('r').eligible, true);
+  assert.equal(byId.get('b').eligible, true);
+  // 계층 보존
+  assert.equal(byId.get('r').parentId, null);
+  assert.equal(byId.get('r').depth, 0);
+  assert.equal(byId.get('b').parentId, 'r');
+  assert.equal(byId.get('b').depth, 1);
+});
+
+test('scanComponentCandidates(#1) — 깊은 eligible의 조상 체인은 맥락으로 보존', () => {
+  const deep = { id: 'd', name: 'deep', type: 'FRAME' }; // eligible(깊음)
+  const mid = { id: 'm', name: 'mid', type: 'GROUP', locked: true, children: [deep] }; // 잠금(비-eligible)이지만 조상
+  const top = { id: 'top', name: 'top', type: 'TEXT', children: [mid] }; // 텍스트(비-eligible)이지만 조상
+
+  const out = scanComponentCandidates([top]);
+  // deep이 eligible이라 그 조상(top, mid)도 맥락으로 유지
+  assert.deepEqual(out.map((c) => c.id), ['top', 'm', 'd']);
+  assert.equal(out.find((c) => c.id === 'd').eligible, true);
+  assert.equal(out.find((c) => c.id === 'm').eligible, false);
+  assert.equal(out.find((c) => c.id === 'top').eligible, false);
 });
 
 test('classifyVariants — 그룹/속성/빈 조합/단일', () => {
@@ -652,4 +668,30 @@ test('checkContrast — 집계 + 실패 우선·대비 낮은 순 정렬', () =>
   // 실패가 앞으로, 실패 안에서는 대비 낮은(bad) 것이 먼저, 통과(pass)는 맨 뒤.
   assert.deepEqual(r.findings.map((f) => f.id), ['bad', 'mid', 'pass']);
   assert.equal(r.findings[2].pass, true);
+});
+
+test('suggestContrastFix(#2) — 보정색이 required 충족(텍스트·배경 둘 다)', () => {
+  const fg = '#999999';
+  const bg = '#ffffff';
+  const required = 4.5; // 원래 ≈2.8 미달
+  const { suggestedFg, suggestedBg } = suggestContrastFix(fg, bg, required);
+  assert.ok(contrastRatio(hexToRgb(suggestedFg), hexToRgb(bg)) >= required - 0.05); // 텍스트색 보정
+  assert.ok(contrastRatio(hexToRgb(fg), hexToRgb(suggestedBg)) >= required - 0.05); // 배경색 보정
+  // 보정 fg는 원본보다 대비가 크다(흰 배경 → 더 어둡게).
+  assert.ok(contrastRatio(hexToRgb(suggestedFg), hexToRgb(bg)) > contrastRatio(hexToRgb(fg), hexToRgb(bg)));
+});
+
+test('suggestContrastFix(#2) — 어두운 배경이면 텍스트색을 밝혀 통과', () => {
+  const { suggestedFg } = suggestContrastFix('#444444', '#222222', 4.5);
+  assert.ok(contrastRatio(hexToRgb(suggestedFg), hexToRgb('#222222')) >= 4.5 - 0.05);
+});
+
+test('evaluateSample — 미달은 보정 제안 첨부, 통과는 없음', () => {
+  const fail = evaluateSample({ id: '1', name: 't', fg: '#aaaaaa', bg: '#ffffff', fontSize: 16, bold: false }, 'AA');
+  assert.equal(fail.pass, false);
+  assert.ok(fail.suggestedFg && fail.suggestedBg);
+  assert.ok(contrastRatio(hexToRgb(fail.suggestedFg), hexToRgb('#ffffff')) >= fail.required - 0.05);
+  const ok = evaluateSample({ id: '2', name: 't', fg: '#000000', bg: '#ffffff', fontSize: 16, bold: false }, 'AA');
+  assert.equal(ok.pass, true);
+  assert.equal(ok.suggestedFg, undefined);
 });
