@@ -2,7 +2,7 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi } from './shared/messages';
-import type { DraftToken } from './lib/tokens';
+import { type DraftToken, suggestNonColorSemanticMap } from './lib/tokens';
 import { FREE_LIMITS, type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
@@ -103,10 +103,11 @@ $('btnPalette').addEventListener('click', () => {
   });
   tokens = paletteToDraftTokens(p);
   renderTokens();
-  // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능)
+  // 시맨틱 매핑 textarea를 색상 추천값으로 채움(편집 가능) + 비색상(간격·반경) 병합
   ($('semMap') as HTMLTextAreaElement).value = Object.entries(suggestSemanticMap(p))
     .map(([role, global]) => `${role} = ${global}`)
     .join('\n');
+  mergeSemSuggestions(suggestNonColorSemanticMap(tokens.map((t) => t.name)));
   $('paletteInfo').textContent = `${p.scales.length}계열 · ${tokens.length}색 생성`;
   setStatus(
     'paletteStatus',
@@ -132,6 +133,14 @@ $('btnCreateApply').addEventListener('click', () => {
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   send({ type: 'CREATE_TOKENS', tokens, base }); // 확인 후 실제 적용
 });
+
+/** 추천 매핑을 semMap에 병합. 사용자가 이미 입력/편집한 역할은 보존(기존 우선). */
+function mergeSemSuggestions(suggest: Record<string, string>): void {
+  if (!Object.keys(suggest).length) return;
+  const ta = $('semMap') as HTMLTextAreaElement;
+  const existing = textToSemanticMap(ta.value);
+  ta.value = semanticMapToText({ ...suggest, ...existing }); // 기존 항목이 추천을 덮어씀
+}
 
 $('btnSemantics').addEventListener('click', () => {
   const map: Record<string, string> = {};
@@ -412,6 +421,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
       renderTokens();
+      mergeSemSuggestions(suggestNonColorSemanticMap(tokens.map((t) => t.name))); // 간격·반경 시맨틱 추천
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
       $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
       setStatus('extractStatus', msg.warnings.join(' ') || `${tokens.length}개 후보 추출 완료.`, msg.warnings.length ? 'warn' : 'ok');
