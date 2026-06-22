@@ -100,7 +100,8 @@ export type UiToCode =
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Pro): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Pro): 선택 세트의 빠진 조합 자동 생성
   | { type: 'EXPOSE_PROPERTIES' } // Phase 4.1(Pro): 컴포넌트 속성(Boolean/Text/Instance-swap) 노출
-  | { type: 'CHECK_CONTRAST'; level: WcagLevel }; // 명도 대비 점검(읽기 전용 감사)
+  | { type: 'CHECK_CONTRAST'; level: WcagLevel } // 명도 대비 점검(읽기 전용 감사)
+  | { type: 'APPLY_CONTRAST_FIX'; nodeId: string; hex: string }; // #2: 보정색을 해당 노드 단색 채움에 적용
 
 /** code → UI 응답. */
 export type CodeToUi =

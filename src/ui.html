@@ -118,12 +118,17 @@
     #wizardBar { margin-top: 7px; }
 
     /* 명도 대비 점검 결과 */
-    .cfind { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
+    .cfind { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 3px 0; }
+    .cfind .cname { flex: 1 1 70px; min-width: 70px; }
     .cpair { display: inline-flex; }
     .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid #0003; }
     .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
     .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
     .cfind .ratio { font-variant-numeric: tabular-nums; }
+    /* #2 대비 보정 제안 버튼 */
+    .cfix { display: inline-flex; gap: 4px; }
+    .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 1px 5px; font-size: 10px; width: auto; }
+    .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid #0003; }
   </style>
 </head>
 <body>

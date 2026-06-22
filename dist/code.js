@@ -283,8 +283,76 @@
   }
 
   // src/lib/color.ts
+  var mod360 = (h) => (h % 360 + 360) % 360;
   function srgbToLinear(c) {
     return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+  function linearToSrgb(c) {
+    return c <= 31308e-7 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  }
+  function linearRgbToOklab(r, g, b) {
+    const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+    const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+    const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+    const l_ = Math.cbrt(l);
+    const m_ = Math.cbrt(m);
+    const s_ = Math.cbrt(s);
+    return {
+      L: 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
+      a: 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
+      b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_
+    };
+  }
+  function oklabToLinearRgb(lab) {
+    const l_ = lab.L + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
+    const m_ = lab.L - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
+    const s_ = lab.L - 0.0894841775 * lab.a - 1.291485548 * lab.b;
+    const l = l_ ** 3;
+    const m = m_ ** 3;
+    const s = s_ ** 3;
+    return {
+      r: 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      g: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      b: -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
+    };
+  }
+  function oklabToOklch(lab) {
+    const c = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
+    const h = c < 1e-7 ? 0 : mod360(Math.atan2(lab.b, lab.a) * 180 / Math.PI);
+    return { l: lab.L, c, h };
+  }
+  function oklchToOklab(lch) {
+    const hr = lch.h * Math.PI / 180;
+    return { L: lch.l, a: lch.c * Math.cos(hr), b: lch.c * Math.sin(hr) };
+  }
+  function rgbToOklch(rgb) {
+    return oklabToOklch(linearRgbToOklab(srgbToLinear(rgb.r), srgbToLinear(rgb.g), srgbToLinear(rgb.b)));
+  }
+  function oklchToRgb(lch) {
+    const lin = oklabToLinearRgb(oklchToOklab(lch));
+    return { r: clamp01(linearToSrgb(lin.r)), g: clamp01(linearToSrgb(lin.g)), b: clamp01(linearToSrgb(lin.b)) };
+  }
+  function hexToOklch(hex) {
+    return rgbToOklch(hexToRgb(hex));
+  }
+  function oklchToHex(lch) {
+    return rgbToHex(oklchToRgb(lch));
+  }
+  function inGamut(lch) {
+    const lin = oklabToLinearRgb(oklchToOklab(lch));
+    const eps = 1e-4;
+    return lin.r >= -eps && lin.r <= 1 + eps && lin.g >= -eps && lin.g <= 1 + eps && lin.b >= -eps && lin.b <= 1 + eps;
+  }
+  function clampToGamut(lch) {
+    if (inGamut(lch)) return lch;
+    let lo = 0;
+    let hi = lch.c;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (inGamut({ l: lch.l, c: mid, h: lch.h })) lo = mid;
+      else hi = mid;
+    }
+    return { l: lch.l, c: lo, h: lch.h };
   }
   function relativeLuminance(rgb) {
     const r = srgbToLinear(rgb.r);
@@ -1444,11 +1512,52 @@
     return large ? 3 : 4.5;
   }
   var round2 = (n) => Math.round(n * 100) / 100;
+  var clamp012 = (n) => Math.min(1, Math.max(0, n));
+  function adjustLForContrast(srcHex, otherHex, required) {
+    const src = hexToOklch(srcHex);
+    const otherRgb = hexToRgb(otherHex);
+    const at = (L) => {
+      const hex = oklchToHex(clampToGamut({ l: clamp012(L), c: src.c, h: src.h }));
+      return { hex, ratio: contrastRatio(hexToRgb(hex), otherRgb) };
+    };
+    if (at(src.l).ratio >= required) return srcHex;
+    const solve = (toL) => {
+      if (at(toL).ratio < required) return { ok: false, L: toL, hex: at(toL).hex };
+      let lo = src.l;
+      let hi = toL;
+      for (let i = 0; i < 24; i++) {
+        const mid = (lo + hi) / 2;
+        if (at(mid).ratio >= required) hi = mid;
+        else lo = mid;
+      }
+      return { ok: true, L: hi, hex: at(hi).hex };
+    };
+    const dark = solve(0);
+    const light = solve(1);
+    const ok = [dark, light].filter((c) => c.ok).sort((a, b) => Math.abs(a.L - src.l) - Math.abs(b.L - src.l));
+    if (ok.length) return ok[0].hex;
+    return at(0).ratio >= at(1).ratio ? at(0).hex : at(1).hex;
+  }
+  function suggestContrastFix(fg, bg, required) {
+    return {
+      suggestedFg: adjustLForContrast(fg, bg, required),
+      // 텍스트색 명도 조정(국소·파급 적음)
+      suggestedBg: adjustLForContrast(bg, fg, required)
+      // 배경색 명도 조정(옵션)
+    };
+  }
   function evaluateSample(s, level) {
     const large = isLargeText(s.fontSize, s.bold);
     const required = requiredRatio(level, large);
     const ratio = round2(contrastRatio(hexToRgb(s.fg), hexToRgb(s.bg)));
-    return { id: s.id, name: s.name, fg: s.fg, bg: s.bg, ratio, required, large, pass: ratio >= required };
+    const pass = ratio >= required;
+    const f = { id: s.id, name: s.name, fg: s.fg, bg: s.bg, bgId: s.bgId, ratio, required, large, pass };
+    if (!pass) {
+      const fix = suggestContrastFix(s.fg, s.bg, required);
+      f.suggestedFg = fix.suggestedFg;
+      f.suggestedBg = fix.suggestedBg;
+    }
+    return f;
   }
   function checkContrast(samples, level) {
     const findings = samples.map((s) => evaluateSample(s, level));
@@ -1731,11 +1840,11 @@
     }
     return null;
   }
-  function effectiveBgHex(node) {
+  function effectiveBg(node) {
     let cur = node.parent;
     while (cur && cur.type !== "PAGE" && cur.type !== "DOCUMENT") {
       const hex = solidFillHex(cur);
-      if (hex) return hex;
+      if (hex) return { hex, id: cur.id };
       cur = cur.parent;
     }
     return null;
@@ -1760,12 +1869,12 @@
         const fg = solidFillHex(n);
         if (!fg) note2("no-fill");
         else {
-          const bg = effectiveBgHex(n);
+          const bg = effectiveBg(n);
           if (!bg) note2("no-bg");
           else {
             const fontSize = typeof n.fontSize === "number" ? n.fontSize : 16;
             const bold = typeof n.fontWeight === "number" ? n.fontWeight >= 700 : false;
-            samples.push({ id: n.id, name: n.name, fg, bg, fontSize, bold });
+            samples.push({ id: n.id, name: n.name, fg, bg: bg.hex, bgId: bg.id, fontSize, bold });
           }
         }
       }
@@ -2136,6 +2245,25 @@
             findings: report.findings,
             skipped
           });
+          break;
+        }
+        case "APPLY_CONTRAST_FIX": {
+          const node = await figma.getNodeByIdAsync(msg.nodeId);
+          if (node && "fills" in node) {
+            const fills = node.fills;
+            if (Array.isArray(fills)) {
+              const i = fills.findIndex((p) => {
+                var _a2;
+                return p.type === "SOLID" && p.visible !== false && ((_a2 = p.opacity) != null ? _a2 : 1) > 0;
+              });
+              if (i >= 0) {
+                const next = fills.slice();
+                next[i] = __spreadProps(__spreadValues({}, next[i]), { color: hexToRgb(msg.hex) });
+                node.fills = next;
+                commitUndo(figma);
+              }
+            }
+          }
           break;
         }
       }

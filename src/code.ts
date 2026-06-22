@@ -7,7 +7,7 @@ import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
-import { rgbToHex } from './lib/tokens';
+import { rgbToHex, hexToRgb } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
@@ -295,12 +295,12 @@ function solidFillHex(node: SceneNode): string | null {
   return null;
 }
 
-/** 텍스트 위로 올라가며 가장 가까운 상위의 단색 배경 hex. 없으면 null. */
-function effectiveBgHex(node: SceneNode): string | null {
+/** 텍스트 위로 올라가며 가장 가까운 상위의 단색 배경(hex + 노드 id). 없으면 null. */
+function effectiveBg(node: SceneNode): { hex: string; id: string } | null {
   let cur: BaseNode | null = node.parent;
   while (cur && cur.type !== 'PAGE' && cur.type !== 'DOCUMENT') {
     const hex = solidFillHex(cur as SceneNode);
-    if (hex) return hex;
+    if (hex) return { hex, id: cur.id };
     cur = cur.parent;
   }
   return null;
@@ -325,12 +325,12 @@ function collectContrastSamples(sel: readonly SceneNode[]): { samples: ContrastS
       const fg = solidFillHex(n);
       if (!fg) note('no-fill'); // 단색 글자색 없음(혼합/이미지/그라데이션 등)
       else {
-        const bg = effectiveBgHex(n);
+        const bg = effectiveBg(n);
         if (!bg) note('no-bg'); // 상위에 단색 배경이 없음
         else {
           const fontSize = typeof n.fontSize === 'number' ? n.fontSize : 16; // 혼합이면 보수적 기본값
           const bold = typeof n.fontWeight === 'number' ? n.fontWeight >= 700 : false;
-          samples.push({ id: n.id, name: n.name, fg, bg, fontSize, bold });
+          samples.push({ id: n.id, name: n.name, fg, bg: bg.hex, bgId: bg.id, fontSize, bold });
         }
       }
     }
@@ -720,6 +720,23 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           findings: report.findings,
           skipped,
         });
+        break;
+      }
+      case 'APPLY_CONTRAST_FIX': {
+        // #2: 보정색을 대상 노드(텍스트=글자색 / 배경=배경 노드)의 첫 단색 채움에 적용.
+        const node = await figma.getNodeByIdAsync(msg.nodeId);
+        if (node && 'fills' in node) {
+          const fills = (node as { fills?: readonly Paint[] | typeof figma.mixed }).fills;
+          if (Array.isArray(fills)) {
+            const i = fills.findIndex((p) => p.type === 'SOLID' && p.visible !== false && (p.opacity ?? 1) > 0);
+            if (i >= 0) {
+              const next = fills.slice();
+              next[i] = { ...(next[i] as SolidPaint), color: hexToRgb(msg.hex) };
+              (node as unknown as { fills: Paint[] }).fills = next;
+              commitUndo(figma); // UX2: 보정 적용을 단일 Undo로
+            }
+          }
+        }
         break;
       }
     }

@@ -1232,6 +1232,25 @@ function contrastSkipText(skipped: Record<string, number>): string {
     .join(' · ');
 }
 
+/** #2: 보정 적용 버튼(색 미리보기 + 라벨). 클릭 → 해당 노드 채움 교체 + ‘다시 검사’ 안내. */
+function contrastFixBtn(label: string, hex: string, nodeId: string): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.className = 'fixbtn';
+  btn.title = `${label} 색을 ${hex}로 보정`;
+  const sw = document.createElement('span');
+  sw.className = 'swatch';
+  sw.style.background = hex;
+  btn.appendChild(sw);
+  btn.appendChild(document.createTextNode(` ${label}`));
+  btn.addEventListener('click', () => {
+    send({ type: 'APPLY_CONTRAST_FIX', nodeId, hex });
+    btn.disabled = true;
+    btn.textContent = '✓ 적용';
+    setStatus('contrastStatus', '보정 적용됨 — ‘대비 검사’로 다시 확인하세요.', 'ok');
+  });
+  return btn;
+}
+
 function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): void {
   const box = $('contrastList');
   box.innerHTML = '';
@@ -1251,6 +1270,7 @@ function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): vo
     row.appendChild(pair);
 
     const name = document.createElement('span');
+    name.className = 'cname';
     name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
     row.appendChild(name);
 
@@ -1258,6 +1278,15 @@ function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): vo
     ratio.className = 'ratio warn';
     ratio.textContent = `${f.ratio} / ${f.required}`;
     row.appendChild(ratio);
+
+    // #2: 보정 제안 — 텍스트색(기본)·배경색(옵션). 클릭 시 해당 노드에 적용.
+    if (f.suggestedFg || f.suggestedBg) {
+      const fix = document.createElement('span');
+      fix.className = 'cfix';
+      if (f.suggestedFg) fix.appendChild(contrastFixBtn('텍스트', f.suggestedFg, f.id));
+      if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn('배경', f.suggestedBg, f.bgId));
+      row.appendChild(fix);
+    }
 
     box.appendChild(row);
   }

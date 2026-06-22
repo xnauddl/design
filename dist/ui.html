@@ -118,12 +118,17 @@
     #wizardBar { margin-top: 7px; }
 
     /* 명도 대비 점검 결과 */
-    .cfind { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
+    .cfind { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 3px 0; }
+    .cfind .cname { flex: 1 1 70px; min-width: 70px; }
     .cpair { display: inline-flex; }
     .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid #0003; }
     .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
     .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
     .cfind .ratio { font-variant-numeric: tabular-nums; }
+    /* #2 대비 보정 제안 버튼 */
+    .cfix { display: inline-flex; gap: 4px; }
+    .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 1px 5px; font-size: 10px; width: auto; }
+    .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid #0003; }
   </style>
 </head>
 <body>
@@ -1952,6 +1957,23 @@
       return `${(_a = CONTRAST_SKIP_LABELS[k]) != null ? _a : k} ${n}`;
     }).join(" \xB7 ");
   }
+  function contrastFixBtn(label, hex, nodeId) {
+    const btn = document.createElement("button");
+    btn.className = "fixbtn";
+    btn.title = `${label} \uC0C9\uC744 ${hex}\uB85C \uBCF4\uC815`;
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = hex;
+    btn.appendChild(sw);
+    btn.appendChild(document.createTextNode(` ${label}`));
+    btn.addEventListener("click", () => {
+      send({ type: "APPLY_CONTRAST_FIX", nodeId, hex });
+      btn.disabled = true;
+      btn.textContent = "\u2713 \uC801\uC6A9";
+      setStatus("contrastStatus", "\uBCF4\uC815 \uC801\uC6A9\uB428 \u2014 \u2018\uB300\uBE44 \uAC80\uC0AC\u2019\uB85C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694.", "ok");
+    });
+    return btn;
+  }
   function renderContrast(msg) {
     const box = $("contrastList");
     box.innerHTML = "";
@@ -1969,12 +1991,20 @@
       }
       row.appendChild(pair);
       const name = document.createElement("span");
+      name.className = "cname";
       name.textContent = `${f.name}${f.large ? " \xB7 \uD070\uAE00\uC790" : ""}`;
       row.appendChild(name);
       const ratio = document.createElement("span");
       ratio.className = "ratio warn";
       ratio.textContent = `${f.ratio} / ${f.required}`;
       row.appendChild(ratio);
+      if (f.suggestedFg || f.suggestedBg) {
+        const fix = document.createElement("span");
+        fix.className = "cfix";
+        if (f.suggestedFg) fix.appendChild(contrastFixBtn("\uD14D\uC2A4\uD2B8", f.suggestedFg, f.id));
+        if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn("\uBC30\uACBD", f.suggestedBg, f.bgId));
+        row.appendChild(fix);
+      }
       box.appendChild(row);
     }
     const skip = contrastSkipText(msg.skipped);

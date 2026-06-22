@@ -57,6 +57,8 @@ import {
   checkPair,
   evaluateSample,
   checkContrast,
+  suggestContrastFix,
+  contrastRatio,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -666,4 +668,30 @@ test('checkContrast — 집계 + 실패 우선·대비 낮은 순 정렬', () =>
   // 실패가 앞으로, 실패 안에서는 대비 낮은(bad) 것이 먼저, 통과(pass)는 맨 뒤.
   assert.deepEqual(r.findings.map((f) => f.id), ['bad', 'mid', 'pass']);
   assert.equal(r.findings[2].pass, true);
+});
+
+test('suggestContrastFix(#2) — 보정색이 required 충족(텍스트·배경 둘 다)', () => {
+  const fg = '#999999';
+  const bg = '#ffffff';
+  const required = 4.5; // 원래 ≈2.8 미달
+  const { suggestedFg, suggestedBg } = suggestContrastFix(fg, bg, required);
+  assert.ok(contrastRatio(hexToRgb(suggestedFg), hexToRgb(bg)) >= required - 0.05); // 텍스트색 보정
+  assert.ok(contrastRatio(hexToRgb(fg), hexToRgb(suggestedBg)) >= required - 0.05); // 배경색 보정
+  // 보정 fg는 원본보다 대비가 크다(흰 배경 → 더 어둡게).
+  assert.ok(contrastRatio(hexToRgb(suggestedFg), hexToRgb(bg)) > contrastRatio(hexToRgb(fg), hexToRgb(bg)));
+});
+
+test('suggestContrastFix(#2) — 어두운 배경이면 텍스트색을 밝혀 통과', () => {
+  const { suggestedFg } = suggestContrastFix('#444444', '#222222', 4.5);
+  assert.ok(contrastRatio(hexToRgb(suggestedFg), hexToRgb('#222222')) >= 4.5 - 0.05);
+});
+
+test('evaluateSample — 미달은 보정 제안 첨부, 통과는 없음', () => {
+  const fail = evaluateSample({ id: '1', name: 't', fg: '#aaaaaa', bg: '#ffffff', fontSize: 16, bold: false }, 'AA');
+  assert.equal(fail.pass, false);
+  assert.ok(fail.suggestedFg && fail.suggestedBg);
+  assert.ok(contrastRatio(hexToRgb(fail.suggestedFg), hexToRgb('#ffffff')) >= fail.required - 0.05);
+  const ok = evaluateSample({ id: '2', name: 't', fg: '#000000', bg: '#ffffff', fontSize: 16, bold: false }, 'AA');
+  assert.equal(ok.pass, true);
+  assert.equal(ok.suggestedFg, undefined);
 });
