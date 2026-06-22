@@ -1135,37 +1135,64 @@
   var lastExportFormat = "w3c";
   var lastSelCount = 0;
   var createFrom = "tokens";
+  var CHUNK = 150;
+  var chunkPending = /* @__PURE__ */ new WeakMap();
+  function renderChunked(mount, items, makeRow) {
+    const prev = chunkPending.get(mount);
+    if (prev !== void 0) {
+      cancelAnimationFrame(prev);
+      chunkPending.delete(mount);
+    }
+    mount.innerHTML = "";
+    if (items.length <= CHUNK) {
+      const frag = document.createDocumentFragment();
+      items.forEach((it, i2) => frag.appendChild(makeRow(it, i2)));
+      mount.appendChild(frag);
+      return;
+    }
+    let i = 0;
+    const step = () => {
+      const frag = document.createDocumentFragment();
+      const end = Math.min(i + CHUNK, items.length);
+      for (; i < end; i++) frag.appendChild(makeRow(items[i], i));
+      mount.appendChild(frag);
+      if (i < items.length) chunkPending.set(mount, requestAnimationFrame(step));
+      else chunkPending.delete(mount);
+    };
+    chunkPending.set(mount, requestAnimationFrame(step));
+  }
+  function makeTokenRow(t, i) {
+    const row = document.createElement("div");
+    row.className = "tk";
+    const sw = document.createElement("span");
+    if ((t.category === "color" || t.category === "effectColor") && typeof t.value === "string") {
+      sw.className = "swatch";
+      sw.style.background = t.value;
+    }
+    row.appendChild(sw);
+    const input = document.createElement("input");
+    input.value = t.name;
+    input.addEventListener("input", () => {
+      tokens[i].name = input.value;
+    });
+    row.appendChild(input);
+    const cat = document.createElement("span");
+    cat.className = "cat";
+    cat.textContent = t.unit && t.unit !== "px" ? `${t.category}\xB7${t.unit}` : t.category;
+    row.appendChild(cat);
+    return row;
+  }
   function renderTokens() {
     const box = $("tokenList");
-    box.innerHTML = "";
     if (!tokens.length) {
+      box.innerHTML = "";
       const empty = document.createElement("div");
       empty.className = "ux";
       empty.innerHTML = '<div class="ux-h"><span class="badge">UX4</span><span class="ux-t">\uBE48 \uC0C1\uD0DC \uB3C4\uC6C0\uB9D0</span></div>' + (lastSelCount > 0 ? "<div>\uC120\uD0DD\uC5D0\uC11C \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC744 \uBF51\uC2B5\uB2C8\uB2E4. <b>\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019</b>\uC744 \uB204\uB974\uC138\uC694.</div>" : "<div>\uD504\uB808\uC784\uC744 \uC120\uD0DD\uD55C \uB4A4 <b>\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019</b>\uC744 \uB204\uB974\uBA74 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uD6C4\uBCF4\uB85C \uC7A1\uD799\uB2C8\uB2E4. \uC608) \uBC84\uD2BC\xB7\uCE74\uB4DC</div>");
       box.appendChild(empty);
       return;
     }
-    tokens.forEach((t, i) => {
-      const row = document.createElement("div");
-      row.className = "tk";
-      const sw = document.createElement("span");
-      if ((t.category === "color" || t.category === "effectColor") && typeof t.value === "string") {
-        sw.className = "swatch";
-        sw.style.background = t.value;
-      }
-      row.appendChild(sw);
-      const input = document.createElement("input");
-      input.value = t.name;
-      input.addEventListener("input", () => {
-        tokens[i].name = input.value;
-      });
-      row.appendChild(input);
-      const cat = document.createElement("span");
-      cat.className = "cat";
-      cat.textContent = t.unit && t.unit !== "px" ? `${t.category}\xB7${t.unit}` : t.category;
-      row.appendChild(cat);
-      box.appendChild(row);
-    });
+    renderChunked(box, tokens, makeTokenRow);
   }
   var brandColor = $("brand");
   var brandHex = $("brandHex");
@@ -1226,7 +1253,6 @@
     });
   }
   function renderColorTable() {
-    var _a;
     const card = $("colorTableCard");
     const colors = tokens.filter((t) => t.category === "color" && typeof t.value === "string");
     if (!colors.length) {
@@ -1238,9 +1264,8 @@
     for (const [role, name] of Object.entries(textToSemanticMap($("semMap").value))) {
       if (!roleByName.has(name)) roleByName.set(name, role);
     }
-    const box = $("colorTable");
-    box.innerHTML = "";
-    for (const t of colors) {
+    renderChunked($("colorTable"), colors, (t) => {
+      var _a;
       const row = document.createElement("div");
       row.className = "crow";
       const sw = document.createElement("span");
@@ -1256,8 +1281,8 @@
       role.value = (_a = roleByName.get(t.name)) != null ? _a : "";
       role.dataset.name = t.name;
       row.append(sw, name, role);
-      box.appendChild(row);
-    }
+      return row;
+    });
   }
   function applyColorRoles() {
     const map = {};
@@ -2040,37 +2065,37 @@
   function baseDepth(rows) {
     return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
   }
-  function renderSelectableTree(mount, rows, checked, opts) {
-    mount.innerHTML = "";
-    const base = rows.length ? baseDepth(rows) : 0;
-    for (const r of rows) {
-      const affected = r.change !== void 0;
-      if (!affected && !r.header && opts.hideContext) continue;
-      const row = document.createElement("div");
-      row.className = affected ? "tree-row affected" : r.header ? "tree-row header" : "tree-row context";
-      row.style.paddingLeft = `${(r.depth - base) * 12}px`;
-      if (affected) {
-        const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.checked = checked.has(r.id);
-        cb.addEventListener("change", () => {
-          if (cb.checked) checked.add(r.id);
-          else checked.delete(r.id);
-          opts.onChange();
-        });
-        row.appendChild(cb);
-        const label = document.createElement("span");
-        const nameCls = r.replace === false ? "tree-name" : "before";
-        label.innerHTML = ` <span class="${nameCls}">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
-        row.appendChild(label);
-      } else {
-        const label = document.createElement("span");
-        label.className = "tree-ctx";
-        label.textContent = r.name;
-        row.appendChild(label);
-      }
-      mount.appendChild(row);
+  function makeTreeRow(r, base, checked, onChange) {
+    const affected = r.change !== void 0;
+    const row = document.createElement("div");
+    row.className = affected ? "tree-row affected" : r.header ? "tree-row header" : "tree-row context";
+    row.style.paddingLeft = `${(r.depth - base) * 12}px`;
+    if (affected) {
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = checked.has(r.id);
+      cb.addEventListener("change", () => {
+        if (cb.checked) checked.add(r.id);
+        else checked.delete(r.id);
+        onChange();
+      });
+      row.appendChild(cb);
+      const label = document.createElement("span");
+      const nameCls = r.replace === false ? "tree-name" : "before";
+      label.innerHTML = ` <span class="${nameCls}">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
+      row.appendChild(label);
+    } else {
+      const label = document.createElement("span");
+      label.className = "tree-ctx";
+      label.textContent = r.name;
+      row.appendChild(label);
     }
+    return row;
+  }
+  function renderSelectableTree(mount, rows, checked, opts) {
+    const base = rows.length ? baseDepth(rows) : 0;
+    const visible = rows.filter((r) => r.change !== void 0 || r.header || !opts.hideContext);
+    renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
   }
   var renameNodes = [];
   var renameChecked = /* @__PURE__ */ new Set();
