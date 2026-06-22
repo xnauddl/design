@@ -232,3 +232,56 @@ export function dedupeName(name: string, taken: Set<string>): string {
   taken.add(out);
   return out;
 }
+
+/* ============================================================
+   네이밍 v2 — W3C HTML 태그 ↔ ARIA role (rename.ts가 사용)
+   - 이름은 단일 태그/단어(맥락 접두사·숫자 없음).
+   - 시맨틱은 W3C 태그, 의미 없는 묶음은 제네릭 구분어(비-태그).
+   ============================================================ */
+
+/** 추론·이름에 쓰는 시맨틱 HTML 태그(랜드마크 + 신호로 구분 가능한 요소). */
+export const SEMANTIC_TAGS = [
+  'header', 'nav', 'main', 'aside', 'footer', 'section',
+  'button', 'img', 'svg', 'figure', 'figcaption', 'ul', 'li', 'input', 'label', 'hr', 'title',
+] as const;
+export type SemanticTag = (typeof SEMANTIC_TAGS)[number];
+
+/** 제네릭(의미 없는 묶음) 구분어 — 비-태그. 깊이 사다리(wrap…inner) + 신호어(box·scroll). */
+export const GENERIC_WORDS = ['wrap', 'container', 'content', 'inner', 'box', 'scroll'] as const;
+
+/** 제네릭 깊이 사다리 단어(0=wrap … 3↑=inner, 숫자 없음). box·scroll은 신호라 별도. */
+const DEPTH_WORDS = ['wrap', 'container', 'content', 'inner'] as const;
+
+/** 제네릭 중첩 깊이 → 단어. 시맨틱 조상에서 0으로 리셋해 호출한다. */
+export function depthWord(depth: number): string {
+  const i = Math.min(Math.max(depth, 0), DEPTH_WORDS.length - 1);
+  return DEPTH_WORDS[i];
+}
+
+const SEMANTIC_SET: ReadonlySet<string> = new Set(SEMANTIC_TAGS);
+const GENERIC_SET: ReadonlySet<string> = new Set(GENERIC_WORDS);
+export const isSemanticTag = (w: string): boolean => SEMANTIC_SET.has(w);
+export const isGenericWord = (w: string): boolean => GENERIC_SET.has(w);
+
+/** HTML 태그 → 암묵적 ARIA role (W3C "ARIA in HTML"). null = 암묵 role 없음/맥락 의존. */
+const TAG_ROLE: Record<string, string | null> = {
+  header: 'banner', footer: 'contentinfo', nav: 'navigation', main: 'main',
+  aside: 'complementary', section: 'region', button: 'button', img: 'img',
+  figure: 'figure', figcaption: null, ul: 'list', li: 'listitem',
+  input: 'textbox', label: null, hr: 'separator', title: 'heading', svg: null,
+};
+
+/**
+ * 태그 → 최종 ARIA role (조상 sectioning 판정은 호출부에서 insideSectioning으로 전달).
+ * - header/footer: sectioning(article·section·main·aside·nav) 조상 안이면 generic(null)으로 강등.
+ * - section: 접근 가능한 이름이 있을 때만 region.
+ * 예: ariaRoleForTag('header') → 'banner', ariaRoleForTag('header',{insideSectioning:true}) → null.
+ */
+export function ariaRoleForTag(
+  tag: string,
+  ctx: { insideSectioning?: boolean; hasAccessibleName?: boolean } = {},
+): string | null {
+  if ((tag === 'header' || tag === 'footer') && ctx.insideSectioning) return null;
+  if (tag === 'section' && !ctx.hasAccessibleName) return null;
+  return TAG_ROLE[tag] ?? null;
+}

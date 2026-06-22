@@ -276,20 +276,8 @@
     "title"
   ];
   var ROLE_SET = new Set(ROLE_VOCAB);
-  function isKnownRole(seg) {
-    return ROLE_SET.has(seg);
-  }
   function kebab(input) {
     return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s_/]+/g, "-").replace(/[^a-zA-Z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
-  }
-  function layerNameFromRole(ancestorName, role, opts = {}) {
-    const ctx = ancestorName ? kebab(ancestorName) : "";
-    const parts = limitDepth([...ctx ? ctx.split("-") : [], kebab(role)], opts.maxDepth);
-    return parts.filter(Boolean).join("-");
-  }
-  function limitDepth(segs, maxDepth = 3) {
-    if (segs.length <= maxDepth) return segs;
-    return segs.slice(segs.length - maxDepth);
   }
   var DEFAULT_NAME_RE = /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( \d+)?( copy( \d+)?)?$/;
   function isDefaultName(name) {
@@ -361,13 +349,6 @@
     if (/^[0-9a-f]{6}$/.test(v)) return true;
     return v.split("-").every((s) => /^\d+$/.test(s) || UNIT_WORDS.has(s));
   }
-  var GENERIC_ROLES = /* @__PURE__ */ new Set(["container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
-  function pickScope(name) {
-    const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
-    if (!segs.length) return null;
-    const known = segs.filter(isKnownRole);
-    return known.length ? known[known.length - 1] : segs[segs.length - 1];
-  }
   function isTokenEchoName(name) {
     const n = name.trim().toLowerCase();
     for (const ns of PRIMITIVE_NS) {
@@ -389,6 +370,34 @@
     taken.add(out);
     return out;
   }
+  var SEMANTIC_TAGS = [
+    "header",
+    "nav",
+    "main",
+    "aside",
+    "footer",
+    "section",
+    "button",
+    "img",
+    "svg",
+    "figure",
+    "figcaption",
+    "ul",
+    "li",
+    "input",
+    "label",
+    "hr",
+    "title"
+  ];
+  var GENERIC_WORDS = ["wrap", "container", "content", "inner", "box", "scroll"];
+  var DEPTH_WORDS = ["wrap", "container", "content", "inner"];
+  function depthWord(depth) {
+    const i = Math.min(Math.max(depth, 0), DEPTH_WORDS.length - 1);
+    return DEPTH_WORDS[i];
+  }
+  var SEMANTIC_SET = new Set(SEMANTIC_TAGS);
+  var GENERIC_SET = new Set(GENERIC_WORDS);
+  var isGenericWord = (w) => GENERIC_SET.has(w);
 
   // src/lib/extract.ts
   var round = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
@@ -1095,91 +1104,89 @@
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const changes = [];
-    await recurse(selection2, null, opts, changes, 0, null, 0);
+    await recurse(selection2, opts, changes, 0, null, 0, false);
     return { changes, applied: opts.apply };
   }
-  async function recurse(nodes, ancestorName, opts, out, depth, parentLayout, ladder) {
+  async function recurse(nodes, opts, out, depth, parentLayout, genericDepth, parentIsList) {
     const total = nodes.length;
     for (let i = 0; i < total; i++) {
       const node = nodes[i];
-      const pos = { index: i, total, parentLayout, depth, ladder };
-      const decided = await decide(node, ancestorName, pos, opts);
-      let contextForChildren = node.name;
-      if (!decided.skip && decided.name) {
-        if (decided.name !== node.name) {
-          out.push({ id: node.id, before: node.name, after: decided.name });
-          if (opts.apply) node.name = decided.name;
-        }
-        contextForChildren = decided.name;
+      const ctx = { index: i, total, parentLayout, depth, genericDepth, parentIsList };
+      const decided = await decide(node, ctx);
+      if (!decided.skip && decided.name && decided.name !== node.name) {
+        out.push({ id: node.id, before: node.name, after: decided.name });
+        if (opts.apply) node.name = decided.name;
       }
       if ("children" in node) {
-        await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node), decided.childLadder);
+        const childGenericDepth = !decided.skip && decided.generic ? genericDepth + 1 : 0;
+        const childIsList = !decided.skip && decided.name === "ul";
+        await recurse(node.children, opts, out, depth + 1, layoutOf(node), childGenericDepth, childIsList);
       }
     }
   }
-  var LADDER_WORDS = ["", "content", "inner"];
-  function ladderWord(ladder) {
-    if (ladder <= 0) return "";
-    return LADDER_WORDS[Math.min(ladder, LADDER_WORDS.length - 1)];
-  }
-  function nextLadder(thisNodeScope, effectiveName, parentLadder) {
-    const childScope = pickScope(effectiveName);
-    if (childScope === null) return 0;
-    if (childScope === thisNodeScope) return parentLadder + 1;
-    return 1;
-  }
-  async function decide(node, ancestorName, pos, opts) {
-    const inheritedScope = ancestorName ? pickScope(ancestorName) : null;
-    const keep = () => ({ skip: true, childLadder: nextLadder(inheritedScope, node.name, pos.ladder) });
-    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return keep();
-    if (node.type === "TEXT") return keep();
-    if (node.type === "INSTANCE") return keep();
-    if (node.locked) return keep();
-    if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return keep();
+  async function decide(node, ctx) {
+    const keep = { skip: true, generic: false };
+    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return keep;
+    if (node.type === "TEXT") return keep;
+    if (node.type === "INSTANCE") return keep;
+    if (node.locked) return keep;
+    if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return keep;
     const token = await primaryToken(node);
-    let role = resolveRole(node, token, pos);
-    if ((role === "container" || role === "wrapper") && pos.ladder > 0) role = ladderWord(pos.ladder);
-    let scope = inheritedScope != null ? inheritedScope : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
-    if (scope === role) scope = null;
-    const name = layerNameFromRole(scope, role, { maxDepth: opts.maxDepth });
-    return { skip: false, name, childLadder: nextLadder(scope, name, pos.ladder) };
+    const tag = resolveTag(node, token, ctx);
+    return { skip: false, name: tag, generic: isGenericWord(tag) };
   }
-  function resolveRole(node, token, pos) {
+  function resolveTag(node, token, ctx) {
+    if (ctx.parentIsList && node.type !== "TEXT") return "li";
     if (isButtonLike(node)) return "button";
-    const region = regionRole(node, pos);
+    const region = regionRole(node, ctx);
     if (region) return region;
-    if (token == null ? void 0 : token.roleLeaf) return token.roleLeaf;
+    if (looksLikeList(node)) return "ul";
+    if (looksLikeFigure(node)) return "figure";
+    if (token == null ? void 0 : token.roleLeaf) {
+      const t = TOKEN_TAG[token.roleLeaf];
+      if (t) return t;
+    }
     switch (node.type) {
       case "VECTOR":
       case "BOOLEAN_OPERATION":
       case "STAR":
       case "POLYGON":
-        return "icon";
+        return "svg";
       case "LINE":
-        return "divider";
+        return "hr";
       case "RECTANGLE":
       case "ELLIPSE": {
-        if (isThin(node)) return "divider";
-        if (hasImageFill(node)) return node.type === "ELLIPSE" ? "avatar" : "image";
-        if (hasVisibleFill(node)) return "background";
-        if (hasVisibleStroke(node)) return "border";
-        return "shape";
+        if (isThin(node)) return "hr";
+        if (hasImageFill(node)) return "img";
+        return "box";
       }
       case "FRAME":
       case "GROUP":
       case "SECTION": {
+        if (isScrollable(node)) return "scroll";
         const count = "children" in node ? node.children.length : 0;
         if (count === 0) {
-          if (hasImageFill(node)) return "image";
-          if (hasColorFill(node)) return "swatch";
-          return "container";
+          if (hasImageFill(node)) return "img";
+          if (hasVisibleFill(node) || hasVisibleStroke(node)) return "box";
+          return depthWord(ctx.genericDepth);
         }
-        return count === 1 ? "wrapper" : "container";
+        if (cornerRadiusOf(node) > 0 && (hasVisibleFill(node) || hasVisibleStroke(node))) return "box";
+        return depthWord(ctx.genericDepth);
       }
       default:
-        return kebab(node.type);
+        return depthWord(ctx.genericDepth);
     }
   }
+  var TOKEN_TAG = {
+    background: "box",
+    swatch: "box",
+    border: "box",
+    badge: "box",
+    icon: "svg",
+    divider: "hr",
+    image: "img",
+    avatar: "img"
+  };
   var FIELD_ORDER = [
     "fills",
     "strokes",
@@ -1236,10 +1243,6 @@
     const f = paints(node, "fills");
     return !!f && f.some((p) => p.visible !== false && p.type === "IMAGE");
   }
-  function hasColorFill(node) {
-    const f = paints(node, "fills");
-    return !!f && f.some((p) => p.visible !== false && p.type !== "IMAGE");
-  }
   function hasVisibleStroke(node) {
     const s = paints(node, "strokes");
     return !!s && s.some((p) => p.visible !== false);
@@ -1252,11 +1255,11 @@
   function isContainerType(node) {
     return node.type === "FRAME" || node.type === "GROUP" || node.type === "SECTION";
   }
-  function regionRole(node, pos) {
-    if (pos.depth !== 1 || pos.parentLayout !== "vertical" || pos.total < 2) return null;
+  function regionRole(node, ctx) {
+    if (ctx.depth !== 1 || ctx.parentLayout !== "vertical" || ctx.total < 2) return null;
     if (!isContainerType(node)) return null;
-    if (pos.index === 0) return "header";
-    if (pos.index === pos.total - 1) return "footer";
+    if (ctx.index === 0) return "header";
+    if (ctx.index === ctx.total - 1) return "footer";
     return null;
   }
   function isButtonLike(node) {
@@ -1268,6 +1271,36 @@
     const d = dims(node);
     if (d && d.h > 80) return false;
     return true;
+  }
+  function looksLikeList(node) {
+    if (!isContainerType(node) || layoutOf(node) === null) return false;
+    if (!("children" in node)) return false;
+    const kids = node.children.filter((c) => c.type !== "TEXT");
+    if (kids.length < 3) return false;
+    const t0 = kids[0].type;
+    if (!kids.every((k) => k.type === t0)) return false;
+    if ("children" in kids[0]) {
+      const c0 = kids[0].children.length;
+      if (c0 < 1) return false;
+      if (!kids.every((k) => "children" in k && k.children.length === c0)) return false;
+    }
+    return true;
+  }
+  function looksLikeFigure(node) {
+    if (!isContainerType(node) || !("children" in node)) return false;
+    const kids = node.children;
+    if (kids.length === 0 || kids.length > 3) return false;
+    const imgs = kids.filter(isImageNode);
+    if (imgs.length !== 1) return false;
+    return kids.every((k) => isImageNode(k) || k.type === "TEXT");
+  }
+  function isImageNode(node) {
+    if (node.type !== "RECTANGLE" && node.type !== "ELLIPSE" && node.type !== "FRAME") return false;
+    return hasImageFill(node);
+  }
+  function isScrollable(node) {
+    const od = node.overflowDirection;
+    return !!od && od !== "NONE";
   }
   function cornerRadiusOf(node) {
     const r = node.cornerRadius;

@@ -22,6 +22,10 @@ import {
   parseTokenName,
   pickScope,
   dedupeName,
+  ariaRoleForTag,
+  depthWord,
+  isGenericWord,
+  isSemanticTag,
   hasEntitlement,
   limitsForTier,
   clampCount,
@@ -188,6 +192,46 @@ test('pickScope — 깨끗한 맥락 1단계(숫자·단위·일반구조어 제
   assert.equal(pickScope('letter-spacing-0-percent-px'), 'spacing'); // 단위·숫자 제거
   assert.equal(pickScope('hero'), 'hero');
   assert.equal(pickScope(''), null);
+});
+
+test('depthWord — 제네릭 깊이 사다리(0=wrap…3↑=inner, 숫자 없음)', () => {
+  assert.equal(depthWord(0), 'wrap');
+  assert.equal(depthWord(1), 'container');
+  assert.equal(depthWord(2), 'content');
+  assert.equal(depthWord(3), 'inner');
+  assert.equal(depthWord(9), 'inner'); // 3 이상은 inner 유지(숫자 안 붙임)
+});
+
+test('isGenericWord / isSemanticTag — 어휘 분류', () => {
+  for (const w of ['wrap', 'container', 'content', 'inner', 'box', 'scroll']) assert.equal(isGenericWord(w), true);
+  for (const w of ['header', 'svg', 'ul', 'div']) assert.equal(isGenericWord(w), false);
+  for (const t of ['header', 'nav', 'main', 'aside', 'footer', 'button', 'img', 'svg', 'ul', 'li', 'figure', 'hr']) {
+    assert.equal(isSemanticTag(t), true);
+  }
+  assert.equal(isSemanticTag('div'), false); // div는 시맨틱 태그 아님
+  assert.equal(isSemanticTag('wrap'), false);
+});
+
+test('ariaRoleForTag — W3C HTML 태그 → 암묵적 ARIA role + 맥락 강등', () => {
+  assert.equal(ariaRoleForTag('header'), 'banner');
+  assert.equal(ariaRoleForTag('footer'), 'contentinfo');
+  assert.equal(ariaRoleForTag('nav'), 'navigation');
+  assert.equal(ariaRoleForTag('main'), 'main');
+  assert.equal(ariaRoleForTag('aside'), 'complementary');
+  assert.equal(ariaRoleForTag('button'), 'button');
+  assert.equal(ariaRoleForTag('img'), 'img');
+  assert.equal(ariaRoleForTag('ul'), 'list');
+  assert.equal(ariaRoleForTag('li'), 'listitem');
+  assert.equal(ariaRoleForTag('figure'), 'figure');
+  assert.equal(ariaRoleForTag('hr'), 'separator');
+  assert.equal(ariaRoleForTag('title'), 'heading');
+  assert.equal(ariaRoleForTag('svg'), null); // 암묵 role 없음
+  // 맥락 강등: header/footer는 sectioning 조상 안이면 generic(null)
+  assert.equal(ariaRoleForTag('header', { insideSectioning: true }), null);
+  assert.equal(ariaRoleForTag('footer', { insideSectioning: true }), null);
+  // section은 접근가능 이름이 있을 때만 region
+  assert.equal(ariaRoleForTag('section'), null);
+  assert.equal(ariaRoleForTag('section', { hasAccessibleName: true }), 'region');
 });
 
 test('parseTokenName — 역할 말단/맥락 접두사/원시 토큰', () => {
