@@ -54,6 +54,18 @@
     /* #14 리사이즈 핸들(우하단) */
     #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
     #resizeHandle::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 0; height: 0; border-left: 7px solid transparent; border-bottom: 7px solid var(--muted); opacity: 0.6; }
+    /* 진행 안내 파이프라인(§3) */
+    #pipelineSteps { margin: 7px 0; }
+    .pstep { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 3px 0; cursor: pointer; }
+    .pstep .pdot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border); background: #fff; font-size: 8px; line-height: 12px; text-align: center; color: var(--muted); }
+    .pstep.done .pdot { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .pstep.ready .pdot { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .pstep.blocked { opacity: .6; }
+    .pstep .plabel { color: var(--text); }
+    .pstep .pstat { font-size: 10px; }
+    .pstep.done .pstat { color: var(--ok); }
+    .pstep.ready .pstat { color: var(--accent); }
+    .pstep.blocked .pstat { color: var(--muted); }
     /* #11 전제 미충족 안내 + 바로가기 */
     .prereq { margin: 6px 0; font-size: 11px; color: var(--warn); display: flex; align-items: center; gap: 6px; }
     button.link { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; width: auto; }
@@ -179,6 +191,14 @@
         <button id="btnGuide">전체 실행</button>
         <button id="btnOnboardClose">닫기</button>
       </div>
+    </div>
+
+    <!-- 진행 안내 — 만들기→적용 의존 파이프라인 단계 상태(§3) -->
+    <div class="step" id="pipelineCard">
+      <h2>진행 안내</h2>
+      <div class="muted">권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.</div>
+      <div id="pipelineSteps"></div>
+      <div class="muted" style="font-size:10px">리네임 · 대비 점검 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
     </div>
   </section>
 
