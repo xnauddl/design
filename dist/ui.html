@@ -51,6 +51,9 @@
     .warn { color: var(--warn); }
     .ok { color: var(--ok); }
     code { font-family: ui-monospace, monospace; color: var(--muted); }
+    /* #14 리사이즈 핸들(우하단) */
+    #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
+    #resizeHandle::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 0; height: 0; border-left: 7px solid transparent; border-bottom: 7px solid var(--muted); opacity: 0.6; }
     /* #11 전제 미충족 안내 + 바로가기 */
     .prereq { margin: 6px 0; font-size: 11px; color: var(--warn); display: flex; align-items: center; gap: 6px; }
     button.link { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; width: auto; }
@@ -125,6 +128,7 @@
 </head>
 <body>
   <div class="tabs" role="tablist" aria-label="작업 탭">
+    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard">시작</button>
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply">적용</button>
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings">관리</button>
@@ -136,11 +140,11 @@
     <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
   </div>
 
-  <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
+  <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
     <div class="step" id="wizardCard">
       <div class="ux-h"><span class="badge">NEW</span><span class="ux-t">시스템화 마법사</span></div>
-      <div class="muted">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>합니다. 세부 설정값은 아래 각 단계 입력(base·허용오차·맥락단계·시맨틱·대비 기준)을 그대로 사용합니다.</div>
+      <div class="muted">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" /> 시맨틱 매핑</label>
         <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> 접근성 검수</label>
@@ -159,13 +163,15 @@
     <!-- UX4 · 온보딩 / 가이드 -->
     <div class="ux" id="onboardCard">
       <div class="ux-h"><span class="badge">UX4</span><span class="ux-t">온보딩 / 가이드</span></div>
-      <div>처음이세요? 위 <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 아래 섹션을 차례로 사용하세요.</div>
+      <div>처음이세요? <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 ‘만들기·적용’ 탭을 차례로 사용하세요.</div>
       <div class="row">
-        <button id="btnGuide">마법사로 시작</button>
+        <button id="btnGuide">전체 실행</button>
         <button id="btnOnboardClose">닫기</button>
       </div>
     </div>
+  </section>
 
+  <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
     <div class="step">
       <h2>0 · 브랜드 팔레트 생성</h2>
       <div class="row">
@@ -284,7 +290,7 @@
 
     <div class="step" id="contrastCard">
       <h2>5 · 명도 대비 점검</h2>
-      <div class="muted">선택 안 텍스트의 글자색 ↔ 배경색 대비를 WCAG 기준으로 검사합니다. 배경은 가장 가까운 상위 프레임의 단색 채움을 사용합니다(읽기 전용 · 변경 없음).</div>
+      <div class="muted">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
       <div class="row">
         <label class="inline">기준
           <select id="contrastLevel">
@@ -303,7 +309,7 @@
 
     <div class="step" id="componentCard">
       <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
-      <div class="muted">선택 하위에서 <b>후보 스캔</b> → 컴포넌트화할 프레임을 골라 등록. 같은 베이스 이름(예: <code>button/primary</code>) 컴포넌트들 → 베리언트 세트. (Pro 전용)</div>
+      <div class="muted">하위에서 <b>후보 스캔</b> → 골라 등록. 같은 베이스 이름(<code>button/primary</code>) → 베리언트 세트.</div>
       <div class="row">
         <button id="btnScanComp">후보 스캔</button>
         <button id="btnRegisterComp">컴포넌트 등록</button>
@@ -408,6 +414,9 @@
       <div>키보드 전용 조작 · 명도 대비 AA · i18n</div>
     </div>
   </section>
+
+  <!-- #14 창 리사이즈 핸들(우하단) -->
+  <div id="resizeHandle" title="드래그해 크기 조절"></div>
 
   <script>
 "use strict";
@@ -950,7 +959,7 @@
     $("onboardCard").style.display = "none";
   });
   $("btnGuide").addEventListener("click", () => {
-    showTab("tokens");
+    showTab("wizard");
     $("btnWizardRun").focus();
     $("wizardCard").scrollIntoView({ block: "start", behavior: "smooth" });
   });
@@ -1915,7 +1924,7 @@
   send({ type: "GET_PREREQ" });
   send({ type: "GET_LICENSE" });
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
-  var TABS = ["tokens", "apply", "settings"];
+  var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {
     for (const t of TABS) {
       $(`tab-${t}`).classList.toggle("active", t === name);
@@ -1940,7 +1949,47 @@
       $(`tabbtn-${target}`).focus();
     });
   });
-  showTab("tokens");
+  showTab("wizard");
+  (() => {
+    const handle = $("resizeHandle");
+    let resizing = false;
+    let pending = null;
+    let raf = 0;
+    const flush = (commit) => {
+      if (!pending) return;
+      send({ type: "RESIZE", width: pending.w, height: pending.h, commit });
+      pending = null;
+    };
+    handle.addEventListener("pointerdown", (e) => {
+      resizing = true;
+      handle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    handle.addEventListener("pointermove", (e) => {
+      if (!resizing) return;
+      const pe = e;
+      pending = { w: Math.ceil(pe.clientX + 6), h: Math.ceil(pe.clientY + 6) };
+      if (!raf) raf = requestAnimationFrame(() => {
+        raf = 0;
+        flush(false);
+      });
+    });
+    const end = (e) => {
+      if (!resizing) return;
+      resizing = false;
+      if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+      flush(true);
+      try {
+        handle.releasePointerCapture(e.pointerId);
+      } catch (e2) {
+      }
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+  })();
 })();
 
 </script>

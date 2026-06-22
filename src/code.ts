@@ -16,7 +16,26 @@ import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from '.
 import { Preset, upsertPreset } from './lib/presets';
 import { commitUndo } from './lib/undo';
 
-figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
+// #14: 기본 창을 키우고(트리·편집표 수용) 사용자 리사이즈를 허용. 마지막 크기는 clientStorage에 기억.
+const UI_SIZE_KEY = 'dsl.uiSize';
+const UI_MIN = { w: 360, h: 480 };
+const UI_MAX = { w: 900, h: 1200 };
+const UI_DEFAULT = { w: 460, h: 660 };
+const clampSize = (w: number, h: number) => ({
+  w: Math.round(Math.min(UI_MAX.w, Math.max(UI_MIN.w, w))),
+  h: Math.round(Math.min(UI_MAX.h, Math.max(UI_MIN.h, h))),
+});
+
+figma.showUI(__html__, { width: UI_DEFAULT.w, height: UI_DEFAULT.h, themeColors: true });
+
+// 저장된 창 크기 복원(있으면).
+figma.clientStorage.getAsync(UI_SIZE_KEY).then((s) => {
+  const v = s as { w?: number; h?: number } | undefined;
+  if (v && typeof v.w === 'number' && typeof v.h === 'number') {
+    const c = clampSize(v.w, v.h);
+    figma.ui.resize(c.w, c.h);
+  }
+}).catch(() => {});
 
 const selection = () => figma.currentPage.selection;
 
@@ -438,6 +457,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'GET_PREREQ': {
         await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
+        break;
+      }
+      case 'RESIZE': {
+        // #14: 드래그 중엔 즉시 리사이즈, commit(드롭) 시 크기 저장.
+        const c = clampSize(msg.width, msg.height);
+        figma.ui.resize(c.w, c.h);
+        if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { w: c.w, h: c.h }).catch(() => {});
         break;
       }
       case 'GET_LICENSE': {

@@ -1488,7 +1488,23 @@
   }
 
   // src/code.ts
-  figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
+  var UI_SIZE_KEY = "dsl.uiSize";
+  var UI_MIN = { w: 360, h: 480 };
+  var UI_MAX = { w: 900, h: 1200 };
+  var UI_DEFAULT = { w: 460, h: 660 };
+  var clampSize = (w, h) => ({
+    w: Math.round(Math.min(UI_MAX.w, Math.max(UI_MIN.w, w))),
+    h: Math.round(Math.min(UI_MAX.h, Math.max(UI_MIN.h, h)))
+  });
+  figma.showUI(__html__, { width: UI_DEFAULT.w, height: UI_DEFAULT.h, themeColors: true });
+  figma.clientStorage.getAsync(UI_SIZE_KEY).then((s) => {
+    const v = s;
+    if (v && typeof v.w === "number" && typeof v.h === "number") {
+      const c = clampSize(v.w, v.h);
+      figma.ui.resize(c.w, c.h);
+    }
+  }).catch(() => {
+  });
   var selection = () => figma.currentPage.selection;
   var DEV_TIER_KEY = "dsl.devTier";
   var CACHE_KEY = "dsl.licenseCache";
@@ -1850,6 +1866,13 @@
         }
         case "GET_PREREQ": {
           await postPrereq();
+          break;
+        }
+        case "RESIZE": {
+          const c = clampSize(msg.width, msg.height);
+          figma.ui.resize(c.w, c.h);
+          if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { w: c.w, h: c.h }).catch(() => {
+          });
           break;
         }
         case "GET_LICENSE": {

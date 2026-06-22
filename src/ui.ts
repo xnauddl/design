@@ -148,7 +148,7 @@ $('btnOnboardClose').addEventListener('click', () => {
   $('onboardCard').style.display = 'none';
 });
 $('btnGuide').addEventListener('click', () => {
-  showTab('tokens');
+  showTab('wizard');
   $('btnWizardRun').focus();
   $('wizardCard').scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
@@ -1303,7 +1303,7 @@ send({ type: 'GET_LICENSE' });
 document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
 
 /* ---------- 탭 내비게이션 (UI 개편 + UX8 키보드) ---------- */
-const TABS = ['tokens', 'apply', 'settings'] as const;
+const TABS = ['wizard', 'tokens', 'apply', 'settings'] as const;
 function showTab(name: (typeof TABS)[number]): void {
   for (const t of TABS) {
     $(`tab-${t}`).classList.toggle('active', t === name);
@@ -1330,4 +1330,37 @@ TABS.forEach((t, i) => {
     $(`tabbtn-${target}`).focus();
   });
 });
-showTab('tokens');
+showTab('wizard'); // #4: 첫 화면은 ‘시작’(시스템화 마법사)
+
+/* ---------- #14: 창 리사이즈(우하단 핸들 드래그) ---------- */
+(() => {
+  const handle = $('resizeHandle');
+  let resizing = false;
+  let pending: { w: number; h: number } | null = null;
+  let raf = 0;
+  const flush = (commit: boolean): void => {
+    if (!pending) return;
+    send({ type: 'RESIZE', width: pending.w, height: pending.h, commit });
+    pending = null;
+  };
+  handle.addEventListener('pointerdown', (e) => {
+    resizing = true;
+    handle.setPointerCapture((e as PointerEvent).pointerId);
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!resizing) return;
+    const pe = e as PointerEvent;
+    pending = { w: Math.ceil(pe.clientX + 6), h: Math.ceil(pe.clientY + 6) };
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; flush(false); }); // rAF 스로틀
+  });
+  const end = (e: Event): void => {
+    if (!resizing) return;
+    resizing = false;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    flush(true); // 드롭 시 최종 크기 저장
+    try { handle.releasePointerCapture((e as PointerEvent).pointerId); } catch { /* 무시 */ }
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+})();

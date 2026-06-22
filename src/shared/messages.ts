@@ -86,6 +86,7 @@ export type UiToCode =
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   | { type: 'GET_COLLECTIONS' }
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
+  | { type: 'RESIZE'; width: number; height: number; commit?: boolean } // #14: 창 리사이즈(commit 시 크기 저장)
   | { type: 'GET_LICENSE' }
   | { type: 'SET_LICENSE'; tier: Tier } // M1: 개발용 강제 티어(검증 키 없을 때만 적용)
   | { type: 'LICENSE_VERIFIED'; key: string; result: VerifyResult } // M2.2: UI가 검증한 결과 보고
