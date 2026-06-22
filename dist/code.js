@@ -1,25 +1,5 @@
 "use strict";
 (() => {
-  var __defProp = Object.defineProperty;
-  var __defProps = Object.defineProperties;
-  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
-  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-  var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __propIsEnum = Object.prototype.propertyIsEnumerable;
-  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-  var __spreadValues = (a, b) => {
-    for (var prop in b || (b = {}))
-      if (__hasOwnProp.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    if (__getOwnPropSymbols)
-      for (var prop of __getOwnPropSymbols(b)) {
-        if (__propIsEnum.call(b, prop))
-          __defNormalProp(a, prop, b[prop]);
-      }
-    return a;
-  };
-  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
-
   // src/shared/messages.ts
   function post(msg) {
     figma.ui.postMessage(msg);
@@ -163,12 +143,12 @@
     if (existing) {
       if (!existing.sources.includes(source)) existing.sources.push(source);
     } else {
-      acc.map.set(k, __spreadProps(__spreadValues({}, token), { sources: [source] }));
+      acc.map.set(k, { ...token, sources: [source] });
     }
   }
-  function collectPaints(acc, paints2, source) {
-    if (paints2 === figma.mixed || !Array.isArray(paints2)) return;
-    for (const p of paints2) {
+  function collectPaints(acc, paints, source) {
+    if (paints === figma.mixed || !Array.isArray(paints)) return;
+    for (const p of paints) {
       if (p.visible === false) continue;
       if (p.type === "SOLID") {
         const hex = rgbToHex(p.color);
@@ -418,6 +398,167 @@
     }
     return summary;
   }
+  var roundN = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
+  function walkText(node, out) {
+    if (node.type === "TEXT") out.push(node);
+    else if ("children" in node) for (const c of node.children) walkText(c, out);
+  }
+  function scanTextStyles(nodes) {
+    const texts = [];
+    for (const n of nodes) walkText(n, texts);
+    const samples = [];
+    const warnings = /* @__PURE__ */ new Set();
+    for (const t of texts) {
+      if (t.fontSize === figma.mixed || t.fontName === figma.mixed) {
+        warnings.add("\uBD80\uBD84 \uC11C\uC2DD(\uD63C\uD569) \uD14D\uC2A4\uD2B8\uB294 \uC2A4\uD0B5\uD588\uC2B5\uB2C8\uB2E4.");
+        continue;
+      }
+      const fontSize = roundN(t.fontSize);
+      const { family, style } = t.fontName;
+      let lineHeight = 0;
+      const lh = t.lineHeight;
+      if (lh !== figma.mixed && lh.unit !== "AUTO") {
+        lineHeight = lh.unit === "PERCENT" ? roundN(fontSize * lh.value / 100) : roundN(lh.value);
+      }
+      let letterSpacing = 0;
+      const ls = t.letterSpacing;
+      if (ls !== figma.mixed && ls.unit === "PIXELS") letterSpacing = roundN(ls.value);
+      samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name });
+    }
+    return { samples, warnings: [...warnings] };
+  }
+  async function createSemanticTextStyles(specs, apply, nodes) {
+    var _a;
+    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [] };
+    if (!specs.length) return res;
+    const tokens = [];
+    const seen = /* @__PURE__ */ new Set();
+    const pushTok = (t) => {
+      if (!seen.has(t.name)) {
+        seen.add(t.name);
+        tokens.push(t);
+      }
+    };
+    for (const s of specs) {
+      pushTok({ name: numberTokenName("font-size", s.fontSize), category: "fontSize", value: s.fontSize, sources: ["fontSize"] });
+      if (s.lineHeight > 0)
+        pushTok({ name: numberTokenName("line-height", s.lineHeight), category: "lineHeight", value: s.lineHeight, unit: "px", sources: ["lineHeight"] });
+    }
+    await createTokens(tokens, 16);
+    const aliasMap = {};
+    for (const s of specs) {
+      aliasMap[`font-size/${s.name}`] = numberTokenName("font-size", s.fontSize);
+      if (s.lineHeight > 0) aliasMap[`line-height/${s.name}`] = numberTokenName("line-height", s.lineHeight);
+    }
+    await createSemanticAliases(aliasMap);
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const semId = (_a = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _a.id;
+    const semByName = /* @__PURE__ */ new Map();
+    if (semId) {
+      for (const v of await figma.variables.getLocalVariablesAsync())
+        if (v.variableCollectionId === semId) semByName.set(v.name, v);
+    }
+    const existing = await figma.getLocalTextStylesAsync();
+    const styleByName = new Map(existing.map((s) => [s.name, s]));
+    for (const spec of specs) {
+      let style = styleByName.get(spec.name);
+      const created = !style;
+      if (!style) {
+        style = figma.createTextStyle();
+        style.name = spec.name;
+      }
+      const wanted = { family: spec.family, style: spec.style };
+      let loaded;
+      try {
+        await figma.loadFontAsync(wanted);
+        loaded = wanted;
+      } catch {
+        try {
+          const fb = { family: spec.family, style: "Regular" };
+          await figma.loadFontAsync(fb);
+          loaded = fb;
+          res.missing.push(`${spec.name}: \uD3F0\uD2B8 ${spec.style}\u2192Regular`);
+        } catch {
+          res.missing.push(`${spec.name}: \uD3F0\uD2B8 '${spec.family}' \uC5C6\uC74C`);
+          continue;
+        }
+      }
+      style.fontName = loaded;
+      style.fontSize = spec.fontSize;
+      style.lineHeight = spec.lineHeight > 0 ? { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
+      if (spec.letterSpacing) style.letterSpacing = { value: spec.letterSpacing, unit: "PIXELS" };
+      const fsVar = semByName.get(`font-size/${spec.name}`);
+      if (fsVar) {
+        style.setBoundVariable("fontSize", fsVar);
+        res.bound++;
+      } else res.missing.push(`font-size/${spec.name}`);
+      if (spec.lineHeight > 0) {
+        const lhVar = semByName.get(`line-height/${spec.name}`);
+        if (lhVar) {
+          style.setBoundVariable("lineHeight", lhVar);
+          res.bound++;
+        } else res.missing.push(`line-height/${spec.name}`);
+      }
+      res[created ? "created" : "updated"]++;
+      styleByName.set(spec.name, style);
+    }
+    if (apply) {
+      const texts = [];
+      for (const n of nodes) walkText(n, texts);
+      for (const t of texts) {
+        if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
+        const fontSize = roundN(t.fontSize);
+        const { family, style } = t.fontName;
+        const spec = specs.find((s) => s.fontSize === fontSize && s.family === family && s.style === style);
+        if (!spec) continue;
+        const ts = styleByName.get(spec.name);
+        if (!ts) continue;
+        try {
+          await figma.loadFontAsync(t.fontName);
+          await t.setTextStyleIdAsync(ts.id);
+          res.applied++;
+        } catch {
+        }
+      }
+    }
+    return res;
+  }
+
+  // src/lib/textStyles.ts
+  var RAMP_NAMES = ["display", "h1", "h2", "h3", "title", "body", "caption", "overline"];
+  var sigKey = (s) => `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
+  function clusterTextStyles(samples) {
+    const map = /* @__PURE__ */ new Map();
+    for (const s of samples) {
+      const k = sigKey(s);
+      const ex = map.get(k);
+      if (ex) ex.count++;
+      else
+        map.set(k, {
+          fontSize: s.fontSize,
+          lineHeight: s.lineHeight,
+          letterSpacing: s.letterSpacing,
+          family: s.family,
+          style: s.style,
+          count: 1,
+          sample: s.layerName
+        });
+    }
+    return [...map.values()];
+  }
+  function nameTextStyles(clusters) {
+    const sorted = [...clusters].sort(
+      (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight
+    );
+    return sorted.map((c, i) => ({
+      name: i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`,
+      fontSize: c.fontSize,
+      lineHeight: c.lineHeight,
+      letterSpacing: c.letterSpacing,
+      family: c.family,
+      style: c.style
+    }));
+  }
 
   // src/lib/bind.ts
   var TIER = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
@@ -548,10 +689,10 @@
   function bindPaints(node, entries, res, apply) {
     for (const key of ["fills", "strokes"]) {
       if (!(key in node)) continue;
-      const paints2 = node[key];
-      if (paints2 === figma.mixed || !Array.isArray(paints2)) continue;
+      const paints = node[key];
+      if (paints === figma.mixed || !Array.isArray(paints)) continue;
       let changed = false;
-      const next = paints2.map((p) => {
+      const next = paints.map((p) => {
         if (p.type !== "SOLID") return p;
         const v = matchColor(entries, rgbToHex(p.color));
         if (!v) {
@@ -618,7 +759,7 @@
     if (node.fontName === figma.mixed) return;
     try {
       await figma.loadFontAsync(node.fontName);
-    } catch (e) {
+    } catch {
       note(res, "font");
       return;
     }
@@ -648,7 +789,7 @@
     try {
       node.setRangeBoundVariable(0, len, field, v);
       res.bound++;
-    } catch (e) {
+    } catch {
       skip(res, "error");
     }
   }
@@ -665,55 +806,30 @@
     try {
       node.setBoundVariable(field, v);
       res.bound++;
-    } catch (e) {
+    } catch {
       skip(res, "error");
     }
   }
 
   // src/lib/naming.ts
-  var ROLE_VOCAB = [
-    // 구조
-    "container",
-    "wrapper",
-    "content",
-    "group",
-    // 영역
-    "header",
-    "body",
-    "footer",
-    "leading",
-    "trailing",
-    // 요소
-    "icon",
-    "image",
-    "background",
-    "swatch",
-    "border",
-    "divider",
-    "badge",
-    "avatar",
-    // 시맨틱(영역/컴포넌트) — 인식·정리 + 일부 구조 추론
-    "nav",
-    "hero",
-    "main",
-    "sidebar",
-    "section",
-    "button",
-    "card",
-    "list",
-    "item",
-    "field",
-    "tab",
-    "chip",
-    "label",
-    "title"
-  ];
-  var ROLE_SET = new Set(ROLE_VOCAB);
-  function isKnownRole(seg) {
-    return ROLE_SET.has(seg);
-  }
   function kebab(input) {
     return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s_/]+/g, "-").replace(/[^a-zA-Z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+  }
+  var STYLE_LEAVES = /* @__PURE__ */ new Set([
+    "fill",
+    "color",
+    "stroke",
+    "bg",
+    "text",
+    "border"
+  ]);
+  function layerNameFromToken(tokenName, opts = {}) {
+    let segs = tokenName.split("/").filter(Boolean);
+    if (opts.stripStyleLeaf && segs.length > 1 && STYLE_LEAVES.has(segs[segs.length - 1].toLowerCase())) {
+      segs = segs.slice(0, -1);
+    }
+    segs = limitDepth(segs, opts.maxDepth);
+    return segs.map(kebab).filter(Boolean).join("-");
   }
   function layerNameFromRole(ancestorName, role, opts = {}) {
     const ctx = ancestorName ? kebab(ancestorName) : "";
@@ -724,167 +840,53 @@
     if (segs.length <= maxDepth) return segs;
     return segs.slice(segs.length - maxDepth);
   }
-  var DEFAULT_NAME_RE = /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( \d+)?( copy( \d+)?)?$/;
-  function isDefaultName(name) {
-    const n = name.trim();
-    if (!n) return true;
-    return DEFAULT_NAME_RE.test(n);
-  }
-  var PRIMITIVE_NS = /* @__PURE__ */ new Set([
-    "color",
-    "colour",
-    "spacing",
-    "space",
-    "gap",
-    "padding",
-    "size",
-    "sizing",
-    "radius",
-    "border-radius",
-    "opacity",
-    "font",
-    "font-size",
-    "font-weight",
-    "line-height",
-    "letter-spacing",
-    "number",
-    "dimension",
-    "width",
-    "height",
-    "elevation",
-    "shadow",
-    "z"
-  ]);
-  var LEAF_ROLE = {
-    background: "background",
-    bg: "background",
-    fill: "background",
-    surface: "background",
-    swatch: "swatch",
-    sample: "swatch",
-    border: "border",
-    stroke: "border",
-    outline: "border",
-    icon: "icon",
-    glyph: "icon",
-    divider: "divider",
-    separator: "divider",
-    rule: "divider",
-    image: "image",
-    img: "image",
-    picture: "image",
-    thumbnail: "image",
-    avatar: "avatar",
-    badge: "badge",
-    dot: "badge",
-    indicator: "badge"
-  };
-  function parseTokenName(tokenName) {
-    var _a;
-    const segs = tokenName.split("/").map((s) => s.trim()).filter(Boolean);
-    if (!segs.length) return { roleLeaf: null, context: null, primitive: false };
-    if (PRIMITIVE_NS.has(kebab(segs[0]))) return { roleLeaf: null, context: null, primitive: true };
-    const roleLeaf = (_a = LEAF_ROLE[kebab(segs[segs.length - 1])]) != null ? _a : null;
-    const ctxSegs = roleLeaf ? segs.slice(0, -1) : segs;
-    const context = ctxSegs.length ? ctxSegs.map(kebab).filter(Boolean).join("-") : null;
-    return { roleLeaf, context, primitive: false };
-  }
-  var UNIT_WORDS = /* @__PURE__ */ new Set(["percent", "px", "em", "rem", "ratio", "pt"]);
-  function isTokenValue(v) {
-    if (/^[0-9a-f]{6}$/.test(v)) return true;
-    return v.split("-").every((s) => /^\d+$/.test(s) || UNIT_WORDS.has(s));
-  }
-  var GENERIC_ROLES = /* @__PURE__ */ new Set(["container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
-  function pickScope(name) {
-    const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
-    if (!segs.length) return null;
-    const known = segs.filter(isKnownRole);
-    return known.length ? known[known.length - 1] : segs[segs.length - 1];
-  }
-  function isTokenEchoName(name) {
-    const n = name.trim().toLowerCase();
-    for (const ns of PRIMITIVE_NS) {
-      if (n.startsWith(ns + "-")) {
-        const value = n.slice(ns.length + 1);
-        if (value && isTokenValue(value)) return true;
-      }
+  function dedupeName(name, taken) {
+    if (!taken.has(name)) {
+      taken.add(name);
+      return name;
     }
-    return false;
+    let i = 2;
+    while (taken.has(`${name}-${i}`)) i++;
+    const out = `${name}-${i}`;
+    taken.add(out);
+    return out;
   }
 
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const changes = [];
-    await recurse(selection2, null, opts, changes, 0, null);
+    await recurse(selection2, null, opts, changes);
     return { changes, applied: opts.apply };
   }
-  async function recurse(nodes, ancestorName, opts, out, depth, parentLayout) {
-    const total = nodes.length;
-    for (let i = 0; i < total; i++) {
-      const node = nodes[i];
-      const pos = { index: i, total, parentLayout, depth };
-      const decided = await decide(node, ancestorName, pos, opts);
+  async function recurse(nodes, ancestorName, opts, out) {
+    const taken = /* @__PURE__ */ new Set();
+    for (const node of nodes) {
+      const decided = await decide(node, ancestorName, opts);
       let contextForChildren = node.name;
       if (!decided.skip && decided.name) {
-        if (decided.name !== node.name) {
-          out.push({ id: node.id, before: node.name, after: decided.name });
-          if (opts.apply) node.name = decided.name;
+        const finalName = dedupeName(decided.name, taken);
+        if (finalName !== node.name) {
+          out.push({ id: node.id, before: node.name, after: finalName });
+          if (opts.apply) node.name = finalName;
         }
-        contextForChildren = decided.name;
+        contextForChildren = finalName;
+      } else {
+        taken.add(node.name);
       }
-      if ("children" in node) {
-        await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node));
-      }
+      if ("children" in node) await recurse(node.children, contextForChildren, opts, out);
     }
   }
-  async function decide(node, ancestorName, pos, opts) {
-    var _a;
+  async function decide(node, ancestorName, opts) {
     if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true };
     if (node.type === "TEXT") return { skip: true };
     if (node.type === "INSTANCE") return { skip: true };
     if (node.locked) return { skip: true };
-    if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
-    const token = await primaryToken(node);
-    const role = resolveRole(node, token, pos);
-    let scope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
-    if (scope === role) scope = null;
-    return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
-  }
-  function resolveRole(node, token, pos) {
-    if (isButtonLike(node)) return "button";
-    const region = regionRole(node, pos);
-    if (region) return region;
-    if (token == null ? void 0 : token.roleLeaf) return token.roleLeaf;
-    switch (node.type) {
-      case "VECTOR":
-      case "BOOLEAN_OPERATION":
-      case "STAR":
-      case "POLYGON":
-        return "icon";
-      case "LINE":
-        return "divider";
-      case "RECTANGLE":
-      case "ELLIPSE": {
-        if (isThin(node)) return "divider";
-        if (hasImageFill(node)) return node.type === "ELLIPSE" ? "avatar" : "image";
-        if (hasVisibleFill(node)) return "background";
-        if (hasVisibleStroke(node)) return "border";
-        return "shape";
-      }
-      case "FRAME":
-      case "GROUP":
-      case "SECTION": {
-        const count = "children" in node ? node.children.length : 0;
-        if (count === 0) {
-          if (hasImageFill(node)) return "image";
-          if (hasColorFill(node)) return "swatch";
-          return "container";
-        }
-        return count === 1 ? "wrapper" : "container";
-      }
-      default:
-        return kebab(node.type);
+    const tokenName = await primaryTokenName(node);
+    if (tokenName) {
+      return { skip: false, name: layerNameFromToken(tokenName, { maxDepth: opts.maxDepth }) };
     }
+    const role = inferRole(node);
+    return { skip: false, name: layerNameFromRole(ancestorName, role, { maxDepth: opts.maxDepth }) };
   }
   var FIELD_ORDER = [
     "fills",
@@ -896,14 +898,14 @@
     "paddingLeft",
     "paddingTop"
   ];
-  async function primaryToken(node) {
+  async function primaryTokenName(node) {
     const bv = node.boundVariables;
     if (!bv) return null;
     for (const field of FIELD_ORDER) {
       const id = firstAliasId(bv[field]);
       if (id) {
         const v = await figma.variables.getVariableByIdAsync(id);
-        if (v) return parseTokenName(v.name);
+        if (v) return v.name;
       }
     }
     return null;
@@ -914,75 +916,29 @@
     if (Array.isArray(entry)) return (_a = entry[0]) == null ? void 0 : _a.id;
     return entry.id;
   }
-  function dims(node) {
-    if (!("width" in node) || !("height" in node)) return null;
-    const w = node.width;
-    const h = node.height;
-    if (typeof w !== "number" || typeof h !== "number") return null;
-    return { w, h };
-  }
-  function isThin(node) {
-    const d = dims(node);
-    if (!d) return false;
-    const min = Math.min(d.w, d.h);
-    const max = Math.max(d.w, d.h);
-    if (min <= 0) return false;
-    return min <= 2 || max / min >= 25;
-  }
-  function paints(node, field) {
-    if (!(field in node)) return null;
-    const p = node[field];
-    return Array.isArray(p) ? p : null;
+  function inferRole(node) {
+    switch (node.type) {
+      case "VECTOR":
+      case "BOOLEAN_OPERATION":
+      case "STAR":
+      case "POLYGON":
+      case "LINE":
+        return "icon";
+      case "FRAME":
+      case "GROUP":
+      case "SECTION":
+        return "container";
+      case "RECTANGLE":
+      case "ELLIPSE":
+        return hasVisibleFill(node) ? "background" : "shape";
+      default:
+        return kebab(node.type);
+    }
   }
   function hasVisibleFill(node) {
-    const f = paints(node, "fills");
-    return !!f && f.some((p) => p.visible !== false);
-  }
-  function hasImageFill(node) {
-    const f = paints(node, "fills");
-    return !!f && f.some((p) => p.visible !== false && p.type === "IMAGE");
-  }
-  function hasColorFill(node) {
-    const f = paints(node, "fills");
-    return !!f && f.some((p) => p.visible !== false && p.type !== "IMAGE");
-  }
-  function hasVisibleStroke(node) {
-    const s = paints(node, "strokes");
-    return !!s && s.some((p) => p.visible !== false);
-  }
-  function layoutOf(node) {
-    if (!("layoutMode" in node)) return null;
-    const m = node.layoutMode;
-    return m === "VERTICAL" ? "vertical" : m === "HORIZONTAL" ? "horizontal" : null;
-  }
-  function isContainerType(node) {
-    return node.type === "FRAME" || node.type === "GROUP" || node.type === "SECTION";
-  }
-  function regionRole(node, pos) {
-    if (pos.depth !== 1 || pos.parentLayout !== "vertical" || pos.total < 2) return null;
-    if (!isContainerType(node)) return null;
-    if (pos.index === 0) return "header";
-    if (pos.index === pos.total - 1) return "footer";
-    return null;
-  }
-  function isButtonLike(node) {
-    if (node.type !== "FRAME") return false;
-    if (layoutOf(node) === null) return false;
-    if (!(cornerRadiusOf(node) > 0)) return false;
-    if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
-    if (!hasDirectText(node)) return false;
-    const d = dims(node);
-    if (d && d.h > 80) return false;
-    return true;
-  }
-  function cornerRadiusOf(node) {
-    const r = node.cornerRadius;
-    if (typeof r === "number") return r;
-    const tl = node.topLeftRadius;
-    return typeof tl === "number" ? tl : 0;
-  }
-  function hasDirectText(node) {
-    return "children" in node && node.children.some((c) => c.type === "TEXT");
+    if (!("fills" in node)) return false;
+    const fills = node.fills;
+    return Array.isArray(fills) && fills.some((p) => p.visible !== false);
   }
 
   // src/lib/exporters.ts
@@ -1202,7 +1158,7 @@
     let combos = [{}];
     for (const k of keys) {
       const next = [];
-      for (const c of combos) for (const v of props[k]) next.push(__spreadProps(__spreadValues({}, c), { [k]: v }));
+      for (const c of combos) for (const v of props[k]) next.push({ ...c, [k]: v });
       combos = next;
     }
     return combos;
@@ -1306,47 +1262,6 @@
     return { groups, singles };
   }
 
-  // src/lib/color.ts
-  function srgbToLinear(c) {
-    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  }
-  function relativeLuminance(rgb) {
-    const r = srgbToLinear(rgb.r);
-    const g = srgbToLinear(rgb.g);
-    const b = srgbToLinear(rgb.b);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  }
-  function contrastRatio(a, b) {
-    const la = relativeLuminance(a);
-    const lb = relativeLuminance(b);
-    const hi = Math.max(la, lb);
-    const lo = Math.min(la, lb);
-    return (hi + 0.05) / (lo + 0.05);
-  }
-
-  // src/lib/contrast.ts
-  function isLargeText(fontSizePx, bold) {
-    if (fontSizePx >= 24) return true;
-    return bold && fontSizePx >= 18.66;
-  }
-  function requiredRatio(level, large) {
-    if (level === "AAA") return large ? 4.5 : 7;
-    return large ? 3 : 4.5;
-  }
-  var round2 = (n) => Math.round(n * 100) / 100;
-  function evaluateSample(s, level) {
-    const large = isLargeText(s.fontSize, s.bold);
-    const required = requiredRatio(level, large);
-    const ratio = round2(contrastRatio(hexToRgb(s.fg), hexToRgb(s.bg)));
-    return { id: s.id, name: s.name, fg: s.fg, bg: s.bg, ratio, required, large, pass: ratio >= required };
-  }
-  function checkContrast(samples, level) {
-    const findings = samples.map((s) => evaluateSample(s, level));
-    findings.sort((a, b) => Number(a.pass) - Number(b.pass) || a.ratio - b.ratio);
-    const failed = findings.reduce((n, f) => n + (f.pass ? 0 : 1), 0);
-    return { level, checked: findings.length, passed: findings.length - failed, failed, findings };
-  }
-
   // src/lib/entitlements.ts
   var TIERS = ["free", "pro", "team"];
   var TIER_RANK = { free: 0, pro: 1, team: 2 };
@@ -1448,7 +1363,7 @@
       if (Array.isArray(ps)) presets = ps;
       const h = await figma.clientStorage.getAsync(HISTORY_KEY);
       if (Array.isArray(h)) history = h;
-    } catch (e) {
+    } catch {
     }
   }
   function record(action, summary) {
@@ -1486,10 +1401,15 @@
     post({ type: "PREMIUM_REQUIRED", feature: "components", message: "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
     return false;
   }
+  function requireTextStyles() {
+    if (hasEntitlement(currentTier(), "components")) return true;
+    post({ type: "PREMIUM_REQUIRED", feature: "textStyles", message: "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
+    return false;
+  }
   async function savePresets() {
     try {
       await figma.clientStorage.setAsync(PRESETS_KEY, presets);
-    } catch (e) {
+    } catch {
     }
   }
   function kindOf(v) {
@@ -1552,58 +1472,6 @@
     post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped });
   }
   figma.on("selectionchange", postSelection);
-  var CONTRAST_SCAN_CAP = 2e3;
-  function solidFillHex(node) {
-    var _a;
-    const fills = node.fills;
-    if (!Array.isArray(fills)) return null;
-    for (const p of fills) {
-      if (p.type === "SOLID" && p.visible !== false && ((_a = p.opacity) != null ? _a : 1) > 0) return rgbToHex(p.color);
-    }
-    return null;
-  }
-  function effectiveBgHex(node) {
-    let cur = node.parent;
-    while (cur && cur.type !== "PAGE" && cur.type !== "DOCUMENT") {
-      const hex = solidFillHex(cur);
-      if (hex) return hex;
-      cur = cur.parent;
-    }
-    return null;
-  }
-  function collectContrastSamples(sel) {
-    const samples = [];
-    const skipped = {};
-    const note2 = (k) => {
-      var _a;
-      skipped[k] = ((_a = skipped[k]) != null ? _a : 0) + 1;
-    };
-    const stack = sel.slice();
-    let scanned = 0;
-    while (stack.length) {
-      if (scanned >= CONTRAST_SCAN_CAP) {
-        note2("capped");
-        break;
-      }
-      const n = stack.pop();
-      scanned++;
-      if (n.type === "TEXT" && n.visible) {
-        const fg = solidFillHex(n);
-        if (!fg) note2("no-fill");
-        else {
-          const bg = effectiveBgHex(n);
-          if (!bg) note2("no-bg");
-          else {
-            const fontSize = typeof n.fontSize === "number" ? n.fontSize : 16;
-            const bold = typeof n.fontWeight === "number" ? n.fontWeight >= 700 : false;
-            samples.push({ id: n.id, name: n.name, fg, bg, fontSize, bold });
-          }
-        }
-      }
-      if ("children" in n) for (const c of n.children) stack.push(c);
-    }
-    return { samples, skipped };
-  }
   figma.ui.onmessage = async (msg) => {
     var _a, _b;
     try {
@@ -1678,6 +1546,20 @@
           commitUndo(figma);
           break;
         }
+        case "SCAN_TEXT_STYLES": {
+          const { samples, warnings } = scanTextStyles(selection());
+          const styles = nameTextStyles(clusterTextStyles(samples));
+          post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
+          break;
+        }
+        case "CREATE_TEXT_STYLES": {
+          if (!requireTextStyles()) break;
+          const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
+          post({ type: "TEXT_STYLES_RESULT", created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
+          record("semantics", `\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C ${r.created + r.updated} (\uBC14\uC778\uB529 ${r.bound}${r.applied ? ` \xB7 \uC801\uC6A9 ${r.applied}` : ""})`);
+          commitUndo(figma);
+          break;
+        }
         case "GET_COLLECTIONS": {
           const cols = await figma.variables.getLocalVariableCollectionsAsync();
           post({ type: "COLLECTIONS", collections: cols.map((c) => ({ id: c.id, name: c.name })) });
@@ -1692,7 +1574,7 @@
           devTier = msg.tier;
           try {
             await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);
-          } catch (e) {
+          } catch {
           }
           postLicense();
           break;
@@ -1702,7 +1584,7 @@
             cache = cacheFromVerify(msg.key, msg.result, Date.now());
             try {
               await figma.clientStorage.setAsync(CACHE_KEY, cache);
-            } catch (e) {
+            } catch {
             }
             postLicense("\uB77C\uC774\uC120\uC2A4 \uC801\uC6A9\uB428");
           } else if (msg.result.offline) {
@@ -1718,7 +1600,7 @@
           cache = null;
           try {
             await figma.clientStorage.deleteAsync(CACHE_KEY);
-          } catch (e) {
+          } catch {
           }
           postLicense("\uB77C\uC774\uC120\uC2A4 \uD0A4 \uC81C\uAC70\uB428");
           break;
@@ -1752,7 +1634,7 @@
           history = [];
           try {
             await figma.clientStorage.deleteAsync(HISTORY_KEY);
-          } catch (e) {
+          } catch {
           }
           post({ type: "HISTORY", entries: history });
           break;
@@ -1814,7 +1696,7 @@
             try {
               figma.createComponentFromNode(node);
               registered++;
-            } catch (e) {
+            } catch {
               skipped++;
             }
           }
@@ -1847,7 +1729,7 @@
               arrangeSet(set);
               sets++;
               if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(" / ")}`);
-            } catch (e) {
+            } catch {
             }
           }
           post({ type: "VARIANTS_RESULT", sets, missing, singles: result.singles });
@@ -1871,7 +1753,7 @@
                 set.appendChild(clone);
                 generated++;
                 combos.push(`${set.name}: ${combo}`);
-              } catch (e) {
+              } catch {
               }
             }
             if (missing.length) arrangeSet(set);
@@ -1897,31 +1779,17 @@
                 else if (p.type === "BOOLEAN") def = target.visible;
                 else def = target.type === "INSTANCE" && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : "";
                 const id = node.addComponentProperty(p.propName, p.type, def);
-                const refs = __spreadValues({}, (_b = target.componentPropertyReferences) != null ? _b : {});
+                const refs = { ...(_b = target.componentPropertyReferences) != null ? _b : {} };
                 refs[p.field] = id;
                 target.componentPropertyReferences = refs;
                 created++;
                 props.push(`${p.propName}:${p.type}`);
-              } catch (e) {
+              } catch {
               }
             }
           }
           post({ type: "PROPERTIES_RESULT", created, props });
           if (created) commitUndo(figma);
-          break;
-        }
-        case "CHECK_CONTRAST": {
-          const { samples, skipped } = collectContrastSamples(selection());
-          const report = checkContrast(samples, msg.level);
-          post({
-            type: "CONTRAST_RESULT",
-            level: report.level,
-            checked: report.checked,
-            passed: report.passed,
-            failed: report.failed,
-            findings: report.findings,
-            skipped
-          });
           break;
         }
       }

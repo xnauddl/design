@@ -3,112 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <style>
-    /* ── 목업(Figma 17:2/17:94/17:178) 디자인 토큰 ──────────────
-       라이트 고정(목업이 라이트 단일). 색·치수·타이포를 목업과 1:1로 맞춤. */
-    :root {
-      color-scheme: light;
-      --text: #121212;
-      --muted: #878787;
-      --border: #e0e0e0;
-      --field: #f7f7f7;
-      --accent: #0d99ff;
-      --ux-bg: #e8f5ff;
-      --ok: #0a7d29;
-      --warn: #b86b00;
-    }
-    * { box-sizing: border-box; }
-    body {
-      font: 400 11px/1.45 "Inter", -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
-      margin: 0; padding: 12px; color: var(--text); background: #fff;
-    }
-    h2 { font-size: 11px; font-weight: 600; color: var(--text); margin: 0 0 7px; text-transform: none; letter-spacing: 0; }
-
-    /* 카드 */
-    .step { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
-    .step > * + * { margin-top: 7px; }
-
-    /* 버튼 */
-    button { font: 600 11px/16px "Inter", -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border); background: #fff; color: var(--text); cursor: pointer; }
-    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-    button:disabled { opacity: .45; cursor: default; }
-
-    /* 입력 / 셀렉트 / 텍스트영역 (필드) */
-    input[type="text"], input[type="number"], select, textarea {
-      font: 400 11px/16px "Inter", -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
-      background: var(--field); color: var(--text);
-      border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
-    }
-    input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
-    input[type="number"] { width: 56px; }
-    input[type="color"] { width: 32px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; }
-    input[type="checkbox"] { accent-color: var(--accent); }
-    select { padding-right: 6px; }
-
+    :root { color-scheme: light dark; }
+    body { font: 12px -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif; margin: 0; padding: 12px; color: var(--figma-color-text, #111); }
+    h2 { font-size: 12px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
+    .step { border: 1px solid var(--figma-color-border, #e5e5e5); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    button { font: inherit; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--figma-color-border, #d5d5d5); background: var(--figma-color-bg, #fff); cursor: pointer; }
+    button.primary { background: #0d99ff; color: #fff; border-color: #0d99ff; }
+    button:disabled { opacity: .5; cursor: default; }
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    label.inline { display: inline-flex; gap: 5px; align-items: center; }
-    .muted { color: var(--muted); }
-    .status { margin-top: 4px; min-height: 15px; }
-    .warn { color: var(--warn); }
-    .ok { color: var(--ok); }
-    code { font-family: ui-monospace, monospace; color: var(--muted); }
-
-    /* 토큰 목록 / diff / 결과 표시 */
-    #tokenList { max-height: 180px; overflow: auto; margin-top: 7px; }
+    label.inline { display: inline-flex; gap: 4px; align-items: center; }
+    input[type="number"] { width: 56px; font: inherit; padding: 3px 5px; }
+    .muted { opacity: .65; }
+    .status { margin-top: 6px; min-height: 16px; }
+    .warn { color: #b00; }
+    .ok { color: #0a7d28; }
+    #tokenList { max-height: 180px; overflow: auto; margin-top: 8px; }
     .tk { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
-    .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
+    .tk input { font: inherit; padding: 2px 4px; width: 100%; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
-    .cat { font-size: 10px; color: var(--muted); }
-    #diff { max-height: 160px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
+    .cat { font-size: 10px; opacity: .6; }
+    #diff { max-height: 160px; overflow: auto; margin-top: 8px; font-family: ui-monospace, monospace; font-size: 11px; }
     .diff-row { padding: 1px 0; }
-    .before { color: var(--muted); text-decoration: line-through; }
-    .after { color: var(--ok); }
-
-    /* 탭바 */
-    .tabs { display: flex; gap: 8px; position: sticky; top: 0; background: #fff; padding: 0 0 10px; margin: 0 0 2px; z-index: 2; }
-    .tab-btn { flex: 1; padding: 7px 0; border-radius: 6px; border: 1px solid var(--border); }
-    .tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .before { opacity: .55; text-decoration: line-through; }
+    .after { color: #0a7d28; }
+    /* 탭 내비게이션 (UI 개편) */
+    .tabs { display: flex; gap: 4px; position: sticky; top: 0; background: var(--figma-color-bg, #fff); padding: 2px 0 8px; margin: -2px 0 4px; z-index: 1; }
+    .tab-btn { flex: 1; }
+    .tab-btn.active { background: #0d99ff; color: #fff; border-color: #0d99ff; }
     .tab-section { display: none; }
     .tab-section.active { display: block; }
-    .tab-section > * { margin-bottom: 10px; }
-
-    /* UX 콜아웃 박스 + 배지 */
-    .ux { background: var(--ux-bg); border: 1px solid var(--accent); border-radius: 6px; padding: 8px; }
-    .ux > * + * { margin-top: 5px; }
-    .step .ux { margin-top: 7px; }
-    .ux-h { display: flex; align-items: center; gap: 6px; }
-    .badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; line-height: 14px; padding: 2px 5px; border-radius: 4px; background: var(--accent); color: #fff; }
-    .ux-t { font-size: 10px; font-weight: 600; line-height: 15px; color: var(--accent); }
-
-    /* UX5 선택 동기화 카드 (상단 sticky) */
-    #selBarWrap { position: sticky; top: 43px; z-index: 1; margin: 0 0 10px; }
-    .selbar { color: var(--text); }
-    .selbar.muted { color: var(--muted); }
-
+    /* UX5 선택 동기화 바 / UX4 빈 상태 */
+    .selbar { position: sticky; top: 33px; z-index: 1; background: var(--figma-color-bg, #fff); font-size: 11px; padding: 4px 0 8px; margin: -2px 0 6px; border-bottom: 1px solid var(--figma-color-border, #eee); }
+    .selbar.muted { opacity: .6; }
+    .empty { padding: 12px 10px; border: 1px dashed var(--figma-color-border, #ddd); border-radius: 6px; opacity: .8; line-height: 1.5; }
     /* UX6 진행률 바 */
-    .bar { height: 8px; border-radius: 4px; background: var(--field); border: 1px solid var(--border); overflow: hidden; }
-    .bar-fill { height: 100%; width: 0%; background: var(--accent); transition: width .1s linear; }
-
-    /* 시스템화 마법사 스테퍼 */
-    #wizardSteps { margin-top: 7px; }
-    .wstep { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
-    .wstep .dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border); background: #fff; font-size: 8px; line-height: 12px; text-align: center; color: var(--muted); }
-    .wstep.done .dot { background: var(--ok); border-color: var(--ok); color: #fff; }
-    .wstep.active .dot { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .wstep.fail .dot { background: var(--warn); border-color: var(--warn); color: #fff; }
-    .wstep .wlabel { color: var(--text); }
-    .wstep.skip { opacity: .55; }
-    .wstep.skip .wlabel { color: var(--muted); }
-    .wstep .wnote { font-size: 10px; color: var(--muted); }
-    .wstep.fail .wnote { color: var(--warn); }
-    #wizardBar { margin-top: 7px; }
-
-    /* 명도 대비 점검 결과 */
-    .cfind { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
-    .cpair { display: inline-flex; }
-    .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid #0003; }
-    .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
-    .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
-    .cfind .ratio { font-variant-numeric: tabular-nums; }
+    .bar { height: 8px; border-radius: 4px; background: var(--figma-color-bg-secondary, #eee); border: 1px solid var(--figma-color-border, #ddd); overflow: hidden; }
+    .bar-fill { height: 100%; width: 0%; background: #0d99ff; transition: width .1s linear; }
   </style>
 </head>
 <body>
@@ -118,51 +48,20 @@
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings">관리</button>
   </div>
 
-  <!-- UX5 · 선택 동기화 (실시간) -->
-  <div class="ux" id="selBarWrap">
-    <div class="ux-h"><span class="badge">UX5</span><span class="ux-t">선택 동기화 (실시간)</span></div>
-    <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
-  </div>
+  <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
-    <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
-    <div class="step" id="wizardCard">
-      <div class="ux-h"><span class="badge">NEW</span><span class="ux-t">시스템화 마법사</span></div>
-      <div class="muted">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>합니다. 세부 설정값은 아래 각 단계 입력(base·허용오차·맥락단계·시맨틱·대비 기준)을 그대로 사용합니다.</div>
-      <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> 시맨틱 매핑</label>
-        <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> 접근성 검수</label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> 컴포넌트화</label>
-        <span class="muted" id="wizComponentLock"></span>
-      </div>
-      <div class="row">
-        <button id="btnWizardRun" class="primary">전체 실행</button>
-        <button id="btnWizardCancel" style="display:none">취소</button>
-      </div>
-      <div id="wizardSteps"></div>
-      <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
-      <div class="status" id="wizardSummary"></div>
-    </div>
-
-    <!-- UX4 · 온보딩 / 가이드 -->
-    <div class="ux" id="onboardCard">
-      <div class="ux-h"><span class="badge">UX4</span><span class="ux-t">온보딩 / 가이드</span></div>
-      <div>처음이세요? 위 <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 아래 섹션을 차례로 사용하세요.</div>
-      <div class="row">
-        <button id="btnGuide">마법사로 시작</button>
-        <button id="btnOnboardClose">닫기</button>
-      </div>
-    </div>
-
     <div class="step">
       <h2>0 · 브랜드 팔레트 생성</h2>
       <div class="row">
         <label class="inline">브랜드색 <input id="brand" type="color" value="#3366ff" /></label>
-        <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
+        <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:84px; font:inherit; padding:3px 5px;" />
       </div>
       <div class="row">
         <label class="inline"><input id="useBrand2" type="checkbox" /> 보조색</label>
         <input id="brand2" type="color" value="#ff5722" />
+      </div>
+      <div class="row">
         <label class="inline">하모니
           <select id="harmony">
             <option value="">없음</option>
@@ -176,14 +75,11 @@
         <label class="inline"><input id="incNeutral" type="checkbox" checked /> 중립</label>
         <label class="inline"><input id="incStatus" type="checkbox" checked /> 상태색</label>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">적용 전 미리보기</span></div>
-        <div class="row">
-          <button id="btnPalette" class="primary">팔레트 생성</button>
-          <span class="muted" id="paletteInfo"></span>
-        </div>
-        <div class="status" id="paletteStatus"></div>
+      <div class="row">
+        <button id="btnPalette" class="primary">팔레트 생성</button>
+        <span class="muted" id="paletteInfo"></span>
       </div>
+      <div class="status" id="paletteStatus"></div>
     </div>
 
     <div class="step">
@@ -200,25 +96,41 @@
       <h2>2 · 토큰 생성 (Global + Semantic)</h2>
       <div class="row">
         <label class="inline">base(rem)px <input id="base" type="number" value="16" min="1" /></label>
+        <button id="btnCreate">미리보기</button>
+        <button id="btnCreateApply" class="primary" style="display:none">적용</button>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">변경 요약 → 확인</span></div>
-        <div class="row">
-          <button id="btnCreate">미리보기</button>
-          <button id="btnCreateApply" class="primary" style="display:none">적용</button>
-        </div>
-        <div class="status" id="createStatus"></div>
-      </div>
+      <div class="status" id="createStatus"></div>
     </div>
 
     <div class="step">
       <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
       <div class="muted">먼저 ‘2 · 토큰 생성’으로 Global 변수를 만든 뒤 실행하세요. 형식: <code>역할 = Global변수이름</code></div>
-      <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; font-family:ui-monospace, monospace;"></textarea>
-      <div class="row">
+      <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+      <div class="row" style="margin-top:6px;">
         <button id="btnSemantics">시맨틱 별칭 생성</button>
       </div>
       <div class="status" id="semStatus"></div>
+    </div>
+
+    <div class="step">
+      <h2>2.6 · 텍스트 스타일 (화면 → 스타일)</h2>
+      <div class="muted">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Pro)</div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnScanText">선택에서 스캔</button>
+        <button id="btnTsAddRow">행 추가</button>
+        <label class="inline">폰트 <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
+      </div>
+      <table id="tsTable" style="width:100%; border-collapse:collapse; margin-top:6px; font-size:11px;">
+        <thead><tr style="text-align:left; color:var(--muted,#888);">
+          <th>이름</th><th>크기</th><th>행간</th><th>스타일</th><th></th>
+        </tr></thead>
+        <tbody id="tsRows"></tbody>
+      </table>
+      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 원본 텍스트에 스타일 적용</label>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
+      </div>
+      <div class="status" id="tsStatus"></div>
     </div>
   </section>
 
@@ -230,18 +142,15 @@
         <button id="btnApply">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none">선택에 바인딩</button>
       </div>
-      <div class="ux" id="applyProgress" style="display:none">
-        <div class="ux-h"><span class="badge">UX6</span><span class="ux-t">진행률 / 취소</span></div>
+      <div class="muted" style="margin-top:6px;">↶ 적용 후 한 번의 되돌리기(Ctrl/⌘Z)로 이 작업 전체를 취소할 수 있어요.</div>
+      <div id="applyProgress" style="display:none; margin-top:8px;">
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
-        <div class="row">
+        <div class="row" style="margin-top:4px;">
           <span class="muted" id="applyProgressText"></span>
           <button id="btnApplyCancel">취소</button>
         </div>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX3</span><span class="ux-t">사유별 피드백</span></div>
-        <div class="status" id="applyStatus"></div>
-      </div>
+      <div class="status" id="applyStatus"></div>
     </div>
 
     <div class="step">
@@ -251,47 +160,22 @@
         <button id="btnPreview">미리보기</button>
         <button id="btnRename" disabled>이름 적용</button>
       </div>
+      <div class="muted" style="margin-top:6px;">↶ 이름 적용 후 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
       <div id="diff"></div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX2</span><span class="ux-t">되돌리기 안전장치</span></div>
-        <div>이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
-      </div>
       <div class="status" id="renameStatus"></div>
-    </div>
-
-    <div class="step" id="contrastCard">
-      <h2>5 · 명도 대비 점검</h2>
-      <div class="muted">선택 안 텍스트의 글자색 ↔ 배경색 대비를 WCAG 기준으로 검사합니다. 배경은 가장 가까운 상위 프레임의 단색 채움을 사용합니다(읽기 전용 · 변경 없음).</div>
-      <div class="row">
-        <label class="inline">기준
-          <select id="contrastLevel">
-            <option value="AA">AA (4.5 · 큰글자 3)</option>
-            <option value="AAA">AAA (7 · 큰글자 4.5)</option>
-          </select>
-        </label>
-        <button id="btnContrast" class="primary">대비 검사</button>
-      </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX9</span><span class="ux-t">명도 대비 (읽기 전용)</span></div>
-        <div id="contrastList" style="max-height:160px; overflow:auto; font-family:ui-monospace, monospace; font-size:11px;"></div>
-        <div class="status" id="contrastStatus"></div>
-      </div>
     </div>
 
     <div class="step" id="componentCard">
       <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
       <div class="muted">선택 프레임 → 메인 컴포넌트. 같은 베이스 이름(예: <code>button/primary</code>) 컴포넌트들 → 베리언트 세트. (Pro 전용)</div>
-      <div class="row">
+      <div class="row" style="margin-top:6px;">
         <button id="btnRegisterComp">컴포넌트 등록</button>
         <button id="btnClassifyVariants">베리언트 분류</button>
         <button id="btnGenMissing">누락 조합 생성</button>
         <button id="btnExposeProps">속성 노출</button>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">적용 전 미리보기</span></div>
-        <div id="variantReport" style="max-height:120px; overflow:auto; font-family:ui-monospace, monospace; font-size:11px;"></div>
-        <div class="status" id="componentStatus"></div>
-      </div>
+      <div id="variantReport" style="max-height:120px; overflow:auto; margin-top:6px; font-family:ui-monospace, monospace; font-size:11px;"></div>
+      <div class="status" id="componentStatus"></div>
     </div>
   </section>
 
@@ -299,7 +183,7 @@
     <div class="step">
       <h2>내보내기 (코드)</h2>
       <div class="muted">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
-      <div class="row">
+      <div class="row" style="margin-top:6px;">
         <label class="inline">형식
           <select id="exportFormat">
             <option value="w3c">W3C 토큰 JSON</option>
@@ -314,27 +198,24 @@
         </label>
         <label class="inline"><input id="exportSnap" type="checkbox" /> px 스냅샷 포함</label>
       </div>
-      <div class="row">
+      <div class="row" style="margin-top:6px;">
         <button id="btnExport" class="primary">내보내기</button>
         <button id="btnDownloadExport">다운로드</button>
       </div>
-      <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%; font-family:ui-monospace, monospace;"></textarea>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX7</span><span class="ux-t">오류 처리 + 복구</span></div>
-        <div class="status" id="exportStatus"></div>
-      </div>
+      <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+      <div class="status" id="exportStatus"></div>
     </div>
 
     <div class="step">
       <h2>요금제 / 라이선스</h2>
       <div class="row">
-        <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
+        <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px; font:inherit; padding:3px 5px;" />
         <button id="btnVerify">검증</button>
         <button id="btnClearLicense">해제</button>
       </div>
-      <div class="muted" id="licenseInfo"></div>
-      <div class="muted" id="limitsInfo"></div>
-      <div class="row">
+      <div class="muted" id="licenseInfo" style="margin-top:4px;"></div>
+      <div class="muted" id="limitsInfo" style="margin-top:2px;"></div>
+      <div class="row" style="margin-top:6px;">
         <label class="inline">개발용 강제 티어
           <select id="tier">
             <option value="free">Free</option>
@@ -344,77 +225,84 @@
         </label>
         <span class="muted">(검증된 키가 없을 때만 적용)</span>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX7</span><span class="ux-t">오프라인 유예</span></div>
-        <div class="status" id="licenseStatus"></div>
-      </div>
+      <div class="status" id="licenseStatus"></div>
     </div>
 
     <div class="step" id="presetCard">
       <h2>팀 공유 프리셋 <span class="muted" id="presetLock"></span></h2>
       <div class="muted">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Team 전용)</div>
-      <div class="row">
-        <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px;" />
+      <div class="row" style="margin-top:6px;">
+        <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px; font:inherit; padding:3px 5px;" />
         <button id="btnSavePreset">현재 설정 저장</button>
       </div>
-      <div class="row">
-        <select id="presetList" style="flex:1; min-width:120px;"></select>
+      <div class="row" style="margin-top:6px;">
+        <select id="presetList" style="flex:1; min-width:120px; font:inherit; padding:3px 5px;"></select>
         <button id="btnLoadPreset">불러오기</button>
         <button id="btnDeletePreset">삭제</button>
       </div>
-      <div class="row">
+      <div class="row" style="margin-top:6px;">
         <button id="btnExportPreset">내보내기(JSON)</button>
         <button id="btnImportPreset">가져오기(JSON)</button>
       </div>
-      <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%; font-family:ui-monospace, monospace;"></textarea>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">불러오기 전 미리보기</span></div>
-        <div class="status" id="presetStatus"></div>
-      </div>
+      <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+      <div class="status" id="presetStatus"></div>
     </div>
 
     <div class="step" id="historyCard">
       <h2>변경 이력 <span class="muted" id="historyLock"></span></h2>
       <div class="muted">토큰 생성·바인딩·리네임·시맨틱 적용 기록(로컬). (Team 전용 조회)</div>
-      <div class="row">
+      <div class="row" style="margin-top:6px;">
         <button id="btnRefreshHistory">새로고침</button>
         <button id="btnExportHistory">내보내기</button>
         <button id="btnClearHistory">비우기</button>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX3</span><span class="ux-t">사유별 그룹 + 시간</span></div>
-        <div id="historyList" style="max-height:140px; overflow:auto; font-family:ui-monospace, monospace; font-size:11px;"></div>
-        <div class="status" id="historyStatus"></div>
-      </div>
-      <textarea id="historyJson" spellcheck="false" rows="3" placeholder="내보낸 이력이 여기에 표시됩니다." style="width:100%; font-family:ui-monospace, monospace;"></textarea>
-    </div>
-
-    <!-- UX8 · 접근성 / 국제화 -->
-    <div class="ux">
-      <div class="ux-h"><span class="badge">UX8</span><span class="ux-t">접근성 · 국제화</span></div>
-      <div>키보드 전용 조작 · 명도 대비 AA · i18n</div>
+      <div id="historyList" style="max-height:140px; overflow:auto; margin-top:6px; font-family:ui-monospace, monospace; font-size:11px;"></div>
+      <textarea id="historyJson" spellcheck="false" rows="3" placeholder="내보낸 이력이 여기에 표시됩니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+      <div class="status" id="historyStatus"></div>
     </div>
   </section>
 
   <script>
 "use strict";
 (() => {
-  var __defProp = Object.defineProperty;
-  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-  var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __propIsEnum = Object.prototype.propertyIsEnumerable;
-  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-  var __spreadValues = (a, b) => {
-    for (var prop in b || (b = {}))
-      if (__hasOwnProp.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    if (__getOwnPropSymbols)
-      for (var prop of __getOwnPropSymbols(b)) {
-        if (__propIsEnum.call(b, prop))
-          __defNormalProp(a, prop, b[prop]);
-      }
-    return a;
+  // src/lib/textStyles.ts
+  var STYLE_BY_WEIGHT = {
+    100: "Thin",
+    200: "ExtraLight",
+    300: "Light",
+    400: "Regular",
+    500: "Medium",
+    600: "SemiBold",
+    700: "Bold",
+    800: "ExtraBold",
+    900: "Black"
   };
+  function fontStyleForWeight(weight, italic = false) {
+    var _a;
+    const base = (_a = STYLE_BY_WEIGHT[weight]) != null ? _a : "Regular";
+    if (!italic) return base;
+    return base === "Regular" ? "Italic" : `${base} Italic`;
+  }
+  var DEFAULT_TYPE_RAMP = [
+    { name: "display", fontSize: 48, lineHeight: 56, weight: 700 },
+    { name: "h1", fontSize: 32, lineHeight: 40, weight: 700 },
+    { name: "h2", fontSize: 24, lineHeight: 32, weight: 600 },
+    { name: "h3", fontSize: 20, lineHeight: 28, weight: 600 },
+    { name: "title", fontSize: 18, lineHeight: 24, weight: 600 },
+    { name: "body", fontSize: 16, lineHeight: 24, weight: 400 },
+    { name: "caption", fontSize: 13, lineHeight: 18, weight: 400 },
+    { name: "overline", fontSize: 11, lineHeight: 16, weight: 500 }
+  ];
+  function rampToSpecs(family) {
+    return DEFAULT_TYPE_RAMP.map((r) => ({
+      name: r.name,
+      fontSize: r.fontSize,
+      lineHeight: r.lineHeight,
+      letterSpacing: 0,
+      family,
+      style: fontStyleForWeight(r.weight, false)
+    }));
+  }
 
   // src/lib/entitlements.ts
   var TIERS = ["free", "pro", "team"];
@@ -497,7 +385,7 @@
     let sigOk = false;
     try {
       sigOk = await verifySig(jwt.signingInput, jwt.signatureB64, alg);
-    } catch (e) {
+    } catch {
       sigOk = false;
     }
     if (!sigOk) return { ok: false, error: "\uC11C\uBA85 \uAC80\uC99D \uC2E4\uD328" };
@@ -515,14 +403,14 @@
   // src/lib/presets.ts
   var PRESET_VERSION = 1;
   function serializePreset(p) {
-    return JSON.stringify(__spreadValues({ v: PRESET_VERSION }, p), null, 2);
+    return JSON.stringify({ v: PRESET_VERSION, ...p }, null, 2);
   }
   var num = (v, d) => typeof v === "number" && isFinite(v) ? v : d;
   function parsePreset(text) {
     let raw;
     try {
       raw = JSON.parse(text);
-    } catch (e) {
+    } catch {
       return { ok: false, error: "JSON \uD30C\uC2F1 \uC2E4\uD328" };
     }
     if (!raw || typeof raw !== "object") return { ok: false, error: "\uD504\uB9AC\uC14B \uAC1D\uCCB4\uAC00 \uC544\uB2D8" };
@@ -818,40 +706,6 @@
     }
   }
 
-  // src/lib/wizard.ts
-  var WIZARD_STEPS = [
-    { id: "extract", label: "\uD1A0\uD070 \uCD94\uCD9C", write: false, optional: false },
-    { id: "create", label: "\uD1A0\uD070 \uC0DD\uC131", write: true, optional: false },
-    { id: "semantics", label: "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551", write: true, optional: true },
-    { id: "bind", label: "\uBC14\uC778\uB529", write: true, optional: false },
-    { id: "rename", label: "\uB808\uC774\uC5B4 \uC815\uB3C8", write: true, optional: false },
-    { id: "contrast", label: "\uC811\uADFC\uC131 \uAC80\uC218", write: false, optional: true },
-    { id: "componentize", label: "\uCEF4\uD3EC\uB10C\uD2B8\uD654", write: true, optional: true, pro: true }
-  ];
-  function planWizard(options, ctx) {
-    return WIZARD_STEPS.map((step) => {
-      if (!step.optional) return { step, run: true };
-      const enabled = options[step.id];
-      if (!enabled) return { step, run: false, skipReason: "\uC635\uC158 \uAEBC\uC9D0" };
-      if (step.id === "semantics" && !ctx.hasSemanticMap) return { step, run: false, skipReason: "\uB9E4\uD551 \uC5C6\uC74C" };
-      if (step.pro && !ctx.isPro) return { step, run: false, skipReason: "Pro \uC804\uC6A9" };
-      return { step, run: true };
-    });
-  }
-  function summarize(t) {
-    var _a;
-    const parts = [];
-    if (t.created != null) parts.push(`\uD1A0\uD070 ${t.created}`);
-    if (t.bound != null) parts.push(`\uBC14\uC778\uB529 ${t.bound}`);
-    if (t.renamed != null) parts.push(`\uB9AC\uB124\uC784 ${t.renamed}`);
-    if (t.contrastChecked != null) {
-      const passed = t.contrastChecked - ((_a = t.contrastFailed) != null ? _a : 0);
-      parts.push(`\uB300\uBE44 ${passed}/${t.contrastChecked} \uD1B5\uACFC`);
-    }
-    if (t.components != null && t.components > 0) parts.push(`\uCEF4\uD3EC\uB10C\uD2B8 ${t.components}`);
-    return parts.length ? parts.join(" \xB7 ") : "\uC644\uB8CC\uB41C \uC791\uC5C5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4";
-  }
-
   // src/ui.ts
   var lastSentMsg = null;
   function send(msg) {
@@ -873,8 +727,8 @@
     box.innerHTML = "";
     if (!tokens.length) {
       const empty = document.createElement("div");
-      empty.className = "ux";
-      empty.innerHTML = '<div class="ux-h"><span class="badge">UX4</span><span class="ux-t">\uBE48 \uC0C1\uD0DC \uB3C4\uC6C0\uB9D0</span></div>' + (lastSelCount > 0 ? "<div>\uC120\uD0DD\uC5D0\uC11C \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC744 \uBF51\uC2B5\uB2C8\uB2E4. <b>\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019</b>\uC744 \uB204\uB974\uC138\uC694.</div>" : "<div>\uD504\uB808\uC784\uC744 \uC120\uD0DD\uD55C \uB4A4 <b>\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019</b>\uC744 \uB204\uB974\uBA74 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uD6C4\uBCF4\uB85C \uC7A1\uD799\uB2C8\uB2E4. \uC608) \uBC84\uD2BC\xB7\uCE74\uB4DC</div>");
+      empty.className = "empty";
+      empty.innerHTML = lastSelCount > 0 ? "\uC120\uD0DD\uC5D0\uC11C \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC744 \uBF51\uC2B5\uB2C8\uB2E4. <b>\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019</b>\uC744 \uB204\uB974\uC138\uC694." : "\uD504\uB808\uC784\uC744 \uC120\uD0DD\uD55C \uB4A4 <b>\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019</b>\uC744 \uB204\uB974\uBA74 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uD6C4\uBCF4\uB85C \uC7A1\uD799\uB2C8\uB2E4. \uC608) \uBC84\uD2BC\xB7\uCE74\uB4DC";
       box.appendChild(empty);
       return;
     }
@@ -932,14 +786,6 @@
       p.warnings.length ? "warn" : "ok"
     );
   });
-  $("btnOnboardClose").addEventListener("click", () => {
-    $("onboardCard").style.display = "none";
-  });
-  $("btnGuide").addEventListener("click", () => {
-    showTab("tokens");
-    $("btnWizardRun").focus();
-    $("wizardCard").scrollIntoView({ block: "start", behavior: "smooth" });
-  });
   $("btnExtract").addEventListener("click", () => send({ type: "EXTRACT" }));
   $("btnCreate").addEventListener("click", () => {
     if (!tokens.length) {
@@ -966,6 +812,77 @@
     }
     send({ type: "CREATE_SEMANTICS", map });
   });
+  function tsFontFamily() {
+    return $("tsFont").value.trim() || "Inter";
+  }
+  function textStyleRow(s) {
+    const tr = document.createElement("tr");
+    const cell = (field, value, width, type = "text") => {
+      const td = document.createElement("td");
+      const inp = document.createElement("input");
+      inp.type = type;
+      inp.value = value;
+      inp.dataset.field = field;
+      inp.style.width = width;
+      if (type === "number") inp.style.textAlign = "right";
+      td.appendChild(inp);
+      tr.appendChild(td);
+    };
+    cell("name", s.name, "84px");
+    cell("fontSize", String(s.fontSize), "40px", "number");
+    cell("lineHeight", String(s.lineHeight), "40px", "number");
+    cell("style", s.style, "64px");
+    const tdDel = document.createElement("td");
+    const del = document.createElement("button");
+    del.textContent = "\u2715";
+    del.title = "\uD589 \uC0AD\uC81C";
+    del.addEventListener("click", () => tr.remove());
+    tdDel.appendChild(del);
+    tr.appendChild(tdDel);
+    tr.dataset.letterSpacing = String(s.letterSpacing);
+    return tr;
+  }
+  function renderTextStyleRows(specs) {
+    const tbody = $("tsRows");
+    tbody.innerHTML = "";
+    for (const s of specs) tbody.appendChild(textStyleRow(s));
+  }
+  function readTextStyleRows() {
+    const family = tsFontFamily();
+    const specs = [];
+    for (const tr of Array.from($("tsRows").querySelectorAll("tr"))) {
+      const get = (f) => {
+        var _a, _b;
+        return (_b = (_a = tr.querySelector(`input[data-field="${f}"]`)) == null ? void 0 : _a.value) != null ? _b : "";
+      };
+      const name = get("name").trim();
+      if (!name) continue;
+      specs.push({
+        name,
+        fontSize: Number(get("fontSize")) || 0,
+        lineHeight: Number(get("lineHeight")) || 0,
+        letterSpacing: Number(tr.dataset.letterSpacing) || 0,
+        family,
+        style: get("style").trim() || "Regular"
+      });
+    }
+    return specs;
+  }
+  $("btnScanText").addEventListener("click", () => send({ type: "SCAN_TEXT_STYLES" }));
+  $("btnTsAddRow").addEventListener(
+    "click",
+    () => $("tsRows").appendChild(
+      textStyleRow({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: tsFontFamily(), style: "Regular" })
+    )
+  );
+  $("btnTextStyles").addEventListener("click", () => {
+    const styles = readTextStyleRows();
+    if (!styles.length) {
+      setStatus("tsStatus", "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uC2A4\uCE94\u2019 \uD558\uAC70\uB098 \u2018\uD589 \uCD94\uAC00\u2019\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC815\uC758\uD558\uC138\uC694.", "warn");
+      return;
+    }
+    send({ type: "CREATE_TEXT_STYLES", styles, apply: $("tsApply").checked });
+  });
   $("btnApply").addEventListener("click", () => {
     const tolerance = Number($("tol").value) || 0;
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
@@ -984,193 +901,10 @@
     const maxDepth = Number($("depth").value) || 3;
     send({ type: "RENAME", apply: false, maxDepth });
   });
-  $("btnContrast").addEventListener("click", () => {
-    const level = $("contrastLevel").value;
-    setStatus("contrastStatus", "\uB300\uBE44 \uAC80\uC0AC \uC911\u2026", "");
-    send({ type: "CHECK_CONTRAST", level });
-  });
   $("btnRename").addEventListener("click", () => {
     const maxDepth = Number($("depth").value) || 3;
     send({ type: "RENAME", apply: true, maxDepth });
   });
-  var wizardRunning = false;
-  var wizardWaiter = null;
-  window.addEventListener("message", (event) => {
-    const m = event.data.pluginMessage;
-    if (!m) return;
-    if (wizardRunning && m.type === "PROGRESS" && m.op === "bind") updateWizardBar(m.done, m.total);
-    if (!wizardWaiter) return;
-    if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
-      const w = wizardWaiter;
-      wizardWaiter = null;
-      w.reject(new Error(m.message));
-      return;
-    }
-    if (wizardWaiter.types.includes(m.type)) {
-      const w = wizardWaiter;
-      wizardWaiter = null;
-      w.resolve(m);
-    }
-  });
-  function wizardRequest(msg, expect) {
-    return new Promise((resolve, reject) => {
-      wizardWaiter = {
-        types: [...expect],
-        resolve: (m) => resolve(m),
-        reject
-      };
-      send(msg);
-    });
-  }
-  function showWizardBar() {
-    $("wizardBar").style.display = "";
-    $("wizardBarFill").style.width = "0%";
-  }
-  function updateWizardBar(done, total) {
-    $("wizardBar").style.display = "";
-    const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
-    $("wizardBarFill").style.width = `${pct}%`;
-  }
-  function hideWizardBar() {
-    $("wizardBar").style.display = "none";
-  }
-  function renderWizardSteps(plan) {
-    const box = $("wizardSteps");
-    box.innerHTML = "";
-    plan.forEach((p, i) => {
-      var _a;
-      const row = document.createElement("div");
-      row.className = "wstep" + (p.run ? "" : " skip");
-      row.id = `wstep-${p.step.id}`;
-      const dot = document.createElement("span");
-      dot.className = "dot";
-      dot.textContent = String(i + 1);
-      const label = document.createElement("span");
-      label.className = "wlabel";
-      label.textContent = p.step.label;
-      const note = document.createElement("span");
-      note.className = "wnote";
-      note.textContent = p.run ? "" : (_a = p.skipReason) != null ? _a : "\uAC74\uB108\uB700";
-      row.append(dot, label, note);
-      box.appendChild(row);
-    });
-  }
-  function setWizardStep(id, state, note) {
-    const row = document.getElementById(`wstep-${id}`);
-    if (!row) return;
-    row.classList.remove("active", "done", "fail");
-    row.classList.add(state);
-    const dot = row.querySelector(".dot");
-    if (dot && state === "done") dot.textContent = "\u2713";
-    if (dot && state === "fail") dot.textContent = "!";
-    const n = row.querySelector(".wnote");
-    if (n) n.textContent = note;
-  }
-  async function runWizard() {
-    if (wizardRunning) return;
-    if (lastSelCount <= 0) {
-      setStatus("wizardSummary", "\uBA3C\uC800 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C \uD1A0\uD070\uC744 \uCD94\uCD9C\uD569\uB2C8\uB2E4.", "warn");
-      return;
-    }
-    const base = Number($("base").value) || 16;
-    const tolerance = Number($("tol").value) || 0;
-    const maxDepth = Number($("depth").value) || 3;
-    const level = $("contrastLevel").value;
-    const semMap = textToSemanticMap($("semMap").value);
-    const options = {
-      semantics: $("wizOptSemantics").checked,
-      contrast: $("wizOptContrast").checked,
-      componentize: $("wizOptComponentize").checked
-    };
-    const ctx = { isPro, hasSemanticMap: Object.keys(semMap).length > 0 };
-    const plan = planWizard(options, ctx);
-    wizardRunning = true;
-    $("btnWizardRun").disabled = true;
-    $("btnWizardCancel").style.display = "";
-    setStatus("wizardSummary", "\uC2E4\uD589 \uC911\u2026", "");
-    renderWizardSteps(plan);
-    const totals = {};
-    let stopped = false;
-    for (const p of plan) {
-      if (!p.run) continue;
-      if (stopped) {
-        setWizardStep(p.step.id, "fail", "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700");
-        continue;
-      }
-      setWizardStep(p.step.id, "active", "\uC9C4\uD589 \uC911\u2026");
-      try {
-        switch (p.step.id) {
-          case "extract": {
-            const r = await wizardRequest({ type: "EXTRACT" }, ["EXTRACT_RESULT"]);
-            tokens = r.tokens;
-            if (!tokens.length) {
-              setWizardStep("extract", "fail", "\uCD94\uCD9C\uB41C \uD1A0\uD070 \uC5C6\uC74C \u2014 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uC788\uB294 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694.");
-              stopped = true;
-              break;
-            }
-            setWizardStep("extract", "done", `${tokens.length}\uAC1C \uD6C4\uBCF4`);
-            break;
-          }
-          case "create": {
-            const r = await wizardRequest({ type: "CREATE_TOKENS", tokens, base }, ["CREATE_RESULT"]);
-            totals.created = r.created + r.updated;
-            setWizardStep("create", "done", r.limited ? `${r.created + r.updated}\uAC1C \xB7 \u26A0 Free \uD55C\uB3C4 \uC77C\uBD80\uB9CC` : `\uC0DD\uC131 ${r.created} \xB7 \uAC31\uC2E0 ${r.updated}`);
-            break;
-          }
-          case "semantics": {
-            const r = await wizardRequest({ type: "CREATE_SEMANTICS", map: semMap }, ["SEMANTICS_RESULT"]);
-            totals.semanticsAliased = r.aliased;
-            setWizardStep("semantics", "done", `\uBCC4\uCE6D ${r.aliased}${r.missing.length ? ` \xB7 \uB204\uB77D ${r.missing.length}` : ""}`);
-            break;
-          }
-          case "bind": {
-            showWizardBar();
-            const r = await wizardRequest({ type: "APPLY", tolerance }, ["APPLY_RESULT"]);
-            hideWizardBar();
-            totals.bound = r.bound;
-            if (r.cancelled) {
-              setWizardStep("bind", "done", `\uCDE8\uC18C\uB428 \u2014 ${r.bound}\uAC74\uB9CC \uC801\uC6A9`);
-              stopped = true;
-              break;
-            }
-            setWizardStep("bind", "done", `\uBC14\uC778\uB529 ${r.bound}${r.skipped ? ` \xB7 \uC2A4\uD0B5 ${r.skipped}` : ""}`);
-            break;
-          }
-          case "rename": {
-            const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth }, ["RENAME_RESULT"]);
-            totals.renamed = r.changes.length;
-            setWizardStep("rename", "done", `${r.changes.length}\uAC1C \uC774\uB984 \uC801\uC6A9`);
-            break;
-          }
-          case "contrast": {
-            const r = await wizardRequest({ type: "CHECK_CONTRAST", level }, ["CONTRAST_RESULT"]);
-            totals.contrastChecked = r.checked;
-            totals.contrastFailed = r.failed;
-            setWizardStep("contrast", r.failed ? "fail" : "done", r.checked === 0 ? "\uAC80\uC0AC\uD560 \uD14D\uC2A4\uD2B8 \uC5C6\uC74C" : `${r.checked - r.failed}/${r.checked} ${r.level} \uD1B5\uACFC`);
-            break;
-          }
-          case "componentize": {
-            const reg = await wizardRequest({ type: "REGISTER_COMPONENTS" }, ["COMPONENTS_RESULT"]);
-            const cls = await wizardRequest({ type: "CLASSIFY_VARIANTS" }, ["VARIANTS_RESULT"]);
-            totals.components = reg.registered;
-            setWizardStep("componentize", "done", `\uB4F1\uB85D ${reg.registered} \xB7 \uC138\uD2B8 ${cls.sets}`);
-            break;
-          }
-        }
-      } catch (e) {
-        hideWizardBar();
-        const fe = explainError(e instanceof Error ? e.message : String(e));
-        setWizardStep(p.step.id, "fail", `${fe.message}${fe.action ? ` \u2014 ${fe.action}` : ""}`);
-        stopped = true;
-      }
-    }
-    wizardRunning = false;
-    $("btnWizardRun").disabled = false;
-    $("btnWizardCancel").style.display = "none";
-    setStatus("wizardSummary", `${stopped ? "\uC911\uB2E8" : "\uC644\uB8CC"} \u2014 ${summarize(totals)}`, stopped ? "warn" : "ok");
-  }
-  $("btnWizardRun").addEventListener("click", () => void runWizard());
-  $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
   $("tier").addEventListener("change", () => {
     send({ type: "SET_LICENSE", tier: $("tier").value });
   });
@@ -1213,7 +947,7 @@
       const signed = !!json && typeof json === "object" && typeof json.token === "string";
       const parsed = signed ? await verifyLicenseToken(json.token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify) : parseVerifyResponse(json);
       result = parsed.ok ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt } : { ok: false, error: parsed.error };
-    } catch (e) {
+    } catch {
       result = { ok: false, error: "\uAC80\uC99D \uC11C\uBC84 \uC5F0\uACB0 \uC2E4\uD328(\uC624\uD504\uB77C\uC778)", offline: true };
     }
     send({ type: "LICENSE_VERIFIED", key, result });
@@ -1240,8 +974,6 @@
     $("presetLock").textContent = lock;
     $("historyLock").textContent = lock;
     $("componentLock").textContent = isPro ? "" : "\u{1F512} Pro \uC804\uC6A9";
-    $("wizComponentLock").textContent = isPro ? "" : "\u{1F512} Pro";
-    $("wizOptComponentize").disabled = !isPro;
     if (isTeam && !teamDataRequested) {
       teamDataRequested = true;
       send({ type: "GET_PRESETS" });
@@ -1436,6 +1168,28 @@
           msg.missing.length ? "warn" : "ok"
         );
         break;
+      case "TEXT_STYLE_CANDIDATES": {
+        if (msg.styles.length) {
+          $("tsFont").value = msg.styles[0].family || tsFontFamily();
+          renderTextStyleRows(msg.styles);
+          setStatus(
+            "tsStatus",
+            `${msg.styles.length}\uAC1C \uC2A4\uD0C0\uC77C \uD6C4\uBCF4 \uCD94\uCD9C. \uC774\uB984\xB7\uAC12 \uD655\uC778 \uD6C4 \uB4F1\uB85D\uD558\uC138\uC694.` + (msg.warnings.length ? " " + msg.warnings.join(" ") : ""),
+            msg.warnings.length ? "warn" : "ok"
+          );
+        } else {
+          renderTextStyleRows(rampToSpecs(tsFontFamily()));
+          setStatus("tsStatus", "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC2B5\uB2C8\uB2E4. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694.", "warn");
+        }
+        break;
+      }
+      case "TEXT_STYLES_RESULT":
+        setStatus(
+          "tsStatus",
+          `\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C ${msg.created + msg.updated}\uAC1C (\uC0DD\uC131 ${msg.created} / \uAC31\uC2E0 ${msg.updated}) \xB7 \uBC14\uC778\uB529 ${msg.bound}` + (msg.applied ? ` \xB7 \uC801\uC6A9 ${msg.applied}` : "") + (msg.missing.length ? ` \xB7 \uBBF8\uC5F0\uACB0: ${msg.missing.join(", ")}` : ""),
+          msg.missing.length ? "warn" : "ok"
+        );
+        break;
       case "COLLECTIONS":
         break;
       case "LICENSE_STATUS": {
@@ -1511,11 +1265,8 @@
         setStatus("componentStatus", `\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131 ${msg.created}\uAC1C \uB178\uCD9C`, msg.created ? "ok" : "warn");
         break;
       }
-      case "CONTRAST_RESULT":
-        renderContrast(msg);
-        break;
       case "PREMIUM_REQUIRED": {
-        const statusId = msg.feature === "components" ? "componentStatus" : msg.feature === "teamPresets" ? "presetStatus" : "createStatus";
+        const statusId = msg.feature === "components" ? "componentStatus" : msg.feature === "textStyles" ? "tsStatus" : msg.feature === "teamPresets" ? "presetStatus" : "createStatus";
         setStatus(statusId, `${msg.message} (\uC720\uB8CC \uAE30\uB2A5: ${msg.feature})`, "warn");
         break;
       }
@@ -1534,6 +1285,8 @@
     EXTRACT: "extractStatus",
     CREATE_TOKENS: "createStatus",
     CREATE_SEMANTICS: "semStatus",
+    SCAN_TEXT_STYLES: "tsStatus",
+    CREATE_TEXT_STYLES: "tsStatus",
     APPLY: "applyStatus",
     RENAME: "renameStatus",
     EXPORT: "exportStatus",
@@ -1541,7 +1294,6 @@
     CLASSIFY_VARIANTS: "componentStatus",
     GENERATE_MISSING_VARIANTS: "componentStatus",
     EXPOSE_PROPERTIES: "componentStatus",
-    CHECK_CONTRAST: "contrastStatus",
     GET_PRESETS: "presetStatus",
     SAVE_PRESET: "presetStatus",
     DELETE_PRESET: "presetStatus",
@@ -1596,52 +1348,6 @@
       return `${(_a = REASON_LABELS[k]) != null ? _a : k} ${n}`;
     }).join(" \xB7 ");
   }
-  var CONTRAST_SKIP_LABELS = {
-    "no-fill": "\uB2E8\uC0C9 \uAE00\uC790\uC0C9 \uC5C6\uC74C",
-    "no-bg": "\uBC30\uACBD \uC5C6\uC74C",
-    capped: "\uC2A4\uCE94 \uC0C1\uD55C \uB3C4\uB2EC"
-  };
-  function contrastSkipText(skipped) {
-    return Object.entries(skipped).filter(([, n]) => n > 0).map(([k, n]) => {
-      var _a;
-      return `${(_a = CONTRAST_SKIP_LABELS[k]) != null ? _a : k} ${n}`;
-    }).join(" \xB7 ");
-  }
-  function renderContrast(msg) {
-    const box = $("contrastList");
-    box.innerHTML = "";
-    const fails = msg.findings.filter((f) => !f.pass);
-    for (const f of fails) {
-      const row = document.createElement("div");
-      row.className = "cfind";
-      const pair = document.createElement("span");
-      pair.className = "cpair";
-      for (const hex of [f.bg, f.fg]) {
-        const sw = document.createElement("span");
-        sw.className = "swatch";
-        sw.style.background = hex;
-        pair.appendChild(sw);
-      }
-      row.appendChild(pair);
-      const name = document.createElement("span");
-      name.textContent = `${f.name}${f.large ? " \xB7 \uD070\uAE00\uC790" : ""}`;
-      row.appendChild(name);
-      const ratio = document.createElement("span");
-      ratio.className = "ratio warn";
-      ratio.textContent = `${f.ratio} / ${f.required}`;
-      row.appendChild(ratio);
-      box.appendChild(row);
-    }
-    const skip = contrastSkipText(msg.skipped);
-    const skipNote = skip ? ` \xB7 \uAC74\uB108\uB700: ${skip}` : "";
-    if (msg.checked === 0) {
-      setStatus("contrastStatus", `\uAC80\uC0AC\uD560 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.${skip ? ` (\uAC74\uB108\uB700: ${skip})` : " \uD14D\uC2A4\uD2B8\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694."}`, "warn");
-    } else if (fails.length === 0) {
-      setStatus("contrastStatus", `${msg.checked}\uAC1C \uBAA8\uB450 ${msg.level} \uD1B5\uACFC \u2713${skipNote}`, "ok");
-    } else {
-      setStatus("contrastStatus", `${msg.checked}\uAC1C \uC911 ${fails.length}\uAC1C ${msg.level} \uBBF8\uB2EC${skipNote}`, "warn");
-    }
-  }
   function showApplyProgress(label) {
     $("applyProgress").style.display = "";
     $("applyBarFill").style.width = "0%";
@@ -1684,7 +1390,6 @@
       btn.setAttribute("aria-selected", String(on));
       btn.tabIndex = on ? 0 : -1;
     }
-    $("selBarWrap").style.display = name === "settings" ? "none" : "";
   }
   TABS.forEach((t, i) => {
     const btn = $(`tabbtn-${t}`);
