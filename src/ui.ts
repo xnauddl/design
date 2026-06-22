@@ -10,6 +10,7 @@ import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_P
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
+import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import type { WcagLevel } from './lib/contrast';
@@ -111,6 +112,7 @@ $('btnPalette').addEventListener('click', () => {
   renderTokens();
   // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
   setSemMapText(paletteSemanticMap(p));
+  renderColorTable(); // #3: 색 편집표(hue·역할) 표시
   ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
   $('paletteInfo').textContent = `${p.scales.length}계열 · ${tokens.length}색 생성`;
   setStatus(
@@ -135,6 +137,71 @@ function suggestSemMapFrom(toks: DraftToken[]): void {
     .map((t) => ({ name: t.name, hex: t.value as string }));
   if (!colors.length) return;
   setSemMapText(suggestSemanticMap(colors));
+}
+
+/** #3: 색 토큰 이름을 hue-Global(`color/blue/500`, 충돌 접미사)로 변환 — 추출 hex명 정규화. */
+function huefyTokenColors(toks: DraftToken[]): void {
+  const idx: number[] = [];
+  const hexes: string[] = [];
+  toks.forEach((t, i) => {
+    if (t.category === 'color' && typeof t.value === 'string') {
+      idx.push(i);
+      hexes.push(t.value);
+    }
+  });
+  if (!idx.length) return;
+  const names = nameColorsByHue(hexes);
+  idx.forEach((ti, k) => {
+    toks[ti].name = names[k];
+  });
+}
+
+/* ---------- #3 색 편집표 (hue → 역할) ---------- */
+/** 색 토큰을 표로: 스와치 · hue 이름 · 역할 입력(현 semMap에서 prefill). */
+function renderColorTable(): void {
+  const card = $('colorTableCard');
+  const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
+  if (!colors.length) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+  // 현 semMap을 역할→이름으로 읽어 이름→역할로 뒤집어 prefill.
+  const roleByName = new Map<string, string>();
+  for (const [role, name] of Object.entries(textToSemanticMap(($('semMap') as HTMLTextAreaElement).value))) {
+    if (!roleByName.has(name)) roleByName.set(name, role);
+  }
+  const box = $('colorTable');
+  box.innerHTML = '';
+  for (const t of colors) {
+    const row = document.createElement('div');
+    row.className = 'crow';
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = t.value as string;
+    const name = document.createElement('span');
+    name.className = 'cn';
+    name.textContent = t.name;
+    name.title = `${t.name} · ${classifyColor(t.value as string).achromatic ? '무채' : 'hue'}`;
+    const role = document.createElement('input');
+    role.setAttribute('list', 'roleList');
+    role.placeholder = '역할(선택)';
+    role.value = roleByName.get(t.name) ?? '';
+    role.dataset.name = t.name;
+    row.append(sw, name, role);
+    box.appendChild(row);
+  }
+}
+
+/** 색 편집표의 역할 입력 → 시맨틱 매핑 textarea로 반영(역할=이름). */
+function applyColorRoles(): void {
+  const map: Record<string, string> = {};
+  $('colorTable').querySelectorAll<HTMLInputElement>('input[data-name]').forEach((inp) => {
+    const role = inp.value.trim();
+    if (role) map[role] = inp.dataset.name as string; // 같은 역할 중복 시 뒤가 우선
+  });
+  setSemMapText(map);
+  setStatus('semStatus', `${Object.keys(map).length}개 역할 반영됨 — ‘시맨틱 별칭 생성’으로 적용.`, 'ok');
 }
 
 // 보조색 사용 토글 → 보조색·하모니 입력 활성/비활성 동기화.
@@ -187,6 +254,8 @@ $('btnCreateApply').addEventListener('click', () => {
   createFrom = 'tokens';
   send({ type: 'CREATE_TOKENS', tokens, base }); // 확인 후 실제 적용
 });
+
+$('btnColorRoles').addEventListener('click', applyColorRoles); // #3 색 편집표 → 시맨틱 매핑
 
 $('btnSemantics').addEventListener('click', () => {
   const map: Record<string, string> = {};
@@ -732,11 +801,13 @@ window.onmessage = (event: MessageEvent) => {
   switch (msg.type) {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
+      huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
       renderTokens();
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
       ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
       // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
       suggestSemMapFrom(tokens);
+      renderColorTable(); // #3: 색 편집표(hue·역할) 표시
       $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
       setStatus('extractStatus', msg.warnings.join(' ') || `${tokens.length}개 후보 추출 완료.`, msg.warnings.length ? 'warn' : 'ok');
       break;

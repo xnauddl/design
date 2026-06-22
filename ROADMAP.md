@@ -97,7 +97,7 @@
 - [x] 팔레트 Global을 **hue로 통일**(`color/blue/500`), 역할은 Semantic만(`paletteSemanticMap`) `(PR #37)`
 - [x] 동일 hue 충돌 **접미사 인덱스**(`blue`, `blue-2`) `(PR #37)`
 - [x] 시맨틱 매핑 **일반화**(`suggestSemanticMap(colors)`) — 추출 색에서도 역할 추천(실제 이름 지시) `(PR #37)`
-- [ ] 추출 색 **편집표**(hue→역할 자동추천·확정) + **추출 Global hue 버킷팅** — UI 후속(편집표와 함께)
+- [x] 추출 색 **편집표**(hue·역할 표시·역할 확정·반영) + **추출 Global hue 버킷팅**(`nameColorsByHue`, 충돌 접미사) `(PR #37)`
 - [ ] **기존 Global 스캔**(재방문 매핑) — code.ts가 기존 색 변수 공급
 - [ ] 전 토큰 역할 어휘 확장 (색 우선→spacing/radius/size; **size=icon 최소·effects=후순위 보류**)
 - [ ] **단위 토큰 단일화** — px FLOAT + `description`("160%"), 내보내기는 description 우선

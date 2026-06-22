@@ -32,6 +32,7 @@ import {
   classifyColor,
   hueName,
   stepForL,
+  nameColorsByHue,
 } from '../dist/pure.mjs';
 
 const close = (a, b, tol = 0.01) => Math.abs(a - b) <= tol;
@@ -198,6 +199,18 @@ test('suggestSemanticMap(#10) — 임의 색에서 역할 추천(실제 이름 �
   assert.equal(map['surface'], 'color/f8f8f8');
   assert.equal(map['text'], 'color/111111');
   assert.equal(map['border'], 'color/888888');
+});
+
+test('nameColorsByHue(#3) — hue-Global 이름 + 동일 (hue,step) 충돌 접미사', () => {
+  // 같은 파랑 두 개(거의 같은 명도) → blue/500, blue/500-2. 빨강·무채는 독립.
+  const names = nameColorsByHue(['#3366ff', '#3366fe', '#ff0000', '#808080']);
+  assert.equal(names[0], `color/${classifyColor('#3366ff').family}/${classifyColor('#3366ff').step}`);
+  assert.match(names[1], /-2$/); // 충돌 → 접미사
+  assert.equal(names[0].replace(/\/\d+$/, ''), names[1].replace(/\/\d+(-\d+)?$/, '')); // 같은 hue 패밀리
+  assert.equal(names[2], `color/red/${classifyColor('#ff0000').step}`);
+  assert.equal(names[3].startsWith('color/gray/'), true);
+  // 모든 결과는 팔레트(hue) 이름으로 인식
+  for (const n of names) assert.equal(isPaletteColorName(n), true);
 });
 
 test('isPaletteColorName — hue 패밀리(+충돌 접미사)만 정리 대상', () => {

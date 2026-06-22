@@ -65,6 +65,12 @@
     .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
     .cat { font-size: 10px; color: var(--muted); }
+    /* #3 색 편집표 */
+    #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
+    .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 2px 0; }
+    .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0003; }
+    .crow .cn { font-family: ui-monospace, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .crow input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
     #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
     .tree-row.header { opacity: 1; color: var(--muted); }
     .before { color: var(--muted); text-decoration: line-through; }
@@ -217,6 +223,22 @@
       </div>
       <div id="tokenList"></div>
       <div class="status" id="extractStatus"></div>
+    </div>
+
+    <!-- #3 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
+    <div class="step" id="colorTableCard" style="display:none">
+      <h2>1.5 · 색 편집 (hue → 역할)</h2>
+      <div class="muted">Global은 <b>hue 패밀리</b>(<code>color/blue/500</code>), 역할은 Semantic만. 역할을 확정해 ‘반영’하세요.</div>
+      <div id="colorTable"></div>
+      <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
+      <datalist id="roleList">
+        <option value="surface"></option><option value="surface/muted"></option>
+        <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
+        <option value="border"></option>
+        <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
+        <option value="secondary"></option><option value="accent"></option>
+        <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
+      </datalist>
     </div>
 
     <div class="step" id="createCard">

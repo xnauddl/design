@@ -78,3 +78,19 @@ export function classifyColor(hex: string): ColorClass {
   const achromatic = o.c < ACHROMATIC_C;
   return { family: achromatic ? 'gray' : hueName(o.h), step: stepForL(o.l), achromatic };
 }
+
+/**
+ * 색 목록 → hue-Global 이름(`color/{hue}/{step}`). 같은 (hue,step)에 서로 다른 색이
+ * 겹치면 결정적 접미사 인덱스(`color/blue/500`, `color/blue/500-2`; 입력 순서 우선).
+ * 입력과 같은 순서로 반환(토큰 매핑 보존).
+ */
+export function nameColorsByHue(hexes: readonly string[]): string[] {
+  const seen = new Map<string, number>(); // 'family/step' → 다음 인덱스
+  return hexes.map((hex) => {
+    const { family, step } = classifyColor(hex);
+    const base = `${family}/${step}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return n === 1 ? `color/${base}` : `color/${family}/${step}-${n}`;
+  });
+}
