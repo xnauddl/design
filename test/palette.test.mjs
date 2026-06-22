@@ -24,6 +24,7 @@ import {
   generatePalette,
   paletteToDraftTokens,
   suggestSemanticMap,
+  isPaletteColorName,
   mod360,
   scopeForSemanticRole,
 } from '../dist/pure.mjs';
@@ -172,4 +173,14 @@ test('suggestSemanticMap — 존재 패밀리에만 역할 배정', () => {
   assert.equal(map2['surface'], undefined);
   assert.equal(map2['success'], undefined);
   assert.equal(map2['primary'], 'color/primary/500');
+});
+
+test('isPaletteColorName — 팔레트 색만 정리 대상', () => {
+  assert.equal(isPaletteColorName('color/primary/500'), true);
+  assert.equal(isPaletteColorName('color/secondary/50'), true);
+  assert.equal(isPaletteColorName('color/accent-2/700'), true);
+  assert.equal(isPaletteColorName('color/success/500'), true);
+  assert.equal(isPaletteColorName('color/brandish/500'), false); // 사용자 패밀리
+  assert.equal(isPaletteColorName('color/0066ff'), false); // 추출 hex 색
+  assert.equal(isPaletteColorName('spacing/16'), false); // 비색
 });

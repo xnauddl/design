@@ -23,7 +23,7 @@ export interface RenameChange {
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT' }
-  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean } // preview: UX1 미리보기(쓰기 없음)
+  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
   | { type: 'APPLY'; tolerance: number; preview?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
   | { type: 'RENAME'; apply: boolean; maxDepth: number }

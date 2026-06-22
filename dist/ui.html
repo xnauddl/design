@@ -948,7 +948,7 @@
     }
     const base = Number($("base").value) || 16;
     createFrom = "palette";
-    send({ type: "CREATE_TOKENS", tokens, base });
+    send({ type: "CREATE_TOKENS", tokens, base, replacePalette: true });
     setStatus("paletteStatus", "\uBCC0\uC218\uC5D0 \uC801\uC6A9 \uC911\u2026", "");
   });
   $("btnOnboardClose").addEventListener("click", () => {

@@ -138,7 +138,7 @@ $('btnPaletteApply').addEventListener('click', () => {
   }
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'palette';
-  send({ type: 'CREATE_TOKENS', tokens, base }); // 미리보기 없이 바로 변수 생성
+  send({ type: 'CREATE_TOKENS', tokens, base, replacePalette: true }); // 바로 변수 생성 + 이전 팔레트 색 정리
   setStatus('paletteStatus', '변수에 적용 중…', '');
 });
 
