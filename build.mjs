@@ -9,9 +9,11 @@ const watch = process.argv.includes('--watch');
 const outdir = 'dist';
 await mkdir(outdir, { recursive: true });
 
+// target는 es2017로 고정한다. Figma 플러그인 샌드박스 파서는 객체 스프레드({...x},
+// ES2018)를 거부("Unexpected token ...")하므로, esbuild가 이를 헬퍼로 트랜스파일하도록
+// es2018 미만으로 내린다. async/await(es2017)은 런타임이 지원하므로 그대로 둔다.
 const shared = {
   bundle: true,
-  // Figma 플러그인 샌드박스는 객체 스프레드(ES2018)를 파싱하지 못함 → es2017로 낮춰 트랜스파일.
   target: 'es2017',
   logLevel: 'info',
 };
