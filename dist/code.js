@@ -1,5 +1,25 @@
 "use strict";
 (() => {
+  var __defProp = Object.defineProperty;
+  var __defProps = Object.defineProperties;
+  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
+  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __propIsEnum = Object.prototype.propertyIsEnumerable;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __spreadValues = (a, b) => {
+    for (var prop in b || (b = {}))
+      if (__hasOwnProp.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    if (__getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(b)) {
+        if (__propIsEnum.call(b, prop))
+          __defNormalProp(a, prop, b[prop]);
+      }
+    return a;
+  };
+  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+
   // src/shared/messages.ts
   function post(msg) {
     figma.ui.postMessage(msg);
@@ -143,7 +163,7 @@
     if (existing) {
       if (!existing.sources.includes(source)) existing.sources.push(source);
     } else {
-      acc.map.set(k, { ...token, sources: [source] });
+      acc.map.set(k, __spreadProps(__spreadValues({}, token), { sources: [source] }));
     }
   }
   function collectPaints(acc, paints, source) {
@@ -472,13 +492,13 @@
       try {
         await figma.loadFontAsync(wanted);
         loaded = wanted;
-      } catch {
+      } catch (e) {
         try {
           const fb = { family: spec.family, style: "Regular" };
           await figma.loadFontAsync(fb);
           loaded = fb;
           res.missing.push(`${spec.name}: \uD3F0\uD2B8 ${spec.style}\u2192Regular`);
-        } catch {
+        } catch (e2) {
           res.missing.push(`${spec.name}: \uD3F0\uD2B8 '${spec.family}' \uC5C6\uC74C`);
           continue;
         }
@@ -517,7 +537,7 @@
           await figma.loadFontAsync(t.fontName);
           await t.setTextStyleIdAsync(ts.id);
           res.applied++;
-        } catch {
+        } catch (e) {
         }
       }
     }
@@ -759,7 +779,7 @@
     if (node.fontName === figma.mixed) return;
     try {
       await figma.loadFontAsync(node.fontName);
-    } catch {
+    } catch (e) {
       note(res, "font");
       return;
     }
@@ -789,7 +809,7 @@
     try {
       node.setRangeBoundVariable(0, len, field, v);
       res.bound++;
-    } catch {
+    } catch (e) {
       skip(res, "error");
     }
   }
@@ -806,7 +826,7 @@
     try {
       node.setBoundVariable(field, v);
       res.bound++;
-    } catch {
+    } catch (e) {
       skip(res, "error");
     }
   }
@@ -1158,7 +1178,7 @@
     let combos = [{}];
     for (const k of keys) {
       const next = [];
-      for (const c of combos) for (const v of props[k]) next.push({ ...c, [k]: v });
+      for (const c of combos) for (const v of props[k]) next.push(__spreadProps(__spreadValues({}, c), { [k]: v }));
       combos = next;
     }
     return combos;
@@ -1363,7 +1383,7 @@
       if (Array.isArray(ps)) presets = ps;
       const h = await figma.clientStorage.getAsync(HISTORY_KEY);
       if (Array.isArray(h)) history = h;
-    } catch {
+    } catch (e) {
     }
   }
   function record(action, summary) {
@@ -1409,7 +1429,7 @@
   async function savePresets() {
     try {
       await figma.clientStorage.setAsync(PRESETS_KEY, presets);
-    } catch {
+    } catch (e) {
     }
   }
   function kindOf(v) {
@@ -1574,7 +1594,7 @@
           devTier = msg.tier;
           try {
             await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);
-          } catch {
+          } catch (e) {
           }
           postLicense();
           break;
@@ -1584,7 +1604,7 @@
             cache = cacheFromVerify(msg.key, msg.result, Date.now());
             try {
               await figma.clientStorage.setAsync(CACHE_KEY, cache);
-            } catch {
+            } catch (e) {
             }
             postLicense("\uB77C\uC774\uC120\uC2A4 \uC801\uC6A9\uB428");
           } else if (msg.result.offline) {
@@ -1600,7 +1620,7 @@
           cache = null;
           try {
             await figma.clientStorage.deleteAsync(CACHE_KEY);
-          } catch {
+          } catch (e) {
           }
           postLicense("\uB77C\uC774\uC120\uC2A4 \uD0A4 \uC81C\uAC70\uB428");
           break;
@@ -1634,7 +1654,7 @@
           history = [];
           try {
             await figma.clientStorage.deleteAsync(HISTORY_KEY);
-          } catch {
+          } catch (e) {
           }
           post({ type: "HISTORY", entries: history });
           break;
@@ -1696,7 +1716,7 @@
             try {
               figma.createComponentFromNode(node);
               registered++;
-            } catch {
+            } catch (e) {
               skipped++;
             }
           }
@@ -1729,7 +1749,7 @@
               arrangeSet(set);
               sets++;
               if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(" / ")}`);
-            } catch {
+            } catch (e) {
             }
           }
           post({ type: "VARIANTS_RESULT", sets, missing, singles: result.singles });
@@ -1753,7 +1773,7 @@
                 set.appendChild(clone);
                 generated++;
                 combos.push(`${set.name}: ${combo}`);
-              } catch {
+              } catch (e) {
               }
             }
             if (missing.length) arrangeSet(set);
@@ -1779,12 +1799,12 @@
                 else if (p.type === "BOOLEAN") def = target.visible;
                 else def = target.type === "INSTANCE" && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : "";
                 const id = node.addComponentProperty(p.propName, p.type, def);
-                const refs = { ...(_b = target.componentPropertyReferences) != null ? _b : {} };
+                const refs = __spreadValues({}, (_b = target.componentPropertyReferences) != null ? _b : {});
                 refs[p.field] = id;
                 target.componentPropertyReferences = refs;
                 created++;
                 props.push(`${p.propName}:${p.type}`);
-              } catch {
+              } catch (e) {
               }
             }
           }

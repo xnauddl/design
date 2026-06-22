@@ -265,6 +265,23 @@
   <script>
 "use strict";
 (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __propIsEnum = Object.prototype.propertyIsEnumerable;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __spreadValues = (a, b) => {
+    for (var prop in b || (b = {}))
+      if (__hasOwnProp.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    if (__getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(b)) {
+        if (__propIsEnum.call(b, prop))
+          __defNormalProp(a, prop, b[prop]);
+      }
+    return a;
+  };
+
   // src/lib/textStyles.ts
   var STYLE_BY_WEIGHT = {
     100: "Thin",
@@ -385,7 +402,7 @@
     let sigOk = false;
     try {
       sigOk = await verifySig(jwt.signingInput, jwt.signatureB64, alg);
-    } catch {
+    } catch (e) {
       sigOk = false;
     }
     if (!sigOk) return { ok: false, error: "\uC11C\uBA85 \uAC80\uC99D \uC2E4\uD328" };
@@ -403,14 +420,14 @@
   // src/lib/presets.ts
   var PRESET_VERSION = 1;
   function serializePreset(p) {
-    return JSON.stringify({ v: PRESET_VERSION, ...p }, null, 2);
+    return JSON.stringify(__spreadValues({ v: PRESET_VERSION }, p), null, 2);
   }
   var num = (v, d) => typeof v === "number" && isFinite(v) ? v : d;
   function parsePreset(text) {
     let raw;
     try {
       raw = JSON.parse(text);
-    } catch {
+    } catch (e) {
       return { ok: false, error: "JSON \uD30C\uC2F1 \uC2E4\uD328" };
     }
     if (!raw || typeof raw !== "object") return { ok: false, error: "\uD504\uB9AC\uC14B \uAC1D\uCCB4\uAC00 \uC544\uB2D8" };
@@ -947,7 +964,7 @@
       const signed = !!json && typeof json === "object" && typeof json.token === "string";
       const parsed = signed ? await verifyLicenseToken(json.token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify) : parseVerifyResponse(json);
       result = parsed.ok ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt } : { ok: false, error: parsed.error };
-    } catch {
+    } catch (e) {
       result = { ok: false, error: "\uAC80\uC99D \uC11C\uBC84 \uC5F0\uACB0 \uC2E4\uD328(\uC624\uD504\uB77C\uC778)", offline: true };
     }
     send({ type: "LICENSE_VERIFIED", key, result });
