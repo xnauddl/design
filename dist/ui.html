@@ -51,6 +51,10 @@
     .warn { color: var(--warn); }
     .ok { color: var(--ok); }
     code { font-family: ui-monospace, monospace; color: var(--muted); }
+    /* #11 전제 미충족 안내 + 바로가기 */
+    .prereq { margin: 6px 0; font-size: 11px; color: var(--warn); display: flex; align-items: center; gap: 6px; }
+    button.link { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; width: auto; }
+    button.link:hover { opacity: 0.8; }
 
     /* 토큰 목록 / diff / 결과 표시 */
     #tokenList { max-height: 180px; overflow: auto; margin-top: 7px; }
@@ -204,7 +208,7 @@
       <div class="status" id="extractStatus"></div>
     </div>
 
-    <div class="step">
+    <div class="step" id="createCard">
       <h2>2 · 토큰 생성 (Global + Semantic)</h2>
       <div class="row">
         <label class="inline">base(rem)px <input id="base" type="number" value="16" min="1" /></label>
@@ -221,7 +225,8 @@
 
     <div class="step">
       <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
-      <div class="muted">먼저 ‘2 · 토큰 생성’으로 Global 변수를 만든 뒤 실행하세요. 형식: <code>역할 = Global변수이름</code></div>
+      <div class="muted">형식: <code>역할 = Global변수이름</code></div>
+      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; font-family:ui-monospace, monospace;"></textarea>
       <div class="row">
         <button id="btnSemantics">시맨틱 별칭 생성</button>
@@ -233,6 +238,7 @@
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
       <h2>3 · 적용 (바인딩)</h2>
+      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
         <button id="btnApply">미리보기</button>
@@ -853,6 +859,8 @@
   var isTeam = false;
   var isPro = false;
   var teamDataRequested = false;
+  var hasGlobal = false;
+  var hasBindable = false;
   var lastExportFormat = "w3c";
   var lastSelCount = 0;
   var createFrom = "tokens";
@@ -1261,17 +1269,32 @@
     "presetJson"
   ];
   var PRO_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnExposeProps"];
-  function updateTeamGate() {
+  function updateGates() {
     for (const id of TEAM_FIELDS) $(id).disabled = !isTeam;
     for (const id of PRO_FIELDS) $(id).disabled = !isPro;
     $("presetLock").textContent = isTeam ? "" : "\u{1F512} Team \uC804\uC6A9";
     $("componentLock").textContent = isPro ? "" : "\u{1F512} Pro \uC804\uC6A9";
     $("wizComponentLock").textContent = isPro ? "" : "\u{1F512} Pro";
     $("wizOptComponentize").disabled = !isPro;
+    setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
+    setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
+    if (!hasBindable) $("btnApplyConfirm").disabled = true;
     if (isTeam && !teamDataRequested) {
       teamDataRequested = true;
       send({ type: "GET_PRESETS" });
     }
+  }
+  function setPrereq(btnId, noticeId, ok, msg) {
+    $(btnId).disabled = !ok;
+    const notice = $(noticeId);
+    notice.style.display = ok ? "none" : "";
+    const text = notice.querySelector(".prereq-text");
+    if (text) text.textContent = ok ? "" : msg;
+  }
+  function goToCreate() {
+    showTab("tokens");
+    $("createCard").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("btnCreate").focus();
   }
   $("btnScanComp").addEventListener("click", () => {
     setStatus("componentStatus", "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026", "");
@@ -1478,6 +1501,11 @@
         break;
       case "COLLECTIONS":
         break;
+      case "PREREQ_STATE":
+        hasGlobal = msg.hasGlobal;
+        hasBindable = msg.hasBindable;
+        updateGates();
+        break;
       case "LICENSE_STATUS": {
         const srcLabel = msg.source === "key" ? `\uB77C\uC774\uC120\uC2A4 \uD0A4${msg.status ? ` \xB7 ${msg.status}` : ""}` : msg.source === "dev" ? "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C" : "\uC5C6\uC74C";
         const exp = msg.expiresAt ? ` \xB7 \uB9CC\uB8CC ${new Date(msg.expiresAt).toISOString().slice(0, 10)}` : "";
@@ -1491,7 +1519,7 @@
         }
         isTeam = msg.tier === "team";
         isPro = msg.tier === "pro" || msg.tier === "team";
-        updateTeamGate();
+        updateGates();
         break;
       }
       case "PRESETS":
@@ -1881,10 +1909,12 @@
   function escapeHtml(s) {
     return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
   }
-  updateTeamGate();
+  updateGates();
   renderTokens();
   send({ type: "GET_COLLECTIONS" });
+  send({ type: "GET_PREREQ" });
   send({ type: "GET_LICENSE" });
+  document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
   var TABS = ["tokens", "apply", "settings"];
   function showTab(name) {
     for (const t of TABS) {
@@ -1896,6 +1926,7 @@
       btn.tabIndex = on ? 0 : -1;
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
+    if (name !== "settings") send({ type: "GET_PREREQ" });
   }
   TABS.forEach((t, i) => {
     const btn = $(`tabbtn-${t}`);

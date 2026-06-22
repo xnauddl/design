@@ -85,6 +85,7 @@ export type UiToCode =
   | { type: 'RENAME_APPLY'; items: { id: string; after: string }[] } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   | { type: 'GET_COLLECTIONS' }
+  | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
   | { type: 'GET_LICENSE' }
   | { type: 'SET_LICENSE'; tier: Tier } // M1: 개발용 강제 티어(검증 키 없을 때만 적용)
   | { type: 'LICENSE_VERIFIED'; key: string; result: VerifyResult } // M2.2: UI가 검증한 결과 보고
@@ -111,6 +112,8 @@ export type CodeToUi =
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
+  // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).
+  | { type: 'PREREQ_STATE'; hasGlobal: boolean; hasBindable: boolean }
   | {
       type: 'LICENSE_STATUS';
       tier: Tier;

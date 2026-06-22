@@ -4,7 +4,7 @@
 import type { UiToCode, RenameChange } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, prunePaletteColors, GLOBAL, SEMANTIC } from './lib/variables';
+import { createTokens, previewCreateTokens, createSemanticAliases, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
@@ -73,6 +73,25 @@ async function loadLicense(): Promise<void> {
     if (Array.isArray(ps)) presets = ps as Preset[];
   } catch {
     /* 저장소 접근 실패 시 free 유지 */
+  }
+}
+
+/**
+ * #11: 단계 전제 상태를 UI에 보고 — Global 변수 존재(시맨틱 매핑 가능) ·
+ * 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능). 전제 미충족 카드는
+ * UI가 비활성+안내로 가드한다. 토큰/시맨틱 변경 후·시작 시·요청 시 호출.
+ */
+async function postPrereq(): Promise<void> {
+  try {
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
+    const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
+    const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
+    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable });
+  } catch {
+    /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
 }
 
@@ -325,6 +344,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
+          await postPrereq(); // #11: 토큰 생성 → 시맨틱/바인딩 전제 충족 갱신
         }
         break;
       }
@@ -407,12 +427,17 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const s = await createSemanticAliases(msg.map);
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
+        await postPrereq(); // #11: 시맨틱 별칭(바인딩 가능 변수) 생성 → 전제 갱신
         break;
       }
       case 'GET_COLLECTIONS': {
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
         post({ type: 'COLLECTIONS', collections: cols.map((c) => ({ id: c.id, name: c.name })) });
         postSelection(); // UI 초기화 시점 — 현재 선택 상태도 함께 전송(UX5).
+        break;
+      }
+      case 'GET_PREREQ': {
+        await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
         break;
       }
       case 'GET_LICENSE': {

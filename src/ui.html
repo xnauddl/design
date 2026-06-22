@@ -51,6 +51,10 @@
     .warn { color: var(--warn); }
     .ok { color: var(--ok); }
     code { font-family: ui-monospace, monospace; color: var(--muted); }
+    /* #11 전제 미충족 안내 + 바로가기 */
+    .prereq { margin: 6px 0; font-size: 11px; color: var(--warn); display: flex; align-items: center; gap: 6px; }
+    button.link { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; width: auto; }
+    button.link:hover { opacity: 0.8; }
 
     /* 토큰 목록 / diff / 결과 표시 */
     #tokenList { max-height: 180px; overflow: auto; margin-top: 7px; }
@@ -204,7 +208,7 @@
       <div class="status" id="extractStatus"></div>
     </div>
 
-    <div class="step">
+    <div class="step" id="createCard">
       <h2>2 · 토큰 생성 (Global + Semantic)</h2>
       <div class="row">
         <label class="inline">base(rem)px <input id="base" type="number" value="16" min="1" /></label>
@@ -221,7 +225,8 @@
 
     <div class="step">
       <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
-      <div class="muted">먼저 ‘2 · 토큰 생성’으로 Global 변수를 만든 뒤 실행하세요. 형식: <code>역할 = Global변수이름</code></div>
+      <div class="muted">형식: <code>역할 = Global변수이름</code></div>
+      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; font-family:ui-monospace, monospace;"></textarea>
       <div class="row">
         <button id="btnSemantics">시맨틱 별칭 생성</button>
@@ -233,6 +238,7 @@
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
       <h2>3 · 적용 (바인딩)</h2>
+      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
         <button id="btnApply">미리보기</button>

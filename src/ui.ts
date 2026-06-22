@@ -31,6 +31,9 @@ let presets: Preset[] = [];
 let isTeam = false;
 let isPro = false;
 let teamDataRequested = false;
+// #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩).
+let hasGlobal = false;
+let hasBindable = false;
 let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
@@ -517,18 +520,44 @@ const TEAM_FIELDS = [
 
 const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps'];
 
-function updateTeamGate(): void {
+/**
+ * 통합 게이트(#11·#12) — 유료 잠금(Pro/Team)과 전제 미충족(Global/바인딩 변수 없음)을
+ * 한 메커니즘으로: 해당 버튼 disabled + 배지/안내(+바로가기) 표시.
+ */
+function updateGates(): void {
+  // 유료 잠금(#12)
   for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
   for (const id of PRO_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPro;
   $('presetLock').textContent = isTeam ? '' : '🔒 Team 전용';
   $('componentLock').textContent = isPro ? '' : '🔒 Pro 전용';
-  // 마법사의 컴포넌트화 옵션도 Pro 게이팅(미Pro면 체크 불가).
   $('wizComponentLock').textContent = isPro ? '' : '🔒 Pro';
   ($('wizOptComponentize') as HTMLInputElement).disabled = !isPro;
+
+  // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
+  setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
+  setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 바인딩할 변수를 만드세요.');
+  if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
+
   if (isTeam && !teamDataRequested) {
     teamDataRequested = true;
     send({ type: 'GET_PRESETS' });
   }
+}
+
+/** 전제 충족 여부로 버튼 활성/안내(+바로가기) 토글. */
+function setPrereq(btnId: string, noticeId: string, ok: boolean, msg: string): void {
+  ($(btnId) as HTMLButtonElement).disabled = !ok;
+  const notice = $(noticeId);
+  notice.style.display = ok ? 'none' : '';
+  const text = notice.querySelector('.prereq-text');
+  if (text) text.textContent = ok ? '' : msg;
+}
+
+/** 전제 미충족 안내의 ‘토큰 생성으로’ 바로가기 — 토큰 탭으로 이동 + 생성 카드 포커스. */
+function goToCreate(): void {
+  showTab('tokens');
+  $('createCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  ($('btnCreate') as HTMLButtonElement).focus();
 }
 
 /* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
@@ -759,7 +788,13 @@ window.onmessage = (event: MessageEvent) => {
       );
       break;
     case 'COLLECTIONS':
-      // 현재는 존재 확인용 프로브(별도 UI 없음). 추후 컬렉션 상태 표시에 사용.
+      // 존재 확인용 프로브(별도 UI 없음).
+      break;
+    case 'PREREQ_STATE':
+      // #11: 단계 전제 갱신 → 통합 게이트 재평가.
+      hasGlobal = msg.hasGlobal;
+      hasBindable = msg.hasBindable;
+      updateGates();
       break;
     case 'LICENSE_STATUS': {
       const srcLabel =
@@ -781,7 +816,7 @@ window.onmessage = (event: MessageEvent) => {
       }
       isTeam = msg.tier === 'team';
       isPro = msg.tier === 'pro' || msg.tier === 'team';
-      updateTeamGate();
+      updateGates();
       break;
     }
     case 'PRESETS':
@@ -1257,11 +1292,15 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
 }
 
-// 초기: 컬렉션 조회(존재 확인용) + 라이선스 상태 조회. 팀 카드는 Team 확인 전까지 잠금.
-updateTeamGate();
+// 초기: 컬렉션·전제·라이선스 조회. 팀 카드는 Team 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
+updateGates();
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
 send({ type: 'GET_COLLECTIONS' });
+send({ type: 'GET_PREREQ' }); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
+
+// #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
+document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
 
 /* ---------- 탭 내비게이션 (UI 개편 + UX8 키보드) ---------- */
 const TABS = ['tokens', 'apply', 'settings'] as const;
@@ -1276,6 +1315,7 @@ function showTab(name: (typeof TABS)[number]): void {
   }
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
+  if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
 }
 TABS.forEach((t, i) => {
   const btn = $(`tabbtn-${t}`);

@@ -1529,6 +1529,18 @@
     } catch (e) {
     }
   }
+  async function postPrereq() {
+    try {
+      const cols = await figma.variables.getLocalVariableCollectionsAsync();
+      const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
+      const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+      const vars = await figma.variables.getLocalVariablesAsync();
+      const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
+      const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
+      post({ type: "PREREQ_STATE", hasGlobal, hasBindable });
+    } catch (e) {
+    }
+  }
   function requireTeam() {
     if (hasEntitlement(currentTier(), "teamPresets")) return true;
     post({ type: "PREMIUM_REQUIRED", feature: "teamPresets", message: "\uD300 \uACF5\uC720 \uD504\uB9AC\uC14B/\uC774\uB825\uC740 Team \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
@@ -1745,6 +1757,7 @@
           post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
           if (!msg.preview) {
             commitUndo(figma);
+            await postPrereq();
           }
           break;
         }
@@ -1826,12 +1839,17 @@
           const s = await createSemanticAliases(msg.map);
           post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
           commitUndo(figma);
+          await postPrereq();
           break;
         }
         case "GET_COLLECTIONS": {
           const cols = await figma.variables.getLocalVariableCollectionsAsync();
           post({ type: "COLLECTIONS", collections: cols.map((c) => ({ id: c.id, name: c.name })) });
           postSelection();
+          break;
+        }
+        case "GET_PREREQ": {
+          await postPrereq();
           break;
         }
         case "GET_LICENSE": {
