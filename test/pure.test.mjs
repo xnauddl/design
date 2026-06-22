@@ -52,6 +52,11 @@ import {
   variantGrid,
   inferProp,
   inferComponentProperties,
+  clusterTextStyles,
+  nameTextStyles,
+  fontStyleForWeight,
+  rampToSpecs,
+  RAMP_NAMES,
   commitUndo,
   explainError,
   nextTabIndex,
@@ -652,4 +657,65 @@ test('checkContrast — 집계 + 실패 우선·대비 낮은 순 정렬', () =>
   // 실패가 앞으로, 실패 안에서는 대비 낮은(bad) 것이 먼저, 통과(pass)는 맨 뒤.
   assert.deepEqual(r.findings.map((f) => f.id), ['bad', 'mid', 'pass']);
   assert.equal(r.findings[2].pass, true);
+});
+
+/* ================= textStyles.ts (Phase C) ================= */
+test('clusterTextStyles — 동일 시그니처 dedupe + 빈도', () => {
+  const samples = [
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'a' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b' },
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h' },
+  ];
+  const cl = clusterTextStyles(samples);
+  assert.equal(cl.length, 2);
+  const body = cl.find((c) => c.fontSize === 16);
+  assert.equal(body.count, 2);
+  // 굵기만 달라도 별개 군집
+  const samples2 = [
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'a' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'b' },
+  ];
+  assert.equal(clusterTextStyles(samples2).length, 2);
+});
+
+test('nameTextStyles — 크기 내림차순 램프 명명 + 초과분 text-N', () => {
+  const clusters = [
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 5, sample: 'b' },
+    { fontSize: 48, lineHeight: 56, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 1, sample: 'd' },
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 1, sample: 'h' },
+  ];
+  const specs = nameTextStyles(clusters);
+  assert.deepEqual(specs.map((s) => [s.name, s.fontSize]), [
+    ['display', 48],
+    ['h1', 32],
+    ['h2', 16],
+  ]);
+  // 램프 길이 초과 → text-N
+  const many = Array.from({ length: 9 }, (_, i) => ({
+    fontSize: 100 - i,
+    lineHeight: 120,
+    letterSpacing: 0,
+    family: 'Inter',
+    style: 'Regular',
+    count: 1,
+    sample: '',
+  }));
+  const names = nameTextStyles(many).map((s) => s.name);
+  assert.equal(names[RAMP_NAMES.length], 'text-9');
+});
+
+test('fontStyleForWeight — 굵기/italic → Figma style', () => {
+  assert.equal(fontStyleForWeight(400), 'Regular');
+  assert.equal(fontStyleForWeight(700), 'Bold');
+  assert.equal(fontStyleForWeight(600), 'SemiBold');
+  assert.equal(fontStyleForWeight(400, true), 'Italic');
+  assert.equal(fontStyleForWeight(700, true), 'Bold Italic');
+  assert.equal(fontStyleForWeight(123), 'Regular'); // 미지정 → Regular
+});
+
+test('rampToSpecs — 기본 램프에 패밀리 주입', () => {
+  const specs = rampToSpecs('Pretendard');
+  assert.ok(specs.length >= 6);
+  assert.ok(specs.every((s) => s.family === 'Pretendard'));
+  assert.ok(specs.some((s) => s.name === 'body' && s.fontSize === 16));
 });

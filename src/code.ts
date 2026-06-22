@@ -4,7 +4,8 @@
 import type { UiToCode } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, GLOBAL, SEMANTIC } from './lib/variables';
+import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, createSemanticTextStyles, GLOBAL, SEMANTIC } from './lib/variables';
+import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
@@ -120,6 +121,13 @@ function arrangeSet(set: ComponentSetNode): void {
 function requirePro(): boolean {
   if (hasEntitlement(currentTier(), 'components')) return true;
   post({ type: 'PREMIUM_REQUIRED', feature: 'components', message: '컴포넌트 등록·베리언트 분류는 Pro 요금제 기능입니다.' });
+  return false;
+}
+
+/** Pro 이상 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
+function requireTextStyles(): boolean {
+  if (hasEntitlement(currentTier(), 'components')) return true;
+  post({ type: 'PREMIUM_REQUIRED', feature: 'textStyles', message: '텍스트 스타일 등록은 Pro 요금제 기능입니다.' });
   return false;
 }
 
@@ -333,6 +341,21 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
         record('semantics', `별칭 ${s.aliased} (생성 ${s.created} / 갱신 ${s.updated})`);
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
+        break;
+      }
+      case 'SCAN_TEXT_STYLES': {
+        // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
+        const { samples, warnings } = scanTextStyles(selection());
+        const styles = nameTextStyles(clusterTextStyles(samples));
+        post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+        break;
+      }
+      case 'CREATE_TEXT_STYLES': {
+        if (!requireTextStyles()) break;
+        const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
+        post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
+        record('semantics', `텍스트 스타일 ${r.created + r.updated} (바인딩 ${r.bound}${r.applied ? ` · 적용 ${r.applied}` : ''})`);
+        commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로
         break;
       }
       case 'GET_COLLECTIONS': {
