@@ -96,7 +96,8 @@ src/
     i18n.ts     UI 문자열 단일 소스 + t() 룩업·{var} 보간(현재 ko) — 순수
     pure.ts     테스트용 순수 배럴(→ dist/pure.mjs)
     extract.ts  선택 노드에서 토큰 추출
-    variables.ts 3계층 변수 생성/갱신(upsert) + 시맨틱 별칭 매핑(createSemanticAliases)
+    variables.ts 3계층 변수 생성/갱신(upsert) + 시맨틱 별칭 매핑 + 텍스트 스타일 등록(createSemanticTextStyles)
+    textStyles.ts 텍스트 스타일 순수 로직(시그니처 군집·크기 랭킹 명명·기본 램프) — Phase C
     bind.ts     resolved 값 매칭 → 변수 바인딩
     rename.ts   boundVariables·역할 추론 → 리네임
     entitlements.ts 요금제 티어·기능 게이팅·사용량 한도(M1) — 순수
@@ -137,6 +138,16 @@ spacing/radius/size는 **센터(md) 티셔츠 스케일**(`spacing/sm·md·lg`),
 `createSemanticAliases`가 원시 스코프를 상속한 별칭 변수를 upsert(멱등)로 생성합니다. **#3 색 편집표(UI 1.5단계)**: 추출/생성 색을 표로 보여주고
 (스와치·hue 이름·역할 입력), 추출 색은 `nameColorsByHue`로 **hue-Global 이름**(`color/blue/500`, 같은
 hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정해 ‘반영’하면 시맨틱 매핑에 채워집니다.
+
+## 텍스트 스타일 (UI 2.6단계 · Phase C, Pro)
+
+화면의 **실제 텍스트를 인식**해 타이포 조합을 **시맨틱 변수로 등록**하고, 이를 **명명된 텍스트 스타일**로 등록·바인딩하는 end-to-end 파이프라인입니다(스타일 → 시맨틱 → Global 3계층 완성).
+
+- **스캔**(`SCAN_TEXT_STYLES`): 선택 트리의 TEXT 노드에서 `{fontSize, lineHeight(px), letterSpacing, family, style}` 시그니처를 수집(`scanTextStyles`). 부분 서식(mixed) 텍스트는 스킵+경고.
+- **군집·명명**(순수 `textStyles.ts`): 동일 시그니처를 묶고(`clusterTextStyles`), **fontSize 내림차순**으로 `display·h1·h2·h3·title·body·caption·overline` 역할명을 배정(`nameTextStyles`, 초과분 `text-N`). 선택이 없으면 `DEFAULT_TYPE_RAMP` 폴백.
+- **등록**(`CREATE_TEXT_STYLES`, `createSemanticTextStyles`): 각 스타일의 size·lineHeight로 **Global 원시 + Semantic 별칭**(`font-size/{역할}`·`line-height/{역할}`)을 보장(`createTokens`·`createSemanticAliases` 재사용 — 구 Phase B 흡수)한 뒤, `createTextStyle`로 스타일을 upsert하고 `setBoundVariable('fontSize'|'lineHeight', …)`로 시맨틱 변수에 바인딩. 폰트 로드 실패 시 `Regular` 폴백+보고.
+- **적용**(옵션, 기본 OFF): 켜면 시그니처가 일치하는 원본 텍스트에 `setTextStyleIdAsync`로 스타일을 연결 → 토큰 값 변경이 화면에 일괄 반영.
+- UI "2.6 · 텍스트 스타일" 카드: **‘선택에서 스캔’ → 구조 표(이름·크기·행간·스타일) 편집 → ‘원본에 적용’ 체크 → ‘텍스트 스타일 등록’**. 순수 로직(군집·명명·램프)은 `node --test`로 검증, figma 호출만 `variables.ts`. **Pro 게이팅**(비-Pro는 `PREMIUM_REQUIRED`; 스캔은 무게이팅 미리보기).
 
 ## 코드 내보내기 (Export)
 

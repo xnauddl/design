@@ -2,6 +2,7 @@
    messages.ts — code(샌드박스) ↔ ui(iframe) 메시지 타입 단일 소스
    ============================================================ */
 import type { DraftToken } from '../lib/tokens';
+import type { TextStyleSpec } from '../lib/textStyles';
 import type { Tier } from '../lib/entitlements';
 import type { LicenseStatus, VerifyResult } from '../lib/license';
 import type { Preset } from '../lib/presets';
@@ -84,6 +85,8 @@ export type UiToCode =
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
   | { type: 'RENAME_APPLY'; items: { id: string; after: string }[] } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
+  | { type: 'SCAN_TEXT_STYLES' } // Phase C: 선택 텍스트에서 스타일 후보 추출
+  | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[]; apply: boolean } // Phase C: 변수 보장+스타일 등록(+적용)
   | { type: 'GET_COLLECTIONS' }
   | { type: 'GET_GLOBAL_COLORS' } // #10: 기존 Global 색 변수 스캔(재방문 시맨틱 매핑 추천용)
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
@@ -114,6 +117,8 @@ export type CodeToUi =
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
+  | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[] } // Phase C: 스캔 결과
+  | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; applied: number; missing: string[] } // Phase C
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   | { type: 'GLOBAL_COLORS'; colors: { name: string; hex: string }[] } // #10: 기존 Global 색(이름+hex)
   // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).

@@ -287,6 +287,27 @@
       </div>
       <div class="status" id="semStatus"></div>
     </div>
+
+    <div class="step">
+      <h2>2.6 · 텍스트 스타일 (화면 → 스타일)</h2>
+      <div class="muted">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Pro)</div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnScanText">선택에서 스캔</button>
+        <button id="btnTsAddRow">행 추가</button>
+        <label class="inline">폰트 <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
+      </div>
+      <table id="tsTable" style="width:100%; border-collapse:collapse; margin-top:6px; font-size:11px;">
+        <thead><tr style="text-align:left; color:var(--muted,#888);">
+          <th>이름</th><th>크기</th><th>행간</th><th>스타일</th><th></th>
+        </tr></thead>
+        <tbody id="tsRows"></tbody>
+      </table>
+      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 원본 텍스트에 스타일 적용</label>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
+      </div>
+      <div class="status" id="tsStatus"></div>
+    </div>
   </section>
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
