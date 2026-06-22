@@ -39,6 +39,13 @@
     /* UX6 진행률 바 */
     .bar { height: 8px; border-radius: 4px; background: var(--figma-color-bg-secondary, #eee); border: 1px solid var(--figma-color-border, #ddd); overflow: hidden; }
     .bar-fill { height: 100%; width: 0%; background: #0d99ff; transition: width .1s linear; }
+    /* 명도 대비 점검 결과 */
+    .cfind { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
+    .cpair { display: inline-flex; }
+    .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid #0003; }
+    .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
+    .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
+    .cfind .ratio { font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
@@ -142,6 +149,22 @@
       <div class="muted" style="margin-top:6px;">↶ 이름 적용 후 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
       <div id="diff"></div>
       <div class="status" id="renameStatus"></div>
+    </div>
+
+    <div class="step" id="contrastCard">
+      <h2>5 · 명도 대비 점검</h2>
+      <div class="muted">선택 안 텍스트의 글자색 ↔ 배경색 대비를 WCAG 기준으로 검사합니다. 배경은 가장 가까운 상위 프레임의 단색 채움을 사용합니다(읽기 전용 · 변경 없음).</div>
+      <div class="row" style="margin-top:6px;">
+        <label class="inline">기준
+          <select id="contrastLevel">
+            <option value="AA">AA (4.5 · 큰글자 3)</option>
+            <option value="AAA">AAA (7 · 큰글자 4.5)</option>
+          </select>
+        </label>
+        <button id="btnContrast" class="primary">대비 검사</button>
+      </div>
+      <div id="contrastList" style="max-height:160px; overflow:auto; margin-top:6px; font-family:ui-monospace, monospace; font-size:11px;"></div>
+      <div class="status" id="contrastStatus"></div>
     </div>
 
     <div class="step" id="componentCard">

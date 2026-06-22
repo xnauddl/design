@@ -13,6 +13,7 @@ import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
+import type { WcagLevel } from './lib/contrast';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -166,6 +167,12 @@ $('btnApplyCancel').addEventListener('click', () => {
 $('btnPreview').addEventListener('click', () => {
   const maxDepth = Number(($('depth') as HTMLInputElement).value) || 3;
   send({ type: 'RENAME', apply: false, maxDepth });
+});
+
+$('btnContrast').addEventListener('click', () => {
+  const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
+  setStatus('contrastStatus', '대비 검사 중…', '');
+  send({ type: 'CHECK_CONTRAST', level });
 });
 
 $('btnRename').addEventListener('click', () => {
@@ -552,6 +559,9 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('componentStatus', `컴포넌트 속성 ${msg.created}개 노출`, msg.created ? 'ok' : 'warn');
       break;
     }
+    case 'CONTRAST_RESULT':
+      renderContrast(msg);
+      break;
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 팀 기능은 ‘관리’ 탭).
       const statusId = msg.feature === 'components' ? 'componentStatus' : msg.feature === 'teamPresets' ? 'presetStatus' : 'createStatus';
@@ -584,6 +594,7 @@ const OP_STATUS: Record<string, string> = {
   CLASSIFY_VARIANTS: 'componentStatus',
   GENERATE_MISSING_VARIANTS: 'componentStatus',
   EXPOSE_PROPERTIES: 'componentStatus',
+  CHECK_CONTRAST: 'contrastStatus',
   GET_PRESETS: 'presetStatus',
   SAVE_PRESET: 'presetStatus',
   DELETE_PRESET: 'presetStatus',
@@ -641,6 +652,59 @@ function reasonsText(reasons: Record<string, number>): string {
     .filter(([, n]) => n > 0)
     .map(([k, n]) => `${REASON_LABELS[k] ?? k} ${n}`)
     .join(' · ');
+}
+
+/* ---------- 명도 대비 점검 결과 렌더 ---------- */
+const CONTRAST_SKIP_LABELS: Record<string, string> = {
+  'no-fill': '단색 글자색 없음',
+  'no-bg': '배경 없음',
+  capped: '스캔 상한 도달',
+};
+function contrastSkipText(skipped: Record<string, number>): string {
+  return Object.entries(skipped)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${CONTRAST_SKIP_LABELS[k] ?? k} ${n}`)
+    .join(' · ');
+}
+
+function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): void {
+  const box = $('contrastList');
+  box.innerHTML = '';
+  const fails = msg.findings.filter((f) => !f.pass); // 실패 건만 나열(조치 대상)
+  for (const f of fails) {
+    const row = document.createElement('div');
+    row.className = 'cfind';
+
+    const pair = document.createElement('span');
+    pair.className = 'cpair';
+    for (const hex of [f.bg, f.fg]) {
+      const sw = document.createElement('span');
+      sw.className = 'swatch';
+      sw.style.background = hex;
+      pair.appendChild(sw);
+    }
+    row.appendChild(pair);
+
+    const name = document.createElement('span');
+    name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
+    row.appendChild(name);
+
+    const ratio = document.createElement('span');
+    ratio.className = 'ratio warn';
+    ratio.textContent = `${f.ratio} / ${f.required}`;
+    row.appendChild(ratio);
+
+    box.appendChild(row);
+  }
+  const skip = contrastSkipText(msg.skipped);
+  const skipNote = skip ? ` · 건너뜀: ${skip}` : '';
+  if (msg.checked === 0) {
+    setStatus('contrastStatus', `검사할 텍스트가 없습니다.${skip ? ` (건너뜀: ${skip})` : ' 텍스트가 있는 프레임을 선택하세요.'}`, 'warn');
+  } else if (fails.length === 0) {
+    setStatus('contrastStatus', `${msg.checked}개 모두 ${msg.level} 통과 ✓${skipNote}`, 'ok');
+  } else {
+    setStatus('contrastStatus', `${msg.checked}개 중 ${fails.length}개 ${msg.level} 미달${skipNote}`, 'warn');
+  }
 }
 
 /* ---------- UX6: 진행률 바 ---------- */

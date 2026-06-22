@@ -51,6 +51,11 @@ import {
   commitUndo,
   explainError,
   nextTabIndex,
+  isLargeText,
+  requiredRatio,
+  checkPair,
+  evaluateSample,
+  checkContrast,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -534,4 +539,59 @@ test('nextTabIndex — 화살표 순환 + Home/End, 그 외 -1', () => {
   assert.equal(nextTabIndex('End', 0, 3), 2);
   assert.equal(nextTabIndex('Enter', 0, 3), -1); // 내비 키 아님
   assert.equal(nextTabIndex('ArrowRight', 0, 0), -1); // 빈 목록
+});
+
+/* ================= contrast.ts (명도 대비 점검) ================= */
+test('isLargeText — 24px↑ 또는 18.66px↑ + 볼드', () => {
+  assert.equal(isLargeText(24, false), true);
+  assert.equal(isLargeText(23.9, false), false);
+  assert.equal(isLargeText(19, true), true); // 14pt 볼드
+  assert.equal(isLargeText(19, false), false); // 볼드 아니면 미달
+  assert.equal(isLargeText(18, true), false); // 18.66px 미만
+});
+
+test('requiredRatio — level·large 매트릭스', () => {
+  assert.equal(requiredRatio('AA', false), 4.5);
+  assert.equal(requiredRatio('AA', true), 3);
+  assert.equal(requiredRatio('AAA', false), 7);
+  assert.equal(requiredRatio('AAA', true), 4.5);
+});
+
+test('checkPair — 흑/백 21(AA·AAA 통과), 회색쌍 미달', () => {
+  const bw = checkPair('#000000', '#ffffff');
+  assert.equal(bw.ratio, 21);
+  assert.equal(bw.aa, true);
+  assert.equal(bw.aaa, true);
+  const gray = checkPair('#888888', '#777777');
+  assert.equal(gray.aa, false);
+  assert.equal(gray.aaa, false);
+});
+
+test('evaluateSample — 큰 글자는 완화된 기준(AA 3) 적용', () => {
+  // 대비 ~3.x인 쌍: 일반 텍스트는 미달(4.5), 큰 글자는 통과(3).
+  const small = evaluateSample({ id: '1', name: 't', fg: '#767676', bg: '#ffffff', fontSize: 16, bold: false }, 'AA');
+  assert.equal(small.large, false);
+  assert.equal(small.required, 4.5);
+  assert.equal(small.pass, true); // #767676 on white ≈ 4.54
+  const big = evaluateSample({ id: '2', name: 't', fg: '#949494', bg: '#ffffff', fontSize: 30, bold: false }, 'AA');
+  assert.equal(big.large, true);
+  assert.equal(big.required, 3);
+  assert.equal(big.pass, true); // ≈3.1, 큰 글자 기준 통과
+  const bigSmallFail = evaluateSample({ id: '3', name: 't', fg: '#949494', bg: '#ffffff', fontSize: 16, bold: false }, 'AA');
+  assert.equal(bigSmallFail.pass, false); // 같은 색이라도 일반 텍스트면 미달
+});
+
+test('checkContrast — 집계 + 실패 우선·대비 낮은 순 정렬', () => {
+  const samples = [
+    { id: 'pass', name: '통과', fg: '#000000', bg: '#ffffff', fontSize: 16, bold: false }, // 21
+    { id: 'bad', name: '심각', fg: '#cccccc', bg: '#ffffff', fontSize: 16, bold: false }, // ≈1.6
+    { id: 'mid', name: '경계', fg: '#999999', bg: '#ffffff', fontSize: 16, bold: false }, // ≈2.8
+  ];
+  const r = checkContrast(samples, 'AA');
+  assert.equal(r.checked, 3);
+  assert.equal(r.passed, 1);
+  assert.equal(r.failed, 2);
+  // 실패가 앞으로, 실패 안에서는 대비 낮은(bad) 것이 먼저, 통과(pass)는 맨 뒤.
+  assert.deepEqual(r.findings.map((f) => f.id), ['bad', 'mid', 'pass']);
+  assert.equal(r.findings[2].pass, true);
 });
