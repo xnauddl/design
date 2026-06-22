@@ -909,6 +909,104 @@
     return tokens2;
   }
 
+  // src/lib/roles.ts
+  var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
+  var TSHIRT_MID = TSHIRT.indexOf("md");
+  function tshirtRoles(values) {
+    const n = values.length;
+    if (!n) return [];
+    let start = TSHIRT_MID - Math.floor((n - 1) / 2);
+    start = Math.max(0, Math.min(start, Math.max(0, TSHIRT.length - n)));
+    return values.map((_, i) => {
+      const idx = start + i;
+      return idx < TSHIRT.length ? TSHIRT[idx] : `${TSHIRT[TSHIRT.length - 1]}-${idx - TSHIRT.length + 2}`;
+    });
+  }
+  function radiusRoles(values) {
+    const base = tshirtRoles(values);
+    return values.map((v, i) => v === 0 ? "none" : v >= 999 ? "full" : base[i]);
+  }
+  var FS_UP = ["title", "h3", "h2", "h1", "display"];
+  var FS_DOWN = ["caption", "overline"];
+  function fontSizeRoles(values, base = 16) {
+    const n = values.length;
+    if (!n) return [];
+    let bodyI = 0;
+    let bd = Infinity;
+    values.forEach((v, i) => {
+      const d = Math.abs(v - base);
+      if (d < bd) {
+        bd = d;
+        bodyI = i;
+      }
+    });
+    return values.map((_, i) => {
+      var _a, _b;
+      if (i === bodyI) return "body";
+      if (i > bodyI) return (_a = FS_UP[i - bodyI - 1]) != null ? _a : `display-${i - bodyI - FS_UP.length + 1}`;
+      return (_b = FS_DOWN[bodyI - i - 1]) != null ? _b : `overline-${bodyI - i - FS_DOWN.length + 1}`;
+    });
+  }
+  var WEIGHTS = [
+    { v: 100, role: "thin" },
+    { v: 200, role: "extralight" },
+    { v: 300, role: "light" },
+    { v: 400, role: "regular" },
+    { v: 500, role: "medium" },
+    { v: 600, role: "semibold" },
+    { v: 700, role: "bold" },
+    { v: 800, role: "extrabold" },
+    { v: 900, role: "black" }
+  ];
+  function weightRole(value) {
+    let best = WEIGHTS[0];
+    let bd = Infinity;
+    for (const w of WEIGHTS) {
+      const d = Math.abs(w.v - value);
+      if (d < bd) {
+        bd = d;
+        best = w;
+      }
+    }
+    return best.role;
+  }
+  function familyRole(name, index) {
+    const lower = name.toLowerCase();
+    if (/\bmono|mononoki|consol|courier|menlo|code\b/.test(lower)) return "mono";
+    if (/serif/.test(lower) && !/sans/.test(lower)) return "serif";
+    if (/sans|inter|roboto|helvetica|arial|pretendard/.test(lower)) return "sans";
+    return index === 0 ? "body" : "heading";
+  }
+  function numericEntries(tokens2, category) {
+    const byVal = /* @__PURE__ */ new Map();
+    for (const t of tokens2) {
+      if (t.category === category && typeof t.value === "number" && !byVal.has(t.value)) byVal.set(t.value, t.name);
+    }
+    return [...byVal.keys()].sort((a, b) => a - b).map((value) => ({ value, name: byVal.get(value) }));
+  }
+  function suggestTokenRoles(tokens2, base = 16) {
+    const map = {};
+    const colors = tokens2.filter((t) => t.category === "color" && typeof t.value === "string").map((t) => ({ name: t.name, hex: t.value }));
+    Object.assign(map, suggestSemanticMap(colors));
+    const scale = (category, prefix, roleFn) => {
+      const entries = numericEntries(tokens2, category);
+      const roles = roleFn(entries.map((e) => e.value));
+      entries.forEach((e, i) => {
+        map[`${prefix}/${roles[i]}`] = e.name;
+      });
+    };
+    scale("gap", "spacing", tshirtRoles);
+    scale("radius", "radius", radiusRoles);
+    scale("size", "size", tshirtRoles);
+    scale("fontSize", "font-size", (vals) => fontSizeRoles(vals, base));
+    for (const e of numericEntries(tokens2, "fontWeight")) map[`font-weight/${weightRole(e.value)}`] = e.name;
+    const families = tokens2.filter((t) => t.category === "fontFamily" && typeof t.value === "string");
+    families.forEach((t, i) => {
+      map[`font-family/${familyRole(String(t.value), i)}`] = t.name;
+    });
+    return map;
+  }
+
   // src/lib/errors.ts
   function explainError(raw) {
     const s = (raw || "").toLowerCase();
@@ -1069,9 +1167,9 @@
   }
   function suggestSemMapFrom(toks) {
     if ($("semMap").value.trim()) return;
-    const colors = toks.filter((t) => t.category === "color" && typeof t.value === "string").map((t) => ({ name: t.name, hex: t.value }));
-    if (!colors.length) return;
-    setSemMapText(suggestSemanticMap(colors));
+    const base = Number($("base").value) || 16;
+    const map = suggestTokenRoles(toks, base);
+    if (Object.keys(map).length) setSemMapText(map);
   }
   function huefyTokenColors(toks) {
     const idx = [];
