@@ -19,6 +19,7 @@ import {
   isDefaultName,
   isTokenEchoName,
   parseTokenName,
+  pickScope,
   dedupeName,
   hasEntitlement,
   limitsForTier,
@@ -151,14 +152,28 @@ test('isDefaultName — Figma 기본명만 교체 대상', () => {
 });
 
 test('isTokenEchoName — 구 리네임의 원시 토큰 베낌 이름만 교체 대상', () => {
-  // 원시 토큰 경로를 그대로 베낀 이름 → 교체 대상
-  for (const n of ['color-121210', 'color-0066ff', 'spacing-16', 'line-height-1-5', 'opacity-50', 'radius-9999']) {
+  // 원시 토큰 경로를 그대로 베낀 이름(스냅샷 단위 포함) → 교체 대상
+  for (const n of [
+    'color-121210', 'color-0066ff', 'spacing-16', 'line-height-1-5', 'opacity-50', 'radius-9999',
+    'letter-spacing-0-percent-px', 'line-height-150-percent-px', 'line-height-1-5-em',
+  ]) {
     assert.equal(isTokenEchoName(n), true, n);
   }
   // 같은 네임스페이스라도 값이 단어면 사람 이름 → 보존
   for (const n of ['color-picker', 'size-large', 'radius-full', 'spacing-control', 'button-primary', 'card-header']) {
     assert.equal(isTokenEchoName(n), false, n);
   }
+});
+
+test('pickScope — 깨끗한 맥락 1단계(숫자·단위·일반구조어 제거)', () => {
+  assert.equal(pickScope('card-header'), 'header'); // 알려진 역할 마지막
+  assert.equal(pickScope('button-primary'), 'button'); // 역할만 채택, primary 무시
+  assert.equal(pickScope('primary-button'), 'button');
+  assert.equal(pickScope('wrapper-2'), null); // 숫자 제거 후 일반구조어만 → null
+  assert.equal(pickScope('container'), null); // 일반 구조어는 맥락 안 됨
+  assert.equal(pickScope('letter-spacing-0-percent-px'), 'spacing'); // 단위·숫자 제거
+  assert.equal(pickScope('hero'), 'hero');
+  assert.equal(pickScope(''), null);
 });
 
 test('parseTokenName — 역할 말단/맥락 접두사/원시 토큰', () => {

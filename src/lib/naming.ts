@@ -25,7 +25,30 @@ export const ROLE_VOCAB = [
   'divider',
   'badge',
   'avatar',
+  // 시맨틱(영역/컴포넌트) — 인식·정리 + 일부 구조 추론
+  'nav',
+  'hero',
+  'main',
+  'sidebar',
+  'section',
+  'button',
+  'card',
+  'list',
+  'item',
+  'field',
+  'tab',
+  'chip',
+  'label',
+  'title',
 ] as const;
+
+/** 역할 어휘 집합(맥락 추출 시 의미 있는 세그먼트 판별용). */
+const ROLE_SET: ReadonlySet<string> = new Set(ROLE_VOCAB);
+
+/** 세그먼트가 알려진 역할 어휘인지. */
+export function isKnownRole(seg: string): boolean {
+  return ROLE_SET.has(seg);
+}
 
 export type Role = (typeof ROLE_VOCAB)[number];
 
@@ -151,10 +174,31 @@ export function parseTokenName(tokenName: string): ParsedToken {
   return { roleLeaf, context, primitive: false };
 }
 
-/** 토큰 값 꼴(색 6자리 hex 또는 숫자 세그먼트)인지. */
+/** 토큰 값에 붙는 단위 어휘(스냅샷 토큰 이름의 꼬리). */
+const UNIT_WORDS = new Set(['percent', 'px', 'em', 'rem', 'ratio', 'pt']);
+
+/** 토큰 값 꼴(색 6자리 hex, 또는 숫자·단위 세그먼트)인지. */
 function isTokenValue(v: string): boolean {
   if (/^[0-9a-f]{6}$/.test(v)) return true; // 색: 121210, 0066ff
-  return v.split('-').every((s) => /^\d+$/.test(s)); // 숫자: 16, 1-5
+  // 숫자/단위: 16 · 1-5 · 0-percent-px · 150-percent-px · 1-5-em
+  return v.split('-').every((s) => /^\d+$/.test(s) || UNIT_WORDS.has(s));
+}
+
+/** 식별력이 없는 일반 구조 어휘 — 맥락 접두사로 쓰지 않는다(container-header 같은 군더더기 방지). */
+const GENERIC_ROLES = new Set(['container', 'wrapper', 'content', 'group', 'section', 'body', 'main', 'shape']);
+
+/**
+ * 이름에서 깨끗한 "맥락 1단계"를 뽑는다 — 숫자·단위·hex·일반 구조어를 버리고,
+ * 식별력 있는 역할/단어 하나를 반환(없으면 null → 맥락 없이 역할만).
+ * 예: 'card-header' → 'header' · 'button-primary' → 'button' · 'container' → null · 'wrapper-2' → null.
+ */
+export function pickScope(name: string): string | null {
+  const segs = kebab(name)
+    .split('-')
+    .filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
+  if (!segs.length) return null;
+  const known = segs.filter(isKnownRole);
+  return known.length ? known[known.length - 1] : segs[segs.length - 1];
 }
 
 /**

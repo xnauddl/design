@@ -28,15 +28,15 @@
 ### 레이어 네이밍
 **원칙: 레이어의 "역할(role)"이 이름을 정한다. 토큰은 이름을 짓는 "신호"로만 쓰고 경로를 그대로 복사하지 않는다.**
 
-- 형식: **kebab-case 소문자**, 구분자 `-`. 구조: `{상위 맥락}-{로컬 역할}`(기본 최대 3단계).
-- **보존형** — Figma 기본명(`Frame 12`·`Rectangle`·`Vector`·`Group 5`…)과 구(舊) 리네임이 원시 토큰 경로를 베껴 만든 이름(`color-121210`·`spacing-16`·`line-height-1-5`…)만 교체한다. 사람이 지은 의미 있는 이름(`color-picker`·`size-large` 등 값이 단어인 경우 포함)은 **그대로 보존**하고 자식의 맥락으로만 쓴다.
-- **역할 판정 순서**: ① 바인딩 토큰의 **말단(leaf)** 이 역할 어휘면 그것(`button/primary/background`의 `background`) → ② 노드 타입·기하(VECTOR=`icon`, 얇은 막대=`divider`, 이미지 타원=`avatar`, 채움 사각형=`background`, 외곽선만=`border`, 프레임=`container`/단일자식 `wrapper`).
-  - **스와치**: 자식이 없고 색(단색·그라데이션)만 채운 프레임 → `swatch`(이미지 채움이면 `image`, 빈 프레임이면 `container`). 자식이 있으면 색이 있어도 `container`/`wrapper`.
-  - 핵심 역할 어휘: `icon`·`background`·`swatch`·`border`·`divider`·`container`·`wrapper`·`image`·`avatar`·`badge`.
-  - **원시(Global) 토큰**(`color/blue-500`·`spacing/16`…)은 이름 신호가 없다 → 기하로 폴백(역할 오염 방지).
-- **맥락(context)** 출처: ① 가장 가까운 *의미 있는* 조상 이름 → ② (없으면) 토큰 경로 접두사(`button/primary/background` → `button-primary`).
+- 형식: **kebab-case 소문자**, 구분자 `-`. 구조: `{맥락}-{역할}` — **최대 2토막**(짧고 의미 있게).
+- **보존형** — Figma 기본명(`Frame 12`·`Rectangle`·`Group 5`…)과 구(舊) 리네임이 원시·스냅샷 토큰 경로를 베껴 만든 이름(`color-121210`·`spacing-16`·`letter-spacing-0-percent-px`…)만 교체한다. 사람이 지은 의미 있는 이름(`color-picker`·`size-large` 등 값이 단어인 경우 포함)은 **그대로 보존**하고 자식의 맥락으로만 쓴다.
+- **역할 판정 순서**: ① **버튼**(오토레이아웃+라운드+채움/외곽선+직속 텍스트) → ② **영역**(페이지 세로 스택의 첫=`header`/마지막=`footer`, depth 1 한정) → ③ 바인딩 토큰 **말단**이 역할 어휘면 그것(`…/background`→`background`) → ④ 타입·기하(VECTOR=`icon`, 얇은 막대=`divider`, 이미지 타원=`avatar`, 채움 사각형=`background`, 외곽선만=`border`, 색만 채운 빈 프레임=`swatch`, 그 외 프레임=`container`/단일자식 `wrapper`).
+  - 역할 어휘: 요소(`icon`·`background`·`swatch`·`border`·`divider`·`image`·`avatar`·`badge`) + 시맨틱(`header`·`footer`·`nav`·`hero`·`button`·`card`·`label`·`title`…). 시맨틱은 **인식·보존**(사람·컴포넌트명)에 더해 button·header·footer만 **구조 추론**.
+  - **원시/스냅샷 토큰**(`color/blue-500`·`line-height/150-percent-px`…)은 이름 신호가 없다 → 기하로 폴백(역할 오염 방지).
+- **맥락(context)** — 바로 위 의미 있는 이름에서 **깨끗한 1단계**만 뽑는다(`pickScope`): 숫자·단위(`percent`·`px`…)·hex·일반 구조어(`container`·`wrapper`…)는 버린다. 없으면 토큰 경로 접두사에서. 그래서 `percent-px-container`·`2-wrapper-icon` 같은 군더더기가 생기지 않는다. 맥락==역할이면 중복 제거(`button-button`→`button`).
+- **숫자 안 붙임** — 형제가 같은 이름이어도 그대로 둔다(Figma는 중복 레이어명 허용, 정체성은 ID). `-2`/`-3` 없음.
 - **제외**(이름 유지): Component/ComponentSet · **Text** · Instance · 잠긴 레이어. *텍스트는 이름만 제외하고 변수 바인딩은 정상 수행.*
-- 형제 충돌은 `-2`/`-3` 접미사. 정돈된 역할명은 기본명이 아니므로 재실행 시 보존된다 → **멱등**.
+- 정돈된 역할명은 기본명이 아니므로 재실행 시 보존된다 → **멱등**.
 
 ### 컴포넌트 등록 / 베리언트 분류 (Phase 3 · 구현됨, Pro)
 선택 레이어를 **메인 컴포넌트로 등록**하고, 같은 베이스 이름을 공유하는 컴포넌트들을 **베리언트 세트(ComponentSet)** 로 묶어 분류한다. 토큰/리네임과 동일하게 **kebab·멱등** 규칙을 따르며, 구조/이름만 바꾸고 토큰 바인딩은 건드리지 않는다.

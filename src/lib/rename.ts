@@ -1,15 +1,26 @@
 /* ============================================================
    rename.ts — 레이어를 "역할(role)"에 맞게 정돈 (naming.ts 규칙 사용)
    원칙: 역할이 이름을 정한다. 토큰은 신호로만 쓰고 경로를 복사하지 않는다.
-   - 보존형: Figma 기본명(Frame 12·Rectangle·Vector…)만 교체, 사람이 지은
-     의미 있는 이름은 보존하고 자식의 맥락(context)으로만 사용.
-   - 역할 판정: 토큰 말단(신호) → 노드 타입/기하(채움·외곽선·얇음·이미지) 순.
-   - 맥락: 가장 가까운 의미 있는 조상 이름 → (없으면) 토큰 경로 접두사.
+   - 보존형: Figma 기본명(Frame 12…)과 구 리네임의 토큰 베낌명만 교체,
+     사람이 지은 의미 있는 이름은 보존하고 자식의 맥락(context)으로만 사용.
+   - 역할 판정: 영역(상단/하단) → 버튼 → 토큰 말단 → 타입/기하 순.
+     · 영역: 페이지 세로 스택의 첫/마지막 컨테이너 → header/footer
+     · 버튼: 오토레이아웃 + 라운드 + 채움/외곽선 + 직속 텍스트 → button
+   - 맥락: 바로 위 의미 있는 이름에서 깨끗한 1단계만(pickScope). 숫자·단위 조각 제거.
+   - 이름 형식: {맥락}-{역할} 최대 2토막. 형제 충돌에 숫자 안 붙임(Figma 중복 허용).
    - 제외: Component/ComponentSet · Text · Instance · 잠긴 레이어.
    ============================================================ */
-import { isDefaultName, isTokenEchoName, parseTokenName, layerNameFromRole, dedupeName, kebab } from './naming';
+import { isDefaultName, isTokenEchoName, parseTokenName, layerNameFromRole, pickScope, kebab } from './naming';
 import type { ParsedToken } from './naming';
 import type { RenameChange } from '../shared/messages';
+
+/** 자식에게 내려보내는 위치 정보(영역 추론용). depth 0 = 선택 루트. */
+interface Pos {
+  index: number;
+  total: number;
+  parentLayout: 'vertical' | 'horizontal' | null;
+  depth: number;
+}
 
 interface Opts {
   apply: boolean;
@@ -26,7 +37,7 @@ export async function renameSelection(
   opts: Opts,
 ): Promise<RenameOutcome> {
   const changes: RenameChange[] = [];
-  await recurse(selection, null, opts, changes);
+  await recurse(selection, null, opts, changes, 0, null);
   return { changes, applied: opts.apply };
 }
 
@@ -35,30 +46,35 @@ async function recurse(
   ancestorName: string | null,
   opts: Opts,
   out: RenameChange[],
+  depth: number,
+  parentLayout: Pos['parentLayout'],
 ): Promise<void> {
-  const taken = new Set<string>();
-  for (const node of nodes) {
-    const decided = await decide(node, ancestorName, opts);
+  const total = nodes.length;
+  for (let i = 0; i < total; i++) {
+    const node = nodes[i];
+    const pos: Pos = { index: i, total, parentLayout, depth };
+    const decided = await decide(node, ancestorName, pos, opts);
     let contextForChildren = node.name;
 
     if (!decided.skip && decided.name) {
-      const finalName = dedupeName(decided.name, taken);
-      if (finalName !== node.name) {
-        out.push({ id: node.id, before: node.name, after: finalName });
-        if (opts.apply) node.name = finalName;
+      // 숫자 접미사 없음 — 형제가 같은 이름이어도 그대로(Figma는 중복 이름 허용).
+      if (decided.name !== node.name) {
+        out.push({ id: node.id, before: node.name, after: decided.name });
+        if (opts.apply) node.name = decided.name;
       }
-      contextForChildren = finalName;
-    } else {
-      taken.add(node.name); // 보존·제외된 이름도 형제 충돌 방지용으로 예약
+      contextForChildren = decided.name;
     }
 
-    if ('children' in node) await recurse(node.children, contextForChildren, opts, out);
+    if ('children' in node) {
+      await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node));
+    }
   }
 }
 
 async function decide(
   node: SceneNode,
   ancestorName: string | null,
+  pos: Pos,
   opts: Opts,
 ): Promise<{ skip: boolean; name?: string }> {
   // 제외 규칙(이름 유지 · 자기 이름을 자식 맥락으로 전달)
@@ -72,15 +88,19 @@ async function decide(
   if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
 
   const token = await primaryToken(node);
-  const role = resolveRole(node, token);
-  // 맥락: 의미 있는 조상 이름 우선, 없으면 토큰 경로 접두사.
-  const ctx = ancestorName ?? token?.context ?? null;
-  return { skip: false, name: layerNameFromRole(ctx, role, { maxDepth: opts.maxDepth }) };
+  const role = resolveRole(node, token, pos);
+  // 맥락: 바로 위 의미 있는 이름에서 깨끗한 1단계 → 없으면 토큰 경로 접두사에서.
+  let scope = (ancestorName ? pickScope(ancestorName) : null) ?? (token?.context ? pickScope(token.context) : null);
+  if (scope === role) scope = null; // 맥락==역할이면 중복 제거(button-button 방지)
+  return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
 }
 
-/* ---------- 역할 판정: 토큰 신호 → 타입/기하 ---------- */
-function resolveRole(node: SceneNode, token: ParsedToken | null): string {
-  if (token?.roleLeaf) return token.roleLeaf; // 토큰 말단이 역할이면 그것이 1순위 신호
+/* ---------- 역할 판정: 영역 → 버튼 → 토큰 신호 → 타입/기하 ---------- */
+function resolveRole(node: SceneNode, token: ParsedToken | null, pos: Pos): string {
+  if (isButtonLike(node)) return 'button'; // 버튼은 토큰 채움색보다 우선
+  const region = regionRole(node, pos);
+  if (region) return region;
+  if (token?.roleLeaf) return token.roleLeaf; // 토큰 말단이 역할이면 신호로 사용
 
   switch (node.type) {
     case 'VECTOR':
@@ -190,4 +210,50 @@ function hasColorFill(node: SceneNode): boolean {
 function hasVisibleStroke(node: SceneNode): boolean {
   const s = paints(node, 'strokes');
   return !!s && s.some((p) => p.visible !== false);
+}
+
+/* ---------- 시맨틱(영역/버튼) 추론 ---------- */
+function layoutOf(node: SceneNode): Pos['parentLayout'] {
+  if (!('layoutMode' in node)) return null;
+  const m = (node as { layoutMode?: string }).layoutMode;
+  return m === 'VERTICAL' ? 'vertical' : m === 'HORIZONTAL' ? 'horizontal' : null;
+}
+
+function isContainerType(node: SceneNode): boolean {
+  return node.type === 'FRAME' || node.type === 'GROUP' || node.type === 'SECTION';
+}
+
+/**
+ * 영역 추론(보수적): 페이지(세로 오토레이아웃) 바로 아래 컨테이너의
+ * 첫 자식 → header, 마지막 자식 → footer. depth 1에서만(과추론 방지).
+ */
+function regionRole(node: SceneNode, pos: Pos): string | null {
+  if (pos.depth !== 1 || pos.parentLayout !== 'vertical' || pos.total < 2) return null;
+  if (!isContainerType(node)) return null;
+  if (pos.index === 0) return 'header';
+  if (pos.index === pos.total - 1) return 'footer';
+  return null;
+}
+
+/** 버튼 추론: 오토레이아웃 + 라운드 + 채움/외곽선 + 직속 텍스트 + 과대하지 않음. */
+function isButtonLike(node: SceneNode): boolean {
+  if (node.type !== 'FRAME') return false;
+  if (layoutOf(node) === null) return false; // 오토레이아웃만
+  if (!(cornerRadiusOf(node) > 0)) return false;
+  if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
+  if (!hasDirectText(node)) return false;
+  const d = dims(node);
+  if (d && d.h > 80) return false; // 너무 크면 버튼 아님(영역/카드)
+  return true;
+}
+
+function cornerRadiusOf(node: SceneNode): number {
+  const r = (node as { cornerRadius?: number | symbol }).cornerRadius;
+  if (typeof r === 'number') return r;
+  const tl = (node as { topLeftRadius?: number }).topLeftRadius; // mixed 라운드면 한 모서리로 판단
+  return typeof tl === 'number' ? tl : 0;
+}
+
+function hasDirectText(node: SceneNode): boolean {
+  return 'children' in node && node.children.some((c) => c.type === 'TEXT');
 }
