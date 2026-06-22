@@ -820,29 +820,27 @@ test('renameSelection(#7b) — 인스턴스 서브트리는 통째 스킵(자식
 });
 
 /* ================= prunePaletteColors (팔레트 재적용 정리) ================= */
-test('prunePaletteColors — keep에 없는 팔레트 색만 삭제(사용자 변수 보존)', async () => {
+test('prunePaletteColors(#3) — 재생성 hue 패밀리 안에서만 정리(다른 패밀리·추출 hex 보존)', async () => {
   const figma = installFigma();
-  // 이전 팔레트(사각=accent-1·2·3) + 사용자 커스텀 색 + 비색
+  // 이전 팔레트(blue 2스텝 + green) + 추출 hex 색 + 비색
   await createTokens(
     [
-      { name: 'color/accent-1/500', category: 'color', sources: ['fill'], value: '#111111' },
-      { name: 'color/accent-2/500', category: 'color', sources: ['fill'], value: '#222222' },
-      { name: 'color/accent-3/500', category: 'color', sources: ['fill'], value: '#333333' },
-      { name: 'color/secondary/500', category: 'color', sources: ['fill'], value: '#444444' },
-      { name: 'color/brandish/500', category: 'color', sources: ['fill'], value: '#555555' }, // 사용자 색(팔레트 패밀리 아님)
+      { name: 'color/blue/500', category: 'color', sources: ['fill'], value: '#3366ff' },
+      { name: 'color/blue/700', category: 'color', sources: ['fill'], value: '#1133aa' },
+      { name: 'color/green/500', category: 'color', sources: ['fill'], value: '#22aa55' },
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }, // 추출 hex(2토막)
       { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
     ],
     16,
   );
-  // 새 팔레트(보색=accent-1만) 재적용 → accent-2·3 정리, accent-1·secondary·사용자색·간격 보존
-  const keep = ['color/accent-1/500', 'color/secondary/500'];
+  // 새 팔레트가 blue/500만 → blue 패밀리의 다른 스텝(blue/700)만 정리. green·추출 hex·간격 보존.
+  const keep = ['color/blue/500'];
   const removed = await prunePaletteColors(keep);
 
-  assert.equal(removed, 4); // Global+Semantic 각각 accent-2, accent-3 = 4개
-  assert.ok(!findVar(figma, 'Global', 'color/accent-2/500'));
-  assert.ok(!findVar(figma, 'Global', 'color/accent-3/500'));
-  assert.ok(findVar(figma, 'Global', 'color/accent-1/500')); // keep
-  assert.ok(findVar(figma, 'Global', 'color/secondary/500')); // keep
-  assert.ok(findVar(figma, 'Global', 'color/brandish/500')); // 사용자 색 보존
+  assert.equal(removed, 2); // blue/700 의 Global+Semantic
+  assert.ok(!findVar(figma, 'Global', 'color/blue/700'));
+  assert.ok(findVar(figma, 'Global', 'color/blue/500')); // keep
+  assert.ok(findVar(figma, 'Global', 'color/green/500')); // 다른 패밀리 보존
+  assert.ok(findVar(figma, 'Global', 'color/0066ff')); // 추출 hex 보존
   assert.ok(findVar(figma, 'Global', 'spacing/16')); // 비색 보존
 });

@@ -300,13 +300,33 @@
     return (hi + 0.05) / (lo + 0.05);
   }
 
+  // src/lib/colorName.ts
+  var STEP_LIST = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+  var STEP_L = STEP_LIST.map((_, i) => 0.97 + (0.16 - 0.97) * (i / (STEP_LIST.length - 1)));
+  var HUE_CENTERS = [
+    { name: "red", h: 25 },
+    { name: "orange", h: 65 },
+    { name: "yellow", h: 100 },
+    { name: "green", h: 145 },
+    { name: "teal", h: 190 },
+    { name: "blue", h: 250 },
+    { name: "indigo", h: 285 },
+    { name: "purple", h: 320 },
+    { name: "pink", h: 355 }
+  ];
+  var HUE_FAMILIES = [...HUE_CENTERS.map((c) => c.name), "gray"];
+
   // src/lib/palette.ts
-  var PALETTE_FAMILIES = ["primary", "secondary", "neutral", "success", "warning", "error", "info"];
   function isPaletteColorName(name) {
-    var _a;
     if (!name.startsWith("color/")) return false;
-    const family = (_a = name.split("/")[1]) != null ? _a : "";
-    return PALETTE_FAMILIES.includes(family) || /^accent-\d+$/.test(family);
+    const parts = name.split("/");
+    if (parts.length !== 3) return false;
+    const base = parts[1].replace(/-\d+$/, "");
+    return HUE_FAMILIES.includes(base);
+  }
+  function paletteFamilyOf(name) {
+    if (!isPaletteColorName(name)) return null;
+    return name.split("/")[1];
   }
 
   // src/lib/variables.ts
@@ -421,12 +441,14 @@
   }
   async function prunePaletteColors(keep) {
     const keepSet = new Set(keep);
+    const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f) => f !== null));
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const palIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC).map((c) => c.id));
     let removed = 0;
     for (const v of await figma.variables.getLocalVariablesAsync()) {
       if (!palIds.has(v.variableCollectionId)) continue;
-      if (isPaletteColorName(v.name) && !keepSet.has(v.name)) {
+      const fam = paletteFamilyOf(v.name);
+      if (fam && keepFamilies.has(fam) && !keepSet.has(v.name)) {
         v.remove();
         removed++;
       }

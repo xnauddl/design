@@ -667,6 +667,56 @@
     return { l: lch.l, c: lo, h: lch.h };
   }
 
+  // src/lib/colorName.ts
+  var STEP_LIST = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+  var STEP_L = STEP_LIST.map((_, i) => 0.97 + (0.16 - 0.97) * (i / (STEP_LIST.length - 1)));
+  var ACHROMATIC_C = 0.03;
+  var HUE_CENTERS = [
+    { name: "red", h: 25 },
+    { name: "orange", h: 65 },
+    { name: "yellow", h: 100 },
+    { name: "green", h: 145 },
+    { name: "teal", h: 190 },
+    { name: "blue", h: 250 },
+    { name: "indigo", h: 285 },
+    { name: "purple", h: 320 },
+    { name: "pink", h: 355 }
+  ];
+  var HUE_FAMILIES = [...HUE_CENTERS.map((c) => c.name), "gray"];
+  function angularDist(a, b) {
+    const d = Math.abs(((a - b) % 360 + 360) % 360);
+    return Math.min(d, 360 - d);
+  }
+  function hueName(h) {
+    let best = HUE_CENTERS[0];
+    let bestD = Infinity;
+    for (const c of HUE_CENTERS) {
+      const d = angularDist(h, c.h);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return best.name;
+  }
+  function stepForL(l) {
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < STEP_LIST.length; i++) {
+      const d = Math.abs(STEP_L[i] - l);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    return STEP_LIST[best];
+  }
+  function classifyColor(hex) {
+    const o = hexToOklch(hex);
+    const achromatic = o.c < ACHROMATIC_C;
+    return { family: achromatic ? "gray" : hueName(o.h), step: stepForL(o.l), achromatic };
+  }
+
   // src/lib/palette.ts
   var STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
   var lerp = (a, b, t) => a + (b - a) * t;
@@ -729,44 +779,81 @@
       return buildScale(family, seed);
     });
   }
+  function scaleHue(scale) {
+    var _a;
+    const mid = (_a = scale.swatches.find((s) => s.step === 500)) != null ? _a : scale.swatches[Math.floor(scale.swatches.length / 2)];
+    return classifyColor(mid.hex).family;
+  }
   function generatePalette(input) {
-    const scales = [];
+    var _a;
     const warnings = [];
     const base = hexToOklch(input.brand.primary);
     if (base.c < LOW_CHROMA) {
       warnings.push("\uBE0C\uB79C\uB4DC\uC0C9\uC758 \uCC44\uB3C4\uAC00 \uB9E4\uC6B0 \uB0AE\uC544 hue\uAC00 \uBD88\uC548\uC815\uD569\uB2C8\uB2E4 \u2014 \uC911\uB9BD(neutral) \uC2A4\uCF00\uC77C\uB85C \uB2E4\uB8E8\uB294 \uAC83\uC744 \uAD8C\uC7A5\uD569\uB2C8\uB2E4.");
     }
-    scales.push(buildScale("primary", input.brand.primary, { anchor: true }));
-    if (input.brand.secondary) scales.push(buildScale("secondary", input.brand.secondary, { anchor: true }));
+    const built = [];
+    built.push({ role: "primary", scale: buildScale("primary", input.brand.primary, { anchor: true }) });
+    if (input.brand.secondary) built.push({ role: "secondary", scale: buildScale("secondary", input.brand.secondary, { anchor: true }) });
     if (input.harmony) {
       harmonyHexes(input.brand.primary, input.harmony).forEach((hex, i) => {
-        scales.push(buildScale(`accent-${i + 1}`, hex));
+        built.push({ role: `accent-${i + 1}`, scale: buildScale(`accent-${i + 1}`, hex) });
       });
     }
-    if (input.includeNeutral) scales.push(neutralScale(input.brand.primary));
-    if (input.includeStatus) scales.push(...statusScales());
-    return { scales, warnings };
+    if (input.includeNeutral) built.push({ role: "neutral", scale: neutralScale(input.brand.primary) });
+    if (input.includeStatus) for (const s of statusScales()) built.push({ role: roleForStatusHue(s), scale: s });
+    const used = /* @__PURE__ */ new Map();
+    const scales = [];
+    const roles = [];
+    for (const b of built) {
+      const hue = scaleHue(b.scale);
+      const n = ((_a = used.get(hue)) != null ? _a : 0) + 1;
+      used.set(hue, n);
+      const family = n === 1 ? hue : `${hue}-${n}`;
+      scales.push({ family, swatches: b.scale.swatches });
+      roles.push({ role: b.role, family });
+    }
+    return { scales, roles, warnings };
   }
-  function suggestSemanticMap(p) {
-    const families = new Set(p.scales.map((s) => s.family));
+  function roleForStatusHue(scale) {
+    return scale.family;
+  }
+  function paletteSemanticMap(p) {
+    const byRole = new Map(p.roles.map((r) => [r.role, r.family]));
     const map = {};
-    if (families.has("primary")) {
-      map["primary"] = "color/primary/500";
-      map["primary/strong"] = "color/primary/700";
-      map["primary/subtle"] = "color/primary/100";
+    const primary = byRole.get("primary");
+    if (primary) {
+      map["primary"] = `color/${primary}/500`;
+      map["primary/strong"] = `color/${primary}/700`;
+      map["primary/subtle"] = `color/${primary}/100`;
     }
-    if (families.has("secondary")) map["secondary"] = "color/secondary/500";
-    for (const f of families) if (f.startsWith("accent-")) map[f] = `color/${f}/500`;
-    if (families.has("neutral")) {
-      map["surface"] = "color/neutral/50";
-      map["surface/muted"] = "color/neutral/100";
-      map["text"] = "color/neutral/900";
-      map["text/muted"] = "color/neutral/600";
-      map["border"] = "color/neutral/200";
+    const secondary = byRole.get("secondary");
+    if (secondary) map["secondary"] = `color/${secondary}/500`;
+    for (const r of p.roles) if (r.role.startsWith("accent-")) map[r.role] = `color/${r.family}/500`;
+    const neutral = byRole.get("neutral");
+    if (neutral) {
+      map["surface"] = `color/${neutral}/50`;
+      map["surface/muted"] = `color/${neutral}/100`;
+      map["text"] = `color/${neutral}/900`;
+      map["text/muted"] = `color/${neutral}/600`;
+      map["border"] = `color/${neutral}/200`;
     }
-    for (const f of ["success", "warning", "error", "info"]) {
-      if (families.has(f)) map[f] = `color/${f}/500`;
+    for (const role of ["success", "warning", "error", "info"]) {
+      const f = byRole.get(role);
+      if (f) map[role] = `color/${f}/500`;
     }
+    return map;
+  }
+  function suggestSemanticMap(colors) {
+    const classed = colors.map((c) => ({ name: c.name, o: hexToOklch(c.hex), achromatic: hexToOklch(c.hex).c < LOW_CHROMA }));
+    const map = {};
+    const neutrals = classed.filter((c) => c.achromatic).sort((a, b) => b.o.l - a.o.l);
+    if (neutrals.length) {
+      map["surface"] = neutrals[0].name;
+      map["text"] = neutrals[neutrals.length - 1].name;
+      if (neutrals.length >= 3) map["border"] = neutrals[Math.floor(neutrals.length / 2)].name;
+    }
+    const chroma = classed.filter((c) => !c.achromatic).sort((a, b) => b.o.c - a.o.c);
+    if (chroma.length) map["primary"] = chroma[0].name;
     return map;
   }
   function paletteToDraftTokens(p) {
@@ -929,7 +1016,7 @@
     });
     tokens = paletteToDraftTokens(p);
     renderTokens();
-    $("semMap").value = Object.entries(suggestSemanticMap(p)).map(([role, global]) => `${role} = ${global}`).join("\n");
+    setSemMapText(paletteSemanticMap(p));
     $("btnPaletteApply").style.display = "";
     $("paletteInfo").textContent = `${p.scales.length}\uACC4\uC5F4 \xB7 ${tokens.length}\uC0C9 \uC0DD\uC131`;
     setStatus(
@@ -938,6 +1025,15 @@
       p.warnings.length ? "warn" : "ok"
     );
   });
+  function setSemMapText(map) {
+    $("semMap").value = Object.entries(map).map(([role, global]) => `${role} = ${global}`).join("\n");
+  }
+  function suggestSemMapFrom(toks) {
+    if ($("semMap").value.trim()) return;
+    const colors = toks.filter((t) => t.category === "color" && typeof t.value === "string").map((t) => ({ name: t.name, hex: t.value }));
+    if (!colors.length) return;
+    setSemMapText(suggestSemanticMap(colors));
+  }
   function syncSecondaryControls() {
     const on = $("useBrand2").checked;
     $("brand2").disabled = !on;
@@ -1446,6 +1542,7 @@
         renderTokens();
         $("btnCreateApply").style.display = "none";
         $("btnPaletteApply").style.display = "none";
+        suggestSemMapFrom(tokens);
         $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
         setStatus("extractStatus", msg.warnings.join(" ") || `${tokens.length}\uAC1C \uD6C4\uBCF4 \uCD94\uCD9C \uC644\uB8CC.`, msg.warnings.length ? "warn" : "ok");
         break;

@@ -9,7 +9,7 @@ import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import type { ExportFormat } from './lib/exporters';
-import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
+import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import type { WcagLevel } from './lib/contrast';
@@ -109,10 +109,8 @@ $('btnPalette').addEventListener('click', () => {
   });
   tokens = paletteToDraftTokens(p);
   renderTokens();
-  // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능)
-  ($('semMap') as HTMLTextAreaElement).value = Object.entries(suggestSemanticMap(p))
-    .map(([role, global]) => `${role} = ${global}`)
-    .join('\n');
+  // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
+  setSemMapText(paletteSemanticMap(p));
   ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
   $('paletteInfo').textContent = `${p.scales.length}계열 · ${tokens.length}색 생성`;
   setStatus(
@@ -121,6 +119,23 @@ $('btnPalette').addEventListener('click', () => {
     p.warnings.length ? 'warn' : 'ok',
   );
 });
+
+/** 시맨틱 매핑 textarea를 `역할 = 변수명` 줄로 채움. */
+function setSemMapText(map: Record<string, string>): void {
+  ($('semMap') as HTMLTextAreaElement).value = Object.entries(map)
+    .map(([role, global]) => `${role} = ${global}`)
+    .join('\n');
+}
+
+/** #10: 색 토큰에서 시맨틱 역할을 추천(매핑이 비어 있을 때만 — 사용자 편집 보존). */
+function suggestSemMapFrom(toks: DraftToken[]): void {
+  if (($('semMap') as HTMLTextAreaElement).value.trim()) return;
+  const colors = toks
+    .filter((t) => t.category === 'color' && typeof t.value === 'string')
+    .map((t) => ({ name: t.name, hex: t.value as string }));
+  if (!colors.length) return;
+  setSemMapText(suggestSemanticMap(colors));
+}
 
 // 보조색 사용 토글 → 보조색·하모니 입력 활성/비활성 동기화.
 function syncSecondaryControls(): void {
@@ -720,6 +735,8 @@ window.onmessage = (event: MessageEvent) => {
       renderTokens();
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
       ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
+      // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
+      suggestSemMapFrom(tokens);
       $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
       setStatus('extractStatus', msg.warnings.join(' ') || `${tokens.length}개 후보 추출 완료.`, msg.warnings.length ? 'warn' : 'ok');
       break;
