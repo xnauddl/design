@@ -1,0 +1,17 @@
+name = "dsl-license-verify"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+
+# 변수(공개): 플러그인 licenseConfig.ts 값과 일치시킬 것.
+[vars]
+LICENSE_ISS = "design-system-linker-license"
+LICENSE_AUD = "design-system-linker"
+TOKEN_TTL_DAYS = "30"
+
+# 비밀(secret)은 커밋하지 말고 wrangler로 주입:
+#   npx wrangler secret put LICENSE_PRIVATE_JWK   # scripts/gen-license-keys.mjs의 private JWK(JSON)
+#   npx wrangler secret put ADMIN_KEYS            # (선택) 오너 관리자 키, 쉼표 구분
+# 배포:
+#   npx wrangler deploy
+# 배포 후 출력된 *.workers.dev URL을 src/lib/licenseConfig.ts VERIFY_URL 및
+# manifest.json allowedDomains 에 반영.

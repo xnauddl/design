@@ -6,6 +6,8 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
 const watch = process.argv.includes('--watch');
+// 개발 빌드 여부 — watch 또는 --dev. __DEV__=true일 때만 개발용 티어 토글이 활성(백도어 차단).
+const dev = watch || process.argv.includes('--dev');
 const outdir = 'dist';
 await mkdir(outdir, { recursive: true });
 
@@ -13,6 +15,7 @@ const shared = {
   bundle: true,
   target: 'es2019',
   logLevel: 'info',
+  define: { __DEV__: JSON.stringify(dev) },
 };
 
 // (1) 샌드박스 코드

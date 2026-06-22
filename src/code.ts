@@ -10,7 +10,7 @@ import { renameSelection } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { classifyVariants, missingVariants, variantGrid, inferComponentProperties } from './lib/components';
-import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
+import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
 import { HistoryEntry, HistoryAction, pushHistory } from './lib/history';
@@ -56,7 +56,7 @@ function postLicense(note?: string): void {
   post({
     type: 'LICENSE_STATUS',
     tier: e.tier,
-    unlimited: hasEntitlement(e.tier, 'unlimited'),
+    paid: e.tier === 'paid',
     source: e.source,
     status: e.status,
     expiresAt: e.expiresAt,
@@ -66,8 +66,9 @@ function postLicense(note?: string): void {
 
 async function loadLicense(): Promise<void> {
   try {
+    // 개발용 강제 티어는 개발 빌드에서만 적용(배포 빌드 백도어 차단).
     const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
-    if (isTier(dt)) devTier = dt;
+    if (__DEV__ && isTier(dt)) devTier = dt;
     const c = (await figma.clientStorage.getAsync(CACHE_KEY)) as LicenseCache | undefined;
     // 손상/구형 캐시 방어: 모든 필드 형식을 확인(특히 key는 REQUEST_VERIFY에서 사용).
     if (c && typeof c.key === 'string' && isTier(c.tier) && typeof c.expiresAt === 'number' && typeof c.lastVerified === 'number') cache = c;
@@ -86,10 +87,10 @@ function record(action: HistoryAction, summary: string): void {
   void figma.clientStorage.setAsync(HISTORY_KEY, history).catch(() => {});
 }
 
-/** Team 전용 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requireTeam(): boolean {
-  if (hasEntitlement(currentTier(), 'teamPresets')) return true;
-  post({ type: 'PREMIUM_REQUIRED', feature: 'teamPresets', message: '팀 공유 프리셋/이력은 Team 요금제 기능입니다.' });
+/** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용) */
+function requirePaid(feature: Feature, message: string): boolean {
+  if (currentTier() === 'paid') return true;
+  post({ type: 'PREMIUM_REQUIRED', feature, message });
   return false;
 }
 
@@ -113,13 +114,6 @@ function arrangeSet(set: ComponentSetNode): void {
     maxRow = Math.max(maxRow, g.row);
   }
   set.resizeWithoutConstraints(pad * 2 + (maxCol + 1) * cellW + maxCol * gap, pad * 2 + (maxRow + 1) * cellH + maxRow * gap);
-}
-
-/** Pro 이상 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requirePro(): boolean {
-  if (hasEntitlement(currentTier(), 'components')) return true;
-  post({ type: 'PREMIUM_REQUIRED', feature: 'components', message: '컴포넌트 등록·베리언트 분류는 Pro 요금제 기능입니다.' });
-  return false;
 }
 
 async function savePresets(): Promise<void> {
@@ -208,15 +202,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_TOKENS': {
-        // Free 사용량 한도: 초과분은 적용하지 않음(비파괴) + 업그레이드 안내.
-        const limit = limitsForTier(currentTier()).tokens;
-        const c = clampCount(msg.tokens.length, limit);
-        const slice = msg.tokens.slice(0, c.allowed);
-        // UX1: preview면 변수를 만들지 않고 예정 수만 집계.
-        const s = msg.preview ? await previewCreateTokens(slice) : await createTokens(slice, msg.base);
-        let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
-        if (c.limited) summary += ` · ⚠ ${msg.tokens.length}개 중 ${c.allowed}개만 적용(Free 한도 ${limit}) — 업그레이드 필요`;
-        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
+        // 미리보기(추출/예정 집계)는 Free. 실제 변수 생성만 Paid 게이팅.
+        if (!msg.preview && !requirePaid('tokens', '토큰(변수) 생성은 Paid 기능입니다. 미리보기는 무료로 제공됩니다.')) break;
+        const s = msg.preview ? await previewCreateTokens(msg.tokens) : await createTokens(msg.tokens, msg.base);
+        const summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
+        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview });
         if (!msg.preview) {
           record('create', summary);
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
@@ -224,13 +214,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'APPLY': {
-        const lim = limitsForTier(currentTier());
         bindCancel = false; // UX6: 새 작업 시작 시 취소 플래그 초기화
-        // UX1: preview면 dry-run(바인딩 없이 집계). UX3: 사유별 스킵(reasons). UX6: 진행률·취소.
+        // 바인딩은 Free·무제한. UX1: preview면 dry-run(바인딩 없이 집계). UX3: 사유별 스킵. UX6: 진행률·취소.
         const r = await bindSelection(
           selection(),
           msg.tolerance,
-          { maxNodes: lim.nodes, maxBindings: lim.bindings },
+          { maxNodes: Infinity, maxBindings: Infinity },
           !msg.preview,
           {
             onProgress: (done, total) => post({ type: 'PROGRESS', op: 'bind', done, total }),
@@ -268,6 +257,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_SEMANTICS': {
+        if (!requirePaid('semantics', '시맨틱 매핑은 Paid 기능입니다.')) break;
         const s = await createSemanticAliases(msg.map);
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
         record('semantics', `별칭 ${s.aliased} (생성 ${s.created} / 갱신 ${s.updated})`);
@@ -285,6 +275,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'SET_LICENSE': {
+        if (!__DEV__) break; // 개발 빌드 전용 — 배포 빌드에선 페이월 우회 백도어 차단
         devTier = msg.tier;
         try {
           await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);
@@ -327,31 +318,31 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'GET_PRESETS': {
-        if (!requireTeam()) break;
+        if (!requirePaid('presets', '공유 프리셋·변경 이력은 Paid 기능입니다.')) break;
         post({ type: 'PRESETS', presets });
         break;
       }
       case 'SAVE_PRESET': {
-        if (!requireTeam()) break;
+        if (!requirePaid('presets', '공유 프리셋·변경 이력은 Paid 기능입니다.')) break;
         presets = upsertPreset(presets, msg.preset);
         await savePresets();
         post({ type: 'PRESETS', presets });
         break;
       }
       case 'DELETE_PRESET': {
-        if (!requireTeam()) break;
+        if (!requirePaid('presets', '공유 프리셋·변경 이력은 Paid 기능입니다.')) break;
         presets = presets.filter((p) => p.name !== msg.name);
         await savePresets();
         post({ type: 'PRESETS', presets });
         break;
       }
       case 'GET_HISTORY': {
-        if (!requireTeam()) break;
+        if (!requirePaid('presets', '공유 프리셋·변경 이력은 Paid 기능입니다.')) break;
         post({ type: 'HISTORY', entries: history });
         break;
       }
       case 'CLEAR_HISTORY': {
-        if (!requireTeam()) break;
+        if (!requirePaid('presets', '공유 프리셋·변경 이력은 Paid 기능입니다.')) break;
         history = [];
         try {
           await figma.clientStorage.deleteAsync(HISTORY_KEY);
@@ -362,7 +353,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'EXPORT': {
-        // 모든 디자인 시스템 변수(Global+Semantic)를 코드로 내보내기. (현재 Free; 추후 게이팅 가능)
+        // 모든 디자인 시스템 변수(Global+Semantic)를 코드로 내보내기. (Free — 리드젠)
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
         const colById = new Map(cols.map((c) => [c.id, c]));
         const vars = await figma.variables.getLocalVariablesAsync();
@@ -400,7 +391,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'REGISTER_COMPONENTS': {
-        if (!requirePro()) break;
+        if (!requirePaid('components', '컴포넌트 등록·베리언트는 Paid 기능입니다.')) break;
         let registered = 0;
         let skipped = 0;
         for (const node of selection()) {
@@ -428,7 +419,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CLASSIFY_VARIANTS': {
-        if (!requirePro()) break;
+        if (!requirePaid('components', '컴포넌트 등록·베리언트는 Paid 기능입니다.')) break;
         const comps = selection().filter((n): n is ComponentNode => n.type === 'COMPONENT');
         const byName = new Map<string, ComponentNode>();
         for (const c of comps) if (!byName.has(c.name)) byName.set(c.name, c);
@@ -461,7 +452,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'GENERATE_MISSING_VARIANTS': {
-        if (!requirePro()) break;
+        if (!requirePaid('components', '컴포넌트 등록·베리언트는 Paid 기능입니다.')) break;
         const sets = selection().filter((n): n is ComponentSetNode => n.type === 'COMPONENT_SET');
         let generated = 0;
         const combos: string[] = [];
@@ -488,7 +479,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'EXPOSE_PROPERTIES': {
-        if (!requirePro()) break;
+        if (!requirePaid('components', '컴포넌트 등록·베리언트는 Paid 기능입니다.')) break;
         let created = 0;
         const props: string[] = [];
         // 단일 컴포넌트 대상(세트는 변형 충돌 방지 위해 개별 변형을 선택).

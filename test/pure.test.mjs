@@ -18,8 +18,6 @@ import {
   layerNameFromRole,
   dedupeName,
   hasEntitlement,
-  limitsForTier,
-  clampCount,
   isTier,
   evaluateLicense,
   parseVerifyResponse,
@@ -146,30 +144,19 @@ test('멱등성 — 같은 입력은 같은 출력', () => {
 });
 
 /* ================= entitlements.ts ================= */
-test('hasEntitlement — 티어 위계로 기능 해금', () => {
+test('hasEntitlement — Paid에서만 유료 기능 해금', () => {
+  assert.equal(hasEntitlement('free', 'tokens'), false);
   assert.equal(hasEntitlement('free', 'components'), false);
-  assert.equal(hasEntitlement('pro', 'components'), true);
-  assert.equal(hasEntitlement('free', 'unlimited'), false);
-  assert.equal(hasEntitlement('pro', 'unlimited'), true);
-  // teamPresets는 team에서만
-  assert.equal(hasEntitlement('pro', 'teamPresets'), false);
-  assert.equal(hasEntitlement('team', 'teamPresets'), true);
+  assert.equal(hasEntitlement('paid', 'tokens'), true);
+  assert.equal(hasEntitlement('paid', 'semantics'), true);
+  assert.equal(hasEntitlement('paid', 'components'), true);
+  assert.equal(hasEntitlement('paid', 'presets'), true);
 });
 
-test('limitsForTier — Free는 한도, Pro/Team은 무제한', () => {
-  assert.deepEqual(limitsForTier('free'), { nodes: 50, tokens: 100, bindings: 200 });
-  assert.equal(limitsForTier('pro').tokens, Infinity);
-  assert.equal(limitsForTier('team').nodes, Infinity);
-});
-
-test('clampCount — 한도까지 자르고 초과 보고', () => {
-  assert.deepEqual(clampCount(120, 100), { allowed: 100, limited: true, overflow: 20 });
-  assert.deepEqual(clampCount(80, 100), { allowed: 80, limited: false, overflow: 0 });
-  assert.deepEqual(clampCount(5, Infinity), { allowed: 5, limited: false, overflow: 0 });
-});
-
-test('isTier — 유효 티어 검증', () => {
-  assert.equal(isTier('pro'), true);
+test('isTier — 유효 티어 검증(free|paid)', () => {
+  assert.equal(isTier('free'), true);
+  assert.equal(isTier('paid'), true);
+  assert.equal(isTier('pro'), false); // 구 3티어 값은 무효
   assert.equal(isTier('enterprise'), false);
   assert.equal(isTier(undefined), false);
 });
@@ -180,23 +167,23 @@ test('evaluateLicense — 캐시 없음/만료/활성', () => {
   assert.deepEqual(evaluateLicense(null, now), { tier: 'free', status: 'none', stale: false });
   // 만료(now > expiresAt) → free/expired
   assert.deepEqual(
-    evaluateLicense({ key: 'k', tier: 'pro', expiresAt: now - 1, lastVerified: now }, now),
+    evaluateLicense({ key: 'k', tier: 'paid', expiresAt: now - 1, lastVerified: now }, now),
     { tier: 'free', status: 'expired', stale: true },
   );
   // 만료 전 + 최근 검증 → active
   assert.deepEqual(
-    evaluateLicense({ key: 'k', tier: 'pro', expiresAt: now + GRACE_MS, lastVerified: now }, now),
-    { tier: 'pro', status: 'active', stale: false },
+    evaluateLicense({ key: 'k', tier: 'paid', expiresAt: now + GRACE_MS, lastVerified: now }, now),
+    { tier: 'paid', status: 'active', stale: false },
   );
 });
 
 test('evaluateLicense — 오프라인 grace 유지 후 강등', () => {
   const now = 2_000_000_000_000;
-  const base = { key: 'k', tier: 'team', expiresAt: now + GRACE_MS * 2 };
+  const base = { key: 'k', tier: 'paid', expiresAt: now + GRACE_MS * 2 };
   // 검증이 REVERIFY 경과·grace 이내 → 티어 유지(grace, stale)
   assert.deepEqual(
     evaluateLicense({ ...base, lastVerified: now - (REVERIFY_MS + 1000) }, now),
-    { tier: 'team', status: 'grace', stale: true },
+    { tier: 'paid', status: 'grace', stale: true },
   );
   // grace 초과(장기 미검증) → 강등 free
   assert.deepEqual(
@@ -206,19 +193,19 @@ test('evaluateLicense — 오프라인 grace 유지 후 강등', () => {
 });
 
 test('parseVerifyResponse — 성공/실패/형식오류', () => {
-  const ok = parseVerifyResponse({ valid: true, tier: 'pro', expiresAt: 123 });
-  assert.deepEqual(ok, { ok: true, tier: 'pro', expiresAt: 123 });
+  const ok = parseVerifyResponse({ valid: true, tier: 'paid', expiresAt: 123 });
+  assert.deepEqual(ok, { ok: true, tier: 'paid', expiresAt: 123 });
   assert.equal(parseVerifyResponse({ valid: false, error: '만료됨' }).error, '만료됨');
   assert.equal(parseVerifyResponse({ tier: 'gold', expiresAt: 1 }).ok, false); // 알 수 없는 티어
-  assert.equal(parseVerifyResponse({ valid: true, tier: 'pro' }).ok, false); // 만료시각 없음
+  assert.equal(parseVerifyResponse({ valid: true, tier: 'paid' }).ok, false); // 만료시각 없음
   assert.equal(parseVerifyResponse('nope').ok, false);
 });
 
 test('cacheFromVerify — 응답+키+now → 캐시', () => {
-  const v = { ok: true, tier: 'pro', expiresAt: 999 };
+  const v = { ok: true, tier: 'paid', expiresAt: 999 };
   assert.deepEqual(cacheFromVerify('KEY-1', v, 500), {
     key: 'KEY-1',
-    tier: 'pro',
+    tier: 'paid',
     expiresAt: 999,
     lastVerified: 500,
   });
@@ -235,10 +222,10 @@ test('base64UrlToString — base64url 디코드(ASCII JSON)', () => {
 });
 
 test('decodeJwt — 헤더/페이로드/서명 분해', () => {
-  const t = makeToken({ alg: 'ES256', typ: 'JWT' }, { tier: 'team', exp: 42 });
+  const t = makeToken({ alg: 'ES256', typ: 'JWT' }, { tier: 'paid', exp: 42 });
   const jwt = decodeJwt(t);
   assert.equal(jwt.header.alg, 'ES256');
-  assert.equal(jwt.payload.tier, 'team');
+  assert.equal(jwt.payload.tier, 'paid');
   assert.equal(jwt.signatureB64, 'SIG');
   assert.equal(jwt.signingInput, t.slice(0, t.lastIndexOf('.')));
   assert.throws(() => decodeJwt('a.b')); // 형식 오류
@@ -247,16 +234,16 @@ test('decodeJwt — 헤더/페이로드/서명 분해', () => {
 test('validateLicenseClaims — 만료·iss·aud·tier', () => {
   const now = 1_000_000;
   const exp = (now + 60_000) / 1000; // 초 단위
-  const base = { tier: 'pro', exp, iss: 'srv', aud: 'plugin' };
+  const base = { tier: 'paid', exp, iss: 'srv', aud: 'plugin' };
   assert.deepEqual(validateLicenseClaims(base, now, { issuer: 'srv', audience: 'plugin' }), {
     ok: true,
-    tier: 'pro',
+    tier: 'paid',
     expiresAt: exp * 1000,
   });
-  assert.equal(validateLicenseClaims({ tier: 'pro', exp: (now - 1) / 1000 }, now).ok, false); // 만료
+  assert.equal(validateLicenseClaims({ tier: 'paid', exp: (now - 1) / 1000 }, now).ok, false); // 만료
   assert.equal(validateLicenseClaims(base, now, { issuer: 'other' }).ok, false); // iss 불일치
   assert.equal(validateLicenseClaims({ tier: 'gold', exp }, now).ok, false); // 알 수 없는 티어
-  assert.equal(validateLicenseClaims({ tier: 'pro' }, now).ok, false); // exp 없음
+  assert.equal(validateLicenseClaims({ tier: 'paid' }, now).ok, false); // exp 없음
 });
 
 /* ================= presets.ts (M3 Team) ================= */
@@ -476,20 +463,20 @@ test('missingVariants — 베리언트 자식 이름에서 빠진 조합(Phase 4
 test('verifyLicenseToken — 서명 검증 주입 + alg=none 거부', async () => {
   const now = 1_000_000;
   const exp = (now + 60_000) / 1000;
-  const tok = makeToken({ alg: 'ES256' }, { tier: 'pro', exp });
+  const tok = makeToken({ alg: 'ES256' }, { tier: 'paid', exp });
   const yes = async () => true;
   const no = async () => false;
 
   const ok = await verifyLicenseToken(tok, now, {}, yes);
-  assert.deepEqual(ok, { ok: true, tier: 'pro', expiresAt: exp * 1000 });
+  assert.deepEqual(ok, { ok: true, tier: 'paid', expiresAt: exp * 1000 });
 
   // 서명 실패 → 거부
   assert.equal((await verifyLicenseToken(tok, now, {}, no)).ok, false);
   // alg=none → 서명 검증 호출 없이 거부
-  const none = makeToken({ alg: 'none' }, { tier: 'pro', exp });
+  const none = makeToken({ alg: 'none' }, { tier: 'paid', exp });
   assert.equal((await verifyLicenseToken(none, now, {}, yes)).ok, false);
   // 서명 OK라도 만료면 거부
-  const expired = makeToken({ alg: 'ES256' }, { tier: 'pro', exp: (now - 1) / 1000 });
+  const expired = makeToken({ alg: 'ES256' }, { tier: 'paid', exp: (now - 1) / 1000 });
   assert.equal((await verifyLicenseToken(expired, now, {}, yes)).ok, false);
 });
 
