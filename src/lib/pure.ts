@@ -5,6 +5,7 @@ export * from './color';
 export * from './colorName';
 export * from './contrast';
 export * from './palette';
+export * from './roles';
 export * from './entitlements';
 export * from './license';
 export * from './licenseToken';

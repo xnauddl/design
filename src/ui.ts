@@ -11,6 +11,7 @@ import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSem
 import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
+import { suggestTokenRoles } from './lib/roles';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import type { WcagLevel } from './lib/contrast';
@@ -129,14 +130,12 @@ function setSemMapText(map: Record<string, string>): void {
     .join('\n');
 }
 
-/** #10: 색 토큰에서 시맨틱 역할을 추천(매핑이 비어 있을 때만 — 사용자 편집 보존). */
+/** #10·역할 어휘: 전 토큰에서 시맨틱 역할을 추천(매핑이 비어 있을 때만 — 사용자 편집 보존). */
 function suggestSemMapFrom(toks: DraftToken[]): void {
   if (($('semMap') as HTMLTextAreaElement).value.trim()) return;
-  const colors = toks
-    .filter((t) => t.category === 'color' && typeof t.value === 'string')
-    .map((t) => ({ name: t.name, hex: t.value as string }));
-  if (!colors.length) return;
-  setSemMapText(suggestSemanticMap(colors));
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
+  const map = suggestTokenRoles(toks, base);
+  if (Object.keys(map).length) setSemMapText(map);
 }
 
 /** #3: 색 토큰 이름을 hue-Global(`color/blue/500`, 충돌 접미사)로 변환 — 추출 hex명 정규화. */
