@@ -1,0 +1,1747 @@
+"use strict";
+(() => {
+  var __defProp = Object.defineProperty;
+  var __defProps = Object.defineProperties;
+  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
+  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __propIsEnum = Object.prototype.propertyIsEnumerable;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __spreadValues = (a, b) => {
+    for (var prop in b || (b = {}))
+      if (__hasOwnProp.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    if (__getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(b)) {
+        if (__propIsEnum.call(b, prop))
+          __defNormalProp(a, prop, b[prop]);
+      }
+    return a;
+  };
+  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+
+  // src/shared/messages.ts
+  function post(msg) {
+    figma.ui.postMessage(msg);
+  }
+
+  // src/lib/tokens.ts
+  var clamp01 = (n) => Math.min(1, Math.max(0, n));
+  var to255 = (c) => Math.round(clamp01(c) * 255);
+  function rgbToHex(rgb) {
+    const h = (c) => to255(c).toString(16).padStart(2, "0");
+    return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`.toLowerCase();
+  }
+  function hexToRgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m) throw new Error(`\uC798\uBABB\uB41C hex: ${hex}`);
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
+  }
+  function resolvedTypeFor(category) {
+    switch (category) {
+      case "color":
+      case "effectColor":
+        return "COLOR";
+      case "fontFamily":
+        return "STRING";
+      default:
+        return "FLOAT";
+    }
+  }
+  function resolvedTypeForToken(t) {
+    if ((t.category === "lineHeight" || t.category === "letterSpacing") && t.unit && t.unit !== "px") {
+      return "STRING";
+    }
+    return resolvedTypeFor(t.category);
+  }
+  function stringValueForUnit(value, unit) {
+    switch (unit) {
+      case "percent":
+        return `${value}%`;
+      case "em":
+        return `${value}em`;
+      case "rem":
+        return `${value}rem`;
+      case "ratio":
+        return `${value}`;
+      case "px":
+        return `${value}px`;
+    }
+  }
+  function scopesFor(source) {
+    switch (source) {
+      case "fill":
+        return ["ALL_FILLS"];
+      case "stroke":
+        return ["STROKE_COLOR"];
+      case "effectColor":
+        return ["EFFECT_COLOR"];
+      case "gap":
+        return ["GAP"];
+      case "size":
+        return ["WIDTH_HEIGHT"];
+      case "radius":
+        return ["CORNER_RADIUS"];
+      case "fontSize":
+        return ["FONT_SIZE"];
+      case "lineHeight":
+        return ["LINE_HEIGHT"];
+      case "letterSpacing":
+        return ["LETTER_SPACING"];
+      case "fontFamily":
+        return ["FONT_FAMILY"];
+      case "fontWeight":
+        return ["FONT_WEIGHT"];
+      case "effectFloat":
+        return ["EFFECT_FLOAT"];
+      case "opacity":
+        return ["OPACITY"];
+    }
+  }
+  function scopesForSources(sources) {
+    const set = /* @__PURE__ */ new Set();
+    for (const s of sources) for (const sc of scopesFor(s)) set.add(sc);
+    return [...set];
+  }
+  var VALID_SCOPES = {
+    COLOR: /* @__PURE__ */ new Set(["ALL_SCOPES", "ALL_FILLS", "FRAME_FILL", "SHAPE_FILL", "TEXT_FILL", "STROKE_COLOR", "EFFECT_COLOR"]),
+    FLOAT: /* @__PURE__ */ new Set(["ALL_SCOPES", "GAP", "WIDTH_HEIGHT", "CORNER_RADIUS", "FONT_SIZE", "LINE_HEIGHT", "LETTER_SPACING", "FONT_WEIGHT", "EFFECT_FLOAT", "OPACITY"]),
+    STRING: /* @__PURE__ */ new Set(["ALL_SCOPES", "FONT_FAMILY"]),
+    BOOLEAN: /* @__PURE__ */ new Set(["ALL_SCOPES"])
+  };
+  function scopesForType(scopes, type) {
+    const ok = VALID_SCOPES[type];
+    return scopes.filter((s) => ok.has(s));
+  }
+  function scopeForSemanticRole(role) {
+    switch (role.split("/")[0].toLowerCase()) {
+      case "text":
+        return ["TEXT_FILL"];
+      case "border":
+        return ["STROKE_COLOR"];
+      case "surface":
+      case "background":
+        return ["FRAME_FILL"];
+      default:
+        return void 0;
+    }
+  }
+  function toPx(value, unit, opts = {}) {
+    var _a, _b;
+    const base = (_a = opts.base) != null ? _a : 16;
+    const fontSize = (_b = opts.fontSize) != null ? _b : base;
+    switch (unit) {
+      case "px":
+        return value;
+      case "rem":
+        return value * base;
+      case "em":
+        return value * fontSize;
+      case "percent":
+        return fontSize * value / 100;
+      case "ratio":
+        return fontSize * value;
+    }
+  }
+  function colorTokenName(hex) {
+    return `color/${hex.replace("#", "").toLowerCase()}`;
+  }
+  function numberTokenName(group, value) {
+    const v = Number.isInteger(value) ? String(value) : String(value).replace(".", "_");
+    return `${group}/${v}`;
+  }
+
+  // src/lib/extract.ts
+  var round = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
+  function keyOf(category, value, unit) {
+    return `${category}|${value}|${unit != null ? unit : ""}`;
+  }
+  function add(acc, token, source) {
+    const k = keyOf(token.category, token.value, token.unit);
+    const existing = acc.map.get(k);
+    if (existing) {
+      if (!existing.sources.includes(source)) existing.sources.push(source);
+    } else {
+      acc.map.set(k, __spreadProps(__spreadValues({}, token), { sources: [source] }));
+    }
+  }
+  function collectPaints(acc, paints, source) {
+    if (paints === figma.mixed || !Array.isArray(paints)) return;
+    for (const p of paints) {
+      if (p.visible === false) continue;
+      if (p.type === "SOLID") {
+        const hex = rgbToHex(p.color);
+        add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source);
+        if (p.opacity != null && p.opacity < 1) {
+          const o = round(p.opacity);
+          add(acc, { name: numberTokenName("opacity", o), category: "opacity", value: o }, "opacity");
+        }
+      } else if (p.type.startsWith("GRADIENT") || p.type === "IMAGE" || p.type === "VIDEO") {
+        acc.warnings.add("\uADF8\uB77C\uB514\uC5B8\uD2B8/\uC774\uBBF8\uC9C0 \uCC44\uC6C0\uC740 \uBCC0\uC218 \uBC14\uC778\uB529 \uBD88\uAC00 \u2014 \uC2A4\uD0B5\uD588\uC2B5\uB2C8\uB2E4.");
+      }
+    }
+  }
+  function collectText(acc, node) {
+    if (node.fontSize !== figma.mixed) {
+      const v = round(node.fontSize);
+      add(acc, { name: numberTokenName("font-size", v), category: "fontSize", value: v }, "fontSize");
+    }
+    if (node.fontName !== figma.mixed) {
+      const fam = node.fontName.family;
+      add(acc, { name: `font-family/${fam}`, category: "fontFamily", value: fam }, "fontFamily");
+    }
+    if (node.lineHeight !== figma.mixed && node.lineHeight.unit !== "AUTO") {
+      const lh = node.lineHeight;
+      const unit = lh.unit === "PERCENT" ? "percent" : "px";
+      const v = round(lh.value);
+      add(acc, { name: numberTokenName("line-height", v), category: "lineHeight", value: v, unit }, "lineHeight");
+    }
+    if (node.letterSpacing !== figma.mixed) {
+      const ls = node.letterSpacing;
+      const unit = ls.unit === "PERCENT" ? "percent" : "px";
+      const v = round(ls.value);
+      add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing");
+    }
+  }
+  function collectSpacing(acc, node) {
+    if (node.layoutMode === "NONE") return;
+    const gaps = [node.itemSpacing, node.paddingLeft, node.paddingRight, node.paddingTop, node.paddingBottom];
+    if (typeof node.counterAxisSpacing === "number") gaps.push(node.counterAxisSpacing);
+    for (const g of gaps) {
+      if (typeof g === "number" && g > 0) {
+        const v = round(g);
+        add(acc, { name: numberTokenName("spacing", v), category: "gap", value: v }, "gap");
+      }
+    }
+  }
+  function collectSize(acc, node) {
+    if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
+    for (const v of [round(node.width), round(node.height)]) {
+      if (v > 0) add(acc, { name: numberTokenName("size", v), category: "size", value: v }, "size");
+    }
+  }
+  function collectRadius(acc, node) {
+    if (!("cornerRadius" in node)) return;
+    const r = node.cornerRadius;
+    const values = [];
+    if (r === figma.mixed) {
+      for (const corner of ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"]) {
+        const cv = node[corner];
+        if (typeof cv === "number") values.push(cv);
+      }
+    } else if (typeof r === "number") {
+      values.push(r);
+    }
+    for (const rv of values) {
+      if (rv > 0) {
+        const v = round(rv);
+        add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius");
+      }
+    }
+  }
+  function collectEffects(acc, node) {
+    var _a;
+    if (!("effects" in node)) return;
+    for (const e of node.effects) {
+      if (e.visible === false) continue;
+      if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") {
+        const hex = rgbToHex(e.color);
+        add(acc, { name: colorTokenName(hex), category: "effectColor", value: hex }, "effectColor");
+        for (const [g, val] of [
+          ["shadow-blur", e.radius],
+          ["shadow-spread", (_a = e.spread) != null ? _a : 0],
+          ["shadow-x", e.offset.x],
+          ["shadow-y", e.offset.y]
+        ]) {
+          const v = round(val);
+          add(acc, { name: numberTokenName(g, v), category: "effectFloat", value: v }, "effectFloat");
+        }
+      } else if (e.type === "LAYER_BLUR" || e.type === "BACKGROUND_BLUR") {
+        const v = round(e.radius);
+        add(acc, { name: numberTokenName("blur", v), category: "effectFloat", value: v }, "effectFloat");
+      }
+    }
+  }
+  function walk(acc, node) {
+    if ("fills" in node) collectPaints(acc, node.fills, "fill");
+    if ("strokes" in node) collectPaints(acc, node.strokes, "stroke");
+    if (node.type === "TEXT") collectText(acc, node);
+    if (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE") {
+      collectSpacing(acc, node);
+    }
+    collectSize(acc, node);
+    collectRadius(acc, node);
+    collectEffects(acc, node);
+    if ("children" in node) for (const child of node.children) walk(acc, child);
+  }
+  function extractFromSelection(selection2) {
+    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set() };
+    for (const node of selection2) walk(acc, node);
+    const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
+    return { tokens, warnings: [...acc.warnings] };
+  }
+
+  // src/lib/variables.ts
+  var GLOBAL = "Global";
+  var SEMANTIC = "Semantic";
+  var COMPONENT = "Component";
+  var vkey = (collectionId, name) => `${collectionId}\0${name}`;
+  async function buildVarIndex() {
+    const idx = /* @__PURE__ */ new Map();
+    for (const v of await figma.variables.getLocalVariablesAsync()) {
+      idx.set(vkey(v.variableCollectionId, v.name), v);
+    }
+    return idx;
+  }
+  function upsertVariable(name, collection, type, idx) {
+    const k = vkey(collection.id, name);
+    const existing = idx.get(k);
+    if (existing) return { variable: existing, created: false };
+    const variable = figma.variables.createVariable(name, collection, type);
+    idx.set(k, variable);
+    return { variable, created: true };
+  }
+  async function resolveCollections() {
+    var _a, _b;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const globalCol = (_a = cols.find((c) => c.name === GLOBAL)) != null ? _a : figma.variables.createVariableCollection(GLOBAL);
+    const semanticCol = (_b = cols.find((c) => c.name === SEMANTIC)) != null ? _b : figma.variables.createVariableCollection(SEMANTIC);
+    return { globalCol, semanticCol };
+  }
+  async function createTokens(tokens, base) {
+    const { globalCol, semanticCol } = await resolveCollections();
+    const gMode = globalCol.defaultModeId;
+    const sMode = semanticCol.defaultModeId;
+    const idx = await buildVarIndex();
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0 };
+    for (const t of tokens) {
+      const type = resolvedTypeForToken(t);
+      const g = upsertVariable(t.name, globalCol, type, idx);
+      summary[g.created ? "created" : "updated"]++;
+      summary.globals++;
+      setGlobalLiteral(g.variable, gMode, t, type);
+      g.variable.scopes = scopesForType(scopesForSources(t.sources), type);
+      g.variable.hiddenFromPublishing = true;
+      if (type === "STRING" && t.unit && t.unit !== "px" && typeof t.value === "number") {
+        const grp = t.category === "lineHeight" ? "line-height" : "letter-spacing";
+        const pxName = `${numberTokenName(grp, t.value)}-${t.unit}-px`;
+        const gpx = upsertVariable(pxName, globalCol, "FLOAT", idx);
+        gpx.variable.setValueForMode(gMode, toPx(t.value, t.unit, { base, fontSize: base }));
+        gpx.variable.scopes = scopesForType(scopesForSources(t.sources), "FLOAT");
+        gpx.variable.hiddenFromPublishing = true;
+        summary[gpx.created ? "created" : "updated"]++;
+        summary.globals++;
+        const spx = upsertVariable(pxName, semanticCol, "FLOAT", idx);
+        spx.variable.setValueForMode(sMode, figma.variables.createVariableAlias(gpx.variable));
+        spx.variable.scopes = scopesForType(scopesForSources(t.sources), "FLOAT");
+        summary[spx.created ? "created" : "updated"]++;
+        summary.semantics++;
+      }
+      const s = upsertVariable(t.name, semanticCol, type, idx);
+      s.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g.variable));
+      s.variable.scopes = scopesForType(scopesForSources(t.sources), type);
+      summary[s.created ? "created" : "updated"]++;
+      summary.semantics++;
+    }
+    return summary;
+  }
+  async function previewCreateTokens(tokens) {
+    var _a, _b, _c, _d;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const gId = (_b = (_a = cols.find((c) => c.name === GLOBAL)) == null ? void 0 : _a.id) != null ? _b : "#G";
+    const sId = (_d = (_c = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _c.id) != null ? _d : "#S";
+    const existing = /* @__PURE__ */ new Set();
+    for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0 };
+    const seen = /* @__PURE__ */ new Set();
+    const tally = (colId, name, kind) => {
+      const k = vkey(colId, name);
+      summary[kind]++;
+      if (seen.has(k)) {
+        summary.updated++;
+        return;
+      }
+      seen.add(k);
+      summary[existing.has(k) ? "updated" : "created"]++;
+    };
+    for (const t of tokens) {
+      tally(gId, t.name, "globals");
+      const type = resolvedTypeForToken(t);
+      if (type === "STRING" && t.unit && t.unit !== "px" && typeof t.value === "number") {
+        const grp = t.category === "lineHeight" ? "line-height" : "letter-spacing";
+        const pxName = `${numberTokenName(grp, t.value)}-${t.unit}-px`;
+        tally(gId, pxName, "globals");
+        tally(sId, pxName, "semantics");
+      }
+      tally(sId, t.name, "semantics");
+    }
+    return summary;
+  }
+  function setGlobalLiteral(v, modeId, t, type) {
+    if (type === "COLOR") {
+      const { r, g, b } = hexToRgb(String(t.value));
+      v.setValueForMode(modeId, { r, g, b, a: 1 });
+    } else if (type === "STRING") {
+      if (t.unit && t.unit !== "px" && typeof t.value === "number") {
+        v.setValueForMode(modeId, stringValueForUnit(t.value, t.unit));
+      } else {
+        v.setValueForMode(modeId, String(t.value));
+      }
+    } else {
+      v.setValueForMode(modeId, Number(t.value));
+    }
+  }
+  async function createSemanticAliases(map) {
+    var _a, _b;
+    const summary = { created: 0, updated: 0, aliased: 0, missing: [] };
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const globalCol = cols.find((c) => c.name === GLOBAL);
+    if (!globalCol) {
+      summary.missing = Object.values(map);
+      return summary;
+    }
+    const semanticCol = (_a = cols.find((c) => c.name === SEMANTIC)) != null ? _a : figma.variables.createVariableCollection(SEMANTIC);
+    const sMode = semanticCol.defaultModeId;
+    const idx = await buildVarIndex();
+    for (const [semName, globalName] of Object.entries(map)) {
+      const g = idx.get(vkey(globalCol.id, globalName));
+      if (!g) {
+        summary.missing.push(globalName);
+        continue;
+      }
+      const u = upsertVariable(semName, semanticCol, g.resolvedType, idx);
+      u.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g));
+      u.variable.scopes = scopesForType((_b = scopeForSemanticRole(semName)) != null ? _b : g.scopes, g.resolvedType);
+      summary[u.created ? "created" : "updated"]++;
+      summary.aliased++;
+    }
+    return summary;
+  }
+
+  // src/lib/bind.ts
+  var TIER = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
+  function countNodes(sel) {
+    let n = 0;
+    const stack = sel.slice();
+    while (stack.length) {
+      const x = stack.pop();
+      n++;
+      if ("children" in x) for (const c of x.children) stack.push(c);
+    }
+    return n;
+  }
+  function note(res, key) {
+    var _a;
+    res.reasons[key] = ((_a = res.reasons[key]) != null ? _a : 0) + 1;
+  }
+  function skip(res, key) {
+    res.skipped++;
+    note(res, key);
+  }
+  async function bindSelection(selection2, tolerance, limits = {}, apply = true, hooks = {}) {
+    var _a, _b, _c;
+    const entries = await buildIndex();
+    const res = { bound: 0, skipped: 0, flags: [], reasons: {} };
+    const flagSet = /* @__PURE__ */ new Set();
+    const budget = {
+      nodes: (_a = limits.maxNodes) != null ? _a : Infinity,
+      maxBindings: (_b = limits.maxBindings) != null ? _b : Infinity,
+      limited: false
+    };
+    const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
+    for (const node of selection2) {
+      await walk2(node, entries, tolerance, res, flagSet, budget, apply, hooks, prog);
+      if (res.cancelled) break;
+    }
+    if (budget.limited) res.limited = true;
+    res.flags = [...flagSet];
+    (_c = hooks.onProgress) == null ? void 0 : _c.call(hooks, prog.done, prog.total);
+    return res;
+  }
+  async function buildIndex() {
+    var _a;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const tierOf = new Map(cols.map((c) => {
+      var _a2;
+      return [c.id, (_a2 = TIER[c.name]) != null ? _a2 : 0];
+    }));
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const entries = [];
+    for (const v of vars) {
+      const tier = (_a = tierOf.get(v.variableCollectionId)) != null ? _a : 0;
+      if (tier < 2) continue;
+      const val = await resolveValue(v, modeOf);
+      if (val == null) continue;
+      const e = { variable: v, tier, type: v.resolvedType };
+      if (v.resolvedType === "COLOR" && isRGB(val)) e.colorHex = rgbToHex(val);
+      else if (v.resolvedType === "FLOAT" && typeof val === "number") e.num = val;
+      else if (v.resolvedType === "STRING" && typeof val === "string") e.str = val;
+      entries.push(e);
+    }
+    entries.sort((a, b) => b.tier - a.tier);
+    return entries;
+  }
+  async function resolveValue(v, modeOf) {
+    let cur = v;
+    for (let i = 0; i < 12 && cur; i++) {
+      const mode = modeOf.get(cur.variableCollectionId);
+      const val = mode ? cur.valuesByMode[mode] : void 0;
+      if (val && typeof val === "object" && "type" in val && val.type === "VARIABLE_ALIAS") {
+        cur = await figma.variables.getVariableByIdAsync(val.id);
+      } else {
+        return val;
+      }
+    }
+    return void 0;
+  }
+  function isRGB(v) {
+    return typeof v === "object" && v !== null && "r" in v && "g" in v && "b" in v;
+  }
+  function matchColor(entries, hex) {
+    for (const e of entries) if (e.colorHex === hex) return e.variable;
+    return null;
+  }
+  function matchFloat(entries, value, tol) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const e of entries) {
+      if (e.num == null) continue;
+      const dist = Math.abs(e.num - value);
+      if (dist > tol) continue;
+      if (dist < bestDist || dist === bestDist && best !== null && best.tier < e.tier) {
+        best = e;
+        bestDist = dist;
+      }
+    }
+    return best ? best.variable : null;
+  }
+  async function walk2(node, entries, tol, res, flags, budget, apply, hooks, prog) {
+    var _a;
+    if (res.cancelled) return;
+    if (budget.nodes <= 0 || res.bound >= budget.maxBindings) {
+      budget.limited = true;
+      return;
+    }
+    budget.nodes--;
+    bindPaints(node, entries, res, apply);
+    bindFrame(node, entries, tol, res, flags, apply);
+    bindRadius(node, entries, tol, res, apply);
+    bindEffects(node, entries, res, apply);
+    await bindText(node, entries, tol, res, apply);
+    prog.done++;
+    if (hooks.onProgress && prog.done % prog.every === 0) {
+      hooks.onProgress(prog.done, prog.total);
+      if (hooks.yieldToEvents) await hooks.yieldToEvents();
+      if ((_a = hooks.shouldCancel) == null ? void 0 : _a.call(hooks)) {
+        res.cancelled = true;
+        return;
+      }
+    }
+    if ("children" in node)
+      for (const c of node.children) {
+        await walk2(c, entries, tol, res, flags, budget, apply, hooks, prog);
+        if (res.cancelled) return;
+      }
+  }
+  function bindPaints(node, entries, res, apply) {
+    for (const key of ["fills", "strokes"]) {
+      if (!(key in node)) continue;
+      const paints = node[key];
+      if (paints === figma.mixed || !Array.isArray(paints)) continue;
+      let changed = false;
+      const next = paints.map((p) => {
+        if (p.type !== "SOLID") return p;
+        const v = matchColor(entries, rgbToHex(p.color));
+        if (!v) {
+          skip(res, "no-match");
+          return p;
+        }
+        changed = true;
+        res.bound++;
+        return apply ? figma.variables.setBoundVariableForPaint(p, "color", v) : p;
+      });
+      if (changed && apply) node[key] = next;
+    }
+  }
+  function bindFrame(node, entries, tol, res, flags, apply) {
+    if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
+    if (node.layoutSizingHorizontal === "FIXED") tryBind(node, "width", node.width, entries, tol, res, apply);
+    else if (node.layoutSizingHorizontal === "HUG" || node.layoutSizingHorizontal === "FILL") {
+      flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
+      note(res, "hug-fill");
+    }
+    if (node.layoutSizingVertical === "FIXED") tryBind(node, "height", node.height, entries, tol, res, apply);
+    if (node.layoutMode === "NONE") {
+      flags.add("\uC624\uD1A0\uB808\uC774\uC544\uC6C3\uC774 \uC544\uB2CC \uD504\uB808\uC784\uC740 padding/gap \uBC14\uC778\uB529 \uBD88\uAC00.");
+      note(res, "no-autolayout");
+      return;
+    }
+    tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply);
+    tryBind(node, "paddingLeft", node.paddingLeft, entries, tol, res, apply);
+    tryBind(node, "paddingRight", node.paddingRight, entries, tol, res, apply);
+    tryBind(node, "paddingTop", node.paddingTop, entries, tol, res, apply);
+    tryBind(node, "paddingBottom", node.paddingBottom, entries, tol, res, apply);
+  }
+  function bindRadius(node, entries, tol, res, apply) {
+    if (!("cornerRadius" in node)) return;
+    const r = node.cornerRadius;
+    const corners = ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"];
+    if (r !== figma.mixed && typeof r === "number" && r > 0) {
+      for (const c of corners) tryBind(node, c, r, entries, tol, res, apply);
+    } else if (r === figma.mixed) {
+      for (const c of corners) {
+        const cv = node[c];
+        if (typeof cv === "number" && cv > 0) tryBind(node, c, cv, entries, tol, res, apply);
+      }
+    }
+  }
+  function bindEffects(node, entries, res, apply) {
+    if (!("effects" in node)) return;
+    let changed = false;
+    const next = node.effects.map((e) => {
+      if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return e;
+      const v = matchColor(entries, rgbToHex(e.color));
+      if (!v) {
+        skip(res, "no-match");
+        return e;
+      }
+      changed = true;
+      res.bound++;
+      return apply ? figma.variables.setBoundVariableForEffect(e, "color", v) : e;
+    });
+    if (changed && apply) node.effects = next;
+  }
+  async function bindText(node, entries, tol, res, apply) {
+    if (node.type !== "TEXT") return;
+    if (node.fontName === figma.mixed) return;
+    try {
+      await figma.loadFontAsync(node.fontName);
+    } catch (e) {
+      note(res, "font");
+      return;
+    }
+    if (node.fontSize !== figma.mixed) tryBindText(node, "fontSize", node.fontSize, entries, tol, res, apply);
+    if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS") {
+      tryBindText(node, "lineHeight", node.lineHeight.value, entries, tol, res, apply);
+    }
+    if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") {
+      tryBindText(node, "letterSpacing", node.letterSpacing.value, entries, tol, res, apply);
+    }
+  }
+  function tryBindText(node, field, value, entries, tol, res, apply) {
+    const v = matchFloat(entries, value, tol);
+    const len = node.characters.length;
+    if (len === 0) {
+      skip(res, "empty-text");
+      return;
+    }
+    if (!v) {
+      skip(res, "no-match");
+      return;
+    }
+    if (!apply) {
+      res.bound++;
+      return;
+    }
+    try {
+      node.setRangeBoundVariable(0, len, field, v);
+      res.bound++;
+    } catch (e) {
+      skip(res, "error");
+    }
+  }
+  function tryBind(node, field, value, entries, tol, res, apply) {
+    const v = matchFloat(entries, value, tol);
+    if (!v) {
+      skip(res, "no-match");
+      return;
+    }
+    if (!apply) {
+      res.bound++;
+      return;
+    }
+    try {
+      node.setBoundVariable(field, v);
+      res.bound++;
+    } catch (e) {
+      skip(res, "error");
+    }
+  }
+
+  // src/lib/naming.ts
+  function kebab(input) {
+    return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s_/]+/g, "-").replace(/[^a-zA-Z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+  }
+  var STYLE_LEAVES = /* @__PURE__ */ new Set([
+    "fill",
+    "color",
+    "stroke",
+    "bg",
+    "text",
+    "border"
+  ]);
+  function layerNameFromToken(tokenName, opts = {}) {
+    let segs = tokenName.split("/").filter(Boolean);
+    if (opts.stripStyleLeaf && segs.length > 1 && STYLE_LEAVES.has(segs[segs.length - 1].toLowerCase())) {
+      segs = segs.slice(0, -1);
+    }
+    segs = limitDepth(segs, opts.maxDepth);
+    return segs.map(kebab).filter(Boolean).join("-");
+  }
+  function layerNameFromRole(ancestorName, role, opts = {}) {
+    const ctx = ancestorName ? kebab(ancestorName) : "";
+    const parts = limitDepth([...ctx ? ctx.split("-") : [], kebab(role)], opts.maxDepth);
+    return parts.filter(Boolean).join("-");
+  }
+  function limitDepth(segs, maxDepth = 3) {
+    if (segs.length <= maxDepth) return segs;
+    return segs.slice(segs.length - maxDepth);
+  }
+  function dedupeName(name, taken) {
+    if (!taken.has(name)) {
+      taken.add(name);
+      return name;
+    }
+    let i = 2;
+    while (taken.has(`${name}-${i}`)) i++;
+    const out = `${name}-${i}`;
+    taken.add(out);
+    return out;
+  }
+
+  // src/lib/rename.ts
+  async function renameSelection(selection2, opts) {
+    const changes = [];
+    await recurse(selection2, null, opts, changes);
+    return { changes, applied: opts.apply };
+  }
+  async function recurse(nodes, ancestorName, opts, out) {
+    const taken = /* @__PURE__ */ new Set();
+    for (const node of nodes) {
+      const decided = await decide(node, ancestorName, opts);
+      let contextForChildren = node.name;
+      if (!decided.skip && decided.name) {
+        const finalName = dedupeName(decided.name, taken);
+        if (finalName !== node.name) {
+          out.push({ id: node.id, before: node.name, after: finalName });
+          if (opts.apply) node.name = finalName;
+        }
+        contextForChildren = finalName;
+      } else {
+        taken.add(node.name);
+      }
+      if ("children" in node) await recurse(node.children, contextForChildren, opts, out);
+    }
+  }
+  async function decide(node, ancestorName, opts) {
+    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true };
+    if (node.type === "TEXT") return { skip: true };
+    if (node.type === "INSTANCE") return { skip: true };
+    if (node.locked) return { skip: true };
+    const tokenName = await primaryTokenName(node);
+    if (tokenName) {
+      return { skip: false, name: layerNameFromToken(tokenName, { maxDepth: opts.maxDepth }) };
+    }
+    const role = inferRole(node);
+    return { skip: false, name: layerNameFromRole(ancestorName, role, { maxDepth: opts.maxDepth }) };
+  }
+  var FIELD_ORDER = [
+    "fills",
+    "strokes",
+    "width",
+    "height",
+    "topLeftRadius",
+    "itemSpacing",
+    "paddingLeft",
+    "paddingTop"
+  ];
+  async function primaryTokenName(node) {
+    const bv = node.boundVariables;
+    if (!bv) return null;
+    for (const field of FIELD_ORDER) {
+      const id = firstAliasId(bv[field]);
+      if (id) {
+        const v = await figma.variables.getVariableByIdAsync(id);
+        if (v) return v.name;
+      }
+    }
+    return null;
+  }
+  function firstAliasId(entry) {
+    var _a;
+    if (!entry) return void 0;
+    if (Array.isArray(entry)) return (_a = entry[0]) == null ? void 0 : _a.id;
+    return entry.id;
+  }
+  function inferRole(node) {
+    switch (node.type) {
+      case "VECTOR":
+      case "BOOLEAN_OPERATION":
+      case "STAR":
+      case "POLYGON":
+      case "LINE":
+        return "icon";
+      case "FRAME":
+      case "GROUP":
+      case "SECTION":
+        return "container";
+      case "RECTANGLE":
+      case "ELLIPSE":
+        return hasVisibleFill(node) ? "background" : "shape";
+      default:
+        return kebab(node.type);
+    }
+  }
+  function hasVisibleFill(node) {
+    if (!("fills" in node)) return false;
+    const fills = node.fills;
+    return Array.isArray(fills) && fills.some((p) => p.visible !== false);
+  }
+
+  // src/lib/exporters.ts
+  var isSnapshot = (name) => /-px$/.test(name);
+  var WEIGHT_NAMES = {
+    thin: 100,
+    hairline: 100,
+    extralight: 200,
+    ultralight: 200,
+    light: 300,
+    regular: 400,
+    normal: 400,
+    medium: 500,
+    semibold: 600,
+    demibold: 600,
+    bold: 700,
+    extrabold: 800,
+    ultrabold: 800,
+    black: 900,
+    heavy: 900
+  };
+  function splitWeightStyle(value) {
+    var _a;
+    if (typeof value === "number") return { weight: value, italic: false };
+    const s = String(value);
+    const italic = /italic|oblique/i.test(s);
+    const cleaned = s.replace(/italic|oblique/gi, "").replace(/[\s_-]/g, "").toLowerCase();
+    const weight = (_a = WEIGHT_NAMES[cleaned]) != null ? _a : Number(cleaned) || 400;
+    return { weight, italic };
+  }
+  function dimension(token, opts) {
+    const n = Number(token.value);
+    if (token.kind === "fontSize" && opts.fontSizeUnit === "rem") {
+      const r = n / opts.base;
+      return `${Number(r.toFixed(4))}rem`;
+    }
+    return `${n}px`;
+  }
+  function cssLiteral(token, opts) {
+    switch (token.kind) {
+      case "color":
+        return String(token.value);
+      case "fontFamily":
+        return String(token.value);
+      case "opacity":
+        return String(token.value);
+      case "lineHeight":
+      case "letterSpacing":
+        return token.type === "FLOAT" ? `${Number(token.value)}px` : String(token.value);
+      case "fontWeight":
+        return String(splitWeightStyle(token.value).weight);
+      case "fontSize":
+      case "spacing":
+      case "radius":
+      case "size":
+        return dimension(token, opts);
+      default:
+        return String(token.value);
+    }
+  }
+  var cssVar = (name) => `--${kebab(name)}`;
+  function toCss(tokens, opts) {
+    const lines = [":root {"];
+    for (const t of tokens) {
+      if (t.aliasOf) {
+        lines.push(`  ${cssVar(t.name)}: var(${cssVar(t.aliasOf)});`);
+      } else {
+        lines.push(`  ${cssVar(t.name)}: ${cssLiteral(t, opts)};`);
+        if (t.kind === "fontWeight" && splitWeightStyle(t.value).italic) {
+          lines.push(`  ${cssVar(t.name)}-style: italic;`);
+        }
+      }
+    }
+    lines.push("}");
+    return lines.join("\n");
+  }
+  var W3C_TYPE = {
+    color: "color",
+    fontSize: "dimension",
+    spacing: "dimension",
+    radius: "dimension",
+    size: "dimension",
+    fontFamily: "fontFamily",
+    fontWeight: "fontWeight",
+    opacity: "number",
+    lineHeight: "lineHeight",
+    // 비표준(DTCG 미정의) — 단위 보존 위해 문자열 값
+    letterSpacing: "letterSpacing"
+    // 비표준
+  };
+  var w3cRef = (name) => `{${name.split("/").filter(Boolean).join(".")}}`;
+  function w3cValue(token, opts) {
+    var _a;
+    if (token.aliasOf) return w3cRef(token.aliasOf);
+    switch (token.kind) {
+      case "color":
+      case "fontFamily":
+        return String(token.value);
+      case "lineHeight":
+      case "letterSpacing":
+        return token.type === "FLOAT" ? `${Number(token.value)}px` : String(token.value);
+      case "opacity":
+        return Number(token.value);
+      case "fontWeight":
+        return splitWeightStyle(token.value).weight;
+      case "fontSize":
+      case "spacing":
+      case "radius":
+      case "size":
+        return dimension(token, opts);
+      default:
+        return (_a = token.value) != null ? _a : "";
+    }
+  }
+  function toW3C(tokens, opts) {
+    var _a;
+    const root = {};
+    for (const t of tokens) {
+      const segs = t.name.split("/").filter(Boolean);
+      let node = root;
+      for (let i = 0; i < segs.length - 1; i++) {
+        const key = segs[i];
+        if (!node[key] || "$value" in node[key]) node[key] = (_a = node[key]) != null ? _a : {};
+        node = node[key];
+      }
+      const leaf = { $value: w3cValue(t, opts) };
+      const ty = W3C_TYPE[t.kind];
+      if (ty) leaf.$type = ty;
+      node[segs[segs.length - 1]] = leaf;
+      if (!t.aliasOf && t.kind === "fontWeight" && splitWeightStyle(t.value).italic) {
+        node[`${segs[segs.length - 1]}-style`] = { $type: "fontStyle", $value: "italic" };
+      }
+    }
+    return JSON.stringify(root, null, 2);
+  }
+  function dedupeByName(tokens) {
+    const seen = /* @__PURE__ */ new Map();
+    for (const t of tokens) {
+      const prev = seen.get(t.name);
+      if (!prev || prev.collection === "Semantic" && t.collection === "Global") seen.set(t.name, t);
+    }
+    return [...seen.values()];
+  }
+  function exportTokens(tokens, opts) {
+    let list = opts.includeSnapshots ? tokens : tokens.filter((t) => !isSnapshot(t.name));
+    list = dedupeByName(list);
+    return opts.format === "css" ? toCss(list, opts) : toW3C(list, opts);
+  }
+
+  // src/lib/components.ts
+  var STATES = /* @__PURE__ */ new Set(["default", "hover", "pressed", "focus", "active", "disabled", "selected", "loading"]);
+  var SIZES = /* @__PURE__ */ new Set(["xs", "sm", "md", "lg", "xl", "xxl", "tiny", "small", "medium", "large", "huge"]);
+  var TYPES = /* @__PURE__ */ new Set([
+    "primary",
+    "secondary",
+    "tertiary",
+    "ghost",
+    "outline",
+    "outlined",
+    "filled",
+    "text",
+    "link",
+    "danger",
+    "warning",
+    "success",
+    "info",
+    "accent",
+    "brand",
+    "neutral"
+  ]);
+  function inferProp(value) {
+    const v = value.toLowerCase();
+    if (STATES.has(v)) return "state";
+    if (SIZES.has(v)) return "size";
+    if (TYPES.has(v)) return "type";
+    return null;
+  }
+  function parseVariantName(name) {
+    var _a;
+    const trimmed = name.trim();
+    const props = {};
+    if (trimmed.includes("=")) {
+      let base2 = "";
+      for (const part of trimmed.split(",")) {
+        const seg = part.trim();
+        if (!seg) continue;
+        const eq = seg.indexOf("=");
+        if (eq >= 0) {
+          const k = kebab(seg.slice(0, eq));
+          const val = kebab(seg.slice(eq + 1));
+          if (k && val) props[k] = val;
+        } else if (!base2) {
+          base2 = kebab(seg);
+        }
+      }
+      return { base: base2, props };
+    }
+    const segs = trimmed.split("/").map((s) => kebab(s)).filter(Boolean);
+    const base = (_a = segs[0]) != null ? _a : "";
+    let unknown = 0;
+    for (const seg of segs.slice(1)) {
+      const prop = inferProp(seg);
+      if (prop && !(prop in props)) props[prop] = seg;
+      else {
+        const key = unknown === 0 ? "variant" : `variant-${unknown + 1}`;
+        props[key] = seg;
+        unknown++;
+      }
+    }
+    return { base, props };
+  }
+  function formatVariant(props) {
+    return Object.keys(props).sort().map((k) => `${k}=${props[k]}`).join(", ");
+  }
+  function cartesian(props) {
+    const keys = Object.keys(props).sort();
+    let combos = [{}];
+    for (const k of keys) {
+      const next = [];
+      for (const c of combos) for (const v of props[k]) next.push(__spreadProps(__spreadValues({}, c), { [k]: v }));
+      combos = next;
+    }
+    return combos;
+  }
+  function inferComponentProperties(layers) {
+    const out = [];
+    const taken = /* @__PURE__ */ new Set();
+    const uniq = (base) => {
+      let n = base || "prop";
+      let i = 2;
+      while (taken.has(n)) n = `${base || "prop"}-${i++}`;
+      taken.add(n);
+      return n;
+    };
+    for (const l of layers) {
+      if (l.name.trim().endsWith("?")) {
+        out.push({ propName: uniq(kebab(l.name.replace(/\?+$/, "")) || "show"), type: "BOOLEAN", layerName: l.name, field: "visible" });
+      } else if (l.type === "TEXT") {
+        out.push({ propName: uniq(kebab(l.name) || "text"), type: "TEXT", layerName: l.name, field: "characters" });
+      } else if (l.type === "INSTANCE") {
+        out.push({ propName: uniq(kebab(l.name) || "swap"), type: "INSTANCE_SWAP", layerName: l.name, field: "mainComponent" });
+      }
+    }
+    return out;
+  }
+  function variantGrid(names) {
+    const parsed = names.map((n) => ({ name: n, props: parseVariantName(n).props }));
+    const keys = [...new Set(parsed.flatMap((p) => Object.keys(p.props)))].sort();
+    if (keys.length === 0) return parsed.map((p, i) => ({ name: p.name, row: 0, col: i }));
+    if (keys.length <= 2) {
+      const rowKey = keys.length === 2 ? keys[0] : null;
+      const colKey = keys.length === 2 ? keys[1] : keys[0];
+      const rowVals = rowKey ? [...new Set(parsed.map((p) => p.props[rowKey]).filter((v) => v != null))].sort() : [""];
+      const colVals = [...new Set(parsed.map((p) => p.props[colKey]).filter((v) => v != null))].sort();
+      return parsed.map((p) => ({
+        name: p.name,
+        row: rowKey ? Math.max(0, rowVals.indexOf(p.props[rowKey])) : 0,
+        col: Math.max(0, colVals.indexOf(p.props[colKey]))
+      }));
+    }
+    const cols = Math.ceil(Math.sqrt(parsed.length));
+    return parsed.map((p, i) => ({ name: p.name, row: Math.floor(i / cols), col: i % cols }));
+  }
+  function missingVariants(variantNames) {
+    var _a;
+    const parsed = variantNames.map((n) => parseVariantName(n).props).filter((p) => Object.keys(p).length > 0);
+    if (parsed.length < 2) return [];
+    const keySig = (p) => Object.keys(p).sort().join(",");
+    if (new Set(parsed.map(keySig)).size !== 1) return [];
+    const properties = {};
+    for (const p of parsed) {
+      for (const [k, v] of Object.entries(p)) {
+        const arr = (_a = properties[k]) != null ? _a : properties[k] = [];
+        if (!arr.includes(v)) arr.push(v);
+      }
+    }
+    for (const k of Object.keys(properties)) properties[k].sort();
+    const existing = new Set(parsed.map(formatVariant));
+    return cartesian(properties).map(formatVariant).filter((v) => !existing.has(v));
+  }
+  function classifyVariants(names) {
+    var _a, _b;
+    const byBase = /* @__PURE__ */ new Map();
+    for (const name of names) {
+      const p = parseVariantName(name);
+      if (!p.base) continue;
+      const list = (_a = byBase.get(p.base)) != null ? _a : [];
+      list.push({ name, props: p.props });
+      byBase.set(p.base, list);
+    }
+    const groups = [];
+    const singles = [];
+    for (const [base, parsed] of byBase) {
+      const withProps = parsed.filter((p) => Object.keys(p.props).length > 0);
+      if (withProps.length < 2) {
+        for (const p of parsed) singles.push(p.name);
+        continue;
+      }
+      const members = withProps.map((p) => ({
+        name: p.name,
+        props: p.props,
+        variant: formatVariant(p.props)
+      }));
+      const properties = {};
+      for (const m of members) {
+        for (const [k, v] of Object.entries(m.props)) {
+          const arr = (_b = properties[k]) != null ? _b : properties[k] = [];
+          if (!arr.includes(v)) arr.push(v);
+        }
+      }
+      for (const k of Object.keys(properties)) properties[k].sort();
+      const keySig = (p) => Object.keys(p).sort().join(",");
+      const sigs = new Set(members.map((m) => keySig(m.props)));
+      let missing = [];
+      if (sigs.size === 1) {
+        const existing = new Set(members.map((m) => m.variant));
+        missing = cartesian(properties).map(formatVariant).filter((v) => !existing.has(v));
+      }
+      groups.push({ base, properties, members, missing });
+    }
+    return { groups, singles };
+  }
+
+  // src/lib/color.ts
+  function srgbToLinear(c) {
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+  function relativeLuminance(rgb) {
+    const r = srgbToLinear(rgb.r);
+    const g = srgbToLinear(rgb.g);
+    const b = srgbToLinear(rgb.b);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  function contrastRatio(a, b) {
+    const la = relativeLuminance(a);
+    const lb = relativeLuminance(b);
+    const hi = Math.max(la, lb);
+    const lo = Math.min(la, lb);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  // src/lib/contrast.ts
+  function isLargeText(fontSizePx, bold) {
+    if (fontSizePx >= 24) return true;
+    return bold && fontSizePx >= 18.66;
+  }
+  function requiredRatio(level, large) {
+    if (level === "AAA") return large ? 4.5 : 7;
+    return large ? 3 : 4.5;
+  }
+  var round2 = (n) => Math.round(n * 100) / 100;
+  function evaluateSample(s, level) {
+    const large = isLargeText(s.fontSize, s.bold);
+    const required = requiredRatio(level, large);
+    const ratio = round2(contrastRatio(hexToRgb(s.fg), hexToRgb(s.bg)));
+    return { id: s.id, name: s.name, fg: s.fg, bg: s.bg, ratio, required, large, pass: ratio >= required };
+  }
+  function checkContrast(samples, level) {
+    const findings = samples.map((s) => evaluateSample(s, level));
+    findings.sort((a, b) => Number(a.pass) - Number(b.pass) || a.ratio - b.ratio);
+    const failed = findings.reduce((n, f) => n + (f.pass ? 0 : 1), 0);
+    return { level, checked: findings.length, passed: findings.length - failed, failed, findings };
+  }
+
+  // src/lib/entitlements.ts
+  var TIERS = ["free", "pro", "team"];
+  var TIER_RANK = { free: 0, pro: 1, team: 2 };
+  var FEATURE_MIN_TIER = {
+    unlimited: "pro",
+    components: "pro",
+    publish: "pro",
+    multiMode: "pro",
+    aiNaming: "pro",
+    teamPresets: "team"
+  };
+  function hasEntitlement(tier, feature) {
+    return TIER_RANK[tier] >= TIER_RANK[FEATURE_MIN_TIER[feature]];
+  }
+  var FREE_LIMITS = { nodes: 50, tokens: 100, bindings: 200 };
+  var UNLIMITED = { nodes: Infinity, tokens: Infinity, bindings: Infinity };
+  function limitsForTier(tier) {
+    return hasEntitlement(tier, "unlimited") ? UNLIMITED : FREE_LIMITS;
+  }
+  function clampCount(requested, limit) {
+    const allowed = Math.min(requested, limit);
+    return { allowed, limited: requested > limit, overflow: Math.max(0, requested - allowed) };
+  }
+  function isTier(v) {
+    return typeof v === "string" && TIERS.includes(v);
+  }
+
+  // src/lib/license.ts
+  var REVERIFY_MS = 24 * 60 * 60 * 1e3;
+  var GRACE_MS = 14 * 24 * 60 * 60 * 1e3;
+  function evaluateLicense(cache2, now) {
+    if (!cache2) return { tier: "free", status: "none", stale: false };
+    if (now > cache2.expiresAt) return { tier: "free", status: "expired", stale: true };
+    const age = now - cache2.lastVerified;
+    if (age <= REVERIFY_MS) return { tier: cache2.tier, status: "active", stale: false };
+    if (age <= GRACE_MS) return { tier: cache2.tier, status: "grace", stale: true };
+    return { tier: "free", status: "expired", stale: true };
+  }
+  function cacheFromVerify(key, v, now) {
+    return { key, tier: v.tier, expiresAt: v.expiresAt, lastVerified: now };
+  }
+
+  // src/lib/presets.ts
+  function upsertPreset(list, p) {
+    return [p, ...list.filter((x) => x.name !== p.name)];
+  }
+
+  // src/lib/history.ts
+  var HISTORY_CAP = 100;
+  function pushHistory(list, entry, cap = HISTORY_CAP) {
+    return [entry, ...list].slice(0, cap);
+  }
+
+  // src/lib/undo.ts
+  function commitUndo(f) {
+    if (typeof f.commitUndo === "function") f.commitUndo();
+  }
+
+  // src/code.ts
+  figma.showUI(__html__, { width: 400, height: 600, themeColors: true });
+  var selection = () => figma.currentPage.selection;
+  var DEV_TIER_KEY = "dsl.devTier";
+  var CACHE_KEY = "dsl.licenseCache";
+  var PRESETS_KEY = "dsl.presets";
+  var HISTORY_KEY = "dsl.history";
+  var devTier = "free";
+  var cache = null;
+  var presets = [];
+  var history = [];
+  var bindCancel = false;
+  function effective() {
+    if (cache) {
+      const ev = evaluateLicense(cache, Date.now());
+      return { tier: ev.tier, source: "key", status: ev.status, expiresAt: cache.expiresAt };
+    }
+    if (devTier !== "free") return { tier: devTier, source: "dev" };
+    return { tier: "free", source: "none" };
+  }
+  var currentTier = () => effective().tier;
+  function postLicense(note2) {
+    const e = effective();
+    post({
+      type: "LICENSE_STATUS",
+      tier: e.tier,
+      unlimited: hasEntitlement(e.tier, "unlimited"),
+      source: e.source,
+      status: e.status,
+      expiresAt: e.expiresAt,
+      note: note2
+    });
+  }
+  async function loadLicense() {
+    try {
+      const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
+      if (isTier(dt)) devTier = dt;
+      const c = await figma.clientStorage.getAsync(CACHE_KEY);
+      if (c && typeof c.key === "string" && isTier(c.tier) && typeof c.expiresAt === "number" && typeof c.lastVerified === "number") cache = c;
+      const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
+      if (Array.isArray(ps)) presets = ps;
+      const h = await figma.clientStorage.getAsync(HISTORY_KEY);
+      if (Array.isArray(h)) history = h;
+    } catch (e) {
+    }
+  }
+  function record(action, summary) {
+    history = pushHistory(history, { at: Date.now(), action, summary });
+    void figma.clientStorage.setAsync(HISTORY_KEY, history).catch(() => {
+    });
+  }
+  function requireTeam() {
+    if (hasEntitlement(currentTier(), "teamPresets")) return true;
+    post({ type: "PREMIUM_REQUIRED", feature: "teamPresets", message: "\uD300 \uACF5\uC720 \uD504\uB9AC\uC14B/\uC774\uB825\uC740 Team \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
+    return false;
+  }
+  function arrangeSet(set) {
+    const children = set.children.filter((c) => c.type === "COMPONENT");
+    if (!children.length) return;
+    const cellW = Math.max(...children.map((c) => c.width));
+    const cellH = Math.max(...children.map((c) => c.height));
+    const gap = 16;
+    const pad = 16;
+    const pos = new Map(variantGrid(children.map((c) => c.name)).map((g) => [g.name, g]));
+    let maxCol = 0;
+    let maxRow = 0;
+    for (const c of children) {
+      const g = pos.get(c.name);
+      if (!g) continue;
+      c.x = pad + g.col * (cellW + gap);
+      c.y = pad + g.row * (cellH + gap);
+      maxCol = Math.max(maxCol, g.col);
+      maxRow = Math.max(maxRow, g.row);
+    }
+    set.resizeWithoutConstraints(pad * 2 + (maxCol + 1) * cellW + maxCol * gap, pad * 2 + (maxRow + 1) * cellH + maxRow * gap);
+  }
+  function requirePro() {
+    if (hasEntitlement(currentTier(), "components")) return true;
+    post({ type: "PREMIUM_REQUIRED", feature: "components", message: "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
+    return false;
+  }
+  async function savePresets() {
+    try {
+      await figma.clientStorage.setAsync(PRESETS_KEY, presets);
+    } catch (e) {
+    }
+  }
+  function kindOf(v) {
+    if (v.resolvedType === "COLOR") return "color";
+    const sc = v.scopes;
+    if (sc.includes("FONT_SIZE")) return "fontSize";
+    if (sc.includes("GAP")) return "spacing";
+    if (sc.includes("CORNER_RADIUS")) return "radius";
+    if (sc.includes("WIDTH_HEIGHT")) return "size";
+    if (sc.includes("LINE_HEIGHT")) return "lineHeight";
+    if (sc.includes("LETTER_SPACING")) return "letterSpacing";
+    if (sc.includes("OPACITY")) return "opacity";
+    if (sc.includes("FONT_WEIGHT")) return "fontWeight";
+    if (sc.includes("FONT_FAMILY")) return "fontFamily";
+    const n = v.name;
+    if (n.startsWith("line-height")) return "lineHeight";
+    if (n.startsWith("letter-spacing")) return "letterSpacing";
+    if (n.startsWith("font-size")) return "fontSize";
+    if (n.startsWith("spacing")) return "spacing";
+    if (n.startsWith("radius")) return "radius";
+    if (n.startsWith("size")) return "size";
+    if (n.includes("font") && n.includes("weight")) return "fontWeight";
+    if (n.includes("font") && n.includes("family")) return "fontFamily";
+    if (n.includes("opacity")) return "opacity";
+    return "other";
+  }
+  loadLicense().then(() => {
+    postLicense();
+    if (cache && evaluateLicense(cache, Date.now()).stale) post({ type: "REQUEST_VERIFY", key: cache.key });
+  });
+  var SCAN_CAP = 1500;
+  function isBindableCandidate(n) {
+    const fills = n.fills;
+    const hasFills = Array.isArray(fills) && fills.some((p) => p.type === "SOLID" && p.visible !== false);
+    const strokes = n.strokes;
+    const hasStrokes = Array.isArray(strokes) && strokes.length > 0;
+    const r = n.cornerRadius;
+    const hasRadius = typeof r === "number" && r > 0;
+    const hasFont = typeof n.fontSize === "number";
+    const lm = n.layoutMode;
+    const hasGap = !!lm && lm !== "NONE" && typeof n.itemSpacing === "number";
+    return hasFills || hasStrokes || hasRadius || hasFont || hasGap;
+  }
+  function postSelection() {
+    const sel = selection();
+    let scanned = 0;
+    let bindable = 0;
+    let capped = false;
+    const stack = sel.slice();
+    while (stack.length) {
+      if (scanned >= SCAN_CAP) {
+        capped = true;
+        break;
+      }
+      const n = stack.pop();
+      scanned++;
+      if (isBindableCandidate(n)) bindable++;
+      if ("children" in n) for (const c of n.children) stack.push(c);
+    }
+    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped });
+  }
+  figma.on("selectionchange", postSelection);
+  var CONTRAST_SCAN_CAP = 2e3;
+  function solidFillHex(node) {
+    var _a;
+    const fills = node.fills;
+    if (!Array.isArray(fills)) return null;
+    for (const p of fills) {
+      if (p.type === "SOLID" && p.visible !== false && ((_a = p.opacity) != null ? _a : 1) > 0) return rgbToHex(p.color);
+    }
+    return null;
+  }
+  function effectiveBgHex(node) {
+    let cur = node.parent;
+    while (cur && cur.type !== "PAGE" && cur.type !== "DOCUMENT") {
+      const hex = solidFillHex(cur);
+      if (hex) return hex;
+      cur = cur.parent;
+    }
+    return null;
+  }
+  function collectContrastSamples(sel) {
+    const samples = [];
+    const skipped = {};
+    const note2 = (k) => {
+      var _a;
+      skipped[k] = ((_a = skipped[k]) != null ? _a : 0) + 1;
+    };
+    const stack = sel.slice();
+    let scanned = 0;
+    while (stack.length) {
+      if (scanned >= CONTRAST_SCAN_CAP) {
+        note2("capped");
+        break;
+      }
+      const n = stack.pop();
+      scanned++;
+      if (n.type === "TEXT" && n.visible) {
+        const fg = solidFillHex(n);
+        if (!fg) note2("no-fill");
+        else {
+          const bg = effectiveBgHex(n);
+          if (!bg) note2("no-bg");
+          else {
+            const fontSize = typeof n.fontSize === "number" ? n.fontSize : 16;
+            const bold = typeof n.fontWeight === "number" ? n.fontWeight >= 700 : false;
+            samples.push({ id: n.id, name: n.name, fg, bg, fontSize, bold });
+          }
+        }
+      }
+      if ("children" in n) for (const c of n.children) stack.push(c);
+    }
+    return { samples, skipped };
+  }
+  figma.ui.onmessage = async (msg) => {
+    var _a, _b;
+    try {
+      switch (msg.type) {
+        case "EXTRACT": {
+          const sel = selection();
+          const { tokens, warnings } = extractFromSelection(sel);
+          post({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length });
+          break;
+        }
+        case "CREATE_TOKENS": {
+          const limit = limitsForTier(currentTier()).tokens;
+          const c = clampCount(msg.tokens.length, limit);
+          const slice = msg.tokens.slice(0, c.allowed);
+          const s = msg.preview ? await previewCreateTokens(slice) : await createTokens(slice, msg.base);
+          let summary = `Global ${s.globals}\uAC1C \xB7 Semantic ${s.semantics}\uAC1C (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated})`;
+          if (c.limited) summary += ` \xB7 \u26A0 ${msg.tokens.length}\uAC1C \uC911 ${c.allowed}\uAC1C\uB9CC \uC801\uC6A9(Free \uD55C\uB3C4 ${limit}) \u2014 \uC5C5\uADF8\uB808\uC774\uB4DC \uD544\uC694`;
+          post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
+          if (!msg.preview) {
+            record("create", summary);
+            commitUndo(figma);
+          }
+          break;
+        }
+        case "APPLY": {
+          const lim = limitsForTier(currentTier());
+          bindCancel = false;
+          const r = await bindSelection(
+            selection(),
+            msg.tolerance,
+            { maxNodes: lim.nodes, maxBindings: lim.bindings },
+            !msg.preview,
+            {
+              onProgress: (done, total) => post({ type: "PROGRESS", op: "bind", done, total }),
+              shouldCancel: () => bindCancel,
+              yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
+            }
+          );
+          post({
+            type: "APPLY_RESULT",
+            bound: r.bound,
+            skipped: r.skipped,
+            flags: r.flags,
+            reasons: r.reasons,
+            limited: !!r.limited,
+            preview: msg.preview,
+            cancelled: r.cancelled
+          });
+          if (!msg.preview) {
+            if (!r.cancelled) record("bind", `\uBC14\uC778\uB529 ${r.bound} \xB7 \uC2A4\uD0B5 ${r.skipped}${r.limited ? " \xB7 \uD55C\uB3C4 \uB3C4\uB2EC" : ""}`);
+            commitUndo(figma);
+          }
+          break;
+        }
+        case "CANCEL": {
+          bindCancel = true;
+          break;
+        }
+        case "RENAME": {
+          const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
+          post({ type: "RENAME_RESULT", changes: r.changes, applied: r.applied });
+          if (r.applied && r.changes.length) {
+            record("rename", `${r.changes.length}\uAC1C \uB808\uC774\uC5B4 \uC774\uB984 \uC801\uC6A9`);
+            commitUndo(figma);
+          }
+          break;
+        }
+        case "CREATE_SEMANTICS": {
+          const s = await createSemanticAliases(msg.map);
+          post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
+          record("semantics", `\uBCC4\uCE6D ${s.aliased} (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated})`);
+          commitUndo(figma);
+          break;
+        }
+        case "GET_COLLECTIONS": {
+          const cols = await figma.variables.getLocalVariableCollectionsAsync();
+          post({ type: "COLLECTIONS", collections: cols.map((c) => ({ id: c.id, name: c.name })) });
+          postSelection();
+          break;
+        }
+        case "GET_LICENSE": {
+          postLicense();
+          break;
+        }
+        case "SET_LICENSE": {
+          devTier = msg.tier;
+          try {
+            await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);
+          } catch (e) {
+          }
+          postLicense();
+          break;
+        }
+        case "LICENSE_VERIFIED": {
+          if (msg.result.ok) {
+            cache = cacheFromVerify(msg.key, msg.result, Date.now());
+            try {
+              await figma.clientStorage.setAsync(CACHE_KEY, cache);
+            } catch (e) {
+            }
+            postLicense("\uB77C\uC774\uC120\uC2A4 \uC801\uC6A9\uB428");
+          } else if (msg.result.offline) {
+            postLicense(
+              cache ? "\uC624\uD504\uB77C\uC778 \u2014 \uCE90\uC2DC\uB41C \uB77C\uC774\uC120\uC2A4\uB85C \uB3D9\uC791(grace)." : "\uC624\uD504\uB77C\uC778 \u2014 \uD0A4\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."
+            );
+          } else {
+            postLicense(`\uAC80\uC99D \uC2E4\uD328: ${msg.result.error}`);
+          }
+          break;
+        }
+        case "CLEAR_LICENSE": {
+          cache = null;
+          try {
+            await figma.clientStorage.deleteAsync(CACHE_KEY);
+          } catch (e) {
+          }
+          postLicense("\uB77C\uC774\uC120\uC2A4 \uD0A4 \uC81C\uAC70\uB428");
+          break;
+        }
+        case "GET_PRESETS": {
+          if (!requireTeam()) break;
+          post({ type: "PRESETS", presets });
+          break;
+        }
+        case "SAVE_PRESET": {
+          if (!requireTeam()) break;
+          presets = upsertPreset(presets, msg.preset);
+          await savePresets();
+          post({ type: "PRESETS", presets });
+          break;
+        }
+        case "DELETE_PRESET": {
+          if (!requireTeam()) break;
+          presets = presets.filter((p) => p.name !== msg.name);
+          await savePresets();
+          post({ type: "PRESETS", presets });
+          break;
+        }
+        case "GET_HISTORY": {
+          if (!requireTeam()) break;
+          post({ type: "HISTORY", entries: history });
+          break;
+        }
+        case "CLEAR_HISTORY": {
+          if (!requireTeam()) break;
+          history = [];
+          try {
+            await figma.clientStorage.deleteAsync(HISTORY_KEY);
+          } catch (e) {
+          }
+          post({ type: "HISTORY", entries: history });
+          break;
+        }
+        case "EXPORT": {
+          const cols = await figma.variables.getLocalVariableCollectionsAsync();
+          const colById = new Map(cols.map((c) => [c.id, c]));
+          const vars = await figma.variables.getLocalVariablesAsync();
+          const nameById = new Map(vars.map((v) => [v.id, v.name]));
+          const tokens = [];
+          for (const v of vars) {
+            const col = colById.get(v.variableCollectionId);
+            if (!col || col.name !== GLOBAL && col.name !== SEMANTIC) continue;
+            const raw = v.valuesByMode[col.defaultModeId];
+            const t = {
+              name: v.name,
+              collection: col.name,
+              type: v.resolvedType,
+              kind: kindOf(v)
+            };
+            if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+              const target = nameById.get(raw.id);
+              if (!target) continue;
+              t.aliasOf = target;
+            } else if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) {
+              t.value = rgbToHex(raw);
+            } else {
+              t.value = raw;
+            }
+            tokens.push(t);
+          }
+          tokens.sort((a, b) => a.name.localeCompare(b.name));
+          const content = exportTokens(tokens, {
+            format: msg.format,
+            fontSizeUnit: msg.fontSizeUnit,
+            base: msg.base,
+            includeSnapshots: msg.includeSnapshots
+          });
+          post({ type: "EXPORT_RESULT", format: msg.format, content });
+          break;
+        }
+        case "REGISTER_COMPONENTS": {
+          if (!requirePro()) break;
+          let registered = 0;
+          let skipped = 0;
+          for (const node of selection()) {
+            if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") {
+              skipped++;
+              continue;
+            }
+            if (node.type === "INSTANCE" || node.type === "TEXT" || node.locked) {
+              skipped++;
+              continue;
+            }
+            if (node.type !== "FRAME" && node.type !== "GROUP") {
+              skipped++;
+              continue;
+            }
+            try {
+              figma.createComponentFromNode(node);
+              registered++;
+            } catch (e) {
+              skipped++;
+            }
+          }
+          post({ type: "COMPONENTS_RESULT", registered, skipped });
+          if (registered) commitUndo(figma);
+          break;
+        }
+        case "CLASSIFY_VARIANTS": {
+          if (!requirePro()) break;
+          const comps = selection().filter((n) => n.type === "COMPONENT");
+          const byName = /* @__PURE__ */ new Map();
+          for (const c of comps) if (!byName.has(c.name)) byName.set(c.name, c);
+          const result = classifyVariants(comps.map((c) => c.name));
+          let sets = 0;
+          const missing = [];
+          for (const g of result.groups) {
+            const nodes = g.members.map((m) => byName.get(m.name)).filter((n) => {
+              var _a2;
+              return !!n && ((_a2 = n.parent) == null ? void 0 : _a2.type) !== "COMPONENT_SET";
+            });
+            if (nodes.length < 2) continue;
+            try {
+              const parent = (_a = nodes[0].parent) != null ? _a : figma.currentPage;
+              const set = figma.combineAsVariants(nodes, parent);
+              set.name = g.base;
+              for (const m of g.members) {
+                const node = byName.get(m.name);
+                if (node) node.name = m.variant;
+              }
+              arrangeSet(set);
+              sets++;
+              if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(" / ")}`);
+            } catch (e) {
+            }
+          }
+          post({ type: "VARIANTS_RESULT", sets, missing, singles: result.singles });
+          if (sets) commitUndo(figma);
+          break;
+        }
+        case "GENERATE_MISSING_VARIANTS": {
+          if (!requirePro()) break;
+          const sets = selection().filter((n) => n.type === "COMPONENT_SET");
+          let generated = 0;
+          const combos = [];
+          for (const set of sets) {
+            const children = set.children.filter((c) => c.type === "COMPONENT");
+            if (!children.length) continue;
+            const missing = missingVariants(children.map((c) => c.name));
+            const src = children[0];
+            for (const combo of missing) {
+              try {
+                const clone = src.clone();
+                clone.name = combo;
+                set.appendChild(clone);
+                generated++;
+                combos.push(`${set.name}: ${combo}`);
+              } catch (e) {
+              }
+            }
+            if (missing.length) arrangeSet(set);
+          }
+          post({ type: "GENERATE_RESULT", generated, sets: sets.length, combos });
+          if (generated) commitUndo(figma);
+          break;
+        }
+        case "EXPOSE_PROPERTIES": {
+          if (!requirePro()) break;
+          let created = 0;
+          const props = [];
+          for (const node of selection()) {
+            if (node.type !== "COMPONENT") continue;
+            const layers = node.findAll(() => true);
+            const plan = inferComponentProperties(layers.map((l) => ({ name: l.name, type: l.type })));
+            for (const p of plan) {
+              const target = layers.find((l) => l.name === p.layerName);
+              if (!target) continue;
+              try {
+                let def = "";
+                if (p.type === "TEXT") def = target.type === "TEXT" ? target.characters : "";
+                else if (p.type === "BOOLEAN") def = target.visible;
+                else def = target.type === "INSTANCE" && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : "";
+                const id = node.addComponentProperty(p.propName, p.type, def);
+                const refs = __spreadValues({}, (_b = target.componentPropertyReferences) != null ? _b : {});
+                refs[p.field] = id;
+                target.componentPropertyReferences = refs;
+                created++;
+                props.push(`${p.propName}:${p.type}`);
+              } catch (e) {
+              }
+            }
+          }
+          post({ type: "PROPERTIES_RESULT", created, props });
+          if (created) commitUndo(figma);
+          break;
+        }
+        case "CHECK_CONTRAST": {
+          const { samples, skipped } = collectContrastSamples(selection());
+          const report = checkContrast(samples, msg.level);
+          post({
+            type: "CONTRAST_RESULT",
+            level: report.level,
+            checked: report.checked,
+            passed: report.passed,
+            failed: report.failed,
+            findings: report.findings,
+            skipped
+          });
+          break;
+        }
+      }
+    } catch (err) {
+      post({ type: "ERROR", message: err instanceof Error ? err.message : String(err), op: msg == null ? void 0 : msg.type });
+    }
+  };
+})();

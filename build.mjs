@@ -11,7 +11,8 @@ await mkdir(outdir, { recursive: true });
 
 const shared = {
   bundle: true,
-  target: 'es2019',
+  // Figma 플러그인 샌드박스는 객체 스프레드(ES2018)를 파싱하지 못함 → es2017로 낮춰 트랜스파일.
+  target: 'es2017',
   logLevel: 'info',
 };
 
