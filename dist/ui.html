@@ -831,7 +831,7 @@
     for (const scale of p.scales) {
       for (const sw of scale.swatches) {
         tokens2.push({
-          name: `color/${scale.family}/${sw.step}`,
+          name: colorScaleName(scale.family, sw.step),
           category: "color",
           value: sw.hex,
           sources: ["fill"]
@@ -840,6 +840,13 @@
     }
     return tokens2;
   }
+  function colorScaleName(family, step) {
+    return `color/${family}/${step}`;
+  }
+  var STEP_L = STEPS.map((step, i) => ({
+    step,
+    l: lerp(0.97, 0.16, i / (STEPS.length - 1))
+  }));
 
   // src/lib/errors.ts
   function explainError(raw) {
