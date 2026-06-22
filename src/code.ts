@@ -324,10 +324,27 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'RENAME': {
         const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
-        post({ type: 'RENAME_RESULT', changes: r.changes, applied: r.applied });
+        post({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied, capped: r.capped });
         if (r.applied && r.changes.length) {
           record('rename', `${r.changes.length}개 레이어 이름 적용`);
           commitUndo(figma); // UX2: 리네임 전체를 단일 Undo로
+        }
+        break;
+      }
+      case 'APPLY_RENAME': {
+        // 미리보기 트리에서 체크한 노드만 직접 적용(WYSIWYG, 재추론 없음). 소실 노드는 graceful skip.
+        let count = 0;
+        for (const item of msg.renames) {
+          const node = await figma.getNodeByIdAsync(item.id);
+          if (node && 'name' in node && (node as SceneNode).name !== item.after) {
+            (node as SceneNode).name = item.after;
+            count++;
+          }
+        }
+        post({ type: 'RENAME_APPLIED', count });
+        if (count) {
+          record('rename', `${count}개 레이어 이름 적용`);
+          commitUndo(figma); // UX2: 선택 리네임을 단일 Undo로
         }
         break;
       }

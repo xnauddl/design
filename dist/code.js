@@ -854,42 +854,57 @@
   }
 
   // src/lib/rename.ts
+  var MAX_NODES = 5e3;
   async function renameSelection(selection2, opts) {
-    const changes = [];
-    await recurse(selection2, null, opts, changes, 0, null);
-    return { changes, applied: opts.apply };
+    const nodes = [];
+    const state = { capped: false };
+    await recurse(selection2, null, null, opts, nodes, state, 0, null);
+    const changes = nodes.filter((n) => n.changed).map((n) => ({ id: n.id, before: n.before, after: n.after }));
+    return { changes, nodes, applied: opts.apply, capped: state.capped };
   }
-  async function recurse(nodes, ancestorName, opts, out, depth, parentLayout) {
-    const total = nodes.length;
+  async function recurse(sceneNodes, ancestorName, parentId, opts, out, state, depth, parentLayout) {
+    const total = sceneNodes.length;
     for (let i = 0; i < total; i++) {
-      const node = nodes[i];
+      if (out.length >= MAX_NODES) {
+        state.capped = true;
+        return;
+      }
+      const node = sceneNodes[i];
+      const before = node.name;
       const pos = { index: i, total, parentLayout, depth };
       const decided = await decide(node, ancestorName, pos, opts);
-      let contextForChildren = node.name;
-      if (!decided.skip && decided.name) {
-        if (decided.name !== node.name) {
-          out.push({ id: node.id, before: node.name, after: decided.name });
-          if (opts.apply) node.name = decided.name;
-        }
-        contextForChildren = decided.name;
+      let after = before;
+      let changed = false;
+      let preserved = null;
+      if (decided.kind === "rename") {
+        after = decided.name;
+        changed = after !== before;
+        if (changed && opts.apply) node.name = after;
+      } else {
+        preserved = decided.reason;
       }
-      if ("children" in node) {
-        await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node));
+      out.push({ id: node.id, type: node.type, before, after, changed, depth, parentId, preserved });
+      let contextForChildren = null;
+      if (decided.kind === "rename") contextForChildren = after;
+      else if (!isDefaultName(before) && !isTokenEchoName(before)) contextForChildren = before;
+      if ("children" in node && node.type !== "INSTANCE") {
+        await recurse(node.children, contextForChildren, node.id, opts, out, state, depth + 1, layoutOf(node));
       }
     }
   }
   async function decide(node, ancestorName, pos, opts) {
     var _a;
-    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true };
-    if (node.type === "TEXT") return { skip: true };
-    if (node.type === "INSTANCE") return { skip: true };
-    if (node.locked) return { skip: true };
-    if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
+    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { kind: "preserve", reason: "component" };
+    if (node.type === "TEXT") return { kind: "preserve", reason: "text" };
+    if (node.type === "INSTANCE") return { kind: "preserve", reason: "instance" };
+    if (node.locked) return { kind: "preserve", reason: "locked" };
+    if (pos.depth === 0 && isContainerType(node)) return { kind: "preserve", reason: "root" };
+    if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { kind: "preserve", reason: "named" };
     const token = await primaryToken(node);
     const role = resolveRole(node, token, pos);
     let scope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
     if (scope === role) scope = null;
-    return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
+    return { kind: "rename", name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
   }
   function resolveRole(node, token, pos) {
     if (isButtonLike(node)) return "button";

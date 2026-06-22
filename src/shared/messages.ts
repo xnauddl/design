@@ -20,13 +20,38 @@ export interface RenameChange {
   after: string;
 }
 
+/** 리네임에서 이름을 바꾸지 않고 보존하는 사유(미리보기 트리에서 맥락으로 회색 표시). */
+export type PreservedReason = 'root' | 'instance' | 'component' | 'text' | 'locked' | 'named';
+
+/**
+ * 리네임 미리보기 트리의 한 노드(방문한 모든 레이어 = 전체 서브트리).
+ * 영향 노드(`changed`)는 체크·강조, 나머지(`preserved`)는 맥락으로 회색 표시.
+ */
+export interface RenameNode {
+  id: string;
+  /** SceneNode.type — 트리 아이콘/표시용. */
+  type: string;
+  before: string;
+  /** 제안 이름(변경 없으면 before와 동일). */
+  after: string;
+  /** after !== before — 리네임 대상(체크 가능). */
+  changed: boolean;
+  /** 선택 루트 기준 깊이(0 = 루트). */
+  depth: number;
+  /** 부모 노드 id(루트는 null) — 트리 들여쓰기/접기용. */
+  parentId: string | null;
+  /** 보존 사유(null이면 정상 후보). */
+  preserved: PreservedReason | null;
+}
+
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT' }
   | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
   | { type: 'APPLY'; tolerance: number; preview?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
-  | { type: 'RENAME'; apply: boolean; maxDepth: number }
+  | { type: 'RENAME'; apply: boolean; maxDepth: number } // apply:false=미리보기(트리), true=전체 적용(마법사)
+  | { type: 'APPLY_RENAME'; renames: { id: string; after: string }[] } // 미리보기에서 체크한 것만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   | { type: 'GET_COLLECTIONS' }
   | { type: 'GET_LICENSE' }
@@ -53,7 +78,8 @@ export type CodeToUi =
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; limited?: boolean; preview?: boolean }
   | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; limited?: boolean; preview?: boolean; cancelled?: boolean }
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
-  | { type: 'RENAME_RESULT'; changes: RenameChange[]; applied: boolean }
+  | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean; capped: boolean }
+  | { type: 'RENAME_APPLIED'; count: number } // APPLY_RENAME 결과(선택분만 적용)
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   | {
