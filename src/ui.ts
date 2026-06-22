@@ -1,7 +1,7 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
 import { FREE_LIMITS, type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
@@ -518,7 +518,7 @@ const TEAM_FIELDS = [
   'btnRefreshHistory', 'btnExportHistory', 'btnClearHistory', 'historyJson',
 ];
 
-const PRO_FIELDS = ['btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps'];
+const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps'];
 
 function updateTeamGate(): void {
   for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
@@ -538,9 +538,34 @@ function updateTeamGate(): void {
 }
 
 /* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
+$('btnScanComp').addEventListener('click', () => {
+  setStatus('componentStatus', '후보 스캔 중…', '');
+  send({ type: 'SCAN_COMPONENT_CANDIDATES' });
+});
+
 $('btnRegisterComp').addEventListener('click', () => {
-  setStatus('componentStatus', '컴포넌트 등록 중…', '');
-  send({ type: 'REGISTER_COMPONENTS' });
+  // #1: 스캔 후보가 있으면 체크한 노드만, 없으면 최상위 선택(폴백).
+  if (compCandidates.length) {
+    const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
+    if (!nodeIds.length) return;
+    setStatus('componentStatus', '컴포넌트 등록 중…', '');
+    send({ type: 'REGISTER_COMPONENTS', nodeIds });
+  } else {
+    setStatus('componentStatus', '컴포넌트 등록 중…', '');
+    send({ type: 'REGISTER_COMPONENTS' });
+  }
+});
+
+$('compAll').addEventListener('change', (e) => {
+  const on = (e.target as HTMLInputElement).checked;
+  compChecked.clear();
+  if (on) for (const c of compCandidates) if (c.eligible) compChecked.add(c.id);
+  renderCompTree();
+});
+
+$('compHideCtx').addEventListener('change', (e) => {
+  compHideContext = (e.target as HTMLInputElement).checked;
+  renderCompTree();
 });
 
 $('btnClassifyVariants').addEventListener('click', () => {
@@ -804,7 +829,17 @@ window.onmessage = (event: MessageEvent) => {
       ($('exportOut') as HTMLTextAreaElement).value = msg.content;
       setStatus('exportStatus', `${msg.format === 'css' ? 'CSS' : 'W3C JSON'} 내보냄 — 복사 또는 다운로드.`, 'ok');
       break;
+    case 'COMPONENT_CANDIDATES': {
+      // #1: 하위 등록 후보를 트리로. 등록 가능 노드 기본 전체 체크.
+      compCandidates = msg.nodes;
+      compChecked.clear();
+      for (const c of msg.nodes) if (c.eligible) compChecked.add(c.id);
+      renderCompTree();
+      if (!compEligibleCount()) setStatus('componentStatus', '선택 하위에 등록 가능한 프레임이 없습니다.', 'warn');
+      break;
+    }
     case 'COMPONENTS_RESULT':
+      clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
       setStatus('componentStatus', `컴포넌트 등록 ${msg.registered} · 스킵 ${msg.skipped}`, msg.registered ? 'ok' : 'warn');
       break;
     case 'VARIANTS_RESULT': {
@@ -924,6 +959,8 @@ interface TreeRow {
   change?: string;
   /** 영향 후보를 가진 노드의 헤더(맥락 숨김에도 유지, 체크 불가). */
   header?: boolean;
+  /** false면 name을 교체(취소선)가 아니라 그대로 유지(예: 컴포넌트 등록은 이름 보존). 기본 true. */
+  replace?: boolean;
 }
 
 /** 선택 서브트리의 최소 depth(루트 기준)로 들여쓰기를 정규화한다. */
@@ -957,7 +994,8 @@ function renderSelectableTree(
       });
       row.appendChild(cb);
       const label = document.createElement('span');
-      label.innerHTML = ` <span class="before">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change as string)}</span>`;
+      const nameCls = r.replace === false ? 'tree-name' : 'before'; // 이름 보존(컴포넌트)은 취소선 없음
+      label.innerHTML = ` <span class="${nameCls}">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change as string)}</span>`;
       row.appendChild(label);
     } else {
       const label = document.createElement('span');
@@ -1102,6 +1140,52 @@ function clearBindPreview(): void {
   $('bindTree').innerHTML = '';
   ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
   ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
+}
+
+/* ---------- 컴포넌트 등록(#1): 하위 후보 트리 + 선택 등록 ---------- */
+let compCandidates: ComponentCandidate[] = [];
+const compChecked = new Set<string>(); // 체크된 등록 후보(노드 id)
+let compHideContext = false;
+
+function compEligibleCount(): number {
+  return compCandidates.reduce((n, c) => n + (c.eligible ? 1 : 0), 0);
+}
+
+function compRows(): TreeRow[] {
+  return compCandidates.map((n) =>
+    n.eligible
+      ? { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, change: '컴포넌트', replace: false }
+      : { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId },
+  );
+}
+
+function renderCompTree(): void {
+  const has = compCandidates.length > 0;
+  ($('compTreeCtrls') as HTMLElement).style.display = has ? '' : 'none';
+  renderSelectableTree($('compTree'), compRows(), compChecked, {
+    hideContext: compHideContext,
+    onChange: updateCompRegister,
+  });
+  updateCompRegister();
+}
+
+/** 등록 버튼 라벨/상태 + 전체선택 마스터 동기화. */
+function updateCompRegister(): void {
+  const total = compEligibleCount();
+  const sel = compChecked.size;
+  if (compCandidates.length) {
+    const all = $('compAll') as HTMLInputElement;
+    all.checked = sel === total && total > 0;
+    all.indeterminate = sel > 0 && sel < total;
+    setStatus('componentStatus', total === 0 ? '등록 가능한 프레임이 없습니다.' : `등록 후보 ${total}개 · ${sel}개 선택`, '');
+  }
+}
+
+function clearCompPreview(): void {
+  compCandidates = [];
+  compChecked.clear();
+  $('compTree').innerHTML = '';
+  ($('compTreeCtrls') as HTMLElement).style.display = 'none';
 }
 
 /** UX3: 스킵 사유 키 → 한글 라벨. */

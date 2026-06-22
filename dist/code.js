@@ -1387,6 +1387,29 @@
     }
     return { groups, singles };
   }
+  function componentEligible(node) {
+    return (node.type === "FRAME" || node.type === "GROUP") && !node.locked;
+  }
+  function scanComponentCandidates(selection2) {
+    var _a, _b;
+    const all = [];
+    const visit = (n, depth, parentId) => {
+      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: componentEligible(n) });
+      if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
+    };
+    for (const n of selection2) visit(n, 0, null);
+    const byId = new Map(all.map((c) => [c.id, c]));
+    const keep = new Set(all.filter((c) => c.eligible).map((c) => c.id));
+    for (const c of all) {
+      if (!c.eligible) continue;
+      let p = c.parentId;
+      while (p && !keep.has(p)) {
+        keep.add(p);
+        p = (_b = (_a = byId.get(p)) == null ? void 0 : _a.parentId) != null ? _b : null;
+      }
+    }
+    return all.filter((c) => keep.has(c.id));
+  }
 
   // src/lib/contrast.ts
   function isLargeText(fontSizePx, bold) {
@@ -1941,11 +1964,27 @@
           post({ type: "EXPORT_RESULT", format: msg.format, content });
           break;
         }
+        case "SCAN_COMPONENT_CANDIDATES": {
+          if (!requirePro()) break;
+          post({ type: "COMPONENT_CANDIDATES", nodes: scanComponentCandidates(selection()) });
+          break;
+        }
         case "REGISTER_COMPONENTS": {
           if (!requirePro()) break;
           let registered = 0;
           let skipped = 0;
-          for (const node of selection()) {
+          let targets;
+          if (msg.nodeIds && msg.nodeIds.length) {
+            targets = [];
+            for (const id of msg.nodeIds) {
+              const n = await figma.getNodeByIdAsync(id);
+              if (n && "type" in n) targets.push(n);
+              else skipped++;
+            }
+          } else {
+            targets = [...selection()];
+          }
+          for (const node of targets) {
             if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") {
               skipped++;
               continue;

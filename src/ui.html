@@ -58,9 +58,10 @@
     .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
     .cat { font-size: 10px; color: var(--muted); }
-    #diff, #bindTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
+    #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
     .tree-row.header { opacity: 1; color: var(--muted); }
     .before { color: var(--muted); text-decoration: line-through; }
+    .tree-name { color: inherit; }
     .after { color: var(--ok); }
     /* 선택형 미리보기 트리(#13) */
     .tree-ctrls { font-size: 11px; margin-top: 6px; }
@@ -296,13 +297,19 @@
 
     <div class="step" id="componentCard">
       <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
-      <div class="muted">선택 프레임 → 메인 컴포넌트. 같은 베이스 이름(예: <code>button/primary</code>) 컴포넌트들 → 베리언트 세트. (Pro 전용)</div>
+      <div class="muted">선택 하위에서 <b>후보 스캔</b> → 컴포넌트화할 프레임을 골라 등록. 같은 베이스 이름(예: <code>button/primary</code>) 컴포넌트들 → 베리언트 세트. (Pro 전용)</div>
       <div class="row">
+        <button id="btnScanComp">후보 스캔</button>
         <button id="btnRegisterComp">컴포넌트 등록</button>
         <button id="btnClassifyVariants">베리언트 분류</button>
         <button id="btnGenMissing">누락 조합 생성</button>
         <button id="btnExposeProps">속성 노출</button>
       </div>
+      <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
+        <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="compHideCtx" /> 맥락 숨기기</label>
+      </div>
+      <div id="compTree"></div>
       <div class="ux">
         <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">적용 전 미리보기</span></div>
         <div id="variantReport" style="max-height:120px; overflow:auto; font-family:ui-monospace, monospace; font-size:11px;"></div>

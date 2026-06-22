@@ -52,6 +52,7 @@ import {
   variantGrid,
   inferProp,
   inferComponentProperties,
+  scanComponentCandidates,
   commitUndo,
   explainError,
   nextTabIndex,
@@ -464,6 +465,42 @@ test('inferProp / parseVariantName — 어휘·경로·명시형', () => {
 
 test('formatVariant — 속성명 정렬', () => {
   assert.equal(formatVariant({ type: 'primary', state: 'hover' }), 'state=hover, type=primary');
+});
+
+test('scanComponentCandidates(#1) — 영향(FRAME/GROUP)+조상만, 잠금/인스턴스/텍스트 제외', () => {
+  // page(FRAME) > card(FRAME, 잠금) ... 실제로는: root(FRAME) > [text, btn(FRAME), inst(INSTANCE), grp(GROUP, 잠금)]
+  const text = { id: 't', name: 'Label', type: 'TEXT' };
+  const icon = { id: 'i', name: 'Vector', type: 'VECTOR' };
+  const btn = { id: 'b', name: 'btn', type: 'FRAME', children: [icon] }; // eligible
+  const inst = { id: 'in', name: 'Inst', type: 'INSTANCE' }; // 제외
+  const lockedGrp = { id: 'g', name: 'grp', type: 'GROUP', locked: true }; // 잠금 → 제외
+  const root = { id: 'r', name: 'root', type: 'FRAME', children: [text, btn, inst, lockedGrp] }; // eligible
+
+  const out = scanComponentCandidates([root]);
+  const byId = new Map(out.map((c) => [c.id, c]));
+
+  // 유지: root(eligible) + btn(eligible). icon은 비-eligible 말단이지만 btn의 자식이라 잡음 → 제외.
+  assert.deepEqual(out.map((c) => c.id).sort(), ['b', 'r']);
+  assert.equal(byId.get('r').eligible, true);
+  assert.equal(byId.get('b').eligible, true);
+  // 계층 보존
+  assert.equal(byId.get('r').parentId, null);
+  assert.equal(byId.get('r').depth, 0);
+  assert.equal(byId.get('b').parentId, 'r');
+  assert.equal(byId.get('b').depth, 1);
+});
+
+test('scanComponentCandidates(#1) — 깊은 eligible의 조상 체인은 맥락으로 보존', () => {
+  const deep = { id: 'd', name: 'deep', type: 'FRAME' }; // eligible(깊음)
+  const mid = { id: 'm', name: 'mid', type: 'GROUP', locked: true, children: [deep] }; // 잠금(비-eligible)이지만 조상
+  const top = { id: 'top', name: 'top', type: 'TEXT', children: [mid] }; // 텍스트(비-eligible)이지만 조상
+
+  const out = scanComponentCandidates([top]);
+  // deep이 eligible이라 그 조상(top, mid)도 맥락으로 유지
+  assert.deepEqual(out.map((c) => c.id), ['top', 'm', 'd']);
+  assert.equal(out.find((c) => c.id === 'd').eligible, true);
+  assert.equal(out.find((c) => c.id === 'm').eligible, false);
+  assert.equal(out.find((c) => c.id === 'top').eligible, false);
 });
 
 test('classifyVariants — 그룹/속성/빈 조합/단일', () => {

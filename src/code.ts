@@ -9,7 +9,7 @@ import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { classifyVariants, missingVariants, variantGrid, inferComponentProperties } from './lib/components';
+import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
@@ -551,11 +551,28 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'EXPORT_RESULT', format: msg.format, content });
         break;
       }
+      case 'SCAN_COMPONENT_CANDIDATES': {
+        if (!requirePro()) break;
+        post({ type: 'COMPONENT_CANDIDATES', nodes: scanComponentCandidates(selection()) });
+        break;
+      }
       case 'REGISTER_COMPONENTS': {
         if (!requirePro()) break;
         let registered = 0;
         let skipped = 0;
-        for (const node of selection()) {
+        // #1: nodeIds 지정 시 해당 노드만(미리보기 트리 선택), 아니면 최상위 선택(마법사·폴백).
+        let targets: SceneNode[];
+        if (msg.nodeIds && msg.nodeIds.length) {
+          targets = [];
+          for (const id of msg.nodeIds) {
+            const n = await figma.getNodeByIdAsync(id);
+            if (n && 'type' in n) targets.push(n as SceneNode);
+            else skipped++; // 소실 노드 graceful skip
+          }
+        } else {
+          targets = [...selection()];
+        }
+        for (const node of targets) {
           if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') {
             skipped++; // 이미 컴포넌트(멱등)
             continue;
