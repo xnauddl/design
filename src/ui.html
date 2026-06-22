@@ -88,6 +88,20 @@
     .bar { height: 8px; border-radius: 4px; background: var(--field); border: 1px solid var(--border); overflow: hidden; }
     .bar-fill { height: 100%; width: 0%; background: var(--accent); transition: width .1s linear; }
 
+    /* 시스템화 마법사 스테퍼 */
+    #wizardSteps { margin-top: 7px; }
+    .wstep { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
+    .wstep .dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border); background: #fff; font-size: 8px; line-height: 12px; text-align: center; color: var(--muted); }
+    .wstep.done .dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .wstep.active .dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .wstep.fail .dot { background: var(--warn); border-color: var(--warn); color: #fff; }
+    .wstep .wlabel { color: var(--text); }
+    .wstep.skip { opacity: .55; }
+    .wstep.skip .wlabel { color: var(--muted); }
+    .wstep .wnote { font-size: 10px; color: var(--muted); }
+    .wstep.fail .wnote { color: var(--warn); }
+    #wizardBar { margin-top: 7px; }
+
     /* 명도 대비 점검 결과 */
     .cfind { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
     .cpair { display: inline-flex; }
@@ -111,12 +125,31 @@
   </div>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
+    <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
+    <div class="step" id="wizardCard">
+      <div class="ux-h"><span class="badge">NEW</span><span class="ux-t">시스템화 마법사</span></div>
+      <div class="muted">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>합니다. 세부 설정값은 아래 각 단계 입력(base·허용오차·맥락단계·시맨틱·대비 기준)을 그대로 사용합니다.</div>
+      <div class="row">
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> 시맨틱 매핑</label>
+        <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> 접근성 검수</label>
+        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> 컴포넌트화</label>
+        <span class="muted" id="wizComponentLock"></span>
+      </div>
+      <div class="row">
+        <button id="btnWizardRun" class="primary">전체 실행</button>
+        <button id="btnWizardCancel" style="display:none">취소</button>
+      </div>
+      <div id="wizardSteps"></div>
+      <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
+      <div class="status" id="wizardSummary"></div>
+    </div>
+
     <!-- UX4 · 온보딩 / 가이드 -->
     <div class="ux" id="onboardCard">
       <div class="ux-h"><span class="badge">UX4</span><span class="ux-t">온보딩 / 가이드</span></div>
-      <div>처음이세요? ① 추출 → ② 토큰 → ③ 바인딩 → ④ 리네임</div>
+      <div>처음이세요? 위 <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 아래 섹션을 차례로 사용하세요.</div>
       <div class="row">
-        <button id="btnGuide">가이드 보기</button>
+        <button id="btnGuide">마법사로 시작</button>
         <button id="btnOnboardClose">닫기</button>
       </div>
     </div>
