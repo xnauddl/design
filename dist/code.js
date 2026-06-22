@@ -166,9 +166,9 @@
       acc.map.set(k, __spreadProps(__spreadValues({}, token), { sources: [source] }));
     }
   }
-  function collectPaints(acc, paints, source) {
-    if (paints === figma.mixed || !Array.isArray(paints)) return;
-    for (const p of paints) {
+  function collectPaints(acc, paints2, source) {
+    if (paints2 === figma.mixed || !Array.isArray(paints2)) return;
+    for (const p of paints2) {
       if (p.visible === false) continue;
       if (p.type === "SOLID") {
         const hex = rgbToHex(p.color);
@@ -709,10 +709,10 @@
   function bindPaints(node, entries, res, apply) {
     for (const key of ["fills", "strokes"]) {
       if (!(key in node)) continue;
-      const paints = node[key];
-      if (paints === figma.mixed || !Array.isArray(paints)) continue;
+      const paints2 = node[key];
+      if (paints2 === figma.mixed || !Array.isArray(paints2)) continue;
       let changed = false;
-      const next = paints.map((p) => {
+      const next = paints2.map((p) => {
         if (p.type !== "SOLID") return p;
         const v = matchColor(entries, rgbToHex(p.color));
         if (!v) {
@@ -832,24 +832,49 @@
   }
 
   // src/lib/naming.ts
+  var ROLE_VOCAB = [
+    // 구조
+    "container",
+    "wrapper",
+    "content",
+    "group",
+    // 영역
+    "header",
+    "body",
+    "footer",
+    "leading",
+    "trailing",
+    // 요소
+    "icon",
+    "image",
+    "background",
+    "swatch",
+    "border",
+    "divider",
+    "badge",
+    "avatar",
+    // 시맨틱(영역/컴포넌트) — 인식·정리 + 일부 구조 추론
+    "nav",
+    "hero",
+    "main",
+    "sidebar",
+    "section",
+    "button",
+    "card",
+    "list",
+    "item",
+    "field",
+    "tab",
+    "chip",
+    "label",
+    "title"
+  ];
+  var ROLE_SET = new Set(ROLE_VOCAB);
+  function isKnownRole(seg) {
+    return ROLE_SET.has(seg);
+  }
   function kebab(input) {
     return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s_/]+/g, "-").replace(/[^a-zA-Z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
-  }
-  var STYLE_LEAVES = /* @__PURE__ */ new Set([
-    "fill",
-    "color",
-    "stroke",
-    "bg",
-    "text",
-    "border"
-  ]);
-  function layerNameFromToken(tokenName, opts = {}) {
-    let segs = tokenName.split("/").filter(Boolean);
-    if (opts.stripStyleLeaf && segs.length > 1 && STYLE_LEAVES.has(segs[segs.length - 1].toLowerCase())) {
-      segs = segs.slice(0, -1);
-    }
-    segs = limitDepth(segs, opts.maxDepth);
-    return segs.map(kebab).filter(Boolean).join("-");
   }
   function layerNameFromRole(ancestorName, role, opts = {}) {
     const ctx = ancestorName ? kebab(ancestorName) : "";
@@ -860,53 +885,167 @@
     if (segs.length <= maxDepth) return segs;
     return segs.slice(segs.length - maxDepth);
   }
-  function dedupeName(name, taken) {
-    if (!taken.has(name)) {
-      taken.add(name);
-      return name;
+  var DEFAULT_NAME_RE = /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( \d+)?( copy( \d+)?)?$/;
+  function isDefaultName(name) {
+    const n = name.trim();
+    if (!n) return true;
+    return DEFAULT_NAME_RE.test(n);
+  }
+  var PRIMITIVE_NS = /* @__PURE__ */ new Set([
+    "color",
+    "colour",
+    "spacing",
+    "space",
+    "gap",
+    "padding",
+    "size",
+    "sizing",
+    "radius",
+    "border-radius",
+    "opacity",
+    "font",
+    "font-size",
+    "font-weight",
+    "line-height",
+    "letter-spacing",
+    "number",
+    "dimension",
+    "width",
+    "height",
+    "elevation",
+    "shadow",
+    "z"
+  ]);
+  var LEAF_ROLE = {
+    background: "background",
+    bg: "background",
+    fill: "background",
+    surface: "background",
+    swatch: "swatch",
+    sample: "swatch",
+    border: "border",
+    stroke: "border",
+    outline: "border",
+    icon: "icon",
+    glyph: "icon",
+    divider: "divider",
+    separator: "divider",
+    rule: "divider",
+    image: "image",
+    img: "image",
+    picture: "image",
+    thumbnail: "image",
+    avatar: "avatar",
+    badge: "badge",
+    dot: "badge",
+    indicator: "badge"
+  };
+  function parseTokenName(tokenName) {
+    var _a;
+    const segs = tokenName.split("/").map((s) => s.trim()).filter(Boolean);
+    if (!segs.length) return { roleLeaf: null, context: null, primitive: false };
+    if (PRIMITIVE_NS.has(kebab(segs[0]))) return { roleLeaf: null, context: null, primitive: true };
+    const roleLeaf = (_a = LEAF_ROLE[kebab(segs[segs.length - 1])]) != null ? _a : null;
+    const ctxSegs = roleLeaf ? segs.slice(0, -1) : segs;
+    const context = ctxSegs.length ? ctxSegs.map(kebab).filter(Boolean).join("-") : null;
+    return { roleLeaf, context, primitive: false };
+  }
+  var UNIT_WORDS = /* @__PURE__ */ new Set(["percent", "px", "em", "rem", "ratio", "pt"]);
+  function isTokenValue(v) {
+    if (/^[0-9a-f]{6}$/.test(v)) return true;
+    return v.split("-").every((s) => /^\d+$/.test(s) || UNIT_WORDS.has(s));
+  }
+  var GENERIC_ROLES = /* @__PURE__ */ new Set(["container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
+  function pickScope(name) {
+    const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
+    if (!segs.length) return null;
+    const known = segs.filter(isKnownRole);
+    return known.length ? known[known.length - 1] : segs[segs.length - 1];
+  }
+  function isTokenEchoName(name) {
+    const n = name.trim().toLowerCase();
+    for (const ns of PRIMITIVE_NS) {
+      if (n.startsWith(ns + "-")) {
+        const value = n.slice(ns.length + 1);
+        if (value && isTokenValue(value)) return true;
+      }
     }
-    let i = 2;
-    while (taken.has(`${name}-${i}`)) i++;
-    const out = `${name}-${i}`;
-    taken.add(out);
-    return out;
+    return false;
   }
 
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const changes = [];
-    await recurse(selection2, null, opts, changes);
+    await recurse(selection2, null, opts, changes, 0, null);
     return { changes, applied: opts.apply };
   }
-  async function recurse(nodes, ancestorName, opts, out) {
-    const taken = /* @__PURE__ */ new Set();
-    for (const node of nodes) {
-      const decided = await decide(node, ancestorName, opts);
+  async function recurse(nodes, ancestorName, opts, out, depth, parentLayout) {
+    const total = nodes.length;
+    for (let i = 0; i < total; i++) {
+      const node = nodes[i];
+      const pos = { index: i, total, parentLayout, depth };
+      const decided = await decide(node, ancestorName, pos, opts);
       let contextForChildren = node.name;
       if (!decided.skip && decided.name) {
-        const finalName = dedupeName(decided.name, taken);
-        if (finalName !== node.name) {
-          out.push({ id: node.id, before: node.name, after: finalName });
-          if (opts.apply) node.name = finalName;
+        if (decided.name !== node.name) {
+          out.push({ id: node.id, before: node.name, after: decided.name });
+          if (opts.apply) node.name = decided.name;
         }
-        contextForChildren = finalName;
-      } else {
-        taken.add(node.name);
+        contextForChildren = decided.name;
       }
-      if ("children" in node) await recurse(node.children, contextForChildren, opts, out);
+      if ("children" in node) {
+        await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node));
+      }
     }
   }
-  async function decide(node, ancestorName, opts) {
+  async function decide(node, ancestorName, pos, opts) {
+    var _a;
     if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true };
     if (node.type === "TEXT") return { skip: true };
     if (node.type === "INSTANCE") return { skip: true };
     if (node.locked) return { skip: true };
-    const tokenName = await primaryTokenName(node);
-    if (tokenName) {
-      return { skip: false, name: layerNameFromToken(tokenName, { maxDepth: opts.maxDepth }) };
+    if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
+    const token = await primaryToken(node);
+    const role = resolveRole(node, token, pos);
+    let scope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
+    if (scope === role) scope = null;
+    return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
+  }
+  function resolveRole(node, token, pos) {
+    if (isButtonLike(node)) return "button";
+    const region = regionRole(node, pos);
+    if (region) return region;
+    if (token == null ? void 0 : token.roleLeaf) return token.roleLeaf;
+    switch (node.type) {
+      case "VECTOR":
+      case "BOOLEAN_OPERATION":
+      case "STAR":
+      case "POLYGON":
+        return "icon";
+      case "LINE":
+        return "divider";
+      case "RECTANGLE":
+      case "ELLIPSE": {
+        if (isThin(node)) return "divider";
+        if (hasImageFill(node)) return node.type === "ELLIPSE" ? "avatar" : "image";
+        if (hasVisibleFill(node)) return "background";
+        if (hasVisibleStroke(node)) return "border";
+        return "shape";
+      }
+      case "FRAME":
+      case "GROUP":
+      case "SECTION": {
+        const count = "children" in node ? node.children.length : 0;
+        if (count === 0) {
+          if (hasImageFill(node)) return "image";
+          if (hasColorFill(node)) return "swatch";
+          return "container";
+        }
+        return count === 1 ? "wrapper" : "container";
+      }
+      default:
+        return kebab(node.type);
     }
-    const role = inferRole(node);
-    return { skip: false, name: layerNameFromRole(ancestorName, role, { maxDepth: opts.maxDepth }) };
   }
   var FIELD_ORDER = [
     "fills",
@@ -918,14 +1057,14 @@
     "paddingLeft",
     "paddingTop"
   ];
-  async function primaryTokenName(node) {
+  async function primaryToken(node) {
     const bv = node.boundVariables;
     if (!bv) return null;
     for (const field of FIELD_ORDER) {
       const id = firstAliasId(bv[field]);
       if (id) {
         const v = await figma.variables.getVariableByIdAsync(id);
-        if (v) return v.name;
+        if (v) return parseTokenName(v.name);
       }
     }
     return null;
@@ -936,29 +1075,75 @@
     if (Array.isArray(entry)) return (_a = entry[0]) == null ? void 0 : _a.id;
     return entry.id;
   }
-  function inferRole(node) {
-    switch (node.type) {
-      case "VECTOR":
-      case "BOOLEAN_OPERATION":
-      case "STAR":
-      case "POLYGON":
-      case "LINE":
-        return "icon";
-      case "FRAME":
-      case "GROUP":
-      case "SECTION":
-        return "container";
-      case "RECTANGLE":
-      case "ELLIPSE":
-        return hasVisibleFill(node) ? "background" : "shape";
-      default:
-        return kebab(node.type);
-    }
+  function dims(node) {
+    if (!("width" in node) || !("height" in node)) return null;
+    const w = node.width;
+    const h = node.height;
+    if (typeof w !== "number" || typeof h !== "number") return null;
+    return { w, h };
+  }
+  function isThin(node) {
+    const d = dims(node);
+    if (!d) return false;
+    const min = Math.min(d.w, d.h);
+    const max = Math.max(d.w, d.h);
+    if (min <= 0) return false;
+    return min <= 2 || max / min >= 25;
+  }
+  function paints(node, field) {
+    if (!(field in node)) return null;
+    const p = node[field];
+    return Array.isArray(p) ? p : null;
   }
   function hasVisibleFill(node) {
-    if (!("fills" in node)) return false;
-    const fills = node.fills;
-    return Array.isArray(fills) && fills.some((p) => p.visible !== false);
+    const f = paints(node, "fills");
+    return !!f && f.some((p) => p.visible !== false);
+  }
+  function hasImageFill(node) {
+    const f = paints(node, "fills");
+    return !!f && f.some((p) => p.visible !== false && p.type === "IMAGE");
+  }
+  function hasColorFill(node) {
+    const f = paints(node, "fills");
+    return !!f && f.some((p) => p.visible !== false && p.type !== "IMAGE");
+  }
+  function hasVisibleStroke(node) {
+    const s = paints(node, "strokes");
+    return !!s && s.some((p) => p.visible !== false);
+  }
+  function layoutOf(node) {
+    if (!("layoutMode" in node)) return null;
+    const m = node.layoutMode;
+    return m === "VERTICAL" ? "vertical" : m === "HORIZONTAL" ? "horizontal" : null;
+  }
+  function isContainerType(node) {
+    return node.type === "FRAME" || node.type === "GROUP" || node.type === "SECTION";
+  }
+  function regionRole(node, pos) {
+    if (pos.depth !== 1 || pos.parentLayout !== "vertical" || pos.total < 2) return null;
+    if (!isContainerType(node)) return null;
+    if (pos.index === 0) return "header";
+    if (pos.index === pos.total - 1) return "footer";
+    return null;
+  }
+  function isButtonLike(node) {
+    if (node.type !== "FRAME") return false;
+    if (layoutOf(node) === null) return false;
+    if (!(cornerRadiusOf(node) > 0)) return false;
+    if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
+    if (!hasDirectText(node)) return false;
+    const d = dims(node);
+    if (d && d.h > 80) return false;
+    return true;
+  }
+  function cornerRadiusOf(node) {
+    const r = node.cornerRadius;
+    if (typeof r === "number") return r;
+    const tl = node.topLeftRadius;
+    return typeof tl === "number" ? tl : 0;
+  }
+  function hasDirectText(node) {
+    return "children" in node && node.children.some((c) => c.type === "TEXT");
   }
 
   // src/lib/exporters.ts
@@ -1282,6 +1467,47 @@
     return { groups, singles };
   }
 
+  // src/lib/color.ts
+  function srgbToLinear(c) {
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+  function relativeLuminance(rgb) {
+    const r = srgbToLinear(rgb.r);
+    const g = srgbToLinear(rgb.g);
+    const b = srgbToLinear(rgb.b);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  function contrastRatio(a, b) {
+    const la = relativeLuminance(a);
+    const lb = relativeLuminance(b);
+    const hi = Math.max(la, lb);
+    const lo = Math.min(la, lb);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  // src/lib/contrast.ts
+  function isLargeText(fontSizePx, bold) {
+    if (fontSizePx >= 24) return true;
+    return bold && fontSizePx >= 18.66;
+  }
+  function requiredRatio(level, large) {
+    if (level === "AAA") return large ? 4.5 : 7;
+    return large ? 3 : 4.5;
+  }
+  var round2 = (n) => Math.round(n * 100) / 100;
+  function evaluateSample(s, level) {
+    const large = isLargeText(s.fontSize, s.bold);
+    const required = requiredRatio(level, large);
+    const ratio = round2(contrastRatio(hexToRgb(s.fg), hexToRgb(s.bg)));
+    return { id: s.id, name: s.name, fg: s.fg, bg: s.bg, ratio, required, large, pass: ratio >= required };
+  }
+  function checkContrast(samples, level) {
+    const findings = samples.map((s) => evaluateSample(s, level));
+    findings.sort((a, b) => Number(a.pass) - Number(b.pass) || a.ratio - b.ratio);
+    const failed = findings.reduce((n, f) => n + (f.pass ? 0 : 1), 0);
+    return { level, checked: findings.length, passed: findings.length - failed, failed, findings };
+  }
+
   // src/lib/entitlements.ts
   var TIERS = ["free", "pro", "team"];
   var TIER_RANK = { free: 0, pro: 1, team: 2 };
@@ -1492,6 +1718,58 @@
     post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped });
   }
   figma.on("selectionchange", postSelection);
+  var CONTRAST_SCAN_CAP = 2e3;
+  function solidFillHex(node) {
+    var _a;
+    const fills = node.fills;
+    if (!Array.isArray(fills)) return null;
+    for (const p of fills) {
+      if (p.type === "SOLID" && p.visible !== false && ((_a = p.opacity) != null ? _a : 1) > 0) return rgbToHex(p.color);
+    }
+    return null;
+  }
+  function effectiveBgHex(node) {
+    let cur = node.parent;
+    while (cur && cur.type !== "PAGE" && cur.type !== "DOCUMENT") {
+      const hex = solidFillHex(cur);
+      if (hex) return hex;
+      cur = cur.parent;
+    }
+    return null;
+  }
+  function collectContrastSamples(sel) {
+    const samples = [];
+    const skipped = {};
+    const note2 = (k) => {
+      var _a;
+      skipped[k] = ((_a = skipped[k]) != null ? _a : 0) + 1;
+    };
+    const stack = sel.slice();
+    let scanned = 0;
+    while (stack.length) {
+      if (scanned >= CONTRAST_SCAN_CAP) {
+        note2("capped");
+        break;
+      }
+      const n = stack.pop();
+      scanned++;
+      if (n.type === "TEXT" && n.visible) {
+        const fg = solidFillHex(n);
+        if (!fg) note2("no-fill");
+        else {
+          const bg = effectiveBgHex(n);
+          if (!bg) note2("no-bg");
+          else {
+            const fontSize = typeof n.fontSize === "number" ? n.fontSize : 16;
+            const bold = typeof n.fontWeight === "number" ? n.fontWeight >= 700 : false;
+            samples.push({ id: n.id, name: n.name, fg, bg, fontSize, bold });
+          }
+        }
+      }
+      if ("children" in n) for (const c of n.children) stack.push(c);
+    }
+    return { samples, skipped };
+  }
   figma.ui.onmessage = async (msg) => {
     var _a, _b;
     try {
@@ -1810,6 +2088,20 @@
           }
           post({ type: "PROPERTIES_RESULT", created, props });
           if (created) commitUndo(figma);
+          break;
+        }
+        case "CHECK_CONTRAST": {
+          const { samples, skipped } = collectContrastSamples(selection());
+          const report = checkContrast(samples, msg.level);
+          post({
+            type: "CONTRAST_RESULT",
+            level: report.level,
+            checked: report.checked,
+            passed: report.passed,
+            failed: report.failed,
+            findings: report.findings,
+            skipped
+          });
           break;
         }
       }
