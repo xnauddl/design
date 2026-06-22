@@ -67,6 +67,7 @@ import {
   weightRole,
   familyRole,
   suggestTokenRoles,
+  pipelineSteps,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -762,4 +763,24 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
   assert.equal(map['font-size/title'], 'font-size/24');
   assert.equal(map['font-weight/bold'], 'font-weight/700');
   assert.equal(map['font-family/sans'], 'font-family/Inter');
+});
+
+/* ================= pipeline.ts (진행 안내 §3) ================= */
+test('pipelineSteps — 전제에 따른 단계 상태', () => {
+  // 변수 없음: 토큰=ready, 시맨틱/바인딩=blocked(+안내)
+  const empty = pipelineSteps({ hasGlobal: false, hasBindable: false });
+  assert.deepEqual(empty.map((s) => [s.id, s.status]), [
+    ['tokens', 'ready'], ['semantics', 'blocked'], ['bind', 'blocked'],
+  ]);
+  assert.ok(empty[1].hint && empty[2].hint); // blocked엔 안내
+
+  // Global만: 토큰=done, 시맨틱=ready, 바인딩=blocked
+  const g = pipelineSteps({ hasGlobal: true, hasBindable: false });
+  assert.deepEqual(g.map((s) => s.status), ['done', 'ready', 'blocked']);
+
+  // 둘 다: 토큰=done, 시맨틱/바인딩=ready(안내 없음)
+  const both = pipelineSteps({ hasGlobal: true, hasBindable: true });
+  assert.deepEqual(both.map((s) => s.status), ['done', 'ready', 'ready']);
+  assert.equal(both[1].hint, undefined);
+  assert.equal(both[2].hint, undefined);
 });

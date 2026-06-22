@@ -12,6 +12,7 @@ import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles } from './lib/roles';
+import { pipelineSteps, type StepStatus } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import type { WcagLevel } from './lib/contrast';
@@ -649,6 +650,59 @@ function goToCreate(): void {
   ($('btnCreate') as HTMLButtonElement).focus();
 }
 
+/* ---------- 진행 안내 파이프라인(§3) ---------- */
+const STEP_STAT_LABEL: Record<StepStatus, string> = { done: '완료', ready: '준비됨', blocked: '전제 미충족' };
+
+/** 단계 클릭 → 해당 단계 카드/탭으로 이동. */
+function gotoStep(id: 'tokens' | 'semantics' | 'bind'): void {
+  if (id === 'bind') {
+    showTab('apply');
+    const b = $('btnApply') as HTMLButtonElement;
+    b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    b.focus();
+    return;
+  }
+  showTab('tokens');
+  const target = id === 'tokens' ? 'btnCreate' : 'btnSemantics';
+  const b = $(target) as HTMLButtonElement;
+  b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  b.focus();
+}
+
+/** PREREQ_STATE 기반으로 의존 파이프라인 단계 상태를 그린다(시작 탭). */
+function renderPipeline(): void {
+  const box = $('pipelineSteps');
+  box.innerHTML = '';
+  const steps = pipelineSteps({ hasGlobal, hasBindable });
+  steps.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = `pstep ${s.status}`;
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+
+    const dot = document.createElement('span');
+    dot.className = 'pdot';
+    dot.textContent = s.status === 'done' ? '✓' : String(i + 1);
+    const label = document.createElement('span');
+    label.className = 'plabel';
+    label.textContent = s.label;
+    const stat = document.createElement('span');
+    stat.className = 'pstat';
+    stat.textContent = s.hint ?? STEP_STAT_LABEL[s.status];
+
+    row.append(dot, label, stat);
+    const go = (): void => gotoStep(s.id);
+    row.addEventListener('click', go);
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        go();
+      }
+    });
+    box.appendChild(row);
+  });
+}
+
 /* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
 $('btnScanComp').addEventListener('click', () => {
   setStatus('componentStatus', '후보 스캔 중…', '');
@@ -892,10 +946,11 @@ window.onmessage = (event: MessageEvent) => {
       }
       break;
     case 'PREREQ_STATE':
-      // #11: 단계 전제 갱신 → 통합 게이트 재평가.
+      // #11: 단계 전제 갱신 → 통합 게이트 재평가 + 진행 안내(§3).
       hasGlobal = msg.hasGlobal;
       hasBindable = msg.hasBindable;
       updateGates();
+      renderPipeline();
       break;
     case 'LICENSE_STATUS': {
       const srcLabel =
@@ -1424,6 +1479,7 @@ function escapeHtml(s: string): string {
 
 // 초기: 컬렉션·전제·라이선스 조회. 팀 카드는 Team 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
 updateGates();
+renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_PREREQ' }); // #11: 단계 전제 상태
