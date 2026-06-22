@@ -1,7 +1,7 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode } from './shared/messages';
+import type { UiToCode, RenameChange } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, prunePaletteColors, GLOBAL, SEMANTIC } from './lib/variables';
@@ -324,10 +324,28 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'RENAME': {
         const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
-        post({ type: 'RENAME_RESULT', changes: r.changes, applied: r.applied });
+        post({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied });
         if (r.applied && r.changes.length) {
           record('rename', `${r.changes.length}개 레이어 이름 적용`);
           commitUndo(figma); // UX2: 리네임 전체를 단일 Undo로
+        }
+        break;
+      }
+      case 'RENAME_APPLY': {
+        // #7: 미리보기 트리에서 체크한 항목만 직접 적용(재계산 없이 id→after 그대로).
+        const changes: RenameChange[] = [];
+        for (const { id, after } of msg.items) {
+          const node = await figma.getNodeByIdAsync(id);
+          if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
+          const before = node.name;
+          if (before === after) continue;
+          node.name = after;
+          changes.push({ id, before, after });
+        }
+        post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true });
+        if (changes.length) {
+          record('rename', `${changes.length}개 레이어 이름 적용`);
+          commitUndo(figma); // UX2: 선택 리네임 전체를 단일 Undo로
         }
         break;
       }

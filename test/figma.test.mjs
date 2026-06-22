@@ -534,6 +534,33 @@ test('renameSelection — 역할 기반·보존형·맥락 전파·형제 중복
   assert.equal(inst.name, 'KeepInstance');
 });
 
+test('renameSelection — nodes: 전체 서브트리 + 계층(depth/parentId) + 영향 노드만 after', async () => {
+  installFigma();
+  const icon = { type: 'VECTOR', id: 'ic', name: 'Vector 2' }; // 영향(→ icon)
+  const keep = { type: 'TEXT', id: 'tx', name: 'KeepText', characters: 'x' }; // 보존(after 없음)
+  const root = { type: 'FRAME', id: 'root', name: 'card', children: [icon, keep] }; // 의미명 → 보존
+
+  const { nodes, changes } = await renameSelection([root], { apply: false, maxDepth: 3 });
+
+  // 전체 서브트리(루트 + 자식 2)가 모두 트리에 담긴다.
+  assert.deepEqual(nodes.map((n) => n.id).sort(), ['ic', 'root', 'tx']);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  // 계층: 루트 depth0·parentId null, 자식 depth1·parentId 'root'
+  assert.equal(byId.get('root').depth, 0);
+  assert.equal(byId.get('root').parentId, null);
+  assert.equal(byId.get('ic').depth, 1);
+  assert.equal(byId.get('ic').parentId, 'root');
+  // 영향 노드만 after 보유(icon), 보존 노드(root·text)는 after 없음
+  assert.equal(byId.get('ic').after, 'card-icon');
+  assert.equal(byId.get('root').after, undefined);
+  assert.equal(byId.get('tx').after, undefined);
+  // name은 변경 전(before) — apply:false라 실제 이름 불변
+  assert.equal(byId.get('ic').name, 'Vector 2');
+  assert.equal(icon.name, 'Vector 2');
+  // changes는 영향 노드만(=after 있는 노드 수와 일치)
+  assert.equal(changes.length, nodes.filter((n) => n.after !== undefined).length);
+});
+
 test('renameSelection — 의미 있는 이름은 보존(교체 안 함)', async () => {
   installFigma();
   const node = { type: 'FRAME', id: 'f', name: 'OriginalName', children: [] };

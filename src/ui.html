@@ -58,10 +58,16 @@
     .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
     .cat { font-size: 10px; color: var(--muted); }
-    #diff { max-height: 160px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
-    .diff-row { padding: 1px 0; }
+    #diff { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
     .before { color: var(--muted); text-decoration: line-through; }
     .after { color: var(--ok); }
+    /* 선택형 미리보기 트리(#13) */
+    .tree-ctrls { font-size: 11px; margin-top: 6px; }
+    .tree-row { display: flex; align-items: center; gap: 4px; padding: 1px 0; white-space: nowrap; }
+    .tree-row.affected { font-weight: 500; }
+    .tree-row.context { opacity: 0.5; }
+    .tree-row .tree-ctx { color: var(--muted); }
+    .tree-row input { margin: 0; }
 
     /* 탭바 */
     .tabs { display: flex; gap: 8px; position: sticky; top: 0; background: #fff; padding: 0 0 10px; margin: 0 0 2px; z-index: 2; }
@@ -250,6 +256,10 @@
         <label class="inline">맥락 최대단계 <input id="depth" type="number" value="3" min="1" /></label>
         <button id="btnPreview">미리보기</button>
         <button id="btnRename" disabled>이름 적용</button>
+      </div>
+      <div class="row tree-ctrls">
+        <label class="inline"><input type="checkbox" id="renameAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="renameHideCtx" /> 맥락 숨기기</label>
       </div>
       <div id="diff"></div>
       <div class="ux">

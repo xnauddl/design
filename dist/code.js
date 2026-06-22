@@ -855,26 +855,30 @@
 
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
-    const changes = [];
-    await recurse(selection2, null, opts, changes, 0, null);
-    return { changes, applied: opts.apply };
+    const col = { changes: [], nodes: [] };
+    await recurse(selection2, null, opts, col, 0, null, null);
+    return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
   }
-  async function recurse(nodes, ancestorName, opts, out, depth, parentLayout) {
+  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId) {
     const total = nodes.length;
     for (let i = 0; i < total; i++) {
       const node = nodes[i];
+      const before = node.name;
       const pos = { index: i, total, parentLayout, depth };
       const decided = await decide(node, ancestorName, pos, opts);
-      let contextForChildren = node.name;
+      let contextForChildren = before;
+      let after;
       if (!decided.skip && decided.name) {
-        if (decided.name !== node.name) {
-          out.push({ id: node.id, before: node.name, after: decided.name });
-          if (opts.apply) node.name = decided.name;
-        }
         contextForChildren = decided.name;
+        if (decided.name !== before) {
+          after = decided.name;
+          col.changes.push({ id: node.id, before, after });
+          if (opts.apply) node.name = after;
+        }
       }
+      col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
       if ("children" in node) {
-        await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node));
+        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id);
       }
     }
   }
@@ -1689,9 +1693,26 @@
         }
         case "RENAME": {
           const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
-          post({ type: "RENAME_RESULT", changes: r.changes, applied: r.applied });
+          post({ type: "RENAME_RESULT", changes: r.changes, nodes: r.nodes, applied: r.applied });
           if (r.applied && r.changes.length) {
             record("rename", `${r.changes.length}\uAC1C \uB808\uC774\uC5B4 \uC774\uB984 \uC801\uC6A9`);
+            commitUndo(figma);
+          }
+          break;
+        }
+        case "RENAME_APPLY": {
+          const changes = [];
+          for (const { id, after } of msg.items) {
+            const node = await figma.getNodeByIdAsync(id);
+            if (!node || !("name" in node)) continue;
+            const before = node.name;
+            if (before === after) continue;
+            node.name = after;
+            changes.push({ id, before, after });
+          }
+          post({ type: "RENAME_RESULT", changes, nodes: [], applied: true });
+          if (changes.length) {
+            record("rename", `${changes.length}\uAC1C \uB808\uC774\uC5B4 \uC774\uB984 \uC801\uC6A9`);
             commitUndo(figma);
           }
           break;

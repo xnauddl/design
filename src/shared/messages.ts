@@ -20,6 +20,22 @@ export interface RenameChange {
   after: string;
 }
 
+/**
+ * 선택형 미리보기 트리(#13)의 한 노드. 선택 서브트리 전체를 평면(pre-order)으로 담되
+ * `depth`/`parentId`로 계층을 복원한다. `after`가 있으면 **영향 노드**(리네임 대상),
+ * 없으면 회색 맥락(보존). 바인딩(#6)·컴포넌트(#1) 미리보기도 같은 형태를 재사용한다.
+ */
+export interface RenameNode {
+  id: string;
+  /** 현재 이름(=before). */
+  name: string;
+  type: string;
+  depth: number;
+  parentId: string | null;
+  /** 리네임 후 이름. 존재 시 영향 노드(체크 가능). */
+  after?: string;
+}
+
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT' }
@@ -27,6 +43,7 @@ export type UiToCode =
   | { type: 'APPLY'; tolerance: number; preview?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
+  | { type: 'RENAME_APPLY'; items: { id: string; after: string }[] } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   | { type: 'GET_COLLECTIONS' }
   | { type: 'GET_LICENSE' }
@@ -53,7 +70,7 @@ export type CodeToUi =
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; limited?: boolean; preview?: boolean }
   | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; limited?: boolean; preview?: boolean; cancelled?: boolean }
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
-  | { type: 'RENAME_RESULT'; changes: RenameChange[]; applied: boolean }
+  | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   | {

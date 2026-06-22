@@ -1,7 +1,7 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameNode } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
 import { FREE_LIMITS, type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
@@ -214,8 +214,24 @@ $('btnContrast').addEventListener('click', () => {
 });
 
 $('btnRename').addEventListener('click', () => {
-  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 3;
-  send({ type: 'RENAME', apply: true, maxDepth });
+  // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG).
+  const items = renameNodes
+    .filter((n) => n.after !== undefined && renameChecked.has(n.id))
+    .map((n) => ({ id: n.id, after: n.after as string }));
+  if (!items.length) return;
+  send({ type: 'RENAME_APPLY', items });
+});
+
+$('renameAll').addEventListener('change', (e) => {
+  const on = (e.target as HTMLInputElement).checked;
+  renameChecked.clear();
+  if (on) for (const n of renameNodes) if (n.after !== undefined) renameChecked.add(n.id);
+  renderRenameTree();
+});
+
+$('renameHideCtx').addEventListener('change', (e) => {
+  renameHideContext = (e.target as HTMLInputElement).checked;
+  renderRenameTree();
 });
 
 /* ============================================================
@@ -714,7 +730,7 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'RENAME_RESULT':
-      renderDiff(msg.changes, msg.applied);
+      renderRenameResult(msg);
       break;
     case 'SEMANTICS_RESULT':
       setStatus(
@@ -869,21 +885,120 @@ function showError(id: string, f: FriendlyError): void {
   }
 }
 
-function renderDiff(changes: { before: string; after: string }[], applied: boolean): void {
-  const box = $('diff');
-  box.innerHTML = '';
-  for (const c of changes) {
+/* ============================================================
+   선택형 미리보기 트리 (#13) — 공통 컴포넌트.
+   선택 서브트리 전체를 Figma 레이어 패널처럼 들여쓰기로 표시하고,
+   영향 노드(change 보유)만 체크박스로 골라 적용한다. 나머지는 회색 맥락.
+   #6(바인딩)·#1(컴포넌트) 미리보기도 이 컴포넌트를 재사용한다.
+   ============================================================ */
+interface TreeRow {
+  id: string;
+  name: string;
+  type: string;
+  depth: number;
+  parentId: string | null;
+  /** 적용 후 라벨(리네임=after, 바인딩=변수명…). 존재 시 영향 노드(체크 가능). */
+  change?: string;
+}
+
+/** 선택 서브트리의 최소 depth(루트 기준)로 들여쓰기를 정규화한다. */
+function baseDepth(rows: TreeRow[]): number {
+  return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
+}
+
+function renderSelectableTree(
+  mount: HTMLElement,
+  rows: TreeRow[],
+  checked: Set<string>,
+  opts: { onChange: () => void; hideContext: boolean },
+): void {
+  mount.innerHTML = '';
+  const base = rows.length ? baseDepth(rows) : 0;
+  for (const r of rows) {
+    const affected = r.change !== undefined;
+    if (!affected && opts.hideContext) continue;
     const row = document.createElement('div');
-    row.className = 'diff-row';
-    row.innerHTML = `<span class="before">${escapeHtml(c.before)}</span> → <span class="after">${escapeHtml(c.after)}</span>`;
-    box.appendChild(row);
+    row.className = affected ? 'tree-row affected' : 'tree-row context';
+    row.style.paddingLeft = `${(r.depth - base) * 12}px`;
+
+    if (affected) {
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = checked.has(r.id);
+      cb.addEventListener('change', () => {
+        if (cb.checked) checked.add(r.id);
+        else checked.delete(r.id);
+        opts.onChange();
+      });
+      row.appendChild(cb);
+      const label = document.createElement('span');
+      label.innerHTML = ` <span class="before">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change as string)}</span>`;
+      row.appendChild(label);
+    } else {
+      const label = document.createElement('span');
+      label.className = 'tree-ctx';
+      label.textContent = r.name;
+      row.appendChild(label);
+    }
+    mount.appendChild(row);
   }
-  ($('btnRename') as HTMLButtonElement).disabled = applied || changes.length === 0;
+}
+
+/* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
+let renameNodes: RenameNode[] = []; // 마지막 미리보기 서브트리
+const renameChecked = new Set<string>(); // 체크된 영향 노드 id
+let renameHideContext = false; // 맥락(비영향) 숨기기 토글
+
+function affectedRenameCount(): number {
+  return renameNodes.reduce((n, r) => n + (r.after !== undefined ? 1 : 0), 0);
+}
+
+function renderRenameTree(): void {
+  const rows: TreeRow[] = renameNodes.map((n) => ({
+    id: n.id,
+    name: n.name,
+    type: n.type,
+    depth: n.depth,
+    parentId: n.parentId,
+    change: n.after,
+  }));
+  renderSelectableTree($('diff'), rows, renameChecked, {
+    hideContext: renameHideContext,
+    onChange: updateRenameApply,
+  });
+  updateRenameApply();
+}
+
+/** 적용 버튼 활성/라벨 + 전체선택 마스터 상태를 체크 수에 맞춰 갱신. */
+function updateRenameApply(): void {
+  const total = affectedRenameCount();
+  const sel = renameChecked.size;
+  ($('btnRename') as HTMLButtonElement).disabled = sel === 0;
+  const all = $('renameAll') as HTMLInputElement;
+  all.checked = total > 0 && sel === total;
+  all.indeterminate = sel > 0 && sel < total;
   setStatus(
     'renameStatus',
-    applied ? `${changes.length}개 이름 적용 완료.` : changes.length ? `${changes.length}개 변경 예정 — 확인 후 ‘이름 적용’.` : '변경할 이름이 없습니다.',
-    applied ? 'ok' : '',
+    total === 0 ? '변경할 이름이 없습니다.' : `${total}개 변경 예정 · ${sel}개 선택 — ‘이름 적용’.`,
+    '',
   );
+}
+
+function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): void {
+  if (!msg.applied) {
+    // 미리보기: 전체 서브트리 + 영향 노드 기본 체크.
+    renameNodes = msg.nodes;
+    renameChecked.clear();
+    for (const n of msg.nodes) if (n.after !== undefined) renameChecked.add(n.id);
+    renderRenameTree();
+    return;
+  }
+  // 적용 완료(선택 적용 또는 마법사): 트리 비우고 결과만.
+  renameNodes = [];
+  renameChecked.clear();
+  $('diff').innerHTML = '';
+  ($('btnRename') as HTMLButtonElement).disabled = true;
+  setStatus('renameStatus', `${msg.changes.length}개 이름 적용 완료.`, 'ok');
 }
 
 /** UX3: 스킵 사유 키 → 한글 라벨. */

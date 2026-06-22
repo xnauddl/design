@@ -12,7 +12,7 @@
    ============================================================ */
 import { isDefaultName, isTokenEchoName, parseTokenName, layerNameFromRole, pickScope, kebab } from './naming';
 import type { ParsedToken } from './naming';
-import type { RenameChange } from '../shared/messages';
+import type { RenameChange, RenameNode } from '../shared/messages';
 
 /** 자식에게 내려보내는 위치 정보(영역 추론용). depth 0 = 선택 루트. */
 interface Pos {
@@ -29,44 +29,59 @@ interface Opts {
 
 export interface RenameOutcome {
   changes: RenameChange[];
+  /** 선택 서브트리 전체(미리보기 트리 #13용). 영향 노드는 `after` 보유. */
+  nodes: RenameNode[];
   applied: boolean;
+}
+
+/** 순회 중 수집물(변경분 + 트리 노드). */
+interface Collect {
+  changes: RenameChange[];
+  nodes: RenameNode[];
 }
 
 export async function renameSelection(
   selection: readonly SceneNode[],
   opts: Opts,
 ): Promise<RenameOutcome> {
-  const changes: RenameChange[] = [];
-  await recurse(selection, null, opts, changes, 0, null);
-  return { changes, applied: opts.apply };
+  const col: Collect = { changes: [], nodes: [] };
+  await recurse(selection, null, opts, col, 0, null, null);
+  return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
 }
 
 async function recurse(
   nodes: readonly SceneNode[],
   ancestorName: string | null,
   opts: Opts,
-  out: RenameChange[],
+  col: Collect,
   depth: number,
   parentLayout: Pos['parentLayout'],
+  parentId: string | null,
 ): Promise<void> {
   const total = nodes.length;
   for (let i = 0; i < total; i++) {
     const node = nodes[i];
+    const before = node.name; // apply 시 node.name이 바뀌므로 먼저 캡처
     const pos: Pos = { index: i, total, parentLayout, depth };
     const decided = await decide(node, ancestorName, pos, opts);
-    let contextForChildren = node.name;
+    let contextForChildren = before;
+    let after: string | undefined;
 
     if (!decided.skip && decided.name) {
-      // 숫자 접미사 없음 — 형제가 같은 이름이어도 그대로(Figma는 중복 이름 허용).
-      if (decided.name !== node.name) {
-        out.push({ id: node.id, before: node.name, after: decided.name });
-        if (opts.apply) node.name = decided.name;
-      }
       contextForChildren = decided.name;
+      // 숫자 접미사 없음 — 형제가 같은 이름이어도 그대로(Figma는 중복 이름 허용).
+      if (decided.name !== before) {
+        after = decided.name;
+        col.changes.push({ id: node.id, before, after });
+        if (opts.apply) node.name = after;
+      }
     }
 
+    // 영향 여부와 무관하게 트리에 담는다(전체 서브트리 + 영향 노드 강조).
+    col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
+
     if ('children' in node) {
-      await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node));
+      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id);
     }
   }
 }

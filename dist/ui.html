@@ -58,10 +58,16 @@
     .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
     .cat { font-size: 10px; color: var(--muted); }
-    #diff { max-height: 160px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
-    .diff-row { padding: 1px 0; }
+    #diff { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
     .before { color: var(--muted); text-decoration: line-through; }
     .after { color: var(--ok); }
+    /* 선택형 미리보기 트리(#13) */
+    .tree-ctrls { font-size: 11px; margin-top: 6px; }
+    .tree-row { display: flex; align-items: center; gap: 4px; padding: 1px 0; white-space: nowrap; }
+    .tree-row.affected { font-weight: 500; }
+    .tree-row.context { opacity: 0.5; }
+    .tree-row .tree-ctx { color: var(--muted); }
+    .tree-row input { margin: 0; }
 
     /* 탭바 */
     .tabs { display: flex; gap: 8px; position: sticky; top: 0; background: #fff; padding: 0 0 10px; margin: 0 0 2px; z-index: 2; }
@@ -250,6 +256,10 @@
         <label class="inline">맥락 최대단계 <input id="depth" type="number" value="3" min="1" /></label>
         <button id="btnPreview">미리보기</button>
         <button id="btnRename" disabled>이름 적용</button>
+      </div>
+      <div class="row tree-ctrls">
+        <label class="inline"><input type="checkbox" id="renameAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="renameHideCtx" /> 맥락 숨기기</label>
       </div>
       <div id="diff"></div>
       <div class="ux">
@@ -1011,8 +1021,21 @@
     send({ type: "CHECK_CONTRAST", level });
   });
   $("btnRename").addEventListener("click", () => {
-    const maxDepth = Number($("depth").value) || 3;
-    send({ type: "RENAME", apply: true, maxDepth });
+    const items = renameNodes.filter((n) => n.after !== void 0 && renameChecked.has(n.id)).map((n) => ({ id: n.id, after: n.after }));
+    if (!items.length) return;
+    send({ type: "RENAME_APPLY", items });
+  });
+  $("renameAll").addEventListener("change", (e) => {
+    const on = e.target.checked;
+    renameChecked.clear();
+    if (on) {
+      for (const n of renameNodes) if (n.after !== void 0) renameChecked.add(n.id);
+    }
+    renderRenameTree();
+  });
+  $("renameHideCtx").addEventListener("change", (e) => {
+    renameHideContext = e.target.checked;
+    renderRenameTree();
   });
   var wizardRunning = false;
   var wizardWaiter = null;
@@ -1452,7 +1475,7 @@
         break;
       }
       case "RENAME_RESULT":
-        renderDiff(msg.changes, msg.applied);
+        renderRenameResult(msg);
         break;
       case "SEMANTICS_RESULT":
         setStatus(
@@ -1591,21 +1614,87 @@
       el.appendChild(btn);
     }
   }
-  function renderDiff(changes, applied) {
-    const box = $("diff");
-    box.innerHTML = "";
-    for (const c of changes) {
+  function baseDepth(rows) {
+    return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
+  }
+  function renderSelectableTree(mount, rows, checked, opts) {
+    mount.innerHTML = "";
+    const base = rows.length ? baseDepth(rows) : 0;
+    for (const r of rows) {
+      const affected = r.change !== void 0;
+      if (!affected && opts.hideContext) continue;
       const row = document.createElement("div");
-      row.className = "diff-row";
-      row.innerHTML = `<span class="before">${escapeHtml(c.before)}</span> \u2192 <span class="after">${escapeHtml(c.after)}</span>`;
-      box.appendChild(row);
+      row.className = affected ? "tree-row affected" : "tree-row context";
+      row.style.paddingLeft = `${(r.depth - base) * 12}px`;
+      if (affected) {
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = checked.has(r.id);
+        cb.addEventListener("change", () => {
+          if (cb.checked) checked.add(r.id);
+          else checked.delete(r.id);
+          opts.onChange();
+        });
+        row.appendChild(cb);
+        const label = document.createElement("span");
+        label.innerHTML = ` <span class="before">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
+        row.appendChild(label);
+      } else {
+        const label = document.createElement("span");
+        label.className = "tree-ctx";
+        label.textContent = r.name;
+        row.appendChild(label);
+      }
+      mount.appendChild(row);
     }
-    $("btnRename").disabled = applied || changes.length === 0;
+  }
+  var renameNodes = [];
+  var renameChecked = /* @__PURE__ */ new Set();
+  var renameHideContext = false;
+  function affectedRenameCount() {
+    return renameNodes.reduce((n, r) => n + (r.after !== void 0 ? 1 : 0), 0);
+  }
+  function renderRenameTree() {
+    const rows = renameNodes.map((n) => ({
+      id: n.id,
+      name: n.name,
+      type: n.type,
+      depth: n.depth,
+      parentId: n.parentId,
+      change: n.after
+    }));
+    renderSelectableTree($("diff"), rows, renameChecked, {
+      hideContext: renameHideContext,
+      onChange: updateRenameApply
+    });
+    updateRenameApply();
+  }
+  function updateRenameApply() {
+    const total = affectedRenameCount();
+    const sel = renameChecked.size;
+    $("btnRename").disabled = sel === 0;
+    const all = $("renameAll");
+    all.checked = total > 0 && sel === total;
+    all.indeterminate = sel > 0 && sel < total;
     setStatus(
       "renameStatus",
-      applied ? `${changes.length}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.` : changes.length ? `${changes.length}\uAC1C \uBCC0\uACBD \uC608\uC815 \u2014 \uD655\uC778 \uD6C4 \u2018\uC774\uB984 \uC801\uC6A9\u2019.` : "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
-      applied ? "ok" : ""
+      total === 0 ? "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." : `${total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 ${sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.`,
+      ""
     );
+  }
+  function renderRenameResult(msg) {
+    if (!msg.applied) {
+      renameNodes = msg.nodes;
+      renameChecked.clear();
+      for (const n of msg.nodes) if (n.after !== void 0) renameChecked.add(n.id);
+      renderRenameTree();
+      return;
+    }
+    renameNodes = [];
+    renameChecked.clear();
+    $("diff").innerHTML = "";
+    $("btnRename").disabled = true;
+    setStatus("renameStatus", `${msg.changes.length}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.`, "ok");
   }
   var REASON_LABELS = {
     "no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
