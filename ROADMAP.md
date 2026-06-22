@@ -122,7 +122,7 @@
 ### 9.1 환경 이전 절차
 - 작업본은 커밋 `원격 이전을 위한 로컬 작업본 임시 커밋`에 들어 있고 **origin에 푸시함**.
 - 새 환경: `git fetch && git checkout feat/preview-tree-rename` → `npm test`(빌드+테스트, **109 pass** 확인) → 아래 9.3부터 이어서.
-- 임시 커밋이라 UI 완료 후 정리(squash)·정식 커밋 권장. (참고: README에 §5 Team 티어 "지금은 구현 안 함" 메모 1줄이 미커밋 상태일 수 있음 — 본 작업과 무관.)
+- 임시 커밋이라 UI 완료 후 정리(squash)·정식 커밋 권장.
 
 ### 9.2 완료(커밋됨 · 순수 로직 `node --test` 통과)
 - [x] `src/shared/messages.ts` — `PreservedReason`·`RenameNode{id,type,before,after,changed,depth,parentId,preserved}` 추가. `RENAME_RESULT`에 `nodes`+`capped` 추가. 신규 `APPLY_RENAME{renames:{id,after}[]}`(UI→code)·`RENAME_APPLIED{count}`(code→UI).
