@@ -244,3 +244,51 @@ export function numberTokenName(group: string, value: number): string {
   const v = Number.isInteger(value) ? String(value) : String(value).replace('.', '_');
   return `${group}/${v}`;
 }
+
+/** 숫자 토큰 이름의 끝 세그먼트를 수치로 파싱. 예: 'spacing/16'→16, 'radius/1_5'→1.5. */
+function numberFromTokenName(name: string): number | undefined {
+  const last = name.split('/').pop() ?? '';
+  const n = Number(last.replace('_', '.'));
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/* ============================================================
+   비색상 시맨틱 추천 — 간격(space/*)·반경(radius/*) 티셔츠 스케일을
+   가장 가까운 기존 Global 숫자 토큰에 매핑. 색상은 suggestSemanticMap(팔레트)이 담당.
+   반환은 {시맨틱이름 → Global이름}으로 createSemanticAliases 입력과 동일.
+   ============================================================ */
+const SPACING_SCALE: ReadonlyArray<readonly [string, number]> = [
+  ['space/xs', 4],
+  ['space/sm', 8],
+  ['space/md', 16],
+  ['space/lg', 24],
+  ['space/xl', 32],
+  ['space/2xl', 48],
+];
+const RADIUS_SCALE: ReadonlyArray<readonly [string, number]> = [
+  ['radius/sm', 4],
+  ['radius/md', 8],
+  ['radius/lg', 16],
+];
+
+/** names: 존재하는 Global 토큰 이름 목록. 간격·반경 시맨틱 별칭 추천을 만든다. */
+export function suggestNonColorSemanticMap(names: string[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  const candidates = (prefix: string) =>
+    names
+      .filter((n) => n.startsWith(prefix + '/'))
+      .map((n) => ({ name: n, v: numberFromTokenName(n) }))
+      .filter((x): x is { name: string; v: number } => x.v !== undefined);
+  const nearest = (cands: { name: string; v: number }[], target: number) =>
+    cands.reduce((best, c) => (Math.abs(c.v - target) < Math.abs(best.v - target) ? c : best));
+
+  const spacing = candidates('spacing');
+  if (spacing.length) for (const [role, target] of SPACING_SCALE) map[role] = nearest(spacing, target).name;
+
+  const radius = candidates('radius');
+  if (radius.length) {
+    for (const [role, target] of RADIUS_SCALE) map[role] = nearest(radius, target).name;
+    map['radius/full'] = radius.reduce((a, b) => (b.v > a.v ? b : a)).name; // 가장 큰 반경 = full
+  }
+  return map;
+}

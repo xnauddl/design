@@ -13,6 +13,7 @@ import {
   toPx,
   colorTokenName,
   numberTokenName,
+  suggestNonColorSemanticMap,
   kebab,
   layerNameFromToken,
   layerNameFromRole,
@@ -287,6 +288,29 @@ test('semanticMap 텍스트 ↔ 객체', () => {
   assert.deepEqual(textToSemanticMap(semanticMapToText(map)), map);
   // 공백 포함 값 보존
   assert.deepEqual(textToSemanticMap('a = b c'), { a: 'b c' });
+});
+
+test('suggestNonColorSemanticMap — 간격·반경 티셔츠 스케일을 가까운 Global에 매핑', () => {
+  const names = ['color/primary/500', 'spacing/4', 'spacing/8', 'spacing/16', 'spacing/24', 'radius/8', 'radius/24'];
+  const map = suggestNonColorSemanticMap(names);
+  // 간격: 정확/근사 매핑
+  assert.equal(map['space/xs'], 'spacing/4');
+  assert.equal(map['space/sm'], 'spacing/8');
+  assert.equal(map['space/md'], 'spacing/16');
+  assert.equal(map['space/lg'], 'spacing/24');
+  assert.equal(map['space/xl'], 'spacing/24'); // 32 없음 → 가장 가까운 24
+  // 반경: 근사 + full=최대
+  assert.equal(map['radius/md'], 'radius/8');
+  assert.equal(map['radius/full'], 'radius/24');
+  // 색상은 제외(팔레트 추천 담당)
+  assert.ok(!Object.values(map).some((v) => v.startsWith('color/')));
+});
+
+test('suggestNonColorSemanticMap — 해당 토큰 없으면 빈 매핑', () => {
+  assert.deepEqual(suggestNonColorSemanticMap(['color/primary/500', 'font-size/16']), {});
+  // 소수 접미사 파싱(1_5 → 1.5)
+  const m = suggestNonColorSemanticMap(['radius/1_5', 'radius/8']);
+  assert.equal(m['radius/sm'], 'radius/1_5'); // 4에 가장 가까운 건 1.5 vs 8 → |1.5-4|=2.5 < |8-4|=4
 });
 
 /* ================= history.ts (M3.1 Team) ================= */
