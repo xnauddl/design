@@ -185,7 +185,7 @@ function isTokenValue(v: string): boolean {
 }
 
 /** 식별력이 없는 일반 구조 어휘 — 맥락 접두사로 쓰지 않는다(container-header 같은 군더더기 방지). */
-const GENERIC_ROLES = new Set(['container', 'wrapper', 'content', 'group', 'section', 'body', 'main', 'shape']);
+const GENERIC_ROLES = new Set(['frame', 'container', 'wrapper', 'content', 'group', 'section', 'body', 'main', 'shape']);
 
 /**
  * 이름에서 깨끗한 "맥락 1단계"를 뽑는다 — 숫자·단위·hex·일반 구조어를 버리고,

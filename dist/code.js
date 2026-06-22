@@ -872,7 +872,7 @@
     if (/^[0-9a-f]{6}$/.test(v)) return true;
     return v.split("-").every((s) => /^\d+$/.test(s) || UNIT_WORDS.has(s));
   }
-  var GENERIC_ROLES = /* @__PURE__ */ new Set(["container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
+  var GENERIC_ROLES = /* @__PURE__ */ new Set(["frame", "container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
   function pickScope(name) {
     const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
     if (!segs.length) return null;
@@ -914,7 +914,7 @@
         }
       }
       col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
-      if ("children" in node) {
+      if ("children" in node && node.type !== "INSTANCE") {
         await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id);
       }
     }
@@ -925,6 +925,7 @@
     if (node.type === "TEXT") return { skip: true };
     if (node.type === "INSTANCE") return { skip: true };
     if (node.locked) return { skip: true };
+    if (pos.depth === 0 && isContainerType(node)) return { skip: true };
     if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
     const token = await primaryToken(node);
     const role = resolveRole(node, token, pos);

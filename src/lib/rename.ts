@@ -80,7 +80,8 @@ async function recurse(
     // 영향 여부와 무관하게 트리에 담는다(전체 서브트리 + 영향 노드 강조).
     col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
 
-    if ('children' in node) {
+    // #7b-2: 인스턴스 서브트리는 통째로 스킵(내부는 메인 컴포넌트 소유 → 리네임 무의미·에러 위험).
+    if ('children' in node && node.type !== 'INSTANCE') {
       await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id);
     }
   }
@@ -97,6 +98,9 @@ async function decide(
   if (node.type === 'TEXT') return { skip: true };
   if (node.type === 'INSTANCE') return { skip: true };
   if (node.locked) return { skip: true };
+
+  // #7b-1: 선택 루트(depth 0) 컨테이너는 기본명이어도 항상 보존 — 자식의 맥락으로만 쓴다.
+  if (pos.depth === 0 && isContainerType(node)) return { skip: true };
 
   // 보존형: 사람이 지은 의미 있는 이름은 그대로 두고 맥락으로만 쓴다.
   // 단, Figma 기본명과 구 리네임이 남긴 토큰 베낌 이름(color-121210 등)은 교체.
