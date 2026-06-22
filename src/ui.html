@@ -58,7 +58,8 @@
     .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
     .cat { font-size: 10px; color: var(--muted); }
-    #diff { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
+    #diff, #bindTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
+    .tree-row.header { opacity: 1; color: var(--muted); }
     .before { color: var(--muted); text-decoration: line-through; }
     .after { color: var(--ok); }
     /* 선택형 미리보기 트리(#13) */
@@ -236,6 +237,11 @@
         <button id="btnApply">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none">선택에 바인딩</button>
       </div>
+      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
+        <label class="inline"><input type="checkbox" id="bindAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="bindHideCtx" /> 맥락 숨기기</label>
+      </div>
+      <div id="bindTree"></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="badge">UX6</span><span class="ux-t">진행률 / 취소</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>

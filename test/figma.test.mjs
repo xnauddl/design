@@ -420,6 +420,58 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
   assert.equal(real.bound, 2);
   assert.equal(real.skipped, 1);
   assert.equal(node2.fills[0].boundVariables.color.type, 'VARIABLE_ALIAS');
+  // apply=true(실제)에서는 미리보기 후보/노드를 수집하지 않음
+  assert.equal(real.candidates, undefined);
+  assert.equal(real.nodes, undefined);
+});
+
+test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 필드/변수/인덱스', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+    ],
+    16,
+  );
+  // 루트(매칭 없음) → 자식(색+width 매칭). 조상은 맥락으로 보존돼야 한다.
+  const child = {
+    type: 'FRAME',
+    id: 'child',
+    name: 'child',
+    fills: [
+      { type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }, // #0066ff → 후보(fills,0)
+      { type: 'SOLID', color: { r: 0, g: 1, b: 0 } }, // 미매칭
+    ],
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: 200, // → 후보(width)
+    height: 50,
+    layoutMode: 'NONE',
+    setBoundVariable() {},
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'root', fills: [], layoutMode: 'NONE', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [child], setBoundVariable() {} };
+
+  const dry = await bindSelection([root], 0.5, {}, false);
+
+  // 후보 2건: fills[0] 색 + width
+  assert.equal(dry.candidates.length, 2);
+  const fillC = dry.candidates.find((c) => c.field === 'fills');
+  assert.equal(fillC.nodeId, 'child');
+  assert.equal(fillC.index, 0);
+  assert.equal(fillC.currentValue, '#0066ff');
+  assert.equal(fillC.variableName, 'color/0066ff');
+  assert.ok(fillC.tier >= 2);
+  const widthC = dry.candidates.find((c) => c.field === 'width');
+  assert.equal(widthC.nodeId, 'child');
+  assert.equal(widthC.distance, 0); // 정확 매칭
+
+  // 트리: 영향(child) + 조상(root)만, pre-order. 계층 복원.
+  assert.deepEqual(dry.nodes.map((n) => n.id), ['root', 'child']);
+  const byId = new Map(dry.nodes.map((n) => [n.id, n]));
+  assert.equal(byId.get('root').parentId, null);
+  assert.equal(byId.get('child').parentId, 'root');
+  assert.equal(byId.get('child').depth, 1);
 });
 
 test('bindSelection — 진행률 보고 + 취소(UX6)', async () => {

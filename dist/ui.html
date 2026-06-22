@@ -58,7 +58,8 @@
     .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
     .cat { font-size: 10px; color: var(--muted); }
-    #diff { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
+    #diff, #bindTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
+    .tree-row.header { opacity: 1; color: var(--muted); }
     .before { color: var(--muted); text-decoration: line-through; }
     .after { color: var(--ok); }
     /* 선택형 미리보기 트리(#13) */
@@ -236,6 +237,11 @@
         <button id="btnApply">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none">선택에 바인딩</button>
       </div>
+      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
+        <label class="inline"><input type="checkbox" id="bindAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="bindHideCtx" /> 맥락 숨기기</label>
+      </div>
+      <div id="bindTree"></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="badge">UX6</span><span class="ux-t">진행률 / 취소</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
@@ -1003,9 +1009,20 @@
     send({ type: "APPLY", tolerance, preview: true });
   });
   $("btnApplyConfirm").addEventListener("click", () => {
-    const tolerance = Number($("tol").value) || 0;
+    const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
+    if (!items.length) return;
     showApplyProgress("\uBC14\uC778\uB529 \uC911\u2026");
-    send({ type: "APPLY", tolerance });
+    send({ type: "APPLY_SELECTED", items });
+  });
+  $("bindAll").addEventListener("change", (e) => {
+    const on = e.target.checked;
+    bindChecked.clear();
+    if (on) for (const c of bindCandidates) bindChecked.add(candKey(c));
+    renderBindTree();
+  });
+  $("bindHideCtx").addEventListener("change", (e) => {
+    bindHideContext = e.target.checked;
+    renderBindTree();
   });
   $("btnApplyCancel").addEventListener("click", () => {
     send({ type: "CANCEL" });
@@ -1420,6 +1437,7 @@
     send({ type: "CLEAR_LICENSE" });
   });
   window.onmessage = (event) => {
+    var _a, _b;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
@@ -1435,7 +1453,7 @@
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
-        $("btnApplyConfirm").style.display = "none";
+        clearBindPreview();
         if (!tokens.length) renderTokens();
         break;
       }
@@ -1463,12 +1481,18 @@
         const limitNote = msg.limited ? " \xB7 \u26A0 Free \uD55C\uB3C4 \uB3C4\uB2EC \u2014 \uC77C\uBD80\uB9CC \uC801\uC6A9(\uC5C5\uADF8\uB808\uC774\uB4DC \uD544\uC694)" : "";
         const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}${limitNote}`;
         if (msg.cancelled) {
+          clearBindPreview();
           setStatus("applyStatus", `\uCDE8\uC18C\uB428 \u2014 \uBC14\uC778\uB529 ${msg.bound}\uAC74\uB9CC \uC801\uC6A9${detail}`, "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
-          setStatus("applyStatus", `\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uBC14\uC778\uB529 ${msg.bound}\uAC74 \uC608\uC815${detail} \xB7 \u2018\uC120\uD0DD\uC5D0 \uBC14\uC778\uB529\u2019\uC73C\uB85C \uBC18\uC601`, msg.limited || msg.skipped ? "warn" : "");
-          confirmBtn.style.display = "";
+          bindCandidates = (_a = msg.candidates) != null ? _a : [];
+          bindNodes = (_b = msg.nodes) != null ? _b : [];
+          bindChecked.clear();
+          for (const c of bindCandidates) bindChecked.add(candKey(c));
+          renderBindTree();
+          setStatus("applyStatus", `\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uBC14\uC778\uB529 ${msg.bound}\uAC74 \uD6C4\uBCF4${detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uC5D0 \uBC14\uC778\uB529\u2019`, msg.limited || msg.skipped ? "warn" : "");
         } else {
+          clearBindPreview();
           setStatus("applyStatus", `\uBC14\uC778\uB529 ${msg.bound}${detail}`, msg.limited || msg.skipped ? "warn" : "ok");
           confirmBtn.style.display = "none";
         }
@@ -1622,9 +1646,9 @@
     const base = rows.length ? baseDepth(rows) : 0;
     for (const r of rows) {
       const affected = r.change !== void 0;
-      if (!affected && opts.hideContext) continue;
+      if (!affected && !r.header && opts.hideContext) continue;
       const row = document.createElement("div");
-      row.className = affected ? "tree-row affected" : "tree-row context";
+      row.className = affected ? "tree-row affected" : r.header ? "tree-row header" : "tree-row context";
       row.style.paddingLeft = `${(r.depth - base) * 12}px`;
       if (affected) {
         const cb = document.createElement("input");
@@ -1695,6 +1719,72 @@
     $("diff").innerHTML = "";
     $("btnRename").disabled = true;
     setStatus("renameStatus", `${msg.changes.length}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.`, "ok");
+  }
+  var bindCandidates = [];
+  var bindNodes = [];
+  var bindChecked = /* @__PURE__ */ new Set();
+  var bindHideContext = false;
+  function candKey(c) {
+    var _a;
+    return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}`;
+  }
+  function hasBindPreview() {
+    return bindCandidates.length > 0;
+  }
+  function bindRows() {
+    const byNode = /* @__PURE__ */ new Map();
+    for (const c of bindCandidates) {
+      const arr = byNode.get(c.nodeId);
+      if (arr) arr.push(c);
+      else byNode.set(c.nodeId, [c]);
+    }
+    const rows = [];
+    for (const n of bindNodes) {
+      const cands = byNode.get(n.id);
+      rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands });
+      if (cands) {
+        for (const c of cands) {
+          const dist = c.distance && c.distance > 0 ? ` ~${Math.round(c.distance * 100) / 100}` : "";
+          rows.push({
+            id: candKey(c),
+            name: `${c.field} ${c.currentValue}`,
+            type: c.field,
+            depth: n.depth + 1,
+            parentId: n.id,
+            change: `${c.variableName}${dist}`
+          });
+        }
+      }
+    }
+    return rows;
+  }
+  function renderBindTree() {
+    $("bindTreeCtrls").style.display = hasBindPreview() ? "" : "none";
+    renderSelectableTree($("bindTree"), bindRows(), bindChecked, {
+      hideContext: bindHideContext,
+      onChange: updateBindApply
+    });
+    updateBindApply();
+  }
+  function updateBindApply() {
+    const total = bindCandidates.length;
+    const sel = bindChecked.size;
+    const confirm = $("btnApplyConfirm");
+    confirm.style.display = hasBindPreview() ? "" : "none";
+    confirm.disabled = sel === 0;
+    if (hasBindPreview()) {
+      const all = $("bindAll");
+      all.checked = sel === total && total > 0;
+      all.indeterminate = sel > 0 && sel < total;
+    }
+  }
+  function clearBindPreview() {
+    bindCandidates = [];
+    bindNodes = [];
+    bindChecked.clear();
+    $("bindTree").innerHTML = "";
+    $("bindTreeCtrls").style.display = "none";
+    $("btnApplyConfirm").style.display = "none";
   }
   var REASON_LABELS = {
     "no-match": "\uB9E4\uCE6D \uC5C6\uC74C",

@@ -462,6 +462,25 @@
 
   // src/lib/bind.ts
   var TIER = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
+  function addColorCand(preview, node, field, index, hex, e) {
+    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
+  }
+  function addFloatCand(preview, node, field, value, e) {
+    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : void 0 });
+  }
+  function pruneToAffected(nodeIndex, candidates) {
+    var _a, _b, _c, _d;
+    const byId = new Map(nodeIndex.map((n) => [n.id, n]));
+    const keep = new Set(candidates.map((c) => c.nodeId));
+    for (const c of candidates) {
+      let p = (_b = (_a = byId.get(c.nodeId)) == null ? void 0 : _a.parentId) != null ? _b : null;
+      while (p && !keep.has(p)) {
+        keep.add(p);
+        p = (_d = (_c = byId.get(p)) == null ? void 0 : _c.parentId) != null ? _d : null;
+      }
+    }
+    return nodeIndex.filter((n) => keep.has(n.id));
+  }
   function countNodes(sel) {
     let n = 0;
     const stack = sel.slice();
@@ -491,12 +510,17 @@
       limited: false
     };
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
+    const preview = apply ? null : { candidates: [], nodeIndex: [] };
     for (const node of selection2) {
-      await walk2(node, entries, tolerance, res, flagSet, budget, apply, hooks, prog);
+      await walk2(node, entries, tolerance, res, flagSet, budget, apply, hooks, prog, preview, 0, null);
       if (res.cancelled) break;
     }
     if (budget.limited) res.limited = true;
     res.flags = [...flagSet];
+    if (preview) {
+      res.candidates = preview.candidates;
+      res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates);
+    }
     (_c = hooks.onProgress) == null ? void 0 : _c.call(hooks, prog.done, prog.total);
     return res;
   }
@@ -541,7 +565,7 @@
     return typeof v === "object" && v !== null && "r" in v && "g" in v && "b" in v;
   }
   function matchColor(entries, hex) {
-    for (const e of entries) if (e.colorHex === hex) return e.variable;
+    for (const e of entries) if (e.colorHex === hex) return e;
     return null;
   }
   function matchFloat(entries, value, tol) {
@@ -556,9 +580,9 @@
         bestDist = dist;
       }
     }
-    return best ? best.variable : null;
+    return best;
   }
-  async function walk2(node, entries, tol, res, flags, budget, apply, hooks, prog) {
+  async function walk2(node, entries, tol, res, flags, budget, apply, hooks, prog, preview, depth, parentId) {
     var _a;
     if (res.cancelled) return;
     if (budget.nodes <= 0 || res.bound >= budget.maxBindings) {
@@ -566,11 +590,12 @@
       return;
     }
     budget.nodes--;
-    bindPaints(node, entries, res, apply);
-    bindFrame(node, entries, tol, res, flags, apply);
-    bindRadius(node, entries, tol, res, apply);
-    bindEffects(node, entries, res, apply);
-    await bindText(node, entries, tol, res, apply);
+    preview == null ? void 0 : preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
+    bindPaints(node, entries, res, apply, preview);
+    bindFrame(node, entries, tol, res, flags, apply, preview);
+    bindRadius(node, entries, tol, res, apply, preview);
+    bindEffects(node, entries, res, apply, preview);
+    await bindText(node, entries, tol, res, apply, preview);
     prog.done++;
     if (hooks.onProgress && prog.done % prog.every === 0) {
       hooks.onProgress(prog.done, prog.total);
@@ -582,79 +607,89 @@
     }
     if ("children" in node)
       for (const c of node.children) {
-        await walk2(c, entries, tol, res, flags, budget, apply, hooks, prog);
+        await walk2(c, entries, tol, res, flags, budget, apply, hooks, prog, preview, depth + 1, node.id);
         if (res.cancelled) return;
       }
   }
-  function bindPaints(node, entries, res, apply) {
+  function bindPaints(node, entries, res, apply, preview) {
     for (const key of ["fills", "strokes"]) {
       if (!(key in node)) continue;
       const paints2 = node[key];
       if (paints2 === figma.mixed || !Array.isArray(paints2)) continue;
       let changed = false;
-      const next = paints2.map((p) => {
+      const next = paints2.map((p, i) => {
         if (p.type !== "SOLID") return p;
-        const v = matchColor(entries, rgbToHex(p.color));
-        if (!v) {
+        const hex = rgbToHex(p.color);
+        const e = matchColor(entries, hex);
+        if (!e) {
           skip(res, "no-match");
           return p;
         }
-        changed = true;
         res.bound++;
-        return apply ? figma.variables.setBoundVariableForPaint(p, "color", v) : p;
+        if (!apply) {
+          addColorCand(preview, node, key, i, hex, e);
+          return p;
+        }
+        changed = true;
+        return figma.variables.setBoundVariableForPaint(p, "color", e.variable);
       });
       if (changed && apply) node[key] = next;
     }
   }
-  function bindFrame(node, entries, tol, res, flags, apply) {
+  function bindFrame(node, entries, tol, res, flags, apply, preview) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
-    if (node.layoutSizingHorizontal === "FIXED") tryBind(node, "width", node.width, entries, tol, res, apply);
+    if (node.layoutSizingHorizontal === "FIXED") tryBind(node, "width", node.width, entries, tol, res, apply, preview);
     else if (node.layoutSizingHorizontal === "HUG" || node.layoutSizingHorizontal === "FILL") {
       flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
       note(res, "hug-fill");
     }
-    if (node.layoutSizingVertical === "FIXED") tryBind(node, "height", node.height, entries, tol, res, apply);
+    if (node.layoutSizingVertical === "FIXED") tryBind(node, "height", node.height, entries, tol, res, apply, preview);
     if (node.layoutMode === "NONE") {
       flags.add("\uC624\uD1A0\uB808\uC774\uC544\uC6C3\uC774 \uC544\uB2CC \uD504\uB808\uC784\uC740 padding/gap \uBC14\uC778\uB529 \uBD88\uAC00.");
       note(res, "no-autolayout");
       return;
     }
-    tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply);
-    tryBind(node, "paddingLeft", node.paddingLeft, entries, tol, res, apply);
-    tryBind(node, "paddingRight", node.paddingRight, entries, tol, res, apply);
-    tryBind(node, "paddingTop", node.paddingTop, entries, tol, res, apply);
-    tryBind(node, "paddingBottom", node.paddingBottom, entries, tol, res, apply);
+    tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply, preview);
+    tryBind(node, "paddingLeft", node.paddingLeft, entries, tol, res, apply, preview);
+    tryBind(node, "paddingRight", node.paddingRight, entries, tol, res, apply, preview);
+    tryBind(node, "paddingTop", node.paddingTop, entries, tol, res, apply, preview);
+    tryBind(node, "paddingBottom", node.paddingBottom, entries, tol, res, apply, preview);
   }
-  function bindRadius(node, entries, tol, res, apply) {
+  function bindRadius(node, entries, tol, res, apply, preview) {
     if (!("cornerRadius" in node)) return;
     const r = node.cornerRadius;
     const corners = ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"];
     if (r !== figma.mixed && typeof r === "number" && r > 0) {
-      for (const c of corners) tryBind(node, c, r, entries, tol, res, apply);
+      for (const c of corners) tryBind(node, c, r, entries, tol, res, apply, preview);
     } else if (r === figma.mixed) {
       for (const c of corners) {
         const cv = node[c];
-        if (typeof cv === "number" && cv > 0) tryBind(node, c, cv, entries, tol, res, apply);
+        if (typeof cv === "number" && cv > 0) tryBind(node, c, cv, entries, tol, res, apply, preview);
       }
     }
   }
-  function bindEffects(node, entries, res, apply) {
+  function bindEffects(node, entries, res, apply, preview) {
     if (!("effects" in node)) return;
     let changed = false;
-    const next = node.effects.map((e) => {
+    const next = node.effects.map((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return e;
-      const v = matchColor(entries, rgbToHex(e.color));
-      if (!v) {
+      const hex = rgbToHex(e.color);
+      const ent = matchColor(entries, hex);
+      if (!ent) {
         skip(res, "no-match");
         return e;
       }
-      changed = true;
       res.bound++;
-      return apply ? figma.variables.setBoundVariableForEffect(e, "color", v) : e;
+      if (!apply) {
+        addColorCand(preview, node, "effects", i, hex, ent);
+        return e;
+      }
+      changed = true;
+      return figma.variables.setBoundVariableForEffect(e, "color", ent.variable);
     });
     if (changed && apply) node.effects = next;
   }
-  async function bindText(node, entries, tol, res, apply) {
+  async function bindText(node, entries, tol, res, apply, preview) {
     if (node.type !== "TEXT") return;
     if (node.fontName === figma.mixed) return;
     try {
@@ -663,50 +698,52 @@
       note(res, "font");
       return;
     }
-    if (node.fontSize !== figma.mixed) tryBindText(node, "fontSize", node.fontSize, entries, tol, res, apply);
+    if (node.fontSize !== figma.mixed) tryBindText(node, "fontSize", node.fontSize, entries, tol, res, apply, preview);
     if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS") {
-      tryBindText(node, "lineHeight", node.lineHeight.value, entries, tol, res, apply);
+      tryBindText(node, "lineHeight", node.lineHeight.value, entries, tol, res, apply, preview);
     }
     if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") {
-      tryBindText(node, "letterSpacing", node.letterSpacing.value, entries, tol, res, apply);
+      tryBindText(node, "letterSpacing", node.letterSpacing.value, entries, tol, res, apply, preview);
     }
   }
-  function tryBindText(node, field, value, entries, tol, res, apply) {
-    const v = matchFloat(entries, value, tol);
+  function tryBindText(node, field, value, entries, tol, res, apply, preview) {
+    const e = matchFloat(entries, value, tol);
     const len = node.characters.length;
     if (len === 0) {
       skip(res, "empty-text");
       return;
     }
-    if (!v) {
+    if (!e) {
       skip(res, "no-match");
       return;
     }
     if (!apply) {
       res.bound++;
+      addFloatCand(preview, node, field, value, e);
       return;
     }
     try {
-      node.setRangeBoundVariable(0, len, field, v);
+      node.setRangeBoundVariable(0, len, field, e.variable);
       res.bound++;
-    } catch (e) {
+    } catch (e2) {
       skip(res, "error");
     }
   }
-  function tryBind(node, field, value, entries, tol, res, apply) {
-    const v = matchFloat(entries, value, tol);
-    if (!v) {
+  function tryBind(node, field, value, entries, tol, res, apply, preview) {
+    const e = matchFloat(entries, value, tol);
+    if (!e) {
       skip(res, "no-match");
       return;
     }
     if (!apply) {
       res.bound++;
+      addFloatCand(preview, node, field, value, e);
       return;
     }
     try {
-      node.setBoundVariable(field, v);
+      node.setBoundVariable(field, e.variable);
       res.bound++;
-    } catch (e) {
+    } catch (e2) {
       skip(res, "error");
     }
   }
@@ -1513,6 +1550,52 @@
     post({ type: "PREMIUM_REQUIRED", feature: "components", message: "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
     return false;
   }
+  var TEXT_BIND_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing"]);
+  async function applySelectedBinding(item) {
+    var _a, _b;
+    const node = await figma.getNodeByIdAsync(item.nodeId);
+    if (!node || !("type" in node)) return false;
+    const variable = await figma.variables.getVariableByIdAsync(item.variableId);
+    if (!variable) return false;
+    const sn = node;
+    try {
+      if (item.field === "fills" || item.field === "strokes") {
+        if (!(item.field in sn)) return false;
+        const paints2 = sn[item.field];
+        if (paints2 === figma.mixed || !Array.isArray(paints2)) return false;
+        const i = (_a = item.index) != null ? _a : 0;
+        const p = paints2[i];
+        if (!p || p.type !== "SOLID") return false;
+        const arr = paints2.slice();
+        arr[i] = figma.variables.setBoundVariableForPaint(p, "color", variable);
+        sn[item.field] = arr;
+        return true;
+      }
+      if (item.field === "effects") {
+        if (!("effects" in sn)) return false;
+        const effects = sn.effects;
+        const i = (_b = item.index) != null ? _b : 0;
+        const e = effects[i];
+        if (!e || e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return false;
+        const arr = effects.slice();
+        arr[i] = figma.variables.setBoundVariableForEffect(e, "color", variable);
+        sn.effects = arr;
+        return true;
+      }
+      if (TEXT_BIND_FIELDS.has(item.field)) {
+        if (sn.type !== "TEXT" || sn.fontName === figma.mixed) return false;
+        await figma.loadFontAsync(sn.fontName);
+        const len = sn.characters.length;
+        if (len === 0) return false;
+        sn.setRangeBoundVariable(0, len, item.field, variable);
+        return true;
+      }
+      sn.setBoundVariable(item.field, variable);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
   async function savePresets() {
     try {
       await figma.clientStorage.setAsync(PRESETS_KEY, presets);
@@ -1679,7 +1762,11 @@
             reasons: r.reasons,
             limited: !!r.limited,
             preview: msg.preview,
-            cancelled: r.cancelled
+            cancelled: r.cancelled,
+            candidates: r.candidates,
+            // #6: 미리보기 후보(dry-run만)
+            nodes: r.nodes
+            // #13: 미리보기 트리 맥락
           });
           if (!msg.preview) {
             if (!r.cancelled) record("bind", `\uBC14\uC778\uB529 ${r.bound} \xB7 \uC2A4\uD0B5 ${r.skipped}${r.limited ? " \xB7 \uD55C\uB3C4 \uB3C4\uB2EC" : ""}`);
@@ -1689,6 +1776,20 @@
         }
         case "CANCEL": {
           bindCancel = true;
+          break;
+        }
+        case "APPLY_SELECTED": {
+          let bound = 0;
+          let skipped = 0;
+          for (const item of msg.items) {
+            if (await applySelectedBinding(item)) bound++;
+            else skipped++;
+          }
+          post({ type: "APPLY_RESULT", bound, skipped, flags: [], reasons: {} });
+          if (bound) {
+            record("bind", `\uBC14\uC778\uB529 ${bound}\uAC74 \uC801\uC6A9${skipped ? ` \xB7 \uC2A4\uD0B5 ${skipped}` : ""}`);
+            commitUndo(figma);
+          }
           break;
         }
         case "RENAME": {

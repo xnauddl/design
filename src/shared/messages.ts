@@ -36,11 +36,41 @@ export interface RenameNode {
   after?: string;
 }
 
+/**
+ * 바인딩 미리보기(#6)의 한 후보 — (노드, 필드[, 페인트 인덱스])가 매칭한 변수.
+ * 체크된 후보만 `APPLY_SELECTED`로 재매칭 없이 그대로 적용한다.
+ */
+export interface BindCandidate {
+  nodeId: string;
+  /** 'fills'|'strokes'|'effects'|'width'|'height'|'paddingLeft'|…|'fontSize'|'lineHeight'|'letterSpacing' */
+  field: string;
+  /** 색(fills/strokes/effects) 바인딩 시 페인트/효과 배열 내 인덱스. */
+  index?: number;
+  /** 표시용 현재값(hex 또는 숫자). */
+  currentValue: string;
+  variableId: string;
+  variableName: string;
+  /** Component 3 > Semantic 2. */
+  tier: number;
+  /** FLOAT 매칭 거리(0/undefined=정확). */
+  distance?: number;
+}
+
+/** 바인딩 미리보기 트리(#13)의 맥락 노드 — 영향 노드 + 그 조상 체인. */
+export interface BindNode {
+  id: string;
+  name: string;
+  type: string;
+  depth: number;
+  parentId: string | null;
+}
+
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT' }
   | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
   | { type: 'APPLY'; tolerance: number; preview?: boolean } // preview: UX1 dry-run(바인딩 없음)
+  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[] } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
   | { type: 'RENAME_APPLY'; items: { id: string; after: string }[] } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
@@ -68,7 +98,7 @@ export type CodeToUi =
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean }
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; limited?: boolean; preview?: boolean }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; limited?: boolean; preview?: boolean; cancelled?: boolean }
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; limited?: boolean; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[] } // candidates/nodes: 미리보기 트리(#6·#13)
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }

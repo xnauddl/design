@@ -1,7 +1,7 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameNode } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
 import { FREE_LIMITS, type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
@@ -192,9 +192,25 @@ $('btnApply').addEventListener('click', () => {
 });
 
 $('btnApplyConfirm').addEventListener('click', () => {
-  const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
+  // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG).
+  const items = bindCandidates
+    .filter((c) => bindChecked.has(candKey(c)))
+    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
+  if (!items.length) return;
   showApplyProgress('바인딩 중…'); // UX6
-  send({ type: 'APPLY', tolerance }); // 확인 후 실제 바인딩
+  send({ type: 'APPLY_SELECTED', items });
+});
+
+$('bindAll').addEventListener('change', (e) => {
+  const on = (e.target as HTMLInputElement).checked;
+  bindChecked.clear();
+  if (on) for (const c of bindCandidates) bindChecked.add(candKey(c));
+  renderBindTree();
+});
+
+$('bindHideCtx').addEventListener('change', (e) => {
+  bindHideContext = (e.target as HTMLInputElement).checked;
+  renderBindTree();
 });
 
 $('btnApplyCancel').addEventListener('click', () => {
@@ -687,7 +703,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
-      ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none'; // 선택 변경 → 바인딩 미리보기 무효화
+      clearBindPreview(); // 선택 변경 → 바인딩 미리보기 무효화
       if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
       break;
     }
@@ -718,12 +734,19 @@ window.onmessage = (event: MessageEvent) => {
       const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}${limitNote}`;
       if (msg.cancelled) {
         // UX6: 취소 — 처리한 만큼만 적용(비파괴).
+        clearBindPreview();
         setStatus('applyStatus', `취소됨 — 바인딩 ${msg.bound}건만 적용${detail}`, 'warn');
         confirmBtn.style.display = 'none';
       } else if (msg.preview) {
-        setStatus('applyStatus', `미리보기 — 바인딩 ${msg.bound}건 예정${detail} · ‘선택에 바인딩’으로 반영`, msg.limited || msg.skipped ? 'warn' : '');
-        confirmBtn.style.display = '';
+        // #6: 후보를 선택형 미리보기 트리로. 기본 전체 체크.
+        bindCandidates = msg.candidates ?? [];
+        bindNodes = msg.nodes ?? [];
+        bindChecked.clear();
+        for (const c of bindCandidates) bindChecked.add(candKey(c));
+        renderBindTree();
+        setStatus('applyStatus', `미리보기 — 바인딩 ${msg.bound}건 후보${detail} · 체크 후 ‘선택에 바인딩’`, msg.limited || msg.skipped ? 'warn' : '');
       } else {
+        clearBindPreview();
         setStatus('applyStatus', `바인딩 ${msg.bound}${detail}`, msg.limited || msg.skipped ? 'warn' : 'ok');
         confirmBtn.style.display = 'none';
       }
@@ -899,6 +922,8 @@ interface TreeRow {
   parentId: string | null;
   /** 적용 후 라벨(리네임=after, 바인딩=변수명…). 존재 시 영향 노드(체크 가능). */
   change?: string;
+  /** 영향 후보를 가진 노드의 헤더(맥락 숨김에도 유지, 체크 불가). */
+  header?: boolean;
 }
 
 /** 선택 서브트리의 최소 depth(루트 기준)로 들여쓰기를 정규화한다. */
@@ -916,9 +941,9 @@ function renderSelectableTree(
   const base = rows.length ? baseDepth(rows) : 0;
   for (const r of rows) {
     const affected = r.change !== undefined;
-    if (!affected && opts.hideContext) continue;
+    if (!affected && !r.header && opts.hideContext) continue; // 헤더는 맥락 숨김에도 유지
     const row = document.createElement('div');
-    row.className = affected ? 'tree-row affected' : 'tree-row context';
+    row.className = affected ? 'tree-row affected' : r.header ? 'tree-row header' : 'tree-row context';
     row.style.paddingLeft = `${(r.depth - base) * 12}px`;
 
     if (affected) {
@@ -999,6 +1024,84 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
   $('diff').innerHTML = '';
   ($('btnRename') as HTMLButtonElement).disabled = true;
   setStatus('renameStatus', `${msg.changes.length}개 이름 적용 완료.`, 'ok');
+}
+
+/* ---------- 바인딩(#6): 미리보기 트리 + 선택 적용 ---------- */
+let bindCandidates: BindCandidate[] = [];
+let bindNodes: BindNode[] = [];
+const bindChecked = new Set<string>(); // 체크된 후보 키
+let bindHideContext = false;
+
+/** 후보 고유 키(노드+필드+인덱스). */
+function candKey(c: { nodeId: string; field: string; index?: number }): string {
+  return `${c.nodeId}|${c.field}|${c.index ?? ''}`;
+}
+
+/** 미리보기 후보를 트리에 표시 가능 여부. */
+function hasBindPreview(): boolean {
+  return bindCandidates.length > 0;
+}
+
+/** code의 후보/노드를 트리 행으로: 노드 헤더 + 후보(체크) 행. */
+function bindRows(): TreeRow[] {
+  const byNode = new Map<string, BindCandidate[]>();
+  for (const c of bindCandidates) {
+    const arr = byNode.get(c.nodeId);
+    if (arr) arr.push(c);
+    else byNode.set(c.nodeId, [c]);
+  }
+  const rows: TreeRow[] = [];
+  for (const n of bindNodes) {
+    const cands = byNode.get(n.id);
+    rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands });
+    if (cands) {
+      for (const c of cands) {
+        const dist = c.distance && c.distance > 0 ? ` ~${Math.round(c.distance * 100) / 100}` : '';
+        rows.push({
+          id: candKey(c),
+          name: `${c.field} ${c.currentValue}`,
+          type: c.field,
+          depth: n.depth + 1,
+          parentId: n.id,
+          change: `${c.variableName}${dist}`,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+function renderBindTree(): void {
+  ($('bindTreeCtrls') as HTMLElement).style.display = hasBindPreview() ? '' : 'none';
+  renderSelectableTree($('bindTree'), bindRows(), bindChecked, {
+    hideContext: bindHideContext,
+    onChange: updateBindApply,
+  });
+  updateBindApply();
+}
+
+/** 선택에 바인딩 버튼 활성/라벨 + 전체선택 마스터 동기화. */
+function updateBindApply(): void {
+  const total = bindCandidates.length;
+  const sel = bindChecked.size;
+  const confirm = $('btnApplyConfirm') as HTMLButtonElement;
+  confirm.style.display = hasBindPreview() ? '' : 'none';
+  confirm.disabled = sel === 0;
+  if (hasBindPreview()) {
+    const all = $('bindAll') as HTMLInputElement;
+    all.checked = sel === total && total > 0;
+    all.indeterminate = sel > 0 && sel < total;
+  }
+}
+
+/** 바인딩 미리보기/적용 상태를 초기화(선택 변경·적용 완료 시). */
+function clearBindPreview(): void {
+  bindCandidates = [];
+  bindNodes = [];
+  bindChecked.clear();
+  $('bindTree').innerHTML = '';
+  ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
+  ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
 }
 
 /** UX3: 스킵 사유 키 → 한글 라벨. */

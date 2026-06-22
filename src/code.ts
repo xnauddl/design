@@ -123,6 +123,59 @@ function requirePro(): boolean {
   return false;
 }
 
+/** #6: 텍스트 범위 바인딩 필드(나머지는 노드 스칼라 필드). */
+const TEXT_BIND_FIELDS = new Set(['fontSize', 'lineHeight', 'letterSpacing']);
+
+/**
+ * #6: 미리보기에서 체크한 후보 1건을 재매칭 없이 그대로 바인딩한다.
+ * 노드/변수 소실·미스매치는 false(graceful skip). 성공 시 true.
+ */
+async function applySelectedBinding(item: { nodeId: string; field: string; index?: number; variableId: string }): Promise<boolean> {
+  const node = await figma.getNodeByIdAsync(item.nodeId);
+  if (!node || !('type' in node)) return false;
+  const variable = await figma.variables.getVariableByIdAsync(item.variableId);
+  if (!variable) return false;
+  const sn = node as SceneNode;
+  try {
+    if (item.field === 'fills' || item.field === 'strokes') {
+      if (!(item.field in sn)) return false;
+      const paints = (sn as unknown as Record<string, Paint[] | typeof figma.mixed>)[item.field];
+      if (paints === figma.mixed || !Array.isArray(paints)) return false;
+      const i = item.index ?? 0;
+      const p = paints[i];
+      if (!p || p.type !== 'SOLID') return false;
+      const arr = paints.slice();
+      arr[i] = figma.variables.setBoundVariableForPaint(p, 'color', variable);
+      (sn as unknown as Record<string, Paint[]>)[item.field] = arr;
+      return true;
+    }
+    if (item.field === 'effects') {
+      if (!('effects' in sn)) return false;
+      const effects = (sn as unknown as { effects: readonly Effect[] }).effects;
+      const i = item.index ?? 0;
+      const e = effects[i];
+      if (!e || (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW')) return false;
+      const arr = effects.slice();
+      arr[i] = figma.variables.setBoundVariableForEffect(e, 'color', variable);
+      (sn as unknown as { effects: readonly Effect[] }).effects = arr;
+      return true;
+    }
+    if (TEXT_BIND_FIELDS.has(item.field)) {
+      if (sn.type !== 'TEXT' || sn.fontName === figma.mixed) return false;
+      await figma.loadFontAsync(sn.fontName);
+      const len = sn.characters.length;
+      if (len === 0) return false;
+      sn.setRangeBoundVariable(0, len, item.field as VariableBindableTextField, variable);
+      return true;
+    }
+    // 스칼라 노드 필드(width/height/padding…/cornerRadius…)
+    (sn as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(item.field as VariableBindableNodeField, variable);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function savePresets(): Promise<void> {
   try {
     await figma.clientStorage.setAsync(PRESETS_KEY, presets);
@@ -311,6 +364,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           limited: !!r.limited,
           preview: msg.preview,
           cancelled: r.cancelled,
+          candidates: r.candidates, // #6: 미리보기 후보(dry-run만)
+          nodes: r.nodes, // #13: 미리보기 트리 맥락
         });
         if (!msg.preview) {
           if (!r.cancelled) record('bind', `바인딩 ${r.bound} · 스킵 ${r.skipped}${r.limited ? ' · 한도 도달' : ''}`);
@@ -320,6 +375,21 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'CANCEL': {
         bindCancel = true; // UX6: 다음 양보 지점에서 중단
+        break;
+      }
+      case 'APPLY_SELECTED': {
+        // #6: 미리보기 트리에서 체크한 후보만 재매칭 없이 그대로 바인딩(WYSIWYG).
+        let bound = 0;
+        let skipped = 0;
+        for (const item of msg.items) {
+          if (await applySelectedBinding(item)) bound++;
+          else skipped++; // 노드/변수 소실·실패는 graceful skip
+        }
+        post({ type: 'APPLY_RESULT', bound, skipped, flags: [], reasons: {} });
+        if (bound) {
+          record('bind', `바인딩 ${bound}건 적용${skipped ? ` · 스킵 ${skipped}` : ''}`);
+          commitUndo(figma); // UX2: 선택 바인딩 전체를 단일 Undo로
+        }
         break;
       }
       case 'RENAME': {
