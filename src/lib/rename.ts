@@ -8,6 +8,9 @@
      · 버튼: 오토레이아웃 + 라운드 + 채움/외곽선 + 직속 텍스트 → button
    - 맥락: 바로 위 의미 있는 이름에서 깨끗한 1단계만(pickScope). 숫자·단위 조각 제거.
    - 이름 형식: {맥락}-{역할} 최대 2토막. 형제 충돌에 숫자 안 붙임(Figma 중복 허용).
+   - 중첩 컨테이너: 같은 맥락(scope)이 깊어지면 container→content→inner 사다리로 구분.
+     예) header › header-content › header-inner › header-inner(이하 동일, 숫자 안 붙임).
+     맥락 없는(scope=null) 컨테이너·형제는 사다리를 타지 않고 그대로 container.
    - 제외: Component/ComponentSet · Text · Instance · 잠긴 레이어.
    ============================================================ */
 import { isDefaultName, isTokenEchoName, parseTokenName, layerNameFromRole, pickScope, kebab } from './naming';
@@ -20,6 +23,8 @@ interface Pos {
   total: number;
   parentLayout: 'vertical' | 'horizontal' | null;
   depth: number;
+  /** 같은 맥락(scope) 컨테이너 중첩 단계 — container→content→inner 사다리 인덱스. */
+  ladder: number;
 }
 
 interface Opts {
@@ -37,7 +42,7 @@ export async function renameSelection(
   opts: Opts,
 ): Promise<RenameOutcome> {
   const changes: RenameChange[] = [];
-  await recurse(selection, null, opts, changes, 0, null);
+  await recurse(selection, null, opts, changes, 0, null, 0);
   return { changes, applied: opts.apply };
 }
 
@@ -48,11 +53,12 @@ async function recurse(
   out: RenameChange[],
   depth: number,
   parentLayout: Pos['parentLayout'],
+  ladder: number,
 ): Promise<void> {
   const total = nodes.length;
   for (let i = 0; i < total; i++) {
     const node = nodes[i];
-    const pos: Pos = { index: i, total, parentLayout, depth };
+    const pos: Pos = { index: i, total, parentLayout, depth, ladder };
     const decided = await decide(node, ancestorName, pos, opts);
     let contextForChildren = node.name;
 
@@ -66,9 +72,30 @@ async function recurse(
     }
 
     if ('children' in node) {
-      await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node));
+      await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node), decided.childLadder);
     }
   }
+}
+
+/* ---------- 중첩 구조 사다리: 같은 맥락이 깊어질수록 단계어 교체 ---------- */
+/** 사다리 단계어(숫자 없음). 0=container/wrapper 유지, 1=content, 2↑=inner(중복 허용). */
+const LADDER_WORDS = ['', 'content', 'inner'] as const;
+
+/** 사다리 깊이 → 구조 단계어. 0은 호출부에서 기본 역할(container/wrapper) 유지. */
+function ladderWord(ladder: number): string {
+  if (ladder <= 0) return '';
+  return LADDER_WORDS[Math.min(ladder, LADDER_WORDS.length - 1)];
+}
+
+/**
+ * 자식에게 내려줄 사다리 단계 — 같은 맥락(scope)이 이어지면 +1, 새 맥락이 생기면 1,
+ * 맥락이 없으면 0(사다리 리셋). childScope는 이 노드 이름에서 뽑은 맥락 1단계.
+ */
+function nextLadder(thisNodeScope: string | null, effectiveName: string, parentLadder: number): number {
+  const childScope = pickScope(effectiveName);
+  if (childScope === null) return 0;
+  if (childScope === thisNodeScope) return parentLadder + 1;
+  return 1;
 }
 
 async function decide(
@@ -76,23 +103,30 @@ async function decide(
   ancestorName: string | null,
   pos: Pos,
   opts: Opts,
-): Promise<{ skip: boolean; name?: string }> {
+): Promise<{ skip: boolean; name?: string; childLadder: number }> {
+  // 보존/제외 노드: 이름은 유지하되, 자식 사다리는 이 노드 이름의 맥락 연속성으로 계산.
+  const inheritedScope = ancestorName ? pickScope(ancestorName) : null;
+  const keep = () => ({ skip: true, childLadder: nextLadder(inheritedScope, node.name, pos.ladder) });
+
   // 제외 규칙(이름 유지 · 자기 이름을 자식 맥락으로 전달)
-  if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return { skip: true };
-  if (node.type === 'TEXT') return { skip: true };
-  if (node.type === 'INSTANCE') return { skip: true };
-  if (node.locked) return { skip: true };
+  if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return keep();
+  if (node.type === 'TEXT') return keep();
+  if (node.type === 'INSTANCE') return keep();
+  if (node.locked) return keep();
 
   // 보존형: 사람이 지은 의미 있는 이름은 그대로 두고 맥락으로만 쓴다.
   // 단, Figma 기본명과 구 리네임이 남긴 토큰 베낌 이름(color-121210 등)은 교체.
-  if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
+  if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return keep();
 
   const token = await primaryToken(node);
-  const role = resolveRole(node, token, pos);
+  let role = resolveRole(node, token, pos);
+  // 중첩 구조 사다리: 같은 맥락의 generic 구조 역할(container/wrapper)이 깊어지면 content→inner로.
+  if ((role === 'container' || role === 'wrapper') && pos.ladder > 0) role = ladderWord(pos.ladder);
   // 맥락: 바로 위 의미 있는 이름에서 깨끗한 1단계 → 없으면 토큰 경로 접두사에서.
-  let scope = (ancestorName ? pickScope(ancestorName) : null) ?? (token?.context ? pickScope(token.context) : null);
+  let scope = inheritedScope ?? (token?.context ? pickScope(token.context) : null);
   if (scope === role) scope = null; // 맥락==역할이면 중복 제거(button-button 방지)
-  return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
+  const name = layerNameFromRole(scope, role, { maxDepth: opts.maxDepth });
+  return { skip: false, name, childLadder: nextLadder(scope, name, pos.ladder) };
 }
 
 /* ---------- 역할 판정: 영역 → 버튼 → 토큰 신호 → 타입/기하 ---------- */

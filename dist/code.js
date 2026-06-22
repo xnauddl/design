@@ -1074,14 +1074,14 @@
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const changes = [];
-    await recurse(selection2, null, opts, changes, 0, null);
+    await recurse(selection2, null, opts, changes, 0, null, 0);
     return { changes, applied: opts.apply };
   }
-  async function recurse(nodes, ancestorName, opts, out, depth, parentLayout) {
+  async function recurse(nodes, ancestorName, opts, out, depth, parentLayout, ladder) {
     const total = nodes.length;
     for (let i = 0; i < total; i++) {
       const node = nodes[i];
-      const pos = { index: i, total, parentLayout, depth };
+      const pos = { index: i, total, parentLayout, depth, ladder };
       const decided = await decide(node, ancestorName, pos, opts);
       let contextForChildren = node.name;
       if (!decided.skip && decided.name) {
@@ -1092,22 +1092,36 @@
         contextForChildren = decided.name;
       }
       if ("children" in node) {
-        await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node));
+        await recurse(node.children, contextForChildren, opts, out, depth + 1, layoutOf(node), decided.childLadder);
       }
     }
   }
+  var LADDER_WORDS = ["", "content", "inner"];
+  function ladderWord(ladder) {
+    if (ladder <= 0) return "";
+    return LADDER_WORDS[Math.min(ladder, LADDER_WORDS.length - 1)];
+  }
+  function nextLadder(thisNodeScope, effectiveName, parentLadder) {
+    const childScope = pickScope(effectiveName);
+    if (childScope === null) return 0;
+    if (childScope === thisNodeScope) return parentLadder + 1;
+    return 1;
+  }
   async function decide(node, ancestorName, pos, opts) {
-    var _a;
-    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true };
-    if (node.type === "TEXT") return { skip: true };
-    if (node.type === "INSTANCE") return { skip: true };
-    if (node.locked) return { skip: true };
-    if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
+    const inheritedScope = ancestorName ? pickScope(ancestorName) : null;
+    const keep = () => ({ skip: true, childLadder: nextLadder(inheritedScope, node.name, pos.ladder) });
+    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return keep();
+    if (node.type === "TEXT") return keep();
+    if (node.type === "INSTANCE") return keep();
+    if (node.locked) return keep();
+    if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return keep();
     const token = await primaryToken(node);
-    const role = resolveRole(node, token, pos);
-    let scope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
+    let role = resolveRole(node, token, pos);
+    if ((role === "container" || role === "wrapper") && pos.ladder > 0) role = ladderWord(pos.ladder);
+    let scope = inheritedScope != null ? inheritedScope : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
     if (scope === role) scope = null;
-    return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
+    const name = layerNameFromRole(scope, role, { maxDepth: opts.maxDepth });
+    return { skip: false, name, childLadder: nextLadder(scope, name, pos.ladder) };
   }
   function resolveRole(node, token, pos) {
     if (isButtonLike(node)) return "button";

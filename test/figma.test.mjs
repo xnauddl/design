@@ -739,6 +739,39 @@ test('renameSelection — 영역 추론: 페이지 세로 스택의 첫=header, 
   assert.equal(after.get('fi'), 'footer-icon');
 });
 
+test('renameSelection — 중첩 컨테이너 사다리: 같은 맥락 깊어지면 content→inner(숫자 없음)', async () => {
+  installFigma();
+  // header(영역) 안에 컨테이너가 3겹 — 모두 'header-container'로 반복되던 케이스.
+  const deep3 = { type: 'FRAME', id: 'd3', name: 'Frame', children: [
+    { type: 'VECTOR', id: 'v3a', name: 'Vector' }, { type: 'VECTOR', id: 'v3b', name: 'Vector' },
+  ] };
+  const deep2 = { type: 'FRAME', id: 'd2', name: 'Frame', children: [deep3, { type: 'VECTOR', id: 'x2', name: 'Vector' }] };
+  const deep1 = { type: 'FRAME', id: 'd1', name: 'Frame', children: [deep2, { type: 'VECTOR', id: 'x1', name: 'Vector' }] };
+  const header = { type: 'FRAME', id: 'hd', name: 'Frame', children: [deep1, { type: 'VECTOR', id: 'hx', name: 'Vector' }] };
+  const footer = { type: 'FRAME', id: 'ft', name: 'Frame', children: [] };
+  const page = { type: 'FRAME', id: 'page', name: 'Frame', layoutMode: 'VERTICAL', children: [header, footer] };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('hd'), 'header'); // 영역
+  assert.equal(after.get('d1'), 'header-content'); // 1단계 중첩 → content
+  assert.equal(after.get('d2'), 'header-inner'); // 2단계 → inner
+  assert.equal(after.get('d3'), 'header-inner'); // 3단계 이상 → inner 유지(숫자 안 붙임)
+  assert.equal(after.get('hx'), 'header-icon'); // 맥락은 계속 header
+});
+
+test('renameSelection — 맥락 없는 컨테이너는 사다리 안 탐(그대로 container)', async () => {
+  installFigma();
+  // scope=null 이면 반복 위험이 작아(그냥 container) 사다리 미적용.
+  const inner = { type: 'FRAME', id: 'in', name: 'Frame', children: [
+    { type: 'VECTOR', id: 'iv1', name: 'Vector' }, { type: 'VECTOR', id: 'iv2', name: 'Vector' },
+  ] };
+  const root = { type: 'FRAME', id: 'rt', name: 'Frame', children: [inner, { type: 'VECTOR', id: 'rv', name: 'Vector' }] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('rt'), 'container'); // 맥락 없는 루트
+  assert.equal(after.get('in'), 'container'); // 맥락 없으니 사다리 안 탐
+});
+
 test('renameSelection — 버튼 추론: 오토레이아웃+라운드+채움+텍스트 → button', async () => {
   installFigma();
   const btn = {
