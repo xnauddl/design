@@ -1978,6 +1978,21 @@
           await postPrereq();
           break;
         }
+        case "GET_GLOBAL_COLORS": {
+          const cols = await figma.variables.getLocalVariableCollectionsAsync();
+          const globalCol = cols.find((c) => c.name === GLOBAL);
+          const colors = [];
+          if (globalCol) {
+            const mode = globalCol.defaultModeId;
+            for (const v of await figma.variables.getLocalVariablesAsync()) {
+              if (v.variableCollectionId !== globalCol.id || v.resolvedType !== "COLOR") continue;
+              const raw = v.valuesByMode[mode];
+              if (raw && typeof raw === "object" && "r" in raw) colors.push({ name: v.name, hex: rgbToHex(raw) });
+            }
+          }
+          post({ type: "GLOBAL_COLORS", colors });
+          break;
+        }
         case "RESIZE": {
           const c = clampSize(msg.width, msg.height);
           figma.ui.resize(c.w, c.h);

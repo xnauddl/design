@@ -257,6 +257,12 @@ $('btnCreateApply').addEventListener('click', () => {
 
 $('btnColorRoles').addEventListener('click', applyColorRoles); // #3 색 편집표 → 시맨틱 매핑
 
+$('btnScanGlobals').addEventListener('click', () => {
+  // #10: 기존 Global 색에서 시맨틱 역할 추천(재방문 매핑).
+  setStatus('semStatus', '기존 색 스캔 중…', '');
+  send({ type: 'GET_GLOBAL_COLORS' });
+});
+
 $('btnSemantics').addEventListener('click', () => {
   const map: Record<string, string> = {};
   for (const line of ($('semMap') as HTMLTextAreaElement).value.split('\n')) {
@@ -876,6 +882,15 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'COLLECTIONS':
       // 존재 확인용 프로브(별도 UI 없음).
+      break;
+    case 'GLOBAL_COLORS':
+      // #10: 기존 Global 색에서 역할 추천 → 시맨틱 매핑 textarea 채움(재방문 매핑).
+      if (!msg.colors.length) {
+        setStatus('semStatus', '기존 Global 색 변수가 없습니다 — 먼저 토큰을 생성하세요.', 'warn');
+      } else {
+        setSemMapText(suggestSemanticMap(msg.colors));
+        setStatus('semStatus', `기존 색 ${msg.colors.length}개에서 역할 추천 — 확인 후 ‘시맨틱 별칭 생성’.`, 'ok');
+      }
       break;
     case 'PREREQ_STATE':
       // #11: 단계 전제 갱신 → 통합 게이트 재평가.

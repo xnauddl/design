@@ -98,7 +98,7 @@
 - [x] 동일 hue 충돌 **접미사 인덱스**(`blue`, `blue-2`) `(PR #37)`
 - [x] 시맨틱 매핑 **일반화**(`suggestSemanticMap(colors)`) — 추출 색에서도 역할 추천(실제 이름 지시) `(PR #37)`
 - [x] 추출 색 **편집표**(hue·역할 표시·역할 확정·반영) + **추출 Global hue 버킷팅**(`nameColorsByHue`, 충돌 접미사) `(PR #37)`
-- [ ] **기존 Global 스캔**(재방문 매핑) — code.ts가 기존 색 변수 공급
+- [x] **기존 Global 스캔**(재방문 매핑) — `GET_GLOBAL_COLORS`로 기존 Global 색을 읽어 `suggestSemanticMap` 추천(‘기존 색에서 추천’ 버튼) `(PR #39)`
 - [ ] 전 토큰 역할 어휘 확장 (색 우선→spacing/radius/size; **size=icon 최소·effects=후순위 보류**)
 - [x] **단위 토큰 단일화** — 비-px lineHeight/letterSpacing을 px FLOAT 단일로(스냅샷 폐기) + 원본 단위는 `Variable.description`("160%"), 내보내기 우선(`unitDescription`) `(PR #38)`
 
