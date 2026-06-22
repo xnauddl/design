@@ -112,3 +112,33 @@
 - [ ] 명도 대비 **후속 보정**(텍스트색 기본 + 배경 옵션)
 - [ ] **변경 이력 제거**
 - [ ] 내보내기 미리보기 **비목표**(현행 유지)
+
+---
+
+## 9. 구현 진행 현황 — 개발 환경 이전용 핸드오프 (2026-06-22)
+> v2 우선순위 **①(공통 선택형 미리보기 트리)** 착수. 파일럿 = **리네임(#7·#7b·#13)**.
+> 작업 브랜치 **`feat/preview-tree-rename`**(`main`에서 분기). 엔진·테스트·메시지·핸들러는 **완료(커밋됨)**, **UI는 미착수**.
+
+### 9.1 환경 이전 절차
+- 작업본은 커밋 `원격 이전을 위한 로컬 작업본 임시 커밋`에 들어 있고 **origin에 푸시함**.
+- 새 환경: `git fetch && git checkout feat/preview-tree-rename` → `npm test`(빌드+테스트, **109 pass** 확인) → 아래 9.3부터 이어서.
+- 임시 커밋이라 UI 완료 후 정리(squash)·정식 커밋 권장. (참고: README에 §5 Team 티어 "지금은 구현 안 함" 메모 1줄이 미커밋 상태일 수 있음 — 본 작업과 무관.)
+
+### 9.2 완료(커밋됨 · 순수 로직 `node --test` 통과)
+- [x] `src/shared/messages.ts` — `PreservedReason`·`RenameNode{id,type,before,after,changed,depth,parentId,preserved}` 추가. `RENAME_RESULT`에 `nodes`+`capped` 추가. 신규 `APPLY_RENAME{renames:{id,after}[]}`(UI→code)·`RENAME_APPLIED{count}`(code→UI).
+- [x] `src/lib/rename.ts` — **전체 서브트리** 방출(`RenameNode[]`), `changes`는 파생(하위호환). 안전 상한 `MAX_NODES=5000`. **#7b-1** 루트 컨테이너 항상 보존, **#7b-2** 인스턴스 하위 서브트리 스킵. 자식 맥락은 **의미 있는 이름만** 전파(기본명·토큰베낌명 잡음 차단).
+- [x] `src/code.ts` — `RENAME`이 `nodes`+`capped` 전송. 신규 `APPLY_RENAME` 핸들러(`getNodeByIdAsync`로 체크분만 직접 적용=WYSIWYG, 소실 노드 graceful skip, `record`+`commitUndo`).
+- [x] `test/figma.test.mjs` — 단일 기본명 루트를 쓰던 6개 테스트를 보존 루트 하위로 래핑, **신규 3개**(#7b-1·#7b-2·트리 출력). 총 109 pass.
+- [x] `dist/code.js` 재빌드 반영.
+
+### 9.3 다음 작업 — UI (미착수, 여기서 이어서)
+- [ ] **공통 트리 컴포넌트** `renderSelectableTree(host, rows, opts)` → `{getChecked, setAll, count}` (ui.ts). row=`{id,parentId,depth,label,detail,checkable,checked,muted,chip,hasChildren}`. 기본: 영향 노드 체크·강조, **체크 가능한 후손이 없는 컨테이너는 접힘**, 부모 체인 가시성 토글(▸/▾).
+- [ ] **리네임 어댑터** `renderRenameTree(nodes, applied, capped)` — `RenameNode→row` 매핑. 보존 라벨: root=루트·instance=인스턴스·component=컴포넌트·text=텍스트·locked=잠김·named=유지.
+- [ ] `ui.html` 리네임 카드(약 247–260행): `#diff`→`#renameTree`로 교체 + 툴바(전체 선택/해제·개수) + 트리 CSS(들여쓰기·토글·체크박스·강조/회색·사유 칩).
+- [ ] `ui.ts` 배선: `RENAME_RESULT`(716행)에서 `lastRenameNodes` 저장 후 트리 렌더(`renderDiff` 대체). `btnRename`(216행)을 `RENAME apply:true`→**체크분 수집 후 `APPLY_RENAME`**로 변경. `btnPreview`(205행)는 `RENAME apply:false` 유지. `RENAME_APPLIED` 핸들러 추가. 구 `renderDiff`(872행) 제거.
+- [ ] **마법사 경로 유지**: `ui.ts:384`는 `RENAME apply:true`로 전체 적용 후 `r.changes.length` 사용 — 그대로 동작해야 함(회귀 확인).
+- [ ] 빌드(`npm run build`) + Figma 수동 로드로 미리보기→선택→적용 검증.
+
+### 9.4 후속 PR (이 트리 컴포넌트 재사용)
+- [ ] **#6 바인딩** 트리 미리보기 + `APPLY_SELECTED`(=WYSIWYG). `bind.ts`에 `BindCandidate[]` 신설(dry-run 시 채움).
+- [ ] **#1 컴포넌트 등록** — 선택 디자인 **하위 picker**. 신규 `SCAN_COMPONENT_CANDIDATES`→트리→`REGISTER_COMPONENTS{nodeIds}`.
