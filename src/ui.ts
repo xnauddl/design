@@ -766,9 +766,8 @@ $('btnExport').addEventListener('click', () => {
   const format = ($('exportFormat') as HTMLSelectElement).value as ExportFormat;
   const fontSizeUnit = ($('exportFontUnit') as HTMLSelectElement).value as 'px' | 'rem';
   const base = Number(($('base') as HTMLInputElement).value) || 16;
-  const includeSnapshots = ($('exportSnap') as HTMLInputElement).checked;
   setStatus('exportStatus', '내보내는 중…', '');
-  send({ type: 'EXPORT', format, fontSizeUnit, base, includeSnapshots });
+  send({ type: 'EXPORT', format, fontSizeUnit, base });
 });
 
 $('btnDownloadExport').addEventListener('click', () => {

@@ -548,6 +548,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             type: v.resolvedType,
             kind: kindOf(v),
           };
+          if (v.description) t.description = v.description; // #16: 원본 단위("160%") 내보내기 우선
           if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
             const target = nameById.get((raw as VariableAlias).id);
             if (!target) continue; // 대상 불명 → 스킵
@@ -564,7 +565,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           format: msg.format,
           fontSizeUnit: msg.fontSizeUnit,
           base: msg.base,
-          includeSnapshots: msg.includeSnapshots,
         });
         post({ type: 'EXPORT_RESULT', format: msg.format, content });
         break;

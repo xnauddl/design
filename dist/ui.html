@@ -374,7 +374,6 @@
             <option value="rem">rem</option>
           </select>
         </label>
-        <label class="inline"><input id="exportSnap" type="checkbox" /> px 스냅샷 포함</label>
       </div>
       <div class="row">
         <button id="btnExport" class="primary">내보내기</button>
@@ -1605,9 +1604,8 @@
     const format = $("exportFormat").value;
     const fontSizeUnit = $("exportFontUnit").value;
     const base = Number($("base").value) || 16;
-    const includeSnapshots = $("exportSnap").checked;
     setStatus("exportStatus", "\uB0B4\uBCF4\uB0B4\uB294 \uC911\u2026", "");
-    send({ type: "EXPORT", format, fontSizeUnit, base, includeSnapshots });
+    send({ type: "EXPORT", format, fontSizeUnit, base });
   });
   $("btnDownloadExport").addEventListener("click", () => {
     const content = $("exportOut").value;

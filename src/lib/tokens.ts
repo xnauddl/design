@@ -103,12 +103,20 @@ export function resolvedTypeFor(category: TokenCategory): ResolvedType {
   }
 }
 
-/** 단위까지 반영한 토큰별 타입. 비-px lineHeight/letterSpacing은 STRING(코드용 진실). */
+/**
+ * 토큰별 변수 타입. #16: lineHeight/letterSpacing은 단위와 무관하게 **px FLOAT 단일**
+ * (원본 단위값 "160%"는 Variable.description에 저장, 내보내기에서 우선 출력).
+ */
 export function resolvedTypeForToken(t: { category: TokenCategory; unit?: Unit }): ResolvedType {
-  if ((t.category === 'lineHeight' || t.category === 'letterSpacing') && t.unit && t.unit !== 'px') {
-    return 'STRING';
-  }
   return resolvedTypeFor(t.category);
+}
+
+/** #16: 비-px 단위면 description용 단위 문자열("160%"), px/단위없음이면 undefined. */
+export function unitDescription(t: { category: TokenCategory; unit?: Unit; value: string | number }): string | undefined {
+  if ((t.category === 'lineHeight' || t.category === 'letterSpacing') && t.unit && t.unit !== 'px' && typeof t.value === 'number') {
+    return stringValueForUnit(t.value, t.unit);
+  }
+  return undefined;
 }
 
 /** 비-px 단위의 STRING 표현(코드용). 예: percent 150 → "150%", rem 1.5 → "1.5rem". */
@@ -175,9 +183,8 @@ const VALID_SCOPES: Record<ResolvedType, ReadonlySet<ScopeName>> = {
 };
 
 /**
- * 스코프 목록을 변수 타입에 유효한 것만 남긴다. 비-px lineHeight/letterSpacing은 STRING이라
- * LINE_HEIGHT/LETTER_SPACING(FLOAT 전용) 스코프를 못 받는다 — Figma가 거부하므로 사전 차단.
- * (px 스냅샷 FLOAT 변수는 그대로 LINE_HEIGHT 스코프를 가진다.)
+ * 스코프 목록을 변수 타입에 유효한 것만 남긴다(Figma가 타입에 안 맞는 스코프를 거부하므로 사전 차단).
+ * #16: lineHeight/letterSpacing은 px FLOAT이라 LINE_HEIGHT/LETTER_SPACING 스코프를 그대로 받는다.
  */
 export function scopesForType(scopes: ScopeName[], type: ResolvedType): ScopeName[] {
   const ok = VALID_SCOPES[type];

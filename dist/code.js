@@ -50,10 +50,13 @@
     }
   }
   function resolvedTypeForToken(t) {
-    if ((t.category === "lineHeight" || t.category === "letterSpacing") && t.unit && t.unit !== "px") {
-      return "STRING";
-    }
     return resolvedTypeFor(t.category);
+  }
+  function unitDescription(t) {
+    if ((t.category === "lineHeight" || t.category === "letterSpacing") && t.unit && t.unit !== "px" && typeof t.value === "number") {
+      return stringValueForUnit(t.value, t.unit);
+    }
+    return void 0;
   }
   function stringValueForUnit(value, unit) {
     switch (unit) {
@@ -435,24 +438,11 @@
       const g = upsertVariable(t.name, globalCol, type, idx);
       summary[g.created ? "created" : "updated"]++;
       summary.globals++;
-      setGlobalLiteral(g.variable, gMode, t, type);
+      setGlobalLiteral(g.variable, gMode, t, type, base);
       g.variable.scopes = scopesForType(scopesForSources(t.sources), type);
       g.variable.hiddenFromPublishing = true;
-      if (type === "STRING" && t.unit && t.unit !== "px" && typeof t.value === "number") {
-        const grp = t.category === "lineHeight" ? "line-height" : "letter-spacing";
-        const pxName = `${numberTokenName(grp, t.value)}-${t.unit}-px`;
-        const gpx = upsertVariable(pxName, globalCol, "FLOAT", idx);
-        gpx.variable.setValueForMode(gMode, toPx(t.value, t.unit, { base, fontSize: base }));
-        gpx.variable.scopes = scopesForType(scopesForSources(t.sources), "FLOAT");
-        gpx.variable.hiddenFromPublishing = true;
-        summary[gpx.created ? "created" : "updated"]++;
-        summary.globals++;
-        const spx = upsertVariable(pxName, semanticCol, "FLOAT", idx);
-        spx.variable.setValueForMode(sMode, figma.variables.createVariableAlias(gpx.variable));
-        spx.variable.scopes = scopesForType(scopesForSources(t.sources), "FLOAT");
-        summary[spx.created ? "created" : "updated"]++;
-        summary.semantics++;
-      }
+      const desc = unitDescription(t);
+      if (desc) g.variable.description = desc;
       const s = upsertVariable(t.name, semanticCol, type, idx);
       s.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g.variable));
       s.variable.scopes = scopesForType(scopesForSources(t.sources), type);
@@ -482,29 +472,19 @@
     };
     for (const t of tokens) {
       tally(gId, t.name, "globals");
-      const type = resolvedTypeForToken(t);
-      if (type === "STRING" && t.unit && t.unit !== "px" && typeof t.value === "number") {
-        const grp = t.category === "lineHeight" ? "line-height" : "letter-spacing";
-        const pxName = `${numberTokenName(grp, t.value)}-${t.unit}-px`;
-        tally(gId, pxName, "globals");
-        tally(sId, pxName, "semantics");
-      }
       tally(sId, t.name, "semantics");
     }
     return summary;
   }
-  function setGlobalLiteral(v, modeId, t, type) {
+  function setGlobalLiteral(v, modeId, t, type, base) {
     if (type === "COLOR") {
       const { r, g, b } = hexToRgb(String(t.value));
       v.setValueForMode(modeId, { r, g, b, a: 1 });
     } else if (type === "STRING") {
-      if (t.unit && t.unit !== "px" && typeof t.value === "number") {
-        v.setValueForMode(modeId, stringValueForUnit(t.value, t.unit));
-      } else {
-        v.setValueForMode(modeId, String(t.value));
-      }
+      v.setValueForMode(modeId, String(t.value));
     } else {
-      v.setValueForMode(modeId, Number(t.value));
+      const num = t.unit && t.unit !== "px" && typeof t.value === "number" ? toPx(t.value, t.unit, { base, fontSize: base }) : Number(t.value);
+      v.setValueForMode(modeId, num);
     }
   }
   async function prunePaletteColors(keep) {
@@ -1159,7 +1139,6 @@
   }
 
   // src/lib/exporters.ts
-  var isSnapshot = (name) => /-px$/.test(name);
   var WEIGHT_NAMES = {
     thin: 100,
     hairline: 100,
@@ -1195,6 +1174,7 @@
     return `${n}px`;
   }
   function cssLiteral(token, opts) {
+    var _a;
     switch (token.kind) {
       case "color":
         return String(token.value);
@@ -1204,7 +1184,7 @@
         return String(token.value);
       case "lineHeight":
       case "letterSpacing":
-        return token.type === "FLOAT" ? `${Number(token.value)}px` : String(token.value);
+        return (_a = token.description) != null ? _a : `${Number(token.value)}px`;
       case "fontWeight":
         return String(splitWeightStyle(token.value).weight);
       case "fontSize":
@@ -1248,7 +1228,7 @@
   };
   var w3cRef = (name) => `{${name.split("/").filter(Boolean).join(".")}}`;
   function w3cValue(token, opts) {
-    var _a;
+    var _a, _b;
     if (token.aliasOf) return w3cRef(token.aliasOf);
     switch (token.kind) {
       case "color":
@@ -1256,7 +1236,7 @@
         return String(token.value);
       case "lineHeight":
       case "letterSpacing":
-        return token.type === "FLOAT" ? `${Number(token.value)}px` : String(token.value);
+        return (_a = token.description) != null ? _a : `${Number(token.value)}px`;
       case "opacity":
         return Number(token.value);
       case "fontWeight":
@@ -1267,7 +1247,7 @@
       case "size":
         return dimension(token, opts);
       default:
-        return (_a = token.value) != null ? _a : "";
+        return (_b = token.value) != null ? _b : "";
     }
   }
   function toW3C(tokens, opts) {
@@ -1300,8 +1280,7 @@
     return [...seen.values()];
   }
   function exportTokens(tokens, opts) {
-    let list = opts.includeSnapshots ? tokens : tokens.filter((t) => !isSnapshot(t.name));
-    list = dedupeByName(list);
+    const list = dedupeByName(tokens);
     return opts.format === "css" ? toCss(list, opts) : toW3C(list, opts);
   }
 
@@ -2080,6 +2059,7 @@
               type: v.resolvedType,
               kind: kindOf(v)
             };
+            if (v.description) t.description = v.description;
             if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
               const target = nameById.get(raw.id);
               if (!target) continue;
@@ -2095,8 +2075,7 @@
           const content = exportTokens(tokens, {
             format: msg.format,
             fontSizeUnit: msg.fontSizeUnit,
-            base: msg.base,
-            includeSnapshots: msg.includeSnapshots
+            base: msg.base
           });
           post({ type: "EXPORT_RESULT", format: msg.format, content });
           break;
