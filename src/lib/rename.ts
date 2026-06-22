@@ -100,8 +100,16 @@ function resolveRole(node: SceneNode, token: ParsedToken | null): string {
     }
     case 'FRAME':
     case 'GROUP':
-    case 'SECTION':
-      return 'children' in node && node.children.length === 1 ? 'wrapper' : 'container';
+    case 'SECTION': {
+      const count = 'children' in node ? node.children.length : 0;
+      if (count === 0) {
+        // 자식 없는 프레임: 색만 채웠으면 스와치, 이미지면 image, 비었으면 container.
+        if (hasImageFill(node)) return 'image';
+        if (hasColorFill(node)) return 'swatch';
+        return 'container';
+      }
+      return count === 1 ? 'wrapper' : 'container';
+    }
     default:
       return kebab(node.type);
   }
@@ -171,6 +179,12 @@ function hasVisibleFill(node: SceneNode): boolean {
 function hasImageFill(node: SceneNode): boolean {
   const f = paints(node, 'fills');
   return !!f && f.some((p) => p.visible !== false && p.type === 'IMAGE');
+}
+
+/** 보이는 색(단색·그라데이션, 이미지 제외) 채움이 있는지 — 스와치 판정용. */
+function hasColorFill(node: SceneNode): boolean {
+  const f = paints(node, 'fills');
+  return !!f && f.some((p) => p.visible !== false && p.type !== 'IMAGE');
 }
 
 function hasVisibleStroke(node: SceneNode): boolean {

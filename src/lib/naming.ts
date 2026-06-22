@@ -20,6 +20,7 @@ export const ROLE_VOCAB = [
   'icon',
   'image',
   'background',
+  'swatch',
   'border',
   'divider',
   'badge',
@@ -116,6 +117,7 @@ const PRIMITIVE_NS = new Set([
 /** 토큰 경로 말단(leaf)이 역할 어휘일 때의 매핑(핵심 어휘). */
 const LEAF_ROLE: Record<string, Role> = {
   background: 'background', bg: 'background', fill: 'background', surface: 'background',
+  swatch: 'swatch', sample: 'swatch',
   border: 'border', stroke: 'border', outline: 'border',
   icon: 'icon', glyph: 'icon',
   divider: 'divider', separator: 'divider', rule: 'divider',

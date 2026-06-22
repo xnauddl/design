@@ -583,9 +583,37 @@ test('renameSelection — 구 리네임이 남긴 토큰 베낌 이름(color-121
   };
   const { changes } = await renameSelection([frame], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  // 원시 토큰은 신호 없음 → 기하 폴백(빈 프레임 → container), 'color-121210'에서 벗어남
-  assert.equal(after.get('f'), 'container');
+  // 원시 토큰은 신호 없음 → 색만 채운 빈 프레임 → swatch, 'color-121210'에서 벗어남
+  assert.equal(after.get('f'), 'swatch');
   assert.notEqual(frame.name, 'color-121210');
+});
+
+test('renameSelection — swatch 규칙: 색만 채운 빈 프레임 → swatch, 이미지 → image, 빈 → container', async () => {
+  installFigma();
+  const swatch = { type: 'FRAME', id: 's', name: 'Frame 1', fills: [{ type: 'SOLID', visible: true }], children: [] };
+  const imageFrame = { type: 'FRAME', id: 'im', name: 'Frame 2', fills: [{ type: 'IMAGE', visible: true }], children: [] };
+  const emptyFrame = { type: 'FRAME', id: 'e', name: 'Frame 3', children: [] };
+  const { changes } = await renameSelection([swatch, imageFrame, emptyFrame], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('s'), 'swatch'); // 색만 채운 빈 프레임 → swatch
+  assert.equal(after.get('im'), 'image'); // 이미지 채움 → image
+  assert.equal(after.get('e'), 'container'); // 빈 프레임 → container
+});
+
+test('renameSelection — 색이 있어도 자식이 있으면 스와치가 아니라 컨테이너', async () => {
+  installFigma();
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Frame 1',
+    fills: [{ type: 'SOLID', visible: true }],
+    children: [
+      { type: 'VECTOR', id: 'ci', name: 'Vector 1' },
+      { type: 'VECTOR', id: 'ci2', name: 'Vector 2' },
+    ],
+  };
+  const { changes } = await renameSelection([card], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('card'), 'container'); // 색+자식 다수 → container(스와치 아님)
+  assert.equal(after.get('ci'), 'container-icon'); // 맥락 전파 확인
 });
 
 test('renameSelection — 기하 신호: 얇은 막대→divider, 이미지 타원→avatar', async () => {
