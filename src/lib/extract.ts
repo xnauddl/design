@@ -11,6 +11,8 @@ import {
   numberTokenName,
   opacityTokenName,
 } from './tokens';
+import { classifyColorScale, colorScaleName } from './palette';
+import { dedupeName } from './naming';
 
 interface Accumulator {
   map: Map<string, DraftToken>;
@@ -170,10 +172,28 @@ export interface ExtractResult {
   warnings: string[];
 }
 
+/**
+ * 추출 색(category 'color')을 팔레트와 동일한 `color/{family}/{step}`로 개명한다.
+ * hex로 정렬해 결정적 순서를 만들고, 같은 family/step 버킷에 둘 이상이 들어오면 `dedupeName`이
+ * `-2`, `-3` 접미사를 붙인다(앞 색 값이 덮어써지는 upsert 충돌 방지). effectColor(그림자색)는
+ * 팔레트 개념이 아니므로 'shadow/color/{hex}' 그대로 둔다.
+ */
+function nameColorsByScale(acc: Accumulator): void {
+  const colors = [...acc.map.values()]
+    .filter((t) => t.category === 'color')
+    .sort((a, b) => String(a.value).localeCompare(String(b.value)));
+  const taken = new Set<string>();
+  for (const t of colors) {
+    const { family, step } = classifyColorScale(String(t.value));
+    t.name = dedupeName(colorScaleName(family, step), taken);
+  }
+}
+
 /** 현재 선택(자식 포함)에서 토큰 후보를 추출. */
 export function extractFromSelection(selection: readonly SceneNode[]): ExtractResult {
   const acc: Accumulator = { map: new Map(), warnings: new Set() };
   for (const node of selection) walk(acc, node);
+  nameColorsByScale(acc);
   const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
   return { tokens, warnings: [...acc.warnings] };
 }

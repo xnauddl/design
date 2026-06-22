@@ -141,12 +141,12 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
   const byName = new Map(tokens.map((t) => [t.name, t]));
 
   assert.equal(warnings.length, 0);
-  // 색상
-  assert.equal(byName.get('color/ff0000')?.category, 'color');
-  assert.equal(byName.get('color/000000')?.category, 'color');
-  assert.equal(byName.get('color/0000ff')?.category, 'color');
+  // 색상 — 팔레트와 동일한 color/{family}/{step} 체계(OKLCH 분류)
+  assert.equal(byName.get('color/red/400')?.category, 'color'); // #ff0000
+  assert.equal(byName.get('color/neutral/950')?.category, 'color'); // #000000
+  assert.equal(byName.get('color/blue/600')?.category, 'color'); // #0000ff
   // 검정은 한 번만(dedup)
-  assert.equal(tokens.filter((t) => t.name === 'color/000000').length, 1);
+  assert.equal(tokens.filter((t) => t.name === 'color/neutral/950').length, 1);
   // 타이포
   assert.equal(byName.get('font-size/24')?.category, 'fontSize');
   assert.equal(byName.get('font-family/Inter')?.category, 'fontFamily');
@@ -183,9 +183,9 @@ test('extractFromSelection — 그림자색은 채움색과 이름 분리(P1) + 
   const byName = new Map(tokens.map((t) => [t.name, t]));
 
   // 채움색과 그림자색이 서로 다른 이름 → upsert 충돌/스코프 덮어쓰기 없음
-  assert.equal(byName.get('color/000000')?.category, 'color');
-  assert.equal(byName.get('shadow/color/000000')?.category, 'effectColor');
-  assert.notEqual('color/000000', 'shadow/color/000000');
+  assert.equal(byName.get('color/neutral/950')?.category, 'color'); // 채움 #000000
+  assert.equal(byName.get('shadow/color/000000')?.category, 'effectColor'); // 그림자색은 hex 유지
+  assert.notEqual('color/neutral/950', 'shadow/color/000000');
   // P2: 그림자 수치는 'shadow/' 계층
   assert.equal(byName.get('shadow/blur/4')?.category, 'effectFloat');
   assert.equal(byName.get('shadow/spread/1')?.category, 'effectFloat');
@@ -193,6 +193,25 @@ test('extractFromSelection — 그림자색은 채움색과 이름 분리(P1) + 
   assert.equal(byName.get('shadow/y/2')?.category, 'effectFloat');
   // P3: 불투명도 0.5 → 'opacity/50'(값은 그대로 0.5)
   assert.equal(byName.get('opacity/50')?.value, 0.5);
+});
+
+test('extractFromSelection — 같은 family/step 버킷 충돌은 결정적 접미사(-2)', () => {
+  installFigma();
+  // 두 파랑은 모두 color/blue/500으로 분류됨 → 이름 충돌 → 뒤(큰 hex)에 -2
+  const a = {
+    type: 'RECTANGLE', id: 'a', name: 'A',
+    fills: [{ type: 'SOLID', color: { r: 51 / 255, g: 102 / 255, b: 1 }, visible: true }], // #3366ff
+  };
+  const b = {
+    type: 'RECTANGLE', id: 'b', name: 'B',
+    fills: [{ type: 'SOLID', color: { r: 58 / 255, g: 107 / 255, b: 1 }, visible: true }], // #3a6bff
+  };
+  const { tokens } = extractFromSelection([a, b]);
+  const names = tokens.filter((t) => t.category === 'color').map((t) => t.name).sort();
+
+  assert.deepEqual(names, ['color/blue/500', 'color/blue/500-2']);
+  // 두 색 모두 보존(값 손실 없음) — 서로 다른 변수
+  assert.equal(tokens.filter((t) => t.category === 'color').length, 2);
 });
 
 test('extractFromSelection — 그라디언트 채움은 경고', () => {

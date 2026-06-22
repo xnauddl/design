@@ -24,6 +24,8 @@ import {
   generatePalette,
   paletteToDraftTokens,
   suggestSemanticMap,
+  colorScaleName,
+  classifyColorScale,
   mod360,
   scopeForSemanticRole,
 } from '../dist/pure.mjs';
@@ -172,4 +174,28 @@ test('suggestSemanticMap — 존재 패밀리에만 역할 배정', () => {
   assert.equal(map2['surface'], undefined);
   assert.equal(map2['success'], undefined);
   assert.equal(map2['primary'], 'color/primary/500');
+});
+
+test('classifyColorScale — 추출 색을 팔레트와 동일한 family/step로 분류', () => {
+  assert.equal(colorScaleName('primary', 500), 'color/primary/500');
+
+  // 무채색(채도 낮음) → neutral, 양 끝 명도
+  assert.deepEqual(classifyColorScale('#ffffff'), { family: 'neutral', step: 50 });
+  assert.deepEqual(classifyColorScale('#000000'), { family: 'neutral', step: 950 });
+  assert.equal(classifyColorScale('#121210').family, 'neutral'); // 거의 검정
+
+  // 유채색 → hue 버킷
+  assert.equal(classifyColorScale('#ff0000').family, 'red');
+  assert.equal(classifyColorScale('#3366ff').family, 'blue');
+  assert.equal(classifyColorScale('#00ff00').family, 'green');
+
+  // step은 항상 STEPS 중 하나
+  for (const hex of ['#ff0000', '#3366ff', '#00ff00']) {
+    assert.ok(STEPS.includes(classifyColorScale(hex).step));
+  }
+
+  // 팔레트 생성과 추출이 같은 변수 이름을 산출(동일 체계) — primary/500 스와치를 다시 분류하면 blue 계열
+  const draft = paletteToDraftTokens(generatePalette({ brand: { primary: '#3366ff' } }));
+  const p500 = draft.find((t) => t.name === 'color/primary/500');
+  assert.ok(p500); // 팔레트가 colorScaleName으로 명명
 });

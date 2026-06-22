@@ -155,6 +155,234 @@
     return `opacity/${Math.round(value * 100)}`;
   }
 
+  // src/lib/color.ts
+  var mod360 = (h) => (h % 360 + 360) % 360;
+  function srgbToLinear(c) {
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+  function linearRgbToOklab(r, g, b) {
+    const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+    const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+    const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+    const l_ = Math.cbrt(l);
+    const m_ = Math.cbrt(m);
+    const s_ = Math.cbrt(s);
+    return {
+      L: 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
+      a: 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
+      b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_
+    };
+  }
+  function oklabToOklch(lab) {
+    const c = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
+    const h = c < 1e-7 ? 0 : mod360(Math.atan2(lab.b, lab.a) * 180 / Math.PI);
+    return { l: lab.L, c, h };
+  }
+  function rgbToOklch(rgb) {
+    return oklabToOklch(linearRgbToOklab(srgbToLinear(rgb.r), srgbToLinear(rgb.g), srgbToLinear(rgb.b)));
+  }
+  function hexToOklch(hex) {
+    return rgbToOklch(hexToRgb(hex));
+  }
+  function relativeLuminance(rgb) {
+    const r = srgbToLinear(rgb.r);
+    const g = srgbToLinear(rgb.g);
+    const b = srgbToLinear(rgb.b);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  function contrastRatio(a, b) {
+    const la = relativeLuminance(a);
+    const lb = relativeLuminance(b);
+    const hi = Math.max(la, lb);
+    const lo = Math.min(la, lb);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  // src/lib/palette.ts
+  var STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+  var lerp = (a, b, t) => a + (b - a) * t;
+  var LOW_CHROMA = 0.03;
+  function colorScaleName(family, step) {
+    return `color/${family}/${step}`;
+  }
+  var HUE_FAMILIES = [
+    { name: "red", h: 29 },
+    { name: "orange", h: 60 },
+    { name: "yellow", h: 100 },
+    { name: "green", h: 142 },
+    { name: "teal", h: 195 },
+    { name: "blue", h: 264 },
+    { name: "purple", h: 310 },
+    { name: "pink", h: 350 }
+  ];
+  var STEP_L = STEPS.map((step, i) => ({
+    step,
+    l: lerp(0.97, 0.16, i / (STEPS.length - 1))
+  }));
+  function hueDist(a, b) {
+    const d = Math.abs(mod360(a) - mod360(b));
+    return Math.min(d, 360 - d);
+  }
+  function classifyColorScale(hex) {
+    const { l, c, h } = hexToOklch(hex);
+    const family = c < LOW_CHROMA ? "neutral" : HUE_FAMILIES.reduce((best, f) => hueDist(h, f.h) < hueDist(h, best.h) ? f : best).name;
+    const step = STEP_L.reduce((best, s) => Math.abs(l - s.l) < Math.abs(l - best.l) ? s : best).step;
+    return { family, step };
+  }
+
+  // src/lib/naming.ts
+  var ROLE_VOCAB = [
+    // 구조
+    "container",
+    "wrapper",
+    "content",
+    "group",
+    // 영역
+    "header",
+    "body",
+    "footer",
+    "leading",
+    "trailing",
+    // 요소
+    "icon",
+    "image",
+    "background",
+    "swatch",
+    "border",
+    "divider",
+    "badge",
+    "avatar",
+    // 시맨틱(영역/컴포넌트) — 인식·정리 + 일부 구조 추론
+    "nav",
+    "hero",
+    "main",
+    "sidebar",
+    "section",
+    "button",
+    "card",
+    "list",
+    "item",
+    "field",
+    "tab",
+    "chip",
+    "label",
+    "title"
+  ];
+  var ROLE_SET = new Set(ROLE_VOCAB);
+  function isKnownRole(seg) {
+    return ROLE_SET.has(seg);
+  }
+  function kebab(input) {
+    return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s_/]+/g, "-").replace(/[^a-zA-Z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+  }
+  function layerNameFromRole(ancestorName, role, opts = {}) {
+    const ctx = ancestorName ? kebab(ancestorName) : "";
+    const parts = limitDepth([...ctx ? ctx.split("-") : [], kebab(role)], opts.maxDepth);
+    return parts.filter(Boolean).join("-");
+  }
+  function limitDepth(segs, maxDepth = 3) {
+    if (segs.length <= maxDepth) return segs;
+    return segs.slice(segs.length - maxDepth);
+  }
+  var DEFAULT_NAME_RE = /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( \d+)?( copy( \d+)?)?$/;
+  function isDefaultName(name) {
+    const n = name.trim();
+    if (!n) return true;
+    return DEFAULT_NAME_RE.test(n);
+  }
+  var PRIMITIVE_NS = /* @__PURE__ */ new Set([
+    "color",
+    "colour",
+    "spacing",
+    "space",
+    "gap",
+    "padding",
+    "size",
+    "sizing",
+    "radius",
+    "border-radius",
+    "opacity",
+    "font",
+    "font-size",
+    "font-weight",
+    "line-height",
+    "letter-spacing",
+    "number",
+    "dimension",
+    "width",
+    "height",
+    "elevation",
+    "shadow",
+    "z"
+  ]);
+  var LEAF_ROLE = {
+    background: "background",
+    bg: "background",
+    fill: "background",
+    surface: "background",
+    swatch: "swatch",
+    sample: "swatch",
+    border: "border",
+    stroke: "border",
+    outline: "border",
+    icon: "icon",
+    glyph: "icon",
+    divider: "divider",
+    separator: "divider",
+    rule: "divider",
+    image: "image",
+    img: "image",
+    picture: "image",
+    thumbnail: "image",
+    avatar: "avatar",
+    badge: "badge",
+    dot: "badge",
+    indicator: "badge"
+  };
+  function parseTokenName(tokenName) {
+    var _a;
+    const segs = tokenName.split("/").map((s) => s.trim()).filter(Boolean);
+    if (!segs.length) return { roleLeaf: null, context: null, primitive: false };
+    if (PRIMITIVE_NS.has(kebab(segs[0]))) return { roleLeaf: null, context: null, primitive: true };
+    const roleLeaf = (_a = LEAF_ROLE[kebab(segs[segs.length - 1])]) != null ? _a : null;
+    const ctxSegs = roleLeaf ? segs.slice(0, -1) : segs;
+    const context = ctxSegs.length ? ctxSegs.map(kebab).filter(Boolean).join("-") : null;
+    return { roleLeaf, context, primitive: false };
+  }
+  var UNIT_WORDS = /* @__PURE__ */ new Set(["percent", "px", "em", "rem", "ratio", "pt"]);
+  function isTokenValue(v) {
+    if (/^[0-9a-f]{6}$/.test(v)) return true;
+    return v.split("-").every((s) => /^\d+$/.test(s) || UNIT_WORDS.has(s));
+  }
+  var GENERIC_ROLES = /* @__PURE__ */ new Set(["container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
+  function pickScope(name) {
+    const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
+    if (!segs.length) return null;
+    const known = segs.filter(isKnownRole);
+    return known.length ? known[known.length - 1] : segs[segs.length - 1];
+  }
+  function isTokenEchoName(name) {
+    const n = name.trim().toLowerCase();
+    for (const ns of PRIMITIVE_NS) {
+      if (n.startsWith(ns + "-")) {
+        const value = n.slice(ns.length + 1);
+        if (value && isTokenValue(value)) return true;
+      }
+    }
+    return false;
+  }
+  function dedupeName(name, taken) {
+    if (!taken.has(name)) {
+      taken.add(name);
+      return name;
+    }
+    let i = 2;
+    while (taken.has(`${name}-${i}`)) i++;
+    const out = `${name}-${i}`;
+    taken.add(out);
+    return out;
+  }
+
   // src/lib/extract.ts
   var round = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
   function keyOf(category, value, unit) {
@@ -278,9 +506,18 @@
     collectEffects(acc, node);
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
+  function nameColorsByScale(acc) {
+    const colors = [...acc.map.values()].filter((t) => t.category === "color").sort((a, b) => String(a.value).localeCompare(String(b.value)));
+    const taken = /* @__PURE__ */ new Set();
+    for (const t of colors) {
+      const { family, step } = classifyColorScale(String(t.value));
+      t.name = dedupeName(colorScaleName(family, step), taken);
+    }
+  }
   function extractFromSelection(selection2) {
     const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set() };
     for (const node of selection2) walk(acc, node);
+    nameColorsByScale(acc);
     const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
     return { tokens, warnings: [...acc.warnings] };
   }
@@ -834,148 +1071,6 @@
     }
   }
 
-  // src/lib/naming.ts
-  var ROLE_VOCAB = [
-    // 구조
-    "container",
-    "wrapper",
-    "content",
-    "group",
-    // 영역
-    "header",
-    "body",
-    "footer",
-    "leading",
-    "trailing",
-    // 요소
-    "icon",
-    "image",
-    "background",
-    "swatch",
-    "border",
-    "divider",
-    "badge",
-    "avatar",
-    // 시맨틱(영역/컴포넌트) — 인식·정리 + 일부 구조 추론
-    "nav",
-    "hero",
-    "main",
-    "sidebar",
-    "section",
-    "button",
-    "card",
-    "list",
-    "item",
-    "field",
-    "tab",
-    "chip",
-    "label",
-    "title"
-  ];
-  var ROLE_SET = new Set(ROLE_VOCAB);
-  function isKnownRole(seg) {
-    return ROLE_SET.has(seg);
-  }
-  function kebab(input) {
-    return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s_/]+/g, "-").replace(/[^a-zA-Z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
-  }
-  function layerNameFromRole(ancestorName, role, opts = {}) {
-    const ctx = ancestorName ? kebab(ancestorName) : "";
-    const parts = limitDepth([...ctx ? ctx.split("-") : [], kebab(role)], opts.maxDepth);
-    return parts.filter(Boolean).join("-");
-  }
-  function limitDepth(segs, maxDepth = 3) {
-    if (segs.length <= maxDepth) return segs;
-    return segs.slice(segs.length - maxDepth);
-  }
-  var DEFAULT_NAME_RE = /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( \d+)?( copy( \d+)?)?$/;
-  function isDefaultName(name) {
-    const n = name.trim();
-    if (!n) return true;
-    return DEFAULT_NAME_RE.test(n);
-  }
-  var PRIMITIVE_NS = /* @__PURE__ */ new Set([
-    "color",
-    "colour",
-    "spacing",
-    "space",
-    "gap",
-    "padding",
-    "size",
-    "sizing",
-    "radius",
-    "border-radius",
-    "opacity",
-    "font",
-    "font-size",
-    "font-weight",
-    "line-height",
-    "letter-spacing",
-    "number",
-    "dimension",
-    "width",
-    "height",
-    "elevation",
-    "shadow",
-    "z"
-  ]);
-  var LEAF_ROLE = {
-    background: "background",
-    bg: "background",
-    fill: "background",
-    surface: "background",
-    swatch: "swatch",
-    sample: "swatch",
-    border: "border",
-    stroke: "border",
-    outline: "border",
-    icon: "icon",
-    glyph: "icon",
-    divider: "divider",
-    separator: "divider",
-    rule: "divider",
-    image: "image",
-    img: "image",
-    picture: "image",
-    thumbnail: "image",
-    avatar: "avatar",
-    badge: "badge",
-    dot: "badge",
-    indicator: "badge"
-  };
-  function parseTokenName(tokenName) {
-    var _a;
-    const segs = tokenName.split("/").map((s) => s.trim()).filter(Boolean);
-    if (!segs.length) return { roleLeaf: null, context: null, primitive: false };
-    if (PRIMITIVE_NS.has(kebab(segs[0]))) return { roleLeaf: null, context: null, primitive: true };
-    const roleLeaf = (_a = LEAF_ROLE[kebab(segs[segs.length - 1])]) != null ? _a : null;
-    const ctxSegs = roleLeaf ? segs.slice(0, -1) : segs;
-    const context = ctxSegs.length ? ctxSegs.map(kebab).filter(Boolean).join("-") : null;
-    return { roleLeaf, context, primitive: false };
-  }
-  var UNIT_WORDS = /* @__PURE__ */ new Set(["percent", "px", "em", "rem", "ratio", "pt"]);
-  function isTokenValue(v) {
-    if (/^[0-9a-f]{6}$/.test(v)) return true;
-    return v.split("-").every((s) => /^\d+$/.test(s) || UNIT_WORDS.has(s));
-  }
-  var GENERIC_ROLES = /* @__PURE__ */ new Set(["container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
-  function pickScope(name) {
-    const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
-    if (!segs.length) return null;
-    const known = segs.filter(isKnownRole);
-    return known.length ? known[known.length - 1] : segs[segs.length - 1];
-  }
-  function isTokenEchoName(name) {
-    const n = name.trim().toLowerCase();
-    for (const ns of PRIMITIVE_NS) {
-      if (n.startsWith(ns + "-")) {
-        const value = n.slice(ns.length + 1);
-        if (value && isTokenValue(value)) return true;
-      }
-    }
-    return false;
-  }
-
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const changes = [];
@@ -1468,24 +1563,6 @@
       groups.push({ base, properties, members, missing });
     }
     return { groups, singles };
-  }
-
-  // src/lib/color.ts
-  function srgbToLinear(c) {
-    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  }
-  function relativeLuminance(rgb) {
-    const r = srgbToLinear(rgb.r);
-    const g = srgbToLinear(rgb.g);
-    const b = srgbToLinear(rgb.b);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  }
-  function contrastRatio(a, b) {
-    const la = relativeLuminance(a);
-    const lb = relativeLuminance(b);
-    const hi = Math.max(la, lb);
-    const lo = Math.min(la, lb);
-    return (hi + 0.05) / (lo + 0.05);
   }
 
   // src/lib/contrast.ts

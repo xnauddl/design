@@ -178,7 +178,7 @@ export function paletteToDraftTokens(p: PaletteResult): DraftToken[] {
   for (const scale of p.scales) {
     for (const sw of scale.swatches) {
       tokens.push({
-        name: `color/${scale.family}/${sw.step}`,
+        name: colorScaleName(scale.family, sw.step),
         category: 'color',
         value: sw.hex,
         sources: ['fill'],
@@ -186,4 +186,50 @@ export function paletteToDraftTokens(p: PaletteResult): DraftToken[] {
     }
   }
   return tokens;
+}
+
+/* ---------- 색 스케일 명칭 (팔레트·추출 공용) ---------- */
+
+/** 색 스케일 변수 이름 — 팔레트 생성과 추출이 동일 체계를 쓰도록 공유. 예: colorScaleName('primary',500)='color/primary/500'. */
+export function colorScaleName(family: string, step: number): string {
+  return `color/${family}/${step}`;
+}
+
+/** OKLCH hue(도) 기준 명명 버킷 중심. 가장 가까운 중심의 이름을 family로 채택(pure 색의 OKLCH hue 근사). */
+const HUE_FAMILIES: ReadonlyArray<{ name: string; h: number }> = [
+  { name: 'red', h: 29 },
+  { name: 'orange', h: 60 },
+  { name: 'yellow', h: 100 },
+  { name: 'green', h: 142 },
+  { name: 'teal', h: 195 },
+  { name: 'blue', h: 264 },
+  { name: 'purple', h: 310 },
+  { name: 'pink', h: 350 },
+];
+
+/** 표준 명도 램프(buildScale 기본 [0.97,0.16])의 스텝별 목표 L. 추출 색의 step 매칭에 사용. */
+const STEP_L: ReadonlyArray<{ step: number; l: number }> = STEPS.map((step, i) => ({
+  step,
+  l: lerp(0.97, 0.16, i / (STEPS.length - 1)),
+}));
+
+/** 두 hue(도) 사이 원형 거리(0~180). */
+function hueDist(a: number, b: number): number {
+  const d = Math.abs(mod360(a) - mod360(b));
+  return Math.min(d, 360 - d);
+}
+
+/**
+ * 추출한 임의 색 → 팔레트와 동일한 {family, step}.
+ * - 채도가 매우 낮으면(LOW_CHROMA 미만) family='neutral' (hue 불안정 → 회색 취급).
+ * - 그 외에는 OKLCH hue를 가장 가까운 명명 버킷에, L을 가장 가까운 스텝에 매칭.
+ */
+export function classifyColorScale(hex: string): { family: string; step: number } {
+  const { l, c, h } = hexToOklch(hex);
+  const family =
+    c < LOW_CHROMA
+      ? 'neutral'
+      : HUE_FAMILIES.reduce((best, f) => (hueDist(h, f.h) < hueDist(h, best.h) ? f : best)).name;
+  const step = STEP_L.reduce((best, s) => (Math.abs(l - s.l) < Math.abs(l - best.l) ? s : best)).step;
+  return { family, step };
 }
