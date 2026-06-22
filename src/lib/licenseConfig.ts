@@ -17,3 +17,9 @@ export const LICENSE_ALG = 'ES256';
 
 /** 검증 서버 공개키(JWK, ES256/P-256) — 자리표시. 배포 시 실제 공개키로 교체. */
 export const LICENSE_PUBLIC_JWK = { kty: 'EC', crv: 'P-256', x: 'PLACEHOLDER', y: 'PLACEHOLDER' };
+
+/** 구매(체크아웃) 페이지 — LemonSqueezy 결제 링크(자리표시). 배포 시 교체. */
+export const PURCHASE_URL = 'https://example.lemonsqueezy.com/buy/PLACEHOLDER';
+
+/** 구독·결제·기기 관리(LemonSqueezy Customer Portal, 자리표시). 배포 시 교체. */
+export const PORTAL_URL = 'https://app.lemonsqueezy.com/my-orders';

@@ -3,10 +3,10 @@
    ============================================================ */
 import type { UiToCode, CodeToUi } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
-import { FREE_LIMITS, type Tier } from './lib/entitlements';
+import { type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
-import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
+import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import { type HistoryEntry, formatHistory, serializeHistory } from './lib/history';
 import type { ExportFormat } from './lib/exporters';
@@ -28,9 +28,8 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
 let history: HistoryEntry[] = [];
-let isTeam = false;
-let isPro = false;
-let teamDataRequested = false;
+let isPaid = false;
+let paidDataRequested = false;
 let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 
@@ -173,9 +172,18 @@ $('btnRename').addEventListener('click', () => {
   send({ type: 'RENAME', apply: true, maxDepth });
 });
 
-$('tier').addEventListener('change', () => {
-  send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
-});
+// 개발용 강제 티어 토글 — 개발 빌드에서만 노출/동작(배포 빌드 백도어 차단).
+if (__DEV__) {
+  $('tier').addEventListener('change', () => {
+    send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
+  });
+} else {
+  $('devTierRow').style.display = 'none';
+}
+
+// 구매(LemonSqueezy 체크아웃) · 구독/기기 관리(Customer Portal) — 새 탭으로 이동.
+$('btnBuy').addEventListener('click', () => window.open(PURCHASE_URL, '_blank'));
+$('btnManage').addEventListener('click', () => window.open(PORTAL_URL, '_blank'));
 
 $('btnVerify').addEventListener('click', () => {
   const key = ($('licenseKey') as HTMLInputElement).value.trim();
@@ -233,23 +241,24 @@ async function verifyAndReport(key: string): Promise<void> {
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
 
-/* ---------- 팀 기능 게이트 (M3 프리셋 · M3.1 이력, Team) ---------- */
-const TEAM_FIELDS = [
+/* ---------- 유료(Paid) 기능 게이트 (토큰 생성·시맨틱·컴포넌트·프리셋/이력) ---------- */
+const PAID_FIELDS = [
+  // 컴포넌트/베리언트
+  'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps',
+  // 공유 프리셋
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
+  // 변경 이력
   'btnRefreshHistory', 'btnExportHistory', 'btnClearHistory', 'historyJson',
 ];
 
-const PRO_FIELDS = ['btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps'];
-
-function updateTeamGate(): void {
-  for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
-  for (const id of PRO_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPro;
-  const lock = isTeam ? '' : '🔒 Team 전용';
+function updateGate(): void {
+  for (const id of PAID_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPaid;
+  const lock = isPaid ? '' : '🔒 Paid 전용';
   $('presetLock').textContent = lock;
   $('historyLock').textContent = lock;
-  $('componentLock').textContent = isPro ? '' : '🔒 Pro 전용';
-  if (isTeam && !teamDataRequested) {
-    teamDataRequested = true;
+  $('componentLock').textContent = lock;
+  if (isPaid && !paidDataRequested) {
+    paidDataRequested = true;
     send({ type: 'GET_PRESETS' });
     send({ type: 'GET_HISTORY' });
   }
@@ -481,18 +490,17 @@ window.onmessage = (event: MessageEvent) => {
             : '없음';
       const exp = msg.expiresAt ? ` · 만료 ${new Date(msg.expiresAt).toISOString().slice(0, 10)}` : '';
       $('licenseInfo').textContent = `현재: ${msg.tier.toUpperCase()} (${srcLabel})${exp}`;
-      const cap = (n: number) => (msg.unlimited ? '∞' : String(n));
-      $('limitsInfo').textContent =
-        `1회 한도 — 노드 ${cap(FREE_LIMITS.nodes)} · 토큰 ${cap(FREE_LIMITS.tokens)} · 바인딩 ${cap(FREE_LIMITS.bindings)}`;
+      $('limitsInfo').textContent = msg.paid
+        ? 'Paid — 모든 기능 잠금 해제(토큰 생성·시맨틱·컴포넌트·프리셋/이력).'
+        : 'Free — 팔레트·리네임·바인딩·미리보기·내보내기. 토큰 생성·시맨틱·컴포넌트는 Paid.';
       // 개발용 토글은 검증 키가 없을 때만 의미가 있으므로, 키가 적용 중이면 표시만 동기화
-      if (msg.source !== 'key') ($('tier') as HTMLSelectElement).value = msg.tier;
+      if (__DEV__ && msg.source !== 'key') ($('tier') as HTMLSelectElement).value = msg.tier;
       if (msg.note) {
         const cls = /실패|오프라인/.test(msg.note) ? 'warn' : 'ok';
         setStatus('licenseStatus', msg.note, cls);
       }
-      isTeam = msg.tier === 'team';
-      isPro = msg.tier === 'pro' || msg.tier === 'team';
-      updateTeamGate();
+      isPaid = msg.paid;
+      updateGate();
       break;
     }
     case 'PRESETS':
@@ -553,9 +561,13 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'PREMIUM_REQUIRED': {
-      // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 팀 기능은 ‘관리’ 탭).
-      const statusId = msg.feature === 'components' ? 'componentStatus' : msg.feature === 'teamPresets' ? 'presetStatus' : 'createStatus';
-      setStatus(statusId, `${msg.message} (유료 기능: ${msg.feature})`, 'warn');
+      // 기능에 맞는 카드 영역으로 라우팅.
+      const statusId =
+        msg.feature === 'components' ? 'componentStatus'
+        : msg.feature === 'presets' ? 'presetStatus'
+        : msg.feature === 'semantics' ? 'semStatus'
+        : 'createStatus';
+      setStatus(statusId, `${msg.message} ‘요금제 / 라이선스’에서 업그레이드하세요.`, 'warn');
       break;
     }
     case 'REQUEST_VERIFY':
@@ -680,8 +692,8 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
 }
 
-// 초기: 컬렉션 조회(존재 확인용) + 라이선스 상태 조회. 팀 카드는 Team 확인 전까지 잠금.
-updateTeamGate();
+// 초기: 컬렉션 조회(존재 확인용) + 라이선스 상태 조회. 유료 카드는 Paid 확인 전까지 잠금.
+updateGate();
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_LICENSE' });
