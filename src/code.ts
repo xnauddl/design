@@ -10,6 +10,7 @@ import { renameSelection } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { classifyVariants, missingVariants, variantGrid, inferComponentProperties } from './lib/components';
+import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
@@ -197,6 +198,66 @@ function postSelection(): void {
   post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped });
 }
 figma.on('selectionchange', postSelection);
+
+/* ---------- 명도 대비 점검(읽기 전용) ----------
+   선택 하위의 텍스트 노드마다 글자색(첫 단색 채움)과 유효 배경(가장 가까운 상위
+   단색 채움)을 뽑아 ContrastSample로 만든다. 판정은 순수 모듈(contrast.ts)에 위임.
+   한계: 부분 투명·겹친 형제·범위별 혼합색은 다루지 않고 사유별로 건너뛴다. */
+const CONTRAST_SCAN_CAP = 2000;
+
+/** 노드의 첫 '보이는 단색' 채움 hex. 없거나 혼합(mixed)이면 null. */
+function solidFillHex(node: SceneNode): string | null {
+  const fills = (node as { fills?: readonly Paint[] | typeof figma.mixed }).fills;
+  if (!Array.isArray(fills)) return null; // figma.mixed 또는 fills 없음
+  for (const p of fills) {
+    if (p.type === 'SOLID' && p.visible !== false && (p.opacity ?? 1) > 0) return rgbToHex(p.color);
+  }
+  return null;
+}
+
+/** 텍스트 위로 올라가며 가장 가까운 상위의 단색 배경 hex. 없으면 null. */
+function effectiveBgHex(node: SceneNode): string | null {
+  let cur: BaseNode | null = node.parent;
+  while (cur && cur.type !== 'PAGE' && cur.type !== 'DOCUMENT') {
+    const hex = solidFillHex(cur as SceneNode);
+    if (hex) return hex;
+    cur = cur.parent;
+  }
+  return null;
+}
+
+function collectContrastSamples(sel: readonly SceneNode[]): { samples: ContrastSample[]; skipped: Record<string, number> } {
+  const samples: ContrastSample[] = [];
+  const skipped: Record<string, number> = {};
+  const note = (k: string): void => {
+    skipped[k] = (skipped[k] ?? 0) + 1;
+  };
+  const stack: SceneNode[] = sel.slice();
+  let scanned = 0;
+  while (stack.length) {
+    if (scanned >= CONTRAST_SCAN_CAP) {
+      note('capped');
+      break;
+    }
+    const n = stack.pop() as SceneNode;
+    scanned++;
+    if (n.type === 'TEXT' && n.visible) {
+      const fg = solidFillHex(n);
+      if (!fg) note('no-fill'); // 단색 글자색 없음(혼합/이미지/그라데이션 등)
+      else {
+        const bg = effectiveBgHex(n);
+        if (!bg) note('no-bg'); // 상위에 단색 배경이 없음
+        else {
+          const fontSize = typeof n.fontSize === 'number' ? n.fontSize : 16; // 혼합이면 보수적 기본값
+          const bold = typeof n.fontWeight === 'number' ? n.fontWeight >= 700 : false;
+          samples.push({ id: n.id, name: n.name, fg, bg, fontSize, bold });
+        }
+      }
+    }
+    if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
+  }
+  return { samples, skipped };
+}
 
 figma.ui.onmessage = async (msg: UiToCode) => {
   try {
@@ -518,6 +579,21 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'PROPERTIES_RESULT', created, props });
         if (created) commitUndo(figma); // UX2
+        break;
+      }
+      case 'CHECK_CONTRAST': {
+        // 읽기 전용 감사 — 쓰기/Undo/이력 없음. 추출은 figma, 판정은 순수 모듈.
+        const { samples, skipped } = collectContrastSamples(selection());
+        const report = checkContrast(samples, msg.level);
+        post({
+          type: 'CONTRAST_RESULT',
+          level: report.level,
+          checked: report.checked,
+          passed: report.passed,
+          failed: report.failed,
+          findings: report.findings,
+          skipped,
+        });
         break;
       }
     }

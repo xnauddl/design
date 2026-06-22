@@ -13,6 +13,8 @@ import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, suggestSemanticMap, type Harmony } from './lib/palette';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
+import type { WcagLevel } from './lib/contrast';
+import { planWizard, summarize, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -39,13 +41,14 @@ function renderTokens(): void {
   const box = $('tokenList');
   box.innerHTML = '';
   if (!tokens.length) {
-    // UX4: 빈 상태 — 선택 여부에 따라 안내 문구를 바꾼다.
+    // UX4: 빈 상태 — 선택 여부에 따라 안내 문구를 바꾼다(콜아웃 박스 + 배지).
     const empty = document.createElement('div');
-    empty.className = 'empty';
+    empty.className = 'ux';
     empty.innerHTML =
-      lastSelCount > 0
-        ? '선택에서 색·폰트·간격을 뽑습니다. <b>‘선택에서 토큰 추출’</b>을 누르세요.'
-        : '프레임을 선택한 뒤 <b>‘선택에서 토큰 추출’</b>을 누르면 색·폰트·간격이 후보로 잡힙니다. 예) 버튼·카드';
+      '<div class="ux-h"><span class="badge">UX4</span><span class="ux-t">빈 상태 도움말</span></div>' +
+      (lastSelCount > 0
+        ? '<div>선택에서 색·폰트·간격을 뽑습니다. <b>‘선택에서 토큰 추출’</b>을 누르세요.</div>'
+        : '<div>프레임을 선택한 뒤 <b>‘선택에서 토큰 추출’</b>을 누르면 색·폰트·간격이 후보로 잡힙니다. 예) 버튼·카드</div>');
     box.appendChild(empty);
     return;
   }
@@ -115,6 +118,16 @@ $('btnPalette').addEventListener('click', () => {
   );
 });
 
+/* ---------- UX4: 온보딩 카드 ---------- */
+$('btnOnboardClose').addEventListener('click', () => {
+  $('onboardCard').style.display = 'none';
+});
+$('btnGuide').addEventListener('click', () => {
+  showTab('tokens');
+  $('btnWizardRun').focus();
+  $('wizardCard').scrollIntoView({ block: 'start', behavior: 'smooth' });
+});
+
 /* ---------- 버튼 ---------- */
 $('btnExtract').addEventListener('click', () => send({ type: 'EXTRACT' }));
 
@@ -168,10 +181,218 @@ $('btnPreview').addEventListener('click', () => {
   send({ type: 'RENAME', apply: false, maxDepth });
 });
 
+$('btnContrast').addEventListener('click', () => {
+  const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
+  setStatus('contrastStatus', '대비 검사 중…', '');
+  send({ type: 'CHECK_CONTRAST', level });
+});
+
 $('btnRename').addEventListener('click', () => {
   const maxDepth = Number(($('depth') as HTMLInputElement).value) || 3;
   send({ type: 'RENAME', apply: true, maxDepth });
 });
+
+/* ============================================================
+   시스템화 마법사 — 기존 메시지(추출→생성→시맨틱→바인딩→정돈→검수→컴포넌트화)를
+   순서대로 호출하는 UI 시퀀서. 신규 로직은 lib/wizard.ts(순수)에 분리.
+   기존 window.onmessage 스위치는 그대로 두고, 별도 리스너로 단계 완료를 await한다.
+   ============================================================ */
+let wizardRunning = false;
+// 한 번에 하나의 단계만 await(순차 실행)하므로 단일 대기자로 충분.
+let wizardWaiter: { types: string[]; resolve: (m: CodeToUi) => void; reject: (e: Error) => void } | null = null;
+
+window.addEventListener('message', (event: MessageEvent) => {
+  const m = (event.data as { pluginMessage?: CodeToUi }).pluginMessage;
+  if (!m) return;
+  // 바인딩 진행률(UX6)은 마법사 자체 진행바로 표시(‘적용’ 탭 진행바는 안 보임).
+  if (wizardRunning && m.type === 'PROGRESS' && m.op === 'bind') updateWizardBar(m.done, m.total);
+  if (!wizardWaiter) return;
+  // 오류/유료요구는 대기 중이면 해당 단계 실패로 처리(무한 대기 방지).
+  if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
+    const w = wizardWaiter;
+    wizardWaiter = null;
+    w.reject(new Error(m.message));
+    return;
+  }
+  if (wizardWaiter.types.includes(m.type)) {
+    const w = wizardWaiter;
+    wizardWaiter = null;
+    w.resolve(m);
+  }
+});
+
+/** 메시지를 보내고 기대 응답(또는 오류)까지 기다린다. 결과 타입은 expect로 좁혀진다. */
+function wizardRequest<T extends CodeToUi['type']>(msg: UiToCode, expect: T[]): Promise<Extract<CodeToUi, { type: T }>> {
+  return new Promise<Extract<CodeToUi, { type: T }>>((resolve, reject) => {
+    wizardWaiter = {
+      types: [...expect],
+      resolve: (m) => resolve(m as Extract<CodeToUi, { type: T }>),
+      reject,
+    };
+    send(msg);
+  });
+}
+
+function showWizardBar(): void {
+  $('wizardBar').style.display = '';
+  ($('wizardBarFill') as HTMLElement).style.width = '0%';
+}
+function updateWizardBar(done: number, total: number): void {
+  $('wizardBar').style.display = '';
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  ($('wizardBarFill') as HTMLElement).style.width = `${pct}%`;
+}
+function hideWizardBar(): void {
+  $('wizardBar').style.display = 'none';
+}
+
+/** 계획에 따라 단계 행을 그린다(번호·라벨·사유). 실행 안 할 단계는 skip 표시. */
+function renderWizardSteps(plan: WizardPlanItem[]): void {
+  const box = $('wizardSteps');
+  box.innerHTML = '';
+  plan.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'wstep' + (p.run ? '' : ' skip');
+    row.id = `wstep-${p.step.id}`;
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.textContent = String(i + 1);
+    const label = document.createElement('span');
+    label.className = 'wlabel';
+    label.textContent = p.step.label;
+    const note = document.createElement('span');
+    note.className = 'wnote';
+    note.textContent = p.run ? '' : p.skipReason ?? '건너뜀';
+    row.append(dot, label, note);
+    box.appendChild(row);
+  });
+}
+
+function setWizardStep(id: WizardStepId, state: 'active' | 'done' | 'fail', note: string): void {
+  const row = document.getElementById(`wstep-${id}`);
+  if (!row) return;
+  row.classList.remove('active', 'done', 'fail');
+  row.classList.add(state);
+  const dot = row.querySelector('.dot') as HTMLElement | null;
+  if (dot && state === 'done') dot.textContent = '✓';
+  if (dot && state === 'fail') dot.textContent = '!';
+  const n = row.querySelector('.wnote') as HTMLElement | null;
+  if (n) n.textContent = note;
+}
+
+async function runWizard(): Promise<void> {
+  if (wizardRunning) return;
+  if (lastSelCount <= 0) {
+    setStatus('wizardSummary', '먼저 프레임을 선택하세요 — 선택한 레이어에서 토큰을 추출합니다.', 'warn');
+    return;
+  }
+  // 설정값은 각 단계의 기존 입력 필드에서 읽는다(단일 출처).
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
+  const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
+  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 3;
+  const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
+  const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
+
+  const options: WizardOptions = {
+    semantics: ($('wizOptSemantics') as HTMLInputElement).checked,
+    contrast: ($('wizOptContrast') as HTMLInputElement).checked,
+    componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
+  };
+  const ctx: WizardContext = { isPro, hasSemanticMap: Object.keys(semMap).length > 0 };
+  const plan = planWizard(options, ctx);
+
+  wizardRunning = true;
+  ($('btnWizardRun') as HTMLButtonElement).disabled = true;
+  $('btnWizardCancel').style.display = '';
+  setStatus('wizardSummary', '실행 중…', '');
+  renderWizardSteps(plan);
+
+  const totals: WizardTotals = {};
+  let stopped = false;
+
+  for (const p of plan) {
+    if (!p.run) continue; // renderWizardSteps에서 이미 skip 표시
+    if (stopped) {
+      setWizardStep(p.step.id, 'fail', '이전 단계 중단으로 건너뜀');
+      continue;
+    }
+    setWizardStep(p.step.id, 'active', '진행 중…');
+    try {
+      switch (p.step.id) {
+        case 'extract': {
+          const r = await wizardRequest({ type: 'EXTRACT' }, ['EXTRACT_RESULT']);
+          tokens = r.tokens; // 모듈 변수 동기화(다음 단계 일관성)
+          if (!tokens.length) {
+            setWizardStep('extract', 'fail', '추출된 토큰 없음 — 색·폰트·간격이 있는 프레임을 선택하세요.');
+            stopped = true;
+            break;
+          }
+          setWizardStep('extract', 'done', `${tokens.length}개 후보`);
+          break;
+        }
+        case 'create': {
+          const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens, base }, ['CREATE_RESULT']);
+          totals.created = r.created + r.updated;
+          setWizardStep('create', 'done', r.limited ? `${r.created + r.updated}개 · ⚠ Free 한도 일부만` : `생성 ${r.created} · 갱신 ${r.updated}`);
+          break;
+        }
+        case 'semantics': {
+          const r = await wizardRequest({ type: 'CREATE_SEMANTICS', map: semMap }, ['SEMANTICS_RESULT']);
+          totals.semanticsAliased = r.aliased;
+          setWizardStep('semantics', 'done', `별칭 ${r.aliased}${r.missing.length ? ` · 누락 ${r.missing.length}` : ''}`);
+          break;
+        }
+        case 'bind': {
+          showWizardBar();
+          const r = await wizardRequest({ type: 'APPLY', tolerance }, ['APPLY_RESULT']);
+          hideWizardBar();
+          totals.bound = r.bound;
+          if (r.cancelled) {
+            setWizardStep('bind', 'done', `취소됨 — ${r.bound}건만 적용`);
+            stopped = true;
+            break;
+          }
+          setWizardStep('bind', 'done', `바인딩 ${r.bound}${r.skipped ? ` · 스킵 ${r.skipped}` : ''}`);
+          break;
+        }
+        case 'rename': {
+          const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth }, ['RENAME_RESULT']);
+          totals.renamed = r.changes.length;
+          setWizardStep('rename', 'done', `${r.changes.length}개 이름 적용`);
+          break;
+        }
+        case 'contrast': {
+          const r = await wizardRequest({ type: 'CHECK_CONTRAST', level }, ['CONTRAST_RESULT']);
+          totals.contrastChecked = r.checked;
+          totals.contrastFailed = r.failed;
+          // 미달 발견은 ‘실행 실패’가 아니라 ‘점검 결과’ — 흐름은 계속하되 주의 표시.
+          setWizardStep('contrast', r.failed ? 'fail' : 'done', r.checked === 0 ? '검사할 텍스트 없음' : `${r.checked - r.failed}/${r.checked} ${r.level} 통과`);
+          break;
+        }
+        case 'componentize': {
+          const reg = await wizardRequest({ type: 'REGISTER_COMPONENTS' }, ['COMPONENTS_RESULT']);
+          const cls = await wizardRequest({ type: 'CLASSIFY_VARIANTS' }, ['VARIANTS_RESULT']);
+          totals.components = reg.registered;
+          setWizardStep('componentize', 'done', `등록 ${reg.registered} · 세트 ${cls.sets}`);
+          break;
+        }
+      }
+    } catch (e) {
+      hideWizardBar();
+      const fe = explainError(e instanceof Error ? e.message : String(e));
+      setWizardStep(p.step.id, 'fail', `${fe.message}${fe.action ? ` — ${fe.action}` : ''}`);
+      stopped = true;
+    }
+  }
+
+  wizardRunning = false;
+  ($('btnWizardRun') as HTMLButtonElement).disabled = false;
+  $('btnWizardCancel').style.display = 'none';
+  setStatus('wizardSummary', `${stopped ? '중단' : '완료'} — ${summarize(totals)}`, stopped ? 'warn' : 'ok');
+}
+
+$('btnWizardRun').addEventListener('click', () => void runWizard());
+$('btnWizardCancel').addEventListener('click', () => send({ type: 'CANCEL' }));
 
 $('tier').addEventListener('change', () => {
   send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
@@ -248,6 +469,9 @@ function updateTeamGate(): void {
   $('presetLock').textContent = lock;
   $('historyLock').textContent = lock;
   $('componentLock').textContent = isPro ? '' : '🔒 Pro 전용';
+  // 마법사의 컴포넌트화 옵션도 Pro 게이팅(미Pro면 체크 불가).
+  $('wizComponentLock').textContent = isPro ? '' : '🔒 Pro';
+  ($('wizOptComponentize') as HTMLInputElement).disabled = !isPro;
   if (isTeam && !teamDataRequested) {
     teamDataRequested = true;
     send({ type: 'GET_PRESETS' });
@@ -552,6 +776,9 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('componentStatus', `컴포넌트 속성 ${msg.created}개 노출`, msg.created ? 'ok' : 'warn');
       break;
     }
+    case 'CONTRAST_RESULT':
+      renderContrast(msg);
+      break;
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 팀 기능은 ‘관리’ 탭).
       const statusId = msg.feature === 'components' ? 'componentStatus' : msg.feature === 'teamPresets' ? 'presetStatus' : 'createStatus';
@@ -584,6 +811,7 @@ const OP_STATUS: Record<string, string> = {
   CLASSIFY_VARIANTS: 'componentStatus',
   GENERATE_MISSING_VARIANTS: 'componentStatus',
   EXPOSE_PROPERTIES: 'componentStatus',
+  CHECK_CONTRAST: 'contrastStatus',
   GET_PRESETS: 'presetStatus',
   SAVE_PRESET: 'presetStatus',
   DELETE_PRESET: 'presetStatus',
@@ -643,6 +871,59 @@ function reasonsText(reasons: Record<string, number>): string {
     .join(' · ');
 }
 
+/* ---------- 명도 대비 점검 결과 렌더 ---------- */
+const CONTRAST_SKIP_LABELS: Record<string, string> = {
+  'no-fill': '단색 글자색 없음',
+  'no-bg': '배경 없음',
+  capped: '스캔 상한 도달',
+};
+function contrastSkipText(skipped: Record<string, number>): string {
+  return Object.entries(skipped)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${CONTRAST_SKIP_LABELS[k] ?? k} ${n}`)
+    .join(' · ');
+}
+
+function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): void {
+  const box = $('contrastList');
+  box.innerHTML = '';
+  const fails = msg.findings.filter((f) => !f.pass); // 실패 건만 나열(조치 대상)
+  for (const f of fails) {
+    const row = document.createElement('div');
+    row.className = 'cfind';
+
+    const pair = document.createElement('span');
+    pair.className = 'cpair';
+    for (const hex of [f.bg, f.fg]) {
+      const sw = document.createElement('span');
+      sw.className = 'swatch';
+      sw.style.background = hex;
+      pair.appendChild(sw);
+    }
+    row.appendChild(pair);
+
+    const name = document.createElement('span');
+    name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
+    row.appendChild(name);
+
+    const ratio = document.createElement('span');
+    ratio.className = 'ratio warn';
+    ratio.textContent = `${f.ratio} / ${f.required}`;
+    row.appendChild(ratio);
+
+    box.appendChild(row);
+  }
+  const skip = contrastSkipText(msg.skipped);
+  const skipNote = skip ? ` · 건너뜀: ${skip}` : '';
+  if (msg.checked === 0) {
+    setStatus('contrastStatus', `검사할 텍스트가 없습니다.${skip ? ` (건너뜀: ${skip})` : ' 텍스트가 있는 프레임을 선택하세요.'}`, 'warn');
+  } else if (fails.length === 0) {
+    setStatus('contrastStatus', `${msg.checked}개 모두 ${msg.level} 통과 ✓${skipNote}`, 'ok');
+  } else {
+    setStatus('contrastStatus', `${msg.checked}개 중 ${fails.length}개 ${msg.level} 미달${skipNote}`, 'warn');
+  }
+}
+
 /* ---------- UX6: 진행률 바 ---------- */
 function showApplyProgress(label: string): void {
   $('applyProgress').style.display = '';
@@ -697,6 +978,8 @@ function showTab(name: (typeof TABS)[number]): void {
     btn.setAttribute('aria-selected', String(on));
     btn.tabIndex = on ? 0 : -1; // UX8: roving tabindex — 탭 묶음은 한 번의 Tab 정지점
   }
+  // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
+  $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
 }
 TABS.forEach((t, i) => {
   const btn = $(`tabbtn-${t}`);

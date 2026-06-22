@@ -7,6 +7,7 @@ import type { LicenseStatus, VerifyResult } from '../lib/license';
 import type { Preset } from '../lib/presets';
 import type { HistoryEntry } from '../lib/history';
 import type { ExportFormat } from '../lib/exporters';
+import type { WcagLevel, ContrastFinding } from '../lib/contrast';
 
 export interface CollectionInfo {
   id: string;
@@ -41,7 +42,8 @@ export type UiToCode =
   | { type: 'REGISTER_COMPONENTS' } // Phase 3(Pro): 선택 프레임 → 메인 컴포넌트
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Pro): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Pro): 선택 세트의 빠진 조합 자동 생성
-  | { type: 'EXPOSE_PROPERTIES' }; // Phase 4.1(Pro): 컴포넌트 속성(Boolean/Text/Instance-swap) 노출
+  | { type: 'EXPOSE_PROPERTIES' } // Phase 4.1(Pro): 컴포넌트 속성(Boolean/Text/Instance-swap) 노출
+  | { type: 'CHECK_CONTRAST'; level: WcagLevel }; // 명도 대비 점검(읽기 전용 감사)
 
 /** code → UI 응답. */
 export type CodeToUi =
@@ -76,6 +78,8 @@ export type CodeToUi =
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[] } // Phase 3
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'PROPERTIES_RESULT'; created: number; props: string[] } // Phase 4.1
+  // 명도 대비 점검: 텍스트-배경 쌍 평가 결과 + 추출 단계에서 건너뛴 사유별 집계(skipped).
+  | { type: 'CONTRAST_RESULT'; level: WcagLevel; checked: number; passed: number; failed: number; findings: ContrastFinding[]; skipped: Record<string, number> }
   | { type: 'ERROR'; message: string; op?: string }; // op: 실패한 UiToCode 종류(상태 라우팅용)
 
 /** code → UI 안전 전송. */

@@ -16,6 +16,10 @@ import {
   kebab,
   layerNameFromToken,
   layerNameFromRole,
+  isDefaultName,
+  isTokenEchoName,
+  parseTokenName,
+  pickScope,
   dedupeName,
   hasEntitlement,
   limitsForTier,
@@ -51,6 +55,11 @@ import {
   commitUndo,
   explainError,
   nextTabIndex,
+  isLargeText,
+  requiredRatio,
+  checkPair,
+  evaluateSample,
+  checkContrast,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -129,6 +138,60 @@ test('layerNameFromRole — 상위 맥락 + 역할', () => {
   assert.equal(layerNameFromRole('button-primary', 'icon'), 'button-primary-icon');
   assert.equal(layerNameFromRole(null, 'container'), 'container');
   assert.equal(layerNameFromRole('a-b-c', 'icon', { maxDepth: 2 }), 'c-icon');
+});
+
+test('isDefaultName — Figma 기본명만 교체 대상', () => {
+  // 기본/자동 생성명 → 교체 대상
+  for (const n of ['Frame 12', 'Frame', 'Rectangle', 'Ellipse 3', 'Vector 7', 'Group 5 copy', 'Group 5 copy 2', 'Union', 'Line 2', '', '   ']) {
+    assert.equal(isDefaultName(n), true, n);
+  }
+  // 사람이 지은 의미 있는 이름 → 보존
+  for (const n of ['button', 'card-header', 'Root', 'icon', 'OriginalName', 'frame-wrapper', 'rectangle-bg']) {
+    assert.equal(isDefaultName(n), false, n);
+  }
+});
+
+test('isTokenEchoName — 구 리네임의 원시 토큰 베낌 이름만 교체 대상', () => {
+  // 원시 토큰 경로를 그대로 베낀 이름(스냅샷 단위 포함) → 교체 대상
+  for (const n of [
+    'color-121210', 'color-0066ff', 'spacing-16', 'line-height-1-5', 'opacity-50', 'radius-9999',
+    'letter-spacing-0-percent-px', 'line-height-150-percent-px', 'line-height-1-5-em',
+  ]) {
+    assert.equal(isTokenEchoName(n), true, n);
+  }
+  // 같은 네임스페이스라도 값이 단어면 사람 이름 → 보존
+  for (const n of ['color-picker', 'size-large', 'radius-full', 'spacing-control', 'button-primary', 'card-header']) {
+    assert.equal(isTokenEchoName(n), false, n);
+  }
+});
+
+test('pickScope — 깨끗한 맥락 1단계(숫자·단위·일반구조어 제거)', () => {
+  assert.equal(pickScope('card-header'), 'header'); // 알려진 역할 마지막
+  assert.equal(pickScope('button-primary'), 'button'); // 역할만 채택, primary 무시
+  assert.equal(pickScope('primary-button'), 'button');
+  assert.equal(pickScope('wrapper-2'), null); // 숫자 제거 후 일반구조어만 → null
+  assert.equal(pickScope('container'), null); // 일반 구조어는 맥락 안 됨
+  assert.equal(pickScope('letter-spacing-0-percent-px'), 'spacing'); // 단위·숫자 제거
+  assert.equal(pickScope('hero'), 'hero');
+  assert.equal(pickScope(''), null);
+});
+
+test('parseTokenName — 역할 말단/맥락 접두사/원시 토큰', () => {
+  // 시맨틱: 말단 background가 역할, 접두사가 맥락
+  assert.deepEqual(parseTokenName('button/primary/background'), {
+    roleLeaf: 'background', context: 'button-primary', primitive: false,
+  });
+  // 말단 별칭(fill→background, stroke→border)
+  assert.equal(parseTokenName('card/title/fill').roleLeaf, 'background');
+  assert.equal(parseTokenName('field/outline/stroke').roleLeaf, 'border');
+  assert.equal(parseTokenName('nav/avatar').roleLeaf, 'avatar');
+  // 역할 아닌 말단 → roleLeaf 없음, 전체 경로가 맥락
+  assert.deepEqual(parseTokenName('text/heading'), {
+    roleLeaf: null, context: 'text-heading', primitive: false,
+  });
+  // 원시(Global) 토큰 → 신호 없음
+  assert.deepEqual(parseTokenName('color/blue-500'), { roleLeaf: null, context: null, primitive: true });
+  assert.deepEqual(parseTokenName('spacing/16'), { roleLeaf: null, context: null, primitive: true });
 });
 
 test('dedupeName — 형제 충돌 -2/-3', () => {
@@ -534,4 +597,59 @@ test('nextTabIndex — 화살표 순환 + Home/End, 그 외 -1', () => {
   assert.equal(nextTabIndex('End', 0, 3), 2);
   assert.equal(nextTabIndex('Enter', 0, 3), -1); // 내비 키 아님
   assert.equal(nextTabIndex('ArrowRight', 0, 0), -1); // 빈 목록
+});
+
+/* ================= contrast.ts (명도 대비 점검) ================= */
+test('isLargeText — 24px↑ 또는 18.66px↑ + 볼드', () => {
+  assert.equal(isLargeText(24, false), true);
+  assert.equal(isLargeText(23.9, false), false);
+  assert.equal(isLargeText(19, true), true); // 14pt 볼드
+  assert.equal(isLargeText(19, false), false); // 볼드 아니면 미달
+  assert.equal(isLargeText(18, true), false); // 18.66px 미만
+});
+
+test('requiredRatio — level·large 매트릭스', () => {
+  assert.equal(requiredRatio('AA', false), 4.5);
+  assert.equal(requiredRatio('AA', true), 3);
+  assert.equal(requiredRatio('AAA', false), 7);
+  assert.equal(requiredRatio('AAA', true), 4.5);
+});
+
+test('checkPair — 흑/백 21(AA·AAA 통과), 회색쌍 미달', () => {
+  const bw = checkPair('#000000', '#ffffff');
+  assert.equal(bw.ratio, 21);
+  assert.equal(bw.aa, true);
+  assert.equal(bw.aaa, true);
+  const gray = checkPair('#888888', '#777777');
+  assert.equal(gray.aa, false);
+  assert.equal(gray.aaa, false);
+});
+
+test('evaluateSample — 큰 글자는 완화된 기준(AA 3) 적용', () => {
+  // 대비 ~3.x인 쌍: 일반 텍스트는 미달(4.5), 큰 글자는 통과(3).
+  const small = evaluateSample({ id: '1', name: 't', fg: '#767676', bg: '#ffffff', fontSize: 16, bold: false }, 'AA');
+  assert.equal(small.large, false);
+  assert.equal(small.required, 4.5);
+  assert.equal(small.pass, true); // #767676 on white ≈ 4.54
+  const big = evaluateSample({ id: '2', name: 't', fg: '#949494', bg: '#ffffff', fontSize: 30, bold: false }, 'AA');
+  assert.equal(big.large, true);
+  assert.equal(big.required, 3);
+  assert.equal(big.pass, true); // ≈3.1, 큰 글자 기준 통과
+  const bigSmallFail = evaluateSample({ id: '3', name: 't', fg: '#949494', bg: '#ffffff', fontSize: 16, bold: false }, 'AA');
+  assert.equal(bigSmallFail.pass, false); // 같은 색이라도 일반 텍스트면 미달
+});
+
+test('checkContrast — 집계 + 실패 우선·대비 낮은 순 정렬', () => {
+  const samples = [
+    { id: 'pass', name: '통과', fg: '#000000', bg: '#ffffff', fontSize: 16, bold: false }, // 21
+    { id: 'bad', name: '심각', fg: '#cccccc', bg: '#ffffff', fontSize: 16, bold: false }, // ≈1.6
+    { id: 'mid', name: '경계', fg: '#999999', bg: '#ffffff', fontSize: 16, bold: false }, // ≈2.8
+  ];
+  const r = checkContrast(samples, 'AA');
+  assert.equal(r.checked, 3);
+  assert.equal(r.passed, 1);
+  assert.equal(r.failed, 2);
+  // 실패가 앞으로, 실패 안에서는 대비 낮은(bad) 것이 먼저, 통과(pass)는 맨 뒤.
+  assert.deepEqual(r.findings.map((f) => f.id), ['bad', 'mid', 'pass']);
+  assert.equal(r.findings[2].pass, true);
 });
