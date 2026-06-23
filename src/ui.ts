@@ -1324,7 +1324,7 @@ function renderSelectableTree(
 /* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
 let renameNodes: RenameNode[] = []; // 마지막 미리보기 서브트리
 const renameChecked = new Set<string>(); // 체크된 영향 노드 id
-let renameHideContext = false; // 맥락(비영향) 숨기기 토글
+let renameHideContext = true; // 맥락(비영향) 숨기기 토글 — 기본 ON
 
 function affectedRenameCount(): number {
   return renameNodes.reduce((n, r) => n + (r.after !== undefined ? 1 : 0), 0);
@@ -1382,7 +1382,7 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
 let bindCandidates: BindCandidate[] = [];
 let bindNodes: BindNode[] = [];
 const bindChecked = new Set<string>(); // 체크된 후보 키
-let bindHideContext = false;
+let bindHideContext = true; // 기본 ON
 
 /** 후보 고유 키(노드+필드+인덱스). */
 function candKey(c: { nodeId: string; field: string; index?: number }): string {
@@ -1459,7 +1459,7 @@ function clearBindPreview(): void {
 /* ---------- 컴포넌트 등록(#1): 하위 후보 트리 + 선택 등록 ---------- */
 let compCandidates: ComponentCandidate[] = [];
 const compChecked = new Set<string>(); // 체크된 등록 후보(노드 id)
-let compHideContext = false;
+let compHideContext = true; // 기본 ON
 
 function compEligibleCount(): number {
   return compCandidates.reduce((n, c) => n + (c.eligible ? 1 : 0), 0);
