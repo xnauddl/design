@@ -407,10 +407,6 @@ $('bindAll').addEventListener('change', (e) => {
   renderBindTree();
 });
 
-$('bindHideCtx').addEventListener('change', (e) => {
-  bindHideContext = (e.target as HTMLInputElement).checked;
-  renderBindTree();
-});
 
 $('btnApplyCancel').addEventListener('click', () => {
   send({ type: 'CANCEL' }); // UX6: 취소 요청
@@ -444,10 +440,6 @@ $('renameAll').addEventListener('change', (e) => {
   renderRenameTree();
 });
 
-$('renameHideCtx').addEventListener('change', (e) => {
-  renameHideContext = (e.target as HTMLInputElement).checked;
-  renderRenameTree();
-});
 
 /* ============================================================
    시스템화 마법사 — 기존 메시지(추출→생성→시맨틱→바인딩→정돈→검수→컴포넌트화)를
@@ -837,10 +829,6 @@ $('compAll').addEventListener('change', (e) => {
   renderCompTree();
 });
 
-$('compHideCtx').addEventListener('change', (e) => {
-  compHideContext = (e.target as HTMLInputElement).checked;
-  renderCompTree();
-});
 
 $('btnClassifyVariants').addEventListener('click', () => {
   setStatus('componentStatus', t('component.classifying'), '');
@@ -1324,7 +1312,7 @@ function renderSelectableTree(
 /* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
 let renameNodes: RenameNode[] = []; // 마지막 미리보기 서브트리
 const renameChecked = new Set<string>(); // 체크된 영향 노드 id
-let renameHideContext = false; // 맥락(비영향) 숨기기 토글
+const renameHideContext = true; // 맥락(비영향) 노드는 항상 숨김(토글 없음)
 
 function affectedRenameCount(): number {
   return renameNodes.reduce((n, r) => n + (r.after !== undefined ? 1 : 0), 0);
@@ -1382,7 +1370,7 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
 let bindCandidates: BindCandidate[] = [];
 let bindNodes: BindNode[] = [];
 const bindChecked = new Set<string>(); // 체크된 후보 키
-let bindHideContext = false;
+const bindHideContext = true; // 항상 숨김(토글 없음)
 
 /** 후보 고유 키(노드+필드+인덱스). */
 function candKey(c: { nodeId: string; field: string; index?: number }): string {
@@ -1459,7 +1447,7 @@ function clearBindPreview(): void {
 /* ---------- 컴포넌트 등록(#1): 하위 후보 트리 + 선택 등록 ---------- */
 let compCandidates: ComponentCandidate[] = [];
 const compChecked = new Set<string>(); // 체크된 등록 후보(노드 id)
-let compHideContext = false;
+const compHideContext = true; // 항상 숨김(토글 없음)
 
 function compEligibleCount(): number {
   return compCandidates.reduce((n, c) => n + (c.eligible ? 1 : 0), 0);
