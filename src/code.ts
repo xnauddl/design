@@ -152,7 +152,7 @@ function requirePro(): boolean {
 }
 
 /** #6: 텍스트 범위 바인딩 필드(나머지는 노드 스칼라 필드). */
-const TEXT_BIND_FIELDS = new Set(['fontSize', 'lineHeight', 'letterSpacing']);
+const TEXT_BIND_FIELDS = new Set(['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily']);
 
 /**
  * #6: 미리보기에서 체크한 후보 1건을 재매칭 없이 그대로 바인딩한다.
@@ -231,6 +231,7 @@ function kindOf(v: Variable): TokenKind {
   if (sc.includes('LINE_HEIGHT')) return 'lineHeight';
   if (sc.includes('LETTER_SPACING')) return 'letterSpacing';
   if (sc.includes('OPACITY')) return 'opacity';
+  if (sc.includes('EFFECT_FLOAT')) return 'effectFloat';
   if (sc.includes('FONT_WEIGHT')) return 'fontWeight';
   if (sc.includes('FONT_FAMILY')) return 'fontFamily';
   const n = v.name;
@@ -240,6 +241,7 @@ function kindOf(v: Variable): TokenKind {
   if (n.startsWith('spacing')) return 'spacing';
   if (n.startsWith('radius')) return 'radius';
   if (n.startsWith('stroke-width')) return 'strokeWidth';
+  if (n.startsWith('shadow-') || n.startsWith('blur')) return 'effectFloat';
   if (n.startsWith('size')) return 'size';
   if (n.includes('font') && n.includes('weight')) return 'fontWeight';
   if (n.includes('font') && n.includes('family')) return 'fontFamily';

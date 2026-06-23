@@ -1160,6 +1160,7 @@
     scale("gap", "spacing", tshirtRoles);
     scale("radius", "radius", radiusRoles);
     scale("size", "size", tshirtRoles);
+    scale("strokeWidth", "stroke-width", tshirtRoles);
     scale("fontSize", "font-size", (vals) => fontSizeRoles(vals, base));
     for (const e of numericEntries(tokens2, "fontWeight")) map[`font-weight/${weightRole(e.value)}`] = e.name;
     const families = tokens2.filter((t2) => t2.category === "fontFamily" && typeof t2.value === "string");

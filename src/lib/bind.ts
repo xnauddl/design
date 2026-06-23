@@ -80,6 +80,9 @@ function addColorCand(preview: Preview | null, node: SceneNode, field: string, i
 function addFloatCand(preview: Preview | null, node: SceneNode, field: string, value: number, e: VarEntry): void {
   preview?.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : undefined });
 }
+function addStrCand(preview: Preview | null, node: SceneNode, field: string, value: string, e: VarEntry): void {
+  preview?.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
+}
 
 /** 미리보기 트리를 영향 노드 + 그 조상 체인으로 가지치기(pre-order 보존). */
 function pruneToAffected(nodeIndex: BindNode[], candidates: BindCandidate[]): BindNode[] {
@@ -248,6 +251,16 @@ function matchFloat(entries: VarEntry[], value: number, tol: number, scope?: Var
     }
   }
   return best;
+}
+
+function matchString(entries: VarEntry[], str: string, scope: VariableScope): VarEntry | null {
+  // STRING 변수는 정확 일치 + 용도(스코프). fontFamily가 다른 STRING에 붙는 오매칭 방지.
+  for (const e of entries) {
+    if (e.str !== str) continue;
+    if (!e.scopes.includes('ALL_SCOPES') && !e.scopes.includes(scope)) continue;
+    return e;
+  }
+  return null;
 }
 
 /* ---------- 노드 순회 바인딩 ---------- */
@@ -435,6 +448,21 @@ async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: 
   }
   if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === 'PIXELS') {
     tryBindText(node, 'letterSpacing', node.letterSpacing.value, entries, tol, res, apply, preview);
+  }
+  // fontFamily — STRING 변수(FONT_FAMILY)에 정확 일치 바인딩.
+  const fe = matchString(entries, node.fontName.family, 'FONT_FAMILY');
+  if (fe && node.characters.length > 0) {
+    if (!apply) {
+      res.bound++;
+      addStrCand(preview, node, 'fontFamily', node.fontName.family, fe);
+    } else {
+      try {
+        node.setRangeBoundVariable(0, node.characters.length, 'fontFamily', fe.variable);
+        res.bound++;
+      } catch {
+        skip(res, 'error');
+      }
+    }
   }
 }
 
