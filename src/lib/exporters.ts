@@ -15,6 +15,7 @@ export type TokenKind =
   | 'radius'
   | 'size'
   | 'strokeWidth'
+  | 'effectFloat'
   | 'lineHeight'
   | 'letterSpacing'
   | 'fontFamily'
@@ -104,6 +105,7 @@ function cssLiteral(token: ExportToken, opts: ExportOptions): string {
     case 'radius':
     case 'size':
     case 'strokeWidth':
+    case 'effectFloat':
       return dimension(token, opts);
     default:
       return String(token.value);
@@ -138,6 +140,7 @@ const W3C_TYPE: Partial<Record<TokenKind, string>> = {
   radius: 'dimension',
   size: 'dimension',
   strokeWidth: 'dimension',
+  effectFloat: 'dimension',
   fontFamily: 'fontFamily',
   fontWeight: 'fontWeight',
   opacity: 'number',
@@ -166,6 +169,7 @@ function w3cValue(token: ExportToken, opts: ExportOptions): string | number {
     case 'radius':
     case 'size':
     case 'strokeWidth':
+    case 'effectFloat':
       return dimension(token, opts);
     default:
       return token.value ?? '';

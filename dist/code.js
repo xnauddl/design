@@ -755,6 +755,9 @@
   function addFloatCand(preview, node, field, value, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : void 0 });
   }
+  function addStrCand(preview, node, field, value, e) {
+    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
+  }
   function pruneToAffected(nodeIndex, candidates) {
     var _a, _b, _c, _d;
     const byId = new Map(nodeIndex.map((n) => [n.id, n]));
@@ -875,6 +878,14 @@
       }
     }
     return best;
+  }
+  function matchString(entries, str, scope) {
+    for (const e of entries) {
+      if (e.str !== str) continue;
+      if (!e.scopes.includes("ALL_SCOPES") && !e.scopes.includes(scope)) continue;
+      return e;
+    }
+    return null;
   }
   async function walk2(node, entries, tol, res, flags, budget, apply, hooks, prog, preview, depth, parentId) {
     var _a;
@@ -1022,6 +1033,20 @@
     }
     if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") {
       tryBindText(node, "letterSpacing", node.letterSpacing.value, entries, tol, res, apply, preview);
+    }
+    const fe = matchString(entries, node.fontName.family, "FONT_FAMILY");
+    if (fe && node.characters.length > 0) {
+      if (!apply) {
+        res.bound++;
+        addStrCand(preview, node, "fontFamily", node.fontName.family, fe);
+      } else {
+        try {
+          node.setRangeBoundVariable(0, node.characters.length, "fontFamily", fe.variable);
+          res.bound++;
+        } catch (e) {
+          skip(res, "error");
+        }
+      }
     }
   }
   function tryBindText(node, field, value, entries, tol, res, apply, preview) {
@@ -1440,6 +1465,7 @@
       case "radius":
       case "size":
       case "strokeWidth":
+      case "effectFloat":
         return dimension(token, opts);
       default:
         return String(token.value);
@@ -1468,6 +1494,7 @@
     radius: "dimension",
     size: "dimension",
     strokeWidth: "dimension",
+    effectFloat: "dimension",
     fontFamily: "fontFamily",
     fontWeight: "fontWeight",
     opacity: "number",
@@ -1496,6 +1523,7 @@
       case "radius":
       case "size":
       case "strokeWidth":
+      case "effectFloat":
         return dimension(token, opts);
       default:
         return (_b = token.value) != null ? _b : "";
@@ -1948,7 +1976,7 @@
     post({ type: "PREMIUM_REQUIRED", feature: "components", message: "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
     return false;
   }
-  var TEXT_BIND_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing"]);
+  var TEXT_BIND_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily"]);
   async function applySelectedBinding(item) {
     var _a, _b;
     const node = await figma.getNodeByIdAsync(item.nodeId);
@@ -2016,6 +2044,7 @@
     if (sc.includes("LINE_HEIGHT")) return "lineHeight";
     if (sc.includes("LETTER_SPACING")) return "letterSpacing";
     if (sc.includes("OPACITY")) return "opacity";
+    if (sc.includes("EFFECT_FLOAT")) return "effectFloat";
     if (sc.includes("FONT_WEIGHT")) return "fontWeight";
     if (sc.includes("FONT_FAMILY")) return "fontFamily";
     const n = v.name;
@@ -2025,6 +2054,7 @@
     if (n.startsWith("spacing")) return "spacing";
     if (n.startsWith("radius")) return "radius";
     if (n.startsWith("stroke-width")) return "strokeWidth";
+    if (n.startsWith("shadow-") || n.startsWith("blur")) return "effectFloat";
     if (n.startsWith("size")) return "size";
     if (n.includes("font") && n.includes("weight")) return "fontWeight";
     if (n.includes("font") && n.includes("family")) return "fontFamily";

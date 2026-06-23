@@ -509,6 +509,32 @@ test('bindSelection — 레이어 불투명도(opacity)는 OPACITY 변수에 정
   assert.equal(res.bound, 1);
 });
 
+test('bindSelection — fontFamily(STRING)는 FONT_FAMILY 변수에 정확 일치 바인딩', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'font-family/Inter', category: 'fontFamily', sources: ['fontFamily'], value: 'Inter' }], 16);
+  const node = {
+    type: 'TEXT',
+    id: 'txt',
+    name: 'txt',
+    fills: [],
+    fontName: { family: 'Inter', style: 'Regular' },
+    fontSize: 16,
+    lineHeight: { unit: 'AUTO' },
+    letterSpacing: { unit: 'PIXELS', value: 0 },
+    characters: 'Hello',
+    boundVariables: {},
+    setRangeBoundVariable(start, end, field, v) {
+      this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id };
+    },
+  };
+
+  const res = await bindSelection([node], 0.5);
+
+  const fam = findVar(figma, 'Semantic', 'font-family/Inter');
+  assert.equal(node.boundVariables.fontFamily.id, fam.id);
+  assert.ok(res.bound >= 1);
+});
+
 test('bindSelection — 사용량 한도(maxNodes) 초과 시 부분 적용 + limited', async () => {
   installFigma();
   await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
