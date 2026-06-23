@@ -78,6 +78,8 @@
         return ["ALL_FILLS"];
       case "stroke":
         return ["STROKE_COLOR"];
+      case "strokeWidth":
+        return ["STROKE_FLOAT"];
       case "effectColor":
         return ["EFFECT_COLOR"];
       case "gap":
@@ -109,7 +111,7 @@
   }
   var VALID_SCOPES = {
     COLOR: /* @__PURE__ */ new Set(["ALL_SCOPES", "ALL_FILLS", "FRAME_FILL", "SHAPE_FILL", "TEXT_FILL", "STROKE_COLOR", "EFFECT_COLOR"]),
-    FLOAT: /* @__PURE__ */ new Set(["ALL_SCOPES", "GAP", "WIDTH_HEIGHT", "CORNER_RADIUS", "FONT_SIZE", "LINE_HEIGHT", "LETTER_SPACING", "FONT_WEIGHT", "EFFECT_FLOAT", "OPACITY"]),
+    FLOAT: /* @__PURE__ */ new Set(["ALL_SCOPES", "GAP", "WIDTH_HEIGHT", "CORNER_RADIUS", "STROKE_FLOAT", "FONT_SIZE", "LINE_HEIGHT", "LETTER_SPACING", "FONT_WEIGHT", "EFFECT_FLOAT", "OPACITY"]),
     STRING: /* @__PURE__ */ new Set(["ALL_SCOPES", "FONT_FAMILY"]),
     BOOLEAN: /* @__PURE__ */ new Set(["ALL_SCOPES"])
   };
@@ -243,6 +245,27 @@
       }
     }
   }
+  function collectStroke(acc, node) {
+    if (!("strokes" in node) || !("strokeWeight" in node)) return;
+    const strokes = node.strokes;
+    if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
+    const w = node.strokeWeight;
+    const widths = [];
+    if (w === figma.mixed) {
+      for (const side of ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"]) {
+        const sv = node[side];
+        if (typeof sv === "number") widths.push(sv);
+      }
+    } else if (typeof w === "number") {
+      widths.push(w);
+    }
+    for (const wv of widths) {
+      if (wv > 0) {
+        const v = round(wv);
+        add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth");
+      }
+    }
+  }
   function collectEffects(acc, node) {
     var _a;
     if (!("effects" in node)) return;
@@ -275,6 +298,7 @@
     }
     collectSize(acc, node);
     collectRadius(acc, node);
+    collectStroke(acc, node);
     collectEffects(acc, node);
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
@@ -693,6 +717,28 @@
 
   // src/lib/bind.ts
   var TIER = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
+  var FIELD_SCOPE = {
+    width: "WIDTH_HEIGHT",
+    height: "WIDTH_HEIGHT",
+    itemSpacing: "GAP",
+    counterAxisSpacing: "GAP",
+    paddingLeft: "GAP",
+    paddingRight: "GAP",
+    paddingTop: "GAP",
+    paddingBottom: "GAP",
+    topLeftRadius: "CORNER_RADIUS",
+    topRightRadius: "CORNER_RADIUS",
+    bottomLeftRadius: "CORNER_RADIUS",
+    bottomRightRadius: "CORNER_RADIUS",
+    strokeWeight: "STROKE_FLOAT",
+    strokeTopWeight: "STROKE_FLOAT",
+    strokeRightWeight: "STROKE_FLOAT",
+    strokeBottomWeight: "STROKE_FLOAT",
+    strokeLeftWeight: "STROKE_FLOAT",
+    fontSize: "FONT_SIZE",
+    lineHeight: "LINE_HEIGHT",
+    letterSpacing: "LETTER_SPACING"
+  };
   function addColorCand(preview, node, field, index, hex, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
   }
@@ -756,7 +802,7 @@
     return res;
   }
   async function buildIndex() {
-    var _a;
+    var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
     const tierOf = new Map(cols.map((c) => {
@@ -770,7 +816,7 @@
       if (tier < 2) continue;
       const val = await resolveValue(v, modeOf);
       if (val == null) continue;
-      const e = { variable: v, tier, type: v.resolvedType };
+      const e = { variable: v, tier, type: v.resolvedType, scopes: (_b = v.scopes) != null ? _b : ["ALL_SCOPES"] };
       if (v.resolvedType === "COLOR" && isRGB(val)) e.colorHex = rgbToHex(val);
       else if (v.resolvedType === "FLOAT" && typeof val === "number") e.num = val;
       else if (v.resolvedType === "STRING" && typeof val === "string") e.str = val;
@@ -799,11 +845,12 @@
     for (const e of entries) if (e.colorHex === hex) return e;
     return null;
   }
-  function matchFloat(entries, value, tol) {
+  function matchFloat(entries, value, tol, scope) {
     let best = null;
     let bestDist = Infinity;
     for (const e of entries) {
       if (e.num == null) continue;
+      if (scope && !e.scopes.includes("ALL_SCOPES") && !e.scopes.includes(scope)) continue;
       const dist = Math.abs(e.num - value);
       if (dist > tol) continue;
       if (dist < bestDist || dist === bestDist && best !== null && best.tier < e.tier) {
@@ -825,6 +872,7 @@
     bindPaints(node, entries, res, apply, preview);
     bindFrame(node, entries, tol, res, flags, apply, preview);
     bindRadius(node, entries, tol, res, apply, preview);
+    bindStroke(node, entries, tol, res, apply, preview);
     bindEffects(node, entries, res, apply, preview);
     await bindText(node, entries, tol, res, apply, preview);
     prog.done++;
@@ -881,6 +929,7 @@
       return;
     }
     tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply, preview);
+    if (typeof node.counterAxisSpacing === "number") tryBind(node, "counterAxisSpacing", node.counterAxisSpacing, entries, tol, res, apply, preview);
     tryBind(node, "paddingLeft", node.paddingLeft, entries, tol, res, apply, preview);
     tryBind(node, "paddingRight", node.paddingRight, entries, tol, res, apply, preview);
     tryBind(node, "paddingTop", node.paddingTop, entries, tol, res, apply, preview);
@@ -897,6 +946,20 @@
         const cv = node[c];
         if (typeof cv === "number" && cv > 0) tryBind(node, c, cv, entries, tol, res, apply, preview);
       }
+    }
+  }
+  function bindStroke(node, entries, tol, res, apply, preview) {
+    if (!("strokes" in node) || !("strokeWeight" in node)) return;
+    const strokes = node.strokes;
+    if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
+    const w = node.strokeWeight;
+    if (w !== figma.mixed && typeof w === "number") {
+      if (w > 0) tryBind(node, "strokeWeight", w, entries, tol, res, apply, preview);
+      return;
+    }
+    for (const side of ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"]) {
+      const sv = node[side];
+      if (typeof sv === "number" && sv > 0) tryBind(node, side, sv, entries, tol, res, apply, preview);
     }
   }
   function bindEffects(node, entries, res, apply, preview) {
@@ -938,7 +1001,7 @@
     }
   }
   function tryBindText(node, field, value, entries, tol, res, apply, preview) {
-    const e = matchFloat(entries, value, tol);
+    const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     const len = node.characters.length;
     if (len === 0) {
       skip(res, "empty-text");
@@ -961,7 +1024,7 @@
     }
   }
   function tryBind(node, field, value, entries, tol, res, apply, preview) {
-    const e = matchFloat(entries, value, tol);
+    const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     if (!e) {
       skip(res, "no-match");
       return;
@@ -1352,6 +1415,7 @@
       case "spacing":
       case "radius":
       case "size":
+      case "strokeWidth":
         return dimension(token, opts);
       default:
         return String(token.value);
@@ -1379,6 +1443,7 @@
     spacing: "dimension",
     radius: "dimension",
     size: "dimension",
+    strokeWidth: "dimension",
     fontFamily: "fontFamily",
     fontWeight: "fontWeight",
     opacity: "number",
@@ -1406,6 +1471,7 @@
       case "spacing":
       case "radius":
       case "size":
+      case "strokeWidth":
         return dimension(token, opts);
       default:
         return (_b = token.value) != null ? _b : "";
@@ -1922,6 +1988,7 @@
     if (sc.includes("GAP")) return "spacing";
     if (sc.includes("CORNER_RADIUS")) return "radius";
     if (sc.includes("WIDTH_HEIGHT")) return "size";
+    if (sc.includes("STROKE_FLOAT")) return "strokeWidth";
     if (sc.includes("LINE_HEIGHT")) return "lineHeight";
     if (sc.includes("LETTER_SPACING")) return "letterSpacing";
     if (sc.includes("OPACITY")) return "opacity";
@@ -1933,6 +2000,7 @@
     if (n.startsWith("font-size")) return "fontSize";
     if (n.startsWith("spacing")) return "spacing";
     if (n.startsWith("radius")) return "radius";
+    if (n.startsWith("stroke-width")) return "strokeWidth";
     if (n.startsWith("size")) return "size";
     if (n.includes("font") && n.includes("weight")) return "fontWeight";
     if (n.includes("font") && n.includes("family")) return "fontFamily";

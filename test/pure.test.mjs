@@ -88,7 +88,13 @@ test('scopesFor — 속성별 스코프', () => {
   assert.deepEqual(scopesFor('radius'), ['CORNER_RADIUS']);
   assert.deepEqual(scopesFor('gap'), ['GAP']);
   assert.deepEqual(scopesFor('size'), ['WIDTH_HEIGHT']);
+  assert.deepEqual(scopesFor('strokeWidth'), ['STROKE_FLOAT']);
   assert.deepEqual(scopesFor('opacity'), ['OPACITY']);
+});
+
+test('scopesForType — STROKE_FLOAT은 FLOAT만 허용(COLOR 거부)', () => {
+  assert.deepEqual(scopesForType(['STROKE_FLOAT'], 'FLOAT'), ['STROKE_FLOAT']);
+  assert.deepEqual(scopesForType(['STROKE_FLOAT'], 'COLOR'), []);
 });
 
 test('scopesForType — 타입에 유효한 스코프만 통과', () => {

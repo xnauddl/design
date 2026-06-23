@@ -11,12 +11,41 @@ interface VarEntry {
   variable: Variable;
   tier: number; // Component 3 > Semantic 2 > Global 1
   type: VariableResolvedDataType;
+  scopes: readonly VariableScope[]; // 용도 스코프 — 필드와 안 맞는 변수 오매칭 차단
   colorHex?: string;
   num?: number;
   str?: string;
 }
 
 const TIER: Record<string, number> = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
+
+/**
+ * 바인딩 대상 필드 → 요구 변수 스코프. 변수 `scopes`가 이 스코프(또는 `ALL_SCOPES`)를
+ * 포함할 때만 매칭한다. 여백(GAP)이 line-height/letter-spacing(LINE_HEIGHT/LETTER_SPACING)
+ * 변수에 값만 비슷하다고 잘못 연결되는 오매칭을 막는다. (Figma의 GAP 스코프는 gap+padding 공용.)
+ */
+const FIELD_SCOPE: Record<string, VariableScope> = {
+  width: 'WIDTH_HEIGHT',
+  height: 'WIDTH_HEIGHT',
+  itemSpacing: 'GAP',
+  counterAxisSpacing: 'GAP',
+  paddingLeft: 'GAP',
+  paddingRight: 'GAP',
+  paddingTop: 'GAP',
+  paddingBottom: 'GAP',
+  topLeftRadius: 'CORNER_RADIUS',
+  topRightRadius: 'CORNER_RADIUS',
+  bottomLeftRadius: 'CORNER_RADIUS',
+  bottomRightRadius: 'CORNER_RADIUS',
+  strokeWeight: 'STROKE_FLOAT',
+  strokeTopWeight: 'STROKE_FLOAT',
+  strokeRightWeight: 'STROKE_FLOAT',
+  strokeBottomWeight: 'STROKE_FLOAT',
+  strokeLeftWeight: 'STROKE_FLOAT',
+  fontSize: 'FONT_SIZE',
+  lineHeight: 'LINE_HEIGHT',
+  letterSpacing: 'LETTER_SPACING',
+};
 
 export interface BindResult {
   bound: number;
@@ -153,7 +182,7 @@ async function buildIndex(): Promise<VarEntry[]> {
     if (tier < 2) continue; // Component/Semantic만 바인딩 대상
     const val = await resolveValue(v, modeOf);
     if (val == null) continue;
-    const e: VarEntry = { variable: v, tier, type: v.resolvedType };
+    const e: VarEntry = { variable: v, tier, type: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'] };
     if (v.resolvedType === 'COLOR' && isRGB(val)) e.colorHex = rgbToHex(val);
     else if (v.resolvedType === 'FLOAT' && typeof val === 'number') e.num = val;
     else if (v.resolvedType === 'STRING' && typeof val === 'string') e.str = val;
@@ -189,11 +218,13 @@ function matchColor(entries: VarEntry[], hex: string): VarEntry | null {
   for (const e of entries) if (e.colorHex === hex) return e;
   return null;
 }
-function matchFloat(entries: VarEntry[], value: number, tol: number): VarEntry | null {
+function matchFloat(entries: VarEntry[], value: number, tol: number, scope?: VariableScope): VarEntry | null {
   let best: VarEntry | null = null;
   let bestDist = Infinity;
   for (const e of entries) {
     if (e.num == null) continue;
+    // 용도(스코프) 불일치 변수는 제외 — 여백이 line-height/letter-spacing 등에 붙는 오매칭 방지.
+    if (scope && !e.scopes.includes('ALL_SCOPES') && !e.scopes.includes(scope)) continue;
     const dist = Math.abs(e.num - value);
     if (dist > tol) continue;
     // 가장 가까운 값 우선, 동률이면 높은 tier 우선.
@@ -232,6 +263,7 @@ async function walk(
   bindPaints(node, entries, res, apply, preview);
   bindFrame(node, entries, tol, res, flags, apply, preview);
   bindRadius(node, entries, tol, res, apply, preview);
+  bindStroke(node, entries, tol, res, apply, preview);
   bindEffects(node, entries, res, apply, preview);
   await bindText(node, entries, tol, res, apply, preview);
   // UX6: 주기적으로 진행률 보고 + 이벤트 루프 양보(취소 메시지 수신 가능) + 취소 확인.
@@ -303,6 +335,7 @@ function bindFrame(
     return;
   }
   tryBind(node, 'itemSpacing', node.itemSpacing, entries, tol, res, apply, preview);
+  if (typeof node.counterAxisSpacing === 'number') tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, tol, res, apply, preview);
   tryBind(node, 'paddingLeft', node.paddingLeft, entries, tol, res, apply, preview);
   tryBind(node, 'paddingRight', node.paddingRight, entries, tol, res, apply, preview);
   tryBind(node, 'paddingTop', node.paddingTop, entries, tol, res, apply, preview);
@@ -320,6 +353,23 @@ function bindRadius(node: SceneNode, entries: VarEntry[], tol: number, res: Bind
       const cv = (node as unknown as Record<string, number>)[c];
       if (typeof cv === 'number' && cv > 0) tryBind(node, c, cv, entries, tol, res, apply, preview);
     }
+  }
+}
+
+function bindStroke(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): void {
+  if (!('strokes' in node) || !('strokeWeight' in node)) return;
+  // 보이는 선이 있을 때만 두께 바인딩(선 없는 노드의 strokeWeight는 무의미).
+  const strokes = (node as { strokes: readonly Paint[] | typeof figma.mixed }).strokes;
+  if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
+  const w = (node as { strokeWeight: number | typeof figma.mixed }).strokeWeight;
+  if (w !== figma.mixed && typeof w === 'number') {
+    if (w > 0) tryBind(node, 'strokeWeight', w, entries, tol, res, apply, preview);
+    return;
+  }
+  // 변별 두께(상/우/하/좌)
+  for (const side of ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const) {
+    const sv = (node as unknown as Record<string, number>)[side];
+    if (typeof sv === 'number' && sv > 0) tryBind(node, side, sv, entries, tol, res, apply, preview);
   }
 }
 
@@ -374,7 +424,7 @@ function tryBindText(
   apply: boolean,
   preview: Preview | null,
 ): void {
-  const e = matchFloat(entries, value, tol);
+  const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   const len = node.characters.length;
   if (len === 0) {
     skip(res, 'empty-text');
@@ -407,7 +457,7 @@ function tryBind(
   apply: boolean,
   preview: Preview | null,
 ): void {
-  const e = matchFloat(entries, value, tol);
+  const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   if (!e) {
     skip(res, 'no-match');
     return;
