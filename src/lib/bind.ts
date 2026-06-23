@@ -45,7 +45,11 @@ const FIELD_SCOPE: Record<string, VariableScope> = {
   fontSize: 'FONT_SIZE',
   lineHeight: 'LINE_HEIGHT',
   letterSpacing: 'LETTER_SPACING',
+  opacity: 'OPACITY',
 };
+
+/** 불투명도는 0~1 범위라 px 허용오차 대신 정밀 매칭(추출 시 소수 2자리 반올림 대응). */
+const OPACITY_TOL = 0.005;
 
 export interface BindResult {
   bound: number;
@@ -274,6 +278,7 @@ async function walk(
   bindFrame(node, entries, tol, res, flags, apply, preview);
   bindRadius(node, entries, tol, res, apply, preview);
   bindStroke(node, entries, tol, res, apply, preview);
+  bindOpacity(node, entries, tol, res, apply, preview);
   bindEffects(node, entries, res, apply, preview);
   await bindText(node, entries, tol, res, apply, preview);
   // UX6: 주기적으로 진행률 보고 + 이벤트 루프 양보(취소 메시지 수신 가능) + 취소 확인.
@@ -365,6 +370,14 @@ function bindRadius(node: SceneNode, entries: VarEntry[], tol: number, res: Bind
       if (typeof cv === 'number' && cv > 0) tryBind(node, c, cv, entries, tol, res, apply, preview);
     }
   }
+}
+
+function bindOpacity(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): void {
+  if (!('opacity' in node)) return;
+  const o = (node as { opacity: number }).opacity;
+  if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1/0은 바인딩 대상 아님
+  // 0~1 범위라 px 허용오차를 쓰지 않고 정밀(OPACITY_TOL) 매칭.
+  tryBind(node, 'opacity', o, entries, Math.min(tol, OPACITY_TOL), res, apply, preview);
 }
 
 function bindStroke(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): void {

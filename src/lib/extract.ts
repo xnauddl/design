@@ -149,6 +149,15 @@ function collectStroke(acc: Accumulator, node: SceneNode): void {
   }
 }
 
+/* ---------- layer opacity ---------- */
+function collectOpacity(acc: Accumulator, node: SceneNode): void {
+  if (!('opacity' in node)) return;
+  const o = (node as { opacity: number }).opacity;
+  if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1(불투명)·0(숨김 동등)은 토큰화 안 함
+  const v = round(o);
+  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity');
+}
+
 /* ---------- effects ---------- */
 function collectEffects(acc: Accumulator, node: SceneNode): void {
   if (!('effects' in node)) return;
@@ -183,6 +192,7 @@ function walk(acc: Accumulator, node: SceneNode): void {
   collectSize(acc, node);
   collectRadius(acc, node);
   collectStroke(acc, node);
+  collectOpacity(acc, node);
   collectEffects(acc, node);
   if ('children' in node) for (const child of node.children) walk(acc, child);
 }

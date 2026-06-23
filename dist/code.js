@@ -266,6 +266,13 @@
       }
     }
   }
+  function collectOpacity(acc, node) {
+    if (!("opacity" in node)) return;
+    const o = node.opacity;
+    if (typeof o !== "number" || o >= 1 || o <= 0) return;
+    const v = round(o);
+    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity");
+  }
   function collectEffects(acc, node) {
     var _a;
     if (!("effects" in node)) return;
@@ -299,6 +306,7 @@
     collectSize(acc, node);
     collectRadius(acc, node);
     collectStroke(acc, node);
+    collectOpacity(acc, node);
     collectEffects(acc, node);
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
@@ -737,8 +745,10 @@
     strokeLeftWeight: "STROKE_FLOAT",
     fontSize: "FONT_SIZE",
     lineHeight: "LINE_HEIGHT",
-    letterSpacing: "LETTER_SPACING"
+    letterSpacing: "LETTER_SPACING",
+    opacity: "OPACITY"
   };
+  var OPACITY_TOL = 5e-3;
   function addColorCand(preview, node, field, index, hex, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
   }
@@ -879,6 +889,7 @@
     bindFrame(node, entries, tol, res, flags, apply, preview);
     bindRadius(node, entries, tol, res, apply, preview);
     bindStroke(node, entries, tol, res, apply, preview);
+    bindOpacity(node, entries, tol, res, apply, preview);
     bindEffects(node, entries, res, apply, preview);
     await bindText(node, entries, tol, res, apply, preview);
     prog.done++;
@@ -954,6 +965,12 @@
         if (typeof cv === "number" && cv > 0) tryBind(node, c, cv, entries, tol, res, apply, preview);
       }
     }
+  }
+  function bindOpacity(node, entries, tol, res, apply, preview) {
+    if (!("opacity" in node)) return;
+    const o = node.opacity;
+    if (typeof o !== "number" || o >= 1 || o <= 0) return;
+    tryBind(node, "opacity", o, entries, Math.min(tol, OPACITY_TOL), res, apply, preview);
   }
   function bindStroke(node, entries, tol, res, apply, preview) {
     if (!("strokes" in node) || !("strokeWeight" in node)) return;
