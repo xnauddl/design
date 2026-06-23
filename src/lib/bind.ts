@@ -214,8 +214,18 @@ function isRGB(v: VariableValue): v is RGB | RGBA {
   return typeof v === 'object' && v !== null && 'r' in v && 'g' in v && 'b' in v;
 }
 
-function matchColor(entries: VarEntry[], hex: string): VarEntry | null {
-  for (const e of entries) if (e.colorHex === hex) return e;
+/** 색상 필드별 허용 스코프 — 변수 scopes가 이 중 하나(또는 ALL_SCOPES)를 포함해야 매칭. */
+const FILL_SCOPES: readonly VariableScope[] = ['ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL'];
+const STROKE_SCOPES: readonly VariableScope[] = ['STROKE_COLOR'];
+const EFFECT_SCOPES: readonly VariableScope[] = ['EFFECT_COLOR'];
+
+function colorScopeOk(e: VarEntry, allowed: readonly VariableScope[]): boolean {
+  return e.scopes.includes('ALL_SCOPES') || allowed.some((s) => e.scopes.includes(s));
+}
+
+function matchColor(entries: VarEntry[], hex: string, allowed: readonly VariableScope[]): VarEntry | null {
+  // 용도(스코프) 일치 + 정확한 hex. stroke 전용 색이 fill에, effect 색이 fill에 붙는 오매칭 방지.
+  for (const e of entries) if (e.colorHex === hex && colorScopeOk(e, allowed)) return e;
   return null;
 }
 function matchFloat(entries: VarEntry[], value: number, tol: number, scope?: VariableScope): VarEntry | null {
@@ -288,11 +298,12 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
     if (!(key in node)) continue;
     const paints = (node as unknown as Record<string, Paint[] | typeof figma.mixed>)[key];
     if (paints === figma.mixed || !Array.isArray(paints)) continue;
+    const allowed = key === 'fills' ? FILL_SCOPES : STROKE_SCOPES;
     let changed = false;
     const next = paints.map((p, i) => {
       if (p.type !== 'SOLID') return p;
       const hex = rgbToHex(p.color);
-      const e = matchColor(entries, hex);
+      const e = matchColor(entries, hex, allowed);
       if (!e) {
         skip(res, 'no-match');
         return p;
@@ -379,7 +390,7 @@ function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, appl
   const next = (node as { effects: readonly Effect[] }).effects.map((e, i) => {
     if (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW') return e;
     const hex = rgbToHex(e.color);
-    const ent = matchColor(entries, hex);
+    const ent = matchColor(entries, hex, EFFECT_SCOPES);
     if (!ent) {
       skip(res, 'no-match');
       return e;
