@@ -4,6 +4,7 @@
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
 import { t } from './lib/i18n';
+import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { FREE_LIMITS, type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
@@ -305,6 +306,82 @@ $('btnSemantics').addEventListener('click', () => {
     return;
   }
   send({ type: 'CREATE_SEMANTICS', map });
+});
+
+/* ---------- 2.6 · 텍스트 스타일 (Phase C) ---------- */
+function tsFontFamily(): string {
+  return ($('tsFont') as HTMLInputElement).value.trim() || 'Inter';
+}
+
+/** 표 1행 생성(스펙 → 입력 행). family·letterSpacing은 행 dataset에 보존. */
+function textStyleRow(s: TextStyleSpec): HTMLTableRowElement {
+  const tr = document.createElement('tr');
+  const cell = (field: string, value: string, width: string, type = 'text'): void => {
+    const td = document.createElement('td');
+    const inp = document.createElement('input');
+    inp.type = type;
+    inp.value = value;
+    inp.dataset.field = field;
+    inp.style.width = width;
+    if (type === 'number') inp.style.textAlign = 'right';
+    td.appendChild(inp);
+    tr.appendChild(td);
+  };
+  cell('name', s.name, '84px');
+  cell('fontSize', String(s.fontSize), '40px', 'number');
+  cell('lineHeight', String(s.lineHeight), '40px', 'number');
+  cell('style', s.style, '64px');
+  const tdDel = document.createElement('td');
+  const del = document.createElement('button');
+  del.textContent = '✕';
+  del.title = '행 삭제';
+  del.addEventListener('click', () => tr.remove());
+  tdDel.appendChild(del);
+  tr.appendChild(tdDel);
+  tr.dataset.letterSpacing = String(s.letterSpacing);
+  return tr;
+}
+
+function renderTextStyleRows(specs: TextStyleSpec[]): void {
+  const tbody = $('tsRows');
+  tbody.innerHTML = '';
+  for (const s of specs) tbody.appendChild(textStyleRow(s));
+}
+
+/** 표 → 스펙. 폰트 패밀리는 tsFont 단일 입력을 모든 행에 적용. */
+function readTextStyleRows(): TextStyleSpec[] {
+  const family = tsFontFamily();
+  const specs: TextStyleSpec[] = [];
+  for (const tr of Array.from($('tsRows').querySelectorAll('tr'))) {
+    const get = (f: string): string =>
+      (tr.querySelector(`input[data-field="${f}"]`) as HTMLInputElement | null)?.value ?? '';
+    const name = get('name').trim();
+    if (!name) continue;
+    specs.push({
+      name,
+      fontSize: Number(get('fontSize')) || 0,
+      lineHeight: Number(get('lineHeight')) || 0,
+      letterSpacing: Number((tr as HTMLElement).dataset.letterSpacing) || 0,
+      family,
+      style: get('style').trim() || 'Regular',
+    });
+  }
+  return specs;
+}
+
+$('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
+$('btnTsAddRow').addEventListener('click', () =>
+  $('tsRows').appendChild(
+    textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: tsFontFamily(), style: 'Regular' }),
+  ),
+);
+$('btnTextStyles').addEventListener('click', () => {
+  const styles = readTextStyleRows();
+  if (!styles.length) {
+    setStatus('tsStatus', '먼저 ‘선택에서 스캔’ 하거나 ‘행 추가’로 스타일을 정의하세요.', 'warn');
+    return;
+  }
+  send({ type: 'CREATE_TEXT_STYLES', styles, apply: ($('tsApply') as HTMLInputElement).checked });
 });
 
 $('btnApply').addEventListener('click', () => {
@@ -964,6 +1041,31 @@ window.onmessage = (event: MessageEvent) => {
         msg.missing.length ? 'warn' : 'ok',
       );
       break;
+    case 'TEXT_STYLE_CANDIDATES': {
+      if (msg.styles.length) {
+        ($('tsFont') as HTMLInputElement).value = msg.styles[0].family || tsFontFamily();
+        renderTextStyleRows(msg.styles);
+        setStatus(
+          'tsStatus',
+          `${msg.styles.length}개 스타일 후보 추출. 이름·값 확인 후 등록하세요.` +
+            (msg.warnings.length ? ' ' + msg.warnings.join(' ') : ''),
+          msg.warnings.length ? 'warn' : 'ok',
+        );
+      } else {
+        renderTextStyleRows(rampToSpecs(tsFontFamily()));
+        setStatus('tsStatus', '선택에서 텍스트를 못 찾아 기본 램프로 채웠습니다. 폰트·값을 조정하세요.', 'warn');
+      }
+      break;
+    }
+    case 'TEXT_STYLES_RESULT':
+      setStatus(
+        'tsStatus',
+        `텍스트 스타일 ${msg.created + msg.updated}개 (생성 ${msg.created} / 갱신 ${msg.updated}) · 바인딩 ${msg.bound}` +
+          (msg.applied ? ` · 적용 ${msg.applied}` : '') +
+          (msg.missing.length ? ` · 미연결: ${msg.missing.join(', ')}` : ''),
+        msg.missing.length ? 'warn' : 'ok',
+      );
+      break;
     case 'COLLECTIONS':
       // 존재 확인용 프로브(별도 UI 없음).
       break;
@@ -1073,7 +1175,14 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 팀 기능은 ‘관리’ 탭).
-      const statusId = msg.feature === 'components' ? 'componentStatus' : msg.feature === 'teamPresets' ? 'presetStatus' : 'createStatus';
+      const statusId =
+        msg.feature === 'components'
+          ? 'componentStatus'
+          : msg.feature === 'textStyles'
+            ? 'tsStatus'
+            : msg.feature === 'teamPresets'
+              ? 'presetStatus'
+              : 'createStatus';
       setStatus(statusId, t('premium.required', { message: msg.message, feature: msg.feature }), 'warn');
       break;
     }
@@ -1096,6 +1205,8 @@ const OP_STATUS: Record<string, string> = {
   EXTRACT: 'extractStatus',
   CREATE_TOKENS: 'createStatus',
   CREATE_SEMANTICS: 'semStatus',
+  SCAN_TEXT_STYLES: 'tsStatus',
+  CREATE_TEXT_STYLES: 'tsStatus',
   APPLY: 'applyStatus',
   RENAME: 'renameStatus',
   EXPORT: 'exportStatus',

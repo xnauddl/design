@@ -529,6 +529,167 @@
     }
     return summary;
   }
+  var roundN = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
+  function walkText(node, out) {
+    if (node.type === "TEXT") out.push(node);
+    else if ("children" in node) for (const c of node.children) walkText(c, out);
+  }
+  function scanTextStyles(nodes) {
+    const texts = [];
+    for (const n of nodes) walkText(n, texts);
+    const samples = [];
+    const warnings = /* @__PURE__ */ new Set();
+    for (const t of texts) {
+      if (t.fontSize === figma.mixed || t.fontName === figma.mixed) {
+        warnings.add("\uBD80\uBD84 \uC11C\uC2DD(\uD63C\uD569) \uD14D\uC2A4\uD2B8\uB294 \uC2A4\uD0B5\uD588\uC2B5\uB2C8\uB2E4.");
+        continue;
+      }
+      const fontSize = roundN(t.fontSize);
+      const { family, style } = t.fontName;
+      let lineHeight = 0;
+      const lh = t.lineHeight;
+      if (lh !== figma.mixed && lh.unit !== "AUTO") {
+        lineHeight = lh.unit === "PERCENT" ? roundN(fontSize * lh.value / 100) : roundN(lh.value);
+      }
+      let letterSpacing = 0;
+      const ls = t.letterSpacing;
+      if (ls !== figma.mixed && ls.unit === "PIXELS") letterSpacing = roundN(ls.value);
+      samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name });
+    }
+    return { samples, warnings: [...warnings] };
+  }
+  async function createSemanticTextStyles(specs, apply, nodes) {
+    var _a;
+    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [] };
+    if (!specs.length) return res;
+    const tokens = [];
+    const seen = /* @__PURE__ */ new Set();
+    const pushTok = (t) => {
+      if (!seen.has(t.name)) {
+        seen.add(t.name);
+        tokens.push(t);
+      }
+    };
+    for (const s of specs) {
+      pushTok({ name: numberTokenName("font-size", s.fontSize), category: "fontSize", value: s.fontSize, sources: ["fontSize"] });
+      if (s.lineHeight > 0)
+        pushTok({ name: numberTokenName("line-height", s.lineHeight), category: "lineHeight", value: s.lineHeight, unit: "px", sources: ["lineHeight"] });
+    }
+    await createTokens(tokens, 16);
+    const aliasMap = {};
+    for (const s of specs) {
+      aliasMap[`font-size/${s.name}`] = numberTokenName("font-size", s.fontSize);
+      if (s.lineHeight > 0) aliasMap[`line-height/${s.name}`] = numberTokenName("line-height", s.lineHeight);
+    }
+    await createSemanticAliases(aliasMap);
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const semId = (_a = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _a.id;
+    const semByName = /* @__PURE__ */ new Map();
+    if (semId) {
+      for (const v of await figma.variables.getLocalVariablesAsync())
+        if (v.variableCollectionId === semId) semByName.set(v.name, v);
+    }
+    const existing = await figma.getLocalTextStylesAsync();
+    const styleByName = new Map(existing.map((s) => [s.name, s]));
+    for (const spec of specs) {
+      let style = styleByName.get(spec.name);
+      const created = !style;
+      if (!style) {
+        style = figma.createTextStyle();
+        style.name = spec.name;
+      }
+      const wanted = { family: spec.family, style: spec.style };
+      let loaded;
+      try {
+        await figma.loadFontAsync(wanted);
+        loaded = wanted;
+      } catch (e) {
+        try {
+          const fb = { family: spec.family, style: "Regular" };
+          await figma.loadFontAsync(fb);
+          loaded = fb;
+          res.missing.push(`${spec.name}: \uD3F0\uD2B8 ${spec.style}\u2192Regular`);
+        } catch (e2) {
+          res.missing.push(`${spec.name}: \uD3F0\uD2B8 '${spec.family}' \uC5C6\uC74C`);
+          continue;
+        }
+      }
+      style.fontName = loaded;
+      style.fontSize = spec.fontSize;
+      style.lineHeight = spec.lineHeight > 0 ? { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
+      if (spec.letterSpacing) style.letterSpacing = { value: spec.letterSpacing, unit: "PIXELS" };
+      const fsVar = semByName.get(`font-size/${spec.name}`);
+      if (fsVar) {
+        style.setBoundVariable("fontSize", fsVar);
+        res.bound++;
+      } else res.missing.push(`font-size/${spec.name}`);
+      if (spec.lineHeight > 0) {
+        const lhVar = semByName.get(`line-height/${spec.name}`);
+        if (lhVar) {
+          style.setBoundVariable("lineHeight", lhVar);
+          res.bound++;
+        } else res.missing.push(`line-height/${spec.name}`);
+      }
+      res[created ? "created" : "updated"]++;
+      styleByName.set(spec.name, style);
+    }
+    if (apply) {
+      const texts = [];
+      for (const n of nodes) walkText(n, texts);
+      for (const t of texts) {
+        if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
+        const fontSize = roundN(t.fontSize);
+        const { family, style } = t.fontName;
+        const spec = specs.find((s) => s.fontSize === fontSize && s.family === family && s.style === style);
+        if (!spec) continue;
+        const ts = styleByName.get(spec.name);
+        if (!ts) continue;
+        try {
+          await figma.loadFontAsync(t.fontName);
+          await t.setTextStyleIdAsync(ts.id);
+          res.applied++;
+        } catch (e) {
+        }
+      }
+    }
+    return res;
+  }
+
+  // src/lib/textStyles.ts
+  var RAMP_NAMES = ["display", "h1", "h2", "h3", "title", "body", "caption", "overline"];
+  var sigKey = (s) => `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
+  function clusterTextStyles(samples) {
+    const map = /* @__PURE__ */ new Map();
+    for (const s of samples) {
+      const k = sigKey(s);
+      const ex = map.get(k);
+      if (ex) ex.count++;
+      else
+        map.set(k, {
+          fontSize: s.fontSize,
+          lineHeight: s.lineHeight,
+          letterSpacing: s.letterSpacing,
+          family: s.family,
+          style: s.style,
+          count: 1,
+          sample: s.layerName
+        });
+    }
+    return [...map.values()];
+  }
+  function nameTextStyles(clusters) {
+    const sorted = [...clusters].sort(
+      (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight
+    );
+    return sorted.map((c, i) => ({
+      name: i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`,
+      fontSize: c.fontSize,
+      lineHeight: c.lineHeight,
+      letterSpacing: c.letterSpacing,
+      family: c.family,
+      style: c.style
+    }));
+  }
 
   // src/lib/bind.ts
   var TIER = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
@@ -1743,6 +1904,11 @@
       return false;
     }
   }
+  function requireTextStyles() {
+    if (hasEntitlement(currentTier(), "components")) return true;
+    post({ type: "PREMIUM_REQUIRED", feature: "textStyles", message: "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
+    return false;
+  }
   async function savePresets() {
     try {
       await figma.clientStorage.setAsync(PRESETS_KEY, presets);
@@ -1966,6 +2132,19 @@
           post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
           commitUndo(figma);
           await postPrereq();
+          break;
+        }
+        case "SCAN_TEXT_STYLES": {
+          const { samples, warnings } = scanTextStyles(selection());
+          const styles = nameTextStyles(clusterTextStyles(samples));
+          post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
+          break;
+        }
+        case "CREATE_TEXT_STYLES": {
+          if (!requireTextStyles()) break;
+          const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
+          post({ type: "TEXT_STYLES_RESULT", created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
+          commitUndo(figma);
           break;
         }
         case "GET_COLLECTIONS": {

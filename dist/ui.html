@@ -287,6 +287,27 @@
       </div>
       <div class="status" id="semStatus"></div>
     </div>
+
+    <div class="step">
+      <h2>2.6 · 텍스트 스타일 (화면 → 스타일)</h2>
+      <div class="muted">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Pro)</div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnScanText">선택에서 스캔</button>
+        <button id="btnTsAddRow">행 추가</button>
+        <label class="inline">폰트 <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
+      </div>
+      <table id="tsTable" style="width:100%; border-collapse:collapse; margin-top:6px; font-size:11px;">
+        <thead><tr style="text-align:left; color:var(--muted,#888);">
+          <th>이름</th><th>크기</th><th>행간</th><th>스타일</th><th></th>
+        </tr></thead>
+        <tbody id="tsRows"></tbody>
+      </table>
+      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 원본 텍스트에 스타일 적용</label>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
+      </div>
+      <div class="status" id="tsStatus"></div>
+    </div>
   </section>
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
@@ -565,6 +586,45 @@
     const tpl = (_a = STRINGS[key]) != null ? _a : key;
     if (!vars) return tpl;
     return tpl.replace(/\{(\w+)\}/g, (_, k) => k in vars ? String(vars[k]) : `{${k}}`);
+  }
+
+  // src/lib/textStyles.ts
+  var STYLE_BY_WEIGHT = {
+    100: "Thin",
+    200: "ExtraLight",
+    300: "Light",
+    400: "Regular",
+    500: "Medium",
+    600: "SemiBold",
+    700: "Bold",
+    800: "ExtraBold",
+    900: "Black"
+  };
+  function fontStyleForWeight(weight, italic = false) {
+    var _a;
+    const base = (_a = STYLE_BY_WEIGHT[weight]) != null ? _a : "Regular";
+    if (!italic) return base;
+    return base === "Regular" ? "Italic" : `${base} Italic`;
+  }
+  var DEFAULT_TYPE_RAMP = [
+    { name: "display", fontSize: 48, lineHeight: 56, weight: 700 },
+    { name: "h1", fontSize: 32, lineHeight: 40, weight: 700 },
+    { name: "h2", fontSize: 24, lineHeight: 32, weight: 600 },
+    { name: "h3", fontSize: 20, lineHeight: 28, weight: 600 },
+    { name: "title", fontSize: 18, lineHeight: 24, weight: 600 },
+    { name: "body", fontSize: 16, lineHeight: 24, weight: 400 },
+    { name: "caption", fontSize: 13, lineHeight: 18, weight: 400 },
+    { name: "overline", fontSize: 11, lineHeight: 16, weight: 500 }
+  ];
+  function rampToSpecs(family) {
+    return DEFAULT_TYPE_RAMP.map((r) => ({
+      name: r.name,
+      fontSize: r.fontSize,
+      lineHeight: r.lineHeight,
+      letterSpacing: 0,
+      family,
+      style: fontStyleForWeight(r.weight, false)
+    }));
   }
 
   // src/lib/entitlements.ts
@@ -1433,6 +1493,77 @@
     }
     send({ type: "CREATE_SEMANTICS", map });
   });
+  function tsFontFamily() {
+    return $("tsFont").value.trim() || "Inter";
+  }
+  function textStyleRow(s) {
+    const tr = document.createElement("tr");
+    const cell = (field, value, width, type = "text") => {
+      const td = document.createElement("td");
+      const inp = document.createElement("input");
+      inp.type = type;
+      inp.value = value;
+      inp.dataset.field = field;
+      inp.style.width = width;
+      if (type === "number") inp.style.textAlign = "right";
+      td.appendChild(inp);
+      tr.appendChild(td);
+    };
+    cell("name", s.name, "84px");
+    cell("fontSize", String(s.fontSize), "40px", "number");
+    cell("lineHeight", String(s.lineHeight), "40px", "number");
+    cell("style", s.style, "64px");
+    const tdDel = document.createElement("td");
+    const del = document.createElement("button");
+    del.textContent = "\u2715";
+    del.title = "\uD589 \uC0AD\uC81C";
+    del.addEventListener("click", () => tr.remove());
+    tdDel.appendChild(del);
+    tr.appendChild(tdDel);
+    tr.dataset.letterSpacing = String(s.letterSpacing);
+    return tr;
+  }
+  function renderTextStyleRows(specs) {
+    const tbody = $("tsRows");
+    tbody.innerHTML = "";
+    for (const s of specs) tbody.appendChild(textStyleRow(s));
+  }
+  function readTextStyleRows() {
+    const family = tsFontFamily();
+    const specs = [];
+    for (const tr of Array.from($("tsRows").querySelectorAll("tr"))) {
+      const get = (f) => {
+        var _a, _b;
+        return (_b = (_a = tr.querySelector(`input[data-field="${f}"]`)) == null ? void 0 : _a.value) != null ? _b : "";
+      };
+      const name = get("name").trim();
+      if (!name) continue;
+      specs.push({
+        name,
+        fontSize: Number(get("fontSize")) || 0,
+        lineHeight: Number(get("lineHeight")) || 0,
+        letterSpacing: Number(tr.dataset.letterSpacing) || 0,
+        family,
+        style: get("style").trim() || "Regular"
+      });
+    }
+    return specs;
+  }
+  $("btnScanText").addEventListener("click", () => send({ type: "SCAN_TEXT_STYLES" }));
+  $("btnTsAddRow").addEventListener(
+    "click",
+    () => $("tsRows").appendChild(
+      textStyleRow({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: tsFontFamily(), style: "Regular" })
+    )
+  );
+  $("btnTextStyles").addEventListener("click", () => {
+    const styles = readTextStyleRows();
+    if (!styles.length) {
+      setStatus("tsStatus", "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uC2A4\uCE94\u2019 \uD558\uAC70\uB098 \u2018\uD589 \uCD94\uAC00\u2019\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC815\uC758\uD558\uC138\uC694.", "warn");
+      return;
+    }
+    send({ type: "CREATE_TEXT_STYLES", styles, apply: $("tsApply").checked });
+  });
   $("btnApply").addEventListener("click", () => {
     const tolerance = Number($("tol").value) || 0;
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
@@ -1998,6 +2129,28 @@
           msg.missing.length ? "warn" : "ok"
         );
         break;
+      case "TEXT_STYLE_CANDIDATES": {
+        if (msg.styles.length) {
+          $("tsFont").value = msg.styles[0].family || tsFontFamily();
+          renderTextStyleRows(msg.styles);
+          setStatus(
+            "tsStatus",
+            `${msg.styles.length}\uAC1C \uC2A4\uD0C0\uC77C \uD6C4\uBCF4 \uCD94\uCD9C. \uC774\uB984\xB7\uAC12 \uD655\uC778 \uD6C4 \uB4F1\uB85D\uD558\uC138\uC694.` + (msg.warnings.length ? " " + msg.warnings.join(" ") : ""),
+            msg.warnings.length ? "warn" : "ok"
+          );
+        } else {
+          renderTextStyleRows(rampToSpecs(tsFontFamily()));
+          setStatus("tsStatus", "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC2B5\uB2C8\uB2E4. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694.", "warn");
+        }
+        break;
+      }
+      case "TEXT_STYLES_RESULT":
+        setStatus(
+          "tsStatus",
+          `\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C ${msg.created + msg.updated}\uAC1C (\uC0DD\uC131 ${msg.created} / \uAC31\uC2E0 ${msg.updated}) \xB7 \uBC14\uC778\uB529 ${msg.bound}` + (msg.applied ? ` \xB7 \uC801\uC6A9 ${msg.applied}` : "") + (msg.missing.length ? ` \xB7 \uBBF8\uC5F0\uACB0: ${msg.missing.join(", ")}` : ""),
+          msg.missing.length ? "warn" : "ok"
+        );
+        break;
       case "COLLECTIONS":
         break;
       case "GLOBAL_COLORS":
@@ -2095,7 +2248,7 @@
         renderContrast(msg);
         break;
       case "PREMIUM_REQUIRED": {
-        const statusId = msg.feature === "components" ? "componentStatus" : msg.feature === "teamPresets" ? "presetStatus" : "createStatus";
+        const statusId = msg.feature === "components" ? "componentStatus" : msg.feature === "textStyles" ? "tsStatus" : msg.feature === "teamPresets" ? "presetStatus" : "createStatus";
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }
@@ -2114,6 +2267,8 @@
     EXTRACT: "extractStatus",
     CREATE_TOKENS: "createStatus",
     CREATE_SEMANTICS: "semStatus",
+    SCAN_TEXT_STYLES: "tsStatus",
+    CREATE_TEXT_STYLES: "tsStatus",
     APPLY: "applyStatus",
     RENAME: "renameStatus",
     EXPORT: "exportStatus",

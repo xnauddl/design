@@ -10,6 +10,8 @@ import {
   previewCreateTokens,
   createSemanticAliases,
   prunePaletteColors,
+  scanTextStyles,
+  createSemanticTextStyles,
   bindSelection,
   renameSelection,
 } from '../dist/figma-lib.mjs';
@@ -18,6 +20,7 @@ import {
 function installFigma() {
   const collections = [];
   const variables = [];
+  const textStyles = [];
   let seq = 0;
   const mixed = Symbol('figma.mixed');
 
@@ -72,7 +75,24 @@ function installFigma() {
       }),
     },
     loadFontAsync: async () => {},
-    _state: { collections, variables },
+    createTextStyle: () => {
+      const st = {
+        id: `style:${seq++}`,
+        name: '',
+        fontName: { family: '', style: '' },
+        fontSize: 0,
+        lineHeight: { unit: 'AUTO' },
+        letterSpacing: { value: 0, unit: 'PIXELS' },
+        boundVariables: {},
+        setBoundVariable(field, v) {
+          this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id };
+        },
+      };
+      textStyles.push(st);
+      return st;
+    },
+    getLocalTextStylesAsync: async () => textStyles.slice(),
+    _state: { collections, variables, textStyles },
   };
   globalThis.figma = figma;
   return figma;
@@ -837,4 +857,50 @@ test('prunePaletteColors(#3) — 재생성 hue 패밀리 안에서만 정리(다
   assert.ok(findVar(figma, 'Global', 'color/green/500')); // 다른 패밀리 보존
   assert.ok(findVar(figma, 'Global', 'color/0066ff')); // 추출 hex 보존
   assert.ok(findVar(figma, 'Global', 'spacing/16')); // 비색 보존
+});
+
+/* ================= textStyles.ts (Phase C) ================= */
+test('scanTextStyles — TEXT 노드 시그니처 수집(+%행간 환산·mixed 스킵)', () => {
+  const figma = installFigma();
+  const t1 = { type: 'TEXT', id: 't1', name: 'Title', fontSize: 32, fontName: { family: 'Inter', style: 'Bold' }, lineHeight: { unit: 'PIXELS', value: 40 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'Hi' };
+  const t2 = { type: 'TEXT', id: 't2', name: 'Body', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'PERCENT', value: 150 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'x' };
+  const tMixed = { type: 'TEXT', id: 't3', name: 'Mixed', fontSize: figma.mixed, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'AUTO' }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'y' };
+  const frame = { type: 'FRAME', id: 'f', name: 'F', children: [t1, t2, tMixed] };
+
+  const { samples, warnings } = scanTextStyles([frame]);
+  assert.equal(samples.length, 2); // mixed 제외
+  assert.equal(samples.find((s) => s.fontSize === 16).lineHeight, 24); // 150% × 16
+  assert.equal(samples.find((s) => s.fontSize === 32).style, 'Bold');
+  assert.ok(warnings.length >= 1);
+});
+
+test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 적용 + 멱등', async () => {
+  const figma = installFigma();
+  const specs = [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }];
+  const node = {
+    type: 'TEXT', id: 'n1', name: 'b', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'hi',
+    _styleId: null, async setTextStyleIdAsync(id) { this._styleId = id; },
+  };
+
+  const r = await createSemanticTextStyles(specs, true, [node]);
+  assert.equal(r.created, 1);
+  assert.equal(r.bound, 2); // fontSize + lineHeight
+  assert.equal(r.applied, 1);
+  assert.deepEqual(r.missing, []);
+
+  // 시맨틱 변수(역할명) 생성 + 스타일 바인딩
+  assert.ok(findVar(figma, 'Semantic', 'font-size/body'));
+  assert.ok(findVar(figma, 'Semantic', 'line-height/body'));
+  const style = figma._state.textStyles.find((s) => s.name === 'body');
+  assert.equal(style.fontSize, 16);
+  assert.ok(style.boundVariables.fontSize);
+  assert.ok(style.boundVariables.lineHeight);
+  assert.equal(node._styleId, style.id); // 원본 적용됨
+
+  // 멱등: 재실행 → updated(신규 0)
+  const r2 = await createSemanticTextStyles(specs, false, []);
+  assert.equal(r2.created, 0);
+  assert.equal(r2.updated, 1);
+  assert.equal(figma._state.textStyles.length, 1); // 중복 생성 없음
 });
