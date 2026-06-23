@@ -2150,7 +2150,7 @@
     return { samples, skipped };
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b;
+    var _a, _b, _c;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -2405,6 +2405,7 @@
           if (!requirePro()) break;
           let registered = 0;
           let skipped = 0;
+          const isContainerFrame = (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked;
           let targets;
           if (msg.nodeIds && msg.nodeIds.length) {
             targets = [];
@@ -2414,14 +2415,24 @@
               else skipped++;
             }
           } else {
-            targets = [...selection()];
+            const roots = [...selection()];
+            if (roots.length > 1) {
+              targets = roots;
+            } else if (roots.length === 1) {
+              const root = roots[0];
+              const kids = "children" in root ? root.children.filter(isContainerFrame) : [];
+              targets = kids.length ? kids : [root];
+            } else {
+              targets = [];
+            }
           }
+          const created = [];
           for (const node of targets) {
-            if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") {
-              skipped++;
+            if (node.type === "COMPONENT") {
+              created.push(node);
               continue;
             }
-            if (node.type === "INSTANCE" || node.type === "TEXT" || node.locked) {
+            if (node.type === "COMPONENT_SET" || node.type === "INSTANCE" || node.type === "TEXT" || node.locked) {
               skipped++;
               continue;
             }
@@ -2430,14 +2441,39 @@
               continue;
             }
             try {
-              figma.createComponentFromNode(node);
+              created.push(figma.createComponentFromNode(node));
               registered++;
             } catch (e) {
               skipped++;
             }
           }
-          post({ type: "COMPONENTS_RESULT", registered, skipped });
-          if (registered) commitUndo(figma);
+          const byName = /* @__PURE__ */ new Map();
+          for (const c of created) if (!byName.has(c.name)) byName.set(c.name, c);
+          const cls = classifyVariants(created.map((c) => c.name));
+          let sets = 0;
+          const missing = [];
+          for (const g of cls.groups) {
+            const nodes = g.members.map((m) => byName.get(m.name)).filter((n) => {
+              var _a2;
+              return !!n && ((_a2 = n.parent) == null ? void 0 : _a2.type) !== "COMPONENT_SET";
+            });
+            if (nodes.length < 2) continue;
+            try {
+              const parent = (_a = nodes[0].parent) != null ? _a : figma.currentPage;
+              const set = figma.combineAsVariants(nodes, parent);
+              set.name = g.base;
+              for (const m of g.members) {
+                const node = byName.get(m.name);
+                if (node) node.name = m.variant;
+              }
+              arrangeSet(set);
+              sets++;
+              if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(" / ")}`);
+            } catch (e) {
+            }
+          }
+          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles: cls.singles, missing });
+          if (registered || sets) commitUndo(figma);
           break;
         }
         case "CLASSIFY_VARIANTS": {
@@ -2455,7 +2491,7 @@
             });
             if (nodes.length < 2) continue;
             try {
-              const parent = (_a = nodes[0].parent) != null ? _a : figma.currentPage;
+              const parent = (_b = nodes[0].parent) != null ? _b : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = g.base;
               for (const m of g.members) {
@@ -2515,7 +2551,7 @@
                 else if (p.type === "BOOLEAN") def = target.visible;
                 else def = target.type === "INSTANCE" && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : "";
                 const id = node.addComponentProperty(p.propName, p.type, def);
-                const refs = __spreadValues({}, (_b = target.componentPropertyReferences) != null ? _b : {});
+                const refs = __spreadValues({}, (_c = target.componentPropertyReferences) != null ? _c : {});
                 refs[p.field] = id;
                 target.componentPropertyReferences = refs;
                 created++;
