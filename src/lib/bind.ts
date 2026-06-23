@@ -28,6 +28,7 @@ const FIELD_SCOPE: Record<string, VariableScope> = {
   width: 'WIDTH_HEIGHT',
   height: 'WIDTH_HEIGHT',
   itemSpacing: 'GAP',
+  counterAxisSpacing: 'GAP',
   paddingLeft: 'GAP',
   paddingRight: 'GAP',
   paddingTop: 'GAP',
@@ -36,6 +37,11 @@ const FIELD_SCOPE: Record<string, VariableScope> = {
   topRightRadius: 'CORNER_RADIUS',
   bottomLeftRadius: 'CORNER_RADIUS',
   bottomRightRadius: 'CORNER_RADIUS',
+  strokeWeight: 'STROKE_FLOAT',
+  strokeTopWeight: 'STROKE_FLOAT',
+  strokeRightWeight: 'STROKE_FLOAT',
+  strokeBottomWeight: 'STROKE_FLOAT',
+  strokeLeftWeight: 'STROKE_FLOAT',
   fontSize: 'FONT_SIZE',
   lineHeight: 'LINE_HEIGHT',
   letterSpacing: 'LETTER_SPACING',
@@ -257,6 +263,7 @@ async function walk(
   bindPaints(node, entries, res, apply, preview);
   bindFrame(node, entries, tol, res, flags, apply, preview);
   bindRadius(node, entries, tol, res, apply, preview);
+  bindStroke(node, entries, tol, res, apply, preview);
   bindEffects(node, entries, res, apply, preview);
   await bindText(node, entries, tol, res, apply, preview);
   // UX6: 주기적으로 진행률 보고 + 이벤트 루프 양보(취소 메시지 수신 가능) + 취소 확인.
@@ -328,6 +335,7 @@ function bindFrame(
     return;
   }
   tryBind(node, 'itemSpacing', node.itemSpacing, entries, tol, res, apply, preview);
+  if (typeof node.counterAxisSpacing === 'number') tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, tol, res, apply, preview);
   tryBind(node, 'paddingLeft', node.paddingLeft, entries, tol, res, apply, preview);
   tryBind(node, 'paddingRight', node.paddingRight, entries, tol, res, apply, preview);
   tryBind(node, 'paddingTop', node.paddingTop, entries, tol, res, apply, preview);
@@ -345,6 +353,23 @@ function bindRadius(node: SceneNode, entries: VarEntry[], tol: number, res: Bind
       const cv = (node as unknown as Record<string, number>)[c];
       if (typeof cv === 'number' && cv > 0) tryBind(node, c, cv, entries, tol, res, apply, preview);
     }
+  }
+}
+
+function bindStroke(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): void {
+  if (!('strokes' in node) || !('strokeWeight' in node)) return;
+  // 보이는 선이 있을 때만 두께 바인딩(선 없는 노드의 strokeWeight는 무의미).
+  const strokes = (node as { strokes: readonly Paint[] | typeof figma.mixed }).strokes;
+  if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
+  const w = (node as { strokeWeight: number | typeof figma.mixed }).strokeWeight;
+  if (w !== figma.mixed && typeof w === 'number') {
+    if (w > 0) tryBind(node, 'strokeWeight', w, entries, tol, res, apply, preview);
+    return;
+  }
+  // 변별 두께(상/우/하/좌)
+  for (const side of ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const) {
+    const sv = (node as unknown as Record<string, number>)[side];
+    if (typeof sv === 'number' && sv > 0) tryBind(node, side, sv, entries, tol, res, apply, preview);
   }
 }
 

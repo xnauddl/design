@@ -227,6 +227,7 @@ function kindOf(v: Variable): TokenKind {
   if (sc.includes('GAP')) return 'spacing';
   if (sc.includes('CORNER_RADIUS')) return 'radius';
   if (sc.includes('WIDTH_HEIGHT')) return 'size';
+  if (sc.includes('STROKE_FLOAT')) return 'strokeWidth';
   if (sc.includes('LINE_HEIGHT')) return 'lineHeight';
   if (sc.includes('LETTER_SPACING')) return 'letterSpacing';
   if (sc.includes('OPACITY')) return 'opacity';
@@ -238,6 +239,7 @@ function kindOf(v: Variable): TokenKind {
   if (n.startsWith('font-size')) return 'fontSize';
   if (n.startsWith('spacing')) return 'spacing';
   if (n.startsWith('radius')) return 'radius';
+  if (n.startsWith('stroke-width')) return 'strokeWidth';
   if (n.startsWith('size')) return 'size';
   if (n.includes('font') && n.includes('weight')) return 'fontWeight';
   if (n.includes('font') && n.includes('family')) return 'fontFamily';
