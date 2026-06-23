@@ -418,7 +418,7 @@ $('btnApplyCancel').addEventListener('click', () => {
 });
 
 $('btnPreview').addEventListener('click', () => {
-  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 3;
+  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 8;
   send({ type: 'RENAME', apply: false, maxDepth });
 });
 
@@ -546,7 +546,7 @@ async function runWizard(): Promise<void> {
   // 설정값은 각 단계의 기존 입력 필드에서 읽는다(단일 출처).
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
-  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 3;
+  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 8;
   const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
   const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
 
@@ -872,7 +872,7 @@ const gatherPreset = (name: string): Preset => ({
   name,
   base: Number(($('base') as HTMLInputElement).value) || 16,
   tolerance: Number(($('tol') as HTMLInputElement).value) || 0,
-  maxDepth: Number(($('depth') as HTMLInputElement).value) || 3,
+  maxDepth: Number(($('depth') as HTMLInputElement).value) || 8,
   semanticMap: textToSemanticMap(($('semMap') as HTMLTextAreaElement).value),
 });
 

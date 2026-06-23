@@ -1141,7 +1141,7 @@
     const parts = limitDepth([...ctx ? ctx.split("-") : [], kebab(role)], opts.maxDepth);
     return parts.filter(Boolean).join("-");
   }
-  function limitDepth(segs, maxDepth = 3) {
+  function limitDepth(segs, maxDepth = 8) {
     if (segs.length <= maxDepth) return segs;
     return segs.slice(segs.length - maxDepth);
   }

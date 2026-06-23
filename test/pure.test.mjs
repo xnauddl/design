@@ -361,7 +361,7 @@ test('serializePreset / parsePreset — 라운드트립 + 검증', () => {
   assert.equal(parsePreset('{nope').ok, false);
   // 누락 필드는 기본값으로 정규화
   const def = parsePreset(JSON.stringify({ name: 'x' }));
-  assert.deepEqual(def, { ok: true, preset: { name: 'x', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: {} } });
+  assert.deepEqual(def, { ok: true, preset: { name: 'x', base: 16, tolerance: 0.5, maxDepth: 8, semanticMap: {} } });
 });
 
 test('upsertPreset — 이름 키 교체(최신 앞)', () => {

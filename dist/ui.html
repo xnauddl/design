@@ -341,7 +341,7 @@
     <div class="step">
       <h2>4 · 리네임</h2>
       <div class="row">
-        <label class="inline">맥락 최대단계 <input id="depth" type="number" value="3" min="1" /></label>
+        <label class="inline">맥락 최대단계 <input id="depth" type="number" value="8" min="1" /></label>
         <button id="btnPreview">미리보기</button>
         <button id="btnRename" disabled>이름 적용</button>
       </div>
@@ -752,7 +752,7 @@
         name,
         base: num(o.base, 16),
         tolerance: num(o.tolerance, 0.5),
-        maxDepth: Math.max(1, Math.round(num(o.maxDepth, 3))),
+        maxDepth: Math.max(1, Math.round(num(o.maxDepth, 8))),
         semanticMap
       }
     };
@@ -1591,7 +1591,7 @@
     setStatus("applyStatus", t("apply.cancelRequested"), "warn");
   });
   $("btnPreview").addEventListener("click", () => {
-    const maxDepth = Number($("depth").value) || 3;
+    const maxDepth = Number($("depth").value) || 8;
     send({ type: "RENAME", apply: false, maxDepth });
   });
   $("btnContrast").addEventListener("click", () => {
@@ -1697,7 +1697,7 @@
     }
     const base = Number($("base").value) || 16;
     const tolerance = Number($("tol").value) || 0;
-    const maxDepth = Number($("depth").value) || 3;
+    const maxDepth = Number($("depth").value) || 8;
     const level = $("contrastLevel").value;
     const semMap = textToSemanticMap($("semMap").value);
     const options = {
@@ -1977,7 +1977,7 @@
     name,
     base: Number($("base").value) || 16,
     tolerance: Number($("tol").value) || 0,
-    maxDepth: Number($("depth").value) || 3,
+    maxDepth: Number($("depth").value) || 8,
     semanticMap: textToSemanticMap($("semMap").value)
   });
   function applyPreset(p) {
