@@ -841,8 +841,14 @@
   function isRGB(v) {
     return typeof v === "object" && v !== null && "r" in v && "g" in v && "b" in v;
   }
-  function matchColor(entries, hex) {
-    for (const e of entries) if (e.colorHex === hex) return e;
+  var FILL_SCOPES = ["ALL_FILLS", "FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"];
+  var STROKE_SCOPES = ["STROKE_COLOR"];
+  var EFFECT_SCOPES = ["EFFECT_COLOR"];
+  function colorScopeOk(e, allowed) {
+    return e.scopes.includes("ALL_SCOPES") || allowed.some((s) => e.scopes.includes(s));
+  }
+  function matchColor(entries, hex, allowed) {
+    for (const e of entries) if (e.colorHex === hex && colorScopeOk(e, allowed)) return e;
     return null;
   }
   function matchFloat(entries, value, tol, scope) {
@@ -895,11 +901,12 @@
       if (!(key in node)) continue;
       const paints2 = node[key];
       if (paints2 === figma.mixed || !Array.isArray(paints2)) continue;
+      const allowed = key === "fills" ? FILL_SCOPES : STROKE_SCOPES;
       let changed = false;
       const next = paints2.map((p, i) => {
         if (p.type !== "SOLID") return p;
         const hex = rgbToHex(p.color);
-        const e = matchColor(entries, hex);
+        const e = matchColor(entries, hex, allowed);
         if (!e) {
           skip(res, "no-match");
           return p;
@@ -968,7 +975,7 @@
     const next = node.effects.map((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return e;
       const hex = rgbToHex(e.color);
-      const ent = matchColor(entries, hex);
+      const ent = matchColor(entries, hex, EFFECT_SCOPES);
       if (!ent) {
         skip(res, "no-match");
         return e;

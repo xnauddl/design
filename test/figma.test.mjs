@@ -442,6 +442,39 @@ test('bindSelection — 선 두께(strokeWeight)는 STROKE_FLOAT 변수에 바�
   assert.equal(res.bound, 1);
 });
 
+test('bindSelection — 색상도 용도 스코프로 분리(stroke 전용 색은 fill에 안 붙음)', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'color/aa0000', category: 'color', sources: ['fill'], value: '#aa0000' }, // ALL_FILLS
+      { name: 'color/0000aa', category: 'color', sources: ['stroke'], value: '#0000aa' }, // STROKE_COLOR
+    ],
+    16,
+  );
+  const node = {
+    type: 'FRAME',
+    id: 'c',
+    name: 'c',
+    fills: [
+      { type: 'SOLID', color: { r: 0.6667, g: 0, b: 0 } }, // #aa0000 → fill 변수
+      { type: 'SOLID', color: { r: 0, g: 0, b: 0.6667 } }, // #0000aa = stroke 전용 색 → fill엔 안 붙어야
+    ],
+    strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0.6667 }, visible: true }], // #0000aa → stroke 변수
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    layoutMode: 'NONE',
+  };
+
+  const res = await bindSelection([node], 0.5);
+
+  const fillVar = findVar(figma, 'Semantic', 'color/aa0000');
+  const strokeVar = findVar(figma, 'Semantic', 'color/0000aa');
+  assert.equal(node.fills[0].boundVariables.color.id, fillVar.id); // fill 매칭
+  assert.equal(node.fills[1].boundVariables, undefined); // stroke 전용 색은 fill에 안 붙음
+  assert.equal(node.strokes[0].boundVariables.color.id, strokeVar.id); // stroke 매칭
+  assert.equal(res.bound, 2);
+});
+
 test('bindSelection — 사용량 한도(maxNodes) 초과 시 부분 적용 + limited', async () => {
   installFigma();
   await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
