@@ -556,7 +556,7 @@
     "component.noEligible": "\uC120\uD0DD \uD558\uC704\uC5D0 \uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
     "component.noEligibleShort": "\uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
     "component.candidates": "\uB4F1\uB85D \uD6C4\uBCF4 {total}\uAC1C \xB7 {sel}\uAC1C \uC120\uD0DD",
-    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D {registered} \xB7 \uC2A4\uD0B5 {skipped}",
+    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {registered} \xB7 \uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}{extra}",
     "component.variants": "\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}\uAC1C \uC0DD\uC131{extra}",
     "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
     "component.exposed": "\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131 {created}\uAC1C \uB178\uCD9C",
@@ -1774,9 +1774,8 @@
           }
           case "componentize": {
             const reg = await wizardRequest({ type: "REGISTER_COMPONENTS" }, ["COMPONENTS_RESULT"]);
-            const cls = await wizardRequest({ type: "CLASSIFY_VARIANTS" }, ["VARIANTS_RESULT"]);
             totals.components = reg.registered;
-            setWizardStep("componentize", "done", `\uB4F1\uB85D ${reg.registered} \xB7 \uC138\uD2B8 ${cls.sets}`);
+            setWizardStep("componentize", "done", `\uB4F1\uB85D ${reg.registered} \xB7 \uC138\uD2B8 ${reg.sets}`);
             break;
           }
         }
@@ -2202,10 +2201,24 @@
         if (!compEligibleCount()) setStatus("componentStatus", t("component.noEligible"), "warn");
         break;
       }
-      case "COMPONENTS_RESULT":
+      case "COMPONENTS_RESULT": {
         clearCompPreview();
-        setStatus("componentStatus", t("component.registered", { registered: msg.registered, skipped: msg.skipped }), msg.registered ? "ok" : "warn");
+        const extra = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}`;
+        setStatus("componentStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? "ok" : "warn");
+        const box = $("variantReport");
+        box.innerHTML = "";
+        if (msg.missing.length) {
+          const h = document.createElement("div");
+          h.textContent = "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):";
+          box.appendChild(h);
+          for (const m of msg.missing) {
+            const d = document.createElement("div");
+            d.textContent = `  ${m}`;
+            box.appendChild(d);
+          }
+        }
         break;
+      }
       case "VARIANTS_RESULT": {
         const box = $("variantReport");
         box.innerHTML = "";

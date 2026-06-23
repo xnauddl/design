@@ -620,7 +620,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!requirePro()) break;
         let registered = 0;
         let skipped = 0;
-        // #1: nodeIds 지정 시 해당 노드만(미리보기 트리 선택), 아니면 최상위 선택(마법사·폴백).
+        const isContainerFrame = (n: SceneNode): boolean => (n.type === 'FRAME' || n.type === 'GROUP') && !n.locked;
+        // 대상 후보 결정: 트리에서 체크한 nodeIds, 없으면 **선택 프레임 '내부'의 직접 후보(자식)**를
+        // 등록한다(선택 프레임 자체가 아님). 후보가 없는 리프 프레임은 그 자신을 등록.
         let targets: SceneNode[];
         if (msg.nodeIds && msg.nodeIds.length) {
           targets = [];
@@ -630,14 +632,26 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             else skipped++; // 소실 노드 graceful skip
           }
         } else {
-          targets = [...selection()];
+          const roots = [...selection()];
+          if (roots.length > 1) {
+            targets = roots; // 여러 프레임 직접 선택 → 변형 프레임들로 보고 그대로 등록
+          } else if (roots.length === 1) {
+            // 단일 선택은 컨테이너로 보고 '내부' 후보(자식)를 등록. 후보 없으면 자신(리프).
+            const root = roots[0];
+            const kids = 'children' in root ? (root.children as readonly SceneNode[]).filter(isContainerFrame) : [];
+            targets = kids.length ? kids : [root];
+          } else {
+            targets = [];
+          }
         }
+        // 1) 후보 → 메인 컴포넌트 등록(기존 컴포넌트는 분류 대상에 포함).
+        const created: ComponentNode[] = [];
         for (const node of targets) {
-          if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') {
-            skipped++; // 이미 컴포넌트(멱등)
+          if (node.type === 'COMPONENT') {
+            created.push(node);
             continue;
           }
-          if (node.type === 'INSTANCE' || node.type === 'TEXT' || node.locked) {
+          if (node.type === 'COMPONENT_SET' || node.type === 'INSTANCE' || node.type === 'TEXT' || node.locked) {
             skipped++;
             continue;
           }
@@ -646,14 +660,40 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             continue;
           }
           try {
-            figma.createComponentFromNode(node); // 이름 유지(리네임 단계에서 정함)
+            created.push(figma.createComponentFromNode(node)); // 이름 유지(리네임 단계에서 정함)
             registered++;
           } catch {
             skipped++;
           }
         }
-        post({ type: 'COMPONENTS_RESULT', registered, skipped });
-        if (registered) commitUndo(figma); // UX2
+        // 2) 베이스 이름으로 묶어 베리언트 세트 결합(멤버 2개+). 단일은 컴포넌트로 유지.
+        const byName = new Map<string, ComponentNode>();
+        for (const c of created) if (!byName.has(c.name)) byName.set(c.name, c);
+        const cls = classifyVariants(created.map((c) => c.name));
+        let sets = 0;
+        const missing: string[] = [];
+        for (const g of cls.groups) {
+          const nodes = g.members
+            .map((m) => byName.get(m.name))
+            .filter((n): n is ComponentNode => !!n && n.parent?.type !== 'COMPONENT_SET');
+          if (nodes.length < 2) continue;
+          try {
+            const parent = nodes[0].parent ?? figma.currentPage;
+            const set = figma.combineAsVariants(nodes, parent);
+            set.name = g.base;
+            for (const m of g.members) {
+              const node = byName.get(m.name);
+              if (node) node.name = m.variant; // 'prop=value, ...'
+            }
+            arrangeSet(set); // 속성 기반 그리드 정렬 + 리사이즈
+            sets++;
+            if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(' / ')}`);
+          } catch {
+            /* 결합 실패 시 스킵 */
+          }
+        }
+        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles: cls.singles, missing });
+        if (registered || sets) commitUndo(figma); // UX2
         break;
       }
       case 'CLASSIFY_VARIANTS': {

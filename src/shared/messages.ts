@@ -100,7 +100,7 @@ export type UiToCode =
   | { type: 'DELETE_PRESET'; name: string } // M3(Team): 프리셋 삭제
   | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number } // 토큰 코드 내보내기
   | { type: 'SCAN_COMPONENT_CANDIDATES' } // #1(Pro): 선택 하위 순회 → 등록 후보 트리
-  | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[] } // Phase 3(Pro): 선택/지정 노드 → 메인 컴포넌트(nodeIds 미지정 시 최상위 선택)
+  | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[] } // Phase 3(Pro): 후보(트리 선택 nodeIds, 없으면 선택 프레임 '내부' 후보) → 메인 컴포넌트 등록 + 베이스 묶음 베리언트 세트
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Pro): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Pro): 선택 세트의 빠진 조합 자동 생성
   | { type: 'EXPOSE_PROPERTIES' } // Phase 4.1(Pro): 컴포넌트 속성(Boolean/Text/Instance-swap) 노출
@@ -141,7 +141,7 @@ export type CodeToUi =
   | { type: 'PRESETS'; presets: Preset[] } // M3(Team): 프리셋 목록
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
-  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number } // Phase 3
+  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; missing: string[] } // Phase 3: 등록 + 베이스 묶음 베리언트 세트
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[] } // Phase 3
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'PROPERTIES_RESULT'; created: number; props: string[] } // Phase 4.1

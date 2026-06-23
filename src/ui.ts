@@ -627,10 +627,10 @@ async function runWizard(): Promise<void> {
           break;
         }
         case 'componentize': {
+          // 등록이 베이스 묶음 베리언트 세트까지 함께 수행(별도 분류 불필요).
           const reg = await wizardRequest({ type: 'REGISTER_COMPONENTS' }, ['COMPONENTS_RESULT']);
-          const cls = await wizardRequest({ type: 'CLASSIFY_VARIANTS' }, ['VARIANTS_RESULT']);
           totals.components = reg.registered;
-          setWizardStep('componentize', 'done', `등록 ${reg.registered} · 세트 ${cls.sets}`);
+          setWizardStep('componentize', 'done', `등록 ${reg.registered} · 세트 ${reg.sets}`);
           break;
         }
       }
@@ -1127,10 +1127,25 @@ window.onmessage = (event: MessageEvent) => {
       if (!compEligibleCount()) setStatus('componentStatus', t('component.noEligible'), 'warn');
       break;
     }
-    case 'COMPONENTS_RESULT':
+    case 'COMPONENTS_RESULT': {
       clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
-      setStatus('componentStatus', t('component.registered', { registered: msg.registered, skipped: msg.skipped }), msg.registered ? 'ok' : 'warn');
+      const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}`;
+      setStatus('componentStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? 'ok' : 'warn');
+      // 빈 조합(미생성) 리포트
+      const box = $('variantReport');
+      box.innerHTML = '';
+      if (msg.missing.length) {
+        const h = document.createElement('div');
+        h.textContent = '빈 조합(미생성):';
+        box.appendChild(h);
+        for (const m of msg.missing) {
+          const d = document.createElement('div');
+          d.textContent = `  ${m}`;
+          box.appendChild(d);
+        }
+      }
       break;
+    }
     case 'VARIANTS_RESULT': {
       const box = $('variantReport');
       box.innerHTML = '';
