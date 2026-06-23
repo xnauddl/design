@@ -693,6 +693,22 @@
 
   // src/lib/bind.ts
   var TIER = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
+  var FIELD_SCOPE = {
+    width: "WIDTH_HEIGHT",
+    height: "WIDTH_HEIGHT",
+    itemSpacing: "GAP",
+    paddingLeft: "GAP",
+    paddingRight: "GAP",
+    paddingTop: "GAP",
+    paddingBottom: "GAP",
+    topLeftRadius: "CORNER_RADIUS",
+    topRightRadius: "CORNER_RADIUS",
+    bottomLeftRadius: "CORNER_RADIUS",
+    bottomRightRadius: "CORNER_RADIUS",
+    fontSize: "FONT_SIZE",
+    lineHeight: "LINE_HEIGHT",
+    letterSpacing: "LETTER_SPACING"
+  };
   function addColorCand(preview, node, field, index, hex, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
   }
@@ -756,7 +772,7 @@
     return res;
   }
   async function buildIndex() {
-    var _a;
+    var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
     const tierOf = new Map(cols.map((c) => {
@@ -770,7 +786,7 @@
       if (tier < 2) continue;
       const val = await resolveValue(v, modeOf);
       if (val == null) continue;
-      const e = { variable: v, tier, type: v.resolvedType };
+      const e = { variable: v, tier, type: v.resolvedType, scopes: (_b = v.scopes) != null ? _b : ["ALL_SCOPES"] };
       if (v.resolvedType === "COLOR" && isRGB(val)) e.colorHex = rgbToHex(val);
       else if (v.resolvedType === "FLOAT" && typeof val === "number") e.num = val;
       else if (v.resolvedType === "STRING" && typeof val === "string") e.str = val;
@@ -799,11 +815,12 @@
     for (const e of entries) if (e.colorHex === hex) return e;
     return null;
   }
-  function matchFloat(entries, value, tol) {
+  function matchFloat(entries, value, tol, scope) {
     let best = null;
     let bestDist = Infinity;
     for (const e of entries) {
       if (e.num == null) continue;
+      if (scope && !e.scopes.includes("ALL_SCOPES") && !e.scopes.includes(scope)) continue;
       const dist = Math.abs(e.num - value);
       if (dist > tol) continue;
       if (dist < bestDist || dist === bestDist && best !== null && best.tier < e.tier) {
@@ -938,7 +955,7 @@
     }
   }
   function tryBindText(node, field, value, entries, tol, res, apply, preview) {
-    const e = matchFloat(entries, value, tol);
+    const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     const len = node.characters.length;
     if (len === 0) {
       skip(res, "empty-text");
@@ -961,7 +978,7 @@
     }
   }
   function tryBind(node, field, value, entries, tol, res, apply, preview) {
-    const e = matchFloat(entries, value, tol);
+    const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     if (!e) {
       skip(res, "no-match");
       return;

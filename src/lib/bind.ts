@@ -11,12 +11,35 @@ interface VarEntry {
   variable: Variable;
   tier: number; // Component 3 > Semantic 2 > Global 1
   type: VariableResolvedDataType;
+  scopes: readonly VariableScope[]; // 용도 스코프 — 필드와 안 맞는 변수 오매칭 차단
   colorHex?: string;
   num?: number;
   str?: string;
 }
 
 const TIER: Record<string, number> = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
+
+/**
+ * 바인딩 대상 필드 → 요구 변수 스코프. 변수 `scopes`가 이 스코프(또는 `ALL_SCOPES`)를
+ * 포함할 때만 매칭한다. 여백(GAP)이 line-height/letter-spacing(LINE_HEIGHT/LETTER_SPACING)
+ * 변수에 값만 비슷하다고 잘못 연결되는 오매칭을 막는다. (Figma의 GAP 스코프는 gap+padding 공용.)
+ */
+const FIELD_SCOPE: Record<string, VariableScope> = {
+  width: 'WIDTH_HEIGHT',
+  height: 'WIDTH_HEIGHT',
+  itemSpacing: 'GAP',
+  paddingLeft: 'GAP',
+  paddingRight: 'GAP',
+  paddingTop: 'GAP',
+  paddingBottom: 'GAP',
+  topLeftRadius: 'CORNER_RADIUS',
+  topRightRadius: 'CORNER_RADIUS',
+  bottomLeftRadius: 'CORNER_RADIUS',
+  bottomRightRadius: 'CORNER_RADIUS',
+  fontSize: 'FONT_SIZE',
+  lineHeight: 'LINE_HEIGHT',
+  letterSpacing: 'LETTER_SPACING',
+};
 
 export interface BindResult {
   bound: number;
@@ -153,7 +176,7 @@ async function buildIndex(): Promise<VarEntry[]> {
     if (tier < 2) continue; // Component/Semantic만 바인딩 대상
     const val = await resolveValue(v, modeOf);
     if (val == null) continue;
-    const e: VarEntry = { variable: v, tier, type: v.resolvedType };
+    const e: VarEntry = { variable: v, tier, type: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'] };
     if (v.resolvedType === 'COLOR' && isRGB(val)) e.colorHex = rgbToHex(val);
     else if (v.resolvedType === 'FLOAT' && typeof val === 'number') e.num = val;
     else if (v.resolvedType === 'STRING' && typeof val === 'string') e.str = val;
@@ -189,11 +212,13 @@ function matchColor(entries: VarEntry[], hex: string): VarEntry | null {
   for (const e of entries) if (e.colorHex === hex) return e;
   return null;
 }
-function matchFloat(entries: VarEntry[], value: number, tol: number): VarEntry | null {
+function matchFloat(entries: VarEntry[], value: number, tol: number, scope?: VariableScope): VarEntry | null {
   let best: VarEntry | null = null;
   let bestDist = Infinity;
   for (const e of entries) {
     if (e.num == null) continue;
+    // 용도(스코프) 불일치 변수는 제외 — 여백이 line-height/letter-spacing 등에 붙는 오매칭 방지.
+    if (scope && !e.scopes.includes('ALL_SCOPES') && !e.scopes.includes(scope)) continue;
     const dist = Math.abs(e.num - value);
     if (dist > tol) continue;
     // 가장 가까운 값 우선, 동률이면 높은 tier 우선.
@@ -374,7 +399,7 @@ function tryBindText(
   apply: boolean,
   preview: Preview | null,
 ): void {
-  const e = matchFloat(entries, value, tol);
+  const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   const len = node.characters.length;
   if (len === 0) {
     skip(res, 'empty-text');
@@ -407,7 +432,7 @@ function tryBind(
   apply: boolean,
   preview: Preview | null,
 ): void {
-  const e = matchFloat(entries, value, tol);
+  const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   if (!e) {
     skip(res, 'no-match');
     return;
