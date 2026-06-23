@@ -321,7 +321,6 @@
       </div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> 전체 선택</label>
-        <label class="inline"><input type="checkbox" id="bindHideCtx" checked /> 맥락 숨기기</label>
       </div>
       <div id="bindTree"></div>
       <div class="ux" id="applyProgress" style="display:none">
@@ -347,7 +346,6 @@
       </div>
       <div class="row tree-ctrls">
         <label class="inline"><input type="checkbox" id="renameAll" checked /> 전체 선택</label>
-        <label class="inline"><input type="checkbox" id="renameHideCtx" checked /> 맥락 숨기기</label>
       </div>
       <div id="diff"></div>
       <div class="ux">
@@ -388,7 +386,6 @@
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
-        <label class="inline"><input type="checkbox" id="compHideCtx" checked /> 맥락 숨기기</label>
       </div>
       <div id="compTree"></div>
       <div class="ux">
@@ -1582,10 +1579,6 @@
     if (on) for (const c of bindCandidates) bindChecked.add(candKey(c));
     renderBindTree();
   });
-  $("bindHideCtx").addEventListener("change", (e) => {
-    bindHideContext = e.target.checked;
-    renderBindTree();
-  });
   $("btnApplyCancel").addEventListener("click", () => {
     send({ type: "CANCEL" });
     setStatus("applyStatus", t("apply.cancelRequested"), "warn");
@@ -1610,10 +1603,6 @@
     if (on) {
       for (const n of renameNodes) if (n.after !== void 0) renameChecked.add(n.id);
     }
-    renderRenameTree();
-  });
-  $("renameHideCtx").addEventListener("change", (e) => {
-    renameHideContext = e.target.checked;
     renderRenameTree();
   });
   var wizardRunning = false;
@@ -1945,10 +1934,6 @@
     if (on) {
       for (const c of compCandidates) if (c.eligible) compChecked.add(c.id);
     }
-    renderCompTree();
-  });
-  $("compHideCtx").addEventListener("change", (e) => {
-    compHideContext = e.target.checked;
     renderCompTree();
   });
   $("btnClassifyVariants").addEventListener("click", () => {
