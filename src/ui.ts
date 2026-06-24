@@ -524,31 +524,13 @@ $('renameHideCtx').addEventListener('change', (e) => {
 /* ============================================================
    시스템화 마법사 — 기존 메시지(추출→생성→시맨틱→바인딩→정돈→검수→컴포넌트화)를
    순서대로 호출하는 UI 시퀀서. 신규 로직은 lib/wizard.ts(순수)에 분리.
-   기존 window.onmessage 스위치는 그대로 두고, 별도 리스너로 단계 완료를 await한다.
+   단계 완료는 통합 디스패처(window.onmessage)가 wizardWaiter로 await를 해소한다.
+   마법사 실행 중에는 메인 스위치를 돌리지 않아 일반 패널 상태 desync를 차단한다.
    ============================================================ */
 let wizardRunning = false;
 // 한 번에 하나의 단계만 await(순차 실행)하므로 단일 대기자로 충분.
+// 단계 응답 라우팅은 통합 디스패처(window.onmessage)가 wizardWaiter를 보고 처리한다.
 let wizardWaiter: { types: string[]; resolve: (m: CodeToUi) => void; reject: (e: Error) => void } | null = null;
-
-window.addEventListener('message', (event: MessageEvent) => {
-  const m = (event.data as { pluginMessage?: CodeToUi }).pluginMessage;
-  if (!m) return;
-  // 바인딩 진행률(UX6)은 마법사 자체 진행바로 표시(‘적용’ 탭 진행바는 안 보임).
-  if (wizardRunning && m.type === 'PROGRESS' && m.op === 'bind') updateWizardBar(m.done, m.total);
-  if (!wizardWaiter) return;
-  // 오류/유료요구는 대기 중이면 해당 단계 실패로 처리(무한 대기 방지).
-  if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
-    const w = wizardWaiter;
-    wizardWaiter = null;
-    w.reject(new Error(m.message));
-    return;
-  }
-  if (wizardWaiter.types.includes(m.type)) {
-    const w = wizardWaiter;
-    wizardWaiter = null;
-    w.resolve(m);
-  }
-});
 
 /** 메시지를 보내고 기대 응답(또는 오류)까지 기다린다. 결과 타입은 expect로 좁혀진다. */
 function wizardRequest<T extends CodeToUi['type']>(msg: UiToCode, expect: T[]): Promise<Extract<CodeToUi, { type: T }>> {
@@ -650,7 +632,7 @@ async function runWizard(): Promise<void> {
       switch (p.step.id) {
         case 'extract': {
           const r = await wizardRequest({ type: 'EXTRACT' }, ['EXTRACT_RESULT']);
-          tokens = r.tokens; // 모듈 변수 동기화(다음 단계 일관성)
+          applyExtractResult(r); // tokens 동기화 + hue 정규화 + 추출/색 패널 일관화(메인 스위치와 단일 출처)
           if (!tokens.length) {
             setWizardStep('extract', 'fail', '추출된 토큰 없음 — 색·폰트·간격이 있는 프레임을 선택하세요.');
             stopped = true;
@@ -1033,24 +1015,28 @@ $('btnClearLicense').addEventListener('click', () => {
 });
 
 /* ---------- code → ui ---------- */
-window.onmessage = (event: MessageEvent) => {
-  const msg = event.data.pluginMessage as CodeToUi | undefined;
-  if (!msg) return;
-  switch (msg.type) {
-    case 'EXTRACT_RESULT': {
-      tokens = msg.tokens;
-      huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
-      renderTokens();
-      ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
-      ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
-      // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
-      suggestSemMapFrom(tokens);
-      renderColorClusters(); // 색 정리(군집): 대표색·단색 유지·요약
+/** EXTRACT_RESULT를 모듈 tokens에 반영 + hue-Global 이름 정규화 + 토큰 의존 패널 렌더.
+   메인 스위치와 마법사 extract 단계의 단일 출처 — huefy를 양쪽에서 일관 적용한다. */
+function applyExtractResult(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void {
+  tokens = msg.tokens;
+  huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
+  renderTokens();
+  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
+  ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
+  // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
+  suggestSemMapFrom(tokens);
+  renderColorClusters(); // 색 정리(군집): 대표색·단색 유지·요약
   renderColorTable(); // #3: 색 편집표(hue·역할) 표시
-      $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
-      setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
+  $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
+  setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
+}
+
+/** 메인 메시지 스위치 — 마법사 비실행 시에만 dispatchMessage가 호출한다. */
+function mainSwitch(msg: CodeToUi): void {
+  switch (msg.type) {
+    case 'EXTRACT_RESULT':
+      applyExtractResult(msg);
       break;
-    }
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
@@ -1271,6 +1257,36 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
   }
+}
+
+/* ---------- 단일 메시지 디스패처 — 마법사 라우팅 + 메인 스위치 통합 ----------
+   마법사 실행 중에는 메인 스위치를 돌리지 않아, 단계별 결과(APPLY/RENAME/CREATE…)가
+   일반 패널 상태를 덮어쓰는 desync를 차단한다. 마법사가 기다리는 단계 응답은
+   wizardWaiter로만 라우팅한다. */
+window.onmessage = (event: MessageEvent) => {
+  const m = (event.data as { pluginMessage?: CodeToUi }).pluginMessage;
+  if (!m) return;
+  // 바인딩 진행률(UX6)은 마법사 자체 진행바로 표시('적용' 탭 진행바는 안 보임).
+  if (wizardRunning && m.type === 'PROGRESS' && m.op === 'bind') updateWizardBar(m.done, m.total);
+  // 마법사 단계가 응답을 대기 중이면 해당 단계로만 라우팅(메인 스위치 건너뜀).
+  if (wizardWaiter) {
+    // 오류/유료요구는 대기 중이면 해당 단계 실패로 처리(무한 대기 방지).
+    if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
+      const w = wizardWaiter;
+      wizardWaiter = null;
+      w.reject(new Error(m.message));
+      return;
+    }
+    if (wizardWaiter.types.includes(m.type)) {
+      const w = wizardWaiter;
+      wizardWaiter = null;
+      w.resolve(m);
+    }
+    return; // 기다리지 않는 메시지는 무시 — 진행 중 패널 상태 보호.
+  }
+  // 단계 사이(대기자 없음)라도 마법사 실행 중이면 메인 스위치를 돌리지 않는다.
+  if (wizardRunning) return;
+  mainSwitch(m);
 };
 
 /* ---------- UX7: 오류 라우팅/표시 ---------- */

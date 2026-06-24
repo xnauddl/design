@@ -1784,23 +1784,6 @@
   });
   var wizardRunning = false;
   var wizardWaiter = null;
-  window.addEventListener("message", (event) => {
-    const m = event.data.pluginMessage;
-    if (!m) return;
-    if (wizardRunning && m.type === "PROGRESS" && m.op === "bind") updateWizardBar(m.done, m.total);
-    if (!wizardWaiter) return;
-    if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
-      const w = wizardWaiter;
-      wizardWaiter = null;
-      w.reject(new Error(m.message));
-      return;
-    }
-    if (wizardWaiter.types.includes(m.type)) {
-      const w = wizardWaiter;
-      wizardWaiter = null;
-      w.resolve(m);
-    }
-  });
   function wizardRequest(msg, expect) {
     return new Promise((resolve, reject) => {
       wizardWaiter = {
@@ -1891,7 +1874,7 @@
         switch (p.step.id) {
           case "extract": {
             const r = await wizardRequest({ type: "EXTRACT" }, ["EXTRACT_RESULT"]);
-            tokens = r.tokens;
+            applyExtractResult(r);
             if (!tokens.length) {
               setWizardStep("extract", "fail", "\uCD94\uCD9C\uB41C \uD1A0\uD070 \uC5C6\uC74C \u2014 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uC788\uB294 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694.");
               stopped = true;
@@ -2221,24 +2204,24 @@
     $("licenseKey").value = "";
     send({ type: "CLEAR_LICENSE" });
   });
-  window.onmessage = (event) => {
+  function applyExtractResult(msg) {
+    tokens = msg.tokens;
+    huefyTokenColors(tokens);
+    renderTokens();
+    $("btnCreateApply").style.display = "none";
+    $("btnPaletteApply").style.display = "none";
+    suggestSemMapFrom(tokens);
+    renderColorClusters();
+    renderColorTable();
+    $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
+    setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");
+  }
+  function mainSwitch(msg) {
     var _a, _b;
-    const msg = event.data.pluginMessage;
-    if (!msg) return;
     switch (msg.type) {
-      case "EXTRACT_RESULT": {
-        tokens = msg.tokens;
-        huefyTokenColors(tokens);
-        renderTokens();
-        $("btnCreateApply").style.display = "none";
-        $("btnPaletteApply").style.display = "none";
-        suggestSemMapFrom(tokens);
-        renderColorClusters();
-        renderColorTable();
-        $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
-        setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");
+      case "EXTRACT_RESULT":
+        applyExtractResult(msg);
         break;
-      }
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
@@ -2430,6 +2413,27 @@
         break;
       }
     }
+  }
+  window.onmessage = (event) => {
+    const m = event.data.pluginMessage;
+    if (!m) return;
+    if (wizardRunning && m.type === "PROGRESS" && m.op === "bind") updateWizardBar(m.done, m.total);
+    if (wizardWaiter) {
+      if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
+        const w = wizardWaiter;
+        wizardWaiter = null;
+        w.reject(new Error(m.message));
+        return;
+      }
+      if (wizardWaiter.types.includes(m.type)) {
+        const w = wizardWaiter;
+        wizardWaiter = null;
+        w.resolve(m);
+      }
+      return;
+    }
+    if (wizardRunning) return;
+    mainSwitch(m);
   };
   var OP_STATUS = {
     EXTRACT: "extractStatus",
