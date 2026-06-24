@@ -202,9 +202,11 @@
     }
     if (node.letterSpacing !== figma.mixed) {
       const ls = node.letterSpacing;
-      const unit = ls.unit === "PERCENT" ? "percent" : "px";
       const v = round(ls.value);
-      add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing");
+      if (v !== 0) {
+        const unit = ls.unit === "PERCENT" ? "percent" : "px";
+        add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing");
+      }
     }
   }
   function collectSpacing(acc, node) {
@@ -864,7 +866,13 @@
         changed = true;
         return figma.variables.setBoundVariableForPaint(p, "color", e.variable);
       });
-      if (changed && apply) node[key] = next;
+      if (changed && apply) {
+        try {
+          node[key] = next;
+        } catch (e) {
+          note(res, "error");
+        }
+      }
     }
   }
   function bindFrame(node, entries, tol, res, flags, apply, preview) {
@@ -918,7 +926,13 @@
       changed = true;
       return figma.variables.setBoundVariableForEffect(e, "color", ent.variable);
     });
-    if (changed && apply) node.effects = next;
+    if (changed && apply) {
+      try {
+        node.effects = next;
+      } catch (e) {
+        note(res, "error");
+      }
+    }
   }
   async function bindText(node, entries, tol, res, apply, preview) {
     if (node.type !== "TEXT") return;

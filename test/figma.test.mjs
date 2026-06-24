@@ -169,6 +169,27 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
   assert.equal(byName.get('radius/4')?.category, 'radius');
 });
 
+test('extractFromSelection — letter-spacing 0은 스킵, 음수/양수는 수집', () => {
+  installFigma();
+  const mk = (id, value) => ({
+    type: 'TEXT',
+    id,
+    name: id,
+    fontSize: 16,
+    fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'AUTO' },
+    letterSpacing: { unit: 'PIXELS', value },
+    characters: 'x',
+  });
+  const { tokens } = extractFromSelection([mk('z', 0), mk('p', 2), mk('n', -1)]);
+  const names = new Set(tokens.map((t) => t.name));
+  // 기본값 0은 의미 없는 토큰이라 생성 안 함
+  assert.equal(names.has('letter-spacing/0'), false);
+  // 양수/음수(자간 좁힘)는 의미 있으므로 수집
+  assert.equal(names.has('letter-spacing/2'), true);
+  assert.equal(tokens.some((t) => t.category === 'letterSpacing' && t.value === -1), true);
+});
+
 test('extractFromSelection — 그라디언트 채움은 경고', () => {
   installFigma();
   const node = {

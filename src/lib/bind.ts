@@ -273,7 +273,14 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
       changed = true;
       return figma.variables.setBoundVariableForPaint(p, 'color', e.variable);
     });
-    if (changed && apply) (node as unknown as Record<string, Paint[]>)[key] = next;
+    // 잠금/읽기 전용 노드 등에서 재할당이 throw해도 해당 노드만 건너뛰고 전체 순회는 계속.
+    if (changed && apply) {
+      try {
+        (node as unknown as Record<string, Paint[]>)[key] = next;
+      } catch {
+        note(res, 'error');
+      }
+    }
   }
 }
 
@@ -342,7 +349,14 @@ function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, appl
     changed = true;
     return figma.variables.setBoundVariableForEffect(e, 'color', ent.variable);
   });
-  if (changed && apply) (node as unknown as { effects: readonly Effect[] }).effects = next;
+  // 잠금/읽기 전용 노드 등에서 재할당이 throw해도 해당 노드만 건너뛰고 전체 순회는 계속.
+  if (changed && apply) {
+    try {
+      (node as unknown as { effects: readonly Effect[] }).effects = next;
+    } catch {
+      note(res, 'error');
+    }
+  }
 }
 
 async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): Promise<void> {

@@ -76,9 +76,13 @@ function collectText(acc: Accumulator, node: TextNode): void {
   }
   if (node.letterSpacing !== figma.mixed) {
     const ls = node.letterSpacing;
-    const unit: Unit = ls.unit === 'PERCENT' ? 'percent' : 'px';
     const v = round(ls.value);
-    add(acc, { name: numberTokenName('letter-spacing', v), category: 'letterSpacing', value: v, unit }, 'letterSpacing');
+    // 기본값 0은 의미 없는 토큰(letter-spacing/0)이라 스킵 — 다른 수집기와 동일하게 0 가드.
+    // 음수(자간 좁힘)는 의미 있으므로 보존: `!== 0`.
+    if (v !== 0) {
+      const unit: Unit = ls.unit === 'PERCENT' ? 'percent' : 'px';
+      add(acc, { name: numberTokenName('letter-spacing', v), category: 'letterSpacing', value: v, unit }, 'letterSpacing');
+    }
   }
 }
 
