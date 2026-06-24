@@ -1,8 +1,10 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
-import type { DraftToken } from './lib/tokens';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate, VarInfo, VarMode, VarValueCell, VarPatch } from './shared/messages';
+import type { DraftToken, ScopeName } from './lib/tokens';
+import { scopesForTypeList } from './lib/tokens';
+import { validateVarName } from './lib/variableEdit';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { FREE_LIMITS, type Tier } from './lib/entitlements';
@@ -43,6 +45,7 @@ let hasBindable = false;
 let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
+let varList: VarInfo[] = []; // R1: 변수 편집기 목록(VARIABLES 수신)
 
 /* ---------- 토큰 목록 렌더 ---------- */
 /* ---------- 점진(청크) 렌더 — 대량 목록을 프레임 단위로 나눠 비차단 렌더(§4) ----------
@@ -1032,6 +1035,182 @@ function applyExtractResult(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>):
 }
 
 /** 메인 메시지 스위치 — 마법사 비실행 시에만 dispatchMessage가 호출한다. */
+/* ---------- R1: 변수 속성 편집기 ----------
+   3계층 변수를 컬렉션별로 그룹화해 인라인 편집(값·이름·스코프·설명·삭제). 변경은
+   blur/change 시 EDIT_VARIABLE로 즉시 전송, 결과로 행/목록을 갱신한다. */
+function sendVarPatch(id: string, patch: VarPatch): void {
+  send({ type: 'EDIT_VARIABLE', id, patch });
+}
+
+/** 모드 한 칸의 리터럴 입력(타입별: color/number/text). 커밋 시 literal 패치 전송. */
+function makeLiteralInput(v: VarInfo, modeId: string, val: VarValueCell): HTMLElement {
+  if (v.type === 'COLOR') {
+    const c = document.createElement('input');
+    c.type = 'color';
+    c.className = 'vlit vcolor';
+    c.value = val.kind === 'literal' && HEX6.test(val.display) ? val.display.toLowerCase() : '#000000';
+    c.title = c.value;
+    c.addEventListener('change', () => sendVarPatch(v.id, { value: { modeId, literal: c.value } }));
+    return c;
+  }
+  const input = document.createElement('input');
+  input.className = 'vlit';
+  if (v.type === 'FLOAT') input.type = 'number';
+  input.value = val.kind === 'literal' ? val.display : '';
+  const prev = input.value;
+  const commit = (): void => {
+    if (input.value !== prev) sendVarPatch(v.id, { value: { modeId, literal: input.value } });
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') input.blur();
+  });
+  return input;
+}
+
+/** 모드 한 칸: 별칭 셀렉트(같은 타입) + 리터럴 입력(별칭 선택 시 숨김). */
+function makeValueCell(v: VarInfo, m: VarMode): HTMLElement {
+  const cell = document.createElement('div');
+  cell.className = 'vcell';
+  if (v.modes.length > 1) {
+    const lab = document.createElement('span');
+    lab.className = 'vmode';
+    lab.textContent = m.name;
+    lab.title = m.name;
+    cell.appendChild(lab);
+  }
+  const val = v.values[m.modeId] ?? { kind: 'literal', display: '' };
+
+  const sel = document.createElement('select');
+  sel.className = 'valias';
+  const litOpt = document.createElement('option');
+  litOpt.value = '';
+  litOpt.textContent = '— 리터럴 —';
+  sel.appendChild(litOpt);
+  for (const o of varList) {
+    if (o.id === v.id || o.type !== v.type) continue;
+    const op = document.createElement('option');
+    op.value = o.id;
+    op.textContent = o.name;
+    sel.appendChild(op);
+  }
+  sel.value = val.kind === 'alias' && val.aliasId ? val.aliasId : '';
+
+  const lit = makeLiteralInput(v, m.modeId, val);
+  const sync = (): void => {
+    lit.style.display = sel.value ? 'none' : '';
+  };
+  sync();
+  sel.addEventListener('change', () => {
+    if (sel.value) sendVarPatch(v.id, { value: { modeId: m.modeId, aliasId: sel.value } });
+    sync();
+  });
+  cell.append(sel, lit);
+  return cell;
+}
+
+/** 타입별 유효 스코프 멀티셀렉트. 변경 시 scopes 패치 전송. */
+function makeScopeSelect(v: VarInfo): HTMLSelectElement {
+  const sel = document.createElement('select');
+  sel.multiple = true;
+  sel.className = 'vscopes';
+  for (const sc of scopesForTypeList(v.type)) {
+    const op = document.createElement('option');
+    op.value = sc;
+    op.textContent = sc;
+    if (v.scopes.includes(sc)) op.selected = true;
+    sel.appendChild(op);
+  }
+  sel.addEventListener('change', () => {
+    const picked = Array.from(sel.selectedOptions, (o) => o.value) as ScopeName[];
+    sendVarPatch(v.id, { scopes: picked });
+  });
+  return sel;
+}
+
+/** 변수 1행: 이름·타입배지·모드별 값·스코프·설명·삭제. */
+function makeVarRow(v: VarInfo): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'vrow';
+  row.dataset.id = v.id;
+
+  const name = document.createElement('input');
+  name.className = 'vname';
+  name.value = v.name;
+  name.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') name.blur();
+  });
+  name.addEventListener('blur', () => {
+    const nm = name.value.trim();
+    if (nm === v.name) return;
+    const others = varList.filter((x) => x.id !== v.id && x.collection === v.collection).map((x) => x.name);
+    const err = validateVarName(nm, others);
+    if (err) {
+      setStatus('varEditStatus', err, 'warn');
+      name.value = v.name;
+      return;
+    }
+    sendVarPatch(v.id, { name: nm });
+  });
+
+  const badge = document.createElement('span');
+  badge.className = 'vbadge';
+  badge.textContent = v.type;
+  badge.title = `${v.collection} · 타입 고정(변경 불가)`;
+
+  const values = document.createElement('div');
+  values.className = 'vvalues';
+  for (const m of v.modes) values.appendChild(makeValueCell(v, m));
+
+  const scopes = makeScopeSelect(v);
+
+  const desc = document.createElement('input');
+  desc.className = 'vdesc';
+  desc.placeholder = '설명';
+  desc.value = v.description;
+  desc.addEventListener('blur', () => {
+    if (desc.value !== v.description) sendVarPatch(v.id, { description: desc.value });
+  });
+
+  const del = document.createElement('button');
+  del.className = 'vdel';
+  del.textContent = '삭제';
+  del.addEventListener('click', () => {
+    if (confirm(t('varedit.confirmDelete', { name: v.name }))) send({ type: 'DELETE_VARIABLE', id: v.id });
+  });
+
+  row.append(name, badge, values, scopes, desc, del);
+  return row;
+}
+
+/** 편집기 목록 렌더 — 컬렉션별 그룹 헤더 + 변수 행. */
+function renderVarEditor(): void {
+  const mount = $('varEditList');
+  mount.innerHTML = '';
+  if (!varList.length) {
+    const empty = document.createElement('div');
+    empty.className = 'muted';
+    empty.textContent = t('varedit.empty');
+    mount.appendChild(empty);
+    $('varEditInfo').textContent = '';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  let curCol = '';
+  for (const v of varList) {
+    if (v.collection !== curCol) {
+      curCol = v.collection;
+      const h = document.createElement('div');
+      h.className = 'vgroup';
+      h.textContent = curCol;
+      frag.appendChild(h);
+    }
+    frag.appendChild(makeVarRow(v));
+  }
+  mount.appendChild(frag);
+  $('varEditInfo').textContent = t('varedit.count', { count: varList.length });
+}
+
 function mainSwitch(msg: CodeToUi): void {
   switch (msg.type) {
     case 'EXTRACT_RESULT':
@@ -1249,6 +1428,33 @@ function mainSwitch(msg: CodeToUi): void {
       // code가 캐시된 키의 (재)검증을 요청 — UI에서 수행 후 결과 보고.
       void verifyAndReport(msg.key);
       break;
+    case 'VARIABLES':
+      // R1: 편집기 목록 수신.
+      varList = msg.vars;
+      renderVarEditor();
+      break;
+    case 'EDIT_VARIABLE_RESULT': {
+      // R1: 편집/삭제 결과 — 실패는 경고, 성공은 목록 갱신.
+      if (!msg.ok) {
+        setStatus('varEditStatus', t('varedit.editFail', { error: msg.error ?? '' }), 'warn');
+        // 실패 시 표시값 복원을 위해 재조회(낙관적 입력 되돌리기).
+        send({ type: 'GET_VARIABLES' });
+        break;
+      }
+      if (msg.deleted) {
+        const gone = varList.find((x) => x.id === msg.id);
+        varList = varList.filter((x) => x.id !== msg.id);
+        renderVarEditor();
+        setStatus('varEditStatus', t('varedit.deleted', { name: gone?.name ?? '' }), 'ok');
+      } else if (msg.var) {
+        const i = varList.findIndex((x) => x.id === msg.id);
+        if (i >= 0) varList[i] = msg.var;
+        // 이름 변경은 다른 행의 별칭 표시명에도 영향 → 전체 재렌더.
+        renderVarEditor();
+        setStatus('varEditStatus', t('varedit.saved'), 'ok');
+      }
+      break;
+    }
     case 'ERROR': {
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
       const statusId = (msg.op && OP_STATUS[msg.op]) || 'extractStatus';
@@ -1308,6 +1514,9 @@ const OP_STATUS: Record<string, string> = {
   GENERATE_MISSING_VARIANTS: 'componentStatus',
   EXPOSE_PROPERTIES: 'componentStatus',
   CHECK_CONTRAST: 'contrastStatus',
+  GET_VARIABLES: 'varEditStatus',
+  EDIT_VARIABLE: 'varEditStatus',
+  DELETE_VARIABLE: 'varEditStatus',
   GET_PRESETS: 'presetStatus',
   SAVE_PRESET: 'presetStatus',
   DELETE_PRESET: 'presetStatus',
@@ -1726,6 +1935,9 @@ send({ type: 'GET_LICENSE' });
 // #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
 document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
 
+// R1: 변수 편집기 새로고침.
+$('btnVarRefresh').addEventListener('click', () => send({ type: 'GET_VARIABLES' }));
+
 /* ---------- 탭 내비게이션 (UI 개편 + UX8 키보드) ---------- */
 const TABS = ['wizard', 'tokens', 'apply', 'settings'] as const;
 function showTab(name: (typeof TABS)[number]): void {
@@ -1740,6 +1952,7 @@ function showTab(name: (typeof TABS)[number]): void {
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
+  if (name === 'settings') send({ type: 'GET_VARIABLES' }); // R1: 편집기 진입 시 최신 변수 조회
 }
 TABS.forEach((t, i) => {
   const btn = $(`tabbtn-${t}`);

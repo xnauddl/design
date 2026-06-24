@@ -158,6 +158,20 @@
     .cfix { display: inline-flex; gap: 4px; }
     .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 1px 5px; font-size: 10px; width: auto; }
     .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid #0003; }
+    /* R1 변수 편집기 */
+    #varEditList { max-height: 320px; overflow: auto; margin: 6px 0; }
+    .vgroup { font-size: 11px; font-weight: 600; color: var(--muted); margin: 8px 0 2px; border-bottom: 1px solid #0002; padding-bottom: 2px; }
+    .vrow { display: grid; grid-template-columns: minmax(80px,1.4fr) 42px minmax(90px,1.6fr) 86px minmax(60px,1fr) 40px; gap: 5px; align-items: start; padding: 3px 0; }
+    .vrow input, .vrow select { font: 400 11px "Inter", monospace; padding: 3px 4px; width: 100%; box-sizing: border-box; }
+    .vbadge { font-size: 9px; color: var(--muted); border: 1px solid #0003; border-radius: 3px; padding: 2px 3px; text-align: center; align-self: center; }
+    .vvalues { display: flex; flex-direction: column; gap: 3px; }
+    .vcell { display: flex; align-items: center; gap: 3px; }
+    .vmode { font-size: 9px; color: var(--muted); min-width: 26px; }
+    .vcell .valias { flex: 1; min-width: 0; }
+    .vcell .vlit { flex: 1; min-width: 0; }
+    .vcell input[type="color"] { padding: 0; height: 22px; width: 28px; flex: 0 0 auto; }
+    .vscopes { height: 44px; }
+    .vdel { font-size: 10px; padding: 3px 4px; align-self: center; }
   </style>
 </head>
 <body>
@@ -448,6 +462,20 @@
       </div>
     </div>
 
+    <div class="step" id="varEditCard">
+      <h2>변수 편집</h2>
+      <div class="muted">디자인 시스템 변수(Global·Semantic·Component)의 값·이름·스코프·설명을 직접 고치거나 삭제합니다. 변경은 즉시 반영(각 작업 단일 Undo). 다중 모드(라이트/다크 등)는 모드별 값 칸으로 편집합니다.</div>
+      <div class="row">
+        <button id="btnVarRefresh">새로고침</button>
+        <span class="muted" id="varEditInfo"></span>
+      </div>
+      <div id="varEditList"></div>
+      <div class="ux">
+        <div class="ux-h"><span class="badge">R1</span><span class="ux-t">즉시 편집 · 단일 Undo</span></div>
+        <div class="status" id="varEditStatus"></div>
+      </div>
+    </div>
+
     <div class="step">
       <h2>요금제 / 라이선스</h2>
       <div class="row">
@@ -526,6 +554,37 @@
     return a;
   };
 
+  // src/lib/tokens.ts
+  var clamp01 = (n) => Math.min(1, Math.max(0, n));
+  var to255 = (c) => Math.round(clamp01(c) * 255);
+  function rgbToHex(rgb) {
+    const h = (c) => to255(c).toString(16).padStart(2, "0");
+    return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`.toLowerCase();
+  }
+  function hexToRgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m) throw new Error(`\uC798\uBABB\uB41C hex: ${hex}`);
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
+  }
+  var VALID_SCOPES = {
+    COLOR: /* @__PURE__ */ new Set(["ALL_SCOPES", "ALL_FILLS", "FRAME_FILL", "SHAPE_FILL", "TEXT_FILL", "STROKE_COLOR", "EFFECT_COLOR"]),
+    FLOAT: /* @__PURE__ */ new Set(["ALL_SCOPES", "GAP", "WIDTH_HEIGHT", "CORNER_RADIUS", "FONT_SIZE", "LINE_HEIGHT", "LETTER_SPACING", "FONT_WEIGHT", "EFFECT_FLOAT", "OPACITY"]),
+    STRING: /* @__PURE__ */ new Set(["ALL_SCOPES", "FONT_FAMILY"]),
+    BOOLEAN: /* @__PURE__ */ new Set(["ALL_SCOPES"])
+  };
+  function scopesForTypeList(type) {
+    return [...VALID_SCOPES[type]];
+  }
+
+  // src/lib/variableEdit.ts
+  function validateVarName(name, existing) {
+    const n = name.trim();
+    if (!n) return "\uC774\uB984\uC744 \uC785\uB825\uD558\uC138\uC694.";
+    if (existing.includes(n)) return "\uAC19\uC740 \uCEEC\uB809\uC158\uC5D0 \uAC19\uC740 \uC774\uB984\uC758 \uBCC0\uC218\uAC00 \uC788\uC2B5\uB2C8\uB2E4.";
+    return null;
+  }
+
   // src/lib/i18n.ts
   var STRINGS = {
     // 공통 진행/상태
@@ -603,7 +662,15 @@
     // 라이선스
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
-    "premium.required": "{message} (\uC720\uB8CC \uAE30\uB2A5: {feature})"
+    "premium.required": "{message} (\uC720\uB8CC \uAE30\uB2A5: {feature})",
+    // 변수 편집기(R1)
+    "varedit.empty": "\uD3B8\uC9D1\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.",
+    "varedit.count": "\uBCC0\uC218 {count}\uAC1C",
+    "varedit.saved": "\uBCC0\uACBD \uC800\uC7A5\uB428.",
+    "varedit.deleted": "\u2018{name}\u2019 \uC0AD\uC81C\uB428 \u2014 \uB418\uB3CC\uB9AC\uB824\uBA74 Undo.",
+    "varedit.editFail": "\uD3B8\uC9D1 \uC2E4\uD328: {error}",
+    "varedit.dupName": "\uAC19\uC740 \uCEEC\uB809\uC158\uC5D0 \uAC19\uC740 \uC774\uB984\uC758 \uBCC0\uC218\uAC00 \uC788\uC2B5\uB2C8\uB2E4.",
+    "varedit.confirmDelete": "\u2018{name}\u2019 \uBCC0\uC218\uB97C \uC0AD\uC81C\uD560\uAE4C\uC694? \uB418\uB3CC\uB9AC\uB824\uBA74 Undo\uD558\uC138\uC694."
   };
   function t(key, vars) {
     var _a;
@@ -791,20 +858,6 @@
       if (m) map[m[1]] = m[2];
     }
     return map;
-  }
-
-  // src/lib/tokens.ts
-  var clamp01 = (n) => Math.min(1, Math.max(0, n));
-  var to255 = (c) => Math.round(clamp01(c) * 255);
-  function rgbToHex(rgb) {
-    const h = (c) => to255(c).toString(16).padStart(2, "0");
-    return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`.toLowerCase();
-  }
-  function hexToRgb(hex) {
-    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-    if (!m) throw new Error(`\uC798\uBABB\uB41C hex: ${hex}`);
-    const n = parseInt(m[1], 16);
-    return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
   }
 
   // src/lib/color.ts
@@ -1385,6 +1438,7 @@
   var lastExportFormat = "w3c";
   var lastSelCount = 0;
   var createFrom = "tokens";
+  var varList = [];
   var CHUNK = 150;
   var chunkPending = /* @__PURE__ */ new WeakMap();
   function renderChunked(mount, items, makeRow) {
@@ -2216,8 +2270,162 @@
     $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
     setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");
   }
+  function sendVarPatch(id, patch) {
+    send({ type: "EDIT_VARIABLE", id, patch });
+  }
+  function makeLiteralInput(v, modeId, val) {
+    if (v.type === "COLOR") {
+      const c = document.createElement("input");
+      c.type = "color";
+      c.className = "vlit vcolor";
+      c.value = val.kind === "literal" && HEX6.test(val.display) ? val.display.toLowerCase() : "#000000";
+      c.title = c.value;
+      c.addEventListener("change", () => sendVarPatch(v.id, { value: { modeId, literal: c.value } }));
+      return c;
+    }
+    const input = document.createElement("input");
+    input.className = "vlit";
+    if (v.type === "FLOAT") input.type = "number";
+    input.value = val.kind === "literal" ? val.display : "";
+    const prev = input.value;
+    const commit = () => {
+      if (input.value !== prev) sendVarPatch(v.id, { value: { modeId, literal: input.value } });
+    };
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") input.blur();
+    });
+    return input;
+  }
+  function makeValueCell(v, m) {
+    var _a;
+    const cell = document.createElement("div");
+    cell.className = "vcell";
+    if (v.modes.length > 1) {
+      const lab = document.createElement("span");
+      lab.className = "vmode";
+      lab.textContent = m.name;
+      lab.title = m.name;
+      cell.appendChild(lab);
+    }
+    const val = (_a = v.values[m.modeId]) != null ? _a : { kind: "literal", display: "" };
+    const sel = document.createElement("select");
+    sel.className = "valias";
+    const litOpt = document.createElement("option");
+    litOpt.value = "";
+    litOpt.textContent = "\u2014 \uB9AC\uD130\uB7F4 \u2014";
+    sel.appendChild(litOpt);
+    for (const o of varList) {
+      if (o.id === v.id || o.type !== v.type) continue;
+      const op = document.createElement("option");
+      op.value = o.id;
+      op.textContent = o.name;
+      sel.appendChild(op);
+    }
+    sel.value = val.kind === "alias" && val.aliasId ? val.aliasId : "";
+    const lit = makeLiteralInput(v, m.modeId, val);
+    const sync = () => {
+      lit.style.display = sel.value ? "none" : "";
+    };
+    sync();
+    sel.addEventListener("change", () => {
+      if (sel.value) sendVarPatch(v.id, { value: { modeId: m.modeId, aliasId: sel.value } });
+      sync();
+    });
+    cell.append(sel, lit);
+    return cell;
+  }
+  function makeScopeSelect(v) {
+    const sel = document.createElement("select");
+    sel.multiple = true;
+    sel.className = "vscopes";
+    for (const sc of scopesForTypeList(v.type)) {
+      const op = document.createElement("option");
+      op.value = sc;
+      op.textContent = sc;
+      if (v.scopes.includes(sc)) op.selected = true;
+      sel.appendChild(op);
+    }
+    sel.addEventListener("change", () => {
+      const picked = Array.from(sel.selectedOptions, (o) => o.value);
+      sendVarPatch(v.id, { scopes: picked });
+    });
+    return sel;
+  }
+  function makeVarRow(v) {
+    const row = document.createElement("div");
+    row.className = "vrow";
+    row.dataset.id = v.id;
+    const name = document.createElement("input");
+    name.className = "vname";
+    name.value = v.name;
+    name.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") name.blur();
+    });
+    name.addEventListener("blur", () => {
+      const nm = name.value.trim();
+      if (nm === v.name) return;
+      const others = varList.filter((x) => x.id !== v.id && x.collection === v.collection).map((x) => x.name);
+      const err = validateVarName(nm, others);
+      if (err) {
+        setStatus("varEditStatus", err, "warn");
+        name.value = v.name;
+        return;
+      }
+      sendVarPatch(v.id, { name: nm });
+    });
+    const badge = document.createElement("span");
+    badge.className = "vbadge";
+    badge.textContent = v.type;
+    badge.title = `${v.collection} \xB7 \uD0C0\uC785 \uACE0\uC815(\uBCC0\uACBD \uBD88\uAC00)`;
+    const values = document.createElement("div");
+    values.className = "vvalues";
+    for (const m of v.modes) values.appendChild(makeValueCell(v, m));
+    const scopes = makeScopeSelect(v);
+    const desc = document.createElement("input");
+    desc.className = "vdesc";
+    desc.placeholder = "\uC124\uBA85";
+    desc.value = v.description;
+    desc.addEventListener("blur", () => {
+      if (desc.value !== v.description) sendVarPatch(v.id, { description: desc.value });
+    });
+    const del = document.createElement("button");
+    del.className = "vdel";
+    del.textContent = "\uC0AD\uC81C";
+    del.addEventListener("click", () => {
+      if (confirm(t("varedit.confirmDelete", { name: v.name }))) send({ type: "DELETE_VARIABLE", id: v.id });
+    });
+    row.append(name, badge, values, scopes, desc, del);
+    return row;
+  }
+  function renderVarEditor() {
+    const mount = $("varEditList");
+    mount.innerHTML = "";
+    if (!varList.length) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.textContent = t("varedit.empty");
+      mount.appendChild(empty);
+      $("varEditInfo").textContent = "";
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    let curCol = "";
+    for (const v of varList) {
+      if (v.collection !== curCol) {
+        curCol = v.collection;
+        const h = document.createElement("div");
+        h.className = "vgroup";
+        h.textContent = curCol;
+        frag.appendChild(h);
+      }
+      frag.appendChild(makeVarRow(v));
+    }
+    mount.appendChild(frag);
+    $("varEditInfo").textContent = t("varedit.count", { count: varList.length });
+  }
   function mainSwitch(msg) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     switch (msg.type) {
       case "EXTRACT_RESULT":
         applyExtractResult(msg);
@@ -2406,6 +2614,29 @@
       case "REQUEST_VERIFY":
         void verifyAndReport(msg.key);
         break;
+      case "VARIABLES":
+        varList = msg.vars;
+        renderVarEditor();
+        break;
+      case "EDIT_VARIABLE_RESULT": {
+        if (!msg.ok) {
+          setStatus("varEditStatus", t("varedit.editFail", { error: (_c = msg.error) != null ? _c : "" }), "warn");
+          send({ type: "GET_VARIABLES" });
+          break;
+        }
+        if (msg.deleted) {
+          const gone = varList.find((x) => x.id === msg.id);
+          varList = varList.filter((x) => x.id !== msg.id);
+          renderVarEditor();
+          setStatus("varEditStatus", t("varedit.deleted", { name: (_d = gone == null ? void 0 : gone.name) != null ? _d : "" }), "ok");
+        } else if (msg.var) {
+          const i = varList.findIndex((x) => x.id === msg.id);
+          if (i >= 0) varList[i] = msg.var;
+          renderVarEditor();
+          setStatus("varEditStatus", t("varedit.saved"), "ok");
+        }
+        break;
+      }
       case "ERROR": {
         const statusId = msg.op && OP_STATUS[msg.op] || "extractStatus";
         if (msg.op === "APPLY") hideApplyProgress();
@@ -2453,6 +2684,9 @@
     GENERATE_MISSING_VARIANTS: "componentStatus",
     EXPOSE_PROPERTIES: "componentStatus",
     CHECK_CONTRAST: "contrastStatus",
+    GET_VARIABLES: "varEditStatus",
+    EDIT_VARIABLE: "varEditStatus",
+    DELETE_VARIABLE: "varEditStatus",
     GET_PRESETS: "presetStatus",
     SAVE_PRESET: "presetStatus",
     DELETE_PRESET: "presetStatus",
@@ -2607,9 +2841,9 @@
   function updateBindApply() {
     const total = bindCandidates.length;
     const sel = bindChecked.size;
-    const confirm = $("btnApplyConfirm");
-    confirm.style.display = hasBindPreview() ? "" : "none";
-    confirm.disabled = sel === 0;
+    const confirm2 = $("btnApplyConfirm");
+    confirm2.style.display = hasBindPreview() ? "" : "none";
+    confirm2.disabled = sel === 0;
     if (hasBindPreview()) {
       const all = $("bindAll");
       all.checked = sel === total && total > 0;
@@ -2780,6 +3014,7 @@
   send({ type: "GET_PREREQ" });
   send({ type: "GET_LICENSE" });
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
+  $("btnVarRefresh").addEventListener("click", () => send({ type: "GET_VARIABLES" }));
   var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {
     for (const t2 of TABS) {
@@ -2792,6 +3027,7 @@
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
     if (name !== "settings") send({ type: "GET_PREREQ" });
+    if (name === "settings") send({ type: "GET_VARIABLES" });
   }
   TABS.forEach((t2, i) => {
     const btn = $(`tabbtn-${t2}`);

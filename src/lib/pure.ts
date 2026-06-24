@@ -14,6 +14,7 @@ export * from './license';
 export * from './licenseToken';
 export * from './presets';
 export * from './exporters';
+export * from './variableEdit';
 export * from './components';
 export * from './textStyles';
 export * from './undo';

@@ -42,6 +42,12 @@ import {
   textToSemanticMap,
   exportTokens,
   splitWeightStyle,
+  scopesForTypeList,
+  parseVarValue,
+  displayVarValue,
+  validateVarName,
+  sanitizeScopes,
+  aliasSelfReference,
   parseVariantName,
   formatVariant,
   classifyVariants,
@@ -441,6 +447,91 @@ test('exportTokens — 동일 이름 Semantic 미러 제거(Global 우선)', () 
 test('exportTokens — 빈 입력', () => {
   assert.equal(exportTokens([], OPTS), ':root {\n}');
   assert.equal(exportTokens([], { ...OPTS, format: 'w3c' }), '{}');
+});
+
+test('exportTokens CSS 다중 모드 — [data-theme] 오버라이드 블록(R1)', () => {
+  const tokens = [
+    { name: 'color/blue/500', collection: 'Global', type: 'COLOR', kind: 'color', value: '#2563eb' },
+    { name: 'color/blue/300', collection: 'Global', type: 'COLOR', kind: 'color', value: '#93c5fd' },
+    // Semantic 다중 모드: 기본(light)=blue/500 별칭, dark 모드=blue/300 별칭
+    {
+      name: 'surface',
+      collection: 'Semantic',
+      type: 'COLOR',
+      kind: 'color',
+      aliasOf: 'color/blue/500',
+      themes: [{ theme: 'Dark', aliasOf: 'color/blue/300' }],
+    },
+  ];
+  const css = exportTokens(tokens, OPTS);
+  // :root는 기본 모드, data-theme="dark"는 오버라이드(모드명 kebab)
+  assert.match(css, /:root \{[\s\S]*--surface: var\(--color-blue-500\);[\s\S]*\}/);
+  assert.match(css, /\[data-theme="dark"\] \{\s*--surface: var\(--color-blue-300\);\s*\}/);
+  // Global(단일 모드)은 data-theme 블록에 안 들어감
+  assert.doesNotMatch(css, /\[data-theme="dark"\] \{[^}]*--color-blue-500/);
+});
+
+test('exportTokens CSS 다중 모드 — 리터럴 오버라이드', () => {
+  const tokens = [
+    { name: 'bg', collection: 'Semantic', type: 'COLOR', kind: 'color', value: '#ffffff', themes: [{ theme: 'Dark', value: '#000000' }] },
+  ];
+  const css = exportTokens(tokens, OPTS);
+  assert.match(css, /:root \{\s*--bg: #ffffff;\s*\}/);
+  assert.match(css, /\[data-theme="dark"\] \{\s*--bg: #000000;\s*\}/);
+});
+
+/* ================= variableEdit.ts (R1) ================= */
+test('parseVarValue — 타입별 파싱/검증', () => {
+  // COLOR
+  assert.deepEqual(parseVarValue('COLOR', '#ffffff'), { ok: true, value: { r: 1, g: 1, b: 1 } });
+  assert.deepEqual(parseVarValue('COLOR', '000000'), { ok: true, value: { r: 0, g: 0, b: 0 } });
+  assert.equal(parseVarValue('COLOR', 'nope').ok, false);
+  assert.equal(parseVarValue('COLOR', '#fff').ok, false); // 3자리 거부
+  // FLOAT
+  assert.deepEqual(parseVarValue('FLOAT', '16'), { ok: true, value: 16 });
+  assert.deepEqual(parseVarValue('FLOAT', '-1.5'), { ok: true, value: -1.5 });
+  assert.equal(parseVarValue('FLOAT', '').ok, false);
+  assert.equal(parseVarValue('FLOAT', 'abc').ok, false);
+  // STRING
+  assert.deepEqual(parseVarValue('STRING', 'Inter'), { ok: true, value: 'Inter' });
+  assert.equal(parseVarValue('STRING', '   ').ok, false);
+  // BOOLEAN
+  assert.deepEqual(parseVarValue('BOOLEAN', 'true'), { ok: true, value: true });
+  assert.deepEqual(parseVarValue('BOOLEAN', 'FALSE'), { ok: true, value: false });
+  assert.equal(parseVarValue('BOOLEAN', 'yes').ok, false);
+});
+
+test('displayVarValue — 색은 hex, 그 외 문자열', () => {
+  assert.equal(displayVarValue('COLOR', { r: 1, g: 1, b: 1 }), '#ffffff');
+  assert.equal(displayVarValue('FLOAT', 16), '16');
+  assert.equal(displayVarValue('STRING', 'Inter'), 'Inter');
+});
+
+test('validateVarName — 빈 이름·중복 거부', () => {
+  assert.equal(validateVarName('surface', ['bg', 'text']), null);
+  assert.match(validateVarName('', []), /이름/);
+  assert.match(validateVarName('  ', []), /이름/);
+  assert.match(validateVarName('bg', ['bg', 'text']), /중복|이름/);
+});
+
+test('sanitizeScopes — 타입 무효 스코프 제거 + 중복 제거', () => {
+  // COLOR에 FLOAT 전용 스코프(GAP)는 제거, 중복은 1개로
+  const out = sanitizeScopes(['ALL_FILLS', 'GAP', 'ALL_FILLS', 'STROKE_COLOR'], 'COLOR');
+  assert.deepEqual(out.sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+});
+
+test('scopesForTypeList — 타입별 유효 스코프 노출', () => {
+  const color = scopesForTypeList('COLOR');
+  assert.ok(color.includes('ALL_FILLS'));
+  assert.ok(!color.includes('GAP')); // FLOAT 전용
+  const float = scopesForTypeList('FLOAT');
+  assert.ok(float.includes('GAP'));
+  assert.ok(!float.includes('TEXT_FILL'));
+});
+
+test('aliasSelfReference — 자기참조만 차단', () => {
+  assert.equal(aliasSelfReference('a', 'a'), true);
+  assert.equal(aliasSelfReference('a', 'b'), false);
 });
 
 /* ================= components.ts (Phase 3) ================= */

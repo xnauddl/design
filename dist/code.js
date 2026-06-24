@@ -1313,6 +1313,38 @@
     return "children" in node && node.children.some((c) => c.type === "TEXT");
   }
 
+  // src/lib/variableEdit.ts
+  function parseVarValue(type, input) {
+    const s = input.trim();
+    switch (type) {
+      case "COLOR": {
+        if (!/^#?[0-9a-f]{6}$/i.test(s)) return { ok: false, error: "\uC0C9\uC740 #RRGGBB \uD615\uC2DD\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4." };
+        return { ok: true, value: hexToRgb(s) };
+      }
+      case "FLOAT": {
+        const n = Number(s);
+        if (s === "" || !Number.isFinite(n)) return { ok: false, error: "\uC22B\uC790\uB97C \uC785\uB825\uD558\uC138\uC694." };
+        return { ok: true, value: n };
+      }
+      case "STRING": {
+        if (s === "") return { ok: false, error: "\uBE48 \uBB38\uC790\uC5F4\uC740 \uD5C8\uC6A9\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4." };
+        return { ok: true, value: input };
+      }
+      case "BOOLEAN": {
+        const v = s.toLowerCase();
+        if (v === "true") return { ok: true, value: true };
+        if (v === "false") return { ok: true, value: false };
+        return { ok: false, error: "true \uB610\uB294 false\uB97C \uC785\uB825\uD558\uC138\uC694." };
+      }
+    }
+  }
+  function sanitizeScopes(scopes, type) {
+    return [...new Set(scopesForType(scopes, type))];
+  }
+  function aliasSelfReference(sourceId, targetId) {
+    return sourceId === targetId;
+  }
+
   // src/lib/exporters.ts
   var WEIGHT_NAMES = {
     thin: 100,
@@ -1372,20 +1404,38 @@
     }
   }
   var cssVar = (name) => `--${kebab(name)}`;
+  function cssDeclValue(token, value, aliasOf, opts) {
+    if (aliasOf) return `var(${cssVar(aliasOf)})`;
+    return value === void 0 ? cssLiteral(token, opts) : cssLiteral(__spreadProps(__spreadValues({}, token), { value, description: void 0 }), opts);
+  }
   function toCss(tokens, opts) {
-    const lines = [":root {"];
+    var _a, _b;
+    const root = [":root {"];
     for (const t of tokens) {
       if (t.aliasOf) {
-        lines.push(`  ${cssVar(t.name)}: var(${cssVar(t.aliasOf)});`);
+        root.push(`  ${cssVar(t.name)}: var(${cssVar(t.aliasOf)});`);
       } else {
-        lines.push(`  ${cssVar(t.name)}: ${cssLiteral(t, opts)};`);
+        root.push(`  ${cssVar(t.name)}: ${cssLiteral(t, opts)};`);
         if (t.kind === "fontWeight" && splitWeightStyle(t.value).italic) {
-          lines.push(`  ${cssVar(t.name)}-style: italic;`);
+          root.push(`  ${cssVar(t.name)}-style: italic;`);
         }
       }
     }
-    lines.push("}");
-    return lines.join("\n");
+    root.push("}");
+    const blocks = [root.join("\n")];
+    const themeOrder = [];
+    for (const t of tokens) for (const th of (_a = t.themes) != null ? _a : []) if (!themeOrder.includes(th.theme)) themeOrder.push(th.theme);
+    for (const theme of themeOrder) {
+      const lines = [`[data-theme="${kebab(theme)}"] {`];
+      for (const t of tokens) {
+        const tv = ((_b = t.themes) != null ? _b : []).find((x) => x.theme === theme);
+        if (!tv) continue;
+        lines.push(`  ${cssVar(t.name)}: ${cssDeclValue(t, tv.value, tv.aliasOf, opts)};`);
+      }
+      lines.push("}");
+      blocks.push(lines.join("\n"));
+    }
+    return blocks.join("\n\n");
   }
   var W3C_TYPE = {
     color: "color",
@@ -1953,6 +2003,118 @@
     if (n.includes("opacity")) return "opacity";
     return "other";
   }
+  var EDITABLE_COLLECTIONS = /* @__PURE__ */ new Set([GLOBAL, SEMANTIC, COMPONENT]);
+  var errMsg = (e) => e instanceof Error ? e.message : String(e);
+  function toValueCell(type, raw, nameById) {
+    if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+      const aliasId = raw.id;
+      const aliasName = nameById.get(aliasId);
+      return { kind: "alias", display: aliasName != null ? aliasName : "(\uC54C \uC218 \uC5C6\uC74C)", aliasId, aliasName };
+    }
+    if (type === "COLOR" && raw && typeof raw === "object" && "r" in raw) {
+      return { kind: "literal", display: rgbToHex(raw) };
+    }
+    if (raw === void 0) return { kind: "literal", display: "" };
+    return { kind: "literal", display: String(raw) };
+  }
+  function toVarInfo(v, col, nameById) {
+    var _a;
+    const modes = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
+    const values = {};
+    for (const m of col.modes) values[m.modeId] = toValueCell(v.resolvedType, v.valuesByMode[m.modeId], nameById);
+    return {
+      id: v.id,
+      name: v.name,
+      collection: col.name,
+      type: v.resolvedType,
+      description: (_a = v.description) != null ? _a : "",
+      scopes: v.scopes,
+      hidden: v.hiddenFromPublishing,
+      modes,
+      defaultModeId: col.defaultModeId,
+      values
+    };
+  }
+  async function collectVars() {
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const colById = new Map(cols.map((c) => [c.id, c]));
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const nameById = new Map(vars.map((v) => [v.id, v.name]));
+    const out = [];
+    for (const v of vars) {
+      const col = colById.get(v.variableCollectionId);
+      if (!col || !EDITABLE_COLLECTIONS.has(col.name)) continue;
+      out.push(toVarInfo(v, col, nameById));
+    }
+    out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
+    return out;
+  }
+  async function aliasWouldCycle(sourceId, target) {
+    const seen = /* @__PURE__ */ new Set();
+    let frontier = [target];
+    while (frontier.length) {
+      const next = [];
+      for (const cur of frontier) {
+        if (cur.id === sourceId) return true;
+        if (seen.has(cur.id)) continue;
+        seen.add(cur.id);
+        for (const modeId of Object.keys(cur.valuesByMode)) {
+          const raw = cur.valuesByMode[modeId];
+          if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+            const nv = await figma.variables.getVariableByIdAsync(raw.id);
+            if (nv) next.push(nv);
+          }
+        }
+      }
+      frontier = next;
+    }
+    return false;
+  }
+  async function applyVarValue(v, col, value) {
+    const modeId = value.modeId || col.defaultModeId;
+    if (!col.modes.some((m) => m.modeId === modeId)) return "\uB300\uC0C1 \uBAA8\uB4DC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
+    if (value.aliasId !== void 0) {
+      if (aliasSelfReference(v.id, value.aliasId)) return "\uBCC0\uC218\uB97C \uC790\uAE30 \uC790\uC2E0\uC5D0 \uBCC4\uCE6D\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
+      const target = await figma.variables.getVariableByIdAsync(value.aliasId);
+      if (!target) return "\uBCC4\uCE6D \uB300\uC0C1\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
+      if (target.resolvedType !== v.resolvedType) return "\uBCC4\uCE6D \uB300\uC0C1\uC758 \uD0C0\uC785\uC774 \uB2E4\uB985\uB2C8\uB2E4.";
+      if (await aliasWouldCycle(v.id, target)) return "\uBCC4\uCE6D\uC774 \uC21C\uD658 \uCC38\uC870\uB97C \uB9CC\uB4ED\uB2C8\uB2E4.";
+      v.setValueForMode(modeId, figma.variables.createVariableAlias(target));
+      return null;
+    }
+    if (value.literal !== void 0) {
+      const p = parseVarValue(v.resolvedType, value.literal);
+      if (!p.ok) return p.error;
+      v.setValueForMode(modeId, p.value);
+      return null;
+    }
+    return null;
+  }
+  async function editVariable(id, patch) {
+    const v = await figma.variables.getVariableByIdAsync(id);
+    if (!v) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: "\uBCC0\uC218\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4." };
+    const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+    if (!col || !EDITABLE_COLLECTIONS.has(col.name)) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: "\uD3B8\uC9D1 \uB300\uC0C1\uC774 \uC544\uB2CC \uCEEC\uB809\uC158\uC785\uB2C8\uB2E4." };
+    try {
+      if (patch.name !== void 0) {
+        const nm = patch.name.trim();
+        if (!nm) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: "\uC774\uB984\uC744 \uC785\uB825\uD558\uC138\uC694." };
+        v.name = nm;
+      }
+      if (patch.description !== void 0) v.description = patch.description;
+      if (patch.hidden !== void 0) v.hiddenFromPublishing = patch.hidden;
+      if (patch.scopes) v.scopes = sanitizeScopes(patch.scopes, v.resolvedType);
+      if (patch.value) {
+        const err = await applyVarValue(v, col, patch.value);
+        if (err) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: err };
+      }
+    } catch (e) {
+      return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: errMsg(e) };
+    }
+    const all = await figma.variables.getLocalVariablesAsync();
+    const nameById = new Map(all.map((x) => [x.id, x.name]));
+    return { type: "EDIT_VARIABLE_RESULT", id, ok: true, var: toVarInfo(v, col, nameById) };
+  }
   loadLicense().then(() => {
     postLicense();
     if (cache && evaluateLicense(cache, Date.now()).stale) post({ type: "REQUEST_VERIFY", key: cache.key });
@@ -2186,6 +2348,40 @@
           post({ type: "GLOBAL_COLORS", colors });
           break;
         }
+        case "GET_VARIABLES": {
+          post({ type: "VARIABLES", vars: await collectVars() });
+          break;
+        }
+        case "EDIT_VARIABLE": {
+          const res = await editVariable(msg.id, msg.patch);
+          post(res);
+          if (res.ok) {
+            commitUndo(figma);
+            await postPrereq();
+          }
+          break;
+        }
+        case "DELETE_VARIABLE": {
+          const v = await figma.variables.getVariableByIdAsync(msg.id);
+          if (!v) {
+            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: false, error: "\uBCC0\uC218\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4." });
+            break;
+          }
+          const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+          if (!col || !EDITABLE_COLLECTIONS.has(col.name)) {
+            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: false, error: "\uD3B8\uC9D1 \uB300\uC0C1\uC774 \uC544\uB2CC \uCEEC\uB809\uC158\uC785\uB2C8\uB2E4." });
+            break;
+          }
+          try {
+            v.remove();
+            commitUndo(figma);
+            await postPrereq();
+            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: true, deleted: true });
+          } catch (e) {
+            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: false, error: errMsg(e) });
+          }
+          break;
+        }
         case "RESIZE": {
           const c = clampSize(msg.width, msg.height);
           figma.ui.resize(c.w, c.h);
@@ -2277,6 +2473,25 @@
             } else {
               t.value = raw;
             }
+            const themes = [];
+            for (const m of col.modes) {
+              if (m.modeId === col.defaultModeId) continue;
+              const mraw = v.valuesByMode[m.modeId];
+              const tv = { theme: m.name };
+              if (mraw && typeof mraw === "object" && "type" in mraw && mraw.type === "VARIABLE_ALIAS") {
+                const target = nameById.get(mraw.id);
+                if (!target) continue;
+                tv.aliasOf = target;
+              } else if (v.resolvedType === "COLOR" && mraw && typeof mraw === "object" && "r" in mraw) {
+                tv.value = rgbToHex(mraw);
+              } else if (mraw !== void 0) {
+                tv.value = mraw;
+              } else {
+                continue;
+              }
+              themes.push(tv);
+            }
+            if (themes.length) t.themes = themes;
             tokens.push(t);
           }
           tokens.sort((a, b) => a.name.localeCompare(b.name));

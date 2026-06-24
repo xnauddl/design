@@ -158,6 +158,20 @@
     .cfix { display: inline-flex; gap: 4px; }
     .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 1px 5px; font-size: 10px; width: auto; }
     .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid #0003; }
+    /* R1 변수 편집기 */
+    #varEditList { max-height: 320px; overflow: auto; margin: 6px 0; }
+    .vgroup { font-size: 11px; font-weight: 600; color: var(--muted); margin: 8px 0 2px; border-bottom: 1px solid #0002; padding-bottom: 2px; }
+    .vrow { display: grid; grid-template-columns: minmax(80px,1.4fr) 42px minmax(90px,1.6fr) 86px minmax(60px,1fr) 40px; gap: 5px; align-items: start; padding: 3px 0; }
+    .vrow input, .vrow select { font: 400 11px "Inter", monospace; padding: 3px 4px; width: 100%; box-sizing: border-box; }
+    .vbadge { font-size: 9px; color: var(--muted); border: 1px solid #0003; border-radius: 3px; padding: 2px 3px; text-align: center; align-self: center; }
+    .vvalues { display: flex; flex-direction: column; gap: 3px; }
+    .vcell { display: flex; align-items: center; gap: 3px; }
+    .vmode { font-size: 9px; color: var(--muted); min-width: 26px; }
+    .vcell .valias { flex: 1; min-width: 0; }
+    .vcell .vlit { flex: 1; min-width: 0; }
+    .vcell input[type="color"] { padding: 0; height: 22px; width: 28px; flex: 0 0 auto; }
+    .vscopes { height: 44px; }
+    .vdel { font-size: 10px; padding: 3px 4px; align-self: center; }
   </style>
 </head>
 <body>
@@ -445,6 +459,20 @@
       <div class="ux">
         <div class="ux-h"><span class="badge">UX7</span><span class="ux-t">오류 처리 + 복구</span></div>
         <div class="status" id="exportStatus"></div>
+      </div>
+    </div>
+
+    <div class="step" id="varEditCard">
+      <h2>변수 편집</h2>
+      <div class="muted">디자인 시스템 변수(Global·Semantic·Component)의 값·이름·스코프·설명을 직접 고치거나 삭제합니다. 변경은 즉시 반영(각 작업 단일 Undo). 다중 모드(라이트/다크 등)는 모드별 값 칸으로 편집합니다.</div>
+      <div class="row">
+        <button id="btnVarRefresh">새로고침</button>
+        <span class="muted" id="varEditInfo"></span>
+      </div>
+      <div id="varEditList"></div>
+      <div class="ux">
+        <div class="ux-h"><span class="badge">R1</span><span class="ux-t">즉시 편집 · 단일 Undo</span></div>
+        <div class="status" id="varEditStatus"></div>
       </div>
     </div>
 

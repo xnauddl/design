@@ -191,6 +191,11 @@ export function scopesForType(scopes: ScopeName[], type: ResolvedType): ScopeNam
   return scopes.filter((s) => ok.has(s));
 }
 
+/** 변수 타입별로 UI가 제시할 수 있는 유효 스코프 목록(편집기 멀티셀렉트용). */
+export function scopesForTypeList(type: ResolvedType): ScopeName[] {
+  return [...VALID_SCOPES[type]];
+}
+
 /**
  * 시맨틱 역할 이름 → 속성에 맞는 스코프. 역할 머리말(슬래시 앞)로 판단.
  * 미지정 역할(primary/secondary/accent/상태색 등)은 undefined → 호출자가 원시 스코프를 상속.
