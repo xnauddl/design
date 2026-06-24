@@ -83,6 +83,17 @@
     .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0003; }
     .crow .cn { font-family: ui-monospace, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .crow input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
+    /* 색 정리(군집) */
+    .cluster-sum { font-size: 11px; color: var(--muted); margin: 4px 0; }
+    #clusterList { max-height: 200px; overflow: auto; }
+    .clrow { display: flex; align-items: center; gap: 4px; padding: 3px 0; flex-wrap: wrap; }
+    .clrow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0003; }
+    .clrow .arrow { color: var(--muted); margin: 0 2px; }
+    .clrow .rep { width: 16px; height: 16px; border-radius: 3px; border: 1px solid #0003; }
+    .clrow .cn { font-family: ui-monospace, monospace; font-size: 11px; }
+    .clrow .cnt { font-size: 10px; color: var(--muted); }
+    .cluster-kept { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .cluster-kept .swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid #0003; }
     #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
     .tree-row.header { opacity: 1; color: var(--muted); }
     .before { color: var(--muted); text-decoration: line-through; }
@@ -243,6 +254,15 @@
       </div>
       <div id="tokenList"></div>
       <div class="status" id="extractStatus"></div>
+    </div>
+
+    <!-- 색 정리(군집) — ΔE로 비슷한 색을 대표색으로 병합(허용오차 8 고정·비노출) -->
+    <div class="step" id="colorClusterCard" style="display:none">
+      <h2>1.4 · 색 정리 (군집)</h2>
+      <div class="muted">비슷한 색을 묶어 <b>대표색</b> 하나로 병합합니다. 역할은 소수 대표색에만 답니다.</div>
+      <div class="cluster-sum" id="clusterSummary"></div>
+      <div id="clusterList"></div>
+      <div class="cluster-kept" id="clusterKept" style="display:none"></div>
     </div>
 
     <!-- #3 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
@@ -522,6 +542,10 @@
     "extract.done": "{count}\uAC1C \uD6C4\uBCF4 \uCD94\uCD9C \uC644\uB8CC.",
     "create.needExtract": "\uBA3C\uC800 \uD1A0\uD070\uC744 \uCD94\uCD9C\uD558\uC138\uC694.",
     "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
+    // 색 정리(군집) — ΔE로 비슷한 색을 대표색으로 병합(허용오차 고정·비노출).
+    "cluster.summary": "{total}\uC0C9 \u2192 {reps} \uB300\uD45C\uC0C9 \xB7 {merged}\uC0C9 \uBCD1\uD569",
+    "cluster.kept": "\uB2E8\uC0C9 \uC720\uC9C0 \xB7 \uADF8\uB300\uB85C \uBCF4\uC874 (\uAD70\uC9D1 \uC548 \uD568)",
+    "cluster.none": "\uBE44\uC2B7\uD55C \uC0C9\uC774 \uC5C6\uC5B4 \uBB36\uC744 \uC0C9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uCD94\uCD9C \uC0C9\uC744 \uADF8\uB300\uB85C \uC0AC\uC6A9\uD569\uB2C8\uB2E4.",
     // 시맨틱 매핑
     "semantic.rolesApplied": "{count}\uAC1C \uC5ED\uD560 \uBC18\uC601\uB428 \u2014 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019\uC73C\uB85C \uC801\uC6A9.",
     "semantic.scanningGlobals": "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026",
@@ -1071,6 +1095,90 @@
     return tokens2;
   }
 
+  // src/lib/colorCluster.ts
+  var DEFAULT_DELTA_E = 8;
+  function oklabPoint(hex) {
+    const { l, c, h } = hexToOklch(hex);
+    const r = h * Math.PI / 180;
+    return { L: l, a: c * Math.cos(r), b: c * Math.sin(r), c, l };
+  }
+  function find(parent2, i) {
+    while (parent2[i] !== i) {
+      parent2[i] = parent2[parent2[i]];
+      i = parent2[i];
+    }
+    return i;
+  }
+  function clusterColorsByDeltaE(colors, tolerance = DEFAULT_DELTA_E) {
+    const n = colors.length;
+    if (n === 0) return [];
+    const pts = colors.map((c) => oklabPoint(c.hex));
+    const parent2 = colors.map((_, i) => i);
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const d = Math.hypot(pts[i].L - pts[j].L, pts[i].a - pts[j].a, pts[i].b - pts[j].b) * 100;
+        if (d <= tolerance) {
+          const ri = find(parent2, i);
+          const rj = find(parent2, j);
+          if (ri !== rj) parent2[Math.max(ri, rj)] = Math.min(ri, rj);
+        }
+      }
+    }
+    const order = [];
+    const groups = /* @__PURE__ */ new Map();
+    for (let i = 0; i < n; i++) {
+      const r = find(parent2, i);
+      let g = groups.get(r);
+      if (!g) {
+        g = [];
+        groups.set(r, g);
+        order.push(r);
+      }
+      g.push(i);
+    }
+    return order.map((r) => {
+      const idxs = groups.get(r);
+      let best = idxs[0];
+      for (const i of idxs) {
+        const p = pts[i];
+        const q = pts[best];
+        if (p.c > q.c + 1e-9) best = i;
+        else if (Math.abs(p.c - q.c) <= 1e-9) {
+          const dp = Math.abs(p.l - 0.6);
+          const dq = Math.abs(q.l - 0.6);
+          if (dp < dq - 1e-9) best = i;
+          else if (Math.abs(dp - dq) <= 1e-9 && colors[i].name < colors[best].name) best = i;
+        }
+      }
+      const members = idxs.map((i) => colors[i]);
+      return { representative: colors[best], members, isSingleton: members.length === 1 };
+    });
+  }
+  function clusterSummary(clusters) {
+    const total = clusters.reduce((s, c) => s + c.members.length, 0);
+    const representatives = clusters.length;
+    return {
+      total,
+      representatives,
+      merged: total - representatives,
+      singletons: clusters.filter((c) => c.isSingleton).length
+    };
+  }
+  function clusterColorTokens(tokens2, tolerance = DEFAULT_DELTA_E) {
+    const colors = [];
+    for (const t2 of tokens2) {
+      if (t2.category === "color" && typeof t2.value === "string") colors.push({ name: t2.name, hex: t2.value });
+    }
+    const clusters = clusterColorsByDeltaE(colors, tolerance);
+    const merges = {};
+    for (const cl of clusters) {
+      for (const m of cl.members) {
+        if (m.name !== cl.representative.name) merges[m.name] = cl.representative.name;
+      }
+    }
+    return { clusters, merges };
+  }
+
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
   var TSHIRT_MID = TSHIRT.indexOf("md");
@@ -1148,8 +1256,8 @@
   }
   function suggestTokenRoles(tokens2, base = 16) {
     const map = {};
-    const colors = tokens2.filter((t2) => t2.category === "color" && typeof t2.value === "string").map((t2) => ({ name: t2.name, hex: t2.value }));
-    Object.assign(map, suggestSemanticMap(colors));
+    const { clusters } = clusterColorTokens(tokens2);
+    Object.assign(map, suggestSemanticMap(clusters.map((cl) => cl.representative)));
     const scale = (category, prefix, roleFn) => {
       const entries = numericEntries(tokens2, category);
       const roles = roleFn(entries.map((e) => e.value));
@@ -1361,6 +1469,7 @@
     tokens = paletteToDraftTokens(p);
     renderTokens();
     setSemMapText(paletteSemanticMap(p));
+    renderColorClusters();
     renderColorTable();
     $("btnPaletteApply").style.display = "";
     $("paletteInfo").textContent = t("palette.summary", { count: p.scales.length, tokens: tokens.length });
@@ -1425,6 +1534,64 @@
       row.append(sw, name, role);
       return row;
     });
+  }
+  function swatchEl(hex, cls = "swatch") {
+    const s = document.createElement("span");
+    s.className = cls;
+    s.style.background = hex;
+    return s;
+  }
+  function renderColorClusters() {
+    const card = $("colorClusterCard");
+    const colorToks = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
+    if (colorToks.length < 2) {
+      card.style.display = "none";
+      return;
+    }
+    const { clusters } = clusterColorTokens(tokens);
+    const s = clusterSummary(clusters);
+    card.style.display = "";
+    $("clusterSummary").textContent = t("cluster.summary", { total: s.total, reps: s.representatives, merged: s.merged });
+    const list = $("clusterList");
+    list.textContent = "";
+    const merged = clusters.filter((c) => !c.isSingleton);
+    if (!merged.length) {
+      const none = document.createElement("div");
+      none.className = "muted";
+      none.textContent = t("cluster.none");
+      list.appendChild(none);
+    }
+    for (const cl of merged) {
+      const row = document.createElement("div");
+      row.className = "clrow";
+      for (const m of cl.members) row.appendChild(swatchEl(m.hex));
+      const arrow = document.createElement("span");
+      arrow.className = "arrow";
+      arrow.textContent = "\u2192";
+      row.appendChild(arrow);
+      row.appendChild(swatchEl(cl.representative.hex, "rep"));
+      const name = document.createElement("span");
+      name.className = "cn";
+      name.textContent = cl.representative.name;
+      row.appendChild(name);
+      const cnt = document.createElement("span");
+      cnt.className = "cnt";
+      cnt.textContent = `\xB7 ${cl.members.length}\uC0C9\u21921`;
+      row.appendChild(cnt);
+      list.appendChild(row);
+    }
+    const singles = clusters.filter((c) => c.isSingleton);
+    const kept = $("clusterKept");
+    if (singles.length) {
+      kept.style.display = "";
+      kept.textContent = "";
+      for (const c of singles) kept.appendChild(swatchEl(c.representative.hex));
+      const label = document.createElement("span");
+      label.textContent = t("cluster.kept");
+      kept.appendChild(label);
+    } else {
+      kept.style.display = "none";
+    }
   }
   function applyColorRoles() {
     const map = {};
@@ -2066,6 +2233,7 @@
         $("btnCreateApply").style.display = "none";
         $("btnPaletteApply").style.display = "none";
         suggestSemMapFrom(tokens);
+        renderColorClusters();
         renderColorTable();
         $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
         setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");

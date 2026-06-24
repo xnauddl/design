@@ -83,6 +83,17 @@
     .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0003; }
     .crow .cn { font-family: ui-monospace, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .crow input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
+    /* 색 정리(군집) */
+    .cluster-sum { font-size: 11px; color: var(--muted); margin: 4px 0; }
+    #clusterList { max-height: 200px; overflow: auto; }
+    .clrow { display: flex; align-items: center; gap: 4px; padding: 3px 0; flex-wrap: wrap; }
+    .clrow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0003; }
+    .clrow .arrow { color: var(--muted); margin: 0 2px; }
+    .clrow .rep { width: 16px; height: 16px; border-radius: 3px; border: 1px solid #0003; }
+    .clrow .cn { font-family: ui-monospace, monospace; font-size: 11px; }
+    .clrow .cnt { font-size: 10px; color: var(--muted); }
+    .cluster-kept { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .cluster-kept .swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid #0003; }
     #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
     .tree-row.header { opacity: 1; color: var(--muted); }
     .before { color: var(--muted); text-decoration: line-through; }
@@ -243,6 +254,15 @@
       </div>
       <div id="tokenList"></div>
       <div class="status" id="extractStatus"></div>
+    </div>
+
+    <!-- 색 정리(군집) — ΔE로 비슷한 색을 대표색으로 병합(허용오차 8 고정·비노출) -->
+    <div class="step" id="colorClusterCard" style="display:none">
+      <h2>1.4 · 색 정리 (군집)</h2>
+      <div class="muted">비슷한 색을 묶어 <b>대표색</b> 하나로 병합합니다. 역할은 소수 대표색에만 답니다.</div>
+      <div class="cluster-sum" id="clusterSummary"></div>
+      <div id="clusterList"></div>
+      <div class="cluster-kept" id="clusterKept" style="display:none"></div>
     </div>
 
     <!-- #3 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->

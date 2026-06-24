@@ -14,6 +14,7 @@ import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles } from './lib/roles';
+import { clusterColorTokens, clusterSummary } from './lib/colorCluster';
 import { pipelineSteps, type StepStatus } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
@@ -148,6 +149,7 @@ $('btnPalette').addEventListener('click', () => {
   renderTokens();
   // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
   setSemMapText(paletteSemanticMap(p));
+  renderColorClusters(); // 색 정리(군집): 대표색·단색 유지·요약
   renderColorTable(); // #3: 색 편집표(hue·역할) 표시
   ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
   $('paletteInfo').textContent = t('palette.summary', { count: p.scales.length, tokens: tokens.length });
@@ -223,6 +225,76 @@ function renderColorTable(): void {
     row.append(sw, name, role);
     return row;
   });
+}
+
+/* ---------- 색 정리(군집) — ΔE 대표색·단색 유지 ---------- */
+/** 작은 스와치 span 생성. */
+function swatchEl(hex: string, cls = 'swatch'): HTMLSpanElement {
+  const s = document.createElement('span');
+  s.className = cls;
+  s.style.background = hex;
+  return s;
+}
+
+/**
+ * 추출/생성 색을 ΔE 군집으로 묶어 대표색·단색을 표시(허용오차 8 고정·비노출).
+ * 와이어프레임 '정리(군집)': 비슷한 색 → 대표색, 단색은 보존, 병합 버튼 없음(자동).
+ */
+function renderColorClusters(): void {
+  const card = $('colorClusterCard');
+  const colorToks = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
+  if (colorToks.length < 2) {
+    card.style.display = 'none';
+    return;
+  }
+  const { clusters } = clusterColorTokens(tokens);
+  const s = clusterSummary(clusters);
+  card.style.display = '';
+  $('clusterSummary').textContent = t('cluster.summary', { total: s.total, reps: s.representatives, merged: s.merged });
+
+  // 병합 군집(구성원 2+): 구성원 스와치 → 대표색 + 이름 + (n색)
+  const list = $('clusterList');
+  list.textContent = '';
+  const merged = clusters.filter((c) => !c.isSingleton);
+  if (!merged.length) {
+    const none = document.createElement('div');
+    none.className = 'muted';
+    none.textContent = t('cluster.none');
+    list.appendChild(none);
+  }
+  for (const cl of merged) {
+    const row = document.createElement('div');
+    row.className = 'clrow';
+    for (const m of cl.members) row.appendChild(swatchEl(m.hex));
+    const arrow = document.createElement('span');
+    arrow.className = 'arrow';
+    arrow.textContent = '→';
+    row.appendChild(arrow);
+    row.appendChild(swatchEl(cl.representative.hex, 'rep'));
+    const name = document.createElement('span');
+    name.className = 'cn';
+    name.textContent = cl.representative.name;
+    row.appendChild(name);
+    const cnt = document.createElement('span');
+    cnt.className = 'cnt';
+    cnt.textContent = `· ${cl.members.length}색→1`;
+    row.appendChild(cnt);
+    list.appendChild(row);
+  }
+
+  // 단색 유지(단일 구성원) — 칩으로 보존 표시
+  const singles = clusters.filter((c) => c.isSingleton);
+  const kept = $('clusterKept');
+  if (singles.length) {
+    kept.style.display = '';
+    kept.textContent = '';
+    for (const c of singles) kept.appendChild(swatchEl(c.representative.hex));
+    const label = document.createElement('span');
+    label.textContent = t('cluster.kept');
+    kept.appendChild(label);
+  } else {
+    kept.style.display = 'none';
+  }
 }
 
 /** 색 편집표의 역할 입력 → 시맨틱 매핑 textarea로 반영(역할=이름). */
@@ -973,7 +1045,8 @@ window.onmessage = (event: MessageEvent) => {
       ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
       // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
       suggestSemMapFrom(tokens);
-      renderColorTable(); // #3: 색 편집표(hue·역할) 표시
+      renderColorClusters(); // 색 정리(군집): 대표색·단색 유지·요약
+  renderColorTable(); // #3: 색 편집표(hue·역할) 표시
       $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
       setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
       break;

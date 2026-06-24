@@ -26,6 +26,11 @@ export const STRINGS: Record<string, string> = {
   'create.needExtract': '먼저 토큰을 추출하세요.',
   'create.preview': '미리보기 — {summary} · ‘적용’으로 반영',
 
+  // 색 정리(군집) — ΔE로 비슷한 색을 대표색으로 병합(허용오차 고정·비노출).
+  'cluster.summary': '{total}색 → {reps} 대표색 · {merged}색 병합',
+  'cluster.kept': '단색 유지 · 그대로 보존 (군집 안 함)',
+  'cluster.none': '비슷한 색이 없어 묶을 색이 없습니다 — 추출 색을 그대로 사용합니다.',
+
   // 시맨틱 매핑
   'semantic.rolesApplied': '{count}개 역할 반영됨 — ‘시맨틱 별칭 생성’으로 적용.',
   'semantic.scanningGlobals': '기존 색 스캔 중…',

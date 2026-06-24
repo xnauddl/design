@@ -2,6 +2,7 @@
 export * from './tokens';
 export * from './naming';
 export * from './color';
+export * from './colorCluster';
 export * from './colorName';
 export * from './contrast';
 export * from './palette';
