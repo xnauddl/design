@@ -406,10 +406,6 @@ $('bindAll').addEventListener('change', (e) => {
   renderBindTree();
 });
 
-$('bindHideCtx').addEventListener('change', (e) => {
-  bindHideContext = (e.target as HTMLInputElement).checked;
-  renderBindTree();
-});
 
 $('btnApplyCancel').addEventListener('click', () => {
   send({ type: 'CANCEL' }); // UX6: 취소 요청
@@ -417,7 +413,7 @@ $('btnApplyCancel').addEventListener('click', () => {
 });
 
 $('btnPreview').addEventListener('click', () => {
-  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 3;
+  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 8;
   send({ type: 'RENAME', apply: false, maxDepth });
 });
 
@@ -443,10 +439,6 @@ $('renameAll').addEventListener('change', (e) => {
   renderRenameTree();
 });
 
-$('renameHideCtx').addEventListener('change', (e) => {
-  renameHideContext = (e.target as HTMLInputElement).checked;
-  renderRenameTree();
-});
 
 /* ============================================================
    시스템화 마법사 — 기존 메시지(추출→생성→시맨틱→바인딩→정돈→검수→컴포넌트화)를
@@ -545,7 +537,7 @@ async function runWizard(): Promise<void> {
   // 설정값은 각 단계의 기존 입력 필드에서 읽는다(단일 출처).
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
-  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 3;
+  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 8;
   const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
   const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
 
@@ -626,10 +618,10 @@ async function runWizard(): Promise<void> {
           break;
         }
         case 'componentize': {
+          // 등록이 베이스 묶음 베리언트 세트까지 함께 수행(별도 분류 불필요).
           const reg = await wizardRequest({ type: 'REGISTER_COMPONENTS' }, ['COMPONENTS_RESULT']);
-          const cls = await wizardRequest({ type: 'CLASSIFY_VARIANTS' }, ['VARIANTS_RESULT']);
           totals.components = reg.registered;
-          setWizardStep('componentize', 'done', `등록 ${reg.registered} · 세트 ${cls.sets}`);
+          setWizardStep('componentize', 'done', `등록 ${reg.registered} · 세트 ${reg.sets}`);
           break;
         }
       }
@@ -836,10 +828,6 @@ $('compAll').addEventListener('change', (e) => {
   renderCompTree();
 });
 
-$('compHideCtx').addEventListener('change', (e) => {
-  compHideContext = (e.target as HTMLInputElement).checked;
-  renderCompTree();
-});
 
 $('btnClassifyVariants').addEventListener('click', () => {
   setStatus('componentStatus', t('component.classifying'), '');
@@ -871,7 +859,7 @@ const gatherPreset = (name: string): Preset => ({
   name,
   base: Number(($('base') as HTMLInputElement).value) || 16,
   tolerance: Number(($('tol') as HTMLInputElement).value) || 0,
-  maxDepth: Number(($('depth') as HTMLInputElement).value) || 3,
+  maxDepth: Number(($('depth') as HTMLInputElement).value) || 8,
   semanticMap: textToSemanticMap(($('semMap') as HTMLTextAreaElement).value),
 });
 
@@ -1126,10 +1114,25 @@ window.onmessage = (event: MessageEvent) => {
       if (!compEligibleCount()) setStatus('componentStatus', t('component.noEligible'), 'warn');
       break;
     }
-    case 'COMPONENTS_RESULT':
+    case 'COMPONENTS_RESULT': {
       clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
-      setStatus('componentStatus', t('component.registered', { registered: msg.registered, skipped: msg.skipped }), msg.registered ? 'ok' : 'warn');
+      const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}`;
+      setStatus('componentStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? 'ok' : 'warn');
+      // 빈 조합(미생성) 리포트
+      const box = $('variantReport');
+      box.innerHTML = '';
+      if (msg.missing.length) {
+        const h = document.createElement('div');
+        h.textContent = '빈 조합(미생성):';
+        box.appendChild(h);
+        for (const m of msg.missing) {
+          const d = document.createElement('div');
+          d.textContent = `  ${m}`;
+          box.appendChild(d);
+        }
+      }
       break;
+    }
     case 'VARIANTS_RESULT': {
       const box = $('variantReport');
       box.innerHTML = '';
@@ -1308,7 +1311,7 @@ function renderSelectableTree(
 /* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
 let renameNodes: RenameNode[] = []; // 마지막 미리보기 서브트리
 const renameChecked = new Set<string>(); // 체크된 영향 노드 id
-let renameHideContext = false; // 맥락(비영향) 숨기기 토글
+const renameHideContext = true; // 맥락(비영향) 노드는 항상 숨김(토글 없음)
 
 function affectedRenameCount(): number {
   return renameNodes.reduce((n, r) => n + (r.after !== undefined ? 1 : 0), 0);
@@ -1366,7 +1369,7 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
 let bindCandidates: BindCandidate[] = [];
 let bindNodes: BindNode[] = [];
 const bindChecked = new Set<string>(); // 체크된 후보 키
-let bindHideContext = false;
+const bindHideContext = true; // 항상 숨김(토글 없음)
 
 /** 후보 고유 키(노드+필드+인덱스). */
 function candKey(c: { nodeId: string; field: string; index?: number }): string {
@@ -1443,7 +1446,7 @@ function clearBindPreview(): void {
 /* ---------- 컴포넌트 등록(#1): 하위 후보 트리 + 선택 등록 ---------- */
 let compCandidates: ComponentCandidate[] = [];
 const compChecked = new Set<string>(); // 체크된 등록 후보(노드 id)
-let compHideContext = false;
+const compHideContext = true; // 항상 숨김(토글 없음)
 
 function compEligibleCount(): number {
   return compCandidates.reduce((n, c) => n + (c.eligible ? 1 : 0), 0);

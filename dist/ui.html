@@ -417,7 +417,6 @@
       </div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> 전체 선택</label>
-        <label class="inline"><input type="checkbox" id="bindHideCtx" /> 맥락 숨기기</label>
       </div>
       <div id="bindTree"></div>
       <div class="ux" id="applyProgress" style="display:none">
@@ -434,13 +433,12 @@
     <div class="step">
       <h2>4 · 리네임</h2>
       <div class="row">
-        <label class="inline">맥락 최대단계 <input id="depth" type="number" value="3" min="1" /></label>
+        <label class="inline">맥락 최대단계 <input id="depth" type="number" value="8" min="1" /></label>
         <button id="btnPreview">미리보기</button>
         <button id="btnRename" disabled>이름 적용</button>
       </div>
       <div class="row tree-ctrls">
         <label class="inline"><input type="checkbox" id="renameAll" checked /> 전체 선택</label>
-        <label class="inline"><input type="checkbox" id="renameHideCtx" /> 맥락 숨기기</label>
       </div>
       <div id="diff"></div>
       <div class="ux">
@@ -478,7 +476,6 @@
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
-        <label class="inline"><input type="checkbox" id="compHideCtx" /> 맥락 숨기기</label>
       </div>
       <div id="compTree"></div>
       <div id="variantReport" style="max-height:120px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
@@ -634,7 +631,7 @@
     "component.noEligible": "\uC120\uD0DD \uD558\uC704\uC5D0 \uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
     "component.noEligibleShort": "\uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
     "component.candidates": "\uB4F1\uB85D \uD6C4\uBCF4 {total}\uAC1C \xB7 {sel}\uAC1C \uC120\uD0DD",
-    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D {registered} \xB7 \uC2A4\uD0B5 {skipped}",
+    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {registered} \xB7 \uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}{extra}",
     "component.variants": "\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}\uAC1C \uC0DD\uC131{extra}",
     "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
     "component.exposed": "\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131 {created}\uAC1C \uB178\uCD9C",
@@ -830,7 +827,7 @@
         name,
         base: num(o.base, 16),
         tolerance: num(o.tolerance, 0.5),
-        maxDepth: Math.max(1, Math.round(num(o.maxDepth, 3))),
+        maxDepth: Math.max(1, Math.round(num(o.maxDepth, 8))),
         semanticMap
       }
     };
@@ -1238,6 +1235,7 @@
     scale("gap", "spacing", tshirtRoles);
     scale("radius", "radius", radiusRoles);
     scale("size", "size", tshirtRoles);
+    scale("strokeWidth", "stroke-width", tshirtRoles);
     scale("fontSize", "font-size", (vals) => fontSizeRoles(vals, base));
     for (const e of numericEntries(tokens2, "fontWeight")) map[`font-weight/${weightRole(e.value)}`] = e.name;
     const families = tokens2.filter((t2) => t2.category === "fontFamily" && typeof t2.value === "string");
@@ -1659,16 +1657,12 @@
     if (on) for (const c of bindCandidates) bindChecked.add(candKey(c));
     renderBindTree();
   });
-  $("bindHideCtx").addEventListener("change", (e) => {
-    bindHideContext = e.target.checked;
-    renderBindTree();
-  });
   $("btnApplyCancel").addEventListener("click", () => {
     send({ type: "CANCEL" });
     setStatus("applyStatus", t("apply.cancelRequested"), "warn");
   });
   $("btnPreview").addEventListener("click", () => {
-    const maxDepth = Number($("depth").value) || 3;
+    const maxDepth = Number($("depth").value) || 8;
     send({ type: "RENAME", apply: false, maxDepth });
   });
   $("btnContrast").addEventListener("click", () => {
@@ -1687,10 +1681,6 @@
     if (on) {
       for (const n of renameNodes) if (n.after !== void 0) renameChecked.add(n.id);
     }
-    renderRenameTree();
-  });
-  $("renameHideCtx").addEventListener("change", (e) => {
-    renameHideContext = e.target.checked;
     renderRenameTree();
   });
   var wizardRunning = false;
@@ -1774,7 +1764,7 @@
     }
     const base = Number($("base").value) || 16;
     const tolerance = Number($("tol").value) || 0;
-    const maxDepth = Number($("depth").value) || 3;
+    const maxDepth = Number($("depth").value) || 8;
     const level = $("contrastLevel").value;
     const semMap = textToSemanticMap($("semMap").value);
     const options = {
@@ -1851,9 +1841,8 @@
           }
           case "componentize": {
             const reg = await wizardRequest({ type: "REGISTER_COMPONENTS" }, ["COMPONENTS_RESULT"]);
-            const cls = await wizardRequest({ type: "CLASSIFY_VARIANTS" }, ["VARIANTS_RESULT"]);
             totals.components = reg.registered;
-            setWizardStep("componentize", "done", `\uB4F1\uB85D ${reg.registered} \xB7 \uC138\uD2B8 ${cls.sets}`);
+            setWizardStep("componentize", "done", `\uB4F1\uB85D ${reg.registered} \xB7 \uC138\uD2B8 ${reg.sets}`);
             break;
           }
         }
@@ -2025,10 +2014,6 @@
     }
     renderCompTree();
   });
-  $("compHideCtx").addEventListener("change", (e) => {
-    compHideContext = e.target.checked;
-    renderCompTree();
-  });
   $("btnClassifyVariants").addEventListener("click", () => {
     setStatus("componentStatus", t("component.classifying"), "");
     send({ type: "CLASSIFY_VARIANTS" });
@@ -2055,7 +2040,7 @@
     name,
     base: Number($("base").value) || 16,
     tolerance: Number($("tol").value) || 0,
-    maxDepth: Number($("depth").value) || 3,
+    maxDepth: Number($("depth").value) || 8,
     semanticMap: textToSemanticMap($("semMap").value)
   });
   function applyPreset(p) {
@@ -2279,10 +2264,24 @@
         if (!compEligibleCount()) setStatus("componentStatus", t("component.noEligible"), "warn");
         break;
       }
-      case "COMPONENTS_RESULT":
+      case "COMPONENTS_RESULT": {
         clearCompPreview();
-        setStatus("componentStatus", t("component.registered", { registered: msg.registered, skipped: msg.skipped }), msg.registered ? "ok" : "warn");
+        const extra = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}`;
+        setStatus("componentStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? "ok" : "warn");
+        const box = $("variantReport");
+        box.innerHTML = "";
+        if (msg.missing.length) {
+          const h = document.createElement("div");
+          h.textContent = "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):";
+          box.appendChild(h);
+          for (const m of msg.missing) {
+            const d = document.createElement("div");
+            d.textContent = `  ${m}`;
+            box.appendChild(d);
+          }
+        }
         break;
+      }
       case "VARIANTS_RESULT": {
         const box = $("variantReport");
         box.innerHTML = "";
@@ -2414,7 +2413,7 @@
   }
   var renameNodes = [];
   var renameChecked = /* @__PURE__ */ new Set();
-  var renameHideContext = false;
+  var renameHideContext = true;
   function affectedRenameCount() {
     return renameNodes.reduce((n, r) => n + (r.after !== void 0 ? 1 : 0), 0);
   }
@@ -2463,7 +2462,7 @@
   var bindCandidates = [];
   var bindNodes = [];
   var bindChecked = /* @__PURE__ */ new Set();
-  var bindHideContext = false;
+  var bindHideContext = true;
   function candKey(c) {
     var _a;
     return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}`;
@@ -2528,7 +2527,7 @@
   }
   var compCandidates = [];
   var compChecked = /* @__PURE__ */ new Set();
-  var compHideContext = false;
+  var compHideContext = true;
   function compEligibleCount() {
     return compCandidates.reduce((n, c) => n + (c.eligible ? 1 : 0), 0);
   }

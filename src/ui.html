@@ -417,7 +417,6 @@
       </div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> 전체 선택</label>
-        <label class="inline"><input type="checkbox" id="bindHideCtx" /> 맥락 숨기기</label>
       </div>
       <div id="bindTree"></div>
       <div class="ux" id="applyProgress" style="display:none">
@@ -434,13 +433,12 @@
     <div class="step">
       <h2>4 · 리네임</h2>
       <div class="row">
-        <label class="inline">맥락 최대단계 <input id="depth" type="number" value="3" min="1" /></label>
+        <label class="inline">맥락 최대단계 <input id="depth" type="number" value="8" min="1" /></label>
         <button id="btnPreview">미리보기</button>
         <button id="btnRename" disabled>이름 적용</button>
       </div>
       <div class="row tree-ctrls">
         <label class="inline"><input type="checkbox" id="renameAll" checked /> 전체 선택</label>
-        <label class="inline"><input type="checkbox" id="renameHideCtx" /> 맥락 숨기기</label>
       </div>
       <div id="diff"></div>
       <div class="ux">
@@ -478,7 +476,6 @@
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
-        <label class="inline"><input type="checkbox" id="compHideCtx" /> 맥락 숨기기</label>
       </div>
       <div id="compTree"></div>
       <div id="variantReport" style="max-height:120px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>

@@ -11,12 +11,45 @@ interface VarEntry {
   variable: Variable;
   tier: number; // Component 3 > Semantic 2 > Global 1
   type: VariableResolvedDataType;
+  scopes: readonly VariableScope[]; // 용도 스코프 — 필드와 안 맞는 변수 오매칭 차단
   colorHex?: string;
   num?: number;
   str?: string;
 }
 
 const TIER: Record<string, number> = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
+
+/**
+ * 바인딩 대상 필드 → 요구 변수 스코프. 변수 `scopes`가 이 스코프(또는 `ALL_SCOPES`)를
+ * 포함할 때만 매칭한다. 여백(GAP)이 line-height/letter-spacing(LINE_HEIGHT/LETTER_SPACING)
+ * 변수에 값만 비슷하다고 잘못 연결되는 오매칭을 막는다. (Figma의 GAP 스코프는 gap+padding 공용.)
+ */
+const FIELD_SCOPE: Record<string, VariableScope> = {
+  width: 'WIDTH_HEIGHT',
+  height: 'WIDTH_HEIGHT',
+  itemSpacing: 'GAP',
+  counterAxisSpacing: 'GAP',
+  paddingLeft: 'GAP',
+  paddingRight: 'GAP',
+  paddingTop: 'GAP',
+  paddingBottom: 'GAP',
+  topLeftRadius: 'CORNER_RADIUS',
+  topRightRadius: 'CORNER_RADIUS',
+  bottomLeftRadius: 'CORNER_RADIUS',
+  bottomRightRadius: 'CORNER_RADIUS',
+  strokeWeight: 'STROKE_FLOAT',
+  strokeTopWeight: 'STROKE_FLOAT',
+  strokeRightWeight: 'STROKE_FLOAT',
+  strokeBottomWeight: 'STROKE_FLOAT',
+  strokeLeftWeight: 'STROKE_FLOAT',
+  fontSize: 'FONT_SIZE',
+  lineHeight: 'LINE_HEIGHT',
+  letterSpacing: 'LETTER_SPACING',
+  opacity: 'OPACITY',
+};
+
+/** 불투명도는 0~1 범위라 px 허용오차 대신 정밀 매칭(추출 시 소수 2자리 반올림 대응). */
+const OPACITY_TOL = 0.005;
 
 export interface BindResult {
   bound: number;
@@ -46,6 +79,9 @@ function addColorCand(preview: Preview | null, node: SceneNode, field: string, i
 }
 function addFloatCand(preview: Preview | null, node: SceneNode, field: string, value: number, e: VarEntry): void {
   preview?.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : undefined });
+}
+function addStrCand(preview: Preview | null, node: SceneNode, field: string, value: string, e: VarEntry): void {
+  preview?.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
 }
 
 /** 미리보기 트리를 영향 노드 + 그 조상 체인으로 가지치기(pre-order 보존). */
@@ -153,7 +189,7 @@ async function buildIndex(): Promise<VarEntry[]> {
     if (tier < 2) continue; // Component/Semantic만 바인딩 대상
     const val = await resolveValue(v, modeOf);
     if (val == null) continue;
-    const e: VarEntry = { variable: v, tier, type: v.resolvedType };
+    const e: VarEntry = { variable: v, tier, type: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'] };
     if (v.resolvedType === 'COLOR' && isRGB(val)) e.colorHex = rgbToHex(val);
     else if (v.resolvedType === 'FLOAT' && typeof val === 'number') e.num = val;
     else if (v.resolvedType === 'STRING' && typeof val === 'string') e.str = val;
@@ -185,15 +221,27 @@ function isRGB(v: VariableValue): v is RGB | RGBA {
   return typeof v === 'object' && v !== null && 'r' in v && 'g' in v && 'b' in v;
 }
 
-function matchColor(entries: VarEntry[], hex: string): VarEntry | null {
-  for (const e of entries) if (e.colorHex === hex) return e;
+/** 색상 필드별 허용 스코프 — 변수 scopes가 이 중 하나(또는 ALL_SCOPES)를 포함해야 매칭. */
+const FILL_SCOPES: readonly VariableScope[] = ['ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL'];
+const STROKE_SCOPES: readonly VariableScope[] = ['STROKE_COLOR'];
+const EFFECT_SCOPES: readonly VariableScope[] = ['EFFECT_COLOR'];
+
+function colorScopeOk(e: VarEntry, allowed: readonly VariableScope[]): boolean {
+  return e.scopes.includes('ALL_SCOPES') || allowed.some((s) => e.scopes.includes(s));
+}
+
+function matchColor(entries: VarEntry[], hex: string, allowed: readonly VariableScope[]): VarEntry | null {
+  // 용도(스코프) 일치 + 정확한 hex. stroke 전용 색이 fill에, effect 색이 fill에 붙는 오매칭 방지.
+  for (const e of entries) if (e.colorHex === hex && colorScopeOk(e, allowed)) return e;
   return null;
 }
-function matchFloat(entries: VarEntry[], value: number, tol: number): VarEntry | null {
+function matchFloat(entries: VarEntry[], value: number, tol: number, scope?: VariableScope): VarEntry | null {
   let best: VarEntry | null = null;
   let bestDist = Infinity;
   for (const e of entries) {
     if (e.num == null) continue;
+    // 용도(스코프) 불일치 변수는 제외 — 여백이 line-height/letter-spacing 등에 붙는 오매칭 방지.
+    if (scope && !e.scopes.includes('ALL_SCOPES') && !e.scopes.includes(scope)) continue;
     const dist = Math.abs(e.num - value);
     if (dist > tol) continue;
     // 가장 가까운 값 우선, 동률이면 높은 tier 우선.
@@ -203,6 +251,16 @@ function matchFloat(entries: VarEntry[], value: number, tol: number): VarEntry |
     }
   }
   return best;
+}
+
+function matchString(entries: VarEntry[], str: string, scope: VariableScope): VarEntry | null {
+  // STRING 변수는 정확 일치 + 용도(스코프). fontFamily가 다른 STRING에 붙는 오매칭 방지.
+  for (const e of entries) {
+    if (e.str !== str) continue;
+    if (!e.scopes.includes('ALL_SCOPES') && !e.scopes.includes(scope)) continue;
+    return e;
+  }
+  return null;
 }
 
 /* ---------- 노드 순회 바인딩 ---------- */
@@ -232,6 +290,8 @@ async function walk(
   bindPaints(node, entries, res, apply, preview);
   bindFrame(node, entries, tol, res, flags, apply, preview);
   bindRadius(node, entries, tol, res, apply, preview);
+  bindStroke(node, entries, tol, res, apply, preview);
+  bindOpacity(node, entries, tol, res, apply, preview);
   bindEffects(node, entries, res, apply, preview);
   await bindText(node, entries, tol, res, apply, preview);
   // UX6: 주기적으로 진행률 보고 + 이벤트 루프 양보(취소 메시지 수신 가능) + 취소 확인.
@@ -256,11 +316,12 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
     if (!(key in node)) continue;
     const paints = (node as unknown as Record<string, Paint[] | typeof figma.mixed>)[key];
     if (paints === figma.mixed || !Array.isArray(paints)) continue;
+    const allowed = key === 'fills' ? FILL_SCOPES : STROKE_SCOPES;
     let changed = false;
     const next = paints.map((p, i) => {
       if (p.type !== 'SOLID') return p;
       const hex = rgbToHex(p.color);
-      const e = matchColor(entries, hex);
+      const e = matchColor(entries, hex, allowed);
       if (!e) {
         skip(res, 'no-match');
         return p;
@@ -303,6 +364,7 @@ function bindFrame(
     return;
   }
   tryBind(node, 'itemSpacing', node.itemSpacing, entries, tol, res, apply, preview);
+  if (typeof node.counterAxisSpacing === 'number') tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, tol, res, apply, preview);
   tryBind(node, 'paddingLeft', node.paddingLeft, entries, tol, res, apply, preview);
   tryBind(node, 'paddingRight', node.paddingRight, entries, tol, res, apply, preview);
   tryBind(node, 'paddingTop', node.paddingTop, entries, tol, res, apply, preview);
@@ -323,13 +385,38 @@ function bindRadius(node: SceneNode, entries: VarEntry[], tol: number, res: Bind
   }
 }
 
+function bindOpacity(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): void {
+  if (!('opacity' in node)) return;
+  const o = (node as { opacity: number }).opacity;
+  if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1/0은 바인딩 대상 아님
+  // 0~1 범위라 px 허용오차를 쓰지 않고 정밀(OPACITY_TOL) 매칭.
+  tryBind(node, 'opacity', o, entries, Math.min(tol, OPACITY_TOL), res, apply, preview);
+}
+
+function bindStroke(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): void {
+  if (!('strokes' in node) || !('strokeWeight' in node)) return;
+  // 보이는 선이 있을 때만 두께 바인딩(선 없는 노드의 strokeWeight는 무의미).
+  const strokes = (node as { strokes: readonly Paint[] | typeof figma.mixed }).strokes;
+  if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
+  const w = (node as { strokeWeight: number | typeof figma.mixed }).strokeWeight;
+  if (w !== figma.mixed && typeof w === 'number') {
+    if (w > 0) tryBind(node, 'strokeWeight', w, entries, tol, res, apply, preview);
+    return;
+  }
+  // 변별 두께(상/우/하/좌)
+  for (const side of ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const) {
+    const sv = (node as unknown as Record<string, number>)[side];
+    if (typeof sv === 'number' && sv > 0) tryBind(node, side, sv, entries, tol, res, apply, preview);
+  }
+}
+
 function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, apply: boolean, preview: Preview | null): void {
   if (!('effects' in node)) return;
   let changed = false;
   const next = (node as { effects: readonly Effect[] }).effects.map((e, i) => {
     if (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW') return e;
     const hex = rgbToHex(e.color);
-    const ent = matchColor(entries, hex);
+    const ent = matchColor(entries, hex, EFFECT_SCOPES);
     if (!ent) {
       skip(res, 'no-match');
       return e;
@@ -362,6 +449,21 @@ async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: 
   if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === 'PIXELS') {
     tryBindText(node, 'letterSpacing', node.letterSpacing.value, entries, tol, res, apply, preview);
   }
+  // fontFamily — STRING 변수(FONT_FAMILY)에 정확 일치 바인딩.
+  const fe = matchString(entries, node.fontName.family, 'FONT_FAMILY');
+  if (fe && node.characters.length > 0) {
+    if (!apply) {
+      res.bound++;
+      addStrCand(preview, node, 'fontFamily', node.fontName.family, fe);
+    } else {
+      try {
+        node.setRangeBoundVariable(0, node.characters.length, 'fontFamily', fe.variable);
+        res.bound++;
+      } catch {
+        skip(res, 'error');
+      }
+    }
+  }
 }
 
 function tryBindText(
@@ -374,7 +476,7 @@ function tryBindText(
   apply: boolean,
   preview: Preview | null,
 ): void {
-  const e = matchFloat(entries, value, tol);
+  const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   const len = node.characters.length;
   if (len === 0) {
     skip(res, 'empty-text');
@@ -407,7 +509,7 @@ function tryBind(
   apply: boolean,
   preview: Preview | null,
 ): void {
-  const e = matchFloat(entries, value, tol);
+  const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   if (!e) {
     skip(res, 'no-match');
     return;
