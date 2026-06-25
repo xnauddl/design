@@ -160,15 +160,6 @@
     .crow input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
     /* 색 정리(군집) */
     .cluster-sum { font-size: 11px; color: var(--muted); margin: 4px 0; }
-    #clusterList { max-height: 200px; overflow: auto; }
-    .clrow { display: flex; align-items: center; gap: 4px; padding: 3px 0; flex-wrap: wrap; }
-    .clrow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0003; }
-    .clrow .arrow { color: var(--muted); margin: 0 2px; }
-    .clrow .rep { width: 16px; height: 16px; border-radius: 3px; border: 1px solid #0003; }
-    .clrow .cn { font-family: ui-monospace, monospace; font-size: 11px; }
-    .clrow .cnt { font-size: 10px; color: var(--muted); }
-    .cluster-kept { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 6px; }
-    .cluster-kept .swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid #0003; }
     #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
     .tree-row.header { opacity: 1; color: var(--muted); }
     .before { color: var(--muted); text-decoration: line-through; }
@@ -415,15 +406,8 @@
       </div>
       <div id="tokenList"></div>
       <div class="status" id="extractStatus"></div>
-    </div>
-
-    <!-- 색 정리(군집) — ΔE로 비슷한 색을 대표색으로 병합(허용오차 8 고정·비노출) -->
-    <div class="step" id="colorClusterCard" style="display:none">
-      <h2>1.4 · 색 정리 (군집)</h2>
-      <div class="hint">비슷한 색을 묶어 <b>대표색</b> 하나로 병합합니다. 역할은 소수 대표색에만 답니다.</div>
-      <div class="cluster-sum" id="clusterSummary"></div>
-      <div id="clusterList"></div>
-      <div class="cluster-kept" id="clusterKept" style="display:none"></div>
+      <!-- 색 정리(군집): 추출/생성 색을 ΔE로 자동으로 묶어 대표색 요약을 한 줄로 표시(별도 카드 없이 추출에 흡수). -->
+      <div class="cluster-sum" id="clusterSummary" style="display:none"></div>
     </div>
 
     <!-- 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
@@ -728,10 +712,8 @@
     "extract.done": "{count}\uAC1C \uD6C4\uBCF4 \uCD94\uCD9C \uC644\uB8CC.",
     "create.needExtract": "\uBA3C\uC800 \uD1A0\uD070\uC744 \uCD94\uCD9C\uD558\uC138\uC694.",
     "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
-    // 색 정리(군집) — ΔE로 비슷한 색을 대표색으로 병합(허용오차 고정·비노출).
+    // 색 정리(군집) — ΔE로 비슷한 색을 대표색으로 병합(허용오차 고정·비노출). 추출 카드에 요약 한 줄.
     "cluster.summary": "{total}\uC0C9 \u2192 {reps} \uB300\uD45C\uC0C9 \xB7 {merged}\uC0C9 \uBCD1\uD569",
-    "cluster.kept": "\uB2E8\uC0C9 \uC720\uC9C0 \xB7 \uADF8\uB300\uB85C \uBCF4\uC874 (\uAD70\uC9D1 \uC548 \uD568)",
-    "cluster.none": "\uBE44\uC2B7\uD55C \uC0C9\uC774 \uC5C6\uC5B4 \uBB36\uC744 \uC0C9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uCD94\uCD9C \uC0C9\uC744 \uADF8\uB300\uB85C \uC0AC\uC6A9\uD569\uB2C8\uB2E4.",
     // 시맨틱 매핑
     "semantic.rolesApplied": "{count}\uAC1C \uC5ED\uD560 \uBC18\uC601\uB428 \u2014 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019\uC73C\uB85C \uC801\uC6A9.",
     "semantic.scanningGlobals": "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026",
@@ -1745,63 +1727,23 @@
       return row;
     });
   }
-  function swatchEl(hex, cls = "swatch") {
-    const s = document.createElement("span");
-    s.className = cls;
-    s.style.background = hex;
-    return s;
-  }
   function renderColorClusters() {
-    const card = $("colorClusterCard");
+    const box = $("clusterSummary");
     const colorToks = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
     if (colorToks.length < 2) {
-      card.style.display = "none";
+      box.style.display = "none";
+      box.textContent = "";
       return;
     }
     const { clusters } = clusterColorTokens(tokens);
     const s = clusterSummary(clusters);
-    card.style.display = "";
-    $("clusterSummary").textContent = t("cluster.summary", { total: s.total, reps: s.representatives, merged: s.merged });
-    const list = $("clusterList");
-    list.textContent = "";
-    const merged = clusters.filter((c) => !c.isSingleton);
-    if (!merged.length) {
-      const none = document.createElement("div");
-      none.className = "muted";
-      none.textContent = t("cluster.none");
-      list.appendChild(none);
+    if (s.merged <= 0) {
+      box.style.display = "none";
+      box.textContent = "";
+      return;
     }
-    for (const cl of merged) {
-      const row = document.createElement("div");
-      row.className = "clrow";
-      for (const m of cl.members) row.appendChild(swatchEl(m.hex));
-      const arrow = document.createElement("span");
-      arrow.className = "arrow";
-      arrow.textContent = "\u2192";
-      row.appendChild(arrow);
-      row.appendChild(swatchEl(cl.representative.hex, "rep"));
-      const name = document.createElement("span");
-      name.className = "cn";
-      name.textContent = cl.representative.name;
-      row.appendChild(name);
-      const cnt = document.createElement("span");
-      cnt.className = "cnt";
-      cnt.textContent = `\xB7 ${cl.members.length}\uC0C9\u21921`;
-      row.appendChild(cnt);
-      list.appendChild(row);
-    }
-    const singles = clusters.filter((c) => c.isSingleton);
-    const kept = $("clusterKept");
-    if (singles.length) {
-      kept.style.display = "";
-      kept.textContent = "";
-      for (const c of singles) kept.appendChild(swatchEl(c.representative.hex));
-      const label = document.createElement("span");
-      label.textContent = t("cluster.kept");
-      kept.appendChild(label);
-    } else {
-      kept.style.display = "none";
-    }
+    box.style.display = "";
+    box.textContent = t("cluster.summary", { total: s.total, reps: s.representatives, merged: s.merged });
   }
   function applyColorRoles() {
     const map = {};
