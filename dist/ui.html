@@ -40,6 +40,8 @@
       --warn:          #9a6300;
       --warn-subtle:   #fbf1df;
       --danger:        #c8252f;
+      --danger-subtle: #fdecec;
+      --danger-border: #f4c9cc;
 
       /* 반경 */
       --r-sm: 5px;
@@ -80,6 +82,15 @@
       box-shadow: var(--shadow-sm);
     }
     .step > * + * { margin-top: 8px; }
+
+    /* ── 카드 헤더(접기 chevron + 타이틀 줄 버튼) — 캐논 패턴 ── */
+    .step-head { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+    .step-head h2 { margin: 0; flex: 1 1 auto; }
+    .step-head > button { flex: 0 0 auto; }
+    .step-head .chev { flex: 0 0 auto; color: var(--muted); font-size: 13px; line-height: 1; transform: rotate(90deg); transition: transform .12s; }
+    .step.collapsed .step-head .chev { transform: rotate(0deg); }
+    .step-body > * + * { margin-top: 8px; }
+    .step.collapsed .step-body { display: none; }
 
     /* ── 버튼 ── */
     button {
@@ -171,6 +182,16 @@
     .ux-t { font-size: var(--fs); font-weight: 600; color: var(--accent-strong); }
     .hint { color: var(--text-2); font-size: 10.5px; }
 
+    /* ── 빈 상태 (캐논 108:2 패턴) ── */
+    .empty-state { text-align: center; padding: 14px 10px; color: var(--text-2); }
+    .empty-state .es-title { font-weight: 600; color: var(--text); }
+    .empty-state .es-guide { margin-top: 4px; font-size: 10.5px; }
+    .empty-state button { margin-top: 8px; }
+
+    /* ── 에러 콜아웃(위험) ── */
+    .ux.danger { background: var(--danger-subtle); border-color: var(--danger-border); }
+    .ux.danger .ux-t { color: var(--danger); }
+
     /* ── 진행률 바 ── */
     .bar { height: 7px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
     .bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 999px; transition: width .12s linear; }
@@ -252,7 +273,7 @@
 </head>
 <body>
   <div class="tabs" role="tablist" aria-label="작업 탭">
-    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard">시작</button>
+    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard">마법사</button>
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply">적용</button>
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings">관리</button>
@@ -362,7 +383,7 @@
     <div class="step" id="createCard">
       <h2>2 · 토큰 생성 (Global + Semantic)</h2>
       <div class="row">
-        <label class="inline">base(rem)px <input id="base" type="number" value="16" min="1" /></label>
+        <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
       </div>
       <div class="hint">미리보기로 변경 요약을 확인한 뒤 적용하세요.</div>
       <div class="row">
@@ -372,7 +393,9 @@
       <div class="status" id="createStatus"></div>
     </div>
 
-    <div class="step">
+    <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
+         DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
+    <div class="step" style="display:none">
       <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
       <div class="hint">형식: <code>역할 = Global변수이름</code></div>
       <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
@@ -449,7 +472,7 @@
     </div>
 
     <div class="step" id="contrastCard">
-      <h2>5 · 명도 대비 점검</h2>
+      <h2>5 · 명도 대비 점검 (WCAG)</h2>
       <div class="hint">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
       <div class="row">
         <label class="inline">기준
@@ -1400,14 +1423,33 @@
     row.appendChild(cat);
     return row;
   }
+  function renderEmptyState(box, title, guide, actionLabel) {
+    box.innerHTML = "";
+    const wrap = document.createElement("div");
+    wrap.className = "empty-state";
+    const t2 = document.createElement("div");
+    t2.className = "es-title";
+    t2.textContent = title;
+    const g = document.createElement("div");
+    g.className = "es-guide";
+    g.textContent = guide;
+    wrap.append(t2, g);
+    if (actionLabel) {
+      const btn = document.createElement("button");
+      btn.textContent = actionLabel;
+      btn.disabled = true;
+      wrap.appendChild(btn);
+    }
+    box.appendChild(wrap);
+  }
   function renderTokens() {
     const box = $("tokenList");
     if (!tokens.length) {
-      box.innerHTML = "";
-      const empty = document.createElement("div");
-      empty.className = "ux";
-      empty.innerHTML = lastSelCount > 0 ? "<div>\uC120\uD0DD\uC5D0\uC11C \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC744 \uBF51\uC2B5\uB2C8\uB2E4. <b>\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019</b>\uC744 \uB204\uB974\uC138\uC694.</div>" : "<div>\uD504\uB808\uC784\uC744 \uC120\uD0DD\uD55C \uB4A4 <b>\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019</b>\uC744 \uB204\uB974\uBA74 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uD6C4\uBCF4\uB85C \uC7A1\uD799\uB2C8\uB2E4. \uC608) \uBC84\uD2BC\xB7\uCE74\uB4DC</div>";
-      box.appendChild(empty);
+      if (lastSelCount > 0) {
+        renderEmptyState(box, "\uCD94\uCD9C \uC900\uBE44\uB428", "\uC120\uD0DD\uC5D0\uC11C \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC744 \uBF51\uC2B5\uB2C8\uB2E4. \u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uC138\uC694.");
+      } else {
+        renderEmptyState(box, "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC5B4\uC694", "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uB4DC\uB824\uC694.");
+      }
       return;
     }
     renderChunked(box, tokens, makeTokenRow);
@@ -2139,6 +2181,7 @@
         renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
         clearBindPreview();
         if (!tokens.length) renderTokens();
+        refreshTreeEmptyStates();
         break;
       }
       case "CREATE_RESULT": {
@@ -2152,6 +2195,10 @@
         } else {
           setStatus("createStatus", msg.summary, msg.limited ? "warn" : "ok");
           applyBtn.style.display = "none";
+          if (!wizardRunning) {
+            const semMap = textToSemanticMap($("semMap").value);
+            if (Object.keys(semMap).length) send({ type: "CREATE_SEMANTICS", map: semMap });
+          }
         }
         break;
       }
@@ -2364,17 +2411,32 @@
   };
   function showError(id, f) {
     const el = $(id);
-    el.className = "status warn";
-    el.textContent = `\uC624\uB958: ${f.message}${f.action ? ` \u2014 ${f.action}` : ""}`;
+    el.className = "status";
+    el.innerHTML = "";
+    const box = document.createElement("div");
+    box.className = "ux danger";
+    const h = document.createElement("div");
+    h.className = "ux-h";
+    const title = document.createElement("span");
+    title.className = "ux-t";
+    title.textContent = f.message;
+    h.appendChild(title);
+    box.appendChild(h);
+    if (f.action) {
+      const g = document.createElement("div");
+      g.className = "hint";
+      g.textContent = f.action;
+      box.appendChild(g);
+    }
     if (f.retryable && lastSentMsg) {
       const retry = lastSentMsg;
       const btn = document.createElement("button");
+      btn.className = "primary";
       btn.textContent = "\uB2E4\uC2DC \uC2DC\uB3C4";
-      btn.style.marginLeft = "6px";
       btn.addEventListener("click", () => send(retry));
-      el.appendChild(document.createTextNode(" "));
-      el.appendChild(btn);
+      box.appendChild(btn);
     }
+    el.appendChild(box);
   }
   function baseDepth(rows) {
     return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
@@ -2561,6 +2623,17 @@
     $("compTree").innerHTML = "";
     $("compTreeCtrls").style.display = "none";
   }
+  function refreshTreeEmptyStates() {
+    const guide = "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uB4DC\uB824\uC694.";
+    if (!hasBindPreview()) {
+      if (lastSelCount === 0) renderEmptyState($("bindTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC5B4\uC694", guide);
+      else $("bindTree").innerHTML = "";
+    }
+    if (compCandidates.length === 0) {
+      if (lastSelCount === 0) renderEmptyState($("compTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC5B4\uC694", guide);
+      else $("compTree").innerHTML = "";
+    }
+  }
   var REASON_LABELS = {
     "no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
     "empty-text": "\uBE48 \uD14D\uC2A4\uD2B8",
@@ -2674,9 +2747,47 @@
   function escapeHtml(s) {
     return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
   }
+  var TITLE_BTN_IDS = /* @__PURE__ */ new Set([
+    "btnWizardRun",
+    "btnPalette",
+    "btnExtract",
+    "btnColorRoles",
+    "btnCreate",
+    "btnTextStyles",
+    "btnApply",
+    "btnPreview",
+    "btnContrast",
+    "btnExport"
+  ]);
+  function applyCardChrome() {
+    document.querySelectorAll(".step").forEach((card) => {
+      const h2 = card.querySelector("h2");
+      if (!h2 || card.querySelector(".step-head")) return;
+      const head = document.createElement("div");
+      head.className = "step-head";
+      const body = document.createElement("div");
+      body.className = "step-body";
+      while (h2.nextSibling) body.appendChild(h2.nextSibling);
+      card.insertBefore(head, h2);
+      const chev = document.createElement("span");
+      chev.className = "chev";
+      chev.textContent = "\u203A";
+      head.appendChild(chev);
+      head.appendChild(h2);
+      const btn = Array.from(body.querySelectorAll("button")).find((b) => TITLE_BTN_IDS.has(b.id));
+      if (btn) head.appendChild(btn);
+      card.appendChild(body);
+      head.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return;
+        card.classList.toggle("collapsed");
+      });
+    });
+  }
+  applyCardChrome();
   updateGates();
   renderPipeline();
   renderTokens();
+  refreshTreeEmptyStates();
   send({ type: "GET_COLLECTIONS" });
   send({ type: "GET_PREREQ" });
   send({ type: "GET_LICENSE" });
