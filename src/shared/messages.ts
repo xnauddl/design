@@ -88,6 +88,8 @@ export interface VarValueCell {
 export interface VarInfo {
   id: string;
   name: string;
+  /** 소속 컬렉션 id(다크 생성 등 컬렉션 단위 작업용). */
+  collectionId: string;
   /** 소속 컬렉션 이름('Global'|'Semantic'|'Component'). 읽기 전용(이동 불가). */
   collection: string;
   /** 읽기 전용(타입 고정). */
@@ -154,7 +156,9 @@ export type UiToCode =
   | { type: 'APPLY_CONTRAST_FIX'; nodeId: string; hex: string } // #2: 보정색을 해당 노드 단색 채움에 적용
   | { type: 'GET_VARIABLES' } // R1: 3계층 변수 목록(편집기)
   | { type: 'EDIT_VARIABLE'; id: string; patch: VarPatch } // R1: 변수 속성 즉시 편집
-  | { type: 'DELETE_VARIABLE'; id: string }; // R1: 변수 삭제
+  | { type: 'DELETE_VARIABLE'; id: string } // R1: 변수 삭제
+  | { type: 'GET_VARIABLE_USAGE'; id: string } // R2-C: 삭제/리네임 전 사용처 조회
+  | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId: string; toModeId: string }; // R2-A: 라이트→다크 자동 채움
 
 /** code → UI 응답. */
 export type CodeToUi =
@@ -198,6 +202,9 @@ export type CodeToUi =
   | { type: 'CONTRAST_RESULT'; level: WcagLevel; checked: number; passed: number; failed: number; findings: ContrastFinding[]; skipped: Record<string, number> }
   | { type: 'VARIABLES'; vars: VarInfo[] } // R1: 편집기용 변수 목록
   | { type: 'EDIT_VARIABLE_RESULT'; id: string; ok: boolean; error?: string; var?: VarInfo; deleted?: boolean } // R1: 편집/삭제 결과
+  // R2-C: 변수 사용처 — 바인딩된 노드 + 이 변수를 별칭하는 변수. capped=노드 스캔 상한 도달.
+  | { type: 'VARIABLE_USAGE'; id: string; nodes: { id: string; name: string }[]; aliasedBy: { id: string; name: string }[]; capped: boolean }
+  | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number } // R2-A: 다크 생성 결과
   | { type: 'ERROR'; message: string; op?: string }; // op: 실패한 UiToCode 종류(상태 라우팅용)
 
 /** code → UI 안전 전송. */

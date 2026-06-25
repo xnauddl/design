@@ -172,6 +172,9 @@
     .vcell input[type="color"] { padding: 0; height: 22px; width: 28px; flex: 0 0 auto; }
     .vscopes { height: 44px; }
     .vdel { font-size: 10px; padding: 3px 4px; align-self: center; }
+    #darkGenPanel:empty { display: none; }
+    #darkGenPanel { margin: 8px 0 2px; padding-top: 6px; border-top: 1px solid #0002; }
+    #darkGenPanel select { font: 400 11px "Inter", monospace; padding: 3px 4px; }
   </style>
 </head>
 <body>
@@ -470,6 +473,7 @@
         <span class="muted" id="varEditInfo"></span>
       </div>
       <div id="varEditList"></div>
+      <div id="darkGenPanel"></div>
       <div class="ux">
         <div class="ux-h"><span class="badge">R1</span><span class="ux-t">즉시 편집 · 단일 Undo</span></div>
         <div class="status" id="varEditStatus"></div>
@@ -670,7 +674,15 @@
     "varedit.deleted": "\u2018{name}\u2019 \uC0AD\uC81C\uB428 \u2014 \uB418\uB3CC\uB9AC\uB824\uBA74 Undo.",
     "varedit.editFail": "\uD3B8\uC9D1 \uC2E4\uD328: {error}",
     "varedit.dupName": "\uAC19\uC740 \uCEEC\uB809\uC158\uC5D0 \uAC19\uC740 \uC774\uB984\uC758 \uBCC0\uC218\uAC00 \uC788\uC2B5\uB2C8\uB2E4.",
-    "varedit.confirmDelete": "\u2018{name}\u2019 \uBCC0\uC218\uB97C \uC0AD\uC81C\uD560\uAE4C\uC694? \uB418\uB3CC\uB9AC\uB824\uBA74 Undo\uD558\uC138\uC694."
+    "varedit.confirmDelete": "\u2018{name}\u2019 \uBCC0\uC218\uB97C \uC0AD\uC81C\uD560\uAE4C\uC694? \uB418\uB3CC\uB9AC\uB824\uBA74 Undo\uD558\uC138\uC694.",
+    // R2-C: 영향 분석(where-used)
+    "varedit.usageNodes": "\uC774 \uBCC0\uC218\uB97C \uC4F0\uB294 \uB178\uB4DC {count}\uAC1C",
+    "varedit.usageAliases": "\uC774 \uBCC0\uC218\uB97C \uBCC4\uCE6D\uD558\uB294 \uBCC0\uC218 {count}\uAC1C: {names}",
+    // R2-A: 다크 자동 생성
+    "varedit.darkDone": "\uB2E4\uD06C \uC0DD\uC131 \u2014 \uB2E4\uD06C Global {created}\uAC1C \xB7 \uC7AC\uBCC4\uCE6D {realiased}\uAC1C{skip}",
+    "varedit.darkSkip": " \xB7 \uC2A4\uD0B5 {skipped}(\uBCC4\uCE6D \uC544\uB2D8)",
+    "varedit.darkSameMode": "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C \uBAA8\uB4DC\uAC00 \uAC19\uC2B5\uB2C8\uB2E4 \u2014 \uC11C\uB85C \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
+    "varedit.darkHint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC Semantic \uC0C9\uC744 OKLCH \uBA85\uB3C4 \uBC18\uC804\uC73C\uB85C \uB2E4\uD06C \uBAA8\uB4DC\uC5D0 \uC790\uB3D9 \uCC44\uC6C1\uB2C8\uB2E4(\uB2E4\uD06C\uC6A9 Global \uC0DD\uC131 \uD6C4 \uC7AC-\uBCC4\uCE6D)."
   };
   function t(key, vars) {
     var _a;
@@ -1439,6 +1451,7 @@
   var lastSelCount = 0;
   var createFrom = "tokens";
   var varList = [];
+  var pendingDelete = null;
   var CHUNK = 150;
   var chunkPending = /* @__PURE__ */ new WeakMap();
   function renderChunked(mount, items, makeRow) {
@@ -2393,7 +2406,8 @@
     del.className = "vdel";
     del.textContent = "\uC0AD\uC81C";
     del.addEventListener("click", () => {
-      if (confirm(t("varedit.confirmDelete", { name: v.name }))) send({ type: "DELETE_VARIABLE", id: v.id });
+      pendingDelete = { id: v.id, name: v.name };
+      send({ type: "GET_VARIABLE_USAGE", id: v.id });
     });
     row.append(name, badge, values, scopes, desc, del);
     return row;
@@ -2423,6 +2437,50 @@
     }
     mount.appendChild(frag);
     $("varEditInfo").textContent = t("varedit.count", { count: varList.length });
+    renderDarkGen();
+  }
+  function renderDarkGen() {
+    var _a;
+    const panel = $("darkGenPanel");
+    panel.innerHTML = "";
+    const sem = varList.find((v) => v.collection === "Semantic" && v.modes.length >= 2);
+    if (!sem) return;
+    const modeSelect = (def) => {
+      const s = document.createElement("select");
+      for (const m of sem.modes) {
+        const o = document.createElement("option");
+        o.value = m.modeId;
+        o.textContent = m.name;
+        if (m.modeId === def) o.selected = true;
+        s.appendChild(o);
+      }
+      return s;
+    };
+    const toMode = sem.modes.find((m) => m.modeId !== sem.defaultModeId);
+    const fromSel = modeSelect(sem.defaultModeId);
+    const toSel = modeSelect((_a = toMode == null ? void 0 : toMode.modeId) != null ? _a : sem.defaultModeId);
+    const btn = document.createElement("button");
+    btn.textContent = "\uB2E4\uD06C \uC790\uB3D9 \uC0DD\uC131";
+    btn.addEventListener("click", () => {
+      if (fromSel.value === toSel.value) {
+        setStatus("varEditStatus", t("varedit.darkSameMode"), "warn");
+        return;
+      }
+      send({ type: "GENERATE_DARK_MODE", collectionId: sem.collectionId, fromModeId: fromSel.value, toModeId: toSel.value });
+    });
+    const hint = document.createElement("div");
+    hint.className = "muted";
+    hint.textContent = t("varedit.darkHint");
+    const row = document.createElement("div");
+    row.className = "row";
+    const l1 = document.createElement("span");
+    l1.className = "muted";
+    l1.textContent = "\uB77C\uC774\uD2B8";
+    const l2 = document.createElement("span");
+    l2.className = "muted";
+    l2.textContent = "\u2192 \uB2E4\uD06C";
+    row.append(l1, fromSel, l2, toSel, btn);
+    panel.append(hint, row);
   }
   function mainSwitch(msg) {
     var _a, _b, _c, _d;
@@ -2637,6 +2695,25 @@
         }
         break;
       }
+      case "VARIABLE_USAGE": {
+        if (!pendingDelete || pendingDelete.id !== msg.id) break;
+        const pd = pendingDelete;
+        pendingDelete = null;
+        const lines = [];
+        if (msg.nodes.length) lines.push("\u26A0 " + t("varedit.usageNodes", { count: `${msg.nodes.length}${msg.capped ? "+" : ""}` }));
+        if (msg.aliasedBy.length) {
+          const names = msg.aliasedBy.slice(0, 5).map((x) => x.name).join(", ") + (msg.aliasedBy.length > 5 ? "\u2026" : "");
+          lines.push("\u26A0 " + t("varedit.usageAliases", { count: msg.aliasedBy.length, names }));
+        }
+        const warn = lines.length ? "\n\n" + lines.join("\n") : "";
+        if (confirm(t("varedit.confirmDelete", { name: pd.name }) + warn)) send({ type: "DELETE_VARIABLE", id: pd.id });
+        break;
+      }
+      case "DARK_MODE_RESULT": {
+        const skip = msg.skipped ? t("varedit.darkSkip", { skipped: msg.skipped }) : "";
+        setStatus("varEditStatus", t("varedit.darkDone", { created: msg.created, realiased: msg.realiased, skip }), "ok");
+        break;
+      }
       case "ERROR": {
         const statusId = msg.op && OP_STATUS[msg.op] || "extractStatus";
         if (msg.op === "APPLY") hideApplyProgress();
@@ -2687,6 +2764,8 @@
     GET_VARIABLES: "varEditStatus",
     EDIT_VARIABLE: "varEditStatus",
     DELETE_VARIABLE: "varEditStatus",
+    GET_VARIABLE_USAGE: "varEditStatus",
+    GENERATE_DARK_MODE: "varEditStatus",
     GET_PRESETS: "presetStatus",
     SAVE_PRESET: "presetStatus",
     DELETE_PRESET: "presetStatus",

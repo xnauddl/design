@@ -75,3 +75,32 @@ export function sanitizeScopes(scopes: ScopeName[], type: ResolvedType): ScopeNa
 export function aliasSelfReference(sourceId: string, targetId: string): boolean {
   return sourceId === targetId;
 }
+
+/** findAliasReferers 입력용 최소 구조(messages.VarInfo와 구조적으로 호환, 결합 회피). */
+interface AliasCellLike {
+  kind: 'literal' | 'alias';
+  aliasId?: string;
+}
+interface VarLike {
+  id: string;
+  name: string;
+  values: Record<string, AliasCellLike>;
+}
+
+/**
+ * varId를 (어느 모드에서든) 별칭으로 참조하는 변수들 — 삭제/리네임 영향 분석(R2-C).
+ * 자기 자신은 제외. 순수 함수라 node --test로 검증.
+ */
+export function findAliasReferers(varId: string, vars: readonly VarLike[]): { id: string; name: string }[] {
+  const out: { id: string; name: string }[] = [];
+  for (const v of vars) {
+    if (v.id === varId) continue;
+    for (const cell of Object.values(v.values)) {
+      if (cell.kind === 'alias' && cell.aliasId === varId) {
+        out.push({ id: v.id, name: v.name });
+        break;
+      }
+    }
+  }
+  return out;
+}

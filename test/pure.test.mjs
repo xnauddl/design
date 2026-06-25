@@ -48,6 +48,10 @@ import {
   validateVarName,
   sanitizeScopes,
   aliasSelfReference,
+  findAliasReferers,
+  darkValueForLight,
+  darkGlobalName,
+  hexToOklch,
   parseVariantName,
   formatVariant,
   classifyVariants,
@@ -532,6 +536,39 @@ test('scopesForTypeList — 타입별 유효 스코프 노출', () => {
 test('aliasSelfReference — 자기참조만 차단', () => {
   assert.equal(aliasSelfReference('a', 'a'), true);
   assert.equal(aliasSelfReference('a', 'b'), false);
+});
+
+test('findAliasReferers — varId를 별칭하는 변수 수집(자기 제외, R2-C)', () => {
+  const vars = [
+    { id: 'g1', name: 'color/blue/500', values: { m: { kind: 'literal' } } },
+    { id: 's1', name: 'primary', values: { m: { kind: 'alias', aliasId: 'g1' } } },
+    { id: 's2', name: 'surface', values: { light: { kind: 'alias', aliasId: 'g1' }, dark: { kind: 'literal' } } },
+    { id: 's3', name: 'text', values: { m: { kind: 'alias', aliasId: 'other' } } },
+  ];
+  const refs = findAliasReferers('g1', vars);
+  assert.deepEqual(refs.map((r) => r.name).sort(), ['primary', 'surface']);
+  // 어느 모드든 한 번이라도 별칭하면 1회만(중복 없음)
+  assert.equal(refs.length, 2);
+  assert.deepEqual(findAliasReferers('none', vars), []);
+});
+
+/* ================= themeGen.ts (R2-A) ================= */
+test('darkValueForLight — OKLCH 명도 반전(밝음↔어두움)', () => {
+  // 흰색 → 어두운 색(L 낮아짐), 검정 → 밝은 색(L 높아짐)
+  const fromWhite = hexToOklch(darkValueForLight('#ffffff'));
+  const fromBlack = hexToOklch(darkValueForLight('#000000'));
+  assert.ok(fromWhite.l < 0.5, `흰색 반전 L=${fromWhite.l}`);
+  assert.ok(fromBlack.l > 0.5, `검정 반전 L=${fromBlack.l}`);
+  // 유효 hex 반환
+  assert.match(darkValueForLight('#2563eb'), /^#[0-9a-f]{6}$/);
+  // hue 보존(유채색) — 파랑 계열 유지
+  const lightH = hexToOklch('#2563eb').h;
+  const darkH = hexToOklch(darkValueForLight('#2563eb')).h;
+  assert.ok(Math.abs(lightH - darkH) < 15, `hue 보존 ${lightH}→${darkH}`);
+});
+
+test('darkGlobalName — dark/ 그룹 접두', () => {
+  assert.equal(darkGlobalName('color/blue/500'), 'dark/color/blue/500');
 });
 
 /* ================= components.ts (Phase 3) ================= */

@@ -46,6 +46,7 @@ let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
 let varList: VarInfo[] = []; // R1: 변수 편집기 목록(VARIABLES 수신)
+let pendingDelete: { id: string; name: string } | null = null; // R2-C: 사용처 조회 후 삭제 확정 대기
 
 /* ---------- 토큰 목록 렌더 ---------- */
 /* ---------- 점진(청크) 렌더 — 대량 목록을 프레임 단위로 나눠 비차단 렌더(§4) ----------
@@ -1176,7 +1177,9 @@ function makeVarRow(v: VarInfo): HTMLElement {
   del.className = 'vdel';
   del.textContent = '삭제';
   del.addEventListener('click', () => {
-    if (confirm(t('varedit.confirmDelete', { name: v.name }))) send({ type: 'DELETE_VARIABLE', id: v.id });
+    // R2-C: 삭제 전에 사용처(바인딩 노드 + 별칭 변수)를 조회해 경고 후 확정.
+    pendingDelete = { id: v.id, name: v.name };
+    send({ type: 'GET_VARIABLE_USAGE', id: v.id });
   });
 
   row.append(name, badge, values, scopes, desc, del);
@@ -1209,6 +1212,53 @@ function renderVarEditor(): void {
   }
   mount.appendChild(frag);
   $('varEditInfo').textContent = t('varedit.count', { count: varList.length });
+  renderDarkGen();
+}
+
+/** R2-A: 다중 모드 Semantic 컬렉션이 있으면 다크 자동 생성 패널을 그린다(없으면 비움→숨김). */
+function renderDarkGen(): void {
+  const panel = $('darkGenPanel');
+  panel.innerHTML = '';
+  const sem = varList.find((v) => v.collection === 'Semantic' && v.modes.length >= 2);
+  if (!sem) return;
+  const modeSelect = (def: string): HTMLSelectElement => {
+    const s = document.createElement('select');
+    for (const m of sem.modes) {
+      const o = document.createElement('option');
+      o.value = m.modeId;
+      o.textContent = m.name;
+      if (m.modeId === def) o.selected = true;
+      s.appendChild(o);
+    }
+    return s;
+  };
+  const toMode = sem.modes.find((m) => m.modeId !== sem.defaultModeId);
+  const fromSel = modeSelect(sem.defaultModeId);
+  const toSel = modeSelect(toMode?.modeId ?? sem.defaultModeId);
+
+  const btn = document.createElement('button');
+  btn.textContent = '다크 자동 생성';
+  btn.addEventListener('click', () => {
+    if (fromSel.value === toSel.value) {
+      setStatus('varEditStatus', t('varedit.darkSameMode'), 'warn');
+      return;
+    }
+    send({ type: 'GENERATE_DARK_MODE', collectionId: sem.collectionId, fromModeId: fromSel.value, toModeId: toSel.value });
+  });
+
+  const hint = document.createElement('div');
+  hint.className = 'muted';
+  hint.textContent = t('varedit.darkHint');
+  const row = document.createElement('div');
+  row.className = 'row';
+  const l1 = document.createElement('span');
+  l1.className = 'muted';
+  l1.textContent = '라이트';
+  const l2 = document.createElement('span');
+  l2.className = 'muted';
+  l2.textContent = '→ 다크';
+  row.append(l1, fromSel, l2, toSel, btn);
+  panel.append(hint, row);
 }
 
 function mainSwitch(msg: CodeToUi): void {
@@ -1455,6 +1505,27 @@ function mainSwitch(msg: CodeToUi): void {
       }
       break;
     }
+    case 'VARIABLE_USAGE': {
+      // R2-C: 삭제 확정 흐름 — 사용처를 경고에 담아 confirm.
+      if (!pendingDelete || pendingDelete.id !== msg.id) break;
+      const pd = pendingDelete;
+      pendingDelete = null;
+      const lines: string[] = [];
+      if (msg.nodes.length) lines.push('⚠ ' + t('varedit.usageNodes', { count: `${msg.nodes.length}${msg.capped ? '+' : ''}` }));
+      if (msg.aliasedBy.length) {
+        const names = msg.aliasedBy.slice(0, 5).map((x) => x.name).join(', ') + (msg.aliasedBy.length > 5 ? '…' : '');
+        lines.push('⚠ ' + t('varedit.usageAliases', { count: msg.aliasedBy.length, names }));
+      }
+      const warn = lines.length ? '\n\n' + lines.join('\n') : '';
+      if (confirm(t('varedit.confirmDelete', { name: pd.name }) + warn)) send({ type: 'DELETE_VARIABLE', id: pd.id });
+      break;
+    }
+    case 'DARK_MODE_RESULT': {
+      // R2-A: 다크 생성 결과(이후 VARIABLES 재수신으로 목록 갱신).
+      const skip = msg.skipped ? t('varedit.darkSkip', { skipped: msg.skipped }) : '';
+      setStatus('varEditStatus', t('varedit.darkDone', { created: msg.created, realiased: msg.realiased, skip }), 'ok');
+      break;
+    }
     case 'ERROR': {
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
       const statusId = (msg.op && OP_STATUS[msg.op]) || 'extractStatus';
@@ -1517,6 +1588,8 @@ const OP_STATUS: Record<string, string> = {
   GET_VARIABLES: 'varEditStatus',
   EDIT_VARIABLE: 'varEditStatus',
   DELETE_VARIABLE: 'varEditStatus',
+  GET_VARIABLE_USAGE: 'varEditStatus',
+  GENERATE_DARK_MODE: 'varEditStatus',
   GET_PRESETS: 'presetStatus',
   SAVE_PRESET: 'presetStatus',
   DELETE_PRESET: 'presetStatus',

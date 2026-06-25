@@ -1344,6 +1344,28 @@
   function aliasSelfReference(sourceId, targetId) {
     return sourceId === targetId;
   }
+  function findAliasReferers(varId, vars) {
+    const out = [];
+    for (const v of vars) {
+      if (v.id === varId) continue;
+      for (const cell of Object.values(v.values)) {
+        if (cell.kind === "alias" && cell.aliasId === varId) {
+          out.push({ id: v.id, name: v.name });
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
+  // src/lib/themeGen.ts
+  function darkValueForLight(hex) {
+    const lch = hexToOklch(hex);
+    return oklchToHex(clampToGamut({ l: 1 - lch.l, c: lch.c, h: lch.h }));
+  }
+  function darkGlobalName(lightName) {
+    return `dark/${lightName}`;
+  }
 
   // src/lib/exporters.ts
   var WEIGHT_NAMES = {
@@ -2025,6 +2047,7 @@
     return {
       id: v.id,
       name: v.name,
+      collectionId: col.id,
       collection: col.name,
       type: v.resolvedType,
       description: (_a = v.description) != null ? _a : "",
@@ -2114,6 +2137,81 @@
     const all = await figma.variables.getLocalVariablesAsync();
     const nameById = new Map(all.map((x) => [x.id, x.name]));
     return { type: "EDIT_VARIABLE_RESULT", id, ok: true, var: toVarInfo(v, col, nameById) };
+  }
+  var USAGE_SCAN_CAP = 5e3;
+  function nodeBindsVar(node, varId) {
+    const bv = node.boundVariables;
+    if (!bv) return false;
+    const hits = (a) => !!a && typeof a === "object" && a.id === varId;
+    for (const key of Object.keys(bv)) {
+      const entry = bv[key];
+      if (Array.isArray(entry)) {
+        if (entry.some(hits)) return true;
+      } else if (entry && typeof entry === "object") {
+        if (hits(entry)) return true;
+        for (const v of Object.values(entry)) if (hits(v)) return true;
+      }
+    }
+    return false;
+  }
+  function collectBoundNodes(varId) {
+    const nodes = [];
+    const stack = [...figma.currentPage.children];
+    let scanned = 0;
+    let capped = false;
+    while (stack.length) {
+      if (scanned >= USAGE_SCAN_CAP) {
+        capped = true;
+        break;
+      }
+      const n = stack.pop();
+      scanned++;
+      if (nodeBindsVar(n, varId)) nodes.push({ id: n.id, name: n.name });
+      if ("children" in n) for (const c of n.children) stack.push(c);
+    }
+    return { nodes, capped };
+  }
+  async function generateDarkMode(collectionId, fromModeId, toModeId) {
+    var _a;
+    let created = 0;
+    let realiased = 0;
+    let skipped = 0;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const semanticCol = cols.find((c) => c.id === collectionId);
+    if (!semanticCol) return { type: "DARK_MODE_RESULT", created, realiased, skipped };
+    const globalCol = (_a = cols.find((c) => c.name === GLOBAL)) != null ? _a : figma.variables.createVariableCollection(GLOBAL);
+    const gMode = globalCol.defaultModeId;
+    const allVars = await figma.variables.getLocalVariablesAsync();
+    const byId = new Map(allVars.map((v) => [v.id, v]));
+    const globalByName = new Map(allVars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
+    for (const v of allVars) {
+      if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
+      const fromRaw = v.valuesByMode[fromModeId];
+      if (!(fromRaw && typeof fromRaw === "object" && "type" in fromRaw && fromRaw.type === "VARIABLE_ALIAS")) {
+        skipped++;
+        continue;
+      }
+      const lightGlobal = byId.get(fromRaw.id);
+      const lightRaw = lightGlobal == null ? void 0 : lightGlobal.valuesByMode[gMode];
+      if (!lightGlobal || !(lightRaw && typeof lightRaw === "object" && "r" in lightRaw)) {
+        skipped++;
+        continue;
+      }
+      const darkHex = darkValueForLight(rgbToHex(lightRaw));
+      const dname = darkGlobalName(lightGlobal.name);
+      let dark = globalByName.get(dname);
+      if (!dark) {
+        dark = figma.variables.createVariable(dname, globalCol, "COLOR");
+        dark.scopes = lightGlobal.scopes;
+        dark.hiddenFromPublishing = true;
+        globalByName.set(dname, dark);
+        created++;
+      }
+      dark.setValueForMode(gMode, hexToRgb(darkHex));
+      v.setValueForMode(toModeId, figma.variables.createVariableAlias(dark));
+      realiased++;
+    }
+    return { type: "DARK_MODE_RESULT", created, realiased, skipped };
   }
   loadLicense().then(() => {
     postLicense();
@@ -2380,6 +2478,22 @@
           } catch (e) {
             post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: false, error: errMsg(e) });
           }
+          break;
+        }
+        case "GET_VARIABLE_USAGE": {
+          const { nodes, capped } = collectBoundNodes(msg.id);
+          const aliasedBy = findAliasReferers(msg.id, await collectVars());
+          post({ type: "VARIABLE_USAGE", id: msg.id, nodes, aliasedBy, capped });
+          break;
+        }
+        case "GENERATE_DARK_MODE": {
+          const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
+          post(r);
+          if (r.created || r.realiased) {
+            commitUndo(figma);
+            await postPrereq();
+          }
+          post({ type: "VARIABLES", vars: await collectVars() });
           break;
         }
         case "RESIZE": {

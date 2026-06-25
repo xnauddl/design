@@ -172,6 +172,9 @@
     .vcell input[type="color"] { padding: 0; height: 22px; width: 28px; flex: 0 0 auto; }
     .vscopes { height: 44px; }
     .vdel { font-size: 10px; padding: 3px 4px; align-self: center; }
+    #darkGenPanel:empty { display: none; }
+    #darkGenPanel { margin: 8px 0 2px; padding-top: 6px; border-top: 1px solid #0002; }
+    #darkGenPanel select { font: 400 11px "Inter", monospace; padding: 3px 4px; }
   </style>
 </head>
 <body>
@@ -470,6 +473,7 @@
         <span class="muted" id="varEditInfo"></span>
       </div>
       <div id="varEditList"></div>
+      <div id="darkGenPanel"></div>
       <div class="ux">
         <div class="ux-h"><span class="badge">R1</span><span class="ux-t">즉시 편집 · 단일 Undo</span></div>
         <div class="status" id="varEditStatus"></div>

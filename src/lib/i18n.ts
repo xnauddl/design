@@ -107,6 +107,14 @@ export const STRINGS: Record<string, string> = {
   'varedit.editFail': '편집 실패: {error}',
   'varedit.dupName': '같은 컬렉션에 같은 이름의 변수가 있습니다.',
   'varedit.confirmDelete': '‘{name}’ 변수를 삭제할까요? 되돌리려면 Undo하세요.',
+  // R2-C: 영향 분석(where-used)
+  'varedit.usageNodes': '이 변수를 쓰는 노드 {count}개',
+  'varedit.usageAliases': '이 변수를 별칭하는 변수 {count}개: {names}',
+  // R2-A: 다크 자동 생성
+  'varedit.darkDone': '다크 생성 — 다크 Global {created}개 · 재별칭 {realiased}개{skip}',
+  'varedit.darkSkip': ' · 스킵 {skipped}(별칭 아님)',
+  'varedit.darkSameMode': '라이트와 다크 모드가 같습니다 — 서로 다른 모드를 고르세요.',
+  'varedit.darkHint': '라이트 모드 Semantic 색을 OKLCH 명도 반전으로 다크 모드에 자동 채웁니다(다크용 Global 생성 후 재-별칭).',
 };
 
 /** key → 문자열. `{var}` 자리표시자를 vars로 치환. 누락 키는 key 그대로(폴백). */
