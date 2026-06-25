@@ -100,18 +100,36 @@ function makeTokenRow(t: DraftToken, i: number): HTMLElement {
   return row;
 }
 
+/** 공통 빈 상태 — 가운데 굵은 헤드라인 + 안내 + (선택) 비활성 버튼. 캐논 108:2 패턴. */
+function renderEmptyState(box: HTMLElement, title: string, guide: string, actionLabel?: string): void {
+  box.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'empty-state';
+  const t = document.createElement('div');
+  t.className = 'es-title';
+  t.textContent = title;
+  const g = document.createElement('div');
+  g.className = 'es-guide';
+  g.textContent = guide;
+  wrap.append(t, g);
+  if (actionLabel) {
+    const btn = document.createElement('button');
+    btn.textContent = actionLabel;
+    btn.disabled = true;
+    wrap.appendChild(btn);
+  }
+  box.appendChild(wrap);
+}
+
 function renderTokens(): void {
   const box = $('tokenList');
   if (!tokens.length) {
-    box.innerHTML = '';
-    // 빈 상태 — 선택 여부에 따라 안내 문구를 바꾼다(콜아웃 노트).
-    const empty = document.createElement('div');
-    empty.className = 'ux';
-    empty.innerHTML =
-      (lastSelCount > 0
-        ? '<div>선택에서 색·폰트·간격을 뽑습니다. <b>‘선택에서 토큰 추출’</b>을 누르세요.</div>'
-        : '<div>프레임을 선택한 뒤 <b>‘선택에서 토큰 추출’</b>을 누르면 색·폰트·간격이 후보로 잡힙니다. 예) 버튼·카드</div>');
-    box.appendChild(empty);
+    // 빈 상태(캐논 108:2 패턴) — 선택 여부로 헤드라인/안내를 분기.
+    if (lastSelCount > 0) {
+      renderEmptyState(box, '추출 준비됨', '선택에서 색·폰트·간격을 뽑습니다. ‘선택에서 토큰 추출’을 누르세요.');
+    } else {
+      renderEmptyState(box, '선택한 노드가 없어요', '프레임이나 레이어를 선택하면 후보를 찾아드려요.');
+    }
     return;
   }
   renderChunked(box, tokens, makeTokenRow); // §4: 대량 추출도 비차단
@@ -970,6 +988,7 @@ window.onmessage = (event: MessageEvent) => {
       renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
       clearBindPreview(); // 선택 변경 → 바인딩 미리보기 무효화
       if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
+      refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드 빈 상태 갱신
       break;
     }
     case 'CREATE_RESULT': {
@@ -985,6 +1004,12 @@ window.onmessage = (event: MessageEvent) => {
       } else {
         setStatus('createStatus', msg.summary, msg.limited ? 'warn' : 'ok');
         applyBtn.style.display = 'none';
+        // 2.5 카드 숨김(자동 흡수): 토큰 생성 적용 시 자동 추천 매핑으로 역할 별칭(Semantic)도 자동 생성.
+        // 마법사는 자체 semantics 단계가 있어 제외(메인 핸들러와 동시 수신 → 이중 생성 방지).
+        if (!wizardRunning) {
+          const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
+          if (Object.keys(semMap).length) send({ type: 'CREATE_SEMANTICS', map: semMap });
+        }
       }
       break;
     }
@@ -1228,17 +1253,33 @@ const OP_STATUS: Record<string, string> = {
 
 function showError(id: string, f: FriendlyError): void {
   const el = $(id);
-  el.className = 'status warn';
-  el.textContent = `오류: ${f.message}${f.action ? ` — ${f.action}` : ''}`;
+  el.className = 'status';
+  el.innerHTML = '';
+  // 에러 = 빨강 콜아웃 박스(캐논 108:2 패턴) + (가능하면) 다시 시도.
+  const box = document.createElement('div');
+  box.className = 'ux danger';
+  const h = document.createElement('div');
+  h.className = 'ux-h';
+  const title = document.createElement('span');
+  title.className = 'ux-t';
+  title.textContent = f.message;
+  h.appendChild(title);
+  box.appendChild(h);
+  if (f.action) {
+    const g = document.createElement('div');
+    g.className = 'hint';
+    g.textContent = f.action;
+    box.appendChild(g);
+  }
   if (f.retryable && lastSentMsg) {
     const retry = lastSentMsg;
     const btn = document.createElement('button');
+    btn.className = 'primary';
     btn.textContent = '다시 시도';
-    btn.style.marginLeft = '6px';
     btn.addEventListener('click', () => send(retry));
-    el.appendChild(document.createTextNode(' '));
-    el.appendChild(btn);
+    box.appendChild(btn);
   }
+  el.appendChild(box);
 }
 
 /* ============================================================
@@ -1489,6 +1530,20 @@ function clearCompPreview(): void {
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';
 }
 
+/** 선택 의존 카드(바인딩·컴포넌트)의 빈 상태(캐논 108:2) — 미리보기/후보가 없을 때만,
+    무선택이면 캐논 빈 상태를 표시하고, 선택이 있으면 비워 둔다(액션 버튼이 흐름을 주도). */
+function refreshTreeEmptyStates(): void {
+  const guide = '프레임이나 레이어를 선택하면 후보를 찾아드려요.';
+  if (!hasBindPreview()) {
+    if (lastSelCount === 0) renderEmptyState($('bindTree'), '선택한 노드가 없어요', guide);
+    else $('bindTree').innerHTML = '';
+  }
+  if (compCandidates.length === 0) {
+    if (lastSelCount === 0) renderEmptyState($('compTree'), '선택한 노드가 없어요', guide);
+    else $('compTree').innerHTML = '';
+  }
+}
+
 /** UX3: 스킵 사유 키 → 한글 라벨. */
 const REASON_LABELS: Record<string, string> = {
   'no-match': '매칭 없음',
@@ -1624,10 +1679,45 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
 }
 
+/* ---------- 캐논 패턴: 카드 접기(아코디언) + 주 버튼 타이틀 줄 이동 ---------- */
+// 카드별 '주 버튼'(타이틀 줄 우측으로 이동). 카드 안에서 첫 번째로 매칭되는 버튼만 옮긴다.
+const TITLE_BTN_IDS = new Set([
+  'btnWizardRun', 'btnPalette', 'btnExtract', 'btnColorRoles', 'btnCreate',
+  'btnTextStyles', 'btnApply', 'btnPreview', 'btnContrast', 'btnExport',
+]);
+/** 모든 .step 카드를 접이식으로 + 주 버튼을 타이틀 줄로. 노드 이동이라 id/리스너 보존, 멱등. */
+function applyCardChrome(): void {
+  document.querySelectorAll<HTMLElement>('.step').forEach((card) => {
+    const h2 = card.querySelector('h2');
+    if (!h2 || card.querySelector('.step-head')) return; // 멱등
+    const head = document.createElement('div');
+    head.className = 'step-head';
+    const body = document.createElement('div');
+    body.className = 'step-body';
+    while (h2.nextSibling) body.appendChild(h2.nextSibling); // h2 이후 형제를 body로
+    card.insertBefore(head, h2);
+    // 캐논 순서: chevron(왼쪽) · 타이틀 · 주 버튼(오른쪽)
+    const chev = document.createElement('span');
+    chev.className = 'chev';
+    chev.textContent = '›';
+    head.appendChild(chev);
+    head.appendChild(h2);
+    const btn = Array.from(body.querySelectorAll<HTMLButtonElement>('button')).find((b) => TITLE_BTN_IDS.has(b.id));
+    if (btn) head.appendChild(btn); // 주 버튼을 타이틀 줄로 이동
+    card.appendChild(body);
+    head.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('button')) return; // 버튼 클릭은 토글 제외
+      card.classList.toggle('collapsed');
+    });
+  });
+}
+
 // 초기: 컬렉션·전제·라이선스 조회. 팀 카드는 Team 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
+applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
 updateGates();
 renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
+refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드도 시작 시 빈 상태 표시
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_PREREQ' }); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
