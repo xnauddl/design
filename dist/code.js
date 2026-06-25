@@ -406,7 +406,8 @@
   var GLOBAL = "Global";
   var SEMANTIC = "Semantic";
   var COMPONENT = "Component";
-  var vkey = (collectionId, name) => `${collectionId}\0${name}`;
+  var SEP = "\0";
+  var vkey = (collectionId, name) => `${collectionId}${SEP}${name}`;
   async function buildVarIndex() {
     const idx = /* @__PURE__ */ new Map();
     for (const v of await figma.variables.getLocalVariablesAsync()) {
