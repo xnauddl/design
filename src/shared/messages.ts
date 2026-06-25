@@ -1,7 +1,7 @@
 /* ============================================================
    messages.ts — code(샌드박스) ↔ ui(iframe) 메시지 타입 단일 소스
    ============================================================ */
-import type { DraftToken } from '../lib/tokens';
+import type { DraftToken, ResolvedType, ScopeName } from '../lib/tokens';
 import type { TextStyleSpec } from '../lib/textStyles';
 import type { Tier } from '../lib/entitlements';
 import type { LicenseStatus, VerifyResult } from '../lib/license';
@@ -65,6 +65,54 @@ export interface BindNode {
   parentId: string | null;
 }
 
+/** 변수 편집기(R1) — 컬렉션의 모드 하나(id + 표시명). */
+export interface VarMode {
+  modeId: string;
+  name: string;
+}
+
+/** 변수 편집기 — 한 모드의 값 칸. 리터럴(표시 문자열) 또는 별칭(대상 변수). */
+export interface VarValueCell {
+  kind: 'literal' | 'alias';
+  /** 표시/편집용 문자열 — COLOR=hex, FLOAT/STRING=문자열화. alias면 대상 이름. */
+  display: string;
+  /** kind='alias'일 때 대상 변수 id/이름. */
+  aliasId?: string;
+  aliasName?: string;
+}
+
+/**
+ * 변수 편집기(R1)의 변수 한 개 스냅샷. 우리 3계층(Global/Semantic/Component)만 대상.
+ * 다중 모드 컬렉션이면 modes가 2개 이상이고 values에 모드별 칸이 담긴다(단일 모드면 1개).
+ */
+export interface VarInfo {
+  id: string;
+  name: string;
+  /** 소속 컬렉션 id(다크 생성 등 컬렉션 단위 작업용). */
+  collectionId: string;
+  /** 소속 컬렉션 이름('Global'|'Semantic'|'Component'). 읽기 전용(이동 불가). */
+  collection: string;
+  /** 읽기 전용(타입 고정). */
+  type: ResolvedType;
+  description: string;
+  scopes: ScopeName[];
+  hidden: boolean;
+  modes: VarMode[];
+  defaultModeId: string;
+  /** modeId → 값 칸. */
+  values: Record<string, VarValueCell>;
+}
+
+/** EDIT_VARIABLE 패치 — 지정한 속성만 변경(즉시 편집, 행별 단일 Undo). */
+export interface VarPatch {
+  name?: string;
+  description?: string;
+  scopes?: ScopeName[];
+  hidden?: boolean;
+  /** 값 변경 — modeId로 대상 모드 지정(단일 모드면 defaultModeId). literal/aliasId 택1. */
+  value?: { modeId: string; literal?: string; aliasId?: string };
+}
+
 /** 컴포넌트 등록 후보(#1) — 선택 하위에서 스캔한 노드. eligible=등록 가능(체크). */
 export interface ComponentCandidate {
   id: string;
@@ -105,7 +153,12 @@ export type UiToCode =
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Pro): 선택 세트의 빠진 조합 자동 생성
   | { type: 'EXPOSE_PROPERTIES' } // Phase 4.1(Pro): 컴포넌트 속성(Boolean/Text/Instance-swap) 노출
   | { type: 'CHECK_CONTRAST'; level: WcagLevel } // 명도 대비 점검(읽기 전용 감사)
-  | { type: 'APPLY_CONTRAST_FIX'; nodeId: string; hex: string }; // #2: 보정색을 해당 노드 단색 채움에 적용
+  | { type: 'APPLY_CONTRAST_FIX'; nodeId: string; hex: string } // #2: 보정색을 해당 노드 단색 채움에 적용
+  | { type: 'GET_VARIABLES' } // R1: 3계층 변수 목록(편집기)
+  | { type: 'EDIT_VARIABLE'; id: string; patch: VarPatch } // R1: 변수 속성 즉시 편집
+  | { type: 'DELETE_VARIABLE'; id: string } // R1: 변수 삭제
+  | { type: 'GET_VARIABLE_USAGE'; id: string } // R2-C: 삭제/리네임 전 사용처 조회
+  | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId: string; toModeId: string }; // R2-A: 라이트→다크 자동 채움
 
 /** code → UI 응답. */
 export type CodeToUi =
@@ -147,6 +200,11 @@ export type CodeToUi =
   | { type: 'PROPERTIES_RESULT'; created: number; props: string[] } // Phase 4.1
   // 명도 대비 점검: 텍스트-배경 쌍 평가 결과 + 추출 단계에서 건너뛴 사유별 집계(skipped).
   | { type: 'CONTRAST_RESULT'; level: WcagLevel; checked: number; passed: number; failed: number; findings: ContrastFinding[]; skipped: Record<string, number> }
+  | { type: 'VARIABLES'; vars: VarInfo[] } // R1: 편집기용 변수 목록
+  | { type: 'EDIT_VARIABLE_RESULT'; id: string; ok: boolean; error?: string; var?: VarInfo; deleted?: boolean } // R1: 편집/삭제 결과
+  // R2-C: 변수 사용처 — 바인딩된 노드 + 이 변수를 별칭하는 변수. capped=노드 스캔 상한 도달.
+  | { type: 'VARIABLE_USAGE'; id: string; nodes: { id: string; name: string }[]; aliasedBy: { id: string; name: string }[]; capped: boolean }
+  | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number } // R2-A: 다크 생성 결과
   | { type: 'ERROR'; message: string; op?: string }; // op: 실패한 UiToCode 종류(상태 라우팅용)
 
 /** code → UI 안전 전송. */

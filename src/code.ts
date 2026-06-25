@@ -1,15 +1,17 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode, RenameChange } from './shared/messages';
+import type { UiToCode, RenameChange, CodeToUi, VarInfo, VarMode, VarValueCell, VarPatch } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, createSemanticTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
-import { rgbToHex, hexToRgb } from './lib/tokens';
-import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
+import { rgbToHex, hexToRgb, type ResolvedType, type ScopeName } from './lib/tokens';
+import { parseVarValue, sanitizeScopes, aliasSelfReference, findAliasReferers } from './lib/variableEdit';
+import { darkValueForLight, darkGlobalName } from './lib/themeGen';
+import { ExportToken, ThemeValue, TokenKind, exportTokens } from './lib/exporters';
 import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
@@ -98,14 +100,16 @@ async function loadLicense(): Promise<void> {
 
 /**
  * #11: 단계 전제 상태를 UI에 보고 — Global 변수 존재(시맨틱 매핑 가능) ·
- * 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능). 전제 미충족 카드는
- * UI가 비활성+안내로 가드한다. 토큰/시맨틱 변경 후·시작 시·요청 시 호출.
+ * 바인딩 가능 변수 존재(바인딩 가능). 바인딩은 Component/Semantic을 우선하되
+ * Global을 폴백으로 직접 바인딩하므로, Global만 있어도 바인딩 가능으로 본다.
+ * 전제 미충족 카드는 UI가 비활성+안내로 가드한다. 토큰/시맨틱 변경 후·시작 시·요청 시 호출.
  */
 async function postPrereq(): Promise<void> {
   try {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
-    const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+    // Global도 폴백 바인딩 대상 → 바인딩 가능 집합에 포함.
+    const bindableIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
     const vars = await figma.variables.getLocalVariablesAsync();
     const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
@@ -249,6 +253,221 @@ function kindOf(v: Variable): TokenKind {
   return 'other';
 }
 
+/* ---------- R1: 변수 속성 편집기 ----------
+   우리 3계층(Global/Semantic/Component) 변수만 대상으로 값·이름·스코프·설명·삭제를
+   직접 편집한다. 외부/타 플러그인 변수는 비대상(안전). 작업마다 단일 Undo(commitUndo). */
+const EDITABLE_COLLECTIONS = new Set([GLOBAL, SEMANTIC, COMPONENT]);
+const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** valuesByMode 한 항목 → 편집기용 값 칸(별칭은 nameById로 표시명 해소). */
+function toValueCell(type: ResolvedType, raw: VariableValue | undefined, nameById: Map<string, string>): VarValueCell {
+  if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+    const aliasId = (raw as VariableAlias).id;
+    const aliasName = nameById.get(aliasId);
+    return { kind: 'alias', display: aliasName ?? '(알 수 없음)', aliasId, aliasName };
+  }
+  if (type === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) {
+    return { kind: 'literal', display: rgbToHex(raw as RGB) };
+  }
+  if (raw === undefined) return { kind: 'literal', display: '' };
+  return { kind: 'literal', display: String(raw) };
+}
+
+/** Variable + 소속 컬렉션 → VarInfo(모드별 값 포함). */
+function toVarInfo(v: Variable, col: VariableCollection, nameById: Map<string, string>): VarInfo {
+  const modes: VarMode[] = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
+  const values: Record<string, VarValueCell> = {};
+  for (const m of col.modes) values[m.modeId] = toValueCell(v.resolvedType, v.valuesByMode[m.modeId], nameById);
+  return {
+    id: v.id,
+    name: v.name,
+    collectionId: col.id,
+    collection: col.name,
+    type: v.resolvedType,
+    description: v.description ?? '',
+    scopes: v.scopes as ScopeName[],
+    hidden: v.hiddenFromPublishing,
+    modes,
+    defaultModeId: col.defaultModeId,
+    values,
+  };
+}
+
+/** 3계층 컬렉션의 모든 변수를 VarInfo[]로(컬렉션→이름 정렬). */
+async function collectVars(): Promise<VarInfo[]> {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const colById = new Map(cols.map((c) => [c.id, c]));
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const nameById = new Map(vars.map((v) => [v.id, v.name]));
+  const out: VarInfo[] = [];
+  for (const v of vars) {
+    const col = colById.get(v.variableCollectionId);
+    if (!col || !EDITABLE_COLLECTIONS.has(col.name)) continue;
+    out.push(toVarInfo(v, col, nameById));
+  }
+  out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
+  return out;
+}
+
+/** 별칭 재지정이 순환을 만드는지 — target에서 alias 간선을 따라 sourceId에 도달하면 순환. */
+async function aliasWouldCycle(sourceId: string, target: Variable): Promise<boolean> {
+  const seen = new Set<string>();
+  let frontier: Variable[] = [target];
+  while (frontier.length) {
+    const next: Variable[] = [];
+    for (const cur of frontier) {
+      if (cur.id === sourceId) return true;
+      if (seen.has(cur.id)) continue;
+      seen.add(cur.id);
+      for (const modeId of Object.keys(cur.valuesByMode)) {
+        const raw = cur.valuesByMode[modeId];
+        if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+          const nv = await figma.variables.getVariableByIdAsync((raw as VariableAlias).id);
+          if (nv) next.push(nv);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return false;
+}
+
+/** 값 패치 적용(리터럴/별칭). 오류 메시지 문자열 반환, 성공 시 null. */
+async function applyVarValue(v: Variable, col: VariableCollection, value: NonNullable<VarPatch['value']>): Promise<string | null> {
+  const modeId = value.modeId || col.defaultModeId;
+  if (!col.modes.some((m) => m.modeId === modeId)) return '대상 모드를 찾을 수 없습니다.';
+  if (value.aliasId !== undefined) {
+    if (aliasSelfReference(v.id, value.aliasId)) return '변수를 자기 자신에 별칭할 수 없습니다.';
+    const target = await figma.variables.getVariableByIdAsync(value.aliasId);
+    if (!target) return '별칭 대상을 찾을 수 없습니다.';
+    if (target.resolvedType !== v.resolvedType) return '별칭 대상의 타입이 다릅니다.';
+    if (await aliasWouldCycle(v.id, target)) return '별칭이 순환 참조를 만듭니다.';
+    v.setValueForMode(modeId, figma.variables.createVariableAlias(target));
+    return null;
+  }
+  if (value.literal !== undefined) {
+    const p = parseVarValue(v.resolvedType, value.literal);
+    if (!p.ok) return p.error;
+    v.setValueForMode(modeId, p.value as VariableValue);
+    return null;
+  }
+  return null;
+}
+
+/** 변수 속성 패치 적용 → 결과 메시지(갱신 VarInfo 포함). */
+async function editVariable(id: string, patch: VarPatch): Promise<Extract<CodeToUi, { type: 'EDIT_VARIABLE_RESULT' }>> {
+  const v = await figma.variables.getVariableByIdAsync(id);
+  if (!v) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '변수를 찾을 수 없습니다.' };
+  const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+  if (!col || !EDITABLE_COLLECTIONS.has(col.name)) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '편집 대상이 아닌 컬렉션입니다.' };
+  try {
+    if (patch.name !== undefined) {
+      const nm = patch.name.trim();
+      if (!nm) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '이름을 입력하세요.' };
+      v.name = nm;
+    }
+    if (patch.description !== undefined) v.description = patch.description;
+    if (patch.hidden !== undefined) v.hiddenFromPublishing = patch.hidden;
+    if (patch.scopes) v.scopes = sanitizeScopes(patch.scopes, v.resolvedType);
+    if (patch.value) {
+      const err = await applyVarValue(v, col, patch.value);
+      if (err) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: err };
+    }
+  } catch (e) {
+    return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: errMsg(e) };
+  }
+  const all = await figma.variables.getLocalVariablesAsync();
+  const nameById = new Map(all.map((x) => [x.id, x.name]));
+  return { type: 'EDIT_VARIABLE_RESULT', id, ok: true, var: toVarInfo(v, col, nameById) };
+}
+
+/* ---------- R2-C: 삭제/리네임 영향 분석(where-used) ---------- */
+const USAGE_SCAN_CAP = 5000;
+
+/** 노드의 boundVariables에 varId가 쓰였는지(스칼라/배열/중첩 모두 검사). */
+function nodeBindsVar(node: SceneNode, varId: string): boolean {
+  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
+  if (!bv) return false;
+  const hits = (a: unknown): boolean => !!a && typeof a === 'object' && (a as VariableAlias).id === varId;
+  for (const key of Object.keys(bv)) {
+    const entry = bv[key];
+    if (Array.isArray(entry)) {
+      if (entry.some(hits)) return true;
+    } else if (entry && typeof entry === 'object') {
+      if (hits(entry)) return true; // {type,id} 형태
+      for (const v of Object.values(entry as Record<string, unknown>)) if (hits(v)) return true;
+    }
+  }
+  return false;
+}
+
+/** 현재 페이지에서 변수에 바인딩된 노드 수집(상한 적용). */
+function collectBoundNodes(varId: string): { nodes: { id: string; name: string }[]; capped: boolean } {
+  const nodes: { id: string; name: string }[] = [];
+  const stack: SceneNode[] = [...figma.currentPage.children];
+  let scanned = 0;
+  let capped = false;
+  while (stack.length) {
+    if (scanned >= USAGE_SCAN_CAP) {
+      capped = true;
+      break;
+    }
+    const n = stack.pop() as SceneNode;
+    scanned++;
+    if (nodeBindsVar(n, varId)) nodes.push({ id: n.id, name: n.name });
+    if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
+  }
+  return { nodes, capped };
+}
+
+/* ---------- R2-A: 라이트→다크 자동 생성 ----------
+   (a안) Semantic 다크 모드를 다크용 Global 프리미티브로 재-별칭(계층 보존).
+   라이트 모드가 Global 별칭인 COLOR 변수만 대상 — 그 Global의 hex를 L 반전해
+   `dark/<global이름>` 프리미티브에 리터럴로 쓰고, Semantic 다크 모드는 그 변수를 별칭. */
+async function generateDarkMode(collectionId: string, fromModeId: string, toModeId: string): Promise<Extract<CodeToUi, { type: 'DARK_MODE_RESULT' }>> {
+  let created = 0;
+  let realiased = 0;
+  let skipped = 0;
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const semanticCol = cols.find((c) => c.id === collectionId);
+  if (!semanticCol) return { type: 'DARK_MODE_RESULT', created, realiased, skipped };
+  const globalCol = cols.find((c) => c.name === GLOBAL) ?? figma.variables.createVariableCollection(GLOBAL);
+  const gMode = globalCol.defaultModeId;
+  const allVars = await figma.variables.getLocalVariablesAsync();
+  const byId = new Map(allVars.map((v) => [v.id, v]));
+  const globalByName = new Map(allVars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
+
+  for (const v of allVars) {
+    if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== 'COLOR') continue;
+    const fromRaw = v.valuesByMode[fromModeId];
+    // 라이트 모드가 Global 별칭이 아니면 스킵(3계층 규칙 — 리터럴 Semantic은 대상 아님).
+    if (!(fromRaw && typeof fromRaw === 'object' && 'type' in fromRaw && (fromRaw as VariableAlias).type === 'VARIABLE_ALIAS')) {
+      skipped++;
+      continue;
+    }
+    const lightGlobal = byId.get((fromRaw as VariableAlias).id);
+    const lightRaw = lightGlobal?.valuesByMode[gMode];
+    if (!lightGlobal || !(lightRaw && typeof lightRaw === 'object' && 'r' in lightRaw)) {
+      skipped++;
+      continue;
+    }
+    const darkHex = darkValueForLight(rgbToHex(lightRaw as RGB));
+    const dname = darkGlobalName(lightGlobal.name);
+    let dark = globalByName.get(dname);
+    if (!dark) {
+      dark = figma.variables.createVariable(dname, globalCol, 'COLOR');
+      dark.scopes = lightGlobal.scopes;
+      dark.hiddenFromPublishing = true;
+      globalByName.set(dname, dark);
+      created++;
+    }
+    dark.setValueForMode(gMode, hexToRgb(darkHex));
+    v.setValueForMode(toModeId, figma.variables.createVariableAlias(dark));
+    realiased++;
+  }
+  return { type: 'DARK_MODE_RESULT', created, realiased, skipped };
+}
+
 loadLicense().then(() => {
   postLicense();
   // 캐시가 오래됐으면 UI에 백그라운드 재검증 요청(WebCrypto는 UI에서).
@@ -369,7 +588,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const s = msg.preview ? await previewCreateTokens(slice) : await createTokens(slice, msg.base);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
-        let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
+        let summary = `Global ${s.globals}개 (생성 ${s.created} / 갱신 ${s.updated}) · Semantic은 시맨틱 매핑 단계에서`;
         if (pruned) summary += ` · 이전 색 ${pruned}개 정리`;
         if (c.limited) summary += ` · ⚠ ${msg.tokens.length}개 중 ${c.allowed}개만 적용(Free 한도 ${limit}) — 업그레이드 필요`;
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
@@ -501,6 +720,56 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'GLOBAL_COLORS', colors });
         break;
       }
+      case 'GET_VARIABLES': {
+        post({ type: 'VARIABLES', vars: await collectVars() }); // R1: 편집기 목록
+        break;
+      }
+      case 'EDIT_VARIABLE': {
+        const res = await editVariable(msg.id, msg.patch);
+        post(res);
+        if (res.ok) {
+          commitUndo(figma); // UX2: 행별 단일 Undo
+          await postPrereq(); // 값/이름 변경이 전제 상태에 영향 가능
+        }
+        break;
+      }
+      case 'DELETE_VARIABLE': {
+        const v = await figma.variables.getVariableByIdAsync(msg.id);
+        if (!v) {
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: '변수를 찾을 수 없습니다.' });
+          break;
+        }
+        const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+        if (!col || !EDITABLE_COLLECTIONS.has(col.name)) {
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: '편집 대상이 아닌 컬렉션입니다.' });
+          break;
+        }
+        try {
+          v.remove();
+          commitUndo(figma); // UX2: 삭제도 단일 Undo
+          await postPrereq();
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: true, deleted: true });
+        } catch (e) {
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: errMsg(e) });
+        }
+        break;
+      }
+      case 'GET_VARIABLE_USAGE': {
+        const { nodes, capped } = collectBoundNodes(msg.id); // R2-C: 바인딩된 노드(현재 페이지)
+        const aliasedBy = findAliasReferers(msg.id, await collectVars()); // 이 변수를 별칭하는 변수
+        post({ type: 'VARIABLE_USAGE', id: msg.id, nodes, aliasedBy, capped });
+        break;
+      }
+      case 'GENERATE_DARK_MODE': {
+        const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId); // R2-A
+        post(r);
+        if (r.created || r.realiased) {
+          commitUndo(figma); // UX2: 다크 생성 전체를 단일 Undo로
+          await postPrereq();
+        }
+        post({ type: 'VARIABLES', vars: await collectVars() }); // 편집기 목록 갱신
+        break;
+      }
       case 'RESIZE': {
         // #14: 드래그 중엔 즉시 리사이즈, commit(드롭) 시 크기 저장.
         const c = clampSize(msg.width, msg.height);
@@ -600,6 +869,26 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           } else {
             t.value = raw as string | number;
           }
+          // R1: 비기본 모드 → themes(다중 모드 컬렉션에서만 채워짐). CSS는 [data-theme] 블록으로 출력.
+          const themes: ThemeValue[] = [];
+          for (const m of col.modes) {
+            if (m.modeId === col.defaultModeId) continue;
+            const mraw = v.valuesByMode[m.modeId];
+            const tv: ThemeValue = { theme: m.name };
+            if (mraw && typeof mraw === 'object' && 'type' in mraw && (mraw as VariableAlias).type === 'VARIABLE_ALIAS') {
+              const target = nameById.get((mraw as VariableAlias).id);
+              if (!target) continue; // 대상 불명 → 이 모드 스킵(상속)
+              tv.aliasOf = target;
+            } else if (v.resolvedType === 'COLOR' && mraw && typeof mraw === 'object' && 'r' in mraw) {
+              tv.value = rgbToHex(mraw as RGB);
+            } else if (mraw !== undefined) {
+              tv.value = mraw as string | number;
+            } else {
+              continue; // 값 없음 → 상속
+            }
+            themes.push(tv);
+          }
+          if (themes.length) t.themes = themes;
           tokens.push(t);
         }
         tokens.sort((a, b) => a.name.localeCompare(b.name));

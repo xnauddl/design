@@ -10,7 +10,7 @@ export type StepStatus = 'done' | 'ready' | 'blocked';
 export interface PrereqState {
   /** Global 변수 존재(시맨틱 매핑 전제). */
   hasGlobal: boolean;
-  /** 바인딩 가능 변수(Semantic/Component) 존재(바인딩 전제). */
+  /** 바인딩 가능 변수 존재(바인딩 전제). Component/Semantic 우선, Global은 폴백이라 Global만 있어도 true. */
   hasBindable: boolean;
 }
 

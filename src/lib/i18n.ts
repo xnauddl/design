@@ -26,6 +26,9 @@ export const STRINGS: Record<string, string> = {
   'create.needExtract': '먼저 토큰을 추출하세요.',
   'create.preview': '미리보기 — {summary} · ‘적용’으로 반영',
 
+  // 색 정리(군집) — ΔE로 비슷한 색을 대표색으로 병합(허용오차 고정·비노출). 추출 카드에 요약 한 줄.
+  'cluster.summary': '{total}색 → {reps} 대표색 · {merged}색 병합',
+
   // 시맨틱 매핑
   'semantic.rolesApplied': '{count}개 역할 반영됨 — ‘시맨틱 별칭 생성’으로 적용.',
   'semantic.scanningGlobals': '기존 색 스캔 중…',
@@ -93,6 +96,23 @@ export const STRINGS: Record<string, string> = {
 
   // 유료 게이팅
   'premium.required': '{message} (유료 기능: {feature})',
+
+  // 변수 편집기(R1)
+  'varedit.empty': '편집할 변수가 없습니다 — 먼저 토큰을 생성하세요.',
+  'varedit.count': '변수 {count}개',
+  'varedit.saved': '변경 저장됨.',
+  'varedit.deleted': '‘{name}’ 삭제됨 — 되돌리려면 Undo.',
+  'varedit.editFail': '편집 실패: {error}',
+  'varedit.dupName': '같은 컬렉션에 같은 이름의 변수가 있습니다.',
+  'varedit.confirmDelete': '‘{name}’ 변수를 삭제할까요? 되돌리려면 Undo하세요.',
+  // R2-C: 영향 분석(where-used)
+  'varedit.usageNodes': '이 변수를 쓰는 노드 {count}개',
+  'varedit.usageAliases': '이 변수를 별칭하는 변수 {count}개: {names}',
+  // R2-A: 다크 자동 생성
+  'varedit.darkDone': '다크 생성 — 다크 Global {created}개 · 재별칭 {realiased}개{skip}',
+  'varedit.darkSkip': ' · 스킵 {skipped}(별칭 아님)',
+  'varedit.darkSameMode': '라이트와 다크 모드가 같습니다 — 서로 다른 모드를 고르세요.',
+  'varedit.darkHint': '라이트 모드 Semantic 색을 OKLCH 명도 반전으로 다크 모드에 자동 채웁니다(다크용 Global 생성 후 재-별칭).',
 };
 
 /** key → 문자열. `{var}` 자리표시자를 vars로 치환. 누락 키는 key 그대로(폴백). */

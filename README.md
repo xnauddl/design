@@ -13,8 +13,8 @@
 
 ### 디자인 토큰 3계층 (별도 컬렉션 + 별칭)
 - **Global** (`Global` 컬렉션) — 원시값(`#HEX`/`px`)을 **직접** 넣는 유일한 계층. `hiddenFromPublishing=true`로 직접 사용 방지.
-- **Semantic** (`Semantic` 컬렉션) — 리터럴 금지, **오직 Global 변수를 별칭 참조**. 속성에 맞는 `scopes` 자동 설정.
-- **Component** — Semantic을 한 번 더 참조(현재 v1은 수동/추후, 코드에선 Semantic 미러까지 자동 생성).
+- **Semantic** (`Semantic` 컬렉션) — 리터럴 금지, **오직 Global 변수를 별칭 참조**. **이름은 역할명만**(`primary`, `surface`, `font-size/body`, `spacing/md`…) — 원시명 1:1 미러는 만들지 않는다(패턴 C). 토큰 생성은 Global만 만들고, Semantic은 **시맨틱 매핑** 단계(`createSemanticAliases`)에서 역할 별칭으로 채운다. 속성에 맞는 `scopes` 자동 설정.
+- **Component** — Semantic을 한 번 더 참조(현재 v1은 수동/추후).
 - 변수명에 tier 접두사(`global/`…)를 넣지 않습니다(컬렉션이 네임스페이스). 예: `color/blue-500`.
 - 참조 방향은 `Component → Semantic → Global` 단방향.
 

@@ -1,8 +1,10 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
-import type { DraftToken } from './lib/tokens';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate, VarInfo, VarMode, VarValueCell, VarPatch } from './shared/messages';
+import type { DraftToken, ScopeName } from './lib/tokens';
+import { scopesForTypeList } from './lib/tokens';
+import { validateVarName } from './lib/variableEdit';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { FREE_LIMITS, type Tier } from './lib/entitlements';
@@ -14,6 +16,7 @@ import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles } from './lib/roles';
+import { clusterColorTokens, clusterSummary } from './lib/colorCluster';
 import { pipelineSteps, type StepStatus } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
@@ -42,6 +45,8 @@ let hasBindable = false;
 let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
+let varList: VarInfo[] = []; // R1: 변수 편집기 목록(VARIABLES 수신)
+let pendingDelete: { id: string; name: string } | null = null; // R2-C: 사용처 조회 후 삭제 확정 대기
 
 /* ---------- 토큰 목록 렌더 ---------- */
 /* ---------- 점진(청크) 렌더 — 대량 목록을 프레임 단위로 나눠 비차단 렌더(§4) ----------
@@ -165,6 +170,7 @@ $('btnPalette').addEventListener('click', () => {
   renderTokens();
   // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
   setSemMapText(paletteSemanticMap(p));
+  renderColorClusters(); // 색 정리(군집): 대표색·단색 유지·요약
   renderColorTable(); // #3: 색 편집표(hue·역할) 표시
   ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
   $('paletteInfo').textContent = t('palette.summary', { count: p.scales.length, tokens: tokens.length });
@@ -240,6 +246,32 @@ function renderColorTable(): void {
     row.append(sw, name, role);
     return row;
   });
+}
+
+/* ---------- 색 정리(군집) — ΔE 대표색 요약(추출에 흡수) ---------- */
+/**
+ * 추출/생성 색을 ΔE 군집으로 자동으로 묶어 대표색 **요약 한 줄**만 추출 카드에 표시
+ * (허용오차 8 고정·비노출, 병합 버튼 없음). 병합이 실제로 일어난 경우에만 노출.
+ * 군집 상세(어떤 색이 어디로)는 1.5 색 편집표가 대신하므로 별도 시각화는 두지 않는다.
+ */
+function renderColorClusters(): void {
+  const box = $('clusterSummary');
+  const colorToks = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
+  if (colorToks.length < 2) {
+    box.style.display = 'none';
+    box.textContent = '';
+    return;
+  }
+  const { clusters } = clusterColorTokens(tokens);
+  const s = clusterSummary(clusters);
+  if (s.merged <= 0) {
+    // 비슷한 색이 없어 묶을 게 없으면 잡음 없이 숨긴다.
+    box.style.display = 'none';
+    box.textContent = '';
+    return;
+  }
+  box.style.display = '';
+  box.textContent = t('cluster.summary', { total: s.total, reps: s.representatives, merged: s.merged });
 }
 
 /** 색 편집표의 역할 입력 → 시맨틱 매핑 textarea로 반영(역할=이름). */
@@ -461,31 +493,13 @@ $('renameAll').addEventListener('change', (e) => {
 /* ============================================================
    시스템화 마법사 — 기존 메시지(추출→생성→시맨틱→바인딩→정돈→검수→컴포넌트화)를
    순서대로 호출하는 UI 시퀀서. 신규 로직은 lib/wizard.ts(순수)에 분리.
-   기존 window.onmessage 스위치는 그대로 두고, 별도 리스너로 단계 완료를 await한다.
+   단계 완료는 통합 디스패처(window.onmessage)가 wizardWaiter로 await를 해소한다.
+   마법사 실행 중에는 메인 스위치를 돌리지 않아 일반 패널 상태 desync를 차단한다.
    ============================================================ */
 let wizardRunning = false;
 // 한 번에 하나의 단계만 await(순차 실행)하므로 단일 대기자로 충분.
+// 단계 응답 라우팅은 통합 디스패처(window.onmessage)가 wizardWaiter를 보고 처리한다.
 let wizardWaiter: { types: string[]; resolve: (m: CodeToUi) => void; reject: (e: Error) => void } | null = null;
-
-window.addEventListener('message', (event: MessageEvent) => {
-  const m = (event.data as { pluginMessage?: CodeToUi }).pluginMessage;
-  if (!m) return;
-  // 바인딩 진행률(UX6)은 마법사 자체 진행바로 표시(‘적용’ 탭 진행바는 안 보임).
-  if (wizardRunning && m.type === 'PROGRESS' && m.op === 'bind') updateWizardBar(m.done, m.total);
-  if (!wizardWaiter) return;
-  // 오류/유료요구는 대기 중이면 해당 단계 실패로 처리(무한 대기 방지).
-  if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
-    const w = wizardWaiter;
-    wizardWaiter = null;
-    w.reject(new Error(m.message));
-    return;
-  }
-  if (wizardWaiter.types.includes(m.type)) {
-    const w = wizardWaiter;
-    wizardWaiter = null;
-    w.resolve(m);
-  }
-});
 
 /** 메시지를 보내고 기대 응답(또는 오류)까지 기다린다. 결과 타입은 expect로 좁혀진다. */
 function wizardRequest<T extends CodeToUi['type']>(msg: UiToCode, expect: T[]): Promise<Extract<CodeToUi, { type: T }>> {
@@ -587,7 +601,7 @@ async function runWizard(): Promise<void> {
       switch (p.step.id) {
         case 'extract': {
           const r = await wizardRequest({ type: 'EXTRACT' }, ['EXTRACT_RESULT']);
-          tokens = r.tokens; // 모듈 변수 동기화(다음 단계 일관성)
+          applyExtractResult(r); // tokens 동기화 + hue 정규화 + 추출/색 패널 일관화(메인 스위치와 단일 출처)
           if (!tokens.length) {
             setWizardStep('extract', 'fail', '추출된 토큰 없음 — 색·폰트·간격이 있는 프레임을 선택하세요.');
             stopped = true;
@@ -966,23 +980,253 @@ $('btnClearLicense').addEventListener('click', () => {
 });
 
 /* ---------- code → ui ---------- */
-window.onmessage = (event: MessageEvent) => {
-  const msg = event.data.pluginMessage as CodeToUi | undefined;
-  if (!msg) return;
-  switch (msg.type) {
-    case 'EXTRACT_RESULT': {
-      tokens = msg.tokens;
-      huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
-      renderTokens();
-      ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
-      ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
-      // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
-      suggestSemMapFrom(tokens);
-      renderColorTable(); // #3: 색 편집표(hue·역할) 표시
-      $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
-      setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
-      break;
+/** EXTRACT_RESULT를 모듈 tokens에 반영 + hue-Global 이름 정규화 + 토큰 의존 패널 렌더.
+   메인 스위치와 마법사 extract 단계의 단일 출처 — huefy를 양쪽에서 일관 적용한다. */
+function applyExtractResult(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void {
+  tokens = msg.tokens;
+  huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
+  renderTokens();
+  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
+  ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
+  // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
+  suggestSemMapFrom(tokens);
+  renderColorClusters(); // 색 정리(군집): 대표색·단색 유지·요약
+  renderColorTable(); // #3: 색 편집표(hue·역할) 표시
+  $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
+  setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
+}
+
+/** 메인 메시지 스위치 — 마법사 비실행 시에만 dispatchMessage가 호출한다. */
+/* ---------- R1: 변수 속성 편집기 ----------
+   3계층 변수를 컬렉션별로 그룹화해 인라인 편집(값·이름·스코프·설명·삭제). 변경은
+   blur/change 시 EDIT_VARIABLE로 즉시 전송, 결과로 행/목록을 갱신한다. */
+function sendVarPatch(id: string, patch: VarPatch): void {
+  send({ type: 'EDIT_VARIABLE', id, patch });
+}
+
+/** 모드 한 칸의 리터럴 입력(타입별: color/number/text). 커밋 시 literal 패치 전송. */
+function makeLiteralInput(v: VarInfo, modeId: string, val: VarValueCell): HTMLElement {
+  if (v.type === 'COLOR') {
+    const c = document.createElement('input');
+    c.type = 'color';
+    c.className = 'vlit vcolor';
+    c.value = val.kind === 'literal' && HEX6.test(val.display) ? val.display.toLowerCase() : '#000000';
+    c.title = c.value;
+    c.addEventListener('change', () => sendVarPatch(v.id, { value: { modeId, literal: c.value } }));
+    return c;
+  }
+  const input = document.createElement('input');
+  input.className = 'vlit';
+  if (v.type === 'FLOAT') input.type = 'number';
+  input.value = val.kind === 'literal' ? val.display : '';
+  const prev = input.value;
+  const commit = (): void => {
+    if (input.value !== prev) sendVarPatch(v.id, { value: { modeId, literal: input.value } });
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') input.blur();
+  });
+  return input;
+}
+
+/** 모드 한 칸: 별칭 셀렉트(같은 타입) + 리터럴 입력(별칭 선택 시 숨김). */
+function makeValueCell(v: VarInfo, m: VarMode): HTMLElement {
+  const cell = document.createElement('div');
+  cell.className = 'vcell';
+  if (v.modes.length > 1) {
+    const lab = document.createElement('span');
+    lab.className = 'vmode';
+    lab.textContent = m.name;
+    lab.title = m.name;
+    cell.appendChild(lab);
+  }
+  const val = v.values[m.modeId] ?? { kind: 'literal', display: '' };
+
+  const sel = document.createElement('select');
+  sel.className = 'valias';
+  const litOpt = document.createElement('option');
+  litOpt.value = '';
+  litOpt.textContent = '— 리터럴 —';
+  sel.appendChild(litOpt);
+  for (const o of varList) {
+    if (o.id === v.id || o.type !== v.type) continue;
+    const op = document.createElement('option');
+    op.value = o.id;
+    op.textContent = o.name;
+    sel.appendChild(op);
+  }
+  sel.value = val.kind === 'alias' && val.aliasId ? val.aliasId : '';
+
+  const lit = makeLiteralInput(v, m.modeId, val);
+  const sync = (): void => {
+    lit.style.display = sel.value ? 'none' : '';
+  };
+  sync();
+  sel.addEventListener('change', () => {
+    if (sel.value) sendVarPatch(v.id, { value: { modeId: m.modeId, aliasId: sel.value } });
+    sync();
+  });
+  cell.append(sel, lit);
+  return cell;
+}
+
+/** 타입별 유효 스코프 멀티셀렉트. 변경 시 scopes 패치 전송. */
+function makeScopeSelect(v: VarInfo): HTMLSelectElement {
+  const sel = document.createElement('select');
+  sel.multiple = true;
+  sel.className = 'vscopes';
+  for (const sc of scopesForTypeList(v.type)) {
+    const op = document.createElement('option');
+    op.value = sc;
+    op.textContent = sc;
+    if (v.scopes.includes(sc)) op.selected = true;
+    sel.appendChild(op);
+  }
+  sel.addEventListener('change', () => {
+    const picked = Array.from(sel.selectedOptions, (o) => o.value) as ScopeName[];
+    sendVarPatch(v.id, { scopes: picked });
+  });
+  return sel;
+}
+
+/** 변수 1행: 이름·타입배지·모드별 값·스코프·설명·삭제. */
+function makeVarRow(v: VarInfo): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'vrow';
+  row.dataset.id = v.id;
+
+  const name = document.createElement('input');
+  name.className = 'vname';
+  name.value = v.name;
+  name.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') name.blur();
+  });
+  name.addEventListener('blur', () => {
+    const nm = name.value.trim();
+    if (nm === v.name) return;
+    const others = varList.filter((x) => x.id !== v.id && x.collection === v.collection).map((x) => x.name);
+    const err = validateVarName(nm, others);
+    if (err) {
+      setStatus('varEditStatus', err, 'warn');
+      name.value = v.name;
+      return;
     }
+    sendVarPatch(v.id, { name: nm });
+  });
+
+  const badge = document.createElement('span');
+  badge.className = 'vbadge';
+  badge.textContent = v.type;
+  badge.title = `${v.collection} · 타입 고정(변경 불가)`;
+
+  const values = document.createElement('div');
+  values.className = 'vvalues';
+  for (const m of v.modes) values.appendChild(makeValueCell(v, m));
+
+  const scopes = makeScopeSelect(v);
+
+  const desc = document.createElement('input');
+  desc.className = 'vdesc';
+  desc.placeholder = '설명';
+  desc.value = v.description;
+  desc.addEventListener('blur', () => {
+    if (desc.value !== v.description) sendVarPatch(v.id, { description: desc.value });
+  });
+
+  const del = document.createElement('button');
+  del.className = 'vdel';
+  del.textContent = '삭제';
+  del.addEventListener('click', () => {
+    // R2-C: 삭제 전에 사용처(바인딩 노드 + 별칭 변수)를 조회해 경고 후 확정.
+    pendingDelete = { id: v.id, name: v.name };
+    send({ type: 'GET_VARIABLE_USAGE', id: v.id });
+  });
+
+  row.append(name, badge, values, scopes, desc, del);
+  return row;
+}
+
+/** 편집기 목록 렌더 — 컬렉션별 그룹 헤더 + 변수 행. */
+function renderVarEditor(): void {
+  const mount = $('varEditList');
+  mount.innerHTML = '';
+  if (!varList.length) {
+    const empty = document.createElement('div');
+    empty.className = 'muted';
+    empty.textContent = t('varedit.empty');
+    mount.appendChild(empty);
+    $('varEditInfo').textContent = '';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  let curCol = '';
+  for (const v of varList) {
+    if (v.collection !== curCol) {
+      curCol = v.collection;
+      const h = document.createElement('div');
+      h.className = 'vgroup';
+      h.textContent = curCol;
+      frag.appendChild(h);
+    }
+    frag.appendChild(makeVarRow(v));
+  }
+  mount.appendChild(frag);
+  $('varEditInfo').textContent = t('varedit.count', { count: varList.length });
+  renderDarkGen();
+}
+
+/** R2-A: 다중 모드 Semantic 컬렉션이 있으면 다크 자동 생성 패널을 그린다(없으면 비움→숨김). */
+function renderDarkGen(): void {
+  const panel = $('darkGenPanel');
+  panel.innerHTML = '';
+  const sem = varList.find((v) => v.collection === 'Semantic' && v.modes.length >= 2);
+  if (!sem) return;
+  const modeSelect = (def: string): HTMLSelectElement => {
+    const s = document.createElement('select');
+    for (const m of sem.modes) {
+      const o = document.createElement('option');
+      o.value = m.modeId;
+      o.textContent = m.name;
+      if (m.modeId === def) o.selected = true;
+      s.appendChild(o);
+    }
+    return s;
+  };
+  const toMode = sem.modes.find((m) => m.modeId !== sem.defaultModeId);
+  const fromSel = modeSelect(sem.defaultModeId);
+  const toSel = modeSelect(toMode?.modeId ?? sem.defaultModeId);
+
+  const btn = document.createElement('button');
+  btn.textContent = '다크 자동 생성';
+  btn.addEventListener('click', () => {
+    if (fromSel.value === toSel.value) {
+      setStatus('varEditStatus', t('varedit.darkSameMode'), 'warn');
+      return;
+    }
+    send({ type: 'GENERATE_DARK_MODE', collectionId: sem.collectionId, fromModeId: fromSel.value, toModeId: toSel.value });
+  });
+
+  const hint = document.createElement('div');
+  hint.className = 'muted';
+  hint.textContent = t('varedit.darkHint');
+  const row = document.createElement('div');
+  row.className = 'row';
+  const l1 = document.createElement('span');
+  l1.className = 'muted';
+  l1.textContent = '라이트';
+  const l2 = document.createElement('span');
+  l2.className = 'muted';
+  l2.textContent = '→ 다크';
+  row.append(l1, fromSel, l2, toSel, btn);
+  panel.append(hint, row);
+}
+
+function mainSwitch(msg: CodeToUi): void {
+  switch (msg.type) {
+    case 'EXTRACT_RESULT':
+      applyExtractResult(msg);
+      break;
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
@@ -1217,6 +1461,54 @@ window.onmessage = (event: MessageEvent) => {
       // code가 캐시된 키의 (재)검증을 요청 — UI에서 수행 후 결과 보고.
       void verifyAndReport(msg.key);
       break;
+    case 'VARIABLES':
+      // R1: 편집기 목록 수신.
+      varList = msg.vars;
+      renderVarEditor();
+      break;
+    case 'EDIT_VARIABLE_RESULT': {
+      // R1: 편집/삭제 결과 — 실패는 경고, 성공은 목록 갱신.
+      if (!msg.ok) {
+        setStatus('varEditStatus', t('varedit.editFail', { error: msg.error ?? '' }), 'warn');
+        // 실패 시 표시값 복원을 위해 재조회(낙관적 입력 되돌리기).
+        send({ type: 'GET_VARIABLES' });
+        break;
+      }
+      if (msg.deleted) {
+        const gone = varList.find((x) => x.id === msg.id);
+        varList = varList.filter((x) => x.id !== msg.id);
+        renderVarEditor();
+        setStatus('varEditStatus', t('varedit.deleted', { name: gone?.name ?? '' }), 'ok');
+      } else if (msg.var) {
+        const i = varList.findIndex((x) => x.id === msg.id);
+        if (i >= 0) varList[i] = msg.var;
+        // 이름 변경은 다른 행의 별칭 표시명에도 영향 → 전체 재렌더.
+        renderVarEditor();
+        setStatus('varEditStatus', t('varedit.saved'), 'ok');
+      }
+      break;
+    }
+    case 'VARIABLE_USAGE': {
+      // R2-C: 삭제 확정 흐름 — 사용처를 경고에 담아 confirm.
+      if (!pendingDelete || pendingDelete.id !== msg.id) break;
+      const pd = pendingDelete;
+      pendingDelete = null;
+      const lines: string[] = [];
+      if (msg.nodes.length) lines.push('⚠ ' + t('varedit.usageNodes', { count: `${msg.nodes.length}${msg.capped ? '+' : ''}` }));
+      if (msg.aliasedBy.length) {
+        const names = msg.aliasedBy.slice(0, 5).map((x) => x.name).join(', ') + (msg.aliasedBy.length > 5 ? '…' : '');
+        lines.push('⚠ ' + t('varedit.usageAliases', { count: msg.aliasedBy.length, names }));
+      }
+      const warn = lines.length ? '\n\n' + lines.join('\n') : '';
+      if (confirm(t('varedit.confirmDelete', { name: pd.name }) + warn)) send({ type: 'DELETE_VARIABLE', id: pd.id });
+      break;
+    }
+    case 'DARK_MODE_RESULT': {
+      // R2-A: 다크 생성 결과(이후 VARIABLES 재수신으로 목록 갱신).
+      const skip = msg.skipped ? t('varedit.darkSkip', { skipped: msg.skipped }) : '';
+      setStatus('varEditStatus', t('varedit.darkDone', { created: msg.created, realiased: msg.realiased, skip }), 'ok');
+      break;
+    }
     case 'ERROR': {
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
       const statusId = (msg.op && OP_STATUS[msg.op]) || 'extractStatus';
@@ -1225,6 +1517,36 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
   }
+}
+
+/* ---------- 단일 메시지 디스패처 — 마법사 라우팅 + 메인 스위치 통합 ----------
+   마법사 실행 중에는 메인 스위치를 돌리지 않아, 단계별 결과(APPLY/RENAME/CREATE…)가
+   일반 패널 상태를 덮어쓰는 desync를 차단한다. 마법사가 기다리는 단계 응답은
+   wizardWaiter로만 라우팅한다. */
+window.onmessage = (event: MessageEvent) => {
+  const m = (event.data as { pluginMessage?: CodeToUi }).pluginMessage;
+  if (!m) return;
+  // 바인딩 진행률(UX6)은 마법사 자체 진행바로 표시('적용' 탭 진행바는 안 보임).
+  if (wizardRunning && m.type === 'PROGRESS' && m.op === 'bind') updateWizardBar(m.done, m.total);
+  // 마법사 단계가 응답을 대기 중이면 해당 단계로만 라우팅(메인 스위치 건너뜀).
+  if (wizardWaiter) {
+    // 오류/유료요구는 대기 중이면 해당 단계 실패로 처리(무한 대기 방지).
+    if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
+      const w = wizardWaiter;
+      wizardWaiter = null;
+      w.reject(new Error(m.message));
+      return;
+    }
+    if (wizardWaiter.types.includes(m.type)) {
+      const w = wizardWaiter;
+      wizardWaiter = null;
+      w.resolve(m);
+    }
+    return; // 기다리지 않는 메시지는 무시 — 진행 중 패널 상태 보호.
+  }
+  // 단계 사이(대기자 없음)라도 마법사 실행 중이면 메인 스위치를 돌리지 않는다.
+  if (wizardRunning) return;
+  mainSwitch(m);
 };
 
 /* ---------- UX7: 오류 라우팅/표시 ---------- */
@@ -1235,13 +1557,22 @@ const OP_STATUS: Record<string, string> = {
   SCAN_TEXT_STYLES: 'tsStatus',
   CREATE_TEXT_STYLES: 'tsStatus',
   APPLY: 'applyStatus',
+  APPLY_SELECTED: 'applyStatus',
   RENAME: 'renameStatus',
+  RENAME_APPLY: 'renameStatus',
+  APPLY_CONTRAST_FIX: 'contrastStatus',
   EXPORT: 'exportStatus',
+  SCAN_COMPONENT_CANDIDATES: 'componentStatus',
   REGISTER_COMPONENTS: 'componentStatus',
   CLASSIFY_VARIANTS: 'componentStatus',
   GENERATE_MISSING_VARIANTS: 'componentStatus',
   EXPOSE_PROPERTIES: 'componentStatus',
   CHECK_CONTRAST: 'contrastStatus',
+  GET_VARIABLES: 'varEditStatus',
+  EDIT_VARIABLE: 'varEditStatus',
+  DELETE_VARIABLE: 'varEditStatus',
+  GET_VARIABLE_USAGE: 'varEditStatus',
+  GENERATE_DARK_MODE: 'varEditStatus',
   GET_PRESETS: 'presetStatus',
   SAVE_PRESET: 'presetStatus',
   DELETE_PRESET: 'presetStatus',
@@ -1725,6 +2056,9 @@ send({ type: 'GET_LICENSE' });
 // #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
 document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
 
+// R1: 변수 편집기 새로고침.
+$('btnVarRefresh').addEventListener('click', () => send({ type: 'GET_VARIABLES' }));
+
 /* ---------- 탭 내비게이션 (UI 개편 + UX8 키보드) ---------- */
 const TABS = ['wizard', 'tokens', 'apply', 'settings'] as const;
 function showTab(name: (typeof TABS)[number]): void {
@@ -1739,6 +2073,7 @@ function showTab(name: (typeof TABS)[number]): void {
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
+  if (name === 'settings') send({ type: 'GET_VARIABLES' }); // R1: 편집기 진입 시 최신 변수 조회
 }
 TABS.forEach((t, i) => {
   const btn = $(`tabbtn-${t}`);

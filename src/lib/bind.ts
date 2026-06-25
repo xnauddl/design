@@ -1,6 +1,7 @@
 /* ============================================================
    bind.ts — 토큰(변수)을 레이어 속성에 바인딩 (top-down)
-   - 매칭은 resolved 값 기준, Component > Semantic 우선. Global 직접 바인딩 제외.
+   - 매칭은 resolved 값 기준, Component > Semantic > Global 우선. Global은 역할 변수가
+     없을 때만 쓰는 폴백(Semantic=역할명 원칙이라 원시값엔 역할 변수가 없을 수 있음).
    - 프레임 크기(Fixed)·여백(오토레이아웃)·반경·효과·텍스트 지원.
    ============================================================ */
 import { rgbToHex } from './tokens';
@@ -186,7 +187,7 @@ async function buildIndex(): Promise<VarEntry[]> {
   const entries: VarEntry[] = [];
   for (const v of vars) {
     const tier = tierOf.get(v.variableCollectionId) ?? 0;
-    if (tier < 2) continue; // Component/Semantic만 바인딩 대상
+    if (tier < 1) continue; // Component/Semantic/Global 바인딩 대상(Global은 폴백). tier 0(미상 컬렉션) 제외
     const val = await resolveValue(v, modeOf);
     if (val == null) continue;
     const e: VarEntry = { variable: v, tier, type: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'] };
@@ -244,8 +245,8 @@ function matchFloat(entries: VarEntry[], value: number, tol: number, scope?: Var
     if (scope && !e.scopes.includes('ALL_SCOPES') && !e.scopes.includes(scope)) continue;
     const dist = Math.abs(e.num - value);
     if (dist > tol) continue;
-    // 가장 가까운 값 우선, 동률이면 높은 tier 우선.
-    if (dist < bestDist || (dist === bestDist && best !== null && best.tier < e.tier)) {
+    // 높은 tier 우선(Global은 폴백), 같은 tier면 가장 가까운 값.
+    if (best === null || e.tier > best.tier || (e.tier === best.tier && dist < bestDist)) {
       best = e;
       bestDist = dist;
     }
@@ -334,7 +335,14 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
       changed = true;
       return figma.variables.setBoundVariableForPaint(p, 'color', e.variable);
     });
-    if (changed && apply) (node as unknown as Record<string, Paint[]>)[key] = next;
+    // 잠금/읽기 전용 노드 등에서 재할당이 throw해도 해당 노드만 건너뛰고 전체 순회는 계속.
+    if (changed && apply) {
+      try {
+        (node as unknown as Record<string, Paint[]>)[key] = next;
+      } catch {
+        note(res, 'error');
+      }
+    }
   }
 }
 
@@ -429,7 +437,14 @@ function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, appl
     changed = true;
     return figma.variables.setBoundVariableForEffect(e, 'color', ent.variable);
   });
-  if (changed && apply) (node as unknown as { effects: readonly Effect[] }).effects = next;
+  // 잠금/읽기 전용 노드 등에서 재할당이 throw해도 해당 노드만 건너뛰고 전체 순회는 계속.
+  if (changed && apply) {
+    try {
+      (node as unknown as { effects: readonly Effect[] }).effects = next;
+    } catch {
+      note(res, 'error');
+    }
+  }
 }
 
 async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): Promise<void> {

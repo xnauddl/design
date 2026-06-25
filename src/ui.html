@@ -146,6 +146,33 @@
     label.inline { display: inline-flex; gap: 5px; align-items: center; color: var(--text-2); }
     .status { margin-top: 4px; min-height: 15px; color: var(--text-2); }
 
+    /* 토큰 목록 / diff / 결과 표시 */
+    #tokenList { max-height: 180px; overflow: auto; margin-top: 7px; }
+    .tk { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
+    .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
+    .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
+    .cat { font-size: 10px; color: var(--muted); }
+    /* #3 색 편집표 */
+    #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
+    .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 2px 0; }
+    .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0003; }
+    .crow .cn { font-family: ui-monospace, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .crow input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
+    /* 색 정리(군집) */
+    .cluster-sum { font-size: 11px; color: var(--muted); margin: 4px 0; }
+    #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
+    .tree-row.header { opacity: 1; color: var(--muted); }
+    .before { color: var(--muted); text-decoration: line-through; }
+    .tree-name { color: inherit; }
+    .after { color: var(--ok); }
+    /* 선택형 미리보기 트리(#13) */
+    .tree-ctrls { font-size: 11px; margin-top: 6px; }
+    .tree-row { display: flex; align-items: center; gap: 4px; padding: 1px 0; white-space: nowrap; }
+    .tree-row.affected { font-weight: 500; }
+    .tree-row.context { opacity: 0.5; }
+    .tree-row .tree-ctx { color: var(--muted); }
+    .tree-row input { margin: 0; }
+
     /* ── 탭바 (세그먼트 컨트롤) ── */
     .tabs {
       display: flex; gap: 3px; position: sticky; top: 0; z-index: 3;
@@ -265,6 +292,23 @@
     .cfix { display: inline-flex; gap: 4px; }
     .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
     .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
+    /* R1 변수 편집기 */
+    #varEditList { max-height: 320px; overflow: auto; margin: 6px 0; }
+    .vgroup { font-size: 11px; font-weight: 600; color: var(--muted); margin: 8px 0 2px; border-bottom: 1px solid #0002; padding-bottom: 2px; }
+    .vrow { display: grid; grid-template-columns: minmax(80px,1.4fr) 42px minmax(90px,1.6fr) 86px minmax(60px,1fr) 40px; gap: 5px; align-items: start; padding: 3px 0; }
+    .vrow input, .vrow select { font: 400 11px "Inter", monospace; padding: 3px 4px; width: 100%; box-sizing: border-box; }
+    .vbadge { font-size: 9px; color: var(--muted); border: 1px solid #0003; border-radius: 3px; padding: 2px 3px; text-align: center; align-self: center; }
+    .vvalues { display: flex; flex-direction: column; gap: 3px; }
+    .vcell { display: flex; align-items: center; gap: 3px; }
+    .vmode { font-size: 9px; color: var(--muted); min-width: 26px; }
+    .vcell .valias { flex: 1; min-width: 0; }
+    .vcell .vlit { flex: 1; min-width: 0; }
+    .vcell input[type="color"] { padding: 0; height: 22px; width: 28px; flex: 0 0 auto; }
+    .vscopes { height: 44px; }
+    .vdel { font-size: 10px; padding: 3px 4px; align-self: center; }
+    #darkGenPanel:empty { display: none; }
+    #darkGenPanel { margin: 8px 0 2px; padding-top: 6px; border-top: 1px solid #0002; }
+    #darkGenPanel select { font: 400 11px "Inter", monospace; padding: 3px 4px; }
 
     /* ── 리사이즈 핸들(우하단) ── */
     #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
@@ -362,6 +406,8 @@
       </div>
       <div id="tokenList"></div>
       <div class="status" id="extractStatus"></div>
+      <!-- 색 정리(군집): 추출/생성 색을 ΔE로 자동으로 묶어 대표색 요약을 한 줄로 표시(별도 카드 없이 추출에 흡수). -->
+      <div class="cluster-sum" id="clusterSummary" style="display:none"></div>
     </div>
 
     <!-- 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
@@ -391,6 +437,22 @@
         <button id="btnCreateApply" class="primary" style="display:none">적용</button>
       </div>
       <div class="status" id="createStatus"></div>
+    </div>
+
+    <!-- 변수 편집: 토큰 생성 직후 — 방금 만든 변수의 값·이름·스코프를 바로 손보거나 삭제(다크 생성 포함). -->
+    <div class="step" id="varEditCard">
+      <h2>변수 편집</h2>
+      <div class="hint">Global·Semantic·Component 변수의 값·이름·스코프를 직접 고치거나 삭제합니다. (각 작업 단일 Undo)</div>
+      <div class="row">
+        <button id="btnVarRefresh">새로고침</button>
+        <span class="muted" id="varEditInfo"></span>
+      </div>
+      <div id="varEditList"></div>
+      <div id="darkGenPanel"></div>
+      <div class="ux">
+        <div class="ux-h"><span class="ux-t">즉시 편집 · 단일 Undo</span></div>
+        <div class="status" id="varEditStatus"></div>
+      </div>
     </div>
 
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.

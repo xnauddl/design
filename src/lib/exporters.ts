@@ -23,18 +23,29 @@ export type TokenKind =
   | 'opacity'
   | 'other';
 
+/** R1(다중 모드): 비기본 모드 하나의 값. theme=모드명(CSS data-theme 속성값). */
+export interface ThemeValue {
+  theme: string;
+  /** 리터럴(COLOR=#hex, FLOAT=숫자, STRING=문자). */
+  value?: string | number;
+  /** 별칭 대상 토큰 이름. */
+  aliasOf?: string;
+}
+
 export interface ExportToken {
   /** 슬래시 경로 이름. 예: 'color/primary/500', 'surface'. */
   name: string;
   collection: 'Global' | 'Semantic';
   type: ResolvedType;
   kind: TokenKind;
-  /** Global 리터럴. COLOR=#hex, FLOAT=px 숫자, STRING=문자("Inter"). */
+  /** 기본 모드 리터럴. COLOR=#hex, FLOAT=px 숫자, STRING=문자("Inter"). */
   value?: string | number;
-  /** Semantic 별칭 대상 토큰 이름. */
+  /** 기본 모드 별칭 대상 토큰 이름. */
   aliasOf?: string;
   /** #16: 원본 단위 표기(Variable.description). lineHeight/letterSpacing 출력 시 px보다 우선("160%"). */
   description?: string;
+  /** R1: 비기본 모드별 값(테마/반응형). CSS는 [data-theme] 블록으로 출력. 단일 모드면 비움. */
+  themes?: ThemeValue[];
 }
 
 export interface ExportOptions {
@@ -115,21 +126,44 @@ function cssLiteral(token: ExportToken, opts: ExportOptions): string {
 /* ---------- CSS 내보내기 ---------- */
 const cssVar = (name: string): string => `--${kebab(name)}`;
 
+/** 한 변수의 한 값(리터럴/별칭)을 CSS 선언 우변으로. value 미지정 시 token.value 사용(기본 모드). */
+function cssDeclValue(token: ExportToken, value: string | number | undefined, aliasOf: string | undefined, opts: ExportOptions): string {
+  if (aliasOf) return `var(${cssVar(aliasOf)})`;
+  // 모드 오버라이드 값이면 description(단위) 없이 그 값으로, 기본 모드면 토큰 그대로.
+  return value === undefined ? cssLiteral(token, opts) : cssLiteral({ ...token, value, description: undefined }, opts);
+}
+
 function toCss(tokens: ExportToken[], opts: ExportOptions): string {
-  const lines: string[] = [':root {'];
+  // :root — 기본 모드 값
+  const root: string[] = [':root {'];
   for (const t of tokens) {
     if (t.aliasOf) {
-      lines.push(`  ${cssVar(t.name)}: var(${cssVar(t.aliasOf)});`);
+      root.push(`  ${cssVar(t.name)}: var(${cssVar(t.aliasOf)});`);
     } else {
-      lines.push(`  ${cssVar(t.name)}: ${cssLiteral(t, opts)};`);
+      root.push(`  ${cssVar(t.name)}: ${cssLiteral(t, opts)};`);
       // italic이면 동반 font-style 변수
       if (t.kind === 'fontWeight' && splitWeightStyle(t.value as string | number).italic) {
-        lines.push(`  ${cssVar(t.name)}-style: italic;`);
+        root.push(`  ${cssVar(t.name)}-style: italic;`);
       }
     }
   }
-  lines.push('}');
-  return lines.join('\n');
+  root.push('}');
+  const blocks: string[] = [root.join('\n')];
+
+  // R1: 다중 모드 → [data-theme="<모드명>"] 오버라이드 블록(첫 등장 순서).
+  const themeOrder: string[] = [];
+  for (const t of tokens) for (const th of t.themes ?? []) if (!themeOrder.includes(th.theme)) themeOrder.push(th.theme);
+  for (const theme of themeOrder) {
+    const lines: string[] = [`[data-theme="${kebab(theme)}"] {`];
+    for (const t of tokens) {
+      const tv = (t.themes ?? []).find((x) => x.theme === theme);
+      if (!tv) continue; // 이 모드 값이 없는 변수는 :root 값을 상속
+      lines.push(`  ${cssVar(t.name)}: ${cssDeclValue(t, tv.value, tv.aliasOf, opts)};`);
+    }
+    lines.push('}');
+    blocks.push(lines.join('\n'));
+  }
+  return blocks.join('\n\n');
 }
 
 /* ---------- W3C DTCG JSON 내보내기 ---------- */

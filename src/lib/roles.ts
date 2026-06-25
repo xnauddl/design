@@ -10,6 +10,7 @@
    ============================================================ */
 import type { DraftToken, TokenCategory } from './tokens';
 import { suggestSemanticMap } from './palette';
+import { clusterColorTokens } from './colorCluster';
 
 /** 센터(md)에 맞춘 티셔츠 사다리. */
 const TSHIRT = ['3xs', '2xs', 'xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl'];
@@ -101,11 +102,10 @@ function numericEntries(tokens: DraftToken[], category: TokenCategory): Array<{ 
 export function suggestTokenRoles(tokens: DraftToken[], base = 16): Record<string, string> {
   const map: Record<string, string> = {};
 
-  // 색 — 기존 휴리스틱(무채→surface/text/border, 채도최고→primary).
-  const colors = tokens
-    .filter((t) => t.category === 'color' && typeof t.value === 'string')
-    .map((t) => ({ name: t.name, hex: t.value as string }));
-  Object.assign(map, suggestSemanticMap(colors));
+  // 색 — ΔE 군집(와이어프레임 '정리(군집)')으로 비슷한 색을 대표색으로 묶은 뒤,
+  // 역할은 대표색에만 추천(무채→surface/text/border, 채도최고→primary). 단색은 그대로 대표색.
+  const { clusters } = clusterColorTokens(tokens);
+  Object.assign(map, suggestSemanticMap(clusters.map((cl) => cl.representative)));
 
   // 수치 — 티셔츠/타입 스케일. prefix는 Semantic 폴더 그룹.
   const scale = (category: TokenCategory, prefix: string, roleFn: (vals: number[]) => string[]): void => {

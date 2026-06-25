@@ -146,6 +146,33 @@
     label.inline { display: inline-flex; gap: 5px; align-items: center; color: var(--text-2); }
     .status { margin-top: 4px; min-height: 15px; color: var(--text-2); }
 
+    /* 토큰 목록 / diff / 결과 표시 */
+    #tokenList { max-height: 180px; overflow: auto; margin-top: 7px; }
+    .tk { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
+    .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
+    .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
+    .cat { font-size: 10px; color: var(--muted); }
+    /* #3 색 편집표 */
+    #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
+    .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 2px 0; }
+    .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0003; }
+    .crow .cn { font-family: ui-monospace, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .crow input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
+    /* 색 정리(군집) */
+    .cluster-sum { font-size: 11px; color: var(--muted); margin: 4px 0; }
+    #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
+    .tree-row.header { opacity: 1; color: var(--muted); }
+    .before { color: var(--muted); text-decoration: line-through; }
+    .tree-name { color: inherit; }
+    .after { color: var(--ok); }
+    /* 선택형 미리보기 트리(#13) */
+    .tree-ctrls { font-size: 11px; margin-top: 6px; }
+    .tree-row { display: flex; align-items: center; gap: 4px; padding: 1px 0; white-space: nowrap; }
+    .tree-row.affected { font-weight: 500; }
+    .tree-row.context { opacity: 0.5; }
+    .tree-row .tree-ctx { color: var(--muted); }
+    .tree-row input { margin: 0; }
+
     /* ── 탭바 (세그먼트 컨트롤) ── */
     .tabs {
       display: flex; gap: 3px; position: sticky; top: 0; z-index: 3;
@@ -265,6 +292,23 @@
     .cfix { display: inline-flex; gap: 4px; }
     .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
     .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
+    /* R1 변수 편집기 */
+    #varEditList { max-height: 320px; overflow: auto; margin: 6px 0; }
+    .vgroup { font-size: 11px; font-weight: 600; color: var(--muted); margin: 8px 0 2px; border-bottom: 1px solid #0002; padding-bottom: 2px; }
+    .vrow { display: grid; grid-template-columns: minmax(80px,1.4fr) 42px minmax(90px,1.6fr) 86px minmax(60px,1fr) 40px; gap: 5px; align-items: start; padding: 3px 0; }
+    .vrow input, .vrow select { font: 400 11px "Inter", monospace; padding: 3px 4px; width: 100%; box-sizing: border-box; }
+    .vbadge { font-size: 9px; color: var(--muted); border: 1px solid #0003; border-radius: 3px; padding: 2px 3px; text-align: center; align-self: center; }
+    .vvalues { display: flex; flex-direction: column; gap: 3px; }
+    .vcell { display: flex; align-items: center; gap: 3px; }
+    .vmode { font-size: 9px; color: var(--muted); min-width: 26px; }
+    .vcell .valias { flex: 1; min-width: 0; }
+    .vcell .vlit { flex: 1; min-width: 0; }
+    .vcell input[type="color"] { padding: 0; height: 22px; width: 28px; flex: 0 0 auto; }
+    .vscopes { height: 44px; }
+    .vdel { font-size: 10px; padding: 3px 4px; align-self: center; }
+    #darkGenPanel:empty { display: none; }
+    #darkGenPanel { margin: 8px 0 2px; padding-top: 6px; border-top: 1px solid #0002; }
+    #darkGenPanel select { font: 400 11px "Inter", monospace; padding: 3px 4px; }
 
     /* ── 리사이즈 핸들(우하단) ── */
     #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
@@ -362,6 +406,8 @@
       </div>
       <div id="tokenList"></div>
       <div class="status" id="extractStatus"></div>
+      <!-- 색 정리(군집): 추출/생성 색을 ΔE로 자동으로 묶어 대표색 요약을 한 줄로 표시(별도 카드 없이 추출에 흡수). -->
+      <div class="cluster-sum" id="clusterSummary" style="display:none"></div>
     </div>
 
     <!-- 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
@@ -391,6 +437,22 @@
         <button id="btnCreateApply" class="primary" style="display:none">적용</button>
       </div>
       <div class="status" id="createStatus"></div>
+    </div>
+
+    <!-- 변수 편집: 토큰 생성 직후 — 방금 만든 변수의 값·이름·스코프를 바로 손보거나 삭제(다크 생성 포함). -->
+    <div class="step" id="varEditCard">
+      <h2>변수 편집</h2>
+      <div class="hint">Global·Semantic·Component 변수의 값·이름·스코프를 직접 고치거나 삭제합니다. (각 작업 단일 Undo)</div>
+      <div class="row">
+        <button id="btnVarRefresh">새로고침</button>
+        <span class="muted" id="varEditInfo"></span>
+      </div>
+      <div id="varEditList"></div>
+      <div id="darkGenPanel"></div>
+      <div class="ux">
+        <div class="ux-h"><span class="ux-t">즉시 편집 · 단일 Undo</span></div>
+        <div class="status" id="varEditStatus"></div>
+      </div>
     </div>
 
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
@@ -604,6 +666,37 @@
     return a;
   };
 
+  // src/lib/tokens.ts
+  var clamp01 = (n) => Math.min(1, Math.max(0, n));
+  var to255 = (c) => Math.round(clamp01(c) * 255);
+  function rgbToHex(rgb) {
+    const h = (c) => to255(c).toString(16).padStart(2, "0");
+    return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`.toLowerCase();
+  }
+  function hexToRgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m) throw new Error(`\uC798\uBABB\uB41C hex: ${hex}`);
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
+  }
+  var VALID_SCOPES = {
+    COLOR: /* @__PURE__ */ new Set(["ALL_SCOPES", "ALL_FILLS", "FRAME_FILL", "SHAPE_FILL", "TEXT_FILL", "STROKE_COLOR", "EFFECT_COLOR"]),
+    FLOAT: /* @__PURE__ */ new Set(["ALL_SCOPES", "GAP", "WIDTH_HEIGHT", "CORNER_RADIUS", "STROKE_FLOAT", "FONT_SIZE", "LINE_HEIGHT", "LETTER_SPACING", "FONT_WEIGHT", "EFFECT_FLOAT", "OPACITY"]),
+    STRING: /* @__PURE__ */ new Set(["ALL_SCOPES", "FONT_FAMILY"]),
+    BOOLEAN: /* @__PURE__ */ new Set(["ALL_SCOPES"])
+  };
+  function scopesForTypeList(type) {
+    return [...VALID_SCOPES[type]];
+  }
+
+  // src/lib/variableEdit.ts
+  function validateVarName(name, existing) {
+    const n = name.trim();
+    if (!n) return "\uC774\uB984\uC744 \uC785\uB825\uD558\uC138\uC694.";
+    if (existing.includes(n)) return "\uAC19\uC740 \uCEEC\uB809\uC158\uC5D0 \uAC19\uC740 \uC774\uB984\uC758 \uBCC0\uC218\uAC00 \uC788\uC2B5\uB2C8\uB2E4.";
+    return null;
+  }
+
   // src/lib/i18n.ts
   var STRINGS = {
     // 공통 진행/상태
@@ -620,6 +713,8 @@
     "extract.done": "{count}\uAC1C \uD6C4\uBCF4 \uCD94\uCD9C \uC644\uB8CC.",
     "create.needExtract": "\uBA3C\uC800 \uD1A0\uD070\uC744 \uCD94\uCD9C\uD558\uC138\uC694.",
     "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
+    // 색 정리(군집) — ΔE로 비슷한 색을 대표색으로 병합(허용오차 고정·비노출). 추출 카드에 요약 한 줄.
+    "cluster.summary": "{total}\uC0C9 \u2192 {reps} \uB300\uD45C\uC0C9 \xB7 {merged}\uC0C9 \uBCD1\uD569",
     // 시맨틱 매핑
     "semantic.rolesApplied": "{count}\uAC1C \uC5ED\uD560 \uBC18\uC601\uB428 \u2014 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019\uC73C\uB85C \uC801\uC6A9.",
     "semantic.scanningGlobals": "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026",
@@ -677,7 +772,23 @@
     // 라이선스
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
-    "premium.required": "{message} (\uC720\uB8CC \uAE30\uB2A5: {feature})"
+    "premium.required": "{message} (\uC720\uB8CC \uAE30\uB2A5: {feature})",
+    // 변수 편집기(R1)
+    "varedit.empty": "\uD3B8\uC9D1\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.",
+    "varedit.count": "\uBCC0\uC218 {count}\uAC1C",
+    "varedit.saved": "\uBCC0\uACBD \uC800\uC7A5\uB428.",
+    "varedit.deleted": "\u2018{name}\u2019 \uC0AD\uC81C\uB428 \u2014 \uB418\uB3CC\uB9AC\uB824\uBA74 Undo.",
+    "varedit.editFail": "\uD3B8\uC9D1 \uC2E4\uD328: {error}",
+    "varedit.dupName": "\uAC19\uC740 \uCEEC\uB809\uC158\uC5D0 \uAC19\uC740 \uC774\uB984\uC758 \uBCC0\uC218\uAC00 \uC788\uC2B5\uB2C8\uB2E4.",
+    "varedit.confirmDelete": "\u2018{name}\u2019 \uBCC0\uC218\uB97C \uC0AD\uC81C\uD560\uAE4C\uC694? \uB418\uB3CC\uB9AC\uB824\uBA74 Undo\uD558\uC138\uC694.",
+    // R2-C: 영향 분석(where-used)
+    "varedit.usageNodes": "\uC774 \uBCC0\uC218\uB97C \uC4F0\uB294 \uB178\uB4DC {count}\uAC1C",
+    "varedit.usageAliases": "\uC774 \uBCC0\uC218\uB97C \uBCC4\uCE6D\uD558\uB294 \uBCC0\uC218 {count}\uAC1C: {names}",
+    // R2-A: 다크 자동 생성
+    "varedit.darkDone": "\uB2E4\uD06C \uC0DD\uC131 \u2014 \uB2E4\uD06C Global {created}\uAC1C \xB7 \uC7AC\uBCC4\uCE6D {realiased}\uAC1C{skip}",
+    "varedit.darkSkip": " \xB7 \uC2A4\uD0B5 {skipped}(\uBCC4\uCE6D \uC544\uB2D8)",
+    "varedit.darkSameMode": "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C \uBAA8\uB4DC\uAC00 \uAC19\uC2B5\uB2C8\uB2E4 \u2014 \uC11C\uB85C \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
+    "varedit.darkHint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC Semantic \uC0C9\uC744 OKLCH \uBA85\uB3C4 \uBC18\uC804\uC73C\uB85C \uB2E4\uD06C \uBAA8\uB4DC\uC5D0 \uC790\uB3D9 \uCC44\uC6C1\uB2C8\uB2E4(\uB2E4\uD06C\uC6A9 Global \uC0DD\uC131 \uD6C4 \uC7AC-\uBCC4\uCE6D)."
   };
   function t(key, vars) {
     var _a;
@@ -865,20 +976,6 @@
       if (m) map[m[1]] = m[2];
     }
     return map;
-  }
-
-  // src/lib/tokens.ts
-  var clamp01 = (n) => Math.min(1, Math.max(0, n));
-  var to255 = (c) => Math.round(clamp01(c) * 255);
-  function rgbToHex(rgb) {
-    const h = (c) => to255(c).toString(16).padStart(2, "0");
-    return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`.toLowerCase();
-  }
-  function hexToRgb(hex) {
-    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-    if (!m) throw new Error(`\uC798\uBABB\uB41C hex: ${hex}`);
-    const n = parseInt(m[1], 16);
-    return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
   }
 
   // src/lib/color.ts
@@ -1169,6 +1266,90 @@
     return tokens2;
   }
 
+  // src/lib/colorCluster.ts
+  var DEFAULT_DELTA_E = 8;
+  function oklabPoint(hex) {
+    const { l, c, h } = hexToOklch(hex);
+    const r = h * Math.PI / 180;
+    return { L: l, a: c * Math.cos(r), b: c * Math.sin(r), c, l };
+  }
+  function find(parent2, i) {
+    while (parent2[i] !== i) {
+      parent2[i] = parent2[parent2[i]];
+      i = parent2[i];
+    }
+    return i;
+  }
+  function clusterColorsByDeltaE(colors, tolerance = DEFAULT_DELTA_E) {
+    const n = colors.length;
+    if (n === 0) return [];
+    const pts = colors.map((c) => oklabPoint(c.hex));
+    const parent2 = colors.map((_, i) => i);
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const d = Math.hypot(pts[i].L - pts[j].L, pts[i].a - pts[j].a, pts[i].b - pts[j].b) * 100;
+        if (d <= tolerance) {
+          const ri = find(parent2, i);
+          const rj = find(parent2, j);
+          if (ri !== rj) parent2[Math.max(ri, rj)] = Math.min(ri, rj);
+        }
+      }
+    }
+    const order = [];
+    const groups = /* @__PURE__ */ new Map();
+    for (let i = 0; i < n; i++) {
+      const r = find(parent2, i);
+      let g = groups.get(r);
+      if (!g) {
+        g = [];
+        groups.set(r, g);
+        order.push(r);
+      }
+      g.push(i);
+    }
+    return order.map((r) => {
+      const idxs = groups.get(r);
+      let best = idxs[0];
+      for (const i of idxs) {
+        const p = pts[i];
+        const q = pts[best];
+        if (p.c > q.c + 1e-9) best = i;
+        else if (Math.abs(p.c - q.c) <= 1e-9) {
+          const dp = Math.abs(p.l - 0.6);
+          const dq = Math.abs(q.l - 0.6);
+          if (dp < dq - 1e-9) best = i;
+          else if (Math.abs(dp - dq) <= 1e-9 && colors[i].name < colors[best].name) best = i;
+        }
+      }
+      const members = idxs.map((i) => colors[i]);
+      return { representative: colors[best], members, isSingleton: members.length === 1 };
+    });
+  }
+  function clusterSummary(clusters) {
+    const total = clusters.reduce((s, c) => s + c.members.length, 0);
+    const representatives = clusters.length;
+    return {
+      total,
+      representatives,
+      merged: total - representatives,
+      singletons: clusters.filter((c) => c.isSingleton).length
+    };
+  }
+  function clusterColorTokens(tokens2, tolerance = DEFAULT_DELTA_E) {
+    const colors = [];
+    for (const t2 of tokens2) {
+      if (t2.category === "color" && typeof t2.value === "string") colors.push({ name: t2.name, hex: t2.value });
+    }
+    const clusters = clusterColorsByDeltaE(colors, tolerance);
+    const merges = {};
+    for (const cl of clusters) {
+      for (const m of cl.members) {
+        if (m.name !== cl.representative.name) merges[m.name] = cl.representative.name;
+      }
+    }
+    return { clusters, merges };
+  }
+
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
   var TSHIRT_MID = TSHIRT.indexOf("md");
@@ -1246,8 +1427,8 @@
   }
   function suggestTokenRoles(tokens2, base = 16) {
     const map = {};
-    const colors = tokens2.filter((t2) => t2.category === "color" && typeof t2.value === "string").map((t2) => ({ name: t2.name, hex: t2.value }));
-    Object.assign(map, suggestSemanticMap(colors));
+    const { clusters } = clusterColorTokens(tokens2);
+    Object.assign(map, suggestSemanticMap(clusters.map((cl) => cl.representative)));
     const scale = (category, prefix, roleFn) => {
       const entries = numericEntries(tokens2, category);
       const roles = roleFn(entries.map((e) => e.value));
@@ -1376,6 +1557,8 @@
   var lastExportFormat = "w3c";
   var lastSelCount = 0;
   var createFrom = "tokens";
+  var varList = [];
+  var pendingDelete = null;
   var CHUNK = 150;
   var chunkPending = /* @__PURE__ */ new WeakMap();
   function renderChunked(mount, items, makeRow) {
@@ -1479,6 +1662,7 @@
     tokens = paletteToDraftTokens(p);
     renderTokens();
     setSemMapText(paletteSemanticMap(p));
+    renderColorClusters();
     renderColorTable();
     $("btnPaletteApply").style.display = "";
     $("paletteInfo").textContent = t("palette.summary", { count: p.scales.length, tokens: tokens.length });
@@ -1543,6 +1727,24 @@
       row.append(sw, name, role);
       return row;
     });
+  }
+  function renderColorClusters() {
+    const box = $("clusterSummary");
+    const colorToks = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
+    if (colorToks.length < 2) {
+      box.style.display = "none";
+      box.textContent = "";
+      return;
+    }
+    const { clusters } = clusterColorTokens(tokens);
+    const s = clusterSummary(clusters);
+    if (s.merged <= 0) {
+      box.style.display = "none";
+      box.textContent = "";
+      return;
+    }
+    box.style.display = "";
+    box.textContent = t("cluster.summary", { total: s.total, reps: s.representatives, merged: s.merged });
   }
   function applyColorRoles() {
     const map = {};
@@ -1727,23 +1929,6 @@
   });
   var wizardRunning = false;
   var wizardWaiter = null;
-  window.addEventListener("message", (event) => {
-    const m = event.data.pluginMessage;
-    if (!m) return;
-    if (wizardRunning && m.type === "PROGRESS" && m.op === "bind") updateWizardBar(m.done, m.total);
-    if (!wizardWaiter) return;
-    if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
-      const w = wizardWaiter;
-      wizardWaiter = null;
-      w.reject(new Error(m.message));
-      return;
-    }
-    if (wizardWaiter.types.includes(m.type)) {
-      const w = wizardWaiter;
-      wizardWaiter = null;
-      w.resolve(m);
-    }
-  });
   function wizardRequest(msg, expect) {
     return new Promise((resolve, reject) => {
       wizardWaiter = {
@@ -1834,7 +2019,7 @@
         switch (p.step.id) {
           case "extract": {
             const r = await wizardRequest({ type: "EXTRACT" }, ["EXTRACT_RESULT"]);
-            tokens = r.tokens;
+            applyExtractResult(r);
             if (!tokens.length) {
               setWizardStep("extract", "fail", "\uCD94\uCD9C\uB41C \uD1A0\uD070 \uC5C6\uC74C \u2014 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uC788\uB294 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694.");
               stopped = true;
@@ -2159,23 +2344,223 @@
     $("licenseKey").value = "";
     send({ type: "CLEAR_LICENSE" });
   });
-  window.onmessage = (event) => {
-    var _a, _b;
-    const msg = event.data.pluginMessage;
-    if (!msg) return;
-    switch (msg.type) {
-      case "EXTRACT_RESULT": {
-        tokens = msg.tokens;
-        huefyTokenColors(tokens);
-        renderTokens();
-        $("btnCreateApply").style.display = "none";
-        $("btnPaletteApply").style.display = "none";
-        suggestSemMapFrom(tokens);
-        renderColorTable();
-        $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
-        setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");
-        break;
+  function applyExtractResult(msg) {
+    tokens = msg.tokens;
+    huefyTokenColors(tokens);
+    renderTokens();
+    $("btnCreateApply").style.display = "none";
+    $("btnPaletteApply").style.display = "none";
+    suggestSemMapFrom(tokens);
+    renderColorClusters();
+    renderColorTable();
+    $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
+    setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");
+  }
+  function sendVarPatch(id, patch) {
+    send({ type: "EDIT_VARIABLE", id, patch });
+  }
+  function makeLiteralInput(v, modeId, val) {
+    if (v.type === "COLOR") {
+      const c = document.createElement("input");
+      c.type = "color";
+      c.className = "vlit vcolor";
+      c.value = val.kind === "literal" && HEX6.test(val.display) ? val.display.toLowerCase() : "#000000";
+      c.title = c.value;
+      c.addEventListener("change", () => sendVarPatch(v.id, { value: { modeId, literal: c.value } }));
+      return c;
+    }
+    const input = document.createElement("input");
+    input.className = "vlit";
+    if (v.type === "FLOAT") input.type = "number";
+    input.value = val.kind === "literal" ? val.display : "";
+    const prev = input.value;
+    const commit = () => {
+      if (input.value !== prev) sendVarPatch(v.id, { value: { modeId, literal: input.value } });
+    };
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") input.blur();
+    });
+    return input;
+  }
+  function makeValueCell(v, m) {
+    var _a;
+    const cell = document.createElement("div");
+    cell.className = "vcell";
+    if (v.modes.length > 1) {
+      const lab = document.createElement("span");
+      lab.className = "vmode";
+      lab.textContent = m.name;
+      lab.title = m.name;
+      cell.appendChild(lab);
+    }
+    const val = (_a = v.values[m.modeId]) != null ? _a : { kind: "literal", display: "" };
+    const sel = document.createElement("select");
+    sel.className = "valias";
+    const litOpt = document.createElement("option");
+    litOpt.value = "";
+    litOpt.textContent = "\u2014 \uB9AC\uD130\uB7F4 \u2014";
+    sel.appendChild(litOpt);
+    for (const o of varList) {
+      if (o.id === v.id || o.type !== v.type) continue;
+      const op = document.createElement("option");
+      op.value = o.id;
+      op.textContent = o.name;
+      sel.appendChild(op);
+    }
+    sel.value = val.kind === "alias" && val.aliasId ? val.aliasId : "";
+    const lit = makeLiteralInput(v, m.modeId, val);
+    const sync = () => {
+      lit.style.display = sel.value ? "none" : "";
+    };
+    sync();
+    sel.addEventListener("change", () => {
+      if (sel.value) sendVarPatch(v.id, { value: { modeId: m.modeId, aliasId: sel.value } });
+      sync();
+    });
+    cell.append(sel, lit);
+    return cell;
+  }
+  function makeScopeSelect(v) {
+    const sel = document.createElement("select");
+    sel.multiple = true;
+    sel.className = "vscopes";
+    for (const sc of scopesForTypeList(v.type)) {
+      const op = document.createElement("option");
+      op.value = sc;
+      op.textContent = sc;
+      if (v.scopes.includes(sc)) op.selected = true;
+      sel.appendChild(op);
+    }
+    sel.addEventListener("change", () => {
+      const picked = Array.from(sel.selectedOptions, (o) => o.value);
+      sendVarPatch(v.id, { scopes: picked });
+    });
+    return sel;
+  }
+  function makeVarRow(v) {
+    const row = document.createElement("div");
+    row.className = "vrow";
+    row.dataset.id = v.id;
+    const name = document.createElement("input");
+    name.className = "vname";
+    name.value = v.name;
+    name.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") name.blur();
+    });
+    name.addEventListener("blur", () => {
+      const nm = name.value.trim();
+      if (nm === v.name) return;
+      const others = varList.filter((x) => x.id !== v.id && x.collection === v.collection).map((x) => x.name);
+      const err = validateVarName(nm, others);
+      if (err) {
+        setStatus("varEditStatus", err, "warn");
+        name.value = v.name;
+        return;
       }
+      sendVarPatch(v.id, { name: nm });
+    });
+    const badge = document.createElement("span");
+    badge.className = "vbadge";
+    badge.textContent = v.type;
+    badge.title = `${v.collection} \xB7 \uD0C0\uC785 \uACE0\uC815(\uBCC0\uACBD \uBD88\uAC00)`;
+    const values = document.createElement("div");
+    values.className = "vvalues";
+    for (const m of v.modes) values.appendChild(makeValueCell(v, m));
+    const scopes = makeScopeSelect(v);
+    const desc = document.createElement("input");
+    desc.className = "vdesc";
+    desc.placeholder = "\uC124\uBA85";
+    desc.value = v.description;
+    desc.addEventListener("blur", () => {
+      if (desc.value !== v.description) sendVarPatch(v.id, { description: desc.value });
+    });
+    const del = document.createElement("button");
+    del.className = "vdel";
+    del.textContent = "\uC0AD\uC81C";
+    del.addEventListener("click", () => {
+      pendingDelete = { id: v.id, name: v.name };
+      send({ type: "GET_VARIABLE_USAGE", id: v.id });
+    });
+    row.append(name, badge, values, scopes, desc, del);
+    return row;
+  }
+  function renderVarEditor() {
+    const mount = $("varEditList");
+    mount.innerHTML = "";
+    if (!varList.length) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.textContent = t("varedit.empty");
+      mount.appendChild(empty);
+      $("varEditInfo").textContent = "";
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    let curCol = "";
+    for (const v of varList) {
+      if (v.collection !== curCol) {
+        curCol = v.collection;
+        const h = document.createElement("div");
+        h.className = "vgroup";
+        h.textContent = curCol;
+        frag.appendChild(h);
+      }
+      frag.appendChild(makeVarRow(v));
+    }
+    mount.appendChild(frag);
+    $("varEditInfo").textContent = t("varedit.count", { count: varList.length });
+    renderDarkGen();
+  }
+  function renderDarkGen() {
+    var _a;
+    const panel = $("darkGenPanel");
+    panel.innerHTML = "";
+    const sem = varList.find((v) => v.collection === "Semantic" && v.modes.length >= 2);
+    if (!sem) return;
+    const modeSelect = (def) => {
+      const s = document.createElement("select");
+      for (const m of sem.modes) {
+        const o = document.createElement("option");
+        o.value = m.modeId;
+        o.textContent = m.name;
+        if (m.modeId === def) o.selected = true;
+        s.appendChild(o);
+      }
+      return s;
+    };
+    const toMode = sem.modes.find((m) => m.modeId !== sem.defaultModeId);
+    const fromSel = modeSelect(sem.defaultModeId);
+    const toSel = modeSelect((_a = toMode == null ? void 0 : toMode.modeId) != null ? _a : sem.defaultModeId);
+    const btn = document.createElement("button");
+    btn.textContent = "\uB2E4\uD06C \uC790\uB3D9 \uC0DD\uC131";
+    btn.addEventListener("click", () => {
+      if (fromSel.value === toSel.value) {
+        setStatus("varEditStatus", t("varedit.darkSameMode"), "warn");
+        return;
+      }
+      send({ type: "GENERATE_DARK_MODE", collectionId: sem.collectionId, fromModeId: fromSel.value, toModeId: toSel.value });
+    });
+    const hint = document.createElement("div");
+    hint.className = "muted";
+    hint.textContent = t("varedit.darkHint");
+    const row = document.createElement("div");
+    row.className = "row";
+    const l1 = document.createElement("span");
+    l1.className = "muted";
+    l1.textContent = "\uB77C\uC774\uD2B8";
+    const l2 = document.createElement("span");
+    l2.className = "muted";
+    l2.textContent = "\u2192 \uB2E4\uD06C";
+    row.append(l1, fromSel, l2, toSel, btn);
+    panel.append(hint, row);
+  }
+  function mainSwitch(msg) {
+    var _a, _b, _c, _d;
+    switch (msg.type) {
+      case "EXTRACT_RESULT":
+        applyExtractResult(msg);
+        break;
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
@@ -2379,6 +2764,48 @@
       case "REQUEST_VERIFY":
         void verifyAndReport(msg.key);
         break;
+      case "VARIABLES":
+        varList = msg.vars;
+        renderVarEditor();
+        break;
+      case "EDIT_VARIABLE_RESULT": {
+        if (!msg.ok) {
+          setStatus("varEditStatus", t("varedit.editFail", { error: (_c = msg.error) != null ? _c : "" }), "warn");
+          send({ type: "GET_VARIABLES" });
+          break;
+        }
+        if (msg.deleted) {
+          const gone = varList.find((x) => x.id === msg.id);
+          varList = varList.filter((x) => x.id !== msg.id);
+          renderVarEditor();
+          setStatus("varEditStatus", t("varedit.deleted", { name: (_d = gone == null ? void 0 : gone.name) != null ? _d : "" }), "ok");
+        } else if (msg.var) {
+          const i = varList.findIndex((x) => x.id === msg.id);
+          if (i >= 0) varList[i] = msg.var;
+          renderVarEditor();
+          setStatus("varEditStatus", t("varedit.saved"), "ok");
+        }
+        break;
+      }
+      case "VARIABLE_USAGE": {
+        if (!pendingDelete || pendingDelete.id !== msg.id) break;
+        const pd = pendingDelete;
+        pendingDelete = null;
+        const lines = [];
+        if (msg.nodes.length) lines.push("\u26A0 " + t("varedit.usageNodes", { count: `${msg.nodes.length}${msg.capped ? "+" : ""}` }));
+        if (msg.aliasedBy.length) {
+          const names = msg.aliasedBy.slice(0, 5).map((x) => x.name).join(", ") + (msg.aliasedBy.length > 5 ? "\u2026" : "");
+          lines.push("\u26A0 " + t("varedit.usageAliases", { count: msg.aliasedBy.length, names }));
+        }
+        const warn = lines.length ? "\n\n" + lines.join("\n") : "";
+        if (confirm(t("varedit.confirmDelete", { name: pd.name }) + warn)) send({ type: "DELETE_VARIABLE", id: pd.id });
+        break;
+      }
+      case "DARK_MODE_RESULT": {
+        const skip = msg.skipped ? t("varedit.darkSkip", { skipped: msg.skipped }) : "";
+        setStatus("varEditStatus", t("varedit.darkDone", { created: msg.created, realiased: msg.realiased, skip }), "ok");
+        break;
+      }
       case "ERROR": {
         const statusId = msg.op && OP_STATUS[msg.op] || "extractStatus";
         if (msg.op === "APPLY") hideApplyProgress();
@@ -2386,6 +2813,27 @@
         break;
       }
     }
+  }
+  window.onmessage = (event) => {
+    const m = event.data.pluginMessage;
+    if (!m) return;
+    if (wizardRunning && m.type === "PROGRESS" && m.op === "bind") updateWizardBar(m.done, m.total);
+    if (wizardWaiter) {
+      if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
+        const w = wizardWaiter;
+        wizardWaiter = null;
+        w.reject(new Error(m.message));
+        return;
+      }
+      if (wizardWaiter.types.includes(m.type)) {
+        const w = wizardWaiter;
+        wizardWaiter = null;
+        w.resolve(m);
+      }
+      return;
+    }
+    if (wizardRunning) return;
+    mainSwitch(m);
   };
   var OP_STATUS = {
     EXTRACT: "extractStatus",
@@ -2394,13 +2842,22 @@
     SCAN_TEXT_STYLES: "tsStatus",
     CREATE_TEXT_STYLES: "tsStatus",
     APPLY: "applyStatus",
+    APPLY_SELECTED: "applyStatus",
     RENAME: "renameStatus",
+    RENAME_APPLY: "renameStatus",
+    APPLY_CONTRAST_FIX: "contrastStatus",
     EXPORT: "exportStatus",
+    SCAN_COMPONENT_CANDIDATES: "componentStatus",
     REGISTER_COMPONENTS: "componentStatus",
     CLASSIFY_VARIANTS: "componentStatus",
     GENERATE_MISSING_VARIANTS: "componentStatus",
     EXPOSE_PROPERTIES: "componentStatus",
     CHECK_CONTRAST: "contrastStatus",
+    GET_VARIABLES: "varEditStatus",
+    EDIT_VARIABLE: "varEditStatus",
+    DELETE_VARIABLE: "varEditStatus",
+    GET_VARIABLE_USAGE: "varEditStatus",
+    GENERATE_DARK_MODE: "varEditStatus",
     GET_PRESETS: "presetStatus",
     SAVE_PRESET: "presetStatus",
     DELETE_PRESET: "presetStatus",
@@ -2570,9 +3027,9 @@
   function updateBindApply() {
     const total = bindCandidates.length;
     const sel = bindChecked.size;
-    const confirm = $("btnApplyConfirm");
-    confirm.style.display = hasBindPreview() ? "" : "none";
-    confirm.disabled = sel === 0;
+    const confirm2 = $("btnApplyConfirm");
+    confirm2.style.display = hasBindPreview() ? "" : "none";
+    confirm2.disabled = sel === 0;
     if (hasBindPreview()) {
       const all = $("bindAll");
       all.checked = sel === total && total > 0;
@@ -2792,6 +3249,7 @@
   send({ type: "GET_PREREQ" });
   send({ type: "GET_LICENSE" });
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
+  $("btnVarRefresh").addEventListener("click", () => send({ type: "GET_VARIABLES" }));
   var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {
     for (const t2 of TABS) {
@@ -2804,6 +3262,7 @@
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
     if (name !== "settings") send({ type: "GET_PREREQ" });
+    if (name === "settings") send({ type: "GET_VARIABLES" });
   }
   TABS.forEach((t2, i) => {
     const btn = $(`tabbtn-${t2}`);
