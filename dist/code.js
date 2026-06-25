@@ -422,19 +422,16 @@
     idx.set(k, variable);
     return { variable, created: true };
   }
-  async function resolveCollections() {
-    var _a, _b;
+  async function resolveGlobalCollection() {
+    var _a;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const globalCol = (_a = cols.find((c) => c.name === GLOBAL)) != null ? _a : figma.variables.createVariableCollection(GLOBAL);
-    const semanticCol = (_b = cols.find((c) => c.name === SEMANTIC)) != null ? _b : figma.variables.createVariableCollection(SEMANTIC);
-    return { globalCol, semanticCol };
+    return (_a = cols.find((c) => c.name === GLOBAL)) != null ? _a : figma.variables.createVariableCollection(GLOBAL);
   }
   async function createTokens(tokens, base) {
-    const { globalCol, semanticCol } = await resolveCollections();
+    const globalCol = await resolveGlobalCollection();
     const gMode = globalCol.defaultModeId;
-    const sMode = semanticCol.defaultModeId;
     const idx = await buildVarIndex();
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0 };
+    const summary = { created: 0, updated: 0, globals: 0 };
     for (const t of tokens) {
       const type = resolvedTypeForToken(t);
       const g = upsertVariable(t.name, globalCol, type, idx);
@@ -445,36 +442,26 @@
       g.variable.hiddenFromPublishing = true;
       const desc = unitDescription(t);
       if (desc) g.variable.description = desc;
-      const s = upsertVariable(t.name, semanticCol, type, idx);
-      s.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g.variable));
-      s.variable.scopes = scopesForType(scopesForSources(t.sources), type);
-      summary[s.created ? "created" : "updated"]++;
-      summary.semantics++;
     }
     return summary;
   }
   async function previewCreateTokens(tokens) {
-    var _a, _b, _c, _d;
+    var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const gId = (_b = (_a = cols.find((c) => c.name === GLOBAL)) == null ? void 0 : _a.id) != null ? _b : "#G";
-    const sId = (_d = (_c = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _c.id) != null ? _d : "#S";
     const existing = /* @__PURE__ */ new Set();
     for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0 };
+    const summary = { created: 0, updated: 0, globals: 0 };
     const seen = /* @__PURE__ */ new Set();
-    const tally = (colId, name, kind) => {
-      const k = vkey(colId, name);
-      summary[kind]++;
+    for (const t of tokens) {
+      const k = vkey(gId, t.name);
+      summary.globals++;
       if (seen.has(k)) {
         summary.updated++;
-        return;
+        continue;
       }
       seen.add(k);
       summary[existing.has(k) ? "updated" : "created"]++;
-    };
-    for (const t of tokens) {
-      tally(gId, t.name, "globals");
-      tally(sId, t.name, "semantics");
     }
     return summary;
   }
@@ -2317,7 +2304,7 @@
           const slice = msg.tokens.slice(0, c.allowed);
           const s = msg.preview ? await previewCreateTokens(slice) : await createTokens(slice, msg.base);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
-          let summary = `Global ${s.globals}\uAC1C \xB7 Semantic ${s.semantics}\uAC1C (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated})`;
+          let summary = `Global ${s.globals}\uAC1C (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated}) \xB7 Semantic\uC740 \uC2DC\uB9E8\uD2F1 \uB9E4\uD551 \uB2E8\uACC4\uC5D0\uC11C`;
           if (pruned) summary += ` \xB7 \uC774\uC804 \uC0C9 ${pruned}\uAC1C \uC815\uB9AC`;
           if (c.limited) summary += ` \xB7 \u26A0 ${msg.tokens.length}\uAC1C \uC911 ${c.allowed}\uAC1C\uB9CC \uC801\uC6A9(Free \uD55C\uB3C4 ${limit}) \u2014 \uC5C5\uADF8\uB808\uC774\uB4DC \uD544\uC694`;
           post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
