@@ -439,6 +439,22 @@
       <div class="status" id="createStatus"></div>
     </div>
 
+    <!-- 변수 편집: 토큰 생성 직후 — 방금 만든 변수의 값·이름·스코프를 바로 손보거나 삭제(다크 생성 포함). -->
+    <div class="step" id="varEditCard">
+      <h2>변수 편집</h2>
+      <div class="hint">Global·Semantic·Component 변수의 값·이름·스코프를 직접 고치거나 삭제합니다. (각 작업 단일 Undo)</div>
+      <div class="row">
+        <button id="btnVarRefresh">새로고침</button>
+        <span class="muted" id="varEditInfo"></span>
+      </div>
+      <div id="varEditList"></div>
+      <div id="darkGenPanel"></div>
+      <div class="ux">
+        <div class="ux-h"><span class="ux-t">즉시 편집 · 단일 Undo</span></div>
+        <div class="status" id="varEditStatus"></div>
+      </div>
+    </div>
+
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
          DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
     <div class="step" style="display:none">
@@ -576,21 +592,6 @@
       </div>
       <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%;"></textarea>
       <div class="status" id="exportStatus"></div>
-    </div>
-
-    <div class="step" id="varEditCard">
-      <h2>변수 편집</h2>
-      <div class="hint">Global·Semantic·Component 변수의 값·이름·스코프를 직접 고치거나 삭제합니다. (각 작업 단일 Undo)</div>
-      <div class="row">
-        <button id="btnVarRefresh">새로고침</button>
-        <span class="muted" id="varEditInfo"></span>
-      </div>
-      <div id="varEditList"></div>
-      <div id="darkGenPanel"></div>
-      <div class="ux">
-        <div class="ux-h"><span class="ux-t">즉시 편집 · 단일 Undo</span></div>
-        <div class="status" id="varEditStatus"></div>
-      </div>
     </div>
 
     <div class="step">
