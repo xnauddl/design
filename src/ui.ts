@@ -104,11 +104,10 @@ function renderTokens(): void {
   const box = $('tokenList');
   if (!tokens.length) {
     box.innerHTML = '';
-    // UX4: 빈 상태 — 선택 여부에 따라 안내 문구를 바꾼다(콜아웃 박스 + 배지).
+    // 빈 상태 — 선택 여부에 따라 안내 문구를 바꾼다(콜아웃 노트).
     const empty = document.createElement('div');
     empty.className = 'ux';
     empty.innerHTML =
-      '<div class="ux-h"><span class="badge">UX4</span><span class="ux-t">빈 상태 도움말</span></div>' +
       (lastSelCount > 0
         ? '<div>선택에서 색·폰트·간격을 뽑습니다. <b>‘선택에서 토큰 추출’</b>을 누르세요.</div>'
         : '<div>프레임을 선택한 뒤 <b>‘선택에서 토큰 추출’</b>을 누르면 색·폰트·간격이 후보로 잡힙니다. 예) 버튼·카드</div>');

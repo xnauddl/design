@@ -3,150 +3,251 @@
 <head>
   <meta charset="UTF-8" />
   <style>
-    /* ── 목업(Figma 17:2/17:94/17:178) 디자인 토큰 ──────────────
-       라이트 고정(목업이 라이트 단일). 색·치수·타이포를 목업과 1:1로 맞춤. */
+    /* ── 디자인 시스템 v2 (라이트 고정) ───────────────────────────────
+       색·간격·반경·타이포를 토큰화. 좁은 패널(≈320–480px)에 맞춘 11px 베이스.
+       JS가 참조하는 id/클래스명은 그대로 두고 스타일만 재설계. */
     :root {
       color-scheme: light;
-      --text: #121212;
-      --muted: #878787;
-      --border: #e0e0e0;
-      --field: #f7f7f7;
-      --accent: #0d99ff;
-      --ux-bg: #e8f5ff;
-      --ok: #0a7d29;
-      --warn: #b86b00;
+
+      /* 표면 */
+      --bg:            #ffffff;
+      --surface:       #ffffff;
+      --surface-2:     #f4f5f6;   /* 필드·트랙·미묘한 채움 */
+      --surface-hover: #eceef0;
+
+      /* 텍스트 */
+      --text:          #1b1b1f;
+      --text-2:        #5e636b;   /* 보조 */
+      --muted:         #9298a1;   /* 흐림 */
+
+      /* 경계 */
+      --border:        #e7e8ea;
+      --border-2:      #d4d6da;   /* 강조 경계·hover */
+
+      /* 강조(Figma 블루 계열) */
+      --accent:        #0d99ff;
+      --accent-hover:  #0a86e6;
+      --accent-press:  #0974c9;
+      --accent-strong: #0a6dbf;   /* 텍스트용 진한 강조 */
+      --accent-subtle: #ecf6ff;   /* 콜아웃 배경 */
+      --accent-border: #c4e4ff;
+
+      --on-accent:     #ffffff;
+
+      /* 상태 */
+      --ok:            #117b34;
+      --ok-subtle:     #e8f5ec;
+      --warn:          #9a6300;
+      --warn-subtle:   #fbf1df;
+      --danger:        #c8252f;
+
+      /* 반경 */
+      --r-sm: 5px;
+      --r:    7px;
+      --r-lg: 10px;
+
+      /* 그림자 */
+      --shadow-sm: 0 1px 1.5px rgba(20,22,28,.05);
+      --shadow:    0 1px 2px rgba(20,22,28,.06), 0 2px 6px rgba(20,22,28,.05);
+
+      --fs:   11px;
+      --font: "Inter", -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, monospace;
     }
+
     * { box-sizing: border-box; }
     body {
-      font: 400 11px/1.45 "Inter", -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
-      margin: 0; padding: 12px; color: var(--text); background: #fff;
+      font: 400 var(--fs)/1.5 var(--font);
+      margin: 0; padding: 12px;
+      color: var(--text); background: var(--bg);
+      -webkit-font-smoothing: antialiased;
     }
-    h2 { font-size: 11px; font-weight: 600; color: var(--text); margin: 0 0 7px; text-transform: none; letter-spacing: 0; }
+    h2 {
+      font-size: var(--fs); font-weight: 600; color: var(--text);
+      margin: 0 0 8px; letter-spacing: -0.1px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .muted   { color: var(--muted); }
+    .warn    { color: var(--warn); }
+    .ok      { color: var(--ok); }
+    code     { font-family: var(--mono); font-size: 10.5px; color: var(--text-2); background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+    b        { font-weight: 600; }
 
-    /* 카드 */
-    .step { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
-    .step > * + * { margin-top: 7px; }
+    /* ── 카드 ── */
+    .step {
+      border: 1px solid var(--border); border-radius: var(--r-lg);
+      padding: 12px; margin-bottom: 10px; background: var(--surface);
+      box-shadow: var(--shadow-sm);
+    }
+    .step > * + * { margin-top: 8px; }
 
-    /* 버튼 */
-    button { font: 600 11px/16px "Inter", -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border); background: #fff; color: var(--text); cursor: pointer; }
-    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-    button:disabled { opacity: .45; cursor: default; }
+    /* ── 버튼 ── */
+    button {
+      font: 600 var(--fs)/1 var(--font);
+      padding: 7px 11px; border-radius: var(--r-sm);
+      border: 1px solid var(--border-2); background: var(--surface); color: var(--text);
+      cursor: pointer; transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
+      white-space: nowrap;
+    }
+    button:hover { background: var(--surface-2); border-color: var(--border-2); }
+    button:active { background: var(--surface-hover); }
+    button.primary {
+      background: var(--accent); color: var(--on-accent); border-color: var(--accent);
+      box-shadow: var(--shadow-sm);
+    }
+    button.primary:hover  { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button.primary:active { background: var(--accent-press); border-color: var(--accent-press); }
+    button:focus-visible {
+      outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    }
+    button:disabled { opacity: .42; cursor: default; box-shadow: none; }
+    button:disabled:hover { background: var(--surface); border-color: var(--border-2); }
+    button.link {
+      border: none; background: none; padding: 0; width: auto;
+      color: var(--accent-strong); cursor: pointer; font: inherit; font-weight: 600;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    button.link:hover { color: var(--accent-hover); background: none; }
 
-    /* 입력 / 셀렉트 / 텍스트영역 (필드) */
+    /* ── 입력 / 셀렉트 / 텍스트영역 ── */
     input[type="text"], input[type="number"], select, textarea {
-      font: 400 11px/16px "Inter", -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
-      background: var(--field); color: var(--text);
-      border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+      font: 400 var(--fs)/1.4 var(--font);
+      background: var(--surface-2); color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 6px 8px; transition: background .12s, border-color .12s, box-shadow .12s;
     }
-    input[type="text"]::placeholder, textarea::placeholder { color: var(--muted); }
+    input[type="text"]:hover, input[type="number"]:hover, select:hover, textarea:hover { border-color: var(--border-2); }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+      outline: none; background: var(--surface);
+      border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle);
+    }
+    input::placeholder, textarea::placeholder { color: var(--muted); }
     input[type="number"] { width: 56px; }
-    input[type="color"] { width: 32px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; }
-    input[type="checkbox"] { accent-color: var(--accent); }
+    input[type="color"] {
+      width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
+      border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
+    }
+    input[type="checkbox"] { accent-color: var(--accent); width: 13px; height: 13px; }
     select { padding-right: 6px; }
+    textarea { font-family: var(--mono); line-height: 1.5; resize: vertical; }
 
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    label.inline { display: inline-flex; gap: 5px; align-items: center; }
-    .muted { color: var(--muted); }
-    .status { margin-top: 4px; min-height: 15px; }
-    .warn { color: var(--warn); }
-    .ok { color: var(--ok); }
-    code { font-family: ui-monospace, monospace; color: var(--muted); }
-    /* #14 리사이즈 핸들(우하단) */
-    #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
-    #resizeHandle::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 0; height: 0; border-left: 7px solid transparent; border-bottom: 7px solid var(--muted); opacity: 0.6; }
-    /* 진행 안내 파이프라인(§3) */
-    #pipelineSteps { margin: 7px 0; }
-    .pstep { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 3px 0; cursor: pointer; }
-    .pstep .pdot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border); background: #fff; font-size: 8px; line-height: 12px; text-align: center; color: var(--muted); }
-    .pstep.done .pdot { background: var(--ok); border-color: var(--ok); color: #fff; }
-    .pstep.ready .pdot { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .pstep.blocked { opacity: .6; }
-    .pstep .plabel { color: var(--text); }
-    .pstep .pstat { font-size: 10px; }
-    .pstep.done .pstat { color: var(--ok); }
-    .pstep.ready .pstat { color: var(--accent); }
-    .pstep.blocked .pstat { color: var(--muted); }
-    /* #11 전제 미충족 안내 + 바로가기 */
-    .prereq { margin: 6px 0; font-size: 11px; color: var(--warn); display: flex; align-items: center; gap: 6px; }
-    button.link { border: none; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; width: auto; }
-    button.link:hover { opacity: 0.8; }
+    label.inline { display: inline-flex; gap: 5px; align-items: center; color: var(--text-2); }
+    .status { margin-top: 4px; min-height: 15px; color: var(--text-2); }
 
-    /* 토큰 목록 / diff / 결과 표시 */
-    #tokenList { max-height: 180px; overflow: auto; margin-top: 7px; }
-    .tk { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
-    .tk input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
-    .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
-    .cat { font-size: 10px; color: var(--muted); }
-    /* #3 색 편집표 */
-    #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
-    .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 2px 0; }
-    .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0003; }
-    .crow .cn { font-family: ui-monospace, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .crow input { font: 400 11px "Inter", monospace; padding: 3px 5px; width: 100%; }
-    #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
-    .tree-row.header { opacity: 1; color: var(--muted); }
-    .before { color: var(--muted); text-decoration: line-through; }
-    .tree-name { color: inherit; }
-    .after { color: var(--ok); }
-    /* 선택형 미리보기 트리(#13) */
-    .tree-ctrls { font-size: 11px; margin-top: 6px; }
-    .tree-row { display: flex; align-items: center; gap: 4px; padding: 1px 0; white-space: nowrap; }
-    .tree-row.affected { font-weight: 500; }
-    .tree-row.context { opacity: 0.5; }
-    .tree-row .tree-ctx { color: var(--muted); }
-    .tree-row input { margin: 0; }
-
-    /* 탭바 */
-    .tabs { display: flex; gap: 8px; position: sticky; top: 0; background: #fff; padding: 0 0 10px; margin: 0 0 2px; z-index: 2; }
-    .tab-btn { flex: 1; padding: 7px 0; border-radius: 6px; border: 1px solid var(--border); }
-    .tab-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    /* ── 탭바 (세그먼트 컨트롤) ── */
+    .tabs {
+      display: flex; gap: 3px; position: sticky; top: 0; z-index: 3;
+      background: var(--surface-2); border: 1px solid var(--border);
+      padding: 3px; border-radius: var(--r); margin: 0 0 10px;
+    }
+    .tab-btn {
+      flex: 1; padding: 6px 4px; border: none; background: transparent;
+      color: var(--text-2); font-weight: 600; border-radius: var(--r-sm);
+    }
+    .tab-btn:hover:not(.active) { background: var(--surface-hover); color: var(--text); }
+    .tab-btn.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
     .tab-section { display: none; }
     .tab-section.active { display: block; }
     .tab-section > * { margin-bottom: 10px; }
 
-    /* UX 콜아웃 박스 + 배지 */
-    .ux { background: var(--ux-bg); border: 1px solid var(--accent); border-radius: 6px; padding: 8px; }
+    /* ── 선택 동기화 바 (탭 아래 sticky) ── */
+    #selBarWrap {
+      position: sticky; top: 41px; z-index: 2; margin: 0 0 10px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 7px 10px;
+    }
+    .selbar { color: var(--text); font-weight: 500; }
+    .selbar.muted { color: var(--muted); font-weight: 400; }
+
+    /* ── 콜아웃(안내 노트) ── */
+    .ux {
+      background: var(--accent-subtle); border: 1px solid var(--accent-border);
+      border-radius: var(--r); padding: 9px 10px;
+    }
     .ux > * + * { margin-top: 5px; }
-    .step .ux { margin-top: 7px; }
+    .step .ux { margin-top: 8px; }
     .ux-h { display: flex; align-items: center; gap: 6px; }
-    .badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 600; line-height: 14px; padding: 2px 5px; border-radius: 4px; background: var(--accent); color: #fff; }
-    .ux-t { font-size: 10px; font-weight: 600; line-height: 15px; color: var(--accent); }
+    .ux-t { font-size: var(--fs); font-weight: 600; color: var(--accent-strong); }
+    .hint { color: var(--text-2); font-size: 10.5px; }
 
-    /* UX5 선택 동기화 카드 (상단 sticky) */
-    #selBarWrap { position: sticky; top: 43px; z-index: 1; margin: 0 0 10px; }
-    .selbar { color: var(--text); }
-    .selbar.muted { color: var(--muted); }
+    /* ── 진행률 바 ── */
+    .bar { height: 7px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+    .bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 999px; transition: width .12s linear; }
 
-    /* UX6 진행률 바 */
-    .bar { height: 8px; border-radius: 4px; background: var(--field); border: 1px solid var(--border); overflow: hidden; }
-    .bar-fill { height: 100%; width: 0%; background: var(--accent); transition: width .1s linear; }
+    /* ── 전제 미충족 안내 ── */
+    .prereq { margin: 6px 0; font-size: var(--fs); color: var(--warn); display: flex; align-items: center; gap: 6px; }
 
-    /* 시스템화 마법사 스테퍼 */
-    #wizardSteps { margin-top: 7px; }
-    .wstep { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
-    .wstep .dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border); background: #fff; font-size: 8px; line-height: 12px; text-align: center; color: var(--muted); }
-    .wstep.done .dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+    /* ── 진행 안내 파이프라인 ── */
+    #pipelineSteps { margin: 6px 0; }
+    .pstep { display: grid; grid-template-columns: 18px 1fr auto; gap: 7px; align-items: center; padding: 4px 6px; margin: 0 -6px; cursor: pointer; border-radius: var(--r-sm); }
+    .pstep:hover { background: var(--surface-2); }
+    .pstep .pdot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface); font-size: 9px; line-height: 14px; text-align: center; color: var(--muted); font-weight: 600; }
+    .pstep.done .pdot  { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .pstep.ready .pdot { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .pstep.blocked { opacity: .55; }
+    .pstep .plabel { color: var(--text); }
+    .pstep .pstat  { font-size: 10px; }
+    .pstep.done .pstat    { color: var(--ok); }
+    .pstep.ready .pstat   { color: var(--accent-strong); }
+    .pstep.blocked .pstat { color: var(--muted); }
+
+    /* ── 시스템화 마법사 스테퍼 ── */
+    #wizardSteps { margin-top: 8px; }
+    .wstep { display: grid; grid-template-columns: 18px 1fr auto; gap: 7px; align-items: center; padding: 3px 0; }
+    .wstep .dot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface); font-size: 9px; line-height: 14px; text-align: center; color: var(--muted); font-weight: 600; }
+    .wstep.done .dot   { background: var(--ok); border-color: var(--ok); color: #fff; }
     .wstep.active .dot { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .wstep.fail .dot { background: var(--warn); border-color: var(--warn); color: #fff; }
+    .wstep.fail .dot   { background: var(--warn); border-color: var(--warn); color: #fff; }
     .wstep .wlabel { color: var(--text); }
     .wstep.skip { opacity: .55; }
     .wstep.skip .wlabel { color: var(--muted); }
     .wstep .wnote { font-size: 10px; color: var(--muted); }
     .wstep.fail .wnote { color: var(--warn); }
-    #wizardBar { margin-top: 7px; }
+    #wizardBar { margin-top: 8px; }
 
-    /* 명도 대비 점검 결과 */
-    .cfind { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 3px 0; }
+    /* ── 토큰 목록 / 색 편집표 ── */
+    #tokenList { max-height: 180px; overflow: auto; margin-top: 8px; }
+    .tk { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 3px 0; }
+    .tk input { font: 400 var(--fs) var(--mono); padding: 4px 6px; width: 100%; }
+    .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
+    .cat { font-size: 10px; color: var(--muted); }
+    #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
+    .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 3px 0; }
+    .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
+    .crow .cn { font-family: var(--mono); font-size: var(--fs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .crow input { font: 400 var(--fs) var(--mono); padding: 4px 6px; width: 100%; }
+
+    /* ── diff / 선택형 미리보기 트리 ── */
+    #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 8px; font-family: var(--mono); font-size: var(--fs); border: 1px solid var(--border); border-radius: var(--r-sm); }
+    #diff:empty, #bindTree:empty, #compTree:empty { border: none; }
+    .tree-row { display: flex; align-items: center; gap: 5px; padding: 2px 7px; white-space: nowrap; }
+    .tree-row:nth-child(even) { background: var(--surface-2); }
+    .tree-row.header { opacity: 1; color: var(--muted); background: none; }
+    .tree-row.affected { font-weight: 500; }
+    .tree-row.context { opacity: 0.5; }
+    .tree-row .tree-ctx { color: var(--muted); }
+    .tree-row input { margin: 0; }
+    .before { color: var(--muted); text-decoration: line-through; }
+    .tree-name { color: inherit; }
+    .after { color: var(--ok); }
+    .tree-ctrls { font-size: var(--fs); margin-top: 6px; }
+
+    /* ── 명도 대비 점검 결과 ── */
+    .cfind { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; }
     .cfind .cname { flex: 1 1 70px; min-width: 70px; }
     .cpair { display: inline-flex; }
-    .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid #0003; }
+    .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid rgba(0,0,0,.18); }
     .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
     .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
     .cfind .ratio { font-variant-numeric: tabular-nums; }
-    /* #2 대비 보정 제안 버튼 */
     .cfix { display: inline-flex; gap: 4px; }
-    .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 1px 5px; font-size: 10px; width: auto; }
-    .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid #0003; }
+    .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
+    .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
+
+    /* ── 리사이즈 핸들(우하단) ── */
+    #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
+    #resizeHandle::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 0; height: 0; border-left: 7px solid transparent; border-bottom: 7px solid var(--muted); opacity: 0.5; }
   </style>
 </head>
 <body>
@@ -157,17 +258,16 @@
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings">관리</button>
   </div>
 
-  <!-- UX5 · 선택 동기화 (실시간) -->
-  <div class="ux" id="selBarWrap">
-    <div class="ux-h"><span class="badge">UX5</span><span class="ux-t">선택 동기화 (실시간)</span></div>
+  <!-- 선택 동기화 (실시간) -->
+  <div id="selBarWrap">
     <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
   </div>
 
   <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
     <div class="step" id="wizardCard">
-      <div class="ux-h"><span class="badge">NEW</span><span class="ux-t">시스템화 마법사</span></div>
-      <div class="muted">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
+      <h2>시스템화 마법사</h2>
+      <div class="hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" /> 시맨틱 매핑</label>
         <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> 접근성 검수</label>
@@ -183,9 +283,9 @@
       <div class="status" id="wizardSummary"></div>
     </div>
 
-    <!-- UX4 · 온보딩 / 가이드 -->
+    <!-- 온보딩 / 가이드 -->
     <div class="ux" id="onboardCard">
-      <div class="ux-h"><span class="badge">UX4</span><span class="ux-t">온보딩 / 가이드</span></div>
+      <div class="ux-h"><span class="ux-t">온보딩 / 가이드</span></div>
       <div>처음이세요? <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 ‘만들기·적용’ 탭을 차례로 사용하세요.</div>
       <div class="row">
         <button id="btnGuide">전체 실행</button>
@@ -193,10 +293,10 @@
       </div>
     </div>
 
-    <!-- 진행 안내 — 만들기→적용 의존 파이프라인 단계 상태(§3) -->
+    <!-- 진행 안내 — 만들기→적용 의존 파이프라인 단계 상태 -->
     <div class="step" id="pipelineCard">
       <h2>진행 안내</h2>
-      <div class="muted">권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.</div>
+      <div class="hint">권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.</div>
       <div id="pipelineSteps"></div>
       <div class="muted" style="font-size:10px">리네임 · 대비 점검 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
     </div>
@@ -224,15 +324,13 @@
         <label class="inline"><input id="incNeutral" type="checkbox" checked /> 중립</label>
         <label class="inline"><input id="incStatus" type="checkbox" checked /> 상태색</label>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">생성으로 미리보고 적용으로 변수에 반영</span></div>
-        <div class="row">
-          <button id="btnPalette" class="primary">팔레트 생성</button>
-          <button id="btnPaletteApply" style="display:none">적용 (변수 생성)</button>
-          <span class="muted" id="paletteInfo"></span>
-        </div>
-        <div class="status" id="paletteStatus"></div>
+      <div class="hint">미리보기로 확인한 뒤 ‘적용’하면 변수로 반영됩니다.</div>
+      <div class="row">
+        <button id="btnPalette" class="primary">팔레트 생성</button>
+        <button id="btnPaletteApply" style="display:none">적용 (변수 생성)</button>
+        <span class="muted" id="paletteInfo"></span>
       </div>
+      <div class="status" id="paletteStatus"></div>
     </div>
 
     <div class="step">
@@ -245,10 +343,10 @@
       <div class="status" id="extractStatus"></div>
     </div>
 
-    <!-- #3 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
+    <!-- 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
     <div class="step" id="colorTableCard" style="display:none">
       <h2>1.5 · 색 편집 (hue → 역할)</h2>
-      <div class="muted">Global은 <b>hue 패밀리</b>(<code>color/blue/500</code>), 역할은 Semantic만. 역할을 확정해 ‘반영’하세요.</div>
+      <div class="hint">Global은 <b>hue 패밀리</b>(<code>color/blue/500</code>), 역할은 Semantic만. 역할을 확정해 ‘반영’하세요.</div>
       <div id="colorTable"></div>
       <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
       <datalist id="roleList">
@@ -266,21 +364,19 @@
       <div class="row">
         <label class="inline">base(rem)px <input id="base" type="number" value="16" min="1" /></label>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">변경 요약 → 확인</span></div>
-        <div class="row">
-          <button id="btnCreate">미리보기</button>
-          <button id="btnCreateApply" class="primary" style="display:none">적용</button>
-        </div>
-        <div class="status" id="createStatus"></div>
+      <div class="hint">미리보기로 변경 요약을 확인한 뒤 적용하세요.</div>
+      <div class="row">
+        <button id="btnCreate">미리보기</button>
+        <button id="btnCreateApply" class="primary" style="display:none">적용</button>
       </div>
+      <div class="status" id="createStatus"></div>
     </div>
 
     <div class="step">
       <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
-      <div class="muted">형식: <code>역할 = Global변수이름</code></div>
+      <div class="hint">형식: <code>역할 = Global변수이름</code></div>
       <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
-      <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; font-family:ui-monospace, monospace;"></textarea>
+      <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
       <div class="row">
         <button id="btnSemantics">시맨틱 별칭 생성</button>
         <button id="btnScanGlobals">기존 색에서 추천</button>
@@ -290,14 +386,14 @@
 
     <div class="step">
       <h2>2.6 · 텍스트 스타일 (화면 → 스타일)</h2>
-      <div class="muted">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Pro)</div>
+      <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Pro)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText">선택에서 스캔</button>
         <button id="btnTsAddRow">행 추가</button>
         <label class="inline">폰트 <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
       </div>
       <table id="tsTable" style="width:100%; border-collapse:collapse; margin-top:6px; font-size:11px;">
-        <thead><tr style="text-align:left; color:var(--muted,#888);">
+        <thead><tr style="text-align:left; color:var(--muted);">
           <th>이름</th><th>크기</th><th>행간</th><th>스타일</th><th></th>
         </tr></thead>
         <tbody id="tsRows"></tbody>
@@ -324,17 +420,14 @@
       </div>
       <div id="bindTree"></div>
       <div class="ux" id="applyProgress" style="display:none">
-        <div class="ux-h"><span class="badge">UX6</span><span class="ux-t">진행률 / 취소</span></div>
+        <div class="ux-h"><span class="ux-t">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
         <div class="row">
           <span class="muted" id="applyProgressText"></span>
           <button id="btnApplyCancel">취소</button>
         </div>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX3</span><span class="ux-t">사유별 피드백</span></div>
-        <div class="status" id="applyStatus"></div>
-      </div>
+      <div class="status" id="applyStatus"></div>
     </div>
 
     <div class="step">
@@ -349,7 +442,7 @@
       </div>
       <div id="diff"></div>
       <div class="ux">
-        <div class="ux-h"><span class="badge">UX2</span><span class="ux-t">되돌리기 안전장치</span></div>
+        <div class="ux-h"><span class="ux-t">되돌리기 안전장치</span></div>
         <div>이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
       </div>
       <div class="status" id="renameStatus"></div>
@@ -357,7 +450,7 @@
 
     <div class="step" id="contrastCard">
       <h2>5 · 명도 대비 점검</h2>
-      <div class="muted">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
+      <div class="hint">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
       <div class="row">
         <label class="inline">기준
           <select id="contrastLevel">
@@ -367,16 +460,13 @@
         </label>
         <button id="btnContrast" class="primary">대비 검사</button>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX9</span><span class="ux-t">명도 대비 (읽기 전용)</span></div>
-        <div id="contrastList" style="max-height:160px; overflow:auto; font-family:ui-monospace, monospace; font-size:11px;"></div>
-        <div class="status" id="contrastStatus"></div>
-      </div>
+      <div id="contrastList" style="max-height:160px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
+      <div class="status" id="contrastStatus"></div>
     </div>
 
     <div class="step" id="componentCard">
       <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
-      <div class="muted">하위에서 <b>후보 스캔</b> → 골라 등록. 같은 베이스 이름(<code>button/primary</code>) → 베리언트 세트.</div>
+      <div class="hint">하위에서 <b>후보 스캔</b> → 골라 등록. 같은 베이스 이름(<code>button/primary</code>) → 베리언트 세트.</div>
       <div class="row">
         <button id="btnScanComp">후보 스캔</button>
         <button id="btnRegisterComp">컴포넌트 등록</button>
@@ -388,18 +478,15 @@
         <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
       </div>
       <div id="compTree"></div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">적용 전 미리보기</span></div>
-        <div id="variantReport" style="max-height:120px; overflow:auto; font-family:ui-monospace, monospace; font-size:11px;"></div>
-        <div class="status" id="componentStatus"></div>
-      </div>
+      <div id="variantReport" style="max-height:120px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
+      <div class="status" id="componentStatus"></div>
     </div>
   </section>
 
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
     <div class="step">
       <h2>내보내기 (코드)</h2>
-      <div class="muted">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
+      <div class="hint">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
       <div class="row">
         <label class="inline">형식
           <select id="exportFormat">
@@ -418,11 +505,8 @@
         <button id="btnExport" class="primary">내보내기</button>
         <button id="btnDownloadExport">다운로드</button>
       </div>
-      <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%; font-family:ui-monospace, monospace;"></textarea>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX7</span><span class="ux-t">오류 처리 + 복구</span></div>
-        <div class="status" id="exportStatus"></div>
-      </div>
+      <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%;"></textarea>
+      <div class="status" id="exportStatus"></div>
     </div>
 
     <div class="step">
@@ -444,15 +528,12 @@
         </label>
         <span class="muted">(검증된 키가 없을 때만 적용)</span>
       </div>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX7</span><span class="ux-t">오프라인 유예</span></div>
-        <div class="status" id="licenseStatus"></div>
-      </div>
+      <div class="status" id="licenseStatus"></div>
     </div>
 
     <div class="step" id="presetCard">
       <h2>팀 공유 프리셋 <span class="muted" id="presetLock"></span></h2>
-      <div class="muted">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Team 전용)</div>
+      <div class="hint">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Team 전용)</div>
       <div class="row">
         <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px;" />
         <button id="btnSavePreset">현재 설정 저장</button>
@@ -466,21 +547,18 @@
         <button id="btnExportPreset">내보내기(JSON)</button>
         <button id="btnImportPreset">가져오기(JSON)</button>
       </div>
-      <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%; font-family:ui-monospace, monospace;"></textarea>
-      <div class="ux">
-        <div class="ux-h"><span class="badge">UX1</span><span class="ux-t">불러오기 전 미리보기</span></div>
-        <div class="status" id="presetStatus"></div>
-      </div>
+      <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%;"></textarea>
+      <div class="status" id="presetStatus"></div>
     </div>
 
-    <!-- UX8 · 접근성 / 국제화 -->
+    <!-- 접근성 / 국제화 -->
     <div class="ux">
-      <div class="ux-h"><span class="badge">UX8</span><span class="ux-t">접근성 · 국제화</span></div>
+      <div class="ux-h"><span class="ux-t">접근성 · 국제화</span></div>
       <div>키보드 전용 조작 · 명도 대비 AA · i18n</div>
     </div>
   </section>
 
-  <!-- #14 창 리사이즈 핸들(우하단) -->
+  <!-- 창 리사이즈 핸들(우하단) -->
   <div id="resizeHandle" title="드래그해 크기 조절"></div>
 
   <!-- UI_SCRIPT -->
