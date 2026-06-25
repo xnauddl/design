@@ -78,6 +78,8 @@
         return ["ALL_FILLS"];
       case "stroke":
         return ["STROKE_COLOR"];
+      case "strokeWidth":
+        return ["STROKE_FLOAT"];
       case "effectColor":
         return ["EFFECT_COLOR"];
       case "gap":
@@ -109,7 +111,7 @@
   }
   var VALID_SCOPES = {
     COLOR: /* @__PURE__ */ new Set(["ALL_SCOPES", "ALL_FILLS", "FRAME_FILL", "SHAPE_FILL", "TEXT_FILL", "STROKE_COLOR", "EFFECT_COLOR"]),
-    FLOAT: /* @__PURE__ */ new Set(["ALL_SCOPES", "GAP", "WIDTH_HEIGHT", "CORNER_RADIUS", "FONT_SIZE", "LINE_HEIGHT", "LETTER_SPACING", "FONT_WEIGHT", "EFFECT_FLOAT", "OPACITY"]),
+    FLOAT: /* @__PURE__ */ new Set(["ALL_SCOPES", "GAP", "WIDTH_HEIGHT", "CORNER_RADIUS", "STROKE_FLOAT", "FONT_SIZE", "LINE_HEIGHT", "LETTER_SPACING", "FONT_WEIGHT", "EFFECT_FLOAT", "OPACITY"]),
     STRING: /* @__PURE__ */ new Set(["ALL_SCOPES", "FONT_FAMILY"]),
     BOOLEAN: /* @__PURE__ */ new Set(["ALL_SCOPES"])
   };
@@ -245,6 +247,34 @@
       }
     }
   }
+  function collectStroke(acc, node) {
+    if (!("strokes" in node) || !("strokeWeight" in node)) return;
+    const strokes = node.strokes;
+    if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
+    const w = node.strokeWeight;
+    const widths = [];
+    if (w === figma.mixed) {
+      for (const side of ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"]) {
+        const sv = node[side];
+        if (typeof sv === "number") widths.push(sv);
+      }
+    } else if (typeof w === "number") {
+      widths.push(w);
+    }
+    for (const wv of widths) {
+      if (wv > 0) {
+        const v = round(wv);
+        add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth");
+      }
+    }
+  }
+  function collectOpacity(acc, node) {
+    if (!("opacity" in node)) return;
+    const o = node.opacity;
+    if (typeof o !== "number" || o >= 1 || o <= 0) return;
+    const v = round(o);
+    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity");
+  }
   function collectEffects(acc, node) {
     var _a;
     if (!("effects" in node)) return;
@@ -277,6 +307,8 @@
     }
     collectSize(acc, node);
     collectRadius(acc, node);
+    collectStroke(acc, node);
+    collectOpacity(acc, node);
     collectEffects(acc, node);
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
@@ -683,11 +715,38 @@
 
   // src/lib/bind.ts
   var TIER = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
+  var FIELD_SCOPE = {
+    width: "WIDTH_HEIGHT",
+    height: "WIDTH_HEIGHT",
+    itemSpacing: "GAP",
+    counterAxisSpacing: "GAP",
+    paddingLeft: "GAP",
+    paddingRight: "GAP",
+    paddingTop: "GAP",
+    paddingBottom: "GAP",
+    topLeftRadius: "CORNER_RADIUS",
+    topRightRadius: "CORNER_RADIUS",
+    bottomLeftRadius: "CORNER_RADIUS",
+    bottomRightRadius: "CORNER_RADIUS",
+    strokeWeight: "STROKE_FLOAT",
+    strokeTopWeight: "STROKE_FLOAT",
+    strokeRightWeight: "STROKE_FLOAT",
+    strokeBottomWeight: "STROKE_FLOAT",
+    strokeLeftWeight: "STROKE_FLOAT",
+    fontSize: "FONT_SIZE",
+    lineHeight: "LINE_HEIGHT",
+    letterSpacing: "LETTER_SPACING",
+    opacity: "OPACITY"
+  };
+  var OPACITY_TOL = 5e-3;
   function addColorCand(preview, node, field, index, hex, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
   }
   function addFloatCand(preview, node, field, value, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : void 0 });
+  }
+  function addStrCand(preview, node, field, value, e) {
+    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
   }
   function pruneToAffected(nodeIndex, candidates) {
     var _a, _b, _c, _d;
@@ -746,7 +805,7 @@
     return res;
   }
   async function buildIndex() {
-    var _a;
+    var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
     const tierOf = new Map(cols.map((c) => {
@@ -760,7 +819,7 @@
       if (tier < 1) continue;
       const val = await resolveValue(v, modeOf);
       if (val == null) continue;
-      const e = { variable: v, tier, type: v.resolvedType };
+      const e = { variable: v, tier, type: v.resolvedType, scopes: (_b = v.scopes) != null ? _b : ["ALL_SCOPES"] };
       if (v.resolvedType === "COLOR" && isRGB(val)) e.colorHex = rgbToHex(val);
       else if (v.resolvedType === "FLOAT" && typeof val === "number") e.num = val;
       else if (v.resolvedType === "STRING" && typeof val === "string") e.str = val;
@@ -785,15 +844,22 @@
   function isRGB(v) {
     return typeof v === "object" && v !== null && "r" in v && "g" in v && "b" in v;
   }
-  function matchColor(entries, hex) {
-    for (const e of entries) if (e.colorHex === hex) return e;
+  var FILL_SCOPES = ["ALL_FILLS", "FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"];
+  var STROKE_SCOPES = ["STROKE_COLOR"];
+  var EFFECT_SCOPES = ["EFFECT_COLOR"];
+  function colorScopeOk(e, allowed) {
+    return e.scopes.includes("ALL_SCOPES") || allowed.some((s) => e.scopes.includes(s));
+  }
+  function matchColor(entries, hex, allowed) {
+    for (const e of entries) if (e.colorHex === hex && colorScopeOk(e, allowed)) return e;
     return null;
   }
-  function matchFloat(entries, value, tol) {
+  function matchFloat(entries, value, tol, scope) {
     let best = null;
     let bestDist = Infinity;
     for (const e of entries) {
       if (e.num == null) continue;
+      if (scope && !e.scopes.includes("ALL_SCOPES") && !e.scopes.includes(scope)) continue;
       const dist = Math.abs(e.num - value);
       if (dist > tol) continue;
       if (best === null || e.tier > best.tier || e.tier === best.tier && dist < bestDist) {
@@ -802,6 +868,14 @@
       }
     }
     return best;
+  }
+  function matchString(entries, str, scope) {
+    for (const e of entries) {
+      if (e.str !== str) continue;
+      if (!e.scopes.includes("ALL_SCOPES") && !e.scopes.includes(scope)) continue;
+      return e;
+    }
+    return null;
   }
   async function walk2(node, entries, tol, res, flags, budget, apply, hooks, prog, preview, depth, parentId) {
     var _a;
@@ -815,6 +889,8 @@
     bindPaints(node, entries, res, apply, preview);
     bindFrame(node, entries, tol, res, flags, apply, preview);
     bindRadius(node, entries, tol, res, apply, preview);
+    bindStroke(node, entries, tol, res, apply, preview);
+    bindOpacity(node, entries, tol, res, apply, preview);
     bindEffects(node, entries, res, apply, preview);
     await bindText(node, entries, tol, res, apply, preview);
     prog.done++;
@@ -837,11 +913,12 @@
       if (!(key in node)) continue;
       const paints2 = node[key];
       if (paints2 === figma.mixed || !Array.isArray(paints2)) continue;
+      const allowed = key === "fills" ? FILL_SCOPES : STROKE_SCOPES;
       let changed = false;
       const next = paints2.map((p, i) => {
         if (p.type !== "SOLID") return p;
         const hex = rgbToHex(p.color);
-        const e = matchColor(entries, hex);
+        const e = matchColor(entries, hex, allowed);
         if (!e) {
           skip(res, "no-match");
           return p;
@@ -877,6 +954,7 @@
       return;
     }
     tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply, preview);
+    if (typeof node.counterAxisSpacing === "number") tryBind(node, "counterAxisSpacing", node.counterAxisSpacing, entries, tol, res, apply, preview);
     tryBind(node, "paddingLeft", node.paddingLeft, entries, tol, res, apply, preview);
     tryBind(node, "paddingRight", node.paddingRight, entries, tol, res, apply, preview);
     tryBind(node, "paddingTop", node.paddingTop, entries, tol, res, apply, preview);
@@ -895,13 +973,33 @@
       }
     }
   }
+  function bindOpacity(node, entries, tol, res, apply, preview) {
+    if (!("opacity" in node)) return;
+    const o = node.opacity;
+    if (typeof o !== "number" || o >= 1 || o <= 0) return;
+    tryBind(node, "opacity", o, entries, Math.min(tol, OPACITY_TOL), res, apply, preview);
+  }
+  function bindStroke(node, entries, tol, res, apply, preview) {
+    if (!("strokes" in node) || !("strokeWeight" in node)) return;
+    const strokes = node.strokes;
+    if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
+    const w = node.strokeWeight;
+    if (w !== figma.mixed && typeof w === "number") {
+      if (w > 0) tryBind(node, "strokeWeight", w, entries, tol, res, apply, preview);
+      return;
+    }
+    for (const side of ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"]) {
+      const sv = node[side];
+      if (typeof sv === "number" && sv > 0) tryBind(node, side, sv, entries, tol, res, apply, preview);
+    }
+  }
   function bindEffects(node, entries, res, apply, preview) {
     if (!("effects" in node)) return;
     let changed = false;
     const next = node.effects.map((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return e;
       const hex = rgbToHex(e.color);
-      const ent = matchColor(entries, hex);
+      const ent = matchColor(entries, hex, EFFECT_SCOPES);
       if (!ent) {
         skip(res, "no-match");
         return e;
@@ -938,9 +1036,23 @@
     if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") {
       tryBindText(node, "letterSpacing", node.letterSpacing.value, entries, tol, res, apply, preview);
     }
+    const fe = matchString(entries, node.fontName.family, "FONT_FAMILY");
+    if (fe && node.characters.length > 0) {
+      if (!apply) {
+        res.bound++;
+        addStrCand(preview, node, "fontFamily", node.fontName.family, fe);
+      } else {
+        try {
+          node.setRangeBoundVariable(0, node.characters.length, "fontFamily", fe.variable);
+          res.bound++;
+        } catch (e) {
+          skip(res, "error");
+        }
+      }
+    }
   }
   function tryBindText(node, field, value, entries, tol, res, apply, preview) {
-    const e = matchFloat(entries, value, tol);
+    const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     const len = node.characters.length;
     if (len === 0) {
       skip(res, "empty-text");
@@ -963,7 +1075,7 @@
     }
   }
   function tryBind(node, field, value, entries, tol, res, apply, preview) {
-    const e = matchFloat(entries, value, tol);
+    const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     if (!e) {
       skip(res, "no-match");
       return;
@@ -1031,7 +1143,7 @@
     const parts = limitDepth([...ctx ? ctx.split("-") : [], kebab(role)], opts.maxDepth);
     return parts.filter(Boolean).join("-");
   }
-  function limitDepth(segs, maxDepth = 3) {
+  function limitDepth(segs, maxDepth = 8) {
     if (segs.length <= maxDepth) return segs;
     return segs.slice(segs.length - maxDepth);
   }
@@ -1408,6 +1520,8 @@
       case "spacing":
       case "radius":
       case "size":
+      case "strokeWidth":
+      case "effectFloat":
         return dimension(token, opts);
       default:
         return String(token.value);
@@ -1453,6 +1567,8 @@
     spacing: "dimension",
     radius: "dimension",
     size: "dimension",
+    strokeWidth: "dimension",
+    effectFloat: "dimension",
     fontFamily: "fontFamily",
     fontWeight: "fontWeight",
     opacity: "number",
@@ -1480,6 +1596,8 @@
       case "spacing":
       case "radius":
       case "size":
+      case "strokeWidth":
+      case "effectFloat":
         return dimension(token, opts);
       default:
         return (_b = token.value) != null ? _b : "";
@@ -1932,7 +2050,7 @@
     post({ type: "PREMIUM_REQUIRED", feature: "components", message: "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
     return false;
   }
-  var TEXT_BIND_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing"]);
+  var TEXT_BIND_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily"]);
   async function applySelectedBinding(item) {
     var _a, _b;
     const node = await figma.getNodeByIdAsync(item.nodeId);
@@ -1996,9 +2114,11 @@
     if (sc.includes("GAP")) return "spacing";
     if (sc.includes("CORNER_RADIUS")) return "radius";
     if (sc.includes("WIDTH_HEIGHT")) return "size";
+    if (sc.includes("STROKE_FLOAT")) return "strokeWidth";
     if (sc.includes("LINE_HEIGHT")) return "lineHeight";
     if (sc.includes("LETTER_SPACING")) return "letterSpacing";
     if (sc.includes("OPACITY")) return "opacity";
+    if (sc.includes("EFFECT_FLOAT")) return "effectFloat";
     if (sc.includes("FONT_WEIGHT")) return "fontWeight";
     if (sc.includes("FONT_FAMILY")) return "fontFamily";
     const n = v.name;
@@ -2007,6 +2127,8 @@
     if (n.startsWith("font-size")) return "fontSize";
     if (n.startsWith("spacing")) return "spacing";
     if (n.startsWith("radius")) return "radius";
+    if (n.startsWith("stroke-width")) return "strokeWidth";
+    if (n.startsWith("shadow-") || n.startsWith("blur")) return "effectFloat";
     if (n.startsWith("size")) return "size";
     if (n.includes("font") && n.includes("weight")) return "fontWeight";
     if (n.includes("font") && n.includes("family")) return "fontFamily";
@@ -2290,7 +2412,7 @@
     return { samples, skipped };
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b;
+    var _a, _b, _c;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -2614,6 +2736,7 @@
           if (!requirePro()) break;
           let registered = 0;
           let skipped = 0;
+          const isContainerFrame = (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked;
           let targets;
           if (msg.nodeIds && msg.nodeIds.length) {
             targets = [];
@@ -2623,14 +2746,24 @@
               else skipped++;
             }
           } else {
-            targets = [...selection()];
+            const roots = [...selection()];
+            if (roots.length > 1) {
+              targets = roots;
+            } else if (roots.length === 1) {
+              const root = roots[0];
+              const kids = "children" in root ? root.children.filter(isContainerFrame) : [];
+              targets = kids.length ? kids : [root];
+            } else {
+              targets = [];
+            }
           }
+          const created = [];
           for (const node of targets) {
-            if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") {
-              skipped++;
+            if (node.type === "COMPONENT") {
+              created.push(node);
               continue;
             }
-            if (node.type === "INSTANCE" || node.type === "TEXT" || node.locked) {
+            if (node.type === "COMPONENT_SET" || node.type === "INSTANCE" || node.type === "TEXT" || node.locked) {
               skipped++;
               continue;
             }
@@ -2639,14 +2772,39 @@
               continue;
             }
             try {
-              figma.createComponentFromNode(node);
+              created.push(figma.createComponentFromNode(node));
               registered++;
             } catch (e) {
               skipped++;
             }
           }
-          post({ type: "COMPONENTS_RESULT", registered, skipped });
-          if (registered) commitUndo(figma);
+          const byName = /* @__PURE__ */ new Map();
+          for (const c of created) if (!byName.has(c.name)) byName.set(c.name, c);
+          const cls = classifyVariants(created.map((c) => c.name));
+          let sets = 0;
+          const missing = [];
+          for (const g of cls.groups) {
+            const nodes = g.members.map((m) => byName.get(m.name)).filter((n) => {
+              var _a2;
+              return !!n && ((_a2 = n.parent) == null ? void 0 : _a2.type) !== "COMPONENT_SET";
+            });
+            if (nodes.length < 2) continue;
+            try {
+              const parent = (_a = nodes[0].parent) != null ? _a : figma.currentPage;
+              const set = figma.combineAsVariants(nodes, parent);
+              set.name = g.base;
+              for (const m of g.members) {
+                const node = byName.get(m.name);
+                if (node) node.name = m.variant;
+              }
+              arrangeSet(set);
+              sets++;
+              if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(" / ")}`);
+            } catch (e) {
+            }
+          }
+          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles: cls.singles, missing });
+          if (registered || sets) commitUndo(figma);
           break;
         }
         case "CLASSIFY_VARIANTS": {
@@ -2664,7 +2822,7 @@
             });
             if (nodes.length < 2) continue;
             try {
-              const parent = (_a = nodes[0].parent) != null ? _a : figma.currentPage;
+              const parent = (_b = nodes[0].parent) != null ? _b : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = g.base;
               for (const m of g.members) {
@@ -2724,7 +2882,7 @@
                 else if (p.type === "BOOLEAN") def = target.visible;
                 else def = target.type === "INSTANCE" && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : "";
                 const id = node.addComponentProperty(p.propName, p.type, def);
-                const refs = __spreadValues({}, (_b = target.componentPropertyReferences) != null ? _b : {});
+                const refs = __spreadValues({}, (_c = target.componentPropertyReferences) != null ? _c : {});
                 refs[p.field] = id;
                 target.componentPropertyReferences = refs;
                 created++;

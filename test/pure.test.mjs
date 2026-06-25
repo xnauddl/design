@@ -98,7 +98,13 @@ test('scopesFor — 속성별 스코프', () => {
   assert.deepEqual(scopesFor('radius'), ['CORNER_RADIUS']);
   assert.deepEqual(scopesFor('gap'), ['GAP']);
   assert.deepEqual(scopesFor('size'), ['WIDTH_HEIGHT']);
+  assert.deepEqual(scopesFor('strokeWidth'), ['STROKE_FLOAT']);
   assert.deepEqual(scopesFor('opacity'), ['OPACITY']);
+});
+
+test('scopesForType — STROKE_FLOAT은 FLOAT만 허용(COLOR 거부)', () => {
+  assert.deepEqual(scopesForType(['STROKE_FLOAT'], 'FLOAT'), ['STROKE_FLOAT']);
+  assert.deepEqual(scopesForType(['STROKE_FLOAT'], 'COLOR'), []);
 });
 
 test('scopesForType — 타입에 유효한 스코프만 통과', () => {
@@ -365,7 +371,7 @@ test('serializePreset / parsePreset — 라운드트립 + 검증', () => {
   assert.equal(parsePreset('{nope').ok, false);
   // 누락 필드는 기본값으로 정규화
   const def = parsePreset(JSON.stringify({ name: 'x' }));
-  assert.deepEqual(def, { ok: true, preset: { name: 'x', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: {} } });
+  assert.deepEqual(def, { ok: true, preset: { name: 'x', base: 16, tolerance: 0.5, maxDepth: 8, semanticMap: {} } });
 });
 
 test('upsertPreset — 이름 키 교체(최신 앞)', () => {
@@ -392,6 +398,16 @@ test('splitWeightStyle — weight/italic 분리', () => {
   assert.deepEqual(splitWeightStyle('Bold'), { weight: 700, italic: false });
   assert.deepEqual(splitWeightStyle('Semi Bold Italic'), { weight: 600, italic: true });
   assert.deepEqual(splitWeightStyle('Italic'), { weight: 400, italic: true });
+});
+
+test('exportTokens — strokeWidth/effectFloat는 px 치수로 출력', () => {
+  const tokens = [
+    { name: 'stroke-width/2', collection: 'Global', type: 'FLOAT', kind: 'strokeWidth', value: 2 },
+    { name: 'shadow-blur/4', collection: 'Global', type: 'FLOAT', kind: 'effectFloat', value: 4 },
+  ];
+  const css = exportTokens(tokens, OPTS);
+  assert.match(css, /--stroke-width-2: 2px;/);
+  assert.match(css, /--shadow-blur-4: 4px;/); // effectFloat가 'other'로 새지 않고 px
 });
 
 test('exportTokens CSS — 색·별칭·단위(description #16)·italic', () => {
@@ -886,6 +902,9 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
     { name: 'font-size/24', category: 'fontSize', sources: ['fontSize'], value: 24 },
     { name: 'font-weight/700', category: 'fontWeight', sources: ['fontWeight'], value: 700 },
     { name: 'font-family/Inter', category: 'fontFamily', sources: ['fontFamily'], value: 'Inter' },
+    { name: 'stroke-width/1', category: 'strokeWidth', sources: ['strokeWidth'], value: 1 },
+    { name: 'stroke-width/2', category: 'strokeWidth', sources: ['strokeWidth'], value: 2 },
+    { name: 'stroke-width/4', category: 'strokeWidth', sources: ['strokeWidth'], value: 4 },
   ];
   const map = suggestTokenRoles(tokens, 16);
   assert.equal(map['primary'], 'color/0066ff'); // 색(유일 유채) → primary
@@ -897,6 +916,7 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
   assert.equal(map['font-size/title'], 'font-size/24');
   assert.equal(map['font-weight/bold'], 'font-weight/700');
   assert.equal(map['font-family/sans'], 'font-family/Inter');
+  assert.equal(map['stroke-width/md'], 'stroke-width/2'); // 티셔츠 센터
 });
 
 /* ================= pipeline.ts (진행 안내 §3) ================= */

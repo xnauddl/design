@@ -107,7 +107,7 @@ export function layerNameFromRole(
   return parts.filter(Boolean).join('-');
 }
 
-function limitDepth(segs: string[], maxDepth = 3): string[] {
+function limitDepth(segs: string[], maxDepth = 8): string[] {
   if (segs.length <= maxDepth) return segs;
   // 뒤쪽(로컬 역할)을 보존하고 앞쪽 맥락을 자른다.
   return segs.slice(segs.length - maxDepth);

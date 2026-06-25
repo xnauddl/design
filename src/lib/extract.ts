@@ -129,6 +129,39 @@ function collectRadius(acc: Accumulator, node: SceneNode): void {
   }
 }
 
+/* ---------- stroke width (border) ---------- */
+function collectStroke(acc: Accumulator, node: SceneNode): void {
+  if (!('strokes' in node) || !('strokeWeight' in node)) return;
+  const strokes = (node as { strokes: readonly Paint[] | typeof figma.mixed }).strokes;
+  // 보이는 선이 있을 때만 두께를 토큰 후보로(선 없는 노드의 strokeWeight는 무의미).
+  if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
+  const w = (node as { strokeWeight: number | typeof figma.mixed }).strokeWeight;
+  const widths: number[] = [];
+  if (w === figma.mixed) {
+    for (const side of ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const) {
+      const sv = (node as unknown as Record<string, unknown>)[side];
+      if (typeof sv === 'number') widths.push(sv);
+    }
+  } else if (typeof w === 'number') {
+    widths.push(w);
+  }
+  for (const wv of widths) {
+    if (wv > 0) {
+      const v = round(wv);
+      add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth');
+    }
+  }
+}
+
+/* ---------- layer opacity ---------- */
+function collectOpacity(acc: Accumulator, node: SceneNode): void {
+  if (!('opacity' in node)) return;
+  const o = (node as { opacity: number }).opacity;
+  if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1(불투명)·0(숨김 동등)은 토큰화 안 함
+  const v = round(o);
+  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity');
+}
+
 /* ---------- effects ---------- */
 function collectEffects(acc: Accumulator, node: SceneNode): void {
   if (!('effects' in node)) return;
@@ -162,6 +195,8 @@ function walk(acc: Accumulator, node: SceneNode): void {
   }
   collectSize(acc, node);
   collectRadius(acc, node);
+  collectStroke(acc, node);
+  collectOpacity(acc, node);
   collectEffects(acc, node);
   if ('children' in node) for (const child of node.children) walk(acc, child);
 }

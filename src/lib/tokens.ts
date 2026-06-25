@@ -10,6 +10,7 @@ export type ScopeName =
   | 'SHAPE_FILL'
   | 'TEXT_FILL'
   | 'STROKE_COLOR'
+  | 'STROKE_FLOAT'
   | 'EFFECT_COLOR'
   | 'GAP'
   | 'WIDTH_HEIGHT'
@@ -30,6 +31,7 @@ export type Unit = 'px' | 'percent' | 'em' | 'rem' | 'ratio';
 export type SourceField =
   | 'fill'
   | 'stroke'
+  | 'strokeWidth'
   | 'effectColor'
   | 'gap'
   | 'size'
@@ -48,6 +50,7 @@ export type TokenCategory =
   | 'gap'
   | 'size'
   | 'radius'
+  | 'strokeWidth'
   | 'fontSize'
   | 'lineHeight'
   | 'letterSpacing'
@@ -142,6 +145,8 @@ export function scopesFor(source: SourceField): ScopeName[] {
       return ['ALL_FILLS'];
     case 'stroke':
       return ['STROKE_COLOR'];
+    case 'strokeWidth':
+      return ['STROKE_FLOAT'];
     case 'effectColor':
       return ['EFFECT_COLOR'];
     case 'gap':
@@ -177,7 +182,7 @@ export function scopesForSources(sources: SourceField[]): ScopeName[] {
 /** resolvedType별 Figma가 허용하는 스코프. 이외 스코프를 변수에 지정하면 런타임 거부됨. */
 const VALID_SCOPES: Record<ResolvedType, ReadonlySet<ScopeName>> = {
   COLOR: new Set(['ALL_SCOPES', 'ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL', 'STROKE_COLOR', 'EFFECT_COLOR']),
-  FLOAT: new Set(['ALL_SCOPES', 'GAP', 'WIDTH_HEIGHT', 'CORNER_RADIUS', 'FONT_SIZE', 'LINE_HEIGHT', 'LETTER_SPACING', 'FONT_WEIGHT', 'EFFECT_FLOAT', 'OPACITY']),
+  FLOAT: new Set(['ALL_SCOPES', 'GAP', 'WIDTH_HEIGHT', 'CORNER_RADIUS', 'STROKE_FLOAT', 'FONT_SIZE', 'LINE_HEIGHT', 'LETTER_SPACING', 'FONT_WEIGHT', 'EFFECT_FLOAT', 'OPACITY']),
   STRING: new Set(['ALL_SCOPES', 'FONT_FAMILY']),
   BOOLEAN: new Set(['ALL_SCOPES']),
 };

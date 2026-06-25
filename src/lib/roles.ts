@@ -118,6 +118,7 @@ export function suggestTokenRoles(tokens: DraftToken[], base = 16): Record<strin
   scale('gap', 'spacing', tshirtRoles);
   scale('radius', 'radius', radiusRoles);
   scale('size', 'size', tshirtRoles);
+  scale('strokeWidth', 'stroke-width', tshirtRoles);
   scale('fontSize', 'font-size', (vals) => fontSizeRoles(vals, base));
 
   // fontWeight — 값→이름.
