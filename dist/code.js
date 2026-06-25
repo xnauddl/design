@@ -756,7 +756,7 @@
     const entries = [];
     for (const v of vars) {
       const tier = (_a = tierOf.get(v.variableCollectionId)) != null ? _a : 0;
-      if (tier < 2) continue;
+      if (tier < 1) continue;
       const val = await resolveValue(v, modeOf);
       if (val == null) continue;
       const e = { variable: v, tier, type: v.resolvedType };
@@ -795,7 +795,7 @@
       if (e.num == null) continue;
       const dist = Math.abs(e.num - value);
       if (dist > tol) continue;
-      if (dist < bestDist || dist === bestDist && best !== null && best.tier < e.tier) {
+      if (best === null || e.tier > best.tier || e.tier === best.tier && dist < bestDist) {
         best = e;
         bestDist = dist;
       }
@@ -1893,7 +1893,7 @@
     try {
       const cols = await figma.variables.getLocalVariableCollectionsAsync();
       const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
-      const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+      const bindableIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
       const vars = await figma.variables.getLocalVariablesAsync();
       const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));

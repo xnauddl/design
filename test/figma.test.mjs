@@ -361,6 +361,48 @@ test('bindSelection — 색/크기 바인딩, 미매칭 skip, 오토레이아웃
   assert.equal(node._bound.width, sSize.id);
 });
 
+test('bindSelection — 역할 Semantic 없으면 Global로 폴백 바인딩', async () => {
+  const figma = installFigma();
+  // 역할 별칭 없이 Global 원시값만 생성(시맨틱 매핑 전 상태).
+  await createTokens(
+    [
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+    ],
+    16,
+  );
+  const node = {
+    type: 'FRAME', id: 'box', name: 'box',
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }], // #0066ff → Global 폴백 매칭
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG',
+    width: 200, height: 50, layoutMode: 'NONE',
+    setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; },
+  };
+  const res = await bindSelection([node], 0.5);
+  assert.equal(res.bound, 2); // 색 + width 모두 Global로 바인딩
+  const gSize = findVar(figma, 'Global', 'size/200');
+  assert.equal(node._bound.width, gSize.id);
+  assert.equal(node.fills[0].boundVariables.color.type, 'VARIABLE_ALIAS');
+});
+
+test('bindSelection — Global·Semantic 공존 시 역할 Semantic 우선(Global은 폴백)', async () => {
+  const figma = installFigma();
+  // Global size/200 + 역할 별칭 size/lg(→200). 같은 값이지만 Semantic이 우선이어야.
+  await seedBindable(
+    [{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }],
+    { 'size/lg': 'size/200' },
+  );
+  const node = {
+    type: 'FRAME', id: 'n', name: 'n', fills: [],
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG',
+    width: 200, height: 50, layoutMode: 'NONE',
+    setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; },
+  };
+  await bindSelection([node], 0.5);
+  const sLg = findVar(figma, 'Semantic', 'size/lg');
+  assert.equal(node._bound.width, sLg.id); // Global이 아닌 Semantic 역할 변수로
+});
+
 test('bindSelection — 허용오차 내 동률은 가장 가까운 값으로 바인딩', async () => {
   const figma = installFigma();
   await seedBindable(

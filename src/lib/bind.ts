@@ -1,6 +1,7 @@
 /* ============================================================
    bind.ts — 토큰(변수)을 레이어 속성에 바인딩 (top-down)
-   - 매칭은 resolved 값 기준, Component > Semantic 우선. Global 직접 바인딩 제외.
+   - 매칭은 resolved 값 기준, Component > Semantic > Global 우선. Global은 역할 변수가
+     없을 때만 쓰는 폴백(Semantic=역할명 원칙이라 원시값엔 역할 변수가 없을 수 있음).
    - 프레임 크기(Fixed)·여백(오토레이아웃)·반경·효과·텍스트 지원.
    ============================================================ */
 import { rgbToHex } from './tokens';
@@ -150,7 +151,7 @@ async function buildIndex(): Promise<VarEntry[]> {
   const entries: VarEntry[] = [];
   for (const v of vars) {
     const tier = tierOf.get(v.variableCollectionId) ?? 0;
-    if (tier < 2) continue; // Component/Semantic만 바인딩 대상
+    if (tier < 1) continue; // Component/Semantic/Global 바인딩 대상(Global은 폴백). tier 0(미상 컬렉션) 제외
     const val = await resolveValue(v, modeOf);
     if (val == null) continue;
     const e: VarEntry = { variable: v, tier, type: v.resolvedType };
@@ -196,8 +197,8 @@ function matchFloat(entries: VarEntry[], value: number, tol: number): VarEntry |
     if (e.num == null) continue;
     const dist = Math.abs(e.num - value);
     if (dist > tol) continue;
-    // 가장 가까운 값 우선, 동률이면 높은 tier 우선.
-    if (dist < bestDist || (dist === bestDist && best !== null && best.tier < e.tier)) {
+    // 높은 tier 우선(Global은 폴백), 같은 tier면 가장 가까운 값.
+    if (best === null || e.tier > best.tier || (e.tier === best.tier && dist < bestDist)) {
       best = e;
       bestDist = dist;
     }

@@ -100,14 +100,16 @@ async function loadLicense(): Promise<void> {
 
 /**
  * #11: 단계 전제 상태를 UI에 보고 — Global 변수 존재(시맨틱 매핑 가능) ·
- * 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능). 전제 미충족 카드는
- * UI가 비활성+안내로 가드한다. 토큰/시맨틱 변경 후·시작 시·요청 시 호출.
+ * 바인딩 가능 변수 존재(바인딩 가능). 바인딩은 Component/Semantic을 우선하되
+ * Global을 폴백으로 직접 바인딩하므로, Global만 있어도 바인딩 가능으로 본다.
+ * 전제 미충족 카드는 UI가 비활성+안내로 가드한다. 토큰/시맨틱 변경 후·시작 시·요청 시 호출.
  */
 async function postPrereq(): Promise<void> {
   try {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
-    const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+    // Global도 폴백 바인딩 대상 → 바인딩 가능 집합에 포함.
+    const bindableIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
     const vars = await figma.variables.getLocalVariablesAsync();
     const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
