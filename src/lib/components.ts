@@ -308,11 +308,18 @@ export function componentEligible(node: ScanNode): boolean {
 /**
  * 선택 하위를 순회해 등록 후보 트리를 만든다 — 영향(eligible) + 그 조상 체인만 유지.
  * 비-eligible 말단(텍스트·벡터…)은 잡음이라 제외하되, 위치 맥락은 조상으로 보존.
+ *
+ * **단일 선택의 최상위(부모 프레임)는 컨테이너**라 등록 대상에서 제외한다 — 자기 자신은
+ * 컴포넌트화하지 않고 그 안의 자식만 후보가 된다. 트리에는 회색 맥락으로 남는다.
+ * (다중 선택 시에는 선택 각각이 등록 단위이므로 최상위도 eligible. `REGISTER_COMPONENTS`의
+ * 대상 결정과 동일한 규칙.)
  */
 export function scanComponentCandidates(selection: readonly ScanNode[]): ComponentCandidateNode[] {
+  const single = selection.length === 1;
   const all: ComponentCandidateNode[] = [];
   const visit = (n: ScanNode, depth: number, parentId: string | null): void => {
-    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: componentEligible(n) });
+    const isContainerRoot = single && depth === 0; // 컨테이너 자신 → 등록 제외
+    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
     if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
   };
   for (const n of selection) visit(n, 0, null);
