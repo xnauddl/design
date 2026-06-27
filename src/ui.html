@@ -489,11 +489,11 @@
 
     <div class="step" id="componentCard">
       <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
-      <div class="hint">하위에서 <b>후보 스캔</b> → 골라 등록. 같은 베이스 이름(<code>button/primary</code>) → 베리언트 세트. <b>등록</b>이 분류까지 자동으로 합니다.</div>
-      <div class="hint muted"><b>베리언트 분류</b>는 이미 만들어 둔 기존 컴포넌트를 다시 묶을 때만 쓰세요. <b>속성 노출</b>은 선택한 세트(또는 단독 컴포넌트) 대상.</div>
+      <div class="hint"><b>후보 스캔</b> → 골라 등록. 부모 프레임 안에서 <b>구조가 같은</b>(여백·타입·이름) 자식끼리 묶고, <b>크기·색상</b> 차이는 <code>size</code>·<code>color</code> 베리언트로 자동 분리합니다.</div>
+      <div class="hint muted"><b>베리언트 분류</b>는 이미 만들어 둔 기존 컴포넌트를 <b>이름</b>으로 다시 묶을 때만. <b>속성 노출</b>은 선택한 세트(또는 단독 컴포넌트) 대상.</div>
       <div class="row">
         <button id="btnScanComp" title="선택 프레임 하위에서 등록 가능한 후보를 스캔">후보 스캔</button>
-        <button id="btnRegisterComp" title="후보를 메인 컴포넌트로 등록 + 같은 베이스 이름끼리 베리언트 세트로 자동 분류">컴포넌트 등록</button>
+        <button id="btnRegisterComp" title="후보를 메인 컴포넌트로 등록 + 구조가 같은 자식끼리 베리언트 세트로 자동 분류(크기·색은 size·color 속성)">컴포넌트 등록</button>
         <button id="btnClassifyVariants" title="이미 만들어 둔 기존 컴포넌트들을 베이스 이름으로 다시 묶기(등록은 이미 분류 포함)">베리언트 분류</button>
         <button id="btnGenMissing" title="선택한 베리언트 세트의 빠진 속성 조합 자동 생성">누락 조합 생성</button>
         <button id="btnExposeProps" title="선택한 세트/컴포넌트의 레이어를 TEXT·INSTANCE_SWAP·BOOLEAN 속성으로 노출">속성 노출</button>

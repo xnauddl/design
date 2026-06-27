@@ -5,6 +5,8 @@
    combineAsVariants 적용은 code.ts.
    ============================================================ */
 import { kebab } from './naming';
+import { tshirtRoles } from './roles';
+import { classifyColor } from './colorName';
 
 /** 알려진 속성 어휘 — 값 → 속성명 추론. */
 const STATES = new Set(['default', 'hover', 'pressed', 'focus', 'active', 'disabled', 'loading']);
@@ -292,6 +294,10 @@ export interface ComponentCandidateNode {
   parentId: string | null;
   /** 등록 가능(FRAME/GROUP, 잠금/컴포넌트/인스턴스/텍스트 아님). */
   eligible: boolean;
+  /** 구조 그룹으로 묶일 세트 이름(미리보기). 세트 후보일 때만. */
+  group?: string;
+  /** 도출된 베리언트(`size=lg, color=blue` 등) 미리보기. */
+  variant?: string;
 }
 
 /** 컴포넌트로 등록 가능한 노드인가(FRAME/GROUP, 잠금 제외). */
@@ -322,4 +328,156 @@ export function scanComponentCandidates(selection: readonly ScanNode[]): Compone
     }
   }
   return all.filter((c) => keep.has(c.id));
+}
+
+/* ---------- 구조 기반 그룹화(등록): 생김새 같은 자식을 베리언트 세트로 ---------- */
+/**
+ * 구조 비교용 노드(figma SceneNode에서 추출). ScanNode + 여백·크기·대표 색.
+ * 크기(width/height)·색(fillHex)은 시그니처에서 제외하고 **차이를 속성으로** 흡수한다.
+ */
+export interface StructNode extends ScanNode {
+  width?: number;
+  height?: number;
+  paddingTop?: number;
+  paddingRight?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  itemSpacing?: number;
+  counterAxisSpacing?: number;
+  layoutMode?: string;
+  /** 프레임 자체의 첫 visible SOLID fill(hex). 없으면 null. */
+  fillHex?: string | null;
+  children?: readonly StructNode[];
+}
+
+/**
+ * 구조 시그니처(결정적 문자열). 동일 = **여백(패딩·간격·layoutMode) + 자식 타입 + 자식 이름**.
+ * - 크기(width/height)·색(fillHex)은 **제외**(차이는 size/color 속성으로 흡수).
+ * - 루트 자신의 이름은 제외(세트/컴포넌트 이름으로 쓰임), 자식 이름은 포함.
+ */
+export function structuralSignature(node: StructNode): string {
+  const sig = (m: StructNode, withName: boolean): unknown => ({
+    t: m.type,
+    ...(withName ? { n: kebab(m.name) } : {}),
+    p: [m.paddingTop ?? 0, m.paddingRight ?? 0, m.paddingBottom ?? 0, m.paddingLeft ?? 0],
+    s: m.itemSpacing ?? 0,
+    cs: m.counterAxisSpacing ?? 0,
+    l: m.layoutMode ?? 'NONE',
+    c: (m.children ?? []).map((ch) => sig(ch, true)),
+  });
+  return JSON.stringify(sig(node, false));
+}
+
+export interface StructGroup {
+  key: string; // 구조 시그니처
+  members: StructNode[]; // 입력 순서 보존
+}
+
+/** 자식들을 구조 시그니처로 그룹화(입력 순서 유지). */
+export function groupByStructure(children: readonly StructNode[]): StructGroup[] {
+  const map = new Map<string, StructNode[]>();
+  const order: string[] = [];
+  for (const c of children) {
+    const k = structuralSignature(c);
+    if (!map.has(k)) {
+      map.set(k, []);
+      order.push(k);
+    }
+    map.get(k)!.push(c);
+  }
+  return order.map((k) => ({ key: k, members: map.get(k)! }));
+}
+
+/** 색 hex 목록 → 색 이름 라벨(충돌은 `-N`, 무채색은 `gray-{step}`). */
+export function colorAxisLabels(hexes: readonly string[]): string[] {
+  const used = new Set<string>();
+  const uniq = (base: string): string => {
+    let name = base;
+    let i = 2;
+    while (used.has(name)) name = `${base}-${i++}`;
+    used.add(name);
+    return name;
+  };
+  return hexes.map((hex) => {
+    const { family, step, achromatic } = classifyColor(hex);
+    return uniq(achromatic ? `gray-${step}` : family);
+  });
+}
+
+export interface DerivedVariant {
+  id: string;
+  name: string; // 원본 멤버 이름
+  props: Record<string, string>;
+  variant: string; // 'prop=value, ...'(멤버 1개면 '')
+}
+
+/**
+ * 같은 구조 그룹 멤버들 → 차이 축 도출(순수).
+ * - 크기(면적 width*height) 고유값 2개+ → `size`(티셔츠 등급).
+ * - 색(fillHex) 모든 멤버 보유 + 고유값 2개+ → `color`(색 이름).
+ * - 둘 다 없으면 `variant=1·2…`. 동일 조합 충돌은 `variant` 인덱스로 분리(combineAsVariants는 고유 이름 필요).
+ */
+export function deriveVariants(members: readonly StructNode[]): DerivedVariant[] {
+  if (members.length <= 1) {
+    return members.map((m) => ({ id: m.id, name: m.name, props: {}, variant: '' }));
+  }
+  const props: Record<string, string>[] = members.map(() => ({}));
+
+  // size 축: 면적 오름차순 → 티셔츠 등급
+  const areas = members.map((m) => (m.width ?? 0) * (m.height ?? 0));
+  const distinctAreas = [...new Set(areas)];
+  if (distinctAreas.length > 1) {
+    const sorted = [...distinctAreas].sort((a, b) => a - b);
+    const grades = tshirtRoles(sorted);
+    const byArea = new Map(sorted.map((a, i) => [a, grades[i]]));
+    members.forEach((_, i) => {
+      props[i].size = byArea.get(areas[i])!;
+    });
+  }
+
+  // color 축: 모든 멤버에 fill이 있을 때만
+  const hexes = members.map((m) => m.fillHex ?? null);
+  if (hexes.every((h): h is string => h != null)) {
+    const distinct = [...new Set(hexes)];
+    if (distinct.length > 1) {
+      const labels = colorAxisLabels(distinct);
+      const byHex = new Map(distinct.map((h, i) => [h, labels[i]]));
+      members.forEach((_, i) => {
+        props[i].color = byHex.get(hexes[i] as string)!;
+      });
+    }
+  }
+
+  // 고유성: 축이 전혀 없으면 variant=N, 부분 충돌은 충돌분만 variant 인덱스
+  const anyAxis = props.some((p) => Object.keys(p).length > 0);
+  if (!anyAxis) {
+    members.forEach((_, i) => {
+      props[i].variant = String(i + 1);
+    });
+  } else {
+    const counts = new Map<string, number>();
+    members.forEach((_, i) => {
+      const base = formatVariant(props[i]);
+      const c = (counts.get(base) ?? 0) + 1;
+      counts.set(base, c);
+      if (c > 1) props[i].variant = String(c);
+    });
+  }
+
+  return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));
+}
+
+/** 그룹 멤버 이름들의 공통 베이스(세트 이름용). 토큰 공통 접두 → 없으면 첫 이름. */
+export function commonBaseName(names: readonly string[]): string {
+  if (!names.length) return '';
+  const split = (s: string) => kebab(s).split('-').filter(Boolean);
+  let prefix = split(names[0]);
+  for (const n of names.slice(1)) {
+    const toks = split(n);
+    let i = 0;
+    while (i < prefix.length && i < toks.length && prefix[i] === toks[i]) i++;
+    prefix = prefix.slice(0, i);
+    if (!prefix.length) break;
+  }
+  return prefix.length ? prefix.join('-') : kebab(names[0]);
 }

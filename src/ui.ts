@@ -1494,11 +1494,12 @@ function compEligibleCount(): number {
 }
 
 function compRows(): TreeRow[] {
-  return compCandidates.map((n) =>
-    n.eligible
-      ? { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, change: '컴포넌트', replace: false }
-      : { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId },
-  );
+  return compCandidates.map((n) => {
+    if (!n.eligible) return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId };
+    // 세트로 묶일 후보는 '세트이름 · 베리언트'로, 단독은 '컴포넌트'로 표기.
+    const change = n.group ? `${n.group} · ${n.variant || '베리언트'}` : '컴포넌트';
+    return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, change, replace: false };
+  });
 }
 
 function renderCompTree(): void {
