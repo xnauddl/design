@@ -73,10 +73,12 @@ export interface ComponentCandidate {
   depth: number;
   parentId: string | null;
   eligible: boolean;
-  /** 구조 그룹으로 묶일 세트 이름(미리보기). 세트 후보일 때만. */
+  /** 구조 그룹으로 묶일 세트 이름(미리보기). 세트(2개+) 후보일 때만. */
   group?: string;
-  /** 도출된 베리언트(`size=lg, color=blue` 등) 미리보기. */
+  /** 도출된 베리언트(`Size=lg, Color=blue` 등) 미리보기. 세트 멤버일 때만. */
   variant?: string;
+  /** 단독 컴포넌트로 등록될 후보의 등록 이름(PascalCase). 단독일 때만(group과 배타). */
+  single?: string;
 }
 
 /** UI → code 요청. */
@@ -145,8 +147,8 @@ export type CodeToUi =
   | { type: 'PRESETS'; presets: Preset[] } // M3(Team): 프리셋 목록
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
-  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; missing: string[] } // Phase 3: 등록 + 베이스 묶음 베리언트 세트
-  | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[] } // Phase 3
+  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; missing: string[]; failures?: string[] } // Phase 3: 등록 + 베이스 묶음 베리언트 세트(failures: 조용히 삼키던 실패 진단)
+  | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'PROPERTIES_RESULT'; created: number; props: string[] } // Phase 4.1
   // 명도 대비 점검: 텍스트-배경 쌍 평가 결과 + 추출 단계에서 건너뛴 사유별 집계(skipped).

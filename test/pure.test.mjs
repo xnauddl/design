@@ -54,6 +54,10 @@ import {
   scanComponentCandidates,
   structuralSignature,
   groupByStructure,
+  groupByComponentName,
+  recognizeComponentName,
+  extractNameProps,
+  distinguishingTokens,
   deriveVariants,
   colorAxisLabels,
   commonBaseName,
@@ -547,7 +551,8 @@ test('scanComponentCandidates(#1) — 영향(FRAME/GROUP)+조상만, 잠금/인�
 });
 
 test('scanComponentCandidates(#1) — 깊은 eligible의 조상 체인은 맥락으로 보존', () => {
-  const deep = { id: 'd', name: 'deep', type: 'FRAME' }; // eligible(깊음)
+  // 엄격 필터: 깊은 노드도 인식된 컴포넌트명('card')이라야 eligible.
+  const deep = { id: 'd', name: 'card', type: 'FRAME' }; // eligible(깊음·컴포넌트명)
   const mid = { id: 'm', name: 'mid', type: 'GROUP', locked: true, children: [deep] }; // 잠금(비-eligible)이지만 조상
   const top = { id: 'top', name: 'top', type: 'TEXT', children: [mid] }; // 텍스트(비-eligible)이지만 조상
 
@@ -557,6 +562,19 @@ test('scanComponentCandidates(#1) — 깊은 eligible의 조상 체인은 맥락
   assert.equal(out.find((c) => c.id === 'd').eligible, true);
   assert.equal(out.find((c) => c.id === 'm').eligible, false);
   assert.equal(out.find((c) => c.id === 'top').eligible, false);
+});
+
+test('scanComponentCandidates(#1) — 엄격 필터: 컴포넌트명 없는 프레임은 비-eligible', () => {
+  const btn = { id: 'b', name: 'btn', type: 'FRAME' }; // 인식됨 → eligible
+  const blob = { id: 'x', name: 'Frame 12', type: 'FRAME' }; // 미인식 → 제외
+  const card = { id: 'c', name: 'card-header', type: 'FRAME' }; // 'card' 인식 → eligible
+  const root = { id: 'r', name: 'root', type: 'FRAME', children: [btn, blob, card] };
+
+  const out = scanComponentCandidates([root]);
+  const byId = new Map(out.map((c) => [c.id, c]));
+  assert.equal(byId.get('b').eligible, true);
+  assert.equal(byId.get('c').eligible, true);
+  assert.equal(byId.has('x'), false); // 미인식 + 비-조상 → 트리에서 제외
 });
 
 test('scanComponentCandidates(#1) — 단일 선택 컨테이너 제외 vs 다중 선택 루트 포함', () => {
@@ -577,19 +595,25 @@ test('scanComponentCandidates(#1) — 단일 선택 컨테이너 제외 vs 다�
   assert.equal(multi.find((c) => c.id === 'b').eligible, true);
 });
 
-test('structuralSignature — 크기·색·루트이름 무시, 자식 이름/타입/여백 반영', () => {
-  const mk = (w, hex, childName) => ({
-    id: 'x', name: 'btn-' + w, type: 'FRAME', width: w, height: 40,
+test('structuralSignature — 골격(자식 타입트리+방향)만 비교, 변형값(크기·색·이름·여백)은 무시', () => {
+  const mk = (over = {}) => ({
+    id: 'x', name: 'btn-' + (over.width ?? 100), type: 'FRAME', width: over.width ?? 100, height: 40,
     paddingTop: 8, paddingRight: 12, paddingBottom: 8, paddingLeft: 12, itemSpacing: 4, layoutMode: 'HORIZONTAL',
-    fillHex: hex, children: [{ id: 'c', name: childName, type: 'TEXT' }],
+    fillHex: over.fillHex ?? '#2d7ff9',
+    children: [{ id: 'c', name: over.childName ?? 'Label', type: over.childType ?? 'TEXT' }],
+    ...over,
   });
-  // 크기·색·루트 이름만 다름 → 같은 시그니처
-  assert.equal(structuralSignature(mk(100, '#2d7ff9', 'Label')), structuralSignature(mk(200, '#ff0000', 'Label')));
-  // 자식 이름 다름 → 다른 시그니처
-  assert.notEqual(structuralSignature(mk(100, '#2d7ff9', 'Label')), structuralSignature(mk(100, '#2d7ff9', 'Icon')));
-  // 여백 다름 → 다른 시그니처
-  const a = mk(100, '#2d7ff9', 'Label');
-  assert.notEqual(structuralSignature(a), structuralSignature({ ...a, paddingTop: 99 }));
+  const base = structuralSignature(mk());
+  // 크기·색·루트이름이 달라도 같은 시그니처(변형으로 흡수)
+  assert.equal(base, structuralSignature(mk({ width: 200, fillHex: '#ff0000' })));
+  // 자식 레이어 이름이 달라도 같은 시그니처(이름은 변형마다 제각각 → 무시)
+  assert.equal(base, structuralSignature(mk({ childName: 'Icon' })));
+  // 패딩·간격이 달라도 같은 시그니처(size 변형이 흔히 다른 곳 → 무시) ← 핵심 수정
+  assert.equal(base, structuralSignature(mk({ paddingTop: 99, itemSpacing: 24 })));
+  // 자식 타입이 다르면 다른 시그니처(골격 차이)
+  assert.notEqual(base, structuralSignature(mk({ childType: 'VECTOR' })));
+  // 레이아웃 방향이 다르면 다른 시그니처
+  assert.notEqual(base, structuralSignature(mk({ layoutMode: 'VERTICAL' })));
 });
 
 test('groupByStructure — 구조 같은 자식끼리 묶기(순서 보존)', () => {
@@ -599,6 +623,70 @@ test('groupByStructure — 구조 같은 자식끼리 묶기(순서 보존)', ()
   assert.equal(groups.length, 2);
   assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'c']);
   assert.deepEqual(groups[1].members.map((m) => m.id), ['b']);
+});
+
+test('recognizeComponentName — 마지막 명사 우선(접두어는 맥락)', () => {
+  assert.equal(recognizeComponentName('btn'), 'Button'); // 약어
+  assert.equal(recognizeComponentName('button-primary'), 'Button');
+  assert.equal(recognizeComponentName('nav-button'), 'Button'); // 끝 명사 = button(nav는 맥락)
+  assert.equal(recognizeComponentName('card-item'), 'Item'); // 끝 명사 = item
+  assert.equal(recognizeComponentName('card-header'), 'Header'); // 둘 다 명사 → 마지막(header)
+  assert.equal(recognizeComponentName('Frame 12'), null); // 미인식
+  assert.equal(recognizeComponentName('hero-banner'), 'Banner'); // hero 미인식, banner 인식
+});
+
+test('extractNameProps — 명사 제외 + 보편 속성 추출', () => {
+  assert.deepEqual(extractNameProps('button-primary'), { Type: 'primary' });
+  assert.deepEqual(extractNameProps('button-primary-hover'), { Type: 'primary', State: 'hover' });
+  assert.deepEqual(extractNameProps('btn-lg'), { Size: 'lg' });
+  assert.deepEqual(extractNameProps('chip-selected'), { Selected: 'true' });
+  assert.deepEqual(extractNameProps('card'), {}); // 명사만 → 속성 없음
+});
+
+test('groupByComponentName — 컴포넌트명 기준: 내부 구조 달라도 같은 이름이면 한 세트 + 미인식 제외', () => {
+  // 같은 'Button'이지만 자식 구조가 제각각(아이콘 유무·줄 수). 구조는 게이트가 아니므로 한 세트로.
+  const plain = (id, name) => ({ id, name, type: 'FRAME', layoutMode: 'HORIZONTAL', children: [{ id: id + '-t', name: 'label', type: 'TEXT' }] });
+  const withIcon = (id, name) => ({ id, name, type: 'FRAME', layoutMode: 'HORIZONTAL', children: [{ id: id + '-i', name: 'icon', type: 'FRAME', children: [] }, { id: id + '-t', name: 'label', type: 'TEXT' }] });
+  const twoLine = (id, name) => ({ id, name, type: 'FRAME', layoutMode: 'VERTICAL', children: [{ id: id + '-t', name: 'label', type: 'TEXT' }, { id: id + '-s', name: 'sub', type: 'TEXT' }] });
+  const card = (id, name) => ({ id, name, type: 'FRAME', layoutMode: 'VERTICAL', children: [{ id: id + '-t', name: 'title', type: 'TEXT' }] });
+  const blob = { id: 'x', name: 'Frame 9', type: 'FRAME', layoutMode: 'NONE', children: [] }; // 미인식 → 제외
+  const groups = groupByComponentName([plain('a', 'primary-button'), withIcon('b', 'icon-button'), twoLine('c', 'stacked-button'), card('d', 'card-item'), blob]);
+  // Button 3개(구조 달라도) 한 세트, Item(card-item) 별도, Frame 9 제외.
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].key, 'Button');
+  assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'b', 'c']);
+  assert.equal(groups[1].key, 'Item');
+  assert.deepEqual(groups[1].members.map((m) => m.id), ['d']);
+});
+
+test('groupByComponentName — 자식 레이어명만 다른 변형도 한 세트(회귀: 과거엔 쪼개짐)', () => {
+  // 같은 골격(FRAME>TEXT)·같은 컴포넌트명(Button)이지만 자식 이름이 label/text로 다른 변형.
+  const btn = (id, name, childName) => ({ id, name, type: 'FRAME', width: 100, height: 40, paddingTop: 8, layoutMode: 'HORIZONTAL', fillHex: '#111', children: [{ id: id + '-c', name: childName, type: 'TEXT' }] });
+  const groups = groupByComponentName([btn('a', 'primary-button', 'label'), btn('b', 'secondary-button', 'text')]);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'b']);
+});
+
+test('groupByComponentName — size 변형(패딩만 다름)도 한 세트(회귀: 과거엔 쪼개짐)', () => {
+  // 같은 골격·같은 이름(Button), size 변형이라 패딩만 다름 → 반드시 한 세트로.
+  const btn = (id, name, pad) => ({ id, name, type: 'FRAME', width: 100, height: 40, paddingTop: pad, paddingBottom: pad, paddingLeft: pad * 2, paddingRight: pad * 2, layoutMode: 'HORIZONTAL', fillHex: '#111', children: [{ id: id + '-c', name: 'label', type: 'TEXT' }] });
+  const groups = groupByComponentName([btn('a', 'button-small', 6), btn('b', 'button-medium', 10), btn('c', 'button-large', 14)]);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'b', 'c']);
+});
+
+test('deriveVariants — 이름 우선: type/state는 이름에서, 기하는 무시', () => {
+  const m = (id, name) => ({ id, name, type: 'FRAME', width: 100, height: 40, fillHex: '#2d7ff9' });
+  // 이름이 구분 → 기하(같은 크기/색) 보완 안 함
+  const d = deriveVariants([m('a', 'button-primary'), m('b', 'button-secondary')]);
+  assert.deepEqual(d.map((x) => x.variant), ['Type=primary', 'Type=secondary']);
+});
+
+test('deriveVariants — 이름+기하 보완: 같은 type, 크기 다르면 Size 추가', () => {
+  const m = (id, name, w) => ({ id, name, type: 'FRAME', width: w, height: 40, fillHex: '#2d7ff9' });
+  const d = deriveVariants([m('a', 'button-primary', 80), m('b', 'button-primary', 160)]);
+  // 이름만으로는 둘 다 Type=primary(충돌) → 면적으로 Size 보완(2값은 md 중심 → md·lg)
+  assert.deepEqual(d.map((x) => x.variant), ['Size=md, Type=primary', 'Size=lg, Type=primary']);
 });
 
 test('deriveVariants — 크기만 다름 → Size 등급', () => {
@@ -620,10 +708,41 @@ test('deriveVariants — 크기+색 → 두 축(키 정렬: Color, Size)', () =>
   assert.match(d[0].variant, /^Color=.*, Size=/);
 });
 
-test('deriveVariants — 크기·색 동일 → Variant=N fallback / 단일은 빈 변형', () => {
+test('deriveVariants — 크기·색·이름 동일 → Variant=N fallback / 단일은 빈 변형', () => {
+  // 이름도 'btn'으로 동일(구별 토큰 없음) → 마지막 수단 인덱스.
   const same = (id) => ({ id, name: 'btn', type: 'FRAME', width: 100, height: 40, fillHex: '#2d7ff9' });
   assert.deepEqual(deriveVariants([same('a'), same('b')]).map((x) => x.variant), ['Variant=1', 'Variant=2']);
   assert.deepEqual(deriveVariants([same('a')]), [{ id: 'a', name: 'btn', props: {}, variant: '' }]);
+});
+
+test('distinguishingTokens — 컴포넌트 명사·어휘 제외한 구별 토큰', () => {
+  assert.equal(distinguishingTokens('nav-left'), 'left'); // nav=명사 제외
+  assert.equal(distinguishingTokens('nav links'), 'links');
+  assert.equal(distinguishingTokens('artist-button'), 'artist'); // button=명사 제외
+  assert.equal(distinguishingTokens('button-primary'), ''); // primary=Type 어휘 제외 → 남는 토큰 없음
+  assert.equal(distinguishingTokens('btn'), ''); // 명사뿐
+});
+
+test('deriveVariants — 어휘로 안 갈리면 구별 토큰을 Variant 값으로(의미 보존)', () => {
+  const m = (id, name) => ({ id, name, type: 'FRAME', width: 100, height: 40, fillHex: '#2d7ff9' });
+  // nav-left/right/links: 어휘 없음 → 구별 토큰으로(Variant=1/2/3 아님).
+  const nav = deriveVariants([m('a', 'nav-left'), m('b', 'nav-right'), m('c', 'nav links')]);
+  assert.deepEqual(nav.map((x) => x.variant), ['Variant=left', 'Variant=right', 'Variant=links']);
+  // like/artist button: 끝명사 button으로 묶이고 구별 토큰 like/artist 보존.
+  const btn = deriveVariants([m('a', 'like button'), m('b', 'artist-button')]);
+  assert.deepEqual(btn.map((x) => x.variant), ['Variant=like', 'Variant=artist']);
+});
+
+test('deriveVariants — 혼합(무속성 + 속성): 균일 키 + 빈 이름 없음(Figma 세트 유효)', () => {
+  const m = (id, name) => ({ id, name, type: 'FRAME', width: 100, height: 40, fillHex: '#2d7ff9' });
+  // nav-button(무속성) + button-primary(Type) → 끝명사 button으로 묶임. 무속성 멤버는 Type=default로 채워
+  // 모든 변형이 같은 속성 키(Type)를 갖는다(키가 섞이면 Figma 세트 오류).
+  const d = deriveVariants([m('a', 'nav-button'), m('b', 'button-primary')]);
+  assert.ok(d.every((x) => x.variant.length > 0), '빈 변형 이름 없음');
+  assert.equal(new Set(d.map((x) => x.variant)).size, 2, '변형 이름 고유');
+  const keysOf = (v) => v.split(', ').map((s) => s.split('=')[0]).sort().join(',');
+  assert.equal(new Set(d.map((x) => keysOf(x.variant))).size, 1, '모든 변형이 동일 속성 키');
+  assert.deepEqual(d.map((x) => x.variant).sort(), ['Type=default', 'Type=primary']);
 });
 
 test('colorAxisLabels / commonBaseName(PascalCase·약어 펼침)', () => {
@@ -632,7 +751,18 @@ test('colorAxisLabels / commonBaseName(PascalCase·약어 펼침)', () => {
   assert.equal(commonBaseName(['Button Large', 'Button Small']), 'Button');
   assert.equal(commonBaseName(['btn-primary', 'btn-secondary']), 'Button'); // btn → Button
   assert.equal(commonBaseName(['card', 'card']), 'Card');
-  assert.equal(commonBaseName(['card-header', 'card-header']), 'CardHeader');
+  assert.equal(commonBaseName(['nav-button', 'nav-button-active']), 'NavButton'); // 공통 접두 유지
+  // 공통 접두 없음 → 인식 명사(마지막)로 폴백
+  assert.equal(commonBaseName(['nav-button', 'button-primary']), 'Button');
+  assert.equal(commonBaseName(['primary-button', 'secondary-button']), 'Button');
+});
+
+test('groupByComponentName — 마지막 명사로 묶음(접두어 달라도 같은 세트)', () => {
+  const mk = (id, name) => ({ id, name, type: 'FRAME', width: 100, height: 40, paddingTop: 8, layoutMode: 'HORIZONTAL', fillHex: '#111', children: [{ id: id + '-c', name: 'Label', type: 'TEXT' }] });
+  // nav-button·button-primary·primary-button → 모두 끝 명사 button + 같은 구조 → 한 세트.
+  const groups = groupByComponentName([mk('a', 'nav-button'), mk('b', 'button-primary'), mk('c', 'primary-button')]);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'b', 'c']);
 });
 
 test('classifyVariants — 그룹/속성/빈 조합/단일', () => {

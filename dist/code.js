@@ -1661,6 +1661,95 @@
     if (TYPES.has(v)) return "Type";
     return null;
   }
+  var COMPONENT_NOUNS = /* @__PURE__ */ new Set([
+    "button",
+    "link",
+    "toggle",
+    "switch",
+    "checkbox",
+    "radio",
+    "slider",
+    "input",
+    "textfield",
+    "field",
+    "textarea",
+    "select",
+    "dropdown",
+    "combobox",
+    "search",
+    "card",
+    "panel",
+    "modal",
+    "dialog",
+    "drawer",
+    "sheet",
+    "popover",
+    "tooltip",
+    "accordion",
+    "tab",
+    "tabs",
+    "breadcrumb",
+    "pagination",
+    "navbar",
+    "nav",
+    "sidebar",
+    "menu",
+    "stepper",
+    "avatar",
+    "badge",
+    "chip",
+    "tag",
+    "toast",
+    "snackbar",
+    "alert",
+    "banner",
+    "progress",
+    "spinner",
+    "skeleton",
+    "table",
+    "list",
+    "item",
+    "divider",
+    "label",
+    "tooltip",
+    "header",
+    "footer"
+  ]);
+  var NOUN_ABBR = { btn: "button", img: "image" };
+  function nounWord(token) {
+    var _a;
+    return (_a = NOUN_ABBR[token]) != null ? _a : token;
+  }
+  function recognizeComponentName(name) {
+    let found = null;
+    for (const t of kebab(name).split("-").filter(Boolean)) {
+      const w = nounWord(t);
+      if (COMPONENT_NOUNS.has(w)) found = pascalCase(w);
+    }
+    return found;
+  }
+  function extractNameProps(name) {
+    const props = {};
+    for (const t of kebab(name).split("-").filter(Boolean)) {
+      if (COMPONENT_NOUNS.has(nounWord(t))) continue;
+      if (BOOLEANS.has(t)) {
+        const bk = capitalize(t);
+        if (!(bk in props)) props[bk] = "true";
+        continue;
+      }
+      const p = inferProp(t);
+      if (p && !(p in props)) props[p] = t;
+    }
+    return props;
+  }
+  function distinguishingTokens(name) {
+    return kebab(name).split("-").filter(Boolean).filter((t) => {
+      if (COMPONENT_NOUNS.has(nounWord(t))) return false;
+      if (BOOLEANS.has(t)) return false;
+      if (inferProp(t)) return false;
+      return true;
+    }).join("-");
+  }
   function parseVariantName(name) {
     var _a;
     const trimmed = name.trim();
@@ -1771,48 +1860,6 @@
     const existing = new Set(parsed.map(formatVariant));
     return cartesian(properties).map(formatVariant).filter((v) => !existing.has(v));
   }
-  function classifyVariants(names) {
-    var _a, _b;
-    const byBase = /* @__PURE__ */ new Map();
-    for (const name of names) {
-      const p = parseVariantName(name);
-      if (!p.base) continue;
-      const list = (_a = byBase.get(p.base)) != null ? _a : [];
-      list.push({ name, props: p.props });
-      byBase.set(p.base, list);
-    }
-    const groups = [];
-    const singles = [];
-    for (const [base, parsed] of byBase) {
-      const withProps = parsed.filter((p) => Object.keys(p.props).length > 0);
-      if (withProps.length < 2) {
-        for (const p of parsed) singles.push(p.name);
-        continue;
-      }
-      const members = withProps.map((p) => ({
-        name: p.name,
-        props: p.props,
-        variant: formatVariant(p.props)
-      }));
-      const properties = {};
-      for (const m of members) {
-        for (const [k, v] of Object.entries(m.props)) {
-          const arr = (_b = properties[k]) != null ? _b : properties[k] = [];
-          if (!arr.includes(v)) arr.push(v);
-        }
-      }
-      for (const k of Object.keys(properties)) properties[k].sort();
-      const keySig = (p) => Object.keys(p).sort().join(",");
-      const sigs = new Set(members.map((m) => keySig(m.props)));
-      let missing = [];
-      if (sigs.size === 1) {
-        const existing = new Set(members.map((m) => m.variant));
-        missing = cartesian(properties).map(formatVariant).filter((v) => !existing.has(v));
-      }
-      groups.push({ base, properties, members, missing });
-    }
-    return { groups, singles };
-  }
   function componentEligible(node) {
     return (node.type === "FRAME" || node.type === "GROUP") && !node.locked;
   }
@@ -1822,7 +1869,8 @@
     const all = [];
     const visit = (n, depth, parentId) => {
       const isContainerRoot = single && depth === 0;
-      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
+      const named = recognizeComponentName(n.name) !== null;
+      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && named && componentEligible(n) });
       if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
     };
     for (const n of selection2) visit(n, 0, null);
@@ -1838,26 +1886,13 @@
     }
     return all.filter((c) => keep.has(c.id));
   }
-  function structuralSignature(node) {
-    const sig = (m, withName) => {
-      var _a, _b, _c, _d, _e, _f, _g, _h;
-      return __spreadProps(__spreadValues({
-        t: m.type
-      }, withName ? { n: kebab(m.name) } : {}), {
-        p: [(_a = m.paddingTop) != null ? _a : 0, (_b = m.paddingRight) != null ? _b : 0, (_c = m.paddingBottom) != null ? _c : 0, (_d = m.paddingLeft) != null ? _d : 0],
-        s: (_e = m.itemSpacing) != null ? _e : 0,
-        cs: (_f = m.counterAxisSpacing) != null ? _f : 0,
-        l: (_g = m.layoutMode) != null ? _g : "NONE",
-        c: ((_h = m.children) != null ? _h : []).map((ch) => sig(ch, true))
-      });
-    };
-    return JSON.stringify(sig(node, false));
-  }
-  function groupByStructure(children) {
+  function groupByComponentName(children) {
     const map = /* @__PURE__ */ new Map();
     const order = [];
     for (const c of children) {
-      const k = structuralSignature(c);
+      const comp = recognizeComponentName(c.name);
+      if (!comp) continue;
+      const k = comp;
       if (!map.has(k)) {
         map.set(k, []);
         order.push(k);
@@ -1884,52 +1919,56 @@
     if (members.length <= 1) {
       return members.map((m) => ({ id: m.id, name: m.name, props: {}, variant: "" }));
     }
-    const props = members.map(() => ({}));
-    const areas = members.map((m) => {
-      var _a, _b;
-      return ((_a = m.width) != null ? _a : 0) * ((_b = m.height) != null ? _b : 0);
-    });
-    const distinctAreas = [...new Set(areas)];
-    if (distinctAreas.length > 1) {
-      const sorted = [...distinctAreas].sort((a, b) => a - b);
-      const grades = tshirtRoles(sorted);
-      const byArea = new Map(sorted.map((a, i) => [a, grades[i]]));
-      members.forEach((_, i) => {
-        props[i].Size = byArea.get(areas[i]);
-      });
-    }
-    const hexes = members.map((m) => {
-      var _a;
-      return (_a = m.fillHex) != null ? _a : null;
-    });
-    if (hexes.every((h) => h != null)) {
-      const distinct = [...new Set(hexes)];
-      if (distinct.length > 1) {
-        const labels = colorAxisLabels(distinct);
-        const byHex = new Map(distinct.map((h, i) => [h, labels[i]]));
-        members.forEach((_, i) => {
-          props[i].Color = byHex.get(hexes[i]);
+    const props = members.map((m) => extractNameProps(m.name));
+    const nameDistinct = new Set(props.map(formatVariant)).size === members.length;
+    if (!nameDistinct) {
+      if (!props.some((p) => "Size" in p)) {
+        const areas = members.map((m) => {
+          var _a, _b;
+          return ((_a = m.width) != null ? _a : 0) * ((_b = m.height) != null ? _b : 0);
         });
+        const distinctAreas = [...new Set(areas)];
+        if (distinctAreas.length > 1) {
+          const sorted = [...distinctAreas].sort((a, b) => a - b);
+          const grades = tshirtRoles(sorted);
+          const byArea = new Map(sorted.map((a, i) => [a, grades[i]]));
+          members.forEach((_, i) => {
+            props[i].Size = byArea.get(areas[i]);
+          });
+        }
+      }
+      if (!props.some((p) => "Color" in p)) {
+        const hexes = members.map((m) => {
+          var _a;
+          return (_a = m.fillHex) != null ? _a : null;
+        });
+        if (hexes.every((h) => h != null)) {
+          const distinct = [...new Set(hexes)];
+          if (distinct.length > 1) {
+            const labels = colorAxisLabels(distinct);
+            const byHex = new Map(distinct.map((h, i) => [h, labels[i]]));
+            members.forEach((_, i) => {
+              props[i].Color = byHex.get(hexes[i]);
+            });
+          }
+        }
       }
     }
-    const anyAxis = props.some((p) => Object.keys(p).length > 0);
-    if (!anyAxis) {
+    const keys = [...new Set(props.flatMap((p) => Object.keys(p)))];
+    if (keys.length) {
+      for (const p of props) for (const k of keys) if (!(k in p)) p[k] = "default";
+    }
+    if (new Set(props.map(formatVariant)).size !== members.length) {
+      const tokens = members.map((m) => distinguishingTokens(m.name));
+      const usable = tokens.every((t) => t.length > 0) && new Set(tokens).size === members.length;
       members.forEach((_, i) => {
-        props[i].Variant = String(i + 1);
-      });
-    } else {
-      const counts = /* @__PURE__ */ new Map();
-      members.forEach((_, i) => {
-        var _a;
-        const base = formatVariant(props[i]);
-        const c = ((_a = counts.get(base)) != null ? _a : 0) + 1;
-        counts.set(base, c);
-        if (c > 1) props[i].Variant = String(c);
+        props[i].Variant = usable ? tokens[i] : String(i + 1);
       });
     }
     return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));
   }
   function commonBaseName(names) {
+    var _a;
     if (!names.length) return "";
     const split = (s) => kebab(s).split("-").filter(Boolean);
     let prefix = split(names[0]);
@@ -1940,7 +1979,8 @@
       prefix = prefix.slice(0, i);
       if (!prefix.length) break;
     }
-    return pascalCase(prefix.length ? prefix.join("-") : names[0]);
+    if (prefix.length) return pascalCase(prefix.join("-"));
+    return (_a = recognizeComponentName(names[0])) != null ? _a : pascalCase(names[0]);
   }
 
   // src/lib/contrast.ts
@@ -2153,6 +2193,27 @@
       maxRow = Math.max(maxRow, g.row);
     }
     set.resizeWithoutConstraints(pad * 2 + (maxCol + 1) * cellW + maxCol * gap, pad * 2 + (maxRow + 1) * cellH + maxRow * gap);
+  }
+  async function ensureComponentsPage() {
+    await figma.loadAllPagesAsync();
+    const found = figma.root.children.find((p) => p.name === COMPONENTS_PAGE);
+    if (found) return found;
+    const page = figma.createPage();
+    page.name = COMPONENTS_PAGE;
+    return page;
+  }
+  var COMPONENTS_PAGE = "Components";
+  function pageStartX(page) {
+    const ch = page.children;
+    return ch.length ? Math.max(...ch.map((n) => n.x + n.width)) + 48 : 0;
+  }
+  function errText(e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+  function pageOf(node) {
+    let n = node;
+    while (n && n.type !== "PAGE") n = n.parent;
+    return n && n.type === "PAGE" ? n : null;
   }
   function requirePro() {
     if (hasEntitlement(currentTier(), "components")) return true;
@@ -2611,25 +2672,28 @@
             const kids = root.children.filter(
               (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked
             );
-            if (kids.length < 2) continue;
-            for (const g of groupByStructure(kids.map(toStructNode))) {
-              if (g.members.length < 2) continue;
+            for (const g of groupByComponentName(kids.map(toStructNode))) {
+              if (g.members.length < 2) {
+                preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
+                continue;
+              }
               const base = commonBaseName(g.members.map((m) => m.name));
               for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
             }
           }
           const nodes = candidates.map((c) => {
             const p = preview.get(c.id);
-            return p ? __spreadProps(__spreadValues({}, c), { group: p.group, variant: p.variant }) : c;
+            return p ? __spreadValues(__spreadValues({}, c), p) : c;
           });
           post({ type: "COMPONENT_CANDIDATES", nodes });
           break;
         }
         case "REGISTER_COMPONENTS": {
           if (!requirePro()) break;
+          await figma.loadAllPagesAsync();
           let registered = 0;
           let skipped = 0;
-          const eligible = (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked;
+          const eligible = (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked && recognizeComponentName(n.name) !== null;
           let targets;
           if (msg.nodeIds && msg.nodeIds.length) {
             targets = [];
@@ -2651,19 +2715,47 @@
             if (eligible(n)) valid.push(n);
             else skipped++;
           }
+          if (!valid.length) {
+            post({ type: "COMPONENTS_RESULT", registered: 0, skipped, sets: 0, singles: [], missing: [], failures: [] });
+            break;
+          }
+          const origin = /* @__PURE__ */ new Map();
+          for (const n of valid) {
+            const parent = n.parent;
+            const hasKids = !!parent && "children" in parent;
+            const idx = hasKids ? parent.children.indexOf(n) : -1;
+            const al = !!parent && "layoutMode" in parent && parent.layoutMode !== "NONE";
+            origin.set(n.id, { parent: hasKids ? parent : null, index: idx, x: n.x, y: n.y, autolayout: al });
+          }
           const byId = new Map(valid.map((n) => [n.id, n]));
-          const groups = groupByStructure(valid.map(toStructNode));
+          const groups = groupByComponentName(valid.map(toStructNode));
+          const page = await ensureComponentsPage();
+          let cursorX = pageStartX(page);
           let sets = 0;
           const singles = [];
+          const failures = [];
+          const placements = [];
+          const placeOnPage = (n) => {
+            page.appendChild(n);
+            n.x = cursorX;
+            n.y = 0;
+            cursorX += n.width + 48;
+          };
           for (const g of groups) {
             if (g.members.length === 1) {
               const node = byId.get(g.members[0].id);
               if (!node) continue;
               try {
-                singles.push(figma.createComponentFromNode(node).name);
+                const comp = figma.createComponentFromNode(node);
+                comp.name = pascalCase(comp.name);
+                placeOnPage(comp);
+                singles.push(comp.name);
                 registered++;
+                const o = origin.get(g.members[0].id);
+                if (o) placements.push({ inst: comp.createInstance(), o });
               } catch (e) {
                 skipped++;
+                failures.push(`\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328(${g.members[0].name}): ${errText(e)}`);
               }
               continue;
             }
@@ -2673,59 +2765,141 @@
               const node = byId.get(m.id);
               if (!node) continue;
               try {
-                made.push({ comp: figma.createComponentFromNode(node), variant: (_a = variantById.get(m.id)) != null ? _a : "" });
+                made.push({ id: m.id, comp: figma.createComponentFromNode(node), variant: (_a = variantById.get(m.id)) != null ? _a : "" });
                 registered++;
               } catch (e) {
                 skipped++;
+                failures.push(`\uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328(${m.name}): ${errText(e)}`);
               }
             }
             if (made.length < 2) {
-              for (const x of made) singles.push(x.comp.name);
+              for (const x of made) {
+                x.comp.name = pascalCase(x.comp.name);
+                placeOnPage(x.comp);
+                singles.push(x.comp.name);
+                const o = origin.get(x.id);
+                if (o) placements.push({ inst: x.comp.createInstance(), o });
+              }
+              continue;
+            }
+            let set;
+            try {
+              const home = (_b = pageOf(made[0].comp)) != null ? _b : figma.currentPage;
+              set = figma.combineAsVariants(made.map((x) => x.comp), home);
+            } catch (e) {
+              failures.push(`\uACB0\uD569 \uC2E4\uD328(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
+              for (const x of made) {
+                try {
+                  x.comp.name = pascalCase(x.comp.name);
+                } catch (e2) {
+                }
+                placeOnPage(x.comp);
+                singles.push(x.comp.name);
+                const o = origin.get(x.id);
+                if (o) {
+                  try {
+                    placements.push({ inst: x.comp.createInstance(), o });
+                  } catch (ie) {
+                    failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328: ${errText(ie)}`);
+                  }
+                }
+              }
+              continue;
+            }
+            set.name = commonBaseName(g.members.map((m) => m.name));
+            for (const x of made) if (x.variant) x.comp.name = x.variant;
+            page.appendChild(set);
+            try {
+              arrangeSet(set);
+            } catch (e) {
+              failures.push(`\uC815\uB82C \uC2E4\uD328(${set.name}): ${errText(e)}`);
+            }
+            set.x = cursorX;
+            set.y = 0;
+            cursorX += set.width + 48;
+            sets++;
+            for (const x of made) {
+              const o = origin.get(x.id);
+              if (o) {
+                try {
+                  placements.push({ inst: x.comp.createInstance(), o });
+                } catch (e) {
+                  failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${x.variant}): ${errText(e)}`);
+                }
+              }
+            }
+          }
+          placements.sort((a, b) => {
+            var _a2, _b2, _c2, _d2;
+            const pa = (_b2 = (_a2 = a.o.parent) == null ? void 0 : _a2.id) != null ? _b2 : "";
+            const pb = (_d2 = (_c2 = b.o.parent) == null ? void 0 : _c2.id) != null ? _d2 : "";
+            return pa === pb ? a.o.index - b.o.index : pa < pb ? -1 : 1;
+          });
+          for (const { inst, o } of placements) {
+            if (!o.parent) {
+              skipped++;
               continue;
             }
             try {
-              const parent = (_b = made[0].comp.parent) != null ? _b : figma.currentPage;
-              const set = figma.combineAsVariants(made.map((x) => x.comp), parent);
-              set.name = commonBaseName(g.members.map((m) => m.name));
-              for (const x of made) if (x.variant) x.comp.name = x.variant;
-              arrangeSet(set);
-              sets++;
+              const len = o.parent.children.length;
+              o.parent.insertChild(Math.min(Math.max(0, o.index), len), inst);
+              if (!o.autolayout) {
+                inst.x = o.x;
+                inst.y = o.y;
+              }
             } catch (e) {
+              skipped++;
+              failures.push(`\uC778\uC2A4\uD134\uC2A4 \uBC30\uCE58 \uC2E4\uD328: ${errText(e)}`);
             }
           }
-          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, missing: [] });
+          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, missing: [], failures });
           if (registered || sets) commitUndo(figma);
           break;
         }
         case "CLASSIFY_VARIANTS": {
           if (!requirePro()) break;
-          const comps = selection().filter((n) => n.type === "COMPONENT");
-          const byName = /* @__PURE__ */ new Map();
-          for (const c of comps) if (!byName.has(c.name)) byName.set(c.name, c);
-          const result = classifyVariants(comps.map((c) => c.name));
+          const comps = selection().filter(
+            (n) => {
+              var _a2;
+              return n.type === "COMPONENT" && ((_a2 = n.parent) == null ? void 0 : _a2.type) !== "COMPONENT_SET";
+            }
+          );
+          const byId = new Map(comps.map((c) => [c.id, c]));
+          const groups = groupByComponentName(comps.map(toStructNode));
           let sets = 0;
           const missing = [];
-          for (const g of result.groups) {
-            const nodes = g.members.map((m) => byName.get(m.name)).filter((n) => {
-              var _a2;
-              return !!n && ((_a2 = n.parent) == null ? void 0 : _a2.type) !== "COMPONENT_SET";
-            });
-            if (nodes.length < 2) continue;
+          const singles = [];
+          const failures = [];
+          for (const g of groups) {
+            const nodes = g.members.map((m) => byId.get(m.id)).filter((n) => !!n);
+            if (nodes.length < 2) {
+              if (nodes[0]) singles.push(nodes[0].name);
+              continue;
+            }
+            const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
               const parent = (_c = nodes[0].parent) != null ? _c : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
-              set.name = pascalCase(g.base);
+              set.name = commonBaseName(g.members.map((m) => m.name));
               for (const m of g.members) {
-                const node = byName.get(m.name);
-                if (node) node.name = m.variant;
+                const node = byId.get(m.id);
+                const v = variantById.get(m.id);
+                if (node && v) node.name = v;
               }
-              arrangeSet(set);
+              try {
+                arrangeSet(set);
+              } catch (e) {
+                failures.push(`\uC815\uB82C \uC2E4\uD328(${set.name}): ${errText(e)}`);
+              }
+              const childNames = set.children.filter((c) => c.type === "COMPONENT").map((c) => c.name);
+              const miss = missingVariants(childNames);
+              if (miss.length) missing.push(`${set.name}: ${miss.join(" / ")}`);
               sets++;
-              if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(" / ")}`);
             } catch (e) {
+              failures.push(`\uACB0\uD569 \uC2E4\uD328(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
             }
           }
-          post({ type: "VARIANTS_RESULT", sets, missing, singles: result.singles });
+          post({ type: "VARIANTS_RESULT", sets, missing, singles, failures });
           if (sets) commitUndo(figma);
           break;
         }

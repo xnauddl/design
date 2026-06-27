@@ -253,6 +253,10 @@
     .tree-name { color: inherit; }
     .after { color: var(--ok); }
     .tree-ctrls { font-size: var(--fs); margin-top: 6px; }
+    /* 등록 후보 종류 배지(세트 ↔ 단독) */
+    .tag { display: inline-block; padding: 0 5px; border-radius: 999px; font-size: 10px; font-weight: 600; line-height: 15px; border: 1px solid transparent; }
+    .tag-set { background: var(--accent-subtle); color: var(--accent-strong); border-color: var(--accent-border); }
+    .tag-single { background: var(--ok-subtle); color: var(--ok); border-color: var(--ok); }
 
     /* ── 명도 대비 점검 결과 ── */
     .cfind { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; }
@@ -489,12 +493,12 @@
 
     <div class="step" id="componentCard">
       <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
-      <div class="hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모 프레임은 컨테이너</b>(등록 제외), 그 안에서 <b>구조가 같은</b>(여백·타입·이름) 자식끼리 묶고, <b>크기·색상</b> 차이는 <code>Size</code>·<code>Color</code> 베리언트로 자동 분리합니다.</div>
-      <div class="hint muted"><b>베리언트 분류</b>는 이미 만들어 둔 기존 컴포넌트를 <b>이름</b>으로 다시 묶을 때만. <b>속성 노출</b>은 선택한 세트(또는 단독 컴포넌트) 대상.</div>
+      <div class="hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외)이며, 이름에 <b>컴포넌트명</b>(button·card·chip…)이 있는 자식만 추립니다. <b>같은 컴포넌트명</b>이면 한 세트로 묶습니다 — 내부 구조·패딩·크기·색이 달라도 OK(차이는 속성으로 흡수, 과묶임은 체크 해제). 속성은 <b>이름 우선</b>(<code>Type</code>·<code>State</code>·<code>Size</code>) + 부족하면 크기·색 보완. 후보엔 <b>세트</b>/<b>단독</b> 배지가 붙습니다. 메인 컴포넌트는 <b>Components 페이지</b>로 보내고 원래 자리엔 <b>인스턴스</b>가 남습니다.</div>
+      <div class="hint muted"><b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 컴포넌트명끼리 다시 묶을 때만(등록과 같은 기준 — 프레임은 「컴포넌트 등록」). <b>속성 노출</b>은 선택한 세트(또는 단독 컴포넌트) 대상.</div>
       <div class="row">
-        <button id="btnScanComp" title="선택 프레임 하위에서 등록 가능한 후보를 스캔">후보 스캔</button>
-        <button id="btnRegisterComp" title="후보를 메인 컴포넌트로 등록 + 구조가 같은 자식끼리 베리언트 세트로 자동 분류(크기·색은 Size·Color 속성)">컴포넌트 등록</button>
-        <button id="btnClassifyVariants" title="이미 만들어 둔 기존 컴포넌트들을 베이스 이름으로 다시 묶기(등록은 이미 분류 포함)">베리언트 분류</button>
+        <button id="btnScanComp" title="선택 프레임 하위에서 컴포넌트명이 있는 등록 후보를 스캔">후보 스캔</button>
+        <button id="btnRegisterComp" title="후보를 메인 컴포넌트로 등록(Components 페이지로 이동, 원위치엔 인스턴스) + 같은 컴포넌트명끼리 베리언트 세트로 묶음(내부 구조·패딩·크기·색 차이는 속성으로 흡수)">컴포넌트 등록</button>
+        <button id="btnClassifyVariants" title="이미 만들어 둔 기존 컴포넌트들을 같은 컴포넌트명(머리명사) 기준으로 세트로 묶기 — 등록과 동일 기준(프레임은 '컴포넌트 등록' 사용)">베리언트 분류</button>
         <button id="btnGenMissing" title="선택한 베리언트 세트의 빠진 속성 조합 자동 생성">누락 조합 생성</button>
         <button id="btnExposeProps" title="선택한 세트/컴포넌트의 레이어를 TEXT·INSTANCE_SWAP·BOOLEAN 속성으로 노출">속성 노출</button>
       </div>
@@ -589,6 +593,8 @@
 "use strict";
 (() => {
   var __defProp = Object.defineProperty;
+  var __defProps = Object.defineProperties;
+  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
   var __getOwnPropSymbols = Object.getOwnPropertySymbols;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __propIsEnum = Object.prototype.propertyIsEnumerable;
@@ -604,6 +610,7 @@
       }
     return a;
   };
+  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 
   // src/lib/i18n.ts
   var STRINGS = {
@@ -2328,6 +2335,18 @@
             box.appendChild(d);
           }
         }
+        if (msg.failures && msg.failures.length) {
+          const h = document.createElement("div");
+          h.className = "warn";
+          h.textContent = `\uCC98\uB9AC \uC911 \uBB38\uC81C ${msg.failures.length}\uAC74:`;
+          box.appendChild(h);
+          for (const f of msg.failures) {
+            const d = document.createElement("div");
+            d.className = "warn";
+            d.textContent = `  \u2022 ${f}`;
+            box.appendChild(d);
+          }
+        }
         break;
       }
       case "VARIANTS_RESULT": {
@@ -2343,8 +2362,20 @@
             box.appendChild(d);
           }
         }
+        if (msg.failures && msg.failures.length) {
+          const h = document.createElement("div");
+          h.className = "warn";
+          h.textContent = `\uCC98\uB9AC \uC911 \uBB38\uC81C ${msg.failures.length}\uAC74:`;
+          box.appendChild(h);
+          for (const f of msg.failures) {
+            const d = document.createElement("div");
+            d.className = "warn";
+            d.textContent = `  \u2022 ${f}`;
+            box.appendChild(d);
+          }
+        }
         const extra = `${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.missing.length ? " \xB7 \uBE48 \uC870\uD569 \uC788\uC74C" : ""}`;
-        setStatus("componentStatus", t("component.variants", { sets: msg.sets, extra }), "ok");
+        setStatus("componentStatus", t("component.variants", { sets: msg.sets, extra }), msg.sets ? "ok" : "warn");
         break;
       }
       case "GENERATE_RESULT": {
@@ -2457,6 +2488,12 @@
         onChange();
       });
       row.appendChild(cb);
+      if (r.badge) {
+        const tag = document.createElement("span");
+        tag.className = `tag tag-${r.badge.kind}`;
+        tag.textContent = r.badge.text;
+        row.appendChild(tag);
+      }
       const label = document.createElement("span");
       const nameCls = r.replace === false ? "tree-name" : "before";
       label.innerHTML = ` <span class="${nameCls}">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
@@ -2597,8 +2634,11 @@
   function compRows() {
     return compCandidates.map((n) => {
       if (!n.eligible) return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId };
-      const change = n.group ? `${n.group} \xB7 ${n.variant || "\uBCA0\uB9AC\uC5B8\uD2B8"}` : "\uCEF4\uD3EC\uB10C\uD2B8";
-      return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, change, replace: false };
+      const base = { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, replace: false };
+      if (n.group) {
+        return __spreadProps(__spreadValues({}, base), { change: `${n.group} \xB7 ${n.variant || "\uBCA0\uB9AC\uC5B8\uD2B8"}`, badge: { text: "\uC138\uD2B8", kind: "set" } });
+      }
+      return __spreadProps(__spreadValues({}, base), { change: n.single || "\uCEF4\uD3EC\uB10C\uD2B8", badge: { text: "\uB2E8\uB3C5", kind: "single" } });
     });
   }
   function renderCompTree() {
