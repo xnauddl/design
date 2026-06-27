@@ -73,6 +73,10 @@ export interface ComponentCandidate {
   depth: number;
   parentId: string | null;
   eligible: boolean;
+  /** 구조 그룹으로 묶일 세트 이름(미리보기). 세트 후보일 때만. */
+  group?: string;
+  /** 도출된 베리언트(`size=lg, color=blue` 등) 미리보기. */
+  variant?: string;
 }
 
 /** UI → code 요청. */
