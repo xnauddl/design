@@ -47,15 +47,15 @@
 
 - **컴포넌트 등록(registration)**
   - 선택한 `FRAME`/`GROUP`을 메인 컴포넌트로 변환. 이미 `COMPONENT`이거나 `COMPONENT_SET` 멤버면 건너뜀(멱등).
-  - 이름 규칙: kebab 경로 `{영역}/{컴포넌트}`(예: `button`, `form/input`). 슬래시는 Figma 폴더 그룹으로 표시.
+  - 세트 이름은 멤버 공통 베이스를 **PascalCase**로 정규화(흔한 약어 펼침: `btn`→`Button`). 단독 컴포넌트는 원본 레이어 이름 유지.
   - **제외**: `INSTANCE` · 잠긴 레이어 · `TEXT`.
   - (선택) 컴포넌트 설명·Code Connect 메타데이터 자리표시.
 - **베리언트 분류(variant classification)**
   - 베이스 이름이 같은 형제 컴포넌트들을 `combineAsVariants`로 한 세트에 결합.
-  - 베리언트 **속성(property) 추론** — 이름에서 `속성=값` 쌍으로 정규화:
-    - `base/{value}`(경로형) → 알려진 어휘는 해당 속성, 미지정 값은 `variant`; `base, prop=value`(명시형) → 다중 키.
-    - 어휘 매핑: `state`(default·hover·pressed·focus·active·disabled·loading) · `size`(sm·md·lg) · `type`(primary·secondary·…) · `selected`(불리언 축 — 경로형 `…/selected` → `selected=true`, 명시형 `selected=true/false`).
-  - 정규화 결과를 각 베리언트 이름 `prop=value, prop2=value2`(Figma 베리언트 규약)로 적용.
+  - 베리언트 **속성(property) 추론** — 이름에서 `속성=값` 쌍으로 정규화. 추론한 속성명은 Figma 라이브러리 관례대로 **Capitalize**(`Size`·`Color`…), 사용자가 명시한 `prop=value`는 기존 세트 호환을 위해 **그대로 보존**:
+    - `base/{value}`(경로형) → 알려진 어휘는 해당 속성, 미지정 값은 `Variant`; `base, prop=value`(명시형) → 다중 키(사용자 표기 유지).
+    - 어휘 매핑: `State`(default·hover·pressed·focus·active·disabled·loading) · `Size`(sm·md·lg) · `Type`(primary·secondary·…) · `Selected`(불리언 축 — 경로형 `…/selected` → `Selected=true`, 명시형 `selected=true/false`).
+  - 정규화 결과를 각 베리언트 이름 `Prop=value, Prop2=value2`(Figma 베리언트 규약)로 적용.
   - 속성 매트릭스의 **빈 조합 리포트**(분류 시) → **자동 생성은 Phase 4**(`GENERATE_MISSING_VARIANTS`).
 - **멱등·안전**
   - 재실행 시 기존 ComponentSet/속성을 이름 키로 재사용(중복 결합 방지).

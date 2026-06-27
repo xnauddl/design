@@ -15,6 +15,8 @@ import {
   colorTokenName,
   numberTokenName,
   kebab,
+  pascalCase,
+  capitalize,
   layerNameFromToken,
   layerNameFromRole,
   isDefaultName,
@@ -157,6 +159,17 @@ test('kebab 정규화', () => {
   assert.equal(kebab('buttonPrimary'), 'button-primary');
   assert.equal(kebab('button/primary/background'), 'button-primary-background');
   assert.equal(kebab('  Card__Header '), 'card-header');
+});
+
+test('pascalCase / capitalize — 컴포넌트·속성명 관례', () => {
+  assert.equal(pascalCase('btn'), 'Button'); // 약어 펼침
+  assert.equal(pascalCase('card-header'), 'CardHeader');
+  assert.equal(pascalCase('img wrapper'), 'ImageWrapper');
+  assert.equal(pascalCase('Button'), 'Button'); // 멱등
+  assert.equal(pascalCase(''), ''); // 빈 입력 보존
+  assert.equal(capitalize('size'), 'Size');
+  assert.equal(capitalize('Color'), 'Color'); // 멱등
+  assert.equal(capitalize(''), '');
 });
 
 test('layerNameFromToken — 전체 경로 kebab', () => {
@@ -466,20 +479,21 @@ test('exportTokens — 빈 입력', () => {
 
 /* ================= components.ts (Phase 3) ================= */
 test('inferProp / parseVariantName — 어휘·경로·명시형', () => {
-  assert.equal(inferProp('hover'), 'state');
-  assert.equal(inferProp('lg'), 'size');
-  assert.equal(inferProp('primary'), 'type');
+  // 추론 속성명은 Capitalize(관례)
+  assert.equal(inferProp('hover'), 'State');
+  assert.equal(inferProp('lg'), 'Size');
+  assert.equal(inferProp('primary'), 'Type');
   assert.equal(inferProp('zzz'), null);
   // selected는 state 어휘가 아니라 불리언 축(아래 별도 테스트)
   assert.equal(inferProp('selected'), null);
-  // 경로형: 어휘 추론
+  // 경로형: 어휘 추론 → Capitalize
   assert.deepEqual(parseVariantName('button/primary/hover'), {
     base: 'button',
-    props: { type: 'primary', state: 'hover' },
+    props: { Type: 'primary', State: 'hover' },
   });
-  // 미지정 값 → variant
-  assert.deepEqual(parseVariantName('chip/foo'), { base: 'chip', props: { variant: 'foo' } });
-  // 명시형 prop=value
+  // 미지정 값 → Variant
+  assert.deepEqual(parseVariantName('chip/foo'), { base: 'chip', props: { Variant: 'foo' } });
+  // 명시형 prop=value는 사용자 지정이라 그대로 보존(기존 세트 호환)
   assert.deepEqual(parseVariantName('button, size=lg, state=hover'), {
     base: 'button',
     props: { size: 'lg', state: 'hover' },
@@ -487,17 +501,17 @@ test('inferProp / parseVariantName — 어휘·경로·명시형', () => {
 });
 
 test('parseVariantName — selected 불리언 축(A)', () => {
-  // 경로형: 값이 곧 속성명, 값은 true
+  // 경로형: 값이 곧 속성명(Capitalize), 값은 true
   assert.deepEqual(parseVariantName('card/selected'), {
     base: 'card',
-    props: { selected: 'true' },
+    props: { Selected: 'true' },
   });
   // 다른 어휘와 공존
   assert.deepEqual(parseVariantName('chip/primary/selected'), {
     base: 'chip',
-    props: { type: 'primary', selected: 'true' },
+    props: { Type: 'primary', Selected: 'true' },
   });
-  // 명시형 true/false는 그대로
+  // 명시형 true/false는 사용자 지정이라 그대로
   assert.deepEqual(parseVariantName('toggle, selected=false'), {
     base: 'toggle',
     props: { selected: 'false' },
@@ -587,37 +601,38 @@ test('groupByStructure — 구조 같은 자식끼리 묶기(순서 보존)', ()
   assert.deepEqual(groups[1].members.map((m) => m.id), ['b']);
 });
 
-test('deriveVariants — 크기만 다름 → size 등급', () => {
+test('deriveVariants — 크기만 다름 → Size 등급', () => {
   const m = (id, w) => ({ id, name: 'btn', type: 'FRAME', width: w, height: 40, fillHex: '#2d7ff9' });
   const d = deriveVariants([m('a', 80), m('b', 120), m('c', 160)]);
-  assert.deepEqual(d.map((x) => x.variant), ['size=sm', 'size=md', 'size=lg']);
+  assert.deepEqual(d.map((x) => x.variant), ['Size=sm', 'Size=md', 'Size=lg']);
 });
 
-test('deriveVariants — 색만 다름 → color 이름', () => {
+test('deriveVariants — 색만 다름 → Color 이름', () => {
   const m = (id, hex) => ({ id, name: 'chip', type: 'FRAME', width: 100, height: 40, fillHex: hex });
   const d = deriveVariants([m('a', '#2d7ff9'), m('b', '#e5484d')]);
-  assert.ok(d.every((x) => x.variant.startsWith('color=')));
+  assert.ok(d.every((x) => x.variant.startsWith('Color=')));
   assert.notEqual(d[0].variant, d[1].variant);
 });
 
-test('deriveVariants — 크기+색 → 두 축(키 정렬: color, size)', () => {
+test('deriveVariants — 크기+색 → 두 축(키 정렬: Color, Size)', () => {
   const m = (id, w, hex) => ({ id, name: 'btn', type: 'FRAME', width: w, height: 40, fillHex: hex });
   const d = deriveVariants([m('a', 80, '#2d7ff9'), m('b', 160, '#e5484d')]);
-  assert.match(d[0].variant, /^color=.*, size=/);
+  assert.match(d[0].variant, /^Color=.*, Size=/);
 });
 
-test('deriveVariants — 크기·색 동일 → variant=N fallback / 단일은 빈 변형', () => {
+test('deriveVariants — 크기·색 동일 → Variant=N fallback / 단일은 빈 변형', () => {
   const same = (id) => ({ id, name: 'btn', type: 'FRAME', width: 100, height: 40, fillHex: '#2d7ff9' });
-  assert.deepEqual(deriveVariants([same('a'), same('b')]).map((x) => x.variant), ['variant=1', 'variant=2']);
+  assert.deepEqual(deriveVariants([same('a'), same('b')]).map((x) => x.variant), ['Variant=1', 'Variant=2']);
   assert.deepEqual(deriveVariants([same('a')]), [{ id: 'a', name: 'btn', props: {}, variant: '' }]);
 });
 
-test('colorAxisLabels / commonBaseName', () => {
+test('colorAxisLabels / commonBaseName(PascalCase·약어 펼침)', () => {
   const labels = colorAxisLabels(['#2d7ff9', '#e5484d']);
   assert.notEqual(labels[0], labels[1]);
-  assert.equal(commonBaseName(['Button Large', 'Button Small']), 'button');
-  assert.equal(commonBaseName(['btn-primary', 'btn-secondary']), 'btn');
-  assert.equal(commonBaseName(['card', 'card']), 'card');
+  assert.equal(commonBaseName(['Button Large', 'Button Small']), 'Button');
+  assert.equal(commonBaseName(['btn-primary', 'btn-secondary']), 'Button'); // btn → Button
+  assert.equal(commonBaseName(['card', 'card']), 'Card');
+  assert.equal(commonBaseName(['card-header', 'card-header']), 'CardHeader');
 });
 
 test('classifyVariants — 그룹/속성/빈 조합/단일', () => {
@@ -631,10 +646,11 @@ test('classifyVariants — 그룹/속성/빈 조합/단일', () => {
   assert.equal(r.groups.length, 1);
   const g = r.groups[0];
   assert.equal(g.base, 'button');
-  assert.deepEqual(g.properties, { type: ['primary', 'secondary'], state: ['default', 'hover'] });
+  // 경로형 추론 → 속성명 Capitalize
+  assert.deepEqual(g.properties, { Type: ['primary', 'secondary'], State: ['default', 'hover'] });
   assert.equal(g.members.length, 3);
-  // 빈 조합: secondary + hover 없음
-  assert.deepEqual(g.missing, ['state=hover, type=secondary']);
+  // 빈 조합: secondary + hover 없음(키 정렬: State < Type)
+  assert.deepEqual(g.missing, ['State=hover, Type=secondary']);
 });
 
 test('classifyVariants — 멤버 1개 베이스는 단일', () => {
@@ -681,10 +697,10 @@ test('inferComponentProperties — 레이어 → 속성 계획(Phase 4.1)', () =
     { name: 'label', type: 'TEXT' }, // 이름 충돌 → -2
   ]);
   assert.deepEqual(plan, [
-    { propName: 'label', type: 'TEXT', layerName: 'label', field: 'characters' },
-    { propName: 'icon', type: 'INSTANCE_SWAP', layerName: 'icon', field: 'mainComponent' },
-    { propName: 'badge', type: 'BOOLEAN', layerName: 'badge?', field: 'visible' },
-    { propName: 'label-2', type: 'TEXT', layerName: 'label', field: 'characters' },
+    { propName: 'Label', type: 'TEXT', layerName: 'label', field: 'characters' },
+    { propName: 'Icon', type: 'INSTANCE_SWAP', layerName: 'icon', field: 'mainComponent' },
+    { propName: 'Badge', type: 'BOOLEAN', layerName: 'badge?', field: 'visible' },
+    { propName: 'Label-2', type: 'TEXT', layerName: 'label', field: 'characters' },
   ]);
   // 텍스트가 ?로 끝나면 BOOLEAN 우선
   assert.equal(inferComponentProperties([{ name: 'caption?', type: 'TEXT' }])[0].type, 'BOOLEAN');
