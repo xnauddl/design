@@ -1794,9 +1794,11 @@
   }
   function scanComponentCandidates(selection2) {
     var _a, _b;
+    const single = selection2.length === 1;
     const all = [];
     const visit = (n, depth, parentId) => {
-      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: componentEligible(n) });
+      const isContainerRoot = single && depth === 0;
+      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
       if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
     };
     for (const n of selection2) visit(n, 0, null);

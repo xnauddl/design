@@ -520,9 +520,10 @@ test('scanComponentCandidates(#1) — 영향(FRAME/GROUP)+조상만, 잠금/인�
   const out = scanComponentCandidates([root]);
   const byId = new Map(out.map((c) => [c.id, c]));
 
-  // 유지: root(eligible) + btn(eligible). icon은 비-eligible 말단이지만 btn의 자식이라 잡음 → 제외.
+  // 유지: root(컨테이너 맥락) + btn(eligible). icon은 비-eligible 말단이지만 btn의 자식이라 잡음 → 제외.
   assert.deepEqual(out.map((c) => c.id).sort(), ['b', 'r']);
-  assert.equal(byId.get('r').eligible, true);
+  // 단일 선택의 최상위(컨테이너)는 등록 대상 제외 → eligible=false(회색 맥락).
+  assert.equal(byId.get('r').eligible, false);
   assert.equal(byId.get('b').eligible, true);
   // 계층 보존
   assert.equal(byId.get('r').parentId, null);
@@ -542,6 +543,24 @@ test('scanComponentCandidates(#1) — 깊은 eligible의 조상 체인은 맥락
   assert.equal(out.find((c) => c.id === 'd').eligible, true);
   assert.equal(out.find((c) => c.id === 'm').eligible, false);
   assert.equal(out.find((c) => c.id === 'top').eligible, false);
+});
+
+test('scanComponentCandidates(#1) — 단일 선택 컨테이너 제외 vs 다중 선택 루트 포함', () => {
+  const childA = { id: 'a', name: 'btn', type: 'FRAME' };
+  const childB = { id: 'b', name: 'btn', type: 'FRAME' };
+  const container = { id: 'box', name: 'box', type: 'FRAME', children: [childA, childB] };
+
+  // 단일 선택: 컨테이너(box)는 등록 대상 아님 → eligible=false, 자식만 eligible.
+  const single = scanComponentCandidates([container]);
+  const sById = new Map(single.map((c) => [c.id, c]));
+  assert.equal(sById.get('box').eligible, false);
+  assert.equal(sById.get('a').eligible, true);
+  assert.equal(sById.get('b').eligible, true);
+
+  // 다중 선택: 선택 각각이 등록 단위 → 최상위도 eligible.
+  const multi = scanComponentCandidates([childA, childB]);
+  assert.equal(multi.find((c) => c.id === 'a').eligible, true);
+  assert.equal(multi.find((c) => c.id === 'b').eligible, true);
 });
 
 test('structuralSignature — 크기·색·루트이름 무시, 자식 이름/타입/여백 반영', () => {
