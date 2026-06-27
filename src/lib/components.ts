@@ -34,7 +34,7 @@ const COMPONENT_NOUNS = new Set([
   'card', 'panel', 'modal', 'dialog', 'drawer', 'sheet', 'popover', 'tooltip', 'accordion',
   'tab', 'tabs', 'breadcrumb', 'pagination', 'navbar', 'nav', 'sidebar', 'menu', 'stepper',
   'avatar', 'badge', 'chip', 'tag', 'toast', 'snackbar', 'alert', 'banner', 'progress',
-  'spinner', 'skeleton', 'table', 'list', 'divider', 'label', 'tooltip', 'header', 'footer',
+  'spinner', 'skeleton', 'table', 'list', 'item', 'divider', 'label', 'tooltip', 'header', 'footer',
 ]);
 /** 컴포넌트 명사 약어 → 표준어. */
 const NOUN_ABBR: Readonly<Record<string, string>> = { btn: 'button', img: 'image' };
@@ -46,14 +46,16 @@ function nounWord(token: string): string {
 
 /**
  * 이름에 알려진 **컴포넌트 명사**가 있으면 표준 PascalCase 이름을 반환(없으면 null).
- * 첫 번째로 매칭되는 명사 토큰 기준(예: `button-primary` → `Button`, `btn` → `Button`).
+ * **마지막으로 매칭되는 명사 토큰** 기준 — 영어 핵심어(head noun)는 보통 맨 뒤라
+ * 앞단어는 맥락으로 본다(예: `nav-button` → `Button`, `card-item` → `Item`, `btn` → `Button`).
  */
 export function recognizeComponentName(name: string): string | null {
+  let found: string | null = null;
   for (const t of kebab(name).split('-').filter(Boolean)) {
     const w = nounWord(t);
-    if (COMPONENT_NOUNS.has(w)) return pascalCase(w);
+    if (COMPONENT_NOUNS.has(w)) found = pascalCase(w); // 마지막 매칭 우선
   }
-  return null;
+  return found;
 }
 
 /**
@@ -550,6 +552,10 @@ export function deriveVariants(members: readonly StructNode[]): DerivedVariant[]
       props[i].Variant = String(i + 1);
     });
   } else {
+    // 혼합 그룹의 무속성 멤버(예: 끝명사만 같은 `nav-button`)는 빈 이름이 되지 않게 Variant로 채움.
+    members.forEach((_, i) => {
+      if (Object.keys(props[i]).length === 0) props[i].Variant = String(i + 1);
+    });
     const counts = new Map<string, number>();
     members.forEach((_, i) => {
       const base = formatVariant(props[i]);
@@ -563,8 +569,9 @@ export function deriveVariants(members: readonly StructNode[]): DerivedVariant[]
 }
 
 /**
- * 그룹 멤버 이름들의 공통 베이스(세트 이름용) — 토큰 공통 접두 → 없으면 첫 이름.
- * 결과는 컴포넌트 관례대로 PascalCase로 정규화한다(`btn-*` → `Button`).
+ * 그룹 멤버 이름들의 공통 베이스(세트 이름용) — 토큰 공통 접두를 PascalCase로.
+ * 공통 접두가 있으면 그대로(`nav-button-*` → `NavButton`), **없으면 인식된 컴포넌트명**
+ * (=마지막 명사)으로 폴백한다(`nav-button` + `button-primary` → `Button`).
  */
 export function commonBaseName(names: readonly string[]): string {
   if (!names.length) return '';
@@ -577,5 +584,6 @@ export function commonBaseName(names: readonly string[]): string {
     prefix = prefix.slice(0, i);
     if (!prefix.length) break;
   }
-  return pascalCase(prefix.length ? prefix.join('-') : names[0]);
+  if (prefix.length) return pascalCase(prefix.join('-'));
+  return recognizeComponentName(names[0]) ?? pascalCase(names[0]); // 공통 접두 없음 → 인식 명사
 }

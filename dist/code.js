@@ -1708,6 +1708,7 @@
     "skeleton",
     "table",
     "list",
+    "item",
     "divider",
     "label",
     "tooltip",
@@ -1720,11 +1721,12 @@
     return (_a = NOUN_ABBR[token]) != null ? _a : token;
   }
   function recognizeComponentName(name) {
+    let found = null;
     for (const t of kebab(name).split("-").filter(Boolean)) {
       const w = nounWord(t);
-      if (COMPONENT_NOUNS.has(w)) return pascalCase(w);
+      if (COMPONENT_NOUNS.has(w)) found = pascalCase(w);
     }
-    return null;
+    return found;
   }
   function extractNameProps(name) {
     const props = {};
@@ -2007,6 +2009,9 @@
         props[i].Variant = String(i + 1);
       });
     } else {
+      members.forEach((_, i) => {
+        if (Object.keys(props[i]).length === 0) props[i].Variant = String(i + 1);
+      });
       const counts = /* @__PURE__ */ new Map();
       members.forEach((_, i) => {
         var _a;
@@ -2019,6 +2024,7 @@
     return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));
   }
   function commonBaseName(names) {
+    var _a;
     if (!names.length) return "";
     const split = (s) => kebab(s).split("-").filter(Boolean);
     let prefix = split(names[0]);
@@ -2029,7 +2035,8 @@
       prefix = prefix.slice(0, i);
       if (!prefix.length) break;
     }
-    return pascalCase(prefix.length ? prefix.join("-") : names[0]);
+    if (prefix.length) return pascalCase(prefix.join("-"));
+    return (_a = recognizeComponentName(names[0])) != null ? _a : pascalCase(names[0]);
   }
 
   // src/lib/contrast.ts
