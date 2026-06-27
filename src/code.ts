@@ -665,22 +665,26 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!requirePro()) break;
         const roots = selection();
         const candidates = scanComponentCandidates(roots);
-        // 부모별 직계 자식을 구조+컴포넌트명으로 묶어 그룹/변형 미리보기를 후보에 주입(세트 후보만 라벨).
-        const preview = new Map<string, { group: string; variant: string }>();
+        // 부모별 직계 자식을 구조+컴포넌트명으로 묶어 미리보기 라벨 주입.
+        // 세트(2개+) → group(세트명)+variant, 단독(1개) → single(PascalCase 등록명).
+        const preview = new Map<string, { group?: string; variant?: string; single?: string }>();
         for (const root of roots) {
           if (!('children' in root)) continue;
           const kids = (root.children as readonly SceneNode[]).filter(
             (n) => (n.type === 'FRAME' || n.type === 'GROUP') && !n.locked,
           );
           for (const g of groupByStructureAndName(kids.map(toStructNode))) {
-            if (g.members.length < 2) continue;
+            if (g.members.length < 2) {
+              preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
+              continue;
+            }
             const base = commonBaseName(g.members.map((m) => m.name));
             for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
           }
         }
         const nodes = candidates.map((c) => {
           const p = preview.get(c.id);
-          return p ? { ...c, group: p.group, variant: p.variant } : c;
+          return p ? { ...c, ...p } : c;
         });
         post({ type: 'COMPONENT_CANDIDATES', nodes });
         break;
@@ -754,6 +758,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             if (!node) continue;
             try {
               const comp = figma.createComponentFromNode(node);
+              comp.name = pascalCase(comp.name); // 단독도 PascalCase 등록명(관례·미리보기 정합)
               placeOnPage(comp);
               singles.push(comp.name);
               registered++;
@@ -780,6 +785,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (made.length < 2) {
             // 결합 불가 → 단일로 페이지 이동 + 인스턴스 복원.
             for (const x of made) {
+              x.comp.name = pascalCase(x.comp.name); // 단독 PascalCase 등록명
               placeOnPage(x.comp);
               singles.push(x.comp.name);
               const o = origin.get(x.id);

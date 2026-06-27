@@ -349,10 +349,12 @@ export interface ComponentCandidateNode {
   parentId: string | null;
   /** 등록 가능(FRAME/GROUP, 잠금/컴포넌트/인스턴스/텍스트 아님). */
   eligible: boolean;
-  /** 구조 그룹으로 묶일 세트 이름(미리보기). 세트 후보일 때만. */
+  /** 구조 그룹으로 묶일 **세트 이름**(미리보기). 세트(2개+) 후보일 때만. */
   group?: string;
-  /** 도출된 베리언트(`Size=lg, Color=blue` 등) 미리보기. */
+  /** 도출된 베리언트(`Size=lg, Color=blue` 등) 미리보기. 세트 멤버일 때만. */
   variant?: string;
+  /** **단독** 컴포넌트로 등록될 후보의 등록 이름(PascalCase). 단독일 때만(group과 배타). */
+  single?: string;
 }
 
 /** 컴포넌트로 등록 가능한 노드인가(FRAME/GROUP, 잠금 제외). */
@@ -417,21 +419,21 @@ export interface StructNode extends ScanNode {
 }
 
 /**
- * 구조 시그니처(결정적 문자열). 동일 = **여백(패딩·간격·layoutMode) + 자식 타입 + 자식 이름**.
- * - 크기(width/height)·색(fillHex)은 **제외**(차이는 size/color 속성으로 흡수).
- * - 루트 자신의 이름은 제외(세트/컴포넌트 이름으로 쓰임), 자식 이름은 포함.
+ * 구조 시그니처(결정적 문자열). 동일 = **자식 타입 트리 + 레이아웃 방향(layoutMode)**.
+ * "같은 컴포넌트의 변형인가"를 보는 골격 비교다. 변형 간 자연히 달라지는 값은 **모두 제외**해
+ * 변형 축으로 흡수한다:
+ * - 패딩·itemSpacing·counterAxisSpacing(=size 변형이 흔히 달라지는 곳) → **제외**.
+ * - 자식 레이어 **이름**(변형마다 제각각이라 그룹을 깨던 주범) → **제외**.
+ * - 크기(width/height)·색(fillHex) → **제외**(차이는 Size/Color 속성으로 흡수).
+ * 남는 것: 노드 타입 + 자식의 타입/순서/중첩 + 레이아웃 방향. 이게 같으면 한 세트 후보.
  */
 export function structuralSignature(node: StructNode): string {
-  const sig = (m: StructNode, withName: boolean): unknown => ({
+  const sig = (m: StructNode): unknown => ({
     t: m.type,
-    ...(withName ? { n: kebab(m.name) } : {}),
-    p: [m.paddingTop ?? 0, m.paddingRight ?? 0, m.paddingBottom ?? 0, m.paddingLeft ?? 0],
-    s: m.itemSpacing ?? 0,
-    cs: m.counterAxisSpacing ?? 0,
     l: m.layoutMode ?? 'NONE',
-    c: (m.children ?? []).map((ch) => sig(ch, true)),
+    c: (m.children ?? []).map(sig),
   });
-  return JSON.stringify(sig(node, false));
+  return JSON.stringify(sig(node));
 }
 
 export interface StructGroup {

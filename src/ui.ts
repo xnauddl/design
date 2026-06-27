@@ -1300,6 +1300,8 @@ interface TreeRow {
   header?: boolean;
   /** false면 name을 교체(취소선)가 아니라 그대로 유지(예: 컴포넌트 등록은 이름 보존). 기본 true. */
   replace?: boolean;
+  /** 행 앞 종류 배지(예: 세트/단독). text=라벨, kind=색 클래스(set|single). */
+  badge?: { text: string; kind: 'set' | 'single' };
 }
 
 /** 선택 서브트리의 최소 depth(루트 기준)로 들여쓰기를 정규화한다. */
@@ -1324,6 +1326,12 @@ function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: (
       onChange();
     });
     row.appendChild(cb);
+    if (r.badge) {
+      const tag = document.createElement('span');
+      tag.className = `tag tag-${r.badge.kind}`;
+      tag.textContent = r.badge.text;
+      row.appendChild(tag);
+    }
     const label = document.createElement('span');
     const nameCls = r.replace === false ? 'tree-name' : 'before'; // 이름 보존(컴포넌트)은 취소선 없음
     label.innerHTML = ` <span class="${nameCls}">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change as string)}</span>`;
@@ -1496,9 +1504,12 @@ function compEligibleCount(): number {
 function compRows(): TreeRow[] {
   return compCandidates.map((n) => {
     if (!n.eligible) return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId };
-    // 세트로 묶일 후보는 '세트이름 · 베리언트'로, 단독은 '컴포넌트'로 표기.
-    const change = n.group ? `${n.group} · ${n.variant || '베리언트'}` : '컴포넌트';
-    return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, change, replace: false };
+    // 세트 멤버: [세트] 배지 + '세트이름 · 베리언트'. 단독: [단독] 배지 + 등록명.
+    const base = { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, replace: false };
+    if (n.group) {
+      return { ...base, change: `${n.group} · ${n.variant || '베리언트'}`, badge: { text: '세트', kind: 'set' as const } };
+    }
+    return { ...base, change: n.single || '컴포넌트', badge: { text: '단독', kind: 'single' as const } };
   });
 }
 

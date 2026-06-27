@@ -1921,19 +1921,15 @@
     return all.filter((c) => keep.has(c.id));
   }
   function structuralSignature(node) {
-    const sig = (m, withName) => {
-      var _a, _b, _c, _d, _e, _f, _g, _h;
-      return __spreadProps(__spreadValues({
-        t: m.type
-      }, withName ? { n: kebab(m.name) } : {}), {
-        p: [(_a = m.paddingTop) != null ? _a : 0, (_b = m.paddingRight) != null ? _b : 0, (_c = m.paddingBottom) != null ? _c : 0, (_d = m.paddingLeft) != null ? _d : 0],
-        s: (_e = m.itemSpacing) != null ? _e : 0,
-        cs: (_f = m.counterAxisSpacing) != null ? _f : 0,
-        l: (_g = m.layoutMode) != null ? _g : "NONE",
-        c: ((_h = m.children) != null ? _h : []).map((ch) => sig(ch, true))
-      });
+    const sig = (m) => {
+      var _a, _b;
+      return {
+        t: m.type,
+        l: (_a = m.layoutMode) != null ? _a : "NONE",
+        c: ((_b = m.children) != null ? _b : []).map(sig)
+      };
     };
-    return JSON.stringify(sig(node, false));
+    return JSON.stringify(sig(node));
   }
   function groupByStructureAndName(children) {
     const map = /* @__PURE__ */ new Map();
@@ -2721,14 +2717,17 @@
               (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked
             );
             for (const g of groupByStructureAndName(kids.map(toStructNode))) {
-              if (g.members.length < 2) continue;
+              if (g.members.length < 2) {
+                preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
+                continue;
+              }
               const base = commonBaseName(g.members.map((m) => m.name));
               for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
             }
           }
           const nodes = candidates.map((c) => {
             const p = preview.get(c.id);
-            return p ? __spreadProps(__spreadValues({}, c), { group: p.group, variant: p.variant }) : c;
+            return p ? __spreadValues(__spreadValues({}, c), p) : c;
           });
           post({ type: "COMPONENT_CANDIDATES", nodes });
           break;
@@ -2791,6 +2790,7 @@
               if (!node) continue;
               try {
                 const comp = figma.createComponentFromNode(node);
+                comp.name = pascalCase(comp.name);
                 placeOnPage(comp);
                 singles.push(comp.name);
                 registered++;
@@ -2815,6 +2815,7 @@
             }
             if (made.length < 2) {
               for (const x of made) {
+                x.comp.name = pascalCase(x.comp.name);
                 placeOnPage(x.comp);
                 singles.push(x.comp.name);
                 const o = origin.get(x.id);
