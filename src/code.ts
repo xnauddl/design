@@ -9,6 +9,7 @@ import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
+import { pascalCase } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByStructure, deriveVariants, commonBaseName } from './lib/components';
 import type { CompPropType, StructNode } from './lib/components';
@@ -755,7 +756,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try {
             const parent = nodes[0].parent ?? figma.currentPage;
             const set = figma.combineAsVariants(nodes, parent);
-            set.name = g.base;
+            set.name = pascalCase(g.base);
             for (const m of g.members) {
               const node = byName.get(m.name);
               if (node) node.name = m.variant; // 'prop=value, ...'

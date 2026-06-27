@@ -1170,6 +1170,27 @@
   function kebab(input) {
     return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s_/]+/g, "-").replace(/[^a-zA-Z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
   }
+  var ABBR = {
+    btn: "button",
+    img: "image",
+    txt: "text",
+    msg: "message",
+    ico: "icon",
+    pic: "picture",
+    pwd: "password"
+  };
+  function pascalCase(input) {
+    const tokens = kebab(input).split("-").filter(Boolean);
+    const out = tokens.map((t) => {
+      var _a;
+      const w = (_a = ABBR[t]) != null ? _a : t;
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join("");
+    return out || input;
+  }
+  function capitalize(input) {
+    return input ? input.charAt(0).toUpperCase() + input.slice(1) : input;
+  }
   function layerNameFromRole(ancestorName, role, opts = {}) {
     const ctx = ancestorName ? kebab(ancestorName) : "";
     const parts = limitDepth([...ctx ? ctx.split("-") : [], kebab(role)], opts.maxDepth);
@@ -1635,9 +1656,9 @@
   var BOOLEANS = /* @__PURE__ */ new Set(["selected"]);
   function inferProp(value) {
     const v = value.toLowerCase();
-    if (STATES.has(v)) return "state";
-    if (SIZES.has(v)) return "size";
-    if (TYPES.has(v)) return "type";
+    if (STATES.has(v)) return "State";
+    if (SIZES.has(v)) return "Size";
+    if (TYPES.has(v)) return "Type";
     return null;
   }
   function parseVariantName(name) {
@@ -1664,14 +1685,17 @@
     const base = (_a = segs[0]) != null ? _a : "";
     let unknown = 0;
     for (const seg of segs.slice(1)) {
-      if (BOOLEANS.has(seg) && !(seg in props)) {
-        props[seg] = "true";
-        continue;
+      if (BOOLEANS.has(seg)) {
+        const bk = capitalize(seg);
+        if (!(bk in props)) {
+          props[bk] = "true";
+          continue;
+        }
       }
       const prop = inferProp(seg);
       if (prop && !(prop in props)) props[prop] = seg;
       else {
-        const key = unknown === 0 ? "variant" : `variant-${unknown + 1}`;
+        const key = unknown === 0 ? "Variant" : `Variant-${unknown + 1}`;
         props[key] = seg;
         unknown++;
       }
@@ -1695,19 +1719,19 @@
     const out = [];
     const taken = /* @__PURE__ */ new Set();
     const uniq = (base) => {
-      let n = base || "prop";
+      let n = base || "Prop";
       let i = 2;
-      while (taken.has(n)) n = `${base || "prop"}-${i++}`;
+      while (taken.has(n)) n = `${base || "Prop"}-${i++}`;
       taken.add(n);
       return n;
     };
     for (const l of layers) {
       if (l.name.trim().endsWith("?")) {
-        out.push({ propName: uniq(kebab(l.name.replace(/\?+$/, "")) || "show"), type: "BOOLEAN", layerName: l.name, field: "visible" });
+        out.push({ propName: uniq(pascalCase(l.name.replace(/\?+$/, "")) || "Show"), type: "BOOLEAN", layerName: l.name, field: "visible" });
       } else if (l.type === "TEXT") {
-        out.push({ propName: uniq(kebab(l.name) || "text"), type: "TEXT", layerName: l.name, field: "characters" });
+        out.push({ propName: uniq(pascalCase(l.name) || "Text"), type: "TEXT", layerName: l.name, field: "characters" });
       } else if (l.type === "INSTANCE") {
-        out.push({ propName: uniq(kebab(l.name) || "swap"), type: "INSTANCE_SWAP", layerName: l.name, field: "mainComponent" });
+        out.push({ propName: uniq(pascalCase(l.name) || "Swap"), type: "INSTANCE_SWAP", layerName: l.name, field: "mainComponent" });
       }
     }
     return out;
@@ -1871,7 +1895,7 @@
       const grades = tshirtRoles(sorted);
       const byArea = new Map(sorted.map((a, i) => [a, grades[i]]));
       members.forEach((_, i) => {
-        props[i].size = byArea.get(areas[i]);
+        props[i].Size = byArea.get(areas[i]);
       });
     }
     const hexes = members.map((m) => {
@@ -1884,14 +1908,14 @@
         const labels = colorAxisLabels(distinct);
         const byHex = new Map(distinct.map((h, i) => [h, labels[i]]));
         members.forEach((_, i) => {
-          props[i].color = byHex.get(hexes[i]);
+          props[i].Color = byHex.get(hexes[i]);
         });
       }
     }
     const anyAxis = props.some((p) => Object.keys(p).length > 0);
     if (!anyAxis) {
       members.forEach((_, i) => {
-        props[i].variant = String(i + 1);
+        props[i].Variant = String(i + 1);
       });
     } else {
       const counts = /* @__PURE__ */ new Map();
@@ -1900,7 +1924,7 @@
         const base = formatVariant(props[i]);
         const c = ((_a = counts.get(base)) != null ? _a : 0) + 1;
         counts.set(base, c);
-        if (c > 1) props[i].variant = String(c);
+        if (c > 1) props[i].Variant = String(c);
       });
     }
     return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));
@@ -1916,7 +1940,7 @@
       prefix = prefix.slice(0, i);
       if (!prefix.length) break;
     }
-    return prefix.length ? prefix.join("-") : kebab(names[0]);
+    return pascalCase(prefix.length ? prefix.join("-") : names[0]);
   }
 
   // src/lib/contrast.ts
@@ -2690,7 +2714,7 @@
             try {
               const parent = (_c = nodes[0].parent) != null ? _c : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
-              set.name = g.base;
+              set.name = pascalCase(g.base);
               for (const m of g.members) {
                 const node = byName.get(m.name);
                 if (node) node.name = m.variant;

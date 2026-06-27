@@ -4,7 +4,7 @@
    이름 분석(속성=값 추론)·그룹화·빈 조합 산출. 실제 createComponentFromNode·
    combineAsVariants 적용은 code.ts.
    ============================================================ */
-import { kebab } from './naming';
+import { kebab, pascalCase, capitalize } from './naming';
 import { tshirtRoles } from './roles';
 import { classifyColor } from './colorName';
 
@@ -18,12 +18,12 @@ const TYPES = new Set([
 /** 불리언 축 어휘 — 값 자체가 속성명, 값은 true(예: `card/selected` → `selected=true`). */
 const BOOLEANS = new Set(['selected']);
 
-/** 값 → 속성명(미지정이면 null). */
+/** 값 → 속성명(미지정이면 null). 속성명은 Figma 라이브러리 관례대로 Capitalize. */
 export function inferProp(value: string): string | null {
   const v = value.toLowerCase();
-  if (STATES.has(v)) return 'state';
-  if (SIZES.has(v)) return 'size';
-  if (TYPES.has(v)) return 'type';
+  if (STATES.has(v)) return 'State';
+  if (SIZES.has(v)) return 'Size';
+  if (TYPES.has(v)) return 'Type';
   return null;
 }
 
@@ -62,14 +62,17 @@ export function parseVariantName(name: string): ParsedName {
   const base = segs[0] ?? '';
   let unknown = 0;
   for (const seg of segs.slice(1)) {
-    if (BOOLEANS.has(seg) && !(seg in props)) {
-      props[seg] = 'true'; // 불리언 축: 값이 곧 속성명 → `selected=true`
-      continue;
+    if (BOOLEANS.has(seg)) {
+      const bk = capitalize(seg); // 불리언 축: 값이 곧 속성명 → `Selected=true`
+      if (!(bk in props)) {
+        props[bk] = 'true';
+        continue;
+      }
     }
     const prop = inferProp(seg);
     if (prop && !(prop in props)) props[prop] = seg;
     else {
-      const key = unknown === 0 ? 'variant' : `variant-${unknown + 1}`;
+      const key = unknown === 0 ? 'Variant' : `Variant-${unknown + 1}`;
       props[key] = seg;
       unknown++;
     }
@@ -128,7 +131,7 @@ export interface GridCell {
 export type CompPropType = 'TEXT' | 'INSTANCE_SWAP' | 'BOOLEAN';
 
 export interface CompPropPlan {
-  /** 컴포넌트 속성 이름(kebab). */
+  /** 컴포넌트 속성 이름(PascalCase). */
   propName: string;
   type: CompPropType;
   /** 대상 레이어 이름(매칭용). */
@@ -138,8 +141,8 @@ export interface CompPropPlan {
 }
 
 /**
- * 자식 레이어 → 노출할 컴포넌트 속성 계획(순수, 규칙 기반).
- * - 이름이 `?`로 끝나면 → BOOLEAN(가시성). 예: `badge?` → 속성 `badge`(visible).
+ * 자식 레이어 → 노출할 컴포넌트 속성 계획(순수, 규칙 기반). 속성명은 PascalCase(관례).
+ * - 이름이 `?`로 끝나면 → BOOLEAN(가시성). 예: `badge?` → 속성 `Badge`(visible).
  * - TEXT 레이어 → TEXT(characters).
  * - INSTANCE 레이어 → INSTANCE_SWAP(mainComponent).
  * 속성 이름 충돌은 `-2` 접미사로 회피.
@@ -148,19 +151,19 @@ export function inferComponentProperties(layers: { name: string; type: string }[
   const out: CompPropPlan[] = [];
   const taken = new Set<string>();
   const uniq = (base: string): string => {
-    let n = base || 'prop';
+    let n = base || 'Prop';
     let i = 2;
-    while (taken.has(n)) n = `${base || 'prop'}-${i++}`;
+    while (taken.has(n)) n = `${base || 'Prop'}-${i++}`;
     taken.add(n);
     return n;
   };
   for (const l of layers) {
     if (l.name.trim().endsWith('?')) {
-      out.push({ propName: uniq(kebab(l.name.replace(/\?+$/, '')) || 'show'), type: 'BOOLEAN', layerName: l.name, field: 'visible' });
+      out.push({ propName: uniq(pascalCase(l.name.replace(/\?+$/, '')) || 'Show'), type: 'BOOLEAN', layerName: l.name, field: 'visible' });
     } else if (l.type === 'TEXT') {
-      out.push({ propName: uniq(kebab(l.name) || 'text'), type: 'TEXT', layerName: l.name, field: 'characters' });
+      out.push({ propName: uniq(pascalCase(l.name) || 'Text'), type: 'TEXT', layerName: l.name, field: 'characters' });
     } else if (l.type === 'INSTANCE') {
-      out.push({ propName: uniq(kebab(l.name) || 'swap'), type: 'INSTANCE_SWAP', layerName: l.name, field: 'mainComponent' });
+      out.push({ propName: uniq(pascalCase(l.name) || 'Swap'), type: 'INSTANCE_SWAP', layerName: l.name, field: 'mainComponent' });
     }
   }
   return out;
@@ -296,7 +299,7 @@ export interface ComponentCandidateNode {
   eligible: boolean;
   /** 구조 그룹으로 묶일 세트 이름(미리보기). 세트 후보일 때만. */
   group?: string;
-  /** 도출된 베리언트(`size=lg, color=blue` 등) 미리보기. */
+  /** 도출된 베리언트(`Size=lg, Color=blue` 등) 미리보기. */
   variant?: string;
 }
 
@@ -419,10 +422,10 @@ export interface DerivedVariant {
 }
 
 /**
- * 같은 구조 그룹 멤버들 → 차이 축 도출(순수).
- * - 크기(면적 width*height) 고유값 2개+ → `size`(티셔츠 등급).
- * - 색(fillHex) 모든 멤버 보유 + 고유값 2개+ → `color`(색 이름).
- * - 둘 다 없으면 `variant=1·2…`. 동일 조합 충돌은 `variant` 인덱스로 분리(combineAsVariants는 고유 이름 필요).
+ * 같은 구조 그룹 멤버들 → 차이 축 도출(순수). 속성명은 Capitalize(Figma 라이브러리 관례).
+ * - 크기(면적 width*height) 고유값 2개+ → `Size`(티셔츠 등급).
+ * - 색(fillHex) 모든 멤버 보유 + 고유값 2개+ → `Color`(색 이름).
+ * - 둘 다 없으면 `Variant=1·2…`. 동일 조합 충돌은 `Variant` 인덱스로 분리(combineAsVariants는 고유 이름 필요).
  */
 export function deriveVariants(members: readonly StructNode[]): DerivedVariant[] {
   if (members.length <= 1) {
@@ -438,7 +441,7 @@ export function deriveVariants(members: readonly StructNode[]): DerivedVariant[]
     const grades = tshirtRoles(sorted);
     const byArea = new Map(sorted.map((a, i) => [a, grades[i]]));
     members.forEach((_, i) => {
-      props[i].size = byArea.get(areas[i])!;
+      props[i].Size = byArea.get(areas[i])!;
     });
   }
 
@@ -450,7 +453,7 @@ export function deriveVariants(members: readonly StructNode[]): DerivedVariant[]
       const labels = colorAxisLabels(distinct);
       const byHex = new Map(distinct.map((h, i) => [h, labels[i]]));
       members.forEach((_, i) => {
-        props[i].color = byHex.get(hexes[i] as string)!;
+        props[i].Color = byHex.get(hexes[i] as string)!;
       });
     }
   }
@@ -459,7 +462,7 @@ export function deriveVariants(members: readonly StructNode[]): DerivedVariant[]
   const anyAxis = props.some((p) => Object.keys(p).length > 0);
   if (!anyAxis) {
     members.forEach((_, i) => {
-      props[i].variant = String(i + 1);
+      props[i].Variant = String(i + 1);
     });
   } else {
     const counts = new Map<string, number>();
@@ -467,14 +470,17 @@ export function deriveVariants(members: readonly StructNode[]): DerivedVariant[]
       const base = formatVariant(props[i]);
       const c = (counts.get(base) ?? 0) + 1;
       counts.set(base, c);
-      if (c > 1) props[i].variant = String(c);
+      if (c > 1) props[i].Variant = String(c);
     });
   }
 
   return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));
 }
 
-/** 그룹 멤버 이름들의 공통 베이스(세트 이름용). 토큰 공통 접두 → 없으면 첫 이름. */
+/**
+ * 그룹 멤버 이름들의 공통 베이스(세트 이름용) — 토큰 공통 접두 → 없으면 첫 이름.
+ * 결과는 컴포넌트 관례대로 PascalCase로 정규화한다(`btn-*` → `Button`).
+ */
 export function commonBaseName(names: readonly string[]): string {
   if (!names.length) return '';
   const split = (s: string) => kebab(s).split('-').filter(Boolean);
@@ -486,5 +492,5 @@ export function commonBaseName(names: readonly string[]): string {
     prefix = prefix.slice(0, i);
     if (!prefix.length) break;
   }
-  return prefix.length ? prefix.join('-') : kebab(names[0]);
+  return pascalCase(prefix.length ? prefix.join('-') : names[0]);
 }

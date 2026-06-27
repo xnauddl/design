@@ -63,6 +63,36 @@ export function kebab(input: string): string {
     .toLowerCase();
 }
 
+/** 흔한 UI 약어 → 전체 단어(PascalCase 세트 이름 정규화용). */
+const ABBR: Readonly<Record<string, string>> = {
+  btn: 'button',
+  img: 'image',
+  txt: 'text',
+  msg: 'message',
+  ico: 'icon',
+  pic: 'picture',
+  pwd: 'password',
+};
+
+/**
+ * 임의 문자열 → PascalCase(컴포넌트/세트 이름 관례). 토큰별로 약어를 전체 단어로 펴고
+ * 첫 글자를 대문자화해 이어붙인다. 예: `btn` → `Button`, `card-header` → `CardHeader`.
+ * 펼 토큰이 없으면 원본을 그대로 반환(빈 결과 방지).
+ */
+export function pascalCase(input: string): string {
+  const tokens = kebab(input).split('-').filter(Boolean);
+  const out = tokens.map((t) => {
+    const w = ABBR[t] ?? t;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join('');
+  return out || input;
+}
+
+/** 첫 글자만 대문자(속성명 관례: `size` → `Size`). 나머지는 보존. */
+export function capitalize(input: string): string {
+  return input ? input.charAt(0).toUpperCase() + input.slice(1) : input;
+}
+
 /** 스타일 말단 세그먼트(노드 이름에 불필요한 역할). 기본 보존, 옵션으로 제거. */
 const STYLE_LEAVES = new Set([
   'fill',
