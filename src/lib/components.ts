@@ -7,12 +7,14 @@
 import { kebab } from './naming';
 
 /** 알려진 속성 어휘 — 값 → 속성명 추론. */
-const STATES = new Set(['default', 'hover', 'pressed', 'focus', 'active', 'disabled', 'selected', 'loading']);
+const STATES = new Set(['default', 'hover', 'pressed', 'focus', 'active', 'disabled', 'loading']);
 const SIZES = new Set(['xs', 'sm', 'md', 'lg', 'xl', 'xxl', 'tiny', 'small', 'medium', 'large', 'huge']);
 const TYPES = new Set([
   'primary', 'secondary', 'tertiary', 'ghost', 'outline', 'outlined', 'filled',
   'text', 'link', 'danger', 'warning', 'success', 'info', 'accent', 'brand', 'neutral',
 ]);
+/** 불리언 축 어휘 — 값 자체가 속성명, 값은 true(예: `card/selected` → `selected=true`). */
+const BOOLEANS = new Set(['selected']);
 
 /** 값 → 속성명(미지정이면 null). */
 export function inferProp(value: string): string | null {
@@ -58,6 +60,10 @@ export function parseVariantName(name: string): ParsedName {
   const base = segs[0] ?? '';
   let unknown = 0;
   for (const seg of segs.slice(1)) {
+    if (BOOLEANS.has(seg) && !(seg in props)) {
+      props[seg] = 'true'; // 불리언 축: 값이 곧 속성명 → `selected=true`
+      continue;
+    }
     const prop = inferProp(seg);
     if (prop && !(prop in props)) props[prop] = seg;
     else {

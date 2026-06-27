@@ -1564,7 +1564,7 @@
   }
 
   // src/lib/components.ts
-  var STATES = /* @__PURE__ */ new Set(["default", "hover", "pressed", "focus", "active", "disabled", "selected", "loading"]);
+  var STATES = /* @__PURE__ */ new Set(["default", "hover", "pressed", "focus", "active", "disabled", "loading"]);
   var SIZES = /* @__PURE__ */ new Set(["xs", "sm", "md", "lg", "xl", "xxl", "tiny", "small", "medium", "large", "huge"]);
   var TYPES = /* @__PURE__ */ new Set([
     "primary",
@@ -1584,6 +1584,7 @@
     "brand",
     "neutral"
   ]);
+  var BOOLEANS = /* @__PURE__ */ new Set(["selected"]);
   function inferProp(value) {
     const v = value.toLowerCase();
     if (STATES.has(v)) return "state";
@@ -1615,6 +1616,10 @@
     const base = (_a = segs[0]) != null ? _a : "";
     let unknown = 0;
     for (const seg of segs.slice(1)) {
+      if (BOOLEANS.has(seg) && !(seg in props)) {
+        props[seg] = "true";
+        continue;
+      }
       const prop = inferProp(seg);
       if (prop && !(prop in props)) props[prop] = seg;
       else {
@@ -2538,26 +2543,41 @@
           if (!requirePro()) break;
           let created = 0;
           const props = [];
-          for (const node of selection()) {
-            if (node.type !== "COMPONENT") continue;
-            const layers = node.findAll(() => true);
-            const plan = inferComponentProperties(layers.map((l) => ({ name: l.name, type: l.type })));
+          const defaultFor = (target, type) => {
+            if (type === "TEXT") return target.type === "TEXT" ? target.characters : "";
+            if (type === "BOOLEAN") return target.visible;
+            return target.type === "INSTANCE" && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : "";
+          };
+          const expose = (container, scopes) => {
+            var _a2;
+            const scopeLayers = scopes.map((s) => s.findAll(() => true));
+            const repLayers = scopeLayers[0];
+            if (!repLayers) return;
+            const plan = inferComponentProperties(repLayers.map((l) => ({ name: l.name, type: l.type })));
             for (const p of plan) {
-              const target = layers.find((l) => l.name === p.layerName);
-              if (!target) continue;
+              const repTarget = repLayers.find((l) => l.name === p.layerName);
+              if (!repTarget) continue;
               try {
-                let def = "";
-                if (p.type === "TEXT") def = target.type === "TEXT" ? target.characters : "";
-                else if (p.type === "BOOLEAN") def = target.visible;
-                else def = target.type === "INSTANCE" && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : "";
-                const id = node.addComponentProperty(p.propName, p.type, def);
-                const refs = __spreadValues({}, (_c = target.componentPropertyReferences) != null ? _c : {});
-                refs[p.field] = id;
-                target.componentPropertyReferences = refs;
+                const id = container.addComponentProperty(p.propName, p.type, defaultFor(repTarget, p.type));
+                for (const layers of scopeLayers) {
+                  const target = layers.find((l) => l.name === p.layerName);
+                  if (!target) continue;
+                  const refs = __spreadValues({}, (_a2 = target.componentPropertyReferences) != null ? _a2 : {});
+                  refs[p.field] = id;
+                  target.componentPropertyReferences = refs;
+                }
                 created++;
                 props.push(`${p.propName}:${p.type}`);
               } catch (e) {
               }
+            }
+          };
+          for (const node of selection()) {
+            if (node.type === "COMPONENT_SET") {
+              const variants = node.children.filter((c) => c.type === "COMPONENT");
+              if (variants.length) expose(node, variants);
+            } else if (node.type === "COMPONENT" && ((_c = node.parent) == null ? void 0 : _c.type) !== "COMPONENT_SET") {
+              expose(node, [node]);
             }
           }
           post({ type: "PROPERTIES_RESULT", created, props });
