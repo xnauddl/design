@@ -2003,23 +2003,18 @@
         }
       }
     }
-    const anyAxis = props.some((p) => Object.keys(p).length > 0);
-    if (!anyAxis) {
+    const keys = [...new Set(props.flatMap((p) => Object.keys(p)))];
+    if (keys.length === 0) {
       members.forEach((_, i) => {
         props[i].Variant = String(i + 1);
       });
     } else {
-      members.forEach((_, i) => {
-        if (Object.keys(props[i]).length === 0) props[i].Variant = String(i + 1);
-      });
-      const counts = /* @__PURE__ */ new Map();
-      members.forEach((_, i) => {
-        var _a;
-        const base = formatVariant(props[i]);
-        const c = ((_a = counts.get(base)) != null ? _a : 0) + 1;
-        counts.set(base, c);
-        if (c > 1) props[i].Variant = String(c);
-      });
+      for (const p of props) for (const k of keys) if (!(k in p)) p[k] = "default";
+      if (new Set(props.map(formatVariant)).size !== members.length) {
+        members.forEach((_, i) => {
+          props[i].Variant = String(i + 1);
+        });
+      }
     }
     return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));
   }

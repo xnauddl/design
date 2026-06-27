@@ -545,24 +545,22 @@ export function deriveVariants(members: readonly StructNode[]): DerivedVariant[]
     }
   }
 
-  // 3) 고유성: 축이 전혀 없으면 Variant=N, 부분 충돌은 충돌분만 Variant 인덱스
-  const anyAxis = props.some((p) => Object.keys(p).length > 0);
-  if (!anyAxis) {
+  // 3) 균일한 속성 키 + 고유 이름(Figma 세트 유효성 요건: 모든 변형이 같은 속성 키 집합).
+  //    - 키 전혀 없음 → 단일 `Variant=N`.
+  //    - 멤버마다 키가 다르면(혼합) **키 합집합**으로 맞추고 빠진 키는 `default`로 채운다.
+  //    - 그래도 같은 조합이 겹치면 균일하게 `Variant` 인덱스를 전 멤버에 추가.
+  const keys = [...new Set(props.flatMap((p) => Object.keys(p)))];
+  if (keys.length === 0) {
     members.forEach((_, i) => {
       props[i].Variant = String(i + 1);
     });
   } else {
-    // 혼합 그룹의 무속성 멤버(예: 끝명사만 같은 `nav-button`)는 빈 이름이 되지 않게 Variant로 채움.
-    members.forEach((_, i) => {
-      if (Object.keys(props[i]).length === 0) props[i].Variant = String(i + 1);
-    });
-    const counts = new Map<string, number>();
-    members.forEach((_, i) => {
-      const base = formatVariant(props[i]);
-      const c = (counts.get(base) ?? 0) + 1;
-      counts.set(base, c);
-      if (c > 1) props[i].Variant = String(c);
-    });
+    for (const p of props) for (const k of keys) if (!(k in p)) p[k] = 'default';
+    if (new Set(props.map(formatVariant)).size !== members.length) {
+      members.forEach((_, i) => {
+        props[i].Variant = String(i + 1);
+      });
+    }
   }
 
   return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));
