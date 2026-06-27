@@ -1742,6 +1742,14 @@
     }
     return props;
   }
+  function distinguishingTokens(name) {
+    return kebab(name).split("-").filter(Boolean).filter((t) => {
+      if (COMPONENT_NOUNS.has(nounWord(t))) return false;
+      if (BOOLEANS.has(t)) return false;
+      if (inferProp(t)) return false;
+      return true;
+    }).join("-");
+  }
   function parseVariantName(name) {
     var _a;
     const trimmed = name.trim();
@@ -1989,17 +1997,15 @@
       }
     }
     const keys = [...new Set(props.flatMap((p) => Object.keys(p)))];
-    if (keys.length === 0) {
-      members.forEach((_, i) => {
-        props[i].Variant = String(i + 1);
-      });
-    } else {
+    if (keys.length) {
       for (const p of props) for (const k of keys) if (!(k in p)) p[k] = "default";
-      if (new Set(props.map(formatVariant)).size !== members.length) {
-        members.forEach((_, i) => {
-          props[i].Variant = String(i + 1);
-        });
-      }
+    }
+    if (new Set(props.map(formatVariant)).size !== members.length) {
+      const tokens = members.map((m) => distinguishingTokens(m.name));
+      const usable = tokens.every((t) => t.length > 0) && new Set(tokens).size === members.length;
+      members.forEach((_, i) => {
+        props[i].Variant = usable ? tokens[i] : String(i + 1);
+      });
     }
     return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));
   }

@@ -79,6 +79,24 @@ export function extractNameProps(name: string): Record<string, string> {
   return props;
 }
 
+/**
+ * 이름에서 **구별 토큰**(컴포넌트 명사·알려진 속성 어휘를 뺀 설명 토큰)을 kebab으로.
+ * 변형 도출이 어휘로 멤버를 못 가를 때, `Variant=1·2` 대신 이 토큰을 변형 값으로 써서
+ * 사용자의 네이밍을 보존한다(예: `nav-left`→`left`, `artist-button`→`artist`).
+ */
+export function distinguishingTokens(name: string): string {
+  return kebab(name)
+    .split('-')
+    .filter(Boolean)
+    .filter((t) => {
+      if (COMPONENT_NOUNS.has(nounWord(t))) return false; // 컴포넌트 명사 = 베이스
+      if (BOOLEANS.has(t)) return false; // 불리언 어휘
+      if (inferProp(t)) return false; // State/Size/Type 어휘
+      return true;
+    })
+    .join('-');
+}
+
 export interface ParsedName {
   base: string;
   props: Record<string, string>;
@@ -513,7 +531,8 @@ export interface DerivedVariant {
  * 2. 이름만으로 멤버가 구분되지 않으면 빈 축을 **기하로 보완**:
  *    - 크기(면적 width*height) 고유값 2개+ → `Size`(티셔츠 등급, 이름이 Size를 안 줄 때만).
  *    - 색(fillHex) 모든 멤버 보유 + 고유값 2개+ → `Color`(색 이름).
- * 3. 그래도 동일하면 `Variant=1·2…`(combineAsVariants는 고유 이름 필요).
+ * 3. 그래도 안 갈리면 이름의 **구별 토큰**을 `Variant` 값으로(의미 보존; `nav-left`→`Variant=left`),
+ *    구별 토큰이 없으면 마지막 수단 `Variant=1·2…`(combineAsVariants는 고유 이름 필요).
  */
 export function deriveVariants(members: readonly StructNode[]): DerivedVariant[] {
   if (members.length <= 1) {
@@ -555,21 +574,19 @@ export function deriveVariants(members: readonly StructNode[]): DerivedVariant[]
   }
 
   // 3) 균일한 속성 키 + 고유 이름(Figma 세트 유효성 요건: 모든 변형이 같은 속성 키 집합).
-  //    - 키 전혀 없음 → 단일 `Variant=N`.
   //    - 멤버마다 키가 다르면(혼합) **키 합집합**으로 맞추고 빠진 키는 `default`로 채운다.
-  //    - 그래도 같은 조합이 겹치면 균일하게 `Variant` 인덱스를 전 멤버에 추가.
   const keys = [...new Set(props.flatMap((p) => Object.keys(p)))];
-  if (keys.length === 0) {
+  if (keys.length) for (const p of props) for (const k of keys) if (!(k in p)) p[k] = 'default';
+
+  // 아직 멤버 구분이 안 되면(어휘로 못 가름) → 이름의 **구별 토큰**을 `Variant` 값으로(의미 보존).
+  //   예: nav-left/nav-right/nav-links → Variant=left/right/links, artist-button/like-button → Variant=artist/like.
+  //   구별 토큰이 비거나 겹치면 마지막 수단으로 `Variant=N` 인덱스.
+  if (new Set(props.map(formatVariant)).size !== members.length) {
+    const tokens = members.map((m) => distinguishingTokens(m.name));
+    const usable = tokens.every((t) => t.length > 0) && new Set(tokens).size === members.length;
     members.forEach((_, i) => {
-      props[i].Variant = String(i + 1);
+      props[i].Variant = usable ? tokens[i] : String(i + 1);
     });
-  } else {
-    for (const p of props) for (const k of keys) if (!(k in p)) p[k] = 'default';
-    if (new Set(props.map(formatVariant)).size !== members.length) {
-      members.forEach((_, i) => {
-        props[i].Variant = String(i + 1);
-      });
-    }
   }
 
   return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));

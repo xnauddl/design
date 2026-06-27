@@ -57,6 +57,7 @@ import {
   groupByComponentName,
   recognizeComponentName,
   extractNameProps,
+  distinguishingTokens,
   deriveVariants,
   colorAxisLabels,
   commonBaseName,
@@ -707,10 +708,29 @@ test('deriveVariants — 크기+색 → 두 축(키 정렬: Color, Size)', () =>
   assert.match(d[0].variant, /^Color=.*, Size=/);
 });
 
-test('deriveVariants — 크기·색 동일 → Variant=N fallback / 단일은 빈 변형', () => {
+test('deriveVariants — 크기·색·이름 동일 → Variant=N fallback / 단일은 빈 변형', () => {
+  // 이름도 'btn'으로 동일(구별 토큰 없음) → 마지막 수단 인덱스.
   const same = (id) => ({ id, name: 'btn', type: 'FRAME', width: 100, height: 40, fillHex: '#2d7ff9' });
   assert.deepEqual(deriveVariants([same('a'), same('b')]).map((x) => x.variant), ['Variant=1', 'Variant=2']);
   assert.deepEqual(deriveVariants([same('a')]), [{ id: 'a', name: 'btn', props: {}, variant: '' }]);
+});
+
+test('distinguishingTokens — 컴포넌트 명사·어휘 제외한 구별 토큰', () => {
+  assert.equal(distinguishingTokens('nav-left'), 'left'); // nav=명사 제외
+  assert.equal(distinguishingTokens('nav links'), 'links');
+  assert.equal(distinguishingTokens('artist-button'), 'artist'); // button=명사 제외
+  assert.equal(distinguishingTokens('button-primary'), ''); // primary=Type 어휘 제외 → 남는 토큰 없음
+  assert.equal(distinguishingTokens('btn'), ''); // 명사뿐
+});
+
+test('deriveVariants — 어휘로 안 갈리면 구별 토큰을 Variant 값으로(의미 보존)', () => {
+  const m = (id, name) => ({ id, name, type: 'FRAME', width: 100, height: 40, fillHex: '#2d7ff9' });
+  // nav-left/right/links: 어휘 없음 → 구별 토큰으로(Variant=1/2/3 아님).
+  const nav = deriveVariants([m('a', 'nav-left'), m('b', 'nav-right'), m('c', 'nav links')]);
+  assert.deepEqual(nav.map((x) => x.variant), ['Variant=left', 'Variant=right', 'Variant=links']);
+  // like/artist button: 끝명사 button으로 묶이고 구별 토큰 like/artist 보존.
+  const btn = deriveVariants([m('a', 'like button'), m('b', 'artist-button')]);
+  assert.deepEqual(btn.map((x) => x.variant), ['Variant=like', 'Variant=artist']);
 });
 
 test('deriveVariants — 혼합(무속성 + 속성): 균일 키 + 빈 이름 없음(Figma 세트 유효)', () => {
