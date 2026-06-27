@@ -11,7 +11,7 @@ import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByComponentName, recognizeComponentName, deriveVariants, commonBaseName } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByComponentName, recognizeComponentName, deriveVariants, commonBaseName } from './lib/components';
 import type { CompPropType, StructNode } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
@@ -868,34 +868,43 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'CLASSIFY_VARIANTS': {
         if (!requirePro()) break;
-        const comps = selection().filter((n): n is ComponentNode => n.type === 'COMPONENT');
-        const byName = new Map<string, ComponentNode>();
-        for (const c of comps) if (!byName.has(c.name)) byName.set(c.name, c);
-        const result = classifyVariants(comps.map((c) => c.name));
+        // 「컴포넌트 등록」과 동일한 **컴포넌트명(머리명사) 기준**으로 기존 컴포넌트를 다시 묶는다.
+        // 선택의 COMPONENT 중 아직 세트에 안 속한 것만(멱등). 컴포넌트명 미인식 노드는 단독.
+        const comps = selection().filter(
+          (n): n is ComponentNode => n.type === 'COMPONENT' && n.parent?.type !== 'COMPONENT_SET',
+        );
+        const byId = new Map(comps.map((c) => [c.id, c]));
+        const groups = groupByComponentName(comps.map(toStructNode));
         let sets = 0;
         const missing: string[] = [];
-        for (const g of result.groups) {
-          // 아직 세트에 속하지 않은 멤버만(멱등)
-          const nodes = g.members
-            .map((m) => byName.get(m.name))
-            .filter((n): n is ComponentNode => !!n && n.parent?.type !== 'COMPONENT_SET');
-          if (nodes.length < 2) continue;
+        const singles: string[] = [];
+        const failures: string[] = [];
+        for (const g of groups) {
+          const nodes = g.members.map((m) => byId.get(m.id)).filter((n): n is ComponentNode => !!n);
+          if (nodes.length < 2) {
+            if (nodes[0]) singles.push(nodes[0].name);
+            continue;
+          }
+          const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
           try {
             const parent = nodes[0].parent ?? figma.currentPage;
             const set = figma.combineAsVariants(nodes, parent);
-            set.name = pascalCase(g.base);
+            set.name = commonBaseName(g.members.map((m) => m.name));
             for (const m of g.members) {
-              const node = byName.get(m.name);
-              if (node) node.name = m.variant; // 'prop=value, ...'
+              const node = byId.get(m.id);
+              const v = variantById.get(m.id);
+              if (node && v) node.name = v; // 'Prop=value, ...'
             }
-            arrangeSet(set); // 속성 기반 그리드 정렬 + 리사이즈
+            try { arrangeSet(set); } catch (e) { failures.push(`정렬 실패(${set.name}): ${errText(e)}`); }
+            const childNames = set.children.filter((c): c is ComponentNode => c.type === 'COMPONENT').map((c) => c.name);
+            const miss = missingVariants(childNames);
+            if (miss.length) missing.push(`${set.name}: ${miss.join(' / ')}`);
             sets++;
-            if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(' / ')}`);
-          } catch {
-            /* 결합 실패 시 스킵 */
+          } catch (e) {
+            failures.push(`결합 실패(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
           }
         }
-        post({ type: 'VARIANTS_RESULT', sets, missing, singles: result.singles });
+        post({ type: 'VARIANTS_RESULT', sets, missing, singles, failures });
         if (sets) commitUndo(figma); // UX2
         break;
       }

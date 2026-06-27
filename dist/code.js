@@ -1860,48 +1860,6 @@
     const existing = new Set(parsed.map(formatVariant));
     return cartesian(properties).map(formatVariant).filter((v) => !existing.has(v));
   }
-  function classifyVariants(names) {
-    var _a, _b;
-    const byBase = /* @__PURE__ */ new Map();
-    for (const name of names) {
-      const p = parseVariantName(name);
-      if (!p.base) continue;
-      const list = (_a = byBase.get(p.base)) != null ? _a : [];
-      list.push({ name, props: p.props });
-      byBase.set(p.base, list);
-    }
-    const groups = [];
-    const singles = [];
-    for (const [base, parsed] of byBase) {
-      const withProps = parsed.filter((p) => Object.keys(p.props).length > 0);
-      if (withProps.length < 2) {
-        for (const p of parsed) singles.push(p.name);
-        continue;
-      }
-      const members = withProps.map((p) => ({
-        name: p.name,
-        props: p.props,
-        variant: formatVariant(p.props)
-      }));
-      const properties = {};
-      for (const m of members) {
-        for (const [k, v] of Object.entries(m.props)) {
-          const arr = (_b = properties[k]) != null ? _b : properties[k] = [];
-          if (!arr.includes(v)) arr.push(v);
-        }
-      }
-      for (const k of Object.keys(properties)) properties[k].sort();
-      const keySig = (p) => Object.keys(p).sort().join(",");
-      const sigs = new Set(members.map((m) => keySig(m.props)));
-      let missing = [];
-      if (sigs.size === 1) {
-        const existing = new Set(members.map((m) => m.variant));
-        missing = cartesian(properties).map(formatVariant).filter((v) => !existing.has(v));
-      }
-      groups.push({ base, properties, members, missing });
-    }
-    return { groups, singles };
-  }
   function componentEligible(node) {
     return (node.type === "FRAME" || node.type === "GROUP") && !node.locked;
   }
@@ -2900,33 +2858,48 @@
         }
         case "CLASSIFY_VARIANTS": {
           if (!requirePro()) break;
-          const comps = selection().filter((n) => n.type === "COMPONENT");
-          const byName = /* @__PURE__ */ new Map();
-          for (const c of comps) if (!byName.has(c.name)) byName.set(c.name, c);
-          const result = classifyVariants(comps.map((c) => c.name));
+          const comps = selection().filter(
+            (n) => {
+              var _a2;
+              return n.type === "COMPONENT" && ((_a2 = n.parent) == null ? void 0 : _a2.type) !== "COMPONENT_SET";
+            }
+          );
+          const byId = new Map(comps.map((c) => [c.id, c]));
+          const groups = groupByComponentName(comps.map(toStructNode));
           let sets = 0;
           const missing = [];
-          for (const g of result.groups) {
-            const nodes = g.members.map((m) => byName.get(m.name)).filter((n) => {
-              var _a2;
-              return !!n && ((_a2 = n.parent) == null ? void 0 : _a2.type) !== "COMPONENT_SET";
-            });
-            if (nodes.length < 2) continue;
+          const singles = [];
+          const failures = [];
+          for (const g of groups) {
+            const nodes = g.members.map((m) => byId.get(m.id)).filter((n) => !!n);
+            if (nodes.length < 2) {
+              if (nodes[0]) singles.push(nodes[0].name);
+              continue;
+            }
+            const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
               const parent = (_c = nodes[0].parent) != null ? _c : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
-              set.name = pascalCase(g.base);
+              set.name = commonBaseName(g.members.map((m) => m.name));
               for (const m of g.members) {
-                const node = byName.get(m.name);
-                if (node) node.name = m.variant;
+                const node = byId.get(m.id);
+                const v = variantById.get(m.id);
+                if (node && v) node.name = v;
               }
-              arrangeSet(set);
+              try {
+                arrangeSet(set);
+              } catch (e) {
+                failures.push(`\uC815\uB82C \uC2E4\uD328(${set.name}): ${errText(e)}`);
+              }
+              const childNames = set.children.filter((c) => c.type === "COMPONENT").map((c) => c.name);
+              const miss = missingVariants(childNames);
+              if (miss.length) missing.push(`${set.name}: ${miss.join(" / ")}`);
               sets++;
-              if (g.missing.length) missing.push(`${g.base}: ${g.missing.join(" / ")}`);
             } catch (e) {
+              failures.push(`\uACB0\uD569 \uC2E4\uD328(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
             }
           }
-          post({ type: "VARIANTS_RESULT", sets, missing, singles: result.singles });
+          post({ type: "VARIANTS_RESULT", sets, missing, singles, failures });
           if (sets) commitUndo(figma);
           break;
         }

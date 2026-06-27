@@ -1183,8 +1183,20 @@ window.onmessage = (event: MessageEvent) => {
           box.appendChild(d);
         }
       }
+      if (msg.failures && msg.failures.length) {
+        const h = document.createElement('div');
+        h.className = 'warn';
+        h.textContent = `처리 중 문제 ${msg.failures.length}건:`;
+        box.appendChild(h);
+        for (const f of msg.failures) {
+          const d = document.createElement('div');
+          d.className = 'warn';
+          d.textContent = `  • ${f}`;
+          box.appendChild(d);
+        }
+      }
       const extra = `${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.missing.length ? ' · 빈 조합 있음' : ''}`;
-      setStatus('componentStatus', t('component.variants', { sets: msg.sets, extra }), 'ok');
+      setStatus('componentStatus', t('component.variants', { sets: msg.sets, extra }), msg.sets ? 'ok' : 'warn');
       break;
     }
     case 'GENERATE_RESULT': {
