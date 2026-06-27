@@ -54,7 +54,7 @@ import {
   scanComponentCandidates,
   structuralSignature,
   groupByStructure,
-  groupByStructureAndName,
+  groupByComponentName,
   recognizeComponentName,
   extractNameProps,
   deriveVariants,
@@ -642,28 +642,34 @@ test('extractNameProps — 명사 제외 + 보편 속성 추출', () => {
   assert.deepEqual(extractNameProps('card'), {}); // 명사만 → 속성 없음
 });
 
-test('groupByStructureAndName — 구조(타입트리)+컴포넌트명 둘 다 같아야 한 세트 + 미인식 제외', () => {
-  const btn = (id, childType) => ({ id, name: 'btn', type: 'FRAME', width: 100, height: 40, paddingTop: 8, layoutMode: 'HORIZONTAL', fillHex: '#111', children: [{ id: id + '-c', name: 'x', type: childType }] });
-  const blob = { id: 'x', name: 'Frame 9', type: 'FRAME', width: 100, height: 40, paddingTop: 8, layoutMode: 'HORIZONTAL', fillHex: '#111', children: [{ id: 'x-c', name: 'Label', type: 'TEXT' }] };
-  // a,b: 같은 골격(자식 TEXT)·이름(btn). c: 같은 이름이지만 자식 타입 다름(VECTOR=구조 다름) → 별도. x: 미인식 → 제외.
-  const groups = groupByStructureAndName([btn('a', 'TEXT'), btn('b', 'TEXT'), btn('c', 'VECTOR'), blob]);
+test('groupByComponentName — 컴포넌트명 기준: 내부 구조 달라도 같은 이름이면 한 세트 + 미인식 제외', () => {
+  // 같은 'Button'이지만 자식 구조가 제각각(아이콘 유무·줄 수). 구조는 게이트가 아니므로 한 세트로.
+  const plain = (id, name) => ({ id, name, type: 'FRAME', layoutMode: 'HORIZONTAL', children: [{ id: id + '-t', name: 'label', type: 'TEXT' }] });
+  const withIcon = (id, name) => ({ id, name, type: 'FRAME', layoutMode: 'HORIZONTAL', children: [{ id: id + '-i', name: 'icon', type: 'FRAME', children: [] }, { id: id + '-t', name: 'label', type: 'TEXT' }] });
+  const twoLine = (id, name) => ({ id, name, type: 'FRAME', layoutMode: 'VERTICAL', children: [{ id: id + '-t', name: 'label', type: 'TEXT' }, { id: id + '-s', name: 'sub', type: 'TEXT' }] });
+  const card = (id, name) => ({ id, name, type: 'FRAME', layoutMode: 'VERTICAL', children: [{ id: id + '-t', name: 'title', type: 'TEXT' }] });
+  const blob = { id: 'x', name: 'Frame 9', type: 'FRAME', layoutMode: 'NONE', children: [] }; // 미인식 → 제외
+  const groups = groupByComponentName([plain('a', 'primary-button'), withIcon('b', 'icon-button'), twoLine('c', 'stacked-button'), card('d', 'card-item'), blob]);
+  // Button 3개(구조 달라도) 한 세트, Item(card-item) 별도, Frame 9 제외.
   assert.equal(groups.length, 2);
-  assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'b']);
-  assert.deepEqual(groups[1].members.map((m) => m.id), ['c']);
+  assert.equal(groups[0].key, 'Button');
+  assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'b', 'c']);
+  assert.equal(groups[1].key, 'Item');
+  assert.deepEqual(groups[1].members.map((m) => m.id), ['d']);
 });
 
-test('groupByStructureAndName — 자식 레이어명만 다른 변형도 한 세트(회귀: 과거엔 쪼개짐)', () => {
+test('groupByComponentName — 자식 레이어명만 다른 변형도 한 세트(회귀: 과거엔 쪼개짐)', () => {
   // 같은 골격(FRAME>TEXT)·같은 컴포넌트명(Button)이지만 자식 이름이 label/text로 다른 변형.
   const btn = (id, name, childName) => ({ id, name, type: 'FRAME', width: 100, height: 40, paddingTop: 8, layoutMode: 'HORIZONTAL', fillHex: '#111', children: [{ id: id + '-c', name: childName, type: 'TEXT' }] });
-  const groups = groupByStructureAndName([btn('a', 'primary-button', 'label'), btn('b', 'secondary-button', 'text')]);
+  const groups = groupByComponentName([btn('a', 'primary-button', 'label'), btn('b', 'secondary-button', 'text')]);
   assert.equal(groups.length, 1);
   assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'b']);
 });
 
-test('groupByStructureAndName — size 변형(패딩만 다름)도 한 세트(회귀: 과거엔 쪼개짐)', () => {
+test('groupByComponentName — size 변형(패딩만 다름)도 한 세트(회귀: 과거엔 쪼개짐)', () => {
   // 같은 골격·같은 이름(Button), size 변형이라 패딩만 다름 → 반드시 한 세트로.
   const btn = (id, name, pad) => ({ id, name, type: 'FRAME', width: 100, height: 40, paddingTop: pad, paddingBottom: pad, paddingLeft: pad * 2, paddingRight: pad * 2, layoutMode: 'HORIZONTAL', fillHex: '#111', children: [{ id: id + '-c', name: 'label', type: 'TEXT' }] });
-  const groups = groupByStructureAndName([btn('a', 'button-small', 6), btn('b', 'button-medium', 10), btn('c', 'button-large', 14)]);
+  const groups = groupByComponentName([btn('a', 'button-small', 6), btn('b', 'button-medium', 10), btn('c', 'button-large', 14)]);
   assert.equal(groups.length, 1);
   assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'b', 'c']);
 });
@@ -731,10 +737,10 @@ test('colorAxisLabels / commonBaseName(PascalCase·약어 펼침)', () => {
   assert.equal(commonBaseName(['primary-button', 'secondary-button']), 'Button');
 });
 
-test('groupByStructureAndName — 마지막 명사로 묶음(접두어 달라도 같은 세트)', () => {
+test('groupByComponentName — 마지막 명사로 묶음(접두어 달라도 같은 세트)', () => {
   const mk = (id, name) => ({ id, name, type: 'FRAME', width: 100, height: 40, paddingTop: 8, layoutMode: 'HORIZONTAL', fillHex: '#111', children: [{ id: id + '-c', name: 'Label', type: 'TEXT' }] });
   // nav-button·button-primary·primary-button → 모두 끝 명사 button + 같은 구조 → 한 세트.
-  const groups = groupByStructureAndName([mk('a', 'nav-button'), mk('b', 'button-primary'), mk('c', 'primary-button')]);
+  const groups = groupByComponentName([mk('a', 'nav-button'), mk('b', 'button-primary'), mk('c', 'primary-button')]);
   assert.equal(groups.length, 1);
   assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'b', 'c']);
 });

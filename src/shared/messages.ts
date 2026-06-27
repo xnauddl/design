@@ -147,7 +147,7 @@ export type CodeToUi =
   | { type: 'PRESETS'; presets: Preset[] } // M3(Team): 프리셋 목록
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
-  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; missing: string[] } // Phase 3: 등록 + 베이스 묶음 베리언트 세트
+  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; missing: string[]; failures?: string[] } // Phase 3: 등록 + 베이스 묶음 베리언트 세트(failures: 조용히 삼키던 실패 진단)
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[] } // Phase 3
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'PROPERTIES_RESULT'; created: number; props: string[] } // Phase 4.1

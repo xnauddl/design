@@ -457,16 +457,23 @@ export function groupByStructure(children: readonly StructNode[]): StructGroup[]
 }
 
 /**
- * 등록용 그룹화 — **구조 + 인식된 컴포넌트명**이 모두 같아야 한 세트(잘못 묶임 방지).
+ * 등록용 그룹화 — **인식된 컴포넌트명(머리명사)** 기준으로 한 세트.
  * 컴포넌트명이 인식되지 않는 노드는 제외(엄격 필터). 입력 순서 보존.
+ *
+ * **왜 구조를 게이트로 쓰지 않나:** 실무 변형은 같은 컴포넌트라도 내부 구조가 제각각이다
+ * (아이콘 유무·텍스트 줄 수·래퍼 차이…). 구조 시그니처까지 같아야 묶으면 이런 변형들이
+ * 전부 1-멤버로 쪼개져 **세트가 아예 안 생긴다**. 그래서 같은 컴포넌트명이면 한 세트 후보로
+ * 묶고, 구조·크기·색 차이는 **베리언트 속성으로 흡수**한다(deriveVariants). 등록 후보는
+ * 사용자가 picker로 직접 고르므로(과묶임은 체크 해제로 회복) 이름 기준이 안전하다.
+ * 구조 시그니처(structuralSignature/groupByStructure)는 다른 용도로 남겨둔다.
  */
-export function groupByStructureAndName(children: readonly StructNode[]): StructGroup[] {
+export function groupByComponentName(children: readonly StructNode[]): StructGroup[] {
   const map = new Map<string, StructNode[]>();
   const order: string[] = [];
   for (const c of children) {
     const comp = recognizeComponentName(c.name);
     if (!comp) continue; // 컴포넌트명 없음 → 등록 대상 아님
-    const k = comp + ' ' + structuralSignature(c);
+    const k = comp; // 머리명사 기준 그룹(구조는 비-게이팅 → deriveVariants가 흡수)
     if (!map.has(k)) {
       map.set(k, []);
       order.push(k);

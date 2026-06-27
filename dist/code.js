@@ -1920,24 +1920,13 @@
     }
     return all.filter((c) => keep.has(c.id));
   }
-  function structuralSignature(node) {
-    const sig = (m) => {
-      var _a, _b;
-      return {
-        t: m.type,
-        l: (_a = m.layoutMode) != null ? _a : "NONE",
-        c: ((_b = m.children) != null ? _b : []).map(sig)
-      };
-    };
-    return JSON.stringify(sig(node));
-  }
-  function groupByStructureAndName(children) {
+  function groupByComponentName(children) {
     const map = /* @__PURE__ */ new Map();
     const order = [];
     for (const c of children) {
       const comp = recognizeComponentName(c.name);
       if (!comp) continue;
-      const k = comp + "\0" + structuralSignature(c);
+      const k = comp;
       if (!map.has(k)) {
         map.set(k, []);
         order.push(k);
@@ -2253,6 +2242,9 @@
   function pageStartX(page) {
     const ch = page.children;
     return ch.length ? Math.max(...ch.map((n) => n.x + n.width)) + 48 : 0;
+  }
+  function errText(e) {
+    return e instanceof Error ? e.message : String(e);
   }
   function pageOf(node) {
     let n = node;
@@ -2716,7 +2708,7 @@
             const kids = root.children.filter(
               (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked
             );
-            for (const g of groupByStructureAndName(kids.map(toStructNode))) {
+            for (const g of groupByComponentName(kids.map(toStructNode))) {
               if (g.members.length < 2) {
                 preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
                 continue;
@@ -2760,7 +2752,7 @@
             else skipped++;
           }
           if (!valid.length) {
-            post({ type: "COMPONENTS_RESULT", registered: 0, skipped, sets: 0, singles: [], missing: [] });
+            post({ type: "COMPONENTS_RESULT", registered: 0, skipped, sets: 0, singles: [], missing: [], failures: [] });
             break;
           }
           const origin = /* @__PURE__ */ new Map();
@@ -2772,11 +2764,12 @@
             origin.set(n.id, { parent: hasKids ? parent : null, index: idx, x: n.x, y: n.y, autolayout: al });
           }
           const byId = new Map(valid.map((n) => [n.id, n]));
-          const groups = groupByStructureAndName(valid.map(toStructNode));
+          const groups = groupByComponentName(valid.map(toStructNode));
           const page = await ensureComponentsPage();
           let cursorX = pageStartX(page);
           let sets = 0;
           const singles = [];
+          const failures = [];
           const placements = [];
           const placeOnPage = (n) => {
             page.appendChild(n);
@@ -2798,6 +2791,7 @@
                 if (o) placements.push({ inst: comp.createInstance(), o });
               } catch (e) {
                 skipped++;
+                failures.push(`\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328(${g.members[0].name}): ${errText(e)}`);
               }
               continue;
             }
@@ -2811,6 +2805,7 @@
                 registered++;
               } catch (e) {
                 skipped++;
+                failures.push(`\uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328(${m.name}): ${errText(e)}`);
               }
             }
             if (made.length < 2) {
@@ -2823,22 +2818,51 @@
               }
               continue;
             }
+            let set;
             try {
               const home = (_b = pageOf(made[0].comp)) != null ? _b : figma.currentPage;
-              const set = figma.combineAsVariants(made.map((x) => x.comp), home);
-              set.name = commonBaseName(g.members.map((m) => m.name));
-              for (const x of made) if (x.variant) x.comp.name = x.variant;
-              arrangeSet(set);
-              page.appendChild(set);
-              set.x = cursorX;
-              set.y = 0;
-              cursorX += set.width + 48;
-              sets++;
-              for (const x of made) {
-                const o = origin.get(x.id);
-                if (o) placements.push({ inst: x.comp.createInstance(), o });
-              }
+              set = figma.combineAsVariants(made.map((x) => x.comp), home);
             } catch (e) {
+              failures.push(`\uACB0\uD569 \uC2E4\uD328(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
+              for (const x of made) {
+                try {
+                  x.comp.name = pascalCase(x.comp.name);
+                } catch (e2) {
+                }
+                placeOnPage(x.comp);
+                singles.push(x.comp.name);
+                const o = origin.get(x.id);
+                if (o) {
+                  try {
+                    placements.push({ inst: x.comp.createInstance(), o });
+                  } catch (ie) {
+                    failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328: ${errText(ie)}`);
+                  }
+                }
+              }
+              continue;
+            }
+            set.name = commonBaseName(g.members.map((m) => m.name));
+            for (const x of made) if (x.variant) x.comp.name = x.variant;
+            page.appendChild(set);
+            try {
+              arrangeSet(set);
+            } catch (e) {
+              failures.push(`\uC815\uB82C \uC2E4\uD328(${set.name}): ${errText(e)}`);
+            }
+            set.x = cursorX;
+            set.y = 0;
+            cursorX += set.width + 48;
+            sets++;
+            for (const x of made) {
+              const o = origin.get(x.id);
+              if (o) {
+                try {
+                  placements.push({ inst: x.comp.createInstance(), o });
+                } catch (e) {
+                  failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${x.variant}): ${errText(e)}`);
+                }
+              }
             }
           }
           placements.sort((a, b) => {
@@ -2861,9 +2885,10 @@
               }
             } catch (e) {
               skipped++;
+              failures.push(`\uC778\uC2A4\uD134\uC2A4 \uBC30\uCE58 \uC2E4\uD328: ${errText(e)}`);
             }
           }
-          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, missing: [] });
+          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, missing: [], failures });
           if (registered || sets) commitUndo(figma);
           break;
         }

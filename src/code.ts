@@ -11,7 +11,7 @@ import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByStructureAndName, recognizeComponentName, deriveVariants, commonBaseName } from './lib/components';
+import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByComponentName, recognizeComponentName, deriveVariants, commonBaseName } from './lib/components';
 import type { CompPropType, StructNode } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
@@ -161,6 +161,11 @@ const COMPONENTS_PAGE = 'Components';
 function pageStartX(page: PageNode): number {
   const ch = page.children;
   return ch.length ? Math.max(...ch.map((n) => n.x + n.width)) + 48 : 0;
+}
+
+/** 예외에서 사람이 읽을 메시지 추출(진단 노출용). */
+function errText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
 }
 
 /** 노드가 속한 페이지(없으면 null) — 부모를 PAGE까지 거슬러 올라간다. */
@@ -673,7 +678,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           const kids = (root.children as readonly SceneNode[]).filter(
             (n) => (n.type === 'FRAME' || n.type === 'GROUP') && !n.locked,
           );
-          for (const g of groupByStructureAndName(kids.map(toStructNode))) {
+          for (const g of groupByComponentName(kids.map(toStructNode))) {
             if (g.members.length < 2) {
               preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
               continue;
@@ -721,7 +726,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         // 인식된 후보가 없으면 빈 페이지 생성 없이 종료.
         if (!valid.length) {
-          post({ type: 'COMPONENTS_RESULT', registered: 0, skipped, sets: 0, singles: [], missing: [] });
+          post({ type: 'COMPONENTS_RESULT', registered: 0, skipped, sets: 0, singles: [], missing: [], failures: [] });
           break;
         }
 
@@ -737,11 +742,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
 
         const byId = new Map(valid.map((n) => [n.id, n]));
-        const groups = groupByStructureAndName(valid.map(toStructNode));
+        const groups = groupByComponentName(valid.map(toStructNode));
         const page = await ensureComponentsPage();
         let cursorX = pageStartX(page);
         let sets = 0;
         const singles: string[] = [];
+        const failures: string[] = []; // 조용히 삼키던 실패를 UI로 노출(진단)
         // 인스턴스는 모든 컴포넌트 빌드 후 일괄 배치(원본 제거 후 인덱스 복원).
         const placements: { inst: InstanceNode; o: Origin }[] = [];
 
@@ -764,8 +770,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               registered++;
               const o = origin.get(g.members[0].id);
               if (o) placements.push({ inst: comp.createInstance(), o });
-            } catch {
+            } catch (e) {
               skipped++;
+              failures.push(`단독 등록 실패(${g.members[0].name}): ${errText(e)}`);
             }
             continue;
           }
@@ -778,8 +785,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             try {
               made.push({ id: m.id, comp: figma.createComponentFromNode(node), variant: variantById.get(m.id) ?? '' });
               registered++;
-            } catch {
+            } catch (e) {
               skipped++;
+              failures.push(`컴포넌트화 실패(${m.name}): ${errText(e)}`);
             }
           }
           if (made.length < 2) {
@@ -793,24 +801,40 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             }
             continue;
           }
+          // 결합(핵심). 실패해도 컴포넌트가 소실되지 않게 **단독으로라도 등록**(반쪽 상태 방지).
+          let set: ComponentSetNode;
           try {
             // combineAsVariants는 "부모와 같은 페이지" 제약이 있어 **원본 페이지에서 결합 후** 컴포넌트 페이지로 이동.
             const home = pageOf(made[0].comp) ?? figma.currentPage;
-            const set = figma.combineAsVariants(made.map((x) => x.comp), home);
-            set.name = commonBaseName(g.members.map((m) => m.name));
-            for (const x of made) if (x.variant) x.comp.name = x.variant; // 'Prop=value, ...'
-            arrangeSet(set); // 속성 기반 그리드 정렬 + 리사이즈
-            page.appendChild(set); // Components 페이지로 이동
-            set.x = cursorX;
-            set.y = 0;
-            cursorX += set.width + 48;
-            sets++;
+            set = figma.combineAsVariants(made.map((x) => x.comp), home);
+          } catch (e) {
+            failures.push(`결합 실패(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
             for (const x of made) {
+              // 결합 못 한 멤버는 단독 컴포넌트로 등록 + 원위치 인스턴스(원본 소실 방지).
+              try { x.comp.name = pascalCase(x.comp.name); } catch { /* 이름만 실패 무시 */ }
+              placeOnPage(x.comp);
+              singles.push(x.comp.name);
               const o = origin.get(x.id);
-              if (o) placements.push({ inst: x.comp.createInstance(), o }); // 변형별 인스턴스
+              if (o) {
+                try { placements.push({ inst: x.comp.createInstance(), o }); } catch (ie) { failures.push(`인스턴스 실패: ${errText(ie)}`); }
+              }
             }
-          } catch {
-            /* 결합 실패 시 스킵 */
+            continue;
+          }
+          // 결합 성공 — 이름/이동/인스턴스는 **무조건** 수행(장식 단계 실패로 세트를 버리지 않음).
+          set.name = commonBaseName(g.members.map((m) => m.name));
+          for (const x of made) if (x.variant) x.comp.name = x.variant; // 'Prop=value, ...'
+          page.appendChild(set); // Components 페이지로 이동
+          try { arrangeSet(set); } catch (e) { failures.push(`정렬 실패(${set.name}): ${errText(e)}`); } // 장식: 비치명
+          set.x = cursorX;
+          set.y = 0;
+          cursorX += set.width + 48;
+          sets++;
+          for (const x of made) {
+            const o = origin.get(x.id);
+            if (o) {
+              try { placements.push({ inst: x.comp.createInstance(), o }); } catch (e) { failures.push(`인스턴스 실패(${x.variant}): ${errText(e)}`); } // 변형별 인스턴스
+            }
           }
         }
 
@@ -832,12 +856,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               inst.x = o.x;
               inst.y = o.y;
             }
-          } catch {
+          } catch (e) {
             skipped++;
+            failures.push(`인스턴스 배치 실패: ${errText(e)}`);
           }
         }
 
-        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, missing: [] });
+        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, missing: [], failures });
         if (registered || sets) commitUndo(figma); // UX2
         break;
       }

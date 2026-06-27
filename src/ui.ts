@@ -1143,7 +1143,7 @@ window.onmessage = (event: MessageEvent) => {
       clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
       const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}`;
       setStatus('componentStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? 'ok' : 'warn');
-      // 빈 조합(미생성) 리포트
+      // 빈 조합(미생성) + 실패(진단) 리포트
       const box = $('variantReport');
       box.innerHTML = '';
       if (msg.missing.length) {
@@ -1153,6 +1153,18 @@ window.onmessage = (event: MessageEvent) => {
         for (const m of msg.missing) {
           const d = document.createElement('div');
           d.textContent = `  ${m}`;
+          box.appendChild(d);
+        }
+      }
+      if (msg.failures && msg.failures.length) {
+        const h = document.createElement('div');
+        h.className = 'warn';
+        h.textContent = `처리 중 문제 ${msg.failures.length}건:`;
+        box.appendChild(h);
+        for (const f of msg.failures) {
+          const d = document.createElement('div');
+          d.className = 'warn';
+          d.textContent = `  • ${f}`;
           box.appendChild(d);
         }
       }

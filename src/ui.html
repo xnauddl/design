@@ -493,11 +493,11 @@
 
     <div class="step" id="componentCard">
       <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
-      <div class="hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외)이며, 이름에 <b>컴포넌트명</b>(button·card·chip…)이 있는 자식만 추립니다. <b>골격(자식 타입·방향)+이름</b>이 같으면 한 세트로 묶습니다 — 패딩·자식 이름·크기·색이 달라도 OK(차이는 속성으로). 속성은 <b>이름 우선</b>(<code>Type</code>·<code>State</code>·<code>Size</code>) + 부족하면 크기·색 보완. 후보엔 <b>세트</b>/<b>단독</b> 배지가 붙습니다. 메인 컴포넌트는 <b>Components 페이지</b>로 보내고 원래 자리엔 <b>인스턴스</b>가 남습니다.</div>
+      <div class="hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외)이며, 이름에 <b>컴포넌트명</b>(button·card·chip…)이 있는 자식만 추립니다. <b>같은 컴포넌트명</b>이면 한 세트로 묶습니다 — 내부 구조·패딩·크기·색이 달라도 OK(차이는 속성으로 흡수, 과묶임은 체크 해제). 속성은 <b>이름 우선</b>(<code>Type</code>·<code>State</code>·<code>Size</code>) + 부족하면 크기·색 보완. 후보엔 <b>세트</b>/<b>단독</b> 배지가 붙습니다. 메인 컴포넌트는 <b>Components 페이지</b>로 보내고 원래 자리엔 <b>인스턴스</b>가 남습니다.</div>
       <div class="hint muted"><b>베리언트 분류</b>는 이미 만들어 둔 기존 컴포넌트를 <b>이름</b>으로 다시 묶을 때만. <b>속성 노출</b>은 선택한 세트(또는 단독 컴포넌트) 대상.</div>
       <div class="row">
         <button id="btnScanComp" title="선택 프레임 하위에서 컴포넌트명이 있는 등록 후보를 스캔">후보 스캔</button>
-        <button id="btnRegisterComp" title="후보를 메인 컴포넌트로 등록(Components 페이지로 이동, 원위치엔 인스턴스) + 골격(자식 타입·방향)+이름이 같은 자식끼리 베리언트 세트로 묶음(패딩·자식이름·크기·색 차이는 속성으로 흡수)">컴포넌트 등록</button>
+        <button id="btnRegisterComp" title="후보를 메인 컴포넌트로 등록(Components 페이지로 이동, 원위치엔 인스턴스) + 같은 컴포넌트명끼리 베리언트 세트로 묶음(내부 구조·패딩·크기·색 차이는 속성으로 흡수)">컴포넌트 등록</button>
         <button id="btnClassifyVariants" title="이미 만들어 둔 기존 컴포넌트들을 베이스 이름으로 다시 묶기(등록은 이미 분류 포함)">베리언트 분류</button>
         <button id="btnGenMissing" title="선택한 베리언트 세트의 빠진 속성 조합 자동 생성">누락 조합 생성</button>
         <button id="btnExposeProps" title="선택한 세트/컴포넌트의 레이어를 TEXT·INSTANCE_SWAP·BOOLEAN 속성으로 노출">속성 노출</button>
