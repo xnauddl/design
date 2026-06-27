@@ -50,6 +50,11 @@ import {
   inferProp,
   inferComponentProperties,
   scanComponentCandidates,
+  structuralSignature,
+  groupByStructure,
+  deriveVariants,
+  colorAxisLabels,
+  commonBaseName,
   clusterTextStyles,
   nameTextStyles,
   fontStyleForWeight,
@@ -537,6 +542,63 @@ test('scanComponentCandidates(#1) — 깊은 eligible의 조상 체인은 맥락
   assert.equal(out.find((c) => c.id === 'd').eligible, true);
   assert.equal(out.find((c) => c.id === 'm').eligible, false);
   assert.equal(out.find((c) => c.id === 'top').eligible, false);
+});
+
+test('structuralSignature — 크기·색·루트이름 무시, 자식 이름/타입/여백 반영', () => {
+  const mk = (w, hex, childName) => ({
+    id: 'x', name: 'btn-' + w, type: 'FRAME', width: w, height: 40,
+    paddingTop: 8, paddingRight: 12, paddingBottom: 8, paddingLeft: 12, itemSpacing: 4, layoutMode: 'HORIZONTAL',
+    fillHex: hex, children: [{ id: 'c', name: childName, type: 'TEXT' }],
+  });
+  // 크기·색·루트 이름만 다름 → 같은 시그니처
+  assert.equal(structuralSignature(mk(100, '#2d7ff9', 'Label')), structuralSignature(mk(200, '#ff0000', 'Label')));
+  // 자식 이름 다름 → 다른 시그니처
+  assert.notEqual(structuralSignature(mk(100, '#2d7ff9', 'Label')), structuralSignature(mk(100, '#2d7ff9', 'Icon')));
+  // 여백 다름 → 다른 시그니처
+  const a = mk(100, '#2d7ff9', 'Label');
+  assert.notEqual(structuralSignature(a), structuralSignature({ ...a, paddingTop: 99 }));
+});
+
+test('groupByStructure — 구조 같은 자식끼리 묶기(순서 보존)', () => {
+  const btn = (id, w) => ({ id, name: 'btn', type: 'FRAME', width: w, height: 40, paddingTop: 8, paddingLeft: 8, layoutMode: 'HORIZONTAL', fillHex: '#111111', children: [{ id: id + '-t', name: 'Label', type: 'TEXT' }] });
+  const card = (id) => ({ id, name: 'card', type: 'FRAME', width: 200, height: 120, paddingTop: 16, layoutMode: 'VERTICAL', fillHex: '#ffffff', children: [{ id: id + '-t', name: 'Title', type: 'TEXT' }] });
+  const groups = groupByStructure([btn('a', 100), card('b'), btn('c', 200)]);
+  assert.equal(groups.length, 2);
+  assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'c']);
+  assert.deepEqual(groups[1].members.map((m) => m.id), ['b']);
+});
+
+test('deriveVariants — 크기만 다름 → size 등급', () => {
+  const m = (id, w) => ({ id, name: 'btn', type: 'FRAME', width: w, height: 40, fillHex: '#2d7ff9' });
+  const d = deriveVariants([m('a', 80), m('b', 120), m('c', 160)]);
+  assert.deepEqual(d.map((x) => x.variant), ['size=sm', 'size=md', 'size=lg']);
+});
+
+test('deriveVariants — 색만 다름 → color 이름', () => {
+  const m = (id, hex) => ({ id, name: 'chip', type: 'FRAME', width: 100, height: 40, fillHex: hex });
+  const d = deriveVariants([m('a', '#2d7ff9'), m('b', '#e5484d')]);
+  assert.ok(d.every((x) => x.variant.startsWith('color=')));
+  assert.notEqual(d[0].variant, d[1].variant);
+});
+
+test('deriveVariants — 크기+색 → 두 축(키 정렬: color, size)', () => {
+  const m = (id, w, hex) => ({ id, name: 'btn', type: 'FRAME', width: w, height: 40, fillHex: hex });
+  const d = deriveVariants([m('a', 80, '#2d7ff9'), m('b', 160, '#e5484d')]);
+  assert.match(d[0].variant, /^color=.*, size=/);
+});
+
+test('deriveVariants — 크기·색 동일 → variant=N fallback / 단일은 빈 변형', () => {
+  const same = (id) => ({ id, name: 'btn', type: 'FRAME', width: 100, height: 40, fillHex: '#2d7ff9' });
+  assert.deepEqual(deriveVariants([same('a'), same('b')]).map((x) => x.variant), ['variant=1', 'variant=2']);
+  assert.deepEqual(deriveVariants([same('a')]), [{ id: 'a', name: 'btn', props: {}, variant: '' }]);
+});
+
+test('colorAxisLabels / commonBaseName', () => {
+  const labels = colorAxisLabels(['#2d7ff9', '#e5484d']);
+  assert.notEqual(labels[0], labels[1]);
+  assert.equal(commonBaseName(['Button Large', 'Button Small']), 'button');
+  assert.equal(commonBaseName(['btn-primary', 'btn-secondary']), 'btn');
+  assert.equal(commonBaseName(['card', 'card']), 'card');
 });
 
 test('classifyVariants — 그룹/속성/빈 조합/단일', () => {
