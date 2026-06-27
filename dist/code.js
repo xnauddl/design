@@ -1661,6 +1661,85 @@
     if (TYPES.has(v)) return "Type";
     return null;
   }
+  var COMPONENT_NOUNS = /* @__PURE__ */ new Set([
+    "button",
+    "link",
+    "toggle",
+    "switch",
+    "checkbox",
+    "radio",
+    "slider",
+    "input",
+    "textfield",
+    "field",
+    "textarea",
+    "select",
+    "dropdown",
+    "combobox",
+    "search",
+    "card",
+    "panel",
+    "modal",
+    "dialog",
+    "drawer",
+    "sheet",
+    "popover",
+    "tooltip",
+    "accordion",
+    "tab",
+    "tabs",
+    "breadcrumb",
+    "pagination",
+    "navbar",
+    "nav",
+    "sidebar",
+    "menu",
+    "stepper",
+    "avatar",
+    "badge",
+    "chip",
+    "tag",
+    "toast",
+    "snackbar",
+    "alert",
+    "banner",
+    "progress",
+    "spinner",
+    "skeleton",
+    "table",
+    "list",
+    "divider",
+    "label",
+    "tooltip",
+    "header",
+    "footer"
+  ]);
+  var NOUN_ABBR = { btn: "button", img: "image" };
+  function nounWord(token) {
+    var _a;
+    return (_a = NOUN_ABBR[token]) != null ? _a : token;
+  }
+  function recognizeComponentName(name) {
+    for (const t of kebab(name).split("-").filter(Boolean)) {
+      const w = nounWord(t);
+      if (COMPONENT_NOUNS.has(w)) return pascalCase(w);
+    }
+    return null;
+  }
+  function extractNameProps(name) {
+    const props = {};
+    for (const t of kebab(name).split("-").filter(Boolean)) {
+      if (COMPONENT_NOUNS.has(nounWord(t))) continue;
+      if (BOOLEANS.has(t)) {
+        const bk = capitalize(t);
+        if (!(bk in props)) props[bk] = "true";
+        continue;
+      }
+      const p = inferProp(t);
+      if (p && !(p in props)) props[p] = t;
+    }
+    return props;
+  }
   function parseVariantName(name) {
     var _a;
     const trimmed = name.trim();
@@ -1822,7 +1901,8 @@
     const all = [];
     const visit = (n, depth, parentId) => {
       const isContainerRoot = single && depth === 0;
-      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
+      const named = recognizeComponentName(n.name) !== null;
+      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && named && componentEligible(n) });
       if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
     };
     for (const n of selection2) visit(n, 0, null);
@@ -1853,11 +1933,13 @@
     };
     return JSON.stringify(sig(node, false));
   }
-  function groupByStructure(children) {
+  function groupByStructureAndName(children) {
     const map = /* @__PURE__ */ new Map();
     const order = [];
     for (const c of children) {
-      const k = structuralSignature(c);
+      const comp = recognizeComponentName(c.name);
+      if (!comp) continue;
+      const k = comp + "\0" + structuralSignature(c);
       if (!map.has(k)) {
         map.set(k, []);
         order.push(k);
@@ -1884,32 +1966,39 @@
     if (members.length <= 1) {
       return members.map((m) => ({ id: m.id, name: m.name, props: {}, variant: "" }));
     }
-    const props = members.map(() => ({}));
-    const areas = members.map((m) => {
-      var _a, _b;
-      return ((_a = m.width) != null ? _a : 0) * ((_b = m.height) != null ? _b : 0);
-    });
-    const distinctAreas = [...new Set(areas)];
-    if (distinctAreas.length > 1) {
-      const sorted = [...distinctAreas].sort((a, b) => a - b);
-      const grades = tshirtRoles(sorted);
-      const byArea = new Map(sorted.map((a, i) => [a, grades[i]]));
-      members.forEach((_, i) => {
-        props[i].Size = byArea.get(areas[i]);
-      });
-    }
-    const hexes = members.map((m) => {
-      var _a;
-      return (_a = m.fillHex) != null ? _a : null;
-    });
-    if (hexes.every((h) => h != null)) {
-      const distinct = [...new Set(hexes)];
-      if (distinct.length > 1) {
-        const labels = colorAxisLabels(distinct);
-        const byHex = new Map(distinct.map((h, i) => [h, labels[i]]));
-        members.forEach((_, i) => {
-          props[i].Color = byHex.get(hexes[i]);
+    const props = members.map((m) => extractNameProps(m.name));
+    const nameDistinct = new Set(props.map(formatVariant)).size === members.length;
+    if (!nameDistinct) {
+      if (!props.some((p) => "Size" in p)) {
+        const areas = members.map((m) => {
+          var _a, _b;
+          return ((_a = m.width) != null ? _a : 0) * ((_b = m.height) != null ? _b : 0);
         });
+        const distinctAreas = [...new Set(areas)];
+        if (distinctAreas.length > 1) {
+          const sorted = [...distinctAreas].sort((a, b) => a - b);
+          const grades = tshirtRoles(sorted);
+          const byArea = new Map(sorted.map((a, i) => [a, grades[i]]));
+          members.forEach((_, i) => {
+            props[i].Size = byArea.get(areas[i]);
+          });
+        }
+      }
+      if (!props.some((p) => "Color" in p)) {
+        const hexes = members.map((m) => {
+          var _a;
+          return (_a = m.fillHex) != null ? _a : null;
+        });
+        if (hexes.every((h) => h != null)) {
+          const distinct = [...new Set(hexes)];
+          if (distinct.length > 1) {
+            const labels = colorAxisLabels(distinct);
+            const byHex = new Map(distinct.map((h, i) => [h, labels[i]]));
+            members.forEach((_, i) => {
+              props[i].Color = byHex.get(hexes[i]);
+            });
+          }
+        }
       }
     }
     const anyAxis = props.some((p) => Object.keys(p).length > 0);
@@ -2153,6 +2242,24 @@
       maxRow = Math.max(maxRow, g.row);
     }
     set.resizeWithoutConstraints(pad * 2 + (maxCol + 1) * cellW + maxCol * gap, pad * 2 + (maxRow + 1) * cellH + maxRow * gap);
+  }
+  async function ensureComponentsPage() {
+    await figma.loadAllPagesAsync();
+    const found = figma.root.children.find((p) => p.name === COMPONENTS_PAGE);
+    if (found) return found;
+    const page = figma.createPage();
+    page.name = COMPONENTS_PAGE;
+    return page;
+  }
+  var COMPONENTS_PAGE = "Components";
+  function pageStartX(page) {
+    const ch = page.children;
+    return ch.length ? Math.max(...ch.map((n) => n.x + n.width)) + 48 : 0;
+  }
+  function pageOf(node) {
+    let n = node;
+    while (n && n.type !== "PAGE") n = n.parent;
+    return n && n.type === "PAGE" ? n : null;
   }
   function requirePro() {
     if (hasEntitlement(currentTier(), "components")) return true;
@@ -2611,8 +2718,7 @@
             const kids = root.children.filter(
               (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked
             );
-            if (kids.length < 2) continue;
-            for (const g of groupByStructure(kids.map(toStructNode))) {
+            for (const g of groupByStructureAndName(kids.map(toStructNode))) {
               if (g.members.length < 2) continue;
               const base = commonBaseName(g.members.map((m) => m.name));
               for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
@@ -2627,9 +2733,10 @@
         }
         case "REGISTER_COMPONENTS": {
           if (!requirePro()) break;
+          await figma.loadAllPagesAsync();
           let registered = 0;
           let skipped = 0;
-          const eligible = (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked;
+          const eligible = (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked && recognizeComponentName(n.name) !== null;
           let targets;
           if (msg.nodeIds && msg.nodeIds.length) {
             targets = [];
@@ -2651,17 +2758,42 @@
             if (eligible(n)) valid.push(n);
             else skipped++;
           }
+          if (!valid.length) {
+            post({ type: "COMPONENTS_RESULT", registered: 0, skipped, sets: 0, singles: [], missing: [] });
+            break;
+          }
+          const origin = /* @__PURE__ */ new Map();
+          for (const n of valid) {
+            const parent = n.parent;
+            const hasKids = !!parent && "children" in parent;
+            const idx = hasKids ? parent.children.indexOf(n) : -1;
+            const al = !!parent && "layoutMode" in parent && parent.layoutMode !== "NONE";
+            origin.set(n.id, { parent: hasKids ? parent : null, index: idx, x: n.x, y: n.y, autolayout: al });
+          }
           const byId = new Map(valid.map((n) => [n.id, n]));
-          const groups = groupByStructure(valid.map(toStructNode));
+          const groups = groupByStructureAndName(valid.map(toStructNode));
+          const page = await ensureComponentsPage();
+          let cursorX = pageStartX(page);
           let sets = 0;
           const singles = [];
+          const placements = [];
+          const placeOnPage = (n) => {
+            page.appendChild(n);
+            n.x = cursorX;
+            n.y = 0;
+            cursorX += n.width + 48;
+          };
           for (const g of groups) {
             if (g.members.length === 1) {
               const node = byId.get(g.members[0].id);
               if (!node) continue;
               try {
-                singles.push(figma.createComponentFromNode(node).name);
+                const comp = figma.createComponentFromNode(node);
+                placeOnPage(comp);
+                singles.push(comp.name);
                 registered++;
+                const o = origin.get(g.members[0].id);
+                if (o) placements.push({ inst: comp.createInstance(), o });
               } catch (e) {
                 skipped++;
               }
@@ -2673,24 +2805,59 @@
               const node = byId.get(m.id);
               if (!node) continue;
               try {
-                made.push({ comp: figma.createComponentFromNode(node), variant: (_a = variantById.get(m.id)) != null ? _a : "" });
+                made.push({ id: m.id, comp: figma.createComponentFromNode(node), variant: (_a = variantById.get(m.id)) != null ? _a : "" });
                 registered++;
               } catch (e) {
                 skipped++;
               }
             }
             if (made.length < 2) {
-              for (const x of made) singles.push(x.comp.name);
+              for (const x of made) {
+                placeOnPage(x.comp);
+                singles.push(x.comp.name);
+                const o = origin.get(x.id);
+                if (o) placements.push({ inst: x.comp.createInstance(), o });
+              }
               continue;
             }
             try {
-              const parent = (_b = made[0].comp.parent) != null ? _b : figma.currentPage;
-              const set = figma.combineAsVariants(made.map((x) => x.comp), parent);
+              const home = (_b = pageOf(made[0].comp)) != null ? _b : figma.currentPage;
+              const set = figma.combineAsVariants(made.map((x) => x.comp), home);
               set.name = commonBaseName(g.members.map((m) => m.name));
               for (const x of made) if (x.variant) x.comp.name = x.variant;
               arrangeSet(set);
+              page.appendChild(set);
+              set.x = cursorX;
+              set.y = 0;
+              cursorX += set.width + 48;
               sets++;
+              for (const x of made) {
+                const o = origin.get(x.id);
+                if (o) placements.push({ inst: x.comp.createInstance(), o });
+              }
             } catch (e) {
+            }
+          }
+          placements.sort((a, b) => {
+            var _a2, _b2, _c2, _d2;
+            const pa = (_b2 = (_a2 = a.o.parent) == null ? void 0 : _a2.id) != null ? _b2 : "";
+            const pb = (_d2 = (_c2 = b.o.parent) == null ? void 0 : _c2.id) != null ? _d2 : "";
+            return pa === pb ? a.o.index - b.o.index : pa < pb ? -1 : 1;
+          });
+          for (const { inst, o } of placements) {
+            if (!o.parent) {
+              skipped++;
+              continue;
+            }
+            try {
+              const len = o.parent.children.length;
+              o.parent.insertChild(Math.min(Math.max(0, o.index), len), inst);
+              if (!o.autolayout) {
+                inst.x = o.x;
+                inst.y = o.y;
+              }
+            } catch (e) {
+              skipped++;
             }
           }
           post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, missing: [] });

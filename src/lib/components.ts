@@ -27,6 +27,56 @@ export function inferProp(value: string): string | null {
   return null;
 }
 
+/** 알려진 컴포넌트 명사(단어 단위). 후보 추림·세트 그룹 키에 사용. */
+const COMPONENT_NOUNS = new Set([
+  'button', 'link', 'toggle', 'switch', 'checkbox', 'radio', 'slider',
+  'input', 'textfield', 'field', 'textarea', 'select', 'dropdown', 'combobox', 'search',
+  'card', 'panel', 'modal', 'dialog', 'drawer', 'sheet', 'popover', 'tooltip', 'accordion',
+  'tab', 'tabs', 'breadcrumb', 'pagination', 'navbar', 'nav', 'sidebar', 'menu', 'stepper',
+  'avatar', 'badge', 'chip', 'tag', 'toast', 'snackbar', 'alert', 'banner', 'progress',
+  'spinner', 'skeleton', 'table', 'list', 'divider', 'label', 'tooltip', 'header', 'footer',
+]);
+/** 컴포넌트 명사 약어 → 표준어. */
+const NOUN_ABBR: Readonly<Record<string, string>> = { btn: 'button', img: 'image' };
+
+/** 토큰을 표준어로(약어 펼침 + 소문자). */
+function nounWord(token: string): string {
+  return NOUN_ABBR[token] ?? token;
+}
+
+/**
+ * 이름에 알려진 **컴포넌트 명사**가 있으면 표준 PascalCase 이름을 반환(없으면 null).
+ * 첫 번째로 매칭되는 명사 토큰 기준(예: `button-primary` → `Button`, `btn` → `Button`).
+ */
+export function recognizeComponentName(name: string): string | null {
+  for (const t of kebab(name).split('-').filter(Boolean)) {
+    const w = nounWord(t);
+    if (COMPONENT_NOUNS.has(w)) return pascalCase(w);
+  }
+  return null;
+}
+
+/**
+ * 이름에서 **보편 속성**을 추출(컴포넌트 명사 토큰은 베이스라 제외).
+ * - 불리언 어휘(`selected`) → `Selected=true`.
+ * - `inferProp` 어휘 → `State`/`Size`/`Type`.
+ * - 그 외 토큰은 설명용 베이스로 보고 무시.
+ */
+export function extractNameProps(name: string): Record<string, string> {
+  const props: Record<string, string> = {};
+  for (const t of kebab(name).split('-').filter(Boolean)) {
+    if (COMPONENT_NOUNS.has(nounWord(t))) continue; // 컴포넌트 명사 = 베이스
+    if (BOOLEANS.has(t)) {
+      const bk = capitalize(t);
+      if (!(bk in props)) props[bk] = 'true';
+      continue;
+    }
+    const p = inferProp(t);
+    if (p && !(p in props)) props[p] = t;
+  }
+  return props;
+}
+
 export interface ParsedName {
   base: string;
   props: Record<string, string>;
@@ -316,13 +366,17 @@ export function componentEligible(node: ScanNode): boolean {
  * 컴포넌트화하지 않고 그 안의 자식만 후보가 된다. 트리에는 회색 맥락으로 남는다.
  * (다중 선택 시에는 선택 각각이 등록 단위이므로 최상위도 eligible. `REGISTER_COMPONENTS`의
  * 대상 결정과 동일한 규칙.)
+ *
+ * **엄격 필터**: 이름에 알려진 **컴포넌트 명사**가 있는 노드만 eligible(`recognizeComponentName`).
+ * 이름 없는 프레임(`Frame 12` 등)은 후보에서 추려낸다 — 회색 맥락으로만 남거나 제외.
  */
 export function scanComponentCandidates(selection: readonly ScanNode[]): ComponentCandidateNode[] {
   const single = selection.length === 1;
   const all: ComponentCandidateNode[] = [];
   const visit = (n: ScanNode, depth: number, parentId: string | null): void => {
     const isContainerRoot = single && depth === 0; // 컨테이너 자신 → 등록 제외
-    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
+    const named = recognizeComponentName(n.name) !== null; // 엄격 필터
+    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && named && componentEligible(n) });
     if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
   };
   for (const n of selection) visit(n, 0, null);
@@ -398,6 +452,26 @@ export function groupByStructure(children: readonly StructNode[]): StructGroup[]
   return order.map((k) => ({ key: k, members: map.get(k)! }));
 }
 
+/**
+ * 등록용 그룹화 — **구조 + 인식된 컴포넌트명**이 모두 같아야 한 세트(잘못 묶임 방지).
+ * 컴포넌트명이 인식되지 않는 노드는 제외(엄격 필터). 입력 순서 보존.
+ */
+export function groupByStructureAndName(children: readonly StructNode[]): StructGroup[] {
+  const map = new Map<string, StructNode[]>();
+  const order: string[] = [];
+  for (const c of children) {
+    const comp = recognizeComponentName(c.name);
+    if (!comp) continue; // 컴포넌트명 없음 → 등록 대상 아님
+    const k = comp + ' ' + structuralSignature(c);
+    if (!map.has(k)) {
+      map.set(k, []);
+      order.push(k);
+    }
+    map.get(k)!.push(c);
+  }
+  return order.map((k) => ({ key: k, members: map.get(k)! }));
+}
+
 /** 색 hex 목록 → 색 이름 라벨(충돌은 `-N`, 무채색은 `gray-{step}`). */
 export function colorAxisLabels(hexes: readonly string[]): string[] {
   const used = new Set<string>();
@@ -422,43 +496,54 @@ export interface DerivedVariant {
 }
 
 /**
- * 같은 구조 그룹 멤버들 → 차이 축 도출(순수). 속성명은 Capitalize(Figma 라이브러리 관례).
- * - 크기(면적 width*height) 고유값 2개+ → `Size`(티셔츠 등급).
- * - 색(fillHex) 모든 멤버 보유 + 고유값 2개+ → `Color`(색 이름).
- * - 둘 다 없으면 `Variant=1·2…`. 동일 조합 충돌은 `Variant` 인덱스로 분리(combineAsVariants는 고유 이름 필요).
+ * 같은 그룹 멤버들 → 차이 축 도출(순수). 속성명은 Capitalize(Figma 라이브러리 관례).
+ * **이름 우선 + 기하 보완**:
+ * 1. 이름 어휘(`Type`/`State`/`Size`/`Selected`)를 먼저 속성으로(`extractNameProps`).
+ * 2. 이름만으로 멤버가 구분되지 않으면 빈 축을 **기하로 보완**:
+ *    - 크기(면적 width*height) 고유값 2개+ → `Size`(티셔츠 등급, 이름이 Size를 안 줄 때만).
+ *    - 색(fillHex) 모든 멤버 보유 + 고유값 2개+ → `Color`(색 이름).
+ * 3. 그래도 동일하면 `Variant=1·2…`(combineAsVariants는 고유 이름 필요).
  */
 export function deriveVariants(members: readonly StructNode[]): DerivedVariant[] {
   if (members.length <= 1) {
     return members.map((m) => ({ id: m.id, name: m.name, props: {}, variant: '' }));
   }
-  const props: Record<string, string>[] = members.map(() => ({}));
+  // 1) 이름 어휘 우선
+  const props: Record<string, string>[] = members.map((m) => extractNameProps(m.name));
 
-  // size 축: 면적 오름차순 → 티셔츠 등급
-  const areas = members.map((m) => (m.width ?? 0) * (m.height ?? 0));
-  const distinctAreas = [...new Set(areas)];
-  if (distinctAreas.length > 1) {
-    const sorted = [...distinctAreas].sort((a, b) => a - b);
-    const grades = tshirtRoles(sorted);
-    const byArea = new Map(sorted.map((a, i) => [a, grades[i]]));
-    members.forEach((_, i) => {
-      props[i].Size = byArea.get(areas[i])!;
-    });
-  }
-
-  // color 축: 모든 멤버에 fill이 있을 때만
-  const hexes = members.map((m) => m.fillHex ?? null);
-  if (hexes.every((h): h is string => h != null)) {
-    const distinct = [...new Set(hexes)];
-    if (distinct.length > 1) {
-      const labels = colorAxisLabels(distinct);
-      const byHex = new Map(distinct.map((h, i) => [h, labels[i]]));
-      members.forEach((_, i) => {
-        props[i].Color = byHex.get(hexes[i] as string)!;
-      });
+  // 2) 이름만으로 구분 안 되면(중복 조합 존재) 기하로 보완
+  const nameDistinct = new Set(props.map(formatVariant)).size === members.length;
+  if (!nameDistinct) {
+    // size: 이름이 Size를 안 줬을 때만
+    if (!props.some((p) => 'Size' in p)) {
+      const areas = members.map((m) => (m.width ?? 0) * (m.height ?? 0));
+      const distinctAreas = [...new Set(areas)];
+      if (distinctAreas.length > 1) {
+        const sorted = [...distinctAreas].sort((a, b) => a - b);
+        const grades = tshirtRoles(sorted);
+        const byArea = new Map(sorted.map((a, i) => [a, grades[i]]));
+        members.forEach((_, i) => {
+          props[i].Size = byArea.get(areas[i])!;
+        });
+      }
+    }
+    // color: 이름이 Color를 안 줬고(애초에 이름엔 없음) 모든 멤버에 fill이 있을 때
+    if (!props.some((p) => 'Color' in p)) {
+      const hexes = members.map((m) => m.fillHex ?? null);
+      if (hexes.every((h): h is string => h != null)) {
+        const distinct = [...new Set(hexes)];
+        if (distinct.length > 1) {
+          const labels = colorAxisLabels(distinct);
+          const byHex = new Map(distinct.map((h, i) => [h, labels[i]]));
+          members.forEach((_, i) => {
+            props[i].Color = byHex.get(hexes[i] as string)!;
+          });
+        }
+      }
     }
   }
 
-  // 고유성: 축이 전혀 없으면 variant=N, 부분 충돌은 충돌분만 variant 인덱스
+  // 3) 고유성: 축이 전혀 없으면 Variant=N, 부분 충돌은 충돌분만 Variant 인덱스
   const anyAxis = props.some((p) => Object.keys(p).length > 0);
   if (!anyAxis) {
     members.forEach((_, i) => {
