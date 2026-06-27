@@ -465,6 +465,8 @@ test('inferProp / parseVariantName — 어휘·경로·명시형', () => {
   assert.equal(inferProp('lg'), 'size');
   assert.equal(inferProp('primary'), 'type');
   assert.equal(inferProp('zzz'), null);
+  // selected는 state 어휘가 아니라 불리언 축(아래 별도 테스트)
+  assert.equal(inferProp('selected'), null);
   // 경로형: 어휘 추론
   assert.deepEqual(parseVariantName('button/primary/hover'), {
     base: 'button',
@@ -476,6 +478,24 @@ test('inferProp / parseVariantName — 어휘·경로·명시형', () => {
   assert.deepEqual(parseVariantName('button, size=lg, state=hover'), {
     base: 'button',
     props: { size: 'lg', state: 'hover' },
+  });
+});
+
+test('parseVariantName — selected 불리언 축(A)', () => {
+  // 경로형: 값이 곧 속성명, 값은 true
+  assert.deepEqual(parseVariantName('card/selected'), {
+    base: 'card',
+    props: { selected: 'true' },
+  });
+  // 다른 어휘와 공존
+  assert.deepEqual(parseVariantName('chip/primary/selected'), {
+    base: 'chip',
+    props: { type: 'primary', selected: 'true' },
+  });
+  // 명시형 true/false는 그대로
+  assert.deepEqual(parseVariantName('toggle, selected=false'), {
+    base: 'toggle',
+    props: { selected: 'false' },
   });
 });
 
@@ -541,6 +561,15 @@ test('classifyVariants — 멤버 1개 베이스는 단일', () => {
   // 서로 다른 베이스, 각 1개 → 모두 단일
   assert.deepEqual(r.groups, []);
   assert.deepEqual(r.singles.sort(), ['badge/lg', 'icon/sm']);
+});
+
+test('classifyVariants — selected 불리언 축(A)', () => {
+  const r = classifyVariants(['switch, selected=true', 'switch, selected=false']);
+  assert.equal(r.groups.length, 1);
+  const g = r.groups[0];
+  assert.equal(g.base, 'switch');
+  assert.deepEqual(g.properties, { selected: ['false', 'true'] });
+  assert.deepEqual(g.missing, []); // true/false 둘 다 존재
 });
 
 test('variantGrid — 2속성 매트릭스 좌표(행=첫 속성, 열=둘째)', () => {

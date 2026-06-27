@@ -11,6 +11,7 @@ import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates } from './lib/components';
+import type { CompPropType } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
@@ -760,29 +761,48 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!requirePro()) break;
         let created = 0;
         const props: string[] = [];
-        // 단일 컴포넌트 대상(세트는 변형 충돌 방지 위해 개별 변형을 선택).
-        for (const node of selection()) {
-          if (node.type !== 'COMPONENT') continue;
-          const layers = node.findAll(() => true);
-          const plan = inferComponentProperties(layers.map((l) => ({ name: l.name, type: l.type })));
+
+        // 속성 기본값: 대표 레이어 + 타입에서 산출.
+        const defaultFor = (target: SceneNode, type: CompPropType): string | boolean => {
+          if (type === 'TEXT') return target.type === 'TEXT' ? target.characters : '';
+          if (type === 'BOOLEAN') return target.visible;
+          // INSTANCE_SWAP 기본값: 발행된 컴포넌트는 key, 로컬(미발행)은 빈 key라 id 사용.
+          return target.type === 'INSTANCE' && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : '';
+        };
+
+        // container(컴포넌트 또는 세트)에 속성 추가 → 모든 scope의 동명 레이어에 참조 연결.
+        // 단독 컴포넌트는 scope=[자신], 세트는 scope=변형 자식 전부(addComponentProperty는 세트에).
+        const expose = (container: ComponentNode | ComponentSetNode, scopes: readonly ComponentNode[]): void => {
+          const scopeLayers = scopes.map((s) => s.findAll(() => true));
+          const repLayers = scopeLayers[0];
+          if (!repLayers) return;
+          const plan = inferComponentProperties(repLayers.map((l) => ({ name: l.name, type: l.type })));
           for (const p of plan) {
-            const target = layers.find((l) => l.name === p.layerName);
-            if (!target) continue;
+            const repTarget = repLayers.find((l) => l.name === p.layerName);
+            if (!repTarget) continue;
             try {
-              let def: string | boolean = '';
-              if (p.type === 'TEXT') def = target.type === 'TEXT' ? target.characters : '';
-              else if (p.type === 'BOOLEAN') def = target.visible;
-              // INSTANCE_SWAP 기본값: 발행된 컴포넌트는 key, 로컬(미발행)은 빈 key라 id 사용.
-              else def = target.type === 'INSTANCE' && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : '';
-              const id = node.addComponentProperty(p.propName, p.type, def);
-              const refs = { ...(target.componentPropertyReferences ?? {}) };
-              refs[p.field] = id;
-              target.componentPropertyReferences = refs;
+              const id = container.addComponentProperty(p.propName, p.type, defaultFor(repTarget, p.type));
+              for (const layers of scopeLayers) {
+                const target = layers.find((l) => l.name === p.layerName);
+                if (!target) continue; // 해당 레이어 없는 변형은 스킵
+                const refs = { ...(target.componentPropertyReferences ?? {}) };
+                refs[p.field] = id;
+                target.componentPropertyReferences = refs;
+              }
               created++;
               props.push(`${p.propName}:${p.type}`);
             } catch {
               /* 속성 추가/연결 실패 시 스킵(예: 미발행 INSTANCE_SWAP) */
             }
+          }
+        };
+
+        for (const node of selection()) {
+          if (node.type === 'COMPONENT_SET') {
+            const variants = node.children.filter((c): c is ComponentNode => c.type === 'COMPONENT');
+            if (variants.length) expose(node, variants);
+          } else if (node.type === 'COMPONENT' && node.parent?.type !== 'COMPONENT_SET') {
+            expose(node, [node]); // 단독 컴포넌트(세트 멤버는 세트 선택으로 처리)
           }
         }
         post({ type: 'PROPERTIES_RESULT', created, props });
