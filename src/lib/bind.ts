@@ -23,8 +23,6 @@ export interface BindResult {
   flags: string[];
   /** UX3: 스킵/건너뜀 사유별 집계(키→건수). 예: { 'no-match': 2, 'hug-fill': 3 }. */
   reasons: Record<string, number>;
-  /** 사용량 한도로 일부만 적용되었는가(Free 티어). */
-  limited?: boolean;
   /** UX6: 사용자가 취소해 중단되었는가(이미 처리한 만큼은 유지). */
   cancelled?: boolean;
 }
@@ -65,39 +63,20 @@ function skip(res: BindResult, key: string): void {
   note(res, key);
 }
 
-/** 1회 실행 사용량 한도(미지정 시 무제한). */
-export interface BindLimits {
-  maxNodes?: number;
-  maxBindings?: number;
-}
-
-interface Budget {
-  nodes: number;
-  maxBindings: number;
-  limited: boolean;
-}
-
 export async function bindSelection(
   selection: readonly SceneNode[],
   tolerance: number,
-  limits: BindLimits = {},
   apply = true, // UX1: false면 dry-run(미리보기) — 변경 없이 동일 집계만.
   hooks: BindHooks = {}, // UX6: 진행률·취소.
 ): Promise<BindResult> {
   const entries = await buildIndex();
   const res: BindResult = { bound: 0, skipped: 0, flags: [], reasons: {} };
   const flagSet = new Set<string>();
-  const budget: Budget = {
-    nodes: limits.maxNodes ?? Infinity,
-    maxBindings: limits.maxBindings ?? Infinity,
-    limited: false,
-  };
   const prog: Progress = { done: 0, total: hooks.onProgress ? countNodes(selection) : 0, every: 50 };
   for (const node of selection) {
-    await walk(node, entries, tolerance, res, flagSet, budget, apply, hooks, prog);
+    await walk(node, entries, tolerance, res, flagSet, apply, hooks, prog);
     if (res.cancelled) break;
   }
-  if (budget.limited) res.limited = true;
   res.flags = [...flagSet];
   hooks.onProgress?.(prog.done, prog.total); // 최종 진행률(100%)
   return res;
@@ -174,18 +153,11 @@ async function walk(
   tol: number,
   res: BindResult,
   flags: Set<string>,
-  budget: Budget,
   apply: boolean,
   hooks: BindHooks,
   prog: Progress,
 ): Promise<void> {
   if (res.cancelled) return;
-  // 사용량 한도(노드 수 / 누적 바인딩 수) 초과 시 비파괴 중단 — 처리한 만큼만 적용.
-  if (budget.nodes <= 0 || res.bound >= budget.maxBindings) {
-    budget.limited = true;
-    return;
-  }
-  budget.nodes--;
   bindPaints(node, entries, res, apply);
   bindFrame(node, entries, tol, res, flags, apply);
   bindRadius(node, entries, tol, res, apply);
@@ -203,7 +175,7 @@ async function walk(
   }
   if ('children' in node)
     for (const c of node.children) {
-      await walk(c, entries, tol, res, flags, budget, apply, hooks, prog);
+      await walk(c, entries, tol, res, flags, apply, hooks, prog);
       if (res.cancelled) return;
     }
 }

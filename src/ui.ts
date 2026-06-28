@@ -265,6 +265,8 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
 
 /* ---------- 유료(Paid) 기능 게이트 (토큰 생성·시맨틱·컴포넌트·프리셋/이력) ---------- */
 const PAID_FIELDS = [
+  // 토큰 생성(적용)·시맨틱 매핑 — 미리보기/추출은 Free, 실제 생성만 Paid.
+  'btnCreateApply', 'btnSemantics',
   // 컴포넌트/베리언트
   'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps',
   // 공유 프리셋
@@ -279,6 +281,9 @@ function updateGate(): void {
   $('presetLock').textContent = lock;
   $('historyLock').textContent = lock;
   $('componentLock').textContent = lock;
+  $('semLock').textContent = lock;
+  // 토큰 카드: 미리보기는 Free, 생성(적용)만 Paid임을 명시.
+  $('createLock').textContent = isPaid ? '' : '🔒 생성은 Paid · 미리보기 무료';
   if (isPaid && !paidDataRequested) {
     paidDataRequested = true;
     send({ type: 'GET_PRESETS' });
@@ -286,7 +291,7 @@ function updateGate(): void {
   }
 }
 
-/* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
+/* ---------- 컴포넌트 / 베리언트 (Phase 3, Paid) ---------- */
 $('btnRegisterComp').addEventListener('click', () => {
   setStatus('componentStatus', '컴포넌트 등록 중…', '');
   send({ type: 'REGISTER_COMPONENTS' });
@@ -378,7 +383,7 @@ $('btnImportPreset').addEventListener('click', () => {
   send({ type: 'SAVE_PRESET', preset: parsed.preset });
 });
 
-/* ---------- 변경 이력 (M3.1, Team) ---------- */
+/* ---------- 변경 이력 (M3.1, Paid) ---------- */
 function renderHistory(): void {
   const box = $('historyList');
   box.innerHTML = '';
@@ -459,10 +464,10 @@ window.onmessage = (event: MessageEvent) => {
       const applyBtn = $('btnCreateApply') as HTMLButtonElement;
       if (msg.preview) {
         // UX1: 변경 요약을 먼저 보여주고 ‘적용’ 버튼 노출.
-        setStatus('createStatus', `미리보기 — ${msg.summary} · ‘적용’으로 반영`, msg.limited ? 'warn' : '');
+        setStatus('createStatus', `미리보기 — ${msg.summary} · ‘적용’으로 반영`, '');
         applyBtn.style.display = '';
       } else {
-        setStatus('createStatus', msg.summary, msg.limited ? 'warn' : 'ok');
+        setStatus('createStatus', msg.summary, 'ok');
         applyBtn.style.display = 'none';
       }
       break;
@@ -474,17 +479,16 @@ window.onmessage = (event: MessageEvent) => {
       hideApplyProgress(); // UX6
       const confirmBtn = $('btnApplyConfirm') as HTMLButtonElement;
       const rt = reasonsText(msg.reasons); // UX3: 사유별 스킵
-      const limitNote = msg.limited ? ' · ⚠ Free 한도 도달 — 일부만 적용(업그레이드 필요)' : '';
-      const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}${limitNote}`;
+      const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}`;
       if (msg.cancelled) {
         // UX6: 취소 — 처리한 만큼만 적용(비파괴).
         setStatus('applyStatus', `취소됨 — 바인딩 ${msg.bound}건만 적용${detail}`, 'warn');
         confirmBtn.style.display = 'none';
       } else if (msg.preview) {
-        setStatus('applyStatus', `미리보기 — 바인딩 ${msg.bound}건 예정${detail} · ‘선택에 바인딩’으로 반영`, msg.limited || msg.skipped ? 'warn' : '');
+        setStatus('applyStatus', `미리보기 — 바인딩 ${msg.bound}건 예정${detail} · ‘선택에 바인딩’으로 반영`, msg.skipped ? 'warn' : '');
         confirmBtn.style.display = '';
       } else {
-        setStatus('applyStatus', `바인딩 ${msg.bound}${detail}`, msg.limited || msg.skipped ? 'warn' : 'ok');
+        setStatus('applyStatus', `바인딩 ${msg.bound}${detail}`, msg.skipped ? 'warn' : 'ok');
         confirmBtn.style.display = 'none';
       }
       break;

@@ -31,8 +31,8 @@ const HISTORY_KEY = 'dsl.history';
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
-let presets: Preset[] = []; // M3(Team): 공유 프리셋
-let history: HistoryEntry[] = []; // M3.1(Team): 변경 이력
+let presets: Preset[] = []; // M3(Paid): 공유 프리셋
+let history: HistoryEntry[] = []; // M3.1(Paid): 변경 이력
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
 
 function effective(): {
@@ -46,6 +46,8 @@ function effective(): {
     return { tier: ev.tier, source: 'key', status: ev.status, expiresAt: cache.expiresAt };
   }
   if (devTier !== 'free') return { tier: devTier, source: 'dev' };
+  // 개발 빌드에선 강제 티어 토글이 활성 출처(free 포함) — UI가 토글 상태를 숨기지 않도록.
+  if (__DEV__) return { tier: 'free', source: 'dev' };
   return { tier: 'free', source: 'none' };
 }
 
@@ -81,7 +83,7 @@ async function loadLicense(): Promise<void> {
   }
 }
 
-/** 변경 이력 기록(항상 로컬). 조회/비우기만 Team 게이팅. */
+/** 변경 이력 기록(항상 로컬). 조회/비우기만 Paid 게이팅. */
 function record(action: HistoryAction, summary: string): void {
   history = pushHistory(history, { at: Date.now(), action, summary });
   void figma.clientStorage.setAsync(HISTORY_KEY, history).catch(() => {});
@@ -215,11 +217,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'APPLY': {
         bindCancel = false; // UX6: 새 작업 시작 시 취소 플래그 초기화
-        // 바인딩은 Free·무제한. UX1: preview면 dry-run(바인딩 없이 집계). UX3: 사유별 스킵. UX6: 진행률·취소.
+        // 바인딩은 Free(무제한). UX1: preview면 dry-run(바인딩 없이 집계). UX3: 사유별 스킵. UX6: 진행률·취소.
         const r = await bindSelection(
           selection(),
           msg.tolerance,
-          { maxNodes: Infinity, maxBindings: Infinity },
           !msg.preview,
           {
             onProgress: (done, total) => post({ type: 'PROGRESS', op: 'bind', done, total }),
@@ -233,12 +234,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           skipped: r.skipped,
           flags: r.flags,
           reasons: r.reasons,
-          limited: !!r.limited,
           preview: msg.preview,
           cancelled: r.cancelled,
         });
         if (!msg.preview) {
-          if (!r.cancelled) record('bind', `바인딩 ${r.bound} · 스킵 ${r.skipped}${r.limited ? ' · 한도 도달' : ''}`);
+          if (!r.cancelled) record('bind', `바인딩 ${r.bound} · 스킵 ${r.skipped}`);
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
         }
         break;
