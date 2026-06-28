@@ -8,6 +8,7 @@ import type { LicenseStatus, VerifyResult } from '../lib/license';
 import type { Preset } from '../lib/presets';
 import type { ExportFormat } from '../lib/exporters';
 import type { WcagLevel, ContrastFinding } from '../lib/contrast';
+import type { FrameMeta, VaryingPosition } from '../lib/similar';
 
 export interface CollectionInfo {
   id: string;
@@ -152,6 +153,9 @@ export type UiToCode =
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Pro): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Pro): 선택 세트의 빠진 조합 자동 생성
   | { type: 'EXPOSE_PROPERTIES' } // Phase 4.1(Pro): 컴포넌트 속성(Boolean/Text/Instance-swap) 노출
+  | { type: 'SCAN_SIMILAR' } // 닮은 프레임 컴포넌트화: 선택 프레임 정렬·가변 위치·마스터 추천(미리보기, Free)
+  | { type: 'FOCUS_NODE'; id: string } // 후보 행 포커스 → 캔버스에서 해당 노드 선택+줌(마스터 판단 근거)
+  | { type: 'COMPONENTIZE_SIMILAR'; masterId: string; frameIds: string[] } // 적용(Paid): 마스터 컴포넌트 + 인스턴스 오버라이드
   | { type: 'CHECK_CONTRAST'; level: WcagLevel } // 명도 대비 점검(읽기 전용 감사)
   | { type: 'APPLY_CONTRAST_FIX'; nodeId: string; hex: string } // #2: 보정색을 해당 노드 단색 채움에 적용
   | { type: 'GET_VARIABLES' } // R1: 3계층 변수 목록(편집기)
@@ -199,6 +203,15 @@ export type CodeToUi =
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[] } // Phase 3
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'PROPERTIES_RESULT'; created: number; props: string[] } // Phase 4.1
+  | {
+      type: 'SIMILAR_CANDIDATES'; // 닮은 프레임 스캔 결과(미리보기)
+      metas: FrameMeta[]; // 멤버 메타(점수 내림차순 → 추천 맨 앞)
+      recommendedMasterId: string | null;
+      varying: VaryingPosition[]; // 가변 위치(노출될 속성)
+      imageWarnings: string[]; // 이미지 fill 경로(교체 불가 안내)
+      excluded: { id: string; name: string; reason: string }[];
+    }
+  | { type: 'COMPONENTIZE_RESULT'; master: string; properties: number; instances: number; warnings: string[] }
   // 명도 대비 점검: 텍스트-배경 쌍 평가 결과 + 추출 단계에서 건너뛴 사유별 집계(skipped).
   | { type: 'CONTRAST_RESULT'; level: WcagLevel; checked: number; passed: number; failed: number; findings: ContrastFinding[]; skipped: Record<string, number> }
   | { type: 'VARIABLES'; vars: VarInfo[] } // R1: 편집기용 변수 목록

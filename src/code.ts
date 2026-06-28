@@ -13,6 +13,7 @@ import { parseVarValue, sanitizeScopes, aliasSelfReference, findAliasReferers } 
 import { darkValueForLight, darkGlobalName } from './lib/themeGen';
 import { ExportToken, ThemeValue, TokenKind, exportTokens } from './lib/exporters';
 import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates } from './lib/components';
+import { alignFrames, planContentProperties, flattenFrame, overridesForFrame, type FrameNode as SimNode } from './lib/similar';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, Feature, isTier, isPaid, coerceTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
@@ -151,6 +152,44 @@ function arrangeSet(set: ComponentSetNode): void {
     maxRow = Math.max(maxRow, g.row);
   }
   set.resizeWithoutConstraints(pad * 2 + (maxCol + 1) * cellW + maxCol * gap, pad * 2 + (maxRow + 1) * cellH + maxRow * gap);
+}
+
+/* ---------- 닮은 프레임 컴포넌트화 ---------- */
+/** figma 노드 → similar.ts 입력 트리(콘텐츠 신호 포함). INSTANCE key는 async 조회. */
+async function buildSimTree(node: SceneNode): Promise<SimNode> {
+  const out: SimNode = { id: node.id, name: node.name, type: node.type };
+  if (node.type === 'TEXT') out.characters = typeof node.characters === 'string' ? node.characters : '';
+  if (node.type === 'INSTANCE') {
+    const mc = await node.getMainComponentAsync();
+    if (mc) out.componentKey = mc.key || mc.id;
+  }
+  const fills = (node as { fills?: unknown }).fills;
+  if (Array.isArray(fills) && fills.some((p) => (p as Paint).type === 'IMAGE' && (p as Paint).visible !== false)) out.hasImageFill = true;
+  if ('children' in node) {
+    const kids: SimNode[] = [];
+    for (const c of (node as SceneNode & ChildrenMixin).children as readonly SceneNode[]) kids.push(await buildSimTree(c));
+    out.children = kids;
+  }
+  return out;
+}
+
+/** flattenFrame과 동일한 이름-경로 규칙으로 figma 자식 노드를 경로별로 매핑(속성 연결용). */
+function figmaPathMap(root: SceneNode): Map<string, SceneNode> {
+  const map = new Map<string, SceneNode>();
+  const visit = (node: SceneNode, prefix: string): void => {
+    if (!('children' in node)) return;
+    const seen = new Map<string, number>();
+    for (const c of (node as SceneNode & ChildrenMixin).children as readonly SceneNode[]) {
+      const n = (seen.get(c.name) ?? 0) + 1;
+      seen.set(c.name, n);
+      const seg = n === 1 ? c.name : `${c.name}#${n}`;
+      const path = prefix ? `${prefix}/${seg}` : seg;
+      map.set(path, c);
+      visit(c, path);
+    }
+  };
+  visit(root, '');
+  return map;
 }
 
 /** #6: 텍스트 범위 바인딩 필드(나머지는 노드 스칼라 필드). */
@@ -1074,6 +1113,111 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'PROPERTIES_RESULT', created, props });
         if (created) commitUndo(figma); // UX2
+        break;
+      }
+      case 'SCAN_SIMILAR': {
+        // 미리보기(읽기 전용)는 Free — 선택 프레임을 정렬해 가변 위치·마스터 추천을 보여준다.
+        const frames = selection().filter((n) => n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'COMPONENT');
+        const trees: SimNode[] = [];
+        for (const f of frames) trees.push(await buildSimTree(f));
+        const r = alignFrames(trees);
+        post({
+          type: 'SIMILAR_CANDIDATES',
+          metas: r.metas,
+          recommendedMasterId: r.recommendedMasterId,
+          varying: r.varying,
+          imageWarnings: r.imageWarnings,
+          excluded: r.excluded,
+        });
+        break;
+      }
+      case 'FOCUS_NODE': {
+        // 후보 행 포커스 → 캔버스에서 해당 프레임 선택+줌(마스터 판단 근거, 읽기 전용).
+        const n = await figma.getNodeByIdAsync(msg.id);
+        if (n && 'type' in n && n.type !== 'PAGE' && n.type !== 'DOCUMENT') {
+          const sn = n as SceneNode;
+          figma.currentPage.selection = [sn];
+          figma.viewport.scrollAndZoomIntoView([sn]);
+        }
+        break;
+      }
+      case 'COMPONENTIZE_SIMILAR': {
+        if (!requirePaid('components', '닮은 프레임 컴포넌트화는 Paid 기능입니다.')) break;
+        const master = await figma.getNodeByIdAsync(msg.masterId);
+        if (!master || (master.type !== 'FRAME' && master.type !== 'GROUP')) {
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, warnings: ['마스터 프레임을 찾을 수 없습니다.'] });
+          break;
+        }
+        // 멤버 노드 수집(마스터 포함) → 트리·정렬·속성 계획을 live 노드에서 재도출.
+        const memberNodes: SceneNode[] = [];
+        for (const id of msg.frameIds) {
+          const n = await figma.getNodeByIdAsync(id);
+          if (n && 'type' in n) memberNodes.push(n as SceneNode);
+        }
+        const trees: SimNode[] = [];
+        for (const n of memberNodes) trees.push(await buildSimTree(n));
+        const treeById = new Map(memberNodes.map((n, i) => [n.id, trees[i]]));
+        const aligned = alignFrames(trees);
+        const plan = planContentProperties(aligned.varying);
+
+        // 1) 마스터 → 컴포넌트(자식·이름 보존). 원본 자리에 컴포넌트가 위치.
+        const comp = figma.createComponentFromNode(master as FrameNode);
+        // 2) 가변 위치를 컴포넌트 속성으로 노출 + 레이어 연결(기본값=마스터 콘텐츠).
+        const compPaths = figmaPathMap(comp);
+        const propIdByPath = new Map<string, string>();
+        let properties = 0;
+        for (const p of plan) {
+          const target = compPaths.get(p.path);
+          if (!target) continue;
+          try {
+            let def = '';
+            if (p.type === 'TEXT') def = target.type === 'TEXT' ? target.characters : '';
+            else {
+              const mc = target.type === 'INSTANCE' ? await target.getMainComponentAsync() : null;
+              def = mc ? mc.key || mc.id : '';
+            }
+            const id = comp.addComponentProperty(p.propName, p.type, def);
+            const refs = { ...(target.componentPropertyReferences ?? {}) };
+            refs[p.field] = id;
+            target.componentPropertyReferences = refs;
+            propIdByPath.set(p.path, id);
+            properties++;
+          } catch {
+            /* 미발행 INSTANCE_SWAP 등 실패 시 스킵 */
+          }
+        }
+        // 3) 마스터 외 멤버 → 인스턴스로 교체(각 프레임 콘텐츠를 오버라이드로 이식).
+        let instances = 0;
+        for (const n of memberNodes) {
+          if (n.id === msg.masterId) continue; // 마스터는 이미 컴포넌트로 소비됨
+          const leaves = treeById.get(n.id);
+          if (!leaves) continue;
+          try {
+            const inst = comp.createInstance();
+            inst.x = n.x;
+            inst.y = n.y;
+            try { inst.resize(n.width, n.height); } catch { /* 제약상 리사이즈 불가 시 기본 크기 */ }
+            if (n.parent) n.parent.appendChild(inst);
+            const ov = overridesForFrame(flattenFrame(leaves), plan);
+            const props: Record<string, string> = {};
+            for (const p of plan) {
+              const v = ov[p.propName];
+              const id = propIdByPath.get(p.path);
+              if (v !== undefined && id) props[id] = v;
+            }
+            try { inst.setProperties(props); } catch { /* 일부 오버라이드 실패 무시 */ }
+            n.remove();
+            instances++;
+          } catch {
+            /* 인스턴스 생성 실패 시 원본 보존 */
+          }
+        }
+        const warnings = [
+          ...aligned.imageWarnings.map((p) => `이미지 '${p}'는 인스턴스가 아니라 교체 속성으로 노출 불가(인스턴스로 감싸세요).`),
+          ...aligned.excluded.map((e) => `${e.name}: ${e.reason}`),
+        ];
+        post({ type: 'COMPONENTIZE_RESULT', master: comp.name, properties, instances, warnings });
+        commitUndo(figma); // UX2: 전체를 단일 Undo로
         break;
       }
       case 'CHECK_CONTRAST': {
