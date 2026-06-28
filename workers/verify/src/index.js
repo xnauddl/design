@@ -1,8 +1,9 @@
 /* ============================================================
    Cloudflare Worker — 라이선스 검증기 (수익화 검증 방식 C)
-   POST /verify { key, instanceName?, instanceId? }
-     → instanceId 있으면 해당 기기로 validate, 없으면 activate(activation_limit으로 기기 수 제한).
-     → 유효하면 ES256 서명 JWT와 기기 instanceId를 반환({ token, instanceId? }).
+   POST /verify { key, instanceName?, instanceId?, action? }
+     · action='verify'(기본): instanceId 있으면 해당 기기로 validate, 없으면 activate(activation_limit으로 기기 수 제한).
+       → 유효하면 ES256 서명 JWT와 기기 instanceId를 반환({ token, instanceId? }).
+     · action='deactivate': 해당 instanceId의 활성화를 LS에서 반납 → { deactivated: true }.
      CORS: 플러그인 UI iframe에서 호출하므로 모든 응답에 CORS 헤더 + OPTIONS 프리플라이트 처리.
    플러그인은 공개키로 토큰을 검증하고 clientStorage에 캐시(오프라인 grace).
    비밀(개인키·LS 설정)은 Worker secret/vars로만 보관 — 디자인 데이터는 다루지 않음.
@@ -17,6 +18,7 @@
 
 const LS_VALIDATE = 'https://api.lemonsqueezy.com/v1/licenses/validate';
 const LS_ACTIVATE = 'https://api.lemonsqueezy.com/v1/licenses/activate';
+const LS_DEACTIVATE = 'https://api.lemonsqueezy.com/v1/licenses/deactivate';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // 플러그인 UI는 별도 출처(브라우저 iframe)에서 호출하므로 CORS가 필요하다.
@@ -90,8 +92,21 @@ export default {
     const key = typeof req.key === 'string' ? req.key.trim() : '';
     if (!key) return json({ valid: false, error: '라이선스 키 없음' }, 400);
     const instanceName = typeof req.instanceName === 'string' ? req.instanceName : (env.LICENSE_AUD || 'plugin');
-    // 이전 활성화에서 받아 플러그인이 보관한 instance_id(있으면 해당 기기로 바인딩 재검증).
+    // 이전 활성화에서 받아 플러그인이 보관한 instance_id(있으면 해당 기기로 바인딩 재검증/반납).
     const instanceId = typeof req.instanceId === 'string' && req.instanceId ? req.instanceId : '';
+    const action = typeof req.action === 'string' ? req.action : 'verify';
+
+    // 해제(deactivate): 이 기기의 활성화 슬롯을 LS에서 반납 → 같은/다른 기기 재활성화 가능.
+    if (action === 'deactivate') {
+      if (!instanceId) return json({ deactivated: false, error: 'instanceId 없음' }, 400);
+      try {
+        const data = await lsCall(LS_DEACTIVATE, { license_key: key, instance_id: instanceId });
+        if (data.deactivated === true) return json({ deactivated: true });
+        return json({ deactivated: false, error: data.error || '비활성화 실패' }, 200);
+      } catch (e) {
+        return json({ deactivated: false, error: `검증 서버 오류: ${e && e.message ? e.message : e}` }, 502);
+      }
+    }
 
     // 오너 관리자 키(선택) — LS 없이 장기 paid 토큰(스모크 테스트용).
     const adminKeys = (env.ADMIN_KEYS || '').split(',').map((s) => s.trim()).filter(Boolean);

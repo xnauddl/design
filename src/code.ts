@@ -308,6 +308,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CLEAR_LICENSE': {
+        // 로컬 해제 전, 활성화된 기기를 LS에서 반납(슬롯 회수, best-effort). 네트워크는 UI에서.
+        if (cache && cache.instanceId) post({ type: 'REQUEST_DEACTIVATE', key: cache.key, instanceId: cache.instanceId });
         cache = null;
         try {
           await figma.clientStorage.deleteAsync(CACHE_KEY);

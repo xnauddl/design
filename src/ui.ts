@@ -247,6 +247,22 @@ async function verifyAndReport(key: string, instanceId?: string): Promise<void> 
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
 
+/** 해제 시 이 기기의 LS 활성화 슬롯 반납(best-effort). 실패해도 로컬 해제는 이미 적용됨(포털 수동 해제는 폴백). */
+async function deactivateInstance(key: string, instanceId: string): Promise<void> {
+  try {
+    const resp = await fetch(VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deactivate', key, instanceId, pluginId: PLUGIN_ID }),
+    });
+    const json = (await resp.json()) as { deactivated?: boolean };
+    if (json && json.deactivated) setStatus('licenseStatus', '이 기기의 활성화를 해제했습니다.', 'ok');
+    // 실패는 조용히 무시 — 로컬 해제는 이미 적용됨.
+  } catch {
+    /* 오프라인 — best-effort, 무시 */
+  }
+}
+
 /* ---------- 유료(Paid) 기능 게이트 (토큰 생성·시맨틱·컴포넌트·프리셋/이력) ---------- */
 const PAID_FIELDS = [
   // 컴포넌트/베리언트
@@ -579,6 +595,10 @@ window.onmessage = (event: MessageEvent) => {
     case 'REQUEST_VERIFY':
       // code가 캐시된 키의 (재)검증을 요청 — 보관된 instanceId로 같은 기기에 validate.
       void verifyAndReport(msg.key, msg.instanceId);
+      break;
+    case 'REQUEST_DEACTIVATE':
+      // 해제 시 이 기기의 LS 활성화 슬롯 반납(best-effort) — 로컬 해제는 code에서 이미 완료.
+      void deactivateInstance(msg.key, msg.instanceId);
       break;
     case 'ERROR': {
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
