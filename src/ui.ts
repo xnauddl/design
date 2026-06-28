@@ -739,7 +739,8 @@ const TEAM_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
 
-const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps'];
+// btnTextStyles(등록)는 Pro — btnScanText(스캔/미리보기)는 Free라 제외(code.ts SCAN_TEXT_STYLES 무게이팅).
+const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps', 'btnTextStyles'];
 
 /**
  * 통합 게이트(#11·#12) — 유료 잠금(Pro/Team)과 전제 미충족(Global/바인딩 변수 없음)을
@@ -752,6 +753,7 @@ function updateGates(): void {
   $('presetLock').textContent = isTeam ? '' : '🔒 Team 전용';
   $('componentLock').textContent = isPro ? '' : '🔒 Pro 전용';
   $('wizComponentLock').textContent = isPro ? '' : '🔒 Pro';
+  $('textStyleLock').textContent = isPro ? '' : '🔒 Pro 전용';
   ($('wizOptComponentize') as HTMLInputElement).disabled = !isPro;
 
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
