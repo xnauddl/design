@@ -103,11 +103,11 @@ $('btnPalette').addEventListener('click', () => {
   });
   tokens = paletteToDraftTokens(p);
   renderTokens();
-  // 시맨틱 매핑 textarea를 색상 추천값으로 채움(편집 가능) + 비색상(간격·반경) 병합
+  // 시맨틱 매핑 textarea를 색상 추천값으로 채움(편집 가능). 비색상(간격·반경)은 색만 있는
+  // 팔레트엔 해당 토큰이 없어 추천이 없으므로, 토큰 추출(EXTRACT_RESULT) 경로에서만 병합한다.
   ($('semMap') as HTMLTextAreaElement).value = Object.entries(suggestSemanticMap(p))
     .map(([role, global]) => `${role} = ${global}`)
     .join('\n');
-  mergeSemSuggestions(suggestNonColorSemanticMap(tokens.map((t) => t.name)));
   $('paletteInfo').textContent = `${p.scales.length}계열 · ${tokens.length}색 생성`;
   setStatus(
     'paletteStatus',
