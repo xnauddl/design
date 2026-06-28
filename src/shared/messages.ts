@@ -179,7 +179,8 @@ export type CodeToUi =
   | {
       type: 'LICENSE_STATUS';
       tier: Tier;
-      unlimited: boolean;
+      /** 유료(Paid) 여부 — 유료 기능 잠금 해제 표시용. */
+      paid: boolean;
       /** 라이선스 출처: 검증 키 / 개발용 강제 / 없음. */
       source: 'key' | 'dev' | 'none';
       /** 키 기반일 때의 캐시 평가 상태. */

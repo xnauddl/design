@@ -44,7 +44,7 @@ export interface WizardOptions {
 
 /** 실행 시점의 게이팅 컨텍스트(티어·매핑 존재 여부). */
 export interface WizardContext {
-  isPro: boolean;
+  isPaid: boolean;
   /** 시맨틱 매핑 텍스트에 한 줄이라도 매핑이 있는지. */
   hasSemanticMap: boolean;
 }
@@ -62,7 +62,7 @@ export interface WizardPlanItem {
  * - 필수 단계: 항상 실행.
  * - 선택 단계: 옵션이 꺼져 있으면 건너뜀.
  * - 시맨틱: 옵션이 켜져도 매핑이 없으면 건너뜀(만들 별칭이 없음).
- * - Pro 단계: 옵션이 켜져도 비Pro면 건너뜀.
+ * - Paid 단계: 옵션이 켜져도 비Paid면 건너뜀.
  */
 export function planWizard(options: WizardOptions, ctx: WizardContext): WizardPlanItem[] {
   return WIZARD_STEPS.map((step) => {
@@ -70,7 +70,7 @@ export function planWizard(options: WizardOptions, ctx: WizardContext): WizardPl
     const enabled = options[step.id as keyof WizardOptions];
     if (!enabled) return { step, run: false, skipReason: '옵션 꺼짐' };
     if (step.id === 'semantics' && !ctx.hasSemanticMap) return { step, run: false, skipReason: '매핑 없음' };
-    if (step.pro && !ctx.isPro) return { step, run: false, skipReason: 'Pro 전용' };
+    if (step.pro && !ctx.isPaid) return { step, run: false, skipReason: 'Paid 전용' };
     return { step, run: true };
   });
 }

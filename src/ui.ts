@@ -7,10 +7,10 @@ import { scopesForTypeList } from './lib/tokens';
 import { validateVarName } from './lib/variableEdit';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
-import { FREE_LIMITS, type Tier } from './lib/entitlements';
+import { type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
-import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
+import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
@@ -36,9 +36,8 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
-let isTeam = false;
-let isPro = false;
-let teamDataRequested = false;
+let isPaid = false;
+let paidDataRequested = false;
 // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩).
 let hasGlobal = false;
 let hasBindable = false;
@@ -578,7 +577,7 @@ async function runWizard(): Promise<void> {
     contrast: ($('wizOptContrast') as HTMLInputElement).checked,
     componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
   };
-  const ctx: WizardContext = { isPro, hasSemanticMap: Object.keys(semMap).length > 0 };
+  const ctx: WizardContext = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
   const plan = planWizard(options, ctx);
 
   wizardRunning = true;
@@ -674,9 +673,18 @@ async function runWizard(): Promise<void> {
 $('btnWizardRun').addEventListener('click', () => void runWizard());
 $('btnWizardCancel').addEventListener('click', () => send({ type: 'CANCEL' }));
 
-$('tier').addEventListener('change', () => {
-  send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
-});
+// 개발용 강제 티어 토글 — 개발 빌드에서만 노출/동작(배포 빌드 백도어 차단).
+if (__DEV__) {
+  $('tier').addEventListener('change', () => {
+    send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
+  });
+} else {
+  $('devTierRow').style.display = 'none';
+}
+
+// 구매(LemonSqueezy 체크아웃) · 구독/기기 관리(Customer Portal) — 새 탭으로 이동.
+$('btnBuy').addEventListener('click', () => window.open(PURCHASE_URL, '_blank'));
+$('btnManage').addEventListener('click', () => window.open(PORTAL_URL, '_blank'));
 
 $('btnVerify').addEventListener('click', () => {
   const key = ($('licenseKey') as HTMLInputElement).value.trim();
@@ -734,35 +742,36 @@ async function verifyAndReport(key: string): Promise<void> {
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
 
-/* ---------- 팀 기능 게이트 (M3 프리셋, Team) ---------- */
-const TEAM_FIELDS = [
+/* ---------- 유료(Paid) 기능 게이트 (토큰 생성·시맨틱·컴포넌트·텍스트 스타일·프리셋) ---------- */
+// 모두 Paid 잠금 대상. btnScanText(스캔/미리보기)는 Free라 제외(code.ts SCAN_TEXT_STYLES 무게이팅).
+const PAID_FIELDS = [
+  // 컴포넌트/베리언트·텍스트 스타일
+  'btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps', 'btnTextStyles',
+  // 공유 프리셋
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
 
-// btnTextStyles(등록)는 Pro — btnScanText(스캔/미리보기)는 Free라 제외(code.ts SCAN_TEXT_STYLES 무게이팅).
-const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps', 'btnTextStyles'];
-
 /**
- * 통합 게이트(#11·#12) — 유료 잠금(Pro/Team)과 전제 미충족(Global/바인딩 변수 없음)을
+ * 통합 게이트(#11·#12) — 유료 잠금(Paid)과 전제 미충족(Global/바인딩 변수 없음)을
  * 한 메커니즘으로: 해당 버튼 disabled + 배지/안내(+바로가기) 표시.
  */
 function updateGates(): void {
-  // 유료 잠금(#12)
-  for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
-  for (const id of PRO_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPro;
-  $('presetLock').textContent = isTeam ? '' : '🔒 Team 전용';
-  $('componentLock').textContent = isPro ? '' : '🔒 Pro 전용';
-  $('wizComponentLock').textContent = isPro ? '' : '🔒 Pro';
-  $('textStyleLock').textContent = isPro ? '' : '🔒 Pro 전용';
-  ($('wizOptComponentize') as HTMLInputElement).disabled = !isPro;
+  // 유료 잠금(#12) — Free/Paid 2티어
+  const lock = isPaid ? '' : '🔒 Paid 전용';
+  for (const id of PAID_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPaid;
+  $('presetLock').textContent = lock;
+  $('componentLock').textContent = lock;
+  $('wizComponentLock').textContent = isPaid ? '' : '🔒 Paid';
+  $('textStyleLock').textContent = lock;
+  ($('wizOptComponentize') as HTMLInputElement).disabled = !isPaid;
 
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
   setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 바인딩할 변수를 만드세요.');
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
 
-  if (isTeam && !teamDataRequested) {
-    teamDataRequested = true;
+  if (isPaid && !paidDataRequested) {
+    paidDataRequested = true;
     send({ type: 'GET_PRESETS' });
   }
 }
@@ -1352,17 +1361,16 @@ function mainSwitch(msg: CodeToUi): void {
             : '없음';
       const exp = msg.expiresAt ? ` · 만료 ${new Date(msg.expiresAt).toISOString().slice(0, 10)}` : '';
       $('licenseInfo').textContent = `현재: ${msg.tier.toUpperCase()} (${srcLabel})${exp}`;
-      const cap = (n: number) => (msg.unlimited ? '∞' : String(n));
-      $('limitsInfo').textContent =
-        `1회 한도 — 노드 ${cap(FREE_LIMITS.nodes)} · 토큰 ${cap(FREE_LIMITS.tokens)} · 바인딩 ${cap(FREE_LIMITS.bindings)}`;
-      // 개발용 토글은 검증 키가 없을 때만 의미가 있으므로, 키가 적용 중이면 표시만 동기화
-      if (msg.source !== 'key') ($('tier') as HTMLSelectElement).value = msg.tier;
+      $('limitsInfo').textContent = msg.paid
+        ? 'Paid — 모든 기능 잠금 해제(토큰 생성·시맨틱·컴포넌트·텍스트 스타일·프리셋).'
+        : 'Free — 팔레트·리네임·바인딩·미리보기·내보내기. 토큰 생성·시맨틱·컴포넌트는 Paid.';
+      // 개발용 토글은 검증 키가 없을 때만 의미가 있으므로, 키가 적용 중이면 표시만 동기화(개발 빌드 전용)
+      if (__DEV__ && msg.source !== 'key') ($('tier') as HTMLSelectElement).value = msg.tier;
       if (msg.note) {
         const cls = /실패|오프라인/.test(msg.note) ? 'warn' : 'ok';
         setStatus('licenseStatus', msg.note, cls);
       }
-      isTeam = msg.tier === 'team';
-      isPro = msg.tier === 'pro' || msg.tier === 'team';
+      isPaid = msg.paid;
       updateGates();
       break;
     }
@@ -1447,14 +1455,14 @@ function mainSwitch(msg: CodeToUi): void {
       renderContrast(msg);
       break;
     case 'PREMIUM_REQUIRED': {
-      // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 팀 기능은 ‘관리’ 탭).
+      // 기능에 맞는 카드 영역으로 라우팅(토큰=만들기, 시맨틱=매핑, 컴포넌트=적용, 프리셋=관리).
       const statusId =
         msg.feature === 'components'
           ? 'componentStatus'
-          : msg.feature === 'textStyles'
-            ? 'tsStatus'
-            : msg.feature === 'teamPresets'
-              ? 'presetStatus'
+          : msg.feature === 'presets'
+            ? 'presetStatus'
+            : msg.feature === 'semantics'
+              ? 'semStatus'
               : 'createStatus';
       setStatus(statusId, t('premium.required', { message: msg.message, feature: msg.feature }), 'warn');
       break;

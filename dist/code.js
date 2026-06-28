@@ -1907,30 +1907,8 @@
   }
 
   // src/lib/entitlements.ts
-  var TIERS = ["free", "pro", "team"];
-  var TIER_RANK = { free: 0, pro: 1, team: 2 };
-  var FEATURE_MIN_TIER = {
-    unlimited: "pro",
-    components: "pro",
-    publish: "pro",
-    multiMode: "pro",
-    aiNaming: "pro",
-    teamPresets: "team"
-  };
-  function hasEntitlement(tier, feature) {
-    return TIER_RANK[tier] >= TIER_RANK[FEATURE_MIN_TIER[feature]];
-  }
-  var FREE_LIMITS = { nodes: 50, tokens: 100, bindings: 200 };
-  var UNLIMITED = { nodes: Infinity, tokens: Infinity, bindings: Infinity };
-  function limitsForTier(tier) {
-    return hasEntitlement(tier, "unlimited") ? UNLIMITED : FREE_LIMITS;
-  }
-  function clampCount(requested, limit) {
-    const allowed = Math.min(requested, limit);
-    return { allowed, limited: requested > limit, overflow: Math.max(0, requested - allowed) };
-  }
   function isTier(v) {
-    return typeof v === "string" && TIERS.includes(v);
+    return v === "free" || v === "paid";
   }
 
   // src/lib/license.ts
@@ -1998,7 +1976,7 @@
     post({
       type: "LICENSE_STATUS",
       tier: e.tier,
-      unlimited: hasEntitlement(e.tier, "unlimited"),
+      paid: e.tier === "paid",
       source: e.source,
       status: e.status,
       expiresAt: e.expiresAt,
@@ -2008,7 +1986,7 @@
   async function loadLicense() {
     try {
       const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
-      if (isTier(dt)) devTier = dt;
+      if (false) devTier = dt;
       const c = await figma.clientStorage.getAsync(CACHE_KEY);
       if (c && typeof c.key === "string" && isTier(c.tier) && typeof c.expiresAt === "number" && typeof c.lastVerified === "number") cache = c;
       const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
@@ -2028,9 +2006,9 @@
     } catch (e) {
     }
   }
-  function requireTeam() {
-    if (hasEntitlement(currentTier(), "teamPresets")) return true;
-    post({ type: "PREMIUM_REQUIRED", feature: "teamPresets", message: "\uD300 \uACF5\uC720 \uD504\uB9AC\uC14B/\uC774\uB825\uC740 Team \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
+  function requirePaid(feature, message) {
+    if (currentTier() === "paid") return true;
+    post({ type: "PREMIUM_REQUIRED", feature, message });
     return false;
   }
   function arrangeSet(set) {
@@ -2052,11 +2030,6 @@
       maxRow = Math.max(maxRow, g.row);
     }
     set.resizeWithoutConstraints(pad * 2 + (maxCol + 1) * cellW + maxCol * gap, pad * 2 + (maxRow + 1) * cellH + maxRow * gap);
-  }
-  function requirePro() {
-    if (hasEntitlement(currentTier(), "components")) return true;
-    post({ type: "PREMIUM_REQUIRED", feature: "components", message: "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
-    return false;
   }
   var TEXT_BIND_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily"]);
   async function applySelectedBinding(item) {
@@ -2103,11 +2076,6 @@
     } catch (e) {
       return false;
     }
-  }
-  function requireTextStyles() {
-    if (hasEntitlement(currentTier(), "components")) return true;
-    post({ type: "PREMIUM_REQUIRED", feature: "textStyles", message: "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
-    return false;
   }
   async function savePresets() {
     try {
@@ -2435,15 +2403,12 @@
           break;
         }
         case "CREATE_TOKENS": {
-          const limit = limitsForTier(currentTier()).tokens;
-          const c = clampCount(msg.tokens.length, limit);
-          const slice = msg.tokens.slice(0, c.allowed);
-          const s = msg.preview ? await previewCreateTokens(slice) : await createTokens(slice, msg.base);
+          if (!msg.preview && !requirePaid("tokens", "\uD1A0\uD070(\uBCC0\uC218) \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4. \uBBF8\uB9AC\uBCF4\uAE30\uB294 \uBB34\uB8CC\uB85C \uC81C\uACF5\uB429\uB2C8\uB2E4.")) break;
+          const s = msg.preview ? await previewCreateTokens(msg.tokens) : await createTokens(msg.tokens, msg.base);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
           let summary = `Global ${s.globals}\uAC1C (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated}) \xB7 Semantic\uC740 \uC2DC\uB9E8\uD2F1 \uB9E4\uD551 \uB2E8\uACC4\uC5D0\uC11C`;
           if (pruned) summary += ` \xB7 \uC774\uC804 \uC0C9 ${pruned}\uAC1C \uC815\uB9AC`;
-          if (c.limited) summary += ` \xB7 \u26A0 ${msg.tokens.length}\uAC1C \uC911 ${c.allowed}\uAC1C\uB9CC \uC801\uC6A9(Free \uD55C\uB3C4 ${limit}) \u2014 \uC5C5\uADF8\uB808\uC774\uB4DC \uD544\uC694`;
-          post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
+          post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, preview: msg.preview });
           if (!msg.preview) {
             commitUndo(figma);
             await postPrereq();
@@ -2451,12 +2416,11 @@
           break;
         }
         case "APPLY": {
-          const lim = limitsForTier(currentTier());
           bindCancel = false;
           const r = await bindSelection(
             selection(),
             msg.tolerance,
-            { maxNodes: lim.nodes, maxBindings: lim.bindings },
+            { maxNodes: Infinity, maxBindings: Infinity },
             !msg.preview,
             {
               onProgress: (done, total) => post({ type: "PROGRESS", op: "bind", done, total }),
@@ -2525,6 +2489,7 @@
           break;
         }
         case "CREATE_SEMANTICS": {
+          if (!requirePaid("semantics", "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const s = await createSemanticAliases(msg.map);
           post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
           commitUndo(figma);
@@ -2538,7 +2503,7 @@
           break;
         }
         case "CREATE_TEXT_STYLES": {
-          if (!requireTextStyles()) break;
+          if (!requirePaid("components", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
           post({ type: "TEXT_STYLES_RESULT", created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
           commitUndo(figma);
@@ -2631,6 +2596,7 @@
           break;
         }
         case "SET_LICENSE": {
+          if (true) break;
           devTier = msg.tier;
           try {
             await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);
@@ -2666,19 +2632,19 @@
           break;
         }
         case "GET_PRESETS": {
-          if (!requireTeam()) break;
+          if (!requirePaid("presets", "\uACF5\uC720 \uD504\uB9AC\uC14B\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           post({ type: "PRESETS", presets });
           break;
         }
         case "SAVE_PRESET": {
-          if (!requireTeam()) break;
+          if (!requirePaid("presets", "\uACF5\uC720 \uD504\uB9AC\uC14B\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           presets = upsertPreset(presets, msg.preset);
           await savePresets();
           post({ type: "PRESETS", presets });
           break;
         }
         case "DELETE_PRESET": {
-          if (!requireTeam()) break;
+          if (!requirePaid("presets", "\uACF5\uC720 \uD504\uB9AC\uC14B\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           presets = presets.filter((p) => p.name !== msg.name);
           await savePresets();
           post({ type: "PRESETS", presets });
@@ -2741,12 +2707,12 @@
           break;
         }
         case "SCAN_COMPONENT_CANDIDATES": {
-          if (!requirePro()) break;
+          if (!requirePaid("components", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           post({ type: "COMPONENT_CANDIDATES", nodes: scanComponentCandidates(selection()) });
           break;
         }
         case "REGISTER_COMPONENTS": {
-          if (!requirePro()) break;
+          if (!requirePaid("components", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           let registered = 0;
           let skipped = 0;
           const isContainerFrame = (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked;
@@ -2821,7 +2787,7 @@
           break;
         }
         case "CLASSIFY_VARIANTS": {
-          if (!requirePro()) break;
+          if (!requirePaid("components", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const comps = selection().filter((n) => n.type === "COMPONENT");
           const byName = /* @__PURE__ */ new Map();
           for (const c of comps) if (!byName.has(c.name)) byName.set(c.name, c);
@@ -2853,7 +2819,7 @@
           break;
         }
         case "GENERATE_MISSING_VARIANTS": {
-          if (!requirePro()) break;
+          if (!requirePaid("components", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const sets = selection().filter((n) => n.type === "COMPONENT_SET");
           let generated = 0;
           const combos = [];
@@ -2879,7 +2845,7 @@
           break;
         }
         case "EXPOSE_PROPERTIES": {
-          if (!requirePro()) break;
+          if (!requirePaid("components", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           let created = 0;
           const props = [];
           for (const node of selection()) {

@@ -596,6 +596,11 @@
 
     <div class="step">
       <h2>요금제 / 라이선스</h2>
+      <div class="muted">Paid(연 구독) — 토큰 생성·시맨틱 매핑·컴포넌트/베리언트·텍스트 스타일·프리셋 잠금 해제. 팔레트·리네임·바인딩·미리보기·내보내기는 무료.</div>
+      <div class="row">
+        <button id="btnBuy" class="primary">구독하기</button>
+        <button id="btnManage">구독 관리</button>
+      </div>
       <div class="row">
         <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
         <button id="btnVerify">검증</button>
@@ -603,21 +608,20 @@
       </div>
       <div class="muted" id="licenseInfo"></div>
       <div class="muted" id="limitsInfo"></div>
-      <div class="row">
+      <div class="row" id="devTierRow">
         <label class="inline">개발용 강제 티어
           <select id="tier">
             <option value="free">Free</option>
-            <option value="pro">Pro</option>
-            <option value="team">Team</option>
+            <option value="paid">Paid</option>
           </select>
         </label>
-        <span class="muted">(검증된 키가 없을 때만 적용)</span>
+        <span class="muted">(개발 빌드 전용 · 검증된 키가 없을 때만 적용)</span>
       </div>
       <div class="status" id="licenseStatus"></div>
     </div>
 
     <div class="step" id="presetCard">
-      <h2>팀 공유 프리셋 <span class="muted" id="presetLock"></span></h2>
+      <h2>공유 프리셋 <span class="muted" id="presetLock"></span></h2>
       <div class="hint">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다.</div>
       <div class="row">
         <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px;" />
@@ -837,10 +841,8 @@
   }
 
   // src/lib/entitlements.ts
-  var TIERS = ["free", "pro", "team"];
-  var FREE_LIMITS = { nodes: 50, tokens: 100, bindings: 200 };
   function isTier(v) {
-    return typeof v === "string" && TIERS.includes(v);
+    return v === "free" || v === "paid";
   }
 
   // src/lib/license.ts
@@ -931,6 +933,8 @@
   var LICENSE_AUD = PLUGIN_ID;
   var LICENSE_ALG = "ES256";
   var LICENSE_PUBLIC_JWK = { kty: "EC", crv: "P-256", x: "PLACEHOLDER", y: "PLACEHOLDER" };
+  var PURCHASE_URL = "https://example.lemonsqueezy.com/buy/PLACEHOLDER";
+  var PORTAL_URL = "https://app.lemonsqueezy.com/my-orders";
 
   // src/lib/presets.ts
   var PRESET_VERSION = 1;
@@ -1521,7 +1525,7 @@
       const enabled = options[step.id];
       if (!enabled) return { step, run: false, skipReason: "\uC635\uC158 \uAEBC\uC9D0" };
       if (step.id === "semantics" && !ctx.hasSemanticMap) return { step, run: false, skipReason: "\uB9E4\uD551 \uC5C6\uC74C" };
-      if (step.pro && !ctx.isPro) return { step, run: false, skipReason: "Pro \uC804\uC6A9" };
+      if (step.pro && !ctx.isPaid) return { step, run: false, skipReason: "Paid \uC804\uC6A9" };
       return { step, run: true };
     });
   }
@@ -1549,9 +1553,8 @@
   var $ = (id) => document.getElementById(id);
   var tokens = [];
   var presets = [];
-  var isTeam = false;
-  var isPro = false;
-  var teamDataRequested = false;
+  var isPaid = false;
+  var paidDataRequested = false;
   var hasGlobal = false;
   var hasBindable = false;
   var lastExportFormat = "w3c";
@@ -1999,7 +2002,7 @@
       contrast: $("wizOptContrast").checked,
       componentize: $("wizOptComponentize").checked
     };
-    const ctx = { isPro, hasSemanticMap: Object.keys(semMap).length > 0 };
+    const ctx = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
     const plan = planWizard(options, ctx);
     wizardRunning = true;
     $("btnWizardRun").disabled = true;
@@ -2087,9 +2090,15 @@
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
   $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
-  $("tier").addEventListener("change", () => {
-    send({ type: "SET_LICENSE", tier: $("tier").value });
-  });
+  if (false) {
+    $("tier").addEventListener("change", () => {
+      send({ type: "SET_LICENSE", tier: $("tier").value });
+    });
+  } else {
+    $("devTierRow").style.display = "none";
+  }
+  $("btnBuy").addEventListener("click", () => window.open(PURCHASE_URL, "_blank"));
+  $("btnManage").addEventListener("click", () => window.open(PORTAL_URL, "_blank"));
   $("btnVerify").addEventListener("click", () => {
     const key = $("licenseKey").value.trim();
     if (!key) {
@@ -2134,7 +2143,15 @@
     }
     send({ type: "LICENSE_VERIFIED", key, result });
   }
-  var TEAM_FIELDS = [
+  var PAID_FIELDS = [
+    // 컴포넌트/베리언트·텍스트 스타일
+    "btnScanComp",
+    "btnRegisterComp",
+    "btnClassifyVariants",
+    "btnGenMissing",
+    "btnExposeProps",
+    "btnTextStyles",
+    // 공유 프리셋
     "presetName",
     "btnSavePreset",
     "presetList",
@@ -2144,20 +2161,19 @@
     "btnImportPreset",
     "presetJson"
   ];
-  var PRO_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnExposeProps", "btnTextStyles"];
   function updateGates() {
-    for (const id of TEAM_FIELDS) $(id).disabled = !isTeam;
-    for (const id of PRO_FIELDS) $(id).disabled = !isPro;
-    $("presetLock").textContent = isTeam ? "" : "\u{1F512} Team \uC804\uC6A9";
-    $("componentLock").textContent = isPro ? "" : "\u{1F512} Pro \uC804\uC6A9";
-    $("wizComponentLock").textContent = isPro ? "" : "\u{1F512} Pro";
-    $("textStyleLock").textContent = isPro ? "" : "\u{1F512} Pro \uC804\uC6A9";
-    $("wizOptComponentize").disabled = !isPro;
+    const lock = isPaid ? "" : "\u{1F512} Paid \uC804\uC6A9";
+    for (const id of PAID_FIELDS) $(id).disabled = !isPaid;
+    $("presetLock").textContent = lock;
+    $("componentLock").textContent = lock;
+    $("wizComponentLock").textContent = isPaid ? "" : "\u{1F512} Paid";
+    $("textStyleLock").textContent = lock;
+    $("wizOptComponentize").disabled = !isPaid;
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!hasBindable) $("btnApplyConfirm").disabled = true;
-    if (isTeam && !teamDataRequested) {
-      teamDataRequested = true;
+    if (isPaid && !paidDataRequested) {
+      paidDataRequested = true;
       send({ type: "GET_PRESETS" });
     }
   }
@@ -2667,15 +2683,13 @@
         const srcLabel = msg.source === "key" ? `\uB77C\uC774\uC120\uC2A4 \uD0A4${msg.status ? ` \xB7 ${msg.status}` : ""}` : msg.source === "dev" ? "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C" : "\uC5C6\uC74C";
         const exp = msg.expiresAt ? ` \xB7 \uB9CC\uB8CC ${new Date(msg.expiresAt).toISOString().slice(0, 10)}` : "";
         $("licenseInfo").textContent = `\uD604\uC7AC: ${msg.tier.toUpperCase()} (${srcLabel})${exp}`;
-        const cap = (n) => msg.unlimited ? "\u221E" : String(n);
-        $("limitsInfo").textContent = `1\uD68C \uD55C\uB3C4 \u2014 \uB178\uB4DC ${cap(FREE_LIMITS.nodes)} \xB7 \uD1A0\uD070 ${cap(FREE_LIMITS.tokens)} \xB7 \uBC14\uC778\uB529 ${cap(FREE_LIMITS.bindings)}`;
-        if (msg.source !== "key") $("tier").value = msg.tier;
+        $("limitsInfo").textContent = msg.paid ? "Paid \u2014 \uBAA8\uB4E0 \uAE30\uB2A5 \uC7A0\uAE08 \uD574\uC81C(\uD1A0\uD070 \uC0DD\uC131\xB7\uC2DC\uB9E8\uD2F1\xB7\uCEF4\uD3EC\uB10C\uD2B8\xB7\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\xB7\uD504\uB9AC\uC14B)." : "Free \u2014 \uD314\uB808\uD2B8\xB7\uB9AC\uB124\uC784\xB7\uBC14\uC778\uB529\xB7\uBBF8\uB9AC\uBCF4\uAE30\xB7\uB0B4\uBCF4\uB0B4\uAE30. \uD1A0\uD070 \uC0DD\uC131\xB7\uC2DC\uB9E8\uD2F1\xB7\uCEF4\uD3EC\uB10C\uD2B8\uB294 Paid.";
+        if (false) $("tier").value = msg.tier;
         if (msg.note) {
           const cls = /실패|오프라인/.test(msg.note) ? "warn" : "ok";
           setStatus("licenseStatus", msg.note, cls);
         }
-        isTeam = msg.tier === "team";
-        isPro = msg.tier === "pro" || msg.tier === "team";
+        isPaid = msg.paid;
         updateGates();
         break;
       }
@@ -2758,7 +2772,7 @@
         renderContrast(msg);
         break;
       case "PREMIUM_REQUIRED": {
-        const statusId = msg.feature === "components" ? "componentStatus" : msg.feature === "textStyles" ? "tsStatus" : msg.feature === "teamPresets" ? "presetStatus" : "createStatus";
+        const statusId = msg.feature === "components" ? "componentStatus" : msg.feature === "presets" ? "presetStatus" : msg.feature === "semantics" ? "semStatus" : "createStatus";
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }
