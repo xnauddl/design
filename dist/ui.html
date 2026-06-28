@@ -317,10 +317,10 @@
 </head>
 <body>
   <div class="tabs" role="tablist" aria-label="작업 탭">
-    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard">마법사</button>
-    <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens">만들기</button>
-    <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply">적용</button>
-    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings">관리</button>
+    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard" data-i18n="tab.wizard">마법사</button>
+    <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
+    <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
+    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">관리</button>
   </div>
 
   <!-- 선택 동기화 (실시간) -->
@@ -331,17 +331,17 @@
   <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
     <div class="step" id="wizardCard">
-      <h2>시스템화 마법사</h2>
-      <div class="hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
+      <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
+      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
       <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> 시맨틱 매핑</label>
-        <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> 접근성 검수</label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> 컴포넌트화</label>
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span></label>
+        <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> <span data-i18n="wizardCard.optContrast">접근성 검수</span></label>
+        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span></label>
         <span class="muted" id="wizComponentLock"></span>
       </div>
       <div class="row">
-        <button id="btnWizardRun" class="primary">전체 실행</button>
-        <button id="btnWizardCancel" style="display:none">취소</button>
+        <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
+        <button id="btnWizardCancel" style="display:none" data-i18n="common.cancel">취소</button>
       </div>
       <div id="wizardSteps"></div>
       <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
@@ -861,7 +861,21 @@
     "pipeline.step.semantics": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
     "pipeline.step.bind": "\uBC14\uC778\uB529",
     "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
-    "pipeline.hint.needBindable": "\uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694"
+    "pipeline.hint.needBindable": "\uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
+    /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
+    "common.cancel": "\uCDE8\uC18C",
+    // 탭
+    "tab.wizard": "\uB9C8\uBC95\uC0AC",
+    "tab.tokens": "\uB9CC\uB4E4\uAE30",
+    "tab.apply": "\uC801\uC6A9",
+    "tab.settings": "\uAD00\uB9AC",
+    // 마법사 카드
+    "wizardCard.title": "\uC2DC\uC2A4\uD15C\uD654 \uB9C8\uBC95\uC0AC",
+    "wizardCard.hint": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC744 \uD55C \uBC88\uC5D0 <b>\uD1A0\uD070\uD654 \xB7 \uBC14\uC778\uB529 \xB7 \uC815\uB3C8 \xB7 \uC811\uADFC\uC131 \uAC80\uC218</b>. \uC138\uBD80\uAC12\uC740 \u2018\uB9CC\uB4E4\uAE30/\uC801\uC6A9\u2019 \uD0ED\uC758 \uAC01 \uC785\uB825(base\xB7\uD5C8\uC6A9\uC624\uCC28\xB7\uB9E5\uB77D\uB2E8\uACC4\xB7\uB300\uBE44 \uAE30\uC900)\uC744 \uC0AC\uC6A9\uD569\uB2C8\uB2E4.",
+    "wizardCard.optSemantics": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
+    "wizardCard.optContrast": "\uC811\uADFC\uC131 \uAC80\uC218",
+    "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
+    "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589"
   };
   function t(key, vars) {
     var _a;
@@ -3381,6 +3395,15 @@
       });
     });
   }
+  function applyStaticI18n(root = document) {
+    root.querySelectorAll("[data-i18n]").forEach((el) => {
+      el.textContent = t(el.dataset.i18n);
+    });
+    root.querySelectorAll("[data-i18n-html]").forEach((el) => {
+      el.innerHTML = t(el.dataset.i18nHtml);
+    });
+  }
+  applyStaticI18n();
   applyCardChrome();
   updateGates();
   renderPipeline();

@@ -317,10 +317,10 @@
 </head>
 <body>
   <div class="tabs" role="tablist" aria-label="작업 탭">
-    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard">마법사</button>
-    <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens">만들기</button>
-    <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply">적용</button>
-    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings">관리</button>
+    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard" data-i18n="tab.wizard">마법사</button>
+    <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
+    <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
+    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">관리</button>
   </div>
 
   <!-- 선택 동기화 (실시간) -->
@@ -331,17 +331,17 @@
   <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
     <div class="step" id="wizardCard">
-      <h2>시스템화 마법사</h2>
-      <div class="hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
+      <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
+      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
       <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> 시맨틱 매핑</label>
-        <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> 접근성 검수</label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> 컴포넌트화</label>
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span></label>
+        <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> <span data-i18n="wizardCard.optContrast">접근성 검수</span></label>
+        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span></label>
         <span class="muted" id="wizComponentLock"></span>
       </div>
       <div class="row">
-        <button id="btnWizardRun" class="primary">전체 실행</button>
-        <button id="btnWizardCancel" style="display:none">취소</button>
+        <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
+        <button id="btnWizardCancel" style="display:none" data-i18n="common.cancel">취소</button>
       </div>
       <div id="wizardSteps"></div>
       <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>

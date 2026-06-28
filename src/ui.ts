@@ -2134,7 +2134,20 @@ function applyCardChrome(): void {
   });
 }
 
+/** 정적 HTML 라벨 외부화: [data-i18n]=textContent, [data-i18n-html]=innerHTML(신뢰된 자체 문자열).
+ *  텍스트 전용 요소는 data-i18n, <b>/<code> 등 마크업이 있으면 data-i18n-html을 쓴다.
+ *  뱃지 span(예: …Lock)이 함께 있는 요소는 텍스트만 <span data-i18n>로 감싸 뱃지를 보존한다. */
+function applyStaticI18n(root: ParentNode = document): void {
+  root.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n as string);
+  });
+  root.querySelectorAll<HTMLElement>('[data-i18n-html]').forEach((el) => {
+    el.innerHTML = t(el.dataset.i18nHtml as string);
+  });
+}
+
 // 초기: 컬렉션·전제·라이선스 조회. 팀 카드는 Team 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
+applyStaticI18n(); // 정적 라벨 외부화(캐논 변형 전에 원본 요소에 적용)
 applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
 updateGates();
 renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)

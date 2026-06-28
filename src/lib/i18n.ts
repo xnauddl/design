@@ -176,6 +176,21 @@ export const STRINGS: Record<string, string> = {
   'pipeline.step.bind': '바인딩',
   'pipeline.hint.needTokens': '토큰을 먼저 생성하세요',
   'pipeline.hint.needBindable': '바인딩할 변수를 먼저 생성하세요',
+
+  /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
+  'common.cancel': '취소',
+  // 탭
+  'tab.wizard': '마법사',
+  'tab.tokens': '만들기',
+  'tab.apply': '적용',
+  'tab.settings': '관리',
+  // 마법사 카드
+  'wizardCard.title': '시스템화 마법사',
+  'wizardCard.hint': '선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.',
+  'wizardCard.optSemantics': '시맨틱 매핑',
+  'wizardCard.optContrast': '접근성 검수',
+  'wizardCard.optComponentize': '컴포넌트화',
+  'wizardCard.run': '전체 실행',
 };
 
 /** key → 문자열. `{var}` 자리표시자를 vars로 치환. 누락 키는 key 그대로(폴백). */
