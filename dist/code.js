@@ -1966,6 +1966,113 @@
     return out;
   }
 
+  // src/lib/similarApply.ts
+  async function buildSimTree(node) {
+    const out = { id: node.id, name: node.name, type: node.type };
+    if (node.type === "TEXT") out.characters = typeof node.characters === "string" ? node.characters : "";
+    if (node.type === "INSTANCE") {
+      const mc = await node.getMainComponentAsync();
+      if (mc) out.componentKey = mc.key || mc.id;
+    }
+    const fills = node.fills;
+    if (Array.isArray(fills) && fills.some((p) => p.type === "IMAGE" && p.visible !== false)) out.hasImageFill = true;
+    if ("children" in node) {
+      const kids = [];
+      for (const c of node.children) kids.push(await buildSimTree(c));
+      out.children = kids;
+    }
+    return out;
+  }
+  function figmaPathMap(root) {
+    const map = /* @__PURE__ */ new Map();
+    const visit = (node, prefix) => {
+      var _a;
+      if (!("children" in node)) return;
+      const seen = /* @__PURE__ */ new Map();
+      for (const c of node.children) {
+        const n = ((_a = seen.get(c.name)) != null ? _a : 0) + 1;
+        seen.set(c.name, n);
+        const seg = n === 1 ? c.name : `${c.name}#${n}`;
+        const path = prefix ? `${prefix}/${seg}` : seg;
+        map.set(path, c);
+        visit(c, path);
+      }
+    };
+    visit(root, "");
+    return map;
+  }
+  async function scanSimilar(frames) {
+    const trees = [];
+    for (const f of frames) trees.push(await buildSimTree(f));
+    return alignFrames(trees);
+  }
+  async function componentizeSimilar(master, members) {
+    var _a;
+    const trees = [];
+    for (const n of members) trees.push(await buildSimTree(n));
+    const treeById = new Map(members.map((n, i) => [n.id, trees[i]]));
+    const aligned = alignFrames(trees);
+    const plan = planContentProperties(aligned.varying);
+    const comp = figma.createComponentFromNode(master);
+    const compPaths = figmaPathMap(comp);
+    const propIdByPath = /* @__PURE__ */ new Map();
+    let properties = 0;
+    for (const p of plan) {
+      const target = compPaths.get(p.path);
+      if (!target) continue;
+      try {
+        let def = "";
+        if (p.type === "TEXT") def = target.type === "TEXT" ? target.characters : "";
+        else {
+          const mc = target.type === "INSTANCE" ? await target.getMainComponentAsync() : null;
+          def = mc ? mc.key || mc.id : "";
+        }
+        const id = comp.addComponentProperty(p.propName, p.type, def);
+        const refs = __spreadValues({}, (_a = target.componentPropertyReferences) != null ? _a : {});
+        refs[p.field] = id;
+        target.componentPropertyReferences = refs;
+        propIdByPath.set(p.path, id);
+        properties++;
+      } catch (e) {
+      }
+    }
+    let instances = 0;
+    for (const n of members) {
+      if (n.id === master.id) continue;
+      const leaves = treeById.get(n.id);
+      if (!leaves) continue;
+      try {
+        const inst = comp.createInstance();
+        inst.x = n.x;
+        inst.y = n.y;
+        try {
+          inst.resize(n.width, n.height);
+        } catch (e) {
+        }
+        if (n.parent) n.parent.appendChild(inst);
+        const ov = overridesForFrame(flattenFrame(leaves), plan);
+        const props = {};
+        for (const p of plan) {
+          const v = ov[p.propName];
+          const id = propIdByPath.get(p.path);
+          if (v !== void 0 && id) props[id] = v;
+        }
+        try {
+          inst.setProperties(props);
+        } catch (e) {
+        }
+        n.remove();
+        instances++;
+      } catch (e) {
+      }
+    }
+    const warnings = [
+      ...aligned.imageWarnings.map((p) => `\uC774\uBBF8\uC9C0 '${p}'\uB294 \uC778\uC2A4\uD134\uC2A4\uAC00 \uC544\uB2C8\uB77C \uAD50\uCCB4 \uC18D\uC131\uC73C\uB85C \uB178\uCD9C \uBD88\uAC00(\uC778\uC2A4\uD134\uC2A4\uB85C \uAC10\uC2F8\uC138\uC694).`),
+      ...aligned.excluded.map((e) => `${e.name}: ${e.reason}`)
+    ];
+    return { master: comp.name, properties, instances, warnings };
+  }
+
   // src/lib/contrast.ts
   function isLargeText(fontSizePx, bold) {
     if (fontSizePx >= 24) return true;
@@ -2165,40 +2272,6 @@
       maxRow = Math.max(maxRow, g.row);
     }
     set.resizeWithoutConstraints(pad * 2 + (maxCol + 1) * cellW + maxCol * gap, pad * 2 + (maxRow + 1) * cellH + maxRow * gap);
-  }
-  async function buildSimTree(node) {
-    const out = { id: node.id, name: node.name, type: node.type };
-    if (node.type === "TEXT") out.characters = typeof node.characters === "string" ? node.characters : "";
-    if (node.type === "INSTANCE") {
-      const mc = await node.getMainComponentAsync();
-      if (mc) out.componentKey = mc.key || mc.id;
-    }
-    const fills = node.fills;
-    if (Array.isArray(fills) && fills.some((p) => p.type === "IMAGE" && p.visible !== false)) out.hasImageFill = true;
-    if ("children" in node) {
-      const kids = [];
-      for (const c of node.children) kids.push(await buildSimTree(c));
-      out.children = kids;
-    }
-    return out;
-  }
-  function figmaPathMap(root) {
-    const map = /* @__PURE__ */ new Map();
-    const visit = (node, prefix) => {
-      var _a;
-      if (!("children" in node)) return;
-      const seen = /* @__PURE__ */ new Map();
-      for (const c of node.children) {
-        const n = ((_a = seen.get(c.name)) != null ? _a : 0) + 1;
-        seen.set(c.name, n);
-        const seg = n === 1 ? c.name : `${c.name}#${n}`;
-        const path = prefix ? `${prefix}/${seg}` : seg;
-        map.set(path, c);
-        visit(c, path);
-      }
-    };
-    visit(root, "");
-    return map;
   }
   var TEXT_BIND_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily"]);
   async function applySelectedBinding(item) {
@@ -2562,7 +2635,7 @@
     return { samples, skipped };
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -3045,9 +3118,7 @@
         }
         case "SCAN_SIMILAR": {
           const frames = selection().filter((n) => n.type === "FRAME" || n.type === "GROUP" || n.type === "COMPONENT");
-          const trees = [];
-          for (const f of frames) trees.push(await buildSimTree(f));
-          const r = alignFrames(trees);
+          const r = await scanSimilar(frames);
           post({
             type: "SIMILAR_CANDIDATES",
             metas: r.metas,
@@ -3079,70 +3150,9 @@
             const n = await figma.getNodeByIdAsync(id);
             if (n && "type" in n) memberNodes.push(n);
           }
-          const trees = [];
-          for (const n of memberNodes) trees.push(await buildSimTree(n));
-          const treeById = new Map(memberNodes.map((n, i) => [n.id, trees[i]]));
-          const aligned = alignFrames(trees);
-          const plan = planContentProperties(aligned.varying);
-          const comp = figma.createComponentFromNode(master);
-          const compPaths = figmaPathMap(comp);
-          const propIdByPath = /* @__PURE__ */ new Map();
-          let properties = 0;
-          for (const p of plan) {
-            const target = compPaths.get(p.path);
-            if (!target) continue;
-            try {
-              let def = "";
-              if (p.type === "TEXT") def = target.type === "TEXT" ? target.characters : "";
-              else {
-                const mc = target.type === "INSTANCE" ? await target.getMainComponentAsync() : null;
-                def = mc ? mc.key || mc.id : "";
-              }
-              const id = comp.addComponentProperty(p.propName, p.type, def);
-              const refs = __spreadValues({}, (_d = target.componentPropertyReferences) != null ? _d : {});
-              refs[p.field] = id;
-              target.componentPropertyReferences = refs;
-              propIdByPath.set(p.path, id);
-              properties++;
-            } catch (e) {
-            }
-          }
-          let instances = 0;
-          for (const n of memberNodes) {
-            if (n.id === msg.masterId) continue;
-            const leaves = treeById.get(n.id);
-            if (!leaves) continue;
-            try {
-              const inst = comp.createInstance();
-              inst.x = n.x;
-              inst.y = n.y;
-              try {
-                inst.resize(n.width, n.height);
-              } catch (e) {
-              }
-              if (n.parent) n.parent.appendChild(inst);
-              const ov = overridesForFrame(flattenFrame(leaves), plan);
-              const props = {};
-              for (const p of plan) {
-                const v = ov[p.propName];
-                const id = propIdByPath.get(p.path);
-                if (v !== void 0 && id) props[id] = v;
-              }
-              try {
-                inst.setProperties(props);
-              } catch (e) {
-              }
-              n.remove();
-              instances++;
-            } catch (e) {
-            }
-          }
-          const warnings = [
-            ...aligned.imageWarnings.map((p) => `\uC774\uBBF8\uC9C0 '${p}'\uB294 \uC778\uC2A4\uD134\uC2A4\uAC00 \uC544\uB2C8\uB77C \uAD50\uCCB4 \uC18D\uC131\uC73C\uB85C \uB178\uCD9C \uBD88\uAC00(\uC778\uC2A4\uD134\uC2A4\uB85C \uAC10\uC2F8\uC138\uC694).`),
-            ...aligned.excluded.map((e) => `${e.name}: ${e.reason}`)
-          ];
-          post({ type: "COMPONENTIZE_RESULT", master: comp.name, properties, instances, warnings });
-          commitUndo(figma);
+          const r = await componentizeSimilar(master, memberNodes);
+          post({ type: "COMPONENTIZE_RESULT", master: r.master, properties: r.properties, instances: r.instances, warnings: r.warnings });
+          if (r.instances) commitUndo(figma);
           break;
         }
         case "CHECK_CONTRAST": {
