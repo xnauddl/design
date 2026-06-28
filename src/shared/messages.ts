@@ -208,10 +208,10 @@ export type CodeToUi =
       metas: FrameMeta[]; // 멤버 메타(점수 내림차순 → 추천 맨 앞)
       recommendedMasterId: string | null;
       varying: VaryingPosition[]; // 가변 위치(노출될 속성)
-      imageWarnings: string[]; // 이미지 fill 경로(교체 불가 안내)
+      imageVarying: string[]; // 가변 이미지 fill 경로(인스턴스 fill 오버라이드 대상)
       excluded: { id: string; name: string; reason: string }[];
     }
-  | { type: 'COMPONENTIZE_RESULT'; master: string; properties: number; instances: number; warnings: string[] }
+  | { type: 'COMPONENTIZE_RESULT'; master: string; properties: number; instances: number; images: number; warnings: string[] }
   // 명도 대비 점검: 텍스트-배경 쌍 평가 결과 + 추출 단계에서 건너뛴 사유별 집계(skipped).
   | { type: 'CONTRAST_RESULT'; level: WcagLevel; checked: number; passed: number; failed: number; findings: ContrastFinding[]; skipped: Record<string, number> }
   | { type: 'VARIABLES'; vars: VarInfo[] } // R1: 편집기용 변수 목록

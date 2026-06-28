@@ -21,7 +21,13 @@ async function buildSimTree(node: SceneNode): Promise<SimNode> {
     if (mc) out.componentKey = mc.key || mc.id;
   }
   const fills = (node as { fills?: unknown }).fills;
-  if (Array.isArray(fills) && fills.some((p) => (p as Paint).type === 'IMAGE' && (p as Paint).visible !== false)) out.hasImageFill = true;
+  if (Array.isArray(fills)) {
+    const img = fills.find((p) => (p as Paint).type === 'IMAGE' && (p as Paint).visible !== false) as ImagePaint | undefined;
+    if (img) {
+      out.hasImageFill = true;
+      out.imageHash = img.imageHash ?? undefined; // 변동 감지용(인스턴스 fill 오버라이드)
+    }
+  }
   if ('children' in node) {
     const kids: SimNode[] = [];
     for (const c of (node as SceneNode & ChildrenMixin).children as readonly SceneNode[]) kids.push(await buildSimTree(c));
@@ -60,6 +66,8 @@ export interface ComponentizeResult {
   master: string;
   properties: number;
   instances: number;
+  /** v2: 인스턴스 fill 오버라이드로 교체한 이미지 수. */
+  images: number;
   warnings: string[];
 }
 
@@ -106,6 +114,7 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
 
   // 3) 마스터 외 멤버 → 인스턴스 교체(각 프레임 콘텐츠를 오버라이드로 이식).
   let instances = 0;
+  let images = 0;
   for (const n of members) {
     if (n.id === master.id) continue; // 마스터는 이미 컴포넌트로 소비됨
     const leaves = treeById.get(n.id);
@@ -116,6 +125,7 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
       inst.y = n.y;
       try { inst.resize(n.width, n.height); } catch { /* 제약상 불가 시 기본 크기 */ }
       if (n.parent) (n.parent as ChildrenMixin).appendChild(inst);
+      // 컴포넌트 속성 오버라이드(TEXT/INSTANCE_SWAP).
       const ov = overridesForFrame(flattenFrame(leaves), plan);
       const props: Record<string, string> = {};
       for (const p of plan) {
@@ -124,6 +134,19 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
         if (v !== undefined && id) props[id] = v;
       }
       try { inst.setProperties(props); } catch { /* 일부 오버라이드 실패 무시 */ }
+      // v2: 가변 이미지 fill → 인스턴스 내부 레이어 fills를 멤버 원본으로 교체(컴포넌트 속성 불필요).
+      if (aligned.imageVarying.length) {
+        const srcPaths = figmaPathMap(n);
+        const dstPaths = figmaPathMap(inst);
+        for (const path of aligned.imageVarying) {
+          const src = srcPaths.get(path);
+          const dst = dstPaths.get(path);
+          const f = src && 'fills' in src ? (src as GeometryMixin).fills : null;
+          if (dst && 'fills' in dst && Array.isArray(f)) {
+            try { (dst as GeometryMixin).fills = f; images++; } catch { /* fill 오버라이드 실패 무시 */ }
+          }
+        }
+      }
       n.remove();
       instances++;
     } catch {
@@ -131,9 +154,6 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
     }
   }
 
-  const warnings = [
-    ...aligned.imageWarnings.map((p) => `이미지 '${p}'는 인스턴스가 아니라 교체 속성으로 노출 불가(인스턴스로 감싸세요).`),
-    ...aligned.excluded.map((e) => `${e.name}: ${e.reason}`),
-  ];
-  return { master: comp.name, properties, instances, warnings };
+  const warnings = aligned.excluded.map((e) => `${e.name}: ${e.reason}`);
+  return { master: comp.name, properties, instances, images, warnings };
 }

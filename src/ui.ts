@@ -946,13 +946,14 @@ function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): 
   }
 
   const propCount = msg.varying.length;
+  const imgCount = msg.imageVarying.length;
   const warns: string[] = [];
-  if (propCount) warns.push(`노출 속성 ${propCount}개(${msg.varying.map((v) => (v.type === 'TEXT' ? '텍스트' : '이미지/인스턴스')).join('·')})`);
-  else warns.push('가변 위치 없음 — 모든 내용이 동일합니다.');
-  if (msg.imageWarnings.length) warns.push(`⚠ 이미지 fill ${msg.imageWarnings.length}곳은 교체 불가(인스턴스로 감싸야 함): ${msg.imageWarnings.join(', ')}`);
+  if (propCount) warns.push(`노출 속성 ${propCount}개(${msg.varying.map((v) => (v.type === 'TEXT' ? '텍스트' : '인스턴스')).join('·')})`);
+  if (imgCount) warns.push(`이미지 ${imgCount}곳은 인스턴스 fill 오버라이드로 교체: ${msg.imageVarying.join(', ')}`);
+  if (!propCount && !imgCount) warns.push('가변 위치 없음 — 모든 내용이 동일합니다.');
   if (msg.excluded.length) warns.push(`제외 ${msg.excluded.length}개: ${msg.excluded.map((e) => `${e.name}(${e.reason})`).join(', ')}`);
   $('similarWarn').innerHTML = warns.map(escapeHtml).join('<br>');
-  setStatus('similarStatus', `멤버 ${msg.metas.length}개 · 마스터 선택 후 ‘컴포넌트화’`, propCount ? 'ok' : 'warn');
+  setStatus('similarStatus', `멤버 ${msg.metas.length}개 · 마스터 선택 후 ‘컴포넌트화’`, propCount || imgCount ? 'ok' : 'warn');
 }
 
 function renderPresetList(): void {
@@ -1524,10 +1525,11 @@ function mainSwitch(msg: CodeToUi): void {
       break;
     case 'COMPONENTIZE_RESULT': {
       const warn = msg.warnings.length ? ` · ⚠ ${msg.warnings.length}건` : '';
+      const img = msg.images ? ` · 이미지 ${msg.images}` : '';
       setStatus(
         'similarStatus',
         msg.instances
-          ? `‘${escapeHtml(msg.master)}’ 컴포넌트화 — 속성 ${msg.properties} · 인스턴스 ${msg.instances}${warn}`
+          ? `‘${escapeHtml(msg.master)}’ 컴포넌트화 — 속성 ${msg.properties} · 인스턴스 ${msg.instances}${img}${warn}`
           : `컴포넌트화 실패 또는 대상 없음${warn}`,
         msg.instances ? 'ok' : 'warn',
       );

@@ -1853,7 +1853,7 @@
         seen.set(c.name, n);
         const seg = n === 1 ? c.name : `${c.name}#${n}`;
         const path = prefix ? `${prefix}/${seg}` : seg;
-        out.push({ id: c.id, path, type: c.type, characters: c.characters, componentKey: c.componentKey, hasImageFill: c.hasImageFill });
+        out.push({ id: c.id, path, type: c.type, characters: c.characters, componentKey: c.componentKey, hasImageFill: c.hasImageFill, imageHash: c.imageHash });
         visit(c, path);
       }
     };
@@ -1887,7 +1887,7 @@
   }
   function alignFrames(frames) {
     var _a;
-    const empty = { memberIds: [], recommendedMasterId: null, metas: [], varying: [], imageWarnings: [], excluded: [] };
+    const empty = { memberIds: [], recommendedMasterId: null, metas: [], varying: [], imageVarying: [], excluded: [] };
     if (frames.length < 2) {
       return __spreadProps(__spreadValues({}, empty), { excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: "\uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uD544\uC694" })) });
     }
@@ -1905,13 +1905,20 @@
     const flats = best.map((f) => flattenFrame(f));
     const paths = flats[0];
     const varying = [];
-    const imageWarnings = [];
+    const imageVarying = [];
+    const at = (leaves, path) => leaves.find((l) => l.path === path);
     for (const entry of paths) {
-      if (entry.hasImageFill) imageWarnings.push(entry.path);
+      if (entry.hasImageFill) {
+        const hashes = new Set(flats.map((f) => {
+          var _a2, _b;
+          return (_b = (_a2 = at(f, entry.path)) == null ? void 0 : _a2.imageHash) != null ? _b : "";
+        }));
+        if (hashes.size > 1) imageVarying.push(entry.path);
+      }
       if (entry.type !== "TEXT" && entry.type !== "INSTANCE") continue;
       const valueAt = (leaves) => {
         var _a2;
-        const e = leaves.find((l) => l.path === entry.path);
+        const e = at(leaves, entry.path);
         if (!e) return "";
         return entry.type === "TEXT" ? textOf(e) : (_a2 = e.componentKey) != null ? _a2 : "";
       };
@@ -1927,7 +1934,7 @@
       recommendedMasterId,
       metas,
       varying,
-      imageWarnings: [...new Set(imageWarnings)],
+      imageVarying: [...new Set(imageVarying)],
       excluded
     };
   }
@@ -1968,6 +1975,7 @@
 
   // src/lib/similarApply.ts
   async function buildSimTree(node) {
+    var _a;
     const out = { id: node.id, name: node.name, type: node.type };
     if (node.type === "TEXT") out.characters = typeof node.characters === "string" ? node.characters : "";
     if (node.type === "INSTANCE") {
@@ -1975,7 +1983,13 @@
       if (mc) out.componentKey = mc.key || mc.id;
     }
     const fills = node.fills;
-    if (Array.isArray(fills) && fills.some((p) => p.type === "IMAGE" && p.visible !== false)) out.hasImageFill = true;
+    if (Array.isArray(fills)) {
+      const img = fills.find((p) => p.type === "IMAGE" && p.visible !== false);
+      if (img) {
+        out.hasImageFill = true;
+        out.imageHash = (_a = img.imageHash) != null ? _a : void 0;
+      }
+    }
     if ("children" in node) {
       const kids = [];
       for (const c of node.children) kids.push(await buildSimTree(c));
@@ -2037,6 +2051,7 @@
       }
     }
     let instances = 0;
+    let images = 0;
     for (const n of members) {
       if (n.id === master.id) continue;
       const leaves = treeById.get(n.id);
@@ -2061,16 +2076,29 @@
           inst.setProperties(props);
         } catch (e) {
         }
+        if (aligned.imageVarying.length) {
+          const srcPaths = figmaPathMap(n);
+          const dstPaths = figmaPathMap(inst);
+          for (const path of aligned.imageVarying) {
+            const src = srcPaths.get(path);
+            const dst = dstPaths.get(path);
+            const f = src && "fills" in src ? src.fills : null;
+            if (dst && "fills" in dst && Array.isArray(f)) {
+              try {
+                dst.fills = f;
+                images++;
+              } catch (e) {
+              }
+            }
+          }
+        }
         n.remove();
         instances++;
       } catch (e) {
       }
     }
-    const warnings = [
-      ...aligned.imageWarnings.map((p) => `\uC774\uBBF8\uC9C0 '${p}'\uB294 \uC778\uC2A4\uD134\uC2A4\uAC00 \uC544\uB2C8\uB77C \uAD50\uCCB4 \uC18D\uC131\uC73C\uB85C \uB178\uCD9C \uBD88\uAC00(\uC778\uC2A4\uD134\uC2A4\uB85C \uAC10\uC2F8\uC138\uC694).`),
-      ...aligned.excluded.map((e) => `${e.name}: ${e.reason}`)
-    ];
-    return { master: comp.name, properties, instances, warnings };
+    const warnings = aligned.excluded.map((e) => `${e.name}: ${e.reason}`);
+    return { master: comp.name, properties, instances, images, warnings };
   }
 
   // src/lib/contrast.ts
@@ -3124,7 +3152,7 @@
             metas: r.metas,
             recommendedMasterId: r.recommendedMasterId,
             varying: r.varying,
-            imageWarnings: r.imageWarnings,
+            imageVarying: r.imageVarying,
             excluded: r.excluded
           });
           break;
@@ -3142,7 +3170,7 @@
           if (!requirePaid("components", "\uB2EE\uC740 \uD504\uB808\uC784 \uCEF4\uD3EC\uB10C\uD2B8\uD654\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const master = await figma.getNodeByIdAsync(msg.masterId);
           if (!master || master.type !== "FRAME" && master.type !== "GROUP") {
-            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, warnings: ["\uB9C8\uC2A4\uD130 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."] });
+            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: ["\uB9C8\uC2A4\uD130 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."] });
             break;
           }
           const memberNodes = [];
@@ -3151,7 +3179,7 @@
             if (n && "type" in n) memberNodes.push(n);
           }
           const r = await componentizeSimilar(master, memberNodes);
-          post({ type: "COMPONENTIZE_RESULT", master: r.master, properties: r.properties, instances: r.instances, warnings: r.warnings });
+          post({ type: "COMPONENTIZE_RESULT", master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
           if (r.instances) commitUndo(figma);
           break;
         }

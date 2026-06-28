@@ -1086,7 +1086,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           metas: r.metas,
           recommendedMasterId: r.recommendedMasterId,
           varying: r.varying,
-          imageWarnings: r.imageWarnings,
+          imageVarying: r.imageVarying,
           excluded: r.excluded,
         });
         break;
@@ -1105,7 +1105,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!requirePaid('components', '닮은 프레임 컴포넌트화는 Paid 기능입니다.')) break;
         const master = await figma.getNodeByIdAsync(msg.masterId);
         if (!master || (master.type !== 'FRAME' && master.type !== 'GROUP')) {
-          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, warnings: ['마스터 프레임을 찾을 수 없습니다.'] });
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['마스터 프레임을 찾을 수 없습니다.'] });
           break;
         }
         // 멤버 노드 수집(마스터 포함) → 정렬·생성·인스턴스 교체는 순수+적용 lib에 위임.
@@ -1115,7 +1115,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (n && 'type' in n) memberNodes.push(n as SceneNode);
         }
         const r = await componentizeSimilar(master as SceneNode, memberNodes);
-        post({ type: 'COMPONENTIZE_RESULT', master: r.master, properties: r.properties, instances: r.instances, warnings: r.warnings });
+        post({ type: 'COMPONENTIZE_RESULT', master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
         if (r.instances) commitUndo(figma); // UX2: 전체를 단일 Undo로
         break;
       }

@@ -33,7 +33,14 @@ function installFigma() {
         id: `comp:${seq++}`, name: node.name, type: 'COMPONENT', children: node.children, props: [],
         addComponentProperty(pname, ptype, def) { const id = `${pname}#${seq++}`; this.props.push({ id, pname, ptype, def }); return id; },
         createInstance() {
-          const i = { id: `inst:${seq++}`, type: 'INSTANCE', x: 0, y: 0, parent: null, applied: {},
+          // 인스턴스는 컴포넌트 자식을 복제(fill 오버라이드가 마스터를 건드리지 않게).
+          // leaf에는 children 키를 만들지 않는다(실제 figma처럼 — figmaPathMap의 'children' in node 판정).
+          const clone = (c) => {
+            const o = { ...c, fills: Array.isArray(c.fills) ? c.fills.map((p) => ({ ...p })) : c.fills };
+            if (c.children) o.children = c.children.map(clone);
+            return o;
+          };
+          const i = { id: `inst:${seq++}`, type: 'INSTANCE', x: 0, y: 0, parent: null, applied: {}, children: this.children.map(clone),
             resize() {}, setProperties(p) { Object.assign(this.applied, p); }, remove() {} };
           created.push(i);
           return i;
@@ -75,6 +82,7 @@ test('componentizeSimilar — 컴포넌트 생성·속성 노출·인스턴스 �
   // 결과 집계
   assert.equal(r.properties, 2); // Title(TEXT) + Image(INSTANCE_SWAP)
   assert.equal(r.instances, 2); // 마스터 제외 2개
+  assert.equal(r.images, 0); // 이미지 fill 없음(INSTANCE 카드)
   assert.deepEqual(r.warnings, []);
 
   // 마스터 → 컴포넌트(소비), 자식에 속성 참조 연결
@@ -103,21 +111,23 @@ test('componentizeSimilar — 컴포넌트 생성·속성 노출·인스턴스 �
   assert.equal(page.appended.length, 2);
 });
 
-test('componentizeSimilar — 이미지 fill은 속성 아님 + 경고(목)', async () => {
+test('componentizeSimilar — 가변 이미지 fill은 인스턴스 fill 오버라이드(v2, 목)', async () => {
   const figma = installFigma();
   const page = { appendChild(n) { n.parent = this; } };
-  const imgCard = (id, title) => ({
+  const imgCard = (id, title, hash) => ({
     id, name: 'Card', type: 'FRAME', x: 0, y: 0, width: 50, height: 50, parent: page, removed: false,
-    children: [{ id: `${id}:pic`, name: 'Photo', type: 'RECTANGLE', fills: [{ type: 'IMAGE', visible: true }] }, txt(`${id}:t`, 'Title', title)],
+    children: [{ id: `${id}:pic`, name: 'Photo', type: 'RECTANGLE', fills: [{ type: 'IMAGE', visible: true, imageHash: hash }] }, txt(`${id}:t`, 'Title', title)],
     remove() { this.removed = true; },
   });
-  const m = imgCard('1', 'A');
-  const r = await componentizeSimilar(m, [m, imgCard('2', 'B')]);
+  const m = imgCard('1', 'A', 'hA'); // 마스터
+  const b = imgCard('2', 'A', 'hB'); // 텍스트 동일, 이미지만 다름
+  const r = await componentizeSimilar(m, [m, b]);
 
-  assert.equal(r.properties, 1); // Title만 속성(이미지 fill 제외)
+  assert.equal(r.properties, 0); // 텍스트 동일 → 컴포넌트 속성 없음
   assert.equal(r.instances, 1);
-  assert.equal(r.warnings.length, 1);
-  assert.match(r.warnings[0], /Photo/);
-  // 인스턴스 오버라이드는 텍스트만
-  assert.deepEqual(Object.values(figma._created[0].applied), ['B']);
+  assert.equal(r.images, 1); // 이미지 1곳 인스턴스 fill 오버라이드
+  assert.deepEqual(r.warnings, []);
+  // 인스턴스의 Photo fills가 멤버(b)의 원본 이미지로 교체됨
+  const instPhoto = figma._created[0].children.find((c) => c.name === 'Photo');
+  assert.equal(instPhoto.fills[0].imageHash, 'hB');
 });
