@@ -1692,10 +1692,11 @@
     $("semMap").value = Object.entries(map).map(([role, global]) => `${role} = ${global}`).join("\n");
   }
   function suggestSemMapFrom(toks) {
-    if ($("semMap").value.trim()) return;
     const base = Number($("base").value) || 16;
-    const map = suggestTokenRoles(toks, base);
-    if (Object.keys(map).length) setSemMapText(map);
+    const suggest = suggestTokenRoles(toks, base);
+    if (!Object.keys(suggest).length) return;
+    const existing = textToSemanticMap($("semMap").value);
+    setSemMapText(__spreadValues(__spreadValues({}, suggest), existing));
   }
   function huefyTokenColors(toks) {
     const idx = [];

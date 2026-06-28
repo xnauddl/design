@@ -187,12 +187,14 @@ function setSemMapText(map: Record<string, string>): void {
     .join('\n');
 }
 
-/** #10·역할 어휘: 전 토큰에서 시맨틱 역할을 추천(매핑이 비어 있을 때만 — 사용자 편집 보존). */
+/** #10·역할 어휘: 전 토큰에서 시맨틱 역할 추천을 semMap에 **추가 병합**(PR #31 방식).
+ *  사용자가 이미 입력/편집한 역할은 보존(기존 우선), 새 추천만 더한다. */
 function suggestSemMapFrom(toks: DraftToken[]): void {
-  if (($('semMap') as HTMLTextAreaElement).value.trim()) return;
   const base = Number(($('base') as HTMLInputElement).value) || 16;
-  const map = suggestTokenRoles(toks, base);
-  if (Object.keys(map).length) setSemMapText(map);
+  const suggest = suggestTokenRoles(toks, base);
+  if (!Object.keys(suggest).length) return;
+  const existing = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
+  setSemMapText({ ...suggest, ...existing }); // 기존(사용자) 항목이 추천을 덮어씀
 }
 
 /** #3: 색 토큰 이름을 hue-Global(`color/blue/500`, 충돌 접미사)로 변환 — 추출 hex명 정규화. */
