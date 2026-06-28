@@ -259,9 +259,14 @@ function kindOf(v: Variable): TokenKind {
 const EDITABLE_COLLECTIONS = new Set([GLOBAL, SEMANTIC, COMPONENT]);
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
+/** valuesByMode 원시값이 변수 별칭({type:'VARIABLE_ALIAS', id})인지. */
+function isVariableAlias(raw: unknown): raw is VariableAlias {
+  return !!raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS';
+}
+
 /** valuesByMode 한 항목 → 편집기용 값 칸(별칭은 nameById로 표시명 해소). */
 function toValueCell(type: ResolvedType, raw: VariableValue | undefined, nameById: Map<string, string>): VarValueCell {
-  if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+  if (isVariableAlias(raw)) {
     const aliasId = (raw as VariableAlias).id;
     const aliasName = nameById.get(aliasId);
     return { kind: 'alias', display: aliasName ?? '(알 수 없음)', aliasId, aliasName };
@@ -321,8 +326,8 @@ async function aliasWouldCycle(sourceId: string, target: Variable): Promise<bool
       seen.add(cur.id);
       for (const modeId of Object.keys(cur.valuesByMode)) {
         const raw = cur.valuesByMode[modeId];
-        if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
-          const nv = await figma.variables.getVariableByIdAsync((raw as VariableAlias).id);
+        if (isVariableAlias(raw)) {
+          const nv = await figma.variables.getVariableByIdAsync(raw.id);
           if (nv) next.push(nv);
         }
       }
@@ -401,10 +406,13 @@ function nodeBindsVar(node: SceneNode, varId: string): boolean {
   return false;
 }
 
-/** 현재 페이지에서 변수에 바인딩된 노드 수집(상한 적용). */
-function collectBoundNodes(varId: string): { nodes: { id: string; name: string }[]; capped: boolean } {
+/** 문서 전체 페이지에서 변수에 바인딩된 노드 수집(상한 적용).
+ *  dynamic-page라 다른 페이지 순회 전 loadAllPagesAsync 필요 — 현재 페이지만 보면 타 페이지 사용처를 놓쳐 삭제 경고가 위양성. */
+async function collectBoundNodes(varId: string): Promise<{ nodes: { id: string; name: string }[]; capped: boolean }> {
+  await figma.loadAllPagesAsync();
   const nodes: { id: string; name: string }[] = [];
-  const stack: SceneNode[] = [...figma.currentPage.children];
+  const stack: SceneNode[] = [];
+  for (const page of figma.root.children) stack.push(...(page.children as readonly SceneNode[]));
   let scanned = 0;
   let capped = false;
   while (stack.length) {
@@ -441,11 +449,11 @@ async function generateDarkMode(collectionId: string, fromModeId: string, toMode
     if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== 'COLOR') continue;
     const fromRaw = v.valuesByMode[fromModeId];
     // 라이트 모드가 Global 별칭이 아니면 스킵(3계층 규칙 — 리터럴 Semantic은 대상 아님).
-    if (!(fromRaw && typeof fromRaw === 'object' && 'type' in fromRaw && (fromRaw as VariableAlias).type === 'VARIABLE_ALIAS')) {
+    if (!isVariableAlias(fromRaw)) {
       skipped++;
       continue;
     }
-    const lightGlobal = byId.get((fromRaw as VariableAlias).id);
+    const lightGlobal = byId.get(fromRaw.id);
     const lightRaw = lightGlobal?.valuesByMode[gMode];
     if (!lightGlobal || !(lightRaw && typeof lightRaw === 'object' && 'r' in lightRaw)) {
       skipped++;
@@ -755,7 +763,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'GET_VARIABLE_USAGE': {
-        const { nodes, capped } = collectBoundNodes(msg.id); // R2-C: 바인딩된 노드(현재 페이지)
+        const { nodes, capped } = await collectBoundNodes(msg.id); // R2-C: 바인딩된 노드(문서 전체)
         const aliasedBy = findAliasReferers(msg.id, await collectVars()); // 이 변수를 별칭하는 변수
         post({ type: 'VARIABLE_USAGE', id: msg.id, nodes, aliasedBy, capped });
         break;
@@ -860,8 +868,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             kind: kindOf(v),
           };
           if (v.description) t.description = v.description; // #16: 원본 단위("160%") 내보내기 우선
-          if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
-            const target = nameById.get((raw as VariableAlias).id);
+          if (isVariableAlias(raw)) {
+            const target = nameById.get(raw.id);
             if (!target) continue; // 대상 불명 → 스킵
             t.aliasOf = target;
           } else if (v.resolvedType === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) {
@@ -875,8 +883,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             if (m.modeId === col.defaultModeId) continue;
             const mraw = v.valuesByMode[m.modeId];
             const tv: ThemeValue = { theme: m.name };
-            if (mraw && typeof mraw === 'object' && 'type' in mraw && (mraw as VariableAlias).type === 'VARIABLE_ALIAS') {
-              const target = nameById.get((mraw as VariableAlias).id);
+            if (isVariableAlias(mraw)) {
+              const target = nameById.get(mraw.id);
               if (!target) continue; // 대상 불명 → 이 모드 스킵(상속)
               tv.aliasOf = target;
             } else if (v.resolvedType === 'COLOR' && mraw && typeof mraw === 'object' && 'r' in mraw) {

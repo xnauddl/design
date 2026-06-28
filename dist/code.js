@@ -1530,7 +1530,7 @@
   var cssVar = (name) => `--${kebab(name)}`;
   function cssDeclValue(token, value, aliasOf, opts) {
     if (aliasOf) return `var(${cssVar(aliasOf)})`;
-    return value === void 0 ? cssLiteral(token, opts) : cssLiteral(__spreadProps(__spreadValues({}, token), { value, description: void 0 }), opts);
+    return value === void 0 ? cssLiteral(token, opts) : cssLiteral(__spreadProps(__spreadValues({}, token), { value }), opts);
   }
   function toCss(tokens, opts) {
     var _a, _b;
@@ -1632,8 +1632,16 @@
     }
     return [...seen.values()];
   }
+  function normalizeUnits(tokens) {
+    return tokens.map(
+      (t) => {
+        var _a;
+        return ((_a = t.themes) == null ? void 0 : _a.length) && (t.kind === "lineHeight" || t.kind === "letterSpacing") ? __spreadProps(__spreadValues({}, t), { description: void 0 }) : t;
+      }
+    );
+  }
   function exportTokens(tokens, opts) {
-    const list = dedupeByName(tokens);
+    const list = normalizeUnits(dedupeByName(tokens));
     return opts.format === "css" ? toCss(list, opts) : toW3C(list, opts);
   }
 
@@ -2137,8 +2145,11 @@
   }
   var EDITABLE_COLLECTIONS = /* @__PURE__ */ new Set([GLOBAL, SEMANTIC, COMPONENT]);
   var errMsg = (e) => e instanceof Error ? e.message : String(e);
+  function isVariableAlias(raw) {
+    return !!raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS";
+  }
   function toValueCell(type, raw, nameById) {
-    if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+    if (isVariableAlias(raw)) {
       const aliasId = raw.id;
       const aliasName = nameById.get(aliasId);
       return { kind: "alias", display: aliasName != null ? aliasName : "(\uC54C \uC218 \uC5C6\uC74C)", aliasId, aliasName };
@@ -2193,7 +2204,7 @@
         seen.add(cur.id);
         for (const modeId of Object.keys(cur.valuesByMode)) {
           const raw = cur.valuesByMode[modeId];
-          if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+          if (isVariableAlias(raw)) {
             const nv = await figma.variables.getVariableByIdAsync(raw.id);
             if (nv) next.push(nv);
           }
@@ -2264,9 +2275,11 @@
     }
     return false;
   }
-  function collectBoundNodes(varId) {
+  async function collectBoundNodes(varId) {
+    await figma.loadAllPagesAsync();
     const nodes = [];
-    const stack = [...figma.currentPage.children];
+    const stack = [];
+    for (const page of figma.root.children) stack.push(...page.children);
     let scanned = 0;
     let capped = false;
     while (stack.length) {
@@ -2297,7 +2310,7 @@
     for (const v of allVars) {
       if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
       const fromRaw = v.valuesByMode[fromModeId];
-      if (!(fromRaw && typeof fromRaw === "object" && "type" in fromRaw && fromRaw.type === "VARIABLE_ALIAS")) {
+      if (!isVariableAlias(fromRaw)) {
         skipped++;
         continue;
       }
@@ -2591,7 +2604,7 @@
           break;
         }
         case "GET_VARIABLE_USAGE": {
-          const { nodes, capped } = collectBoundNodes(msg.id);
+          const { nodes, capped } = await collectBoundNodes(msg.id);
           const aliasedBy = findAliasReferers(msg.id, await collectVars());
           post({ type: "VARIABLE_USAGE", id: msg.id, nodes, aliasedBy, capped });
           break;
@@ -2688,7 +2701,7 @@
               kind: kindOf(v)
             };
             if (v.description) t.description = v.description;
-            if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+            if (isVariableAlias(raw)) {
               const target = nameById.get(raw.id);
               if (!target) continue;
               t.aliasOf = target;
@@ -2702,7 +2715,7 @@
               if (m.modeId === col.defaultModeId) continue;
               const mraw = v.valuesByMode[m.modeId];
               const tv = { theme: m.name };
-              if (mraw && typeof mraw === "object" && "type" in mraw && mraw.type === "VARIABLE_ALIAS") {
+              if (isVariableAlias(mraw)) {
                 const target = nameById.get(mraw.id);
                 if (!target) continue;
                 tv.aliasOf = target;

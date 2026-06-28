@@ -129,8 +129,8 @@ const cssVar = (name: string): string => `--${kebab(name)}`;
 /** 한 변수의 한 값(리터럴/별칭)을 CSS 선언 우변으로. value 미지정 시 token.value 사용(기본 모드). */
 function cssDeclValue(token: ExportToken, value: string | number | undefined, aliasOf: string | undefined, opts: ExportOptions): string {
   if (aliasOf) return `var(${cssVar(aliasOf)})`;
-  // 모드 오버라이드 값이면 description(단위) 없이 그 값으로, 기본 모드면 토큰 그대로.
-  return value === undefined ? cssLiteral(token, opts) : cssLiteral({ ...token, value, description: undefined }, opts);
+  // 모드 오버라이드도 기본 모드와 같은 단위 규칙으로(normalizeUnits가 다중 모드 단위 토큰의 description을 이미 정리).
+  return value === undefined ? cssLiteral(token, opts) : cssLiteral({ ...token, value }, opts);
 }
 
 function toCss(tokens: ExportToken[], opts: ExportOptions): string {
@@ -240,9 +240,9 @@ function toW3C(tokens: ExportToken[], opts: ExportOptions): string {
 }
 
 /**
- * 이름 중복 제거 — Semantic은 Global의 1:1 미러(동일 이름)라 그대로 두면
- * 충돌/자기참조가 생긴다. 같은 이름이면 Global(리터럴) 우선, Semantic 미러는 버린다.
- * 이름이 고유한 시맨틱 역할(primary·surface·space/md 등)은 유지된다.
+ * 이름 중복 제거 — 드물게 Global·Semantic이 같은 이름을 가지면(과거 미러 잔재 등)
+ * 같은 이름은 Global(리터럴) 우선, 충돌하는 Semantic 항목은 버린다.
+ * 이름이 고유한 시맨틱 역할(primary·surface·space/md 등)은 그대로 유지된다.
  */
 function dedupeByName(tokens: ExportToken[]): ExportToken[] {
   const seen = new Map<string, ExportToken>();
@@ -253,8 +253,19 @@ function dedupeByName(tokens: ExportToken[]): ExportToken[] {
   return [...seen.values()];
 }
 
+/**
+ * 다중 모드 lineHeight/letterSpacing의 단위 통일 — Variable.description은 단일 필드라
+ * 모드별 단위 표기를 담을 수 없다. 모드 오버라이드가 있는 토큰은 description(원본 "160%")을 버리고
+ * 전 모드 px로 출력해 `:root`(%)·`[data-theme]`(px) 단위 불일치를 막는다(단일 모드 토큰은 #16대로 보존).
+ */
+function normalizeUnits(tokens: ExportToken[]): ExportToken[] {
+  return tokens.map((t) =>
+    t.themes?.length && (t.kind === 'lineHeight' || t.kind === 'letterSpacing') ? { ...t, description: undefined } : t,
+  );
+}
+
 /** 형식에 따라 토큰을 코드 문자열로 내보낸다. */
 export function exportTokens(tokens: ExportToken[], opts: ExportOptions): string {
-  const list = dedupeByName(tokens);
+  const list = normalizeUnits(dedupeByName(tokens));
   return opts.format === 'css' ? toCss(list, opts) : toW3C(list, opts);
 }

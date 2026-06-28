@@ -500,6 +500,25 @@ test('exportTokens CSS 다중 모드 — 리터럴 오버라이드', () => {
   assert.match(css, /\[data-theme="dark"\] \{\s*--bg: #000000;\s*\}/);
 });
 
+test('exportTokens 다중 모드 — lineHeight 단위는 모드 간 일관(% 혼입 방지)', () => {
+  // 다중 모드 lineHeight: 변수 description은 단일이라 모드별 단위를 못 담음 →
+  // 모드 오버라이드가 있으면 :root·[data-theme] 모두 px로 통일(160% / 25.6px 불일치 금지).
+  const tokens = [
+    { name: 'line-height/160', collection: 'Global', type: 'FLOAT', kind: 'lineHeight', value: 25.6, description: '160%', themes: [{ theme: 'Compact', value: 22.4 }] },
+  ];
+  const css = exportTokens(tokens, OPTS);
+  assert.match(css, /:root \{\s*--line-height-160: 25\.6px;\s*\}/); // description("160%") 대신 px
+  assert.match(css, /\[data-theme="compact"\] \{\s*--line-height-160: 22\.4px;\s*\}/);
+  assert.doesNotMatch(css, /160%/); // 단위 혼입 없음
+
+  // 단일 모드(themes 없음)는 #16대로 description("150%") 보존
+  const single = exportTokens(
+    [{ name: 'line-height/150', collection: 'Global', type: 'FLOAT', kind: 'lineHeight', value: 24, description: '150%' }],
+    OPTS,
+  );
+  assert.match(single, /--line-height-150: 150%;/);
+});
+
 /* ================= variableEdit.ts (R1) ================= */
 test('parseVarValue — 타입별 파싱/검증', () => {
   // COLOR
