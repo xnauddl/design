@@ -725,7 +725,7 @@ const TEAM_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
 
-const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps'];
+const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
 
 /**
  * 통합 게이트(#11·#12) — 유료 잠금(Pro/Team)과 전제 미충족(Global/바인딩 변수 없음)을
@@ -855,11 +855,6 @@ $('btnClassifyVariants').addEventListener('click', () => {
 $('btnGenMissing').addEventListener('click', () => {
   setStatus('componentStatus', t('component.generating'), '');
   send({ type: 'GENERATE_MISSING_VARIANTS' });
-});
-
-$('btnExposeProps').addEventListener('click', () => {
-  setStatus('componentStatus', t('component.exposing'), '');
-  send({ type: 'EXPOSE_PROPERTIES' });
 });
 
 function renderPresetList(): void {
@@ -1131,17 +1126,18 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('exportStatus', t('export.done', { format: msg.format === 'css' ? 'CSS' : 'W3C JSON' }), 'ok');
       break;
     case 'COMPONENT_CANDIDATES': {
-      // #1: 하위 등록 후보를 트리로. 등록 가능 노드 기본 전체 체크.
+      // #1: 하위 등록 후보를 트리로. 모든 프레임이 선택 가능하되 **반복 이름(group)만 기본 체크** —
+      // 잡음(컨테이너/래퍼 단발성)은 체크 해제 상태로 두고, 사용자가 필요시 추가 체크.
       compCandidates = msg.nodes;
       compChecked.clear();
-      for (const c of msg.nodes) if (c.eligible) compChecked.add(c.id);
+      for (const c of msg.nodes) if (c.eligible && c.group) compChecked.add(c.id);
       renderCompTree();
       if (!compEligibleCount()) setStatus('componentStatus', t('component.noEligible'), 'warn');
       break;
     }
     case 'COMPONENTS_RESULT': {
       clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
-      const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}`;
+      const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.exposed ? ` · 속성 ${msg.exposed}` : ''}`;
       setStatus('componentStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? 'ok' : 'warn');
       // 빈 조합(미생성) + 실패(진단) 리포트
       const box = $('variantReport');
@@ -1210,17 +1206,6 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('componentStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
       break;
     }
-    case 'PROPERTIES_RESULT': {
-      const box = $('variantReport');
-      box.innerHTML = '';
-      for (const p of msg.props) {
-        const d = document.createElement('div');
-        d.textContent = `+ ${p}`;
-        box.appendChild(d);
-      }
-      setStatus('componentStatus', t('component.exposed', { created: msg.created }), msg.created ? 'ok' : 'warn');
-      break;
-    }
     case 'CONTRAST_RESULT':
       renderContrast(msg);
       break;
@@ -1264,7 +1249,6 @@ const OP_STATUS: Record<string, string> = {
   REGISTER_COMPONENTS: 'componentStatus',
   CLASSIFY_VARIANTS: 'componentStatus',
   GENERATE_MISSING_VARIANTS: 'componentStatus',
-  EXPOSE_PROPERTIES: 'componentStatus',
   CHECK_CONTRAST: 'contrastStatus',
   GET_PRESETS: 'presetStatus',
   SAVE_PRESET: 'presetStatus',

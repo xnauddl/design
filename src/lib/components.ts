@@ -389,16 +389,17 @@ export function componentEligible(node: ScanNode): boolean {
  * (다중 선택 시에는 선택 각각이 등록 단위이므로 최상위도 eligible. `REGISTER_COMPONENTS`의
  * 대상 결정과 동일한 규칙.)
  *
- * **엄격 필터**: 이름에 알려진 **컴포넌트 명사**가 있는 노드만 eligible(`recognizeComponentName`).
- * 이름 없는 프레임(`Frame 12` 등)은 후보에서 추려낸다 — 회색 맥락으로만 남거나 제외.
+ * **게이트 없음**: 모든 FRAME/GROUP(미잠금)이 eligible. 사용자가 레이어 이름을 컨테이너/래퍼
+ * 같은 임의 이름으로 짓는 실제 파일에서는 명사 사전 게이트가 진짜 컴포넌트(`row-container`,
+ * `preview-container` 등)를 통째로 버린다. 그래서 모든 프레임을 선택 가능하게 두고, **반복되는
+ * 이름**(2회+)만 기본 체크하도록 미리보기에서 `group`을 매긴다(code.ts). 잡음은 체크 해제로 회복.
  */
 export function scanComponentCandidates(selection: readonly ScanNode[]): ComponentCandidateNode[] {
   const single = selection.length === 1;
   const all: ComponentCandidateNode[] = [];
   const visit = (n: ScanNode, depth: number, parentId: string | null): void => {
     const isContainerRoot = single && depth === 0; // 컨테이너 자신 → 등록 제외
-    const named = recognizeComponentName(n.name) !== null; // 엄격 필터
-    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && named && componentEligible(n) });
+    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
     if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
   };
   for (const n of selection) visit(n, 0, null);
@@ -499,6 +500,52 @@ export function groupByComponentName(children: readonly StructNode[]): StructGro
     map.get(k)!.push(c);
   }
   return order.map((k) => ({ key: k, members: map.get(k)! }));
+}
+
+/**
+ * 등록용 그룹화 — **정확한(정규화) 이름** 기준. 사용자는 "같은 것"에 똑같은 이름을 주고
+ * 다른 컴포넌트엔 다른 이름을 준다(`Artwork Card`×6, `Like Button`×6, `artist-button`×1).
+ * 머리명사로 묶으면 `Like Button`+`artist-button`이 'Button'으로 잘못 합쳐지므로, 정확한 이름으로
+ * 묶어 사용자의 네이밍 의도를 그대로 따른다. 키는 kebab 정규화, 입력 순서 보존.
+ */
+export function groupByExactName(children: readonly StructNode[]): StructGroup[] {
+  const map = new Map<string, StructNode[]>();
+  const order: string[] = [];
+  for (const c of children) {
+    const k = kebab(c.name);
+    if (!k) continue; // 빈 이름 제외
+    if (!map.has(k)) {
+      map.set(k, []);
+      order.push(k);
+    }
+    map.get(k)!.push(c);
+  }
+  return order.map((k) => ({ key: k, members: map.get(k)! }));
+}
+
+/**
+ * **완전 동일 시그니처** — 구조(타입 트리+레이아웃) + 크기(반올림) + 대표 색까지 같으면 동일.
+ * `structuralSignature`(골격만)와 달리 크기·색을 **포함**해, 픽셀상 같은 반복물을 가려낸다.
+ * 같은 이름 그룹의 멤버가 전부 이 시그니처까지 같으면 → 하나의 컴포넌트 + 인스턴스(중복 제거),
+ * 다르면 → 베리언트 세트(차이를 Size/Color/Variant 축으로 흡수).
+ */
+export function fullSignature(node: StructNode): string {
+  const sig = (m: StructNode): unknown => ({
+    t: m.type,
+    l: m.layoutMode ?? 'NONE',
+    w: Math.round(m.width ?? 0),
+    h: Math.round(m.height ?? 0),
+    f: m.fillHex ?? null,
+    c: (m.children ?? []).map(sig),
+  });
+  return JSON.stringify(sig(node));
+}
+
+/** 그룹 멤버가 전부 완전 동일(=인스턴스로 중복 제거 가능)한가. */
+export function membersIdentical(members: readonly StructNode[]): boolean {
+  if (members.length < 2) return false;
+  const first = fullSignature(members[0]);
+  return members.every((m) => fullSignature(m) === first);
 }
 
 /** 색 hex 목록 → 색 이름 라벨(충돌은 `-N`, 무채색은 `gray-{step}`). */

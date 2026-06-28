@@ -60,14 +60,12 @@ export const STRINGS: Record<string, string> = {
   'component.registering': '컴포넌트 등록 중…',
   'component.classifying': '베리언트 분류 중…',
   'component.generating': '누락 조합 생성 중…',
-  'component.exposing': '속성 노출 중…',
   'component.noEligible': '선택 하위에 등록 가능한 프레임이 없습니다.',
   'component.noEligibleShort': '등록 가능한 프레임이 없습니다.',
   'component.candidates': '등록 후보 {total}개 · {sel}개 선택',
   'component.registered': '컴포넌트 {registered} · 베리언트 세트 {sets}{extra}',
   'component.variants': '베리언트 세트 {sets}개 생성{extra}',
   'component.generated': '누락 조합 {generated}개 생성(세트 {sets})',
-  'component.exposed': '컴포넌트 속성 {created}개 노출',
 
   // 마법사
   'wizard.needSelect': '먼저 프레임을 선택하세요 — 선택한 레이어에서 토큰을 추출합니다.',
