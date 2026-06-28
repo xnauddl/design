@@ -389,16 +389,17 @@ export function componentEligible(node: ScanNode): boolean {
  * (다중 선택 시에는 선택 각각이 등록 단위이므로 최상위도 eligible. `REGISTER_COMPONENTS`의
  * 대상 결정과 동일한 규칙.)
  *
- * **엄격 필터**: 이름에 알려진 **컴포넌트 명사**가 있는 노드만 eligible(`recognizeComponentName`).
- * 이름 없는 프레임(`Frame 12` 등)은 후보에서 추려낸다 — 회색 맥락으로만 남거나 제외.
+ * **게이트 없음**: 모든 FRAME/GROUP(미잠금)이 eligible. 사용자가 레이어 이름을 컨테이너/래퍼
+ * 같은 임의 이름으로 짓는 실제 파일에서는 명사 사전 게이트가 진짜 컴포넌트(`row-container`,
+ * `preview-container` 등)를 통째로 버린다. 그래서 모든 프레임을 선택 가능하게 두고, **반복되는
+ * 이름**(2회+)만 기본 체크하도록 미리보기에서 `group`을 매긴다(code.ts). 잡음은 체크 해제로 회복.
  */
 export function scanComponentCandidates(selection: readonly ScanNode[]): ComponentCandidateNode[] {
   const single = selection.length === 1;
   const all: ComponentCandidateNode[] = [];
   const visit = (n: ScanNode, depth: number, parentId: string | null): void => {
     const isContainerRoot = single && depth === 0; // 컨테이너 자신 → 등록 제외
-    const named = recognizeComponentName(n.name) !== null; // 엄격 필터
-    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && named && componentEligible(n) });
+    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
     if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
   };
   for (const n of selection) visit(n, 0, null);
@@ -416,10 +417,10 @@ export function scanComponentCandidates(selection: readonly ScanNode[]): Compone
   return all.filter((c) => keep.has(c.id));
 }
 
-/* ---------- 구조 기반 그룹화(등록): 생김새 같은 자식을 베리언트 세트로 ---------- */
+/* ---------- 이름 기반 그룹화(등록): 같은 이름 자식을 베리언트 세트로 ---------- */
 /**
- * 구조 비교용 노드(figma SceneNode에서 추출). ScanNode + 여백·크기·대표 색.
- * 크기(width/height)·색(fillHex)은 시그니처에서 제외하고 **차이를 속성으로** 흡수한다.
+ * 그룹화/변형 도출용 노드(figma SceneNode에서 추출). ScanNode + 여백·크기·대표 색.
+ * 크기(width/height)·색(fillHex)은 변형 축(Size/Color) 도출에 쓴다.
  */
 export interface StructNode extends ScanNode {
   width?: number;
@@ -436,62 +437,31 @@ export interface StructNode extends ScanNode {
   children?: readonly StructNode[];
 }
 
-/**
- * 구조 시그니처(결정적 문자열). 동일 = **자식 타입 트리 + 레이아웃 방향(layoutMode)**.
- * "같은 컴포넌트의 변형인가"를 보는 골격 비교다. 변형 간 자연히 달라지는 값은 **모두 제외**해
- * 변형 축으로 흡수한다:
- * - 패딩·itemSpacing·counterAxisSpacing(=size 변형이 흔히 달라지는 곳) → **제외**.
- * - 자식 레이어 **이름**(변형마다 제각각이라 그룹을 깨던 주범) → **제외**.
- * - 크기(width/height)·색(fillHex) → **제외**(차이는 Size/Color 속성으로 흡수).
- * 남는 것: 노드 타입 + 자식의 타입/순서/중첩 + 레이아웃 방향. 이게 같으면 한 세트 후보.
- */
-export function structuralSignature(node: StructNode): string {
-  const sig = (m: StructNode): unknown => ({
-    t: m.type,
-    l: m.layoutMode ?? 'NONE',
-    c: (m.children ?? []).map(sig),
-  });
-  return JSON.stringify(sig(node));
-}
-
 export interface StructGroup {
-  key: string; // 구조 시그니처
+  key: string; // 그룹 키(정규화된 이름)
   members: StructNode[]; // 입력 순서 보존
 }
 
-/** 자식들을 구조 시그니처로 그룹화(입력 순서 유지). */
-export function groupByStructure(children: readonly StructNode[]): StructGroup[] {
-  const map = new Map<string, StructNode[]>();
-  const order: string[] = [];
-  for (const c of children) {
-    const k = structuralSignature(c);
-    if (!map.has(k)) {
-      map.set(k, []);
-      order.push(k);
-    }
-    map.get(k)!.push(c);
-  }
-  return order.map((k) => ({ key: k, members: map.get(k)! }));
+/**
+ * 등록용 그룹화 — **정확한(정규화) 이름** 기준. 사용자는 "같은 것"에 똑같은 이름을 주고
+ * 다른 컴포넌트엔 다른 이름을 준다(`Artwork Card`×6, `Like Button`×6, `artist-button`×1).
+ * 머리명사로 묶으면 `Like Button`+`artist-button`이 'Button'으로 잘못 합쳐지므로, 정확한 이름으로
+ * 묶어 사용자의 네이밍 의도를 그대로 따른다. 입력 순서 보존.
+ *
+ * 키 정규화 = **소문자 + 연속 공백 1칸**만. `kebab`을 쓰지 않는다 — kebab은 구두점·구분자를 전부
+ * `-`로 뭉개 `Card (Large)`와 `Card Large`처럼 **서로 다른 이름을 잘못 합친다**. 대소문자·여백만
+ * 관대하게 보고 구두점/글자는 그대로 구분한다.
+ */
+function exactNameKey(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-/**
- * 등록용 그룹화 — **인식된 컴포넌트명(머리명사)** 기준으로 한 세트.
- * 컴포넌트명이 인식되지 않는 노드는 제외(엄격 필터). 입력 순서 보존.
- *
- * **왜 구조를 게이트로 쓰지 않나:** 실무 변형은 같은 컴포넌트라도 내부 구조가 제각각이다
- * (아이콘 유무·텍스트 줄 수·래퍼 차이…). 구조 시그니처까지 같아야 묶으면 이런 변형들이
- * 전부 1-멤버로 쪼개져 **세트가 아예 안 생긴다**. 그래서 같은 컴포넌트명이면 한 세트 후보로
- * 묶고, 구조·크기·색 차이는 **베리언트 속성으로 흡수**한다(deriveVariants). 등록 후보는
- * 사용자가 picker로 직접 고르므로(과묶임은 체크 해제로 회복) 이름 기준이 안전하다.
- * 구조 시그니처(structuralSignature/groupByStructure)는 다른 용도로 남겨둔다.
- */
-export function groupByComponentName(children: readonly StructNode[]): StructGroup[] {
+export function groupByExactName(children: readonly StructNode[]): StructGroup[] {
   const map = new Map<string, StructNode[]>();
   const order: string[] = [];
   for (const c of children) {
-    const comp = recognizeComponentName(c.name);
-    if (!comp) continue; // 컴포넌트명 없음 → 등록 대상 아님
-    const k = comp; // 머리명사 기준 그룹(구조는 비-게이팅 → deriveVariants가 흡수)
+    const k = exactNameKey(c.name);
+    if (!k) continue; // 빈 이름 제외
     if (!map.has(k)) {
       map.set(k, []);
       order.push(k);
