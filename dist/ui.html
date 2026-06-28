@@ -239,6 +239,13 @@
     .crow .cn { font-family: var(--mono); font-size: var(--fs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .crow input { font: 400 var(--fs) var(--mono); padding: 4px 6px; width: 100%; }
 
+    /* ── 색 정리(ΔE 군집) 요약 ── */
+    #colorSection { border-top: 1px solid var(--border); padding-top: 8px; }
+    #colorSection > * + * { margin-top: 6px; }
+    .tidy { border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
+    .tidy-note { display: flex; align-items: center; gap: 8px; }
+    .tidy-note #tidySumText { flex: 1 1 auto; font-weight: 600; }
+
     /* ── diff / 선택형 미리보기 트리 ── */
     #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 8px; font-family: var(--mono); font-size: var(--fs); border: 1px solid var(--border); border-radius: var(--r-sm); }
     #diff:empty, #bindTree:empty, #compTree:empty { border: none; }
@@ -329,7 +336,7 @@
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
     <div class="step">
-      <h2>0 · 브랜드 팔레트 생성</h2>
+      <h2>브랜드 팔레트 생성</h2>
       <div class="row">
         <label class="inline">브랜드색 <input id="brand" type="color" value="#3366ff" /></label>
         <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
@@ -358,34 +365,39 @@
       <div class="status" id="paletteStatus"></div>
     </div>
 
+    <!-- 추출 + 색 정리 통합 — 추출 후 같은 카드에서 바로 병합·역할 지정. -->
     <div class="step">
-      <h2>1 · 추출</h2>
+      <h2>추출 · 색 정리</h2>
       <div class="row">
         <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
         <span class="muted" id="selInfo"></span>
       </div>
-      <div id="tokenList"></div>
       <div class="status" id="extractStatus"></div>
-    </div>
-
-    <!-- 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
-    <div class="step" id="colorTableCard" style="display:none">
-      <h2>1.5 · 색 편집 (hue → 역할)</h2>
-      <div class="hint">Global은 <b>hue 패밀리</b>(<code>color/blue/500</code>), 역할은 Semantic만. 역할을 확정해 ‘반영’하세요.</div>
-      <div id="colorTable"></div>
-      <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
-      <datalist id="roleList">
-        <option value="surface"></option><option value="surface/muted"></option>
-        <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
-        <option value="border"></option>
-        <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
-        <option value="secondary"></option><option value="accent"></option>
-        <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
-      </datalist>
+      <!-- 색 정리 — 추출 색이 있을 때만. 변수 생성 전 드래프트 단계라 바인딩 영향 없음.
+           색 외 토큰(간격·폰트·효과 등)은 아래 ‘토큰 생성’ 카드에 표시. -->
+      <div id="colorSection" style="display:none">
+        <div class="hint">비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). 역할(Semantic)을 정하세요. Global은 hue 패밀리(<code>color/blue/500</code>).</div>
+        <div id="tidySummary" class="tidy tidy-note" style="display:none">
+          <span id="tidySumText"></span>
+          <button id="btnTidyUndo" class="link">되돌리기</button>
+        </div>
+        <div id="colorTable"></div>
+        <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
+        <datalist id="roleList">
+          <option value="surface"></option><option value="surface/muted"></option>
+          <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
+          <option value="border"></option>
+          <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
+          <option value="secondary"></option><option value="accent"></option>
+          <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
+        </datalist>
+      </div>
     </div>
 
     <div class="step" id="createCard">
-      <h2>2 · 토큰 생성 (Global + Semantic)</h2>
+      <h2>토큰 생성 (Global + Semantic)</h2>
+      <div class="hint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다.</div>
+      <div id="tokenList"></div>
       <div class="row">
         <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
       </div>
@@ -400,7 +412,7 @@
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
          DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
     <div class="step" style="display:none">
-      <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
+      <h2>시맨틱 매핑 (역할 → 토큰)</h2>
       <div class="hint">형식: <code>역할 = Global변수이름</code></div>
       <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
@@ -412,7 +424,7 @@
     </div>
 
     <div class="step">
-      <h2>2.6 · 텍스트 스타일 (화면 → 스타일)</h2>
+      <h2>텍스트 스타일 (화면 → 스타일)</h2>
       <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Pro)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText">선택에서 스캔</button>
@@ -435,7 +447,7 @@
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
-      <h2>3 · 적용 (바인딩)</h2>
+      <h2>적용 (바인딩)</h2>
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
@@ -458,7 +470,7 @@
     </div>
 
     <div class="step">
-      <h2>4 · 리네임</h2>
+      <h2>리네임</h2>
       <div class="row">
         <label class="inline">맥락 최대단계 <input id="depth" type="number" value="8" min="1" /></label>
         <button id="btnPreview">미리보기</button>
@@ -476,7 +488,7 @@
     </div>
 
     <div class="step" id="contrastCard">
-      <h2>5 · 명도 대비 점검 (WCAG)</h2>
+      <h2>명도 대비 점검 (WCAG)</h2>
       <div class="hint">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
       <div class="row">
         <label class="inline">기준
@@ -1448,17 +1460,33 @@
     }
     box.appendChild(wrap);
   }
+  var colorRevealed = false;
+  var previewRevealed = false;
+  var lastTidy = { before: 0, after: 0, merged: 0 };
+  var pendingCreatePreview = false;
   function renderTokens() {
     const box = $("tokenList");
+    const showHint = (msg) => {
+      box.innerHTML = "";
+      const hint = document.createElement("div");
+      hint.className = "hint";
+      hint.textContent = msg;
+      box.appendChild(hint);
+    };
     if (!tokens.length) {
-      if (lastSelCount > 0) {
-        renderEmptyState(box, "\uCD94\uCD9C \uC900\uBE44\uB428", "\uC120\uD0DD\uC5D0\uC11C \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC744 \uBF51\uC2B5\uB2C8\uB2E4. \u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uC138\uC694.");
-      } else {
-        renderEmptyState(box, "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC5B4\uC694", "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uB4DC\uB824\uC694.");
-      }
+      showHint(lastSelCount > 0 ? "\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC740 \uC0C9\uC744, \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB294 \uC0C9 \uC678 \uD1A0\uD070\uC744 \uD45C\uC2DC\uD569\uB2C8\uB2E4." : "\uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uACE0 \u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uC138\uC694.");
       return;
     }
-    renderChunked(box, tokens, makeTokenRow);
+    if (!previewRevealed) {
+      showHint("\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uC0DD\uC131\uD560 \uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC774 \uD45C\uC2DC\uB429\uB2C8\uB2E4.");
+      return;
+    }
+    const others = tokens.filter((t2) => t2.category !== "color");
+    if (!others.length) {
+      showHint("\uC0C9 \uC678 \uD1A0\uD070\uC774 \uC5C6\uC2B5\uB2C8\uB2E4(\uC0C9\uB9CC \uCD94\uCD9C\uB428).");
+      return;
+    }
+    renderChunked(box, others, makeTokenRow);
   }
   var brandColor = $("brand");
   var brandHex = $("brandHex");
@@ -1483,9 +1511,13 @@
       includeStatus: $("incStatus").checked
     });
     tokens = paletteToDraftTokens(p);
+    colorRevealed = true;
+    previewRevealed = false;
     renderTokens();
     setSemMapText(paletteSemanticMap(p));
     renderColorTable();
+    hideTidySummary();
+    preTidyTokens = null;
     $("btnPaletteApply").style.display = "";
     $("paletteInfo").textContent = t("palette.summary", { count: p.scales.length, tokens: tokens.length });
     setStatus(
@@ -1519,9 +1551,9 @@
     });
   }
   function renderColorTable() {
-    const card = $("colorTableCard");
+    const card = $("colorSection");
     const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
-    if (!colors.length) {
+    if (!colorRevealed || !colors.length) {
       card.style.display = "none";
       return;
     }
@@ -1559,6 +1591,56 @@
     setSemMapText(map);
     setStatus("semStatus", t("semantic.rolesApplied", { count: Object.keys(map).length }), "ok");
   }
+  function colorHexes() {
+    return tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string").map((t2) => t2.value.toLowerCase());
+  }
+  var preTidyTokens = null;
+  function tidyColors() {
+    const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
+    const before = colors.length;
+    const baseName = (name) => name.replace(/-\d+$/, "");
+    const keep = /* @__PURE__ */ new Map();
+    const drop = /* @__PURE__ */ new Set();
+    for (const t2 of colors) {
+      const k = baseName(t2.name);
+      const rep = keep.get(k);
+      if (!rep) {
+        keep.set(k, t2);
+      } else {
+        for (const s of t2.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+        drop.add(t2);
+      }
+    }
+    if (drop.size) {
+      tokens = tokens.filter((t2) => !drop.has(t2));
+      for (const [base, rep] of keep) rep.name = base;
+    }
+    return { before, after: keep.size, merged: drop.size };
+  }
+  function renderTidySummary(s) {
+    const box = $("tidySummary");
+    if (s.merged <= 0) {
+      box.style.display = "none";
+      return;
+    }
+    box.style.display = "";
+    $("tidySumText").textContent = `\uBE44\uC2B7\uD55C \uC0C9 ${s.before} \u2192 ${s.after}\uAC1C\uB85C \uC790\uB3D9 \uC815\uB9AC\uB428`;
+  }
+  function hideTidySummary() {
+    $("tidySummary").style.display = "none";
+  }
+  function undoTidy() {
+    if (!preTidyTokens) return;
+    tokens = preTidyTokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
+    preTidyTokens = null;
+    hideTidySummary();
+    renderTokens();
+    renderColorTable();
+    suggestSemMapFrom(tokens);
+    $("btnCreateApply").style.display = "none";
+    setStatus("extractStatus", `\uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694 \xB7 \uCD94\uCD9C \uC0C9 ${new Set(colorHexes()).size}\uAC1C`, "");
+  }
+  $("btnTidyUndo").addEventListener("click", undoTidy);
   function syncSecondaryControls() {
     const on = $("useBrand2").checked;
     $("brand2").disabled = !on;
@@ -1584,12 +1666,19 @@
     $("btnWizardRun").focus();
     $("wizardCard").scrollIntoView({ block: "start", behavior: "smooth" });
   });
-  $("btnExtract").addEventListener("click", () => send({ type: "EXTRACT" }));
+  $("btnExtract").addEventListener("click", () => {
+    colorRevealed = true;
+    previewRevealed = false;
+    send({ type: "EXTRACT" });
+  });
   $("btnCreate").addEventListener("click", () => {
+    previewRevealed = true;
     if (!tokens.length) {
-      setStatus("createStatus", t("create.needExtract"), "warn");
+      pendingCreatePreview = true;
+      send({ type: "EXTRACT" });
       return;
     }
+    renderTokens();
     const base = Number($("base").value) || 16;
     createFrom = "tokens";
     send({ type: "CREATE_TOKENS", tokens, base, preview: true });
@@ -2172,13 +2261,23 @@
       case "EXTRACT_RESULT": {
         tokens = msg.tokens;
         huefyTokenColors(tokens);
-        renderTokens();
+        preTidyTokens = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
+        lastTidy = tidyColors();
         $("btnCreateApply").style.display = "none";
         $("btnPaletteApply").style.display = "none";
         suggestSemMapFrom(tokens);
         renderColorTable();
-        $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
+        renderTidySummary(lastTidy);
+        renderTokens();
+        const colorN = tokens.filter((tk) => tk.category === "color").length;
+        $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uC0C9 ${colorN} \xB7 \uADF8 \uC678 ${tokens.length - colorN}`;
         setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");
+        if (pendingCreatePreview) {
+          pendingCreatePreview = false;
+          const base = Number($("base").value) || 16;
+          createFrom = "tokens";
+          send({ type: "CREATE_TOKENS", tokens, base, preview: true });
+        }
         break;
       }
       case "SELECTION_STATE": {
@@ -2776,10 +2875,10 @@
     return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
   }
   var TITLE_BTN_IDS = /* @__PURE__ */ new Set([
+    // btnColorRoles 제외: 색 정리는 추출 카드에 흡수돼 더 이상 독립 카드 머리가 아님(본문 버튼).
     "btnWizardRun",
     "btnPalette",
     "btnExtract",
-    "btnColorRoles",
     "btnCreate",
     "btnTextStyles",
     "btnApply",

@@ -121,18 +121,39 @@ function renderEmptyState(box: HTMLElement, title: string, guide: string, action
   box.appendChild(wrap);
 }
 
+// 버튼 역할 분리: ‘선택에서 토큰 추출’은 색만(colorRevealed), ‘미리보기’는 색 외 토큰만
+// (previewRevealed) 노출. 추출은 색·색 외를 한 번에 읽는 단일 동작이라, 어느 버튼을
+// 먼저 눌러도 추출이 실행되고(자동 추출) 각자 자기 영역만 펼친다.
+let colorRevealed = false;
+let previewRevealed = false;
+let lastTidy: { before: number; after: number; merged: number } = { before: 0, after: 0, merged: 0 };
+let pendingCreatePreview = false; // ‘미리보기’가 추출을 유발했을 때, 추출 후 생성 미리보기 전송
+// ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만.
 function renderTokens(): void {
   const box = $('tokenList');
+  const showHint = (msg: string): void => {
+    box.innerHTML = '';
+    const hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = msg;
+    box.appendChild(hint);
+  };
   if (!tokens.length) {
-    // 빈 상태(캐논 108:2 패턴) — 선택 여부로 헤드라인/안내를 분기.
-    if (lastSelCount > 0) {
-      renderEmptyState(box, '추출 준비됨', '선택에서 색·폰트·간격을 뽑습니다. ‘선택에서 토큰 추출’을 누르세요.');
-    } else {
-      renderEmptyState(box, '선택한 노드가 없어요', '프레임이나 레이어를 선택하면 후보를 찾아드려요.');
-    }
+    showHint(lastSelCount > 0
+      ? '‘선택에서 토큰 추출’은 색을, ‘미리보기’는 색 외 토큰을 표시합니다.'
+      : '프레임을 선택하고 ‘선택에서 토큰 추출’을 누르세요.');
     return;
   }
-  renderChunked(box, tokens, makeTokenRow); // §4: 대량 추출도 비차단
+  if (!previewRevealed) {
+    showHint('‘미리보기’를 누르면 생성할 색 외 토큰(간격·크기·폰트·효과)이 표시됩니다.');
+    return;
+  }
+  const others = tokens.filter((t) => t.category !== 'color');
+  if (!others.length) {
+    showHint('색 외 토큰이 없습니다(색만 추출됨).');
+    return;
+  }
+  renderChunked(box, others, makeTokenRow); // §4: 대량 추출도 비차단
 }
 
 /* ---------- 0 · 브랜드 팔레트 ---------- */
@@ -162,10 +183,14 @@ $('btnPalette').addEventListener('click', () => {
     includeStatus: ($('incStatus') as HTMLInputElement).checked,
   });
   tokens = paletteToDraftTokens(p);
+  colorRevealed = true; // 팔레트 생성 = 색 노출
+  previewRevealed = false; // 색 외 토큰 목록은 ‘미리보기’ 클릭 시
   renderTokens();
   // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
   setSemMapText(paletteSemanticMap(p));
   renderColorTable(); // #3: 색 편집표(hue·역할) 표시
+  hideTidySummary(); // 팔레트 스케일은 의도적 간격 — 정리 안 함
+  preTidyTokens = null;
   ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
   $('paletteInfo').textContent = t('palette.summary', { count: p.scales.length, tokens: tokens.length });
   setStatus(
@@ -210,10 +235,10 @@ function huefyTokenColors(toks: DraftToken[]): void {
 /* ---------- #3 색 편집표 (hue → 역할) ---------- */
 /** 색 토큰을 표로: 스와치 · hue 이름 · 역할 입력(현 semMap에서 prefill). */
 function renderColorTable(): void {
-  const card = $('colorTableCard');
+  const card = $('colorSection');
   const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
-  if (!colors.length) {
-    card.style.display = 'none';
+  if (!colorRevealed || !colors.length) {
+    card.style.display = 'none'; // 색은 ‘선택에서 토큰 추출’(colorRevealed) 후에만 노출
     return;
   }
   card.style.display = '';
@@ -253,6 +278,73 @@ function applyColorRoles(): void {
   setStatus('semStatus', t('semantic.rolesApplied', { count: Object.keys(map).length }), 'ok');
 }
 
+/* ---------- 색 정리 (ΔE 군집 N:1) ---------- */
+/** 현재 색 토큰 hex 목록. */
+function colorHexes(): string[] {
+  return tokens
+    .filter((t) => t.category === 'color' && typeof t.value === 'string')
+    .map((t) => (t.value as string).toLowerCase());
+}
+
+/** 자동 정리 직전의 추출 토큰 스냅샷(되돌리기용). null이면 되돌릴 것 없음. */
+let preTidyTokens: DraftToken[] | null = null;
+
+/** 색 토큰을 hue-단계 이름 기준으로 N:1 병합(드래프트 단계 — 변수·바인딩 영향 없음).
+   huefy가 같은 단계로 본 색(예: color/gray/50 와 color/gray/50-2)은 한 대표로 합친다
+   (sources union, 대표는 접미사 없는 base 이름). 단계 버킷이 ΔE(군집)보다 관대해
+   실데이터에서 확실히 정리됨 — 같은 단계 색이 두 변수로 남지 않는다. 통계 반환. */
+function tidyColors(): { before: number; after: number; merged: number } {
+  const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
+  const before = colors.length;
+  const baseName = (name: string) => name.replace(/-\d+$/, ''); // 충돌 접미사(-2,-3…) 제거
+  const keep = new Map<string, DraftToken>(); // base 이름 → 남길 대표 토큰
+  const drop = new Set<DraftToken>();
+  for (const t of colors) {
+    const k = baseName(t.name);
+    const rep = keep.get(k);
+    if (!rep) {
+      keep.set(k, t);
+    } else {
+      for (const s of t.sources) if (!rep.sources.includes(s)) rep.sources.push(s); // 스코프 union 보존
+      drop.add(t);
+    }
+  }
+  if (drop.size) {
+    tokens = tokens.filter((t) => !drop.has(t));
+    for (const [base, rep] of keep) rep.name = base; // 대표 이름을 base로 정규화(접미사 제거)
+  }
+  return { before, after: keep.size, merged: drop.size };
+}
+
+/** 정리 결과 요약 한 줄 + 되돌리기. merged=0이면 숨김. */
+function renderTidySummary(s: { before: number; after: number; merged: number }): void {
+  const box = $('tidySummary');
+  if (s.merged <= 0) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = '';
+  $('tidySumText').textContent = `비슷한 색 ${s.before} → ${s.after}개로 자동 정리됨`;
+}
+
+function hideTidySummary(): void {
+  $('tidySummary').style.display = 'none';
+}
+
+/** 자동 정리 되돌리기 — 정리 직전 추출 색으로 복원(이번 추출 한정). */
+function undoTidy(): void {
+  if (!preTidyTokens) return;
+  tokens = preTidyTokens.map((t) => ({ ...t, sources: [...t.sources] }));
+  preTidyTokens = null;
+  hideTidySummary();
+  renderTokens();
+  renderColorTable();
+  suggestSemMapFrom(tokens);
+  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 집합 변경 → 새 미리보기 필요
+  setStatus('extractStatus', `정리를 되돌렸어요 · 추출 색 ${new Set(colorHexes()).size}개`, '');
+}
+$('btnTidyUndo').addEventListener('click', undoTidy);
+
 // 보조색 사용 토글 → 보조색·하모니 입력 활성/비활성 동기화.
 function syncSecondaryControls(): void {
   const on = ($('useBrand2') as HTMLInputElement).checked;
@@ -285,13 +377,22 @@ $('btnGuide').addEventListener('click', () => {
 });
 
 /* ---------- 버튼 ---------- */
-$('btnExtract').addEventListener('click', () => send({ type: 'EXTRACT' }));
+$('btnExtract').addEventListener('click', () => {
+  colorRevealed = true; // 추출 버튼 역할: 색 노출
+  previewRevealed = false; // 색 외 토큰은 ‘미리보기’ 클릭 시
+  send({ type: 'EXTRACT' });
+});
 
 $('btnCreate').addEventListener('click', () => {
+  previewRevealed = true; // 미리보기 버튼 역할: 생성할 색 외 토큰을 펼침
   if (!tokens.length) {
-    setStatus('createStatus', t('create.needExtract'), 'warn');
+    // 추출 전에 눌러도 동작: 추출을 자동 실행하고, 결과 도착 후 생성 미리보기까지 이어감.
+    // (색은 colorRevealed가 false라 노출 안 함 — 추출 버튼의 역할)
+    pendingCreatePreview = true;
+    send({ type: 'EXTRACT' });
     return;
   }
+  renderTokens();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
   send({ type: 'CREATE_TOKENS', tokens, base, preview: true }); // UX1: 미리보기 먼저
@@ -971,14 +1072,26 @@ window.onmessage = (event: MessageEvent) => {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
       huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
-      renderTokens();
+      // 추출 색 자동 정리(같은 hue-단계 N:1 병합) — 드래프트 단계라 바인딩 영향 없음.
+      preTidyTokens = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기 스냅샷
+      lastTidy = tidyColors();
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
       ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
       // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
       suggestSemMapFrom(tokens);
-      renderColorTable(); // #3: 색 편집표(hue·역할) 표시
-      $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
+      renderColorTable(); // colorRevealed면 색 표(추출 버튼이 켬)
+      renderTidySummary(lastTidy); // 정리 요약 한 줄 + 되돌리기
+      renderTokens(); // previewRevealed면 색 외 목록(미리보기 버튼이 켬)
+      const colorN = tokens.filter((tk) => tk.category === 'color').length;
+      $('selInfo').textContent = `선택 ${msg.selection}개 · 색 ${colorN} · 그 외 ${tokens.length - colorN}`;
       setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
+      if (pendingCreatePreview) {
+        // ‘미리보기’가 추출을 유발 → 추출 완료 후 생성 미리보기까지 이어감.
+        pendingCreatePreview = false;
+        const base = Number(($('base') as HTMLInputElement).value) || 16;
+        createFrom = 'tokens';
+        send({ type: 'CREATE_TOKENS', tokens, base, preview: true });
+      }
       break;
     }
     case 'SELECTION_STATE': {
@@ -1705,7 +1818,8 @@ function escapeHtml(s: string): string {
 /* ---------- 캐논 패턴: 카드 접기(아코디언) + 주 버튼 타이틀 줄 이동 ---------- */
 // 카드별 '주 버튼'(타이틀 줄 우측으로 이동). 카드 안에서 첫 번째로 매칭되는 버튼만 옮긴다.
 const TITLE_BTN_IDS = new Set([
-  'btnWizardRun', 'btnPalette', 'btnExtract', 'btnColorRoles', 'btnCreate',
+  // btnColorRoles 제외: 색 정리는 추출 카드에 흡수돼 더 이상 독립 카드 머리가 아님(본문 버튼).
+  'btnWizardRun', 'btnPalette', 'btnExtract', 'btnCreate',
   'btnTextStyles', 'btnApply', 'btnPreview', 'btnContrast', 'btnExport',
 ]);
 /** 모든 .step 카드를 접이식으로 + 주 버튼을 타이틀 줄로. 노드 이동이라 id/리스너 보존, 멱등. */
