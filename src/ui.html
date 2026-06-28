@@ -372,9 +372,9 @@
         <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
         <span class="muted" id="selInfo"></span>
       </div>
-      <div id="tokenList"></div>
       <div class="status" id="extractStatus"></div>
-      <!-- 색 정리 — 추출 색이 있을 때만. 변수 생성 전 드래프트 단계라 바인딩 영향 없음. -->
+      <!-- 색 정리 — 추출 색이 있을 때만. 변수 생성 전 드래프트 단계라 바인딩 영향 없음.
+           색 외 토큰(간격·폰트·효과 등)은 아래 ‘토큰 생성’ 카드에 표시. -->
       <div id="colorSection" style="display:none">
         <div class="hint">비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). 역할(Semantic)을 정하세요. Global은 hue 패밀리(<code>color/blue/500</code>).</div>
         <div id="tidySummary" class="tidy tidy-note" style="display:none">
@@ -396,6 +396,8 @@
 
     <div class="step" id="createCard">
       <h2>토큰 생성 (Global + Semantic)</h2>
+      <div class="hint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다.</div>
+      <div id="tokenList"></div>
       <div class="row">
         <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
       </div>

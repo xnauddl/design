@@ -372,9 +372,9 @@
         <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
         <span class="muted" id="selInfo"></span>
       </div>
-      <div id="tokenList"></div>
       <div class="status" id="extractStatus"></div>
-      <!-- 색 정리 — 추출 색이 있을 때만. 변수 생성 전 드래프트 단계라 바인딩 영향 없음. -->
+      <!-- 색 정리 — 추출 색이 있을 때만. 변수 생성 전 드래프트 단계라 바인딩 영향 없음.
+           색 외 토큰(간격·폰트·효과 등)은 아래 ‘토큰 생성’ 카드에 표시. -->
       <div id="colorSection" style="display:none">
         <div class="hint">비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). 역할(Semantic)을 정하세요. Global은 hue 패밀리(<code>color/blue/500</code>).</div>
         <div id="tidySummary" class="tidy tidy-note" style="display:none">
@@ -396,6 +396,8 @@
 
     <div class="step" id="createCard">
       <h2>토큰 생성 (Global + Semantic)</h2>
+      <div class="hint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다.</div>
+      <div id="tokenList"></div>
       <div class="row">
         <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
       </div>
@@ -1460,17 +1462,13 @@
   }
   function renderTokens() {
     const box = $("tokenList");
-    if (!tokens.length) {
-      if (lastSelCount > 0) {
-        renderEmptyState(box, "\uCD94\uCD9C \uC900\uBE44\uB428", "\uC120\uD0DD\uC5D0\uC11C \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC744 \uBF51\uC2B5\uB2C8\uB2E4. \u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uC138\uC694.");
-      } else {
-        renderEmptyState(box, "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC5B4\uC694", "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uB4DC\uB824\uC694.");
-      }
-      return;
-    }
     const others = tokens.filter((t2) => t2.category !== "color");
     if (!others.length) {
       box.innerHTML = "";
+      const hint = document.createElement("div");
+      hint.className = "hint";
+      hint.textContent = lastSelCount > 0 ? "\uCD94\uCD9C\uD558\uBA74 \uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC774 \uC5EC\uAE30\uC5D0 \uD45C\uC2DC\uB429\uB2C8\uB2E4." : "\uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uACE0 \u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uC138\uC694.";
+      box.appendChild(hint);
       return;
     }
     renderChunked(box, others, makeTokenRow);
@@ -2247,7 +2245,8 @@
         suggestSemMapFrom(tokens);
         renderColorTable();
         renderTidySummary(tidy);
-        $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uD1A0\uD070 ${tokens.length}\uAC1C`;
+        const colorN = tokens.filter((tk) => tk.category === "color").length;
+        $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uC0C9 ${colorN} \xB7 \uADF8 \uC678 ${tokens.length - colorN}`;
         setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");
         break;
       }

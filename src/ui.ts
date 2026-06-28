@@ -121,21 +121,18 @@ function renderEmptyState(box: HTMLElement, title: string, guide: string, action
   box.appendChild(wrap);
 }
 
+// ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만. 색은 ‘색 정리’ 카드의 색 표에 단일 표시.
 function renderTokens(): void {
   const box = $('tokenList');
-  if (!tokens.length) {
-    // 빈 상태(캐논 108:2 패턴) — 선택 여부로 헤드라인/안내를 분기.
-    if (lastSelCount > 0) {
-      renderEmptyState(box, '추출 준비됨', '선택에서 색·폰트·간격을 뽑습니다. ‘선택에서 토큰 추출’을 누르세요.');
-    } else {
-      renderEmptyState(box, '선택한 노드가 없어요', '프레임이나 레이어를 선택하면 후보를 찾아드려요.');
-    }
-    return;
-  }
-  // 색은 아래 색 표(스와치·역할)에 단일 표시 — 토큰 리스트엔 간격·폰트 등 비-색 토큰만.
   const others = tokens.filter((t) => t.category !== 'color');
   if (!others.length) {
-    box.innerHTML = ''; // 색만 추출된 경우: 색 표에서 확인(빈 상태 문구 아님)
+    box.innerHTML = '';
+    const hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = lastSelCount > 0
+      ? '추출하면 색 외 토큰(간격·크기·폰트·효과)이 여기에 표시됩니다.'
+      : '프레임을 선택하고 ‘선택에서 토큰 추출’을 누르세요.';
+    box.appendChild(hint);
     return;
   }
   renderChunked(box, others, makeTokenRow); // §4: 대량 추출도 비차단
@@ -1056,7 +1053,8 @@ window.onmessage = (event: MessageEvent) => {
       suggestSemMapFrom(tokens);
       renderColorTable(); // 정리된 색을 색 표(스와치·역할)에 단일 표시
       renderTidySummary(tidy); // 정리 요약 한 줄 + 되돌리기
-      $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
+      const colorN = tokens.filter((tk) => tk.category === 'color').length;
+      $('selInfo').textContent = `선택 ${msg.selection}개 · 색 ${colorN} · 그 외 ${tokens.length - colorN}`;
       setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
       break;
     }
