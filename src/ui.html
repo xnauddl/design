@@ -350,34 +350,34 @@
 
     <!-- 온보딩 / 가이드 -->
     <div class="ux" id="onboardCard">
-      <div class="ux-h"><span class="ux-t">온보딩 / 가이드</span></div>
-      <div>처음이세요? <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 ‘만들기·적용’ 탭을 차례로 사용하세요.</div>
+      <div class="ux-h"><span class="ux-t" data-i18n="onboard.title">온보딩 / 가이드</span></div>
+      <div data-i18n-html="onboard.body">처음이세요? <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 ‘만들기·적용’ 탭을 차례로 사용하세요.</div>
       <div class="row">
-        <button id="btnGuide">전체 실행</button>
-        <button id="btnOnboardClose">닫기</button>
+        <button id="btnGuide" data-i18n="onboard.run">전체 실행</button>
+        <button id="btnOnboardClose" data-i18n="onboard.close">닫기</button>
       </div>
     </div>
 
     <!-- 진행 안내 — 만들기→적용 의존 파이프라인 단계 상태 -->
     <div class="step" id="pipelineCard">
-      <h2>진행 안내</h2>
-      <div class="hint">권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.</div>
+      <h2 data-i18n="pipeline.title">진행 안내</h2>
+      <div class="hint" data-i18n="pipeline.hint">권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.</div>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px">리네임 · 대비 점검 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 대비 점검 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
     </div>
   </section>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
     <div class="step">
-      <h2>0 · 브랜드 팔레트 생성</h2>
+      <h2 data-i18n="palette.title">0 · 브랜드 팔레트 생성</h2>
       <div class="row">
-        <label class="inline">브랜드색 <input id="brand" type="color" value="#3366ff" /></label>
+        <label class="inline"><span data-i18n="palette.brand">브랜드색</span> <input id="brand" type="color" value="#3366ff" /></label>
         <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
       </div>
       <div class="row">
-        <label class="inline"><input id="useBrand2" type="checkbox" /> 보조색</label>
+        <label class="inline"><input id="useBrand2" type="checkbox" /> <span data-i18n="palette.brand2">보조색</span></label>
         <input id="brand2" type="color" value="#ff5722" disabled />
-        <label class="inline">하모니
+        <label class="inline"><span data-i18n="palette.harmony">하모니</span>
           <select id="harmony" disabled>
             <option value="complementary">보색</option>
             <option value="analogous">유사</option>
@@ -386,22 +386,22 @@
             <option value="tetradic">사각</option>
           </select>
         </label>
-        <label class="inline"><input id="incNeutral" type="checkbox" checked /> 중립</label>
-        <label class="inline"><input id="incStatus" type="checkbox" checked /> 상태색</label>
+        <label class="inline"><input id="incNeutral" type="checkbox" checked /> <span data-i18n="palette.neutral">중립</span></label>
+        <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태색</span></label>
       </div>
-      <div class="hint">미리보기로 확인한 뒤 ‘적용’하면 변수로 반영됩니다.</div>
+      <div class="hint" data-i18n="palette.previewHint">미리보기로 확인한 뒤 ‘적용’하면 변수로 반영됩니다.</div>
       <div class="row">
-        <button id="btnPalette" class="primary">팔레트 생성</button>
-        <button id="btnPaletteApply" style="display:none">적용 (변수 생성)</button>
+        <button id="btnPalette" class="primary" data-i18n="palette.gen">팔레트 생성</button>
+        <button id="btnPaletteApply" style="display:none" data-i18n="palette.apply">적용 (변수 생성)</button>
         <span class="muted" id="paletteInfo"></span>
       </div>
       <div class="status" id="paletteStatus"></div>
     </div>
 
     <div class="step">
-      <h2>1 · 추출</h2>
+      <h2 data-i18n="extract.title">1 · 추출</h2>
       <div class="row">
-        <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
+        <button id="btnExtract" class="primary" data-i18n="extract.scanBtn">선택에서 토큰 추출</button>
         <span class="muted" id="selInfo"></span>
       </div>
       <div id="tokenList"></div>
@@ -412,10 +412,10 @@
 
     <!-- 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
     <div class="step" id="colorTableCard" style="display:none">
-      <h2>1.5 · 색 편집 (hue → 역할)</h2>
-      <div class="hint">Global은 <b>hue 패밀리</b>(<code>color/blue/500</code>), 역할은 Semantic만. 역할을 확정해 ‘반영’하세요.</div>
+      <h2 data-i18n="colorTable.title">1.5 · 색 편집 (hue → 역할)</h2>
+      <div class="hint" data-i18n-html="colorTable.hint">Global은 <b>hue 패밀리</b>(<code>color/blue/500</code>), 역할은 Semantic만. 역할을 확정해 ‘반영’하세요.</div>
       <div id="colorTable"></div>
-      <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
+      <div class="row"><button id="btnColorRoles" data-i18n="colorTable.applyBtn">시맨틱 매핑에 반영</button></div>
       <datalist id="roleList">
         <option value="surface"></option><option value="surface/muted"></option>
         <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
@@ -427,30 +427,30 @@
     </div>
 
     <div class="step" id="createCard">
-      <h2>2 · 토큰 생성 (Global + Semantic)</h2>
+      <h2 data-i18n="create.title">2 · 토큰 생성 (Global + Semantic)</h2>
       <div class="row">
-        <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
+        <label class="inline"><span data-i18n="create.base">base(px)</span> <input id="base" type="number" value="16" min="1" /></label>
       </div>
-      <div class="hint">미리보기로 변경 요약을 확인한 뒤 적용하세요.</div>
+      <div class="hint" data-i18n="create.hint">미리보기로 변경 요약을 확인한 뒤 적용하세요.</div>
       <div class="row">
-        <button id="btnCreate">미리보기</button>
-        <button id="btnCreateApply" class="primary" style="display:none">적용</button>
+        <button id="btnCreate" data-i18n="create.previewBtn">미리보기</button>
+        <button id="btnCreateApply" class="primary" style="display:none" data-i18n="create.apply">적용</button>
       </div>
       <div class="status" id="createStatus"></div>
     </div>
 
     <!-- 변수 편집: 토큰 생성 직후 — 방금 만든 변수의 값·이름·스코프를 바로 손보거나 삭제(다크 생성 포함). -->
     <div class="step" id="varEditCard">
-      <h2>변수 편집</h2>
-      <div class="hint">Global·Semantic·Component 변수의 값·이름·스코프를 직접 고치거나 삭제합니다. (각 작업 단일 Undo)</div>
+      <h2 data-i18n="varedit.title">변수 편집</h2>
+      <div class="hint" data-i18n="varedit.hint">Global·Semantic·Component 변수의 값·이름·스코프를 직접 고치거나 삭제합니다. (각 작업 단일 Undo)</div>
       <div class="row">
-        <button id="btnVarRefresh">새로고침</button>
+        <button id="btnVarRefresh" data-i18n="varedit.refresh">새로고침</button>
         <span class="muted" id="varEditInfo"></span>
       </div>
       <div id="varEditList"></div>
       <div id="darkGenPanel"></div>
       <div class="ux">
-        <div class="ux-h"><span class="ux-t">즉시 편집 · 단일 Undo</span></div>
+        <div class="ux-h"><span class="ux-t" data-i18n="varedit.uxTitle">즉시 편집 · 단일 Undo</span></div>
         <div class="status" id="varEditStatus"></div>
       </div>
     </div>
@@ -458,34 +458,34 @@
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
          DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
     <div class="step" style="display:none">
-      <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
-      <div class="hint">형식: <code>역할 = Global변수이름</code></div>
-      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
+      <h2 data-i18n="semantic.title">2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
+      <div class="hint" data-i18n-html="semantic.formatLabel">형식: <code>역할 = Global변수이름</code></div>
+      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
       <div class="row">
-        <button id="btnSemantics">시맨틱 별칭 생성</button>
-        <button id="btnScanGlobals">기존 색에서 추천</button>
+        <button id="btnSemantics" data-i18n="semantic.aliasBtn">시맨틱 별칭 생성</button>
+        <button id="btnScanGlobals" data-i18n="semantic.scanBtn">기존 색에서 추천</button>
       </div>
       <div class="status" id="semStatus"></div>
     </div>
 
     <div class="step">
-      <h2>2.6 · 텍스트 스타일 (화면 → 스타일) <span class="muted" id="textStyleLock"></span></h2>
-      <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다.</div>
+      <h2><span data-i18n="textStyle.title">2.6 · 텍스트 스타일 (화면 → 스타일)</span> <span class="muted" id="textStyleLock"></span></h2>
+      <div class="hint" data-i18n-html="textStyle.hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다.</div>
       <div class="row" style="margin-top:6px;">
-        <button id="btnScanText">선택에서 스캔</button>
-        <button id="btnTsAddRow">행 추가</button>
-        <label class="inline">폰트 <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
+        <button id="btnScanText" data-i18n="textStyle.scanBtn">선택에서 스캔</button>
+        <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
+        <label class="inline"><span data-i18n="textStyle.font">폰트</span> <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
       </div>
       <table id="tsTable" style="width:100%; border-collapse:collapse; margin-top:6px; font-size:11px;">
         <thead><tr style="text-align:left; color:var(--muted);">
-          <th>이름</th><th>크기</th><th>행간</th><th>스타일</th><th></th>
+          <th data-i18n="textStyle.colName">이름</th><th data-i18n="textStyle.colSize">크기</th><th data-i18n="textStyle.colLineHeight">행간</th><th data-i18n="textStyle.colStyle">스타일</th><th></th>
         </tr></thead>
         <tbody id="tsRows"></tbody>
       </table>
-      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 원본 텍스트에 스타일 적용</label>
+      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">원본 텍스트에 스타일 적용</span></label>
       <div class="row" style="margin-top:6px;">
-        <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
+        <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">텍스트 스타일 등록</button>
       </div>
       <div class="status" id="tsStatus"></div>
     </div>
@@ -493,74 +493,74 @@
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
-      <h2>3 · 적용 (바인딩)</h2>
-      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
+      <h2 data-i18n="bind.title">3 · 적용 (바인딩)</h2>
+      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
       <div class="row">
-        <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
-        <button id="btnApply">미리보기</button>
-        <button id="btnApplyConfirm" class="primary" style="display:none">선택에 바인딩</button>
+        <label class="inline"><span data-i18n="bind.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
+        <button id="btnApply" data-i18n="bind.preview">미리보기</button>
+        <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택에 바인딩</button>
       </div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="bindAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
       </div>
       <div id="bindTree"></div>
       <div class="ux" id="applyProgress" style="display:none">
-        <div class="ux-h"><span class="ux-t">진행률</span></div>
+        <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
         <div class="row">
           <span class="muted" id="applyProgressText"></span>
-          <button id="btnApplyCancel">취소</button>
+          <button id="btnApplyCancel" data-i18n="common.cancel">취소</button>
         </div>
       </div>
       <div class="status" id="applyStatus"></div>
     </div>
 
     <div class="step">
-      <h2>4 · 리네임</h2>
+      <h2 data-i18n="rename.title">4 · 리네임</h2>
       <div class="row">
-        <label class="inline">맥락 최대단계 <input id="depth" type="number" value="8" min="1" /></label>
-        <button id="btnPreview">미리보기</button>
-        <button id="btnRename" disabled>이름 적용</button>
+        <label class="inline"><span data-i18n="rename.depth">맥락 최대단계</span> <input id="depth" type="number" value="8" min="1" /></label>
+        <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
+        <button id="btnRename" disabled data-i18n="rename.apply">이름 적용</button>
       </div>
       <div class="row tree-ctrls">
-        <label class="inline"><input type="checkbox" id="renameAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
       </div>
       <div id="diff"></div>
       <div class="ux">
-        <div class="ux-h"><span class="ux-t">되돌리기 안전장치</span></div>
-        <div>이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
+        <div class="ux-h"><span class="ux-t" data-i18n="rename.undoTitle">되돌리기 안전장치</span></div>
+        <div data-i18n="rename.undoBody">이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
       </div>
       <div class="status" id="renameStatus"></div>
     </div>
 
     <div class="step" id="contrastCard">
-      <h2>5 · 명도 대비 점검 (WCAG)</h2>
-      <div class="hint">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
+      <h2 data-i18n="contrast.title">5 · 명도 대비 점검 (WCAG)</h2>
+      <div class="hint" data-i18n="contrast.hint">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
       <div class="row">
-        <label class="inline">기준
+        <label class="inline"><span data-i18n="contrast.level">기준</span>
           <select id="contrastLevel">
             <option value="AA">AA (4.5 · 큰글자 3)</option>
             <option value="AAA">AAA (7 · 큰글자 4.5)</option>
           </select>
         </label>
-        <button id="btnContrast" class="primary">대비 검사</button>
+        <button id="btnContrast" class="primary" data-i18n="contrast.checkBtn">대비 검사</button>
       </div>
       <div id="contrastList" style="max-height:160px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
       <div class="status" id="contrastStatus"></div>
     </div>
 
     <div class="step" id="componentCard">
-      <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
-      <div class="hint">하위에서 <b>후보 스캔</b> → 골라 등록. 같은 베이스 이름(<code>button/primary</code>) → 베리언트 세트.</div>
+      <h2><span data-i18n="component.title">컴포넌트 / 베리언트</span> <span class="muted" id="componentLock"></span></h2>
+      <div class="hint" data-i18n-html="component.hint">하위에서 <b>후보 스캔</b> → 골라 등록. 같은 베이스 이름(<code>button/primary</code>) → 베리언트 세트.</div>
       <div class="row">
-        <button id="btnScanComp">후보 스캔</button>
-        <button id="btnRegisterComp">컴포넌트 등록</button>
-        <button id="btnClassifyVariants">베리언트 분류</button>
-        <button id="btnGenMissing">누락 조합 생성</button>
-        <button id="btnExposeProps">속성 노출</button>
+        <button id="btnScanComp" data-i18n="component.scanBtn">후보 스캔</button>
+        <button id="btnRegisterComp" data-i18n="component.registerBtn">컴포넌트 등록</button>
+        <button id="btnClassifyVariants" data-i18n="component.classifyBtn">베리언트 분류</button>
+        <button id="btnGenMissing" data-i18n="component.genMissingBtn">누락 조합 생성</button>
+        <button id="btnExposeProps" data-i18n="component.exposeBtn">속성 노출</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
+        <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
       </div>
       <div id="compTree"></div>
       <div id="variantReport" style="max-height:120px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
@@ -568,13 +568,13 @@
     </div>
 
     <div class="step" id="similarCard">
-      <h2>닮은 프레임 → 컴포넌트 <span class="muted" id="similarLock"></span></h2>
-      <div class="hint">구조가 같고 <b>내용(텍스트·이미지)만 다른</b> 프레임들을 선택 → <b>스캔</b>. 마스터 1개를 고르면 가변 텍스트/인스턴스를 <b>컴포넌트 속성</b>으로 노출하고 나머지는 인스턴스로 교체합니다.</div>
+      <h2><span data-i18n="similar.title">닮은 프레임 → 컴포넌트</span> <span class="muted" id="similarLock"></span></h2>
+      <div class="hint" data-i18n-html="similar.hint">구조가 같고 <b>내용(텍스트·이미지)만 다른</b> 프레임들을 선택 → <b>스캔</b>. 마스터 1개를 고르면 가변 텍스트/인스턴스를 <b>컴포넌트 속성</b>으로 노출하고 나머지는 인스턴스로 교체합니다.</div>
       <div class="row" style="margin-top:6px;">
-        <button id="btnScanSimilar">닮은 프레임 스캔</button>
-        <button id="btnComponentize" class="primary">컴포넌트화</button>
+        <button id="btnScanSimilar" data-i18n="similar.scanBtn">닮은 프레임 스캔</button>
+        <button id="btnComponentize" class="primary" data-i18n="similar.componentizeBtn">컴포넌트화</button>
       </div>
-      <div class="muted" id="similarHint" style="margin-top:4px;">행을 클릭하면 캔버스에서 해당 프레임을 보여줍니다(◯ 마스터 선택).</div>
+      <div class="muted" id="similarHint" style="margin-top:4px;" data-i18n="similar.rowHint">행을 클릭하면 캔버스에서 해당 프레임을 보여줍니다(◯ 마스터 선택).</div>
       <div id="similarList" style="max-height:180px; overflow:auto; margin-top:6px; font-size:11px;"></div>
       <div class="muted" id="similarWarn" style="margin-top:4px;"></div>
       <div class="status" id="similarStatus"></div>
@@ -583,16 +583,16 @@
 
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
     <div class="step">
-      <h2>내보내기 (코드)</h2>
-      <div class="hint">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
+      <h2 data-i18n="export.title">내보내기 (코드)</h2>
+      <div class="hint" data-i18n="export.hint">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
       <div class="row">
-        <label class="inline">형식
+        <label class="inline"><span data-i18n="export.format">형식</span>
           <select id="exportFormat">
             <option value="w3c">W3C 토큰 JSON</option>
             <option value="css">CSS 변수</option>
           </select>
         </label>
-        <label class="inline">폰트 크기
+        <label class="inline"><span data-i18n="export.fontUnit">폰트 크기</span>
           <select id="exportFontUnit">
             <option value="px">px</option>
             <option value="rem">rem</option>
@@ -600,54 +600,54 @@
         </label>
       </div>
       <div class="row">
-        <button id="btnExport" class="primary">내보내기</button>
-        <button id="btnDownloadExport">다운로드</button>
+        <button id="btnExport" class="primary" data-i18n="export.runBtn">내보내기</button>
+        <button id="btnDownloadExport" data-i18n="export.downloadBtn">다운로드</button>
       </div>
       <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%;"></textarea>
       <div class="status" id="exportStatus"></div>
     </div>
 
     <div class="step">
-      <h2>요금제 / 라이선스</h2>
-      <div class="muted">Paid(연 구독) — 토큰 생성·시맨틱 매핑·컴포넌트/베리언트·텍스트 스타일·프리셋 잠금 해제. 팔레트·리네임·바인딩·미리보기·내보내기는 무료.</div>
+      <h2 data-i18n="license.title">요금제 / 라이선스</h2>
+      <div class="muted" data-i18n="license.desc">Paid(연 구독) — 토큰 생성·시맨틱 매핑·컴포넌트/베리언트·텍스트 스타일·프리셋 잠금 해제. 팔레트·리네임·바인딩·미리보기·내보내기는 무료.</div>
       <div class="row">
-        <button id="btnBuy" class="primary">구독하기</button>
-        <button id="btnManage">구독 관리</button>
+        <button id="btnBuy" class="primary" data-i18n="license.buy">구독하기</button>
+        <button id="btnManage" data-i18n="license.manage">구독 관리</button>
       </div>
       <div class="row">
         <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
-        <button id="btnVerify">검증</button>
-        <button id="btnClearLicense">해제</button>
+        <button id="btnVerify" data-i18n="license.verify">검증</button>
+        <button id="btnClearLicense" data-i18n="license.clear">해제</button>
       </div>
       <div class="muted" id="licenseInfo"></div>
       <div class="muted" id="limitsInfo"></div>
       <div class="row" id="devTierRow">
-        <label class="inline">개발용 강제 티어
+        <label class="inline"><span data-i18n="license.devTier">개발용 강제 티어</span>
           <select id="tier">
             <option value="free">Free</option>
             <option value="paid">Paid</option>
           </select>
         </label>
-        <span class="muted">(개발 빌드 전용 · 검증된 키가 없을 때만 적용)</span>
+        <span class="muted" data-i18n="license.devTierNote">(개발 빌드 전용 · 검증된 키가 없을 때만 적용)</span>
       </div>
       <div class="status" id="licenseStatus"></div>
     </div>
 
     <div class="step" id="presetCard">
-      <h2>공유 프리셋 <span class="muted" id="presetLock"></span></h2>
-      <div class="hint">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다.</div>
+      <h2><span data-i18n="preset.title">공유 프리셋</span> <span class="muted" id="presetLock"></span></h2>
+      <div class="hint" data-i18n="preset.hint">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다.</div>
       <div class="row">
         <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px;" />
-        <button id="btnSavePreset">현재 설정 저장</button>
+        <button id="btnSavePreset" data-i18n="preset.saveBtn">현재 설정 저장</button>
       </div>
       <div class="row">
         <select id="presetList" style="flex:1; min-width:120px;"></select>
-        <button id="btnLoadPreset">불러오기</button>
-        <button id="btnDeletePreset">삭제</button>
+        <button id="btnLoadPreset" data-i18n="preset.loadBtn">불러오기</button>
+        <button id="btnDeletePreset" data-i18n="preset.deleteBtn">삭제</button>
       </div>
       <div class="row">
-        <button id="btnExportPreset">내보내기(JSON)</button>
-        <button id="btnImportPreset">가져오기(JSON)</button>
+        <button id="btnExportPreset" data-i18n="preset.exportBtn">내보내기(JSON)</button>
+        <button id="btnImportPreset" data-i18n="preset.importBtn">가져오기(JSON)</button>
       </div>
       <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%;"></textarea>
       <div class="status" id="presetStatus"></div>
@@ -655,8 +655,8 @@
 
     <!-- 접근성 / 국제화 -->
     <div class="ux">
-      <div class="ux-h"><span class="ux-t">접근성 · 국제화</span></div>
-      <div>키보드 전용 조작 · 명도 대비 AA · i18n</div>
+      <div class="ux-h"><span class="ux-t" data-i18n="a11y.title">접근성 · 국제화</span></div>
+      <div data-i18n="a11y.body">키보드 전용 조작 · 명도 대비 AA · i18n</div>
     </div>
   </section>
 
