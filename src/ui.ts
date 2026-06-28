@@ -133,7 +133,13 @@ function renderTokens(): void {
     }
     return;
   }
-  renderChunked(box, tokens, makeTokenRow); // §4: 대량 추출도 비차단
+  // 색은 아래 색 표(스와치·역할)에 단일 표시 — 토큰 리스트엔 간격·폰트 등 비-색 토큰만.
+  const others = tokens.filter((t) => t.category !== 'color');
+  if (!others.length) {
+    box.innerHTML = ''; // 색만 추출된 경우: 색 표에서 확인(빈 상태 문구 아님)
+    return;
+  }
+  renderChunked(box, others, makeTokenRow); // §4: 대량 추출도 비차단
 }
 
 /* ---------- 0 · 브랜드 팔레트 ---------- */
@@ -167,7 +173,8 @@ $('btnPalette').addEventListener('click', () => {
   // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
   setSemMapText(paletteSemanticMap(p));
   renderColorTable(); // #3: 색 편집표(hue·역할) 표시
-  renderColorTidy(false); // 팔레트 스케일은 의도적 간격 — 정리 대상 아님(숨김)
+  hideTidySummary(); // 팔레트 스케일은 의도적 간격 — 정리 안 함
+  preTidyTokens = null;
   ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
   $('paletteInfo').textContent = t('palette.summary', { count: p.scales.length, tokens: tokens.length });
   setStatus(
@@ -263,57 +270,14 @@ function colorHexes(): string[] {
     .map((t) => (t.value as string).toLowerCase());
 }
 
-/** 비슷한 색 군집을 미리보기로 표시(병합 후보 N→1). active=false면 숨김.
-   추출 색에서만 호출 — 팔레트 스케일은 의도적 간격이라 정리 대상 아님. */
-function renderColorTidy(active: boolean): void {
-  const box = $('colorTidy');
-  if (!active) {
-    box.style.display = 'none';
-    return;
-  }
-  const hexes = colorHexes();
-  const clusters = clusterColors(hexes).filter((c) => c.members.length > 1);
-  if (!clusters.length) {
-    box.style.display = 'none';
-    return;
-  }
-  box.style.display = '';
-  const total = new Set(hexes).size;
-  const after = total - clusters.reduce((n, c) => n + (c.members.length - 1), 0);
-  $('tidySum').textContent = `비슷한 색 ${total} → ${after}개로 정리`;
-  const list = $('tidyList');
-  list.innerHTML = '';
-  for (const cl of clusters) {
-    const row = document.createElement('div');
-    row.className = 'tidy-row';
-    const members = document.createElement('span');
-    members.className = 'tidy-members';
-    for (const m of cl.members) {
-      const sw = document.createElement('span');
-      sw.className = m === cl.rep ? 'swatch rep' : 'swatch';
-      sw.style.background = m;
-      sw.title = m;
-      members.appendChild(sw);
-    }
-    const arrow = document.createElement('span');
-    arrow.className = 'tidy-arrow';
-    arrow.textContent = '→';
-    const rep = document.createElement('span');
-    rep.className = 'swatch rep';
-    rep.style.background = cl.rep;
-    rep.title = `대표 ${cl.rep}`;
-    const cnt = document.createElement('span');
-    cnt.className = 'tidy-cnt muted';
-    cnt.textContent = `${cl.members.length}→1`;
-    row.append(members, arrow, rep, cnt);
-    list.appendChild(row);
-  }
-}
+/** 자동 정리 직전의 추출 토큰 스냅샷(되돌리기용). null이면 되돌릴 것 없음. */
+let preTidyTokens: DraftToken[] | null = null;
 
-/** 병합 실행 — 군집마다 대표 색 토큰만 남기고 나머지는 제거(sources 합침).
-   드래프트 단계라 변수·바인딩은 그대로. */
-function applyColorTidy(): void {
+/** 색 토큰을 ΔE 군집으로 N:1 병합(드래프트 단계 — 변수·바인딩 영향 없음).
+   군집마다 대표 토큰만 남기고 나머지는 제거(sources 합침). tokens 제자리 갱신, 통계 반환. */
+function tidyColors(): { before: number; after: number; merged: number } {
   const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
+  const before = new Set(colors.map((t) => (t.value as string).toLowerCase())).size;
   const clusters = clusterColors(colors.map((t) => (t.value as string).toLowerCase()));
   const repOf = new Map<string, string>();
   for (const cl of clusters) for (const m of cl.members) repOf.set(m, cl.rep);
@@ -332,18 +296,41 @@ function applyColorTidy(): void {
       drop.add(t);
     }
   }
-  if (!drop.size) return;
+  if (drop.size) {
+    tokens = tokens.filter((t) => !drop.has(t));
+    huefyTokenColors(tokens); // 충돌 접미사 줄도록 이름 재정규화
+  }
+  return { before, after: keep.size, merged: drop.size };
+}
 
-  tokens = tokens.filter((t) => !drop.has(t));
-  huefyTokenColors(tokens); // 충돌 접미사 줄도록 이름 재정규화
+/** 정리 결과 요약 한 줄 + 되돌리기. merged=0이면 숨김. */
+function renderTidySummary(s: { before: number; after: number; merged: number }): void {
+  const box = $('tidySummary');
+  if (s.merged <= 0) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = '';
+  $('tidySumText').textContent = `비슷한 색 ${s.before} → ${s.after}개로 자동 정리됨`;
+}
+
+function hideTidySummary(): void {
+  $('tidySummary').style.display = 'none';
+}
+
+/** 자동 정리 되돌리기 — 정리 직전 추출 색으로 복원(이번 추출 한정). */
+function undoTidy(): void {
+  if (!preTidyTokens) return;
+  tokens = preTidyTokens.map((t) => ({ ...t, sources: [...t.sources] }));
+  preTidyTokens = null;
+  hideTidySummary();
   renderTokens();
   renderColorTable();
-  renderColorTidy(true);
   suggestSemMapFrom(tokens);
   ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 집합 변경 → 새 미리보기 필요
-  setStatus('extractStatus', `비슷한 색 ${drop.size}개를 대표색으로 병합 · 색 ${keep.size}개`, 'ok');
+  setStatus('extractStatus', `정리를 되돌렸어요 · 추출 색 ${new Set(colorHexes()).size}개`, '');
 }
-$('btnColorTidy').addEventListener('click', applyColorTidy);
+$('btnTidyUndo').addEventListener('click', undoTidy);
 
 // 보조색 사용 토글 → 보조색·하모니 입력 활성/비활성 동기화.
 function syncSecondaryControls(): void {
@@ -1063,13 +1050,16 @@ window.onmessage = (event: MessageEvent) => {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
       huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
+      // 추출 색 자동 정리(ΔE 군집 N:1) — 비슷한 색을 대표색으로 병합. 드래프트 단계라 바인딩 영향 없음.
+      preTidyTokens = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기 스냅샷
+      const tidy = tidyColors();
       renderTokens();
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
       ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
       // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
       suggestSemMapFrom(tokens);
-      renderColorTable(); // #3: 색 편집표(hue·역할) 표시
-      renderColorTidy(true); // 추출 색만 N:1 정리 미리보기
+      renderColorTable(); // 정리된 색을 색 표(스와치·역할)에 단일 표시
+      renderTidySummary(tidy); // 정리 요약 한 줄 + 되돌리기
       $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
       setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
       break;

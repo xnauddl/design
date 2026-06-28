@@ -239,20 +239,12 @@
     .crow .cn { font-family: var(--mono); font-size: var(--fs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .crow input { font: 400 var(--fs) var(--mono); padding: 4px 6px; width: 100%; }
 
-    /* ── 색 정리(ΔE 군집) 미리보기 ── */
+    /* ── 색 정리(ΔE 군집) 요약 ── */
     #colorSection { border-top: 1px solid var(--border); padding-top: 8px; }
     #colorSection > * + * { margin-top: 6px; }
     .tidy { border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
-    .tidy-head { display: flex; align-items: center; gap: 8px; }
-    .tidy-sum { flex: 1 1 auto; font-weight: 600; }
-    .tidy-head > button { flex: 0 0 auto; }
-    #tidyList { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
-    .tidy-row { display: flex; align-items: center; gap: 6px; }
-    .tidy-members { display: inline-flex; gap: 2px; }
-    .tidy-arrow { color: var(--muted); }
-    .tidy .swatch { width: 13px; height: 13px; }
-    .tidy .swatch.rep { box-shadow: 0 0 0 2px var(--accent); }
-    .tidy-cnt { margin-left: auto; font-size: 10px; }
+    .tidy-note { display: flex; align-items: center; gap: 8px; }
+    .tidy-note #tidySumText { flex: 1 1 auto; font-weight: 600; }
 
     /* ── diff / 선택형 미리보기 트리 ── */
     #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 8px; font-family: var(--mono); font-size: var(--fs); border: 1px solid var(--border); border-radius: var(--r-sm); }
@@ -384,14 +376,10 @@
       <div class="status" id="extractStatus"></div>
       <!-- 색 정리 — 추출 색이 있을 때만. 변수 생성 전 드래프트 단계라 바인딩 영향 없음. -->
       <div id="colorSection" style="display:none">
-        <div class="hint">비슷한 색을 대표 1색으로 <b>병합</b>하고 역할(Semantic)을 정합니다. Global은 hue 패밀리(<code>color/blue/500</code>).</div>
-        <div id="colorTidy" class="tidy" style="display:none">
-          <div class="tidy-head">
-            <span class="tidy-sum" id="tidySum"></span>
-            <button id="btnColorTidy" class="primary">병합</button>
-          </div>
-          <div id="tidyList"></div>
-          <div class="hint">변수 생성 전 단계라 이미 적용된 디자인(바인딩)에는 영향이 없어요.</div>
+        <div class="hint">비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). 역할(Semantic)을 정하세요. Global은 hue 패밀리(<code>color/blue/500</code>).</div>
+        <div id="tidySummary" class="tidy tidy-note" style="display:none">
+          <span id="tidySumText"></span>
+          <button id="btnTidyUndo" class="link">되돌리기</button>
         </div>
         <div id="colorTable"></div>
         <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
