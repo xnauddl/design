@@ -2,7 +2,7 @@
    messages.ts — code(샌드박스) ↔ ui(iframe) 메시지 타입 단일 소스
    ============================================================ */
 import type { DraftToken } from '../lib/tokens';
-import type { Tier } from '../lib/entitlements';
+import type { Tier, Feature } from '../lib/entitlements';
 import type { LicenseStatus, VerifyResult } from '../lib/license';
 import type { Preset } from '../lib/presets';
 import type { HistoryEntry } from '../lib/history';
@@ -68,7 +68,7 @@ export type CodeToUi =
       /** 마지막 작업 관련 메시지(검증 실패·오프라인 안내 등). */
       note?: string;
     }
-  | { type: 'PREMIUM_REQUIRED'; feature: string; message: string }
+  | { type: 'PREMIUM_REQUIRED'; feature: Feature; message: string }
   | { type: 'REQUEST_VERIFY'; key: string; instanceId?: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서). instanceId: 같은 기기로 validate
   | { type: 'REQUEST_DEACTIVATE'; key: string; instanceId: string } // 해제 시 code → UI: 이 기기의 LS 활성화 슬롯 반납(best-effort)
   | { type: 'PRESETS'; presets: Preset[] } // M3(Team): 프리셋 목록
