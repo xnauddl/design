@@ -239,6 +239,19 @@
     .crow .cn { font-family: var(--mono); font-size: var(--fs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .crow input { font: 400 var(--fs) var(--mono); padding: 4px 6px; width: 100%; }
 
+    /* ── 색 정리(ΔE 군집) 미리보기 ── */
+    .tidy { border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
+    .tidy-head { display: flex; align-items: center; gap: 8px; }
+    .tidy-sum { flex: 1 1 auto; font-weight: 600; }
+    .tidy-head > button { flex: 0 0 auto; }
+    #tidyList { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+    .tidy-row { display: flex; align-items: center; gap: 6px; }
+    .tidy-members { display: inline-flex; gap: 2px; }
+    .tidy-arrow { color: var(--muted); }
+    .tidy .swatch { width: 13px; height: 13px; }
+    .tidy .swatch.rep { box-shadow: 0 0 0 2px var(--accent); }
+    .tidy-cnt { margin-left: auto; font-size: 10px; }
+
     /* ── diff / 선택형 미리보기 트리 ── */
     #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 8px; font-family: var(--mono); font-size: var(--fs); border: 1px solid var(--border); border-radius: var(--r-sm); }
     #diff:empty, #bindTree:empty, #compTree:empty { border: none; }
@@ -329,7 +342,7 @@
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
     <div class="step">
-      <h2>0 · 브랜드 팔레트 생성</h2>
+      <h2>브랜드 팔레트 생성</h2>
       <div class="row">
         <label class="inline">브랜드색 <input id="brand" type="color" value="#3366ff" /></label>
         <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
@@ -359,7 +372,7 @@
     </div>
 
     <div class="step">
-      <h2>1 · 추출</h2>
+      <h2>추출</h2>
       <div class="row">
         <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
         <span class="muted" id="selInfo"></span>
@@ -370,8 +383,17 @@
 
     <!-- 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
     <div class="step" id="colorTableCard" style="display:none">
-      <h2>1.5 · 색 편집 (hue → 역할)</h2>
+      <h2>색 정리 (비슷한 색 병합 → 역할)</h2>
       <div class="hint">Global은 <b>hue 패밀리</b>(<code>color/blue/500</code>), 역할은 Semantic만. 역할을 확정해 ‘반영’하세요.</div>
+      <!-- 추출 색 N:1 정리 — 변수 생성 전 드래프트 단계(바인딩 영향 없음). 비슷한 색이 있을 때만 표시. -->
+      <div id="colorTidy" class="tidy" style="display:none">
+        <div class="tidy-head">
+          <span class="tidy-sum" id="tidySum"></span>
+          <button id="btnColorTidy" class="primary">병합</button>
+        </div>
+        <div id="tidyList"></div>
+        <div class="hint">변수 생성 전 단계라 이미 적용된 디자인(바인딩)에는 영향이 없어요.</div>
+      </div>
       <div id="colorTable"></div>
       <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
       <datalist id="roleList">
@@ -385,7 +407,7 @@
     </div>
 
     <div class="step" id="createCard">
-      <h2>2 · 토큰 생성 (Global + Semantic)</h2>
+      <h2>토큰 생성 (Global + Semantic)</h2>
       <div class="row">
         <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
       </div>
@@ -400,7 +422,7 @@
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
          DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
     <div class="step" style="display:none">
-      <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
+      <h2>시맨틱 매핑 (역할 → 토큰)</h2>
       <div class="hint">형식: <code>역할 = Global변수이름</code></div>
       <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
@@ -412,7 +434,7 @@
     </div>
 
     <div class="step">
-      <h2>2.6 · 텍스트 스타일 (화면 → 스타일)</h2>
+      <h2>텍스트 스타일 (화면 → 스타일)</h2>
       <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Pro)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText">선택에서 스캔</button>
@@ -435,7 +457,7 @@
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
-      <h2>3 · 적용 (바인딩)</h2>
+      <h2>적용 (바인딩)</h2>
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
@@ -458,7 +480,7 @@
     </div>
 
     <div class="step">
-      <h2>4 · 리네임</h2>
+      <h2>리네임</h2>
       <div class="row">
         <label class="inline">맥락 최대단계 <input id="depth" type="number" value="8" min="1" /></label>
         <button id="btnPreview">미리보기</button>
@@ -476,7 +498,7 @@
     </div>
 
     <div class="step" id="contrastCard">
-      <h2>5 · 명도 대비 점검 (WCAG)</h2>
+      <h2>명도 대비 점검 (WCAG)</h2>
       <div class="hint">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
       <div class="row">
         <label class="inline">기준

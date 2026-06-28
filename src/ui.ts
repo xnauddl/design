@@ -13,6 +13,7 @@ import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSem
 import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
+import { clusterColors } from './lib/cluster';
 import { suggestTokenRoles } from './lib/roles';
 import { pipelineSteps, type StepStatus } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
@@ -166,6 +167,7 @@ $('btnPalette').addEventListener('click', () => {
   // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
   setSemMapText(paletteSemanticMap(p));
   renderColorTable(); // #3: 색 편집표(hue·역할) 표시
+  renderColorTidy(false); // 팔레트 스케일은 의도적 간격 — 정리 대상 아님(숨김)
   ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
   $('paletteInfo').textContent = t('palette.summary', { count: p.scales.length, tokens: tokens.length });
   setStatus(
@@ -252,6 +254,96 @@ function applyColorRoles(): void {
   setSemMapText(map);
   setStatus('semStatus', t('semantic.rolesApplied', { count: Object.keys(map).length }), 'ok');
 }
+
+/* ---------- 색 정리 (ΔE 군집 N:1) ---------- */
+/** 현재 색 토큰 hex 목록. */
+function colorHexes(): string[] {
+  return tokens
+    .filter((t) => t.category === 'color' && typeof t.value === 'string')
+    .map((t) => (t.value as string).toLowerCase());
+}
+
+/** 비슷한 색 군집을 미리보기로 표시(병합 후보 N→1). active=false면 숨김.
+   추출 색에서만 호출 — 팔레트 스케일은 의도적 간격이라 정리 대상 아님. */
+function renderColorTidy(active: boolean): void {
+  const box = $('colorTidy');
+  if (!active) {
+    box.style.display = 'none';
+    return;
+  }
+  const hexes = colorHexes();
+  const clusters = clusterColors(hexes).filter((c) => c.members.length > 1);
+  if (!clusters.length) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = '';
+  const total = new Set(hexes).size;
+  const after = total - clusters.reduce((n, c) => n + (c.members.length - 1), 0);
+  $('tidySum').textContent = `비슷한 색 ${total} → ${after}개로 정리`;
+  const list = $('tidyList');
+  list.innerHTML = '';
+  for (const cl of clusters) {
+    const row = document.createElement('div');
+    row.className = 'tidy-row';
+    const members = document.createElement('span');
+    members.className = 'tidy-members';
+    for (const m of cl.members) {
+      const sw = document.createElement('span');
+      sw.className = m === cl.rep ? 'swatch rep' : 'swatch';
+      sw.style.background = m;
+      sw.title = m;
+      members.appendChild(sw);
+    }
+    const arrow = document.createElement('span');
+    arrow.className = 'tidy-arrow';
+    arrow.textContent = '→';
+    const rep = document.createElement('span');
+    rep.className = 'swatch rep';
+    rep.style.background = cl.rep;
+    rep.title = `대표 ${cl.rep}`;
+    const cnt = document.createElement('span');
+    cnt.className = 'tidy-cnt muted';
+    cnt.textContent = `${cl.members.length}→1`;
+    row.append(members, arrow, rep, cnt);
+    list.appendChild(row);
+  }
+}
+
+/** 병합 실행 — 군집마다 대표 색 토큰만 남기고 나머지는 제거(sources 합침).
+   드래프트 단계라 변수·바인딩은 그대로. */
+function applyColorTidy(): void {
+  const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
+  const clusters = clusterColors(colors.map((t) => (t.value as string).toLowerCase()));
+  const repOf = new Map<string, string>();
+  for (const cl of clusters) for (const m of cl.members) repOf.set(m, cl.rep);
+
+  const keep = new Map<string, DraftToken>(); // 대표 hex → 남길 토큰
+  for (const t of colors) {
+    const hex = (t.value as string).toLowerCase();
+    if (hex === repOf.get(hex) && !keep.has(hex)) keep.set(hex, t);
+  }
+  const drop = new Set<DraftToken>();
+  for (const t of colors) {
+    const hex = (t.value as string).toLowerCase();
+    const repTok = keep.get(repOf.get(hex) as string);
+    if (repTok && t !== repTok) {
+      for (const s of t.sources) if (!repTok.sources.includes(s)) repTok.sources.push(s); // 스코프 union 보존
+      drop.add(t);
+    }
+  }
+  if (!drop.size) return;
+
+  tokens = tokens.filter((t) => !drop.has(t));
+  huefyTokenColors(tokens); // 충돌 접미사 줄도록 이름 재정규화
+  renderTokens();
+  renderColorTable();
+  renderColorTidy(true);
+  suggestSemMapFrom(tokens);
+  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 집합 변경 → 새 미리보기 필요
+  setStatus('extractStatus', `비슷한 색 ${drop.size}개를 대표색으로 병합 · 색 ${keep.size}개`, 'ok');
+}
+$('btnColorTidy').addEventListener('click', applyColorTidy);
 
 // 보조색 사용 토글 → 보조색·하모니 입력 활성/비활성 동기화.
 function syncSecondaryControls(): void {
@@ -977,6 +1069,7 @@ window.onmessage = (event: MessageEvent) => {
       // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
       suggestSemMapFrom(tokens);
       renderColorTable(); // #3: 색 편집표(hue·역할) 표시
+      renderColorTidy(true); // 추출 색만 N:1 정리 미리보기
       $('selInfo').textContent = `선택 ${msg.selection}개 · 토큰 ${tokens.length}개`;
       setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
       break;
