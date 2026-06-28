@@ -47,7 +47,11 @@ async function recurse(
       taken.add(node.name); // 스킵된 이름도 충돌 방지용으로 예약
     }
 
-    if ('children' in node) await recurse(node.children, contextForChildren, opts, out);
+    // 인스턴스 내부 레이어는 이름이 메인 컴포넌트에서 파생되어 변경 불가(Figma가 throw)
+    // → 서브트리를 순회하지 않는다. (인스턴스 자체는 decide()에서 이미 skip.)
+    if ('children' in node && node.type !== 'INSTANCE') {
+      await recurse(node.children, contextForChildren, opts, out);
+    }
   }
 }
 

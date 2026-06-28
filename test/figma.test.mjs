@@ -474,7 +474,9 @@ test('renameSelection — 토큰명/역할명/제외규칙/형제 dedup', async 
   const icon1 = { type: 'VECTOR', id: 'ic1', name: 'Vector 2' };
   const icon2 = { type: 'VECTOR', id: 'ic2', name: 'Vector 3' };
   const txt = { type: 'TEXT', id: 'tx', name: 'KeepText', characters: 'x' };
-  const inst = { type: 'INSTANCE', id: 'in', name: 'KeepInstance' };
+  // 인스턴스 + 내부 자식: 인스턴스 자식 이름은 변경 불가(Figma throw) → 순회 제외돼야 함.
+  const instChild = { type: 'RECTANGLE', id: 'inch', name: 'InstanceChildRect', fills: [{ type: 'SOLID', visible: true }] };
+  const inst = { type: 'INSTANCE', id: 'in', name: 'KeepInstance', children: [instChild] };
   const bg2 = { type: 'RECTANGLE', id: 'bg2', name: 'Rectangle 9', fills: [{ type: 'SOLID', visible: true }] };
 
   const root = {
@@ -502,6 +504,9 @@ test('renameSelection — 토큰명/역할명/제외규칙/형제 dedup', async 
   assert.equal(after.has('in'), false);
   assert.equal(txt.name, 'KeepText');
   assert.equal(inst.name, 'KeepInstance');
+  // 인스턴스 자식은 순회 제외(이름 변경 불가) → 변경 항목 없음, 원래 이름 유지
+  assert.equal(after.has('inch'), false);
+  assert.equal(instChild.name, 'InstanceChildRect');
 });
 
 test('renameSelection — apply:false면 미리보기만(노드 이름 불변)', async () => {
