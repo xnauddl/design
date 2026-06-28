@@ -830,7 +830,10 @@ $('btnRegisterComp').addEventListener('click', () => {
   // #1: 스캔 후보가 있으면 체크한 노드만, 없으면 최상위 선택(폴백).
   if (compCandidates.length) {
     const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
-    if (!nodeIds.length) return;
+    if (!nodeIds.length) {
+      setStatus('componentStatus', t('component.noChecked'), 'warn'); // 무반응 방지: 체크 0이면 안내
+      return;
+    }
     setStatus('componentStatus', t('component.registering'), '');
     send({ type: 'REGISTER_COMPONENTS', nodeIds });
   } else {

@@ -62,6 +62,7 @@ export const STRINGS: Record<string, string> = {
   'component.generating': '누락 조합 생성 중…',
   'component.noEligible': '선택 하위에 등록 가능한 프레임이 없습니다.',
   'component.noEligibleShort': '등록 가능한 프레임이 없습니다.',
+  'component.noChecked': '체크된 후보가 없습니다 — 트리에서 묶을 항목을 선택하세요.',
   'component.candidates': '등록 후보 {total}개 · {sel}개 선택',
   'component.registered': '컴포넌트 {registered} · 베리언트 세트 {sets}{extra}',
   'component.variants': '베리언트 세트 {sets}개 생성{extra}',
