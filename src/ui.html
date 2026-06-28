@@ -3,68 +3,342 @@
 <head>
   <meta charset="UTF-8" />
   <style>
-    :root { color-scheme: light dark; }
-    body { font: 12px -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif; margin: 0; padding: 12px; color: var(--figma-color-text, #111); }
-    h2 { font-size: 12px; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; }
-    .step { border: 1px solid var(--figma-color-border, #e5e5e5); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
-    button { font: inherit; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--figma-color-border, #d5d5d5); background: var(--figma-color-bg, #fff); cursor: pointer; }
-    button.primary { background: #0d99ff; color: #fff; border-color: #0d99ff; }
-    button:disabled { opacity: .5; cursor: default; }
+    /* ── 디자인 시스템 v2 (라이트 고정) ───────────────────────────────
+       색·간격·반경·타이포를 토큰화. 좁은 패널(≈320–480px)에 맞춘 11px 베이스.
+       JS가 참조하는 id/클래스명은 그대로 두고 스타일만 재설계. */
+    :root {
+      color-scheme: light;
+
+      /* 표면 */
+      --bg:            #ffffff;
+      --surface:       #ffffff;
+      --surface-2:     #f4f5f6;   /* 필드·트랙·미묘한 채움 */
+      --surface-hover: #eceef0;
+
+      /* 텍스트 */
+      --text:          #1b1b1f;
+      --text-2:        #5e636b;   /* 보조 */
+      --muted:         #9298a1;   /* 흐림 */
+
+      /* 경계 */
+      --border:        #e7e8ea;
+      --border-2:      #d4d6da;   /* 강조 경계·hover */
+
+      /* 강조(Figma 블루 계열) */
+      --accent:        #0d99ff;
+      --accent-hover:  #0a86e6;
+      --accent-press:  #0974c9;
+      --accent-strong: #0a6dbf;   /* 텍스트용 진한 강조 */
+      --accent-subtle: #ecf6ff;   /* 콜아웃 배경 */
+      --accent-border: #c4e4ff;
+
+      --on-accent:     #ffffff;
+
+      /* 상태 */
+      --ok:            #117b34;
+      --ok-subtle:     #e8f5ec;
+      --warn:          #9a6300;
+      --warn-subtle:   #fbf1df;
+      --danger:        #c8252f;
+      --danger-subtle: #fdecec;
+      --danger-border: #f4c9cc;
+
+      /* 반경 */
+      --r-sm: 5px;
+      --r:    7px;
+      --r-lg: 10px;
+
+      /* 그림자 */
+      --shadow-sm: 0 1px 1.5px rgba(20,22,28,.05);
+      --shadow:    0 1px 2px rgba(20,22,28,.06), 0 2px 6px rgba(20,22,28,.05);
+
+      --fs:   11px;
+      --font: "Inter", -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      font: 400 var(--fs)/1.5 var(--font);
+      margin: 0; padding: 12px;
+      color: var(--text); background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+    h2 {
+      font-size: var(--fs); font-weight: 600; color: var(--text);
+      margin: 0 0 8px; letter-spacing: -0.1px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .muted   { color: var(--muted); }
+    .warn    { color: var(--warn); }
+    .ok      { color: var(--ok); }
+    code     { font-family: var(--mono); font-size: 10.5px; color: var(--text-2); background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+    b        { font-weight: 600; }
+
+    /* ── 카드 ── */
+    .step {
+      border: 1px solid var(--border); border-radius: var(--r-lg);
+      padding: 12px; margin-bottom: 10px; background: var(--surface);
+      box-shadow: var(--shadow-sm);
+    }
+    .step > * + * { margin-top: 8px; }
+
+    /* ── 카드 헤더(접기 chevron + 타이틀 줄 버튼) — 캐논 패턴 ── */
+    .step-head { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+    .step-head h2 { margin: 0; flex: 1 1 auto; }
+    .step-head > button { flex: 0 0 auto; }
+    .step-head .chev { flex: 0 0 auto; color: var(--muted); font-size: 13px; line-height: 1; transform: rotate(90deg); transition: transform .12s; }
+    .step.collapsed .step-head .chev { transform: rotate(0deg); }
+    .step-body > * + * { margin-top: 8px; }
+    .step.collapsed .step-body { display: none; }
+
+    /* ── 버튼 ── */
+    button {
+      font: 600 var(--fs)/1 var(--font);
+      padding: 7px 11px; border-radius: var(--r-sm);
+      border: 1px solid var(--border-2); background: var(--surface); color: var(--text);
+      cursor: pointer; transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
+      white-space: nowrap;
+    }
+    button:hover { background: var(--surface-2); border-color: var(--border-2); }
+    button:active { background: var(--surface-hover); }
+    button.primary {
+      background: var(--accent); color: var(--on-accent); border-color: var(--accent);
+      box-shadow: var(--shadow-sm);
+    }
+    button.primary:hover  { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button.primary:active { background: var(--accent-press); border-color: var(--accent-press); }
+    button:focus-visible {
+      outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    }
+    button:disabled { opacity: .42; cursor: default; box-shadow: none; }
+    button:disabled:hover { background: var(--surface); border-color: var(--border-2); }
+    button.link {
+      border: none; background: none; padding: 0; width: auto;
+      color: var(--accent-strong); cursor: pointer; font: inherit; font-weight: 600;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    button.link:hover { color: var(--accent-hover); background: none; }
+
+    /* ── 입력 / 셀렉트 / 텍스트영역 ── */
+    input[type="text"], input[type="number"], select, textarea {
+      font: 400 var(--fs)/1.4 var(--font);
+      background: var(--surface-2); color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      padding: 6px 8px; transition: background .12s, border-color .12s, box-shadow .12s;
+    }
+    input[type="text"]:hover, input[type="number"]:hover, select:hover, textarea:hover { border-color: var(--border-2); }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+      outline: none; background: var(--surface);
+      border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle);
+    }
+    input::placeholder, textarea::placeholder { color: var(--muted); }
+    input[type="number"] { width: 56px; }
+    input[type="color"] {
+      width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
+      border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
+    }
+    input[type="checkbox"] { accent-color: var(--accent); width: 13px; height: 13px; }
+    select { padding-right: 6px; }
+    textarea { font-family: var(--mono); line-height: 1.5; resize: vertical; }
+
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    label.inline { display: inline-flex; gap: 4px; align-items: center; }
-    input[type="number"] { width: 56px; font: inherit; padding: 3px 5px; }
-    .muted { opacity: .65; }
-    .status { margin-top: 6px; min-height: 16px; }
-    .warn { color: #b00; }
-    .ok { color: #0a7d28; }
-    #tokenList { max-height: 180px; overflow: auto; margin-top: 8px; }
-    .tk { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; }
-    .tk input { font: inherit; padding: 2px 4px; width: 100%; }
-    .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #0002; }
-    .cat { font-size: 10px; opacity: .6; }
-    #diff { max-height: 160px; overflow: auto; margin-top: 8px; font-family: ui-monospace, monospace; font-size: 11px; }
-    .diff-row { padding: 1px 0; }
-    .before { opacity: .55; text-decoration: line-through; }
-    .after { color: #0a7d28; }
-    /* 탭 내비게이션 (UI 개편) */
-    .tabs { display: flex; gap: 4px; position: sticky; top: 0; background: var(--figma-color-bg, #fff); padding: 2px 0 8px; margin: -2px 0 4px; z-index: 1; }
-    .tab-btn { flex: 1; }
-    .tab-btn.active { background: #0d99ff; color: #fff; border-color: #0d99ff; }
+    label.inline { display: inline-flex; gap: 5px; align-items: center; color: var(--text-2); }
+    .status { margin-top: 4px; min-height: 15px; color: var(--text-2); }
+
+    /* ── 탭바 (세그먼트 컨트롤) ── */
+    .tabs {
+      display: flex; gap: 3px; position: sticky; top: 0; z-index: 3;
+      background: var(--surface-2); border: 1px solid var(--border);
+      padding: 3px; border-radius: var(--r); margin: 0 0 10px;
+    }
+    .tab-btn {
+      flex: 1; padding: 6px 4px; border: none; background: transparent;
+      color: var(--text-2); font-weight: 600; border-radius: var(--r-sm);
+    }
+    .tab-btn:hover:not(.active) { background: var(--surface-hover); color: var(--text); }
+    .tab-btn.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
     .tab-section { display: none; }
     .tab-section.active { display: block; }
-    /* UX5 선택 동기화 바 / UX4 빈 상태 */
-    .selbar { position: sticky; top: 33px; z-index: 1; background: var(--figma-color-bg, #fff); font-size: 11px; padding: 4px 0 8px; margin: -2px 0 6px; border-bottom: 1px solid var(--figma-color-border, #eee); }
-    .selbar.muted { opacity: .6; }
-    .empty { padding: 12px 10px; border: 1px dashed var(--figma-color-border, #ddd); border-radius: 6px; opacity: .8; line-height: 1.5; }
-    /* UX6 진행률 바 */
-    .bar { height: 8px; border-radius: 4px; background: var(--figma-color-bg-secondary, #eee); border: 1px solid var(--figma-color-border, #ddd); overflow: hidden; }
-    .bar-fill { height: 100%; width: 0%; background: #0d99ff; transition: width .1s linear; }
+    .tab-section > * { margin-bottom: 10px; }
+
+    /* ── 선택 동기화 바 (탭 아래 sticky) ── */
+    #selBarWrap {
+      position: sticky; top: 41px; z-index: 2; margin: 0 0 10px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 7px 10px;
+    }
+    .selbar { color: var(--text); font-weight: 500; }
+    .selbar.muted { color: var(--muted); font-weight: 400; }
+
+    /* ── 콜아웃(안내 노트) ── */
+    .ux {
+      background: var(--accent-subtle); border: 1px solid var(--accent-border);
+      border-radius: var(--r); padding: 9px 10px;
+    }
+    .ux > * + * { margin-top: 5px; }
+    .step .ux { margin-top: 8px; }
+    .ux-h { display: flex; align-items: center; gap: 6px; }
+    .ux-t { font-size: var(--fs); font-weight: 600; color: var(--accent-strong); }
+    .hint { color: var(--text-2); font-size: 10.5px; }
+
+    /* ── 빈 상태 (캐논 108:2 패턴) ── */
+    .empty-state { text-align: center; padding: 14px 10px; color: var(--text-2); }
+    .empty-state .es-title { font-weight: 600; color: var(--text); }
+    .empty-state .es-guide { margin-top: 4px; font-size: 10.5px; }
+    .empty-state button { margin-top: 8px; }
+
+    /* ── 에러 콜아웃(위험) ── */
+    .ux.danger { background: var(--danger-subtle); border-color: var(--danger-border); }
+    .ux.danger .ux-t { color: var(--danger); }
+
+    /* ── 진행률 바 ── */
+    .bar { height: 7px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+    .bar-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 999px; transition: width .12s linear; }
+
+    /* ── 전제 미충족 안내 ── */
+    .prereq { margin: 6px 0; font-size: var(--fs); color: var(--warn); display: flex; align-items: center; gap: 6px; }
+
+    /* ── 진행 안내 파이프라인 ── */
+    #pipelineSteps { margin: 6px 0; }
+    .pstep { display: grid; grid-template-columns: 18px 1fr auto; gap: 7px; align-items: center; padding: 4px 6px; margin: 0 -6px; cursor: pointer; border-radius: var(--r-sm); }
+    .pstep:hover { background: var(--surface-2); }
+    .pstep .pdot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface); font-size: 9px; line-height: 14px; text-align: center; color: var(--muted); font-weight: 600; }
+    .pstep.done .pdot  { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .pstep.ready .pdot { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .pstep.blocked { opacity: .55; }
+    .pstep .plabel { color: var(--text); }
+    .pstep .pstat  { font-size: 10px; }
+    .pstep.done .pstat    { color: var(--ok); }
+    .pstep.ready .pstat   { color: var(--accent-strong); }
+    .pstep.blocked .pstat { color: var(--muted); }
+
+    /* ── 시스템화 마법사 스테퍼 ── */
+    #wizardSteps { margin-top: 8px; }
+    .wstep { display: grid; grid-template-columns: 18px 1fr auto; gap: 7px; align-items: center; padding: 3px 0; }
+    .wstep .dot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface); font-size: 9px; line-height: 14px; text-align: center; color: var(--muted); font-weight: 600; }
+    .wstep.done .dot   { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .wstep.active .dot { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .wstep.fail .dot   { background: var(--warn); border-color: var(--warn); color: #fff; }
+    .wstep .wlabel { color: var(--text); }
+    .wstep.skip { opacity: .55; }
+    .wstep.skip .wlabel { color: var(--muted); }
+    .wstep .wnote { font-size: 10px; color: var(--muted); }
+    .wstep.fail .wnote { color: var(--warn); }
+    #wizardBar { margin-top: 8px; }
+
+    /* ── 토큰 목록 / 색 편집표 ── */
+    #tokenList { max-height: 180px; overflow: auto; margin-top: 8px; }
+    .tk { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 3px 0; }
+    .tk input { font: 400 var(--fs) var(--mono); padding: 4px 6px; width: 100%; }
+    .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
+    .cat { font-size: 10px; color: var(--muted); }
+    #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
+    .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 3px 0; }
+    .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
+    .crow .cn { font-family: var(--mono); font-size: var(--fs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .crow input { font: 400 var(--fs) var(--mono); padding: 4px 6px; width: 100%; }
+
+    /* ── diff / 선택형 미리보기 트리 ── */
+    #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 8px; font-family: var(--mono); font-size: var(--fs); border: 1px solid var(--border); border-radius: var(--r-sm); }
+    #diff:empty, #bindTree:empty, #compTree:empty { border: none; }
+    .tree-row { display: flex; align-items: center; gap: 5px; padding: 2px 7px; white-space: nowrap; }
+    .tree-row:nth-child(even) { background: var(--surface-2); }
+    .tree-row.header { opacity: 1; color: var(--muted); background: none; }
+    .tree-row.affected { font-weight: 500; }
+    .tree-row.context { opacity: 0.5; }
+    .tree-row .tree-ctx { color: var(--muted); }
+    .tree-row input { margin: 0; }
+    .before { color: var(--muted); text-decoration: line-through; }
+    .tree-name { color: inherit; }
+    .after { color: var(--ok); }
+    .tree-ctrls { font-size: var(--fs); margin-top: 6px; }
+    /* 등록 후보 종류 배지(세트 ↔ 단독) */
+    .tag { display: inline-block; padding: 0 5px; border-radius: 999px; font-size: 10px; font-weight: 600; line-height: 15px; border: 1px solid transparent; }
+    .tag-set { background: var(--accent-subtle); color: var(--accent-strong); border-color: var(--accent-border); }
+    .tag-single { background: var(--ok-subtle); color: var(--ok); border-color: var(--ok); }
+
+    /* ── 명도 대비 점검 결과 ── */
+    .cfind { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; }
+    .cfind .cname { flex: 1 1 70px; min-width: 70px; }
+    .cpair { display: inline-flex; }
+    .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid rgba(0,0,0,.18); }
+    .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
+    .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
+    .cfind .ratio { font-variant-numeric: tabular-nums; }
+    .cfix { display: inline-flex; gap: 4px; }
+    .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
+    .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
+
+    /* ── 리사이즈 핸들(우하단) ── */
+    #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
+    #resizeHandle::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 0; height: 0; border-left: 7px solid transparent; border-bottom: 7px solid var(--muted); opacity: 0.5; }
   </style>
 </head>
 <body>
   <div class="tabs" role="tablist" aria-label="작업 탭">
+    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard">마법사</button>
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply">적용</button>
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings">관리</button>
   </div>
 
-  <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
+  <!-- 선택 동기화 (실시간) -->
+  <div id="selBarWrap">
+    <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
+  </div>
+
+  <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
+    <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
+    <div class="step" id="wizardCard">
+      <h2>시스템화 마법사</h2>
+      <div class="hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
+      <div class="row">
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> 시맨틱 매핑</label>
+        <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> 접근성 검수</label>
+        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> 컴포넌트화</label>
+        <span class="muted" id="wizComponentLock"></span>
+      </div>
+      <div class="row">
+        <button id="btnWizardRun" class="primary">전체 실행</button>
+        <button id="btnWizardCancel" style="display:none">취소</button>
+      </div>
+      <div id="wizardSteps"></div>
+      <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
+      <div class="status" id="wizardSummary"></div>
+    </div>
+
+    <!-- 온보딩 / 가이드 -->
+    <div class="ux" id="onboardCard">
+      <div class="ux-h"><span class="ux-t">온보딩 / 가이드</span></div>
+      <div>처음이세요? <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 ‘만들기·적용’ 탭을 차례로 사용하세요.</div>
+      <div class="row">
+        <button id="btnGuide">전체 실행</button>
+        <button id="btnOnboardClose">닫기</button>
+      </div>
+    </div>
+
+    <!-- 진행 안내 — 만들기→적용 의존 파이프라인 단계 상태 -->
+    <div class="step" id="pipelineCard">
+      <h2>진행 안내</h2>
+      <div class="hint">권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.</div>
+      <div id="pipelineSteps"></div>
+      <div class="muted" style="font-size:10px">리네임 · 대비 점검 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
+    </div>
+  </section>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
     <div class="step">
       <h2>0 · 브랜드 팔레트 생성</h2>
       <div class="row">
         <label class="inline">브랜드색 <input id="brand" type="color" value="#3366ff" /></label>
-        <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:84px; font:inherit; padding:3px 5px;" />
+        <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
       </div>
       <div class="row">
         <label class="inline"><input id="useBrand2" type="checkbox" /> 보조색</label>
-        <input id="brand2" type="color" value="#ff5722" />
-      </div>
-      <div class="row">
+        <input id="brand2" type="color" value="#ff5722" disabled />
         <label class="inline">하모니
-          <select id="harmony">
-            <option value="">없음</option>
+          <select id="harmony" disabled>
             <option value="complementary">보색</option>
             <option value="analogous">유사</option>
             <option value="triadic">삼각</option>
@@ -75,8 +349,10 @@
         <label class="inline"><input id="incNeutral" type="checkbox" checked /> 중립</label>
         <label class="inline"><input id="incStatus" type="checkbox" checked /> 상태색</label>
       </div>
+      <div class="hint">미리보기로 확인한 뒤 ‘적용’하면 변수로 반영됩니다.</div>
       <div class="row">
         <button id="btnPalette" class="primary">팔레트 생성</button>
+        <button id="btnPaletteApply" style="display:none">적용 (변수 생성)</button>
         <span class="muted" id="paletteInfo"></span>
       </div>
       <div class="status" id="paletteStatus"></div>
@@ -92,39 +368,88 @@
       <div class="status" id="extractStatus"></div>
     </div>
 
-    <div class="step">
+    <!-- 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
+    <div class="step" id="colorTableCard" style="display:none">
+      <h2>1.5 · 색 편집 (hue → 역할)</h2>
+      <div class="hint">Global은 <b>hue 패밀리</b>(<code>color/blue/500</code>), 역할은 Semantic만. 역할을 확정해 ‘반영’하세요.</div>
+      <div id="colorTable"></div>
+      <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
+      <datalist id="roleList">
+        <option value="surface"></option><option value="surface/muted"></option>
+        <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
+        <option value="border"></option>
+        <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
+        <option value="secondary"></option><option value="accent"></option>
+        <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
+      </datalist>
+    </div>
+
+    <div class="step" id="createCard">
       <h2>2 · 토큰 생성 (Global + Semantic)</h2>
       <div class="row">
-        <label class="inline">base(rem)px <input id="base" type="number" value="16" min="1" /></label>
+        <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
+      </div>
+      <div class="hint">미리보기로 변경 요약을 확인한 뒤 적용하세요.</div>
+      <div class="row">
         <button id="btnCreate">미리보기</button>
         <button id="btnCreateApply" class="primary" style="display:none">적용</button>
       </div>
       <div class="status" id="createStatus"></div>
     </div>
 
-    <div class="step">
+    <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
+         DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
+    <div class="step" style="display:none">
       <h2>2.5 · 시맨틱 매핑 (역할 → 토큰)</h2>
-      <div class="muted">먼저 ‘2 · 토큰 생성’으로 Global 변수를 만든 뒤 실행하세요. 형식: <code>역할 = Global변수이름</code></div>
-      <textarea id="semMap" spellcheck="false" rows="6" style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
-      <div class="row" style="margin-top:6px;">
+      <div class="hint">형식: <code>역할 = Global변수이름</code></div>
+      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
+      <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
+      <div class="row">
         <button id="btnSemantics">시맨틱 별칭 생성</button>
+        <button id="btnScanGlobals">기존 색에서 추천</button>
       </div>
       <div class="status" id="semStatus"></div>
+    </div>
+
+    <div class="step">
+      <h2>2.6 · 텍스트 스타일 (화면 → 스타일)</h2>
+      <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Pro)</div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnScanText">선택에서 스캔</button>
+        <button id="btnTsAddRow">행 추가</button>
+        <label class="inline">폰트 <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
+      </div>
+      <table id="tsTable" style="width:100%; border-collapse:collapse; margin-top:6px; font-size:11px;">
+        <thead><tr style="text-align:left; color:var(--muted);">
+          <th>이름</th><th>크기</th><th>행간</th><th>스타일</th><th></th>
+        </tr></thead>
+        <tbody id="tsRows"></tbody>
+      </table>
+      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 원본 텍스트에 스타일 적용</label>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
+      </div>
+      <div class="status" id="tsStatus"></div>
     </div>
   </section>
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
       <h2>3 · 적용 (바인딩)</h2>
+      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
         <button id="btnApply">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none">선택에 바인딩</button>
       </div>
-      <div class="muted" style="margin-top:6px;">↶ 적용 후 한 번의 되돌리기(Ctrl/⌘Z)로 이 작업 전체를 취소할 수 있어요.</div>
-      <div id="applyProgress" style="display:none; margin-top:8px;">
+      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
+        <label class="inline"><input type="checkbox" id="bindAll" checked /> 전체 선택</label>
+      </div>
+      <div id="bindTree"></div>
+      <div class="ux" id="applyProgress" style="display:none">
+        <div class="ux-h"><span class="ux-t">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
-        <div class="row" style="margin-top:4px;">
+        <div class="row">
           <span class="muted" id="applyProgressText"></span>
           <button id="btnApplyCancel">취소</button>
         </div>
@@ -135,25 +460,52 @@
     <div class="step">
       <h2>4 · 리네임</h2>
       <div class="row">
-        <label class="inline">맥락 최대단계 <input id="depth" type="number" value="3" min="1" /></label>
+        <label class="inline">맥락 최대단계 <input id="depth" type="number" value="8" min="1" /></label>
         <button id="btnPreview">미리보기</button>
         <button id="btnRename" disabled>이름 적용</button>
       </div>
-      <div class="muted" style="margin-top:6px;">↶ 이름 적용 후 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
+      <div class="row tree-ctrls">
+        <label class="inline"><input type="checkbox" id="renameAll" checked /> 전체 선택</label>
+      </div>
       <div id="diff"></div>
+      <div class="ux">
+        <div class="ux-h"><span class="ux-t">되돌리기 안전장치</span></div>
+        <div>이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
+      </div>
       <div class="status" id="renameStatus"></div>
+    </div>
+
+    <div class="step" id="contrastCard">
+      <h2>5 · 명도 대비 점검 (WCAG)</h2>
+      <div class="hint">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
+      <div class="row">
+        <label class="inline">기준
+          <select id="contrastLevel">
+            <option value="AA">AA (4.5 · 큰글자 3)</option>
+            <option value="AAA">AAA (7 · 큰글자 4.5)</option>
+          </select>
+        </label>
+        <button id="btnContrast" class="primary">대비 검사</button>
+      </div>
+      <div id="contrastList" style="max-height:160px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
+      <div class="status" id="contrastStatus"></div>
     </div>
 
     <div class="step" id="componentCard">
       <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
-      <div class="muted">선택 프레임 → 메인 컴포넌트. 같은 베이스 이름(예: <code>button/primary</code>) 컴포넌트들 → 베리언트 세트. (Pro 전용)</div>
-      <div class="row" style="margin-top:6px;">
-        <button id="btnRegisterComp">컴포넌트 등록</button>
-        <button id="btnClassifyVariants">베리언트 분류</button>
-        <button id="btnGenMissing">누락 조합 생성</button>
-        <button id="btnExposeProps">속성 노출</button>
+      <div class="hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외)이며, 이름에 <b>컴포넌트명</b>(button·card·chip…)이 있는 자식만 추립니다. <b>같은 컴포넌트명</b>이면 한 세트로 묶습니다 — 내부 구조·패딩·크기·색이 달라도 OK(차이는 속성으로 흡수, 과묶임은 체크 해제). 속성은 <b>이름 우선</b>(<code>Type</code>·<code>State</code>·<code>Size</code>) + 부족하면 크기·색 보완. 후보엔 <b>세트</b>/<b>단독</b> 배지가 붙습니다. 메인 컴포넌트는 <b>Components 페이지</b>로 보내고 원래 자리엔 <b>인스턴스</b>가 남습니다.</div>
+      <div class="hint muted"><b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 컴포넌트명끼리 다시 묶을 때만(등록과 같은 기준 — 프레임은 「컴포넌트 등록」). <b>속성 노출</b>은 선택한 세트(또는 단독 컴포넌트) 대상.</div>
+      <div class="row">
+        <button id="btnScanComp" title="선택 프레임 하위 전체에서 등록 후보(모든 프레임)를 스캔 — 같은 이름이 반복되는 것은 자동 체크">후보 스캔</button>
+        <button id="btnRegisterComp" title="후보를 메인 컴포넌트로 등록(Components 페이지로 이동, 원위치엔 인스턴스) + 같은 이름끼리 베리언트 세트로 묶고(깊은 것부터 → 중첩 보존) 텍스트·인스턴스·가시성 속성을 자동 노출">컴포넌트 등록</button>
+        <button id="btnClassifyVariants" title="이미 만들어 둔 기존 컴포넌트들을 같은 이름 기준으로 세트로 묶기 — 등록과 동일 기준(프레임은 '컴포넌트 등록' 사용)">베리언트 분류</button>
+        <button id="btnGenMissing" title="선택한 베리언트 세트의 빠진 속성 조합 자동 생성">누락 조합 생성</button>
       </div>
-      <div id="variantReport" style="max-height:120px; overflow:auto; margin-top:6px; font-family:ui-monospace, monospace; font-size:11px;"></div>
+      <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
+        <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
+      </div>
+      <div id="compTree"></div>
+      <div id="variantReport" style="max-height:120px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
       <div class="status" id="componentStatus"></div>
     </div>
   </section>
@@ -161,8 +513,8 @@
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
     <div class="step">
       <h2>내보내기 (코드)</h2>
-      <div class="muted">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
-      <div class="row" style="margin-top:6px;">
+      <div class="hint">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
+      <div class="row">
         <label class="inline">형식
           <select id="exportFormat">
             <option value="w3c">W3C 토큰 JSON</option>
@@ -175,26 +527,25 @@
             <option value="rem">rem</option>
           </select>
         </label>
-        <label class="inline"><input id="exportSnap" type="checkbox" /> px 스냅샷 포함</label>
       </div>
-      <div class="row" style="margin-top:6px;">
+      <div class="row">
         <button id="btnExport" class="primary">내보내기</button>
         <button id="btnDownloadExport">다운로드</button>
       </div>
-      <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+      <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%;"></textarea>
       <div class="status" id="exportStatus"></div>
     </div>
 
     <div class="step">
       <h2>요금제 / 라이선스</h2>
       <div class="row">
-        <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px; font:inherit; padding:3px 5px;" />
+        <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
         <button id="btnVerify">검증</button>
         <button id="btnClearLicense">해제</button>
       </div>
-      <div class="muted" id="licenseInfo" style="margin-top:4px;"></div>
-      <div class="muted" id="limitsInfo" style="margin-top:2px;"></div>
-      <div class="row" style="margin-top:6px;">
+      <div class="muted" id="licenseInfo"></div>
+      <div class="muted" id="limitsInfo"></div>
+      <div class="row">
         <label class="inline">개발용 강제 티어
           <select id="tier">
             <option value="free">Free</option>
@@ -209,37 +560,33 @@
 
     <div class="step" id="presetCard">
       <h2>팀 공유 프리셋 <span class="muted" id="presetLock"></span></h2>
-      <div class="muted">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Team 전용)</div>
-      <div class="row" style="margin-top:6px;">
-        <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px; font:inherit; padding:3px 5px;" />
+      <div class="hint">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Team 전용)</div>
+      <div class="row">
+        <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px;" />
         <button id="btnSavePreset">현재 설정 저장</button>
       </div>
-      <div class="row" style="margin-top:6px;">
-        <select id="presetList" style="flex:1; min-width:120px; font:inherit; padding:3px 5px;"></select>
+      <div class="row">
+        <select id="presetList" style="flex:1; min-width:120px;"></select>
         <button id="btnLoadPreset">불러오기</button>
         <button id="btnDeletePreset">삭제</button>
       </div>
-      <div class="row" style="margin-top:6px;">
+      <div class="row">
         <button id="btnExportPreset">내보내기(JSON)</button>
         <button id="btnImportPreset">가져오기(JSON)</button>
       </div>
-      <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
+      <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%;"></textarea>
       <div class="status" id="presetStatus"></div>
     </div>
 
-    <div class="step" id="historyCard">
-      <h2>변경 이력 <span class="muted" id="historyLock"></span></h2>
-      <div class="muted">토큰 생성·바인딩·리네임·시맨틱 적용 기록(로컬). (Team 전용 조회)</div>
-      <div class="row" style="margin-top:6px;">
-        <button id="btnRefreshHistory">새로고침</button>
-        <button id="btnExportHistory">내보내기</button>
-        <button id="btnClearHistory">비우기</button>
-      </div>
-      <div id="historyList" style="max-height:140px; overflow:auto; margin-top:6px; font-family:ui-monospace, monospace; font-size:11px;"></div>
-      <textarea id="historyJson" spellcheck="false" rows="3" placeholder="내보낸 이력이 여기에 표시됩니다." style="width:100%; box-sizing:border-box; font:11px ui-monospace, monospace; margin-top:6px;"></textarea>
-      <div class="status" id="historyStatus"></div>
+    <!-- 접근성 / 국제화 -->
+    <div class="ux">
+      <div class="ux-h"><span class="ux-t">접근성 · 국제화</span></div>
+      <div>키보드 전용 조작 · 명도 대비 AA · i18n</div>
     </div>
   </section>
+
+  <!-- 창 리사이즈 핸들(우하단) -->
+  <div id="resizeHandle" title="드래그해 크기 조절"></div>
 
   <!-- UI_SCRIPT -->
 </body>

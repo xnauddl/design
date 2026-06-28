@@ -23,9 +23,16 @@ import {
   statusScales,
   generatePalette,
   paletteToDraftTokens,
+  paletteSemanticMap,
   suggestSemanticMap,
+  isPaletteColorName,
   mod360,
   scopeForSemanticRole,
+  // colorName (#3)
+  classifyColor,
+  hueName,
+  stepForL,
+  nameColorsByHue,
 } from '../dist/pure.mjs';
 
 const close = (a, b, tol = 0.01) => Math.abs(a - b) <= tol;
@@ -156,20 +163,75 @@ test('generatePalette + paletteToDraftTokens — DraftToken 형식', () => {
   }
 });
 
-test('suggestSemanticMap — 존재 패밀리에만 역할 배정', () => {
+test('paletteSemanticMap(#3) — Global=hue, 역할은 Semantic, 동일 hue 충돌 접미사', () => {
   const p = generatePalette({ brand: { primary: '#3366ff' }, includeNeutral: true, includeStatus: true });
-  const map = suggestSemanticMap(p);
-  assert.equal(map['primary'], 'color/primary/500');
-  assert.equal(map['surface'], 'color/neutral/50');
-  assert.equal(map['text'], 'color/neutral/900');
-  assert.equal(map['success'], 'color/success/500');
-  // secondary 미생성 → 매핑 없음
-  assert.equal(map['secondary'], undefined);
+  const pf = classifyColor('#3366ff').family;
+  const map = paletteSemanticMap(p);
+  assert.equal(map['primary'], `color/${pf}/500`);
+  assert.equal(map['primary/strong'], `color/${pf}/700`);
+  assert.equal(map['primary/subtle'], `color/${pf}/100`);
+  assert.equal(map['surface'], 'color/gray/50'); // neutral(저채도) → gray
+  assert.equal(map['text'], 'color/gray/900');
+  assert.equal(map['border'], 'color/gray/200');
+  assert.equal(map['success'], 'color/green/500');
+  assert.equal(map['error'], 'color/red/500');
+  assert.equal(map['secondary'], undefined); // 미생성
+  // primary가 blue면 info(h250)도 blue → 충돌 접미사
+  if (pf === 'blue') assert.equal(map['info'], 'color/blue-2/500');
+  // 모든 Global 토큰은 hue 패밀리 이름
+  for (const t of paletteToDraftTokens(p)) assert.equal(isPaletteColorName(t.name), true);
 
   // neutral/status 제외 시 역할도 빠짐
-  const p2 = generatePalette({ brand: { primary: '#3366ff' } });
-  const map2 = suggestSemanticMap(p2);
+  const map2 = paletteSemanticMap(generatePalette({ brand: { primary: '#3366ff' } }));
   assert.equal(map2['surface'], undefined);
   assert.equal(map2['success'], undefined);
-  assert.equal(map2['primary'], 'color/primary/500');
+  assert.equal(map2['primary'], `color/${pf}/500`);
+});
+
+test('suggestSemanticMap(#10) — 임의 색에서 역할 추천(실제 이름 지시)', () => {
+  const map = suggestSemanticMap([
+    { name: 'color/0066ff', hex: '#0066ff' }, // 유채(채도 최고) → primary
+    { name: 'color/f8f8f8', hex: '#f8f8f8' }, // 무채 밝음 → surface
+    { name: 'color/111111', hex: '#111111' }, // 무채 어둠 → text
+    { name: 'color/888888', hex: '#888888' }, // 무채 중간 → border
+  ]);
+  assert.equal(map['primary'], 'color/0066ff');
+  assert.equal(map['surface'], 'color/f8f8f8');
+  assert.equal(map['text'], 'color/111111');
+  assert.equal(map['border'], 'color/888888');
+});
+
+test('nameColorsByHue(#3) — hue-Global 이름 + 동일 (hue,step) 충돌 접미사', () => {
+  // 같은 파랑 두 개(거의 같은 명도) → blue/500, blue/500-2. 빨강·무채는 독립.
+  const names = nameColorsByHue(['#3366ff', '#3366fe', '#ff0000', '#808080']);
+  assert.equal(names[0], `color/${classifyColor('#3366ff').family}/${classifyColor('#3366ff').step}`);
+  assert.match(names[1], /-2$/); // 충돌 → 접미사
+  assert.equal(names[0].replace(/\/\d+$/, ''), names[1].replace(/\/\d+(-\d+)?$/, '')); // 같은 hue 패밀리
+  assert.equal(names[2], `color/red/${classifyColor('#ff0000').step}`);
+  assert.equal(names[3].startsWith('color/gray/'), true);
+  // 모든 결과는 팔레트(hue) 이름으로 인식
+  for (const n of names) assert.equal(isPaletteColorName(n), true);
+});
+
+test('isPaletteColorName — hue 패밀리(+충돌 접미사)만 정리 대상', () => {
+  assert.equal(isPaletteColorName('color/blue/500'), true);
+  assert.equal(isPaletteColorName('color/blue-2/700'), true);
+  assert.equal(isPaletteColorName('color/gray/50'), true);
+  assert.equal(isPaletteColorName('color/brandish/500'), false); // 사용자 패밀리
+  assert.equal(isPaletteColorName('color/0066ff'), false); // 추출 hex 색(2토막)
+  assert.equal(isPaletteColorName('spacing/16'), false); // 비색
+});
+
+test('classifyColor / hueName / stepForL (#3) — hue·스텝·무채색', () => {
+  assert.equal(classifyColor('#ff0000').family, 'red');
+  assert.equal(classifyColor('#00ff00').family, 'green');
+  assert.equal(classifyColor('#0000ff').family, 'blue');
+  const g = classifyColor('#808080');
+  assert.equal(g.family, 'gray');
+  assert.equal(g.achromatic, true);
+  // 밝기 → 스텝(밝을수록 작은 step)
+  assert.equal(classifyColor('#ffffff').step, 50);
+  assert.equal(classifyColor('#000000').step, 950);
+  assert.ok(stepForL(0.5) >= 400 && stepForL(0.5) <= 600);
+  assert.equal(typeof hueName(250), 'string');
 });
