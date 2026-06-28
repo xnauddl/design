@@ -17,7 +17,7 @@ import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSeman
 import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles } from './lib/roles';
 import { clusterColorTokens, clusterSummary } from './lib/colorCluster';
-import { pipelineSteps, type StepStatus } from './lib/pipeline';
+import { pipelineSteps } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import type { WcagLevel } from './lib/contrast';
@@ -540,10 +540,10 @@ function renderWizardSteps(plan: WizardPlanItem[]): void {
     dot.textContent = String(i + 1);
     const label = document.createElement('span');
     label.className = 'wlabel';
-    label.textContent = p.step.label;
+    label.textContent = t('wizard.step.' + p.step.id);
     const note = document.createElement('span');
     note.className = 'wnote';
-    note.textContent = p.run ? '' : p.skipReason ?? '건너뜀';
+    note.textContent = p.run ? '' : t(p.skipReason ?? 'wizard.skip.default');
     row.append(dot, label, note);
     box.appendChild(row);
   });
@@ -796,7 +796,6 @@ function goToCreate(): void {
 }
 
 /* ---------- 진행 안내 파이프라인(§3) ---------- */
-const STEP_STAT_LABEL: Record<StepStatus, string> = { done: '완료', ready: '준비됨', blocked: '전제 미충족' };
 
 /** 단계 클릭 → 해당 단계 카드/탭으로 이동. */
 function gotoStep(id: 'tokens' | 'semantics' | 'bind'): void {
@@ -833,7 +832,7 @@ function renderPipeline(): void {
     label.textContent = s.label;
     const stat = document.createElement('span');
     stat.className = 'pstat';
-    stat.textContent = s.hint ?? STEP_STAT_LABEL[s.status];
+    stat.textContent = s.hint ?? t('pipeline.stat.' + s.status);
 
     row.append(dot, label, stat);
     const go = (): void => gotoStep(s.id);
@@ -1981,31 +1980,18 @@ function refreshTreeEmptyStates(): void {
 }
 
 /** UX3: 스킵 사유 키 → 한글 라벨. */
-const REASON_LABELS: Record<string, string> = {
-  'no-match': '매칭 없음',
-  'empty-text': '빈 텍스트',
-  error: '바인딩 실패',
-  'hug-fill': 'HUG/FILL',
-  'no-autolayout': '오토레이아웃 아님',
-  font: '폰트 미로드',
-};
 function reasonsText(reasons: Record<string, number>): string {
   return Object.entries(reasons)
     .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${REASON_LABELS[k] ?? k} ${n}`)
+    .map(([k, n]) => `${t('reason.' + k)} ${n}`)
     .join(' · ');
 }
 
 /* ---------- 명도 대비 점검 결과 렌더 ---------- */
-const CONTRAST_SKIP_LABELS: Record<string, string> = {
-  'no-fill': '단색 글자색 없음',
-  'no-bg': '배경 없음',
-  capped: '스캔 상한 도달',
-};
 function contrastSkipText(skipped: Record<string, number>): string {
   return Object.entries(skipped)
     .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${CONTRAST_SKIP_LABELS[k] ?? k} ${n}`)
+    .map(([k, n]) => `${t('contrastSkip.' + k)} ${n}`)
     .join(' · ');
 }
 

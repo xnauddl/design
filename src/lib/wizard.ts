@@ -15,7 +15,6 @@ export type WizardStepId =
 
 export interface WizardStepDef {
   id: WizardStepId;
-  label: string;
   /** 문서를 변경하는 단계인지(읽기 전용이면 false). */
   write: boolean;
   /** 옵션(체크박스)로 끌 수 있는 단계인지. 필수 단계는 항상 실행. */
@@ -24,15 +23,16 @@ export interface WizardStepDef {
   pro?: boolean;
 }
 
-/** 단계 순서 = 실제 데이터 의존 순서. 바인딩(bind) 후 리네임(rename). */
+/** 단계 순서 = 실제 데이터 의존 순서. 바인딩(bind) 후 리네임(rename).
+ *  표시 라벨은 i18n `wizard.step.<id>` 키로 UI가 해석(외부화). */
 export const WIZARD_STEPS: readonly WizardStepDef[] = [
-  { id: 'extract', label: '토큰 추출', write: false, optional: false },
-  { id: 'create', label: '토큰 생성', write: true, optional: false },
-  { id: 'semantics', label: '시맨틱 매핑', write: true, optional: true },
-  { id: 'bind', label: '바인딩', write: true, optional: false },
-  { id: 'rename', label: '레이어 정돈', write: true, optional: false },
-  { id: 'contrast', label: '접근성 검수', write: false, optional: true },
-  { id: 'componentize', label: '컴포넌트화', write: true, optional: true, pro: true },
+  { id: 'extract', write: false, optional: false },
+  { id: 'create', write: true, optional: false },
+  { id: 'semantics', write: true, optional: true },
+  { id: 'bind', write: true, optional: false },
+  { id: 'rename', write: true, optional: false },
+  { id: 'contrast', write: false, optional: true },
+  { id: 'componentize', write: true, optional: true, pro: true },
 ];
 
 /** 사용자가 켠 선택 단계(필수 단계는 포함하지 않는다). */
@@ -67,10 +67,11 @@ export interface WizardPlanItem {
 export function planWizard(options: WizardOptions, ctx: WizardContext): WizardPlanItem[] {
   return WIZARD_STEPS.map((step) => {
     if (!step.optional) return { step, run: true };
+    // skipReason은 i18n 키(UI가 t()로 해석 — 외부화).
     const enabled = options[step.id as keyof WizardOptions];
-    if (!enabled) return { step, run: false, skipReason: '옵션 꺼짐' };
-    if (step.id === 'semantics' && !ctx.hasSemanticMap) return { step, run: false, skipReason: '매핑 없음' };
-    if (step.pro && !ctx.isPaid) return { step, run: false, skipReason: 'Paid 전용' };
+    if (!enabled) return { step, run: false, skipReason: 'wizard.skip.optionOff' };
+    if (step.id === 'semantics' && !ctx.hasSemanticMap) return { step, run: false, skipReason: 'wizard.skip.noMapping' };
+    if (step.pro && !ctx.isPaid) return { step, run: false, skipReason: 'wizard.skip.paid' };
     return { step, run: true };
   });
 }

@@ -805,7 +805,34 @@
     "varedit.darkDone": "\uB2E4\uD06C \uC0DD\uC131 \u2014 \uB2E4\uD06C Global {created}\uAC1C \xB7 \uC7AC\uBCC4\uCE6D {realiased}\uAC1C{skip}",
     "varedit.darkSkip": " \xB7 \uC2A4\uD0B5 {skipped}(\uBCC4\uCE6D \uC544\uB2D8)",
     "varedit.darkSameMode": "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C \uBAA8\uB4DC\uAC00 \uAC19\uC2B5\uB2C8\uB2E4 \u2014 \uC11C\uB85C \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
-    "varedit.darkHint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC Semantic \uC0C9\uC744 OKLCH \uBA85\uB3C4 \uBC18\uC804\uC73C\uB85C \uB2E4\uD06C \uBAA8\uB4DC\uC5D0 \uC790\uB3D9 \uCC44\uC6C1\uB2C8\uB2E4(\uB2E4\uD06C\uC6A9 Global \uC0DD\uC131 \uD6C4 \uC7AC-\uBCC4\uCE6D)."
+    "varedit.darkHint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC Semantic \uC0C9\uC744 OKLCH \uBA85\uB3C4 \uBC18\uC804\uC73C\uB85C \uB2E4\uD06C \uBAA8\uB4DC\uC5D0 \uC790\uB3D9 \uCC44\uC6C1\uB2C8\uB2E4(\uB2E4\uD06C\uC6A9 Global \uC0DD\uC131 \uD6C4 \uC7AC-\uBCC4\uCE6D).",
+    // 마법사 단계 라벨(WIZARD_STEPS id 기준) + 건너뜀 사유
+    "wizard.step.extract": "\uD1A0\uD070 \uCD94\uCD9C",
+    "wizard.step.create": "\uD1A0\uD070 \uC0DD\uC131",
+    "wizard.step.semantics": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
+    "wizard.step.bind": "\uBC14\uC778\uB529",
+    "wizard.step.rename": "\uB808\uC774\uC5B4 \uC815\uB3C8",
+    "wizard.step.contrast": "\uC811\uADFC\uC131 \uAC80\uC218",
+    "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
+    "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
+    "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
+    "wizard.skip.paid": "Paid \uC804\uC6A9",
+    "wizard.skip.default": "\uAC74\uB108\uB700",
+    // 진행 안내(파이프라인) 단계 상태
+    "pipeline.stat.done": "\uC644\uB8CC",
+    "pipeline.stat.ready": "\uC900\uBE44\uB428",
+    "pipeline.stat.blocked": "\uC804\uC81C \uBBF8\uCDA9\uC871",
+    // 바인딩 스킵 사유(라벨 맵)
+    "reason.no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
+    "reason.empty-text": "\uBE48 \uD14D\uC2A4\uD2B8",
+    "reason.error": "\uBC14\uC778\uB529 \uC2E4\uD328",
+    "reason.hug-fill": "HUG/FILL",
+    "reason.no-autolayout": "\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uC544\uB2D8",
+    "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
+    // 명도 대비 스킵 사유(라벨 맵)
+    "contrastSkip.no-fill": "\uB2E8\uC0C9 \uAE00\uC790\uC0C9 \uC5C6\uC74C",
+    "contrastSkip.no-bg": "\uBC30\uACBD \uC5C6\uC74C",
+    "contrastSkip.capped": "\uC2A4\uCE94 \uC0C1\uD55C \uB3C4\uB2EC"
   };
   function t(key, vars) {
     var _a;
@@ -1524,21 +1551,21 @@
 
   // src/lib/wizard.ts
   var WIZARD_STEPS = [
-    { id: "extract", label: "\uD1A0\uD070 \uCD94\uCD9C", write: false, optional: false },
-    { id: "create", label: "\uD1A0\uD070 \uC0DD\uC131", write: true, optional: false },
-    { id: "semantics", label: "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551", write: true, optional: true },
-    { id: "bind", label: "\uBC14\uC778\uB529", write: true, optional: false },
-    { id: "rename", label: "\uB808\uC774\uC5B4 \uC815\uB3C8", write: true, optional: false },
-    { id: "contrast", label: "\uC811\uADFC\uC131 \uAC80\uC218", write: false, optional: true },
-    { id: "componentize", label: "\uCEF4\uD3EC\uB10C\uD2B8\uD654", write: true, optional: true, pro: true }
+    { id: "extract", write: false, optional: false },
+    { id: "create", write: true, optional: false },
+    { id: "semantics", write: true, optional: true },
+    { id: "bind", write: true, optional: false },
+    { id: "rename", write: true, optional: false },
+    { id: "contrast", write: false, optional: true },
+    { id: "componentize", write: true, optional: true, pro: true }
   ];
   function planWizard(options, ctx) {
     return WIZARD_STEPS.map((step) => {
       if (!step.optional) return { step, run: true };
       const enabled = options[step.id];
-      if (!enabled) return { step, run: false, skipReason: "\uC635\uC158 \uAEBC\uC9D0" };
-      if (step.id === "semantics" && !ctx.hasSemanticMap) return { step, run: false, skipReason: "\uB9E4\uD551 \uC5C6\uC74C" };
-      if (step.pro && !ctx.isPaid) return { step, run: false, skipReason: "Paid \uC804\uC6A9" };
+      if (!enabled) return { step, run: false, skipReason: "wizard.skip.optionOff" };
+      if (step.id === "semantics" && !ctx.hasSemanticMap) return { step, run: false, skipReason: "wizard.skip.noMapping" };
+      if (step.pro && !ctx.isPaid) return { step, run: false, skipReason: "wizard.skip.paid" };
       return { step, run: true };
     });
   }
@@ -1981,10 +2008,10 @@
       dot.textContent = String(i + 1);
       const label = document.createElement("span");
       label.className = "wlabel";
-      label.textContent = p.step.label;
+      label.textContent = t("wizard.step." + p.step.id);
       const note = document.createElement("span");
       note.className = "wnote";
-      note.textContent = p.run ? "" : (_a = p.skipReason) != null ? _a : "\uAC74\uB108\uB700";
+      note.textContent = p.run ? "" : t((_a = p.skipReason) != null ? _a : "wizard.skip.default");
       row.append(dot, label, note);
       box.appendChild(row);
     });
@@ -2205,7 +2232,6 @@
     $("createCard").scrollIntoView({ behavior: "smooth", block: "center" });
     $("btnCreate").focus();
   }
-  var STEP_STAT_LABEL = { done: "\uC644\uB8CC", ready: "\uC900\uBE44\uB428", blocked: "\uC804\uC81C \uBBF8\uCDA9\uC871" };
   function gotoStep(id) {
     if (id === "bind") {
       showTab("apply");
@@ -2238,7 +2264,7 @@
       label.textContent = s.label;
       const stat = document.createElement("span");
       stat.className = "pstat";
-      stat.textContent = (_a = s.hint) != null ? _a : STEP_STAT_LABEL[s.status];
+      stat.textContent = (_a = s.hint) != null ? _a : t("pipeline.stat." + s.status);
       row.append(dot, label, stat);
       const go = () => gotoStep(s.id);
       row.addEventListener("click", go);
@@ -3199,30 +3225,11 @@
       else $("compTree").innerHTML = "";
     }
   }
-  var REASON_LABELS = {
-    "no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
-    "empty-text": "\uBE48 \uD14D\uC2A4\uD2B8",
-    error: "\uBC14\uC778\uB529 \uC2E4\uD328",
-    "hug-fill": "HUG/FILL",
-    "no-autolayout": "\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uC544\uB2D8",
-    font: "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC"
-  };
   function reasonsText(reasons) {
-    return Object.entries(reasons).filter(([, n]) => n > 0).map(([k, n]) => {
-      var _a;
-      return `${(_a = REASON_LABELS[k]) != null ? _a : k} ${n}`;
-    }).join(" \xB7 ");
+    return Object.entries(reasons).filter(([, n]) => n > 0).map(([k, n]) => `${t("reason." + k)} ${n}`).join(" \xB7 ");
   }
-  var CONTRAST_SKIP_LABELS = {
-    "no-fill": "\uB2E8\uC0C9 \uAE00\uC790\uC0C9 \uC5C6\uC74C",
-    "no-bg": "\uBC30\uACBD \uC5C6\uC74C",
-    capped: "\uC2A4\uCE94 \uC0C1\uD55C \uB3C4\uB2EC"
-  };
   function contrastSkipText(skipped) {
-    return Object.entries(skipped).filter(([, n]) => n > 0).map(([k, n]) => {
-      var _a;
-      return `${(_a = CONTRAST_SKIP_LABELS[k]) != null ? _a : k} ${n}`;
-    }).join(" \xB7 ");
+    return Object.entries(skipped).filter(([, n]) => n > 0).map(([k, n]) => `${t("contrastSkip." + k)} ${n}`).join(" \xB7 ");
   }
   function contrastFixBtn(label, hex, nodeId) {
     const btn = document.createElement("button");

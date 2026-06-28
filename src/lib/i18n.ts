@@ -113,6 +113,37 @@ export const STRINGS: Record<string, string> = {
   'varedit.darkSkip': ' · 스킵 {skipped}(별칭 아님)',
   'varedit.darkSameMode': '라이트와 다크 모드가 같습니다 — 서로 다른 모드를 고르세요.',
   'varedit.darkHint': '라이트 모드 Semantic 색을 OKLCH 명도 반전으로 다크 모드에 자동 채웁니다(다크용 Global 생성 후 재-별칭).',
+
+  // 마법사 단계 라벨(WIZARD_STEPS id 기준) + 건너뜀 사유
+  'wizard.step.extract': '토큰 추출',
+  'wizard.step.create': '토큰 생성',
+  'wizard.step.semantics': '시맨틱 매핑',
+  'wizard.step.bind': '바인딩',
+  'wizard.step.rename': '레이어 정돈',
+  'wizard.step.contrast': '접근성 검수',
+  'wizard.step.componentize': '컴포넌트화',
+  'wizard.skip.optionOff': '옵션 꺼짐',
+  'wizard.skip.noMapping': '매핑 없음',
+  'wizard.skip.paid': 'Paid 전용',
+  'wizard.skip.default': '건너뜀',
+
+  // 진행 안내(파이프라인) 단계 상태
+  'pipeline.stat.done': '완료',
+  'pipeline.stat.ready': '준비됨',
+  'pipeline.stat.blocked': '전제 미충족',
+
+  // 바인딩 스킵 사유(라벨 맵)
+  'reason.no-match': '매칭 없음',
+  'reason.empty-text': '빈 텍스트',
+  'reason.error': '바인딩 실패',
+  'reason.hug-fill': 'HUG/FILL',
+  'reason.no-autolayout': '오토레이아웃 아님',
+  'reason.font': '폰트 미로드',
+
+  // 명도 대비 스킵 사유(라벨 맵)
+  'contrastSkip.no-fill': '단색 글자색 없음',
+  'contrastSkip.no-bg': '배경 없음',
+  'contrastSkip.capped': '스캔 상한 도달',
 };
 
 /** key → 문자열. `{var}` 자리표시자를 vars로 치환. 누락 키는 key 그대로(폴백). */
