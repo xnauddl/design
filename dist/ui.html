@@ -1460,15 +1460,27 @@
     }
     box.appendChild(wrap);
   }
+  var previewRevealed = false;
   function renderTokens() {
     const box = $("tokenList");
-    const others = tokens.filter((t2) => t2.category !== "color");
-    if (!others.length) {
+    const showHint = (msg) => {
       box.innerHTML = "";
       const hint = document.createElement("div");
       hint.className = "hint";
-      hint.textContent = lastSelCount > 0 ? "\uCD94\uCD9C\uD558\uBA74 \uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC774 \uC5EC\uAE30\uC5D0 \uD45C\uC2DC\uB429\uB2C8\uB2E4." : "\uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uACE0 \u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uC138\uC694.";
+      hint.textContent = msg;
       box.appendChild(hint);
+    };
+    if (!tokens.length) {
+      showHint(lastSelCount > 0 ? "\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC740 \uC0C9\uC744, \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB294 \uC0C9 \uC678 \uD1A0\uD070\uC744 \uD45C\uC2DC\uD569\uB2C8\uB2E4." : "\uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uACE0 \u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uC138\uC694.");
+      return;
+    }
+    if (!previewRevealed) {
+      showHint("\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uC0DD\uC131\uD560 \uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC774 \uD45C\uC2DC\uB429\uB2C8\uB2E4.");
+      return;
+    }
+    const others = tokens.filter((t2) => t2.category !== "color");
+    if (!others.length) {
+      showHint("\uC0C9 \uC678 \uD1A0\uD070\uC774 \uC5C6\uC2B5\uB2C8\uB2E4(\uC0C9\uB9CC \uCD94\uCD9C\uB428).");
       return;
     }
     renderChunked(box, others, makeTokenRow);
@@ -1496,6 +1508,7 @@
       includeStatus: $("incStatus").checked
     });
     tokens = paletteToDraftTokens(p);
+    previewRevealed = false;
     renderTokens();
     setSemMapText(paletteSemanticMap(p));
     renderColorTable();
@@ -1655,6 +1668,8 @@
       setStatus("createStatus", t("create.needExtract"), "warn");
       return;
     }
+    previewRevealed = true;
+    renderTokens();
     const base = Number($("base").value) || 16;
     createFrom = "tokens";
     send({ type: "CREATE_TOKENS", tokens, base, preview: true });
@@ -2239,6 +2254,7 @@
         huefyTokenColors(tokens);
         preTidyTokens = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
         const tidy = tidyColors();
+        previewRevealed = false;
         renderTokens();
         $("btnCreateApply").style.display = "none";
         $("btnPaletteApply").style.display = "none";

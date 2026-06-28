@@ -121,18 +121,32 @@ function renderEmptyState(box: HTMLElement, title: string, guide: string, action
   box.appendChild(wrap);
 }
 
-// ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만. 색은 ‘색 정리’ 카드의 색 표에 단일 표시.
+// 버튼 역할 분리: ‘선택에서 토큰 추출’은 색만 노출(색 정리 카드), 색 외 토큰은
+// ‘미리보기’를 눌러야(previewRevealed=true) ‘토큰 생성’ 카드에 펼쳐진다.
+let previewRevealed = false;
+// ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만.
 function renderTokens(): void {
   const box = $('tokenList');
-  const others = tokens.filter((t) => t.category !== 'color');
-  if (!others.length) {
+  const showHint = (msg: string): void => {
     box.innerHTML = '';
     const hint = document.createElement('div');
     hint.className = 'hint';
-    hint.textContent = lastSelCount > 0
-      ? '추출하면 색 외 토큰(간격·크기·폰트·효과)이 여기에 표시됩니다.'
-      : '프레임을 선택하고 ‘선택에서 토큰 추출’을 누르세요.';
+    hint.textContent = msg;
     box.appendChild(hint);
+  };
+  if (!tokens.length) {
+    showHint(lastSelCount > 0
+      ? '‘선택에서 토큰 추출’은 색을, ‘미리보기’는 색 외 토큰을 표시합니다.'
+      : '프레임을 선택하고 ‘선택에서 토큰 추출’을 누르세요.');
+    return;
+  }
+  if (!previewRevealed) {
+    showHint('‘미리보기’를 누르면 생성할 색 외 토큰(간격·크기·폰트·효과)이 표시됩니다.');
+    return;
+  }
+  const others = tokens.filter((t) => t.category !== 'color');
+  if (!others.length) {
+    showHint('색 외 토큰이 없습니다(색만 추출됨).');
     return;
   }
   renderChunked(box, others, makeTokenRow); // §4: 대량 추출도 비차단
@@ -165,6 +179,7 @@ $('btnPalette').addEventListener('click', () => {
     includeStatus: ($('incStatus') as HTMLInputElement).checked,
   });
   tokens = paletteToDraftTokens(p);
+  previewRevealed = false; // 팔레트도 색 — 색 외 토큰 목록은 ‘미리보기’ 클릭 시
   renderTokens();
   // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
   setSemMapText(paletteSemanticMap(p));
@@ -364,6 +379,8 @@ $('btnCreate').addEventListener('click', () => {
     setStatus('createStatus', t('create.needExtract'), 'warn');
     return;
   }
+  previewRevealed = true; // 미리보기 버튼 역할: 생성할 색 외 토큰을 펼침
+  renderTokens();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
   send({ type: 'CREATE_TOKENS', tokens, base, preview: true }); // UX1: 미리보기 먼저
@@ -1046,6 +1063,7 @@ window.onmessage = (event: MessageEvent) => {
       // 추출 색 자동 정리(ΔE 군집 N:1) — 비슷한 색을 대표색으로 병합. 드래프트 단계라 바인딩 영향 없음.
       preTidyTokens = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기 스냅샷
       const tidy = tidyColors();
+      previewRevealed = false; // 추출 버튼 역할: 색만 노출 — 색 외 토큰은 ‘미리보기’ 클릭 시
       renderTokens();
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
       ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
