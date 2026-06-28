@@ -13,7 +13,6 @@ import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSem
 import type { ExportFormat } from './lib/exporters';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
-import { clusterColors } from './lib/cluster';
 import { suggestTokenRoles } from './lib/roles';
 import { pipelineSteps, type StepStatus } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
@@ -273,32 +272,29 @@ function colorHexes(): string[] {
 /** 자동 정리 직전의 추출 토큰 스냅샷(되돌리기용). null이면 되돌릴 것 없음. */
 let preTidyTokens: DraftToken[] | null = null;
 
-/** 색 토큰을 ΔE 군집으로 N:1 병합(드래프트 단계 — 변수·바인딩 영향 없음).
-   군집마다 대표 토큰만 남기고 나머지는 제거(sources 합침). tokens 제자리 갱신, 통계 반환. */
+/** 색 토큰을 hue-단계 이름 기준으로 N:1 병합(드래프트 단계 — 변수·바인딩 영향 없음).
+   huefy가 같은 단계로 본 색(예: color/gray/50 와 color/gray/50-2)은 한 대표로 합친다
+   (sources union, 대표는 접미사 없는 base 이름). 단계 버킷이 ΔE(군집)보다 관대해
+   실데이터에서 확실히 정리됨 — 같은 단계 색이 두 변수로 남지 않는다. 통계 반환. */
 function tidyColors(): { before: number; after: number; merged: number } {
   const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
-  const before = new Set(colors.map((t) => (t.value as string).toLowerCase())).size;
-  const clusters = clusterColors(colors.map((t) => (t.value as string).toLowerCase()));
-  const repOf = new Map<string, string>();
-  for (const cl of clusters) for (const m of cl.members) repOf.set(m, cl.rep);
-
-  const keep = new Map<string, DraftToken>(); // 대표 hex → 남길 토큰
-  for (const t of colors) {
-    const hex = (t.value as string).toLowerCase();
-    if (hex === repOf.get(hex) && !keep.has(hex)) keep.set(hex, t);
-  }
+  const before = colors.length;
+  const baseName = (name: string) => name.replace(/-\d+$/, ''); // 충돌 접미사(-2,-3…) 제거
+  const keep = new Map<string, DraftToken>(); // base 이름 → 남길 대표 토큰
   const drop = new Set<DraftToken>();
   for (const t of colors) {
-    const hex = (t.value as string).toLowerCase();
-    const repTok = keep.get(repOf.get(hex) as string);
-    if (repTok && t !== repTok) {
-      for (const s of t.sources) if (!repTok.sources.includes(s)) repTok.sources.push(s); // 스코프 union 보존
+    const k = baseName(t.name);
+    const rep = keep.get(k);
+    if (!rep) {
+      keep.set(k, t);
+    } else {
+      for (const s of t.sources) if (!rep.sources.includes(s)) rep.sources.push(s); // 스코프 union 보존
       drop.add(t);
     }
   }
   if (drop.size) {
     tokens = tokens.filter((t) => !drop.has(t));
-    huefyTokenColors(tokens); // 충돌 접미사 줄도록 이름 재정규화
+    for (const [base, rep] of keep) rep.name = base; // 대표 이름을 base로 정규화(접미사 제거)
   }
   return { before, after: keep.size, merged: drop.size };
 }

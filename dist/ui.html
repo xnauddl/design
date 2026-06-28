@@ -1185,49 +1185,6 @@
     return tokens2;
   }
 
-  // src/lib/cluster.ts
-  var TIDY_TOL = 0.02;
-  function labOf(hex) {
-    const { l, c, h } = hexToOklch(hex);
-    const rad = h * Math.PI / 180;
-    return { L: l, a: c * Math.cos(rad), b: c * Math.sin(rad) };
-  }
-  function colorDistance(hex1, hex2) {
-    const p = labOf(hex1);
-    const q = labOf(hex2);
-    return Math.hypot(p.L - q.L, p.a - q.a, p.b - q.b);
-  }
-  function clusterColors(hexes, tol = TIDY_TOL) {
-    const uniq = [...new Set(hexes.map((h) => h.toLowerCase()))].sort();
-    const clusters = [];
-    for (const hex of uniq) {
-      let placed = false;
-      for (const cl of clusters) {
-        if (cl.some((m) => colorDistance(m, hex) <= tol)) {
-          cl.push(hex);
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) clusters.push([hex]);
-    }
-    return clusters.map((members) => ({ rep: medoid(members), members }));
-  }
-  function medoid(members) {
-    if (members.length === 1) return members[0];
-    let best = members[0];
-    let bestSum = Infinity;
-    for (const m of members) {
-      let sum = 0;
-      for (const n of members) sum += colorDistance(m, n);
-      if (sum < bestSum - 1e-9 || Math.abs(sum - bestSum) <= 1e-9 && m < best) {
-        bestSum = sum;
-        best = m;
-      }
-    }
-    return best;
-  }
-
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
   var TSHIRT_MID = TSHIRT.indexOf("md");
@@ -1625,27 +1582,23 @@
   var preTidyTokens = null;
   function tidyColors() {
     const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
-    const before = new Set(colors.map((t2) => t2.value.toLowerCase())).size;
-    const clusters = clusterColors(colors.map((t2) => t2.value.toLowerCase()));
-    const repOf = /* @__PURE__ */ new Map();
-    for (const cl of clusters) for (const m of cl.members) repOf.set(m, cl.rep);
+    const before = colors.length;
+    const baseName = (name) => name.replace(/-\d+$/, "");
     const keep = /* @__PURE__ */ new Map();
-    for (const t2 of colors) {
-      const hex = t2.value.toLowerCase();
-      if (hex === repOf.get(hex) && !keep.has(hex)) keep.set(hex, t2);
-    }
     const drop = /* @__PURE__ */ new Set();
     for (const t2 of colors) {
-      const hex = t2.value.toLowerCase();
-      const repTok = keep.get(repOf.get(hex));
-      if (repTok && t2 !== repTok) {
-        for (const s of t2.sources) if (!repTok.sources.includes(s)) repTok.sources.push(s);
+      const k = baseName(t2.name);
+      const rep = keep.get(k);
+      if (!rep) {
+        keep.set(k, t2);
+      } else {
+        for (const s of t2.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
         drop.add(t2);
       }
     }
     if (drop.size) {
       tokens = tokens.filter((t2) => !drop.has(t2));
-      huefyTokenColors(tokens);
+      for (const [base, rep] of keep) rep.name = base;
     }
     return { before, after: keep.size, merged: drop.size };
   }
