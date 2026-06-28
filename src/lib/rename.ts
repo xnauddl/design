@@ -74,26 +74,45 @@ async function decide(
   return { skip: false, name: layerNameFromRole(ancestorName, role, { maxDepth: opts.maxDepth }) };
 }
 
-/* ---------- 주(主) 바인딩 토큰 이름 ---------- */
+/* ---------- 주(主) 바인딩 토큰 이름 ----------
+   bind.ts가 바인딩하는 모든 스칼라 필드를 포괄: 네 corner·네 padding 전부.
+   (텍스트 필드는 TEXT 노드가 decide()에서 제외되므로 생략, 효과 색은 아래 별도 처리.) */
 const FIELD_ORDER = [
   'fills',
   'strokes',
   'width',
   'height',
   'topLeftRadius',
+  'topRightRadius',
+  'bottomLeftRadius',
+  'bottomRightRadius',
   'itemSpacing',
   'paddingLeft',
+  'paddingRight',
   'paddingTop',
+  'paddingBottom',
 ] as const;
 
 async function primaryTokenName(node: SceneNode): Promise<string | null> {
   const bv = (node as { boundVariables?: Record<string, unknown> }).boundVariables;
-  if (!bv) return null;
-  for (const field of FIELD_ORDER) {
-    const id = firstAliasId(bv[field]);
-    if (id) {
-      const v = await figma.variables.getVariableByIdAsync(id);
-      if (v) return v.name;
+  if (bv) {
+    for (const field of FIELD_ORDER) {
+      const id = firstAliasId(bv[field]);
+      if (id) {
+        const v = await figma.variables.getVariableByIdAsync(id);
+        if (v) return v.name;
+      }
+    }
+  }
+  // 효과(그림자) 색 바인딩은 node.boundVariables가 아니라 각 effect에 보관됨 → 별도 확인.
+  const effects = (node as { effects?: readonly Effect[] }).effects;
+  if (Array.isArray(effects)) {
+    for (const e of effects) {
+      const id = firstAliasId((e as { boundVariables?: Record<string, unknown> }).boundVariables?.color);
+      if (id) {
+        const v = await figma.variables.getVariableByIdAsync(id);
+        if (v) return v.name;
+      }
     }
   }
   return null;

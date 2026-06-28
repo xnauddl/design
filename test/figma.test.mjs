@@ -509,6 +509,29 @@ test('renameSelection — 토큰명/역할명/제외규칙/형제 dedup', async 
   assert.equal(instChild.name, 'InstanceChildRect');
 });
 
+test('renameSelection — 비대표 바인딩 필드(paddingRight·효과 색)도 토큰명 인식', async () => {
+  const figma = installFigma();
+  const col = figma.variables.createVariableCollection('Semantic');
+  const space = figma.variables.createVariable('space/md', col, 'FLOAT');
+  const shadow = figma.variables.createVariable('shadow/ambient', col, 'COLOR');
+
+  // paddingRight'만' 바인딩(이전엔 FIELD_ORDER에서 누락 → 역할명으로 폴백)
+  const padNode = {
+    type: 'FRAME', id: 'pad', name: 'Frame 1',
+    boundVariables: { paddingRight: { type: 'VARIABLE_ALIAS', id: space.id } },
+  };
+  // 효과 색'만' 바인딩(node.boundVariables 아닌 effect에 보관)
+  const fxNode = {
+    type: 'FRAME', id: 'fx', name: 'Frame 2',
+    effects: [{ type: 'DROP_SHADOW', boundVariables: { color: { type: 'VARIABLE_ALIAS', id: shadow.id } } }],
+  };
+
+  const { changes } = await renameSelection([padNode, fxNode], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('pad'), 'space-md'); // 역할 'container'가 아니라 토큰명
+  assert.equal(after.get('fx'), 'shadow-ambient');
+});
+
 test('renameSelection — apply:false면 미리보기만(노드 이름 불변)', async () => {
   installFigma();
   const node = { type: 'FRAME', id: 'f', name: 'OriginalName', children: [] };
