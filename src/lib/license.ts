@@ -68,7 +68,7 @@ export type VerifyResult = VerifyOk | (VerifyErr & { offline?: boolean });
 
 /**
  * 검증 서버 응답(JSON) 파싱. 기대 형식:
- *   성공: { valid:true, tier:'pro', expiresAt: <ms> }
+ *   성공: { valid:true, tier:'paid', expiresAt: <ms> }
  *   실패: { valid:false, error:'...' }
  * 위변조 방지를 위해 실제 운영에서는 서명(JWT 등) 검증을 추가한다(M2.1).
  */

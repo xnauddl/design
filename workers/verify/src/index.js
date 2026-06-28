@@ -49,12 +49,14 @@ async function signJwt(payload, privateJwk) {
   return `${signingInput}.${b64urlFromBytes(new Uint8Array(sig))}`;
 }
 
-/** 토큰 발급: tier=paid, exp=min(라이선스 만료, now+TTL). */
+/** 토큰 발급: tier=paid, exp=min(라이선스 만료, now+TTL).
+ *  licenseExpiryMs: 0/유한하지 않음 = 만료 없음(평생 라이선스) → TTL만 적용.
+ *  과거 시각이면 그대로 캡 → 토큰이 즉시 만료되어 플러그인이 거부(만료 구독 방어). */
 async function issueToken(env, licenseExpiryMs) {
   const ttlDays = Number(env.TOKEN_TTL_DAYS || 30);
   const now = Date.now();
   let exp = now + ttlDays * DAY_MS;
-  if (licenseExpiryMs && licenseExpiryMs < exp) exp = licenseExpiryMs; // 라이선스 만료를 넘지 않음
+  if (Number.isFinite(licenseExpiryMs) && licenseExpiryMs > 0 && licenseExpiryMs < exp) exp = licenseExpiryMs;
   const payload = {
     tier: 'paid',
     iss: env.LICENSE_ISS,
@@ -121,7 +123,9 @@ export default {
         const msg = data.error || (lk.status === 'expired' ? '구독이 만료되었습니다.' : '유효하지 않은 라이선스 키이거나 기기 활성화 한도를 초과했습니다.');
         return json({ valid: false, error: msg }, 200);
       }
-      const expiryMs = lk.expires_at ? Date.parse(lk.expires_at) : 0;
+      // 라이선스 만료(구독 종료일). 형식 불량(NaN)은 0(만료 없음)으로 처리해 토큰 시각이 오염되지 않게 한다.
+      const parsedExpiry = lk.expires_at ? Date.parse(lk.expires_at) : 0;
+      const expiryMs = Number.isNaN(parsedExpiry) ? 0 : parsedExpiry;
       const token = await issueToken(env, expiryMs);
       // 플러그인은 instanceId를 캐시에 보관 → 다음 재검증 때 되돌려보내 같은 기기로 validate.
       return json(newInstanceId ? { token, instanceId: newInstanceId } : { token });

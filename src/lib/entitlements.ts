@@ -22,11 +22,6 @@ export function hasEntitlement(tier: Tier, _feature: Feature): boolean {
   return tier === 'paid';
 }
 
-/** 유료 사용자 여부(가독성 헬퍼). */
-export function isPaid(tier: Tier): boolean {
-  return tier === 'paid';
-}
-
 /** 런타임 값이 유효한 Tier인지(저장소/메시지/토큰 클레임 입력 검증용). */
 export function isTier(v: unknown): v is Tier {
   return v === 'free' || v === 'paid';
