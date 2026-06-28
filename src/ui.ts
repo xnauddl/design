@@ -212,7 +212,7 @@ function huefyTokenColors(toks: DraftToken[]): void {
 /* ---------- #3 색 편집표 (hue → 역할) ---------- */
 /** 색 토큰을 표로: 스와치 · hue 이름 · 역할 입력(현 semMap에서 prefill). */
 function renderColorTable(): void {
-  const card = $('colorTableCard');
+  const card = $('colorSection');
   const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
   if (!colors.length) {
     card.style.display = 'none';
@@ -1798,7 +1798,8 @@ function escapeHtml(s: string): string {
 /* ---------- 캐논 패턴: 카드 접기(아코디언) + 주 버튼 타이틀 줄 이동 ---------- */
 // 카드별 '주 버튼'(타이틀 줄 우측으로 이동). 카드 안에서 첫 번째로 매칭되는 버튼만 옮긴다.
 const TITLE_BTN_IDS = new Set([
-  'btnWizardRun', 'btnPalette', 'btnExtract', 'btnColorRoles', 'btnCreate',
+  // btnColorRoles 제외: 색 정리는 추출 카드에 흡수돼 더 이상 독립 카드 머리가 아님(본문 버튼).
+  'btnWizardRun', 'btnPalette', 'btnExtract', 'btnCreate',
   'btnTextStyles', 'btnApply', 'btnPreview', 'btnContrast', 'btnExport',
 ]);
 /** 모든 .step 카드를 접이식으로 + 주 버튼을 타이틀 줄로. 노드 이동이라 id/리스너 보존, 멱등. */

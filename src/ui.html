@@ -240,6 +240,8 @@
     .crow input { font: 400 var(--fs) var(--mono); padding: 4px 6px; width: 100%; }
 
     /* ── 색 정리(ΔE 군집) 미리보기 ── */
+    #colorSection { border-top: 1px solid var(--border); padding-top: 8px; }
+    #colorSection > * + * { margin-top: 6px; }
     .tidy { border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
     .tidy-head { display: flex; align-items: center; gap: 8px; }
     .tidy-sum { flex: 1 1 auto; font-weight: 600; }
@@ -371,39 +373,37 @@
       <div class="status" id="paletteStatus"></div>
     </div>
 
+    <!-- 추출 + 색 정리 통합 — 추출 후 같은 카드에서 바로 병합·역할 지정. -->
     <div class="step">
-      <h2>추출</h2>
+      <h2>추출 · 색 정리</h2>
       <div class="row">
         <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
         <span class="muted" id="selInfo"></span>
       </div>
       <div id="tokenList"></div>
       <div class="status" id="extractStatus"></div>
-    </div>
-
-    <!-- 색 편집표 — 추출/생성 색의 hue·역할 확인·수정 -->
-    <div class="step" id="colorTableCard" style="display:none">
-      <h2>색 정리 (비슷한 색 병합 → 역할)</h2>
-      <div class="hint">Global은 <b>hue 패밀리</b>(<code>color/blue/500</code>), 역할은 Semantic만. 역할을 확정해 ‘반영’하세요.</div>
-      <!-- 추출 색 N:1 정리 — 변수 생성 전 드래프트 단계(바인딩 영향 없음). 비슷한 색이 있을 때만 표시. -->
-      <div id="colorTidy" class="tidy" style="display:none">
-        <div class="tidy-head">
-          <span class="tidy-sum" id="tidySum"></span>
-          <button id="btnColorTidy" class="primary">병합</button>
+      <!-- 색 정리 — 추출 색이 있을 때만. 변수 생성 전 드래프트 단계라 바인딩 영향 없음. -->
+      <div id="colorSection" style="display:none">
+        <div class="hint">비슷한 색을 대표 1색으로 <b>병합</b>하고 역할(Semantic)을 정합니다. Global은 hue 패밀리(<code>color/blue/500</code>).</div>
+        <div id="colorTidy" class="tidy" style="display:none">
+          <div class="tidy-head">
+            <span class="tidy-sum" id="tidySum"></span>
+            <button id="btnColorTidy" class="primary">병합</button>
+          </div>
+          <div id="tidyList"></div>
+          <div class="hint">변수 생성 전 단계라 이미 적용된 디자인(바인딩)에는 영향이 없어요.</div>
         </div>
-        <div id="tidyList"></div>
-        <div class="hint">변수 생성 전 단계라 이미 적용된 디자인(바인딩)에는 영향이 없어요.</div>
+        <div id="colorTable"></div>
+        <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
+        <datalist id="roleList">
+          <option value="surface"></option><option value="surface/muted"></option>
+          <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
+          <option value="border"></option>
+          <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
+          <option value="secondary"></option><option value="accent"></option>
+          <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
+        </datalist>
       </div>
-      <div id="colorTable"></div>
-      <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
-      <datalist id="roleList">
-        <option value="surface"></option><option value="surface/muted"></option>
-        <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
-        <option value="border"></option>
-        <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
-        <option value="secondary"></option><option value="accent"></option>
-        <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
-      </datalist>
     </div>
 
     <div class="step" id="createCard">
