@@ -30,7 +30,7 @@ export function parseVarValue(type: ResolvedType, input: string): ParseResult {
     }
     case 'STRING': {
       if (s === '') return { ok: false, error: '빈 문자열은 허용되지 않습니다.' };
-      return { ok: true, value: input };
+      return { ok: true, value: s };
     }
     case 'BOOLEAN': {
       const v = s.toLowerCase();

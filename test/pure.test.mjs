@@ -533,6 +533,7 @@ test('parseVarValue — 타입별 파싱/검증', () => {
   assert.equal(parseVarValue('FLOAT', 'abc').ok, false);
   // STRING
   assert.deepEqual(parseVarValue('STRING', 'Inter'), { ok: true, value: 'Inter' });
+  assert.deepEqual(parseVarValue('STRING', '  Inter  '), { ok: true, value: 'Inter' }); // 앞뒤 공백 트림
   assert.equal(parseVarValue('STRING', '   ').ok, false);
   // BOOLEAN
   assert.deepEqual(parseVarValue('BOOLEAN', 'true'), { ok: true, value: true });

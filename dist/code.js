@@ -1428,7 +1428,7 @@
       }
       case "STRING": {
         if (s === "") return { ok: false, error: "\uBE48 \uBB38\uC790\uC5F4\uC740 \uD5C8\uC6A9\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4." };
-        return { ok: true, value: input };
+        return { ok: true, value: s };
       }
       case "BOOLEAN": {
         const v = s.toLowerCase();
