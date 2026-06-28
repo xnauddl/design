@@ -832,7 +832,36 @@
     // 명도 대비 스킵 사유(라벨 맵)
     "contrastSkip.no-fill": "\uB2E8\uC0C9 \uAE00\uC790\uC0C9 \uC5C6\uC74C",
     "contrastSkip.no-bg": "\uBC30\uACBD \uC5C6\uC74C",
-    "contrastSkip.capped": "\uC2A4\uCE94 \uC0C1\uD55C \uB3C4\uB2EC"
+    "contrastSkip.capped": "\uC2A4\uCE94 \uC0C1\uD55C \uB3C4\uB2EC",
+    // 마법사 시퀀서 단계 결과
+    "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
+    "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
+    "wizard.seq.noExtract": "\uCD94\uCD9C\uB41C \uD1A0\uD070 \uC5C6\uC74C \u2014 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uC788\uB294 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694.",
+    "wizard.seq.extractDone": "{count}\uAC1C \uD6C4\uBCF4",
+    "wizard.seq.createLimited": "{count}\uAC1C \xB7 \u26A0 Free \uD55C\uB3C4 \uC77C\uBD80\uB9CC",
+    "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
+    "wizard.seq.semantics": "\uBCC4\uCE6D {aliased}",
+    "wizard.seq.semanticsMissing": " \xB7 \uB204\uB77D {n}",
+    "wizard.seq.bindCancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC801\uC6A9",
+    "wizard.seq.bindDone": "\uBC14\uC778\uB529 {bound}",
+    "wizard.seq.bindSkip": " \xB7 \uC2A4\uD0B5 {n}",
+    "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
+    "wizard.seq.contrastNone": "\uAC80\uC0AC\uD560 \uD14D\uC2A4\uD2B8 \uC5C6\uC74C",
+    "wizard.seq.contrastPass": "{pass}/{checked} {level} \uD1B5\uACFC",
+    "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
+    // 마법사 완료 요약(summarize, wizard.ts)
+    "wizard.sum.tokens": "\uD1A0\uD070 {n}",
+    "wizard.sum.bound": "\uBC14\uC778\uB529 {n}",
+    "wizard.sum.renamed": "\uB9AC\uB124\uC784 {n}",
+    "wizard.sum.contrast": "\uB300\uBE44 {passed}/{total} \uD1B5\uACFC",
+    "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
+    "wizard.sum.empty": "\uC644\uB8CC\uB41C \uC791\uC5C5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
+    // 진행 안내 단계 라벨·안내
+    "pipeline.step.tokens": "\uD1A0\uD070 \uC0DD\uC131 (Global)",
+    "pipeline.step.semantics": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
+    "pipeline.step.bind": "\uBC14\uC778\uB529",
+    "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
+    "pipeline.hint.needBindable": "\uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694"
   };
   function t(key, vars) {
     var _a;
@@ -1496,18 +1525,16 @@
   // src/lib/pipeline.ts
   function pipelineSteps(s) {
     return [
-      { id: "tokens", label: "\uD1A0\uD070 \uC0DD\uC131 (Global)", status: s.hasGlobal ? "done" : "ready" },
+      { id: "tokens", status: s.hasGlobal ? "done" : "ready" },
       {
         id: "semantics",
-        label: "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
         status: s.hasGlobal ? "ready" : "blocked",
-        hint: s.hasGlobal ? void 0 : "\uD1A0\uD070\uC744 \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694"
+        hint: s.hasGlobal ? void 0 : "pipeline.hint.needTokens"
       },
       {
         id: "bind",
-        label: "\uBC14\uC778\uB529",
         status: s.hasBindable ? "ready" : "blocked",
-        hint: s.hasBindable ? void 0 : "\uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694"
+        hint: s.hasBindable ? void 0 : "pipeline.hint.needBindable"
       }
     ];
   }
@@ -1569,18 +1596,18 @@
       return { step, run: true };
     });
   }
-  function summarize(t2) {
+  function summarize(totals) {
     var _a;
     const parts = [];
-    if (t2.created != null) parts.push(`\uD1A0\uD070 ${t2.created}`);
-    if (t2.bound != null) parts.push(`\uBC14\uC778\uB529 ${t2.bound}`);
-    if (t2.renamed != null) parts.push(`\uB9AC\uB124\uC784 ${t2.renamed}`);
-    if (t2.contrastChecked != null) {
-      const passed = t2.contrastChecked - ((_a = t2.contrastFailed) != null ? _a : 0);
-      parts.push(`\uB300\uBE44 ${passed}/${t2.contrastChecked} \uD1B5\uACFC`);
+    if (totals.created != null) parts.push(t("wizard.sum.tokens", { n: totals.created }));
+    if (totals.bound != null) parts.push(t("wizard.sum.bound", { n: totals.bound }));
+    if (totals.renamed != null) parts.push(t("wizard.sum.renamed", { n: totals.renamed }));
+    if (totals.contrastChecked != null) {
+      const passed = totals.contrastChecked - ((_a = totals.contrastFailed) != null ? _a : 0);
+      parts.push(t("wizard.sum.contrast", { passed, total: totals.contrastChecked }));
     }
-    if (t2.components != null && t2.components > 0) parts.push(`\uCEF4\uD3EC\uB10C\uD2B8 ${t2.components}`);
-    return parts.length ? parts.join(" \xB7 ") : "\uC644\uB8CC\uB41C \uC791\uC5C5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4";
+    if (totals.components != null && totals.components > 0) parts.push(t("wizard.sum.components", { n: totals.components }));
+    return parts.length ? parts.join(" \xB7 ") : t("wizard.sum.empty");
   }
 
   // src/ui.ts
@@ -2055,33 +2082,33 @@
     for (const p of plan) {
       if (!p.run) continue;
       if (stopped) {
-        setWizardStep(p.step.id, "fail", "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700");
+        setWizardStep(p.step.id, "fail", t("wizard.seq.stoppedPrev"));
         continue;
       }
-      setWizardStep(p.step.id, "active", "\uC9C4\uD589 \uC911\u2026");
+      setWizardStep(p.step.id, "active", t("wizard.seq.running"));
       try {
         switch (p.step.id) {
           case "extract": {
             const r = await wizardRequest({ type: "EXTRACT" }, ["EXTRACT_RESULT"]);
             applyExtractResult(r);
             if (!tokens.length) {
-              setWizardStep("extract", "fail", "\uCD94\uCD9C\uB41C \uD1A0\uD070 \uC5C6\uC74C \u2014 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uC788\uB294 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694.");
+              setWizardStep("extract", "fail", t("wizard.seq.noExtract"));
               stopped = true;
               break;
             }
-            setWizardStep("extract", "done", `${tokens.length}\uAC1C \uD6C4\uBCF4`);
+            setWizardStep("extract", "done", t("wizard.seq.extractDone", { count: tokens.length }));
             break;
           }
           case "create": {
             const r = await wizardRequest({ type: "CREATE_TOKENS", tokens, base }, ["CREATE_RESULT"]);
             totals.created = r.created + r.updated;
-            setWizardStep("create", "done", r.limited ? `${r.created + r.updated}\uAC1C \xB7 \u26A0 Free \uD55C\uB3C4 \uC77C\uBD80\uB9CC` : `\uC0DD\uC131 ${r.created} \xB7 \uAC31\uC2E0 ${r.updated}`);
+            setWizardStep("create", "done", r.limited ? t("wizard.seq.createLimited", { count: r.created + r.updated }) : t("wizard.seq.createDone", { created: r.created, updated: r.updated }));
             break;
           }
           case "semantics": {
             const r = await wizardRequest({ type: "CREATE_SEMANTICS", map: semMap }, ["SEMANTICS_RESULT"]);
             totals.semanticsAliased = r.aliased;
-            setWizardStep("semantics", "done", `\uBCC4\uCE6D ${r.aliased}${r.missing.length ? ` \xB7 \uB204\uB77D ${r.missing.length}` : ""}`);
+            setWizardStep("semantics", "done", t("wizard.seq.semantics", { aliased: r.aliased }) + (r.missing.length ? t("wizard.seq.semanticsMissing", { n: r.missing.length }) : ""));
             break;
           }
           case "bind": {
@@ -2090,30 +2117,30 @@
             hideWizardBar();
             totals.bound = r.bound;
             if (r.cancelled) {
-              setWizardStep("bind", "done", `\uCDE8\uC18C\uB428 \u2014 ${r.bound}\uAC74\uB9CC \uC801\uC6A9`);
+              setWizardStep("bind", "done", t("wizard.seq.bindCancelled", { bound: r.bound }));
               stopped = true;
               break;
             }
-            setWizardStep("bind", "done", `\uBC14\uC778\uB529 ${r.bound}${r.skipped ? ` \xB7 \uC2A4\uD0B5 ${r.skipped}` : ""}`);
+            setWizardStep("bind", "done", t("wizard.seq.bindDone", { bound: r.bound }) + (r.skipped ? t("wizard.seq.bindSkip", { n: r.skipped }) : ""));
             break;
           }
           case "rename": {
             const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth }, ["RENAME_RESULT"]);
             totals.renamed = r.changes.length;
-            setWizardStep("rename", "done", `${r.changes.length}\uAC1C \uC774\uB984 \uC801\uC6A9`);
+            setWizardStep("rename", "done", t("wizard.seq.renameDone", { count: r.changes.length }));
             break;
           }
           case "contrast": {
             const r = await wizardRequest({ type: "CHECK_CONTRAST", level }, ["CONTRAST_RESULT"]);
             totals.contrastChecked = r.checked;
             totals.contrastFailed = r.failed;
-            setWizardStep("contrast", r.failed ? "fail" : "done", r.checked === 0 ? "\uAC80\uC0AC\uD560 \uD14D\uC2A4\uD2B8 \uC5C6\uC74C" : `${r.checked - r.failed}/${r.checked} ${r.level} \uD1B5\uACFC`);
+            setWizardStep("contrast", r.failed ? "fail" : "done", r.checked === 0 ? t("wizard.seq.contrastNone") : t("wizard.seq.contrastPass", { pass: r.checked - r.failed, checked: r.checked, level: r.level }));
             break;
           }
           case "componentize": {
             const reg = await wizardRequest({ type: "REGISTER_COMPONENTS" }, ["COMPONENTS_RESULT"]);
             totals.components = reg.registered;
-            setWizardStep("componentize", "done", `\uB4F1\uB85D ${reg.registered} \xB7 \uC138\uD2B8 ${reg.sets}`);
+            setWizardStep("componentize", "done", t("wizard.seq.componentize", { registered: reg.registered, sets: reg.sets }));
             break;
           }
         }
@@ -2251,7 +2278,6 @@
     box.innerHTML = "";
     const steps = pipelineSteps({ hasGlobal, hasBindable });
     steps.forEach((s, i) => {
-      var _a;
       const row = document.createElement("div");
       row.className = `pstep ${s.status}`;
       row.tabIndex = 0;
@@ -2261,10 +2287,10 @@
       dot.textContent = s.status === "done" ? "\u2713" : String(i + 1);
       const label = document.createElement("span");
       label.className = "plabel";
-      label.textContent = s.label;
+      label.textContent = t("pipeline.step." + s.id);
       const stat = document.createElement("span");
       stat.className = "pstat";
-      stat.textContent = (_a = s.hint) != null ? _a : t("pipeline.stat." + s.status);
+      stat.textContent = s.hint ? t(s.hint) : t("pipeline.stat." + s.status);
       row.append(dot, label, stat);
       const go = () => gotoStep(s.id);
       row.addEventListener("click", go);

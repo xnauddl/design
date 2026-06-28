@@ -594,33 +594,33 @@ async function runWizard(): Promise<void> {
   for (const p of plan) {
     if (!p.run) continue; // renderWizardSteps에서 이미 skip 표시
     if (stopped) {
-      setWizardStep(p.step.id, 'fail', '이전 단계 중단으로 건너뜀');
+      setWizardStep(p.step.id, 'fail', t('wizard.seq.stoppedPrev'));
       continue;
     }
-    setWizardStep(p.step.id, 'active', '진행 중…');
+    setWizardStep(p.step.id, 'active', t('wizard.seq.running'));
     try {
       switch (p.step.id) {
         case 'extract': {
           const r = await wizardRequest({ type: 'EXTRACT' }, ['EXTRACT_RESULT']);
           applyExtractResult(r); // tokens 동기화 + hue 정규화 + 추출/색 패널 일관화(메인 스위치와 단일 출처)
           if (!tokens.length) {
-            setWizardStep('extract', 'fail', '추출된 토큰 없음 — 색·폰트·간격이 있는 프레임을 선택하세요.');
+            setWizardStep('extract', 'fail', t('wizard.seq.noExtract'));
             stopped = true;
             break;
           }
-          setWizardStep('extract', 'done', `${tokens.length}개 후보`);
+          setWizardStep('extract', 'done', t('wizard.seq.extractDone', { count: tokens.length }));
           break;
         }
         case 'create': {
           const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens, base }, ['CREATE_RESULT']);
           totals.created = r.created + r.updated;
-          setWizardStep('create', 'done', r.limited ? `${r.created + r.updated}개 · ⚠ Free 한도 일부만` : `생성 ${r.created} · 갱신 ${r.updated}`);
+          setWizardStep('create', 'done', r.limited ? t('wizard.seq.createLimited', { count: r.created + r.updated }) : t('wizard.seq.createDone', { created: r.created, updated: r.updated }));
           break;
         }
         case 'semantics': {
           const r = await wizardRequest({ type: 'CREATE_SEMANTICS', map: semMap }, ['SEMANTICS_RESULT']);
           totals.semanticsAliased = r.aliased;
-          setWizardStep('semantics', 'done', `별칭 ${r.aliased}${r.missing.length ? ` · 누락 ${r.missing.length}` : ''}`);
+          setWizardStep('semantics', 'done', t('wizard.seq.semantics', { aliased: r.aliased }) + (r.missing.length ? t('wizard.seq.semanticsMissing', { n: r.missing.length }) : ''));
           break;
         }
         case 'bind': {
@@ -629,17 +629,17 @@ async function runWizard(): Promise<void> {
           hideWizardBar();
           totals.bound = r.bound;
           if (r.cancelled) {
-            setWizardStep('bind', 'done', `취소됨 — ${r.bound}건만 적용`);
+            setWizardStep('bind', 'done', t('wizard.seq.bindCancelled', { bound: r.bound }));
             stopped = true;
             break;
           }
-          setWizardStep('bind', 'done', `바인딩 ${r.bound}${r.skipped ? ` · 스킵 ${r.skipped}` : ''}`);
+          setWizardStep('bind', 'done', t('wizard.seq.bindDone', { bound: r.bound }) + (r.skipped ? t('wizard.seq.bindSkip', { n: r.skipped }) : ''));
           break;
         }
         case 'rename': {
           const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth }, ['RENAME_RESULT']);
           totals.renamed = r.changes.length;
-          setWizardStep('rename', 'done', `${r.changes.length}개 이름 적용`);
+          setWizardStep('rename', 'done', t('wizard.seq.renameDone', { count: r.changes.length }));
           break;
         }
         case 'contrast': {
@@ -647,14 +647,14 @@ async function runWizard(): Promise<void> {
           totals.contrastChecked = r.checked;
           totals.contrastFailed = r.failed;
           // 미달 발견은 ‘실행 실패’가 아니라 ‘점검 결과’ — 흐름은 계속하되 주의 표시.
-          setWizardStep('contrast', r.failed ? 'fail' : 'done', r.checked === 0 ? '검사할 텍스트 없음' : `${r.checked - r.failed}/${r.checked} ${r.level} 통과`);
+          setWizardStep('contrast', r.failed ? 'fail' : 'done', r.checked === 0 ? t('wizard.seq.contrastNone') : t('wizard.seq.contrastPass', { pass: r.checked - r.failed, checked: r.checked, level: r.level }));
           break;
         }
         case 'componentize': {
           // 등록이 베이스 묶음 베리언트 세트까지 함께 수행(별도 분류 불필요).
           const reg = await wizardRequest({ type: 'REGISTER_COMPONENTS' }, ['COMPONENTS_RESULT']);
           totals.components = reg.registered;
-          setWizardStep('componentize', 'done', `등록 ${reg.registered} · 세트 ${reg.sets}`);
+          setWizardStep('componentize', 'done', t('wizard.seq.componentize', { registered: reg.registered, sets: reg.sets }));
           break;
         }
       }
@@ -829,10 +829,10 @@ function renderPipeline(): void {
     dot.textContent = s.status === 'done' ? '✓' : String(i + 1);
     const label = document.createElement('span');
     label.className = 'plabel';
-    label.textContent = s.label;
+    label.textContent = t('pipeline.step.' + s.id);
     const stat = document.createElement('span');
     stat.className = 'pstat';
-    stat.textContent = s.hint ?? t('pipeline.stat.' + s.status);
+    stat.textContent = s.hint ? t(s.hint) : t('pipeline.stat.' + s.status);
 
     row.append(dot, label, stat);
     const go = (): void => gotoStep(s.id);

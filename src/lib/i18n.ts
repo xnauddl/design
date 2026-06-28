@@ -144,6 +144,38 @@ export const STRINGS: Record<string, string> = {
   'contrastSkip.no-fill': '단색 글자색 없음',
   'contrastSkip.no-bg': '배경 없음',
   'contrastSkip.capped': '스캔 상한 도달',
+
+  // 마법사 시퀀서 단계 결과
+  'wizard.seq.stoppedPrev': '이전 단계 중단으로 건너뜀',
+  'wizard.seq.running': '진행 중…',
+  'wizard.seq.noExtract': '추출된 토큰 없음 — 색·폰트·간격이 있는 프레임을 선택하세요.',
+  'wizard.seq.extractDone': '{count}개 후보',
+  'wizard.seq.createLimited': '{count}개 · ⚠ Free 한도 일부만',
+  'wizard.seq.createDone': '생성 {created} · 갱신 {updated}',
+  'wizard.seq.semantics': '별칭 {aliased}',
+  'wizard.seq.semanticsMissing': ' · 누락 {n}',
+  'wizard.seq.bindCancelled': '취소됨 — {bound}건만 적용',
+  'wizard.seq.bindDone': '바인딩 {bound}',
+  'wizard.seq.bindSkip': ' · 스킵 {n}',
+  'wizard.seq.renameDone': '{count}개 이름 적용',
+  'wizard.seq.contrastNone': '검사할 텍스트 없음',
+  'wizard.seq.contrastPass': '{pass}/{checked} {level} 통과',
+  'wizard.seq.componentize': '등록 {registered} · 세트 {sets}',
+
+  // 마법사 완료 요약(summarize, wizard.ts)
+  'wizard.sum.tokens': '토큰 {n}',
+  'wizard.sum.bound': '바인딩 {n}',
+  'wizard.sum.renamed': '리네임 {n}',
+  'wizard.sum.contrast': '대비 {passed}/{total} 통과',
+  'wizard.sum.components': '컴포넌트 {n}',
+  'wizard.sum.empty': '완료된 작업이 없습니다',
+
+  // 진행 안내 단계 라벨·안내
+  'pipeline.step.tokens': '토큰 생성 (Global)',
+  'pipeline.step.semantics': '시맨틱 매핑',
+  'pipeline.step.bind': '바인딩',
+  'pipeline.hint.needTokens': '토큰을 먼저 생성하세요',
+  'pipeline.hint.needBindable': '바인딩할 변수를 먼저 생성하세요',
 };
 
 /** key → 문자열. `{var}` 자리표시자를 vars로 치환. 누락 키는 key 그대로(폴백). */

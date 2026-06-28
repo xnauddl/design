@@ -2,6 +2,7 @@
    wizard.ts — 시스템화 마법사의 순수 로직(단계 정의·계획·요약)
    figma/DOM 의존 없음. 실제 메시지 시퀀싱은 ui.ts가 이 정의를 따라 수행한다.
    ============================================================ */
+import { t } from './i18n';
 
 /** 마법사 단계 식별자(각 단계는 기존 UiToCode 메시지 1~2개로 매핑된다). */
 export type WizardStepId =
@@ -88,15 +89,15 @@ export interface WizardTotals {
 }
 
 /** 누적 집계 → 사람이 읽는 완료 요약 한 줄. */
-export function summarize(t: WizardTotals): string {
+export function summarize(totals: WizardTotals): string {
   const parts: string[] = [];
-  if (t.created != null) parts.push(`토큰 ${t.created}`);
-  if (t.bound != null) parts.push(`바인딩 ${t.bound}`);
-  if (t.renamed != null) parts.push(`리네임 ${t.renamed}`);
-  if (t.contrastChecked != null) {
-    const passed = t.contrastChecked - (t.contrastFailed ?? 0);
-    parts.push(`대비 ${passed}/${t.contrastChecked} 통과`);
+  if (totals.created != null) parts.push(t('wizard.sum.tokens', { n: totals.created }));
+  if (totals.bound != null) parts.push(t('wizard.sum.bound', { n: totals.bound }));
+  if (totals.renamed != null) parts.push(t('wizard.sum.renamed', { n: totals.renamed }));
+  if (totals.contrastChecked != null) {
+    const passed = totals.contrastChecked - (totals.contrastFailed ?? 0);
+    parts.push(t('wizard.sum.contrast', { passed, total: totals.contrastChecked }));
   }
-  if (t.components != null && t.components > 0) parts.push(`컴포넌트 ${t.components}`);
-  return parts.length ? parts.join(' · ') : '완료된 작업이 없습니다';
+  if (totals.components != null && totals.components > 0) parts.push(t('wizard.sum.components', { n: totals.components }));
+  return parts.length ? parts.join(' · ') : t('wizard.sum.empty');
 }
