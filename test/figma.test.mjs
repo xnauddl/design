@@ -532,6 +532,21 @@ test('renameSelection — 비대표 바인딩 필드(paddingRight·효과 색)�
   assert.equal(after.get('fx'), 'shadow-ambient');
 });
 
+test('renameSelection — 역할 추론이 ROLE_VOCAB 내에서 확장(divider·image·border·shape)', async () => {
+  installFigma();
+  const line = { type: 'LINE', id: 'ln', name: 'Line 1' };
+  const img = { type: 'RECTANGLE', id: 'im', name: 'Rect A', fills: [{ type: 'IMAGE', visible: true }] };
+  const bordered = { type: 'RECTANGLE', id: 'bd', name: 'Rect B', fills: [], strokes: [{ type: 'SOLID', visible: true }] };
+  const bare = { type: 'ELLIPSE', id: 'sh', name: 'Ellipse C', fills: [] };
+
+  const { changes } = await renameSelection([line, img, bordered, bare], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('ln'), 'divider'); // LINE → 구분선
+  assert.equal(after.get('im'), 'image'); // 이미지 채움
+  assert.equal(after.get('bd'), 'border'); // 채움 없고 선만
+  assert.equal(after.get('sh'), 'shape'); // 채움·선 없음(어휘 밖 kebab(type) 아님)
+});
+
 test('renameSelection — apply:false면 미리보기만(노드 이름 불변)', async () => {
   installFigma();
   const node = { type: 'FRAME', id: 'f', name: 'OriginalName', children: [] };

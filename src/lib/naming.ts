@@ -24,6 +24,7 @@ export const ROLE_VOCAB = [
   'divider',
   'badge',
   'avatar',
+  'shape', // 채움·선 없는 순수 도형(추론 폴백)
 ] as const;
 
 export type Role = (typeof ROLE_VOCAB)[number];
