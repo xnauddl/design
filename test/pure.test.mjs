@@ -715,6 +715,17 @@ test('groupByExactName — 명사 사전에 없는 이름도 묶음(row-containe
   assert.equal(groups[1].members.length, 2); // preview-container ×2
 });
 
+test('groupByExactName — 대소문자·여백은 관대, 구두점은 구분(kebab 오병합 방지)', () => {
+  const mk = (id, name) => ({ id, name, type: 'FRAME', width: 100, height: 40, children: [] });
+  // 구두점만 다른 서로 다른 이름은 합쳐지면 안 됨(kebab이면 둘 다 'card-large'로 오병합).
+  const split = groupByExactName([mk('a', 'Card (Large)'), mk('b', 'Card Large')]);
+  assert.equal(split.length, 2);
+  // 대소문자·여백만 다른 같은 이름은 한 그룹.
+  const merged = groupByExactName([mk('c', 'Like Button'), mk('d', 'like  button')]);
+  assert.equal(merged.length, 1);
+  assert.deepEqual(merged[0].members.map((m) => m.id), ['c', 'd']);
+});
+
 test('classifyVariants — 그룹/속성/빈 조합/단일', () => {
   const r = classifyVariants([
     'button/primary/default',

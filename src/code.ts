@@ -12,7 +12,7 @@ import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, commonBaseName } from './lib/components';
-import type { CompPropType, StructNode } from './lib/components';
+import type { CompPropType, StructNode, StructGroup } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
@@ -410,6 +410,60 @@ function exposeProperties(container: ComponentNode | ComponentSetNode, scopes: r
   return out;
 }
 
+/** a가 b의 조상인가(부모 체인). */
+function isAncestorOf(a: BaseNode, b: BaseNode): boolean {
+  let p: BaseNode | null = b.parent;
+  while (p) { if (p.id === a.id) return true; p = p.parent; }
+  return false;
+}
+
+/**
+ * 등록용 그룹화 — 정확한 이름 그룹(`groupByExactName`) + **같은 이름의 조상 제외**.
+ * 같은 이름의 조상·자손이 함께 선택되면 한 세트에 둘 다 넣을 수 없어(결합이 깨짐) 잎 쪽만 남긴다.
+ * SCAN 미리보기와 REGISTER가 **동일 규칙**을 쓰도록 한 곳에 둔다.
+ */
+function groupForRegister(nodes: readonly SceneNode[]): StructGroup[] {
+  const liveById = new Map(nodes.map((n) => [n.id, n]));
+  return groupByExactName(nodes.map(toStructNode))
+    .map((g) => {
+      const live = g.members.map((m) => liveById.get(m.id)).filter((n): n is SceneNode => !!n);
+      const members = g.members.filter((m) => {
+        const node = liveById.get(m.id);
+        return node ? !live.some((o) => o.id !== node.id && isAncestorOf(node, o)) : false;
+      });
+      return { key: g.key, members };
+    })
+    .filter((g) => g.members.length > 0);
+}
+
+/**
+ * **내부(자손) 그룹 먼저** — 위상 정렬. 내부 반복이 먼저 세트/인스턴스가 된 뒤 바깥을 컴포넌트화해야
+ * 중첩이 보존된다. "다른 남은 그룹을 자기 안에 포함하지 않는(=가장 안쪽인) 그룹"부터 출력한다.
+ * 깊이만으로 정렬하면 한 그룹의 멤버가 여러 깊이에 걸칠 때 어긋날 수 있어, 실제 포함관계로 정렬한다.
+ * 사이클(이론상)·동순위는 문서 깊이 내림차순으로 폴백.
+ */
+function orderInnerFirst(groups: readonly StructGroup[], byId: Map<string, SceneNode>): StructGroup[] {
+  const liveOf = (g: StructGroup): SceneNode[] => g.members.map((m) => byId.get(m.id)).filter((n): n is SceneNode => !!n);
+  const docDepth = (n: SceneNode): number => {
+    let d = 0;
+    let p: BaseNode | null = n.parent;
+    while (p && p.type !== 'PAGE' && p.type !== 'DOCUMENT') { d++; p = p.parent; }
+    return d;
+  };
+  const groupDepth = (g: StructGroup): number => Math.max(0, ...liveOf(g).map(docDepth));
+  // x가 남은 다른 그룹 y를 자기 안에 포함하면(=y가 x보다 안쪽) x는 아직 출력 불가.
+  const containsRemaining = (x: StructGroup, rest: readonly StructGroup[]): boolean =>
+    rest.some((y) => y !== x && liveOf(y).some((b) => liveOf(x).some((a) => a.id !== b.id && isAncestorOf(a, b))));
+  const remaining = [...groups].sort((a, b) => groupDepth(b) - groupDepth(a)); // 깊이 폴백(사이클/동순위)
+  const out: StructGroup[] = [];
+  while (remaining.length) {
+    let idx = remaining.findIndex((x) => !containsRemaining(x, remaining));
+    if (idx < 0) idx = 0; // 사이클 폴백: 가장 깊은 것
+    out.push(remaining.splice(idx, 1)[0]);
+  }
+  return out;
+}
+
 /** 텍스트 위로 올라가며 가장 가까운 상위의 단색 배경(hex + 노드 id). 없으면 null. */
 function effectiveBg(node: SceneNode): { hex: string; id: string } | null {
   let cur: BaseNode | null = node.parent;
@@ -725,26 +779,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if ('children' in n) for (const c of n.children as readonly SceneNode[]) index(c);
         };
         for (const r of roots) index(r);
-        // **전체 eligible 후보**를 정확한 이름으로 묶어 미리보기 라벨 주입(깊이 무관).
-        // 같은 이름의 조상/자손이 함께면 조상 제외(등록과 동일 규칙). 반복(2개+) → group+variant(자동체크),
-        // 단독(1개) → single(PascalCase). 이게 "묶임" 여부를 등록 전에 그대로 보여준다.
+        // **전체 eligible 후보**를 정확한 이름으로 묶어 미리보기 라벨 주입(깊이 무관, 등록과 동일 규칙).
+        // 반복(2개+) → group+variant(자동체크), 단독(1개) → single(PascalCase). "묶임" 여부를 등록 전에 그대로 보여준다.
         const eligibleNodes = candidates
           .filter((c) => c.eligible)
           .map((c) => liveById.get(c.id))
           .filter((n): n is SceneNode => !!n);
-        const isAncestor = (a: SceneNode, b: SceneNode): boolean => {
-          let p: BaseNode | null = b.parent;
-          while (p) { if (p.id === a.id) return true; p = p.parent; }
-          return false;
-        };
-        const groups = groupByExactName(eligibleNodes.map(toStructNode)).map((g) => {
-          const live = g.members.map((m) => liveById.get(m.id)).filter((n): n is SceneNode => !!n);
-          const members = g.members.filter((m) => {
-            const node = liveById.get(m.id);
-            return node ? !live.some((o) => o.id !== node.id && isAncestor(node, o)) : false;
-          });
-          return { members };
-        });
+        const groups = groupForRegister(eligibleNodes);
         const preview = new Map<string, { group?: string; variant?: string; single?: string }>();
         for (const g of groups) {
           if (g.members.length < 2) {
@@ -800,41 +841,16 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         const byId = new Map(valid.map((n) => [n.id, n]));
 
-        // 정확한 이름 기준 그룹화. 같은 이름의 **조상/자손이 함께 선택**되면 조상을 제외한다
-        // (같은 세트에 조상·자손을 함께 넣으면 결합이 깨짐 — 잎 쪽을 등록 단위로).
-        const isAncestor = (a: SceneNode, b: SceneNode): boolean => {
-          let p: BaseNode | null = b.parent;
-          while (p) { if (p.id === a.id) return true; p = p.parent; }
-          return false;
-        };
-        let groups = groupByExactName(valid.map(toStructNode)).map((g) => {
-          const live = g.members.map((m) => byId.get(m.id)).filter((n): n is SceneNode => !!n);
-          const members = g.members.filter((m) => {
-            const node = byId.get(m.id);
-            return node ? !live.some((o) => o.id !== node.id && isAncestor(node, o)) : false;
-          });
-          return { key: g.key, members };
-        });
-        if (setsOnly) groups = groups.filter((g) => g.members.length >= 2); // 폴백: 반복만
+        // 정확한 이름 그룹화 + 같은 이름 조상 제외(SCAN과 공유). 폴백(스캔 없이 등록)은 반복만.
+        let groups = groupForRegister(valid);
+        if (setsOnly) groups = groups.filter((g) => g.members.length >= 2);
         if (!groups.length) {
           post({ type: 'COMPONENTS_RESULT', registered: 0, skipped, sets: 0, singles: [], missing: [], failures: [] });
           break;
         }
-
-        // **깊은 그룹부터** 처리 — 내부 반복(예: Like Button)이 먼저 세트/인스턴스가 된 뒤 바깥
-        // (Artwork Card)을 컴포넌트화하면 그 안에 내부 인스턴스가 들어가 **중첩이 보존**된다(각 단계 모두).
-        const docDepth = (n: SceneNode): number => {
-          let d = 0;
-          let p: BaseNode | null = n.parent;
-          while (p && p.type !== 'PAGE' && p.type !== 'DOCUMENT') { d++; p = p.parent; }
-          return d;
-        };
-        const groupDepth = (g: { members: { id: string }[] }): number => {
-          let max = 0;
-          for (const m of g.members) { const node = byId.get(m.id); if (node) max = Math.max(max, docDepth(node)); }
-          return max;
-        };
-        groups = [...groups].sort((a, b) => groupDepth(b) - groupDepth(a));
+        // **내부(자손) 그룹 먼저** — 내부 반복이 먼저 세트/인스턴스가 된 뒤 바깥을 컴포넌트화해야
+        // 그 안에 내부 인스턴스가 들어가 중첩이 보존된다(각 단계 모두). 실제 포함관계로 위상 정렬.
+        groups = orderInnerFirst(groups, byId);
 
         const page = await ensureComponentsPage();
         let cursorX = pageStartX(page);
@@ -874,6 +890,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             } catch (e) { skipped++; failures.push(`인스턴스 배치 실패: ${errText(e)}`); }
           }
         };
+        // 단독 컴포넌트 1개를 페이지 이동 + 원위치 인스턴스 + 속성 노출 대상 등록(단독·결합불가·결합실패 3곳 공용).
+        const placeSingle = (comp: ComponentNode, o: Origin, name: string): void => {
+          try { comp.name = name; } catch { /* 이름 실패 무시 */ }
+          placeOnPage(comp);
+          singles.push(comp.name);
+          containers.push({ container: comp, scopes: [comp] });
+          try { restore([{ inst: comp.createInstance(), o }]); } catch (e) { failures.push(`인스턴스 실패(${comp.name}): ${errText(e)}`); }
+        };
 
         for (const g of groups) {
           const setName = commonBaseName(g.members.map((m) => m.name)); // 정확한 이름 → PascalCase
@@ -884,12 +908,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             const o = captureOrigin(node);
             try {
               const comp = figma.createComponentFromNode(node);
-              comp.name = pascalCase(g.members[0].name);
-              placeOnPage(comp);
-              singles.push(comp.name);
               registered++;
-              containers.push({ container: comp, scopes: [comp] });
-              restore([{ inst: comp.createInstance(), o }]);
+              placeSingle(comp, o, pascalCase(g.members[0].name));
             } catch (e) {
               skipped++;
               failures.push(`단독 등록 실패(${g.members[0].name}): ${errText(e)}`);
@@ -913,13 +933,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           }
           if (made.length < 2) {
             // 결합 불가 → 단독으로 등록 + 원위치 인스턴스.
-            for (const x of made) {
-              try { x.comp.name = setName; } catch { /* 이름 실패 무시 */ }
-              placeOnPage(x.comp);
-              singles.push(x.comp.name);
-              containers.push({ container: x.comp, scopes: [x.comp] });
-              restore([{ inst: x.comp.createInstance(), o: x.o }]);
-            }
+            for (const x of made) placeSingle(x.comp, x.o, setName);
             continue;
           }
           // 결합(핵심). 실패해도 컴포넌트가 소실되지 않게 **단독으로라도 등록**(반쪽 상태 방지).
@@ -930,13 +944,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             set = figma.combineAsVariants(made.map((x) => x.comp), home);
           } catch (e) {
             failures.push(`결합 실패(${setName}): ${errText(e)}`);
-            for (const x of made) {
-              try { x.comp.name = setName; } catch { /* 이름 실패 무시 */ }
-              placeOnPage(x.comp);
-              singles.push(x.comp.name);
-              containers.push({ container: x.comp, scopes: [x.comp] });
-              try { restore([{ inst: x.comp.createInstance(), o: x.o }]); } catch (ie) { failures.push(`인스턴스 실패: ${errText(ie)}`); }
-            }
+            for (const x of made) placeSingle(x.comp, x.o, setName);
             continue;
           }
           // 결합 성공 — 이름/이동/인스턴스는 **무조건** 수행(장식 단계 실패로 세트를 버리지 않음).

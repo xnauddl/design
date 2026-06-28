@@ -1885,11 +1885,14 @@
     }
     return all.filter((c) => keep.has(c.id));
   }
+  function exactNameKey(name) {
+    return name.trim().toLowerCase().replace(/\s+/g, " ");
+  }
   function groupByExactName(children) {
     const map = /* @__PURE__ */ new Map();
     const order = [];
     for (const c of children) {
-      const k = kebab(c.name);
+      const k = exactNameKey(c.name);
       if (!k) continue;
       if (!map.has(k)) {
         map.set(k, []);
@@ -2411,6 +2414,47 @@
     }
     return out;
   }
+  function isAncestorOf(a, b) {
+    let p = b.parent;
+    while (p) {
+      if (p.id === a.id) return true;
+      p = p.parent;
+    }
+    return false;
+  }
+  function groupForRegister(nodes) {
+    const liveById = new Map(nodes.map((n) => [n.id, n]));
+    return groupByExactName(nodes.map(toStructNode)).map((g) => {
+      const live = g.members.map((m) => liveById.get(m.id)).filter((n) => !!n);
+      const members = g.members.filter((m) => {
+        const node = liveById.get(m.id);
+        return node ? !live.some((o) => o.id !== node.id && isAncestorOf(node, o)) : false;
+      });
+      return { key: g.key, members };
+    }).filter((g) => g.members.length > 0);
+  }
+  function orderInnerFirst(groups, byId) {
+    const liveOf = (g) => g.members.map((m) => byId.get(m.id)).filter((n) => !!n);
+    const docDepth = (n) => {
+      let d = 0;
+      let p = n.parent;
+      while (p && p.type !== "PAGE" && p.type !== "DOCUMENT") {
+        d++;
+        p = p.parent;
+      }
+      return d;
+    };
+    const groupDepth = (g) => Math.max(0, ...liveOf(g).map(docDepth));
+    const containsRemaining = (x, rest) => rest.some((y) => y !== x && liveOf(y).some((b) => liveOf(x).some((a) => a.id !== b.id && isAncestorOf(a, b))));
+    const remaining = [...groups].sort((a, b) => groupDepth(b) - groupDepth(a));
+    const out = [];
+    while (remaining.length) {
+      let idx = remaining.findIndex((x) => !containsRemaining(x, remaining));
+      if (idx < 0) idx = 0;
+      out.push(remaining.splice(idx, 1)[0]);
+    }
+    return out;
+  }
   function effectiveBg(node) {
     let cur = node.parent;
     while (cur && cur.type !== "PAGE" && cur.type !== "DOCUMENT") {
@@ -2711,22 +2755,7 @@
           };
           for (const r of roots) index(r);
           const eligibleNodes = candidates.filter((c) => c.eligible).map((c) => liveById.get(c.id)).filter((n) => !!n);
-          const isAncestor = (a, b) => {
-            let p = b.parent;
-            while (p) {
-              if (p.id === a.id) return true;
-              p = p.parent;
-            }
-            return false;
-          };
-          const groups = groupByExactName(eligibleNodes.map(toStructNode)).map((g) => {
-            const live = g.members.map((m) => liveById.get(m.id)).filter((n) => !!n);
-            const members = g.members.filter((m) => {
-              const node = liveById.get(m.id);
-              return node ? !live.some((o) => o.id !== node.id && isAncestor(node, o)) : false;
-            });
-            return { members };
-          });
+          const groups = groupForRegister(eligibleNodes);
           const preview = /* @__PURE__ */ new Map();
           for (const g of groups) {
             if (g.members.length < 2) {
@@ -2777,45 +2806,13 @@
             else skipped++;
           }
           const byId = new Map(valid.map((n) => [n.id, n]));
-          const isAncestor = (a, b) => {
-            let p = b.parent;
-            while (p) {
-              if (p.id === a.id) return true;
-              p = p.parent;
-            }
-            return false;
-          };
-          let groups = groupByExactName(valid.map(toStructNode)).map((g) => {
-            const live = g.members.map((m) => byId.get(m.id)).filter((n) => !!n);
-            const members = g.members.filter((m) => {
-              const node = byId.get(m.id);
-              return node ? !live.some((o) => o.id !== node.id && isAncestor(node, o)) : false;
-            });
-            return { key: g.key, members };
-          });
+          let groups = groupForRegister(valid);
           if (setsOnly) groups = groups.filter((g) => g.members.length >= 2);
           if (!groups.length) {
             post({ type: "COMPONENTS_RESULT", registered: 0, skipped, sets: 0, singles: [], missing: [], failures: [] });
             break;
           }
-          const docDepth = (n) => {
-            let d = 0;
-            let p = n.parent;
-            while (p && p.type !== "PAGE" && p.type !== "DOCUMENT") {
-              d++;
-              p = p.parent;
-            }
-            return d;
-          };
-          const groupDepth = (g) => {
-            let max = 0;
-            for (const m of g.members) {
-              const node = byId.get(m.id);
-              if (node) max = Math.max(max, docDepth(node));
-            }
-            return max;
-          };
-          groups = [...groups].sort((a, b) => groupDepth(b) - groupDepth(a));
+          groups = orderInnerFirst(groups, byId);
           const page = await ensureComponentsPage();
           let cursorX = pageStartX(page);
           let sets = 0;
@@ -2860,6 +2857,20 @@
               }
             }
           };
+          const placeSingle = (comp, o, name) => {
+            try {
+              comp.name = name;
+            } catch (e) {
+            }
+            placeOnPage(comp);
+            singles.push(comp.name);
+            containers.push({ container: comp, scopes: [comp] });
+            try {
+              restore([{ inst: comp.createInstance(), o }]);
+            } catch (e) {
+              failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${comp.name}): ${errText(e)}`);
+            }
+          };
           for (const g of groups) {
             const setName = commonBaseName(g.members.map((m) => m.name));
             if (g.members.length === 1) {
@@ -2868,12 +2879,8 @@
               const o = captureOrigin(node);
               try {
                 const comp = figma.createComponentFromNode(node);
-                comp.name = pascalCase(g.members[0].name);
-                placeOnPage(comp);
-                singles.push(comp.name);
                 registered++;
-                containers.push({ container: comp, scopes: [comp] });
-                restore([{ inst: comp.createInstance(), o }]);
+                placeSingle(comp, o, pascalCase(g.members[0].name));
               } catch (e) {
                 skipped++;
                 failures.push(`\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328(${g.members[0].name}): ${errText(e)}`);
@@ -2895,16 +2902,7 @@
               }
             }
             if (made.length < 2) {
-              for (const x of made) {
-                try {
-                  x.comp.name = setName;
-                } catch (e) {
-                }
-                placeOnPage(x.comp);
-                singles.push(x.comp.name);
-                containers.push({ container: x.comp, scopes: [x.comp] });
-                restore([{ inst: x.comp.createInstance(), o: x.o }]);
-              }
+              for (const x of made) placeSingle(x.comp, x.o, setName);
               continue;
             }
             let set;
@@ -2913,20 +2911,7 @@
               set = figma.combineAsVariants(made.map((x) => x.comp), home);
             } catch (e) {
               failures.push(`\uACB0\uD569 \uC2E4\uD328(${setName}): ${errText(e)}`);
-              for (const x of made) {
-                try {
-                  x.comp.name = setName;
-                } catch (e2) {
-                }
-                placeOnPage(x.comp);
-                singles.push(x.comp.name);
-                containers.push({ container: x.comp, scopes: [x.comp] });
-                try {
-                  restore([{ inst: x.comp.createInstance(), o: x.o }]);
-                } catch (ie) {
-                  failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328: ${errText(ie)}`);
-                }
-              }
+              for (const x of made) placeSingle(x.comp, x.o, setName);
               continue;
             }
             set.name = setName;

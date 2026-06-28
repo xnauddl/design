@@ -446,13 +446,21 @@ export interface StructGroup {
  * 등록용 그룹화 — **정확한(정규화) 이름** 기준. 사용자는 "같은 것"에 똑같은 이름을 주고
  * 다른 컴포넌트엔 다른 이름을 준다(`Artwork Card`×6, `Like Button`×6, `artist-button`×1).
  * 머리명사로 묶으면 `Like Button`+`artist-button`이 'Button'으로 잘못 합쳐지므로, 정확한 이름으로
- * 묶어 사용자의 네이밍 의도를 그대로 따른다. 키는 kebab 정규화, 입력 순서 보존.
+ * 묶어 사용자의 네이밍 의도를 그대로 따른다. 입력 순서 보존.
+ *
+ * 키 정규화 = **소문자 + 연속 공백 1칸**만. `kebab`을 쓰지 않는다 — kebab은 구두점·구분자를 전부
+ * `-`로 뭉개 `Card (Large)`와 `Card Large`처럼 **서로 다른 이름을 잘못 합친다**. 대소문자·여백만
+ * 관대하게 보고 구두점/글자는 그대로 구분한다.
  */
+function exactNameKey(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 export function groupByExactName(children: readonly StructNode[]): StructGroup[] {
   const map = new Map<string, StructNode[]>();
   const order: string[] = [];
   for (const c of children) {
-    const k = kebab(c.name);
+    const k = exactNameKey(c.name);
     if (!k) continue; // 빈 이름 제외
     if (!map.has(k)) {
       map.set(k, []);
