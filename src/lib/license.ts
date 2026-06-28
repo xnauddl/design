@@ -14,6 +14,8 @@ export interface LicenseCache {
   expiresAt: number;
   /** 마지막 성공 검증 시각(ms epoch). */
   lastVerified: number;
+  /** LS 기기 인스턴스 식별자 — 재검증 시 같은 기기로 validate하기 위해 보관(없을 수 있음). */
+  instanceId?: string;
 }
 
 /** 이 주기보다 오래되면 온라인 시 재검증 권장. */
@@ -53,6 +55,8 @@ export interface VerifyOk {
   ok: true;
   tier: Tier;
   expiresAt: number;
+  /** 검증 서버가 돌려준 기기 인스턴스 식별자(있으면 캐시에 보관해 재검증 때 되돌려보냄). */
+  instanceId?: string;
 }
 export interface VerifyErr {
   ok: false;
@@ -82,5 +86,7 @@ export function parseVerifyResponse(json: unknown): VerifyOk | VerifyErr {
 
 /** 성공 응답 + 키 + 현재시각 → 저장할 캐시. */
 export function cacheFromVerify(key: string, v: VerifyOk, now: number): LicenseCache {
-  return { key, tier: v.tier, expiresAt: v.expiresAt, lastVerified: now };
+  const cache: LicenseCache = { key, tier: v.tier, expiresAt: v.expiresAt, lastVerified: now };
+  if (v.instanceId) cache.instanceId = v.instanceId; // 없으면 키 자체를 두지 않음(캐시 형태 안정).
+  return cache;
 }

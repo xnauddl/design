@@ -1,7 +1,9 @@
 /* ============================================================
    Cloudflare Worker — 라이선스 검증기 (수익화 검증 방식 C)
-   POST /verify { key, instanceName? }
-     → LemonSqueezy 라이선스 활성화/검증 → 유효하면 ES256 서명 JWT({ token }) 반환.
+   POST /verify { key, instanceName?, instanceId? }
+     → instanceId 있으면 해당 기기로 validate, 없으면 activate(activation_limit으로 기기 수 제한).
+     → 유효하면 ES256 서명 JWT와 기기 instanceId를 반환({ token, instanceId? }).
+     CORS: 플러그인 UI iframe에서 호출하므로 모든 응답에 CORS 헤더 + OPTIONS 프리플라이트 처리.
    플러그인은 공개키로 토큰을 검증하고 clientStorage에 캐시(오프라인 grace).
    비밀(개인키·LS 설정)은 Worker secret/vars로만 보관 — 디자인 데이터는 다루지 않음.
 
@@ -17,8 +19,17 @@ const LS_VALIDATE = 'https://api.lemonsqueezy.com/v1/licenses/validate';
 const LS_ACTIVATE = 'https://api.lemonsqueezy.com/v1/licenses/activate';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// 플러그인 UI는 별도 출처(브라우저 iframe)에서 호출하므로 CORS가 필요하다.
+// application/x-www-form-urlencoded가 아닌 JSON 본문은 프리플라이트(OPTIONS)를 유발 → 응답마다 CORS 헤더 부여.
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Max-Age': '86400',
+};
+
 const json = (obj, status = 200) =>
-  new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
+  new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json', ...CORS } });
 
 function b64urlFromString(s) {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -54,19 +65,18 @@ async function issueToken(env, licenseExpiryMs) {
   return signJwt(payload, JSON.parse(env.LICENSE_PRIVATE_JWK));
 }
 
-async function lsCall(url, key, instanceName) {
-  const body = new URLSearchParams({ license_key: key });
-  if (instanceName) body.set('instance_name', instanceName);
+async function lsCall(url, params) {
   const r = await fetch(url, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
+    body: new URLSearchParams(params),
   });
   return r.json();
 }
 
 export default {
   async fetch(request, env) {
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (request.method !== 'POST') return json({ valid: false, error: 'POST만 허용' }, 405);
 
     let req;
@@ -78,6 +88,8 @@ export default {
     const key = typeof req.key === 'string' ? req.key.trim() : '';
     if (!key) return json({ valid: false, error: '라이선스 키 없음' }, 400);
     const instanceName = typeof req.instanceName === 'string' ? req.instanceName : (env.LICENSE_AUD || 'plugin');
+    // 이전 활성화에서 받아 플러그인이 보관한 instance_id(있으면 해당 기기로 바인딩 재검증).
+    const instanceId = typeof req.instanceId === 'string' && req.instanceId ? req.instanceId : '';
 
     // 오너 관리자 키(선택) — LS 없이 장기 paid 토큰(스모크 테스트용).
     const adminKeys = (env.ADMIN_KEYS || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -87,19 +99,32 @@ export default {
     }
 
     try {
-      // 1) 활성화 시도(미등록 기기 등록 — LS activation_limit으로 기기 수 제한). 이미 활성화면 validate로.
-      let data = await lsCall(LS_ACTIVATE, key, instanceName);
-      if (!data.activated && !data.valid) data = await lsCall(LS_VALIDATE, key, instanceName);
+      // 1) 기존 기기: 저장된 instance_id로 validate(특정 활성 인스턴스에 바인딩).
+      let data = null;
+      if (instanceId) data = await lsCall(LS_VALIDATE, { license_key: key, instance_id: instanceId });
+
+      // 2) 신규/무효 기기: activate로 인스턴스 등록(LS activation_limit으로 기기 수 제한).
+      //    ⚠ instance 없는 validate로 폴백하지 않는다 — 그랬다간 activation_limit이 무력화됨(기기 한도 우회).
+      let newInstanceId = instanceId;
+      if (!data || data.valid !== true) {
+        data = await lsCall(LS_ACTIVATE, { license_key: key, instance_name: instanceName });
+        if (data.activated === true && data.instance && typeof data.instance.id === 'string') {
+          newInstanceId = data.instance.id;
+        }
+      }
 
       const lk = data.license_key || {};
-      const active = data.valid === true || data.activated === true || lk.status === 'active';
+      // 활성 판정은 인스턴스에 바인딩된 신호만 신뢰: validate(instance_id) 성공 또는 activate 성공.
+      // lk.status==='active'만으로 통과시키지 않는다(한도 초과 응답에도 status가 active일 수 있음).
+      const active = data.valid === true || data.activated === true;
       if (!active) {
-        const msg = data.error || (lk.status === 'expired' ? '구독이 만료되었습니다.' : '유효하지 않은 라이선스 키입니다.');
+        const msg = data.error || (lk.status === 'expired' ? '구독이 만료되었습니다.' : '유효하지 않은 라이선스 키이거나 기기 활성화 한도를 초과했습니다.');
         return json({ valid: false, error: msg }, 200);
       }
       const expiryMs = lk.expires_at ? Date.parse(lk.expires_at) : 0;
       const token = await issueToken(env, expiryMs);
-      return json({ token });
+      // 플러그인은 instanceId를 캐시에 보관 → 다음 재검증 때 되돌려보내 같은 기기로 validate.
+      return json(newInstanceId ? { token, instanceId: newInstanceId } : { token });
     } catch (e) {
       return json({ valid: false, error: `검증 서버 오류: ${e && e.message ? e.message : e}` }, 502);
     }

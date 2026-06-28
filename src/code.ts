@@ -153,7 +153,7 @@ function kindOf(v: Variable): TokenKind {
 loadLicense().then(() => {
   postLicense();
   // 캐시가 오래됐으면 UI에 백그라운드 재검증 요청(WebCrypto는 UI에서).
-  if (cache && evaluateLicense(cache, Date.now()).stale) post({ type: 'REQUEST_VERIFY', key: cache.key });
+  if (cache && evaluateLicense(cache, Date.now()).stale) post({ type: 'REQUEST_VERIFY', key: cache.key, instanceId: cache.instanceId });
 });
 
 /* ---------- UX5: 실시간 선택 동기화 ----------

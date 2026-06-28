@@ -217,14 +217,15 @@ async function subtleVerify(signingInput: string, signatureB64: string, alg: str
   return crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, b64urlToBytes(signatureB64), data);
 }
 
-/** 검증 서버 호출 + 서명/클레임 검증 → 결과를 code로 보고(code가 캐시·적용). */
-async function verifyAndReport(key: string): Promise<void> {
+/** 검증 서버 호출 + 서명/클레임 검증 → 결과를 code로 보고(code가 캐시·적용).
+ *  instanceId: 이전 활성화에서 받아 캐시에 보관한 기기 식별자(있으면 같은 기기로 validate). */
+async function verifyAndReport(key: string, instanceId?: string): Promise<void> {
   let result: VerifyResult;
   try {
     const resp = await fetch(VERIFY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, pluginId: PLUGIN_ID }),
+      body: JSON.stringify({ key, pluginId: PLUGIN_ID, instanceId }),
     });
     const json: unknown = await resp.json();
     // 서명 토큰({ token }) 우선, 없으면 평문 응답(개발/하위호환).
@@ -232,8 +233,13 @@ async function verifyAndReport(key: string): Promise<void> {
     const parsed = signed
       ? await verifyLicenseToken((json as { token: string }).token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify)
       : parseVerifyResponse(json);
+    // 서버가 돌려준 기기 instanceId를 캐시에 보관(다음 재검증 때 같은 기기로 validate). 없으면 기존 값 유지.
+    const respInstanceId =
+      !!json && typeof json === 'object' && typeof (json as { instanceId?: unknown }).instanceId === 'string'
+        ? (json as { instanceId: string }).instanceId
+        : instanceId;
     result = parsed.ok
-      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt }
+      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: respInstanceId }
       : { ok: false, error: parsed.error };
   } catch {
     result = { ok: false, error: '검증 서버 연결 실패(오프라인)', offline: true };
@@ -571,8 +577,8 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'REQUEST_VERIFY':
-      // code가 캐시된 키의 (재)검증을 요청 — UI에서 수행 후 결과 보고.
-      void verifyAndReport(msg.key);
+      // code가 캐시된 키의 (재)검증을 요청 — 보관된 instanceId로 같은 기기에 validate.
+      void verifyAndReport(msg.key, msg.instanceId);
       break;
     case 'ERROR': {
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.

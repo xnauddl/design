@@ -211,6 +211,13 @@ test('cacheFromVerify — 응답+키+now → 캐시', () => {
   });
 });
 
+test('cacheFromVerify — instanceId 있으면 보관, 없으면 키 자체 없음', () => {
+  const withId = cacheFromVerify('KEY-1', { ok: true, tier: 'paid', expiresAt: 999, instanceId: 'inst-9' }, 500);
+  assert.equal(withId.instanceId, 'inst-9');
+  const withoutId = cacheFromVerify('KEY-1', { ok: true, tier: 'paid', expiresAt: 999 }, 500);
+  assert.ok(!('instanceId' in withoutId)); // undefined 키조차 두지 않음(캐시 형태 안정)
+});
+
 /* ================= licenseToken.ts (M2.1 서명 검증 코어) ================= */
 const b64url = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
 const makeToken = (header, payload) => `${b64url(header)}.${b64url(payload)}.SIG`;
