@@ -25,6 +25,7 @@ import {
   hasEntitlement,
   isPaid,
   isTier,
+  coerceTier,
   evaluateLicense,
   parseVerifyResponse,
   cacheFromVerify,
@@ -265,6 +266,15 @@ test('isTier — free/paid만 유효(구 pro/team 거부)', () => {
   assert.equal(isTier('team'), false);
   assert.equal(isTier('enterprise'), false);
   assert.equal(isTier(undefined), false);
+});
+
+test('coerceTier — 구 pro/team 캐시는 paid로 정규화(하위호환), 무효는 null', () => {
+  assert.equal(coerceTier('free'), 'free');
+  assert.equal(coerceTier('paid'), 'paid');
+  assert.equal(coerceTier('pro'), 'paid'); // 구 3티어 → paid 등가
+  assert.equal(coerceTier('team'), 'paid');
+  assert.equal(coerceTier('enterprise'), null);
+  assert.equal(coerceTier(undefined), null);
 });
 
 /* ================= license.ts ================= */

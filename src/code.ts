@@ -14,7 +14,7 @@ import { darkValueForLight, darkGlobalName } from './lib/themeGen';
 import { ExportToken, ThemeValue, TokenKind, exportTokens } from './lib/exporters';
 import { classifyVariants, missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
-import { Tier, Feature, isTier } from './lib/entitlements';
+import { Tier, Feature, isTier, isPaid, coerceTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
 import { commitUndo } from './lib/undo';
@@ -76,7 +76,7 @@ function postLicense(note?: string): void {
   post({
     type: 'LICENSE_STATUS',
     tier: e.tier,
-    paid: e.tier === 'paid',
+    paid: isPaid(e.tier),
     source: e.source,
     status: e.status,
     expiresAt: e.expiresAt,
@@ -91,7 +91,11 @@ async function loadLicense(): Promise<void> {
     if (__DEV__ && isTier(dt)) devTier = dt;
     const c = (await figma.clientStorage.getAsync(CACHE_KEY)) as LicenseCache | undefined;
     // 손상/구형 캐시 방어: 모든 필드 형식을 확인(특히 key는 REQUEST_VERIFY에서 사용).
-    if (c && typeof c.key === 'string' && isTier(c.tier) && typeof c.expiresAt === 'number' && typeof c.lastVerified === 'number') cache = c;
+    // 구 3티어(pro/team) 캐시는 coerceTier로 paid 정규화 — 업데이트 후 유효 유료 사용자가 free로 강등되지 않게.
+    if (c && typeof c.key === 'string' && typeof c.expiresAt === 'number' && typeof c.lastVerified === 'number') {
+      const tier = coerceTier(c.tier);
+      if (tier) cache = { ...c, tier };
+    }
     const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
     if (Array.isArray(ps)) presets = ps as Preset[];
   } catch {
@@ -122,7 +126,7 @@ async function postPrereq(): Promise<void> {
 
 /** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용) */
 function requirePaid(feature: Feature, message: string): boolean {
-  if (currentTier() === 'paid') return true;
+  if (isPaid(currentTier())) return true;
   post({ type: 'PREMIUM_REQUIRED', feature, message });
   return false;
 }
@@ -681,7 +685,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_TEXT_STYLES': {
-        if (!requirePaid('components', '텍스트 스타일 등록은 Paid 기능입니다.')) break;
+        if (!requirePaid('textStyles', '텍스트 스타일 등록은 Paid 기능입니다.')) break;
         const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
         post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
         commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로

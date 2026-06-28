@@ -12,7 +12,8 @@ export type Tier = 'free' | 'paid';
 export type Feature =
   | 'tokens' // 토큰(3계층 변수) 생성
   | 'semantics' // 시맨틱 매핑
-  | 'components' // 컴포넌트 등록·베리언트(Phase 3/4/4.1)·텍스트 스타일
+  | 'components' // 컴포넌트 등록·베리언트(Phase 3/4/4.1)
+  | 'textStyles' // 텍스트 스타일 등록
   | 'presets'; // 공유 프리셋
 
 export const TIERS: Tier[] = ['free', 'paid'];
@@ -30,4 +31,15 @@ export function isPaid(tier: Tier): boolean {
 /** 런타임 값이 유효한 Tier인지(저장소/메시지/토큰 클레임 입력 검증용). */
 export function isTier(v: unknown): v is Tier {
   return v === 'free' || v === 'paid';
+}
+
+/**
+ * 저장된 티어 값을 현행 Tier로 정규화. 유효하면 그대로, 구 3티어(`pro`·`team`)는
+ * 모두 Paid 등가였으므로 `paid`로 매핑(하위호환 — 캐시·토큰 잔재가 free로 강등되는 것 방지).
+ * 알 수 없는 값은 null. (캐시는 서명 검증 후 기록되므로 매핑이 새 우회를 만들지 않음.)
+ */
+export function coerceTier(v: unknown): Tier | null {
+  if (isTier(v)) return v;
+  if (v === 'pro' || v === 'team') return 'paid';
+  return null;
 }

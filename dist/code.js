@@ -1907,8 +1907,16 @@
   }
 
   // src/lib/entitlements.ts
+  function isPaid(tier) {
+    return tier === "paid";
+  }
   function isTier(v) {
     return v === "free" || v === "paid";
+  }
+  function coerceTier(v) {
+    if (isTier(v)) return v;
+    if (v === "pro" || v === "team") return "paid";
+    return null;
   }
 
   // src/lib/license.ts
@@ -1976,7 +1984,7 @@
     post({
       type: "LICENSE_STATUS",
       tier: e.tier,
-      paid: e.tier === "paid",
+      paid: isPaid(e.tier),
       source: e.source,
       status: e.status,
       expiresAt: e.expiresAt,
@@ -1988,7 +1996,10 @@
       const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
       if (false) devTier = dt;
       const c = await figma.clientStorage.getAsync(CACHE_KEY);
-      if (c && typeof c.key === "string" && isTier(c.tier) && typeof c.expiresAt === "number" && typeof c.lastVerified === "number") cache = c;
+      if (c && typeof c.key === "string" && typeof c.expiresAt === "number" && typeof c.lastVerified === "number") {
+        const tier = coerceTier(c.tier);
+        if (tier) cache = __spreadProps(__spreadValues({}, c), { tier });
+      }
       const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
       if (Array.isArray(ps)) presets = ps;
     } catch (e) {
@@ -2007,7 +2018,7 @@
     }
   }
   function requirePaid(feature, message) {
-    if (currentTier() === "paid") return true;
+    if (isPaid(currentTier())) return true;
     post({ type: "PREMIUM_REQUIRED", feature, message });
     return false;
   }
@@ -2503,7 +2514,7 @@
           break;
         }
         case "CREATE_TEXT_STYLES": {
-          if (!requirePaid("components", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
           post({ type: "TEXT_STYLES_RESULT", created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
           commitUndo(figma);

@@ -2772,7 +2772,7 @@
         renderContrast(msg);
         break;
       case "PREMIUM_REQUIRED": {
-        const statusId = msg.feature === "components" ? "componentStatus" : msg.feature === "presets" ? "presetStatus" : msg.feature === "semantics" ? "semStatus" : "createStatus";
+        const statusId = msg.feature === "components" ? "componentStatus" : msg.feature === "textStyles" ? "tsStatus" : msg.feature === "presets" ? "presetStatus" : msg.feature === "semantics" ? "semStatus" : "createStatus";
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }

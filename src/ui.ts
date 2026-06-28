@@ -1455,15 +1455,17 @@ function mainSwitch(msg: CodeToUi): void {
       renderContrast(msg);
       break;
     case 'PREMIUM_REQUIRED': {
-      // 기능에 맞는 카드 영역으로 라우팅(토큰=만들기, 시맨틱=매핑, 컴포넌트=적용, 프리셋=관리).
+      // 기능에 맞는 카드 영역으로 라우팅(토큰=만들기, 시맨틱=매핑, 컴포넌트=적용, 텍스트 스타일·프리셋=각 카드).
       const statusId =
         msg.feature === 'components'
           ? 'componentStatus'
-          : msg.feature === 'presets'
-            ? 'presetStatus'
-            : msg.feature === 'semantics'
-              ? 'semStatus'
-              : 'createStatus';
+          : msg.feature === 'textStyles'
+            ? 'tsStatus'
+            : msg.feature === 'presets'
+              ? 'presetStatus'
+              : msg.feature === 'semantics'
+                ? 'semStatus'
+                : 'createStatus';
       setStatus(statusId, t('premium.required', { message: msg.message, feature: msg.feature }), 'warn');
       break;
     }
