@@ -121,9 +121,13 @@ function renderEmptyState(box: HTMLElement, title: string, guide: string, action
   box.appendChild(wrap);
 }
 
-// 버튼 역할 분리: ‘선택에서 토큰 추출’은 색만 노출(색 정리 카드), 색 외 토큰은
-// ‘미리보기’를 눌러야(previewRevealed=true) ‘토큰 생성’ 카드에 펼쳐진다.
+// 버튼 역할 분리: ‘선택에서 토큰 추출’은 색만(colorRevealed), ‘미리보기’는 색 외 토큰만
+// (previewRevealed) 노출. 추출은 색·색 외를 한 번에 읽는 단일 동작이라, 어느 버튼을
+// 먼저 눌러도 추출이 실행되고(자동 추출) 각자 자기 영역만 펼친다.
+let colorRevealed = false;
 let previewRevealed = false;
+let lastTidy: { before: number; after: number; merged: number } = { before: 0, after: 0, merged: 0 };
+let pendingCreatePreview = false; // ‘미리보기’가 추출을 유발했을 때, 추출 후 생성 미리보기 전송
 // ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만.
 function renderTokens(): void {
   const box = $('tokenList');
@@ -179,7 +183,8 @@ $('btnPalette').addEventListener('click', () => {
     includeStatus: ($('incStatus') as HTMLInputElement).checked,
   });
   tokens = paletteToDraftTokens(p);
-  previewRevealed = false; // 팔레트도 색 — 색 외 토큰 목록은 ‘미리보기’ 클릭 시
+  colorRevealed = true; // 팔레트 생성 = 색 노출
+  previewRevealed = false; // 색 외 토큰 목록은 ‘미리보기’ 클릭 시
   renderTokens();
   // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
   setSemMapText(paletteSemanticMap(p));
@@ -232,8 +237,8 @@ function huefyTokenColors(toks: DraftToken[]): void {
 function renderColorTable(): void {
   const card = $('colorSection');
   const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
-  if (!colors.length) {
-    card.style.display = 'none';
+  if (!colorRevealed || !colors.length) {
+    card.style.display = 'none'; // 색은 ‘선택에서 토큰 추출’(colorRevealed) 후에만 노출
     return;
   }
   card.style.display = '';
@@ -372,14 +377,21 @@ $('btnGuide').addEventListener('click', () => {
 });
 
 /* ---------- 버튼 ---------- */
-$('btnExtract').addEventListener('click', () => send({ type: 'EXTRACT' }));
+$('btnExtract').addEventListener('click', () => {
+  colorRevealed = true; // 추출 버튼 역할: 색 노출
+  previewRevealed = false; // 색 외 토큰은 ‘미리보기’ 클릭 시
+  send({ type: 'EXTRACT' });
+});
 
 $('btnCreate').addEventListener('click', () => {
+  previewRevealed = true; // 미리보기 버튼 역할: 생성할 색 외 토큰을 펼침
   if (!tokens.length) {
-    setStatus('createStatus', t('create.needExtract'), 'warn');
+    // 추출 전에 눌러도 동작: 추출을 자동 실행하고, 결과 도착 후 생성 미리보기까지 이어감.
+    // (색은 colorRevealed가 false라 노출 안 함 — 추출 버튼의 역할)
+    pendingCreatePreview = true;
+    send({ type: 'EXTRACT' });
     return;
   }
-  previewRevealed = true; // 미리보기 버튼 역할: 생성할 색 외 토큰을 펼침
   renderTokens();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
@@ -1060,20 +1072,26 @@ window.onmessage = (event: MessageEvent) => {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
       huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
-      // 추출 색 자동 정리(ΔE 군집 N:1) — 비슷한 색을 대표색으로 병합. 드래프트 단계라 바인딩 영향 없음.
+      // 추출 색 자동 정리(같은 hue-단계 N:1 병합) — 드래프트 단계라 바인딩 영향 없음.
       preTidyTokens = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기 스냅샷
-      const tidy = tidyColors();
-      previewRevealed = false; // 추출 버튼 역할: 색만 노출 — 색 외 토큰은 ‘미리보기’ 클릭 시
-      renderTokens();
+      lastTidy = tidyColors();
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
       ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
       // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
       suggestSemMapFrom(tokens);
-      renderColorTable(); // 정리된 색을 색 표(스와치·역할)에 단일 표시
-      renderTidySummary(tidy); // 정리 요약 한 줄 + 되돌리기
+      renderColorTable(); // colorRevealed면 색 표(추출 버튼이 켬)
+      renderTidySummary(lastTidy); // 정리 요약 한 줄 + 되돌리기
+      renderTokens(); // previewRevealed면 색 외 목록(미리보기 버튼이 켬)
       const colorN = tokens.filter((tk) => tk.category === 'color').length;
       $('selInfo').textContent = `선택 ${msg.selection}개 · 색 ${colorN} · 그 외 ${tokens.length - colorN}`;
       setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
+      if (pendingCreatePreview) {
+        // ‘미리보기’가 추출을 유발 → 추출 완료 후 생성 미리보기까지 이어감.
+        pendingCreatePreview = false;
+        const base = Number(($('base') as HTMLInputElement).value) || 16;
+        createFrom = 'tokens';
+        send({ type: 'CREATE_TOKENS', tokens, base, preview: true });
+      }
       break;
     }
     case 'SELECTION_STATE': {

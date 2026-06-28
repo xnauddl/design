@@ -1460,7 +1460,10 @@
     }
     box.appendChild(wrap);
   }
+  var colorRevealed = false;
   var previewRevealed = false;
+  var lastTidy = { before: 0, after: 0, merged: 0 };
+  var pendingCreatePreview = false;
   function renderTokens() {
     const box = $("tokenList");
     const showHint = (msg) => {
@@ -1508,6 +1511,7 @@
       includeStatus: $("incStatus").checked
     });
     tokens = paletteToDraftTokens(p);
+    colorRevealed = true;
     previewRevealed = false;
     renderTokens();
     setSemMapText(paletteSemanticMap(p));
@@ -1549,7 +1553,7 @@
   function renderColorTable() {
     const card = $("colorSection");
     const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
-    if (!colors.length) {
+    if (!colorRevealed || !colors.length) {
       card.style.display = "none";
       return;
     }
@@ -1662,13 +1666,18 @@
     $("btnWizardRun").focus();
     $("wizardCard").scrollIntoView({ block: "start", behavior: "smooth" });
   });
-  $("btnExtract").addEventListener("click", () => send({ type: "EXTRACT" }));
+  $("btnExtract").addEventListener("click", () => {
+    colorRevealed = true;
+    previewRevealed = false;
+    send({ type: "EXTRACT" });
+  });
   $("btnCreate").addEventListener("click", () => {
+    previewRevealed = true;
     if (!tokens.length) {
-      setStatus("createStatus", t("create.needExtract"), "warn");
+      pendingCreatePreview = true;
+      send({ type: "EXTRACT" });
       return;
     }
-    previewRevealed = true;
     renderTokens();
     const base = Number($("base").value) || 16;
     createFrom = "tokens";
@@ -2253,17 +2262,22 @@
         tokens = msg.tokens;
         huefyTokenColors(tokens);
         preTidyTokens = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
-        const tidy = tidyColors();
-        previewRevealed = false;
-        renderTokens();
+        lastTidy = tidyColors();
         $("btnCreateApply").style.display = "none";
         $("btnPaletteApply").style.display = "none";
         suggestSemMapFrom(tokens);
         renderColorTable();
-        renderTidySummary(tidy);
+        renderTidySummary(lastTidy);
+        renderTokens();
         const colorN = tokens.filter((tk) => tk.category === "color").length;
         $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uC0C9 ${colorN} \xB7 \uADF8 \uC678 ${tokens.length - colorN}`;
         setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");
+        if (pendingCreatePreview) {
+          pendingCreatePreview = false;
+          const base = Number($("base").value) || 16;
+          createFrom = "tokens";
+          send({ type: "CREATE_TOKENS", tokens, base, preview: true });
+        }
         break;
       }
       case "SELECTION_STATE": {
