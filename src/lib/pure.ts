@@ -17,6 +17,7 @@ export * from './exporters';
 export * from './variableEdit';
 export * from './themeGen';
 export * from './components';
+export * from './similar';
 export * from './textStyles';
 export * from './undo';
 export * from './errors';
