@@ -566,6 +566,19 @@
       <div id="variantReport" style="max-height:120px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
       <div class="status" id="componentStatus"></div>
     </div>
+
+    <div class="step" id="similarCard">
+      <h2>닮은 프레임 → 컴포넌트 <span class="muted" id="similarLock"></span></h2>
+      <div class="hint">구조가 같고 <b>내용(텍스트·이미지)만 다른</b> 프레임들을 선택 → <b>스캔</b>. 마스터 1개를 고르면 가변 텍스트/인스턴스를 <b>컴포넌트 속성</b>으로 노출하고 나머지는 인스턴스로 교체합니다.</div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnScanSimilar">닮은 프레임 스캔</button>
+        <button id="btnComponentize" class="primary">컴포넌트화</button>
+      </div>
+      <div class="muted" id="similarHint" style="margin-top:4px;">행을 클릭하면 캔버스에서 해당 프레임을 보여줍니다(◯ 마스터 선택).</div>
+      <div id="similarList" style="max-height:180px; overflow:auto; margin-top:6px; font-size:11px;"></div>
+      <div class="muted" id="similarWarn" style="margin-top:4px;"></div>
+      <div class="status" id="similarStatus"></div>
+    </div>
   </section>
 
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">

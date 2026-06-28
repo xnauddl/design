@@ -566,6 +566,19 @@
       <div id="variantReport" style="max-height:120px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
       <div class="status" id="componentStatus"></div>
     </div>
+
+    <div class="step" id="similarCard">
+      <h2>닮은 프레임 → 컴포넌트 <span class="muted" id="similarLock"></span></h2>
+      <div class="hint">구조가 같고 <b>내용(텍스트·이미지)만 다른</b> 프레임들을 선택 → <b>스캔</b>. 마스터 1개를 고르면 가변 텍스트/인스턴스를 <b>컴포넌트 속성</b>으로 노출하고 나머지는 인스턴스로 교체합니다.</div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnScanSimilar">닮은 프레임 스캔</button>
+        <button id="btnComponentize" class="primary">컴포넌트화</button>
+      </div>
+      <div class="muted" id="similarHint" style="margin-top:4px;">행을 클릭하면 캔버스에서 해당 프레임을 보여줍니다(◯ 마스터 선택).</div>
+      <div id="similarList" style="max-height:180px; overflow:auto; margin-top:6px; font-size:11px;"></div>
+      <div class="muted" id="similarWarn" style="margin-top:4px;"></div>
+      <div class="status" id="similarStatus"></div>
+    </div>
   </section>
 
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
@@ -2151,6 +2164,7 @@
     "btnGenMissing",
     "btnExposeProps",
     "btnTextStyles",
+    "btnComponentize",
     // 공유 프리셋
     "presetName",
     "btnSavePreset",
@@ -2166,6 +2180,7 @@
     for (const id of PAID_FIELDS) $(id).disabled = !isPaid;
     $("presetLock").textContent = lock;
     $("componentLock").textContent = lock;
+    $("similarLock").textContent = lock;
     $("wizComponentLock").textContent = isPaid ? "" : "\u{1F512} Paid";
     $("textStyleLock").textContent = lock;
     $("wizOptComponentize").disabled = !isPaid;
@@ -2270,6 +2285,63 @@
     setStatus("componentStatus", t("component.exposing"), "");
     send({ type: "EXPOSE_PROPERTIES" });
   });
+  var similarMemberIds = [];
+  var similarMasterId = null;
+  $("btnScanSimilar").addEventListener("click", () => {
+    setStatus("similarStatus", "\uB2EE\uC740 \uD504\uB808\uC784 \uC2A4\uCE94 \uC911\u2026", "");
+    send({ type: "SCAN_SIMILAR" });
+  });
+  $("btnComponentize").addEventListener("click", () => {
+    if (!similarMasterId || similarMemberIds.length < 2) {
+      setStatus("similarStatus", "\uBA3C\uC800 \uC2A4\uCE94 \uD6C4 \uB9C8\uC2A4\uD130\uB97C \uC120\uD0DD\uD558\uC138\uC694(\uB2EE\uC740 \uD504\uB808\uC784 2\uAC1C \uC774\uC0C1).", "warn");
+      return;
+    }
+    setStatus("similarStatus", "\uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC801\uC6A9 \uC911\u2026", "");
+    send({ type: "COMPONENTIZE_SIMILAR", masterId: similarMasterId, frameIds: similarMemberIds });
+  });
+  function renderSimilar(msg) {
+    similarMemberIds = msg.metas.map((m) => m.id);
+    similarMasterId = msg.recommendedMasterId;
+    const list = $("similarList");
+    list.innerHTML = "";
+    if (!msg.metas.length) {
+      const why = msg.excluded.length ? msg.excluded[0].reason : "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784 2\uAC1C \uC774\uC0C1\uC744 \uC120\uD0DD\uD558\uC138\uC694.";
+      setStatus("similarStatus", `\uB300\uC0C1 \uC5C6\uC74C \u2014 ${why}`, "warn");
+      $("similarWarn").textContent = "";
+      return;
+    }
+    for (const m of msg.metas) {
+      const row = document.createElement("label");
+      row.className = "inline";
+      row.style.cssText = "display:flex; gap:6px; align-items:center; padding:2px 0; cursor:pointer;";
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "similarMaster";
+      radio.checked = m.id === similarMasterId;
+      radio.addEventListener("change", () => {
+        similarMasterId = m.id;
+        send({ type: "FOCUS_NODE", id: m.id });
+      });
+      const star = m.id === msg.recommendedMasterId ? "\u2B50 " : "";
+      const meta = `${escapeHtml(m.name)} \xB7 \uD14D\uC2A4\uD2B8 ${m.textFilled}/${m.textTotal} \xB7 \uC774\uBBF8\uC9C0 ${m.images}` + (m.emptyLayers ? ` \xB7 \uBE48 ${m.emptyLayers}` : "");
+      const span = document.createElement("span");
+      span.innerHTML = `${star}${meta}`;
+      span.style.cssText = "flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;";
+      row.addEventListener("click", (e) => {
+        if (e.target !== radio) send({ type: "FOCUS_NODE", id: m.id });
+      });
+      row.append(radio, span);
+      list.appendChild(row);
+    }
+    const propCount = msg.varying.length;
+    const warns = [];
+    if (propCount) warns.push(`\uB178\uCD9C \uC18D\uC131 ${propCount}\uAC1C(${msg.varying.map((v) => v.type === "TEXT" ? "\uD14D\uC2A4\uD2B8" : "\uC774\uBBF8\uC9C0/\uC778\uC2A4\uD134\uC2A4").join("\xB7")})`);
+    else warns.push("\uAC00\uBCC0 \uC704\uCE58 \uC5C6\uC74C \u2014 \uBAA8\uB4E0 \uB0B4\uC6A9\uC774 \uB3D9\uC77C\uD569\uB2C8\uB2E4.");
+    if (msg.imageWarnings.length) warns.push(`\u26A0 \uC774\uBBF8\uC9C0 fill ${msg.imageWarnings.length}\uACF3\uC740 \uAD50\uCCB4 \uBD88\uAC00(\uC778\uC2A4\uD134\uC2A4\uB85C \uAC10\uC2F8\uC57C \uD568): ${msg.imageWarnings.join(", ")}`);
+    if (msg.excluded.length) warns.push(`\uC81C\uC678 ${msg.excluded.length}\uAC1C: ${msg.excluded.map((e) => `${e.name}(${e.reason})`).join(", ")}`);
+    $("similarWarn").innerHTML = warns.map(escapeHtml).join("<br>");
+    setStatus("similarStatus", `\uBA64\uBC84 ${msg.metas.length}\uAC1C \xB7 \uB9C8\uC2A4\uD130 \uC120\uD0DD \uD6C4 \u2018\uCEF4\uD3EC\uB10C\uD2B8\uD654\u2019`, propCount ? "ok" : "warn");
+  }
   function renderPresetList() {
     const sel = $("presetList");
     sel.innerHTML = "";
@@ -2768,6 +2840,22 @@
         setStatus("componentStatus", t("component.exposed", { created: msg.created }), msg.created ? "ok" : "warn");
         break;
       }
+      case "SIMILAR_CANDIDATES":
+        renderSimilar(msg);
+        break;
+      case "COMPONENTIZE_RESULT": {
+        const warn = msg.warnings.length ? ` \xB7 \u26A0 ${msg.warnings.length}\uAC74` : "";
+        setStatus(
+          "similarStatus",
+          msg.instances ? `\u2018${escapeHtml(msg.master)}\u2019 \uCEF4\uD3EC\uB10C\uD2B8\uD654 \u2014 \uC18D\uC131 ${msg.properties} \xB7 \uC778\uC2A4\uD134\uC2A4 ${msg.instances}${warn}` : `\uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328 \uB610\uB294 \uB300\uC0C1 \uC5C6\uC74C${warn}`,
+          msg.instances ? "ok" : "warn"
+        );
+        if (msg.warnings.length) $("similarWarn").innerHTML = msg.warnings.map(escapeHtml).join("<br>");
+        $("similarList").innerHTML = "";
+        similarMemberIds = [];
+        similarMasterId = null;
+        break;
+      }
       case "CONTRAST_RESULT":
         renderContrast(msg);
         break;
@@ -2867,6 +2955,8 @@
     CLASSIFY_VARIANTS: "componentStatus",
     GENERATE_MISSING_VARIANTS: "componentStatus",
     EXPOSE_PROPERTIES: "componentStatus",
+    SCAN_SIMILAR: "similarStatus",
+    COMPONENTIZE_SIMILAR: "similarStatus",
     CHECK_CONTRAST: "contrastStatus",
     GET_VARIABLES: "varEditStatus",
     EDIT_VARIABLE: "varEditStatus",

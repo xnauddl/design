@@ -746,7 +746,7 @@ async function verifyAndReport(key: string): Promise<void> {
 // 모두 Paid 잠금 대상. btnScanText(스캔/미리보기)는 Free라 제외(code.ts SCAN_TEXT_STYLES 무게이팅).
 const PAID_FIELDS = [
   // 컴포넌트/베리언트·텍스트 스타일
-  'btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps', 'btnTextStyles',
+  'btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnExposeProps', 'btnTextStyles', 'btnComponentize',
   // 공유 프리셋
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
@@ -761,6 +761,7 @@ function updateGates(): void {
   for (const id of PAID_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPaid;
   $('presetLock').textContent = lock;
   $('componentLock').textContent = lock;
+  $('similarLock').textContent = lock;
   $('wizComponentLock').textContent = isPaid ? '' : '🔒 Paid';
   $('textStyleLock').textContent = lock;
   ($('wizOptComponentize') as HTMLInputElement).disabled = !isPaid;
@@ -886,6 +887,73 @@ $('btnExposeProps').addEventListener('click', () => {
   setStatus('componentStatus', t('component.exposing'), '');
   send({ type: 'EXPOSE_PROPERTIES' });
 });
+
+/* ---------- 닮은 프레임 컴포넌트화 ---------- */
+let similarMemberIds: string[] = []; // 마지막 스캔의 멤버 프레임 id
+let similarMasterId: string | null = null; // 선택된 마스터
+
+$('btnScanSimilar').addEventListener('click', () => {
+  setStatus('similarStatus', '닮은 프레임 스캔 중…', '');
+  send({ type: 'SCAN_SIMILAR' });
+});
+
+$('btnComponentize').addEventListener('click', () => {
+  if (!similarMasterId || similarMemberIds.length < 2) {
+    setStatus('similarStatus', '먼저 스캔 후 마스터를 선택하세요(닮은 프레임 2개 이상).', 'warn');
+    return;
+  }
+  setStatus('similarStatus', '컴포넌트화 적용 중…', '');
+  send({ type: 'COMPONENTIZE_SIMILAR', masterId: similarMasterId, frameIds: similarMemberIds });
+});
+
+/** 스캔 결과 → 멤버 목록(메타·추천·마스터 라디오·행 클릭 포커스) 렌더. */
+function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): void {
+  similarMemberIds = msg.metas.map((m) => m.id);
+  similarMasterId = msg.recommendedMasterId;
+  const list = $('similarList');
+  list.innerHTML = '';
+
+  if (!msg.metas.length) {
+    const why = msg.excluded.length ? msg.excluded[0].reason : '구조가 같은 프레임 2개 이상을 선택하세요.';
+    setStatus('similarStatus', `대상 없음 — ${why}`, 'warn');
+    $('similarWarn').textContent = '';
+    return;
+  }
+
+  for (const m of msg.metas) {
+    const row = document.createElement('label');
+    row.className = 'inline';
+    row.style.cssText = 'display:flex; gap:6px; align-items:center; padding:2px 0; cursor:pointer;';
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'similarMaster';
+    radio.checked = m.id === similarMasterId;
+    radio.addEventListener('change', () => {
+      similarMasterId = m.id;
+      send({ type: 'FOCUS_NODE', id: m.id });
+    });
+    const star = m.id === msg.recommendedMasterId ? '⭐ ' : '';
+    const meta = `${escapeHtml(m.name)} · 텍스트 ${m.textFilled}/${m.textTotal} · 이미지 ${m.images}` + (m.emptyLayers ? ` · 빈 ${m.emptyLayers}` : '');
+    const span = document.createElement('span');
+    span.innerHTML = `${star}${meta}`;
+    span.style.cssText = 'flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+    // 행(라벨) 클릭 → 캔버스 포커스
+    row.addEventListener('click', (e) => {
+      if (e.target !== radio) send({ type: 'FOCUS_NODE', id: m.id });
+    });
+    row.append(radio, span);
+    list.appendChild(row);
+  }
+
+  const propCount = msg.varying.length;
+  const warns: string[] = [];
+  if (propCount) warns.push(`노출 속성 ${propCount}개(${msg.varying.map((v) => (v.type === 'TEXT' ? '텍스트' : '이미지/인스턴스')).join('·')})`);
+  else warns.push('가변 위치 없음 — 모든 내용이 동일합니다.');
+  if (msg.imageWarnings.length) warns.push(`⚠ 이미지 fill ${msg.imageWarnings.length}곳은 교체 불가(인스턴스로 감싸야 함): ${msg.imageWarnings.join(', ')}`);
+  if (msg.excluded.length) warns.push(`제외 ${msg.excluded.length}개: ${msg.excluded.map((e) => `${e.name}(${e.reason})`).join(', ')}`);
+  $('similarWarn').innerHTML = warns.map(escapeHtml).join('<br>');
+  setStatus('similarStatus', `멤버 ${msg.metas.length}개 · 마스터 선택 후 ‘컴포넌트화’`, propCount ? 'ok' : 'warn');
+}
 
 function renderPresetList(): void {
   const sel = $('presetList') as HTMLSelectElement;
@@ -1451,6 +1519,25 @@ function mainSwitch(msg: CodeToUi): void {
       setStatus('componentStatus', t('component.exposed', { created: msg.created }), msg.created ? 'ok' : 'warn');
       break;
     }
+    case 'SIMILAR_CANDIDATES':
+      renderSimilar(msg);
+      break;
+    case 'COMPONENTIZE_RESULT': {
+      const warn = msg.warnings.length ? ` · ⚠ ${msg.warnings.length}건` : '';
+      setStatus(
+        'similarStatus',
+        msg.instances
+          ? `‘${escapeHtml(msg.master)}’ 컴포넌트화 — 속성 ${msg.properties} · 인스턴스 ${msg.instances}${warn}`
+          : `컴포넌트화 실패 또는 대상 없음${warn}`,
+        msg.instances ? 'ok' : 'warn',
+      );
+      if (msg.warnings.length) $('similarWarn').innerHTML = msg.warnings.map(escapeHtml).join('<br>');
+      // 노드 구조가 바뀌었으니 목록 비우고 재스캔 유도
+      $('similarList').innerHTML = '';
+      similarMemberIds = [];
+      similarMasterId = null;
+      break;
+    }
     case 'CONTRAST_RESULT':
       renderContrast(msg);
       break;
@@ -1579,6 +1666,8 @@ const OP_STATUS: Record<string, string> = {
   CLASSIFY_VARIANTS: 'componentStatus',
   GENERATE_MISSING_VARIANTS: 'componentStatus',
   EXPOSE_PROPERTIES: 'componentStatus',
+  SCAN_SIMILAR: 'similarStatus',
+  COMPONENTIZE_SIMILAR: 'similarStatus',
   CHECK_CONTRAST: 'contrastStatus',
   GET_VARIABLES: 'varEditStatus',
   EDIT_VARIABLE: 'varEditStatus',
