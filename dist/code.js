@@ -1152,7 +1152,10 @@
     "hero",
     "main",
     "sidebar",
+    "aside",
     "section",
+    "article",
+    "figure",
     "button",
     "card",
     "list",
@@ -1199,12 +1202,6 @@
   function limitDepth(segs, maxDepth = 8) {
     if (segs.length <= maxDepth) return segs;
     return segs.slice(segs.length - maxDepth);
-  }
-  var DEFAULT_NAME_RE = /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( \d+)?( copy( \d+)?)?$/;
-  function isDefaultName(name) {
-    const n = name.trim();
-    if (!n) return true;
-    return DEFAULT_NAME_RE.test(n);
   }
   var PRIMITIVE_NS = /* @__PURE__ */ new Set([
     "color",
@@ -1266,10 +1263,6 @@
     return { roleLeaf, context, primitive: false };
   }
   var UNIT_WORDS = /* @__PURE__ */ new Set(["percent", "px", "em", "rem", "ratio", "pt"]);
-  function isTokenValue(v) {
-    if (/^[0-9a-f]{6}$/.test(v)) return true;
-    return v.split("-").every((s) => /^\d+$/.test(s) || UNIT_WORDS.has(s));
-  }
   var GENERIC_ROLES = /* @__PURE__ */ new Set(["frame", "container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
   function pickScope(name) {
     const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
@@ -1277,62 +1270,73 @@
     const known = segs.filter(isKnownRole);
     return known.length ? known[known.length - 1] : segs[segs.length - 1];
   }
-  function isTokenEchoName(name) {
-    const n = name.trim().toLowerCase();
-    for (const ns of PRIMITIVE_NS) {
-      if (n.startsWith(ns + "-")) {
-        const value = n.slice(ns.length + 1);
-        if (value && isTokenValue(value)) return true;
-      }
-    }
-    return false;
-  }
 
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const col = { changes: [], nodes: [] };
-    await recurse(selection2, null, opts, col, 0, null, null);
+    await recurse(selection2, null, opts, col, 0, null, null, false);
     return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
   }
-  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId) {
+  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentIsList) {
     const total = nodes.length;
+    const widths = parentLayout === "horizontal" ? nodes.map((n) => {
+      var _a, _b;
+      return (_b = (_a = dims(n)) == null ? void 0 : _a.w) != null ? _b : null;
+    }) : null;
+    const maxW = widths ? Math.max(0, ...widths.filter((w) => w != null)) : 0;
     for (let i = 0; i < total; i++) {
       const node = nodes[i];
       const before = node.name;
-      const pos = { index: i, total, parentLayout, depth };
-      const decided = await decide(node, ancestorName, pos, opts);
+      const wi = widths ? widths[i] : null;
+      const widthFrac = wi != null && maxW > 0 ? wi / maxW : null;
+      const pos = { index: i, total, parentLayout, depth, widthFrac };
+      const decided = await decide(node, ancestorName, pos, opts, parentIsList);
       let contextForChildren = before;
       let after;
       if (!decided.skip && decided.name) {
-        contextForChildren = decided.name;
         if (decided.name !== before) {
           after = decided.name;
           col.changes.push({ id: node.id, before, after });
           if (opts.apply) node.name = after;
         }
+        contextForChildren = decided.passthrough ? ancestorName : decided.name;
       }
       col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
       if ("children" in node && node.type !== "INSTANCE") {
-        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id);
+        const childInList = node.type === "FRAME" && isListLike(node, node.children);
+        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, childInList);
       }
     }
   }
-  async function decide(node, ancestorName, pos, opts) {
+  async function decide(node, ancestorName, pos, opts, parentIsList) {
     var _a;
     if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true };
     if (node.type === "TEXT") return { skip: true };
     if (node.type === "INSTANCE") return { skip: true };
     if (node.locked) return { skip: true };
-    if (pos.depth === 0 && isContainerType(node)) return { skip: true };
-    if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
+    if (pos.depth === 0 && isContainerType(node)) {
+      const hc = highConfidenceRole(node);
+      if (!hc) return { skip: true };
+      let hcScope = ancestorName ? pickScope(ancestorName) : null;
+      if (hcScope === hc) hcScope = null;
+      return { skip: false, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }) };
+    }
     const token = await primaryToken(node);
-    const role = resolveRole(node, token, pos);
+    const role = resolveRole(node, token, pos, parentIsList);
+    if (PASSTHROUGH_ROLES.has(role)) return { skip: false, name: role, passthrough: true };
     let scope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
     if (scope === role) scope = null;
     return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
   }
-  function resolveRole(node, token, pos) {
-    if (isButtonLike(node)) return "button";
+  var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper"]);
+  function resolveRole(node, token, pos, parentIsList) {
+    if (isNavLike(node)) return "nav";
+    if (isButtonLike(node)) return isChipLike(node) ? "chip" : "button";
+    if (parentIsList && isContainerType(node)) {
+      const kids = "children" in node ? node.children : [];
+      if (isCardLike(node, kids)) return "article";
+      return "item";
+    }
     const region = regionRole(node, pos);
     if (region) return region;
     if (token == null ? void 0 : token.roleLeaf) return token.roleLeaf;
@@ -1355,17 +1359,36 @@
       case "FRAME":
       case "GROUP":
       case "SECTION": {
-        const count = "children" in node ? node.children.length : 0;
-        if (count === 0) {
+        const kids = "children" in node ? node.children : [];
+        if (kids.length === 0) {
           if (hasImageFill(node)) return "image";
           if (hasColorFill(node)) return "swatch";
           return "container";
         }
-        return count === 1 ? "wrapper" : "container";
+        if (isFieldLike(node, kids)) return "field";
+        if (isListLike(node, kids)) return "list";
+        if (isCardLike(node, kids)) return "card";
+        if (isFigureLike(node, kids)) return "figure";
+        if (isPageSection(pos)) return "section";
+        return kids.length === 1 ? "wrapper" : "container";
       }
       default:
         return kebab(node.type);
     }
+  }
+  function highConfidenceRole(node) {
+    if (isNavLike(node)) return "nav";
+    if (isButtonLike(node)) return isChipLike(node) ? "chip" : "button";
+    if ("children" in node && isContainerType(node)) {
+      const kids = node.children;
+      if (kids.length) {
+        if (isFieldLike(node, kids)) return "field";
+        if (isListLike(node, kids)) return "list";
+        if (isCardLike(node, kids)) return "card";
+        if (isFigureLike(node, kids)) return "figure";
+      }
+    }
+    return null;
   }
   var FIELD_ORDER = [
     "fills",
@@ -1440,11 +1463,18 @@
     return node.type === "FRAME" || node.type === "GROUP" || node.type === "SECTION";
   }
   function regionRole(node, pos) {
-    if (pos.depth !== 1 || pos.parentLayout !== "vertical" || pos.total < 2) return null;
-    if (!isContainerType(node)) return null;
+    if (pos.depth !== 1 || !isContainerType(node)) return null;
+    if (pos.parentLayout === "horizontal") {
+      return pos.widthFrac != null && pos.widthFrac <= 0.4 ? "aside" : null;
+    }
+    if (pos.parentLayout !== "vertical" || pos.total < 2) return null;
     if (pos.index === 0) return "header";
     if (pos.index === pos.total - 1) return "footer";
+    if (pos.total === 3) return "main";
     return null;
+  }
+  function isPageSection(pos) {
+    return pos.depth === 1 && pos.parentLayout === "vertical" && pos.total > 3 && pos.index > 0 && pos.index < pos.total - 1;
   }
   function isButtonLike(node) {
     if (node.type !== "FRAME") return false;
@@ -1464,6 +1494,86 @@
   }
   function hasDirectText(node) {
     return "children" in node && node.children.some((c) => c.type === "TEXT");
+  }
+  function isChipLike(node) {
+    const d = dims(node);
+    if (!d || d.h > 28) return false;
+    return cornerRadiusOf(node) >= d.h / 2 - 1;
+  }
+  function hasDropShadow(node) {
+    const eff = node.effects;
+    return Array.isArray(eff) && eff.some((e) => e.visible !== false && e.type === "DROP_SHADOW");
+  }
+  function isCardLike(node, kids) {
+    if (node.type !== "FRAME") return false;
+    if (kids.length < 2) return false;
+    if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
+    return cornerRadiusOf(node) > 0 || hasDropShadow(node);
+  }
+  var LIST_ITEM_TYPES = /* @__PURE__ */ new Set(["FRAME", "GROUP", "INSTANCE", "COMPONENT", "RECTANGLE", "ELLIPSE"]);
+  function isListLike(node, kids) {
+    var _a;
+    if (node.type !== "FRAME") return false;
+    if (layoutOf(node) === null) return false;
+    if (kids.length < 3) return false;
+    const counts = /* @__PURE__ */ new Map();
+    for (const k of kids) counts.set(k.type, ((_a = counts.get(k.type)) != null ? _a : 0) + 1);
+    let domType = null;
+    let domCount = 0;
+    for (const [t, c] of counts) if (c > domCount) {
+      domCount = c;
+      domType = t;
+    }
+    if (!domType || domCount / kids.length < 0.8) return false;
+    if (!LIST_ITEM_TYPES.has(domType)) return false;
+    return dimsSimilar(kids);
+  }
+  function dimsSimilar(kids) {
+    const ws = [];
+    const hs = [];
+    for (const k of kids) {
+      const d = dims(k);
+      if (!d) return false;
+      ws.push(d.w);
+      hs.push(d.h);
+    }
+    return ratioWithin(ws, 1.5) && ratioWithin(hs, 1.5);
+  }
+  function ratioWithin(xs, max) {
+    const mn = Math.min(...xs);
+    const mx = Math.max(...xs);
+    if (mn <= 0) return false;
+    return mx / mn <= max;
+  }
+  function isFieldLike(node, kids) {
+    if (node.type !== "FRAME") return false;
+    if (layoutOf(node) !== "vertical") return false;
+    if (kids.length < 2 || kids.length > 3) return false;
+    const hasLabel = kids.some((k) => k.type === "TEXT");
+    const hasInput = kids.some(isInputBox);
+    return hasLabel && hasInput;
+  }
+  function isInputBox(node) {
+    if (node.type !== "FRAME" && node.type !== "RECTANGLE") return false;
+    if (!hasVisibleStroke(node) && !hasVisibleFill(node)) return false;
+    const d = dims(node);
+    return !!d && d.h > 0 && d.w >= d.h * 2;
+  }
+  function isNavLike(node) {
+    if (node.type !== "FRAME") return false;
+    if (layoutOf(node) !== "horizontal") return false;
+    const kids = node.children;
+    if (kids.length < 3) return false;
+    const d = dims(node);
+    if (d && d.h > 80) return false;
+    return kids.every((k) => k.type === "TEXT" || k.type === "FRAME" && hasDirectText(k));
+  }
+  function isFigureLike(node, kids) {
+    if (node.type !== "FRAME") return false;
+    if (kids.length < 2 || kids.length > 3) return false;
+    const hasImg = kids.some((k) => hasImageFill(k));
+    const hasCaption = kids.some((k) => k.type === "TEXT");
+    return hasImg && hasCaption;
   }
 
   // src/lib/exporters.ts

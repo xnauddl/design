@@ -725,7 +725,7 @@ test('renameSelection — 역할 기반·보존형·맥락 전파·형제 중복
   const col = figma.variables.createVariableCollection('Semantic');
   const tokenVar = figma.variables.createVariable('button/primary/background', col, 'COLOR');
 
-  // 의미 있는 이름 → 보존하고 자식 맥락으로 사용.
+  // 선택 루트(depth 0 컨테이너) → 보존하고 자식 맥락으로 사용.
   const bg = {
     type: 'RECTANGLE',
     id: 'bg',
@@ -742,7 +742,7 @@ test('renameSelection — 역할 기반·보존형·맥락 전파·형제 중복
   const root = {
     type: 'FRAME',
     id: 'root',
-    name: 'button', // 사람이 지은 이름 → 보존
+    name: 'button', // 선택 루트 → 보존(자식 맥락 'button')
     children: [bg, icon1, icon2, txt, inst, bg2],
   };
 
@@ -750,7 +750,7 @@ test('renameSelection — 역할 기반·보존형·맥락 전파·형제 중복
   assert.equal(applied, true);
 
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  // 의미 있는 루트 이름은 보존(변경 없음) → 자식 맥락 'button'
+  // 선택 루트 이름은 보존(변경 없음) → 자식 맥락 'button'
   assert.equal(after.has('root'), false);
   assert.equal(root.name, 'button');
   // 토큰 말단(background)이 역할 신호 → 토큰 경로 복사가 아니라 맥락(button)+역할
@@ -771,7 +771,7 @@ test('renameSelection — nodes: 전체 서브트리 + 계층(depth/parentId) + 
   installFigma();
   const icon = { type: 'VECTOR', id: 'ic', name: 'Vector 2' }; // 영향(→ icon)
   const keep = { type: 'TEXT', id: 'tx', name: 'KeepText', characters: 'x' }; // 보존(after 없음)
-  const root = { type: 'FRAME', id: 'root', name: 'card', children: [icon, keep] }; // 의미명 → 보존
+  const root = { type: 'FRAME', id: 'root', name: 'card', children: [icon, keep] }; // 선택 루트 → 보존
 
   const { nodes, changes } = await renameSelection([root], { apply: false, maxDepth: 3 });
 
@@ -794,12 +794,23 @@ test('renameSelection — nodes: 전체 서브트리 + 계층(depth/parentId) + 
   assert.equal(changes.length, nodes.filter((n) => n.after !== undefined).length);
 });
 
-test('renameSelection — 의미 있는 이름은 보존(교체 안 함)', async () => {
+test('renameSelection — 선택 루트 컨테이너는 사람이 지은 이름이어도 보존(맥락 기준)', async () => {
   installFigma();
   const node = { type: 'FRAME', id: 'f', name: 'OriginalName', children: [] };
   const { changes } = await renameSelection([node], { apply: true, maxDepth: 3 });
-  assert.equal(changes.length, 0); // 기본명이 아니므로 보존
+  assert.equal(changes.length, 0); // 선택 루트(depth 0 컨테이너)는 보존
   assert.equal(node.name, 'OriginalName');
+});
+
+test('renameSelection — 정규화: 사람이 지은 하위 레이어 이름도 역할로 교체(뚜렷한 역할)', async () => {
+  installFigma();
+  const inner = { type: 'VECTOR', id: 'in', name: 'OriginalName' }; // 사람이 지은 이름
+  // 선택 루트(보존) 아래의 사람이 지은 이름 → 보존하지 않고 역할(VECTOR → icon)로 교체.
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [inner] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('in'), 'icon'); // 'OriginalName'을 역할(icon)로 덮어씀
+  assert.equal(inner.name, 'icon');
 });
 
 test('renameSelection — 토큰 신호로 맥락/역할 결정(조상 없음 → 토큰 접두사 폴백, 원시 토큰은 무시)', async () => {
@@ -866,7 +877,7 @@ test('renameSelection — swatch 규칙: 색만 채운 빈 프레임 → swatch,
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('s'), 'swatch'); // 색만 채운 빈 프레임 → swatch
   assert.equal(after.get('im'), 'image'); // 이미지 채움 → image
-  assert.equal(after.get('e'), 'container'); // 빈 프레임 → container
+  assert.equal(after.get('e'), 'container'); // 빈 프레임 → container(맥락 없이 plain)
 });
 
 test('renameSelection — 색이 있어도 자식이 있으면 스와치가 아니라 컨테이너', async () => {
@@ -883,7 +894,7 @@ test('renameSelection — 색이 있어도 자식이 있으면 스와치가 아�
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [card] };
   const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('card'), 'container'); // 색+자식 다수 → container(스와치 아님)
+  assert.equal(after.get('card'), 'container'); // 색+자식 다수, 라운드/그림자 없음 → container(plain)
   assert.equal(after.get('ci'), 'icon'); // 부모가 일반 container → 맥락 접두사 안 붙임
 });
 
@@ -937,7 +948,7 @@ test('renameSelection — 영역 추론: 페이지 세로 스택의 첫=header, 
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('hd'), 'header'); // 첫 자식
   assert.equal(after.get('ft'), 'footer'); // 마지막 자식
-  assert.equal(after.get('mid'), 'container'); // 가운데는 영역 추론 안 함
+  assert.equal(after.get('mid'), 'main'); // 3분할 가운데 → main(HTML 랜드마크)
   assert.equal(after.get('hi'), 'header-icon'); // header 맥락 전파
   assert.equal(after.get('fi'), 'footer-icon');
 });
@@ -961,6 +972,233 @@ test('renameSelection — 버튼 추론: 오토레이아웃+라운드+채움+텍
   assert.equal(after.get('bi'), 'button-icon'); // button 맥락 전파
 });
 
+test('renameSelection — 카드: 표면+라운드+자식 2개↑ → card', async () => {
+  installFigma();
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Frame 1',
+    cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
+    children: [
+      { type: 'VECTOR', id: 'c1', name: 'Vector 1' },
+      { type: 'TEXT', id: 'c2', name: 'Title', characters: 'x' },
+    ],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [card] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('card'), 'card'); // 둥근 표면 + 자식 다수 → card(container 아님)
+});
+
+test('renameSelection — 선택 루트라도 고신뢰 시멘틱(card)이면 역할명으로 교체', async () => {
+  installFigma();
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Frame 1',
+    cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
+    children: [
+      { type: 'VECTOR', id: 'c1', name: 'Vector 1' },
+      { type: 'TEXT', id: 'c2', name: 'Title', characters: 'x' },
+    ],
+  };
+  // 카드 프레임을 직접 선택(depth 0) — 일반 컨테이너면 보존이지만 카드는 교체.
+  const { changes } = await renameSelection([card], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('card'), 'card'); // 루트여도 카드면 교체
+  assert.equal(card.name, 'card');
+  assert.equal(after.get('c1'), 'card-icon'); // 맥락 card 전파
+});
+
+test('renameSelection — 선택 루트가 일반 컨테이너면 보존(고신뢰 시멘틱 아님)', async () => {
+  installFigma();
+  const root = {
+    type: 'FRAME', id: 'page', name: 'Desktop',
+    children: [
+      { type: 'VECTOR', id: 'v1', name: 'Vector 1' },
+      { type: 'VECTOR', id: 'v2', name: 'Vector 2' },
+    ],
+  };
+  // 라운드·그림자·오토레이아웃 없는 일반 프레임 → card/list 아님 → 루트 보존.
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.has('page'), false); // 일반 루트는 그대로
+  assert.equal(root.name, 'Desktop');
+  assert.equal(after.get('v1'), 'desktop-icon'); // 보존된 루트 'Desktop'이 자식 맥락으로
+});
+
+test('renameSelection — HTML 랜드마크 nav: 가로 링크행(텍스트 3개↑) → nav', async () => {
+  installFigma();
+  const nav = {
+    type: 'FRAME', id: 'nav', name: 'Frame 1', layoutMode: 'HORIZONTAL', height: 48,
+    children: [
+      { type: 'TEXT', id: 'l1', name: 'Label', characters: '홈' },
+      { type: 'TEXT', id: 'l2', name: 'Label', characters: '소개' },
+      { type: 'TEXT', id: 'l3', name: 'Label', characters: '연락' },
+    ],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [nav] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('nav'), 'nav'); // 가로 링크행 → nav(버튼/리스트보다 우선)
+});
+
+test('renameSelection — HTML 랜드마크 main: 세로 3분할 가운데 → main', async () => {
+  installFigma();
+  const page = {
+    type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'VERTICAL',
+    children: [
+      { type: 'FRAME', id: 'hd', name: 'Frame 2', children: [{ type: 'VECTOR', id: 'hi', name: 'Vector 1' }] },
+      { type: 'FRAME', id: 'mn', name: 'Frame 3', children: [{ type: 'VECTOR', id: 'mi', name: 'Vector 2' }] },
+      { type: 'FRAME', id: 'ft', name: 'Frame 4', children: [{ type: 'VECTOR', id: 'fi', name: 'Vector 3' }] },
+    ],
+  };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('hd'), 'header');
+  assert.equal(after.get('mn'), 'main'); // 가운데
+  assert.equal(after.get('ft'), 'footer');
+  assert.equal(after.get('mi'), 'icon'); // main은 광역 랜드마크(GENERIC_ROLES) — 맥락 접두사로 안 씀
+});
+
+test('renameSelection — HTML 랜드마크 figure: 이미지+캡션 → figure(카드 크롬 없을 때)', async () => {
+  installFigma();
+  const figure = {
+    type: 'FRAME', id: 'fig', name: 'Frame 1',
+    children: [
+      { type: 'RECTANGLE', id: 'im', name: 'Rectangle 1', width: 200, height: 120, fills: [{ type: 'IMAGE', visible: true }] },
+      { type: 'TEXT', id: 'cap', name: 'Caption', characters: '설명' },
+    ],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [figure] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('fig'), 'figure'); // 이미지+캡션 → figure
+  assert.equal(after.get('im'), 'figure-image'); // 맥락 figure 전파
+});
+
+test('renameSelection — HTML 랜드마크 aside: 가로 스플릿의 좁은 컬럼 → aside', async () => {
+  installFigma();
+  const side = { type: 'FRAME', id: 'side', name: 'Frame 2', width: 200, height: 600, children: [{ type: 'VECTOR', id: 'si', name: 'Vector 1' }] };
+  const body = { type: 'FRAME', id: 'body', name: 'Frame 3', width: 800, height: 600, children: [{ type: 'VECTOR', id: 'bi', name: 'Vector 2' }] };
+  const page = { type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'HORIZONTAL', children: [side, body] };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('side'), 'aside'); // 200/800=0.25 ≤ 0.4 → aside
+  assert.notEqual(after.get('body'), 'aside'); // 넓은 쪽은 aside 아님
+});
+
+test('renameSelection — HTML 랜드마크 section: 페이지 중간 블록(3개 초과) → section', async () => {
+  installFigma();
+  const mk = (id, vid) => ({ type: 'FRAME', id, name: id, children: [{ type: 'VECTOR', id: vid, name: 'Vector' }] });
+  const page = {
+    type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'VERTICAL',
+    children: [mk('hd', 'v0'), mk('s1', 'v1'), mk('s2', 'v2'), mk('s3', 'v3'), mk('ft', 'v4')],
+  };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('hd'), 'header');
+  assert.equal(after.get('ft'), 'footer');
+  assert.equal(after.get('s1'), 'section'); // total>3 → 가운데 블록은 section
+  assert.equal(after.get('s2'), 'section');
+  assert.equal(after.get('s3'), 'section');
+});
+
+test('renameSelection — HTML 시맨틱 article: 피드(리스트) 안의 카드형 항목 → article', async () => {
+  installFigma();
+  const card = (id) => ({
+    type: 'FRAME', id, name: 'Frame X', width: 300, height: 120,
+    cornerRadius: 8, fills: [{ type: 'SOLID', visible: true }],
+    children: [
+      { type: 'TEXT', id: id + 't', name: 'Title', characters: '제목' },
+      { type: 'VECTOR', id: id + 'i', name: 'Vector' },
+    ],
+  });
+  const feed = {
+    type: 'FRAME', id: 'feed', name: 'Frame 1', layoutMode: 'VERTICAL',
+    children: [card('a1'), card('a2'), card('a3')],
+  };
+  const { changes } = await renameSelection([feed], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('feed'), 'list'); // 반복 카드 컨테이너 → list
+  assert.equal(after.get('a1'), 'list-article'); // 리스트 안 카드형 → article(맥락 list), item/header 아님
+  assert.equal(after.get('a2'), 'list-article');
+});
+
+test('renameSelection — 카드 크롬이 있으면 figure보다 card 우선', async () => {
+  installFigma();
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Frame 1',
+    cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
+    children: [
+      { type: 'RECTANGLE', id: 'im', name: 'Rectangle 1', width: 200, height: 120, fills: [{ type: 'IMAGE', visible: true }] },
+      { type: 'TEXT', id: 'cap', name: 'Caption', characters: '설명' },
+    ],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [card] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('card'), 'card'); // 라운드+채움 → card(figure 아님)
+});
+
+test('renameSelection — 칩: 작은 알약형 버튼 → chip', async () => {
+  installFigma();
+  const chip = {
+    type: 'FRAME', id: 'chip', name: 'Frame 1', layoutMode: 'HORIZONTAL',
+    cornerRadius: 12, width: 60, height: 24, fills: [{ type: 'SOLID', visible: true }],
+    children: [{ type: 'TEXT', id: 'ct', name: 'Label', characters: '태그' }],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [chip] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('chip'), 'chip'); // 높이 24 + 알약형 → chip(button 아님)
+});
+
+test('renameSelection — 리스트: 오토레이아웃+유사 반복 자식 3개↑ → list, 자식 → item', async () => {
+  installFigma();
+  const mkRow = (id) => ({
+    type: 'FRAME', id, name: 'Frame X', width: 300, height: 48,
+    children: [{ type: 'TEXT', id: id + 't', name: 't', characters: 'x' }],
+  });
+  const list = {
+    type: 'FRAME', id: 'list', name: 'Frame 1', layoutMode: 'VERTICAL',
+    children: [mkRow('r1'), mkRow('r2'), mkRow('r3')],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [list] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('list'), 'list'); // 반복 아이템 컨테이너 → list
+  assert.equal(after.get('r1'), 'list-item'); // 리스트 직속 컨테이너 자식 → item(맥락 list)
+});
+
+test('renameSelection — 일반 레이아웃은 plain 역할명으로 정리하되 맥락은 자식에게 통과(card-image)', async () => {
+  installFigma();
+  const img = { type: 'RECTANGLE', id: 'img', name: 'Rectangle 1', width: 100, height: 100, fills: [{ type: 'IMAGE', visible: true }] };
+  const wrapper = { type: 'FRAME', id: 'wrap', name: 'Frame 8', children: [img] }; // 단일 자식 → wrapper 폴백
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Frame 1',
+    cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
+    children: [wrapper, { type: 'TEXT', id: 'tt', name: 'Title', characters: 'x' }],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [card] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('card'), 'card'); // 카드는 정규화
+  assert.equal(after.get('wrap'), 'wrapper'); // 'Frame 8' → 맥락 없는 plain wrapper
+  assert.equal(after.get('img'), 'card-image'); // 맥락(card)이 wrapper를 통과해 손주에 전파
+});
+
+test('renameSelection — 필드: 세로 스택 라벨+입력박스 → field', async () => {
+  installFigma();
+  const field = {
+    type: 'FRAME', id: 'field', name: 'Frame 1', layoutMode: 'VERTICAL',
+    children: [
+      { type: 'TEXT', id: 'lb', name: 'Label', characters: '이메일' },
+      { type: 'RECTANGLE', id: 'box', name: 'Rectangle 1', width: 240, height: 40, strokes: [{ type: 'SOLID', visible: true }] },
+    ],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [field] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('field'), 'field'); // 라벨+입력박스 세로 스택 → field
+});
+
 test('renameSelection — 스냅샷 토큰 베낌(line-height-150-percent-px)도 교체', async () => {
   installFigma();
   const frame = { type: 'FRAME', id: 'f', name: 'line-height-150-percent-px', children: [] };
@@ -968,7 +1206,7 @@ test('renameSelection — 스냅샷 토큰 베낌(line-height-150-percent-px)도
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [frame] };
   const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('f'), 'container'); // percent-px echo → 보존 안 하고 역할로 교체
+  assert.equal(after.get('f'), 'container'); // percent-px echo → 그대로 두지 않고 container로 정리
   assert.notEqual(frame.name, 'line-height-150-percent-px');
 });
 
