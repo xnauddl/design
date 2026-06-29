@@ -1085,6 +1085,32 @@ test('nameTextStyles — 크기 내림차순 램프 명명 + 초과분 text-N', 
   assert.equal(names[RAMP_NAMES.length], 'text-9');
 });
 
+test('nameTextStyles — 같은 크기 다중 스타일은 base/weight로 분기(병합 금지)', () => {
+  // 크기 2종(32,16) → 32=display, 16=h1. 16px에 Regular/Bold 둘 → h1/regular, h1/bold
+  const byWeight = nameTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 5, sample: '' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 2, sample: '' },
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 1, sample: '' },
+  ]).map((s) => s.name);
+  assert.equal(new Set(byWeight).size, byWeight.length); // 전부 유일
+  assert.ok(byWeight.includes('display')); // 32px 단독
+  assert.ok(byWeight.includes('h1/regular') && byWeight.includes('h1/bold'));
+
+  // 같은 16px·같은 굵기, 패밀리만 다름 → base/family-weight (크기 1종 → base=display)
+  const byFamily = nameTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 2, sample: '' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Roboto', style: 'Bold', count: 1, sample: '' },
+  ]).map((s) => s.name);
+  assert.ok(byFamily.includes('display/inter-bold') && byFamily.includes('display/roboto-bold'));
+
+  // 같은 크기·굵기·패밀리, 행간만 다름(별도 군집) → 유일성 보강으로 둘 다 보존
+  const byLh = nameTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, sample: '' },
+    { fontSize: 16, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, sample: '' },
+  ]).map((s) => s.name);
+  assert.equal(new Set(byLh).size, 2);
+});
+
 test('fontStyleForWeight — 굵기/italic → Figma style', () => {
   assert.equal(fontStyleForWeight(400), 'Regular');
   assert.equal(fontStyleForWeight(700), 'Bold');

@@ -427,14 +427,17 @@ $('btnSemantics').addEventListener('click', () => {
 });
 
 /* ---------- 2.6 · 텍스트 스타일 (Phase C) ---------- */
+/** #tsFont는 '새 행 기본 폰트' 씨앗 — 실제 폰트는 행별 폰트 셀에서 보존(스캔 행은 읽기 전용). */
 function tsFontFamily(): string {
   return ($('tsFont') as HTMLInputElement).value.trim() || 'Inter';
 }
 
-/** 표 1행 생성(스펙 → 입력 행). family·letterSpacing은 행 dataset에 보존. */
-function textStyleRow(s: TextStyleSpec): HTMLTableRowElement {
+/** 표 1행 생성(스펙 → 입력 행). 폰트는 행별 셀로 보존(패밀리가 행마다 다를 수 있음).
+   locked=true(스캔 행): 폰트·크기·행간·자간·스타일은 읽기 전용(이미 디자인된 사실) — 이름(role)만 편집. */
+function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   const tr = document.createElement('tr');
-  const cell = (field: string, value: string, width: string, type = 'text'): void => {
+  const cell = (field: string, value: string, width: string, opts: { type?: string; readonly?: boolean } = {}): void => {
+    const { type = 'text', readonly = false } = opts;
     const td = document.createElement('td');
     const inp = document.createElement('input');
     inp.type = type;
@@ -442,13 +445,20 @@ function textStyleRow(s: TextStyleSpec): HTMLTableRowElement {
     inp.dataset.field = field;
     inp.style.width = width;
     if (type === 'number') inp.style.textAlign = 'right';
+    if (readonly) {
+      inp.readOnly = true;
+      inp.tabIndex = -1;
+      inp.title = '스캔된 값(읽기 전용) — 새 값으로 정의하려면 ‘행 추가’를 쓰세요';
+    }
     td.appendChild(inp);
     tr.appendChild(td);
   };
   cell('name', s.name, '84px');
-  cell('fontSize', String(s.fontSize), '40px', 'number');
-  cell('lineHeight', String(s.lineHeight), '40px', 'number');
-  cell('style', s.style, '64px');
+  cell('family', s.family, '96px', { readonly: locked });
+  cell('fontSize', String(s.fontSize), '52px', { type: 'number', readonly: locked });
+  cell('lineHeight', String(s.lineHeight), '52px', { type: 'number', readonly: locked });
+  cell('letterSpacing', String(s.letterSpacing), '60px', { type: 'number', readonly: locked });
+  cell('style', s.style, '64px', { readonly: locked });
   const tdDel = document.createElement('td');
   const del = document.createElement('button');
   del.textContent = '✕';
@@ -456,19 +466,17 @@ function textStyleRow(s: TextStyleSpec): HTMLTableRowElement {
   del.addEventListener('click', () => tr.remove());
   tdDel.appendChild(del);
   tr.appendChild(tdDel);
-  tr.dataset.letterSpacing = String(s.letterSpacing);
   return tr;
 }
 
-function renderTextStyleRows(specs: TextStyleSpec[]): void {
+function renderTextStyleRows(specs: TextStyleSpec[], locked = false): void {
   const tbody = $('tsRows');
   tbody.innerHTML = '';
-  for (const s of specs) tbody.appendChild(textStyleRow(s));
+  for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
 }
 
-/** 표 → 스펙. 폰트 패밀리는 tsFont 단일 입력을 모든 행에 적용. */
+/** 표 → 스펙. 폰트 패밀리는 행별 폰트 셀에서 읽는다(비면 tsFont 기본값). */
 function readTextStyleRows(): TextStyleSpec[] {
-  const family = tsFontFamily();
   const specs: TextStyleSpec[] = [];
   for (const tr of Array.from($('tsRows').querySelectorAll('tr'))) {
     const get = (f: string): string =>
@@ -479,8 +487,8 @@ function readTextStyleRows(): TextStyleSpec[] {
       name,
       fontSize: Number(get('fontSize')) || 0,
       lineHeight: Number(get('lineHeight')) || 0,
-      letterSpacing: Number((tr as HTMLElement).dataset.letterSpacing) || 0,
-      family,
+      letterSpacing: Number(get('letterSpacing')) || 0,
+      family: get('family').trim() || tsFontFamily(),
       style: get('style').trim() || 'Regular',
     });
   }
@@ -488,11 +496,11 @@ function readTextStyleRows(): TextStyleSpec[] {
 }
 
 $('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
-$('btnTsAddRow').addEventListener('click', () =>
+$('btnTsAddRow').addEventListener('click', () => {
   $('tsRows').appendChild(
     textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: tsFontFamily(), style: 'Regular' }),
-  ),
-);
+  );
+});
 $('btnTextStyles').addEventListener('click', () => {
   const styles = readTextStyleRows();
   if (!styles.length) {
@@ -1167,10 +1175,10 @@ window.onmessage = (event: MessageEvent) => {
     case 'TEXT_STYLE_CANDIDATES': {
       if (msg.styles.length) {
         ($('tsFont') as HTMLInputElement).value = msg.styles[0].family || tsFontFamily();
-        renderTextStyleRows(msg.styles);
+        renderTextStyleRows(msg.styles, true);
         setStatus(
           'tsStatus',
-          `${msg.styles.length}개 스타일 후보 추출. 이름·값 확인 후 등록하세요.` +
+          `${msg.styles.length}개 스타일 후보 추출. 폰트·크기·행간·자간·스타일은 잠금(스캔값), 이름(role)만 정리 후 등록하세요.` +
             (msg.warnings.length ? ' ' + msg.warnings.join(' ') : ''),
           msg.warnings.length ? 'warn' : 'ok',
         );

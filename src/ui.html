@@ -134,6 +134,13 @@
     }
     input::placeholder, textarea::placeholder { color: var(--muted); }
     input[type="number"] { width: 56px; }
+    /* 텍스트 스타일 표: 스피너 화살표 제거(폭 확보) */
+    #tsTable input[type="number"]::-webkit-inner-spin-button,
+    #tsTable input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    /* 스캔 행의 잠긴 값(폰트·크기·행간·자간·스타일): 편집 불가 → 라벨처럼 표시 */
+    #tsTable input[readonly] { background: transparent; border-color: transparent; color: var(--muted); cursor: default; }
+    #tsTable input[readonly]:hover { border-color: transparent; }
+    #tsTable input[readonly]:focus { outline: none; box-shadow: none; border-color: transparent; background: transparent; }
     input[type="color"] {
       width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
       border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
@@ -425,18 +432,20 @@
 
     <div class="step">
       <h2>텍스트 스타일 (화면 → 스타일)</h2>
-      <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Pro)</div>
+      <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height/letter-spacing)에 바인딩합니다. 스캔된 항목은 이름(role)만 정리하고 폰트·크기·행간·자간·스타일은 읽기 전용입니다. 새 값이 필요하면 ‘행 추가’로 정의하세요. (Pro)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText">선택에서 스캔</button>
         <button id="btnTsAddRow">행 추가</button>
-        <label class="inline">폰트 <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
+        <label class="inline">새 행 폰트 <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
       </div>
-      <table id="tsTable" style="width:100%; border-collapse:collapse; margin-top:6px; font-size:11px;">
+      <div style="overflow-x:auto; margin-top:6px;">
+      <table id="tsTable" style="border-collapse:collapse; font-size:11px;">
         <thead><tr style="text-align:left; color:var(--muted);">
-          <th>이름</th><th>크기</th><th>행간</th><th>스타일</th><th></th>
+          <th>이름</th><th>폰트</th><th>크기</th><th>행간</th><th>자간</th><th>스타일</th><th></th>
         </tr></thead>
         <tbody id="tsRows"></tbody>
       </table>
+      </div>
       <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 원본 텍스트에 스타일 적용</label>
       <div class="row" style="margin-top:6px;">
         <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>

@@ -63,19 +63,57 @@ export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
   return [...map.values()];
 }
 
-/** 군집 → 스펙. fontSize 내림차순으로 RAMP_NAMES 배정(동률은 빈도→자간 보조정렬). */
+/** 이름 조각 정규화(소문자·영숫자 외→'-'). 예: 'SemiBold'→'semibold', 'Noto Sans KR'→'noto-sans-kr'. */
+const slug = (s: string): string =>
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+/** 군집 → 스펙. **고유 크기**를 내림차순으로 RAMP_NAMES(초과분 text-N) 배정 →
+   같은 크기에 스타일이 여럿이면 `base/weight`로 분기(굵기도 겹치면 `base/family-weight`).
+   그 크기에 하나뿐이면 base 그대로(예: body). 끝으로 이름 유일성 보강(겹치면 -2,-3…).
+   같은 크기·굵기·패밀리라도 행간/자간이 다르면 별도 군집이므로 분리 유지(병합 금지). */
 export function nameTextStyles(clusters: StyleCluster[]): TextStyleSpec[] {
-  const sorted = [...clusters].sort(
-    (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight,
-  );
-  return sorted.map((c, i) => ({
-    name: i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`,
-    fontSize: c.fontSize,
-    lineHeight: c.lineHeight,
-    letterSpacing: c.letterSpacing,
-    family: c.family,
-    style: c.style,
-  }));
+  const sizesDesc = [...new Set(clusters.map((c) => c.fontSize))].sort((a, b) => b - a);
+  const baseBySize = new Map<number, string>();
+  sizesDesc.forEach((sz, i) => baseBySize.set(sz, i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`));
+
+  const used = new Set<string>();
+  const unique = (n: string): string => {
+    if (!used.has(n)) {
+      used.add(n);
+      return n;
+    }
+    let k = 2;
+    while (used.has(`${n}-${k}`)) k++;
+    const u = `${n}-${k}`;
+    used.add(u);
+    return u;
+  };
+
+  const specs: TextStyleSpec[] = [];
+  for (const sz of sizesDesc) {
+    const base = baseBySize.get(sz) as string;
+    const group = clusters
+      .filter((c) => c.fontSize === sz)
+      .sort((a, b) => b.count - a.count || b.lineHeight - a.lineHeight);
+    const weightUnique = new Set(group.map((c) => slug(c.style))).size === group.length;
+    for (const c of group) {
+      const name =
+        group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`;
+      specs.push({
+        name: unique(name),
+        fontSize: c.fontSize,
+        lineHeight: c.lineHeight,
+        letterSpacing: c.letterSpacing,
+        family: c.family,
+        style: c.style,
+      });
+    }
+  }
+  return specs;
 }
 
 const STYLE_BY_WEIGHT: Record<number, string> = {

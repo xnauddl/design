@@ -622,7 +622,7 @@
       }
       let letterSpacing = 0;
       const ls = t.letterSpacing;
-      if (ls !== figma.mixed && ls.unit === "PIXELS") letterSpacing = roundN(ls.value);
+      if (ls !== figma.mixed) letterSpacing = ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
       samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name });
     }
     return { samples, warnings: [...warnings] };
@@ -643,12 +643,15 @@
       pushTok({ name: numberTokenName("font-size", s.fontSize), category: "fontSize", value: s.fontSize, sources: ["fontSize"] });
       if (s.lineHeight > 0)
         pushTok({ name: numberTokenName("line-height", s.lineHeight), category: "lineHeight", value: s.lineHeight, unit: "px", sources: ["lineHeight"] });
+      if (s.letterSpacing !== 0)
+        pushTok({ name: numberTokenName("letter-spacing", s.letterSpacing), category: "letterSpacing", value: s.letterSpacing, unit: "px", sources: ["letterSpacing"] });
     }
     await createTokens(tokens, 16);
     const aliasMap = {};
     for (const s of specs) {
       aliasMap[`font-size/${s.name}`] = numberTokenName("font-size", s.fontSize);
       if (s.lineHeight > 0) aliasMap[`line-height/${s.name}`] = numberTokenName("line-height", s.lineHeight);
+      if (s.letterSpacing !== 0) aliasMap[`letter-spacing/${s.name}`] = numberTokenName("letter-spacing", s.letterSpacing);
     }
     await createSemanticAliases(aliasMap);
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
@@ -699,27 +702,46 @@
           res.bound++;
         } else res.missing.push(`line-height/${spec.name}`);
       }
+      if (spec.letterSpacing !== 0) {
+        const lsVar = semByName.get(`letter-spacing/${spec.name}`);
+        if (lsVar) {
+          style.setBoundVariable("letterSpacing", lsVar);
+          res.bound++;
+        } else res.missing.push(`letter-spacing/${spec.name}`);
+      }
       res[created ? "created" : "updated"]++;
       styleByName.set(spec.name, style);
     }
     if (apply) {
       const texts = [];
       for (const n of nodes) walkText(n, texts);
+      const loaded = /* @__PURE__ */ new Set();
+      const ensureFont = async (fn) => {
+        const k = `${fn.family} ${fn.style}`;
+        if (loaded.has(k)) return;
+        await figma.loadFontAsync(fn);
+        loaded.add(k);
+      };
+      let matched = 0;
       for (const t of texts) {
         if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
         const fontSize = roundN(t.fontSize);
-        const { family, style } = t.fontName;
-        const spec = specs.find((s) => s.fontSize === fontSize && s.family === family && s.style === style);
+        const fn = t.fontName;
+        const spec = specs.find((s) => s.fontSize === fontSize && s.family === fn.family && s.style === fn.style);
         if (!spec) continue;
         const ts = styleByName.get(spec.name);
         if (!ts) continue;
+        matched++;
         try {
-          await figma.loadFontAsync(t.fontName);
+          await ensureFont(fn);
           await t.setTextStyleIdAsync(ts.id);
           res.applied++;
         } catch (e) {
+          res.missing.push(`\uC801\uC6A9 \uC2E4\uD328 '${t.name}'(\uD3F0\uD2B8 \uB85C\uB4DC \uBD88\uAC00)`);
         }
       }
+      if (texts.length === 0) res.missing.push("\uC801\uC6A9 \uB300\uC0C1 \uC5C6\uC74C \u2014 \uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8 \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4(\uB4F1\uB85D \uD6C4 \uC120\uD0DD\uC774 \uD480\uB838\uC744 \uC218 \uC788\uC74C)");
+      else if (matched === 0) res.missing.push("\uC801\uC6A9 \uB9E4\uCE6D 0 \u2014 \uC120\uD0DD\uC774 \uC2A4\uCE94\uACFC \uB2E4\uB974\uAC70\uB098 \uD3F0\uD2B8\xB7\uD06C\uAE30\xB7\uAD75\uAE30 \uBD88\uC77C\uCE58");
     }
     return res;
   }
@@ -746,18 +768,41 @@
     }
     return [...map.values()];
   }
+  var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   function nameTextStyles(clusters) {
-    const sorted = [...clusters].sort(
-      (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight
-    );
-    return sorted.map((c, i) => ({
-      name: i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`,
-      fontSize: c.fontSize,
-      lineHeight: c.lineHeight,
-      letterSpacing: c.letterSpacing,
-      family: c.family,
-      style: c.style
-    }));
+    const sizesDesc = [...new Set(clusters.map((c) => c.fontSize))].sort((a, b) => b - a);
+    const baseBySize = /* @__PURE__ */ new Map();
+    sizesDesc.forEach((sz, i) => baseBySize.set(sz, i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`));
+    const used = /* @__PURE__ */ new Set();
+    const unique = (n) => {
+      if (!used.has(n)) {
+        used.add(n);
+        return n;
+      }
+      let k = 2;
+      while (used.has(`${n}-${k}`)) k++;
+      const u = `${n}-${k}`;
+      used.add(u);
+      return u;
+    };
+    const specs = [];
+    for (const sz of sizesDesc) {
+      const base = baseBySize.get(sz);
+      const group = clusters.filter((c) => c.fontSize === sz).sort((a, b) => b.count - a.count || b.lineHeight - a.lineHeight);
+      const weightUnique = new Set(group.map((c) => slug(c.style))).size === group.length;
+      for (const c of group) {
+        const name = group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`;
+        specs.push({
+          name: unique(name),
+          fontSize: c.fontSize,
+          lineHeight: c.lineHeight,
+          letterSpacing: c.letterSpacing,
+          family: c.family,
+          style: c.style
+        });
+      }
+    }
+    return specs;
   }
 
   // src/lib/bind.ts
@@ -1294,16 +1339,16 @@
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const col = { changes: [], nodes: [] };
-    await recurse(selection2, null, opts, col, 0, null, null);
+    await recurse(selection2, null, opts, col, 0, null, null, false);
     return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
   }
-  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId) {
+  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentIsList) {
     const total = nodes.length;
     for (let i = 0; i < total; i++) {
       const node = nodes[i];
       const before = node.name;
       const pos = { index: i, total, parentLayout, depth };
-      const decided = await decide(node, ancestorName, pos, opts);
+      const decided = await decide(node, ancestorName, pos, opts, parentIsList);
       let contextForChildren = before;
       let after;
       if (!decided.skip && decided.name) {
@@ -1316,11 +1361,12 @@
       }
       col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
       if ("children" in node && node.type !== "INSTANCE") {
-        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id);
+        const childInList = node.type === "FRAME" && isListLike(node, node.children);
+        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, childInList);
       }
     }
   }
-  async function decide(node, ancestorName, pos, opts) {
+  async function decide(node, ancestorName, pos, opts, parentIsList) {
     var _a;
     if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true };
     if (node.type === "TEXT") return { skip: true };
@@ -1329,15 +1375,17 @@
     if (pos.depth === 0 && isContainerType(node)) return { skip: true };
     if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
     const token = await primaryToken(node);
-    const role = resolveRole(node, token, pos);
+    const role = resolveRole(node, token, pos, parentIsList);
     let scope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
     if (scope === role) scope = null;
     return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
   }
-  function resolveRole(node, token, pos) {
-    if (isButtonLike(node)) return "button";
-    const region = regionRole(node, pos);
+  function resolveRole(node, token, pos, parentIsList) {
+    var _a;
+    if (isButtonLike(node)) return isChipLike(node) ? "chip" : "button";
+    const region = (_a = heroRole(node, pos)) != null ? _a : regionRole(node, pos);
     if (region) return region;
+    if (parentIsList && isContainerType(node)) return "item";
     if (token == null ? void 0 : token.roleLeaf) return token.roleLeaf;
     switch (node.type) {
       case "VECTOR":
@@ -1358,13 +1406,16 @@
       case "FRAME":
       case "GROUP":
       case "SECTION": {
-        const count = "children" in node ? node.children.length : 0;
-        if (count === 0) {
+        const kids = "children" in node ? node.children : [];
+        if (kids.length === 0) {
           if (hasImageFill(node)) return "image";
           if (hasColorFill(node)) return "swatch";
           return "container";
         }
-        return count === 1 ? "wrapper" : "container";
+        if (isFieldLike(node, kids)) return "field";
+        if (isListLike(node, kids)) return "list";
+        if (isCardLike(node, kids)) return "card";
+        return kids.length === 1 ? "wrapper" : "container";
       }
       default:
         return kebab(node.type);
@@ -1467,6 +1518,81 @@
   }
   function hasDirectText(node) {
     return "children" in node && node.children.some((c) => c.type === "TEXT");
+  }
+  function isChipLike(node) {
+    const d = dims(node);
+    if (!d || d.h > 28) return false;
+    return cornerRadiusOf(node) >= d.h / 2 - 1;
+  }
+  function hasDropShadow(node) {
+    const eff = node.effects;
+    return Array.isArray(eff) && eff.some((e) => e.visible !== false && e.type === "DROP_SHADOW");
+  }
+  function isCardLike(node, kids) {
+    if (node.type !== "FRAME") return false;
+    if (kids.length < 2) return false;
+    if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
+    return cornerRadiusOf(node) > 0 || hasDropShadow(node);
+  }
+  var LIST_ITEM_TYPES = /* @__PURE__ */ new Set(["FRAME", "GROUP", "INSTANCE", "COMPONENT", "RECTANGLE", "ELLIPSE"]);
+  function isListLike(node, kids) {
+    var _a;
+    if (node.type !== "FRAME") return false;
+    if (layoutOf(node) === null) return false;
+    if (kids.length < 3) return false;
+    const counts = /* @__PURE__ */ new Map();
+    for (const k of kids) counts.set(k.type, ((_a = counts.get(k.type)) != null ? _a : 0) + 1);
+    let domType = null;
+    let domCount = 0;
+    for (const [t, c] of counts) if (c > domCount) {
+      domCount = c;
+      domType = t;
+    }
+    if (!domType || domCount / kids.length < 0.8) return false;
+    if (!LIST_ITEM_TYPES.has(domType)) return false;
+    return dimsSimilar(kids);
+  }
+  function dimsSimilar(kids) {
+    const ws = [];
+    const hs = [];
+    for (const k of kids) {
+      const d = dims(k);
+      if (!d) return false;
+      ws.push(d.w);
+      hs.push(d.h);
+    }
+    return ratioWithin(ws, 1.5) && ratioWithin(hs, 1.5);
+  }
+  function ratioWithin(xs, max) {
+    const mn = Math.min(...xs);
+    const mx = Math.max(...xs);
+    if (mn <= 0) return false;
+    return mx / mn <= max;
+  }
+  function isFieldLike(node, kids) {
+    if (node.type !== "FRAME") return false;
+    if (layoutOf(node) !== "vertical") return false;
+    if (kids.length < 2 || kids.length > 3) return false;
+    const hasLabel = kids.some((k) => k.type === "TEXT");
+    const hasInput = kids.some(isInputBox);
+    return hasLabel && hasInput;
+  }
+  function isInputBox(node) {
+    if (node.type !== "FRAME" && node.type !== "RECTANGLE") return false;
+    if (!hasVisibleStroke(node) && !hasVisibleFill(node)) return false;
+    const d = dims(node);
+    return !!d && d.h > 0 && d.w >= d.h * 2;
+  }
+  function heroRole(node, pos) {
+    if (pos.depth !== 1 || pos.parentLayout !== "vertical") return null;
+    if (!isContainerType(node) || pos.index > 1) return null;
+    const d = dims(node);
+    if (!d || d.h < 320) return null;
+    if (!hasVisibleFill(node) && !hasImageFill(node) && !hasChildImage(node)) return null;
+    return "hero";
+  }
+  function hasChildImage(node) {
+    return "children" in node && node.children.some((c) => hasImageFill(c));
   }
 
   // src/lib/exporters.ts
