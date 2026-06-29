@@ -727,7 +727,13 @@
         if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
         const fontSize = roundN(t.fontSize);
         const fn = t.fontName;
-        const spec = specs.find((s) => s.fontSize === fontSize && s.family === fn.family && s.style === fn.style);
+        const lh = t.lineHeight;
+        const lhPx = lh === figma.mixed || lh.unit === "AUTO" ? 0 : lh.unit === "PERCENT" ? roundN(fontSize * lh.value / 100) : roundN(lh.value);
+        const ls = t.letterSpacing;
+        const lsPx = ls === figma.mixed ? 0 : ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
+        const spec = specs.find(
+          (s) => s.fontSize === fontSize && s.family === fn.family && s.style === fn.style && s.lineHeight === lhPx && s.letterSpacing === lsPx
+        );
         if (!spec) continue;
         const ts = styleByName.get(spec.name);
         if (!ts) continue;
@@ -741,7 +747,7 @@
         }
       }
       if (texts.length === 0) res.missing.push("\uC801\uC6A9 \uB300\uC0C1 \uC5C6\uC74C \u2014 \uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8 \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4(\uB4F1\uB85D \uD6C4 \uC120\uD0DD\uC774 \uD480\uB838\uC744 \uC218 \uC788\uC74C)");
-      else if (matched === 0) res.missing.push("\uC801\uC6A9 \uB9E4\uCE6D 0 \u2014 \uC120\uD0DD\uC774 \uC2A4\uCE94\uACFC \uB2E4\uB974\uAC70\uB098 \uD3F0\uD2B8\xB7\uD06C\uAE30\xB7\uAD75\uAE30 \uBD88\uC77C\uCE58");
+      else if (matched === 0) res.missing.push("\uC801\uC6A9 \uB9E4\uCE6D 0 \u2014 \uC120\uD0DD\uC774 \uC2A4\uCE94\uACFC \uB2E4\uB974\uAC70\uB098 \uD3F0\uD2B8\xB7\uD06C\uAE30\xB7\uAD75\uAE30\xB7\uD589\uAC04\xB7\uC790\uAC04 \uBD88\uC77C\uCE58");
     }
     return res;
   }

@@ -427,10 +427,8 @@ $('btnSemantics').addEventListener('click', () => {
 });
 
 /* ---------- 2.6 · 텍스트 스타일 (Phase C) ---------- */
-/** #tsFont는 '새 행 기본 폰트' 씨앗 — 실제 폰트는 행별 폰트 셀에서 보존(스캔 행은 읽기 전용). */
-function tsFontFamily(): string {
-  return ($('tsFont') as HTMLInputElement).value.trim() || 'Inter';
-}
+/** 폰트는 행별 폰트 셀로 보존(스캔 행 읽기 전용). 수동 행/폴백의 기본 패밀리만 상수로 둔다. */
+const DEFAULT_TS_FAMILY = 'Inter';
 
 /** 표 1행 생성(스펙 → 입력 행). 폰트는 행별 셀로 보존(패밀리가 행마다 다를 수 있음).
    locked=true(스캔 행): 폰트·크기·행간·자간·스타일은 읽기 전용(이미 디자인된 사실) — 이름(role)만 편집. */
@@ -475,7 +473,7 @@ function renderTextStyleRows(specs: TextStyleSpec[], locked = false): void {
   for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
 }
 
-/** 표 → 스펙. 폰트 패밀리는 행별 폰트 셀에서 읽는다(비면 tsFont 기본값). */
+/** 표 → 스펙. 폰트 패밀리는 행별 폰트 셀에서 읽는다(비면 DEFAULT_TS_FAMILY). */
 function readTextStyleRows(): TextStyleSpec[] {
   const specs: TextStyleSpec[] = [];
   for (const tr of Array.from($('tsRows').querySelectorAll('tr'))) {
@@ -488,7 +486,7 @@ function readTextStyleRows(): TextStyleSpec[] {
       fontSize: Number(get('fontSize')) || 0,
       lineHeight: Number(get('lineHeight')) || 0,
       letterSpacing: Number(get('letterSpacing')) || 0,
-      family: get('family').trim() || tsFontFamily(),
+      family: get('family').trim() || DEFAULT_TS_FAMILY,
       style: get('style').trim() || 'Regular',
     });
   }
@@ -498,7 +496,7 @@ function readTextStyleRows(): TextStyleSpec[] {
 $('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
 $('btnTsAddRow').addEventListener('click', () => {
   $('tsRows').appendChild(
-    textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: tsFontFamily(), style: 'Regular' }),
+    textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' }),
   );
 });
 $('btnTextStyles').addEventListener('click', () => {
@@ -1174,7 +1172,6 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'TEXT_STYLE_CANDIDATES': {
       if (msg.styles.length) {
-        ($('tsFont') as HTMLInputElement).value = msg.styles[0].family || tsFontFamily();
         renderTextStyleRows(msg.styles, true);
         setStatus(
           'tsStatus',
@@ -1183,7 +1180,7 @@ window.onmessage = (event: MessageEvent) => {
           msg.warnings.length ? 'warn' : 'ok',
         );
       } else {
-        renderTextStyleRows(rampToSpecs(tsFontFamily()));
+        renderTextStyleRows(rampToSpecs(DEFAULT_TS_FAMILY));
         setStatus('tsStatus', '선택에서 텍스트를 못 찾아 기본 램프로 채웠습니다. 폰트·값을 조정하세요.', 'warn');
       }
       break;

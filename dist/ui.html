@@ -436,7 +436,6 @@
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText">선택에서 스캔</button>
         <button id="btnTsAddRow">행 추가</button>
-        <label class="inline">새 행 폰트 <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
       </div>
       <div style="overflow-x:auto; margin-top:6px;">
       <table id="tsTable" style="border-collapse:collapse; font-size:11px;">
@@ -1715,9 +1714,7 @@
     }
     send({ type: "CREATE_SEMANTICS", map });
   });
-  function tsFontFamily() {
-    return $("tsFont").value.trim() || "Inter";
-  }
+  var DEFAULT_TS_FAMILY = "Inter";
   function textStyleRow(s, locked = false) {
     const tr = document.createElement("tr");
     const cell = (field, value, width, opts = {}) => {
@@ -1771,7 +1768,7 @@
         fontSize: Number(get("fontSize")) || 0,
         lineHeight: Number(get("lineHeight")) || 0,
         letterSpacing: Number(get("letterSpacing")) || 0,
-        family: get("family").trim() || tsFontFamily(),
+        family: get("family").trim() || DEFAULT_TS_FAMILY,
         style: get("style").trim() || "Regular"
       });
     }
@@ -1780,7 +1777,7 @@
   $("btnScanText").addEventListener("click", () => send({ type: "SCAN_TEXT_STYLES" }));
   $("btnTsAddRow").addEventListener("click", () => {
     $("tsRows").appendChild(
-      textStyleRow({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: tsFontFamily(), style: "Regular" })
+      textStyleRow({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: "Regular" })
     );
   });
   $("btnTextStyles").addEventListener("click", () => {
@@ -2359,7 +2356,6 @@
         break;
       case "TEXT_STYLE_CANDIDATES": {
         if (msg.styles.length) {
-          $("tsFont").value = msg.styles[0].family || tsFontFamily();
           renderTextStyleRows(msg.styles, true);
           setStatus(
             "tsStatus",
@@ -2367,7 +2363,7 @@
             msg.warnings.length ? "warn" : "ok"
           );
         } else {
-          renderTextStyleRows(rampToSpecs(tsFontFamily()));
+          renderTextStyleRows(rampToSpecs(DEFAULT_TS_FAMILY));
           setStatus("tsStatus", "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC2B5\uB2C8\uB2E4. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694.", "warn");
         }
         break;
