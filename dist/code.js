@@ -222,9 +222,12 @@
   }
   function collectSize(acc, node) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
-    for (const v of [round(node.width), round(node.height)]) {
-      if (v > 0) add(acc, { name: numberTokenName("size", v), category: "size", value: v }, "size");
-    }
+    const addSize = (v) => {
+      const rv = round(v);
+      if (rv > 0) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size");
+    };
+    if (node.layoutSizingHorizontal === "FIXED") addSize(node.width);
+    if (node.layoutSizingVertical === "FIXED") addSize(node.height);
   }
   function collectRadius(acc, node) {
     if (!("cornerRadius" in node)) return;
