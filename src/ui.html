@@ -134,6 +134,20 @@
     }
     input::placeholder, textarea::placeholder { color: var(--muted); }
     input[type="number"] { width: 56px; }
+    /* 텍스트 스타일 표: 스피너 화살표 제거(폭 확보) */
+    #tsTable input[type="number"]::-webkit-inner-spin-button,
+    #tsTable input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    /* 표 전체가 패널 폭 안에 들어오도록 셀·입력 패딩 축소(가로 스크롤·삭제 버튼 숨김 방지) */
+    #tsTable th, #tsTable td { padding: 0 1px; }
+    #tsTable input { padding: 4px 5px; }
+    #tsTable td:last-child button { padding: 2px 5px; }
+    /* 스캔 행의 잠긴 값(폰트·크기·행간·자간·스타일): 편집 불가 → 라벨처럼 표시 */
+    #tsTable input[readonly] { background: transparent; border-color: transparent; color: var(--muted); cursor: default; }
+    #tsTable input[readonly]:hover { border-color: transparent; }
+    #tsTable input[readonly]:focus { outline: none; box-shadow: none; border-color: transparent; background: transparent; }
+    /* 이름 칸 좌측 액센트로 행 구분: 파랑=이미 등록된 스타일(rename 대상), 앰버=새로 만들어질 스타일 */
+    #tsTable input.ts-bound { border-left: 2px solid var(--accent); padding-left: 5px; }
+    #tsTable input.ts-new { border-left: 2px solid var(--warn); padding-left: 5px; }
     input[type="color"] {
       width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
       border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
@@ -425,22 +439,35 @@
 
     <div class="step">
       <h2>텍스트 스타일 (화면 → 스타일)</h2>
-      <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Pro)</div>
+      <div class="hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 새 스타일은 ‘행 추가’로. (Pro)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText">선택에서 스캔</button>
         <button id="btnTsAddRow">행 추가</button>
-        <label class="inline">폰트 <input id="tsFont" type="text" placeholder="Inter" style="width:120px;" /></label>
       </div>
-      <table id="tsTable" style="width:100%; border-collapse:collapse; margin-top:6px; font-size:11px;">
+      <div style="overflow-x:auto; margin-top:6px;">
+      <table id="tsTable" style="table-layout:fixed; width:100%; border-collapse:collapse; font-size:11px;">
+        <colgroup>
+          <col style="width:64px;" /><!-- 이름 -->
+          <col /><!-- 폰트(가변: 남는 폭 흡수) -->
+          <col style="width:38px;" /><!-- 크기 -->
+          <col style="width:38px;" /><!-- 행간 -->
+          <col style="width:44px;" /><!-- 자간 -->
+          <col style="width:52px;" /><!-- 스타일 -->
+          <col style="width:28px;" /><!-- 삭제 -->
+        </colgroup>
         <thead><tr style="text-align:left; color:var(--muted);">
-          <th>이름</th><th>크기</th><th>행간</th><th>스타일</th><th></th>
+          <th>이름</th><th>폰트</th><th>크기</th><th>행간</th><th>자간</th><th>스타일</th><th></th>
         </tr></thead>
         <tbody id="tsRows"></tbody>
       </table>
-      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 원본 텍스트에 스타일 적용</label>
-      <div class="row" style="margin-top:6px;">
-        <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
       </div>
+      <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
+      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 등록할 때 화면의 글자에도 적용</label>
+      <div class="row" style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border);">
+        <button id="btnApplyExistingText" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 적용만</button>
+        <span class="muted" style="align-self:center;">이미 만든 스타일에 연결만</span>
+      </div>
+      <div class="prereq" id="tsApplyPrereq" style="display:none; margin-top:4px;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
     </div>
   </section>
@@ -557,7 +584,8 @@
       </div>
       <div class="muted" id="licenseInfo"></div>
       <div class="muted" id="limitsInfo"></div>
-      <div class="row">
+      <!-- 개발용 강제 티어: 사용자 화면 비노출(개발 시 display 해제). #tier id는 ui.ts가 참조하므로 DOM 유지. -->
+      <div class="row" id="devTierRow" style="display:none;">
         <label class="inline">개발용 강제 티어
           <select id="tier">
             <option value="free">Free</option>

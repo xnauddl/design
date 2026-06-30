@@ -138,6 +138,8 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
     paddingRight: 8,
     paddingTop: 0,
     paddingBottom: 0,
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
     width: 200,
     height: 100,
     cornerRadius: 8,
@@ -175,6 +177,53 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
   // 레이어 불투명도(<1)
   assert.equal(byName.get('opacity/0_5')?.category, 'opacity');
   assert.deepEqual(byName.get('opacity/0_5')?.sources, ['opacity']);
+});
+
+test('extractFromSelection — HUG/FILL 축의 크기는 토큰화하지 않음(Fixed만)', () => {
+  installFigma();
+  // 가로 FILL(부모 채움), 세로 HUG(콘텐츠 맞춤) — 둘 다 동적 크기라 size 토큰 제외.
+  const fillHug = {
+    type: 'FRAME',
+    id: 'f-fh',
+    name: 'FillHug',
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FILL',
+    layoutSizingVertical: 'HUG',
+    width: 320,
+    height: 44,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [],
+  };
+  // 가로만 Fixed → 그 축의 크기(width)만 토큰화.
+  const fixedW = {
+    type: 'FRAME',
+    id: 'f-fw',
+    name: 'FixedW',
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: 280,
+    height: 99,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [],
+  };
+
+  const { tokens } = extractFromSelection([fillHug, fixedW]);
+  const names = new Set(tokens.map((t) => t.name));
+  // FILL/HUG 축의 값은 모두 제외
+  assert.equal(names.has('size/320'), false); // 가로 FILL
+  assert.equal(names.has('size/44'), false); // 세로 HUG
+  assert.equal(names.has('size/99'), false); // 세로 HUG
+  // Fixed 축만 수집
+  assert.equal(names.has('size/280'), true); // 가로 FIXED
 });
 
 test('extractFromSelection — 그라디언트 채움은 경고', () => {

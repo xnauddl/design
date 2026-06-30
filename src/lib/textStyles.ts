@@ -13,6 +13,8 @@ export interface TextSample {
   family: string;
   style: string; // 'Regular','Bold' 등 Figma fontName.style
   layerName: string;
+  /** 노드에 이미 바인딩된 로컬 텍스트 스타일 id('' = 없음/혼합). 재스캔 rename 앵커. */
+  styleId: string;
 }
 
 /** 동일 시그니처를 묶은 후보(빈도 포함). */
@@ -24,10 +26,25 @@ export interface StyleCluster {
   style: string;
   count: number; // 같은 시그니처 노드 수
   sample: string; // 대표 레이어 이름(명명 힌트)
+  /** 이 군집 노드들이 바인딩된 로컬 스타일 id(중복 제거, '' 제외). 정확히 1개면 rename 앵커. */
+  styleIds: string[];
 }
 
 /** 등록할 텍스트 스타일 1개. name = 바인딩할 시맨틱 역할(font-size/{name}). */
 export interface TextStyleSpec {
+  name: string;
+  fontSize: number;
+  lineHeight: number;
+  letterSpacing: number;
+  family: string;
+  style: string;
+  /** 재스캔 시 이미 바인딩된 기존 스타일 id. 있으면 등록=이 스타일 rename(신규 생성 아님). */
+  boundStyleId?: string;
+}
+
+/** 이미 존재하는 로컬 텍스트 스타일(시그니처 매칭용). px 환산된 행간·자간. */
+export interface ExistingTextStyle {
+  id: string;
   name: string;
   fontSize: number;
   lineHeight: number;
@@ -42,14 +59,15 @@ export const RAMP_NAMES = ['display', 'h1', 'h2', 'h3', 'title', 'body', 'captio
 const sigKey = (s: { fontSize: number; lineHeight: number; letterSpacing: number; family: string; style: string }) =>
   `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
 
-/** 텍스트 샘플 → 동일 시그니처 군집(빈도순 누적). */
+/** 텍스트 샘플 → 동일 시그니처 군집(빈도순 누적). 바인딩된 스타일 id도 군집별로 모은다. */
 export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
   const map = new Map<string, StyleCluster>();
+  const ids = new Map<string, Set<string>>(); // sigKey → 바인딩된 styleId 집합('' 제외)
   for (const s of samples) {
     const k = sigKey(s);
     const ex = map.get(k);
     if (ex) ex.count++;
-    else
+    else {
       map.set(k, {
         fontSize: s.fontSize,
         lineHeight: s.lineHeight,
@@ -58,24 +76,97 @@ export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
         style: s.style,
         count: 1,
         sample: s.layerName,
+        styleIds: [],
       });
+      ids.set(k, new Set());
+    }
+    if (s.styleId) (ids.get(k) as Set<string>).add(s.styleId);
   }
+  for (const [k, c] of map) c.styleIds = [...(ids.get(k) as Set<string>)];
   return [...map.values()];
 }
 
-/** 군집 → 스펙. fontSize 내림차순으로 RAMP_NAMES 배정(동률은 빈도→자간 보조정렬). */
-export function nameTextStyles(clusters: StyleCluster[]): TextStyleSpec[] {
-  const sorted = [...clusters].sort(
-    (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight,
-  );
-  return sorted.map((c, i) => ({
-    name: i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`,
-    fontSize: c.fontSize,
-    lineHeight: c.lineHeight,
-    letterSpacing: c.letterSpacing,
-    family: c.family,
-    style: c.style,
-  }));
+/** 이름 조각 정규화(소문자·영숫자 외→'-'). 예: 'SemiBold'→'semibold', 'Noto Sans KR'→'noto-sans-kr'. */
+const slug = (s: string): string =>
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+/** 군집 → 스펙. **고유 크기**를 내림차순으로 RAMP_NAMES(초과분 text-N) 배정 →
+   같은 크기에 스타일이 여럿이면 `base/weight`로 분기(굵기도 겹치면 `base/family-weight`).
+   그 크기에 하나뿐이면 base 그대로(예: body). 끝으로 이름 유일성 보강(겹치면 -2,-3…).
+   같은 크기·굵기·패밀리라도 행간/자간이 다르면 별도 군집이므로 분리 유지(병합 금지).
+
+   existing(이미 존재하는 로컬 텍스트 스타일들)을 주면, 군집을 기존 스타일에 **앵커**한다:
+   (1) 노드가 그 스타일에 실제 바인딩됨(styleIds) 또는 (2) **시그니처가 같은 기존 스타일이 정확히 1개**.
+   앵커되면 자동 이름 대신 **기존 이름을 유지**하고 spec.boundStyleId를 채운다 — 재스캔/타프레임에서
+   같은 타이포가 또 잡혀도 중복 생성 없이 그 스타일로 인식되고, 이름을 바꾸면 rename된다. */
+export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingTextStyle[]): TextStyleSpec[] {
+  // 기존 스타일 인덱스: id→이름, 시그니처→id(중복 시그니처는 모호 → 제외).
+  const nameById = new Map<string, string>();
+  const idBySig = new Map<string, string | null>(); // null = 같은 시그니처 2개 이상(모호)
+  for (const e of existing ?? []) {
+    nameById.set(e.id, e.name);
+    const k = sigKey(e);
+    idBySig.set(k, idBySig.has(k) ? null : e.id);
+  }
+  // 군집 → 앵커할 기존 스타일 id(노드 바인딩 우선, 없으면 시그니처 매칭). 그 id가 로컬에 존재할 때만.
+  const boundIdOf = (c: StyleCluster): string | undefined => {
+    if (!existing) return undefined;
+    if (c.styleIds.length === 1 && nameById.has(c.styleIds[0])) return c.styleIds[0];
+    const sigId = idBySig.get(sigKey(c));
+    return sigId && nameById.has(sigId) ? sigId : undefined;
+  };
+
+  const sizesDesc = [...new Set(clusters.map((c) => c.fontSize))].sort((a, b) => b - a);
+  const baseBySize = new Map<number, string>();
+  sizesDesc.forEach((sz, i) => baseBySize.set(sz, i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`));
+
+  const used = new Set<string>();
+  const unique = (n: string): string => {
+    if (!used.has(n)) {
+      used.add(n);
+      return n;
+    }
+    let k = 2;
+    while (used.has(`${n}-${k}`)) k++;
+    const u = `${n}-${k}`;
+    used.add(u);
+    return u;
+  };
+
+  // 앵커 군집의 기존 이름을 먼저 예약 — 자동 이름이 이를 침범하지 않도록.
+  for (const c of clusters) {
+    const id = boundIdOf(c);
+    if (id) used.add(nameById.get(id) as string);
+  }
+
+  const specs: TextStyleSpec[] = [];
+  for (const sz of sizesDesc) {
+    const base = baseBySize.get(sz) as string;
+    const group = clusters
+      .filter((c) => c.fontSize === sz)
+      .sort((a, b) => b.count - a.count || b.lineHeight - a.lineHeight);
+    const weightUnique = new Set(group.map((c) => slug(c.style))).size === group.length;
+    for (const c of group) {
+      const boundId = boundIdOf(c);
+      const name = boundId
+        ? (nameById.get(boundId) as string) // 기존 이름 유지(예약됨 → unique 불필요)
+        : unique(group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`);
+      specs.push({
+        name,
+        fontSize: c.fontSize,
+        lineHeight: c.lineHeight,
+        letterSpacing: c.letterSpacing,
+        family: c.family,
+        style: c.style,
+        ...(boundId ? { boundStyleId: boundId } : {}),
+      });
+    }
+  }
+  return specs;
 }
 
 const STYLE_BY_WEIGHT: Record<number, string> = {
