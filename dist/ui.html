@@ -450,6 +450,7 @@
       <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 원본 텍스트에 스타일 적용</label>
       <div class="row" style="margin-top:6px;">
         <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
+        <button id="btnApplyExistingText" title="선택 텍스트를 시그니처가 같은 기존 스타일에 바인딩합니다. 새 스타일·변수는 만들지 않습니다.">기존 스타일 적용만</button>
       </div>
       <div class="status" id="tsStatus"></div>
     </div>
@@ -1799,6 +1800,10 @@
     }
     send({ type: "CREATE_TEXT_STYLES", styles, apply: $("tsApply").checked });
   });
+  $("btnApplyExistingText").addEventListener("click", () => {
+    setStatus("tsStatus", "\uC120\uD0DD \uD14D\uC2A4\uD2B8\uB97C \uAE30\uC874 \uC2A4\uD0C0\uC77C\uC5D0 \uC801\uC6A9 \uC911\u2026", "ok");
+    send({ type: "APPLY_TEXT_STYLES" });
+  });
   $("btnApply").addEventListener("click", () => {
     const tolerance = Number($("tol").value) || 0;
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
@@ -2385,6 +2390,13 @@
           "tsStatus",
           `\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C ${msg.created + msg.updated}\uAC1C (\uC0DD\uC131 ${msg.created} / \uAC31\uC2E0 ${msg.updated}) \xB7 \uBC14\uC778\uB529 ${msg.bound}` + (msg.applied ? ` \xB7 \uC801\uC6A9 ${msg.applied}` : "") + (msg.missing.length ? ` \xB7 \uBBF8\uC5F0\uACB0: ${msg.missing.join(", ")}` : ""),
           msg.missing.length ? "warn" : "ok"
+        );
+        break;
+      case "TEXT_STYLES_APPLIED":
+        setStatus(
+          "tsStatus",
+          `\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC801\uC6A9 ${msg.applied}\uAC74` + (msg.missing.length ? ` \xB7 ${msg.missing.join(" \xB7 ")}` : ""),
+          msg.applied === 0 || msg.missing.length ? "warn" : "ok"
         );
         break;
       case "COLLECTIONS":

@@ -518,6 +518,11 @@ $('btnTextStyles').addEventListener('click', () => {
   }
   send({ type: 'CREATE_TEXT_STYLES', styles, apply: ($('tsApply') as HTMLInputElement).checked });
 });
+$('btnApplyExistingText').addEventListener('click', () => {
+  // 적용만: 표/스캔과 무관하게 현재 선택의 텍스트를 기존 스타일에 바인딩(생성 없음).
+  setStatus('tsStatus', '선택 텍스트를 기존 스타일에 적용 중…', 'ok');
+  send({ type: 'APPLY_TEXT_STYLES' });
+});
 
 $('btnApply').addEventListener('click', () => {
   const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
@@ -1205,6 +1210,13 @@ window.onmessage = (event: MessageEvent) => {
           (msg.applied ? ` · 적용 ${msg.applied}` : '') +
           (msg.missing.length ? ` · 미연결: ${msg.missing.join(', ')}` : ''),
         msg.missing.length ? 'warn' : 'ok',
+      );
+      break;
+    case 'TEXT_STYLES_APPLIED':
+      setStatus(
+        'tsStatus',
+        `기존 스타일 적용 ${msg.applied}건` + (msg.missing.length ? ` · ${msg.missing.join(' · ')}` : ''),
+        msg.applied === 0 || msg.missing.length ? 'warn' : 'ok',
       );
       break;
     case 'COLLECTIONS':

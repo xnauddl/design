@@ -1127,16 +1127,39 @@ test('nameTextStyles — 이미 바인딩된 군집은 기존 이름 유지 + bo
     { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h', styleId: 'S:1' },
     { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b', styleId: '' },
   ]);
-  const specs = nameTextStyles(clusters, new Map([['S:1', '제목-강조']]));
+  const existing = [{ id: 'S:1', name: '제목-강조', fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold' }];
+  const specs = nameTextStyles(clusters, existing);
   const s32 = specs.find((s) => s.fontSize === 32);
   const s16 = specs.find((s) => s.fontSize === 16);
   assert.equal(s32.name, '제목-강조'); // 자동 이름(display) 대신 기존 이름 유지
   assert.equal(s32.boundStyleId, 'S:1'); // rename 앵커 부여
-  assert.equal(s16.boundStyleId, undefined); // 미바인딩은 앵커 없음
+  assert.equal(s16.boundStyleId, undefined); // 미바인딩·미존재는 앵커 없음
   assert.ok(s16.name.length > 0); // 미바인딩은 자동 이름
 
-  // existingNameById 미전달(기존 호출부) → 종전과 동일: 전부 자동 이름·앵커 없음
+  // existing 미전달(기존 호출부) → 종전과 동일: 전부 자동 이름·앵커 없음
   assert.ok(nameTextStyles(clusters).every((s) => s.boundStyleId === undefined));
+});
+
+test('nameTextStyles — 바인딩 안 됐어도 시그니처가 같은 기존 스타일이 있으면 앵커(타프레임 중복 방지)', () => {
+  // 다른 프레임의 생 텍스트: styleId 없음(''). 하지만 시그니처가 기존 'body'와 동일 → 그 스타일로 인식.
+  const clusters = clusterTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'p', styleId: '' },
+  ]);
+  const existing = [{ id: 'S:body', name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }];
+  const specs = nameTextStyles(clusters, existing);
+  assert.equal(specs[0].name, 'body'); // 자동 이름 아니라 기존 이름
+  assert.equal(specs[0].boundStyleId, 'S:body'); // 시그니처 매칭으로 앵커 → 등록 시 중복 생성 X
+});
+
+test('nameTextStyles — 같은 시그니처 기존 스타일이 2개면 모호 → 시그니처 앵커 안 함', () => {
+  const clusters = clusterTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'p', styleId: '' },
+  ]);
+  const existing = [
+    { id: 'S:a', name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+    { id: 'S:b', name: 'label', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+  ];
+  assert.equal(nameTextStyles(clusters, existing)[0].boundStyleId, undefined); // 모호 → 앵커 보류, 자동 이름
 });
 
 test('nameTextStyles — 한 군집이 여러 스타일에 걸치면 모호 → 앵커 안 함', () => {
@@ -1146,8 +1169,12 @@ test('nameTextStyles — 한 군집이 여러 스타일에 걸치면 모호 → 
   ]);
   assert.equal(clusters.length, 1);
   assert.equal(clusters[0].styleIds.length, 2);
-  const specs = nameTextStyles(clusters, new Map([['S:1', 'x'], ['S:2', 'y']]));
-  assert.equal(specs[0].boundStyleId, undefined); // 단일 스타일이 아니므로 rename 앵커 부여 안 함
+  // 노드 바인딩이 2개라 모호하고, 시그니처도 두 스타일이 같아 모호 → 앵커 안 함.
+  const existing = [
+    { id: 'S:1', name: 'x', fontSize: 20, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+    { id: 'S:2', name: 'y', fontSize: 20, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+  ];
+  assert.equal(nameTextStyles(clusters, existing)[0].boundStyleId, undefined);
 });
 
 test('fontStyleForWeight — 굵기/italic → Figma style', () => {

@@ -4,7 +4,7 @@
 import type { UiToCode, RenameChange } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, createSemanticTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
+import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
@@ -621,9 +621,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
         const { samples, warnings } = scanTextStyles(selection());
-        // 이미 등록된(바인딩된) 스타일은 현재 이름을 유지하도록 id→name 맵 전달 → 재스캔 후 rename 가능.
-        const nameById = new Map((await figma.getLocalTextStylesAsync()).map((s) => [s.id, s.name]));
-        const styles = nameTextStyles(clusterTextStyles(samples), nameById);
+        // 기존 로컬 스타일 목록 전달 → 노드 바인딩/시그니처가 같은 후보는 '이미 등록'으로 인식(이름 유지).
+        const styles = nameTextStyles(clusterTextStyles(samples), await scanExistingTextStyles());
         post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
         break;
       }
@@ -632,6 +631,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
         post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
         commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로
+        break;
+      }
+      case 'APPLY_TEXT_STYLES': {
+        // 적용만(생성 없음): 선택 텍스트를 시그니처가 같은 기존 스타일에 바인딩.
+        if (!requireTextStyles()) break;
+        const r = await applyExistingTextStyles(selection());
+        post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, missing: r.missing });
+        commitUndo(figma);
         break;
       }
       case 'GET_COLLECTIONS': {
