@@ -141,6 +141,8 @@
     #tsTable input[readonly] { background: transparent; border-color: transparent; color: var(--muted); cursor: default; }
     #tsTable input[readonly]:hover { border-color: transparent; }
     #tsTable input[readonly]:focus { outline: none; box-shadow: none; border-color: transparent; background: transparent; }
+    /* 이미 등록(바인딩)된 스타일의 이름 칸: 좌측 액센트로 '재스캔에서 잡힌 기존 스타일'임을 표시(rename 대상) */
+    #tsTable input.ts-bound { border-left: 2px solid var(--accent); padding-left: 5px; }
     input[type="color"] {
       width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
       border-radius: var(--r-sm); background: var(--surface); cursor: pointer;

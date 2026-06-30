@@ -623,14 +623,43 @@
       let letterSpacing = 0;
       const ls = t.letterSpacing;
       if (ls !== figma.mixed) letterSpacing = ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
-      samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name });
+      const sid = t.textStyleId;
+      const styleId = sid === figma.mixed ? "" : sid;
+      samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name, styleId });
     }
     return { samples, warnings: [...warnings] };
   }
   async function createSemanticTextStyles(specs, apply, nodes) {
-    var _a;
+    var _a, _b;
     const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [] };
     if (!specs.length) return res;
+    const existing = await figma.getLocalTextStylesAsync();
+    const styleById = new Map(existing.map((s) => [s.id, s]));
+    const styleByName = new Map(existing.map((s) => [s.name, s]));
+    const roleRenames = [];
+    for (const spec of specs) {
+      if (!spec.boundStyleId) continue;
+      const st = styleById.get(spec.boundStyleId);
+      if (st && st.name !== spec.name) roleRenames.push({ from: st.name, to: spec.name });
+    }
+    if (roleRenames.length) {
+      const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
+      const semId0 = (_a = cols0.find((c) => c.name === SEMANTIC)) == null ? void 0 : _a.id;
+      if (semId0) {
+        const byName = /* @__PURE__ */ new Map();
+        for (const v of await figma.variables.getLocalVariablesAsync())
+          if (v.variableCollectionId === semId0) byName.set(v.name, v);
+        for (const { from, to } of roleRenames)
+          for (const cat of ["font-size", "line-height", "letter-spacing"]) {
+            const v = byName.get(`${cat}/${from}`);
+            if (v && !byName.has(`${cat}/${to}`)) {
+              v.name = `${cat}/${to}`;
+              byName.set(`${cat}/${to}`, v);
+              byName.delete(`${cat}/${from}`);
+            }
+          }
+      }
+    }
     const tokens = [];
     const seen = /* @__PURE__ */ new Set();
     const pushTok = (t) => {
@@ -655,19 +684,19 @@
     }
     await createSemanticAliases(aliasMap);
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_a = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _a.id;
+    const semId = (_b = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _b.id;
     const semByName = /* @__PURE__ */ new Map();
     if (semId) {
       for (const v of await figma.variables.getLocalVariablesAsync())
         if (v.variableCollectionId === semId) semByName.set(v.name, v);
     }
-    const existing = await figma.getLocalTextStylesAsync();
-    const styleByName = new Map(existing.map((s) => [s.name, s]));
     for (const spec of specs) {
-      let style = styleByName.get(spec.name);
+      let style = spec.boundStyleId ? styleById.get(spec.boundStyleId) : void 0;
+      if (!style) style = styleByName.get(spec.name);
       const created = !style;
-      if (!style) {
-        style = figma.createTextStyle();
+      if (!style) style = figma.createTextStyle();
+      if (style.name !== spec.name) {
+        styleByName.delete(style.name);
         style.name = spec.name;
       }
       const wanted = { family: spec.family, style: spec.style };
@@ -757,11 +786,12 @@
   var sigKey = (s) => `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
   function clusterTextStyles(samples) {
     const map = /* @__PURE__ */ new Map();
+    const ids = /* @__PURE__ */ new Map();
     for (const s of samples) {
       const k = sigKey(s);
       const ex = map.get(k);
       if (ex) ex.count++;
-      else
+      else {
         map.set(k, {
           fontSize: s.fontSize,
           lineHeight: s.lineHeight,
@@ -769,13 +799,23 @@
           family: s.family,
           style: s.style,
           count: 1,
-          sample: s.layerName
+          sample: s.layerName,
+          styleIds: []
         });
+        ids.set(k, /* @__PURE__ */ new Set());
+      }
+      if (s.styleId) ids.get(k).add(s.styleId);
     }
+    for (const [k, c] of map) c.styleIds = [...ids.get(k)];
     return [...map.values()];
   }
   var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  function nameTextStyles(clusters) {
+  function nameTextStyles(clusters, existingNameById) {
+    const boundIdOf = (c) => {
+      if (!existingNameById || c.styleIds.length !== 1) return void 0;
+      const id = c.styleIds[0];
+      return existingNameById.has(id) ? id : void 0;
+    };
     const sizesDesc = [...new Set(clusters.map((c) => c.fontSize))].sort((a, b) => b - a);
     const baseBySize = /* @__PURE__ */ new Map();
     sizesDesc.forEach((sz, i) => baseBySize.set(sz, i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`));
@@ -791,21 +831,26 @@
       used.add(u);
       return u;
     };
+    for (const c of clusters) {
+      const id = boundIdOf(c);
+      if (id) used.add(existingNameById.get(id));
+    }
     const specs = [];
     for (const sz of sizesDesc) {
       const base = baseBySize.get(sz);
       const group = clusters.filter((c) => c.fontSize === sz).sort((a, b) => b.count - a.count || b.lineHeight - a.lineHeight);
       const weightUnique = new Set(group.map((c) => slug(c.style))).size === group.length;
       for (const c of group) {
-        const name = group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`;
-        specs.push({
-          name: unique(name),
+        const boundId = boundIdOf(c);
+        const name = boundId ? existingNameById.get(boundId) : unique(group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`);
+        specs.push(__spreadValues({
+          name,
           fontSize: c.fontSize,
           lineHeight: c.lineHeight,
           letterSpacing: c.letterSpacing,
           family: c.family,
           style: c.style
-        });
+        }, boundId ? { boundStyleId: boundId } : {}));
       }
     }
     return specs;
@@ -2660,7 +2705,8 @@
         }
         case "SCAN_TEXT_STYLES": {
           const { samples, warnings } = scanTextStyles(selection());
-          const styles = nameTextStyles(clusterTextStyles(samples));
+          const nameById = new Map((await figma.getLocalTextStylesAsync()).map((s) => [s.id, s.name]));
+          const styles = nameTextStyles(clusterTextStyles(samples), nameById);
           post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
           break;
         }

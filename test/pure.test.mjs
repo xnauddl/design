@@ -1111,6 +1111,45 @@ test('nameTextStyles — 같은 크기 다중 스타일은 base/weight로 분기
   assert.equal(new Set(byLh).size, 2);
 });
 
+test('clusterTextStyles — 바인딩된 styleId를 군집별로 수집(중복 제거)', () => {
+  const samples = [
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h', styleId: 'S:1' },
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h2', styleId: 'S:1' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b', styleId: '' },
+  ];
+  const cl = clusterTextStyles(samples);
+  assert.deepEqual(cl.find((c) => c.fontSize === 32).styleIds, ['S:1']); // 같은 스타일 → 1개로
+  assert.deepEqual(cl.find((c) => c.fontSize === 16).styleIds, []); // 미바인딩(빈 id) → 없음
+});
+
+test('nameTextStyles — 이미 바인딩된 군집은 기존 이름 유지 + boundStyleId(재스캔 rename)', () => {
+  const clusters = clusterTextStyles([
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h', styleId: 'S:1' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b', styleId: '' },
+  ]);
+  const specs = nameTextStyles(clusters, new Map([['S:1', '제목-강조']]));
+  const s32 = specs.find((s) => s.fontSize === 32);
+  const s16 = specs.find((s) => s.fontSize === 16);
+  assert.equal(s32.name, '제목-강조'); // 자동 이름(display) 대신 기존 이름 유지
+  assert.equal(s32.boundStyleId, 'S:1'); // rename 앵커 부여
+  assert.equal(s16.boundStyleId, undefined); // 미바인딩은 앵커 없음
+  assert.ok(s16.name.length > 0); // 미바인딩은 자동 이름
+
+  // existingNameById 미전달(기존 호출부) → 종전과 동일: 전부 자동 이름·앵커 없음
+  assert.ok(nameTextStyles(clusters).every((s) => s.boundStyleId === undefined));
+});
+
+test('nameTextStyles — 한 군집이 여러 스타일에 걸치면 모호 → 앵커 안 함', () => {
+  const clusters = clusterTextStyles([
+    { fontSize: 20, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'a', styleId: 'S:1' },
+    { fontSize: 20, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b', styleId: 'S:2' },
+  ]);
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].styleIds.length, 2);
+  const specs = nameTextStyles(clusters, new Map([['S:1', 'x'], ['S:2', 'y']]));
+  assert.equal(specs[0].boundStyleId, undefined); // 단일 스타일이 아니므로 rename 앵커 부여 안 함
+});
+
 test('fontStyleForWeight — 굵기/italic → Figma style', () => {
   assert.equal(fontStyleForWeight(400), 'Regular');
   assert.equal(fontStyleForWeight(700), 'Bold');

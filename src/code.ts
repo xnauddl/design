@@ -621,7 +621,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
         const { samples, warnings } = scanTextStyles(selection());
-        const styles = nameTextStyles(clusterTextStyles(samples));
+        // 이미 등록된(바인딩된) 스타일은 현재 이름을 유지하도록 id→name 맵 전달 → 재스캔 후 rename 가능.
+        const nameById = new Map((await figma.getLocalTextStylesAsync()).map((s) => [s.id, s.name]));
+        const styles = nameTextStyles(clusterTextStyles(samples), nameById);
         post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
         break;
       }

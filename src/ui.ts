@@ -434,6 +434,8 @@ const DEFAULT_TS_FAMILY = 'Inter';
    locked=true(스캔 행): 폰트·크기·행간·자간·스타일은 읽기 전용(이미 디자인된 사실) — 이름(role)만 편집. */
 function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   const tr = document.createElement('tr');
+  // 이미 바인딩된 스타일이면 id 보존 → 등록 시 신규 생성이 아니라 그 스타일 rename.
+  if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
   const cell = (field: string, value: string, width: string, opts: { type?: string; readonly?: boolean } = {}): void => {
     const { type = 'text', readonly = false } = opts;
     const td = document.createElement('td');
@@ -452,6 +454,13 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
     tr.appendChild(td);
   };
   cell('name', s.name, '84px');
+  if (s.boundStyleId) {
+    const nameInp = tr.querySelector('input[data-field="name"]') as HTMLInputElement | null;
+    if (nameInp) {
+      nameInp.classList.add('ts-bound');
+      nameInp.title = '이미 등록된 스타일 — 이름을 바꾸면 새로 만들지 않고 이 스타일을 rename합니다';
+    }
+  }
   cell('family', s.family, '96px', { readonly: locked });
   cell('fontSize', String(s.fontSize), '52px', { type: 'number', readonly: locked });
   cell('lineHeight', String(s.lineHeight), '52px', { type: 'number', readonly: locked });
@@ -481,6 +490,7 @@ function readTextStyleRows(): TextStyleSpec[] {
       (tr.querySelector(`input[data-field="${f}"]`) as HTMLInputElement | null)?.value ?? '';
     const name = get('name').trim();
     if (!name) continue;
+    const boundStyleId = (tr as HTMLTableRowElement).dataset.boundStyleId;
     specs.push({
       name,
       fontSize: Number(get('fontSize')) || 0,
@@ -488,6 +498,7 @@ function readTextStyleRows(): TextStyleSpec[] {
       letterSpacing: Number(get('letterSpacing')) || 0,
       family: get('family').trim() || DEFAULT_TS_FAMILY,
       style: get('style').trim() || 'Regular',
+      ...(boundStyleId ? { boundStyleId } : {}),
     });
   }
   return specs;
@@ -1173,9 +1184,11 @@ window.onmessage = (event: MessageEvent) => {
     case 'TEXT_STYLE_CANDIDATES': {
       if (msg.styles.length) {
         renderTextStyleRows(msg.styles, true);
+        const bound = msg.styles.filter((s) => s.boundStyleId).length;
         setStatus(
           'tsStatus',
           `${msg.styles.length}개 스타일 후보 추출. 폰트·크기·행간·자간·스타일은 잠금(스캔값), 이름(role)만 정리 후 등록하세요.` +
+            (bound ? ` ${bound}개는 이미 등록됨 — 이름을 바꾸면 새로 만들지 않고 해당 스타일을 rename합니다.` : '') +
             (msg.warnings.length ? ' ' + msg.warnings.join(' ') : ''),
           msg.warnings.length ? 'warn' : 'ok',
         );

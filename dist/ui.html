@@ -141,6 +141,8 @@
     #tsTable input[readonly] { background: transparent; border-color: transparent; color: var(--muted); cursor: default; }
     #tsTable input[readonly]:hover { border-color: transparent; }
     #tsTable input[readonly]:focus { outline: none; box-shadow: none; border-color: transparent; background: transparent; }
+    /* 이미 등록(바인딩)된 스타일의 이름 칸: 좌측 액센트로 '재스캔에서 잡힌 기존 스타일'임을 표시(rename 대상) */
+    #tsTable input.ts-bound { border-left: 2px solid var(--accent); padding-left: 5px; }
     input[type="color"] {
       width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
       border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
@@ -1717,6 +1719,7 @@
   var DEFAULT_TS_FAMILY = "Inter";
   function textStyleRow(s, locked = false) {
     const tr = document.createElement("tr");
+    if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
     const cell = (field, value, width, opts = {}) => {
       const { type = "text", readonly = false } = opts;
       const td = document.createElement("td");
@@ -1735,6 +1738,13 @@
       tr.appendChild(td);
     };
     cell("name", s.name, "84px");
+    if (s.boundStyleId) {
+      const nameInp = tr.querySelector('input[data-field="name"]');
+      if (nameInp) {
+        nameInp.classList.add("ts-bound");
+        nameInp.title = "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C \u2014 \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0 \uC774 \uC2A4\uD0C0\uC77C\uC744 rename\uD569\uB2C8\uB2E4";
+      }
+    }
     cell("family", s.family, "96px", { readonly: locked });
     cell("fontSize", String(s.fontSize), "52px", { type: "number", readonly: locked });
     cell("lineHeight", String(s.lineHeight), "52px", { type: "number", readonly: locked });
@@ -1763,14 +1773,15 @@
       };
       const name = get("name").trim();
       if (!name) continue;
-      specs.push({
+      const boundStyleId = tr.dataset.boundStyleId;
+      specs.push(__spreadValues({
         name,
         fontSize: Number(get("fontSize")) || 0,
         lineHeight: Number(get("lineHeight")) || 0,
         letterSpacing: Number(get("letterSpacing")) || 0,
         family: get("family").trim() || DEFAULT_TS_FAMILY,
         style: get("style").trim() || "Regular"
-      });
+      }, boundStyleId ? { boundStyleId } : {}));
     }
     return specs;
   }
@@ -2357,9 +2368,10 @@
       case "TEXT_STYLE_CANDIDATES": {
         if (msg.styles.length) {
           renderTextStyleRows(msg.styles, true);
+          const bound = msg.styles.filter((s) => s.boundStyleId).length;
           setStatus(
             "tsStatus",
-            `${msg.styles.length}\uAC1C \uC2A4\uD0C0\uC77C \uD6C4\uBCF4 \uCD94\uCD9C. \uD3F0\uD2B8\xB7\uD06C\uAE30\xB7\uD589\uAC04\xB7\uC790\uAC04\xB7\uC2A4\uD0C0\uC77C\uC740 \uC7A0\uAE08(\uC2A4\uCE94\uAC12), \uC774\uB984(role)\uB9CC \uC815\uB9AC \uD6C4 \uB4F1\uB85D\uD558\uC138\uC694.` + (msg.warnings.length ? " " + msg.warnings.join(" ") : ""),
+            `${msg.styles.length}\uAC1C \uC2A4\uD0C0\uC77C \uD6C4\uBCF4 \uCD94\uCD9C. \uD3F0\uD2B8\xB7\uD06C\uAE30\xB7\uD589\uAC04\xB7\uC790\uAC04\xB7\uC2A4\uD0C0\uC77C\uC740 \uC7A0\uAE08(\uC2A4\uCE94\uAC12), \uC774\uB984(role)\uB9CC \uC815\uB9AC \uD6C4 \uB4F1\uB85D\uD558\uC138\uC694.` + (bound ? ` ${bound}\uAC1C\uB294 \uC774\uBBF8 \uB4F1\uB85D\uB428 \u2014 \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0 \uD574\uB2F9 \uC2A4\uD0C0\uC77C\uC744 rename\uD569\uB2C8\uB2E4.` : "") + (msg.warnings.length ? " " + msg.warnings.join(" ") : ""),
             msg.warnings.length ? "warn" : "ok"
           );
         } else {

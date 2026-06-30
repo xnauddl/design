@@ -13,6 +13,8 @@ export interface TextSample {
   family: string;
   style: string; // 'Regular','Bold' 등 Figma fontName.style
   layerName: string;
+  /** 노드에 이미 바인딩된 로컬 텍스트 스타일 id('' = 없음/혼합). 재스캔 rename 앵커. */
+  styleId: string;
 }
 
 /** 동일 시그니처를 묶은 후보(빈도 포함). */
@@ -24,6 +26,8 @@ export interface StyleCluster {
   style: string;
   count: number; // 같은 시그니처 노드 수
   sample: string; // 대표 레이어 이름(명명 힌트)
+  /** 이 군집 노드들이 바인딩된 로컬 스타일 id(중복 제거, '' 제외). 정확히 1개면 rename 앵커. */
+  styleIds: string[];
 }
 
 /** 등록할 텍스트 스타일 1개. name = 바인딩할 시맨틱 역할(font-size/{name}). */
@@ -34,6 +38,8 @@ export interface TextStyleSpec {
   letterSpacing: number;
   family: string;
   style: string;
+  /** 재스캔 시 이미 바인딩된 기존 스타일 id. 있으면 등록=이 스타일 rename(신규 생성 아님). */
+  boundStyleId?: string;
 }
 
 /** 크기 랭킹 순으로 부여하는 기본 역할명. 초과분은 text-N. */
@@ -42,14 +48,15 @@ export const RAMP_NAMES = ['display', 'h1', 'h2', 'h3', 'title', 'body', 'captio
 const sigKey = (s: { fontSize: number; lineHeight: number; letterSpacing: number; family: string; style: string }) =>
   `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
 
-/** 텍스트 샘플 → 동일 시그니처 군집(빈도순 누적). */
+/** 텍스트 샘플 → 동일 시그니처 군집(빈도순 누적). 바인딩된 스타일 id도 군집별로 모은다. */
 export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
   const map = new Map<string, StyleCluster>();
+  const ids = new Map<string, Set<string>>(); // sigKey → 바인딩된 styleId 집합('' 제외)
   for (const s of samples) {
     const k = sigKey(s);
     const ex = map.get(k);
     if (ex) ex.count++;
-    else
+    else {
       map.set(k, {
         fontSize: s.fontSize,
         lineHeight: s.lineHeight,
@@ -58,8 +65,13 @@ export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
         style: s.style,
         count: 1,
         sample: s.layerName,
+        styleIds: [],
       });
+      ids.set(k, new Set());
+    }
+    if (s.styleId) (ids.get(k) as Set<string>).add(s.styleId);
   }
+  for (const [k, c] of map) c.styleIds = [...(ids.get(k) as Set<string>)];
   return [...map.values()];
 }
 
@@ -74,8 +86,19 @@ const slug = (s: string): string =>
 /** 군집 → 스펙. **고유 크기**를 내림차순으로 RAMP_NAMES(초과분 text-N) 배정 →
    같은 크기에 스타일이 여럿이면 `base/weight`로 분기(굵기도 겹치면 `base/family-weight`).
    그 크기에 하나뿐이면 base 그대로(예: body). 끝으로 이름 유일성 보강(겹치면 -2,-3…).
-   같은 크기·굵기·패밀리라도 행간/자간이 다르면 별도 군집이므로 분리 유지(병합 금지). */
-export function nameTextStyles(clusters: StyleCluster[]): TextStyleSpec[] {
+   같은 크기·굵기·패밀리라도 행간/자간이 다르면 별도 군집이므로 분리 유지(병합 금지).
+
+   existingNameById(로컬 스타일 id→현재 이름)를 주면, 정확히 1개 스타일에만 바인딩된 군집은
+   자동 이름 대신 **현재 이름을 유지**하고 spec.boundStyleId를 채운다 — 재스캔 후 그 행에서
+   이름을 바꾸면 등록 시 신규 생성이 아니라 그 스타일을 rename(중복·고아 방지). */
+export function nameTextStyles(clusters: StyleCluster[], existingNameById?: Map<string, string>): TextStyleSpec[] {
+  // 군집 → 단일 바인딩 스타일 id(있고, 그 id가 로컬에 존재할 때만).
+  const boundIdOf = (c: StyleCluster): string | undefined => {
+    if (!existingNameById || c.styleIds.length !== 1) return undefined;
+    const id = c.styleIds[0];
+    return existingNameById.has(id) ? id : undefined;
+  };
+
   const sizesDesc = [...new Set(clusters.map((c) => c.fontSize))].sort((a, b) => b - a);
   const baseBySize = new Map<number, string>();
   sizesDesc.forEach((sz, i) => baseBySize.set(sz, i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`));
@@ -93,6 +116,12 @@ export function nameTextStyles(clusters: StyleCluster[]): TextStyleSpec[] {
     return u;
   };
 
+  // 바인딩 군집의 현재 이름을 먼저 예약 — 자동 이름이 이를 침범하지 않도록.
+  for (const c of clusters) {
+    const id = boundIdOf(c);
+    if (id) used.add((existingNameById as Map<string, string>).get(id) as string);
+  }
+
   const specs: TextStyleSpec[] = [];
   for (const sz of sizesDesc) {
     const base = baseBySize.get(sz) as string;
@@ -101,15 +130,18 @@ export function nameTextStyles(clusters: StyleCluster[]): TextStyleSpec[] {
       .sort((a, b) => b.count - a.count || b.lineHeight - a.lineHeight);
     const weightUnique = new Set(group.map((c) => slug(c.style))).size === group.length;
     for (const c of group) {
-      const name =
-        group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`;
+      const boundId = boundIdOf(c);
+      const name = boundId
+        ? ((existingNameById as Map<string, string>).get(boundId) as string) // 기존 이름 유지(예약됨 → unique 불필요)
+        : unique(group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`);
       specs.push({
-        name: unique(name),
+        name,
         fontSize: c.fontSize,
         lineHeight: c.lineHeight,
         letterSpacing: c.letterSpacing,
         family: c.family,
         style: c.style,
+        ...(boundId ? { boundStyleId: boundId } : {}),
       });
     }
   }
