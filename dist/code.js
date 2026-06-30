@@ -600,6 +600,7 @@
   }
   var roundN = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
   function walkText(node, out) {
+    if (node.visible === false) return;
     if (node.type === "TEXT") out.push(node);
     else if ("children" in node) for (const c of node.children) walkText(c, out);
   }
@@ -718,31 +719,34 @@
       let style = spec.boundStyleId ? styleById.get(spec.boundStyleId) : void 0;
       if (!style) style = styleByName.get(spec.name);
       const created = !style;
+      const isRename = !created && !!spec.boundStyleId;
       if (!style) style = figma.createTextStyle();
       if (style.name !== spec.name) {
         styleByName.delete(style.name);
         style.name = spec.name;
       }
-      const wanted = { family: spec.family, style: spec.style };
-      let loaded;
-      try {
-        await figma.loadFontAsync(wanted);
-        loaded = wanted;
-      } catch (e) {
+      if (!isRename) {
+        const wanted = { family: spec.family, style: spec.style };
+        let loaded;
         try {
-          const fb = { family: spec.family, style: "Regular" };
-          await figma.loadFontAsync(fb);
-          loaded = fb;
-          res.missing.push(`${spec.name}: \uD3F0\uD2B8 ${spec.style}\u2192Regular`);
-        } catch (e2) {
-          res.missing.push(`${spec.name}: \uD3F0\uD2B8 '${spec.family}' \uC5C6\uC74C`);
-          continue;
+          await figma.loadFontAsync(wanted);
+          loaded = wanted;
+        } catch (e) {
+          try {
+            const fb = { family: spec.family, style: "Regular" };
+            await figma.loadFontAsync(fb);
+            loaded = fb;
+            res.missing.push(`${spec.name}: \uD3F0\uD2B8 ${spec.style}\u2192Regular`);
+          } catch (e2) {
+            res.missing.push(`${spec.name}: \uD3F0\uD2B8 '${spec.family}' \uC5C6\uC74C`);
+            continue;
+          }
         }
+        style.fontName = loaded;
+        style.fontSize = spec.fontSize;
+        style.lineHeight = spec.lineHeight > 0 ? { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
+        if (spec.letterSpacing) style.letterSpacing = { value: spec.letterSpacing, unit: "PIXELS" };
       }
-      style.fontName = loaded;
-      style.fontSize = spec.fontSize;
-      style.lineHeight = spec.lineHeight > 0 ? { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
-      if (spec.letterSpacing) style.letterSpacing = { value: spec.letterSpacing, unit: "PIXELS" };
       const fsVar = semByName.get(`font-size/${spec.name}`);
       if (fsVar) {
         style.setBoundVariable("fontSize", fsVar);
@@ -2341,7 +2345,8 @@
       const vars = await figma.variables.getLocalVariablesAsync();
       const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-      post({ type: "PREREQ_STATE", hasGlobal, hasBindable });
+      const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
+      post({ type: "PREREQ_STATE", hasGlobal, hasBindable, hasTextStyles });
     } catch (e) {
     }
   }
@@ -2790,6 +2795,7 @@
           const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
           post({ type: "TEXT_STYLES_RESULT", created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
           commitUndo(figma);
+          await postPrereq();
           break;
         }
         case "APPLY_TEXT_STYLES": {

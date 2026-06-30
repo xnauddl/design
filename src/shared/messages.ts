@@ -129,7 +129,7 @@ export type CodeToUi =
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   | { type: 'GLOBAL_COLORS'; colors: { name: string; hex: string }[] } // #10: 기존 Global 색(이름+hex)
   // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).
-  | { type: 'PREREQ_STATE'; hasGlobal: boolean; hasBindable: boolean }
+  | { type: 'PREREQ_STATE'; hasGlobal: boolean; hasBindable: boolean; hasTextStyles: boolean }
   | {
       type: 'LICENSE_STATUS';
       tier: Tier;

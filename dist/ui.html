@@ -137,12 +137,17 @@
     /* 텍스트 스타일 표: 스피너 화살표 제거(폭 확보) */
     #tsTable input[type="number"]::-webkit-inner-spin-button,
     #tsTable input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    /* 표 전체가 패널 폭 안에 들어오도록 셀·입력 패딩 축소(가로 스크롤·삭제 버튼 숨김 방지) */
+    #tsTable th, #tsTable td { padding: 0 1px; }
+    #tsTable input { padding: 4px 5px; }
+    #tsTable td:last-child button { padding: 2px 5px; }
     /* 스캔 행의 잠긴 값(폰트·크기·행간·자간·스타일): 편집 불가 → 라벨처럼 표시 */
     #tsTable input[readonly] { background: transparent; border-color: transparent; color: var(--muted); cursor: default; }
     #tsTable input[readonly]:hover { border-color: transparent; }
     #tsTable input[readonly]:focus { outline: none; box-shadow: none; border-color: transparent; background: transparent; }
-    /* 이미 등록(바인딩)된 스타일의 이름 칸: 좌측 액센트로 '재스캔에서 잡힌 기존 스타일'임을 표시(rename 대상) */
+    /* 이름 칸 좌측 액센트로 행 구분: 파랑=이미 등록된 스타일(rename 대상), 앰버=새로 만들어질 스타일 */
     #tsTable input.ts-bound { border-left: 2px solid var(--accent); padding-left: 5px; }
+    #tsTable input.ts-new { border-left: 2px solid var(--warn); padding-left: 5px; }
     input[type="color"] {
       width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
       border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
@@ -434,24 +439,35 @@
 
     <div class="step">
       <h2>텍스트 스타일 (화면 → 스타일)</h2>
-      <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height/letter-spacing)에 바인딩합니다. 스캔된 항목은 이름(role)만 정리하고 폰트·크기·행간·자간·스타일은 읽기 전용입니다. 새 값이 필요하면 ‘행 추가’로 정의하세요. (Pro)</div>
+      <div class="hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 새 스타일은 ‘행 추가’로. (Pro)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText">선택에서 스캔</button>
         <button id="btnTsAddRow">행 추가</button>
       </div>
       <div style="overflow-x:auto; margin-top:6px;">
-      <table id="tsTable" style="border-collapse:collapse; font-size:11px;">
+      <table id="tsTable" style="table-layout:fixed; width:100%; border-collapse:collapse; font-size:11px;">
+        <colgroup>
+          <col style="width:64px;" /><!-- 이름 -->
+          <col /><!-- 폰트(가변: 남는 폭 흡수) -->
+          <col style="width:38px;" /><!-- 크기 -->
+          <col style="width:38px;" /><!-- 행간 -->
+          <col style="width:44px;" /><!-- 자간 -->
+          <col style="width:52px;" /><!-- 스타일 -->
+          <col style="width:28px;" /><!-- 삭제 -->
+        </colgroup>
         <thead><tr style="text-align:left; color:var(--muted);">
           <th>이름</th><th>폰트</th><th>크기</th><th>행간</th><th>자간</th><th>스타일</th><th></th>
         </tr></thead>
         <tbody id="tsRows"></tbody>
       </table>
       </div>
-      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 원본 텍스트에 스타일 적용</label>
-      <div class="row" style="margin-top:6px;">
-        <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
-        <button id="btnApplyExistingText" title="선택 텍스트를 시그니처가 같은 기존 스타일에 바인딩합니다. 새 스타일·변수는 만들지 않습니다.">기존 스타일 적용만</button>
+      <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
+      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 등록할 때 화면의 글자에도 적용</label>
+      <div class="row" style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border);">
+        <button id="btnApplyExistingText" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 적용만</button>
+        <span class="muted" style="align-self:center;">이미 만든 스타일에 연결만</span>
       </div>
+      <div class="prereq" id="tsApplyPrereq" style="display:none; margin-top:4px;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
     </div>
   </section>
@@ -568,7 +584,8 @@
       </div>
       <div class="muted" id="licenseInfo"></div>
       <div class="muted" id="limitsInfo"></div>
-      <div class="row">
+      <!-- 개발용 강제 티어: 사용자 화면 비노출(개발 시 display 해제). #tier id는 ui.ts가 참조하므로 DOM 유지. -->
+      <div class="row" id="devTierRow" style="display:none;">
         <label class="inline">개발용 강제 티어
           <select id="tier">
             <option value="free">Free</option>
@@ -1402,6 +1419,7 @@
   var teamDataRequested = false;
   var hasGlobal = false;
   var hasBindable = false;
+  var hasTextStyles = false;
   var lastExportFormat = "w3c";
   var lastSelCount = 0;
   var createFrom = "tokens";
@@ -1721,36 +1739,41 @@
   function textStyleRow(s, locked = false) {
     const tr = document.createElement("tr");
     if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
-    const cell = (field, value, width, opts = {}) => {
+    const cell = (field, value, opts = {}) => {
       const { type = "text", readonly = false } = opts;
       const td = document.createElement("td");
       const inp = document.createElement("input");
       inp.type = type;
       inp.value = value;
       inp.dataset.field = field;
-      inp.style.width = width;
+      inp.style.width = "100%";
       if (type === "number") inp.style.textAlign = "right";
       if (readonly) {
         inp.readOnly = true;
         inp.tabIndex = -1;
-        inp.title = "\uC2A4\uCE94\uB41C \uAC12(\uC77D\uAE30 \uC804\uC6A9) \u2014 \uC0C8 \uAC12\uC73C\uB85C \uC815\uC758\uD558\uB824\uBA74 \u2018\uD589 \uCD94\uAC00\u2019\uB97C \uC4F0\uC138\uC694";
+        inp.title = value ? `${value} \xB7 \uC2A4\uCE94\uD55C \uAC12\uC774\uB77C \uBABB \uBC14\uAFD4\uC694` : "\uC2A4\uCE94\uD55C \uAC12 \u2014 \uC0C8 \uAC12\uC740 \u2018\uD589 \uCD94\uAC00\u2019\uB85C";
       }
       td.appendChild(inp);
       tr.appendChild(td);
     };
-    cell("name", s.name, "84px");
-    if (s.boundStyleId) {
+    cell("name", s.name);
+    {
       const nameInp = tr.querySelector('input[data-field="name"]');
       if (nameInp) {
-        nameInp.classList.add("ts-bound");
-        nameInp.title = "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C \u2014 \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0 \uC774 \uC2A4\uD0C0\uC77C\uC744 rename\uD569\uB2C8\uB2E4";
+        if (s.boundStyleId) {
+          nameInp.classList.add("ts-bound");
+          nameInp.title = "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C\uC774\uC5D0\uC694. \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC774 \uC2A4\uD0C0\uC77C\uC758 \uC774\uB984\uB9CC \uBC14\uB01D\uB2C8\uB2E4(\uC0C8\uB85C \uC548 \uB9CC\uB4E6).";
+        } else {
+          nameInp.classList.add("ts-new");
+          nameInp.title = "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).";
+        }
       }
     }
-    cell("family", s.family, "96px", { readonly: locked });
-    cell("fontSize", String(s.fontSize), "52px", { type: "number", readonly: locked });
-    cell("lineHeight", String(s.lineHeight), "52px", { type: "number", readonly: locked });
-    cell("letterSpacing", String(s.letterSpacing), "60px", { type: "number", readonly: locked });
-    cell("style", s.style, "64px", { readonly: locked });
+    cell("family", s.family, { readonly: locked });
+    cell("fontSize", String(s.fontSize), { type: "number", readonly: locked });
+    cell("lineHeight", String(s.lineHeight), { type: "number", readonly: locked });
+    cell("letterSpacing", String(s.letterSpacing), { type: "number", readonly: locked });
+    cell("style", s.style, { readonly: locked });
     const tdDel = document.createElement("td");
     const del = document.createElement("button");
     del.textContent = "\u2715";
@@ -2092,6 +2115,7 @@
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!hasBindable) $("btnApplyConfirm").disabled = true;
+    setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
     if (isTeam && !teamDataRequested) {
       teamDataRequested = true;
       send({ type: "GET_PRESETS" });
@@ -2374,9 +2398,10 @@
         if (msg.styles.length) {
           renderTextStyleRows(msg.styles, true);
           const bound = msg.styles.filter((s) => s.boundStyleId).length;
+          const fresh = msg.styles.length - bound;
           setStatus(
             "tsStatus",
-            `${msg.styles.length}\uAC1C \uC2A4\uD0C0\uC77C \uD6C4\uBCF4 \uCD94\uCD9C. \uD3F0\uD2B8\xB7\uD06C\uAE30\xB7\uD589\uAC04\xB7\uC790\uAC04\xB7\uC2A4\uD0C0\uC77C\uC740 \uC7A0\uAE08(\uC2A4\uCE94\uAC12), \uC774\uB984(role)\uB9CC \uC815\uB9AC \uD6C4 \uB4F1\uB85D\uD558\uC138\uC694.` + (bound ? ` ${bound}\uAC1C\uB294 \uC774\uBBF8 \uB4F1\uB85D\uB428 \u2014 \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0 \uD574\uB2F9 \uC2A4\uD0C0\uC77C\uC744 rename\uD569\uB2C8\uB2E4.` : "") + (msg.warnings.length ? " " + msg.warnings.join(" ") : ""),
+            `${msg.styles.length}\uAC1C \uCC3E\uC74C \xB7 \uC2E0\uADDC ${fresh}(\uC570\uBC84) \xB7 \uC774\uBBF8 \uB4F1\uB85D ${bound}(\uD30C\uB791)` + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
             msg.warnings.length ? "warn" : "ok"
           );
         } else {
@@ -2412,6 +2437,7 @@
       case "PREREQ_STATE":
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
+        hasTextStyles = msg.hasTextStyles;
         updateGates();
         renderPipeline();
         break;

@@ -36,9 +36,10 @@ let presets: Preset[] = [];
 let isTeam = false;
 let isPro = false;
 let teamDataRequested = false;
-// #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩).
+// #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
 let hasGlobal = false;
 let hasBindable = false;
+let hasTextStyles = false;
 let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
@@ -436,36 +437,44 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   const tr = document.createElement('tr');
   // 이미 바인딩된 스타일이면 id 보존 → 등록 시 신규 생성이 아니라 그 스타일 rename.
   if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
-  const cell = (field: string, value: string, width: string, opts: { type?: string; readonly?: boolean } = {}): void => {
+  // 컬럼 폭은 표의 <colgroup>이 정하고(폰트는 가변), 입력은 칸을 꽉 채운다.
+  const cell = (field: string, value: string, opts: { type?: string; readonly?: boolean } = {}): void => {
     const { type = 'text', readonly = false } = opts;
     const td = document.createElement('td');
     const inp = document.createElement('input');
     inp.type = type;
     inp.value = value;
     inp.dataset.field = field;
-    inp.style.width = width;
+    inp.style.width = '100%';
     if (type === 'number') inp.style.textAlign = 'right';
     if (readonly) {
       inp.readOnly = true;
       inp.tabIndex = -1;
-      inp.title = '스캔된 값(읽기 전용) — 새 값으로 정의하려면 ‘행 추가’를 쓰세요';
+      // 잘려도 hover로 전체값 확인 가능(특히 긴 폰트 패밀리).
+      inp.title = value ? `${value} · 스캔한 값이라 못 바꿔요` : '스캔한 값 — 새 값은 ‘행 추가’로';
     }
     td.appendChild(inp);
     tr.appendChild(td);
   };
-  cell('name', s.name, '84px');
-  if (s.boundStyleId) {
+  cell('name', s.name);
+  {
+    // 행 구분: 이미 등록된 스타일(파랑) vs 새로 만들어질 스타일(앰버) — 스캔 노이즈 식별용.
     const nameInp = tr.querySelector('input[data-field="name"]') as HTMLInputElement | null;
     if (nameInp) {
-      nameInp.classList.add('ts-bound');
-      nameInp.title = '이미 등록된 스타일 — 이름을 바꾸면 새로 만들지 않고 이 스타일을 rename합니다';
+      if (s.boundStyleId) {
+        nameInp.classList.add('ts-bound');
+        nameInp.title = '이미 등록된 스타일이에요. 이름을 바꾸면 이 스타일의 이름만 바뀝니다(새로 안 만듦).';
+      } else {
+        nameInp.classList.add('ts-new');
+        nameInp.title = '새 스타일로 등록됩니다(아직 등록 안 된 글자).';
+      }
     }
   }
-  cell('family', s.family, '96px', { readonly: locked });
-  cell('fontSize', String(s.fontSize), '52px', { type: 'number', readonly: locked });
-  cell('lineHeight', String(s.lineHeight), '52px', { type: 'number', readonly: locked });
-  cell('letterSpacing', String(s.letterSpacing), '60px', { type: 'number', readonly: locked });
-  cell('style', s.style, '64px', { readonly: locked });
+  cell('family', s.family, { readonly: locked });
+  cell('fontSize', String(s.fontSize), { type: 'number', readonly: locked });
+  cell('lineHeight', String(s.lineHeight), { type: 'number', readonly: locked });
+  cell('letterSpacing', String(s.letterSpacing), { type: 'number', readonly: locked });
+  cell('style', s.style, { readonly: locked });
   const tdDel = document.createElement('td');
   const del = document.createElement('button');
   del.textContent = '✕';
@@ -867,6 +876,8 @@ function updateGates(): void {
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
   setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 바인딩할 변수를 만드세요.');
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
+  // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
+  setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
 
   if (isTeam && !teamDataRequested) {
     teamDataRequested = true;
@@ -1190,11 +1201,11 @@ window.onmessage = (event: MessageEvent) => {
       if (msg.styles.length) {
         renderTextStyleRows(msg.styles, true);
         const bound = msg.styles.filter((s) => s.boundStyleId).length;
+        const fresh = msg.styles.length - bound;
         setStatus(
           'tsStatus',
-          `${msg.styles.length}개 스타일 후보 추출. 폰트·크기·행간·자간·스타일은 잠금(스캔값), 이름(role)만 정리 후 등록하세요.` +
-            (bound ? ` ${bound}개는 이미 등록됨 — 이름을 바꾸면 새로 만들지 않고 해당 스타일을 rename합니다.` : '') +
-            (msg.warnings.length ? ' ' + msg.warnings.join(' ') : ''),
+          `${msg.styles.length}개 찾음 · 신규 ${fresh}(앰버) · 이미 등록 ${bound}(파랑)` +
+            (msg.warnings.length ? ' · ' + msg.warnings.join(' ') : ''),
           msg.warnings.length ? 'warn' : 'ok',
         );
       } else {
@@ -1235,6 +1246,7 @@ window.onmessage = (event: MessageEvent) => {
       // #11: 단계 전제 갱신 → 통합 게이트 재평가 + 진행 안내(§3).
       hasGlobal = msg.hasGlobal;
       hasBindable = msg.hasBindable;
+      hasTextStyles = msg.hasTextStyles;
       updateGates();
       renderPipeline();
       break;

@@ -111,7 +111,8 @@ async function postPrereq(): Promise<void> {
     const vars = await figma.variables.getLocalVariablesAsync();
     const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable });
+    const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // '기존 스타일 적용만' 전제
+    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable, hasTextStyles });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -631,6 +632,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
         post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
         commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로
+        await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → '적용만' 등 전제 게이트 갱신
         break;
       }
       case 'APPLY_TEXT_STYLES': {
