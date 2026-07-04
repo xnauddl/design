@@ -14,6 +14,8 @@ export type TokenKind =
   | 'spacing'
   | 'radius'
   | 'size'
+  | 'strokeWidth'
+  | 'effectFloat'
   | 'lineHeight'
   | 'letterSpacing'
   | 'fontFamily'
@@ -27,10 +29,12 @@ export interface ExportToken {
   collection: 'Global' | 'Semantic';
   type: ResolvedType;
   kind: TokenKind;
-  /** Global 리터럴. COLOR=#hex, FLOAT=px 숫자, STRING=단위 포함 문자("150%","Inter"). */
+  /** Global 리터럴. COLOR=#hex, FLOAT=px 숫자, STRING=문자("Inter"). */
   value?: string | number;
   /** Semantic 별칭 대상 토큰 이름. */
   aliasOf?: string;
+  /** #16: 원본 단위 표기(Variable.description). lineHeight/letterSpacing 출력 시 px보다 우선("160%"). */
+  description?: string;
 }
 
 export interface ExportOptions {
@@ -39,11 +43,7 @@ export interface ExportOptions {
   fontSizeUnit: 'px' | 'rem';
   /** rem 환산 기준 px. */
   base: number;
-  /** '-px' 스냅샷 포함 여부(기본 false). */
-  includeSnapshots: boolean;
 }
-
-const isSnapshot = (name: string): boolean => /-px$/.test(name);
 
 /* ---------- 폰트 weight/style(이탤릭) 분리 ---------- */
 const WEIGHT_NAMES: Record<string, number> = {
@@ -96,14 +96,16 @@ function cssLiteral(token: ExportToken, opts: ExportOptions): string {
       return String(token.value);
     case 'lineHeight':
     case 'letterSpacing':
-      // STRING 정본은 단위 포함("150%","1.5em"); FLOAT는 px 스냅샷 → px.
-      return token.type === 'FLOAT' ? `${Number(token.value)}px` : String(token.value);
+      // #16: 원본 단위(description, "160%")가 있으면 우선, 없으면 px.
+      return token.description ?? `${Number(token.value)}px`;
     case 'fontWeight':
       return String(splitWeightStyle(token.value as string | number).weight);
     case 'fontSize':
     case 'spacing':
     case 'radius':
     case 'size':
+    case 'strokeWidth':
+    case 'effectFloat':
       return dimension(token, opts);
     default:
       return String(token.value);
@@ -137,6 +139,8 @@ const W3C_TYPE: Partial<Record<TokenKind, string>> = {
   spacing: 'dimension',
   radius: 'dimension',
   size: 'dimension',
+  strokeWidth: 'dimension',
+  effectFloat: 'dimension',
   fontFamily: 'fontFamily',
   fontWeight: 'fontWeight',
   opacity: 'number',
@@ -155,7 +159,7 @@ function w3cValue(token: ExportToken, opts: ExportOptions): string | number {
       return String(token.value);
     case 'lineHeight':
     case 'letterSpacing':
-      return token.type === 'FLOAT' ? `${Number(token.value)}px` : String(token.value);
+      return token.description ?? `${Number(token.value)}px`; // #16: 원본 단위 우선
     case 'opacity':
       return Number(token.value);
     case 'fontWeight':
@@ -164,6 +168,8 @@ function w3cValue(token: ExportToken, opts: ExportOptions): string | number {
     case 'spacing':
     case 'radius':
     case 'size':
+    case 'strokeWidth':
+    case 'effectFloat':
       return dimension(token, opts);
     default:
       return token.value ?? '';
@@ -215,7 +221,6 @@ function dedupeByName(tokens: ExportToken[]): ExportToken[] {
 
 /** 형식에 따라 토큰을 코드 문자열로 내보낸다. */
 export function exportTokens(tokens: ExportToken[], opts: ExportOptions): string {
-  let list = opts.includeSnapshots ? tokens : tokens.filter((t) => !isSnapshot(t.name));
-  list = dedupeByName(list);
+  const list = dedupeByName(tokens);
   return opts.format === 'css' ? toCss(list, opts) : toW3C(list, opts);
 }

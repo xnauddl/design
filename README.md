@@ -7,6 +7,8 @@
 > 만든 변수는 **코드로 내보내기(W3C 토큰 JSON · CSS 변수)** 도 가능.
 > 설계 배경과 규칙은 저장소 계획 문서를 따릅니다. (마지막 단계는 Phase 3 계획)
 
+> **🛠 v2 재설계 진행 중** — UI/IA · 결과 표면화(선택형 트리 미리보기) · **색 계층 정렬(Global=hue / Semantic=role)** · 단위 토큰 단일화 등 확정된 방향은 [`REDESIGN.md`](REDESIGN.md)에 정리돼 있습니다(요약은 `ROADMAP.md` §8). 아래 본문은 **현재 구현** 기준이며, v2 적용 시 일부가 갱신됩니다.
+
 ## 핵심 규칙
 
 ### 디자인 토큰 3계층 (별도 컬렉션 + 별칭)
@@ -18,34 +20,44 @@
 
 ### 색상 / 단위
 - 색은 **불투명 hex(RGB)** 토큰 + **별도 opacity 토큰**(scope `OPACITY`)으로 분리.
-- `lineHeight`/`letterSpacing`의 `%`·`em`·`rem` 의도는 Figma 변수로 바인딩 불가 → **STRING 토큰으로 보존**하고,
-  필요 시 `base`(기본 16px)로 환산한 **`-px` FLOAT 스냅샷**을 추가 생성(폰트 크기 변경 시 비례하지 않는 스냅샷).
+- `lineHeight`/`letterSpacing`의 `%`·`em`·`rem` → **#16 단위 토큰 단일화**: STRING·`-px` 스냅샷 이중 생성을 폐기하고
+  **px FLOAT 단일 변수**(`base`=16px 기준 환산, 바인딩 가능)로 만들고, **원본 단위는 `Variable.description`("160%")** 에 저장한다.
+  내보내기는 description을 우선 출력(`160%`), 없으면 px. (Figma 패널에도 사람이 읽을 단위가 표시됨.)
 
 ### 프레임 크기·여백 바인딩
 - 크기(`width`/`height`)는 **Fixed**일 때만 바인딩(HUG/FILL 충돌 시 스킵·플래그).
 - `padding`·`gap`은 **오토레이아웃 프레임**에만 존재 → 일반 프레임은 스킵·안내.
 
 ### 레이어 네이밍
-- 형식: **kebab-case 소문자**, 구분자 `-`. 구조: `{상위 맥락}-{로컬 역할}`(기본 최대 3단계).
-- 토큰 보유 레이어 → 변수 전체 경로(`button/primary/background` → `button-primary-background`).
-- 토큰 없는 비텍스트 레이어 → 역할/해부학 어휘(`button-primary-icon`, `-background`, `-container`).
+**원칙: 레이어의 "역할(role)"이 이름을 정한다. 토큰은 이름을 짓는 "신호"로만 쓰고 경로를 그대로 복사하지 않는다.**
+
+- 형식: **kebab-case 소문자**, 구분자 `-`. 구조: `{맥락}-{역할}` — **최대 2토막**(짧고 의미 있게).
+- **보존형** — Figma 기본명(`Frame 12`·`Rectangle`·`Group 5`…)과 구(舊) 리네임이 원시·스냅샷 토큰 경로를 베껴 만든 이름(`color-121210`·`spacing-16`·`letter-spacing-0-percent-px`…)만 교체한다. 사람이 지은 의미 있는 이름(`color-picker`·`size-large` 등 값이 단어인 경우 포함)은 **그대로 보존**하고 자식의 맥락으로만 쓴다.
+- **역할 판정 순서**: ① **버튼**(오토레이아웃+라운드+채움/외곽선+직속 텍스트) → ② **영역**(페이지 세로 스택의 첫=`header`/마지막=`footer`, depth 1 한정) → ③ 바인딩 토큰 **말단**이 역할 어휘면 그것(`…/background`→`background`) → ④ 타입·기하(VECTOR=`icon`, 얇은 막대=`divider`, 이미지 타원=`avatar`, 채움 사각형=`background`, 외곽선만=`border`, 색만 채운 빈 프레임=`swatch`, 그 외 프레임=`container`/단일자식 `wrapper`).
+  - 역할 어휘: 요소(`icon`·`background`·`swatch`·`border`·`divider`·`image`·`avatar`·`badge`) + 시맨틱(`header`·`footer`·`nav`·`hero`·`button`·`card`·`label`·`title`…). 시맨틱은 **인식·보존**(사람·컴포넌트명)에 더해 button·header·footer만 **구조 추론**.
+  - **원시/스냅샷 토큰**(`color/blue-500`·`line-height/150-percent-px`…)은 이름 신호가 없다 → 기하로 폴백(역할 오염 방지).
+- **맥락(context)** — 바로 위 의미 있는 이름에서 **깨끗한 1단계**만 뽑는다(`pickScope`): 숫자·단위(`percent`·`px`…)·hex·일반 구조어(`container`·`wrapper`…)는 버린다. 없으면 토큰 경로 접두사에서. 그래서 `percent-px-container`·`2-wrapper-icon` 같은 군더더기가 생기지 않는다. 맥락==역할이면 중복 제거(`button-button`→`button`).
+- **숫자 안 붙임** — 형제가 같은 이름이어도 그대로 둔다(Figma는 중복 레이어명 허용, 정체성은 ID). `-2`/`-3` 없음.
 - **제외**(이름 유지): Component/ComponentSet · **Text** · Instance · 잠긴 레이어. *텍스트는 이름만 제외하고 변수 바인딩은 정상 수행.*
-- 형제 충돌은 `-2`/`-3` 접미사, 토큰/역할에서 매번 재계산하므로 **멱등**.
+- **선택 루트 보존**(#7b): 선택의 **최상위(depth 0) 컨테이너**(프레임 등)는 **기본명이어도 항상 보존**하고 자식의 맥락으로만 쓴다(선택한 화면/프레임 이름을 건드리지 않음). **인스턴스는 서브트리까지 통째 스킵**(내부는 메인 컴포넌트 소유).
+- 정돈된 역할명은 기본명이 아니므로 재실행 시 보존된다 → **멱등**.
 
 ### 컴포넌트 등록 / 베리언트 분류 (Phase 3 · 구현됨, Paid)
 선택 레이어를 **메인 컴포넌트로 등록**하고, 같은 베이스 이름을 공유하는 컴포넌트들을 **베리언트 세트(ComponentSet)** 로 묶어 분류한다. 토큰/리네임과 동일하게 **kebab·멱등** 규칙을 따르며, 구조/이름만 바꾸고 토큰 바인딩은 건드리지 않는다.
 
 - **컴포넌트 등록(registration)**
-  - 선택한 `FRAME`/`GROUP`을 메인 컴포넌트로 변환. 이미 `COMPONENT`이거나 `COMPONENT_SET` 멤버면 건너뜀(멱등).
-  - 이름 규칙: kebab 경로 `{영역}/{컴포넌트}`(예: `button`, `form/input`). 슬래시는 Figma 폴더 그룹으로 표시.
-  - **제외**: `INSTANCE` · 잠긴 레이어 · `TEXT`.
-  - (선택) 컴포넌트 설명·Code Connect 메타데이터 자리표시.
+  - 선택한 **부모는 컨테이너**(자신은 컴포넌트화 X) — 그 **직계 자식**만 대상. 다중 선택 시엔 선택 각각이 대상.
+  - **엄격 필터**: 이름에 알려진 **컴포넌트 명사**(`button`/`card`/`chip`/`badge`/`tab`/`item`… + 약어 `btn`)가 있는 `FRAME`/`GROUP`만 추린다. 이름 없는 프레임(`Frame 12`)·`INSTANCE`·잠금·`TEXT`는 제외. 명사가 여럿이면 **끝 명사(head noun)** 기준 — 앞단어는 맥락(`nav-button`→`Button`, `card-item`→`Item`).
+  - **그룹화 = 컴포넌트명(머리명사) 기준**으로 한 세트. **구조는 게이트로 쓰지 않는다** — 실무 변형은 같은 컴포넌트라도 내부 구조가 제각각(아이콘 유무·텍스트 줄 수·래퍼 차이…)이라, 구조까지 같아야 묶으면 변형이 전부 1-멤버로 쪼개져 **세트가 아예 안 생긴다**. 그래서 같은 컴포넌트명이면 한 세트 후보로 묶고, 구조·크기·색·패딩 차이는 **베리언트 속성으로 흡수**(`deriveVariants`). 과묶임은 picker에서 **체크 해제**로 회복. 세트 이름은 멤버 공통 베이스를 **PascalCase**로(약어 펼침 `btn`→`Button`, 공통 접두 없으면 머리명사). 단독 컴포넌트도 **PascalCase**로 등록(`card-item`→`CardItem`).
+  - **견고성**: `combineAsVariants` 실패 시 멤버를 **단독으로라도 등록**(컴포넌트 소실 방지). 결합 성공 후 정렬(`arrangeSet`)은 **비치명**(실패해도 세트·인스턴스는 유지). 조용히 삼키던 실패는 **UI에 진단으로 노출**(`failures`).
+  - **인스턴스 교체 + 전용 페이지**: 메인 컴포넌트(세트)는 `Components` 페이지(없으면 생성·있으면 재사용)로 이동하고, 원래 자리(부모·인덱스·좌표)에는 해당 변형의 **인스턴스**를 배치한다. 선택 프레임에는 인스턴스만 남는다.
+  - **속성 도출 = 이름 우선 + 기하 보완 + 구별 토큰**: 멤버 이름의 보편 어휘(`Type`/`State`/`Size`/`Selected`)를 먼저 속성으로. 이름만으로 멤버가 안 갈리면 빈 축을 기하로 보완 — 면적→`Size`(티셔츠 등급), 단색 채움→`Color`(색 이름). 그래도 안 갈리면 **이름의 구별 토큰**(컴포넌트 명사·어휘를 뺀 나머지)을 `Variant` 값으로 보존 — `nav-left`/`nav-right`→`Variant=left`/`Variant=right`, `artist-button`/`like-button`→`Variant=artist`/`Variant=like`. 구별 토큰조차 없으면 마지막 수단 `Variant=N`.
 - **베리언트 분류(variant classification)**
   - 베이스 이름이 같은 형제 컴포넌트들을 `combineAsVariants`로 한 세트에 결합.
-  - 베리언트 **속성(property) 추론** — 이름에서 `속성=값` 쌍으로 정규화:
-    - `base/{value}`(단일 축) → 기본 속성명 `variant`; `base, prop=value`(다축) → 다중 키.
-    - 어휘 매핑: `state`(default·hover·pressed·disabled) · `size`(sm·md·lg) · `type`/`emphasis`(primary·secondary·…) · `selected`(true/false → Boolean 속성).
-  - 정규화 결과를 각 베리언트 이름 `prop=value, prop2=value2`(Figma 베리언트 규약)로 적용.
+  - 베리언트 **속성(property) 추론** — 이름에서 `속성=값` 쌍으로 정규화. 추론한 속성명은 Figma 라이브러리 관례대로 **Capitalize**(`Size`·`Color`…), 사용자가 명시한 `prop=value`는 기존 세트 호환을 위해 **그대로 보존**:
+    - `base/{value}`(경로형) → 알려진 어휘는 해당 속성, 미지정 값은 `Variant`; `base, prop=value`(명시형) → 다중 키(사용자 표기 유지).
+    - 어휘 매핑: `State`(default·hover·pressed·focus·active·disabled·loading) · `Size`(sm·md·lg) · `Type`(primary·secondary·…) · `Selected`(불리언 축 — 경로형 `…/selected` → `Selected=true`, 명시형 `selected=true/false`).
+  - 정규화 결과를 각 베리언트 이름 `Prop=value, Prop2=value2`(Figma 베리언트 규약)로 적용.
   - 속성 매트릭스의 **빈 조합 리포트**(분류 시) → **자동 생성은 Phase 4**(`GENERATE_MISSING_VARIANTS`).
 - **멱등·안전**
   - 재실행 시 기존 ComponentSet/속성을 이름 키로 재사용(중복 결합 방지).
@@ -78,10 +90,16 @@ src/
     tokens.ts   토큰 모델 + 순수 헬퍼(hex·스코프·단위 환산)
     naming.ts   레이어 네이밍 규칙(kebab·역할·맥락) — 순수
     color.ts    색공간 변환(sRGB↔OKLab↔OKLCH)·WCAG 대비 — 순수
-    palette.ts  브랜드색→톤 스케일·하모니·중립·상태색 생성 — 순수
+    colorName.ts 색→hue 패밀리·스텝 분류 + 색 목록 hue 네이밍(충돌 접미사, #3) — 순수
+    contrast.ts 명도 대비 점검(텍스트-배경 쌍 → AA/AAA 판정·리포트) — 순수
+    palette.ts  브랜드색→hue 스케일·하모니·중립·상태색 + 역할→hue 매핑 — 순수
+    roles.ts    전 토큰 역할 어휘 추천(수치 티셔츠·fontSize 타입·weight·family) — 순수
+    pipeline.ts 만들기→적용 의존 파이프라인 단계 상태(진행 안내) — 순수
+    i18n.ts     UI 문자열 단일 소스 + t() 룩업·{var} 보간(현재 ko) — 순수
     pure.ts     테스트용 순수 배럴(→ dist/pure.mjs)
     extract.ts  선택 노드에서 토큰 추출
-    variables.ts 3계층 변수 생성/갱신(upsert) + 시맨틱 별칭 매핑(createSemanticAliases)
+    variables.ts 3계층 변수 생성/갱신(upsert) + 시맨틱 별칭 매핑 + 텍스트 스타일 등록(createSemanticTextStyles)
+    textStyles.ts 텍스트 스타일 순수 로직(시그니처 군집·크기 랭킹 명명·기본 램프) — Phase C
     bind.ts     resolved 값 매칭 → 변수 바인딩
     rename.ts   boundVariables·역할 추론 → 리네임
     entitlements.ts 요금제 티어(Free/Paid)·기능 게이팅 — 순수
@@ -89,7 +107,6 @@ src/
     licenseToken.ts 서명 토큰(JWT) 디코드·클레임·서명검증 통합 — 순수
     licenseConfig.ts 검증 서버 URL·공개키·구매/관리 링크(자리표시) — UI/code 공용 설정
     presets.ts   공유 프리셋 직렬화·검증·매핑(Paid) — 순수
-    history.ts   변경 이력(audit) 기록·포맷(Paid) — 순수
     exporters.ts 변수 → W3C 토큰 JSON · CSS 변수 내보내기 — 순수
     components.ts 컴포넌트 등록 + 베리언트 분류 순수 파서(속성=값 추론·그룹화·빈 조합) — 적용은 code.ts
     pure.ts        순수 로직 배럴(→ dist/pure.mjs)
@@ -103,23 +120,43 @@ build.mjs              esbuild 빌드(코드 번들 + UI 인라인 + 테스트 �
 ## 브랜드 팔레트 생성 (UI 0단계)
 
 브랜드 색상을 선택하면 OKLCH 기반으로 **톤 스케일(50–950)**, 선택적 **하모니(보색·유사·삼각·분할·사각)**,
-**중립(gray)·상태색(success/warning/error/info)** 을 생성해 토큰 목록에 채웁니다. 이후 `2 · 토큰 생성`으로
-기존 3계층 변수 파이프라인(Global 리터럴 → Semantic 별칭)에 그대로 커밋됩니다. 생성 로직은 전부 순수
-함수(`color.ts`/`palette.ts`)라 UI 스레드에서 동작하며 `node --test`로 검증됩니다.
+**중립·상태색(success/warning/error/info)** 을 생성해 토큰 목록에 채웁니다. **#3: Global 이름은 역할이 아니라
+hue 패밀리**(`color/blue/500`·`color/gray/900`)로 만들고(원시=정체성), 역할(primary·surface…)은
+`paletteSemanticMap`이 **Semantic 별칭**으로만 산출합니다. 동일 hue가 겹치면(예: primary·info 둘 다 blue)
+결정적 **접미사 인덱스**(`blue`, `blue-2`). 이후 `2 · 토큰 생성`으로 3계층 파이프라인(Global 리터럴 → Semantic
+별칭)에 커밋됩니다. 로직은 전부 순수(`color.ts`/`colorName.ts`/`palette.ts`)라 `node --test`로 검증됩니다.
 
 ## 시맨틱 매핑 (UI 2.5단계)
 
 `surface`·`text`·`border`·`primary` 같은 **의미(semantic) 역할**을 특정 Global 변수에 별칭으로 연결합니다
-(`Component → Semantic → Global` 단방향, 리터럴 금지). 팔레트 생성 시 `suggestSemanticMap`이 존재하는
-패밀리 기준으로 추천 매핑을 채워주며, `역할 = Global변수이름` 형식으로 편집 후 적용합니다. 적용은
-`createSemanticAliases`가 원시 스코프를 상속한 별칭 변수를 upsert(멱등)로 생성합니다.
+(`Component → Semantic → Global` 단방향, 리터럴 금지). **#10: 색 소스와 무관하게 추천** — 팔레트는
+`paletteSemanticMap`(역할→hue 정확), **추출·기존 색은 `suggestSemanticMap(colors)`** 가 OKLCH로 분류해
+무채색→surface/text/border, 채도 최고 유채색→primary를 **실제 변수 이름으로** 추천합니다(추출 후에도 매핑
+가능). **재방문 매핑**: ‘기존 색에서 추천’ 버튼은 `GET_GLOBAL_COLORS`로 **문서에 이미 있는 Global 색**을 읽어
+같은 로직으로 추천합니다(새 추출 없이도). **전 토큰 역할 어휘**(`suggestTokenRoles`): 색뿐 아니라
+spacing/radius/size는 **센터(md) 티셔츠 스케일**(`spacing/sm·md·lg`), fontSize는 base 기준 **type 스케일**
+(`font-size/body·title·h1`), fontWeight는 이름(`font-weight/bold`), fontFamily는 키워드/순서(`font-family/sans·heading`)로
+추천합니다(약함인 opacity·letterSpacing, 후순위 effects는 제외). `역할 = Global변수이름` 형식으로 편집 후 적용하며,
+`createSemanticAliases`가 원시 스코프를 상속한 별칭 변수를 upsert(멱등)로 생성합니다. **#3 색 편집표(UI 1.5단계)**: 추출/생성 색을 표로 보여주고
+(스와치·hue 이름·역할 입력), 추출 색은 `nameColorsByHue`로 **hue-Global 이름**(`color/blue/500`, 같은
+hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정해 ‘반영’하면 시맨틱 매핑에 채워집니다.
+
+## 텍스트 스타일 (UI 2.6단계 · Phase C, Paid)
+
+화면의 **실제 텍스트를 인식**해 타이포 조합을 **시맨틱 변수로 등록**하고, 이를 **명명된 텍스트 스타일**로 등록·바인딩하는 end-to-end 파이프라인입니다(스타일 → 시맨틱 → Global 3계층 완성).
+
+- **스캔**(`SCAN_TEXT_STYLES`): 선택 트리의 TEXT 노드에서 `{fontSize, lineHeight(px), letterSpacing, family, style}` 시그니처를 수집(`scanTextStyles`). 부분 서식(mixed) 텍스트는 스킵+경고.
+- **군집·명명**(순수 `textStyles.ts`): 동일 시그니처를 묶고(`clusterTextStyles`), **fontSize 내림차순**으로 `display·h1·h2·h3·title·body·caption·overline` 역할명을 배정(`nameTextStyles`, 초과분 `text-N`). 선택이 없으면 `DEFAULT_TYPE_RAMP` 폴백.
+- **등록**(`CREATE_TEXT_STYLES`, `createSemanticTextStyles`): 각 스타일의 size·lineHeight로 **Global 원시 + Semantic 별칭**(`font-size/{역할}`·`line-height/{역할}`)을 보장(`createTokens`·`createSemanticAliases` 재사용 — 구 Phase B 흡수)한 뒤, `createTextStyle`로 스타일을 upsert하고 `setBoundVariable('fontSize'|'lineHeight', …)`로 시맨틱 변수에 바인딩. 폰트 로드 실패 시 `Regular` 폴백+보고.
+- **적용**(옵션, 기본 OFF): 켜면 시그니처가 일치하는 원본 텍스트에 `setTextStyleIdAsync`로 스타일을 연결 → 토큰 값 변경이 화면에 일괄 반영.
+- UI "2.6 · 텍스트 스타일" 카드: **‘선택에서 스캔’ → 구조 표(이름·크기·행간·스타일) 편집 → ‘원본에 적용’ 체크 → ‘텍스트 스타일 등록’**. 순수 로직(군집·명명·램프)은 `node --test`로 검증, figma 호출만 `variables.ts`. **Paid 게이팅**(비-Paid는 `PREMIUM_REQUIRED`; 스캔은 무게이팅 미리보기).
 
 ## 코드 내보내기 (Export)
 
 만든 **모든 디자인 변수**(Global+Semantic)를 코드로 내보낸다. 형식은 **택1**: **W3C 토큰 JSON**(DTCG) 또는 **CSS 변수**(`:root{ --…: … }`). Semantic 별칭은 W3C `{color.primary.500}` / CSS `var(--color-primary-500)`로 보존. 변환 로직(`exporters.ts`)은 순수라 `node --test`로 검증, 변수 읽기만 `code.ts`.
 
 - **단위**: 폰트 크기는 **px/rem 택1**(rem은 `base`로 환산). 간격·반경·size는 px.
-- **line-height·letter-spacing**: 정본(STRING)의 `%·em·rem` 단위를 **그대로** 출력(CSS 네이티브 지원; W3C는 비표준 문자열). 내부 `-px` 스냅샷은 기본 제외(옵션으로 포함).
+- **line-height·letter-spacing**(#16): `Variable.description`의 원본 단위(`160%`·`0.02em`)를 우선 출력(CSS 네이티브; W3C는 비표준 문자열), 없으면 px. 별도 `-px` 스냅샷·옵션은 폐기.
 - **fontWeight/italic**: italic은 굵기가 아니라 `font-style` → `splitWeightStyle`로 분리해 `font-weight` + (italic 시) `font-style: italic`/비표준 `fontStyle` 토큰 동반.
 - **HUG/FILL 비대상**: 레이어 오토레이아웃 sizing은 변수가 아니라 export 대상이 아니다(대응 토큰 없음).
 - UI "내보내기(코드)" 카드에서 형식·폰트단위 선택 → 결과 복사 또는 `tokens.json`/`tokens.css` 다운로드. 게이팅: **Free**(리드젠).
@@ -135,7 +172,7 @@ build.mjs              esbuild 빌드(코드 번들 + UI 인라인 + 테스트 �
 
 **Phase 4 — 누락 조합 자동 생성**: 선택한 베리언트 세트의 **빠진 속성 조합**(`missingVariants` 순수 계산)을 기존 변형을 클론해 `prop=value`로 이름 지정하여 생성(`GENERATE_MISSING_VARIANTS`, Paid). 분류·생성 후 세트는 **속성 기반 2D 그리드**(`variantGrid`: 첫 속성=행, 둘째=열)로 정렬되고 자식에 맞게 **리사이즈**된다. 라이브러리 발행은 Plugin API 미지원이라 수동.
 
-**Phase 4.1 — 컴포넌트 속성 노출**: 선택한 컴포넌트의 자식 레이어를 규칙으로 분석(`inferComponentProperties`)해 **컴포넌트 속성**을 만들고 연결(`EXPOSE_PROPERTIES`, Paid). TEXT 레이어→TEXT(characters), INSTANCE→INSTANCE_SWAP(mainComponent, 기본값은 발행 컴포넌트 key 또는 로컬 id), 이름이 `?`로 끝나는 레이어→BOOLEAN(visible). 실패 항목은 건너뜀.
+**Phase 4.1 — 컴포넌트 속성 노출**: 선택한 컴포넌트 또는 **베리언트 세트**의 자식 레이어를 규칙으로 분석(`inferComponentProperties`)해 **컴포넌트 속성**을 만들고 연결(`EXPOSE_PROPERTIES`, Paid). 세트는 대표 변형으로 속성을 계획해 **세트에 추가**하고 모든 변형의 동명 레이어에 참조를 연결한다. TEXT 레이어→TEXT(characters), INSTANCE→INSTANCE_SWAP(mainComponent, 기본값은 발행 컴포넌트 key 또는 로컬 id), 이름이 `?`로 끝나는 레이어→BOOLEAN(visible). 실패 항목은 건너뜀.
 
 빌드 메모: Figma UI는 단일 HTML만 로드(외부 `<script src>` 불가)하므로, `ui.ts` 번들 결과를
 `ui.html`의 인라인 `<script>`로 주입합니다(`build.mjs`).
@@ -144,9 +181,10 @@ build.mjs              esbuild 빌드(코드 번들 + UI 인라인 + 테스트 �
 
 단계가 늘어 길어진 단일 스크롤을 **탭 그룹**으로 재편한다.
 
-- **구조 재편 ✅ (구현됨)**: 단일 스크롤 → **탭 3개** `만들기`(팔레트·추출·토큰 생성·시맨틱) / `적용`(바인딩·리네임·컴포넌트·베리언트) / `관리`(내보내기·요금제·프리셋·이력). 상단 sticky 탭 바.
-- **진행 안내**(추후): 단계별 완료/대기 상태, 권장 순서 가이드(의존관계 시각화).
-- **유료 게이팅 노출 ✅**: 컴포넌트·프리셋/이력(Paid) 카드에 🔒 잠금·비활성 표시.
+- **구조 재편 ✅ (v2 4탭)**: **`시작`(시스템화 마법사) / `만들기`(팔레트·추출·생성·시맨틱) / `적용`(바인딩·리네임·대비·컴포넌트) / `관리`(내보내기·요금제·프리셋)**. 상단 sticky 탭 바, 첫 화면은 `시작`. 창은 우하단 핸들로 리사이즈(크기 기억).
+- **통합 게이트 ✅ (v2 #11·#12)**: **전제 미충족 가드** — Global 변수가 없으면 시맨틱 매핑, 바인딩 가능 변수가 없으면 바인딩 카드를 **비활성+안내(+‘토큰 생성으로’ 바로가기)** 로 가드(조용히 0건 방지). 유료 잠금(Paid)과 함께 `updateGates` 한 메커니즘으로 처리(`PREREQ_STATE`로 상태 동기화).
+- **진행 안내 ✅ (의존관계 시각화)**: 시작 탭에 의존 파이프라인(토큰 생성→시맨틱 매핑→바인딩)의 **단계 상태**(완료/준비됨/전제 미충족)를 표시하고, 클릭하면 해당 단계로 이동합니다. 상태 로직은 순수(`pipeline.ts`)라 `node --test`로 검증. 리네임·대비·컴포넌트는 독립이라 별도 표기.
+- **유료 게이팅 노출 ✅**: 토큰 생성·시맨틱·컴포넌트·프리셋 등 유료(Paid) 카드에 🔒 잠금·비활성 표시(미리보기·탐색은 무료).
 - **반응형·접근성**(부분): 탭 `role=tab/tabpanel`·`aria-selected`. 키보드 화살표 이동·대비는 추후.
 
 > 비고: 기능 동작은 그대로 두고 **메뉴/레이아웃 표현만** 개편. `ui.html`/`ui.ts`만 변경(메시지·로직 불변).
@@ -160,11 +198,14 @@ build.mjs              esbuild 빌드(코드 번들 + UI 인라인 + 테스트 �
 - ✅ **명확한 피드백**: 바인딩 스킵을 사유별 그룹으로(매칭 없음·빈 텍스트·HUG/FILL·오토레이아웃 아님·폰트 미로드·실패). _(`BindResult.reasons`)_
 - ✅ **온보딩·가이드**: 추출 목록 빈 상태 도움말(선택 여부에 맞춘 안내·예시).
 - ✅ **선택 동기화**: 선택 변경 시 실시간 상태 바(선택 n·요소 m·바인딩 후보 b), 스캔 상한 안전장치. _(`SELECTION_STATE`)_
-- ✅ **성능 체감**: 대량 바인딩 진행률 바 + 협조적 취소(비파괴, 처리분 유지). _(`BindHooks`)_
+- ✅ **성능 체감**: 대량 바인딩 진행률 바 + 협조적 취소(비파괴, 처리분 유지). _(`BindHooks`)_ · **대량 선택 점진 렌더** — 토큰 목록·선택 트리·색 편집표가 클 때 `requestAnimationFrame` 청크로 비차단 렌더(소량은 즉시). _(`renderChunked`)_
 - ✅ **오류 처리**: 사람이 읽는 메시지 + 복구 행동 + ‘다시 시도’, 실패한 작업 영역으로 라우팅. _(`lib/errors.ts`)_
 - ✅ **접근성**: 탭 키보드 내비(roving tabindex + 화살표/Home/End), ARIA tab/tabpanel. _(`lib/a11y.ts`)_
+- ✅ **명도 대비 점검 + 보정(#2)**: 선택 안 텍스트의 글자색 ↔ 유효 배경(가장 가까운 상위 단색 채움)을 WCAG 기준(AA/AAA, 큰 글자 반영)으로 검사 → 미달 건을 대비 낮은 순으로 보고. **미달 행마다 보정 제안** — `suggestContrastFix`가 OKLCH 명도(L)를 이분 탐색해 기준을 통과시키는 **최소 변경색**을 산출(텍스트색 기본·배경색 옵션), ‘텍스트/배경’ 버튼으로 해당 노드 채움에 적용(`APPLY_CONTRAST_FIX`, 단일 Undo). _(`lib/contrast.ts`, `CHECK_CONTRAST`)_
 
-> 비고: 동작 규칙(3계층·멱등·스코프)은 유지하고 **경험 계층**만 개선했다. 잔여(추후): 국제화(i18n 문자열 외부화), 명도 대비 점검, 대량 선택 비차단 점진 렌더.
+- ✅ **국제화(i18n) 인프라**: UI 문자열을 `i18n.ts`의 `STRINGS` 단일 소스로 모으고 `t(key, vars)`로 조회(`{var}` 보간, 누락 키는 폴백). 상태/피드백(`setStatus`) 메시지를 전부 키로 외부화. _(잔여: HTML 정적 라벨·마법사 단계 문구는 같은 패턴으로 추후)_
+
+> 비고: 동작 규칙(3계층·멱등·스코프)은 유지하고 **경험 계층**만 개선했다.
 
 ## 유료화 / 상용 전환
 
@@ -203,12 +244,25 @@ build.mjs              esbuild 빌드(코드 번들 + UI 인라인 + 테스트 �
 ### 엔타이틀먼트 모델
 - `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`presets`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
 - `code.ts`: `requirePaid(feature, message)` 단일 게이트. 토큰 생성(미리보기 제외)·시맨틱·컴포넌트·프리셋/이력을 게이팅. 바인딩·리네임·팔레트·내보내기·미리보기는 무게이팅.
-- 메시지(`src/shared/messages.ts`): `CodeToUi.LICENSE_STATUS { tier, paid, source, … }` · `PREMIUM_REQUIRED { feature, message }`.
+- 메시지(`src/shared/messages.ts`): `CodeToUi.LICENSE_STATUS { tier, unlimited, source, … }` · `PREMIUM_REQUIRED { feature, message }`.
 
 ### 관리자 / 개발·테스트 전권 + 백도어 차단
 - **개발 빌드 전용 티어 토글**: `__DEV__`(esbuild define, `npm run watch`/`node build.mjs --dev`에서 true) 일 때만 `SET_LICENSE` 개발용 강제 티어(`paid`)가 동작 → 결제 없이 전권 테스트.
 - **배포 빌드**(`npm run build`)에선 `__DEV__=false` → `SET_LICENSE` 핸들러와 UI 토글이 **컴파일 단계에서 비활성**(페이월 우회 백도어 차단).
 - **실제 검증 경로 테스트**: LemonSqueezy **test mode** + sandbox 키로 Worker `/verify`. (선택) Worker `ADMIN_KEYS` 오너 allowlist 키 → 장기 paid 토큰(스모크 테스트용).
+
+### 가격 (자리표시)
+- **Paid** — 단일 유료 티어. 월/연 구독(연 결제 할인), 금액 **TBD**. 결제·환불·세금은 **LemonSqueezy(MoR)** 위임.
+
+### 단계별 출시
+- **M0**: 전 기능 무료.
+- **M1 ✅ (구현됨)**: 엔타이틀먼트(`entitlements.ts`, Free/Paid) + `requirePaid` 단일 게이트 + UI 개발용 티어 토글. **사용량 횟수 한도 없음**(기능 게이팅으로 대체). 결제 없음.
+- **M2 ✅ (구현됨, 서버 미배포)**: 라이선스 키 입력·검증(`license.ts` + UI fetch) + `clientStorage` 캐시·오프라인 grace. `VERIFY_URL`·`allowedDomains`는 자리표시 → 실제 검증 서버/결제 제공자 연동 시 교체.
+- **M2.1 ✅ (구현됨)**: 서명 토큰(JWT) 검증 코어(`licenseToken.ts`) — 서명+클레임 검사, `alg=none` 거부.
+- **M2.2 ✅ (구현됨)**: 네트워크+서명 검증을 **UI 아이프레임**으로 이동(`verifyAndReport`→`LICENSE_VERIFIED`), `code`는 캐시/grace/게이팅만. 시작 시 stale 캐시는 `REQUEST_VERIFY`로 재검증(보관된 `instanceId`로 같은 기기 validate). 키 해제 시 `REQUEST_DEACTIVATE`로 LemonSqueezy 활성화 슬롯 반납(best-effort).
+- **M3 ✅ (구현됨: 공유 프리셋)**: Paid 게이팅으로 **공유 프리셋**(`presets.ts`) — base·허용오차·맥락단계·시맨틱 매핑을 저장/불러오기 + JSON 내보내기/가져오기(`clientStorage` 보관). 비-Paid는 `PREMIUM_REQUIRED`.
+- **M3.1 ~~변경 이력~~ — v2에서 제거(PR #37)**: 불투명한 집계성 이력은 v2 재설계에서 비목표로 결정해 `history.ts`·이력 카드·메시지·기록 호출부를 전면 삭제했다. (선택형 미리보기 트리가 "무엇이 바뀌는지"를 더 투명하게 대체.)
+- **M3.2**(다음): 서버 기반 시트(seat) 관리 · 가격/프로모션 확정 · 팀 동기화(클라우드 공유).
 
 ### 프라이버시 · 법무
 - 토큰·디자인 데이터 **로컬 처리** 유지, 외부 전송은 **라이선스 검증 요청(키 + instanceName)** 에 한정 — 디자인 데이터 미전송.

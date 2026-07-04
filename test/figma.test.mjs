@@ -9,6 +9,9 @@ import {
   createTokens,
   previewCreateTokens,
   createSemanticAliases,
+  prunePaletteColors,
+  scanTextStyles,
+  createSemanticTextStyles,
   bindSelection,
   renameSelection,
 } from '../dist/figma-lib.mjs';
@@ -17,6 +20,7 @@ import {
 function installFigma() {
   const collections = [];
   const variables = [];
+  const textStyles = [];
   let seq = 0;
   const mixed = Symbol('figma.mixed');
 
@@ -41,6 +45,10 @@ function installFigma() {
       valuesByMode: {},
       setValueForMode(modeId, value) {
         this.valuesByMode[modeId] = value;
+      },
+      remove() {
+        const i = variables.indexOf(this);
+        if (i >= 0) variables.splice(i, 1);
       },
     };
     variables.push(v);
@@ -67,7 +75,24 @@ function installFigma() {
       }),
     },
     loadFontAsync: async () => {},
-    _state: { collections, variables },
+    createTextStyle: () => {
+      const st = {
+        id: `style:${seq++}`,
+        name: '',
+        fontName: { family: '', style: '' },
+        fontSize: 0,
+        lineHeight: { unit: 'AUTO' },
+        letterSpacing: { value: 0, unit: 'PIXELS' },
+        boundVariables: {},
+        setBoundVariable(field, v) {
+          this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id };
+        },
+      };
+      textStyles.push(st);
+      return st;
+    },
+    getLocalTextStylesAsync: async () => textStyles.slice(),
+    _state: { collections, variables, textStyles },
   };
   globalThis.figma = figma;
   return figma;
@@ -98,6 +123,7 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
     name: 'Rect',
     fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, visible: true }], // 같은 검정 → dedup
     strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 1 }, visible: true }],
+    strokeWeight: 2,
     cornerRadius: 4,
   };
   const frame = {
@@ -105,6 +131,7 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
     id: 'f1',
     name: 'Frame',
     fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 }, visible: true }],
+    opacity: 0.5,
     layoutMode: 'VERTICAL',
     itemSpacing: 16,
     paddingLeft: 8,
@@ -142,6 +169,12 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
   assert.equal(byName.get('size/100')?.category, 'size');
   assert.equal(byName.get('radius/8')?.category, 'radius');
   assert.equal(byName.get('radius/4')?.category, 'radius');
+  // 선 두께(border) — 보이는 선이 있을 때만
+  assert.equal(byName.get('stroke-width/2')?.category, 'strokeWidth');
+  assert.deepEqual(byName.get('stroke-width/2')?.sources, ['strokeWidth']);
+  // 레이어 불투명도(<1)
+  assert.equal(byName.get('opacity/0_5')?.category, 'opacity');
+  assert.deepEqual(byName.get('opacity/0_5')?.sources, ['opacity']);
 });
 
 test('extractFromSelection — 그라디언트 채움은 경고', () => {
@@ -170,8 +203,8 @@ test('createTokens — Global 리터럴 + Semantic 별칭 + scopes/hidden + px �
     16,
   );
 
-  // 색(G+S)=2 + 라인하이트(G STRING + G px + S px미러 + S STRING)=4 + 간격(G+S)=2 = created 8
-  assert.deepEqual(summary, { created: 8, updated: 0, globals: 4, semantics: 4 });
+  // #16: 토큰당 G+S 1쌍(스냅샷 없음). 색2 + 라인하이트2 + 간격2 = created 6
+  assert.deepEqual(summary, { created: 6, updated: 0, globals: 3, semantics: 3 });
 
   // Global 색: 리터럴 + scope + hidden
   const gColor = findVar(figma, 'Global', 'color/0066ff');
@@ -184,37 +217,31 @@ test('createTokens — Global 리터럴 + Semantic 별칭 + scopes/hidden + px �
   assert.equal(sColor.valuesByMode['mode:Semantic'].type, 'VARIABLE_ALIAS');
   assert.equal(sColor.valuesByMode['mode:Semantic'].id, gColor.id);
 
-  // 비-px lineHeight: Global은 STRING '150%', px 스냅샷 FLOAT 24(이름에 단위 포함)
+  // #16: 비-px lineHeight는 px FLOAT 단일(value=24=16*150/100) + 원본 단위는 description
   const gLh = findVar(figma, 'Global', 'line-height/150');
-  assert.equal(gLh.resolvedType, 'STRING');
-  assert.equal(gLh.valuesByMode['mode:Global'], '150%');
-  // STRING엔 LINE_HEIGHT(FLOAT 전용) 스코프를 못 줌 → 필터되어 빈 배열 (실 Figma 거부 방지)
-  assert.deepEqual(gLh.scopes, []);
-  const gLhPx = findVar(figma, 'Global', 'line-height/150-percent-px');
-  assert.equal(gLhPx.resolvedType, 'FLOAT');
-  assert.equal(gLhPx.valuesByMode['mode:Global'], 24);
-  // px 스냅샷(FLOAT)은 LINE_HEIGHT 스코프 유지
-  assert.deepEqual(gLhPx.scopes, ['LINE_HEIGHT']);
-  // px 스냅샷은 Semantic 미러(별칭)도 있어 바인딩 가능
-  const sLhPx = findVar(figma, 'Semantic', 'line-height/150-percent-px');
-  assert.equal(sLhPx.resolvedType, 'FLOAT');
-  assert.equal(sLhPx.valuesByMode['mode:Semantic'].type, 'VARIABLE_ALIAS');
-  assert.equal(sLhPx.valuesByMode['mode:Semantic'].id, gLhPx.id);
+  assert.equal(gLh.resolvedType, 'FLOAT');
+  assert.equal(gLh.valuesByMode['mode:Global'], 24);
+  assert.equal(gLh.description, '150%');
+  assert.deepEqual(gLh.scopes, ['LINE_HEIGHT']); // FLOAT라 스코프 유지
+  // Semantic 미러(별칭)
+  const sLh = findVar(figma, 'Semantic', 'line-height/150');
+  assert.equal(sLh.resolvedType, 'FLOAT');
+  assert.equal(sLh.valuesByMode['mode:Semantic'].type, 'VARIABLE_ALIAS');
+  assert.equal(sLh.valuesByMode['mode:Semantic'].id, gLh.id);
+  // 스냅샷(-px) 변수는 생성하지 않음
+  assert.equal(findVar(figma, 'Global', 'line-height/150-percent-px'), undefined);
 });
 
-test('createTokens — px 스냅샷 이름에 단위 포함(percent vs em 값 충돌 없음)', async () => {
+test('createTokens(#16) — letterSpacing(em)도 px FLOAT + description', async () => {
   const figma = installFigma();
   await createTokens(
-    [
-      { name: 'line-height/150', category: 'lineHeight', sources: ['lineHeight'], value: 150, unit: 'percent' },
-      { name: 'line-height/150-em', category: 'lineHeight', sources: ['lineHeight'], value: 150, unit: 'em' },
-    ],
+    [{ name: 'letter-spacing/0_02', category: 'letterSpacing', sources: ['letterSpacing'], value: 0.02, unit: 'em' }],
     16,
   );
-  const pct = findVar(figma, 'Global', 'line-height/150-percent-px');
-  const em = findVar(figma, 'Global', 'line-height/150-em-px');
-  assert.equal(pct.valuesByMode['mode:Global'], 24); // 16*150/100
-  assert.equal(em.valuesByMode['mode:Global'], 2400); // 150*16
+  const g = findVar(figma, 'Global', 'letter-spacing/0_02');
+  assert.equal(g.resolvedType, 'FLOAT');
+  assert.equal(g.valuesByMode['mode:Global'], 0.32); // 0.02*16
+  assert.equal(g.description, '0.02em');
 });
 
 test('createTokens — 재실행 멱등(upsert): 두 번째는 모두 updated', async () => {
@@ -349,6 +376,165 @@ test('bindSelection — 허용오차 내 동률은 가장 가까운 값으로 �
   assert.equal(node._bound.width, s12.id);
 });
 
+test('bindSelection — 여백(padding/gap)은 GAP 변수에만 — size/line-height/letter-spacing 오매칭 방지', async () => {
+  const figma = installFigma();
+  // 값이 모두 24로 같은 네 변수: 간격(GAP)·크기(WIDTH_HEIGHT)·행간(LINE_HEIGHT)·자간(LETTER_SPACING)
+  await createTokens(
+    [
+      { name: 'spacing/24', category: 'gap', sources: ['gap'], value: 24 },
+      { name: 'size/24', category: 'size', sources: ['size'], value: 24 },
+      { name: 'line-height/lg', category: 'lineHeight', sources: ['lineHeight'], value: 24, unit: 'px' },
+      { name: 'letter-spacing/wide', category: 'letterSpacing', sources: ['letterSpacing'], value: 24, unit: 'px' },
+    ],
+    16,
+  );
+  const node = {
+    type: 'FRAME',
+    id: 'al',
+    name: 'al',
+    fills: [],
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    layoutMode: 'HORIZONTAL',
+    itemSpacing: 24,
+    paddingLeft: 24,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  };
+
+  const res = await bindSelection([node], 0.5);
+
+  const gap = findVar(figma, 'Semantic', 'spacing/24');
+  // itemSpacing·paddingLeft는 GAP 변수로만 연결(크기/행간/자간으로 새지 않음)
+  assert.equal(node._bound.itemSpacing, gap.id);
+  assert.equal(node._bound.paddingLeft, gap.id);
+  assert.equal(res.bound, 2); // itemSpacing + paddingLeft (0짜리 padding 3개는 no-match)
+});
+
+test('bindSelection — 선 두께(strokeWeight)는 STROKE_FLOAT 변수에 바인딩(여백 변수로 안 샘)', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'stroke-width/2', category: 'strokeWidth', sources: ['strokeWidth'], value: 2 },
+      { name: 'spacing/2', category: 'gap', sources: ['gap'], value: 2 }, // 같은 값 2 — 오매칭 유혹
+    ],
+    16,
+  );
+  const node = {
+    type: 'FRAME',
+    id: 'bordered',
+    name: 'bordered',
+    fills: [],
+    strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, visible: true }],
+    strokeWeight: 2,
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    layoutMode: 'NONE',
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  };
+
+  const res = await bindSelection([node], 0.5);
+
+  const sw = findVar(figma, 'Semantic', 'stroke-width/2');
+  assert.equal(node._bound.strokeWeight, sw.id); // STROKE_FLOAT 변수로 연결
+  assert.equal(res.bound, 1);
+});
+
+test('bindSelection — 색상도 용도 스코프로 분리(stroke 전용 색은 fill에 안 붙음)', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'color/aa0000', category: 'color', sources: ['fill'], value: '#aa0000' }, // ALL_FILLS
+      { name: 'color/0000aa', category: 'color', sources: ['stroke'], value: '#0000aa' }, // STROKE_COLOR
+    ],
+    16,
+  );
+  const node = {
+    type: 'FRAME',
+    id: 'c',
+    name: 'c',
+    fills: [
+      { type: 'SOLID', color: { r: 0.6667, g: 0, b: 0 } }, // #aa0000 → fill 변수
+      { type: 'SOLID', color: { r: 0, g: 0, b: 0.6667 } }, // #0000aa = stroke 전용 색 → fill엔 안 붙어야
+    ],
+    strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0.6667 }, visible: true }], // #0000aa → stroke 변수
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    layoutMode: 'NONE',
+  };
+
+  const res = await bindSelection([node], 0.5);
+
+  const fillVar = findVar(figma, 'Semantic', 'color/aa0000');
+  const strokeVar = findVar(figma, 'Semantic', 'color/0000aa');
+  assert.equal(node.fills[0].boundVariables.color.id, fillVar.id); // fill 매칭
+  assert.equal(node.fills[1].boundVariables, undefined); // stroke 전용 색은 fill에 안 붙음
+  assert.equal(node.strokes[0].boundVariables.color.id, strokeVar.id); // stroke 매칭
+  assert.equal(res.bound, 2);
+});
+
+test('bindSelection — 레이어 불투명도(opacity)는 OPACITY 변수에 정밀 바인딩', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'opacity/0_5', category: 'opacity', sources: ['opacity'], value: 0.5 }, // OPACITY
+      { name: 'size/0_5', category: 'size', sources: ['size'], value: 0.5 }, // WIDTH_HEIGHT — 같은 값, 오매칭 유혹
+    ],
+    16,
+  );
+  const node = {
+    type: 'FRAME',
+    id: 'op',
+    name: 'op',
+    fills: [],
+    opacity: 0.5,
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    layoutMode: 'NONE',
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  };
+
+  const res = await bindSelection([node], 4); // px 허용오차가 커도 opacity는 정밀 매칭
+
+  const op = findVar(figma, 'Semantic', 'opacity/0_5');
+  assert.equal(node._bound.opacity, op.id); // OPACITY 변수로만 연결(size로 안 샘)
+  assert.equal(res.bound, 1);
+});
+
+test('bindSelection — fontFamily(STRING)는 FONT_FAMILY 변수에 정확 일치 바인딩', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'font-family/Inter', category: 'fontFamily', sources: ['fontFamily'], value: 'Inter' }], 16);
+  const node = {
+    type: 'TEXT',
+    id: 'txt',
+    name: 'txt',
+    fills: [],
+    fontName: { family: 'Inter', style: 'Regular' },
+    fontSize: 16,
+    lineHeight: { unit: 'AUTO' },
+    letterSpacing: { unit: 'PIXELS', value: 0 },
+    characters: 'Hello',
+    boundVariables: {},
+    setRangeBoundVariable(start, end, field, v) {
+      this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id };
+    },
+  };
+
+  const res = await bindSelection([node], 0.5);
+
+  const fam = findVar(figma, 'Semantic', 'font-family/Inter');
+  assert.equal(node.boundVariables.fontFamily.id, fam.id);
+  assert.ok(res.bound >= 1);
+});
+
 test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + 사유', async () => {
   installFigma();
   await createTokens(
@@ -392,6 +578,58 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
   assert.equal(real.bound, 2);
   assert.equal(real.skipped, 1);
   assert.equal(node2.fills[0].boundVariables.color.type, 'VARIABLE_ALIAS');
+  // apply=true(실제)에서는 미리보기 후보/노드를 수집하지 않음
+  assert.equal(real.candidates, undefined);
+  assert.equal(real.nodes, undefined);
+});
+
+test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 필드/변수/인덱스', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+    ],
+    16,
+  );
+  // 루트(매칭 없음) → 자식(색+width 매칭). 조상은 맥락으로 보존돼야 한다.
+  const child = {
+    type: 'FRAME',
+    id: 'child',
+    name: 'child',
+    fills: [
+      { type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }, // #0066ff → 후보(fills,0)
+      { type: 'SOLID', color: { r: 0, g: 1, b: 0 } }, // 미매칭
+    ],
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: 200, // → 후보(width)
+    height: 50,
+    layoutMode: 'NONE',
+    setBoundVariable() {},
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'root', fills: [], layoutMode: 'NONE', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [child], setBoundVariable() {} };
+
+  const dry = await bindSelection([root], 0.5, false);
+
+  // 후보 2건: fills[0] 색 + width
+  assert.equal(dry.candidates.length, 2);
+  const fillC = dry.candidates.find((c) => c.field === 'fills');
+  assert.equal(fillC.nodeId, 'child');
+  assert.equal(fillC.index, 0);
+  assert.equal(fillC.currentValue, '#0066ff');
+  assert.equal(fillC.variableName, 'color/0066ff');
+  assert.ok(fillC.tier >= 2);
+  const widthC = dry.candidates.find((c) => c.field === 'width');
+  assert.equal(widthC.nodeId, 'child');
+  assert.equal(widthC.distance, 0); // 정확 매칭
+
+  // 트리: 영향(child) + 조상(root)만, pre-order. 계층 복원.
+  assert.deepEqual(dry.nodes.map((n) => n.id), ['root', 'child']);
+  const byId = new Map(dry.nodes.map((n) => [n.id, n]));
+  assert.equal(byId.get('root').parentId, null);
+  assert.equal(byId.get('child').parentId, 'root');
+  assert.equal(byId.get('child').depth, 1);
 });
 
 test('bindSelection — 진행률 보고 + 취소(UX6)', async () => {
@@ -459,11 +697,12 @@ test('previewCreateTokens — 변수 생성 없이 생성/갱신 예정 집계',
 });
 
 /* ================= rename.ts ================= */
-test('renameSelection — 토큰명/역할명/제외규칙/형제 dedup', async () => {
+test('renameSelection — 역할 기반·보존형·맥락 전파·형제 중복(숫자 없음)', async () => {
   const figma = installFigma();
   const col = figma.variables.createVariableCollection('Semantic');
   const tokenVar = figma.variables.createVariable('button/primary/background', col, 'COLOR');
 
+  // 의미 있는 이름 → 보존하고 자식 맥락으로 사용.
   const bg = {
     type: 'RECTANGLE',
     id: 'bg',
@@ -474,15 +713,13 @@ test('renameSelection — 토큰명/역할명/제외규칙/형제 dedup', async 
   const icon1 = { type: 'VECTOR', id: 'ic1', name: 'Vector 2' };
   const icon2 = { type: 'VECTOR', id: 'ic2', name: 'Vector 3' };
   const txt = { type: 'TEXT', id: 'tx', name: 'KeepText', characters: 'x' };
-  // 인스턴스 + 내부 자식: 인스턴스 자식 이름은 변경 불가(Figma throw) → 순회 제외돼야 함.
-  const instChild = { type: 'RECTANGLE', id: 'inch', name: 'InstanceChildRect', fills: [{ type: 'SOLID', visible: true }] };
-  const inst = { type: 'INSTANCE', id: 'in', name: 'KeepInstance', children: [instChild] };
+  const inst = { type: 'INSTANCE', id: 'in', name: 'KeepInstance' };
   const bg2 = { type: 'RECTANGLE', id: 'bg2', name: 'Rectangle 9', fills: [{ type: 'SOLID', visible: true }] };
 
   const root = {
     type: 'FRAME',
     id: 'root',
-    name: 'Root',
+    name: 'button', // 사람이 지은 이름 → 보존
     children: [bg, icon1, icon2, txt, inst, bg2],
   };
 
@@ -490,69 +727,324 @@ test('renameSelection — 토큰명/역할명/제외규칙/형제 dedup', async 
   assert.equal(applied, true);
 
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  // 루트 FRAME → role 'container'
-  assert.equal(after.get('root'), 'container');
-  // 토큰 보유 → 변수 전체 경로
-  assert.equal(after.get('bg'), 'button-primary-background');
-  // 역할명 + 상위 맥락 + 형제 dedup
-  assert.equal(after.get('ic1'), 'container-icon');
-  assert.equal(after.get('ic2'), 'container-icon-2');
-  // 토큰 없는 채움 사각형 → background
-  assert.equal(after.get('bg2'), 'container-background');
+  // 의미 있는 루트 이름은 보존(변경 없음) → 자식 맥락 'button'
+  assert.equal(after.has('root'), false);
+  assert.equal(root.name, 'button');
+  // 토큰 말단(background)이 역할 신호 → 토큰 경로 복사가 아니라 맥락(button)+역할
+  assert.equal(after.get('bg'), 'button-background');
+  // VECTOR → icon, 맥락 button. 형제가 같아도 숫자 안 붙음(Figma 중복 허용)
+  assert.equal(after.get('ic1'), 'button-icon');
+  assert.equal(after.get('ic2'), 'button-icon');
+  // 토큰 없는 채움 사각형 → background, bg와 동일(중복 허용)
+  assert.equal(after.get('bg2'), 'button-background');
   // 제외: Text·Instance는 변경 없음(이름 유지)
   assert.equal(after.has('tx'), false);
   assert.equal(after.has('in'), false);
   assert.equal(txt.name, 'KeepText');
   assert.equal(inst.name, 'KeepInstance');
-  // 인스턴스 자식은 순회 제외(이름 변경 불가) → 변경 항목 없음, 원래 이름 유지
-  assert.equal(after.has('inch'), false);
-  assert.equal(instChild.name, 'InstanceChildRect');
 });
 
-test('renameSelection — 비대표 바인딩 필드(paddingRight·효과 색)도 토큰명 인식', async () => {
+test('renameSelection — nodes: 전체 서브트리 + 계층(depth/parentId) + 영향 노드만 after', async () => {
+  installFigma();
+  const icon = { type: 'VECTOR', id: 'ic', name: 'Vector 2' }; // 영향(→ icon)
+  const keep = { type: 'TEXT', id: 'tx', name: 'KeepText', characters: 'x' }; // 보존(after 없음)
+  const root = { type: 'FRAME', id: 'root', name: 'card', children: [icon, keep] }; // 의미명 → 보존
+
+  const { nodes, changes } = await renameSelection([root], { apply: false, maxDepth: 3 });
+
+  // 전체 서브트리(루트 + 자식 2)가 모두 트리에 담긴다.
+  assert.deepEqual(nodes.map((n) => n.id).sort(), ['ic', 'root', 'tx']);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  // 계층: 루트 depth0·parentId null, 자식 depth1·parentId 'root'
+  assert.equal(byId.get('root').depth, 0);
+  assert.equal(byId.get('root').parentId, null);
+  assert.equal(byId.get('ic').depth, 1);
+  assert.equal(byId.get('ic').parentId, 'root');
+  // 영향 노드만 after 보유(icon), 보존 노드(root·text)는 after 없음
+  assert.equal(byId.get('ic').after, 'card-icon');
+  assert.equal(byId.get('root').after, undefined);
+  assert.equal(byId.get('tx').after, undefined);
+  // name은 변경 전(before) — apply:false라 실제 이름 불변
+  assert.equal(byId.get('ic').name, 'Vector 2');
+  assert.equal(icon.name, 'Vector 2');
+  // changes는 영향 노드만(=after 있는 노드 수와 일치)
+  assert.equal(changes.length, nodes.filter((n) => n.after !== undefined).length);
+});
+
+test('renameSelection — 의미 있는 이름은 보존(교체 안 함)', async () => {
+  installFigma();
+  const node = { type: 'FRAME', id: 'f', name: 'OriginalName', children: [] };
+  const { changes } = await renameSelection([node], { apply: true, maxDepth: 3 });
+  assert.equal(changes.length, 0); // 기본명이 아니므로 보존
+  assert.equal(node.name, 'OriginalName');
+});
+
+test('renameSelection — 토큰 신호로 맥락/역할 결정(조상 없음 → 토큰 접두사 폴백, 원시 토큰은 무시)', async () => {
   const figma = installFigma();
   const col = figma.variables.createVariableCollection('Semantic');
-  const space = figma.variables.createVariable('space/md', col, 'FLOAT');
-  const shadow = figma.variables.createVariable('shadow/ambient', col, 'COLOR');
+  const semantic = figma.variables.createVariable('button/primary/background', col, 'COLOR');
+  const glob = figma.variables.createVariableCollection('Global');
+  const primitive = figma.variables.createVariable('color/blue-500', glob, 'COLOR');
 
-  // paddingRight'만' 바인딩(이전엔 FIELD_ORDER에서 누락 → 역할명으로 폴백)
-  const padNode = {
-    type: 'FRAME', id: 'pad', name: 'Frame 1',
-    boundVariables: { paddingRight: { type: 'VARIABLE_ALIAS', id: space.id } },
+  // 단독 선택(조상 없음) + 시맨틱 토큰 → 토큰 접두사에서 깨끗한 1단계(button)가 맥락, leaf가 역할
+  const a = {
+    type: 'RECTANGLE',
+    id: 'a',
+    name: 'Rectangle 1',
+    boundVariables: { fills: [{ type: 'VARIABLE_ALIAS', id: semantic.id }] },
+    fills: [{ type: 'SOLID', visible: true }],
   };
-  // 효과 색'만' 바인딩(node.boundVariables 아닌 effect에 보관)
-  const fxNode = {
-    type: 'FRAME', id: 'fx', name: 'Frame 2',
-    effects: [{ type: 'DROP_SHADOW', boundVariables: { color: { type: 'VARIABLE_ALIAS', id: shadow.id } } }],
+  // 원시(Global) 토큰 → 이름 신호 없음 → 기하 폴백(채움 → background), 맥락 없음
+  const b = {
+    type: 'RECTANGLE',
+    id: 'b',
+    name: 'Rectangle 1',
+    boundVariables: { fills: [{ type: 'VARIABLE_ALIAS', id: primitive.id }] },
+    fills: [{ type: 'SOLID', visible: true }],
   };
 
-  const { changes } = await renameSelection([padNode, fxNode], { apply: true, maxDepth: 3 });
+  const { changes } = await renameSelection([a, b], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('pad'), 'space-md'); // 역할 'container'가 아니라 토큰명
-  assert.equal(after.get('fx'), 'shadow-ambient');
+  assert.equal(after.get('a'), 'button-background'); // button-primary → 1단계 button
+  assert.equal(after.get('b'), 'background');
 });
 
-test('renameSelection — 역할 추론이 ROLE_VOCAB 내에서 확장(divider·image·border·shape)', async () => {
-  installFigma();
-  const line = { type: 'LINE', id: 'ln', name: 'Line 1' };
-  const img = { type: 'RECTANGLE', id: 'im', name: 'Rect A', fills: [{ type: 'IMAGE', visible: true }] };
-  const bordered = { type: 'RECTANGLE', id: 'bd', name: 'Rect B', fills: [], strokes: [{ type: 'SOLID', visible: true }] };
-  const bare = { type: 'ELLIPSE', id: 'sh', name: 'Ellipse C', fills: [] };
+test('renameSelection — 구 리네임이 남긴 토큰 베낌 이름(color-121210)은 교체', async () => {
+  const figma = installFigma();
+  const glob = figma.variables.createVariableCollection('Global');
+  const primitive = figma.variables.createVariable('color/121210', glob, 'COLOR');
 
-  const { changes } = await renameSelection([line, img, bordered, bare], { apply: true, maxDepth: 3 });
+  // 구 동작이 원시 토큰 경로를 베껴 만든 프레임 이름 → 보존하면 안 됨
+  const frame = {
+    type: 'FRAME',
+    id: 'f',
+    name: 'color-121210',
+    fills: [{ type: 'SOLID', visible: true }],
+    boundVariables: { fills: [{ type: 'VARIABLE_ALIAS', id: primitive.id }] },
+    children: [],
+  };
+  // #7b: depth0 루트는 항상 보존되므로 대상 프레임을 루트 아래에 둔다.
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [frame] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('ln'), 'divider'); // LINE → 구분선
-  assert.equal(after.get('im'), 'image'); // 이미지 채움
-  assert.equal(after.get('bd'), 'border'); // 채움 없고 선만
-  assert.equal(after.get('sh'), 'shape'); // 채움·선 없음(어휘 밖 kebab(type) 아님)
+  // 원시 토큰은 신호 없음 → 색만 채운 빈 프레임 → swatch, 'color-121210'에서 벗어남
+  assert.equal(after.get('f'), 'swatch');
+  assert.notEqual(frame.name, 'color-121210');
+});
+
+test('renameSelection — swatch 규칙: 색만 채운 빈 프레임 → swatch, 이미지 → image, 빈 → container', async () => {
+  installFigma();
+  const swatch = { type: 'FRAME', id: 's', name: 'Frame 1', fills: [{ type: 'SOLID', visible: true }], children: [] };
+  const imageFrame = { type: 'FRAME', id: 'im', name: 'Frame 2', fills: [{ type: 'IMAGE', visible: true }], children: [] };
+  const emptyFrame = { type: 'FRAME', id: 'e', name: 'Frame 3', children: [] };
+  // #7b: 대상들을 루트(보존) 아래에 둬 역할 추론을 depth≥1에서 검증.
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [swatch, imageFrame, emptyFrame] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('s'), 'swatch'); // 색만 채운 빈 프레임 → swatch
+  assert.equal(after.get('im'), 'image'); // 이미지 채움 → image
+  assert.equal(after.get('e'), 'container'); // 빈 프레임 → container
+});
+
+test('renameSelection — 색이 있어도 자식이 있으면 스와치가 아니라 컨테이너', async () => {
+  installFigma();
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Frame 1',
+    fills: [{ type: 'SOLID', visible: true }],
+    children: [
+      { type: 'VECTOR', id: 'ci', name: 'Vector 1' },
+      { type: 'VECTOR', id: 'ci2', name: 'Vector 2' },
+    ],
+  };
+  // #7b: card를 루트(보존) 아래에 둬 depth≥1에서 역할 추론 검증.
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [card] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('card'), 'container'); // 색+자식 다수 → container(스와치 아님)
+  assert.equal(after.get('ci'), 'icon'); // 부모가 일반 container → 맥락 접두사 안 붙임
+});
+
+test('renameSelection — 기하 신호: 얇은 막대→divider, 이미지 타원→avatar', async () => {
+  installFigma();
+  const divider = { type: 'RECTANGLE', id: 'd', name: 'Rectangle 1', width: 200, height: 1, fills: [{ type: 'SOLID', visible: true }] };
+  const avatar = { type: 'ELLIPSE', id: 'av', name: 'Ellipse 1', width: 40, height: 40, fills: [{ type: 'IMAGE', visible: true }] };
+  const { changes } = await renameSelection([divider, avatar], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('d'), 'divider');
+  assert.equal(after.get('av'), 'avatar');
+});
+
+test('renameSelection — 멱등: 한 번 정돈한 이름은 재실행에도 불변', async () => {
+  installFigma();
+  const icon1 = { type: 'VECTOR', id: 'ic1', name: 'Vector 1' };
+  const icon2 = { type: 'VECTOR', id: 'ic2', name: 'Vector 2' };
+  const root = { type: 'FRAME', id: 'root', name: 'card', children: [icon1, icon2] };
+
+  await renameSelection([root], { apply: true, maxDepth: 3 });
+  assert.equal(icon1.name, 'card-icon');
+  assert.equal(icon2.name, 'card-icon'); // 숫자 없이 형제 중복 허용
+  // 2회차: 역할명은 기본명이 아니므로 보존 → 변경 0
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  assert.equal(changes.length, 0);
 });
 
 test('renameSelection — apply:false면 미리보기만(노드 이름 불변)', async () => {
   installFigma();
-  const node = { type: 'FRAME', id: 'f', name: 'OriginalName', children: [] };
-  const { changes, applied } = await renameSelection([node], { apply: false, maxDepth: 3 });
+  const node = { type: 'FRAME', id: 'f', name: 'Frame 1', children: [] };
+  // #7b: depth0 루트는 보존이므로 대상을 루트 아래에 둔다(루트는 변경에 안 잡힘).
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [node] };
+  const { changes, applied } = await renameSelection([root], { apply: false, maxDepth: 3 });
   assert.equal(applied, false);
   assert.equal(changes.length, 1);
   assert.equal(changes[0].after, 'container');
-  assert.equal(node.name, 'OriginalName'); // 적용 안 함
+  assert.equal(node.name, 'Frame 1'); // 적용 안 함
+});
+
+test('renameSelection — 영역 추론: 페이지 세로 스택의 첫=header, 마지막=footer', async () => {
+  installFigma();
+  const page = {
+    type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'VERTICAL',
+    children: [
+      { type: 'FRAME', id: 'hd', name: 'Frame 2', children: [{ type: 'VECTOR', id: 'hi', name: 'Vector 1' }] },
+      { type: 'FRAME', id: 'mid', name: 'Frame 3', children: [] },
+      { type: 'FRAME', id: 'ft', name: 'Frame 4', children: [{ type: 'VECTOR', id: 'fi', name: 'Vector 2' }] },
+    ],
+  };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('hd'), 'header'); // 첫 자식
+  assert.equal(after.get('ft'), 'footer'); // 마지막 자식
+  assert.equal(after.get('mid'), 'container'); // 가운데는 영역 추론 안 함
+  assert.equal(after.get('hi'), 'header-icon'); // header 맥락 전파
+  assert.equal(after.get('fi'), 'footer-icon');
+});
+
+test('renameSelection — 버튼 추론: 오토레이아웃+라운드+채움+텍스트 → button', async () => {
+  installFigma();
+  const btn = {
+    type: 'FRAME', id: 'btn', name: 'Frame 1', layoutMode: 'HORIZONTAL',
+    cornerRadius: 8, height: 40, fills: [{ type: 'SOLID', visible: true }],
+    children: [
+      { type: 'TEXT', id: 'bt', name: 'Label', characters: '확인' },
+      { type: 'VECTOR', id: 'bi', name: 'Vector 1' },
+    ],
+  };
+  // #7b: btn을 루트(보존) 아래에 둬 depth≥1에서 버튼 추론 검증.
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [btn] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('btn'), 'button'); // 구조로 버튼 인식
+  assert.equal(after.has('bt'), false); // 텍스트는 불변
+  assert.equal(after.get('bi'), 'button-icon'); // button 맥락 전파
+});
+
+test('renameSelection — 스냅샷 토큰 베낌(line-height-150-percent-px)도 교체', async () => {
+  installFigma();
+  const frame = { type: 'FRAME', id: 'f', name: 'line-height-150-percent-px', children: [] };
+  // #7b: depth0 루트는 보존이므로 대상을 루트 아래에 둔다.
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [frame] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('f'), 'container'); // percent-px echo → 보존 안 하고 역할로 교체
+  assert.notEqual(frame.name, 'line-height-150-percent-px');
+});
+
+test('renameSelection(#7b) — 선택 루트 컨테이너는 기본명이어도 보존, 자식은 정돈(맥락 누수 없음)', async () => {
+  installFigma();
+  const icon = { type: 'VECTOR', id: 'ic', name: 'Vector 1' };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 1', children: [icon] }; // 기본명 루트
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.has('root'), false); // depth0 루트는 기본명이어도 보존
+  assert.equal(root.name, 'Frame 1');
+  assert.equal(after.get('ic'), 'icon'); // 'Frame 1' 맥락이 'frame-icon'으로 새지 않음
+});
+
+test('renameSelection(#7b) — 인스턴스 서브트리는 통째 스킵(자식 미순회)', async () => {
+  installFigma();
+  const innerIcon = { type: 'VECTOR', id: 'inner', name: 'Vector 1' }; // 인스턴스 내부 → 불변
+  const inst = { type: 'INSTANCE', id: 'inst', name: 'Button', children: [innerIcon] };
+  const looseIcon = { type: 'VECTOR', id: 'loose', name: 'Vector 2' };
+  const root = { type: 'FRAME', id: 'root', name: 'card', children: [inst, looseIcon] }; // 의미명 루트
+
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const ids = new Set(changes.map((c) => c.id));
+  assert.equal(ids.has('inner'), false); // 인스턴스 내부 미변경
+  assert.equal(innerIcon.name, 'Vector 1');
+  assert.equal(ids.has('loose'), true); // 인스턴스 밖은 정돈(card-icon)
+  // 트리(nodes)에도 인스턴스 자식은 포함되지 않음(순회 중단), 인스턴스 자신은 맥락으로 표시
+  assert.equal(nodes.some((n) => n.id === 'inner'), false);
+  assert.equal(nodes.some((n) => n.id === 'inst'), true);
+});
+
+/* ================= prunePaletteColors (팔레트 재적용 정리) ================= */
+test('prunePaletteColors(#3) — 재생성 hue 패밀리 안에서만 정리(다른 패밀리·추출 hex 보존)', async () => {
+  const figma = installFigma();
+  // 이전 팔레트(blue 2스텝 + green) + 추출 hex 색 + 비색
+  await createTokens(
+    [
+      { name: 'color/blue/500', category: 'color', sources: ['fill'], value: '#3366ff' },
+      { name: 'color/blue/700', category: 'color', sources: ['fill'], value: '#1133aa' },
+      { name: 'color/green/500', category: 'color', sources: ['fill'], value: '#22aa55' },
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }, // 추출 hex(2토막)
+      { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+    ],
+    16,
+  );
+  // 새 팔레트가 blue/500만 → blue 패밀리의 다른 스텝(blue/700)만 정리. green·추출 hex·간격 보존.
+  const keep = ['color/blue/500'];
+  const removed = await prunePaletteColors(keep);
+
+  assert.equal(removed, 2); // blue/700 의 Global+Semantic
+  assert.ok(!findVar(figma, 'Global', 'color/blue/700'));
+  assert.ok(findVar(figma, 'Global', 'color/blue/500')); // keep
+  assert.ok(findVar(figma, 'Global', 'color/green/500')); // 다른 패밀리 보존
+  assert.ok(findVar(figma, 'Global', 'color/0066ff')); // 추출 hex 보존
+  assert.ok(findVar(figma, 'Global', 'spacing/16')); // 비색 보존
+});
+
+/* ================= textStyles.ts (Phase C) ================= */
+test('scanTextStyles — TEXT 노드 시그니처 수집(+%행간 환산·mixed 스킵)', () => {
+  const figma = installFigma();
+  const t1 = { type: 'TEXT', id: 't1', name: 'Title', fontSize: 32, fontName: { family: 'Inter', style: 'Bold' }, lineHeight: { unit: 'PIXELS', value: 40 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'Hi' };
+  const t2 = { type: 'TEXT', id: 't2', name: 'Body', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'PERCENT', value: 150 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'x' };
+  const tMixed = { type: 'TEXT', id: 't3', name: 'Mixed', fontSize: figma.mixed, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'AUTO' }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'y' };
+  const frame = { type: 'FRAME', id: 'f', name: 'F', children: [t1, t2, tMixed] };
+
+  const { samples, warnings } = scanTextStyles([frame]);
+  assert.equal(samples.length, 2); // mixed 제외
+  assert.equal(samples.find((s) => s.fontSize === 16).lineHeight, 24); // 150% × 16
+  assert.equal(samples.find((s) => s.fontSize === 32).style, 'Bold');
+  assert.ok(warnings.length >= 1);
+});
+
+test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 적용 + 멱등', async () => {
+  const figma = installFigma();
+  const specs = [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }];
+  const node = {
+    type: 'TEXT', id: 'n1', name: 'b', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'hi',
+    _styleId: null, async setTextStyleIdAsync(id) { this._styleId = id; },
+  };
+
+  const r = await createSemanticTextStyles(specs, true, [node]);
+  assert.equal(r.created, 1);
+  assert.equal(r.bound, 2); // fontSize + lineHeight
+  assert.equal(r.applied, 1);
+  assert.deepEqual(r.missing, []);
+
+  // 시맨틱 변수(역할명) 생성 + 스타일 바인딩
+  assert.ok(findVar(figma, 'Semantic', 'font-size/body'));
+  assert.ok(findVar(figma, 'Semantic', 'line-height/body'));
+  const style = figma._state.textStyles.find((s) => s.name === 'body');
+  assert.equal(style.fontSize, 16);
+  assert.ok(style.boundVariables.fontSize);
+  assert.ok(style.boundVariables.lineHeight);
+  assert.equal(node._styleId, style.id); // 원본 적용됨
+
+  // 멱등: 재실행 → updated(신규 0)
+  const r2 = await createSemanticTextStyles(specs, false, []);
+  assert.equal(r2.created, 0);
+  assert.equal(r2.updated, 1);
+  assert.equal(figma._state.textStyles.length, 1); // 중복 생성 없음
 });

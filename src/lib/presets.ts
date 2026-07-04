@@ -50,7 +50,7 @@ export function parsePreset(text: string): { ok: true; preset: Preset } | { ok: 
       name,
       base: num(o.base, 16),
       tolerance: num(o.tolerance, 0.5),
-      maxDepth: Math.max(1, Math.round(num(o.maxDepth, 3))),
+      maxDepth: Math.max(1, Math.round(num(o.maxDepth, 8))),
       semanticMap,
     },
   };
