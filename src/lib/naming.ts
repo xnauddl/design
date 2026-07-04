@@ -29,25 +29,30 @@ export const ROLE_VOCAB = [
 
 export type Role = (typeof ROLE_VOCAB)[number];
 
-/** 임의 문자열 → kebab-case 소문자. 카멜/공백/언더스코어/슬래시를 '-'로 정규화. */
+/** 임의 문자열 → kebab-case 소문자. 카멜/공백/언더스코어/슬래시를 '-'로 정규화.
+   단, 숫자 사이 '_'(numberTokenName의 소수점 표기, 예: 1_5=1.5)는 보존해
+   토큰 변수명·레이어명·CSS 변수명이 같은 표기('1_5')로 일치하게 한다. */
 export function kebab(input: string): string {
   return input
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2') // camelCase 경계
-    .replace(/[\s_/]+/g, '-') // 공백·언더스코어·슬래시
-    .replace(/[^a-zA-Z0-9-]+/g, '-') // 기타 문자
+    .replace(/[\s/]+/g, '-') // 공백·슬래시
+    // '_'는 숫자 사이(소수점)만 유지, 그 외에는 '-'로. (lookbehind 미사용 — 샌드박스 호환)
+    .replace(/_/g, (_m, i: number, s: string) => (/\d/.test(s[i - 1] || '') && /\d/.test(s[i + 1] || '') ? '_' : '-'))
+    .replace(/[^a-zA-Z0-9_-]+/g, '-') // 기타 문자('_'는 유지)
     .replace(/-+/g, '-') // 중복 하이픈
-    .replace(/^-+|-+$/g, '') // 양끝 하이픈
+    .replace(/^[-_]+|[-_]+$/g, '') // 양끝 하이픈·언더스코어
     .toLowerCase();
 }
 
-/** 스타일 말단 세그먼트(노드 이름에 불필요한 역할). 기본 보존, 옵션으로 제거. */
+/** 스타일 말단 세그먼트(순수 스타일 서술자 — 노드 이름엔 불필요). 기본 보존, 옵션으로 제거.
+   주의: 'border'는 STYLE_LEAVES에서 제외 — ROLE_VOCAB의 유효 역할(inferRole이 산출)이라
+   말단이라도 의미가 있어 버리지 않는다(스타일 말단 vs 역할의 이중 의미 방지). */
 const STYLE_LEAVES = new Set([
   'fill',
   'color',
   'stroke',
   'bg',
   'text',
-  'border',
 ]);
 
 export interface LayerNameOptions {

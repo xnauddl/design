@@ -113,14 +113,22 @@ test('kebab 정규화', () => {
   assert.equal(kebab('buttonPrimary'), 'button-primary');
   assert.equal(kebab('button/primary/background'), 'button-primary-background');
   assert.equal(kebab('  Card__Header '), 'card-header');
+  // 숫자 사이 '_'(소수점 표기)는 보존, 그 외 '_'는 '-'
+  assert.equal(kebab('line-height/1_5'), 'line-height-1_5');
+  assert.equal(kebab('a_1'), 'a-1'); // 비-숫자 경계는 '-'
+  assert.equal(kebab('1_5_2'), '1_5_2'); // 연속 소수 표기도 보존
 });
 
 test('layerNameFromToken — 전체 경로 kebab', () => {
   assert.equal(layerNameFromToken('button/primary/background'), 'button-primary-background');
   // 스타일 말단 제거 옵션
   assert.equal(layerNameFromToken('card/title/fill', { stripStyleLeaf: true }), 'card-title');
+  // 'border'는 유효 역할이라 stripStyleLeaf로도 보존(스타일 말단 아님)
+  assert.equal(layerNameFromToken('card/border', { stripStyleLeaf: true }), 'card-border');
   // maxDepth: 앞쪽 맥락을 자르고 로컬 역할 보존
   assert.equal(layerNameFromToken('a/b/c/d/e', { maxDepth: 3 }), 'c-d-e');
+  // 소수 토큰: 변수명 'line-height/1_5'과 동일 표기로 레이어명에 보존(1-5로 뭉개지지 않음)
+  assert.equal(layerNameFromToken('line-height/1_5'), 'line-height-1_5');
 });
 
 test('layerNameFromRole — 상위 맥락 + 역할', () => {
