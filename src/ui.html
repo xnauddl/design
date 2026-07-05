@@ -395,7 +395,7 @@
     </div>
 
     <div class="step" id="createCard">
-      <h2>토큰 생성 (Global + Semantic)</h2>
+      <h2>토큰 생성 (Global + Semantic) <span class="muted" id="createLock"></span></h2>
       <div class="hint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다.</div>
       <div id="tokenList"></div>
       <div class="row">
@@ -412,7 +412,7 @@
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
          DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
     <div class="step" style="display:none">
-      <h2>시맨틱 매핑 (역할 → 토큰)</h2>
+      <h2>시맨틱 매핑 (역할 → 토큰) <span class="muted" id="semLock"></span></h2>
       <div class="hint">형식: <code>역할 = Global변수이름</code></div>
       <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
@@ -424,7 +424,7 @@
     </div>
 
     <div class="step">
-      <h2>텍스트 스타일 (화면 → 스타일)</h2>
+      <h2>텍스트 스타일 (화면 → 스타일) <span class="muted" id="tsLock"></span></h2>
       <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Paid)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText">선택에서 스캔</button>
@@ -556,7 +556,7 @@
         <button id="btnClearLicense">해제</button>
       </div>
       <div class="muted" id="licenseInfo"></div>
-      <div class="row">
+      <div class="row" id="devTierRow">
         <label class="inline">개발용 강제 티어
           <select id="tier">
             <option value="free">Free</option>

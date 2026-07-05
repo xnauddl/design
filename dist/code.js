@@ -2101,6 +2101,7 @@
       return { tier: ev.tier, source: "key", status: ev.status, expiresAt: cache.expiresAt };
     }
     if (devTier !== "free") return { tier: devTier, source: "dev" };
+    if (false) return { tier: "free", source: "dev" };
     return { tier: "free", source: "none" };
   }
   var currentTier = () => effective().tier;
@@ -2126,7 +2127,7 @@
   async function loadLicense() {
     try {
       const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
-      if (isTier(dt)) devTier = dt;
+      if (false) devTier = dt;
       const c = await figma.clientStorage.getAsync(CACHE_KEY);
       if (c && typeof c.key === "string" && isTier(c.tier) && typeof c.expiresAt === "number" && typeof c.lastVerified === "number") cache = c;
       const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
@@ -2562,6 +2563,7 @@
           break;
         }
         case "CREATE_SEMANTICS": {
+          if (!requirePaid("semantics", "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const s = await createSemanticAliases(msg.map);
           post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
           commitUndo(figma);
@@ -2618,6 +2620,7 @@
           break;
         }
         case "SET_LICENSE": {
+          if (true) break;
           devTier = msg.tier;
           try {
             await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);

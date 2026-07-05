@@ -33,8 +33,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
-let isTeam = false;
-let isPro = false;
+let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
 let teamDataRequested = false;
 // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩).
 let hasGlobal = false;
@@ -665,7 +664,7 @@ async function runWizard(): Promise<void> {
     contrast: ($('wizOptContrast') as HTMLInputElement).checked,
     componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
   };
-  const ctx: WizardContext = { isPro, hasSemanticMap: Object.keys(semMap).length > 0 };
+  const ctx: WizardContext = { isPro: isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
   const plan = planWizard(options, ctx);
 
   wizardRunning = true;
@@ -761,9 +760,14 @@ async function runWizard(): Promise<void> {
 $('btnWizardRun').addEventListener('click', () => void runWizard());
 $('btnWizardCancel').addEventListener('click', () => send({ type: 'CANCEL' }));
 
-$('tier').addEventListener('change', () => {
-  send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
-});
+// 개발용 강제 티어 토글 — 개발 빌드에서만 노출/동작(배포 빌드 백도어 차단).
+if (__DEV__) {
+  $('tier').addEventListener('change', () => {
+    send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
+  });
+} else {
+  $('devTierRow').style.display = 'none';
+}
 
 $('btnVerify').addEventListener('click', () => {
   const key = ($('licenseKey') as HTMLInputElement).value.trim();
@@ -840,32 +844,37 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
   }
 }
 
-/* ---------- 팀 기능 게이트 (M3 프리셋, Team) ---------- */
-const TEAM_FIELDS = [
+/* ---------- 유료(Paid) 기능 게이트 ----------
+   Free/Paid 2티어. Paid에서 해금: 토큰 생성(적용)·시맨틱·텍스트 스타일·컴포넌트/베리언트·공유 프리셋.
+   Free: 팔레트·추출·토큰 미리보기·바인딩·리네임·명도 대비·내보내기. */
+const PAID_LOCK = '🔒 Paid 전용';
+const PRESET_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
-
-const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
+const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
+// 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
+const PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, 'btnCreateApply', 'btnTextStyles'];
 
 /**
- * 통합 게이트(#11·#12) — 유료 잠금(Pro/Team)과 전제 미충족(Global/바인딩 변수 없음)을
+ * 통합 게이트(#11·#12) — 유료 잠금(Paid)과 전제 미충족(Global/바인딩 변수 없음)을
  * 한 메커니즘으로: 해당 버튼 disabled + 배지/안내(+바로가기) 표시.
  */
 function updateGates(): void {
-  // 유료 잠금(#12)
-  for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
-  for (const id of PRO_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPro;
-  $('presetLock').textContent = isTeam ? '' : '🔒 Paid 전용';
-  $('componentLock').textContent = isPro ? '' : '🔒 Paid 전용';
-  $('wizComponentLock').textContent = isPro ? '' : '🔒 Paid';
-  ($('wizOptComponentize') as HTMLInputElement).disabled = !isPro;
+  // 유료 잠금(#12) — Free는 유료 버튼을 클릭 전에 사전 비활성 + 🔒 배지(클릭-후-거부 방지).
+  for (const id of PAID_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPaid;
+  for (const id of ['presetLock', 'componentLock', 'createLock', 'semLock', 'tsLock']) {
+    $(id).textContent = isPaid ? '' : PAID_LOCK;
+  }
+  $('wizComponentLock').textContent = isPaid ? '' : '🔒 Paid';
+  ($('wizOptComponentize') as HTMLInputElement).disabled = !isPaid;
 
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
+  if (!isPaid) ($('btnSemantics') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
   setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 바인딩할 변수를 만드세요.');
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
 
-  if (isTeam && !teamDataRequested) {
+  if (isPaid && !teamDataRequested) {
     teamDataRequested = true;
     send({ type: 'GET_PRESETS' });
   }
@@ -1236,14 +1245,13 @@ window.onmessage = (event: MessageEvent) => {
       const exp = msg.expiresAt ? ` · 만료 ${new Date(msg.expiresAt).toISOString().slice(0, 10)}` : '';
       $('licenseInfo').textContent = `현재: ${msg.tier.toUpperCase()} (${srcLabel})${exp}`;
       // 개발용 토글은 검증 키가 없을 때만 의미가 있으므로, 키가 적용 중이면 표시만 동기화
-      if (msg.source !== 'key') ($('tier') as HTMLSelectElement).value = msg.tier;
+      if (__DEV__ && msg.source !== 'key') ($('tier') as HTMLSelectElement).value = msg.tier;
       if (msg.note) {
         const cls = /실패|오프라인/.test(msg.note) ? 'warn' : 'ok';
         setStatus('licenseStatus', msg.note, cls);
       }
-      // Free/Paid 2티어 — 유료면 모든 유료 기능(프리셋·컴포넌트) 해금.
-      isTeam = msg.unlimited;
-      isPro = msg.unlimited;
+      // Free/Paid 2티어 — 유료면 모든 유료 기능 해금.
+      isPaid = msg.unlimited;
       updateGates();
       break;
     }

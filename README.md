@@ -64,7 +64,7 @@
   - 텍스트·토큰 바인딩 불변(네이밍/구조만 변경). 모호한 속성 추론은 **미리보기에서 사용자가 교정**.
 - **Phase 4**:
   - **누락 조합 자동 생성 ✅ (구현됨, Paid)** — 선택한 베리언트 세트의 빠진 조합을 기존 변형 클론+`prop=value` 리네임으로 생성(`missingVariants` 순수 계산 + `code.ts` 적용, `GENERATE_MISSING_VARIANTS`).
-  - **컴포넌트 속성(Boolean/Text/Instance-swap) 노출 ✅ (구현됨, Paid)** — 레이어 규칙(`inferComponentProperties`)으로 속성 계획 → `addComponentProperty` + 참조 연결(`EXPOSE_PROPERTIES`). TEXT→characters, INSTANCE→mainComponent, `이름?`→visible(Boolean).
+  - **컴포넌트 속성(Boolean/Text/Instance-swap) 노출 ✅ (구현됨, Paid)** — 레이어 규칙(`inferComponentProperties`)으로 속성 계획 → `addComponentProperty` + 참조 연결. 별도 메시지 없이 `REGISTER_COMPONENTS` 등록 시 자동 노출(`exposeProperties`). TEXT→characters, INSTANCE→mainComponent, `이름?`→visible(Boolean).
   - **라이브러리 발행** — Figma Plugin API에 발행 기능이 없어 **수동(또는 조직 정책)**, 코드 비대상.
 
 ## 개발
@@ -172,7 +172,7 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 
 **Phase 4 — 누락 조합 자동 생성**: 선택한 베리언트 세트의 **빠진 속성 조합**(`missingVariants` 순수 계산)을 기존 변형을 클론해 `prop=value`로 이름 지정하여 생성(`GENERATE_MISSING_VARIANTS`, Paid). 분류·생성 후 세트는 **속성 기반 2D 그리드**(`variantGrid`: 첫 속성=행, 둘째=열)로 정렬되고 자식에 맞게 **리사이즈**된다. 라이브러리 발행은 Plugin API 미지원이라 수동.
 
-**Phase 4.1 — 컴포넌트 속성 노출**: 선택한 컴포넌트 또는 **베리언트 세트**의 자식 레이어를 규칙으로 분석(`inferComponentProperties`)해 **컴포넌트 속성**을 만들고 연결(`EXPOSE_PROPERTIES`, Paid). 세트는 대표 변형으로 속성을 계획해 **세트에 추가**하고 모든 변형의 동명 레이어에 참조를 연결한다. TEXT 레이어→TEXT(characters), INSTANCE→INSTANCE_SWAP(mainComponent, 기본값은 발행 컴포넌트 key 또는 로컬 id), 이름이 `?`로 끝나는 레이어→BOOLEAN(visible). 실패 항목은 건너뜀.
+**Phase 4.1 — 컴포넌트 속성 노출**: 선택한 컴포넌트 또는 **베리언트 세트**의 자식 레이어를 규칙으로 분석(`inferComponentProperties`)해 **컴포넌트 속성**을 만들고 연결한다(Paid). 별도 메시지가 아니라 **`REGISTER_COMPONENTS` 등록 시 자동 노출**(`exposeProperties`). 세트는 대표 변형으로 속성을 계획해 **세트에 추가**하고 모든 변형의 동명 레이어에 참조를 연결한다. TEXT 레이어→TEXT(characters), INSTANCE→INSTANCE_SWAP(mainComponent, 기본값은 발행 컴포넌트 key 또는 로컬 id), 이름이 `?`로 끝나는 레이어→BOOLEAN(visible). 실패 항목은 건너뜀.
 
 빌드 메모: Figma UI는 단일 HTML만 로드(외부 `<script src>` 불가)하므로, `ui.ts` 번들 결과를
 `ui.html`의 인라인 `<script>`로 주입합니다(`build.mjs`).

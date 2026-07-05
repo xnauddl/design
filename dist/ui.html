@@ -395,7 +395,7 @@
     </div>
 
     <div class="step" id="createCard">
-      <h2>토큰 생성 (Global + Semantic)</h2>
+      <h2>토큰 생성 (Global + Semantic) <span class="muted" id="createLock"></span></h2>
       <div class="hint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다.</div>
       <div id="tokenList"></div>
       <div class="row">
@@ -412,7 +412,7 @@
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
          DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
     <div class="step" style="display:none">
-      <h2>시맨틱 매핑 (역할 → 토큰)</h2>
+      <h2>시맨틱 매핑 (역할 → 토큰) <span class="muted" id="semLock"></span></h2>
       <div class="hint">형식: <code>역할 = Global변수이름</code></div>
       <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
@@ -424,7 +424,7 @@
     </div>
 
     <div class="step">
-      <h2>텍스트 스타일 (화면 → 스타일)</h2>
+      <h2>텍스트 스타일 (화면 → 스타일) <span class="muted" id="tsLock"></span></h2>
       <div class="hint">선택한 텍스트에서 후보를 뽑아 <b>텍스트 스타일</b>로 등록하고 시맨틱 변수(font-size/line-height)에 바인딩합니다. (Paid)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText">선택에서 스캔</button>
@@ -556,7 +556,7 @@
         <button id="btnClearLicense">해제</button>
       </div>
       <div class="muted" id="licenseInfo"></div>
-      <div class="row">
+      <div class="row" id="devTierRow">
         <label class="inline">개발용 강제 티어
           <select id="tier">
             <option value="free">Free</option>
@@ -1382,8 +1382,7 @@
   var $ = (id) => document.getElementById(id);
   var tokens = [];
   var presets = [];
-  var isTeam = false;
-  var isPro = false;
+  var isPaid = false;
   var teamDataRequested = false;
   var hasGlobal = false;
   var hasBindable = false;
@@ -1905,7 +1904,7 @@
       contrast: $("wizOptContrast").checked,
       componentize: $("wizOptComponentize").checked
     };
-    const ctx = { isPro, hasSemanticMap: Object.keys(semMap).length > 0 };
+    const ctx = { isPro: isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
     const plan = planWizard(options, ctx);
     wizardRunning = true;
     $("btnWizardRun").disabled = true;
@@ -1993,9 +1992,13 @@
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
   $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
-  $("tier").addEventListener("change", () => {
-    send({ type: "SET_LICENSE", tier: $("tier").value });
-  });
+  if (false) {
+    $("tier").addEventListener("change", () => {
+      send({ type: "SET_LICENSE", tier: $("tier").value });
+    });
+  } else {
+    $("devTierRow").style.display = "none";
+  }
   $("btnVerify").addEventListener("click", () => {
     const key = $("licenseKey").value.trim();
     if (!key) {
@@ -2051,7 +2054,8 @@
     } catch (e) {
     }
   }
-  var TEAM_FIELDS = [
+  var PAID_LOCK = "\u{1F512} Paid \uC804\uC6A9";
+  var PRESET_FIELDS = [
     "presetName",
     "btnSavePreset",
     "presetList",
@@ -2061,18 +2065,20 @@
     "btnImportPreset",
     "presetJson"
   ];
-  var PRO_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing"];
+  var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing"];
+  var PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, "btnCreateApply", "btnTextStyles"];
   function updateGates() {
-    for (const id of TEAM_FIELDS) $(id).disabled = !isTeam;
-    for (const id of PRO_FIELDS) $(id).disabled = !isPro;
-    $("presetLock").textContent = isTeam ? "" : "\u{1F512} Paid \uC804\uC6A9";
-    $("componentLock").textContent = isPro ? "" : "\u{1F512} Paid \uC804\uC6A9";
-    $("wizComponentLock").textContent = isPro ? "" : "\u{1F512} Paid";
-    $("wizOptComponentize").disabled = !isPro;
+    for (const id of PAID_FIELDS) $(id).disabled = !isPaid;
+    for (const id of ["presetLock", "componentLock", "createLock", "semLock", "tsLock"]) {
+      $(id).textContent = isPaid ? "" : PAID_LOCK;
+    }
+    $("wizComponentLock").textContent = isPaid ? "" : "\u{1F512} Paid";
+    $("wizOptComponentize").disabled = !isPaid;
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
+    if (!isPaid) $("btnSemantics").disabled = true;
     setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!hasBindable) $("btnApplyConfirm").disabled = true;
-    if (isTeam && !teamDataRequested) {
+    if (isPaid && !teamDataRequested) {
       teamDataRequested = true;
       send({ type: "GET_PRESETS" });
     }
@@ -2391,13 +2397,12 @@
         const srcLabel = msg.source === "key" ? `\uB77C\uC774\uC120\uC2A4 \uD0A4${msg.status ? ` \xB7 ${msg.status}` : ""}` : msg.source === "dev" ? "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C" : "\uC5C6\uC74C";
         const exp = msg.expiresAt ? ` \xB7 \uB9CC\uB8CC ${new Date(msg.expiresAt).toISOString().slice(0, 10)}` : "";
         $("licenseInfo").textContent = `\uD604\uC7AC: ${msg.tier.toUpperCase()} (${srcLabel})${exp}`;
-        if (msg.source !== "key") $("tier").value = msg.tier;
+        if (false) $("tier").value = msg.tier;
         if (msg.note) {
           const cls = /실패|오프라인/.test(msg.note) ? "warn" : "ok";
           setStatus("licenseStatus", msg.note, cls);
         }
-        isTeam = msg.unlimited;
-        isPro = msg.unlimited;
+        isPaid = msg.unlimited;
         updateGates();
         break;
       }

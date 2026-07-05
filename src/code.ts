@@ -52,7 +52,7 @@ const PRESETS_KEY = 'dsl.presets';
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
-let presets: Preset[] = []; // M3(Team): 공유 프리셋
+let presets: Preset[] = []; // 공유 프리셋(Paid)
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
 
 function effective(): {
@@ -66,6 +66,8 @@ function effective(): {
     return { tier: ev.tier, source: 'key', status: ev.status, expiresAt: cache.expiresAt };
   }
   if (devTier !== 'free') return { tier: devTier, source: 'dev' };
+  // 개발 빌드에선 강제 티어 토글이 활성 출처(free 포함) — UI가 토글 상태를 숨기지 않도록.
+  if (__DEV__) return { tier: 'free', source: 'dev' };
   return { tier: 'free', source: 'none' };
 }
 
@@ -96,7 +98,7 @@ function postLicense(note?: string): void {
 async function loadLicense(): Promise<void> {
   try {
     const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
-    if (isTier(dt)) devTier = dt;
+    if (__DEV__ && isTier(dt)) devTier = dt; // 개발용 강제 티어는 dev 빌드에서만 로드(배포 백도어 차단)
     const c = (await figma.clientStorage.getAsync(CACHE_KEY)) as LicenseCache | undefined;
     // 손상/구형 캐시 방어: 모든 필드 형식을 확인(특히 key는 REQUEST_VERIFY에서 사용).
     if (c && typeof c.key === 'string' && isTier(c.tier) && typeof c.expiresAt === 'number' && typeof c.lastVerified === 'number') cache = c;
@@ -609,6 +611,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_SEMANTICS': {
+        if (!requirePaid('semantics', '시맨틱 매핑은 Paid 기능입니다.')) break;
         const s = await createSemanticAliases(msg.map);
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
@@ -667,6 +670,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'SET_LICENSE': {
+        if (!__DEV__) break; // 개발 빌드 전용 — 배포 빌드에선 페이월 우회 백도어 차단
         devTier = msg.tier;
         try {
           await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);
