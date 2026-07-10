@@ -662,10 +662,18 @@
     const styleById = new Map(existing.map((s) => [s.id, s]));
     const styleByName = new Map(existing.map((s) => [s.name, s]));
     const anchoredStyle = (spec) => spec.boundStyleId ? styleById.get(spec.boundStyleId) : void 0;
+    const renameBlocked = /* @__PURE__ */ new Set();
     const roleRenames = [];
     for (const spec of specs) {
       const st = anchoredStyle(spec);
-      if (st && st.name !== spec.name) roleRenames.push({ from: st.name, to: spec.name });
+      if (!st || st.name === spec.name) continue;
+      const occupant = styleByName.get(spec.name);
+      if (occupant && occupant.id !== st.id) {
+        renameBlocked.add(spec.boundStyleId);
+        res.missing.push(`\uC774\uB984 \uCDA9\uB3CC '${st.name}'\u2192'${spec.name}' \u2014 \uC774\uBBF8 \uAC19\uC740 \uC774\uB984 \uC2A4\uD0C0\uC77C\uC774 \uC788\uC5B4 rename \uBCF4\uB958`);
+        continue;
+      }
+      roleRenames.push({ from: st.name, to: spec.name });
     }
     if (roleRenames.length) {
       const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
@@ -737,6 +745,9 @@
     }
     for (const spec of specs) {
       const anchored = anchoredStyle(spec);
+      if (anchored && spec.boundStyleId && renameBlocked.has(spec.boundStyleId)) {
+        continue;
+      }
       let style = anchored;
       if (!style) style = styleByName.get(spec.name);
       const created = !style;
@@ -766,29 +777,30 @@
         style.fontName = loaded;
         style.fontSize = spec.fontSize;
         style.lineHeight = spec.lineHeight > 0 ? { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
-        if (spec.letterSpacing) style.letterSpacing = { value: spec.letterSpacing, unit: "PIXELS" };
+        style.letterSpacing = { value: spec.letterSpacing, unit: "PIXELS" };
       }
-      const fsVar = semByName.get(`font-size/${spec.name}`);
+      const bindRole = style.name;
+      const fsVar = semByName.get(`font-size/${bindRole}`);
       if (fsVar) {
         style.setBoundVariable("fontSize", fsVar);
         res.bound++;
-      } else res.missing.push(`font-size/${spec.name}`);
-      if (spec.lineHeight > 0) {
-        const lhVar = semByName.get(`line-height/${spec.name}`);
+      } else res.missing.push(`font-size/${bindRole}`);
+      if (spec.lineHeight > 0 || isRename) {
+        const lhVar = semByName.get(`line-height/${bindRole}`);
         if (lhVar) {
           style.setBoundVariable("lineHeight", lhVar);
           res.bound++;
-        } else res.missing.push(`line-height/${spec.name}`);
+        } else if (spec.lineHeight > 0) res.missing.push(`line-height/${bindRole}`);
       }
-      if (spec.letterSpacing !== 0) {
-        const lsVar = semByName.get(`letter-spacing/${spec.name}`);
+      if (spec.letterSpacing !== 0 || isRename) {
+        const lsVar = semByName.get(`letter-spacing/${bindRole}`);
         if (lsVar) {
           style.setBoundVariable("letterSpacing", lsVar);
           res.bound++;
-        } else res.missing.push(`letter-spacing/${spec.name}`);
+        } else if (spec.letterSpacing !== 0) res.missing.push(`letter-spacing/${bindRole}`);
       }
       res[created ? "created" : "updated"]++;
-      styleByName.set(spec.name, style);
+      styleByName.set(style.name, style);
     }
     if (apply) {
       const texts = [];

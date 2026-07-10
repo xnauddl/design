@@ -1143,7 +1143,7 @@ test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 적용 
   assert.equal(figma._state.textStyles.length, 1); // 중복 생성 없음
 });
 
-test('createSemanticTextStyles — 기존 역할로 rename해도 시맨틱 토큰을 덮어쓰지 않음', async () => {
+test('createSemanticTextStyles — 기존 역할로 rename은 충돌 보류(동명·시맨틱 보존)', async () => {
   const figma = installFigma();
   // body(16) · caption(13) 각각 등록
   await createSemanticTextStyles(
@@ -1156,21 +1156,72 @@ test('createSemanticTextStyles — 기존 역할로 rename해도 시맨틱 토�
   );
   const bodySem = findVar(figma, 'Semantic', 'font-size/body');
   const bodyGlobalId = bodySem.valuesByMode['mode:Semantic'].id;
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
   const caption = figma._state.textStyles.find((s) => s.name === 'caption');
-  assert.ok(caption);
+  assert.ok(body && caption);
+  const bodyBound = body.boundVariables.fontSize.id;
 
-  // caption → body로 rename(대상 역할 이미 존재). 스캔 스펙은 caption 값(13)이지만 body 시맨틱은 유지돼야 함.
+  // caption → body: 대상 이름 점유 → rename 거부(동명 스타일·잘못된 바인딩 방지).
   const r = await createSemanticTextStyles(
     [{ name: 'body', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular', boundStyleId: caption.id }],
     false,
     [],
   );
   assert.equal(r.created, 0);
-  assert.equal(r.updated, 1);
+  assert.equal(r.updated, 0); // 충돌 스킵
+  assert.ok(r.missing.some((m) => m.includes('이름 충돌')));
+  assert.equal(caption.name, 'caption'); // 이름 유지
+  assert.equal(caption.fontSize, 13);
+  assert.equal(figma._state.textStyles.filter((s) => s.name === 'body').length, 1); // 동명 없음
   const bodySemAfter = findVar(figma, 'Semantic', 'font-size/body');
-  assert.equal(bodySemAfter.valuesByMode['mode:Semantic'].id, bodyGlobalId); // 덮어쓰기 없음
-  assert.equal(caption.fontSize, 13); // rename 모드: 타이포도 보존
-  assert.equal(caption.name, 'body');
+  assert.equal(bodySemAfter.valuesByMode['mode:Semantic'].id, bodyGlobalId);
+  assert.equal(body.boundVariables.fontSize.id, bodyBound); // 기존 body 바인딩 불변
+});
+
+test('createSemanticTextStyles — 빈 이름으로 rename하면 시맨틱 별칭도 이동', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles(
+    [{ name: 'caption', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const caption = figma._state.textStyles.find((s) => s.name === 'caption');
+  const oldSem = findVar(figma, 'Semantic', 'font-size/caption');
+  const globalId = oldSem.valuesByMode['mode:Semantic'].id;
+
+  const r = await createSemanticTextStyles(
+    [{ name: 'display', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular', boundStyleId: caption.id }],
+    false,
+    [],
+  );
+  assert.equal(r.updated, 1);
+  assert.equal(caption.name, 'display');
+  assert.equal(caption.fontSize, 13); // rename: 타이포 보존
+  assert.equal(findVar(figma, 'Semantic', 'font-size/caption'), undefined); // 옛 역할 이동됨
+  const moved = findVar(figma, 'Semantic', 'font-size/display');
+  assert.ok(moved);
+  assert.equal(moved.valuesByMode['mode:Semantic'].id, globalId); // 같은 Global 별칭 유지
+  assert.equal(caption.boundVariables.fontSize.id, moved.id);
+});
+
+test('createSemanticTextStyles — letterSpacing 0이면 기존 자간을 클리어', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 2, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
+  assert.equal(body.letterSpacing.value, 2);
+
+  // stale 앵커 없이 동명 갱신 → 자간 0으로 클리어
+  await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  assert.equal(body.letterSpacing.value, 0);
+  assert.equal(body.letterSpacing.unit, 'PIXELS');
 });
 
 test('createSemanticTextStyles — stale boundStyleId는 rename 모드가 아님(타이포 기록)', async () => {
