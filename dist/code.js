@@ -2038,8 +2038,10 @@
   }
 
   // src/lib/entitlements.ts
-  function isTier(v) {
-    return v === "free" || v === "paid";
+  function normalizeLegacyTier(v) {
+    if (v === "free" || v === "paid") return v;
+    if (v === "pro" || v === "team") return "paid";
+    return null;
   }
 
   // src/lib/license.ts
@@ -2056,6 +2058,17 @@
   function cacheFromVerify(key, v, now) {
     const cache2 = { key, tier: v.tier, expiresAt: v.expiresAt, lastVerified: now };
     if (v.instanceId) cache2.instanceId = v.instanceId;
+    return cache2;
+  }
+  function normalizeLicenseCache(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const o = raw;
+    if (typeof o.key !== "string") return null;
+    const tier = normalizeLegacyTier(o.tier);
+    if (!tier) return null;
+    if (typeof o.expiresAt !== "number" || typeof o.lastVerified !== "number") return null;
+    const cache2 = { key: o.key, tier, expiresAt: o.expiresAt, lastVerified: o.lastVerified };
+    if (typeof o.instanceId === "string" && o.instanceId) cache2.instanceId = o.instanceId;
     return cache2;
   }
 
@@ -2128,8 +2141,18 @@
     try {
       const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
       if (false) devTier = dt;
-      const c = await figma.clientStorage.getAsync(CACHE_KEY);
-      if (c && typeof c.key === "string" && isTier(c.tier) && typeof c.expiresAt === "number" && typeof c.lastVerified === "number") cache = c;
+      const raw = await figma.clientStorage.getAsync(CACHE_KEY);
+      const normalized = normalizeLicenseCache(raw);
+      if (normalized) {
+        cache = normalized;
+        const legacyTier = raw && typeof raw === "object" && (raw.tier === "pro" || raw.tier === "team");
+        if (legacyTier) {
+          try {
+            await figma.clientStorage.setAsync(CACHE_KEY, normalized);
+          } catch (e) {
+          }
+        }
+      }
       const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
       if (Array.isArray(ps)) presets = ps;
     } catch (e) {
@@ -2279,7 +2302,9 @@
   }
   loadLicense().then(() => {
     postLicense();
-    if (cache && evaluateLicense(cache, Date.now()).stale) post({ type: "REQUEST_VERIFY", key: cache.key, instanceId: cache.instanceId });
+    if (cache && cache.instanceId && evaluateLicense(cache, Date.now()).stale) {
+      post({ type: "REQUEST_VERIFY", key: cache.key, instanceId: cache.instanceId });
+    }
   });
   var SCAN_CAP = 1500;
   function isBindableCandidate(n) {
@@ -2631,6 +2656,14 @@
         }
         case "LICENSE_VERIFIED": {
           if (msg.result.ok) {
+            const prev = cache;
+            if (prev == null ? void 0 : prev.instanceId) {
+              const keyChanged = prev.key !== msg.key;
+              const instChanged = !!msg.result.instanceId && prev.instanceId !== msg.result.instanceId;
+              if (keyChanged || instChanged) {
+                post({ type: "REQUEST_DEACTIVATE", key: prev.key, instanceId: prev.instanceId });
+              }
+            }
             cache = cacheFromVerify(msg.key, msg.result, Date.now());
             try {
               await figma.clientStorage.setAsync(CACHE_KEY, cache);

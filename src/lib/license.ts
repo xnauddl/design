@@ -3,7 +3,7 @@
    M2: 외부 키 검증의 "두뇌". 실제 fetch·clientStorage는 code.ts(부수효과)에서.
    원칙: 만료 전이면 적용, 오프라인이면 grace 동안 유지, grace 초과 시 강등(free).
    ============================================================ */
-import { Tier, isTier } from './entitlements';
+import { Tier, isTier, normalizeLegacyTier } from './entitlements';
 
 export interface LicenseCache {
   /** 사용자 라이선스 키. */
@@ -88,5 +88,21 @@ export function parseVerifyResponse(json: unknown): VerifyOk | VerifyErr {
 export function cacheFromVerify(key: string, v: VerifyOk, now: number): LicenseCache {
   const cache: LicenseCache = { key, tier: v.tier, expiresAt: v.expiresAt, lastVerified: now };
   if (v.instanceId) cache.instanceId = v.instanceId; // 없으면 키 자체를 두지 않음(캐시 형태 안정).
+  return cache;
+}
+
+/**
+ * clientStorage에서 읽은 캐시 정규화. 구 3티어(pro/team)는 paid로 승격.
+ * 필수 필드가 없거나 tier를 알 수 없으면 null(손상 캐시 무시).
+ */
+export function normalizeLicenseCache(raw: unknown): LicenseCache | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.key !== 'string') return null;
+  const tier = normalizeLegacyTier(o.tier);
+  if (!tier) return null;
+  if (typeof o.expiresAt !== 'number' || typeof o.lastVerified !== 'number') return null;
+  const cache: LicenseCache = { key: o.key, tier, expiresAt: o.expiresAt, lastVerified: o.lastVerified };
+  if (typeof o.instanceId === 'string' && o.instanceId) cache.instanceId = o.instanceId;
   return cache;
 }

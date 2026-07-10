@@ -26,6 +26,8 @@ import {
   dedupeName,
   hasEntitlement,
   isTier,
+  normalizeLegacyTier,
+  normalizeLicenseCache,
   evaluateLicense,
   parseVerifyResponse,
   cacheFromVerify,
@@ -278,6 +280,26 @@ test('isTier — 유효 티어 검증(free|paid)', () => {
   assert.equal(isTier('pro'), false); // 구 3티어 값은 무효
   assert.equal(isTier('enterprise'), false);
   assert.equal(isTier(undefined), false);
+});
+
+test('normalizeLegacyTier — pro/team → paid 승격', () => {
+  assert.equal(normalizeLegacyTier('pro'), 'paid');
+  assert.equal(normalizeLegacyTier('team'), 'paid');
+  assert.equal(normalizeLegacyTier('paid'), 'paid');
+  assert.equal(normalizeLegacyTier('free'), 'free');
+  assert.equal(normalizeLegacyTier('enterprise'), null);
+});
+
+test('normalizeLicenseCache — 구 pro/team 캐시를 paid로 정규화', () => {
+  const base = { key: 'KEY-1', expiresAt: 9_999, lastVerified: 1_000 };
+  assert.deepEqual(normalizeLicenseCache({ ...base, tier: 'pro' }), { ...base, tier: 'paid' });
+  assert.deepEqual(normalizeLicenseCache({ ...base, tier: 'team', instanceId: 'inst-1' }), {
+    ...base,
+    tier: 'paid',
+    instanceId: 'inst-1',
+  });
+  assert.equal(normalizeLicenseCache({ ...base, tier: 'enterprise' }), null);
+  assert.equal(normalizeLicenseCache({ key: 'k' }), null);
 });
 
 /* ================= license.ts ================= */

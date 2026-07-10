@@ -853,7 +853,7 @@ const PRESET_FIELDS = [
 ];
 const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
-const PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, 'btnCreateApply', 'btnTextStyles'];
+const PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, 'btnCreateApply', 'btnPaletteApply', 'btnTextStyles'];
 
 /**
  * 통합 게이트(#11·#12) — 유료 잠금(Paid)과 전제 미충족(Global/바인딩 변수 없음)을

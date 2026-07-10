@@ -2066,7 +2066,7 @@
     "presetJson"
   ];
   var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing"];
-  var PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, "btnCreateApply", "btnTextStyles"];
+  var PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, "btnCreateApply", "btnPaletteApply", "btnTextStyles"];
   function updateGates() {
     for (const id of PAID_FIELDS) $(id).disabled = !isPaid;
     for (const id of ["presetLock", "componentLock", "createLock", "semLock", "tsLock"]) {

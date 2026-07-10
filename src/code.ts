@@ -15,7 +15,7 @@ import { missingVariants, variantGrid, inferComponentProperties, scanComponentCa
 import type { CompPropType, StructNode, StructGroup } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, Feature, isTier } from './lib/entitlements';
-import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
+import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
 import { commitUndo } from './lib/undo';
 
@@ -99,9 +99,21 @@ async function loadLicense(): Promise<void> {
   try {
     const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
     if (__DEV__ && isTier(dt)) devTier = dt; // 개발용 강제 티어는 dev 빌드에서만 로드(배포 백도어 차단)
-    const c = (await figma.clientStorage.getAsync(CACHE_KEY)) as LicenseCache | undefined;
-    // 손상/구형 캐시 방어: 모든 필드 형식을 확인(특히 key는 REQUEST_VERIFY에서 사용).
-    if (c && typeof c.key === 'string' && isTier(c.tier) && typeof c.expiresAt === 'number' && typeof c.lastVerified === 'number') cache = c;
+    const raw = await figma.clientStorage.getAsync(CACHE_KEY);
+    const normalized = normalizeLicenseCache(raw);
+    if (normalized) {
+      cache = normalized;
+      // 구 3티어(pro/team) 캐시를 paid로 승격했으면 저장소도 갱신 — 업데이트 직후 Free 강등 방지.
+      const legacyTier =
+        raw && typeof raw === 'object' && ((raw as { tier?: unknown }).tier === 'pro' || (raw as { tier?: unknown }).tier === 'team');
+      if (legacyTier) {
+        try {
+          await figma.clientStorage.setAsync(CACHE_KEY, normalized);
+        } catch {
+          /* 저장 실패해도 세션 동안은 승격된 캐시 적용 */
+        }
+      }
+    }
     const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
     if (Array.isArray(ps)) presets = ps as Preset[];
   } catch {
@@ -288,7 +300,10 @@ function kindOf(v: Variable): TokenKind {
 loadLicense().then(() => {
   postLicense();
   // 캐시가 오래됐으면 UI에 백그라운드 재검증 요청(WebCrypto는 UI에서).
-  if (cache && evaluateLicense(cache, Date.now()).stale) post({ type: 'REQUEST_VERIFY', key: cache.key, instanceId: cache.instanceId });
+  // instanceId 없는 구 캐시는 activate만 남아 한도 초과로 실패할 수 있음 → grace 유지, 수동 재입력 때 instanceId 확보.
+  if (cache && cache.instanceId && evaluateLicense(cache, Date.now()).stale) {
+    post({ type: 'REQUEST_VERIFY', key: cache.key, instanceId: cache.instanceId });
+  }
 });
 
 /* ---------- UX5: 실시간 선택 동기화 ----------
@@ -683,6 +698,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'LICENSE_VERIFIED': {
         // UI가 수행한 검증 결과를 받아 캐시·적용(부수효과만 여기서).
         if (msg.result.ok) {
+          const prev = cache;
+          // 키 교체·기기 변경 시 이전 LS 활성화 슬롯 반납(best-effort) — activation_limit 고아 방지.
+          if (prev?.instanceId) {
+            const keyChanged = prev.key !== msg.key;
+            const instChanged = !!msg.result.instanceId && prev.instanceId !== msg.result.instanceId;
+            if (keyChanged || instChanged) {
+              post({ type: 'REQUEST_DEACTIVATE', key: prev.key, instanceId: prev.instanceId });
+            }
+          }
           cache = cacheFromVerify(msg.key, msg.result, Date.now());
           try {
             await figma.clientStorage.setAsync(CACHE_KEY, cache);

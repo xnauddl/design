@@ -26,3 +26,10 @@ export function hasEntitlement(tier: Tier, _feature: Feature): boolean {
 export function isTier(v: unknown): v is Tier {
   return v === 'free' || v === 'paid';
 }
+
+/** 구 3티어(pro/team) → Paid 2티어. 알 수 없는 값은 null. */
+export function normalizeLegacyTier(v: unknown): Tier | null {
+  if (v === 'free' || v === 'paid') return v;
+  if (v === 'pro' || v === 'team') return 'paid';
+  return null;
+}
