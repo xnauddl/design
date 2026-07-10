@@ -655,16 +655,16 @@
     return out;
   }
   async function createSemanticTextStyles(specs, apply, nodes) {
-    var _a, _b;
+    var _a, _b, _c;
     const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [] };
     if (!specs.length) return res;
     const existing = await figma.getLocalTextStylesAsync();
     const styleById = new Map(existing.map((s) => [s.id, s]));
     const styleByName = new Map(existing.map((s) => [s.name, s]));
+    const anchoredStyle = (spec) => spec.boundStyleId ? styleById.get(spec.boundStyleId) : void 0;
     const roleRenames = [];
     for (const spec of specs) {
-      if (!spec.boundStyleId) continue;
-      const st = styleById.get(spec.boundStyleId);
+      const st = anchoredStyle(spec);
       if (st && st.name !== spec.name) roleRenames.push({ from: st.name, to: spec.name });
     }
     if (roleRenames.length) {
@@ -693,33 +693,54 @@
         tokens.push(t);
       }
     };
-    for (const s of specs) {
-      pushTok({ name: numberTokenName("font-size", s.fontSize), category: "fontSize", value: s.fontSize, sources: ["fontSize"] });
-      if (s.lineHeight > 0)
-        pushTok({ name: numberTokenName("line-height", s.lineHeight), category: "lineHeight", value: s.lineHeight, unit: "px", sources: ["lineHeight"] });
-      if (s.letterSpacing !== 0)
-        pushTok({ name: numberTokenName("letter-spacing", s.letterSpacing), category: "letterSpacing", value: s.letterSpacing, unit: "px", sources: ["letterSpacing"] });
-    }
-    await createTokens(tokens, 16);
     const aliasMap = {};
+    const pushAlias = (role, fontSize, lineHeight, letterSpacing) => {
+      pushTok({ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] });
+      aliasMap[`font-size/${role}`] = numberTokenName("font-size", fontSize);
+      if (lineHeight > 0) {
+        pushTok({ name: numberTokenName("line-height", lineHeight), category: "lineHeight", value: lineHeight, unit: "px", sources: ["lineHeight"] });
+        aliasMap[`line-height/${role}`] = numberTokenName("line-height", lineHeight);
+      }
+      if (letterSpacing !== 0) {
+        pushTok({ name: numberTokenName("letter-spacing", letterSpacing), category: "letterSpacing", value: letterSpacing, unit: "px", sources: ["letterSpacing"] });
+        aliasMap[`letter-spacing/${role}`] = numberTokenName("letter-spacing", letterSpacing);
+      }
+    };
     for (const s of specs) {
-      aliasMap[`font-size/${s.name}`] = numberTokenName("font-size", s.fontSize);
-      if (s.lineHeight > 0) aliasMap[`line-height/${s.name}`] = numberTokenName("line-height", s.lineHeight);
-      if (s.letterSpacing !== 0) aliasMap[`letter-spacing/${s.name}`] = numberTokenName("letter-spacing", s.letterSpacing);
+      if (anchoredStyle(s)) continue;
+      pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing);
     }
-    await createSemanticAliases(aliasMap);
+    {
+      const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
+      const semId0 = (_b = cols0.find((c) => c.name === SEMANTIC)) == null ? void 0 : _b.id;
+      const semNames = /* @__PURE__ */ new Set();
+      if (semId0) {
+        for (const v of await figma.variables.getLocalVariablesAsync())
+          if (v.variableCollectionId === semId0) semNames.add(v.name);
+      }
+      for (const s of specs) {
+        const st = anchoredStyle(s);
+        if (!st) continue;
+        if (semNames.has(`font-size/${s.name}`)) continue;
+        const fontSize = roundN(st.fontSize);
+        pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing));
+      }
+    }
+    if (tokens.length) await createTokens(tokens, 16);
+    if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_b = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _b.id;
+    const semId = (_c = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _c.id;
     const semByName = /* @__PURE__ */ new Map();
     if (semId) {
       for (const v of await figma.variables.getLocalVariablesAsync())
         if (v.variableCollectionId === semId) semByName.set(v.name, v);
     }
     for (const spec of specs) {
-      let style = spec.boundStyleId ? styleById.get(spec.boundStyleId) : void 0;
+      const anchored = anchoredStyle(spec);
+      let style = anchored;
       if (!style) style = styleByName.get(spec.name);
       const created = !style;
-      const isRename = !created && !!spec.boundStyleId;
+      const isRename = !!anchored;
       if (!style) style = figma.createTextStyle();
       if (style.name !== spec.name) {
         styleByName.delete(style.name);
@@ -884,15 +905,20 @@
   var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   function nameTextStyles(clusters, existing) {
     const nameById = /* @__PURE__ */ new Map();
+    const sigById = /* @__PURE__ */ new Map();
     const idBySig = /* @__PURE__ */ new Map();
     for (const e of existing != null ? existing : []) {
       nameById.set(e.id, e.name);
       const k = sigKey(e);
+      sigById.set(e.id, k);
       idBySig.set(k, idBySig.has(k) ? null : e.id);
     }
     const boundIdOf = (c) => {
       if (!existing) return void 0;
-      if (c.styleIds.length === 1 && nameById.has(c.styleIds[0])) return c.styleIds[0];
+      if (c.styleIds.length === 1) {
+        const id = c.styleIds[0];
+        if (nameById.has(id) && sigById.get(id) === sigKey(c)) return id;
+      }
       const sigId = idBySig.get(sigKey(c));
       return sigId && nameById.has(sigId) ? sigId : void 0;
     };

@@ -1142,3 +1142,54 @@ test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 적용 
   assert.equal(r2.updated, 1);
   assert.equal(figma._state.textStyles.length, 1); // 중복 생성 없음
 });
+
+test('createSemanticTextStyles — 기존 역할로 rename해도 시맨틱 토큰을 덮어쓰지 않음', async () => {
+  const figma = installFigma();
+  // body(16) · caption(13) 각각 등록
+  await createSemanticTextStyles(
+    [
+      { name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+      { name: 'caption', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+    ],
+    false,
+    [],
+  );
+  const bodySem = findVar(figma, 'Semantic', 'font-size/body');
+  const bodyGlobalId = bodySem.valuesByMode['mode:Semantic'].id;
+  const caption = figma._state.textStyles.find((s) => s.name === 'caption');
+  assert.ok(caption);
+
+  // caption → body로 rename(대상 역할 이미 존재). 스캔 스펙은 caption 값(13)이지만 body 시맨틱은 유지돼야 함.
+  const r = await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular', boundStyleId: caption.id }],
+    false,
+    [],
+  );
+  assert.equal(r.created, 0);
+  assert.equal(r.updated, 1);
+  const bodySemAfter = findVar(figma, 'Semantic', 'font-size/body');
+  assert.equal(bodySemAfter.valuesByMode['mode:Semantic'].id, bodyGlobalId); // 덮어쓰기 없음
+  assert.equal(caption.fontSize, 13); // rename 모드: 타이포도 보존
+  assert.equal(caption.name, 'body');
+});
+
+test('createSemanticTextStyles — stale boundStyleId는 rename 모드가 아님(타이포 기록)', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
+  // 존재하지 않는 id + 같은 이름 → 이름 폴백으로 body를 찾지만, stale 앵커라 타이포를 스펙으로 갱신해야 함.
+  const r = await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 18, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Medium', boundStyleId: 'style:gone' }],
+    false,
+    [],
+  );
+  assert.equal(r.created, 0);
+  assert.equal(r.updated, 1);
+  assert.equal(body.fontSize, 18);
+  assert.equal(body.fontName.style, 'Medium');
+  assert.equal(body.lineHeight.value, 28);
+});

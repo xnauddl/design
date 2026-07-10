@@ -100,22 +100,28 @@ const slug = (s: string): string =>
    같은 크기·굵기·패밀리라도 행간/자간이 다르면 별도 군집이므로 분리 유지(병합 금지).
 
    existing(이미 존재하는 로컬 텍스트 스타일들)을 주면, 군집을 기존 스타일에 **앵커**한다:
-   (1) 노드가 그 스타일에 실제 바인딩됨(styleIds) 또는 (2) **시그니처가 같은 기존 스타일이 정확히 1개**.
+   (1) 노드가 그 스타일에 바인딩되고 **시그니처도 일치**하거나 (2) **시그니처가 같은 기존 스타일이 정확히 1개**.
+   스타일 바인딩만 있고 로컬 오버라이드(크기·행간 등)로 시그니처가 어긋나면 앵커하지 않는다.
    앵커되면 자동 이름 대신 **기존 이름을 유지**하고 spec.boundStyleId를 채운다 — 재스캔/타프레임에서
    같은 타이포가 또 잡혀도 중복 생성 없이 그 스타일로 인식되고, 이름을 바꾸면 rename된다. */
 export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingTextStyle[]): TextStyleSpec[] {
-  // 기존 스타일 인덱스: id→이름, 시그니처→id(중복 시그니처는 모호 → 제외).
+  // 기존 스타일 인덱스: id→이름·시그니처, 시그니처→id(중복 시그니처는 모호 → 제외).
   const nameById = new Map<string, string>();
+  const sigById = new Map<string, string>();
   const idBySig = new Map<string, string | null>(); // null = 같은 시그니처 2개 이상(모호)
   for (const e of existing ?? []) {
     nameById.set(e.id, e.name);
     const k = sigKey(e);
+    sigById.set(e.id, k);
     idBySig.set(k, idBySig.has(k) ? null : e.id);
   }
-  // 군집 → 앵커할 기존 스타일 id(노드 바인딩 우선, 없으면 시그니처 매칭). 그 id가 로컬에 존재할 때만.
+  // 군집 → 앵커할 기존 스타일 id. 노드 바인딩은 시그니처 일치할 때만(오버라이드 어긋남 방지).
   const boundIdOf = (c: StyleCluster): string | undefined => {
     if (!existing) return undefined;
-    if (c.styleIds.length === 1 && nameById.has(c.styleIds[0])) return c.styleIds[0];
+    if (c.styleIds.length === 1) {
+      const id = c.styleIds[0];
+      if (nameById.has(id) && sigById.get(id) === sigKey(c)) return id;
+    }
     const sigId = idBySig.get(sigKey(c));
     return sigId && nameById.has(sigId) ? sigId : undefined;
   };
