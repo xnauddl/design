@@ -584,29 +584,6 @@ test('bindSelection — fontFamily(STRING)는 FONT_FAMILY 변수에 정확 일�
   assert.ok(res.bound >= 1);
 });
 
-test('bindSelection — 사용량 한도(maxNodes) 초과 시 부분 적용 + limited', async () => {
-  installFigma();
-  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
-  const mk = (id) => ({
-    type: 'FRAME',
-    id,
-    name: id,
-    fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }], // 매칭 → 노드당 1 바인딩
-    layoutSizingHorizontal: 'HUG',
-    layoutSizingVertical: 'HUG',
-    layoutMode: 'NONE',
-    setBoundVariable() {},
-  });
-  const res = await bindSelection([mk('a'), mk('b'), mk('c')], 0.5, { maxNodes: 2 });
-  assert.equal(res.limited, true);
-  assert.equal(res.bound, 2); // 노드 2개만 처리
-
-  // 한도 미지정(무제한)이면 limited 없음
-  const res2 = await bindSelection([mk('d'), mk('e')], 0.5);
-  assert.equal(res2.limited, undefined);
-  assert.equal(res2.bound, 2);
-});
-
 test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + 사유', async () => {
   installFigma();
   await createTokens(
@@ -635,7 +612,7 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
   });
 
   const node = mk();
-  const dry = await bindSelection([node], 0.5, {}, false);
+  const dry = await bindSelection([node], 0.5, false);
   assert.equal(dry.bound, 2); // 색1 + width1 예정
   assert.equal(dry.skipped, 1); // 미매칭 색1
   assert.equal(dry.reasons['no-match'], 1);
@@ -646,7 +623,7 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
 
   // 실제 적용은 동일 수치 + 변경 발생
   const node2 = mk();
-  const real = await bindSelection([node2], 0.5, {}, true);
+  const real = await bindSelection([node2], 0.5, true);
   assert.equal(real.bound, 2);
   assert.equal(real.skipped, 1);
   assert.equal(node2.fills[0].boundVariables.color.type, 'VARIABLE_ALIAS');
@@ -682,7 +659,7 @@ test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 
   };
   const root = { type: 'FRAME', id: 'root', name: 'root', fills: [], layoutMode: 'NONE', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [child], setBoundVariable() {} };
 
-  const dry = await bindSelection([root], 0.5, {}, false);
+  const dry = await bindSelection([root], 0.5, false);
 
   // 후보 2건: fills[0] 색 + width
   assert.equal(dry.candidates.length, 2);
@@ -722,7 +699,7 @@ test('bindSelection — 진행률 보고 + 취소(UX6)', async () => {
   const sel = Array.from({ length: 120 }, (_, i) => mk('n' + i));
   let lastDone = 0;
   let total = 0;
-  const res = await bindSelection(sel, 0.5, {}, true, {
+  const res = await bindSelection(sel, 0.5, true, {
     onProgress: (d, t) => {
       lastDone = d;
       total = t;
@@ -736,7 +713,7 @@ test('bindSelection — 진행률 보고 + 취소(UX6)', async () => {
 
   // 취소: shouldCancel true → 첫 양보 지점(50)에서 중단, 처리한 만큼만 적용
   const sel2 = Array.from({ length: 120 }, (_, i) => mk('m' + i));
-  const res2 = await bindSelection(sel2, 0.5, {}, true, {
+  const res2 = await bindSelection(sel2, 0.5, true, {
     onProgress: () => {},
     shouldCancel: () => true,
     yieldToEvents: () => Promise.resolve(),

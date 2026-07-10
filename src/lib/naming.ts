@@ -52,12 +52,14 @@ export function isKnownRole(seg: string): boolean {
 
 export type Role = (typeof ROLE_VOCAB)[number];
 
-/** 임의 문자열 → kebab-case 소문자. 카멜/공백/언더스코어/슬래시를 '-'로 정규화. */
+/** 임의 문자열 → kebab-case 소문자. 카멜/공백/슬래시를 '-'로 정규화.
+ *  '_'는 숫자 사이(소수점 표기 `1_5`)면 보존하고, 그 외 위치에서는 '-'로. */
 export function kebab(input: string): string {
   return input
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2') // camelCase 경계
-    .replace(/[\s_/]+/g, '-') // 공백·언더스코어·슬래시
-    .replace(/[^a-zA-Z0-9-]+/g, '-') // 기타 문자
+    .replace(/[\s/]+/g, '-') // 공백·슬래시
+    .replace(/_/g, (_m, i, s) => (/\d/.test(s[i - 1] || '') && /\d/.test(s[i + 1] || '') ? '_' : '-')) // 소수점 '_'만 보존
+    .replace(/[^a-zA-Z0-9_-]+/g, '-') // 기타 문자('_'는 위에서 처리 → 보존)
     .replace(/-+/g, '-') // 중복 하이픈
     .replace(/^-+|-+$/g, '') // 양끝 하이픈
     .toLowerCase();
@@ -94,13 +96,13 @@ export function capitalize(input: string): string {
 }
 
 /** 스타일 말단 세그먼트(노드 이름에 불필요한 역할). 기본 보존, 옵션으로 제거. */
+// 'border'는 ROLE_VOCAB의 유효 역할이므로 스타일 말단에서 제외(역할 우선, 이중 의미 해소).
 const STYLE_LEAVES = new Set([
   'fill',
   'color',
   'stroke',
   'bg',
   'text',
-  'border',
 ]);
 
 export interface LayerNameOptions {

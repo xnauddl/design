@@ -5,7 +5,7 @@ import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, Component
 import type { DraftToken } from './lib/tokens';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
-import { FREE_LIMITS, type Tier } from './lib/entitlements';
+import { type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
@@ -33,8 +33,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
-let isTeam = false;
-let isPro = false;
+let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
 let teamDataRequested = false;
 // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
 let hasGlobal = false;
@@ -696,7 +695,7 @@ async function runWizard(): Promise<void> {
     contrast: ($('wizOptContrast') as HTMLInputElement).checked,
     componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
   };
-  const ctx: WizardContext = { isPro, hasSemanticMap: Object.keys(semMap).length > 0 };
+  const ctx: WizardContext = { isPro: isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
   const plan = planWizard(options, ctx);
 
   wizardRunning = true;
@@ -731,7 +730,7 @@ async function runWizard(): Promise<void> {
         case 'create': {
           const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens, base }, ['CREATE_RESULT']);
           totals.created = r.created + r.updated;
-          setWizardStep('create', 'done', r.limited ? `${r.created + r.updated}개 · ⚠ Free 한도 일부만` : `생성 ${r.created} · 갱신 ${r.updated}`);
+          setWizardStep('create', 'done', `생성 ${r.created} · 갱신 ${r.updated}`);
           break;
         }
         case 'semantics': {
@@ -792,9 +791,14 @@ async function runWizard(): Promise<void> {
 $('btnWizardRun').addEventListener('click', () => void runWizard());
 $('btnWizardCancel').addEventListener('click', () => send({ type: 'CANCEL' }));
 
-$('tier').addEventListener('change', () => {
-  send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
-});
+// 개발용 강제 티어 토글 — 개발 빌드에서만 노출/동작(배포 빌드 백도어 차단).
+if (__DEV__) {
+  $('tier').addEventListener('change', () => {
+    send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
+  });
+} else {
+  $('devTierRow').style.display = 'none';
+}
 
 $('btnVerify').addEventListener('click', () => {
   const key = ($('licenseKey') as HTMLInputElement).value.trim();
@@ -828,14 +832,15 @@ async function subtleVerify(signingInput: string, signatureB64: string, alg: str
   return crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, b64urlToBytes(signatureB64), data);
 }
 
-/** 검증 서버 호출 + 서명/클레임 검증 → 결과를 code로 보고(code가 캐시·적용). */
-async function verifyAndReport(key: string): Promise<void> {
+/** 검증 서버 호출 + 서명/클레임 검증 → 결과를 code로 보고(code가 캐시·적용).
+ *  instanceId: 이전 활성화에서 받아 캐시에 보관한 기기 식별자(있으면 같은 기기로 validate). */
+async function verifyAndReport(key: string, instanceId?: string): Promise<void> {
   let result: VerifyResult;
   try {
     const resp = await fetch(VERIFY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, pluginId: PLUGIN_ID }),
+      body: JSON.stringify({ key, pluginId: PLUGIN_ID, instanceId }),
     });
     const json: unknown = await resp.json();
     // 서명 토큰({ token }) 우선, 없으면 평문 응답(개발/하위호환).
@@ -843,8 +848,13 @@ async function verifyAndReport(key: string): Promise<void> {
     const parsed = signed
       ? await verifyLicenseToken((json as { token: string }).token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify)
       : parseVerifyResponse(json);
+    // 서버가 돌려준 기기 instanceId를 보관(다음 재검증 때 같은 기기로 validate). 없으면 기존 값 유지.
+    const respInstanceId =
+      !!json && typeof json === 'object' && typeof (json as { instanceId?: unknown }).instanceId === 'string'
+        ? (json as { instanceId: string }).instanceId
+        : instanceId;
     result = parsed.ok
-      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt }
+      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: respInstanceId }
       : { ok: false, error: parsed.error };
   } catch {
     result = { ok: false, error: '검증 서버 연결 실패(오프라인)', offline: true };
@@ -852,34 +862,52 @@ async function verifyAndReport(key: string): Promise<void> {
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
 
-/* ---------- 팀 기능 게이트 (M3 프리셋, Team) ---------- */
-const TEAM_FIELDS = [
+/** 라이선스 키 제거 시 이 기기의 LS 활성화 슬롯을 반납(best-effort). 실패해도 로컬 제거는 진행됨. */
+async function deactivateInstance(key: string, instanceId: string): Promise<void> {
+  try {
+    await fetch(VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deactivate', key, instanceId, pluginId: PLUGIN_ID }),
+    });
+  } catch {
+    /* 오프라인 등 실패는 무시 — 슬롯은 만료/재활성화로 회수됨. */
+  }
+}
+
+/* ---------- 유료(Paid) 기능 게이트 ----------
+   Free/Paid 2티어. Paid에서 해금: 토큰 생성(적용)·시맨틱·텍스트 스타일·컴포넌트/베리언트·공유 프리셋.
+   Free: 팔레트·추출·토큰 미리보기·바인딩·리네임·명도 대비·내보내기. */
+const PAID_LOCK = '🔒 Paid 전용';
+const PRESET_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
-
-const PRO_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
+const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
+// 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
+const PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, 'btnCreateApply', 'btnPaletteApply', 'btnTextStyles'];
 
 /**
- * 통합 게이트(#11·#12) — 유료 잠금(Pro/Team)과 전제 미충족(Global/바인딩 변수 없음)을
+ * 통합 게이트(#11·#12) — 유료 잠금(Paid)과 전제 미충족(Global/바인딩 변수 없음)을
  * 한 메커니즘으로: 해당 버튼 disabled + 배지/안내(+바로가기) 표시.
  */
 function updateGates(): void {
-  // 유료 잠금(#12)
-  for (const id of TEAM_FIELDS) ($(id) as HTMLButtonElement).disabled = !isTeam;
-  for (const id of PRO_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPro;
-  $('presetLock').textContent = isTeam ? '' : '🔒 Team 전용';
-  $('componentLock').textContent = isPro ? '' : '🔒 Pro 전용';
-  $('wizComponentLock').textContent = isPro ? '' : '🔒 Pro';
-  ($('wizOptComponentize') as HTMLInputElement).disabled = !isPro;
+  // 유료 잠금(#12) — Free는 유료 버튼을 클릭 전에 사전 비활성 + 🔒 배지(클릭-후-거부 방지).
+  for (const id of PAID_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPaid;
+  for (const id of ['presetLock', 'componentLock', 'createLock', 'semLock', 'tsLock']) {
+    $(id).textContent = isPaid ? '' : PAID_LOCK;
+  }
+  $('wizComponentLock').textContent = isPaid ? '' : '🔒 Paid';
+  ($('wizOptComponentize') as HTMLInputElement).disabled = !isPaid;
 
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
+  if (!isPaid) ($('btnSemantics') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
   setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 바인딩할 변수를 만드세요.');
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
   // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
 
-  if (isTeam && !teamDataRequested) {
+  if (isPaid && !teamDataRequested) {
     teamDataRequested = true;
     send({ type: 'GET_PRESETS' });
   }
@@ -1139,14 +1167,14 @@ window.onmessage = (event: MessageEvent) => {
       const applyBtn = $('btnCreateApply') as HTMLButtonElement;
       if (msg.preview) {
         // UX1: 변경 요약을 먼저 보여주고 ‘적용’ 버튼 노출.
-        setStatus('createStatus', t('create.preview', { summary: msg.summary }), msg.limited ? 'warn' : '');
+        setStatus('createStatus', t('create.preview', { summary: msg.summary }), '');
         applyBtn.style.display = '';
       } else if (createFrom === 'palette') {
         // 팔레트 카드의 ‘적용’에서 온 결과 → 팔레트 상태에 표시.
-        setStatus('paletteStatus', msg.summary, msg.limited ? 'warn' : 'ok');
+        setStatus('paletteStatus', msg.summary, 'ok');
         createFrom = 'tokens';
       } else {
-        setStatus('createStatus', msg.summary, msg.limited ? 'warn' : 'ok');
+        setStatus('createStatus', msg.summary, 'ok');
         applyBtn.style.display = 'none';
         // 2.5 카드 숨김(자동 흡수): 토큰 생성 적용 시 자동 추천 매핑으로 역할 별칭(Semantic)도 자동 생성.
         // 마법사는 자체 semantics 단계가 있어 제외(메인 핸들러와 동시 수신 → 이중 생성 방지).
@@ -1164,8 +1192,7 @@ window.onmessage = (event: MessageEvent) => {
       hideApplyProgress(); // UX6
       const confirmBtn = $('btnApplyConfirm') as HTMLButtonElement;
       const rt = reasonsText(msg.reasons); // UX3: 사유별 스킵
-      const limitNote = msg.limited ? ' · ⚠ Free 한도 도달 — 일부만 적용(업그레이드 필요)' : '';
-      const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}${limitNote}`;
+      const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}`;
       if (msg.cancelled) {
         // UX6: 취소 — 처리한 만큼만 적용(비파괴).
         clearBindPreview();
@@ -1178,10 +1205,10 @@ window.onmessage = (event: MessageEvent) => {
         bindChecked.clear();
         for (const c of bindCandidates) bindChecked.add(candKey(c));
         renderBindTree();
-        setStatus('applyStatus', t('apply.preview', { bound: msg.bound, detail }), msg.limited || msg.skipped ? 'warn' : '');
+        setStatus('applyStatus', t('apply.preview', { bound: msg.bound, detail }), msg.skipped ? 'warn' : '');
       } else {
         clearBindPreview();
-        setStatus('applyStatus', t('apply.done', { bound: msg.bound, detail }), msg.limited || msg.skipped ? 'warn' : 'ok');
+        setStatus('applyStatus', t('apply.done', { bound: msg.bound, detail }), msg.skipped ? 'warn' : 'ok');
         confirmBtn.style.display = 'none';
       }
       break;
@@ -1259,17 +1286,14 @@ window.onmessage = (event: MessageEvent) => {
             : '없음';
       const exp = msg.expiresAt ? ` · 만료 ${new Date(msg.expiresAt).toISOString().slice(0, 10)}` : '';
       $('licenseInfo').textContent = `현재: ${msg.tier.toUpperCase()} (${srcLabel})${exp}`;
-      const cap = (n: number) => (msg.unlimited ? '∞' : String(n));
-      $('limitsInfo').textContent =
-        `1회 한도 — 노드 ${cap(FREE_LIMITS.nodes)} · 토큰 ${cap(FREE_LIMITS.tokens)} · 바인딩 ${cap(FREE_LIMITS.bindings)}`;
       // 개발용 토글은 검증 키가 없을 때만 의미가 있으므로, 키가 적용 중이면 표시만 동기화
-      if (msg.source !== 'key') ($('tier') as HTMLSelectElement).value = msg.tier;
+      if (__DEV__ && msg.source !== 'key') ($('tier') as HTMLSelectElement).value = msg.tier;
       if (msg.note) {
         const cls = /실패|오프라인/.test(msg.note) ? 'warn' : 'ok';
         setStatus('licenseStatus', msg.note, cls);
       }
-      isTeam = msg.tier === 'team';
-      isPro = msg.tier === 'pro' || msg.tier === 'team';
+      // Free/Paid 2티어 — 유료면 모든 유료 기능 해금.
+      isPaid = msg.unlimited;
       updateGates();
       break;
     }
@@ -1368,21 +1392,25 @@ window.onmessage = (event: MessageEvent) => {
       renderContrast(msg);
       break;
     case 'PREMIUM_REQUIRED': {
-      // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 팀 기능은 ‘관리’ 탭).
+      // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭).
       const statusId =
         msg.feature === 'components'
           ? 'componentStatus'
-          : msg.feature === 'textStyles'
-            ? 'tsStatus'
-            : msg.feature === 'teamPresets'
-              ? 'presetStatus'
-              : 'createStatus';
+          : msg.feature === 'presets'
+            ? 'presetStatus'
+            : msg.feature === 'semantics'
+              ? 'semStatus'
+              : 'createStatus'; // tokens(기본)
       setStatus(statusId, t('premium.required', { message: msg.message, feature: msg.feature }), 'warn');
       break;
     }
     case 'REQUEST_VERIFY':
-      // code가 캐시된 키의 (재)검증을 요청 — UI에서 수행 후 결과 보고.
-      void verifyAndReport(msg.key);
+      // code가 캐시된 키의 (재)검증을 요청 — 보관된 instanceId로 같은 기기에 validate 후 보고.
+      void verifyAndReport(msg.key, msg.instanceId);
+      break;
+    case 'REQUEST_DEACTIVATE':
+      // 키 제거 시 이 기기의 LS 활성화 슬롯 반납(best-effort).
+      void deactivateInstance(msg.key, msg.instanceId);
       break;
     case 'ERROR': {
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
