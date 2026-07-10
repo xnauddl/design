@@ -138,6 +138,8 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
     paddingRight: 8,
     paddingTop: 0,
     paddingBottom: 0,
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
     width: 200,
     height: 100,
     cornerRadius: 8,
@@ -175,6 +177,53 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
   // 레이어 불투명도(<1)
   assert.equal(byName.get('opacity/0_5')?.category, 'opacity');
   assert.deepEqual(byName.get('opacity/0_5')?.sources, ['opacity']);
+});
+
+test('extractFromSelection — HUG/FILL 축의 크기는 토큰화하지 않음(Fixed만)', () => {
+  installFigma();
+  // 가로 FILL(부모 채움), 세로 HUG(콘텐츠 맞춤) — 둘 다 동적 크기라 size 토큰 제외.
+  const fillHug = {
+    type: 'FRAME',
+    id: 'f-fh',
+    name: 'FillHug',
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FILL',
+    layoutSizingVertical: 'HUG',
+    width: 320,
+    height: 44,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [],
+  };
+  // 가로만 Fixed → 그 축의 크기(width)만 토큰화.
+  const fixedW = {
+    type: 'FRAME',
+    id: 'f-fw',
+    name: 'FixedW',
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: 280,
+    height: 99,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [],
+  };
+
+  const { tokens } = extractFromSelection([fillHug, fixedW]);
+  const names = new Set(tokens.map((t) => t.name));
+  // FILL/HUG 축의 값은 모두 제외
+  assert.equal(names.has('size/320'), false); // 가로 FILL
+  assert.equal(names.has('size/44'), false); // 세로 HUG
+  assert.equal(names.has('size/99'), false); // 세로 HUG
+  // Fixed 축만 수집
+  assert.equal(names.has('size/280'), true); // 가로 FIXED
 });
 
 test('extractFromSelection — 그라디언트 채움은 경고', () => {
@@ -1029,9 +1078,9 @@ test('prunePaletteColors(#3) — 재생성 hue 패밀리 안에서만 정리(다
 /* ================= textStyles.ts (Phase C) ================= */
 test('scanTextStyles — TEXT 노드 시그니처 수집(+%행간 환산·mixed 스킵)', () => {
   const figma = installFigma();
-  const t1 = { type: 'TEXT', id: 't1', name: 'Title', fontSize: 32, fontName: { family: 'Inter', style: 'Bold' }, lineHeight: { unit: 'PIXELS', value: 40 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'Hi' };
-  const t2 = { type: 'TEXT', id: 't2', name: 'Body', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'PERCENT', value: 150 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'x' };
-  const tMixed = { type: 'TEXT', id: 't3', name: 'Mixed', fontSize: figma.mixed, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'AUTO' }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'y' };
+  const t1 = { type: 'TEXT', id: 't1', name: 'Title', fontSize: 32, fontName: { family: 'Inter', style: 'Bold' }, lineHeight: { unit: 'PIXELS', value: 40 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'Hi', textStyleId: '' };
+  const t2 = { type: 'TEXT', id: 't2', name: 'Body', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'PERCENT', value: 150 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'x', textStyleId: '' };
+  const tMixed = { type: 'TEXT', id: 't3', name: 'Mixed', fontSize: figma.mixed, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'AUTO' }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'y', textStyleId: '' };
   const frame = { type: 'FRAME', id: 'f', name: 'F', children: [t1, t2, tMixed] };
 
   const { samples, warnings } = scanTextStyles([frame]);
@@ -1039,6 +1088,28 @@ test('scanTextStyles — TEXT 노드 시그니처 수집(+%행간 환산·mixed 
   assert.equal(samples.find((s) => s.fontSize === 16).lineHeight, 24); // 150% × 16
   assert.equal(samples.find((s) => s.fontSize === 32).style, 'Bold');
   assert.ok(warnings.length >= 1);
+});
+
+test('scanTextStyles — 숨김 텍스트(visible=false)와 그 하위는 스캔하지 않음', () => {
+  installFigma();
+  const visible = {
+    type: 'TEXT', id: 'vis', name: 'Show', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'a', textStyleId: '',
+  };
+  const hidden = {
+    type: 'TEXT', id: 'hid', name: 'Hide', visible: false, fontSize: 48, fontName: { family: 'Inter', style: 'Bold' },
+    lineHeight: { unit: 'PIXELS', value: 56 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'b', textStyleId: '',
+  };
+  const nestedHidden = {
+    type: 'FRAME', id: 'wrap', name: 'HiddenWrap', visible: false,
+    children: [{
+      type: 'TEXT', id: 'nested', name: 'Nested', fontSize: 20, fontName: { family: 'Inter', style: 'Regular' },
+      lineHeight: { unit: 'PIXELS', value: 28 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'c', textStyleId: '',
+    }],
+  };
+  const { samples } = scanTextStyles([{ type: 'FRAME', id: 'f', name: 'F', children: [visible, hidden, nestedHidden] }]);
+  assert.equal(samples.length, 1);
+  assert.equal(samples[0].layerName, 'Show');
 });
 
 test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 적용 + 멱등', async () => {

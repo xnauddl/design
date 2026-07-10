@@ -4,7 +4,7 @@
 import type { UiToCode, RenameChange } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, createSemanticTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
+import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
@@ -111,7 +111,8 @@ async function postPrereq(): Promise<void> {
     const vars = await figma.variables.getLocalVariablesAsync();
     const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable });
+    const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // '기존 스타일 적용만' 전제
+    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable, hasTextStyles });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -621,7 +622,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
         const { samples, warnings } = scanTextStyles(selection());
-        const styles = nameTextStyles(clusterTextStyles(samples));
+        // 기존 로컬 스타일 목록 전달 → 노드 바인딩/시그니처가 같은 후보는 '이미 등록'으로 인식(이름 유지).
+        const styles = nameTextStyles(clusterTextStyles(samples), await scanExistingTextStyles());
         post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
         break;
       }
@@ -630,6 +632,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
         post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
         commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로
+        await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → '적용만' 등 전제 게이트 갱신
+        break;
+      }
+      case 'APPLY_TEXT_STYLES': {
+        // 적용만(생성 없음): 선택 텍스트를 시그니처가 같은 기존 스타일에 바인딩.
+        if (!requireTextStyles()) break;
+        const r = await applyExistingTextStyles(selection());
+        post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, missing: r.missing });
+        commitUndo(figma);
         break;
       }
       case 'GET_COLLECTIONS': {

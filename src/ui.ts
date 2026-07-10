@@ -36,9 +36,10 @@ let presets: Preset[] = [];
 let isTeam = false;
 let isPro = false;
 let teamDataRequested = false;
-// #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩).
+// #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
 let hasGlobal = false;
 let hasBindable = false;
+let hasTextStyles = false;
 let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
@@ -427,28 +428,53 @@ $('btnSemantics').addEventListener('click', () => {
 });
 
 /* ---------- 2.6 · 텍스트 스타일 (Phase C) ---------- */
-function tsFontFamily(): string {
-  return ($('tsFont') as HTMLInputElement).value.trim() || 'Inter';
-}
+/** 폰트는 행별 폰트 셀로 보존(스캔 행 읽기 전용). 수동 행/폴백의 기본 패밀리만 상수로 둔다. */
+const DEFAULT_TS_FAMILY = 'Inter';
 
-/** 표 1행 생성(스펙 → 입력 행). family·letterSpacing은 행 dataset에 보존. */
-function textStyleRow(s: TextStyleSpec): HTMLTableRowElement {
+/** 표 1행 생성(스펙 → 입력 행). 폰트는 행별 셀로 보존(패밀리가 행마다 다를 수 있음).
+   locked=true(스캔 행): 폰트·크기·행간·자간·스타일은 읽기 전용(이미 디자인된 사실) — 이름(role)만 편집. */
+function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   const tr = document.createElement('tr');
-  const cell = (field: string, value: string, width: string, type = 'text'): void => {
+  // 이미 바인딩된 스타일이면 id 보존 → 등록 시 신규 생성이 아니라 그 스타일 rename.
+  if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
+  // 컬럼 폭은 표의 <colgroup>이 정하고(폰트는 가변), 입력은 칸을 꽉 채운다.
+  const cell = (field: string, value: string, opts: { type?: string; readonly?: boolean } = {}): void => {
+    const { type = 'text', readonly = false } = opts;
     const td = document.createElement('td');
     const inp = document.createElement('input');
     inp.type = type;
     inp.value = value;
     inp.dataset.field = field;
-    inp.style.width = width;
+    inp.style.width = '100%';
     if (type === 'number') inp.style.textAlign = 'right';
+    if (readonly) {
+      inp.readOnly = true;
+      inp.tabIndex = -1;
+      // 잘려도 hover로 전체값 확인 가능(특히 긴 폰트 패밀리).
+      inp.title = value ? `${value} · 스캔한 값이라 못 바꿔요` : '스캔한 값 — 새 값은 ‘행 추가’로';
+    }
     td.appendChild(inp);
     tr.appendChild(td);
   };
-  cell('name', s.name, '84px');
-  cell('fontSize', String(s.fontSize), '40px', 'number');
-  cell('lineHeight', String(s.lineHeight), '40px', 'number');
-  cell('style', s.style, '64px');
+  cell('name', s.name);
+  {
+    // 행 구분: 이미 등록된 스타일(파랑) vs 새로 만들어질 스타일(앰버) — 스캔 노이즈 식별용.
+    const nameInp = tr.querySelector('input[data-field="name"]') as HTMLInputElement | null;
+    if (nameInp) {
+      if (s.boundStyleId) {
+        nameInp.classList.add('ts-bound');
+        nameInp.title = '이미 등록된 스타일이에요. 이름을 바꾸면 이 스타일의 이름만 바뀝니다(새로 안 만듦).';
+      } else {
+        nameInp.classList.add('ts-new');
+        nameInp.title = '새 스타일로 등록됩니다(아직 등록 안 된 글자).';
+      }
+    }
+  }
+  cell('family', s.family, { readonly: locked });
+  cell('fontSize', String(s.fontSize), { type: 'number', readonly: locked });
+  cell('lineHeight', String(s.lineHeight), { type: 'number', readonly: locked });
+  cell('letterSpacing', String(s.letterSpacing), { type: 'number', readonly: locked });
+  cell('style', s.style, { readonly: locked });
   const tdDel = document.createElement('td');
   const del = document.createElement('button');
   del.textContent = '✕';
@@ -456,43 +482,43 @@ function textStyleRow(s: TextStyleSpec): HTMLTableRowElement {
   del.addEventListener('click', () => tr.remove());
   tdDel.appendChild(del);
   tr.appendChild(tdDel);
-  tr.dataset.letterSpacing = String(s.letterSpacing);
   return tr;
 }
 
-function renderTextStyleRows(specs: TextStyleSpec[]): void {
+function renderTextStyleRows(specs: TextStyleSpec[], locked = false): void {
   const tbody = $('tsRows');
   tbody.innerHTML = '';
-  for (const s of specs) tbody.appendChild(textStyleRow(s));
+  for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
 }
 
-/** 표 → 스펙. 폰트 패밀리는 tsFont 단일 입력을 모든 행에 적용. */
+/** 표 → 스펙. 폰트 패밀리는 행별 폰트 셀에서 읽는다(비면 DEFAULT_TS_FAMILY). */
 function readTextStyleRows(): TextStyleSpec[] {
-  const family = tsFontFamily();
   const specs: TextStyleSpec[] = [];
   for (const tr of Array.from($('tsRows').querySelectorAll('tr'))) {
     const get = (f: string): string =>
       (tr.querySelector(`input[data-field="${f}"]`) as HTMLInputElement | null)?.value ?? '';
     const name = get('name').trim();
     if (!name) continue;
+    const boundStyleId = (tr as HTMLTableRowElement).dataset.boundStyleId;
     specs.push({
       name,
       fontSize: Number(get('fontSize')) || 0,
       lineHeight: Number(get('lineHeight')) || 0,
-      letterSpacing: Number((tr as HTMLElement).dataset.letterSpacing) || 0,
-      family,
+      letterSpacing: Number(get('letterSpacing')) || 0,
+      family: get('family').trim() || DEFAULT_TS_FAMILY,
       style: get('style').trim() || 'Regular',
+      ...(boundStyleId ? { boundStyleId } : {}),
     });
   }
   return specs;
 }
 
 $('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
-$('btnTsAddRow').addEventListener('click', () =>
+$('btnTsAddRow').addEventListener('click', () => {
   $('tsRows').appendChild(
-    textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: tsFontFamily(), style: 'Regular' }),
-  ),
-);
+    textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' }),
+  );
+});
 $('btnTextStyles').addEventListener('click', () => {
   const styles = readTextStyleRows();
   if (!styles.length) {
@@ -500,6 +526,11 @@ $('btnTextStyles').addEventListener('click', () => {
     return;
   }
   send({ type: 'CREATE_TEXT_STYLES', styles, apply: ($('tsApply') as HTMLInputElement).checked });
+});
+$('btnApplyExistingText').addEventListener('click', () => {
+  // 적용만: 표/스캔과 무관하게 현재 선택의 텍스트를 기존 스타일에 바인딩(생성 없음).
+  setStatus('tsStatus', '선택 텍스트를 기존 스타일에 적용 중…', 'ok');
+  send({ type: 'APPLY_TEXT_STYLES' });
 });
 
 $('btnApply').addEventListener('click', () => {
@@ -845,6 +876,8 @@ function updateGates(): void {
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
   setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 바인딩할 변수를 만드세요.');
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
+  // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
+  setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
 
   if (isTeam && !teamDataRequested) {
     teamDataRequested = true;
@@ -1166,16 +1199,17 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'TEXT_STYLE_CANDIDATES': {
       if (msg.styles.length) {
-        ($('tsFont') as HTMLInputElement).value = msg.styles[0].family || tsFontFamily();
-        renderTextStyleRows(msg.styles);
+        renderTextStyleRows(msg.styles, true);
+        const bound = msg.styles.filter((s) => s.boundStyleId).length;
+        const fresh = msg.styles.length - bound;
         setStatus(
           'tsStatus',
-          `${msg.styles.length}개 스타일 후보 추출. 이름·값 확인 후 등록하세요.` +
-            (msg.warnings.length ? ' ' + msg.warnings.join(' ') : ''),
+          `${msg.styles.length}개 찾음 · 신규 ${fresh}(앰버) · 이미 등록 ${bound}(파랑)` +
+            (msg.warnings.length ? ' · ' + msg.warnings.join(' ') : ''),
           msg.warnings.length ? 'warn' : 'ok',
         );
       } else {
-        renderTextStyleRows(rampToSpecs(tsFontFamily()));
+        renderTextStyleRows(rampToSpecs(DEFAULT_TS_FAMILY));
         setStatus('tsStatus', '선택에서 텍스트를 못 찾아 기본 램프로 채웠습니다. 폰트·값을 조정하세요.', 'warn');
       }
       break;
@@ -1187,6 +1221,13 @@ window.onmessage = (event: MessageEvent) => {
           (msg.applied ? ` · 적용 ${msg.applied}` : '') +
           (msg.missing.length ? ` · 미연결: ${msg.missing.join(', ')}` : ''),
         msg.missing.length ? 'warn' : 'ok',
+      );
+      break;
+    case 'TEXT_STYLES_APPLIED':
+      setStatus(
+        'tsStatus',
+        `기존 스타일 적용 ${msg.applied}건` + (msg.missing.length ? ` · ${msg.missing.join(' · ')}` : ''),
+        msg.applied === 0 || msg.missing.length ? 'warn' : 'ok',
       );
       break;
     case 'COLLECTIONS':
@@ -1205,6 +1246,7 @@ window.onmessage = (event: MessageEvent) => {
       // #11: 단계 전제 갱신 → 통합 게이트 재평가 + 진행 안내(§3).
       hasGlobal = msg.hasGlobal;
       hasBindable = msg.hasBindable;
+      hasTextStyles = msg.hasTextStyles;
       updateGates();
       renderPipeline();
       break;
