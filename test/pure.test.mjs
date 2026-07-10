@@ -1177,6 +1177,19 @@ test('nameTextStyles — 한 군집이 여러 스타일에 걸치면 모호 → 
   assert.equal(nameTextStyles(clusters, existing)[0].boundStyleId, undefined);
 });
 
+test('nameTextStyles — styleId 바인딩이어도 시그니처 불일치(오버라이드)면 앵커 안 함', () => {
+  // 스타일 body(16/24)가 붙어 있지만 노드가 fontSize 18로 오버라이드 → 시그니처 어긋남.
+  const clusters = clusterTextStyles([
+    { fontSize: 18, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'p', styleId: 'S:body' },
+  ]);
+  const existing = [
+    { id: 'S:body', name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+  ];
+  const specs = nameTextStyles(clusters, existing);
+  assert.equal(specs[0].boundStyleId, undefined); // 오버라이드 → rename 앵커 보류
+  assert.notEqual(specs[0].name, 'body'); // 자동 이름(크기 램프)
+});
+
 test('fontStyleForWeight — 굵기/italic → Figma style', () => {
   assert.equal(fontStyleForWeight(400), 'Regular');
   assert.equal(fontStyleForWeight(700), 'Bold');
