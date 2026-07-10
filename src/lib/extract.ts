@@ -99,9 +99,13 @@ function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | Inst
 function collectSize(acc: Accumulator, node: SceneNode): void {
   // 프레임류만 사이즈 후보로(노이즈 방지)
   if (node.type !== 'FRAME' && node.type !== 'COMPONENT' && node.type !== 'INSTANCE') return;
-  for (const v of [round(node.width), round(node.height)]) {
-    if (v > 0) add(acc, { name: numberTokenName('size', v), category: 'size', value: v }, 'size');
-  }
+  // Fixed인 축만 토큰화 — HUG/FILL은 계산된 동적 크기라 디자인 토큰이 아님(bind.ts와 동일 기준).
+  const addSize = (v: number) => {
+    const rv = round(v);
+    if (rv > 0) add(acc, { name: numberTokenName('size', rv), category: 'size', value: rv }, 'size');
+  };
+  if (node.layoutSizingHorizontal === 'FIXED') addSize(node.width);
+  if (node.layoutSizingVertical === 'FIXED') addSize(node.height);
 }
 
 /* ---------- radius ---------- */
