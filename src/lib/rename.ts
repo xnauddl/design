@@ -18,7 +18,7 @@
    - 이름 형식: {맥락}-{역할} 최대 2토막. 형제 충돌에 숫자 안 붙임(Figma 중복 허용).
    - 제외: Component/ComponentSet · Text · Instance · 잠긴 레이어.
    ============================================================ */
-import { parseTokenName, layerNameFromRole, pickScope, kebab } from './naming';
+import { parseTokenName, layerNameFromRole, pickScope, kebab, ROLE_KEY } from './naming';
 import type { ParsedToken } from './naming';
 import type { RenameChange, RenameNode } from '../shared/messages';
 
@@ -104,6 +104,9 @@ async function recurse(
         col.changes.push({ id: node.id, before, after });
         if (opts.apply) node.name = after;
       }
+      // 판정한 역할을 노드에 남긴다 — 등록이 머리명사로 읽어 이름 파싱 추측을 없앤다.
+      // 이름이 안 바뀐 재실행에서도 기록해 예전 리네임 결과에 값을 채운다(멱등).
+      if (opts.apply && decided.role) writeRole(node, decided.role);
       // 맥락: 일반 레이아웃(passthrough)은 받은 맥락을 그대로 통과, 그 외엔 내 새 이름.
       contextForChildren = decided.passthrough ? ancestorName : decided.name;
     }
@@ -126,7 +129,7 @@ async function decide(
   pos: Pos,
   opts: Opts,
   parentIsList: boolean,
-): Promise<{ skip: boolean; name?: string; passthrough?: boolean }> {
+): Promise<{ skip: boolean; name?: string; passthrough?: boolean; role?: string }> {
   // 제외 규칙(이름 유지 · 자기 이름을 자식 맥락으로 전달)
   if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return { skip: true };
   if (node.type === 'TEXT') return { skip: true };
@@ -140,7 +143,7 @@ async function decide(
     if (!hc) return { skip: true };
     let hcScope = ancestorName ? pickScope(ancestorName) : null;
     if (hcScope === hc) hcScope = null;
-    return { skip: false, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }) };
+    return { skip: false, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }), role: hc };
   }
 
   // 전체 정규화: 현재 이름과 무관하게 역할 기반 이름으로 교체(사람이 지은 이름도 덮어씀).
@@ -152,9 +155,23 @@ async function decide(
   const role = resolveRole(node, token, pos, parentIsList, ctxScope);
   // 역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하되,
   // 상속 맥락은 자식에게 그대로 통과(passthrough)시켜 의미있는 후손이 카드 맥락을 받게.
-  if (PASSTHROUGH_ROLES.has(role)) return { skip: false, name: role, passthrough: true };
+  if (PASSTHROUGH_ROLES.has(role)) return { skip: false, name: role, passthrough: true, role };
   const scope = ctxScope === role ? null : ctxScope; // 맥락==역할이면 중복 제거(button-button 방지)
-  return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
+  return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }), role };
+}
+
+/**
+ * 판정한 역할을 노드 pluginData에 기록한다. 실패해도 리네임은 계속 — 이름이 본체고
+ * 기록은 등록 단계의 보조 신호다. (테스트 목처럼 API가 없는 노드도 안전하게 통과)
+ */
+function writeRole(node: SceneNode, role: string): void {
+  const fn = (node as { setPluginData?: (key: string, value: string) => void }).setPluginData;
+  if (typeof fn !== 'function') return;
+  try {
+    fn.call(node, ROLE_KEY, role);
+  } catch {
+    /* 기록 실패 무시 */
+  }
 }
 
 /** 역할 없는 순수 레이아웃 폴백 — 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과. */

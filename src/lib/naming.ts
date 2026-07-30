@@ -68,6 +68,13 @@ export const RECOGNIZED_ROLES = [
 /** 역할 어휘 전체(출력 + 인식). */
 export const ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES] as const;
 
+/**
+ * 리네임이 판정한 역할을 노드에 남기는 pluginData 키.
+ * 컴포넌트 등록이 이 값을 머리명사로 읽는다 — 이름 텍스트만으로는 사람이 지은 복합 명사
+ * (`nav-button`)와 리네임이 지은 `{맥락}-{역할}`(`card-thumbnail`)을 구분할 수 없다.
+ */
+export const ROLE_KEY = 'dsRole';
+
 /** 역할 어휘 집합(맥락 추출 시 의미 있는 세그먼트 판별용). */
 const ROLE_SET: ReadonlySet<string> = new Set(ROLE_VOCAB);
 

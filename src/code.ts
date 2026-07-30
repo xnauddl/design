@@ -10,7 +10,8 @@ import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, commonBaseName } from './lib/components';
+import { ROLE_KEY } from './lib/naming';
+import { missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames } from './lib/components';
 import type { CompPropType, StructNode, StructGroup } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, Feature, isTier } from './lib/entitlements';
@@ -358,6 +359,20 @@ function solidFillHex(node: SceneNode): string | null {
   return null;
 }
 
+/**
+ * 리네임이 남긴 역할(`dsRole`)을 읽는다 — 등록이 머리명사로 쓴다. 없으면 undefined
+ * (사람이 지은 이름이거나 리네임 전). API가 없는 노드도 안전하게 통과.
+ */
+function readRole(node: SceneNode): string | undefined {
+  const fn = (node as { getPluginData?: (key: string) => string }).getPluginData;
+  if (typeof fn !== 'function') return undefined;
+  try {
+    return fn.call(node, ROLE_KEY) || undefined;
+  } catch {
+    return undefined; // 읽기 실패 → 이름 기반 폴백
+  }
+}
+
 /** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색을 읽어 순수 그룹화에 넘김. */
 function toStructNode(node: SceneNode): StructNode {
   const a = node as unknown as Record<string, unknown>;
@@ -378,6 +393,7 @@ function toStructNode(node: SceneNode): StructNode {
     counterAxisSpacing: num(a.counterAxisSpacing),
     layoutMode: typeof a.layoutMode === 'string' ? a.layoutMode : undefined,
     fillHex: solidFillHex(node),
+    role: readRole(node),
     children: kids.map(toStructNode),
   };
 }
@@ -826,15 +842,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           .filter((n): n is SceneNode => !!n);
         const groups = groupForRegister(eligibleNodes);
         const preview = new Map<string, { group?: string; variant?: string; single?: string }>();
-        for (const g of groups) {
+        // 단독·세트 모두 같은 규칙 + 그룹 간 이름 충돌 해소(등록과 동일한 결과를 미리 보여준다).
+        const previewNames = resolveGroupNames(groups.map((g) => g.members));
+        groups.forEach((g, i) => {
           if (g.members.length < 2) {
-            // 단독도 세트와 같은 규칙 — 맥락 토막을 뗀 이름(`article-avatar` → `Avatar`).
-            if (g.members[0]) preview.set(g.members[0].id, { single: commonBaseName([g.members[0].name]) });
-            continue;
+            if (g.members[0]) preview.set(g.members[0].id, { single: previewNames[i] });
+            return;
           }
-          const base = commonBaseName(g.members.map((m) => m.name));
-          for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
-        }
+          for (const d of deriveVariants(g.members)) preview.set(d.id, { group: previewNames[i], variant: d.variant });
+        });
         const nodes = candidates.map((c) => {
           const p = preview.get(c.id);
           return p ? { ...c, ...p } : c;
@@ -939,8 +955,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try { restore([{ inst: comp.createInstance(), o }]); } catch (e) { failures.push(`인스턴스 실패(${comp.name}): ${errText(e)}`); }
         };
 
-        for (const g of groups) {
-          const setName = commonBaseName(g.members.map((m) => m.name)); // 정확한 이름 → PascalCase
+        // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
+        const groupNames = resolveGroupNames(groups.map((g) => g.members));
+        for (let gi = 0; gi < groups.length; gi++) {
+          const g = groups[gi];
+          const setName = groupNames[gi];
           // 단독(1개) — 컴포넌트화 + 원위치 인스턴스.
           if (g.members.length === 1) {
             const node = byId.get(g.members[0].id);
@@ -949,7 +968,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             try {
               const comp = figma.createComponentFromNode(node);
               registered++;
-              placeSingle(comp, o, commonBaseName([g.members[0].name])); // 미리보기와 동일 규칙
+              placeSingle(comp, o, setName); // 단독·세트 동일 규칙
             } catch (e) {
               skipped++;
               failures.push(`단독 등록 실패(${g.members[0].name}): ${errText(e)}`);
@@ -1027,7 +1046,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const missing: string[] = [];
         const singles: string[] = [];
         const failures: string[] = [];
-        for (const g of groups) {
+        const groupNames = resolveGroupNames(groups.map((g) => g.members)); // 등록과 동일 규칙
+        for (let gi = 0; gi < groups.length; gi++) {
+          const g = groups[gi];
           const nodes = g.members.map((m) => byId.get(m.id)).filter((n): n is ComponentNode => !!n);
           if (nodes.length < 2) {
             if (nodes[0]) singles.push(nodes[0].name);
@@ -1037,7 +1058,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try {
             const parent = nodes[0].parent ?? figma.currentPage;
             const set = figma.combineAsVariants(nodes, parent);
-            set.name = commonBaseName(g.members.map((m) => m.name));
+            set.name = groupNames[gi];
             for (const m of g.members) {
               const node = byId.get(m.id);
               const v = variantById.get(m.id);
@@ -1049,7 +1070,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             if (miss.length) missing.push(`${set.name}: ${miss.join(' / ')}`);
             sets++;
           } catch (e) {
-            failures.push(`결합 실패(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
+            failures.push(`결합 실패(${groupNames[gi]}): ${errText(e)}`);
           }
         }
         post({ type: 'VARIANTS_RESULT', sets, missing, singles, failures });

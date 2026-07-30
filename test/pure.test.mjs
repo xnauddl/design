@@ -63,6 +63,8 @@ import {
   deriveVariants,
   colorAxisLabels,
   commonBaseName,
+  componentBaseName,
+  resolveGroupNames,
   clusterTextStyles,
   nameTextStyles,
   fontStyleForWeight,
@@ -770,6 +772,68 @@ test('commonBaseName — 맥락 접두 제거(컴포넌트 이름은 자리와 �
   assert.equal(commonBaseName(['row-container', 'row-container']), 'RowContainer');
   assert.equal(commonBaseName(['button-large', 'button-large']), 'ButtonLarge');
   assert.equal(commonBaseName(['Frame 12']), 'Frame12');
+});
+
+test('componentBaseName — 리네임이 남긴 역할(dsRole)이 머리명사를 정한다', () => {
+  const mk = (name, role) => ({ id: name + (role ?? ''), name, type: 'FRAME', role });
+  // 이름만으로는 못 떼던 것들 — 맥락도 컴포넌트 명사인 경우.
+  assert.equal(componentBaseName([mk('card-thumbnail', 'thumbnail')]), 'Thumbnail');
+  assert.equal(componentBaseName([mk('item-avatar', 'avatar')]), 'Avatar');
+  assert.equal(componentBaseName([mk('field-input', 'input')]), 'Input');
+  assert.equal(componentBaseName([mk('modal-button', 'button')]), 'Button');
+  assert.equal(componentBaseName([mk('header-icon', 'icon')]), 'Icon');
+  assert.equal(componentBaseName([mk('progress-indicator', 'indicator')]), 'Indicator');
+  // 머리가 컴포넌트 명사가 아니어서 이름 규칙이 손대지 못했던 것도 역할로 해결된다.
+  assert.equal(componentBaseName([mk('list-article', 'article')]), 'Article');
+  assert.equal(componentBaseName([mk('page-main', 'main')]), 'Main');
+  // 기록 없음(사람이 지은 이름) → 이름 기반 폴백. nav-button은 복합 명사로 보존.
+  assert.equal(componentBaseName([mk('nav-button')]), 'NavButton');
+  assert.equal(componentBaseName([mk('article-avatar')]), 'Avatar');
+  // 같은 nav-button이라도 리네임이 지은 것이면(역할 기록) 역할이 이긴다 — 이름만으론 구분 불가한 지점.
+  assert.equal(componentBaseName([mk('nav-button', 'button')]), 'Button');
+  // 멤버 3개 전원 동일 역할 → 신뢰.
+  assert.equal(
+    componentBaseName([mk('article-avatar', 'avatar'), mk('article-avatar', 'avatar'), mk('article-avatar', 'avatar')]),
+    'Avatar',
+  );
+});
+
+test('componentBaseName — 낡은 기록은 무시(이름 말단 불일치·역할 분열)', () => {
+  const mk = (name, role) => ({ id: name + (role ?? ''), name, type: 'FRAME', role });
+  // 리네임 뒤 사람이 이름을 바꿨다 → 기록보다 사람의 이름이 우선.
+  assert.equal(componentBaseName([mk('PrimaryCta', 'button')]), 'PrimaryCta');
+  assert.equal(componentBaseName([mk('like-heart', 'icon')]), 'LikeHeart');
+  // 멤버끼리 역할이 갈리면 신뢰하지 않는다.
+  assert.equal(componentBaseName([mk('nav-button', 'button'), mk('nav-button', 'chip')]), 'NavButton');
+  // 한쪽만 기록이 있으면 신뢰하지 않는다.
+  assert.equal(componentBaseName([mk('nav-button', 'button'), mk('nav-button')]), 'NavButton');
+});
+
+test('resolveGroupNames — 맥락 붕괴로 겹치면 맥락을 되살려 구분', () => {
+  const g = (name, role, n = 1) =>
+    Array.from({ length: n }, (_, i) => ({ id: `${name}${i}`, name, type: 'FRAME', role }));
+  // 회귀: 둘 다 Avatar가 되면 「분류」가 무관한 컴포넌트를 한 세트로 병합한다.
+  assert.deepEqual(
+    resolveGroupNames([g('article-avatar', 'avatar', 3), g('profile-avatar', 'avatar', 2)]),
+    ['ArticleAvatar', 'ProfileAvatar'],
+  );
+  // 겹치지 않으면 맥락을 뗀 이름 그대로.
+  assert.deepEqual(
+    resolveGroupNames([g('article-avatar', 'avatar', 3), g('signup-button', 'button', 2)]),
+    ['Avatar', 'Button'],
+  );
+  // 3개 이상 충돌도 전부 구분.
+  assert.deepEqual(
+    resolveGroupNames([g('article-avatar', 'avatar'), g('profile-avatar', 'avatar'), g('header-avatar', 'avatar')]),
+    ['ArticleAvatar', 'ProfileAvatar', 'HeaderAvatar'],
+  );
+  // 맥락을 되살려도 같으면(kebab 정규화가 같은 경우) 마지막 수단으로 숫자.
+  assert.deepEqual(
+    resolveGroupNames([g('Article Avatar', 'avatar'), g('article-avatar', 'avatar')]),
+    ['ArticleAvatar', 'ArticleAvatar2'],
+  );
+  // 단독 그룹 하나만 있으면 충돌 없음.
+  assert.deepEqual(resolveGroupNames([g('article-avatar', 'avatar')]), ['Avatar']);
 });
 
 test('groupByExactName — 정확한 이름끼리만 묶음(머리명사 병합 안 함)', () => {

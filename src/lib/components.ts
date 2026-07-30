@@ -437,6 +437,8 @@ export interface StructNode extends ScanNode {
   layoutMode?: string;
   /** 프레임 자체의 첫 visible SOLID fill(hex). 없으면 null. */
   fillHex?: string | null;
+  /** 리네임이 남긴 역할(pluginData `dsRole`). 사람이 지은 이름에는 없다. */
+  role?: string;
   children?: readonly StructNode[];
 }
 
@@ -585,14 +587,9 @@ function stripContextTokens(tokens: readonly string[]): string[] {
   return tokens.slice(start);
 }
 
-/**
- * 그룹 멤버 이름들의 공통 베이스(세트 이름용) — 토큰 공통 접두를 PascalCase로.
- * 공통 접두가 있으면 맥락 토막만 떼고 쓰고(`nav-button-*` → `NavButton`,
- * `article-avatar` → `Avatar`), **없으면 인식된 컴포넌트명**(=마지막 명사)으로
- * 폴백한다(`nav-button` + `button-primary` → `Button`).
- */
-export function commonBaseName(names: readonly string[]): string {
-  if (!names.length) return '';
+/** 이름들의 공통 접두 토큰(맥락 포함). 공통분이 없으면 빈 배열. */
+function commonPrefixTokens(names: readonly string[]): string[] {
+  if (!names.length) return [];
   const split = (s: string) => kebab(s).split('-').filter(Boolean);
   let prefix = split(names[0]);
   for (const n of names.slice(1)) {
@@ -602,6 +599,77 @@ export function commonBaseName(names: readonly string[]): string {
     prefix = prefix.slice(0, i);
     if (!prefix.length) break;
   }
+  return prefix;
+}
+
+/**
+ * 그룹 멤버 이름들의 공통 베이스(세트 이름용) — 토큰 공통 접두를 PascalCase로.
+ * 공통 접두가 있으면 맥락 토막만 떼고 쓰고(`nav-button-*` → `NavButton`,
+ * `article-avatar` → `Avatar`), **없으면 인식된 컴포넌트명**(=마지막 명사)으로
+ * 폴백한다(`nav-button` + `button-primary` → `Button`).
+ *
+ * 이름 텍스트만 보는 휴리스틱이라 맥락이 컴포넌트 명사면 복합 명사와 구분할 수 없다
+ * (`card-thumbnail`). 리네임이 남긴 역할이 있으면 `componentBaseName`을 쓰는 게 정확하다.
+ */
+export function commonBaseName(names: readonly string[]): string {
+  if (!names.length) return '';
+  const prefix = commonPrefixTokens(names);
   if (prefix.length) return pascalCase(stripContextTokens(prefix).join('-'));
   return recognizeComponentName(names[0]) ?? pascalCase(names[0]); // 공통 접두 없음 → 인식 명사
+}
+
+/**
+ * 멤버 전원이 같은 역할을 기록하고 있고 그 역할이 **현재 이름의 말단과 일치**할 때만
+ * 그 역할을 신뢰한다(아니면 null). 말단 일치 검사가 낡은 기록을 걸러낸다 — 리네임 뒤
+ * 사람이 이름을 바꿨다면 기록보다 사람의 이름이 우선이다.
+ */
+function trustedRole(members: readonly StructNode[]): string | null {
+  if (!members.length) return null;
+  const role = members[0].role ? kebab(members[0].role) : '';
+  if (!role) return null;
+  for (const m of members) {
+    if (!m.role || kebab(m.role) !== role) return null; // 역할이 갈리면 신뢰 못 함
+    const toks = kebab(m.name).split('-').filter(Boolean);
+    if (toks[toks.length - 1] !== role) return null; // 이름이 손으로 바뀜 → 기록 무시
+  }
+  return role;
+}
+
+/**
+ * 그룹의 컴포넌트 이름 — 리네임이 남긴 역할(`dsRole`)이 있으면 그것을 머리명사로 쓴다.
+ * 이름만으로는 `nav-button`(사람이 지은 복합 명사)과 `card-thumbnail`(맥락+역할)이
+ * 구조적으로 같아 구분할 수 없다. 역할 기록이 그 추측을 없앤다.
+ * 기록이 없거나 신뢰할 수 없으면 이름 기반 규칙(`commonBaseName`)으로 폴백한다.
+ */
+export function componentBaseName(members: readonly StructNode[]): string {
+  const role = trustedRole(members);
+  return role ? pascalCase(role) : commonBaseName(members.map((m) => m.name));
+}
+
+/** 맥락을 되살린 이름(충돌 해소용) — 맥락 토막을 떼지 않은 공통 접두. */
+function contextualName(members: readonly StructNode[]): string {
+  const prefix = commonPrefixTokens(members.map((m) => m.name));
+  return prefix.length ? pascalCase(prefix.join('-')) : commonBaseName(members.map((m) => m.name));
+}
+
+/**
+ * 그룹별 최종 컴포넌트 이름(입력 순서와 1:1) — 맥락을 뗀 이름이 서로 **겹치면 맥락을 되살려**
+ * 구분한다. 겹친 채로 등록하면 「분류」가 정확한 이름 기준으로 무관한 컴포넌트를 한 세트로
+ * 병합한다(`article-avatar`·`profile-avatar` → 둘 다 `Avatar` → 병합).
+ * 맥락을 되살려도 여전히 겹치면 마지막 수단으로 숫자를 붙인다.
+ */
+export function resolveGroupNames(groups: readonly (readonly StructNode[])[]): string[] {
+  const base = groups.map(componentBaseName);
+  const collides = new Set(base.filter((n, i) => base.indexOf(n) !== i));
+  const taken = new Set<string>();
+  return base.map((n, i) => {
+    let name = collides.has(n) ? contextualName(groups[i]) : n;
+    if (taken.has(name)) {
+      let k = 2;
+      while (taken.has(`${name}${k}`)) k++;
+      name = `${name}${k}`;
+    }
+    taken.add(name);
+    return name;
+  });
 }

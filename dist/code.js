@@ -1383,6 +1383,7 @@
     "title"
   ];
   var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
+  var ROLE_KEY = "dsRole";
   var ROLE_SET = new Set(ROLE_VOCAB);
   function isKnownRole(seg) {
     return ROLE_SET.has(seg);
@@ -1534,6 +1535,7 @@
           col.changes.push({ id: node.id, before, after });
           if (opts.apply) node.name = after;
         }
+        if (opts.apply && decided.role) writeRole(node, decided.role);
         contextForChildren = decided.passthrough ? ancestorName : decided.name;
       }
       col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
@@ -1554,14 +1556,22 @@
       if (!hc) return { skip: true };
       let hcScope = ancestorName ? pickScope(ancestorName) : null;
       if (hcScope === hc) hcScope = null;
-      return { skip: false, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }) };
+      return { skip: false, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }), role: hc };
     }
     const token = await primaryToken(node);
     const ctxScope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
     const role = resolveRole(node, token, pos, parentIsList, ctxScope);
-    if (PASSTHROUGH_ROLES.has(role)) return { skip: false, name: role, passthrough: true };
+    if (PASSTHROUGH_ROLES.has(role)) return { skip: false, name: role, passthrough: true, role };
     const scope = ctxScope === role ? null : ctxScope;
-    return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
+    return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }), role };
+  }
+  function writeRole(node, role) {
+    const fn = node.setPluginData;
+    if (typeof fn !== "function") return;
+    try {
+      fn.call(node, ROLE_KEY, role);
+    } catch (e) {
+    }
   }
   var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper"]);
   function resolveRole(node, token, pos, parentIsList, ctxScope) {
@@ -2417,9 +2427,8 @@
     while (start > 0 && COMPONENT_NOUNS.has(nounWord(tokens[start - 1]))) start--;
     return tokens.slice(start);
   }
-  function commonBaseName(names) {
-    var _a;
-    if (!names.length) return "";
+  function commonPrefixTokens(names) {
+    if (!names.length) return [];
     const split = (s) => kebab(s).split("-").filter(Boolean);
     let prefix = split(names[0]);
     for (const n of names.slice(1)) {
@@ -2429,8 +2438,48 @@
       prefix = prefix.slice(0, i);
       if (!prefix.length) break;
     }
+    return prefix;
+  }
+  function commonBaseName(names) {
+    var _a;
+    if (!names.length) return "";
+    const prefix = commonPrefixTokens(names);
     if (prefix.length) return pascalCase(stripContextTokens(prefix).join("-"));
     return (_a = recognizeComponentName(names[0])) != null ? _a : pascalCase(names[0]);
+  }
+  function trustedRole(members) {
+    if (!members.length) return null;
+    const role = members[0].role ? kebab(members[0].role) : "";
+    if (!role) return null;
+    for (const m of members) {
+      if (!m.role || kebab(m.role) !== role) return null;
+      const toks = kebab(m.name).split("-").filter(Boolean);
+      if (toks[toks.length - 1] !== role) return null;
+    }
+    return role;
+  }
+  function componentBaseName(members) {
+    const role = trustedRole(members);
+    return role ? pascalCase(role) : commonBaseName(members.map((m) => m.name));
+  }
+  function contextualName(members) {
+    const prefix = commonPrefixTokens(members.map((m) => m.name));
+    return prefix.length ? pascalCase(prefix.join("-")) : commonBaseName(members.map((m) => m.name));
+  }
+  function resolveGroupNames(groups) {
+    const base = groups.map(componentBaseName);
+    const collides = new Set(base.filter((n, i) => base.indexOf(n) !== i));
+    const taken = /* @__PURE__ */ new Set();
+    return base.map((n, i) => {
+      let name = collides.has(n) ? contextualName(groups[i]) : n;
+      if (taken.has(name)) {
+        let k = 2;
+        while (taken.has(`${name}${k}`)) k++;
+        name = `${name}${k}`;
+      }
+      taken.add(name);
+      return name;
+    });
   }
 
   // src/lib/contrast.ts
@@ -2809,6 +2858,15 @@
     }
     return null;
   }
+  function readRole(node) {
+    const fn = node.getPluginData;
+    if (typeof fn !== "function") return void 0;
+    try {
+      return fn.call(node, ROLE_KEY) || void 0;
+    } catch (e) {
+      return void 0;
+    }
+  }
   function toStructNode(node) {
     const a = node;
     const num = (v) => typeof v === "number" ? v : void 0;
@@ -2828,6 +2886,7 @@
       counterAxisSpacing: num(a.counterAxisSpacing),
       layoutMode: typeof a.layoutMode === "string" ? a.layoutMode : void 0,
       fillHex: solidFillHex(node),
+      role: readRole(node),
       children: kids.map(toStructNode)
     };
   }
@@ -3229,14 +3288,14 @@
           const eligibleNodes = candidates.filter((c) => c.eligible).map((c) => liveById.get(c.id)).filter((n) => !!n);
           const groups = groupForRegister(eligibleNodes);
           const preview = /* @__PURE__ */ new Map();
-          for (const g of groups) {
+          const previewNames = resolveGroupNames(groups.map((g) => g.members));
+          groups.forEach((g, i) => {
             if (g.members.length < 2) {
-              if (g.members[0]) preview.set(g.members[0].id, { single: commonBaseName([g.members[0].name]) });
-              continue;
+              if (g.members[0]) preview.set(g.members[0].id, { single: previewNames[i] });
+              return;
             }
-            const base = commonBaseName(g.members.map((m) => m.name));
-            for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
-          }
+            for (const d of deriveVariants(g.members)) preview.set(d.id, { group: previewNames[i], variant: d.variant });
+          });
           const nodes = candidates.map((c) => {
             const p = preview.get(c.id);
             return p ? __spreadValues(__spreadValues({}, c), p) : c;
@@ -3343,8 +3402,10 @@
               failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${comp.name}): ${errText(e)}`);
             }
           };
-          for (const g of groups) {
-            const setName = commonBaseName(g.members.map((m) => m.name));
+          const groupNames = resolveGroupNames(groups.map((g) => g.members));
+          for (let gi = 0; gi < groups.length; gi++) {
+            const g = groups[gi];
+            const setName = groupNames[gi];
             if (g.members.length === 1) {
               const node = byId.get(g.members[0].id);
               if (!node) continue;
@@ -3352,7 +3413,7 @@
               try {
                 const comp = figma.createComponentFromNode(node);
                 registered++;
-                placeSingle(comp, o, commonBaseName([g.members[0].name]));
+                placeSingle(comp, o, setName);
               } catch (e) {
                 skipped++;
                 failures.push(`\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328(${g.members[0].name}): ${errText(e)}`);
@@ -3435,7 +3496,9 @@
           const missing = [];
           const singles = [];
           const failures = [];
-          for (const g of groups) {
+          const groupNames = resolveGroupNames(groups.map((g) => g.members));
+          for (let gi = 0; gi < groups.length; gi++) {
+            const g = groups[gi];
             const nodes = g.members.map((m) => byId.get(m.id)).filter((n) => !!n);
             if (nodes.length < 2) {
               if (nodes[0]) singles.push(nodes[0].name);
@@ -3445,7 +3508,7 @@
             try {
               const parent = (_c = nodes[0].parent) != null ? _c : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
-              set.name = commonBaseName(g.members.map((m) => m.name));
+              set.name = groupNames[gi];
               for (const m of g.members) {
                 const node = byId.get(m.id);
                 const v = variantById.get(m.id);
@@ -3461,7 +3524,7 @@
               if (miss.length) missing.push(`${set.name}: ${miss.join(" / ")}`);
               sets++;
             } catch (e) {
-              failures.push(`\uACB0\uD569 \uC2E4\uD328(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
+              failures.push(`\uACB0\uD569 \uC2E4\uD328(${groupNames[gi]}): ${errText(e)}`);
             }
           }
           post({ type: "VARIANTS_RESULT", sets, missing, singles, failures });
