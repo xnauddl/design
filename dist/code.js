@@ -2529,6 +2529,9 @@
   }
 
   // src/lib/entitlements.ts
+  function isTier(v) {
+    return v === "free" || v === "paid";
+  }
   function normalizeLegacyTier(v) {
     if (v === "free" || v === "paid") return v;
     if (v === "pro" || v === "team") return "paid";
@@ -2605,7 +2608,7 @@
       return { tier: ev.tier, source: "key", status: ev.status, expiresAt: cache.expiresAt };
     }
     if (devTier !== "free") return { tier: devTier, source: "dev" };
-    if (false) return { tier: "free", source: "dev" };
+    if (true) return { tier: "free", source: "dev" };
     return { tier: "free", source: "none" };
   }
   var currentTier = () => effective().tier;
@@ -2631,7 +2634,7 @@
   async function loadLicense() {
     try {
       const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
-      if (false) devTier = dt;
+      if (isTier(dt)) devTier = dt;
       const raw = await figma.clientStorage.getAsync(CACHE_KEY);
       const normalized = normalizeLicenseCache(raw);
       if (normalized) {
@@ -3145,7 +3148,7 @@
           break;
         }
         case "SET_LICENSE": {
-          if (true) break;
+          if (false) break;
           devTier = msg.tier;
           try {
             await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);

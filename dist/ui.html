@@ -2042,7 +2042,7 @@
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
   $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
-  if (false) {
+  if (true) {
     $("tier").addEventListener("change", () => {
       send({ type: "SET_LICENSE", tier: $("tier").value });
     });
@@ -2457,7 +2457,7 @@
         const srcLabel = msg.source === "key" ? `\uB77C\uC774\uC120\uC2A4 \uD0A4${msg.status ? ` \xB7 ${msg.status}` : ""}` : msg.source === "dev" ? "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C" : "\uC5C6\uC74C";
         const exp = msg.expiresAt ? ` \xB7 \uB9CC\uB8CC ${new Date(msg.expiresAt).toISOString().slice(0, 10)}` : "";
         $("licenseInfo").textContent = `\uD604\uC7AC: ${msg.tier.toUpperCase()} (${srcLabel})${exp}`;
-        if (false) $("tier").value = msg.tier;
+        if (msg.source !== "key") $("tier").value = msg.tier;
         if (msg.note) {
           const cls = /실패|오프라인/.test(msg.note) ? "warn" : "ok";
           setStatus("licenseStatus", msg.note, cls);
