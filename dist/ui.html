@@ -674,6 +674,7 @@
     "extract.done": "{count}\uAC1C \uD6C4\uBCF4 \uCD94\uCD9C \uC644\uB8CC.",
     "create.needExtract": "\uBA3C\uC800 \uD1A0\uD070\uC744 \uCD94\uCD9C\uD558\uC138\uC694.",
     "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
+    "create.baseChanged": "base {base}px\uB85C \uB2E4\uC2DC \uACC4\uC0B0 \uC911\u2026",
     // 시맨틱 매핑
     "semantic.rolesApplied": "{count}\uAC1C \uC5ED\uD560 \uBC18\uC601\uB428 \u2014 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019\uC73C\uB85C \uC801\uC6A9.",
     "semantic.scanningGlobals": "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026",
@@ -1721,6 +1722,20 @@
     const base = Number($("base").value) || 16;
     createFrom = "tokens";
     send({ type: "CREATE_TOKENS", tokens, base });
+  });
+  var basePreviewTimer = 0;
+  $("base").addEventListener("input", () => {
+    const applyBtn = $("btnCreateApply");
+    if (applyBtn.style.display === "none") return;
+    applyBtn.style.display = "none";
+    const base = Number($("base").value) || 16;
+    setStatus("createStatus", t("create.baseChanged", { base }), "");
+    clearTimeout(basePreviewTimer);
+    basePreviewTimer = window.setTimeout(() => {
+      if (!tokens.length) return;
+      createFrom = "tokens";
+      send({ type: "CREATE_TOKENS", tokens, base: Number($("base").value) || 16, preview: true });
+    }, 350);
   });
   $("btnColorRoles").addEventListener("click", applyColorRoles);
   $("btnScanGlobals").addEventListener("click", () => {

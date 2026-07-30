@@ -405,6 +405,24 @@ $('btnCreateApply').addEventListener('click', () => {
   send({ type: 'CREATE_TOKENS', tokens, base }); // 확인 후 실제 적용
 });
 
+// base는 비-px 값(rem·%·em)을 px로 환산하는 기준이라 미리보기 결과가 base에 따라 달라진다.
+// 미리보기를 본 뒤 base만 바꾸면 옛 기준 요약이 남은 채 ‘적용’이 새 base로 실행돼 어긋나므로,
+// 즉시 ‘적용’을 감추고 새 base로 미리보기를 다시 돌린다(미리보기는 변수를 만들지 않는 읽기).
+let basePreviewTimer = 0;
+($('base') as HTMLInputElement).addEventListener('input', () => {
+  const applyBtn = $('btnCreateApply') as HTMLButtonElement;
+  if (applyBtn.style.display === 'none') return; // 아직 미리보기 전 — 무효화할 결과가 없음
+  applyBtn.style.display = 'none';
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
+  setStatus('createStatus', t('create.baseChanged', { base }), '');
+  clearTimeout(basePreviewTimer);
+  basePreviewTimer = window.setTimeout(() => {
+    if (!tokens.length) return;
+    createFrom = 'tokens';
+    send({ type: 'CREATE_TOKENS', tokens, base: Number(($('base') as HTMLInputElement).value) || 16, preview: true });
+  }, 350); // 타이핑 중 매 키마다 보내지 않도록
+});
+
 $('btnColorRoles').addEventListener('click', applyColorRoles); // #3 색 편집표 → 시맨틱 매핑
 
 $('btnScanGlobals').addEventListener('click', () => {

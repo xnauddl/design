@@ -122,6 +122,36 @@ export function unitDescription(t: { category: TokenCategory; unit?: Unit; value
   return undefined;
 }
 
+/** base(px)로 px 환산되는 토큰 1건 — 미리보기 표시·검증용. */
+export interface PxConversion {
+  /** 변수 이름 */
+  name: string;
+  /** 원본 표기("160%", "1.5rem") */
+  from: string;
+  /** 환산된 px 값 */
+  to: number;
+}
+
+/**
+ * base(px) 환산 대상과 결과. 변수 생성이 쓰는 규칙(비-px 수치 → toPx)과 **같은 판정**을
+ * 써야 미리보기와 실제 값이 어긋나지 않으므로, 양쪽이 이 함수를 공유한다.
+ */
+export function pxConversions(
+  tokens: readonly { name: string; category: TokenCategory; unit?: Unit; value: string | number }[],
+  base: number,
+): PxConversion[] {
+  const out: PxConversion[] = [];
+  for (const t of tokens) {
+    if (!t.unit || t.unit === 'px' || typeof t.value !== 'number') continue;
+    out.push({
+      name: t.name,
+      from: stringValueForUnit(t.value, t.unit),
+      to: toPx(t.value, t.unit, { base, fontSize: base }),
+    });
+  }
+  return out;
+}
+
 /** 비-px 단위의 STRING 표현(코드용). 예: percent 150 → "150%", rem 1.5 → "1.5rem". */
 export function stringValueForUnit(value: number, unit: Unit): string {
   switch (unit) {
