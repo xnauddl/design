@@ -1101,13 +1101,14 @@ test('renameSelection — HTML 랜드마크 figure: 이미지+캡션 → figure(
 
 test('renameSelection — HTML 랜드마크 aside: 페이지 가로 스플릿의 좁은 컬럼 → aside', async () => {
   installFigma();
-  const side = { type: 'FRAME', id: 'side', name: 'Frame 2', width: 200, height: 600, children: [{ type: 'VECTOR', id: 'si', name: 'Vector 1' }] };
-  const body = { type: 'FRAME', id: 'body', name: 'Frame 3', width: 800, height: 600, children: [{ type: 'VECTOR', id: 'bi', name: 'Vector 2' }] };
-  const page = { type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'HORIZONTAL', width: 1000, height: 600, children: [side, body] };
+  const side = { type: 'FRAME', id: 'side', name: 'Frame 2', width: 200, height: 900, children: [{ type: 'VECTOR', id: 'si', name: 'Vector 1' }] };
+  const body = { type: 'FRAME', id: 'body', name: 'Frame 3', width: 1240, height: 900, children: [{ type: 'VECTOR', id: 'bi', name: 'Vector 2' }] };
+  // 페이지 크롬(≥768×800)이어야 aside 게이트를 통과한다.
+  const page = { type: 'FRAME', id: 'page', name: 'Desktop', layoutMode: 'HORIZONTAL', width: 1440, height: 900, children: [side, body] };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('side'), 'aside'); // 부모 폭 대비 200/1000=0.2 ≤ 0.35 → aside
-  assert.notEqual(after.get('body'), 'aside'); // 넓은 쪽은 aside 아님
+  assert.equal(after.get('side'), 'desktop-aside'); // 부모 폭 대비 200/1440 ≈ 0.14 ≤ 0.35 → aside
+  assert.notEqual(after.get('body'), 'desktop-aside'); // 넓은 쪽은 aside 아님
 });
 
 test('renameSelection — aside: 납작한 툴바의 작은 자식은 aside 아님', async () => {
@@ -1629,13 +1630,13 @@ test('renameSelection — 히어로 섹션 안에는 header/footer 랜드마크�
   }
 });
 
-test('renameSelection — 페이지는 이름이 역할 어휘가 아니고 세로로 길 때만 랜드마크', async () => {
+test('renameSelection — 페이지는 이름이 역할 어휘가 아니고 화면 크기일 때만 랜드마크', async () => {
   installFigma();
   const block = (id, h) => ({
     type: 'FRAME', id, name: `Frame ${id}`, width: 1440, height: h,
     children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
   });
-  // 'Desktop'은 역할 어휘가 아니고 1440x2400은 세로로 길다 → 페이지로 인정.
+  // 'Desktop'은 역할 어휘가 아니고 1440x2400은 페이지 크롬 → 랜드마크 인정.
   const page = {
     type: 'FRAME', id: 'page', name: 'Desktop', layoutMode: 'VERTICAL', width: 1440, height: 2400,
     children: [block('h', 80), block('m', 2000), block('f', 320)],
@@ -1645,6 +1646,69 @@ test('renameSelection — 페이지는 이름이 역할 어휘가 아니고 세�
   assert.equal(after.get('h'), 'desktop-header');
   assert.equal(after.get('m'), 'desktop-main');
   assert.equal(after.get('f'), 'desktop-footer');
+});
+
+test('renameSelection — 카드 가로 스플릿의 좁은 열은 aside 아님', async () => {
+  installFigma();
+  const side = { type: 'FRAME', id: 'side', name: 'Frame S', width: 200, height: 500, children: [{ type: 'VECTOR', id: 'sv', name: 'Vector' }] };
+  const body = { type: 'FRAME', id: 'body', name: 'Frame B', width: 760, height: 500, children: [{ type: 'VECTOR', id: 'bv', name: 'Vector' }] };
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Card', layoutMode: 'HORIZONTAL', width: 1000, height: 500,
+    children: [side, body],
+  };
+  const { changes } = await renameSelection([card], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.notEqual(after.get('side'), 'card-aside');
+  assert.ok(!/aside$/.test(after.get('side') ?? ''), `카드 자식이 aside(${after.get('side')})가 됐다`);
+});
+
+test('renameSelection — 시트·드로어·무명 좁은 패널에는 header/footer가 생기지 않음', async () => {
+  installFigma();
+  const block = (id, h, w) => ({
+    type: 'FRAME', id, name: `Frame ${id}`, width: w, height: h,
+    children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
+  });
+  for (const name of ['Sheet', 'Drawer', 'Dialog', 'Popup']) {
+    const root = {
+      type: 'FRAME', id: 'r', name, layoutMode: 'VERTICAL', width: 400, height: 640,
+      children: [block('t', 64, 400), block('b', 520, 400), block('f', 56, 400)],
+    };
+    const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+    const after = new Map(changes.map((c) => [c.id, c.after]));
+    for (const id of ['t', 'b', 'f']) {
+      assert.ok(
+        !/-(header|footer|main|section)$/.test(after.get(id) ?? ''),
+        `${name} 자식 ${id}가 랜드마크(${after.get(id)})가 됐다`,
+      );
+    }
+  }
+  // 이름 없는 좁은 세로 패널도 형태 게이트로 막는다.
+  const anon = {
+    type: 'FRAME', id: 'r', name: 'Frame 9', layoutMode: 'VERTICAL', width: 400, height: 640,
+    children: [block('t', 64, 400), block('b', 520, 400), block('f', 56, 400)],
+  };
+  const { changes } = await renameSelection([anon], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  for (const id of ['t', 'b', 'f']) {
+    assert.ok(!/-(header|footer|main|section)$/.test(after.get(id) ?? ''), `좁은 패널 자식 ${id}→${after.get(id)}`);
+  }
+});
+
+test('renameSelection — 모바일 Home 화면은 세로 랜드마크 유지', async () => {
+  installFigma();
+  const block = (id, h) => ({
+    type: 'FRAME', id, name: `Frame ${id}`, width: 390, height: h,
+    children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
+  });
+  const home = {
+    type: 'FRAME', id: 'home', name: 'Home', layoutMode: 'VERTICAL', width: 390, height: 844,
+    children: [block('h', 64), block('m', 700), block('f', 80)],
+  };
+  const { changes } = await renameSelection([home], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('h'), 'home-header');
+  assert.equal(after.get('m'), 'home-main');
+  assert.equal(after.get('f'), 'home-footer');
 });
 
 test('renameSelection — 카드 안 통계 행은 nav가 아님', async () => {

@@ -381,19 +381,24 @@ function isPageSplit(pos: Pos): boolean {
 }
 
 /**
- * 부모가 "페이지"로 볼 만한지 — header/footer/main을 붙일 자격.
+ * 부모가 "페이지"로 볼 만한지 — header/footer/main/aside를 붙일 자격.
  * depth는 선택 기준 상대값이라, 이 게이트가 없으면 Hero·Card처럼 페이지가 아닌 걸
  * 선택하는 순간 그 자식들이 전부 depth 1 = 랜드마크 자리로 취급된다(hero-footer).
  * 두 가지로 거른다:
- *  - 이름: 부모 맥락이 알려진 역할(hero/card/nav/modal…)이면 페이지가 아니다.
+ *  - 이름: 부모 맥락이 알려진 역할(hero/card/nav/modal/sheet…)이면 페이지가 아니다.
  *    'Desktop'·'Home'처럼 역할 어휘가 아닌 이름이나, 일반 구조어(pickScope가 null)만 통과.
- *  - 형태: 페이지는 세로로 길다. 넓고 낮은 히어로 배너를 배제한다(치수를 모르면 통과).
+ *  - 형태: 좁은 모달/시트(폭 < 768)는 모바일 세로 화면만 예외로 통과.
+ *    데스크톱 폭은 히어로 배너(~700)보다 큰 화면 높이(≥800)만 페이지로 본다.
+ *    치수를 모르면 이름 판정에만 의존.
  */
 function isPageParent(pos: Pos, ctxScope: string | null): boolean {
   if (ctxScope && isKnownRole(ctxScope)) return false;
   const p = pos.parentDims;
   if (!p || p.w <= 0 || p.h <= 0) return true; // 치수 미상 → 이름 판정에만 의존
-  return p.h >= 900 || p.h >= p.w;
+  // 좁은 프레임: 시트/드로어/다이얼로그 vs 세로 모바일 화면
+  if (p.w < 768) return p.h >= 700 && p.h >= p.w;
+  // 데스크톱·태블릿 폭: 납작한 히어로·패널은 배제, 화면 크롬만 통과
+  return p.h >= 800;
 }
 
 /**
@@ -407,11 +412,12 @@ function regionRole(node: SceneNode, pos: Pos, ctxScope: string | null): string 
   if (pos.depth !== 1 || !isContainerType(node)) return null;
   if (pos.regionIndex < 0) return null;
   if (pos.parentLayout === 'horizontal') {
+    if (!isPageParent(pos, ctxScope)) return null; // 카드·패널 안 좁은 열은 aside 아님
     if (!isPageSplit(pos)) return null;
     return pos.widthFrac != null && pos.widthFrac <= 0.35 ? 'aside' : null;
   }
   if (pos.parentLayout !== 'vertical' || pos.regionTotal < 2) return null;
-  if (!isPageParent(pos, ctxScope)) return null; // 히어로·카드 안에는 header/footer가 없다
+  if (!isPageParent(pos, ctxScope)) return null; // 히어로·카드·시트 안에는 header/footer가 없다
   if (pos.regionIndex === 0) return 'header';
   if (pos.regionIndex === pos.regionTotal - 1) return 'footer';
   if (pos.regionTotal === 3) return 'main'; // 가운데(0·마지막은 위에서 처리됨)

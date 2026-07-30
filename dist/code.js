@@ -1378,6 +1378,10 @@
     "trailing",
     "hero",
     "sidebar",
+    "sheet",
+    "drawer",
+    "dialog",
+    "popup",
     "tab",
     "label",
     "title"
@@ -1721,12 +1725,14 @@
     if (ctxScope && isKnownRole(ctxScope)) return false;
     const p = pos.parentDims;
     if (!p || p.w <= 0 || p.h <= 0) return true;
-    return p.h >= 900 || p.h >= p.w;
+    if (p.w < 768) return p.h >= 700 && p.h >= p.w;
+    return p.h >= 800;
   }
   function regionRole(node, pos, ctxScope) {
     if (pos.depth !== 1 || !isContainerType(node)) return null;
     if (pos.regionIndex < 0) return null;
     if (pos.parentLayout === "horizontal") {
+      if (!isPageParent(pos, ctxScope)) return null;
       if (!isPageSplit(pos)) return null;
       return pos.widthFrac != null && pos.widthFrac <= 0.35 ? "aside" : null;
     }

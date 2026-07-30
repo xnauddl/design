@@ -263,6 +263,21 @@ test('역할 어휘 — 검출기가 내는 이름은 출력용에 있다(어휘
   assert.ok(EMITTED_ROLES.includes('aside'));
   assert.ok(RECOGNIZED_ROLES.includes('sidebar'));
   assert.equal(pickScope('sidebar'), 'sidebar');
+  // 시트·드로어류는 출력하지 않고 인식만 — 페이지 랜드마크 오검출 방지.
+  for (const r of ['sheet', 'drawer', 'dialog', 'popup']) {
+    assert.ok(RECOGNIZED_ROLES.includes(r), `'${r}'이 RECOGNIZED_ROLES에 없다`);
+    assert.equal(pickScope(r), r);
+  }
+});
+
+test('parseTokenName — 새 leaf 역할 매핑(thumbnail/indicator/overlay…)', () => {
+  assert.equal(parseTokenName('card/thumb').roleLeaf, 'thumbnail');
+  assert.equal(parseTokenName('card/thumbnail').roleLeaf, 'thumbnail');
+  assert.equal(parseTokenName('track/indicator').roleLeaf, 'indicator');
+  assert.equal(parseTokenName('ui/progress').roleLeaf, 'progress');
+  assert.equal(parseTokenName('avatar/status').roleLeaf, 'status');
+  assert.equal(parseTokenName('modal/scrim').roleLeaf, 'overlay');
+  assert.equal(parseTokenName('field/input').roleLeaf, 'input');
 });
 
 test('parseTokenName — 역할 말단/맥락 접두사/원시 토큰', () => {

@@ -51,6 +51,7 @@ export const EMITTED_ROLES = [
  * 검출기 없이 "인식"에만 쓰는 어휘 — 디자이너가 이미 이 이름을 썼을 때
  * 맥락(pickScope)으로 존중한다. 우리가 먼저 지어내지는 않는다.
  * `sidebar`는 `aside`(HTML 랜드마크, 출력 캐논)의 인식용 별칭.
+ * `sheet`/`drawer`/`dialog`/`popup`은 페이지 랜드마크 오검출을 막기 위한 인식 전용.
  */
 export const RECOGNIZED_ROLES = [
   'content',
@@ -60,6 +61,10 @@ export const RECOGNIZED_ROLES = [
   'trailing',
   'hero',
   'sidebar',
+  'sheet',
+  'drawer',
+  'dialog',
+  'popup',
   'tab',
   'label',
   'title',
