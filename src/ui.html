@@ -254,10 +254,18 @@
     /* 목록이 자기 스크롤 영역이라는 게 보여야 한다. 경계 없이 상한만 걸면 마지막 행이 반쯤
        잘린 채 끝나 "미리보기가 잘렸다"로 읽힌다. 높이는 패널 높이를 따라가고(패널은
        480–1200px 리사이즈 가능), ui.ts가 행 높이의 정수배로 스냅해 반쪽 행을 없앤다.
-       ‘모두 펼치기’(.expanded)면 상한을 풀어 페이지 스크롤로 전체를 본다. */
+       ‘모두 펼치기’(.expanded)면 상한을 풀어 페이지 스크롤로 전체를 본다.
+
+       높이 스냅만으로는 **맨 위에서만** 온전한 행이 보인다. 토큰이 수십 개면 사용자는 목록을
+       스크롤한 상태로 보게 되고, 그때는 위·아래 끝 행이 동시에 잘린다(실제 신고 화면).
+       그래서 스크롤 자체를 행 경계에 멈추게 한다 — 높이가 행 높이의 정수배이므로 어느 위치에
+       멈춰도 위아래 모두 온전한 행이 된다. */
     #tokenList { overflow: auto; margin-top: 8px; }
-    #tokenList.framed { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 2px 7px; }
-    #tokenList.scrolls { max-height: clamp(200px, 40vh, 560px); }
+    /* 세로 패딩 금지 — 스크롤포트 높이가 행 높이의 정수배여야 스냅 위치마다 위아래가
+       딱 맞는다. 세로 여백은 행 자신의 padding(.tk)이 낸다. */
+    #tokenList.framed { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0 7px; }
+    #tokenList.scrolls { max-height: clamp(200px, 40vh, 560px); scroll-snap-type: y mandatory; }
+    #tokenList.scrolls .tk { scroll-snap-align: start; }
     #tokenList.expanded { max-height: none; overflow: visible; }
     .tk { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
     /* 이름 폭 우선 — 이 목록은 색 외 토큰만 담아 스와치 없는 행이 대부분인데, 빈 14px 거터를
