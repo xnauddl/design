@@ -11,7 +11,7 @@ import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { ROLE_KEY } from './lib/naming';
-import { missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, componentEligible, groupByExactName, deriveVariants, resolveGroupNames } from './lib/components';
 import type { CompPropType, StructNode, StructGroup } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, Feature, isTier } from './lib/entitlements';
@@ -826,7 +826,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_COMPONENT_CANDIDATES': {
         if (!requirePro()) break;
         const roots = selection();
-        const candidates = scanComponentCandidates(roots);
+        // StructNode로 매핑해 넘긴다 — 말단 등록 자격이 `dsRole`에 달려 있다.
+        const candidates = scanComponentCandidates(roots.map(toStructNode));
         // 라이브 노드 인덱스(서브트리 전체) — 후보 id → 실제 노드.
         const liveById = new Map<string, SceneNode>();
         const index = (n: SceneNode): void => {
@@ -863,9 +864,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         await figma.loadAllPagesAsync(); // dynamic-page: 컴포넌트 페이지 이동 전 로드
         let registered = 0;
         let skipped = 0;
-        // 후보 필터: FRAME/GROUP · 미잠금(인스턴스/컴포넌트 타입은 자동 제외). **이름 게이트 없음** —
-        // 실제 파일은 container/wrapper 같은 임의 이름이 흔해 명사 사전 게이트가 진짜 컴포넌트를 버린다.
-        const eligible = (n: SceneNode): boolean => (n.type === 'FRAME' || n.type === 'GROUP') && !n.locked;
+        // 후보 필터: 스캔(`componentEligible`)과 **같은 규칙** — FRAME/GROUP 전부(이름 게이트 없음,
+        // 실제 파일은 container/wrapper 같은 임의 이름이 흔해 명사 사전 게이트가 진짜 컴포넌트를 버린다)
+        // + 리네임이 재사용 원자로 판정한 말단(아바타·아이콘·썸네일…). 미잠금만.
+        const eligible = (n: SceneNode): boolean =>
+          componentEligible({ id: n.id, name: n.name, type: n.type, locked: n.locked, role: readRole(n) });
         // 대상 결정: 트리에서 체크한 nodeIds, 없으면(스캔 없이 등록) 선택 서브트리를 **재귀**로 모아
         // **반복 이름(2회+)만** 묶는다(단독 잡음 제외).
         let targets: SceneNode[];

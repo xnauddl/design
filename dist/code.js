@@ -2311,8 +2311,11 @@
     const existing = new Set(parsed.map(formatVariant));
     return cartesian(properties).map(formatVariant).filter((v) => !existing.has(v));
   }
+  var COMPONENT_ROLES = /* @__PURE__ */ new Set(["icon", "image", "thumbnail", "avatar", "status", "badge", "divider"]);
   function componentEligible(node) {
-    return (node.type === "FRAME" || node.type === "GROUP") && !node.locked;
+    if (node.locked) return false;
+    if (node.type === "FRAME" || node.type === "GROUP") return true;
+    return !!node.role && COMPONENT_ROLES.has(kebab(node.role));
   }
   function scanComponentCandidates(selection2) {
     var _a, _b;
@@ -3278,7 +3281,7 @@
         case "SCAN_COMPONENT_CANDIDATES": {
           if (!requirePro()) break;
           const roots = selection();
-          const candidates = scanComponentCandidates(roots);
+          const candidates = scanComponentCandidates(roots.map(toStructNode));
           const liveById = /* @__PURE__ */ new Map();
           const index = (n) => {
             liveById.set(n.id, n);
@@ -3308,7 +3311,7 @@
           await figma.loadAllPagesAsync();
           let registered = 0;
           let skipped = 0;
-          const eligible = (n) => (n.type === "FRAME" || n.type === "GROUP") && !n.locked;
+          const eligible = (n) => componentEligible({ id: n.id, name: n.name, type: n.type, locked: n.locked, role: readRole(n) });
           let targets;
           let setsOnly = false;
           if (msg.nodeIds && msg.nodeIds.length) {

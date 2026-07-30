@@ -56,6 +56,7 @@ import {
   inferProp,
   inferComponentProperties,
   scanComponentCandidates,
+  componentEligible,
   groupByExactName,
   recognizeComponentName,
   extractNameProps,
@@ -626,6 +627,52 @@ test('scanComponentCandidates(#1) — 게이트 없음: 모든 FRAME/GROUP이 el
   assert.equal(byId.get('x').eligible, true); // 임의 이름 프레임도 선택 가능
   assert.equal(byId.get('w').eligible, true); // container/wrapper류도 후보
   assert.equal(byId.has('t'), false); // 텍스트는 후보 아님(비-eligible + 비-조상 → 제외)
+});
+
+test('componentEligible — 역할 있는 말단은 등록 가능, 장식·무역할은 제외', () => {
+  const n = (type, role) => ({ id: 'x', name: 'x', type, role });
+  // 재사용 원자 → 프레임으로 감싸지 않아도 후보.
+  assert.equal(componentEligible(n('ELLIPSE', 'avatar')), true);
+  assert.equal(componentEligible(n('ELLIPSE', 'status')), true);
+  assert.equal(componentEligible(n('VECTOR', 'icon')), true);
+  assert.equal(componentEligible(n('RECTANGLE', 'thumbnail')), true);
+  assert.equal(componentEligible(n('RECTANGLE', 'image')), true);
+  assert.equal(componentEligible(n('LINE', 'divider')), true);
+  // 장식·내부 부품 → 제외.
+  assert.equal(componentEligible(n('RECTANGLE', 'background')), false);
+  assert.equal(componentEligible(n('RECTANGLE', 'border')), false);
+  assert.equal(componentEligible(n('RECTANGLE', 'shape')), false);
+  assert.equal(componentEligible(n('RECTANGLE', 'indicator')), false); // progress의 부품
+  // 역할 기록이 없으면(리네임 전) 기존과 동일하게 제외 — 게이트가 열리지 않는다.
+  assert.equal(componentEligible(n('ELLIPSE')), false);
+  assert.equal(componentEligible(n('VECTOR')), false);
+  assert.equal(componentEligible(n('TEXT', 'icon')), true); // 역할이 있으면 타입은 묻지 않음
+  // FRAME/GROUP은 역할과 무관하게 후보(기존 동작).
+  assert.equal(componentEligible(n('FRAME')), true);
+  assert.equal(componentEligible(n('GROUP')), true);
+  // 잠금은 무조건 제외.
+  assert.equal(componentEligible({ id: 'x', name: 'x', type: 'ELLIPSE', role: 'avatar', locked: true }), false);
+  assert.equal(componentEligible({ id: 'x', name: 'x', type: 'FRAME', locked: true }), false);
+});
+
+test('scanComponentCandidates(#1) — 역할 있는 말단이 후보로 올라온다(타입 게이트 개방)', () => {
+  const avatar = { id: 'a', name: 'article-avatar', type: 'ELLIPSE', role: 'avatar' };
+  const dot = { id: 'd', name: 'article-status', type: 'ELLIPSE', role: 'status' };
+  const deco = { id: 'g', name: 'article-background', type: 'RECTANGLE', role: 'background' }; // 장식 → 제외
+  const plain = { id: 'p', name: 'Vector 9', type: 'VECTOR' }; // 역할 없음 → 제외
+  const row = { id: 'r', name: 'list-article', type: 'FRAME', role: 'article', children: [avatar, dot, deco, plain] };
+  const root = { id: 'root', name: 'Page', type: 'FRAME', children: [row] };
+
+  const out = scanComponentCandidates([root]);
+  const byId = new Map(out.map((c) => [c.id, c]));
+  assert.deepEqual(out.map((c) => c.id).sort(), ['a', 'd', 'r', 'root']);
+  assert.equal(byId.get('a').eligible, true);
+  assert.equal(byId.get('d').eligible, true);
+  assert.equal(byId.get('r').eligible, true);
+  assert.equal(byId.get('root').eligible, false); // 단일 선택 최상위 = 컨테이너 맥락
+  // 계층 보존 — 말단도 부모 아래에 붙는다.
+  assert.equal(byId.get('a').parentId, 'r');
+  assert.equal(byId.get('a').depth, 2);
 });
 
 test('scanComponentCandidates(#1) — 단일 선택 컨테이너 제외 vs 다중 선택 루트 포함', () => {

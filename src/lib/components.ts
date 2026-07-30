@@ -359,6 +359,8 @@ export interface ScanNode {
   name: string;
   type: string;
   locked?: boolean;
+  /** 리네임이 남긴 역할(pluginData `dsRole`). 말단 노드의 등록 자격을 가른다. */
+  role?: string;
   children?: readonly ScanNode[];
 }
 
@@ -368,7 +370,7 @@ export interface ComponentCandidateNode {
   type: string;
   depth: number;
   parentId: string | null;
-  /** 등록 가능(FRAME/GROUP, 잠금/컴포넌트/인스턴스/텍스트 아님). */
+  /** 등록 가능(FRAME/GROUP 또는 역할이 재사용 원자인 말단, 잠금/컴포넌트/인스턴스/텍스트 아님). */
   eligible: boolean;
   /** 구조 그룹으로 묶일 **세트 이름**(미리보기). 세트(2개+) 후보일 때만. */
   group?: string;
@@ -378,14 +380,32 @@ export interface ComponentCandidateNode {
   single?: string;
 }
 
-/** 컴포넌트로 등록 가능한 노드인가(FRAME/GROUP, 잠금 제외). */
+/**
+ * 말단 노드(사각형·타원·벡터…)라도 등록 후보가 되는 역할 — 재사용되는 UI 원자.
+ * 리네임이 판정해 `dsRole`로 남긴 값만 인정하므로, 리네임을 돌리지 않은 파일에서는
+ * 말단이 하나도 열리지 않는다(기존과 동일).
+ *
+ * `background`·`border`·`shape`·`swatch`는 장식이라 제외하고, `indicator`는 progress의
+ * 내부 부품이라 제외한다(그 progress 프레임 자체가 이미 후보다).
+ */
+const COMPONENT_ROLES = new Set(['icon', 'image', 'thumbnail', 'avatar', 'status', 'badge', 'divider']);
+
+/**
+ * 컴포넌트로 등록 가능한 노드인가 — 잠금 제외 + 다음 중 하나.
+ * - FRAME/GROUP(구조 노드): 이름 게이트 없이 모두
+ * - 말단 노드: 리네임이 남긴 역할이 재사용 원자(`COMPONENT_ROLES`)일 때만.
+ *   타원 아바타·벡터 아이콘처럼 프레임으로 감싸지 않은 요소를 그대로 등록하기 위한 통로다.
+ */
 export function componentEligible(node: ScanNode): boolean {
-  return (node.type === 'FRAME' || node.type === 'GROUP') && !node.locked;
+  if (node.locked) return false;
+  if (node.type === 'FRAME' || node.type === 'GROUP') return true;
+  return !!node.role && COMPONENT_ROLES.has(kebab(node.role));
 }
 
 /**
  * 선택 하위를 순회해 등록 후보 트리를 만든다 — 영향(eligible) + 그 조상 체인만 유지.
- * 비-eligible 말단(텍스트·벡터…)은 잡음이라 제외하되, 위치 맥락은 조상으로 보존.
+ * 역할 없는 말단(텍스트·장식 도형…)은 잡음이라 제외하되, 위치 맥락은 조상으로 보존.
+ * 리네임이 재사용 원자로 판정한 말단(아바타·아이콘·썸네일…)은 후보로 올린다.
  *
  * **단일 선택의 최상위(부모 프레임)는 컨테이너**라 등록 대상에서 제외한다 — 자기 자신은
  * 컴포넌트화하지 않고 그 안의 자식만 후보가 된다. 트리에는 회색 맥락으로 남는다.
