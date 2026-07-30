@@ -2,7 +2,7 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
-import type { DraftToken } from './lib/tokens';
+import { type DraftToken, resolvedTypeForToken } from './lib/tokens';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier } from './lib/entitlements';
@@ -49,7 +49,12 @@ let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호�
    같은 mount를 다시 렌더하면 진행 중 청크를 취소(선택 변경·토글 시 잔상 방지). */
 const CHUNK = 150;
 const chunkPending = new WeakMap<HTMLElement, number>();
-function renderChunked<T>(mount: HTMLElement, items: T[], makeRow: (item: T, i: number) => Node): void {
+function renderChunked<T>(
+  mount: HTMLElement,
+  items: T[],
+  makeRow: (item: T, i: number) => Node,
+  onDone?: () => void, // 전체 행이 붙은 뒤 실행(높이 측정처럼 렌더 완료가 전제인 후처리)
+): void {
   const prev = chunkPending.get(mount);
   if (prev !== undefined) {
     cancelAnimationFrame(prev);
@@ -60,6 +65,7 @@ function renderChunked<T>(mount: HTMLElement, items: T[], makeRow: (item: T, i: 
     const frag = document.createDocumentFragment();
     items.forEach((it, i) => frag.appendChild(makeRow(it, i)));
     mount.appendChild(frag);
+    onDone?.();
     return;
   }
   let i = 0;
@@ -69,33 +75,47 @@ function renderChunked<T>(mount: HTMLElement, items: T[], makeRow: (item: T, i: 
     for (; i < end; i++) frag.appendChild(makeRow(items[i], i));
     mount.appendChild(frag);
     if (i < items.length) chunkPending.set(mount, requestAnimationFrame(step));
-    else chunkPending.delete(mount);
+    else {
+      chunkPending.delete(mount);
+      onDone?.();
+    }
   };
   chunkPending.set(mount, requestAnimationFrame(step));
 }
 
-/** 토큰 1행(스와치·이름 입력·카테고리). i는 tokens 인덱스(이름 편집 반영용). */
-function makeTokenRow(t: DraftToken, i: number): HTMLElement {
+/**
+ * 토큰 1행(스와치·이름 입력·타입 칩).
+ * 이름 편집은 넘겨받은 토큰 객체를 그대로 고친다 — 목록은 `tokens`를 필터한 배열이라
+ * 행 인덱스가 `tokens` 인덱스와 어긋난다(색 토큰이 앞에 있으면 남의 이름을 덮어썼다).
+ */
+function makeTokenRow(t: DraftToken): HTMLElement {
   const row = document.createElement('div');
   row.className = 'tk';
 
   const sw = document.createElement('span');
+  sw.className = 'tk-gutter'; // 스와치 없는 행은 CSS가 폭 0으로 접는다(#tokenList.has-swatch 참고)
   if ((t.category === 'color' || t.category === 'effectColor') && typeof t.value === 'string') {
-    sw.className = 'swatch';
+    sw.classList.add('swatch');
     sw.style.background = t.value;
   }
   row.appendChild(sw);
 
+  // 좁은 패널에서는 긴 이름(예: font-family/…)이 입력칸 폭을 넘겨 앞부분만 보인다.
+  // 입력칸은 편집 대상이라 말줄임을 못 쓰므로 전체 이름을 title로 항상 읽을 수 있게 둔다.
   const input = document.createElement('input');
   input.value = t.name;
+  input.title = t.name;
   input.addEventListener('input', () => {
-    tokens[i].name = input.value;
+    t.name = input.value;
+    input.title = input.value;
   });
   row.appendChild(input);
 
   const cat = document.createElement('span');
   cat.className = 'cat';
   cat.textContent = t.unit && t.unit !== 'px' ? `${t.category}·${t.unit}` : t.category;
+  // 칩은 좁으니 값·Figma 변수 타입은 title로 — 이름만으로 구분 안 되는 토큰(fontFamily 등) 확인용.
+  cat.title = `${t.category}${t.unit ? ` · ${t.unit}` : ''} · ${resolvedTypeForToken(t)} · ${t.value}`;
   row.appendChild(cat);
   return row;
 }
@@ -128,15 +148,68 @@ let colorRevealed = false;
 let previewRevealed = false;
 let lastTidy: { before: number; after: number; merged: number } = { before: 0, after: 0, merged: 0 };
 let pendingCreatePreview = false; // ‘미리보기’가 추출을 유발했을 때, 추출 후 생성 미리보기 전송
+let tokenListExpanded = false; // ‘모두 펼치기’ — 목록 높이 상한을 풀고 페이지 스크롤로 전체 확인
+
+/**
+ * 토큰 목록의 스크롤 영역 높이를 **행 높이의 정수배로 내림 맞춤**하고, 가려진 개수를 알린다.
+ *
+ * CSS 상한(패널 높이 비례)이 행 높이와 맞을 이유가 없어 마지막 행이 늘 반쯤 잘린 채 끝났고,
+ * 경계선·스크롤바도 없어서 "미리보기가 잘려 변수명과 타입이 안 보인다"로 읽혔다.
+ * 보이는 행은 항상 온전한 행이 되게 하고, 남은 개수와 ‘모두 펼치기’를 목록 아래에 붙인다.
+ * 행이 붙은 뒤(렌더 완료)와 패널 리사이즈 후에 호출해야 측정이 맞는다.
+ */
+function layoutTokenList(): void {
+  const box = $('tokenList');
+  const more = $('tokenListMore');
+  const label = $('tokenListCount');
+  const btn = $('btnTokenListExpand') as HTMLButtonElement;
+  box.style.height = ''; // 이전 스냅 해제 — 상한/내용을 다시 재야 한다
+  const rows = box.querySelectorAll('.tk');
+  if (!rows.length) {
+    box.classList.remove('framed', 'scrolls', 'expanded'); // 안내 문구만 있을 땐 테두리 없이
+    more.style.display = 'none';
+    return;
+  }
+  box.classList.add('framed');
+  box.classList.toggle('expanded', tokenListExpanded);
+  box.classList.toggle('scrolls', !tokenListExpanded);
+  if (tokenListExpanded) {
+    more.style.display = '';
+    label.textContent = `총 ${rows.length}개 모두 표시`;
+    btn.textContent = '접기';
+    return;
+  }
+  // offsetHeight는 정수로 반올림돼 행 높이가 소수(30.67px)면 어긋난다 → 실측 소수 높이 사용.
+  const rowH = rows[0].getBoundingClientRect().height;
+  if (!rowH || box.scrollHeight <= box.clientHeight + 1) {
+    more.style.display = 'none'; // 상한에 안 걸림 — 이미 전부 보인다
+    return;
+  }
+  const cs = getComputedStyle(box);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const shown = Math.max(1, Math.floor((box.clientHeight - padY) / rowH));
+  // box-sizing:border-box라 height에 테두리까지 포함된다. 보정을 빼먹으면 그만큼(2px)
+  // 마지막 행이 다시 잘린다. 소수 높이는 올림해 잘림 대신 미세한 여백이 남게 한다.
+  const borderY = box.offsetHeight - box.clientHeight;
+  box.style.height = `${Math.ceil(shown * rowH) + padY + borderY}px`; // 반쪽 행 제거
+  more.style.display = '';
+  label.textContent = `총 ${rows.length}개 중 ${shown}개 표시 — 스크롤하거나`;
+  btn.textContent = '모두 펼치기';
+}
+
 // ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만.
 function renderTokens(): void {
   const box = $('tokenList');
+  const others = tokens.filter((t) => t.category !== 'color');
+  // 카드 제목의 개수 — 목록이 접혀 있어도 몇 개가 생성 대상인지 먼저 알린다.
+  $('createCount').textContent = others.length ? `· 색 외 ${others.length}개` : '';
   const showHint = (msg: string): void => {
     box.innerHTML = '';
     const hint = document.createElement('div');
     hint.className = 'hint';
     hint.textContent = msg;
     box.appendChild(hint);
+    layoutTokenList(); // 행이 없으니 경계·개수 줄을 걷어낸다
   };
   if (!tokens.length) {
     showHint(lastSelCount > 0
@@ -148,13 +221,19 @@ function renderTokens(): void {
     showHint('‘미리보기’를 누르면 생성할 색 외 토큰(간격·크기·폰트·효과)이 표시됩니다.');
     return;
   }
-  const others = tokens.filter((t) => t.category !== 'color');
   if (!others.length) {
     showHint('색 외 토큰이 없습니다(색만 추출됨).');
     return;
   }
-  renderChunked(box, others, makeTokenRow); // §4: 대량 추출도 비차단
+  // 스와치가 실제로 쓰이는 목록에서만 14px 거터를 유지(그 외엔 이름 폭으로 넘긴다).
+  box.classList.toggle('has-swatch', others.some((o) => o.category === 'effectColor' && typeof o.value === 'string'));
+  renderChunked(box, others, makeTokenRow, layoutTokenList); // §4: 대량 추출도 비차단
 }
+
+$('btnTokenListExpand').addEventListener('click', () => {
+  tokenListExpanded = !tokenListExpanded;
+  layoutTokenList();
+});
 
 /* ---------- 0 · 브랜드 팔레트 ---------- */
 const brandColor = $('brand') as HTMLInputElement;
@@ -1986,6 +2065,8 @@ if (typeof ResizeObserver !== 'undefined') {
   ro.observe($('selBarWrap'));
 }
 window.addEventListener('resize', syncStickyOffsets);
+// 목록 상한은 패널 높이 비례(40vh)라 리사이즈하면 몇 행이 들어가는지가 바뀐다 → 다시 스냅.
+window.addEventListener('resize', layoutTokenList);
 updateGates();
 renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시

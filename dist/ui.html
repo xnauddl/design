@@ -251,11 +251,33 @@
     #wizardBar { margin-top: 8px; }
 
     /* ── 토큰 목록 / 색 편집표 ── */
-    #tokenList { max-height: 180px; overflow: auto; margin-top: 8px; }
-    .tk { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: center; padding: 3px 0; }
-    .tk input { font: 400 var(--fs) var(--mono); padding: 4px 6px; width: 100%; }
+    /* 목록이 자기 스크롤 영역이라는 게 보여야 한다. 경계 없이 상한만 걸면 마지막 행이 반쯤
+       잘린 채 끝나 "미리보기가 잘렸다"로 읽힌다. 높이는 패널 높이를 따라가고(패널은
+       480–1200px 리사이즈 가능), ui.ts가 행 높이의 정수배로 스냅해 반쪽 행을 없앤다.
+       ‘모두 펼치기’(.expanded)면 상한을 풀어 페이지 스크롤로 전체를 본다. */
+    #tokenList { overflow: auto; margin-top: 8px; }
+    #tokenList.framed { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 2px 7px; }
+    #tokenList.scrolls { max-height: clamp(200px, 40vh, 560px); }
+    #tokenList.expanded { max-height: none; overflow: visible; }
+    .tk { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+    /* 이름 폭 우선 — 이 목록은 색 외 토큰만 담아 스와치 없는 행이 대부분인데, 빈 14px 거터를
+       늘 두면 좁은 패널(최소 360px)에서 이름 폭만 깎인다. 스와치가 실제로 있는 목록에서만
+       거터를 유지해(행마다 같은 들여쓰기로 정렬) 그 외에는 이름에 폭을 넘긴다. */
+    .tk > .tk-gutter { display: none; }
+    #tokenList.has-swatch .tk > .tk-gutter { display: block; flex: 0 0 14px; }
+    .tk input { font: 400 var(--fs) var(--mono); padding: 4px 6px; flex: 1 1 auto; min-width: 0; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
-    .cat { font-size: 10px; color: var(--muted); }
+    /* 타입은 맨 끝 10px 흐린 글자였다 → 칩으로. 최소 폭을 줘 행마다 같은 자리에서 읽힌다. */
+    .cat {
+      flex: 0 0 auto; margin-left: auto;
+      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 0 5px; white-space: nowrap;
+      min-width: 58px; text-align: center;
+    }
+    /* 목록 아래 ‘총 n개 중 m개 표시 — 스크롤하거나 [모두 펼치기]’ 줄 */
+    .tk-more { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .tk-more .tk-count { color: var(--muted); }
     #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
     .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 3px 0; }
     .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
@@ -418,9 +440,14 @@
     </div>
 
     <div class="step" id="createCard">
-      <h2>토큰 생성 (Global + Semantic) <span class="muted" id="createLock"></span></h2>
+      <h2>토큰 생성 (Global + Semantic) <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
       <div class="hint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다.</div>
       <div id="tokenList"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="tk-more" id="tokenListMore" style="display:none">
+        <span class="tk-count" id="tokenListCount"></span>
+        <button class="link" id="btnTokenListExpand">모두 펼치기</button>
+      </div>
       <div class="row">
         <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
       </div>
@@ -657,6 +684,34 @@
     return a;
   };
   var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+
+  // src/lib/tokens.ts
+  var clamp01 = (n) => Math.min(1, Math.max(0, n));
+  var to255 = (c) => Math.round(clamp01(c) * 255);
+  function rgbToHex(rgb) {
+    const h = (c) => to255(c).toString(16).padStart(2, "0");
+    return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`.toLowerCase();
+  }
+  function hexToRgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m) throw new Error(`\uC798\uBABB\uB41C hex: ${hex}`);
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
+  }
+  function resolvedTypeFor(category) {
+    switch (category) {
+      case "color":
+      case "effectColor":
+        return "COLOR";
+      case "fontFamily":
+        return "STRING";
+      default:
+        return "FLOAT";
+    }
+  }
+  function resolvedTypeForToken(t2) {
+    return resolvedTypeFor(t2.category);
+  }
 
   // src/lib/i18n.ts
   var STRINGS = {
@@ -917,20 +972,6 @@
       if (m) map[m[1]] = m[2];
     }
     return map;
-  }
-
-  // src/lib/tokens.ts
-  var clamp01 = (n) => Math.min(1, Math.max(0, n));
-  var to255 = (c) => Math.round(clamp01(c) * 255);
-  function rgbToHex(rgb) {
-    const h = (c) => to255(c).toString(16).padStart(2, "0");
-    return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`.toLowerCase();
-  }
-  function hexToRgb(hex) {
-    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-    if (!m) throw new Error(`\uC798\uBABB\uB41C hex: ${hex}`);
-    const n = parseInt(m[1], 16);
-    return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
   }
 
   // src/lib/color.ts
@@ -1430,7 +1471,7 @@
   var createFrom = "tokens";
   var CHUNK = 150;
   var chunkPending = /* @__PURE__ */ new WeakMap();
-  function renderChunked(mount, items, makeRow) {
+  function renderChunked(mount, items, makeRow, onDone) {
     const prev = chunkPending.get(mount);
     if (prev !== void 0) {
       cancelAnimationFrame(prev);
@@ -1441,6 +1482,7 @@
       const frag = document.createDocumentFragment();
       items.forEach((it, i2) => frag.appendChild(makeRow(it, i2)));
       mount.appendChild(frag);
+      onDone == null ? void 0 : onDone();
       return;
     }
     let i = 0;
@@ -1450,28 +1492,35 @@
       for (; i < end; i++) frag.appendChild(makeRow(items[i], i));
       mount.appendChild(frag);
       if (i < items.length) chunkPending.set(mount, requestAnimationFrame(step));
-      else chunkPending.delete(mount);
+      else {
+        chunkPending.delete(mount);
+        onDone == null ? void 0 : onDone();
+      }
     };
     chunkPending.set(mount, requestAnimationFrame(step));
   }
-  function makeTokenRow(t2, i) {
+  function makeTokenRow(t2) {
     const row = document.createElement("div");
     row.className = "tk";
     const sw = document.createElement("span");
+    sw.className = "tk-gutter";
     if ((t2.category === "color" || t2.category === "effectColor") && typeof t2.value === "string") {
-      sw.className = "swatch";
+      sw.classList.add("swatch");
       sw.style.background = t2.value;
     }
     row.appendChild(sw);
     const input = document.createElement("input");
     input.value = t2.name;
+    input.title = t2.name;
     input.addEventListener("input", () => {
-      tokens[i].name = input.value;
+      t2.name = input.value;
+      input.title = input.value;
     });
     row.appendChild(input);
     const cat = document.createElement("span");
     cat.className = "cat";
     cat.textContent = t2.unit && t2.unit !== "px" ? `${t2.category}\xB7${t2.unit}` : t2.category;
+    cat.title = `${t2.category}${t2.unit ? ` \xB7 ${t2.unit}` : ""} \xB7 ${resolvedTypeForToken(t2)} \xB7 ${t2.value}`;
     row.appendChild(cat);
     return row;
   }
@@ -1498,14 +1547,53 @@
   var previewRevealed = false;
   var lastTidy = { before: 0, after: 0, merged: 0 };
   var pendingCreatePreview = false;
+  var tokenListExpanded = false;
+  function layoutTokenList() {
+    const box = $("tokenList");
+    const more = $("tokenListMore");
+    const label = $("tokenListCount");
+    const btn = $("btnTokenListExpand");
+    box.style.height = "";
+    const rows = box.querySelectorAll(".tk");
+    if (!rows.length) {
+      box.classList.remove("framed", "scrolls", "expanded");
+      more.style.display = "none";
+      return;
+    }
+    box.classList.add("framed");
+    box.classList.toggle("expanded", tokenListExpanded);
+    box.classList.toggle("scrolls", !tokenListExpanded);
+    if (tokenListExpanded) {
+      more.style.display = "";
+      label.textContent = `\uCD1D ${rows.length}\uAC1C \uBAA8\uB450 \uD45C\uC2DC`;
+      btn.textContent = "\uC811\uAE30";
+      return;
+    }
+    const rowH = rows[0].getBoundingClientRect().height;
+    if (!rowH || box.scrollHeight <= box.clientHeight + 1) {
+      more.style.display = "none";
+      return;
+    }
+    const cs = getComputedStyle(box);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const shown = Math.max(1, Math.floor((box.clientHeight - padY) / rowH));
+    const borderY = box.offsetHeight - box.clientHeight;
+    box.style.height = `${Math.ceil(shown * rowH) + padY + borderY}px`;
+    more.style.display = "";
+    label.textContent = `\uCD1D ${rows.length}\uAC1C \uC911 ${shown}\uAC1C \uD45C\uC2DC \u2014 \uC2A4\uD06C\uB864\uD558\uAC70\uB098`;
+    btn.textContent = "\uBAA8\uB450 \uD3BC\uCE58\uAE30";
+  }
   function renderTokens() {
     const box = $("tokenList");
+    const others = tokens.filter((t2) => t2.category !== "color");
+    $("createCount").textContent = others.length ? `\xB7 \uC0C9 \uC678 ${others.length}\uAC1C` : "";
     const showHint = (msg) => {
       box.innerHTML = "";
       const hint = document.createElement("div");
       hint.className = "hint";
       hint.textContent = msg;
       box.appendChild(hint);
+      layoutTokenList();
     };
     if (!tokens.length) {
       showHint(lastSelCount > 0 ? "\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC740 \uC0C9\uC744, \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB294 \uC0C9 \uC678 \uD1A0\uD070\uC744 \uD45C\uC2DC\uD569\uB2C8\uB2E4." : "\uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uACE0 \u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uC138\uC694.");
@@ -1515,13 +1603,17 @@
       showHint("\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uC0DD\uC131\uD560 \uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC774 \uD45C\uC2DC\uB429\uB2C8\uB2E4.");
       return;
     }
-    const others = tokens.filter((t2) => t2.category !== "color");
     if (!others.length) {
       showHint("\uC0C9 \uC678 \uD1A0\uD070\uC774 \uC5C6\uC2B5\uB2C8\uB2E4(\uC0C9\uB9CC \uCD94\uCD9C\uB428).");
       return;
     }
-    renderChunked(box, others, makeTokenRow);
+    box.classList.toggle("has-swatch", others.some((o) => o.category === "effectColor" && typeof o.value === "string"));
+    renderChunked(box, others, makeTokenRow, layoutTokenList);
   }
+  $("btnTokenListExpand").addEventListener("click", () => {
+    tokenListExpanded = !tokenListExpanded;
+    layoutTokenList();
+  });
   var brandColor = $("brand");
   var brandHex = $("brandHex");
   brandColor.addEventListener("input", () => {
@@ -3043,6 +3135,7 @@
     ro.observe($("selBarWrap"));
   }
   window.addEventListener("resize", syncStickyOffsets);
+  window.addEventListener("resize", layoutTokenList);
   updateGates();
   renderPipeline();
   renderTokens();
