@@ -216,14 +216,17 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 
 | 기능 | Free (무제한) | Paid |
 |---|:---:|:---:|
-| 색상 팔레트 생성 · 레이어 리네임 · 바인딩(기존 변수) | ✅ | ✅ |
+| 색상 팔레트 **생성·미리보기** · 레이어 리네임 · 바인딩(기존 변수) | ✅ | ✅ |
 | 토큰 추출/미리보기 · 명도 대비 점검 · 코드 내보내기(W3C JSON / CSS) | ✅ | ✅ |
-| **토큰(3계층 변수) 생성** | — | ✅ |
+| **토큰(3계층 변수) 생성** (팔레트 ‘적용’ 포함) | — | ✅ |
 | **시맨틱 매핑** | — | ✅ |
 | **컴포넌트 등록 · 베리언트(Phase 3/4/4.1)** | — | ✅ |
-| **공유 프리셋 · 변경 이력** | — | ✅ |
+| **텍스트 스타일 등록 · 적용** | — | ✅ |
+| **공유 프리셋** | — | ✅ |
 
 > 의존성: Free '바인딩'은 **기존 변수**에 연결만 가능하다. 빈 파일에서 새 변수 시스템을 만들려면 '토큰 생성'(Paid)이 필요 — 자연스러운 업셀 지점.
+>
+> 팔레트는 **생성·미리보기까지 Free**다. ‘적용 (변수 생성)’은 실제로 변수를 만들므로 `CREATE_TOKENS`로 이어져 Paid 게이트를 탄다.
 
 ### 가격
 - **Paid — 연 $39**(≈ $3.25/월). LemonSqueezy 수수료 5%+$0.50 → 실수령 ~$36.5/건(~94%). (월 옵션·런치 프로모는 추후)
@@ -242,8 +245,9 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 - **자리표시**: `licenseConfig.ts`의 `VERIFY_URL`·`LICENSE_PUBLIC_JWK`·`PURCHASE_URL`·`PORTAL_URL`, `manifest.json allowedDomains` → 배포 시 실제 값으로 교체. 키쌍 생성: `node scripts/gen-license-keys.mjs`. Worker 셋업: `workers/verify/README.md`.
 
 ### 엔타이틀먼트 모델
-- `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`presets`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
-- `code.ts`: `requirePaid(feature, message)` 단일 게이트. 토큰 생성(미리보기 제외)·시맨틱·컴포넌트·프리셋/이력을 게이팅. 바인딩·리네임·팔레트·내보내기·미리보기는 무게이팅.
+- `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`textStyles`·`presets`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
+- `code.ts`: `requirePaid(feature, message)` 단일 게이트. 토큰 생성(미리보기 제외)·시맨틱·컴포넌트·텍스트 스타일·프리셋을 게이팅. 바인딩·리네임·팔레트 생성·내보내기·미리보기는 무게이팅(팔레트 **적용**은 `CREATE_TOKENS`이라 `tokens`로 게이팅).
+- UI(`ui.ts`)는 유료 버튼을 **클릭 전에** 사전 비활성(`PAID_FIELDS` + 🔒 배지)하고, 거부 안내는 `PREMIUM_STATUS_ID`로 **해당 기능의 카드**에 띄운다(클릭-후-거부 방지).
 - 메시지(`src/shared/messages.ts`): `CodeToUi.LICENSE_STATUS { tier, unlimited, source, … }` · `PREMIUM_REQUIRED { feature, message }`.
 
 ### 관리자 / 개발·테스트 전권 + 백도어 차단
@@ -251,8 +255,8 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 - **배포 빌드**(`npm run build`)에선 `__DEV__=false` → `SET_LICENSE` 핸들러와 UI 토글이 **컴파일 단계에서 비활성**(페이월 우회 백도어 차단).
 - **실제 검증 경로 테스트**: LemonSqueezy **test mode** + sandbox 키로 Worker `/verify`. (선택) Worker `ADMIN_KEYS` 오너 allowlist 키 → 장기 paid 토큰(스모크 테스트용).
 
-### 가격 (자리표시)
-- **Paid** — 단일 유료 티어. 월/연 구독(연 결제 할인), 금액 **TBD**. 결제·환불·세금은 **LemonSqueezy(MoR)** 위임.
+### 가격
+- **Paid** — 단일 유료 티어, **연 $39 확정**(위 ‘가격’ 절 참고). 결제·환불·세금은 **LemonSqueezy(MoR)** 위임. 월 옵션·런치 프로모는 추후.
 
 ### 단계별 출시
 - **M0**: 전 기능 무료.
