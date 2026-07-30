@@ -1914,6 +1914,22 @@ const TITLE_BTN_IDS = new Set([
   'btnWizardRun', 'btnPalette', 'btnExtract', 'btnCreate',
   'btnTextStyles', 'btnApply', 'btnPreview', 'btnContrast', 'btnExport',
 ]);
+/**
+ * sticky 오프셋 동기화 — 탭 바·선택 바의 '실제' 높이를 CSS 변수로 넘긴다.
+ * 카드 헤더(주 버튼 포함)가 그 아래에 정확히 붙어야 가려지지 않는다. 폭이 좁아져 선택 바가
+ * 두 줄이 되거나 창을 리사이즈해도 따라간다(하드코딩 41px/71px은 그 경우 어긋남).
+ */
+function syncStickyOffsets(): void {
+  const tabs = document.querySelector<HTMLElement>('.tabs');
+  const bar = $('selBarWrap');
+  if (!tabs) return;
+  const tabsH = Math.round(tabs.getBoundingClientRect().height);
+  const barH = Math.round(bar.getBoundingClientRect().height);
+  const root = document.documentElement;
+  root.style.setProperty('--tabs-h', `${tabsH}px`);
+  root.style.setProperty('--head-top', `${tabsH + barH}px`);
+}
+
 /** 모든 .step 카드를 접이식으로 + 주 버튼을 타이틀 줄로. 노드 이동이라 id/리스너 보존, 멱등. */
 function applyCardChrome(): void {
   document.querySelectorAll<HTMLElement>('.step').forEach((card) => {
@@ -1943,6 +1959,15 @@ function applyCardChrome(): void {
 
 // 초기: 컬렉션·전제·라이선스 조회. 팀 카드는 Team 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
 applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
+syncStickyOffsets(); // 카드 헤더 sticky 오프셋(탭 바 + 선택 바 높이)
+// 선택 바는 문구가 바뀌며 높이가 변하고, 창 리사이즈로 두 바 모두 접힐 수 있다 → 계속 추적.
+if (typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(() => syncStickyOffsets());
+  const tabsEl = document.querySelector('.tabs');
+  if (tabsEl) ro.observe(tabsEl);
+  ro.observe($('selBarWrap'));
+}
+window.addEventListener('resize', syncStickyOffsets);
 updateGates();
 renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
