@@ -1408,6 +1408,10 @@
   }
   var HEX6 = /^#[0-9a-fA-F]{6}$/;
   var $ = (id) => document.getElementById(id);
+  function readMaxDepth() {
+    const value = Number($("depth").value);
+    return Number.isFinite(value) ? Math.max(1, Math.round(value)) : 8;
+  }
   var tokens = [];
   var presets = [];
   var isPaid = false;
@@ -1844,8 +1848,7 @@
     setStatus("applyStatus", t("apply.cancelRequested"), "warn");
   });
   $("btnPreview").addEventListener("click", () => {
-    const maxDepth = Number($("depth").value) || 8;
-    send({ type: "RENAME", apply: false, maxDepth });
+    send({ type: "RENAME", apply: false, maxDepth: readMaxDepth() });
   });
   $("btnContrast").addEventListener("click", () => {
     const level = $("contrastLevel").value;
@@ -1853,7 +1856,7 @@
     send({ type: "CHECK_CONTRAST", level });
   });
   $("btnRename").addEventListener("click", () => {
-    const items = renameNodes.filter((n) => n.after !== void 0 && renameChecked.has(n.id)).map((n) => ({ id: n.id, after: n.after }));
+    const items = renameNodes.filter((n) => n.after !== void 0 && renameChecked.has(n.id)).map((n) => ({ id: n.id, before: n.name, after: n.after }));
     if (!items.length) return;
     send({ type: "RENAME_APPLY", items });
   });
@@ -1946,7 +1949,7 @@
     }
     const base = Number($("base").value) || 16;
     const tolerance = Number($("tol").value) || 0;
-    const maxDepth = Number($("depth").value) || 8;
+    const maxDepth = readMaxDepth();
     const level = $("contrastLevel").value;
     const semMap = textToSemanticMap($("semMap").value);
     const options = {
@@ -2240,7 +2243,7 @@
     name,
     base: Number($("base").value) || 16,
     tolerance: Number($("tol").value) || 0,
-    maxDepth: Number($("depth").value) || 8,
+    maxDepth: readMaxDepth(),
     semanticMap: textToSemanticMap($("semMap").value)
   });
   function applyPreset(p) {

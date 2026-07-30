@@ -31,6 +31,11 @@ const HEX6 = /^#[0-9a-fA-F]{6}$/;
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
   document.getElementById(id) as T;
 
+function readMaxDepth(): number {
+  const value = Number(($('depth') as HTMLInputElement).value);
+  return Number.isFinite(value) ? Math.max(1, Math.round(value)) : 8;
+}
+
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
 let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
@@ -562,8 +567,7 @@ $('btnApplyCancel').addEventListener('click', () => {
 });
 
 $('btnPreview').addEventListener('click', () => {
-  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 8;
-  send({ type: 'RENAME', apply: false, maxDepth });
+  send({ type: 'RENAME', apply: false, maxDepth: readMaxDepth() });
 });
 
 $('btnContrast').addEventListener('click', () => {
@@ -576,7 +580,7 @@ $('btnRename').addEventListener('click', () => {
   // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG).
   const items = renameNodes
     .filter((n) => n.after !== undefined && renameChecked.has(n.id))
-    .map((n) => ({ id: n.id, after: n.after as string }));
+    .map((n) => ({ id: n.id, before: n.name, after: n.after as string }));
   if (!items.length) return;
   send({ type: 'RENAME_APPLY', items });
 });
@@ -686,7 +690,7 @@ async function runWizard(): Promise<void> {
   // 설정값은 각 단계의 기존 입력 필드에서 읽는다(단일 출처).
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
-  const maxDepth = Number(($('depth') as HTMLInputElement).value) || 8;
+  const maxDepth = readMaxDepth();
   const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
   const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
 
@@ -1037,7 +1041,7 @@ const gatherPreset = (name: string): Preset => ({
   name,
   base: Number(($('base') as HTMLInputElement).value) || 16,
   tolerance: Number(($('tol') as HTMLInputElement).value) || 0,
-  maxDepth: Number(($('depth') as HTMLInputElement).value) || 8,
+  maxDepth: readMaxDepth(),
   semanticMap: textToSemanticMap(($('semMap') as HTMLTextAreaElement).value),
 });
 
