@@ -2289,6 +2289,10 @@
     return cache2;
   }
 
+  // src/lib/licenseConfig.ts
+  var PURCHASE_URL = "https://example.lemonsqueezy.com/buy/PLACEHOLDER";
+  var PORTAL_URL = "https://app.lemonsqueezy.com/my-orders";
+
   // src/lib/presets.ts
   function upsertPreset(list, p) {
     return [p, ...list.filter((x) => x.name !== p.name)];
@@ -2482,7 +2486,7 @@
     }
   }
   function requireTextStyles() {
-    return requirePaid("components", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
+    return requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
   }
   async function savePresets() {
     try {
@@ -2915,6 +2919,10 @@
           } catch (e) {
           }
           postLicense("\uB77C\uC774\uC120\uC2A4 \uD0A4 \uC81C\uAC70\uB428");
+          break;
+        }
+        case "OPEN_LICENSE_LINK": {
+          figma.openExternal(msg.target === "purchase" ? PURCHASE_URL : PORTAL_URL);
           break;
         }
         case "GET_PRESETS": {

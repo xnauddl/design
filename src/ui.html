@@ -583,6 +583,12 @@
         <button id="btnClearLicense">해제</button>
       </div>
       <div class="muted" id="licenseInfo"></div>
+      <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유. -->
+      <div class="row">
+        <button id="btnBuy" class="primary">구독하기</button>
+        <button id="btnPortal" title="구독·결제수단 변경, 기기 활성화 해제(기기 1대 한도)">구독 관리</button>
+      </div>
+      <div class="hint">Paid는 연 $39. 기기 1대까지 활성화되며, 기기를 옮기려면 ‘해제’ 후 새 기기에서 키를 다시 검증하세요.</div>
       <!-- 개발용 강제 티어: 사용자 화면 비노출(개발 시 display 해제). #tier id는 ui.ts가 참조하므로 DOM 유지. -->
       <div class="row" id="devTierRow" style="display:none;">
         <label class="inline">개발용 강제 티어

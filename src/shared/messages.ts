@@ -102,6 +102,9 @@ export type UiToCode =
   | { type: 'SET_LICENSE'; tier: Tier } // M1: 개발용 강제 티어(검증 키 없을 때만 적용)
   | { type: 'LICENSE_VERIFIED'; key: string; result: VerifyResult } // M2.2: UI가 검증한 결과 보고
   | { type: 'CLEAR_LICENSE' } // 키 제거 → 개발용 티어/Free로 복귀
+  // 결제/구독 관리 링크 열기. UI 아이프레임은 외부 링크를 못 열어 code의 openExternal 경유.
+  // URL은 code가 licenseConfig에서 해석한다(임의 URL 전달 금지 — 열린 리다이렉트 방지).
+  | { type: 'OPEN_LICENSE_LINK'; target: 'purchase' | 'portal' }
   | { type: 'GET_PRESETS' } // M3(Paid): 저장된 프리셋 목록 요청
   | { type: 'SAVE_PRESET'; preset: Preset } // M3(Paid): 프리셋 저장/갱신
   | { type: 'DELETE_PRESET'; name: string } // M3(Paid): 프리셋 삭제

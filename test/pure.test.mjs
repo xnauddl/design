@@ -29,8 +29,9 @@ import {
   normalizeLegacyTier,
   normalizeLicenseCache,
   evaluateLicense,
-  parseVerifyResponse,
   cacheFromVerify,
+  extractSignedToken,
+  pickInstanceId,
   REVERIFY_MS,
   GRACE_MS,
   base64UrlToString,
@@ -333,13 +334,22 @@ test('evaluateLicense — 오프라인 grace 유지 후 강등', () => {
   );
 });
 
-test('parseVerifyResponse — 성공/실패/형식오류', () => {
-  const ok = parseVerifyResponse({ valid: true, tier: 'paid', expiresAt: 123 });
-  assert.deepEqual(ok, { ok: true, tier: 'paid', expiresAt: 123 });
-  assert.equal(parseVerifyResponse({ valid: false, error: '만료됨' }).error, '만료됨');
-  assert.equal(parseVerifyResponse({ tier: 'gold', expiresAt: 1 }).ok, false); // 알 수 없는 티어
-  assert.equal(parseVerifyResponse({ valid: true, tier: 'paid' }).ok, false); // 만료시각 없음
-  assert.equal(parseVerifyResponse('nope').ok, false);
+test('extractSignedToken — 서명 토큰만 수용(평문 응답은 페이월 우회라 거부)', () => {
+  assert.deepEqual(extractSignedToken({ token: 'a.b.c' }), { ok: true, token: 'a.b.c' });
+  // 서명 없는 평문 성공 응답을 절대 통과시키면 안 된다.
+  assert.equal(extractSignedToken({ valid: true, tier: 'paid', expiresAt: 9e12 }).ok, false);
+  assert.equal(extractSignedToken({ token: '' }).ok, false);
+  assert.equal(extractSignedToken({ token: 123 }).ok, false);
+  assert.equal(extractSignedToken(null).ok, false);
+  assert.equal(extractSignedToken('nope').ok, false);
+});
+
+test('pickInstanceId — 응답값 우선, 없으면 기존 유지', () => {
+  assert.equal(pickInstanceId({ instanceId: 'new' }, 'old'), 'new');
+  assert.equal(pickInstanceId({}, 'old'), 'old');
+  assert.equal(pickInstanceId({ instanceId: '' }, 'old'), 'old');
+  assert.equal(pickInstanceId({ instanceId: 7 }, 'old'), 'old');
+  assert.equal(pickInstanceId(null, undefined), undefined);
 });
 
 test('cacheFromVerify — 응답+키+now → 캐시', () => {
