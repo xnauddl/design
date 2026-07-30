@@ -18,7 +18,7 @@
    - 이름 형식: {맥락}-{역할} 최대 2토막. 형제 충돌에 숫자 안 붙임(Figma 중복 허용).
    - 제외: Component/ComponentSet · Text · Instance · 잠긴 레이어.
    ============================================================ */
-import { parseTokenName, layerNameFromRole, pickScope, kebab } from './naming';
+import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole } from './naming';
 import type { ParsedToken } from './naming';
 import type { RenameChange, RenameNode } from '../shared/messages';
 
@@ -67,7 +67,7 @@ export async function renameSelection(
   opts: Opts,
 ): Promise<RenameOutcome> {
   const col: Collect = { changes: [], nodes: [] };
-  await recurse(selection, null, opts, col, 0, null, null, false, null);
+  await recurse(selection, null, opts, col, 0, null, null, null, null);
   return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
 }
 
@@ -79,7 +79,7 @@ async function recurse(
   depth: number,
   parentLayout: Pos['parentLayout'],
   parentId: string | null,
-  parentIsList: boolean,
+  parentRole: string | null,
   parentDims: { w: number; h: number } | null,
 ): Promise<void> {
   const total = nodes.length;
@@ -105,7 +105,7 @@ async function recurse(
       afterOverlay: overlayAt >= 0 && i > overlayAt,
       hasAvatarSibling,
     };
-    const decided = await decide(node, ancestorName, pos, opts, parentIsList);
+    const decided = await decide(node, ancestorName, pos, opts, parentRole);
     let contextForChildren: string | null = before;
     let after: string | undefined;
 
@@ -126,11 +126,10 @@ async function recurse(
     // 제외 대상은 서브트리째 건너뛴다 — decide()가 노드 자신만 스킵하면 내부는 그대로 리네임돼
     // 메인 컴포넌트 내부 이름(→ 모든 인스턴스에 전파)과 잠금 레이어까지 덮어쓰게 된다.
     if ('children' in node && !isSkippedSubtree(node)) {
-      // 자식 → item은 부모에게 "실제로 부여된" 역할이 list일 때만(구조 판정 재계산 금지 —
-      // nav처럼 list를 앞지르는 역할이 붙어도 자식이 item이 되는 불일치를 막는다).
-      const childInList = decided.role === 'list';
+      // 자식 역할은 부모에게 "실제로 부여된" 역할에서만 파생한다(구조 재판정 금지) —
+      // 그래야 nav처럼 list를 앞지르는 역할이 붙었을 때 자식이 엉뚱하게 item이 되지 않는다.
       const childDims = decided.passthrough ? parentDims : dims(node);
-      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, childInList, childDims);
+      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, decided.role ?? null, childDims);
     }
   }
 }
@@ -140,7 +139,7 @@ async function decide(
   ancestorName: string | null,
   pos: Pos,
   opts: Opts,
-  parentIsList: boolean,
+  parentRole: string | null,
 ): Promise<{ skip: boolean; name?: string; passthrough?: boolean; role?: string }> {
   // 제외 규칙(이름 유지 · 자기 이름을 자식 맥락으로 전달)
   if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return { skip: true };
@@ -164,7 +163,7 @@ async function decide(
   // 맥락: 바로 위 의미 있는 이름에서 깨끗한 1단계 → 없으면 토큰 경로 접두사에서.
   // 역할 판정보다 먼저 구한다 — field→input, card→thumbnail처럼 맥락이 역할을 가르는 경우가 있다.
   const ctxScope = (ancestorName ? pickScope(ancestorName) : null) ?? (token?.context ? pickScope(token.context) : null);
-  const role = resolveRole(node, token, pos, parentIsList, ctxScope);
+  const role = resolveRole(node, token, pos, parentRole, ctxScope);
   // 역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하되,
   // 상속 맥락은 자식에게 그대로 통과(passthrough)시켜 의미있는 후손이 카드 맥락을 받게.
   if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: role, passthrough: true };
@@ -180,7 +179,7 @@ function resolveRole(
   node: SceneNode,
   token: ParsedToken | null,
   pos: Pos,
-  parentIsList: boolean,
+  parentRole: string | null,
   ctxScope: string | null,
 ): string {
   // 확정된 모달 레이어는 최우선 — 배경막과 그 위 패널은 다른 무엇으로도 읽히면 안 된다.
@@ -221,7 +220,7 @@ function resolveRole(
         if (hasImageFill(node)) return 'image';
         if (hasColorFill(node)) return 'swatch';
         // 빈 컨테이너도 페이지 랜드마크 자리는 차지한다(자리표시 섹션).
-        const emptyRegion = regionRole(node, pos);
+        const emptyRegion = regionRole(node, pos, ctxScope);
         if (emptyRegion) return emptyRegion;
         return 'container';
       }
@@ -230,14 +229,15 @@ function resolveRole(
       // 첫/마지막에 놓인 카드·필드가 전부 header/footer로 덮인다.
       // progress는 card보다 먼저 — 알약형 트랙은 라운드+채움이라 card 조건도 만족한다.
       if (isProgressLike(node, kids)) return 'progress';
-      if (isCardLike(node, kids)) return parentIsList ? 'article' : 'card'; // 피드 안 카드형 → article
+      if (isCardLike(node, kids)) return parentRole === 'list' ? 'article' : 'card'; // 피드 안 카드형 → article
       if (isFigureLike(node, kids)) return 'figure'; // HTML 랜드마크: 이미지+캡션
       if (isFieldLike(node, kids)) return 'field';
       if (isListLike(node, kids)) return 'list';
-      if (parentIsList) return 'item'; // 그 외 리스트 직속 컨테이너 → item(=list-item)
-      const region = regionRole(node, pos); // HTML 랜드마크: header/footer/main/aside
+      // 리스트·네비의 직속 컨테이너 자식 → item(= list-item / nav-item)
+      if (parentRole === 'list' || parentRole === 'nav') return 'item';
+      const region = regionRole(node, pos, ctxScope); // HTML 랜드마크: header/footer/main/aside
       if (region) return region;
-      if (isPageSection(pos)) return 'section'; // HTML 랜드마크: 역할 없는 페이지 중간 블록
+      if (isPageSection(pos, ctxScope)) return 'section'; // 역할 없는 페이지 중간 블록
       return kids.length === 1 ? 'wrapper' : 'container';
     }
     default:
@@ -381,13 +381,29 @@ function isPageSplit(pos: Pos): boolean {
 }
 
 /**
+ * 부모가 "페이지"로 볼 만한지 — header/footer/main을 붙일 자격.
+ * depth는 선택 기준 상대값이라, 이 게이트가 없으면 Hero·Card처럼 페이지가 아닌 걸
+ * 선택하는 순간 그 자식들이 전부 depth 1 = 랜드마크 자리로 취급된다(hero-footer).
+ * 두 가지로 거른다:
+ *  - 이름: 부모 맥락이 알려진 역할(hero/card/nav/modal…)이면 페이지가 아니다.
+ *    'Desktop'·'Home'처럼 역할 어휘가 아닌 이름이나, 일반 구조어(pickScope가 null)만 통과.
+ *  - 형태: 페이지는 세로로 길다. 넓고 낮은 히어로 배너를 배제한다(치수를 모르면 통과).
+ */
+function isPageParent(pos: Pos, ctxScope: string | null): boolean {
+  if (ctxScope && isKnownRole(ctxScope)) return false;
+  const p = pos.parentDims;
+  if (!p || p.w <= 0 || p.h <= 0) return true; // 치수 미상 → 이름 판정에만 의존
+  return p.h >= 900 || p.h >= p.w;
+}
+
+/**
  * HTML 랜드마크 영역 추론(보수적, depth 1 컨테이너만).
  * 순번은 `regionIndex`/`regionTotal` — 숨김·TEXT·인스턴스 형제를 뺀 슬롯이라
  * 유령 레이어 하나가 header/footer 자리를 밀어내지 않는다.
  * - 가로: 페이지 수준 스플릿에서 부모 폭 대비 ≤35%인 좁은 컬럼 → aside
  * - 세로: 첫 → header, 마지막 → footer, 정확히 3분할이면 가운데 → main
  */
-function regionRole(node: SceneNode, pos: Pos): string | null {
+function regionRole(node: SceneNode, pos: Pos, ctxScope: string | null): string | null {
   if (pos.depth !== 1 || !isContainerType(node)) return null;
   if (pos.regionIndex < 0) return null;
   if (pos.parentLayout === 'horizontal') {
@@ -395,6 +411,7 @@ function regionRole(node: SceneNode, pos: Pos): string | null {
     return pos.widthFrac != null && pos.widthFrac <= 0.35 ? 'aside' : null;
   }
   if (pos.parentLayout !== 'vertical' || pos.regionTotal < 2) return null;
+  if (!isPageParent(pos, ctxScope)) return null; // 히어로·카드 안에는 header/footer가 없다
   if (pos.regionIndex === 0) return 'header';
   if (pos.regionIndex === pos.regionTotal - 1) return 'footer';
   if (pos.regionTotal === 3) return 'main'; // 가운데(0·마지막은 위에서 처리됨)
@@ -402,13 +419,14 @@ function regionRole(node: SceneNode, pos: Pos): string | null {
 }
 
 /** 페이지(세로 스택, 슬롯 3개 초과)의 역할 없는 중간 블록인지 — section 폴백. */
-function isPageSection(pos: Pos): boolean {
+function isPageSection(pos: Pos, ctxScope: string | null): boolean {
   return (
     pos.depth === 1 &&
     pos.parentLayout === 'vertical' &&
     pos.regionIndex > 0 &&
     pos.regionTotal > 3 &&
-    pos.regionIndex < pos.regionTotal - 1
+    pos.regionIndex < pos.regionTotal - 1 &&
+    isPageParent(pos, ctxScope)
   );
 }
 

@@ -1608,6 +1608,45 @@ test('renameSelection — 랜드마크 슬롯은 숨김·TEXT 형제를 세지 �
   assert.equal(after.get('ft'), 'desktop-footer'); // 뒤의 TEXT가 footer 자리를 삼키지 않음
 });
 
+test('renameSelection — 히어로 섹션 안에는 header/footer 랜드마크가 생기지 않음', async () => {
+  installFigma();
+  // depth는 선택 기준 상대값이라, 게이트가 없으면 Hero를 선택하는 순간 그 자식들이
+  // 전부 depth 1 = 페이지 랜드마크 자리로 취급돼 마지막 자식이 hero-footer가 된다.
+  const txt = (id, s) => ({ type: 'TEXT', id, name: 'Text', characters: s });
+  const block = (id, h) => ({ type: 'FRAME', id, name: `Frame ${id}`, width: 1200, height: h, children: [txt(id + 't', '내용')] });
+  const hero = {
+    type: 'FRAME', id: 'hero', name: 'Hero', layoutMode: 'VERTICAL', width: 1200, height: 700,
+    children: [block('b1', 120), block('b2', 300), block('b3', 80)],
+  };
+  const { changes } = await renameSelection([hero], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  for (const id of ['b1', 'b2', 'b3']) {
+    const name = after.get(id);
+    assert.ok(
+      !/-(header|footer|main|section)$/.test(name ?? ''),
+      `히어로 자식 ${id}가 랜드마크(${name})가 됐다`,
+    );
+  }
+});
+
+test('renameSelection — 페이지는 이름이 역할 어휘가 아니고 세로로 길 때만 랜드마크', async () => {
+  installFigma();
+  const block = (id, h) => ({
+    type: 'FRAME', id, name: `Frame ${id}`, width: 1440, height: h,
+    children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
+  });
+  // 'Desktop'은 역할 어휘가 아니고 1440x2400은 세로로 길다 → 페이지로 인정.
+  const page = {
+    type: 'FRAME', id: 'page', name: 'Desktop', layoutMode: 'VERTICAL', width: 1440, height: 2400,
+    children: [block('h', 80), block('m', 2000), block('f', 320)],
+  };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('h'), 'desktop-header');
+  assert.equal(after.get('m'), 'desktop-main');
+  assert.equal(after.get('f'), 'desktop-footer');
+});
+
 test('renameSelection — 카드 안 통계 행은 nav가 아님', async () => {
   installFigma();
   const col = (id, t) => ({
@@ -1630,7 +1669,7 @@ test('renameSelection — 카드 안 통계 행은 nav가 아님', async () => {
   assert.notEqual(after.get('row'), 'card-nav'); // depth 2의 행은 페이지 랜드마크가 아님
 });
 
-test('renameSelection — nav로 판정된 행의 자식은 item이 아님', async () => {
+test('renameSelection — nav의 링크 자식은 nav-item', async () => {
   installFigma();
   const link = (id) => ({
     type: 'FRAME', id, name: `Frame ${id}`, width: 80, height: 32,
@@ -1644,7 +1683,27 @@ test('renameSelection — nav로 판정된 행의 자식은 item이 아님', asy
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('nav'), 'desktop-nav');
-  assert.notEqual(after.get('l1'), 'nav-item'); // 부모에게 부여된 역할이 list가 아니므로 item 아님
+  assert.equal(after.get('l1'), 'nav-item'); // 의미 없는 wrapper가 아니라 nav-item(DS 표준 Nav Item)
+});
+
+test('renameSelection — 자식 역할은 부모에게 부여된 역할에서만 파생', async () => {
+  installFigma();
+  // 카드 크롬이 있어 card로 확정되지만, 구조만 보면 isListLike도 참인 프레임.
+  // 구조를 재판정하면 자식이 item이 된다 — 확정 역할(card)에서만 파생해야 한다.
+  const row = (id) => ({
+    type: 'FRAME', id, name: `Frame ${id}`, width: 280, height: 48,
+    children: [{ type: 'TEXT', id: id + 't', name: 't', characters: 'x' }],
+  });
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Frame C', layoutMode: 'VERTICAL', width: 320, height: 200,
+    cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
+    children: [row('r1'), row('r2'), row('r3')],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Desktop', width: 1440, height: 900, children: [card] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('card'), 'desktop-card');
+  assert.notEqual(after.get('r1'), 'card-item'); // 부여된 역할이 list가 아니므로 item 아님
 });
 
 test('renameSelection — 썸네일 판정은 통과 래퍼가 아니라 카드 기준으로', async () => {

@@ -1498,11 +1498,11 @@
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const col = { changes: [], nodes: [] };
-    await recurse(selection2, null, opts, col, 0, null, null, false, null);
+    await recurse(selection2, null, opts, col, 0, null, null, null, null);
     return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
   }
-  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentIsList, parentDims) {
-    var _a, _b;
+  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentRole, parentDims) {
+    var _a, _b, _c;
     const total = nodes.length;
     const slotOf = /* @__PURE__ */ new Map();
     let slots = 0;
@@ -1527,7 +1527,7 @@
         afterOverlay: overlayAt >= 0 && i > overlayAt,
         hasAvatarSibling
       };
-      const decided = await decide(node, ancestorName, pos, opts, parentIsList);
+      const decided = await decide(node, ancestorName, pos, opts, parentRole);
       let contextForChildren = before;
       let after;
       if (!decided.skip && decided.name) {
@@ -1540,13 +1540,12 @@
       }
       col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
       if ("children" in node && !isSkippedSubtree(node)) {
-        const childInList = decided.role === "list";
         const childDims = decided.passthrough ? parentDims : dims(node);
-        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, childInList, childDims);
+        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_c = decided.role) != null ? _c : null, childDims);
       }
     }
   }
-  async function decide(node, ancestorName, pos, opts, parentIsList) {
+  async function decide(node, ancestorName, pos, opts, parentRole) {
     var _a;
     if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true };
     if (node.type === "TEXT") return { skip: true };
@@ -1561,13 +1560,13 @@
     }
     const token = await primaryToken(node);
     const ctxScope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
-    const role = resolveRole(node, token, pos, parentIsList, ctxScope);
+    const role = resolveRole(node, token, pos, parentRole, ctxScope);
     if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: role, passthrough: true };
     const scope = ctxScope === role ? null : ctxScope;
     return { skip: false, role, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
   }
   var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper"]);
-  function resolveRole(node, token, pos, parentIsList, ctxScope) {
+  function resolveRole(node, token, pos, parentRole, ctxScope) {
     if (pos.isOverlay) return "overlay";
     if (isModalLike(node, pos, ctxScope)) return "modal";
     if (ctxScope === "progress" && isBarFill(node)) return "indicator";
@@ -1600,19 +1599,19 @@
         if (kids.length === 0) {
           if (hasImageFill(node)) return "image";
           if (hasColorFill(node)) return "swatch";
-          const emptyRegion = regionRole(node, pos);
+          const emptyRegion = regionRole(node, pos, ctxScope);
           if (emptyRegion) return emptyRegion;
           return "container";
         }
         if (isProgressLike(node, kids)) return "progress";
-        if (isCardLike(node, kids)) return parentIsList ? "article" : "card";
+        if (isCardLike(node, kids)) return parentRole === "list" ? "article" : "card";
         if (isFigureLike(node, kids)) return "figure";
         if (isFieldLike(node, kids)) return "field";
         if (isListLike(node, kids)) return "list";
-        if (parentIsList) return "item";
-        const region = regionRole(node, pos);
+        if (parentRole === "list" || parentRole === "nav") return "item";
+        const region = regionRole(node, pos, ctxScope);
         if (region) return region;
-        if (isPageSection(pos)) return "section";
+        if (isPageSection(pos, ctxScope)) return "section";
         return kids.length === 1 ? "wrapper" : "container";
       }
       default:
@@ -1718,7 +1717,13 @@
     const p = pos.parentDims;
     return !!p && p.w >= 768 && p.h >= 400;
   }
-  function regionRole(node, pos) {
+  function isPageParent(pos, ctxScope) {
+    if (ctxScope && isKnownRole(ctxScope)) return false;
+    const p = pos.parentDims;
+    if (!p || p.w <= 0 || p.h <= 0) return true;
+    return p.h >= 900 || p.h >= p.w;
+  }
+  function regionRole(node, pos, ctxScope) {
     if (pos.depth !== 1 || !isContainerType(node)) return null;
     if (pos.regionIndex < 0) return null;
     if (pos.parentLayout === "horizontal") {
@@ -1726,13 +1731,14 @@
       return pos.widthFrac != null && pos.widthFrac <= 0.35 ? "aside" : null;
     }
     if (pos.parentLayout !== "vertical" || pos.regionTotal < 2) return null;
+    if (!isPageParent(pos, ctxScope)) return null;
     if (pos.regionIndex === 0) return "header";
     if (pos.regionIndex === pos.regionTotal - 1) return "footer";
     if (pos.regionTotal === 3) return "main";
     return null;
   }
-  function isPageSection(pos) {
-    return pos.depth === 1 && pos.parentLayout === "vertical" && pos.regionIndex > 0 && pos.regionTotal > 3 && pos.regionIndex < pos.regionTotal - 1;
+  function isPageSection(pos, ctxScope) {
+    return pos.depth === 1 && pos.parentLayout === "vertical" && pos.regionIndex > 0 && pos.regionTotal > 3 && pos.regionIndex < pos.regionTotal - 1 && isPageParent(pos, ctxScope);
   }
   function isButtonLike(node) {
     if (node.type !== "FRAME") return false;
