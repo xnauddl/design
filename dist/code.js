@@ -1502,8 +1502,12 @@
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const col = { changes: [], nodes: [] };
-    await recurse(selection2, null, opts, col, 0, null, null, null, null);
+    const safeOpts = __spreadProps(__spreadValues({}, opts), { maxDepth: normalizeMaxDepth(opts.maxDepth) });
+    await recurse(selection2, null, safeOpts, col, 0, null, null, null, null);
     return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
+  }
+  function normalizeMaxDepth(v) {
+    return Number.isFinite(v) ? Math.max(1, Math.round(v)) : 8;
   }
   async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentRole, parentDims) {
     var _a, _b, _c;
@@ -1654,7 +1658,10 @@
       const id = firstAliasId(bv[field]);
       if (id) {
         const v = await figma.variables.getVariableByIdAsync(id);
-        if (v) return parseTokenName(v.name);
+        if (v) {
+          const token = parseTokenName(v.name);
+          if (!token.primitive) return token;
+        }
       }
     }
     return null;
@@ -2529,9 +2536,6 @@
   }
 
   // src/lib/entitlements.ts
-  function isTier(v) {
-    return v === "free" || v === "paid";
-  }
   function normalizeLegacyTier(v) {
     if (v === "free" || v === "paid") return v;
     if (v === "pro" || v === "team") return "paid";
@@ -2608,7 +2612,7 @@
       return { tier: ev.tier, source: "key", status: ev.status, expiresAt: cache.expiresAt };
     }
     if (devTier !== "free") return { tier: devTier, source: "dev" };
-    if (true) return { tier: "free", source: "dev" };
+    if (false) return { tier: "free", source: "dev" };
     return { tier: "free", source: "none" };
   }
   var currentTier = () => effective().tier;
@@ -2634,7 +2638,7 @@
   async function loadLicense() {
     try {
       const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
-      if (isTier(dt)) devTier = dt;
+      if (false) devTier = dt;
       const raw = await figma.clientStorage.getAsync(CACHE_KEY);
       const normalized = normalizeLicenseCache(raw);
       if (normalized) {
@@ -3068,10 +3072,11 @@
         }
         case "RENAME_APPLY": {
           const changes = [];
-          for (const { id, after } of msg.items) {
+          for (const { id, before: expectedBefore, after } of msg.items) {
             const node = await figma.getNodeByIdAsync(id);
             if (!node || !("name" in node)) continue;
             const before = node.name;
+            if (before !== expectedBefore) continue;
             if (before === after) continue;
             node.name = after;
             changes.push({ id, before, after });
@@ -3148,7 +3153,7 @@
           break;
         }
         case "SET_LICENSE": {
-          if (false) break;
+          if (true) break;
           devTier = msg.tier;
           try {
             await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);

@@ -869,6 +869,53 @@ test('renameSelection — 토큰 신호로 맥락/역할 결정(조상 없음 �
   assert.equal(after.get('b'), 'background');
 });
 
+test('renameSelection — primaryToken은 먼저 만난 원시 토큰을 건너뛰고 뒤쪽 시맨틱 신호를 사용', async () => {
+  const figma = installFigma();
+  const glob = figma.variables.createVariableCollection('Global');
+  const primitive = figma.variables.createVariable('color/blue-500', glob, 'COLOR');
+  const sem = figma.variables.createVariableCollection('Semantic');
+  const semantic = figma.variables.createVariable('card/media/image', sem, 'COLOR');
+
+  const node = {
+    type: 'RECTANGLE',
+    id: 'r',
+    name: 'Rectangle 1',
+    boundVariables: {
+      fills: [{ type: 'VARIABLE_ALIAS', id: primitive.id }],
+      strokes: [{ type: 'VARIABLE_ALIAS', id: semantic.id }],
+    },
+    fills: [{ type: 'SOLID', visible: true }],
+    strokes: [{ type: 'SOLID', visible: true }],
+  };
+
+  const { changes } = await renameSelection([node], { apply: true, maxDepth: 3 });
+  assert.equal(changes[0].after, 'card-image');
+});
+
+test('renameSelection — maxDepth 입력 방어: 음수·소수·NaN은 안전한 정수 범위로 정규화', async () => {
+  const figma = installFigma();
+  const sem = figma.variables.createVariableCollection('Semantic');
+  const semantic = figma.variables.createVariable('button/primary/background', sem, 'COLOR');
+  const mk = (id) => ({
+    type: 'RECTANGLE',
+    id,
+    name: 'Rectangle 1',
+    boundVariables: { fills: [{ type: 'VARIABLE_ALIAS', id: semantic.id }] },
+    fills: [{ type: 'SOLID', visible: true }],
+  });
+
+  const neg = mk('neg');
+  const frac = mk('frac');
+  const nan = mk('nan');
+  const r1 = await renameSelection([neg], { apply: true, maxDepth: -3 });
+  const r2 = await renameSelection([frac], { apply: true, maxDepth: 1.6 });
+  const r3 = await renameSelection([nan], { apply: true, maxDepth: Number.NaN });
+
+  assert.equal(r1.changes[0].after, 'background'); // 음수 → 1
+  assert.equal(r2.changes[0].after, 'button-background'); // 1.6 → 2
+  assert.equal(r3.changes[0].after, 'button-background'); // NaN → 기본 8
+});
+
 test('renameSelection — 구 리네임이 남긴 토큰 베낌 이름(color-121210)은 교체', async () => {
   const figma = installFigma();
   const glob = figma.variables.createVariableCollection('Global');
@@ -1484,20 +1531,26 @@ test('renameSelection — 상태: 아바타 형제가 없으면 status 아님', 
 
 /* ---- 리뷰 회귀: 순회 범위 · 검출기 게이팅 (실제 치수를 가진 픽스처) ---- */
 
-test('renameSelection — 메인 컴포넌트·잠긴 서브트리는 통째로 건드리지 않음', async () => {
+test('renameSelection — 메인 컴포넌트·컴포넌트 세트·잠긴 서브트리는 통째로 건드리지 않음', async () => {
   installFigma();
   const inner = { type: 'VECTOR', id: 'ci', name: 'LeadingIcon' };
   const comp = { type: 'COMPONENT', id: 'comp', name: 'Button/Primary', children: [inner] };
+  const setKid = { type: 'VECTOR', id: 'csi', name: 'Vector 2' };
+  const set = { type: 'COMPONENT_SET', id: 'set', name: 'Button', children: [setKid] };
   const lockedKid = { type: 'VECTOR', id: 'lk', name: 'Vector 1' };
   const locked = { type: 'FRAME', id: 'lock', name: 'Locked Group', locked: true, children: [lockedKid] };
-  const root = { type: 'FRAME', id: 'root', name: 'card', children: [comp, locked] };
+  const root = { type: 'FRAME', id: 'root', name: 'card', children: [comp, set, locked] };
   const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const ids = new Set(changes.map((c) => c.id));
   assert.equal(ids.has('ci'), false); // 메인 컴포넌트 내부 → 모든 인스턴스에 전파되므로 불가침
   assert.equal(inner.name, 'LeadingIcon');
+  assert.equal(ids.has('csi'), false);
+  assert.equal(setKid.name, 'Vector 2');
   assert.equal(ids.has('lk'), false);
   assert.equal(lockedKid.name, 'Vector 1');
   assert.equal(nodes.some((n) => n.id === 'ci'), false); // 순회 자체를 하지 않음
+  assert.equal(nodes.some((n) => n.id === 'csi'), false);
+  assert.equal(nodes.some((n) => n.id === 'lk'), false);
 });
 
 test('renameSelection — 페이지 섹션 스택은 list가 아니라 랜드마크로', async () => {

@@ -4,8 +4,12 @@
    - 정규화: 뚜렷한 역할(card/list/field/button/header… 등)은 역할 기반 이름으로 교체(사람이 지은 이름도 덮어씀).
      역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과.
      선택 루트(depth 0) 컨테이너는 보존(자식 맥락 앵커) — 단 카드/리스트/필드/버튼처럼 확실한 시멘틱이면 루트도 교체.
-   - 역할 판정: 오버레이/모달 → 입력 → nav → 버튼/칩 → 리스트아이템 → 상태/썸네일 →
-     영역(landmark) → 토큰 말단 → 시맨틱 컨테이너 → 타입/기하 순.
+   - 역할 판정:
+     · 전역 고우선: 오버레이/모달 → progress 안 indicator → field 안 input → 버튼/칩 → nav →
+       status/thumbnail → 토큰 말단.
+     · FRAME/GROUP/SECTION: progress → card/article → figure → field → list → list/nav-item →
+       영역(landmark) → section → container/wrapper.
+     · 그 외 타입/기하: VECTOR=icon, 얇은 막대=divider, 이미지 타원=avatar, 채움=background 등.
      · HTML 랜드마크: 첫→header·마지막→footer·3분할 가운데→main·그 외 페이지 중간→section,
        가로 좁은 컬럼→aside, 가로 링크행→nav, 이미지+캡션→figure, 피드 안 카드형 항목→article
      · 버튼/칩: 오토레이아웃 + 라운드 + 채움/외곽선 + 직속 텍스트 → button(작고 알약형이면 chip)
@@ -14,9 +18,10 @@
      · 맥락이 가르는 역할: field 안 입력상자 → input, card/item 안 작은 이미지 → thumbnail,
        아바타 곁 작은 원 → status, 부모를 덮는 반투명 면 → overlay(그 위 패널 → modal)
      · HTML 랜드마크와 컴포넌트/디자인 어휘(card/chip/avatar…)를 함께 사용. 리스트 항목은 영역보다 우선.
-   - 맥락: 바로 위 의미 있는 이름에서 깨끗한 1단계만(pickScope). 숫자·단위 조각 제거.
+   - 맥락: 바로 위 의미 있는 이름에서 깨끗한 1단계만(pickScope). 없으면 시맨틱 토큰 접두사에서.
+     숫자·단위 조각 제거.
    - 이름 형식: {맥락}-{역할} 최대 2토막. 형제 충돌에 숫자 안 붙임(Figma 중복 허용).
-   - 제외: Component/ComponentSet · Text · Instance · 잠긴 레이어.
+   - 제외: Component/ComponentSet · Instance · 잠긴 레이어는 서브트리째 스킵, Text는 자기 이름만 보존.
    ============================================================ */
 import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole } from './naming';
 import type { ParsedToken } from './naming';
@@ -67,8 +72,13 @@ export async function renameSelection(
   opts: Opts,
 ): Promise<RenameOutcome> {
   const col: Collect = { changes: [], nodes: [] };
-  await recurse(selection, null, opts, col, 0, null, null, null, null);
+  const safeOpts: Opts = { ...opts, maxDepth: normalizeMaxDepth(opts.maxDepth) };
+  await recurse(selection, null, safeOpts, col, 0, null, null, null, null);
   return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
+}
+
+function normalizeMaxDepth(v: number): number {
+  return Number.isFinite(v) ? Math.max(1, Math.round(v)) : 8;
 }
 
 async function recurse(
@@ -141,7 +151,7 @@ async function decide(
   opts: Opts,
   parentRole: string | null,
 ): Promise<{ skip: boolean; name?: string; passthrough?: boolean; role?: string }> {
-  // 제외 규칙(이름 유지 · 자기 이름을 자식 맥락으로 전달)
+  // 제외 규칙(이름 유지). 일부 노드는 recurse()에서 서브트리째 중단한다.
   if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return { skip: true };
   if (node.type === 'TEXT') return { skip: true };
   if (node.type === 'INSTANCE') return { skip: true };
@@ -174,7 +184,7 @@ async function decide(
 /** 역할 없는 순수 레이아웃 폴백 — 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과. */
 const PASSTHROUGH_ROLES = new Set(['container', 'wrapper']);
 
-/* ---------- 역할 판정: 오버레이/모달 → 입력 → 버튼/칩 → 영역 → 리스트아이템 → 토큰 신호 → 시맨틱 컨테이너 → 타입/기하 ---------- */
+/* ---------- 역할 판정: 전역 고우선 → 토큰 신호 → 컨테이너 시맨틱/랜드마크 → 타입/기하 ---------- */
 function resolveRole(
   node: SceneNode,
   token: ParsedToken | null,
@@ -285,7 +295,10 @@ async function primaryToken(node: SceneNode): Promise<ParsedToken | null> {
     const id = firstAliasId(bv[field]);
     if (id) {
       const v = await figma.variables.getVariableByIdAsync(id);
-      if (v) return parseTokenName(v.name);
+      if (v) {
+        const token = parseTokenName(v.name);
+        if (!token.primitive) return token;
+      }
     }
   }
   return null;
