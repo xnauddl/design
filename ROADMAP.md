@@ -37,7 +37,8 @@
 - [x] **UX9 명도 대비 점검** — WCAG AA/AAA 읽기 전용 감사(`contrast.ts`)
 - [x] **대량 선택 점진 렌더** — 토큰 목록·선택 트리·색 편집표를 프레임 단위 청크로 비차단 렌더(`renderChunked`, 소량은 즉시) `(PR #42)`
 - [x] **i18n 인프라 + 상태/피드백 외부화** — `i18n.ts`(`t()`·`STRINGS`·`{var}` 보간) + ui.ts의 `setStatus` 피드백 메시지 전부 키로 이전 `(PR #43)`
-- [ ] **잔여** — 정적 라벨(ui.html)·마법사 단계 문구·라벨 맵 외부화(같은 `t()` 패턴)
+- [x] **정적 라벨·마법사 문구·라벨 맵 외부화** — ui.html 정적 라벨 100개를 `data-i18n`/`data-i18n-html` + `applyStaticLabels()`로, 마법사 단계·건너뜀 사유·스킵 사유 맵을 `t()` 키로 이전 `(PR #70)`
+- [ ] **잔여** — `title` 툴팁·`<option>`·`placeholder` 외부화(같은 `t()` 패턴)
 
 ## 5. 유료화 / 상용 전환 — Free/Paid 2티어
 - **모델**: 오픈 코어 + Freemium. **Free / Paid 2티어** · 연 $39 · LemonSqueezy(웹 결제 → 키 발급 → 무료 서버리스 검증).
