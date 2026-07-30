@@ -277,6 +277,11 @@ export const STRINGS: Record<string, string> = {
   'a11y.body': '키보드 전용 조작 · 명도 대비 AA · i18n',
 };
 
+/** 해당 키가 STRINGS에 정의돼 있는가. 정적 라벨 하이드레이션이 오타 키로 원문을 덮지 않도록 쓴다. */
+export function hasString(key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(STRINGS, key);
+}
+
 /** key → 문자열. `{var}` 자리표시자를 vars로 치환. 누락 키는 key 그대로(폴백). */
 export function t(key: string, vars?: StringVars): string {
   const tpl = STRINGS[key] ?? key;

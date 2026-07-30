@@ -3,7 +3,7 @@
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
 import type { DraftToken } from './lib/tokens';
-import { t } from './lib/i18n';
+import { t, hasString } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier } from './lib/entitlements';
 import { parseVerifyResponse, type VerifyResult } from './lib/license';
@@ -1909,11 +1909,14 @@ function applyCardChrome(): void {
  *  텍스트 전용 요소는 data-i18n, <b>/<code> 등 마크업이 있으면 data-i18n-html을 쓴다.
  *  뱃지 span(예: …Lock)이 함께 있는 요소는 텍스트만 <span data-i18n>로 감싸 뱃지를 보존한다. */
 function applyStaticI18n(root: ParentNode = document): void {
+  // 정의된 키만 덮어쓴다 — 오타/누락 키에서 t()가 키 문자열을 반환해 HTML 원문을 파괴하지 않도록.
   root.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
-    el.textContent = t(el.dataset.i18n as string);
+    const key = el.dataset.i18n as string;
+    if (hasString(key)) el.textContent = t(key);
   });
   root.querySelectorAll<HTMLElement>('[data-i18n-html]').forEach((el) => {
-    el.innerHTML = t(el.dataset.i18nHtml as string);
+    const key = el.dataset.i18nHtml as string;
+    if (hasString(key)) el.innerHTML = t(key);
   });
 }
 

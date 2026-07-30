@@ -898,6 +898,9 @@
     "a11y.title": "\uC811\uADFC\uC131 \xB7 \uAD6D\uC81C\uD654",
     "a11y.body": "\uD0A4\uBCF4\uB4DC \uC804\uC6A9 \uC870\uC791 \xB7 \uBA85\uB3C4 \uB300\uBE44 AA \xB7 i18n"
   };
+  function hasString(key) {
+    return Object.prototype.hasOwnProperty.call(STRINGS, key);
+  }
   function t(key, vars) {
     var _a;
     const tpl = (_a = STRINGS[key]) != null ? _a : key;
@@ -3136,10 +3139,12 @@
   }
   function applyStaticI18n(root = document) {
     root.querySelectorAll("[data-i18n]").forEach((el) => {
-      el.textContent = t(el.dataset.i18n);
+      const key = el.dataset.i18n;
+      if (hasString(key)) el.textContent = t(key);
     });
     root.querySelectorAll("[data-i18n-html]").forEach((el) => {
-      el.innerHTML = t(el.dataset.i18nHtml);
+      const key = el.dataset.i18nHtml;
+      if (hasString(key)) el.innerHTML = t(key);
     });
   }
   applyStaticI18n();
