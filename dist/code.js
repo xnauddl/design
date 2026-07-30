@@ -58,6 +58,18 @@
     }
     return void 0;
   }
+  function pxConversions(tokens, base) {
+    const out = [];
+    for (const t of tokens) {
+      if (!t.unit || t.unit === "px" || typeof t.value !== "number") continue;
+      out.push({
+        name: t.name,
+        from: stringValueForUnit(t.value, t.unit),
+        to: toPx(t.value, t.unit, { base, fontSize: base })
+      });
+    }
+    return out;
+  }
   function stringValueForUnit(value, unit) {
     switch (unit) {
       case "percent":
@@ -501,7 +513,7 @@
     const gMode = globalCol.defaultModeId;
     const sMode = semanticCol.defaultModeId;
     const idx = await buildVarIndex();
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0 };
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base) };
     for (const t of tokens) {
       const type = resolvedTypeForToken(t);
       const g = upsertVariable(t.name, globalCol, type, idx);
@@ -520,14 +532,14 @@
     }
     return summary;
   }
-  async function previewCreateTokens(tokens) {
+  async function previewCreateTokens(tokens, base) {
     var _a, _b, _c, _d;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const gId = (_b = (_a = cols.find((c) => c.name === GLOBAL)) == null ? void 0 : _a.id) != null ? _b : "#G";
     const sId = (_d = (_c = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _c.id) != null ? _d : "#S";
     const existing = /* @__PURE__ */ new Set();
     for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0 };
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base) };
     const seen = /* @__PURE__ */ new Set();
     const tally = (colId, name, kind) => {
       const k = vkey(colId, name);
@@ -3004,10 +3016,15 @@
         }
         case "CREATE_TOKENS": {
           if (!msg.preview && !requirePaid("tokens", "\uD1A0\uD070(\uBCC0\uC218) \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4. \uBBF8\uB9AC\uBCF4\uAE30\uB294 \uBB34\uB8CC\uB85C \uC81C\uACF5\uB429\uB2C8\uB2E4.")) break;
-          const s = msg.preview ? await previewCreateTokens(msg.tokens) : await createTokens(msg.tokens, msg.base);
+          const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
           let summary = `Global ${s.globals}\uAC1C \xB7 Semantic ${s.semantics}\uAC1C (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated})`;
           if (pruned) summary += ` \xB7 \uC774\uC804 \uC0C9 ${pruned}\uAC1C \uC815\uB9AC`;
+          if (s.conversions.length) {
+            const px = (n) => String(Math.round(n * 100) / 100);
+            const ex = s.conversions.slice(0, 2).map((c) => `${c.from}\u2192${px(c.to)}px`).join(", ");
+            summary += ` \xB7 base ${msg.base}px \uD658\uC0B0 ${s.conversions.length}\uAC1C(${ex}${s.conversions.length > 2 ? " \uC678" : ""})`;
+          }
           post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, preview: msg.preview });
           if (!msg.preview) {
             commitUndo(figma);

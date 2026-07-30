@@ -25,6 +25,7 @@ export const STRINGS: Record<string, string> = {
   'extract.done': '{count}개 후보 추출 완료.',
   'create.needExtract': '먼저 토큰을 추출하세요.',
   'create.preview': '미리보기 — {summary} · ‘적용’으로 반영',
+  'create.baseChanged': 'base {base}px로 다시 계산 중…',
 
   // 시맨틱 매핑
   'semantic.rolesApplied': '{count}개 역할 반영됨 — ‘시맨틱 별칭 생성’으로 적용.',
