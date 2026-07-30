@@ -1332,46 +1332,57 @@
   }
 
   // src/lib/naming.ts
-  var ROLE_VOCAB = [
-    // 구조
+  var EMITTED_ROLES = [
+    // 구조 폴백(역할을 못 정했을 때)
     "container",
     "wrapper",
-    "content",
-    "group",
-    // 영역
+    "shape",
+    // HTML 랜드마크
     "header",
-    "body",
     "footer",
-    "leading",
-    "trailing",
+    "main",
+    "aside",
+    "nav",
+    "section",
+    "article",
+    "figure",
+    // 컴포넌트
+    "button",
+    "chip",
+    "card",
+    "list",
+    "item",
+    "field",
+    "input",
+    "modal",
+    "overlay",
+    "progress",
+    "indicator",
     // 요소
     "icon",
     "image",
+    "thumbnail",
     "background",
     "swatch",
     "border",
     "divider",
     "badge",
-    "avatar",
-    // 시맨틱(영역/컴포넌트) — 인식·정리 + 일부 구조 추론
-    "nav",
+    "status",
+    "avatar"
+  ];
+  var RECOGNIZED_ROLES = [
+    "content",
+    "group",
+    "body",
+    "leading",
+    "trailing",
     "hero",
-    "main",
     "sidebar",
-    "aside",
-    "section",
-    "article",
-    "figure",
-    "button",
-    "card",
-    "list",
-    "item",
-    "field",
     "tab",
-    "chip",
     "label",
     "title"
   ];
+  var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
   var ROLE_SET = new Set(ROLE_VOCAB);
   function isKnownRole(seg) {
     return ROLE_SET.has(seg);
@@ -1452,11 +1463,18 @@
     image: "image",
     img: "image",
     picture: "image",
-    thumbnail: "image",
+    thumbnail: "thumbnail",
+    thumb: "thumbnail",
     avatar: "avatar",
     badge: "badge",
     dot: "badge",
-    indicator: "badge"
+    status: "status",
+    indicator: "indicator",
+    progress: "progress",
+    overlay: "overlay",
+    scrim: "overlay",
+    backdrop: "overlay",
+    input: "input"
   };
   function parseTokenName(tokenName) {
     var _a;
@@ -1480,22 +1498,33 @@
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const col = { changes: [], nodes: [] };
-    await recurse(selection2, null, opts, col, 0, null, null, false);
+    await recurse(selection2, null, opts, col, 0, null, null, false, null);
     return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
   }
-  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentIsList) {
+  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentIsList, parentDims) {
     const total = nodes.length;
     const widths = parentLayout === "horizontal" ? nodes.map((n) => {
       var _a, _b;
       return (_b = (_a = dims(n)) == null ? void 0 : _a.w) != null ? _b : null;
     }) : null;
     const maxW = widths ? Math.max(0, ...widths.filter((w) => w != null)) : 0;
+    const overlayAt = nodes.findIndex((n) => isOverlayLike(n, parentDims));
+    const hasAvatarSibling = nodes.some((n) => n.type === "ELLIPSE" && hasImageFill(n));
     for (let i = 0; i < total; i++) {
       const node = nodes[i];
       const before = node.name;
       const wi = widths ? widths[i] : null;
       const widthFrac = wi != null && maxW > 0 ? wi / maxW : null;
-      const pos = { index: i, total, parentLayout, depth, widthFrac };
+      const pos = {
+        index: i,
+        total,
+        parentLayout,
+        depth,
+        widthFrac,
+        parentDims,
+        afterOverlay: overlayAt >= 0 && i > overlayAt,
+        hasAvatarSibling
+      };
       const decided = await decide(node, ancestorName, pos, opts, parentIsList);
       let contextForChildren = before;
       let after;
@@ -1510,7 +1539,7 @@
       col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
       if ("children" in node && node.type !== "INSTANCE") {
         const childInList = node.type === "FRAME" && isListLike(node, node.children);
-        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, childInList);
+        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, childInList, dims(node));
       }
     }
   }
@@ -1528,14 +1557,18 @@
       return { skip: false, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }) };
     }
     const token = await primaryToken(node);
-    const role = resolveRole(node, token, pos, parentIsList);
+    const ctxScope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
+    const role = resolveRole(node, token, pos, parentIsList, ctxScope);
     if (PASSTHROUGH_ROLES.has(role)) return { skip: false, name: role, passthrough: true };
-    let scope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
-    if (scope === role) scope = null;
+    const scope = ctxScope === role ? null : ctxScope;
     return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
   }
   var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper"]);
-  function resolveRole(node, token, pos, parentIsList) {
+  function resolveRole(node, token, pos, parentIsList, ctxScope) {
+    if (isOverlayLike(node, pos.parentDims)) return "overlay";
+    if (isModalLike(node, pos, ctxScope)) return "modal";
+    if (ctxScope === "progress" && isBarFill(node)) return "indicator";
+    if (isInputLike(node, ctxScope)) return "input";
     if (isNavLike(node)) return "nav";
     if (isButtonLike(node)) return isChipLike(node) ? "chip" : "button";
     if (parentIsList && isContainerType(node)) {
@@ -1543,6 +1576,8 @@
       if (isCardLike(node, kids)) return "article";
       return "item";
     }
+    if (isStatusDot(node, pos)) return "status";
+    if (isThumbnail(node, pos, ctxScope)) return "thumbnail";
     const region = regionRole(node, pos);
     if (region) return region;
     if (token == null ? void 0 : token.roleLeaf) return token.roleLeaf;
@@ -1571,6 +1606,7 @@
           if (hasColorFill(node)) return "swatch";
           return "container";
         }
+        if (isProgressLike(node, kids)) return "progress";
         if (isFieldLike(node, kids)) return "field";
         if (isListLike(node, kids)) return "list";
         if (isCardLike(node, kids)) return "card";
@@ -1583,11 +1619,13 @@
     }
   }
   function highConfidenceRole(node) {
+    if (isInputLike(node, null)) return "input";
     if (isNavLike(node)) return "nav";
     if (isButtonLike(node)) return isChipLike(node) ? "chip" : "button";
     if ("children" in node && isContainerType(node)) {
       const kids = node.children;
       if (kids.length) {
+        if (isProgressLike(node, kids)) return "progress";
         if (isFieldLike(node, kids)) return "field";
         if (isListLike(node, kids)) return "list";
         if (isCardLike(node, kids)) return "card";
@@ -1780,6 +1818,85 @@
     const hasImg = kids.some((k) => hasImageFill(k));
     const hasCaption = kids.some((k) => k.type === "TEXT");
     return hasImg && hasCaption;
+  }
+  function isTranslucent(node) {
+    const o = node.opacity;
+    if (typeof o === "number" && o < 1) return true;
+    const f = paints(node, "fills");
+    return !!f && f.some((p) => p.visible !== false && p.type !== "IMAGE" && typeof p.opacity === "number" && p.opacity < 1);
+  }
+  function coversParent(node, parentDims) {
+    if (!parentDims || parentDims.w <= 0 || parentDims.h <= 0) return false;
+    const d = dims(node);
+    if (!d) return false;
+    return d.w / parentDims.w >= 0.95 && d.h / parentDims.h >= 0.95;
+  }
+  function isOverlayLike(node, parentDims) {
+    if (node.type !== "FRAME" && node.type !== "RECTANGLE") return false;
+    if (!coversParent(node, parentDims)) return false;
+    if (!hasColorFill(node)) return false;
+    return isTranslucent(node);
+  }
+  function isInsetPanel(node, parentDims) {
+    if (!parentDims || parentDims.w <= 0 || parentDims.h <= 0) return false;
+    const d = dims(node);
+    return !!d && d.w / parentDims.w <= 0.9 && d.h / parentDims.h <= 0.9;
+  }
+  function isModalLike(node, pos, ctxScope) {
+    if (!isContainerType(node)) return false;
+    if (!("children" in node) || node.children.length === 0) return false;
+    if (!pos.afterOverlay && ctxScope !== "overlay") return false;
+    if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
+    return isInsetPanel(node, pos.parentDims);
+  }
+  function isInputLike(node, ctxScope) {
+    if (ctxScope === "field" && isInputBox(node)) return true;
+    if (node.type !== "FRAME") return false;
+    if (!hasVisibleStroke(node) || hasVisibleFill(node)) return false;
+    if (!hasDirectText(node)) return false;
+    const d = dims(node);
+    return !!d && d.h > 0 && d.h <= 72 && d.w >= d.h * 3;
+  }
+  function isProgressLike(node, kids) {
+    if (node.type !== "FRAME") return false;
+    if (kids.length < 1 || kids.length > 2) return false;
+    if (kids.some((k) => k.type === "TEXT")) return false;
+    const d = dims(node);
+    if (!d || d.h <= 0 || d.h > 24) return false;
+    if (d.w < d.h * 4) return false;
+    if (cornerRadiusOf(node) < d.h / 2 - 1) return false;
+    if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
+    return kids.some((k) => {
+      const kd = dims(k);
+      return !!kd && kd.w > 0 && kd.w <= d.w && kd.h <= d.h + 1 && hasColorFill(k);
+    });
+  }
+  function isBarFill(node) {
+    if (node.type !== "RECTANGLE" && node.type !== "FRAME") return false;
+    if ("children" in node && node.children.length > 0) return false;
+    if (hasImageFill(node) || !hasColorFill(node)) return false;
+    const d = dims(node);
+    return !!d && d.h > 0 && d.h <= 24 && d.w >= d.h * 2;
+  }
+  var THUMB_CONTEXTS = /* @__PURE__ */ new Set(["card", "article", "item", "list", "figure"]);
+  function isThumbnail(node, pos, ctxScope) {
+    if (!ctxScope || !THUMB_CONTEXTS.has(ctxScope)) return false;
+    if (node.type === "ELLIPSE") return false;
+    if (!hasImageFill(node)) return false;
+    const d = dims(node);
+    if (!d) return false;
+    if (Math.max(d.w, d.h) <= 96) return true;
+    const p = pos.parentDims;
+    return !!p && p.w > 0 && p.h > 0 && d.w * d.h / (p.w * p.h) <= 0.35;
+  }
+  function isStatusDot(node, pos) {
+    if (!pos.hasAvatarSibling) return false;
+    if (node.type !== "ELLIPSE" && node.type !== "RECTANGLE" && node.type !== "FRAME") return false;
+    if (hasImageFill(node) || !hasColorFill(node)) return false;
+    const d = dims(node);
+    if (!d || d.w <= 0 || d.h <= 0) return false;
+    if (Math.max(d.w, d.h) > 16) return false;
+    return node.type === "ELLIPSE" || cornerRadiusOf(node) >= Math.min(d.w, d.h) / 2 - 1;
   }
 
   // src/lib/exporters.ts
