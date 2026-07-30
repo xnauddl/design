@@ -195,22 +195,26 @@ const PRIMITIVE_NS = new Set([
   'elevation', 'shadow', 'z',
 ]);
 
-/** 토큰 경로 말단(leaf)이 역할 어휘일 때의 매핑(핵심 어휘). */
-const LEAF_ROLE: Record<string, Role> = {
-  background: 'background', bg: 'background', fill: 'background', surface: 'background',
-  swatch: 'swatch', sample: 'swatch',
-  border: 'border', stroke: 'border', outline: 'border',
-  icon: 'icon', glyph: 'icon',
-  divider: 'divider', separator: 'divider', rule: 'divider',
-  image: 'image', img: 'image', picture: 'image',
-  thumbnail: 'thumbnail', thumb: 'thumbnail',
-  avatar: 'avatar',
-  badge: 'badge', dot: 'badge',
-  status: 'status',
-  indicator: 'indicator', progress: 'progress',
-  overlay: 'overlay', scrim: 'overlay', backdrop: 'overlay',
-  input: 'input',
-};
+/**
+ * 토큰 경로 말단(leaf)이 역할 어휘일 때의 매핑(핵심 어휘).
+ * Map으로 둔다 — 키가 디자이너가 정하는 토큰 세그먼트라, 객체 리터럴이면
+ * `constructor` 같은 Object.prototype 키가 역할 대신 함수로 해석돼 리네임 전체가 죽는다.
+ */
+const LEAF_ROLE = new Map<string, Role>([
+  ['background', 'background'], ['bg', 'background'], ['fill', 'background'], ['surface', 'background'],
+  ['swatch', 'swatch'], ['sample', 'swatch'],
+  ['border', 'border'], ['stroke', 'border'], ['outline', 'border'],
+  ['icon', 'icon'], ['glyph', 'icon'],
+  ['divider', 'divider'], ['separator', 'divider'], ['rule', 'divider'],
+  ['image', 'image'], ['img', 'image'], ['picture', 'image'],
+  ['thumbnail', 'thumbnail'], ['thumb', 'thumbnail'],
+  ['avatar', 'avatar'],
+  ['badge', 'badge'], ['dot', 'badge'],
+  ['status', 'status'],
+  ['indicator', 'indicator'], ['progress', 'progress'],
+  ['overlay', 'overlay'], ['scrim', 'overlay'], ['backdrop', 'overlay'],
+  ['input', 'input'],
+]);
 
 export interface ParsedToken {
   /** 토큰 말단이 역할 어휘이면 그 역할(아니면 null). */
@@ -231,7 +235,7 @@ export function parseTokenName(tokenName: string): ParsedToken {
   if (!segs.length) return { roleLeaf: null, context: null, primitive: false };
   if (PRIMITIVE_NS.has(kebab(segs[0]))) return { roleLeaf: null, context: null, primitive: true };
 
-  const roleLeaf = LEAF_ROLE[kebab(segs[segs.length - 1])] ?? null;
+  const roleLeaf = LEAF_ROLE.get(kebab(segs[segs.length - 1])) ?? null;
   const ctxSegs = roleLeaf ? segs.slice(0, -1) : segs;
   const context = ctxSegs.length ? ctxSegs.map(kebab).filter(Boolean).join('-') : null;
   return { roleLeaf, context, primitive: false };

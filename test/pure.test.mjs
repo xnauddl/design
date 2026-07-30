@@ -236,6 +236,14 @@ test('pickScope — 깨끗한 맥락 1단계(숫자·단위·일반구조어 제
   assert.equal(pickScope(''), null);
 });
 
+test('parseTokenName — Object.prototype 키가 역할로 새지 않음(리네임 크래시 방지)', () => {
+  // 토큰 세그먼트는 디자이너가 정한다. 역할 맵이 객체 리터럴이면 'constructor'가
+  // 함수로 해석돼 kebab(role)에서 TypeError가 나고 리네임 실행 전체가 죽는다.
+  for (const key of ['constructor', 'toString', 'hasOwnProperty', 'valueOf']) {
+    assert.equal(parseTokenName(`brand/${key}`).roleLeaf, null, `'${key}'가 역할로 해석됨`);
+  }
+});
+
 test('역할 어휘 — 출력용/인식용 분리, 겹치지 않고 합집합이 ROLE_VOCAB', () => {
   const emitted = new Set(EMITTED_ROLES);
   const recognized = new Set(RECOGNIZED_ROLES);

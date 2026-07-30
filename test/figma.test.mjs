@@ -1099,15 +1099,27 @@ test('renameSelection — HTML 랜드마크 figure: 이미지+캡션 → figure(
   assert.equal(after.get('im'), 'figure-image'); // 맥락 figure 전파
 });
 
-test('renameSelection — HTML 랜드마크 aside: 가로 스플릿의 좁은 컬럼 → aside', async () => {
+test('renameSelection — HTML 랜드마크 aside: 페이지 가로 스플릿의 좁은 컬럼 → aside', async () => {
   installFigma();
   const side = { type: 'FRAME', id: 'side', name: 'Frame 2', width: 200, height: 600, children: [{ type: 'VECTOR', id: 'si', name: 'Vector 1' }] };
   const body = { type: 'FRAME', id: 'body', name: 'Frame 3', width: 800, height: 600, children: [{ type: 'VECTOR', id: 'bi', name: 'Vector 2' }] };
-  const page = { type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'HORIZONTAL', children: [side, body] };
+  const page = { type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'HORIZONTAL', width: 1000, height: 600, children: [side, body] };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('side'), 'aside'); // 200/800=0.25 ≤ 0.4 → aside
+  assert.equal(after.get('side'), 'aside'); // 부모 폭 대비 200/1000=0.2 ≤ 0.35 → aside
   assert.notEqual(after.get('body'), 'aside'); // 넓은 쪽은 aside 아님
+});
+
+test('renameSelection — aside: 납작한 툴바의 작은 자식은 aside 아님', async () => {
+  installFigma();
+  // 페이지 스플릿이 아니라 가로 툴바 — 로고·액션이 사이드바로 표기되면 안 된다.
+  const logo = { type: 'FRAME', id: 'logo', name: 'Frame 2', width: 120, height: 64, children: [{ type: 'VECTOR', id: 'li', name: 'Vector 1' }] };
+  const actions = { type: 'FRAME', id: 'act', name: 'Frame 3', width: 160, height: 64, children: [{ type: 'VECTOR', id: 'ai', name: 'Vector 2' }] };
+  const bar = { type: 'FRAME', id: 'bar', name: 'Top Bar', layoutMode: 'HORIZONTAL', width: 1440, height: 64, children: [logo, actions] };
+  const { changes } = await renameSelection([bar], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.notEqual(after.get('logo'), 'bar-aside');
+  assert.notEqual(after.get('act'), 'bar-aside');
 });
 
 test('renameSelection — HTML 랜드마크 section: 페이지 중간 블록(3개 초과) → section', async () => {
@@ -1280,18 +1292,20 @@ test('renameSelection — 입력: field 맥락의 입력 상자 → input', asyn
   assert.equal(after.get('box'), 'field-input'); // 예전엔 border로 떨어지던 자리
 });
 
-test('renameSelection — 입력: 테두리만 두른 넓은 텍스트 상자 → input(button 아님)', async () => {
+test('renameSelection — 입력: 맥락 없는 테두리형 상자는 button 유지(아웃라인 버튼 보호)', async () => {
   installFigma();
-  const input = {
-    type: 'FRAME', id: 'in', name: 'Frame 1', layoutMode: 'HORIZONTAL',
-    cornerRadius: 6, width: 280, height: 44,
+  // 채움 없는 넓은 테두리 상자는 텍스트 입력과 아웃라인 버튼이 구조적으로 같다.
+  // field 맥락이 없으면 button으로 둔다 — 세컨더리 버튼이 전부 input이 되는 쪽이 훨씬 나쁘다.
+  const cancel = {
+    type: 'FRAME', id: 'cancel', name: 'Frame 1', layoutMode: 'HORIZONTAL',
+    cornerRadius: 24, width: 320, height: 48,
     strokes: [{ type: 'SOLID', visible: true }], // 채움 없이 외곽선만
-    children: [{ type: 'TEXT', id: 'ph', name: 'Placeholder', characters: '검색어 입력' }],
+    children: [{ type: 'TEXT', id: 'ct', name: 'Label', characters: '취소' }],
   };
-  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [input] };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [cancel] };
   const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('in'), 'input'); // 라운드+텍스트지만 채움이 없으므로 button 아님
+  assert.equal(after.get('cancel'), 'button');
 });
 
 test('renameSelection — 입력: 채움이 있으면 여전히 button(오검출 방지)', async () => {
@@ -1359,7 +1373,7 @@ test('renameSelection — 오버레이/모달: 풀블리드 반투명 → overla
   assert.equal(after.get('panel'), 'desktop-modal'); // 오버레이 뒤 컨테이너 → card 아님
 });
 
-test('renameSelection — 모달: 반투명 배경 레이어가 깔린 페이지의 전폭 header는 modal 아님', async () => {
+test('renameSelection — 모달: 배경막 뒤라도 전폭 header는 modal 아님', async () => {
   installFigma();
   const scrim = {
     type: 'RECTANGLE', id: 'scrim', name: 'Rectangle 1', width: 1440, height: 900,
@@ -1370,11 +1384,43 @@ test('renameSelection — 모달: 반투명 배경 레이어가 깔린 페이지
     fills: [{ type: 'SOLID', visible: true }],
     children: [{ type: 'VECTOR', id: 'hi', name: 'Vector 1' }],
   };
-  const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [scrim, header] };
+  const panel = {
+    type: 'FRAME', id: 'panel', name: 'Frame 3', width: 480, height: 320,
+    cornerRadius: 16, fills: [{ type: 'SOLID', visible: true }],
+    children: [{ type: 'VECTOR', id: 'pi', name: 'Vector 2' }],
+  };
+  const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [scrim, header, panel] };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('scrim'), 'desktop-overlay');
+  assert.equal(after.get('panel'), 'desktop-modal'); // 인셋 패널만 modal
   assert.notEqual(after.get('hd'), 'desktop-modal'); // 전폭이라 패널 아님
+});
+
+test('renameSelection — 오버레이: 패널 없는 반투명 배경은 overlay 아님', async () => {
+  installFigma();
+  // 장식용 틴트 워시 — 위에 얹힌 패널이 없으면 배경막으로 보지 않는다.
+  const wash = {
+    type: 'RECTANGLE', id: 'wash', name: 'Rectangle 1', width: 1440, height: 900,
+    fills: [{ type: 'SOLID', visible: true, opacity: 0.6 }],
+  };
+  const hero = {
+    type: 'FRAME', id: 'hero', name: 'Frame 2', width: 1200, height: 700,
+    fills: [{ type: 'SOLID', visible: true }],
+    children: [{ type: 'VECTOR', id: 'hv', name: 'Vector 1' }],
+  };
+  const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [wash] };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
+  assert.equal(new Map(changes.map((c) => [c.id, c.after])).get('wash'), 'desktop-background');
+  // 그라데이션 워시는 패널이 뒤따라도 배경막이 아니다(단색 스크림만 인정).
+  const gradPage = {
+    type: 'FRAME', id: 'gp', name: 'Desktop', width: 1440, height: 900,
+    children: [{ ...wash, id: 'grad', fills: [{ type: 'GRADIENT_LINEAR', visible: true, opacity: 0.6 }] }, hero],
+  };
+  const r2 = await renameSelection([gradPage], { apply: true, maxDepth: 3 });
+  const after2 = new Map(r2.changes.map((c) => [c.id, c.after]));
+  assert.notEqual(after2.get('grad'), 'desktop-overlay');
+  assert.notEqual(after2.get('hero'), 'desktop-modal');
 });
 
 test('renameSelection — 오버레이: 불투명한 풀블리드 면은 overlay 아님', async () => {
@@ -1433,6 +1479,206 @@ test('renameSelection — 상태: 아바타 형제가 없으면 status 아님', 
   const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('dot'), 'background');
+});
+
+/* ---- 리뷰 회귀: 순회 범위 · 검출기 게이팅 (실제 치수를 가진 픽스처) ---- */
+
+test('renameSelection — 메인 컴포넌트·잠긴 서브트리는 통째로 건드리지 않음', async () => {
+  installFigma();
+  const inner = { type: 'VECTOR', id: 'ci', name: 'LeadingIcon' };
+  const comp = { type: 'COMPONENT', id: 'comp', name: 'Button/Primary', children: [inner] };
+  const lockedKid = { type: 'VECTOR', id: 'lk', name: 'Vector 1' };
+  const locked = { type: 'FRAME', id: 'lock', name: 'Locked Group', locked: true, children: [lockedKid] };
+  const root = { type: 'FRAME', id: 'root', name: 'card', children: [comp, locked] };
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const ids = new Set(changes.map((c) => c.id));
+  assert.equal(ids.has('ci'), false); // 메인 컴포넌트 내부 → 모든 인스턴스에 전파되므로 불가침
+  assert.equal(inner.name, 'LeadingIcon');
+  assert.equal(ids.has('lk'), false);
+  assert.equal(lockedKid.name, 'Vector 1');
+  assert.equal(nodes.some((n) => n.id === 'ci'), false); // 순회 자체를 하지 않음
+});
+
+test('renameSelection — 페이지 섹션 스택은 list가 아니라 랜드마크로', async () => {
+  installFigma();
+  const mk = (id, h) => ({
+    type: 'FRAME', id, name: `Frame ${id}`, width: 1440, height: h,
+    children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
+  });
+  const page = {
+    type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 3400, layoutMode: 'VERTICAL',
+    children: [mk('s1', 600), mk('s2', 700), mk('s3', 800), mk('s4', 650), mk('s5', 650)],
+  };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.has('page'), false); // 선택 루트 이름 보존(list로 덮이지 않음)
+  assert.equal(after.get('s1'), 'desktop-header'); // 보존된 루트가 맥락으로
+  assert.equal(after.get('s5'), 'desktop-footer');
+  assert.equal(after.get('s2'), 'desktop-section');
+});
+
+test('renameSelection — depth 1의 카드가 header/footer로 덮이지 않음', async () => {
+  installFigma();
+  const mkCard = (id, h) => ({
+    type: 'FRAME', id, name: `Frame ${id}`, width: 360, height: h,
+    cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
+    children: [
+      { type: 'TEXT', id: id + 't', name: 'Title', characters: 'x' },
+      { type: 'VECTOR', id: id + 'v', name: 'Vector' },
+    ],
+  });
+  const dash = {
+    type: 'FRAME', id: 'dash', name: 'Dashboard', layoutMode: 'VERTICAL', width: 360, height: 460,
+    children: [mkCard('c1', 120), mkCard('c2', 300)],
+  };
+  const { changes } = await renameSelection([dash], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('c1'), 'dashboard-card'); // 첫 자식이지만 header 아님
+  assert.equal(after.get('c2'), 'dashboard-card'); // 마지막 자식이지만 footer 아님
+});
+
+test('renameSelection — 넓은 커버 이미지가 있어도 카드는 field가 아니라 card', async () => {
+  installFigma();
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Product Card', layoutMode: 'VERTICAL', width: 320, height: 400,
+    cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
+    children: [
+      { type: 'TEXT', id: 'tt', name: 'Title', characters: '제품' },
+      { type: 'RECTANGLE', id: 'cover', name: 'Rectangle 1', width: 320, height: 160, fills: [{ type: 'IMAGE', visible: true }] },
+    ],
+  };
+  const { changes } = await renameSelection([card], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('card'), 'card'); // 2:1 커버 사진이 입력 상자로 오인되지 않음
+  assert.equal(after.get('cover'), 'card-image'); // 전면 커버 → image(thumbnail 아님)
+});
+
+test('renameSelection — 반복 필드 3개인 폼도 field/input 사슬 유지', async () => {
+  installFigma();
+  const mkField = (id) => ({
+    type: 'FRAME', id, name: `Field ${id}`, layoutMode: 'VERTICAL', width: 400, height: 70,
+    children: [
+      { type: 'TEXT', id: id + 'l', name: 'Label', characters: '라벨' },
+      { type: 'RECTANGLE', id: id + 'i', name: 'Rectangle', width: 400, height: 44, strokes: [{ type: 'SOLID', visible: true }] },
+    ],
+  });
+  const form = {
+    type: 'FRAME', id: 'form', name: 'Signup Form', layoutMode: 'VERTICAL', width: 400, height: 240,
+    children: [mkField('f1'), mkField('f2'), mkField('f3')],
+  };
+  const { changes } = await renameSelection([form], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.ok(after.get('f1').endsWith('field'), `field여야 하는데 ${after.get('f1')}`); // item 아님
+  assert.equal(after.get('f1i'), 'field-input'); // border 아님
+});
+
+test('renameSelection — 숨긴 힌트·에러 줄이 있어도 field 유지', async () => {
+  installFigma();
+  const field = {
+    type: 'FRAME', id: 'field', name: 'Email Field', layoutMode: 'VERTICAL', width: 240, height: 70,
+    children: [
+      { type: 'TEXT', id: 'lb', name: 'Label', characters: '이메일' },
+      { type: 'RECTANGLE', id: 'box', name: 'Rectangle 1', width: 240, height: 40, strokes: [{ type: 'SOLID', visible: true }] },
+      { type: 'TEXT', id: 'hint', name: 'Hint', characters: '힌트' },
+      { type: 'TEXT', id: 'err', name: 'Error', characters: '에러', visible: false },
+    ],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [field] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('field'), 'field');
+  assert.equal(after.get('box'), 'field-input');
+});
+
+test('renameSelection — 랜드마크 슬롯은 숨김·TEXT 형제를 세지 않음', async () => {
+  installFigma();
+  const mk = (id) => ({
+    type: 'FRAME', id, name: `Frame ${id}`, width: 1000, height: 200,
+    children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
+  });
+  const ghost = { type: 'FRAME', id: 'ghost', name: 'Frame G', visible: false, width: 1000, height: 10, children: [] };
+  const page = {
+    type: 'FRAME', id: 'page', name: 'Desktop', width: 1000, height: 900, layoutMode: 'VERTICAL',
+    children: [ghost, mk('hd'), mk('mn'), mk('ft'), { type: 'TEXT', id: 'cp', name: 'c', characters: '© 2026' }],
+  };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('hd'), 'desktop-header'); // 유령 프레임이 header 자리를 뺏지 않음
+  assert.equal(after.get('mn'), 'desktop-main');
+  assert.equal(after.get('ft'), 'desktop-footer'); // 뒤의 TEXT가 footer 자리를 삼키지 않음
+});
+
+test('renameSelection — 카드 안 통계 행은 nav가 아님', async () => {
+  installFigma();
+  const col = (id, t) => ({
+    type: 'FRAME', id, name: `Frame ${id}`, width: 80, height: 48,
+    children: [{ type: 'TEXT', id: id + 't', name: 'n', characters: t }],
+  });
+  const row = {
+    type: 'FRAME', id: 'row', name: 'Frame R', layoutMode: 'HORIZONTAL', width: 300, height: 48,
+    children: [col('a', '12'), col('b', '34'), col('c', '56')],
+  };
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Frame C', width: 320, height: 200, cornerRadius: 12,
+    fills: [{ type: 'SOLID', visible: true }],
+    children: [row, { type: 'TEXT', id: 'ct', name: 'Title', characters: 'x' }],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Desktop', width: 1440, height: 900, children: [card] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('card'), 'desktop-card');
+  assert.notEqual(after.get('row'), 'card-nav'); // depth 2의 행은 페이지 랜드마크가 아님
+});
+
+test('renameSelection — nav로 판정된 행의 자식은 item이 아님', async () => {
+  installFigma();
+  const link = (id) => ({
+    type: 'FRAME', id, name: `Frame ${id}`, width: 80, height: 32,
+    children: [{ type: 'TEXT', id: id + 't', name: 'l', characters: '링크' }],
+  });
+  const nav = {
+    type: 'FRAME', id: 'nav', name: 'Frame N', layoutMode: 'HORIZONTAL', width: 600, height: 48,
+    children: [link('l1'), link('l2'), link('l3')],
+  };
+  const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [nav] };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('nav'), 'desktop-nav');
+  assert.notEqual(after.get('l1'), 'nav-item'); // 부모에게 부여된 역할이 list가 아니므로 item 아님
+});
+
+test('renameSelection — 썸네일 판정은 통과 래퍼가 아니라 카드 기준으로', async () => {
+  installFigma();
+  const img = { type: 'RECTANGLE', id: 'img', name: 'Rectangle 1', width: 200, height: 150, fills: [{ type: 'IMAGE', visible: true }] };
+  const hug = { type: 'FRAME', id: 'hug', name: 'Frame 8', width: 200, height: 150, children: [img] }; // 이미지를 hug하는 래퍼
+  const card = {
+    type: 'FRAME', id: 'card', name: 'Frame 1', width: 800, height: 600, cornerRadius: 12,
+    fills: [{ type: 'SOLID', visible: true }],
+    children: [hug, { type: 'TEXT', id: 'tt', name: 'Title', characters: 'x' }],
+  };
+  const { changes } = await renameSelection([card], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  // 래퍼(200x150) 대비면 면적비 1.0이라 thumbnail이 안 되지만, 카드(800x600) 대비면 6% → thumbnail.
+  assert.equal(after.get('img'), 'card-thumbnail');
+});
+
+test('renameSelection — 장식 액센트 바·프레임 구분선은 progress 아님', async () => {
+  installFigma();
+  const accent = {
+    type: 'FRAME', id: 'acc', name: 'Frame 1', width: 40, height: 4, cornerRadius: 2,
+    fills: [{ type: 'SOLID', visible: true }],
+    children: [{ type: 'RECTANGLE', id: 'accf', name: 'Rectangle 1', width: 40, height: 4, fills: [{ type: 'SOLID', visible: true }] }],
+  };
+  const rule = {
+    type: 'FRAME', id: 'rule', name: 'Frame 2', width: 400, height: 2, cornerRadius: 0,
+    fills: [{ type: 'SOLID', visible: true }],
+    children: [{ type: 'RECTANGLE', id: 'rulef', name: 'Rectangle 2', width: 400, height: 2, fills: [{ type: 'SOLID', visible: true }] }],
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Desktop', width: 1440, height: 900, children: [accent, rule] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.notEqual(after.get('acc'), 'desktop-progress'); // 채움 바가 트랙과 같은 폭 → 진행 표시 아님
+  assert.notEqual(after.get('rule'), 'desktop-progress'); // 2px 트랙은 알약 검사가 공허해짐
 });
 
 test('renameSelection — 출력한 역할은 모두 어휘(ROLE_VOCAB) 안에 있다', async () => {
