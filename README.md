@@ -42,7 +42,7 @@
 - **선택 루트 보존**(#7b): 선택의 **최상위(depth 0) 컨테이너**(프레임 등)는 **기본명이어도 항상 보존**하고 자식의 맥락으로만 쓴다(선택한 화면/프레임 이름을 건드리지 않음). **인스턴스는 서브트리까지 통째 스킵**(내부는 메인 컴포넌트 소유).
 - 정돈된 역할명은 기본명이 아니므로 재실행 시 보존된다 → **멱등**.
 
-### 컴포넌트 등록 / 베리언트 분류 (Phase 3 · 구현됨, Pro)
+### 컴포넌트 등록 / 베리언트 분류 (Phase 3 · 구현됨, Paid)
 선택 레이어를 **메인 컴포넌트로 등록**하고, 같은 베이스 이름을 공유하는 컴포넌트들을 **베리언트 세트(ComponentSet)** 로 묶어 분류한다. 토큰/리네임과 동일하게 **kebab·멱등** 규칙을 따르며, 구조/이름만 바꾸고 토큰 바인딩은 건드리지 않는다.
 
 - **컴포넌트 등록(registration)**
@@ -63,8 +63,8 @@
   - 재실행 시 기존 ComponentSet/속성을 이름 키로 재사용(중복 결합 방지).
   - 텍스트·토큰 바인딩 불변(네이밍/구조만 변경). 모호한 속성 추론은 **미리보기에서 사용자가 교정**.
 - **Phase 4**:
-  - **누락 조합 자동 생성 ✅ (구현됨, Pro)** — 선택한 베리언트 세트의 빠진 조합을 기존 변형 클론+`prop=value` 리네임으로 생성(`missingVariants` 순수 계산 + `code.ts` 적용, `GENERATE_MISSING_VARIANTS`).
-  - **컴포넌트 속성(Boolean/Text/Instance-swap) 노출 ✅ (구현됨, Pro)** — 레이어 규칙(`inferComponentProperties`)으로 속성 계획 → `addComponentProperty` + 참조 연결(`EXPOSE_PROPERTIES`). TEXT→characters, INSTANCE→mainComponent, `이름?`→visible(Boolean).
+  - **누락 조합 자동 생성 ✅ (구현됨, Paid)** — 선택한 베리언트 세트의 빠진 조합을 기존 변형 클론+`prop=value` 리네임으로 생성(`missingVariants` 순수 계산 + `code.ts` 적용, `GENERATE_MISSING_VARIANTS`).
+  - **컴포넌트 속성(Boolean/Text/Instance-swap) 노출 ✅ (구현됨, Paid)** — 레이어 규칙(`inferComponentProperties`)으로 속성 계획 → `addComponentProperty` + 참조 연결. 별도 메시지 없이 `REGISTER_COMPONENTS` 등록 시 자동 노출(`exposeProperties`). TEXT→characters, INSTANCE→mainComponent, `이름?`→visible(Boolean).
   - **라이브러리 발행** — Figma Plugin API에 발행 기능이 없어 **수동(또는 조직 정책)**, 코드 비대상.
 
 ## 개발
@@ -102,11 +102,11 @@ src/
     textStyles.ts 텍스트 스타일 순수 로직(시그니처 군집·크기 랭킹 명명·기본 램프) — Phase C
     bind.ts     resolved 값 매칭 → 변수 바인딩
     rename.ts   boundVariables·역할 추론 → 리네임
-    entitlements.ts 요금제 티어·기능 게이팅·사용량 한도(M1) — 순수
-    license.ts   라이선스 캐시 평가·grace·검증 응답 파싱(M2) — 순수
-    licenseToken.ts 서명 토큰(JWT) 디코드·클레임·서명검증 통합(M2.1) — 순수
-    licenseConfig.ts 검증 서버 URL·공개키·발급자(자리표시) — UI/code 공용 설정
-    presets.ts   팀 공유 프리셋 직렬화·검증·매핑(M3, Team) — 순수
+    entitlements.ts 요금제 티어(Free/Paid)·기능 게이팅 — 순수
+    license.ts   라이선스 캐시 평가·grace·검증 응답 파싱 — 순수
+    licenseToken.ts 서명 토큰(JWT) 디코드·클레임·서명검증 통합 — 순수
+    licenseConfig.ts 검증 서버 URL·공개키·구매/관리 링크(자리표시) — UI/code 공용 설정
+    presets.ts   공유 프리셋 직렬화·검증·매핑(Paid) — 순수
     exporters.ts 변수 → W3C 토큰 JSON · CSS 변수 내보내기 — 순수
     components.ts 컴포넌트 등록 + 베리언트 분류 순수 파서(속성=값 추론·그룹화·빈 조합) — 적용은 code.ts
     pure.ts        순수 로직 배럴(→ dist/pure.mjs)
@@ -141,15 +141,15 @@ spacing/radius/size는 **센터(md) 티셔츠 스케일**(`spacing/sm·md·lg`),
 (스와치·hue 이름·역할 입력), 추출 색은 `nameColorsByHue`로 **hue-Global 이름**(`color/blue/500`, 같은
 hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정해 ‘반영’하면 시맨틱 매핑에 채워집니다.
 
-## 텍스트 스타일 (UI 2.6단계 · Phase C, Pro)
+## 텍스트 스타일 (UI 2.6단계 · Phase C, Paid)
 
 화면의 **실제 텍스트를 인식**해 타이포 조합을 **시맨틱 변수로 등록**하고, 이를 **명명된 텍스트 스타일**로 등록·바인딩하는 end-to-end 파이프라인입니다(스타일 → 시맨틱 → Global 3계층 완성).
 
-- **스캔**(`SCAN_TEXT_STYLES`): 선택 트리의 TEXT 노드에서 `{fontSize, lineHeight(px), letterSpacing, family, style}` 시그니처를 수집(`scanTextStyles`). 부분 서식(mixed) 텍스트는 스킵+경고.
-- **군집·명명**(순수 `textStyles.ts`): 동일 시그니처를 묶고(`clusterTextStyles`), **fontSize 내림차순**으로 `display·h1·h2·h3·title·body·caption·overline` 역할명을 배정(`nameTextStyles`, 초과분 `text-N`). 선택이 없으면 `DEFAULT_TYPE_RAMP` 폴백.
-- **등록**(`CREATE_TEXT_STYLES`, `createSemanticTextStyles`): 각 스타일의 size·lineHeight로 **Global 원시 + Semantic 별칭**(`font-size/{역할}`·`line-height/{역할}`)을 보장(`createTokens`·`createSemanticAliases` 재사용 — 구 Phase B 흡수)한 뒤, `createTextStyle`로 스타일을 upsert하고 `setBoundVariable('fontSize'|'lineHeight', …)`로 시맨틱 변수에 바인딩. 폰트 로드 실패 시 `Regular` 폴백+보고.
-- **적용**(옵션, 기본 OFF): 켜면 시그니처가 일치하는 원본 텍스트에 `setTextStyleIdAsync`로 스타일을 연결 → 토큰 값 변경이 화면에 일괄 반영.
-- UI "2.6 · 텍스트 스타일" 카드: **‘선택에서 스캔’ → 구조 표(이름·크기·행간·스타일) 편집 → ‘원본에 적용’ 체크 → ‘텍스트 스타일 등록’**. 순수 로직(군집·명명·램프)은 `node --test`로 검증, figma 호출만 `variables.ts`. **Pro 게이팅**(비-Pro는 `PREMIUM_REQUIRED`; 스캔은 무게이팅 미리보기).
+- **스캔**(`SCAN_TEXT_STYLES`): 선택 트리의 **보이는** TEXT 노드에서 `{fontSize, lineHeight(px), letterSpacing, family, style}` 시그니처를 수집(`scanTextStyles`). 숨김(`visible=false`)·부분 서식(mixed)은 스킵(+경고). PERCENT 자간·행간은 px 환산.
+- **군집·명명**(순수 `textStyles.ts`): 동일 시그니처를 묶고(`clusterTextStyles`), **fontSize 내림차순**으로 `display·h1·…·overline` 배정(`nameTextStyles`, 같은 크기는 `base/weight`·`base/family-weight` 분기). **기존 스타일 앵커**: 노드 `textStyleId` 또는 시그니처가 로컬 스타일과 정확히 1개 일치하면 기존 이름 유지 + `boundStyleId`(재스캔=rename, 타프레임 중복 방지). 선택이 없으면 `DEFAULT_TYPE_RAMP` 폴백.
+- **등록**(`CREATE_TEXT_STYLES`, `createSemanticTextStyles`): size·lineHeight·letterSpacing → **Global + Semantic**(`font-size|line-height|letter-spacing/{역할}`) 보장 후 텍스트 스타일 upsert·시맨틱 바인딩. `boundStyleId`가 있으면 **이름만 rename**(폰트·크기·행간·자간 보존). 폰트 로드 실패 시 `Regular` 폴백+보고.
+- **적용**: (a) 등록 시 옵션 — 전체 시그니처(패밀리·크기·굵기·행간·자간) 일치 노드에 연결. (b) **기존 스타일 적용만**(`APPLY_TEXT_STYLES`) — 생성 없이 시그니처 매칭 바인딩(미등록·모호는 보고).
+- UI: **‘선택에서 스캔’** → 표(이름만 편집·스캔값 읽기 전용, 신규=앰버/등록됨=파랑) → **‘텍스트 스타일 등록’** (+화면 적용 체크) · **‘기존 스타일 적용만’**. 순수 로직은 `node --test`, figma 호출은 `variables.ts`. **Paid 게이팅**(스캔은 무게이팅 미리보기).
 
 ## 코드 내보내기 (Export)
 
@@ -159,20 +159,20 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 - **line-height·letter-spacing**(#16): `Variable.description`의 원본 단위(`160%`·`0.02em`)를 우선 출력(CSS 네이티브; W3C는 비표준 문자열), 없으면 px. 별도 `-px` 스냅샷·옵션은 폐기.
 - **fontWeight/italic**: italic은 굵기가 아니라 `font-style` → `splitWeightStyle`로 분리해 `font-weight` + (italic 시) `font-style: italic`/비표준 `fontStyle` 토큰 동반.
 - **HUG/FILL 비대상**: 레이어 오토레이아웃 sizing은 변수가 아니라 export 대상이 아니다(대응 토큰 없음).
-- UI "내보내기(코드)" 카드에서 형식·폰트단위 선택 → 결과 복사 또는 `tokens.json`/`tokens.css` 다운로드. 게이팅: 현재 Free.
+- UI "내보내기(코드)" 카드에서 형식·폰트단위 선택 → 결과 복사 또는 `tokens.json`/`tokens.css` 다운로드. 게이팅: **Free**(리드젠).
 
-## 컴포넌트 등록 / 베리언트 분류 (UI 5단계 · Phase 3 구현됨, Pro)
+## 컴포넌트 등록 / 베리언트 분류 (UI 5단계 · Phase 3 구현됨, Paid)
 
 선택한 프레임을 **메인 컴포넌트로 등록**(`REGISTER_COMPONENTS`)하고, 같은 베이스 이름(예: `button/primary`,
 `button/secondary`)을 공유하는 컴포넌트들을 **베리언트 세트**로 분류(`CLASSIFY_VARIANTS`)합니다. 속성 추론
 (이름 → `속성=값`, 어휘 state/size/type)·그룹화·빈 조합 산출은 **순수 파서**(`components.ts`)로 `node --test`
 검증, 실제 `createComponentFromNode`·`combineAsVariants`·자식 이름(`prop=value`) 적용만 `code.ts`에서
 수행합니다(순수/부수효과 분리). 결과는 `COMPONENTS_RESULT`/`VARIANTS_RESULT`(생성 수·빈 조합·단일)로 보고.
-이미 컴포넌트/세트 멤버면 건너뜀(멱등), `INSTANCE`·`TEXT`·잠금 제외. **Pro 게이팅**(비-Pro는 `PREMIUM_REQUIRED`).
+이미 컴포넌트/세트 멤버면 건너뜀(멱등), `INSTANCE`·`TEXT`·잠금 제외. **Paid 게이팅**(비-Paid는 `PREMIUM_REQUIRED`).
 
-**Phase 4 — 누락 조합 자동 생성**: 선택한 베리언트 세트의 **빠진 속성 조합**(`missingVariants` 순수 계산)을 기존 변형을 클론해 `prop=value`로 이름 지정하여 생성(`GENERATE_MISSING_VARIANTS`, Pro). 분류·생성 후 세트는 **속성 기반 2D 그리드**(`variantGrid`: 첫 속성=행, 둘째=열)로 정렬되고 자식에 맞게 **리사이즈**된다. 라이브러리 발행은 Plugin API 미지원이라 수동.
+**Phase 4 — 누락 조합 자동 생성**: 선택한 베리언트 세트의 **빠진 속성 조합**(`missingVariants` 순수 계산)을 기존 변형을 클론해 `prop=value`로 이름 지정하여 생성(`GENERATE_MISSING_VARIANTS`, Paid). 분류·생성 후 세트는 **속성 기반 2D 그리드**(`variantGrid`: 첫 속성=행, 둘째=열)로 정렬되고 자식에 맞게 **리사이즈**된다. 라이브러리 발행은 Plugin API 미지원이라 수동.
 
-**Phase 4.1 — 컴포넌트 속성 노출**: 선택한 컴포넌트 또는 **베리언트 세트**의 자식 레이어를 규칙으로 분석(`inferComponentProperties`)해 **컴포넌트 속성**을 만들고 연결(`EXPOSE_PROPERTIES`, Pro). 세트는 대표 변형으로 속성을 계획해 **세트에 추가**하고 모든 변형의 동명 레이어에 참조를 연결한다. TEXT 레이어→TEXT(characters), INSTANCE→INSTANCE_SWAP(mainComponent, 기본값은 발행 컴포넌트 key 또는 로컬 id), 이름이 `?`로 끝나는 레이어→BOOLEAN(visible). 실패 항목은 건너뜀.
+**Phase 4.1 — 컴포넌트 속성 노출**: 선택한 컴포넌트 또는 **베리언트 세트**의 자식 레이어를 규칙으로 분석(`inferComponentProperties`)해 **컴포넌트 속성**을 만들고 연결한다(Paid). 별도 메시지가 아니라 **`REGISTER_COMPONENTS` 등록 시 자동 노출**(`exposeProperties`). 세트는 대표 변형으로 속성을 계획해 **세트에 추가**하고 모든 변형의 동명 레이어에 참조를 연결한다. TEXT 레이어→TEXT(characters), INSTANCE→INSTANCE_SWAP(mainComponent, 기본값은 발행 컴포넌트 key 또는 로컬 id), 이름이 `?`로 끝나는 레이어→BOOLEAN(visible). 실패 항목은 건너뜀.
 
 빌드 메모: Figma UI는 단일 HTML만 로드(외부 `<script src>` 불가)하므로, `ui.ts` 번들 결과를
 `ui.html`의 인라인 `<script>`로 주입합니다(`build.mjs`).
@@ -182,9 +182,9 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 단계가 늘어 길어진 단일 스크롤을 **탭 그룹**으로 재편한다.
 
 - **구조 재편 ✅ (v2 4탭)**: **`시작`(시스템화 마법사) / `만들기`(팔레트·추출·생성·시맨틱) / `적용`(바인딩·리네임·대비·컴포넌트) / `관리`(내보내기·요금제·프리셋)**. 상단 sticky 탭 바, 첫 화면은 `시작`. 창은 우하단 핸들로 리사이즈(크기 기억).
-- **통합 게이트 ✅ (v2 #11·#12)**: **전제 미충족 가드** — Global 변수가 없으면 시맨틱 매핑, 바인딩 가능 변수가 없으면 바인딩 카드를 **비활성+안내(+‘토큰 생성으로’ 바로가기)** 로 가드(조용히 0건 방지). 유료 잠금(Pro/Team)과 함께 `updateGates` 한 메커니즘으로 처리(`PREREQ_STATE`로 상태 동기화).
+- **통합 게이트 ✅ (v2 #11·#12)**: **전제 미충족 가드** — Global 변수가 없으면 시맨틱 매핑, 바인딩 가능 변수가 없으면 바인딩 카드를 **비활성+안내(+‘토큰 생성으로’ 바로가기)** 로 가드(조용히 0건 방지). 유료 잠금(Paid)과 함께 `updateGates` 한 메커니즘으로 처리(`PREREQ_STATE`로 상태 동기화).
 - **진행 안내 ✅ (의존관계 시각화)**: 시작 탭에 의존 파이프라인(토큰 생성→시맨틱 매핑→바인딩)의 **단계 상태**(완료/준비됨/전제 미충족)를 표시하고, 클릭하면 해당 단계로 이동합니다. 상태 로직은 순수(`pipeline.ts`)라 `node --test`로 검증. 리네임·대비·컴포넌트는 독립이라 별도 표기.
-- **유료 게이팅 노출 ✅(부분)**: 컴포넌트(Pro)·프리셋(Team) 카드에 🔒 잠금·비활성 표시. (토큰 생성·시맨틱 등 Paid 배지는 2티어 전환 PR #30과 함께.)
+- **유료 게이팅 노출 ✅**: 토큰 생성·시맨틱·컴포넌트·프리셋 등 유료(Paid) 카드에 🔒 잠금·비활성 표시(미리보기·탐색은 무료).
 - **반응형·접근성**(부분): 탭 `role=tab/tabpanel`·`aria-selected`. 키보드 화살표 이동·대비는 추후.
 
 > 비고: 기능 동작은 그대로 두고 **메뉴/레이아웃 표현만** 개편. `ui.html`/`ui.ts`만 변경(메시지·로직 불변).
@@ -207,78 +207,67 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 
 > 비고: 동작 규칙(3계층·멱등·스코프)은 유지하고 **경험 계층**만 개선했다.
 
-## 유료화 / 상용 전환 (추후 · 로드맵)
+## 유료화 / 상용 전환
 
-오픈 코어 + **프리미엄(Freemium)** 모델. **구독(월/연)** 과 **외부 라이선스 키**(웹 결제 → 키 발급 → 플러그인이 서버 검증)를 기준으로 한다. 무료 사용자의 기존 동작은 **절대 막지 않으며**, 유료 기능·한도 초과분은 **미리보기·계산은 허용하고 적용(쓰기)만 잠금**한다.
+오픈 코어 + **프리미엄(Freemium)** 모델. **Free / Paid 2단계**, **연 구독**, **외부 결제(LemonSqueezy)** + **무료 서버리스 검증(Cloudflare Workers)** 으로 한다. 무료 사용자의 기존 동작은 **절대 막지 않으며**, 유료 기능은 **미리보기·탐색은 허용하고 생성(쓰기)만 잠금**한다. (결정 배경·대안 비교는 `ROADMAP.md`)
 
-### 유료화 기준 (게이팅 원칙)
-무료↔유료를 가르는 명시적 규칙. (a)+(b) 조합을 1차 기준으로 한다.
+### Free / Paid 경계 (기능 기반 게이팅 — 회당 횟수 제한 없음)
+탐색·체험은 무료, **실제 디자인 시스템 생성은 Paid**.
 
-- **(a) 사용량 한도** — 핵심 기능은 무료지만 **1회 실행 규모에 한도**를 둔다. 초과분은 적용하지 않고 업그레이드 안내(비파괴적).
-- **(b) 기능 고도화** — 자동화·AI·발행·멀티모드·컴포넌트/베리언트 등 **고급 기능은 Pro 이상**.
-- **(c) 협업** — 공유 프리셋·시트·변경 이력 등 팀 기능은 **Team**.
-- **(d) 비파괴 게이팅** — 한도 초과/유료 기능도 **미리보기·계산은 허용**, **적용(쓰기)만 잠금**.
+| 기능 | Free (무제한) | Paid |
+|---|:---:|:---:|
+| 색상 팔레트 생성 · 레이어 리네임 · 바인딩(기존 변수) | ✅ | ✅ |
+| 토큰 추출/미리보기 · 명도 대비 점검 · 코드 내보내기(W3C JSON / CSS) | ✅ | ✅ |
+| **토큰(3계층 변수) 생성** | — | ✅ |
+| **시맨틱 매핑** | — | ✅ |
+| **컴포넌트 등록 · 베리언트(Phase 3/4/4.1)** | — | ✅ |
+| **공유 프리셋 · 변경 이력** | — | ✅ |
 
-### 사용량 한도 (Free · 자리표시)
-정확 수치는 **TBD**(아래는 예시). **회당 규모 제한**을 1차 기준으로 한다(일일 횟수 제한 아님).
+> 의존성: Free '바인딩'은 **기존 변수**에 연결만 가능하다. 빈 파일에서 새 변수 시스템을 만들려면 '토큰 생성'(Paid)이 필요 — 자연스러운 업셀 지점.
 
-| 항목 | Free 한도(예시) | Pro/Team |
-|---|---|---|
-| 1회 선택 처리 노드 | 50개 | 무제한 |
-| 1회 토큰 생성/갱신 | 100개 | 무제한 |
-| 1회 바인딩 | 200건 | 무제한 |
-| 팔레트 계열 | 기본(primary·중립·상태) | 보조색·하모니·다축 포함 |
+### 가격
+- **Paid — 연 $39**(≈ $3.25/월). LemonSqueezy 수수료 5%+$0.50 → 실수령 ~$36.5/건(~94%). (월 옵션·런치 프로모는 추후)
 
-한도 초과 시: 계산/미리보기는 보여주되 **적용은 한도까지만** + `PREMIUM_REQUIRED` 안내(예: "n개 중 m개만 적용됨 · 업그레이드").
+### 결제 · 계정 관리 (LemonSqueezy 위임 — 커스텀 계정 0)
+- **결제**: LemonSqueezy(MoR=Merchant of Record). 전 세계 VAT/세금·인보이스·환불을 대행 → **별도 계정/DB/로그인 미도입**.
+- **고객 셀프서비스**: LS Customer Portal(매직링크) — 구독 취소/재개·결제수단·인보이스·키 조회. 플러그인은 "구독하기"/"구독 관리" 링크만 노출.
+- **기기 관리**: LS 라이선스 **activation limit=1**(1대) + instances(activate/validate/deactivate). 기기 교체 시 기존 instance 해제 후 활성화(친절 안내).
+- **식별**: 로그인 없는 **키 기반**. 키는 `figma.clientStorage`(기기별) 보관.
 
-### 티어 매트릭스
+### 검증 아키텍처 (방식 C — 무료 서버리스)
+- **Cloudflare Worker**(`workers/verify`, 무료 티어): `POST /verify { key, instanceName? }` → LemonSqueezy `activate`/`validate` → 활성/만료 확인 → **ES256 서명 JWT(`{ token }`)** 반환. 개인키·LS 설정은 Worker secret, **공개키만 플러그인 임베드**. 고정비 ~$0.
+- **플러그인**: 검증(`fetch` + 서명 검증 `crypto.subtle`)은 **UI 아이프레임**에서 수행(`verifyAndReport`)하고 결과(`LICENSE_VERIFIED`)만 `code.ts`로 보고. `code.ts`는 **캐시·grace·게이팅**만 담당.
+- **캐시·오프라인**: `LicenseCache = { key, tier, expiresAt, lastVerified }`를 `clientStorage`에 보관. `evaluateLicense`는 만료 전이면 적용, 오프라인이면 **grace(14일)** 유지, grace 초과 시 free 강등. 시작 시 stale 캐시는 `REQUEST_VERIFY`로 재검증.
+- **위변조 방지**: `verifyLicenseToken`이 **서명 + 클레임(exp·iss·aud·tier)** 검사, `alg=none` 거부. `{ valid,tier,expiresAt }` 평문 응답은 개발/하위호환 경로.
+- **자리표시**: `licenseConfig.ts`의 `VERIFY_URL`·`LICENSE_PUBLIC_JWK`·`PURCHASE_URL`·`PORTAL_URL`, `manifest.json allowedDomains` → 배포 시 실제 값으로 교체. 키쌍 생성: `node scripts/gen-license-keys.mjs`. Worker 셋업: `workers/verify/README.md`.
 
-| 기능 | Free | Pro | Team |
-|---|:---:|:---:|:---:|
-| 추출 · 토큰 생성(3계층) · 시맨틱 매핑 · 바인딩 · 리네임 | ✅ (한도) | ✅ 무제한 | ✅ 무제한 |
-| 팔레트 생성(기본) | ✅ | ✅ | ✅ |
-| 컴포넌트 등록 · 베리언트 분류(Phase 3) | — | ✅ | ✅ |
-| 라이브러리 발행 · 멀티모드/테마 · 누락조합 자동생성 · AI 네이밍 | — | ✅ | ✅ |
-| 공유 프리셋/네이밍 규칙 · 변경 이력 · 시트 관리 · 우선 지원 | — | — | ✅ |
+### 엔타이틀먼트 모델
+- `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`presets`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
+- `code.ts`: `requirePaid(feature, message)` 단일 게이트. 토큰 생성(미리보기 제외)·시맨틱·컴포넌트·프리셋/이력을 게이팅. 바인딩·리네임·팔레트·내보내기·미리보기는 무게이팅.
+- 메시지(`src/shared/messages.ts`): `CodeToUi.LICENSE_STATUS { tier, unlimited, source, … }` · `PREMIUM_REQUIRED { feature, message }`.
+
+### 관리자 / 개발·테스트 전권 + 백도어 차단
+- **개발 빌드 전용 티어 토글**: `__DEV__`(esbuild define, `npm run watch`/`node build.mjs --dev`에서 true) 일 때만 `SET_LICENSE` 개발용 강제 티어(`paid`)가 동작 → 결제 없이 전권 테스트.
+- **배포 빌드**(`npm run build`)에선 `__DEV__=false` → `SET_LICENSE` 핸들러와 UI 토글이 **컴파일 단계에서 비활성**(페이월 우회 백도어 차단).
+- **실제 검증 경로 테스트**: LemonSqueezy **test mode** + sandbox 키로 Worker `/verify`. (선택) Worker `ADMIN_KEYS` 오너 allowlist 키 → 장기 paid 토큰(스모크 테스트용).
 
 ### 가격 (자리표시)
-- **Pro** — **$8–12/월**(연 결제 할인, 예: 2개월분). 금액 **TBD**.
-- **Team** — **시트(seat)당** 과금. 금액 **TBD**.
-
-### 라이선스 아키텍처 (외부 키) — M2 구현(서버 미배포)
-- 웹 결제(결제 제공자: Gumroad/LemonSqueezy/Paddle 또는 자체 서버) → **라이선스 키 발급** → 플러그인 설정에 키 입력 → `code.ts`가 **검증 서버**(`VERIFY_URL` 자리표시)에 `fetch` 요청 → 엔타이틀먼트 응답.
-- 검증 서버 책임: 키 진위·구독 상태·만료·시트 확인. **디자인 데이터 미전송**(키 + pluginId만).
-- `figma.clientStorage` 캐시 `LicenseCache = { key, tier, expiresAt, lastVerified }`. 평가(`evaluateLicense`)는 만료 전이면 적용, 오프라인이면 **grace(기본 14일)** 동안 유지, grace 초과 시 강등(free). 오래된 캐시는 시작 시 백그라운드 재검증.
-- **위변조 방지(M2.1 구현)**: 서버가 비대칭 서명(ES256/EdDSA) **JWT**를 발급, 플러그인이 공개키로 검증. 검증 응답이 `{ token }`이면 `verifyLicenseToken`으로 **서명+클레임(exp·iss·aud·tier)** 검사 후 신뢰(`alg=none` 거부). `{ valid,tier,expiresAt }` 평문은 개발/하위호환 경로.
-- **검증 위치(M2.2)**: 네트워크 `fetch` + 서명(`crypto.subtle`) 검증은 **UI 아이프레임**에서 수행(WebCrypto 가용). UI가 결과(`LICENSE_VERIFIED`)만 `code.ts`로 보고하고, `code.ts`는 **캐시·grace·게이팅**만 담당(부수효과 분리). 시작 시 캐시가 오래됐으면 `code → UI`로 `REQUEST_VERIFY`(재검증 요청).
-- 순수 로직(`license.ts` 캐시 평가, `licenseToken.ts` 디코드·클레임)은 `node --test`로 검증. `VERIFY_URL`·공개키(`licenseConfig.ts`)·`allowedDomains`는 자리표시(배포 시 교체).
-
-### 엔타이틀먼트 모델 (M1 구현됨 · 결제는 추후)
-- 기능 플래그 집합 + 단일 게이트 `hasEntitlement(tier, feature)` — `src/lib/entitlements.ts`(순수, 테스트됨).
-- **사용량 한도 집행**: Free일 때 `code.ts`가 `createTokens`는 입력 토큰을 한도까지 슬라이스, `bindSelection`은 노드/바인딩 예산으로 비파괴 중단 → 결과 `limited` 플래그 + 업그레이드 안내.
-- 메시지(`src/shared/messages.ts`): `UiToCode`에 `GET_LICENSE` · `SET_LICENSE`(M1 개발용 티어 토글); `CodeToUi`에 `LICENSE_STATUS` · `PREMIUM_REQUIRED`. 티어는 `figma.clientStorage`에 저장.
-- UI: "요금제 / 라이선스 (개발용)" 카드에서 Free/Pro/Team 토글로 한도 동작을 검증할 수 있다(결제 연동은 M2).
-
-### 게이팅 표면 (UI · UI 개편 로드맵과 연계)
-- 유료 단계 카드에 잠금/배지, 한도 초과 시 "n개 중 m개만 적용됨 · 업그레이드" 안내.
-- 미리보기는 항상 가능, 적용 버튼은 비활성/부분적용 + 업그레이드 CTA. 설정에 **라이선스 키 입력** 영역.
+- **Paid** — 단일 유료 티어. 월/연 구독(연 결제 할인), 금액 **TBD**. 결제·환불·세금은 **LemonSqueezy(MoR)** 위임.
 
 ### 단계별 출시
 - **M0**: 전 기능 무료.
-- **M1 ✅ (구현됨)**: 엔타이틀먼트(`entitlements.ts`) + 사용량 한도 집행(`createTokens`/`bindSelection`) + UI 개발용 티어 토글. 결제 없음.
-- **M2 ✅ (구현됨, 서버 미배포)**: 라이선스 키 입력·검증(`license.ts` + `code.ts` fetch) + `clientStorage` 캐시·오프라인 grace. `VERIFY_URL`·`allowedDomains`는 자리표시 → 실제 검증 서버/결제 제공자 연동 시 교체.
+- **M1 ✅ (구현됨)**: 엔타이틀먼트(`entitlements.ts`, Free/Paid) + `requirePaid` 단일 게이트 + UI 개발용 티어 토글. **사용량 횟수 한도 없음**(기능 게이팅으로 대체). 결제 없음.
+- **M2 ✅ (구현됨, 서버 미배포)**: 라이선스 키 입력·검증(`license.ts` + UI fetch) + `clientStorage` 캐시·오프라인 grace. `VERIFY_URL`·`allowedDomains`는 자리표시 → 실제 검증 서버/결제 제공자 연동 시 교체.
 - **M2.1 ✅ (구현됨)**: 서명 토큰(JWT) 검증 코어(`licenseToken.ts`) — 서명+클레임 검사, `alg=none` 거부.
-- **M2.2 ✅ (구현됨)**: 네트워크+서명 검증을 **UI 아이프레임**으로 이동(`verifyAndReport`→`LICENSE_VERIFIED`), `code`는 캐시/grace/게이팅만. 시작 시 stale 캐시는 `REQUEST_VERIFY`로 재검증. (실제 공개키/검증 서버는 배포 시 연동)
-- **M3 ✅ (부분 구현: 공유 프리셋)**: Team 게이팅(`teamPresets`)으로 **공유 프리셋**(`presets.ts`) — base·허용오차·맥락단계·시맨틱 매핑을 저장/불러오기 + JSON 내보내기/가져오기(`clientStorage` 보관). 비-Team은 `PREMIUM_REQUIRED`.
+- **M2.2 ✅ (구현됨)**: 네트워크+서명 검증을 **UI 아이프레임**으로 이동(`verifyAndReport`→`LICENSE_VERIFIED`), `code`는 캐시/grace/게이팅만. 시작 시 stale 캐시는 `REQUEST_VERIFY`로 재검증(보관된 `instanceId`로 같은 기기 validate). 키 해제 시 `REQUEST_DEACTIVATE`로 LemonSqueezy 활성화 슬롯 반납(best-effort).
+- **M3 ✅ (구현됨: 공유 프리셋)**: Paid 게이팅으로 **공유 프리셋**(`presets.ts`) — base·허용오차·맥락단계·시맨틱 매핑을 저장/불러오기 + JSON 내보내기/가져오기(`clientStorage` 보관). 비-Paid는 `PREMIUM_REQUIRED`.
 - **M3.1 ~~변경 이력~~ — v2에서 제거(PR #37)**: 불투명한 집계성 이력은 v2 재설계에서 비목표로 결정해 `history.ts`·이력 카드·메시지·기록 호출부를 전면 삭제했다. (선택형 미리보기 트리가 "무엇이 바뀌는지"를 더 투명하게 대체.)
 - **M3.2**(다음): 서버 기반 시트(seat) 관리 · 가격/프로모션 확정 · 팀 동기화(클라우드 공유).
 
 ### 프라이버시 · 법무
-- 토큰·디자인 데이터 **로컬 처리** 유지, 외부 전송은 **라이선스 검증 요청에 한정**.
-- 환불·약관·개인정보 처리방침·세금(VAT는 결제 제공자에 위임) — 자리표시.
+- 토큰·디자인 데이터 **로컬 처리** 유지, 외부 전송은 **라이선스 검증 요청(키 + instanceName)** 에 한정 — 디자인 데이터 미전송.
+- 환불·약관·개인정보 처리방침·세금(VAT)은 **LemonSqueezy(MoR)** 에 위임.
 
 ### 리스크 · 미정
-- Figma 정책(외부 결제/키 방식 허용 범위) 확인 필요.
-- 정확한 한도 수치·가격·결제 제공자 선택, 무료↔유료 경계 재조정 여지.
-
-> 비고: 이 섹션은 **사업/구현 방향의 설계 문서(자리표시 포함)** 이며, 실제 결제·라이선스 연동과 기능 게이팅은 별도 PR에서 진행한다.
+- 연 가격 금액·월 옵션 여부 확정. Figma 발행 정책(외부 결제/키 방식 — 현재 허용, 광고·저품질 금지) 재확인.
+- 기기 교체(1대 한도) 셀프 해제 UX — LS 포털 가능 여부 확인, 불가 시 지원/Worker "이 기기로 이동" 추후.

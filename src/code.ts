@@ -4,7 +4,7 @@
 import type { UiToCode, RenameChange } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, createSemanticTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
+import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
@@ -14,8 +14,8 @@ import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, commonBaseName } from './lib/components';
 import type { CompPropType, StructNode, StructGroup } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
-import { Tier, isTier, hasEntitlement, limitsForTier, clampCount } from './lib/entitlements';
-import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify } from './lib/license';
+import { Tier, Feature, isTier } from './lib/entitlements';
+import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { Preset, upsertPreset } from './lib/presets';
 import { commitUndo } from './lib/undo';
 
@@ -52,7 +52,7 @@ const PRESETS_KEY = 'dsl.presets';
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
-let presets: Preset[] = []; // M3(Team): 공유 프리셋
+let presets: Preset[] = []; // 공유 프리셋(Paid)
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
 
 function effective(): {
@@ -66,17 +66,28 @@ function effective(): {
     return { tier: ev.tier, source: 'key', status: ev.status, expiresAt: cache.expiresAt };
   }
   if (devTier !== 'free') return { tier: devTier, source: 'dev' };
+  // 개발 빌드에선 강제 티어 토글이 활성 출처(free 포함) — UI가 토글 상태를 숨기지 않도록.
+  if (__DEV__) return { tier: 'free', source: 'dev' };
   return { tier: 'free', source: 'none' };
 }
 
 const currentTier = (): Tier => effective().tier;
+/** Free/Paid 2티어 — 유료면 모든 유료 기능 해금. */
+const isPaid = (): boolean => currentTier() === 'paid';
+
+/** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용) */
+function requirePaid(feature: Feature, message: string): boolean {
+  if (isPaid()) return true;
+  post({ type: 'PREMIUM_REQUIRED', feature, message });
+  return false;
+}
 
 function postLicense(note?: string): void {
   const e = effective();
   post({
     type: 'LICENSE_STATUS',
     tier: e.tier,
-    unlimited: hasEntitlement(e.tier, 'unlimited'),
+    unlimited: e.tier === 'paid', // Free/Paid 2티어 — 유료면 모든 기능 해금
     source: e.source,
     status: e.status,
     expiresAt: e.expiresAt,
@@ -87,10 +98,22 @@ function postLicense(note?: string): void {
 async function loadLicense(): Promise<void> {
   try {
     const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
-    if (isTier(dt)) devTier = dt;
-    const c = (await figma.clientStorage.getAsync(CACHE_KEY)) as LicenseCache | undefined;
-    // 손상/구형 캐시 방어: 모든 필드 형식을 확인(특히 key는 REQUEST_VERIFY에서 사용).
-    if (c && typeof c.key === 'string' && isTier(c.tier) && typeof c.expiresAt === 'number' && typeof c.lastVerified === 'number') cache = c;
+    if (__DEV__ && isTier(dt)) devTier = dt; // 개발용 강제 티어는 dev 빌드에서만 로드(배포 백도어 차단)
+    const raw = await figma.clientStorage.getAsync(CACHE_KEY);
+    const normalized = normalizeLicenseCache(raw);
+    if (normalized) {
+      cache = normalized;
+      // 구 3티어(pro/team) 캐시를 paid로 승격했으면 저장소도 갱신 — 업데이트 직후 Free 강등 방지.
+      const legacyTier =
+        raw && typeof raw === 'object' && ((raw as { tier?: unknown }).tier === 'pro' || (raw as { tier?: unknown }).tier === 'team');
+      if (legacyTier) {
+        try {
+          await figma.clientStorage.setAsync(CACHE_KEY, normalized);
+        } catch {
+          /* 저장 실패해도 세션 동안은 승격된 캐시 적용 */
+        }
+      }
+    }
     const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
     if (Array.isArray(ps)) presets = ps as Preset[];
   } catch {
@@ -111,17 +134,16 @@ async function postPrereq(): Promise<void> {
     const vars = await figma.variables.getLocalVariablesAsync();
     const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable });
+    const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // '기존 스타일 적용만' 전제
+    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable, hasTextStyles });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
 }
 
-/** Team 전용 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. */
+/** Paid 게이트(공유 프리셋): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireTeam(): boolean {
-  if (hasEntitlement(currentTier(), 'teamPresets')) return true;
-  post({ type: 'PREMIUM_REQUIRED', feature: 'teamPresets', message: '팀 공유 프리셋/이력은 Team 요금제 기능입니다.' });
-  return false;
+  return requirePaid('presets', '공유 프리셋은 Paid 기능입니다.');
 }
 
 /** 베리언트 세트를 속성 기반 2D 그리드로 정렬하고 자식에 맞게 리사이즈. */
@@ -175,11 +197,9 @@ function pageOf(node: BaseNode): PageNode | null {
   return n && n.type === 'PAGE' ? n : null;
 }
 
-/** Pro 이상 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
+/** Paid 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requirePro(): boolean {
-  if (hasEntitlement(currentTier(), 'components')) return true;
-  post({ type: 'PREMIUM_REQUIRED', feature: 'components', message: '컴포넌트 등록·베리언트 분류는 Pro 요금제 기능입니다.' });
-  return false;
+  return requirePaid('components', '컴포넌트 등록·베리언트 분류는 Paid 기능입니다.');
 }
 
 /** #6: 텍스트 범위 바인딩 필드(나머지는 노드 스칼라 필드). */
@@ -235,11 +255,9 @@ async function applySelectedBinding(item: { nodeId: string; field: string; index
   }
 }
 
-/** Pro 이상 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
+/** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireTextStyles(): boolean {
-  if (hasEntitlement(currentTier(), 'components')) return true;
-  post({ type: 'PREMIUM_REQUIRED', feature: 'textStyles', message: '텍스트 스타일 등록은 Pro 요금제 기능입니다.' });
-  return false;
+  return requirePaid('components', '텍스트 스타일 등록은 Paid 기능입니다.');
 }
 
 async function savePresets(): Promise<void> {
@@ -283,7 +301,10 @@ function kindOf(v: Variable): TokenKind {
 loadLicense().then(() => {
   postLicense();
   // 캐시가 오래됐으면 UI에 백그라운드 재검증 요청(WebCrypto는 UI에서).
-  if (cache && evaluateLicense(cache, Date.now()).stale) post({ type: 'REQUEST_VERIFY', key: cache.key });
+  // instanceId 없는 구 캐시는 activate만 남아 한도 초과로 실패할 수 있음 → grace 유지, 수동 재입력 때 instanceId 확보.
+  if (cache && cache.instanceId && evaluateLicense(cache, Date.now()).stale) {
+    post({ type: 'REQUEST_VERIFY', key: cache.key, instanceId: cache.instanceId });
+  }
 });
 
 /* ---------- UX5: 실시간 선택 동기화 ----------
@@ -518,18 +539,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_TOKENS': {
-        // Free 사용량 한도: 초과분은 적용하지 않음(비파괴) + 업그레이드 안내.
-        const limit = limitsForTier(currentTier()).tokens;
-        const c = clampCount(msg.tokens.length, limit);
-        const slice = msg.tokens.slice(0, c.allowed);
+        // Free/Paid: 미리보기는 무료 · 실제 변수 생성은 Paid.
+        if (!msg.preview && !requirePaid('tokens', '토큰(변수) 생성은 Paid 기능입니다. 미리보기는 무료로 제공됩니다.')) break;
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계.
-        const s = msg.preview ? await previewCreateTokens(slice) : await createTokens(slice, msg.base);
+        const s = msg.preview ? await previewCreateTokens(msg.tokens) : await createTokens(msg.tokens, msg.base);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
         if (pruned) summary += ` · 이전 색 ${pruned}개 정리`;
-        if (c.limited) summary += ` · ⚠ ${msg.tokens.length}개 중 ${c.allowed}개만 적용(Free 한도 ${limit}) — 업그레이드 필요`;
-        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
+        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
           await postPrereq(); // #11: 토큰 생성 → 시맨틱/바인딩 전제 충족 갱신
@@ -537,13 +555,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'APPLY': {
-        const lim = limitsForTier(currentTier());
         bindCancel = false; // UX6: 새 작업 시작 시 취소 플래그 초기화
         // UX1: preview면 dry-run(바인딩 없이 집계). UX3: 사유별 스킵(reasons). UX6: 진행률·취소.
         const r = await bindSelection(
           selection(),
           msg.tolerance,
-          { maxNodes: lim.nodes, maxBindings: lim.bindings },
           !msg.preview,
           {
             onProgress: (done, total) => post({ type: 'PROGRESS', op: 'bind', done, total }),
@@ -557,7 +573,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           skipped: r.skipped,
           flags: r.flags,
           reasons: r.reasons,
-          limited: !!r.limited,
           preview: msg.preview,
           cancelled: r.cancelled,
           candidates: r.candidates, // #6: 미리보기 후보(dry-run만)
@@ -612,6 +627,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_SEMANTICS': {
+        if (!requirePaid('semantics', '시맨틱 매핑은 Paid 기능입니다.')) break;
         const s = await createSemanticAliases(msg.map);
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
@@ -621,7 +637,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
         const { samples, warnings } = scanTextStyles(selection());
-        const styles = nameTextStyles(clusterTextStyles(samples));
+        // 기존 로컬 스타일 목록 전달 → 노드 바인딩/시그니처가 같은 후보는 '이미 등록'으로 인식(이름 유지).
+        const styles = nameTextStyles(clusterTextStyles(samples), await scanExistingTextStyles());
         post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
         break;
       }
@@ -630,6 +647,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
         post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
         commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로
+        await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → '적용만' 등 전제 게이트 갱신
+        break;
+      }
+      case 'APPLY_TEXT_STYLES': {
+        // 적용만(생성 없음): 선택 텍스트를 시그니처가 같은 기존 스타일에 바인딩.
+        if (!requireTextStyles()) break;
+        const r = await applyExistingTextStyles(selection());
+        post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, missing: r.missing });
+        commitUndo(figma);
         break;
       }
       case 'GET_COLLECTIONS': {
@@ -670,6 +696,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'SET_LICENSE': {
+        if (!__DEV__) break; // 개발 빌드 전용 — 배포 빌드에선 페이월 우회 백도어 차단
         devTier = msg.tier;
         try {
           await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);
@@ -682,6 +709,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'LICENSE_VERIFIED': {
         // UI가 수행한 검증 결과를 받아 캐시·적용(부수효과만 여기서).
         if (msg.result.ok) {
+          const prev = cache;
+          // 키 교체·기기 변경 시 이전 LS 활성화 슬롯 반납(best-effort) — activation_limit 고아 방지.
+          if (prev?.instanceId) {
+            const keyChanged = prev.key !== msg.key;
+            const instChanged = !!msg.result.instanceId && prev.instanceId !== msg.result.instanceId;
+            if (keyChanged || instChanged) {
+              post({ type: 'REQUEST_DEACTIVATE', key: prev.key, instanceId: prev.instanceId });
+            }
+          }
           cache = cacheFromVerify(msg.key, msg.result, Date.now());
           try {
             await figma.clientStorage.setAsync(CACHE_KEY, cache);
@@ -702,6 +738,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CLEAR_LICENSE': {
+        // 이 기기의 LS 활성화 슬롯 반납(best-effort) — 캐시를 지우기 전에 키+instanceId를 UI로 넘긴다.
+        if (cache?.key && cache.instanceId) {
+          post({ type: 'REQUEST_DEACTIVATE', key: cache.key, instanceId: cache.instanceId });
+        }
         cache = null;
         try {
           await figma.clientStorage.deleteAsync(CACHE_KEY);

@@ -222,9 +222,12 @@
   }
   function collectSize(acc, node) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
-    for (const v of [round(node.width), round(node.height)]) {
-      if (v > 0) add(acc, { name: numberTokenName("size", v), category: "size", value: v }, "size");
-    }
+    const addSize = (v) => {
+      const rv = round(v);
+      if (rv > 0) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size");
+    };
+    if (node.layoutSizingHorizontal === "FIXED") addSize(node.width);
+    if (node.layoutSizingVertical === "FIXED") addSize(node.height);
   }
   function collectRadius(acc, node) {
     if (!("cornerRadius" in node)) return;
@@ -597,6 +600,7 @@
   }
   var roundN = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
   function walkText(node, out) {
+    if (node.visible === false) return;
     if (node.type === "TEXT") out.push(node);
     else if ("children" in node) for (const c of node.children) walkText(c, out);
   }
@@ -619,15 +623,76 @@
       }
       let letterSpacing = 0;
       const ls = t.letterSpacing;
-      if (ls !== figma.mixed && ls.unit === "PIXELS") letterSpacing = roundN(ls.value);
-      samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name });
+      if (ls !== figma.mixed) letterSpacing = ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
+      const sid = t.textStyleId;
+      const styleId = sid === figma.mixed ? "" : sid;
+      samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name, styleId });
     }
     return { samples, warnings: [...warnings] };
   }
+  function lhPxOf(fontSize, lh) {
+    if (lh === figma.mixed || lh.unit === "AUTO") return 0;
+    return lh.unit === "PERCENT" ? roundN(fontSize * lh.value / 100) : roundN(lh.value);
+  }
+  function lsPxOf(fontSize, ls) {
+    if (ls === figma.mixed) return 0;
+    return ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
+  }
+  async function scanExistingTextStyles() {
+    const out = [];
+    for (const s of await figma.getLocalTextStylesAsync()) {
+      const fontSize = roundN(s.fontSize);
+      out.push({
+        id: s.id,
+        name: s.name,
+        fontSize,
+        lineHeight: lhPxOf(fontSize, s.lineHeight),
+        letterSpacing: lsPxOf(fontSize, s.letterSpacing),
+        family: s.fontName.family,
+        style: s.fontName.style
+      });
+    }
+    return out;
+  }
   async function createSemanticTextStyles(specs, apply, nodes) {
-    var _a;
+    var _a, _b, _c;
     const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [] };
     if (!specs.length) return res;
+    const existing = await figma.getLocalTextStylesAsync();
+    const styleById = new Map(existing.map((s) => [s.id, s]));
+    const styleByName = new Map(existing.map((s) => [s.name, s]));
+    const anchoredStyle = (spec) => spec.boundStyleId ? styleById.get(spec.boundStyleId) : void 0;
+    const renameBlocked = /* @__PURE__ */ new Set();
+    const roleRenames = [];
+    for (const spec of specs) {
+      const st = anchoredStyle(spec);
+      if (!st || st.name === spec.name) continue;
+      const occupant = styleByName.get(spec.name);
+      if (occupant && occupant.id !== st.id) {
+        renameBlocked.add(spec.boundStyleId);
+        res.missing.push(`\uC774\uB984 \uCDA9\uB3CC '${st.name}'\u2192'${spec.name}' \u2014 \uC774\uBBF8 \uAC19\uC740 \uC774\uB984 \uC2A4\uD0C0\uC77C\uC774 \uC788\uC5B4 rename \uBCF4\uB958`);
+        continue;
+      }
+      roleRenames.push({ from: st.name, to: spec.name });
+    }
+    if (roleRenames.length) {
+      const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
+      const semId0 = (_a = cols0.find((c) => c.name === SEMANTIC)) == null ? void 0 : _a.id;
+      if (semId0) {
+        const byName = /* @__PURE__ */ new Map();
+        for (const v of await figma.variables.getLocalVariablesAsync())
+          if (v.variableCollectionId === semId0) byName.set(v.name, v);
+        for (const { from, to } of roleRenames)
+          for (const cat of ["font-size", "line-height", "letter-spacing"]) {
+            const v = byName.get(`${cat}/${from}`);
+            if (v && !byName.has(`${cat}/${to}`)) {
+              v.name = `${cat}/${to}`;
+              byName.set(`${cat}/${to}`, v);
+              byName.delete(`${cat}/${from}`);
+            }
+          }
+      }
+    }
     const tokens = [];
     const seen = /* @__PURE__ */ new Set();
     const pushTok = (t) => {
@@ -636,88 +701,188 @@
         tokens.push(t);
       }
     };
-    for (const s of specs) {
-      pushTok({ name: numberTokenName("font-size", s.fontSize), category: "fontSize", value: s.fontSize, sources: ["fontSize"] });
-      if (s.lineHeight > 0)
-        pushTok({ name: numberTokenName("line-height", s.lineHeight), category: "lineHeight", value: s.lineHeight, unit: "px", sources: ["lineHeight"] });
-    }
-    await createTokens(tokens, 16);
     const aliasMap = {};
+    const pushAlias = (role, fontSize, lineHeight, letterSpacing) => {
+      pushTok({ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] });
+      aliasMap[`font-size/${role}`] = numberTokenName("font-size", fontSize);
+      if (lineHeight > 0) {
+        pushTok({ name: numberTokenName("line-height", lineHeight), category: "lineHeight", value: lineHeight, unit: "px", sources: ["lineHeight"] });
+        aliasMap[`line-height/${role}`] = numberTokenName("line-height", lineHeight);
+      }
+      if (letterSpacing !== 0) {
+        pushTok({ name: numberTokenName("letter-spacing", letterSpacing), category: "letterSpacing", value: letterSpacing, unit: "px", sources: ["letterSpacing"] });
+        aliasMap[`letter-spacing/${role}`] = numberTokenName("letter-spacing", letterSpacing);
+      }
+    };
     for (const s of specs) {
-      aliasMap[`font-size/${s.name}`] = numberTokenName("font-size", s.fontSize);
-      if (s.lineHeight > 0) aliasMap[`line-height/${s.name}`] = numberTokenName("line-height", s.lineHeight);
+      if (anchoredStyle(s)) continue;
+      pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing);
     }
-    await createSemanticAliases(aliasMap);
+    {
+      const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
+      const semId0 = (_b = cols0.find((c) => c.name === SEMANTIC)) == null ? void 0 : _b.id;
+      const semNames = /* @__PURE__ */ new Set();
+      if (semId0) {
+        for (const v of await figma.variables.getLocalVariablesAsync())
+          if (v.variableCollectionId === semId0) semNames.add(v.name);
+      }
+      for (const s of specs) {
+        const st = anchoredStyle(s);
+        if (!st) continue;
+        if (semNames.has(`font-size/${s.name}`)) continue;
+        const fontSize = roundN(st.fontSize);
+        pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing));
+      }
+    }
+    if (tokens.length) await createTokens(tokens, 16);
+    if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_a = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _a.id;
+    const semId = (_c = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _c.id;
     const semByName = /* @__PURE__ */ new Map();
     if (semId) {
       for (const v of await figma.variables.getLocalVariablesAsync())
         if (v.variableCollectionId === semId) semByName.set(v.name, v);
     }
-    const existing = await figma.getLocalTextStylesAsync();
-    const styleByName = new Map(existing.map((s) => [s.name, s]));
     for (const spec of specs) {
-      let style = styleByName.get(spec.name);
+      const anchored = anchoredStyle(spec);
+      if (anchored && spec.boundStyleId && renameBlocked.has(spec.boundStyleId)) {
+        continue;
+      }
+      let style = anchored;
+      if (!style) style = styleByName.get(spec.name);
       const created = !style;
-      if (!style) {
-        style = figma.createTextStyle();
+      const isRename = !!anchored;
+      if (!style) style = figma.createTextStyle();
+      if (style.name !== spec.name) {
+        styleByName.delete(style.name);
         style.name = spec.name;
       }
-      const wanted = { family: spec.family, style: spec.style };
-      let loaded;
-      try {
-        await figma.loadFontAsync(wanted);
-        loaded = wanted;
-      } catch (e) {
+      if (!isRename) {
+        const wanted = { family: spec.family, style: spec.style };
+        let loaded;
         try {
-          const fb = { family: spec.family, style: "Regular" };
-          await figma.loadFontAsync(fb);
-          loaded = fb;
-          res.missing.push(`${spec.name}: \uD3F0\uD2B8 ${spec.style}\u2192Regular`);
-        } catch (e2) {
-          res.missing.push(`${spec.name}: \uD3F0\uD2B8 '${spec.family}' \uC5C6\uC74C`);
-          continue;
+          await figma.loadFontAsync(wanted);
+          loaded = wanted;
+        } catch (e) {
+          try {
+            const fb = { family: spec.family, style: "Regular" };
+            await figma.loadFontAsync(fb);
+            loaded = fb;
+            res.missing.push(`${spec.name}: \uD3F0\uD2B8 ${spec.style}\u2192Regular`);
+          } catch (e2) {
+            res.missing.push(`${spec.name}: \uD3F0\uD2B8 '${spec.family}' \uC5C6\uC74C`);
+            continue;
+          }
         }
+        style.fontName = loaded;
+        style.fontSize = spec.fontSize;
+        style.lineHeight = spec.lineHeight > 0 ? { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
+        style.letterSpacing = { value: spec.letterSpacing, unit: "PIXELS" };
       }
-      style.fontName = loaded;
-      style.fontSize = spec.fontSize;
-      style.lineHeight = spec.lineHeight > 0 ? { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
-      if (spec.letterSpacing) style.letterSpacing = { value: spec.letterSpacing, unit: "PIXELS" };
-      const fsVar = semByName.get(`font-size/${spec.name}`);
+      const bindRole = style.name;
+      const fsVar = semByName.get(`font-size/${bindRole}`);
       if (fsVar) {
         style.setBoundVariable("fontSize", fsVar);
         res.bound++;
-      } else res.missing.push(`font-size/${spec.name}`);
-      if (spec.lineHeight > 0) {
-        const lhVar = semByName.get(`line-height/${spec.name}`);
+      } else res.missing.push(`font-size/${bindRole}`);
+      if (spec.lineHeight > 0 || isRename) {
+        const lhVar = semByName.get(`line-height/${bindRole}`);
         if (lhVar) {
           style.setBoundVariable("lineHeight", lhVar);
           res.bound++;
-        } else res.missing.push(`line-height/${spec.name}`);
+        } else if (spec.lineHeight > 0) res.missing.push(`line-height/${bindRole}`);
+      }
+      if (spec.letterSpacing !== 0 || isRename) {
+        const lsVar = semByName.get(`letter-spacing/${bindRole}`);
+        if (lsVar) {
+          style.setBoundVariable("letterSpacing", lsVar);
+          res.bound++;
+        } else if (spec.letterSpacing !== 0) res.missing.push(`letter-spacing/${bindRole}`);
       }
       res[created ? "created" : "updated"]++;
-      styleByName.set(spec.name, style);
+      styleByName.set(style.name, style);
     }
     if (apply) {
       const texts = [];
       for (const n of nodes) walkText(n, texts);
+      const loaded = /* @__PURE__ */ new Set();
+      const ensureFont = async (fn) => {
+        const k = `${fn.family} ${fn.style}`;
+        if (loaded.has(k)) return;
+        await figma.loadFontAsync(fn);
+        loaded.add(k);
+      };
+      let matched = 0;
       for (const t of texts) {
         if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
         const fontSize = roundN(t.fontSize);
-        const { family, style } = t.fontName;
-        const spec = specs.find((s) => s.fontSize === fontSize && s.family === family && s.style === style);
+        const fn = t.fontName;
+        const lhPx = lhPxOf(fontSize, t.lineHeight);
+        const lsPx = lsPxOf(fontSize, t.letterSpacing);
+        const spec = specs.find(
+          (s) => s.fontSize === fontSize && s.family === fn.family && s.style === fn.style && s.lineHeight === lhPx && s.letterSpacing === lsPx
+        );
         if (!spec) continue;
         const ts = styleByName.get(spec.name);
         if (!ts) continue;
+        matched++;
         try {
-          await figma.loadFontAsync(t.fontName);
+          await ensureFont(fn);
           await t.setTextStyleIdAsync(ts.id);
           res.applied++;
         } catch (e) {
+          res.missing.push(`\uC801\uC6A9 \uC2E4\uD328 '${t.name}'(\uD3F0\uD2B8 \uB85C\uB4DC \uBD88\uAC00)`);
         }
       }
+      if (texts.length === 0) res.missing.push("\uC801\uC6A9 \uB300\uC0C1 \uC5C6\uC74C \u2014 \uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8 \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4(\uB4F1\uB85D \uD6C4 \uC120\uD0DD\uC774 \uD480\uB838\uC744 \uC218 \uC788\uC74C)");
+      else if (matched === 0) res.missing.push("\uC801\uC6A9 \uB9E4\uCE6D 0 \u2014 \uC120\uD0DD\uC774 \uC2A4\uCE94\uACFC \uB2E4\uB974\uAC70\uB098 \uD3F0\uD2B8\xB7\uD06C\uAE30\xB7\uAD75\uAE30\xB7\uD589\uAC04\xB7\uC790\uAC04 \uBD88\uC77C\uCE58");
     }
+    return res;
+  }
+  async function applyExistingTextStyles(nodes) {
+    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [] };
+    const styleBySig = /* @__PURE__ */ new Map();
+    for (const s of await figma.getLocalTextStylesAsync()) {
+      const fontSize = roundN(s.fontSize);
+      const k = `${fontSize}|${lhPxOf(fontSize, s.lineHeight)}|${lsPxOf(fontSize, s.letterSpacing)}|${s.fontName.family}|${s.fontName.style}`;
+      styleBySig.set(k, styleBySig.has(k) ? null : s);
+    }
+    const texts = [];
+    for (const n of nodes) walkText(n, texts);
+    const loaded = /* @__PURE__ */ new Set();
+    const ensureFont = async (fn) => {
+      const k = `${fn.family} ${fn.style}`;
+      if (loaded.has(k)) return;
+      await figma.loadFontAsync(fn);
+      loaded.add(k);
+    };
+    const unregistered = /* @__PURE__ */ new Set();
+    let ambiguous = 0;
+    for (const t of texts) {
+      if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
+      const fontSize = roundN(t.fontSize);
+      const fn = t.fontName;
+      const k = `${fontSize}|${lhPxOf(fontSize, t.lineHeight)}|${lsPxOf(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
+      const hit = styleBySig.get(k);
+      if (hit === void 0) {
+        unregistered.add(`${fn.family} ${fn.style} ${fontSize}`);
+        continue;
+      }
+      if (hit === null) {
+        ambiguous++;
+        continue;
+      }
+      try {
+        await ensureFont(fn);
+        await t.setTextStyleIdAsync(hit.id);
+        res.applied++;
+      } catch (e) {
+        res.missing.push(`\uC801\uC6A9 \uC2E4\uD328 '${t.name}'(\uD3F0\uD2B8 \uB85C\uB4DC \uBD88\uAC00)`);
+      }
+    }
+    if (texts.length === 0) res.missing.push("\uC801\uC6A9 \uB300\uC0C1 \uC5C6\uC74C \u2014 \uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8 \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4");
+    if (unregistered.size) res.missing.push(`\uBBF8\uB4F1\uB85D ${unregistered.size}\uC885 \u2014 \uBA3C\uC800 \uB4F1\uB85D \uD544\uC694: ${[...unregistered].join(", ")}`);
+    if (ambiguous) res.missing.push(`\uBAA8\uD638 ${ambiguous}\uAC1C \u2014 \uAC19\uC740 \uD0C0\uC774\uD3EC\uC758 \uC2A4\uD0C0\uC77C\uC774 \uC5EC\uB7EC \uAC1C\uB77C \uC790\uB3D9 \uC801\uC6A9 \uBCF4\uB958`);
     return res;
   }
 
@@ -726,11 +891,12 @@
   var sigKey = (s) => `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
   function clusterTextStyles(samples) {
     const map = /* @__PURE__ */ new Map();
+    const ids = /* @__PURE__ */ new Map();
     for (const s of samples) {
       const k = sigKey(s);
       const ex = map.get(k);
       if (ex) ex.count++;
-      else
+      else {
         map.set(k, {
           fontSize: s.fontSize,
           lineHeight: s.lineHeight,
@@ -738,23 +904,74 @@
           family: s.family,
           style: s.style,
           count: 1,
-          sample: s.layerName
+          sample: s.layerName,
+          styleIds: []
         });
+        ids.set(k, /* @__PURE__ */ new Set());
+      }
+      if (s.styleId) ids.get(k).add(s.styleId);
     }
+    for (const [k, c] of map) c.styleIds = [...ids.get(k)];
     return [...map.values()];
   }
-  function nameTextStyles(clusters) {
-    const sorted = [...clusters].sort(
-      (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight
-    );
-    return sorted.map((c, i) => ({
-      name: i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`,
-      fontSize: c.fontSize,
-      lineHeight: c.lineHeight,
-      letterSpacing: c.letterSpacing,
-      family: c.family,
-      style: c.style
-    }));
+  var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  function nameTextStyles(clusters, existing) {
+    const nameById = /* @__PURE__ */ new Map();
+    const sigById = /* @__PURE__ */ new Map();
+    const idBySig = /* @__PURE__ */ new Map();
+    for (const e of existing != null ? existing : []) {
+      nameById.set(e.id, e.name);
+      const k = sigKey(e);
+      sigById.set(e.id, k);
+      idBySig.set(k, idBySig.has(k) ? null : e.id);
+    }
+    const boundIdOf = (c) => {
+      if (!existing) return void 0;
+      if (c.styleIds.length === 1) {
+        const id = c.styleIds[0];
+        if (nameById.has(id) && sigById.get(id) === sigKey(c)) return id;
+      }
+      const sigId = idBySig.get(sigKey(c));
+      return sigId && nameById.has(sigId) ? sigId : void 0;
+    };
+    const sizesDesc = [...new Set(clusters.map((c) => c.fontSize))].sort((a, b) => b - a);
+    const baseBySize = /* @__PURE__ */ new Map();
+    sizesDesc.forEach((sz, i) => baseBySize.set(sz, i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`));
+    const used = /* @__PURE__ */ new Set();
+    const unique = (n) => {
+      if (!used.has(n)) {
+        used.add(n);
+        return n;
+      }
+      let k = 2;
+      while (used.has(`${n}-${k}`)) k++;
+      const u = `${n}-${k}`;
+      used.add(u);
+      return u;
+    };
+    for (const c of clusters) {
+      const id = boundIdOf(c);
+      if (id) used.add(nameById.get(id));
+    }
+    const specs = [];
+    for (const sz of sizesDesc) {
+      const base = baseBySize.get(sz);
+      const group = clusters.filter((c) => c.fontSize === sz).sort((a, b) => b.count - a.count || b.lineHeight - a.lineHeight);
+      const weightUnique = new Set(group.map((c) => slug(c.style))).size === group.length;
+      for (const c of group) {
+        const boundId = boundIdOf(c);
+        const name = boundId ? nameById.get(boundId) : unique(group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`);
+        specs.push(__spreadValues({
+          name,
+          fontSize: c.fontSize,
+          lineHeight: c.lineHeight,
+          letterSpacing: c.letterSpacing,
+          family: c.family,
+          style: c.style
+        }, boundId ? { boundStyleId: boundId } : {}));
+      }
+    }
+    return specs;
   }
 
   // src/lib/bind.ts
@@ -823,29 +1040,23 @@
     res.skipped++;
     note(res, key);
   }
-  async function bindSelection(selection2, tolerance, limits = {}, apply = true, hooks = {}) {
-    var _a, _b, _c;
+  async function bindSelection(selection2, tolerance, apply = true, hooks = {}) {
+    var _a;
     const entries = await buildIndex();
     const res = { bound: 0, skipped: 0, flags: [], reasons: {} };
     const flagSet = /* @__PURE__ */ new Set();
-    const budget = {
-      nodes: (_a = limits.maxNodes) != null ? _a : Infinity,
-      maxBindings: (_b = limits.maxBindings) != null ? _b : Infinity,
-      limited: false
-    };
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
     const preview = apply ? null : { candidates: [], nodeIndex: [] };
     for (const node of selection2) {
-      await walk2(node, entries, tolerance, res, flagSet, budget, apply, hooks, prog, preview, 0, null);
+      await walk2(node, entries, tolerance, res, flagSet, apply, hooks, prog, preview, 0, null);
       if (res.cancelled) break;
     }
-    if (budget.limited) res.limited = true;
     res.flags = [...flagSet];
     if (preview) {
       res.candidates = preview.candidates;
       res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates);
     }
-    (_c = hooks.onProgress) == null ? void 0 : _c.call(hooks, prog.done, prog.total);
+    (_a = hooks.onProgress) == null ? void 0 : _a.call(hooks, prog.done, prog.total);
     return res;
   }
   async function buildIndex() {
@@ -921,14 +1132,9 @@
     }
     return null;
   }
-  async function walk2(node, entries, tol, res, flags, budget, apply, hooks, prog, preview, depth, parentId) {
+  async function walk2(node, entries, tol, res, flags, apply, hooks, prog, preview, depth, parentId) {
     var _a;
     if (res.cancelled) return;
-    if (budget.nodes <= 0 || res.bound >= budget.maxBindings) {
-      budget.limited = true;
-      return;
-    }
-    budget.nodes--;
     preview == null ? void 0 : preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
     bindPaints(node, entries, res, apply, preview);
     bindFrame(node, entries, tol, res, flags, apply, preview);
@@ -948,7 +1154,7 @@
     }
     if ("children" in node)
       for (const c of node.children) {
-        await walk2(c, entries, tol, res, flags, budget, apply, hooks, prog, preview, depth + 1, node.id);
+        await walk2(c, entries, tol, res, flags, apply, hooks, prog, preview, depth + 1, node.id);
         if (res.cancelled) return;
       }
   }
@@ -1171,7 +1377,7 @@
     return ROLE_SET.has(seg);
   }
   function kebab(input) {
-    return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s_/]+/g, "-").replace(/[^a-zA-Z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+    return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s/]+/g, "-").replace(/_/g, (_m, i, s) => /\d/.test(s[i - 1] || "") && /\d/.test(s[i + 1] || "") ? "_" : "-").replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
   }
   var ABBR = {
     btn: "button",
@@ -2159,30 +2365,10 @@
   }
 
   // src/lib/entitlements.ts
-  var TIERS = ["free", "pro", "team"];
-  var TIER_RANK = { free: 0, pro: 1, team: 2 };
-  var FEATURE_MIN_TIER = {
-    unlimited: "pro",
-    components: "pro",
-    publish: "pro",
-    multiMode: "pro",
-    aiNaming: "pro",
-    teamPresets: "team"
-  };
-  function hasEntitlement(tier, feature) {
-    return TIER_RANK[tier] >= TIER_RANK[FEATURE_MIN_TIER[feature]];
-  }
-  var FREE_LIMITS = { nodes: 50, tokens: 100, bindings: 200 };
-  var UNLIMITED = { nodes: Infinity, tokens: Infinity, bindings: Infinity };
-  function limitsForTier(tier) {
-    return hasEntitlement(tier, "unlimited") ? UNLIMITED : FREE_LIMITS;
-  }
-  function clampCount(requested, limit) {
-    const allowed = Math.min(requested, limit);
-    return { allowed, limited: requested > limit, overflow: Math.max(0, requested - allowed) };
-  }
-  function isTier(v) {
-    return typeof v === "string" && TIERS.includes(v);
+  function normalizeLegacyTier(v) {
+    if (v === "free" || v === "paid") return v;
+    if (v === "pro" || v === "team") return "paid";
+    return null;
   }
 
   // src/lib/license.ts
@@ -2197,7 +2383,20 @@
     return { tier: "free", status: "expired", stale: true };
   }
   function cacheFromVerify(key, v, now) {
-    return { key, tier: v.tier, expiresAt: v.expiresAt, lastVerified: now };
+    const cache2 = { key, tier: v.tier, expiresAt: v.expiresAt, lastVerified: now };
+    if (v.instanceId) cache2.instanceId = v.instanceId;
+    return cache2;
+  }
+  function normalizeLicenseCache(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const o = raw;
+    if (typeof o.key !== "string") return null;
+    const tier = normalizeLegacyTier(o.tier);
+    if (!tier) return null;
+    if (typeof o.expiresAt !== "number" || typeof o.lastVerified !== "number") return null;
+    const cache2 = { key: o.key, tier, expiresAt: o.expiresAt, lastVerified: o.lastVerified };
+    if (typeof o.instanceId === "string" && o.instanceId) cache2.instanceId = o.instanceId;
+    return cache2;
   }
 
   // src/lib/presets.ts
@@ -2242,15 +2441,23 @@
       return { tier: ev.tier, source: "key", status: ev.status, expiresAt: cache.expiresAt };
     }
     if (devTier !== "free") return { tier: devTier, source: "dev" };
+    if (false) return { tier: "free", source: "dev" };
     return { tier: "free", source: "none" };
   }
   var currentTier = () => effective().tier;
+  var isPaid = () => currentTier() === "paid";
+  function requirePaid(feature, message) {
+    if (isPaid()) return true;
+    post({ type: "PREMIUM_REQUIRED", feature, message });
+    return false;
+  }
   function postLicense(note2) {
     const e = effective();
     post({
       type: "LICENSE_STATUS",
       tier: e.tier,
-      unlimited: hasEntitlement(e.tier, "unlimited"),
+      unlimited: e.tier === "paid",
+      // Free/Paid 2티어 — 유료면 모든 기능 해금
       source: e.source,
       status: e.status,
       expiresAt: e.expiresAt,
@@ -2260,9 +2467,19 @@
   async function loadLicense() {
     try {
       const dt = await figma.clientStorage.getAsync(DEV_TIER_KEY);
-      if (isTier(dt)) devTier = dt;
-      const c = await figma.clientStorage.getAsync(CACHE_KEY);
-      if (c && typeof c.key === "string" && isTier(c.tier) && typeof c.expiresAt === "number" && typeof c.lastVerified === "number") cache = c;
+      if (false) devTier = dt;
+      const raw = await figma.clientStorage.getAsync(CACHE_KEY);
+      const normalized = normalizeLicenseCache(raw);
+      if (normalized) {
+        cache = normalized;
+        const legacyTier = raw && typeof raw === "object" && (raw.tier === "pro" || raw.tier === "team");
+        if (legacyTier) {
+          try {
+            await figma.clientStorage.setAsync(CACHE_KEY, normalized);
+          } catch (e) {
+          }
+        }
+      }
       const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
       if (Array.isArray(ps)) presets = ps;
     } catch (e) {
@@ -2276,14 +2493,13 @@
       const vars = await figma.variables.getLocalVariablesAsync();
       const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-      post({ type: "PREREQ_STATE", hasGlobal, hasBindable });
+      const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
+      post({ type: "PREREQ_STATE", hasGlobal, hasBindable, hasTextStyles });
     } catch (e) {
     }
   }
   function requireTeam() {
-    if (hasEntitlement(currentTier(), "teamPresets")) return true;
-    post({ type: "PREMIUM_REQUIRED", feature: "teamPresets", message: "\uD300 \uACF5\uC720 \uD504\uB9AC\uC14B/\uC774\uB825\uC740 Team \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
-    return false;
+    return requirePaid("presets", "\uACF5\uC720 \uD504\uB9AC\uC14B\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
   }
   function arrangeSet(set) {
     const children = set.children.filter((c) => c.type === "COMPONENT");
@@ -2327,9 +2543,7 @@
     return n && n.type === "PAGE" ? n : null;
   }
   function requirePro() {
-    if (hasEntitlement(currentTier(), "components")) return true;
-    post({ type: "PREMIUM_REQUIRED", feature: "components", message: "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
-    return false;
+    return requirePaid("components", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
   }
   var TEXT_BIND_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily"]);
   async function applySelectedBinding(item) {
@@ -2378,9 +2592,7 @@
     }
   }
   function requireTextStyles() {
-    if (hasEntitlement(currentTier(), "components")) return true;
-    post({ type: "PREMIUM_REQUIRED", feature: "textStyles", message: "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Pro \uC694\uAE08\uC81C \uAE30\uB2A5\uC785\uB2C8\uB2E4." });
-    return false;
+    return requirePaid("components", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
   }
   async function savePresets() {
     try {
@@ -2418,7 +2630,9 @@
   }
   loadLicense().then(() => {
     postLicense();
-    if (cache && evaluateLicense(cache, Date.now()).stale) post({ type: "REQUEST_VERIFY", key: cache.key });
+    if (cache && cache.instanceId && evaluateLicense(cache, Date.now()).stale) {
+      post({ type: "REQUEST_VERIFY", key: cache.key, instanceId: cache.instanceId });
+    }
   });
   var SCAN_CAP = 1500;
   function isBindableCandidate(n) {
@@ -2618,15 +2832,12 @@
           break;
         }
         case "CREATE_TOKENS": {
-          const limit = limitsForTier(currentTier()).tokens;
-          const c = clampCount(msg.tokens.length, limit);
-          const slice = msg.tokens.slice(0, c.allowed);
-          const s = msg.preview ? await previewCreateTokens(slice) : await createTokens(slice, msg.base);
+          if (!msg.preview && !requirePaid("tokens", "\uD1A0\uD070(\uBCC0\uC218) \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4. \uBBF8\uB9AC\uBCF4\uAE30\uB294 \uBB34\uB8CC\uB85C \uC81C\uACF5\uB429\uB2C8\uB2E4.")) break;
+          const s = msg.preview ? await previewCreateTokens(msg.tokens) : await createTokens(msg.tokens, msg.base);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
           let summary = `Global ${s.globals}\uAC1C \xB7 Semantic ${s.semantics}\uAC1C (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated})`;
           if (pruned) summary += ` \xB7 \uC774\uC804 \uC0C9 ${pruned}\uAC1C \uC815\uB9AC`;
-          if (c.limited) summary += ` \xB7 \u26A0 ${msg.tokens.length}\uAC1C \uC911 ${c.allowed}\uAC1C\uB9CC \uC801\uC6A9(Free \uD55C\uB3C4 ${limit}) \u2014 \uC5C5\uADF8\uB808\uC774\uB4DC \uD544\uC694`;
-          post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, limited: c.limited, preview: msg.preview });
+          post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, preview: msg.preview });
           if (!msg.preview) {
             commitUndo(figma);
             await postPrereq();
@@ -2634,12 +2845,10 @@
           break;
         }
         case "APPLY": {
-          const lim = limitsForTier(currentTier());
           bindCancel = false;
           const r = await bindSelection(
             selection(),
             msg.tolerance,
-            { maxNodes: lim.nodes, maxBindings: lim.bindings },
             !msg.preview,
             {
               onProgress: (done, total) => post({ type: "PROGRESS", op: "bind", done, total }),
@@ -2653,7 +2862,6 @@
             skipped: r.skipped,
             flags: r.flags,
             reasons: r.reasons,
-            limited: !!r.limited,
             preview: msg.preview,
             cancelled: r.cancelled,
             candidates: r.candidates,
@@ -2708,6 +2916,7 @@
           break;
         }
         case "CREATE_SEMANTICS": {
+          if (!requirePaid("semantics", "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const s = await createSemanticAliases(msg.map);
           post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
           commitUndo(figma);
@@ -2716,7 +2925,7 @@
         }
         case "SCAN_TEXT_STYLES": {
           const { samples, warnings } = scanTextStyles(selection());
-          const styles = nameTextStyles(clusterTextStyles(samples));
+          const styles = nameTextStyles(clusterTextStyles(samples), await scanExistingTextStyles());
           post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
           break;
         }
@@ -2724,6 +2933,14 @@
           if (!requireTextStyles()) break;
           const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
           post({ type: "TEXT_STYLES_RESULT", created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
+          commitUndo(figma);
+          await postPrereq();
+          break;
+        }
+        case "APPLY_TEXT_STYLES": {
+          if (!requireTextStyles()) break;
+          const r = await applyExistingTextStyles(selection());
+          post({ type: "TEXT_STYLES_APPLIED", applied: r.applied, missing: r.missing });
           commitUndo(figma);
           break;
         }
@@ -2764,6 +2981,7 @@
           break;
         }
         case "SET_LICENSE": {
+          if (true) break;
           devTier = msg.tier;
           try {
             await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);
@@ -2774,6 +2992,14 @@
         }
         case "LICENSE_VERIFIED": {
           if (msg.result.ok) {
+            const prev = cache;
+            if (prev == null ? void 0 : prev.instanceId) {
+              const keyChanged = prev.key !== msg.key;
+              const instChanged = !!msg.result.instanceId && prev.instanceId !== msg.result.instanceId;
+              if (keyChanged || instChanged) {
+                post({ type: "REQUEST_DEACTIVATE", key: prev.key, instanceId: prev.instanceId });
+              }
+            }
             cache = cacheFromVerify(msg.key, msg.result, Date.now());
             try {
               await figma.clientStorage.setAsync(CACHE_KEY, cache);
@@ -2790,6 +3016,9 @@
           break;
         }
         case "CLEAR_LICENSE": {
+          if ((cache == null ? void 0 : cache.key) && cache.instanceId) {
+            post({ type: "REQUEST_DEACTIVATE", key: cache.key, instanceId: cache.instanceId });
+          }
           cache = null;
           try {
             await figma.clientStorage.deleteAsync(CACHE_KEY);

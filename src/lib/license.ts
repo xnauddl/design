@@ -3,7 +3,7 @@
    M2: 외부 키 검증의 "두뇌". 실제 fetch·clientStorage는 code.ts(부수효과)에서.
    원칙: 만료 전이면 적용, 오프라인이면 grace 동안 유지, grace 초과 시 강등(free).
    ============================================================ */
-import { Tier, isTier } from './entitlements';
+import { Tier, isTier, normalizeLegacyTier } from './entitlements';
 
 export interface LicenseCache {
   /** 사용자 라이선스 키. */
@@ -14,6 +14,8 @@ export interface LicenseCache {
   expiresAt: number;
   /** 마지막 성공 검증 시각(ms epoch). */
   lastVerified: number;
+  /** LS 기기 인스턴스 식별자 — 재검증 시 같은 기기로 validate하기 위해 보관(없을 수 있음). */
+  instanceId?: string;
 }
 
 /** 이 주기보다 오래되면 온라인 시 재검증 권장. */
@@ -53,6 +55,8 @@ export interface VerifyOk {
   ok: true;
   tier: Tier;
   expiresAt: number;
+  /** 검증 서버가 돌려준 기기 인스턴스 식별자(있으면 캐시에 보관해 재검증 때 되돌려보냄). */
+  instanceId?: string;
 }
 export interface VerifyErr {
   ok: false;
@@ -64,7 +68,7 @@ export type VerifyResult = VerifyOk | (VerifyErr & { offline?: boolean });
 
 /**
  * 검증 서버 응답(JSON) 파싱. 기대 형식:
- *   성공: { valid:true, tier:'pro', expiresAt: <ms> }
+ *   성공: { valid:true, tier:'paid', expiresAt: <ms> }
  *   실패: { valid:false, error:'...' }
  * 위변조 방지를 위해 실제 운영에서는 서명(JWT 등) 검증을 추가한다(M2.1).
  */
@@ -82,5 +86,23 @@ export function parseVerifyResponse(json: unknown): VerifyOk | VerifyErr {
 
 /** 성공 응답 + 키 + 현재시각 → 저장할 캐시. */
 export function cacheFromVerify(key: string, v: VerifyOk, now: number): LicenseCache {
-  return { key, tier: v.tier, expiresAt: v.expiresAt, lastVerified: now };
+  const cache: LicenseCache = { key, tier: v.tier, expiresAt: v.expiresAt, lastVerified: now };
+  if (v.instanceId) cache.instanceId = v.instanceId; // 없으면 키 자체를 두지 않음(캐시 형태 안정).
+  return cache;
+}
+
+/**
+ * clientStorage에서 읽은 캐시 정규화. 구 3티어(pro/team)는 paid로 승격.
+ * 필수 필드가 없거나 tier를 알 수 없으면 null(손상 캐시 무시).
+ */
+export function normalizeLicenseCache(raw: unknown): LicenseCache | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.key !== 'string') return null;
+  const tier = normalizeLegacyTier(o.tier);
+  if (!tier) return null;
+  if (typeof o.expiresAt !== 'number' || typeof o.lastVerified !== 'number') return null;
+  const cache: LicenseCache = { key: o.key, tier, expiresAt: o.expiresAt, lastVerified: o.lastVerified };
+  if (typeof o.instanceId === 'string' && o.instanceId) cache.instanceId = o.instanceId;
+  return cache;
 }

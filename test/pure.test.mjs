@@ -25,9 +25,9 @@ import {
   pickScope,
   dedupeName,
   hasEntitlement,
-  limitsForTier,
-  clampCount,
   isTier,
+  normalizeLegacyTier,
+  normalizeLicenseCache,
   evaluateLicense,
   parseVerifyResponse,
   cacheFromVerify,
@@ -161,6 +161,10 @@ test('kebab 정규화', () => {
   assert.equal(kebab('buttonPrimary'), 'button-primary');
   assert.equal(kebab('button/primary/background'), 'button-primary-background');
   assert.equal(kebab('  Card__Header '), 'card-header');
+  // 숫자 사이 '_'(소수점 표기)는 보존, 그 외 '_'는 '-'
+  assert.equal(kebab('line-height/1_5'), 'line-height-1_5');
+  assert.equal(kebab('a_1'), 'a-1'); // 비-숫자 경계는 '-'
+  assert.equal(kebab('1_5_2'), '1_5_2'); // 연속 소수 표기도 보존
 });
 
 test('pascalCase / capitalize — 컴포넌트·속성명 관례', () => {
@@ -178,8 +182,12 @@ test('layerNameFromToken — 전체 경로 kebab', () => {
   assert.equal(layerNameFromToken('button/primary/background'), 'button-primary-background');
   // 스타일 말단 제거 옵션
   assert.equal(layerNameFromToken('card/title/fill', { stripStyleLeaf: true }), 'card-title');
+  // 'border'는 유효 역할이라 stripStyleLeaf로도 보존(스타일 말단 아님)
+  assert.equal(layerNameFromToken('card/border', { stripStyleLeaf: true }), 'card-border');
   // maxDepth: 앞쪽 맥락을 자르고 로컬 역할 보존
   assert.equal(layerNameFromToken('a/b/c/d/e', { maxDepth: 3 }), 'c-d-e');
+  // 소수 토큰: 변수명 'line-height/1_5'과 동일 표기로 레이어명에 보존(1-5로 뭉개지지 않음)
+  assert.equal(layerNameFromToken('line-height/1_5'), 'line-height-1_5');
 });
 
 test('layerNameFromRole — 상위 맥락 + 역할', () => {
@@ -257,32 +265,41 @@ test('멱등성 — 같은 입력은 같은 출력', () => {
 });
 
 /* ================= entitlements.ts ================= */
-test('hasEntitlement — 티어 위계로 기능 해금', () => {
+test('hasEntitlement — Paid에서만 유료 기능 해금', () => {
+  assert.equal(hasEntitlement('free', 'tokens'), false);
   assert.equal(hasEntitlement('free', 'components'), false);
-  assert.equal(hasEntitlement('pro', 'components'), true);
-  assert.equal(hasEntitlement('free', 'unlimited'), false);
-  assert.equal(hasEntitlement('pro', 'unlimited'), true);
-  // teamPresets는 team에서만
-  assert.equal(hasEntitlement('pro', 'teamPresets'), false);
-  assert.equal(hasEntitlement('team', 'teamPresets'), true);
+  assert.equal(hasEntitlement('paid', 'tokens'), true);
+  assert.equal(hasEntitlement('paid', 'semantics'), true);
+  assert.equal(hasEntitlement('paid', 'components'), true);
+  assert.equal(hasEntitlement('paid', 'presets'), true);
 });
 
-test('limitsForTier — Free는 한도, Pro/Team은 무제한', () => {
-  assert.deepEqual(limitsForTier('free'), { nodes: 50, tokens: 100, bindings: 200 });
-  assert.equal(limitsForTier('pro').tokens, Infinity);
-  assert.equal(limitsForTier('team').nodes, Infinity);
-});
-
-test('clampCount — 한도까지 자르고 초과 보고', () => {
-  assert.deepEqual(clampCount(120, 100), { allowed: 100, limited: true, overflow: 20 });
-  assert.deepEqual(clampCount(80, 100), { allowed: 80, limited: false, overflow: 0 });
-  assert.deepEqual(clampCount(5, Infinity), { allowed: 5, limited: false, overflow: 0 });
-});
-
-test('isTier — 유효 티어 검증', () => {
-  assert.equal(isTier('pro'), true);
+test('isTier — 유효 티어 검증(free|paid)', () => {
+  assert.equal(isTier('free'), true);
+  assert.equal(isTier('paid'), true);
+  assert.equal(isTier('pro'), false); // 구 3티어 값은 무효
   assert.equal(isTier('enterprise'), false);
   assert.equal(isTier(undefined), false);
+});
+
+test('normalizeLegacyTier — pro/team → paid 승격', () => {
+  assert.equal(normalizeLegacyTier('pro'), 'paid');
+  assert.equal(normalizeLegacyTier('team'), 'paid');
+  assert.equal(normalizeLegacyTier('paid'), 'paid');
+  assert.equal(normalizeLegacyTier('free'), 'free');
+  assert.equal(normalizeLegacyTier('enterprise'), null);
+});
+
+test('normalizeLicenseCache — 구 pro/team 캐시를 paid로 정규화', () => {
+  const base = { key: 'KEY-1', expiresAt: 9_999, lastVerified: 1_000 };
+  assert.deepEqual(normalizeLicenseCache({ ...base, tier: 'pro' }), { ...base, tier: 'paid' });
+  assert.deepEqual(normalizeLicenseCache({ ...base, tier: 'team', instanceId: 'inst-1' }), {
+    ...base,
+    tier: 'paid',
+    instanceId: 'inst-1',
+  });
+  assert.equal(normalizeLicenseCache({ ...base, tier: 'enterprise' }), null);
+  assert.equal(normalizeLicenseCache({ key: 'k' }), null);
 });
 
 /* ================= license.ts ================= */
@@ -291,23 +308,23 @@ test('evaluateLicense — 캐시 없음/만료/활성', () => {
   assert.deepEqual(evaluateLicense(null, now), { tier: 'free', status: 'none', stale: false });
   // 만료(now > expiresAt) → free/expired
   assert.deepEqual(
-    evaluateLicense({ key: 'k', tier: 'pro', expiresAt: now - 1, lastVerified: now }, now),
+    evaluateLicense({ key: 'k', tier: 'paid', expiresAt: now - 1, lastVerified: now }, now),
     { tier: 'free', status: 'expired', stale: true },
   );
   // 만료 전 + 최근 검증 → active
   assert.deepEqual(
-    evaluateLicense({ key: 'k', tier: 'pro', expiresAt: now + GRACE_MS, lastVerified: now }, now),
-    { tier: 'pro', status: 'active', stale: false },
+    evaluateLicense({ key: 'k', tier: 'paid', expiresAt: now + GRACE_MS, lastVerified: now }, now),
+    { tier: 'paid', status: 'active', stale: false },
   );
 });
 
 test('evaluateLicense — 오프라인 grace 유지 후 강등', () => {
   const now = 2_000_000_000_000;
-  const base = { key: 'k', tier: 'team', expiresAt: now + GRACE_MS * 2 };
+  const base = { key: 'k', tier: 'paid', expiresAt: now + GRACE_MS * 2 };
   // 검증이 REVERIFY 경과·grace 이내 → 티어 유지(grace, stale)
   assert.deepEqual(
     evaluateLicense({ ...base, lastVerified: now - (REVERIFY_MS + 1000) }, now),
-    { tier: 'team', status: 'grace', stale: true },
+    { tier: 'paid', status: 'grace', stale: true },
   );
   // grace 초과(장기 미검증) → 강등 free
   assert.deepEqual(
@@ -317,22 +334,29 @@ test('evaluateLicense — 오프라인 grace 유지 후 강등', () => {
 });
 
 test('parseVerifyResponse — 성공/실패/형식오류', () => {
-  const ok = parseVerifyResponse({ valid: true, tier: 'pro', expiresAt: 123 });
-  assert.deepEqual(ok, { ok: true, tier: 'pro', expiresAt: 123 });
+  const ok = parseVerifyResponse({ valid: true, tier: 'paid', expiresAt: 123 });
+  assert.deepEqual(ok, { ok: true, tier: 'paid', expiresAt: 123 });
   assert.equal(parseVerifyResponse({ valid: false, error: '만료됨' }).error, '만료됨');
   assert.equal(parseVerifyResponse({ tier: 'gold', expiresAt: 1 }).ok, false); // 알 수 없는 티어
-  assert.equal(parseVerifyResponse({ valid: true, tier: 'pro' }).ok, false); // 만료시각 없음
+  assert.equal(parseVerifyResponse({ valid: true, tier: 'paid' }).ok, false); // 만료시각 없음
   assert.equal(parseVerifyResponse('nope').ok, false);
 });
 
 test('cacheFromVerify — 응답+키+now → 캐시', () => {
-  const v = { ok: true, tier: 'pro', expiresAt: 999 };
+  const v = { ok: true, tier: 'paid', expiresAt: 999 };
   assert.deepEqual(cacheFromVerify('KEY-1', v, 500), {
     key: 'KEY-1',
-    tier: 'pro',
+    tier: 'paid',
     expiresAt: 999,
     lastVerified: 500,
   });
+});
+
+test('cacheFromVerify — instanceId 있으면 보관, 없으면 키 자체 없음', () => {
+  const withId = cacheFromVerify('KEY-1', { ok: true, tier: 'paid', expiresAt: 999, instanceId: 'inst-9' }, 500);
+  assert.equal(withId.instanceId, 'inst-9');
+  const withoutId = cacheFromVerify('KEY-1', { ok: true, tier: 'paid', expiresAt: 999 }, 500);
+  assert.ok(!('instanceId' in withoutId)); // undefined 키조차 두지 않음(캐시 형태 안정)
 });
 
 /* ================= licenseToken.ts (M2.1 서명 검증 코어) ================= */
@@ -346,10 +370,10 @@ test('base64UrlToString — base64url 디코드(ASCII JSON)', () => {
 });
 
 test('decodeJwt — 헤더/페이로드/서명 분해', () => {
-  const t = makeToken({ alg: 'ES256', typ: 'JWT' }, { tier: 'team', exp: 42 });
+  const t = makeToken({ alg: 'ES256', typ: 'JWT' }, { tier: 'paid', exp: 42 });
   const jwt = decodeJwt(t);
   assert.equal(jwt.header.alg, 'ES256');
-  assert.equal(jwt.payload.tier, 'team');
+  assert.equal(jwt.payload.tier, 'paid');
   assert.equal(jwt.signatureB64, 'SIG');
   assert.equal(jwt.signingInput, t.slice(0, t.lastIndexOf('.')));
   assert.throws(() => decodeJwt('a.b')); // 형식 오류
@@ -358,16 +382,16 @@ test('decodeJwt — 헤더/페이로드/서명 분해', () => {
 test('validateLicenseClaims — 만료·iss·aud·tier', () => {
   const now = 1_000_000;
   const exp = (now + 60_000) / 1000; // 초 단위
-  const base = { tier: 'pro', exp, iss: 'srv', aud: 'plugin' };
+  const base = { tier: 'paid', exp, iss: 'srv', aud: 'plugin' };
   assert.deepEqual(validateLicenseClaims(base, now, { issuer: 'srv', audience: 'plugin' }), {
     ok: true,
-    tier: 'pro',
+    tier: 'paid',
     expiresAt: exp * 1000,
   });
-  assert.equal(validateLicenseClaims({ tier: 'pro', exp: (now - 1) / 1000 }, now).ok, false); // 만료
+  assert.equal(validateLicenseClaims({ tier: 'paid', exp: (now - 1) / 1000 }, now).ok, false); // 만료
   assert.equal(validateLicenseClaims(base, now, { issuer: 'other' }).ok, false); // iss 불일치
   assert.equal(validateLicenseClaims({ tier: 'gold', exp }, now).ok, false); // 알 수 없는 티어
-  assert.equal(validateLicenseClaims({ tier: 'pro' }, now).ok, false); // exp 없음
+  assert.equal(validateLicenseClaims({ tier: 'paid' }, now).ok, false); // exp 없음
 });
 
 /* ================= presets.ts (M3 Team) ================= */
@@ -809,20 +833,20 @@ test('missingVariants — 베리언트 자식 이름에서 빠진 조합(Phase 4
 test('verifyLicenseToken — 서명 검증 주입 + alg=none 거부', async () => {
   const now = 1_000_000;
   const exp = (now + 60_000) / 1000;
-  const tok = makeToken({ alg: 'ES256' }, { tier: 'pro', exp });
+  const tok = makeToken({ alg: 'ES256' }, { tier: 'paid', exp });
   const yes = async () => true;
   const no = async () => false;
 
   const ok = await verifyLicenseToken(tok, now, {}, yes);
-  assert.deepEqual(ok, { ok: true, tier: 'pro', expiresAt: exp * 1000 });
+  assert.deepEqual(ok, { ok: true, tier: 'paid', expiresAt: exp * 1000 });
 
   // 서명 실패 → 거부
   assert.equal((await verifyLicenseToken(tok, now, {}, no)).ok, false);
   // alg=none → 서명 검증 호출 없이 거부
-  const none = makeToken({ alg: 'none' }, { tier: 'pro', exp });
+  const none = makeToken({ alg: 'none' }, { tier: 'paid', exp });
   assert.equal((await verifyLicenseToken(none, now, {}, yes)).ok, false);
   // 서명 OK라도 만료면 거부
-  const expired = makeToken({ alg: 'ES256' }, { tier: 'pro', exp: (now - 1) / 1000 });
+  const expired = makeToken({ alg: 'ES256' }, { tier: 'paid', exp: (now - 1) / 1000 });
   assert.equal((await verifyLicenseToken(expired, now, {}, yes)).ok, false);
 });
 
@@ -1083,6 +1107,111 @@ test('nameTextStyles — 크기 내림차순 램프 명명 + 초과분 text-N', 
   }));
   const names = nameTextStyles(many).map((s) => s.name);
   assert.equal(names[RAMP_NAMES.length], 'text-9');
+});
+
+test('nameTextStyles — 같은 크기 다중 스타일은 base/weight로 분기(병합 금지)', () => {
+  // 크기 2종(32,16) → 32=display, 16=h1. 16px에 Regular/Bold 둘 → h1/regular, h1/bold
+  const byWeight = nameTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 5, sample: '' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 2, sample: '' },
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 1, sample: '' },
+  ]).map((s) => s.name);
+  assert.equal(new Set(byWeight).size, byWeight.length); // 전부 유일
+  assert.ok(byWeight.includes('display')); // 32px 단독
+  assert.ok(byWeight.includes('h1/regular') && byWeight.includes('h1/bold'));
+
+  // 같은 16px·같은 굵기, 패밀리만 다름 → base/family-weight (크기 1종 → base=display)
+  const byFamily = nameTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 2, sample: '' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Roboto', style: 'Bold', count: 1, sample: '' },
+  ]).map((s) => s.name);
+  assert.ok(byFamily.includes('display/inter-bold') && byFamily.includes('display/roboto-bold'));
+
+  // 같은 크기·굵기·패밀리, 행간만 다름(별도 군집) → 유일성 보강으로 둘 다 보존
+  const byLh = nameTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, sample: '' },
+    { fontSize: 16, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, sample: '' },
+  ]).map((s) => s.name);
+  assert.equal(new Set(byLh).size, 2);
+});
+
+test('clusterTextStyles — 바인딩된 styleId를 군집별로 수집(중복 제거)', () => {
+  const samples = [
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h', styleId: 'S:1' },
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h2', styleId: 'S:1' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b', styleId: '' },
+  ];
+  const cl = clusterTextStyles(samples);
+  assert.deepEqual(cl.find((c) => c.fontSize === 32).styleIds, ['S:1']); // 같은 스타일 → 1개로
+  assert.deepEqual(cl.find((c) => c.fontSize === 16).styleIds, []); // 미바인딩(빈 id) → 없음
+});
+
+test('nameTextStyles — 이미 바인딩된 군집은 기존 이름 유지 + boundStyleId(재스캔 rename)', () => {
+  const clusters = clusterTextStyles([
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h', styleId: 'S:1' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b', styleId: '' },
+  ]);
+  const existing = [{ id: 'S:1', name: '제목-강조', fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold' }];
+  const specs = nameTextStyles(clusters, existing);
+  const s32 = specs.find((s) => s.fontSize === 32);
+  const s16 = specs.find((s) => s.fontSize === 16);
+  assert.equal(s32.name, '제목-강조'); // 자동 이름(display) 대신 기존 이름 유지
+  assert.equal(s32.boundStyleId, 'S:1'); // rename 앵커 부여
+  assert.equal(s16.boundStyleId, undefined); // 미바인딩·미존재는 앵커 없음
+  assert.ok(s16.name.length > 0); // 미바인딩은 자동 이름
+
+  // existing 미전달(기존 호출부) → 종전과 동일: 전부 자동 이름·앵커 없음
+  assert.ok(nameTextStyles(clusters).every((s) => s.boundStyleId === undefined));
+});
+
+test('nameTextStyles — 바인딩 안 됐어도 시그니처가 같은 기존 스타일이 있으면 앵커(타프레임 중복 방지)', () => {
+  // 다른 프레임의 생 텍스트: styleId 없음(''). 하지만 시그니처가 기존 'body'와 동일 → 그 스타일로 인식.
+  const clusters = clusterTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'p', styleId: '' },
+  ]);
+  const existing = [{ id: 'S:body', name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }];
+  const specs = nameTextStyles(clusters, existing);
+  assert.equal(specs[0].name, 'body'); // 자동 이름 아니라 기존 이름
+  assert.equal(specs[0].boundStyleId, 'S:body'); // 시그니처 매칭으로 앵커 → 등록 시 중복 생성 X
+});
+
+test('nameTextStyles — 같은 시그니처 기존 스타일이 2개면 모호 → 시그니처 앵커 안 함', () => {
+  const clusters = clusterTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'p', styleId: '' },
+  ]);
+  const existing = [
+    { id: 'S:a', name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+    { id: 'S:b', name: 'label', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+  ];
+  assert.equal(nameTextStyles(clusters, existing)[0].boundStyleId, undefined); // 모호 → 앵커 보류, 자동 이름
+});
+
+test('nameTextStyles — 한 군집이 여러 스타일에 걸치면 모호 → 앵커 안 함', () => {
+  const clusters = clusterTextStyles([
+    { fontSize: 20, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'a', styleId: 'S:1' },
+    { fontSize: 20, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b', styleId: 'S:2' },
+  ]);
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].styleIds.length, 2);
+  // 노드 바인딩이 2개라 모호하고, 시그니처도 두 스타일이 같아 모호 → 앵커 안 함.
+  const existing = [
+    { id: 'S:1', name: 'x', fontSize: 20, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+    { id: 'S:2', name: 'y', fontSize: 20, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+  ];
+  assert.equal(nameTextStyles(clusters, existing)[0].boundStyleId, undefined);
+});
+
+test('nameTextStyles — styleId 바인딩이어도 시그니처 불일치(오버라이드)면 앵커 안 함', () => {
+  // 스타일 body(16/24)가 붙어 있지만 노드가 fontSize 18로 오버라이드 → 시그니처 어긋남.
+  const clusters = clusterTextStyles([
+    { fontSize: 18, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'p', styleId: 'S:body' },
+  ]);
+  const existing = [
+    { id: 'S:body', name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+  ];
+  const specs = nameTextStyles(clusters, existing);
+  assert.equal(specs[0].boundStyleId, undefined); // 오버라이드 → rename 앵커 보류
+  assert.notEqual(specs[0].name, 'body'); // 자동 이름(크기 램프)
 });
 
 test('fontStyleForWeight — 굵기/italic → Figma style', () => {

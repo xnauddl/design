@@ -1,7 +1,7 @@
 /* ============================================================
    presets.ts — 팀 공유 프리셋(재사용 설정 묶음) 직렬화/검증 (순수)
-   M3(Team): base·tolerance·maxDepth·시맨틱 매핑을 한 묶음으로 저장/공유(JSON).
-   저장은 clientStorage(code), 팀 공유는 JSON 내보내기/가져오기. 게이팅은 Team.
+   M3(Paid): base·tolerance·maxDepth·시맨틱 매핑을 한 묶음으로 저장/공유(JSON).
+   저장은 clientStorage(code), 팀 공유는 JSON 내보내기/가져오기. 게이팅은 Paid.
    ============================================================ */
 
 export interface Preset {

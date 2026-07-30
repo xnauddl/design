@@ -138,6 +138,8 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
     paddingRight: 8,
     paddingTop: 0,
     paddingBottom: 0,
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
     width: 200,
     height: 100,
     cornerRadius: 8,
@@ -175,6 +177,53 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
   // 레이어 불투명도(<1)
   assert.equal(byName.get('opacity/0_5')?.category, 'opacity');
   assert.deepEqual(byName.get('opacity/0_5')?.sources, ['opacity']);
+});
+
+test('extractFromSelection — HUG/FILL 축의 크기는 토큰화하지 않음(Fixed만)', () => {
+  installFigma();
+  // 가로 FILL(부모 채움), 세로 HUG(콘텐츠 맞춤) — 둘 다 동적 크기라 size 토큰 제외.
+  const fillHug = {
+    type: 'FRAME',
+    id: 'f-fh',
+    name: 'FillHug',
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FILL',
+    layoutSizingVertical: 'HUG',
+    width: 320,
+    height: 44,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [],
+  };
+  // 가로만 Fixed → 그 축의 크기(width)만 토큰화.
+  const fixedW = {
+    type: 'FRAME',
+    id: 'f-fw',
+    name: 'FixedW',
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: 280,
+    height: 99,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [],
+  };
+
+  const { tokens } = extractFromSelection([fillHug, fixedW]);
+  const names = new Set(tokens.map((t) => t.name));
+  // FILL/HUG 축의 값은 모두 제외
+  assert.equal(names.has('size/320'), false); // 가로 FILL
+  assert.equal(names.has('size/44'), false); // 세로 HUG
+  assert.equal(names.has('size/99'), false); // 세로 HUG
+  // Fixed 축만 수집
+  assert.equal(names.has('size/280'), true); // 가로 FIXED
 });
 
 test('extractFromSelection — 그라디언트 채움은 경고', () => {
@@ -535,29 +584,6 @@ test('bindSelection — fontFamily(STRING)는 FONT_FAMILY 변수에 정확 일�
   assert.ok(res.bound >= 1);
 });
 
-test('bindSelection — 사용량 한도(maxNodes) 초과 시 부분 적용 + limited', async () => {
-  installFigma();
-  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
-  const mk = (id) => ({
-    type: 'FRAME',
-    id,
-    name: id,
-    fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }], // 매칭 → 노드당 1 바인딩
-    layoutSizingHorizontal: 'HUG',
-    layoutSizingVertical: 'HUG',
-    layoutMode: 'NONE',
-    setBoundVariable() {},
-  });
-  const res = await bindSelection([mk('a'), mk('b'), mk('c')], 0.5, { maxNodes: 2 });
-  assert.equal(res.limited, true);
-  assert.equal(res.bound, 2); // 노드 2개만 처리
-
-  // 한도 미지정(무제한)이면 limited 없음
-  const res2 = await bindSelection([mk('d'), mk('e')], 0.5);
-  assert.equal(res2.limited, undefined);
-  assert.equal(res2.bound, 2);
-});
-
 test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + 사유', async () => {
   installFigma();
   await createTokens(
@@ -586,7 +612,7 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
   });
 
   const node = mk();
-  const dry = await bindSelection([node], 0.5, {}, false);
+  const dry = await bindSelection([node], 0.5, false);
   assert.equal(dry.bound, 2); // 색1 + width1 예정
   assert.equal(dry.skipped, 1); // 미매칭 색1
   assert.equal(dry.reasons['no-match'], 1);
@@ -597,7 +623,7 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
 
   // 실제 적용은 동일 수치 + 변경 발생
   const node2 = mk();
-  const real = await bindSelection([node2], 0.5, {}, true);
+  const real = await bindSelection([node2], 0.5, true);
   assert.equal(real.bound, 2);
   assert.equal(real.skipped, 1);
   assert.equal(node2.fills[0].boundVariables.color.type, 'VARIABLE_ALIAS');
@@ -633,7 +659,7 @@ test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 
   };
   const root = { type: 'FRAME', id: 'root', name: 'root', fills: [], layoutMode: 'NONE', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [child], setBoundVariable() {} };
 
-  const dry = await bindSelection([root], 0.5, {}, false);
+  const dry = await bindSelection([root], 0.5, false);
 
   // 후보 2건: fills[0] 색 + width
   assert.equal(dry.candidates.length, 2);
@@ -673,7 +699,7 @@ test('bindSelection — 진행률 보고 + 취소(UX6)', async () => {
   const sel = Array.from({ length: 120 }, (_, i) => mk('n' + i));
   let lastDone = 0;
   let total = 0;
-  const res = await bindSelection(sel, 0.5, {}, true, {
+  const res = await bindSelection(sel, 0.5, true, {
     onProgress: (d, t) => {
       lastDone = d;
       total = t;
@@ -687,7 +713,7 @@ test('bindSelection — 진행률 보고 + 취소(UX6)', async () => {
 
   // 취소: shouldCancel true → 첫 양보 지점(50)에서 중단, 처리한 만큼만 적용
   const sel2 = Array.from({ length: 120 }, (_, i) => mk('m' + i));
-  const res2 = await bindSelection(sel2, 0.5, {}, true, {
+  const res2 = await bindSelection(sel2, 0.5, true, {
     onProgress: () => {},
     shouldCancel: () => true,
     yieldToEvents: () => Promise.resolve(),
@@ -1267,9 +1293,9 @@ test('prunePaletteColors(#3) — 재생성 hue 패밀리 안에서만 정리(다
 /* ================= textStyles.ts (Phase C) ================= */
 test('scanTextStyles — TEXT 노드 시그니처 수집(+%행간 환산·mixed 스킵)', () => {
   const figma = installFigma();
-  const t1 = { type: 'TEXT', id: 't1', name: 'Title', fontSize: 32, fontName: { family: 'Inter', style: 'Bold' }, lineHeight: { unit: 'PIXELS', value: 40 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'Hi' };
-  const t2 = { type: 'TEXT', id: 't2', name: 'Body', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'PERCENT', value: 150 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'x' };
-  const tMixed = { type: 'TEXT', id: 't3', name: 'Mixed', fontSize: figma.mixed, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'AUTO' }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'y' };
+  const t1 = { type: 'TEXT', id: 't1', name: 'Title', fontSize: 32, fontName: { family: 'Inter', style: 'Bold' }, lineHeight: { unit: 'PIXELS', value: 40 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'Hi', textStyleId: '' };
+  const t2 = { type: 'TEXT', id: 't2', name: 'Body', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'PERCENT', value: 150 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'x', textStyleId: '' };
+  const tMixed = { type: 'TEXT', id: 't3', name: 'Mixed', fontSize: figma.mixed, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'AUTO' }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'y', textStyleId: '' };
   const frame = { type: 'FRAME', id: 'f', name: 'F', children: [t1, t2, tMixed] };
 
   const { samples, warnings } = scanTextStyles([frame]);
@@ -1277,6 +1303,28 @@ test('scanTextStyles — TEXT 노드 시그니처 수집(+%행간 환산·mixed 
   assert.equal(samples.find((s) => s.fontSize === 16).lineHeight, 24); // 150% × 16
   assert.equal(samples.find((s) => s.fontSize === 32).style, 'Bold');
   assert.ok(warnings.length >= 1);
+});
+
+test('scanTextStyles — 숨김 텍스트(visible=false)와 그 하위는 스캔하지 않음', () => {
+  installFigma();
+  const visible = {
+    type: 'TEXT', id: 'vis', name: 'Show', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'a', textStyleId: '',
+  };
+  const hidden = {
+    type: 'TEXT', id: 'hid', name: 'Hide', visible: false, fontSize: 48, fontName: { family: 'Inter', style: 'Bold' },
+    lineHeight: { unit: 'PIXELS', value: 56 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'b', textStyleId: '',
+  };
+  const nestedHidden = {
+    type: 'FRAME', id: 'wrap', name: 'HiddenWrap', visible: false,
+    children: [{
+      type: 'TEXT', id: 'nested', name: 'Nested', fontSize: 20, fontName: { family: 'Inter', style: 'Regular' },
+      lineHeight: { unit: 'PIXELS', value: 28 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'c', textStyleId: '',
+    }],
+  };
+  const { samples } = scanTextStyles([{ type: 'FRAME', id: 'f', name: 'F', children: [visible, hidden, nestedHidden] }]);
+  assert.equal(samples.length, 1);
+  assert.equal(samples[0].layerName, 'Show');
 });
 
 test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 적용 + 멱등', async () => {
@@ -1308,4 +1356,106 @@ test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 적용 
   assert.equal(r2.created, 0);
   assert.equal(r2.updated, 1);
   assert.equal(figma._state.textStyles.length, 1); // 중복 생성 없음
+});
+
+test('createSemanticTextStyles — 기존 역할로 rename은 충돌 보류(동명·시맨틱 보존)', async () => {
+  const figma = installFigma();
+  // body(16) · caption(13) 각각 등록
+  await createSemanticTextStyles(
+    [
+      { name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+      { name: 'caption', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+    ],
+    false,
+    [],
+  );
+  const bodySem = findVar(figma, 'Semantic', 'font-size/body');
+  const bodyGlobalId = bodySem.valuesByMode['mode:Semantic'].id;
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
+  const caption = figma._state.textStyles.find((s) => s.name === 'caption');
+  assert.ok(body && caption);
+  const bodyBound = body.boundVariables.fontSize.id;
+
+  // caption → body: 대상 이름 점유 → rename 거부(동명 스타일·잘못된 바인딩 방지).
+  const r = await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular', boundStyleId: caption.id }],
+    false,
+    [],
+  );
+  assert.equal(r.created, 0);
+  assert.equal(r.updated, 0); // 충돌 스킵
+  assert.ok(r.missing.some((m) => m.includes('이름 충돌')));
+  assert.equal(caption.name, 'caption'); // 이름 유지
+  assert.equal(caption.fontSize, 13);
+  assert.equal(figma._state.textStyles.filter((s) => s.name === 'body').length, 1); // 동명 없음
+  const bodySemAfter = findVar(figma, 'Semantic', 'font-size/body');
+  assert.equal(bodySemAfter.valuesByMode['mode:Semantic'].id, bodyGlobalId);
+  assert.equal(body.boundVariables.fontSize.id, bodyBound); // 기존 body 바인딩 불변
+});
+
+test('createSemanticTextStyles — 빈 이름으로 rename하면 시맨틱 별칭도 이동', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles(
+    [{ name: 'caption', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const caption = figma._state.textStyles.find((s) => s.name === 'caption');
+  const oldSem = findVar(figma, 'Semantic', 'font-size/caption');
+  const globalId = oldSem.valuesByMode['mode:Semantic'].id;
+
+  const r = await createSemanticTextStyles(
+    [{ name: 'display', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular', boundStyleId: caption.id }],
+    false,
+    [],
+  );
+  assert.equal(r.updated, 1);
+  assert.equal(caption.name, 'display');
+  assert.equal(caption.fontSize, 13); // rename: 타이포 보존
+  assert.equal(findVar(figma, 'Semantic', 'font-size/caption'), undefined); // 옛 역할 이동됨
+  const moved = findVar(figma, 'Semantic', 'font-size/display');
+  assert.ok(moved);
+  assert.equal(moved.valuesByMode['mode:Semantic'].id, globalId); // 같은 Global 별칭 유지
+  assert.equal(caption.boundVariables.fontSize.id, moved.id);
+});
+
+test('createSemanticTextStyles — letterSpacing 0이면 기존 자간을 클리어', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 2, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
+  assert.equal(body.letterSpacing.value, 2);
+
+  // stale 앵커 없이 동명 갱신 → 자간 0으로 클리어
+  await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  assert.equal(body.letterSpacing.value, 0);
+  assert.equal(body.letterSpacing.unit, 'PIXELS');
+});
+
+test('createSemanticTextStyles — stale boundStyleId는 rename 모드가 아님(타이포 기록)', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
+  // 존재하지 않는 id + 같은 이름 → 이름 폴백으로 body를 찾지만, stale 앵커라 타이포를 스펙으로 갱신해야 함.
+  const r = await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 18, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Medium', boundStyleId: 'style:gone' }],
+    false,
+    [],
+  );
+  assert.equal(r.created, 0);
+  assert.equal(r.updated, 1);
+  assert.equal(body.fontSize, 18);
+  assert.equal(body.fontName.style, 'Medium');
+  assert.equal(body.lineHeight.value, 28);
 });

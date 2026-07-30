@@ -3,7 +3,7 @@
    ============================================================ */
 import type { DraftToken } from '../lib/tokens';
 import type { TextStyleSpec } from '../lib/textStyles';
-import type { Tier } from '../lib/entitlements';
+import type { Tier, Feature } from '../lib/entitlements';
 import type { LicenseStatus, VerifyResult } from '../lib/license';
 import type { Preset } from '../lib/presets';
 import type { ExportFormat } from '../lib/exporters';
@@ -93,6 +93,7 @@ export type UiToCode =
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   | { type: 'SCAN_TEXT_STYLES' } // Phase C: 선택 텍스트에서 스타일 후보 추출
   | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[]; apply: boolean } // Phase C: 변수 보장+스타일 등록(+적용)
+  | { type: 'APPLY_TEXT_STYLES' } // Phase C: 적용만(생성 없음) — 선택 텍스트를 기존 스타일에 바인딩
   | { type: 'GET_COLLECTIONS' }
   | { type: 'GET_GLOBAL_COLORS' } // #10: 기존 Global 색 변수 스캔(재방문 시맨틱 매핑 추천용)
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
@@ -101,14 +102,14 @@ export type UiToCode =
   | { type: 'SET_LICENSE'; tier: Tier } // M1: 개발용 강제 티어(검증 키 없을 때만 적용)
   | { type: 'LICENSE_VERIFIED'; key: string; result: VerifyResult } // M2.2: UI가 검증한 결과 보고
   | { type: 'CLEAR_LICENSE' } // 키 제거 → 개발용 티어/Free로 복귀
-  | { type: 'GET_PRESETS' } // M3(Team): 저장된 프리셋 목록 요청
-  | { type: 'SAVE_PRESET'; preset: Preset } // M3(Team): 프리셋 저장/갱신
-  | { type: 'DELETE_PRESET'; name: string } // M3(Team): 프리셋 삭제
+  | { type: 'GET_PRESETS' } // M3(Paid): 저장된 프리셋 목록 요청
+  | { type: 'SAVE_PRESET'; preset: Preset } // M3(Paid): 프리셋 저장/갱신
+  | { type: 'DELETE_PRESET'; name: string } // M3(Paid): 프리셋 삭제
   | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number } // 토큰 코드 내보내기
-  | { type: 'SCAN_COMPONENT_CANDIDATES' } // #1(Pro): 선택 하위 순회 → 등록 후보 트리
-  | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[] } // Phase 3(Pro): 후보(트리 선택 nodeIds, 없으면 선택 프레임 '내부' 후보) → 메인 컴포넌트 등록 + 베이스 묶음 베리언트 세트
-  | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Pro): 같은 베이스 컴포넌트 → 베리언트 세트
-  | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Pro): 선택 세트의 빠진 조합 자동 생성
+  | { type: 'SCAN_COMPONENT_CANDIDATES' } // #1(Paid): 선택 하위 순회 → 등록 후보 트리
+  | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[] } // Phase 3(Paid): 후보(트리 선택 nodeIds, 없으면 선택 프레임 '내부' 후보) → 메인 컴포넌트 등록 + 베이스 묶음 베리언트 세트
+  | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Paid): 같은 베이스 컴포넌트 → 베리언트 세트
+  | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Paid): 선택 세트의 빠진 조합 자동 생성
   | { type: 'CHECK_CONTRAST'; level: WcagLevel } // 명도 대비 점검(읽기 전용 감사)
   | { type: 'APPLY_CONTRAST_FIX'; nodeId: string; hex: string }; // #2: 보정색을 해당 노드 단색 채움에 적용
 
@@ -117,17 +118,18 @@ export type CodeToUi =
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean }
-  | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; limited?: boolean; preview?: boolean }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; limited?: boolean; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[] } // candidates/nodes: 미리보기 트리(#6·#13)
+  | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[] } // candidates/nodes: 미리보기 트리(#6·#13)
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[] } // Phase C: 스캔 결과
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; applied: number; missing: string[] } // Phase C
+  | { type: 'TEXT_STYLES_APPLIED'; applied: number; missing: string[] } // Phase C: 적용만(생성 없음) 결과
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   | { type: 'GLOBAL_COLORS'; colors: { name: string; hex: string }[] } // #10: 기존 Global 색(이름+hex)
   // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).
-  | { type: 'PREREQ_STATE'; hasGlobal: boolean; hasBindable: boolean }
+  | { type: 'PREREQ_STATE'; hasGlobal: boolean; hasBindable: boolean; hasTextStyles: boolean }
   | {
       type: 'LICENSE_STATUS';
       tier: Tier;
@@ -141,9 +143,10 @@ export type CodeToUi =
       /** 마지막 작업 관련 메시지(검증 실패·오프라인 안내 등). */
       note?: string;
     }
-  | { type: 'PREMIUM_REQUIRED'; feature: string; message: string }
-  | { type: 'REQUEST_VERIFY'; key: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서)
-  | { type: 'PRESETS'; presets: Preset[] } // M3(Team): 프리셋 목록
+  | { type: 'PREMIUM_REQUIRED'; feature: Feature; message: string }
+  | { type: 'REQUEST_VERIFY'; key: string; instanceId?: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서). instanceId: 같은 기기로 validate
+  | { type: 'REQUEST_DEACTIVATE'; key: string; instanceId: string } // 해제 시 code → UI: 이 기기의 LS 활성화 슬롯 반납(best-effort)
+  | { type: 'PRESETS'; presets: Preset[] } // M3(Paid): 프리셋 목록
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단

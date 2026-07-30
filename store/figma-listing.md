@@ -31,11 +31,11 @@
 - 🔗 **시맨틱 매핑** — `surface`, `text` 같은 역할을 Global 변수에 별칭으로 연결
 - 🎯 **자동 바인딩** — 선택 속성을 가장 가까운 변수에 연결(허용오차). 적용 전 미리보기, 사유별 스킵 안내, 진행률·취소
 - ✏️ **레이어 리네임** — 토큰/역할 기반의 일관된 이름으로, 변경 diff 미리보기
-- 🧩 **컴포넌트 · 베리언트 (Pro)** — 컴포넌트 등록, 베리언트 분류, 누락 조합 생성, 속성 노출
+- 🧩 **컴포넌트 · 베리언트 (Paid)** — 컴포넌트 등록, 베리언트 분류, 누락 조합 생성, 속성 노출
 - 📦 **코드 내보내기** — W3C 디자인 토큰 JSON / CSS 변수 (px·rem 선택)
 
 **안전·프라이버시**
-- 모든 변경은 단일 Undo로 되돌리기, 한도 초과분은 비파괴 처리
+- 모든 변경은 단일 Undo로 되돌리기 · 미리보기 → 적용 2단계(비파괴)
 - **디자인 데이터를 외부로 전송하지 않습니다.** 네트워크는 (선택적) 라이선스 키 검증에만 사용
 
 ### English
@@ -47,11 +47,11 @@
 - 🔗 **Semantic mapping** — alias roles (`surface`, `text`, …) to Global variables
 - 🎯 **Auto‑bind** properties to the nearest variable (tolerance), with preview, grouped skip reasons, progress & cancel
 - ✏️ **Rename** layers from tokens/roles with a change diff
-- 🧩 **Components & variants (Pro)** — register, classify variants, generate missing combos, expose properties
+- 🧩 **Components & variants (Paid)** — register, classify variants, generate missing combos, expose properties
 - 📦 **Export** to W3C Design Tokens JSON / CSS variables (px or rem)
 
 **Safety & privacy**
-- Single‑undo per run, non‑destructive limits
+- Single‑undo per run, non‑destructive preview → apply
 - **No design data leaves Figma.** Network is used only for optional license‑key verification.
 
 ---
