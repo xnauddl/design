@@ -3,7 +3,7 @@
    figma/DOM 의존 없음. 실제 메시지 시퀀싱은 ui.ts가 이 정의를 따라 수행한다.
    ============================================================ */
 
-/** 마법사 단계 식별자(각 단계는 기존 UiToCode 메시지 1~2개로 매핑된다). */
+/** 마법사 단계 식별자(각 단계는 기존 UiToCode 메시지 1개로 매핑된다). */
 export type WizardStepId =
   | 'extract' // EXTRACT (읽기)
   | 'create' // CREATE_TOKENS (쓰기)
@@ -11,7 +11,8 @@ export type WizardStepId =
   | 'bind' // APPLY (쓰기)
   | 'rename' // RENAME (쓰기) — bind 이후라야 토큰을 역할 신호로 활용 가능
   | 'contrast' // CHECK_CONTRAST (읽기, 선택)
-  | 'componentize'; // REGISTER_COMPONENTS → CLASSIFY_VARIANTS (쓰기, 선택, Pro)
+  // 등록이 같은 이름 묶음의 세트 결합까지 함께 수행하므로 별도 CLASSIFY_VARIANTS를 보내지 않는다.
+  | 'componentize'; // REGISTER_COMPONENTS (쓰기, 선택, Pro)
 
 export interface WizardStepDef {
   id: WizardStepId;
