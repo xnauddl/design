@@ -143,7 +143,7 @@ async function postPrereq(): Promise<void> {
 }
 
 /** Paid 게이트(공유 프리셋): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requireTeam(): boolean {
+function requirePresets(): boolean {
   return requirePaid('presets', '공유 프리셋은 Paid 기능입니다.');
 }
 
@@ -199,7 +199,7 @@ function pageOf(node: BaseNode): PageNode | null {
 }
 
 /** Paid 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requirePro(): boolean {
+function requireComponents(): boolean {
   return requirePaid('components', '컴포넌트 등록·베리언트 분류는 Paid 기능입니다.');
 }
 
@@ -758,19 +758,19 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'GET_PRESETS': {
-        if (!requireTeam()) break;
+        if (!requirePresets()) break;
         post({ type: 'PRESETS', presets });
         break;
       }
       case 'SAVE_PRESET': {
-        if (!requireTeam()) break;
+        if (!requirePresets()) break;
         presets = upsertPreset(presets, msg.preset);
         await savePresets();
         post({ type: 'PRESETS', presets });
         break;
       }
       case 'DELETE_PRESET': {
-        if (!requireTeam()) break;
+        if (!requirePresets()) break;
         presets = presets.filter((p) => p.name !== msg.name);
         await savePresets();
         post({ type: 'PRESETS', presets });
@@ -815,7 +815,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'SCAN_COMPONENT_CANDIDATES': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         const roots = selection();
         const candidates = scanComponentCandidates(roots);
         // 라이브 노드 인덱스(서브트리 전체) — 후보 id → 실제 노드.
@@ -849,7 +849,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'REGISTER_COMPONENTS': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         await figma.loadAllPagesAsync(); // dynamic-page: 컴포넌트 페이지 이동 전 로드
         let registered = 0;
         let skipped = 0;
@@ -1021,7 +1021,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CLASSIFY_VARIANTS': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         // 「컴포넌트 등록」과 동일한 **정확한 이름 기준**으로 기존 컴포넌트를 다시 묶는다.
         // 선택의 COMPONENT 중 아직 세트에 안 속한 것만(멱등). 같은 이름 2개+ → 세트, 1개 → 단독.
         const comps = selection().filter(
@@ -1063,7 +1063,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'GENERATE_MISSING_VARIANTS': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         const sets = selection().filter((n): n is ComponentSetNode => n.type === 'COMPONENT_SET');
         let generated = 0;
         const combos: string[] = [];

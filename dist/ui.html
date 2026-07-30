@@ -1382,7 +1382,7 @@
     { id: "bind", label: "\uBC14\uC778\uB529", write: true, optional: false },
     { id: "rename", label: "\uB808\uC774\uC5B4 \uC815\uB3C8", write: true, optional: false },
     { id: "contrast", label: "\uC811\uADFC\uC131 \uAC80\uC218", write: false, optional: true },
-    { id: "componentize", label: "\uCEF4\uD3EC\uB10C\uD2B8\uD654", write: true, optional: true, pro: true }
+    { id: "componentize", label: "\uCEF4\uD3EC\uB10C\uD2B8\uD654", write: true, optional: true, paid: true }
   ];
   function planWizard(options, ctx) {
     return WIZARD_STEPS.map((step) => {
@@ -1390,7 +1390,7 @@
       const enabled = options[step.id];
       if (!enabled) return { step, run: false, skipReason: "\uC635\uC158 \uAEBC\uC9D0" };
       if (step.id === "semantics" && !ctx.hasSemanticMap) return { step, run: false, skipReason: "\uB9E4\uD551 \uC5C6\uC74C" };
-      if (step.pro && !ctx.isPro) return { step, run: false, skipReason: "Pro \uC804\uC6A9" };
+      if (step.paid && !ctx.isPaid) return { step, run: false, skipReason: "Paid \uC804\uC6A9" };
       return { step, run: true };
     });
   }
@@ -1419,7 +1419,7 @@
   var tokens = [];
   var presets = [];
   var isPaid = false;
-  var teamDataRequested = false;
+  var paidDataRequested = false;
   var hasGlobal = false;
   var hasBindable = false;
   var hasTextStyles = false;
@@ -1962,7 +1962,7 @@
       contrast: $("wizOptContrast").checked,
       componentize: $("wizOptComponentize").checked
     };
-    const ctx = { isPro: isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
+    const ctx = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
     const plan = planWizard(options, ctx);
     wizardRunning = true;
     $("btnWizardRun").disabled = true;
@@ -2151,8 +2151,8 @@
     if (!hasBindable) $("btnApplyConfirm").disabled = true;
     setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
     if (!isPaid) $("btnApplyExistingText").disabled = true;
-    if (isPaid && !teamDataRequested) {
-      teamDataRequested = true;
+    if (isPaid && !paidDataRequested) {
+      paidDataRequested = true;
       send({ type: "GET_PRESETS" });
     }
   }

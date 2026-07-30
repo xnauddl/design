@@ -2392,7 +2392,7 @@
     } catch (e) {
     }
   }
-  function requireTeam() {
+  function requirePresets() {
     return requirePaid("presets", "\uACF5\uC720 \uD504\uB9AC\uC14B\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
   }
   function arrangeSet(set) {
@@ -2436,7 +2436,7 @@
     while (n && n.type !== "PAGE") n = n.parent;
     return n && n.type === "PAGE" ? n : null;
   }
-  function requirePro() {
+  function requireComponents() {
     return requirePaid("components", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
   }
   var TEXT_BIND_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily"]);
@@ -2926,19 +2926,19 @@
           break;
         }
         case "GET_PRESETS": {
-          if (!requireTeam()) break;
+          if (!requirePresets()) break;
           post({ type: "PRESETS", presets });
           break;
         }
         case "SAVE_PRESET": {
-          if (!requireTeam()) break;
+          if (!requirePresets()) break;
           presets = upsertPreset(presets, msg.preset);
           await savePresets();
           post({ type: "PRESETS", presets });
           break;
         }
         case "DELETE_PRESET": {
-          if (!requireTeam()) break;
+          if (!requirePresets()) break;
           presets = presets.filter((p) => p.name !== msg.name);
           await savePresets();
           post({ type: "PRESETS", presets });
@@ -2982,7 +2982,7 @@
           break;
         }
         case "SCAN_COMPONENT_CANDIDATES": {
-          if (!requirePro()) break;
+          if (!requireComponents()) break;
           const roots = selection();
           const candidates = scanComponentCandidates(roots);
           const liveById = /* @__PURE__ */ new Map();
@@ -3010,7 +3010,7 @@
           break;
         }
         case "REGISTER_COMPONENTS": {
-          if (!requirePro()) break;
+          if (!requireComponents()) break;
           await figma.loadAllPagesAsync();
           let registered = 0;
           let skipped = 0;
@@ -3187,7 +3187,7 @@
           break;
         }
         case "CLASSIFY_VARIANTS": {
-          if (!requirePro()) break;
+          if (!requireComponents()) break;
           const comps = selection().filter(
             (n) => {
               var _a2;
@@ -3234,7 +3234,7 @@
           break;
         }
         case "GENERATE_MISSING_VARIANTS": {
-          if (!requirePro()) break;
+          if (!requireComponents()) break;
           const sets = selection().filter((n) => n.type === "COMPONENT_SET");
           let generated = 0;
           const combos = [];
