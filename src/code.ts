@@ -9,7 +9,6 @@ import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
-import { pascalCase } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, commonBaseName } from './lib/components';
 import type { CompPropType, StructNode, StructGroup } from './lib/components';
@@ -829,7 +828,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const preview = new Map<string, { group?: string; variant?: string; single?: string }>();
         for (const g of groups) {
           if (g.members.length < 2) {
-            if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
+            // 단독도 세트와 같은 규칙 — 맥락 토막을 뗀 이름(`article-avatar` → `Avatar`).
+            if (g.members[0]) preview.set(g.members[0].id, { single: commonBaseName([g.members[0].name]) });
             continue;
           }
           const base = commonBaseName(g.members.map((m) => m.name));
@@ -949,7 +949,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             try {
               const comp = figma.createComponentFromNode(node);
               registered++;
-              placeSingle(comp, o, pascalCase(g.members[0].name));
+              placeSingle(comp, o, commonBaseName([g.members[0].name])); // 미리보기와 동일 규칙
             } catch (e) {
               skipped++;
               failures.push(`단독 등록 실패(${g.members[0].name}): ${errText(e)}`);

@@ -35,6 +35,9 @@ const COMPONENT_NOUNS = new Set([
   'tab', 'tabs', 'breadcrumb', 'pagination', 'navbar', 'nav', 'sidebar', 'menu', 'stepper',
   'avatar', 'badge', 'chip', 'tag', 'toast', 'snackbar', 'alert', 'banner', 'progress',
   'spinner', 'skeleton', 'table', 'list', 'item', 'divider', 'label', 'tooltip', 'header', 'footer',
+  // naming.ts EMITTED_ROLES 정합 — 리네임이 출력하는 요소 역할도 컴포넌트가 된다.
+  // 없으면 `header-icon`의 머리명사가 `header`로 잡혀 역할이 사라지고 맥락이 이름이 된다.
+  'icon', 'image', 'thumbnail', 'status', 'indicator', 'overlay',
 ]);
 /** 컴포넌트 명사 약어 → 표준어. */
 const NOUN_ABBR: Readonly<Record<string, string>> = { btn: 'button', img: 'image' };
@@ -563,9 +566,30 @@ export function deriveVariants(members: readonly StructNode[]): DerivedVariant[]
 }
 
 /**
+ * 공통 접두에서 **맥락 토막**을 떼어낸다 — 컴포넌트 이름은 놓인 자리와 무관해야 한다.
+ * 리네임이 붙이는 이름은 `{맥락}-{역할}` 꼴이라(`article-avatar`) 그대로 쓰면 맥락이 박힌다.
+ *
+ * 말단(머리명사)에서 **뒤로 이어지는 컴포넌트 명사 연속**만 이름으로 남기고 그 앞은 버린다.
+ * 명사가 이어지면 복합 명사로 보고 보존(`nav-button`·`card-header`·`list-item`), 명사가
+ * 끊기는 지점부터는 맥락이다. 첫 토막만 보면 `list-article-thumbnail`처럼 맥락에 명사가
+ * 섞였을 때(`list`) 못 떼어낸다.
+ * 예: `article-avatar` → `avatar` · `list-article-thumbnail` → `thumbnail` · `nav-button` → `nav-button`.
+ * 말단이 컴포넌트 명사가 아니면(`row-container`) 임의 이름으로 보고 손대지 않는다.
+ */
+function stripContextTokens(tokens: readonly string[]): string[] {
+  const last = tokens.length - 1;
+  if (last < 0) return tokens.slice();
+  if (!COMPONENT_NOUNS.has(nounWord(tokens[last]))) return tokens.slice(); // 말단이 역할이 아니면 보존
+  let start = last;
+  while (start > 0 && COMPONENT_NOUNS.has(nounWord(tokens[start - 1]))) start--; // 명사 연속 = 복합 명사
+  return tokens.slice(start);
+}
+
+/**
  * 그룹 멤버 이름들의 공통 베이스(세트 이름용) — 토큰 공통 접두를 PascalCase로.
- * 공통 접두가 있으면 그대로(`nav-button-*` → `NavButton`), **없으면 인식된 컴포넌트명**
- * (=마지막 명사)으로 폴백한다(`nav-button` + `button-primary` → `Button`).
+ * 공통 접두가 있으면 맥락 토막만 떼고 쓰고(`nav-button-*` → `NavButton`,
+ * `article-avatar` → `Avatar`), **없으면 인식된 컴포넌트명**(=마지막 명사)으로
+ * 폴백한다(`nav-button` + `button-primary` → `Button`).
  */
 export function commonBaseName(names: readonly string[]): string {
   if (!names.length) return '';
@@ -578,6 +602,6 @@ export function commonBaseName(names: readonly string[]): string {
     prefix = prefix.slice(0, i);
     if (!prefix.length) break;
   }
-  if (prefix.length) return pascalCase(prefix.join('-'));
+  if (prefix.length) return pascalCase(stripContextTokens(prefix).join('-'));
   return recognizeComponentName(names[0]) ?? pascalCase(names[0]); // 공통 접두 없음 → 인식 명사
 }

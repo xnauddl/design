@@ -2146,7 +2146,15 @@
     "label",
     "tooltip",
     "header",
-    "footer"
+    "footer",
+    // naming.ts EMITTED_ROLES 정합 — 리네임이 출력하는 요소 역할도 컴포넌트가 된다.
+    // 없으면 `header-icon`의 머리명사가 `header`로 잡혀 역할이 사라지고 맥락이 이름이 된다.
+    "icon",
+    "image",
+    "thumbnail",
+    "status",
+    "indicator",
+    "overlay"
   ]);
   var NOUN_ABBR = { btn: "button", img: "image" };
   function nounWord(token) {
@@ -2401,6 +2409,14 @@
     }
     return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));
   }
+  function stripContextTokens(tokens) {
+    const last = tokens.length - 1;
+    if (last < 0) return tokens.slice();
+    if (!COMPONENT_NOUNS.has(nounWord(tokens[last]))) return tokens.slice();
+    let start = last;
+    while (start > 0 && COMPONENT_NOUNS.has(nounWord(tokens[start - 1]))) start--;
+    return tokens.slice(start);
+  }
   function commonBaseName(names) {
     var _a;
     if (!names.length) return "";
@@ -2413,7 +2429,7 @@
       prefix = prefix.slice(0, i);
       if (!prefix.length) break;
     }
-    if (prefix.length) return pascalCase(prefix.join("-"));
+    if (prefix.length) return pascalCase(stripContextTokens(prefix).join("-"));
     return (_a = recognizeComponentName(names[0])) != null ? _a : pascalCase(names[0]);
   }
 
@@ -3215,7 +3231,7 @@
           const preview = /* @__PURE__ */ new Map();
           for (const g of groups) {
             if (g.members.length < 2) {
-              if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
+              if (g.members[0]) preview.set(g.members[0].id, { single: commonBaseName([g.members[0].name]) });
               continue;
             }
             const base = commonBaseName(g.members.map((m) => m.name));
@@ -3336,7 +3352,7 @@
               try {
                 const comp = figma.createComponentFromNode(node);
                 registered++;
-                placeSingle(comp, o, pascalCase(g.members[0].name));
+                placeSingle(comp, o, commonBaseName([g.members[0].name]));
               } catch (e) {
                 skipped++;
                 failures.push(`\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328(${g.members[0].name}): ${errText(e)}`);

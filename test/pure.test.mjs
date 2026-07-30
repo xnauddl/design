@@ -654,6 +654,16 @@ test('recognizeComponentName — 마지막 명사 우선(접두어는 맥락)', 
   assert.equal(recognizeComponentName('hero-banner'), 'Banner'); // hero 미인식, banner 인식
 });
 
+test('recognizeComponentName — EMITTED_ROLES 정합(요소 역할도 컴포넌트 명사)', () => {
+  // 리네임 결과를 그대로 넣었을 때 역할이 살아남아야 한다(맥락이 이름이 되면 안 됨).
+  assert.equal(recognizeComponentName('header-icon'), 'Icon'); // 이전엔 'Header'(맥락)였다
+  assert.equal(recognizeComponentName('article-status'), 'Status'); // 이전엔 null
+  assert.equal(recognizeComponentName('article-thumbnail'), 'Thumbnail');
+  assert.equal(recognizeComponentName('article-avatar'), 'Avatar');
+  assert.equal(recognizeComponentName('img'), 'Image'); // 약어 → 이제 명사로 인식
+  assert.equal(recognizeComponentName('progress-indicator'), 'Indicator');
+});
+
 test('extractNameProps — 명사 제외 + 보편 속성 추출', () => {
   assert.deepEqual(extractNameProps('button-primary'), { Type: 'primary' });
   assert.deepEqual(extractNameProps('button-primary-hover'), { Type: 'primary', State: 'hover' });
@@ -742,6 +752,24 @@ test('colorAxisLabels / commonBaseName(PascalCase·약어 펼침)', () => {
   // 공통 접두 없음 → 인식 명사(마지막)로 폴백
   assert.equal(commonBaseName(['nav-button', 'button-primary']), 'Button');
   assert.equal(commonBaseName(['primary-button', 'secondary-button']), 'Button');
+});
+
+test('commonBaseName — 맥락 접두 제거(컴포넌트 이름은 자리와 무관)', () => {
+  // 리네임이 붙인 {맥락}-{역할} 이름이 균일하면 공통 접두 = 전체라 예전엔 맥락이 박혔다.
+  assert.equal(commonBaseName(['article-avatar', 'article-avatar', 'article-avatar']), 'Avatar');
+  assert.equal(commonBaseName(['article-status', 'article-status']), 'Status');
+  assert.equal(commonBaseName(['signup-button', 'signup-button']), 'Button');
+  assert.equal(commonBaseName(['list-article-thumbnail', 'list-article-thumbnail']), 'Thumbnail'); // 다단 맥락
+  // 단독 등록 경로(code.ts)도 같은 함수를 탄다.
+  assert.equal(commonBaseName(['article-avatar']), 'Avatar');
+  // 앞 토막도 컴포넌트 명사면 복합 명사일 수 있어 보존한다.
+  assert.equal(commonBaseName(['nav-button', 'nav-button']), 'NavButton');
+  assert.equal(commonBaseName(['card-header', 'card-header']), 'CardHeader');
+  assert.equal(commonBaseName(['header-icon', 'header-icon']), 'HeaderIcon');
+  // 말단이 역할 어휘가 아니면 손대지 않는다(임의 이름 보존 — 기존 동작).
+  assert.equal(commonBaseName(['row-container', 'row-container']), 'RowContainer');
+  assert.equal(commonBaseName(['button-large', 'button-large']), 'ButtonLarge');
+  assert.equal(commonBaseName(['Frame 12']), 'Frame12');
 });
 
 test('groupByExactName — 정확한 이름끼리만 묶음(머리명사 병합 안 함)', () => {
