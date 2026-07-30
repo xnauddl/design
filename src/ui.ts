@@ -792,7 +792,9 @@ $('btnWizardRun').addEventListener('click', () => void runWizard());
 $('btnWizardCancel').addEventListener('click', () => send({ type: 'CANCEL' }));
 
 // 개발용 강제 티어 토글 — 개발 빌드에서만 노출/동작(배포 빌드 백도어 차단).
+// HTML은 기본 display:none(배포 안전). dev 빌드에서만 여기서 노출한다.
 if (__DEV__) {
+  $('devTierRow').style.display = '';
   $('tier').addEventListener('change', () => {
     send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
   });
@@ -876,15 +878,24 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
 }
 
 /* ---------- 유료(Paid) 기능 게이트 ----------
-   Free/Paid 2티어. Paid에서 해금: 토큰 생성(적용)·시맨틱·텍스트 스타일·컴포넌트/베리언트·공유 프리셋.
-   Free: 팔레트·추출·토큰 미리보기·바인딩·리네임·명도 대비·내보내기. */
+   Free/Paid 2티어. Paid에서 해금: 팔레트·토큰 생성(미리보기+적용)·시맨틱·텍스트 스타일·
+   컴포넌트/베리언트·공유 프리셋.
+   Free: 추출·색 정리·바인딩·리네임·명도 대비·내보내기. */
 const PAID_LOCK = '🔒 Paid 전용';
 const PRESET_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
 const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
-const PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, 'btnCreateApply', 'btnPaletteApply', 'btnTextStyles'];
+// 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
+// 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
+const PAID_FIELDS = [
+  ...PRESET_FIELDS,
+  ...COMPONENT_FIELDS,
+  'btnPalette', 'btnPaletteApply',
+  'btnCreate', 'btnCreateApply',
+  'btnTextStyles',
+];
 
 /**
  * 통합 게이트(#11·#12) — 유료 잠금(Paid)과 전제 미충족(Global/바인딩 변수 없음)을
@@ -892,8 +903,12 @@ const PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, 'btnCreateApply', 'b
  */
 function updateGates(): void {
   // 유료 잠금(#12) — Free는 유료 버튼을 클릭 전에 사전 비활성 + 🔒 배지(클릭-후-거부 방지).
-  for (const id of PAID_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPaid;
-  for (const id of ['presetLock', 'componentLock', 'createLock', 'semLock', 'tsLock']) {
+  for (const id of PAID_FIELDS) {
+    const el = $(id) as HTMLButtonElement;
+    el.disabled = !isPaid;
+    setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
+  }
+  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
   $('wizComponentLock').textContent = isPaid ? '' : '🔒 Paid';
@@ -911,6 +926,13 @@ function updateGates(): void {
     teamDataRequested = true;
     send({ type: 'GET_PRESETS' });
   }
+}
+
+/** 유료 잠금 사유를 툴팁으로. 원래 title(기능 설명)은 dataset에 1회 백업해 보존·복원한다. */
+function setLockTitle(el: HTMLElement, locked: boolean): void {
+  if (el.dataset.baseTitle === undefined) el.dataset.baseTitle = el.title;
+  const base = el.dataset.baseTitle;
+  el.title = locked ? (base ? `${base} · ${PAID_LOCK}` : PAID_LOCK) : base;
 }
 
 /** 전제 충족 여부로 버튼 활성/안내(+바로가기) 토글. */

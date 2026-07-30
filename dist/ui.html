@@ -350,7 +350,7 @@
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
     <div class="step">
-      <h2>브랜드 팔레트 생성</h2>
+      <h2>브랜드 팔레트 생성 <span class="muted" id="paletteLock"></span></h2>
       <div class="row">
         <label class="inline">브랜드색 <input id="brand" type="color" value="#3366ff" /></label>
         <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
@@ -2043,6 +2043,7 @@
   $("btnWizardRun").addEventListener("click", () => void runWizard());
   $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
   if (false) {
+    $("devTierRow").style.display = "";
     $("tier").addEventListener("change", () => {
       send({ type: "SET_LICENSE", tier: $("tier").value });
     });
@@ -2116,10 +2117,22 @@
     "presetJson"
   ];
   var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing"];
-  var PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, "btnCreateApply", "btnPaletteApply", "btnTextStyles"];
+  var PAID_FIELDS = [
+    ...PRESET_FIELDS,
+    ...COMPONENT_FIELDS,
+    "btnPalette",
+    "btnPaletteApply",
+    "btnCreate",
+    "btnCreateApply",
+    "btnTextStyles"
+  ];
   function updateGates() {
-    for (const id of PAID_FIELDS) $(id).disabled = !isPaid;
-    for (const id of ["presetLock", "componentLock", "createLock", "semLock", "tsLock"]) {
+    for (const id of PAID_FIELDS) {
+      const el = $(id);
+      el.disabled = !isPaid;
+      setLockTitle(el, !isPaid);
+    }
+    for (const id of ["paletteLock", "presetLock", "componentLock", "createLock", "semLock", "tsLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     $("wizComponentLock").textContent = isPaid ? "" : "\u{1F512} Paid";
@@ -2133,6 +2146,11 @@
       teamDataRequested = true;
       send({ type: "GET_PRESETS" });
     }
+  }
+  function setLockTitle(el, locked) {
+    if (el.dataset.baseTitle === void 0) el.dataset.baseTitle = el.title;
+    const base = el.dataset.baseTitle;
+    el.title = locked ? base ? `${base} \xB7 ${PAID_LOCK}` : PAID_LOCK : base;
   }
   function setPrereq(btnId, noticeId, ok, msg) {
     $(btnId).disabled = !ok;
