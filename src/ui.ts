@@ -405,6 +405,24 @@ $('btnCreateApply').addEventListener('click', () => {
   send({ type: 'CREATE_TOKENS', tokens, base }); // 확인 후 실제 적용
 });
 
+// base는 비-px 값(rem·%·em)을 px로 환산하는 기준이라 미리보기 결과가 base에 따라 달라진다.
+// 미리보기를 본 뒤 base만 바꾸면 옛 기준 요약이 남은 채 ‘적용’이 새 base로 실행돼 어긋나므로,
+// 즉시 ‘적용’을 감추고 새 base로 미리보기를 다시 돌린다(미리보기는 변수를 만들지 않는 읽기).
+let basePreviewTimer = 0;
+($('base') as HTMLInputElement).addEventListener('input', () => {
+  const applyBtn = $('btnCreateApply') as HTMLButtonElement;
+  if (applyBtn.style.display === 'none') return; // 아직 미리보기 전 — 무효화할 결과가 없음
+  applyBtn.style.display = 'none';
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
+  setStatus('createStatus', t('create.baseChanged', { base }), '');
+  clearTimeout(basePreviewTimer);
+  basePreviewTimer = window.setTimeout(() => {
+    if (!tokens.length) return;
+    createFrom = 'tokens';
+    send({ type: 'CREATE_TOKENS', tokens, base: Number(($('base') as HTMLInputElement).value) || 16, preview: true });
+  }, 350); // 타이핑 중 매 키마다 보내지 않도록
+});
+
 $('btnColorRoles').addEventListener('click', applyColorRoles); // #3 색 편집표 → 시맨틱 매핑
 
 $('btnScanGlobals').addEventListener('click', () => {
@@ -792,7 +810,9 @@ $('btnWizardRun').addEventListener('click', () => void runWizard());
 $('btnWizardCancel').addEventListener('click', () => send({ type: 'CANCEL' }));
 
 // 개발용 강제 티어 토글 — 개발 빌드에서만 노출/동작(배포 빌드 백도어 차단).
+// HTML은 기본 display:none(배포 안전). dev 빌드에서만 여기서 노출한다.
 if (__DEV__) {
+  $('devTierRow').style.display = '';
   $('tier').addEventListener('change', () => {
     send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
   });
@@ -876,15 +896,24 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
 }
 
 /* ---------- 유료(Paid) 기능 게이트 ----------
-   Free/Paid 2티어. Paid에서 해금: 토큰 생성(적용)·시맨틱·텍스트 스타일·컴포넌트/베리언트·공유 프리셋.
-   Free: 팔레트·추출·토큰 미리보기·바인딩·리네임·명도 대비·내보내기. */
+   Free/Paid 2티어. Paid에서 해금: 팔레트·토큰 생성(미리보기+적용)·시맨틱·텍스트 스타일·
+   컴포넌트/베리언트·공유 프리셋.
+   Free: 추출·색 정리·바인딩·리네임·명도 대비·내보내기. */
 const PAID_LOCK = '🔒 Paid 전용';
 const PRESET_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
 const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
-const PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, 'btnCreateApply', 'btnPaletteApply', 'btnTextStyles'];
+// 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
+// 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
+const PAID_FIELDS = [
+  ...PRESET_FIELDS,
+  ...COMPONENT_FIELDS,
+  'btnPalette', 'btnPaletteApply',
+  'btnCreate', 'btnCreateApply',
+  'btnTextStyles',
+];
 
 /**
  * 통합 게이트(#11·#12) — 유료 잠금(Paid)과 전제 미충족(Global/바인딩 변수 없음)을
@@ -892,8 +921,12 @@ const PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, 'btnCreateApply', 'b
  */
 function updateGates(): void {
   // 유료 잠금(#12) — Free는 유료 버튼을 클릭 전에 사전 비활성 + 🔒 배지(클릭-후-거부 방지).
-  for (const id of PAID_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPaid;
-  for (const id of ['presetLock', 'componentLock', 'createLock', 'semLock', 'tsLock']) {
+  for (const id of PAID_FIELDS) {
+    const el = $(id) as HTMLButtonElement;
+    el.disabled = !isPaid;
+    setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
+  }
+  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
   $('wizComponentLock').textContent = isPaid ? '' : '🔒 Paid';
@@ -911,6 +944,13 @@ function updateGates(): void {
     teamDataRequested = true;
     send({ type: 'GET_PRESETS' });
   }
+}
+
+/** 유료 잠금 사유를 툴팁으로. 원래 title(기능 설명)은 dataset에 1회 백업해 보존·복원한다. */
+function setLockTitle(el: HTMLElement, locked: boolean): void {
+  if (el.dataset.baseTitle === undefined) el.dataset.baseTitle = el.title;
+  const base = el.dataset.baseTitle;
+  el.title = locked ? (base ? `${base} · ${PAID_LOCK}` : PAID_LOCK) : base;
 }
 
 /** 전제 충족 여부로 버튼 활성/안내(+바로가기) 토글. */
@@ -1892,6 +1932,22 @@ const TITLE_BTN_IDS = new Set([
   'btnWizardRun', 'btnPalette', 'btnExtract', 'btnCreate',
   'btnTextStyles', 'btnApply', 'btnPreview', 'btnContrast', 'btnExport',
 ]);
+/**
+ * sticky 오프셋 동기화 — 탭 바·선택 바의 '실제' 높이를 CSS 변수로 넘긴다.
+ * 카드 헤더(주 버튼 포함)가 그 아래에 정확히 붙어야 가려지지 않는다. 폭이 좁아져 선택 바가
+ * 두 줄이 되거나 창을 리사이즈해도 따라간다(하드코딩 41px/71px은 그 경우 어긋남).
+ */
+function syncStickyOffsets(): void {
+  const tabs = document.querySelector<HTMLElement>('.tabs');
+  const bar = $('selBarWrap');
+  if (!tabs) return;
+  const tabsH = Math.round(tabs.getBoundingClientRect().height);
+  const barH = Math.round(bar.getBoundingClientRect().height);
+  const root = document.documentElement;
+  root.style.setProperty('--tabs-h', `${tabsH}px`);
+  root.style.setProperty('--head-top', `${tabsH + barH}px`);
+}
+
 /** 모든 .step 카드를 접이식으로 + 주 버튼을 타이틀 줄로. 노드 이동이라 id/리스너 보존, 멱등. */
 function applyCardChrome(): void {
   document.querySelectorAll<HTMLElement>('.step').forEach((card) => {
@@ -1921,6 +1977,15 @@ function applyCardChrome(): void {
 
 // 초기: 컬렉션·전제·라이선스 조회. 팀 카드는 Team 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
 applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
+syncStickyOffsets(); // 카드 헤더 sticky 오프셋(탭 바 + 선택 바 높이)
+// 선택 바는 문구가 바뀌며 높이가 변하고, 창 리사이즈로 두 바 모두 접힐 수 있다 → 계속 추적.
+if (typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(() => syncStickyOffsets());
+  const tabsEl = document.querySelector('.tabs');
+  if (tabsEl) ro.observe(tabsEl);
+  ro.observe($('selBarWrap'));
+}
+window.addEventListener('resize', syncStickyOffsets);
 updateGates();
 renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시

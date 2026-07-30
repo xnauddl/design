@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build": "node build.mjs",
+    "build:dev": "node build.mjs --dev",
     "watch": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test"
