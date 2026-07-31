@@ -169,6 +169,7 @@ interface ListRegion {
 
 const LIST_REGIONS: ListRegion[] = [
   { mount: 'tokenList', row: '.tk', more: 'tokenListMore', count: 'tokenListCount', expand: 'btnTokenListExpand' },
+  { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
 ];
 
 // ‘모두 펼치기’로 상한을 푼 목록의 마운트 id. 목록별로 따로 기억해야 한 목록을 펼친 게
@@ -364,9 +365,15 @@ function renderColorTable(): void {
   const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
   if (!colorRevealed || !colors.length) {
     card.style.display = 'none'; // 색은 ‘선택에서 토큰 추출’(colorRevealed) 후에만 노출
+    $('colorCount').textContent = '';
+    // 옛 행을 남겨 두면 다음 추출이 색 0개일 때 테두리·‘총 n개’ 줄이 실제와 어긋난 채 되살아난다.
+    $('colorTable').innerHTML = '';
+    layoutListBy('colorTable'); // 행이 없으니 경계·개수 줄을 걷어낸다
     return;
   }
   card.style.display = '';
+  // 카드 제목의 개수 — 표가 상한에 걸려 일부만 보여도 정리 대상 색이 몇 개인지 먼저 알린다.
+  $('colorCount').textContent = `· 색 ${colors.length}개`;
   // 현 semMap을 역할→이름으로 읽어 이름→역할로 뒤집어 prefill.
   const roleByName = new Map<string, string>();
   for (const [role, name] of Object.entries(textToSemanticMap(($('semMap') as HTMLTextAreaElement).value))) {
@@ -389,7 +396,7 @@ function renderColorTable(): void {
     role.dataset.name = t.name;
     row.append(sw, name, role);
     return row;
-  });
+  }, () => layoutListBy('colorTable')); // 행이 다 붙은 뒤라야 행 높이 측정이 맞는다
 }
 
 /** 색 편집표의 역할 입력 → 시맨틱 매핑 textarea로 반영(역할=이름). */
@@ -2146,6 +2153,9 @@ function showTab(name: (typeof TABS)[number]): void {
   }
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
+  // 숨은 탭에서 렌더된 목록은 행 높이가 0으로 측정돼 스냅도 개수 줄도 없이 남는다 — 마법사가
+  // 추출을 돌리면 ‘만들기’ 탭 목록이 그렇게 되고, 탭을 열면 반쪽 행이 그대로 보인다. 여기서 다시 잰다.
+  layoutAllLists();
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
 }
 TABS.forEach((t, i) => {

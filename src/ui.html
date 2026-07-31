@@ -289,7 +289,10 @@
     /* 목록 아래 ‘총 n개 중 m개 표시 — 스크롤하거나 [모두 펼치기]’ 줄 */
     .list-more { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
     .list-more .list-count { color: var(--muted); }
-    #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
+    /* 색 정리 표도 같은 결함이었다 — 220px 고정 상한 ÷ 행 31px ≈ 7.1행이라 마지막 행이
+       상시 반쯤 잘렸고, 바로 아래 ‘토큰 생성’ 목록만 고쳐 두면 한 화면에서 처리가 어긋나 보인다.
+       그래서 상한도 공용 값(패널 높이 비례)으로 넘긴다 — 고정 220px은 큰 패널에서 근거가 없다.
+       스냅은 행 높이가 균일할 때만 맞으므로 .crow의 padding·입력칸 높이는 행마다 같게 둘 것. */
     .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 3px 0; }
     .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
     .crow .cn { font-family: var(--mono); font-size: var(--fs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -423,7 +426,7 @@
 
     <!-- 추출 + 색 정리 통합 — 추출 후 같은 카드에서 바로 병합·역할 지정. -->
     <div class="step">
-      <h2>추출 · 색 정리</h2>
+      <h2>추출 · 색 정리 <span class="muted" id="colorCount"></span></h2>
       <div class="row">
         <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
         <span class="muted" id="selInfo"></span>
@@ -437,7 +440,12 @@
           <span id="tidySumText"></span>
           <button id="btnTidyUndo" class="link">되돌리기</button>
         </div>
-        <div id="colorTable"></div>
+        <div id="colorTable" class="list-region"></div>
+        <!-- 표가 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+        <div class="list-more" id="colorTableMore" style="display:none">
+          <span class="list-count" id="colorTableCount"></span>
+          <button class="link" id="btnColorTableExpand">모두 펼치기</button>
+        </div>
         <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
         <datalist id="roleList">
           <option value="surface"></option><option value="surface/muted"></option>

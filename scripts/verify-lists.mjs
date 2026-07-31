@@ -9,13 +9,21 @@
  * 사용: node scripts/verify-lists.mjs [--list <id>|all] [--count 70] [--shots <dir>]
  */
 import pw from 'playwright'; // CommonJS 패키지라 named export가 안 된다
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 import { mkdirSync, existsSync } from 'node:fs';
 
 const { chromium } = pw;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const UI = join(ROOT, 'dist', 'ui.html');
+
+if (!existsSync(UI)) {
+  console.error(`dist/ui.html 없음 — 먼저 \`npm run build\`. (${UI})`);
+  process.exit(2);
+}
+// 색 시드는 UI가 쓰는 분류기 그대로 골라야 한다(아래 fakeColors 주석 참고).
+// 정적 import는 위 안내보다 먼저 평가돼 dist가 없을 때 원인 모를 예외가 되므로 동적으로 읽는다.
+const { classifyColor } = await import(pathToFileURL(join(ROOT, 'dist', 'pure.mjs')).href);
 
 /* ---------- 시드 데이터 ---------- */
 
@@ -28,6 +36,50 @@ function fakeTokens(n) {
     sources: ['itemSpacing'],
     value: 4 + i,
   }));
+}
+
+/** HSL(0–360, 0–1, 0–1) → #rrggbb. 색상값을 격자로 훑으려고 쓰는 최소 변환. */
+function hslHex(h, s, l) {
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const k = (n + h / 30) % 12;
+    return l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+  };
+  const to = (v) => Math.round(v * 255).toString(16).padStart(2, '0');
+  return `#${to(f(0))}${to(f(8))}${to(f(4))}`;
+}
+
+/**
+ * 색 토큰 n개 — **hue/step 버킷이 서로 다른** 색만 고른다.
+ *
+ * EXTRACT_RESULT 핸들러는 시드 직후 huefyTokenColors(색 → `color/{hue}/{step}` 이름)와
+ * tidyColors(같은 base 이름끼리 N:1 병합)를 돌린다. 색상값을 아무렇게나 70개 넣으면
+ * 같은 버킷으로 몰려 몇 개로 병합되고, 그러면 하네스의 ‘총 N개’ 단언이 시드 수와 어긋난다.
+ * 그래서 UI가 쓰는 분류기(classifyColor) 그대로 버킷을 세어 중복을 건너뛴다.
+ * 버킷 상한은 hue 9종+gray × step 11단 = 110개.
+ */
+function fakeColors(n) {
+  const seen = new Set();
+  const out = [];
+  // 밝기 바깥 · hue 안쪽 순회 — 한 단(step) 안에서 여러 hue를 먼저 채워 목록이 골고루 섞인다.
+  // 채도는 4단으로 훑는다. 무채(gray)와 고채도만으로는 아주 밝은 단(red/50 등)에 닿지 못해
+  // 버킷이 109개에서 멈춘다 — 중간 채도가 있어야 110개가 다 나온다.
+  for (let l = 2; l <= 98 && out.length < n; l += 2) {
+    for (let h = 0; h < 360 && out.length < n; h += 5) {
+      for (const s of [0, 0.2, 0.5, 0.9]) {
+        if (out.length >= n) break;
+        const value = hslHex(h, s, l / 100);
+        const c = classifyColor(value);
+        const bucket = `${c.family}/${c.step}`;
+        if (seen.has(bucket)) continue;
+        seen.add(bucket);
+        // 이름은 huefy가 어차피 덮어쓴다 — 추출 결과와 같은 hex 이름 형태만 맞춰 둔다.
+        out.push({ name: `color/${value.slice(1)}`, category: 'color', sources: ['fills'], value });
+      }
+    }
+  }
+  if (out.length < n) throw new Error(`고유 hue/step 버킷이 ${out.length}개뿐 — --count를 낮추세요(최대 110)`);
+  return out;
 }
 
 /* ---------- 목록 배선 ----------
@@ -44,6 +96,20 @@ const LISTS = {
     async setup(page, n) {
       await seed(page, { type: 'EXTRACT_RESULT', tokens: fakeTokens(n), selection: 1, warnings: [] });
       await page.click('#btnCreate'); // previewRevealed=true → 색 외 목록 렌더
+    },
+  },
+  colorTable: {
+    label: '추출 · 색 정리 표',
+    tab: 'tabbtn-tokens',
+    row: '.crow',
+    more: 'colorTableMore',
+    count: 'colorTableCount',
+    expand: 'btnColorTableExpand',
+    async setup(page, n) {
+      // 백엔드가 없어 클릭만으로는 데이터가 안 온다 — colorRevealed를 켜고(추출 버튼의 역할)
+      // 결과는 직접 주입한다. 순서가 바뀌면 표가 잠긴 채로 남는다.
+      await page.click('#btnExtract');
+      await seed(page, { type: 'EXTRACT_RESULT', tokens: fakeColors(n), selection: 1, warnings: [] });
     },
   },
 };
@@ -157,10 +223,6 @@ const which = arg('--list', 'all');
 const count = Number(arg('--count', '70'));
 const shots = arg('--shots', '');
 
-if (!existsSync(UI)) {
-  console.error(`dist/ui.html 없음 — 먼저 \`npm run build\`. (${UI})`);
-  process.exit(2);
-}
 if (shots) mkdirSync(shots, { recursive: true });
 
 const ids = which === 'all' ? Object.keys(LISTS) : [which];
