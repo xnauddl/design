@@ -170,6 +170,7 @@ interface ListRegion {
 const LIST_REGIONS: ListRegion[] = [
   { mount: 'tokenList', row: '.tk', more: 'tokenListMore', count: 'tokenListCount', expand: 'btnTokenListExpand' },
   { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
+  { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
 ];
 
 // ‘모두 펼치기’로 상한을 푼 목록의 마운트 id. 목록별로 따로 기억해야 한 목록을 펼친 게
@@ -1486,6 +1487,9 @@ window.onmessage = (event: MessageEvent) => {
       compChecked.clear();
       for (const c of msg.nodes) if (c.eligible && c.group) compChecked.add(c.id);
       renderCompTree();
+      // 다시 스캔했으면 이전 등록/분류 리포트는 남의 얘기다. 개수를 카드 제목에 올린 뒤로는
+      // 카드를 접어 둬도 옛 수치가 계속 보여, 새 후보와 짝이 안 맞는다.
+      renderVariantReport([]);
       if (!compEligibleCount()) setStatus('componentStatus', t('component.noEligible'), 'warn');
       break;
     }
@@ -1494,69 +1498,17 @@ window.onmessage = (event: MessageEvent) => {
       const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.exposed ? ` · 속성 ${msg.exposed}` : ''}`;
       setStatus('componentStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? 'ok' : 'warn');
       // 빈 조합(미생성) + 실패(진단) 리포트
-      const box = $('variantReport');
-      box.innerHTML = '';
-      if (msg.missing.length) {
-        const h = document.createElement('div');
-        h.textContent = '빈 조합(미생성):';
-        box.appendChild(h);
-        for (const m of msg.missing) {
-          const d = document.createElement('div');
-          d.textContent = `  ${m}`;
-          box.appendChild(d);
-        }
-      }
-      if (msg.failures && msg.failures.length) {
-        const h = document.createElement('div');
-        h.className = 'warn';
-        h.textContent = `처리 중 문제 ${msg.failures.length}건:`;
-        box.appendChild(h);
-        for (const f of msg.failures) {
-          const d = document.createElement('div');
-          d.className = 'warn';
-          d.textContent = `  • ${f}`;
-          box.appendChild(d);
-        }
-      }
+      renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       break;
     }
     case 'VARIANTS_RESULT': {
-      const box = $('variantReport');
-      box.innerHTML = '';
-      if (msg.missing.length) {
-        const h = document.createElement('div');
-        h.textContent = '빈 조합(미생성):';
-        box.appendChild(h);
-        for (const m of msg.missing) {
-          const d = document.createElement('div');
-          d.textContent = `  ${m}`;
-          box.appendChild(d);
-        }
-      }
-      if (msg.failures && msg.failures.length) {
-        const h = document.createElement('div');
-        h.className = 'warn';
-        h.textContent = `처리 중 문제 ${msg.failures.length}건:`;
-        box.appendChild(h);
-        for (const f of msg.failures) {
-          const d = document.createElement('div');
-          d.className = 'warn';
-          d.textContent = `  • ${f}`;
-          box.appendChild(d);
-        }
-      }
+      renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       const extra = `${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.missing.length ? ' · 빈 조합 있음' : ''}`;
       setStatus('componentStatus', t('component.variants', { sets: msg.sets, extra }), msg.sets ? 'ok' : 'warn');
       break;
     }
     case 'GENERATE_RESULT': {
-      const box = $('variantReport');
-      box.innerHTML = '';
-      for (const c of msg.combos) {
-        const d = document.createElement('div');
-        d.textContent = `+ ${c}`;
-        box.appendChild(d);
-      }
+      renderVariantReport([{ tag: '생성', items: msg.combos, marker: 'added' }]);
       setStatus('componentStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
       break;
     }
@@ -1908,6 +1860,65 @@ function clearCompPreview(): void {
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';
 }
 
+/* ---------- 등록/분류 결과 리포트(#variantReport) ----------
+   세 메시지(COMPONENTS_RESULT · VARIANTS_RESULT · GENERATE_RESULT)가 각자 다른 내용을 그리는데
+   렌더 코드가 세 번 복붙돼 있었고, 행이라는 단위 자체가 없어 맨 <div>에 **리터럴 공백**으로
+   들여썼다. 뭉뚱그려 한 모양으로 합치는 대신 ‘머리줄 + 항목 줄’이라는 공통 구조만 뽑는다. */
+
+/** 항목 앞 표시 — 내용이 아니라 장식이라 textContent가 아니라 CSS(::before)가 그린다. */
+type VariantReportMarker = 'bullet' | 'added';
+
+interface VariantReportSection {
+  /** 카드 제목 개수 span에 쓸 짧은 이름 */
+  tag: string;
+  /** 목록 안 머리줄. 종류가 하나뿐이면(생성 결과) 생략 */
+  head?: string;
+  items: string[];
+  /** 진단(실패)은 경고색 */
+  warn?: boolean;
+  marker?: VariantReportMarker;
+}
+
+interface VariantReportLine {
+  text: string;
+  cls: string;
+}
+
+function makeVariantReportRow(l: VariantReportLine): HTMLElement {
+  const d = document.createElement('div');
+  d.className = l.cls;
+  d.textContent = l.text;
+  // 행 높이가 균일해야 스냅이 성립해 줄바꿈을 막았다 → 잘린 뒷부분은 title로 읽는다.
+  d.title = l.text;
+  return d;
+}
+
+/** 등록·분류가 공유하는 구획(빈 조합 + 실패 진단) — 두 결과가 같은 리포트를 그린다. */
+function variantIssueSections(missing: string[], failures?: string[]): VariantReportSection[] {
+  const f = failures || [];
+  return [
+    { tag: '빈 조합', head: '빈 조합(미생성):', items: missing },
+    { tag: '문제', head: `처리 중 문제 ${f.length}건:`, items: f, warn: true, marker: 'bullet' },
+  ];
+}
+
+function renderVariantReport(sections: VariantReportSection[]): void {
+  const filled = sections.filter((s) => s.items.length);
+  // 카드 제목의 개수(#tokenList의 createCount와 같은 패턴) — 리포트가 상한에 걸리거나
+  // 카드가 접혀 있어도 무엇이 몇 건인지 먼저 알린다.
+  $('componentCount').textContent = filled.map((s) => `· ${s.tag} ${s.items.length}개`).join(' ');
+  const lines: VariantReportLine[] = [];
+  for (const s of filled) {
+    const warn = s.warn ? ' vr-warn' : '';
+    if (s.head) lines.push({ text: s.head, cls: `vr-row vr-head${warn}` });
+    const marker = s.marker ? ` vr-${s.marker}` : '';
+    for (const it of s.items) lines.push({ text: it, cls: `vr-row vr-item${warn}${marker}` });
+  }
+  // 빈 조합은 베리언트 속성의 곱집합이라 세트 하나로도 수백 줄이 된다 → 청크 렌더.
+  // 줄이 0이어도 불러야 마운트가 비워지고 onDone이 테두리·푸터를 걷는다.
+  renderChunked($('variantReport'), lines, makeVariantReportRow, () => layoutListBy('variantReport'));
+}
+
 /** 선택 의존 카드(바인딩·컴포넌트)의 빈 상태(캐논 108:2) — 미리보기/후보가 없을 때만,
     무선택이면 캐논 빈 상태를 표시하고, 선택이 있으면 비워 둔다(액션 버튼이 흐름을 주도). */
 function refreshTreeEmptyStates(): void {
@@ -2153,8 +2164,9 @@ function showTab(name: (typeof TABS)[number]): void {
   }
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
-  // 숨은 탭에서 렌더된 목록은 행 높이가 0으로 측정돼 스냅도 개수 줄도 없이 남는다 — 마법사가
-  // 추출을 돌리면 ‘만들기’ 탭 목록이 그렇게 되고, 탭을 열면 반쪽 행이 그대로 보인다. 여기서 다시 잰다.
+  // 비활성 탭은 .tab-section이 display:none이라 그 안에서 렌더된 목록은 행 높이 0으로 측정되고
+  // 스냅이 조용히 bail한다(접힌 카드와 같은 함정). 마법사가 추출을 돌려 ‘만들기’ 탭 목록을 채우거나
+  // ‘적용’ 탭 리포트를 채우는 경로가 실제로 있으므로, 탭이 보이는 순간 다시 잰다.
   layoutAllLists();
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
 }
