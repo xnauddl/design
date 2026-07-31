@@ -303,8 +303,24 @@
     .tidy-note #tidySumText { flex: 1 1 auto; font-weight: 600; }
 
     /* ── diff / 선택형 미리보기 트리 ── */
-    #diff, #bindTree, #compTree { max-height: 220px; overflow: auto; margin-top: 8px; font-family: var(--mono); font-size: var(--fs); border: 1px solid var(--border); border-radius: var(--r-sm); }
-    #diff:empty, #bindTree:empty, #compTree:empty { border: none; }
+    /* 세 트리도 .list-region(#tokenList와 같은 처리) — 행 높이 20.5px에 상한이 220px이라
+       220÷20.5≈10.7행, 마지막 행이 **상시** 반쪽으로 끝났다. 스캔 상한이 1500노드고 노드
+       헤더 + 후보 필드마다 한 행이라 수천 행이 되는 최대 목록이어서 증상도 가장 크다.
+       기존 :empty 규칙은 테두리를 걷어내지 못했다 — renderEmptyState가 채운 빈 상태는
+       자식이 있어 :empty가 아니라, 안내 문구 한 덩이가 스크롤 영역인 척 테두리를 달고 있었다.
+       이제 행 수로 판단하는 layoutList가 두 경우(빈 DOM·안내 문구)를 함께 처리한다.
+       상한은 기본값(40vh)보다 낮게 — 세 트리가 모두 ‘적용’ 탭에 있어 동시에 미리보기를 물면
+       카드 세 개가 각각 40vh를 먹고 탭이 화면 몇 배로 길어진다. */
+    #diff, #bindTree, #compTree {
+      font-family: var(--mono); font-size: var(--fs);
+      --list-cap: clamp(200px, 30vh, 420px);
+      /* 좌우 여백은 .tree-row가 낸다 — 컨테이너가 또 주면 짝수 행 줄무늬가 테두리에 못 닿아
+         목록이 아니라 들여쓴 문단처럼 보인다. */
+      padding: 0;
+    }
+    /* 행이 nowrap이라 긴 이름은 가로로 넘친다. 펼침(.expanded)의 overflow:visible이면 그 행이
+       카드 밖으로 삐져나오므로, 세로 상한이 풀린 뒤에는 auto로 되돌려 가로만 스크롤시킨다. */
+    #diff.expanded, #bindTree.expanded, #compTree.expanded { overflow: auto; }
     .tree-row { display: flex; align-items: center; gap: 5px; padding: 2px 7px; white-space: nowrap; }
     .tree-row:nth-child(even) { background: var(--surface-2); }
     .tree-row.header { opacity: 1; color: var(--muted); background: none; }
@@ -521,7 +537,7 @@
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
-      <h2>적용 (바인딩)</h2>
+      <h2>적용 (바인딩) <span class="muted" id="bindCount"></span></h2>
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
@@ -531,7 +547,12 @@
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> 전체 선택</label>
       </div>
-      <div id="bindTree"></div>
+      <div id="bindTree" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="bindTreeMore" style="display:none">
+        <span class="list-count" id="bindTreeCount"></span>
+        <button class="link" id="btnBindTreeExpand">모두 펼치기</button>
+      </div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
@@ -544,7 +565,7 @@
     </div>
 
     <div class="step">
-      <h2>리네임</h2>
+      <h2>리네임 <span class="muted" id="renameCount"></span></h2>
       <div class="row">
         <label class="inline">맥락 최대단계 <input id="depth" type="number" value="8" min="1" /></label>
         <button id="btnPreview">미리보기</button>
@@ -553,7 +574,12 @@
       <div class="row tree-ctrls">
         <label class="inline"><input type="checkbox" id="renameAll" checked /> 전체 선택</label>
       </div>
-      <div id="diff"></div>
+      <div id="diff" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="diffMore" style="display:none">
+        <span class="list-count" id="diffCount"></span>
+        <button class="link" id="btnDiffExpand">모두 펼치기</button>
+      </div>
       <div class="ux">
         <div class="ux-h"><span class="ux-t">되돌리기 안전장치</span></div>
         <div>이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
@@ -578,7 +604,7 @@
     </div>
 
     <div class="step" id="componentCard">
-      <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
+      <h2>컴포넌트 / 베리언트 <span class="muted" id="compCount"></span> <span class="muted" id="componentLock"></span></h2>
       <div class="hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외)이며, 이름에 <b>컴포넌트명</b>(button·card·chip…)이 있는 자식만 추립니다. <b>같은 컴포넌트명</b>이면 한 세트로 묶습니다 — 내부 구조·패딩·크기·색이 달라도 OK(차이는 속성으로 흡수, 과묶임은 체크 해제). 속성은 <b>이름 우선</b>(<code>Type</code>·<code>State</code>·<code>Size</code>) + 부족하면 크기·색 보완. 후보엔 <b>세트</b>/<b>단독</b> 배지가 붙습니다. 메인 컴포넌트는 <b>Components 페이지</b>로 보내고 원래 자리엔 <b>인스턴스</b>가 남습니다.</div>
       <div class="hint muted"><b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 컴포넌트명끼리 다시 묶을 때만(등록과 같은 기준 — 프레임은 「컴포넌트 등록」). <b>속성 노출</b>은 선택한 세트(또는 단독 컴포넌트) 대상.</div>
       <div class="row">
@@ -590,7 +616,12 @@
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
       </div>
-      <div id="compTree"></div>
+      <div id="compTree" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="compTreeMore" style="display:none">
+        <span class="list-count" id="compTreeCount"></span>
+        <button class="link" id="btnCompTreeExpand">모두 펼치기</button>
+      </div>
       <div id="variantReport" style="max-height:120px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
       <div class="status" id="componentStatus"></div>
     </div>
