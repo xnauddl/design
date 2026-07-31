@@ -1538,16 +1538,21 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('exportStatus', t('export.done', { format: msg.format === 'css' ? 'CSS' : 'W3C JSON' }), 'ok');
       break;
     case 'COMPONENT_CANDIDATES': {
-      // #1: 하위 등록 후보를 트리로. 모든 프레임이 선택 가능하되 **반복 이름(group)만 기본 체크** —
+      // #1: 하위 등록 후보를 트리로. **반복 이름(group) + 속성접힘(propsOnly)만 기본 체크** —
       // 잡음(컨테이너/래퍼 단발성)은 체크 해제 상태로 두고, 사용자가 필요시 추가 체크.
       compCandidates = msg.nodes;
       compChecked.clear();
-      for (const c of msg.nodes) if (c.eligible && c.group) compChecked.add(c.id);
+      for (const c of msg.nodes) if (c.eligible && (c.group || c.propsOnly)) compChecked.add(c.id);
       renderCompTree();
       // 다시 스캔했으면 이전 등록/분류 리포트는 남의 얘기다. 개수를 카드 제목에 올린 뒤로는
       // 카드를 접어 둬도 옛 수치가 계속 보여, 새 후보와 짝이 안 맞는다.
       renderVariantReport([]);
-      if (!compEligibleCount()) setStatus('componentStatus', t('component.noEligible'), 'warn');
+      // 스캔 완료 시 반드시 ‘스캔 중’을 덮어쓴다(후보 0·비eligible만 있어도).
+      if (!compCandidates.length || !compEligibleCount()) {
+        setStatus('componentStatus', t('component.noEligible'), 'warn');
+      } else {
+        updateCompRegister();
+      }
       break;
     }
     case 'COMPONENTS_RESULT': {
@@ -1613,6 +1618,7 @@ const OP_STATUS: Record<string, string> = {
   APPLY: 'applyStatus',
   RENAME: 'renameStatus',
   EXPORT: 'exportStatus',
+  SCAN_COMPONENT_CANDIDATES: 'componentStatus',
   REGISTER_COMPONENTS: 'componentStatus',
   CLASSIFY_VARIANTS: 'componentStatus',
   GENERATE_MISSING_VARIANTS: 'componentStatus',
@@ -1891,10 +1897,13 @@ function compEligibleCount(): number {
 function compRows(): TreeRow[] {
   return compCandidates.map((n) => {
     if (!n.eligible) return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId };
-    // 세트 멤버: [세트] 배지 + '세트이름 · 베리언트'. 단독: [단독] 배지 + 등록명.
+    // 세트: [세트] · 속성접힘: [속성] · 단독: [단독]
     const base = { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, replace: false };
     if (n.group) {
       return { ...base, change: `${n.group} · ${n.variant || '베리언트'}`, badge: { text: '세트', kind: 'set' as const } };
+    }
+    if (n.propsOnly) {
+      return { ...base, change: `${n.single || '컴포넌트'} · 속성`, badge: { text: '속성', kind: 'single' as const } };
     }
     return { ...base, change: n.single || '컴포넌트', badge: { text: '단독', kind: 'single' as const } };
   });
