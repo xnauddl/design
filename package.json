@@ -10,11 +10,12 @@
     "watch": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test",
-    "verify:lists": "npm run build && node scripts/verify-lists.mjs"
+    "verify:lists": "npm run build && node scripts/verify-lists.mjs && node scripts/verify-lists.mjs --width 360"
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1.100.0",
     "esbuild": "^0.21.0",
+    "playwright": "^1.61.1",
     "typescript": "^5.4.0"
   }
 }

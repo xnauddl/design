@@ -2,7 +2,7 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
-import { type DraftToken, resolvedTypeForToken } from './lib/tokens';
+import { type DraftToken, type Unit, resolvedTypeForToken } from './lib/tokens';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier } from './lib/entitlements';
@@ -17,7 +17,7 @@ import { suggestTokenRoles } from './lib/roles';
 import { pipelineSteps, type StepStatus } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
-import type { WcagLevel } from './lib/contrast';
+import type { WcagLevel, ContrastFinding } from './lib/contrast';
 import { planWizard, summarize, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
@@ -84,6 +84,28 @@ function renderChunked<T>(
 }
 
 /**
+ * 목록 마운트를 비운다 — **진행 중인 청크를 먼저 취소**한다.
+ *
+ * `innerHTML = ''`만 하면 rAF에 예약된 다음 청크가 그대로 살아나 이미 무효가 된 행을 계속
+ * 붙인다(2000노드 미리보기 중 선택을 바꾸면 안내 문구 아래로 수천 행이 다시 쌓였다).
+ * 예전엔 테두리도 개수 줄도 없어 눈에 덜 띄었지만, 이제 렌더 완료 후 layoutList가 돌아
+ * 그 유령 행을 기준으로 테두리·높이·‘총 n개’까지 붙는다 — 취소가 필수가 됐다.
+ */
+function clearMount(mount: HTMLElement): void {
+  const prev = chunkPending.get(mount);
+  if (prev !== undefined) {
+    cancelAnimationFrame(prev);
+    chunkPending.delete(mount);
+  }
+  mount.innerHTML = '';
+}
+
+/** 타입 칩 안의 단위 표기 — 칩이 88px 고정 폭이라 낱말 대신 기호로 줄인다
+    (`letterSpacing·percent` 106px → `letterSpacing·%` 81px). 온전한 표기는 칩 title에 남는다.
+    추출이 실제로 만드는 비-px 단위는 percent뿐이고(lineHeight·letterSpacing), 나머지는 대비용. */
+const UNIT_CHIP: Record<Unit, string> = { px: 'px', percent: '%', em: 'em', rem: 'rem', ratio: '×' };
+
+/**
  * 토큰 1행(스와치·이름 입력·타입 칩).
  * 이름 편집은 넘겨받은 토큰 객체를 그대로 고친다 — 목록은 `tokens`를 필터한 배열이라
  * 행 인덱스가 `tokens` 인덱스와 어긋난다(색 토큰이 앞에 있으면 남의 이름을 덮어썼다).
@@ -114,7 +136,7 @@ function makeTokenRow(t: DraftToken): HTMLElement {
 
   const cat = document.createElement('span');
   cat.className = 'cat';
-  cat.textContent = t.unit && t.unit !== 'px' ? `${t.category}·${t.unit}` : t.category;
+  cat.textContent = t.unit && t.unit !== 'px' ? `${t.category}·${UNIT_CHIP[t.unit]}` : t.category;
   // 칩은 좁으니 값·Figma 변수 타입은 title로 — 이름만으로 구분 안 되는 토큰(fontFamily 등) 확인용.
   cat.title = `${t.category}${t.unit ? ` · ${t.unit}` : ''} · ${resolvedTypeForToken(t)} · ${t.value}`;
   row.appendChild(cat);
@@ -123,7 +145,7 @@ function makeTokenRow(t: DraftToken): HTMLElement {
 
 /** 공통 빈 상태 — 가운데 굵은 헤드라인 + 안내 + (선택) 비활성 버튼. 캐논 108:2 패턴. */
 function renderEmptyState(box: HTMLElement, title: string, guide: string, actionLabel?: string): void {
-  box.innerHTML = '';
+  clearMount(box); // 진행 중이던 청크가 안내 문구 아래로 계속 쌓이지 않게
   const wrap = document.createElement('div');
   wrap.className = 'empty-state';
   const t = document.createElement('div');
@@ -165,10 +187,26 @@ interface ListRegion {
   count: string;
   /** 펼치기/접기 버튼 id */
   expand: string;
+  /**
+   * 스크롤포트 상단을 덮는 고정 헤더 셀렉터(표 목록만). 헤더가 가린 만큼은 행을 놓을 수 없으니
+   * 높이 계산에서 빼고 스냅 위치도 그만큼 내린다. 없으면 0 — div 목록의 계산은 그대로다.
+   */
+  stickyHead?: string;
 }
 
 const LIST_REGIONS: ListRegion[] = [
   { mount: 'tokenList', row: '.tk', more: 'tokenListMore', count: 'tokenListCount', expand: 'btnTokenListExpand' },
+  { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
+  { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
+  { mount: 'contrastList', row: '.cfind', more: 'contrastListMore', count: 'contrastListCount', expand: 'btnContrastListExpand' },
+  // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
+  // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
+  { mount: 'bindTree', row: '.tree-row', more: 'bindTreeMore', count: 'bindTreeCount', expand: 'btnBindTreeExpand' },
+  { mount: 'diff', row: '.tree-row', more: 'diffMore', count: 'diffCount', expand: 'btnDiffExpand' },
+  { mount: 'compTree', row: '.tree-row', more: 'compTreeMore', count: 'compTreeCount', expand: 'btnCompTreeExpand' },
+  // 텍스트 스타일 표 — 마운트는 표를 감싼 래퍼다(표 박스는 스크롤 컨테이너가 못 된다).
+  // 행은 tbody의 tr만(thead의 헤더 행이 한 행으로 세어지면 개수와 행 높이가 둘 다 틀어진다).
+  { mount: 'tsList', row: 'tbody tr', more: 'tsListMore', count: 'tsListCount', expand: 'btnTsListExpand', stickyHead: 'thead' },
 ];
 
 // ‘모두 펼치기’로 상한을 푼 목록의 마운트 id. 목록별로 따로 기억해야 한 목록을 펼친 게
@@ -216,11 +254,19 @@ function layoutList(r: ListRegion): void {
   }
   const cs = getComputedStyle(box);
   const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-  const shown = Math.max(1, Math.floor((box.clientHeight - padY) / rowH));
+  // 표 목록의 고정 헤더는 스크롤포트 상단을 늘 덮고 있어 그만큼은 행이 보일 수 없다.
+  // 빼지 않으면 스크롤포트만 정수배가 되고 ‘헤더 아래 남는 영역’은 정수배가 아니라
+  // 어느 위치에서든 한 행이 헤더에 반쯤 가린다. 스냅 위치도 헤더 아래로 내려야 한다.
+  const head = r.stickyHead ? box.querySelector(r.stickyHead) : null;
+  const headH = head ? head.getBoundingClientRect().height : 0;
+  box.style.scrollPaddingTop = headH ? `${headH}px` : '';
+  const shown = Math.max(1, Math.floor((box.clientHeight - padY - headH) / rowH));
   // box-sizing:border-box라 height에 테두리까지 포함된다. 보정을 빼먹으면 그만큼(2px)
   // 마지막 행이 다시 잘린다. 소수 높이는 올림해 잘림 대신 미세한 여백이 남게 한다.
+  // (offsetHeight−clientHeight는 테두리 + 가로 스크롤바 높이라, 가로로도 스크롤하는
+  //  표 목록에서 스크롤바가 먹는 높이까지 같이 흡수된다.)
   const borderY = box.offsetHeight - box.clientHeight;
-  box.style.height = `${Math.ceil(shown * rowH) + padY + borderY}px`; // 반쪽 행 제거
+  box.style.height = `${Math.ceil(shown * rowH + headH) + padY + borderY}px`; // 반쪽 행 제거
   more.style.display = '';
   label.textContent = `총 ${rows.length}개 중 ${shown}개 표시 — 스크롤하거나`;
   btn.textContent = '모두 펼치기';
@@ -255,7 +301,7 @@ function renderTokens(): void {
   // 카드 제목의 개수 — 목록이 접혀 있어도 몇 개가 생성 대상인지 먼저 알린다.
   $('createCount').textContent = others.length ? `· 색 외 ${others.length}개` : '';
   const showHint = (msg: string): void => {
-    box.innerHTML = '';
+    clearMount(box); // 진행 중이던 청크가 안내 문구 아래로 계속 쌓이지 않게
     const hint = document.createElement('div');
     hint.className = 'hint';
     hint.textContent = msg;
@@ -364,9 +410,15 @@ function renderColorTable(): void {
   const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
   if (!colorRevealed || !colors.length) {
     card.style.display = 'none'; // 색은 ‘선택에서 토큰 추출’(colorRevealed) 후에만 노출
+    $('colorCount').textContent = '';
+    // 옛 행을 남겨 두면 다음 추출이 색 0개일 때 테두리·‘총 n개’ 줄이 실제와 어긋난 채 되살아난다.
+    $('colorTable').innerHTML = '';
+    layoutListBy('colorTable'); // 행이 없으니 경계·개수 줄을 걷어낸다
     return;
   }
   card.style.display = '';
+  // 카드 제목의 개수 — 표가 상한에 걸려 일부만 보여도 정리 대상 색이 몇 개인지 먼저 알린다.
+  $('colorCount').textContent = `· 색 ${colors.length}개`;
   // 현 semMap을 역할→이름으로 읽어 이름→역할로 뒤집어 prefill.
   const roleByName = new Map<string, string>();
   for (const [role, name] of Object.entries(textToSemanticMap(($('semMap') as HTMLTextAreaElement).value))) {
@@ -389,7 +441,7 @@ function renderColorTable(): void {
     role.dataset.name = t.name;
     row.append(sw, name, role);
     return row;
-  });
+  }, () => layoutListBy('colorTable')); // 행이 다 붙은 뒤라야 행 높이 측정이 맞는다
 }
 
 /** 색 편집표의 역할 입력 → 시맨틱 매핑 textarea로 반영(역할=이름). */
@@ -621,7 +673,11 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   const del = document.createElement('button');
   del.textContent = '✕';
   del.title = '행 삭제';
-  del.addEventListener('click', () => tr.remove());
+  // 행이 줄면 상한·개수 문구도 같이 줄어야 한다(안 하면 ‘총 40개 중 8개’가 남아 거짓말이 된다).
+  del.addEventListener('click', () => {
+    tr.remove();
+    layoutListBy('tsList');
+  });
   tdDel.appendChild(del);
   tr.appendChild(tdDel);
   return tr;
@@ -631,6 +687,7 @@ function renderTextStyleRows(specs: TextStyleSpec[], locked = false): void {
   const tbody = $('tsRows');
   tbody.innerHTML = '';
   for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
+  layoutListBy('tsList'); // 행이 붙은 뒤에 재야 행 높이·상한이 맞는다
 }
 
 /** 표 → 스펙. 폰트 패밀리는 행별 폰트 셀에서 읽는다(비면 DEFAULT_TS_FAMILY). */
@@ -657,9 +714,13 @@ function readTextStyleRows(): TextStyleSpec[] {
 
 $('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
 $('btnTsAddRow').addEventListener('click', () => {
-  $('tsRows').appendChild(
-    textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' }),
-  );
+  const tr = textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
+  $('tsRows').appendChild(tr);
+  layoutListBy('tsList');
+  // 표가 상한에 걸린 뒤로는 새 행이 스크롤 밖에 생겨 "행 추가를 눌렀는데 아무 일도 없다"로 보인다.
+  // 추가한 행으로 데려가고 이름 칸에 커서를 둔다(어차피 다음 동작은 이름 입력).
+  tr.scrollIntoView({ block: 'nearest' });
+  (tr.querySelector('input[data-field="name"]') as HTMLInputElement | null)?.focus();
 });
 $('btnTextStyles').addEventListener('click', () => {
   const styles = readTextStyleRows();
@@ -712,6 +773,10 @@ $('btnPreview').addEventListener('click', () => {
 $('btnContrast').addEventListener('click', () => {
   const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
   setStatus('contrastStatus', t('contrast.checking'), '');
+  // 지난 결과를 비운다 — 검사가 ERROR로 끝나면 결과는 그대로 남는데 아래 개수 줄이
+  // ‘총 n개 중 m개 표시’로 남아 지난 회차 수치를 이번 결과인 양 단언한다.
+  $('contrastList').innerHTML = '';
+  layoutListBy('contrastList');
   send({ type: 'CHECK_CONTRAST', level });
 });
 
@@ -1479,6 +1544,9 @@ window.onmessage = (event: MessageEvent) => {
       compChecked.clear();
       for (const c of msg.nodes) if (c.eligible && c.group) compChecked.add(c.id);
       renderCompTree();
+      // 다시 스캔했으면 이전 등록/분류 리포트는 남의 얘기다. 개수를 카드 제목에 올린 뒤로는
+      // 카드를 접어 둬도 옛 수치가 계속 보여, 새 후보와 짝이 안 맞는다.
+      renderVariantReport([]);
       if (!compEligibleCount()) setStatus('componentStatus', t('component.noEligible'), 'warn');
       break;
     }
@@ -1487,69 +1555,17 @@ window.onmessage = (event: MessageEvent) => {
       const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.exposed ? ` · 속성 ${msg.exposed}` : ''}`;
       setStatus('componentStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? 'ok' : 'warn');
       // 빈 조합(미생성) + 실패(진단) 리포트
-      const box = $('variantReport');
-      box.innerHTML = '';
-      if (msg.missing.length) {
-        const h = document.createElement('div');
-        h.textContent = '빈 조합(미생성):';
-        box.appendChild(h);
-        for (const m of msg.missing) {
-          const d = document.createElement('div');
-          d.textContent = `  ${m}`;
-          box.appendChild(d);
-        }
-      }
-      if (msg.failures && msg.failures.length) {
-        const h = document.createElement('div');
-        h.className = 'warn';
-        h.textContent = `처리 중 문제 ${msg.failures.length}건:`;
-        box.appendChild(h);
-        for (const f of msg.failures) {
-          const d = document.createElement('div');
-          d.className = 'warn';
-          d.textContent = `  • ${f}`;
-          box.appendChild(d);
-        }
-      }
+      renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       break;
     }
     case 'VARIANTS_RESULT': {
-      const box = $('variantReport');
-      box.innerHTML = '';
-      if (msg.missing.length) {
-        const h = document.createElement('div');
-        h.textContent = '빈 조합(미생성):';
-        box.appendChild(h);
-        for (const m of msg.missing) {
-          const d = document.createElement('div');
-          d.textContent = `  ${m}`;
-          box.appendChild(d);
-        }
-      }
-      if (msg.failures && msg.failures.length) {
-        const h = document.createElement('div');
-        h.className = 'warn';
-        h.textContent = `처리 중 문제 ${msg.failures.length}건:`;
-        box.appendChild(h);
-        for (const f of msg.failures) {
-          const d = document.createElement('div');
-          d.className = 'warn';
-          d.textContent = `  • ${f}`;
-          box.appendChild(d);
-        }
-      }
+      renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       const extra = `${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.missing.length ? ' · 빈 조합 있음' : ''}`;
       setStatus('componentStatus', t('component.variants', { sets: msg.sets, extra }), msg.sets ? 'ok' : 'warn');
       break;
     }
     case 'GENERATE_RESULT': {
-      const box = $('variantReport');
-      box.innerHTML = '';
-      for (const c of msg.combos) {
-        const d = document.createElement('div');
-        d.textContent = `+ ${c}`;
-        box.appendChild(d);
-      }
+      renderVariantReport([{ tag: '생성', items: msg.combos, marker: 'added' }]);
       setStatus('componentStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
       break;
     }
@@ -1713,7 +1729,9 @@ function renderSelectableTree(
   const base = rows.length ? baseDepth(rows) : 0;
   // 보이는 행만(맥락 숨김 시 비영향·비헤더 제외) → §4: 대형 서브트리도 청크로 비차단 렌더.
   const visible = rows.filter((r) => r.change !== undefined || r.header || !opts.hideContext);
-  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
+  // 세 트리(#bindTree·#diff·#compTree)가 모두 이 호출부를 지난다 — 어느 목록인지는 마운트 id가
+  // 말해 주므로 스냅·개수 줄 재계산도 여기 한 줄로 끝난다(행 0건이면 테두리·줄을 걷는다).
+  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange), () => layoutListBy(mount.id));
 }
 
 /* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
@@ -1745,6 +1763,8 @@ function renderRenameTree(): void {
 function updateRenameApply(): void {
   const total = affectedRenameCount();
   const sel = renameChecked.size;
+  // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
+  $('renameCount').textContent = total ? `· 변경 ${total}개` : '';
   ($('btnRename') as HTMLButtonElement).disabled = sel === 0;
   const all = $('renameAll') as HTMLInputElement;
   all.checked = total > 0 && sel === total;
@@ -1768,7 +1788,9 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
   // 적용 완료(선택 적용 또는 마법사): 트리 비우고 결과만.
   renameNodes = [];
   renameChecked.clear();
-  $('diff').innerHTML = '';
+  clearMount($('diff'));
+  $('renameCount').textContent = '';
+  layoutListBy('diff'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('btnRename') as HTMLButtonElement).disabled = true;
   setStatus('renameStatus', t('rename.applied', { count: msg.changes.length }), 'ok');
 }
@@ -1831,6 +1853,10 @@ function renderBindTree(): void {
 function updateBindApply(): void {
   const total = bindCandidates.length;
   const sel = bindChecked.size;
+  // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
+  // 이 트리는 노드 헤더도 한 행이라 목록 아래 ‘총 n개’(행 수)와 수가 다르다 → 세는 단위를
+  // ‘건’으로 구분해(상태 문구 ‘바인딩 n건 후보’와 같은 말) 같은 수의 오기로 읽히지 않게 한다.
+  $('bindCount').textContent = total ? `· 후보 ${total}건` : '';
   const confirm = $('btnApplyConfirm') as HTMLButtonElement;
   confirm.style.display = hasBindPreview() ? '' : 'none';
   confirm.disabled = sel === 0;
@@ -1846,7 +1872,9 @@ function clearBindPreview(): void {
   bindCandidates = [];
   bindNodes = [];
   bindChecked.clear();
-  $('bindTree').innerHTML = '';
+  clearMount($('bindTree'));
+  $('bindCount').textContent = '';
+  layoutListBy('bindTree'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
   ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
 }
@@ -1886,6 +1914,8 @@ function renderCompTree(): void {
 function updateCompRegister(): void {
   const total = compEligibleCount();
   const sel = compChecked.size;
+  // 카드 제목의 개수 — 트리에 뜨는 건 등록 가능한 후보뿐이라 그 수를 센다(스캔 노드 수가 아니라).
+  $('compCount').textContent = total ? `· 후보 ${total}개` : '';
   if (compCandidates.length) {
     const all = $('compAll') as HTMLInputElement;
     all.checked = sel === total && total > 0;
@@ -1897,21 +1927,86 @@ function updateCompRegister(): void {
 function clearCompPreview(): void {
   compCandidates = [];
   compChecked.clear();
-  $('compTree').innerHTML = '';
+  clearMount($('compTree'));
+  $('compCount').textContent = '';
+  layoutListBy('compTree'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';
+}
+
+/* ---------- 등록/분류 결과 리포트(#variantReport) ----------
+   세 메시지(COMPONENTS_RESULT · VARIANTS_RESULT · GENERATE_RESULT)가 각자 다른 내용을 그리는데
+   렌더 코드가 세 번 복붙돼 있었고, 행이라는 단위 자체가 없어 맨 <div>에 **리터럴 공백**으로
+   들여썼다. 뭉뚱그려 한 모양으로 합치는 대신 ‘머리줄 + 항목 줄’이라는 공통 구조만 뽑는다. */
+
+/** 항목 앞 표시 — 내용이 아니라 장식이라 textContent가 아니라 CSS(::before)가 그린다. */
+type VariantReportMarker = 'bullet' | 'added';
+
+interface VariantReportSection {
+  /** 카드 제목 개수 span에 쓸 짧은 이름 */
+  tag: string;
+  /** 목록 안 머리줄. 종류가 하나뿐이면(생성 결과) 생략 */
+  head?: string;
+  items: string[];
+  /** 진단(실패)은 경고색 */
+  warn?: boolean;
+  marker?: VariantReportMarker;
+}
+
+interface VariantReportLine {
+  text: string;
+  cls: string;
+}
+
+function makeVariantReportRow(l: VariantReportLine): HTMLElement {
+  const d = document.createElement('div');
+  d.className = l.cls;
+  d.textContent = l.text;
+  // 행 높이가 균일해야 스냅이 성립해 줄바꿈을 막았다 → 잘린 뒷부분은 title로 읽는다.
+  d.title = l.text;
+  return d;
+}
+
+/** 등록·분류가 공유하는 구획(빈 조합 + 실패 진단) — 두 결과가 같은 리포트를 그린다. */
+function variantIssueSections(missing: string[], failures?: string[]): VariantReportSection[] {
+  const f = failures || [];
+  return [
+    { tag: '빈 조합', head: '빈 조합(미생성):', items: missing },
+    { tag: '문제', head: `처리 중 문제 ${f.length}건:`, items: f, warn: true, marker: 'bullet' },
+  ];
+}
+
+function renderVariantReport(sections: VariantReportSection[]): void {
+  const filled = sections.filter((s) => s.items.length);
+  // 카드 제목의 개수(#tokenList의 createCount와 같은 패턴) — 리포트가 상한에 걸리거나
+  // 카드가 접혀 있어도 무엇이 몇 건인지 먼저 알린다.
+  $('componentCount').textContent = filled.map((s) => `· ${s.tag} ${s.items.length}개`).join(' ');
+  const lines: VariantReportLine[] = [];
+  for (const s of filled) {
+    const warn = s.warn ? ' vr-warn' : '';
+    if (s.head) lines.push({ text: s.head, cls: `vr-row vr-head${warn}` });
+    const marker = s.marker ? ` vr-${s.marker}` : '';
+    for (const it of s.items) lines.push({ text: it, cls: `vr-row vr-item${warn}${marker}` });
+  }
+  // 빈 조합은 베리언트 속성의 곱집합이라 세트 하나로도 수백 줄이 된다 → 청크 렌더.
+  // 줄이 0이어도 불러야 마운트가 비워지고 onDone이 테두리·푸터를 걷는다.
+  renderChunked($('variantReport'), lines, makeVariantReportRow, () => layoutListBy('variantReport'));
 }
 
 /** 선택 의존 카드(바인딩·컴포넌트)의 빈 상태(캐논 108:2) — 미리보기/후보가 없을 때만,
     무선택이면 캐논 빈 상태를 표시하고, 선택이 있으면 비워 둔다(액션 버튼이 흐름을 주도). */
 function refreshTreeEmptyStates(): void {
   const guide = '프레임이나 레이어를 선택하면 후보를 찾아드려요.';
+  // 어느 쪽이든 행은 0건이다 — 안내 문구는 스크롤 영역이 아니므로 테두리·개수 줄을 걷어야 한다.
+  // (예전 :empty 규칙은 안내 문구가 들어찬 순간 자식이 생겨 안 먹었다.)
   if (!hasBindPreview()) {
     if (lastSelCount === 0) renderEmptyState($('bindTree'), '선택한 노드가 없어요', guide);
-    else $('bindTree').innerHTML = '';
+    else clearMount($('bindTree'));
+    layoutListBy('bindTree');
   }
   if (compCandidates.length === 0) {
     if (lastSelCount === 0) renderEmptyState($('compTree'), '선택한 노드가 없어요', guide);
-    else $('compTree').innerHTML = '';
+    else clearMount($('compTree'));
+    layoutListBy('compTree');
   }
 }
 
@@ -1953,55 +2048,64 @@ function contrastFixBtn(label: string, hex: string, nodeId: string): HTMLButtonE
   sw.className = 'swatch';
   sw.style.background = hex;
   btn.appendChild(sw);
-  btn.appendChild(document.createTextNode(` ${label}`));
+  const text = document.createTextNode(` ${label}`);
+  btn.appendChild(text);
   btn.addEventListener('click', () => {
     send({ type: 'APPLY_CONTRAST_FIX', nodeId, hex });
     btn.disabled = true;
-    btn.textContent = '✓ 적용';
+    // textContent로 통째로 갈아끼우면 스와치 span까지 지워진다 — 어떤 색을 넣었는지 사라지고,
+    // 버튼이 스와치 높이를 잃어 이 행만 낮아진다(행 높이 균일이 스냅의 전제, .cfind 주석).
+    text.textContent = ' ✓ 적용';
     setStatus('contrastStatus', t('contrast.fixApplied'), 'ok');
   });
   return btn;
 }
 
+/** 실패 1행(색쌍 스와치 · 레이어명 · 대비비 · 보정 버튼). */
+function makeContrastRow(f: ContrastFinding): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'cfind';
+
+  const pair = document.createElement('span');
+  pair.className = 'cpair';
+  for (const hex of [f.bg, f.fg]) {
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = hex;
+    pair.appendChild(sw);
+  }
+  row.appendChild(pair);
+
+  const name = document.createElement('span');
+  name.className = 'cname';
+  name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
+  // 이름은 행 높이를 고르게 두려고 한 줄 말줄임이다(.cfind 주석) → 잘린 부분은 title로 읽는다.
+  name.title = name.textContent;
+  row.appendChild(name);
+
+  const ratio = document.createElement('span');
+  ratio.className = 'ratio warn';
+  ratio.textContent = `${f.ratio} / ${f.required}`;
+  row.appendChild(ratio);
+
+  // #2: 보정 제안 — 텍스트색(기본)·배경색(옵션). 클릭 시 해당 노드에 적용.
+  if (f.suggestedFg || f.suggestedBg) {
+    const fix = document.createElement('span');
+    fix.className = 'cfix';
+    if (f.suggestedFg) fix.appendChild(contrastFixBtn('텍스트', f.suggestedFg, f.id));
+    if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn('배경', f.suggestedBg, f.bgId));
+    row.appendChild(fix);
+  }
+  return row;
+}
+
 function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): void {
   const box = $('contrastList');
-  box.innerHTML = '';
   const fails = msg.findings.filter((f) => !f.pass); // 실패 건만 나열(조치 대상)
-  for (const f of fails) {
-    const row = document.createElement('div');
-    row.className = 'cfind';
-
-    const pair = document.createElement('span');
-    pair.className = 'cpair';
-    for (const hex of [f.bg, f.fg]) {
-      const sw = document.createElement('span');
-      sw.className = 'swatch';
-      sw.style.background = hex;
-      pair.appendChild(sw);
-    }
-    row.appendChild(pair);
-
-    const name = document.createElement('span');
-    name.className = 'cname';
-    name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
-    row.appendChild(name);
-
-    const ratio = document.createElement('span');
-    ratio.className = 'ratio warn';
-    ratio.textContent = `${f.ratio} / ${f.required}`;
-    row.appendChild(ratio);
-
-    // #2: 보정 제안 — 텍스트색(기본)·배경색(옵션). 클릭 시 해당 노드에 적용.
-    if (f.suggestedFg || f.suggestedBg) {
-      const fix = document.createElement('span');
-      fix.className = 'cfix';
-      if (f.suggestedFg) fix.appendChild(contrastFixBtn('텍스트', f.suggestedFg, f.id));
-      if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn('배경', f.suggestedBg, f.bgId));
-      row.appendChild(fix);
-    }
-
-    box.appendChild(row);
-  }
+  // 스캔 상한이 2000이라 실패가 수백 건이면 동기 루프가 프레임을 통째로 막는다(§4).
+  // onDone에서 스냅해야 한다 — 청크가 남아 있는 동안 재면 행 수가 모자라 상한에 안 걸린
+  // 것으로 보이고, ‘총 n개 중 m개’ 줄이 안 뜬 채 반쪽 행만 남는다.
+  renderChunked(box, fails, makeContrastRow, () => layoutListBy('contrastList'));
   const skip = contrastSkipText(msg.skipped);
   const skipNote = skip ? ` · 건너뜀: ${skip}` : '';
   if (msg.checked === 0) {
@@ -2146,6 +2250,13 @@ function showTab(name: (typeof TABS)[number]): void {
   }
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
+  // 비활성 탭은 .tab-section이 display:none이라 그 안에서 렌더된 목록은 행 높이가 0으로 측정되고
+  // 스냅이 조용히 bail한다(접힌 카드와 같은 함정 — applyCardChrome 참고). 결과가 다른 탭에 있는
+  // 동안 도착하는 경로가 여럿이다: 마법사의 추출이 ‘만들기’ 탭 목록을, 대비 점검이 #contrastList를,
+  // componentize가 #variantReport를 채우고, 미리보기는 느려서 결과 전에 탭을 옮기는 일이 흔한데
+  // 트리 3종은 첫 화면이 아닌 ‘적용’ 탭에 있다. 탭이 보이는 순간 다시 재지 않으면
+  // 돌아왔을 때 반쪽 행에 개수 줄도 없는 상태가 남는다.
+  layoutAllLists();
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
 }
 TABS.forEach((t, i) => {
