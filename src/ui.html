@@ -260,13 +260,16 @@
        스크롤한 상태로 보게 되고, 그때는 위·아래 끝 행이 동시에 잘린다(실제 신고 화면).
        그래서 스크롤 자체를 행 경계에 멈추게 한다 — 높이가 행 높이의 정수배이므로 어느 위치에
        멈춰도 위아래 모두 온전한 행이 된다. */
-    #tokenList { overflow: auto; margin-top: 8px; }
+    /* 같은 결함이 목록마다 반복되므로 공용 클래스로 둔다. 채택하는 목록은 class="list-region"을
+       붙이고 ui.ts의 LIST_REGIONS에 배선 한 줄을 추가하면 된다. 높이 상한만 다르면 --list-cap. */
+    .list-region { overflow: auto; margin-top: 8px; }
     /* 세로 패딩 금지 — 스크롤포트 높이가 행 높이의 정수배여야 스냅 위치마다 위아래가
-       딱 맞는다. 세로 여백은 행 자신의 padding(.tk)이 낸다. */
-    #tokenList.framed { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0 7px; }
-    #tokenList.scrolls { max-height: clamp(200px, 40vh, 560px); scroll-snap-type: y mandatory; }
-    #tokenList.scrolls .tk { scroll-snap-align: start; }
-    #tokenList.expanded { max-height: none; overflow: visible; }
+       딱 맞는다. 세로 여백은 행 자신의 padding(.tk 등)이 낸다. */
+    .list-region.framed { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0 7px; }
+    .list-region.scrolls { max-height: var(--list-cap, clamp(200px, 40vh, 560px)); scroll-snap-type: y mandatory; }
+    /* 행 클래스가 목록마다 다르므로(.tk · .crow · .tree-row …) 직계 자식 전부에 건다. */
+    .list-region.scrolls > * { scroll-snap-align: start; }
+    .list-region.expanded { max-height: none; overflow: visible; }
     .tk { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
     /* 이름 폭 우선 — 이 목록은 색 외 토큰만 담아 스와치 없는 행이 대부분인데, 빈 14px 거터를
        늘 두면 좁은 패널(최소 360px)에서 이름 폭만 깎인다. 스와치가 실제로 있는 목록에서만
@@ -284,8 +287,8 @@
       min-width: 58px; text-align: center;
     }
     /* 목록 아래 ‘총 n개 중 m개 표시 — 스크롤하거나 [모두 펼치기]’ 줄 */
-    .tk-more { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-    .tk-more .tk-count { color: var(--muted); }
+    .list-more { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .list-more .list-count { color: var(--muted); }
     #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
     .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 3px 0; }
     .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
@@ -450,10 +453,10 @@
     <div class="step" id="createCard">
       <h2>토큰 생성 (Global + Semantic) <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
       <div class="hint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다.</div>
-      <div id="tokenList"></div>
+      <div id="tokenList" class="list-region"></div>
       <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="tk-more" id="tokenListMore" style="display:none">
-        <span class="tk-count" id="tokenListCount"></span>
+      <div class="list-more" id="tokenListMore" style="display:none">
+        <span class="list-count" id="tokenListCount"></span>
         <button class="link" id="btnTokenListExpand">모두 펼치기</button>
       </div>
       <div class="row">

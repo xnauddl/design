@@ -94,7 +94,8 @@ function makeTokenRow(t: DraftToken): HTMLElement {
 
   const sw = document.createElement('span');
   sw.className = 'tk-gutter'; // 스와치 없는 행은 CSS가 폭 0으로 접는다(#tokenList.has-swatch 참고)
-  if ((t.category === 'color' || t.category === 'effectColor') && typeof t.value === 'string') {
+  // 색 토큰은 renderTokens가 걸러내 여기 오지 않는다(색은 위 ‘색 정리’ 표 담당) → effectColor만.
+  if (t.category === 'effectColor' && typeof t.value === 'string') {
     sw.classList.add('swatch');
     sw.style.background = t.value;
   }
@@ -148,32 +149,60 @@ let colorRevealed = false;
 let previewRevealed = false;
 let lastTidy: { before: number; after: number; merged: number } = { before: 0, after: 0, merged: 0 };
 let pendingCreatePreview = false; // ‘미리보기’가 추출을 유발했을 때, 추출 후 생성 미리보기 전송
-let tokenListExpanded = false; // ‘모두 펼치기’ — 목록 높이 상한을 풀고 페이지 스크롤로 전체 확인
+/**
+ * 스크롤되는 목록 하나의 배선. 행 클래스가 목록마다 다르므로(.tk · .crow · .tree-row …)
+ * 셀렉터를 함께 받는다. 새 목록을 채택하려면 마운트에 class="list-region"을 주고,
+ * 아래 ‘더 보기’ 줄(.list-more) 마크업을 붙인 뒤 LIST_REGIONS에 한 줄 추가하면 된다.
+ */
+interface ListRegion {
+  /** 목록 마운트 요소 id */
+  mount: string;
+  /** 행 셀렉터 — 이 목록에서 ‘한 행’으로 셀 요소 */
+  row: string;
+  /** 마운트의 형제인 ‘총 n개 중 m개 표시’ 줄 id */
+  more: string;
+  /** 개수 문구 span id */
+  count: string;
+  /** 펼치기/접기 버튼 id */
+  expand: string;
+}
+
+const LIST_REGIONS: ListRegion[] = [
+  { mount: 'tokenList', row: '.tk', more: 'tokenListMore', count: 'tokenListCount', expand: 'btnTokenListExpand' },
+];
+
+// ‘모두 펼치기’로 상한을 푼 목록의 마운트 id. 목록별로 따로 기억해야 한 목록을 펼친 게
+// 다른 목록까지 펼치지 않는다. 행이 사라지면(빈 상태) 해제 — 다음 렌더가 펼친 채 시작하지 않게.
+const listExpanded = new Set<string>();
 
 /**
- * 토큰 목록의 스크롤 영역 높이를 **행 높이의 정수배로 내림 맞춤**하고, 가려진 개수를 알린다.
+ * 목록의 스크롤 영역 높이를 **행 높이의 정수배로 내림 맞춤**하고, 가려진 개수를 알린다.
  *
  * CSS 상한(패널 높이 비례)이 행 높이와 맞을 이유가 없어 마지막 행이 늘 반쯤 잘린 채 끝났고,
  * 경계선·스크롤바도 없어서 "미리보기가 잘려 변수명과 타입이 안 보인다"로 읽혔다.
  * 보이는 행은 항상 온전한 행이 되게 하고, 남은 개수와 ‘모두 펼치기’를 목록 아래에 붙인다.
  * 행이 붙은 뒤(렌더 완료)와 패널 리사이즈 후에 호출해야 측정이 맞는다.
  */
-function layoutTokenList(): void {
-  const box = $('tokenList');
-  const more = $('tokenListMore');
-  const label = $('tokenListCount');
-  const btn = $('btnTokenListExpand') as HTMLButtonElement;
+function layoutList(r: ListRegion): void {
+  // 아직 마크업이 없는 목록이 배선에 올라와 있어도 전체가 죽지 않게 개별로 건너뛴다.
+  const box = document.getElementById(r.mount);
+  const more = document.getElementById(r.more);
+  const label = document.getElementById(r.count);
+  const btn = document.getElementById(r.expand);
+  if (!box || !more || !label || !btn) return;
+  const expanded = listExpanded.has(r.mount);
   box.style.height = ''; // 이전 스냅 해제 — 상한/내용을 다시 재야 한다
-  const rows = box.querySelectorAll('.tk');
+  const rows = box.querySelectorAll(r.row);
   if (!rows.length) {
+    listExpanded.delete(r.mount);
     box.classList.remove('framed', 'scrolls', 'expanded'); // 안내 문구만 있을 땐 테두리 없이
     more.style.display = 'none';
     return;
   }
   box.classList.add('framed');
-  box.classList.toggle('expanded', tokenListExpanded);
-  box.classList.toggle('scrolls', !tokenListExpanded);
-  if (tokenListExpanded) {
+  box.classList.toggle('expanded', expanded);
+  box.classList.toggle('scrolls', !expanded);
+  if (expanded) {
     more.style.display = '';
     label.textContent = `총 ${rows.length}개 모두 표시`;
     btn.textContent = '접기';
@@ -197,6 +226,28 @@ function layoutTokenList(): void {
   btn.textContent = '모두 펼치기';
 }
 
+/** 마운트 id로 재계산 — renderChunked의 onDone에 그대로 넘기려고 얇게 감쌌다. */
+function layoutListBy(mountId: string): void {
+  const r = LIST_REGIONS.find((x) => x.mount === mountId);
+  if (r) layoutList(r);
+}
+
+/** 등록된 목록 전부 재계산 — 리사이즈·카드 펼침처럼 여러 목록이 한 번에 영향받을 때. */
+function layoutAllLists(): void {
+  for (const r of LIST_REGIONS) layoutList(r);
+}
+
+// 펼치기 버튼 배선은 배열을 돌며 한 번에 — 목록을 추가해도 핸들러를 따로 달 필요가 없다.
+for (const r of LIST_REGIONS) {
+  const btn = document.getElementById(r.expand);
+  if (!btn) continue;
+  btn.addEventListener('click', () => {
+    if (listExpanded.has(r.mount)) listExpanded.delete(r.mount);
+    else listExpanded.add(r.mount);
+    layoutList(r);
+  });
+}
+
 // ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만.
 function renderTokens(): void {
   const box = $('tokenList');
@@ -209,7 +260,7 @@ function renderTokens(): void {
     hint.className = 'hint';
     hint.textContent = msg;
     box.appendChild(hint);
-    layoutTokenList(); // 행이 없으니 경계·개수 줄을 걷어낸다
+    layoutListBy('tokenList'); // 행이 없으니 경계·개수 줄을 걷어낸다
   };
   if (!tokens.length) {
     showHint(lastSelCount > 0
@@ -227,13 +278,8 @@ function renderTokens(): void {
   }
   // 스와치가 실제로 쓰이는 목록에서만 14px 거터를 유지(그 외엔 이름 폭으로 넘긴다).
   box.classList.toggle('has-swatch', others.some((o) => o.category === 'effectColor' && typeof o.value === 'string'));
-  renderChunked(box, others, makeTokenRow, layoutTokenList); // §4: 대량 추출도 비차단
+  renderChunked(box, others, makeTokenRow, () => layoutListBy('tokenList')); // §4: 대량 추출도 비차단
 }
-
-$('btnTokenListExpand').addEventListener('click', () => {
-  tokenListExpanded = !tokenListExpanded;
-  layoutTokenList();
-});
 
 /* ---------- 0 · 브랜드 팔레트 ---------- */
 const brandColor = $('brand') as HTMLInputElement;
@@ -2050,6 +2096,9 @@ function applyCardChrome(): void {
     head.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('button')) return; // 버튼 클릭은 토글 제외
       card.classList.toggle('collapsed');
+      // 접힌 카드는 .step-body가 display:none이라 그 안에서 렌더된 목록은 높이 0으로 측정되고
+      // 스냅이 조용히 bail한다. 펼치는 순간 다시 재지 않으면 반쪽 행이 그대로 남는다.
+      if (!card.classList.contains('collapsed')) layoutAllLists();
     });
   });
 }
@@ -2066,7 +2115,13 @@ if (typeof ResizeObserver !== 'undefined') {
 }
 window.addEventListener('resize', syncStickyOffsets);
 // 목록 상한은 패널 높이 비례(40vh)라 리사이즈하면 몇 행이 들어가는지가 바뀐다 → 다시 스냅.
-window.addEventListener('resize', layoutTokenList);
+// 목록마다 리스너를 달면 드래그 중 리사이즈 1회에 목록 수만큼 레이아웃이 돌아 끊긴다 →
+// 하나로 모아 디바운스한다(드래그가 멎은 뒤 한 번만 재계산해도 결과는 같다).
+let listResizeTimer = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(listResizeTimer);
+  listResizeTimer = window.setTimeout(layoutAllLists, 100);
+});
 updateGates();
 renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
