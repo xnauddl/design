@@ -2,7 +2,7 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
-import { type DraftToken, resolvedTypeForToken } from './lib/tokens';
+import { type DraftToken, type Unit, resolvedTypeForToken } from './lib/tokens';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier } from './lib/entitlements';
@@ -100,6 +100,11 @@ function clearMount(mount: HTMLElement): void {
   mount.innerHTML = '';
 }
 
+/** 타입 칩 안의 단위 표기 — 칩이 88px 고정 폭이라 낱말 대신 기호로 줄인다
+    (`letterSpacing·percent` 106px → `letterSpacing·%` 81px). 온전한 표기는 칩 title에 남는다.
+    추출이 실제로 만드는 비-px 단위는 percent뿐이고(lineHeight·letterSpacing), 나머지는 대비용. */
+const UNIT_CHIP: Record<Unit, string> = { px: 'px', percent: '%', em: 'em', rem: 'rem', ratio: '×' };
+
 /**
  * 토큰 1행(스와치·이름 입력·타입 칩).
  * 이름 편집은 넘겨받은 토큰 객체를 그대로 고친다 — 목록은 `tokens`를 필터한 배열이라
@@ -131,7 +136,7 @@ function makeTokenRow(t: DraftToken): HTMLElement {
 
   const cat = document.createElement('span');
   cat.className = 'cat';
-  cat.textContent = t.unit && t.unit !== 'px' ? `${t.category}·${t.unit}` : t.category;
+  cat.textContent = t.unit && t.unit !== 'px' ? `${t.category}·${UNIT_CHIP[t.unit]}` : t.category;
   // 칩은 좁으니 값·Figma 변수 타입은 title로 — 이름만으로 구분 안 되는 토큰(fontFamily 등) 확인용.
   cat.title = `${t.category}${t.unit ? ` · ${t.unit}` : ''} · ${resolvedTypeForToken(t)} · ${t.value}`;
   row.appendChild(cat);

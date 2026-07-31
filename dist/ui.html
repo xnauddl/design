@@ -278,13 +278,16 @@
     #tokenList.has-swatch .tk > .tk-gutter { display: block; flex: 0 0 14px; }
     .tk input { font: 400 var(--fs) var(--mono); padding: 4px 6px; flex: 1 1 auto; min-width: 0; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
-    /* 타입은 맨 끝 10px 흐린 글자였다 → 칩으로. 최소 폭을 줘 행마다 같은 자리에서 읽힌다. */
+    /* 타입은 맨 끝 10px 흐린 글자였다 → 칩으로. 폭은 88px 고정 — 칩이 내용 폭이면 gap(28px)과
+       letterSpacing·%(81px)의 차이만큼 입력칸 폭이 행마다 어긋나 이름을 훑기 어려웠다.
+       88px = 최장 라벨 letterSpacing·%(81px) + 여유. 단위는 ui.ts가 기호로 줄여 넣는다.
+       그보다 긴 라벨이 들어오면 잘라내되(정렬 유지) 전체 표기는 칩 title에 남는다. */
     .cat {
-      flex: 0 0 auto; margin-left: auto;
+      flex: 0 0 88px; margin-left: auto;
       font: 500 10.5px/1.6 var(--font); color: var(--text-2);
       background: var(--surface-2); border: 1px solid var(--border);
       border-radius: 4px; padding: 0 5px; white-space: nowrap;
-      min-width: 58px; text-align: center;
+      text-align: center; overflow: hidden; text-overflow: ellipsis;
     }
     /* 목록 아래 ‘총 n개 중 m개 표시 — 스크롤하거나 [모두 펼치기]’ 줄 */
     .list-more { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
@@ -1632,6 +1635,7 @@
     }
     mount.innerHTML = "";
   }
+  var UNIT_CHIP = { px: "px", percent: "%", em: "em", rem: "rem", ratio: "\xD7" };
   function makeTokenRow(t2) {
     const row = document.createElement("div");
     row.className = "tk";
@@ -1652,7 +1656,7 @@
     row.appendChild(input);
     const cat = document.createElement("span");
     cat.className = "cat";
-    cat.textContent = t2.unit && t2.unit !== "px" ? `${t2.category}\xB7${t2.unit}` : t2.category;
+    cat.textContent = t2.unit && t2.unit !== "px" ? `${t2.category}\xB7${UNIT_CHIP[t2.unit]}` : t2.category;
     cat.title = `${t2.category}${t2.unit ? ` \xB7 ${t2.unit}` : ""} \xB7 ${resolvedTypeForToken(t2)} \xB7 ${t2.value}`;
     row.appendChild(cat);
     return row;
