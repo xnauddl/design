@@ -79,6 +79,8 @@ export interface ComponentCandidate {
   variant?: string;
   /** 단독 컴포넌트로 등록될 후보의 등록 이름(PascalCase). 단독일 때만(group과 배타). */
   single?: string;
+  /** 텍스트/스왑/불리언만 다른 반복 → 단품+속성으로 접힘(기본 체크). */
+  propsOnly?: boolean;
 }
 
 /** UI → code 요청. */
