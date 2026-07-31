@@ -6,7 +6,10 @@
  * 백엔드(code.ts) 없이도 `postMessage`로 잠금 해제와 데이터 주입이 둘 다 되므로
  * 실제 렌더 결과를 그대로 잴 수 있다.
  *
- * 사용: node scripts/verify-lists.mjs [--list <id>|all] [--count 70] [--shots <dir>]
+ * 사용: node scripts/verify-lists.mjs [--list <id>|all] [--count 70] [--width 420] [--shots <dir>]
+ *
+ * --width는 패널 폭 — 좁을수록 행이 감싸지거나 넘쳐 높이가 불균일해진다(스냅의 전제가 깨진다).
+ * 기본 420px 외에 패널 최소 폭(360px)에서도 돌려야 감쌈 회귀를 잡는다.
  */
 import pw from 'playwright'; // CommonJS 패키지라 named export가 안 된다
 import { fileURLToPath } from 'node:url';
@@ -30,6 +33,31 @@ function fakeTokens(n) {
   }));
 }
 
+/**
+ * 대비 실패 n건. `#contrastList`는 `pass:false`만 그리므로 전부 실패로 만든다.
+ * 행 높이가 고르게 유지되는지가 이 목록의 관건이라, 높이를 흔드는 조합을 일부러 섞는다:
+ * 보정 버튼 0·1·2개, 긴 레이어명(감싸짐 유발), ‘큰글자’ 접미사.
+ */
+function fakeContrastFindings(n) {
+  return Array.from({ length: n }, (_, i) => {
+    const kind = i % 3; // 0: 버튼 2개 · 1: 버튼 1개 · 2: 버튼 없음
+    const long = i % 5 === 0; // 폭을 넘기는 긴 이름
+    return {
+      id: `node-${i}`,
+      name: long ? `Page/Section/Card ${i} / 아주 긴 레이어 이름 텍스트 ${i}` : `Text ${i}`,
+      fg: '#8a8a8a',
+      bg: '#ffffff',
+      bgId: kind === 0 ? `bg-${i}` : undefined,
+      ratio: 2.5 + (i % 17) / 10,
+      required: 4.5,
+      large: i % 4 === 0,
+      pass: false,
+      suggestedFg: kind === 2 ? undefined : '#4a4a4a',
+      suggestedBg: kind === 0 ? '#f2f2f2' : undefined,
+    };
+  });
+}
+
 /* ---------- 목록 배선 ----------
    새 목록을 채택하면 여기에 항목 하나만 추가한다. setup()은 그 목록이 실제로
    행을 그리게 만드는 최소 조작(시드 + ‘펼침’ 버튼 클릭)만 담당한다. */
@@ -44,6 +72,31 @@ const LISTS = {
     async setup(page, n) {
       await seed(page, { type: 'EXTRACT_RESULT', tokens: fakeTokens(n), selection: 1, warnings: [] });
       await page.click('#btnCreate'); // previewRevealed=true → 색 외 목록 렌더
+    },
+  },
+  contrastList: {
+    label: '명도 대비 점검 결과',
+    tab: 'tabbtn-apply',
+    row: '.cfind',
+    more: 'contrastListMore',
+    count: 'contrastListCount',
+    expand: 'btnContrastListExpand',
+    // 이 목록만 행 높이 균일성을 따로 본다 — 감쌈·보정 버튼 유무로 높이가 흔들렸던 곳이라
+    // 반쪽 행이 0건이어도 원인이 되살아났는지 바로 보이게 한다.
+    uniformRows: true,
+    // 마법사(‘시작’ 탭)의 대비 점검이 이 목록을 채운다 — 결과가 숨은 탭에 그려지는 실제 경로.
+    hiddenFrom: 'tabbtn-wizard',
+    async setup(page, n) {
+      // 결과 메시지만 넣으면 된다 — 검사 버튼은 백엔드(code.ts)가 있어야 응답이 온다.
+      await seed(page, {
+        type: 'CONTRAST_RESULT',
+        level: 'AA',
+        checked: n,
+        passed: 0,
+        failed: n,
+        findings: fakeContrastFindings(n),
+        skipped: {},
+      });
     },
   },
 };
@@ -88,14 +141,33 @@ async function partialRows(page, mount, row) {
   }, { mount, row });
 }
 
-async function verify(page, id, spec, count, shots) {
-  const fails = [];
-  const ok = (cond, msg) => { if (!cond) fails.push(msg); };
-
-  await page.goto(`file://${UI}`);
-  await page.click(`#${spec.tab}`);
+/**
+ * 결과가 **다른 탭이 열려 있는 동안** 도착한 경우. 비활성 탭은 display:none이라 행이
+ * 높이 0으로 측정되고 layoutList가 조용히 bail한다 — 탭을 열어도 재계산이 없으면 반쪽 행과
+ * 빈 개수 줄이 그대로 남는다. 실제 경로다(마법사의 대비 점검이 ‘적용’ 탭 목록을 채운다).
+ * 시드가 postMessage만으로 되는 목록에서만 켠다(버튼 클릭은 숨은 탭에서 안 된다).
+ */
+async function seedFromHiddenTab(page, spec, count) {
+  await page.click(`#${spec.hiddenFrom}`);
   await unlock(page);
   await spec.setup(page, count);
+  await page.waitForTimeout(200);
+  await page.click(`#${spec.tab}`);
+}
+
+async function verify(page, id, spec, count, shots, hidden = false) {
+  const fails = [];
+  const ok = (cond, msg) => { if (!cond) fails.push(`${hidden ? '[숨은 탭에서 시드] ' : ''}${msg}`); };
+  const shot = hidden ? `${id}-hidden` : id; // 시나리오끼리 스크린샷을 덮어쓰지 않게
+
+  await page.goto(`file://${UI}`);
+  if (hidden) {
+    await seedFromHiddenTab(page, spec, count);
+  } else {
+    await page.click(`#${spec.tab}`);
+    await unlock(page);
+    await spec.setup(page, count);
+  }
   await page.waitForTimeout(200); // renderChunked의 rAF 청크 + onDone 레이아웃 대기
 
   const state = await page.evaluate(({ mount, more, countId }) => {
@@ -117,6 +189,21 @@ async function verify(page, id, spec, count, shots) {
   ok(!!m, `개수 문구 형식 불일치: ${JSON.stringify(state.countText)}`);
   if (m) ok(Number(m[1]) === count, `총 개수 ${m[1]} ≠ 시드 ${count}`);
 
+  // layoutList는 rows[0] 높이 하나로 몇 행이 들어가는지 계산한다 → 행 높이가 제각각이면
+  // 스냅 자체가 성립하지 않는다. 원인을 결과(반쪽 행)보다 먼저 짚으려고 별도로 잰다.
+  if (spec.uniformRows) {
+    const heights = await page.evaluate(({ mount, row }) => {
+      const seen = new Map();
+      for (const el of document.getElementById(mount).querySelectorAll(row)) {
+        const h = +el.getBoundingClientRect().height.toFixed(2);
+        if (!seen.has(h)) seen.set(h, (el.textContent || '').trim().slice(0, 40));
+      }
+      return [...seen].map(([h, text]) => ({ h, text }));
+    }, { mount: id, row: spec.row });
+    ok(heights.length === 1, `행 높이가 ${heights.length}종 — 정수배 스냅의 전제가 깨짐: ` +
+      JSON.stringify(heights.slice(0, 4)));
+  }
+
   // 스크롤 위치별 반쪽 행 검사 — 높이 스냅만으로는 맨 위에서만 온전하다.
   for (const frac of [0, 0.25, 0.5, 0.75, 1]) {
     await page.evaluate(({ mount, frac }) => {
@@ -127,11 +214,17 @@ async function verify(page, id, spec, count, shots) {
     const { bad, viewport } = await partialRows(page, id, spec.row);
     ok(bad.length === 0, `스크롤 ${Math.round(frac * 100)}%: 반쪽 행 ${bad.length}건 ` +
       `(뷰포트 ${viewport.top}~${viewport.bottom}, 예: ${JSON.stringify(bad[0] || null)})`);
-    if (shots) await page.screenshot({ path: join(shots, `${id}-${Math.round(frac * 100)}.png`) });
+    if (shots) await page.screenshot({ path: join(shots, `${shot}-${Math.round(frac * 100)}.png`) });
   }
 
   // ‘모두 펼치기’ — 상한 해제 후 전부 보이는지.
-  await page.click(`#${spec.expand}`);
+  // 개수 줄이 숨어 있으면 여기서 30초를 기다리다 예외로 튀고, 그 위에서 모은 실패 메시지가
+  // 통째로 사라진다(정작 원인은 그쪽에 있다) → 짧게 끊고 실패로 기록만 한다.
+  try {
+    await page.click(`#${spec.expand}`, { timeout: 3000 });
+  } catch {
+    ok(false, `‘모두 펼치기’ 버튼을 못 누름 — #${spec.more} 줄이 숨겨져 있는지 확인`);
+  }
   await page.waitForTimeout(150);
   const expanded = await page.evaluate(({ mount, countId, row }) => {
     const box = document.getElementById(mount);
@@ -144,7 +237,7 @@ async function verify(page, id, spec, count, shots) {
   ok(expanded.classes.includes('expanded'), '펼치기 후 .expanded 없음');
   ok(expanded.rows === count, `펼친 뒤 행 ${expanded.rows} ≠ ${count}`);
   ok(/모두 표시/.test(expanded.countText || ''), `펼친 뒤 문구 불일치: ${JSON.stringify(expanded.countText)}`);
-  if (shots) await page.screenshot({ path: join(shots, `${id}-expanded.png`), fullPage: true });
+  if (shots) await page.screenshot({ path: join(shots, `${shot}-expanded.png`), fullPage: true });
 
   return fails.filter(Boolean);
 }
@@ -155,6 +248,8 @@ const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 const which = arg('--list', 'all');
 const count = Number(arg('--count', '70'));
+// 값 없이 `--width`만 주면 NaN이 그대로 viewport로 들어가 브라우저가 이상하게 뜬다 → 기본값으로.
+const width = Number(arg('--width', '420')) || 420;
 const shots = arg('--shots', '');
 
 if (!existsSync(UI)) {
@@ -172,22 +267,27 @@ for (const id of ids) {
 }
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 420, height: 900 } }); // 플러그인 패널 폭
+const page = await browser.newPage({ viewport: { width, height: 900 } }); // 플러그인 패널 폭
 let failed = 0;
 for (const id of ids) {
   const spec = LISTS[id];
-  let fails;
-  try {
-    fails = await verify(page, id, spec, count, shots);
-  } catch (e) {
-    fails = [`예외: ${e.message}`];
+  // hiddenFrom이 있으면 ‘숨은 탭에서 시드’ 시나리오를 한 번 더 — 같은 기준을 그대로 적용한다.
+  const scenarios = spec.hiddenFrom ? [false, true] : [false];
+  const fails = [];
+  for (const hidden of scenarios) {
+    try {
+      fails.push(...await verify(page, id, spec, count, shots, hidden));
+    } catch (e) {
+      fails.push(`${hidden ? '[숨은 탭에서 시드] ' : ''}예외: ${e.message}`);
+    }
   }
   if (fails.length) {
     failed++;
     console.error(`✗ ${id} (${spec.label})`);
     for (const f of fails) console.error(`   · ${f}`);
   } else {
-    console.log(`✓ ${id} (${spec.label}) — ${count}개, 5개 스크롤 위치에서 반쪽 행 0건`);
+    console.log(`✓ ${id} (${spec.label}) — ${count}개 · 폭 ${width}px · 시나리오 ${scenarios.length}종, ` +
+      '5개 스크롤 위치에서 반쪽 행 0건');
   }
 }
 await browser.close();
