@@ -84,6 +84,23 @@ function renderChunked<T>(
 }
 
 /**
+ * 목록 마운트를 비운다 — **진행 중인 청크를 먼저 취소**한다.
+ *
+ * `innerHTML = ''`만 하면 rAF에 예약된 다음 청크가 그대로 살아나 이미 무효가 된 행을 계속
+ * 붙인다(2000노드 미리보기 중 선택을 바꾸면 안내 문구 아래로 수천 행이 다시 쌓였다).
+ * 예전엔 테두리도 개수 줄도 없어 눈에 덜 띄었지만, 이제 렌더 완료 후 layoutList가 돌아
+ * 그 유령 행을 기준으로 테두리·높이·‘총 n개’까지 붙는다 — 취소가 필수가 됐다.
+ */
+function clearMount(mount: HTMLElement): void {
+  const prev = chunkPending.get(mount);
+  if (prev !== undefined) {
+    cancelAnimationFrame(prev);
+    chunkPending.delete(mount);
+  }
+  mount.innerHTML = '';
+}
+
+/**
  * 토큰 1행(스와치·이름 입력·타입 칩).
  * 이름 편집은 넘겨받은 토큰 객체를 그대로 고친다 — 목록은 `tokens`를 필터한 배열이라
  * 행 인덱스가 `tokens` 인덱스와 어긋난다(색 토큰이 앞에 있으면 남의 이름을 덮어썼다).
@@ -123,7 +140,7 @@ function makeTokenRow(t: DraftToken): HTMLElement {
 
 /** 공통 빈 상태 — 가운데 굵은 헤드라인 + 안내 + (선택) 비활성 버튼. 캐논 108:2 패턴. */
 function renderEmptyState(box: HTMLElement, title: string, guide: string, actionLabel?: string): void {
-  box.innerHTML = '';
+  clearMount(box); // 진행 중이던 청크가 안내 문구 아래로 계속 쌓이지 않게
   const wrap = document.createElement('div');
   wrap.className = 'empty-state';
   const t = document.createElement('div');
@@ -172,6 +189,11 @@ const LIST_REGIONS: ListRegion[] = [
   { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
   { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
   { mount: 'contrastList', row: '.cfind', more: 'contrastListMore', count: 'contrastListCount', expand: 'btnContrastListExpand' },
+  // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
+  // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
+  { mount: 'bindTree', row: '.tree-row', more: 'bindTreeMore', count: 'bindTreeCount', expand: 'btnBindTreeExpand' },
+  { mount: 'diff', row: '.tree-row', more: 'diffMore', count: 'diffCount', expand: 'btnDiffExpand' },
+  { mount: 'compTree', row: '.tree-row', more: 'compTreeMore', count: 'compTreeCount', expand: 'btnCompTreeExpand' },
 ];
 
 // ‘모두 펼치기’로 상한을 푼 목록의 마운트 id. 목록별로 따로 기억해야 한 목록을 펼친 게
@@ -258,7 +280,7 @@ function renderTokens(): void {
   // 카드 제목의 개수 — 목록이 접혀 있어도 몇 개가 생성 대상인지 먼저 알린다.
   $('createCount').textContent = others.length ? `· 색 외 ${others.length}개` : '';
   const showHint = (msg: string): void => {
-    box.innerHTML = '';
+    clearMount(box); // 진행 중이던 청크가 안내 문구 아래로 계속 쌓이지 않게
     const hint = document.createElement('div');
     hint.className = 'hint';
     hint.textContent = msg;
@@ -1677,7 +1699,9 @@ function renderSelectableTree(
   const base = rows.length ? baseDepth(rows) : 0;
   // 보이는 행만(맥락 숨김 시 비영향·비헤더 제외) → §4: 대형 서브트리도 청크로 비차단 렌더.
   const visible = rows.filter((r) => r.change !== undefined || r.header || !opts.hideContext);
-  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
+  // 세 트리(#bindTree·#diff·#compTree)가 모두 이 호출부를 지난다 — 어느 목록인지는 마운트 id가
+  // 말해 주므로 스냅·개수 줄 재계산도 여기 한 줄로 끝난다(행 0건이면 테두리·줄을 걷는다).
+  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange), () => layoutListBy(mount.id));
 }
 
 /* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
@@ -1709,6 +1733,8 @@ function renderRenameTree(): void {
 function updateRenameApply(): void {
   const total = affectedRenameCount();
   const sel = renameChecked.size;
+  // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
+  $('renameCount').textContent = total ? `· 변경 ${total}개` : '';
   ($('btnRename') as HTMLButtonElement).disabled = sel === 0;
   const all = $('renameAll') as HTMLInputElement;
   all.checked = total > 0 && sel === total;
@@ -1732,7 +1758,9 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
   // 적용 완료(선택 적용 또는 마법사): 트리 비우고 결과만.
   renameNodes = [];
   renameChecked.clear();
-  $('diff').innerHTML = '';
+  clearMount($('diff'));
+  $('renameCount').textContent = '';
+  layoutListBy('diff'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('btnRename') as HTMLButtonElement).disabled = true;
   setStatus('renameStatus', t('rename.applied', { count: msg.changes.length }), 'ok');
 }
@@ -1795,6 +1823,10 @@ function renderBindTree(): void {
 function updateBindApply(): void {
   const total = bindCandidates.length;
   const sel = bindChecked.size;
+  // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
+  // 이 트리는 노드 헤더도 한 행이라 목록 아래 ‘총 n개’(행 수)와 수가 다르다 → 세는 단위를
+  // ‘건’으로 구분해(상태 문구 ‘바인딩 n건 후보’와 같은 말) 같은 수의 오기로 읽히지 않게 한다.
+  $('bindCount').textContent = total ? `· 후보 ${total}건` : '';
   const confirm = $('btnApplyConfirm') as HTMLButtonElement;
   confirm.style.display = hasBindPreview() ? '' : 'none';
   confirm.disabled = sel === 0;
@@ -1810,7 +1842,9 @@ function clearBindPreview(): void {
   bindCandidates = [];
   bindNodes = [];
   bindChecked.clear();
-  $('bindTree').innerHTML = '';
+  clearMount($('bindTree'));
+  $('bindCount').textContent = '';
+  layoutListBy('bindTree'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
   ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
 }
@@ -1850,6 +1884,8 @@ function renderCompTree(): void {
 function updateCompRegister(): void {
   const total = compEligibleCount();
   const sel = compChecked.size;
+  // 카드 제목의 개수 — 트리에 뜨는 건 등록 가능한 후보뿐이라 그 수를 센다(스캔 노드 수가 아니라).
+  $('compCount').textContent = total ? `· 후보 ${total}개` : '';
   if (compCandidates.length) {
     const all = $('compAll') as HTMLInputElement;
     all.checked = sel === total && total > 0;
@@ -1861,7 +1897,9 @@ function updateCompRegister(): void {
 function clearCompPreview(): void {
   compCandidates = [];
   compChecked.clear();
-  $('compTree').innerHTML = '';
+  clearMount($('compTree'));
+  $('compCount').textContent = '';
+  layoutListBy('compTree'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';
 }
 
@@ -1928,13 +1966,17 @@ function renderVariantReport(sections: VariantReportSection[]): void {
     무선택이면 캐논 빈 상태를 표시하고, 선택이 있으면 비워 둔다(액션 버튼이 흐름을 주도). */
 function refreshTreeEmptyStates(): void {
   const guide = '프레임이나 레이어를 선택하면 후보를 찾아드려요.';
+  // 어느 쪽이든 행은 0건이다 — 안내 문구는 스크롤 영역이 아니므로 테두리·개수 줄을 걷어야 한다.
+  // (예전 :empty 규칙은 안내 문구가 들어찬 순간 자식이 생겨 안 먹었다.)
   if (!hasBindPreview()) {
     if (lastSelCount === 0) renderEmptyState($('bindTree'), '선택한 노드가 없어요', guide);
-    else $('bindTree').innerHTML = '';
+    else clearMount($('bindTree'));
+    layoutListBy('bindTree');
   }
   if (compCandidates.length === 0) {
     if (lastSelCount === 0) renderEmptyState($('compTree'), '선택한 노드가 없어요', guide);
-    else $('compTree').innerHTML = '';
+    else clearMount($('compTree'));
+    layoutListBy('compTree');
   }
 }
 
@@ -2178,11 +2220,12 @@ function showTab(name: (typeof TABS)[number]): void {
   }
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
-  // 비활성 탭은 .tab-section이 display:none이라 그 안의 목록은 높이 0으로 측정되고 스냅이
-  // 조용히 bail한다(접힌 카드와 같은 결함 — applyCardChrome 참고). 결과가 다른 탭에 있는 동안
-  // 도착하는 경로가 실제로 여럿이다: 마법사의 추출이 ‘만들기’ 탭 목록을, 대비 점검이
-  // #contrastList를, componentize가 #variantReport를(둘 다 ‘적용’ 탭) 채운다.
-  // 탭을 여는 지금 다시 재지 않으면 반쪽 행과 빈 개수 줄이 그대로 남는다.
+  // 비활성 탭은 .tab-section이 display:none이라 그 안에서 렌더된 목록은 행 높이가 0으로 측정되고
+  // 스냅이 조용히 bail한다(접힌 카드와 같은 함정 — applyCardChrome 참고). 결과가 다른 탭에 있는
+  // 동안 도착하는 경로가 여럿이다: 마법사의 추출이 ‘만들기’ 탭 목록을, 대비 점검이 #contrastList를,
+  // componentize가 #variantReport를 채우고, 미리보기는 느려서 결과 전에 탭을 옮기는 일이 흔한데
+  // 트리 3종은 첫 화면이 아닌 ‘적용’ 탭에 있다. 탭이 보이는 순간 다시 재지 않으면
+  // 돌아왔을 때 반쪽 행에 개수 줄도 없는 상태가 남는다.
   layoutAllLists();
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
 }

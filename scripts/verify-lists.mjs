@@ -110,6 +110,49 @@ function fakeContrastFindings(n) {
   });
 }
 
+/** 리네임 미리보기 노드 n개 — 전부 `after` 보유(영향 노드)라 맥락 숨김에도 n행이 그대로 보인다. */
+function fakeRenameNodes(n) {
+  return Array.from({ length: n }, (_, i) => ({
+    id: `r${i}`,
+    name: `Rectangle ${i + 1}`,
+    type: 'FRAME',
+    depth: 1,
+    parentId: null,
+    after: `card/item-${String(i + 1).padStart(3, '0')}`,
+  }));
+}
+
+/**
+ * 바인딩 미리보기 — 트리 한 행이 노드 헤더 **또는** 후보라, 노드당 (헤더 1 + 후보 1)로 2행씩 만든다.
+ * 후보가 없는 노드는 header:false라 맥락 숨김에 걸려 아예 안 그려지므로, 홀수는 마지막 노드에
+ * 후보를 하나 더 붙여 맞춘다(노드를 하나 더 두면 그 노드가 사라져 행 수가 안 맞는다).
+ */
+function fakeBind(n) {
+  const k = Math.floor(n / 2); // n<2는 표현 못 하지만, 상한을 넘길 만큼(십수 행) 줘야 검사가 성립한다
+  const nodes = [];
+  const candidates = [];
+  for (let i = 0; i < k; i++) {
+    const id = `bn${i}`;
+    nodes.push({ id, name: `Frame ${String(i + 1).padStart(3, '0')}`, type: 'FRAME', depth: 1, parentId: null });
+    candidates.push({ nodeId: id, field: 'itemSpacing', currentValue: String(4 + i), variableId: `v${i}`, variableName: `gap/${i}`, tier: 2 });
+  }
+  if (n % 2 && k) candidates.push({ nodeId: `bn${k - 1}`, field: 'paddingLeft', currentValue: '8', variableId: 'vx', variableName: 'space/8', tier: 2 });
+  return { nodes, candidates };
+}
+
+/** 컴포넌트 등록 후보 n개 — 전부 eligible(세트/단독 배지 행)이라 n행. 비대상은 맥락이라 안 보인다. */
+function fakeCompNodes(n) {
+  return Array.from({ length: n }, (_, i) => ({
+    id: `c${i}`,
+    name: `button ${i + 1}`,
+    type: 'FRAME',
+    depth: 1,
+    parentId: null,
+    eligible: true,
+    ...(i % 5 === 0 ? { single: `Card${i}` } : { group: 'Button', variant: `Size=md, State=${i}` }),
+  }));
+}
+
 /* ---------- 목록 배선 ----------
    새 목록을 채택하면 여기에 항목 하나만 추가한다. setup()은 그 목록이 실제로
    행을 그리게 만드는 최소 조작(시드 + ‘펼침’ 버튼 클릭)만 담당한다. */
@@ -181,6 +224,41 @@ const LISTS = {
         findings: fakeContrastFindings(n),
         skipped: {},
       });
+    },
+  },
+  // 선택형 미리보기 트리 3종 — 셋 다 code(백엔드) 응답 한 방으로 렌더되므로 버튼 클릭이 필요 없다.
+  bindTree: {
+    label: '바인딩 미리보기 트리',
+    tab: 'tabbtn-apply',
+    row: '.tree-row',
+    more: 'bindTreeMore',
+    count: 'bindTreeCount',
+    expand: 'btnBindTreeExpand',
+    async setup(page, n) {
+      const { nodes, candidates } = fakeBind(n);
+      await seed(page, { type: 'APPLY_RESULT', bound: candidates.length, skipped: 0, flags: [], reasons: {}, preview: true, candidates, nodes });
+    },
+  },
+  diff: {
+    label: '리네임 미리보기 트리',
+    tab: 'tabbtn-apply',
+    row: '.tree-row',
+    more: 'diffMore',
+    count: 'diffCount',
+    expand: 'btnDiffExpand',
+    async setup(page, n) {
+      await seed(page, { type: 'RENAME_RESULT', applied: false, changes: [], nodes: fakeRenameNodes(n) });
+    },
+  },
+  compTree: {
+    label: '컴포넌트 등록 후보 트리',
+    tab: 'tabbtn-apply',
+    row: '.tree-row',
+    more: 'compTreeMore',
+    count: 'compTreeCount',
+    expand: 'btnCompTreeExpand',
+    async setup(page, n) {
+      await seed(page, { type: 'COMPONENT_CANDIDATES', nodes: fakeCompNodes(n) });
     },
   },
 };
