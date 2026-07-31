@@ -17,7 +17,7 @@ import { suggestTokenRoles } from './lib/roles';
 import { pipelineSteps, type StepStatus } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
-import type { WcagLevel } from './lib/contrast';
+import type { WcagLevel, ContrastFinding } from './lib/contrast';
 import { planWizard, summarize, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
@@ -171,6 +171,7 @@ const LIST_REGIONS: ListRegion[] = [
   { mount: 'tokenList', row: '.tk', more: 'tokenListMore', count: 'tokenListCount', expand: 'btnTokenListExpand' },
   { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
   { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
+  { mount: 'contrastList', row: '.cfind', more: 'contrastListMore', count: 'contrastListCount', expand: 'btnContrastListExpand' },
 ];
 
 // ‘모두 펼치기’로 상한을 푼 목록의 마운트 id. 목록별로 따로 기억해야 한 목록을 펼친 게
@@ -720,6 +721,10 @@ $('btnPreview').addEventListener('click', () => {
 $('btnContrast').addEventListener('click', () => {
   const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
   setStatus('contrastStatus', t('contrast.checking'), '');
+  // 지난 결과를 비운다 — 검사가 ERROR로 끝나면 결과는 그대로 남는데 아래 개수 줄이
+  // ‘총 n개 중 m개 표시’로 남아 지난 회차 수치를 이번 결과인 양 단언한다.
+  $('contrastList').innerHTML = '';
+  layoutListBy('contrastList');
   send({ type: 'CHECK_CONTRAST', level });
 });
 
@@ -1971,55 +1976,64 @@ function contrastFixBtn(label: string, hex: string, nodeId: string): HTMLButtonE
   sw.className = 'swatch';
   sw.style.background = hex;
   btn.appendChild(sw);
-  btn.appendChild(document.createTextNode(` ${label}`));
+  const text = document.createTextNode(` ${label}`);
+  btn.appendChild(text);
   btn.addEventListener('click', () => {
     send({ type: 'APPLY_CONTRAST_FIX', nodeId, hex });
     btn.disabled = true;
-    btn.textContent = '✓ 적용';
+    // textContent로 통째로 갈아끼우면 스와치 span까지 지워진다 — 어떤 색을 넣었는지 사라지고,
+    // 버튼이 스와치 높이를 잃어 이 행만 낮아진다(행 높이 균일이 스냅의 전제, .cfind 주석).
+    text.textContent = ' ✓ 적용';
     setStatus('contrastStatus', t('contrast.fixApplied'), 'ok');
   });
   return btn;
 }
 
+/** 실패 1행(색쌍 스와치 · 레이어명 · 대비비 · 보정 버튼). */
+function makeContrastRow(f: ContrastFinding): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'cfind';
+
+  const pair = document.createElement('span');
+  pair.className = 'cpair';
+  for (const hex of [f.bg, f.fg]) {
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = hex;
+    pair.appendChild(sw);
+  }
+  row.appendChild(pair);
+
+  const name = document.createElement('span');
+  name.className = 'cname';
+  name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
+  // 이름은 행 높이를 고르게 두려고 한 줄 말줄임이다(.cfind 주석) → 잘린 부분은 title로 읽는다.
+  name.title = name.textContent;
+  row.appendChild(name);
+
+  const ratio = document.createElement('span');
+  ratio.className = 'ratio warn';
+  ratio.textContent = `${f.ratio} / ${f.required}`;
+  row.appendChild(ratio);
+
+  // #2: 보정 제안 — 텍스트색(기본)·배경색(옵션). 클릭 시 해당 노드에 적용.
+  if (f.suggestedFg || f.suggestedBg) {
+    const fix = document.createElement('span');
+    fix.className = 'cfix';
+    if (f.suggestedFg) fix.appendChild(contrastFixBtn('텍스트', f.suggestedFg, f.id));
+    if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn('배경', f.suggestedBg, f.bgId));
+    row.appendChild(fix);
+  }
+  return row;
+}
+
 function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): void {
   const box = $('contrastList');
-  box.innerHTML = '';
   const fails = msg.findings.filter((f) => !f.pass); // 실패 건만 나열(조치 대상)
-  for (const f of fails) {
-    const row = document.createElement('div');
-    row.className = 'cfind';
-
-    const pair = document.createElement('span');
-    pair.className = 'cpair';
-    for (const hex of [f.bg, f.fg]) {
-      const sw = document.createElement('span');
-      sw.className = 'swatch';
-      sw.style.background = hex;
-      pair.appendChild(sw);
-    }
-    row.appendChild(pair);
-
-    const name = document.createElement('span');
-    name.className = 'cname';
-    name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
-    row.appendChild(name);
-
-    const ratio = document.createElement('span');
-    ratio.className = 'ratio warn';
-    ratio.textContent = `${f.ratio} / ${f.required}`;
-    row.appendChild(ratio);
-
-    // #2: 보정 제안 — 텍스트색(기본)·배경색(옵션). 클릭 시 해당 노드에 적용.
-    if (f.suggestedFg || f.suggestedBg) {
-      const fix = document.createElement('span');
-      fix.className = 'cfix';
-      if (f.suggestedFg) fix.appendChild(contrastFixBtn('텍스트', f.suggestedFg, f.id));
-      if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn('배경', f.suggestedBg, f.bgId));
-      row.appendChild(fix);
-    }
-
-    box.appendChild(row);
-  }
+  // 스캔 상한이 2000이라 실패가 수백 건이면 동기 루프가 프레임을 통째로 막는다(§4).
+  // onDone에서 스냅해야 한다 — 청크가 남아 있는 동안 재면 행 수가 모자라 상한에 안 걸린
+  // 것으로 보이고, ‘총 n개 중 m개’ 줄이 안 뜬 채 반쪽 행만 남는다.
+  renderChunked(box, fails, makeContrastRow, () => layoutListBy('contrastList'));
   const skip = contrastSkipText(msg.skipped);
   const skipNote = skip ? ` · 건너뜀: ${skip}` : '';
   if (msg.checked === 0) {
@@ -2164,9 +2178,11 @@ function showTab(name: (typeof TABS)[number]): void {
   }
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
-  // 비활성 탭은 .tab-section이 display:none이라 그 안에서 렌더된 목록은 행 높이 0으로 측정되고
-  // 스냅이 조용히 bail한다(접힌 카드와 같은 함정). 마법사가 추출을 돌려 ‘만들기’ 탭 목록을 채우거나
-  // ‘적용’ 탭 리포트를 채우는 경로가 실제로 있으므로, 탭이 보이는 순간 다시 잰다.
+  // 비활성 탭은 .tab-section이 display:none이라 그 안의 목록은 높이 0으로 측정되고 스냅이
+  // 조용히 bail한다(접힌 카드와 같은 결함 — applyCardChrome 참고). 결과가 다른 탭에 있는 동안
+  // 도착하는 경로가 실제로 여럿이다: 마법사의 추출이 ‘만들기’ 탭 목록을, 대비 점검이
+  // #contrastList를, componentize가 #variantReport를(둘 다 ‘적용’ 탭) 채운다.
+  // 탭을 여는 지금 다시 재지 않으면 반쪽 행과 빈 개수 줄이 그대로 남는다.
   layoutAllLists();
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
 }

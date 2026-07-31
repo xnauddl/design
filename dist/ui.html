@@ -289,7 +289,10 @@
     /* 목록 아래 ‘총 n개 중 m개 표시 — 스크롤하거나 [모두 펼치기]’ 줄 */
     .list-more { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
     .list-more .list-count { color: var(--muted); }
-    #colorTable { max-height: 220px; overflow: auto; margin: 6px 0; }
+    /* 색 정리 표도 같은 결함이었다 — 220px 고정 상한 ÷ 행 31px ≈ 7.1행이라 마지막 행이
+       상시 반쯤 잘렸고, 바로 아래 ‘토큰 생성’ 목록만 고쳐 두면 한 화면에서 처리가 어긋나 보인다.
+       그래서 상한도 공용 값(패널 높이 비례)으로 넘긴다 — 고정 220px은 큰 패널에서 근거가 없다.
+       스냅은 행 높이가 균일할 때만 맞으므로 .crow의 padding·입력칸 높이는 행마다 같게 둘 것. */
     .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 3px 0; }
     .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
     .crow .cn { font-family: var(--mono); font-size: var(--fs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -320,6 +323,21 @@
     .tag { display: inline-block; padding: 0 5px; border-radius: 999px; font-size: 10px; font-weight: 600; line-height: 15px; border: 1px solid transparent; }
     .tag-set { background: var(--accent-subtle); color: var(--accent-strong); border-color: var(--accent-border); }
     .tag-single { background: var(--ok-subtle); color: var(--ok); border-color: var(--ok); }
+
+    /* ── 컴포넌트 등록/분류 리포트(#variantReport) ── */
+    /* 이 목록만 행 추상화가 없어 클래스 없는 맨 <div>에 **리터럴 공백**(`  ${m}`)으로 들여썼다.
+       공백 들여쓰기는 폭이 좁아지면 줄바꿈에 먹혀 사라지고, 줄이 접히면 행 높이까지 들쭉날쭉해져
+       "행 높이가 균일해야 스냅이 성립한다"는 전제가 깨진다 → 들여쓰기는 CSS, 줄바꿈은 금지.
+       한 줄로 자른 대신 전체 문구는 ui.ts가 title로 붙인다(빈 조합 이름은 길다). */
+    #variantReport { font-family: var(--mono); font-size: 11px; --list-cap: clamp(160px, 28vh, 360px); }
+    .vr-row { line-height: 1.5; padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 머리줄은 굵기·색만 다르게 — 글꼴 크기·패딩을 건드리면 행 높이가 어긋나 스냅이 깨진다. */
+    .vr-row.vr-head { font-weight: 600; color: var(--text-2); }
+    .vr-row.vr-item { padding-left: 10px; }
+    .vr-row.vr-warn { color: var(--warn); }
+    /* 불릿·‘+’는 내용이 아니라 표시 — textContent에 섞으면 title(전체 문구)에도 딸려 온다. */
+    .vr-row.vr-bullet::before { content: '• '; color: var(--muted); }
+    .vr-row.vr-added::before { content: '+ '; color: var(--muted); }
 
     /* ── 명도 대비 점검 결과 ── */
     .cfind { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; }
@@ -423,7 +441,7 @@
 
     <!-- 추출 + 색 정리 통합 — 추출 후 같은 카드에서 바로 병합·역할 지정. -->
     <div class="step">
-      <h2>추출 · 색 정리</h2>
+      <h2>추출 · 색 정리 <span class="muted" id="colorCount"></span></h2>
       <div class="row">
         <button id="btnExtract" class="primary">선택에서 토큰 추출</button>
         <span class="muted" id="selInfo"></span>
@@ -437,7 +455,12 @@
           <span id="tidySumText"></span>
           <button id="btnTidyUndo" class="link">되돌리기</button>
         </div>
-        <div id="colorTable"></div>
+        <div id="colorTable" class="list-region"></div>
+        <!-- 표가 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+        <div class="list-more" id="colorTableMore" style="display:none">
+          <span class="list-count" id="colorTableCount"></span>
+          <button class="link" id="btnColorTableExpand">모두 펼치기</button>
+        </div>
         <div class="row"><button id="btnColorRoles">시맨틱 매핑에 반영</button></div>
         <datalist id="roleList">
           <option value="surface"></option><option value="surface/muted"></option>
@@ -578,7 +601,7 @@
     </div>
 
     <div class="step" id="componentCard">
-      <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
+      <h2>컴포넌트 / 베리언트 <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span></h2>
       <div class="hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외)이며, 이름에 <b>컴포넌트명</b>(button·card·chip…)이 있는 자식만 추립니다. <b>같은 컴포넌트명</b>이면 한 세트로 묶습니다 — 내부 구조·패딩·크기·색이 달라도 OK(차이는 속성으로 흡수, 과묶임은 체크 해제). 속성은 <b>이름 우선</b>(<code>Type</code>·<code>State</code>·<code>Size</code>) + 부족하면 크기·색 보완. 후보엔 <b>세트</b>/<b>단독</b> 배지가 붙습니다. 메인 컴포넌트는 <b>Components 페이지</b>로 보내고 원래 자리엔 <b>인스턴스</b>가 남습니다.</div>
       <div class="hint muted"><b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 컴포넌트명끼리 다시 묶을 때만(등록과 같은 기준 — 프레임은 「컴포넌트 등록」). <b>속성 노출</b>은 선택한 세트(또는 단독 컴포넌트) 대상.</div>
       <div class="row">
@@ -591,7 +614,12 @@
         <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
       </div>
       <div id="compTree"></div>
-      <div id="variantReport" style="max-height:120px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
+      <div id="variantReport" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="variantReportMore" style="display:none">
+        <span class="list-count" id="variantReportCount"></span>
+        <button class="link" id="btnVariantReportExpand">모두 펼치기</button>
+      </div>
       <div class="status" id="componentStatus"></div>
     </div>
   </section>
@@ -1559,7 +1587,9 @@
   var lastTidy = { before: 0, after: 0, merged: 0 };
   var pendingCreatePreview = false;
   var LIST_REGIONS = [
-    { mount: "tokenList", row: ".tk", more: "tokenListMore", count: "tokenListCount", expand: "btnTokenListExpand" }
+    { mount: "tokenList", row: ".tk", more: "tokenListMore", count: "tokenListCount", expand: "btnTokenListExpand" },
+    { mount: "colorTable", row: ".crow", more: "colorTableMore", count: "colorTableCount", expand: "btnColorTableExpand" },
+    { mount: "variantReport", row: ".vr-row", more: "variantReportMore", count: "variantReportCount", expand: "btnVariantReportExpand" }
   ];
   var listExpanded = /* @__PURE__ */ new Set();
   function layoutList(r) {
@@ -1710,9 +1740,13 @@
     const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
     if (!colorRevealed || !colors.length) {
       card.style.display = "none";
+      $("colorCount").textContent = "";
+      $("colorTable").innerHTML = "";
+      layoutListBy("colorTable");
       return;
     }
     card.style.display = "";
+    $("colorCount").textContent = `\xB7 \uC0C9 ${colors.length}\uAC1C`;
     const roleByName = /* @__PURE__ */ new Map();
     for (const [role, name] of Object.entries(textToSemanticMap($("semMap").value))) {
       if (!roleByName.has(name)) roleByName.set(name, role);
@@ -1735,7 +1769,7 @@
       role.dataset.name = t2.name;
       row.append(sw, name, role);
       return row;
-    });
+    }, () => layoutListBy("colorTable"));
   }
   function applyColorRoles() {
     const map = {};
@@ -2644,6 +2678,7 @@
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible && c.group) compChecked.add(c.id);
         renderCompTree();
+        renderVariantReport([]);
         if (!compEligibleCount()) setStatus("componentStatus", t("component.noEligible"), "warn");
         break;
       }
@@ -2651,69 +2686,17 @@
         clearCompPreview();
         const extra = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.exposed ? ` \xB7 \uC18D\uC131 ${msg.exposed}` : ""}`;
         setStatus("componentStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? "ok" : "warn");
-        const box = $("variantReport");
-        box.innerHTML = "";
-        if (msg.missing.length) {
-          const h = document.createElement("div");
-          h.textContent = "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):";
-          box.appendChild(h);
-          for (const m of msg.missing) {
-            const d = document.createElement("div");
-            d.textContent = `  ${m}`;
-            box.appendChild(d);
-          }
-        }
-        if (msg.failures && msg.failures.length) {
-          const h = document.createElement("div");
-          h.className = "warn";
-          h.textContent = `\uCC98\uB9AC \uC911 \uBB38\uC81C ${msg.failures.length}\uAC74:`;
-          box.appendChild(h);
-          for (const f of msg.failures) {
-            const d = document.createElement("div");
-            d.className = "warn";
-            d.textContent = `  \u2022 ${f}`;
-            box.appendChild(d);
-          }
-        }
+        renderVariantReport(variantIssueSections(msg.missing, msg.failures));
         break;
       }
       case "VARIANTS_RESULT": {
-        const box = $("variantReport");
-        box.innerHTML = "";
-        if (msg.missing.length) {
-          const h = document.createElement("div");
-          h.textContent = "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):";
-          box.appendChild(h);
-          for (const m of msg.missing) {
-            const d = document.createElement("div");
-            d.textContent = `  ${m}`;
-            box.appendChild(d);
-          }
-        }
-        if (msg.failures && msg.failures.length) {
-          const h = document.createElement("div");
-          h.className = "warn";
-          h.textContent = `\uCC98\uB9AC \uC911 \uBB38\uC81C ${msg.failures.length}\uAC74:`;
-          box.appendChild(h);
-          for (const f of msg.failures) {
-            const d = document.createElement("div");
-            d.className = "warn";
-            d.textContent = `  \u2022 ${f}`;
-            box.appendChild(d);
-          }
-        }
+        renderVariantReport(variantIssueSections(msg.missing, msg.failures));
         const extra = `${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.missing.length ? " \xB7 \uBE48 \uC870\uD569 \uC788\uC74C" : ""}`;
         setStatus("componentStatus", t("component.variants", { sets: msg.sets, extra }), msg.sets ? "ok" : "warn");
         break;
       }
       case "GENERATE_RESULT": {
-        const box = $("variantReport");
-        box.innerHTML = "";
-        for (const c of msg.combos) {
-          const d = document.createElement("div");
-          d.textContent = `+ ${c}`;
-          box.appendChild(d);
-        }
+        renderVariantReport([{ tag: "\uC0DD\uC131", items: msg.combos, marker: "added" }]);
         setStatus("componentStatus", t("component.generated", { generated: msg.generated, sets: msg.sets }), msg.generated ? "ok" : "warn");
         break;
       }
@@ -2985,6 +2968,32 @@
     $("compTree").innerHTML = "";
     $("compTreeCtrls").style.display = "none";
   }
+  function makeVariantReportRow(l) {
+    const d = document.createElement("div");
+    d.className = l.cls;
+    d.textContent = l.text;
+    d.title = l.text;
+    return d;
+  }
+  function variantIssueSections(missing, failures) {
+    const f = failures || [];
+    return [
+      { tag: "\uBE48 \uC870\uD569", head: "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):", items: missing },
+      { tag: "\uBB38\uC81C", head: `\uCC98\uB9AC \uC911 \uBB38\uC81C ${f.length}\uAC74:`, items: f, warn: true, marker: "bullet" }
+    ];
+  }
+  function renderVariantReport(sections) {
+    const filled = sections.filter((s) => s.items.length);
+    $("componentCount").textContent = filled.map((s) => `\xB7 ${s.tag} ${s.items.length}\uAC1C`).join(" ");
+    const lines = [];
+    for (const s of filled) {
+      const warn = s.warn ? " vr-warn" : "";
+      if (s.head) lines.push({ text: s.head, cls: `vr-row vr-head${warn}` });
+      const marker = s.marker ? ` vr-${s.marker}` : "";
+      for (const it of s.items) lines.push({ text: it, cls: `vr-row vr-item${warn}${marker}` });
+    }
+    renderChunked($("variantReport"), lines, makeVariantReportRow, () => layoutListBy("variantReport"));
+  }
   function refreshTreeEmptyStates() {
     const guide = "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uB4DC\uB824\uC694.";
     if (!hasBindPreview()) {
@@ -3189,6 +3198,7 @@
       btn.tabIndex = on ? 0 : -1;
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
+    layoutAllLists();
     if (name !== "settings") send({ type: "GET_PREREQ" });
   }
   TABS.forEach((t2, i) => {
