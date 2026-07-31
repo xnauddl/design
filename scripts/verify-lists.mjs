@@ -46,6 +46,24 @@ const LISTS = {
       await page.click('#btnCreate'); // previewRevealed=true → 색 외 목록 렌더
     },
   },
+  variantReport: {
+    label: '컴포넌트 등록/분류 리포트',
+    tab: 'tabbtn-apply',
+    row: '.vr-row',
+    more: 'variantReportMore',
+    count: 'variantReportCount',
+    expand: 'btnVariantReportExpand',
+    async setup(page, n) {
+      // 세 메시지 중 GENERATE_RESULT만 머리줄이 없어 `줄 수 == 시드 수`가 되고,
+      // 하네스의 ‘총 N개 == 시드 N’ 검사와 그대로 맞는다(다른 둘은 머리줄이 한 줄씩 더 붙는다).
+      await seed(page, {
+        type: 'GENERATE_RESULT',
+        generated: n,
+        sets: 1,
+        combos: Array.from({ length: n }, (_, i) => `Type=Primary, Size=M, State=state-${String(i + 1).padStart(3, '0')}`),
+      });
+    },
+  },
 };
 
 /* ---------- 구동 ---------- */

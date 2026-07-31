@@ -321,6 +321,21 @@
     .tag-set { background: var(--accent-subtle); color: var(--accent-strong); border-color: var(--accent-border); }
     .tag-single { background: var(--ok-subtle); color: var(--ok); border-color: var(--ok); }
 
+    /* ── 컴포넌트 등록/분류 리포트(#variantReport) ── */
+    /* 이 목록만 행 추상화가 없어 클래스 없는 맨 <div>에 **리터럴 공백**(`  ${m}`)으로 들여썼다.
+       공백 들여쓰기는 폭이 좁아지면 줄바꿈에 먹혀 사라지고, 줄이 접히면 행 높이까지 들쭉날쭉해져
+       "행 높이가 균일해야 스냅이 성립한다"는 전제가 깨진다 → 들여쓰기는 CSS, 줄바꿈은 금지.
+       한 줄로 자른 대신 전체 문구는 ui.ts가 title로 붙인다(빈 조합 이름은 길다). */
+    #variantReport { font-family: var(--mono); font-size: 11px; --list-cap: clamp(160px, 28vh, 360px); }
+    .vr-row { line-height: 1.5; padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 머리줄은 굵기·색만 다르게 — 글꼴 크기·패딩을 건드리면 행 높이가 어긋나 스냅이 깨진다. */
+    .vr-row.vr-head { font-weight: 600; color: var(--text-2); }
+    .vr-row.vr-item { padding-left: 10px; }
+    .vr-row.vr-warn { color: var(--warn); }
+    /* 불릿·‘+’는 내용이 아니라 표시 — textContent에 섞으면 title(전체 문구)에도 딸려 온다. */
+    .vr-row.vr-bullet::before { content: '• '; color: var(--muted); }
+    .vr-row.vr-added::before { content: '+ '; color: var(--muted); }
+
     /* ── 명도 대비 점검 결과 ── */
     .cfind { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; }
     .cfind .cname { flex: 1 1 70px; min-width: 70px; }
@@ -578,7 +593,7 @@
     </div>
 
     <div class="step" id="componentCard">
-      <h2>컴포넌트 / 베리언트 <span class="muted" id="componentLock"></span></h2>
+      <h2>컴포넌트 / 베리언트 <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span></h2>
       <div class="hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외)이며, 이름에 <b>컴포넌트명</b>(button·card·chip…)이 있는 자식만 추립니다. <b>같은 컴포넌트명</b>이면 한 세트로 묶습니다 — 내부 구조·패딩·크기·색이 달라도 OK(차이는 속성으로 흡수, 과묶임은 체크 해제). 속성은 <b>이름 우선</b>(<code>Type</code>·<code>State</code>·<code>Size</code>) + 부족하면 크기·색 보완. 후보엔 <b>세트</b>/<b>단독</b> 배지가 붙습니다. 메인 컴포넌트는 <b>Components 페이지</b>로 보내고 원래 자리엔 <b>인스턴스</b>가 남습니다.</div>
       <div class="hint muted"><b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 컴포넌트명끼리 다시 묶을 때만(등록과 같은 기준 — 프레임은 「컴포넌트 등록」). <b>속성 노출</b>은 선택한 세트(또는 단독 컴포넌트) 대상.</div>
       <div class="row">
@@ -591,7 +606,12 @@
         <label class="inline"><input type="checkbox" id="compAll" checked /> 전체 선택</label>
       </div>
       <div id="compTree"></div>
-      <div id="variantReport" style="max-height:120px; overflow:auto; font-family:var(--mono); font-size:11px;"></div>
+      <div id="variantReport" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="variantReportMore" style="display:none">
+        <span class="list-count" id="variantReportCount"></span>
+        <button class="link" id="btnVariantReportExpand">모두 펼치기</button>
+      </div>
       <div class="status" id="componentStatus"></div>
     </div>
   </section>
