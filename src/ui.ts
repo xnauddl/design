@@ -182,6 +182,11 @@ interface ListRegion {
   count: string;
   /** 펼치기/접기 버튼 id */
   expand: string;
+  /**
+   * 스크롤포트 상단을 덮는 고정 헤더 셀렉터(표 목록만). 헤더가 가린 만큼은 행을 놓을 수 없으니
+   * 높이 계산에서 빼고 스냅 위치도 그만큼 내린다. 없으면 0 — div 목록의 계산은 그대로다.
+   */
+  stickyHead?: string;
 }
 
 const LIST_REGIONS: ListRegion[] = [
@@ -194,6 +199,9 @@ const LIST_REGIONS: ListRegion[] = [
   { mount: 'bindTree', row: '.tree-row', more: 'bindTreeMore', count: 'bindTreeCount', expand: 'btnBindTreeExpand' },
   { mount: 'diff', row: '.tree-row', more: 'diffMore', count: 'diffCount', expand: 'btnDiffExpand' },
   { mount: 'compTree', row: '.tree-row', more: 'compTreeMore', count: 'compTreeCount', expand: 'btnCompTreeExpand' },
+  // 텍스트 스타일 표 — 마운트는 표를 감싼 래퍼다(표 박스는 스크롤 컨테이너가 못 된다).
+  // 행은 tbody의 tr만(thead의 헤더 행이 한 행으로 세어지면 개수와 행 높이가 둘 다 틀어진다).
+  { mount: 'tsList', row: 'tbody tr', more: 'tsListMore', count: 'tsListCount', expand: 'btnTsListExpand', stickyHead: 'thead' },
 ];
 
 // ‘모두 펼치기’로 상한을 푼 목록의 마운트 id. 목록별로 따로 기억해야 한 목록을 펼친 게
@@ -241,11 +249,19 @@ function layoutList(r: ListRegion): void {
   }
   const cs = getComputedStyle(box);
   const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-  const shown = Math.max(1, Math.floor((box.clientHeight - padY) / rowH));
+  // 표 목록의 고정 헤더는 스크롤포트 상단을 늘 덮고 있어 그만큼은 행이 보일 수 없다.
+  // 빼지 않으면 스크롤포트만 정수배가 되고 ‘헤더 아래 남는 영역’은 정수배가 아니라
+  // 어느 위치에서든 한 행이 헤더에 반쯤 가린다. 스냅 위치도 헤더 아래로 내려야 한다.
+  const head = r.stickyHead ? box.querySelector(r.stickyHead) : null;
+  const headH = head ? head.getBoundingClientRect().height : 0;
+  box.style.scrollPaddingTop = headH ? `${headH}px` : '';
+  const shown = Math.max(1, Math.floor((box.clientHeight - padY - headH) / rowH));
   // box-sizing:border-box라 height에 테두리까지 포함된다. 보정을 빼먹으면 그만큼(2px)
   // 마지막 행이 다시 잘린다. 소수 높이는 올림해 잘림 대신 미세한 여백이 남게 한다.
+  // (offsetHeight−clientHeight는 테두리 + 가로 스크롤바 높이라, 가로로도 스크롤하는
+  //  표 목록에서 스크롤바가 먹는 높이까지 같이 흡수된다.)
   const borderY = box.offsetHeight - box.clientHeight;
-  box.style.height = `${Math.ceil(shown * rowH) + padY + borderY}px`; // 반쪽 행 제거
+  box.style.height = `${Math.ceil(shown * rowH + headH) + padY + borderY}px`; // 반쪽 행 제거
   more.style.display = '';
   label.textContent = `총 ${rows.length}개 중 ${shown}개 표시 — 스크롤하거나`;
   btn.textContent = '모두 펼치기';
@@ -652,7 +668,11 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   const del = document.createElement('button');
   del.textContent = '✕';
   del.title = '행 삭제';
-  del.addEventListener('click', () => tr.remove());
+  // 행이 줄면 상한·개수 문구도 같이 줄어야 한다(안 하면 ‘총 40개 중 8개’가 남아 거짓말이 된다).
+  del.addEventListener('click', () => {
+    tr.remove();
+    layoutListBy('tsList');
+  });
   tdDel.appendChild(del);
   tr.appendChild(tdDel);
   return tr;
@@ -662,6 +682,7 @@ function renderTextStyleRows(specs: TextStyleSpec[], locked = false): void {
   const tbody = $('tsRows');
   tbody.innerHTML = '';
   for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
+  layoutListBy('tsList'); // 행이 붙은 뒤에 재야 행 높이·상한이 맞는다
 }
 
 /** 표 → 스펙. 폰트 패밀리는 행별 폰트 셀에서 읽는다(비면 DEFAULT_TS_FAMILY). */
@@ -688,9 +709,13 @@ function readTextStyleRows(): TextStyleSpec[] {
 
 $('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
 $('btnTsAddRow').addEventListener('click', () => {
-  $('tsRows').appendChild(
-    textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' }),
-  );
+  const tr = textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
+  $('tsRows').appendChild(tr);
+  layoutListBy('tsList');
+  // 표가 상한에 걸린 뒤로는 새 행이 스크롤 밖에 생겨 "행 추가를 눌렀는데 아무 일도 없다"로 보인다.
+  // 추가한 행으로 데려가고 이름 칸에 커서를 둔다(어차피 다음 동작은 이름 입력).
+  tr.scrollIntoView({ block: 'nearest' });
+  (tr.querySelector('input[data-field="name"]') as HTMLInputElement | null)?.focus();
 });
 $('btnTextStyles').addEventListener('click', () => {
   const styles = readTextStyleRows();
