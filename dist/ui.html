@@ -293,6 +293,29 @@
        상시 반쯤 잘렸고, 바로 아래 ‘토큰 생성’ 목록만 고쳐 두면 한 화면에서 처리가 어긋나 보인다.
        그래서 상한도 공용 값(패널 높이 비례)으로 넘긴다 — 고정 220px은 큰 패널에서 근거가 없다.
        스냅은 행 높이가 균일할 때만 맞으므로 .crow의 padding·입력칸 높이는 행마다 같게 둘 것. */
+
+    /* ── 텍스트 스타일 표(#tsList)의 목록 영역 보정 ──
+       이 표만 결함의 방향이 반대였다. 세로 상한이 아예 없어 잘리는 게 아니라 무한히 자랐고,
+       스캔 행이 수십 개면 아래 ‘등록’·‘기존 스타일 적용만’·상태줄이 화면 밖으로 밀려나
+       "등록 버튼이 없어졌다"로 읽혔다. 공용 .list-region으로 상한을 걸되, 표라서 다른 둘을 덧댄다. */
+    /* (1) 헤더 고정 — div 목록과 달리 헤더가 스크롤을 벗어나면 어느 열이 크기고 행간인지 알 수 없다.
+       배경이 투명하면 지나가는 행이 헤더에 비쳐 보인다. border-collapse:collapse에서는 셀 테두리가
+       sticky를 따라오지 않으므로 구분선은 inset 그림자로 낸다.
+       ‘모두 펼치기’(overflow:visible)면 스크롤포트가 패널이 돼 헤더가 sticky 카드 헤더와 겹치므로
+       그때는 고정하지 않는다 — .scrolls일 때만.
+       z-index를 주면 안 된다: 카드 헤더(.step-head)도 sticky z-index:1이고 같은 스택 문맥이라
+       뒤에 오는 이 헤더가 이겨 ‘텍스트 스타일 등록’ 버튼 위에 글자가 겹쳐 그려진다(패널을
+       세로로 줄이고 페이지를 스크롤하면 재현). 행 위로 올라오는 데는 z-index가 필요 없다 —
+       positioned 요소는 흐름 속 행보다 나중에 그려진다. */
+    .list-region.scrolls #tsTable thead th {
+      position: sticky; top: 0;
+      background: var(--surface-2); box-shadow: inset 0 -1px 0 var(--border);
+    }
+    /* (2) 스냅 대상 — 공용 규칙(.list-region.scrolls > *)은 직계 자식에 걸리는데 표의 직계 자식은
+       thead/tbody라 행이 아니다. 행에 직접 걸어야 스크롤이 행 경계에 멈춘다.
+       고정 헤더가 스크롤포트 상단을 덮으므로 멈출 위치는 헤더 높이만큼 내려야 한다 →
+       ui.ts가 scroll-padding-top을 실측해 넣는다(헤더 높이는 폰트·확대율에 따라 달라진다). */
+    .list-region.scrolls #tsRows tr { scroll-snap-align: start; }
     .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 3px 0; }
     .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
     .crow .cn { font-family: var(--mono); font-size: var(--fs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -547,7 +570,11 @@
         <button id="btnScanText">선택에서 스캔</button>
         <button id="btnTsAddRow">행 추가</button>
       </div>
-      <div style="overflow-x:auto; margin-top:6px;">
+      <!-- 표 박스는 overflow를 받지 못하므로(스크롤 컨테이너가 못 된다) 이 래퍼가 목록 영역이다.
+           가로 스크롤도 같은 요소가 맡는다 — 축을 나누려 한 겹 더 감싸도 CSS가 overflow:visible을
+           auto로 올려버려 결국 한 요소가 두 축을 다 갖는다. 가로 스크롤바 높이는 layoutList가
+           offsetHeight−clientHeight로 함께 흡수하므로 세로 스냅은 어긋나지 않는다. -->
+      <div id="tsList" class="list-region">
       <table id="tsTable" style="table-layout:fixed; width:100%; border-collapse:collapse; font-size:11px;">
         <colgroup>
           <col style="width:64px;" /><!-- 이름 -->
@@ -563,6 +590,11 @@
         </tr></thead>
         <tbody id="tsRows"></tbody>
       </table>
+      </div>
+      <!-- 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="tsListMore" style="display:none">
+        <span class="list-count" id="tsListCount"></span>
+        <button class="link" id="btnTsListExpand">모두 펼치기</button>
       </div>
       <button id="btnTextStyles" class="primary">텍스트 스타일 등록</button>
       <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> 등록할 때 화면의 글자에도 적용</label>
@@ -1657,7 +1689,10 @@
     // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
     { mount: "bindTree", row: ".tree-row", more: "bindTreeMore", count: "bindTreeCount", expand: "btnBindTreeExpand" },
     { mount: "diff", row: ".tree-row", more: "diffMore", count: "diffCount", expand: "btnDiffExpand" },
-    { mount: "compTree", row: ".tree-row", more: "compTreeMore", count: "compTreeCount", expand: "btnCompTreeExpand" }
+    { mount: "compTree", row: ".tree-row", more: "compTreeMore", count: "compTreeCount", expand: "btnCompTreeExpand" },
+    // 텍스트 스타일 표 — 마운트는 표를 감싼 래퍼다(표 박스는 스크롤 컨테이너가 못 된다).
+    // 행은 tbody의 tr만(thead의 헤더 행이 한 행으로 세어지면 개수와 행 높이가 둘 다 틀어진다).
+    { mount: "tsList", row: "tbody tr", more: "tsListMore", count: "tsListCount", expand: "btnTsListExpand", stickyHead: "thead" }
   ];
   var listExpanded = /* @__PURE__ */ new Set();
   function layoutList(r) {
@@ -1691,9 +1726,12 @@
     }
     const cs = getComputedStyle(box);
     const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    const shown = Math.max(1, Math.floor((box.clientHeight - padY) / rowH));
+    const head = r.stickyHead ? box.querySelector(r.stickyHead) : null;
+    const headH = head ? head.getBoundingClientRect().height : 0;
+    box.style.scrollPaddingTop = headH ? `${headH}px` : "";
+    const shown = Math.max(1, Math.floor((box.clientHeight - padY - headH) / rowH));
     const borderY = box.offsetHeight - box.clientHeight;
-    box.style.height = `${Math.ceil(shown * rowH) + padY + borderY}px`;
+    box.style.height = `${Math.ceil(shown * rowH + headH) + padY + borderY}px`;
     more.style.display = "";
     label.textContent = `\uCD1D ${rows.length}\uAC1C \uC911 ${shown}\uAC1C \uD45C\uC2DC \u2014 \uC2A4\uD06C\uB864\uD558\uAC70\uB098`;
     btn.textContent = "\uBAA8\uB450 \uD3BC\uCE58\uAE30";
@@ -2020,7 +2058,10 @@
     const del = document.createElement("button");
     del.textContent = "\u2715";
     del.title = "\uD589 \uC0AD\uC81C";
-    del.addEventListener("click", () => tr.remove());
+    del.addEventListener("click", () => {
+      tr.remove();
+      layoutListBy("tsList");
+    });
     tdDel.appendChild(del);
     tr.appendChild(tdDel);
     return tr;
@@ -2029,6 +2070,7 @@
     const tbody = $("tsRows");
     tbody.innerHTML = "";
     for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
+    layoutListBy("tsList");
   }
   function readTextStyleRows() {
     const specs = [];
@@ -2053,9 +2095,12 @@
   }
   $("btnScanText").addEventListener("click", () => send({ type: "SCAN_TEXT_STYLES" }));
   $("btnTsAddRow").addEventListener("click", () => {
-    $("tsRows").appendChild(
-      textStyleRow({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: "Regular" })
-    );
+    var _a;
+    const tr = textStyleRow({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: "Regular" });
+    $("tsRows").appendChild(tr);
+    layoutListBy("tsList");
+    tr.scrollIntoView({ block: "nearest" });
+    (_a = tr.querySelector('input[data-field="name"]')) == null ? void 0 : _a.focus();
   });
   $("btnTextStyles").addEventListener("click", () => {
     const styles = readTextStyleRows();
