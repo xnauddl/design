@@ -223,6 +223,13 @@ const which = arg('--list', 'all');
 const count = Number(arg('--count', '70'));
 const shots = arg('--shots', '');
 
+// --count가 숫자가 아니면 시드가 조용히 0개가 되고(Array.from({length: NaN}) → []),
+// 원인 대신 ‘.framed 없음’ 같은 엉뚱한 단언 실패로 끝난다 → 여기서 잡는다.
+if (!Number.isInteger(count) || count < 1) {
+  console.error(`--count는 1 이상의 정수여야 합니다: ${JSON.stringify(arg('--count', ''))}`);
+  process.exit(2);
+}
+
 if (shots) mkdirSync(shots, { recursive: true });
 
 const ids = which === 'all' ? Object.keys(LISTS) : [which];
