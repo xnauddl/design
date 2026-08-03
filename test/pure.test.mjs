@@ -1700,8 +1700,32 @@ test('tidyNumberTokens — 같은 칸에 놓이면 사용 수와 무관하게 �
   assert.equal(r.merged, 1);
   assert.equal(r.tokens.length, 1);
   assert.equal(r.tokens[0].value, 16);
-  assert.equal(r.tokens[0].count, 10); // 사용 수를 물려받는다
+  // count는 '서로 다른 레이어 수'라 합산하면 과대계상이 된다(한 레이어가 두 값을 함께 쓸 수 있다).
+  // 겹침을 알 수 없으므로 하한인 최댓값을 쓴다.
+  assert.equal(r.tokens[0].count, 5);
   assert.deepEqual(r.tokens[0].sources, ['gap']);
+});
+
+test('tidyNumberTokens — 한 레이어가 낸 1× 두 값이 합쳐져도 1×로 남는다', () => {
+  // 한 카드의 paddingTop 15 · itemSpacing 17 → 둘 다 16으로 스냅. 실제 레이어는 하나뿐이므로
+  // 합산해서 2×가 되면 '1× 해제'가 이 토큰을 더 이상 걸러내지 못한다.
+  const r = tidyNumberTokens(
+    [numTok('spacing/15', 'gap', 15, 1), numTok('spacing/17', 'gap', 17, 1)],
+    { base: 8, ratio: 0.15 },
+  );
+  assert.equal(r.merged, 1);
+  assert.equal(r.tokens[0].count, 1);
+});
+
+test('tidyNumberTokens — 병합 대표는 가장 많이 쓰인 값(배열 순서 아님)', () => {
+  // 개명한 희소 값이 앞에 있어도 정규 값의 이름이 살아남아야 한다.
+  const rare = { name: 'spacing/gutter', category: 'gap', sources: ['gap'], value: 15, count: 2 };
+  const canonical = numTok('spacing/16', 'gap', 16, 40);
+  const r = tidyNumberTokens([rare, canonical], { base: 8, ratio: 0.15 });
+  assert.equal(r.merged, 1);
+  assert.equal(r.tokens.length, 1);
+  assert.equal(r.tokens[0].name, 'spacing/16');
+  assert.equal(r.tokens[0].count, 40);
 });
 
 test('tidyNumberTokens — 사다리에서 먼 값은 서로 가까워도 합치지 않는다', () => {

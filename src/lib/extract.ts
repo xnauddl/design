@@ -120,9 +120,13 @@ function collectSize(acc: Accumulator, node: SceneNode): void {
   // 유효하므로, 자유 배치 프레임의 layoutSizing*는 **언제나 'FIXED'** 다. Fixed 검사만으로는 화면 프레임·
   // 장식 박스까지 전부 통과하므로, 디자이너가 Fixed를 '선택'할 수 있었던 노드로 좁힌다.
   const parent = node.parent;
+  // 절대 배치 자식은 오토레이아웃 흐름 밖이라 Hug/Fill을 고를 수 없고 항상 FIXED다 —
+  // 부모가 오토레이아웃이어도 '디자이너가 Fixed를 선택했다'가 성립하지 않는다.
+  const absolute = 'layoutPositioning' in node && (node as FrameNode).layoutPositioning === 'ABSOLUTE';
   const inAutoLayout =
-    node.layoutMode !== 'NONE' ||
-    (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE');
+    !absolute &&
+    (node.layoutMode !== 'NONE' ||
+      (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE'));
   if (!inAutoLayout) return;
   // Fixed인 축만 토큰화 — HUG/FILL은 계산된 동적 크기라 디자인 토큰이 아님.
   // 정수만 — 343.5처럼 자유 리사이즈로 남은 소수 값은 의도된 척도가 아님.
@@ -243,10 +247,29 @@ export interface ExtractResult {
   warnings: string[];
 }
 
+/**
+ * 조상까지 실제로 보이는가. walk의 자체 visible 검사는 **선택 루트가 숨긴 그룹 안에 있는 경우**를
+ * 못 거른다(루트 자신은 visible=true). 레이어 패널에서 숨긴 그룹의 자식을 직접 고르는 흔한 경우다.
+ */
+function isEffectivelyVisible(node: SceneNode): boolean {
+  let p: BaseNode | null = node;
+  while (p) {
+    if ('visible' in p && (p as SceneNode).visible === false) return false;
+    p = p.parent;
+  }
+  return true;
+}
+
 /** 현재 선택(자식 포함)에서 토큰 후보를 추출. */
 export function extractFromSelection(selection: readonly SceneNode[]): ExtractResult {
   const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map() };
-  for (const node of selection) walk(acc, node);
+  for (const node of selection) {
+    if (!isEffectivelyVisible(node)) {
+      acc.warnings.add('숨긴 레이어는 토큰 후보에서 제외했습니다.');
+      continue;
+    }
+    walk(acc, node);
+  }
   const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
   return { tokens, warnings: [...acc.warnings] };
 }

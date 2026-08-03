@@ -387,6 +387,100 @@ test('extractFromSelection — count는 값을 쓰는 레이어 수(한 레이�
   assert.equal(byName.get('color/ff0000').count, 2); // 같은 색을 쓰는 레이어 2개
 });
 
+test('extractFromSelection — 절대 배치 자식의 크기는 제외(오토레이아웃 흐름 밖)', () => {
+  installFigma();
+  // 부모가 오토레이아웃이어도 layoutPositioning:'ABSOLUTE'면 Hug/Fill을 고를 수 없어 항상 FIXED다.
+  const badge = {
+    type: 'FRAME',
+    id: 'badge',
+    name: 'Badge',
+    layoutMode: 'NONE',
+    layoutPositioning: 'ABSOLUTE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 187,
+    height: 43,
+    children: [],
+  };
+  const flow = {
+    type: 'FRAME',
+    id: 'flow',
+    name: 'Flow',
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 48,
+    height: 48,
+    children: [],
+  };
+  const card = {
+    type: 'FRAME',
+    id: 'card',
+    name: 'Card',
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [badge, flow],
+  };
+  badge.parent = card;
+  flow.parent = card;
+
+  const names = new Set(extractFromSelection([card]).tokens.map((t) => t.name));
+  assert.equal(names.has('size/187'), false); // 절대 배치 — 자유 리사이즈 잔값
+  assert.equal(names.has('size/43'), false);
+  assert.equal(names.has('size/48'), true); // 흐름 안의 Fixed는 그대로
+});
+
+test('extractFromSelection — 숨긴 조상 안의 레이어를 직접 선택해도 제외', () => {
+  installFigma();
+  const inner = {
+    type: 'FRAME',
+    id: 'inner',
+    name: 'Inner',
+    fills: [{ type: 'SOLID', color: { r: 0, g: 1, b: 0 }, visible: true }], // #00ff00 — 나오면 안 됨
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 77,
+    height: 77,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [],
+  };
+  inner.parent = { type: 'GROUP', id: 'hiddenGroup', visible: false, parent: null };
+
+  const { tokens, warnings } = extractFromSelection([inner]);
+  assert.equal(tokens.length, 0); // 자신은 visible=true지만 조상이 숨김
+  assert.ok(warnings.some((w) => /숨긴 레이어/.test(w)));
+});
+
+test('bindSelection — 숨긴 조상 안의 선택 루트는 바인딩하지 않음', async () => {
+  installFigma();
+  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
+  const node = {
+    type: 'FRAME',
+    id: 'n',
+    name: 'n',
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }],
+    layoutMode: 'NONE',
+    setBoundVariable() {},
+  };
+  node.parent = { type: 'GROUP', id: 'g', visible: false, parent: null };
+
+  const res = await bindSelection([node], 0.5);
+  assert.equal(res.bound, 0);
+  assert.ok(res.reasons.hidden >= 1);
+  assert.equal(node.fills[0].boundVariables, undefined);
+});
+
 test('extractFromSelection — 그리드 오토레이아웃은 gridRowGap/gridColumnGap을 수집', () => {
   installFigma();
   // display:inline-grid; padding:12px 20px; row-gap:12px; column-gap:5px

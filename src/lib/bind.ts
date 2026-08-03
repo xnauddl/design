@@ -118,6 +118,16 @@ interface Progress {
   every: number;
 }
 
+/** 조상까지 실제로 보이는가 — extract.ts와 같은 기준(숨긴 그룹 안의 레이어를 직접 고른 경우). */
+function isEffectivelyVisible(node: SceneNode): boolean {
+  let p: BaseNode | null = node;
+  while (p) {
+    if ('visible' in p && (p as SceneNode).visible === false) return false;
+    p = p.parent;
+  }
+  return true;
+}
+
 /** 선택 하위 전체 노드 수(진행률 분모). 처리 없이 셈만. */
 function countNodes(sel: readonly SceneNode[]): number {
   let n = 0;
@@ -163,6 +173,12 @@ export async function bindSelection(
   const prog: Progress = { done: 0, total: hooks.onProgress ? countNodes(selection) : 0, every: 50 };
   const preview: Preview | null = apply ? null : { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
   for (const node of selection) {
+    // 선택 루트가 숨긴 그룹 안이면 walk의 자체 visible 검사로는 못 거른다(루트 자신은 보임).
+    if (!isEffectivelyVisible(node)) {
+      flagSet.add('숨긴 레이어는 바인딩에서 제외했습니다.');
+      note(res, 'hidden', node, preview);
+      continue;
+    }
     await walk(node, entries, tolerance, res, flagSet, apply, hooks, prog, preview, 0, null);
     if (res.cancelled) break;
   }
@@ -360,9 +376,13 @@ function bindFrame(
   // 자유 배치 프레임은 Hug/Fill이 될 수 없어 layoutSizing*가 항상 'FIXED'라, 이 게이트가 없으면
   // 화면 프레임·장식 박스의 width/height까지 크기 변수에 붙는다.
   const parent = node.parent;
+  // 절대 배치 자식은 오토레이아웃 흐름 밖이라 Hug/Fill을 고를 수 없고 항상 FIXED다 —
+  // 부모가 오토레이아웃이어도 '디자이너가 Fixed를 선택했다'가 성립하지 않는다.
+  const absolute = 'layoutPositioning' in node && (node as FrameNode).layoutPositioning === 'ABSOLUTE';
   const inAutoLayout =
-    node.layoutMode !== 'NONE' ||
-    (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE');
+    !absolute &&
+    (node.layoutMode !== 'NONE' ||
+      (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE'));
   if (inAutoLayout) {
     /**
      * 축 하나를 처리 — 두 축이 같은 규칙을 쓰도록 한 곳에 모은다(세로 축만 사유 집계가

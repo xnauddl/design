@@ -132,6 +132,23 @@ function tokensToCreate(): DraftToken[] {
 }
 
 /**
+ * 값이 바뀌는 변환(사다리 정리·되돌리기) 앞뒤로 체크 상태를 옮긴다.
+ * 키가 값 기반이라 스냅하면 옛 키가 사라진다 — 전체 재선택을 하면 사용자의 '1× 해제'가
+ * 되살아나고, 아무것도 안 하면 전부 풀린다. 그래서 **이름**으로 짝을 맞춰 이월한다
+ * (스냅은 자동 이름만 갱신하고 개명은 보존하므로 이름이 가장 안정적인 축이다).
+ */
+function carryTokenChecked(before: readonly DraftToken[], after: readonly DraftToken[]): void {
+  const checkedNames = new Set(before.filter((t) => tokenChecked.has(tokenKey(t))).map((t) => t.name));
+  // 값이 바뀌면 자동 이름도 바뀌므로, 이름이 안 맞는 건 '체크였던 것끼리 합쳐졌다'고 보고 살린다.
+  const beforeNames = new Set(before.map((t) => t.name));
+  tokenChecked.clear();
+  for (const t of after) {
+    if (t.category === 'color') continue;
+    if (checkedNames.has(t.name) || !beforeNames.has(t.name)) tokenChecked.add(tokenKey(t));
+  }
+}
+
+/**
  * 토큰 1행(스와치·이름 입력·타입 칩).
  * 이름 편집은 넘겨받은 토큰 객체를 그대로 고친다 — 목록은 `tokens`를 필터한 배열이라
  * 행 인덱스가 `tokens` 인덱스와 어긋난다(색 토큰이 앞에 있으면 남의 이름을 덮어썼다).
@@ -391,9 +408,13 @@ function updateTokenCreate(): void {
   all.checked = sel === others.length && others.length > 0;
   all.indeterminate = sel > 0 && sel < others.length;
   // 색만 추출된 경우엔 색 토큰만으로도 생성할 게 있으므로 잠그지 않는다.
+  // 두 버튼은 PAID_FIELDS라 유료 잠금이 우선 — 여기서 무조건 false를 쓰면 Free 티어의 잠금이 풀려
+  // 클릭-후-거부(PREMIUM_REQUIRED) 막다른 길이 된다. 잠금은 더하기만 하고 풀지는 않는다.
   const nothing = others.length > 0 && sel === 0 && !tokens.some((t) => t.category === 'color');
-  ($('btnCreate') as HTMLButtonElement).disabled = nothing;
-  ($('btnCreateApply') as HTMLButtonElement).disabled = nothing;
+  for (const id of ['btnCreate', 'btnCreateApply']) {
+    const el = $(id) as HTMLButtonElement;
+    el.disabled = nothing || !isPaid;
+  }
 }
 
 /* ---------- 0 · 브랜드 팔레트 ---------- */
@@ -424,6 +445,7 @@ $('btnPalette').addEventListener('click', () => {
   });
   tokens = paletteToDraftTokens(p);
   resetTokenChecked();
+  clearNumTidy();
   colorRevealed = true; // 팔레트 생성 = 색 노출
   previewRevealed = false; // 색 외 토큰 목록은 ‘미리보기’ 클릭 시
   renderTokens();
@@ -581,7 +603,9 @@ function hideTidySummary(): void {
 /** 자동 정리 되돌리기 — 정리 직전 추출 색으로 복원(이번 추출 한정). */
 function undoTidy(): void {
   if (!preTidyTokens) return;
-  tokens = preTidyTokens.map((t) => ({ ...t, sources: [...t.sources] }));
+  const restored = preTidyTokens.map((t) => ({ ...t, sources: [...t.sources] }));
+  carryTokenChecked(tokens, restored); // 수치 정리 후라면 키가 어긋나 전부 풀린다
+  tokens = restored;
   preTidyTokens = null;
   hideTidySummary();
   renderTokens();
@@ -635,9 +659,20 @@ $('btnExtract').addEventListener('click', () => {
    달라지기 때문이다(색 병합은 같은 hue-단계 안이라 훨씬 보수적). */
 let preNumTidy: DraftToken[] | null = null;
 
+/** 정리 스냅샷·요약 줄을 함께 걷는다 — 남겨두면 다른 추출의 토큰으로 되돌아간다. */
+function clearNumTidy(): void {
+  preNumTidy = null;
+  $('numTidySummary').style.display = 'none';
+}
+
 $('btnTidyNumbers').addEventListener('click', () => {
+  // 목록이 '표시'된 뒤에만 — 접힌 채로 값을 바꾸면 무엇이 어떻게 옮겨졌는지 볼 수 없다.
+  if (!previewRevealed) {
+    setStatus('createStatus', '먼저 ‘미리보기’를 눌러 정리할 토큰을 확인하세요.', 'warn');
+    return;
+  }
   if (!creatableTokens().length) {
-    setStatus('createStatus', '먼저 ‘미리보기’로 색 외 토큰을 표시하세요.', 'warn');
+    setStatus('createStatus', '정리할 여백·크기 토큰이 없어요.', 'warn');
     return;
   }
   const base = Number(($('tidyBase') as HTMLInputElement).value) || 0;
@@ -652,7 +687,9 @@ $('btnTidyNumbers').addEventListener('click', () => {
   }
   preNumTidy = snapshot;
   tokens = r.tokens;
-  resetTokenChecked(); // 집합이 바뀌었으니 선택도 새로
+  // 스냅으로 키(값)가 바뀌므로 체크를 그대로 두면 전부 풀린다. 그렇다고 전체 재선택을 하면
+  // 사용자의 '1× 해제'가 조용히 되살아난다 → 정리 전 체크 상태를 새 키로 이월한다.
+  carryTokenChecked(snapshot, r.tokens);
   ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 새 미리보기 필요
   renderTokens();
   $('numTidySummary').style.display = '';
@@ -664,12 +701,12 @@ $('btnTidyNumbers').addEventListener('click', () => {
 
 $('btnNumTidyUndo').addEventListener('click', () => {
   if (!preNumTidy) return;
-  tokens = preNumTidy;
-  preNumTidy = null;
-  resetTokenChecked();
+  const restored = preNumTidy;
+  carryTokenChecked(tokens, restored); // 되돌릴 때도 체크를 잃지 않게
+  tokens = restored;
+  clearNumTidy();
   ($('btnCreateApply') as HTMLButtonElement).style.display = 'none';
   renderTokens();
-  $('numTidySummary').style.display = 'none';
   setStatus('createStatus', '수치 정리를 되돌렸어요.', '');
 });
 
@@ -885,7 +922,12 @@ for (const el of Array.from(document.querySelectorAll('.tol-chip'))) {
     clearBindPreview(); // 허용오차가 바뀌면 이전 미리보기 후보는 무효
   });
 }
-($('tol') as HTMLInputElement).addEventListener('input', syncTolPresets);
+($('tol') as HTMLInputElement).addEventListener('input', () => {
+  syncTolPresets();
+  // 칩과 같은 처리 — 허용오차가 바뀌면 이전 값으로 계산된 후보는 무효다. 남겨두면
+  // 사용자가 0을 넣고 '선택에 바인딩'을 눌러도 옛 허용오차의 근사 매칭이 그대로 적용된다.
+  clearBindPreview();
+});
 syncTolPresets();
 
 $('btnApply').addEventListener('click', () => {
@@ -1515,6 +1557,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
       resetTokenChecked(); // 새 추출 = 새 집합 → 전체 선택으로 시작
+      clearNumTidy(); // 이전 추출의 정리 스냅샷으로 되돌아가지 않게
       huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
       // 추출 색 자동 정리(같은 hue-단계 N:1 병합) — 드래프트 단계라 바인딩 영향 없음.
       preTidyTokens = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기 스냅샷
@@ -1541,7 +1584,9 @@ window.onmessage = (event: MessageEvent) => {
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
-      clearBindPreview(); // 선택 변경 → 바인딩 미리보기 무효화
+      // 스킵 칩이 만든 선택 변경이면 미리보기를 유지한다 — 지우면 칩을 한 번 누르는 순간
+      // 칩 줄과 체크해둔 후보가 통째로 사라져 두 번째 사유를 볼 수 없다.
+      if (!msg.selfSelect) clearBindPreview(); // 사용자의 선택 변경 → 바인딩 미리보기 무효화
       if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
       refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드 빈 상태 갱신
       break;
@@ -1581,9 +1626,11 @@ window.onmessage = (event: MessageEvent) => {
       const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt && !asChips ? ` — ${rt}` : ''}`;
       renderSkipReasons(msg.reasons);
       if (msg.cancelled) {
-        // UX6: 취소 — 처리한 만큼만 적용(비파괴).
+        // UX6: 취소 — 처리한 만큼만 적용(비파괴). clearBindPreview가 칩을 숨기므로
+        // 취소 경로에서는 사유를 상태 줄 텍스트로 남긴다(그러지 않으면 둘 다 사라진다).
         clearBindPreview();
-        setStatus('applyStatus', t('apply.cancelled', { bound: msg.bound, detail }), 'warn');
+        const cancelDetail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}`;
+        setStatus('applyStatus', t('apply.cancelled', { bound: msg.bound, detail: cancelDetail }), 'warn');
         confirmBtn.style.display = 'none';
       } else if (msg.preview) {
         // #6: 후보를 선택형 미리보기 트리로. 기본 전체 체크.
@@ -1602,7 +1649,9 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'SELECT_RESULT':
       // 미리보기 이후 레이어가 지워졌거나 다른 페이지로 옮겨졌으면 그만큼 못 찾는다 — 조용히 실패하지 않게.
-      if (msg.found < msg.requested) {
+      if (msg.capped) {
+        setStatus('applyStatus', `레이어 ${msg.found}개만 선택했어요 — 한 번에 보여줄 수 있는 상한(${msg.requested}개 중)입니다.`, 'warn');
+      } else if (msg.found < msg.requested) {
         setStatus('applyStatus', msg.found
           ? `레이어 ${msg.found}개 선택 — ${msg.requested - msg.found}개는 삭제됐거나 다른 페이지에 있어요.`
           : '레이어를 찾지 못했어요 — 삭제됐거나 다른 페이지에 있습니다. 미리보기를 다시 실행해 주세요.', 'warn');
@@ -1781,6 +1830,7 @@ const OP_STATUS: Record<string, string> = {
   SCAN_TEXT_STYLES: 'tsStatus',
   CREATE_TEXT_STYLES: 'tsStatus',
   APPLY: 'applyStatus',
+  SELECT_NODES: 'applyStatus',
   RENAME: 'renameStatus',
   EXPORT: 'exportStatus',
   SCAN_COMPONENT_CANDIDATES: 'componentStatus',
@@ -2043,6 +2093,7 @@ function clearBindPreview(): void {
   bindCandidates = [];
   bindNodes = [];
   bindSkips = [];
+  clearMount($('bindSkips')); // 숨기기만 하면 낡은 칩이 DOM에 남는다
   ($('bindSkips') as HTMLElement).style.display = 'none';
   bindChecked.clear();
   clearMount($('bindTree'));

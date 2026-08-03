@@ -244,7 +244,8 @@
   function collectSize(acc, node) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
     const parent = node.parent;
-    const inAutoLayout = node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE";
+    const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
+    const inAutoLayout = !absolute && (node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE");
     if (!inAutoLayout) return;
     const addSize = (v) => {
       const rv = round(v);
@@ -345,9 +346,23 @@
     }
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
+  function isEffectivelyVisible(node) {
+    let p = node;
+    while (p) {
+      if ("visible" in p && p.visible === false) return false;
+      p = p.parent;
+    }
+    return true;
+  }
   function extractFromSelection(selection2) {
     const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map() };
-    for (const node of selection2) walk(acc, node);
+    for (const node of selection2) {
+      if (!isEffectivelyVisible(node)) {
+        acc.warnings.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD1A0\uD070 \uD6C4\uBCF4\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
+        continue;
+      }
+      walk(acc, node);
+    }
     const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
     return { tokens, warnings: [...acc.warnings] };
   }
@@ -1056,6 +1071,14 @@
     }
     return nodeIndex.filter((n) => keep.has(n.id));
   }
+  function isEffectivelyVisible2(node) {
+    let p = node;
+    while (p) {
+      if ("visible" in p && p.visible === false) return false;
+      p = p.parent;
+    }
+    return true;
+  }
   function countNodes(sel) {
     let n = 0;
     const stack = sel.slice();
@@ -1089,6 +1112,11 @@
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
     const preview = apply ? null : { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     for (const node of selection2) {
+      if (!isEffectivelyVisible2(node)) {
+        flagSet.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
+        note(res, "hidden", node, preview);
+        continue;
+      }
       await walk2(node, entries, tolerance, res, flagSet, apply, hooks, prog, preview, 0, null);
       if (res.cancelled) break;
     }
@@ -1241,7 +1269,8 @@
   function bindFrame(node, entries, tol, res, flags, apply, preview) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
     const parent = node.parent;
-    const inAutoLayout = node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE";
+    const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
+    const inAutoLayout = !absolute && (node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE");
     if (inAutoLayout) {
       const bindAxis = (sizing, field, v) => {
         if (sizing !== "FIXED") {
@@ -3352,6 +3381,7 @@
     }
   });
   var SCAN_CAP = 1500;
+  var SELECT_CAP = 200;
   function isBindableCandidate(n) {
     const fills = n.fills;
     const hasFills = Array.isArray(fills) && fills.some((p) => p.type === "SOLID" && p.visible !== false);
@@ -3364,6 +3394,7 @@
     const hasGap = !!lm && lm !== "NONE" && typeof n.itemSpacing === "number";
     return hasFills || hasStrokes || hasRadius || hasFont || hasGap;
   }
+  var selfSelect = false;
   function postSelection() {
     const sel = selection();
     let scanned = 0;
@@ -3376,11 +3407,14 @@
         break;
       }
       const n = stack.pop();
+      if (n.visible === false) continue;
       scanned++;
       if (isBindableCandidate(n)) bindable++;
+      if (n.type === "INSTANCE") continue;
       if ("children" in n) for (const c of n.children) stack.push(c);
     }
-    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped });
+    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped, selfSelect });
+    selfSelect = false;
   }
   figma.on("selectionchange", postSelection);
   var CONTRAST_SCAN_CAP = 2e3;
@@ -3470,7 +3504,7 @@
     if (type === "BOOLEAN") return target.visible;
     return target.type === "INSTANCE" && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : "";
   }
-  function isEffectivelyVisible(node) {
+  function isEffectivelyVisible3(node) {
     let p = node;
     while (p) {
       if ("visible" in p && p.visible === false) return false;
@@ -3479,7 +3513,7 @@
     return true;
   }
   function sceneComponentEligible(n) {
-    return isEffectivelyVisible(n) && componentEligible(n);
+    return isEffectivelyVisible3(n) && componentEligible(n);
   }
   function resolvePropTarget(root, p) {
     var _a;
@@ -3698,8 +3732,9 @@
           break;
         }
         case "SELECT_NODES": {
+          const ids = msg.ids.slice(0, SELECT_CAP);
           const found = [];
-          for (const id of msg.ids) {
+          for (const id of ids) {
             const n = await figma.getNodeByIdAsync(id);
             if (n && n.type !== "PAGE" && n.type !== "DOCUMENT" && n.parent) found.push(n);
           }
@@ -3708,10 +3743,12 @@
             return false;
           });
           if (onPage.length) {
+            const cur = figma.currentPage.selection;
+            if (onPage.length !== cur.length || onPage.some((n, i) => cur[i] !== n)) selfSelect = true;
             figma.currentPage.selection = onPage;
             figma.viewport.scrollAndZoomIntoView(onPage);
           }
-          post({ type: "SELECT_RESULT", found: onPage.length, requested: msg.ids.length });
+          post({ type: "SELECT_RESULT", found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
           break;
         }
         case "APPLY_SELECTED": {
@@ -3921,7 +3958,7 @@
         }
         case "SCAN_COMPONENT_CANDIDATES": {
           if (!requirePro()) break;
-          const roots = selection().filter(isEffectivelyVisible);
+          const roots = selection().filter(isEffectivelyVisible3);
           const candidates = scanComponentCandidates(roots);
           const liveById = /* @__PURE__ */ new Map();
           const index = (n) => {
@@ -3933,7 +3970,7 @@
           for (const r of roots) index(r);
           const gated = candidates.map((c) => {
             const live = liveById.get(c.id);
-            if (!live || !isEffectivelyVisible(live)) return __spreadProps(__spreadValues({}, c), { eligible: false });
+            if (!live || !isEffectivelyVisible3(live)) return __spreadProps(__spreadValues({}, c), { eligible: false });
             return c;
           });
           const byCand = new Map(gated.map((c) => [c.id, c]));

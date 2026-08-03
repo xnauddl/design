@@ -897,7 +897,7 @@
     return rungs.sort((a, b) => a - b);
   }
   function tidyNumberTokens(tokens2, opts) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e;
     const { base, ratio } = opts;
     const out = tokens2.map(cloneToken);
     const targets = out.filter(
@@ -922,14 +922,16 @@
     const dropped = /* @__PURE__ */ new Set();
     for (const t2 of targets) {
       const k = `${t2.category}|${t2.value}|${(_a = t2.unit) != null ? _a : ""}`;
-      const rep = seen.get(k);
-      if (!rep) {
+      const cur = seen.get(k);
+      if (!cur) {
         seen.set(k, t2);
         continue;
       }
-      for (const s of t2.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
-      rep.count = ((_b = rep.count) != null ? _b : 0) + ((_c = t2.count) != null ? _c : 0);
-      dropped.add(t2);
+      const [rep, gone] = ((_b = t2.count) != null ? _b : 0) > ((_c = cur.count) != null ? _c : 0) ? [t2, cur] : [cur, t2];
+      seen.set(k, rep);
+      for (const s of gone.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+      rep.count = Math.max((_d = rep.count) != null ? _d : 0, (_e = gone.count) != null ? _e : 0);
+      dropped.add(gone);
     }
     return {
       tokens: out.filter((t2) => !dropped.has(t2)),
@@ -1754,6 +1756,15 @@
   function tokensToCreate() {
     return tokens.filter((t2) => t2.category === "color" || tokenChecked.has(tokenKey(t2)));
   }
+  function carryTokenChecked(before, after) {
+    const checkedNames = new Set(before.filter((t2) => tokenChecked.has(tokenKey(t2))).map((t2) => t2.name));
+    const beforeNames = new Set(before.map((t2) => t2.name));
+    tokenChecked.clear();
+    for (const t2 of after) {
+      if (t2.category === "color") continue;
+      if (checkedNames.has(t2.name) || !beforeNames.has(t2.name)) tokenChecked.add(tokenKey(t2));
+    }
+  }
   function makeTokenRow(t2) {
     var _a;
     const row = document.createElement("div");
@@ -1932,8 +1943,10 @@
     all.checked = sel === others.length && others.length > 0;
     all.indeterminate = sel > 0 && sel < others.length;
     const nothing = others.length > 0 && sel === 0 && !tokens.some((t2) => t2.category === "color");
-    $("btnCreate").disabled = nothing;
-    $("btnCreateApply").disabled = nothing;
+    for (const id of ["btnCreate", "btnCreateApply"]) {
+      const el = $(id);
+      el.disabled = nothing || !isPaid;
+    }
   }
   var brandColor = $("brand");
   var brandHex = $("brandHex");
@@ -1959,6 +1972,7 @@
     });
     tokens = paletteToDraftTokens(p);
     resetTokenChecked();
+    clearNumTidy();
     colorRevealed = true;
     previewRevealed = false;
     renderTokens();
@@ -2083,7 +2097,9 @@
   }
   function undoTidy() {
     if (!preTidyTokens) return;
-    tokens = preTidyTokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
+    const restored = preTidyTokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
+    carryTokenChecked(tokens, restored);
+    tokens = restored;
     preTidyTokens = null;
     hideTidySummary();
     renderTokens();
@@ -2124,9 +2140,17 @@
     send({ type: "EXTRACT" });
   });
   var preNumTidy = null;
+  function clearNumTidy() {
+    preNumTidy = null;
+    $("numTidySummary").style.display = "none";
+  }
   $("btnTidyNumbers").addEventListener("click", () => {
+    if (!previewRevealed) {
+      setStatus("createStatus", "\uBA3C\uC800 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB20C\uB7EC \uC815\uB9AC\uD560 \uD1A0\uD070\uC744 \uD655\uC778\uD558\uC138\uC694.", "warn");
+      return;
+    }
     if (!creatableTokens().length) {
-      setStatus("createStatus", "\uBA3C\uC800 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB85C \uC0C9 \uC678 \uD1A0\uD070\uC744 \uD45C\uC2DC\uD558\uC138\uC694.", "warn");
+      setStatus("createStatus", "\uC815\uB9AC\uD560 \uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694.", "warn");
       return;
     }
     const base = Number($("tidyBase").value) || 0;
@@ -2139,7 +2163,7 @@
     }
     preNumTidy = snapshot;
     tokens = r.tokens;
-    resetTokenChecked();
+    carryTokenChecked(snapshot, r.tokens);
     $("btnCreateApply").style.display = "none";
     renderTokens();
     $("numTidySummary").style.display = "";
@@ -2149,12 +2173,12 @@
   });
   $("btnNumTidyUndo").addEventListener("click", () => {
     if (!preNumTidy) return;
-    tokens = preNumTidy;
-    preNumTidy = null;
-    resetTokenChecked();
+    const restored = preNumTidy;
+    carryTokenChecked(tokens, restored);
+    tokens = restored;
+    clearNumTidy();
     $("btnCreateApply").style.display = "none";
     renderTokens();
-    $("numTidySummary").style.display = "none";
     setStatus("createStatus", "\uC218\uCE58 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694.", "");
   });
   $("tokenAll").addEventListener("change", () => {
@@ -2342,7 +2366,10 @@
       clearBindPreview();
     });
   }
-  $("tol").addEventListener("input", syncTolPresets);
+  $("tol").addEventListener("input", () => {
+    syncTolPresets();
+    clearBindPreview();
+  });
   syncTolPresets();
   $("btnApply").addEventListener("click", () => {
     const tolerance = Number($("tol").value) || 0;
@@ -2867,6 +2894,7 @@
       case "EXTRACT_RESULT": {
         tokens = msg.tokens;
         resetTokenChecked();
+        clearNumTidy();
         huefyTokenColors(tokens);
         preTidyTokens = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
         lastTidy = tidyColors();
@@ -2890,7 +2918,7 @@
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
-        clearBindPreview();
+        if (!msg.selfSelect) clearBindPreview();
         if (!tokens.length) renderTokens();
         refreshTreeEmptyStates();
         break;
@@ -2926,7 +2954,8 @@
         renderSkipReasons(msg.reasons);
         if (msg.cancelled) {
           clearBindPreview();
-          setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail }), "warn");
+          const cancelDetail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}`;
+          setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail: cancelDetail }), "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
           bindCandidates = (_b = msg.candidates) != null ? _b : [];
@@ -2943,7 +2972,9 @@
         break;
       }
       case "SELECT_RESULT":
-        if (msg.found < msg.requested) {
+        if (msg.capped) {
+          setStatus("applyStatus", `\uB808\uC774\uC5B4 ${msg.found}\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694 \u2014 \uD55C \uBC88\uC5D0 \uBCF4\uC5EC\uC904 \uC218 \uC788\uB294 \uC0C1\uD55C(${msg.requested}\uAC1C \uC911)\uC785\uB2C8\uB2E4.`, "warn");
+        } else if (msg.found < msg.requested) {
           setStatus("applyStatus", msg.found ? `\uB808\uC774\uC5B4 ${msg.found}\uAC1C \uC120\uD0DD \u2014 ${msg.requested - msg.found}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC5D0 \uC788\uC5B4\uC694.` : "\uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC5D0 \uC788\uC2B5\uB2C8\uB2E4. \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uB2E4\uC2DC \uC2E4\uD589\uD574 \uC8FC\uC138\uC694.", "warn");
         }
         break;
@@ -3087,6 +3118,7 @@
     SCAN_TEXT_STYLES: "tsStatus",
     CREATE_TEXT_STYLES: "tsStatus",
     APPLY: "applyStatus",
+    SELECT_NODES: "applyStatus",
     RENAME: "renameStatus",
     EXPORT: "exportStatus",
     SCAN_COMPONENT_CANDIDATES: "componentStatus",
@@ -3286,6 +3318,7 @@
     bindCandidates = [];
     bindNodes = [];
     bindSkips = [];
+    clearMount($("bindSkips"));
     $("bindSkips").style.display = "none";
     bindChecked.clear();
     clearMount($("bindTree"));

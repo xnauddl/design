@@ -367,20 +367,26 @@ export function tidyNumberTokens(tokens: readonly DraftToken[], opts: TidyNumber
     snapped++;
   }
 
-  // 같은 칸에 놓인 것만 병합 — 사용 수와 무관하다(같은 값이 두 줄 남으면 안 된다).
+  // 같은 칸에 놓인 것만 병합. 대표는 **가장 많이 쓰인 값** — 배열 순서로 고르면 개명한 희소 값이
+  // 정규 값의 이름을 빼앗고, 어느 이름이 살아남는지가 알파벳 정렬 위치에 좌우된다.
   const seen = new Map<string, DraftToken>();
   const dropped = new Set<DraftToken>();
   for (const t of targets) {
     const k = `${t.category}|${t.value}|${t.unit ?? ''}`;
-    const rep = seen.get(k);
-    if (!rep) {
+    const cur = seen.get(k);
+    if (!cur) {
       seen.set(k, t);
       continue;
     }
+    const [rep, gone] = (t.count ?? 0) > (cur.count ?? 0) ? [t, cur] : [cur, t];
+    seen.set(k, rep);
     // 흡수된 값의 출처도 대표가 물려받아야 스코프가 좁아지지 않는다.
-    for (const s of t.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
-    rep.count = (rep.count ?? 0) + (t.count ?? 0);
-    dropped.add(t);
+    for (const s of gone.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+    // count는 '값을 쓰는 서로 다른 레이어 수'다. 두 값을 같은 레이어가 함께 썼을 수 있어
+    // 단순 합산은 과대계상이 된다(한 카드의 padding 15 + gap 17 → 2× 표시). 겹침을 알 수 없으므로
+    // 하한인 최댓값을 쓴다 — '1× 해제'가 실제로 한 레이어짜리 값을 계속 걸러내도록.
+    rep.count = Math.max(rep.count ?? 0, gone.count ?? 0);
+    dropped.add(gone);
   }
 
   return {
