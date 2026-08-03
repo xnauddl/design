@@ -733,7 +733,7 @@
       <!-- 이 카드엔 목록이 둘이다(후보 트리 · 결과 리포트). 세는 대상이 달라 각자 span을 갖고,
            비어 있으면 각자 숨는다 — 스캔 직후엔 후보만, 등록 직후엔 리포트만 뜬다. -->
       <h2>컴포넌트 / 베리언트 <span class="muted" id="compCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span></h2>
-      <div class="hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.</div>
+      <div class="hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·table·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.</div>
       <div class="hint muted"><b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 이름끼리 다시 묶을 때만(프레임은 「컴포넌트 등록」). 등록 시 TEXT·스왑·<code>이름?</code> BOOLEAN 속성이 자동 노출됩니다(접힘=다른 슬롯만, 단독·세트=전체 API).</div>
       <div class="row">
         <button id="btnScanComp" title="선택 하위 고신뢰 구조 후보 스캔 — 같은 이름 반복은 세트/속성으로 자동 체크, 숨김 제외">후보 스캔</button>

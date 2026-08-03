@@ -619,6 +619,64 @@ test('highConfidenceComponentRole — button/chip/card/list/field/nav/progress/f
   assert.equal(isHighConfidenceComponent(box), false);
 });
 
+test('highConfidenceComponentRole — table(행 스택): 열 구조가 반복되면 list보다 우선', () => {
+  const cell = (w, text) => ({ type: 'FRAME', width: w, height: 20, children: text ? [{ type: 'TEXT' }] : [] });
+  // 열 폭이 열마다 다르고(80/200/60) 행마다는 일치 — 표의 형태.
+  const row = () => ({ type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(80, true), cell(200, true), cell(60, true)] });
+  const table = { type: 'FRAME', layoutMode: 'VERTICAL', width: 340, height: 128, children: [row(), row(), row(), row()] };
+  assert.equal(highConfidenceComponentRole(table), 'table');
+});
+
+test('highConfidenceComponentRole — table: 열 수가 어긋나면 표 아님', () => {
+  const cell = (w) => ({ type: 'FRAME', width: w, height: 20, children: [{ type: 'TEXT' }] });
+  const r3 = () => ({ type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(80), cell(200), cell(60)] });
+  const r2 = { type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(80), cell(200)] };
+  const node = { type: 'FRAME', layoutMode: 'VERTICAL', width: 340, height: 96, children: [r3(), r3(), r2] };
+  assert.notEqual(highConfidenceComponentRole(node), 'table');
+});
+
+test('highConfidenceComponentRole — table: 같은 열 폭이 행마다 흔들리면 표 아님(반복 레이아웃)', () => {
+  const cell = (w) => ({ type: 'FRAME', width: w, height: 20, children: [{ type: 'TEXT' }] });
+  const row = (a, b) => ({ type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(a), cell(b)] });
+  const node = { type: 'FRAME', layoutMode: 'VERTICAL', width: 340, height: 96, children: [row(60, 200), row(140, 120), row(30, 260)] };
+  assert.notEqual(highConfidenceComponentRole(node), 'table');
+});
+
+test('highConfidenceComponentRole — table: 텍스트가 없으면 표 아님(이미지 행 반복)', () => {
+  const cell = (w) => ({ type: 'FRAME', width: w, height: 20, children: [{ type: 'RECTANGLE' }] });
+  const row = () => ({ type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(80), cell(200)] });
+  const node = { type: 'FRAME', layoutMode: 'VERTICAL', width: 340, height: 96, children: [row(), row(), row()] };
+  assert.notEqual(highConfidenceComponentRole(node), 'table');
+});
+
+test('highConfidenceComponentRole — table(GRID): 열 폭이 다르면 표', () => {
+  const cell = (w) => ({ type: 'FRAME', width: w, height: 24, children: [{ type: 'TEXT' }] });
+  const grid = {
+    type: 'FRAME', layoutMode: 'GRID', gridColumnCount: 3, gridRowCount: 3, width: 340, height: 96,
+    children: [cell(80), cell(200), cell(60), cell(80), cell(200), cell(60), cell(80), cell(200), cell(60)],
+  };
+  assert.equal(highConfidenceComponentRole(grid), 'table');
+});
+
+test('highConfidenceComponentRole — table(GRID): 셀이 균등하면 갤러리·아이콘 그리드라 표 아님', () => {
+  const cell = () => ({ type: 'FRAME', width: 100, height: 100, children: [{ type: 'TEXT' }] });
+  const gallery = {
+    type: 'FRAME', layoutMode: 'GRID', gridColumnCount: 3, gridRowCount: 2, width: 320, height: 210,
+    children: [cell(), cell(), cell(), cell(), cell(), cell()],
+  };
+  assert.notEqual(highConfidenceComponentRole(gallery), 'table');
+});
+
+test('highConfidenceComponentRole — table이 card보다 앞: 테두리 있는 표 컨테이너', () => {
+  const cell = (w) => ({ type: 'FRAME', width: w, height: 20, children: [{ type: 'TEXT' }] });
+  const row = () => ({ type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(80), cell(200), cell(60)] });
+  const bordered = {
+    type: 'FRAME', layoutMode: 'VERTICAL', width: 340, height: 128, cornerRadius: 8,
+    strokes: [{ visible: true }], children: [row(), row(), row()],
+  };
+  assert.equal(highConfidenceComponentRole(bordered), 'table');
+});
+
 test('highConfidenceComponentRole — heading(빡센 슬롯, 액션 optional)', () => {
   const txt = (id, name = 'Label') => ({ id, name, type: 'TEXT', characters: name });
   const num = {

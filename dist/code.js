@@ -1432,6 +1432,7 @@
     "section",
     "button",
     "card",
+    "table",
     "list",
     "item",
     "field",
@@ -1918,6 +1919,7 @@
       const kids = (_a = node.children) != null ? _a : [];
       if (kids.length) {
         if (isProgressLike(node, kids)) return "progress";
+        if (isTableLike(node, kids)) return "table";
         if (isCardLike(node, kids)) return "card";
         if (isFigureLike(node, kids)) return "figure";
         if (isFieldLike(node, kids)) return "field";
@@ -2000,6 +2002,49 @@
     if (kids.length < 2) return false;
     if (!hasVisibleFill2(node) && !hasVisibleStroke2(node)) return false;
     return cornerRadiusOf2(node) > 0 || hasDropShadow(node);
+  }
+  function rowCells(node) {
+    var _a;
+    if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return null;
+    if (layoutOf2(node) !== "horizontal") return null;
+    const cells = ((_a = node.children) != null ? _a : []).filter(isVisible);
+    return cells.length >= 2 ? cells : null;
+  }
+  function hasTextWithin(node, depth = 2) {
+    var _a;
+    if (node.type === "TEXT") return true;
+    if (depth <= 0) return false;
+    return !!((_a = node.children) == null ? void 0 : _a.some((c) => hasTextWithin(c, depth - 1)));
+  }
+  function isTableLike(node, kids) {
+    var _a, _b;
+    if (node.type !== "FRAME") return false;
+    const visible = kids.filter(isVisible);
+    if (node.layoutMode === "GRID") {
+      const cols2 = (_a = node.gridColumnCount) != null ? _a : 0;
+      const rows2 = (_b = node.gridRowCount) != null ? _b : 0;
+      if (cols2 < 2 || rows2 < 2) return false;
+      if (visible.length < cols2 * 2) return false;
+      if (!visible.some((c) => hasTextWithin(c))) return false;
+      const firstRow = visible.slice(0, cols2).map((c) => c.width);
+      if (firstRow.every((w) => typeof w === "number") && ratioWithin(firstRow, 1.05)) return false;
+      return true;
+    }
+    if (layoutOf2(node) !== "vertical") return false;
+    if (visible.length < 3) return false;
+    const rows = visible.map(rowCells);
+    if (rows.some((r) => r === null)) return false;
+    const cellRows = rows.filter((r) => r !== null);
+    const cols = cellRows[0].length;
+    if (cols < 2) return false;
+    if (!cellRows.every((r) => r.length === cols)) return false;
+    if (!cellRows.some((r) => r.some((c) => hasTextWithin(c)))) return false;
+    for (let i = 0; i < cols; i++) {
+      const widths = cellRows.map((r) => r[i].width);
+      if (!widths.every((w) => typeof w === "number")) return false;
+      if (!ratioWithin(widths, 1.1)) return false;
+    }
+    return true;
   }
   var LIST_ITEM_TYPES = /* @__PURE__ */ new Set(["FRAME", "GROUP", "INSTANCE", "COMPONENT", "RECTANGLE", "ELLIPSE"]);
   function isListLike(node, kids) {

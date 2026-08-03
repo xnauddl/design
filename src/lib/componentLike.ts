@@ -12,6 +12,9 @@ export interface LikeNode {
   width?: number;
   height?: number;
   layoutMode?: string;
+  /** GRID 오토레이아웃에서만 제공 — 표/갤러리 구분에 필요한 격자 규모. */
+  gridRowCount?: number;
+  gridColumnCount?: number;
   cornerRadius?: number | symbol;
   topLeftRadius?: number;
   opacity?: number;
@@ -32,12 +35,13 @@ export interface EffectLike {
   type?: string;
 }
 
-/** 고신뢰 컴포넌트 역할 — button/chip/nav/progress/card/figure/field/list/heading. */
+/** 고신뢰 컴포넌트 역할 — button/chip/nav/progress/table/card/figure/field/list/heading. */
 export type HighConfidenceRole =
   | 'button'
   | 'chip'
   | 'nav'
   | 'progress'
+  | 'table'
   | 'card'
   | 'figure'
   | 'field'
@@ -57,6 +61,9 @@ export function highConfidenceComponentRole(node: LikeNode): HighConfidenceRole 
     const kids = node.children ?? [];
     if (kids.length) {
       if (isProgressLike(node, kids)) return 'progress';
+      // table은 card·list보다 먼저 — 행 스택 표는 list 조건(동일 타입·유사 크기)을 이미 만족하고,
+      // 테두리 있는 표 컨테이너는 card 조건도 만족한다. 판정이 더 까다로운 쪽이 앞이다.
+      if (isTableLike(node, kids)) return 'table';
       if (isCardLike(node, kids)) return 'card';
       if (isFigureLike(node, kids)) return 'figure';
       if (isFieldLike(node, kids)) return 'field';
@@ -157,6 +164,67 @@ function isCardLike(node: LikeNode, kids: readonly LikeNode[]): boolean {
   if (kids.length < 2) return false;
   if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
   return cornerRadiusOf(node) > 0 || hasDropShadow(node);
+}
+
+/* ---------- 표(table) ----------
+   실무의 Figma 표는 대부분 GRID 오토레이아웃이 아니라 **세로 스택 안의 가로 행**이다.
+   두 경로를 모두 본다.
+
+   주의: "완전 균등한 셀"은 표가 아니라 **갤러리·아이콘 그리드의 신호**다. 표는 열마다 폭이
+   다르고 셀에 텍스트가 있다. 그래서 균등성 대신 (1) 열 구조의 반복 (2) 텍스트 존재를 본다. */
+
+/** 행으로 볼 수 있는 자식 — 가로 오토레이아웃 컨테이너. */
+function rowCells(node: LikeNode): readonly LikeNode[] | null {
+  if (node.type !== 'FRAME' && node.type !== 'COMPONENT' && node.type !== 'INSTANCE') return null;
+  if (layoutOf(node) !== 'horizontal') return null;
+  const cells = (node.children ?? []).filter(isVisible);
+  return cells.length >= 2 ? cells : null;
+}
+
+/** 셀(또는 그 하위)에 텍스트가 있는가 — 표와 이미지 갤러리를 가르는 신호. */
+function hasTextWithin(node: LikeNode, depth = 2): boolean {
+  if (node.type === 'TEXT') return true;
+  if (depth <= 0) return false;
+  return !!node.children?.some((c) => hasTextWithin(c, depth - 1));
+}
+
+/**
+ * 표 판정.
+ * - 행 스택: 세로 AL + 행 3개 이상 + 모든 행이 가로 AL + 열 수 동일 + 열 폭이 행마다 정렬 + 텍스트 존재
+ * - GRID: layoutMode 'GRID' + 행·열 2 이상 + 셀 폭이 열마다 다름(균등이면 갤러리) + 텍스트 존재
+ */
+function isTableLike(node: LikeNode, kids: readonly LikeNode[]): boolean {
+  if (node.type !== 'FRAME') return false;
+  const visible = kids.filter(isVisible);
+
+  if (node.layoutMode === 'GRID') {
+    const cols = node.gridColumnCount ?? 0;
+    const rows = node.gridRowCount ?? 0;
+    if (cols < 2 || rows < 2) return false;
+    if (visible.length < cols * 2) return false; // 최소 2행 분량의 셀
+    if (!visible.some((c) => hasTextWithin(c))) return false;
+    // 첫 행의 셀 폭이 전부 같으면 표가 아니라 균등 격자(갤러리·아이콘 그리드).
+    const firstRow = visible.slice(0, cols).map((c) => c.width);
+    if (firstRow.every((w) => typeof w === 'number') && ratioWithin(firstRow as number[], 1.05)) return false;
+    return true;
+  }
+
+  if (layoutOf(node) !== 'vertical') return false;
+  if (visible.length < 3) return false;
+  const rows = visible.map(rowCells);
+  if (rows.some((r) => r === null)) return false;
+  const cellRows = rows.filter((r): r is readonly LikeNode[] => r !== null);
+  const cols = cellRows[0].length;
+  if (cols < 2) return false;
+  if (!cellRows.every((r) => r.length === cols)) return false; // 열 수가 어긋나면 표가 아니다
+  if (!cellRows.some((r) => r.some((c) => hasTextWithin(c)))) return false;
+  // 같은 열끼리 폭이 맞아야 표 — 행마다 제각각이면 그냥 반복 레이아웃이다.
+  for (let i = 0; i < cols; i++) {
+    const widths = cellRows.map((r) => r[i].width);
+    if (!widths.every((w) => typeof w === 'number')) return false;
+    if (!ratioWithin(widths as number[], 1.1)) return false;
+  }
+  return true;
 }
 
 const LIST_ITEM_TYPES = new Set(['FRAME', 'GROUP', 'INSTANCE', 'COMPONENT', 'RECTANGLE', 'ELLIPSE']);
