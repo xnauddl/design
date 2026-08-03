@@ -29,6 +29,8 @@ const FIELD_SCOPE: Record<string, VariableScope> = {
   height: 'WIDTH_HEIGHT',
   itemSpacing: 'GAP',
   counterAxisSpacing: 'GAP',
+  gridRowGap: 'GAP',
+  gridColumnGap: 'GAP',
   paddingLeft: 'GAP',
   paddingRight: 'GAP',
   paddingTop: 'GAP',
@@ -116,7 +118,10 @@ function countNodes(sel: readonly SceneNode[]): number {
   const stack: SceneNode[] = sel.slice();
   while (stack.length) {
     const x = stack.pop() as SceneNode;
+    // walk가 건너뛰는 노드는 분모에서도 빼야 진행률이 100%로 끝난다.
+    if (x.visible === false) continue;
     n++;
+    if (x.type === 'INSTANCE') continue;
     if ('children' in x) for (const c of (x as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
   }
   return n;
@@ -257,6 +262,12 @@ async function walk(
   parentId: string | null,
 ): Promise<void> {
   if (res.cancelled) return;
+  // 숨긴 레이어는 화면에 없는 값이라 하위까지 통째로 제외 — extract.ts와 동일 기준.
+  if (node.visible === false) {
+    flags.add('숨긴 레이어는 바인딩에서 제외했습니다.');
+    note(res, 'hidden');
+    return;
+  }
   // 미리보기 트리(#13)용: 방문한 모든 노드를 기록(나중에 영향+조상으로 가지치기).
   preview?.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
   bindPaints(node, entries, res, apply, preview);
@@ -275,6 +286,15 @@ async function walk(
       res.cancelled = true;
       return;
     }
+  }
+  // 인스턴스 내부에 바인딩하면 인스턴스 오버라이드가 되어 마스터를 고쳐도 따라오지 않는다 —
+  // 인스턴스 자체 속성까지만 처리하고 하위로는 내려가지 않는다(extract.ts와 동일 기준).
+  if (node.type === 'INSTANCE') {
+    if (node.children.length) {
+      flags.add('인스턴스 내부는 오버라이드가 되므로 건너뛰었습니다 — 컴포넌트 원본에서 바인딩하세요.');
+      note(res, 'instance-children');
+    }
+    return;
   }
   if ('children' in node)
     for (const c of node.children) {
@@ -321,13 +341,24 @@ function bindFrame(
 ): void {
   if (node.type !== 'FRAME' && node.type !== 'COMPONENT' && node.type !== 'INSTANCE') return;
 
-  // 크기: Fixed일 때만
-  if (node.layoutSizingHorizontal === 'FIXED') tryBind(node, 'width', node.width, entries, tol, res, apply, preview);
-  else if (node.layoutSizingHorizontal === 'HUG' || node.layoutSizingHorizontal === 'FILL') {
-    flags.add('일부 크기는 HUG/FILL이라 width/height 바인딩을 건너뜀(Fixed 필요).');
-    note(res, 'hug-fill');
+  // 크기: 오토레이아웃 맥락(자신 또는 부모)에서 Fixed인 축만 — extract.ts의 수집 기준과 동일.
+  // 자유 배치 프레임은 Hug/Fill이 될 수 없어 layoutSizing*가 항상 'FIXED'라, 이 게이트가 없으면
+  // 화면 프레임·장식 박스의 width/height까지 크기 변수에 붙는다.
+  const parent = node.parent;
+  const inAutoLayout =
+    node.layoutMode !== 'NONE' ||
+    (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE');
+  if (inAutoLayout) {
+    if (node.layoutSizingHorizontal === 'FIXED') tryBind(node, 'width', node.width, entries, tol, res, apply, preview);
+    else if (node.layoutSizingHorizontal === 'HUG' || node.layoutSizingHorizontal === 'FILL') {
+      flags.add('일부 크기는 HUG/FILL이라 width/height 바인딩을 건너뜀(Fixed 필요).');
+      note(res, 'hug-fill');
+    }
+    if (node.layoutSizingVertical === 'FIXED') tryBind(node, 'height', node.height, entries, tol, res, apply, preview);
+  } else {
+    flags.add('자유 배치(오토레이아웃 밖) 프레임은 크기 바인딩에서 제외했습니다.');
+    note(res, 'size-free-layout');
   }
-  if (node.layoutSizingVertical === 'FIXED') tryBind(node, 'height', node.height, entries, tol, res, apply, preview);
 
   // 여백/간격: 오토레이아웃에만
   if (node.layoutMode === 'NONE') {
@@ -335,8 +366,14 @@ function bindFrame(
     note(res, 'no-autolayout');
     return;
   }
-  tryBind(node, 'itemSpacing', node.itemSpacing, entries, tol, res, apply, preview);
-  if (typeof node.counterAxisSpacing === 'number') tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, tol, res, apply, preview);
+  if (node.layoutMode === 'GRID') {
+    // 그리드 모드의 간격은 gridRowGap/gridColumnGap(extract.ts와 동일 기준).
+    tryBind(node, 'gridRowGap', node.gridRowGap, entries, tol, res, apply, preview);
+    tryBind(node, 'gridColumnGap', node.gridColumnGap, entries, tol, res, apply, preview);
+  } else {
+    tryBind(node, 'itemSpacing', node.itemSpacing, entries, tol, res, apply, preview);
+    if (typeof node.counterAxisSpacing === 'number') tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, tol, res, apply, preview);
+  }
   tryBind(node, 'paddingLeft', node.paddingLeft, entries, tol, res, apply, preview);
   tryBind(node, 'paddingRight', node.paddingRight, entries, tol, res, apply, preview);
   tryBind(node, 'paddingTop', node.paddingTop, entries, tol, res, apply, preview);

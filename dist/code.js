@@ -223,8 +223,13 @@
   }
   function collectSpacing(acc, node) {
     if (node.layoutMode === "NONE") return;
-    const gaps = [node.itemSpacing, node.paddingLeft, node.paddingRight, node.paddingTop, node.paddingBottom];
-    if (typeof node.counterAxisSpacing === "number") gaps.push(node.counterAxisSpacing);
+    const gaps = [node.paddingLeft, node.paddingRight, node.paddingTop, node.paddingBottom];
+    if (node.layoutMode === "GRID") {
+      gaps.push(node.gridRowGap, node.gridColumnGap);
+    } else {
+      gaps.push(node.itemSpacing);
+      if (typeof node.counterAxisSpacing === "number") gaps.push(node.counterAxisSpacing);
+    }
     for (const g of gaps) {
       if (typeof g === "number" && g > 0) {
         const v = round(g);
@@ -234,9 +239,12 @@
   }
   function collectSize(acc, node) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
+    const parent = node.parent;
+    const inAutoLayout = node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE";
+    if (!inAutoLayout) return;
     const addSize = (v) => {
       const rv = round(v);
-      if (rv > 0) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size");
+      if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size");
     };
     if (node.layoutSizingHorizontal === "FIXED") addSize(node.width);
     if (node.layoutSizingVertical === "FIXED") addSize(node.height);
@@ -312,6 +320,10 @@
     }
   }
   function walk(acc, node) {
+    if (node.visible === false) {
+      acc.warnings.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD1A0\uD070 \uD6C4\uBCF4\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
+      return;
+    }
     if ("fills" in node) collectPaints(acc, node.fills, "fill");
     if ("strokes" in node) collectPaints(acc, node.strokes, "stroke");
     if (node.type === "TEXT") collectText(acc, node);
@@ -323,6 +335,10 @@
     collectStroke(acc, node);
     collectOpacity(acc, node);
     collectEffects(acc, node);
+    if (node.type === "INSTANCE") {
+      if (node.children.length) acc.warnings.add("\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uB9C8\uC2A4\uD130 \uBCF5\uC0AC\uBCF8\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uAC12\uC774 \uD544\uC694\uD558\uBA74 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC120\uD0DD\uD574 \uCD94\uCD9C\uD558\uC138\uC694.");
+      return;
+    }
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
   function extractFromSelection(selection2) {
@@ -993,6 +1009,8 @@
     height: "WIDTH_HEIGHT",
     itemSpacing: "GAP",
     counterAxisSpacing: "GAP",
+    gridRowGap: "GAP",
+    gridColumnGap: "GAP",
     paddingLeft: "GAP",
     paddingRight: "GAP",
     paddingTop: "GAP",
@@ -1039,7 +1057,9 @@
     const stack = sel.slice();
     while (stack.length) {
       const x = stack.pop();
+      if (x.visible === false) continue;
       n++;
+      if (x.type === "INSTANCE") continue;
       if ("children" in x) for (const c of x.children) stack.push(c);
     }
     return n;
@@ -1147,6 +1167,11 @@
   async function walk2(node, entries, tol, res, flags, apply, hooks, prog, preview, depth, parentId) {
     var _a;
     if (res.cancelled) return;
+    if (node.visible === false) {
+      flags.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
+      note(res, "hidden");
+      return;
+    }
     preview == null ? void 0 : preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
     bindPaints(node, entries, res, apply, preview);
     bindFrame(node, entries, tol, res, flags, apply, preview);
@@ -1163,6 +1188,13 @@
         res.cancelled = true;
         return;
       }
+    }
+    if (node.type === "INSTANCE") {
+      if (node.children.length) {
+        flags.add("\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uC624\uBC84\uB77C\uC774\uB4DC\uAC00 \uB418\uBBC0\uB85C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uCEF4\uD3EC\uB10C\uD2B8 \uC6D0\uBCF8\uC5D0\uC11C \uBC14\uC778\uB529\uD558\uC138\uC694.");
+        note(res, "instance-children");
+      }
+      return;
     }
     if ("children" in node)
       for (const c of node.children) {
@@ -1198,19 +1230,31 @@
   }
   function bindFrame(node, entries, tol, res, flags, apply, preview) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
-    if (node.layoutSizingHorizontal === "FIXED") tryBind(node, "width", node.width, entries, tol, res, apply, preview);
-    else if (node.layoutSizingHorizontal === "HUG" || node.layoutSizingHorizontal === "FILL") {
-      flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
-      note(res, "hug-fill");
+    const parent = node.parent;
+    const inAutoLayout = node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE";
+    if (inAutoLayout) {
+      if (node.layoutSizingHorizontal === "FIXED") tryBind(node, "width", node.width, entries, tol, res, apply, preview);
+      else if (node.layoutSizingHorizontal === "HUG" || node.layoutSizingHorizontal === "FILL") {
+        flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
+        note(res, "hug-fill");
+      }
+      if (node.layoutSizingVertical === "FIXED") tryBind(node, "height", node.height, entries, tol, res, apply, preview);
+    } else {
+      flags.add("\uC790\uC720 \uBC30\uCE58(\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uBC16) \uD504\uB808\uC784\uC740 \uD06C\uAE30 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
+      note(res, "size-free-layout");
     }
-    if (node.layoutSizingVertical === "FIXED") tryBind(node, "height", node.height, entries, tol, res, apply, preview);
     if (node.layoutMode === "NONE") {
       flags.add("\uC624\uD1A0\uB808\uC774\uC544\uC6C3\uC774 \uC544\uB2CC \uD504\uB808\uC784\uC740 padding/gap \uBC14\uC778\uB529 \uBD88\uAC00.");
       note(res, "no-autolayout");
       return;
     }
-    tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply, preview);
-    if (typeof node.counterAxisSpacing === "number") tryBind(node, "counterAxisSpacing", node.counterAxisSpacing, entries, tol, res, apply, preview);
+    if (node.layoutMode === "GRID") {
+      tryBind(node, "gridRowGap", node.gridRowGap, entries, tol, res, apply, preview);
+      tryBind(node, "gridColumnGap", node.gridColumnGap, entries, tol, res, apply, preview);
+    } else {
+      tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply, preview);
+      if (typeof node.counterAxisSpacing === "number") tryBind(node, "counterAxisSpacing", node.counterAxisSpacing, entries, tol, res, apply, preview);
+    }
     tryBind(node, "paddingLeft", node.paddingLeft, entries, tol, res, apply, preview);
     tryBind(node, "paddingRight", node.paddingRight, entries, tol, res, apply, preview);
     tryBind(node, "paddingTop", node.paddingTop, entries, tol, res, apply, preview);

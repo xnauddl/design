@@ -85,8 +85,15 @@ function collectText(acc: Accumulator, node: TextNode): void {
 /* ---------- auto-layout spacing/padding ---------- */
 function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | InstanceNode): void {
   if (node.layoutMode === 'NONE') return;
-  const gaps: number[] = [node.itemSpacing, node.paddingLeft, node.paddingRight, node.paddingTop, node.paddingBottom];
-  if (typeof node.counterAxisSpacing === 'number') gaps.push(node.counterAxisSpacing);
+  const gaps: number[] = [node.paddingLeft, node.paddingRight, node.paddingTop, node.paddingBottom];
+  if (node.layoutMode === 'GRID') {
+    // 그리드 오토레이아웃의 간격은 gridRowGap/gridColumnGap — itemSpacing/counterAxisSpacing은
+    // HORIZONTAL/VERTICAL 전용이라 그리드에서는 의미 있는 값을 주지 않는다.
+    gaps.push(node.gridRowGap, node.gridColumnGap);
+  } else {
+    gaps.push(node.itemSpacing);
+    if (typeof node.counterAxisSpacing === 'number') gaps.push(node.counterAxisSpacing); // 줄바꿈(wrap) 오토레이아웃의 교차축 간격
+  }
   for (const g of gaps) {
     if (typeof g === 'number' && g > 0) {
       const v = round(g);
@@ -99,10 +106,19 @@ function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | Inst
 function collectSize(acc: Accumulator, node: SceneNode): void {
   // 프레임류만 사이즈 후보로(노이즈 방지)
   if (node.type !== 'FRAME' && node.type !== 'COMPONENT' && node.type !== 'INSTANCE') return;
-  // Fixed인 축만 토큰화 — HUG/FILL은 계산된 동적 크기라 디자인 토큰이 아님(bind.ts와 동일 기준).
+  // 오토레이아웃 맥락에서만. Figma에서 HUG는 오토레이아웃 프레임/텍스트에만, FILL은 오토레이아웃 자식에만
+  // 유효하므로, 자유 배치 프레임의 layoutSizing*는 **언제나 'FIXED'** 다. Fixed 검사만으로는 화면 프레임·
+  // 장식 박스까지 전부 통과하므로, 디자이너가 Fixed를 '선택'할 수 있었던 노드로 좁힌다.
+  const parent = node.parent;
+  const inAutoLayout =
+    node.layoutMode !== 'NONE' ||
+    (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE');
+  if (!inAutoLayout) return;
+  // Fixed인 축만 토큰화 — HUG/FILL은 계산된 동적 크기라 디자인 토큰이 아님.
+  // 정수만 — 343.5처럼 자유 리사이즈로 남은 소수 값은 의도된 척도가 아님.
   const addSize = (v: number) => {
     const rv = round(v);
-    if (rv > 0) add(acc, { name: numberTokenName('size', rv), category: 'size', value: rv }, 'size');
+    if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName('size', rv), category: 'size', value: rv }, 'size');
   };
   if (node.layoutSizingHorizontal === 'FIXED') addSize(node.width);
   if (node.layoutSizingVertical === 'FIXED') addSize(node.height);
@@ -187,6 +203,11 @@ function collectEffects(acc: Accumulator, node: SceneNode): void {
 }
 
 function walk(acc: Accumulator, node: SceneNode): void {
+  // 숨긴 레이어는 화면에 없는 값이라 토큰 후보에서 제외(하위까지 통째로).
+  if (node.visible === false) {
+    acc.warnings.add('숨긴 레이어는 토큰 후보에서 제외했습니다.');
+    return;
+  }
   if ('fills' in node) collectPaints(acc, node.fills, 'fill');
   if ('strokes' in node) collectPaints(acc, node.strokes, 'stroke');
   if (node.type === 'TEXT') collectText(acc, node);
@@ -198,6 +219,12 @@ function walk(acc: Accumulator, node: SceneNode): void {
   collectStroke(acc, node);
   collectOpacity(acc, node);
   collectEffects(acc, node);
+  // 인스턴스 내부는 마스터의 복사본이라 디자이너가 이 화면에서 결정한 값이 아니다 —
+  // 인스턴스 자체 속성(크기·채움·효과)만 읽고 하위로는 내려가지 않는다.
+  if (node.type === 'INSTANCE') {
+    if (node.children.length) acc.warnings.add('인스턴스 내부는 마스터 복사본이라 건너뛰었습니다 — 값이 필요하면 컴포넌트를 선택해 추출하세요.');
+    return;
+  }
   if ('children' in node) for (const child of node.children) walk(acc, child);
 }
 

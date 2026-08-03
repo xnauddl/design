@@ -2026,6 +2026,9 @@ const REASON_LABELS: Record<string, string> = {
   error: '바인딩 실패',
   'hug-fill': 'HUG/FILL',
   'no-autolayout': '오토레이아웃 아님',
+  'size-free-layout': '자유 배치(크기 제외)',
+  hidden: '숨긴 레이어',
+  'instance-children': '인스턴스 내부',
   font: '폰트 미로드',
 };
 function reasonsText(reasons: Record<string, number>): string {
