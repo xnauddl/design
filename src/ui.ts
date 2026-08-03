@@ -1,8 +1,8 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
-import { type DraftToken, type Unit, resolvedTypeForToken } from './lib/tokens';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate } from './shared/messages';
+import { type DraftToken, type Unit, resolvedTypeForToken, tidyNumberTokens } from './lib/tokens';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier } from './lib/entitlements';
@@ -630,6 +630,44 @@ $('btnExtract').addEventListener('click', () => {
   send({ type: 'EXTRACT' });
 });
 
+/* 근접 수치 정리 — 색 정리(tidyColors)와 같은 패턴: 누르면 정리하고 요약 한 줄 + 되돌리기.
+   색과 달리 자동이 아니라 버튼인 이유는, 값을 합치면 토큰의 수치가 바뀌어 바인딩 결과까지
+   달라지기 때문이다(색 병합은 같은 hue-단계 안이라 훨씬 보수적). */
+let preNumTidy: DraftToken[] | null = null;
+
+$('btnTidyNumbers').addEventListener('click', () => {
+  const threshold = Number(($('tidyNum') as HTMLInputElement).value) || 0;
+  if (!creatableTokens().length) {
+    setStatus('createStatus', '먼저 ‘미리보기’로 색 외 토큰을 표시하세요.', 'warn');
+    return;
+  }
+  const snapshot = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기용
+  const r = tidyNumberTokens(tokens, threshold);
+  if (!r.merged) {
+    setStatus('createStatus', threshold > 0 ? `${threshold}px 이내로 합칠 수치 토큰이 없어요.` : '근접 정리 값이 0이라 정리하지 않았어요.', '');
+    return;
+  }
+  preNumTidy = snapshot;
+  tokens = r.tokens;
+  resetTokenChecked(); // 집합이 바뀌었으니 선택도 새로
+  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 새 미리보기 필요
+  renderTokens();
+  $('numTidySummary').style.display = '';
+  $('numTidyText').textContent = `비슷한 수치 ${r.before} → ${r.after}개로 정리됨 (${r.merged}개 흡수)`;
+  setStatus('createStatus', `${threshold}px 이내 ${r.merged}개를 더 많이 쓰인 값으로 합쳤어요.`, 'ok');
+});
+
+$('btnNumTidyUndo').addEventListener('click', () => {
+  if (!preNumTidy) return;
+  tokens = preNumTidy;
+  preNumTidy = null;
+  resetTokenChecked();
+  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none';
+  renderTokens();
+  $('numTidySummary').style.display = 'none';
+  setStatus('createStatus', '수치 정리를 되돌렸어요.', '');
+});
+
 // 전체 선택 / 1× 해제 — 목록이 상한에 잘려 있어도 전체에 적용된다(체크는 DOM이 아니라 집합이 보관).
 $('tokenAll').addEventListener('change', () => {
   const on = ($('tokenAll') as HTMLInputElement).checked;
@@ -819,6 +857,31 @@ $('btnApplyExistingText').addEventListener('click', () => {
   setStatus('tsStatus', '선택 텍스트를 기존 스타일에 적용 중…', 'ok');
   send({ type: 'APPLY_TEXT_STYLES' });
 });
+
+/* 허용오차 프리셋 — 값이 무엇을 뜻하는지 숫자만으로는 안 보여서, 자주 쓰는 값을 칩으로 두고
+   현재 값이 어떤 성격인지 한 줄로 설명한다. 임의 값은 숫자 입력으로 계속 넣을 수 있다. */
+const TOL_HINTS: [number, string][] = [
+  [0, '정확히 같은 값만 바인딩합니다.'],
+  [0.5, '반올림 오차만 흡수합니다(기본).'],
+  [1, '1px 이내 근사값까지 붙습니다.'],
+  [Infinity, '근사 범위가 넓어 의도치 않은 값까지 붙을 수 있습니다.'],
+];
+function syncTolPresets(): void {
+  const v = Number(($('tol') as HTMLInputElement).value) || 0;
+  for (const el of Array.from(document.querySelectorAll('.tol-chip'))) {
+    el.classList.toggle('on', Number((el as HTMLElement).dataset.tol) === v);
+  }
+  $('tolHint').textContent = `허용오차 ${v}px — ${(TOL_HINTS.find(([t]) => v <= t) ?? TOL_HINTS[TOL_HINTS.length - 1])[1]}`;
+}
+for (const el of Array.from(document.querySelectorAll('.tol-chip'))) {
+  el.addEventListener('click', () => {
+    ($('tol') as HTMLInputElement).value = (el as HTMLElement).dataset.tol ?? '0.5';
+    syncTolPresets();
+    clearBindPreview(); // 허용오차가 바뀌면 이전 미리보기 후보는 무효
+  });
+}
+($('tol') as HTMLInputElement).addEventListener('input', syncTolPresets);
+syncTolPresets();
 
 $('btnApply').addEventListener('click', () => {
   const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
@@ -1506,8 +1569,12 @@ window.onmessage = (event: MessageEvent) => {
     case 'APPLY_RESULT': {
       hideApplyProgress(); // UX6
       const confirmBtn = $('btnApplyConfirm') as HTMLButtonElement;
+      bindSkips = msg.skips ?? [];
       const rt = reasonsText(msg.reasons); // UX3: 사유별 스킵
-      const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}`;
+      // 칩(레이어로 이동)이 뜨면 상태 줄에는 사유를 중복해 쓰지 않는다.
+      const asChips = bindSkips.length > 0;
+      const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt && !asChips ? ` — ${rt}` : ''}`;
+      renderSkipReasons(msg.reasons);
       if (msg.cancelled) {
         // UX6: 취소 — 처리한 만큼만 적용(비파괴).
         clearBindPreview();
@@ -1528,6 +1595,14 @@ window.onmessage = (event: MessageEvent) => {
       }
       break;
     }
+    case 'SELECT_RESULT':
+      // 미리보기 이후 레이어가 지워졌거나 다른 페이지로 옮겨졌으면 그만큼 못 찾는다 — 조용히 실패하지 않게.
+      if (msg.found < msg.requested) {
+        setStatus('applyStatus', msg.found
+          ? `레이어 ${msg.found}개 선택 — ${msg.requested - msg.found}개는 삭제됐거나 다른 페이지에 있어요.`
+          : '레이어를 찾지 못했어요 — 삭제됐거나 다른 페이지에 있습니다. 미리보기를 다시 실행해 주세요.', 'warn');
+      }
+      break;
     case 'RENAME_RESULT':
       renderRenameResult(msg);
       break;
@@ -1962,6 +2037,8 @@ function updateBindApply(): void {
 function clearBindPreview(): void {
   bindCandidates = [];
   bindNodes = [];
+  bindSkips = [];
+  ($('bindSkips') as HTMLElement).style.display = 'none';
   bindChecked.clear();
   clearMount($('bindTree'));
   $('bindCount').textContent = '';
@@ -2117,10 +2194,55 @@ const REASON_LABELS: Record<string, string> = {
   'instance-children': '인스턴스 내부',
   font: '폰트 미로드',
 };
+const reasonLabel = (key: string): string => REASON_LABELS[key] ?? key;
+
+/**
+ * 사유별 레이어(미리보기 dry-run에서만 채워짐). 숫자만 있으면 원인 레이어를 찾을 길이 없어,
+ * 사유 칩을 눌러 캔버스에서 선택할 수 있게 보관한다.
+ */
+let bindSkips: BindSkip[] = [];
+
+/** 사유 칩 렌더 — 레이어 목록이 있는 사유만 버튼, 나머지는 글자. */
+function renderSkipReasons(reasons: Record<string, number>): void {
+  const box = $('bindSkips');
+  box.innerHTML = '';
+  const entries = Object.entries(reasons).filter(([, n]) => n > 0);
+  if (!entries.length || !bindSkips.length) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = '';
+  const head = document.createElement('span');
+  head.className = 'muted';
+  head.textContent = '건너뜀:';
+  box.appendChild(head);
+  for (const [key, n] of entries) {
+    const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
+    const label = `${reasonLabel(key)} ${n}`;
+    if (!ids.length) {
+      const span = document.createElement('span');
+      span.className = 'skip-chip static';
+      span.textContent = label;
+      box.appendChild(span);
+      continue;
+    }
+    const btn = document.createElement('button');
+    btn.className = 'skip-chip';
+    btn.textContent = `${label} ›`;
+    // 사유 건수(n)는 속성 단위, 레이어 수는 노드 단위라 서로 다를 수 있다(padding 4건 → 레이어 1개).
+    btn.title = `레이어 ${ids.length}개 선택 — ${bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ')}${ids.length > 5 ? ' 외' : ''}`;
+    btn.addEventListener('click', () => {
+      send({ type: 'SELECT_NODES', ids });
+      setStatus('applyStatus', `${reasonLabel(key)} 레이어 ${ids.length}개를 선택했어요.`, '');
+    });
+    box.appendChild(btn);
+  }
+}
+
 function reasonsText(reasons: Record<string, number>): string {
   return Object.entries(reasons)
     .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${REASON_LABELS[k] ?? k} ${n}`)
+    .map(([k, n]) => `${reasonLabel(k)} ${n}`)
     .join(' · ');
 }
 

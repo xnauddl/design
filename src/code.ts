@@ -705,6 +705,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           cancelled: r.cancelled,
           candidates: r.candidates, // #6: 미리보기 후보(dry-run만)
           nodes: r.nodes, // #13: 미리보기 트리 맥락
+          skips: r.skips, // 사유별 건너뛴 레이어(dry-run만)
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
@@ -713,6 +714,25 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'CANCEL': {
         bindCancel = true; // UX6: 다음 양보 지점에서 중단
+        break;
+      }
+      case 'SELECT_NODES': {
+        // 스킵 사유 → 원인 레이어로 이동(읽기 전용). 삭제·페이지 이동으로 사라진 id는 조용히 무시하고,
+        // 현재 페이지에 남은 것만 선택한다(다른 페이지 노드를 selection에 넣으면 런타임이 거부).
+        const found: SceneNode[] = [];
+        for (const id of msg.ids) {
+          const n = await figma.getNodeByIdAsync(id);
+          if (n && n.type !== 'PAGE' && n.type !== 'DOCUMENT' && (n as SceneNode).parent) found.push(n as SceneNode);
+        }
+        const onPage = found.filter((n) => {
+          for (let p: BaseNode | null = n; p; p = p.parent) if (p.id === figma.currentPage.id) return true;
+          return false;
+        });
+        if (onPage.length) {
+          figma.currentPage.selection = onPage;
+          figma.viewport.scrollAndZoomIntoView(onPage);
+        }
+        post({ type: 'SELECT_RESULT', found: onPage.length, requested: msg.ids.length });
         break;
       }
       case 'APPLY_SELECTED': {

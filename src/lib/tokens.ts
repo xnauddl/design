@@ -286,6 +286,66 @@ export function colorTokenName(hex: string): string {
   return `color/${hex.replace('#', '').toLowerCase()}`;
 }
 
+/* ---------- 수치 토큰 정리 (근접 중복 병합) ---------- */
+
+/**
+ * 정리 대상 카테고리. px 척도라 "1px 차이는 사실상 같은 값"이 성립하는 것만.
+ * opacity(0~1)·fontFamily(문자열)·색은 제외 — 색은 별도의 색 정리가 담당한다.
+ */
+const TIDY_CATEGORIES: ReadonlySet<TokenCategory> = new Set<TokenCategory>([
+  'gap', 'size', 'radius', 'strokeWidth', 'fontSize', 'lineHeight', 'letterSpacing', 'effectFloat',
+]);
+
+export interface TidyNumbersResult {
+  tokens: DraftToken[];
+  before: number;
+  after: number;
+  merged: number;
+}
+
+/**
+ * 근접한 수치 토큰을 **더 많이 쓰인 값**으로 흡수한다. 스케일(4·8배수)로 스냅하지 않는 이유는
+ * 그러면 아무도 안 쓰는 값이 만들어져(14 → 16) 어떤 레이어와도 매칭되지 않는 토큰이 남기 때문이다.
+ * 실제로 쓰이는 값 중 대표를 고르므로 병합 후에도 바인딩이 성립한다.
+ *
+ * 규칙: 같은 카테고리·같은 단위끼리, 사용 레이어 수(count) 내림차순으로 대표를 정하고,
+ * 대표보다 **덜 쓰인** 값이 threshold 이내면 대표로 흡수한다. 같은 횟수끼리는 병합하지 않는다
+ * (둘 다 실제로 쓰이는 값이라 어느 쪽을 지울 근거가 없다).
+ */
+export function tidyNumberTokens(tokens: readonly DraftToken[], threshold: number): TidyNumbersResult {
+  const targets = tokens.filter((t) => TIDY_CATEGORIES.has(t.category) && typeof t.value === 'number');
+  const before = targets.length;
+  if (threshold <= 0 || before === 0) return { tokens: [...tokens], before, after: before, merged: 0 };
+
+  // 사용 수 내림차순 → 같으면 값 오름차순(안정적인 대표 선택).
+  const order = [...targets].sort((a, b) => (b.count ?? 0) - (a.count ?? 0) || (a.value as number) - (b.value as number));
+  const kept: DraftToken[] = [];
+  const dropped = new Set<DraftToken>();
+  for (const t of order) {
+    const rep = kept.find(
+      (k) =>
+        k.category === t.category &&
+        (k.unit ?? '') === (t.unit ?? '') &&
+        (k.count ?? 0) > (t.count ?? 0) && // 덜 쓰인 값만 흡수 — 동률은 둘 다 남긴다
+        Math.abs((k.value as number) - (t.value as number)) <= threshold,
+    );
+    if (rep) {
+      dropped.add(t);
+      // 흡수된 값의 출처도 대표가 물려받아야 스코프가 좁아지지 않는다.
+      for (const s of t.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+      rep.count = (rep.count ?? 0) + (t.count ?? 0);
+    } else {
+      kept.push(t);
+    }
+  }
+  return {
+    tokens: tokens.filter((t) => !dropped.has(t)),
+    before,
+    after: before - dropped.size,
+    merged: dropped.size,
+  };
+}
+
 /** 숫자 토큰 이름 — 그룹 접두사 + 정수/소수 정규화. 예: numberTokenName('spacing',16)='spacing/16'. */
 export function numberTokenName(group: string, value: number): string {
   const v = Number.isInteger(value) ? String(value) : String(value).replace('.', '_');

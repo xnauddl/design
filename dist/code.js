@@ -1068,13 +1068,18 @@
     }
     return n;
   }
-  function note(res, key) {
+  function note(res, key, node, preview, field) {
     var _a;
     res.reasons[key] = ((_a = res.reasons[key]) != null ? _a : 0) + 1;
+    if (!node || !preview) return;
+    const k = `${node.id}|${key}`;
+    if (preview.skipSeen.has(k)) return;
+    preview.skipSeen.add(k);
+    preview.skips.push({ nodeId: node.id, name: node.name, type: node.type, reason: key, field });
   }
-  function skip(res, key) {
+  function skip(res, key, node, preview, field) {
     res.skipped++;
-    note(res, key);
+    note(res, key, node, preview, field);
   }
   async function bindSelection(selection2, tolerance, apply = true, hooks = {}) {
     var _a;
@@ -1082,7 +1087,7 @@
     const res = { bound: 0, skipped: 0, flags: [], reasons: {} };
     const flagSet = /* @__PURE__ */ new Set();
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
-    const preview = apply ? null : { candidates: [], nodeIndex: [] };
+    const preview = apply ? null : { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     for (const node of selection2) {
       await walk2(node, entries, tolerance, res, flagSet, apply, hooks, prog, preview, 0, null);
       if (res.cancelled) break;
@@ -1091,6 +1096,7 @@
     if (preview) {
       res.candidates = preview.candidates;
       res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates);
+      res.skips = preview.skips;
     }
     (_a = hooks.onProgress) == null ? void 0 : _a.call(hooks, prog.done, prog.total);
     return res;
@@ -1173,7 +1179,7 @@
     if (res.cancelled) return;
     if (node.visible === false) {
       flags.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
-      note(res, "hidden");
+      note(res, "hidden", node, preview);
       return;
     }
     preview == null ? void 0 : preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
@@ -1196,7 +1202,7 @@
     if (node.type === "INSTANCE") {
       if (node.children.length) {
         flags.add("\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uC624\uBC84\uB77C\uC774\uB4DC\uAC00 \uB418\uBBC0\uB85C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uCEF4\uD3EC\uB10C\uD2B8 \uC6D0\uBCF8\uC5D0\uC11C \uBC14\uC778\uB529\uD558\uC138\uC694.");
-        note(res, "instance-children");
+        note(res, "instance-children", node, preview);
       }
       return;
     }
@@ -1218,7 +1224,7 @@
         const hex = rgbToHex(p.color);
         const e = matchColor(entries, hex, allowed);
         if (!e) {
-          skip(res, "no-match");
+          skip(res, "no-match", node, preview, key);
           return p;
         }
         res.bound++;
@@ -1240,7 +1246,7 @@
       const bindAxis = (sizing, field, v) => {
         if (sizing !== "FIXED") {
           flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
-          note(res, "hug-fill");
+          note(res, "hug-fill", node, preview, field);
           return;
         }
         const fraction = Math.abs(v - Math.round(v)) >= 5e-3;
@@ -1250,11 +1256,11 @@
       bindAxis(node.layoutSizingVertical, "height", node.height);
     } else {
       flags.add("\uC790\uC720 \uBC30\uCE58(\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uBC16) \uD504\uB808\uC784\uC740 \uD06C\uAE30 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
-      note(res, "size-free-layout");
+      note(res, "size-free-layout", node, preview);
     }
     if (node.layoutMode === "NONE") {
       flags.add("\uC624\uD1A0\uB808\uC774\uC544\uC6C3\uC774 \uC544\uB2CC \uD504\uB808\uC784\uC740 padding/gap \uBC14\uC778\uB529 \uBD88\uAC00.");
-      note(res, "no-autolayout");
+      note(res, "no-autolayout", node, preview);
       return;
     }
     if (node.layoutMode === "GRID") {
@@ -1310,7 +1316,7 @@
       const hex = rgbToHex(e.color);
       const ent = matchColor(entries, hex, EFFECT_SCOPES);
       if (!ent) {
-        skip(res, "no-match");
+        skip(res, "no-match", node, preview, "effects");
         return e;
       }
       res.bound++;
@@ -1329,7 +1335,7 @@
     try {
       await figma.loadFontAsync(node.fontName);
     } catch (e) {
-      note(res, "font");
+      note(res, "font", node, preview);
       return;
     }
     if (node.fontSize !== figma.mixed) tryBindText(node, "fontSize", node.fontSize, entries, tol, res, apply, preview);
@@ -1349,7 +1355,7 @@
           node.setRangeBoundVariable(0, node.characters.length, "fontFamily", fe.variable);
           res.bound++;
         } catch (e) {
-          skip(res, "error");
+          skip(res, "error", node, preview, "fontFamily");
         }
       }
     }
@@ -1358,11 +1364,11 @@
     const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     const len = node.characters.length;
     if (len === 0) {
-      skip(res, "empty-text");
+      skip(res, "empty-text", node, preview, field);
       return;
     }
     if (!e) {
-      skip(res, "no-match");
+      skip(res, "no-match", node, preview, field);
       return;
     }
     if (!apply) {
@@ -1374,13 +1380,13 @@
       node.setRangeBoundVariable(0, len, field, e.variable);
       res.bound++;
     } catch (e2) {
-      skip(res, "error");
+      skip(res, "error", node, preview, field);
     }
   }
   function tryBind(node, field, value, entries, tol, res, apply, preview, noMatchReason = "no-match") {
     const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     if (!e) {
-      skip(res, noMatchReason);
+      skip(res, noMatchReason, node, preview, field);
       return;
     }
     if (!apply) {
@@ -1392,7 +1398,7 @@
       node.setBoundVariable(field, e.variable);
       res.bound++;
     } catch (e2) {
-      skip(res, "error");
+      skip(res, "error", node, preview, field);
     }
   }
 
@@ -3632,8 +3638,10 @@
             cancelled: r.cancelled,
             candidates: r.candidates,
             // #6: 미리보기 후보(dry-run만)
-            nodes: r.nodes
+            nodes: r.nodes,
             // #13: 미리보기 트리 맥락
+            skips: r.skips
+            // 사유별 건너뛴 레이어(dry-run만)
           });
           if (!msg.preview) {
             commitUndo(figma);
@@ -3642,6 +3650,23 @@
         }
         case "CANCEL": {
           bindCancel = true;
+          break;
+        }
+        case "SELECT_NODES": {
+          const found = [];
+          for (const id of msg.ids) {
+            const n = await figma.getNodeByIdAsync(id);
+            if (n && n.type !== "PAGE" && n.type !== "DOCUMENT" && n.parent) found.push(n);
+          }
+          const onPage = found.filter((n) => {
+            for (let p = n; p; p = p.parent) if (p.id === figma.currentPage.id) return true;
+            return false;
+          });
+          if (onPage.length) {
+            figma.currentPage.selection = onPage;
+            figma.viewport.scrollAndZoomIntoView(onPage);
+          }
+          post({ type: "SELECT_RESULT", found: onPage.length, requested: msg.ids.length });
           break;
         }
         case "APPLY_SELECTED": {

@@ -56,6 +56,21 @@ export interface BindCandidate {
   distance?: number;
 }
 
+/**
+ * 바인딩에서 건너뛴 레이어 1건 — 사유 집계가 숫자만 남기면 어떤 레이어가 왜 빠졌는지
+ * 찾을 수 없어, 미리보기에서 사유별로 레이어를 선택할 수 있게 함께 싣는다.
+ * 노드×사유로 중복 제거되어 있다(같은 노드의 padding 4건은 1건).
+ */
+export interface BindSkip {
+  nodeId: string;
+  name: string;
+  type: string;
+  /** REASON_LABELS의 키 — 'no-match' · 'hug-fill' · 'size-fraction' 등. */
+  reason: string;
+  /** 어느 속성에서 났는지(있으면). 예: 'width' · 'paddingLeft'. */
+  field?: string;
+}
+
 /** 바인딩 미리보기 트리(#13)의 맥락 노드 — 영향 노드 + 그 조상 체인. */
 export interface BindNode {
   id: string;
@@ -89,6 +104,7 @@ export type UiToCode =
   | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
   | { type: 'APPLY'; tolerance: number; preview?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[] } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
+  | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
   | { type: 'RENAME_APPLY'; items: { id: string; after: string }[] } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
@@ -120,8 +136,9 @@ export type CodeToUi =
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean }
+  | { type: 'SELECT_RESULT'; found: number; requested: number } // 사유 칩 → 레이어 선택 결과(사라진 레이어 안내)
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[] } // candidates/nodes: 미리보기 트리(#6·#13)
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[] } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }

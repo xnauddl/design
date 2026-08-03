@@ -279,6 +279,25 @@
     /* 이름 입력만 늘어난다 — 체크박스까지 flex:1이면 행이 무너진다. */
     .tk input:not([type="checkbox"]) { font: 400 var(--fs) var(--mono); padding: 4px 6px; flex: 1 1 auto; min-width: 0; }
     .tk > .tk-check { flex: 0 0 auto; margin: 0; }
+    /* 허용오차 프리셋 — 숫자 입력 옆 칩. 현재 값과 같은 칩만 강조된다. */
+    .tol-presets { display: inline-flex; gap: 3px; }
+    .tol-chip {
+      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 7px; cursor: pointer;
+    }
+    .tol-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .tol-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
+    .skip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+    .skip-chip {
+      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 6px; white-space: nowrap; cursor: pointer;
+    }
+    .skip-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .skip-chip.static { cursor: default; color: var(--muted); }
+    .skip-chip.static:hover { border-color: var(--border); color: var(--muted); }
     /* 등장 레이어 수 — 이름과 타입 칩 사이. 1×는 흐리게 해 훑을 때 바로 걸러진다. */
     .tk-use { flex: 0 0 auto; font: 500 10px/1.6 var(--font); color: var(--text-2); white-space: nowrap; }
     .tk-use.once { color: var(--muted); }
@@ -552,6 +571,12 @@
       </div>
       <div class="row">
         <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
+        <label class="inline">근접 정리 <input id="tidyNum" type="number" value="1" min="0" step="0.5" style="width:52px;" title="이 값(px) 이내로 가까운 수치 토큰을 더 많이 쓰인 값으로 합칩니다. 0이면 정리하지 않습니다." /></label>
+        <button id="btnTidyNumbers">정리</button>
+      </div>
+      <div class="tidy tidy-note" id="numTidySummary" style="display:none">
+        <span id="numTidyText"></span>
+        <button id="btnNumTidyUndo" class="link">되돌리기</button>
       </div>
       <div class="hint">미리보기로 변경 요약을 확인한 뒤 적용하세요.</div>
       <div class="row">
@@ -625,6 +650,15 @@
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
+        <span class="tol-presets">
+          <button class="tol-chip" data-tol="0" title="값이 정확히 같을 때만 바인딩">정확</button>
+          <button class="tol-chip" data-tol="0.5" title="반올림 오차만 흡수 — 기본값">0.5</button>
+          <button class="tol-chip" data-tol="1" title="1px 이내 근사값까지 바인딩">1</button>
+          <button class="tol-chip" data-tol="2" title="2px 이내 — 손으로 그린 값이 많은 화면용(과매칭 주의)">2</button>
+        </span>
+      </div>
+      <div class="hint" id="tolHint"></div>
+      <div class="row">
         <button id="btnApply">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none">선택에 바인딩</button>
       </div>
@@ -637,6 +671,8 @@
         <span class="list-count" id="bindTreeCount"></span>
         <button class="link" id="btnBindTreeExpand">모두 펼치기</button>
       </div>
+      <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐). -->
+      <div class="skip-row" id="bindSkips" style="display:none"></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
@@ -848,6 +884,50 @@
   }
   function resolvedTypeForToken(t2) {
     return resolvedTypeFor(t2.category);
+  }
+  var TIDY_CATEGORIES = /* @__PURE__ */ new Set([
+    "gap",
+    "size",
+    "radius",
+    "strokeWidth",
+    "fontSize",
+    "lineHeight",
+    "letterSpacing",
+    "effectFloat"
+  ]);
+  function tidyNumberTokens(tokens2, threshold) {
+    var _a, _b;
+    const targets = tokens2.filter((t2) => TIDY_CATEGORIES.has(t2.category) && typeof t2.value === "number");
+    const before = targets.length;
+    if (threshold <= 0 || before === 0) return { tokens: [...tokens2], before, after: before, merged: 0 };
+    const order = [...targets].sort((a, b) => {
+      var _a2, _b2;
+      return ((_a2 = b.count) != null ? _a2 : 0) - ((_b2 = a.count) != null ? _b2 : 0) || a.value - b.value;
+    });
+    const kept = [];
+    const dropped = /* @__PURE__ */ new Set();
+    for (const t2 of order) {
+      const rep = kept.find(
+        (k) => {
+          var _a2, _b2, _c, _d;
+          return k.category === t2.category && ((_a2 = k.unit) != null ? _a2 : "") === ((_b2 = t2.unit) != null ? _b2 : "") && ((_c = k.count) != null ? _c : 0) > ((_d = t2.count) != null ? _d : 0) && // 덜 쓰인 값만 흡수 — 동률은 둘 다 남긴다
+          Math.abs(k.value - t2.value) <= threshold;
+        }
+      );
+      if (rep) {
+        dropped.add(t2);
+        for (const s of t2.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+        rep.count = ((_a = rep.count) != null ? _a : 0) + ((_b = t2.count) != null ? _b : 0);
+      } else {
+        kept.push(t2);
+      }
+    }
+    return {
+      tokens: tokens2.filter((t2) => !dropped.has(t2)),
+      before,
+      after: before - dropped.size,
+      merged: dropped.size
+    };
   }
 
   // src/lib/i18n.ts
@@ -2029,6 +2109,38 @@
     previewRevealed = false;
     send({ type: "EXTRACT" });
   });
+  var preNumTidy = null;
+  $("btnTidyNumbers").addEventListener("click", () => {
+    const threshold = Number($("tidyNum").value) || 0;
+    if (!creatableTokens().length) {
+      setStatus("createStatus", "\uBA3C\uC800 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB85C \uC0C9 \uC678 \uD1A0\uD070\uC744 \uD45C\uC2DC\uD558\uC138\uC694.", "warn");
+      return;
+    }
+    const snapshot = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
+    const r = tidyNumberTokens(tokens, threshold);
+    if (!r.merged) {
+      setStatus("createStatus", threshold > 0 ? `${threshold}px \uC774\uB0B4\uB85C \uD569\uCE60 \uC218\uCE58 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694.` : "\uADFC\uC811 \uC815\uB9AC \uAC12\uC774 0\uC774\uB77C \uC815\uB9AC\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694.", "");
+      return;
+    }
+    preNumTidy = snapshot;
+    tokens = r.tokens;
+    resetTokenChecked();
+    $("btnCreateApply").style.display = "none";
+    renderTokens();
+    $("numTidySummary").style.display = "";
+    $("numTidyText").textContent = `\uBE44\uC2B7\uD55C \uC218\uCE58 ${r.before} \u2192 ${r.after}\uAC1C\uB85C \uC815\uB9AC\uB428 (${r.merged}\uAC1C \uD761\uC218)`;
+    setStatus("createStatus", `${threshold}px \uC774\uB0B4 ${r.merged}\uAC1C\uB97C \uB354 \uB9CE\uC774 \uC4F0\uC778 \uAC12\uC73C\uB85C \uD569\uCCE4\uC5B4\uC694.`, "ok");
+  });
+  $("btnNumTidyUndo").addEventListener("click", () => {
+    if (!preNumTidy) return;
+    tokens = preNumTidy;
+    preNumTidy = null;
+    resetTokenChecked();
+    $("btnCreateApply").style.display = "none";
+    renderTokens();
+    $("numTidySummary").style.display = "none";
+    setStatus("createStatus", "\uC218\uCE58 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694.", "");
+  });
   $("tokenAll").addEventListener("change", () => {
     const on = $("tokenAll").checked;
     tokenChecked.clear();
@@ -2192,6 +2304,30 @@
     setStatus("tsStatus", "\uC120\uD0DD \uD14D\uC2A4\uD2B8\uB97C \uAE30\uC874 \uC2A4\uD0C0\uC77C\uC5D0 \uC801\uC6A9 \uC911\u2026", "ok");
     send({ type: "APPLY_TEXT_STYLES" });
   });
+  var TOL_HINTS = [
+    [0, "\uC815\uD655\uD788 \uAC19\uC740 \uAC12\uB9CC \uBC14\uC778\uB529\uD569\uB2C8\uB2E4."],
+    [0.5, "\uBC18\uC62C\uB9BC \uC624\uCC28\uB9CC \uD761\uC218\uD569\uB2C8\uB2E4(\uAE30\uBCF8)."],
+    [1, "1px \uC774\uB0B4 \uADFC\uC0AC\uAC12\uAE4C\uC9C0 \uBD99\uC2B5\uB2C8\uB2E4."],
+    [Infinity, "\uADFC\uC0AC \uBC94\uC704\uAC00 \uB113\uC5B4 \uC758\uB3C4\uCE58 \uC54A\uC740 \uAC12\uAE4C\uC9C0 \uBD99\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4."]
+  ];
+  function syncTolPresets() {
+    var _a;
+    const v = Number($("tol").value) || 0;
+    for (const el of Array.from(document.querySelectorAll(".tol-chip"))) {
+      el.classList.toggle("on", Number(el.dataset.tol) === v);
+    }
+    $("tolHint").textContent = `\uD5C8\uC6A9\uC624\uCC28 ${v}px \u2014 ${((_a = TOL_HINTS.find(([t2]) => v <= t2)) != null ? _a : TOL_HINTS[TOL_HINTS.length - 1])[1]}`;
+  }
+  for (const el of Array.from(document.querySelectorAll(".tol-chip"))) {
+    el.addEventListener("click", () => {
+      var _a;
+      $("tol").value = (_a = el.dataset.tol) != null ? _a : "0.5";
+      syncTolPresets();
+      clearBindPreview();
+    });
+  }
+  $("tol").addEventListener("input", syncTolPresets);
+  syncTolPresets();
   $("btnApply").addEventListener("click", () => {
     const tolerance = Number($("tol").value) || 0;
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
@@ -2708,7 +2844,7 @@
     send({ type: "CLEAR_LICENSE" });
   });
   window.onmessage = (event) => {
-    var _a, _b;
+    var _a, _b, _c;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
@@ -2767,15 +2903,18 @@
       case "APPLY_RESULT": {
         hideApplyProgress();
         const confirmBtn = $("btnApplyConfirm");
+        bindSkips = (_a = msg.skips) != null ? _a : [];
         const rt = reasonsText(msg.reasons);
-        const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}`;
+        const asChips = bindSkips.length > 0;
+        const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt && !asChips ? ` \u2014 ${rt}` : ""}`;
+        renderSkipReasons(msg.reasons);
         if (msg.cancelled) {
           clearBindPreview();
           setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail }), "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
-          bindCandidates = (_a = msg.candidates) != null ? _a : [];
-          bindNodes = (_b = msg.nodes) != null ? _b : [];
+          bindCandidates = (_b = msg.candidates) != null ? _b : [];
+          bindNodes = (_c = msg.nodes) != null ? _c : [];
           bindChecked.clear();
           for (const c of bindCandidates) bindChecked.add(candKey(c));
           renderBindTree();
@@ -2787,6 +2926,11 @@
         }
         break;
       }
+      case "SELECT_RESULT":
+        if (msg.found < msg.requested) {
+          setStatus("applyStatus", msg.found ? `\uB808\uC774\uC5B4 ${msg.found}\uAC1C \uC120\uD0DD \u2014 ${msg.requested - msg.found}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC5D0 \uC788\uC5B4\uC694.` : "\uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC5D0 \uC788\uC2B5\uB2C8\uB2E4. \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uB2E4\uC2DC \uC2E4\uD589\uD574 \uC8FC\uC138\uC694.", "warn");
+        }
+        break;
       case "RENAME_RESULT":
         renderRenameResult(msg);
         break;
@@ -3125,6 +3269,8 @@
   function clearBindPreview() {
     bindCandidates = [];
     bindNodes = [];
+    bindSkips = [];
+    $("bindSkips").style.display = "none";
     bindChecked.clear();
     clearMount($("bindTree"));
     $("bindCount").textContent = "";
@@ -3230,11 +3376,47 @@
     "instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
     font: "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC"
   };
+  var reasonLabel = (key) => {
+    var _a;
+    return (_a = REASON_LABELS[key]) != null ? _a : key;
+  };
+  var bindSkips = [];
+  function renderSkipReasons(reasons) {
+    const box = $("bindSkips");
+    box.innerHTML = "";
+    const entries = Object.entries(reasons).filter(([, n]) => n > 0);
+    if (!entries.length || !bindSkips.length) {
+      box.style.display = "none";
+      return;
+    }
+    box.style.display = "";
+    const head = document.createElement("span");
+    head.className = "muted";
+    head.textContent = "\uAC74\uB108\uB700:";
+    box.appendChild(head);
+    for (const [key, n] of entries) {
+      const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
+      const label = `${reasonLabel(key)} ${n}`;
+      if (!ids.length) {
+        const span = document.createElement("span");
+        span.className = "skip-chip static";
+        span.textContent = label;
+        box.appendChild(span);
+        continue;
+      }
+      const btn = document.createElement("button");
+      btn.className = "skip-chip";
+      btn.textContent = `${label} \u203A`;
+      btn.title = `\uB808\uC774\uC5B4 ${ids.length}\uAC1C \uC120\uD0DD \u2014 ${bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(", ")}${ids.length > 5 ? " \uC678" : ""}`;
+      btn.addEventListener("click", () => {
+        send({ type: "SELECT_NODES", ids });
+        setStatus("applyStatus", `${reasonLabel(key)} \uB808\uC774\uC5B4 ${ids.length}\uAC1C\uB97C \uC120\uD0DD\uD588\uC5B4\uC694.`, "");
+      });
+      box.appendChild(btn);
+    }
+  }
   function reasonsText(reasons) {
-    return Object.entries(reasons).filter(([, n]) => n > 0).map(([k, n]) => {
-      var _a;
-      return `${(_a = REASON_LABELS[k]) != null ? _a : k} ${n}`;
-    }).join(" \xB7 ");
+    return Object.entries(reasons).filter(([, n]) => n > 0).map(([k, n]) => `${reasonLabel(k)} ${n}`).join(" \xB7 ");
   }
   var CONTRAST_SKIP_LABELS = {
     "no-fill": "\uB2E8\uC0C9 \uAE00\uC790\uC0C9 \uC5C6\uC74C",

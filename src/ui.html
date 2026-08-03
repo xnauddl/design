@@ -279,6 +279,25 @@
     /* 이름 입력만 늘어난다 — 체크박스까지 flex:1이면 행이 무너진다. */
     .tk input:not([type="checkbox"]) { font: 400 var(--fs) var(--mono); padding: 4px 6px; flex: 1 1 auto; min-width: 0; }
     .tk > .tk-check { flex: 0 0 auto; margin: 0; }
+    /* 허용오차 프리셋 — 숫자 입력 옆 칩. 현재 값과 같은 칩만 강조된다. */
+    .tol-presets { display: inline-flex; gap: 3px; }
+    .tol-chip {
+      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 7px; cursor: pointer;
+    }
+    .tol-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .tol-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
+    .skip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+    .skip-chip {
+      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 6px; white-space: nowrap; cursor: pointer;
+    }
+    .skip-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .skip-chip.static { cursor: default; color: var(--muted); }
+    .skip-chip.static:hover { border-color: var(--border); color: var(--muted); }
     /* 등장 레이어 수 — 이름과 타입 칩 사이. 1×는 흐리게 해 훑을 때 바로 걸러진다. */
     .tk-use { flex: 0 0 auto; font: 500 10px/1.6 var(--font); color: var(--text-2); white-space: nowrap; }
     .tk-use.once { color: var(--muted); }
@@ -552,6 +571,12 @@
       </div>
       <div class="row">
         <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
+        <label class="inline">근접 정리 <input id="tidyNum" type="number" value="1" min="0" step="0.5" style="width:52px;" title="이 값(px) 이내로 가까운 수치 토큰을 더 많이 쓰인 값으로 합칩니다. 0이면 정리하지 않습니다." /></label>
+        <button id="btnTidyNumbers">정리</button>
+      </div>
+      <div class="tidy tidy-note" id="numTidySummary" style="display:none">
+        <span id="numTidyText"></span>
+        <button id="btnNumTidyUndo" class="link">되돌리기</button>
       </div>
       <div class="hint">미리보기로 변경 요약을 확인한 뒤 적용하세요.</div>
       <div class="row">
@@ -625,6 +650,15 @@
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline">허용오차 <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
+        <span class="tol-presets">
+          <button class="tol-chip" data-tol="0" title="값이 정확히 같을 때만 바인딩">정확</button>
+          <button class="tol-chip" data-tol="0.5" title="반올림 오차만 흡수 — 기본값">0.5</button>
+          <button class="tol-chip" data-tol="1" title="1px 이내 근사값까지 바인딩">1</button>
+          <button class="tol-chip" data-tol="2" title="2px 이내 — 손으로 그린 값이 많은 화면용(과매칭 주의)">2</button>
+        </span>
+      </div>
+      <div class="hint" id="tolHint"></div>
+      <div class="row">
         <button id="btnApply">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none">선택에 바인딩</button>
       </div>
@@ -637,6 +671,8 @@
         <span class="list-count" id="bindTreeCount"></span>
         <button class="link" id="btnBindTreeExpand">모두 펼치기</button>
       </div>
+      <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐). -->
+      <div class="skip-row" id="bindSkips" style="display:none"></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>

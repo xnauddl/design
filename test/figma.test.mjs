@@ -722,6 +722,56 @@ test('bindSelection — 소수 크기라도 같은 값의 토큰이 있으면 �
   assert.equal(node._bound.width, findVar(figma, 'Semantic', 'size/343_5').id);
 });
 
+test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사유로 수집', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
+  // 오토레이아웃 프레임 — padding 4방향이 모두 매칭 실패(GAP 변수 없음)지만 레이어는 1개다.
+  const pad = {
+    type: 'FRAME',
+    id: 'pad',
+    name: 'Padded',
+    fills: [],
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    itemSpacing: 7,
+    paddingLeft: 7,
+    paddingRight: 7,
+    paddingTop: 7,
+    paddingBottom: 7,
+    setBoundVariable() {},
+  };
+  const free = {
+    type: 'FRAME',
+    id: 'free',
+    name: 'Free',
+    fills: [],
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 200,
+    height: 200,
+    setBoundVariable() {},
+  };
+
+  const dry = await bindSelection([pad, free], 0.5, false);
+
+  const byReason = (r) => dry.skips.filter((s) => s.reason === r);
+  // padding 5건이 모두 no-match지만 레이어는 1개 — 노드×사유로 중복 제거된다.
+  assert.equal(byReason('no-match').length, 1);
+  assert.equal(byReason('no-match')[0].nodeId, 'pad');
+  assert.equal(byReason('no-match')[0].name, 'Padded');
+  assert.ok(dry.reasons['no-match'] >= 5); // 건수는 속성 단위 그대로
+  // 자유 배치·HUG/FILL도 각각 레이어와 함께 잡힌다.
+  assert.deepEqual(byReason('size-free-layout').map((s) => s.nodeId), ['free']);
+  assert.deepEqual(byReason('hug-fill').map((s) => s.nodeId), ['pad']);
+  assert.equal(byReason('hug-fill')[0].field, 'width'); // 첫 축의 필드가 남는다
+
+  // 실제 적용(apply=true)에서는 수집하지 않는다 — 미리보기 전용 페이로드.
+  const real = await bindSelection([pad, free], 0.5, true);
+  assert.equal(real.skips, undefined);
+});
+
 test('bindSelection — 그리드 오토레이아웃의 row/column gap 바인딩', async () => {
   const figma = installFigma();
   await createTokens(
