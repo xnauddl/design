@@ -623,6 +623,105 @@ test('bindSelection — 허용오차 내 동률은 가장 가까운 값으로 �
   assert.equal(node._bound.width, s12.id);
 });
 
+test('bindSelection — HUG/FILL 사유는 두 축 모두 집계', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
+  // 가로 FILL · 세로 HUG — 두 축 모두 건너뛰었으니 사유도 2건이어야 한다.
+  const node = {
+    type: 'FRAME',
+    id: 'n',
+    name: 'n',
+    fills: [],
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FILL',
+    layoutSizingVertical: 'HUG',
+    width: 200,
+    height: 200,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    setBoundVariable() {},
+  };
+
+  const res = await bindSelection([node], 0.5);
+  assert.equal(res.reasons['hug-fill'], 2); // 세로 축 사유가 빠지지 않는다
+  assert.equal(res.bound, 0);
+});
+
+test('bindSelection — 소수 크기는 근처 정수 토큰에 스냅하지 않음(정확 일치만)', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'size/344', category: 'size', sources: ['size'], value: 344 },
+      { name: 'size/40', category: 'size', sources: ['size'], value: 40 },
+    ],
+    16,
+  );
+  const mk = (id, w) => ({
+    type: 'FRAME',
+    id,
+    name: id,
+    fills: [],
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: w,
+    height: 10,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  });
+
+  // 343.5는 허용오차(1) 안에 size/344가 있지만, extract가 소수 size를 토큰으로 만들지 않으므로
+  // 바인딩도 스냅하지 않는다 — 그러지 않으면 추출이 거부한 값을 바인딩이 되살리며 폭까지 바꾼다.
+  const frac = mk('frac', 343.5);
+  const res = await bindSelection([frac], 1);
+  assert.equal(frac._bound, undefined);
+  assert.equal(res.reasons['size-fraction'], 1); // 사유가 '매칭 없음'에 섞이지 않고 따로 집계된다
+
+  // 정수 크기는 기존대로 허용오차 스냅이 동작한다.
+  const near = mk('near', 39.5);
+  await bindSelection([near], 1);
+  assert.equal(near._bound, undefined); // 39.5도 소수 → 스냅 안 함
+  const exact = mk('exact', 344);
+  await bindSelection([exact], 1);
+  assert.equal(exact._bound.width, findVar(figma, 'Semantic', 'size/344').id);
+});
+
+test('bindSelection — 소수 크기라도 같은 값의 토큰이 있으면 바인딩', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/343_5', category: 'size', sources: ['size'], value: 343.5 }], 16);
+  const node = {
+    type: 'FRAME',
+    id: 'n',
+    name: 'n',
+    fills: [],
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: 343.5,
+    height: 10,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  };
+
+  await bindSelection([node], 1);
+  assert.equal(node._bound.width, findVar(figma, 'Semantic', 'size/343_5').id);
+});
+
 test('bindSelection — 그리드 오토레이아웃의 row/column gap 바인딩', async () => {
   const figma = installFigma();
   await createTokens(

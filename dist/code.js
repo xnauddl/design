@@ -1237,12 +1237,17 @@
     const parent = node.parent;
     const inAutoLayout = node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE";
     if (inAutoLayout) {
-      if (node.layoutSizingHorizontal === "FIXED") tryBind(node, "width", node.width, entries, tol, res, apply, preview);
-      else if (node.layoutSizingHorizontal === "HUG" || node.layoutSizingHorizontal === "FILL") {
-        flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
-        note(res, "hug-fill");
-      }
-      if (node.layoutSizingVertical === "FIXED") tryBind(node, "height", node.height, entries, tol, res, apply, preview);
+      const bindAxis = (sizing, field, v) => {
+        if (sizing !== "FIXED") {
+          flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
+          note(res, "hug-fill");
+          return;
+        }
+        const fraction = Math.abs(v - Math.round(v)) >= 5e-3;
+        tryBind(node, field, v, entries, fraction ? 0 : tol, res, apply, preview, fraction ? "size-fraction" : void 0);
+      };
+      bindAxis(node.layoutSizingHorizontal, "width", node.width);
+      bindAxis(node.layoutSizingVertical, "height", node.height);
     } else {
       flags.add("\uC790\uC720 \uBC30\uCE58(\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uBC16) \uD504\uB808\uC784\uC740 \uD06C\uAE30 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
       note(res, "size-free-layout");
@@ -1372,10 +1377,10 @@
       skip(res, "error");
     }
   }
-  function tryBind(node, field, value, entries, tol, res, apply, preview) {
+  function tryBind(node, field, value, entries, tol, res, apply, preview, noMatchReason = "no-match") {
     const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     if (!e) {
-      skip(res, "no-match");
+      skip(res, noMatchReason);
       return;
     }
     if (!apply) {

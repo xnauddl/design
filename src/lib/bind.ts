@@ -349,12 +349,26 @@ function bindFrame(
     node.layoutMode !== 'NONE' ||
     (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE');
   if (inAutoLayout) {
-    if (node.layoutSizingHorizontal === 'FIXED') tryBind(node, 'width', node.width, entries, tol, res, apply, preview);
-    else if (node.layoutSizingHorizontal === 'HUG' || node.layoutSizingHorizontal === 'FILL') {
-      flags.add('일부 크기는 HUG/FILL이라 width/height 바인딩을 건너뜀(Fixed 필요).');
-      note(res, 'hug-fill');
-    }
-    if (node.layoutSizingVertical === 'FIXED') tryBind(node, 'height', node.height, entries, tol, res, apply, preview);
+    /**
+     * 축 하나를 처리 — 두 축이 같은 규칙을 쓰도록 한 곳에 모은다(세로 축만 사유 집계가
+     * 빠져 HUG/FILL 건수가 실제보다 적게 보이던 문제).
+     *
+     * 소수 크기는 **정확히 같은 값의 토큰에만** 붙인다. extract가 소수 size를 토큰으로
+     * 만들지 않으므로(자유 리사이즈 잔값), 허용오차로 343.5를 size/344에 스냅하면
+     * 추출이 거부한 값을 바인딩이 되살리면서 지오메트리까지 바꾸게 된다. 반대로 같은 값의
+     * 토큰이 이미 있다면 붙이는 게 맞으므로 허용오차만 0으로 좁힌다.
+     */
+    const bindAxis = (sizing: 'FIXED' | 'HUG' | 'FILL', field: 'width' | 'height', v: number): void => {
+      if (sizing !== 'FIXED') {
+        flags.add('일부 크기는 HUG/FILL이라 width/height 바인딩을 건너뜀(Fixed 필요).');
+        note(res, 'hug-fill');
+        return;
+      }
+      const fraction = Math.abs(v - Math.round(v)) >= 0.005; // extract의 소수 2자리 반올림과 같은 판정
+      tryBind(node, field, v, entries, fraction ? 0 : tol, res, apply, preview, fraction ? 'size-fraction' : undefined);
+    };
+    bindAxis(node.layoutSizingHorizontal, 'width', node.width);
+    bindAxis(node.layoutSizingVertical, 'height', node.height);
   } else {
     flags.add('자유 배치(오토레이아웃 밖) 프레임은 크기 바인딩에서 제외했습니다.');
     note(res, 'size-free-layout');
@@ -517,10 +531,12 @@ function tryBind(
   res: BindResult,
   apply: boolean,
   preview: Preview | null,
+  /** 매칭 실패 사유 키 — 호출자가 좁힌 조건으로 실패했을 때 그 이유를 남긴다. */
+  noMatchReason = 'no-match',
 ): void {
   const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   if (!e) {
-    skip(res, 'no-match');
+    skip(res, noMatchReason);
     return;
   }
   if (!apply) {
