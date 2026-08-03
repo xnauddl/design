@@ -571,7 +571,8 @@
       </div>
       <div class="row">
         <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
-        <label class="inline">근접 정리 <input id="tidyNum" type="number" value="1" min="0" step="0.5" style="width:52px;" title="이 값(px) 이내로 가까운 수치 토큰을 더 많이 쓰인 값으로 합칩니다. 0이면 정리하지 않습니다." /></label>
+        <label class="inline">사다리 <input id="tidyBase" type="number" value="8" min="0" step="1" style="width:46px;" title="여백·크기를 이 값 기준 사다리에 맞춥니다. 8이면 …4·2·1 / 8·16·24·32. 기준 미만은 반분할이라 4·2가 보존됩니다. 0이면 정리하지 않습니다." />px</label>
+        <label class="inline">허용 <input id="tidyRatio" type="number" value="15" min="0" max="50" step="5" style="width:46px;" title="값 대비 몇 %까지 옮길지. 비율이라 작은 값일수록 자동으로 보수적입니다(4는 거의 안 움직이고 40은 여유 있게)." />%</label>
         <button id="btnTidyNumbers">정리</button>
       </div>
       <div class="tidy tidy-note" id="numTidySummary" style="display:none">
@@ -885,49 +886,62 @@
   function resolvedTypeForToken(t2) {
     return resolvedTypeFor(t2.category);
   }
-  var TIDY_CATEGORIES = /* @__PURE__ */ new Set([
-    "gap",
-    "size",
-    "radius",
-    "strokeWidth",
-    "fontSize",
-    "lineHeight",
-    "letterSpacing",
-    "effectFloat"
-  ]);
-  function tidyNumberTokens(tokens2, threshold) {
-    var _a, _b;
-    const targets = tokens2.filter((t2) => TIDY_CATEGORIES.has(t2.category) && typeof t2.value === "number");
+  var SNAP_CATEGORIES = /* @__PURE__ */ new Set(["gap", "size"]);
+  var TOKEN_GROUP = { gap: "spacing", size: "size" };
+  var cloneToken = (t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] });
+  function scaleLadder(base, max) {
+    if (base <= 0) return [];
+    const rungs = [];
+    for (let v = base / 2; v >= 1; v /= 2) rungs.push(v);
+    for (let k = 1; base * k <= max + base; k++) rungs.push(base * k);
+    return rungs.sort((a, b) => a - b);
+  }
+  function tidyNumberTokens(tokens2, opts) {
+    var _a, _b, _c;
+    const { base, ratio } = opts;
+    const out = tokens2.map(cloneToken);
+    const targets = out.filter(
+      (t2) => SNAP_CATEGORIES.has(t2.category) && typeof t2.value === "number" && (!t2.unit || t2.unit === "px")
+    );
     const before = targets.length;
-    if (threshold <= 0 || before === 0) return { tokens: [...tokens2], before, after: before, merged: 0 };
-    const order = [...targets].sort((a, b) => {
-      var _a2, _b2;
-      return ((_a2 = b.count) != null ? _a2 : 0) - ((_b2 = a.count) != null ? _b2 : 0) || a.value - b.value;
-    });
-    const kept = [];
+    if (base <= 0 || ratio <= 0 || before === 0) return { tokens: out, before, after: before, merged: 0, snapped: 0 };
+    const rungs = scaleLadder(base, Math.max(...targets.map((t2) => t2.value)));
+    const nearest = (v) => rungs.reduce((p, c) => Math.abs(c - v) < Math.abs(p - v) ? c : p);
+    let snapped = 0;
+    for (const t2 of targets) {
+      const v = t2.value;
+      if (v <= 0) continue;
+      const target = nearest(v);
+      if (target === v || Math.abs(target - v) / v > ratio) continue;
+      const group = TOKEN_GROUP[t2.category];
+      if (group && t2.name === numberTokenName(group, v)) t2.name = numberTokenName(group, target);
+      t2.value = target;
+      snapped++;
+    }
+    const seen = /* @__PURE__ */ new Map();
     const dropped = /* @__PURE__ */ new Set();
-    for (const t2 of order) {
-      const rep = kept.find(
-        (k) => {
-          var _a2, _b2, _c, _d;
-          return k.category === t2.category && ((_a2 = k.unit) != null ? _a2 : "") === ((_b2 = t2.unit) != null ? _b2 : "") && ((_c = k.count) != null ? _c : 0) > ((_d = t2.count) != null ? _d : 0) && // 덜 쓰인 값만 흡수 — 동률은 둘 다 남긴다
-          Math.abs(k.value - t2.value) <= threshold;
-        }
-      );
-      if (rep) {
-        dropped.add(t2);
-        for (const s of t2.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
-        rep.count = ((_a = rep.count) != null ? _a : 0) + ((_b = t2.count) != null ? _b : 0);
-      } else {
-        kept.push(t2);
+    for (const t2 of targets) {
+      const k = `${t2.category}|${t2.value}|${(_a = t2.unit) != null ? _a : ""}`;
+      const rep = seen.get(k);
+      if (!rep) {
+        seen.set(k, t2);
+        continue;
       }
+      for (const s of t2.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+      rep.count = ((_b = rep.count) != null ? _b : 0) + ((_c = t2.count) != null ? _c : 0);
+      dropped.add(t2);
     }
     return {
-      tokens: tokens2.filter((t2) => !dropped.has(t2)),
+      tokens: out.filter((t2) => !dropped.has(t2)),
       before,
       after: before - dropped.size,
-      merged: dropped.size
+      merged: dropped.size,
+      snapped
     };
+  }
+  function numberTokenName(group, value) {
+    const v = Number.isInteger(value) ? String(value) : String(value).replace(".", "_");
+    return `${group}/${v}`;
   }
 
   // src/lib/i18n.ts
@@ -2111,15 +2125,16 @@
   });
   var preNumTidy = null;
   $("btnTidyNumbers").addEventListener("click", () => {
-    const threshold = Number($("tidyNum").value) || 0;
     if (!creatableTokens().length) {
       setStatus("createStatus", "\uBA3C\uC800 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB85C \uC0C9 \uC678 \uD1A0\uD070\uC744 \uD45C\uC2DC\uD558\uC138\uC694.", "warn");
       return;
     }
+    const base = Number($("tidyBase").value) || 0;
+    const ratio = (Number($("tidyRatio").value) || 0) / 100;
     const snapshot = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
-    const r = tidyNumberTokens(tokens, threshold);
-    if (!r.merged) {
-      setStatus("createStatus", threshold > 0 ? `${threshold}px \uC774\uB0B4\uB85C \uD569\uCE60 \uC218\uCE58 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694.` : "\uADFC\uC811 \uC815\uB9AC \uAC12\uC774 0\uC774\uB77C \uC815\uB9AC\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694.", "");
+    const r = tidyNumberTokens(tokens, { base, ratio });
+    if (!r.snapped) {
+      setStatus("createStatus", r.before === 0 ? "\uC815\uB9AC\uD560 \uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694." : `${base}px \uC0AC\uB2E4\uB9AC\uC5D0\uC11C ${Math.round(ratio * 100)}% \uC548\uC5D0 \uB4DC\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694 \u2014 \uD5C8\uC6A9\uC744 \uC62C\uB824\uBCF4\uC138\uC694.`, "");
       return;
     }
     preNumTidy = snapshot;
@@ -2128,8 +2143,9 @@
     $("btnCreateApply").style.display = "none";
     renderTokens();
     $("numTidySummary").style.display = "";
-    $("numTidyText").textContent = `\uBE44\uC2B7\uD55C \uC218\uCE58 ${r.before} \u2192 ${r.after}\uAC1C\uB85C \uC815\uB9AC\uB428 (${r.merged}\uAC1C \uD761\uC218)`;
-    setStatus("createStatus", `${threshold}px \uC774\uB0B4 ${r.merged}\uAC1C\uB97C \uB354 \uB9CE\uC774 \uC4F0\uC778 \uAC12\uC73C\uB85C \uD569\uCCE4\uC5B4\uC694.`, "ok");
+    const merged = r.merged ? ` \xB7 \uAC19\uC740 \uCE78 ${r.merged}\uAC1C \uBCD1\uD569` : "";
+    $("numTidyText").textContent = `\uC5EC\uBC31\xB7\uD06C\uAE30 ${r.before} \u2192 ${r.after}\uAC1C (${base}px \uC0AC\uB2E4\uB9AC\uB85C ${r.snapped}\uAC1C \uC774\uB3D9${merged})`;
+    setStatus("createStatus", `${base}px \uC0AC\uB2E4\uB9AC\uB85C ${r.snapped}\uAC1C\uB97C \uC62E\uACBC\uC5B4\uC694${r.merged ? `, ${r.merged}\uAC1C\uAC00 \uD569\uCCD0\uC84C\uC5B4\uC694` : ""}.`, "ok");
   });
   $("btnNumTidyUndo").addEventListener("click", () => {
     if (!preNumTidy) return;

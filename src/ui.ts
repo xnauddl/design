@@ -630,21 +630,24 @@ $('btnExtract').addEventListener('click', () => {
   send({ type: 'EXTRACT' });
 });
 
-/* 근접 수치 정리 — 색 정리(tidyColors)와 같은 패턴: 누르면 정리하고 요약 한 줄 + 되돌리기.
-   색과 달리 자동이 아니라 버튼인 이유는, 값을 합치면 토큰의 수치가 바뀌어 바인딩 결과까지
+/* 스케일 사다리 정리 — 색 정리(tidyColors)와 같은 패턴: 누르면 정리하고 요약 한 줄 + 되돌리기.
+   색과 달리 자동이 아니라 버튼인 이유는, 값을 옮기면 토큰의 수치가 바뀌어 바인딩 결과까지
    달라지기 때문이다(색 병합은 같은 hue-단계 안이라 훨씬 보수적). */
 let preNumTidy: DraftToken[] | null = null;
 
 $('btnTidyNumbers').addEventListener('click', () => {
-  const threshold = Number(($('tidyNum') as HTMLInputElement).value) || 0;
   if (!creatableTokens().length) {
     setStatus('createStatus', '먼저 ‘미리보기’로 색 외 토큰을 표시하세요.', 'warn');
     return;
   }
+  const base = Number(($('tidyBase') as HTMLInputElement).value) || 0;
+  const ratio = (Number(($('tidyRatio') as HTMLInputElement).value) || 0) / 100;
   const snapshot = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기용
-  const r = tidyNumberTokens(tokens, threshold);
-  if (!r.merged) {
-    setStatus('createStatus', threshold > 0 ? `${threshold}px 이내로 합칠 수치 토큰이 없어요.` : '근접 정리 값이 0이라 정리하지 않았어요.', '');
+  const r = tidyNumberTokens(tokens, { base, ratio });
+  if (!r.snapped) {
+    setStatus('createStatus', r.before === 0
+      ? '정리할 여백·크기 토큰이 없어요.'
+      : `${base}px 사다리에서 ${Math.round(ratio * 100)}% 안에 드는 값이 없어요 — 허용을 올려보세요.`, '');
     return;
   }
   preNumTidy = snapshot;
@@ -653,8 +656,10 @@ $('btnTidyNumbers').addEventListener('click', () => {
   ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 새 미리보기 필요
   renderTokens();
   $('numTidySummary').style.display = '';
-  $('numTidyText').textContent = `비슷한 수치 ${r.before} → ${r.after}개로 정리됨 (${r.merged}개 흡수)`;
-  setStatus('createStatus', `${threshold}px 이내 ${r.merged}개를 더 많이 쓰인 값으로 합쳤어요.`, 'ok');
+  // 이동과 병합은 다른 일이라 따로 센다 — 옮겼지만 같은 칸이 아니어서 안 합쳐진 토큰도 있다.
+  const merged = r.merged ? ` · 같은 칸 ${r.merged}개 병합` : '';
+  $('numTidyText').textContent = `여백·크기 ${r.before} → ${r.after}개 (${base}px 사다리로 ${r.snapped}개 이동${merged})`;
+  setStatus('createStatus', `${base}px 사다리로 ${r.snapped}개를 옮겼어요${r.merged ? `, ${r.merged}개가 합쳐졌어요` : ''}.`, 'ok');
 });
 
 $('btnNumTidyUndo').addEventListener('click', () => {

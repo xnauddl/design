@@ -15,6 +15,7 @@ import {
   colorTokenName,
   numberTokenName,
   tidyNumberTokens,
+  scaleLadder,
   kebab,
   pascalCase,
   capitalize,
@@ -1603,67 +1604,103 @@ test('rampToSpecs — 기본 램프에 패밀리 주입', () => {
   assert.ok(specs.some((s) => s.name === 'body' && s.fontSize === 16));
 });
 
-/* ================= tidyNumberTokens ================= */
+/* ================= tidyNumberTokens (스케일 사다리) ================= */
 const numTok = (name, category, value, count, unit) => ({
   name, category, sources: [category === 'gap' ? 'gap' : 'size'], value, count, ...(unit ? { unit } : {}),
 });
 
-test('tidyNumberTokens — 덜 쓰인 근접 값을 더 많이 쓰인 값으로 흡수', () => {
-  const tokens = [
-    numTok('spacing/12', 'gap', 12, 40),
-    numTok('spacing/13', 'gap', 13, 2), // 12로 흡수(1px 이내, 덜 쓰임)
-    numTok('spacing/16', 'gap', 16, 38), // 12와 4px 떨어져 유지
-  ];
-  const r = tidyNumberTokens(tokens, 1);
-  assert.equal(r.merged, 1);
-  assert.deepEqual(r.tokens.map((t) => t.name), ['spacing/12', 'spacing/16']);
-  assert.equal(r.tokens[0].count, 42); // 흡수한 만큼 사용 수를 물려받는다
+test('scaleLadder — 기준 미만은 반분할, 기준 이상은 배수', () => {
+  assert.deepEqual(scaleLadder(8, 40), [1, 2, 4, 8, 16, 24, 32, 40, 48]);
+  assert.deepEqual(scaleLadder(4, 12), [1, 2, 4, 8, 12, 16]);
+  assert.deepEqual(scaleLadder(0, 40), []);
 });
 
-test('tidyNumberTokens — 사용 수가 같으면 병합하지 않음', () => {
-  const tokens = [numTok('spacing/12', 'gap', 12, 5), numTok('spacing/13', 'gap', 13, 5)];
-  const r = tidyNumberTokens(tokens, 1);
+test('tidyNumberTokens — 8px 사다리·15%: 근사값만 옮기고 2·4는 보존', () => {
+  const vals = [2, 3, 4, 5, 7, 10, 12, 14, 15, 17, 20, 24, 30];
+  const r = tidyNumberTokens(vals.map((v) => numTok('spacing/' + v, 'gap', v, 3)), { base: 8, ratio: 0.15 });
+  const got = r.tokens.map((t) => t.value).sort((a, b) => a - b);
+  // 7→8 · 14·15·17→16 · 30→32 만 이동. 2·3·4·5·10·12·20·24는 사다리에서 멀거나 이미 칸 위.
+  assert.deepEqual(got, [2, 3, 4, 5, 8, 10, 12, 16, 20, 24, 32]);
+  assert.equal(r.snapped, 5);
+  assert.equal(r.merged, 2); // 14·15·17 → 16 한 칸으로
+});
+
+test('tidyNumberTokens — 이동 한계가 비율이라 작은 값일수록 보수적', () => {
+  // 4와 40 모두 사다리 칸에서 4px 떨어져 있지만, 비율은 100% vs 10%로 다르다.
+  const r = tidyNumberTokens([numTok('spacing/4', 'gap', 4, 3), numTok('size/36', 'size', 36, 3)], { base: 8, ratio: 0.15 });
+  const byName = new Map(r.tokens.map((t) => [t.name, t]));
+  assert.equal(byName.get('spacing/4').value, 4); // 유지 — 8까지 100%
+  assert.equal(byName.get('size/32').value, 32); // 36 → 32 (11%)
+});
+
+test('tidyNumberTokens — 같은 칸에 놓이면 사용 수와 무관하게 병합', () => {
+  const r = tidyNumberTokens(
+    [numTok('spacing/15', 'gap', 15, 5), numTok('spacing/17', 'gap', 17, 5)],
+    { base: 8, ratio: 0.15 },
+  );
+  assert.equal(r.snapped, 2);
+  assert.equal(r.merged, 1);
+  assert.equal(r.tokens.length, 1);
+  assert.equal(r.tokens[0].value, 16);
+  assert.equal(r.tokens[0].count, 10); // 사용 수를 물려받는다
+  assert.deepEqual(r.tokens[0].sources, ['gap']);
+});
+
+test('tidyNumberTokens — 사다리에서 먼 값은 서로 가까워도 합치지 않는다', () => {
+  // 12·13은 1px 차이지만 둘 다 8px 사다리에서 멀다 → 의도된 예외로 보고 그대로 둔다.
+  const r = tidyNumberTokens(
+    [numTok('spacing/12', 'gap', 12, 40), numTok('spacing/13', 'gap', 13, 2)],
+    { base: 8, ratio: 0.15 },
+  );
+  assert.equal(r.snapped, 0);
   assert.equal(r.merged, 0);
   assert.equal(r.tokens.length, 2);
 });
 
-test('tidyNumberTokens — 카테고리·단위가 다르면 병합하지 않음', () => {
+test('tidyNumberTokens — 여백·크기만 대상(폰트 크기·선 두께·반경·색 제외)', () => {
   const tokens = [
-    numTok('spacing/12', 'gap', 12, 40),
-    numTok('size/12', 'size', 12, 1), // 카테고리 다름
-    numTok('line-height/12', 'lineHeight', 12, 30),
-    numTok('line-height/12pct', 'lineHeight', 12, 1, 'percent'), // 단위 다름
-  ];
-  const r = tidyNumberTokens(tokens, 1);
-  assert.equal(r.merged, 0);
-  assert.equal(r.tokens.length, 4);
-});
-
-test('tidyNumberTokens — 색·opacity·문자열은 대상 아님', () => {
-  const tokens = [
+    numTok('font-size/15', 'fontSize', 15, 30),
+    numTok('stroke-width/1_5', 'strokeWidth', 1.5, 12),
+    numTok('radius/6', 'radius', 6, 8),
     { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff', count: 9 },
     { name: 'opacity/0_5', category: 'opacity', sources: ['opacity'], value: 0.5, count: 9 },
-    { name: 'opacity/0_6', category: 'opacity', sources: ['opacity'], value: 0.6, count: 1 },
-    { name: 'font-family/Inter', category: 'fontFamily', sources: ['fontFamily'], value: 'Inter', count: 3 },
+    numTok('spacing/15', 'gap', 15, 4),
   ];
-  const r = tidyNumberTokens(tokens, 1);
+  const r = tidyNumberTokens(tokens, { base: 8, ratio: 0.15 });
+  assert.equal(r.before, 1); // 대상은 spacing 하나뿐
+  assert.equal(r.snapped, 1);
+  const byName = new Map(r.tokens.map((t) => [t.name, t]));
+  assert.equal(byName.get('font-size/15').value, 15);
+  assert.equal(byName.get('stroke-width/1_5').value, 1.5);
+  assert.equal(byName.get('radius/6').value, 6);
+  assert.equal(byName.get('spacing/16').value, 16);
+});
+
+test('tidyNumberTokens — 비-px 단위는 사다리와 무관', () => {
+  const t = numTok('spacing/15pct', 'gap', 15, 3, 'percent');
+  const r = tidyNumberTokens([t], { base: 8, ratio: 0.15 });
   assert.equal(r.before, 0);
-  assert.equal(r.merged, 0);
-  assert.equal(r.tokens.length, 4); // opacity 0.5/0.6이 1px 규칙에 휩쓸리지 않는다
+  assert.equal(r.snapped, 0);
+  assert.equal(r.tokens[0].value, 15);
 });
 
-test('tidyNumberTokens — threshold 0이면 그대로', () => {
-  const tokens = [numTok('spacing/12', 'gap', 12, 40), numTok('spacing/13', 'gap', 13, 1)];
-  const r = tidyNumberTokens(tokens, 0);
-  assert.equal(r.merged, 0);
-  assert.equal(r.tokens.length, 2);
+test('tidyNumberTokens — 개명한 토큰은 값만 바꾸고 이름은 보존', () => {
+  const t = { name: 'spacing/inline-sm', category: 'gap', sources: ['gap'], value: 15, count: 3 };
+  const r = tidyNumberTokens([t], { base: 8, ratio: 0.15 });
+  assert.equal(r.snapped, 1);
+  assert.equal(r.tokens[0].value, 16);
+  assert.equal(r.tokens[0].name, 'spacing/inline-sm');
 });
 
-test('tidyNumberTokens — 흡수된 값의 출처를 대표가 물려받는다(스코프 유지)', () => {
-  const a = { name: 'spacing/12', category: 'gap', sources: ['gap'], value: 12, count: 40 };
-  const b = { name: 'spacing/13', category: 'gap', sources: ['gap'], value: 13, count: 1 };
-  b.sources = ['gap'];
-  const r = tidyNumberTokens([a, b], 1);
-  assert.equal(r.merged, 1);
-  assert.deepEqual(r.tokens[0].sources, ['gap']);
+test('tidyNumberTokens — 입력 배열을 변형하지 않는다(되돌리기 스냅샷 보호)', () => {
+  const tokens = [numTok('spacing/15', 'gap', 15, 3), numTok('spacing/17', 'gap', 17, 1)];
+  const snapshot = JSON.stringify(tokens);
+  tidyNumberTokens(tokens, { base: 8, ratio: 0.15 });
+  assert.equal(JSON.stringify(tokens), snapshot);
+});
+
+test('tidyNumberTokens — base 0 또는 허용 0이면 그대로', () => {
+  const tokens = [numTok('spacing/15', 'gap', 15, 3)];
+  assert.equal(tidyNumberTokens(tokens, { base: 0, ratio: 0.15 }).snapped, 0);
+  assert.equal(tidyNumberTokens(tokens, { base: 8, ratio: 0 }).snapped, 0);
 });

@@ -286,63 +286,109 @@ export function colorTokenName(hex: string): string {
   return `color/${hex.replace('#', '').toLowerCase()}`;
 }
 
-/* ---------- 수치 토큰 정리 (근접 중복 병합) ---------- */
+/* ---------- 수치 토큰 정리 (스케일 사다리 스냅) ---------- */
 
 /**
- * 정리 대상 카테고리. px 척도라 "1px 차이는 사실상 같은 값"이 성립하는 것만.
- * opacity(0~1)·fontFamily(문자열)·색은 제외 — 색은 별도의 색 정리가 담당한다.
+ * 스냅 대상 — 8pt 사다리가 실제 관례인 여백·크기만.
+ * fontSize(14·18·20)·strokeWidth(1·1.5·2)·radius(2·4·6)는 각자의 척도가 있어 끌어당기면 망가진다.
  */
-const TIDY_CATEGORIES: ReadonlySet<TokenCategory> = new Set<TokenCategory>([
-  'gap', 'size', 'radius', 'strokeWidth', 'fontSize', 'lineHeight', 'letterSpacing', 'effectFloat',
-]);
+const SNAP_CATEGORIES: ReadonlySet<TokenCategory> = new Set<TokenCategory>(['gap', 'size']);
+
+/** 카테고리별 자동 이름의 그룹 접두사 — 스냅으로 값이 바뀌면 이름도 따라가야 한다. */
+const TOKEN_GROUP: Partial<Record<TokenCategory, string>> = { gap: 'spacing', size: 'size' };
+
+export interface TidyNumbersOptions {
+  /** 사다리 기준(px). 8이면 …4·2·1 / 8·16·24·32… 0 이하면 정리하지 않는다. */
+  base: number;
+  /** 사다리 칸으로 옮길 수 있는 최대 이동 **비율**(0~1). 예: 0.15 = 값의 15%까지. */
+  ratio: number;
+}
 
 export interface TidyNumbersResult {
   tokens: DraftToken[];
+  /** 정리 대상(여백·크기, px)이었던 토큰 수. */
   before: number;
   after: number;
+  /** 같은 칸에 놓여 하나로 합쳐진 토큰 수. */
   merged: number;
+  /** 값이 사다리 칸으로 옮겨진 토큰 수(옮겼지만 중복이 아닐 수 있다). */
+  snapped: number;
+}
+
+const cloneToken = (t: DraftToken): DraftToken => ({ ...t, sources: [...t.sources] });
+
+/**
+ * 스케일 사다리 — 기준 미만은 **반분할**, 기준 이상은 **배수**.
+ * base=8이면 1·2·4 / 8·16·24·32… 8pt 시스템에서 4를 반 스텝, 2를 1/4 스텝으로 쓰는 관례를 그대로 담는다.
+ */
+export function scaleLadder(base: number, max: number): number[] {
+  if (base <= 0) return [];
+  const rungs: number[] = [];
+  for (let v = base / 2; v >= 1; v /= 2) rungs.push(v);
+  for (let k = 1; base * k <= max + base; k++) rungs.push(base * k);
+  return rungs.sort((a, b) => a - b);
 }
 
 /**
- * 근접한 수치 토큰을 **더 많이 쓰인 값**으로 흡수한다. 스케일(4·8배수)로 스냅하지 않는 이유는
- * 그러면 아무도 안 쓰는 값이 만들어져(14 → 16) 어떤 레이어와도 매칭되지 않는 토큰이 남기 때문이다.
- * 실제로 쓰이는 값 중 대표를 고르므로 병합 후에도 바인딩이 성립한다.
+ * 여백·크기 토큰을 스케일 사다리로 정리한다.
  *
- * 규칙: 같은 카테고리·같은 단위끼리, 사용 레이어 수(count) 내림차순으로 대표를 정하고,
- * 대표보다 **덜 쓰인** 값이 threshold 이내면 대표로 흡수한다. 같은 횟수끼리는 병합하지 않는다
- * (둘 다 실제로 쓰이는 값이라 어느 쪽을 지울 근거가 없다).
+ * 이동 거리를 px이 아니라 **값 대비 비율**로 재는 것이 핵심이다. 2px 이동은 값 4에서는 50%,
+ * 64에서는 3%로 의미가 전혀 다르다. 절대 px으로 통제하면 `4 → 8`(2배) 같은 사고가 나므로,
+ * 비율 기준을 쓰면 작은 값은 자동으로 보수적으로, 큰 값은 관대하게 다뤄진다.
+ *
+ * 병합은 스냅의 **결과**다 — 같은 칸에 놓인 토큰만 하나로 합친다(사용 수·출처를 대표가 물려받음).
+ * 사다리에서 먼 값은 의도된 예외로 보고 그대로 둔다. 불필요하면 목록에서 체크를 해제하면 된다.
+ *
+ * 입력은 변경하지 않는다 — 되돌리기용 스냅샷이 오염되지 않게 복제해서 다룬다.
  */
-export function tidyNumberTokens(tokens: readonly DraftToken[], threshold: number): TidyNumbersResult {
-  const targets = tokens.filter((t) => TIDY_CATEGORIES.has(t.category) && typeof t.value === 'number');
+export function tidyNumberTokens(tokens: readonly DraftToken[], opts: TidyNumbersOptions): TidyNumbersResult {
+  const { base, ratio } = opts;
+  const out = tokens.map(cloneToken);
+  // percent 행간 같은 비-px 값은 사다리와 무관하다.
+  const targets = out.filter(
+    (t) => SNAP_CATEGORIES.has(t.category) && typeof t.value === 'number' && (!t.unit || t.unit === 'px'),
+  );
   const before = targets.length;
-  if (threshold <= 0 || before === 0) return { tokens: [...tokens], before, after: before, merged: 0 };
+  if (base <= 0 || ratio <= 0 || before === 0) return { tokens: out, before, after: before, merged: 0, snapped: 0 };
 
-  // 사용 수 내림차순 → 같으면 값 오름차순(안정적인 대표 선택).
-  const order = [...targets].sort((a, b) => (b.count ?? 0) - (a.count ?? 0) || (a.value as number) - (b.value as number));
-  const kept: DraftToken[] = [];
-  const dropped = new Set<DraftToken>();
-  for (const t of order) {
-    const rep = kept.find(
-      (k) =>
-        k.category === t.category &&
-        (k.unit ?? '') === (t.unit ?? '') &&
-        (k.count ?? 0) > (t.count ?? 0) && // 덜 쓰인 값만 흡수 — 동률은 둘 다 남긴다
-        Math.abs((k.value as number) - (t.value as number)) <= threshold,
-    );
-    if (rep) {
-      dropped.add(t);
-      // 흡수된 값의 출처도 대표가 물려받아야 스코프가 좁아지지 않는다.
-      for (const s of t.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
-      rep.count = (rep.count ?? 0) + (t.count ?? 0);
-    } else {
-      kept.push(t);
-    }
+  const rungs = scaleLadder(base, Math.max(...targets.map((t) => t.value as number)));
+  const nearest = (v: number): number => rungs.reduce((p, c) => (Math.abs(c - v) < Math.abs(p - v) ? c : p));
+
+  let snapped = 0;
+  for (const t of targets) {
+    const v = t.value as number;
+    if (v <= 0) continue;
+    const target = nearest(v);
+    if (target === v || Math.abs(target - v) / v > ratio) continue;
+    const group = TOKEN_GROUP[t.category];
+    // 사용자가 개명했으면 그 이름을 존중한다 — 자동 이름 그대로일 때만 값에 맞춰 갱신.
+    if (group && t.name === numberTokenName(group, v)) t.name = numberTokenName(group, target);
+    t.value = target;
+    snapped++;
   }
+
+  // 같은 칸에 놓인 것만 병합 — 사용 수와 무관하다(같은 값이 두 줄 남으면 안 된다).
+  const seen = new Map<string, DraftToken>();
+  const dropped = new Set<DraftToken>();
+  for (const t of targets) {
+    const k = `${t.category}|${t.value}|${t.unit ?? ''}`;
+    const rep = seen.get(k);
+    if (!rep) {
+      seen.set(k, t);
+      continue;
+    }
+    // 흡수된 값의 출처도 대표가 물려받아야 스코프가 좁아지지 않는다.
+    for (const s of t.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+    rep.count = (rep.count ?? 0) + (t.count ?? 0);
+    dropped.add(t);
+  }
+
   return {
-    tokens: tokens.filter((t) => !dropped.has(t)),
+    tokens: out.filter((t) => !dropped.has(t)),
     before,
     after: before - dropped.size,
     merged: dropped.size,
+    snapped,
   };
 }
 

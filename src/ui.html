@@ -571,7 +571,8 @@
       </div>
       <div class="row">
         <label class="inline">base(px) <input id="base" type="number" value="16" min="1" /></label>
-        <label class="inline">근접 정리 <input id="tidyNum" type="number" value="1" min="0" step="0.5" style="width:52px;" title="이 값(px) 이내로 가까운 수치 토큰을 더 많이 쓰인 값으로 합칩니다. 0이면 정리하지 않습니다." /></label>
+        <label class="inline">사다리 <input id="tidyBase" type="number" value="8" min="0" step="1" style="width:46px;" title="여백·크기를 이 값 기준 사다리에 맞춥니다. 8이면 …4·2·1 / 8·16·24·32. 기준 미만은 반분할이라 4·2가 보존됩니다. 0이면 정리하지 않습니다." />px</label>
+        <label class="inline">허용 <input id="tidyRatio" type="number" value="15" min="0" max="50" step="5" style="width:46px;" title="값 대비 몇 %까지 옮길지. 비율이라 작은 값일수록 자동으로 보수적입니다(4는 거의 안 움직이고 40은 여유 있게)." />%</label>
         <button id="btnTidyNumbers">정리</button>
       </div>
       <div class="tidy tidy-note" id="numTidySummary" style="display:none">
