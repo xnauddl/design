@@ -174,25 +174,29 @@
   function keyOf(category, value, unit) {
     return `${category}|${value}|${unit != null ? unit : ""}`;
   }
-  function add(acc, token, source) {
+  function add(acc, token, source, nodeId) {
+    var _a;
     const k = keyOf(token.category, token.value, token.unit);
     const existing = acc.map.get(k);
     if (existing) {
       if (!existing.sources.includes(source)) existing.sources.push(source);
+      if (acc.lastNode.get(k) !== nodeId) existing.count = ((_a = existing.count) != null ? _a : 1) + 1;
     } else {
-      acc.map.set(k, __spreadProps(__spreadValues({}, token), { sources: [source] }));
+      acc.map.set(k, __spreadProps(__spreadValues({}, token), { sources: [source], count: 1 }));
     }
+    acc.lastNode.set(k, nodeId);
   }
-  function collectPaints(acc, paints3, source) {
+  function collectPaints(acc, node, paints3, source) {
+    const nodeId = node.id;
     if (paints3 === figma.mixed || !Array.isArray(paints3)) return;
     for (const p of paints3) {
       if (p.visible === false) continue;
       if (p.type === "SOLID") {
         const hex = rgbToHex(p.color);
-        add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source);
+        add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source, nodeId);
         if (p.opacity != null && p.opacity < 1) {
           const o = round(p.opacity);
-          add(acc, { name: numberTokenName("opacity", o), category: "opacity", value: o }, "opacity");
+          add(acc, { name: numberTokenName("opacity", o), category: "opacity", value: o }, "opacity", node.id);
         }
       } else if (p.type.startsWith("GRADIENT") || p.type === "IMAGE" || p.type === "VIDEO") {
         acc.warnings.add("\uADF8\uB77C\uB514\uC5B8\uD2B8/\uC774\uBBF8\uC9C0 \uCC44\uC6C0\uC740 \uBCC0\uC218 \uBC14\uC778\uB529 \uBD88\uAC00 \u2014 \uC2A4\uD0B5\uD588\uC2B5\uB2C8\uB2E4.");
@@ -202,23 +206,23 @@
   function collectText(acc, node) {
     if (node.fontSize !== figma.mixed) {
       const v = round(node.fontSize);
-      add(acc, { name: numberTokenName("font-size", v), category: "fontSize", value: v }, "fontSize");
+      add(acc, { name: numberTokenName("font-size", v), category: "fontSize", value: v }, "fontSize", node.id);
     }
     if (node.fontName !== figma.mixed) {
       const fam = node.fontName.family;
-      add(acc, { name: `font-family/${fam}`, category: "fontFamily", value: fam }, "fontFamily");
+      add(acc, { name: `font-family/${fam}`, category: "fontFamily", value: fam }, "fontFamily", node.id);
     }
     if (node.lineHeight !== figma.mixed && node.lineHeight.unit !== "AUTO") {
       const lh = node.lineHeight;
       const unit = lh.unit === "PERCENT" ? "percent" : "px";
       const v = round(lh.value);
-      add(acc, { name: numberTokenName("line-height", v), category: "lineHeight", value: v, unit }, "lineHeight");
+      add(acc, { name: numberTokenName("line-height", v), category: "lineHeight", value: v, unit }, "lineHeight", node.id);
     }
     if (node.letterSpacing !== figma.mixed) {
       const ls = node.letterSpacing;
       const unit = ls.unit === "PERCENT" ? "percent" : "px";
       const v = round(ls.value);
-      add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing");
+      add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing", node.id);
     }
   }
   function collectSpacing(acc, node) {
@@ -233,7 +237,7 @@
     for (const g of gaps) {
       if (typeof g === "number" && g > 0) {
         const v = round(g);
-        add(acc, { name: numberTokenName("spacing", v), category: "gap", value: v }, "gap");
+        add(acc, { name: numberTokenName("spacing", v), category: "gap", value: v }, "gap", node.id);
       }
     }
   }
@@ -244,7 +248,7 @@
     if (!inAutoLayout) return;
     const addSize = (v) => {
       const rv = round(v);
-      if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size");
+      if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size", node.id);
     };
     if (node.layoutSizingHorizontal === "FIXED") addSize(node.width);
     if (node.layoutSizingVertical === "FIXED") addSize(node.height);
@@ -264,7 +268,7 @@
     for (const rv of values) {
       if (rv > 0) {
         const v = round(rv);
-        add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius");
+        add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius", node.id);
       }
     }
   }
@@ -285,7 +289,7 @@
     for (const wv of widths) {
       if (wv > 0) {
         const v = round(wv);
-        add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth");
+        add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth", node.id);
       }
     }
   }
@@ -294,7 +298,7 @@
     const o = node.opacity;
     if (typeof o !== "number" || o >= 1 || o <= 0) return;
     const v = round(o);
-    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity");
+    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity", node.id);
   }
   function collectEffects(acc, node) {
     var _a;
@@ -303,7 +307,7 @@
       if (e.visible === false) continue;
       if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") {
         const hex = rgbToHex(e.color);
-        add(acc, { name: colorTokenName(hex), category: "effectColor", value: hex }, "effectColor");
+        add(acc, { name: colorTokenName(hex), category: "effectColor", value: hex }, "effectColor", node.id);
         for (const [g, val] of [
           ["shadow-blur", e.radius],
           ["shadow-spread", (_a = e.spread) != null ? _a : 0],
@@ -311,11 +315,11 @@
           ["shadow-y", e.offset.y]
         ]) {
           const v = round(val);
-          add(acc, { name: numberTokenName(g, v), category: "effectFloat", value: v }, "effectFloat");
+          add(acc, { name: numberTokenName(g, v), category: "effectFloat", value: v }, "effectFloat", node.id);
         }
       } else if (e.type === "LAYER_BLUR" || e.type === "BACKGROUND_BLUR") {
         const v = round(e.radius);
-        add(acc, { name: numberTokenName("blur", v), category: "effectFloat", value: v }, "effectFloat");
+        add(acc, { name: numberTokenName("blur", v), category: "effectFloat", value: v }, "effectFloat", node.id);
       }
     }
   }
@@ -324,8 +328,8 @@
       acc.warnings.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD1A0\uD070 \uD6C4\uBCF4\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
       return;
     }
-    if ("fills" in node) collectPaints(acc, node.fills, "fill");
-    if ("strokes" in node) collectPaints(acc, node.strokes, "stroke");
+    if ("fills" in node) collectPaints(acc, node, node.fills, "fill");
+    if ("strokes" in node) collectPaints(acc, node, node.strokes, "stroke");
     if (node.type === "TEXT") collectText(acc, node);
     if (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE") {
       collectSpacing(acc, node);
@@ -342,7 +346,7 @@
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
   function extractFromSelection(selection2) {
-    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set() };
+    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map() };
     for (const node of selection2) walk(acc, node);
     const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
     return { tokens, warnings: [...acc.warnings] };

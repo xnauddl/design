@@ -105,6 +105,32 @@ function clearMount(mount: HTMLElement): void {
     추출이 실제로 만드는 비-px 단위는 percent뿐이고(lineHeight·letterSpacing), 나머지는 대비용. */
 const UNIT_CHIP: Record<Unit, string> = { px: 'px', percent: '%', em: 'em', rem: 'rem', ratio: '×' };
 
+/* ---------- 생성 대상 선택 ----------
+   바인딩 카드가 후보를 골라 적용하듯(bindChecked), 토큰도 골라서 만든다. 색 토큰은 위 ‘색 정리’
+   표가 담당하므로 이 선택의 대상이 아니다 — 항상 생성에 포함된다. */
+const tokenChecked = new Set<string>();
+
+/** 체크 키 — 이름은 편집 대상이라 값으로 식별한다(추출의 dedup 키와 같은 규칙). */
+function tokenKey(t: DraftToken): string {
+  return `${t.category}|${t.value}|${t.unit ?? ''}`;
+}
+
+/** 이 카드가 고르는 대상(색 외 토큰). */
+function creatableTokens(): DraftToken[] {
+  return tokens.filter((t) => t.category !== 'color');
+}
+
+/** 토큰 집합이 바뀌면 전체 선택으로 초기화(새 추출·팔레트 생성). */
+function resetTokenChecked(): void {
+  tokenChecked.clear();
+  for (const t of creatableTokens()) tokenChecked.add(tokenKey(t));
+}
+
+/** 실제로 생성할 토큰 — 색은 전부, 색 외는 체크한 것만. */
+function tokensToCreate(): DraftToken[] {
+  return tokens.filter((t) => t.category === 'color' || tokenChecked.has(tokenKey(t)));
+}
+
 /**
  * 토큰 1행(스와치·이름 입력·타입 칩).
  * 이름 편집은 넘겨받은 토큰 객체를 그대로 고친다 — 목록은 `tokens`를 필터한 배열이라
@@ -113,6 +139,20 @@ const UNIT_CHIP: Record<Unit, string> = { px: 'px', percent: '%', em: 'em', rem:
 function makeTokenRow(t: DraftToken): HTMLElement {
   const row = document.createElement('div');
   row.className = 'tk';
+
+  // 체크한 토큰만 생성한다. 키는 이름이 아니라 값(category|value|unit) — 이름은 편집 대상이라
+  // 개명하는 순간 체크가 풀린다.
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'tk-check';
+  cb.checked = tokenChecked.has(tokenKey(t));
+  cb.title = '생성 대상';
+  cb.addEventListener('change', () => {
+    if (cb.checked) tokenChecked.add(tokenKey(t));
+    else tokenChecked.delete(tokenKey(t));
+    updateTokenCreate();
+  });
+  row.appendChild(cb);
 
   const sw = document.createElement('span');
   sw.className = 'tk-gutter'; // 스와치 없는 행은 CSS가 폭 0으로 접는다(#tokenList.has-swatch 참고)
@@ -133,6 +173,16 @@ function makeTokenRow(t: DraftToken): HTMLElement {
     input.title = input.value;
   });
   row.appendChild(input);
+
+  // 등장 레이어 수 — 무엇을 남길지 고르는 근거. 1×는 대개 일회성 값이라 눈에 띄게 흐린다.
+  const n = t.count ?? 0;
+  if (n > 0) {
+    const use = document.createElement('span');
+    use.className = n === 1 ? 'tk-use once' : 'tk-use';
+    use.textContent = `${n}×`;
+    use.title = `이 값을 쓰는 레이어 ${n}개`;
+    row.appendChild(use);
+  }
 
   const cat = document.createElement('span');
   cat.className = 'cat';
@@ -297,15 +347,15 @@ for (const r of LIST_REGIONS) {
 // ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만.
 function renderTokens(): void {
   const box = $('tokenList');
-  const others = tokens.filter((t) => t.category !== 'color');
-  // 카드 제목의 개수 — 목록이 접혀 있어도 몇 개가 생성 대상인지 먼저 알린다.
-  $('createCount').textContent = others.length ? `· 색 외 ${others.length}개` : '';
+  const others = creatableTokens();
   const showHint = (msg: string): void => {
     clearMount(box); // 진행 중이던 청크가 안내 문구 아래로 계속 쌓이지 않게
+    ($('tokenCtrls') as HTMLElement).style.display = 'none';
     const hint = document.createElement('div');
     hint.className = 'hint';
     hint.textContent = msg;
     box.appendChild(hint);
+    updateTokenCreate();
     layoutListBy('tokenList'); // 행이 없으니 경계·개수 줄을 걷어낸다
   };
   if (!tokens.length) {
@@ -324,7 +374,26 @@ function renderTokens(): void {
   }
   // 스와치가 실제로 쓰이는 목록에서만 14px 거터를 유지(그 외엔 이름 폭으로 넘긴다).
   box.classList.toggle('has-swatch', others.some((o) => o.category === 'effectColor' && typeof o.value === 'string'));
+  ($('tokenCtrls') as HTMLElement).style.display = '';
   renderChunked(box, others, makeTokenRow, () => layoutListBy('tokenList')); // §4: 대량 추출도 비차단
+  updateTokenCreate();
+}
+
+/**
+ * 선택 수 반영 — 카드 제목 개수·전체선택 마스터·버튼 활성. 바인딩 카드의 updateBindApply와 같은 역할.
+ * 목록이 렌더되기 전(빈 상태)에도 불리므로 DOM 존재만 가정한다.
+ */
+function updateTokenCreate(): void {
+  const others = creatableTokens();
+  const sel = others.filter((t) => tokenChecked.has(tokenKey(t))).length;
+  $('createCount').textContent = others.length ? `· 색 외 ${sel}/${others.length}개` : '';
+  const all = $('tokenAll') as HTMLInputElement;
+  all.checked = sel === others.length && others.length > 0;
+  all.indeterminate = sel > 0 && sel < others.length;
+  // 색만 추출된 경우엔 색 토큰만으로도 생성할 게 있으므로 잠그지 않는다.
+  const nothing = others.length > 0 && sel === 0 && !tokens.some((t) => t.category === 'color');
+  ($('btnCreate') as HTMLButtonElement).disabled = nothing;
+  ($('btnCreateApply') as HTMLButtonElement).disabled = nothing;
 }
 
 /* ---------- 0 · 브랜드 팔레트 ---------- */
@@ -354,6 +423,7 @@ $('btnPalette').addEventListener('click', () => {
     includeStatus: ($('incStatus') as HTMLInputElement).checked,
   });
   tokens = paletteToDraftTokens(p);
+  resetTokenChecked();
   colorRevealed = true; // 팔레트 생성 = 색 노출
   previewRevealed = false; // 색 외 토큰 목록은 ‘미리보기’ 클릭 시
   renderTokens();
@@ -560,6 +630,20 @@ $('btnExtract').addEventListener('click', () => {
   send({ type: 'EXTRACT' });
 });
 
+// 전체 선택 / 1× 해제 — 목록이 상한에 잘려 있어도 전체에 적용된다(체크는 DOM이 아니라 집합이 보관).
+$('tokenAll').addEventListener('change', () => {
+  const on = ($('tokenAll') as HTMLInputElement).checked;
+  tokenChecked.clear();
+  if (on) for (const t of creatableTokens()) tokenChecked.add(tokenKey(t));
+  renderTokens();
+});
+$('btnTokenDropOnce').addEventListener('click', () => {
+  const once = creatableTokens().filter((t) => (t.count ?? 0) <= 1);
+  for (const t of once) tokenChecked.delete(tokenKey(t));
+  renderTokens();
+  setStatus('createStatus', once.length ? `1회만 쓰인 ${once.length}개를 해제했어요.` : '1회만 쓰인 토큰이 없어요.', '');
+});
+
 $('btnCreate').addEventListener('click', () => {
   previewRevealed = true; // 미리보기 버튼 역할: 생성할 색 외 토큰을 펼침
   if (!tokens.length) {
@@ -572,14 +656,14 @@ $('btnCreate').addEventListener('click', () => {
   renderTokens();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
-  send({ type: 'CREATE_TOKENS', tokens, base, preview: true }); // UX1: 미리보기 먼저
+  send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, preview: true }); // UX1: 미리보기 먼저
 });
 
 $('btnCreateApply').addEventListener('click', () => {
   if (!tokens.length) return;
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
-  send({ type: 'CREATE_TOKENS', tokens, base }); // 확인 후 실제 적용
+  send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base }); // 확인 후 실제 적용
 });
 
 // base는 비-px 값(rem·%·em)을 px로 환산하는 기준이라 미리보기 결과가 base에 따라 달라진다.
@@ -596,7 +680,7 @@ let basePreviewTimer = 0;
   basePreviewTimer = window.setTimeout(() => {
     if (!tokens.length) return;
     createFrom = 'tokens';
-    send({ type: 'CREATE_TOKENS', tokens, base: Number(($('base') as HTMLInputElement).value) || 16, preview: true });
+    send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base: Number(($('base') as HTMLInputElement).value) || 16, preview: true });
   }, 350); // 타이핑 중 매 키마다 보내지 않도록
 });
 
@@ -1362,6 +1446,7 @@ window.onmessage = (event: MessageEvent) => {
   switch (msg.type) {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
+      resetTokenChecked(); // 새 추출 = 새 집합 → 전체 선택으로 시작
       huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
       // 추출 색 자동 정리(같은 hue-단계 N:1 병합) — 드래프트 단계라 바인딩 영향 없음.
       preTidyTokens = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기 스냅샷
@@ -1381,7 +1466,7 @@ window.onmessage = (event: MessageEvent) => {
         pendingCreatePreview = false;
         const base = Number(($('base') as HTMLInputElement).value) || 16;
         createFrom = 'tokens';
-        send({ type: 'CREATE_TOKENS', tokens, base, preview: true });
+        send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, preview: true });
       }
       break;
     }

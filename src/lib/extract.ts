@@ -14,6 +14,11 @@ import {
 interface Accumulator {
   map: Map<string, DraftToken>;
   warnings: Set<string>;
+  /**
+   * 토큰 키 → 마지막으로 집계한 노드 id. walk가 한 노드를 끝까지 처리한 뒤 자식으로 내려가므로,
+   * 같은 노드에서 온 연속 add는 이 비교로 걸러진다(padding 4방향이 count 4가 되지 않게).
+   */
+  lastNode: Map<string, string>;
 }
 
 const round = (n: number, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
@@ -26,31 +31,36 @@ function add(
   acc: Accumulator,
   token: Omit<DraftToken, 'sources'>,
   source: SourceField,
+  nodeId: string,
 ): void {
   const k = keyOf(token.category, token.value, token.unit);
   const existing = acc.map.get(k);
   if (existing) {
     if (!existing.sources.includes(source)) existing.sources.push(source);
+    if (acc.lastNode.get(k) !== nodeId) existing.count = (existing.count ?? 1) + 1;
   } else {
-    acc.map.set(k, { ...token, sources: [source] });
+    acc.map.set(k, { ...token, sources: [source], count: 1 });
   }
+  acc.lastNode.set(k, nodeId);
 }
 
 /* ---------- paint ---------- */
 function collectPaints(
   acc: Accumulator,
+  node: SceneNode,
   paints: readonly Paint[] | typeof figma.mixed,
   source: 'fill' | 'stroke',
 ): void {
+  const nodeId = node.id;
   if (paints === figma.mixed || !Array.isArray(paints)) return;
   for (const p of paints) {
     if (p.visible === false) continue;
     if (p.type === 'SOLID') {
       const hex = rgbToHex(p.color);
-      add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source);
+      add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source, nodeId);
       if (p.opacity != null && p.opacity < 1) {
         const o = round(p.opacity);
-        add(acc, { name: numberTokenName('opacity', o), category: 'opacity', value: o }, 'opacity');
+        add(acc, { name: numberTokenName('opacity', o), category: 'opacity', value: o }, 'opacity', node.id);
       }
     } else if (p.type.startsWith('GRADIENT') || p.type === 'IMAGE' || p.type === 'VIDEO') {
       acc.warnings.add('그라디언트/이미지 채움은 변수 바인딩 불가 — 스킵했습니다.');
@@ -62,23 +72,23 @@ function collectPaints(
 function collectText(acc: Accumulator, node: TextNode): void {
   if (node.fontSize !== figma.mixed) {
     const v = round(node.fontSize);
-    add(acc, { name: numberTokenName('font-size', v), category: 'fontSize', value: v }, 'fontSize');
+    add(acc, { name: numberTokenName('font-size', v), category: 'fontSize', value: v }, 'fontSize', node.id);
   }
   if (node.fontName !== figma.mixed) {
     const fam = node.fontName.family;
-    add(acc, { name: `font-family/${fam}`, category: 'fontFamily', value: fam }, 'fontFamily');
+    add(acc, { name: `font-family/${fam}`, category: 'fontFamily', value: fam }, 'fontFamily', node.id);
   }
   if (node.lineHeight !== figma.mixed && node.lineHeight.unit !== 'AUTO') {
     const lh = node.lineHeight;
     const unit: Unit = lh.unit === 'PERCENT' ? 'percent' : 'px';
     const v = round(lh.value);
-    add(acc, { name: numberTokenName('line-height', v), category: 'lineHeight', value: v, unit }, 'lineHeight');
+    add(acc, { name: numberTokenName('line-height', v), category: 'lineHeight', value: v, unit }, 'lineHeight', node.id);
   }
   if (node.letterSpacing !== figma.mixed) {
     const ls = node.letterSpacing;
     const unit: Unit = ls.unit === 'PERCENT' ? 'percent' : 'px';
     const v = round(ls.value);
-    add(acc, { name: numberTokenName('letter-spacing', v), category: 'letterSpacing', value: v, unit }, 'letterSpacing');
+    add(acc, { name: numberTokenName('letter-spacing', v), category: 'letterSpacing', value: v, unit }, 'letterSpacing', node.id);
   }
 }
 
@@ -97,7 +107,7 @@ function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | Inst
   for (const g of gaps) {
     if (typeof g === 'number' && g > 0) {
       const v = round(g);
-      add(acc, { name: numberTokenName('spacing', v), category: 'gap', value: v }, 'gap');
+      add(acc, { name: numberTokenName('spacing', v), category: 'gap', value: v }, 'gap', node.id);
     }
   }
 }
@@ -118,7 +128,7 @@ function collectSize(acc: Accumulator, node: SceneNode): void {
   // 정수만 — 343.5처럼 자유 리사이즈로 남은 소수 값은 의도된 척도가 아님.
   const addSize = (v: number) => {
     const rv = round(v);
-    if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName('size', rv), category: 'size', value: rv }, 'size');
+    if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName('size', rv), category: 'size', value: rv }, 'size', node.id);
   };
   if (node.layoutSizingHorizontal === 'FIXED') addSize(node.width);
   if (node.layoutSizingVertical === 'FIXED') addSize(node.height);
@@ -140,7 +150,7 @@ function collectRadius(acc: Accumulator, node: SceneNode): void {
   for (const rv of values) {
     if (rv > 0) {
       const v = round(rv);
-      add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius');
+      add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id);
     }
   }
 }
@@ -164,7 +174,7 @@ function collectStroke(acc: Accumulator, node: SceneNode): void {
   for (const wv of widths) {
     if (wv > 0) {
       const v = round(wv);
-      add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth');
+      add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id);
     }
   }
 }
@@ -175,7 +185,7 @@ function collectOpacity(acc: Accumulator, node: SceneNode): void {
   const o = (node as { opacity: number }).opacity;
   if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1(불투명)·0(숨김 동등)은 토큰화 안 함
   const v = round(o);
-  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity');
+  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity', node.id);
 }
 
 /* ---------- effects ---------- */
@@ -185,7 +195,7 @@ function collectEffects(acc: Accumulator, node: SceneNode): void {
     if (e.visible === false) continue;
     if (e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW') {
       const hex = rgbToHex(e.color);
-      add(acc, { name: colorTokenName(hex), category: 'effectColor', value: hex }, 'effectColor');
+      add(acc, { name: colorTokenName(hex), category: 'effectColor', value: hex }, 'effectColor', node.id);
       for (const [g, val] of [
         ['shadow-blur', e.radius],
         ['shadow-spread', e.spread ?? 0],
@@ -193,11 +203,11 @@ function collectEffects(acc: Accumulator, node: SceneNode): void {
         ['shadow-y', e.offset.y],
       ] as const) {
         const v = round(val);
-        add(acc, { name: numberTokenName(g, v), category: 'effectFloat', value: v }, 'effectFloat');
+        add(acc, { name: numberTokenName(g, v), category: 'effectFloat', value: v }, 'effectFloat', node.id);
       }
     } else if (e.type === 'LAYER_BLUR' || e.type === 'BACKGROUND_BLUR') {
       const v = round(e.radius);
-      add(acc, { name: numberTokenName('blur', v), category: 'effectFloat', value: v }, 'effectFloat');
+      add(acc, { name: numberTokenName('blur', v), category: 'effectFloat', value: v }, 'effectFloat', node.id);
     }
   }
 }
@@ -208,8 +218,8 @@ function walk(acc: Accumulator, node: SceneNode): void {
     acc.warnings.add('숨긴 레이어는 토큰 후보에서 제외했습니다.');
     return;
   }
-  if ('fills' in node) collectPaints(acc, node.fills, 'fill');
-  if ('strokes' in node) collectPaints(acc, node.strokes, 'stroke');
+  if ('fills' in node) collectPaints(acc, node, node.fills, 'fill');
+  if ('strokes' in node) collectPaints(acc, node, node.strokes, 'stroke');
   if (node.type === 'TEXT') collectText(acc, node);
   if (node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE') {
     collectSpacing(acc, node);
@@ -235,7 +245,7 @@ export interface ExtractResult {
 
 /** 현재 선택(자식 포함)에서 토큰 후보를 추출. */
 export function extractFromSelection(selection: readonly SceneNode[]): ExtractResult {
-  const acc: Accumulator = { map: new Map(), warnings: new Set() };
+  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map() };
   for (const node of selection) walk(acc, node);
   const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
   return { tokens, warnings: [...acc.warnings] };

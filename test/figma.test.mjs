@@ -360,6 +360,33 @@ test('extractFromSelection — 숨긴 레이어와 인스턴스 내부는 순회
   assert.equal(warnings.length, 2); // 숨김 · 인스턴스 안내
 });
 
+test('extractFromSelection — count는 값을 쓰는 레이어 수(한 레이어의 중복 사용은 1)', () => {
+  installFigma();
+  // 한 레이어가 padding 4방향에 모두 16을 써도 1로 센다.
+  const mk = (id, gap) => ({
+    type: 'FRAME',
+    id,
+    name: id,
+    fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 }, visible: true }],
+    layoutMode: 'VERTICAL',
+    itemSpacing: gap,
+    paddingLeft: 16,
+    paddingRight: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    children: [],
+  });
+  const a = mk('a', 16);
+  const b = mk('b', 8); // 16은 패딩으로만, 8은 이 레이어에서만
+
+  const byName = new Map(extractFromSelection([a, b]).tokens.map((t) => [t.name, t]));
+  assert.equal(byName.get('spacing/16').count, 2); // 두 레이어 — 한 레이어의 padding 4회는 1
+  assert.equal(byName.get('spacing/8').count, 1); // b에서만
+  assert.equal(byName.get('color/ff0000').count, 2); // 같은 색을 쓰는 레이어 2개
+});
+
 test('extractFromSelection — 그리드 오토레이아웃은 gridRowGap/gridColumnGap을 수집', () => {
   installFigma();
   // display:inline-grid; padding:12px 20px; row-gap:12px; column-gap:5px

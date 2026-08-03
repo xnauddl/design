@@ -70,6 +70,11 @@ export interface DraftToken {
   value: string | number;
   /** 수치 토큰의 의도 단위(px 외에는 STRING 보존 + 선택적 px 환산). */
   unit?: Unit;
+  /**
+   * 이 값을 쓰는 레이어 수(추출 시 집계). 한 레이어가 같은 값을 여러 번 써도(padding 4방향) 1.
+   * 무엇을 토큰으로 남길지 고르는 근거 — 1이면 대개 일회성 값이다.
+   */
+  count?: number;
 }
 
 /* ---------- 색상 hex ---------- */
