@@ -3247,12 +3247,70 @@
   }
 
   // src/lib/themeGen.ts
+  var DARK_L_MIN = 0.18;
+  var DARK_L_MAX = 0.97;
   function darkValueForLight(hex) {
     const lch = hexToOklch(hex);
-    return oklchToHex(clampToGamut({ l: 1 - lch.l, c: lch.c, h: lch.h }));
+    const l = DARK_L_MIN + (1 - lch.l) * (DARK_L_MAX - DARK_L_MIN);
+    return oklchToHex(clampToGamut({ l, c: lch.c, h: lch.h }));
+  }
+  var DARK_PREFIX = "dark/";
+  function isDarkGlobalName(name) {
+    return name.startsWith(DARK_PREFIX);
   }
   function darkGlobalName(lightName) {
-    return `dark/${lightName}`;
+    return isDarkGlobalName(lightName) ? lightName : `${DARK_PREFIX}${lightName}`;
+  }
+
+  // src/lib/themeApply.ts
+  function isVariableAlias(raw) {
+    return !!raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS";
+  }
+  async function generateDarkMode(collectionId, fromModeId, toModeId) {
+    var _a;
+    let created = 0;
+    let realiased = 0;
+    let skipped = 0;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const semanticCol = cols.find((c) => c.id === collectionId);
+    if (!semanticCol) return { created, realiased, skipped };
+    const globalCol = (_a = cols.find((c) => c.name === GLOBAL)) != null ? _a : figma.variables.createVariableCollection(GLOBAL);
+    const gMode = globalCol.defaultModeId;
+    const allVars = await figma.variables.getLocalVariablesAsync();
+    const byId = new Map(allVars.map((v) => [v.id, v]));
+    const globalByName = new Map(allVars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
+    for (const v of allVars) {
+      if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
+      const fromRaw = v.valuesByMode[fromModeId];
+      if (!isVariableAlias(fromRaw)) {
+        skipped++;
+        continue;
+      }
+      const lightGlobal = byId.get(fromRaw.id);
+      const lightRaw = lightGlobal == null ? void 0 : lightGlobal.valuesByMode[gMode];
+      if (!lightGlobal || !(lightRaw && typeof lightRaw === "object" && "r" in lightRaw)) {
+        skipped++;
+        continue;
+      }
+      if (isDarkGlobalName(lightGlobal.name)) {
+        skipped++;
+        continue;
+      }
+      const darkHex = darkValueForLight(rgbToHex(lightRaw));
+      const dname = darkGlobalName(lightGlobal.name);
+      let dark = globalByName.get(dname);
+      if (!dark) {
+        dark = figma.variables.createVariable(dname, globalCol, "COLOR");
+        dark.scopes = lightGlobal.scopes;
+        dark.hiddenFromPublishing = true;
+        globalByName.set(dname, dark);
+        created++;
+      }
+      dark.setValueForMode(gMode, hexToRgb(darkHex));
+      v.setValueForMode(toModeId, figma.variables.createVariableAlias(dark));
+      realiased++;
+    }
+    return { created, realiased, skipped };
   }
 
   // src/lib/variableEdit.ts
@@ -3475,11 +3533,11 @@
   }
   var EDITABLE_COLLECTIONS = /* @__PURE__ */ new Set([GLOBAL, SEMANTIC, COMPONENT]);
   var USAGE_SCAN_CAP = 5e3;
-  function isVariableAlias(raw) {
+  function isVariableAlias2(raw) {
     return !!raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS";
   }
   function toValueCell(type, raw, nameById) {
-    if (isVariableAlias(raw)) {
+    if (isVariableAlias2(raw)) {
       const aliasId = raw.id;
       const aliasName = nameById.get(aliasId);
       return { kind: "alias", display: aliasName != null ? aliasName : "(\uC54C \uC218 \uC5C6\uC74C)", aliasId, aliasName };
@@ -3534,7 +3592,7 @@
         seen.add(cur.id);
         for (const modeId of Object.keys(cur.valuesByMode)) {
           const raw = cur.valuesByMode[modeId];
-          if (isVariableAlias(raw)) {
+          if (isVariableAlias2(raw)) {
             const nv = await figma.variables.getVariableByIdAsync(raw.id);
             if (nv) next.push(nv);
           }
@@ -3622,48 +3680,6 @@
       if ("children" in n) for (const c of n.children) stack.push(c);
     }
     return { nodes, capped };
-  }
-  async function generateDarkMode(collectionId, fromModeId, toModeId) {
-    var _a;
-    let created = 0;
-    let realiased = 0;
-    let skipped = 0;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semanticCol = cols.find((c) => c.id === collectionId);
-    if (!semanticCol) return { type: "DARK_MODE_RESULT", created, realiased, skipped };
-    const globalCol = (_a = cols.find((c) => c.name === GLOBAL)) != null ? _a : figma.variables.createVariableCollection(GLOBAL);
-    const gMode = globalCol.defaultModeId;
-    const allVars = await figma.variables.getLocalVariablesAsync();
-    const byId = new Map(allVars.map((v) => [v.id, v]));
-    const globalByName = new Map(allVars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
-    for (const v of allVars) {
-      if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
-      const fromRaw = v.valuesByMode[fromModeId];
-      if (!isVariableAlias(fromRaw)) {
-        skipped++;
-        continue;
-      }
-      const lightGlobal = byId.get(fromRaw.id);
-      const lightRaw = lightGlobal == null ? void 0 : lightGlobal.valuesByMode[gMode];
-      if (!lightGlobal || !(lightRaw && typeof lightRaw === "object" && "r" in lightRaw)) {
-        skipped++;
-        continue;
-      }
-      const darkHex = darkValueForLight(rgbToHex(lightRaw));
-      const dname = darkGlobalName(lightGlobal.name);
-      let dark = globalByName.get(dname);
-      if (!dark) {
-        dark = figma.variables.createVariable(dname, globalCol, "COLOR");
-        dark.scopes = lightGlobal.scopes;
-        dark.hiddenFromPublishing = true;
-        globalByName.set(dname, dark);
-        created++;
-      }
-      dark.setValueForMode(gMode, hexToRgb(darkHex));
-      v.setValueForMode(toModeId, figma.variables.createVariableAlias(dark));
-      realiased++;
-    }
-    return { type: "DARK_MODE_RESULT", created, realiased, skipped };
   }
   function pageOf(node) {
     let n = node;
@@ -4740,7 +4756,7 @@
         case "GENERATE_DARK_MODE": {
           if (!requirePaid("tokens", "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
-          post(r);
+          post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
           if (r.created || r.realiased) {
             commitUndo(figma);
             await postPrereq();

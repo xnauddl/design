@@ -15,7 +15,7 @@ import { missingVariants, variantGrid, inferComponentProperties, inferVaryingCom
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
-import { darkValueForLight, darkGlobalName } from './lib/themeGen';
+import { generateDarkMode } from './lib/themeApply';
 import { parseVarValue, sanitizeScopes, aliasSelfReference, findAliasReferers } from './lib/variableEdit';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
@@ -355,53 +355,6 @@ async function collectBoundNodes(varId: string): Promise<{ nodes: { id: string; 
     if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
   }
   return { nodes, capped };
-}
-
-/**
- * 라이트 모드 Semantic 색을 다크 모드로 자동 채움. Semantic이 Global 별칭인 것만 대상이며
- * (3계층 규칙 — 리터럴 Semantic은 건너뜀), 대응하는 `dark/…` Global을 만들어 그 별칭으로 건다.
- */
-async function generateDarkMode(collectionId: string, fromModeId: string, toModeId: string): Promise<Extract<CodeToUi, { type: 'DARK_MODE_RESULT' }>> {
-  let created = 0;
-  let realiased = 0;
-  let skipped = 0;
-  const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const semanticCol = cols.find((c) => c.id === collectionId);
-  if (!semanticCol) return { type: 'DARK_MODE_RESULT', created, realiased, skipped };
-  const globalCol = cols.find((c) => c.name === GLOBAL) ?? figma.variables.createVariableCollection(GLOBAL);
-  const gMode = globalCol.defaultModeId;
-  const allVars = await figma.variables.getLocalVariablesAsync();
-  const byId = new Map(allVars.map((v) => [v.id, v]));
-  const globalByName = new Map(allVars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
-
-  for (const v of allVars) {
-    if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== 'COLOR') continue;
-    const fromRaw = v.valuesByMode[fromModeId];
-    if (!isVariableAlias(fromRaw)) {
-      skipped++;
-      continue;
-    }
-    const lightGlobal = byId.get(fromRaw.id);
-    const lightRaw = lightGlobal?.valuesByMode[gMode];
-    if (!lightGlobal || !(lightRaw && typeof lightRaw === 'object' && 'r' in lightRaw)) {
-      skipped++;
-      continue;
-    }
-    const darkHex = darkValueForLight(rgbToHex(lightRaw as RGB));
-    const dname = darkGlobalName(lightGlobal.name);
-    let dark = globalByName.get(dname);
-    if (!dark) {
-      dark = figma.variables.createVariable(dname, globalCol, 'COLOR');
-      dark.scopes = lightGlobal.scopes;
-      dark.hiddenFromPublishing = true; // 직접 사용 방지(3계층 규칙)
-      globalByName.set(dname, dark);
-      created++;
-    }
-    dark.setValueForMode(gMode, hexToRgb(darkHex));
-    v.setValueForMode(toModeId, figma.variables.createVariableAlias(dark));
-    realiased++;
-  }
-  return { type: 'DARK_MODE_RESULT', created, realiased, skipped };
 }
 
 /** 노드가 속한 페이지(없으면 null) — 부모를 PAGE까지 거슬러 올라간다. */
@@ -1586,7 +1539,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 다크 Global을 새로 만드는 작업이라 토큰 생성과 같은 등급으로 잠근다.
         if (!requirePaid('tokens', '다크 테마 생성은 Paid 기능입니다.')) break;
         const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
-        post(r);
+        post({ type: 'DARK_MODE_RESULT', ...r });
         if (r.created || r.realiased) {
           commitUndo(figma); // UX2: 다크 생성 전체를 단일 Undo로
           await postPrereq();
