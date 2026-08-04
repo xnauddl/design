@@ -9,6 +9,53 @@ import type { Preset } from '../lib/presets';
 import type { ExportFormat } from '../lib/exporters';
 import type { WcagLevel, ContrastFinding } from '../lib/contrast';
 import type { FrameMeta, VaryingPosition } from '../lib/similar';
+import type { ResolvedType, ScopeName } from '../lib/tokens';
+
+export interface VarMode {
+  modeId: string;
+  name: string;
+}
+
+export interface VarValueCell {
+  kind: 'literal' | 'alias';
+  /** 표시/편집용 문자열 — COLOR=hex, FLOAT/STRING=문자열화. alias면 대상 이름. */
+  display: string;
+  /** kind='alias'일 때 대상 변수 id/이름. */
+  aliasId?: string;
+  aliasName?: string;
+}
+
+/**
+ * 변수 편집기의 변수 한 개 스냅샷. 우리 3계층(Global/Semantic/Component)만 대상.
+ * 다중 모드 컬렉션이면 modes가 2개 이상이고 values에 모드별 칸이 담긴다(단일 모드면 1개).
+ */
+export interface VarInfo {
+  id: string;
+  name: string;
+  /** 소속 컬렉션 id(다크 생성 등 컬렉션 단위 작업용). */
+  collectionId: string;
+  /** 소속 컬렉션 이름('Global'|'Semantic'|'Component'). 읽기 전용(이동 불가). */
+  collection: string;
+  /** 읽기 전용(타입 고정). */
+  type: ResolvedType;
+  description: string;
+  scopes: ScopeName[];
+  hidden: boolean;
+  modes: VarMode[];
+  defaultModeId: string;
+  /** modeId → 값 칸. */
+  values: Record<string, VarValueCell>;
+}
+
+/** EDIT_VARIABLE 패치 — 지정한 속성만 변경(즉시 편집, 행별 단일 Undo). */
+export interface VarPatch {
+  name?: string;
+  description?: string;
+  scopes?: ScopeName[];
+  hidden?: boolean;
+  /** 값 변경 — modeId로 대상 모드 지정(단일 모드면 defaultModeId). literal/aliasId 택1. */
+  value?: { modeId: string; literal?: string; aliasId?: string };
+}
 
 export interface CollectionInfo {
   id: string;
@@ -116,6 +163,11 @@ export type UiToCode =
   | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[] } // Phase 3(Paid): 후보(트리 선택 nodeIds, 없으면 선택 프레임 '내부' 후보) → 메인 컴포넌트 등록 + 베이스 묶음 베리언트 세트
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Paid): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Paid): 선택 세트의 빠진 조합 자동 생성
+  | { type: 'GET_VARIABLES' } // 변수 편집기: 3계층 변수 목록
+  | { type: 'EDIT_VARIABLE'; id: string; patch: VarPatch } // 변수 속성 즉시 편집
+  | { type: 'DELETE_VARIABLE'; id: string } // 변수 삭제
+  | { type: 'GET_VARIABLE_USAGE'; id: string } // 삭제/리네임 전 사용처 조회
+  | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId: string; toModeId: string } // 라이트→다크 자동 채움
   | { type: 'SCAN_SIMILAR' } // 닮은 프레임: 선택 프레임 정렬 미리보기(읽기 전용 → Free)
   | { type: 'COMPONENTIZE_SIMILAR'; masterId: string; frameIds: string[] } // 닮은 프레임(Paid): 마스터 컴포넌트화 + 나머지를 오버라이드 인스턴스로 교체
   | { type: 'CHECK_CONTRAST'; level: WcagLevel } // 명도 대비 점검(읽기 전용 감사)
@@ -160,6 +212,11 @@ export type CodeToUi =
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
+  | { type: 'VARIABLES'; vars: VarInfo[] } // 편집기용 변수 목록
+  | { type: 'EDIT_VARIABLE_RESULT'; id: string; ok: boolean; error?: string; var?: VarInfo; deleted?: boolean }
+  // 사용처 — nodes는 문서 전체 스캔(상한 도달 시 capped), aliasedBy는 이 변수를 별칭하는 변수.
+  | { type: 'VARIABLE_USAGE'; id: string; nodes: { id: string; name: string }[]; aliasedBy: { id: string; name: string }[]; capped: boolean }
+  | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number }
   // 닮은 프레임 스캔 결과 — metas는 완전성 점수 내림차순(맨 앞이 추천 마스터).
   // varying/imageVarying는 "무엇이 속성으로 열리는지" 미리 보여주는 용도.
   | { type: 'SIMILAR_CANDIDATES'; metas: FrameMeta[]; recommendedMasterId: string | null; varying: VaryingPosition[]; imageVarying: string[]; excluded: { id: string; name: string; reason: string }[] }
