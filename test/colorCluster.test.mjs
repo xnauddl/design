@@ -113,3 +113,26 @@ test('clusterColorsByDeltaE — 단일 연결 체이닝 방지(군집 폭 ≤ �
   const seen = clusters.flatMap((c) => c.members.map((m) => m.name)).sort();
   assert.deepEqual(seen, ['gray-0', 'gray-1', 'gray-2', 'gray-3']);
 });
+
+test('clusterColorsByDeltaE — 음수 허용오차에서도 종료(무한 루프 방지)', () => {
+  // 대표를 거리 비교에만 맡기면 dist(best,best)=0 <= 음수가 거짓이라 분리 집합이 줄지 않고
+  // 루프가 끝나지 않는다(힙 소진). 대표는 항상 자기 군집에 들어가야 한다.
+  const colors = [
+    { name: 'a', hex: '#ff0000' },
+    { name: 'b', hex: '#00ff00' },
+    { name: 'c', hex: '#0000ff' },
+  ];
+  const clusters = clusterColorsByDeltaE(colors, -1);
+  assert.equal(clusters.length, 3); // 아무것도 묶이지 않으니 전부 단색
+  assert.ok(clusters.every((c) => c.isSingleton));
+  assert.deepEqual(clusters.flatMap((c) => c.members.map((m) => m.name)).sort(), ['a', 'b', 'c']);
+});
+
+test('clusterColorsByDeltaE — 반경으로 떼어낸 군집은 원래 연결요소 바로 뒤에 온다', () => {
+  // 반환 순서가 전체 입력 순서와 같지 않다는 계약을 고정한다(주석과 동작 일치 확인).
+  const ramp = ['#f8f9fa', '#e9ecef', '#dee2e6', '#ced4da'].map((hex, i) => ({ name: `g${i}`, hex }));
+  const reps = clusterColorsByDeltaE(ramp).map((c) => c.representative.name);
+  assert.ok(reps.length > 1);
+  assert.notDeepEqual(reps, [...reps].sort()); // 입력 순서대로 정렬돼 있지 않다
+  assert.deepEqual([...reps].sort(), ['g0', 'g3']);
+});
