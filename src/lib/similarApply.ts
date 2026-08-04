@@ -115,8 +115,13 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
   // 3) 마스터 외 멤버 → 인스턴스 교체(각 프레임 콘텐츠를 오버라이드로 이식).
   let instances = 0;
   let images = 0;
+  const kept: string[] = [];
+  // 정렬에서 제외된(구조 불일치) 프레임은 절대 교체 대상이 아니다 — 스캔과 실행 사이에
+  // 문서가 바뀌어 구조가 달라졌다면 원본을 그대로 두고 경고만 남긴다.
+  const memberSet = new Set(aligned.memberIds);
   for (const n of members) {
     if (n.id === master.id) continue; // 마스터는 이미 컴포넌트로 소비됨
+    if (!memberSet.has(n.id)) continue; // 제외된 프레임 → 원본 보존
     const leaves = treeById.get(n.id);
     if (!leaves) continue;
     try {
@@ -133,7 +138,17 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
         const id = propIdByPath.get(p.path);
         if (v !== undefined && id) props[id] = v;
       }
-      try { inst.setProperties(props); } catch { /* 일부 오버라이드 실패 무시 */ }
+      // 오버라이드가 실패하면 인스턴스는 마스터 콘텐츠 그대로다 — 그 상태로 원본을 지우면
+      // 이 프레임의 고유 콘텐츠가 영영 사라진다. 실패 시 인스턴스를 버리고 원본을 남긴다.
+      if (Object.keys(props).length) {
+        try {
+          inst.setProperties(props);
+        } catch {
+          inst.remove();
+          kept.push(n.name);
+          continue;
+        }
+      }
       // v2: 가변 이미지 fill → 인스턴스 내부 레이어 fills를 멤버 원본으로 교체(컴포넌트 속성 불필요).
       if (aligned.imageVarying.length) {
         const srcPaths = figmaPathMap(n);
@@ -155,5 +170,6 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
   }
 
   const warnings = aligned.excluded.map((e) => `${e.name}: ${e.reason}`);
+  for (const name of kept) warnings.push(`${name}: 속성 오버라이드 실패 — 원본을 그대로 두었습니다.`);
   return { master: comp.name, properties, instances, images, warnings };
 }

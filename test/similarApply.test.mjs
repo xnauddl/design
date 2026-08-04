@@ -131,3 +131,49 @@ test('componentizeSimilar — 가변 이미지 fill은 인스턴스 fill 오버�
   const instPhoto = figma._created[0].children.find((c) => c.name === 'Photo');
   assert.equal(instPhoto.fills[0].imageHash, 'hB');
 });
+
+test('componentizeSimilar — 정렬에서 제외된 프레임은 교체하지 않고 원본 보존', async () => {
+  const f = installFigma();
+  const page = { appendChild() {} };
+  const a = card('A', { title: 'A', imgKey: 'k1' }, page);
+  const b = card('B', { title: 'B', imgKey: 'k2' }, page);
+  // 구조가 다른 프레임 — alignFrames가 '구조 불일치'로 뺀다. 그런데도 members로 넘어오면
+  // (스캔과 실행 사이 문서 변경 등) 인스턴스로 갈아끼우고 원본을 지워선 안 된다.
+  const odd = { id: 'odd', name: 'Other', type: 'FRAME', x: 0, y: 0, width: 10, height: 10, parent: page, removed: false,
+    children: [txt('odd:t', 'Title', 'Z')], remove() { this.removed = true; } };
+
+  const r = await componentizeSimilar(a, [a, b, odd]);
+
+  assert.equal(odd.removed, false, '제외된 프레임의 원본이 삭제됐다');
+  assert.equal(b.removed, true, '정상 멤버는 인스턴스로 교체돼야 한다');
+  assert.equal(r.instances, 1, '교체는 멤버(B) 1개뿐');
+  assert.ok(r.warnings.some((w) => w.includes('Other')), '제외 사유가 경고에 남아야 한다');
+  assert.equal(f._created.length, 1);
+});
+
+test('componentizeSimilar — 오버라이드 실패 시 인스턴스를 버리고 원본을 남긴다', async () => {
+  const f = installFigma();
+  // setProperties가 던지도록 교체 — 오버라이드가 안 먹은 인스턴스는 마스터 내용 그대로라
+  // 그 상태로 원본을 지우면 B의 고유 콘텐츠가 영영 사라진다.
+  const origFromNode = f.createComponentFromNode;
+  f.createComponentFromNode = (node) => {
+    const comp = origFromNode.call(f, node);
+    const origCreate = comp.createInstance.bind(comp);
+    comp.createInstance = () => {
+      const i = origCreate();
+      i.setProperties = () => { throw new Error('override failed'); };
+      return i;
+    };
+    return comp;
+  };
+
+  const page = { appendChild() {} };
+  const a = card('A', { title: 'A', imgKey: 'k1' }, page);
+  const b = card('B', { title: 'B', imgKey: 'k2' }, page);
+
+  const r = await componentizeSimilar(a, [a, b]);
+
+  assert.equal(b.removed, false, '오버라이드가 실패했는데 원본을 지웠다 — 콘텐츠 소실');
+  assert.equal(r.instances, 0, '실패한 교체는 집계하지 않는다');
+  assert.ok(r.warnings.some((w) => w.includes('Card')), '남겨둔 이유가 경고에 있어야 한다');
+});
