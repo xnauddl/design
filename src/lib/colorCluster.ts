@@ -60,7 +60,9 @@ function find(parent: number[], i: number): number {
  * 색 목록을 ΔE 군집으로 묶는다 — 연결요소(ΔE ≤ tolerance)로 후보를 모은 뒤,
  * 대표색에서 ΔE > tolerance인 색은 떼어내 별도 군집으로(단일 연결 체이닝 방지).
  * 대표색 = 군집 내 채도 최고색. 단색(군집 안 됨)은 isSingleton=true.
- * 반환 순서는 각 군집의 첫 등장(입력 순서) 기준으로 안정적.
+ * 반환 순서: 연결요소를 첫 등장(입력 순서)으로 훑되, 반경 밖이라 떼어낸 군집은
+ * 원래 연결요소 **바로 뒤**에 온다. 따라서 전체가 입력 순서로 정렬되지는 않는다
+ * (예: 입력 g0..g3에서 대표가 g3 → g0 순으로 나올 수 있다).
  */
 export function clusterColorsByDeltaE(
   colors: ReadonlyArray<ColorInput>,
@@ -123,7 +125,9 @@ export function clusterColorsByDeltaE(
       const best = pickRepresentative(rest);
       const near: number[] = [];
       const far: number[] = [];
-      for (const i of rest) (dist(i, best) <= tolerance ? near : far).push(i);
+      // 대표는 무조건 near에 넣는다. 거리 비교에만 맡기면 tolerance가 음수일 때
+      // dist(best,best)=0 <= 음수가 거짓이라 near가 비고 far===rest가 되어 루프가 끝나지 않는다.
+      for (const i of rest) (i === best || dist(i, best) <= tolerance ? near : far).push(i);
       const members = near.map((i) => colors[i]);
       out.push({ representative: colors[best], members, isSingleton: members.length === 1 });
       rest = far;
