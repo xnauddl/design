@@ -90,6 +90,19 @@ import {
   suggestTokenRoles,
   pipelineSteps,
   t,
+  parseVarValue,
+  displayVarValue,
+  validateVarName,
+  sanitizeScopes,
+  scopesForTypeList,
+  aliasSelfReference,
+  findAliasReferers,
+  hexToOklch,
+  darkValueForLight,
+  darkGlobalName,
+  isDarkGlobalName,
+  DARK_L_MIN,
+  DARK_L_MAX,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -1619,4 +1632,115 @@ test('rampToSpecs — 기본 램프에 패밀리 주입', () => {
   assert.ok(specs.length >= 6);
   assert.ok(specs.every((s) => s.family === 'Pretendard'));
   assert.ok(specs.some((s) => s.name === 'body' && s.fontSize === 16));
+});
+
+/* ---------- 변수 편집기(R1)·다크 테마 생성(R2) 순수 헬퍼 ---------- */
+
+test('parseVarValue — 타입별 파싱/검증', () => {
+  // COLOR
+  assert.deepEqual(parseVarValue('COLOR', '#ffffff'), { ok: true, value: { r: 1, g: 1, b: 1 } });
+  assert.deepEqual(parseVarValue('COLOR', '000000'), { ok: true, value: { r: 0, g: 0, b: 0 } });
+  assert.equal(parseVarValue('COLOR', 'nope').ok, false);
+  assert.equal(parseVarValue('COLOR', '#fff').ok, false); // 3자리 거부
+  // FLOAT
+  assert.deepEqual(parseVarValue('FLOAT', '16'), { ok: true, value: 16 });
+  assert.deepEqual(parseVarValue('FLOAT', '-1.5'), { ok: true, value: -1.5 });
+  assert.equal(parseVarValue('FLOAT', '').ok, false);
+  assert.equal(parseVarValue('FLOAT', 'abc').ok, false);
+  // STRING
+  assert.deepEqual(parseVarValue('STRING', 'Inter'), { ok: true, value: 'Inter' });
+  assert.deepEqual(parseVarValue('STRING', '  Inter  '), { ok: true, value: 'Inter' }); // 앞뒤 공백 트림
+  assert.equal(parseVarValue('STRING', '   ').ok, false);
+  // BOOLEAN
+  assert.deepEqual(parseVarValue('BOOLEAN', 'true'), { ok: true, value: true });
+  assert.deepEqual(parseVarValue('BOOLEAN', 'FALSE'), { ok: true, value: false });
+  assert.equal(parseVarValue('BOOLEAN', 'yes').ok, false);
+});
+
+test('displayVarValue — 색은 hex, 그 외 문자열', () => {
+  assert.equal(displayVarValue('COLOR', { r: 1, g: 1, b: 1 }), '#ffffff');
+  assert.equal(displayVarValue('FLOAT', 16), '16');
+  assert.equal(displayVarValue('STRING', 'Inter'), 'Inter');
+});
+
+test('validateVarName — 빈 이름·중복 거부', () => {
+  assert.equal(validateVarName('surface', ['bg', 'text']), null);
+  assert.match(validateVarName('', []), /이름/);
+  assert.match(validateVarName('  ', []), /이름/);
+  assert.match(validateVarName('bg', ['bg', 'text']), /중복|이름/);
+});
+
+test('sanitizeScopes — 타입 무효 스코프 제거 + 중복 제거', () => {
+  // COLOR에 FLOAT 전용 스코프(GAP)는 제거, 중복은 1개로
+  const out = sanitizeScopes(['ALL_FILLS', 'GAP', 'ALL_FILLS', 'STROKE_COLOR'], 'COLOR');
+  assert.deepEqual(out.sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+});
+
+test('scopesForTypeList — 타입별 유효 스코프 노출', () => {
+  const color = scopesForTypeList('COLOR');
+  assert.ok(color.includes('ALL_FILLS'));
+  assert.ok(!color.includes('GAP')); // FLOAT 전용
+  const float = scopesForTypeList('FLOAT');
+  assert.ok(float.includes('GAP'));
+  assert.ok(!float.includes('TEXT_FILL'));
+});
+
+test('aliasSelfReference — 자기참조만 차단', () => {
+  assert.equal(aliasSelfReference('a', 'a'), true);
+  assert.equal(aliasSelfReference('a', 'b'), false);
+});
+
+test('findAliasReferers — varId를 별칭하는 변수 수집(자기 제외, R2-C)', () => {
+  const vars = [
+    { id: 'g1', name: 'color/blue/500', values: { m: { kind: 'literal' } } },
+    { id: 's1', name: 'primary', values: { m: { kind: 'alias', aliasId: 'g1' } } },
+    { id: 's2', name: 'surface', values: { light: { kind: 'alias', aliasId: 'g1' }, dark: { kind: 'literal' } } },
+    { id: 's3', name: 'text', values: { m: { kind: 'alias', aliasId: 'other' } } },
+  ];
+  const refs = findAliasReferers('g1', vars);
+  assert.deepEqual(refs.map((r) => r.name).sort(), ['primary', 'surface']);
+  // 어느 모드든 한 번이라도 별칭하면 1회만(중복 없음)
+  assert.equal(refs.length, 2);
+  assert.deepEqual(findAliasReferers('none', vars), []);
+});
+
+test('darkValueForLight — OKLCH 명도 반전(밝음↔어두움)', () => {
+  // 흰색 → 어두운 색(L 낮아짐), 검정 → 밝은 색(L 높아짐)
+  const fromWhite = hexToOklch(darkValueForLight('#ffffff'));
+  const fromBlack = hexToOklch(darkValueForLight('#000000'));
+  assert.ok(fromWhite.l < 0.5, `흰색 반전 L=${fromWhite.l}`);
+  assert.ok(fromBlack.l > 0.5, `검정 반전 L=${fromBlack.l}`);
+  // 유효 hex 반환
+  assert.match(darkValueForLight('#2563eb'), /^#[0-9a-f]{6}$/);
+  // hue 보존(유채색) — 파랑 계열 유지
+  const lightH = hexToOklch('#2563eb').h;
+  const darkH = hexToOklch(darkValueForLight('#2563eb')).h;
+  assert.ok(Math.abs(lightH - darkH) < 15, `hue 보존 ${lightH}→${darkH}`);
+});
+
+test('darkValueForLight — 밝은 표면 위계가 검정으로 붕괴하지 않는다', () => {
+  // 단순 1-L이면 L>0.94 구간이 sRGB에서 전부 #000000이 되어 surface/surface-2가 한 색이 된다.
+  // 대역 압축 후에는 회색 램프 전체가 서로 다른 색으로 남아야 한다.
+  const ramp = ['#ffffff', '#f8f9fa', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#6c757d', '#495057', '#343a40', '#212529', '#000000'];
+  const darks = ramp.map(darkValueForLight);
+  assert.equal(new Set(darks).size, ramp.length, `붕괴: ${darks.join(' ')}`);
+  assert.ok(!darks.includes('#000000'), `순수 검정 표면 생성: ${darks.join(' ')}`);
+  // 라이트가 어두워질수록 다크는 밝아진다(반전) — 순서 뒤집힘 없이 단조.
+  const ls = darks.map((h) => hexToOklch(h).l);
+  for (let i = 1; i < ls.length; i++) {
+    assert.ok(ls[i] > ls[i - 1], `단조 위반 ${ramp[i - 1]}→${ramp[i]}: ${ls[i - 1]} → ${ls[i]}`);
+  }
+  // 결과 L은 다크 대역 안(게멋 클램프는 c만 줄이므로 L은 그대로).
+  // 여유 0.005는 hex 8비트 양자화 왕복 오차(예: L 0.97 → #f5f5f5 → 0.97015) 몫.
+  const eps = 0.005;
+  for (const l of ls) assert.ok(l >= DARK_L_MIN - eps && l <= DARK_L_MAX + eps, `대역 이탈 L=${l}`);
+});
+
+test('darkGlobalName — dark/ 그룹 접두 · 멱등', () => {
+  assert.equal(darkGlobalName('color/blue/500'), 'dark/color/blue/500');
+  // 다크 모드를 출처로 재실행해도 dark/dark/…가 생기지 않는다.
+  assert.equal(darkGlobalName('dark/color/blue/500'), 'dark/color/blue/500');
+  assert.equal(darkGlobalName(darkGlobalName('color/blue/500')), 'dark/color/blue/500');
+  assert.equal(isDarkGlobalName('dark/color/blue/500'), true);
+  assert.equal(isDarkGlobalName('color/blue/500'), false);
 });
