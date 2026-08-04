@@ -406,6 +406,11 @@
     .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
     .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
     .cfind .ratio { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    /* 닮은 프레임 멤버 줄 — .cfind와 같은 한 줄 규칙(이름만 늘어나고 나머지는 고정). label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
+    .simrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; cursor: pointer; }
+    .simrow .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .simrow input[type="radio"], .simrow .tag, .simrow .simmeta { flex: 0 0 auto; }
+    .simrow .simmeta { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .cfix { display: inline-flex; gap: 4px; }
     .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
     .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
@@ -710,6 +715,22 @@
         <button class="link" id="btnVariantReportExpand">모두 펼치기</button>
       </div>
       <div class="status" id="componentStatus"></div>
+    </div>
+
+    <div class="step" id="similarCard">
+      <h2>닮은 프레임 컴포넌트화 <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
+      <div class="hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
+      <div class="row">
+        <button id="btnScanSimilar" title="선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)">닮은 프레임 스캔</button>
+        <button id="btnComponentize" class="primary" title="추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체">컴포넌트화</button>
+      </div>
+      <div id="similarList" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 '모두 펼치기'(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="similarListMore" style="display:none">
+        <span class="list-count" id="similarListCount"></span>
+        <button class="link" id="btnSimilarListExpand">모두 펼치기</button>
+      </div>
+      <div class="status" id="similarStatus"></div>
     </div>
   </section>
 

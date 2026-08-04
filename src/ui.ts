@@ -11,6 +11,7 @@ import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import type { ExportFormat } from './lib/exporters';
+import type { FrameMeta } from './lib/similar';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles } from './lib/roles';
@@ -199,6 +200,7 @@ const LIST_REGIONS: ListRegion[] = [
   { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
   { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
   { mount: 'contrastList', row: '.cfind', more: 'contrastListMore', count: 'contrastListCount', expand: 'btnContrastListExpand' },
+  { mount: 'similarList', row: '.simrow', more: 'similarListMore', count: 'similarListCount', expand: 'btnSimilarListExpand' },
   // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
   // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
   { mount: 'bindTree', row: '.tree-row', more: 'bindTreeMore', count: 'bindTreeCount', expand: 'btnBindTreeExpand' },
@@ -1105,7 +1107,8 @@ const PREMIUM_STATUS_ID: Record<Feature, string> = {
 const PRESET_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
-const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
+// btnScanSimilar(스캔)은 읽기 전용이라 Free — 잠그는 건 실제로 문서를 바꾸는 btnComponentize뿐.
+const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnComponentize'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
 // 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
 // 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
@@ -1130,7 +1133,7 @@ function updateGates(): void {
     el.disabled = !isPaid;
     setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
   }
-  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'createLock', 'semLock', 'tsLock']) {
+  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'similarLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
   $('wizComponentLock').textContent = isPaid ? '' : PAID_LOCK;
@@ -1231,6 +1234,26 @@ function renderPipeline(): void {
 $('btnScanComp').addEventListener('click', () => {
   setStatus('componentStatus', t('component.scanning'), '');
   send({ type: 'SCAN_COMPONENT_CANDIDATES' });
+});
+
+/* ---------- 닮은 프레임 컴포넌트화 ---------- */
+// 스캔이 확정한 멤버(구조가 같은 최대 그룹)와 고른 마스터. 컴포넌트화는 이 둘만 보낸다 —
+// 제외된 프레임을 실수로 교체 대상에 넣지 않으려면 선택 그대로가 아니라 스캔 결과를 써야 한다.
+let similarMemberIds: string[] = [];
+let similarMasterId: string | null = null;
+
+$('btnScanSimilar').addEventListener('click', () => {
+  setStatus('similarStatus', '닮은 프레임을 찾는 중…', '');
+  send({ type: 'SCAN_SIMILAR' });
+});
+
+$('btnComponentize').addEventListener('click', () => {
+  if (similarMemberIds.length < 2 || !similarMasterId) {
+    setStatus('similarStatus', '먼저 스캔해서 마스터를 고르세요.', 'warn');
+    return;
+  }
+  setStatus('similarStatus', '컴포넌트화하는 중…', '');
+  send({ type: 'COMPONENTIZE_SIMILAR', masterId: similarMasterId, frameIds: similarMemberIds });
 });
 
 $('btnRegisterComp').addEventListener('click', () => {
@@ -1605,6 +1628,28 @@ window.onmessage = (event: MessageEvent) => {
     case 'CONTRAST_RESULT':
       renderContrast(msg);
       break;
+    case 'SIMILAR_CANDIDATES':
+      renderSimilar(msg);
+      break;
+    case 'COMPONENTIZE_RESULT': {
+      if (!msg.instances) {
+        // 교체가 하나도 없으면 실패다 — 경고를 그대로 보여줘야 원인을 안다.
+        setStatus('similarStatus', `컴포넌트화하지 못했어요${msg.warnings.length ? ` — ${msg.warnings[0]}` : ''}`, 'warn');
+        break;
+      }
+      const parts = [`마스터 ${msg.master}`, `인스턴스 ${msg.instances}개`];
+      if (msg.properties) parts.push(`속성 ${msg.properties}개`);
+      if (msg.images) parts.push(`이미지 ${msg.images}개`);
+      // 경고(제외·오버라이드 실패)는 성공했어도 반드시 노출 — 원본이 남아 있다는 신호다.
+      const warn = msg.warnings.length ? ` · 남겨둔 것 ${msg.warnings.length}건: ${msg.warnings[0]}` : '';
+      setStatus('similarStatus', `${parts.join(' · ')}${warn}`, msg.warnings.length ? 'warn' : 'ok');
+      // 교체된 프레임은 더 이상 대상이 아니다 — 목록을 비워 이중 실행을 막는다.
+      similarMemberIds = [];
+      similarMasterId = null;
+      $('similarList').innerHTML = '';
+      $('similarCount').textContent = '';
+      break;
+    }
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
       // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
@@ -2154,6 +2199,73 @@ function showApplyProgress(label: string): void {
   ($('applyBarFill') as HTMLElement).style.width = '0%';
   $('applyProgressText').textContent = label;
 }
+/** 닮은 프레임 멤버 한 줄 — 마스터 라디오 + 이름 + 완전성 근거(왜 이게 추천인지). */
+function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement {
+  const row = document.createElement('label'); // 라디오와 한 덩어리로 — 줄 아무 데나 눌러도 선택된다
+  row.className = 'simrow';
+
+  const radio = document.createElement('input');
+  radio.type = 'radio';
+  radio.name = 'similarMaster';
+  radio.value = m.id;
+  radio.checked = m.id === similarMasterId;
+  radio.addEventListener('change', () => {
+    if (radio.checked) similarMasterId = m.id;
+  });
+  row.appendChild(radio);
+
+  const name = document.createElement('span');
+  name.className = 'cname';
+  name.textContent = m.name;
+  name.title = m.name; // 한 줄 말줄임 → 잘린 부분은 title로 읽는다(.cfind와 동일 규칙)
+  row.appendChild(name);
+
+  if (m.id === recommendedId) {
+    const tag = document.createElement('span');
+    tag.className = 'tag tag-set'; // 기존 배지 규약 재사용
+    tag.textContent = '추천';
+    row.appendChild(tag);
+  }
+
+  // 추천 근거를 숫자로 — 텍스트가 얼마나 채워졌는지가 마스터 선택의 핵심이다.
+  const meta = document.createElement('span');
+  meta.className = 'simmeta';
+  const parts = [`텍스트 ${m.textFilled}/${m.textTotal}`];
+  if (m.images) parts.push(`이미지 ${m.images}`);
+  if (m.emptyLayers) parts.push(`빈 칸 ${m.emptyLayers}`);
+  meta.textContent = parts.join(' · ');
+  row.appendChild(meta);
+
+  return row;
+}
+
+/** 스캔 결과 → 멤버 목록(마스터 라디오) + 무엇이 속성으로 열리는지 요약. */
+function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): void {
+  similarMemberIds = msg.metas.map((m) => m.id);
+  similarMasterId = msg.recommendedMasterId;
+  $('similarCount').textContent = msg.metas.length ? `· 대상 ${msg.metas.length}개` : '';
+
+  const box = $('similarList');
+  renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId), () => layoutListBy('similarList'));
+
+  if (!msg.metas.length) {
+    // 왜 대상이 없는지 알려준다 — 제외 사유가 있으면 그걸 그대로 보여주는 게 가장 빠른 안내다.
+    const why = msg.excluded.length ? msg.excluded[0].reason : '구조가 같은 프레임을 2개 이상 선택하세요.';
+    setStatus('similarStatus', `컴포넌트화할 프레임이 없어요 — ${why}`, 'warn');
+    return;
+  }
+
+  const texts = msg.varying.filter((v) => v.type === 'TEXT').length;
+  const swaps = msg.varying.length - texts;
+  const opened: string[] = [];
+  if (texts) opened.push(`텍스트 ${texts}`);
+  if (swaps) opened.push(`아이콘 교체 ${swaps}`);
+  if (msg.imageVarying.length) opened.push(`이미지 ${msg.imageVarying.length}`);
+  const openText = opened.length ? `속성으로 열림: ${opened.join(' · ')}` : '가변 위치가 없어 속성은 만들지 않아요';
+  const skipText = msg.excluded.length ? ` · 제외 ${msg.excluded.length}개(${msg.excluded[0].reason})` : '';
+  setStatus('similarStatus', `대상 ${msg.metas.length}개 · ${openText}${skipText}`, 'ok');
+}
+
 function updateApplyProgress(done: number, total: number): void {
   $('applyProgress').style.display = '';
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;

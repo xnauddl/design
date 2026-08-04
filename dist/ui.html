@@ -406,6 +406,11 @@
     .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
     .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
     .cfind .ratio { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    /* 닮은 프레임 멤버 줄 — .cfind와 같은 한 줄 규칙(이름만 늘어나고 나머지는 고정). label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
+    .simrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; cursor: pointer; }
+    .simrow .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .simrow input[type="radio"], .simrow .tag, .simrow .simmeta { flex: 0 0 auto; }
+    .simrow .simmeta { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .cfix { display: inline-flex; gap: 4px; }
     .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
     .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
@@ -710,6 +715,22 @@
         <button class="link" id="btnVariantReportExpand">모두 펼치기</button>
       </div>
       <div class="status" id="componentStatus"></div>
+    </div>
+
+    <div class="step" id="similarCard">
+      <h2>닮은 프레임 컴포넌트화 <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
+      <div class="hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
+      <div class="row">
+        <button id="btnScanSimilar" title="선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)">닮은 프레임 스캔</button>
+        <button id="btnComponentize" class="primary" title="추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체">컴포넌트화</button>
+      </div>
+      <div id="similarList" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 '모두 펼치기'(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="similarListMore" style="display:none">
+        <span class="list-count" id="similarListCount"></span>
+        <button class="link" id="btnSimilarListExpand">모두 펼치기</button>
+      </div>
+      <div class="status" id="similarStatus"></div>
     </div>
   </section>
 
@@ -1707,6 +1728,7 @@
     { mount: "colorTable", row: ".crow", more: "colorTableMore", count: "colorTableCount", expand: "btnColorTableExpand" },
     { mount: "variantReport", row: ".vr-row", more: "variantReportMore", count: "variantReportCount", expand: "btnVariantReportExpand" },
     { mount: "contrastList", row: ".cfind", more: "contrastListMore", count: "contrastListCount", expand: "btnContrastListExpand" },
+    { mount: "similarList", row: ".simrow", more: "similarListMore", count: "similarListCount", expand: "btnSimilarListExpand" },
     // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
     // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
     { mount: "bindTree", row: ".tree-row", more: "bindTreeMore", count: "bindTreeCount", expand: "btnBindTreeExpand" },
@@ -2445,7 +2467,7 @@
     "btnImportPreset",
     "presetJson"
   ];
-  var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing"];
+  var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnComponentize"];
   var PAID_FIELDS = [
     ...PRESET_FIELDS,
     ...COMPONENT_FIELDS,
@@ -2461,7 +2483,7 @@
       el.disabled = !isPaid;
       setLockTitle(el, !isPaid);
     }
-    for (const id of ["paletteLock", "presetLock", "componentLock", "createLock", "semLock", "tsLock"]) {
+    for (const id of ["paletteLock", "presetLock", "componentLock", "similarLock", "createLock", "semLock", "tsLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     $("wizComponentLock").textContent = isPaid ? "" : PAID_LOCK;
@@ -2543,6 +2565,20 @@
   $("btnScanComp").addEventListener("click", () => {
     setStatus("componentStatus", t("component.scanning"), "");
     send({ type: "SCAN_COMPONENT_CANDIDATES" });
+  });
+  var similarMemberIds = [];
+  var similarMasterId = null;
+  $("btnScanSimilar").addEventListener("click", () => {
+    setStatus("similarStatus", "\uB2EE\uC740 \uD504\uB808\uC784\uC744 \uCC3E\uB294 \uC911\u2026", "");
+    send({ type: "SCAN_SIMILAR" });
+  });
+  $("btnComponentize").addEventListener("click", () => {
+    if (similarMemberIds.length < 2 || !similarMasterId) {
+      setStatus("similarStatus", "\uBA3C\uC800 \uC2A4\uCE94\uD574\uC11C \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.", "warn");
+      return;
+    }
+    setStatus("similarStatus", "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uB294 \uC911\u2026", "");
+    send({ type: "COMPONENTIZE_SIMILAR", masterId: similarMasterId, frameIds: similarMemberIds });
   });
   $("btnRegisterComp").addEventListener("click", () => {
     if (compCandidates.length) {
@@ -2865,6 +2901,25 @@
       case "CONTRAST_RESULT":
         renderContrast(msg);
         break;
+      case "SIMILAR_CANDIDATES":
+        renderSimilar(msg);
+        break;
+      case "COMPONENTIZE_RESULT": {
+        if (!msg.instances) {
+          setStatus("similarStatus", `\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694${msg.warnings.length ? ` \u2014 ${msg.warnings[0]}` : ""}`, "warn");
+          break;
+        }
+        const parts = [`\uB9C8\uC2A4\uD130 ${msg.master}`, `\uC778\uC2A4\uD134\uC2A4 ${msg.instances}\uAC1C`];
+        if (msg.properties) parts.push(`\uC18D\uC131 ${msg.properties}\uAC1C`);
+        if (msg.images) parts.push(`\uC774\uBBF8\uC9C0 ${msg.images}\uAC1C`);
+        const warn = msg.warnings.length ? ` \xB7 \uB0A8\uACA8\uB454 \uAC83 ${msg.warnings.length}\uAC74: ${msg.warnings[0]}` : "";
+        setStatus("similarStatus", `${parts.join(" \xB7 ")}${warn}`, msg.warnings.length ? "warn" : "ok");
+        similarMemberIds = [];
+        similarMasterId = null;
+        $("similarList").innerHTML = "";
+        $("similarCount").textContent = "";
+        break;
+      }
       case "PREMIUM_REQUIRED": {
         const statusId = (_c = PREMIUM_STATUS_ID[msg.feature]) != null ? _c : "createStatus";
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
@@ -3273,6 +3328,59 @@
     $("applyProgress").style.display = "";
     $("applyBarFill").style.width = "0%";
     $("applyProgressText").textContent = label;
+  }
+  function makeSimilarRow(m, recommendedId) {
+    const row = document.createElement("label");
+    row.className = "simrow";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "similarMaster";
+    radio.value = m.id;
+    radio.checked = m.id === similarMasterId;
+    radio.addEventListener("change", () => {
+      if (radio.checked) similarMasterId = m.id;
+    });
+    row.appendChild(radio);
+    const name = document.createElement("span");
+    name.className = "cname";
+    name.textContent = m.name;
+    name.title = m.name;
+    row.appendChild(name);
+    if (m.id === recommendedId) {
+      const tag = document.createElement("span");
+      tag.className = "tag tag-set";
+      tag.textContent = "\uCD94\uCC9C";
+      row.appendChild(tag);
+    }
+    const meta = document.createElement("span");
+    meta.className = "simmeta";
+    const parts = [`\uD14D\uC2A4\uD2B8 ${m.textFilled}/${m.textTotal}`];
+    if (m.images) parts.push(`\uC774\uBBF8\uC9C0 ${m.images}`);
+    if (m.emptyLayers) parts.push(`\uBE48 \uCE78 ${m.emptyLayers}`);
+    meta.textContent = parts.join(" \xB7 ");
+    row.appendChild(meta);
+    return row;
+  }
+  function renderSimilar(msg) {
+    similarMemberIds = msg.metas.map((m) => m.id);
+    similarMasterId = msg.recommendedMasterId;
+    $("similarCount").textContent = msg.metas.length ? `\xB7 \uB300\uC0C1 ${msg.metas.length}\uAC1C` : "";
+    const box = $("similarList");
+    renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId), () => layoutListBy("similarList"));
+    if (!msg.metas.length) {
+      const why = msg.excluded.length ? msg.excluded[0].reason : "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC744 2\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD558\uC138\uC694.";
+      setStatus("similarStatus", `\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD560 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 ${why}`, "warn");
+      return;
+    }
+    const texts = msg.varying.filter((v) => v.type === "TEXT").length;
+    const swaps = msg.varying.length - texts;
+    const opened = [];
+    if (texts) opened.push(`\uD14D\uC2A4\uD2B8 ${texts}`);
+    if (swaps) opened.push(`\uC544\uC774\uCF58 \uAD50\uCCB4 ${swaps}`);
+    if (msg.imageVarying.length) opened.push(`\uC774\uBBF8\uC9C0 ${msg.imageVarying.length}`);
+    const openText = opened.length ? `\uC18D\uC131\uC73C\uB85C \uC5F4\uB9BC: ${opened.join(" \xB7 ")}` : "\uAC00\uBCC0 \uC704\uCE58\uAC00 \uC5C6\uC5B4 \uC18D\uC131\uC740 \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694";
+    const skipText = msg.excluded.length ? ` \xB7 \uC81C\uC678 ${msg.excluded.length}\uAC1C(${msg.excluded[0].reason})` : "";
+    setStatus("similarStatus", `\uB300\uC0C1 ${msg.metas.length}\uAC1C \xB7 ${openText}${skipText}`, "ok");
   }
   function updateApplyProgress(done, total) {
     $("applyProgress").style.display = "";

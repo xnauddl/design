@@ -2977,6 +2977,275 @@
     return { level, checked: findings.length, passed: findings.length - failed, failed, findings };
   }
 
+  // src/lib/similar.ts
+  function flattenFrame(root) {
+    const out = [];
+    const visit = (node, prefix) => {
+      var _a, _b;
+      const seen = /* @__PURE__ */ new Map();
+      for (const c of (_a = node.children) != null ? _a : []) {
+        const n = ((_b = seen.get(c.name)) != null ? _b : 0) + 1;
+        seen.set(c.name, n);
+        const seg = n === 1 ? c.name : `${c.name}#${n}`;
+        const path = prefix ? `${prefix}/${seg}` : seg;
+        out.push({ id: c.id, path, type: c.type, characters: c.characters, componentKey: c.componentKey, hasImageFill: c.hasImageFill, imageHash: c.imageHash });
+        visit(c, path);
+      }
+    };
+    visit(root, "");
+    return out;
+  }
+  var SEP = "\0";
+  function frameShapeSignature(root) {
+    return JSON.stringify(
+      flattenFrame(root).map((e) => `${e.path}${SEP}${e.type}`).sort()
+    );
+  }
+  var textOf = (e) => {
+    var _a;
+    return ((_a = e.characters) != null ? _a : "").trim();
+  };
+  function metaOf(frame) {
+    const leaves = flattenFrame(frame);
+    const texts = leaves.filter((l) => l.type === "TEXT");
+    const textFilled = texts.filter((l) => textOf(l) !== "").length;
+    const images = leaves.filter((l) => l.type === "INSTANCE" || l.hasImageFill).length;
+    const emptyLayers = texts.length - textFilled;
+    return {
+      id: frame.id,
+      name: frame.name,
+      textFilled,
+      textTotal: texts.length,
+      images,
+      emptyLayers,
+      score: textFilled * 2 + images - emptyLayers
+    };
+  }
+  function alignFrames(frames) {
+    var _a;
+    const empty = { memberIds: [], recommendedMasterId: null, metas: [], varying: [], imageVarying: [], excluded: [] };
+    if (frames.length < 2) {
+      return __spreadProps(__spreadValues({}, empty), { excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: "\uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uD544\uC694" })) });
+    }
+    const bySig = /* @__PURE__ */ new Map();
+    for (const f of frames) {
+      const sig = frameShapeSignature(f);
+      ((_a = bySig.get(sig)) != null ? _a : bySig.set(sig, []).get(sig)).push(f);
+    }
+    let best = [];
+    for (const group of bySig.values()) if (group.length > best.length) best = group;
+    const excluded = frames.filter((f) => !best.includes(f)).map((f) => ({ id: f.id, name: f.name, reason: "\uAD6C\uC870 \uBD88\uC77C\uCE58" }));
+    if (best.length < 2) {
+      return __spreadProps(__spreadValues({}, empty), { excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: "\uB3D9\uC77C \uAD6C\uC870 \uD504\uB808\uC784 2\uAC1C \uBBF8\uB9CC" })) });
+    }
+    const flats = best.map((f) => flattenFrame(f));
+    const paths = flats[0];
+    const varying = [];
+    const imageVarying = [];
+    const at = (leaves, path) => leaves.find((l) => l.path === path);
+    for (const entry of paths) {
+      if (entry.hasImageFill) {
+        const hashes = new Set(flats.map((f) => {
+          var _a2, _b;
+          return (_b = (_a2 = at(f, entry.path)) == null ? void 0 : _a2.imageHash) != null ? _b : "";
+        }));
+        if (hashes.size > 1) imageVarying.push(entry.path);
+      }
+      if (entry.type !== "TEXT" && entry.type !== "INSTANCE") continue;
+      const valueAt = (leaves) => {
+        var _a2;
+        const e = at(leaves, entry.path);
+        if (!e) return "";
+        return entry.type === "TEXT" ? textOf(e) : (_a2 = e.componentKey) != null ? _a2 : "";
+      };
+      const distinct = new Set(flats.map(valueAt));
+      if (distinct.size > 1) varying.push({ path: entry.path, type: entry.type === "TEXT" ? "TEXT" : "INSTANCE_SWAP" });
+    }
+    const metas = best.map(metaOf);
+    const order = new Map(best.map((f, i) => [f.id, i]));
+    metas.sort((a, b) => b.score - a.score || order.get(a.id) - order.get(b.id));
+    const recommendedMasterId = metas.length ? metas[0].id : null;
+    return {
+      memberIds: best.map((f) => f.id),
+      recommendedMasterId,
+      metas,
+      varying,
+      imageVarying: [...new Set(imageVarying)],
+      excluded
+    };
+  }
+  var leafName = (path) => {
+    var _a;
+    const seg = (_a = path.split("/").pop()) != null ? _a : path;
+    return kebab(seg.replace(/#\d+$/, ""));
+  };
+  function planContentProperties(varying) {
+    const taken = /* @__PURE__ */ new Set();
+    const uniq = (base) => {
+      const b = base || "prop";
+      let n = b;
+      let i = 2;
+      while (taken.has(n)) n = `${b}-${i++}`;
+      taken.add(n);
+      return n;
+    };
+    return varying.map((v) => ({
+      propName: uniq(leafName(v.path) || (v.type === "TEXT" ? "text" : "swap")),
+      type: v.type,
+      path: v.path,
+      field: v.type === "TEXT" ? "characters" : "mainComponent"
+    }));
+  }
+  function overridesForFrame(frameLeaves, plan) {
+    var _a, _b;
+    const byPath = new Map(frameLeaves.map((l) => [l.path, l]));
+    const out = {};
+    for (const p of plan) {
+      const e = byPath.get(p.path);
+      if (!e) continue;
+      const value = p.type === "TEXT" ? (_a = e.characters) != null ? _a : "" : (_b = e.componentKey) != null ? _b : "";
+      if (value !== "") out[p.propName] = value;
+    }
+    return out;
+  }
+
+  // src/lib/similarApply.ts
+  async function buildSimTree(node) {
+    var _a;
+    const out = { id: node.id, name: node.name, type: node.type };
+    if (node.type === "TEXT") out.characters = typeof node.characters === "string" ? node.characters : "";
+    if (node.type === "INSTANCE") {
+      const mc = await node.getMainComponentAsync();
+      if (mc) out.componentKey = mc.key || mc.id;
+    }
+    const fills = node.fills;
+    if (Array.isArray(fills)) {
+      const img = fills.find((p) => p.type === "IMAGE" && p.visible !== false);
+      if (img) {
+        out.hasImageFill = true;
+        out.imageHash = (_a = img.imageHash) != null ? _a : void 0;
+      }
+    }
+    if ("children" in node) {
+      const kids = [];
+      for (const c of node.children) kids.push(await buildSimTree(c));
+      out.children = kids;
+    }
+    return out;
+  }
+  function figmaPathMap(root) {
+    const map = /* @__PURE__ */ new Map();
+    const visit = (node, prefix) => {
+      var _a;
+      if (!("children" in node)) return;
+      const seen = /* @__PURE__ */ new Map();
+      for (const c of node.children) {
+        const n = ((_a = seen.get(c.name)) != null ? _a : 0) + 1;
+        seen.set(c.name, n);
+        const seg = n === 1 ? c.name : `${c.name}#${n}`;
+        const path = prefix ? `${prefix}/${seg}` : seg;
+        map.set(path, c);
+        visit(c, path);
+      }
+    };
+    visit(root, "");
+    return map;
+  }
+  async function scanSimilar(frames) {
+    const trees = [];
+    for (const f of frames) trees.push(await buildSimTree(f));
+    return alignFrames(trees);
+  }
+  async function componentizeSimilar(master, members) {
+    var _a;
+    const trees = [];
+    for (const n of members) trees.push(await buildSimTree(n));
+    const treeById = new Map(members.map((n, i) => [n.id, trees[i]]));
+    const aligned = alignFrames(trees);
+    const plan = planContentProperties(aligned.varying);
+    const comp = figma.createComponentFromNode(master);
+    const compPaths = figmaPathMap(comp);
+    const propIdByPath = /* @__PURE__ */ new Map();
+    let properties = 0;
+    for (const p of plan) {
+      const target = compPaths.get(p.path);
+      if (!target) continue;
+      try {
+        let def = "";
+        if (p.type === "TEXT") def = target.type === "TEXT" ? target.characters : "";
+        else {
+          const mc = target.type === "INSTANCE" ? await target.getMainComponentAsync() : null;
+          def = mc ? mc.key || mc.id : "";
+        }
+        const id = comp.addComponentProperty(p.propName, p.type, def);
+        const refs = __spreadValues({}, (_a = target.componentPropertyReferences) != null ? _a : {});
+        refs[p.field] = id;
+        target.componentPropertyReferences = refs;
+        propIdByPath.set(p.path, id);
+        properties++;
+      } catch (e) {
+      }
+    }
+    let instances = 0;
+    let images = 0;
+    const kept = [];
+    const memberSet = new Set(aligned.memberIds);
+    for (const n of members) {
+      if (n.id === master.id) continue;
+      if (!memberSet.has(n.id)) continue;
+      const leaves = treeById.get(n.id);
+      if (!leaves) continue;
+      try {
+        const inst = comp.createInstance();
+        inst.x = n.x;
+        inst.y = n.y;
+        try {
+          inst.resize(n.width, n.height);
+        } catch (e) {
+        }
+        if (n.parent) n.parent.appendChild(inst);
+        const ov = overridesForFrame(flattenFrame(leaves), plan);
+        const props = {};
+        for (const p of plan) {
+          const v = ov[p.propName];
+          const id = propIdByPath.get(p.path);
+          if (v !== void 0 && id) props[id] = v;
+        }
+        if (Object.keys(props).length) {
+          try {
+            inst.setProperties(props);
+          } catch (e) {
+            inst.remove();
+            kept.push(n.name);
+            continue;
+          }
+        }
+        if (aligned.imageVarying.length) {
+          const srcPaths = figmaPathMap(n);
+          const dstPaths = figmaPathMap(inst);
+          for (const path of aligned.imageVarying) {
+            const src = srcPaths.get(path);
+            const dst = dstPaths.get(path);
+            const f = src && "fills" in src ? src.fills : null;
+            if (dst && "fills" in dst && Array.isArray(f)) {
+              try {
+                dst.fills = f;
+                images++;
+              } catch (e) {
+              }
+            }
+          }
+        }
+        n.remove();
+        instances++;
+      } catch (e) {
+      }
+    }
+    const warnings = aligned.excluded.map((e) => `${e.name}: ${e.reason}`);
+    for (const name of kept) warnings.push(`${name}: \uC18D\uC131 \uC624\uBC84\uB77C\uC774\uB4DC \uC2E4\uD328 \u2014 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB450\uC5C8\uC2B5\uB2C8\uB2E4.`);
+    return { master: comp.name, properties, instances, images, warnings };
+  }
+
   // src/lib/entitlements.ts
   function normalizeLegacyTier(v) {
     if (v === "free" || v === "paid") return v;
@@ -4188,6 +4457,40 @@
           }
           post({ type: "GENERATE_RESULT", generated, sets: sets.length, combos });
           if (generated) commitUndo(figma);
+          break;
+        }
+        case "SCAN_SIMILAR": {
+          const frames = selection().filter((n) => n.type === "FRAME" || n.type === "GROUP" || n.type === "COMPONENT");
+          const r = await scanSimilar(frames);
+          post({
+            type: "SIMILAR_CANDIDATES",
+            metas: r.metas,
+            recommendedMasterId: r.recommendedMasterId,
+            varying: r.varying,
+            imageVarying: r.imageVarying,
+            excluded: r.excluded
+          });
+          break;
+        }
+        case "COMPONENTIZE_SIMILAR": {
+          if (!requirePaid("components", "\uB2EE\uC740 \uD504\uB808\uC784 \uCEF4\uD3EC\uB10C\uD2B8\uD654\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4. \uC2A4\uCE94\xB7\uBBF8\uB9AC\uBCF4\uAE30\uB294 \uBB34\uB8CC\uC785\uB2C8\uB2E4.")) break;
+          const master = await figma.getNodeByIdAsync(msg.masterId);
+          if (!master || master.type !== "FRAME" && master.type !== "GROUP") {
+            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: ["\uB9C8\uC2A4\uD130 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."] });
+            break;
+          }
+          const memberNodes = [];
+          for (const id of msg.frameIds) {
+            const n = await figma.getNodeByIdAsync(id);
+            if (n && "type" in n) memberNodes.push(n);
+          }
+          if (memberNodes.length < 2) {
+            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: ["\uB300\uC0C1 \uD504\uB808\uC784\uC774 2\uAC1C \uBBF8\uB9CC\uC785\uB2C8\uB2E4. \uB2E4\uC2DC \uC2A4\uCE94\uD558\uC138\uC694."] });
+            break;
+          }
+          const r = await componentizeSimilar(master, memberNodes);
+          post({ type: "COMPONENTIZE_RESULT", master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
+          if (r.instances) commitUndo(figma);
           break;
         }
         case "CHECK_CONTRAST": {

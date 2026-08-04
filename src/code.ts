@@ -14,6 +14,7 @@ import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
+import { scanSimilar, componentizeSimilar } from './lib/similarApply';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
@@ -1331,6 +1332,42 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
         if (generated) commitUndo(figma); // UX2
+        break;
+      }
+      case 'SCAN_SIMILAR': {
+        // 미리보기(읽기 전용)는 Free — 선택 프레임을 정렬해 가변 위치·마스터 추천만 보여준다.
+        const frames = selection().filter((n) => n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'COMPONENT');
+        const r = await scanSimilar(frames);
+        post({
+          type: 'SIMILAR_CANDIDATES',
+          metas: r.metas,
+          recommendedMasterId: r.recommendedMasterId,
+          varying: r.varying,
+          imageVarying: r.imageVarying,
+          excluded: r.excluded,
+        });
+        break;
+      }
+      case 'COMPONENTIZE_SIMILAR': {
+        if (!requirePaid('components', '닮은 프레임 컴포넌트화는 Paid 기능입니다. 스캔·미리보기는 무료입니다.')) break;
+        const master = await figma.getNodeByIdAsync(msg.masterId);
+        if (!master || (master.type !== 'FRAME' && master.type !== 'GROUP')) {
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['마스터 프레임을 찾을 수 없습니다.'] });
+          break;
+        }
+        // 멤버 노드 수집(마스터 포함) → 정렬·컴포넌트화·인스턴스 교체는 similarApply에 위임.
+        const memberNodes: SceneNode[] = [];
+        for (const id of msg.frameIds) {
+          const n = await figma.getNodeByIdAsync(id);
+          if (n && 'type' in n) memberNodes.push(n as SceneNode);
+        }
+        if (memberNodes.length < 2) {
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['대상 프레임이 2개 미만입니다. 다시 스캔하세요.'] });
+          break;
+        }
+        const r = await componentizeSimilar(master as SceneNode, memberNodes);
+        post({ type: 'COMPONENTIZE_RESULT', master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
+        if (r.instances) commitUndo(figma); // UX2: 컴포넌트화 전체를 단일 Undo로
         break;
       }
       case 'CHECK_CONTRAST': {
