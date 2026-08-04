@@ -99,6 +99,9 @@ import {
   hexToOklch,
   darkValueForLight,
   darkGlobalName,
+  isDarkGlobalName,
+  DARK_L_MIN,
+  DARK_L_MAX,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -1696,6 +1699,29 @@ test('darkValueForLight — OKLCH 명도 반전(밝음↔어두움)', () => {
   assert.ok(Math.abs(lightH - darkH) < 15, `hue 보존 ${lightH}→${darkH}`);
 });
 
-test('darkGlobalName — dark/ 그룹 접두', () => {
+test('darkValueForLight — 밝은 표면 위계가 검정으로 붕괴하지 않는다', () => {
+  // 단순 1-L이면 L>0.94 구간이 sRGB에서 전부 #000000이 되어 surface/surface-2가 한 색이 된다.
+  // 대역 압축 후에는 회색 램프 전체가 서로 다른 색으로 남아야 한다.
+  const ramp = ['#ffffff', '#f8f9fa', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#6c757d', '#495057', '#343a40', '#212529', '#000000'];
+  const darks = ramp.map(darkValueForLight);
+  assert.equal(new Set(darks).size, ramp.length, `붕괴: ${darks.join(' ')}`);
+  assert.ok(!darks.includes('#000000'), `순수 검정 표면 생성: ${darks.join(' ')}`);
+  // 라이트가 어두워질수록 다크는 밝아진다(반전) — 순서 뒤집힘 없이 단조.
+  const ls = darks.map((h) => hexToOklch(h).l);
+  for (let i = 1; i < ls.length; i++) {
+    assert.ok(ls[i] > ls[i - 1], `단조 위반 ${ramp[i - 1]}→${ramp[i]}: ${ls[i - 1]} → ${ls[i]}`);
+  }
+  // 결과 L은 다크 대역 안(게멋 클램프는 c만 줄이므로 L은 그대로).
+  // 여유 0.005는 hex 8비트 양자화 왕복 오차(예: L 0.97 → #f5f5f5 → 0.97015) 몫.
+  const eps = 0.005;
+  for (const l of ls) assert.ok(l >= DARK_L_MIN - eps && l <= DARK_L_MAX + eps, `대역 이탈 L=${l}`);
+});
+
+test('darkGlobalName — dark/ 그룹 접두 · 멱등', () => {
   assert.equal(darkGlobalName('color/blue/500'), 'dark/color/blue/500');
+  // 다크 모드를 출처로 재실행해도 dark/dark/…가 생기지 않는다.
+  assert.equal(darkGlobalName('dark/color/blue/500'), 'dark/color/blue/500');
+  assert.equal(darkGlobalName(darkGlobalName('color/blue/500')), 'dark/color/blue/500');
+  assert.equal(isDarkGlobalName('dark/color/blue/500'), true);
+  assert.equal(isDarkGlobalName('color/blue/500'), false);
 });
