@@ -3246,6 +3246,60 @@
     return { master: comp.name, properties, instances, images, warnings };
   }
 
+  // src/lib/themeGen.ts
+  function darkValueForLight(hex) {
+    const lch = hexToOklch(hex);
+    return oklchToHex(clampToGamut({ l: 1 - lch.l, c: lch.c, h: lch.h }));
+  }
+  function darkGlobalName(lightName) {
+    return `dark/${lightName}`;
+  }
+
+  // src/lib/variableEdit.ts
+  function parseVarValue(type, input) {
+    const s = input.trim();
+    switch (type) {
+      case "COLOR": {
+        if (!/^#?[0-9a-f]{6}$/i.test(s)) return { ok: false, error: "\uC0C9\uC740 #RRGGBB \uD615\uC2DD\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4." };
+        return { ok: true, value: hexToRgb(s) };
+      }
+      case "FLOAT": {
+        const n = Number(s);
+        if (s === "" || !Number.isFinite(n)) return { ok: false, error: "\uC22B\uC790\uB97C \uC785\uB825\uD558\uC138\uC694." };
+        return { ok: true, value: n };
+      }
+      case "STRING": {
+        if (s === "") return { ok: false, error: "\uBE48 \uBB38\uC790\uC5F4\uC740 \uD5C8\uC6A9\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4." };
+        return { ok: true, value: s };
+      }
+      case "BOOLEAN": {
+        const v = s.toLowerCase();
+        if (v === "true") return { ok: true, value: true };
+        if (v === "false") return { ok: true, value: false };
+        return { ok: false, error: "true \uB610\uB294 false\uB97C \uC785\uB825\uD558\uC138\uC694." };
+      }
+    }
+  }
+  function sanitizeScopes(scopes, type) {
+    return [...new Set(scopesForType(scopes, type))];
+  }
+  function aliasSelfReference(sourceId, targetId) {
+    return sourceId === targetId;
+  }
+  function findAliasReferers(varId, vars) {
+    const out = [];
+    for (const v of vars) {
+      if (v.id === varId) continue;
+      for (const cell of Object.values(v.values)) {
+        if (cell.kind === "alias" && cell.aliasId === varId) {
+          out.push({ id: v.id, name: v.name });
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
   // src/lib/entitlements.ts
   function normalizeLegacyTier(v) {
     if (v === "free" || v === "paid") return v;
@@ -3418,6 +3472,198 @@
   }
   function errText(e) {
     return e instanceof Error ? e.message : String(e);
+  }
+  var EDITABLE_COLLECTIONS = /* @__PURE__ */ new Set([GLOBAL, SEMANTIC, COMPONENT]);
+  var USAGE_SCAN_CAP = 5e3;
+  function isVariableAlias(raw) {
+    return !!raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS";
+  }
+  function toValueCell(type, raw, nameById) {
+    if (isVariableAlias(raw)) {
+      const aliasId = raw.id;
+      const aliasName = nameById.get(aliasId);
+      return { kind: "alias", display: aliasName != null ? aliasName : "(\uC54C \uC218 \uC5C6\uC74C)", aliasId, aliasName };
+    }
+    if (type === "COLOR" && raw && typeof raw === "object" && "r" in raw) {
+      return { kind: "literal", display: rgbToHex(raw) };
+    }
+    if (raw === void 0) return { kind: "literal", display: "" };
+    return { kind: "literal", display: String(raw) };
+  }
+  function toVarInfo(v, col, nameById) {
+    var _a;
+    const modes = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
+    const values = {};
+    for (const m of col.modes) values[m.modeId] = toValueCell(v.resolvedType, v.valuesByMode[m.modeId], nameById);
+    return {
+      id: v.id,
+      name: v.name,
+      collectionId: col.id,
+      collection: col.name,
+      type: v.resolvedType,
+      description: (_a = v.description) != null ? _a : "",
+      scopes: v.scopes,
+      hidden: v.hiddenFromPublishing,
+      modes,
+      defaultModeId: col.defaultModeId,
+      values
+    };
+  }
+  async function collectVars() {
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const colById = new Map(cols.map((c) => [c.id, c]));
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const nameById = new Map(vars.map((v) => [v.id, v.name]));
+    const out = [];
+    for (const v of vars) {
+      const col = colById.get(v.variableCollectionId);
+      if (!col || !EDITABLE_COLLECTIONS.has(col.name)) continue;
+      out.push(toVarInfo(v, col, nameById));
+    }
+    out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
+    return out;
+  }
+  async function aliasWouldCycle(sourceId, target) {
+    const seen = /* @__PURE__ */ new Set();
+    let frontier = [target];
+    while (frontier.length) {
+      const next = [];
+      for (const cur of frontier) {
+        if (cur.id === sourceId) return true;
+        if (seen.has(cur.id)) continue;
+        seen.add(cur.id);
+        for (const modeId of Object.keys(cur.valuesByMode)) {
+          const raw = cur.valuesByMode[modeId];
+          if (isVariableAlias(raw)) {
+            const nv = await figma.variables.getVariableByIdAsync(raw.id);
+            if (nv) next.push(nv);
+          }
+        }
+      }
+      frontier = next;
+    }
+    return false;
+  }
+  async function applyVarValue(v, col, value) {
+    const modeId = value.modeId || col.defaultModeId;
+    if (!col.modes.some((m) => m.modeId === modeId)) return "\uB300\uC0C1 \uBAA8\uB4DC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
+    if (value.aliasId !== void 0) {
+      if (aliasSelfReference(v.id, value.aliasId)) return "\uBCC0\uC218\uB97C \uC790\uAE30 \uC790\uC2E0\uC5D0 \uBCC4\uCE6D\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
+      const target = await figma.variables.getVariableByIdAsync(value.aliasId);
+      if (!target) return "\uBCC4\uCE6D \uB300\uC0C1\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
+      if (target.resolvedType !== v.resolvedType) return "\uBCC4\uCE6D \uB300\uC0C1\uC758 \uD0C0\uC785\uC774 \uB2E4\uB985\uB2C8\uB2E4.";
+      if (await aliasWouldCycle(v.id, target)) return "\uBCC4\uCE6D\uC774 \uC21C\uD658 \uCC38\uC870\uB97C \uB9CC\uB4ED\uB2C8\uB2E4.";
+      v.setValueForMode(modeId, figma.variables.createVariableAlias(target));
+      return null;
+    }
+    if (value.literal !== void 0) {
+      const p = parseVarValue(v.resolvedType, value.literal);
+      if (!p.ok) return p.error;
+      v.setValueForMode(modeId, p.value);
+      return null;
+    }
+    return null;
+  }
+  async function editVariable(id, patch) {
+    const v = await figma.variables.getVariableByIdAsync(id);
+    if (!v) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: "\uBCC0\uC218\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4." };
+    const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+    if (!col || !EDITABLE_COLLECTIONS.has(col.name)) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: "\uD3B8\uC9D1 \uB300\uC0C1\uC774 \uC544\uB2CC \uCEEC\uB809\uC158\uC785\uB2C8\uB2E4." };
+    try {
+      if (patch.name !== void 0) {
+        const nm = patch.name.trim();
+        if (!nm) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: "\uC774\uB984\uC744 \uC785\uB825\uD558\uC138\uC694." };
+        v.name = nm;
+      }
+      if (patch.description !== void 0) v.description = patch.description;
+      if (patch.hidden !== void 0) v.hiddenFromPublishing = patch.hidden;
+      if (patch.scopes) v.scopes = sanitizeScopes(patch.scopes, v.resolvedType);
+      if (patch.value) {
+        const err = await applyVarValue(v, col, patch.value);
+        if (err) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: err };
+      }
+    } catch (e) {
+      return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: errText(e) };
+    }
+    const all = await figma.variables.getLocalVariablesAsync();
+    const nameById = new Map(all.map((x) => [x.id, x.name]));
+    return { type: "EDIT_VARIABLE_RESULT", id, ok: true, var: toVarInfo(v, col, nameById) };
+  }
+  function nodeBindsVar(node, varId) {
+    const bv = node.boundVariables;
+    if (!bv) return false;
+    const hits = (a) => !!a && typeof a === "object" && a.id === varId;
+    for (const key of Object.keys(bv)) {
+      const entry = bv[key];
+      if (Array.isArray(entry)) {
+        if (entry.some(hits)) return true;
+      } else if (entry && typeof entry === "object") {
+        if (hits(entry)) return true;
+        for (const v of Object.values(entry)) if (hits(v)) return true;
+      }
+    }
+    return false;
+  }
+  async function collectBoundNodes(varId) {
+    await figma.loadAllPagesAsync();
+    const nodes = [];
+    const stack = [];
+    for (const page of figma.root.children) stack.push(...page.children);
+    let scanned = 0;
+    let capped = false;
+    while (stack.length) {
+      if (scanned >= USAGE_SCAN_CAP) {
+        capped = true;
+        break;
+      }
+      const n = stack.pop();
+      scanned++;
+      if (nodeBindsVar(n, varId)) nodes.push({ id: n.id, name: n.name });
+      if ("children" in n) for (const c of n.children) stack.push(c);
+    }
+    return { nodes, capped };
+  }
+  async function generateDarkMode(collectionId, fromModeId, toModeId) {
+    var _a;
+    let created = 0;
+    let realiased = 0;
+    let skipped = 0;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const semanticCol = cols.find((c) => c.id === collectionId);
+    if (!semanticCol) return { type: "DARK_MODE_RESULT", created, realiased, skipped };
+    const globalCol = (_a = cols.find((c) => c.name === GLOBAL)) != null ? _a : figma.variables.createVariableCollection(GLOBAL);
+    const gMode = globalCol.defaultModeId;
+    const allVars = await figma.variables.getLocalVariablesAsync();
+    const byId = new Map(allVars.map((v) => [v.id, v]));
+    const globalByName = new Map(allVars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
+    for (const v of allVars) {
+      if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
+      const fromRaw = v.valuesByMode[fromModeId];
+      if (!isVariableAlias(fromRaw)) {
+        skipped++;
+        continue;
+      }
+      const lightGlobal = byId.get(fromRaw.id);
+      const lightRaw = lightGlobal == null ? void 0 : lightGlobal.valuesByMode[gMode];
+      if (!lightGlobal || !(lightRaw && typeof lightRaw === "object" && "r" in lightRaw)) {
+        skipped++;
+        continue;
+      }
+      const darkHex = darkValueForLight(rgbToHex(lightRaw));
+      const dname = darkGlobalName(lightGlobal.name);
+      let dark = globalByName.get(dname);
+      if (!dark) {
+        dark = figma.variables.createVariable(dname, globalCol, "COLOR");
+        dark.scopes = lightGlobal.scopes;
+        dark.hiddenFromPublishing = true;
+        globalByName.set(dname, dark);
+        created++;
+      }
+      dark.setValueForMode(gMode, hexToRgb(darkHex));
+      v.setValueForMode(toModeId, figma.variables.createVariableAlias(dark));
+      realiased++;
+    }
+    return { type: "DARK_MODE_RESULT", created, realiased, skipped };
   }
   function pageOf(node) {
     let n = node;
@@ -4449,6 +4695,57 @@
           }
           post({ type: "GENERATE_RESULT", generated, sets: sets.length, combos });
           if (generated) commitUndo(figma);
+          break;
+        }
+        case "GET_VARIABLES": {
+          post({ type: "VARIABLES", vars: await collectVars() });
+          break;
+        }
+        case "EDIT_VARIABLE": {
+          const res = await editVariable(msg.id, msg.patch);
+          post(res);
+          if (res.ok) {
+            commitUndo(figma);
+            await postPrereq();
+          }
+          break;
+        }
+        case "DELETE_VARIABLE": {
+          const v = await figma.variables.getVariableByIdAsync(msg.id);
+          if (!v) {
+            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: false, error: "\uBCC0\uC218\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4." });
+            break;
+          }
+          const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+          if (!col || !EDITABLE_COLLECTIONS.has(col.name)) {
+            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: false, error: "\uD3B8\uC9D1 \uB300\uC0C1\uC774 \uC544\uB2CC \uCEEC\uB809\uC158\uC785\uB2C8\uB2E4." });
+            break;
+          }
+          try {
+            v.remove();
+            commitUndo(figma);
+            await postPrereq();
+            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: true, deleted: true });
+          } catch (e) {
+            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: false, error: errText(e) });
+          }
+          break;
+        }
+        case "GET_VARIABLE_USAGE": {
+          const { nodes, capped } = await collectBoundNodes(msg.id);
+          const aliasedBy = findAliasReferers(msg.id, await collectVars());
+          post({ type: "VARIABLE_USAGE", id: msg.id, nodes, aliasedBy, capped });
+          break;
+        }
+        case "GENERATE_DARK_MODE": {
+          if (!requirePaid("tokens", "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
+          const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
+          post(r);
+          if (r.created || r.realiased) {
+            commitUndo(figma);
+            await postPrereq();
+          }
+          post({ type: "VARIABLES", vars: await collectVars() });
           break;
         }
         case "SCAN_SIMILAR": {
