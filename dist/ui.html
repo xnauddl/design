@@ -819,6 +819,14 @@
         <button id="btnClearLicense">해제</button>
       </div>
       <div class="muted" id="licenseInfo"></div>
+      <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유.
+           licenseConfig가 아직 자리표시자면 ui.ts가 이 행과 안내를 숨긴다(없는 페이지로 보내지 않기 위해). -->
+      <div class="row" id="licenseLinkRow">
+        <button id="btnBuy" class="primary">구독하기</button>
+        <button id="btnPortal" title="구독·결제수단 변경, 기기 활성화 해제(기기 1대 한도)">구독 관리</button>
+      </div>
+      <div class="hint" id="licenseLinkHint">Paid는 연 $39. 기기 1대까지 활성화되며, 기기를 옮기려면 ‘해제’ 후 새 기기에서 키를 다시 검증하세요.</div>
+      <div class="hint" id="licenseSetupHint" style="display:none">결제·검증 서버가 아직 연결되지 않았습니다(배포 전). 키 검증과 구독 링크는 배포 후 동작합니다.</div>
       <!-- 개발용 강제 티어: 사용자 화면 비노출(개발 시 display 해제). #tier id는 ui.ts가 참조하므로 DOM 유지. -->
       <div class="row" id="devTierRow" style="display:none;">
         <label class="inline">개발용 강제 티어
@@ -1051,16 +1059,19 @@
   // src/lib/license.ts
   var REVERIFY_MS = 24 * 60 * 60 * 1e3;
   var GRACE_MS = 14 * 24 * 60 * 60 * 1e3;
-  function parseVerifyResponse(json) {
-    if (!json || typeof json !== "object") return { ok: false, error: "\uC798\uBABB\uB41C \uC751\uB2F5 \uD615\uC2DD" };
+  function extractSignedToken(json) {
+    if (!json || typeof json !== "object") return { ok: false, error: "\uC751\uB2F5 \uBCF8\uBB38\uC744 \uD574\uC11D\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4" };
     const o = json;
-    if (o.valid === false) {
-      return { ok: false, error: typeof o.error === "string" ? o.error : "\uC720\uD6A8\uD558\uC9C0 \uC54A\uC740 \uB77C\uC774\uC120\uC2A4 \uD0A4" };
+    if (typeof o.token === "string" && o.token) return { ok: true, token: o.token };
+    if (o.valid === false && typeof o.error === "string" && o.error) return { ok: false, error: o.error };
+    return { ok: false, error: "\uC11C\uBA85 \uD1A0\uD070\uC774 \uC5C6\uB294 \uC751\uB2F5" };
+  }
+  function pickInstanceId(json, prev) {
+    if (json && typeof json === "object") {
+      const v = json.instanceId;
+      if (typeof v === "string" && v) return v;
     }
-    if (!isTier(o.tier)) return { ok: false, error: "\uC751\uB2F5\uC5D0 \uC54C \uC218 \uC5C6\uB294 \uD2F0\uC5B4" };
-    const expiresAt = typeof o.expiresAt === "number" ? o.expiresAt : 0;
-    if (!expiresAt) return { ok: false, error: "\uC751\uB2F5\uC5D0 \uB9CC\uB8CC \uC2DC\uAC01 \uC5C6\uC74C" };
-    return { ok: true, tier: o.tier, expiresAt };
+    return prev;
   }
 
   // src/lib/licenseToken.ts
@@ -1136,6 +1147,13 @@
   var LICENSE_AUD = PLUGIN_ID;
   var LICENSE_ALG = "ES256";
   var LICENSE_PUBLIC_JWK = { kty: "EC", crv: "P-256", x: "PLACEHOLDER", y: "PLACEHOLDER" };
+  var PURCHASE_URL = "https://example.lemonsqueezy.com/buy/PLACEHOLDER";
+  function licenseLinksConfigured() {
+    return !PURCHASE_URL.includes("PLACEHOLDER") && !PURCHASE_URL.includes("example.");
+  }
+  function licenseVerifyConfigured() {
+    return !VERIFY_URL.includes("example.") && LICENSE_PUBLIC_JWK.x !== "PLACEHOLDER";
+  }
 
   // src/lib/presets.ts
   var PRESET_VERSION = 1;
@@ -2459,20 +2477,26 @@
     return crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, b64urlToBytes(signatureB64), data);
   }
   async function verifyAndReport(key, instanceId) {
-    let result;
+    let json;
     try {
       const resp = await fetch(VERIFY_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key, pluginId: PLUGIN_ID, instanceId })
       });
-      const json = await resp.json();
-      const signed = !!json && typeof json === "object" && typeof json.token === "string";
-      const parsed = signed ? await verifyLicenseToken(json.token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify) : parseVerifyResponse(json);
-      const respInstanceId = !!json && typeof json === "object" && typeof json.instanceId === "string" ? json.instanceId : instanceId;
-      result = parsed.ok ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: respInstanceId } : { ok: false, error: parsed.error };
+      json = await resp.json().catch(() => null);
     } catch (e) {
-      result = { ok: false, error: "\uAC80\uC99D \uC11C\uBC84 \uC5F0\uACB0 \uC2E4\uD328(\uC624\uD504\uB77C\uC778)", offline: true };
+      send({ type: "LICENSE_VERIFIED", key, result: { ok: false, error: "\uAC80\uC99D \uC11C\uBC84 \uC5F0\uACB0 \uC2E4\uD328(\uC624\uD504\uB77C\uC778)", offline: true } });
+      return;
+    }
+    let result;
+    try {
+      const ext = extractSignedToken(json);
+      if (!ext.ok) throw new Error(ext.error);
+      const parsed = await verifyLicenseToken(ext.token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify);
+      result = parsed.ok ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: pickInstanceId(json, instanceId) } : { ok: false, error: parsed.error };
+    } catch (e) {
+      result = { ok: false, error: `\uAC80\uC99D \uC2E4\uD328: ${e instanceof Error ? e.message : String(e)}` };
     }
     send({ type: "LICENSE_VERIFIED", key, result });
   }
@@ -2487,6 +2511,13 @@
     }
   }
   var PAID_LOCK = "\u{1F512} Paid \uC804\uC6A9";
+  var PREMIUM_STATUS_ID = {
+    tokens: "createStatus",
+    semantics: "semStatus",
+    components: "componentStatus",
+    textStyles: "tsStatus",
+    presets: "presetStatus"
+  };
   var PRESET_FIELDS = [
     "presetName",
     "btnSavePreset",
@@ -2519,13 +2550,14 @@
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     refreshDarkModes();
-    $("wizComponentLock").textContent = isPaid ? "" : "\u{1F512} Paid";
+    $("wizComponentLock").textContent = isPaid ? "" : PAID_LOCK;
     $("wizOptComponentize").disabled = !isPaid;
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!isPaid) $("btnSemantics").disabled = true;
     setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!hasBindable) $("btnApplyConfirm").disabled = true;
     setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
+    if (!isPaid) $("btnApplyExistingText").disabled = true;
     if (isPaid && !teamDataRequested) {
       teamDataRequested = true;
       send({ type: "GET_PRESETS" });
@@ -2808,8 +2840,15 @@
     $("licenseKey").value = "";
     send({ type: "CLEAR_LICENSE" });
   });
+  $("btnBuy").addEventListener("click", () => send({ type: "OPEN_LICENSE_LINK", target: "purchase" }));
+  $("btnPortal").addEventListener("click", () => send({ type: "OPEN_LICENSE_LINK", target: "portal" }));
+  if (!licenseLinksConfigured()) {
+    $("licenseLinkRow").style.display = "none";
+    $("licenseLinkHint").style.display = "none";
+  }
+  if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
@@ -3076,7 +3115,7 @@
         break;
       }
       case "PREMIUM_REQUIRED": {
-        const statusId = msg.feature === "components" ? "componentStatus" : msg.feature === "presets" ? "presetStatus" : msg.feature === "semantics" ? "semStatus" : "createStatus";
+        const statusId = (_d = PREMIUM_STATUS_ID[msg.feature]) != null ? _d : "createStatus";
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }

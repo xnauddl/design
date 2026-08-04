@@ -5,10 +5,10 @@ import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, Component
 import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList } from './lib/tokens';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
-import { type Tier } from './lib/entitlements';
-import { parseVerifyResponse, type VerifyResult } from './lib/license';
+import { type Tier, type Feature } from './lib/entitlements';
+import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
-import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
+import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import type { ExportFormat } from './lib/exporters';
 import type { FrameMeta } from './lib/similar';
@@ -1049,29 +1049,33 @@ async function subtleVerify(signingInput: string, signatureB64: string, alg: str
 /** 검증 서버 호출 + 서명/클레임 검증 → 결과를 code로 보고(code가 캐시·적용).
  *  instanceId: 이전 활성화에서 받아 캐시에 보관한 기기 식별자(있으면 같은 기기로 validate). */
 async function verifyAndReport(key: string, instanceId?: string): Promise<void> {
-  let result: VerifyResult;
+  let json: unknown;
   try {
     const resp = await fetch(VERIFY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, pluginId: PLUGIN_ID, instanceId }),
     });
-    const json: unknown = await resp.json();
-    // 서명 토큰({ token }) 우선, 없으면 평문 응답(개발/하위호환).
-    const signed = !!json && typeof json === 'object' && typeof (json as { token?: unknown }).token === 'string';
-    const parsed = signed
-      ? await verifyLicenseToken((json as { token: string }).token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify)
-      : parseVerifyResponse(json);
-    // 서버가 돌려준 기기 instanceId를 보관(다음 재검증 때 같은 기기로 validate). 없으면 기존 값 유지.
-    const respInstanceId =
-      !!json && typeof json === 'object' && typeof (json as { instanceId?: unknown }).instanceId === 'string'
-        ? (json as { instanceId: string }).instanceId
-        : instanceId;
-    result = parsed.ok
-      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: respInstanceId }
-      : { ok: false, error: parsed.error };
+    // 네트워크 도달 이후의 실패는 '오프라인'이 아니다 — grace 유지로 페일오픈되지 않게 여기서부터 분리한다.
+    json = await resp.json().catch(() => null);
   } catch {
-    result = { ok: false, error: '검증 서버 연결 실패(오프라인)', offline: true };
+    // fetch 자체 실패(DNS·연결·CORS)만 오프라인 → 기존 캐시를 grace로 유지.
+    send({ type: 'LICENSE_VERIFIED', key, result: { ok: false, error: '검증 서버 연결 실패(오프라인)', offline: true } });
+    return;
+  }
+
+  let result: VerifyResult;
+  try {
+    // 서명 토큰(JWT)만 신뢰한다 — 서명 없는 평문 응답은 페이월 우회 경로라 수용하지 않는다(M2.1).
+    const ext = extractSignedToken(json);
+    if (!ext.ok) throw new Error(ext.error);
+    const parsed = await verifyLicenseToken(ext.token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify);
+    result = parsed.ok
+      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: pickInstanceId(json, instanceId) }
+      : { ok: false, error: parsed.error };
+  } catch (e) {
+    // 서명·클레임·응답 형식 오류 → offline 아님(검증 실패로 확정 처리).
+    result = { ok: false, error: `검증 실패: ${e instanceof Error ? e.message : String(e)}` };
   }
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
@@ -1094,6 +1098,14 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
    컴포넌트/베리언트·공유 프리셋.
    Free: 추출·색 정리·바인딩·리네임·명도 대비·내보내기. */
 const PAID_LOCK = '🔒 Paid 전용';
+/** 유료 거부(PREMIUM_REQUIRED) 안내를 띄울 카드 — Feature별 상태 영역. */
+const PREMIUM_STATUS_ID: Record<Feature, string> = {
+  tokens: 'createStatus',
+  semantics: 'semStatus',
+  components: 'componentStatus',
+  textStyles: 'tsStatus',
+  presets: 'presetStatus',
+};
 const PRESET_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
@@ -1102,6 +1114,8 @@ const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
 // 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
 // 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
+// btnApplyExistingText도 code 쪽에서 requireTextStyles로 막히지만, 전제 가드(등록된 스타일 유무)와
+// 결합돼 있어 여기 목록이 아니라 updateGates 아래에서 별도로 잠근다.
 const PAID_FIELDS = [
   ...PRESET_FIELDS,
   ...COMPONENT_FIELDS,
@@ -1128,7 +1142,7 @@ function updateGates(): void {
   // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가
   // 방금 disabled를 티어만 보고 덮었으니, 모드 조건을 여기서 다시 적용해야 한다(순서 의존).
   refreshDarkModes();
-  $('wizComponentLock').textContent = isPaid ? '' : '🔒 Paid';
+  $('wizComponentLock').textContent = isPaid ? '' : PAID_LOCK;
   ($('wizOptComponentize') as HTMLInputElement).disabled = !isPaid;
 
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
@@ -1138,6 +1152,7 @@ function updateGates(): void {
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
   // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
+  if (!isPaid) ($('btnApplyExistingText') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
 
   if (isPaid && !teamDataRequested) {
     teamDataRequested = true;
@@ -1480,6 +1495,19 @@ $('btnClearLicense').addEventListener('click', () => {
   send({ type: 'CLEAR_LICENSE' });
 });
 
+// 결제·구독 관리는 LemonSqueezy 위임 — URL은 code가 licenseConfig에서 해석해 openExternal로 연다.
+$('btnBuy').addEventListener('click', () => send({ type: 'OPEN_LICENSE_LINK', target: 'purchase' }));
+$('btnPortal').addEventListener('click', () => send({ type: 'OPEN_LICENSE_LINK', target: 'portal' }));
+
+// 배포 전(자리표시자 URL)에는 구독 버튼을 숨긴다 — 눌러도 없는 페이지로 가서 혼란만 준다.
+// URL을 실제 값으로 갈아끼우면 조건이 자동으로 풀려 다시 노출된다.
+if (!licenseLinksConfigured()) {
+  $('licenseLinkRow').style.display = 'none';
+  $('licenseLinkHint').style.display = 'none';
+}
+// 검증 서버·공개키가 미설정이면 키를 넣어도 반드시 '서명 검증 실패'가 난다. 그 이유를 미리 밝힌다.
+if (!licenseVerifyConfigured()) $('licenseSetupHint').style.display = '';
+
 /* ---------- code → ui ---------- */
 window.onmessage = (event: MessageEvent) => {
   const msg = event.data.pluginMessage as CodeToUi | undefined;
@@ -1782,15 +1810,9 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'PREMIUM_REQUIRED': {
-      // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭).
-      const statusId =
-        msg.feature === 'components'
-          ? 'componentStatus'
-          : msg.feature === 'presets'
-            ? 'presetStatus'
-            : msg.feature === 'semantics'
-              ? 'semStatus'
-              : 'createStatus'; // tokens(기본)
+      // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
+      // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
+      const statusId = PREMIUM_STATUS_ID[msg.feature] ?? 'createStatus';
       setStatus(statusId, t('premium.required', { message: msg.message, feature: msg.feature }), 'warn');
       break;
     }
