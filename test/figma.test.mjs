@@ -253,7 +253,14 @@ test('createTokens — Global 리터럴 + Semantic 별칭 + scopes/hidden + px �
   );
 
   // #16: 토큰당 G+S 1쌍(스냅샷 없음). 색2 + 라인하이트2 + 간격2 = created 6
-  assert.deepEqual(summary, { created: 6, updated: 0, globals: 3, semantics: 3 });
+  // conversions: base(16px) 환산 대상은 비-px인 lineHeight(150%)뿐
+  assert.deepEqual(summary, {
+    created: 6,
+    updated: 0,
+    globals: 3,
+    semantics: 3,
+    conversions: [{ name: 'line-height/150', from: '150%', to: 24 }],
+  });
 
   // Global 색: 리터럴 + scope + hidden
   const gColor = findVar(figma, 'Global', 'color/0066ff');
@@ -730,7 +737,7 @@ test('previewCreateTokens — 변수 생성 없이 생성/갱신 예정 집계',
   ];
   // 컬렉션/변수 없는 초기 상태 — 모두 생성 예정.
   const before = figma._state.variables.length;
-  const p = await previewCreateTokens(tokens);
+  const p = await previewCreateTokens(tokens, 16);
   assert.equal(figma._state.variables.length, before); // 미생성(읽기 전용)
   // 토큰 2개 → Global 2 + Semantic 2
   assert.equal(p.globals, 2);
@@ -740,9 +747,35 @@ test('previewCreateTokens — 변수 생성 없이 생성/갱신 예정 집계',
 
   // 실제 생성 후 다시 미리보기 → 모두 갱신 예정.
   await createTokens(tokens, 16);
-  const p2 = await previewCreateTokens(tokens);
+  const p2 = await previewCreateTokens(tokens, 16);
   assert.equal(p2.created, 0);
   assert.equal(p2.updated, 4);
+});
+
+test('previewCreateTokens — base가 환산에 반영되고 실제 생성값과 일치', async () => {
+  const figma = installFigma();
+  const tokens = [
+    { name: 'line-height/160', category: 'lineHeight', sources: ['lineHeight'], value: 160, unit: 'percent' },
+    { name: 'letter-spacing/1-5', category: 'letterSpacing', sources: ['letterSpacing'], value: 1.5, unit: 'rem' },
+    { name: 'size/200', category: 'size', sources: ['size'], value: 200 }, // 단위 없음 — 환산 대상 아님
+  ];
+  const p16 = await previewCreateTokens(tokens, 16);
+  assert.deepEqual(p16.conversions, [
+    { name: 'line-height/160', from: '160%', to: 25.6 },
+    { name: 'letter-spacing/1-5', from: '1.5rem', to: 24 },
+  ]);
+
+  // base를 바꾸면 미리보기 환산도 따라 바뀐다(개수 집계는 그대로).
+  const p20 = await previewCreateTokens(tokens, 20);
+  assert.deepEqual(p20.conversions.map((c) => c.to), [32, 30]);
+  assert.equal(p20.globals, p16.globals);
+  assert.equal(p20.semantics, p16.semantics);
+
+  // 미리보기 환산값 == 실제 생성된 Global 변수값(같은 규칙을 공유하는지 확인).
+  const applied = await createTokens(tokens, 20);
+  assert.deepEqual(applied.conversions.map((c) => c.to), [32, 30]);
+  assert.equal(findVar(figma, 'Global', 'line-height/160').valuesByMode['mode:Global'], 32);
+  assert.equal(findVar(figma, 'Global', 'letter-spacing/1-5').valuesByMode['mode:Global'], 30);
 });
 
 /* ================= rename.ts ================= */

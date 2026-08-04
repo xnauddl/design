@@ -11,8 +11,8 @@ import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, commonBaseName } from './lib/components';
-import type { CompPropType, StructNode, StructGroup } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
+import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
@@ -360,16 +360,30 @@ function solidFillHex(node: SceneNode): string | null {
   return null;
 }
 
-/** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색을 읽어 순수 그룹화에 넘김. */
+/** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑을 읽어 순수 그룹화에 넘김. */
 function toStructNode(node: SceneNode): StructNode {
   const a = node as unknown as Record<string, unknown>;
   const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined);
   const kids = 'children' in node ? (node.children as readonly SceneNode[]) : [];
+  let characters: string | undefined;
+  let mainComponentKey: string | null | undefined;
+  if (node.type === 'TEXT') {
+    try { characters = node.characters; } catch { characters = ''; }
+  }
+  if (node.type === 'INSTANCE') {
+    try {
+      const main = node.mainComponent;
+      mainComponentKey = main ? (main.key || main.id) : null;
+    } catch {
+      mainComponentKey = null;
+    }
+  }
   return {
     id: node.id,
     name: node.name,
     type: node.type,
     locked: node.locked,
+    visible: node.visible,
     width: num(a.width),
     height: num(a.height),
     paddingTop: num(a.paddingTop),
@@ -380,46 +394,154 @@ function toStructNode(node: SceneNode): StructNode {
     counterAxisSpacing: num(a.counterAxisSpacing),
     layoutMode: typeof a.layoutMode === 'string' ? a.layoutMode : undefined,
     fillHex: solidFillHex(node),
-    children: kids.map(toStructNode),
+    characters,
+    mainComponentKey,
+    // INSTANCE 안은 자식 컴포넌트 소관 — 접힘 비교·속성 노출과 동일하게 펼치지 않음.
+    children: node.type === 'INSTANCE' ? [] : kids.map(toStructNode),
   };
 }
 
+/** 컴포넌트 루트 기준 레이어 + 경로(인스턴스 안 미진입). */
+function ownComponentLayersWithPath(root: ComponentNode | SceneNode): { node: SceneNode; path: string }[] {
+  const out: { node: SceneNode; path: string }[] = [];
+  const walk = (n: SceneNode, path: string): void => {
+    if (n !== root) out.push({ node: n, path });
+    if (n.type === 'INSTANCE') return;
+    if (!('children' in n)) return;
+    const kids = n.children as readonly SceneNode[];
+    for (let i = 0; i < kids.length; i++) {
+      walk(kids[i], path === '' ? String(i) : `${path}/${i}`);
+    }
+  };
+  walk(root, '');
+  return out;
+}
+
+/** @deprecated 경로 없는 목록 — 동명 레이어 매칭에 취약. 가급적 withPath 사용. */
+function ownComponentLayers(root: ComponentNode | SceneNode): SceneNode[] {
+  return ownComponentLayersWithPath(root).map((x) => x.node);
+}
+
+/** 루트 기준 자식 인덱스 경로(`0/1`)로 노드 찾기. */
+function nodeAtPath(root: SceneNode, path: string): SceneNode | null {
+  let cur: SceneNode = root;
+  for (const seg of path.split('/').filter(Boolean)) {
+    if (!('children' in cur)) return null;
+    const i = Number(seg);
+    if (!Number.isFinite(i)) return null;
+    const kids = cur.children as readonly SceneNode[];
+    if (!kids[i]) return null;
+    cur = kids[i];
+  }
+  return cur;
+}
+
+function propDefaultFor(target: SceneNode, type: CompPropType): string | boolean {
+  if (type === 'TEXT') return target.type === 'TEXT' ? target.characters : '';
+  if (type === 'BOOLEAN') return target.visible;
+  return target.type === 'INSTANCE' && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : '';
+}
+
+/** 조상 체인 포함 실효 가시성 — 부모만 숨겨도 자식은 후보에서 제외. */
+function isEffectivelyVisible(node: SceneNode): boolean {
+  let p: BaseNode | null = node;
+  while (p) {
+    if ('visible' in p && (p as SceneNode).visible === false) return false;
+    p = p.parent;
+  }
+  return true;
+}
+
+/** 등록/스캔 공통: 실효 보임 + componentEligible. */
+function sceneComponentEligible(n: SceneNode): boolean {
+  return isEffectivelyVisible(n) && componentEligible(n as ScanNode);
+}
+
+/** 계획의 layerPath(우선) 또는 layerName으로 대상 레이어 찾기. */
+function resolvePropTarget(root: SceneNode, p: CompPropPlan): SceneNode | null {
+  if (p.layerPath != null && p.layerPath !== '') {
+    // 경로가 있으면 이름 폴백 금지 — 동명 레이어에 잘못 묶여 고아 속성이 생기는 것 방지.
+    return nodeAtPath(root, p.layerPath);
+  }
+  return ownComponentLayers(root).find((l) => l.name === p.layerName) ?? null;
+}
+
+/** 레이어 계획에 맞춰 노드에서 속성값 스냅샷(등록 전·노드 소멸 전). */
+function propValuesFromNode(root: SceneNode, plan: readonly CompPropPlan[]): Record<string, string | boolean> {
+  return propValuesFromStruct(toStructNode(root), plan);
+}
+
+/** 컴포넌트 속성 정의에서 propName → property id. */
+function propIdsByName(container: ComponentNode | ComponentSetNode): Map<string, string> {
+  const map = new Map<string, string>();
+  const defs = container.componentPropertyDefinitions;
+  if (!defs) return map;
+  for (const [id, def] of Object.entries(defs)) {
+    if (def && typeof def === 'object' && 'name' in def && typeof (def as { name: string }).name === 'string') {
+      map.set((def as { name: string }).name, id);
+    }
+  }
+  return map;
+}
+
+function applyInstancePropValues(
+  inst: InstanceNode,
+  ids: Map<string, string>,
+  values: Record<string, string | boolean>,
+): void {
+  const payload: { [key: string]: string | boolean } = {};
+  for (const [name, val] of Object.entries(values)) {
+    const id = ids.get(name);
+    if (id != null) payload[id] = val;
+  }
+  if (Object.keys(payload).length) {
+    try { inst.setProperties(payload); } catch { /* 일부 속성 적용 실패 무시 */ }
+  }
+}
+
 /**
- * 컴포넌트/세트의 **직속 레이어**를 컴포넌트 속성으로 노출(등록에 자동 통합).
- * `inferComponentProperties` 규칙: TEXT→Text · INSTANCE→Instance-swap · 이름 `?`→Boolean(가시성).
- * **인스턴스 내부로는 진입하지 않는다** — 중첩 컴포넌트(예: 카드 안 image-wrapper 인스턴스)는
- * 그 자체를 swap 후보로만 보고, 내부 텍스트는 해당 자식 컴포넌트가 노출(속성 폭발 방지).
- * 세트는 모든 변형의 동명 레이어에 참조 연결. 반환: 노출된 `속성명:타입` 목록.
+ * 컴포넌트/세트의 레이어를 컴포넌트 속성으로 노출(등록에 자동 통합).
+ *
+ * **TEXT 노출 정책(경로별)**:
+ * - **속성 접힘**(같은 이름·구조 동형, 카피/스왑만 다름): `inferVaryingComponentProperties` —
+ *   값이 다른 슬롯만 속성. 인스턴스에서 값 오버라이드.
+ * - **단독·베리언트 세트**: `inferComponentProperties` — 트리의 TEXT/INSTANCE/`?`를
+ *   컴포넌트 API로 전부 노출(인스턴스에서 라벨 등을 바꿀 수 있게). 동명·동일 카피는 1개만.
+ * 두 경로 모두 **레이어 경로**로 연결(`이름?` → BOOLEAN 우선 동일).
+ *
+ * **인스턴스 내부로는 진입하지 않는다** — 중첩 컴포넌트는 swap 후보로만.
+ * 반환: 노출된 `속성명:타입` 목록.
  */
 function exposeProperties(container: ComponentNode | ComponentSetNode, scopes: readonly ComponentNode[]): string[] {
-  const ownLayers = (root: ComponentNode): SceneNode[] => {
-    const out: SceneNode[] = [];
-    const walk = (n: SceneNode): void => {
-      if (n !== root) out.push(n);
-      if (n.type === 'INSTANCE') return; // 인스턴스 내부 = 그 컴포넌트 소관
-      if ('children' in n) for (const c of n.children as readonly SceneNode[]) walk(c);
-    };
-    walk(root);
-    return out;
-  };
-  const defaultFor = (target: SceneNode, type: CompPropType): string | boolean => {
-    if (type === 'TEXT') return target.type === 'TEXT' ? target.characters : '';
-    if (type === 'BOOLEAN') return target.visible;
-    return target.type === 'INSTANCE' && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : '';
-  };
-  const scopeLayers = scopes.map((s) => ownLayers(s));
-  const repLayers = scopeLayers[0];
-  if (!repLayers) return [];
+  const rep = scopes[0];
+  if (!rep) return [];
+  const layered = ownComponentLayersWithPath(rep);
+  const plan = inferComponentProperties(
+    layered.map(({ node, path }) => ({
+      name: node.name,
+      type: node.type,
+      path,
+      characters: node.type === 'TEXT' ? node.characters : undefined,
+    })),
+  );
+  return exposePropertiesFromPlan(container, scopes, plan);
+}
+
+/** 주어진 계획만 속성으로 노출(접힘: 값이 다른 슬롯만). */
+function exposePropertiesFromPlan(
+  container: ComponentNode | ComponentSetNode,
+  scopes: readonly ComponentNode[],
+  plan: readonly CompPropPlan[],
+): string[] {
   const out: string[] = [];
-  const plan = inferComponentProperties(repLayers.map((l) => ({ name: l.name, type: l.type })));
   for (const p of plan) {
-    const repTarget = repLayers.find((l) => l.name === p.layerName);
+    const repTarget = resolvePropTarget(scopes[0], p);
     if (!repTarget) continue;
     try {
-      const id = container.addComponentProperty(p.propName, p.type, defaultFor(repTarget, p.type));
-      for (const layers of scopeLayers) {
-        const target = layers.find((l) => l.name === p.layerName);
-        if (!target) continue; // 해당 레이어 없는 변형은 스킵
+      const id = container.addComponentProperty(p.propName, p.type, propDefaultFor(repTarget, p.type));
+      for (const scope of scopes) {
+        const target = resolvePropTarget(scope, p);
+        if (!target) continue;
         const refs = { ...(target.componentPropertyReferences ?? {}) };
         refs[p.field] = id;
         target.componentPropertyReferences = refs;
@@ -540,14 +662,20 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_TOKENS': {
-        // Free/Paid: 미리보기는 무료 · 실제 변수 생성은 Paid.
+        // 실제 변수 생성만 Paid(미리보기는 비파괴 읽기라 백엔드는 허용 — UI가 무료 티어에서 버튼을 잠근다).
         if (!msg.preview && !requirePaid('tokens', '토큰(변수) 생성은 Paid 기능입니다. 미리보기는 무료로 제공됩니다.')) break;
-        // UX1: preview면 변수를 만들지 않고 예정 수만 집계.
-        const s = msg.preview ? await previewCreateTokens(msg.tokens) : await createTokens(msg.tokens, msg.base);
+        // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
+        const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
         if (pruned) summary += ` · 이전 색 ${pruned}개 정리`;
+        // base 반영 — 비-px 값이 실제로 얼마가 되는지 요약에 노출. base를 바꾸면 이 줄이 바뀐다.
+        if (s.conversions.length) {
+          const px = (n: number): string => String(Math.round(n * 100) / 100);
+          const ex = s.conversions.slice(0, 2).map((c) => `${c.from}→${px(c.to)}px`).join(', ');
+          summary += ` · base ${msg.base}px 환산 ${s.conversions.length}개(${ex}${s.conversions.length > 2 ? ' 외' : ''})`;
+        }
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
@@ -816,35 +944,69 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'SCAN_COMPONENT_CANDIDATES': {
         if (!requirePro()) break;
-        const roots = selection();
+        // 숨긴 조상 아래 노드는 선택 루트여도 제외(실효 비가시).
+        const roots = selection().filter(isEffectivelyVisible);
         const candidates = scanComponentCandidates(roots);
-        // 라이브 노드 인덱스(서브트리 전체) — 후보 id → 실제 노드.
+        // 라이브 노드 인덱스 — 스캔과 동일하게 인스턴스·메인·세트 안은 펼치지 않는다.
+        // (전체 재귀는 대용량 파일에서 UI가 ‘스캔 중’에 멈춘 것처럼 보이게 함.)
         const liveById = new Map<string, SceneNode>();
         const index = (n: SceneNode): void => {
+          if (n.visible === false) return;
           liveById.set(n.id, n);
+          if (n.type === 'INSTANCE' || n.type === 'COMPONENT' || n.type === 'COMPONENT_SET') return;
           if ('children' in n) for (const c of n.children as readonly SceneNode[]) index(c);
         };
         for (const r of roots) index(r);
-        // **전체 eligible 후보**를 정확한 이름으로 묶어 미리보기 라벨 주입(깊이 무관, 등록과 동일 규칙).
-        // 반복(2개+) → group+variant(자동체크), 단독(1개) → single(PascalCase). "묶임" 여부를 등록 전에 그대로 보여준다.
-        const eligibleNodes = candidates
-          .filter((c) => c.eligible)
-          .map((c) => liveById.get(c.id))
-          .filter((n): n is SceneNode => !!n);
-        const groups = groupForRegister(eligibleNodes);
-        const preview = new Map<string, { group?: string; variant?: string; single?: string }>();
-        for (const g of groups) {
-          if (g.members.length < 2) {
-            if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
-            continue;
-          }
-          const base = commonBaseName(g.members.map((m) => m.name));
-          for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
-        }
-        const nodes = candidates.map((c) => {
-          const p = preview.get(c.id);
-          return p ? { ...c, ...p } : c;
+        // eligible 재확인(조상 숨김 — 순수 스캔은 선택 서브트리만 보아 놓칠 수 있음).
+        const gated = candidates.map((c) => {
+          const live = liveById.get(c.id);
+          if (!live || !isEffectivelyVisible(live)) return { ...c, eligible: false };
+          return c;
         });
+        // eligible이 빠진 뒤 고아 맥락 조상 제거.
+        const byCand = new Map(gated.map((c) => [c.id, c]));
+        const keepIds = new Set(gated.filter((c) => c.eligible).map((c) => c.id));
+        for (const c of gated) {
+          if (!c.eligible) continue;
+          let p = c.parentId;
+          while (p && !keepIds.has(p)) {
+            keepIds.add(p);
+            p = byCand.get(p)?.parentId ?? null;
+          }
+        }
+        const pruned = gated.filter((c) => keepIds.has(c.id));
+        // **전체 eligible 후보**를 정확한 이름으로 묶어 미리보기 라벨 주입(깊이 무관, 등록과 동일 규칙).
+        // 반복(2개+) → 구조 차이면 group+variant(자동체크), 속성(텍스트/스왑/불리언)만 다르면
+        // propsOnly+single(자동체크·단품 접힘). 단독(1개) → single(PascalCase).
+        let nodes = pruned;
+        try {
+          const eligibleNodes = pruned
+            .filter((c) => c.eligible)
+            .map((c) => liveById.get(c.id))
+            .filter((n): n is SceneNode => !!n);
+          const groups = groupForRegister(eligibleNodes);
+          const preview = new Map<string, { group?: string; variant?: string; single?: string; propsOnly?: boolean }>();
+          for (const g of groups) {
+            if (g.members.length < 2) {
+              if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
+              continue;
+            }
+            if (shouldCollapseToProperties(g.members)) {
+              const name = pascalCase(commonBaseName(g.members.map((m) => m.name)) || g.members[0].name);
+              for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true });
+              continue;
+            }
+            const base = commonBaseName(g.members.map((m) => m.name));
+            for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
+          }
+          nodes = pruned.map((c) => {
+            const p = preview.get(c.id);
+            return p ? { ...c, ...p } : c;
+          });
+        } catch (e) {
+          // 미리보기 라벨 실패해도 후보는 반환(스캔 중 고정 방지).
+          console.warn('component preview label failed', e);
+        }
         post({ type: 'COMPONENT_CANDIDATES', nodes });
         break;
       }
@@ -853,9 +1015,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         await figma.loadAllPagesAsync(); // dynamic-page: 컴포넌트 페이지 이동 전 로드
         let registered = 0;
         let skipped = 0;
-        // 후보 필터: FRAME/GROUP · 미잠금(인스턴스/컴포넌트 타입은 자동 제외). **이름 게이트 없음** —
-        // 실제 파일은 container/wrapper 같은 임의 이름이 흔해 명사 사전 게이트가 진짜 컴포넌트를 버린다.
-        const eligible = (n: SceneNode): boolean => (n.type === 'FRAME' || n.type === 'GROUP') && !n.locked;
+        // 후보 필터: 실효 보임 + FRAME/GROUP·미잠금 + 고신뢰 시맨틱 역할.
+        const eligible = (n: SceneNode): boolean => sceneComponentEligible(n);
         // 대상 결정: 트리에서 체크한 nodeIds, 없으면(스캔 없이 등록) 선택 서브트리를 **재귀**로 모아
         // **반복 이름(2회+)만** 묶는다(단독 잡음 제외).
         let targets: SceneNode[];
@@ -872,8 +1033,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           const single = roots.length === 1;
           const collected: SceneNode[] = [];
           const walk = (n: SceneNode, depth: number): void => {
+            if (n.visible === false) return; // 숨김은 등록·하위 스캔 제외
             const isContainerRoot = single && depth === 0; // 컨테이너 자신 제외
             if (!isContainerRoot && eligible(n)) collected.push(n);
+            // 인스턴스·메인·세트 안은 이미 컴포넌트 체계 — 안쪽 FRAME을 다시 등록하지 않음.
+            if (n.type === 'INSTANCE' || n.type === 'COMPONENT' || n.type === 'COMPONENT_SET') return;
             if ('children' in n) for (const c of n.children as readonly SceneNode[]) walk(c, depth + 1);
           };
           for (const r of roots) walk(r, 0);
@@ -905,6 +1069,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const failures: string[] = []; // 조용히 삼키던 실패를 UI로 노출(진단)
         // 등록으로 만든 컴포넌트/세트 — 루프 후 **속성 자동 노출**(옛 '속성 노출' 버튼 통합).
         const containers: { container: ComponentNode | ComponentSetNode; scopes: ComponentNode[] }[] = [];
+        let exposedEarly = 0; // 속성접힘 경로에서 선노출한 속성 수
 
         type Origin = { parent: (BaseNode & ChildrenMixin) | null; index: number; x: number; y: number; autolayout: boolean };
         const captureOrigin = (n: SceneNode): Origin => {
@@ -962,6 +1127,85 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             }
             continue;
           }
+
+          // 텍스트/스왑/불리언만 다른 반복 → 단품 1개 + 속성 오버라이드 인스턴스(세트 금지).
+          if (shouldCollapseToProperties(g.members)) {
+            const live: SceneNode[] = [];
+            for (const m of g.members) {
+              const n = byId.get(m.id);
+              if (n) live.push(n);
+            }
+            if (live.length < 2) {
+              // 소실로 1개만 남으면 단독 경로와 동일.
+              if (live[0]) {
+                const o = captureOrigin(live[0]);
+                try {
+                  const comp = figma.createComponentFromNode(live[0]);
+                  registered++;
+                  placeSingle(comp, o, setName || pascalCase(live[0].name));
+                } catch (e) {
+                  skipped++;
+                  failures.push(`속성접힘 등록 실패(${setName}): ${errText(e)}`);
+                }
+              }
+              continue;
+            }
+            const structs = live.map(toStructNode);
+            const plan = inferVaryingComponentProperties(structs);
+            type Snap = { o: Origin; vals: Record<string, string | boolean> };
+            const snapshots: Snap[] = [];
+            const made: ComponentNode[] = [];
+            const madeFromLive: number[] = [];
+            for (let i = 0; i < live.length; i++) {
+              const n = live[i];
+              const snap: Snap = { o: captureOrigin(n), vals: propValuesFromNode(n, plan) };
+              try {
+                made.push(figma.createComponentFromNode(n));
+                snapshots.push(snap);
+                madeFromLive.push(i);
+              } catch (e) {
+                skipped++;
+                failures.push(`속성접힘 컴포넌트화 실패(${n.name}): ${errText(e)}`);
+              }
+            }
+            if (!made.length) continue;
+            // 액션 슬롯이 있는 쪽을 마스터로 — optional 결손 멤버의 트리를 대표로 쓰면 BOOLEAN 경로가 사라짐.
+            const preferLive = pickCollapseMasterIndex(structs);
+            let masterMade = madeFromLive.indexOf(preferLive);
+            if (masterMade < 0) masterMade = 0;
+            const master = made[masterMade];
+            for (let i = 0; i < made.length; i++) {
+              if (i === masterMade) continue;
+              try { made[i].remove(); } catch { /* 이미 제거됨 */ }
+            }
+            try { master.name = setName || pascalCase(live[preferLive]?.name ?? live[0].name); } catch { /* 이름 실패 무시 */ }
+            placeOnPage(master);
+            singles.push(master.name);
+            registered++; // 남긴 단품 1개만 집계(중간 변환분은 제거)
+            // 값이 다른 슬롯만 TEXT/SWAP/BOOLEAN으로 노출(공통 텍스트는 속성 제외).
+            let collapsedExposed = 0;
+            try {
+              collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
+            } catch (e) {
+              failures.push(`속성 노출 실패(${master.name}): ${errText(e)}`);
+            }
+            exposedEarly += collapsedExposed;
+            const ids = propIdsByName(master);
+            const places: { inst: InstanceNode; o: Origin }[] = [];
+            for (const snap of snapshots) {
+              try {
+                const inst = master.createInstance();
+                applyInstancePropValues(inst, ids, snap.vals);
+                places.push({ inst, o: snap.o });
+              } catch (e) {
+                failures.push(`인스턴스 실패(${master.name}): ${errText(e)}`);
+              }
+            }
+            restore(places);
+            // 루프 끝 일괄 expose는 중복 방지 — 이미 노출했으므로 containers에 넣지 않음.
+            continue;
+          }
+
           // 2개+ → 각 멤버 컴포넌트화(원위치 기록) 후 세트 결합 → 원위치에 변형 인스턴스 복원.
           const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
           const made: { comp: ComponentNode; variant: string; o: Origin }[] = [];
@@ -1011,7 +1255,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
 
         // 속성 자동 노출 — 등록한 각 컴포넌트/세트의 직속 레이어를 Text/Instance-swap/Boolean 속성으로.
-        let exposed = 0;
+        let exposed = exposedEarly;
         for (const c of containers) {
           try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(`속성 노출 실패: ${errText(e)}`); }
         }
