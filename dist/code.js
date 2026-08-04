@@ -59,13 +59,15 @@
     return void 0;
   }
   function pxConversions(tokens, base) {
+    var _a;
     const out = [];
     for (const t of tokens) {
       if (!t.unit || t.unit === "px" || typeof t.value !== "number") continue;
       out.push({
         name: t.name,
         from: stringValueForUnit(t.value, t.unit),
-        to: toPx(t.value, t.unit, { base, fontSize: base })
+        // 토큰이 자기 폰트 크기를 알고 있으면 그것으로 환산(없으면 base) — setGlobalLiteral과 같은 규칙.
+        to: toPx(t.value, t.unit, { base, fontSize: (_a = t.fontSize) != null ? _a : base })
       });
     }
     return out;
@@ -593,13 +595,14 @@
     return summary;
   }
   function setGlobalLiteral(v, modeId, t, type, base) {
+    var _a;
     if (type === "COLOR") {
       const { r, g, b } = hexToRgb(String(t.value));
       v.setValueForMode(modeId, { r, g, b, a: 1 });
     } else if (type === "STRING") {
       v.setValueForMode(modeId, String(t.value));
     } else {
-      const num = t.unit && t.unit !== "px" && typeof t.value === "number" ? toPx(t.value, t.unit, { base, fontSize: base }) : Number(t.value);
+      const num = t.unit && t.unit !== "px" && typeof t.value === "number" ? toPx(t.value, t.unit, { base, fontSize: (_a = t.fontSize) != null ? _a : base }) : Number(t.value);
       v.setValueForMode(modeId, num);
     }
   }
@@ -664,22 +667,28 @@
       const fontSize = roundN(t.fontSize);
       const { family, style } = t.fontName;
       let lineHeight = 0;
+      let lineHeightPercent = 0;
       const lh = t.lineHeight;
       if (lh !== figma.mixed && lh.unit !== "AUTO") {
         lineHeight = lh.unit === "PERCENT" ? roundN(fontSize * lh.value / 100) : roundN(lh.value);
+        if (lh.unit === "PERCENT") lineHeightPercent = roundN(lh.value);
       }
       let letterSpacing = 0;
       const ls = t.letterSpacing;
       if (ls !== figma.mixed) letterSpacing = ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
       const sid = t.textStyleId;
       const styleId = sid === figma.mixed ? "" : sid;
-      samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name, styleId });
+      samples.push({ fontSize, lineHeight, lineHeightPercent, letterSpacing, family, style, layerName: t.name, styleId });
     }
     return { samples, warnings: [...warnings] };
   }
   function lhPxOf(fontSize, lh) {
     if (lh === figma.mixed || lh.unit === "AUTO") return 0;
     return lh.unit === "PERCENT" ? roundN(fontSize * lh.value / 100) : roundN(lh.value);
+  }
+  function lhPctOf(lh) {
+    if (lh === figma.mixed || lh.unit !== "PERCENT") return 0;
+    return roundN(lh.value);
   }
   function lsPxOf(fontSize, ls) {
     if (ls === figma.mixed) return 0;
@@ -702,8 +711,8 @@
     return out;
   }
   async function createSemanticTextStyles(specs, apply, nodes) {
-    var _a, _b, _c;
-    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [] };
+    var _a, _b, _c, _d, _e;
+    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
     if (!specs.length) return res;
     const existing = await figma.getLocalTextStylesAsync();
     const styleById = new Map(existing.map((s) => [s.id, s]));
@@ -749,12 +758,29 @@
       }
     };
     const aliasMap = {};
-    const pushAlias = (role, fontSize, lineHeight, letterSpacing) => {
+    const lhTokens = /* @__PURE__ */ new Map();
+    const pushLineHeightTok = (name, px, pct, fontSize) => {
+      const prev = lhTokens.get(name);
+      if (!prev) {
+        const t = pct > 0 ? { name, category: "lineHeight", value: pct, unit: "percent", fontSize, sources: ["lineHeight"] } : { name, category: "lineHeight", value: px, unit: "px", sources: ["lineHeight"] };
+        lhTokens.set(name, t);
+        pushTok(t);
+        return;
+      }
+      const prevPct = prev.unit === "percent" ? Number(prev.value) : 0;
+      if (prevPct === pct && (pct === 0 || prev.fontSize === fontSize)) return;
+      prev.value = px;
+      prev.unit = "px";
+      prev.fontSize = void 0;
+      res.notes.push(`${name}: \uC5ED\uD560\uB9C8\uB2E4 \uD589\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)`);
+    };
+    const pushAlias = (role, fontSize, lineHeight, letterSpacing, lineHeightPercent = 0) => {
       pushTok({ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] });
       aliasMap[`font-size/${role}`] = numberTokenName("font-size", fontSize);
       if (lineHeight > 0) {
-        pushTok({ name: numberTokenName("line-height", lineHeight), category: "lineHeight", value: lineHeight, unit: "px", sources: ["lineHeight"] });
-        aliasMap[`line-height/${role}`] = numberTokenName("line-height", lineHeight);
+        const lhName = numberTokenName("line-height", lineHeight);
+        pushLineHeightTok(lhName, lineHeight, lineHeightPercent, fontSize);
+        aliasMap[`line-height/${role}`] = lhName;
       }
       if (letterSpacing !== 0) {
         pushTok({ name: numberTokenName("letter-spacing", letterSpacing), category: "letterSpacing", value: letterSpacing, unit: "px", sources: ["letterSpacing"] });
@@ -763,11 +789,11 @@
     };
     for (const s of specs) {
       if (anchoredStyle(s)) continue;
-      pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing);
+      pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing, (_b = s.lineHeightPercent) != null ? _b : 0);
     }
     {
       const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-      const semId0 = (_b = cols0.find((c) => c.name === SEMANTIC)) == null ? void 0 : _b.id;
+      const semId0 = (_c = cols0.find((c) => c.name === SEMANTIC)) == null ? void 0 : _c.id;
       const semNames = /* @__PURE__ */ new Set();
       if (semId0) {
         for (const v of await figma.variables.getLocalVariablesAsync())
@@ -778,13 +804,13 @@
         if (!st) continue;
         if (semNames.has(`font-size/${s.name}`)) continue;
         const fontSize = roundN(st.fontSize);
-        pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing));
+        pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight));
       }
     }
     if (tokens.length) await createTokens(tokens, 16);
     if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_c = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _c.id;
+    const semId = (_d = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _d.id;
     const semByName = /* @__PURE__ */ new Map();
     if (semId) {
       for (const v of await figma.variables.getLocalVariablesAsync())
@@ -823,7 +849,8 @@
         }
         style.fontName = loaded;
         style.fontSize = spec.fontSize;
-        style.lineHeight = spec.lineHeight > 0 ? { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
+        const pct = (_e = spec.lineHeightPercent) != null ? _e : 0;
+        style.lineHeight = spec.lineHeight > 0 ? pct > 0 ? { value: pct, unit: "PERCENT" } : { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
         style.letterSpacing = { value: spec.letterSpacing, unit: "PIXELS" };
       }
       const bindRole = style.name;
@@ -833,11 +860,16 @@
         res.bound++;
       } else res.missing.push(`font-size/${bindRole}`);
       if (spec.lineHeight > 0 || isRename) {
-        const lhVar = semByName.get(`line-height/${bindRole}`);
-        if (lhVar) {
-          style.setBoundVariable("lineHeight", lhVar);
-          res.bound++;
-        } else if (spec.lineHeight > 0) res.missing.push(`line-height/${bindRole}`);
+        const pctNow = lhPctOf(style.lineHeight);
+        if (pctNow > 0) {
+          res.notes.push(`${bindRole}: \uD589\uAC04 ${pctNow}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uBC14\uC778\uB529 \uC0DD\uB7B5`);
+        } else {
+          const lhVar = semByName.get(`line-height/${bindRole}`);
+          if (lhVar) {
+            style.setBoundVariable("lineHeight", lhVar);
+            res.bound++;
+          } else if (spec.lineHeight > 0) res.missing.push(`line-height/${bindRole}`);
+        }
       }
       if (spec.letterSpacing !== 0 || isRename) {
         const lsVar = semByName.get(`letter-spacing/${bindRole}`);
@@ -887,7 +919,7 @@
     return res;
   }
   async function applyExistingTextStyles(nodes) {
-    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [] };
+    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
     const styleBySig = /* @__PURE__ */ new Map();
     for (const s of await figma.getLocalTextStylesAsync()) {
       const fontSize = roundN(s.fontSize);
@@ -942,11 +974,14 @@
     for (const s of samples) {
       const k = sigKey(s);
       const ex = map.get(k);
-      if (ex) ex.count++;
-      else {
+      if (ex) {
+        ex.count++;
+        if (!ex.lineHeightPercent && s.lineHeightPercent) ex.lineHeightPercent = s.lineHeightPercent;
+      } else {
         map.set(k, {
           fontSize: s.fontSize,
           lineHeight: s.lineHeight,
+          lineHeightPercent: s.lineHeightPercent,
           letterSpacing: s.letterSpacing,
           family: s.family,
           style: s.style,
@@ -1008,14 +1043,14 @@
       for (const c of group) {
         const boundId = boundIdOf(c);
         const name = boundId ? nameById.get(boundId) : unique(group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`);
-        specs.push(__spreadValues({
+        specs.push(__spreadValues(__spreadValues({
           name,
           fontSize: c.fontSize,
           lineHeight: c.lineHeight,
           letterSpacing: c.letterSpacing,
           family: c.family,
           style: c.style
-        }, boundId ? { boundStyleId: boundId } : {}));
+        }, c.lineHeightPercent ? { lineHeightPercent: c.lineHeightPercent } : {}), boundId ? { boundStyleId: boundId } : {}));
       }
     }
     return specs;
@@ -3805,7 +3840,7 @@
         case "CREATE_TEXT_STYLES": {
           if (!requireTextStyles()) break;
           const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
-          post({ type: "TEXT_STYLES_RESULT", created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
+          post({ type: "TEXT_STYLES_RESULT", created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing, notes: r.notes });
           commitUndo(figma);
           await postPrereq();
           break;

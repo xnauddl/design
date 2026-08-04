@@ -1807,3 +1807,101 @@ test('createSemanticTextStyles — stale boundStyleId는 rename 모드가 아님
   assert.equal(body.fontName.style, 'Medium');
   assert.equal(body.lineHeight.value, 28);
 });
+
+/* ---------- 행간 %: 등록 단위 보존과 바인딩 생략 — 파일 끝에 모아 둠(동시 작업 브랜치 충돌 최소화) ---------- */
+
+test('scanTextStyles — %행간은 px 환산과 원본 % 를 함께 싣는다', () => {
+  installFigma();
+  const mk = (id, fontSize, lineHeight) => ({
+    type: 'TEXT', id, name: id, fontSize, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'x', textStyleId: '',
+  });
+  const { samples } = scanTextStyles([{
+    type: 'FRAME', id: 'f', name: 'F', children: [
+      mk('pct', 16, { unit: 'PERCENT', value: 150 }),
+      mk('px', 20, { unit: 'PIXELS', value: 28 }),
+      mk('auto', 24, { unit: 'AUTO' }),
+    ],
+  }]);
+  const pct = samples.find((s) => s.fontSize === 16);
+  assert.equal(pct.lineHeight, 24); // 시그니처는 px 환산
+  assert.equal(pct.lineHeightPercent, 150); // 원본은 별도 축으로 보존
+  assert.equal(samples.find((s) => s.fontSize === 20).lineHeightPercent, 0);
+  assert.equal(samples.find((s) => s.fontSize === 24).lineHeightPercent, 0); // AUTO
+});
+
+test('createSemanticTextStyles — %행간은 PERCENT로 등록하고 행간 바인딩은 생략(px 강제 회피)', async () => {
+  const figma = installFigma();
+  const r = await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 16, lineHeight: 24, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const style = figma._state.textStyles.find((s) => s.name === 'body');
+  assert.deepEqual(style.lineHeight, { value: 150, unit: 'PERCENT' }); // %로 등록
+  assert.ok(style.boundVariables.fontSize); // 크기는 그대로 바인딩
+  assert.equal(style.boundVariables.lineHeight, undefined); // 행간만 미바인딩
+  assert.equal(r.bound, 1); // fontSize 만
+  assert.deepEqual(r.missing, []); // 의도된 미바인딩은 경고가 아니다
+  assert.equal(r.notes.length, 1);
+  assert.ok(r.notes[0].includes('150%'));
+
+  // 변수는 px 스냅샷 + 원본 단위는 description(내보내기가 이걸 우선한다)
+  const g = findVar(figma, 'Global', 'line-height/24');
+  assert.equal(g.valuesByMode['mode:Global'], 24);
+  assert.equal(g.description, '150%');
+  assert.ok(findVar(figma, 'Semantic', 'line-height/body')); // 역할 별칭은 그대로 생성
+});
+
+test('createSemanticTextStyles — %는 역할의 폰트 크기로 환산(base 16 고정이면 틀어진다)', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles(
+    [{ name: 'h1', fontSize: 24, lineHeight: 36, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Bold' }],
+    false,
+    [],
+  );
+  const g = findVar(figma, 'Global', 'line-height/36');
+  assert.equal(g.valuesByMode['mode:Global'], 36); // 150% × 24 = 36 (base 16이면 24로 굳었다)
+  assert.equal(g.description, '150%');
+});
+
+test('createSemanticTextStyles — 기존 %스타일을 rename해도 %가 유지되고 바인딩되지 않는다', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 16, lineHeight: 24, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const style = figma._state.textStyles.find((s) => s.name === 'body');
+
+  // 재스캔: 같은 스타일에 앵커된 채 이름만 바꿈
+  const r = await createSemanticTextStyles(
+    [{ name: 'text/base', fontSize: 16, lineHeight: 24, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Regular', boundStyleId: style.id }],
+    false,
+    [],
+  );
+  assert.equal(style.name, 'text/base'); // rename 됨
+  assert.deepEqual(style.lineHeight, { value: 150, unit: 'PERCENT' }); // 타이포 보존
+  assert.equal(style.boundVariables.lineHeight, undefined); // 바인딩이 %를 px로 뭉개지 않았다
+  assert.ok(r.notes.some((n) => n.includes('150%')));
+});
+
+test('createSemanticTextStyles — 같은 px 이름에 원본이 갈리면 px로 기록(다른 역할 내보내기 오염 방지)', async () => {
+  const figma = installFigma();
+  const r = await createSemanticTextStyles(
+    [
+      { name: 'body', fontSize: 16, lineHeight: 24, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+      { name: 'h2', fontSize: 24, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Bold' }, // 같은 24px, 원본은 px
+    ],
+    false,
+    [],
+  );
+  const g = findVar(figma, 'Global', 'line-height/24');
+  assert.equal(g.valuesByMode['mode:Global'], 24);
+  assert.equal(g.description, undefined); // "150%"가 h2 내보내기까지 오염시키지 않는다
+  assert.ok(r.notes.some((n) => n.includes('line-height/24')));
+
+  // 스타일 자체의 단위는 역할별로 각각 유지된다
+  assert.deepEqual(figma._state.textStyles.find((s) => s.name === 'body').lineHeight, { value: 150, unit: 'PERCENT' });
+  assert.deepEqual(figma._state.textStyles.find((s) => s.name === 'h2').lineHeight, { value: 24, unit: 'PIXELS' });
+});

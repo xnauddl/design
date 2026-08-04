@@ -795,6 +795,8 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   const tr = document.createElement('tr');
   // 이미 바인딩된 스타일이면 id 보존 → 등록 시 신규 생성이 아니라 그 스타일 rename.
   if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
+  // 행간 원본 %는 표시용 셀이 아니라 행에 보관한다 — "150%" 문자열을 되파싱하지 않기 위해.
+  if (s.lineHeightPercent) tr.dataset.lineHeightPercent = String(s.lineHeightPercent);
   // 컬럼 폭은 표의 <colgroup>이 정하고(폰트는 가변), 입력은 칸을 꽉 채운다.
   const cell = (field: string, value: string, opts: { type?: string; readonly?: boolean } = {}): void => {
     const { type = 'text', readonly = false } = opts;
@@ -830,7 +832,23 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   }
   cell('family', s.family, { readonly: locked });
   cell('fontSize', String(s.fontSize), { type: 'number', readonly: locked });
-  cell('lineHeight', String(s.lineHeight), { type: 'number', readonly: locked });
+  // 행간 — 스캔 행은 단위까지 보여 준다("24px" / "150%"). %면 %로 등록되고 그 스타일의 행간 변수
+  // 바인딩은 생략되므로(Figma가 바인딩 시 px로 강제) 어느 쪽으로 등록될지가 표에서 보여야 한다.
+  // 등록에 쓰는 px 값은 표시 문자열을 되파싱하지 않고 행 dataset에서 읽는다.
+  if (locked) {
+    const pct = s.lineHeightPercent ?? 0;
+    tr.dataset.lineHeightPx = String(s.lineHeight);
+    cell('lineHeight', s.lineHeight > 0 ? (pct > 0 ? `${pct}%` : `${s.lineHeight}px`) : 'AUTO', { readonly: true });
+    const lhInp = tr.querySelector('input[data-field="lineHeight"]') as HTMLInputElement | null;
+    if (lhInp) {
+      lhInp.title =
+        pct > 0
+          ? `화면에서 ${pct}%로 쓰던 행간(${s.lineHeight}px) — %로 등록하고 행간 변수는 연결하지 않아요(Figma가 px로 바꿔버려서).`
+          : '스캔한 값이라 못 바꿔요';
+    }
+  } else {
+    cell('lineHeight', String(s.lineHeight), { type: 'number' }); // 수동 행은 px 입력
+  }
   cell('letterSpacing', String(s.letterSpacing), { type: 'number', readonly: locked });
   cell('style', s.style, { readonly: locked });
   const tdDel = document.createElement('td');
@@ -863,13 +881,17 @@ function readTextStyleRows(): TextStyleSpec[] {
     const name = get('name').trim();
     if (!name) continue;
     const boundStyleId = (tr as HTMLTableRowElement).dataset.boundStyleId;
+    const lineHeightPercent = Number((tr as HTMLTableRowElement).dataset.lineHeightPercent) || 0;
+    // 스캔 행의 행간 칸은 "150%"처럼 단위가 붙은 표시용 문자열이라 되파싱하지 않는다 — px는 행에 보관된 값.
+    const lineHeightPx = (tr as HTMLTableRowElement).dataset.lineHeightPx;
     specs.push({
       name,
       fontSize: Number(get('fontSize')) || 0,
-      lineHeight: Number(get('lineHeight')) || 0,
+      lineHeight: lineHeightPx !== undefined ? Number(lineHeightPx) || 0 : Number(get('lineHeight')) || 0,
       letterSpacing: Number(get('letterSpacing')) || 0,
       family: get('family').trim() || DEFAULT_TS_FAMILY,
       style: get('style').trim() || 'Regular',
+      ...(lineHeightPercent ? { lineHeightPercent } : {}),
       ...(boundStyleId ? { boundStyleId } : {}),
     });
   }
@@ -1690,6 +1712,8 @@ window.onmessage = (event: MessageEvent) => {
         'tsStatus',
         `텍스트 스타일 ${msg.created + msg.updated}개 (생성 ${msg.created} / 갱신 ${msg.updated}) · 바인딩 ${msg.bound}` +
           (msg.applied ? ` · 적용 ${msg.applied}` : '') +
+          // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
+          (msg.notes.length ? ` · ${msg.notes.join(' · ')}` : '') +
           (msg.missing.length ? ` · 미연결: ${msg.missing.join(', ')}` : ''),
         msg.missing.length ? 'warn' : 'ok',
       );

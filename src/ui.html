@@ -618,13 +618,16 @@
           <col style="width:64px;" /><!-- 이름 -->
           <col /><!-- 폰트(가변: 남는 폭 흡수) -->
           <col style="width:38px;" /><!-- 크기 -->
-          <col style="width:38px;" /><!-- 행간 -->
-          <col style="width:44px;" /><!-- 자간 -->
+          <!-- 행간은 스캔 행에서 단위까지 함께 보여 준다("24px"/"150%") → 38px로는 모자라 46px.
+               열을 따로 만들면 남는 폭을 먹는 ‘폰트’ 열이 360px 패널에서 아예 사라진다.
+               늘린 8px은 자간에서 회수한다(자간은 "-0.5" 정도라 38px로 충분). -->
+          <col style="width:46px;" /><!-- 행간(단위 포함) -->
+          <col style="width:38px;" /><!-- 자간 -->
           <col style="width:52px;" /><!-- 스타일 -->
           <col style="width:28px;" /><!-- 삭제 -->
         </colgroup>
         <thead><tr style="text-align:left; color:var(--muted);">
-          <th>이름</th><th>폰트</th><th>크기</th><th>행간</th><th>자간</th><th>스타일</th><th></th>
+          <th>이름</th><th>폰트</th><th>크기</th><th title="화면에서 쓰던 단위 그대로 등록합니다. %면 %로.">행간</th><th>자간</th><th>스타일</th><th></th>
         </tr></thead>
         <tbody id="tsRows"></tbody>
       </table>

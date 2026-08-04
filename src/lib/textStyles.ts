@@ -6,8 +6,10 @@
 /** 스캔으로 모은 텍스트 노드의 타이포 시그니처(1개 노드 = 1개 샘플). */
 export interface TextSample {
   fontSize: number;
-  /** px 환산 행간. 0 = AUTO(행간 없음). */
+  /** px 환산 행간. 0 = AUTO(행간 없음). 시그니처·매칭의 단일 기준. */
   lineHeight: number;
+  /** 행간 원본이 %였을 때의 값(150 = 150%). 0 = px 원본 또는 AUTO. 등록 단위 결정에만 쓴다. */
+  lineHeightPercent: number;
   /** px 자간(없으면 0). */
   letterSpacing: number;
   family: string;
@@ -21,6 +23,8 @@ export interface TextSample {
 export interface StyleCluster {
   fontSize: number;
   lineHeight: number;
+  /** 군집의 행간 원본 %(0 = px). 섞이면 %가 이긴다 — 아래 clusterTextStyles 참고. */
+  lineHeightPercent: number;
   letterSpacing: number;
   family: string;
   style: string;
@@ -34,7 +38,10 @@ export interface StyleCluster {
 export interface TextStyleSpec {
   name: string;
   fontSize: number;
+  /** px 환산 행간(0 = AUTO). 시맨틱 변수 값·시그니처는 항상 이 값. */
   lineHeight: number;
+  /** >0이면 스타일에 %로 등록하고 행간 변수 바인딩은 생략한다(Figma가 바인딩 시 px로 강제하므로). */
+  lineHeightPercent?: number;
   letterSpacing: number;
   family: string;
   style: string;
@@ -59,18 +66,24 @@ export const RAMP_NAMES = ['display', 'h1', 'h2', 'h3', 'title', 'body', 'captio
 const sigKey = (s: { fontSize: number; lineHeight: number; letterSpacing: number; family: string; style: string }) =>
   `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
 
-/** 텍스트 샘플 → 동일 시그니처 군집(빈도순 누적). 바인딩된 스타일 id도 군집별로 모은다. */
+/** 텍스트 샘플 → 동일 시그니처 군집(빈도순 누적). 바인딩된 스타일 id도 군집별로 모은다.
+   시그니처는 px 환산 행간 기준이므로 `16px/150%`와 `24px` 노드가 한 군집으로 합쳐진다.
+   이때 원본 단위는 **%가 이긴다** — px는 %의 환산 결과로도 설명되지만 그 반대는 아니고,
+   %로 등록해 두면 크기를 바꿔도 비율이 따라오기 때문. */
 export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
   const map = new Map<string, StyleCluster>();
   const ids = new Map<string, Set<string>>(); // sigKey → 바인딩된 styleId 집합('' 제외)
   for (const s of samples) {
     const k = sigKey(s);
     const ex = map.get(k);
-    if (ex) ex.count++;
-    else {
+    if (ex) {
+      ex.count++;
+      if (!ex.lineHeightPercent && s.lineHeightPercent) ex.lineHeightPercent = s.lineHeightPercent; // % 우선
+    } else {
       map.set(k, {
         fontSize: s.fontSize,
         lineHeight: s.lineHeight,
+        lineHeightPercent: s.lineHeightPercent,
         letterSpacing: s.letterSpacing,
         family: s.family,
         style: s.style,
@@ -168,6 +181,7 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
         letterSpacing: c.letterSpacing,
         family: c.family,
         style: c.style,
+        ...(c.lineHeightPercent ? { lineHeightPercent: c.lineHeightPercent } : {}),
         ...(boundId ? { boundStyleId: boundId } : {}),
       });
     }

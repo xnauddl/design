@@ -1786,3 +1786,41 @@ test('tidyNumberTokens — base 0 또는 허용 0이면 그대로', () => {
   assert.equal(tidyNumberTokens(tokens, { base: 0, ratio: 0.15 }).snapped, 0);
   assert.equal(tidyNumberTokens(tokens, { base: 8, ratio: 0 }).snapped, 0);
 });
+
+/* ---------- 행간 원본 단위(%) 보존 — 파일 끝에 모아 둠(동시 작업 브랜치와의 충돌 최소화) ---------- */
+
+test('clusterTextStyles — px 노드와 % 노드가 한 군집이면 원본은 %가 이긴다', () => {
+  const base = { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', styleId: '' };
+  // px 먼저 → % 가 나중에 들어와도 승격된다
+  const pxFirst = clusterTextStyles([
+    { ...base, lineHeightPercent: 0, layerName: 'A' },
+    { ...base, lineHeightPercent: 150, layerName: 'B' },
+  ]);
+  assert.equal(pxFirst.length, 1); // 시그니처는 px 기준이라 한 군집
+  assert.equal(pxFirst[0].count, 2);
+  assert.equal(pxFirst[0].lineHeightPercent, 150);
+
+  // % 먼저 → px 가 뒤에 와도 강등되지 않는다
+  const pctFirst = clusterTextStyles([
+    { ...base, lineHeightPercent: 150, layerName: 'B' },
+    { ...base, lineHeightPercent: 0, layerName: 'A' },
+  ]);
+  assert.equal(pctFirst[0].lineHeightPercent, 150);
+
+  // 전부 px면 0(= px로 등록)
+  const allPx = clusterTextStyles([{ ...base, lineHeightPercent: 0, layerName: 'A' }]);
+  assert.equal(allPx[0].lineHeightPercent, 0);
+});
+
+test('nameTextStyles — 군집의 행간 %는 스펙으로 전달되고, px 군집엔 필드가 없다', () => {
+  const cl = clusterTextStyles([
+    { fontSize: 16, lineHeight: 24, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b', styleId: '' },
+    { fontSize: 32, lineHeight: 40, lineHeightPercent: 0, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 't', styleId: '' },
+  ]);
+  const specs = nameTextStyles(cl);
+  const pct = specs.find((s) => s.fontSize === 16);
+  const px = specs.find((s) => s.fontSize === 32);
+  assert.equal(pct.lineHeightPercent, 150);
+  assert.equal(pct.lineHeight, 24); // px 환산값은 그대로 유지(시맨틱 변수·시그니처 기준)
+  assert.equal(px.lineHeightPercent, undefined);
+});
