@@ -16,6 +16,7 @@ import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } fr
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
+import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { Preset, upsertPreset } from './lib/presets';
 import { commitUndo } from './lib/undo';
 
@@ -257,7 +258,7 @@ async function applySelectedBinding(item: { nodeId: string; field: string; index
 
 /** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireTextStyles(): boolean {
-  return requirePaid('components', '텍스트 스타일 등록은 Paid 기능입니다.');
+  return requirePaid('textStyles', '텍스트 스타일 등록은 Paid 기능입니다.');
 }
 
 async function savePresets(): Promise<void> {
@@ -877,6 +878,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           /* 무시 */
         }
         postLicense('라이선스 키 제거됨');
+        break;
+      }
+      case 'OPEN_LICENSE_LINK': {
+        // URL은 여기서만 해석 — UI가 임의 주소를 넘길 수 없게 한다.
+        figma.openExternal(msg.target === 'purchase' ? PURCHASE_URL : PORTAL_URL);
         break;
       }
       case 'GET_PRESETS': {
