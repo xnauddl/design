@@ -406,6 +406,22 @@
     .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
     .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
     .cfind .ratio { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    /* 닮은 프레임 멤버 줄 — .cfind와 같은 한 줄 규칙(이름만 늘어나고 나머지는 고정). label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
+    .simrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; cursor: pointer; }
+    .simrow .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .simrow input[type="radio"], .simrow .tag, .simrow .simmeta { flex: 0 0 auto; }
+    .simrow .simmeta { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    /* 변수 편집기 한 줄 — 이름(늘어남) + 값 + 컬렉션 배지 + 액션. .simrow와 같은 한 줄 규칙. */
+    .vrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 3px 0; min-height: 30px; }
+    .vrow .vname { flex: 1 1 90px; min-width: 0; }
+    .vrow .vval { flex: 0 1 110px; min-width: 0; }
+    .vrow .vname input, .vrow .vval input, .vrow .vval select { width: 100%; min-width: 0; }
+    .vrow .vcol, .vrow .vact { flex: 0 0 auto; }
+    .vrow .vsw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
+    .vrow .vact button { padding: 0 6px; }
+    /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
+    .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
+    .vusage.warn { color: var(--warn); }
     .cfix { display: inline-flex; gap: 4px; }
     .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
     .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
@@ -566,6 +582,27 @@
       <div class="status" id="semStatus"></div>
     </div>
 
+    <div class="step" id="darkCard">
+      <h2>다크 테마 생성 <span class="muted" id="darkLock"></span></h2>
+      <div class="hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
+      <div class="row">
+        <label class="inline">대상 컬렉션
+          <select id="darkCollection"></select>
+        </label>
+      </div>
+      <div class="row">
+        <label class="inline">라이트 모드
+          <select id="darkFromMode"></select>
+        </label>
+        <label class="inline">다크 모드
+          <select id="darkToMode"></select>
+        </label>
+        <button id="btnGenDark" class="primary">다크 채우기</button>
+      </div>
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
+      <div class="status" id="darkStatus"></div>
+    </div>
+
     <div class="step">
       <h2>텍스트 스타일 (화면 → 스타일) <span class="muted" id="tsLock"></span></h2>
       <div class="hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 새 스타일은 ‘행 추가’로. (Paid)</div>
@@ -711,6 +748,22 @@
       </div>
       <div class="status" id="componentStatus"></div>
     </div>
+
+    <div class="step" id="similarCard">
+      <h2>닮은 프레임 컴포넌트화 <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
+      <div class="hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
+      <div class="row">
+        <button id="btnScanSimilar" title="선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)">닮은 프레임 스캔</button>
+        <button id="btnComponentize" class="primary" title="추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체">컴포넌트화</button>
+      </div>
+      <div id="similarList" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 '모두 펼치기'(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="similarListMore" style="display:none">
+        <span class="list-count" id="similarListCount"></span>
+        <button class="link" id="btnSimilarListExpand">모두 펼치기</button>
+      </div>
+      <div class="status" id="similarStatus"></div>
+    </div>
   </section>
 
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
@@ -737,6 +790,25 @@
       </div>
       <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%;"></textarea>
       <div class="status" id="exportStatus"></div>
+    </div>
+
+    <div class="step" id="varEditCard">
+      <h2>변수 편집기 <span class="muted" id="varCount"></span></h2>
+      <div class="hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.</div>
+      <div class="row">
+        <button id="btnLoadVars">변수 불러오기</button>
+        <label class="inline">컬렉션
+          <select id="varFilterCol"><option value="">전체</option></select>
+        </label>
+        <input id="varFilterText" type="text" placeholder="이름으로 거르기" />
+      </div>
+      <div id="varList" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="varListMore" style="display:none">
+        <span class="list-count" id="varListCount"></span>
+        <button class="link" id="btnVarListExpand">모두 펼치기</button>
+      </div>
+      <div class="status" id="varEditStatus"></div>
     </div>
 
     <div class="step">

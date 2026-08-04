@@ -2,7 +2,7 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
-import { type DraftToken, type Unit, resolvedTypeForToken } from './lib/tokens';
+import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList } from './lib/tokens';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier, type Feature } from './lib/entitlements';
@@ -11,6 +11,8 @@ import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import type { ExportFormat } from './lib/exporters';
+import type { FrameMeta } from './lib/similar';
+import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles } from './lib/roles';
@@ -199,6 +201,8 @@ const LIST_REGIONS: ListRegion[] = [
   { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
   { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
   { mount: 'contrastList', row: '.cfind', more: 'contrastListMore', count: 'contrastListCount', expand: 'btnContrastListExpand' },
+  { mount: 'similarList', row: '.simrow', more: 'similarListMore', count: 'similarListCount', expand: 'btnSimilarListExpand' },
+  { mount: 'varList', row: '.vrow', more: 'varListMore', count: 'varListCount', expand: 'btnVarListExpand' },
   // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
   // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
   { mount: 'bindTree', row: '.tree-row', more: 'bindTreeMore', count: 'bindTreeCount', expand: 'btnBindTreeExpand' },
@@ -1105,7 +1109,8 @@ const PREMIUM_STATUS_ID: Record<Feature, string> = {
 const PRESET_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
-const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
+// btnScanSimilar(스캔)은 읽기 전용이라 Free — 잠그는 건 실제로 문서를 바꾸는 btnComponentize뿐.
+const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnComponentize'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
 // 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
 // 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
@@ -1117,6 +1122,7 @@ const PAID_FIELDS = [
   'btnPalette', 'btnPaletteApply',
   'btnCreate', 'btnCreateApply',
   'btnTextStyles',
+  'btnGenDark', // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
 ];
 
 /**
@@ -1130,9 +1136,12 @@ function updateGates(): void {
     el.disabled = !isPaid;
     setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
   }
-  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'createLock', 'semLock', 'tsLock']) {
+  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
+  // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가
+  // 방금 disabled를 티어만 보고 덮었으니, 모드 조건을 여기서 다시 적용해야 한다(순서 의존).
+  refreshDarkModes();
   $('wizComponentLock').textContent = isPaid ? '' : PAID_LOCK;
   ($('wizOptComponentize') as HTMLInputElement).disabled = !isPaid;
 
@@ -1231,6 +1240,122 @@ function renderPipeline(): void {
 $('btnScanComp').addEventListener('click', () => {
   setStatus('componentStatus', t('component.scanning'), '');
   send({ type: 'SCAN_COMPONENT_CANDIDATES' });
+});
+
+/* ---------- 변수 편집기 ---------- */
+// 마지막으로 받은 목록. 편집은 낙관적으로 반영하지 않고 EDIT_VARIABLE_RESULT로 되돌려받아 갱신한다
+// — figma가 이름을 정규화하거나 값을 거부할 수 있어서, 화면이 실제 상태와 어긋나면 안 된다.
+let allVars: VarInfo[] = [];
+
+/** 컬렉션/이름 필터를 적용한 목록. */
+function visibleVars(): VarInfo[] {
+  const col = ($('varFilterCol') as HTMLSelectElement).value;
+  const q = ($('varFilterText') as HTMLInputElement).value.trim().toLowerCase();
+  return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
+}
+
+function requestVars(): void {
+  setStatus('varEditStatus', '변수를 불러오는 중…', '');
+  send({ type: 'GET_VARIABLES' });
+}
+
+$('btnLoadVars').addEventListener('click', requestVars);
+$('varFilterCol').addEventListener('change', () => renderVars());
+$('varFilterText').addEventListener('input', () => renderVars());
+
+/* ---------- 다크 테마 생성 ---------- */
+// 다크 채우기는 컬렉션의 모드 2개(라이트→다크)를 고르는 게 전부라, 변수 목록에서 모드를 읽어 채운다.
+function refreshDarkOptions(): void {
+  const cols = new Map<string, VarInfo>();
+  for (const v of allVars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
+  const sel = $('darkCollection') as HTMLSelectElement;
+  const prev = sel.value;
+  sel.innerHTML = '';
+  for (const [id, v] of cols) {
+    const o = document.createElement('option');
+    o.value = id;
+    o.textContent = v.collection;
+    sel.appendChild(o);
+  }
+  if (prev && cols.has(prev)) sel.value = prev;
+  // 라이트/다크가 성립하려면 모드가 2개 이상이어야 한다. 이름순 첫 컬렉션(대개 단일 모드인
+  // Global)이 잡히면 카드가 열리자마자 막힌 것처럼 보이니, 실제로 쓸 수 있는 쪽을 기본으로.
+  const usable = [...cols.values()].find((v) => v.modes.length >= 2);
+  if (usable && (cols.get(sel.value)?.modes.length ?? 0) < 2) sel.value = usable.collectionId;
+  refreshDarkModes();
+}
+
+function refreshDarkModes(): void {
+  const colId = ($('darkCollection') as HTMLSelectElement).value;
+  const v = allVars.find((x) => x.collectionId === colId);
+  const modes = v ? v.modes : [];
+  for (const id of ['darkFromMode', 'darkToMode']) {
+    const sel = $(id) as HTMLSelectElement;
+    const prev = sel.value;
+    sel.innerHTML = '';
+    for (const m of modes) {
+      const o = document.createElement('option');
+      o.value = m.modeId;
+      o.textContent = m.name;
+      sel.appendChild(o);
+    }
+    if (prev && modes.some((m) => m.modeId === prev)) sel.value = prev;
+  }
+  // 모드가 2개 이상이어야 라이트→다크가 성립한다. 1개면 무엇을 눌러도 아무 일이 없으니 미리 막는다.
+  const ok = modes.length >= 2;
+  ($('btnGenDark') as HTMLButtonElement).disabled = !ok || !isPaid;
+  const notice = $('darkPrereq');
+  notice.style.display = ok ? 'none' : '';
+  const text = notice.querySelector('.prereq-text');
+  if (text) {
+    text.textContent = ok
+      ? ''
+      : modes.length
+        ? '이 컬렉션에 모드가 하나뿐이에요. Figma에서 다크 모드를 추가한 뒤 다시 시도하세요.'
+        : '먼저 토큰을 생성해 변수를 만드세요.';
+  }
+  // 모드가 2개 이상이면 서로 다른 모드가 기본으로 잡히게 — 같은 모드끼리면 덮어써도 의미가 없다.
+  if (modes.length >= 2 && ($('darkFromMode') as HTMLSelectElement).value === ($('darkToMode') as HTMLSelectElement).value) {
+    ($('darkToMode') as HTMLSelectElement).value = modes[1].modeId;
+  }
+}
+
+$('darkCollection').addEventListener('change', refreshDarkModes);
+
+$('btnGenDark').addEventListener('click', () => {
+  const collectionId = ($('darkCollection') as HTMLSelectElement).value;
+  const fromModeId = ($('darkFromMode') as HTMLSelectElement).value;
+  const toModeId = ($('darkToMode') as HTMLSelectElement).value;
+  if (!collectionId || !fromModeId || !toModeId) {
+    setStatus('darkStatus', '컬렉션과 모드를 고르세요.', 'warn');
+    return;
+  }
+  if (fromModeId === toModeId) {
+    setStatus('darkStatus', '라이트와 다크가 같은 모드예요. 다른 모드를 고르세요.', 'warn');
+    return;
+  }
+  setStatus('darkStatus', '다크 값을 채우는 중…', '');
+  send({ type: 'GENERATE_DARK_MODE', collectionId, fromModeId, toModeId });
+});
+
+/* ---------- 닮은 프레임 컴포넌트화 ---------- */
+// 스캔이 확정한 멤버(구조가 같은 최대 그룹)와 고른 마스터. 컴포넌트화는 이 둘만 보낸다 —
+// 제외된 프레임을 실수로 교체 대상에 넣지 않으려면 선택 그대로가 아니라 스캔 결과를 써야 한다.
+let similarMemberIds: string[] = [];
+let similarMasterId: string | null = null;
+
+$('btnScanSimilar').addEventListener('click', () => {
+  setStatus('similarStatus', '닮은 프레임을 찾는 중…', '');
+  send({ type: 'SCAN_SIMILAR' });
+});
+
+$('btnComponentize').addEventListener('click', () => {
+  if (similarMemberIds.length < 2 || !similarMasterId) {
+    setStatus('similarStatus', '먼저 스캔해서 마스터를 고르세요.', 'warn');
+    return;
+  }
+  setStatus('similarStatus', '컴포넌트화하는 중…', '');
+  send({ type: 'COMPONENTIZE_SIMILAR', masterId: similarMasterId, frameIds: similarMemberIds });
 });
 
 $('btnRegisterComp').addEventListener('click', () => {
@@ -1605,6 +1730,85 @@ window.onmessage = (event: MessageEvent) => {
     case 'CONTRAST_RESULT':
       renderContrast(msg);
       break;
+    case 'VARIABLES': {
+      allVars = msg.vars;
+      // 컬렉션 필터 옵션은 실제로 존재하는 컬렉션에서만 만든다.
+      const sel = $('varFilterCol') as HTMLSelectElement;
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">전체</option>';
+      for (const c of [...new Set(msg.vars.map((v) => v.collection))]) {
+        const o = document.createElement('option');
+        o.value = c;
+        o.textContent = c;
+        sel.appendChild(o);
+      }
+      if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
+      renderVars();
+      refreshDarkOptions();
+      setStatus('varEditStatus', msg.vars.length ? `변수 ${msg.vars.length}개` : '편집할 변수가 없어요. 먼저 토큰을 생성하세요.', msg.vars.length ? 'ok' : 'warn');
+      break;
+    }
+    case 'EDIT_VARIABLE_RESULT': {
+      if (!msg.ok) {
+        setStatus('varEditStatus', `수정하지 못했어요 — ${msg.error ?? '알 수 없는 오류'}`, 'warn');
+        renderVars(); // 거부된 입력이 화면에 남지 않게 되돌린다
+        break;
+      }
+      if (msg.deleted) {
+        allVars = allVars.filter((v) => v.id !== msg.id);
+        setStatus('varEditStatus', '변수를 삭제했어요.', 'ok');
+      } else if (msg.var) {
+        const i = allVars.findIndex((v) => v.id === msg.id);
+        if (i >= 0) allVars[i] = msg.var;
+        setStatus('varEditStatus', `'${msg.var.name}' 수정했어요.`, 'ok');
+      }
+      renderVars();
+      refreshDarkOptions();
+      break;
+    }
+    case 'VARIABLE_USAGE': {
+      const v = allVars.find((x) => x.id === msg.id);
+      const parts: string[] = [];
+      parts.push(msg.nodes.length ? `레이어 ${msg.nodes.length}곳` : '쓰는 레이어 없음');
+      if (msg.aliasedBy.length) parts.push(`이 변수를 가리키는 변수 ${msg.aliasedBy.length}개(${msg.aliasedBy.slice(0, 3).map((a) => a.name).join(', ')}${msg.aliasedBy.length > 3 ? '…' : ''})`);
+      // 상한에 걸리면 "없음"이 아니라 "못 다 봤음"이다 — 삭제 판단이 갈리므로 반드시 알린다.
+      if (msg.capped) parts.push('※ 문서가 커서 일부만 확인했어요');
+      const used = msg.nodes.length || msg.aliasedBy.length;
+      setStatus('varEditStatus', `${v ? `'${v.name}' ` : ''}사용처 — ${parts.join(' · ')}`, used || msg.capped ? 'warn' : 'ok');
+      break;
+    }
+    case 'DARK_MODE_RESULT': {
+      if (!msg.realiased) {
+        const why = msg.skipped ? `Global을 가리키는 색이 없어요(건너뜀 ${msg.skipped}개)` : '대상 색이 없어요';
+        setStatus('darkStatus', `다크 값을 채우지 못했어요 — ${why}`, 'warn');
+        break;
+      }
+      const skip = msg.skipped ? ` · 건너뜀 ${msg.skipped}개(값을 직접 넣은 색)` : '';
+      setStatus('darkStatus', `다크 ${msg.realiased}개 연결 · 새 dark/ 원시색 ${msg.created}개${skip}`, 'ok');
+      break;
+    }
+    case 'SIMILAR_CANDIDATES':
+      renderSimilar(msg);
+      break;
+    case 'COMPONENTIZE_RESULT': {
+      if (!msg.instances) {
+        // 교체가 하나도 없으면 실패다 — 경고를 그대로 보여줘야 원인을 안다.
+        setStatus('similarStatus', `컴포넌트화하지 못했어요${msg.warnings.length ? ` — ${msg.warnings[0]}` : ''}`, 'warn');
+        break;
+      }
+      const parts = [`마스터 ${msg.master}`, `인스턴스 ${msg.instances}개`];
+      if (msg.properties) parts.push(`속성 ${msg.properties}개`);
+      if (msg.images) parts.push(`이미지 ${msg.images}개`);
+      // 경고(제외·오버라이드 실패)는 성공했어도 반드시 노출 — 원본이 남아 있다는 신호다.
+      const warn = msg.warnings.length ? ` · 남겨둔 것 ${msg.warnings.length}건: ${msg.warnings[0]}` : '';
+      setStatus('similarStatus', `${parts.join(' · ')}${warn}`, msg.warnings.length ? 'warn' : 'ok');
+      // 교체된 프레임은 더 이상 대상이 아니다 — 목록을 비워 이중 실행을 막는다.
+      similarMemberIds = [];
+      similarMasterId = null;
+      $('similarList').innerHTML = '';
+      $('similarCount').textContent = '';
+      break;
+    }
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
       // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
@@ -2154,6 +2358,167 @@ function showApplyProgress(label: string): void {
   ($('applyBarFill') as HTMLElement).style.width = '0%';
   $('applyProgressText').textContent = label;
 }
+/** 변수 한 줄 — 이름·값 즉시 편집 + 컬렉션 배지 + 사용처/삭제. */
+function makeVarRow(v: VarInfo): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'vrow';
+  row.dataset.id = v.id;
+
+  // 색이면 스와치를 앞에 — 목록에서 무슨 색인지 눈으로 바로 찾는다.
+  const cell = v.values[v.defaultModeId];
+  if (v.type === 'COLOR' && cell && cell.kind === 'literal' && /^#[0-9a-f]{6}$/i.test(cell.display)) {
+    const sw = document.createElement('span');
+    sw.className = 'vsw';
+    sw.style.background = cell.display;
+    row.appendChild(sw);
+  }
+
+  const nameWrap = document.createElement('span');
+  nameWrap.className = 'vname';
+  const name = document.createElement('input');
+  name.type = 'text';
+  name.value = v.name;
+  name.title = v.name;
+  // change(포커스 아웃/엔터)에서만 보낸다 — 타이핑마다 보내면 편집 한 번이 Undo 수십 개가 된다.
+  name.addEventListener('change', () => {
+    if (name.value.trim() === v.name) return;
+    send({ type: 'EDIT_VARIABLE', id: v.id, patch: { name: name.value } });
+  });
+  nameWrap.appendChild(name);
+  row.appendChild(nameWrap);
+
+  const valWrap = document.createElement('span');
+  valWrap.className = 'vval';
+  if (cell && cell.kind === 'alias') {
+    // 별칭은 같은 타입의 다른 변수로만 바꿀 수 있다 — 자유 입력이면 오타로 깨지기 쉽다.
+    const sel = document.createElement('select');
+    for (const other of allVars.filter((o) => o.type === v.type && o.id !== v.id)) {
+      const o = document.createElement('option');
+      o.value = other.id;
+      o.textContent = other.name;
+      sel.appendChild(o);
+    }
+    sel.value = cell.aliasId ?? '';
+    sel.title = `별칭 → ${cell.display}`;
+    sel.addEventListener('change', () => {
+      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, aliasId: sel.value } } });
+    });
+    valWrap.appendChild(sel);
+  } else {
+    const val = document.createElement('input');
+    val.type = 'text';
+    val.value = cell ? cell.display : '';
+    val.placeholder = v.type === 'COLOR' ? '#RRGGBB' : v.type === 'FLOAT' ? '숫자' : '';
+    val.addEventListener('change', () => {
+      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, literal: val.value } } });
+    });
+    valWrap.appendChild(val);
+  }
+  row.appendChild(valWrap);
+
+  const col = document.createElement('span');
+  col.className = 'vcol tag tag-set';
+  col.textContent = v.collection;
+  col.title = `${v.collection} · ${v.type} · 스코프 ${v.scopes.length}/${scopesForTypeList(v.type).length}`;
+  row.appendChild(col);
+
+  const act = document.createElement('span');
+  act.className = 'vact';
+  const usage = document.createElement('button');
+  usage.className = 'link';
+  usage.textContent = '사용처';
+  usage.addEventListener('click', () => {
+    setStatus('varEditStatus', `${v.name} 사용처를 찾는 중…`, '');
+    send({ type: 'GET_VARIABLE_USAGE', id: v.id });
+  });
+  act.appendChild(usage);
+  const del = document.createElement('button');
+  del.className = 'link';
+  del.textContent = '삭제';
+  del.addEventListener('click', () => {
+    // 되돌리기 어려운 작업이라 한 번 더 묻는다. 사용처를 먼저 보라는 안내도 같이.
+    if (!window.confirm(`'${v.name}' 변수를 삭제할까요?\n이 변수를 쓰던 레이어의 바인딩이 끊깁니다. '사용처'로 먼저 확인하세요.`)) return;
+    send({ type: 'DELETE_VARIABLE', id: v.id });
+  });
+  act.appendChild(del);
+  row.appendChild(act);
+
+  return row;
+}
+
+function renderVars(): void {
+  const vis = visibleVars();
+  $('varCount').textContent = allVars.length ? `· ${vis.length}/${allVars.length}개` : '';
+  renderChunked($('varList'), vis, makeVarRow, () => layoutListBy('varList'));
+}
+
+/** 닮은 프레임 멤버 한 줄 — 마스터 라디오 + 이름 + 완전성 근거(왜 이게 추천인지). */
+function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement {
+  const row = document.createElement('label'); // 라디오와 한 덩어리로 — 줄 아무 데나 눌러도 선택된다
+  row.className = 'simrow';
+
+  const radio = document.createElement('input');
+  radio.type = 'radio';
+  radio.name = 'similarMaster';
+  radio.value = m.id;
+  radio.checked = m.id === similarMasterId;
+  radio.addEventListener('change', () => {
+    if (radio.checked) similarMasterId = m.id;
+  });
+  row.appendChild(radio);
+
+  const name = document.createElement('span');
+  name.className = 'cname';
+  name.textContent = m.name;
+  name.title = m.name; // 한 줄 말줄임 → 잘린 부분은 title로 읽는다(.cfind와 동일 규칙)
+  row.appendChild(name);
+
+  if (m.id === recommendedId) {
+    const tag = document.createElement('span');
+    tag.className = 'tag tag-set'; // 기존 배지 규약 재사용
+    tag.textContent = '추천';
+    row.appendChild(tag);
+  }
+
+  // 추천 근거를 숫자로 — 텍스트가 얼마나 채워졌는지가 마스터 선택의 핵심이다.
+  const meta = document.createElement('span');
+  meta.className = 'simmeta';
+  const parts = [`텍스트 ${m.textFilled}/${m.textTotal}`];
+  if (m.images) parts.push(`이미지 ${m.images}`);
+  if (m.emptyLayers) parts.push(`빈 칸 ${m.emptyLayers}`);
+  meta.textContent = parts.join(' · ');
+  row.appendChild(meta);
+
+  return row;
+}
+
+/** 스캔 결과 → 멤버 목록(마스터 라디오) + 무엇이 속성으로 열리는지 요약. */
+function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): void {
+  similarMemberIds = msg.metas.map((m) => m.id);
+  similarMasterId = msg.recommendedMasterId;
+  $('similarCount').textContent = msg.metas.length ? `· 대상 ${msg.metas.length}개` : '';
+
+  const box = $('similarList');
+  renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId), () => layoutListBy('similarList'));
+
+  if (!msg.metas.length) {
+    // 왜 대상이 없는지 알려준다 — 제외 사유가 있으면 그걸 그대로 보여주는 게 가장 빠른 안내다.
+    const why = msg.excluded.length ? msg.excluded[0].reason : '구조가 같은 프레임을 2개 이상 선택하세요.';
+    setStatus('similarStatus', `컴포넌트화할 프레임이 없어요 — ${why}`, 'warn');
+    return;
+  }
+
+  const texts = msg.varying.filter((v) => v.type === 'TEXT').length;
+  const swaps = msg.varying.length - texts;
+  const opened: string[] = [];
+  if (texts) opened.push(`텍스트 ${texts}`);
+  if (swaps) opened.push(`아이콘 교체 ${swaps}`);
+  if (msg.imageVarying.length) opened.push(`이미지 ${msg.imageVarying.length}`);
+  const openText = opened.length ? `속성으로 열림: ${opened.join(' · ')}` : '가변 위치가 없어 속성은 만들지 않아요';
+  const skipText = msg.excluded.length ? ` · 제외 ${msg.excluded.length}개(${msg.excluded[0].reason})` : '';
+  setStatus('similarStatus', `대상 ${msg.metas.length}개 · ${openText}${skipText}`, 'ok');
+}
+
 function updateApplyProgress(done: number, total: number): void {
   $('applyProgress').style.display = '';
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;

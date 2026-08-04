@@ -406,6 +406,22 @@
     .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
     .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
     .cfind .ratio { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    /* 닮은 프레임 멤버 줄 — .cfind와 같은 한 줄 규칙(이름만 늘어나고 나머지는 고정). label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
+    .simrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; cursor: pointer; }
+    .simrow .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .simrow input[type="radio"], .simrow .tag, .simrow .simmeta { flex: 0 0 auto; }
+    .simrow .simmeta { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    /* 변수 편집기 한 줄 — 이름(늘어남) + 값 + 컬렉션 배지 + 액션. .simrow와 같은 한 줄 규칙. */
+    .vrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 3px 0; min-height: 30px; }
+    .vrow .vname { flex: 1 1 90px; min-width: 0; }
+    .vrow .vval { flex: 0 1 110px; min-width: 0; }
+    .vrow .vname input, .vrow .vval input, .vrow .vval select { width: 100%; min-width: 0; }
+    .vrow .vcol, .vrow .vact { flex: 0 0 auto; }
+    .vrow .vsw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
+    .vrow .vact button { padding: 0 6px; }
+    /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
+    .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
+    .vusage.warn { color: var(--warn); }
     .cfix { display: inline-flex; gap: 4px; }
     .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
     .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
@@ -566,6 +582,27 @@
       <div class="status" id="semStatus"></div>
     </div>
 
+    <div class="step" id="darkCard">
+      <h2>다크 테마 생성 <span class="muted" id="darkLock"></span></h2>
+      <div class="hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
+      <div class="row">
+        <label class="inline">대상 컬렉션
+          <select id="darkCollection"></select>
+        </label>
+      </div>
+      <div class="row">
+        <label class="inline">라이트 모드
+          <select id="darkFromMode"></select>
+        </label>
+        <label class="inline">다크 모드
+          <select id="darkToMode"></select>
+        </label>
+        <button id="btnGenDark" class="primary">다크 채우기</button>
+      </div>
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
+      <div class="status" id="darkStatus"></div>
+    </div>
+
     <div class="step">
       <h2>텍스트 스타일 (화면 → 스타일) <span class="muted" id="tsLock"></span></h2>
       <div class="hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 새 스타일은 ‘행 추가’로. (Paid)</div>
@@ -711,6 +748,22 @@
       </div>
       <div class="status" id="componentStatus"></div>
     </div>
+
+    <div class="step" id="similarCard">
+      <h2>닮은 프레임 컴포넌트화 <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
+      <div class="hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
+      <div class="row">
+        <button id="btnScanSimilar" title="선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)">닮은 프레임 스캔</button>
+        <button id="btnComponentize" class="primary" title="추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체">컴포넌트화</button>
+      </div>
+      <div id="similarList" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 '모두 펼치기'(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="similarListMore" style="display:none">
+        <span class="list-count" id="similarListCount"></span>
+        <button class="link" id="btnSimilarListExpand">모두 펼치기</button>
+      </div>
+      <div class="status" id="similarStatus"></div>
+    </div>
   </section>
 
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
@@ -737,6 +790,25 @@
       </div>
       <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%;"></textarea>
       <div class="status" id="exportStatus"></div>
+    </div>
+
+    <div class="step" id="varEditCard">
+      <h2>변수 편집기 <span class="muted" id="varCount"></span></h2>
+      <div class="hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.</div>
+      <div class="row">
+        <button id="btnLoadVars">변수 불러오기</button>
+        <label class="inline">컬렉션
+          <select id="varFilterCol"><option value="">전체</option></select>
+        </label>
+        <input id="varFilterText" type="text" placeholder="이름으로 거르기" />
+      </div>
+      <div id="varList" class="list-region"></div>
+      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
+      <div class="list-more" id="varListMore" style="display:none">
+        <span class="list-count" id="varListCount"></span>
+        <button class="link" id="btnVarListExpand">모두 펼치기</button>
+      </div>
+      <div class="status" id="varEditStatus"></div>
     </div>
 
     <div class="step">
@@ -847,6 +919,15 @@
   }
   function resolvedTypeForToken(t2) {
     return resolvedTypeFor(t2.category);
+  }
+  var VALID_SCOPES = {
+    COLOR: /* @__PURE__ */ new Set(["ALL_SCOPES", "ALL_FILLS", "FRAME_FILL", "SHAPE_FILL", "TEXT_FILL", "STROKE_COLOR", "EFFECT_COLOR"]),
+    FLOAT: /* @__PURE__ */ new Set(["ALL_SCOPES", "GAP", "WIDTH_HEIGHT", "CORNER_RADIUS", "STROKE_FLOAT", "FONT_SIZE", "LINE_HEIGHT", "LETTER_SPACING", "FONT_WEIGHT", "EFFECT_FLOAT", "OPACITY"]),
+    STRING: /* @__PURE__ */ new Set(["ALL_SCOPES", "FONT_FAMILY"]),
+    BOOLEAN: /* @__PURE__ */ new Set(["ALL_SCOPES"])
+  };
+  function scopesForTypeList(type) {
+    return [...VALID_SCOPES[type]];
   }
 
   // src/lib/i18n.ts
@@ -1707,6 +1788,8 @@
     { mount: "colorTable", row: ".crow", more: "colorTableMore", count: "colorTableCount", expand: "btnColorTableExpand" },
     { mount: "variantReport", row: ".vr-row", more: "variantReportMore", count: "variantReportCount", expand: "btnVariantReportExpand" },
     { mount: "contrastList", row: ".cfind", more: "contrastListMore", count: "contrastListCount", expand: "btnContrastListExpand" },
+    { mount: "similarList", row: ".simrow", more: "similarListMore", count: "similarListCount", expand: "btnSimilarListExpand" },
+    { mount: "varList", row: ".vrow", more: "varListMore", count: "varListCount", expand: "btnVarListExpand" },
     // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
     // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
     { mount: "bindTree", row: ".tree-row", more: "bindTreeMore", count: "bindTreeCount", expand: "btnBindTreeExpand" },
@@ -2445,7 +2528,7 @@
     "btnImportPreset",
     "presetJson"
   ];
-  var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing"];
+  var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnComponentize"];
   var PAID_FIELDS = [
     ...PRESET_FIELDS,
     ...COMPONENT_FIELDS,
@@ -2453,7 +2536,9 @@
     "btnPaletteApply",
     "btnCreate",
     "btnCreateApply",
-    "btnTextStyles"
+    "btnTextStyles",
+    "btnGenDark"
+    // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
   ];
   function updateGates() {
     for (const id of PAID_FIELDS) {
@@ -2461,9 +2546,10 @@
       el.disabled = !isPaid;
       setLockTitle(el, !isPaid);
     }
-    for (const id of ["paletteLock", "presetLock", "componentLock", "createLock", "semLock", "tsLock"]) {
+    for (const id of ["paletteLock", "presetLock", "componentLock", "similarLock", "darkLock", "createLock", "semLock", "tsLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
+    refreshDarkModes();
     $("wizComponentLock").textContent = isPaid ? "" : PAID_LOCK;
     $("wizOptComponentize").disabled = !isPaid;
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
@@ -2543,6 +2629,95 @@
   $("btnScanComp").addEventListener("click", () => {
     setStatus("componentStatus", t("component.scanning"), "");
     send({ type: "SCAN_COMPONENT_CANDIDATES" });
+  });
+  var allVars = [];
+  function visibleVars() {
+    const col = $("varFilterCol").value;
+    const q = $("varFilterText").value.trim().toLowerCase();
+    return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
+  }
+  function requestVars() {
+    setStatus("varEditStatus", "\uBCC0\uC218\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026", "");
+    send({ type: "GET_VARIABLES" });
+  }
+  $("btnLoadVars").addEventListener("click", requestVars);
+  $("varFilterCol").addEventListener("change", () => renderVars());
+  $("varFilterText").addEventListener("input", () => renderVars());
+  function refreshDarkOptions() {
+    var _a, _b;
+    const cols = /* @__PURE__ */ new Map();
+    for (const v of allVars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
+    const sel = $("darkCollection");
+    const prev = sel.value;
+    sel.innerHTML = "";
+    for (const [id, v] of cols) {
+      const o = document.createElement("option");
+      o.value = id;
+      o.textContent = v.collection;
+      sel.appendChild(o);
+    }
+    if (prev && cols.has(prev)) sel.value = prev;
+    const usable = [...cols.values()].find((v) => v.modes.length >= 2);
+    if (usable && ((_b = (_a = cols.get(sel.value)) == null ? void 0 : _a.modes.length) != null ? _b : 0) < 2) sel.value = usable.collectionId;
+    refreshDarkModes();
+  }
+  function refreshDarkModes() {
+    const colId = $("darkCollection").value;
+    const v = allVars.find((x) => x.collectionId === colId);
+    const modes = v ? v.modes : [];
+    for (const id of ["darkFromMode", "darkToMode"]) {
+      const sel = $(id);
+      const prev = sel.value;
+      sel.innerHTML = "";
+      for (const m of modes) {
+        const o = document.createElement("option");
+        o.value = m.modeId;
+        o.textContent = m.name;
+        sel.appendChild(o);
+      }
+      if (prev && modes.some((m) => m.modeId === prev)) sel.value = prev;
+    }
+    const ok = modes.length >= 2;
+    $("btnGenDark").disabled = !ok || !isPaid;
+    const notice = $("darkPrereq");
+    notice.style.display = ok ? "none" : "";
+    const text = notice.querySelector(".prereq-text");
+    if (text) {
+      text.textContent = ok ? "" : modes.length ? "\uC774 \uCEEC\uB809\uC158\uC5D0 \uBAA8\uB4DC\uAC00 \uD558\uB098\uBFD0\uC774\uC5D0\uC694. Figma\uC5D0\uC11C \uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694." : "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.";
+    }
+    if (modes.length >= 2 && $("darkFromMode").value === $("darkToMode").value) {
+      $("darkToMode").value = modes[1].modeId;
+    }
+  }
+  $("darkCollection").addEventListener("change", refreshDarkModes);
+  $("btnGenDark").addEventListener("click", () => {
+    const collectionId = $("darkCollection").value;
+    const fromModeId = $("darkFromMode").value;
+    const toModeId = $("darkToMode").value;
+    if (!collectionId || !fromModeId || !toModeId) {
+      setStatus("darkStatus", "\uCEEC\uB809\uC158\uACFC \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
+      return;
+    }
+    if (fromModeId === toModeId) {
+      setStatus("darkStatus", "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694. \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
+      return;
+    }
+    setStatus("darkStatus", "\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026", "");
+    send({ type: "GENERATE_DARK_MODE", collectionId, fromModeId, toModeId });
+  });
+  var similarMemberIds = [];
+  var similarMasterId = null;
+  $("btnScanSimilar").addEventListener("click", () => {
+    setStatus("similarStatus", "\uB2EE\uC740 \uD504\uB808\uC784\uC744 \uCC3E\uB294 \uC911\u2026", "");
+    send({ type: "SCAN_SIMILAR" });
+  });
+  $("btnComponentize").addEventListener("click", () => {
+    if (similarMemberIds.length < 2 || !similarMasterId) {
+      setStatus("similarStatus", "\uBA3C\uC800 \uC2A4\uCE94\uD574\uC11C \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.", "warn");
+      return;
+    }
+    setStatus("similarStatus", "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uB294 \uC911\u2026", "");
+    send({ type: "COMPONENTIZE_SIMILAR", masterId: similarMasterId, frameIds: similarMemberIds });
   });
   $("btnRegisterComp").addEventListener("click", () => {
     if (compCandidates.length) {
@@ -2673,7 +2848,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
@@ -2865,8 +3040,82 @@
       case "CONTRAST_RESULT":
         renderContrast(msg);
         break;
+      case "VARIABLES": {
+        allVars = msg.vars;
+        const sel = $("varFilterCol");
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">\uC804\uCCB4</option>';
+        for (const c of [...new Set(msg.vars.map((v) => v.collection))]) {
+          const o = document.createElement("option");
+          o.value = c;
+          o.textContent = c;
+          sel.appendChild(o);
+        }
+        if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
+        renderVars();
+        refreshDarkOptions();
+        setStatus("varEditStatus", msg.vars.length ? `\uBCC0\uC218 ${msg.vars.length}\uAC1C` : "\uD3B8\uC9D1\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.", msg.vars.length ? "ok" : "warn");
+        break;
+      }
+      case "EDIT_VARIABLE_RESULT": {
+        if (!msg.ok) {
+          setStatus("varEditStatus", `\uC218\uC815\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${(_c = msg.error) != null ? _c : "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958"}`, "warn");
+          renderVars();
+          break;
+        }
+        if (msg.deleted) {
+          allVars = allVars.filter((v) => v.id !== msg.id);
+          setStatus("varEditStatus", "\uBCC0\uC218\uB97C \uC0AD\uC81C\uD588\uC5B4\uC694.", "ok");
+        } else if (msg.var) {
+          const i = allVars.findIndex((v) => v.id === msg.id);
+          if (i >= 0) allVars[i] = msg.var;
+          setStatus("varEditStatus", `'${msg.var.name}' \uC218\uC815\uD588\uC5B4\uC694.`, "ok");
+        }
+        renderVars();
+        refreshDarkOptions();
+        break;
+      }
+      case "VARIABLE_USAGE": {
+        const v = allVars.find((x) => x.id === msg.id);
+        const parts = [];
+        parts.push(msg.nodes.length ? `\uB808\uC774\uC5B4 ${msg.nodes.length}\uACF3` : "\uC4F0\uB294 \uB808\uC774\uC5B4 \uC5C6\uC74C");
+        if (msg.aliasedBy.length) parts.push(`\uC774 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 ${msg.aliasedBy.length}\uAC1C(${msg.aliasedBy.slice(0, 3).map((a) => a.name).join(", ")}${msg.aliasedBy.length > 3 ? "\u2026" : ""})`);
+        if (msg.capped) parts.push("\u203B \uBB38\uC11C\uAC00 \uCEE4\uC11C \uC77C\uBD80\uB9CC \uD655\uC778\uD588\uC5B4\uC694");
+        const used = msg.nodes.length || msg.aliasedBy.length;
+        setStatus("varEditStatus", `${v ? `'${v.name}' ` : ""}\uC0AC\uC6A9\uCC98 \u2014 ${parts.join(" \xB7 ")}`, used || msg.capped ? "warn" : "ok");
+        break;
+      }
+      case "DARK_MODE_RESULT": {
+        if (!msg.realiased) {
+          const why = msg.skipped ? `Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 ${msg.skipped}\uAC1C)` : "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694";
+          setStatus("darkStatus", `\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${why}`, "warn");
+          break;
+        }
+        const skip = msg.skipped ? ` \xB7 \uAC74\uB108\uB700 ${msg.skipped}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)` : "";
+        setStatus("darkStatus", `\uB2E4\uD06C ${msg.realiased}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 ${msg.created}\uAC1C${skip}`, "ok");
+        break;
+      }
+      case "SIMILAR_CANDIDATES":
+        renderSimilar(msg);
+        break;
+      case "COMPONENTIZE_RESULT": {
+        if (!msg.instances) {
+          setStatus("similarStatus", `\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694${msg.warnings.length ? ` \u2014 ${msg.warnings[0]}` : ""}`, "warn");
+          break;
+        }
+        const parts = [`\uB9C8\uC2A4\uD130 ${msg.master}`, `\uC778\uC2A4\uD134\uC2A4 ${msg.instances}\uAC1C`];
+        if (msg.properties) parts.push(`\uC18D\uC131 ${msg.properties}\uAC1C`);
+        if (msg.images) parts.push(`\uC774\uBBF8\uC9C0 ${msg.images}\uAC1C`);
+        const warn = msg.warnings.length ? ` \xB7 \uB0A8\uACA8\uB454 \uAC83 ${msg.warnings.length}\uAC74: ${msg.warnings[0]}` : "";
+        setStatus("similarStatus", `${parts.join(" \xB7 ")}${warn}`, msg.warnings.length ? "warn" : "ok");
+        similarMemberIds = [];
+        similarMasterId = null;
+        $("similarList").innerHTML = "";
+        $("similarCount").textContent = "";
+        break;
+      }
       case "PREMIUM_REQUIRED": {
-        const statusId = (_c = PREMIUM_STATUS_ID[msg.feature]) != null ? _c : "createStatus";
+        const statusId = (_d = PREMIUM_STATUS_ID[msg.feature]) != null ? _d : "createStatus";
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }
@@ -3273,6 +3522,142 @@
     $("applyProgress").style.display = "";
     $("applyBarFill").style.width = "0%";
     $("applyProgressText").textContent = label;
+  }
+  function makeVarRow(v) {
+    var _a;
+    const row = document.createElement("div");
+    row.className = "vrow";
+    row.dataset.id = v.id;
+    const cell = v.values[v.defaultModeId];
+    if (v.type === "COLOR" && cell && cell.kind === "literal" && /^#[0-9a-f]{6}$/i.test(cell.display)) {
+      const sw = document.createElement("span");
+      sw.className = "vsw";
+      sw.style.background = cell.display;
+      row.appendChild(sw);
+    }
+    const nameWrap = document.createElement("span");
+    nameWrap.className = "vname";
+    const name = document.createElement("input");
+    name.type = "text";
+    name.value = v.name;
+    name.title = v.name;
+    name.addEventListener("change", () => {
+      if (name.value.trim() === v.name) return;
+      send({ type: "EDIT_VARIABLE", id: v.id, patch: { name: name.value } });
+    });
+    nameWrap.appendChild(name);
+    row.appendChild(nameWrap);
+    const valWrap = document.createElement("span");
+    valWrap.className = "vval";
+    if (cell && cell.kind === "alias") {
+      const sel = document.createElement("select");
+      for (const other of allVars.filter((o) => o.type === v.type && o.id !== v.id)) {
+        const o = document.createElement("option");
+        o.value = other.id;
+        o.textContent = other.name;
+        sel.appendChild(o);
+      }
+      sel.value = (_a = cell.aliasId) != null ? _a : "";
+      sel.title = `\uBCC4\uCE6D \u2192 ${cell.display}`;
+      sel.addEventListener("change", () => {
+        send({ type: "EDIT_VARIABLE", id: v.id, patch: { value: { modeId: v.defaultModeId, aliasId: sel.value } } });
+      });
+      valWrap.appendChild(sel);
+    } else {
+      const val = document.createElement("input");
+      val.type = "text";
+      val.value = cell ? cell.display : "";
+      val.placeholder = v.type === "COLOR" ? "#RRGGBB" : v.type === "FLOAT" ? "\uC22B\uC790" : "";
+      val.addEventListener("change", () => {
+        send({ type: "EDIT_VARIABLE", id: v.id, patch: { value: { modeId: v.defaultModeId, literal: val.value } } });
+      });
+      valWrap.appendChild(val);
+    }
+    row.appendChild(valWrap);
+    const col = document.createElement("span");
+    col.className = "vcol tag tag-set";
+    col.textContent = v.collection;
+    col.title = `${v.collection} \xB7 ${v.type} \xB7 \uC2A4\uCF54\uD504 ${v.scopes.length}/${scopesForTypeList(v.type).length}`;
+    row.appendChild(col);
+    const act = document.createElement("span");
+    act.className = "vact";
+    const usage = document.createElement("button");
+    usage.className = "link";
+    usage.textContent = "\uC0AC\uC6A9\uCC98";
+    usage.addEventListener("click", () => {
+      setStatus("varEditStatus", `${v.name} \uC0AC\uC6A9\uCC98\uB97C \uCC3E\uB294 \uC911\u2026`, "");
+      send({ type: "GET_VARIABLE_USAGE", id: v.id });
+    });
+    act.appendChild(usage);
+    const del = document.createElement("button");
+    del.className = "link";
+    del.textContent = "\uC0AD\uC81C";
+    del.addEventListener("click", () => {
+      if (!window.confirm(`'${v.name}' \uBCC0\uC218\uB97C \uC0AD\uC81C\uD560\uAE4C\uC694?
+\uC774 \uBCC0\uC218\uB97C \uC4F0\uB358 \uB808\uC774\uC5B4\uC758 \uBC14\uC778\uB529\uC774 \uB04A\uAE41\uB2C8\uB2E4. '\uC0AC\uC6A9\uCC98'\uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.`)) return;
+      send({ type: "DELETE_VARIABLE", id: v.id });
+    });
+    act.appendChild(del);
+    row.appendChild(act);
+    return row;
+  }
+  function renderVars() {
+    const vis = visibleVars();
+    $("varCount").textContent = allVars.length ? `\xB7 ${vis.length}/${allVars.length}\uAC1C` : "";
+    renderChunked($("varList"), vis, makeVarRow, () => layoutListBy("varList"));
+  }
+  function makeSimilarRow(m, recommendedId) {
+    const row = document.createElement("label");
+    row.className = "simrow";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "similarMaster";
+    radio.value = m.id;
+    radio.checked = m.id === similarMasterId;
+    radio.addEventListener("change", () => {
+      if (radio.checked) similarMasterId = m.id;
+    });
+    row.appendChild(radio);
+    const name = document.createElement("span");
+    name.className = "cname";
+    name.textContent = m.name;
+    name.title = m.name;
+    row.appendChild(name);
+    if (m.id === recommendedId) {
+      const tag = document.createElement("span");
+      tag.className = "tag tag-set";
+      tag.textContent = "\uCD94\uCC9C";
+      row.appendChild(tag);
+    }
+    const meta = document.createElement("span");
+    meta.className = "simmeta";
+    const parts = [`\uD14D\uC2A4\uD2B8 ${m.textFilled}/${m.textTotal}`];
+    if (m.images) parts.push(`\uC774\uBBF8\uC9C0 ${m.images}`);
+    if (m.emptyLayers) parts.push(`\uBE48 \uCE78 ${m.emptyLayers}`);
+    meta.textContent = parts.join(" \xB7 ");
+    row.appendChild(meta);
+    return row;
+  }
+  function renderSimilar(msg) {
+    similarMemberIds = msg.metas.map((m) => m.id);
+    similarMasterId = msg.recommendedMasterId;
+    $("similarCount").textContent = msg.metas.length ? `\xB7 \uB300\uC0C1 ${msg.metas.length}\uAC1C` : "";
+    const box = $("similarList");
+    renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId), () => layoutListBy("similarList"));
+    if (!msg.metas.length) {
+      const why = msg.excluded.length ? msg.excluded[0].reason : "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC744 2\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD558\uC138\uC694.";
+      setStatus("similarStatus", `\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD560 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 ${why}`, "warn");
+      return;
+    }
+    const texts = msg.varying.filter((v) => v.type === "TEXT").length;
+    const swaps = msg.varying.length - texts;
+    const opened = [];
+    if (texts) opened.push(`\uD14D\uC2A4\uD2B8 ${texts}`);
+    if (swaps) opened.push(`\uC544\uC774\uCF58 \uAD50\uCCB4 ${swaps}`);
+    if (msg.imageVarying.length) opened.push(`\uC774\uBBF8\uC9C0 ${msg.imageVarying.length}`);
+    const openText = opened.length ? `\uC18D\uC131\uC73C\uB85C \uC5F4\uB9BC: ${opened.join(" \xB7 ")}` : "\uAC00\uBCC0 \uC704\uCE58\uAC00 \uC5C6\uC5B4 \uC18D\uC131\uC740 \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694";
+    const skipText = msg.excluded.length ? ` \xB7 \uC81C\uC678 ${msg.excluded.length}\uAC1C(${msg.excluded[0].reason})` : "";
+    setStatus("similarStatus", `\uB300\uC0C1 ${msg.metas.length}\uAC1C \xB7 ${openText}${skipText}`, "ok");
   }
   function updateApplyProgress(done, total) {
     $("applyProgress").style.display = "";

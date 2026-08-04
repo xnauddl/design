@@ -20,3 +20,7 @@ export { bindSelection } from './bind';
 export type { BindResult } from './bind';
 export { renameSelection } from './rename';
 export type { RenameOutcome } from './rename';
+export { scanSimilar, componentizeSimilar } from './similarApply';
+export type { ComponentizeResult } from './similarApply';
+export { generateDarkMode } from './themeApply';
+export type { DarkModeResult } from './themeApply';
