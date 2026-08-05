@@ -3,7 +3,7 @@
    순수 로직(tokens·naming)은 pure.test.mjs가 담당. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rgbToHex } from '../dist/pure.mjs';
+import { rgbToHex, hexToRgb } from '../dist/pure.mjs';
 import {
   extractFromSelection,
   createTokens,
@@ -14,6 +14,7 @@ import {
   createSemanticTextStyles,
   bindSelection,
   renameSelection,
+  generateDarkMode,
 } from '../dist/figma-lib.mjs';
 
 /* ---------------- figma 전역 목 ---------------- */
@@ -253,7 +254,14 @@ test('createTokens — Global 리터럴 + Semantic 별칭 + scopes/hidden + px �
   );
 
   // #16: 토큰당 G+S 1쌍(스냅샷 없음). 색2 + 라인하이트2 + 간격2 = created 6
-  assert.deepEqual(summary, { created: 6, updated: 0, globals: 3, semantics: 3 });
+  // conversions: base(16px) 환산 대상은 비-px인 lineHeight(150%)뿐
+  assert.deepEqual(summary, {
+    created: 6,
+    updated: 0,
+    globals: 3,
+    semantics: 3,
+    conversions: [{ name: 'line-height/150', from: '150%', to: 24 }],
+  });
 
   // Global 색: 리터럴 + scope + hidden
   const gColor = findVar(figma, 'Global', 'color/0066ff');
@@ -730,7 +738,7 @@ test('previewCreateTokens — 변수 생성 없이 생성/갱신 예정 집계',
   ];
   // 컬렉션/변수 없는 초기 상태 — 모두 생성 예정.
   const before = figma._state.variables.length;
-  const p = await previewCreateTokens(tokens);
+  const p = await previewCreateTokens(tokens, 16);
   assert.equal(figma._state.variables.length, before); // 미생성(읽기 전용)
   // 토큰 2개 → Global 2 + Semantic 2
   assert.equal(p.globals, 2);
@@ -740,9 +748,35 @@ test('previewCreateTokens — 변수 생성 없이 생성/갱신 예정 집계',
 
   // 실제 생성 후 다시 미리보기 → 모두 갱신 예정.
   await createTokens(tokens, 16);
-  const p2 = await previewCreateTokens(tokens);
+  const p2 = await previewCreateTokens(tokens, 16);
   assert.equal(p2.created, 0);
   assert.equal(p2.updated, 4);
+});
+
+test('previewCreateTokens — base가 환산에 반영되고 실제 생성값과 일치', async () => {
+  const figma = installFigma();
+  const tokens = [
+    { name: 'line-height/160', category: 'lineHeight', sources: ['lineHeight'], value: 160, unit: 'percent' },
+    { name: 'letter-spacing/1-5', category: 'letterSpacing', sources: ['letterSpacing'], value: 1.5, unit: 'rem' },
+    { name: 'size/200', category: 'size', sources: ['size'], value: 200 }, // 단위 없음 — 환산 대상 아님
+  ];
+  const p16 = await previewCreateTokens(tokens, 16);
+  assert.deepEqual(p16.conversions, [
+    { name: 'line-height/160', from: '160%', to: 25.6 },
+    { name: 'letter-spacing/1-5', from: '1.5rem', to: 24 },
+  ]);
+
+  // base를 바꾸면 미리보기 환산도 따라 바뀐다(개수 집계는 그대로).
+  const p20 = await previewCreateTokens(tokens, 20);
+  assert.deepEqual(p20.conversions.map((c) => c.to), [32, 30]);
+  assert.equal(p20.globals, p16.globals);
+  assert.equal(p20.semantics, p16.semantics);
+
+  // 미리보기 환산값 == 실제 생성된 Global 변수값(같은 규칙을 공유하는지 확인).
+  const applied = await createTokens(tokens, 20);
+  assert.deepEqual(applied.conversions.map((c) => c.to), [32, 30]);
+  assert.equal(findVar(figma, 'Global', 'line-height/160').valuesByMode['mode:Global'], 32);
+  assert.equal(findVar(figma, 'Global', 'letter-spacing/1-5').valuesByMode['mode:Global'], 30);
 });
 
 /* ================= rename.ts ================= */
@@ -1220,4 +1254,58 @@ test('createSemanticTextStyles — stale boundStyleId는 rename 모드가 아님
   assert.equal(body.fontSize, 18);
   assert.equal(body.fontName.style, 'Medium');
   assert.equal(body.lineHeight.value, 28);
+});
+
+/* ================= themeApply.ts ================= */
+function darkFixture() {
+  const figma = installFigma();
+  const global = figma.variables.createVariableCollection('Global');
+  const semantic = figma.variables.createVariableCollection('Semantic');
+  const mkGlobal = (name, hex) => {
+    const v = figma.variables.createVariable(name, global, 'COLOR');
+    v.scopes = ['FRAME_FILL'];
+    v.setValueForMode(global.defaultModeId, hexToRgb(hex));
+    return v;
+  };
+  const mkSemantic = (name) => figma.variables.createVariable(name, semantic, 'COLOR');
+  const gVal = (v) => rgbToHex(v.valuesByMode[global.defaultModeId]);
+  return { figma, global, semantic, LIGHT: 'mode:light', DARK: 'mode:dark', mkGlobal, mkSemantic, gVal };
+}
+
+test('generateDarkMode — Global 별칭 Semantic만 dark/ 짝을 만들어 재별칭', async () => {
+  const f = darkFixture();
+  const white = f.mkGlobal('color/gray/0', '#ffffff');
+  const surface = f.mkSemantic('surface');
+  surface.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(white));
+  // 리터럴 Semantic(별칭 아님)은 3계층 규칙상 대상이 아님
+  const brand = f.mkSemantic('brand');
+  brand.setValueForMode(f.LIGHT, { r: 1, g: 0, b: 0 });
+
+  const r = await generateDarkMode(f.semantic.id, f.LIGHT, f.DARK);
+  assert.deepEqual(r, { created: 1, realiased: 1, skipped: 1 });
+
+  const dark = findVar(f.figma, 'Global', 'dark/color/gray/0');
+  assert.ok(dark, 'dark/ 짝 생성');
+  // 흰 표면이 순수 검정이 아니라 다크 표면 대역으로 간다(붕괴 방지).
+  assert.equal(f.gVal(dark), '#121212');
+  assert.equal(dark.hiddenFromPublishing, true, '직접 사용 방지');
+  assert.deepEqual(dark.scopes, white.scopes, '스코프 승계');
+  assert.deepEqual(surface.valuesByMode[f.DARK], { type: 'VARIABLE_ALIAS', id: dark.id });
+  assert.equal(f.gVal(white), '#ffffff', '원본 라이트 값 불변');
+  assert.equal(brand.valuesByMode[f.DARK], undefined, '리터럴은 손대지 않음');
+});
+
+test('generateDarkMode — 출처가 이미 dark/면 원본을 덮어쓰지 않고 건너뛴다', async () => {
+  const f = darkFixture();
+  // 모드를 자유롭게 고를 수 있어 from=Dark가 가능하다. 이때 대상 이름이 출처 자신이라
+  // 가드가 없으면 dark/ 프리미티브의 값을 밝은 값으로 덮어쓰고 자기 자신을 별칭한다.
+  const darkGlobal = f.mkGlobal('dark/color/gray/0', '#121212');
+  const surface = f.mkSemantic('surface');
+  surface.setValueForMode(f.DARK, f.figma.variables.createVariableAlias(darkGlobal));
+
+  const r = await generateDarkMode(f.semantic.id, f.DARK, f.LIGHT);
+  assert.deepEqual(r, { created: 0, realiased: 0, skipped: 1 });
+  assert.equal(findVar(f.figma, 'Global', 'dark/dark/color/gray/0'), undefined, 'dark/dark/ 미생성');
+  assert.equal(f.gVal(darkGlobal), '#121212', '원본 값 불변');
+  assert.equal(surface.valuesByMode[f.LIGHT], undefined, '자기 참조 별칭 미생성');
 });

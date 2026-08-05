@@ -74,12 +74,18 @@ export type VerifyResult = VerifyOk | (VerifyErr & { offline?: boolean });
 /**
  * 검증 서버 응답에서 서명 토큰(JWT)을 꺼낸다.
  * 서명 없는 평문 응답(`{valid:true,tier:'paid'}`)은 페이월 우회 경로이므로 수용하지 않는다(M2.1).
+ *
+ * 다만 서버가 **명시적으로 거부**한 경우(`{valid:false,error}`)엔 그 사유를 그대로 전한다.
+ * Worker는 만료·기기 활성화 한도 초과를 이 형태(status 200)로 알려주는데, 뭉뚱그려
+ * "서명 토큰이 없는 응답"이라고만 하면 사용자가 무엇을 해야 할지 알 수 없다.
+ * 실패 문구만 바꿀 뿐 `ok:true`로 승격시키지 않으므로 서명 없는 응답을 수용하는 것과 무관하다.
  */
 export function extractSignedToken(json: unknown): { ok: true; token: string } | { ok: false; error: string } {
   if (!json || typeof json !== 'object') return { ok: false, error: '응답 본문을 해석할 수 없습니다' };
-  const token = (json as { token?: unknown }).token;
-  if (typeof token !== 'string' || !token) return { ok: false, error: '서명 토큰이 없는 응답' };
-  return { ok: true, token };
+  const o = json as { token?: unknown; valid?: unknown; error?: unknown };
+  if (typeof o.token === 'string' && o.token) return { ok: true, token: o.token };
+  if (o.valid === false && typeof o.error === 'string' && o.error) return { ok: false, error: o.error };
+  return { ok: false, error: '서명 토큰이 없는 응답' };
 }
 
 /** 응답의 기기 instanceId(문자열일 때만) — 없으면 기존 캐시 값을 유지. */
