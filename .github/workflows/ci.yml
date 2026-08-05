@@ -30,3 +30,8 @@ jobs:
       # `npm test`는 build 후 node --test 실행(package.json test 스크립트).
       - name: Build & Test
         run: npm test
+
+      # 문자열 테이블 ↔ 마크업 정합. 위 빌드 산출물을 그대로 쓴다(재빌드 없음).
+      # 브라우저를 안 쓰므로 playwright 설치가 필요 없다.
+      - name: Verify i18n
+        run: node scripts/verify-i18n.mjs

@@ -23,7 +23,6 @@ export const STRINGS: Record<string, string> = {
 
   // 추출 / 토큰 생성
   'extract.done': '{count}개 후보 추출 완료.',
-  'create.needExtract': '먼저 토큰을 추출하세요.',
   'create.preview': '미리보기 — {summary} · ‘적용’으로 반영',
   'create.baseChanged': 'base {base}px로 다시 계산 중…',
 
