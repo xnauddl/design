@@ -227,6 +227,289 @@ test('extractFromSelection — HUG/FILL 축의 크기는 토큰화하지 않음(
   assert.equal(names.has('size/280'), true); // 가로 FIXED
 });
 
+test('extractFromSelection — 자유 배치(오토레이아웃 밖) 프레임의 크기는 제외', () => {
+  installFigma();
+  // 오토레이아웃이 아닌 프레임은 Hug/Fill이 될 수 없어 layoutSizing*가 항상 'FIXED'다.
+  // 화면 프레임·장식 박스가 통째로 토큰이 되지 않도록 맥락으로 걸러야 한다.
+  const decor = {
+    type: 'FRAME',
+    id: 'f-decor',
+    name: 'Decoration',
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 1440,
+    height: 812,
+    children: [],
+  };
+  // 부모가 오토레이아웃이면 Fixed는 디자이너의 선택이므로 수집한다.
+  const child = {
+    type: 'FRAME',
+    id: 'f-child',
+    name: 'Child',
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 48,
+    height: 48,
+    children: [],
+  };
+  const auto = {
+    type: 'FRAME',
+    id: 'f-auto',
+    name: 'Auto',
+    layoutMode: 'HORIZONTAL',
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    width: 48,
+    height: 48,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [child],
+  };
+  child.parent = auto;
+
+  const names = new Set(extractFromSelection([decor, auto]).tokens.map((t) => t.name));
+  assert.equal(names.has('size/1440'), false); // 자유 배치 — 화면 크기
+  assert.equal(names.has('size/812'), false);
+  assert.equal(names.has('size/48'), true); // 오토레이아웃 자식의 Fixed
+});
+
+test('extractFromSelection — 소수 크기는 토큰화하지 않음', () => {
+  installFigma();
+  const node = {
+    type: 'FRAME',
+    id: 'f-frac',
+    name: 'Frac',
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 343.5,
+    height: 64,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [],
+  };
+
+  const names = new Set(extractFromSelection([node]).tokens.map((t) => t.name));
+  assert.equal(names.has('size/343_5'), false); // 자유 리사이즈 잔값
+  assert.equal(names.has('size/64'), true);
+});
+
+test('extractFromSelection — 숨긴 레이어와 인스턴스 내부는 순회하지 않음', () => {
+  installFigma();
+  const hidden = {
+    type: 'FRAME',
+    id: 'f-hidden',
+    name: 'Hidden',
+    visible: false,
+    fills: [{ type: 'SOLID', color: { r: 0, g: 1, b: 0 }, visible: true }], // #00ff00 — 나오면 안 됨
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 77,
+    height: 77,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [],
+  };
+  const inner = {
+    type: 'FRAME',
+    id: 'f-inner',
+    name: 'Inner',
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 1 }, visible: true }], // #0000ff — 인스턴스 내부라 제외
+    cornerRadius: 13,
+    layoutMode: 'NONE',
+    children: [],
+  };
+  const instance = {
+    type: 'INSTANCE',
+    id: 'i1',
+    name: 'Button',
+    fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 }, visible: true }], // #ff0000 — 인스턴스 자체는 수집
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 120,
+    height: 40,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [inner],
+  };
+
+  const { tokens, warnings } = extractFromSelection([hidden, instance]);
+  const names = new Set(tokens.map((t) => t.name));
+  assert.equal(names.has('color/00ff00'), false); // 숨긴 레이어
+  assert.equal(names.has('size/77'), false);
+  assert.equal(names.has('color/0000ff'), false); // 인스턴스 내부
+  assert.equal(names.has('radius/13'), false);
+  assert.equal(names.has('color/ff0000'), true); // 인스턴스 자체 속성은 수집
+  assert.equal(names.has('size/120'), true);
+  assert.equal(names.has('size/40'), true);
+  assert.equal(warnings.length, 2); // 숨김 · 인스턴스 안내
+});
+
+test('extractFromSelection — count는 값을 쓰는 레이어 수(한 레이어의 중복 사용은 1)', () => {
+  installFigma();
+  // 한 레이어가 padding 4방향에 모두 16을 써도 1로 센다.
+  const mk = (id, gap) => ({
+    type: 'FRAME',
+    id,
+    name: id,
+    fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 }, visible: true }],
+    layoutMode: 'VERTICAL',
+    itemSpacing: gap,
+    paddingLeft: 16,
+    paddingRight: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    children: [],
+  });
+  const a = mk('a', 16);
+  const b = mk('b', 8); // 16은 패딩으로만, 8은 이 레이어에서만
+
+  const byName = new Map(extractFromSelection([a, b]).tokens.map((t) => [t.name, t]));
+  assert.equal(byName.get('spacing/16').count, 2); // 두 레이어 — 한 레이어의 padding 4회는 1
+  assert.equal(byName.get('spacing/8').count, 1); // b에서만
+  assert.equal(byName.get('color/ff0000').count, 2); // 같은 색을 쓰는 레이어 2개
+});
+
+test('extractFromSelection — 절대 배치 자식의 크기는 제외(오토레이아웃 흐름 밖)', () => {
+  installFigma();
+  // 부모가 오토레이아웃이어도 layoutPositioning:'ABSOLUTE'면 Hug/Fill을 고를 수 없어 항상 FIXED다.
+  const badge = {
+    type: 'FRAME',
+    id: 'badge',
+    name: 'Badge',
+    layoutMode: 'NONE',
+    layoutPositioning: 'ABSOLUTE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 187,
+    height: 43,
+    children: [],
+  };
+  const flow = {
+    type: 'FRAME',
+    id: 'flow',
+    name: 'Flow',
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 48,
+    height: 48,
+    children: [],
+  };
+  const card = {
+    type: 'FRAME',
+    id: 'card',
+    name: 'Card',
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [badge, flow],
+  };
+  badge.parent = card;
+  flow.parent = card;
+
+  const names = new Set(extractFromSelection([card]).tokens.map((t) => t.name));
+  assert.equal(names.has('size/187'), false); // 절대 배치 — 자유 리사이즈 잔값
+  assert.equal(names.has('size/43'), false);
+  assert.equal(names.has('size/48'), true); // 흐름 안의 Fixed는 그대로
+});
+
+test('extractFromSelection — 숨긴 조상 안의 레이어를 직접 선택해도 제외', () => {
+  installFigma();
+  const inner = {
+    type: 'FRAME',
+    id: 'inner',
+    name: 'Inner',
+    fills: [{ type: 'SOLID', color: { r: 0, g: 1, b: 0 }, visible: true }], // #00ff00 — 나오면 안 됨
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 77,
+    height: 77,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [],
+  };
+  inner.parent = { type: 'GROUP', id: 'hiddenGroup', visible: false, parent: null };
+
+  const { tokens, warnings } = extractFromSelection([inner]);
+  assert.equal(tokens.length, 0); // 자신은 visible=true지만 조상이 숨김
+  assert.ok(warnings.some((w) => /숨긴 레이어/.test(w)));
+});
+
+test('bindSelection — 숨긴 조상 안의 선택 루트는 바인딩하지 않음', async () => {
+  installFigma();
+  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
+  const node = {
+    type: 'FRAME',
+    id: 'n',
+    name: 'n',
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }],
+    layoutMode: 'NONE',
+    setBoundVariable() {},
+  };
+  node.parent = { type: 'GROUP', id: 'g', visible: false, parent: null };
+
+  const res = await bindSelection([node], 0.5);
+  assert.equal(res.bound, 0);
+  assert.ok(res.reasons.hidden >= 1);
+  assert.equal(node.fills[0].boundVariables, undefined);
+});
+
+test('extractFromSelection — 그리드 오토레이아웃은 gridRowGap/gridColumnGap을 수집', () => {
+  installFigma();
+  // display:inline-grid; padding:12px 20px; row-gap:12px; column-gap:5px
+  // 그리드 모드에서는 itemSpacing/counterAxisSpacing이 아니라 grid*Gap이 실제 간격이다.
+  const grid = {
+    type: 'FRAME',
+    id: 'g1',
+    name: 'Grid',
+    layoutMode: 'GRID',
+    gridRowGap: 12,
+    gridColumnGap: 5,
+    itemSpacing: 0, // 그리드에서는 무의미 — 읽어도 안 됨
+    counterAxisSpacing: 0,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingLeft: 20,
+    paddingRight: 20,
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    children: [],
+  };
+
+  const names = new Set(extractFromSelection([grid]).tokens.map((t) => t.name));
+  assert.equal(names.has('spacing/12'), true); // row-gap · 세로 패딩
+  assert.equal(names.has('spacing/5'), true); // column-gap
+  assert.equal(names.has('spacing/20'), true); // 가로 패딩
+});
+
 test('extractFromSelection — 그라디언트 채움은 경고', () => {
   installFigma();
   const node = {
@@ -388,6 +671,7 @@ test('bindSelection — 색/크기 바인딩, 미매칭 skip, 오토레이아웃
     width: 200,
     height: 50,
     layoutMode: 'NONE',
+    parent: { type: 'FRAME', layoutMode: 'VERTICAL' }, // 부모가 오토레이아웃 → Fixed는 디자이너의 선택
     setBoundVariable(field, v) {
       (this._bound ??= {})[field] = v.id;
     },
@@ -424,6 +708,7 @@ test('bindSelection — 허용오차 내 동률은 가장 가까운 값으로 �
     width: 11, // 8(차이3) vs 12(차이1) → 12가 더 가까움
     height: 50,
     layoutMode: 'NONE',
+    parent: { type: 'FRAME', layoutMode: 'VERTICAL' },
     setBoundVariable(field, v) {
       (this._bound ??= {})[field] = v.id;
     },
@@ -431,6 +716,271 @@ test('bindSelection — 허용오차 내 동률은 가장 가까운 값으로 �
   await bindSelection([node], 4);
   const s12 = findVar(figma, 'Semantic', 'size/12');
   assert.equal(node._bound.width, s12.id);
+});
+
+test('bindSelection — HUG/FILL 사유는 두 축 모두 집계', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
+  // 가로 FILL · 세로 HUG — 두 축 모두 건너뛰었으니 사유도 2건이어야 한다.
+  const node = {
+    type: 'FRAME',
+    id: 'n',
+    name: 'n',
+    fills: [],
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FILL',
+    layoutSizingVertical: 'HUG',
+    width: 200,
+    height: 200,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    setBoundVariable() {},
+  };
+
+  const res = await bindSelection([node], 0.5);
+  assert.equal(res.reasons['hug-fill'], 2); // 세로 축 사유가 빠지지 않는다
+  assert.equal(res.bound, 0);
+});
+
+test('bindSelection — 소수 크기는 근처 정수 토큰에 스냅하지 않음(정확 일치만)', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'size/344', category: 'size', sources: ['size'], value: 344 },
+      { name: 'size/40', category: 'size', sources: ['size'], value: 40 },
+    ],
+    16,
+  );
+  const mk = (id, w) => ({
+    type: 'FRAME',
+    id,
+    name: id,
+    fills: [],
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: w,
+    height: 10,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  });
+
+  // 343.5는 허용오차(1) 안에 size/344가 있지만, extract가 소수 size를 토큰으로 만들지 않으므로
+  // 바인딩도 스냅하지 않는다 — 그러지 않으면 추출이 거부한 값을 바인딩이 되살리며 폭까지 바꾼다.
+  const frac = mk('frac', 343.5);
+  const res = await bindSelection([frac], 1);
+  assert.equal(frac._bound, undefined);
+  assert.equal(res.reasons['size-fraction'], 1); // 사유가 '매칭 없음'에 섞이지 않고 따로 집계된다
+
+  // 정수 크기는 기존대로 허용오차 스냅이 동작한다.
+  const near = mk('near', 39.5);
+  await bindSelection([near], 1);
+  assert.equal(near._bound, undefined); // 39.5도 소수 → 스냅 안 함
+  const exact = mk('exact', 344);
+  await bindSelection([exact], 1);
+  assert.equal(exact._bound.width, findVar(figma, 'Semantic', 'size/344').id);
+});
+
+test('bindSelection — 소수 크기라도 같은 값의 토큰이 있으면 바인딩', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/343_5', category: 'size', sources: ['size'], value: 343.5 }], 16);
+  const node = {
+    type: 'FRAME',
+    id: 'n',
+    name: 'n',
+    fills: [],
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: 343.5,
+    height: 10,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  };
+
+  await bindSelection([node], 1);
+  assert.equal(node._bound.width, findVar(figma, 'Semantic', 'size/343_5').id);
+});
+
+test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사유로 수집', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
+  // 오토레이아웃 프레임 — padding 4방향이 모두 매칭 실패(GAP 변수 없음)지만 레이어는 1개다.
+  const pad = {
+    type: 'FRAME',
+    id: 'pad',
+    name: 'Padded',
+    fills: [],
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    itemSpacing: 7,
+    paddingLeft: 7,
+    paddingRight: 7,
+    paddingTop: 7,
+    paddingBottom: 7,
+    setBoundVariable() {},
+  };
+  const free = {
+    type: 'FRAME',
+    id: 'free',
+    name: 'Free',
+    fills: [],
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 200,
+    height: 200,
+    setBoundVariable() {},
+  };
+
+  const dry = await bindSelection([pad, free], 0.5, false);
+
+  const byReason = (r) => dry.skips.filter((s) => s.reason === r);
+  // padding 5건이 모두 no-match지만 레이어는 1개 — 노드×사유로 중복 제거된다.
+  assert.equal(byReason('no-match').length, 1);
+  assert.equal(byReason('no-match')[0].nodeId, 'pad');
+  assert.equal(byReason('no-match')[0].name, 'Padded');
+  assert.ok(dry.reasons['no-match'] >= 5); // 건수는 속성 단위 그대로
+  // 자유 배치·HUG/FILL도 각각 레이어와 함께 잡힌다.
+  assert.deepEqual(byReason('size-free-layout').map((s) => s.nodeId), ['free']);
+  assert.deepEqual(byReason('hug-fill').map((s) => s.nodeId), ['pad']);
+  assert.equal(byReason('hug-fill')[0].field, 'width'); // 첫 축의 필드가 남는다
+
+  // 실제 적용(apply=true)에서는 수집하지 않는다 — 미리보기 전용 페이로드.
+  const real = await bindSelection([pad, free], 0.5, true);
+  assert.equal(real.skips, undefined);
+});
+
+test('bindSelection — 그리드 오토레이아웃의 row/column gap 바인딩', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'spacing/12', category: 'gap', sources: ['gap'], value: 12 },
+      { name: 'spacing/5', category: 'gap', sources: ['gap'], value: 5 },
+    ],
+    16,
+  );
+  const grid = {
+    type: 'FRAME',
+    id: 'g',
+    name: 'g',
+    fills: [],
+    layoutMode: 'GRID',
+    gridRowGap: 12,
+    gridColumnGap: 5,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingLeft: 0,
+    paddingRight: 0,
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  };
+
+  await bindSelection([grid], 0.5);
+  const s12 = findVar(figma, 'Semantic', 'spacing/12');
+  const s5 = findVar(figma, 'Semantic', 'spacing/5');
+  assert.equal(grid._bound.gridRowGap, s12.id);
+  assert.equal(grid._bound.gridColumnGap, s5.id);
+  assert.equal(grid._bound.paddingTop, s12.id); // 패딩은 모드와 무관하게 그대로
+  assert.equal(grid._bound.itemSpacing, undefined); // 그리드에서는 시도하지 않음
+});
+
+test('bindSelection — 자유 배치 크기 제외 · 숨김/인스턴스 내부 미순회(extract.ts와 동일 기준)', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+    ],
+    16,
+  );
+  const blue = () => ({ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }); // #0066ff → 매칭
+
+  // 1) 자유 배치(오토레이아웃 밖) — layoutSizing*는 항상 FIXED지만 크기는 대상 아님. 색은 그대로 바인딩.
+  const free = {
+    type: 'FRAME',
+    id: 'free',
+    name: 'free',
+    fills: [blue()],
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 200,
+    height: 200,
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  };
+  const r1 = await bindSelection([free], 0.5);
+  assert.equal(r1.bound, 1); // 색 1건뿐
+  assert.equal(free._bound, undefined); // width/height 미바인딩
+  assert.ok(r1.reasons['size-free-layout'] >= 1);
+
+  // 2) 숨긴 레이어 — 자신과 하위 모두 제외
+  const hiddenChild = { type: 'FRAME', id: 'hc', name: 'hc', fills: [blue()], layoutMode: 'NONE', setBoundVariable() {} };
+  const hidden = {
+    type: 'FRAME',
+    id: 'h',
+    name: 'h',
+    visible: false,
+    fills: [blue()],
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'HUG',
+    layoutSizingVertical: 'HUG',
+    children: [hiddenChild],
+    setBoundVariable() {},
+  };
+  const r2 = await bindSelection([hidden], 0.5);
+  assert.equal(r2.bound, 0);
+  assert.ok(r2.reasons.hidden >= 1);
+  assert.equal(hiddenChild.fills[0].boundVariables, undefined);
+
+  // 3) 인스턴스 — 자체 속성만 바인딩하고 내부는 건드리지 않음(오버라이드 방지)
+  const inner = { type: 'FRAME', id: 'in', name: 'in', fills: [blue()], layoutMode: 'NONE', setBoundVariable() {} };
+  const inst = {
+    type: 'INSTANCE',
+    id: 'i',
+    name: 'i',
+    fills: [blue()],
+    layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: 200,
+    height: 40,
+    itemSpacing: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    children: [inner],
+    setBoundVariable(field, v) {
+      (this._bound ??= {})[field] = v.id;
+    },
+  };
+  const r3 = await bindSelection([inst], 0.5);
+  const s200 = findVar(figma, 'Semantic', 'size/200');
+  assert.equal(inst._bound.width, s200.id); // 인스턴스 자체 크기는 바인딩
+  assert.equal(inner.fills[0].boundVariables, undefined); // 내부는 미순회
+  assert.ok(r3.reasons['instance-children'] >= 1);
 });
 
 test('bindSelection — 여백(padding/gap)은 GAP 변수에만 — size/line-height/letter-spacing 오매칭 방지', async () => {
@@ -614,6 +1164,7 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
     width: 200,
     height: 50,
     layoutMode: 'NONE', // → 사유 no-autolayout
+    parent: { type: 'FRAME', layoutMode: 'VERTICAL' }, // 크기 바인딩은 오토레이아웃 맥락에서만
     setBoundVariable(field, v) {
       (this._bound ??= {})[field] = v.id;
     },
@@ -665,7 +1216,9 @@ test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 
     layoutMode: 'NONE',
     setBoundVariable() {},
   };
-  const root = { type: 'FRAME', id: 'root', name: 'root', fills: [], layoutMode: 'NONE', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [child], setBoundVariable() {} };
+  // 루트는 오토레이아웃 — 자식의 Fixed 크기가 바인딩 대상이 되려면 맥락이 필요하다.
+  const root = { type: 'FRAME', id: 'root', name: 'root', fills: [], layoutMode: 'VERTICAL', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, children: [child], setBoundVariable() {} };
+  child.parent = root;
 
   const dry = await bindSelection([root], 0.5, false);
 

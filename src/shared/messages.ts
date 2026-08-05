@@ -104,6 +104,21 @@ export interface BindCandidate {
   distance?: number;
 }
 
+/**
+ * 바인딩에서 건너뛴 레이어 1건 — 사유 집계가 숫자만 남기면 어떤 레이어가 왜 빠졌는지
+ * 찾을 수 없어, 미리보기에서 사유별로 레이어를 선택할 수 있게 함께 싣는다.
+ * 노드×사유로 중복 제거되어 있다(같은 노드의 padding 4건은 1건).
+ */
+export interface BindSkip {
+  nodeId: string;
+  name: string;
+  type: string;
+  /** REASON_LABELS의 키 — 'no-match' · 'hug-fill' · 'size-fraction' 등. */
+  reason: string;
+  /** 어느 속성에서 났는지(있으면). 예: 'width' · 'paddingLeft'. */
+  field?: string;
+}
+
 /** 바인딩 미리보기 트리(#13)의 맥락 노드 — 영향 노드 + 그 조상 체인. */
 export interface BindNode {
   id: string;
@@ -137,11 +152,12 @@ export type UiToCode =
   | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
   | { type: 'APPLY'; tolerance: number; preview?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[] } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
+  | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
   | { type: 'RENAME_APPLY'; items: { id: string; after: string }[] } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
-  | { type: 'SCAN_TEXT_STYLES' } // Phase C: 선택 텍스트에서 스타일 후보 추출
+  | { type: 'SCAN_TEXT_STYLES'; useRowLabels?: boolean } // Phase C: 선택 텍스트 후보(+가로 행 라벨→이름)
   | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[]; apply: boolean } // Phase C: 변수 보장+스타일 등록(+적용)
   | { type: 'APPLY_TEXT_STYLES' } // Phase C: 적용만(생성 없음) — 선택 텍스트를 기존 스타일에 바인딩
   | { type: 'GET_COLLECTIONS' }
@@ -177,13 +193,14 @@ export type UiToCode =
 export type CodeToUi =
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
-  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean }
+  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; selfSelect?: boolean } // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
+  | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[] } // candidates/nodes: 미리보기 트리(#6·#13)
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[] } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
-  | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[] } // Phase C: 스캔 결과
+  | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number } // Phase C: 스캔 결과(+행 라벨 통계)
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; applied: number; missing: string[] } // Phase C
   | { type: 'TEXT_STYLES_APPLIED'; applied: number; missing: string[] } // Phase C: 적용만(생성 없음) 결과
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }

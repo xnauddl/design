@@ -5,7 +5,7 @@ import type { UiToCode, RenameChange, VarInfo, VarMode, VarValueCell, VarPatch, 
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
-import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
+import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb, type ResolvedType, type ScopeName } from './lib/tokens';
@@ -479,6 +479,8 @@ loadLicense().then(() => {
    선택이 바뀔 때마다 선택 수·하위 요소 수·바인딩 후보 수를 UI에 알린다.
    대규모 선택에서도 안전하도록 스캔을 상한(SCAN_CAP)으로 제한한다. */
 const SCAN_CAP = 1500;
+/** 스킵 사유 칩 한 번에 선택할 레이어 상한 — 직렬 조회·대량 선택으로 멈추지 않게. */
+const SELECT_CAP = 200;
 function isBindableCandidate(n: SceneNode): boolean {
   const fills = (n as { fills?: unknown }).fills;
   const hasFills = Array.isArray(fills) && fills.some((p) => (p as Paint).type === 'SOLID' && (p as Paint).visible !== false);
@@ -491,6 +493,13 @@ function isBindableCandidate(n: SceneNode): boolean {
   const hasGap = !!lm && lm !== 'NONE' && typeof (n as { itemSpacing?: number }).itemSpacing === 'number';
   return hasFills || hasStrokes || hasRadius || hasFont || hasGap;
 }
+/**
+ * 이번 selectionchange가 플러그인 자신이 만든 것인가(스킵 칩 → 레이어 이동).
+ * UI는 선택이 바뀌면 바인딩 미리보기를 버리는데, 칩이 그 미리보기에서 나온 것이라
+ * 그대로 두면 칩 한 번 누르는 순간 칩 줄 자체가 사라진다.
+ */
+let selfSelect = false;
+
 function postSelection(): void {
   const sel = selection();
   let scanned = 0;
@@ -503,11 +512,15 @@ function postSelection(): void {
       break;
     }
     const n = stack.pop() as SceneNode;
+    // bind.ts의 walk와 같은 기준으로 세야 헤더의 '바인딩 후보 N개'와 실제 결과가 어긋나지 않는다.
+    if (n.visible === false) continue;
     scanned++;
     if (isBindableCandidate(n)) bindable++;
+    if (n.type === 'INSTANCE') continue; // 인스턴스 내부는 바인딩 대상이 아니다
     if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
   }
-  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped });
+  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, selfSelect });
+  selfSelect = false;
 }
 figma.on('selectionchange', postSelection);
 
@@ -873,6 +886,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           cancelled: r.cancelled,
           candidates: r.candidates, // #6: 미리보기 후보(dry-run만)
           nodes: r.nodes, // #13: 미리보기 트리 맥락
+          skips: r.skips, // 사유별 건너뛴 레이어(dry-run만)
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
@@ -881,6 +895,32 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'CANCEL': {
         bindCancel = true; // UX6: 다음 양보 지점에서 중단
+        break;
+      }
+      case 'SELECT_NODES': {
+        // 스킵 사유 → 원인 레이어로 이동(읽기 전용). 삭제·페이지 이동으로 사라진 id는 조용히 무시하고,
+        // 현재 페이지에 남은 것만 선택한다(다른 페이지 노드를 selection에 넣으면 런타임이 거부).
+        // 상한 — 사유 하나에 수천 건이 걸릴 수 있다(자유 배치 프레임이 많은 페이지). 전부 조회하면
+        // 직렬 await로 플러그인이 수 초간 멈추고, 전체 선택 + scrollAndZoomIntoView는 페이지 전체로
+        // 축소돼 오히려 원인을 못 찾는다. 앞에서부터 잘라 보여주고 몇 개를 생략했는지 알린다.
+        const ids = msg.ids.slice(0, SELECT_CAP);
+        const found: SceneNode[] = [];
+        for (const id of ids) {
+          const n = await figma.getNodeByIdAsync(id);
+          if (n && n.type !== 'PAGE' && n.type !== 'DOCUMENT' && (n as SceneNode).parent) found.push(n as SceneNode);
+        }
+        const onPage = found.filter((n) => {
+          for (let p: BaseNode | null = n; p; p = p.parent) if (p.id === figma.currentPage.id) return true;
+          return false;
+        });
+        if (onPage.length) {
+          const cur = figma.currentPage.selection;
+          // 선택이 실제로 바뀔 때만 표시한다 — 안 바뀌면 selectionchange가 안 와서 플래그가 남는다.
+          if (onPage.length !== cur.length || onPage.some((n, i) => cur[i] !== n)) selfSelect = true;
+          figma.currentPage.selection = onPage;
+          figma.viewport.scrollAndZoomIntoView(onPage);
+        }
+        post({ type: 'SELECT_RESULT', found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
         break;
       }
       case 'APPLY_SELECTED': {
@@ -933,9 +973,20 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
         const { samples, warnings } = scanTextStyles(selection());
-        // 기존 로컬 스타일 목록 전달 → 노드 바인딩/시그니처가 같은 후보는 '이미 등록'으로 인식(이름 유지).
-        const styles = nameTextStyles(clusterTextStyles(samples), await scanExistingTextStyles());
-        post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+        const existing = await scanExistingTextStyles();
+        if (msg.useRowLabels) {
+          const r = nameTextStylesWithRowLabels(samples, existing);
+          post({
+            type: 'TEXT_STYLE_CANDIDATES',
+            styles: r.styles,
+            warnings,
+            labeled: r.labeled,
+            fallback: r.fallback,
+          });
+        } else {
+          const styles = nameTextStyles(clusterTextStyles(samples), existing);
+          post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+        }
         break;
       }
       case 'CREATE_TEXT_STYLES': {

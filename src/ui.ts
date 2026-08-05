@@ -1,8 +1,8 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
-import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList } from './lib/tokens';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate } from './shared/messages';
+import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList, tidyNumberTokens } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier, type Feature } from './lib/entitlements';
@@ -107,6 +107,49 @@ function clearMount(mount: HTMLElement): void {
     추출이 실제로 만드는 비-px 단위는 percent뿐이고(lineHeight·letterSpacing), 나머지는 대비용. */
 const UNIT_CHIP: Record<Unit, string> = { px: 'px', percent: '%', em: 'em', rem: 'rem', ratio: '×' };
 
+/* ---------- 생성 대상 선택 ----------
+   바인딩 카드가 후보를 골라 적용하듯(bindChecked), 토큰도 골라서 만든다. 색 토큰은 위 ‘색 정리’
+   표가 담당하므로 이 선택의 대상이 아니다 — 항상 생성에 포함된다. */
+const tokenChecked = new Set<string>();
+
+/** 체크 키 — 이름은 편집 대상이라 값으로 식별한다(추출의 dedup 키와 같은 규칙). */
+function tokenKey(t: DraftToken): string {
+  return `${t.category}|${t.value}|${t.unit ?? ''}`;
+}
+
+/** 이 카드가 고르는 대상(색 외 토큰). */
+function creatableTokens(): DraftToken[] {
+  return tokens.filter((t) => t.category !== 'color');
+}
+
+/** 토큰 집합이 바뀌면 전체 선택으로 초기화(새 추출·팔레트 생성). */
+function resetTokenChecked(): void {
+  tokenChecked.clear();
+  for (const t of creatableTokens()) tokenChecked.add(tokenKey(t));
+}
+
+/** 실제로 생성할 토큰 — 색은 전부, 색 외는 체크한 것만. */
+function tokensToCreate(): DraftToken[] {
+  return tokens.filter((t) => t.category === 'color' || tokenChecked.has(tokenKey(t)));
+}
+
+/**
+ * 값이 바뀌는 변환(사다리 정리·되돌리기) 앞뒤로 체크 상태를 옮긴다.
+ * 키가 값 기반이라 스냅하면 옛 키가 사라진다 — 전체 재선택을 하면 사용자의 '1× 해제'가
+ * 되살아나고, 아무것도 안 하면 전부 풀린다. 그래서 **이름**으로 짝을 맞춰 이월한다
+ * (스냅은 자동 이름만 갱신하고 개명은 보존하므로 이름이 가장 안정적인 축이다).
+ */
+function carryTokenChecked(before: readonly DraftToken[], after: readonly DraftToken[]): void {
+  const checkedNames = new Set(before.filter((t) => tokenChecked.has(tokenKey(t))).map((t) => t.name));
+  // 값이 바뀌면 자동 이름도 바뀌므로, 이름이 안 맞는 건 '체크였던 것끼리 합쳐졌다'고 보고 살린다.
+  const beforeNames = new Set(before.map((t) => t.name));
+  tokenChecked.clear();
+  for (const t of after) {
+    if (t.category === 'color') continue;
+    if (checkedNames.has(t.name) || !beforeNames.has(t.name)) tokenChecked.add(tokenKey(t));
+  }
+}
+
 /**
  * 토큰 1행(스와치·이름 입력·타입 칩).
  * 이름 편집은 넘겨받은 토큰 객체를 그대로 고친다 — 목록은 `tokens`를 필터한 배열이라
@@ -115,6 +158,20 @@ const UNIT_CHIP: Record<Unit, string> = { px: 'px', percent: '%', em: 'em', rem:
 function makeTokenRow(t: DraftToken): HTMLElement {
   const row = document.createElement('div');
   row.className = 'tk';
+
+  // 체크한 토큰만 생성한다. 키는 이름이 아니라 값(category|value|unit) — 이름은 편집 대상이라
+  // 개명하는 순간 체크가 풀린다.
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'tk-check';
+  cb.checked = tokenChecked.has(tokenKey(t));
+  cb.title = '생성 대상';
+  cb.addEventListener('change', () => {
+    if (cb.checked) tokenChecked.add(tokenKey(t));
+    else tokenChecked.delete(tokenKey(t));
+    updateTokenCreate();
+  });
+  row.appendChild(cb);
 
   const sw = document.createElement('span');
   sw.className = 'tk-gutter'; // 스와치 없는 행은 CSS가 폭 0으로 접는다(#tokenList.has-swatch 참고)
@@ -135,6 +192,16 @@ function makeTokenRow(t: DraftToken): HTMLElement {
     input.title = input.value;
   });
   row.appendChild(input);
+
+  // 등장 레이어 수 — 무엇을 남길지 고르는 근거. 1×는 대개 일회성 값이라 눈에 띄게 흐린다.
+  const n = t.count ?? 0;
+  if (n > 0) {
+    const use = document.createElement('span');
+    use.className = n === 1 ? 'tk-use once' : 'tk-use';
+    use.textContent = `${n}×`;
+    use.title = `이 값을 쓰는 레이어 ${n}개`;
+    row.appendChild(use);
+  }
 
   const cat = document.createElement('span');
   cat.className = 'cat';
@@ -301,15 +368,15 @@ for (const r of LIST_REGIONS) {
 // ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만.
 function renderTokens(): void {
   const box = $('tokenList');
-  const others = tokens.filter((t) => t.category !== 'color');
-  // 카드 제목의 개수 — 목록이 접혀 있어도 몇 개가 생성 대상인지 먼저 알린다.
-  $('createCount').textContent = others.length ? `· 색 외 ${others.length}개` : '';
+  const others = creatableTokens();
   const showHint = (msg: string): void => {
     clearMount(box); // 진행 중이던 청크가 안내 문구 아래로 계속 쌓이지 않게
+    ($('tokenCtrls') as HTMLElement).style.display = 'none';
     const hint = document.createElement('div');
     hint.className = 'hint';
     hint.textContent = msg;
     box.appendChild(hint);
+    updateTokenCreate();
     layoutListBy('tokenList'); // 행이 없으니 경계·개수 줄을 걷어낸다
   };
   if (!tokens.length) {
@@ -328,7 +395,30 @@ function renderTokens(): void {
   }
   // 스와치가 실제로 쓰이는 목록에서만 14px 거터를 유지(그 외엔 이름 폭으로 넘긴다).
   box.classList.toggle('has-swatch', others.some((o) => o.category === 'effectColor' && typeof o.value === 'string'));
+  ($('tokenCtrls') as HTMLElement).style.display = '';
   renderChunked(box, others, makeTokenRow, () => layoutListBy('tokenList')); // §4: 대량 추출도 비차단
+  updateTokenCreate();
+}
+
+/**
+ * 선택 수 반영 — 카드 제목 개수·전체선택 마스터·버튼 활성. 바인딩 카드의 updateBindApply와 같은 역할.
+ * 목록이 렌더되기 전(빈 상태)에도 불리므로 DOM 존재만 가정한다.
+ */
+function updateTokenCreate(): void {
+  const others = creatableTokens();
+  const sel = others.filter((t) => tokenChecked.has(tokenKey(t))).length;
+  $('createCount').textContent = others.length ? `· 색 외 ${sel}/${others.length}개` : '';
+  const all = $('tokenAll') as HTMLInputElement;
+  all.checked = sel === others.length && others.length > 0;
+  all.indeterminate = sel > 0 && sel < others.length;
+  // 색만 추출된 경우엔 색 토큰만으로도 생성할 게 있으므로 잠그지 않는다.
+  // 두 버튼은 PAID_FIELDS라 유료 잠금이 우선 — 여기서 무조건 false를 쓰면 Free 티어의 잠금이 풀려
+  // 클릭-후-거부(PREMIUM_REQUIRED) 막다른 길이 된다. 잠금은 더하기만 하고 풀지는 않는다.
+  const nothing = others.length > 0 && sel === 0 && !tokens.some((t) => t.category === 'color');
+  for (const id of ['btnCreate', 'btnCreateApply']) {
+    const el = $(id) as HTMLButtonElement;
+    el.disabled = nothing || !isPaid;
+  }
 }
 
 /* ---------- 0 · 브랜드 팔레트 ---------- */
@@ -358,6 +448,8 @@ $('btnPalette').addEventListener('click', () => {
     includeStatus: ($('incStatus') as HTMLInputElement).checked,
   });
   tokens = paletteToDraftTokens(p);
+  resetTokenChecked();
+  clearNumTidy();
   colorRevealed = true; // 팔레트 생성 = 색 노출
   previewRevealed = false; // 색 외 토큰 목록은 ‘미리보기’ 클릭 시
   renderTokens();
@@ -515,7 +607,9 @@ function hideTidySummary(): void {
 /** 자동 정리 되돌리기 — 정리 직전 추출 색으로 복원(이번 추출 한정). */
 function undoTidy(): void {
   if (!preTidyTokens) return;
-  tokens = preTidyTokens.map((t) => ({ ...t, sources: [...t.sources] }));
+  const restored = preTidyTokens.map((t) => ({ ...t, sources: [...t.sources] }));
+  carryTokenChecked(tokens, restored); // 수치 정리 후라면 키가 어긋나 전부 풀린다
+  tokens = restored;
   preTidyTokens = null;
   hideTidySummary();
   renderTokens();
@@ -564,6 +658,76 @@ $('btnExtract').addEventListener('click', () => {
   send({ type: 'EXTRACT' });
 });
 
+/* 스케일 사다리 정리 — 색 정리(tidyColors)와 같은 패턴: 누르면 정리하고 요약 한 줄 + 되돌리기.
+   색과 달리 자동이 아니라 버튼인 이유는, 값을 옮기면 토큰의 수치가 바뀌어 바인딩 결과까지
+   달라지기 때문이다(색 병합은 같은 hue-단계 안이라 훨씬 보수적). */
+let preNumTidy: DraftToken[] | null = null;
+
+/** 정리 스냅샷·요약 줄을 함께 걷는다 — 남겨두면 다른 추출의 토큰으로 되돌아간다. */
+function clearNumTidy(): void {
+  preNumTidy = null;
+  $('numTidySummary').style.display = 'none';
+}
+
+$('btnTidyNumbers').addEventListener('click', () => {
+  // 목록이 '표시'된 뒤에만 — 접힌 채로 값을 바꾸면 무엇이 어떻게 옮겨졌는지 볼 수 없다.
+  if (!previewRevealed) {
+    setStatus('createStatus', '먼저 ‘미리보기’를 눌러 정리할 토큰을 확인하세요.', 'warn');
+    return;
+  }
+  if (!creatableTokens().length) {
+    setStatus('createStatus', '정리할 여백·크기 토큰이 없어요.', 'warn');
+    return;
+  }
+  const base = Number(($('tidyBase') as HTMLInputElement).value) || 0;
+  const ratio = (Number(($('tidyRatio') as HTMLInputElement).value) || 0) / 100;
+  const snapshot = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기용
+  const r = tidyNumberTokens(tokens, { base, ratio });
+  if (!r.snapped) {
+    setStatus('createStatus', r.before === 0
+      ? '정리할 여백·크기 토큰이 없어요.'
+      : `${base}px 사다리에서 ${Math.round(ratio * 100)}% 안에 드는 값이 없어요 — 허용을 올려보세요.`, '');
+    return;
+  }
+  preNumTidy = snapshot;
+  tokens = r.tokens;
+  // 스냅으로 키(값)가 바뀌므로 체크를 그대로 두면 전부 풀린다. 그렇다고 전체 재선택을 하면
+  // 사용자의 '1× 해제'가 조용히 되살아난다 → 정리 전 체크 상태를 새 키로 이월한다.
+  carryTokenChecked(snapshot, r.tokens);
+  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 새 미리보기 필요
+  renderTokens();
+  $('numTidySummary').style.display = '';
+  // 이동과 병합은 다른 일이라 따로 센다 — 옮겼지만 같은 칸이 아니어서 안 합쳐진 토큰도 있다.
+  const merged = r.merged ? ` · 같은 칸 ${r.merged}개 병합` : '';
+  $('numTidyText').textContent = `여백·크기 ${r.before} → ${r.after}개 (${base}px 사다리로 ${r.snapped}개 이동${merged})`;
+  setStatus('createStatus', `${base}px 사다리로 ${r.snapped}개를 옮겼어요${r.merged ? `, ${r.merged}개가 합쳐졌어요` : ''}.`, 'ok');
+});
+
+$('btnNumTidyUndo').addEventListener('click', () => {
+  if (!preNumTidy) return;
+  const restored = preNumTidy;
+  carryTokenChecked(tokens, restored); // 되돌릴 때도 체크를 잃지 않게
+  tokens = restored;
+  clearNumTidy();
+  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none';
+  renderTokens();
+  setStatus('createStatus', '수치 정리를 되돌렸어요.', '');
+});
+
+// 전체 선택 / 1× 해제 — 목록이 상한에 잘려 있어도 전체에 적용된다(체크는 DOM이 아니라 집합이 보관).
+$('tokenAll').addEventListener('change', () => {
+  const on = ($('tokenAll') as HTMLInputElement).checked;
+  tokenChecked.clear();
+  if (on) for (const t of creatableTokens()) tokenChecked.add(tokenKey(t));
+  renderTokens();
+});
+$('btnTokenDropOnce').addEventListener('click', () => {
+  const once = creatableTokens().filter((t) => (t.count ?? 0) <= 1);
+  for (const t of once) tokenChecked.delete(tokenKey(t));
+  renderTokens();
+  setStatus('createStatus', once.length ? `1회만 쓰인 ${once.length}개를 해제했어요.` : '1회만 쓰인 토큰이 없어요.', '');
+});
+
 $('btnCreate').addEventListener('click', () => {
   previewRevealed = true; // 미리보기 버튼 역할: 생성할 색 외 토큰을 펼침
   if (!tokens.length) {
@@ -576,14 +740,14 @@ $('btnCreate').addEventListener('click', () => {
   renderTokens();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
-  send({ type: 'CREATE_TOKENS', tokens, base, preview: true }); // UX1: 미리보기 먼저
+  send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, preview: true }); // UX1: 미리보기 먼저
 });
 
 $('btnCreateApply').addEventListener('click', () => {
   if (!tokens.length) return;
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
-  send({ type: 'CREATE_TOKENS', tokens, base }); // 확인 후 실제 적용
+  send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base }); // 확인 후 실제 적용
 });
 
 // base는 비-px 값(rem·%·em)을 px로 환산하는 기준이라 미리보기 결과가 base에 따라 달라진다.
@@ -600,7 +764,7 @@ let basePreviewTimer = 0;
   basePreviewTimer = window.setTimeout(() => {
     if (!tokens.length) return;
     createFrom = 'tokens';
-    send({ type: 'CREATE_TOKENS', tokens, base: Number(($('base') as HTMLInputElement).value) || 16, preview: true });
+    send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base: Number(($('base') as HTMLInputElement).value) || 16, preview: true });
   }, 350); // 타이핑 중 매 키마다 보내지 않도록
 });
 
@@ -716,7 +880,12 @@ function readTextStyleRows(): TextStyleSpec[] {
   return specs;
 }
 
-$('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
+$('btnScanText').addEventListener('click', () =>
+  send({
+    type: 'SCAN_TEXT_STYLES',
+    useRowLabels: ($('tsUseRowLabels') as HTMLInputElement).checked,
+  }),
+);
 $('btnTsAddRow').addEventListener('click', () => {
   const tr = textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
   $('tsRows').appendChild(tr);
@@ -739,6 +908,36 @@ $('btnApplyExistingText').addEventListener('click', () => {
   setStatus('tsStatus', '선택 텍스트를 기존 스타일에 적용 중…', 'ok');
   send({ type: 'APPLY_TEXT_STYLES' });
 });
+
+/* 허용오차 프리셋 — 값이 무엇을 뜻하는지 숫자만으로는 안 보여서, 자주 쓰는 값을 칩으로 두고
+   현재 값이 어떤 성격인지 한 줄로 설명한다. 임의 값은 숫자 입력으로 계속 넣을 수 있다. */
+const TOL_HINTS: [number, string][] = [
+  [0, '정확히 같은 값만 바인딩합니다.'],
+  [0.5, '반올림 오차만 흡수합니다(기본).'],
+  [1, '1px 이내 근사값까지 붙습니다.'],
+  [Infinity, '근사 범위가 넓어 의도치 않은 값까지 붙을 수 있습니다.'],
+];
+function syncTolPresets(): void {
+  const v = Number(($('tol') as HTMLInputElement).value) || 0;
+  for (const el of Array.from(document.querySelectorAll('.tol-chip'))) {
+    el.classList.toggle('on', Number((el as HTMLElement).dataset.tol) === v);
+  }
+  $('tolHint').textContent = `허용오차 ${v}px — ${(TOL_HINTS.find(([t]) => v <= t) ?? TOL_HINTS[TOL_HINTS.length - 1])[1]}`;
+}
+for (const el of Array.from(document.querySelectorAll('.tol-chip'))) {
+  el.addEventListener('click', () => {
+    ($('tol') as HTMLInputElement).value = (el as HTMLElement).dataset.tol ?? '0.5';
+    syncTolPresets();
+    clearBindPreview(); // 허용오차가 바뀌면 이전 미리보기 후보는 무효
+  });
+}
+($('tol') as HTMLInputElement).addEventListener('input', () => {
+  syncTolPresets();
+  // 칩과 같은 처리 — 허용오차가 바뀌면 이전 값으로 계산된 후보는 무효다. 남겨두면
+  // 사용자가 0을 넣고 '선택에 바인딩'을 눌러도 옛 허용오차의 근사 매칭이 그대로 적용된다.
+  clearBindPreview();
+});
+syncTolPresets();
 
 $('btnApply').addEventListener('click', () => {
   const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
@@ -1514,6 +1713,8 @@ window.onmessage = (event: MessageEvent) => {
   switch (msg.type) {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
+      resetTokenChecked(); // 새 추출 = 새 집합 → 전체 선택으로 시작
+      clearNumTidy(); // 이전 추출의 정리 스냅샷으로 되돌아가지 않게
       huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
       // 추출 색 자동 정리(같은 hue-단계 N:1 병합) — 드래프트 단계라 바인딩 영향 없음.
       preTidyTokens = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기 스냅샷
@@ -1533,14 +1734,16 @@ window.onmessage = (event: MessageEvent) => {
         pendingCreatePreview = false;
         const base = Number(($('base') as HTMLInputElement).value) || 16;
         createFrom = 'tokens';
-        send({ type: 'CREATE_TOKENS', tokens, base, preview: true });
+        send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, preview: true });
       }
       break;
     }
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
-      clearBindPreview(); // 선택 변경 → 바인딩 미리보기 무효화
+      // 스킵 칩이 만든 선택 변경이면 미리보기를 유지한다 — 지우면 칩을 한 번 누르는 순간
+      // 칩 줄과 체크해둔 후보가 통째로 사라져 두 번째 사유를 볼 수 없다.
+      if (!msg.selfSelect) clearBindPreview(); // 사용자의 선택 변경 → 바인딩 미리보기 무효화
       if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
       refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드 빈 상태 갱신
       break;
@@ -1573,12 +1776,18 @@ window.onmessage = (event: MessageEvent) => {
     case 'APPLY_RESULT': {
       hideApplyProgress(); // UX6
       const confirmBtn = $('btnApplyConfirm') as HTMLButtonElement;
+      bindSkips = msg.skips ?? [];
       const rt = reasonsText(msg.reasons); // UX3: 사유별 스킵
-      const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}`;
+      // 칩(레이어로 이동)이 뜨면 상태 줄에는 사유를 중복해 쓰지 않는다.
+      const asChips = bindSkips.length > 0;
+      const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt && !asChips ? ` — ${rt}` : ''}`;
+      renderSkipReasons(msg.reasons);
       if (msg.cancelled) {
-        // UX6: 취소 — 처리한 만큼만 적용(비파괴).
+        // UX6: 취소 — 처리한 만큼만 적용(비파괴). clearBindPreview가 칩을 숨기므로
+        // 취소 경로에서는 사유를 상태 줄 텍스트로 남긴다(그러지 않으면 둘 다 사라진다).
         clearBindPreview();
-        setStatus('applyStatus', t('apply.cancelled', { bound: msg.bound, detail }), 'warn');
+        const cancelDetail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}`;
+        setStatus('applyStatus', t('apply.cancelled', { bound: msg.bound, detail: cancelDetail }), 'warn');
         confirmBtn.style.display = 'none';
       } else if (msg.preview) {
         // #6: 후보를 선택형 미리보기 트리로. 기본 전체 체크.
@@ -1595,6 +1804,16 @@ window.onmessage = (event: MessageEvent) => {
       }
       break;
     }
+    case 'SELECT_RESULT':
+      // 미리보기 이후 레이어가 지워졌거나 다른 페이지로 옮겨졌으면 그만큼 못 찾는다 — 조용히 실패하지 않게.
+      if (msg.capped) {
+        setStatus('applyStatus', `레이어 ${msg.found}개만 선택했어요 — 한 번에 보여줄 수 있는 상한(${msg.requested}개 중)입니다.`, 'warn');
+      } else if (msg.found < msg.requested) {
+        setStatus('applyStatus', msg.found
+          ? `레이어 ${msg.found}개 선택 — ${msg.requested - msg.found}개는 삭제됐거나 다른 페이지에 있어요.`
+          : '레이어를 찾지 못했어요 — 삭제됐거나 다른 페이지에 있습니다. 미리보기를 다시 실행해 주세요.', 'warn');
+      }
+      break;
     case 'RENAME_RESULT':
       renderRenameResult(msg);
       break;
@@ -1611,9 +1830,14 @@ window.onmessage = (event: MessageEvent) => {
         renderTextStyleRows(msg.styles, true);
         const bound = msg.styles.filter((s) => s.boundStyleId).length;
         const fresh = msg.styles.length - bound;
+        const labelPart =
+          msg.labeled != null
+            ? ` · 라벨이름 ${msg.labeled} · 랭킹폴백 ${msg.fallback ?? 0}`
+            : '';
         setStatus(
           'tsStatus',
           `${msg.styles.length}개 찾음 · 신규 ${fresh}(앰버) · 이미 등록 ${bound}(파랑)` +
+            labelPart +
             (msg.warnings.length ? ' · ' + msg.warnings.join(' ') : ''),
           msg.warnings.length ? 'warn' : 'ok',
         );
@@ -1841,6 +2065,7 @@ const OP_STATUS: Record<string, string> = {
   SCAN_TEXT_STYLES: 'tsStatus',
   CREATE_TEXT_STYLES: 'tsStatus',
   APPLY: 'applyStatus',
+  SELECT_NODES: 'applyStatus',
   RENAME: 'renameStatus',
   EXPORT: 'exportStatus',
   SCAN_COMPONENT_CANDIDATES: 'componentStatus',
@@ -2102,6 +2327,9 @@ function updateBindApply(): void {
 function clearBindPreview(): void {
   bindCandidates = [];
   bindNodes = [];
+  bindSkips = [];
+  clearMount($('bindSkips')); // 숨기기만 하면 낡은 칩이 DOM에 남는다
+  ($('bindSkips') as HTMLElement).style.display = 'none';
   bindChecked.clear();
   clearMount($('bindTree'));
   $('bindCount').textContent = '';
@@ -2245,6 +2473,49 @@ function refreshTreeEmptyStates(): void {
 }
 
 /** UX3: 스킵 사유 키 → 한글 라벨. */
+/**
+ * 사유별 레이어(미리보기 dry-run에서만 채워짐). 숫자만 있으면 원인 레이어를 찾을 길이 없어,
+ * 사유 칩을 눌러 캔버스에서 선택할 수 있게 보관한다.
+ */
+let bindSkips: BindSkip[] = [];
+
+/** 사유 칩 렌더 — 레이어 목록이 있는 사유만 버튼, 나머지는 글자. */
+function renderSkipReasons(reasons: Record<string, number>): void {
+  const box = $('bindSkips');
+  box.innerHTML = '';
+  const entries = Object.entries(reasons).filter(([, n]) => n > 0);
+  if (!entries.length || !bindSkips.length) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = '';
+  const head = document.createElement('span');
+  head.className = 'muted';
+  head.textContent = '건너뜀:';
+  box.appendChild(head);
+  for (const [key, n] of entries) {
+    const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
+    const label = `${t('reason.' + key)} ${n}`;
+    if (!ids.length) {
+      const span = document.createElement('span');
+      span.className = 'skip-chip static';
+      span.textContent = label;
+      box.appendChild(span);
+      continue;
+    }
+    const btn = document.createElement('button');
+    btn.className = 'skip-chip';
+    btn.textContent = `${label} ›`;
+    // 사유 건수(n)는 속성 단위, 레이어 수는 노드 단위라 서로 다를 수 있다(padding 4건 → 레이어 1개).
+    btn.title = `레이어 ${ids.length}개 선택 — ${bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ')}${ids.length > 5 ? ' 외' : ''}`;
+    btn.addEventListener('click', () => {
+      send({ type: 'SELECT_NODES', ids });
+      setStatus('applyStatus', `${t('reason.' + key)} 레이어 ${ids.length}개를 선택했어요.`, '');
+    });
+    box.appendChild(btn);
+  }
+}
+
 function reasonsText(reasons: Record<string, number>): string {
   return Object.entries(reasons)
     .filter(([, n]) => n > 0)

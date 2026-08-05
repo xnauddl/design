@@ -257,7 +257,26 @@ export function scanTextStyles(nodes: readonly SceneNode[]): TextScanResult {
     // 이미 바인딩된 로컬 텍스트 스타일 id(혼합/없음=''). 재스캔 rename 앵커로 군집에 전달.
     const sid = t.textStyleId;
     const styleId = sid === figma.mixed ? '' : sid;
-    samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name, styleId });
+    let characters = '';
+    try { characters = t.characters; } catch { characters = ''; }
+    // HORIZONTAL 부모 = 행. 안쪽 H 행 단위 라벨 짝짓기용.
+    let rowId: string | undefined;
+    let indexInParent: number | undefined;
+    const parent = t.parent;
+    if (
+      parent &&
+      'layoutMode' in parent &&
+      (parent as FrameNode).layoutMode === 'HORIZONTAL' &&
+      'children' in parent
+    ) {
+      rowId = parent.id;
+      indexInParent = parent.children.indexOf(t);
+      if (indexInParent < 0) indexInParent = undefined;
+    }
+    samples.push({
+      fontSize, lineHeight, letterSpacing, family, style,
+      layerName: t.name, styleId, characters, id: t.id, rowId, indexInParent,
+    });
   }
   return { samples, warnings: [...warnings] };
 }

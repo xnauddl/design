@@ -137,6 +137,10 @@ export const STRINGS: Record<string, string> = {
   'reason.error': '바인딩 실패',
   'reason.hug-fill': 'HUG/FILL',
   'reason.no-autolayout': '오토레이아웃 아님',
+  'reason.size-free-layout': '자유 배치(크기 제외)',
+  'reason.size-fraction': '소수 크기(정확 일치만)',
+  'reason.hidden': '숨긴 레이어',
+  'reason.instance-children': '인스턴스 내부',
   'reason.font': '폰트 미로드',
 
   // 명도 대비 스킵 사유(라벨 맵)
@@ -220,8 +224,14 @@ export const STRINGS: Record<string, string> = {
   'colorTable.applyBtn': '시맨틱 매핑에 반영',
   // 토큰 생성
   'create.title': '토큰 생성 (Global + Semantic)',
-  'create.scopeHint': '색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다.',
+  'create.scopeHint': '색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.',
   'create.base': 'base(px)',
+  'create.selectAll': '전체 선택',
+  'create.dropOnce': '1× 해제',
+  'create.tidyBase': '사다리',
+  'create.tidyRatio': '허용',
+  'create.tidyBtn': '정리',
+  'create.tidyUndo': '되돌리기',
   'create.hint': '미리보기로 변경 요약을 확인한 뒤 적용하세요.',
   'create.previewBtn': '미리보기',
   'create.apply': '적용',
@@ -235,6 +245,8 @@ export const STRINGS: Record<string, string> = {
   'textStyle.hint': '화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 새 스타일은 ‘행 추가’로. (Paid)',
   'textStyle.scanBtn': '선택에서 스캔',
   'textStyle.addRow': '행 추가',
+  'textStyle.useRowLabels': '가로 행의 왼쪽 텍스트를 스타일 이름으로 사용',
+  'textStyle.rowLabelsHint': 'ON이면 같은 가로 줄의 <b>왼쪽 텍스트를 라벨(이름)</b>으로, 큰 텍스트를 표본으로 봅니다. 이름은 화면에 적힌 글자 그대로입니다. 표본 오른쪽 텍스트는 표에 넣지 않습니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. (세션만 유지)',
   'textStyle.applyExistingBtn': '기존 스타일 적용만',
   'textStyle.applyExistingNote': '이미 만든 스타일에 연결만',
   'textStyle.colName': '이름',
@@ -248,6 +260,7 @@ export const STRINGS: Record<string, string> = {
   // 적용(바인딩)
   'bind.title': '적용 (바인딩)',
   'bind.tol': '허용오차',
+  'bind.tolExact': '정확',
   'bind.preview': '미리보기',
   'bind.confirm': '선택에 바인딩',
   'bind.progress': '진행률',
@@ -265,7 +278,7 @@ export const STRINGS: Record<string, string> = {
   'contrast.checkBtn': '대비 검사',
   // 컴포넌트 / 베리언트
   'component.title': '컴포넌트 / 베리언트',
-  'component.hint': '<b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.',
+  'component.hint': '<b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·table·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.',
   'component.hint2': '<b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 이름끼리 다시 묶을 때만(프레임은 「컴포넌트 등록」). 등록 시 TEXT·스왑·<code>이름?</code> BOOLEAN 속성이 자동 노출됩니다(접힘=다른 슬롯만, 단독·세트=전체 API).',
   'component.scanBtn': '후보 스캔',
   'component.registerBtn': '컴포넌트 등록',

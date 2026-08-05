@@ -14,6 +14,8 @@ import {
   toPx,
   colorTokenName,
   numberTokenName,
+  tidyNumberTokens,
+  scaleLadder,
   kebab,
   pascalCase,
   capitalize,
@@ -68,6 +70,9 @@ import {
   commonBaseName,
   clusterTextStyles,
   nameTextStyles,
+  nameTextStylesWithRowLabels,
+  pairHorizontalRowLabel,
+  isRowLabelNameLike,
   fontStyleForWeight,
   rampToSpecs,
   RAMP_NAMES,
@@ -647,6 +652,64 @@ test('highConfidenceComponentRole — button/chip/card/list/field/nav/progress/f
   const box = { id: 'x', name: 'Frame 12', type: 'FRAME', children: [txt('a'), txt('b')] };
   assert.equal(highConfidenceComponentRole(box), null);
   assert.equal(isHighConfidenceComponent(box), false);
+});
+
+test('highConfidenceComponentRole — table(행 스택): 열 구조가 반복되면 list보다 우선', () => {
+  const cell = (w, text) => ({ type: 'FRAME', width: w, height: 20, children: text ? [{ type: 'TEXT' }] : [] });
+  // 열 폭이 열마다 다르고(80/200/60) 행마다는 일치 — 표의 형태.
+  const row = () => ({ type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(80, true), cell(200, true), cell(60, true)] });
+  const table = { type: 'FRAME', layoutMode: 'VERTICAL', width: 340, height: 128, children: [row(), row(), row(), row()] };
+  assert.equal(highConfidenceComponentRole(table), 'table');
+});
+
+test('highConfidenceComponentRole — table: 열 수가 어긋나면 표 아님', () => {
+  const cell = (w) => ({ type: 'FRAME', width: w, height: 20, children: [{ type: 'TEXT' }] });
+  const r3 = () => ({ type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(80), cell(200), cell(60)] });
+  const r2 = { type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(80), cell(200)] };
+  const node = { type: 'FRAME', layoutMode: 'VERTICAL', width: 340, height: 96, children: [r3(), r3(), r2] };
+  assert.notEqual(highConfidenceComponentRole(node), 'table');
+});
+
+test('highConfidenceComponentRole — table: 같은 열 폭이 행마다 흔들리면 표 아님(반복 레이아웃)', () => {
+  const cell = (w) => ({ type: 'FRAME', width: w, height: 20, children: [{ type: 'TEXT' }] });
+  const row = (a, b) => ({ type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(a), cell(b)] });
+  const node = { type: 'FRAME', layoutMode: 'VERTICAL', width: 340, height: 96, children: [row(60, 200), row(140, 120), row(30, 260)] };
+  assert.notEqual(highConfidenceComponentRole(node), 'table');
+});
+
+test('highConfidenceComponentRole — table: 텍스트가 없으면 표 아님(이미지 행 반복)', () => {
+  const cell = (w) => ({ type: 'FRAME', width: w, height: 20, children: [{ type: 'RECTANGLE' }] });
+  const row = () => ({ type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(80), cell(200)] });
+  const node = { type: 'FRAME', layoutMode: 'VERTICAL', width: 340, height: 96, children: [row(), row(), row()] };
+  assert.notEqual(highConfidenceComponentRole(node), 'table');
+});
+
+test('highConfidenceComponentRole — table(GRID): 열 폭이 다르면 표', () => {
+  const cell = (w) => ({ type: 'FRAME', width: w, height: 24, children: [{ type: 'TEXT' }] });
+  const grid = {
+    type: 'FRAME', layoutMode: 'GRID', gridColumnCount: 3, gridRowCount: 3, width: 340, height: 96,
+    children: [cell(80), cell(200), cell(60), cell(80), cell(200), cell(60), cell(80), cell(200), cell(60)],
+  };
+  assert.equal(highConfidenceComponentRole(grid), 'table');
+});
+
+test('highConfidenceComponentRole — table(GRID): 셀이 균등하면 갤러리·아이콘 그리드라 표 아님', () => {
+  const cell = () => ({ type: 'FRAME', width: 100, height: 100, children: [{ type: 'TEXT' }] });
+  const gallery = {
+    type: 'FRAME', layoutMode: 'GRID', gridColumnCount: 3, gridRowCount: 2, width: 320, height: 210,
+    children: [cell(), cell(), cell(), cell(), cell(), cell()],
+  };
+  assert.notEqual(highConfidenceComponentRole(gallery), 'table');
+});
+
+test('highConfidenceComponentRole — table이 card보다 앞: 테두리 있는 표 컨테이너', () => {
+  const cell = (w) => ({ type: 'FRAME', width: w, height: 20, children: [{ type: 'TEXT' }] });
+  const row = () => ({ type: 'FRAME', layoutMode: 'HORIZONTAL', width: 340, height: 32, children: [cell(80), cell(200), cell(60)] });
+  const bordered = {
+    type: 'FRAME', layoutMode: 'VERTICAL', width: 340, height: 128, cornerRadius: 8,
+    strokes: [{ visible: true }], children: [row(), row(), row()],
+  };
+  assert.equal(highConfidenceComponentRole(bordered), 'table');
 });
 
 test('highConfidenceComponentRole — heading(빡센 슬롯, 액션 optional)', () => {
@@ -1618,6 +1681,100 @@ test('nameTextStyles — styleId 바인딩이어도 시그니처 불일치(오�
   assert.notEqual(specs[0].name, 'body'); // 자동 이름(크기 램프)
 });
 
+test('isRowLabelNameLike / pairHorizontalRowLabel — 왼쪽 라벨·크기 역전·모호', () => {
+  assert.equal(isRowLabelNameLike('H1'), true);
+  assert.equal(isRowLabelNameLike('a'.repeat(25)), false);
+  assert.equal(isRowLabelNameLike('body/bold'), true);
+  assert.equal(isRowLabelNameLike('line1\nline2'), false);
+
+  const row = (items) =>
+    items.map((it, indexInParent) => ({
+      fontSize: it.fontSize,
+      lineHeight: it.fontSize + 8,
+      letterSpacing: 0,
+      family: 'Inter',
+      style: 'Regular',
+      layerName: 't',
+      styleId: '',
+      characters: it.characters,
+      id: it.id,
+      rowId: 'row1',
+      indexInParent,
+    }));
+
+  // 작은 라벨 + 큰 표본
+  const p1 = pairHorizontalRowLabel(row([
+    { id: 'L', characters: '제목', fontSize: 12 },
+    { id: 'S', characters: 'The quick', fontSize: 32 },
+  ]));
+  assert.equal(p1?.labelName, '제목');
+  assert.equal(p1?.specimen.id, 'S');
+
+  // 왼쪽이 더 커도 짧은 이름성 → 라벨
+  const p2 = pairHorizontalRowLabel(row([
+    { id: 'L', characters: 'H1', fontSize: 40 },
+    { id: 'S', characters: 'sample', fontSize: 16 },
+  ]));
+  assert.equal(p2?.labelName, 'H1');
+
+  // 왼쪽이 크고 이름성 없음 → 실패
+  const p3 = pairHorizontalRowLabel(row([
+    { id: 'L', characters: 'This is a long heading text that exceeds twenty four', fontSize: 40 },
+    { id: 'S', characters: 'x', fontSize: 16 },
+  ]));
+  assert.equal(p3, null);
+});
+
+test('nameTextStylesWithRowLabels — 라벨 이름·우측 제외·unique·앵커 우선', () => {
+  const base = (o) => ({
+    lineHeight: o.fontSize + 8,
+    letterSpacing: 0,
+    family: 'Inter',
+    style: 'Regular',
+    layerName: 't',
+    styleId: o.styleId ?? '',
+    ...o,
+  });
+
+  // 행1: 라벨+표본+우측 / 행2: 다른 라벨+표본
+  const samples = [
+    base({ id: 'a1', rowId: 'r1', indexInParent: 0, characters: 'Display', fontSize: 12 }),
+    base({ id: 'a2', rowId: 'r1', indexInParent: 1, characters: 'Ag', fontSize: 48 }),
+    base({ id: 'a3', rowId: 'r1', indexInParent: 2, characters: '48/56', fontSize: 11 }),
+    base({ id: 'b1', rowId: 'r2', indexInParent: 0, characters: 'Body', fontSize: 12 }),
+    base({ id: 'b2', rowId: 'r2', indexInParent: 1, characters: 'hello', fontSize: 16 }),
+  ];
+  const r = nameTextStylesWithRowLabels(samples);
+  assert.equal(r.labeled, 2);
+  assert.equal(r.fallback, 0);
+  assert.deepEqual(r.styles.map((s) => s.name).sort(), ['Body', 'Display']);
+  assert.ok(!r.styles.some((s) => s.fontSize === 11)); // 우측 제외
+  assert.ok(!r.styles.some((s) => s.fontSize === 12 && s.name === 'caption')); // 라벨 타이포 행 없음
+
+  // 동일 라벨 문자열·다른 시그니처 → unique
+  const dup = nameTextStylesWithRowLabels([
+    base({ id: 'c1', rowId: 'r3', indexInParent: 0, characters: 'Title', fontSize: 12 }),
+    base({ id: 'c2', rowId: 'r3', indexInParent: 1, characters: 'A', fontSize: 20 }),
+    base({ id: 'd1', rowId: 'r4', indexInParent: 0, characters: 'Title', fontSize: 12 }),
+    base({ id: 'd2', rowId: 'r4', indexInParent: 1, characters: 'B', fontSize: 18 }),
+  ]);
+  assert.deepEqual(dup.styles.map((s) => s.name).sort(), ['Title', 'Title-2']);
+
+  // 앵커 있으면 기존 이름 유지
+  const anchored = nameTextStylesWithRowLabels(
+    [
+      base({ id: 'e1', rowId: 'r5', indexInParent: 0, characters: 'FromLabel', fontSize: 12 }),
+      base({
+        id: 'e2', rowId: 'r5', indexInParent: 1, characters: 'Ag', fontSize: 16,
+        styleId: 'S:body',
+      }),
+    ],
+    [{ id: 'S:body', name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+  );
+  assert.equal(anchored.styles[0].boundStyleId, 'S:body');
+  assert.equal(anchored.styles[0].name, 'body');
+});
+
 test('fontStyleForWeight — 굵기/italic → Figma style', () => {
   assert.equal(fontStyleForWeight(400), 'Regular');
   assert.equal(fontStyleForWeight(700), 'Bold');
@@ -1632,6 +1789,131 @@ test('rampToSpecs — 기본 램프에 패밀리 주입', () => {
   assert.ok(specs.length >= 6);
   assert.ok(specs.every((s) => s.family === 'Pretendard'));
   assert.ok(specs.some((s) => s.name === 'body' && s.fontSize === 16));
+});
+
+/* ================= tidyNumberTokens (스케일 사다리) ================= */
+const numTok = (name, category, value, count, unit) => ({
+  name, category, sources: [category === 'gap' ? 'gap' : 'size'], value, count, ...(unit ? { unit } : {}),
+});
+
+test('scaleLadder — 기준 미만은 반분할, 기준 이상은 배수', () => {
+  assert.deepEqual(scaleLadder(8, 40), [1, 2, 4, 8, 16, 24, 32, 40, 48]);
+  assert.deepEqual(scaleLadder(4, 12), [1, 2, 4, 8, 12, 16]);
+  assert.deepEqual(scaleLadder(0, 40), []);
+});
+
+test('tidyNumberTokens — 8px 사다리·15%: 근사값만 옮기고 2·4는 보존', () => {
+  const vals = [2, 3, 4, 5, 7, 10, 12, 14, 15, 17, 20, 24, 30];
+  const r = tidyNumberTokens(vals.map((v) => numTok('spacing/' + v, 'gap', v, 3)), { base: 8, ratio: 0.15 });
+  const got = r.tokens.map((t) => t.value).sort((a, b) => a - b);
+  // 7→8 · 14·15·17→16 · 30→32 만 이동. 2·3·4·5·10·12·20·24는 사다리에서 멀거나 이미 칸 위.
+  assert.deepEqual(got, [2, 3, 4, 5, 8, 10, 12, 16, 20, 24, 32]);
+  assert.equal(r.snapped, 5);
+  assert.equal(r.merged, 2); // 14·15·17 → 16 한 칸으로
+});
+
+test('tidyNumberTokens — 이동 한계가 비율이라 작은 값일수록 보수적', () => {
+  // 4와 40 모두 사다리 칸에서 4px 떨어져 있지만, 비율은 100% vs 10%로 다르다.
+  const r = tidyNumberTokens([numTok('spacing/4', 'gap', 4, 3), numTok('size/36', 'size', 36, 3)], { base: 8, ratio: 0.15 });
+  const byName = new Map(r.tokens.map((t) => [t.name, t]));
+  assert.equal(byName.get('spacing/4').value, 4); // 유지 — 8까지 100%
+  assert.equal(byName.get('size/32').value, 32); // 36 → 32 (11%)
+});
+
+test('tidyNumberTokens — 같은 칸에 놓이면 사용 수와 무관하게 병합', () => {
+  const r = tidyNumberTokens(
+    [numTok('spacing/15', 'gap', 15, 5), numTok('spacing/17', 'gap', 17, 5)],
+    { base: 8, ratio: 0.15 },
+  );
+  assert.equal(r.snapped, 2);
+  assert.equal(r.merged, 1);
+  assert.equal(r.tokens.length, 1);
+  assert.equal(r.tokens[0].value, 16);
+  // count는 '서로 다른 레이어 수'라 합산하면 과대계상이 된다(한 레이어가 두 값을 함께 쓸 수 있다).
+  // 겹침을 알 수 없으므로 하한인 최댓값을 쓴다.
+  assert.equal(r.tokens[0].count, 5);
+  assert.deepEqual(r.tokens[0].sources, ['gap']);
+});
+
+test('tidyNumberTokens — 한 레이어가 낸 1× 두 값이 합쳐져도 1×로 남는다', () => {
+  // 한 카드의 paddingTop 15 · itemSpacing 17 → 둘 다 16으로 스냅. 실제 레이어는 하나뿐이므로
+  // 합산해서 2×가 되면 '1× 해제'가 이 토큰을 더 이상 걸러내지 못한다.
+  const r = tidyNumberTokens(
+    [numTok('spacing/15', 'gap', 15, 1), numTok('spacing/17', 'gap', 17, 1)],
+    { base: 8, ratio: 0.15 },
+  );
+  assert.equal(r.merged, 1);
+  assert.equal(r.tokens[0].count, 1);
+});
+
+test('tidyNumberTokens — 병합 대표는 가장 많이 쓰인 값(배열 순서 아님)', () => {
+  // 개명한 희소 값이 앞에 있어도 정규 값의 이름이 살아남아야 한다.
+  const rare = { name: 'spacing/gutter', category: 'gap', sources: ['gap'], value: 15, count: 2 };
+  const canonical = numTok('spacing/16', 'gap', 16, 40);
+  const r = tidyNumberTokens([rare, canonical], { base: 8, ratio: 0.15 });
+  assert.equal(r.merged, 1);
+  assert.equal(r.tokens.length, 1);
+  assert.equal(r.tokens[0].name, 'spacing/16');
+  assert.equal(r.tokens[0].count, 40);
+});
+
+test('tidyNumberTokens — 사다리에서 먼 값은 서로 가까워도 합치지 않는다', () => {
+  // 12·13은 1px 차이지만 둘 다 8px 사다리에서 멀다 → 의도된 예외로 보고 그대로 둔다.
+  const r = tidyNumberTokens(
+    [numTok('spacing/12', 'gap', 12, 40), numTok('spacing/13', 'gap', 13, 2)],
+    { base: 8, ratio: 0.15 },
+  );
+  assert.equal(r.snapped, 0);
+  assert.equal(r.merged, 0);
+  assert.equal(r.tokens.length, 2);
+});
+
+test('tidyNumberTokens — 여백·크기만 대상(폰트 크기·선 두께·반경·색 제외)', () => {
+  const tokens = [
+    numTok('font-size/15', 'fontSize', 15, 30),
+    numTok('stroke-width/1_5', 'strokeWidth', 1.5, 12),
+    numTok('radius/6', 'radius', 6, 8),
+    { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff', count: 9 },
+    { name: 'opacity/0_5', category: 'opacity', sources: ['opacity'], value: 0.5, count: 9 },
+    numTok('spacing/15', 'gap', 15, 4),
+  ];
+  const r = tidyNumberTokens(tokens, { base: 8, ratio: 0.15 });
+  assert.equal(r.before, 1); // 대상은 spacing 하나뿐
+  assert.equal(r.snapped, 1);
+  const byName = new Map(r.tokens.map((t) => [t.name, t]));
+  assert.equal(byName.get('font-size/15').value, 15);
+  assert.equal(byName.get('stroke-width/1_5').value, 1.5);
+  assert.equal(byName.get('radius/6').value, 6);
+  assert.equal(byName.get('spacing/16').value, 16);
+});
+
+test('tidyNumberTokens — 비-px 단위는 사다리와 무관', () => {
+  const t = numTok('spacing/15pct', 'gap', 15, 3, 'percent');
+  const r = tidyNumberTokens([t], { base: 8, ratio: 0.15 });
+  assert.equal(r.before, 0);
+  assert.equal(r.snapped, 0);
+  assert.equal(r.tokens[0].value, 15);
+});
+
+test('tidyNumberTokens — 개명한 토큰은 값만 바꾸고 이름은 보존', () => {
+  const t = { name: 'spacing/inline-sm', category: 'gap', sources: ['gap'], value: 15, count: 3 };
+  const r = tidyNumberTokens([t], { base: 8, ratio: 0.15 });
+  assert.equal(r.snapped, 1);
+  assert.equal(r.tokens[0].value, 16);
+  assert.equal(r.tokens[0].name, 'spacing/inline-sm');
+});
+
+test('tidyNumberTokens — 입력 배열을 변형하지 않는다(되돌리기 스냅샷 보호)', () => {
+  const tokens = [numTok('spacing/15', 'gap', 15, 3), numTok('spacing/17', 'gap', 17, 1)];
+  const snapshot = JSON.stringify(tokens);
+  tidyNumberTokens(tokens, { base: 8, ratio: 0.15 });
+  assert.equal(JSON.stringify(tokens), snapshot);
+});
+
+test('tidyNumberTokens — base 0 또는 허용 0이면 그대로', () => {
+  const tokens = [numTok('spacing/15', 'gap', 15, 3)];
+  assert.equal(tidyNumberTokens(tokens, { base: 0, ratio: 0.15 }).snapped, 0);
+  assert.equal(tidyNumberTokens(tokens, { base: 8, ratio: 0 }).snapped, 0);
 });
 
 /* ---------- 변수 편집기(R1)·다크 테마 생성(R2) 순수 헬퍼 ---------- */

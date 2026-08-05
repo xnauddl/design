@@ -5,7 +5,7 @@
    ============================================================ */
 import { rgbToHex } from './tokens';
 import { GLOBAL, SEMANTIC, COMPONENT } from './variables';
-import type { BindCandidate, BindNode } from '../shared/messages';
+import type { BindCandidate, BindNode, BindSkip } from '../shared/messages';
 
 interface VarEntry {
   variable: Variable;
@@ -29,6 +29,8 @@ const FIELD_SCOPE: Record<string, VariableScope> = {
   height: 'WIDTH_HEIGHT',
   itemSpacing: 'GAP',
   counterAxisSpacing: 'GAP',
+  gridRowGap: 'GAP',
+  gridColumnGap: 'GAP',
   paddingLeft: 'GAP',
   paddingRight: 'GAP',
   paddingTop: 'GAP',
@@ -63,6 +65,8 @@ export interface BindResult {
   candidates?: BindCandidate[];
   /** #13: dry-run일 때만 — 미리보기 트리 맥락(영향 노드 + 조상 체인). */
   nodes?: BindNode[];
+  /** dry-run일 때만 — 사유별로 건너뛴 레이어(노드×사유 중복 제거). */
+  skips?: BindSkip[];
 }
 
 /** dry-run 미리보기 수집물(apply 시에는 null). */
@@ -70,6 +74,10 @@ interface Preview {
   candidates: BindCandidate[];
   /** 방문한 모든 노드(나중에 영향+조상으로 가지치기). */
   nodeIndex: BindNode[];
+  /** 건너뛴 레이어 — 사유 칩에서 캔버스 선택으로 이어주기 위한 목록. */
+  skips: BindSkip[];
+  /** `nodeId|reason` — 같은 노드·사유가 여러 속성에서 나도 1건으로 남긴다(padding 4건 → 1건). */
+  skipSeen: Set<string>;
 }
 
 function addColorCand(preview: Preview | null, node: SceneNode, field: string, index: number, hex: string, e: VarEntry): void {
@@ -110,26 +118,47 @@ interface Progress {
   every: number;
 }
 
+/** 조상까지 실제로 보이는가 — extract.ts와 같은 기준(숨긴 그룹 안의 레이어를 직접 고른 경우). */
+function isEffectivelyVisible(node: SceneNode): boolean {
+  let p: BaseNode | null = node;
+  while (p) {
+    if ('visible' in p && (p as SceneNode).visible === false) return false;
+    p = p.parent;
+  }
+  return true;
+}
+
 /** 선택 하위 전체 노드 수(진행률 분모). 처리 없이 셈만. */
 function countNodes(sel: readonly SceneNode[]): number {
   let n = 0;
   const stack: SceneNode[] = sel.slice();
   while (stack.length) {
     const x = stack.pop() as SceneNode;
+    // walk가 건너뛰는 노드는 분모에서도 빼야 진행률이 100%로 끝난다.
+    if (x.visible === false) continue;
     n++;
+    if (x.type === 'INSTANCE') continue;
     if ('children' in x) for (const c of (x as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
   }
   return n;
 }
 
-/** 사유 1건 집계(스킵 카운트는 증가시키지 않는 '건너뜀' 사유에도 사용). */
-function note(res: BindResult, key: string): void {
+/**
+ * 사유 1건 집계(스킵 카운트는 증가시키지 않는 '건너뜀' 사유에도 사용).
+ * dry-run이면 어느 레이어였는지도 남긴다 — 숫자만으로는 원인 레이어를 찾을 수 없다.
+ */
+function note(res: BindResult, key: string, node?: SceneNode, preview?: Preview | null, field?: string): void {
   res.reasons[key] = (res.reasons[key] ?? 0) + 1;
+  if (!node || !preview) return;
+  const k = `${node.id}|${key}`;
+  if (preview.skipSeen.has(k)) return;
+  preview.skipSeen.add(k);
+  preview.skips.push({ nodeId: node.id, name: node.name, type: node.type, reason: key, field });
 }
 /** 매칭 실패 등 실제 스킵 — skipped++ 와 사유 집계를 함께. */
-function skip(res: BindResult, key: string): void {
+function skip(res: BindResult, key: string, node?: SceneNode, preview?: Preview | null, field?: string): void {
   res.skipped++;
-  note(res, key);
+  note(res, key, node, preview, field);
 }
 
 export async function bindSelection(
@@ -142,8 +171,14 @@ export async function bindSelection(
   const res: BindResult = { bound: 0, skipped: 0, flags: [], reasons: {} };
   const flagSet = new Set<string>();
   const prog: Progress = { done: 0, total: hooks.onProgress ? countNodes(selection) : 0, every: 50 };
-  const preview: Preview | null = apply ? null : { candidates: [], nodeIndex: [] };
+  const preview: Preview | null = apply ? null : { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
   for (const node of selection) {
+    // 선택 루트가 숨긴 그룹 안이면 walk의 자체 visible 검사로는 못 거른다(루트 자신은 보임).
+    if (!isEffectivelyVisible(node)) {
+      flagSet.add('숨긴 레이어는 바인딩에서 제외했습니다.');
+      note(res, 'hidden', node, preview);
+      continue;
+    }
     await walk(node, entries, tolerance, res, flagSet, apply, hooks, prog, preview, 0, null);
     if (res.cancelled) break;
   }
@@ -151,6 +186,7 @@ export async function bindSelection(
   if (preview) {
     res.candidates = preview.candidates;
     res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates);
+    res.skips = preview.skips;
   }
   hooks.onProgress?.(prog.done, prog.total); // 최종 진행률(100%)
   return res;
@@ -257,6 +293,12 @@ async function walk(
   parentId: string | null,
 ): Promise<void> {
   if (res.cancelled) return;
+  // 숨긴 레이어는 화면에 없는 값이라 하위까지 통째로 제외 — extract.ts와 동일 기준.
+  if (node.visible === false) {
+    flags.add('숨긴 레이어는 바인딩에서 제외했습니다.');
+    note(res, 'hidden', node, preview);
+    return;
+  }
   // 미리보기 트리(#13)용: 방문한 모든 노드를 기록(나중에 영향+조상으로 가지치기).
   preview?.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
   bindPaints(node, entries, res, apply, preview);
@@ -275,6 +317,15 @@ async function walk(
       res.cancelled = true;
       return;
     }
+  }
+  // 인스턴스 내부에 바인딩하면 인스턴스 오버라이드가 되어 마스터를 고쳐도 따라오지 않는다 —
+  // 인스턴스 자체 속성까지만 처리하고 하위로는 내려가지 않는다(extract.ts와 동일 기준).
+  if (node.type === 'INSTANCE') {
+    if (node.children.length) {
+      flags.add('인스턴스 내부는 오버라이드가 되므로 건너뛰었습니다 — 컴포넌트 원본에서 바인딩하세요.');
+      note(res, 'instance-children', node, preview);
+    }
+    return;
   }
   if ('children' in node)
     for (const c of node.children) {
@@ -295,7 +346,7 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
       const hex = rgbToHex(p.color);
       const e = matchColor(entries, hex, allowed);
       if (!e) {
-        skip(res, 'no-match');
+        skip(res, 'no-match', node, preview, key);
         return p;
       }
       res.bound++;
@@ -321,22 +372,57 @@ function bindFrame(
 ): void {
   if (node.type !== 'FRAME' && node.type !== 'COMPONENT' && node.type !== 'INSTANCE') return;
 
-  // 크기: Fixed일 때만
-  if (node.layoutSizingHorizontal === 'FIXED') tryBind(node, 'width', node.width, entries, tol, res, apply, preview);
-  else if (node.layoutSizingHorizontal === 'HUG' || node.layoutSizingHorizontal === 'FILL') {
-    flags.add('일부 크기는 HUG/FILL이라 width/height 바인딩을 건너뜀(Fixed 필요).');
-    note(res, 'hug-fill');
+  // 크기: 오토레이아웃 맥락(자신 또는 부모)에서 Fixed인 축만 — extract.ts의 수집 기준과 동일.
+  // 자유 배치 프레임은 Hug/Fill이 될 수 없어 layoutSizing*가 항상 'FIXED'라, 이 게이트가 없으면
+  // 화면 프레임·장식 박스의 width/height까지 크기 변수에 붙는다.
+  const parent = node.parent;
+  // 절대 배치 자식은 오토레이아웃 흐름 밖이라 Hug/Fill을 고를 수 없고 항상 FIXED다 —
+  // 부모가 오토레이아웃이어도 '디자이너가 Fixed를 선택했다'가 성립하지 않는다.
+  const absolute = 'layoutPositioning' in node && (node as FrameNode).layoutPositioning === 'ABSOLUTE';
+  const inAutoLayout =
+    !absolute &&
+    (node.layoutMode !== 'NONE' ||
+      (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE'));
+  if (inAutoLayout) {
+    /**
+     * 축 하나를 처리 — 두 축이 같은 규칙을 쓰도록 한 곳에 모은다(세로 축만 사유 집계가
+     * 빠져 HUG/FILL 건수가 실제보다 적게 보이던 문제).
+     *
+     * 소수 크기는 **정확히 같은 값의 토큰에만** 붙인다. extract가 소수 size를 토큰으로
+     * 만들지 않으므로(자유 리사이즈 잔값), 허용오차로 343.5를 size/344에 스냅하면
+     * 추출이 거부한 값을 바인딩이 되살리면서 지오메트리까지 바꾸게 된다. 반대로 같은 값의
+     * 토큰이 이미 있다면 붙이는 게 맞으므로 허용오차만 0으로 좁힌다.
+     */
+    const bindAxis = (sizing: 'FIXED' | 'HUG' | 'FILL', field: 'width' | 'height', v: number): void => {
+      if (sizing !== 'FIXED') {
+        flags.add('일부 크기는 HUG/FILL이라 width/height 바인딩을 건너뜀(Fixed 필요).');
+        note(res, 'hug-fill', node, preview, field);
+        return;
+      }
+      const fraction = Math.abs(v - Math.round(v)) >= 0.005; // extract의 소수 2자리 반올림과 같은 판정
+      tryBind(node, field, v, entries, fraction ? 0 : tol, res, apply, preview, fraction ? 'size-fraction' : undefined);
+    };
+    bindAxis(node.layoutSizingHorizontal, 'width', node.width);
+    bindAxis(node.layoutSizingVertical, 'height', node.height);
+  } else {
+    flags.add('자유 배치(오토레이아웃 밖) 프레임은 크기 바인딩에서 제외했습니다.');
+    note(res, 'size-free-layout', node, preview);
   }
-  if (node.layoutSizingVertical === 'FIXED') tryBind(node, 'height', node.height, entries, tol, res, apply, preview);
 
   // 여백/간격: 오토레이아웃에만
   if (node.layoutMode === 'NONE') {
     flags.add('오토레이아웃이 아닌 프레임은 padding/gap 바인딩 불가.');
-    note(res, 'no-autolayout');
+    note(res, 'no-autolayout', node, preview);
     return;
   }
-  tryBind(node, 'itemSpacing', node.itemSpacing, entries, tol, res, apply, preview);
-  if (typeof node.counterAxisSpacing === 'number') tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, tol, res, apply, preview);
+  if (node.layoutMode === 'GRID') {
+    // 그리드 모드의 간격은 gridRowGap/gridColumnGap(extract.ts와 동일 기준).
+    tryBind(node, 'gridRowGap', node.gridRowGap, entries, tol, res, apply, preview);
+    tryBind(node, 'gridColumnGap', node.gridColumnGap, entries, tol, res, apply, preview);
+  } else {
+    tryBind(node, 'itemSpacing', node.itemSpacing, entries, tol, res, apply, preview);
+    if (typeof node.counterAxisSpacing === 'number') tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, tol, res, apply, preview);
+  }
   tryBind(node, 'paddingLeft', node.paddingLeft, entries, tol, res, apply, preview);
   tryBind(node, 'paddingRight', node.paddingRight, entries, tol, res, apply, preview);
   tryBind(node, 'paddingTop', node.paddingTop, entries, tol, res, apply, preview);
@@ -390,7 +476,7 @@ function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, appl
     const hex = rgbToHex(e.color);
     const ent = matchColor(entries, hex, EFFECT_SCOPES);
     if (!ent) {
-      skip(res, 'no-match');
+      skip(res, 'no-match', node, preview, 'effects');
       return e;
     }
     res.bound++;
@@ -410,7 +496,7 @@ async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: 
   try {
     await figma.loadFontAsync(node.fontName); // 텍스트 속성 변경 전 폰트 로드 필수(미리보기에서도 가용성 확인)
   } catch {
-    note(res, 'font');
+    note(res, 'font', node, preview);
     return;
   }
   if (node.fontSize !== figma.mixed) tryBindText(node, 'fontSize', node.fontSize, entries, tol, res, apply, preview);
@@ -432,7 +518,7 @@ async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: 
         node.setRangeBoundVariable(0, node.characters.length, 'fontFamily', fe.variable);
         res.bound++;
       } catch {
-        skip(res, 'error');
+        skip(res, 'error', node, preview, 'fontFamily');
       }
     }
   }
@@ -451,11 +537,11 @@ function tryBindText(
   const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   const len = node.characters.length;
   if (len === 0) {
-    skip(res, 'empty-text');
+    skip(res, 'empty-text', node, preview, field);
     return;
   }
   if (!e) {
-    skip(res, 'no-match');
+    skip(res, 'no-match', node, preview, field);
     return;
   }
   if (!apply) {
@@ -467,7 +553,7 @@ function tryBindText(
     node.setRangeBoundVariable(0, len, field, e.variable);
     res.bound++;
   } catch {
-    skip(res, 'error');
+    skip(res, 'error', node, preview, field);
   }
 }
 
@@ -480,10 +566,12 @@ function tryBind(
   res: BindResult,
   apply: boolean,
   preview: Preview | null,
+  /** 매칭 실패 사유 키 — 호출자가 좁힌 조건으로 실패했을 때 그 이유를 남긴다. */
+  noMatchReason = 'no-match',
 ): void {
   const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   if (!e) {
-    skip(res, 'no-match');
+    skip(res, noMatchReason, node, preview, field);
     return;
   }
   if (!apply) {
@@ -495,6 +583,6 @@ function tryBind(
     (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(field, e.variable);
     res.bound++;
   } catch {
-    skip(res, 'error');
+    skip(res, 'error', node, preview, field);
   }
 }

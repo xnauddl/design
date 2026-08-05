@@ -33,6 +33,7 @@ export const ROLE_VOCAB = [
   'section',
   'button',
   'card',
+  'table',
   'list',
   'item',
   'field',

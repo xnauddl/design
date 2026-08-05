@@ -276,7 +276,31 @@
        거터를 유지해(행마다 같은 들여쓰기로 정렬) 그 외에는 이름에 폭을 넘긴다. */
     .tk > .tk-gutter { display: none; }
     #tokenList.has-swatch .tk > .tk-gutter { display: block; flex: 0 0 14px; }
-    .tk input { font: 400 var(--fs) var(--mono); padding: 4px 6px; flex: 1 1 auto; min-width: 0; }
+    /* 이름 입력만 늘어난다 — 체크박스까지 flex:1이면 행이 무너진다. */
+    .tk input:not([type="checkbox"]) { font: 400 var(--fs) var(--mono); padding: 4px 6px; flex: 1 1 auto; min-width: 0; }
+    .tk > .tk-check { flex: 0 0 auto; margin: 0; }
+    /* 허용오차 프리셋 — 숫자 입력 옆 칩. 현재 값과 같은 칩만 강조된다. */
+    .tol-presets { display: inline-flex; gap: 3px; }
+    .tol-chip {
+      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 7px; cursor: pointer;
+    }
+    .tol-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .tol-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
+    .skip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+    .skip-chip {
+      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 6px; white-space: nowrap; cursor: pointer;
+    }
+    .skip-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .skip-chip.static { cursor: default; color: var(--muted); }
+    .skip-chip.static:hover { border-color: var(--border); color: var(--muted); }
+    /* 등장 레이어 수 — 이름과 타입 칩 사이. 1×는 흐리게 해 훑을 때 바로 걸러진다. */
+    .tk-use { flex: 0 0 auto; font: 500 10px/1.6 var(--font); color: var(--text-2); white-space: nowrap; }
+    .tk-use.once { color: var(--muted); }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
     /* 타입은 맨 끝 10px 흐린 글자였다 → 칩으로. 폭은 88px 고정 — 칩이 내용 폭이면 gap(28px)과
        letterSpacing·%(81px)의 차이만큼 입력칸 폭이 행마다 어긋나 이름을 훑기 어려웠다.
@@ -550,7 +574,11 @@
 
     <div class="step" id="createCard">
       <h2><span data-i18n="create.title">토큰 생성 (Global + Semantic)</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
-      <div class="hint" data-i18n="create.scopeHint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다.</div>
+      <div class="hint" data-i18n-html="create.scopeHint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.</div>
+      <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
+        <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체 선택</span></label>
+        <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
+      </div>
       <div id="tokenList" class="list-region"></div>
       <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="tokenListMore" style="display:none">
@@ -559,6 +587,13 @@
       </div>
       <div class="row">
         <label class="inline"><span data-i18n="create.base">base(px)</span> <input id="base" type="number" value="16" min="1" /></label>
+        <label class="inline"><span data-i18n="create.tidyBase">사다리</span> <input id="tidyBase" type="number" value="8" min="0" step="1" style="width:46px;" title="여백·크기를 이 값 기준 사다리에 맞춥니다. 8이면 …4·2·1 / 8·16·24·32. 기준 미만은 반분할이라 4·2가 보존됩니다. 0이면 정리하지 않습니다." />px</label>
+        <label class="inline"><span data-i18n="create.tidyRatio">허용</span> <input id="tidyRatio" type="number" value="15" min="0" max="50" step="5" style="width:46px;" title="값 대비 몇 %까지 옮길지. 비율이라 작은 값일수록 자동으로 보수적입니다(4는 거의 안 움직이고 40은 여유 있게)." />%</label>
+        <button id="btnTidyNumbers" data-i18n="create.tidyBtn">정리</button>
+      </div>
+      <div class="tidy tidy-note" id="numTidySummary" style="display:none">
+        <span id="numTidyText"></span>
+        <button id="btnNumTidyUndo" class="link" data-i18n="create.tidyUndo">되돌리기</button>
       </div>
       <div class="hint" data-i18n="create.hint">미리보기로 변경 요약을 확인한 뒤 적용하세요.</div>
       <div class="row">
@@ -610,6 +645,8 @@
         <button id="btnScanText" data-i18n="textStyle.scanBtn">선택에서 스캔</button>
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
       </div>
+      <label class="inline" style="margin-top:6px;"><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 스타일 이름으로 사용</span></label>
+      <div class="hint muted" style="margin-top:4px;" data-i18n-html="textStyle.rowLabelsHint">ON이면 같은 가로 줄의 <b>왼쪽 텍스트를 라벨(이름)</b>으로, 큰 텍스트를 표본으로 봅니다. 이름은 화면에 적힌 글자 그대로입니다. 표본 오른쪽 텍스트는 표에 넣지 않습니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. (세션만 유지)</div>
       <!-- 표 박스는 overflow를 받지 못하므로(스크롤 컨테이너가 못 된다) 이 래퍼가 목록 영역이다.
            가로 스크롤도 같은 요소가 맡는다 — 축을 나누려 한 겹 더 감싸도 CSS가 overflow:visible을
            auto로 올려버려 결국 한 요소가 두 축을 다 갖는다. 가로 스크롤바 높이는 layoutList가
@@ -653,6 +690,15 @@
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline"><span data-i18n="bind.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
+        <span class="tol-presets">
+          <button class="tol-chip" data-tol="0" data-i18n="bind.tolExact" title="값이 정확히 같을 때만 바인딩">정확</button>
+          <button class="tol-chip" data-tol="0.5" title="반올림 오차만 흡수 — 기본값">0.5</button>
+          <button class="tol-chip" data-tol="1" title="1px 이내 근사값까지 바인딩">1</button>
+          <button class="tol-chip" data-tol="2" title="2px 이내 — 손으로 그린 값이 많은 화면용(과매칭 주의)">2</button>
+        </span>
+      </div>
+      <div class="hint" id="tolHint"></div>
+      <div class="row">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택에 바인딩</button>
       </div>
@@ -665,6 +711,8 @@
         <span class="list-count" id="bindTreeCount"></span>
         <button class="link" id="btnBindTreeExpand">모두 펼치기</button>
       </div>
+      <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐). -->
+      <div class="skip-row" id="bindSkips" style="display:none"></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
@@ -724,7 +772,7 @@
       <!-- 이 카드엔 목록이 둘이다(후보 트리 · 결과 리포트). 세는 대상이 달라 각자 span을 갖고,
            비어 있으면 각자 숨는다 — 스캔 직후엔 후보만, 등록 직후엔 리포트만 뜬다. -->
       <h2><span data-i18n="component.title">컴포넌트 / 베리언트</span> <span class="muted" id="compCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span></h2>
-      <div class="hint" data-i18n-html="component.hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.</div>
+      <div class="hint" data-i18n-html="component.hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·table·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.</div>
       <div class="hint muted" data-i18n-html="component.hint2"><b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 이름끼리 다시 묶을 때만(프레임은 「컴포넌트 등록」). 등록 시 TEXT·스왑·<code>이름?</code> BOOLEAN 속성이 자동 노출됩니다(접힘=다른 슬롯만, 단독·세트=전체 API).</div>
       <div class="row">
         <button id="btnScanComp" data-i18n="component.scanBtn" title="선택 하위 고신뢰 구조 후보 스캔 — 같은 이름 반복은 세트/속성으로 자동 체크, 숨김 제외">후보 스캔</button>
@@ -929,6 +977,65 @@
   function scopesForTypeList(type) {
     return [...VALID_SCOPES[type]];
   }
+  var SNAP_CATEGORIES = /* @__PURE__ */ new Set(["gap", "size"]);
+  var TOKEN_GROUP = { gap: "spacing", size: "size" };
+  var cloneToken = (t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] });
+  function scaleLadder(base, max) {
+    if (base <= 0) return [];
+    const rungs = [];
+    for (let v = base / 2; v >= 1; v /= 2) rungs.push(v);
+    for (let k = 1; base * k <= max + base; k++) rungs.push(base * k);
+    return rungs.sort((a, b) => a - b);
+  }
+  function tidyNumberTokens(tokens2, opts) {
+    var _a, _b, _c, _d, _e;
+    const { base, ratio } = opts;
+    const out = tokens2.map(cloneToken);
+    const targets = out.filter(
+      (t2) => SNAP_CATEGORIES.has(t2.category) && typeof t2.value === "number" && (!t2.unit || t2.unit === "px")
+    );
+    const before = targets.length;
+    if (base <= 0 || ratio <= 0 || before === 0) return { tokens: out, before, after: before, merged: 0, snapped: 0 };
+    const rungs = scaleLadder(base, Math.max(...targets.map((t2) => t2.value)));
+    const nearest = (v) => rungs.reduce((p, c) => Math.abs(c - v) < Math.abs(p - v) ? c : p);
+    let snapped = 0;
+    for (const t2 of targets) {
+      const v = t2.value;
+      if (v <= 0) continue;
+      const target = nearest(v);
+      if (target === v || Math.abs(target - v) / v > ratio) continue;
+      const group = TOKEN_GROUP[t2.category];
+      if (group && t2.name === numberTokenName(group, v)) t2.name = numberTokenName(group, target);
+      t2.value = target;
+      snapped++;
+    }
+    const seen = /* @__PURE__ */ new Map();
+    const dropped = /* @__PURE__ */ new Set();
+    for (const t2 of targets) {
+      const k = `${t2.category}|${t2.value}|${(_a = t2.unit) != null ? _a : ""}`;
+      const cur = seen.get(k);
+      if (!cur) {
+        seen.set(k, t2);
+        continue;
+      }
+      const [rep, gone] = ((_b = t2.count) != null ? _b : 0) > ((_c = cur.count) != null ? _c : 0) ? [t2, cur] : [cur, t2];
+      seen.set(k, rep);
+      for (const s of gone.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+      rep.count = Math.max((_d = rep.count) != null ? _d : 0, (_e = gone.count) != null ? _e : 0);
+      dropped.add(gone);
+    }
+    return {
+      tokens: out.filter((t2) => !dropped.has(t2)),
+      before,
+      after: before - dropped.size,
+      merged: dropped.size,
+      snapped
+    };
+  }
+  function numberTokenName(group, value) {
+    const v = Number.isInteger(value) ? String(value) : String(value).replace(".", "_");
+    return `${group}/${v}`;
+  }
 
   // src/lib/i18n.ts
   var STRINGS = {
@@ -1045,6 +1152,10 @@
     "reason.error": "\uBC14\uC778\uB529 \uC2E4\uD328",
     "reason.hug-fill": "HUG/FILL",
     "reason.no-autolayout": "\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uC544\uB2D8",
+    "reason.size-free-layout": "\uC790\uC720 \uBC30\uCE58(\uD06C\uAE30 \uC81C\uC678)",
+    "reason.size-fraction": "\uC18C\uC218 \uD06C\uAE30(\uC815\uD655 \uC77C\uCE58\uB9CC)",
+    "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
+    "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
     // 명도 대비 스킵 사유(라벨 맵)
     "contrastSkip.no-fill": "\uB2E8\uC0C9 \uAE00\uC790\uC0C9 \uC5C6\uC74C",
@@ -1123,8 +1234,14 @@
     "colorTable.applyBtn": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551\uC5D0 \uBC18\uC601",
     // 토큰 생성
     "create.title": "\uD1A0\uD070 \uC0DD\uC131 (Global + Semantic)",
-    "create.scopeHint": "\uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uC0C9\uC740 \uC704 \u2018\uC0C9 \uC815\uB9AC\u2019\uC5D0\uC11C \uB2E4\uB8F9\uB2C8\uB2E4.",
+    "create.scopeHint": "\uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uC0C9\uC740 \uC704 \u2018\uC0C9 \uC815\uB9AC\u2019\uC5D0\uC11C \uB2E4\uB8F9\uB2C8\uB2E4. \uCCB4\uD06C\uD55C \uAC83\uB9CC \uC0DD\uC131\uB418\uACE0, <b>n\xD7</b>\uB294 \uADF8 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4 \uC218\uC785\uB2C8\uB2E4.",
     "create.base": "base(px)",
+    "create.selectAll": "\uC804\uCCB4 \uC120\uD0DD",
+    "create.dropOnce": "1\xD7 \uD574\uC81C",
+    "create.tidyBase": "\uC0AC\uB2E4\uB9AC",
+    "create.tidyRatio": "\uD5C8\uC6A9",
+    "create.tidyBtn": "\uC815\uB9AC",
+    "create.tidyUndo": "\uB418\uB3CC\uB9AC\uAE30",
     "create.hint": "\uBBF8\uB9AC\uBCF4\uAE30\uB85C \uBCC0\uACBD \uC694\uC57D\uC744 \uD655\uC778\uD55C \uB4A4 \uC801\uC6A9\uD558\uC138\uC694.",
     "create.previewBtn": "\uBBF8\uB9AC\uBCF4\uAE30",
     "create.apply": "\uC801\uC6A9",
@@ -1138,6 +1255,8 @@
     "textStyle.hint": "\uD654\uBA74\uC758 \uAE00\uC790\uC5D0\uC11C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB9CC\uB4E4\uC5B4 \uB4F1\uB85D\uD569\uB2C8\uB2E4. \uC2A4\uCE94\uD55C \uAC12\uC740 \uBABB \uBC14\uAFB8\uACE0 <b>\uC774\uB984\uB9CC</b> \uC815\uB9AC\uD558\uBA74 \uB3FC\uC694. \uC0C8 \uC2A4\uD0C0\uC77C\uC740 \u2018\uD589 \uCD94\uAC00\u2019\uB85C. (Paid)",
     "textStyle.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uC2A4\uCE94",
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
+    "textStyle.useRowLabels": "\uAC00\uB85C \uD589\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uC2A4\uD0C0\uC77C \uC774\uB984\uC73C\uB85C \uC0AC\uC6A9",
+    "textStyle.rowLabelsHint": "ON\uC774\uBA74 \uAC19\uC740 \uAC00\uB85C \uC904\uC758 <b>\uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)</b>\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uC774\uB984\uC740 \uD654\uBA74\uC5D0 \uC801\uD78C \uAE00\uC790 \uADF8\uB300\uB85C\uC785\uB2C8\uB2E4. \uD45C\uBCF8 \uC624\uB978\uCABD \uD14D\uC2A4\uD2B8\uB294 \uD45C\uC5D0 \uB123\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC9DD\uC744 \uBABB \uCC3E\uC73C\uBA74 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026)\uC73C\uB85C \uB461\uB2C8\uB2E4. (\uC138\uC158\uB9CC \uC720\uC9C0)",
     "textStyle.applyExistingBtn": "\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC801\uC6A9\uB9CC",
     "textStyle.applyExistingNote": "\uC774\uBBF8 \uB9CC\uB4E0 \uC2A4\uD0C0\uC77C\uC5D0 \uC5F0\uACB0\uB9CC",
     "textStyle.colName": "\uC774\uB984",
@@ -1151,6 +1270,7 @@
     // 적용(바인딩)
     "bind.title": "\uC801\uC6A9 (\uBC14\uC778\uB529)",
     "bind.tol": "\uD5C8\uC6A9\uC624\uCC28",
+    "bind.tolExact": "\uC815\uD655",
     "bind.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
     "bind.confirm": "\uC120\uD0DD\uC5D0 \uBC14\uC778\uB529",
     "bind.progress": "\uC9C4\uD589\uB960",
@@ -1168,7 +1288,7 @@
     "contrast.checkBtn": "\uB300\uBE44 \uAC80\uC0AC",
     // 컴포넌트 / 베리언트
     "component.title": "\uCEF4\uD3EC\uB10C\uD2B8 / \uBCA0\uB9AC\uC5B8\uD2B8",
-    "component.hint": "<b>\uD6C4\uBCF4 \uC2A4\uCE94</b> \u2192 \uACE8\uB77C \uB4F1\uB85D. \uC120\uD0DD\uD55C <b>\uBD80\uBAA8\uB294 \uCEE8\uD14C\uC774\uB108</b>(\uB4F1\uB85D \uC81C\uC678). <b>\uACE0\uC2E0\uB8B0 \uAD6C\uC870</b>(button\xB7chip\xB7card\xB7list\xB7field\xB7nav\xB7progress\xB7figure\xB7heading)\uC778 \uBCF4\uC774\uB294 FRAME/GROUP\uB9CC \uD6C4\uBCF4 \u2014 \uC774\uB984\uACFC \uBB34\uAD00, <b>\uC228\uAE40\uC740 \uC81C\uC678</b>. heading\uC740 \uC139\uC158 \uBA38\uB9AC\uC904(\uAC00\uB85C\xB7\uB0AE\uC740 \uB192\uC774\xB7\uD0C0\uC774\uD2C0+\uC120\uD0DD \uC561\uC158/\uBA54\uD0C0)\uC774\uBA70 \uD398\uC774\uC9C0 header \uB79C\uB4DC\uB9C8\uD06C\uC640 \uB2E4\uB984. <b>\uAC19\uC740 \uB808\uC774\uC5B4 \uC774\uB984</b>\uC774 2\uAC1C+\uC774\uBA74: \uAD6C\uC870\uAC00 \uAC19\uACE0 \uD14D\uC2A4\uD2B8/\uC544\uC774\uCF58\uB9CC \uB2E4\uB974\uBA74 <b>\uC18D\uC131</b>(\uB2E8\uD488+TEXT/\uC2A4\uC651), heading\uC758 \uC561\uC158(buttonGroup) \uC720\uBB34\uB9CC \uB2EC\uB77C\uB3C4 <b>\uC18D\uC131</b>, \uAD6C\uC870\xB7\uD06C\uAE30\xB7\uC0C9\uC774 \uB2E4\uB974\uBA74 <b>\uC138\uD2B8</b>. \uC774\uB984\uC774 \uB2E4\uB974\uBA74 \uAC01\uAC01 <b>\uB2E8\uB3C5</b>. \uC18D\uC131\uC740 \uC774\uB984 \uC5B4\uD718(<code>Type</code>\xB7<code>State</code>\xB7<code>Size</code>) \uC6B0\uC120 + \uAE30\uD558 \uBCF4\uC644. \uBA54\uC778\uC740 <b>Components \uD398\uC774\uC9C0</b>, \uC6D0\uC704\uCE58\uC5D4 <b>\uC778\uC2A4\uD134\uC2A4</b>.",
+    "component.hint": "<b>\uD6C4\uBCF4 \uC2A4\uCE94</b> \u2192 \uACE8\uB77C \uB4F1\uB85D. \uC120\uD0DD\uD55C <b>\uBD80\uBAA8\uB294 \uCEE8\uD14C\uC774\uB108</b>(\uB4F1\uB85D \uC81C\uC678). <b>\uACE0\uC2E0\uB8B0 \uAD6C\uC870</b>(button\xB7chip\xB7table\xB7card\xB7list\xB7field\xB7nav\xB7progress\xB7figure\xB7heading)\uC778 \uBCF4\uC774\uB294 FRAME/GROUP\uB9CC \uD6C4\uBCF4 \u2014 \uC774\uB984\uACFC \uBB34\uAD00, <b>\uC228\uAE40\uC740 \uC81C\uC678</b>. heading\uC740 \uC139\uC158 \uBA38\uB9AC\uC904(\uAC00\uB85C\xB7\uB0AE\uC740 \uB192\uC774\xB7\uD0C0\uC774\uD2C0+\uC120\uD0DD \uC561\uC158/\uBA54\uD0C0)\uC774\uBA70 \uD398\uC774\uC9C0 header \uB79C\uB4DC\uB9C8\uD06C\uC640 \uB2E4\uB984. <b>\uAC19\uC740 \uB808\uC774\uC5B4 \uC774\uB984</b>\uC774 2\uAC1C+\uC774\uBA74: \uAD6C\uC870\uAC00 \uAC19\uACE0 \uD14D\uC2A4\uD2B8/\uC544\uC774\uCF58\uB9CC \uB2E4\uB974\uBA74 <b>\uC18D\uC131</b>(\uB2E8\uD488+TEXT/\uC2A4\uC651), heading\uC758 \uC561\uC158(buttonGroup) \uC720\uBB34\uB9CC \uB2EC\uB77C\uB3C4 <b>\uC18D\uC131</b>, \uAD6C\uC870\xB7\uD06C\uAE30\xB7\uC0C9\uC774 \uB2E4\uB974\uBA74 <b>\uC138\uD2B8</b>. \uC774\uB984\uC774 \uB2E4\uB974\uBA74 \uAC01\uAC01 <b>\uB2E8\uB3C5</b>. \uC18D\uC131\uC740 \uC774\uB984 \uC5B4\uD718(<code>Type</code>\xB7<code>State</code>\xB7<code>Size</code>) \uC6B0\uC120 + \uAE30\uD558 \uBCF4\uC644. \uBA54\uC778\uC740 <b>Components \uD398\uC774\uC9C0</b>, \uC6D0\uC704\uCE58\uC5D4 <b>\uC778\uC2A4\uD134\uC2A4</b>.",
     "component.hint2": "<b>\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958</b>\uB294 \uC774\uBBF8 \uB9CC\uB4E4\uC5B4 \uB454 <b>\uAE30\uC874 \uCEF4\uD3EC\uB10C\uD2B8</b>\uB97C \uAC19\uC740 \uC774\uB984\uB07C\uB9AC \uB2E4\uC2DC \uBB36\uC744 \uB54C\uB9CC(\uD504\uB808\uC784\uC740 \u300C\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\u300D). \uB4F1\uB85D \uC2DC TEXT\xB7\uC2A4\uC651\xB7<code>\uC774\uB984?</code> BOOLEAN \uC18D\uC131\uC774 \uC790\uB3D9 \uB178\uCD9C\uB429\uB2C8\uB2E4(\uC811\uD798=\uB2E4\uB978 \uC2AC\uB86F\uB9CC, \uB2E8\uB3C5\xB7\uC138\uD2B8=\uC804\uCCB4 API).",
     "component.scanBtn": "\uD6C4\uBCF4 \uC2A4\uCE94",
     "component.registerBtn": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D",
@@ -1930,9 +2050,45 @@
     mount.innerHTML = "";
   }
   var UNIT_CHIP = { px: "px", percent: "%", em: "em", rem: "rem", ratio: "\xD7" };
+  var tokenChecked = /* @__PURE__ */ new Set();
+  function tokenKey(t2) {
+    var _a;
+    return `${t2.category}|${t2.value}|${(_a = t2.unit) != null ? _a : ""}`;
+  }
+  function creatableTokens() {
+    return tokens.filter((t2) => t2.category !== "color");
+  }
+  function resetTokenChecked() {
+    tokenChecked.clear();
+    for (const t2 of creatableTokens()) tokenChecked.add(tokenKey(t2));
+  }
+  function tokensToCreate() {
+    return tokens.filter((t2) => t2.category === "color" || tokenChecked.has(tokenKey(t2)));
+  }
+  function carryTokenChecked(before, after) {
+    const checkedNames = new Set(before.filter((t2) => tokenChecked.has(tokenKey(t2))).map((t2) => t2.name));
+    const beforeNames = new Set(before.map((t2) => t2.name));
+    tokenChecked.clear();
+    for (const t2 of after) {
+      if (t2.category === "color") continue;
+      if (checkedNames.has(t2.name) || !beforeNames.has(t2.name)) tokenChecked.add(tokenKey(t2));
+    }
+  }
   function makeTokenRow(t2) {
+    var _a;
     const row = document.createElement("div");
     row.className = "tk";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "tk-check";
+    cb.checked = tokenChecked.has(tokenKey(t2));
+    cb.title = "\uC0DD\uC131 \uB300\uC0C1";
+    cb.addEventListener("change", () => {
+      if (cb.checked) tokenChecked.add(tokenKey(t2));
+      else tokenChecked.delete(tokenKey(t2));
+      updateTokenCreate();
+    });
+    row.appendChild(cb);
     const sw = document.createElement("span");
     sw.className = "tk-gutter";
     if (t2.category === "effectColor" && typeof t2.value === "string") {
@@ -1948,6 +2104,14 @@
       input.title = input.value;
     });
     row.appendChild(input);
+    const n = (_a = t2.count) != null ? _a : 0;
+    if (n > 0) {
+      const use = document.createElement("span");
+      use.className = n === 1 ? "tk-use once" : "tk-use";
+      use.textContent = `${n}\xD7`;
+      use.title = `\uC774 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4 ${n}\uAC1C`;
+      row.appendChild(use);
+    }
     const cat = document.createElement("span");
     cat.className = "cat";
     cat.textContent = t2.unit && t2.unit !== "px" ? `${t2.category}\xB7${UNIT_CHIP[t2.unit]}` : t2.category;
@@ -2054,14 +2218,15 @@
   }
   function renderTokens() {
     const box = $("tokenList");
-    const others = tokens.filter((t2) => t2.category !== "color");
-    $("createCount").textContent = others.length ? `\xB7 \uC0C9 \uC678 ${others.length}\uAC1C` : "";
+    const others = creatableTokens();
     const showHint = (msg) => {
       clearMount(box);
+      $("tokenCtrls").style.display = "none";
       const hint = document.createElement("div");
       hint.className = "hint";
       hint.textContent = msg;
       box.appendChild(hint);
+      updateTokenCreate();
       layoutListBy("tokenList");
     };
     if (!tokens.length) {
@@ -2077,7 +2242,22 @@
       return;
     }
     box.classList.toggle("has-swatch", others.some((o) => o.category === "effectColor" && typeof o.value === "string"));
+    $("tokenCtrls").style.display = "";
     renderChunked(box, others, makeTokenRow, () => layoutListBy("tokenList"));
+    updateTokenCreate();
+  }
+  function updateTokenCreate() {
+    const others = creatableTokens();
+    const sel = others.filter((t2) => tokenChecked.has(tokenKey(t2))).length;
+    $("createCount").textContent = others.length ? `\xB7 \uC0C9 \uC678 ${sel}/${others.length}\uAC1C` : "";
+    const all = $("tokenAll");
+    all.checked = sel === others.length && others.length > 0;
+    all.indeterminate = sel > 0 && sel < others.length;
+    const nothing = others.length > 0 && sel === 0 && !tokens.some((t2) => t2.category === "color");
+    for (const id of ["btnCreate", "btnCreateApply"]) {
+      const el = $(id);
+      el.disabled = nothing || !isPaid;
+    }
   }
   var brandColor = $("brand");
   var brandHex = $("brandHex");
@@ -2102,6 +2282,8 @@
       includeStatus: $("incStatus").checked
     });
     tokens = paletteToDraftTokens(p);
+    resetTokenChecked();
+    clearNumTidy();
     colorRevealed = true;
     previewRevealed = false;
     renderTokens();
@@ -2226,7 +2408,9 @@
   }
   function undoTidy() {
     if (!preTidyTokens) return;
-    tokens = preTidyTokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
+    const restored = preTidyTokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
+    carryTokenChecked(tokens, restored);
+    tokens = restored;
     preTidyTokens = null;
     hideTidySummary();
     renderTokens();
@@ -2266,6 +2450,63 @@
     previewRevealed = false;
     send({ type: "EXTRACT" });
   });
+  var preNumTidy = null;
+  function clearNumTidy() {
+    preNumTidy = null;
+    $("numTidySummary").style.display = "none";
+  }
+  $("btnTidyNumbers").addEventListener("click", () => {
+    if (!previewRevealed) {
+      setStatus("createStatus", "\uBA3C\uC800 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB20C\uB7EC \uC815\uB9AC\uD560 \uD1A0\uD070\uC744 \uD655\uC778\uD558\uC138\uC694.", "warn");
+      return;
+    }
+    if (!creatableTokens().length) {
+      setStatus("createStatus", "\uC815\uB9AC\uD560 \uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694.", "warn");
+      return;
+    }
+    const base = Number($("tidyBase").value) || 0;
+    const ratio = (Number($("tidyRatio").value) || 0) / 100;
+    const snapshot = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
+    const r = tidyNumberTokens(tokens, { base, ratio });
+    if (!r.snapped) {
+      setStatus("createStatus", r.before === 0 ? "\uC815\uB9AC\uD560 \uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694." : `${base}px \uC0AC\uB2E4\uB9AC\uC5D0\uC11C ${Math.round(ratio * 100)}% \uC548\uC5D0 \uB4DC\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694 \u2014 \uD5C8\uC6A9\uC744 \uC62C\uB824\uBCF4\uC138\uC694.`, "");
+      return;
+    }
+    preNumTidy = snapshot;
+    tokens = r.tokens;
+    carryTokenChecked(snapshot, r.tokens);
+    $("btnCreateApply").style.display = "none";
+    renderTokens();
+    $("numTidySummary").style.display = "";
+    const merged = r.merged ? ` \xB7 \uAC19\uC740 \uCE78 ${r.merged}\uAC1C \uBCD1\uD569` : "";
+    $("numTidyText").textContent = `\uC5EC\uBC31\xB7\uD06C\uAE30 ${r.before} \u2192 ${r.after}\uAC1C (${base}px \uC0AC\uB2E4\uB9AC\uB85C ${r.snapped}\uAC1C \uC774\uB3D9${merged})`;
+    setStatus("createStatus", `${base}px \uC0AC\uB2E4\uB9AC\uB85C ${r.snapped}\uAC1C\uB97C \uC62E\uACBC\uC5B4\uC694${r.merged ? `, ${r.merged}\uAC1C\uAC00 \uD569\uCCD0\uC84C\uC5B4\uC694` : ""}.`, "ok");
+  });
+  $("btnNumTidyUndo").addEventListener("click", () => {
+    if (!preNumTidy) return;
+    const restored = preNumTidy;
+    carryTokenChecked(tokens, restored);
+    tokens = restored;
+    clearNumTidy();
+    $("btnCreateApply").style.display = "none";
+    renderTokens();
+    setStatus("createStatus", "\uC218\uCE58 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694.", "");
+  });
+  $("tokenAll").addEventListener("change", () => {
+    const on = $("tokenAll").checked;
+    tokenChecked.clear();
+    if (on) for (const t2 of creatableTokens()) tokenChecked.add(tokenKey(t2));
+    renderTokens();
+  });
+  $("btnTokenDropOnce").addEventListener("click", () => {
+    const once = creatableTokens().filter((t2) => {
+      var _a;
+      return ((_a = t2.count) != null ? _a : 0) <= 1;
+    });
+    for (const t2 of once) tokenChecked.delete(tokenKey(t2));
+    renderTokens();
+    setStatus("createStatus", once.length ? `1\uD68C\uB9CC \uC4F0\uC778 ${once.length}\uAC1C\uB97C \uD574\uC81C\uD588\uC5B4\uC694.` : "1\uD68C\uB9CC \uC4F0\uC778 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694.", "");
+  });
   $("btnCreate").addEventListener("click", () => {
     previewRevealed = true;
     if (!tokens.length) {
@@ -2276,13 +2517,13 @@
     renderTokens();
     const base = Number($("base").value) || 16;
     createFrom = "tokens";
-    send({ type: "CREATE_TOKENS", tokens, base, preview: true });
+    send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, preview: true });
   });
   $("btnCreateApply").addEventListener("click", () => {
     if (!tokens.length) return;
     const base = Number($("base").value) || 16;
     createFrom = "tokens";
-    send({ type: "CREATE_TOKENS", tokens, base });
+    send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base });
   });
   var basePreviewTimer = 0;
   $("base").addEventListener("input", () => {
@@ -2295,7 +2536,7 @@
     basePreviewTimer = window.setTimeout(() => {
       if (!tokens.length) return;
       createFrom = "tokens";
-      send({ type: "CREATE_TOKENS", tokens, base: Number($("base").value) || 16, preview: true });
+      send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base: Number($("base").value) || 16, preview: true });
     }, 350);
   });
   $("btnColorRoles").addEventListener("click", applyColorRoles);
@@ -2393,7 +2634,13 @@
     }
     return specs;
   }
-  $("btnScanText").addEventListener("click", () => send({ type: "SCAN_TEXT_STYLES" }));
+  $("btnScanText").addEventListener(
+    "click",
+    () => send({
+      type: "SCAN_TEXT_STYLES",
+      useRowLabels: $("tsUseRowLabels").checked
+    })
+  );
   $("btnTsAddRow").addEventListener("click", () => {
     var _a;
     const tr = textStyleRow({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: "Regular" });
@@ -2414,6 +2661,33 @@
     setStatus("tsStatus", "\uC120\uD0DD \uD14D\uC2A4\uD2B8\uB97C \uAE30\uC874 \uC2A4\uD0C0\uC77C\uC5D0 \uC801\uC6A9 \uC911\u2026", "ok");
     send({ type: "APPLY_TEXT_STYLES" });
   });
+  var TOL_HINTS = [
+    [0, "\uC815\uD655\uD788 \uAC19\uC740 \uAC12\uB9CC \uBC14\uC778\uB529\uD569\uB2C8\uB2E4."],
+    [0.5, "\uBC18\uC62C\uB9BC \uC624\uCC28\uB9CC \uD761\uC218\uD569\uB2C8\uB2E4(\uAE30\uBCF8)."],
+    [1, "1px \uC774\uB0B4 \uADFC\uC0AC\uAC12\uAE4C\uC9C0 \uBD99\uC2B5\uB2C8\uB2E4."],
+    [Infinity, "\uADFC\uC0AC \uBC94\uC704\uAC00 \uB113\uC5B4 \uC758\uB3C4\uCE58 \uC54A\uC740 \uAC12\uAE4C\uC9C0 \uBD99\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4."]
+  ];
+  function syncTolPresets() {
+    var _a;
+    const v = Number($("tol").value) || 0;
+    for (const el of Array.from(document.querySelectorAll(".tol-chip"))) {
+      el.classList.toggle("on", Number(el.dataset.tol) === v);
+    }
+    $("tolHint").textContent = `\uD5C8\uC6A9\uC624\uCC28 ${v}px \u2014 ${((_a = TOL_HINTS.find(([t2]) => v <= t2)) != null ? _a : TOL_HINTS[TOL_HINTS.length - 1])[1]}`;
+  }
+  for (const el of Array.from(document.querySelectorAll(".tol-chip"))) {
+    el.addEventListener("click", () => {
+      var _a;
+      $("tol").value = (_a = el.dataset.tol) != null ? _a : "0.5";
+      syncTolPresets();
+      clearBindPreview();
+    });
+  }
+  $("tol").addEventListener("input", () => {
+    syncTolPresets();
+    clearBindPreview();
+  });
+  syncTolPresets();
   $("btnApply").addEventListener("click", () => {
     const tolerance = Number($("tol").value) || 0;
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
@@ -3041,12 +3315,14 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
       case "EXTRACT_RESULT": {
         tokens = msg.tokens;
+        resetTokenChecked();
+        clearNumTidy();
         huefyTokenColors(tokens);
         preTidyTokens = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
         lastTidy = tidyColors();
@@ -3063,14 +3339,14 @@
           pendingCreatePreview = false;
           const base = Number($("base").value) || 16;
           createFrom = "tokens";
-          send({ type: "CREATE_TOKENS", tokens, base, preview: true });
+          send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, preview: true });
         }
         break;
       }
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
-        clearBindPreview();
+        if (!msg.selfSelect) clearBindPreview();
         if (!tokens.length) renderTokens();
         refreshTreeEmptyStates();
         break;
@@ -3099,15 +3375,19 @@
       case "APPLY_RESULT": {
         hideApplyProgress();
         const confirmBtn = $("btnApplyConfirm");
+        bindSkips = (_a = msg.skips) != null ? _a : [];
         const rt = reasonsText(msg.reasons);
-        const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}`;
+        const asChips = bindSkips.length > 0;
+        const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt && !asChips ? ` \u2014 ${rt}` : ""}`;
+        renderSkipReasons(msg.reasons);
         if (msg.cancelled) {
           clearBindPreview();
-          setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail }), "warn");
+          const cancelDetail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}`;
+          setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail: cancelDetail }), "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
-          bindCandidates = (_a = msg.candidates) != null ? _a : [];
-          bindNodes = (_b = msg.nodes) != null ? _b : [];
+          bindCandidates = (_b = msg.candidates) != null ? _b : [];
+          bindNodes = (_c = msg.nodes) != null ? _c : [];
           bindChecked.clear();
           for (const c of bindCandidates) bindChecked.add(candKey(c));
           renderBindTree();
@@ -3119,6 +3399,13 @@
         }
         break;
       }
+      case "SELECT_RESULT":
+        if (msg.capped) {
+          setStatus("applyStatus", `\uB808\uC774\uC5B4 ${msg.found}\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694 \u2014 \uD55C \uBC88\uC5D0 \uBCF4\uC5EC\uC904 \uC218 \uC788\uB294 \uC0C1\uD55C(${msg.requested}\uAC1C \uC911)\uC785\uB2C8\uB2E4.`, "warn");
+        } else if (msg.found < msg.requested) {
+          setStatus("applyStatus", msg.found ? `\uB808\uC774\uC5B4 ${msg.found}\uAC1C \uC120\uD0DD \u2014 ${msg.requested - msg.found}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC5D0 \uC788\uC5B4\uC694.` : "\uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC5D0 \uC788\uC2B5\uB2C8\uB2E4. \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uB2E4\uC2DC \uC2E4\uD589\uD574 \uC8FC\uC138\uC694.", "warn");
+        }
+        break;
       case "RENAME_RESULT":
         renderRenameResult(msg);
         break;
@@ -3134,9 +3421,10 @@
           renderTextStyleRows(msg.styles, true);
           const bound = msg.styles.filter((s) => s.boundStyleId).length;
           const fresh = msg.styles.length - bound;
+          const labelPart = msg.labeled != null ? ` \xB7 \uB77C\uBCA8\uC774\uB984 ${msg.labeled} \xB7 \uB7AD\uD0B9\uD3F4\uBC31 ${(_d = msg.fallback) != null ? _d : 0}` : "";
           setStatus(
             "tsStatus",
-            `${msg.styles.length}\uAC1C \uCC3E\uC74C \xB7 \uC2E0\uADDC ${fresh}(\uC570\uBC84) \xB7 \uC774\uBBF8 \uB4F1\uB85D ${bound}(\uD30C\uB791)` + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
+            `${msg.styles.length}\uAC1C \uCC3E\uC74C \xB7 \uC2E0\uADDC ${fresh}(\uC570\uBC84) \xB7 \uC774\uBBF8 \uB4F1\uB85D ${bound}(\uD30C\uB791)` + labelPart + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
             msg.warnings.length ? "warn" : "ok"
           );
         } else {
@@ -3252,7 +3540,7 @@
       }
       case "EDIT_VARIABLE_RESULT": {
         if (!msg.ok) {
-          setStatus("varEditStatus", `\uC218\uC815\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${(_c = msg.error) != null ? _c : "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958"}`, "warn");
+          setStatus("varEditStatus", `\uC218\uC815\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${(_e = msg.error) != null ? _e : "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958"}`, "warn");
           renderVars();
           break;
         }
@@ -3308,7 +3596,7 @@
         break;
       }
       case "PREMIUM_REQUIRED": {
-        const statusId = (_d = PREMIUM_STATUS_ID[msg.feature]) != null ? _d : "createStatus";
+        const statusId = (_f = PREMIUM_STATUS_ID[msg.feature]) != null ? _f : "createStatus";
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }
@@ -3333,6 +3621,7 @@
     SCAN_TEXT_STYLES: "tsStatus",
     CREATE_TEXT_STYLES: "tsStatus",
     APPLY: "applyStatus",
+    SELECT_NODES: "applyStatus",
     RENAME: "renameStatus",
     EXPORT: "exportStatus",
     SCAN_COMPONENT_CANDIDATES: "componentStatus",
@@ -3531,6 +3820,9 @@
   function clearBindPreview() {
     bindCandidates = [];
     bindNodes = [];
+    bindSkips = [];
+    clearMount($("bindSkips"));
+    $("bindSkips").style.display = "none";
     bindChecked.clear();
     clearMount($("bindTree"));
     $("bindCount").textContent = "";
@@ -3622,6 +3914,41 @@
       if (lastSelCount === 0) renderEmptyState($("compTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC5B4\uC694", guide);
       else clearMount($("compTree"));
       layoutListBy("compTree");
+    }
+  }
+  var bindSkips = [];
+  function renderSkipReasons(reasons) {
+    const box = $("bindSkips");
+    box.innerHTML = "";
+    const entries = Object.entries(reasons).filter(([, n]) => n > 0);
+    if (!entries.length || !bindSkips.length) {
+      box.style.display = "none";
+      return;
+    }
+    box.style.display = "";
+    const head = document.createElement("span");
+    head.className = "muted";
+    head.textContent = "\uAC74\uB108\uB700:";
+    box.appendChild(head);
+    for (const [key, n] of entries) {
+      const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
+      const label = `${t("reason." + key)} ${n}`;
+      if (!ids.length) {
+        const span = document.createElement("span");
+        span.className = "skip-chip static";
+        span.textContent = label;
+        box.appendChild(span);
+        continue;
+      }
+      const btn = document.createElement("button");
+      btn.className = "skip-chip";
+      btn.textContent = `${label} \u203A`;
+      btn.title = `\uB808\uC774\uC5B4 ${ids.length}\uAC1C \uC120\uD0DD \u2014 ${bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(", ")}${ids.length > 5 ? " \uC678" : ""}`;
+      btn.addEventListener("click", () => {
+        send({ type: "SELECT_NODES", ids });
+        setStatus("applyStatus", `${t("reason." + key)} \uB808\uC774\uC5B4 ${ids.length}\uAC1C\uB97C \uC120\uD0DD\uD588\uC5B4\uC694.`, "");
+      });
+      box.appendChild(btn);
     }
   }
   function reasonsText(reasons) {

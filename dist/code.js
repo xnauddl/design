@@ -174,25 +174,29 @@
   function keyOf(category, value, unit) {
     return `${category}|${value}|${unit != null ? unit : ""}`;
   }
-  function add(acc, token, source) {
+  function add(acc, token, source, nodeId) {
+    var _a;
     const k = keyOf(token.category, token.value, token.unit);
     const existing = acc.map.get(k);
     if (existing) {
       if (!existing.sources.includes(source)) existing.sources.push(source);
+      if (acc.lastNode.get(k) !== nodeId) existing.count = ((_a = existing.count) != null ? _a : 1) + 1;
     } else {
-      acc.map.set(k, __spreadProps(__spreadValues({}, token), { sources: [source] }));
+      acc.map.set(k, __spreadProps(__spreadValues({}, token), { sources: [source], count: 1 }));
     }
+    acc.lastNode.set(k, nodeId);
   }
-  function collectPaints(acc, paints3, source) {
+  function collectPaints(acc, node, paints3, source) {
+    const nodeId = node.id;
     if (paints3 === figma.mixed || !Array.isArray(paints3)) return;
     for (const p of paints3) {
       if (p.visible === false) continue;
       if (p.type === "SOLID") {
         const hex = rgbToHex(p.color);
-        add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source);
+        add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source, nodeId);
         if (p.opacity != null && p.opacity < 1) {
           const o = round(p.opacity);
-          add(acc, { name: numberTokenName("opacity", o), category: "opacity", value: o }, "opacity");
+          add(acc, { name: numberTokenName("opacity", o), category: "opacity", value: o }, "opacity", node.id);
         }
       } else if (p.type.startsWith("GRADIENT") || p.type === "IMAGE" || p.type === "VIDEO") {
         acc.warnings.add("\uADF8\uB77C\uB514\uC5B8\uD2B8/\uC774\uBBF8\uC9C0 \uCC44\uC6C0\uC740 \uBCC0\uC218 \uBC14\uC778\uB529 \uBD88\uAC00 \u2014 \uC2A4\uD0B5\uD588\uC2B5\uB2C8\uB2E4.");
@@ -202,41 +206,50 @@
   function collectText(acc, node) {
     if (node.fontSize !== figma.mixed) {
       const v = round(node.fontSize);
-      add(acc, { name: numberTokenName("font-size", v), category: "fontSize", value: v }, "fontSize");
+      add(acc, { name: numberTokenName("font-size", v), category: "fontSize", value: v }, "fontSize", node.id);
     }
     if (node.fontName !== figma.mixed) {
       const fam = node.fontName.family;
-      add(acc, { name: `font-family/${fam}`, category: "fontFamily", value: fam }, "fontFamily");
+      add(acc, { name: `font-family/${fam}`, category: "fontFamily", value: fam }, "fontFamily", node.id);
     }
     if (node.lineHeight !== figma.mixed && node.lineHeight.unit !== "AUTO") {
       const lh = node.lineHeight;
       const unit = lh.unit === "PERCENT" ? "percent" : "px";
       const v = round(lh.value);
-      add(acc, { name: numberTokenName("line-height", v), category: "lineHeight", value: v, unit }, "lineHeight");
+      add(acc, { name: numberTokenName("line-height", v), category: "lineHeight", value: v, unit }, "lineHeight", node.id);
     }
     if (node.letterSpacing !== figma.mixed) {
       const ls = node.letterSpacing;
       const unit = ls.unit === "PERCENT" ? "percent" : "px";
       const v = round(ls.value);
-      add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing");
+      add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing", node.id);
     }
   }
   function collectSpacing(acc, node) {
     if (node.layoutMode === "NONE") return;
-    const gaps = [node.itemSpacing, node.paddingLeft, node.paddingRight, node.paddingTop, node.paddingBottom];
-    if (typeof node.counterAxisSpacing === "number") gaps.push(node.counterAxisSpacing);
+    const gaps = [node.paddingLeft, node.paddingRight, node.paddingTop, node.paddingBottom];
+    if (node.layoutMode === "GRID") {
+      gaps.push(node.gridRowGap, node.gridColumnGap);
+    } else {
+      gaps.push(node.itemSpacing);
+      if (typeof node.counterAxisSpacing === "number") gaps.push(node.counterAxisSpacing);
+    }
     for (const g of gaps) {
       if (typeof g === "number" && g > 0) {
         const v = round(g);
-        add(acc, { name: numberTokenName("spacing", v), category: "gap", value: v }, "gap");
+        add(acc, { name: numberTokenName("spacing", v), category: "gap", value: v }, "gap", node.id);
       }
     }
   }
   function collectSize(acc, node) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
+    const parent = node.parent;
+    const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
+    const inAutoLayout = !absolute && (node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE");
+    if (!inAutoLayout) return;
     const addSize = (v) => {
       const rv = round(v);
-      if (rv > 0) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size");
+      if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size", node.id);
     };
     if (node.layoutSizingHorizontal === "FIXED") addSize(node.width);
     if (node.layoutSizingVertical === "FIXED") addSize(node.height);
@@ -256,7 +269,7 @@
     for (const rv of values) {
       if (rv > 0) {
         const v = round(rv);
-        add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius");
+        add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius", node.id);
       }
     }
   }
@@ -277,7 +290,7 @@
     for (const wv of widths) {
       if (wv > 0) {
         const v = round(wv);
-        add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth");
+        add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth", node.id);
       }
     }
   }
@@ -286,7 +299,7 @@
     const o = node.opacity;
     if (typeof o !== "number" || o >= 1 || o <= 0) return;
     const v = round(o);
-    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity");
+    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity", node.id);
   }
   function collectEffects(acc, node) {
     var _a;
@@ -295,7 +308,7 @@
       if (e.visible === false) continue;
       if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") {
         const hex = rgbToHex(e.color);
-        add(acc, { name: colorTokenName(hex), category: "effectColor", value: hex }, "effectColor");
+        add(acc, { name: colorTokenName(hex), category: "effectColor", value: hex }, "effectColor", node.id);
         for (const [g, val] of [
           ["shadow-blur", e.radius],
           ["shadow-spread", (_a = e.spread) != null ? _a : 0],
@@ -303,17 +316,21 @@
           ["shadow-y", e.offset.y]
         ]) {
           const v = round(val);
-          add(acc, { name: numberTokenName(g, v), category: "effectFloat", value: v }, "effectFloat");
+          add(acc, { name: numberTokenName(g, v), category: "effectFloat", value: v }, "effectFloat", node.id);
         }
       } else if (e.type === "LAYER_BLUR" || e.type === "BACKGROUND_BLUR") {
         const v = round(e.radius);
-        add(acc, { name: numberTokenName("blur", v), category: "effectFloat", value: v }, "effectFloat");
+        add(acc, { name: numberTokenName("blur", v), category: "effectFloat", value: v }, "effectFloat", node.id);
       }
     }
   }
   function walk(acc, node) {
-    if ("fills" in node) collectPaints(acc, node.fills, "fill");
-    if ("strokes" in node) collectPaints(acc, node.strokes, "stroke");
+    if (node.visible === false) {
+      acc.warnings.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD1A0\uD070 \uD6C4\uBCF4\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
+      return;
+    }
+    if ("fills" in node) collectPaints(acc, node, node.fills, "fill");
+    if ("strokes" in node) collectPaints(acc, node, node.strokes, "stroke");
     if (node.type === "TEXT") collectText(acc, node);
     if (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE") {
       collectSpacing(acc, node);
@@ -323,11 +340,29 @@
     collectStroke(acc, node);
     collectOpacity(acc, node);
     collectEffects(acc, node);
+    if (node.type === "INSTANCE") {
+      if (node.children.length) acc.warnings.add("\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uB9C8\uC2A4\uD130 \uBCF5\uC0AC\uBCF8\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uAC12\uC774 \uD544\uC694\uD558\uBA74 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC120\uD0DD\uD574 \uCD94\uCD9C\uD558\uC138\uC694.");
+      return;
+    }
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
+  function isEffectivelyVisible(node) {
+    let p = node;
+    while (p) {
+      if ("visible" in p && p.visible === false) return false;
+      p = p.parent;
+    }
+    return true;
+  }
   function extractFromSelection(selection2) {
-    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set() };
-    for (const node of selection2) walk(acc, node);
+    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map() };
+    for (const node of selection2) {
+      if (!isEffectivelyVisible(node)) {
+        acc.warnings.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD1A0\uD070 \uD6C4\uBCF4\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
+        continue;
+      }
+      walk(acc, node);
+    }
     const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
     return { tokens, warnings: [...acc.warnings] };
   }
@@ -638,7 +673,33 @@
       if (ls !== figma.mixed) letterSpacing = ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
       const sid = t.textStyleId;
       const styleId = sid === figma.mixed ? "" : sid;
-      samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name, styleId });
+      let characters = "";
+      try {
+        characters = t.characters;
+      } catch (e) {
+        characters = "";
+      }
+      let rowId;
+      let indexInParent;
+      const parent = t.parent;
+      if (parent && "layoutMode" in parent && parent.layoutMode === "HORIZONTAL" && "children" in parent) {
+        rowId = parent.id;
+        indexInParent = parent.children.indexOf(t);
+        if (indexInParent < 0) indexInParent = void 0;
+      }
+      samples.push({
+        fontSize,
+        lineHeight,
+        letterSpacing,
+        family,
+        style,
+        layerName: t.name,
+        styleId,
+        characters,
+        id: t.id,
+        rowId,
+        indexInParent
+      });
     }
     return { samples, warnings: [...warnings] };
   }
@@ -985,6 +1046,113 @@
     }
     return specs;
   }
+  var LABEL_RAMP_RE = /^(display|h[1-6]|title|body|caption|overline)(\/\S+)?$/i;
+  function isRowLabelNameLike(characters) {
+    const t = characters.trim();
+    if (!t || t.includes("\n")) return false;
+    if (t.length <= 24) return true;
+    return LABEL_RAMP_RE.test(t);
+  }
+  function pairHorizontalRowLabel(row) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    if (row.length < 2) return null;
+    const byIndex = [...row].sort((a, b) => {
+      var _a2, _b2;
+      return ((_a2 = a.indexInParent) != null ? _a2 : 0) - ((_b2 = b.indexInParent) != null ? _b2 : 0);
+    });
+    const pool = isRowLabelNameLike((_a = byIndex[0].characters) != null ? _a : "") ? byIndex.slice(1) : byIndex;
+    let specimen = pool[0];
+    for (let i = 1; i < pool.length; i++) {
+      const s = pool[i];
+      const si = (_b = s.indexInParent) != null ? _b : 0;
+      const pi = (_c = specimen.indexInParent) != null ? _c : 0;
+      if (s.fontSize > specimen.fontSize || s.fontSize === specimen.fontSize && si > pi) {
+        specimen = s;
+      }
+    }
+    const specIdx = (_d = specimen.indexInParent) != null ? _d : 0;
+    const left = row.filter((s) => {
+      var _a2;
+      return ((_a2 = s.indexInParent) != null ? _a2 : 0) < specIdx;
+    });
+    if (!left.length) return null;
+    const cands = [];
+    for (const s of left) {
+      const nameLike = isRowLabelNameLike((_e = s.characters) != null ? _e : "");
+      const smaller = s.fontSize < specimen.fontSize;
+      if (!nameLike && !smaller) continue;
+      const idx = (_f = s.indexInParent) != null ? _f : 0;
+      let score = 1e3 - idx;
+      if (nameLike) score += 100;
+      if (smaller) score += 50;
+      cands.push({ s, score });
+    }
+    if (!cands.length) return null;
+    cands.sort((a, b) => b.score - a.score);
+    if (cands.length > 1 && cands[0].score === cands[1].score) return null;
+    const label = cands[0].s;
+    const labelName = ((_g = label.characters) != null ? _g : "").trim();
+    if (!labelName) return null;
+    return { label, specimen, labelName };
+  }
+  function nameTextStylesWithRowLabels(samples, existing) {
+    var _a;
+    const excludeIds = /* @__PURE__ */ new Set();
+    const labelBySig = /* @__PURE__ */ new Map();
+    const byRow = /* @__PURE__ */ new Map();
+    for (const s of samples) {
+      if (!s.rowId || s.id == null || s.indexInParent == null) continue;
+      const list = (_a = byRow.get(s.rowId)) != null ? _a : [];
+      list.push(s);
+      byRow.set(s.rowId, list);
+    }
+    for (const row of byRow.values()) {
+      if (row.length < 2) continue;
+      const pair = pairHorizontalRowLabel(row);
+      if (!pair || !pair.specimen.id) continue;
+      const k = sigKey(pair.specimen);
+      if (!labelBySig.has(k)) labelBySig.set(k, pair.labelName);
+      for (const s of row) {
+        if (!s.id || s.id === pair.specimen.id) continue;
+        excludeIds.add(s.id);
+      }
+    }
+    const forCluster = samples.filter((s) => !s.id || !excludeIds.has(s.id));
+    const styles = nameTextStyles(clusterTextStyles(forCluster), existing);
+    const used = /* @__PURE__ */ new Set();
+    const unique = (n) => {
+      const base = n || "text";
+      if (!used.has(base)) {
+        used.add(base);
+        return base;
+      }
+      let i = 2;
+      while (used.has(`${base}-${i}`)) i++;
+      const u = `${base}-${i}`;
+      used.add(u);
+      return u;
+    };
+    for (const s of styles) {
+      if (s.boundStyleId) used.add(s.name);
+    }
+    let labeled = 0;
+    let fallback = 0;
+    for (const style of styles) {
+      if (style.boundStyleId) continue;
+      const label = labelBySig.get(sigKey(style));
+      if (label) {
+        style.name = unique(label);
+        labeled++;
+      }
+    }
+    for (const style of styles) {
+      if (style.boundStyleId) continue;
+      if (labelBySig.has(sigKey(style))) continue;
+      style.name = unique(style.name);
+      fallback++;
+    }
+    return { styles, labeled, fallback };
+  }
 
   // src/lib/bind.ts
   var TIER = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
@@ -993,6 +1161,8 @@
     height: "WIDTH_HEIGHT",
     itemSpacing: "GAP",
     counterAxisSpacing: "GAP",
+    gridRowGap: "GAP",
+    gridColumnGap: "GAP",
     paddingLeft: "GAP",
     paddingRight: "GAP",
     paddingTop: "GAP",
@@ -1034,23 +1204,38 @@
     }
     return nodeIndex.filter((n) => keep.has(n.id));
   }
+  function isEffectivelyVisible2(node) {
+    let p = node;
+    while (p) {
+      if ("visible" in p && p.visible === false) return false;
+      p = p.parent;
+    }
+    return true;
+  }
   function countNodes(sel) {
     let n = 0;
     const stack = sel.slice();
     while (stack.length) {
       const x = stack.pop();
+      if (x.visible === false) continue;
       n++;
+      if (x.type === "INSTANCE") continue;
       if ("children" in x) for (const c of x.children) stack.push(c);
     }
     return n;
   }
-  function note(res, key) {
+  function note(res, key, node, preview, field) {
     var _a;
     res.reasons[key] = ((_a = res.reasons[key]) != null ? _a : 0) + 1;
+    if (!node || !preview) return;
+    const k = `${node.id}|${key}`;
+    if (preview.skipSeen.has(k)) return;
+    preview.skipSeen.add(k);
+    preview.skips.push({ nodeId: node.id, name: node.name, type: node.type, reason: key, field });
   }
-  function skip(res, key) {
+  function skip(res, key, node, preview, field) {
     res.skipped++;
-    note(res, key);
+    note(res, key, node, preview, field);
   }
   async function bindSelection(selection2, tolerance, apply = true, hooks = {}) {
     var _a;
@@ -1058,8 +1243,13 @@
     const res = { bound: 0, skipped: 0, flags: [], reasons: {} };
     const flagSet = /* @__PURE__ */ new Set();
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
-    const preview = apply ? null : { candidates: [], nodeIndex: [] };
+    const preview = apply ? null : { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     for (const node of selection2) {
+      if (!isEffectivelyVisible2(node)) {
+        flagSet.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
+        note(res, "hidden", node, preview);
+        continue;
+      }
       await walk2(node, entries, tolerance, res, flagSet, apply, hooks, prog, preview, 0, null);
       if (res.cancelled) break;
     }
@@ -1067,6 +1257,7 @@
     if (preview) {
       res.candidates = preview.candidates;
       res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates);
+      res.skips = preview.skips;
     }
     (_a = hooks.onProgress) == null ? void 0 : _a.call(hooks, prog.done, prog.total);
     return res;
@@ -1147,6 +1338,11 @@
   async function walk2(node, entries, tol, res, flags, apply, hooks, prog, preview, depth, parentId) {
     var _a;
     if (res.cancelled) return;
+    if (node.visible === false) {
+      flags.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
+      note(res, "hidden", node, preview);
+      return;
+    }
     preview == null ? void 0 : preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
     bindPaints(node, entries, res, apply, preview);
     bindFrame(node, entries, tol, res, flags, apply, preview);
@@ -1163,6 +1359,13 @@
         res.cancelled = true;
         return;
       }
+    }
+    if (node.type === "INSTANCE") {
+      if (node.children.length) {
+        flags.add("\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uC624\uBC84\uB77C\uC774\uB4DC\uAC00 \uB418\uBBC0\uB85C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uCEF4\uD3EC\uB10C\uD2B8 \uC6D0\uBCF8\uC5D0\uC11C \uBC14\uC778\uB529\uD558\uC138\uC694.");
+        note(res, "instance-children", node, preview);
+      }
+      return;
     }
     if ("children" in node)
       for (const c of node.children) {
@@ -1182,7 +1385,7 @@
         const hex = rgbToHex(p.color);
         const e = matchColor(entries, hex, allowed);
         if (!e) {
-          skip(res, "no-match");
+          skip(res, "no-match", node, preview, key);
           return p;
         }
         res.bound++;
@@ -1198,19 +1401,37 @@
   }
   function bindFrame(node, entries, tol, res, flags, apply, preview) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
-    if (node.layoutSizingHorizontal === "FIXED") tryBind(node, "width", node.width, entries, tol, res, apply, preview);
-    else if (node.layoutSizingHorizontal === "HUG" || node.layoutSizingHorizontal === "FILL") {
-      flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
-      note(res, "hug-fill");
+    const parent = node.parent;
+    const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
+    const inAutoLayout = !absolute && (node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE");
+    if (inAutoLayout) {
+      const bindAxis = (sizing, field, v) => {
+        if (sizing !== "FIXED") {
+          flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
+          note(res, "hug-fill", node, preview, field);
+          return;
+        }
+        const fraction = Math.abs(v - Math.round(v)) >= 5e-3;
+        tryBind(node, field, v, entries, fraction ? 0 : tol, res, apply, preview, fraction ? "size-fraction" : void 0);
+      };
+      bindAxis(node.layoutSizingHorizontal, "width", node.width);
+      bindAxis(node.layoutSizingVertical, "height", node.height);
+    } else {
+      flags.add("\uC790\uC720 \uBC30\uCE58(\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uBC16) \uD504\uB808\uC784\uC740 \uD06C\uAE30 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
+      note(res, "size-free-layout", node, preview);
     }
-    if (node.layoutSizingVertical === "FIXED") tryBind(node, "height", node.height, entries, tol, res, apply, preview);
     if (node.layoutMode === "NONE") {
       flags.add("\uC624\uD1A0\uB808\uC774\uC544\uC6C3\uC774 \uC544\uB2CC \uD504\uB808\uC784\uC740 padding/gap \uBC14\uC778\uB529 \uBD88\uAC00.");
-      note(res, "no-autolayout");
+      note(res, "no-autolayout", node, preview);
       return;
     }
-    tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply, preview);
-    if (typeof node.counterAxisSpacing === "number") tryBind(node, "counterAxisSpacing", node.counterAxisSpacing, entries, tol, res, apply, preview);
+    if (node.layoutMode === "GRID") {
+      tryBind(node, "gridRowGap", node.gridRowGap, entries, tol, res, apply, preview);
+      tryBind(node, "gridColumnGap", node.gridColumnGap, entries, tol, res, apply, preview);
+    } else {
+      tryBind(node, "itemSpacing", node.itemSpacing, entries, tol, res, apply, preview);
+      if (typeof node.counterAxisSpacing === "number") tryBind(node, "counterAxisSpacing", node.counterAxisSpacing, entries, tol, res, apply, preview);
+    }
     tryBind(node, "paddingLeft", node.paddingLeft, entries, tol, res, apply, preview);
     tryBind(node, "paddingRight", node.paddingRight, entries, tol, res, apply, preview);
     tryBind(node, "paddingTop", node.paddingTop, entries, tol, res, apply, preview);
@@ -1257,7 +1478,7 @@
       const hex = rgbToHex(e.color);
       const ent = matchColor(entries, hex, EFFECT_SCOPES);
       if (!ent) {
-        skip(res, "no-match");
+        skip(res, "no-match", node, preview, "effects");
         return e;
       }
       res.bound++;
@@ -1276,7 +1497,7 @@
     try {
       await figma.loadFontAsync(node.fontName);
     } catch (e) {
-      note(res, "font");
+      note(res, "font", node, preview);
       return;
     }
     if (node.fontSize !== figma.mixed) tryBindText(node, "fontSize", node.fontSize, entries, tol, res, apply, preview);
@@ -1296,7 +1517,7 @@
           node.setRangeBoundVariable(0, node.characters.length, "fontFamily", fe.variable);
           res.bound++;
         } catch (e) {
-          skip(res, "error");
+          skip(res, "error", node, preview, "fontFamily");
         }
       }
     }
@@ -1305,11 +1526,11 @@
     const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     const len = node.characters.length;
     if (len === 0) {
-      skip(res, "empty-text");
+      skip(res, "empty-text", node, preview, field);
       return;
     }
     if (!e) {
-      skip(res, "no-match");
+      skip(res, "no-match", node, preview, field);
       return;
     }
     if (!apply) {
@@ -1321,13 +1542,13 @@
       node.setRangeBoundVariable(0, len, field, e.variable);
       res.bound++;
     } catch (e2) {
-      skip(res, "error");
+      skip(res, "error", node, preview, field);
     }
   }
-  function tryBind(node, field, value, entries, tol, res, apply, preview) {
+  function tryBind(node, field, value, entries, tol, res, apply, preview, noMatchReason = "no-match") {
     const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     if (!e) {
-      skip(res, "no-match");
+      skip(res, noMatchReason, node, preview, field);
       return;
     }
     if (!apply) {
@@ -1339,7 +1560,7 @@
       node.setBoundVariable(field, e.variable);
       res.bound++;
     } catch (e2) {
-      skip(res, "error");
+      skip(res, "error", node, preview, field);
     }
   }
 
@@ -1373,6 +1594,7 @@
     "section",
     "button",
     "card",
+    "table",
     "list",
     "item",
     "field",
@@ -1859,6 +2081,7 @@
       const kids = (_a = node.children) != null ? _a : [];
       if (kids.length) {
         if (isProgressLike(node, kids)) return "progress";
+        if (isTableLike(node, kids)) return "table";
         if (isCardLike(node, kids)) return "card";
         if (isFigureLike(node, kids)) return "figure";
         if (isFieldLike(node, kids)) return "field";
@@ -1941,6 +2164,49 @@
     if (kids.length < 2) return false;
     if (!hasVisibleFill2(node) && !hasVisibleStroke2(node)) return false;
     return cornerRadiusOf2(node) > 0 || hasDropShadow(node);
+  }
+  function rowCells(node) {
+    var _a;
+    if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return null;
+    if (layoutOf2(node) !== "horizontal") return null;
+    const cells = ((_a = node.children) != null ? _a : []).filter(isVisible);
+    return cells.length >= 2 ? cells : null;
+  }
+  function hasTextWithin(node, depth = 2) {
+    var _a;
+    if (node.type === "TEXT") return true;
+    if (depth <= 0) return false;
+    return !!((_a = node.children) == null ? void 0 : _a.some((c) => hasTextWithin(c, depth - 1)));
+  }
+  function isTableLike(node, kids) {
+    var _a, _b;
+    if (node.type !== "FRAME") return false;
+    const visible = kids.filter(isVisible);
+    if (node.layoutMode === "GRID") {
+      const cols2 = (_a = node.gridColumnCount) != null ? _a : 0;
+      const rows2 = (_b = node.gridRowCount) != null ? _b : 0;
+      if (cols2 < 2 || rows2 < 2) return false;
+      if (visible.length < cols2 * 2) return false;
+      if (!visible.some((c) => hasTextWithin(c))) return false;
+      const firstRow = visible.slice(0, cols2).map((c) => c.width);
+      if (firstRow.every((w) => typeof w === "number") && ratioWithin(firstRow, 1.05)) return false;
+      return true;
+    }
+    if (layoutOf2(node) !== "vertical") return false;
+    if (visible.length < 3) return false;
+    const rows = visible.map(rowCells);
+    if (rows.some((r) => r === null)) return false;
+    const cellRows = rows.filter((r) => r !== null);
+    const cols = cellRows[0].length;
+    if (cols < 2) return false;
+    if (!cellRows.every((r) => r.length === cols)) return false;
+    if (!cellRows.some((r) => r.some((c) => hasTextWithin(c)))) return false;
+    for (let i = 0; i < cols; i++) {
+      const widths = cellRows.map((r) => r[i].width);
+      if (!widths.every((w) => typeof w === "number")) return false;
+      if (!ratioWithin(widths, 1.1)) return false;
+    }
+    return true;
   }
   var LIST_ITEM_TYPES = /* @__PURE__ */ new Set(["FRAME", "GROUP", "INSTANCE", "COMPONENT", "RECTANGLE", "ELLIPSE"]);
   function isListLike(node, kids) {
@@ -3783,6 +4049,7 @@
     }
   });
   var SCAN_CAP = 1500;
+  var SELECT_CAP = 200;
   function isBindableCandidate(n) {
     const fills = n.fills;
     const hasFills = Array.isArray(fills) && fills.some((p) => p.type === "SOLID" && p.visible !== false);
@@ -3795,6 +4062,7 @@
     const hasGap = !!lm && lm !== "NONE" && typeof n.itemSpacing === "number";
     return hasFills || hasStrokes || hasRadius || hasFont || hasGap;
   }
+  var selfSelect = false;
   function postSelection() {
     const sel = selection();
     let scanned = 0;
@@ -3807,11 +4075,14 @@
         break;
       }
       const n = stack.pop();
+      if (n.visible === false) continue;
       scanned++;
       if (isBindableCandidate(n)) bindable++;
+      if (n.type === "INSTANCE") continue;
       if ("children" in n) for (const c of n.children) stack.push(c);
     }
-    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped });
+    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped, selfSelect });
+    selfSelect = false;
   }
   figma.on("selectionchange", postSelection);
   var CONTRAST_SCAN_CAP = 2e3;
@@ -3901,7 +4172,7 @@
     if (type === "BOOLEAN") return target.visible;
     return target.type === "INSTANCE" && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : "";
   }
-  function isEffectivelyVisible(node) {
+  function isEffectivelyVisible3(node) {
     let p = node;
     while (p) {
       if ("visible" in p && p.visible === false) return false;
@@ -3910,7 +4181,7 @@
     return true;
   }
   function sceneComponentEligible(n) {
-    return isEffectivelyVisible(n) && componentEligible(n);
+    return isEffectivelyVisible3(n) && componentEligible(n);
   }
   function resolvePropTarget(root, p) {
     var _a;
@@ -4114,8 +4385,10 @@
             cancelled: r.cancelled,
             candidates: r.candidates,
             // #6: 미리보기 후보(dry-run만)
-            nodes: r.nodes
+            nodes: r.nodes,
             // #13: 미리보기 트리 맥락
+            skips: r.skips
+            // 사유별 건너뛴 레이어(dry-run만)
           });
           if (!msg.preview) {
             commitUndo(figma);
@@ -4124,6 +4397,26 @@
         }
         case "CANCEL": {
           bindCancel = true;
+          break;
+        }
+        case "SELECT_NODES": {
+          const ids = msg.ids.slice(0, SELECT_CAP);
+          const found = [];
+          for (const id of ids) {
+            const n = await figma.getNodeByIdAsync(id);
+            if (n && n.type !== "PAGE" && n.type !== "DOCUMENT" && n.parent) found.push(n);
+          }
+          const onPage = found.filter((n) => {
+            for (let p = n; p; p = p.parent) if (p.id === figma.currentPage.id) return true;
+            return false;
+          });
+          if (onPage.length) {
+            const cur = figma.currentPage.selection;
+            if (onPage.length !== cur.length || onPage.some((n, i) => cur[i] !== n)) selfSelect = true;
+            figma.currentPage.selection = onPage;
+            figma.viewport.scrollAndZoomIntoView(onPage);
+          }
+          post({ type: "SELECT_RESULT", found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
           break;
         }
         case "APPLY_SELECTED": {
@@ -4173,8 +4466,20 @@
         }
         case "SCAN_TEXT_STYLES": {
           const { samples, warnings } = scanTextStyles(selection());
-          const styles = nameTextStyles(clusterTextStyles(samples), await scanExistingTextStyles());
-          post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
+          const existing = await scanExistingTextStyles();
+          if (msg.useRowLabels) {
+            const r = nameTextStylesWithRowLabels(samples, existing);
+            post({
+              type: "TEXT_STYLE_CANDIDATES",
+              styles: r.styles,
+              warnings,
+              labeled: r.labeled,
+              fallback: r.fallback
+            });
+          } else {
+            const styles = nameTextStyles(clusterTextStyles(samples), existing);
+            post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
+          }
           break;
         }
         case "CREATE_TEXT_STYLES": {
@@ -4337,7 +4642,7 @@
         }
         case "SCAN_COMPONENT_CANDIDATES": {
           if (!requireComponents()) break;
-          const roots = selection().filter(isEffectivelyVisible);
+          const roots = selection().filter(isEffectivelyVisible3);
           const candidates = scanComponentCandidates(roots);
           const liveById = /* @__PURE__ */ new Map();
           const index = (n) => {
@@ -4349,7 +4654,7 @@
           for (const r of roots) index(r);
           const gated = candidates.map((c) => {
             const live = liveById.get(c.id);
-            if (!live || !isEffectivelyVisible(live)) return __spreadProps(__spreadValues({}, c), { eligible: false });
+            if (!live || !isEffectivelyVisible3(live)) return __spreadProps(__spreadValues({}, c), { eligible: false });
             return c;
           });
           const byCand = new Map(gated.map((c) => [c.id, c]));
