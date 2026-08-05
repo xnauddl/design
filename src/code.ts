@@ -948,10 +948,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'RENAME_APPLY': {
         // #7: 미리보기 트리에서 체크한 항목만 직접 적용(재계산 없이 id→after 그대로).
         const changes: RenameChange[] = [];
-        for (const { id, after } of msg.items) {
+        for (const { id, before: expectedBefore, after } of msg.items) {
           const node = await figma.getNodeByIdAsync(id);
           if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
           const before = node.name;
+          if (before !== expectedBefore) continue; // 미리보기 이후 이름이 바뀐 노드는 stale 적용 방지
           if (before === after) continue;
           node.name = after;
           changes.push({ id, before, after });

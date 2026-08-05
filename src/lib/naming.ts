@@ -3,45 +3,76 @@
    형식: kebab-case 소문자, 구분자 '-'. 구조: {상위 맥락}-{로컬 역할}.
    ============================================================ */
 
-/** 토큰 없는 비텍스트 레이어의 역할 어휘. */
-export const ROLE_VOCAB = [
-  // 구조
+/**
+ * 검출기가 실제로 레이어 이름으로 "출력하는" 역할.
+ * rename.ts `resolveRole()`의 반환 후보와 1:1 — 여기 없는 이름을 출력하면 어휘와 어긋난다.
+ * (예외: 이색 노드 타입의 `kebab(node.type)` 폴백)
+ */
+export const EMITTED_ROLES = [
+  // 구조 폴백(역할을 못 정했을 때)
   'container',
   'wrapper',
-  'content',
-  'group',
-  // 영역
+  'shape',
+  // HTML 랜드마크
   'header',
-  'body',
   'footer',
-  'leading',
-  'trailing',
-  // 요소
-  'icon',
-  'image',
-  'background',
-  'swatch',
-  'border',
-  'divider',
-  'badge',
-  'avatar',
-  // 시맨틱(영역/컴포넌트) — 인식·정리 + 일부 구조 추론
-  'nav',
-  'hero',
   'main',
-  'sidebar',
+  'aside',
+  'nav',
   'section',
+  'article',
+  'figure',
+  // 컴포넌트
   'button',
+  'chip',
   'card',
   'table',
   'list',
   'item',
   'field',
+  'input',
+  'modal',
+  'overlay',
+  'progress',
+  'indicator',
+  // 요소
+  'icon',
+  'image',
+  'thumbnail',
+  'background',
+  'swatch',
+  'border',
+  'divider',
+  'badge',
+  'status',
+  'avatar',
+] as const;
+
+/**
+ * 검출기 없이 "인식"에만 쓰는 어휘 — 디자이너가 이미 이 이름을 썼을 때
+ * 맥락(pickScope)으로 존중한다. 우리가 먼저 지어내지는 않는다.
+ * `sidebar`는 `aside`(HTML 랜드마크, 출력 캐논)의 인식용 별칭.
+ * `sheet`/`drawer`/`dialog`/`popup`은 페이지 랜드마크 오검출을 막기 위한 인식 전용.
+ */
+export const RECOGNIZED_ROLES = [
+  'content',
+  'group',
+  'body',
+  'leading',
+  'trailing',
+  'hero',
+  'sidebar',
+  'sheet',
+  'drawer',
+  'dialog',
+  'popup',
   'tab',
-  'chip',
   'label',
   'title',
 ] as const;
+
+/** 역할 어휘 전체(출력 + 인식). */
+export const ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES] as const;
 
 /** 역할 어휘 집합(맥락 추출 시 의미 있는 세그먼트 판별용). */
 const ROLE_SET: ReadonlySet<string> = new Set(ROLE_VOCAB);
@@ -170,17 +201,26 @@ const PRIMITIVE_NS = new Set([
   'elevation', 'shadow', 'z',
 ]);
 
-/** 토큰 경로 말단(leaf)이 역할 어휘일 때의 매핑(핵심 어휘). */
-const LEAF_ROLE: Record<string, Role> = {
-  background: 'background', bg: 'background', fill: 'background', surface: 'background',
-  swatch: 'swatch', sample: 'swatch',
-  border: 'border', stroke: 'border', outline: 'border',
-  icon: 'icon', glyph: 'icon',
-  divider: 'divider', separator: 'divider', rule: 'divider',
-  image: 'image', img: 'image', picture: 'image', thumbnail: 'image',
-  avatar: 'avatar',
-  badge: 'badge', dot: 'badge', indicator: 'badge',
-};
+/**
+ * 토큰 경로 말단(leaf)이 역할 어휘일 때의 매핑(핵심 어휘).
+ * Map으로 둔다 — 키가 디자이너가 정하는 토큰 세그먼트라, 객체 리터럴이면
+ * `constructor` 같은 Object.prototype 키가 역할 대신 함수로 해석돼 리네임 전체가 죽는다.
+ */
+const LEAF_ROLE = new Map<string, Role>([
+  ['background', 'background'], ['bg', 'background'], ['fill', 'background'], ['surface', 'background'],
+  ['swatch', 'swatch'], ['sample', 'swatch'],
+  ['border', 'border'], ['stroke', 'border'], ['outline', 'border'],
+  ['icon', 'icon'], ['glyph', 'icon'],
+  ['divider', 'divider'], ['separator', 'divider'], ['rule', 'divider'],
+  ['image', 'image'], ['img', 'image'], ['picture', 'image'],
+  ['thumbnail', 'thumbnail'], ['thumb', 'thumbnail'],
+  ['avatar', 'avatar'],
+  ['badge', 'badge'], ['dot', 'badge'],
+  ['status', 'status'],
+  ['indicator', 'indicator'], ['progress', 'progress'],
+  ['overlay', 'overlay'], ['scrim', 'overlay'], ['backdrop', 'overlay'],
+  ['input', 'input'],
+]);
 
 export interface ParsedToken {
   /** 토큰 말단이 역할 어휘이면 그 역할(아니면 null). */
@@ -201,7 +241,7 @@ export function parseTokenName(tokenName: string): ParsedToken {
   if (!segs.length) return { roleLeaf: null, context: null, primitive: false };
   if (PRIMITIVE_NS.has(kebab(segs[0]))) return { roleLeaf: null, context: null, primitive: true };
 
-  const roleLeaf = LEAF_ROLE[kebab(segs[segs.length - 1])] ?? null;
+  const roleLeaf = LEAF_ROLE.get(kebab(segs[segs.length - 1])) ?? null;
   const ctxSegs = roleLeaf ? segs.slice(0, -1) : segs;
   const context = ctxSegs.length ? ctxSegs.map(kebab).filter(Boolean).join('-') : null;
   return { roleLeaf, context, primitive: false };

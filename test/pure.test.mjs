@@ -25,6 +25,10 @@ import {
   isTokenEchoName,
   parseTokenName,
   pickScope,
+  isKnownRole,
+  EMITTED_ROLES,
+  RECOGNIZED_ROLES,
+  ROLE_VOCAB,
   dedupeName,
   hasEntitlement,
   isTier,
@@ -255,6 +259,50 @@ test('pickScope — 깨끗한 맥락 1단계(숫자·단위·일반구조어 제
   assert.equal(pickScope('letter-spacing-0-percent-px'), 'spacing'); // 단위·숫자 제거
   assert.equal(pickScope('hero'), 'hero');
   assert.equal(pickScope(''), null);
+});
+
+test('parseTokenName — Object.prototype 키가 역할로 새지 않음(리네임 크래시 방지)', () => {
+  // 토큰 세그먼트는 디자이너가 정한다. 역할 맵이 객체 리터럴이면 'constructor'가
+  // 함수로 해석돼 kebab(role)에서 TypeError가 나고 리네임 실행 전체가 죽는다.
+  for (const key of ['constructor', 'toString', 'hasOwnProperty', 'valueOf']) {
+    assert.equal(parseTokenName(`brand/${key}`).roleLeaf, null, `'${key}'가 역할로 해석됨`);
+  }
+});
+
+test('역할 어휘 — 출력용/인식용 분리, 겹치지 않고 합집합이 ROLE_VOCAB', () => {
+  const emitted = new Set(EMITTED_ROLES);
+  const recognized = new Set(RECOGNIZED_ROLES);
+  assert.equal(emitted.size, EMITTED_ROLES.length); // 중복 없음
+  assert.equal(recognized.size, RECOGNIZED_ROLES.length);
+  for (const r of RECOGNIZED_ROLES) assert.equal(emitted.has(r), false, `'${r}'이 양쪽에 있다`);
+  assert.deepEqual([...ROLE_VOCAB], [...EMITTED_ROLES, ...RECOGNIZED_ROLES]);
+  for (const r of ROLE_VOCAB) assert.ok(isKnownRole(r), `'${r}'을 isKnownRole이 모른다`);
+});
+
+test('역할 어휘 — 검출기가 내는 이름은 출력용에 있다(어휘 어긋남 회귀 방지)', () => {
+  // resolveRole()이 폴백으로 내는 이름들 — 어휘에서 빠지면 맥락 인식이 조용히 깨진다.
+  for (const r of ['shape', 'container', 'wrapper', 'input', 'thumbnail', 'overlay', 'modal', 'progress', 'indicator', 'status']) {
+    assert.ok(EMITTED_ROLES.includes(r), `'${r}'이 EMITTED_ROLES에 없다`);
+  }
+  // aside가 출력 캐논, sidebar는 인식 전용 별칭(둘 다 맥락으로는 인식).
+  assert.ok(EMITTED_ROLES.includes('aside'));
+  assert.ok(RECOGNIZED_ROLES.includes('sidebar'));
+  assert.equal(pickScope('sidebar'), 'sidebar');
+  // 시트·드로어류는 출력하지 않고 인식만 — 페이지 랜드마크 오검출 방지.
+  for (const r of ['sheet', 'drawer', 'dialog', 'popup']) {
+    assert.ok(RECOGNIZED_ROLES.includes(r), `'${r}'이 RECOGNIZED_ROLES에 없다`);
+    assert.equal(pickScope(r), r);
+  }
+});
+
+test('parseTokenName — 새 leaf 역할 매핑(thumbnail/indicator/overlay…)', () => {
+  assert.equal(parseTokenName('card/thumb').roleLeaf, 'thumbnail');
+  assert.equal(parseTokenName('card/thumbnail').roleLeaf, 'thumbnail');
+  assert.equal(parseTokenName('track/indicator').roleLeaf, 'indicator');
+  assert.equal(parseTokenName('ui/progress').roleLeaf, 'progress');
+  assert.equal(parseTokenName('avatar/status').roleLeaf, 'status');
+  assert.equal(parseTokenName('modal/scrim').roleLeaf, 'overlay');
+  assert.equal(parseTokenName('field/input').roleLeaf, 'input');
 });
 
 test('parseTokenName — 역할 말단/맥락 접두사/원시 토큰', () => {

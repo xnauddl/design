@@ -1,16 +1,29 @@
 /* ============================================================
    rename.ts — 레이어를 "역할(role)"에 맞게 정돈 (naming.ts 규칙 사용)
    원칙: 역할이 이름을 정한다. 토큰은 신호로만 쓰고 경로를 복사하지 않는다.
-   - 보존형: Figma 기본명(Frame 12…)과 구 리네임의 토큰 베낌명만 교체,
-     사람이 지은 의미 있는 이름은 보존하고 자식의 맥락(context)으로만 사용.
-   - 역할 판정: 영역(상단/하단) → 버튼 → 토큰 말단 → 타입/기하 순.
-     · 영역: 페이지 세로 스택의 첫/마지막 컨테이너 → header/footer
-     · 버튼: 오토레이아웃 + 라운드 + 채움/외곽선 + 직속 텍스트 → button
-   - 맥락: 바로 위 의미 있는 이름에서 깨끗한 1단계만(pickScope). 숫자·단위 조각 제거.
+   - 정규화: 뚜렷한 역할(card/list/field/button/header… 등)은 역할 기반 이름으로 교체(사람이 지은 이름도 덮어씀).
+     역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과.
+     선택 루트(depth 0) 컨테이너는 보존(자식 맥락 앵커) — 단 카드/리스트/필드/버튼처럼 확실한 시멘틱이면 루트도 교체.
+   - 역할 판정:
+     · 전역 고우선: 오버레이/모달 → progress 안 indicator → field 안 input → 버튼/칩 → nav →
+       status/thumbnail → 토큰 말단.
+     · FRAME/GROUP/SECTION: progress → card/article → figure → field → list → list/nav-item →
+       영역(landmark) → section → container/wrapper.
+     · 그 외 타입/기하: VECTOR=icon, 얇은 막대=divider, 이미지 타원=avatar, 채움=background 등.
+     · HTML 랜드마크: 첫→header·마지막→footer·3분할 가운데→main·그 외 페이지 중간→section,
+       가로 좁은 컬럼→aside, 가로 링크행→nav, 이미지+캡션→figure, 피드 안 카드형 항목→article
+     · 버튼/칩: 오토레이아웃 + 라운드 + 채움/외곽선 + 직속 텍스트 → button(작고 알약형이면 chip)
+     · 시맨틱 컨테이너: 라벨+입력 → field, 반복 아이템 → list, 표면+라운드/그림자 → card,
+       알약형 트랙+채움 바 → progress(그 안의 바 → indicator)
+     · 맥락이 가르는 역할: field 안 입력상자 → input, card/item 안 작은 이미지 → thumbnail,
+       아바타 곁 작은 원 → status, 부모를 덮는 반투명 면 → overlay(그 위 패널 → modal)
+     · HTML 랜드마크와 컴포넌트/디자인 어휘(card/chip/avatar…)를 함께 사용. 리스트 항목은 영역보다 우선.
+   - 맥락: 바로 위 의미 있는 이름에서 깨끗한 1단계만(pickScope). 없으면 시맨틱 토큰 접두사에서.
+     숫자·단위 조각 제거.
    - 이름 형식: {맥락}-{역할} 최대 2토막. 형제 충돌에 숫자 안 붙임(Figma 중복 허용).
-   - 제외: Component/ComponentSet · Text · Instance · 잠긴 레이어.
+   - 제외: Component/ComponentSet · Instance · 잠긴 레이어는 서브트리째 스킵, Text는 자기 이름만 보존.
    ============================================================ */
-import { isDefaultName, isTokenEchoName, parseTokenName, layerNameFromRole, pickScope, kebab } from './naming';
+import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole } from './naming';
 import type { ParsedToken } from './naming';
 import type { RenameChange, RenameNode } from '../shared/messages';
 
@@ -20,6 +33,20 @@ interface Pos {
   total: number;
   parentLayout: 'vertical' | 'horizontal' | null;
   depth: number;
+  /** 가로 부모에서 형제 최대폭 대비 비율(aside 판정용). 세로/없음이면 null. */
+  widthFrac: number | null;
+  /** 부모 치수(풀블리드·면적비 판정용). 알 수 없으면 null. */
+  parentDims: { w: number; h: number } | null;
+  /** 랜드마크 슬롯 번호 — 보이는 컨테이너 형제만 센 순번(대상 아니면 -1). */
+  regionIndex: number;
+  /** 랜드마크 슬롯 총수. */
+  regionTotal: number;
+  /** 자신이 확정된 배경막인지. */
+  isOverlay: boolean;
+  /** 앞선 형제 중 확정된 배경막이 있는지(그 위에 얹힌 패널 → modal). */
+  afterOverlay: boolean;
+  /** 형제 중 아바타(이미지 원)가 있는지(작은 점 → status). */
+  hasAvatarSibling: boolean;
 }
 
 interface Opts {
@@ -45,8 +72,13 @@ export async function renameSelection(
   opts: Opts,
 ): Promise<RenameOutcome> {
   const col: Collect = { changes: [], nodes: [] };
-  await recurse(selection, null, opts, col, 0, null, null);
+  const safeOpts: Opts = { ...opts, maxDepth: normalizeMaxDepth(opts.maxDepth) };
+  await recurse(selection, null, safeOpts, col, 0, null, null, null, null);
   return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
+}
+
+function normalizeMaxDepth(v: number): number {
+  return Number.isFinite(v) ? Math.max(1, Math.round(v)) : 8;
 }
 
 async function recurse(
@@ -57,32 +89,57 @@ async function recurse(
   depth: number,
   parentLayout: Pos['parentLayout'],
   parentId: string | null,
+  parentRole: string | null,
+  parentDims: { w: number; h: number } | null,
 ): Promise<void> {
   const total = nodes.length;
+  // 랜드마크 슬롯 — 실제로 리네임 대상이 되는 "보이는 컨테이너"만 센다.
+  // 숨김 레이어·TEXT·인스턴스가 자리를 차지하면 header/footer가 엉뚱한 노드로 밀린다.
+  const slotOf = new Map<number, number>();
+  let slots = 0;
+  for (let i = 0; i < total; i++) if (isLandmarkCandidate(nodes[i])) slotOf.set(i, slots++);
+  // 형제 신호: 배경막 위치(그 뒤 = modal 후보) · 아바타 존재(작은 점 = status 후보).
+  const overlayAt = findOverlayIndex(nodes, parentDims);
+  const hasAvatarSibling = nodes.some((n) => n.type === 'ELLIPSE' && hasImageFill(n));
   for (let i = 0; i < total; i++) {
     const node = nodes[i];
     const before = node.name; // apply 시 node.name이 바뀌므로 먼저 캡처
-    const pos: Pos = { index: i, total, parentLayout, depth };
-    const decided = await decide(node, ancestorName, pos, opts);
-    let contextForChildren = before;
+    // 좁은 컬럼(aside) 비율은 형제 최대폭이 아니라 부모 폭 대비로 잰다.
+    const w = dims(node)?.w;
+    const widthFrac = w != null && parentDims && parentDims.w > 0 ? w / parentDims.w : null;
+    const pos: Pos = {
+      index: i, total, parentLayout, depth, widthFrac, parentDims,
+      regionIndex: slotOf.get(i) ?? -1,
+      regionTotal: slots,
+      isOverlay: i === overlayAt,
+      afterOverlay: overlayAt >= 0 && i > overlayAt,
+      hasAvatarSibling,
+    };
+    const decided = await decide(node, ancestorName, pos, opts, parentRole);
+    let contextForChildren: string | null = before;
     let after: string | undefined;
 
     if (!decided.skip && decided.name) {
-      contextForChildren = decided.name;
       // 숫자 접미사 없음 — 형제가 같은 이름이어도 그대로(Figma는 중복 이름 허용).
       if (decided.name !== before) {
         after = decided.name;
         col.changes.push({ id: node.id, before, after });
         if (opts.apply) node.name = after;
       }
+      // 맥락: 일반 레이아웃(passthrough)은 받은 맥락을 그대로 통과, 그 외엔 내 새 이름.
+      contextForChildren = decided.passthrough ? ancestorName : decided.name;
     }
 
     // 영향 여부와 무관하게 트리에 담는다(전체 서브트리 + 영향 노드 강조).
     col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
 
-    // #7b-2: 인스턴스 서브트리는 통째로 스킵(내부는 메인 컴포넌트 소유 → 리네임 무의미·에러 위험).
-    if ('children' in node && node.type !== 'INSTANCE') {
-      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id);
+    // 제외 대상은 서브트리째 건너뛴다 — decide()가 노드 자신만 스킵하면 내부는 그대로 리네임돼
+    // 메인 컴포넌트 내부 이름(→ 모든 인스턴스에 전파)과 잠금 레이어까지 덮어쓰게 된다.
+    if ('children' in node && !isSkippedSubtree(node)) {
+      // 자식 역할은 부모에게 "실제로 부여된" 역할에서만 파생한다(구조 재판정 금지) —
+      // 그래야 nav처럼 list를 앞지르는 역할이 붙었을 때 자식이 엉뚱하게 item이 되지 않는다.
+      const childDims = decided.passthrough ? parentDims : dims(node);
+      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, decided.role ?? null, childDims);
     }
   }
 }
@@ -92,33 +149,60 @@ async function decide(
   ancestorName: string | null,
   pos: Pos,
   opts: Opts,
-): Promise<{ skip: boolean; name?: string }> {
-  // 제외 규칙(이름 유지 · 자기 이름을 자식 맥락으로 전달)
+  parentRole: string | null,
+): Promise<{ skip: boolean; name?: string; passthrough?: boolean; role?: string }> {
+  // 제외 규칙(이름 유지). 일부 노드는 recurse()에서 서브트리째 중단한다.
   if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return { skip: true };
   if (node.type === 'TEXT') return { skip: true };
   if (node.type === 'INSTANCE') return { skip: true };
   if (node.locked) return { skip: true };
 
-  // #7b-1: 선택 루트(depth 0) 컨테이너는 기본명이어도 항상 보존 — 자식의 맥락으로만 쓴다.
-  if (pos.depth === 0 && isContainerType(node)) return { skip: true };
+  // #7b-1: 선택 루트(depth 0) 컨테이너는 보존 — 자식의 맥락 앵커로만 쓴다.
+  // 단, 구조로 "확실한" 시멘틱(card/list/field/button/chip)이면 루트라도 역할명으로 교체.
+  if (pos.depth === 0 && isContainerType(node)) {
+    const hc = highConfidenceRole(node);
+    if (!hc) return { skip: true };
+    let hcScope = ancestorName ? pickScope(ancestorName) : null;
+    if (hcScope === hc) hcScope = null;
+    return { skip: false, role: hc, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }) };
+  }
 
-  // 보존형: 사람이 지은 의미 있는 이름은 그대로 두고 맥락으로만 쓴다.
-  // 단, Figma 기본명과 구 리네임이 남긴 토큰 베낌 이름(color-121210 등)은 교체.
-  if (!isDefaultName(node.name) && !isTokenEchoName(node.name)) return { skip: true };
-
+  // 전체 정규화: 현재 이름과 무관하게 역할 기반 이름으로 교체(사람이 지은 이름도 덮어씀).
+  // 구조적 제외(위)와 선택 루트 보존(#7b-1)만 예외 — 그 외엔 모두 역할명으로.
   const token = await primaryToken(node);
-  const role = resolveRole(node, token, pos);
   // 맥락: 바로 위 의미 있는 이름에서 깨끗한 1단계 → 없으면 토큰 경로 접두사에서.
-  let scope = (ancestorName ? pickScope(ancestorName) : null) ?? (token?.context ? pickScope(token.context) : null);
-  if (scope === role) scope = null; // 맥락==역할이면 중복 제거(button-button 방지)
-  return { skip: false, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
+  // 역할 판정보다 먼저 구한다 — field→input, card→thumbnail처럼 맥락이 역할을 가르는 경우가 있다.
+  const ctxScope = (ancestorName ? pickScope(ancestorName) : null) ?? (token?.context ? pickScope(token.context) : null);
+  const role = resolveRole(node, token, pos, parentRole, ctxScope);
+  // 역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하되,
+  // 상속 맥락은 자식에게 그대로 통과(passthrough)시켜 의미있는 후손이 카드 맥락을 받게.
+  if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: role, passthrough: true };
+  const scope = ctxScope === role ? null : ctxScope; // 맥락==역할이면 중복 제거(button-button 방지)
+  return { skip: false, role, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
 }
 
-/* ---------- 역할 판정: 영역 → 버튼 → 토큰 신호 → 타입/기하 ---------- */
-function resolveRole(node: SceneNode, token: ParsedToken | null, pos: Pos): string {
-  if (isButtonLike(node)) return 'button'; // 버튼은 토큰 채움색보다 우선
-  const region = regionRole(node, pos);
-  if (region) return region;
+/** 역할 없는 순수 레이아웃 폴백 — 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과. */
+const PASSTHROUGH_ROLES = new Set(['container', 'wrapper']);
+
+/* ---------- 역할 판정: 전역 고우선 → 토큰 신호 → 컨테이너 시맨틱/랜드마크 → 타입/기하 ---------- */
+function resolveRole(
+  node: SceneNode,
+  token: ParsedToken | null,
+  pos: Pos,
+  parentRole: string | null,
+  ctxScope: string | null,
+): string {
+  // 확정된 모달 레이어는 최우선 — 배경막과 그 위 패널은 다른 무엇으로도 읽히면 안 된다.
+  if (pos.isOverlay) return 'overlay';
+  if (isModalLike(node, pos, ctxScope)) return 'modal';
+  // 프로그레스 트랙 안의 채움 바 → indicator(얇은 막대 → divider 오검출 방지).
+  if (ctxScope === 'progress' && isBarFill(node)) return 'indicator';
+  // 입력은 field 맥락에서만 인정 — 맥락 없이는 아웃라인 버튼과 구분되지 않는다.
+  if (ctxScope === 'field' && isInputBox(node)) return 'input';
+  if (isButtonLike(node)) return isChipLike(node) ? 'chip' : 'button'; // 버튼은 토큰 채움색보다 우선
+  if (isNavLike(node, pos.depth)) return 'nav'; // HTML 랜드마크: 페이지 수준 가로 링크행
+  if (isStatusDot(node, pos)) return 'status'; // 아바타 곁의 작은 점(온라인 표시 등)
+  if (isThumbnail(node, pos, ctxScope)) return 'thumbnail'; // 카드/항목 맥락의 작은 미리보기
   if (token?.roleLeaf) return token.roleLeaf; // 토큰 말단이 역할이면 신호로 사용
 
   switch (node.type) {
@@ -140,18 +224,56 @@ function resolveRole(node: SceneNode, token: ParsedToken | null, pos: Pos): stri
     case 'FRAME':
     case 'GROUP':
     case 'SECTION': {
-      const count = 'children' in node ? node.children.length : 0;
-      if (count === 0) {
-        // 자식 없는 프레임: 색만 채웠으면 스와치, 이미지면 image, 비었으면 container.
+      const kids = 'children' in node ? node.children : [];
+      if (kids.length === 0) {
+        // 자식 없는 프레임: 색만 채웠으면 스와치, 이미지면 image.
         if (hasImageFill(node)) return 'image';
         if (hasColorFill(node)) return 'swatch';
+        // 빈 컨테이너도 페이지 랜드마크 자리는 차지한다(자리표시 섹션).
+        const emptyRegion = regionRole(node, pos, ctxScope);
+        if (emptyRegion) return emptyRegion;
         return 'container';
       }
-      return count === 1 ? 'wrapper' : 'container';
+      // 시맨틱 컨테이너(보수적): 명확한 패턴만 인정, 아니면 일반 container/wrapper.
+      // 이 판정들은 랜드마크(header/footer/aside)보다 먼저다 — 그렇지 않으면 페이지 아래
+      // 첫/마지막에 놓인 카드·필드가 전부 header/footer로 덮인다.
+      // progress는 card보다 먼저 — 알약형 트랙은 라운드+채움이라 card 조건도 만족한다.
+      if (isProgressLike(node, kids)) return 'progress';
+      if (isCardLike(node, kids)) return parentRole === 'list' ? 'article' : 'card'; // 피드 안 카드형 → article
+      if (isFigureLike(node, kids)) return 'figure'; // HTML 랜드마크: 이미지+캡션
+      if (isFieldLike(node, kids)) return 'field';
+      if (isListLike(node, kids)) return 'list';
+      // 리스트·네비의 직속 컨테이너 자식 → item(= list-item / nav-item)
+      if (parentRole === 'list' || parentRole === 'nav') return 'item';
+      const region = regionRole(node, pos, ctxScope); // HTML 랜드마크: header/footer/main/aside
+      if (region) return region;
+      if (isPageSection(pos, ctxScope)) return 'section'; // 역할 없는 페이지 중간 블록
+      return kids.length === 1 ? 'wrapper' : 'container';
     }
     default:
       return kebab(node.type);
   }
+}
+
+/**
+ * 선택 루트(보존 대상)라도 덮어쓸 만큼 "구조로 확실한" 시멘틱 역할만 반환(아니면 null → 보존).
+ * 위치/토큰 같은 약한 신호나 일반 구조(container/wrapper)는 제외 —
+ * 선택 루트를 바꾸려면 그 노드 자체가 명백히 그 시멘틱이어야 한다.
+ */
+function highConfidenceRole(node: SceneNode): string | null {
+  if (isButtonLike(node)) return isChipLike(node) ? 'chip' : 'button';
+  if (isNavLike(node, 0)) return 'nav';
+  if ('children' in node && isContainerType(node)) {
+    const kids = node.children;
+    if (kids.length) {
+      if (isProgressLike(node, kids)) return 'progress';
+      if (isCardLike(node, kids)) return 'card';
+      if (isFigureLike(node, kids)) return 'figure';
+      if (isFieldLike(node, kids)) return 'field';
+      if (isListLike(node, kids)) return 'list';
+    }
+  }
+  return null;
 }
 
 /* ---------- 주(主) 바인딩 토큰 → 파싱된 신호 ---------- */
@@ -173,7 +295,10 @@ async function primaryToken(node: SceneNode): Promise<ParsedToken | null> {
     const id = firstAliasId(bv[field]);
     if (id) {
       const v = await figma.variables.getVariableByIdAsync(id);
-      if (v) return parseTokenName(v.name);
+      if (v) {
+        const token = parseTokenName(v.name);
+        if (!token.primitive) return token;
+      }
     }
   }
   return null;
@@ -243,15 +368,85 @@ function isContainerType(node: SceneNode): boolean {
 }
 
 /**
- * 영역 추론(보수적): 페이지(세로 오토레이아웃) 바로 아래 컨테이너의
- * 첫 자식 → header, 마지막 자식 → footer. depth 1에서만(과추론 방지).
+ * 서브트리째 건너뛸 노드인지 — 내부를 소유하지 않거나 건드리면 안 되는 트리.
+ * 인스턴스(메인 컴포넌트 소유) · 메인 컴포넌트 내부(모든 인스턴스에 전파) · 잠금 레이어.
  */
-function regionRole(node: SceneNode, pos: Pos): string | null {
-  if (pos.depth !== 1 || pos.parentLayout !== 'vertical' || pos.total < 2) return null;
-  if (!isContainerType(node)) return null;
-  if (pos.index === 0) return 'header';
-  if (pos.index === pos.total - 1) return 'footer';
+function isSkippedSubtree(node: SceneNode): boolean {
+  return (
+    node.type === 'INSTANCE' ||
+    node.type === 'COMPONENT' ||
+    node.type === 'COMPONENT_SET' ||
+    node.locked
+  );
+}
+
+/** 랜드마크 슬롯을 차지할 수 있는 형제인지 — 보이는, 리네임 대상 컨테이너만. */
+function isLandmarkCandidate(node: SceneNode): boolean {
+  if (!isContainerType(node)) return false;
+  if (node.locked) return false;
+  return (node as { visible?: boolean }).visible !== false;
+}
+
+/** 페이지 수준 가로 스플릿인지 — 툴바·카드 헤더 같은 납작한 행과 구분(aside 오검출 방지). */
+function isPageSplit(pos: Pos): boolean {
+  const p = pos.parentDims;
+  return !!p && p.w >= 768 && p.h >= 400;
+}
+
+/**
+ * 부모가 "페이지"로 볼 만한지 — header/footer/main/aside를 붙일 자격.
+ * depth는 선택 기준 상대값이라, 이 게이트가 없으면 Hero·Card처럼 페이지가 아닌 걸
+ * 선택하는 순간 그 자식들이 전부 depth 1 = 랜드마크 자리로 취급된다(hero-footer).
+ * 두 가지로 거른다:
+ *  - 이름: 부모 맥락이 알려진 역할(hero/card/nav/modal/sheet…)이면 페이지가 아니다.
+ *    'Desktop'·'Home'처럼 역할 어휘가 아닌 이름이나, 일반 구조어(pickScope가 null)만 통과.
+ *  - 형태: 좁은 모달/시트(폭 < 768)는 모바일 세로 화면만 예외로 통과.
+ *    데스크톱 폭은 히어로 배너(~700)보다 큰 화면 높이(≥800)만 페이지로 본다.
+ *    치수를 모르면 이름 판정에만 의존.
+ */
+function isPageParent(pos: Pos, ctxScope: string | null): boolean {
+  if (ctxScope && isKnownRole(ctxScope)) return false;
+  const p = pos.parentDims;
+  if (!p || p.w <= 0 || p.h <= 0) return true; // 치수 미상 → 이름 판정에만 의존
+  // 좁은 프레임: 시트/드로어/다이얼로그 vs 세로 모바일 화면
+  if (p.w < 768) return p.h >= 700 && p.h >= p.w;
+  // 데스크톱·태블릿 폭: 납작한 히어로·패널은 배제, 화면 크롬만 통과
+  return p.h >= 800;
+}
+
+/**
+ * HTML 랜드마크 영역 추론(보수적, depth 1 컨테이너만).
+ * 순번은 `regionIndex`/`regionTotal` — 숨김·TEXT·인스턴스 형제를 뺀 슬롯이라
+ * 유령 레이어 하나가 header/footer 자리를 밀어내지 않는다.
+ * - 가로: 페이지 수준 스플릿에서 부모 폭 대비 ≤35%인 좁은 컬럼 → aside
+ * - 세로: 첫 → header, 마지막 → footer, 정확히 3분할이면 가운데 → main
+ */
+function regionRole(node: SceneNode, pos: Pos, ctxScope: string | null): string | null {
+  if (pos.depth !== 1 || !isContainerType(node)) return null;
+  if (pos.regionIndex < 0) return null;
+  if (pos.parentLayout === 'horizontal') {
+    if (!isPageParent(pos, ctxScope)) return null; // 카드·패널 안 좁은 열은 aside 아님
+    if (!isPageSplit(pos)) return null;
+    return pos.widthFrac != null && pos.widthFrac <= 0.35 ? 'aside' : null;
+  }
+  if (pos.parentLayout !== 'vertical' || pos.regionTotal < 2) return null;
+  if (!isPageParent(pos, ctxScope)) return null; // 히어로·카드·시트 안에는 header/footer가 없다
+  if (pos.regionIndex === 0) return 'header';
+  if (pos.regionIndex === pos.regionTotal - 1) return 'footer';
+  if (pos.regionTotal === 3) return 'main'; // 가운데(0·마지막은 위에서 처리됨)
   return null;
+}
+
+/** 페이지(세로 스택, 슬롯 3개 초과)의 역할 없는 중간 블록인지 — section 폴백. */
+function isPageSection(pos: Pos, ctxScope: string | null): boolean {
+  return (
+    pos.depth === 1 &&
+    pos.parentLayout === 'vertical' &&
+    pos.regionIndex > 0 &&
+    pos.regionTotal > 3 &&
+    pos.regionIndex < pos.regionTotal - 1 &&
+    isPageParent(pos, ctxScope)
+  );
 }
 
 /** 버튼 추론: 오토레이아웃 + 라운드 + 채움/외곽선 + 직속 텍스트 + 과대하지 않음. */
@@ -275,4 +470,265 @@ function cornerRadiusOf(node: SceneNode): number {
 
 function hasDirectText(node: SceneNode): boolean {
   return 'children' in node && node.children.some((c) => c.type === 'TEXT');
+}
+
+/* ---------- 시맨틱 컨테이너(카드/리스트/필드)·칩 추론 ---------- */
+/** 칩: 작은(높이 ≤28) 알약형(반지름 ≥ 높이/2) — 버튼 중 작고 둥근 것. */
+function isChipLike(node: SceneNode): boolean {
+  const d = dims(node);
+  if (!d || d.h > 28) return false;
+  return cornerRadiusOf(node) >= d.h / 2 - 1;
+}
+
+/** 보이는 드롭섀도가 있는지(카드 판정용). */
+function hasDropShadow(node: SceneNode): boolean {
+  const eff = (node as { effects?: readonly Effect[] }).effects;
+  return Array.isArray(eff) && eff.some((e) => e.visible !== false && e.type === 'DROP_SHADOW');
+}
+
+/** 카드: 표면(채움/외곽선) + 라운드 또는 그림자 + 자식 2개 이상인 프레임. */
+function isCardLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  if (node.type !== 'FRAME') return false;
+  if (kids.length < 2) return false;
+  if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
+  return cornerRadiusOf(node) > 0 || hasDropShadow(node);
+}
+
+/** 리스트 아이템이 될 수 있는(구조적) 자식 타입. */
+const LIST_ITEM_TYPES = new Set(['FRAME', 'GROUP', 'INSTANCE', 'COMPONENT', 'RECTANGLE', 'ELLIPSE']);
+
+/** 리스트: 오토레이아웃 + 같은 타입·유사 크기 자식 3개 이상(반복 아이템). */
+function isListLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  if (node.type !== 'FRAME') return false;
+  if (layoutOf(node) === null) return false; // 오토레이아웃만(우연한 겹침 배제)
+  if (kids.length < 3) return false;
+  const counts = new Map<string, number>();
+  for (const k of kids) counts.set(k.type, (counts.get(k.type) ?? 0) + 1);
+  let domType: string | null = null;
+  let domCount = 0;
+  for (const [t, c] of counts) if (c > domCount) { domCount = c; domType = t; }
+  if (!domType || domCount / kids.length < 0.8) return false; // 8할 이상 같은 타입
+  if (!LIST_ITEM_TYPES.has(domType)) return false;
+  if (isSectionStack(kids)) return false; // 전폭·대형 블록의 반복은 페이지 구성이지 리스트가 아니다
+  return dimsSimilar(kids); // 크기까지 유사해야 반복 아이템
+}
+
+/** 페이지 섹션 스택인지 — 자식이 모두 전폭(≥768)이면서 큰(≥400) 블록. */
+function isSectionStack(kids: readonly SceneNode[]): boolean {
+  return kids.every((k) => {
+    const d = dims(k);
+    return !!d && d.w >= 768 && d.h >= 400;
+  });
+}
+
+/**
+ * 모든 자식의 너비·높이가 서로 비슷한지(반복 행/카드 신호). 치수 없으면 보수적으로 false.
+ * 높이 허용치는 좁게(1.25) — 전폭 페이지 섹션은 너비비가 항상 1.0이라 너비로는 걸러지지 않고,
+ * 헐거운 높이 허용치면 랜딩 페이지 섹션 스택이 통째로 리스트가 된다.
+ */
+function dimsSimilar(kids: readonly SceneNode[]): boolean {
+  const ws: number[] = [];
+  const hs: number[] = [];
+  for (const k of kids) {
+    const d = dims(k);
+    if (!d) return false;
+    ws.push(d.w);
+    hs.push(d.h);
+  }
+  return ratioWithin(ws, 1.5) && ratioWithin(hs, 1.25);
+}
+
+function ratioWithin(xs: number[], max: number): boolean {
+  const mn = Math.min(...xs);
+  const mx = Math.max(...xs);
+  if (mn <= 0) return false;
+  return mx / mn <= max;
+}
+
+/** 보이는 레이어인지(숨긴 에러/힌트 줄을 자식 수에서 빼기 위함). */
+function isVisible(node: SceneNode): boolean {
+  return (node as { visible?: boolean }).visible !== false;
+}
+
+/**
+ * 필드: 세로 스택 안에 라벨(텍스트) + 입력박스.
+ * 보이는 자식만 세고 힌트·에러 줄까지 허용한다 — 숨겨둔 에러 상태 레이어 하나 때문에
+ * 필드가 통째로 container로 떨어지지 않도록.
+ */
+function isFieldLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  if (node.type !== 'FRAME') return false;
+  if (layoutOf(node) !== 'vertical') return false; // 라벨 위, 입력 아래
+  const shown = kids.filter(isVisible);
+  if (shown.length < 2 || shown.length > 4) return false; // 라벨+입력(+힌트/에러)
+  const hasLabel = shown.some((k) => k.type === 'TEXT');
+  const hasInput = shown.some(isInputBox);
+  return hasLabel && hasInput;
+}
+
+/**
+ * 입력박스: 외곽선/색 채움이 있는 가로로 긴(너비 ≥ 높이×2) 프레임·사각형.
+ * 이미지 채움과 입력 높이를 벗어나는 크기는 제외 — 그러지 않으면 카드의 커버 사진이
+ * 입력으로 인식돼 카드 전체가 field로 분류된다.
+ */
+function isInputBox(node: SceneNode): boolean {
+  if (node.type !== 'FRAME' && node.type !== 'RECTANGLE') return false;
+  if (hasImageFill(node)) return false; // 사진은 입력 상자가 아니다
+  if (!hasVisibleStroke(node) && !hasColorFill(node)) return false;
+  const d = dims(node);
+  if (!d || d.h <= 0 || d.h > 72) return false; // 입력 높이 상한
+  return d.w >= d.h * 2;
+}
+
+/* ---------- HTML 랜드마크(nav/figure) 추론 ---------- */
+/**
+ * 네비: 페이지 수준(depth ≤1)의 가로 오토레이아웃 + 링크형 자식 3개 이상, 과대하지 않음.
+ * depth 제한과 버튼 크롬 제외가 없으면 카드 안 통계 행·테이블 헤더·세그먼트 라벨이
+ * 전부 nav 랜드마크로 덮인다.
+ */
+function isNavLike(node: SceneNode, depth: number): boolean {
+  if (node.type !== 'FRAME') return false;
+  if (layoutOf(node) !== 'horizontal') return false;
+  if (depth > 1) return false; // 페이지 수준 링크 행만
+  if (cornerRadiusOf(node) > 0 && (hasVisibleFill(node) || hasVisibleStroke(node))) return false; // 버튼 크롬
+  const kids = node.children;
+  if (kids.length < 3) return false;
+  const d = dims(node);
+  if (d && d.h > 80) return false; // 너무 크면 nav 아님(카드/섹션 행)
+  return kids.every((k) => k.type === 'TEXT' || (k.type === 'FRAME' && hasDirectText(k)));
+}
+
+/** 피겨: 이미지(채움) 자식 + 캡션(텍스트)으로 이뤄진 프레임 — 카드 크롬이 없을 때만(카드 우선). */
+function isFigureLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  if (node.type !== 'FRAME') return false;
+  if (kids.length < 2 || kids.length > 3) return false;
+  const hasImg = kids.some((k) => hasImageFill(k));
+  const hasCaption = kids.some((k) => k.type === 'TEXT');
+  return hasImg && hasCaption;
+}
+
+/* ---------- 오버레이/모달 · 입력 · 프로그레스 · 썸네일 · 상태 추론 ---------- */
+/**
+ * 스크림 페인트인지 — 반투명한 "단색" 표면.
+ * 그라데이션 워시·틴트는 제외한다. 아무 반투명 면이나 배경막으로 보면
+ * 장식용 배경을 깐 페이지의 히어로가 modal이 된다.
+ */
+function isScrimPaint(node: SceneNode): boolean {
+  const f = paints(node, 'fills');
+  if (!f) return false;
+  const solid = f.filter((p) => p.visible !== false && p.type === 'SOLID');
+  if (!solid.length) return false;
+  const o = (node as { opacity?: number }).opacity;
+  if (typeof o === 'number' && o < 1) return true;
+  return solid.some((p) => typeof p.opacity === 'number' && p.opacity < 1);
+}
+
+/** 부모를 거의(≥95%) 덮는지 — 풀블리드 판정. 부모 치수를 모르면 false. */
+function coversParent(node: SceneNode, parentDims: { w: number; h: number } | null): boolean {
+  if (!parentDims || parentDims.w <= 0 || parentDims.h <= 0) return false;
+  const d = dims(node);
+  if (!d) return false;
+  return d.w / parentDims.w >= 0.95 && d.h / parentDims.h >= 0.95;
+}
+
+/** 배경막 후보: 부모를 덮는 반투명 단색 면. */
+function isScrimLike(node: SceneNode, parentDims: { w: number; h: number } | null): boolean {
+  if (node.type !== 'FRAME' && node.type !== 'RECTANGLE') return false;
+  if (!coversParent(node, parentDims)) return false;
+  return isScrimPaint(node);
+}
+
+/** 부모보다 양 축 모두 뚜렷하게 작은지 — 가운데 띄운 패널 판정(전폭 header 배제). */
+function isInsetPanel(node: SceneNode, parentDims: { w: number; h: number } | null): boolean {
+  if (!parentDims || parentDims.w <= 0 || parentDims.h <= 0) return false;
+  const d = dims(node);
+  return !!d && d.w / parentDims.w <= 0.9 && d.h / parentDims.h <= 0.9;
+}
+
+/** 모달 패널: 표면(채움/외곽선)이 있고 부모보다 양 축 모두 작은 내용 컨테이너. */
+function isPanelLike(node: SceneNode, parentDims: { w: number; h: number } | null): boolean {
+  if (!isContainerType(node)) return false;
+  if (!('children' in node) || node.children.length === 0) return false;
+  if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
+  return isInsetPanel(node, parentDims);
+}
+
+/**
+ * 확정된 배경막의 인덱스(없으면 -1).
+ * 반투명 면 하나만으로는 부족하고, 그 위(뒤 형제)나 그 안에 실제 패널이 있어야 배경막으로 인정한다.
+ * 배경막과 패널이 서로를 뒷받침하게 해서 장식용 반투명 배경의 오검출을 막는다.
+ */
+function findOverlayIndex(nodes: readonly SceneNode[], parentDims: { w: number; h: number } | null): number {
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (!isScrimLike(n, parentDims)) continue;
+    for (let j = i + 1; j < nodes.length; j++) if (isPanelLike(nodes[j], parentDims)) return i;
+    if ('children' in n && n.children.some((k) => isPanelLike(k, dims(n)))) return i;
+  }
+  return -1;
+}
+
+/** 모달(패널): 확정된 배경막 뒤에 오거나 배경막 맥락 안에 있는 패널. */
+function isModalLike(node: SceneNode, pos: Pos, ctxScope: string | null): boolean {
+  if (!pos.afterOverlay && ctxScope !== 'overlay') return false;
+  return isPanelLike(node, pos.parentDims);
+}
+
+/**
+ * 프로그레스: 얇고 완전히 둥근 가로 트랙 + 그보다 "좁은" 채움 바 자식.
+ * - 높이 하한 4px: 그 아래는 알약 검사가 공허해져(`r >= h/2`가 0 이상이면 통과) 구분선까지 걸린다
+ * - 채움 바는 트랙보다 좁아야 함: 같은 폭이면 진행 표시가 아니라 장식용 액센트 바다
+ */
+function isProgressLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  if (node.type !== 'FRAME') return false;
+  if (kids.length < 1 || kids.length > 2) return false;
+  if (kids.some((k) => k.type === 'TEXT')) return false; // 텍스트가 있으면 칩/버튼 쪽
+  const d = dims(node);
+  if (!d || d.h < 4 || d.h > 24) return false;
+  if (d.w < d.h * 4) return false; // 가로로 긴 바
+  if (cornerRadiusOf(node) * 2 < d.h) return false; // 완전한 알약형 트랙
+  if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
+  return kids.some((k) => {
+    const kd = dims(k);
+    return !!kd && kd.w > 0 && kd.w < d.w && kd.h <= d.h + 1 && hasColorFill(k);
+  });
+}
+
+/**
+ * 프로그레스 트랙 안의 채움 바인지 — 색만 채운 납작한 가로 막대.
+ * 맥락이 'progress'이기만 하면 인정하면 'Progress'라는 이름의 섹션 아래 색 있는
+ * 모든 자식이 indicator가 된다. 형태까지 봐서 실제 바만 인정한다.
+ */
+function isBarFill(node: SceneNode): boolean {
+  if (node.type !== 'RECTANGLE' && node.type !== 'FRAME') return false;
+  if ('children' in node && node.children.length > 0) return false; // 내용이 있으면 바가 아님
+  if (hasImageFill(node) || !hasColorFill(node)) return false;
+  const d = dims(node);
+  return !!d && d.h > 0 && d.h <= 24 && d.w >= d.h * 2;
+}
+
+/** 썸네일이 성립하는 맥락 — 카드/피드 항목 안의 미리보기. */
+const THUMB_CONTEXTS = new Set(['card', 'article', 'item', 'list', 'figure']);
+
+/** 썸네일: 카드/항목 맥락 안의 작은 이미지. 전면 이미지는 image, 둥근 이미지는 avatar. */
+function isThumbnail(node: SceneNode, pos: Pos, ctxScope: string | null): boolean {
+  if (!ctxScope || !THUMB_CONTEXTS.has(ctxScope)) return false;
+  if (node.type === 'ELLIPSE') return false; // 원형 이미지는 avatar
+  if (!hasImageFill(node)) return false;
+  const d = dims(node);
+  if (!d) return false;
+  if (Math.max(d.w, d.h) <= 96) return true; // 작은 미리보기
+  const p = pos.parentDims;
+  return !!p && p.w > 0 && p.h > 0 && (d.w * d.h) / (p.w * p.h) <= 0.35; // 부모 대비 작음
+}
+
+/** 상태 점: 아바타 형제 곁의 작은 단색 원(온라인 표시 등). */
+function isStatusDot(node: SceneNode, pos: Pos): boolean {
+  if (!pos.hasAvatarSibling) return false;
+  if (node.type !== 'ELLIPSE' && node.type !== 'RECTANGLE' && node.type !== 'FRAME') return false;
+  if (hasImageFill(node) || !hasColorFill(node)) return false;
+  const d = dims(node);
+  if (!d || d.w <= 0 || d.h <= 0) return false;
+  if (Math.max(d.w, d.h) > 16) return false; // 작은 점
+  // 원형이어야 한다 — 사각 타입이면 반지름이 반쪽 이상.
+  return node.type === 'ELLIPSE' || cornerRadiusOf(node) >= Math.min(d.w, d.h) / 2 - 1;
 }
