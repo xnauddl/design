@@ -534,7 +534,7 @@
         <!-- 표가 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
         <div class="list-more" id="colorTableMore" style="display:none">
           <span class="list-count" id="colorTableCount"></span>
-          <button class="link" id="btnColorTableExpand">모두 펼치기</button>
+          <button class="link" id="btnColorTableExpand" data-i18n="list.expandAll">모두 펼치기</button>
         </div>
         <div class="row"><button id="btnColorRoles" data-i18n="colorTable.applyBtn">시맨틱 매핑에 반영</button></div>
         <datalist id="roleList">
@@ -555,7 +555,7 @@
       <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="tokenListMore" style="display:none">
         <span class="list-count" id="tokenListCount"></span>
-        <button class="link" id="btnTokenListExpand">모두 펼치기</button>
+        <button class="link" id="btnTokenListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
       <div class="row">
         <label class="inline"><span data-i18n="create.base">base(px)</span> <input id="base" type="number" value="16" min="1" /></label>
@@ -583,21 +583,21 @@
     </div>
 
     <div class="step" id="darkCard">
-      <h2>다크 테마 생성 <span class="muted" id="darkLock"></span></h2>
-      <div class="hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
+      <h2><span data-i18n="dark.title">다크 테마 생성</span> <span class="muted" id="darkLock"></span></h2>
+      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
       <div class="row">
-        <label class="inline">대상 컬렉션
+        <label class="inline"><span data-i18n="dark.collection">대상 컬렉션</span>
           <select id="darkCollection"></select>
         </label>
       </div>
       <div class="row">
-        <label class="inline">라이트 모드
+        <label class="inline"><span data-i18n="dark.fromMode">라이트 모드</span>
           <select id="darkFromMode"></select>
         </label>
-        <label class="inline">다크 모드
+        <label class="inline"><span data-i18n="dark.toMode">다크 모드</span>
           <select id="darkToMode"></select>
         </label>
-        <button id="btnGenDark" class="primary">다크 채우기</button>
+        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 채우기</button>
       </div>
       <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
       <div class="status" id="darkStatus"></div>
@@ -634,7 +634,7 @@
       <!-- 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="tsListMore" style="display:none">
         <span class="list-count" id="tsListCount"></span>
-        <button class="link" id="btnTsListExpand">모두 펼치기</button>
+        <button class="link" id="btnTsListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
       <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">텍스트 스타일 등록</button>
       <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록할 때 화면의 글자에도 적용</span></label>
@@ -715,7 +715,7 @@
       <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="contrastListMore" style="display:none">
         <span class="list-count" id="contrastListCount"></span>
-        <button class="link" id="btnContrastListExpand">모두 펼치기</button>
+        <button class="link" id="btnContrastListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
       <div class="status" id="contrastStatus"></div>
     </div>
@@ -750,17 +750,17 @@
     </div>
 
     <div class="step" id="similarCard">
-      <h2>닮은 프레임 컴포넌트화 <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
-      <div class="hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
+      <h2><span data-i18n="similar.title">닮은 프레임 컴포넌트화</span> <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
+      <div class="hint" data-i18n-html="similar.hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
       <div class="row">
-        <button id="btnScanSimilar" title="선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)">닮은 프레임 스캔</button>
-        <button id="btnComponentize" class="primary" title="추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체">컴포넌트화</button>
+        <button id="btnScanSimilar" data-i18n="similar.scanBtn" title="선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)">닮은 프레임 스캔</button>
+        <button id="btnComponentize" class="primary" data-i18n="similar.componentizeBtn" title="추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체">컴포넌트화</button>
       </div>
       <div id="similarList" class="list-region"></div>
       <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 '모두 펼치기'(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="similarListMore" style="display:none">
         <span class="list-count" id="similarListCount"></span>
-        <button class="link" id="btnSimilarListExpand">모두 펼치기</button>
+        <button class="link" id="btnSimilarListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
       <div class="status" id="similarStatus"></div>
     </div>
@@ -793,11 +793,11 @@
     </div>
 
     <div class="step" id="varEditCard">
-      <h2>변수 편집기 <span class="muted" id="varCount"></span></h2>
-      <div class="hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.</div>
+      <h2><span data-i18n="varedit.title">변수 편집기</span> <span class="muted" id="varCount"></span></h2>
+      <div class="hint" data-i18n-html="varedit.hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.</div>
       <div class="row">
-        <button id="btnLoadVars">변수 불러오기</button>
-        <label class="inline">컬렉션
+        <button id="btnLoadVars" data-i18n="varedit.loadBtn">변수 불러오기</button>
+        <label class="inline"><span data-i18n="varedit.collection">컬렉션</span>
           <select id="varFilterCol"><option value="">전체</option></select>
         </label>
         <input id="varFilterText" type="text" placeholder="이름으로 거르기" />
@@ -806,7 +806,7 @@
       <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="varListMore" style="display:none">
         <span class="list-count" id="varListCount"></span>
-        <button class="link" id="btnVarListExpand">모두 펼치기</button>
+        <button class="link" id="btnVarListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
       <div class="status" id="varEditStatus"></div>
     </div>

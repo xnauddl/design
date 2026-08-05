@@ -534,7 +534,7 @@
         <!-- 표가 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
         <div class="list-more" id="colorTableMore" style="display:none">
           <span class="list-count" id="colorTableCount"></span>
-          <button class="link" id="btnColorTableExpand">모두 펼치기</button>
+          <button class="link" id="btnColorTableExpand" data-i18n="list.expandAll">모두 펼치기</button>
         </div>
         <div class="row"><button id="btnColorRoles" data-i18n="colorTable.applyBtn">시맨틱 매핑에 반영</button></div>
         <datalist id="roleList">
@@ -555,7 +555,7 @@
       <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="tokenListMore" style="display:none">
         <span class="list-count" id="tokenListCount"></span>
-        <button class="link" id="btnTokenListExpand">모두 펼치기</button>
+        <button class="link" id="btnTokenListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
       <div class="row">
         <label class="inline"><span data-i18n="create.base">base(px)</span> <input id="base" type="number" value="16" min="1" /></label>
@@ -583,21 +583,21 @@
     </div>
 
     <div class="step" id="darkCard">
-      <h2>다크 테마 생성 <span class="muted" id="darkLock"></span></h2>
-      <div class="hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
+      <h2><span data-i18n="dark.title">다크 테마 생성</span> <span class="muted" id="darkLock"></span></h2>
+      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
       <div class="row">
-        <label class="inline">대상 컬렉션
+        <label class="inline"><span data-i18n="dark.collection">대상 컬렉션</span>
           <select id="darkCollection"></select>
         </label>
       </div>
       <div class="row">
-        <label class="inline">라이트 모드
+        <label class="inline"><span data-i18n="dark.fromMode">라이트 모드</span>
           <select id="darkFromMode"></select>
         </label>
-        <label class="inline">다크 모드
+        <label class="inline"><span data-i18n="dark.toMode">다크 모드</span>
           <select id="darkToMode"></select>
         </label>
-        <button id="btnGenDark" class="primary">다크 채우기</button>
+        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 채우기</button>
       </div>
       <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
       <div class="status" id="darkStatus"></div>
@@ -634,7 +634,7 @@
       <!-- 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="tsListMore" style="display:none">
         <span class="list-count" id="tsListCount"></span>
-        <button class="link" id="btnTsListExpand">모두 펼치기</button>
+        <button class="link" id="btnTsListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
       <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">텍스트 스타일 등록</button>
       <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록할 때 화면의 글자에도 적용</span></label>
@@ -715,7 +715,7 @@
       <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="contrastListMore" style="display:none">
         <span class="list-count" id="contrastListCount"></span>
-        <button class="link" id="btnContrastListExpand">모두 펼치기</button>
+        <button class="link" id="btnContrastListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
       <div class="status" id="contrastStatus"></div>
     </div>
@@ -750,17 +750,17 @@
     </div>
 
     <div class="step" id="similarCard">
-      <h2>닮은 프레임 컴포넌트화 <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
-      <div class="hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
+      <h2><span data-i18n="similar.title">닮은 프레임 컴포넌트화</span> <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
+      <div class="hint" data-i18n-html="similar.hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
       <div class="row">
-        <button id="btnScanSimilar" title="선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)">닮은 프레임 스캔</button>
-        <button id="btnComponentize" class="primary" title="추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체">컴포넌트화</button>
+        <button id="btnScanSimilar" data-i18n="similar.scanBtn" title="선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)">닮은 프레임 스캔</button>
+        <button id="btnComponentize" class="primary" data-i18n="similar.componentizeBtn" title="추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체">컴포넌트화</button>
       </div>
       <div id="similarList" class="list-region"></div>
       <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 '모두 펼치기'(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="similarListMore" style="display:none">
         <span class="list-count" id="similarListCount"></span>
-        <button class="link" id="btnSimilarListExpand">모두 펼치기</button>
+        <button class="link" id="btnSimilarListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
       <div class="status" id="similarStatus"></div>
     </div>
@@ -793,11 +793,11 @@
     </div>
 
     <div class="step" id="varEditCard">
-      <h2>변수 편집기 <span class="muted" id="varCount"></span></h2>
-      <div class="hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.</div>
+      <h2><span data-i18n="varedit.title">변수 편집기</span> <span class="muted" id="varCount"></span></h2>
+      <div class="hint" data-i18n-html="varedit.hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.</div>
       <div class="row">
-        <button id="btnLoadVars">변수 불러오기</button>
-        <label class="inline">컬렉션
+        <button id="btnLoadVars" data-i18n="varedit.loadBtn">변수 불러오기</button>
+        <label class="inline"><span data-i18n="varedit.collection">컬렉션</span>
           <select id="varFilterCol"><option value="">전체</option></select>
         </label>
         <input id="varFilterText" type="text" placeholder="이름으로 거르기" />
@@ -806,7 +806,7 @@
       <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="varListMore" style="display:none">
         <span class="list-count" id="varListCount"></span>
-        <button class="link" id="btnVarListExpand">모두 펼치기</button>
+        <button class="link" id="btnVarListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
       <div class="status" id="varEditStatus"></div>
     </div>
@@ -997,6 +997,25 @@
     "preset.exported": "\u2018{name}\u2019 JSON\uC744 \uB0B4\uBCF4\uB0C8\uC2B5\uB2C8\uB2E4(\uBCF5\uC0AC\uD574 \uACF5\uC720).",
     "preset.importFail": "\uAC00\uC838\uC624\uAE30 \uC2E4\uD328: {error}",
     "preset.count": "\uD504\uB9AC\uC14B {count}\uAC1C",
+    // 다크 테마 생성
+    "dark.title": "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131",
+    "dark.hint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC \uC0C9\uC744 <b>\uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4</b> \uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCC44\uC6C1\uB2C8\uB2E4. \uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C\uB77C \uBE0C\uB79C\uB4DC\uC0C9\uC774 \uC720\uC9C0\uB3FC\uC694. Semantic\uC774 Global\uC744 <b>\uAC00\uB9AC\uD0A4\uACE0 \uC788\uB294 \uAC83\uB9CC</b> \uB300\uC0C1\uC774\uACE0, \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB701\uB2C8\uB2E4. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 <code>dark/\u2026</code>\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC9D1\uB2C8\uB2E4. (Paid)",
+    "dark.collection": "\uB300\uC0C1 \uCEEC\uB809\uC158",
+    "dark.fromMode": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC",
+    "dark.toMode": "\uB2E4\uD06C \uBAA8\uB4DC",
+    "dark.genBtn": "\uB2E4\uD06C \uCC44\uC6B0\uAE30",
+    // 닮은 프레임 컴포넌트화
+    "similar.title": "\uB2EE\uC740 \uD504\uB808\uC784 \uCEF4\uD3EC\uB10C\uD2B8\uD654",
+    "similar.hint": "\uAD6C\uC870\uAC00 \uAC19\uACE0 <b>\uB0B4\uC6A9\uB9CC \uB2E4\uB978</b> \uD504\uB808\uC784 \uC5EC\uB7EC \uAC1C\uB97C \uACE8\uB77C \uC2A4\uCE94\uD558\uBA74, \uD558\uB098\uB97C <b>\uB9C8\uC2A4\uD130</b>\uB85C \uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uACE0 \uB098\uBA38\uC9C0\uB294 <b>\uC778\uC2A4\uD134\uC2A4</b>\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uD504\uB808\uC784\uB9C8\uB2E4 \uB2E4\uB978 \uD14D\uC2A4\uD2B8\xB7\uC544\uC774\uCF58\uC740 <b>\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131</b>\uC73C\uB85C \uC5F4\uB9AC\uACE0, \uC774\uBBF8\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uC5D0\uC11C \uAC1C\uBCC4 \uAD50\uCCB4\uB429\uB2C8\uB2E4. \uB9C8\uC2A4\uD130\uB294 <b>\uB0B4\uC6A9\uC774 \uAC00\uC7A5 \uC798 \uCC44\uC6CC\uC9C4</b> \uD504\uB808\uC784\uC744 \uCD94\uCC9C\uD569\uB2C8\uB2E4(\uBE48 \uD14D\uC2A4\uD2B8\uAC00 \uB9CE\uC73C\uBA74 \uAC10\uC810). <b>\uC2A4\uCE94\uC740 \uBB34\uB8CC</b>, \uC2E4\uC81C \uAD50\uCCB4\uB9CC Paid.",
+    "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uC2A4\uCE94",
+    "similar.componentizeBtn": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
+    // 변수 편집기
+    "varedit.title": "\uBCC0\uC218 \uD3B8\uC9D1\uAE30",
+    "varedit.hint": "\uB9CC\uB4E4\uC5B4 \uB454 \uBCC0\uC218\uC758 <b>\uC774\uB984\xB7\uAC12\xB7\uC2A4\uCF54\uD504</b>\uB97C \uC5EC\uAE30\uC11C \uACE0\uCE69\uB2C8\uB2E4. \uAC12 \uCE78\uC5D0 <code>#RRGGBB</code>\xB7\uC22B\uC790\uB97C \uB123\uC73C\uBA74 \uB9AC\uD130\uB7F4, \uB2E4\uB978 \uBCC0\uC218 \uC774\uB984\uC744 \uACE0\uB974\uBA74 \uBCC4\uCE6D\uC774 \uB429\uB2C8\uB2E4. \uD0C0\uC785\uACFC \uC18C\uC18D \uCEEC\uB809\uC158\uC740 \uBC14\uAFC0 \uC218 \uC5C6\uC5B4\uC694. <b>\uC9C0\uC6B0\uAE30 \uC804\uC5D0 \u2018\uC0AC\uC6A9\uCC98\u2019</b>\uB97C \uB20C\uB7EC \uC5B4\uB514\uC5D0 \uC4F0\uC774\uB294\uC9C0 \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
+    "varedit.loadBtn": "\uBCC0\uC218 \uBD88\uB7EC\uC624\uAE30",
+    "varedit.collection": "\uCEEC\uB809\uC158",
+    // 목록 공통(상한 해제 — 6개 카드가 같은 문구를 쓴다)
+    "list.expandAll": "\uBAA8\uB450 \uD3BC\uCE58\uAE30",
     // 내보내기
     "export.needFirst": "\uBA3C\uC800 \uB0B4\uBCF4\uB0B4\uAE30\uB97C \uC2E4\uD589\uD558\uC138\uC694.",
     "export.done": "{format} \uB0B4\uBCF4\uB0C4 \u2014 \uBCF5\uC0AC \uB610\uB294 \uB2E4\uC6B4\uB85C\uB4DC.",

@@ -84,6 +84,25 @@ export const STRINGS: Record<string, string> = {
   'preset.importFail': '가져오기 실패: {error}',
   'preset.count': '프리셋 {count}개',
 
+  // 다크 테마 생성
+  'dark.title': '다크 테마 생성',
+  'dark.hint': '라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)',
+  'dark.collection': '대상 컬렉션',
+  'dark.fromMode': '라이트 모드',
+  'dark.toMode': '다크 모드',
+  'dark.genBtn': '다크 채우기',
+  // 닮은 프레임 컴포넌트화
+  'similar.title': '닮은 프레임 컴포넌트화',
+  'similar.hint': '구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.',
+  'similar.scanBtn': '닮은 프레임 스캔',
+  'similar.componentizeBtn': '컴포넌트화',
+  // 변수 편집기
+  'varedit.title': '변수 편집기',
+  'varedit.hint': '만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.',
+  'varedit.loadBtn': '변수 불러오기',
+  'varedit.collection': '컬렉션',
+  // 목록 공통(상한 해제 — 6개 카드가 같은 문구를 쓴다)
+  'list.expandAll': '모두 펼치기',
   // 내보내기
   'export.needFirst': '먼저 내보내기를 실행하세요.',
   'export.done': '{format} 내보냄 — 복사 또는 다운로드.',
