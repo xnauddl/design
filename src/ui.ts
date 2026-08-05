@@ -804,8 +804,9 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   const tr = document.createElement('tr');
   // 이미 바인딩된 스타일이면 id 보존 → 등록 시 신규 생성이 아니라 그 스타일 rename.
   if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
-  // 행간 원본 %는 표시용 셀이 아니라 행에 보관한다 — "150%" 문자열을 되파싱하지 않기 위해.
+  // 행간·자간 원본 %는 표시용 셀이 아니라 행에 보관한다 — "150%"/"-2%" 문자열을 되파싱하지 않기 위해.
   if (s.lineHeightPercent) tr.dataset.lineHeightPercent = String(s.lineHeightPercent);
+  if (s.letterSpacingPercent) tr.dataset.letterSpacingPercent = String(s.letterSpacingPercent);
   // 컬럼 폭은 표의 <colgroup>이 정하고(폰트는 가변), 입력은 칸을 꽉 채운다.
   const cell = (field: string, value: string, opts: { type?: string; readonly?: boolean } = {}): void => {
     const { type = 'text', readonly = false } = opts;
@@ -858,7 +859,21 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   } else {
     cell('lineHeight', String(s.lineHeight), { type: 'number' }); // 수동 행은 px 입력
   }
-  cell('letterSpacing', String(s.letterSpacing), { type: 'number', readonly: locked });
+  // 자간 — 스캔 행은 단위까지("0.32px" / "-2%"). %면 %로 등록·자간 변수 바인딩 생략(행간과 동일).
+  if (locked) {
+    const lsPct = s.letterSpacingPercent ?? 0;
+    tr.dataset.letterSpacingPx = String(s.letterSpacing);
+    cell('letterSpacing', lsPct !== 0 ? `${lsPct}%` : `${s.letterSpacing}px`, { readonly: true });
+    const lsInp = tr.querySelector('input[data-field="letterSpacing"]') as HTMLInputElement | null;
+    if (lsInp) {
+      lsInp.title =
+        lsPct !== 0
+          ? `화면에서 ${lsPct}%로 쓰던 자간(${s.letterSpacing}px) — %로 등록하고 자간 변수는 연결하지 않아요(Figma가 px로 바꿔버려서).`
+          : '스캔한 값이라 못 바꿔요';
+    }
+  } else {
+    cell('letterSpacing', String(s.letterSpacing), { type: 'number' });
+  }
   cell('style', s.style, { readonly: locked });
   const tdDel = document.createElement('td');
   const del = document.createElement('button');
@@ -891,16 +906,19 @@ function readTextStyleRows(): TextStyleSpec[] {
     if (!name) continue;
     const boundStyleId = (tr as HTMLTableRowElement).dataset.boundStyleId;
     const lineHeightPercent = Number((tr as HTMLTableRowElement).dataset.lineHeightPercent) || 0;
-    // 스캔 행의 행간 칸은 "150%"처럼 단위가 붙은 표시용 문자열이라 되파싱하지 않는다 — px는 행에 보관된 값.
+    const letterSpacingPercent = Number((tr as HTMLTableRowElement).dataset.letterSpacingPercent) || 0;
+    // 스캔 행의 행간·자간 칸은 "150%"/"-2%"처럼 단위가 붙은 표시용 문자열이라 되파싱하지 않는다 — px는 행에 보관된 값.
     const lineHeightPx = (tr as HTMLTableRowElement).dataset.lineHeightPx;
+    const letterSpacingPx = (tr as HTMLTableRowElement).dataset.letterSpacingPx;
     specs.push({
       name,
       fontSize: Number(get('fontSize')) || 0,
       lineHeight: lineHeightPx !== undefined ? Number(lineHeightPx) || 0 : Number(get('lineHeight')) || 0,
-      letterSpacing: Number(get('letterSpacing')) || 0,
+      letterSpacing: letterSpacingPx !== undefined ? Number(letterSpacingPx) || 0 : Number(get('letterSpacing')) || 0,
       family: get('family').trim() || DEFAULT_TS_FAMILY,
       style: get('style').trim() || 'Regular',
       ...(lineHeightPercent ? { lineHeightPercent } : {}),
+      ...(letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}),
       ...(boundStyleId ? { boundStyleId } : {}),
     });
   }

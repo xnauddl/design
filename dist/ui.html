@@ -640,7 +640,7 @@
 
     <div class="step">
       <h2><span data-i18n="textStyle.title">텍스트 스타일 (화면 → 스타일)</span> <span class="muted" id="tsLock"></span></h2>
-      <div class="hint" data-i18n-html="textStyle.hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 새 스타일은 ‘행 추가’로. (Paid)</div>
+      <div class="hint" data-i18n-html="textStyle.hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 행간·자간이 %였으면 표에 %로 보이고 그대로 등록됩니다(그 항목만 변수 연결 생략). 새 스타일은 ‘행 추가’로. (Paid)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">선택에서 스캔</button>
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
@@ -1254,7 +1254,7 @@
     "semantic.scanBtn": "\uAE30\uC874 \uC0C9\uC5D0\uC11C \uCD94\uCC9C",
     // 텍스트 스타일
     "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C (\uD654\uBA74 \u2192 \uC2A4\uD0C0\uC77C)",
-    "textStyle.hint": "\uD654\uBA74\uC758 \uAE00\uC790\uC5D0\uC11C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB9CC\uB4E4\uC5B4 \uB4F1\uB85D\uD569\uB2C8\uB2E4. \uC2A4\uCE94\uD55C \uAC12\uC740 \uBABB \uBC14\uAFB8\uACE0 <b>\uC774\uB984\uB9CC</b> \uC815\uB9AC\uD558\uBA74 \uB3FC\uC694. \uC0C8 \uC2A4\uD0C0\uC77C\uC740 \u2018\uD589 \uCD94\uAC00\u2019\uB85C. (Paid)",
+    "textStyle.hint": "\uD654\uBA74\uC758 \uAE00\uC790\uC5D0\uC11C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB9CC\uB4E4\uC5B4 \uB4F1\uB85D\uD569\uB2C8\uB2E4. \uC2A4\uCE94\uD55C \uAC12\uC740 \uBABB \uBC14\uAFB8\uACE0 <b>\uC774\uB984\uB9CC</b> \uC815\uB9AC\uD558\uBA74 \uB3FC\uC694. \uD589\uAC04\xB7\uC790\uAC04\uC774 %\uC600\uC73C\uBA74 \uD45C\uC5D0 %\uB85C \uBCF4\uC774\uACE0 \uADF8\uB300\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uADF8 \uD56D\uBAA9\uB9CC \uBCC0\uC218 \uC5F0\uACB0 \uC0DD\uB7B5). \uC0C8 \uC2A4\uD0C0\uC77C\uC740 \u2018\uD589 \uCD94\uAC00\u2019\uB85C. (Paid)",
     "textStyle.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uC2A4\uCE94",
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
     "textStyle.useRowLabels": "\uAC00\uB85C \uD589\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uC2A4\uD0C0\uC77C \uC774\uB984\uC73C\uB85C \uC0AC\uC6A9",
@@ -2564,10 +2564,11 @@
   });
   var DEFAULT_TS_FAMILY = "Inter";
   function textStyleRow(s, locked = false) {
-    var _a;
+    var _a, _b;
     const tr = document.createElement("tr");
     if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
     if (s.lineHeightPercent) tr.dataset.lineHeightPercent = String(s.lineHeightPercent);
+    if (s.letterSpacingPercent) tr.dataset.letterSpacingPercent = String(s.letterSpacingPercent);
     const cell = (field, value, opts = {}) => {
       const { type = "text", readonly = false } = opts;
       const td = document.createElement("td");
@@ -2611,7 +2612,17 @@
     } else {
       cell("lineHeight", String(s.lineHeight), { type: "number" });
     }
-    cell("letterSpacing", String(s.letterSpacing), { type: "number", readonly: locked });
+    if (locked) {
+      const lsPct = (_b = s.letterSpacingPercent) != null ? _b : 0;
+      tr.dataset.letterSpacingPx = String(s.letterSpacing);
+      cell("letterSpacing", lsPct !== 0 ? `${lsPct}%` : `${s.letterSpacing}px`, { readonly: true });
+      const lsInp = tr.querySelector('input[data-field="letterSpacing"]');
+      if (lsInp) {
+        lsInp.title = lsPct !== 0 ? `\uD654\uBA74\uC5D0\uC11C ${lsPct}%\uB85C \uC4F0\uB358 \uC790\uAC04(${s.letterSpacing}px) \u2014 %\uB85C \uB4F1\uB85D\uD558\uACE0 \uC790\uAC04 \uBCC0\uC218\uB294 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC544\uC694(Figma\uAC00 px\uB85C \uBC14\uAFD4\uBC84\uB824\uC11C).` : "\uC2A4\uCE94\uD55C \uAC12\uC774\uB77C \uBABB \uBC14\uAFD4\uC694";
+      }
+    } else {
+      cell("letterSpacing", String(s.letterSpacing), { type: "number" });
+    }
     cell("style", s.style, { readonly: locked });
     const tdDel = document.createElement("td");
     const del = document.createElement("button");
@@ -2642,15 +2653,17 @@
       if (!name) continue;
       const boundStyleId = tr.dataset.boundStyleId;
       const lineHeightPercent = Number(tr.dataset.lineHeightPercent) || 0;
+      const letterSpacingPercent = Number(tr.dataset.letterSpacingPercent) || 0;
       const lineHeightPx = tr.dataset.lineHeightPx;
-      specs.push(__spreadValues(__spreadValues({
+      const letterSpacingPx = tr.dataset.letterSpacingPx;
+      specs.push(__spreadValues(__spreadValues(__spreadValues({
         name,
         fontSize: Number(get("fontSize")) || 0,
         lineHeight: lineHeightPx !== void 0 ? Number(lineHeightPx) || 0 : Number(get("lineHeight")) || 0,
-        letterSpacing: Number(get("letterSpacing")) || 0,
+        letterSpacing: letterSpacingPx !== void 0 ? Number(letterSpacingPx) || 0 : Number(get("letterSpacing")) || 0,
         family: get("family").trim() || DEFAULT_TS_FAMILY,
         style: get("style").trim() || "Regular"
-      }, lineHeightPercent ? { lineHeightPercent } : {}), boundStyleId ? { boundStyleId } : {}));
+      }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}), boundStyleId ? { boundStyleId } : {}));
     }
     return specs;
   }
