@@ -118,6 +118,26 @@ interface Progress {
   every: number;
 }
 
+/* ---------- 이미 바인딩된 자리 보호 ---------- */
+/**
+ * 변수가 붙은 뒤에도 Figma는 `p.color`·`node.width`·`node.fontSize`를 **resolved 값 그대로**
+ * 돌려준다. 값만 보고 매칭하면 (1) 두 번째 미리보기에 이미 끝난 건이 다시 후보로 올라
+ * 남은 작업량을 알 수 없고, (2) 사용자가 직접 고른 변수도 같은 값의 상위 tier 변수로
+ * 말없이 교체된다. 그래서 이미 바인딩된 자리는 값이 맞아도 건드리지 않는다.
+ */
+function isNodeFieldBound(node: SceneNode, field: string): boolean {
+  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
+  const entry = bv?.[field];
+  if (!entry) return false;
+  // 텍스트 range 필드(fontSize·lineHeight·letterSpacing·fontFamily)는 구간별 배열로 온다.
+  return Array.isArray(entry) ? entry.length > 0 : true;
+}
+
+/** paint·effect는 노드가 아니라 자기 자신이 `boundVariables.color`를 갖는다. */
+function isColorBound(x: Paint | Effect): boolean {
+  return !!(x as { boundVariables?: { color?: unknown } }).boundVariables?.color;
+}
+
 /** 조상까지 실제로 보이는가 — extract.ts와 같은 기준(숨긴 그룹 안의 레이어를 직접 고른 경우). */
 function isEffectivelyVisible(node: SceneNode): boolean {
   let p: BaseNode | null = node;
@@ -343,6 +363,10 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
     let changed = false;
     const next = paints.map((p, i) => {
       if (p.type !== 'SOLID') return p;
+      if (isColorBound(p)) {
+        note(res, 'already-bound', node, preview, key);
+        return p;
+      }
       const hex = rgbToHex(p.color);
       const e = matchColor(entries, hex, allowed);
       if (!e) {
@@ -473,6 +497,10 @@ function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, appl
   let changed = false;
   const next = (node as { effects: readonly Effect[] }).effects.map((e, i) => {
     if (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW') return e;
+    if (isColorBound(e)) {
+      note(res, 'already-bound', node, preview, 'effects');
+      return e;
+    }
     const hex = rgbToHex(e.color);
     const ent = matchColor(entries, hex, EFFECT_SCOPES);
     if (!ent) {
@@ -508,6 +536,10 @@ async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: 
     tryBindText(node, 'letterSpacing', node.letterSpacing.value, entries, tol, res, apply, preview);
   }
   // fontFamily — STRING 변수(FONT_FAMILY)에 정확 일치 바인딩.
+  if (isNodeFieldBound(node, 'fontFamily')) {
+    note(res, 'already-bound', node, preview, 'fontFamily');
+    return;
+  }
   const fe = matchString(entries, node.fontName.family, 'FONT_FAMILY');
   if (fe && node.characters.length > 0) {
     if (!apply) {
@@ -534,6 +566,10 @@ function tryBindText(
   apply: boolean,
   preview: Preview | null,
 ): void {
+  if (isNodeFieldBound(node, field)) {
+    note(res, 'already-bound', node, preview, field);
+    return;
+  }
   const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   const len = node.characters.length;
   if (len === 0) {
@@ -569,6 +605,10 @@ function tryBind(
   /** 매칭 실패 사유 키 — 호출자가 좁힌 조건으로 실패했을 때 그 이유를 남긴다. */
   noMatchReason = 'no-match',
 ): void {
+  if (isNodeFieldBound(node, field)) {
+    note(res, 'already-bound', node, preview, field);
+    return;
+  }
   const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   if (!e) {
     skip(res, noMatchReason, node, preview, field);

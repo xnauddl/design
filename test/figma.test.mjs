@@ -689,6 +689,76 @@ test('bindSelection — 색/크기 바인딩, 미매칭 skip, 오토레이아웃
   assert.equal(node._bound.width, sSize.id);
 });
 
+test('bindSelection — 이미 바인딩된 자리는 2회차 미리보기에 후보로 오르지 않음', async () => {
+  installFigma();
+  await createTokens(
+    [
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+    ],
+    16,
+  );
+  const node = {
+    type: 'FRAME',
+    id: 'box',
+    name: 'box',
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }],
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'HUG',
+    width: 200,
+    height: 50,
+    layoutMode: 'NONE',
+    parent: { type: 'FRAME', layoutMode: 'VERTICAL' },
+    boundVariables: {},
+    setBoundVariable(field, v) {
+      this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id }; // 실제 Figma와 같은 기록
+    },
+  };
+
+  const first = await bindSelection([node], 0.5);
+  assert.equal(first.bound, 2); // 색 1 + width 1
+
+  // 바인딩 뒤에도 fills[0].color·width는 resolved 값 그대로다 — 값만 보면 다시 매칭된다.
+  const second = await bindSelection([node], 0.5, false);
+  assert.equal(second.bound, 0);
+  assert.equal(second.candidates.length, 0);
+  assert.equal(second.reasons['already-bound'], 2); // 색 1 + width 1
+  assert.equal(second.skipped, 0); // 실패가 아니므로 스킵 수는 늘지 않는다
+  assert.ok(second.skips.some((s) => s.reason === 'already-bound')); // 칩에서 레이어로 이동 가능
+});
+
+test('bindSelection — 이미 붙은 변수는 같은 값의 상위 tier 변수로 덮어쓰지 않음', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
+  const sColor = findVar(figma, 'Semantic', 'color/0066ff');
+  // 같은 값의 Component tier 변수(매칭 우선순위가 더 높다) — 사용자가 고른 Semantic 바인딩을
+  // 말없이 갈아치우면 안 된다.
+  const comp = figma.variables.createVariableCollection('Component');
+  const cv = figma.variables.createVariable('button/bg', comp, 'COLOR');
+  cv.scopes = ['ALL_SCOPES'];
+  cv.setValueForMode(comp.defaultModeId, { r: 0, g: 0.4, b: 1 });
+
+  const node = {
+    type: 'FRAME',
+    id: 'box',
+    name: 'box',
+    fills: [
+      {
+        type: 'SOLID',
+        color: { r: 0, g: 0.4, b: 1 },
+        boundVariables: { color: { type: 'VARIABLE_ALIAS', id: sColor.id } },
+      },
+    ],
+    layoutMode: 'NONE',
+    setBoundVariable() {},
+  };
+
+  const res = await bindSelection([node], 0.5);
+  assert.equal(res.bound, 0);
+  assert.equal(node.fills[0].boundVariables.color.id, sColor.id); // 그대로 유지
+  assert.equal(res.reasons['already-bound'], 1);
+});
+
 test('bindSelection — 허용오차 내 동률은 가장 가까운 값으로 바인딩', async () => {
   const figma = installFigma();
   await createTokens(

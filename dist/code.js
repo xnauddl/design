@@ -1240,6 +1240,16 @@
     }
     return nodeIndex.filter((n) => keep.has(n.id));
   }
+  function isNodeFieldBound(node, field) {
+    const bv = node.boundVariables;
+    const entry = bv == null ? void 0 : bv[field];
+    if (!entry) return false;
+    return Array.isArray(entry) ? entry.length > 0 : true;
+  }
+  function isColorBound(x) {
+    var _a;
+    return !!((_a = x.boundVariables) == null ? void 0 : _a.color);
+  }
   function isEffectivelyVisible2(node) {
     let p = node;
     while (p) {
@@ -1418,6 +1428,10 @@
       let changed = false;
       const next = paints3.map((p, i) => {
         if (p.type !== "SOLID") return p;
+        if (isColorBound(p)) {
+          note(res, "already-bound", node, preview, key);
+          return p;
+        }
         const hex = rgbToHex(p.color);
         const e = matchColor(entries, hex, allowed);
         if (!e) {
@@ -1511,6 +1525,10 @@
     let changed = false;
     const next = node.effects.map((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return e;
+      if (isColorBound(e)) {
+        note(res, "already-bound", node, preview, "effects");
+        return e;
+      }
       const hex = rgbToHex(e.color);
       const ent = matchColor(entries, hex, EFFECT_SCOPES);
       if (!ent) {
@@ -1543,6 +1561,10 @@
     if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") {
       tryBindText(node, "letterSpacing", node.letterSpacing.value, entries, tol, res, apply, preview);
     }
+    if (isNodeFieldBound(node, "fontFamily")) {
+      note(res, "already-bound", node, preview, "fontFamily");
+      return;
+    }
     const fe = matchString(entries, node.fontName.family, "FONT_FAMILY");
     if (fe && node.characters.length > 0) {
       if (!apply) {
@@ -1559,6 +1581,10 @@
     }
   }
   function tryBindText(node, field, value, entries, tol, res, apply, preview) {
+    if (isNodeFieldBound(node, field)) {
+      note(res, "already-bound", node, preview, field);
+      return;
+    }
     const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     const len = node.characters.length;
     if (len === 0) {
@@ -1582,6 +1608,10 @@
     }
   }
   function tryBind(node, field, value, entries, tol, res, apply, preview, noMatchReason = "no-match") {
+    if (isNodeFieldBound(node, field)) {
+      note(res, "already-bound", node, preview, field);
+      return;
+    }
     const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     if (!e) {
       skip(res, noMatchReason, node, preview, field);
