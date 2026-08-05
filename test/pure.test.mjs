@@ -432,7 +432,7 @@ test('validateLicenseClaims — 만료·iss·aud·tier', () => {
   assert.equal(validateLicenseClaims({ tier: 'paid' }, now).ok, false); // exp 없음
 });
 
-/* ================= presets.ts (M3 Team) ================= */
+/* ================= presets.ts (M3 Paid) ================= */
 test('serializePreset / parsePreset — 라운드트립 + 검증', () => {
   const p = { name: 'mobile', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: { surface: 'color/neutral/50' } };
   const round = parsePreset(serializePreset(p));

@@ -36,7 +36,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
 let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
-let teamDataRequested = false;
+let paidDataRequested = false;
 // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
 let hasGlobal = false;
 let hasBindable = false;
@@ -907,7 +907,7 @@ async function runWizard(): Promise<void> {
     contrast: ($('wizOptContrast') as HTMLInputElement).checked,
     componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
   };
-  const ctx: WizardContext = { isPro: isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
+  const ctx: WizardContext = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
   const plan = planWizard(options, ctx);
 
   wizardRunning = true;
@@ -1154,8 +1154,8 @@ function updateGates(): void {
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
   if (!isPaid) ($('btnApplyExistingText') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
 
-  if (isPaid && !teamDataRequested) {
-    teamDataRequested = true;
+  if (isPaid && !paidDataRequested) {
+    paidDataRequested = true;
     send({ type: 'GET_PRESETS' });
   }
 }
@@ -1236,7 +1236,7 @@ function renderPipeline(): void {
   });
 }
 
-/* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
+/* ---------- 컴포넌트 / 베리언트 (Phase 3, Paid) ---------- */
 $('btnScanComp').addEventListener('click', () => {
   setStatus('componentStatus', t('component.scanning'), '');
   send({ type: 'SCAN_COMPONENT_CANDIDATES' });
@@ -2603,7 +2603,7 @@ function applyCardChrome(): void {
   });
 }
 
-// 초기: 컬렉션·전제·라이선스 조회. 팀 카드는 Team 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
+// 초기: 컬렉션·전제·라이선스 조회. 유료 카드는 Paid 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
 applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
 syncStickyOffsets(); // 카드 헤더 sticky 오프셋(탭 바 + 선택 바 높이)
 // 선택 바는 문구가 바뀌며 높이가 변하고, 창 리사이즈로 두 바 모두 접힐 수 있다 → 계속 추적.
