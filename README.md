@@ -46,12 +46,13 @@
 선택 레이어를 **메인 컴포넌트로 등록**하고, 같은 베이스 이름을 공유하는 컴포넌트들을 **베리언트 세트(ComponentSet)** 로 묶어 분류한다. 토큰/리네임과 동일하게 **kebab·멱등** 규칙을 따르며, 구조/이름만 바꾸고 토큰 바인딩은 건드리지 않는다.
 
 - **컴포넌트 등록(registration)**
-  - 선택한 **부모는 컨테이너**(자신은 컴포넌트화 X) — 그 **직계 자식**만 대상. 다중 선택 시엔 선택 각각이 대상.
-  - **엄격 필터**: 이름에 알려진 **컴포넌트 명사**(`button`/`card`/`chip`/`badge`/`tab`/`item`… + 약어 `btn`)가 있는 `FRAME`/`GROUP`만 추린다. 이름 없는 프레임(`Frame 12`)·`INSTANCE`·잠금·`TEXT`는 제외. 명사가 여럿이면 **끝 명사(head noun)** 기준 — 앞단어는 맥락(`nav-button`→`Button`, `card-item`→`Item`).
-  - **그룹화 = 컴포넌트명(머리명사) 기준**으로 한 세트. **구조는 게이트로 쓰지 않는다** — 실무 변형은 같은 컴포넌트라도 내부 구조가 제각각(아이콘 유무·텍스트 줄 수·래퍼 차이…)이라, 구조까지 같아야 묶으면 변형이 전부 1-멤버로 쪼개져 **세트가 아예 안 생긴다**. 그래서 같은 컴포넌트명이면 한 세트 후보로 묶고, 구조·크기·색·패딩 차이는 **베리언트 속성으로 흡수**(`deriveVariants`). 과묶임은 picker에서 **체크 해제**로 회복. 세트 이름은 멤버 공통 베이스를 **PascalCase**로(약어 펼침 `btn`→`Button`, 공통 접두 없으면 머리명사). 단독 컴포넌트도 **PascalCase**로 등록(`card-item`→`CardItem`).
-  - **견고성**: `combineAsVariants` 실패 시 멤버를 **단독으로라도 등록**(컴포넌트 소실 방지). 결합 성공 후 정렬(`arrangeSet`)은 **비치명**(실패해도 세트·인스턴스는 유지). 조용히 삼키던 실패는 **UI에 진단으로 노출**(`failures`).
-  - **인스턴스 교체 + 전용 페이지**: 메인 컴포넌트(세트)는 `Components` 페이지(없으면 생성·있으면 재사용)로 이동하고, 원래 자리(부모·인덱스·좌표)에는 해당 변형의 **인스턴스**를 배치한다. 선택 프레임에는 인스턴스만 남는다.
-  - **속성 도출 = 이름 우선 + 기하 보완 + 구별 토큰**: 멤버 이름의 보편 어휘(`Type`/`State`/`Size`/`Selected`)를 먼저 속성으로. 이름만으로 멤버가 안 갈리면 빈 축을 기하로 보완 — 면적→`Size`(티셔츠 등급), 단색 채움→`Color`(색 이름). 그래도 안 갈리면 **이름의 구별 토큰**(컴포넌트 명사·어휘를 뺀 나머지)을 `Variant` 값으로 보존 — `nav-left`/`nav-right`→`Variant=left`/`Variant=right`, `artist-button`/`like-button`→`Variant=artist`/`Variant=like`. 구별 토큰조차 없으면 마지막 수단 `Variant=N`.
+  - 선택한 **부모는 컨테이너**(자신은 컴포넌트화 X) — 하위 후보만 대상. 다중 선택 시엔 선택 각각이 대상.
+  - **고신뢰 구조 게이트**: `button`/`chip`/`nav`/`progress`/`card`/`figure`/`field`/`list`/`heading`으로 검출되는 **보이는** `FRAME`/`GROUP`만 eligible(레이어 이름 문자열 불필요). `heading`은 섹션 머리줄(가로 스택·높이 상한·타이틀+선택 액션/메타)이며 리네임 페이지 `header` 랜드마크와 별개. 숨김(조상 포함)·잠금·`INSTANCE`/`COMPONENT`/`COMPONENT_SET` 안·임의 컨테이너는 제외.
+  - **그룹화 = 정확한 레이어 이름**(대소문자·여백만 정규화). 이름이 다르면 레이아웃이 같아도 각각 단독.
+  - **같은 이름 2개+**: 구조가 같고 텍스트/스왑/`?` 가시성만 다르면 **속성 접힘**(단품 1개 + 인스턴스 오버라이드). **heading**(타이틀+메타)은 액션 INSTANCE(`buttonGroup` 등) 유무만 달라도 접힘(BOOLEAN). 크기·색·레이아웃 차이면 **베리언트 세트**(`deriveVariants`). 과묶임은 체크 해제. 이름은 **PascalCase**.
+  - **견고성**: `combineAsVariants` 실패 시 단독 등록. 정렬은 비치명. 실패는 UI `failures`.
+  - **인스턴스 교체**: 메인은 `Components` 페이지, 원위치엔 인스턴스.
+  - **세트 속성 도출**: 이름 어휘(`Type`/`State`/`Size`/`Selected`) 우선 + 기하 보완 + 구별 토큰/`Variant=N`.
 - **베리언트 분류(variant classification)**
   - 베이스 이름이 같은 형제 컴포넌트들을 `combineAsVariants`로 한 세트에 결합.
   - 베리언트 **속성(property) 추론** — 이름에서 `속성=값` 쌍으로 정규화. 추론한 속성명은 Figma 라이브러리 관례대로 **Capitalize**(`Size`·`Color`…), 사용자가 명시한 `prop=value`는 기존 세트 호환을 위해 **그대로 보존**:
@@ -64,7 +65,7 @@
   - 텍스트·토큰 바인딩 불변(네이밍/구조만 변경). 모호한 속성 추론은 **미리보기에서 사용자가 교정**.
 - **Phase 4**:
   - **누락 조합 자동 생성 ✅ (구현됨, Paid)** — 선택한 베리언트 세트의 빠진 조합을 기존 변형 클론+`prop=value` 리네임으로 생성(`missingVariants` 순수 계산 + `code.ts` 적용, `GENERATE_MISSING_VARIANTS`).
-  - **컴포넌트 속성(Boolean/Text/Instance-swap) 노출 ✅ (구현됨, Paid)** — 레이어 규칙(`inferComponentProperties`)으로 속성 계획 → `addComponentProperty` + 참조 연결. 별도 메시지 없이 `REGISTER_COMPONENTS` 등록 시 자동 노출(`exposeProperties`). TEXT→characters, INSTANCE→mainComponent, `이름?`→visible(Boolean).
+  - **컴포넌트 속성(Boolean/Text/Instance-swap) 노출 ✅** — 등록 시 자동. **접힘**: 값이 다른 슬롯만(`inferVarying…`). **단독·세트**: 트리 TEXT/INSTANCE/`이름?` 전부(`inferComponentProperties`, 동명·동일 카피는 1개, 연결은 레이어 경로). `이름?` → BOOLEAN 우선(TEXT여도).
   - **라이브러리 발행** — Figma Plugin API에 발행 기능이 없어 **수동(또는 조직 정책)**, 코드 비대상.
 
 ## 개발
@@ -163,16 +164,11 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 
 ## 컴포넌트 등록 / 베리언트 분류 (UI 5단계 · Phase 3 구현됨, Paid)
 
-선택한 프레임을 **메인 컴포넌트로 등록**(`REGISTER_COMPONENTS`)하고, 같은 베이스 이름(예: `button/primary`,
-`button/secondary`)을 공유하는 컴포넌트들을 **베리언트 세트**로 분류(`CLASSIFY_VARIANTS`)합니다. 속성 추론
-(이름 → `속성=값`, 어휘 state/size/type)·그룹화·빈 조합 산출은 **순수 파서**(`components.ts`)로 `node --test`
-검증, 실제 `createComponentFromNode`·`combineAsVariants`·자식 이름(`prop=value`) 적용만 `code.ts`에서
-수행합니다(순수/부수효과 분리). 결과는 `COMPONENTS_RESULT`/`VARIANTS_RESULT`(생성 수·빈 조합·단일)로 보고.
-이미 컴포넌트/세트 멤버면 건너뜀(멱등), `INSTANCE`·`TEXT`·잠금 제외. **Paid 게이팅**(비-Paid는 `PREMIUM_REQUIRED`).
+선택 하위의 **고신뢰 구조** 후보를 스캔·등록(`SCAN_COMPONENT_CANDIDATES` / `REGISTER_COMPONENTS`)하고, 기존 컴포넌트를 같은 이름으로 세트 분류(`CLASSIFY_VARIANTS`)합니다. 후보 게이트·이름 그룹·속성 접힘·베리언트 도출은 `components.ts`/`componentLike.ts` 순수 로직, 적용은 `code.ts`. **Paid**. 숨김(조상 포함) 제외.
 
-**Phase 4 — 누락 조합 자동 생성**: 선택한 베리언트 세트의 **빠진 속성 조합**(`missingVariants` 순수 계산)을 기존 변형을 클론해 `prop=value`로 이름 지정하여 생성(`GENERATE_MISSING_VARIANTS`, Paid). 분류·생성 후 세트는 **속성 기반 2D 그리드**(`variantGrid`: 첫 속성=행, 둘째=열)로 정렬되고 자식에 맞게 **리사이즈**된다. 라이브러리 발행은 Plugin API 미지원이라 수동.
+**속성 노출**: 접힘=가변 슬롯만 / 단독·세트=전체 API. 경로는 레이어 경로로 연결.
 
-**Phase 4.1 — 컴포넌트 속성 노출**: 선택한 컴포넌트 또는 **베리언트 세트**의 자식 레이어를 규칙으로 분석(`inferComponentProperties`)해 **컴포넌트 속성**을 만들고 연결한다(Paid). 별도 메시지가 아니라 **`REGISTER_COMPONENTS` 등록 시 자동 노출**(`exposeProperties`). 세트는 대표 변형으로 속성을 계획해 **세트에 추가**하고 모든 변형의 동명 레이어에 참조를 연결한다. TEXT 레이어→TEXT(characters), INSTANCE→INSTANCE_SWAP(mainComponent, 기본값은 발행 컴포넌트 key 또는 로컬 id), 이름이 `?`로 끝나는 레이어→BOOLEAN(visible). 실패 항목은 건너뜀.
+**Phase 4 — 누락 조합 자동 생성**: 선택한 세트의 빈 조합 클론 생성(`GENERATE_MISSING_VARIANTS`) + `variantGrid` 정렬. 라이브러리 발행은 수동.
 
 빌드 메모: Figma UI는 단일 HTML만 로드(외부 `<script src>` 불가)하므로, `ui.ts` 번들 결과를
 `ui.html`의 인라인 `<script>`로 주입합니다(`build.mjs`).
@@ -209,21 +205,28 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 
 ## 유료화 / 상용 전환
 
-오픈 코어 + **프리미엄(Freemium)** 모델. **Free / Paid 2단계**, **연 구독**, **외부 결제(LemonSqueezy)** + **무료 서버리스 검증(Cloudflare Workers)** 으로 한다. 무료 사용자의 기존 동작은 **절대 막지 않으며**, 유료 기능은 **미리보기·탐색은 허용하고 생성(쓰기)만 잠금**한다. (결정 배경·대안 비교는 `ROADMAP.md`)
+오픈 코어 + **프리미엄(Freemium)** 모델. **Free / Paid 2단계**, **연 구독**, **외부 결제(LemonSqueezy)** + **무료 서버리스 검증(Cloudflare Workers)** 으로 한다. (결정 배경·대안 비교는 `ROADMAP.md`)
 
 ### Free / Paid 경계 (기능 기반 게이팅 — 회당 횟수 제한 없음)
-탐색·체험은 무료, **실제 디자인 시스템 생성은 Paid**.
+경계선은 **기존 자산을 다루는 일 / 새 자산을 만드는 일**이다. 파일에 이미 있는 변수·레이어를 읽고 고치는 작업은 Free, 디자인 시스템을 새로 **생성**하는 작업은 Paid.
 
 | 기능 | Free (무제한) | Paid |
 |---|:---:|:---:|
-| 색상 팔레트 생성 · 레이어 리네임 · 바인딩(기존 변수) | ✅ | ✅ |
-| 토큰 추출/미리보기 · 명도 대비 점검 · 코드 내보내기(W3C JSON / CSS) | ✅ | ✅ |
+| 토큰 추출 · 바인딩(기존 변수) · 레이어 리네임 | ✅ | ✅ |
+| 변수 편집(값·이름·스코프 수정/삭제) · 닮은 프레임 **스캔** | ✅ | ✅ |
+| 명도 대비 점검 · 코드 내보내기(W3C JSON / CSS) | ✅ | ✅ |
+| **색상 팔레트 생성 · 적용** | — | ✅ |
 | **토큰(3계층 변수) 생성** | — | ✅ |
 | **시맨틱 매핑** | — | ✅ |
 | **컴포넌트 등록 · 베리언트(Phase 3/4/4.1)** | — | ✅ |
-| **공유 프리셋 · 변경 이력** | — | ✅ |
+| **닮은 프레임 컴포넌트화** | — | ✅ |
+| **텍스트 스타일 등록 · 적용** | — | ✅ |
+| **다크 테마 생성** | — | ✅ |
+| **공유 프리셋** | — | ✅ |
 
 > 의존성: Free '바인딩'은 **기존 변수**에 연결만 가능하다. 빈 파일에서 새 변수 시스템을 만들려면 '토큰 생성'(Paid)이 필요 — 자연스러운 업셀 지점.
+>
+> **미리보기도 함께 잠근다.** '적용'이 Paid인 카드에서 미리보기만 열어두면 눌러도 적용 버튼이 회색이라, 이유를 알 수 없는 막다른 길이 된다. 그래서 팔레트 생성·토큰 생성 미리보기는 Free에서 비활성이다. 반대로 **닮은 프레임 '스캔'은 Free** — 읽기 전용이고 그 자체로 결과(중복 프레임 목록)가 완결되기 때문.
 
 ### 가격
 - **Paid — 연 $39**(≈ $3.25/월). LemonSqueezy 수수료 5%+$0.50 → 실수령 ~$36.5/건(~94%). (월 옵션·런치 프로모는 추후)
@@ -242,8 +245,10 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 - **자리표시**: `licenseConfig.ts`의 `VERIFY_URL`·`LICENSE_PUBLIC_JWK`·`PURCHASE_URL`·`PORTAL_URL`, `manifest.json allowedDomains` → 배포 시 실제 값으로 교체. 키쌍 생성: `node scripts/gen-license-keys.mjs`. Worker 셋업: `workers/verify/README.md`.
 
 ### 엔타이틀먼트 모델
-- `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`presets`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
-- `code.ts`: `requirePaid(feature, message)` 단일 게이트. 토큰 생성(미리보기 제외)·시맨틱·컴포넌트·프리셋/이력을 게이팅. 바인딩·리네임·팔레트·내보내기·미리보기는 무게이팅.
+- `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`textStyles`·`presets`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
+- `code.ts`: `requirePaid(feature, message)` 단일 게이트 — 토큰 생성·시맨틱·컴포넌트·텍스트 스타일·프리셋, 그리고 기존 기능에 얹힌 둘: **다크 테마 생성**(`dark/` Global을 새로 만드니 `tokens`), **닮은 프레임 컴포넌트화**(`components`). 추출·바인딩·리네임·내보내기·대비 점검·변수 편집·닮은 프레임 스캔은 무게이팅.
+- **두 층으로 막는다.** code의 `requirePaid`가 최종 방어선이고, UI(`ui.ts`)는 그 전에 유료 버튼을 **클릭 전 사전 비활성**(`PAID_FIELDS` + 🔒 배지)한다. 그래서 code에 게이트가 없어도 UI에서 잠기는 항목이 있다 — 팔레트 '생성'(`btnPalette`)이 그 예로, postMessage 없이 UI에서만 도는데도 그 카드의 미리보기 역할이라 함께 잠근다.
+- 거부 안내는 `PREMIUM_STATUS_ID`로 **해당 기능의 카드**에 띄운다(클릭-후-거부 방지).
 - 메시지(`src/shared/messages.ts`): `CodeToUi.LICENSE_STATUS { tier, unlimited, source, … }` · `PREMIUM_REQUIRED { feature, message }`.
 
 ### 관리자 / 개발·테스트 전권 + 백도어 차단
@@ -251,8 +256,8 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 - **배포 빌드**(`npm run build`)에선 `__DEV__=false` → `SET_LICENSE` 핸들러와 UI 토글이 **컴파일 단계에서 비활성**(페이월 우회 백도어 차단).
 - **실제 검증 경로 테스트**: LemonSqueezy **test mode** + sandbox 키로 Worker `/verify`. (선택) Worker `ADMIN_KEYS` 오너 allowlist 키 → 장기 paid 토큰(스모크 테스트용).
 
-### 가격 (자리표시)
-- **Paid** — 단일 유료 티어. 월/연 구독(연 결제 할인), 금액 **TBD**. 결제·환불·세금은 **LemonSqueezy(MoR)** 위임.
+### 가격
+- **Paid** — 단일 유료 티어, **연 $39 확정**(위 ‘가격’ 절 참고). 결제·환불·세금은 **LemonSqueezy(MoR)** 위임. 월 옵션·런치 프로모는 추후.
 
 ### 단계별 출시
 - **M0**: 전 기능 무료.

@@ -25,6 +25,7 @@ export const STRINGS: Record<string, string> = {
   'extract.done': '{count}개 후보 추출 완료.',
   'create.needExtract': '먼저 토큰을 추출하세요.',
   'create.preview': '미리보기 — {summary} · ‘적용’으로 반영',
+  'create.baseChanged': 'base {base}px로 다시 계산 중…',
 
   // 시맨틱 매핑
   'semantic.rolesApplied': '{count}개 역할 반영됨 — ‘시맨틱 별칭 생성’으로 적용.',
@@ -245,8 +246,8 @@ export const STRINGS: Record<string, string> = {
   'contrast.checkBtn': '대비 검사',
   // 컴포넌트 / 베리언트
   'component.title': '컴포넌트 / 베리언트',
-  'component.hint': '<b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외)이며, 이름에 <b>컴포넌트명</b>(button·card·chip…)이 있는 자식만 추립니다. <b>같은 컴포넌트명</b>이면 한 세트로 묶습니다 — 내부 구조·패딩·크기·색이 달라도 OK(차이는 속성으로 흡수, 과묶임은 체크 해제). 속성은 <b>이름 우선</b>(<code>Type</code>·<code>State</code>·<code>Size</code>) + 부족하면 크기·색 보완. 후보엔 <b>세트</b>/<b>단독</b> 배지가 붙습니다. 메인 컴포넌트는 <b>Components 페이지</b>로 보내고 원래 자리엔 <b>인스턴스</b>가 남습니다.',
-  'component.hint2': '<b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 컴포넌트명끼리 다시 묶을 때만(등록과 같은 기준 — 프레임은 「컴포넌트 등록」). <b>속성 노출</b>은 선택한 세트(또는 단독 컴포넌트) 대상.',
+  'component.hint': '<b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.',
+  'component.hint2': '<b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 이름끼리 다시 묶을 때만(프레임은 「컴포넌트 등록」). 등록 시 TEXT·스왑·<code>이름?</code> BOOLEAN 속성이 자동 노출됩니다(접힘=다른 슬롯만, 단독·세트=전체 API).',
   'component.scanBtn': '후보 스캔',
   'component.registerBtn': '컴포넌트 등록',
   'component.classifyBtn': '베리언트 분류',
