@@ -3,7 +3,7 @@
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
 import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList } from './lib/tokens';
-import { t } from './lib/i18n';
+import { t, hasString } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier, type Feature } from './lib/entitlements';
 import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
@@ -16,7 +16,7 @@ import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles } from './lib/roles';
-import { pipelineSteps, type StepStatus } from './lib/pipeline';
+import { pipelineSteps } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import type { WcagLevel, ContrastFinding } from './lib/contrast';
@@ -868,10 +868,10 @@ function renderWizardSteps(plan: WizardPlanItem[]): void {
     dot.textContent = String(i + 1);
     const label = document.createElement('span');
     label.className = 'wlabel';
-    label.textContent = p.step.label;
+    label.textContent = t('wizard.step.' + p.step.id);
     const note = document.createElement('span');
     note.className = 'wnote';
-    note.textContent = p.run ? '' : p.skipReason ?? '건너뜀';
+    note.textContent = p.run ? '' : t(p.skipReason ?? 'wizard.skip.default');
     row.append(dot, label, note);
     box.appendChild(row);
   });
@@ -922,33 +922,33 @@ async function runWizard(): Promise<void> {
   for (const p of plan) {
     if (!p.run) continue; // renderWizardSteps에서 이미 skip 표시
     if (stopped) {
-      setWizardStep(p.step.id, 'fail', '이전 단계 중단으로 건너뜀');
+      setWizardStep(p.step.id, 'fail', t('wizard.seq.stoppedPrev'));
       continue;
     }
-    setWizardStep(p.step.id, 'active', '진행 중…');
+    setWizardStep(p.step.id, 'active', t('wizard.seq.running'));
     try {
       switch (p.step.id) {
         case 'extract': {
           const r = await wizardRequest({ type: 'EXTRACT' }, ['EXTRACT_RESULT']);
           tokens = r.tokens; // 모듈 변수 동기화(다음 단계 일관성)
           if (!tokens.length) {
-            setWizardStep('extract', 'fail', '추출된 토큰 없음 — 색·폰트·간격이 있는 프레임을 선택하세요.');
+            setWizardStep('extract', 'fail', t('wizard.seq.noExtract'));
             stopped = true;
             break;
           }
-          setWizardStep('extract', 'done', `${tokens.length}개 후보`);
+          setWizardStep('extract', 'done', t('wizard.seq.extractDone', { count: tokens.length }));
           break;
         }
         case 'create': {
           const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens, base }, ['CREATE_RESULT']);
           totals.created = r.created + r.updated;
-          setWizardStep('create', 'done', `생성 ${r.created} · 갱신 ${r.updated}`);
+          setWizardStep('create', 'done', t('wizard.seq.createDone', { created: r.created, updated: r.updated }));
           break;
         }
         case 'semantics': {
           const r = await wizardRequest({ type: 'CREATE_SEMANTICS', map: semMap }, ['SEMANTICS_RESULT']);
           totals.semanticsAliased = r.aliased;
-          setWizardStep('semantics', 'done', `별칭 ${r.aliased}${r.missing.length ? ` · 누락 ${r.missing.length}` : ''}`);
+          setWizardStep('semantics', 'done', t('wizard.seq.semantics', { aliased: r.aliased }) + (r.missing.length ? t('wizard.seq.semanticsMissing', { n: r.missing.length }) : ''));
           break;
         }
         case 'bind': {
@@ -957,17 +957,17 @@ async function runWizard(): Promise<void> {
           hideWizardBar();
           totals.bound = r.bound;
           if (r.cancelled) {
-            setWizardStep('bind', 'done', `취소됨 — ${r.bound}건만 적용`);
+            setWizardStep('bind', 'done', t('wizard.seq.bindCancelled', { bound: r.bound }));
             stopped = true;
             break;
           }
-          setWizardStep('bind', 'done', `바인딩 ${r.bound}${r.skipped ? ` · 스킵 ${r.skipped}` : ''}`);
+          setWizardStep('bind', 'done', t('wizard.seq.bindDone', { bound: r.bound }) + (r.skipped ? t('wizard.seq.bindSkip', { n: r.skipped }) : ''));
           break;
         }
         case 'rename': {
           const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth }, ['RENAME_RESULT']);
           totals.renamed = r.changes.length;
-          setWizardStep('rename', 'done', `${r.changes.length}개 이름 적용`);
+          setWizardStep('rename', 'done', t('wizard.seq.renameDone', { count: r.changes.length }));
           break;
         }
         case 'contrast': {
@@ -975,14 +975,14 @@ async function runWizard(): Promise<void> {
           totals.contrastChecked = r.checked;
           totals.contrastFailed = r.failed;
           // 미달 발견은 ‘실행 실패’가 아니라 ‘점검 결과’ — 흐름은 계속하되 주의 표시.
-          setWizardStep('contrast', r.failed ? 'fail' : 'done', r.checked === 0 ? '검사할 텍스트 없음' : `${r.checked - r.failed}/${r.checked} ${r.level} 통과`);
+          setWizardStep('contrast', r.failed ? 'fail' : 'done', r.checked === 0 ? t('wizard.seq.contrastNone') : t('wizard.seq.contrastPass', { pass: r.checked - r.failed, checked: r.checked, level: r.level }));
           break;
         }
         case 'componentize': {
           // 등록이 베이스 묶음 베리언트 세트까지 함께 수행(별도 분류 불필요).
           const reg = await wizardRequest({ type: 'REGISTER_COMPONENTS' }, ['COMPONENTS_RESULT']);
           totals.components = reg.registered;
-          setWizardStep('componentize', 'done', `등록 ${reg.registered} · 세트 ${reg.sets}`);
+          setWizardStep('componentize', 'done', t('wizard.seq.componentize', { registered: reg.registered, sets: reg.sets }));
           break;
         }
       }
@@ -1184,7 +1184,6 @@ function goToCreate(): void {
 }
 
 /* ---------- 진행 안내 파이프라인(§3) ---------- */
-const STEP_STAT_LABEL: Record<StepStatus, string> = { done: '완료', ready: '준비됨', blocked: '전제 미충족' };
 
 /** 단계 클릭 → 해당 단계 카드/탭으로 이동. */
 function gotoStep(id: 'tokens' | 'semantics' | 'bind'): void {
@@ -1218,10 +1217,10 @@ function renderPipeline(): void {
     dot.textContent = s.status === 'done' ? '✓' : String(i + 1);
     const label = document.createElement('span');
     label.className = 'plabel';
-    label.textContent = s.label;
+    label.textContent = t('pipeline.step.' + s.id);
     const stat = document.createElement('span');
     stat.className = 'pstat';
-    stat.textContent = s.hint ?? STEP_STAT_LABEL[s.status];
+    stat.textContent = s.hint ? t(s.hint) : t('pipeline.stat.' + s.status);
 
     row.append(dot, label, stat);
     const go = (): void => gotoStep(s.id);
@@ -2246,31 +2245,18 @@ function refreshTreeEmptyStates(): void {
 }
 
 /** UX3: 스킵 사유 키 → 한글 라벨. */
-const REASON_LABELS: Record<string, string> = {
-  'no-match': '매칭 없음',
-  'empty-text': '빈 텍스트',
-  error: '바인딩 실패',
-  'hug-fill': 'HUG/FILL',
-  'no-autolayout': '오토레이아웃 아님',
-  font: '폰트 미로드',
-};
 function reasonsText(reasons: Record<string, number>): string {
   return Object.entries(reasons)
     .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${REASON_LABELS[k] ?? k} ${n}`)
+    .map(([k, n]) => `${t('reason.' + k)} ${n}`)
     .join(' · ');
 }
 
 /* ---------- 명도 대비 점검 결과 렌더 ---------- */
-const CONTRAST_SKIP_LABELS: Record<string, string> = {
-  'no-fill': '단색 글자색 없음',
-  'no-bg': '배경 없음',
-  capped: '스캔 상한 도달',
-};
 function contrastSkipText(skipped: Record<string, number>): string {
   return Object.entries(skipped)
     .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${CONTRAST_SKIP_LABELS[k] ?? k} ${n}`)
+    .map(([k, n]) => `${t('contrastSkip.' + k)} ${n}`)
     .join(' · ');
 }
 
@@ -2603,7 +2589,23 @@ function applyCardChrome(): void {
   });
 }
 
+/** 정적 HTML 라벨 외부화: [data-i18n]=textContent, [data-i18n-html]=innerHTML(신뢰된 자체 문자열).
+ *  텍스트 전용 요소는 data-i18n, <b>/<code> 등 마크업이 있으면 data-i18n-html을 쓴다.
+ *  뱃지 span(예: …Lock)이 함께 있는 요소는 텍스트만 <span data-i18n>로 감싸 뱃지를 보존한다. */
+function applyStaticI18n(root: ParentNode = document): void {
+  // 정의된 키만 덮어쓴다 — 오타/누락 키에서 t()가 키 문자열을 반환해 HTML 원문을 파괴하지 않도록.
+  root.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
+    const key = el.dataset.i18n as string;
+    if (hasString(key)) el.textContent = t(key);
+  });
+  root.querySelectorAll<HTMLElement>('[data-i18n-html]').forEach((el) => {
+    const key = el.dataset.i18nHtml as string;
+    if (hasString(key)) el.innerHTML = t(key);
+  });
+}
+
 // 초기: 컬렉션·전제·라이선스 조회. 유료 카드는 Paid 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
+applyStaticI18n(); // 정적 라벨 외부화(캐논 변형 전에 원본 요소에 적용)
 applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
 syncStickyOffsets(); // 카드 헤더 sticky 오프셋(탭 바 + 선택 바 높이)
 // 선택 바는 문구가 바뀌며 높이가 변하고, 창 리사이즈로 두 바 모두 접힐 수 있다 → 계속 추적.

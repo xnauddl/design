@@ -16,9 +16,8 @@ export interface PrereqState {
 
 export interface PipelineStep {
   id: 'tokens' | 'semantics' | 'bind';
-  label: string;
   status: StepStatus;
-  /** blocked일 때 다음 행동 안내. */
+  /** blocked일 때 다음 행동 안내(i18n 키, UI가 t()로 해석). 표시 라벨은 `pipeline.step.<id>`. */
   hint?: string;
 }
 
@@ -30,18 +29,16 @@ export interface PipelineStep {
  */
 export function pipelineSteps(s: PrereqState): PipelineStep[] {
   return [
-    { id: 'tokens', label: '토큰 생성 (Global)', status: s.hasGlobal ? 'done' : 'ready' },
+    { id: 'tokens', status: s.hasGlobal ? 'done' : 'ready' },
     {
       id: 'semantics',
-      label: '시맨틱 매핑',
       status: s.hasGlobal ? 'ready' : 'blocked',
-      hint: s.hasGlobal ? undefined : '토큰을 먼저 생성하세요',
+      hint: s.hasGlobal ? undefined : 'pipeline.hint.needTokens',
     },
     {
       id: 'bind',
-      label: '바인딩',
       status: s.hasBindable ? 'ready' : 'blocked',
-      hint: s.hasBindable ? undefined : '바인딩할 변수를 먼저 생성하세요',
+      hint: s.hasBindable ? undefined : 'pipeline.hint.needBindable',
     },
   ];
 }

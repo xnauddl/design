@@ -36,22 +36,22 @@ test('planWizard — 모든 옵션 ON + Paid + 매핑 있음 → 전 단계 실�
 test('planWizard — 모든 선택 OFF → 필수 4단계만', () => {
   const plan = planWizard(ALL_OFF, PAID_MAP);
   assert.deepEqual(runIds(plan), ['extract', 'create', 'bind', 'rename']);
-  assert.equal(item(plan, 'semantics').skipReason, '옵션 꺼짐');
-  assert.equal(item(plan, 'contrast').skipReason, '옵션 꺼짐');
-  assert.equal(item(plan, 'componentize').skipReason, '옵션 꺼짐');
+  assert.equal(item(plan, 'semantics').skipReason, 'wizard.skip.optionOff');
+  assert.equal(item(plan, 'contrast').skipReason, 'wizard.skip.optionOff');
+  assert.equal(item(plan, 'componentize').skipReason, 'wizard.skip.optionOff');
 });
 
 test('planWizard — 시맨틱 옵션 ON이지만 매핑 없음 → 건너뜀', () => {
   const plan = planWizard(ALL_ON, { isPaid: true, hasSemanticMap: false });
   assert.equal(item(plan, 'semantics').run, false);
-  assert.equal(item(plan, 'semantics').skipReason, '매핑 없음');
+  assert.equal(item(plan, 'semantics').skipReason, 'wizard.skip.noMapping');
   assert.ok(!runIds(plan).includes('semantics'));
 });
 
 test('planWizard — 컴포넌트화 옵션 ON이지만 Free → Paid 전용으로 건너뜀', () => {
   const plan = planWizard(ALL_ON, { isPaid: false, hasSemanticMap: true });
   assert.equal(item(plan, 'componentize').run, false);
-  assert.equal(item(plan, 'componentize').skipReason, 'Paid 전용');
+  assert.equal(item(plan, 'componentize').skipReason, 'wizard.skip.paid');
   // 필수 단계와 다른 선택 단계는 영향 없음.
   assert.ok(runIds(plan).includes('contrast'));
 });
