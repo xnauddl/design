@@ -608,6 +608,8 @@
         <button id="btnScanText">선택에서 스캔</button>
         <button id="btnTsAddRow">행 추가</button>
       </div>
+      <label class="inline" style="margin-top:6px;"><input id="tsUseRowLabels" type="checkbox" /> 가로 행의 왼쪽 텍스트를 스타일 이름으로 사용</label>
+      <div class="hint muted" style="margin-top:4px;">ON이면 같은 가로 줄의 <b>왼쪽 텍스트를 라벨(이름)</b>으로, 큰 텍스트를 표본으로 봅니다. 이름은 화면에 적힌 글자 그대로입니다. 표본 오른쪽 텍스트는 표에 넣지 않습니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. (세션만 유지)</div>
       <!-- 표 박스는 overflow를 받지 못하므로(스크롤 컨테이너가 못 된다) 이 래퍼가 목록 영역이다.
            가로 스크롤도 같은 요소가 맡는다 — 축을 나누려 한 겹 더 감싸도 CSS가 overflow:visible을
            auto로 올려버려 결국 한 요소가 두 축을 다 갖는다. 가로 스크롤바 높이는 layoutList가
@@ -2323,7 +2325,13 @@
     }
     return specs;
   }
-  $("btnScanText").addEventListener("click", () => send({ type: "SCAN_TEXT_STYLES" }));
+  $("btnScanText").addEventListener(
+    "click",
+    () => send({
+      type: "SCAN_TEXT_STYLES",
+      useRowLabels: $("tsUseRowLabels").checked
+    })
+  );
   $("btnTsAddRow").addEventListener("click", () => {
     var _a;
     const tr = textStyleRow({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: "Regular" });
@@ -2887,7 +2895,7 @@
     send({ type: "CLEAR_LICENSE" });
   });
   window.onmessage = (event) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
@@ -2993,9 +3001,10 @@
           renderTextStyleRows(msg.styles, true);
           const bound = msg.styles.filter((s) => s.boundStyleId).length;
           const fresh = msg.styles.length - bound;
+          const labelPart = msg.labeled != null ? ` \xB7 \uB77C\uBCA8\uC774\uB984 ${msg.labeled} \xB7 \uB7AD\uD0B9\uD3F4\uBC31 ${(_d = msg.fallback) != null ? _d : 0}` : "";
           setStatus(
             "tsStatus",
-            `${msg.styles.length}\uAC1C \uCC3E\uC74C \xB7 \uC2E0\uADDC ${fresh}(\uC570\uBC84) \xB7 \uC774\uBBF8 \uB4F1\uB85D ${bound}(\uD30C\uB791)` + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
+            `${msg.styles.length}\uAC1C \uCC3E\uC74C \xB7 \uC2E0\uADDC ${fresh}(\uC570\uBC84) \xB7 \uC774\uBBF8 \uB4F1\uB85D ${bound}(\uD30C\uB791)` + labelPart + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
             msg.warnings.length ? "warn" : "ok"
           );
         } else {

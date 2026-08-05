@@ -109,7 +109,7 @@ export type UiToCode =
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
   | { type: 'RENAME_APPLY'; items: { id: string; after: string }[] } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
-  | { type: 'SCAN_TEXT_STYLES' } // Phase C: 선택 텍스트에서 스타일 후보 추출
+  | { type: 'SCAN_TEXT_STYLES'; useRowLabels?: boolean } // Phase C: 선택 텍스트 후보(+가로 행 라벨→이름)
   | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[]; apply: boolean } // Phase C: 변수 보장+스타일 등록(+적용)
   | { type: 'APPLY_TEXT_STYLES' } // Phase C: 적용만(생성 없음) — 선택 텍스트를 기존 스타일에 바인딩
   | { type: 'GET_COLLECTIONS' }
@@ -142,7 +142,7 @@ export type CodeToUi =
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
-  | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[] } // Phase C: 스캔 결과
+  | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number } // Phase C: 스캔 결과(+행 라벨 통계)
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; applied: number; missing: string[] } // Phase C
   | { type: 'TEXT_STYLES_APPLIED'; applied: number; missing: string[] } // Phase C: 적용만(생성 없음) 결과
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }

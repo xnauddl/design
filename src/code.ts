@@ -5,7 +5,7 @@ import type { UiToCode, RenameChange } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
-import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
+import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
@@ -805,9 +805,20 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
         const { samples, warnings } = scanTextStyles(selection());
-        // 기존 로컬 스타일 목록 전달 → 노드 바인딩/시그니처가 같은 후보는 '이미 등록'으로 인식(이름 유지).
-        const styles = nameTextStyles(clusterTextStyles(samples), await scanExistingTextStyles());
-        post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+        const existing = await scanExistingTextStyles();
+        if (msg.useRowLabels) {
+          const r = nameTextStylesWithRowLabels(samples, existing);
+          post({
+            type: 'TEXT_STYLE_CANDIDATES',
+            styles: r.styles,
+            warnings,
+            labeled: r.labeled,
+            fallback: r.fallback,
+          });
+        } else {
+          const styles = nameTextStyles(clusterTextStyles(samples), existing);
+          post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+        }
         break;
       }
       case 'CREATE_TEXT_STYLES': {

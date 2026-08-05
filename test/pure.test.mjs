@@ -69,6 +69,9 @@ import {
   commonBaseName,
   clusterTextStyles,
   nameTextStyles,
+  nameTextStylesWithRowLabels,
+  pairHorizontalRowLabel,
+  isRowLabelNameLike,
   fontStyleForWeight,
   rampToSpecs,
   RAMP_NAMES,
@@ -1644,6 +1647,100 @@ test('nameTextStyles — styleId 바인딩이어도 시그니처 불일치(오�
   const specs = nameTextStyles(clusters, existing);
   assert.equal(specs[0].boundStyleId, undefined); // 오버라이드 → rename 앵커 보류
   assert.notEqual(specs[0].name, 'body'); // 자동 이름(크기 램프)
+});
+
+test('isRowLabelNameLike / pairHorizontalRowLabel — 왼쪽 라벨·크기 역전·모호', () => {
+  assert.equal(isRowLabelNameLike('H1'), true);
+  assert.equal(isRowLabelNameLike('a'.repeat(25)), false);
+  assert.equal(isRowLabelNameLike('body/bold'), true);
+  assert.equal(isRowLabelNameLike('line1\nline2'), false);
+
+  const row = (items) =>
+    items.map((it, indexInParent) => ({
+      fontSize: it.fontSize,
+      lineHeight: it.fontSize + 8,
+      letterSpacing: 0,
+      family: 'Inter',
+      style: 'Regular',
+      layerName: 't',
+      styleId: '',
+      characters: it.characters,
+      id: it.id,
+      rowId: 'row1',
+      indexInParent,
+    }));
+
+  // 작은 라벨 + 큰 표본
+  const p1 = pairHorizontalRowLabel(row([
+    { id: 'L', characters: '제목', fontSize: 12 },
+    { id: 'S', characters: 'The quick', fontSize: 32 },
+  ]));
+  assert.equal(p1?.labelName, '제목');
+  assert.equal(p1?.specimen.id, 'S');
+
+  // 왼쪽이 더 커도 짧은 이름성 → 라벨
+  const p2 = pairHorizontalRowLabel(row([
+    { id: 'L', characters: 'H1', fontSize: 40 },
+    { id: 'S', characters: 'sample', fontSize: 16 },
+  ]));
+  assert.equal(p2?.labelName, 'H1');
+
+  // 왼쪽이 크고 이름성 없음 → 실패
+  const p3 = pairHorizontalRowLabel(row([
+    { id: 'L', characters: 'This is a long heading text that exceeds twenty four', fontSize: 40 },
+    { id: 'S', characters: 'x', fontSize: 16 },
+  ]));
+  assert.equal(p3, null);
+});
+
+test('nameTextStylesWithRowLabels — 라벨 이름·우측 제외·unique·앵커 우선', () => {
+  const base = (o) => ({
+    lineHeight: o.fontSize + 8,
+    letterSpacing: 0,
+    family: 'Inter',
+    style: 'Regular',
+    layerName: 't',
+    styleId: o.styleId ?? '',
+    ...o,
+  });
+
+  // 행1: 라벨+표본+우측 / 행2: 다른 라벨+표본
+  const samples = [
+    base({ id: 'a1', rowId: 'r1', indexInParent: 0, characters: 'Display', fontSize: 12 }),
+    base({ id: 'a2', rowId: 'r1', indexInParent: 1, characters: 'Ag', fontSize: 48 }),
+    base({ id: 'a3', rowId: 'r1', indexInParent: 2, characters: '48/56', fontSize: 11 }),
+    base({ id: 'b1', rowId: 'r2', indexInParent: 0, characters: 'Body', fontSize: 12 }),
+    base({ id: 'b2', rowId: 'r2', indexInParent: 1, characters: 'hello', fontSize: 16 }),
+  ];
+  const r = nameTextStylesWithRowLabels(samples);
+  assert.equal(r.labeled, 2);
+  assert.equal(r.fallback, 0);
+  assert.deepEqual(r.styles.map((s) => s.name).sort(), ['Body', 'Display']);
+  assert.ok(!r.styles.some((s) => s.fontSize === 11)); // 우측 제외
+  assert.ok(!r.styles.some((s) => s.fontSize === 12 && s.name === 'caption')); // 라벨 타이포 행 없음
+
+  // 동일 라벨 문자열·다른 시그니처 → unique
+  const dup = nameTextStylesWithRowLabels([
+    base({ id: 'c1', rowId: 'r3', indexInParent: 0, characters: 'Title', fontSize: 12 }),
+    base({ id: 'c2', rowId: 'r3', indexInParent: 1, characters: 'A', fontSize: 20 }),
+    base({ id: 'd1', rowId: 'r4', indexInParent: 0, characters: 'Title', fontSize: 12 }),
+    base({ id: 'd2', rowId: 'r4', indexInParent: 1, characters: 'B', fontSize: 18 }),
+  ]);
+  assert.deepEqual(dup.styles.map((s) => s.name).sort(), ['Title', 'Title-2']);
+
+  // 앵커 있으면 기존 이름 유지
+  const anchored = nameTextStylesWithRowLabels(
+    [
+      base({ id: 'e1', rowId: 'r5', indexInParent: 0, characters: 'FromLabel', fontSize: 12 }),
+      base({
+        id: 'e2', rowId: 'r5', indexInParent: 1, characters: 'Ag', fontSize: 16,
+        styleId: 'S:body',
+      }),
+    ],
+    [{ id: 'S:body', name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+  );
+  assert.equal(anchored.styles[0].boundStyleId, 'S:body');
+  assert.equal(anchored.styles[0].name, 'body');
 });
 
 test('fontStyleForWeight — 굵기/italic → Figma style', () => {

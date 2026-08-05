@@ -876,7 +876,12 @@ function readTextStyleRows(): TextStyleSpec[] {
   return specs;
 }
 
-$('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
+$('btnScanText').addEventListener('click', () =>
+  send({
+    type: 'SCAN_TEXT_STYLES',
+    useRowLabels: ($('tsUseRowLabels') as HTMLInputElement).checked,
+  }),
+);
 $('btnTsAddRow').addEventListener('click', () => {
   const tr = textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
   $('tsRows').appendChild(tr);
@@ -1673,9 +1678,14 @@ window.onmessage = (event: MessageEvent) => {
         renderTextStyleRows(msg.styles, true);
         const bound = msg.styles.filter((s) => s.boundStyleId).length;
         const fresh = msg.styles.length - bound;
+        const labelPart =
+          msg.labeled != null
+            ? ` · 라벨이름 ${msg.labeled} · 랭킹폴백 ${msg.fallback ?? 0}`
+            : '';
         setStatus(
           'tsStatus',
           `${msg.styles.length}개 찾음 · 신규 ${fresh}(앰버) · 이미 등록 ${bound}(파랑)` +
+            labelPart +
             (msg.warnings.length ? ' · ' + msg.warnings.join(' ') : ''),
           msg.warnings.length ? 'warn' : 'ok',
         );

@@ -673,7 +673,33 @@
       if (ls !== figma.mixed) letterSpacing = ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
       const sid = t.textStyleId;
       const styleId = sid === figma.mixed ? "" : sid;
-      samples.push({ fontSize, lineHeight, letterSpacing, family, style, layerName: t.name, styleId });
+      let characters = "";
+      try {
+        characters = t.characters;
+      } catch (e) {
+        characters = "";
+      }
+      let rowId;
+      let indexInParent;
+      const parent = t.parent;
+      if (parent && "layoutMode" in parent && parent.layoutMode === "HORIZONTAL" && "children" in parent) {
+        rowId = parent.id;
+        indexInParent = parent.children.indexOf(t);
+        if (indexInParent < 0) indexInParent = void 0;
+      }
+      samples.push({
+        fontSize,
+        lineHeight,
+        letterSpacing,
+        family,
+        style,
+        layerName: t.name,
+        styleId,
+        characters,
+        id: t.id,
+        rowId,
+        indexInParent
+      });
     }
     return { samples, warnings: [...warnings] };
   }
@@ -1019,6 +1045,113 @@
       }
     }
     return specs;
+  }
+  var LABEL_RAMP_RE = /^(display|h[1-6]|title|body|caption|overline)(\/\S+)?$/i;
+  function isRowLabelNameLike(characters) {
+    const t = characters.trim();
+    if (!t || t.includes("\n")) return false;
+    if (t.length <= 24) return true;
+    return LABEL_RAMP_RE.test(t);
+  }
+  function pairHorizontalRowLabel(row) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    if (row.length < 2) return null;
+    const byIndex = [...row].sort((a, b) => {
+      var _a2, _b2;
+      return ((_a2 = a.indexInParent) != null ? _a2 : 0) - ((_b2 = b.indexInParent) != null ? _b2 : 0);
+    });
+    const pool = isRowLabelNameLike((_a = byIndex[0].characters) != null ? _a : "") ? byIndex.slice(1) : byIndex;
+    let specimen = pool[0];
+    for (let i = 1; i < pool.length; i++) {
+      const s = pool[i];
+      const si = (_b = s.indexInParent) != null ? _b : 0;
+      const pi = (_c = specimen.indexInParent) != null ? _c : 0;
+      if (s.fontSize > specimen.fontSize || s.fontSize === specimen.fontSize && si > pi) {
+        specimen = s;
+      }
+    }
+    const specIdx = (_d = specimen.indexInParent) != null ? _d : 0;
+    const left = row.filter((s) => {
+      var _a2;
+      return ((_a2 = s.indexInParent) != null ? _a2 : 0) < specIdx;
+    });
+    if (!left.length) return null;
+    const cands = [];
+    for (const s of left) {
+      const nameLike = isRowLabelNameLike((_e = s.characters) != null ? _e : "");
+      const smaller = s.fontSize < specimen.fontSize;
+      if (!nameLike && !smaller) continue;
+      const idx = (_f = s.indexInParent) != null ? _f : 0;
+      let score = 1e3 - idx;
+      if (nameLike) score += 100;
+      if (smaller) score += 50;
+      cands.push({ s, score });
+    }
+    if (!cands.length) return null;
+    cands.sort((a, b) => b.score - a.score);
+    if (cands.length > 1 && cands[0].score === cands[1].score) return null;
+    const label = cands[0].s;
+    const labelName = ((_g = label.characters) != null ? _g : "").trim();
+    if (!labelName) return null;
+    return { label, specimen, labelName };
+  }
+  function nameTextStylesWithRowLabels(samples, existing) {
+    var _a;
+    const excludeIds = /* @__PURE__ */ new Set();
+    const labelBySig = /* @__PURE__ */ new Map();
+    const byRow = /* @__PURE__ */ new Map();
+    for (const s of samples) {
+      if (!s.rowId || s.id == null || s.indexInParent == null) continue;
+      const list = (_a = byRow.get(s.rowId)) != null ? _a : [];
+      list.push(s);
+      byRow.set(s.rowId, list);
+    }
+    for (const row of byRow.values()) {
+      if (row.length < 2) continue;
+      const pair = pairHorizontalRowLabel(row);
+      if (!pair || !pair.specimen.id) continue;
+      const k = sigKey(pair.specimen);
+      if (!labelBySig.has(k)) labelBySig.set(k, pair.labelName);
+      for (const s of row) {
+        if (!s.id || s.id === pair.specimen.id) continue;
+        excludeIds.add(s.id);
+      }
+    }
+    const forCluster = samples.filter((s) => !s.id || !excludeIds.has(s.id));
+    const styles = nameTextStyles(clusterTextStyles(forCluster), existing);
+    const used = /* @__PURE__ */ new Set();
+    const unique = (n) => {
+      const base = n || "text";
+      if (!used.has(base)) {
+        used.add(base);
+        return base;
+      }
+      let i = 2;
+      while (used.has(`${base}-${i}`)) i++;
+      const u = `${base}-${i}`;
+      used.add(u);
+      return u;
+    };
+    for (const s of styles) {
+      if (s.boundStyleId) used.add(s.name);
+    }
+    let labeled = 0;
+    let fallback = 0;
+    for (const style of styles) {
+      if (style.boundStyleId) continue;
+      const label = labelBySig.get(sigKey(style));
+      if (label) {
+        style.name = unique(label);
+        labeled++;
+      }
+    }
+    for (const style of styles) {
+      if (style.boundStyleId) continue;
+      if (labelBySig.has(sigKey(style))) continue;
+      style.name = unique(style.name);
+      fallback++;
+    }
+    return { styles, labeled, fallback };
   }
 
   // src/lib/bind.ts
@@ -3798,8 +3931,20 @@
         }
         case "SCAN_TEXT_STYLES": {
           const { samples, warnings } = scanTextStyles(selection());
-          const styles = nameTextStyles(clusterTextStyles(samples), await scanExistingTextStyles());
-          post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
+          const existing = await scanExistingTextStyles();
+          if (msg.useRowLabels) {
+            const r = nameTextStylesWithRowLabels(samples, existing);
+            post({
+              type: "TEXT_STYLE_CANDIDATES",
+              styles: r.styles,
+              warnings,
+              labeled: r.labeled,
+              fallback: r.fallback
+            });
+          } else {
+            const styles = nameTextStyles(clusterTextStyles(samples), existing);
+            post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
+          }
           break;
         }
         case "CREATE_TEXT_STYLES": {
