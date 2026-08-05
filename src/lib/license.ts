@@ -3,7 +3,7 @@
    M2: 외부 키 검증의 "두뇌". 실제 fetch·clientStorage는 code.ts(부수효과)에서.
    원칙: 만료 전이면 적용, 오프라인이면 grace 동안 유지, grace 초과 시 강등(free).
    ============================================================ */
-import { Tier, isTier, normalizeLegacyTier } from './entitlements';
+import { Tier, normalizeLegacyTier } from './entitlements';
 
 export interface LicenseCache {
   /** 사용자 라이선스 키. */
@@ -63,25 +63,38 @@ export interface VerifyErr {
   error: string;
 }
 
-/** UI(검증 수행) → code(캐시·적용)로 전달되는 검증 결과. offline은 grace 폴백 신호. */
+/**
+ * UI(검증 수행) → code(캐시·적용)로 전달되는 검증 결과.
+ * `offline: true`는 **캐시 티어를 grace로 유지하라**는 신호이므로, 서버에 도달한 뒤의 실패
+ * (서명 불일치·클레임 오류·5xx·비JSON 응답)에는 절대 붙이지 않는다 — 페이월 페일오픈이 된다.
+ * 오직 fetch 자체가 실패(연결 불가)했을 때만 붙인다.
+ */
 export type VerifyResult = VerifyOk | (VerifyErr & { offline?: boolean });
 
 /**
- * 검증 서버 응답(JSON) 파싱. 기대 형식:
- *   성공: { valid:true, tier:'paid', expiresAt: <ms> }
- *   실패: { valid:false, error:'...' }
- * 위변조 방지를 위해 실제 운영에서는 서명(JWT 등) 검증을 추가한다(M2.1).
+ * 검증 서버 응답에서 서명 토큰(JWT)을 꺼낸다.
+ * 서명 없는 평문 응답(`{valid:true,tier:'paid'}`)은 페이월 우회 경로이므로 수용하지 않는다(M2.1).
+ *
+ * 다만 서버가 **명시적으로 거부**한 경우(`{valid:false,error}`)엔 그 사유를 그대로 전한다.
+ * Worker는 만료·기기 활성화 한도 초과를 이 형태(status 200)로 알려주는데, 뭉뚱그려
+ * "서명 토큰이 없는 응답"이라고만 하면 사용자가 무엇을 해야 할지 알 수 없다.
+ * 실패 문구만 바꿀 뿐 `ok:true`로 승격시키지 않으므로 서명 없는 응답을 수용하는 것과 무관하다.
  */
-export function parseVerifyResponse(json: unknown): VerifyOk | VerifyErr {
-  if (!json || typeof json !== 'object') return { ok: false, error: '잘못된 응답 형식' };
-  const o = json as Record<string, unknown>;
-  if (o.valid === false) {
-    return { ok: false, error: typeof o.error === 'string' ? o.error : '유효하지 않은 라이선스 키' };
+export function extractSignedToken(json: unknown): { ok: true; token: string } | { ok: false; error: string } {
+  if (!json || typeof json !== 'object') return { ok: false, error: '응답 본문을 해석할 수 없습니다' };
+  const o = json as { token?: unknown; valid?: unknown; error?: unknown };
+  if (typeof o.token === 'string' && o.token) return { ok: true, token: o.token };
+  if (o.valid === false && typeof o.error === 'string' && o.error) return { ok: false, error: o.error };
+  return { ok: false, error: '서명 토큰이 없는 응답' };
+}
+
+/** 응답의 기기 instanceId(문자열일 때만) — 없으면 기존 캐시 값을 유지. */
+export function pickInstanceId(json: unknown, prev?: string): string | undefined {
+  if (json && typeof json === 'object') {
+    const v = (json as { instanceId?: unknown }).instanceId;
+    if (typeof v === 'string' && v) return v;
   }
-  if (!isTier(o.tier)) return { ok: false, error: '응답에 알 수 없는 티어' };
-  const expiresAt = typeof o.expiresAt === 'number' ? o.expiresAt : 0;
-  if (!expiresAt) return { ok: false, error: '응답에 만료 시각 없음' };
-  return { ok: true, tier: o.tier, expiresAt };
+  return prev;
 }
 
 /** 성공 응답 + 키 + 현재시각 → 저장할 캐시. */

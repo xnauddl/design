@@ -31,8 +31,9 @@ import {
   normalizeLegacyTier,
   normalizeLicenseCache,
   evaluateLicense,
-  parseVerifyResponse,
   cacheFromVerify,
+  extractSignedToken,
+  pickInstanceId,
   REVERIFY_MS,
   GRACE_MS,
   base64UrlToString,
@@ -69,6 +70,9 @@ import {
   commonBaseName,
   clusterTextStyles,
   nameTextStyles,
+  nameTextStylesWithRowLabels,
+  pairHorizontalRowLabel,
+  isRowLabelNameLike,
   fontStyleForWeight,
   rampToSpecs,
   RAMP_NAMES,
@@ -91,6 +95,19 @@ import {
   suggestTokenRoles,
   pipelineSteps,
   t,
+  parseVarValue,
+  displayVarValue,
+  validateVarName,
+  sanitizeScopes,
+  scopesForTypeList,
+  aliasSelfReference,
+  findAliasReferers,
+  hexToOklch,
+  darkValueForLight,
+  darkGlobalName,
+  isDarkGlobalName,
+  DARK_L_MIN,
+  DARK_L_MAX,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -341,13 +358,31 @@ test('evaluateLicense — 오프라인 grace 유지 후 강등', () => {
   );
 });
 
-test('parseVerifyResponse — 성공/실패/형식오류', () => {
-  const ok = parseVerifyResponse({ valid: true, tier: 'paid', expiresAt: 123 });
-  assert.deepEqual(ok, { ok: true, tier: 'paid', expiresAt: 123 });
-  assert.equal(parseVerifyResponse({ valid: false, error: '만료됨' }).error, '만료됨');
-  assert.equal(parseVerifyResponse({ tier: 'gold', expiresAt: 1 }).ok, false); // 알 수 없는 티어
-  assert.equal(parseVerifyResponse({ valid: true, tier: 'paid' }).ok, false); // 만료시각 없음
-  assert.equal(parseVerifyResponse('nope').ok, false);
+test('extractSignedToken — 서명 토큰만 수용(평문 응답은 페이월 우회라 거부)', () => {
+  assert.deepEqual(extractSignedToken({ token: 'a.b.c' }), { ok: true, token: 'a.b.c' });
+  // 서명 없는 평문 성공 응답을 절대 통과시키면 안 된다.
+  assert.equal(extractSignedToken({ valid: true, tier: 'paid', expiresAt: 9e12 }).ok, false);
+  assert.equal(extractSignedToken({ token: '' }).ok, false);
+  // 서버가 명시적으로 거부한 사유는 그대로 전달(만료·기기 한도 등) — 실패는 실패로 두되 문구만 살린다.
+  assert.deepEqual(extractSignedToken({ valid: false, error: '구독이 만료되었습니다.' }), {
+    ok: false,
+    error: '구독이 만료되었습니다.',
+  });
+  // 사유가 있어도 절대 성공으로 승격되지 않는다.
+  assert.equal(extractSignedToken({ valid: false, error: '한도 초과', tier: 'paid' }).ok, false);
+  // valid:true인데 토큰이 없으면 여전히 거부(페일오픈 방지) — error가 있어도 마찬가지.
+  assert.equal(extractSignedToken({ valid: true, tier: 'paid', error: '무시' }).ok, false);
+  assert.equal(extractSignedToken({ token: 123 }).ok, false);
+  assert.equal(extractSignedToken(null).ok, false);
+  assert.equal(extractSignedToken('nope').ok, false);
+});
+
+test('pickInstanceId — 응답값 우선, 없으면 기존 유지', () => {
+  assert.equal(pickInstanceId({ instanceId: 'new' }, 'old'), 'new');
+  assert.equal(pickInstanceId({}, 'old'), 'old');
+  assert.equal(pickInstanceId({ instanceId: '' }, 'old'), 'old');
+  assert.equal(pickInstanceId({ instanceId: 7 }, 'old'), 'old');
+  assert.equal(pickInstanceId(null, undefined), undefined);
 });
 
 test('cacheFromVerify — 응답+키+now → 캐시', () => {
@@ -402,7 +437,7 @@ test('validateLicenseClaims — 만료·iss·aud·tier', () => {
   assert.equal(validateLicenseClaims({ tier: 'paid' }, now).ok, false); // exp 없음
 });
 
-/* ================= presets.ts (M3 Team) ================= */
+/* ================= presets.ts (M3 Paid) ================= */
 test('serializePreset / parsePreset — 라운드트립 + 검증', () => {
   const p = { name: 'mobile', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: { surface: 'color/neutral/50' } };
   const round = parsePreset(serializePreset(p));
@@ -1646,6 +1681,100 @@ test('nameTextStyles — styleId 바인딩이어도 시그니처 불일치(오�
   assert.notEqual(specs[0].name, 'body'); // 자동 이름(크기 램프)
 });
 
+test('isRowLabelNameLike / pairHorizontalRowLabel — 왼쪽 라벨·크기 역전·모호', () => {
+  assert.equal(isRowLabelNameLike('H1'), true);
+  assert.equal(isRowLabelNameLike('a'.repeat(25)), false);
+  assert.equal(isRowLabelNameLike('body/bold'), true);
+  assert.equal(isRowLabelNameLike('line1\nline2'), false);
+
+  const row = (items) =>
+    items.map((it, indexInParent) => ({
+      fontSize: it.fontSize,
+      lineHeight: it.fontSize + 8,
+      letterSpacing: 0,
+      family: 'Inter',
+      style: 'Regular',
+      layerName: 't',
+      styleId: '',
+      characters: it.characters,
+      id: it.id,
+      rowId: 'row1',
+      indexInParent,
+    }));
+
+  // 작은 라벨 + 큰 표본
+  const p1 = pairHorizontalRowLabel(row([
+    { id: 'L', characters: '제목', fontSize: 12 },
+    { id: 'S', characters: 'The quick', fontSize: 32 },
+  ]));
+  assert.equal(p1?.labelName, '제목');
+  assert.equal(p1?.specimen.id, 'S');
+
+  // 왼쪽이 더 커도 짧은 이름성 → 라벨
+  const p2 = pairHorizontalRowLabel(row([
+    { id: 'L', characters: 'H1', fontSize: 40 },
+    { id: 'S', characters: 'sample', fontSize: 16 },
+  ]));
+  assert.equal(p2?.labelName, 'H1');
+
+  // 왼쪽이 크고 이름성 없음 → 실패
+  const p3 = pairHorizontalRowLabel(row([
+    { id: 'L', characters: 'This is a long heading text that exceeds twenty four', fontSize: 40 },
+    { id: 'S', characters: 'x', fontSize: 16 },
+  ]));
+  assert.equal(p3, null);
+});
+
+test('nameTextStylesWithRowLabels — 라벨 이름·우측 제외·unique·앵커 우선', () => {
+  const base = (o) => ({
+    lineHeight: o.fontSize + 8,
+    letterSpacing: 0,
+    family: 'Inter',
+    style: 'Regular',
+    layerName: 't',
+    styleId: o.styleId ?? '',
+    ...o,
+  });
+
+  // 행1: 라벨+표본+우측 / 행2: 다른 라벨+표본
+  const samples = [
+    base({ id: 'a1', rowId: 'r1', indexInParent: 0, characters: 'Display', fontSize: 12 }),
+    base({ id: 'a2', rowId: 'r1', indexInParent: 1, characters: 'Ag', fontSize: 48 }),
+    base({ id: 'a3', rowId: 'r1', indexInParent: 2, characters: '48/56', fontSize: 11 }),
+    base({ id: 'b1', rowId: 'r2', indexInParent: 0, characters: 'Body', fontSize: 12 }),
+    base({ id: 'b2', rowId: 'r2', indexInParent: 1, characters: 'hello', fontSize: 16 }),
+  ];
+  const r = nameTextStylesWithRowLabels(samples);
+  assert.equal(r.labeled, 2);
+  assert.equal(r.fallback, 0);
+  assert.deepEqual(r.styles.map((s) => s.name).sort(), ['Body', 'Display']);
+  assert.ok(!r.styles.some((s) => s.fontSize === 11)); // 우측 제외
+  assert.ok(!r.styles.some((s) => s.fontSize === 12 && s.name === 'caption')); // 라벨 타이포 행 없음
+
+  // 동일 라벨 문자열·다른 시그니처 → unique
+  const dup = nameTextStylesWithRowLabels([
+    base({ id: 'c1', rowId: 'r3', indexInParent: 0, characters: 'Title', fontSize: 12 }),
+    base({ id: 'c2', rowId: 'r3', indexInParent: 1, characters: 'A', fontSize: 20 }),
+    base({ id: 'd1', rowId: 'r4', indexInParent: 0, characters: 'Title', fontSize: 12 }),
+    base({ id: 'd2', rowId: 'r4', indexInParent: 1, characters: 'B', fontSize: 18 }),
+  ]);
+  assert.deepEqual(dup.styles.map((s) => s.name).sort(), ['Title', 'Title-2']);
+
+  // 앵커 있으면 기존 이름 유지
+  const anchored = nameTextStylesWithRowLabels(
+    [
+      base({ id: 'e1', rowId: 'r5', indexInParent: 0, characters: 'FromLabel', fontSize: 12 }),
+      base({
+        id: 'e2', rowId: 'r5', indexInParent: 1, characters: 'Ag', fontSize: 16,
+        styleId: 'S:body',
+      }),
+    ],
+    [{ id: 'S:body', name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
+  );
+  assert.equal(anchored.styles[0].boundStyleId, 'S:body');
+  assert.equal(anchored.styles[0].name, 'body');
+});
+
 test('fontStyleForWeight — 굵기/italic → Figma style', () => {
   assert.equal(fontStyleForWeight(400), 'Regular');
   assert.equal(fontStyleForWeight(700), 'Bold');
@@ -1823,4 +1952,115 @@ test('nameTextStyles — 군집의 행간 %는 스펙으로 전달되고, px 군
   assert.equal(pct.lineHeightPercent, 150);
   assert.equal(pct.lineHeight, 24); // px 환산값은 그대로 유지(시맨틱 변수·시그니처 기준)
   assert.equal(px.lineHeightPercent, undefined);
+});
+
+/* ---------- 변수 편집기(R1)·다크 테마 생성(R2) 순수 헬퍼 ---------- */
+
+test('parseVarValue — 타입별 파싱/검증', () => {
+  // COLOR
+  assert.deepEqual(parseVarValue('COLOR', '#ffffff'), { ok: true, value: { r: 1, g: 1, b: 1 } });
+  assert.deepEqual(parseVarValue('COLOR', '000000'), { ok: true, value: { r: 0, g: 0, b: 0 } });
+  assert.equal(parseVarValue('COLOR', 'nope').ok, false);
+  assert.equal(parseVarValue('COLOR', '#fff').ok, false); // 3자리 거부
+  // FLOAT
+  assert.deepEqual(parseVarValue('FLOAT', '16'), { ok: true, value: 16 });
+  assert.deepEqual(parseVarValue('FLOAT', '-1.5'), { ok: true, value: -1.5 });
+  assert.equal(parseVarValue('FLOAT', '').ok, false);
+  assert.equal(parseVarValue('FLOAT', 'abc').ok, false);
+  // STRING
+  assert.deepEqual(parseVarValue('STRING', 'Inter'), { ok: true, value: 'Inter' });
+  assert.deepEqual(parseVarValue('STRING', '  Inter  '), { ok: true, value: 'Inter' }); // 앞뒤 공백 트림
+  assert.equal(parseVarValue('STRING', '   ').ok, false);
+  // BOOLEAN
+  assert.deepEqual(parseVarValue('BOOLEAN', 'true'), { ok: true, value: true });
+  assert.deepEqual(parseVarValue('BOOLEAN', 'FALSE'), { ok: true, value: false });
+  assert.equal(parseVarValue('BOOLEAN', 'yes').ok, false);
+});
+
+test('displayVarValue — 색은 hex, 그 외 문자열', () => {
+  assert.equal(displayVarValue('COLOR', { r: 1, g: 1, b: 1 }), '#ffffff');
+  assert.equal(displayVarValue('FLOAT', 16), '16');
+  assert.equal(displayVarValue('STRING', 'Inter'), 'Inter');
+});
+
+test('validateVarName — 빈 이름·중복 거부', () => {
+  assert.equal(validateVarName('surface', ['bg', 'text']), null);
+  assert.match(validateVarName('', []), /이름/);
+  assert.match(validateVarName('  ', []), /이름/);
+  assert.match(validateVarName('bg', ['bg', 'text']), /중복|이름/);
+});
+
+test('sanitizeScopes — 타입 무효 스코프 제거 + 중복 제거', () => {
+  // COLOR에 FLOAT 전용 스코프(GAP)는 제거, 중복은 1개로
+  const out = sanitizeScopes(['ALL_FILLS', 'GAP', 'ALL_FILLS', 'STROKE_COLOR'], 'COLOR');
+  assert.deepEqual(out.sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+});
+
+test('scopesForTypeList — 타입별 유효 스코프 노출', () => {
+  const color = scopesForTypeList('COLOR');
+  assert.ok(color.includes('ALL_FILLS'));
+  assert.ok(!color.includes('GAP')); // FLOAT 전용
+  const float = scopesForTypeList('FLOAT');
+  assert.ok(float.includes('GAP'));
+  assert.ok(!float.includes('TEXT_FILL'));
+});
+
+test('aliasSelfReference — 자기참조만 차단', () => {
+  assert.equal(aliasSelfReference('a', 'a'), true);
+  assert.equal(aliasSelfReference('a', 'b'), false);
+});
+
+test('findAliasReferers — varId를 별칭하는 변수 수집(자기 제외, R2-C)', () => {
+  const vars = [
+    { id: 'g1', name: 'color/blue/500', values: { m: { kind: 'literal' } } },
+    { id: 's1', name: 'primary', values: { m: { kind: 'alias', aliasId: 'g1' } } },
+    { id: 's2', name: 'surface', values: { light: { kind: 'alias', aliasId: 'g1' }, dark: { kind: 'literal' } } },
+    { id: 's3', name: 'text', values: { m: { kind: 'alias', aliasId: 'other' } } },
+  ];
+  const refs = findAliasReferers('g1', vars);
+  assert.deepEqual(refs.map((r) => r.name).sort(), ['primary', 'surface']);
+  // 어느 모드든 한 번이라도 별칭하면 1회만(중복 없음)
+  assert.equal(refs.length, 2);
+  assert.deepEqual(findAliasReferers('none', vars), []);
+});
+
+test('darkValueForLight — OKLCH 명도 반전(밝음↔어두움)', () => {
+  // 흰색 → 어두운 색(L 낮아짐), 검정 → 밝은 색(L 높아짐)
+  const fromWhite = hexToOklch(darkValueForLight('#ffffff'));
+  const fromBlack = hexToOklch(darkValueForLight('#000000'));
+  assert.ok(fromWhite.l < 0.5, `흰색 반전 L=${fromWhite.l}`);
+  assert.ok(fromBlack.l > 0.5, `검정 반전 L=${fromBlack.l}`);
+  // 유효 hex 반환
+  assert.match(darkValueForLight('#2563eb'), /^#[0-9a-f]{6}$/);
+  // hue 보존(유채색) — 파랑 계열 유지
+  const lightH = hexToOklch('#2563eb').h;
+  const darkH = hexToOklch(darkValueForLight('#2563eb')).h;
+  assert.ok(Math.abs(lightH - darkH) < 15, `hue 보존 ${lightH}→${darkH}`);
+});
+
+test('darkValueForLight — 밝은 표면 위계가 검정으로 붕괴하지 않는다', () => {
+  // 단순 1-L이면 L>0.94 구간이 sRGB에서 전부 #000000이 되어 surface/surface-2가 한 색이 된다.
+  // 대역 압축 후에는 회색 램프 전체가 서로 다른 색으로 남아야 한다.
+  const ramp = ['#ffffff', '#f8f9fa', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#6c757d', '#495057', '#343a40', '#212529', '#000000'];
+  const darks = ramp.map(darkValueForLight);
+  assert.equal(new Set(darks).size, ramp.length, `붕괴: ${darks.join(' ')}`);
+  assert.ok(!darks.includes('#000000'), `순수 검정 표면 생성: ${darks.join(' ')}`);
+  // 라이트가 어두워질수록 다크는 밝아진다(반전) — 순서 뒤집힘 없이 단조.
+  const ls = darks.map((h) => hexToOklch(h).l);
+  for (let i = 1; i < ls.length; i++) {
+    assert.ok(ls[i] > ls[i - 1], `단조 위반 ${ramp[i - 1]}→${ramp[i]}: ${ls[i - 1]} → ${ls[i]}`);
+  }
+  // 결과 L은 다크 대역 안(게멋 클램프는 c만 줄이므로 L은 그대로).
+  // 여유 0.005는 hex 8비트 양자화 왕복 오차(예: L 0.97 → #f5f5f5 → 0.97015) 몫.
+  const eps = 0.005;
+  for (const l of ls) assert.ok(l >= DARK_L_MIN - eps && l <= DARK_L_MAX + eps, `대역 이탈 L=${l}`);
+});
+
+test('darkGlobalName — dark/ 그룹 접두 · 멱등', () => {
+  assert.equal(darkGlobalName('color/blue/500'), 'dark/color/blue/500');
+  // 다크 모드를 출처로 재실행해도 dark/dark/…가 생기지 않는다.
+  assert.equal(darkGlobalName('dark/color/blue/500'), 'dark/color/blue/500');
+  assert.equal(darkGlobalName(darkGlobalName('color/blue/500')), 'dark/color/blue/500');
+  assert.equal(isDarkGlobalName('dark/color/blue/500'), true);
+  assert.equal(isDarkGlobalName('color/blue/500'), false);
 });

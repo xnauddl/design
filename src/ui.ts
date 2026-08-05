@@ -2,19 +2,21 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate } from './shared/messages';
-import { type DraftToken, type Unit, resolvedTypeForToken, tidyNumberTokens } from './lib/tokens';
-import { t } from './lib/i18n';
+import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList, tidyNumberTokens } from './lib/tokens';
+import { t, hasString } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
-import { type Tier } from './lib/entitlements';
-import { parseVerifyResponse, type VerifyResult } from './lib/license';
+import { type Tier, type Feature } from './lib/entitlements';
+import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
-import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
+import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import type { ExportFormat } from './lib/exporters';
+import type { FrameMeta } from './lib/similar';
+import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles } from './lib/roles';
-import { pipelineSteps, type StepStatus } from './lib/pipeline';
+import { pipelineSteps } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import type { WcagLevel, ContrastFinding } from './lib/contrast';
@@ -34,7 +36,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
 let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
-let teamDataRequested = false;
+let paidDataRequested = false;
 // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
 let hasGlobal = false;
 let hasBindable = false;
@@ -266,6 +268,8 @@ const LIST_REGIONS: ListRegion[] = [
   { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
   { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
   { mount: 'contrastList', row: '.cfind', more: 'contrastListMore', count: 'contrastListCount', expand: 'btnContrastListExpand' },
+  { mount: 'similarList', row: '.simrow', more: 'similarListMore', count: 'similarListCount', expand: 'btnSimilarListExpand' },
+  { mount: 'varList', row: '.vrow', more: 'varListMore', count: 'varListCount', expand: 'btnVarListExpand' },
   // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
   // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
   { mount: 'bindTree', row: '.tree-row', more: 'bindTreeMore', count: 'bindTreeCount', expand: 'btnBindTreeExpand' },
@@ -898,7 +902,12 @@ function readTextStyleRows(): TextStyleSpec[] {
   return specs;
 }
 
-$('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
+$('btnScanText').addEventListener('click', () =>
+  send({
+    type: 'SCAN_TEXT_STYLES',
+    useRowLabels: ($('tsUseRowLabels') as HTMLInputElement).checked,
+  }),
+);
 $('btnTsAddRow').addEventListener('click', () => {
   const tr = textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
   $('tsRows').appendChild(tr);
@@ -1080,10 +1089,10 @@ function renderWizardSteps(plan: WizardPlanItem[]): void {
     dot.textContent = String(i + 1);
     const label = document.createElement('span');
     label.className = 'wlabel';
-    label.textContent = p.step.label;
+    label.textContent = t('wizard.step.' + p.step.id);
     const note = document.createElement('span');
     note.className = 'wnote';
-    note.textContent = p.run ? '' : p.skipReason ?? '건너뜀';
+    note.textContent = p.run ? '' : t(p.skipReason ?? 'wizard.skip.default');
     row.append(dot, label, note);
     box.appendChild(row);
   });
@@ -1119,7 +1128,7 @@ async function runWizard(): Promise<void> {
     contrast: ($('wizOptContrast') as HTMLInputElement).checked,
     componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
   };
-  const ctx: WizardContext = { isPro: isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
+  const ctx: WizardContext = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
   const plan = planWizard(options, ctx);
 
   wizardRunning = true;
@@ -1134,33 +1143,33 @@ async function runWizard(): Promise<void> {
   for (const p of plan) {
     if (!p.run) continue; // renderWizardSteps에서 이미 skip 표시
     if (stopped) {
-      setWizardStep(p.step.id, 'fail', '이전 단계 중단으로 건너뜀');
+      setWizardStep(p.step.id, 'fail', t('wizard.seq.stoppedPrev'));
       continue;
     }
-    setWizardStep(p.step.id, 'active', '진행 중…');
+    setWizardStep(p.step.id, 'active', t('wizard.seq.running'));
     try {
       switch (p.step.id) {
         case 'extract': {
           const r = await wizardRequest({ type: 'EXTRACT' }, ['EXTRACT_RESULT']);
           tokens = r.tokens; // 모듈 변수 동기화(다음 단계 일관성)
           if (!tokens.length) {
-            setWizardStep('extract', 'fail', '추출된 토큰 없음 — 색·폰트·간격이 있는 프레임을 선택하세요.');
+            setWizardStep('extract', 'fail', t('wizard.seq.noExtract'));
             stopped = true;
             break;
           }
-          setWizardStep('extract', 'done', `${tokens.length}개 후보`);
+          setWizardStep('extract', 'done', t('wizard.seq.extractDone', { count: tokens.length }));
           break;
         }
         case 'create': {
           const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens, base }, ['CREATE_RESULT']);
           totals.created = r.created + r.updated;
-          setWizardStep('create', 'done', `생성 ${r.created} · 갱신 ${r.updated}`);
+          setWizardStep('create', 'done', t('wizard.seq.createDone', { created: r.created, updated: r.updated }));
           break;
         }
         case 'semantics': {
           const r = await wizardRequest({ type: 'CREATE_SEMANTICS', map: semMap }, ['SEMANTICS_RESULT']);
           totals.semanticsAliased = r.aliased;
-          setWizardStep('semantics', 'done', `별칭 ${r.aliased}${r.missing.length ? ` · 누락 ${r.missing.length}` : ''}`);
+          setWizardStep('semantics', 'done', t('wizard.seq.semantics', { aliased: r.aliased }) + (r.missing.length ? t('wizard.seq.semanticsMissing', { n: r.missing.length }) : ''));
           break;
         }
         case 'bind': {
@@ -1169,17 +1178,17 @@ async function runWizard(): Promise<void> {
           hideWizardBar();
           totals.bound = r.bound;
           if (r.cancelled) {
-            setWizardStep('bind', 'done', `취소됨 — ${r.bound}건만 적용`);
+            setWizardStep('bind', 'done', t('wizard.seq.bindCancelled', { bound: r.bound }));
             stopped = true;
             break;
           }
-          setWizardStep('bind', 'done', `바인딩 ${r.bound}${r.skipped ? ` · 스킵 ${r.skipped}` : ''}`);
+          setWizardStep('bind', 'done', t('wizard.seq.bindDone', { bound: r.bound }) + (r.skipped ? t('wizard.seq.bindSkip', { n: r.skipped }) : ''));
           break;
         }
         case 'rename': {
           const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth }, ['RENAME_RESULT']);
           totals.renamed = r.changes.length;
-          setWizardStep('rename', 'done', `${r.changes.length}개 이름 적용`);
+          setWizardStep('rename', 'done', t('wizard.seq.renameDone', { count: r.changes.length }));
           break;
         }
         case 'contrast': {
@@ -1187,14 +1196,14 @@ async function runWizard(): Promise<void> {
           totals.contrastChecked = r.checked;
           totals.contrastFailed = r.failed;
           // 미달 발견은 ‘실행 실패’가 아니라 ‘점검 결과’ — 흐름은 계속하되 주의 표시.
-          setWizardStep('contrast', r.failed ? 'fail' : 'done', r.checked === 0 ? '검사할 텍스트 없음' : `${r.checked - r.failed}/${r.checked} ${r.level} 통과`);
+          setWizardStep('contrast', r.failed ? 'fail' : 'done', r.checked === 0 ? t('wizard.seq.contrastNone') : t('wizard.seq.contrastPass', { pass: r.checked - r.failed, checked: r.checked, level: r.level }));
           break;
         }
         case 'componentize': {
           // 등록이 베이스 묶음 베리언트 세트까지 함께 수행(별도 분류 불필요).
           const reg = await wizardRequest({ type: 'REGISTER_COMPONENTS' }, ['COMPONENTS_RESULT']);
           totals.components = reg.registered;
-          setWizardStep('componentize', 'done', `등록 ${reg.registered} · 세트 ${reg.sets}`);
+          setWizardStep('componentize', 'done', t('wizard.seq.componentize', { registered: reg.registered, sets: reg.sets }));
           break;
         }
       }
@@ -1261,29 +1270,33 @@ async function subtleVerify(signingInput: string, signatureB64: string, alg: str
 /** 검증 서버 호출 + 서명/클레임 검증 → 결과를 code로 보고(code가 캐시·적용).
  *  instanceId: 이전 활성화에서 받아 캐시에 보관한 기기 식별자(있으면 같은 기기로 validate). */
 async function verifyAndReport(key: string, instanceId?: string): Promise<void> {
-  let result: VerifyResult;
+  let json: unknown;
   try {
     const resp = await fetch(VERIFY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, pluginId: PLUGIN_ID, instanceId }),
     });
-    const json: unknown = await resp.json();
-    // 서명 토큰({ token }) 우선, 없으면 평문 응답(개발/하위호환).
-    const signed = !!json && typeof json === 'object' && typeof (json as { token?: unknown }).token === 'string';
-    const parsed = signed
-      ? await verifyLicenseToken((json as { token: string }).token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify)
-      : parseVerifyResponse(json);
-    // 서버가 돌려준 기기 instanceId를 보관(다음 재검증 때 같은 기기로 validate). 없으면 기존 값 유지.
-    const respInstanceId =
-      !!json && typeof json === 'object' && typeof (json as { instanceId?: unknown }).instanceId === 'string'
-        ? (json as { instanceId: string }).instanceId
-        : instanceId;
-    result = parsed.ok
-      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: respInstanceId }
-      : { ok: false, error: parsed.error };
+    // 네트워크 도달 이후의 실패는 '오프라인'이 아니다 — grace 유지로 페일오픈되지 않게 여기서부터 분리한다.
+    json = await resp.json().catch(() => null);
   } catch {
-    result = { ok: false, error: '검증 서버 연결 실패(오프라인)', offline: true };
+    // fetch 자체 실패(DNS·연결·CORS)만 오프라인 → 기존 캐시를 grace로 유지.
+    send({ type: 'LICENSE_VERIFIED', key, result: { ok: false, error: '검증 서버 연결 실패(오프라인)', offline: true } });
+    return;
+  }
+
+  let result: VerifyResult;
+  try {
+    // 서명 토큰(JWT)만 신뢰한다 — 서명 없는 평문 응답은 페이월 우회 경로라 수용하지 않는다(M2.1).
+    const ext = extractSignedToken(json);
+    if (!ext.ok) throw new Error(ext.error);
+    const parsed = await verifyLicenseToken(ext.token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify);
+    result = parsed.ok
+      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: pickInstanceId(json, instanceId) }
+      : { ok: false, error: parsed.error };
+  } catch (e) {
+    // 서명·클레임·응답 형식 오류 → offline 아님(검증 실패로 확정 처리).
+    result = { ok: false, error: `검증 실패: ${e instanceof Error ? e.message : String(e)}` };
   }
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
@@ -1306,19 +1319,31 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
    컴포넌트/베리언트·공유 프리셋.
    Free: 추출·색 정리·바인딩·리네임·명도 대비·내보내기. */
 const PAID_LOCK = '🔒 Paid 전용';
+/** 유료 거부(PREMIUM_REQUIRED) 안내를 띄울 카드 — Feature별 상태 영역. */
+const PREMIUM_STATUS_ID: Record<Feature, string> = {
+  tokens: 'createStatus',
+  semantics: 'semStatus',
+  components: 'componentStatus',
+  textStyles: 'tsStatus',
+  presets: 'presetStatus',
+};
 const PRESET_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
-const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
+// btnScanSimilar(스캔)은 읽기 전용이라 Free — 잠그는 건 실제로 문서를 바꾸는 btnComponentize뿐.
+const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnComponentize'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
 // 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
 // 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
+// btnApplyExistingText도 code 쪽에서 requireTextStyles로 막히지만, 전제 가드(등록된 스타일 유무)와
+// 결합돼 있어 여기 목록이 아니라 updateGates 아래에서 별도로 잠근다.
 const PAID_FIELDS = [
   ...PRESET_FIELDS,
   ...COMPONENT_FIELDS,
   'btnPalette', 'btnPaletteApply',
   'btnCreate', 'btnCreateApply',
   'btnTextStyles',
+  'btnGenDark', // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
 ];
 
 /**
@@ -1332,10 +1357,13 @@ function updateGates(): void {
     el.disabled = !isPaid;
     setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
   }
-  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'createLock', 'semLock', 'tsLock']) {
+  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
-  $('wizComponentLock').textContent = isPaid ? '' : '🔒 Paid';
+  // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가
+  // 방금 disabled를 티어만 보고 덮었으니, 모드 조건을 여기서 다시 적용해야 한다(순서 의존).
+  refreshDarkModes();
+  $('wizComponentLock').textContent = isPaid ? '' : PAID_LOCK;
   ($('wizOptComponentize') as HTMLInputElement).disabled = !isPaid;
 
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
@@ -1345,9 +1373,10 @@ function updateGates(): void {
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
   // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
+  if (!isPaid) ($('btnApplyExistingText') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
 
-  if (isPaid && !teamDataRequested) {
-    teamDataRequested = true;
+  if (isPaid && !paidDataRequested) {
+    paidDataRequested = true;
     send({ type: 'GET_PRESETS' });
   }
 }
@@ -1376,7 +1405,6 @@ function goToCreate(): void {
 }
 
 /* ---------- 진행 안내 파이프라인(§3) ---------- */
-const STEP_STAT_LABEL: Record<StepStatus, string> = { done: '완료', ready: '준비됨', blocked: '전제 미충족' };
 
 /** 단계 클릭 → 해당 단계 카드/탭으로 이동. */
 function gotoStep(id: 'tokens' | 'semantics' | 'bind'): void {
@@ -1410,10 +1438,10 @@ function renderPipeline(): void {
     dot.textContent = s.status === 'done' ? '✓' : String(i + 1);
     const label = document.createElement('span');
     label.className = 'plabel';
-    label.textContent = s.label;
+    label.textContent = t('pipeline.step.' + s.id);
     const stat = document.createElement('span');
     stat.className = 'pstat';
-    stat.textContent = s.hint ?? STEP_STAT_LABEL[s.status];
+    stat.textContent = s.hint ? t(s.hint) : t('pipeline.stat.' + s.status);
 
     row.append(dot, label, stat);
     const go = (): void => gotoStep(s.id);
@@ -1428,10 +1456,126 @@ function renderPipeline(): void {
   });
 }
 
-/* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
+/* ---------- 컴포넌트 / 베리언트 (Phase 3, Paid) ---------- */
 $('btnScanComp').addEventListener('click', () => {
   setStatus('componentStatus', t('component.scanning'), '');
   send({ type: 'SCAN_COMPONENT_CANDIDATES' });
+});
+
+/* ---------- 변수 편집기 ---------- */
+// 마지막으로 받은 목록. 편집은 낙관적으로 반영하지 않고 EDIT_VARIABLE_RESULT로 되돌려받아 갱신한다
+// — figma가 이름을 정규화하거나 값을 거부할 수 있어서, 화면이 실제 상태와 어긋나면 안 된다.
+let allVars: VarInfo[] = [];
+
+/** 컬렉션/이름 필터를 적용한 목록. */
+function visibleVars(): VarInfo[] {
+  const col = ($('varFilterCol') as HTMLSelectElement).value;
+  const q = ($('varFilterText') as HTMLInputElement).value.trim().toLowerCase();
+  return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
+}
+
+function requestVars(): void {
+  setStatus('varEditStatus', '변수를 불러오는 중…', '');
+  send({ type: 'GET_VARIABLES' });
+}
+
+$('btnLoadVars').addEventListener('click', requestVars);
+$('varFilterCol').addEventListener('change', () => renderVars());
+$('varFilterText').addEventListener('input', () => renderVars());
+
+/* ---------- 다크 테마 생성 ---------- */
+// 다크 채우기는 컬렉션의 모드 2개(라이트→다크)를 고르는 게 전부라, 변수 목록에서 모드를 읽어 채운다.
+function refreshDarkOptions(): void {
+  const cols = new Map<string, VarInfo>();
+  for (const v of allVars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
+  const sel = $('darkCollection') as HTMLSelectElement;
+  const prev = sel.value;
+  sel.innerHTML = '';
+  for (const [id, v] of cols) {
+    const o = document.createElement('option');
+    o.value = id;
+    o.textContent = v.collection;
+    sel.appendChild(o);
+  }
+  if (prev && cols.has(prev)) sel.value = prev;
+  // 라이트/다크가 성립하려면 모드가 2개 이상이어야 한다. 이름순 첫 컬렉션(대개 단일 모드인
+  // Global)이 잡히면 카드가 열리자마자 막힌 것처럼 보이니, 실제로 쓸 수 있는 쪽을 기본으로.
+  const usable = [...cols.values()].find((v) => v.modes.length >= 2);
+  if (usable && (cols.get(sel.value)?.modes.length ?? 0) < 2) sel.value = usable.collectionId;
+  refreshDarkModes();
+}
+
+function refreshDarkModes(): void {
+  const colId = ($('darkCollection') as HTMLSelectElement).value;
+  const v = allVars.find((x) => x.collectionId === colId);
+  const modes = v ? v.modes : [];
+  for (const id of ['darkFromMode', 'darkToMode']) {
+    const sel = $(id) as HTMLSelectElement;
+    const prev = sel.value;
+    sel.innerHTML = '';
+    for (const m of modes) {
+      const o = document.createElement('option');
+      o.value = m.modeId;
+      o.textContent = m.name;
+      sel.appendChild(o);
+    }
+    if (prev && modes.some((m) => m.modeId === prev)) sel.value = prev;
+  }
+  // 모드가 2개 이상이어야 라이트→다크가 성립한다. 1개면 무엇을 눌러도 아무 일이 없으니 미리 막는다.
+  const ok = modes.length >= 2;
+  ($('btnGenDark') as HTMLButtonElement).disabled = !ok || !isPaid;
+  const notice = $('darkPrereq');
+  notice.style.display = ok ? 'none' : '';
+  const text = notice.querySelector('.prereq-text');
+  if (text) {
+    text.textContent = ok
+      ? ''
+      : modes.length
+        ? '이 컬렉션에 모드가 하나뿐이에요. Figma에서 다크 모드를 추가한 뒤 다시 시도하세요.'
+        : '먼저 토큰을 생성해 변수를 만드세요.';
+  }
+  // 모드가 2개 이상이면 서로 다른 모드가 기본으로 잡히게 — 같은 모드끼리면 덮어써도 의미가 없다.
+  if (modes.length >= 2 && ($('darkFromMode') as HTMLSelectElement).value === ($('darkToMode') as HTMLSelectElement).value) {
+    ($('darkToMode') as HTMLSelectElement).value = modes[1].modeId;
+  }
+}
+
+$('darkCollection').addEventListener('change', refreshDarkModes);
+
+$('btnGenDark').addEventListener('click', () => {
+  const collectionId = ($('darkCollection') as HTMLSelectElement).value;
+  const fromModeId = ($('darkFromMode') as HTMLSelectElement).value;
+  const toModeId = ($('darkToMode') as HTMLSelectElement).value;
+  if (!collectionId || !fromModeId || !toModeId) {
+    setStatus('darkStatus', '컬렉션과 모드를 고르세요.', 'warn');
+    return;
+  }
+  if (fromModeId === toModeId) {
+    setStatus('darkStatus', '라이트와 다크가 같은 모드예요. 다른 모드를 고르세요.', 'warn');
+    return;
+  }
+  setStatus('darkStatus', '다크 값을 채우는 중…', '');
+  send({ type: 'GENERATE_DARK_MODE', collectionId, fromModeId, toModeId });
+});
+
+/* ---------- 닮은 프레임 컴포넌트화 ---------- */
+// 스캔이 확정한 멤버(구조가 같은 최대 그룹)와 고른 마스터. 컴포넌트화는 이 둘만 보낸다 —
+// 제외된 프레임을 실수로 교체 대상에 넣지 않으려면 선택 그대로가 아니라 스캔 결과를 써야 한다.
+let similarMemberIds: string[] = [];
+let similarMasterId: string | null = null;
+
+$('btnScanSimilar').addEventListener('click', () => {
+  setStatus('similarStatus', '닮은 프레임을 찾는 중…', '');
+  send({ type: 'SCAN_SIMILAR' });
+});
+
+$('btnComponentize').addEventListener('click', () => {
+  if (similarMemberIds.length < 2 || !similarMasterId) {
+    setStatus('similarStatus', '먼저 스캔해서 마스터를 고르세요.', 'warn');
+    return;
+  }
+  setStatus('similarStatus', '컴포넌트화하는 중…', '');
+  send({ type: 'COMPONENTIZE_SIMILAR', masterId: similarMasterId, frameIds: similarMemberIds });
 });
 
 $('btnRegisterComp').addEventListener('click', () => {
@@ -1571,6 +1715,19 @@ $('btnClearLicense').addEventListener('click', () => {
   send({ type: 'CLEAR_LICENSE' });
 });
 
+// 결제·구독 관리는 LemonSqueezy 위임 — URL은 code가 licenseConfig에서 해석해 openExternal로 연다.
+$('btnBuy').addEventListener('click', () => send({ type: 'OPEN_LICENSE_LINK', target: 'purchase' }));
+$('btnPortal').addEventListener('click', () => send({ type: 'OPEN_LICENSE_LINK', target: 'portal' }));
+
+// 배포 전(자리표시자 URL)에는 구독 버튼을 숨긴다 — 눌러도 없는 페이지로 가서 혼란만 준다.
+// URL을 실제 값으로 갈아끼우면 조건이 자동으로 풀려 다시 노출된다.
+if (!licenseLinksConfigured()) {
+  $('licenseLinkRow').style.display = 'none';
+  $('licenseLinkHint').style.display = 'none';
+}
+// 검증 서버·공개키가 미설정이면 키를 넣어도 반드시 '서명 검증 실패'가 난다. 그 이유를 미리 밝힌다.
+if (!licenseVerifyConfigured()) $('licenseSetupHint').style.display = '';
+
 /* ---------- code → ui ---------- */
 window.onmessage = (event: MessageEvent) => {
   const msg = event.data.pluginMessage as CodeToUi | undefined;
@@ -1695,9 +1852,14 @@ window.onmessage = (event: MessageEvent) => {
         renderTextStyleRows(msg.styles, true);
         const bound = msg.styles.filter((s) => s.boundStyleId).length;
         const fresh = msg.styles.length - bound;
+        const labelPart =
+          msg.labeled != null
+            ? ` · 라벨이름 ${msg.labeled} · 랭킹폴백 ${msg.fallback ?? 0}`
+            : '';
         setStatus(
           'tsStatus',
           `${msg.styles.length}개 찾음 · 신규 ${fresh}(앰버) · 이미 등록 ${bound}(파랑)` +
+            labelPart +
             (msg.warnings.length ? ' · ' + msg.warnings.join(' ') : ''),
           msg.warnings.length ? 'warn' : 'ok',
         );
@@ -1815,16 +1977,89 @@ window.onmessage = (event: MessageEvent) => {
     case 'CONTRAST_RESULT':
       renderContrast(msg);
       break;
+    case 'VARIABLES': {
+      allVars = msg.vars;
+      // 컬렉션 필터 옵션은 실제로 존재하는 컬렉션에서만 만든다.
+      const sel = $('varFilterCol') as HTMLSelectElement;
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">전체</option>';
+      for (const c of [...new Set(msg.vars.map((v) => v.collection))]) {
+        const o = document.createElement('option');
+        o.value = c;
+        o.textContent = c;
+        sel.appendChild(o);
+      }
+      if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
+      renderVars();
+      refreshDarkOptions();
+      setStatus('varEditStatus', msg.vars.length ? `변수 ${msg.vars.length}개` : '편집할 변수가 없어요. 먼저 토큰을 생성하세요.', msg.vars.length ? 'ok' : 'warn');
+      break;
+    }
+    case 'EDIT_VARIABLE_RESULT': {
+      if (!msg.ok) {
+        setStatus('varEditStatus', `수정하지 못했어요 — ${msg.error ?? '알 수 없는 오류'}`, 'warn');
+        renderVars(); // 거부된 입력이 화면에 남지 않게 되돌린다
+        break;
+      }
+      if (msg.deleted) {
+        allVars = allVars.filter((v) => v.id !== msg.id);
+        setStatus('varEditStatus', '변수를 삭제했어요.', 'ok');
+      } else if (msg.var) {
+        const i = allVars.findIndex((v) => v.id === msg.id);
+        if (i >= 0) allVars[i] = msg.var;
+        setStatus('varEditStatus', `'${msg.var.name}' 수정했어요.`, 'ok');
+      }
+      renderVars();
+      refreshDarkOptions();
+      break;
+    }
+    case 'VARIABLE_USAGE': {
+      const v = allVars.find((x) => x.id === msg.id);
+      const parts: string[] = [];
+      parts.push(msg.nodes.length ? `레이어 ${msg.nodes.length}곳` : '쓰는 레이어 없음');
+      if (msg.aliasedBy.length) parts.push(`이 변수를 가리키는 변수 ${msg.aliasedBy.length}개(${msg.aliasedBy.slice(0, 3).map((a) => a.name).join(', ')}${msg.aliasedBy.length > 3 ? '…' : ''})`);
+      // 상한에 걸리면 "없음"이 아니라 "못 다 봤음"이다 — 삭제 판단이 갈리므로 반드시 알린다.
+      if (msg.capped) parts.push('※ 문서가 커서 일부만 확인했어요');
+      const used = msg.nodes.length || msg.aliasedBy.length;
+      setStatus('varEditStatus', `${v ? `'${v.name}' ` : ''}사용처 — ${parts.join(' · ')}`, used || msg.capped ? 'warn' : 'ok');
+      break;
+    }
+    case 'DARK_MODE_RESULT': {
+      if (!msg.realiased) {
+        const why = msg.skipped ? `Global을 가리키는 색이 없어요(건너뜀 ${msg.skipped}개)` : '대상 색이 없어요';
+        setStatus('darkStatus', `다크 값을 채우지 못했어요 — ${why}`, 'warn');
+        break;
+      }
+      const skip = msg.skipped ? ` · 건너뜀 ${msg.skipped}개(값을 직접 넣은 색)` : '';
+      setStatus('darkStatus', `다크 ${msg.realiased}개 연결 · 새 dark/ 원시색 ${msg.created}개${skip}`, 'ok');
+      break;
+    }
+    case 'SIMILAR_CANDIDATES':
+      renderSimilar(msg);
+      break;
+    case 'COMPONENTIZE_RESULT': {
+      if (!msg.instances) {
+        // 교체가 하나도 없으면 실패다 — 경고를 그대로 보여줘야 원인을 안다.
+        setStatus('similarStatus', `컴포넌트화하지 못했어요${msg.warnings.length ? ` — ${msg.warnings[0]}` : ''}`, 'warn');
+        break;
+      }
+      const parts = [`마스터 ${msg.master}`, `인스턴스 ${msg.instances}개`];
+      if (msg.properties) parts.push(`속성 ${msg.properties}개`);
+      if (msg.images) parts.push(`이미지 ${msg.images}개`);
+      // 경고(제외·오버라이드 실패)는 성공했어도 반드시 노출 — 원본이 남아 있다는 신호다.
+      const warn = msg.warnings.length ? ` · 남겨둔 것 ${msg.warnings.length}건: ${msg.warnings[0]}` : '';
+      setStatus('similarStatus', `${parts.join(' · ')}${warn}`, msg.warnings.length ? 'warn' : 'ok');
+      // 교체된 프레임은 더 이상 대상이 아니다 — 목록을 비워 이중 실행을 막는다.
+      similarMemberIds = [];
+      similarMasterId = null;
+      $('similarList').innerHTML = '';
+      $('similarCount').textContent = '';
+      break;
+    }
     case 'PREMIUM_REQUIRED': {
-      // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭).
-      const statusId =
-        msg.feature === 'components'
-          ? 'componentStatus'
-          : msg.feature === 'presets'
-            ? 'presetStatus'
-            : msg.feature === 'semantics'
-              ? 'semStatus'
-              : 'createStatus'; // tokens(기본)
+      // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
+      // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
+      const statusId = PREMIUM_STATUS_ID[msg.feature] ?? 'createStatus';
       setStatus(statusId, t('premium.required', { message: msg.message, feature: msg.feature }), 'warn');
       break;
     }
@@ -2262,20 +2497,6 @@ function refreshTreeEmptyStates(): void {
 }
 
 /** UX3: 스킵 사유 키 → 한글 라벨. */
-const REASON_LABELS: Record<string, string> = {
-  'no-match': '매칭 없음',
-  'empty-text': '빈 텍스트',
-  error: '바인딩 실패',
-  'hug-fill': 'HUG/FILL',
-  'no-autolayout': '오토레이아웃 아님',
-  'size-free-layout': '자유 배치(크기 제외)',
-  'size-fraction': '소수 크기(정확 일치만)',
-  hidden: '숨긴 레이어',
-  'instance-children': '인스턴스 내부',
-  font: '폰트 미로드',
-};
-const reasonLabel = (key: string): string => REASON_LABELS[key] ?? key;
-
 /**
  * 사유별 레이어(미리보기 dry-run에서만 채워짐). 숫자만 있으면 원인 레이어를 찾을 길이 없어,
  * 사유 칩을 눌러 캔버스에서 선택할 수 있게 보관한다.
@@ -2298,7 +2519,7 @@ function renderSkipReasons(reasons: Record<string, number>): void {
   box.appendChild(head);
   for (const [key, n] of entries) {
     const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
-    const label = `${reasonLabel(key)} ${n}`;
+    const label = `${t('reason.' + key)} ${n}`;
     if (!ids.length) {
       const span = document.createElement('span');
       span.className = 'skip-chip static';
@@ -2313,7 +2534,7 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     btn.title = `레이어 ${ids.length}개 선택 — ${bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ')}${ids.length > 5 ? ' 외' : ''}`;
     btn.addEventListener('click', () => {
       send({ type: 'SELECT_NODES', ids });
-      setStatus('applyStatus', `${reasonLabel(key)} 레이어 ${ids.length}개를 선택했어요.`, '');
+      setStatus('applyStatus', `${t('reason.' + key)} 레이어 ${ids.length}개를 선택했어요.`, '');
     });
     box.appendChild(btn);
   }
@@ -2322,20 +2543,15 @@ function renderSkipReasons(reasons: Record<string, number>): void {
 function reasonsText(reasons: Record<string, number>): string {
   return Object.entries(reasons)
     .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${reasonLabel(k)} ${n}`)
+    .map(([k, n]) => `${t('reason.' + k)} ${n}`)
     .join(' · ');
 }
 
 /* ---------- 명도 대비 점검 결과 렌더 ---------- */
-const CONTRAST_SKIP_LABELS: Record<string, string> = {
-  'no-fill': '단색 글자색 없음',
-  'no-bg': '배경 없음',
-  capped: '스캔 상한 도달',
-};
 function contrastSkipText(skipped: Record<string, number>): string {
   return Object.entries(skipped)
     .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${CONTRAST_SKIP_LABELS[k] ?? k} ${n}`)
+    .map(([k, n]) => `${t('contrastSkip.' + k)} ${n}`)
     .join(' · ');
 }
 
@@ -2423,6 +2639,167 @@ function showApplyProgress(label: string): void {
   ($('applyBarFill') as HTMLElement).style.width = '0%';
   $('applyProgressText').textContent = label;
 }
+/** 변수 한 줄 — 이름·값 즉시 편집 + 컬렉션 배지 + 사용처/삭제. */
+function makeVarRow(v: VarInfo): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'vrow';
+  row.dataset.id = v.id;
+
+  // 색이면 스와치를 앞에 — 목록에서 무슨 색인지 눈으로 바로 찾는다.
+  const cell = v.values[v.defaultModeId];
+  if (v.type === 'COLOR' && cell && cell.kind === 'literal' && /^#[0-9a-f]{6}$/i.test(cell.display)) {
+    const sw = document.createElement('span');
+    sw.className = 'vsw';
+    sw.style.background = cell.display;
+    row.appendChild(sw);
+  }
+
+  const nameWrap = document.createElement('span');
+  nameWrap.className = 'vname';
+  const name = document.createElement('input');
+  name.type = 'text';
+  name.value = v.name;
+  name.title = v.name;
+  // change(포커스 아웃/엔터)에서만 보낸다 — 타이핑마다 보내면 편집 한 번이 Undo 수십 개가 된다.
+  name.addEventListener('change', () => {
+    if (name.value.trim() === v.name) return;
+    send({ type: 'EDIT_VARIABLE', id: v.id, patch: { name: name.value } });
+  });
+  nameWrap.appendChild(name);
+  row.appendChild(nameWrap);
+
+  const valWrap = document.createElement('span');
+  valWrap.className = 'vval';
+  if (cell && cell.kind === 'alias') {
+    // 별칭은 같은 타입의 다른 변수로만 바꿀 수 있다 — 자유 입력이면 오타로 깨지기 쉽다.
+    const sel = document.createElement('select');
+    for (const other of allVars.filter((o) => o.type === v.type && o.id !== v.id)) {
+      const o = document.createElement('option');
+      o.value = other.id;
+      o.textContent = other.name;
+      sel.appendChild(o);
+    }
+    sel.value = cell.aliasId ?? '';
+    sel.title = `별칭 → ${cell.display}`;
+    sel.addEventListener('change', () => {
+      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, aliasId: sel.value } } });
+    });
+    valWrap.appendChild(sel);
+  } else {
+    const val = document.createElement('input');
+    val.type = 'text';
+    val.value = cell ? cell.display : '';
+    val.placeholder = v.type === 'COLOR' ? '#RRGGBB' : v.type === 'FLOAT' ? '숫자' : '';
+    val.addEventListener('change', () => {
+      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, literal: val.value } } });
+    });
+    valWrap.appendChild(val);
+  }
+  row.appendChild(valWrap);
+
+  const col = document.createElement('span');
+  col.className = 'vcol tag tag-set';
+  col.textContent = v.collection;
+  col.title = `${v.collection} · ${v.type} · 스코프 ${v.scopes.length}/${scopesForTypeList(v.type).length}`;
+  row.appendChild(col);
+
+  const act = document.createElement('span');
+  act.className = 'vact';
+  const usage = document.createElement('button');
+  usage.className = 'link';
+  usage.textContent = '사용처';
+  usage.addEventListener('click', () => {
+    setStatus('varEditStatus', `${v.name} 사용처를 찾는 중…`, '');
+    send({ type: 'GET_VARIABLE_USAGE', id: v.id });
+  });
+  act.appendChild(usage);
+  const del = document.createElement('button');
+  del.className = 'link';
+  del.textContent = '삭제';
+  del.addEventListener('click', () => {
+    // 되돌리기 어려운 작업이라 한 번 더 묻는다. 사용처를 먼저 보라는 안내도 같이.
+    if (!window.confirm(`'${v.name}' 변수를 삭제할까요?\n이 변수를 쓰던 레이어의 바인딩이 끊깁니다. '사용처'로 먼저 확인하세요.`)) return;
+    send({ type: 'DELETE_VARIABLE', id: v.id });
+  });
+  act.appendChild(del);
+  row.appendChild(act);
+
+  return row;
+}
+
+function renderVars(): void {
+  const vis = visibleVars();
+  $('varCount').textContent = allVars.length ? `· ${vis.length}/${allVars.length}개` : '';
+  renderChunked($('varList'), vis, makeVarRow, () => layoutListBy('varList'));
+}
+
+/** 닮은 프레임 멤버 한 줄 — 마스터 라디오 + 이름 + 완전성 근거(왜 이게 추천인지). */
+function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement {
+  const row = document.createElement('label'); // 라디오와 한 덩어리로 — 줄 아무 데나 눌러도 선택된다
+  row.className = 'simrow';
+
+  const radio = document.createElement('input');
+  radio.type = 'radio';
+  radio.name = 'similarMaster';
+  radio.value = m.id;
+  radio.checked = m.id === similarMasterId;
+  radio.addEventListener('change', () => {
+    if (radio.checked) similarMasterId = m.id;
+  });
+  row.appendChild(radio);
+
+  const name = document.createElement('span');
+  name.className = 'cname';
+  name.textContent = m.name;
+  name.title = m.name; // 한 줄 말줄임 → 잘린 부분은 title로 읽는다(.cfind와 동일 규칙)
+  row.appendChild(name);
+
+  if (m.id === recommendedId) {
+    const tag = document.createElement('span');
+    tag.className = 'tag tag-set'; // 기존 배지 규약 재사용
+    tag.textContent = '추천';
+    row.appendChild(tag);
+  }
+
+  // 추천 근거를 숫자로 — 텍스트가 얼마나 채워졌는지가 마스터 선택의 핵심이다.
+  const meta = document.createElement('span');
+  meta.className = 'simmeta';
+  const parts = [`텍스트 ${m.textFilled}/${m.textTotal}`];
+  if (m.images) parts.push(`이미지 ${m.images}`);
+  if (m.emptyLayers) parts.push(`빈 칸 ${m.emptyLayers}`);
+  meta.textContent = parts.join(' · ');
+  row.appendChild(meta);
+
+  return row;
+}
+
+/** 스캔 결과 → 멤버 목록(마스터 라디오) + 무엇이 속성으로 열리는지 요약. */
+function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): void {
+  similarMemberIds = msg.metas.map((m) => m.id);
+  similarMasterId = msg.recommendedMasterId;
+  $('similarCount').textContent = msg.metas.length ? `· 대상 ${msg.metas.length}개` : '';
+
+  const box = $('similarList');
+  renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId), () => layoutListBy('similarList'));
+
+  if (!msg.metas.length) {
+    // 왜 대상이 없는지 알려준다 — 제외 사유가 있으면 그걸 그대로 보여주는 게 가장 빠른 안내다.
+    const why = msg.excluded.length ? msg.excluded[0].reason : '구조가 같은 프레임을 2개 이상 선택하세요.';
+    setStatus('similarStatus', `컴포넌트화할 프레임이 없어요 — ${why}`, 'warn');
+    return;
+  }
+
+  const texts = msg.varying.filter((v) => v.type === 'TEXT').length;
+  const swaps = msg.varying.length - texts;
+  const opened: string[] = [];
+  if (texts) opened.push(`텍스트 ${texts}`);
+  if (swaps) opened.push(`아이콘 교체 ${swaps}`);
+  if (msg.imageVarying.length) opened.push(`이미지 ${msg.imageVarying.length}`);
+  const openText = opened.length ? `속성으로 열림: ${opened.join(' · ')}` : '가변 위치가 없어 속성은 만들지 않아요';
+  const skipText = msg.excluded.length ? ` · 제외 ${msg.excluded.length}개(${msg.excluded[0].reason})` : '';
+  setStatus('similarStatus', `대상 ${msg.metas.length}개 · ${openText}${skipText}`, 'ok');
+}
+
 function updateApplyProgress(done: number, total: number): void {
   $('applyProgress').style.display = '';
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
@@ -2507,7 +2884,23 @@ function applyCardChrome(): void {
   });
 }
 
-// 초기: 컬렉션·전제·라이선스 조회. 팀 카드는 Team 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
+/** 정적 HTML 라벨 외부화: [data-i18n]=textContent, [data-i18n-html]=innerHTML(신뢰된 자체 문자열).
+ *  텍스트 전용 요소는 data-i18n, <b>/<code> 등 마크업이 있으면 data-i18n-html을 쓴다.
+ *  뱃지 span(예: …Lock)이 함께 있는 요소는 텍스트만 <span data-i18n>로 감싸 뱃지를 보존한다. */
+function applyStaticI18n(root: ParentNode = document): void {
+  // 정의된 키만 덮어쓴다 — 오타/누락 키에서 t()가 키 문자열을 반환해 HTML 원문을 파괴하지 않도록.
+  root.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
+    const key = el.dataset.i18n as string;
+    if (hasString(key)) el.textContent = t(key);
+  });
+  root.querySelectorAll<HTMLElement>('[data-i18n-html]').forEach((el) => {
+    const key = el.dataset.i18nHtml as string;
+    if (hasString(key)) el.innerHTML = t(key);
+  });
+}
+
+// 초기: 컬렉션·전제·라이선스 조회. 유료 카드는 Paid 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
+applyStaticI18n(); // 정적 라벨 외부화(캐논 변형 전에 원본 요소에 적용)
 applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
 syncStickyOffsets(); // 카드 헤더 sticky 오프셋(탭 바 + 선택 바 높이)
 // 선택 바는 문구가 바뀌며 높이가 변하고, 창 리사이즈로 두 바 모두 접힐 수 있다 → 계속 추적.

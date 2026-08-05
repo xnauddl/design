@@ -147,7 +147,7 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 화면의 **실제 텍스트를 인식**해 타이포 조합을 **시맨틱 변수로 등록**하고, 이를 **명명된 텍스트 스타일**로 등록·바인딩하는 end-to-end 파이프라인입니다(스타일 → 시맨틱 → Global 3계층 완성).
 
 - **스캔**(`SCAN_TEXT_STYLES`): 선택 트리의 **보이는** TEXT 노드에서 `{fontSize, lineHeight(px), letterSpacing, family, style}` 시그니처를 수집(`scanTextStyles`). 숨김(`visible=false`)·부분 서식(mixed)은 스킵(+경고). PERCENT 자간·행간은 px 환산 — 다만 **행간의 원본 %는 `lineHeightPercent`로 함께 보존**한다(시그니처·매칭 기준은 계속 px).
-- **군집·명명**(순수 `textStyles.ts`): 동일 시그니처를 묶고(`clusterTextStyles`), **fontSize 내림차순**으로 `display·h1·…·overline` 배정(`nameTextStyles`, 같은 크기는 `base/weight`·`base/family-weight` 분기). **기존 스타일 앵커**: 노드 `textStyleId` 또는 시그니처가 로컬 스타일과 정확히 1개 일치하면 기존 이름 유지 + `boundStyleId`(재스캔=rename, 타프레임 중복 방지). 선택이 없으면 `DEFAULT_TYPE_RAMP` 폴백.
+  - **군집·명명**(순수 `textStyles.ts`): 동일 시그니처를 묶고(`clusterTextStyles`), **fontSize 내림차순**으로 `display·h1·…·overline` 배정(`nameTextStyles`, 같은 크기는 `base/weight`·`base/family-weight` 분기). **기존 스타일 앵커**: 노드 `textStyleId` 또는 시그니처가 로컬 스타일과 정확히 1개 일치하면 기존 이름 유지 + `boundStyleId`(재스캔=rename, 타프레임 중복 방지). 선택이 없으면 `DEFAULT_TYPE_RAMP` 폴백. **가로 행 라벨 옵션**(`useRowLabels`, 기본 OFF·세션만): 안쪽 HORIZONTAL 행의 왼쪽 텍스트 `characters`를 이름으로(`nameTextStylesWithRowLabels`), 라벨·표본 우측은 표 제외, 실패 시 크기 랭킹 폴백.
 - **등록**(`CREATE_TEXT_STYLES`, `createSemanticTextStyles`): size·lineHeight·letterSpacing → **Global + Semantic**(`font-size|line-height|letter-spacing/{역할}`) 보장 후 텍스트 스타일 upsert·시맨틱 바인딩. `boundStyleId`가 있으면 **이름만 rename**(폰트·크기·행간·자간 보존). 폰트 로드 실패 시 `Regular` 폴백+보고.
 - **행간 % 보존**: 원본이 %인 행간은 스타일에 **`PERCENT`로 등록**하고 그 스타일의 **행간 변수 바인딩만 생략**한다(크기·자간 바인딩은 유지). Figma는 행간에 변수를 바인딩하면 단위를 `PIXELS`로 강제하고, 변수는 단위 없는 FLOAT이라 `150`이 150%가 아니라 **150px**로 해석되므로 %와 바인딩은 동시에 가질 수 없다. 이미 %로 만들어 둔 기존 스타일을 rename할 때도 같은 이유로 바인딩하지 않는다(px로 뭉개지 않기 위해). 변수는 그대로 만들되 **값은 px 스냅샷 + 원본 단위는 `description`("150%")** — 내보내기가 description을 우선하므로 코드에는 `line-height: 150%`로 나간다(#16 규칙). 같은 px 이름에 원본이 갈리면(24px 역할 + 16px의 150% 역할) 다른 역할의 내보내기를 오염시키지 않도록 px로 기록하고 알림을 남긴다. 의도된 미바인딩은 경고(`missing`)가 아니라 `notes`로 보고.
 - **적용**: (a) 등록 시 옵션 — 전체 시그니처(패밀리·크기·굵기·행간·자간) 일치 노드에 연결. (b) **기존 스타일 적용만**(`APPLY_TEXT_STYLES`) — 생성 없이 시그니처 매칭 바인딩(미등록·모호는 보고).
@@ -206,21 +206,28 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 
 ## 유료화 / 상용 전환
 
-오픈 코어 + **프리미엄(Freemium)** 모델. **Free / Paid 2단계**, **연 구독**, **외부 결제(LemonSqueezy)** + **무료 서버리스 검증(Cloudflare Workers)** 으로 한다. 무료 사용자의 기존 동작은 **절대 막지 않으며**, 유료 기능은 **미리보기·탐색은 허용하고 생성(쓰기)만 잠금**한다. (결정 배경·대안 비교는 `ROADMAP.md`)
+오픈 코어 + **프리미엄(Freemium)** 모델. **Free / Paid 2단계**, **연 구독**, **외부 결제(LemonSqueezy)** + **무료 서버리스 검증(Cloudflare Workers)** 으로 한다. (결정 배경·대안 비교는 `ROADMAP.md`)
 
 ### Free / Paid 경계 (기능 기반 게이팅 — 회당 횟수 제한 없음)
-탐색·체험은 무료, **실제 디자인 시스템 생성은 Paid**.
+경계선은 **기존 자산을 다루는 일 / 새 자산을 만드는 일**이다. 파일에 이미 있는 변수·레이어를 읽고 고치는 작업은 Free, 디자인 시스템을 새로 **생성**하는 작업은 Paid.
 
 | 기능 | Free (무제한) | Paid |
 |---|:---:|:---:|
-| 색상 팔레트 생성 · 레이어 리네임 · 바인딩(기존 변수) | ✅ | ✅ |
-| 토큰 추출/미리보기 · 명도 대비 점검 · 코드 내보내기(W3C JSON / CSS) | ✅ | ✅ |
+| 토큰 추출 · 바인딩(기존 변수) · 레이어 리네임 | ✅ | ✅ |
+| 변수 편집(값·이름·스코프 수정/삭제) · 닮은 프레임 **스캔** | ✅ | ✅ |
+| 명도 대비 점검 · 코드 내보내기(W3C JSON / CSS) | ✅ | ✅ |
+| **색상 팔레트 생성 · 적용** | — | ✅ |
 | **토큰(3계층 변수) 생성** | — | ✅ |
 | **시맨틱 매핑** | — | ✅ |
 | **컴포넌트 등록 · 베리언트(Phase 3/4/4.1)** | — | ✅ |
-| **공유 프리셋 · 변경 이력** | — | ✅ |
+| **닮은 프레임 컴포넌트화** | — | ✅ |
+| **텍스트 스타일 등록 · 적용** | — | ✅ |
+| **다크 테마 생성** | — | ✅ |
+| **공유 프리셋** | — | ✅ |
 
 > 의존성: Free '바인딩'은 **기존 변수**에 연결만 가능하다. 빈 파일에서 새 변수 시스템을 만들려면 '토큰 생성'(Paid)이 필요 — 자연스러운 업셀 지점.
+>
+> **미리보기도 함께 잠근다.** '적용'이 Paid인 카드에서 미리보기만 열어두면 눌러도 적용 버튼이 회색이라, 이유를 알 수 없는 막다른 길이 된다. 그래서 팔레트 생성·토큰 생성 미리보기는 Free에서 비활성이다. 반대로 **닮은 프레임 '스캔'은 Free** — 읽기 전용이고 그 자체로 결과(중복 프레임 목록)가 완결되기 때문.
 
 ### 가격
 - **Paid — 연 $39**(≈ $3.25/월). LemonSqueezy 수수료 5%+$0.50 → 실수령 ~$36.5/건(~94%). (월 옵션·런치 프로모는 추후)
@@ -239,8 +246,10 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 - **자리표시**: `licenseConfig.ts`의 `VERIFY_URL`·`LICENSE_PUBLIC_JWK`·`PURCHASE_URL`·`PORTAL_URL`, `manifest.json allowedDomains` → 배포 시 실제 값으로 교체. 키쌍 생성: `node scripts/gen-license-keys.mjs`. Worker 셋업: `workers/verify/README.md`.
 
 ### 엔타이틀먼트 모델
-- `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`presets`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
-- `code.ts`: `requirePaid(feature, message)` 단일 게이트. 토큰 생성(미리보기 제외)·시맨틱·컴포넌트·프리셋/이력을 게이팅. 바인딩·리네임·팔레트·내보내기·미리보기는 무게이팅.
+- `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`textStyles`·`presets`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
+- `code.ts`: `requirePaid(feature, message)` 단일 게이트 — 토큰 생성·시맨틱·컴포넌트·텍스트 스타일·프리셋, 그리고 기존 기능에 얹힌 둘: **다크 테마 생성**(`dark/` Global을 새로 만드니 `tokens`), **닮은 프레임 컴포넌트화**(`components`). 추출·바인딩·리네임·내보내기·대비 점검·변수 편집·닮은 프레임 스캔은 무게이팅.
+- **두 층으로 막는다.** code의 `requirePaid`가 최종 방어선이고, UI(`ui.ts`)는 그 전에 유료 버튼을 **클릭 전 사전 비활성**(`PAID_FIELDS` + 🔒 배지)한다. 그래서 code에 게이트가 없어도 UI에서 잠기는 항목이 있다 — 팔레트 '생성'(`btnPalette`)이 그 예로, postMessage 없이 UI에서만 도는데도 그 카드의 미리보기 역할이라 함께 잠근다.
+- 거부 안내는 `PREMIUM_STATUS_ID`로 **해당 기능의 카드**에 띄운다(클릭-후-거부 방지).
 - 메시지(`src/shared/messages.ts`): `CodeToUi.LICENSE_STATUS { tier, unlimited, source, … }` · `PREMIUM_REQUIRED { feature, message }`.
 
 ### 관리자 / 개발·테스트 전권 + 백도어 차단
@@ -248,8 +257,8 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 - **배포 빌드**(`npm run build`)에선 `__DEV__=false` → `SET_LICENSE` 핸들러와 UI 토글이 **컴파일 단계에서 비활성**(페이월 우회 백도어 차단).
 - **실제 검증 경로 테스트**: LemonSqueezy **test mode** + sandbox 키로 Worker `/verify`. (선택) Worker `ADMIN_KEYS` 오너 allowlist 키 → 장기 paid 토큰(스모크 테스트용).
 
-### 가격 (자리표시)
-- **Paid** — 단일 유료 티어. 월/연 구독(연 결제 할인), 금액 **TBD**. 결제·환불·세금은 **LemonSqueezy(MoR)** 위임.
+### 가격
+- **Paid** — 단일 유료 티어, **연 $39 확정**(위 ‘가격’ 절 참고). 결제·환불·세금은 **LemonSqueezy(MoR)** 위임. 월 옵션·런치 프로모는 추후.
 
 ### 단계별 출시
 - **M0**: 전 기능 무료.
