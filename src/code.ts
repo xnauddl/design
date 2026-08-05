@@ -7,11 +7,11 @@ import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
-import { renameSelection } from './lib/rename';
+import { renameSelection, writeRoleFromName } from './lib/rename';
 import { rgbToHex, hexToRgb, type ResolvedType, type ScopeName } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
@@ -966,6 +966,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'RENAME_APPLY': {
         // #7: 미리보기 트리에서 체크한 항목만 직접 적용(재계산 없이 id→after 그대로).
+        // 이름과 함께 dsRole도 기록 — 말단 후보 자격·등록 머리명사가 readRole에 의존한다.
         const changes: RenameChange[] = [];
         for (const { id, before: expectedBefore, after } of msg.items) {
           const node = await figma.getNodeByIdAsync(id);
@@ -974,6 +975,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (before !== expectedBefore) continue; // 미리보기 이후 이름이 바뀐 노드는 stale 적용 방지
           if (before === after) continue;
           node.name = after;
+          writeRoleFromName(node as SceneNode, after);
           changes.push({ id, before, after });
         }
         post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true });
@@ -1225,19 +1227,21 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             .map((c) => liveById.get(c.id))
             .filter((n): n is SceneNode => !!n);
           const groups = groupForRegister(eligibleNodes);
+          // 등록·분류와 동일: 역할 기반 머리명사 + 그룹 간 충돌 해소.
+          const groupNames = resolveGroupNames(groups.map((g) => g.members));
           const preview = new Map<string, { group?: string; variant?: string; single?: string; propsOnly?: boolean }>();
-          for (const g of groups) {
+          for (let gi = 0; gi < groups.length; gi++) {
+            const g = groups[gi];
+            const name = groupNames[gi];
             if (g.members.length < 2) {
-              if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
+              if (g.members[0]) preview.set(g.members[0].id, { single: name });
               continue;
             }
             if (shouldCollapseToProperties(g.members)) {
-              const name = pascalCase(commonBaseName(g.members.map((m) => m.name)) || g.members[0].name);
               for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true });
               continue;
             }
-            const base = commonBaseName(g.members.map((m) => m.name));
-            for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
+            for (const d of deriveVariants(g.members)) preview.set(d.id, { group: name, variant: d.variant });
           }
           nodes = pruned.map((c) => {
             const p = preview.get(c.id);

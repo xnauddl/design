@@ -198,6 +198,18 @@ function writeRole(node: SceneNode, role: string): void {
   }
 }
 
+/**
+ * 리네임 결과 이름에서 역할 토큰을 뽑아 기록한다 — `RENAME_APPLY`(미리보기 체크 적용)용.
+ * 전체 적용 경로(`renameSelection` apply:true)는 `decide().role`을 직접 쓰지만,
+ * WYSIWYG 적용은 id→after만 받으므로 이름 말단(역할)을 복원한다.
+ * `layerNameFromRole`이 역할을 항상 마지막 토큰에 두므로 말단만 보면 된다.
+ */
+export function writeRoleFromName(node: SceneNode, name: string): void {
+  const toks = kebab(name).split('-').filter(Boolean);
+  const role = toks[toks.length - 1];
+  if (role && isKnownRole(role)) writeRole(node, role);
+}
+
 /** 역할 없는 순수 레이아웃 폴백 — 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과. */
 const PASSTHROUGH_ROLES = new Set(['container', 'wrapper']);
 

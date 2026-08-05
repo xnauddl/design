@@ -1883,6 +1883,11 @@
     } catch (e) {
     }
   }
+  function writeRoleFromName(node, name) {
+    const toks = kebab(name).split("-").filter(Boolean);
+    const role = toks[toks.length - 1];
+    if (role && isKnownRole(role)) writeRole(node, role);
+  }
   var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper"]);
   function resolveRole(node, token, pos, parentRole, ctxScope) {
     if (pos.isOverlay) return "overlay";
@@ -4874,6 +4879,7 @@
             if (before !== expectedBefore) continue;
             if (before === after) continue;
             node.name = after;
+            writeRoleFromName(node, after);
             changes.push({ id, before, after });
           }
           post({ type: "RENAME_RESULT", changes, nodes: [], applied: true });
@@ -5098,19 +5104,20 @@
           try {
             const eligibleNodes = pruned.filter((c) => c.eligible).map((c) => liveById.get(c.id)).filter((n) => !!n);
             const groups = groupForRegister(eligibleNodes);
+            const groupNames = resolveGroupNames(groups.map((g) => g.members));
             const preview = /* @__PURE__ */ new Map();
-            for (const g of groups) {
+            for (let gi = 0; gi < groups.length; gi++) {
+              const g = groups[gi];
+              const name = groupNames[gi];
               if (g.members.length < 2) {
-                if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
+                if (g.members[0]) preview.set(g.members[0].id, { single: name });
                 continue;
               }
               if (shouldCollapseToProperties(g.members)) {
-                const name = pascalCase(commonBaseName(g.members.map((m) => m.name)) || g.members[0].name);
                 for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true });
                 continue;
               }
-              const base = commonBaseName(g.members.map((m) => m.name));
-              for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
+              for (const d of deriveVariants(g.members)) preview.set(d.id, { group: name, variant: d.variant });
             }
             nodes = pruned.map((c) => {
               const p = preview.get(c.id);

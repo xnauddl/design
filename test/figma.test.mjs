@@ -14,6 +14,7 @@ import {
   createSemanticTextStyles,
   bindSelection,
   renameSelection,
+  writeRoleFromName,
   generateDarkMode,
 } from '../dist/figma-lib.mjs';
 
@@ -1702,6 +1703,22 @@ test('renameSelection — apply:false면 역할도 기록하지 않는다(미리
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [icon] };
   await renameSelection([root], { apply: false, maxDepth: 3 });
   assert.equal(icon.getPluginData('dsRole'), '');
+});
+
+test('writeRoleFromName — RENAME_APPLY 경로: 이름 말단 역할을 dsRole로 기록', () => {
+  installFigma();
+  const icon = withPluginData({ type: 'VECTOR', id: 'v', name: 'Vector 1', width: 24, height: 24 });
+  writeRoleFromName(icon, 'header-icon');
+  assert.equal(icon.getPluginData('dsRole'), 'icon');
+
+  const thumb = withPluginData({ type: 'RECTANGLE', id: 'r', name: 'Rectangle 1', width: 64, height: 64 });
+  writeRoleFromName(thumb, 'card-thumbnail');
+  assert.equal(thumb.getPluginData('dsRole'), 'thumbnail');
+
+  // 알려진 역할이 아니면 기록하지 않음(사람 이름 보존).
+  const custom = withPluginData({ type: 'FRAME', id: 'f', name: 'Hero Banner', width: 100, height: 40 });
+  writeRoleFromName(custom, 'Hero Banner');
+  assert.equal(custom.getPluginData('dsRole'), '');
 });
 
 test('renameSelection — pluginData API가 없는 노드에서도 안전(기록 실패가 리네임을 막지 않음)', async () => {
