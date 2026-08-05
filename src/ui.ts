@@ -2070,7 +2070,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
       // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
-      // 텍스트 스타일은 등록(만들기)·적용(적용 탭)이  alike feature라 양쪽 상태줄에 띄운다.
+      // 텍스트 스타일은 등록(만들기)·적용(적용 탭)이 같은 feature라 양쪽 상태줄에 띄운다.
       const statusId = PREMIUM_STATUS_ID[msg.feature] ?? 'createStatus';
       const msgText = t('premium.required', { message: msg.message, feature: msg.feature });
       setStatus(statusId, msgText, 'warn');
