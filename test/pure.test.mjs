@@ -2157,6 +2157,35 @@ test('nameTextStyles — 군집의 행간 %는 스펙으로 전달되고, px 군
   assert.equal(px.lineHeightPercent, undefined);
 });
 
+test('clusterTextStyles — px 자간과 % 자간이 한 군집이면 원본은 %가 이긴다', () => {
+  const base = { fontSize: 16, lineHeight: 24, letterSpacing: 0.32, lineHeightPercent: 0, family: 'Inter', style: 'Regular', styleId: '' };
+  const pxFirst = clusterTextStyles([
+    { ...base, letterSpacingPercent: 0, layerName: 'A' },
+    { ...base, letterSpacingPercent: 2, layerName: 'B' },
+  ]);
+  assert.equal(pxFirst.length, 1);
+  assert.equal(pxFirst[0].letterSpacingPercent, 2);
+
+  const neg = clusterTextStyles([
+    { ...base, letterSpacing: -0.32, letterSpacingPercent: 0, layerName: 'A' },
+    { ...base, letterSpacing: -0.32, letterSpacingPercent: -2, layerName: 'B' },
+  ]);
+  assert.equal(neg[0].letterSpacingPercent, -2);
+});
+
+test('nameTextStyles — 군집의 자간 %는 스펙으로 전달되고, px 군집엔 필드가 없다', () => {
+  const cl = clusterTextStyles([
+    { fontSize: 16, lineHeight: 24, lineHeightPercent: 0, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular', layerName: 'b', styleId: '' },
+    { fontSize: 32, lineHeight: 40, lineHeightPercent: 0, letterSpacing: 0.4, letterSpacingPercent: 0, family: 'Inter', style: 'Bold', layerName: 't', styleId: '' },
+  ]);
+  const specs = nameTextStyles(cl);
+  const pct = specs.find((s) => s.fontSize === 16);
+  const px = specs.find((s) => s.fontSize === 32);
+  assert.equal(pct.letterSpacingPercent, 2);
+  assert.equal(pct.letterSpacing, 0.32);
+  assert.equal(px.letterSpacingPercent, undefined);
+});
+
 /* ---------- 변수 편집기(R1)·다크 테마 생성(R2) 순수 헬퍼 ---------- */
 
 test('parseVarValue — 타입별 파싱/검증', () => {
