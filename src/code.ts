@@ -1,21 +1,25 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode, RenameChange } from './shared/messages';
+import type { UiToCode, RenameChange, VarInfo, VarMode, VarValueCell, VarPatch, CodeToUi } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
-import { rgbToHex, hexToRgb } from './lib/tokens';
+import { rgbToHex, hexToRgb, type ResolvedType, type ScopeName } from './lib/tokens';
 import { pascalCase } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
+import { scanSimilar, componentizeSimilar } from './lib/similarApply';
+import { generateDarkMode } from './lib/themeApply';
+import { parseVarValue, sanitizeScopes, aliasSelfReference, findAliasReferers } from './lib/variableEdit';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
+import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { Preset, upsertPreset } from './lib/presets';
 import { commitUndo } from './lib/undo';
 
@@ -142,7 +146,7 @@ async function postPrereq(): Promise<void> {
 }
 
 /** Paid 게이트(공유 프리셋): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requireTeam(): boolean {
+function requirePresets(): boolean {
   return requirePaid('presets', '공유 프리셋은 Paid 기능입니다.');
 }
 
@@ -190,6 +194,170 @@ function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+/* ---------- 변수 편집기 / 다크 테마 생성 ---------- */
+
+// 우리가 만든 3계층만 편집 대상 — 남의 라이브러리 컬렉션을 건드리지 않는다.
+const EDITABLE_COLLECTIONS = new Set([GLOBAL, SEMANTIC, COMPONENT]);
+// 사용처 조회는 문서 전체를 훑는다 — 큰 파일에서 UI가 굳지 않게 상한을 둔다(도달 시 capped 표시).
+const USAGE_SCAN_CAP = 5000;
+
+function isVariableAlias(raw: unknown): raw is VariableAlias {
+  return !!raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS';
+}
+
+function toValueCell(type: ResolvedType, raw: VariableValue | undefined, nameById: Map<string, string>): VarValueCell {
+  if (isVariableAlias(raw)) {
+    const aliasId = raw.id;
+    const aliasName = nameById.get(aliasId);
+    return { kind: 'alias', display: aliasName ?? '(알 수 없음)', aliasId, aliasName };
+  }
+  if (type === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) {
+    return { kind: 'literal', display: rgbToHex(raw as RGB) };
+  }
+  if (raw === undefined) return { kind: 'literal', display: '' };
+  return { kind: 'literal', display: String(raw) };
+}
+
+function toVarInfo(v: Variable, col: VariableCollection, nameById: Map<string, string>): VarInfo {
+  const modes: VarMode[] = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
+  const values: Record<string, VarValueCell> = {};
+  for (const m of col.modes) values[m.modeId] = toValueCell(v.resolvedType, v.valuesByMode[m.modeId], nameById);
+  return {
+    id: v.id,
+    name: v.name,
+    collectionId: col.id,
+    collection: col.name,
+    type: v.resolvedType,
+    description: v.description ?? '',
+    scopes: v.scopes as ScopeName[],
+    hidden: v.hiddenFromPublishing,
+    modes,
+    defaultModeId: col.defaultModeId,
+    values,
+  };
+}
+
+async function collectVars(): Promise<VarInfo[]> {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const colById = new Map(cols.map((c) => [c.id, c]));
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const nameById = new Map(vars.map((v) => [v.id, v.name]));
+  const out: VarInfo[] = [];
+  for (const v of vars) {
+    const col = colById.get(v.variableCollectionId);
+    if (!col || !EDITABLE_COLLECTIONS.has(col.name)) continue;
+    out.push(toVarInfo(v, col, nameById));
+  }
+  out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
+  return out;
+}
+
+/** 별칭이 순환을 만드는지 — 대상에서 출발해 별칭 사슬을 따라가 source에 닿으면 순환. */
+async function aliasWouldCycle(sourceId: string, target: Variable): Promise<boolean> {
+  const seen = new Set<string>();
+  let frontier: Variable[] = [target];
+  while (frontier.length) {
+    const next: Variable[] = [];
+    for (const cur of frontier) {
+      if (cur.id === sourceId) return true;
+      if (seen.has(cur.id)) continue;
+      seen.add(cur.id);
+      for (const modeId of Object.keys(cur.valuesByMode)) {
+        const raw = cur.valuesByMode[modeId];
+        if (isVariableAlias(raw)) {
+          const nv = await figma.variables.getVariableByIdAsync(raw.id);
+          if (nv) next.push(nv);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return false;
+}
+
+async function applyVarValue(v: Variable, col: VariableCollection, value: NonNullable<VarPatch['value']>): Promise<string | null> {
+  const modeId = value.modeId || col.defaultModeId;
+  if (!col.modes.some((m) => m.modeId === modeId)) return '대상 모드를 찾을 수 없습니다.';
+  if (value.aliasId !== undefined) {
+    if (aliasSelfReference(v.id, value.aliasId)) return '변수를 자기 자신에 별칭할 수 없습니다.';
+    const target = await figma.variables.getVariableByIdAsync(value.aliasId);
+    if (!target) return '별칭 대상을 찾을 수 없습니다.';
+    if (target.resolvedType !== v.resolvedType) return '별칭 대상의 타입이 다릅니다.';
+    if (await aliasWouldCycle(v.id, target)) return '별칭이 순환 참조를 만듭니다.';
+    v.setValueForMode(modeId, figma.variables.createVariableAlias(target));
+    return null;
+  }
+  if (value.literal !== undefined) {
+    const p = parseVarValue(v.resolvedType, value.literal);
+    if (!p.ok) return p.error;
+    v.setValueForMode(modeId, p.value as VariableValue);
+    return null;
+  }
+  return null;
+}
+
+async function editVariable(id: string, patch: VarPatch): Promise<Extract<CodeToUi, { type: 'EDIT_VARIABLE_RESULT' }>> {
+  const v = await figma.variables.getVariableByIdAsync(id);
+  if (!v) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '변수를 찾을 수 없습니다.' };
+  const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+  if (!col || !EDITABLE_COLLECTIONS.has(col.name)) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '편집 대상이 아닌 컬렉션입니다.' };
+  try {
+    if (patch.name !== undefined) {
+      const nm = patch.name.trim();
+      if (!nm) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '이름을 입력하세요.' };
+      v.name = nm;
+    }
+    if (patch.description !== undefined) v.description = patch.description;
+    if (patch.hidden !== undefined) v.hiddenFromPublishing = patch.hidden;
+    if (patch.scopes) v.scopes = sanitizeScopes(patch.scopes, v.resolvedType);
+    if (patch.value) {
+      const err = await applyVarValue(v, col, patch.value);
+      if (err) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: err };
+    }
+  } catch (e) {
+    return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: errText(e) };
+  }
+  const all = await figma.variables.getLocalVariablesAsync();
+  const nameById = new Map(all.map((x) => [x.id, x.name]));
+  return { type: 'EDIT_VARIABLE_RESULT', id, ok: true, var: toVarInfo(v, col, nameById) };
+}
+
+function nodeBindsVar(node: SceneNode, varId: string): boolean {
+  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
+  if (!bv) return false;
+  const hits = (a: unknown): boolean => !!a && typeof a === 'object' && (a as VariableAlias).id === varId;
+  for (const key of Object.keys(bv)) {
+    const entry = bv[key];
+    if (Array.isArray(entry)) {
+      if (entry.some(hits)) return true;
+    } else if (entry && typeof entry === 'object') {
+      if (hits(entry)) return true; // {type,id} 형태
+      for (const v of Object.values(entry as Record<string, unknown>)) if (hits(v)) return true;
+    }
+  }
+  return false;
+}
+
+async function collectBoundNodes(varId: string): Promise<{ nodes: { id: string; name: string }[]; capped: boolean }> {
+  await figma.loadAllPagesAsync();
+  const nodes: { id: string; name: string }[] = [];
+  const stack: SceneNode[] = [];
+  for (const page of figma.root.children) stack.push(...(page.children as readonly SceneNode[]));
+  let scanned = 0;
+  let capped = false;
+  while (stack.length) {
+    if (scanned >= USAGE_SCAN_CAP) {
+      capped = true;
+      break;
+    }
+    const n = stack.pop() as SceneNode;
+    scanned++;
+    if (nodeBindsVar(n, varId)) nodes.push({ id: n.id, name: n.name });
+    if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
+  }
+  return { nodes, capped };
+}
+
 /** 노드가 속한 페이지(없으면 null) — 부모를 PAGE까지 거슬러 올라간다. */
 function pageOf(node: BaseNode): PageNode | null {
   let n: BaseNode | null = node;
@@ -198,7 +366,7 @@ function pageOf(node: BaseNode): PageNode | null {
 }
 
 /** Paid 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requirePro(): boolean {
+function requireComponents(): boolean {
   return requirePaid('components', '컴포넌트 등록·베리언트 분류는 Paid 기능입니다.');
 }
 
@@ -257,7 +425,7 @@ async function applySelectedBinding(item: { nodeId: string; field: string; index
 
 /** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireTextStyles(): boolean {
-  return requirePaid('components', '텍스트 스타일 등록은 Paid 기능입니다.');
+  return requirePaid('textStyles', '텍스트 스타일 등록은 Paid 기능입니다.');
 }
 
 async function savePresets(): Promise<void> {
@@ -919,20 +1087,25 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         postLicense('라이선스 키 제거됨');
         break;
       }
+      case 'OPEN_LICENSE_LINK': {
+        // URL은 여기서만 해석 — UI가 임의 주소를 넘길 수 없게 한다.
+        figma.openExternal(msg.target === 'purchase' ? PURCHASE_URL : PORTAL_URL);
+        break;
+      }
       case 'GET_PRESETS': {
-        if (!requireTeam()) break;
+        if (!requirePresets()) break;
         post({ type: 'PRESETS', presets });
         break;
       }
       case 'SAVE_PRESET': {
-        if (!requireTeam()) break;
+        if (!requirePresets()) break;
         presets = upsertPreset(presets, msg.preset);
         await savePresets();
         post({ type: 'PRESETS', presets });
         break;
       }
       case 'DELETE_PRESET': {
-        if (!requireTeam()) break;
+        if (!requirePresets()) break;
         presets = presets.filter((p) => p.name !== msg.name);
         await savePresets();
         post({ type: 'PRESETS', presets });
@@ -977,7 +1150,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'SCAN_COMPONENT_CANDIDATES': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         // 숨긴 조상 아래 노드는 선택 루트여도 제외(실효 비가시).
         const roots = selection().filter(isEffectivelyVisible);
         const candidates = scanComponentCandidates(roots);
@@ -1045,7 +1218,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'REGISTER_COMPONENTS': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         await figma.loadAllPagesAsync(); // dynamic-page: 컴포넌트 페이지 이동 전 로드
         let registered = 0;
         let skipped = 0;
@@ -1299,7 +1472,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CLASSIFY_VARIANTS': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         // 「컴포넌트 등록」과 동일한 **정확한 이름 기준**으로 기존 컴포넌트를 다시 묶는다.
         // 선택의 COMPONENT 중 아직 세트에 안 속한 것만(멱등). 같은 이름 2개+ → 세트, 1개 → 단독.
         const comps = selection().filter(
@@ -1341,7 +1514,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'GENERATE_MISSING_VARIANTS': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         const sets = selection().filter((n): n is ComponentSetNode => n.type === 'COMPONENT_SET');
         let generated = 0;
         const combos: string[] = [];
@@ -1365,6 +1538,95 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
         if (generated) commitUndo(figma); // UX2
+        break;
+      }
+      case 'GET_VARIABLES': {
+        post({ type: 'VARIABLES', vars: await collectVars() });
+        break;
+      }
+      case 'EDIT_VARIABLE': {
+        const res = await editVariable(msg.id, msg.patch);
+        post(res);
+        if (res.ok) {
+          commitUndo(figma); // UX2: 행별 단일 Undo
+          await postPrereq(); // 값/이름 변경이 전제 상태에 영향 가능
+        }
+        break;
+      }
+      case 'DELETE_VARIABLE': {
+        const v = await figma.variables.getVariableByIdAsync(msg.id);
+        if (!v) {
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: '변수를 찾을 수 없습니다.' });
+          break;
+        }
+        const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+        if (!col || !EDITABLE_COLLECTIONS.has(col.name)) {
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: '편집 대상이 아닌 컬렉션입니다.' });
+          break;
+        }
+        try {
+          v.remove();
+          commitUndo(figma); // UX2: 삭제도 단일 Undo
+          await postPrereq();
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: true, deleted: true });
+        } catch (e) {
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: errText(e) });
+        }
+        break;
+      }
+      case 'GET_VARIABLE_USAGE': {
+        // 읽기 전용 — 삭제/리네임 전에 "이걸 지우면 뭐가 깨지는지"를 먼저 보여준다.
+        const { nodes, capped } = await collectBoundNodes(msg.id);
+        const aliasedBy = findAliasReferers(msg.id, await collectVars());
+        post({ type: 'VARIABLE_USAGE', id: msg.id, nodes, aliasedBy, capped });
+        break;
+      }
+      case 'GENERATE_DARK_MODE': {
+        // 다크 Global을 새로 만드는 작업이라 토큰 생성과 같은 등급으로 잠근다.
+        if (!requirePaid('tokens', '다크 테마 생성은 Paid 기능입니다.')) break;
+        const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
+        post({ type: 'DARK_MODE_RESULT', ...r });
+        if (r.created || r.realiased) {
+          commitUndo(figma); // UX2: 다크 생성 전체를 단일 Undo로
+          await postPrereq();
+        }
+        post({ type: 'VARIABLES', vars: await collectVars() }); // 편집기 목록 갱신
+        break;
+      }
+      case 'SCAN_SIMILAR': {
+        // 미리보기(읽기 전용)는 Free — 선택 프레임을 정렬해 가변 위치·마스터 추천만 보여준다.
+        const frames = selection().filter((n) => n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'COMPONENT');
+        const r = await scanSimilar(frames);
+        post({
+          type: 'SIMILAR_CANDIDATES',
+          metas: r.metas,
+          recommendedMasterId: r.recommendedMasterId,
+          varying: r.varying,
+          imageVarying: r.imageVarying,
+          excluded: r.excluded,
+        });
+        break;
+      }
+      case 'COMPONENTIZE_SIMILAR': {
+        if (!requirePaid('components', '닮은 프레임 컴포넌트화는 Paid 기능입니다. 스캔·미리보기는 무료입니다.')) break;
+        const master = await figma.getNodeByIdAsync(msg.masterId);
+        if (!master || (master.type !== 'FRAME' && master.type !== 'GROUP')) {
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['마스터 프레임을 찾을 수 없습니다.'] });
+          break;
+        }
+        // 멤버 노드 수집(마스터 포함) → 정렬·컴포넌트화·인스턴스 교체는 similarApply에 위임.
+        const memberNodes: SceneNode[] = [];
+        for (const id of msg.frameIds) {
+          const n = await figma.getNodeByIdAsync(id);
+          if (n && 'type' in n) memberNodes.push(n as SceneNode);
+        }
+        if (memberNodes.length < 2) {
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['대상 프레임이 2개 미만입니다. 다시 스캔하세요.'] });
+          break;
+        }
+        const r = await componentizeSimilar(master as SceneNode, memberNodes);
+        post({ type: 'COMPONENTIZE_RESULT', master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
+        if (r.instances) commitUndo(figma); // UX2: 컴포넌트화 전체를 단일 Undo로
         break;
       }
       case 'CHECK_CONTRAST': {
