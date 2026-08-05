@@ -1594,6 +1594,60 @@ test('renameSelection — apply:false면 미리보기만(노드 이름 불변)',
   assert.equal(node.name, 'Frame 1'); // 적용 안 함
 });
 
+/** pluginData를 기억하는 목 노드(리네임의 역할 기록 검증용). */
+const withPluginData = (node) => {
+  const store = new Map();
+  node.setPluginData = (k, v) => store.set(k, v);
+  node.getPluginData = (k) => store.get(k) ?? '';
+  return node;
+};
+
+test('renameSelection — 판정한 역할을 pluginData(dsRole)로 기록', async () => {
+  installFigma();
+  const icon = withPluginData({ type: 'VECTOR', id: 'v', name: 'Vector 1', width: 24, height: 24 });
+  const thumb = withPluginData({
+    type: 'RECTANGLE', id: 'r', name: 'Rectangle 1', width: 64, height: 64,
+    fills: [{ type: 'IMAGE', visible: true, imageHash: 'x' }],
+  });
+  const text = withPluginData({ type: 'TEXT', id: 't', name: '제목', characters: '제목' });
+  // 표면+라운드+자식 2개↑ → 루트라도 고신뢰 card로 교체된다.
+  const card = withPluginData({
+    type: 'FRAME', id: 'c', name: 'Frame 1', width: 300, height: 200, layoutMode: 'VERTICAL',
+    cornerRadius: 12, fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 }, visible: true }],
+    children: [icon, thumb, text],
+  });
+  await renameSelection([card], { apply: true, maxDepth: 3 });
+
+  assert.equal(card.getPluginData('dsRole'), 'card');
+  assert.equal(icon.getPluginData('dsRole'), 'icon');
+  assert.equal(thumb.getPluginData('dsRole'), 'thumbnail'); // card 맥락 → thumbnail
+  assert.equal(text.getPluginData('dsRole'), ''); // TEXT는 제외 대상 → 기록 없음
+  // 이름과 역할이 함께 남아야 등록이 말단 일치 검사를 통과한다.
+  assert.equal(thumb.name, 'card-thumbnail');
+});
+
+test('renameSelection — apply:false면 역할도 기록하지 않는다(미리보기 무해)', async () => {
+  installFigma();
+  const icon = withPluginData({ type: 'VECTOR', id: 'v', name: 'Vector 1', width: 24, height: 24 });
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [icon] };
+  await renameSelection([root], { apply: false, maxDepth: 3 });
+  assert.equal(icon.getPluginData('dsRole'), '');
+});
+
+test('renameSelection — pluginData API가 없는 노드에서도 안전(기록 실패가 리네임을 막지 않음)', async () => {
+  installFigma();
+  const icon = { type: 'VECTOR', id: 'v', name: 'Vector 1', width: 24, height: 24 };
+  const broken = {
+    type: 'VECTOR', id: 'v2', name: 'Vector 2', width: 24, height: 24,
+    setPluginData() { throw new Error('pluginData 실패'); },
+  };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [icon, broken] };
+  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  assert.equal(changes.length, 2);
+  assert.equal(icon.name, 'icon');
+  assert.equal(broken.name, 'icon');
+});
+
 test('renameSelection — 영역 추론: 페이지 세로 스택의 첫=header, 마지막=footer', async () => {
   installFigma();
   const page = {

@@ -1657,6 +1657,7 @@
     "title"
   ];
   var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
+  var ROLE_KEY = "dsRole";
   var ROLE_SET = new Set(ROLE_VOCAB);
   function isKnownRole(seg) {
     return ROLE_SET.has(seg);
@@ -1814,6 +1815,7 @@
           col.changes.push({ id: node.id, before, after });
           if (opts.apply) node.name = after;
         }
+        if (opts.apply && decided.role) writeRole(node, decided.role);
         contextForChildren = decided.passthrough ? ancestorName : decided.name;
       }
       col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
@@ -1842,6 +1844,14 @@
     if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: role, passthrough: true };
     const scope = ctxScope === role ? null : ctxScope;
     return { skip: false, role, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
+  }
+  function writeRole(node, role) {
+    const fn = node.setPluginData;
+    if (typeof fn !== "function") return;
+    try {
+      fn.call(node, ROLE_KEY, role);
+    } catch (e) {
+    }
   }
   var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper"]);
   function resolveRole(node, token, pos, parentRole, ctxScope) {
@@ -2764,7 +2774,15 @@
     "label",
     "tooltip",
     "header",
-    "footer"
+    "footer",
+    // naming.ts EMITTED_ROLES 정합 — 리네임이 출력하는 요소 역할도 컴포넌트가 된다.
+    // 없으면 `header-icon`의 머리명사가 `header`로 잡혀 역할이 사라지고 맥락이 이름이 된다.
+    "icon",
+    "image",
+    "thumbnail",
+    "status",
+    "indicator",
+    "overlay"
   ]);
   var NOUN_ABBR = { btn: "button", img: "image" };
   function nounWord(token) {
@@ -3244,10 +3262,11 @@
     const existing = new Set(parsed.map(formatVariant));
     return cartesian(properties).map(formatVariant).filter((v) => !existing.has(v));
   }
+  var COMPONENT_ROLES = /* @__PURE__ */ new Set(["icon", "image", "thumbnail", "avatar", "status", "badge", "divider"]);
   function componentEligible(node) {
-    if (!(node.type === "FRAME" || node.type === "GROUP") || node.locked) return false;
-    if (node.visible === false) return false;
-    return isHighConfidenceComponent(node);
+    if (node.locked || node.visible === false) return false;
+    if (node.type === "FRAME" || node.type === "GROUP") return isHighConfidenceComponent(node);
+    return !!node.role && COMPONENT_ROLES.has(kebab(node.role));
   }
   function isClosedComponentSubtree(node) {
     return node.type === "INSTANCE" || node.type === "COMPONENT" || node.type === "COMPONENT_SET";
@@ -3480,9 +3499,16 @@
     }
     return members.map((m, i) => ({ id: m.id, name: m.name, props: props[i], variant: formatVariant(props[i]) }));
   }
-  function commonBaseName(names) {
-    var _a;
-    if (!names.length) return "";
+  function stripContextTokens(tokens) {
+    const last = tokens.length - 1;
+    if (last < 0) return tokens.slice();
+    if (!COMPONENT_NOUNS.has(nounWord(tokens[last]))) return tokens.slice();
+    let start = last;
+    while (start > 0 && COMPONENT_NOUNS.has(nounWord(tokens[start - 1]))) start--;
+    return tokens.slice(start);
+  }
+  function commonPrefixTokens(names) {
+    if (!names.length) return [];
     const split = (s) => kebab(s).split("-").filter(Boolean);
     let prefix = split(names[0]);
     for (const n of names.slice(1)) {
@@ -3492,8 +3518,48 @@
       prefix = prefix.slice(0, i);
       if (!prefix.length) break;
     }
-    if (prefix.length) return pascalCase(prefix.join("-"));
+    return prefix;
+  }
+  function commonBaseName(names) {
+    var _a;
+    if (!names.length) return "";
+    const prefix = commonPrefixTokens(names);
+    if (prefix.length) return pascalCase(stripContextTokens(prefix).join("-"));
     return (_a = recognizeComponentName(names[0])) != null ? _a : pascalCase(names[0]);
+  }
+  function trustedRole(members) {
+    if (!members.length) return null;
+    const role = members[0].role ? kebab(members[0].role) : "";
+    if (!role) return null;
+    for (const m of members) {
+      if (!m.role || kebab(m.role) !== role) return null;
+      const toks = kebab(m.name).split("-").filter(Boolean);
+      if (toks[toks.length - 1] !== role) return null;
+    }
+    return role;
+  }
+  function componentBaseName(members) {
+    const role = trustedRole(members);
+    return role ? pascalCase(role) : commonBaseName(members.map((m) => m.name));
+  }
+  function contextualName(members) {
+    const prefix = commonPrefixTokens(members.map((m) => m.name));
+    return prefix.length ? pascalCase(prefix.join("-")) : commonBaseName(members.map((m) => m.name));
+  }
+  function resolveGroupNames(groups) {
+    const base = groups.map(componentBaseName);
+    const collides = new Set(base.filter((n, i) => base.indexOf(n) !== i));
+    const taken = /* @__PURE__ */ new Set();
+    return base.map((n, i) => {
+      let name = collides.has(n) ? contextualName(groups[i]) : n;
+      if (taken.has(name)) {
+        let k = 2;
+        while (taken.has(`${name}${k}`)) k++;
+        name = `${name}${k}`;
+      }
+      taken.add(name);
+      return name;
+    });
   }
 
   // src/lib/contrast.ts
@@ -4412,6 +4478,15 @@
     }
     return null;
   }
+  function readRole(node) {
+    const fn = node.getPluginData;
+    if (typeof fn !== "function") return void 0;
+    try {
+      return fn.call(node, ROLE_KEY) || void 0;
+    } catch (e) {
+      return void 0;
+    }
+  }
   function toStructNode(node) {
     const a = node;
     const num = (v) => typeof v === "number" ? v : void 0;
@@ -4451,6 +4526,7 @@
       fillHex: solidFillHex(node),
       characters,
       mainComponentKey,
+      role: readRole(node),
       // INSTANCE 안은 자식 컴포넌트 소관 — 접힘 비교·속성 노출과 동일하게 펼치지 않음.
       children: node.type === "INSTANCE" ? [] : kids.map(toStructNode)
     };
@@ -4498,7 +4574,9 @@
     return true;
   }
   function sceneComponentEligible(n) {
-    return isEffectivelyVisible3(n) && componentEligible(n);
+    if (!isEffectivelyVisible3(n)) return false;
+    if (n.type === "FRAME" || n.type === "GROUP") return componentEligible(n);
+    return componentEligible({ id: n.id, name: n.name, type: n.type, locked: n.locked, visible: n.visible, role: readRole(n) });
   }
   function resolvePropTarget(root, p) {
     var _a;
@@ -4961,7 +5039,7 @@
         case "SCAN_COMPONENT_CANDIDATES": {
           if (!requireComponents()) break;
           const roots = selection().filter(isEffectivelyVisible3);
-          const candidates = scanComponentCandidates(roots);
+          const candidates = scanComponentCandidates(roots.map(toStructNode));
           const liveById = /* @__PURE__ */ new Map();
           const index = (n) => {
             if (n.visible === false) return;
@@ -5116,8 +5194,10 @@
               failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${comp.name}): ${errText(e)}`);
             }
           };
-          for (const g of groups) {
-            const setName = commonBaseName(g.members.map((m) => m.name));
+          const groupNames = resolveGroupNames(groups.map((g) => g.members));
+          for (let gi = 0; gi < groups.length; gi++) {
+            const g = groups[gi];
+            const setName = groupNames[gi];
             if (g.members.length === 1) {
               const node = byId.get(g.members[0].id);
               if (!node) continue;
@@ -5125,7 +5205,7 @@
               try {
                 const comp = figma.createComponentFromNode(node);
                 registered++;
-                placeSingle(comp, o, pascalCase(g.members[0].name));
+                placeSingle(comp, o, setName);
               } catch (e) {
                 skipped++;
                 failures.push(`\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328(${g.members[0].name}): ${errText(e)}`);
@@ -5285,7 +5365,9 @@
           const missing = [];
           const singles = [];
           const failures = [];
-          for (const g of groups) {
+          const groupNames = resolveGroupNames(groups.map((g) => g.members));
+          for (let gi = 0; gi < groups.length; gi++) {
+            const g = groups[gi];
             const nodes = g.members.map((m) => byId.get(m.id)).filter((n) => !!n);
             if (nodes.length < 2) {
               if (nodes[0]) singles.push(nodes[0].name);
@@ -5295,7 +5377,7 @@
             try {
               const parent = (_g = nodes[0].parent) != null ? _g : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
-              set.name = commonBaseName(g.members.map((m) => m.name));
+              set.name = groupNames[gi];
               for (const m of g.members) {
                 const node = byId.get(m.id);
                 const v = variantById.get(m.id);
@@ -5311,7 +5393,7 @@
               if (miss.length) missing.push(`${set.name}: ${miss.join(" / ")}`);
               sets++;
             } catch (e) {
-              failures.push(`\uACB0\uD569 \uC2E4\uD328(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
+              failures.push(`\uACB0\uD569 \uC2E4\uD328(${groupNames[gi]}): ${errText(e)}`);
             }
           }
           post({ type: "VARIANTS_RESULT", sets, missing, singles, failures });

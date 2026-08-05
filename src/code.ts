@@ -9,9 +9,9 @@ import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from '
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
 import { rgbToHex, hexToRgb, type ResolvedType, type ScopeName } from './lib/tokens';
-import { pascalCase } from './lib/naming';
+import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
@@ -540,7 +540,21 @@ function solidFillHex(node: SceneNode): string | null {
   return null;
 }
 
-/** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑을 읽어 순수 그룹화에 넘김. */
+/**
+ * 리네임이 남긴 역할(`dsRole`)을 읽는다 — 등록이 머리명사로 쓴다. 없으면 undefined
+ * (사람이 지은 이름이거나 리네임 전). API가 없는 노드도 안전하게 통과.
+ */
+function readRole(node: SceneNode): string | undefined {
+  const fn = (node as { getPluginData?: (key: string) => string }).getPluginData;
+  if (typeof fn !== 'function') return undefined;
+  try {
+    return fn.call(node, ROLE_KEY) || undefined;
+  } catch {
+    return undefined; // 읽기 실패 → 이름 기반 폴백
+  }
+}
+
+/** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑·역할을 읽어 순수 그룹화에 넘김. */
 function toStructNode(node: SceneNode): StructNode {
   const a = node as unknown as Record<string, unknown>;
   const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined);
@@ -576,6 +590,7 @@ function toStructNode(node: SceneNode): StructNode {
     fillHex: solidFillHex(node),
     characters,
     mainComponentKey,
+    role: readRole(node),
     // INSTANCE 안은 자식 컴포넌트 소관 — 접힘 비교·속성 노출과 동일하게 펼치지 않음.
     children: node.type === 'INSTANCE' ? [] : kids.map(toStructNode),
   };
@@ -634,7 +649,11 @@ function isEffectivelyVisible(node: SceneNode): boolean {
 
 /** 등록/스캔 공통: 실효 보임 + componentEligible. */
 function sceneComponentEligible(n: SceneNode): boolean {
-  return isEffectivelyVisible(n) && componentEligible(n as ScanNode);
+  if (!isEffectivelyVisible(n)) return false;
+  // FRAME/GROUP은 구조만으로 판정하므로 노드를 그대로 넘긴다.
+  if (n.type === 'FRAME' || n.type === 'GROUP') return componentEligible(n as ScanNode);
+  // 말단은 리네임이 남긴 dsRole로만 열린다 — SceneNode엔 그 필드가 없어 읽어 채운다.
+  return componentEligible({ id: n.id, name: n.name, type: n.type, locked: n.locked, visible: n.visible, role: readRole(n) });
 }
 
 /** 계획의 layerPath(우선) 또는 layerName으로 대상 레이어 찾기. */
@@ -1165,7 +1184,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!requireComponents()) break;
         // 숨긴 조상 아래 노드는 선택 루트여도 제외(실효 비가시).
         const roots = selection().filter(isEffectivelyVisible);
-        const candidates = scanComponentCandidates(roots);
+        // StructNode로 매핑해 넘긴다 — 말단 등록 자격이 `dsRole`에 달려 있다.
+        // toStructNode가 인스턴스 내부를 펼치지 않으므로 스캔 범위는 그대로다.
+        const candidates = scanComponentCandidates(roots.map(toStructNode));
         // 라이브 노드 인덱스 — 스캔과 동일하게 인스턴스·메인·세트 안은 펼치지 않는다.
         // (전체 재귀는 대용량 파일에서 UI가 ‘스캔 중’에 멈춘 것처럼 보이게 함.)
         const liveById = new Map<string, SceneNode>();
@@ -1234,7 +1255,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         await figma.loadAllPagesAsync(); // dynamic-page: 컴포넌트 페이지 이동 전 로드
         let registered = 0;
         let skipped = 0;
-        // 후보 필터: 실효 보임 + FRAME/GROUP·미잠금 + 고신뢰 시맨틱 역할.
+        // 후보 필터: 스캔(`componentEligible`)과 같은 규칙 — 실효 보임 + FRAME/GROUP은 고신뢰
+        // 시맨틱 역할, 말단은 리네임이 재사용 원자로 판정한 것(아바타·아이콘·썸네일…).
         const eligible = (n: SceneNode): boolean => sceneComponentEligible(n);
         // 대상 결정: 트리에서 체크한 nodeIds, 없으면(스캔 없이 등록) 선택 서브트리를 **재귀**로 모아
         // **반복 이름(2회+)만** 묶는다(단독 잡음 제외).
@@ -1329,8 +1351,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try { restore([{ inst: comp.createInstance(), o }]); } catch (e) { failures.push(`인스턴스 실패(${comp.name}): ${errText(e)}`); }
         };
 
-        for (const g of groups) {
-          const setName = commonBaseName(g.members.map((m) => m.name)); // 정확한 이름 → PascalCase
+        // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
+        const groupNames = resolveGroupNames(groups.map((g) => g.members));
+        for (let gi = 0; gi < groups.length; gi++) {
+          const g = groups[gi];
+          const setName = groupNames[gi];
           // 단독(1개) — 컴포넌트화 + 원위치 인스턴스.
           if (g.members.length === 1) {
             const node = byId.get(g.members[0].id);
@@ -1339,7 +1364,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             try {
               const comp = figma.createComponentFromNode(node);
               registered++;
-              placeSingle(comp, o, pascalCase(g.members[0].name));
+              placeSingle(comp, o, setName); // 단독·세트 동일 규칙
             } catch (e) {
               skipped++;
               failures.push(`단독 등록 실패(${g.members[0].name}): ${errText(e)}`);
@@ -1496,7 +1521,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const missing: string[] = [];
         const singles: string[] = [];
         const failures: string[] = [];
-        for (const g of groups) {
+        const groupNames = resolveGroupNames(groups.map((g) => g.members)); // 등록과 동일 규칙
+        for (let gi = 0; gi < groups.length; gi++) {
+          const g = groups[gi];
           const nodes = g.members.map((m) => byId.get(m.id)).filter((n): n is ComponentNode => !!n);
           if (nodes.length < 2) {
             if (nodes[0]) singles.push(nodes[0].name);
@@ -1506,7 +1533,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try {
             const parent = nodes[0].parent ?? figma.currentPage;
             const set = figma.combineAsVariants(nodes, parent);
-            set.name = commonBaseName(g.members.map((m) => m.name));
+            set.name = groupNames[gi];
             for (const m of g.members) {
               const node = byId.get(m.id);
               const v = variantById.get(m.id);
@@ -1518,7 +1545,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             if (miss.length) missing.push(`${set.name}: ${miss.join(' / ')}`);
             sets++;
           } catch (e) {
-            failures.push(`결합 실패(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
+            failures.push(`결합 실패(${groupNames[gi]}): ${errText(e)}`);
           }
         }
         post({ type: 'VARIANTS_RESULT', sets, missing, singles, failures });

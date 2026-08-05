@@ -37,6 +37,9 @@ const COMPONENT_NOUNS = new Set([
   'tab', 'tabs', 'breadcrumb', 'pagination', 'navbar', 'nav', 'sidebar', 'menu', 'stepper',
   'avatar', 'badge', 'chip', 'tag', 'toast', 'snackbar', 'alert', 'banner', 'progress',
   'spinner', 'skeleton', 'table', 'list', 'item', 'divider', 'label', 'tooltip', 'header', 'footer',
+  // naming.ts EMITTED_ROLES 정합 — 리네임이 출력하는 요소 역할도 컴포넌트가 된다.
+  // 없으면 `header-icon`의 머리명사가 `header`로 잡혀 역할이 사라지고 맥락이 이름이 된다.
+  'icon', 'image', 'thumbnail', 'status', 'indicator', 'overlay',
 ]);
 /** 컴포넌트 명사 약어 → 표준어. */
 const NOUN_ABBR: Readonly<Record<string, string>> = { btn: 'button', img: 'image' };
@@ -737,6 +740,8 @@ export interface ScanNode extends LikeNode {
   name: string;
   type: string;
   locked?: boolean;
+  /** 리네임이 남긴 역할(pluginData `dsRole`). 말단 노드의 등록 자격을 가른다. */
+  role?: string;
   children?: readonly ScanNode[];
 }
 
@@ -746,7 +751,7 @@ export interface ComponentCandidateNode {
   type: string;
   depth: number;
   parentId: string | null;
-  /** 등록 가능: FRAME/GROUP·미잠금·보임·고신뢰 시맨틱 역할. */
+  /** 등록 가능: 미잠금·보임 + (FRAME/GROUP은 고신뢰 시맨틱 역할 · 말단은 재사용 원자 역할). */
   eligible: boolean;
   /** 구조 그룹으로 묶일 **세트 이름**(미리보기). 세트(2개+) 후보일 때만. */
   group?: string;
@@ -762,15 +767,28 @@ export interface ComponentCandidateNode {
 }
 
 /**
- * 컴포넌트로 등록 가능한 노드인가.
- * FRAME/GROUP·미잠금·**보임** + 고신뢰 역할(button/chip/card/list/field/nav/progress/figure/heading).
- * 숨김(`visible === false`)은 후보 제외 — BOOLEAN 속성용 자식 visible 판별과는 별개.
- * container/wrapper·랜드마크·임의 프레임은 제외 — 리네임 선행 없이 구조만으로 판정.
+ * 말단 노드(사각형·타원·벡터…)라도 등록 후보가 되는 역할 — 재사용되는 UI 원자.
+ * 리네임이 판정해 `dsRole`로 남긴 값만 인정하므로, 리네임을 돌리지 않은 파일에서는
+ * 말단이 하나도 열리지 않는다(기존과 동일).
+ *
+ * `background`·`border`·`shape`·`swatch`는 장식이라 제외하고, `indicator`는 progress의
+ * 내부 부품이라 제외한다(그 progress 프레임 자체가 이미 후보다).
+ */
+const COMPONENT_ROLES = new Set(['icon', 'image', 'thumbnail', 'avatar', 'status', 'badge', 'divider']);
+
+/**
+ * 컴포넌트로 등록 가능한 노드인가 — 잠금·숨김 제외 + 다음 중 하나.
+ * - FRAME/GROUP: 고신뢰 역할(button/chip/table/card/list/field/nav/progress/figure/heading).
+ *   container/wrapper·랜드마크·임의 프레임은 제외 — 리네임 선행 없이 구조만으로 판정.
+ * - 말단 노드: 리네임이 남긴 역할이 재사용 원자(`COMPONENT_ROLES`)일 때만.
+ *   타원 아바타·벡터 아이콘처럼 프레임으로 감싸지 않은 요소를 그대로 등록하기 위한 통로다.
+ *
+ * 숨김(`visible === false`)은 두 경로 모두 제외 — BOOLEAN 속성용 자식 visible 판별과는 별개.
  */
 export function componentEligible(node: ScanNode): boolean {
-  if (!(node.type === 'FRAME' || node.type === 'GROUP') || node.locked) return false;
-  if (node.visible === false) return false;
-  return isHighConfidenceComponent(node);
+  if (node.locked || node.visible === false) return false;
+  if (node.type === 'FRAME' || node.type === 'GROUP') return isHighConfidenceComponent(node);
+  return !!node.role && COMPONENT_ROLES.has(kebab(node.role));
 }
 
 /**
@@ -784,7 +802,8 @@ function isClosedComponentSubtree(node: ScanNode): boolean {
 
 /**
  * 선택 하위를 순회해 등록 후보 트리를 만든다 — 영향(eligible) + 그 조상 체인만 유지.
- * 비-eligible 말단(텍스트·벡터…)은 잡음이라 제외하되, 위치 맥락은 조상으로 보존.
+ * 역할 없는 말단(텍스트·장식 도형…)은 잡음이라 제외하되, 위치 맥락은 조상으로 보존.
+ * 리네임이 재사용 원자로 판정한 말단(아바타·아이콘·썸네일…)은 후보로 올린다.
  *
  * **단일 선택의 최상위(부모 프레임)는 컨테이너**라 등록 대상에서 제외한다 — 자기 자신은
  * 컴포넌트화하지 않고 그 안의 자식만 후보가 된다. 트리에는 회색 맥락으로 남는다.
@@ -842,6 +861,8 @@ export interface StructNode extends ScanNode {
   layoutMode?: string;
   /** 프레임 자체의 첫 visible SOLID fill(hex). 없으면 null. */
   fillHex?: string | null;
+  /** 리네임이 남긴 역할(pluginData `dsRole`). 사람이 지은 이름에는 없다. */
+  role?: string;
   /** TEXT 레이어 문자열 — 속성 접힘(collapse) 판별용. */
   characters?: string;
   /** INSTANCE의 mainComponent key(또는 id) — swap 접힘 판별용. */
@@ -1153,12 +1174,28 @@ export function deriveVariants(members: readonly StructNode[]): DerivedVariant[]
 }
 
 /**
- * 그룹 멤버 이름들의 공통 베이스(세트 이름용) — 토큰 공통 접두를 PascalCase로.
- * 공통 접두가 있으면 그대로(`nav-button-*` → `NavButton`), **없으면 인식된 컴포넌트명**
- * (=마지막 명사)으로 폴백한다(`nav-button` + `button-primary` → `Button`).
+ * 공통 접두에서 **맥락 토막**을 떼어낸다 — 컴포넌트 이름은 놓인 자리와 무관해야 한다.
+ * 리네임이 붙이는 이름은 `{맥락}-{역할}` 꼴이라(`article-avatar`) 그대로 쓰면 맥락이 박힌다.
+ *
+ * 말단(머리명사)에서 **뒤로 이어지는 컴포넌트 명사 연속**만 이름으로 남기고 그 앞은 버린다.
+ * 명사가 이어지면 복합 명사로 보고 보존(`nav-button`·`card-header`·`list-item`), 명사가
+ * 끊기는 지점부터는 맥락이다. 첫 토막만 보면 `list-article-thumbnail`처럼 맥락에 명사가
+ * 섞였을 때(`list`) 못 떼어낸다.
+ * 예: `article-avatar` → `avatar` · `list-article-thumbnail` → `thumbnail` · `nav-button` → `nav-button`.
+ * 말단이 컴포넌트 명사가 아니면(`row-container`) 임의 이름으로 보고 손대지 않는다.
  */
-export function commonBaseName(names: readonly string[]): string {
-  if (!names.length) return '';
+function stripContextTokens(tokens: readonly string[]): string[] {
+  const last = tokens.length - 1;
+  if (last < 0) return tokens.slice();
+  if (!COMPONENT_NOUNS.has(nounWord(tokens[last]))) return tokens.slice(); // 말단이 역할이 아니면 보존
+  let start = last;
+  while (start > 0 && COMPONENT_NOUNS.has(nounWord(tokens[start - 1]))) start--; // 명사 연속 = 복합 명사
+  return tokens.slice(start);
+}
+
+/** 이름들의 공통 접두 토큰(맥락 포함). 공통분이 없으면 빈 배열. */
+function commonPrefixTokens(names: readonly string[]): string[] {
+  if (!names.length) return [];
   const split = (s: string) => kebab(s).split('-').filter(Boolean);
   let prefix = split(names[0]);
   for (const n of names.slice(1)) {
@@ -1168,6 +1205,77 @@ export function commonBaseName(names: readonly string[]): string {
     prefix = prefix.slice(0, i);
     if (!prefix.length) break;
   }
-  if (prefix.length) return pascalCase(prefix.join('-'));
+  return prefix;
+}
+
+/**
+ * 그룹 멤버 이름들의 공통 베이스(세트 이름용) — 토큰 공통 접두를 PascalCase로.
+ * 공통 접두가 있으면 맥락 토막만 떼고 쓰고(`nav-button-*` → `NavButton`,
+ * `article-avatar` → `Avatar`), **없으면 인식된 컴포넌트명**(=마지막 명사)으로
+ * 폴백한다(`nav-button` + `button-primary` → `Button`).
+ *
+ * 이름 텍스트만 보는 휴리스틱이라 맥락이 컴포넌트 명사면 복합 명사와 구분할 수 없다
+ * (`card-thumbnail`). 리네임이 남긴 역할이 있으면 `componentBaseName`을 쓰는 게 정확하다.
+ */
+export function commonBaseName(names: readonly string[]): string {
+  if (!names.length) return '';
+  const prefix = commonPrefixTokens(names);
+  if (prefix.length) return pascalCase(stripContextTokens(prefix).join('-'));
   return recognizeComponentName(names[0]) ?? pascalCase(names[0]); // 공통 접두 없음 → 인식 명사
+}
+
+/**
+ * 멤버 전원이 같은 역할을 기록하고 있고 그 역할이 **현재 이름의 말단과 일치**할 때만
+ * 그 역할을 신뢰한다(아니면 null). 말단 일치 검사가 낡은 기록을 걸러낸다 — 리네임 뒤
+ * 사람이 이름을 바꿨다면 기록보다 사람의 이름이 우선이다.
+ */
+function trustedRole(members: readonly StructNode[]): string | null {
+  if (!members.length) return null;
+  const role = members[0].role ? kebab(members[0].role) : '';
+  if (!role) return null;
+  for (const m of members) {
+    if (!m.role || kebab(m.role) !== role) return null; // 역할이 갈리면 신뢰 못 함
+    const toks = kebab(m.name).split('-').filter(Boolean);
+    if (toks[toks.length - 1] !== role) return null; // 이름이 손으로 바뀜 → 기록 무시
+  }
+  return role;
+}
+
+/**
+ * 그룹의 컴포넌트 이름 — 리네임이 남긴 역할(`dsRole`)이 있으면 그것을 머리명사로 쓴다.
+ * 이름만으로는 `nav-button`(사람이 지은 복합 명사)과 `card-thumbnail`(맥락+역할)이
+ * 구조적으로 같아 구분할 수 없다. 역할 기록이 그 추측을 없앤다.
+ * 기록이 없거나 신뢰할 수 없으면 이름 기반 규칙(`commonBaseName`)으로 폴백한다.
+ */
+export function componentBaseName(members: readonly StructNode[]): string {
+  const role = trustedRole(members);
+  return role ? pascalCase(role) : commonBaseName(members.map((m) => m.name));
+}
+
+/** 맥락을 되살린 이름(충돌 해소용) — 맥락 토막을 떼지 않은 공통 접두. */
+function contextualName(members: readonly StructNode[]): string {
+  const prefix = commonPrefixTokens(members.map((m) => m.name));
+  return prefix.length ? pascalCase(prefix.join('-')) : commonBaseName(members.map((m) => m.name));
+}
+
+/**
+ * 그룹별 최종 컴포넌트 이름(입력 순서와 1:1) — 맥락을 뗀 이름이 서로 **겹치면 맥락을 되살려**
+ * 구분한다. 겹친 채로 등록하면 「분류」가 정확한 이름 기준으로 무관한 컴포넌트를 한 세트로
+ * 병합한다(`article-avatar`·`profile-avatar` → 둘 다 `Avatar` → 병합).
+ * 맥락을 되살려도 여전히 겹치면 마지막 수단으로 숫자를 붙인다.
+ */
+export function resolveGroupNames(groups: readonly (readonly StructNode[])[]): string[] {
+  const base = groups.map(componentBaseName);
+  const collides = new Set(base.filter((n, i) => base.indexOf(n) !== i));
+  const taken = new Set<string>();
+  return base.map((n, i) => {
+    let name = collides.has(n) ? contextualName(groups[i]) : n;
+    if (taken.has(name)) {
+      let k = 2;
+      while (taken.has(`${name}${k}`)) k++;
+      name = `${name}${k}`;
+    }
+    taken.add(name);
+    return name;
+  });
 }

@@ -59,6 +59,7 @@ import {
   inferProp,
   inferComponentProperties,
   scanComponentCandidates,
+  componentEligible,
   groupByExactName,
   recognizeComponentName,
   extractNameProps,
@@ -72,6 +73,8 @@ import {
   propValuesFromStruct,
   colorAxisLabels,
   commonBaseName,
+  componentBaseName,
+  resolveGroupNames,
   clusterTextStyles,
   nameTextStyles,
   nameTextStylesWithRowLabels,
@@ -924,6 +927,68 @@ test('scanComponentCandidates(#1) — 고신뢰 게이트: 임의/container 프�
   assert.equal(byId.has('t'), false);
 });
 
+test('componentEligible — 역할 있는 말단은 등록 가능, 장식·무역할은 제외', () => {
+  const n = (type, role) => ({ id: 'x', name: 'x', type, role });
+  // 재사용 원자 → 프레임으로 감싸지 않아도 후보.
+  assert.equal(componentEligible(n('ELLIPSE', 'avatar')), true);
+  assert.equal(componentEligible(n('ELLIPSE', 'status')), true);
+  assert.equal(componentEligible(n('VECTOR', 'icon')), true);
+  assert.equal(componentEligible(n('RECTANGLE', 'thumbnail')), true);
+  assert.equal(componentEligible(n('RECTANGLE', 'image')), true);
+  assert.equal(componentEligible(n('LINE', 'divider')), true);
+  // 장식·내부 부품 → 제외.
+  assert.equal(componentEligible(n('RECTANGLE', 'background')), false);
+  assert.equal(componentEligible(n('RECTANGLE', 'border')), false);
+  assert.equal(componentEligible(n('RECTANGLE', 'shape')), false);
+  assert.equal(componentEligible(n('RECTANGLE', 'indicator')), false); // progress의 부품
+  // 역할 기록이 없으면(리네임 전) 기존과 동일하게 제외 — 게이트가 열리지 않는다.
+  assert.equal(componentEligible(n('ELLIPSE')), false);
+  assert.equal(componentEligible(n('VECTOR')), false);
+  assert.equal(componentEligible(n('TEXT', 'icon')), true); // 역할이 있으면 타입은 묻지 않음
+  // FRAME/GROUP은 말단과 규칙이 다르다 — 구조로 판정한다(고신뢰 시맨틱 역할).
+  // 맨 프레임은 후보가 아니고, 버튼처럼 구조가 잡힌 프레임만 열린다.
+  assert.equal(componentEligible(n('FRAME')), false);
+  assert.equal(componentEligible(n('GROUP')), false);
+  const btn = {
+    id: 'b', name: 'Frame', type: 'FRAME', layoutMode: 'HORIZONTAL', cornerRadius: 8,
+    width: 120, height: 40, fills: [{ type: 'SOLID', visible: true }],
+    children: [{ id: 'bt', name: 't', type: 'TEXT', characters: 'x' }],
+  };
+  assert.equal(componentEligible(btn), true);
+  // 숨김은 두 경로 모두 제외.
+  assert.equal(componentEligible({ ...btn, visible: false }), false);
+  assert.equal(componentEligible({ id: 'x', name: 'x', type: 'ELLIPSE', role: 'avatar', visible: false }), false);
+  // 잠금은 무조건 제외.
+  assert.equal(componentEligible({ id: 'x', name: 'x', type: 'ELLIPSE', role: 'avatar', locked: true }), false);
+  assert.equal(componentEligible({ id: 'x', name: 'x', type: 'FRAME', locked: true }), false);
+});
+
+test('scanComponentCandidates(#1) — 역할 있는 말단이 후보로 올라온다(타입 게이트 개방)', () => {
+  const avatar = { id: 'a', name: 'article-avatar', type: 'ELLIPSE', role: 'avatar' };
+  const dot = { id: 'd', name: 'article-status', type: 'ELLIPSE', role: 'status' };
+  const deco = { id: 'g', name: 'article-background', type: 'RECTANGLE', role: 'background' }; // 장식 → 제외
+  const plain = { id: 'p', name: 'Vector 9', type: 'VECTOR' }; // 역할 없음 → 제외
+  // 프레임은 구조로 판정되므로 고신뢰(card) 모양을 갖춘다 — 말단 개방과 별개 규칙.
+  const row = {
+    id: 'r', name: 'list-article', type: 'FRAME', role: 'article',
+    layoutMode: 'HORIZONTAL', cornerRadius: 8, width: 320, height: 72,
+    fills: [{ type: 'SOLID', visible: true }],
+    children: [avatar, dot, deco, plain],
+  };
+  const root = { id: 'root', name: 'Page', type: 'FRAME', children: [row] };
+
+  const out = scanComponentCandidates([root]);
+  const byId = new Map(out.map((c) => [c.id, c]));
+  assert.deepEqual(out.map((c) => c.id).sort(), ['a', 'd', 'r', 'root']);
+  assert.equal(byId.get('a').eligible, true);
+  assert.equal(byId.get('d').eligible, true);
+  assert.equal(byId.get('r').eligible, true);
+  assert.equal(byId.get('root').eligible, false); // 단일 선택 최상위 = 컨테이너 맥락
+  // 계층 보존 — 말단도 부모 아래에 붙는다.
+  assert.equal(byId.get('a').parentId, 'r');
+  assert.equal(byId.get('a').depth, 2);
+});
+
 test('scanComponentCandidates(#1) — 단일 선택 컨테이너 제외 vs 다중 선택 루트 포함', () => {
   const solid = [{ type: 'SOLID', visible: true }];
   const mkBtn = (id) => ({
@@ -1117,6 +1182,16 @@ test('recognizeComponentName — 마지막 명사 우선(접두어는 맥락)', 
   assert.equal(recognizeComponentName('hero-banner'), 'Banner'); // hero 미인식, banner 인식
 });
 
+test('recognizeComponentName — EMITTED_ROLES 정합(요소 역할도 컴포넌트 명사)', () => {
+  // 리네임 결과를 그대로 넣었을 때 역할이 살아남아야 한다(맥락이 이름이 되면 안 됨).
+  assert.equal(recognizeComponentName('header-icon'), 'Icon'); // 이전엔 'Header'(맥락)였다
+  assert.equal(recognizeComponentName('article-status'), 'Status'); // 이전엔 null
+  assert.equal(recognizeComponentName('article-thumbnail'), 'Thumbnail');
+  assert.equal(recognizeComponentName('article-avatar'), 'Avatar');
+  assert.equal(recognizeComponentName('img'), 'Image'); // 약어 → 이제 명사로 인식
+  assert.equal(recognizeComponentName('progress-indicator'), 'Indicator');
+});
+
 test('extractNameProps — 명사 제외 + 보편 속성 추출', () => {
   assert.deepEqual(extractNameProps('button-primary'), { Type: 'primary' });
   assert.deepEqual(extractNameProps('button-primary-hover'), { Type: 'primary', State: 'hover' });
@@ -1205,6 +1280,86 @@ test('colorAxisLabels / commonBaseName(PascalCase·약어 펼침)', () => {
   // 공통 접두 없음 → 인식 명사(마지막)로 폴백
   assert.equal(commonBaseName(['nav-button', 'button-primary']), 'Button');
   assert.equal(commonBaseName(['primary-button', 'secondary-button']), 'Button');
+});
+
+test('commonBaseName — 맥락 접두 제거(컴포넌트 이름은 자리와 무관)', () => {
+  // 리네임이 붙인 {맥락}-{역할} 이름이 균일하면 공통 접두 = 전체라 예전엔 맥락이 박혔다.
+  assert.equal(commonBaseName(['article-avatar', 'article-avatar', 'article-avatar']), 'Avatar');
+  assert.equal(commonBaseName(['article-status', 'article-status']), 'Status');
+  assert.equal(commonBaseName(['signup-button', 'signup-button']), 'Button');
+  assert.equal(commonBaseName(['list-article-thumbnail', 'list-article-thumbnail']), 'Thumbnail'); // 다단 맥락
+  // 단독 등록 경로(code.ts)도 같은 함수를 탄다.
+  assert.equal(commonBaseName(['article-avatar']), 'Avatar');
+  // 앞 토막도 컴포넌트 명사면 복합 명사일 수 있어 보존한다.
+  assert.equal(commonBaseName(['nav-button', 'nav-button']), 'NavButton');
+  assert.equal(commonBaseName(['card-header', 'card-header']), 'CardHeader');
+  assert.equal(commonBaseName(['header-icon', 'header-icon']), 'HeaderIcon');
+  // 말단이 역할 어휘가 아니면 손대지 않는다(임의 이름 보존 — 기존 동작).
+  assert.equal(commonBaseName(['row-container', 'row-container']), 'RowContainer');
+  assert.equal(commonBaseName(['button-large', 'button-large']), 'ButtonLarge');
+  assert.equal(commonBaseName(['Frame 12']), 'Frame12');
+});
+
+test('componentBaseName — 리네임이 남긴 역할(dsRole)이 머리명사를 정한다', () => {
+  const mk = (name, role) => ({ id: name + (role ?? ''), name, type: 'FRAME', role });
+  // 이름만으로는 못 떼던 것들 — 맥락도 컴포넌트 명사인 경우.
+  assert.equal(componentBaseName([mk('card-thumbnail', 'thumbnail')]), 'Thumbnail');
+  assert.equal(componentBaseName([mk('item-avatar', 'avatar')]), 'Avatar');
+  assert.equal(componentBaseName([mk('field-input', 'input')]), 'Input');
+  assert.equal(componentBaseName([mk('modal-button', 'button')]), 'Button');
+  assert.equal(componentBaseName([mk('header-icon', 'icon')]), 'Icon');
+  assert.equal(componentBaseName([mk('progress-indicator', 'indicator')]), 'Indicator');
+  // 머리가 컴포넌트 명사가 아니어서 이름 규칙이 손대지 못했던 것도 역할로 해결된다.
+  assert.equal(componentBaseName([mk('list-article', 'article')]), 'Article');
+  assert.equal(componentBaseName([mk('page-main', 'main')]), 'Main');
+  // 기록 없음(사람이 지은 이름) → 이름 기반 폴백. nav-button은 복합 명사로 보존.
+  assert.equal(componentBaseName([mk('nav-button')]), 'NavButton');
+  assert.equal(componentBaseName([mk('article-avatar')]), 'Avatar');
+  // 같은 nav-button이라도 리네임이 지은 것이면(역할 기록) 역할이 이긴다 — 이름만으론 구분 불가한 지점.
+  assert.equal(componentBaseName([mk('nav-button', 'button')]), 'Button');
+  // 멤버 3개 전원 동일 역할 → 신뢰.
+  assert.equal(
+    componentBaseName([mk('article-avatar', 'avatar'), mk('article-avatar', 'avatar'), mk('article-avatar', 'avatar')]),
+    'Avatar',
+  );
+});
+
+test('componentBaseName — 낡은 기록은 무시(이름 말단 불일치·역할 분열)', () => {
+  const mk = (name, role) => ({ id: name + (role ?? ''), name, type: 'FRAME', role });
+  // 리네임 뒤 사람이 이름을 바꿨다 → 기록보다 사람의 이름이 우선.
+  assert.equal(componentBaseName([mk('PrimaryCta', 'button')]), 'PrimaryCta');
+  assert.equal(componentBaseName([mk('like-heart', 'icon')]), 'LikeHeart');
+  // 멤버끼리 역할이 갈리면 신뢰하지 않는다.
+  assert.equal(componentBaseName([mk('nav-button', 'button'), mk('nav-button', 'chip')]), 'NavButton');
+  // 한쪽만 기록이 있으면 신뢰하지 않는다.
+  assert.equal(componentBaseName([mk('nav-button', 'button'), mk('nav-button')]), 'NavButton');
+});
+
+test('resolveGroupNames — 맥락 붕괴로 겹치면 맥락을 되살려 구분', () => {
+  const g = (name, role, n = 1) =>
+    Array.from({ length: n }, (_, i) => ({ id: `${name}${i}`, name, type: 'FRAME', role }));
+  // 회귀: 둘 다 Avatar가 되면 「분류」가 무관한 컴포넌트를 한 세트로 병합한다.
+  assert.deepEqual(
+    resolveGroupNames([g('article-avatar', 'avatar', 3), g('profile-avatar', 'avatar', 2)]),
+    ['ArticleAvatar', 'ProfileAvatar'],
+  );
+  // 겹치지 않으면 맥락을 뗀 이름 그대로.
+  assert.deepEqual(
+    resolveGroupNames([g('article-avatar', 'avatar', 3), g('signup-button', 'button', 2)]),
+    ['Avatar', 'Button'],
+  );
+  // 3개 이상 충돌도 전부 구분.
+  assert.deepEqual(
+    resolveGroupNames([g('article-avatar', 'avatar'), g('profile-avatar', 'avatar'), g('header-avatar', 'avatar')]),
+    ['ArticleAvatar', 'ProfileAvatar', 'HeaderAvatar'],
+  );
+  // 맥락을 되살려도 같으면(kebab 정규화가 같은 경우) 마지막 수단으로 숫자.
+  assert.deepEqual(
+    resolveGroupNames([g('Article Avatar', 'avatar'), g('article-avatar', 'avatar')]),
+    ['ArticleAvatar', 'ArticleAvatar2'],
+  );
+  // 단독 그룹 하나만 있으면 충돌 없음.
+  assert.deepEqual(resolveGroupNames([g('article-avatar', 'avatar')]), ['Avatar']);
 });
 
 test('groupByExactName — 정확한 이름끼리만 묶음(머리명사 병합 안 함)', () => {
