@@ -1408,6 +1408,13 @@ function goToCreate(): void {
   ($('btnCreate') as HTMLButtonElement).focus();
 }
 
+/** 적용 탭 → 텍스트 스타일 등록 카드로(토큰 생성 카드와 구분). */
+function goToTextStyle(): void {
+  showTab('tokens');
+  $('tsCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  ($('btnTextStyles') as HTMLButtonElement).focus();
+}
+
 /* ---------- 진행 안내 파이프라인(§3) ---------- */
 
 /** 단계 클릭 → 해당 단계 카드/탭으로 이동. */
@@ -2063,8 +2070,11 @@ window.onmessage = (event: MessageEvent) => {
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
       // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
+      // 텍스트 스타일은 등록(만들기)·적용(적용 탭)이  alike feature라 양쪽 상태줄에 띄운다.
       const statusId = PREMIUM_STATUS_ID[msg.feature] ?? 'createStatus';
-      setStatus(statusId, t('premium.required', { message: msg.message, feature: msg.feature }), 'warn');
+      const msgText = t('premium.required', { message: msg.message, feature: msg.feature });
+      setStatus(statusId, msgText, 'warn');
+      if (msg.feature === 'textStyles') setStatus('tsApplyStatus', msgText, 'warn');
       break;
     }
     case 'REQUEST_VERIFY':
@@ -2932,8 +2942,9 @@ send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_PREREQ' }); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
 
-// #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
+// #11: 전제 안내 바로가기 — 토큰 생성 / 텍스트 스타일 등록.
 document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
+document.querySelectorAll<HTMLButtonElement>('[data-goto="textStyle"]').forEach((b) => b.addEventListener('click', goToTextStyle));
 
 /* ---------- 탭 내비게이션 (UI 개편 + UX8 키보드) ---------- */
 const TABS = ['wizard', 'tokens', 'apply', 'settings'] as const;
