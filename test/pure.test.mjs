@@ -29,8 +29,9 @@ import {
   normalizeLegacyTier,
   normalizeLicenseCache,
   evaluateLicense,
-  parseVerifyResponse,
   cacheFromVerify,
+  extractSignedToken,
+  pickInstanceId,
   REVERIFY_MS,
   GRACE_MS,
   base64UrlToString,
@@ -57,6 +58,12 @@ import {
   extractNameProps,
   distinguishingTokens,
   deriveVariants,
+  highConfidenceComponentRole,
+  isHighConfidenceComponent,
+  shouldCollapseToProperties,
+  inferVaryingComponentProperties,
+  pickCollapseMasterIndex,
+  propValuesFromStruct,
   colorAxisLabels,
   commonBaseName,
   clusterTextStyles,
@@ -83,6 +90,19 @@ import {
   suggestTokenRoles,
   pipelineSteps,
   t,
+  parseVarValue,
+  displayVarValue,
+  validateVarName,
+  sanitizeScopes,
+  scopesForTypeList,
+  aliasSelfReference,
+  findAliasReferers,
+  hexToOklch,
+  darkValueForLight,
+  darkGlobalName,
+  isDarkGlobalName,
+  DARK_L_MIN,
+  DARK_L_MAX,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -333,13 +353,31 @@ test('evaluateLicense — 오프라인 grace 유지 후 강등', () => {
   );
 });
 
-test('parseVerifyResponse — 성공/실패/형식오류', () => {
-  const ok = parseVerifyResponse({ valid: true, tier: 'paid', expiresAt: 123 });
-  assert.deepEqual(ok, { ok: true, tier: 'paid', expiresAt: 123 });
-  assert.equal(parseVerifyResponse({ valid: false, error: '만료됨' }).error, '만료됨');
-  assert.equal(parseVerifyResponse({ tier: 'gold', expiresAt: 1 }).ok, false); // 알 수 없는 티어
-  assert.equal(parseVerifyResponse({ valid: true, tier: 'paid' }).ok, false); // 만료시각 없음
-  assert.equal(parseVerifyResponse('nope').ok, false);
+test('extractSignedToken — 서명 토큰만 수용(평문 응답은 페이월 우회라 거부)', () => {
+  assert.deepEqual(extractSignedToken({ token: 'a.b.c' }), { ok: true, token: 'a.b.c' });
+  // 서명 없는 평문 성공 응답을 절대 통과시키면 안 된다.
+  assert.equal(extractSignedToken({ valid: true, tier: 'paid', expiresAt: 9e12 }).ok, false);
+  assert.equal(extractSignedToken({ token: '' }).ok, false);
+  // 서버가 명시적으로 거부한 사유는 그대로 전달(만료·기기 한도 등) — 실패는 실패로 두되 문구만 살린다.
+  assert.deepEqual(extractSignedToken({ valid: false, error: '구독이 만료되었습니다.' }), {
+    ok: false,
+    error: '구독이 만료되었습니다.',
+  });
+  // 사유가 있어도 절대 성공으로 승격되지 않는다.
+  assert.equal(extractSignedToken({ valid: false, error: '한도 초과', tier: 'paid' }).ok, false);
+  // valid:true인데 토큰이 없으면 여전히 거부(페일오픈 방지) — error가 있어도 마찬가지.
+  assert.equal(extractSignedToken({ valid: true, tier: 'paid', error: '무시' }).ok, false);
+  assert.equal(extractSignedToken({ token: 123 }).ok, false);
+  assert.equal(extractSignedToken(null).ok, false);
+  assert.equal(extractSignedToken('nope').ok, false);
+});
+
+test('pickInstanceId — 응답값 우선, 없으면 기존 유지', () => {
+  assert.equal(pickInstanceId({ instanceId: 'new' }, 'old'), 'new');
+  assert.equal(pickInstanceId({}, 'old'), 'old');
+  assert.equal(pickInstanceId({ instanceId: '' }, 'old'), 'old');
+  assert.equal(pickInstanceId({ instanceId: 7 }, 'old'), 'old');
+  assert.equal(pickInstanceId(null, undefined), undefined);
 });
 
 test('cacheFromVerify — 응답+키+now → 캐시', () => {
@@ -394,7 +432,7 @@ test('validateLicenseClaims — 만료·iss·aud·tier', () => {
   assert.equal(validateLicenseClaims({ tier: 'paid' }, now).ok, false); // exp 없음
 });
 
-/* ================= presets.ts (M3 Team) ================= */
+/* ================= presets.ts (M3 Paid) ================= */
 test('serializePreset / parsePreset — 라운드트립 + 검증', () => {
   const p = { name: 'mobile', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: { surface: 'color/neutral/50' } };
   const round = parsePreset(serializePreset(p));
@@ -548,75 +586,414 @@ test('formatVariant — 속성명 정렬', () => {
   assert.equal(formatVariant({ type: 'primary', state: 'hover' }), 'state=hover, type=primary');
 });
 
-test('scanComponentCandidates(#1) — 영향(FRAME/GROUP)+조상만, 잠금/인스턴스/텍스트 제외', () => {
-  // page(FRAME) > card(FRAME, 잠금) ... 실제로는: root(FRAME) > [text, btn(FRAME), inst(INSTANCE), grp(GROUP, 잠금)]
+test('highConfidenceComponentRole — button/chip/card/list/field/nav/progress/figure(+heading은 별도)', () => {
+  const solid = [{ type: 'SOLID', visible: true }];
+  const txt = (id) => ({ id, name: 't', type: 'TEXT', characters: 'x' });
+  // button
+  const btn = {
+    id: 'b', name: 'Frame', type: 'FRAME', layoutMode: 'HORIZONTAL', cornerRadius: 8,
+    width: 120, height: 40, fills: solid, children: [txt('bt')],
+  };
+  assert.equal(highConfidenceComponentRole(btn), 'button');
+  assert.equal(isHighConfidenceComponent(btn), true);
+  // chip (작은 알약)
+  const chip = {
+    id: 'c', name: 'Frame', type: 'FRAME', layoutMode: 'HORIZONTAL', cornerRadius: 12,
+    width: 60, height: 24, fills: solid, children: [txt('ct')],
+  };
+  assert.equal(highConfidenceComponentRole(chip), 'chip');
+  // card
+  const card = {
+    id: 'cd', name: 'Frame', type: 'FRAME', cornerRadius: 12, fills: solid,
+    children: [txt('a'), { id: 'v', name: 'Vector', type: 'VECTOR' }],
+  };
+  assert.equal(highConfidenceComponentRole(card), 'card');
+  // list
+  const row = (id) => ({ id, name: id, type: 'FRAME', width: 200, height: 40, children: [txt(id + 't')] });
+  const list = {
+    id: 'L', name: 'Frame', type: 'FRAME', layoutMode: 'VERTICAL',
+    children: [row('r1'), row('r2'), row('r3')],
+  };
+  assert.equal(highConfidenceComponentRole(list), 'list');
+  // field
+  const input = {
+    id: 'in', name: 'in', type: 'FRAME', width: 200, height: 36,
+    strokes: solid, fills: solid,
+  };
+  const field = {
+    id: 'f', name: 'Frame', type: 'FRAME', layoutMode: 'VERTICAL',
+    children: [txt('lb'), input],
+  };
+  assert.equal(highConfidenceComponentRole(field), 'field');
+  // nav
+  const link = (id) => ({ id, name: id, type: 'FRAME', width: 60, height: 32, children: [txt(id + 't')] });
+  const nav = {
+    id: 'n', name: 'Frame', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 400, height: 40,
+    children: [link('l1'), link('l2'), link('l3')],
+  };
+  assert.equal(highConfidenceComponentRole(nav), 'nav');
+  // progress
+  const bar = { id: 'bar', name: 'bar', type: 'RECTANGLE', width: 80, height: 8, fills: solid };
+  const progress = {
+    id: 'p', name: 'Frame', type: 'FRAME', width: 200, height: 8, cornerRadius: 4, fills: solid,
+    children: [bar],
+  };
+  assert.equal(highConfidenceComponentRole(progress), 'progress');
+  // figure
+  const img = { id: 'im', name: 'im', type: 'RECTANGLE', width: 100, height: 80, fills: [{ type: 'IMAGE', visible: true }] };
+  const figure = { id: 'fg', name: 'Frame', type: 'FRAME', children: [img, txt('cap')] };
+  assert.equal(highConfidenceComponentRole(figure), 'figure');
+  // 일반 컨테이너는 null
+  const box = { id: 'x', name: 'Frame 12', type: 'FRAME', children: [txt('a'), txt('b')] };
+  assert.equal(highConfidenceComponentRole(box), null);
+  assert.equal(isHighConfidenceComponent(box), false);
+});
+
+test('highConfidenceComponentRole — heading(빡센 슬롯, 액션 optional)', () => {
+  const txt = (id, name = 'Label') => ({ id, name, type: 'TEXT', characters: name });
+  const num = {
+    id: 'num', name: 'Num', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 80, height: 24,
+    children: [txt('nl', 'Label'), txt('c1', 'count'), txt('c2', 'count')],
+  };
+  // Label + Num (buttonGroup 없음)
+  const h1 = {
+    id: 'h1', name: 'heading', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 800, height: 40,
+    children: [txt('t1'), num],
+  };
+  assert.equal(highConfidenceComponentRole(h1), 'heading');
+  // Label + buttonGroup + Num
+  const h2 = {
+    id: 'h2', name: 'heading', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 800, height: 40,
+    children: [
+      txt('t2'),
+      { id: 'bg', name: 'buttonGroup', type: 'INSTANCE' },
+      { ...num, id: 'num2' },
+    ],
+  };
+  assert.equal(highConfidenceComponentRole(h2), 'heading');
+  // 이름만 heading — 구조 없으면 null
+  assert.equal(highConfidenceComponentRole({
+    id: 'n', name: 'heading', type: 'FRAME', children: [{ id: 'v', type: 'VECTOR' }],
+  }), null);
+  // 높이 큰 섹션
+  assert.equal(highConfidenceComponentRole({
+    id: 'sec', name: 'heading', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 800, height: 200,
+    children: [txt('t')],
+  }), null);
+  // 채움+라운드면 heading 게이트 탈락(button/card 등 상위 역할로 가거나 null)
+  const solid = [{ type: 'SOLID', visible: true }];
+  assert.notEqual(highConfidenceComponentRole({
+    id: 'cd', name: 'heading', type: 'FRAME', layoutMode: 'HORIZONTAL', cornerRadius: 12, fills: solid,
+    width: 400, height: 40, children: [txt('a'), { id: 'v', type: 'VECTOR' }],
+  }), 'heading');
+  // Table 인스턴스 형제면 화이트리스트 밖
+  assert.equal(highConfidenceComponentRole({
+    id: 'bad', name: 'heading', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 800, height: 40,
+    children: [txt('t'), { id: 'tbl', name: 'Table', type: 'INSTANCE' }, { id: 'extra', type: 'RECTANGLE', width: 10, height: 10 }],
+  }), null);
+});
+
+test('scanComponentCandidates(#1) — heading은 eligible', () => {
+  const heading = {
+    id: 'h', name: 'heading', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 600, height: 36,
+    children: [
+      { id: 't', name: 'Label', type: 'TEXT', characters: '제목' },
+      {
+        id: 'num', name: 'Num', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 60, height: 20,
+        children: [
+          { id: 'c1', name: 'count', type: 'TEXT', characters: '1' },
+          { id: 'c2', name: 'count', type: 'TEXT', characters: '1' },
+        ],
+      },
+    ],
+  };
+  const root = { id: 'r', name: 'sec', type: 'FRAME', children: [heading] };
+  const out = scanComponentCandidates([root]);
+  assert.equal(out.find((c) => c.id === 'h')?.eligible, true);
+});
+
+test('scanComponentCandidates(#1) — 고신뢰만 eligible, 잠금/인스턴스/텍스트 제외', () => {
+  const solid = [{ type: 'SOLID', visible: true }];
   const text = { id: 't', name: 'Label', type: 'TEXT' };
   const icon = { id: 'i', name: 'Vector', type: 'VECTOR' };
-  const btn = { id: 'b', name: 'btn', type: 'FRAME', children: [icon] }; // eligible
-  const inst = { id: 'in', name: 'Inst', type: 'INSTANCE' }; // 제외
-  const lockedGrp = { id: 'g', name: 'grp', type: 'GROUP', locked: true }; // 잠금 → 제외
-  const root = { id: 'r', name: 'root', type: 'FRAME', children: [text, btn, inst, lockedGrp] }; // eligible
+  const btn = {
+    id: 'b', name: 'btn', type: 'FRAME', layoutMode: 'HORIZONTAL', cornerRadius: 8,
+    width: 100, height: 36, fills: solid, children: [{ id: 'bt', name: 't', type: 'TEXT' }],
+  };
+  const bare = { id: 'bare', name: 'Frame 9', type: 'FRAME', children: [icon] }; // 고신뢰 아님
+  const inst = { id: 'in', name: 'Inst', type: 'INSTANCE' };
+  const lockedGrp = { id: 'g', name: 'grp', type: 'GROUP', locked: true };
+  const root = { id: 'r', name: 'root', type: 'FRAME', children: [text, btn, bare, inst, lockedGrp] };
 
   const out = scanComponentCandidates([root]);
   const byId = new Map(out.map((c) => [c.id, c]));
-
-  // 유지: root(컨테이너 맥락) + btn(eligible). icon은 비-eligible 말단이지만 btn의 자식이라 잡음 → 제외.
   assert.deepEqual(out.map((c) => c.id).sort(), ['b', 'r']);
-  // 단일 선택의 최상위(컨테이너)는 등록 대상 제외 → eligible=false(회색 맥락).
-  assert.equal(byId.get('r').eligible, false);
+  assert.equal(byId.get('r').eligible, false); // 단일 선택 컨테이너
   assert.equal(byId.get('b').eligible, true);
-  // 계층 보존
-  assert.equal(byId.get('r').parentId, null);
-  assert.equal(byId.get('r').depth, 0);
-  assert.equal(byId.get('b').parentId, 'r');
-  assert.equal(byId.get('b').depth, 1);
+  assert.equal(byId.has('bare'), false);
+});
+
+test('scanComponentCandidates(#1) — 숨김(visible=false) 프레임은 후보·하위 스캔 제외', () => {
+  const solid = [{ type: 'SOLID', visible: true }];
+  const mkBtn = (id, visible) => ({
+    id, name: id, type: 'FRAME', layoutMode: 'HORIZONTAL', cornerRadius: 8,
+    width: 80, height: 32, fills: solid, visible,
+    children: [{ id: id + 't', name: 't', type: 'TEXT' }],
+  });
+  const shown = mkBtn('shown', true);
+  const hidden = mkBtn('hid', false);
+  // 숨긴 부모 안의 ‘보이는’ 자식도 실효 비가시 → 스캔 안 함
+  const nested = mkBtn('nest', true);
+  const hiddenWrap = { id: 'wrap', name: 'wrap', type: 'FRAME', visible: false, children: [nested] };
+  const root = { id: 'r', name: 'root', type: 'FRAME', children: [shown, hidden, hiddenWrap] };
+
+  const out = scanComponentCandidates([root]);
+  const ids = out.map((c) => c.id).sort();
+  assert.deepEqual(ids, ['r', 'shown']);
+  assert.equal(out.find((c) => c.id === 'shown').eligible, true);
+  assert.equal(out.some((c) => c.id === 'hid' || c.id === 'nest' || c.id === 'wrap'), false);
+});
+
+test('scanComponentCandidates(#1) — INSTANCE/COMPONENT/SET 안은 서브트리째 스킵', () => {
+  const solid = [{ type: 'SOLID', visible: true }];
+  const mkBtn = (id) => ({
+    id, name: id, type: 'FRAME', layoutMode: 'HORIZONTAL', cornerRadius: 8,
+    width: 80, height: 32, fills: solid, children: [{ id: id + 't', name: 't', type: 'TEXT' }],
+  });
+  const nested = mkBtn('nest'); // 인스턴스 안 — 고신뢰여도 스킵
+  const inst = { id: 'in', name: 'Button', type: 'INSTANCE', children: [nested] };
+  const mainInner = mkBtn('mi');
+  const main = { id: 'mc', name: 'Icon/Primary', type: 'COMPONENT', children: [mainInner] };
+  const setKid = mkBtn('sk');
+  const set = { id: 'cs', name: 'Row', type: 'COMPONENT_SET', children: [setKid] };
+  const free = mkBtn('free');
+  const root = { id: 'r', name: 'page', type: 'FRAME', children: [inst, main, set, free] };
+
+  const out = scanComponentCandidates([root]);
+  const ids = out.map((c) => c.id).sort();
+  assert.deepEqual(ids, ['free', 'r']);
+  assert.equal(out.find((c) => c.id === 'free').eligible, true);
 });
 
 test('scanComponentCandidates(#1) — 깊은 eligible의 조상 체인은 맥락으로 보존', () => {
-  // 엄격 필터: 깊은 노드도 인식된 컴포넌트명('card')이라야 eligible.
-  const deep = { id: 'd', name: 'card', type: 'FRAME' }; // eligible(깊음·컴포넌트명)
-  const mid = { id: 'm', name: 'mid', type: 'GROUP', locked: true, children: [deep] }; // 잠금(비-eligible)이지만 조상
-  const top = { id: 'top', name: 'top', type: 'TEXT', children: [mid] }; // 텍스트(비-eligible)이지만 조상
+  const solid = [{ type: 'SOLID', visible: true }];
+  const deep = {
+    id: 'd', name: 'card', type: 'FRAME', cornerRadius: 12, fills: solid,
+    children: [
+      { id: 'dt', name: 't', type: 'TEXT' },
+      { id: 'dv', name: 'v', type: 'VECTOR' },
+    ],
+  };
+  const mid = { id: 'm', name: 'mid', type: 'GROUP', locked: true, children: [deep] };
+  const top = { id: 'top', name: 'top', type: 'TEXT', children: [mid] };
 
   const out = scanComponentCandidates([top]);
-  // deep이 eligible이라 그 조상(top, mid)도 맥락으로 유지
   assert.deepEqual(out.map((c) => c.id), ['top', 'm', 'd']);
   assert.equal(out.find((c) => c.id === 'd').eligible, true);
   assert.equal(out.find((c) => c.id === 'm').eligible, false);
   assert.equal(out.find((c) => c.id === 'top').eligible, false);
 });
 
-test('scanComponentCandidates(#1) — 게이트 없음: 모든 FRAME/GROUP이 eligible(임의 이름 포함)', () => {
-  const btn = { id: 'b', name: 'btn', type: 'FRAME' };
-  const blob = { id: 'x', name: 'Frame 12', type: 'FRAME' }; // 임의 이름도 이제 eligible
-  const wrap = { id: 'w', name: 'row-container', type: 'FRAME' }; // 명사 사전에 없어도 eligible
-  const txt = { id: 't', name: 'Label', type: 'TEXT' }; // 텍스트는 비-eligible(프레임/그룹 아님)
+test('scanComponentCandidates(#1) — 고신뢰 게이트: 임의/container 프레임은 eligible 아님', () => {
+  const solid = [{ type: 'SOLID', visible: true }];
+  const btn = {
+    id: 'b', name: 'btn', type: 'FRAME', layoutMode: 'HORIZONTAL', cornerRadius: 8,
+    width: 100, height: 36, fills: solid, children: [{ id: 'bt', name: 't', type: 'TEXT' }],
+  };
+  const blob = { id: 'x', name: 'Frame 12', type: 'FRAME', children: [{ id: 'xv', name: 'v', type: 'VECTOR' }] };
+  const wrap = { id: 'w', name: 'row-container', type: 'FRAME', children: [{ id: 'wv', name: 'v', type: 'VECTOR' }] };
+  const txt = { id: 't', name: 'Label', type: 'TEXT' };
   const root = { id: 'r', name: 'root', type: 'FRAME', children: [btn, blob, wrap, txt] };
 
   const out = scanComponentCandidates([root]);
   const byId = new Map(out.map((c) => [c.id, c]));
   assert.equal(byId.get('b').eligible, true);
-  assert.equal(byId.get('x').eligible, true); // 임의 이름 프레임도 선택 가능
-  assert.equal(byId.get('w').eligible, true); // container/wrapper류도 후보
-  assert.equal(byId.has('t'), false); // 텍스트는 후보 아님(비-eligible + 비-조상 → 제외)
+  assert.equal(byId.has('x'), false); // 임의 프레임 — 고신뢰 아님
+  assert.equal(byId.has('w'), false); // container류 — 고신뢰 아님
+  assert.equal(byId.has('t'), false);
 });
 
 test('scanComponentCandidates(#1) — 단일 선택 컨테이너 제외 vs 다중 선택 루트 포함', () => {
-  const childA = { id: 'a', name: 'btn', type: 'FRAME' };
-  const childB = { id: 'b', name: 'btn', type: 'FRAME' };
+  const solid = [{ type: 'SOLID', visible: true }];
+  const mkBtn = (id) => ({
+    id, name: 'btn', type: 'FRAME', layoutMode: 'HORIZONTAL', cornerRadius: 8,
+    width: 80, height: 32, fills: solid, children: [{ id: id + 't', name: 't', type: 'TEXT' }],
+  });
+  const childA = mkBtn('a');
+  const childB = mkBtn('b');
   const container = { id: 'box', name: 'box', type: 'FRAME', children: [childA, childB] };
 
-  // 단일 선택: 컨테이너(box)는 등록 대상 아님 → eligible=false, 자식만 eligible.
   const single = scanComponentCandidates([container]);
   const sById = new Map(single.map((c) => [c.id, c]));
   assert.equal(sById.get('box').eligible, false);
   assert.equal(sById.get('a').eligible, true);
   assert.equal(sById.get('b').eligible, true);
 
-  // 다중 선택: 선택 각각이 등록 단위 → 최상위도 eligible.
   const multi = scanComponentCandidates([childA, childB]);
   assert.equal(multi.find((c) => c.id === 'a').eligible, true);
   assert.equal(multi.find((c) => c.id === 'b').eligible, true);
+});
+
+test('shouldCollapseToProperties — 텍스트/스왑/불리언만 다르면 접힘, 구조·크기만은 세트', () => {
+  const mkBtn = (id, opts = {}) => ({
+    id,
+    name: 'button',
+    type: 'FRAME',
+    layoutMode: 'HORIZONTAL',
+    width: opts.width ?? 100,
+    height: opts.height ?? 36,
+    fillHex: opts.fillHex ?? '#111111',
+    children: [
+      {
+        id: id + '-t',
+        name: 'label',
+        type: 'TEXT',
+        characters: opts.text ?? 'OK',
+      },
+      {
+        id: id + '-i',
+        name: 'icon',
+        type: 'INSTANCE',
+        mainComponentKey: opts.icon ?? 'icon-a',
+        children: [],
+      },
+      {
+        id: id + '-b',
+        name: 'badge?',
+        type: 'FRAME',
+        visible: opts.badge ?? true,
+        children: [],
+      },
+    ],
+  });
+
+  // 텍스트만 다름 → 접힘
+  assert.equal(shouldCollapseToProperties([mkBtn('a', { text: '확인' }), mkBtn('b', { text: '취소' })]), true);
+  // 아이콘 스왑만 → 접힘
+  assert.equal(shouldCollapseToProperties([mkBtn('a', { icon: 'a' }), mkBtn('b', { icon: 'b' })]), true);
+  // badge? 가시성만 → 접힘
+  assert.equal(shouldCollapseToProperties([mkBtn('a', { badge: true }), mkBtn('b', { badge: false })]), true);
+  // 완전 동일 → 접힘(단품+인스턴스)
+  assert.equal(shouldCollapseToProperties([mkBtn('a'), mkBtn('b')]), true);
+  // 텍스트+크기(오토레이아웃) → 접힘
+  assert.equal(
+    shouldCollapseToProperties([mkBtn('a', { text: 'OK', width: 80 }), mkBtn('b', { text: '확인합니다', width: 160 })]),
+    true,
+  );
+  // 크기만 다름(카피 동일) → 세트
+  assert.equal(shouldCollapseToProperties([mkBtn('a', { width: 80 }), mkBtn('b', { width: 160 })]), false);
+  // fill 다름 → 세트
+  assert.equal(shouldCollapseToProperties([mkBtn('a', { fillHex: '#111' }), mkBtn('b', { fillHex: '#f00' })]), false);
+  // 자식 구성 다름 → 세트
+  const noIcon = {
+    id: 'x',
+    name: 'button',
+    type: 'FRAME',
+    layoutMode: 'HORIZONTAL',
+    width: 100,
+    height: 36,
+    fillHex: '#111111',
+    children: [{ id: 'xt', name: 'label', type: 'TEXT', characters: 'OK' }],
+  };
+  assert.equal(shouldCollapseToProperties([mkBtn('a'), noIcon]), false);
+  // 멤버 1개 → false
+  assert.equal(shouldCollapseToProperties([mkBtn('a')]), false);
+  // TEXT 레이어명이 카피마다 달라도(확인/취소) 같은 슬롯 → 접힘
+  const named = (id, text) => ({
+    id,
+    name: 'button',
+    type: 'FRAME',
+    layoutMode: 'HORIZONTAL',
+    width: 100,
+    height: 36,
+    fillHex: '#111111',
+    children: [{ id: id + '-t', name: text, type: 'TEXT', characters: text }],
+  });
+  assert.equal(shouldCollapseToProperties([named('a', '확인'), named('b', '취소')]), true);
+});
+
+test('shouldCollapseToProperties — heading 액션(buttonGroup) optional이면 접힘', () => {
+  const txt = (id, chars) => ({ id, name: 'Label', type: 'TEXT', characters: chars });
+  const num = (id, n) => ({
+    id, name: 'Num', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 60, height: 24,
+    children: [
+      { id: id + 'c1', name: 'count', type: 'TEXT', characters: String(n) },
+      { id: id + 'c2', name: 'count', type: 'TEXT', characters: String(n) },
+    ],
+  });
+  const without = {
+    id: 'h1', name: 'heading', type: 'FRAME', layoutMode: 'HORIZONTAL',
+    width: 800, height: 40,
+    children: [txt('t1', '제목'), num('n1', 1)],
+  };
+  const withAction = {
+    id: 'h2', name: 'heading', type: 'FRAME', layoutMode: 'HORIZONTAL',
+    width: 800, height: 40,
+    children: [
+      txt('t2', '다른제목'),
+      { id: 'bg', name: 'buttonGroup', type: 'INSTANCE', mainComponentKey: 'bg-key' },
+      num('n2', 2),
+    ],
+  };
+  assert.equal(shouldCollapseToProperties([without, withAction]), true);
+  assert.equal(pickCollapseMasterIndex([without, withAction]), 1);
+
+  const plan = inferVaryingComponentProperties([without, withAction]);
+  assert.ok(plan.some((p) => p.type === 'BOOLEAN' && p.headingSlot?.kind === 'action'));
+  assert.ok(plan.some((p) => p.type === 'TEXT')); // 제목·count 차이
+  const valsNo = propValuesFromStruct(without, plan);
+  const valsYes = propValuesFromStruct(withAction, plan);
+  const boolProp = plan.find((p) => p.type === 'BOOLEAN');
+  assert.equal(valsNo[boolProp.propName], false);
+  assert.equal(valsYes[boolProp.propName], true);
+
+  // 버튼 아이콘 결손은 여전히 세트(heading 아님)
+  const mkBtn = (id, kids) => ({
+    id, name: 'button', type: 'FRAME', layoutMode: 'HORIZONTAL',
+    width: 100, height: 36, fillHex: '#111111', children: kids,
+  });
+  assert.equal(shouldCollapseToProperties([
+    mkBtn('a', [
+      { id: 'at', name: 'label', type: 'TEXT', characters: 'OK' },
+      { id: 'ai', name: 'icon', type: 'INSTANCE', mainComponentKey: 'i' },
+    ]),
+    mkBtn('b', [{ id: 'bt', name: 'label', type: 'TEXT', characters: 'OK' }]),
+  ]), false);
+});
+
+test('inferVaryingComponentProperties — 다른 텍스트 슬롯만 TEXT 속성 1개', () => {
+  const mk = (id, label, shared = '공통') => ({
+    id,
+    name: 'button',
+    type: 'FRAME',
+    layoutMode: 'HORIZONTAL',
+    children: [
+      { id: id + '-s', name: 'hint', type: 'TEXT', characters: shared },
+      { id: id + '-t', name: label, type: 'TEXT', characters: label },
+    ],
+  });
+  const plan = inferVaryingComponentProperties([mk('a', '확인'), mk('b', '취소')]);
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].type, 'TEXT');
+  assert.equal(plan[0].propName, 'Text'); // 레이어명=카피 → 중립 Text
+  assert.equal(plan[0].layerPath, '1'); // 두 번째 자식(다른 라벨)
+  // 공통 hint는 속성에 없음
+  assert.ok(!plan.some((p) => p.layerPath === '0'));
+});
+
+test('inferVaryingComponentProperties — 두 슬롯 모두 다르면 TEXT 2개', () => {
+  const mk = (id, a, b) => ({
+    id,
+    name: 'card',
+    type: 'FRAME',
+    children: [
+      { id: id + '-a', name: 'title', type: 'TEXT', characters: a },
+      { id: id + '-b', name: 'body', type: 'TEXT', characters: b },
+    ],
+  });
+  const plan = inferVaryingComponentProperties([mk('a', 'A1', 'B1'), mk('b', 'A2', 'B2')]);
+  assert.equal(plan.length, 2);
+  assert.deepEqual(plan.map((p) => p.propName).sort(), ['Body', 'Title']);
 });
 
 test('recognizeComponentName — 마지막 명사 우선(접두어는 맥락)', () => {
@@ -806,19 +1183,46 @@ test('variantGrid — 1속성은 한 축, 속성 없으면 한 줄', () => {
 
 test('inferComponentProperties — 레이어 → 속성 계획(Phase 4.1)', () => {
   const plan = inferComponentProperties([
-    { name: 'label', type: 'TEXT' },
+    { name: 'label', type: 'TEXT', characters: 'A' },
     { name: 'icon', type: 'INSTANCE' },
     { name: 'badge?', type: 'FRAME' }, // 가시성 토글
-    { name: 'label', type: 'TEXT' }, // 이름 충돌 → -2
+    { name: 'label', type: 'TEXT', characters: 'B' }, // 동명·다른 카피 → Label-2
   ]);
   assert.deepEqual(plan, [
-    { propName: 'Label', type: 'TEXT', layerName: 'label', field: 'characters' },
-    { propName: 'Icon', type: 'INSTANCE_SWAP', layerName: 'icon', field: 'mainComponent' },
-    { propName: 'Badge', type: 'BOOLEAN', layerName: 'badge?', field: 'visible' },
-    { propName: 'Label-2', type: 'TEXT', layerName: 'label', field: 'characters' },
+    { propName: 'Label', type: 'TEXT', layerName: 'label', layerPath: undefined, field: 'characters' },
+    { propName: 'Icon', type: 'INSTANCE_SWAP', layerName: 'icon', layerPath: undefined, field: 'mainComponent' },
+    { propName: 'Badge', type: 'BOOLEAN', layerName: 'badge?', layerPath: undefined, field: 'visible' },
+    { propName: 'Label-2', type: 'TEXT', layerName: 'label', layerPath: undefined, field: 'characters' },
   ]);
   // 텍스트가 ?로 끝나면 BOOLEAN 우선
   assert.equal(inferComponentProperties([{ name: 'caption?', type: 'TEXT' }])[0].type, 'BOOLEAN');
+});
+
+test('inferComponentProperties — 동명·동일 카피 TEXT는 속성 1개만(Count/Count-2 고아 방지)', () => {
+  const plan = inferComponentProperties([
+    { name: 'Label', type: 'TEXT', path: '0', characters: '전체' },
+    { name: 'Count', type: 'TEXT', path: '1', characters: '1' },
+    { name: 'Count', type: 'TEXT', path: '2', characters: '1' }, // 동일 카피 → 스킵
+  ]);
+  assert.equal(plan.length, 2);
+  assert.deepEqual(plan.map((p) => p.propName), ['Label', 'Count']);
+  assert.equal(plan[1].layerPath, '1'); // 첫 Count만
+});
+
+test('inferVaryingComponentProperties — 이름? TEXT도 BOOLEAN 우선(전체 노출과 동일)', () => {
+  const mk = (id, visible) => ({
+    id,
+    name: 'chip',
+    type: 'FRAME',
+    children: [
+      { id: id + '-b', name: 'badge?', type: 'TEXT', characters: 'N', visible },
+    ],
+  });
+  const plan = inferVaryingComponentProperties([mk('a', true), mk('b', false)]);
+  assert.equal(plan.length, 1);
+  assert.equal(plan[0].type, 'BOOLEAN');
+  assert.equal(plan[0].propName, 'Badge');
+  assert.equal(plan[0].field, 'visible');
 });
 
 test('missingVariants — 베리언트 자식 이름에서 빠진 조합(Phase 4)', () => {
@@ -1228,4 +1632,115 @@ test('rampToSpecs — 기본 램프에 패밀리 주입', () => {
   assert.ok(specs.length >= 6);
   assert.ok(specs.every((s) => s.family === 'Pretendard'));
   assert.ok(specs.some((s) => s.name === 'body' && s.fontSize === 16));
+});
+
+/* ---------- 변수 편집기(R1)·다크 테마 생성(R2) 순수 헬퍼 ---------- */
+
+test('parseVarValue — 타입별 파싱/검증', () => {
+  // COLOR
+  assert.deepEqual(parseVarValue('COLOR', '#ffffff'), { ok: true, value: { r: 1, g: 1, b: 1 } });
+  assert.deepEqual(parseVarValue('COLOR', '000000'), { ok: true, value: { r: 0, g: 0, b: 0 } });
+  assert.equal(parseVarValue('COLOR', 'nope').ok, false);
+  assert.equal(parseVarValue('COLOR', '#fff').ok, false); // 3자리 거부
+  // FLOAT
+  assert.deepEqual(parseVarValue('FLOAT', '16'), { ok: true, value: 16 });
+  assert.deepEqual(parseVarValue('FLOAT', '-1.5'), { ok: true, value: -1.5 });
+  assert.equal(parseVarValue('FLOAT', '').ok, false);
+  assert.equal(parseVarValue('FLOAT', 'abc').ok, false);
+  // STRING
+  assert.deepEqual(parseVarValue('STRING', 'Inter'), { ok: true, value: 'Inter' });
+  assert.deepEqual(parseVarValue('STRING', '  Inter  '), { ok: true, value: 'Inter' }); // 앞뒤 공백 트림
+  assert.equal(parseVarValue('STRING', '   ').ok, false);
+  // BOOLEAN
+  assert.deepEqual(parseVarValue('BOOLEAN', 'true'), { ok: true, value: true });
+  assert.deepEqual(parseVarValue('BOOLEAN', 'FALSE'), { ok: true, value: false });
+  assert.equal(parseVarValue('BOOLEAN', 'yes').ok, false);
+});
+
+test('displayVarValue — 색은 hex, 그 외 문자열', () => {
+  assert.equal(displayVarValue('COLOR', { r: 1, g: 1, b: 1 }), '#ffffff');
+  assert.equal(displayVarValue('FLOAT', 16), '16');
+  assert.equal(displayVarValue('STRING', 'Inter'), 'Inter');
+});
+
+test('validateVarName — 빈 이름·중복 거부', () => {
+  assert.equal(validateVarName('surface', ['bg', 'text']), null);
+  assert.match(validateVarName('', []), /이름/);
+  assert.match(validateVarName('  ', []), /이름/);
+  assert.match(validateVarName('bg', ['bg', 'text']), /중복|이름/);
+});
+
+test('sanitizeScopes — 타입 무효 스코프 제거 + 중복 제거', () => {
+  // COLOR에 FLOAT 전용 스코프(GAP)는 제거, 중복은 1개로
+  const out = sanitizeScopes(['ALL_FILLS', 'GAP', 'ALL_FILLS', 'STROKE_COLOR'], 'COLOR');
+  assert.deepEqual(out.sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+});
+
+test('scopesForTypeList — 타입별 유효 스코프 노출', () => {
+  const color = scopesForTypeList('COLOR');
+  assert.ok(color.includes('ALL_FILLS'));
+  assert.ok(!color.includes('GAP')); // FLOAT 전용
+  const float = scopesForTypeList('FLOAT');
+  assert.ok(float.includes('GAP'));
+  assert.ok(!float.includes('TEXT_FILL'));
+});
+
+test('aliasSelfReference — 자기참조만 차단', () => {
+  assert.equal(aliasSelfReference('a', 'a'), true);
+  assert.equal(aliasSelfReference('a', 'b'), false);
+});
+
+test('findAliasReferers — varId를 별칭하는 변수 수집(자기 제외, R2-C)', () => {
+  const vars = [
+    { id: 'g1', name: 'color/blue/500', values: { m: { kind: 'literal' } } },
+    { id: 's1', name: 'primary', values: { m: { kind: 'alias', aliasId: 'g1' } } },
+    { id: 's2', name: 'surface', values: { light: { kind: 'alias', aliasId: 'g1' }, dark: { kind: 'literal' } } },
+    { id: 's3', name: 'text', values: { m: { kind: 'alias', aliasId: 'other' } } },
+  ];
+  const refs = findAliasReferers('g1', vars);
+  assert.deepEqual(refs.map((r) => r.name).sort(), ['primary', 'surface']);
+  // 어느 모드든 한 번이라도 별칭하면 1회만(중복 없음)
+  assert.equal(refs.length, 2);
+  assert.deepEqual(findAliasReferers('none', vars), []);
+});
+
+test('darkValueForLight — OKLCH 명도 반전(밝음↔어두움)', () => {
+  // 흰색 → 어두운 색(L 낮아짐), 검정 → 밝은 색(L 높아짐)
+  const fromWhite = hexToOklch(darkValueForLight('#ffffff'));
+  const fromBlack = hexToOklch(darkValueForLight('#000000'));
+  assert.ok(fromWhite.l < 0.5, `흰색 반전 L=${fromWhite.l}`);
+  assert.ok(fromBlack.l > 0.5, `검정 반전 L=${fromBlack.l}`);
+  // 유효 hex 반환
+  assert.match(darkValueForLight('#2563eb'), /^#[0-9a-f]{6}$/);
+  // hue 보존(유채색) — 파랑 계열 유지
+  const lightH = hexToOklch('#2563eb').h;
+  const darkH = hexToOklch(darkValueForLight('#2563eb')).h;
+  assert.ok(Math.abs(lightH - darkH) < 15, `hue 보존 ${lightH}→${darkH}`);
+});
+
+test('darkValueForLight — 밝은 표면 위계가 검정으로 붕괴하지 않는다', () => {
+  // 단순 1-L이면 L>0.94 구간이 sRGB에서 전부 #000000이 되어 surface/surface-2가 한 색이 된다.
+  // 대역 압축 후에는 회색 램프 전체가 서로 다른 색으로 남아야 한다.
+  const ramp = ['#ffffff', '#f8f9fa', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#6c757d', '#495057', '#343a40', '#212529', '#000000'];
+  const darks = ramp.map(darkValueForLight);
+  assert.equal(new Set(darks).size, ramp.length, `붕괴: ${darks.join(' ')}`);
+  assert.ok(!darks.includes('#000000'), `순수 검정 표면 생성: ${darks.join(' ')}`);
+  // 라이트가 어두워질수록 다크는 밝아진다(반전) — 순서 뒤집힘 없이 단조.
+  const ls = darks.map((h) => hexToOklch(h).l);
+  for (let i = 1; i < ls.length; i++) {
+    assert.ok(ls[i] > ls[i - 1], `단조 위반 ${ramp[i - 1]}→${ramp[i]}: ${ls[i - 1]} → ${ls[i]}`);
+  }
+  // 결과 L은 다크 대역 안(게멋 클램프는 c만 줄이므로 L은 그대로).
+  // 여유 0.005는 hex 8비트 양자화 왕복 오차(예: L 0.97 → #f5f5f5 → 0.97015) 몫.
+  const eps = 0.005;
+  for (const l of ls) assert.ok(l >= DARK_L_MIN - eps && l <= DARK_L_MAX + eps, `대역 이탈 L=${l}`);
+});
+
+test('darkGlobalName — dark/ 그룹 접두 · 멱등', () => {
+  assert.equal(darkGlobalName('color/blue/500'), 'dark/color/blue/500');
+  // 다크 모드를 출처로 재실행해도 dark/dark/…가 생기지 않는다.
+  assert.equal(darkGlobalName('dark/color/blue/500'), 'dark/color/blue/500');
+  assert.equal(darkGlobalName(darkGlobalName('color/blue/500')), 'dark/color/blue/500');
+  assert.equal(isDarkGlobalName('dark/color/blue/500'), true);
+  assert.equal(isDarkGlobalName('color/blue/500'), false);
 });

@@ -2,22 +2,24 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, ComponentCandidate } from './shared/messages';
-import type { DraftToken } from './lib/tokens';
+import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList } from './lib/tokens';
 import { t } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
-import { type Tier } from './lib/entitlements';
-import { parseVerifyResponse, type VerifyResult } from './lib/license';
+import { type Tier, type Feature } from './lib/entitlements';
+import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
-import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK } from './lib/licenseConfig';
+import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import type { ExportFormat } from './lib/exporters';
+import type { FrameMeta } from './lib/similar';
+import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles } from './lib/roles';
 import { pipelineSteps, type StepStatus } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
-import type { WcagLevel } from './lib/contrast';
+import type { WcagLevel, ContrastFinding } from './lib/contrast';
 import { planWizard, summarize, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
@@ -34,7 +36,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
 let tokens: DraftToken[] = [];
 let presets: Preset[] = [];
 let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
-let teamDataRequested = false;
+let paidDataRequested = false;
 // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
 let hasGlobal = false;
 let hasBindable = false;
@@ -49,7 +51,12 @@ let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호�
    같은 mount를 다시 렌더하면 진행 중 청크를 취소(선택 변경·토글 시 잔상 방지). */
 const CHUNK = 150;
 const chunkPending = new WeakMap<HTMLElement, number>();
-function renderChunked<T>(mount: HTMLElement, items: T[], makeRow: (item: T, i: number) => Node): void {
+function renderChunked<T>(
+  mount: HTMLElement,
+  items: T[],
+  makeRow: (item: T, i: number) => Node,
+  onDone?: () => void, // 전체 행이 붙은 뒤 실행(높이 측정처럼 렌더 완료가 전제인 후처리)
+): void {
   const prev = chunkPending.get(mount);
   if (prev !== undefined) {
     cancelAnimationFrame(prev);
@@ -60,6 +67,7 @@ function renderChunked<T>(mount: HTMLElement, items: T[], makeRow: (item: T, i: 
     const frag = document.createDocumentFragment();
     items.forEach((it, i) => frag.appendChild(makeRow(it, i)));
     mount.appendChild(frag);
+    onDone?.();
     return;
   }
   let i = 0;
@@ -69,40 +77,77 @@ function renderChunked<T>(mount: HTMLElement, items: T[], makeRow: (item: T, i: 
     for (; i < end; i++) frag.appendChild(makeRow(items[i], i));
     mount.appendChild(frag);
     if (i < items.length) chunkPending.set(mount, requestAnimationFrame(step));
-    else chunkPending.delete(mount);
+    else {
+      chunkPending.delete(mount);
+      onDone?.();
+    }
   };
   chunkPending.set(mount, requestAnimationFrame(step));
 }
 
-/** 토큰 1행(스와치·이름 입력·카테고리). i는 tokens 인덱스(이름 편집 반영용). */
-function makeTokenRow(t: DraftToken, i: number): HTMLElement {
+/**
+ * 목록 마운트를 비운다 — **진행 중인 청크를 먼저 취소**한다.
+ *
+ * `innerHTML = ''`만 하면 rAF에 예약된 다음 청크가 그대로 살아나 이미 무효가 된 행을 계속
+ * 붙인다(2000노드 미리보기 중 선택을 바꾸면 안내 문구 아래로 수천 행이 다시 쌓였다).
+ * 예전엔 테두리도 개수 줄도 없어 눈에 덜 띄었지만, 이제 렌더 완료 후 layoutList가 돌아
+ * 그 유령 행을 기준으로 테두리·높이·‘총 n개’까지 붙는다 — 취소가 필수가 됐다.
+ */
+function clearMount(mount: HTMLElement): void {
+  const prev = chunkPending.get(mount);
+  if (prev !== undefined) {
+    cancelAnimationFrame(prev);
+    chunkPending.delete(mount);
+  }
+  mount.innerHTML = '';
+}
+
+/** 타입 칩 안의 단위 표기 — 칩이 88px 고정 폭이라 낱말 대신 기호로 줄인다
+    (`letterSpacing·percent` 106px → `letterSpacing·%` 81px). 온전한 표기는 칩 title에 남는다.
+    추출이 실제로 만드는 비-px 단위는 percent뿐이고(lineHeight·letterSpacing), 나머지는 대비용. */
+const UNIT_CHIP: Record<Unit, string> = { px: 'px', percent: '%', em: 'em', rem: 'rem', ratio: '×' };
+
+/**
+ * 토큰 1행(스와치·이름 입력·타입 칩).
+ * 이름 편집은 넘겨받은 토큰 객체를 그대로 고친다 — 목록은 `tokens`를 필터한 배열이라
+ * 행 인덱스가 `tokens` 인덱스와 어긋난다(색 토큰이 앞에 있으면 남의 이름을 덮어썼다).
+ */
+function makeTokenRow(t: DraftToken): HTMLElement {
   const row = document.createElement('div');
   row.className = 'tk';
 
   const sw = document.createElement('span');
-  if ((t.category === 'color' || t.category === 'effectColor') && typeof t.value === 'string') {
-    sw.className = 'swatch';
+  sw.className = 'tk-gutter'; // 스와치 없는 행은 CSS가 폭 0으로 접는다(#tokenList.has-swatch 참고)
+  // 색 토큰은 renderTokens가 걸러내 여기 오지 않는다(색은 위 ‘색 정리’ 표 담당) → effectColor만.
+  if (t.category === 'effectColor' && typeof t.value === 'string') {
+    sw.classList.add('swatch');
     sw.style.background = t.value;
   }
   row.appendChild(sw);
 
+  // 좁은 패널에서는 긴 이름(예: font-family/…)이 입력칸 폭을 넘겨 앞부분만 보인다.
+  // 입력칸은 편집 대상이라 말줄임을 못 쓰므로 전체 이름을 title로 항상 읽을 수 있게 둔다.
   const input = document.createElement('input');
   input.value = t.name;
+  input.title = t.name;
   input.addEventListener('input', () => {
-    tokens[i].name = input.value;
+    t.name = input.value;
+    input.title = input.value;
   });
   row.appendChild(input);
 
   const cat = document.createElement('span');
   cat.className = 'cat';
-  cat.textContent = t.unit && t.unit !== 'px' ? `${t.category}·${t.unit}` : t.category;
+  cat.textContent = t.unit && t.unit !== 'px' ? `${t.category}·${UNIT_CHIP[t.unit]}` : t.category;
+  // 칩은 좁으니 값·Figma 변수 타입은 title로 — 이름만으로 구분 안 되는 토큰(fontFamily 등) 확인용.
+  cat.title = `${t.category}${t.unit ? ` · ${t.unit}` : ''} · ${resolvedTypeForToken(t)} · ${t.value}`;
   row.appendChild(cat);
   return row;
 }
 
 /** 공통 빈 상태 — 가운데 굵은 헤드라인 + 안내 + (선택) 비활성 버튼. 캐논 108:2 패턴. */
 function renderEmptyState(box: HTMLElement, title: string, guide: string, actionLabel?: string): void {
-  box.innerHTML = '';
+  clearMount(box); // 진행 중이던 청크가 안내 문구 아래로 계속 쌓이지 않게
   const wrap = document.createElement('div');
   wrap.className = 'empty-state';
   const t = document.createElement('div');
@@ -128,15 +173,144 @@ let colorRevealed = false;
 let previewRevealed = false;
 let lastTidy: { before: number; after: number; merged: number } = { before: 0, after: 0, merged: 0 };
 let pendingCreatePreview = false; // ‘미리보기’가 추출을 유발했을 때, 추출 후 생성 미리보기 전송
+/**
+ * 스크롤되는 목록 하나의 배선. 행 클래스가 목록마다 다르므로(.tk · .crow · .tree-row …)
+ * 셀렉터를 함께 받는다. 새 목록을 채택하려면 마운트에 class="list-region"을 주고,
+ * 아래 ‘더 보기’ 줄(.list-more) 마크업을 붙인 뒤 LIST_REGIONS에 한 줄 추가하면 된다.
+ */
+interface ListRegion {
+  /** 목록 마운트 요소 id */
+  mount: string;
+  /** 행 셀렉터 — 이 목록에서 ‘한 행’으로 셀 요소 */
+  row: string;
+  /** 마운트의 형제인 ‘총 n개 중 m개 표시’ 줄 id */
+  more: string;
+  /** 개수 문구 span id */
+  count: string;
+  /** 펼치기/접기 버튼 id */
+  expand: string;
+  /**
+   * 스크롤포트 상단을 덮는 고정 헤더 셀렉터(표 목록만). 헤더가 가린 만큼은 행을 놓을 수 없으니
+   * 높이 계산에서 빼고 스냅 위치도 그만큼 내린다. 없으면 0 — div 목록의 계산은 그대로다.
+   */
+  stickyHead?: string;
+}
+
+const LIST_REGIONS: ListRegion[] = [
+  { mount: 'tokenList', row: '.tk', more: 'tokenListMore', count: 'tokenListCount', expand: 'btnTokenListExpand' },
+  { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
+  { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
+  { mount: 'contrastList', row: '.cfind', more: 'contrastListMore', count: 'contrastListCount', expand: 'btnContrastListExpand' },
+  { mount: 'similarList', row: '.simrow', more: 'similarListMore', count: 'similarListCount', expand: 'btnSimilarListExpand' },
+  { mount: 'varList', row: '.vrow', more: 'varListMore', count: 'varListCount', expand: 'btnVarListExpand' },
+  // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
+  // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
+  { mount: 'bindTree', row: '.tree-row', more: 'bindTreeMore', count: 'bindTreeCount', expand: 'btnBindTreeExpand' },
+  { mount: 'diff', row: '.tree-row', more: 'diffMore', count: 'diffCount', expand: 'btnDiffExpand' },
+  { mount: 'compTree', row: '.tree-row', more: 'compTreeMore', count: 'compTreeCount', expand: 'btnCompTreeExpand' },
+  // 텍스트 스타일 표 — 마운트는 표를 감싼 래퍼다(표 박스는 스크롤 컨테이너가 못 된다).
+  // 행은 tbody의 tr만(thead의 헤더 행이 한 행으로 세어지면 개수와 행 높이가 둘 다 틀어진다).
+  { mount: 'tsList', row: 'tbody tr', more: 'tsListMore', count: 'tsListCount', expand: 'btnTsListExpand', stickyHead: 'thead' },
+];
+
+// ‘모두 펼치기’로 상한을 푼 목록의 마운트 id. 목록별로 따로 기억해야 한 목록을 펼친 게
+// 다른 목록까지 펼치지 않는다. 행이 사라지면(빈 상태) 해제 — 다음 렌더가 펼친 채 시작하지 않게.
+const listExpanded = new Set<string>();
+
+/**
+ * 목록의 스크롤 영역 높이를 **행 높이의 정수배로 내림 맞춤**하고, 가려진 개수를 알린다.
+ *
+ * CSS 상한(패널 높이 비례)이 행 높이와 맞을 이유가 없어 마지막 행이 늘 반쯤 잘린 채 끝났고,
+ * 경계선·스크롤바도 없어서 "미리보기가 잘려 변수명과 타입이 안 보인다"로 읽혔다.
+ * 보이는 행은 항상 온전한 행이 되게 하고, 남은 개수와 ‘모두 펼치기’를 목록 아래에 붙인다.
+ * 행이 붙은 뒤(렌더 완료)와 패널 리사이즈 후에 호출해야 측정이 맞는다.
+ */
+function layoutList(r: ListRegion): void {
+  // 아직 마크업이 없는 목록이 배선에 올라와 있어도 전체가 죽지 않게 개별로 건너뛴다.
+  const box = document.getElementById(r.mount);
+  const more = document.getElementById(r.more);
+  const label = document.getElementById(r.count);
+  const btn = document.getElementById(r.expand);
+  if (!box || !more || !label || !btn) return;
+  const expanded = listExpanded.has(r.mount);
+  box.style.height = ''; // 이전 스냅 해제 — 상한/내용을 다시 재야 한다
+  const rows = box.querySelectorAll(r.row);
+  if (!rows.length) {
+    listExpanded.delete(r.mount);
+    box.classList.remove('framed', 'scrolls', 'expanded'); // 안내 문구만 있을 땐 테두리 없이
+    more.style.display = 'none';
+    return;
+  }
+  box.classList.add('framed');
+  box.classList.toggle('expanded', expanded);
+  box.classList.toggle('scrolls', !expanded);
+  if (expanded) {
+    more.style.display = '';
+    label.textContent = `총 ${rows.length}개 모두 표시`;
+    btn.textContent = '접기';
+    return;
+  }
+  // offsetHeight는 정수로 반올림돼 행 높이가 소수(30.67px)면 어긋난다 → 실측 소수 높이 사용.
+  const rowH = rows[0].getBoundingClientRect().height;
+  if (!rowH || box.scrollHeight <= box.clientHeight + 1) {
+    more.style.display = 'none'; // 상한에 안 걸림 — 이미 전부 보인다
+    return;
+  }
+  const cs = getComputedStyle(box);
+  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  // 표 목록의 고정 헤더는 스크롤포트 상단을 늘 덮고 있어 그만큼은 행이 보일 수 없다.
+  // 빼지 않으면 스크롤포트만 정수배가 되고 ‘헤더 아래 남는 영역’은 정수배가 아니라
+  // 어느 위치에서든 한 행이 헤더에 반쯤 가린다. 스냅 위치도 헤더 아래로 내려야 한다.
+  const head = r.stickyHead ? box.querySelector(r.stickyHead) : null;
+  const headH = head ? head.getBoundingClientRect().height : 0;
+  box.style.scrollPaddingTop = headH ? `${headH}px` : '';
+  const shown = Math.max(1, Math.floor((box.clientHeight - padY - headH) / rowH));
+  // box-sizing:border-box라 height에 테두리까지 포함된다. 보정을 빼먹으면 그만큼(2px)
+  // 마지막 행이 다시 잘린다. 소수 높이는 올림해 잘림 대신 미세한 여백이 남게 한다.
+  // (offsetHeight−clientHeight는 테두리 + 가로 스크롤바 높이라, 가로로도 스크롤하는
+  //  표 목록에서 스크롤바가 먹는 높이까지 같이 흡수된다.)
+  const borderY = box.offsetHeight - box.clientHeight;
+  box.style.height = `${Math.ceil(shown * rowH + headH) + padY + borderY}px`; // 반쪽 행 제거
+  more.style.display = '';
+  label.textContent = `총 ${rows.length}개 중 ${shown}개 표시 — 스크롤하거나`;
+  btn.textContent = '모두 펼치기';
+}
+
+/** 마운트 id로 재계산 — renderChunked의 onDone에 그대로 넘기려고 얇게 감쌌다. */
+function layoutListBy(mountId: string): void {
+  const r = LIST_REGIONS.find((x) => x.mount === mountId);
+  if (r) layoutList(r);
+}
+
+/** 등록된 목록 전부 재계산 — 리사이즈·카드 펼침처럼 여러 목록이 한 번에 영향받을 때. */
+function layoutAllLists(): void {
+  for (const r of LIST_REGIONS) layoutList(r);
+}
+
+// 펼치기 버튼 배선은 배열을 돌며 한 번에 — 목록을 추가해도 핸들러를 따로 달 필요가 없다.
+for (const r of LIST_REGIONS) {
+  const btn = document.getElementById(r.expand);
+  if (!btn) continue;
+  btn.addEventListener('click', () => {
+    if (listExpanded.has(r.mount)) listExpanded.delete(r.mount);
+    else listExpanded.add(r.mount);
+    layoutList(r);
+  });
+}
+
 // ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만.
 function renderTokens(): void {
   const box = $('tokenList');
+  const others = tokens.filter((t) => t.category !== 'color');
+  // 카드 제목의 개수 — 목록이 접혀 있어도 몇 개가 생성 대상인지 먼저 알린다.
+  $('createCount').textContent = others.length ? `· 색 외 ${others.length}개` : '';
   const showHint = (msg: string): void => {
-    box.innerHTML = '';
+    clearMount(box); // 진행 중이던 청크가 안내 문구 아래로 계속 쌓이지 않게
     const hint = document.createElement('div');
     hint.className = 'hint';
     hint.textContent = msg;
     box.appendChild(hint);
+    layoutListBy('tokenList'); // 행이 없으니 경계·개수 줄을 걷어낸다
   };
   if (!tokens.length) {
     showHint(lastSelCount > 0
@@ -148,12 +322,13 @@ function renderTokens(): void {
     showHint('‘미리보기’를 누르면 생성할 색 외 토큰(간격·크기·폰트·효과)이 표시됩니다.');
     return;
   }
-  const others = tokens.filter((t) => t.category !== 'color');
   if (!others.length) {
     showHint('색 외 토큰이 없습니다(색만 추출됨).');
     return;
   }
-  renderChunked(box, others, makeTokenRow); // §4: 대량 추출도 비차단
+  // 스와치가 실제로 쓰이는 목록에서만 14px 거터를 유지(그 외엔 이름 폭으로 넘긴다).
+  box.classList.toggle('has-swatch', others.some((o) => o.category === 'effectColor' && typeof o.value === 'string'));
+  renderChunked(box, others, makeTokenRow, () => layoutListBy('tokenList')); // §4: 대량 추출도 비차단
 }
 
 /* ---------- 0 · 브랜드 팔레트 ---------- */
@@ -239,9 +414,15 @@ function renderColorTable(): void {
   const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
   if (!colorRevealed || !colors.length) {
     card.style.display = 'none'; // 색은 ‘선택에서 토큰 추출’(colorRevealed) 후에만 노출
+    $('colorCount').textContent = '';
+    // 옛 행을 남겨 두면 다음 추출이 색 0개일 때 테두리·‘총 n개’ 줄이 실제와 어긋난 채 되살아난다.
+    $('colorTable').innerHTML = '';
+    layoutListBy('colorTable'); // 행이 없으니 경계·개수 줄을 걷어낸다
     return;
   }
   card.style.display = '';
+  // 카드 제목의 개수 — 표가 상한에 걸려 일부만 보여도 정리 대상 색이 몇 개인지 먼저 알린다.
+  $('colorCount').textContent = `· 색 ${colors.length}개`;
   // 현 semMap을 역할→이름으로 읽어 이름→역할로 뒤집어 prefill.
   const roleByName = new Map<string, string>();
   for (const [role, name] of Object.entries(textToSemanticMap(($('semMap') as HTMLTextAreaElement).value))) {
@@ -264,7 +445,7 @@ function renderColorTable(): void {
     role.dataset.name = t.name;
     row.append(sw, name, role);
     return row;
-  });
+  }, () => layoutListBy('colorTable')); // 행이 다 붙은 뒤라야 행 높이 측정이 맞는다
 }
 
 /** 색 편집표의 역할 입력 → 시맨틱 매핑 textarea로 반영(역할=이름). */
@@ -405,6 +586,24 @@ $('btnCreateApply').addEventListener('click', () => {
   send({ type: 'CREATE_TOKENS', tokens, base }); // 확인 후 실제 적용
 });
 
+// base는 비-px 값(rem·%·em)을 px로 환산하는 기준이라 미리보기 결과가 base에 따라 달라진다.
+// 미리보기를 본 뒤 base만 바꾸면 옛 기준 요약이 남은 채 ‘적용’이 새 base로 실행돼 어긋나므로,
+// 즉시 ‘적용’을 감추고 새 base로 미리보기를 다시 돌린다(미리보기는 변수를 만들지 않는 읽기).
+let basePreviewTimer = 0;
+($('base') as HTMLInputElement).addEventListener('input', () => {
+  const applyBtn = $('btnCreateApply') as HTMLButtonElement;
+  if (applyBtn.style.display === 'none') return; // 아직 미리보기 전 — 무효화할 결과가 없음
+  applyBtn.style.display = 'none';
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
+  setStatus('createStatus', t('create.baseChanged', { base }), '');
+  clearTimeout(basePreviewTimer);
+  basePreviewTimer = window.setTimeout(() => {
+    if (!tokens.length) return;
+    createFrom = 'tokens';
+    send({ type: 'CREATE_TOKENS', tokens, base: Number(($('base') as HTMLInputElement).value) || 16, preview: true });
+  }, 350); // 타이핑 중 매 키마다 보내지 않도록
+});
+
 $('btnColorRoles').addEventListener('click', applyColorRoles); // #3 색 편집표 → 시맨틱 매핑
 
 $('btnScanGlobals').addEventListener('click', () => {
@@ -478,7 +677,11 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   const del = document.createElement('button');
   del.textContent = '✕';
   del.title = '행 삭제';
-  del.addEventListener('click', () => tr.remove());
+  // 행이 줄면 상한·개수 문구도 같이 줄어야 한다(안 하면 ‘총 40개 중 8개’가 남아 거짓말이 된다).
+  del.addEventListener('click', () => {
+    tr.remove();
+    layoutListBy('tsList');
+  });
   tdDel.appendChild(del);
   tr.appendChild(tdDel);
   return tr;
@@ -488,6 +691,7 @@ function renderTextStyleRows(specs: TextStyleSpec[], locked = false): void {
   const tbody = $('tsRows');
   tbody.innerHTML = '';
   for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
+  layoutListBy('tsList'); // 행이 붙은 뒤에 재야 행 높이·상한이 맞는다
 }
 
 /** 표 → 스펙. 폰트 패밀리는 행별 폰트 셀에서 읽는다(비면 DEFAULT_TS_FAMILY). */
@@ -514,9 +718,13 @@ function readTextStyleRows(): TextStyleSpec[] {
 
 $('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
 $('btnTsAddRow').addEventListener('click', () => {
-  $('tsRows').appendChild(
-    textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' }),
-  );
+  const tr = textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
+  $('tsRows').appendChild(tr);
+  layoutListBy('tsList');
+  // 표가 상한에 걸린 뒤로는 새 행이 스크롤 밖에 생겨 "행 추가를 눌렀는데 아무 일도 없다"로 보인다.
+  // 추가한 행으로 데려가고 이름 칸에 커서를 둔다(어차피 다음 동작은 이름 입력).
+  tr.scrollIntoView({ block: 'nearest' });
+  (tr.querySelector('input[data-field="name"]') as HTMLInputElement | null)?.focus();
 });
 $('btnTextStyles').addEventListener('click', () => {
   const styles = readTextStyleRows();
@@ -569,6 +777,10 @@ $('btnPreview').addEventListener('click', () => {
 $('btnContrast').addEventListener('click', () => {
   const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
   setStatus('contrastStatus', t('contrast.checking'), '');
+  // 지난 결과를 비운다 — 검사가 ERROR로 끝나면 결과는 그대로 남는데 아래 개수 줄이
+  // ‘총 n개 중 m개 표시’로 남아 지난 회차 수치를 이번 결과인 양 단언한다.
+  $('contrastList').innerHTML = '';
+  layoutListBy('contrastList');
   send({ type: 'CHECK_CONTRAST', level });
 });
 
@@ -695,7 +907,7 @@ async function runWizard(): Promise<void> {
     contrast: ($('wizOptContrast') as HTMLInputElement).checked,
     componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
   };
-  const ctx: WizardContext = { isPro: isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
+  const ctx: WizardContext = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
   const plan = planWizard(options, ctx);
 
   wizardRunning = true;
@@ -792,7 +1004,9 @@ $('btnWizardRun').addEventListener('click', () => void runWizard());
 $('btnWizardCancel').addEventListener('click', () => send({ type: 'CANCEL' }));
 
 // 개발용 강제 티어 토글 — 개발 빌드에서만 노출/동작(배포 빌드 백도어 차단).
+// HTML은 기본 display:none(배포 안전). dev 빌드에서만 여기서 노출한다.
 if (__DEV__) {
+  $('devTierRow').style.display = '';
   $('tier').addEventListener('change', () => {
     send({ type: 'SET_LICENSE', tier: ($('tier') as HTMLSelectElement).value as Tier });
   });
@@ -835,29 +1049,33 @@ async function subtleVerify(signingInput: string, signatureB64: string, alg: str
 /** 검증 서버 호출 + 서명/클레임 검증 → 결과를 code로 보고(code가 캐시·적용).
  *  instanceId: 이전 활성화에서 받아 캐시에 보관한 기기 식별자(있으면 같은 기기로 validate). */
 async function verifyAndReport(key: string, instanceId?: string): Promise<void> {
-  let result: VerifyResult;
+  let json: unknown;
   try {
     const resp = await fetch(VERIFY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, pluginId: PLUGIN_ID, instanceId }),
     });
-    const json: unknown = await resp.json();
-    // 서명 토큰({ token }) 우선, 없으면 평문 응답(개발/하위호환).
-    const signed = !!json && typeof json === 'object' && typeof (json as { token?: unknown }).token === 'string';
-    const parsed = signed
-      ? await verifyLicenseToken((json as { token: string }).token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify)
-      : parseVerifyResponse(json);
-    // 서버가 돌려준 기기 instanceId를 보관(다음 재검증 때 같은 기기로 validate). 없으면 기존 값 유지.
-    const respInstanceId =
-      !!json && typeof json === 'object' && typeof (json as { instanceId?: unknown }).instanceId === 'string'
-        ? (json as { instanceId: string }).instanceId
-        : instanceId;
-    result = parsed.ok
-      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: respInstanceId }
-      : { ok: false, error: parsed.error };
+    // 네트워크 도달 이후의 실패는 '오프라인'이 아니다 — grace 유지로 페일오픈되지 않게 여기서부터 분리한다.
+    json = await resp.json().catch(() => null);
   } catch {
-    result = { ok: false, error: '검증 서버 연결 실패(오프라인)', offline: true };
+    // fetch 자체 실패(DNS·연결·CORS)만 오프라인 → 기존 캐시를 grace로 유지.
+    send({ type: 'LICENSE_VERIFIED', key, result: { ok: false, error: '검증 서버 연결 실패(오프라인)', offline: true } });
+    return;
+  }
+
+  let result: VerifyResult;
+  try {
+    // 서명 토큰(JWT)만 신뢰한다 — 서명 없는 평문 응답은 페이월 우회 경로라 수용하지 않는다(M2.1).
+    const ext = extractSignedToken(json);
+    if (!ext.ok) throw new Error(ext.error);
+    const parsed = await verifyLicenseToken(ext.token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify);
+    result = parsed.ok
+      ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: pickInstanceId(json, instanceId) }
+      : { ok: false, error: parsed.error };
+  } catch (e) {
+    // 서명·클레임·응답 형식 오류 → offline 아님(검증 실패로 확정 처리).
+    result = { ok: false, error: `검증 실패: ${e instanceof Error ? e.message : String(e)}` };
   }
   send({ type: 'LICENSE_VERIFIED', key, result });
 }
@@ -876,15 +1094,36 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
 }
 
 /* ---------- 유료(Paid) 기능 게이트 ----------
-   Free/Paid 2티어. Paid에서 해금: 토큰 생성(적용)·시맨틱·텍스트 스타일·컴포넌트/베리언트·공유 프리셋.
-   Free: 팔레트·추출·토큰 미리보기·바인딩·리네임·명도 대비·내보내기. */
+   Free/Paid 2티어. Paid에서 해금: 팔레트·토큰 생성(미리보기+적용)·시맨틱·텍스트 스타일·
+   컴포넌트/베리언트·공유 프리셋.
+   Free: 추출·색 정리·바인딩·리네임·명도 대비·내보내기. */
 const PAID_LOCK = '🔒 Paid 전용';
+/** 유료 거부(PREMIUM_REQUIRED) 안내를 띄울 카드 — Feature별 상태 영역. */
+const PREMIUM_STATUS_ID: Record<Feature, string> = {
+  tokens: 'createStatus',
+  semantics: 'semStatus',
+  components: 'componentStatus',
+  textStyles: 'tsStatus',
+  presets: 'presetStatus',
+};
 const PRESET_FIELDS = [
   'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
 ];
-const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
+// btnScanSimilar(스캔)은 읽기 전용이라 Free — 잠그는 건 실제로 문서를 바꾸는 btnComponentize뿐.
+const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnComponentize'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
-const PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, 'btnCreateApply', 'btnPaletteApply', 'btnTextStyles'];
+// 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
+// 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
+// btnApplyExistingText도 code 쪽에서 requireTextStyles로 막히지만, 전제 가드(등록된 스타일 유무)와
+// 결합돼 있어 여기 목록이 아니라 updateGates 아래에서 별도로 잠근다.
+const PAID_FIELDS = [
+  ...PRESET_FIELDS,
+  ...COMPONENT_FIELDS,
+  'btnPalette', 'btnPaletteApply',
+  'btnCreate', 'btnCreateApply',
+  'btnTextStyles',
+  'btnGenDark', // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
+];
 
 /**
  * 통합 게이트(#11·#12) — 유료 잠금(Paid)과 전제 미충족(Global/바인딩 변수 없음)을
@@ -892,11 +1131,18 @@ const PAID_FIELDS = [...PRESET_FIELDS, ...COMPONENT_FIELDS, 'btnCreateApply', 'b
  */
 function updateGates(): void {
   // 유료 잠금(#12) — Free는 유료 버튼을 클릭 전에 사전 비활성 + 🔒 배지(클릭-후-거부 방지).
-  for (const id of PAID_FIELDS) ($(id) as HTMLButtonElement).disabled = !isPaid;
-  for (const id of ['presetLock', 'componentLock', 'createLock', 'semLock', 'tsLock']) {
+  for (const id of PAID_FIELDS) {
+    const el = $(id) as HTMLButtonElement;
+    el.disabled = !isPaid;
+    setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
+  }
+  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
-  $('wizComponentLock').textContent = isPaid ? '' : '🔒 Paid';
+  // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가
+  // 방금 disabled를 티어만 보고 덮었으니, 모드 조건을 여기서 다시 적용해야 한다(순서 의존).
+  refreshDarkModes();
+  $('wizComponentLock').textContent = isPaid ? '' : PAID_LOCK;
   ($('wizOptComponentize') as HTMLInputElement).disabled = !isPaid;
 
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
@@ -906,11 +1152,19 @@ function updateGates(): void {
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
   // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
+  if (!isPaid) ($('btnApplyExistingText') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
 
-  if (isPaid && !teamDataRequested) {
-    teamDataRequested = true;
+  if (isPaid && !paidDataRequested) {
+    paidDataRequested = true;
     send({ type: 'GET_PRESETS' });
   }
+}
+
+/** 유료 잠금 사유를 툴팁으로. 원래 title(기능 설명)은 dataset에 1회 백업해 보존·복원한다. */
+function setLockTitle(el: HTMLElement, locked: boolean): void {
+  if (el.dataset.baseTitle === undefined) el.dataset.baseTitle = el.title;
+  const base = el.dataset.baseTitle;
+  el.title = locked ? (base ? `${base} · ${PAID_LOCK}` : PAID_LOCK) : base;
 }
 
 /** 전제 충족 여부로 버튼 활성/안내(+바로가기) 토글. */
@@ -982,10 +1236,126 @@ function renderPipeline(): void {
   });
 }
 
-/* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
+/* ---------- 컴포넌트 / 베리언트 (Phase 3, Paid) ---------- */
 $('btnScanComp').addEventListener('click', () => {
   setStatus('componentStatus', t('component.scanning'), '');
   send({ type: 'SCAN_COMPONENT_CANDIDATES' });
+});
+
+/* ---------- 변수 편집기 ---------- */
+// 마지막으로 받은 목록. 편집은 낙관적으로 반영하지 않고 EDIT_VARIABLE_RESULT로 되돌려받아 갱신한다
+// — figma가 이름을 정규화하거나 값을 거부할 수 있어서, 화면이 실제 상태와 어긋나면 안 된다.
+let allVars: VarInfo[] = [];
+
+/** 컬렉션/이름 필터를 적용한 목록. */
+function visibleVars(): VarInfo[] {
+  const col = ($('varFilterCol') as HTMLSelectElement).value;
+  const q = ($('varFilterText') as HTMLInputElement).value.trim().toLowerCase();
+  return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
+}
+
+function requestVars(): void {
+  setStatus('varEditStatus', '변수를 불러오는 중…', '');
+  send({ type: 'GET_VARIABLES' });
+}
+
+$('btnLoadVars').addEventListener('click', requestVars);
+$('varFilterCol').addEventListener('change', () => renderVars());
+$('varFilterText').addEventListener('input', () => renderVars());
+
+/* ---------- 다크 테마 생성 ---------- */
+// 다크 채우기는 컬렉션의 모드 2개(라이트→다크)를 고르는 게 전부라, 변수 목록에서 모드를 읽어 채운다.
+function refreshDarkOptions(): void {
+  const cols = new Map<string, VarInfo>();
+  for (const v of allVars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
+  const sel = $('darkCollection') as HTMLSelectElement;
+  const prev = sel.value;
+  sel.innerHTML = '';
+  for (const [id, v] of cols) {
+    const o = document.createElement('option');
+    o.value = id;
+    o.textContent = v.collection;
+    sel.appendChild(o);
+  }
+  if (prev && cols.has(prev)) sel.value = prev;
+  // 라이트/다크가 성립하려면 모드가 2개 이상이어야 한다. 이름순 첫 컬렉션(대개 단일 모드인
+  // Global)이 잡히면 카드가 열리자마자 막힌 것처럼 보이니, 실제로 쓸 수 있는 쪽을 기본으로.
+  const usable = [...cols.values()].find((v) => v.modes.length >= 2);
+  if (usable && (cols.get(sel.value)?.modes.length ?? 0) < 2) sel.value = usable.collectionId;
+  refreshDarkModes();
+}
+
+function refreshDarkModes(): void {
+  const colId = ($('darkCollection') as HTMLSelectElement).value;
+  const v = allVars.find((x) => x.collectionId === colId);
+  const modes = v ? v.modes : [];
+  for (const id of ['darkFromMode', 'darkToMode']) {
+    const sel = $(id) as HTMLSelectElement;
+    const prev = sel.value;
+    sel.innerHTML = '';
+    for (const m of modes) {
+      const o = document.createElement('option');
+      o.value = m.modeId;
+      o.textContent = m.name;
+      sel.appendChild(o);
+    }
+    if (prev && modes.some((m) => m.modeId === prev)) sel.value = prev;
+  }
+  // 모드가 2개 이상이어야 라이트→다크가 성립한다. 1개면 무엇을 눌러도 아무 일이 없으니 미리 막는다.
+  const ok = modes.length >= 2;
+  ($('btnGenDark') as HTMLButtonElement).disabled = !ok || !isPaid;
+  const notice = $('darkPrereq');
+  notice.style.display = ok ? 'none' : '';
+  const text = notice.querySelector('.prereq-text');
+  if (text) {
+    text.textContent = ok
+      ? ''
+      : modes.length
+        ? '이 컬렉션에 모드가 하나뿐이에요. Figma에서 다크 모드를 추가한 뒤 다시 시도하세요.'
+        : '먼저 토큰을 생성해 변수를 만드세요.';
+  }
+  // 모드가 2개 이상이면 서로 다른 모드가 기본으로 잡히게 — 같은 모드끼리면 덮어써도 의미가 없다.
+  if (modes.length >= 2 && ($('darkFromMode') as HTMLSelectElement).value === ($('darkToMode') as HTMLSelectElement).value) {
+    ($('darkToMode') as HTMLSelectElement).value = modes[1].modeId;
+  }
+}
+
+$('darkCollection').addEventListener('change', refreshDarkModes);
+
+$('btnGenDark').addEventListener('click', () => {
+  const collectionId = ($('darkCollection') as HTMLSelectElement).value;
+  const fromModeId = ($('darkFromMode') as HTMLSelectElement).value;
+  const toModeId = ($('darkToMode') as HTMLSelectElement).value;
+  if (!collectionId || !fromModeId || !toModeId) {
+    setStatus('darkStatus', '컬렉션과 모드를 고르세요.', 'warn');
+    return;
+  }
+  if (fromModeId === toModeId) {
+    setStatus('darkStatus', '라이트와 다크가 같은 모드예요. 다른 모드를 고르세요.', 'warn');
+    return;
+  }
+  setStatus('darkStatus', '다크 값을 채우는 중…', '');
+  send({ type: 'GENERATE_DARK_MODE', collectionId, fromModeId, toModeId });
+});
+
+/* ---------- 닮은 프레임 컴포넌트화 ---------- */
+// 스캔이 확정한 멤버(구조가 같은 최대 그룹)와 고른 마스터. 컴포넌트화는 이 둘만 보낸다 —
+// 제외된 프레임을 실수로 교체 대상에 넣지 않으려면 선택 그대로가 아니라 스캔 결과를 써야 한다.
+let similarMemberIds: string[] = [];
+let similarMasterId: string | null = null;
+
+$('btnScanSimilar').addEventListener('click', () => {
+  setStatus('similarStatus', '닮은 프레임을 찾는 중…', '');
+  send({ type: 'SCAN_SIMILAR' });
+});
+
+$('btnComponentize').addEventListener('click', () => {
+  if (similarMemberIds.length < 2 || !similarMasterId) {
+    setStatus('similarStatus', '먼저 스캔해서 마스터를 고르세요.', 'warn');
+    return;
+  }
+  setStatus('similarStatus', '컴포넌트화하는 중…', '');
+  send({ type: 'COMPONENTIZE_SIMILAR', masterId: similarMasterId, frameIds: similarMemberIds });
 });
 
 $('btnRegisterComp').addEventListener('click', () => {
@@ -1124,6 +1494,19 @@ $('btnClearLicense').addEventListener('click', () => {
   ($('licenseKey') as HTMLInputElement).value = '';
   send({ type: 'CLEAR_LICENSE' });
 });
+
+// 결제·구독 관리는 LemonSqueezy 위임 — URL은 code가 licenseConfig에서 해석해 openExternal로 연다.
+$('btnBuy').addEventListener('click', () => send({ type: 'OPEN_LICENSE_LINK', target: 'purchase' }));
+$('btnPortal').addEventListener('click', () => send({ type: 'OPEN_LICENSE_LINK', target: 'portal' }));
+
+// 배포 전(자리표시자 URL)에는 구독 버튼을 숨긴다 — 눌러도 없는 페이지로 가서 혼란만 준다.
+// URL을 실제 값으로 갈아끼우면 조건이 자동으로 풀려 다시 노출된다.
+if (!licenseLinksConfigured()) {
+  $('licenseLinkRow').style.display = 'none';
+  $('licenseLinkHint').style.display = 'none';
+}
+// 검증 서버·공개키가 미설정이면 키를 넣어도 반드시 '서명 검증 실패'가 난다. 그 이유를 미리 밝힌다.
+if (!licenseVerifyConfigured()) $('licenseSetupHint').style.display = '';
 
 /* ---------- code → ui ---------- */
 window.onmessage = (event: MessageEvent) => {
@@ -1308,13 +1691,21 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('exportStatus', t('export.done', { format: msg.format === 'css' ? 'CSS' : 'W3C JSON' }), 'ok');
       break;
     case 'COMPONENT_CANDIDATES': {
-      // #1: 하위 등록 후보를 트리로. 모든 프레임이 선택 가능하되 **반복 이름(group)만 기본 체크** —
+      // #1: 하위 등록 후보를 트리로. **반복 이름(group) + 속성접힘(propsOnly)만 기본 체크** —
       // 잡음(컨테이너/래퍼 단발성)은 체크 해제 상태로 두고, 사용자가 필요시 추가 체크.
       compCandidates = msg.nodes;
       compChecked.clear();
-      for (const c of msg.nodes) if (c.eligible && c.group) compChecked.add(c.id);
+      for (const c of msg.nodes) if (c.eligible && (c.group || c.propsOnly)) compChecked.add(c.id);
       renderCompTree();
-      if (!compEligibleCount()) setStatus('componentStatus', t('component.noEligible'), 'warn');
+      // 다시 스캔했으면 이전 등록/분류 리포트는 남의 얘기다. 개수를 카드 제목에 올린 뒤로는
+      // 카드를 접어 둬도 옛 수치가 계속 보여, 새 후보와 짝이 안 맞는다.
+      renderVariantReport([]);
+      // 스캔 완료 시 반드시 ‘스캔 중’을 덮어쓴다(후보 0·비eligible만 있어도).
+      if (!compCandidates.length || !compEligibleCount()) {
+        setStatus('componentStatus', t('component.noEligible'), 'warn');
+      } else {
+        updateCompRegister();
+      }
       break;
     }
     case 'COMPONENTS_RESULT': {
@@ -1322,85 +1713,106 @@ window.onmessage = (event: MessageEvent) => {
       const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.exposed ? ` · 속성 ${msg.exposed}` : ''}`;
       setStatus('componentStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? 'ok' : 'warn');
       // 빈 조합(미생성) + 실패(진단) 리포트
-      const box = $('variantReport');
-      box.innerHTML = '';
-      if (msg.missing.length) {
-        const h = document.createElement('div');
-        h.textContent = '빈 조합(미생성):';
-        box.appendChild(h);
-        for (const m of msg.missing) {
-          const d = document.createElement('div');
-          d.textContent = `  ${m}`;
-          box.appendChild(d);
-        }
-      }
-      if (msg.failures && msg.failures.length) {
-        const h = document.createElement('div');
-        h.className = 'warn';
-        h.textContent = `처리 중 문제 ${msg.failures.length}건:`;
-        box.appendChild(h);
-        for (const f of msg.failures) {
-          const d = document.createElement('div');
-          d.className = 'warn';
-          d.textContent = `  • ${f}`;
-          box.appendChild(d);
-        }
-      }
+      renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       break;
     }
     case 'VARIANTS_RESULT': {
-      const box = $('variantReport');
-      box.innerHTML = '';
-      if (msg.missing.length) {
-        const h = document.createElement('div');
-        h.textContent = '빈 조합(미생성):';
-        box.appendChild(h);
-        for (const m of msg.missing) {
-          const d = document.createElement('div');
-          d.textContent = `  ${m}`;
-          box.appendChild(d);
-        }
-      }
-      if (msg.failures && msg.failures.length) {
-        const h = document.createElement('div');
-        h.className = 'warn';
-        h.textContent = `처리 중 문제 ${msg.failures.length}건:`;
-        box.appendChild(h);
-        for (const f of msg.failures) {
-          const d = document.createElement('div');
-          d.className = 'warn';
-          d.textContent = `  • ${f}`;
-          box.appendChild(d);
-        }
-      }
+      renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       const extra = `${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.missing.length ? ' · 빈 조합 있음' : ''}`;
       setStatus('componentStatus', t('component.variants', { sets: msg.sets, extra }), msg.sets ? 'ok' : 'warn');
       break;
     }
     case 'GENERATE_RESULT': {
-      const box = $('variantReport');
-      box.innerHTML = '';
-      for (const c of msg.combos) {
-        const d = document.createElement('div');
-        d.textContent = `+ ${c}`;
-        box.appendChild(d);
-      }
+      renderVariantReport([{ tag: '생성', items: msg.combos, marker: 'added' }]);
       setStatus('componentStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
       break;
     }
     case 'CONTRAST_RESULT':
       renderContrast(msg);
       break;
+    case 'VARIABLES': {
+      allVars = msg.vars;
+      // 컬렉션 필터 옵션은 실제로 존재하는 컬렉션에서만 만든다.
+      const sel = $('varFilterCol') as HTMLSelectElement;
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">전체</option>';
+      for (const c of [...new Set(msg.vars.map((v) => v.collection))]) {
+        const o = document.createElement('option');
+        o.value = c;
+        o.textContent = c;
+        sel.appendChild(o);
+      }
+      if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
+      renderVars();
+      refreshDarkOptions();
+      setStatus('varEditStatus', msg.vars.length ? `변수 ${msg.vars.length}개` : '편집할 변수가 없어요. 먼저 토큰을 생성하세요.', msg.vars.length ? 'ok' : 'warn');
+      break;
+    }
+    case 'EDIT_VARIABLE_RESULT': {
+      if (!msg.ok) {
+        setStatus('varEditStatus', `수정하지 못했어요 — ${msg.error ?? '알 수 없는 오류'}`, 'warn');
+        renderVars(); // 거부된 입력이 화면에 남지 않게 되돌린다
+        break;
+      }
+      if (msg.deleted) {
+        allVars = allVars.filter((v) => v.id !== msg.id);
+        setStatus('varEditStatus', '변수를 삭제했어요.', 'ok');
+      } else if (msg.var) {
+        const i = allVars.findIndex((v) => v.id === msg.id);
+        if (i >= 0) allVars[i] = msg.var;
+        setStatus('varEditStatus', `'${msg.var.name}' 수정했어요.`, 'ok');
+      }
+      renderVars();
+      refreshDarkOptions();
+      break;
+    }
+    case 'VARIABLE_USAGE': {
+      const v = allVars.find((x) => x.id === msg.id);
+      const parts: string[] = [];
+      parts.push(msg.nodes.length ? `레이어 ${msg.nodes.length}곳` : '쓰는 레이어 없음');
+      if (msg.aliasedBy.length) parts.push(`이 변수를 가리키는 변수 ${msg.aliasedBy.length}개(${msg.aliasedBy.slice(0, 3).map((a) => a.name).join(', ')}${msg.aliasedBy.length > 3 ? '…' : ''})`);
+      // 상한에 걸리면 "없음"이 아니라 "못 다 봤음"이다 — 삭제 판단이 갈리므로 반드시 알린다.
+      if (msg.capped) parts.push('※ 문서가 커서 일부만 확인했어요');
+      const used = msg.nodes.length || msg.aliasedBy.length;
+      setStatus('varEditStatus', `${v ? `'${v.name}' ` : ''}사용처 — ${parts.join(' · ')}`, used || msg.capped ? 'warn' : 'ok');
+      break;
+    }
+    case 'DARK_MODE_RESULT': {
+      if (!msg.realiased) {
+        const why = msg.skipped ? `Global을 가리키는 색이 없어요(건너뜀 ${msg.skipped}개)` : '대상 색이 없어요';
+        setStatus('darkStatus', `다크 값을 채우지 못했어요 — ${why}`, 'warn');
+        break;
+      }
+      const skip = msg.skipped ? ` · 건너뜀 ${msg.skipped}개(값을 직접 넣은 색)` : '';
+      setStatus('darkStatus', `다크 ${msg.realiased}개 연결 · 새 dark/ 원시색 ${msg.created}개${skip}`, 'ok');
+      break;
+    }
+    case 'SIMILAR_CANDIDATES':
+      renderSimilar(msg);
+      break;
+    case 'COMPONENTIZE_RESULT': {
+      if (!msg.instances) {
+        // 교체가 하나도 없으면 실패다 — 경고를 그대로 보여줘야 원인을 안다.
+        setStatus('similarStatus', `컴포넌트화하지 못했어요${msg.warnings.length ? ` — ${msg.warnings[0]}` : ''}`, 'warn');
+        break;
+      }
+      const parts = [`마스터 ${msg.master}`, `인스턴스 ${msg.instances}개`];
+      if (msg.properties) parts.push(`속성 ${msg.properties}개`);
+      if (msg.images) parts.push(`이미지 ${msg.images}개`);
+      // 경고(제외·오버라이드 실패)는 성공했어도 반드시 노출 — 원본이 남아 있다는 신호다.
+      const warn = msg.warnings.length ? ` · 남겨둔 것 ${msg.warnings.length}건: ${msg.warnings[0]}` : '';
+      setStatus('similarStatus', `${parts.join(' · ')}${warn}`, msg.warnings.length ? 'warn' : 'ok');
+      // 교체된 프레임은 더 이상 대상이 아니다 — 목록을 비워 이중 실행을 막는다.
+      similarMemberIds = [];
+      similarMasterId = null;
+      $('similarList').innerHTML = '';
+      $('similarCount').textContent = '';
+      break;
+    }
     case 'PREMIUM_REQUIRED': {
-      // 기능에 맞는 카드 영역으로 라우팅(컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭).
-      const statusId =
-        msg.feature === 'components'
-          ? 'componentStatus'
-          : msg.feature === 'presets'
-            ? 'presetStatus'
-            : msg.feature === 'semantics'
-              ? 'semStatus'
-              : 'createStatus'; // tokens(기본)
+      // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
+      // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
+      const statusId = PREMIUM_STATUS_ID[msg.feature] ?? 'createStatus';
       setStatus(statusId, t('premium.required', { message: msg.message, feature: msg.feature }), 'warn');
       break;
     }
@@ -1432,6 +1844,7 @@ const OP_STATUS: Record<string, string> = {
   APPLY: 'applyStatus',
   RENAME: 'renameStatus',
   EXPORT: 'exportStatus',
+  SCAN_COMPONENT_CANDIDATES: 'componentStatus',
   REGISTER_COMPONENTS: 'componentStatus',
   CLASSIFY_VARIANTS: 'componentStatus',
   GENERATE_MISSING_VARIANTS: 'componentStatus',
@@ -1548,7 +1961,9 @@ function renderSelectableTree(
   const base = rows.length ? baseDepth(rows) : 0;
   // 보이는 행만(맥락 숨김 시 비영향·비헤더 제외) → §4: 대형 서브트리도 청크로 비차단 렌더.
   const visible = rows.filter((r) => r.change !== undefined || r.header || !opts.hideContext);
-  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
+  // 세 트리(#bindTree·#diff·#compTree)가 모두 이 호출부를 지난다 — 어느 목록인지는 마운트 id가
+  // 말해 주므로 스냅·개수 줄 재계산도 여기 한 줄로 끝난다(행 0건이면 테두리·줄을 걷는다).
+  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange), () => layoutListBy(mount.id));
 }
 
 /* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
@@ -1580,6 +1995,8 @@ function renderRenameTree(): void {
 function updateRenameApply(): void {
   const total = affectedRenameCount();
   const sel = renameChecked.size;
+  // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
+  $('renameCount').textContent = total ? `· 변경 ${total}개` : '';
   ($('btnRename') as HTMLButtonElement).disabled = sel === 0;
   const all = $('renameAll') as HTMLInputElement;
   all.checked = total > 0 && sel === total;
@@ -1603,7 +2020,9 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
   // 적용 완료(선택 적용 또는 마법사): 트리 비우고 결과만.
   renameNodes = [];
   renameChecked.clear();
-  $('diff').innerHTML = '';
+  clearMount($('diff'));
+  $('renameCount').textContent = '';
+  layoutListBy('diff'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('btnRename') as HTMLButtonElement).disabled = true;
   setStatus('renameStatus', t('rename.applied', { count: msg.changes.length }), 'ok');
 }
@@ -1666,6 +2085,10 @@ function renderBindTree(): void {
 function updateBindApply(): void {
   const total = bindCandidates.length;
   const sel = bindChecked.size;
+  // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
+  // 이 트리는 노드 헤더도 한 행이라 목록 아래 ‘총 n개’(행 수)와 수가 다르다 → 세는 단위를
+  // ‘건’으로 구분해(상태 문구 ‘바인딩 n건 후보’와 같은 말) 같은 수의 오기로 읽히지 않게 한다.
+  $('bindCount').textContent = total ? `· 후보 ${total}건` : '';
   const confirm = $('btnApplyConfirm') as HTMLButtonElement;
   confirm.style.display = hasBindPreview() ? '' : 'none';
   confirm.disabled = sel === 0;
@@ -1681,7 +2104,9 @@ function clearBindPreview(): void {
   bindCandidates = [];
   bindNodes = [];
   bindChecked.clear();
-  $('bindTree').innerHTML = '';
+  clearMount($('bindTree'));
+  $('bindCount').textContent = '';
+  layoutListBy('bindTree'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
   ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
 }
@@ -1698,10 +2123,13 @@ function compEligibleCount(): number {
 function compRows(): TreeRow[] {
   return compCandidates.map((n) => {
     if (!n.eligible) return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId };
-    // 세트 멤버: [세트] 배지 + '세트이름 · 베리언트'. 단독: [단독] 배지 + 등록명.
+    // 세트: [세트] · 속성접힘: [속성] · 단독: [단독]
     const base = { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, replace: false };
     if (n.group) {
       return { ...base, change: `${n.group} · ${n.variant || '베리언트'}`, badge: { text: '세트', kind: 'set' as const } };
+    }
+    if (n.propsOnly) {
+      return { ...base, change: `${n.single || '컴포넌트'} · 속성`, badge: { text: '속성', kind: 'single' as const } };
     }
     return { ...base, change: n.single || '컴포넌트', badge: { text: '단독', kind: 'single' as const } };
   });
@@ -1721,6 +2149,8 @@ function renderCompTree(): void {
 function updateCompRegister(): void {
   const total = compEligibleCount();
   const sel = compChecked.size;
+  // 카드 제목의 개수 — 트리에 뜨는 건 등록 가능한 후보뿐이라 그 수를 센다(스캔 노드 수가 아니라).
+  $('compCount').textContent = total ? `· 후보 ${total}개` : '';
   if (compCandidates.length) {
     const all = $('compAll') as HTMLInputElement;
     all.checked = sel === total && total > 0;
@@ -1732,21 +2162,86 @@ function updateCompRegister(): void {
 function clearCompPreview(): void {
   compCandidates = [];
   compChecked.clear();
-  $('compTree').innerHTML = '';
+  clearMount($('compTree'));
+  $('compCount').textContent = '';
+  layoutListBy('compTree'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';
+}
+
+/* ---------- 등록/분류 결과 리포트(#variantReport) ----------
+   세 메시지(COMPONENTS_RESULT · VARIANTS_RESULT · GENERATE_RESULT)가 각자 다른 내용을 그리는데
+   렌더 코드가 세 번 복붙돼 있었고, 행이라는 단위 자체가 없어 맨 <div>에 **리터럴 공백**으로
+   들여썼다. 뭉뚱그려 한 모양으로 합치는 대신 ‘머리줄 + 항목 줄’이라는 공통 구조만 뽑는다. */
+
+/** 항목 앞 표시 — 내용이 아니라 장식이라 textContent가 아니라 CSS(::before)가 그린다. */
+type VariantReportMarker = 'bullet' | 'added';
+
+interface VariantReportSection {
+  /** 카드 제목 개수 span에 쓸 짧은 이름 */
+  tag: string;
+  /** 목록 안 머리줄. 종류가 하나뿐이면(생성 결과) 생략 */
+  head?: string;
+  items: string[];
+  /** 진단(실패)은 경고색 */
+  warn?: boolean;
+  marker?: VariantReportMarker;
+}
+
+interface VariantReportLine {
+  text: string;
+  cls: string;
+}
+
+function makeVariantReportRow(l: VariantReportLine): HTMLElement {
+  const d = document.createElement('div');
+  d.className = l.cls;
+  d.textContent = l.text;
+  // 행 높이가 균일해야 스냅이 성립해 줄바꿈을 막았다 → 잘린 뒷부분은 title로 읽는다.
+  d.title = l.text;
+  return d;
+}
+
+/** 등록·분류가 공유하는 구획(빈 조합 + 실패 진단) — 두 결과가 같은 리포트를 그린다. */
+function variantIssueSections(missing: string[], failures?: string[]): VariantReportSection[] {
+  const f = failures || [];
+  return [
+    { tag: '빈 조합', head: '빈 조합(미생성):', items: missing },
+    { tag: '문제', head: `처리 중 문제 ${f.length}건:`, items: f, warn: true, marker: 'bullet' },
+  ];
+}
+
+function renderVariantReport(sections: VariantReportSection[]): void {
+  const filled = sections.filter((s) => s.items.length);
+  // 카드 제목의 개수(#tokenList의 createCount와 같은 패턴) — 리포트가 상한에 걸리거나
+  // 카드가 접혀 있어도 무엇이 몇 건인지 먼저 알린다.
+  $('componentCount').textContent = filled.map((s) => `· ${s.tag} ${s.items.length}개`).join(' ');
+  const lines: VariantReportLine[] = [];
+  for (const s of filled) {
+    const warn = s.warn ? ' vr-warn' : '';
+    if (s.head) lines.push({ text: s.head, cls: `vr-row vr-head${warn}` });
+    const marker = s.marker ? ` vr-${s.marker}` : '';
+    for (const it of s.items) lines.push({ text: it, cls: `vr-row vr-item${warn}${marker}` });
+  }
+  // 빈 조합은 베리언트 속성의 곱집합이라 세트 하나로도 수백 줄이 된다 → 청크 렌더.
+  // 줄이 0이어도 불러야 마운트가 비워지고 onDone이 테두리·푸터를 걷는다.
+  renderChunked($('variantReport'), lines, makeVariantReportRow, () => layoutListBy('variantReport'));
 }
 
 /** 선택 의존 카드(바인딩·컴포넌트)의 빈 상태(캐논 108:2) — 미리보기/후보가 없을 때만,
     무선택이면 캐논 빈 상태를 표시하고, 선택이 있으면 비워 둔다(액션 버튼이 흐름을 주도). */
 function refreshTreeEmptyStates(): void {
   const guide = '프레임이나 레이어를 선택하면 후보를 찾아드려요.';
+  // 어느 쪽이든 행은 0건이다 — 안내 문구는 스크롤 영역이 아니므로 테두리·개수 줄을 걷어야 한다.
+  // (예전 :empty 규칙은 안내 문구가 들어찬 순간 자식이 생겨 안 먹었다.)
   if (!hasBindPreview()) {
     if (lastSelCount === 0) renderEmptyState($('bindTree'), '선택한 노드가 없어요', guide);
-    else $('bindTree').innerHTML = '';
+    else clearMount($('bindTree'));
+    layoutListBy('bindTree');
   }
   if (compCandidates.length === 0) {
     if (lastSelCount === 0) renderEmptyState($('compTree'), '선택한 노드가 없어요', guide);
-    else $('compTree').innerHTML = '';
+    else clearMount($('compTree'));
+    layoutListBy('compTree');
   }
 }
 
@@ -1788,55 +2283,64 @@ function contrastFixBtn(label: string, hex: string, nodeId: string): HTMLButtonE
   sw.className = 'swatch';
   sw.style.background = hex;
   btn.appendChild(sw);
-  btn.appendChild(document.createTextNode(` ${label}`));
+  const text = document.createTextNode(` ${label}`);
+  btn.appendChild(text);
   btn.addEventListener('click', () => {
     send({ type: 'APPLY_CONTRAST_FIX', nodeId, hex });
     btn.disabled = true;
-    btn.textContent = '✓ 적용';
+    // textContent로 통째로 갈아끼우면 스와치 span까지 지워진다 — 어떤 색을 넣었는지 사라지고,
+    // 버튼이 스와치 높이를 잃어 이 행만 낮아진다(행 높이 균일이 스냅의 전제, .cfind 주석).
+    text.textContent = ' ✓ 적용';
     setStatus('contrastStatus', t('contrast.fixApplied'), 'ok');
   });
   return btn;
 }
 
+/** 실패 1행(색쌍 스와치 · 레이어명 · 대비비 · 보정 버튼). */
+function makeContrastRow(f: ContrastFinding): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'cfind';
+
+  const pair = document.createElement('span');
+  pair.className = 'cpair';
+  for (const hex of [f.bg, f.fg]) {
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = hex;
+    pair.appendChild(sw);
+  }
+  row.appendChild(pair);
+
+  const name = document.createElement('span');
+  name.className = 'cname';
+  name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
+  // 이름은 행 높이를 고르게 두려고 한 줄 말줄임이다(.cfind 주석) → 잘린 부분은 title로 읽는다.
+  name.title = name.textContent;
+  row.appendChild(name);
+
+  const ratio = document.createElement('span');
+  ratio.className = 'ratio warn';
+  ratio.textContent = `${f.ratio} / ${f.required}`;
+  row.appendChild(ratio);
+
+  // #2: 보정 제안 — 텍스트색(기본)·배경색(옵션). 클릭 시 해당 노드에 적용.
+  if (f.suggestedFg || f.suggestedBg) {
+    const fix = document.createElement('span');
+    fix.className = 'cfix';
+    if (f.suggestedFg) fix.appendChild(contrastFixBtn('텍스트', f.suggestedFg, f.id));
+    if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn('배경', f.suggestedBg, f.bgId));
+    row.appendChild(fix);
+  }
+  return row;
+}
+
 function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): void {
   const box = $('contrastList');
-  box.innerHTML = '';
   const fails = msg.findings.filter((f) => !f.pass); // 실패 건만 나열(조치 대상)
-  for (const f of fails) {
-    const row = document.createElement('div');
-    row.className = 'cfind';
-
-    const pair = document.createElement('span');
-    pair.className = 'cpair';
-    for (const hex of [f.bg, f.fg]) {
-      const sw = document.createElement('span');
-      sw.className = 'swatch';
-      sw.style.background = hex;
-      pair.appendChild(sw);
-    }
-    row.appendChild(pair);
-
-    const name = document.createElement('span');
-    name.className = 'cname';
-    name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
-    row.appendChild(name);
-
-    const ratio = document.createElement('span');
-    ratio.className = 'ratio warn';
-    ratio.textContent = `${f.ratio} / ${f.required}`;
-    row.appendChild(ratio);
-
-    // #2: 보정 제안 — 텍스트색(기본)·배경색(옵션). 클릭 시 해당 노드에 적용.
-    if (f.suggestedFg || f.suggestedBg) {
-      const fix = document.createElement('span');
-      fix.className = 'cfix';
-      if (f.suggestedFg) fix.appendChild(contrastFixBtn('텍스트', f.suggestedFg, f.id));
-      if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn('배경', f.suggestedBg, f.bgId));
-      row.appendChild(fix);
-    }
-
-    box.appendChild(row);
-  }
+  // 스캔 상한이 2000이라 실패가 수백 건이면 동기 루프가 프레임을 통째로 막는다(§4).
+  // onDone에서 스냅해야 한다 — 청크가 남아 있는 동안 재면 행 수가 모자라 상한에 안 걸린
+  // 것으로 보이고, ‘총 n개 중 m개’ 줄이 안 뜬 채 반쪽 행만 남는다.
+  renderChunked(box, fails, makeContrastRow, () => layoutListBy('contrastList'));
   const skip = contrastSkipText(msg.skipped);
   const skipNote = skip ? ` · 건너뜀: ${skip}` : '';
   if (msg.checked === 0) {
@@ -1854,6 +2358,167 @@ function showApplyProgress(label: string): void {
   ($('applyBarFill') as HTMLElement).style.width = '0%';
   $('applyProgressText').textContent = label;
 }
+/** 변수 한 줄 — 이름·값 즉시 편집 + 컬렉션 배지 + 사용처/삭제. */
+function makeVarRow(v: VarInfo): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'vrow';
+  row.dataset.id = v.id;
+
+  // 색이면 스와치를 앞에 — 목록에서 무슨 색인지 눈으로 바로 찾는다.
+  const cell = v.values[v.defaultModeId];
+  if (v.type === 'COLOR' && cell && cell.kind === 'literal' && /^#[0-9a-f]{6}$/i.test(cell.display)) {
+    const sw = document.createElement('span');
+    sw.className = 'vsw';
+    sw.style.background = cell.display;
+    row.appendChild(sw);
+  }
+
+  const nameWrap = document.createElement('span');
+  nameWrap.className = 'vname';
+  const name = document.createElement('input');
+  name.type = 'text';
+  name.value = v.name;
+  name.title = v.name;
+  // change(포커스 아웃/엔터)에서만 보낸다 — 타이핑마다 보내면 편집 한 번이 Undo 수십 개가 된다.
+  name.addEventListener('change', () => {
+    if (name.value.trim() === v.name) return;
+    send({ type: 'EDIT_VARIABLE', id: v.id, patch: { name: name.value } });
+  });
+  nameWrap.appendChild(name);
+  row.appendChild(nameWrap);
+
+  const valWrap = document.createElement('span');
+  valWrap.className = 'vval';
+  if (cell && cell.kind === 'alias') {
+    // 별칭은 같은 타입의 다른 변수로만 바꿀 수 있다 — 자유 입력이면 오타로 깨지기 쉽다.
+    const sel = document.createElement('select');
+    for (const other of allVars.filter((o) => o.type === v.type && o.id !== v.id)) {
+      const o = document.createElement('option');
+      o.value = other.id;
+      o.textContent = other.name;
+      sel.appendChild(o);
+    }
+    sel.value = cell.aliasId ?? '';
+    sel.title = `별칭 → ${cell.display}`;
+    sel.addEventListener('change', () => {
+      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, aliasId: sel.value } } });
+    });
+    valWrap.appendChild(sel);
+  } else {
+    const val = document.createElement('input');
+    val.type = 'text';
+    val.value = cell ? cell.display : '';
+    val.placeholder = v.type === 'COLOR' ? '#RRGGBB' : v.type === 'FLOAT' ? '숫자' : '';
+    val.addEventListener('change', () => {
+      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, literal: val.value } } });
+    });
+    valWrap.appendChild(val);
+  }
+  row.appendChild(valWrap);
+
+  const col = document.createElement('span');
+  col.className = 'vcol tag tag-set';
+  col.textContent = v.collection;
+  col.title = `${v.collection} · ${v.type} · 스코프 ${v.scopes.length}/${scopesForTypeList(v.type).length}`;
+  row.appendChild(col);
+
+  const act = document.createElement('span');
+  act.className = 'vact';
+  const usage = document.createElement('button');
+  usage.className = 'link';
+  usage.textContent = '사용처';
+  usage.addEventListener('click', () => {
+    setStatus('varEditStatus', `${v.name} 사용처를 찾는 중…`, '');
+    send({ type: 'GET_VARIABLE_USAGE', id: v.id });
+  });
+  act.appendChild(usage);
+  const del = document.createElement('button');
+  del.className = 'link';
+  del.textContent = '삭제';
+  del.addEventListener('click', () => {
+    // 되돌리기 어려운 작업이라 한 번 더 묻는다. 사용처를 먼저 보라는 안내도 같이.
+    if (!window.confirm(`'${v.name}' 변수를 삭제할까요?\n이 변수를 쓰던 레이어의 바인딩이 끊깁니다. '사용처'로 먼저 확인하세요.`)) return;
+    send({ type: 'DELETE_VARIABLE', id: v.id });
+  });
+  act.appendChild(del);
+  row.appendChild(act);
+
+  return row;
+}
+
+function renderVars(): void {
+  const vis = visibleVars();
+  $('varCount').textContent = allVars.length ? `· ${vis.length}/${allVars.length}개` : '';
+  renderChunked($('varList'), vis, makeVarRow, () => layoutListBy('varList'));
+}
+
+/** 닮은 프레임 멤버 한 줄 — 마스터 라디오 + 이름 + 완전성 근거(왜 이게 추천인지). */
+function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement {
+  const row = document.createElement('label'); // 라디오와 한 덩어리로 — 줄 아무 데나 눌러도 선택된다
+  row.className = 'simrow';
+
+  const radio = document.createElement('input');
+  radio.type = 'radio';
+  radio.name = 'similarMaster';
+  radio.value = m.id;
+  radio.checked = m.id === similarMasterId;
+  radio.addEventListener('change', () => {
+    if (radio.checked) similarMasterId = m.id;
+  });
+  row.appendChild(radio);
+
+  const name = document.createElement('span');
+  name.className = 'cname';
+  name.textContent = m.name;
+  name.title = m.name; // 한 줄 말줄임 → 잘린 부분은 title로 읽는다(.cfind와 동일 규칙)
+  row.appendChild(name);
+
+  if (m.id === recommendedId) {
+    const tag = document.createElement('span');
+    tag.className = 'tag tag-set'; // 기존 배지 규약 재사용
+    tag.textContent = '추천';
+    row.appendChild(tag);
+  }
+
+  // 추천 근거를 숫자로 — 텍스트가 얼마나 채워졌는지가 마스터 선택의 핵심이다.
+  const meta = document.createElement('span');
+  meta.className = 'simmeta';
+  const parts = [`텍스트 ${m.textFilled}/${m.textTotal}`];
+  if (m.images) parts.push(`이미지 ${m.images}`);
+  if (m.emptyLayers) parts.push(`빈 칸 ${m.emptyLayers}`);
+  meta.textContent = parts.join(' · ');
+  row.appendChild(meta);
+
+  return row;
+}
+
+/** 스캔 결과 → 멤버 목록(마스터 라디오) + 무엇이 속성으로 열리는지 요약. */
+function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): void {
+  similarMemberIds = msg.metas.map((m) => m.id);
+  similarMasterId = msg.recommendedMasterId;
+  $('similarCount').textContent = msg.metas.length ? `· 대상 ${msg.metas.length}개` : '';
+
+  const box = $('similarList');
+  renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId), () => layoutListBy('similarList'));
+
+  if (!msg.metas.length) {
+    // 왜 대상이 없는지 알려준다 — 제외 사유가 있으면 그걸 그대로 보여주는 게 가장 빠른 안내다.
+    const why = msg.excluded.length ? msg.excluded[0].reason : '구조가 같은 프레임을 2개 이상 선택하세요.';
+    setStatus('similarStatus', `컴포넌트화할 프레임이 없어요 — ${why}`, 'warn');
+    return;
+  }
+
+  const texts = msg.varying.filter((v) => v.type === 'TEXT').length;
+  const swaps = msg.varying.length - texts;
+  const opened: string[] = [];
+  if (texts) opened.push(`텍스트 ${texts}`);
+  if (swaps) opened.push(`아이콘 교체 ${swaps}`);
+  if (msg.imageVarying.length) opened.push(`이미지 ${msg.imageVarying.length}`);
+  const openText = opened.length ? `속성으로 열림: ${opened.join(' · ')}` : '가변 위치가 없어 속성은 만들지 않아요';
+  const skipText = msg.excluded.length ? ` · 제외 ${msg.excluded.length}개(${msg.excluded[0].reason})` : '';
+  setStatus('similarStatus', `대상 ${msg.metas.length}개 · ${openText}${skipText}`, 'ok');
+}
+
 function updateApplyProgress(done: number, total: number): void {
   $('applyProgress').style.display = '';
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
@@ -1892,6 +2557,22 @@ const TITLE_BTN_IDS = new Set([
   'btnWizardRun', 'btnPalette', 'btnExtract', 'btnCreate',
   'btnTextStyles', 'btnApply', 'btnPreview', 'btnContrast', 'btnExport',
 ]);
+/**
+ * sticky 오프셋 동기화 — 탭 바·선택 바의 '실제' 높이를 CSS 변수로 넘긴다.
+ * 카드 헤더(주 버튼 포함)가 그 아래에 정확히 붙어야 가려지지 않는다. 폭이 좁아져 선택 바가
+ * 두 줄이 되거나 창을 리사이즈해도 따라간다(하드코딩 41px/71px은 그 경우 어긋남).
+ */
+function syncStickyOffsets(): void {
+  const tabs = document.querySelector<HTMLElement>('.tabs');
+  const bar = $('selBarWrap');
+  if (!tabs) return;
+  const tabsH = Math.round(tabs.getBoundingClientRect().height);
+  const barH = Math.round(bar.getBoundingClientRect().height);
+  const root = document.documentElement;
+  root.style.setProperty('--tabs-h', `${tabsH}px`);
+  root.style.setProperty('--head-top', `${tabsH + barH}px`);
+}
+
 /** 모든 .step 카드를 접이식으로 + 주 버튼을 타이틀 줄로. 노드 이동이라 id/리스너 보존, 멱등. */
 function applyCardChrome(): void {
   document.querySelectorAll<HTMLElement>('.step').forEach((card) => {
@@ -1915,12 +2596,32 @@ function applyCardChrome(): void {
     head.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('button')) return; // 버튼 클릭은 토글 제외
       card.classList.toggle('collapsed');
+      // 접힌 카드는 .step-body가 display:none이라 그 안에서 렌더된 목록은 높이 0으로 측정되고
+      // 스냅이 조용히 bail한다. 펼치는 순간 다시 재지 않으면 반쪽 행이 그대로 남는다.
+      if (!card.classList.contains('collapsed')) layoutAllLists();
     });
   });
 }
 
-// 초기: 컬렉션·전제·라이선스 조회. 팀 카드는 Team 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
+// 초기: 컬렉션·전제·라이선스 조회. 유료 카드는 Paid 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
 applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
+syncStickyOffsets(); // 카드 헤더 sticky 오프셋(탭 바 + 선택 바 높이)
+// 선택 바는 문구가 바뀌며 높이가 변하고, 창 리사이즈로 두 바 모두 접힐 수 있다 → 계속 추적.
+if (typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(() => syncStickyOffsets());
+  const tabsEl = document.querySelector('.tabs');
+  if (tabsEl) ro.observe(tabsEl);
+  ro.observe($('selBarWrap'));
+}
+window.addEventListener('resize', syncStickyOffsets);
+// 목록 상한은 패널 높이 비례(40vh)라 리사이즈하면 몇 행이 들어가는지가 바뀐다 → 다시 스냅.
+// 목록마다 리스너를 달면 드래그 중 리사이즈 1회에 목록 수만큼 레이아웃이 돌아 끊긴다 →
+// 하나로 모아 디바운스한다(드래그가 멎은 뒤 한 번만 재계산해도 결과는 같다).
+let listResizeTimer = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(listResizeTimer);
+  listResizeTimer = window.setTimeout(layoutAllLists, 100);
+});
 updateGates();
 renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
@@ -1945,6 +2646,13 @@ function showTab(name: (typeof TABS)[number]): void {
   }
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
+  // 비활성 탭은 .tab-section이 display:none이라 그 안에서 렌더된 목록은 행 높이가 0으로 측정되고
+  // 스냅이 조용히 bail한다(접힌 카드와 같은 함정 — applyCardChrome 참고). 결과가 다른 탭에 있는
+  // 동안 도착하는 경로가 여럿이다: 마법사의 추출이 ‘만들기’ 탭 목록을, 대비 점검이 #contrastList를,
+  // componentize가 #variantReport를 채우고, 미리보기는 느려서 결과 전에 탭을 옮기는 일이 흔한데
+  // 트리 3종은 첫 화면이 아닌 ‘적용’ 탭에 있다. 탭이 보이는 순간 다시 재지 않으면
+  // 돌아왔을 때 반쪽 행에 개수 줄도 없는 상태가 남는다.
+  layoutAllLists();
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
 }
 TABS.forEach((t, i) => {

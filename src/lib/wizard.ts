@@ -11,7 +11,7 @@ export type WizardStepId =
   | 'bind' // APPLY (쓰기)
   | 'rename' // RENAME (쓰기) — bind 이후라야 토큰을 역할 신호로 활용 가능
   | 'contrast' // CHECK_CONTRAST (읽기, 선택)
-  | 'componentize'; // REGISTER_COMPONENTS → CLASSIFY_VARIANTS (쓰기, 선택, Pro)
+  | 'componentize'; // REGISTER_COMPONENTS → CLASSIFY_VARIANTS (쓰기, 선택, Paid)
 
 export interface WizardStepDef {
   id: WizardStepId;
@@ -20,8 +20,8 @@ export interface WizardStepDef {
   write: boolean;
   /** 옵션(체크박스)로 끌 수 있는 단계인지. 필수 단계는 항상 실행. */
   optional: boolean;
-  /** Pro 이상 필요 여부. */
-  pro?: boolean;
+  /** Paid 필요 여부. */
+  paid?: boolean;
 }
 
 /** 단계 순서 = 실제 데이터 의존 순서. 바인딩(bind) 후 리네임(rename). */
@@ -32,7 +32,7 @@ export const WIZARD_STEPS: readonly WizardStepDef[] = [
   { id: 'bind', label: '바인딩', write: true, optional: false },
   { id: 'rename', label: '레이어 정돈', write: true, optional: false },
   { id: 'contrast', label: '접근성 검수', write: false, optional: true },
-  { id: 'componentize', label: '컴포넌트화', write: true, optional: true, pro: true },
+  { id: 'componentize', label: '컴포넌트화', write: true, optional: true, paid: true },
 ];
 
 /** 사용자가 켠 선택 단계(필수 단계는 포함하지 않는다). */
@@ -44,7 +44,7 @@ export interface WizardOptions {
 
 /** 실행 시점의 게이팅 컨텍스트(티어·매핑 존재 여부). */
 export interface WizardContext {
-  isPro: boolean;
+  isPaid: boolean;
   /** 시맨틱 매핑 텍스트에 한 줄이라도 매핑이 있는지. */
   hasSemanticMap: boolean;
 }
@@ -62,7 +62,7 @@ export interface WizardPlanItem {
  * - 필수 단계: 항상 실행.
  * - 선택 단계: 옵션이 꺼져 있으면 건너뜀.
  * - 시맨틱: 옵션이 켜져도 매핑이 없으면 건너뜀(만들 별칭이 없음).
- * - Pro 단계: 옵션이 켜져도 비Pro면 건너뜀.
+ * - Paid 단계: 옵션이 켜져도 Free면 건너뜀.
  */
 export function planWizard(options: WizardOptions, ctx: WizardContext): WizardPlanItem[] {
   return WIZARD_STEPS.map((step) => {
@@ -70,7 +70,7 @@ export function planWizard(options: WizardOptions, ctx: WizardContext): WizardPl
     const enabled = options[step.id as keyof WizardOptions];
     if (!enabled) return { step, run: false, skipReason: '옵션 꺼짐' };
     if (step.id === 'semantics' && !ctx.hasSemanticMap) return { step, run: false, skipReason: '매핑 없음' };
-    if (step.pro && !ctx.isPro) return { step, run: false, skipReason: 'Pro 전용' };
+    if (step.paid && !ctx.isPaid) return { step, run: false, skipReason: 'Paid 전용' };
     return { step, run: true };
   });
 }
