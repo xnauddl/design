@@ -7,6 +7,8 @@
 import { kebab, pascalCase, capitalize } from './naming';
 import { tshirtRoles } from './roles';
 import { classifyColor } from './colorName';
+import { highConfidenceComponentRole, isHighConfidenceComponent, parseHeadingSlots } from './componentLike';
+import type { LikeNode } from './componentLike';
 
 /** 알려진 속성 어휘 — 값 → 속성명 추론. */
 const STATES = new Set(['default', 'hover', 'pressed', 'focus', 'active', 'disabled', 'loading']);
@@ -209,8 +211,24 @@ export interface CompPropPlan {
   type: CompPropType;
   /** 대상 레이어 이름(매칭용). */
   layerName: string;
+  /**
+   * 루트 기준 자식 인덱스 경로(`0/1`). 접힘 시 레이어명이 카피마다 달라도
+   * 같은 슬롯을 가리키기 위해 사용. **대표(마스터) 트리** 기준.
+   */
+  layerPath?: string;
   /** 연결할 노드 필드. */
   field: 'characters' | 'mainComponent' | 'visible';
+  /**
+   * heading 접힘 전용 — 멤버마다 자식 인덱스가 달라도(액션 optional)
+   * 슬롯 종류·순서로 값을 읽는다. 노출(expose)은 여전히 `layerPath`(마스터).
+   */
+  headingSlot?: {
+    kind: 'title' | 'action' | 'meta';
+    /** 해당 kind 안에서의 순서(0-based). */
+    slotIndex: number;
+    /** title/meta 내부 추가 경로(슬롯 루트 기준). */
+    innerPath?: string;
+  };
 }
 
 /**
@@ -219,10 +237,15 @@ export interface CompPropPlan {
  * - TEXT 레이어 → TEXT(characters).
  * - INSTANCE 레이어 → INSTANCE_SWAP(mainComponent).
  * 속성 이름 충돌은 `-2` 접미사로 회피.
+ * **동명·동일 카피 TEXT는 한 번만** — Count×2(둘 다 "1") → `Count` 속성 1개(고아 Count-2 방지).
+ * `path`가 있으면 `layerPath`로 동명 레이어를 슬롯별로 연결.
  */
-export function inferComponentProperties(layers: { name: string; type: string }[]): CompPropPlan[] {
+export function inferComponentProperties(
+  layers: { name: string; type: string; path?: string; characters?: string }[],
+): CompPropPlan[] {
   const out: CompPropPlan[] = [];
   const taken = new Set<string>();
+  const seenTextContent = new Set<string>();
   const uniq = (base: string): string => {
     let n = base || 'Prop';
     let i = 2;
@@ -232,14 +255,372 @@ export function inferComponentProperties(layers: { name: string; type: string }[
   };
   for (const l of layers) {
     if (l.name.trim().endsWith('?')) {
-      out.push({ propName: uniq(pascalCase(l.name.replace(/\?+$/, '')) || 'Show'), type: 'BOOLEAN', layerName: l.name, field: 'visible' });
+      out.push({
+        propName: uniq(pascalCase(l.name.replace(/\?+$/, '')) || 'Show'),
+        type: 'BOOLEAN',
+        layerName: l.name,
+        layerPath: l.path,
+        field: 'visible',
+      });
     } else if (l.type === 'TEXT') {
-      out.push({ propName: uniq(pascalCase(l.name) || 'Text'), type: 'TEXT', layerName: l.name, field: 'characters' });
+      // characters를 알 때만 동명·동일 카피 중복 제거(미지정 시 기존처럼 Label-2 허용).
+      if (l.characters !== undefined) {
+        const contentKey = `${l.name}\0${l.characters}`;
+        if (seenTextContent.has(contentKey)) continue;
+        seenTextContent.add(contentKey);
+      }
+      out.push({
+        propName: uniq(pascalCase(l.name) || 'Text'),
+        type: 'TEXT',
+        layerName: l.name,
+        layerPath: l.path,
+        field: 'characters',
+      });
     } else if (l.type === 'INSTANCE') {
-      out.push({ propName: uniq(pascalCase(l.name) || 'Swap'), type: 'INSTANCE_SWAP', layerName: l.name, field: 'mainComponent' });
+      out.push({
+        propName: uniq(pascalCase(l.name) || 'Swap'),
+        type: 'INSTANCE_SWAP',
+        layerName: l.name,
+        layerPath: l.path,
+        field: 'mainComponent',
+      });
     }
   }
   return out;
+}
+
+/** TEXT 레이어명이 곧 카피(또는 Text/Text 2)면 속성명은 중립적인 Text. */
+function textPropBaseName(node: { name: string; characters?: string }): string {
+  const n = node.name.trim();
+  const c = node.characters ?? '';
+  if (!n || n === c || /^text(\s+\d+)?$/i.test(n)) return 'Text';
+  return pascalCase(n) || 'Text';
+}
+
+/**
+ * 같은 구조 멤버들 사이 **값이 다른 슬롯만** 컴포넌트 속성으로 계획.
+ * 두 버튼의 라벨만 "확인"/"취소"로 다르면 TEXT 속성 1개(인스턴스에서 값만 변경).
+ * 공통으로 같은 텍스트·아이콘은 속성에 올리지 않는다.
+ * 레이어명이 카피마다 달라도 트리 위치(`layerPath`)로 같은 슬롯을 본다.
+ *
+ * **`이름?` → BOOLEAN 우선**(TEXT여도) — `inferComponentProperties`와 동일.
+ * **heading**: 액션 INSTANCE 유무 차이 → BOOLEAN(가시성), 경로는 액션이 있는 대표 트리 기준.
+ */
+export function inferVaryingComponentProperties(members: readonly StructNode[]): CompPropPlan[] {
+  if (members.length < 2) return [];
+  if (members.every((m) => highConfidenceComponentRole(m as LikeNode) === 'heading')) {
+    return inferVaryingHeadingProperties(members);
+  }
+  const out: CompPropPlan[] = [];
+  const taken = new Set<string>();
+  const uniq = (base: string): string => {
+    let n = base || 'Prop';
+    let i = 2;
+    while (taken.has(n)) n = `${base || 'Prop'}-${i++}`;
+    taken.add(n);
+    return n;
+  };
+
+  const visit = (nodes: readonly StructNode[], path: string): void => {
+    const rep = nodes[0];
+    if (!rep) return;
+
+    if (path !== '') {
+      // `?` 접미사 → BOOLEAN 우선(TEXT·INSTANCE여도 가시성 토글).
+      if (rep.name.trim().endsWith('?')) {
+        const vals = nodes.map((n) => n.visible !== false);
+        if (new Set(vals).size > 1) {
+          out.push({
+            propName: uniq(pascalCase(rep.name.replace(/\?+$/, '')) || 'Show'),
+            type: 'BOOLEAN',
+            layerName: rep.name,
+            layerPath: path,
+            field: 'visible',
+          });
+        }
+      } else if (rep.type === 'TEXT') {
+        const vals = nodes.map((n) => n.characters ?? '');
+        if (new Set(vals).size > 1) {
+          out.push({
+            propName: uniq(textPropBaseName(rep)),
+            type: 'TEXT',
+            layerName: rep.name,
+            layerPath: path,
+            field: 'characters',
+          });
+        }
+      } else if (rep.type === 'INSTANCE') {
+        const vals = nodes.map((n) => n.mainComponentKey ?? '');
+        if (new Set(vals).size > 1) {
+          out.push({
+            propName: uniq(pascalCase(rep.name) || 'Swap'),
+            type: 'INSTANCE_SWAP',
+            layerName: rep.name,
+            layerPath: path,
+            field: 'mainComponent',
+          });
+        }
+      }
+    }
+
+    if (rep.type === 'INSTANCE' || rep.type === 'TEXT') return;
+    const lens = nodes.map((n) => (n.children ?? []).length);
+    if (new Set(lens).size !== 1) return;
+    const n = lens[0] ?? 0;
+    for (let i = 0; i < n; i++) {
+      const kids = nodes.map((m) => (m.children ?? [])[i]).filter((c): c is StructNode => !!c);
+      if (kids.length !== nodes.length) return;
+      visit(kids, path === '' ? String(i) : `${path}/${i}`);
+    }
+  };
+
+  visit(members, '');
+  return out;
+}
+
+/** heading 그룹에서 액션 슬롯이 가장 많은 멤버 인덱스(마스터 후보). */
+export function pickCollapseMasterIndex(members: readonly StructNode[]): number {
+  if (members.length === 0) return 0;
+  let best = 0;
+  let bestActions = headingActionCount(members[0]);
+  let bestKids = members[0].children?.length ?? 0;
+  for (let i = 1; i < members.length; i++) {
+    const a = headingActionCount(members[i]);
+    const k = members[i].children?.length ?? 0;
+    if (a > bestActions || (a === bestActions && k > bestKids)) {
+      best = i;
+      bestActions = a;
+      bestKids = k;
+    }
+  }
+  return best;
+}
+
+function headingActionCount(node: StructNode): number {
+  const slots = parseHeadingSlots(node as LikeNode);
+  if (!slots) return 0;
+  return slots.filter((s) => s.kind === 'action').length;
+}
+
+/** heading 접힘 — 타이틀/메타는 개수 일치, 액션은 optional, 값은 슬롯 정렬. */
+function inferVaryingHeadingProperties(members: readonly StructNode[]): CompPropPlan[] {
+  const bundles = members.map((m) => parseHeadingSlots(m as LikeNode));
+  if (bundles.some((b) => !b)) return [];
+  const repIdx = pickCollapseMasterIndex(members);
+  const out: CompPropPlan[] = [];
+  const taken = new Set<string>();
+  const uniq = (base: string): string => {
+    let n = base || 'Prop';
+    let i = 2;
+    while (taken.has(n)) n = `${base || 'Prop'}-${i++}`;
+    taken.add(n);
+    return n;
+  };
+
+  const ofKind = (slots: NonNullable<(typeof bundles)[0]>, kind: 'title' | 'action' | 'meta') =>
+    slots.filter((s) => s.kind === kind);
+
+  const titles = bundles.map((b) => ofKind(b!, 'title'));
+  const metas = bundles.map((b) => ofKind(b!, 'meta'));
+  const actions = bundles.map((b) => ofKind(b!, 'action'));
+  const titleCount = titles[repIdx].length;
+  const metaCount = metas[repIdx].length;
+  if (titles.some((t) => t.length !== titleCount) || metas.some((m) => m.length !== metaCount)) return [];
+
+  /** 대표 멤버 노드를 앞에 두어 layerName·타입이 마스터 기준이 되게. */
+  const aroundRep = <T>(arr: T[]): T[] => {
+    if (repIdx === 0) return arr;
+    return [arr[repIdx], ...arr.filter((_, i) => i !== repIdx)];
+  };
+
+  // 타이틀 슬롯 — TEXT(직접 또는 래퍼 안)
+  for (let ti = 0; ti < titleCount; ti++) {
+    const repTitle = titles[repIdx][ti];
+    const nodes = aroundRep(titles.map((t) => t[ti].node as StructNode));
+    collectVaryingUnder(nodes, String(repTitle.childIndex), {
+      kind: 'title',
+      slotIndex: ti,
+    }, out, uniq);
+  }
+
+  // 메타 슬롯
+  for (let mi = 0; mi < metaCount; mi++) {
+    const repMeta = metas[repIdx][mi];
+    const nodes = aroundRep(metas.map((m) => m[mi].node as StructNode));
+    collectVaryingUnder(nodes, String(repMeta.childIndex), {
+      kind: 'meta',
+      slotIndex: mi,
+    }, out, uniq);
+  }
+
+  // 액션 — 유무 차이 → BOOLEAN(메타 패턴일 때만), 둘 다 있으면 스왑
+  const maxActions = Math.max(...actions.map((a) => a.length));
+  for (let ai = 0; ai < maxActions; ai++) {
+    const present = actions.map((a) => ai < a.length);
+    const repAction = actions[repIdx][ai];
+    if (!repAction) continue; // 대표에 없으면 경로를 못 만듦 — 마스터 선택으로 방지
+    const layerPath = String(repAction.childIndex);
+    const layerName = (repAction.node as StructNode).name;
+    if (present.some((p) => !p)) {
+      if (metaCount < 1) continue; // 버튼형 과접힘 방지 — shouldCollapse와 동일 가드
+      out.push({
+        propName: uniq(pascalCase(layerName) || 'Action'),
+        type: 'BOOLEAN',
+        layerName,
+        layerPath,
+        field: 'visible',
+        headingSlot: { kind: 'action', slotIndex: ai },
+      });
+    } else {
+      const keys = actions.map((a) => (a[ai].node as StructNode).mainComponentKey ?? '');
+      if (new Set(keys).size > 1) {
+        out.push({
+          propName: uniq(pascalCase(layerName) || 'Swap'),
+          type: 'INSTANCE_SWAP',
+          layerName,
+          layerPath,
+          field: 'mainComponent',
+          headingSlot: { kind: 'action', slotIndex: ai },
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+/** 동형 서브트리에서 변하는 TEXT/`?`/INSTANCE만 계획에 추가(heading 슬롯 메타 포함). */
+function collectVaryingUnder(
+  nodes: readonly StructNode[],
+  path: string,
+  heading: { kind: 'title' | 'meta'; slotIndex: number; innerPath?: string },
+  out: CompPropPlan[],
+  uniq: (base: string) => string,
+): void {
+  const rep = nodes[0];
+  if (!rep) return;
+
+  if (path !== '' || heading.innerPath != null) {
+    const effectivePath = path;
+    if (rep.name.trim().endsWith('?')) {
+      const vals = nodes.map((n) => n.visible !== false);
+      if (new Set(vals).size > 1) {
+        out.push({
+          propName: uniq(pascalCase(rep.name.replace(/\?+$/, '')) || 'Show'),
+          type: 'BOOLEAN',
+          layerName: rep.name,
+          layerPath: effectivePath,
+          field: 'visible',
+          headingSlot: { ...heading },
+        });
+      }
+    } else if (rep.type === 'TEXT') {
+      const vals = nodes.map((n) => n.characters ?? '');
+      if (new Set(vals).size > 1) {
+        out.push({
+          propName: uniq(textPropBaseName(rep)),
+          type: 'TEXT',
+          layerName: rep.name,
+          layerPath: effectivePath,
+          field: 'characters',
+          headingSlot: { ...heading },
+        });
+      }
+    } else if (rep.type === 'INSTANCE') {
+      const vals = nodes.map((n) => n.mainComponentKey ?? '');
+      if (new Set(vals).size > 1) {
+        out.push({
+          propName: uniq(pascalCase(rep.name) || 'Swap'),
+          type: 'INSTANCE_SWAP',
+          layerName: rep.name,
+          layerPath: effectivePath,
+          field: 'mainComponent',
+          headingSlot: { ...heading },
+        });
+      }
+    }
+  }
+
+  if (rep.type === 'INSTANCE' || rep.type === 'TEXT') return;
+  const lens = nodes.map((n) => (n.children ?? []).length);
+  if (new Set(lens).size !== 1) return;
+  const n = lens[0] ?? 0;
+  for (let i = 0; i < n; i++) {
+    const kids = nodes.map((m) => (m.children ?? [])[i]).filter((c): c is StructNode => !!c);
+    if (kids.length !== nodes.length) return;
+    const childPath = path === '' ? String(i) : `${path}/${i}`;
+    const inner = heading.innerPath == null ? String(i) : `${heading.innerPath}/${i}`;
+    // 타이틀이 루트 TEXT면 path가 이미 childIndex — 첫 visit에서 처리됨.
+    // 래퍼/메타는 자식으로 내려가며 innerPath를 쌓는다.
+    collectVaryingUnder(kids, childPath, { ...heading, innerPath: inner }, out, uniq);
+  }
+}
+
+/**
+ * 접힘 속성 계획에 맞춰 StructNode에서 값 스냅샷.
+ * headingSlot이 있으면 멤버별 자식 인덱스 불일치를 슬롯으로 해소.
+ * BOOLEAN 대상이 없으면 false(optional 액션 결손).
+ */
+export function propValuesFromStruct(
+  root: StructNode,
+  plan: readonly CompPropPlan[],
+): Record<string, string | boolean> {
+  const out: Record<string, string | boolean> = {};
+  for (const p of plan) {
+    if (p.headingSlot) {
+      const v = readHeadingSlotProp(root, p);
+      if (v !== undefined) out[p.propName] = v;
+      continue;
+    }
+    const target = p.layerPath ? structAtPath(root, p.layerPath) : null;
+    if (!target) {
+      if (p.type === 'BOOLEAN') out[p.propName] = false;
+      continue;
+    }
+    out[p.propName] = structPropValue(target, p.type);
+  }
+  return out;
+}
+
+function readHeadingSlotProp(root: StructNode, p: CompPropPlan): string | boolean | undefined {
+  const hs = p.headingSlot!;
+  const slots = parseHeadingSlots(root as LikeNode);
+  if (!slots) {
+    return p.type === 'BOOLEAN' ? false : undefined;
+  }
+  const ofKind = slots.filter((s) => s.kind === hs.kind);
+  const slot = ofKind[hs.slotIndex];
+  if (!slot) {
+    return p.type === 'BOOLEAN' ? false : undefined;
+  }
+  let node = slot.node as StructNode;
+  if (hs.innerPath) {
+    const inner = structAtPath(node, hs.innerPath);
+    if (!inner) return p.type === 'BOOLEAN' ? false : undefined;
+    node = inner;
+  } else if (p.type === 'TEXT' && node.type !== 'TEXT') {
+    // 타이틀 래퍼 → 단일 TEXT 자식
+    const kid = (node.children ?? []).find((c) => c.type === 'TEXT');
+    if (kid) node = kid;
+  }
+  return structPropValue(node, p.type);
+}
+
+function structAtPath(root: StructNode, path: string): StructNode | null {
+  let cur: StructNode = root;
+  for (const seg of path.split('/').filter(Boolean)) {
+    const i = Number(seg);
+    const kids = cur.children ?? [];
+    if (!Number.isInteger(i) || i < 0 || i >= kids.length) return null;
+    cur = kids[i];
+  }
+  return cur;
+}
+
+function structPropValue(node: StructNode, type: CompPropType): string | boolean {
+  if (type === 'BOOLEAN') return node.visible !== false;
+  if (type === 'TEXT') return node.characters ?? '';
+  return node.mainComponentKey ?? '';
 }
 
 /**
@@ -353,8 +734,8 @@ export function classifyVariants(names: string[]): ClassifyResult {
 }
 
 /* ---------- #1: 컴포넌트 등록 후보 스캔(순수) ---------- */
-/** 스캔 입력 노드(figma SceneNode와 구조적으로 호환되는 최소 형태). */
-export interface ScanNode {
+/** 스캔 입력 노드(figma SceneNode·LikeNode와 구조적으로 호환). */
+export interface ScanNode extends LikeNode {
   id: string;
   name: string;
   type: string;
@@ -370,7 +751,7 @@ export interface ComponentCandidateNode {
   type: string;
   depth: number;
   parentId: string | null;
-  /** 등록 가능(FRAME/GROUP 또는 역할이 재사용 원자인 말단, 잠금/컴포넌트/인스턴스/텍스트 아님). */
+  /** 등록 가능: 미잠금·보임 + (FRAME/GROUP은 고신뢰 시맨틱 역할 · 말단은 재사용 원자 역할). */
   eligible: boolean;
   /** 구조 그룹으로 묶일 **세트 이름**(미리보기). 세트(2개+) 후보일 때만. */
   group?: string;
@@ -378,6 +759,11 @@ export interface ComponentCandidateNode {
   variant?: string;
   /** **단독** 컴포넌트로 등록될 후보의 등록 이름(PascalCase). 단독일 때만(group과 배타). */
   single?: string;
+  /**
+   * 같은 이름 반복이지만 차이가 TEXT/SWAP/BOOLEAN뿐이라 **세트 대신 단품+속성**으로 접힘.
+   * UI는 기본 체크하고 [속성] 배지로 표시.
+   */
+  propsOnly?: boolean;
 }
 
 /**
@@ -391,15 +777,27 @@ export interface ComponentCandidateNode {
 const COMPONENT_ROLES = new Set(['icon', 'image', 'thumbnail', 'avatar', 'status', 'badge', 'divider']);
 
 /**
- * 컴포넌트로 등록 가능한 노드인가 — 잠금 제외 + 다음 중 하나.
- * - FRAME/GROUP(구조 노드): 이름 게이트 없이 모두
+ * 컴포넌트로 등록 가능한 노드인가 — 잠금·숨김 제외 + 다음 중 하나.
+ * - FRAME/GROUP: 고신뢰 역할(button/chip/table/card/list/field/nav/progress/figure/heading).
+ *   container/wrapper·랜드마크·임의 프레임은 제외 — 리네임 선행 없이 구조만으로 판정.
  * - 말단 노드: 리네임이 남긴 역할이 재사용 원자(`COMPONENT_ROLES`)일 때만.
  *   타원 아바타·벡터 아이콘처럼 프레임으로 감싸지 않은 요소를 그대로 등록하기 위한 통로다.
+ *
+ * 숨김(`visible === false`)은 두 경로 모두 제외 — BOOLEAN 속성용 자식 visible 판별과는 별개.
  */
 export function componentEligible(node: ScanNode): boolean {
-  if (node.locked) return false;
-  if (node.type === 'FRAME' || node.type === 'GROUP') return true;
+  if (node.locked || node.visible === false) return false;
+  if (node.type === 'FRAME' || node.type === 'GROUP') return isHighConfidenceComponent(node);
   return !!node.role && COMPONENT_ROLES.has(kebab(node.role));
+}
+
+/**
+ * 이미 컴포넌트 체계에 속한 서브트리 — 안으로 내려가면 안 된다.
+ * 인스턴스/메인/세트 안의 FRAME을 다시 등록 후보로 잡으면 중복·인스턴스 내부 변조가 된다.
+ * (리네임의 isSkippedSubtree와 같은 취지.)
+ */
+function isClosedComponentSubtree(node: ScanNode): boolean {
+  return node.type === 'INSTANCE' || node.type === 'COMPONENT' || node.type === 'COMPONENT_SET';
 }
 
 /**
@@ -412,17 +810,23 @@ export function componentEligible(node: ScanNode): boolean {
  * (다중 선택 시에는 선택 각각이 등록 단위이므로 최상위도 eligible. `REGISTER_COMPONENTS`의
  * 대상 결정과 동일한 규칙.)
  *
- * **게이트 없음**: 모든 FRAME/GROUP(미잠금)이 eligible. 사용자가 레이어 이름을 컨테이너/래퍼
- * 같은 임의 이름으로 짓는 실제 파일에서는 명사 사전 게이트가 진짜 컴포넌트(`row-container`,
- * `preview-container` 등)를 통째로 버린다. 그래서 모든 프레임을 선택 가능하게 두고, **반복되는
- * 이름**(2회+)만 기본 체크하도록 미리보기에서 `group`을 매긴다(code.ts). 잡음은 체크 해제로 회복.
+ * **고신뢰 게이트**: button/chip/card/list/field/nav/progress/figure/heading 구조만 eligible.
+ * **숨김 제외**: `visible === false` 노드는 후보·하위로 들어가지 않음(숨긴 프레임 단독 등록 방지).
+ * 반복 이름(2회+)은 스캔 후 구조 차이면 `group`(세트), 속성(텍스트/스왑/불리언)만
+ * 다르면 `propsOnly`(단품+속성) — UI 기본 체크(code.ts).
+ *
+ * **닫힌 서브트리**: INSTANCE · COMPONENT · COMPONENT_SET 안은 순회하지 않는다.
  */
 export function scanComponentCandidates(selection: readonly ScanNode[]): ComponentCandidateNode[] {
   const single = selection.length === 1;
   const all: ComponentCandidateNode[] = [];
   const visit = (n: ScanNode, depth: number, parentId: string | null): void => {
+    // 숨김은 후보도 아니고 안쪽도 스캔하지 않음(실효 비가시 트리).
+    if (n.visible === false) return;
     const isContainerRoot = single && depth === 0; // 컨테이너 자신 → 등록 제외
     all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
+    // 이미 등록된 컴포넌트 체계는 서브트리째 스킵(안쪽 FRAME을 새 후보로 잡지 않음).
+    if (isClosedComponentSubtree(n)) return;
     if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
   };
   for (const n of selection) visit(n, 0, null);
@@ -459,7 +863,189 @@ export interface StructNode extends ScanNode {
   fillHex?: string | null;
   /** 리네임이 남긴 역할(pluginData `dsRole`). 사람이 지은 이름에는 없다. */
   role?: string;
+  /** TEXT 레이어 문자열 — 속성 접힘(collapse) 판별용. */
+  characters?: string;
+  /** INSTANCE의 mainComponent key(또는 id) — swap 접힘 판별용. */
+  mainComponentKey?: string | null;
   children?: readonly StructNode[];
+}
+
+/**
+ * 같은 이름 그룹이 **베리언트 세트**가 아니라 **단품 + 컴포넌트 속성**으로 접혀야 하는지.
+ *
+ * 구조(타입·레이어명·자식 수·layout·fill·패딩)가 같고, 차이가 아래뿐이면 collapse:
+ * - TEXT `characters` → TEXT 속성
+ * - INSTANCE `mainComponent` → INSTANCE_SWAP
+ * - 이름 `?` 레이어의 `visible` → BOOLEAN
+ *
+ * **heading 예외**: 타이틀·메타 슬롯 개수가 같고(메타≥1) 액션 INSTANCE만 유무가 다르면
+ * 구조 차로 보지 않고 접힘(BOOLEAN). 버튼 아이콘 결손 등 메타 없는 케이스는 해당 없음.
+ *
+ * 크기만 다르면(카피 변화 없음) Size 세트로 본다. 카피/스왑 차이와 함께 크기가
+ * 달라진 경우(오토레이아웃)는 속성 접힘으로 보고 크기는 무시한다.
+ */
+export function shouldCollapseToProperties(members: readonly StructNode[]): boolean {
+  if (members.length < 2) return false;
+  if (members.every((m) => highConfidenceComponentRole(m as LikeNode) === 'heading')) {
+    return shouldCollapseHeadingMembers(members);
+  }
+  const base = members[0];
+  for (let i = 1; i < members.length; i++) {
+    const d = diffForCollapse(base, members[i]);
+    if (d.struct) return false;
+    if (d.size && !d.prop) return false;
+  }
+  // 완전 동일 복제(prop 없음·struct/size 없음)도 단품 1개 + 인스턴스 N개로 접는다.
+  return true;
+}
+
+/** heading: 슬롯 정렬 비교 — 액션 optional(메타 있을 때만), 타이틀/메타 개수·내부 구조는 일치. */
+function shouldCollapseHeadingMembers(members: readonly StructNode[]): boolean {
+  const bundles = members.map((m) => parseHeadingSlots(m as LikeNode));
+  if (bundles.some((b) => !b)) return false;
+
+  const ofKind = (slots: NonNullable<(typeof bundles)[0]>, kind: 'title' | 'action' | 'meta') =>
+    slots.filter((s) => s.kind === kind);
+
+  const titleNs = bundles.map((b) => ofKind(b!, 'title').length);
+  const metaNs = bundles.map((b) => ofKind(b!, 'meta').length);
+  const actionNs = bundles.map((b) => ofKind(b!, 'action').length);
+  if (new Set(titleNs).size !== 1 || new Set(metaNs).size !== 1) return false;
+
+  // 액션 개수 불일치는 Num 등 메타가 있을 때만 optional — 없으면 버튼(라벨+아이콘) 과접힘 방지.
+  if (new Set(actionNs).size !== 1 && metaNs[0] < 1) return false;
+
+  const base = members[0];
+  for (let i = 1; i < members.length; i++) {
+    const d = diffHeadingPair(base, members[i], bundles[0]!, bundles[i]!);
+    if (d.struct) return false;
+    if (d.size && !d.prop) return false;
+  }
+  return true;
+}
+
+function diffHeadingPair(
+  a: StructNode,
+  b: StructNode,
+  slotsA: NonNullable<ReturnType<typeof parseHeadingSlots>>,
+  slotsB: NonNullable<ReturnType<typeof parseHeadingSlots>>,
+): { prop: boolean; struct: boolean; size: boolean } {
+  let prop = false;
+  let struct = false;
+  let size = false;
+
+  // 루트 크롬(자식 제외)
+  if ((a.layoutMode ?? 'NONE') !== (b.layoutMode ?? 'NONE')) struct = true;
+  if ((a.fillHex ?? null) !== (b.fillHex ?? null)) struct = true;
+  if ((a.paddingTop ?? 0) !== (b.paddingTop ?? 0) ||
+      (a.paddingRight ?? 0) !== (b.paddingRight ?? 0) ||
+      (a.paddingBottom ?? 0) !== (b.paddingBottom ?? 0) ||
+      (a.paddingLeft ?? 0) !== (b.paddingLeft ?? 0) ||
+      (a.itemSpacing ?? 0) !== (b.itemSpacing ?? 0) ||
+      (a.counterAxisSpacing ?? 0) !== (b.counterAxisSpacing ?? 0)) {
+    struct = true;
+  }
+  if ((a.width ?? 0) !== (b.width ?? 0) || (a.height ?? 0) !== (b.height ?? 0)) size = true;
+  if (struct) return { prop, struct, size };
+
+  const kind = (s: typeof slotsA, k: 'title' | 'action' | 'meta') => s.filter((x) => x.kind === k);
+
+  const titlesA = kind(slotsA, 'title');
+  const titlesB = kind(slotsB, 'title');
+  for (let i = 0; i < titlesA.length; i++) {
+    const d = diffForCollapse(titlesA[i].node as StructNode, titlesB[i].node as StructNode);
+    if (d.struct) return { prop: true, struct: true, size };
+    if (d.prop) prop = true;
+    if (d.size) size = true;
+  }
+
+  const metasA = kind(slotsA, 'meta');
+  const metasB = kind(slotsB, 'meta');
+  for (let i = 0; i < metasA.length; i++) {
+    const d = diffForCollapse(metasA[i].node as StructNode, metasB[i].node as StructNode);
+    if (d.struct) return { prop, struct: true, size };
+    if (d.prop) prop = true;
+    if (d.size) size = true;
+  }
+
+  const actionsA = kind(slotsA, 'action');
+  const actionsB = kind(slotsB, 'action');
+  const n = Math.max(actionsA.length, actionsB.length);
+  if (actionsA.length !== actionsB.length) prop = true;
+  for (let i = 0; i < n; i++) {
+    if (i >= actionsA.length || i >= actionsB.length) continue; // 결손은 prop으로 이미 처리
+    const d = diffForCollapse(actionsA[i].node as StructNode, actionsB[i].node as StructNode);
+    if (d.struct) return { prop, struct: true, size };
+    if (d.prop) prop = true;
+  }
+
+  return { prop, struct, size };
+}
+
+/** 두 트리 비교 — 속성으로 흡수 가능한 차이 / 구조 / 크기. INSTANCE 안은 비교하지 않음. */
+function diffForCollapse(a: StructNode, b: StructNode): { prop: boolean; struct: boolean; size: boolean } {
+  let prop = false;
+  let struct = false;
+  let size = false;
+
+  const walk = (x: StructNode, y: StructNode): void => {
+    if (struct) return;
+    if (x.type !== y.type) {
+      struct = true;
+      return;
+    }
+
+    // TEXT/INSTANCE는 레이어명이 카피·에셋마다 달라도 같은 슬롯(위치)로 본다.
+    if (x.type === 'TEXT') {
+      if ((x.characters ?? '') !== (y.characters ?? '')) prop = true;
+      return; // 텍스트 크기 차이는 카피 길이 때문일 수 있어 무시
+    }
+
+    if (x.type === 'INSTANCE') {
+      if ((x.mainComponentKey ?? '') !== (y.mainComponentKey ?? '')) prop = true;
+      return; // 인스턴스 내부는 자식 컴포넌트 소관
+    }
+
+    if (x.name !== y.name) {
+      struct = true;
+      return;
+    }
+
+    const xv = x.visible !== false;
+    const yv = y.visible !== false;
+    if (xv !== yv) {
+      if (x.name.trim().endsWith('?')) prop = true;
+      else struct = true;
+    }
+
+    if ((x.layoutMode ?? 'NONE') !== (y.layoutMode ?? 'NONE')) struct = true;
+    if ((x.fillHex ?? null) !== (y.fillHex ?? null)) struct = true;
+    if ((x.paddingTop ?? 0) !== (y.paddingTop ?? 0) ||
+        (x.paddingRight ?? 0) !== (y.paddingRight ?? 0) ||
+        (x.paddingBottom ?? 0) !== (y.paddingBottom ?? 0) ||
+        (x.paddingLeft ?? 0) !== (y.paddingLeft ?? 0) ||
+        (x.itemSpacing ?? 0) !== (y.itemSpacing ?? 0) ||
+        (x.counterAxisSpacing ?? 0) !== (y.counterAxisSpacing ?? 0)) {
+      struct = true;
+    }
+
+    const xw = x.width ?? 0;
+    const xh = x.height ?? 0;
+    const yw = y.width ?? 0;
+    const yh = y.height ?? 0;
+    if (xw !== yw || xh !== yh) size = true;
+
+    const xc = x.children ?? [];
+    const yc = y.children ?? [];
+    if (xc.length !== yc.length) {
+      struct = true;
+      return;
+    }
+    for (let i = 0; i < xc.length; i++) walk(xc[i], yc[i]);
+  };
+
+  walk(a, b);
+  return { prop, struct, size };
 }
 
 export interface StructGroup {

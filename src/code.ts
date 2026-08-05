@@ -1,21 +1,25 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode, RenameChange } from './shared/messages';
+import type { UiToCode, RenameChange, VarInfo, VarMode, VarValueCell, VarPatch, CodeToUi } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
-import { clusterTextStyles, nameTextStyles } from './lib/textStyles';
+import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
-import { rgbToHex, hexToRgb } from './lib/tokens';
+import { rgbToHex, hexToRgb, type ResolvedType, type ScopeName } from './lib/tokens';
+import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { ROLE_KEY } from './lib/naming';
-import { missingVariants, variantGrid, inferComponentProperties, scanComponentCandidates, componentEligible, groupByExactName, deriveVariants, resolveGroupNames } from './lib/components';
-import type { CompPropType, StructNode, StructGroup } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
+import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { checkContrast, type ContrastSample } from './lib/contrast';
+import { scanSimilar, componentizeSimilar } from './lib/similarApply';
+import { generateDarkMode } from './lib/themeApply';
+import { parseVarValue, sanitizeScopes, aliasSelfReference, findAliasReferers } from './lib/variableEdit';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
+import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { Preset, upsertPreset } from './lib/presets';
 import { commitUndo } from './lib/undo';
 
@@ -142,7 +146,7 @@ async function postPrereq(): Promise<void> {
 }
 
 /** Paid 게이트(공유 프리셋): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requireTeam(): boolean {
+function requirePresets(): boolean {
   return requirePaid('presets', '공유 프리셋은 Paid 기능입니다.');
 }
 
@@ -190,6 +194,170 @@ function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+/* ---------- 변수 편집기 / 다크 테마 생성 ---------- */
+
+// 우리가 만든 3계층만 편집 대상 — 남의 라이브러리 컬렉션을 건드리지 않는다.
+const EDITABLE_COLLECTIONS = new Set([GLOBAL, SEMANTIC, COMPONENT]);
+// 사용처 조회는 문서 전체를 훑는다 — 큰 파일에서 UI가 굳지 않게 상한을 둔다(도달 시 capped 표시).
+const USAGE_SCAN_CAP = 5000;
+
+function isVariableAlias(raw: unknown): raw is VariableAlias {
+  return !!raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS';
+}
+
+function toValueCell(type: ResolvedType, raw: VariableValue | undefined, nameById: Map<string, string>): VarValueCell {
+  if (isVariableAlias(raw)) {
+    const aliasId = raw.id;
+    const aliasName = nameById.get(aliasId);
+    return { kind: 'alias', display: aliasName ?? '(알 수 없음)', aliasId, aliasName };
+  }
+  if (type === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) {
+    return { kind: 'literal', display: rgbToHex(raw as RGB) };
+  }
+  if (raw === undefined) return { kind: 'literal', display: '' };
+  return { kind: 'literal', display: String(raw) };
+}
+
+function toVarInfo(v: Variable, col: VariableCollection, nameById: Map<string, string>): VarInfo {
+  const modes: VarMode[] = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
+  const values: Record<string, VarValueCell> = {};
+  for (const m of col.modes) values[m.modeId] = toValueCell(v.resolvedType, v.valuesByMode[m.modeId], nameById);
+  return {
+    id: v.id,
+    name: v.name,
+    collectionId: col.id,
+    collection: col.name,
+    type: v.resolvedType,
+    description: v.description ?? '',
+    scopes: v.scopes as ScopeName[],
+    hidden: v.hiddenFromPublishing,
+    modes,
+    defaultModeId: col.defaultModeId,
+    values,
+  };
+}
+
+async function collectVars(): Promise<VarInfo[]> {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const colById = new Map(cols.map((c) => [c.id, c]));
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const nameById = new Map(vars.map((v) => [v.id, v.name]));
+  const out: VarInfo[] = [];
+  for (const v of vars) {
+    const col = colById.get(v.variableCollectionId);
+    if (!col || !EDITABLE_COLLECTIONS.has(col.name)) continue;
+    out.push(toVarInfo(v, col, nameById));
+  }
+  out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
+  return out;
+}
+
+/** 별칭이 순환을 만드는지 — 대상에서 출발해 별칭 사슬을 따라가 source에 닿으면 순환. */
+async function aliasWouldCycle(sourceId: string, target: Variable): Promise<boolean> {
+  const seen = new Set<string>();
+  let frontier: Variable[] = [target];
+  while (frontier.length) {
+    const next: Variable[] = [];
+    for (const cur of frontier) {
+      if (cur.id === sourceId) return true;
+      if (seen.has(cur.id)) continue;
+      seen.add(cur.id);
+      for (const modeId of Object.keys(cur.valuesByMode)) {
+        const raw = cur.valuesByMode[modeId];
+        if (isVariableAlias(raw)) {
+          const nv = await figma.variables.getVariableByIdAsync(raw.id);
+          if (nv) next.push(nv);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return false;
+}
+
+async function applyVarValue(v: Variable, col: VariableCollection, value: NonNullable<VarPatch['value']>): Promise<string | null> {
+  const modeId = value.modeId || col.defaultModeId;
+  if (!col.modes.some((m) => m.modeId === modeId)) return '대상 모드를 찾을 수 없습니다.';
+  if (value.aliasId !== undefined) {
+    if (aliasSelfReference(v.id, value.aliasId)) return '변수를 자기 자신에 별칭할 수 없습니다.';
+    const target = await figma.variables.getVariableByIdAsync(value.aliasId);
+    if (!target) return '별칭 대상을 찾을 수 없습니다.';
+    if (target.resolvedType !== v.resolvedType) return '별칭 대상의 타입이 다릅니다.';
+    if (await aliasWouldCycle(v.id, target)) return '별칭이 순환 참조를 만듭니다.';
+    v.setValueForMode(modeId, figma.variables.createVariableAlias(target));
+    return null;
+  }
+  if (value.literal !== undefined) {
+    const p = parseVarValue(v.resolvedType, value.literal);
+    if (!p.ok) return p.error;
+    v.setValueForMode(modeId, p.value as VariableValue);
+    return null;
+  }
+  return null;
+}
+
+async function editVariable(id: string, patch: VarPatch): Promise<Extract<CodeToUi, { type: 'EDIT_VARIABLE_RESULT' }>> {
+  const v = await figma.variables.getVariableByIdAsync(id);
+  if (!v) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '변수를 찾을 수 없습니다.' };
+  const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+  if (!col || !EDITABLE_COLLECTIONS.has(col.name)) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '편집 대상이 아닌 컬렉션입니다.' };
+  try {
+    if (patch.name !== undefined) {
+      const nm = patch.name.trim();
+      if (!nm) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '이름을 입력하세요.' };
+      v.name = nm;
+    }
+    if (patch.description !== undefined) v.description = patch.description;
+    if (patch.hidden !== undefined) v.hiddenFromPublishing = patch.hidden;
+    if (patch.scopes) v.scopes = sanitizeScopes(patch.scopes, v.resolvedType);
+    if (patch.value) {
+      const err = await applyVarValue(v, col, patch.value);
+      if (err) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: err };
+    }
+  } catch (e) {
+    return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: errText(e) };
+  }
+  const all = await figma.variables.getLocalVariablesAsync();
+  const nameById = new Map(all.map((x) => [x.id, x.name]));
+  return { type: 'EDIT_VARIABLE_RESULT', id, ok: true, var: toVarInfo(v, col, nameById) };
+}
+
+function nodeBindsVar(node: SceneNode, varId: string): boolean {
+  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
+  if (!bv) return false;
+  const hits = (a: unknown): boolean => !!a && typeof a === 'object' && (a as VariableAlias).id === varId;
+  for (const key of Object.keys(bv)) {
+    const entry = bv[key];
+    if (Array.isArray(entry)) {
+      if (entry.some(hits)) return true;
+    } else if (entry && typeof entry === 'object') {
+      if (hits(entry)) return true; // {type,id} 형태
+      for (const v of Object.values(entry as Record<string, unknown>)) if (hits(v)) return true;
+    }
+  }
+  return false;
+}
+
+async function collectBoundNodes(varId: string): Promise<{ nodes: { id: string; name: string }[]; capped: boolean }> {
+  await figma.loadAllPagesAsync();
+  const nodes: { id: string; name: string }[] = [];
+  const stack: SceneNode[] = [];
+  for (const page of figma.root.children) stack.push(...(page.children as readonly SceneNode[]));
+  let scanned = 0;
+  let capped = false;
+  while (stack.length) {
+    if (scanned >= USAGE_SCAN_CAP) {
+      capped = true;
+      break;
+    }
+    const n = stack.pop() as SceneNode;
+    scanned++;
+    if (nodeBindsVar(n, varId)) nodes.push({ id: n.id, name: n.name });
+    if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
+  }
+  return { nodes, capped };
+}
+
 /** 노드가 속한 페이지(없으면 null) — 부모를 PAGE까지 거슬러 올라간다. */
 function pageOf(node: BaseNode): PageNode | null {
   let n: BaseNode | null = node;
@@ -198,7 +366,7 @@ function pageOf(node: BaseNode): PageNode | null {
 }
 
 /** Paid 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requirePro(): boolean {
+function requireComponents(): boolean {
   return requirePaid('components', '컴포넌트 등록·베리언트 분류는 Paid 기능입니다.');
 }
 
@@ -257,7 +425,7 @@ async function applySelectedBinding(item: { nodeId: string; field: string; index
 
 /** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireTextStyles(): boolean {
-  return requirePaid('components', '텍스트 스타일 등록은 Paid 기능입니다.');
+  return requirePaid('textStyles', '텍스트 스타일 등록은 Paid 기능입니다.');
 }
 
 async function savePresets(): Promise<void> {
@@ -311,6 +479,8 @@ loadLicense().then(() => {
    선택이 바뀔 때마다 선택 수·하위 요소 수·바인딩 후보 수를 UI에 알린다.
    대규모 선택에서도 안전하도록 스캔을 상한(SCAN_CAP)으로 제한한다. */
 const SCAN_CAP = 1500;
+/** 스킵 사유 칩 한 번에 선택할 레이어 상한 — 직렬 조회·대량 선택으로 멈추지 않게. */
+const SELECT_CAP = 200;
 function isBindableCandidate(n: SceneNode): boolean {
   const fills = (n as { fills?: unknown }).fills;
   const hasFills = Array.isArray(fills) && fills.some((p) => (p as Paint).type === 'SOLID' && (p as Paint).visible !== false);
@@ -323,6 +493,13 @@ function isBindableCandidate(n: SceneNode): boolean {
   const hasGap = !!lm && lm !== 'NONE' && typeof (n as { itemSpacing?: number }).itemSpacing === 'number';
   return hasFills || hasStrokes || hasRadius || hasFont || hasGap;
 }
+/**
+ * 이번 selectionchange가 플러그인 자신이 만든 것인가(스킵 칩 → 레이어 이동).
+ * UI는 선택이 바뀌면 바인딩 미리보기를 버리는데, 칩이 그 미리보기에서 나온 것이라
+ * 그대로 두면 칩 한 번 누르는 순간 칩 줄 자체가 사라진다.
+ */
+let selfSelect = false;
+
 function postSelection(): void {
   const sel = selection();
   let scanned = 0;
@@ -335,11 +512,15 @@ function postSelection(): void {
       break;
     }
     const n = stack.pop() as SceneNode;
+    // bind.ts의 walk와 같은 기준으로 세야 헤더의 '바인딩 후보 N개'와 실제 결과가 어긋나지 않는다.
+    if (n.visible === false) continue;
     scanned++;
     if (isBindableCandidate(n)) bindable++;
+    if (n.type === 'INSTANCE') continue; // 인스턴스 내부는 바인딩 대상이 아니다
     if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
   }
-  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped });
+  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, selfSelect });
+  selfSelect = false;
 }
 figma.on('selectionchange', postSelection);
 
@@ -373,16 +554,30 @@ function readRole(node: SceneNode): string | undefined {
   }
 }
 
-/** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색을 읽어 순수 그룹화에 넘김. */
+/** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑·역할을 읽어 순수 그룹화에 넘김. */
 function toStructNode(node: SceneNode): StructNode {
   const a = node as unknown as Record<string, unknown>;
   const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined);
   const kids = 'children' in node ? (node.children as readonly SceneNode[]) : [];
+  let characters: string | undefined;
+  let mainComponentKey: string | null | undefined;
+  if (node.type === 'TEXT') {
+    try { characters = node.characters; } catch { characters = ''; }
+  }
+  if (node.type === 'INSTANCE') {
+    try {
+      const main = node.mainComponent;
+      mainComponentKey = main ? (main.key || main.id) : null;
+    } catch {
+      mainComponentKey = null;
+    }
+  }
   return {
     id: node.id,
     name: node.name,
     type: node.type,
     locked: node.locked,
+    visible: node.visible,
     width: num(a.width),
     height: num(a.height),
     paddingTop: num(a.paddingTop),
@@ -393,47 +588,159 @@ function toStructNode(node: SceneNode): StructNode {
     counterAxisSpacing: num(a.counterAxisSpacing),
     layoutMode: typeof a.layoutMode === 'string' ? a.layoutMode : undefined,
     fillHex: solidFillHex(node),
+    characters,
+    mainComponentKey,
     role: readRole(node),
-    children: kids.map(toStructNode),
+    // INSTANCE 안은 자식 컴포넌트 소관 — 접힘 비교·속성 노출과 동일하게 펼치지 않음.
+    children: node.type === 'INSTANCE' ? [] : kids.map(toStructNode),
   };
 }
 
+/** 컴포넌트 루트 기준 레이어 + 경로(인스턴스 안 미진입). */
+function ownComponentLayersWithPath(root: ComponentNode | SceneNode): { node: SceneNode; path: string }[] {
+  const out: { node: SceneNode; path: string }[] = [];
+  const walk = (n: SceneNode, path: string): void => {
+    if (n !== root) out.push({ node: n, path });
+    if (n.type === 'INSTANCE') return;
+    if (!('children' in n)) return;
+    const kids = n.children as readonly SceneNode[];
+    for (let i = 0; i < kids.length; i++) {
+      walk(kids[i], path === '' ? String(i) : `${path}/${i}`);
+    }
+  };
+  walk(root, '');
+  return out;
+}
+
+/** @deprecated 경로 없는 목록 — 동명 레이어 매칭에 취약. 가급적 withPath 사용. */
+function ownComponentLayers(root: ComponentNode | SceneNode): SceneNode[] {
+  return ownComponentLayersWithPath(root).map((x) => x.node);
+}
+
+/** 루트 기준 자식 인덱스 경로(`0/1`)로 노드 찾기. */
+function nodeAtPath(root: SceneNode, path: string): SceneNode | null {
+  let cur: SceneNode = root;
+  for (const seg of path.split('/').filter(Boolean)) {
+    if (!('children' in cur)) return null;
+    const i = Number(seg);
+    if (!Number.isFinite(i)) return null;
+    const kids = cur.children as readonly SceneNode[];
+    if (!kids[i]) return null;
+    cur = kids[i];
+  }
+  return cur;
+}
+
+function propDefaultFor(target: SceneNode, type: CompPropType): string | boolean {
+  if (type === 'TEXT') return target.type === 'TEXT' ? target.characters : '';
+  if (type === 'BOOLEAN') return target.visible;
+  return target.type === 'INSTANCE' && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : '';
+}
+
+/** 조상 체인 포함 실효 가시성 — 부모만 숨겨도 자식은 후보에서 제외. */
+function isEffectivelyVisible(node: SceneNode): boolean {
+  let p: BaseNode | null = node;
+  while (p) {
+    if ('visible' in p && (p as SceneNode).visible === false) return false;
+    p = p.parent;
+  }
+  return true;
+}
+
+/** 등록/스캔 공통: 실효 보임 + componentEligible. */
+function sceneComponentEligible(n: SceneNode): boolean {
+  if (!isEffectivelyVisible(n)) return false;
+  // FRAME/GROUP은 구조만으로 판정하므로 노드를 그대로 넘긴다.
+  if (n.type === 'FRAME' || n.type === 'GROUP') return componentEligible(n as ScanNode);
+  // 말단은 리네임이 남긴 dsRole로만 열린다 — SceneNode엔 그 필드가 없어 읽어 채운다.
+  return componentEligible({ id: n.id, name: n.name, type: n.type, locked: n.locked, visible: n.visible, role: readRole(n) });
+}
+
+/** 계획의 layerPath(우선) 또는 layerName으로 대상 레이어 찾기. */
+function resolvePropTarget(root: SceneNode, p: CompPropPlan): SceneNode | null {
+  if (p.layerPath != null && p.layerPath !== '') {
+    // 경로가 있으면 이름 폴백 금지 — 동명 레이어에 잘못 묶여 고아 속성이 생기는 것 방지.
+    return nodeAtPath(root, p.layerPath);
+  }
+  return ownComponentLayers(root).find((l) => l.name === p.layerName) ?? null;
+}
+
+/** 레이어 계획에 맞춰 노드에서 속성값 스냅샷(등록 전·노드 소멸 전). */
+function propValuesFromNode(root: SceneNode, plan: readonly CompPropPlan[]): Record<string, string | boolean> {
+  return propValuesFromStruct(toStructNode(root), plan);
+}
+
+/** 컴포넌트 속성 정의에서 propName → property id. */
+function propIdsByName(container: ComponentNode | ComponentSetNode): Map<string, string> {
+  const map = new Map<string, string>();
+  const defs = container.componentPropertyDefinitions;
+  if (!defs) return map;
+  for (const [id, def] of Object.entries(defs)) {
+    if (def && typeof def === 'object' && 'name' in def && typeof (def as { name: string }).name === 'string') {
+      map.set((def as { name: string }).name, id);
+    }
+  }
+  return map;
+}
+
+function applyInstancePropValues(
+  inst: InstanceNode,
+  ids: Map<string, string>,
+  values: Record<string, string | boolean>,
+): void {
+  const payload: { [key: string]: string | boolean } = {};
+  for (const [name, val] of Object.entries(values)) {
+    const id = ids.get(name);
+    if (id != null) payload[id] = val;
+  }
+  if (Object.keys(payload).length) {
+    try { inst.setProperties(payload); } catch { /* 일부 속성 적용 실패 무시 */ }
+  }
+}
+
 /**
- * 컴포넌트/세트의 **직속 레이어**를 컴포넌트 속성으로 노출(등록에 자동 통합).
- * `inferComponentProperties` 규칙: TEXT→Text · INSTANCE→Instance-swap · 이름 `?`→Boolean(가시성).
- * **인스턴스 내부로는 진입하지 않는다** — 중첩 컴포넌트(예: 카드 안 image-wrapper 인스턴스)는
- * 그 자체를 swap 후보로만 보고, 내부 텍스트는 해당 자식 컴포넌트가 노출(속성 폭발 방지).
- * 세트는 모든 변형의 동명 레이어에 참조 연결. 반환: 노출된 `속성명:타입` 목록.
+ * 컴포넌트/세트의 레이어를 컴포넌트 속성으로 노출(등록에 자동 통합).
+ *
+ * **TEXT 노출 정책(경로별)**:
+ * - **속성 접힘**(같은 이름·구조 동형, 카피/스왑만 다름): `inferVaryingComponentProperties` —
+ *   값이 다른 슬롯만 속성. 인스턴스에서 값 오버라이드.
+ * - **단독·베리언트 세트**: `inferComponentProperties` — 트리의 TEXT/INSTANCE/`?`를
+ *   컴포넌트 API로 전부 노출(인스턴스에서 라벨 등을 바꿀 수 있게). 동명·동일 카피는 1개만.
+ * 두 경로 모두 **레이어 경로**로 연결(`이름?` → BOOLEAN 우선 동일).
+ *
+ * **인스턴스 내부로는 진입하지 않는다** — 중첩 컴포넌트는 swap 후보로만.
+ * 반환: 노출된 `속성명:타입` 목록.
  */
 function exposeProperties(container: ComponentNode | ComponentSetNode, scopes: readonly ComponentNode[]): string[] {
-  const ownLayers = (root: ComponentNode): SceneNode[] => {
-    const out: SceneNode[] = [];
-    const walk = (n: SceneNode): void => {
-      if (n !== root) out.push(n);
-      if (n.type === 'INSTANCE') return; // 인스턴스 내부 = 그 컴포넌트 소관
-      if ('children' in n) for (const c of n.children as readonly SceneNode[]) walk(c);
-    };
-    walk(root);
-    return out;
-  };
-  const defaultFor = (target: SceneNode, type: CompPropType): string | boolean => {
-    if (type === 'TEXT') return target.type === 'TEXT' ? target.characters : '';
-    if (type === 'BOOLEAN') return target.visible;
-    return target.type === 'INSTANCE' && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : '';
-  };
-  const scopeLayers = scopes.map((s) => ownLayers(s));
-  const repLayers = scopeLayers[0];
-  if (!repLayers) return [];
+  const rep = scopes[0];
+  if (!rep) return [];
+  const layered = ownComponentLayersWithPath(rep);
+  const plan = inferComponentProperties(
+    layered.map(({ node, path }) => ({
+      name: node.name,
+      type: node.type,
+      path,
+      characters: node.type === 'TEXT' ? node.characters : undefined,
+    })),
+  );
+  return exposePropertiesFromPlan(container, scopes, plan);
+}
+
+/** 주어진 계획만 속성으로 노출(접힘: 값이 다른 슬롯만). */
+function exposePropertiesFromPlan(
+  container: ComponentNode | ComponentSetNode,
+  scopes: readonly ComponentNode[],
+  plan: readonly CompPropPlan[],
+): string[] {
   const out: string[] = [];
-  const plan = inferComponentProperties(repLayers.map((l) => ({ name: l.name, type: l.type })));
   for (const p of plan) {
-    const repTarget = repLayers.find((l) => l.name === p.layerName);
+    const repTarget = resolvePropTarget(scopes[0], p);
     if (!repTarget) continue;
     try {
-      const id = container.addComponentProperty(p.propName, p.type, defaultFor(repTarget, p.type));
-      for (const layers of scopeLayers) {
-        const target = layers.find((l) => l.name === p.layerName);
-        if (!target) continue; // 해당 레이어 없는 변형은 스킵
+      const id = container.addComponentProperty(p.propName, p.type, propDefaultFor(repTarget, p.type));
+      for (const scope of scopes) {
+        const target = resolvePropTarget(scope, p);
+        if (!target) continue;
         const refs = { ...(target.componentPropertyReferences ?? {}) };
         refs[p.field] = id;
         target.componentPropertyReferences = refs;
@@ -554,14 +861,20 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_TOKENS': {
-        // Free/Paid: 미리보기는 무료 · 실제 변수 생성은 Paid.
+        // 실제 변수 생성만 Paid(미리보기는 비파괴 읽기라 백엔드는 허용 — UI가 무료 티어에서 버튼을 잠근다).
         if (!msg.preview && !requirePaid('tokens', '토큰(변수) 생성은 Paid 기능입니다. 미리보기는 무료로 제공됩니다.')) break;
-        // UX1: preview면 변수를 만들지 않고 예정 수만 집계.
-        const s = msg.preview ? await previewCreateTokens(msg.tokens) : await createTokens(msg.tokens, msg.base);
+        // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
+        const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
         if (pruned) summary += ` · 이전 색 ${pruned}개 정리`;
+        // base 반영 — 비-px 값이 실제로 얼마가 되는지 요약에 노출. base를 바꾸면 이 줄이 바뀐다.
+        if (s.conversions.length) {
+          const px = (n: number): string => String(Math.round(n * 100) / 100);
+          const ex = s.conversions.slice(0, 2).map((c) => `${c.from}→${px(c.to)}px`).join(', ');
+          summary += ` · base ${msg.base}px 환산 ${s.conversions.length}개(${ex}${s.conversions.length > 2 ? ' 외' : ''})`;
+        }
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
@@ -592,6 +905,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           cancelled: r.cancelled,
           candidates: r.candidates, // #6: 미리보기 후보(dry-run만)
           nodes: r.nodes, // #13: 미리보기 트리 맥락
+          skips: r.skips, // 사유별 건너뛴 레이어(dry-run만)
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
@@ -600,6 +914,32 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'CANCEL': {
         bindCancel = true; // UX6: 다음 양보 지점에서 중단
+        break;
+      }
+      case 'SELECT_NODES': {
+        // 스킵 사유 → 원인 레이어로 이동(읽기 전용). 삭제·페이지 이동으로 사라진 id는 조용히 무시하고,
+        // 현재 페이지에 남은 것만 선택한다(다른 페이지 노드를 selection에 넣으면 런타임이 거부).
+        // 상한 — 사유 하나에 수천 건이 걸릴 수 있다(자유 배치 프레임이 많은 페이지). 전부 조회하면
+        // 직렬 await로 플러그인이 수 초간 멈추고, 전체 선택 + scrollAndZoomIntoView는 페이지 전체로
+        // 축소돼 오히려 원인을 못 찾는다. 앞에서부터 잘라 보여주고 몇 개를 생략했는지 알린다.
+        const ids = msg.ids.slice(0, SELECT_CAP);
+        const found: SceneNode[] = [];
+        for (const id of ids) {
+          const n = await figma.getNodeByIdAsync(id);
+          if (n && n.type !== 'PAGE' && n.type !== 'DOCUMENT' && (n as SceneNode).parent) found.push(n as SceneNode);
+        }
+        const onPage = found.filter((n) => {
+          for (let p: BaseNode | null = n; p; p = p.parent) if (p.id === figma.currentPage.id) return true;
+          return false;
+        });
+        if (onPage.length) {
+          const cur = figma.currentPage.selection;
+          // 선택이 실제로 바뀔 때만 표시한다 — 안 바뀌면 selectionchange가 안 와서 플래그가 남는다.
+          if (onPage.length !== cur.length || onPage.some((n, i) => cur[i] !== n)) selfSelect = true;
+          figma.currentPage.selection = onPage;
+          figma.viewport.scrollAndZoomIntoView(onPage);
+        }
+        post({ type: 'SELECT_RESULT', found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
         break;
       }
       case 'APPLY_SELECTED': {
@@ -627,10 +967,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'RENAME_APPLY': {
         // #7: 미리보기 트리에서 체크한 항목만 직접 적용(재계산 없이 id→after 그대로).
         const changes: RenameChange[] = [];
-        for (const { id, after } of msg.items) {
+        for (const { id, before: expectedBefore, after } of msg.items) {
           const node = await figma.getNodeByIdAsync(id);
           if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
           const before = node.name;
+          if (before !== expectedBefore) continue; // 미리보기 이후 이름이 바뀐 노드는 stale 적용 방지
           if (before === after) continue;
           node.name = after;
           changes.push({ id, before, after });
@@ -652,15 +993,26 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
         const { samples, warnings } = scanTextStyles(selection());
-        // 기존 로컬 스타일 목록 전달 → 노드 바인딩/시그니처가 같은 후보는 '이미 등록'으로 인식(이름 유지).
-        const styles = nameTextStyles(clusterTextStyles(samples), await scanExistingTextStyles());
-        post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+        const existing = await scanExistingTextStyles();
+        if (msg.useRowLabels) {
+          const r = nameTextStylesWithRowLabels(samples, existing);
+          post({
+            type: 'TEXT_STYLE_CANDIDATES',
+            styles: r.styles,
+            warnings,
+            labeled: r.labeled,
+            fallback: r.fallback,
+          });
+        } else {
+          const styles = nameTextStyles(clusterTextStyles(samples), existing);
+          post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+        }
         break;
       }
       case 'CREATE_TEXT_STYLES': {
         if (!requireTextStyles()) break;
         const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
-        post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
+        post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing, notes: r.notes });
         commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로
         await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → '적용만' 등 전제 게이트 갱신
         break;
@@ -766,20 +1118,25 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         postLicense('라이선스 키 제거됨');
         break;
       }
+      case 'OPEN_LICENSE_LINK': {
+        // URL은 여기서만 해석 — UI가 임의 주소를 넘길 수 없게 한다.
+        figma.openExternal(msg.target === 'purchase' ? PURCHASE_URL : PORTAL_URL);
+        break;
+      }
       case 'GET_PRESETS': {
-        if (!requireTeam()) break;
+        if (!requirePresets()) break;
         post({ type: 'PRESETS', presets });
         break;
       }
       case 'SAVE_PRESET': {
-        if (!requireTeam()) break;
+        if (!requirePresets()) break;
         presets = upsertPreset(presets, msg.preset);
         await savePresets();
         post({ type: 'PRESETS', presets });
         break;
       }
       case 'DELETE_PRESET': {
-        if (!requireTeam()) break;
+        if (!requirePresets()) break;
         presets = presets.filter((p) => p.name !== msg.name);
         await savePresets();
         post({ type: 'PRESETS', presets });
@@ -824,51 +1181,83 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'SCAN_COMPONENT_CANDIDATES': {
-        if (!requirePro()) break;
-        const roots = selection();
+        if (!requireComponents()) break;
+        // 숨긴 조상 아래 노드는 선택 루트여도 제외(실효 비가시).
+        const roots = selection().filter(isEffectivelyVisible);
         // StructNode로 매핑해 넘긴다 — 말단 등록 자격이 `dsRole`에 달려 있다.
+        // toStructNode가 인스턴스 내부를 펼치지 않으므로 스캔 범위는 그대로다.
         const candidates = scanComponentCandidates(roots.map(toStructNode));
-        // 라이브 노드 인덱스(서브트리 전체) — 후보 id → 실제 노드.
+        // 라이브 노드 인덱스 — 스캔과 동일하게 인스턴스·메인·세트 안은 펼치지 않는다.
+        // (전체 재귀는 대용량 파일에서 UI가 ‘스캔 중’에 멈춘 것처럼 보이게 함.)
         const liveById = new Map<string, SceneNode>();
         const index = (n: SceneNode): void => {
+          if (n.visible === false) return;
           liveById.set(n.id, n);
+          if (n.type === 'INSTANCE' || n.type === 'COMPONENT' || n.type === 'COMPONENT_SET') return;
           if ('children' in n) for (const c of n.children as readonly SceneNode[]) index(c);
         };
         for (const r of roots) index(r);
-        // **전체 eligible 후보**를 정확한 이름으로 묶어 미리보기 라벨 주입(깊이 무관, 등록과 동일 규칙).
-        // 반복(2개+) → group+variant(자동체크), 단독(1개) → single(PascalCase). "묶임" 여부를 등록 전에 그대로 보여준다.
-        const eligibleNodes = candidates
-          .filter((c) => c.eligible)
-          .map((c) => liveById.get(c.id))
-          .filter((n): n is SceneNode => !!n);
-        const groups = groupForRegister(eligibleNodes);
-        const preview = new Map<string, { group?: string; variant?: string; single?: string }>();
-        // 단독·세트 모두 같은 규칙 + 그룹 간 이름 충돌 해소(등록과 동일한 결과를 미리 보여준다).
-        const previewNames = resolveGroupNames(groups.map((g) => g.members));
-        groups.forEach((g, i) => {
-          if (g.members.length < 2) {
-            if (g.members[0]) preview.set(g.members[0].id, { single: previewNames[i] });
-            return;
+        // eligible 재확인(조상 숨김 — 순수 스캔은 선택 서브트리만 보아 놓칠 수 있음).
+        const gated = candidates.map((c) => {
+          const live = liveById.get(c.id);
+          if (!live || !isEffectivelyVisible(live)) return { ...c, eligible: false };
+          return c;
+        });
+        // eligible이 빠진 뒤 고아 맥락 조상 제거.
+        const byCand = new Map(gated.map((c) => [c.id, c]));
+        const keepIds = new Set(gated.filter((c) => c.eligible).map((c) => c.id));
+        for (const c of gated) {
+          if (!c.eligible) continue;
+          let p = c.parentId;
+          while (p && !keepIds.has(p)) {
+            keepIds.add(p);
+            p = byCand.get(p)?.parentId ?? null;
           }
-          for (const d of deriveVariants(g.members)) preview.set(d.id, { group: previewNames[i], variant: d.variant });
-        });
-        const nodes = candidates.map((c) => {
-          const p = preview.get(c.id);
-          return p ? { ...c, ...p } : c;
-        });
+        }
+        const pruned = gated.filter((c) => keepIds.has(c.id));
+        // **전체 eligible 후보**를 정확한 이름으로 묶어 미리보기 라벨 주입(깊이 무관, 등록과 동일 규칙).
+        // 반복(2개+) → 구조 차이면 group+variant(자동체크), 속성(텍스트/스왑/불리언)만 다르면
+        // propsOnly+single(자동체크·단품 접힘). 단독(1개) → single(PascalCase).
+        let nodes = pruned;
+        try {
+          const eligibleNodes = pruned
+            .filter((c) => c.eligible)
+            .map((c) => liveById.get(c.id))
+            .filter((n): n is SceneNode => !!n);
+          const groups = groupForRegister(eligibleNodes);
+          const preview = new Map<string, { group?: string; variant?: string; single?: string; propsOnly?: boolean }>();
+          for (const g of groups) {
+            if (g.members.length < 2) {
+              if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
+              continue;
+            }
+            if (shouldCollapseToProperties(g.members)) {
+              const name = pascalCase(commonBaseName(g.members.map((m) => m.name)) || g.members[0].name);
+              for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true });
+              continue;
+            }
+            const base = commonBaseName(g.members.map((m) => m.name));
+            for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
+          }
+          nodes = pruned.map((c) => {
+            const p = preview.get(c.id);
+            return p ? { ...c, ...p } : c;
+          });
+        } catch (e) {
+          // 미리보기 라벨 실패해도 후보는 반환(스캔 중 고정 방지).
+          console.warn('component preview label failed', e);
+        }
         post({ type: 'COMPONENT_CANDIDATES', nodes });
         break;
       }
       case 'REGISTER_COMPONENTS': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         await figma.loadAllPagesAsync(); // dynamic-page: 컴포넌트 페이지 이동 전 로드
         let registered = 0;
         let skipped = 0;
-        // 후보 필터: 스캔(`componentEligible`)과 **같은 규칙** — FRAME/GROUP 전부(이름 게이트 없음,
-        // 실제 파일은 container/wrapper 같은 임의 이름이 흔해 명사 사전 게이트가 진짜 컴포넌트를 버린다)
-        // + 리네임이 재사용 원자로 판정한 말단(아바타·아이콘·썸네일…). 미잠금만.
-        const eligible = (n: SceneNode): boolean =>
-          componentEligible({ id: n.id, name: n.name, type: n.type, locked: n.locked, role: readRole(n) });
+        // 후보 필터: 스캔(`componentEligible`)과 같은 규칙 — 실효 보임 + FRAME/GROUP은 고신뢰
+        // 시맨틱 역할, 말단은 리네임이 재사용 원자로 판정한 것(아바타·아이콘·썸네일…).
+        const eligible = (n: SceneNode): boolean => sceneComponentEligible(n);
         // 대상 결정: 트리에서 체크한 nodeIds, 없으면(스캔 없이 등록) 선택 서브트리를 **재귀**로 모아
         // **반복 이름(2회+)만** 묶는다(단독 잡음 제외).
         let targets: SceneNode[];
@@ -885,8 +1274,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           const single = roots.length === 1;
           const collected: SceneNode[] = [];
           const walk = (n: SceneNode, depth: number): void => {
+            if (n.visible === false) return; // 숨김은 등록·하위 스캔 제외
             const isContainerRoot = single && depth === 0; // 컨테이너 자신 제외
             if (!isContainerRoot && eligible(n)) collected.push(n);
+            // 인스턴스·메인·세트 안은 이미 컴포넌트 체계 — 안쪽 FRAME을 다시 등록하지 않음.
+            if (n.type === 'INSTANCE' || n.type === 'COMPONENT' || n.type === 'COMPONENT_SET') return;
             if ('children' in n) for (const c of n.children as readonly SceneNode[]) walk(c, depth + 1);
           };
           for (const r of roots) walk(r, 0);
@@ -918,6 +1310,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const failures: string[] = []; // 조용히 삼키던 실패를 UI로 노출(진단)
         // 등록으로 만든 컴포넌트/세트 — 루프 후 **속성 자동 노출**(옛 '속성 노출' 버튼 통합).
         const containers: { container: ComponentNode | ComponentSetNode; scopes: ComponentNode[] }[] = [];
+        let exposedEarly = 0; // 속성접힘 경로에서 선노출한 속성 수
 
         type Origin = { parent: (BaseNode & ChildrenMixin) | null; index: number; x: number; y: number; autolayout: boolean };
         const captureOrigin = (n: SceneNode): Origin => {
@@ -978,6 +1371,85 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             }
             continue;
           }
+
+          // 텍스트/스왑/불리언만 다른 반복 → 단품 1개 + 속성 오버라이드 인스턴스(세트 금지).
+          if (shouldCollapseToProperties(g.members)) {
+            const live: SceneNode[] = [];
+            for (const m of g.members) {
+              const n = byId.get(m.id);
+              if (n) live.push(n);
+            }
+            if (live.length < 2) {
+              // 소실로 1개만 남으면 단독 경로와 동일.
+              if (live[0]) {
+                const o = captureOrigin(live[0]);
+                try {
+                  const comp = figma.createComponentFromNode(live[0]);
+                  registered++;
+                  placeSingle(comp, o, setName || pascalCase(live[0].name));
+                } catch (e) {
+                  skipped++;
+                  failures.push(`속성접힘 등록 실패(${setName}): ${errText(e)}`);
+                }
+              }
+              continue;
+            }
+            const structs = live.map(toStructNode);
+            const plan = inferVaryingComponentProperties(structs);
+            type Snap = { o: Origin; vals: Record<string, string | boolean> };
+            const snapshots: Snap[] = [];
+            const made: ComponentNode[] = [];
+            const madeFromLive: number[] = [];
+            for (let i = 0; i < live.length; i++) {
+              const n = live[i];
+              const snap: Snap = { o: captureOrigin(n), vals: propValuesFromNode(n, plan) };
+              try {
+                made.push(figma.createComponentFromNode(n));
+                snapshots.push(snap);
+                madeFromLive.push(i);
+              } catch (e) {
+                skipped++;
+                failures.push(`속성접힘 컴포넌트화 실패(${n.name}): ${errText(e)}`);
+              }
+            }
+            if (!made.length) continue;
+            // 액션 슬롯이 있는 쪽을 마스터로 — optional 결손 멤버의 트리를 대표로 쓰면 BOOLEAN 경로가 사라짐.
+            const preferLive = pickCollapseMasterIndex(structs);
+            let masterMade = madeFromLive.indexOf(preferLive);
+            if (masterMade < 0) masterMade = 0;
+            const master = made[masterMade];
+            for (let i = 0; i < made.length; i++) {
+              if (i === masterMade) continue;
+              try { made[i].remove(); } catch { /* 이미 제거됨 */ }
+            }
+            try { master.name = setName || pascalCase(live[preferLive]?.name ?? live[0].name); } catch { /* 이름 실패 무시 */ }
+            placeOnPage(master);
+            singles.push(master.name);
+            registered++; // 남긴 단품 1개만 집계(중간 변환분은 제거)
+            // 값이 다른 슬롯만 TEXT/SWAP/BOOLEAN으로 노출(공통 텍스트는 속성 제외).
+            let collapsedExposed = 0;
+            try {
+              collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
+            } catch (e) {
+              failures.push(`속성 노출 실패(${master.name}): ${errText(e)}`);
+            }
+            exposedEarly += collapsedExposed;
+            const ids = propIdsByName(master);
+            const places: { inst: InstanceNode; o: Origin }[] = [];
+            for (const snap of snapshots) {
+              try {
+                const inst = master.createInstance();
+                applyInstancePropValues(inst, ids, snap.vals);
+                places.push({ inst, o: snap.o });
+              } catch (e) {
+                failures.push(`인스턴스 실패(${master.name}): ${errText(e)}`);
+              }
+            }
+            restore(places);
+            // 루프 끝 일괄 expose는 중복 방지 — 이미 노출했으므로 containers에 넣지 않음.
+            continue;
+          }
+
           // 2개+ → 각 멤버 컴포넌트화(원위치 기록) 후 세트 결합 → 원위치에 변형 인스턴스 복원.
           const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
           const made: { comp: ComponentNode; variant: string; o: Origin }[] = [];
@@ -1027,7 +1499,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
 
         // 속성 자동 노출 — 등록한 각 컴포넌트/세트의 직속 레이어를 Text/Instance-swap/Boolean 속성으로.
-        let exposed = 0;
+        let exposed = exposedEarly;
         for (const c of containers) {
           try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(`속성 노출 실패: ${errText(e)}`); }
         }
@@ -1037,7 +1509,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CLASSIFY_VARIANTS': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         // 「컴포넌트 등록」과 동일한 **정확한 이름 기준**으로 기존 컴포넌트를 다시 묶는다.
         // 선택의 COMPONENT 중 아직 세트에 안 속한 것만(멱등). 같은 이름 2개+ → 세트, 1개 → 단독.
         const comps = selection().filter(
@@ -1081,7 +1553,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'GENERATE_MISSING_VARIANTS': {
-        if (!requirePro()) break;
+        if (!requireComponents()) break;
         const sets = selection().filter((n): n is ComponentSetNode => n.type === 'COMPONENT_SET');
         let generated = 0;
         const combos: string[] = [];
@@ -1105,6 +1577,95 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
         if (generated) commitUndo(figma); // UX2
+        break;
+      }
+      case 'GET_VARIABLES': {
+        post({ type: 'VARIABLES', vars: await collectVars() });
+        break;
+      }
+      case 'EDIT_VARIABLE': {
+        const res = await editVariable(msg.id, msg.patch);
+        post(res);
+        if (res.ok) {
+          commitUndo(figma); // UX2: 행별 단일 Undo
+          await postPrereq(); // 값/이름 변경이 전제 상태에 영향 가능
+        }
+        break;
+      }
+      case 'DELETE_VARIABLE': {
+        const v = await figma.variables.getVariableByIdAsync(msg.id);
+        if (!v) {
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: '변수를 찾을 수 없습니다.' });
+          break;
+        }
+        const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
+        if (!col || !EDITABLE_COLLECTIONS.has(col.name)) {
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: '편집 대상이 아닌 컬렉션입니다.' });
+          break;
+        }
+        try {
+          v.remove();
+          commitUndo(figma); // UX2: 삭제도 단일 Undo
+          await postPrereq();
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: true, deleted: true });
+        } catch (e) {
+          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: errText(e) });
+        }
+        break;
+      }
+      case 'GET_VARIABLE_USAGE': {
+        // 읽기 전용 — 삭제/리네임 전에 "이걸 지우면 뭐가 깨지는지"를 먼저 보여준다.
+        const { nodes, capped } = await collectBoundNodes(msg.id);
+        const aliasedBy = findAliasReferers(msg.id, await collectVars());
+        post({ type: 'VARIABLE_USAGE', id: msg.id, nodes, aliasedBy, capped });
+        break;
+      }
+      case 'GENERATE_DARK_MODE': {
+        // 다크 Global을 새로 만드는 작업이라 토큰 생성과 같은 등급으로 잠근다.
+        if (!requirePaid('tokens', '다크 테마 생성은 Paid 기능입니다.')) break;
+        const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
+        post({ type: 'DARK_MODE_RESULT', ...r });
+        if (r.created || r.realiased) {
+          commitUndo(figma); // UX2: 다크 생성 전체를 단일 Undo로
+          await postPrereq();
+        }
+        post({ type: 'VARIABLES', vars: await collectVars() }); // 편집기 목록 갱신
+        break;
+      }
+      case 'SCAN_SIMILAR': {
+        // 미리보기(읽기 전용)는 Free — 선택 프레임을 정렬해 가변 위치·마스터 추천만 보여준다.
+        const frames = selection().filter((n) => n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'COMPONENT');
+        const r = await scanSimilar(frames);
+        post({
+          type: 'SIMILAR_CANDIDATES',
+          metas: r.metas,
+          recommendedMasterId: r.recommendedMasterId,
+          varying: r.varying,
+          imageVarying: r.imageVarying,
+          excluded: r.excluded,
+        });
+        break;
+      }
+      case 'COMPONENTIZE_SIMILAR': {
+        if (!requirePaid('components', '닮은 프레임 컴포넌트화는 Paid 기능입니다. 스캔·미리보기는 무료입니다.')) break;
+        const master = await figma.getNodeByIdAsync(msg.masterId);
+        if (!master || (master.type !== 'FRAME' && master.type !== 'GROUP')) {
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['마스터 프레임을 찾을 수 없습니다.'] });
+          break;
+        }
+        // 멤버 노드 수집(마스터 포함) → 정렬·컴포넌트화·인스턴스 교체는 similarApply에 위임.
+        const memberNodes: SceneNode[] = [];
+        for (const id of msg.frameIds) {
+          const n = await figma.getNodeByIdAsync(id);
+          if (n && 'type' in n) memberNodes.push(n as SceneNode);
+        }
+        if (memberNodes.length < 2) {
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['대상 프레임이 2개 미만입니다. 다시 스캔하세요.'] });
+          break;
+        }
+        const r = await componentizeSimilar(master as SceneNode, memberNodes);
+        post({ type: 'COMPONENTIZE_RESULT', master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
+        if (r.instances) commitUndo(figma); // UX2: 컴포넌트화 전체를 단일 Undo로
         break;
       }
       case 'CHECK_CONTRAST': {

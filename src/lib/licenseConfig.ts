@@ -23,3 +23,16 @@ export const PURCHASE_URL = 'https://example.lemonsqueezy.com/buy/PLACEHOLDER';
 
 /** 구독·결제·기기 관리(LemonSqueezy Customer Portal, 자리표시). 배포 시 교체. */
 export const PORTAL_URL = 'https://app.lemonsqueezy.com/my-orders';
+
+/**
+ * 아직 자리표시자인가 — 결제 링크를 눌러도 없는 페이지로 가는 상태.
+ * UI가 이걸로 구독 버튼을 숨긴다(배포 시 URL을 갈아끼우면 자동으로 다시 노출).
+ */
+export function licenseLinksConfigured(): boolean {
+  return !PURCHASE_URL.includes('PLACEHOLDER') && !PURCHASE_URL.includes('example.');
+}
+
+/** 검증 서버·공개키가 실제 값으로 교체됐는가 — 미설정이면 키 검증이 항상 실패한다. */
+export function licenseVerifyConfigured(): boolean {
+  return !VERIFY_URL.includes('example.') && LICENSE_PUBLIC_JWK.x !== 'PLACEHOLDER';
+}
