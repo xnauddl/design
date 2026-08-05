@@ -1236,7 +1236,7 @@ function renderPipeline(): void {
   });
 }
 
-/* ---------- 컴포넌트 / 베리언트 (Phase 3, Pro) ---------- */
+/* ---------- 컴포넌트 / 베리언트 (Phase 3, Paid) ---------- */
 $('btnScanComp').addEventListener('click', () => {
   setStatus('componentStatus', t('component.scanning'), '');
   send({ type: 'SCAN_COMPONENT_CANDIDATES' });
