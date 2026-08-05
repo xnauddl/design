@@ -678,19 +678,15 @@
       </div>
       <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">텍스트 스타일 등록</button>
       <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록할 때 화면의 글자에도 적용</span></label>
-      <div class="row" style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border);">
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 적용만</button>
-        <span class="muted" style="align-self:center;" data-i18n="textStyle.applyExistingNote">이미 만든 스타일에 연결만</span>
-      </div>
-      <div class="prereq" id="tsApplyPrereq" style="display:none; margin-top:4px;"><span class="prereq-text"></span></div>
+      <div class="hint muted" style="margin-top:6px;" data-i18n="textStyle.applyTabHint">이미 만든 스타일만 화면에 붙이려면 적용 탭 → 텍스트 스타일 적용.</div>
       <div class="status" id="tsStatus"></div>
     </div>
   </section>
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
-      <h2><span data-i18n="bind.title">적용 (바인딩)</span> <span class="muted" id="bindCount"></span></h2>
-      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
+      <h2><span data-i18n="bind.title">변수 바인딩</span> <span class="muted" id="bindCount"></span></h2>
+      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline"><span data-i18n="bind.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
         <span class="tol-presets">
@@ -725,6 +721,16 @@
         </div>
       </div>
       <div class="status" id="applyStatus"></div>
+    </div>
+
+    <div class="step">
+      <h2><span data-i18n="textStyle.applyTitle">텍스트 스타일 적용</span> <span class="muted" id="tsApplyLock"></span></h2>
+      <div class="hint" data-i18n="textStyle.applyHint">선택 글자를 이미 등록된 같은 타이포의 Text Style에 연결합니다. 새로 만들지 않아요. (Paid)</div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnApplyExistingText" class="primary" data-i18n="textStyle.applyExistingBtn" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">텍스트 스타일 적용</button>
+      </div>
+      <div class="prereq" id="tsApplyPrereq" style="display:none; margin-top:4px;"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoTextStyle">텍스트 스타일 등록으로 →</button></div>
+      <div class="status" id="tsApplyStatus"></div>
     </div>
 
     <div class="step">
@@ -1208,6 +1214,7 @@
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4 \uC120\uD0DD",
     "prereq.gotoCreate": "\uD1A0\uD070 \uC0DD\uC131\uC73C\uB85C \u2192",
+    "prereq.gotoTextStyle": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC73C\uB85C \u2192",
     // 온보딩 / 가이드
     "onboard.title": "\uC628\uBCF4\uB529 / \uAC00\uC774\uB4DC",
     "onboard.body": "\uCC98\uC74C\uC774\uC138\uC694? <b>\u2018\uC2DC\uC2A4\uD15C\uD654 \uB9C8\uBC95\uC0AC\u2019</b>\uB85C \uCD94\uCD9C \u2192 \uD1A0\uD070 \u2192 \uBC14\uC778\uB529 \u2192 \uC815\uB3C8\uC744 \uD55C \uBC88\uC5D0 \uB05D\uB0BC \uC218 \uC788\uC5B4\uC694. \uB2E8\uACC4\uBCC4\uB85C \uC9C1\uC811 \uD558\uB824\uBA74 \u2018\uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9\u2019 \uD0ED\uC744 \uCC28\uB840\uB85C \uC0AC\uC6A9\uD558\uC138\uC694.",
@@ -1259,8 +1266,10 @@
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
     "textStyle.useRowLabels": "\uAC00\uB85C \uD589\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uC2A4\uD0C0\uC77C \uC774\uB984\uC73C\uB85C \uC0AC\uC6A9",
     "textStyle.rowLabelsHint": "ON\uC774\uBA74 \uAC19\uC740 \uAC00\uB85C \uC904\uC758 <b>\uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)</b>\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uC774\uB984\uC740 \uD654\uBA74\uC5D0 \uC801\uD78C \uAE00\uC790 \uADF8\uB300\uB85C\uC785\uB2C8\uB2E4. \uD45C\uBCF8 \uC624\uB978\uCABD \uD14D\uC2A4\uD2B8\uB294 \uD45C\uC5D0 \uB123\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC9DD\uC744 \uBABB \uCC3E\uC73C\uBA74 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026)\uC73C\uB85C \uB461\uB2C8\uB2E4. (\uC138\uC158\uB9CC \uC720\uC9C0)",
-    "textStyle.applyExistingBtn": "\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC801\uC6A9\uB9CC",
-    "textStyle.applyExistingNote": "\uC774\uBBF8 \uB9CC\uB4E0 \uC2A4\uD0C0\uC77C\uC5D0 \uC5F0\uACB0\uB9CC",
+    "textStyle.applyExistingBtn": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC801\uC6A9",
+    "textStyle.applyTitle": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC801\uC6A9",
+    "textStyle.applyHint": "\uC120\uD0DD \uAE00\uC790\uB97C \uC774\uBBF8 \uB4F1\uB85D\uB41C \uAC19\uC740 \uD0C0\uC774\uD3EC\uC758 Text Style\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4. \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694. (Paid)",
+    "textStyle.applyTabHint": "\uC774\uBBF8 \uB9CC\uB4E0 \uC2A4\uD0C0\uC77C\uB9CC \uD654\uBA74\uC5D0 \uBD99\uC774\uB824\uBA74 \uC801\uC6A9 \uD0ED \u2192 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC801\uC6A9.",
     "textStyle.colName": "\uC774\uB984",
     "textStyle.colFont": "\uD3F0\uD2B8",
     "textStyle.colSize": "\uD06C\uAE30",
@@ -1269,8 +1278,8 @@
     "textStyle.colStyle": "\uC2A4\uD0C0\uC77C",
     "textStyle.applyOriginal": "\uB4F1\uB85D\uD560 \uB54C \uD654\uBA74\uC758 \uAE00\uC790\uC5D0\uB3C4 \uC801\uC6A9",
     "textStyle.registerBtn": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D",
-    // 적용(바인딩)
-    "bind.title": "\uC801\uC6A9 (\uBC14\uC778\uB529)",
+    // 적용 — 변수 바인딩(탭 이름 ‘적용’과 구분)
+    "bind.title": "\uBCC0\uC218 \uBC14\uC778\uB529",
     "bind.tol": "\uD5C8\uC6A9\uC624\uCC28",
     "bind.tolExact": "\uC815\uD655",
     "bind.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
@@ -2678,7 +2687,7 @@
     send({ type: "CREATE_TEXT_STYLES", styles, apply: $("tsApply").checked });
   });
   $("btnApplyExistingText").addEventListener("click", () => {
-    setStatus("tsStatus", "\uC120\uD0DD \uD14D\uC2A4\uD2B8\uB97C \uAE30\uC874 \uC2A4\uD0C0\uC77C\uC5D0 \uC801\uC6A9 \uC911\u2026", "ok");
+    setStatus("tsApplyStatus", "\uC120\uD0DD \uD14D\uC2A4\uD2B8\uB97C \uAE30\uC874 \uC2A4\uD0C0\uC77C\uC5D0 \uC801\uC6A9 \uC911\u2026", "ok");
     send({ type: "APPLY_TEXT_STYLES" });
   });
   var TOL_HINTS = [
@@ -3034,7 +3043,7 @@
       el.disabled = !isPaid;
       setLockTitle(el, !isPaid);
     }
-    for (const id of ["paletteLock", "presetLock", "componentLock", "similarLock", "darkLock", "createLock", "semLock", "tsLock"]) {
+    for (const id of ["paletteLock", "presetLock", "componentLock", "similarLock", "darkLock", "createLock", "semLock", "tsLock", "tsApplyLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     refreshDarkModes();
@@ -3462,8 +3471,8 @@
         break;
       case "TEXT_STYLES_APPLIED":
         setStatus(
-          "tsStatus",
-          `\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC801\uC6A9 ${msg.applied}\uAC74` + (msg.missing.length ? ` \xB7 ${msg.missing.join(" \xB7 ")}` : ""),
+          "tsApplyStatus",
+          `\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC801\uC6A9 ${msg.applied}\uAC74` + (msg.missing.length ? ` \xB7 ${msg.missing.join(" \xB7 ")}` : ""),
           msg.applied === 0 || msg.missing.length ? "warn" : "ok"
         );
         break;
@@ -3640,6 +3649,7 @@
     CREATE_SEMANTICS: "semStatus",
     SCAN_TEXT_STYLES: "tsStatus",
     CREATE_TEXT_STYLES: "tsStatus",
+    APPLY_TEXT_STYLES: "tsApplyStatus",
     APPLY: "applyStatus",
     SELECT_NODES: "applyStatus",
     RENAME: "renameStatus",

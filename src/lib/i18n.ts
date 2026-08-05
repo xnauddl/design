@@ -195,6 +195,7 @@ export const STRINGS: Record<string, string> = {
   // 공통(정적 라벨)
   'common.selectAll': '전체 선택',
   'prereq.gotoCreate': '토큰 생성으로 →',
+  'prereq.gotoTextStyle': '텍스트 스타일 등록으로 →',
   // 온보딩 / 가이드
   'onboard.title': '온보딩 / 가이드',
   'onboard.body': '처음이세요? <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 ‘만들기·적용’ 탭을 차례로 사용하세요.',
@@ -246,8 +247,10 @@ export const STRINGS: Record<string, string> = {
   'textStyle.addRow': '행 추가',
   'textStyle.useRowLabels': '가로 행의 왼쪽 텍스트를 스타일 이름으로 사용',
   'textStyle.rowLabelsHint': 'ON이면 같은 가로 줄의 <b>왼쪽 텍스트를 라벨(이름)</b>으로, 큰 텍스트를 표본으로 봅니다. 이름은 화면에 적힌 글자 그대로입니다. 표본 오른쪽 텍스트는 표에 넣지 않습니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. (세션만 유지)',
-  'textStyle.applyExistingBtn': '기존 스타일 적용만',
-  'textStyle.applyExistingNote': '이미 만든 스타일에 연결만',
+  'textStyle.applyExistingBtn': '텍스트 스타일 적용',
+  'textStyle.applyTitle': '텍스트 스타일 적용',
+  'textStyle.applyHint': '선택 글자를 이미 등록된 같은 타이포의 Text Style에 연결합니다. 새로 만들지 않아요. (Paid)',
+  'textStyle.applyTabHint': '이미 만든 스타일만 화면에 붙이려면 적용 탭 → 텍스트 스타일 적용.',
   'textStyle.colName': '이름',
   'textStyle.colFont': '폰트',
   'textStyle.colSize': '크기',
@@ -256,8 +259,8 @@ export const STRINGS: Record<string, string> = {
   'textStyle.colStyle': '스타일',
   'textStyle.applyOriginal': '등록할 때 화면의 글자에도 적용',
   'textStyle.registerBtn': '텍스트 스타일 등록',
-  // 적용(바인딩)
-  'bind.title': '적용 (바인딩)',
+  // 적용 — 변수 바인딩(탭 이름 ‘적용’과 구분)
+  'bind.title': '변수 바인딩',
   'bind.tol': '허용오차',
   'bind.tolExact': '정확',
   'bind.preview': '미리보기',

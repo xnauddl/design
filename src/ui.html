@@ -678,19 +678,15 @@
       </div>
       <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">텍스트 스타일 등록</button>
       <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록할 때 화면의 글자에도 적용</span></label>
-      <div class="row" style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border);">
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 적용만</button>
-        <span class="muted" style="align-self:center;" data-i18n="textStyle.applyExistingNote">이미 만든 스타일에 연결만</span>
-      </div>
-      <div class="prereq" id="tsApplyPrereq" style="display:none; margin-top:4px;"><span class="prereq-text"></span></div>
+      <div class="hint muted" style="margin-top:6px;" data-i18n="textStyle.applyTabHint">이미 만든 스타일만 화면에 붙이려면 적용 탭 → 텍스트 스타일 적용.</div>
       <div class="status" id="tsStatus"></div>
     </div>
   </section>
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <div class="step">
-      <h2><span data-i18n="bind.title">적용 (바인딩)</span> <span class="muted" id="bindCount"></span></h2>
-      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
+      <h2><span data-i18n="bind.title">변수 바인딩</span> <span class="muted" id="bindCount"></span></h2>
+      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
       <div class="row">
         <label class="inline"><span data-i18n="bind.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
         <span class="tol-presets">
@@ -725,6 +721,16 @@
         </div>
       </div>
       <div class="status" id="applyStatus"></div>
+    </div>
+
+    <div class="step">
+      <h2><span data-i18n="textStyle.applyTitle">텍스트 스타일 적용</span> <span class="muted" id="tsApplyLock"></span></h2>
+      <div class="hint" data-i18n="textStyle.applyHint">선택 글자를 이미 등록된 같은 타이포의 Text Style에 연결합니다. 새로 만들지 않아요. (Paid)</div>
+      <div class="row" style="margin-top:6px;">
+        <button id="btnApplyExistingText" class="primary" data-i18n="textStyle.applyExistingBtn" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">텍스트 스타일 적용</button>
+      </div>
+      <div class="prereq" id="tsApplyPrereq" style="display:none; margin-top:4px;"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoTextStyle">텍스트 스타일 등록으로 →</button></div>
+      <div class="status" id="tsApplyStatus"></div>
     </div>
 
     <div class="step">

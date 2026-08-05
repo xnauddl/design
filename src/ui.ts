@@ -932,7 +932,7 @@ $('btnTextStyles').addEventListener('click', () => {
 });
 $('btnApplyExistingText').addEventListener('click', () => {
   // 적용만: 표/스캔과 무관하게 현재 선택의 텍스트를 기존 스타일에 바인딩(생성 없음).
-  setStatus('tsStatus', '선택 텍스트를 기존 스타일에 적용 중…', 'ok');
+  setStatus('tsApplyStatus', '선택 텍스트를 기존 스타일에 적용 중…', 'ok');
   send({ type: 'APPLY_TEXT_STYLES' });
 });
 
@@ -1361,7 +1361,7 @@ function updateGates(): void {
     el.disabled = !isPaid;
     setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
   }
-  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
+  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock', 'tsApplyLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
   // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가
@@ -1375,7 +1375,7 @@ function updateGates(): void {
   if (!isPaid) ($('btnSemantics') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
   setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 바인딩할 변수를 만드세요.');
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
-  // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
+  // 텍스트 스타일 적용(적용 탭): 등록된 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
   if (!isPaid) ($('btnApplyExistingText') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
 
@@ -1886,8 +1886,8 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'TEXT_STYLES_APPLIED':
       setStatus(
-        'tsStatus',
-        `기존 스타일 적용 ${msg.applied}건` + (msg.missing.length ? ` · ${msg.missing.join(' · ')}` : ''),
+        'tsApplyStatus',
+        `텍스트 스타일 적용 ${msg.applied}건` + (msg.missing.length ? ` · ${msg.missing.join(' · ')}` : ''),
         msg.applied === 0 || msg.missing.length ? 'warn' : 'ok',
       );
       break;
@@ -2092,6 +2092,7 @@ const OP_STATUS: Record<string, string> = {
   CREATE_SEMANTICS: 'semStatus',
   SCAN_TEXT_STYLES: 'tsStatus',
   CREATE_TEXT_STYLES: 'tsStatus',
+  APPLY_TEXT_STYLES: 'tsApplyStatus',
   APPLY: 'applyStatus',
   SELECT_NODES: 'applyStatus',
   RENAME: 'renameStatus',

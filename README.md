@@ -150,8 +150,8 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
   - **군집·명명**(순수 `textStyles.ts`): 동일 시그니처를 묶고(`clusterTextStyles`), **fontSize 내림차순**으로 `display·h1·…·overline` 배정(`nameTextStyles`, 같은 크기는 `base/weight`·`base/family-weight` 분기). **기존 스타일 앵커**: 노드 `textStyleId` 또는 시그니처가 로컬 스타일과 정확히 1개 일치하면 기존 이름 유지 + `boundStyleId`(재스캔=rename, 타프레임 중복 방지). 선택이 없으면 `DEFAULT_TYPE_RAMP` 폴백. **가로 행 라벨 옵션**(`useRowLabels`, 기본 OFF·세션만): 안쪽 HORIZONTAL 행의 왼쪽 텍스트 `characters`를 이름으로(`nameTextStylesWithRowLabels`), 라벨·표본 우측은 표 제외, 실패 시 크기 랭킹 폴백.
 - **등록**(`CREATE_TEXT_STYLES`, `createSemanticTextStyles`): size·lineHeight·letterSpacing → **Global + Semantic**(`font-size|line-height|letter-spacing/{역할}`) 보장 후 텍스트 스타일 upsert·시맨틱 바인딩. `boundStyleId`가 있으면 **이름만 rename**(폰트·크기·행간·자간 보존). 폰트 로드 실패 시 `Regular` 폴백+보고.
 - **행간 % 보존**: 원본이 %인 행간은 스타일에 **`PERCENT`로 등록**하고 그 스타일의 **행간 변수 바인딩만 생략**한다(크기·자간 바인딩은 유지). Figma는 행간에 변수를 바인딩하면 단위를 `PIXELS`로 강제하고, 변수는 단위 없는 FLOAT이라 `150`이 150%가 아니라 **150px**로 해석되므로 %와 바인딩은 동시에 가질 수 없다. 이미 %로 만들어 둔 기존 스타일을 rename할 때도 같은 이유로 바인딩하지 않는다(px로 뭉개지 않기 위해). 변수는 그대로 만들되 **값은 px 스냅샷 + 원본 단위는 `description`("150%")** — 내보내기가 description을 우선하므로 코드에는 `line-height: 150%`로 나간다(#16 규칙). 같은 px 이름에 원본이 갈리면(24px 역할 + 16px의 150% 역할) 다른 역할의 내보내기를 오염시키지 않도록 px로 기록하고 알림을 남긴다. 의도된 미바인딩은 경고(`missing`)가 아니라 `notes`로 보고.
-- **적용**: (a) 등록 시 옵션 — 전체 시그니처(패밀리·크기·굵기·행간·자간) 일치 노드에 연결. (b) **기존 스타일 적용만**(`APPLY_TEXT_STYLES`) — 생성 없이 시그니처 매칭 바인딩(미등록·모호는 보고).
-- UI: **‘선택에서 스캔’** → 표(이름만 편집·스캔값 읽기 전용, 신규=앰버/등록됨=파랑, 행간은 `24px`/`150%`처럼 단위까지 표시) → **‘텍스트 스타일 등록’** (+화면 적용 체크) · **‘기존 스타일 적용만’**. 순수 로직은 `node --test`, figma 호출은 `variables.ts`. **Paid 게이팅**(스캔은 무게이팅 미리보기).
+- **적용**: (a) 만들기 — 등록 시 옵션으로 시그니처 일치 노드에 연결. (b) **적용 탭 · 텍스트 스타일 적용**(`APPLY_TEXT_STYLES`) — 생성 없이 시그니처 매칭으로 Local Text Style만 연결(미등록·모호는 보고).
+- UI: **만들기** — ‘선택에서 스캔’ → 표 → ‘텍스트 스타일 등록’(+화면 적용 체크). **적용** — ‘텍스트 스타일 적용’(변수 바인딩과 별 카드). 순수 로직은 `node --test`, figma 호출은 `variables.ts`. **Paid 게이팅**(스캔은 무게이팅 미리보기).
 
 ## 코드 내보내기 (Export)
 
