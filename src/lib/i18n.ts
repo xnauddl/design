@@ -46,15 +46,6 @@ export const STRINGS: Record<string, string> = {
   'rename.none': '변경할 이름이 없습니다.',
   'rename.applied': '{count}개 이름 적용 완료.',
 
-  // 명도 대비
-  'contrast.checking': '대비 검사 중…',
-  'contrast.fixApplied': '보정 적용됨 — ‘대비 검사’로 다시 확인하세요.',
-  'contrast.none': '검사할 텍스트가 없습니다.{detail}',
-  'contrast.noneSkip': ' (건너뜀: {skip})',
-  'contrast.noneSelect': ' 텍스트가 있는 프레임을 선택하세요.',
-  'contrast.allPass': '{checked}개 모두 {level} 통과 ✓{skip}',
-  'contrast.someFail': '{checked}개 중 {fails}개 {level} 미달{skip}',
-
   // 컴포넌트 / 베리언트
   'component.scanning': '후보 스캔 중…',
   'component.registering': '컴포넌트 등록 중…',
@@ -118,7 +109,6 @@ export const STRINGS: Record<string, string> = {
   'wizard.step.semantics': '시맨틱 매핑',
   'wizard.step.bind': '바인딩',
   'wizard.step.rename': '레이어 정돈',
-  'wizard.step.contrast': '접근성 검수',
   'wizard.step.componentize': '컴포넌트화',
   'wizard.skip.optionOff': '옵션 꺼짐',
   'wizard.skip.noMapping': '매핑 없음',
@@ -142,11 +132,6 @@ export const STRINGS: Record<string, string> = {
   'reason.instance-children': '인스턴스 내부',
   'reason.font': '폰트 미로드',
 
-  // 명도 대비 스킵 사유(라벨 맵)
-  'contrastSkip.no-fill': '단색 글자색 없음',
-  'contrastSkip.no-bg': '배경 없음',
-  'contrastSkip.capped': '스캔 상한 도달',
-
   // 마법사 시퀀서 단계 결과
   'wizard.seq.stoppedPrev': '이전 단계 중단으로 건너뜀',
   'wizard.seq.running': '진행 중…',
@@ -159,15 +144,12 @@ export const STRINGS: Record<string, string> = {
   'wizard.seq.bindDone': '바인딩 {bound}',
   'wizard.seq.bindSkip': ' · 스킵 {n}',
   'wizard.seq.renameDone': '{count}개 이름 적용',
-  'wizard.seq.contrastNone': '검사할 텍스트 없음',
-  'wizard.seq.contrastPass': '{pass}/{checked} {level} 통과',
   'wizard.seq.componentize': '등록 {registered} · 세트 {sets}',
 
   // 마법사 완료 요약(summarize, wizard.ts)
   'wizard.sum.tokens': '토큰 {n}',
   'wizard.sum.bound': '바인딩 {n}',
   'wizard.sum.renamed': '리네임 {n}',
-  'wizard.sum.contrast': '대비 {passed}/{total} 통과',
   'wizard.sum.components': '컴포넌트 {n}',
   'wizard.sum.empty': '완료된 작업이 없습니다',
 
@@ -187,9 +169,8 @@ export const STRINGS: Record<string, string> = {
   'tab.settings': '관리',
   // 마법사 카드
   'wizardCard.title': '시스템화 마법사',
-  'wizardCard.hint': '선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.',
+  'wizardCard.hint': '선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계)을 사용합니다.',
   'wizardCard.optSemantics': '시맨틱 매핑',
-  'wizardCard.optContrast': '접근성 검수',
   'wizardCard.optComponentize': '컴포넌트화',
   'wizardCard.run': '전체 실행',
   // 공통(정적 라벨)
@@ -203,7 +184,7 @@ export const STRINGS: Record<string, string> = {
   // 진행 안내(파이프라인 카드)
   'pipeline.title': '진행 안내',
   'pipeline.hint': '권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.',
-  'pipeline.indep': '리네임 · 대비 점검 · 컴포넌트는 전제 없이 언제든 가능(독립).',
+  'pipeline.indep': '리네임 · 컴포넌트는 전제 없이 언제든 가능(독립).',
   // 브랜드 팔레트
   'palette.title': '브랜드 팔레트 생성',
   'palette.brand': '브랜드색',
@@ -270,11 +251,6 @@ export const STRINGS: Record<string, string> = {
   'rename.apply': '이름 적용',
   'rename.undoTitle': '되돌리기 안전장치',
   'rename.undoBody': '이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.',
-  // 명도 대비
-  'contrast.title': '명도 대비 점검 (WCAG)',
-  'contrast.hint': '선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).',
-  'contrast.level': '기준',
-  'contrast.checkBtn': '대비 검사',
   // 컴포넌트 / 베리언트
   'component.title': '컴포넌트 / 베리언트',
   'component.hint': '<b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·table·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.',

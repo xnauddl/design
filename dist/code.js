@@ -441,19 +441,6 @@
     }
     return { l: lch.l, c: lo, h: lch.h };
   }
-  function relativeLuminance(rgb) {
-    const r = srgbToLinear(rgb.r);
-    const g = srgbToLinear(rgb.g);
-    const b = srgbToLinear(rgb.b);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  }
-  function contrastRatio(a, b) {
-    const la = relativeLuminance(a);
-    const lb = relativeLuminance(b);
-    const hi = Math.max(la, lb);
-    const lo = Math.min(la, lb);
-    return (hi + 0.05) / (lo + 0.05);
-  }
 
   // src/lib/colorName.ts
   var STEP_LIST = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
@@ -3598,70 +3585,6 @@
     });
   }
 
-  // src/lib/contrast.ts
-  function isLargeText(fontSizePx, bold) {
-    if (fontSizePx >= 24) return true;
-    return bold && fontSizePx >= 18.66;
-  }
-  function requiredRatio(level, large) {
-    if (level === "AAA") return large ? 4.5 : 7;
-    return large ? 3 : 4.5;
-  }
-  var round2 = (n) => Math.round(n * 100) / 100;
-  var clamp012 = (n) => Math.min(1, Math.max(0, n));
-  function adjustLForContrast(srcHex, otherHex, required) {
-    const src = hexToOklch(srcHex);
-    const otherRgb = hexToRgb(otherHex);
-    const at = (L) => {
-      const hex = oklchToHex(clampToGamut({ l: clamp012(L), c: src.c, h: src.h }));
-      return { hex, ratio: contrastRatio(hexToRgb(hex), otherRgb) };
-    };
-    if (at(src.l).ratio >= required) return srcHex;
-    const solve = (toL) => {
-      if (at(toL).ratio < required) return { ok: false, L: toL, hex: at(toL).hex };
-      let lo = src.l;
-      let hi = toL;
-      for (let i = 0; i < 24; i++) {
-        const mid = (lo + hi) / 2;
-        if (at(mid).ratio >= required) hi = mid;
-        else lo = mid;
-      }
-      return { ok: true, L: hi, hex: at(hi).hex };
-    };
-    const dark = solve(0);
-    const light = solve(1);
-    const ok = [dark, light].filter((c) => c.ok).sort((a, b) => Math.abs(a.L - src.l) - Math.abs(b.L - src.l));
-    if (ok.length) return ok[0].hex;
-    return at(0).ratio >= at(1).ratio ? at(0).hex : at(1).hex;
-  }
-  function suggestContrastFix(fg, bg, required) {
-    return {
-      suggestedFg: adjustLForContrast(fg, bg, required),
-      // 텍스트색 명도 조정(국소·파급 적음)
-      suggestedBg: adjustLForContrast(bg, fg, required)
-      // 배경색 명도 조정(옵션)
-    };
-  }
-  function evaluateSample(s, level) {
-    const large = isLargeText(s.fontSize, s.bold);
-    const required = requiredRatio(level, large);
-    const ratio = round2(contrastRatio(hexToRgb(s.fg), hexToRgb(s.bg)));
-    const pass = ratio >= required;
-    const f = { id: s.id, name: s.name, fg: s.fg, bg: s.bg, bgId: s.bgId, ratio, required, large, pass };
-    if (!pass) {
-      const fix = suggestContrastFix(s.fg, s.bg, required);
-      f.suggestedFg = fix.suggestedFg;
-      f.suggestedBg = fix.suggestedBg;
-    }
-    return f;
-  }
-  function checkContrast(samples, level) {
-    const findings = samples.map((s) => evaluateSample(s, level));
-    findings.sort((a, b) => Number(a.pass) - Number(b.pass) || a.ratio - b.ratio);
-    const failed = findings.reduce((n, f) => n + (f.pass ? 0 : 1), 0);
-    return { level, checked: findings.length, passed: findings.length - failed, failed, findings };
-  }
-
   // src/lib/similar.ts
   function flattenFrame(root) {
     const out = [];
@@ -4504,7 +4427,6 @@
     selfSelect = false;
   }
   figma.on("selectionchange", postSelection);
-  var CONTRAST_SCAN_CAP = 2e3;
   function solidFillHex(node) {
     var _a;
     const fills = node.fills;
@@ -4723,48 +4645,6 @@
       out.push(remaining.splice(idx, 1)[0]);
     }
     return out;
-  }
-  function effectiveBg(node) {
-    let cur = node.parent;
-    while (cur && cur.type !== "PAGE" && cur.type !== "DOCUMENT") {
-      const hex = solidFillHex(cur);
-      if (hex) return { hex, id: cur.id };
-      cur = cur.parent;
-    }
-    return null;
-  }
-  function collectContrastSamples(sel) {
-    const samples = [];
-    const skipped = {};
-    const note2 = (k) => {
-      var _a;
-      skipped[k] = ((_a = skipped[k]) != null ? _a : 0) + 1;
-    };
-    const stack = sel.slice();
-    let scanned = 0;
-    while (stack.length) {
-      if (scanned >= CONTRAST_SCAN_CAP) {
-        note2("capped");
-        break;
-      }
-      const n = stack.pop();
-      scanned++;
-      if (n.type === "TEXT" && n.visible) {
-        const fg = solidFillHex(n);
-        if (!fg) note2("no-fill");
-        else {
-          const bg = effectiveBg(n);
-          if (!bg) note2("no-bg");
-          else {
-            const fontSize = typeof n.fontSize === "number" ? n.fontSize : 16;
-            const bold = typeof n.fontWeight === "number" ? n.fontWeight >= 700 : false;
-            samples.push({ id: n.id, name: n.name, fg, bg: bg.hex, bgId: bg.id, fontSize, bold });
-          }
-        }
-      }
-      if ("children" in n) for (const c of n.children) stack.push(c);
-    }
-    return { samples, skipped };
   }
   figma.ui.onmessage = async (msg) => {
     var _a, _b, _c, _d, _e, _f, _g;
@@ -5545,39 +5425,6 @@
           const r = await componentizeSimilar(master, memberNodes);
           post({ type: "COMPONENTIZE_RESULT", master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
           if (r.instances) commitUndo(figma);
-          break;
-        }
-        case "CHECK_CONTRAST": {
-          const { samples, skipped } = collectContrastSamples(selection());
-          const report = checkContrast(samples, msg.level);
-          post({
-            type: "CONTRAST_RESULT",
-            level: report.level,
-            checked: report.checked,
-            passed: report.passed,
-            failed: report.failed,
-            findings: report.findings,
-            skipped
-          });
-          break;
-        }
-        case "APPLY_CONTRAST_FIX": {
-          const node = await figma.getNodeByIdAsync(msg.nodeId);
-          if (node && "fills" in node) {
-            const fills = node.fills;
-            if (Array.isArray(fills)) {
-              const i = fills.findIndex((p) => {
-                var _a2;
-                return p.type === "SOLID" && p.visible !== false && ((_a2 = p.opacity) != null ? _a2 : 1) > 0;
-              });
-              if (i >= 0) {
-                const next = fills.slice();
-                next[i] = __spreadProps(__spreadValues({}, next[i]), { color: hexToRgb(msg.hex) });
-                node.fills = next;
-                commitUndo(figma);
-              }
-            }
-          }
           break;
         }
       }
