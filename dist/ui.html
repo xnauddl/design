@@ -619,7 +619,7 @@
 
     <div class="step" id="darkCard">
       <h2><span data-i18n="dark.title">다크 테마 생성</span> <span class="muted" id="darkLock"></span></h2>
-      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
+      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> <code>Dark</code> 모드를 만듭니다. 모드가 없으면 컬렉션에 <code>Dark</code>를 추가한 뒤 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
       <div class="row">
         <label class="inline"><span data-i18n="dark.collection">대상 컬렉션</span>
           <select id="darkCollection"></select>
@@ -632,9 +632,9 @@
         <label class="inline"><span data-i18n="dark.toMode">다크 모드</span>
           <select id="darkToMode"></select>
         </label>
-        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 채우기</button>
+        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 생성</button>
       </div>
-      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate" style="display:none">토큰 생성으로 →</button></div>
       <div class="status" id="darkStatus"></div>
     </div>
 
@@ -1108,11 +1108,11 @@
     "preset.count": "\uD504\uB9AC\uC14B {count}\uAC1C",
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131",
-    "dark.hint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC \uC0C9\uC744 <b>\uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4</b> \uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCC44\uC6C1\uB2C8\uB2E4. \uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C\uB77C \uBE0C\uB79C\uB4DC\uC0C9\uC774 \uC720\uC9C0\uB3FC\uC694. Semantic\uC774 Global\uC744 <b>\uAC00\uB9AC\uD0A4\uACE0 \uC788\uB294 \uAC83\uB9CC</b> \uB300\uC0C1\uC774\uACE0, \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB701\uB2C8\uB2E4. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 <code>dark/\u2026</code>\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC9D1\uB2C8\uB2E4. (Paid)",
+    "dark.hint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC \uC0C9\uC744 <b>\uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4</b> <code>Dark</code> \uBAA8\uB4DC\uB97C \uB9CC\uB4ED\uB2C8\uB2E4. \uBAA8\uB4DC\uAC00 \uC5C6\uC73C\uBA74 \uCEEC\uB809\uC158\uC5D0 <code>Dark</code>\uB97C \uCD94\uAC00\uD55C \uB4A4 \uCC44\uC6C1\uB2C8\uB2E4. \uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C\uB77C \uBE0C\uB79C\uB4DC\uC0C9\uC774 \uC720\uC9C0\uB3FC\uC694. Semantic\uC774 Global\uC744 <b>\uAC00\uB9AC\uD0A4\uACE0 \uC788\uB294 \uAC83\uB9CC</b> \uB300\uC0C1\uC774\uACE0, \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB701\uB2C8\uB2E4. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 <code>dark/\u2026</code>\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC9D1\uB2C8\uB2E4. (Paid)",
     "dark.collection": "\uB300\uC0C1 \uCEEC\uB809\uC158",
     "dark.fromMode": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC",
     "dark.toMode": "\uB2E4\uD06C \uBAA8\uB4DC",
-    "dark.genBtn": "\uB2E4\uD06C \uCC44\uC6B0\uAE30",
+    "dark.genBtn": "\uB2E4\uD06C \uC0DD\uC131",
     // 닮은 프레임 컴포넌트화
     "similar.title": "\uB2EE\uC740 \uD504\uB808\uC784 \uCEF4\uD3EC\uB10C\uD2B8\uD654",
     "similar.hint": "\uAD6C\uC870\uAC00 \uAC19\uACE0 <b>\uB0B4\uC6A9\uB9CC \uB2E4\uB978</b> \uD504\uB808\uC784 \uC5EC\uB7EC \uAC1C\uB97C \uACE8\uB77C \uC2A4\uCE94\uD558\uBA74, \uD558\uB098\uB97C <b>\uB9C8\uC2A4\uD130</b>\uB85C \uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uACE0 \uB098\uBA38\uC9C0\uB294 <b>\uC778\uC2A4\uD134\uC2A4</b>\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uD504\uB808\uC784\uB9C8\uB2E4 \uB2E4\uB978 \uD14D\uC2A4\uD2B8\xB7\uC544\uC774\uCF58\uC740 <b>\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131</b>\uC73C\uB85C \uC5F4\uB9AC\uACE0, \uC774\uBBF8\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uC5D0\uC11C \uAC1C\uBCC4 \uAD50\uCCB4\uB429\uB2C8\uB2E4. \uB9C8\uC2A4\uD130\uB294 <b>\uB0B4\uC6A9\uC774 \uAC00\uC7A5 \uC798 \uCC44\uC6CC\uC9C4</b> \uD504\uB808\uC784\uC744 \uCD94\uCC9C\uD569\uB2C8\uB2E4(\uBE48 \uD14D\uC2A4\uD2B8\uAC00 \uB9CE\uC73C\uBA74 \uAC10\uC810). <b>\uC2A4\uCE94\uC740 \uBB34\uB8CC</b>, \uC2E4\uC81C \uAD50\uCCB4\uB9CC Paid.",
@@ -3117,20 +3117,21 @@
     send({ type: "SCAN_COMPONENT_CANDIDATES" });
   });
   var allVars = [];
+  var varsLoaded = false;
   function visibleVars() {
     const col = $("varFilterCol").value;
     const q = $("varFilterText").value.trim().toLowerCase();
     return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
   }
-  function requestVars() {
-    setStatus("varEditStatus", "\uBCC0\uC218\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026", "");
+  function requestVars(quiet = false) {
+    if (!quiet) setStatus("varEditStatus", "\uBCC0\uC218\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026", "");
     send({ type: "GET_VARIABLES" });
   }
-  $("btnLoadVars").addEventListener("click", requestVars);
+  $("btnLoadVars").addEventListener("click", () => requestVars(false));
   $("varFilterCol").addEventListener("change", () => renderVars());
   $("varFilterText").addEventListener("input", () => renderVars());
   function refreshDarkOptions() {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const cols = /* @__PURE__ */ new Map();
     for (const v of allVars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
     const sel = $("darkCollection");
@@ -3143,8 +3144,14 @@
       sel.appendChild(o);
     }
     if (prev && cols.has(prev)) sel.value = prev;
-    const usable = [...cols.values()].find((v) => v.modes.length >= 2);
-    if (usable && ((_b = (_a = cols.get(sel.value)) == null ? void 0 : _a.modes.length) != null ? _b : 0) < 2) sel.value = usable.collectionId;
+    const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
+    const usable = (_a = withModes.find((v) => v.collection === "Semantic")) != null ? _a : withModes[0];
+    if (usable && ((_c = (_b = cols.get(sel.value)) == null ? void 0 : _b.modes.length) != null ? _c : 0) < 1) sel.value = usable.collectionId;
+    if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.collection) === "Global") && usable.collection === "Semantic") {
+      sel.value = usable.collectionId;
+    } else if (usable && !sel.value) {
+      sel.value = usable.collectionId;
+    }
     refreshDarkModes();
   }
   function refreshDarkModes() {
@@ -3163,33 +3170,55 @@
       }
       if (prev && modes.some((m) => m.modeId === prev)) sel.value = prev;
     }
-    const ok = modes.length >= 2;
+    const hasCollection = !!colId && modes.length >= 1;
+    const ok = hasCollection && varsLoaded && allVars.length > 0;
     $("btnGenDark").disabled = !ok || !isPaid;
     const notice = $("darkPrereq");
+    const gotoCreate = $("darkPrereqGotoCreate");
     notice.style.display = ok ? "none" : "";
     const text = notice.querySelector(".prereq-text");
-    if (text) {
-      text.textContent = ok ? "" : modes.length ? "\uC774 \uCEEC\uB809\uC158\uC5D0 \uBAA8\uB4DC\uAC00 \uD558\uB098\uBFD0\uC774\uC5D0\uC694. Figma\uC5D0\uC11C \uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694." : "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.";
+    if (!ok && text) {
+      if (!varsLoaded) {
+        text.textContent = "\uBCC0\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026";
+        gotoCreate.style.display = "none";
+      } else if (allVars.length === 0) {
+        text.textContent = "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.";
+        gotoCreate.style.display = "";
+      } else if (!colId || modes.length === 0) {
+        text.textContent = "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158(\uBCF4\uD1B5 Semantic)\uC744 \uACE0\uB974\uC138\uC694.";
+        gotoCreate.style.display = "none";
+      } else {
+        text.textContent = "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.";
+        gotoCreate.style.display = "none";
+      }
     }
-    if (modes.length >= 2 && $("darkFromMode").value === $("darkToMode").value) {
-      $("darkToMode").value = modes[1].modeId;
+    const toSel = $("darkToMode");
+    const darkMode = modes.find((m) => m.name.toLowerCase() === "dark");
+    if (darkMode) {
+      toSel.value = darkMode.modeId;
+    } else if (modes.length >= 1) {
+      const o = document.createElement("option");
+      o.value = "";
+      o.textContent = "Dark (\uC5C6\uC73C\uBA74 \uC0DD\uC131)";
+      toSel.insertBefore(o, toSel.firstChild);
+      toSel.value = "";
+    }
+    const fromSel = $("darkFromMode");
+    if (modes.length >= 2 && darkMode && fromSel.value === darkMode.modeId) {
+      const other = modes.find((m) => m.modeId !== darkMode.modeId);
+      if (other) fromSel.value = other.modeId;
     }
   }
   $("darkCollection").addEventListener("change", refreshDarkModes);
   $("btnGenDark").addEventListener("click", () => {
     const collectionId = $("darkCollection").value;
     const fromModeId = $("darkFromMode").value;
-    const toModeId = $("darkToMode").value;
-    if (!collectionId || !fromModeId || !toModeId) {
-      setStatus("darkStatus", "\uCEEC\uB809\uC158\uACFC \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
+    if (!collectionId || !fromModeId) {
+      setStatus("darkStatus", "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
       return;
     }
-    if (fromModeId === toModeId) {
-      setStatus("darkStatus", "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694. \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
-      return;
-    }
-    setStatus("darkStatus", "\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026", "");
-    send({ type: "GENERATE_DARK_MODE", collectionId, fromModeId, toModeId });
+    setStatus("darkStatus", "Dark \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026", "");
+    send({ type: "GENERATE_DARK_MODE", collectionId, fromModeId });
   });
   var similarMemberIds = [];
   var similarMasterId = null;
@@ -3542,6 +3571,7 @@
         renderContrast(msg);
         break;
       case "VARIABLES": {
+        varsLoaded = true;
         allVars = msg.vars;
         const sel = $("varFilterCol");
         const prev = sel.value;
@@ -3587,13 +3617,19 @@
         break;
       }
       case "DARK_MODE_RESULT": {
-        if (!msg.realiased) {
-          const why = msg.skipped ? `Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 ${msg.skipped}\uAC1C)` : "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694";
-          setStatus("darkStatus", `\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${why}`, "warn");
+        if (msg.error) {
+          setStatus("darkStatus", msg.error, "warn");
           break;
         }
+        if (!msg.realiased) {
+          const why = msg.skipped ? `Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 ${msg.skipped}\uAC1C)` : "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694";
+          const mode2 = msg.modeCreated ? "Dark \uBAA8\uB4DC\uB294 \uCD94\uAC00\uB410\uC5B4\uC694. " : "";
+          setStatus("darkStatus", `${mode2}\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${why}`, "warn");
+          break;
+        }
+        const mode = msg.modeCreated ? "Dark \uBAA8\uB4DC \uCD94\uAC00 \xB7 " : "";
         const skip = msg.skipped ? ` \xB7 \uAC74\uB108\uB700 ${msg.skipped}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)` : "";
-        setStatus("darkStatus", `\uB2E4\uD06C ${msg.realiased}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 ${msg.created}\uAC1C${skip}`, "ok");
+        setStatus("darkStatus", `${mode}\uB2E4\uD06C ${msg.realiased}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 ${msg.created}\uAC1C${skip}`, "ok");
         break;
       }
       case "SIMILAR_CANDIDATES":
@@ -4282,6 +4318,8 @@
   send({ type: "GET_COLLECTIONS" });
   send({ type: "GET_PREREQ" });
   send({ type: "GET_LICENSE" });
+  requestVars(true);
+  refreshDarkModes();
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
   var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {
@@ -4296,6 +4334,7 @@
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
     layoutAllLists();
     if (name !== "settings") send({ type: "GET_PREREQ" });
+    if (name === "tokens") requestVars(true);
   }
   TABS.forEach((t2, i) => {
     const btn = $(`tabbtn-${t2}`);

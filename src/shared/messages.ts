@@ -183,7 +183,7 @@ export type UiToCode =
   | { type: 'EDIT_VARIABLE'; id: string; patch: VarPatch } // 변수 속성 즉시 편집
   | { type: 'DELETE_VARIABLE'; id: string } // 변수 삭제
   | { type: 'GET_VARIABLE_USAGE'; id: string } // 삭제/리네임 전 사용처 조회
-  | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId: string; toModeId: string } // 라이트→다크 자동 채움
+  | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId?: string; toModeId?: string } // 라이트→Dark(없으면 addMode) 자동 채움
   | { type: 'SCAN_SIMILAR' } // 닮은 프레임: 선택 프레임 정렬 미리보기(읽기 전용 → Free)
   | { type: 'COMPONENTIZE_SIMILAR'; masterId: string; frameIds: string[] } // 닮은 프레임(Paid): 마스터 컴포넌트화 + 나머지를 오버라이드 인스턴스로 교체
   | { type: 'CHECK_CONTRAST'; level: WcagLevel } // 명도 대비 점검(읽기 전용 감사)
@@ -233,7 +233,7 @@ export type CodeToUi =
   | { type: 'EDIT_VARIABLE_RESULT'; id: string; ok: boolean; error?: string; var?: VarInfo; deleted?: boolean }
   // 사용처 — nodes는 문서 전체 스캔(상한 도달 시 capped), aliasedBy는 이 변수를 별칭하는 변수.
   | { type: 'VARIABLE_USAGE'; id: string; nodes: { id: string; name: string }[]; aliasedBy: { id: string; name: string }[]; capped: boolean }
-  | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number }
+  | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number; modeCreated?: boolean; error?: string }
   // 닮은 프레임 스캔 결과 — metas는 완전성 점수 내림차순(맨 앞이 추천 마스터).
   // varying/imageVarying는 "무엇이 속성으로 열리는지" 미리 보여주는 용도.
   | { type: 'SIMILAR_CANDIDATES'; metas: FrameMeta[]; recommendedMasterId: string | null; varying: VaryingPosition[]; imageVarying: string[]; excluded: { id: string; name: string; reason: string }[] }

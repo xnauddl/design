@@ -22,5 +22,5 @@ export { renameSelection } from './rename';
 export type { RenameOutcome } from './rename';
 export { scanSimilar, componentizeSimilar } from './similarApply';
 export type { ComponentizeResult } from './similarApply';
-export { generateDarkMode } from './themeApply';
+export { generateDarkMode, ensureDarkMode, findModeByName, DARK_MODE_NAME } from './themeApply';
 export type { DarkModeResult } from './themeApply';

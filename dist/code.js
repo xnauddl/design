@@ -3912,25 +3912,67 @@
   }
 
   // src/lib/themeApply.ts
+  var DARK_MODE_NAME = "Dark";
   function isVariableAlias(raw) {
     return !!raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS";
   }
+  function findModeByName(modes, name) {
+    const key = name.toLowerCase();
+    return modes.find((m) => m.name.toLowerCase() === key);
+  }
+  function ensureDarkMode(collection) {
+    const existing = findModeByName(collection.modes, DARK_MODE_NAME);
+    if (existing) return { modeId: existing.modeId, created: false };
+    const modeId = collection.addMode(DARK_MODE_NAME);
+    return { modeId, created: true };
+  }
   async function generateDarkMode(collectionId, fromModeId, toModeId) {
-    var _a;
+    var _a, _b, _c;
     let created = 0;
     let realiased = 0;
     let skipped = 0;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const semanticCol = cols.find((c) => c.id === collectionId);
-    if (!semanticCol) return { created, realiased, skipped };
-    const globalCol = (_a = cols.find((c) => c.name === GLOBAL)) != null ? _a : figma.variables.createVariableCollection(GLOBAL);
+    if (!semanticCol) return { created, realiased, skipped, error: "\uCEEC\uB809\uC158\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694." };
+    let modeCreated = false;
+    let to = toModeId;
+    if (!to) {
+      try {
+        const ensured = ensureDarkMode(semanticCol);
+        to = ensured.modeId;
+        modeCreated = ensured.created;
+      } catch (e) {
+        const why = e instanceof Error ? e.message : String(e);
+        return {
+          created: 0,
+          realiased: 0,
+          skipped: 0,
+          error: `Dark \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${why || "\uD50C\uB79C\uC5D0\uC11C \uBAA8\uB4DC\uB97C \uB354 \uB9CC\uB4E4 \uC218 \uC5C6\uC744 \uC218 \uC788\uC5B4\uC694."}`
+        };
+      }
+    }
+    let from = fromModeId;
+    if (!from) {
+      const def = semanticCol.defaultModeId;
+      from = def === to ? (_b = (_a = semanticCol.modes.find((m) => m.modeId !== to)) == null ? void 0 : _a.modeId) != null ? _b : def : def;
+    }
+    if (from === to) {
+      return __spreadProps(__spreadValues({
+        created: 0,
+        realiased: 0,
+        skipped: 0
+      }, modeCreated ? { modeCreated: true } : {}), {
+        error: "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694. \uB2E4\uB978 \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694."
+      });
+    }
+    const globalCol = (_c = cols.find((c) => c.name === GLOBAL)) != null ? _c : figma.variables.createVariableCollection(GLOBAL);
     const gMode = globalCol.defaultModeId;
     const allVars = await figma.variables.getLocalVariablesAsync();
     const byId = new Map(allVars.map((v) => [v.id, v]));
     const globalByName = new Map(allVars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
     for (const v of allVars) {
       if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
-      const fromRaw = v.valuesByMode[fromModeId];
+      const fromRaw = v.valuesByMode[from];
       if (!isVariableAlias(fromRaw)) {
         skipped++;
         continue;
@@ -3956,10 +3998,10 @@
         created++;
       }
       dark.setValueForMode(gMode, hexToRgb(darkHex));
-      v.setValueForMode(toModeId, figma.variables.createVariableAlias(dark));
+      v.setValueForMode(to, figma.variables.createVariableAlias(dark));
       realiased++;
     }
-    return { created, realiased, skipped };
+    return __spreadValues({ created, realiased, skipped }, modeCreated ? { modeCreated: true } : {});
   }
 
   // src/lib/variableEdit.ts
@@ -5470,7 +5512,7 @@
           if (!requirePaid("tokens", "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
           post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
-          if (r.created || r.realiased) {
+          if (r.created || r.realiased || r.modeCreated) {
             commitUndo(figma);
             await postPrereq();
           }

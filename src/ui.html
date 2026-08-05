@@ -619,7 +619,7 @@
 
     <div class="step" id="darkCard">
       <h2><span data-i18n="dark.title">다크 테마 생성</span> <span class="muted" id="darkLock"></span></h2>
-      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
+      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> <code>Dark</code> 모드를 만듭니다. 모드가 없으면 컬렉션에 <code>Dark</code>를 추가한 뒤 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
       <div class="row">
         <label class="inline"><span data-i18n="dark.collection">대상 컬렉션</span>
           <select id="darkCollection"></select>
@@ -632,9 +632,9 @@
         <label class="inline"><span data-i18n="dark.toMode">다크 모드</span>
           <select id="darkToMode"></select>
         </label>
-        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 채우기</button>
+        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 생성</button>
       </div>
-      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate" style="display:none">토큰 생성으로 →</button></div>
       <div class="status" id="darkStatus"></div>
     </div>
 

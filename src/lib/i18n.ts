@@ -85,11 +85,11 @@ export const STRINGS: Record<string, string> = {
 
   // 다크 테마 생성
   'dark.title': '다크 테마 생성',
-  'dark.hint': '라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)',
+  'dark.hint': '라이트 모드 색을 <b>명도만 뒤집어</b> <code>Dark</code> 모드를 만듭니다. 모드가 없으면 컬렉션에 <code>Dark</code>를 추가한 뒤 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)',
   'dark.collection': '대상 컬렉션',
   'dark.fromMode': '라이트 모드',
   'dark.toMode': '다크 모드',
-  'dark.genBtn': '다크 채우기',
+  'dark.genBtn': '다크 생성',
   // 닮은 프레임 컴포넌트화
   'similar.title': '닮은 프레임 컴포넌트화',
   'similar.hint': '구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.',

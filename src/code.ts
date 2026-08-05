@@ -1623,13 +1623,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'GENERATE_DARK_MODE': {
         // 다크 Global을 새로 만드는 작업이라 토큰 생성과 같은 등급으로 잠근다.
         if (!requirePaid('tokens', '다크 테마 생성은 Paid 기능입니다.')) break;
+        // toModeId 생략 시 themeApply가 Dark 모드를 ensure(없으면 addMode('Dark')).
         const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
         post({ type: 'DARK_MODE_RESULT', ...r });
-        if (r.created || r.realiased) {
-          commitUndo(figma); // UX2: 다크 생성 전체를 단일 Undo로
+        if (r.created || r.realiased || r.modeCreated) {
+          commitUndo(figma); // UX2: 모드 추가+채움 전체를 단일 Undo로
           await postPrereq();
         }
-        post({ type: 'VARIABLES', vars: await collectVars() }); // 편집기 목록 갱신
+        post({ type: 'VARIABLES', vars: await collectVars() }); // 편집기 목록 갱신(새 Dark 모드 포함)
         break;
       }
       case 'SCAN_SIMILAR': {

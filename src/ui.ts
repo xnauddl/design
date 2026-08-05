@@ -1364,8 +1364,9 @@ function updateGates(): void {
   for (const id of ['paletteLock', 'presetLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
-  // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가
-  // 방금 disabled를 티어만 보고 덮었으니, 모드 조건을 여기서 다시 적용해야 한다(순서 의존).
+  // 다크 채우기는 Paid에 더해 컬렉션·모드(라이트 출처)가 있어야 한다. PAID_FIELDS 루프가
+  // 방금 disabled를 티어만 보고 덮었으니, 전제를 여기서 다시 적용해야 한다(순서 의존).
+  // Dark 모드는 없으면 생성하므로 모드 2개 전제는 더 이상 없다.
   refreshDarkModes();
   $('wizComponentLock').textContent = isPaid ? '' : PAID_LOCK;
   ($('wizOptComponentize') as HTMLInputElement).disabled = !isPaid;
@@ -1470,6 +1471,8 @@ $('btnScanComp').addEventListener('click', () => {
 // 마지막으로 받은 목록. 편집은 낙관적으로 반영하지 않고 EDIT_VARIABLE_RESULT로 되돌려받아 갱신한다
 // — figma가 이름을 정규화하거나 값을 거부할 수 있어서, 화면이 실제 상태와 어긋나면 안 된다.
 let allVars: VarInfo[] = [];
+/** GET_VARIABLES 응답을 한 번이라도 받았는지 — 다크 카드가 ‘목록 미로드’와 ‘토큰 없음’을 구분한다. */
+let varsLoaded = false;
 
 /** 컬렉션/이름 필터를 적용한 목록. */
 function visibleVars(): VarInfo[] {
@@ -1478,17 +1481,20 @@ function visibleVars(): VarInfo[] {
   return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
 }
 
-function requestVars(): void {
-  setStatus('varEditStatus', '변수를 불러오는 중…', '');
+function requestVars(quiet = false): void {
+  if (!quiet) setStatus('varEditStatus', '변수를 불러오는 중…', '');
   send({ type: 'GET_VARIABLES' });
 }
 
-$('btnLoadVars').addEventListener('click', requestVars);
+$('btnLoadVars').addEventListener('click', () => requestVars(false));
 $('varFilterCol').addEventListener('change', () => renderVars());
 $('varFilterText').addEventListener('input', () => renderVars());
 
 /* ---------- 다크 테마 생성 ---------- */
-// 다크 채우기는 컬렉션의 모드 2개(라이트→다크)를 고르는 게 전부라, 변수 목록에서 모드를 읽어 채운다.
+// 라이트 모드 → Dark(없으면 addMode('Dark'))로 채운다. to는 플러그인이 ensure하므로
+// UI의 다크 모드 셀렉트는 안내·미리보기용이고, 버튼은 from만 보낸다.
+// 주의: allVars는 ‘관리 → 변수 불러오기’에만 의존하면 만들기 탭 다크 카드가 항상 비어 보인다
+// (토큰이 있어도 modes=[] → ‘토큰 생성으로’ 오안내). 만들기 탭 진입·시작 시 조용히 로드한다.
 function refreshDarkOptions(): void {
   const cols = new Map<string, VarInfo>();
   for (const v of allVars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
@@ -1502,10 +1508,16 @@ function refreshDarkOptions(): void {
     sel.appendChild(o);
   }
   if (prev && cols.has(prev)) sel.value = prev;
-  // 라이트/다크가 성립하려면 모드가 2개 이상이어야 한다. 이름순 첫 컬렉션(대개 단일 모드인
-  // Global)이 잡히면 카드가 열리자마자 막힌 것처럼 보이니, 실제로 쓸 수 있는 쪽을 기본으로.
-  const usable = [...cols.values()].find((v) => v.modes.length >= 2);
-  if (usable && (cols.get(sel.value)?.modes.length ?? 0) < 2) sel.value = usable.collectionId;
+  // Semantic을 우선(다크 채움 대상). 모드 1개여도 Dark를 만들 수 있으므로 ≥1이면 충분.
+  const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
+  const usable = withModes.find((v) => v.collection === 'Semantic') ?? withModes[0];
+  if (usable && (cols.get(sel.value)?.modes.length ?? 0) < 1) sel.value = usable.collectionId;
+  // 선택이 비었거나 Global만 잡힌 경우 Semantic으로 끌어올린다.
+  if (usable && (!sel.value || cols.get(sel.value)?.collection === 'Global') && usable.collection === 'Semantic') {
+    sel.value = usable.collectionId;
+  } else if (usable && !sel.value) {
+    sel.value = usable.collectionId;
+  }
   refreshDarkModes();
 }
 
@@ -1525,22 +1537,48 @@ function refreshDarkModes(): void {
     }
     if (prev && modes.some((m) => m.modeId === prev)) sel.value = prev;
   }
-  // 모드가 2개 이상이어야 라이트→다크가 성립한다. 1개면 무엇을 눌러도 아무 일이 없으니 미리 막는다.
-  const ok = modes.length >= 2;
+  // 모드 ≥1 + Paid면 생성 가능(Dark 없으면 플러그인이 추가). 목록 미로드·토큰 없음만 막는다.
+  const hasCollection = !!colId && modes.length >= 1;
+  const ok = hasCollection && varsLoaded && allVars.length > 0;
   ($('btnGenDark') as HTMLButtonElement).disabled = !ok || !isPaid;
   const notice = $('darkPrereq');
+  const gotoCreate = $('darkPrereqGotoCreate') as HTMLButtonElement;
   notice.style.display = ok ? 'none' : '';
   const text = notice.querySelector('.prereq-text');
-  if (text) {
-    text.textContent = ok
-      ? ''
-      : modes.length
-        ? '이 컬렉션에 모드가 하나뿐이에요. Figma에서 다크 모드를 추가한 뒤 다시 시도하세요.'
-        : '먼저 토큰을 생성해 변수를 만드세요.';
+  if (!ok && text) {
+    // 목록을 아직 안 받았으면 ‘토큰 없음’이 아니라 로딩 — 오안내(토큰 생성으로)를 막는다.
+    if (!varsLoaded) {
+      text.textContent = '변수 목록을 불러오는 중…';
+      gotoCreate.style.display = 'none';
+    } else if (allVars.length === 0) {
+      text.textContent = '먼저 토큰을 생성해 변수를 만드세요.';
+      gotoCreate.style.display = '';
+    } else if (!colId || modes.length === 0) {
+      text.textContent = '모드가 있는 컬렉션(보통 Semantic)을 고르세요.';
+      gotoCreate.style.display = 'none';
+    } else {
+      text.textContent = '컬렉션과 라이트 모드를 고르세요.';
+      gotoCreate.style.display = 'none';
+    }
   }
-  // 모드가 2개 이상이면 서로 다른 모드가 기본으로 잡히게 — 같은 모드끼리면 덮어써도 의미가 없다.
-  if (modes.length >= 2 && ($('darkFromMode') as HTMLSelectElement).value === ($('darkToMode') as HTMLSelectElement).value) {
-    ($('darkToMode') as HTMLSelectElement).value = modes[1].modeId;
+  // to 셀렉트: 이미 Dark가 있으면 그걸, 없으면 안내 옵션(실제 생성은 플러그인).
+  const toSel = $('darkToMode') as HTMLSelectElement;
+  const darkMode = modes.find((m) => m.name.toLowerCase() === 'dark');
+  if (darkMode) {
+    toSel.value = darkMode.modeId;
+  } else if (modes.length >= 1) {
+    // 플레이스홀더 — 값이 실제 modeId가 아니므로 전송하지 않는다(버튼은 from만 보냄).
+    const o = document.createElement('option');
+    o.value = '';
+    o.textContent = 'Dark (없으면 생성)';
+    toSel.insertBefore(o, toSel.firstChild);
+    toSel.value = '';
+  }
+  // from: Dark가 기본으로 잡히면 다른 모드로.
+  const fromSel = $('darkFromMode') as HTMLSelectElement;
+  if (modes.length >= 2 && darkMode && fromSel.value === darkMode.modeId) {
+    const other = modes.find((m) => m.modeId !== darkMode.modeId);
+    if (other) fromSel.value = other.modeId;
   }
 }
 
@@ -1549,17 +1587,13 @@ $('darkCollection').addEventListener('change', refreshDarkModes);
 $('btnGenDark').addEventListener('click', () => {
   const collectionId = ($('darkCollection') as HTMLSelectElement).value;
   const fromModeId = ($('darkFromMode') as HTMLSelectElement).value;
-  const toModeId = ($('darkToMode') as HTMLSelectElement).value;
-  if (!collectionId || !fromModeId || !toModeId) {
-    setStatus('darkStatus', '컬렉션과 모드를 고르세요.', 'warn');
+  if (!collectionId || !fromModeId) {
+    setStatus('darkStatus', '컬렉션과 라이트 모드를 고르세요.', 'warn');
     return;
   }
-  if (fromModeId === toModeId) {
-    setStatus('darkStatus', '라이트와 다크가 같은 모드예요. 다른 모드를 고르세요.', 'warn');
-    return;
-  }
-  setStatus('darkStatus', '다크 값을 채우는 중…', '');
-  send({ type: 'GENERATE_DARK_MODE', collectionId, fromModeId, toModeId });
+  setStatus('darkStatus', 'Dark 모드를 만들고 값을 채우는 중…', '');
+  // toModeId 생략 → code/themeApply가 Dark를 ensure.
+  send({ type: 'GENERATE_DARK_MODE', collectionId, fromModeId });
 });
 
 /* ---------- 닮은 프레임 컴포넌트화 ---------- */
@@ -1982,6 +2016,7 @@ window.onmessage = (event: MessageEvent) => {
       renderContrast(msg);
       break;
     case 'VARIABLES': {
+      varsLoaded = true;
       allVars = msg.vars;
       // 컬렉션 필터 옵션은 실제로 존재하는 컬렉션에서만 만든다.
       const sel = $('varFilterCol') as HTMLSelectElement;
@@ -2029,13 +2064,19 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'DARK_MODE_RESULT': {
-      if (!msg.realiased) {
-        const why = msg.skipped ? `Global을 가리키는 색이 없어요(건너뜀 ${msg.skipped}개)` : '대상 색이 없어요';
-        setStatus('darkStatus', `다크 값을 채우지 못했어요 — ${why}`, 'warn');
+      if (msg.error) {
+        setStatus('darkStatus', msg.error, 'warn');
         break;
       }
+      if (!msg.realiased) {
+        const why = msg.skipped ? `Global을 가리키는 색이 없어요(건너뜀 ${msg.skipped}개)` : '대상 색이 없어요';
+        const mode = msg.modeCreated ? 'Dark 모드는 추가됐어요. ' : '';
+        setStatus('darkStatus', `${mode}다크 값을 채우지 못했어요 — ${why}`, 'warn');
+        break;
+      }
+      const mode = msg.modeCreated ? 'Dark 모드 추가 · ' : '';
       const skip = msg.skipped ? ` · 건너뜀 ${msg.skipped}개(값을 직접 넣은 색)` : '';
-      setStatus('darkStatus', `다크 ${msg.realiased}개 연결 · 새 dark/ 원시색 ${msg.created}개${skip}`, 'ok');
+      setStatus('darkStatus', `${mode}다크 ${msg.realiased}개 연결 · 새 dark/ 원시색 ${msg.created}개${skip}`, 'ok');
       break;
     }
     case 'SIMILAR_CANDIDATES':
@@ -2930,6 +2971,8 @@ refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드도 시작 시 빈 �
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_PREREQ' }); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
+requestVars(true); // 다크 카드·변수 편집기 — 관리 탭 ‘불러오기’ 없이도 목록 채움
+refreshDarkModes(); // 응답 전 ‘불러오는 중…’ 안내(오안내 ‘토큰 생성으로’ 방지)
 
 // #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
 document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
@@ -2955,6 +2998,8 @@ function showTab(name: (typeof TABS)[number]): void {
   // 돌아왔을 때 반쪽 행에 개수 줄도 없는 상태가 남는다.
   layoutAllLists();
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
+  // 만들기 탭의 다크 카드는 allVars에 의존 — 탭 들어올 때마다 최신화(외부에서 모드/변수 추가 대비).
+  if (name === 'tokens') requestVars(true);
 }
 TABS.forEach((t, i) => {
   const btn = $(`tabbtn-${t}`);
