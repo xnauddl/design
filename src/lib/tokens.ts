@@ -70,6 +70,17 @@ export interface DraftToken {
   value: string | number;
   /** 수치 토큰의 의도 단위(px 외에는 STRING 보존 + 선택적 px 환산). */
   unit?: Unit;
+  /**
+   * %/em 을 px로 환산할 때 쓸 기준 폰트 크기. 없으면 base(16)를 쓴다.
+   * 텍스트 스타일 등록처럼 값마다 폰트 크기가 다르면 base로 환산해선 안 된다 —
+   * `150% @ 24px`는 36px이지 24px이 아니다.
+   */
+  fontSize?: number;
+  /**
+   * 이 값을 쓰는 레이어 수(추출 시 집계). 한 레이어가 같은 값을 여러 번 써도(padding 4방향) 1.
+   * 무엇을 토큰으로 남길지 고르는 근거 — 1이면 대개 일회성 값이다.
+   */
+  count?: number;
 }
 
 /* ---------- 색상 hex ---------- */
@@ -137,7 +148,7 @@ export interface PxConversion {
  * 써야 미리보기와 실제 값이 어긋나지 않으므로, 양쪽이 이 함수를 공유한다.
  */
 export function pxConversions(
-  tokens: readonly { name: string; category: TokenCategory; unit?: Unit; value: string | number }[],
+  tokens: readonly { name: string; category: TokenCategory; unit?: Unit; value: string | number; fontSize?: number }[],
   base: number,
 ): PxConversion[] {
   const out: PxConversion[] = [];
@@ -146,7 +157,8 @@ export function pxConversions(
     out.push({
       name: t.name,
       from: stringValueForUnit(t.value, t.unit),
-      to: toPx(t.value, t.unit, { base, fontSize: base }),
+      // 토큰이 자기 폰트 크기를 알고 있으면 그것으로 환산(없으면 base) — setGlobalLiteral과 같은 규칙.
+      to: toPx(t.value, t.unit, { base, fontSize: t.fontSize ?? base }),
     });
   }
   return out;
@@ -226,6 +238,11 @@ export function scopesForType(scopes: ScopeName[], type: ResolvedType): ScopeNam
   return scopes.filter((s) => ok.has(s));
 }
 
+/** 변수 타입별로 UI가 제시할 수 있는 유효 스코프 목록(편집기 멀티셀렉트용). */
+export function scopesForTypeList(type: ResolvedType): ScopeName[] {
+  return [...VALID_SCOPES[type]];
+}
+
 /**
  * 시맨틱 역할 이름 → 속성에 맞는 스코프. 역할 머리말(슬래시 앞)로 판단.
  * 미지정 역할(primary/secondary/accent/상태색 등)은 undefined → 호출자가 원시 스코프를 상속.
@@ -279,6 +296,118 @@ export function toPx(
 /** 임의 색 → 중립 이름 `color/0066ff` (hex 6자리, # 제거). */
 export function colorTokenName(hex: string): string {
   return `color/${hex.replace('#', '').toLowerCase()}`;
+}
+
+/* ---------- 수치 토큰 정리 (스케일 사다리 스냅) ---------- */
+
+/**
+ * 스냅 대상 — 8pt 사다리가 실제 관례인 여백·크기만.
+ * fontSize(14·18·20)·strokeWidth(1·1.5·2)·radius(2·4·6)는 각자의 척도가 있어 끌어당기면 망가진다.
+ */
+const SNAP_CATEGORIES: ReadonlySet<TokenCategory> = new Set<TokenCategory>(['gap', 'size']);
+
+/** 카테고리별 자동 이름의 그룹 접두사 — 스냅으로 값이 바뀌면 이름도 따라가야 한다. */
+const TOKEN_GROUP: Partial<Record<TokenCategory, string>> = { gap: 'spacing', size: 'size' };
+
+export interface TidyNumbersOptions {
+  /** 사다리 기준(px). 8이면 …4·2·1 / 8·16·24·32… 0 이하면 정리하지 않는다. */
+  base: number;
+  /** 사다리 칸으로 옮길 수 있는 최대 이동 **비율**(0~1). 예: 0.15 = 값의 15%까지. */
+  ratio: number;
+}
+
+export interface TidyNumbersResult {
+  tokens: DraftToken[];
+  /** 정리 대상(여백·크기, px)이었던 토큰 수. */
+  before: number;
+  after: number;
+  /** 같은 칸에 놓여 하나로 합쳐진 토큰 수. */
+  merged: number;
+  /** 값이 사다리 칸으로 옮겨진 토큰 수(옮겼지만 중복이 아닐 수 있다). */
+  snapped: number;
+}
+
+const cloneToken = (t: DraftToken): DraftToken => ({ ...t, sources: [...t.sources] });
+
+/**
+ * 스케일 사다리 — 기준 미만은 **반분할**, 기준 이상은 **배수**.
+ * base=8이면 1·2·4 / 8·16·24·32… 8pt 시스템에서 4를 반 스텝, 2를 1/4 스텝으로 쓰는 관례를 그대로 담는다.
+ */
+export function scaleLadder(base: number, max: number): number[] {
+  if (base <= 0) return [];
+  const rungs: number[] = [];
+  for (let v = base / 2; v >= 1; v /= 2) rungs.push(v);
+  for (let k = 1; base * k <= max + base; k++) rungs.push(base * k);
+  return rungs.sort((a, b) => a - b);
+}
+
+/**
+ * 여백·크기 토큰을 스케일 사다리로 정리한다.
+ *
+ * 이동 거리를 px이 아니라 **값 대비 비율**로 재는 것이 핵심이다. 2px 이동은 값 4에서는 50%,
+ * 64에서는 3%로 의미가 전혀 다르다. 절대 px으로 통제하면 `4 → 8`(2배) 같은 사고가 나므로,
+ * 비율 기준을 쓰면 작은 값은 자동으로 보수적으로, 큰 값은 관대하게 다뤄진다.
+ *
+ * 병합은 스냅의 **결과**다 — 같은 칸에 놓인 토큰만 하나로 합친다(사용 수·출처를 대표가 물려받음).
+ * 사다리에서 먼 값은 의도된 예외로 보고 그대로 둔다. 불필요하면 목록에서 체크를 해제하면 된다.
+ *
+ * 입력은 변경하지 않는다 — 되돌리기용 스냅샷이 오염되지 않게 복제해서 다룬다.
+ */
+export function tidyNumberTokens(tokens: readonly DraftToken[], opts: TidyNumbersOptions): TidyNumbersResult {
+  const { base, ratio } = opts;
+  const out = tokens.map(cloneToken);
+  // percent 행간 같은 비-px 값은 사다리와 무관하다.
+  const targets = out.filter(
+    (t) => SNAP_CATEGORIES.has(t.category) && typeof t.value === 'number' && (!t.unit || t.unit === 'px'),
+  );
+  const before = targets.length;
+  if (base <= 0 || ratio <= 0 || before === 0) return { tokens: out, before, after: before, merged: 0, snapped: 0 };
+
+  const rungs = scaleLadder(base, Math.max(...targets.map((t) => t.value as number)));
+  const nearest = (v: number): number => rungs.reduce((p, c) => (Math.abs(c - v) < Math.abs(p - v) ? c : p));
+
+  let snapped = 0;
+  for (const t of targets) {
+    const v = t.value as number;
+    if (v <= 0) continue;
+    const target = nearest(v);
+    if (target === v || Math.abs(target - v) / v > ratio) continue;
+    const group = TOKEN_GROUP[t.category];
+    // 사용자가 개명했으면 그 이름을 존중한다 — 자동 이름 그대로일 때만 값에 맞춰 갱신.
+    if (group && t.name === numberTokenName(group, v)) t.name = numberTokenName(group, target);
+    t.value = target;
+    snapped++;
+  }
+
+  // 같은 칸에 놓인 것만 병합. 대표는 **가장 많이 쓰인 값** — 배열 순서로 고르면 개명한 희소 값이
+  // 정규 값의 이름을 빼앗고, 어느 이름이 살아남는지가 알파벳 정렬 위치에 좌우된다.
+  const seen = new Map<string, DraftToken>();
+  const dropped = new Set<DraftToken>();
+  for (const t of targets) {
+    const k = `${t.category}|${t.value}|${t.unit ?? ''}`;
+    const cur = seen.get(k);
+    if (!cur) {
+      seen.set(k, t);
+      continue;
+    }
+    const [rep, gone] = (t.count ?? 0) > (cur.count ?? 0) ? [t, cur] : [cur, t];
+    seen.set(k, rep);
+    // 흡수된 값의 출처도 대표가 물려받아야 스코프가 좁아지지 않는다.
+    for (const s of gone.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+    // count는 '값을 쓰는 서로 다른 레이어 수'다. 두 값을 같은 레이어가 함께 썼을 수 있어
+    // 단순 합산은 과대계상이 된다(한 카드의 padding 15 + gap 17 → 2× 표시). 겹침을 알 수 없으므로
+    // 하한인 최댓값을 쓴다 — '1× 해제'가 실제로 한 레이어짜리 값을 계속 걸러내도록.
+    rep.count = Math.max(rep.count ?? 0, gone.count ?? 0);
+    dropped.add(gone);
+  }
+
+  return {
+    tokens: out.filter((t) => !dropped.has(t)),
+    before,
+    after: before - dropped.size,
+    merged: dropped.size,
+    snapped,
+  };
 }
 
 /** 숫자 토큰 이름 — 그룹 접두사 + 정수/소수 정규화. 예: numberTokenName('spacing',16)='spacing/16'. */

@@ -26,6 +26,7 @@ export const EMITTED_ROLES = [
   'button',
   'chip',
   'card',
+  'table',
   'list',
   'item',
   'field',
