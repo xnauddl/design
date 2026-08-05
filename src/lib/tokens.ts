@@ -71,6 +71,12 @@ export interface DraftToken {
   /** 수치 토큰의 의도 단위(px 외에는 STRING 보존 + 선택적 px 환산). */
   unit?: Unit;
   /**
+   * %/em 을 px로 환산할 때 쓸 기준 폰트 크기. 없으면 base(16)를 쓴다.
+   * 텍스트 스타일 등록처럼 값마다 폰트 크기가 다르면 base로 환산해선 안 된다 —
+   * `150% @ 24px`는 36px이지 24px이 아니다.
+   */
+  fontSize?: number;
+  /**
    * 이 값을 쓰는 레이어 수(추출 시 집계). 한 레이어가 같은 값을 여러 번 써도(padding 4방향) 1.
    * 무엇을 토큰으로 남길지 고르는 근거 — 1이면 대개 일회성 값이다.
    */
@@ -142,7 +148,7 @@ export interface PxConversion {
  * 써야 미리보기와 실제 값이 어긋나지 않으므로, 양쪽이 이 함수를 공유한다.
  */
 export function pxConversions(
-  tokens: readonly { name: string; category: TokenCategory; unit?: Unit; value: string | number }[],
+  tokens: readonly { name: string; category: TokenCategory; unit?: Unit; value: string | number; fontSize?: number }[],
   base: number,
 ): PxConversion[] {
   const out: PxConversion[] = [];
@@ -151,7 +157,8 @@ export function pxConversions(
     out.push({
       name: t.name,
       from: stringValueForUnit(t.value, t.unit),
-      to: toPx(t.value, t.unit, { base, fontSize: base }),
+      // 토큰이 자기 폰트 크기를 알고 있으면 그것으로 환산(없으면 base) — setGlobalLiteral과 같은 규칙.
+      to: toPx(t.value, t.unit, { base, fontSize: t.fontSize ?? base }),
     });
   }
   return out;

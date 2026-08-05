@@ -992,7 +992,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'CREATE_TEXT_STYLES': {
         if (!requireTextStyles()) break;
         const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
-        post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing });
+        post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing, notes: r.notes });
         commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로
         await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → '적용만' 등 전제 게이트 갱신
         break;

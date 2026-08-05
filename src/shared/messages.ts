@@ -201,7 +201,7 @@ export type CodeToUi =
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number } // Phase C: 스캔 결과(+행 라벨 통계)
-  | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; applied: number; missing: string[] } // Phase C
+  | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; applied: number; missing: string[]; notes: string[] } // Phase C (notes=경고 아닌 알림)
   | { type: 'TEXT_STYLES_APPLIED'; applied: number; missing: string[] } // Phase C: 적용만(생성 없음) 결과
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   | { type: 'GLOBAL_COLORS'; colors: { name: string; hex: string }[] } // #10: 기존 Global 색(이름+hex)

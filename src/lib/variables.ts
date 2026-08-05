@@ -144,9 +144,11 @@ function setGlobalLiteral(v: Variable, modeId: string, t: DraftToken, type: Reso
     v.setValueForMode(modeId, String(t.value)); // fontFamily 등
   } else {
     // FLOAT — #16: 비-px lineHeight/letterSpacing은 px로 환산해 바인딩 가능하게(원본 단위는 description).
+    // 토큰이 자기 폰트 크기를 알면 그것으로 환산한다 — 텍스트 스타일 등록은 역할마다 크기가 달라
+    // base(16)로 환산하면 `150% @ 24px`가 36이 아니라 24로 굳어진다.
     const num =
       t.unit && t.unit !== 'px' && typeof t.value === 'number'
-        ? toPx(t.value, t.unit, { base, fontSize: base })
+        ? toPx(t.value, t.unit, { base, fontSize: t.fontSize ?? base })
         : Number(t.value);
     v.setValueForMode(modeId, num);
   }
@@ -247,9 +249,11 @@ export function scanTextStyles(nodes: readonly SceneNode[]): TextScanResult {
     const fontSize = roundN(t.fontSize);
     const { family, style } = t.fontName;
     let lineHeight = 0;
+    let lineHeightPercent = 0; // 원본이 %일 때만(등록 단위 결정용). 시그니처는 계속 px.
     const lh = t.lineHeight;
     if (lh !== figma.mixed && lh.unit !== 'AUTO') {
       lineHeight = lh.unit === 'PERCENT' ? roundN((fontSize * lh.value) / 100) : roundN(lh.value);
+      if (lh.unit === 'PERCENT') lineHeightPercent = roundN(lh.value);
     }
     let letterSpacing = 0;
     const ls = t.letterSpacing;
@@ -274,7 +278,7 @@ export function scanTextStyles(nodes: readonly SceneNode[]): TextScanResult {
       if (indexInParent < 0) indexInParent = undefined;
     }
     samples.push({
-      fontSize, lineHeight, letterSpacing, family, style,
+      fontSize, lineHeight, lineHeightPercent, letterSpacing, family, style,
       layerName: t.name, styleId, characters, id: t.id, rowId, indexInParent,
     });
   }
@@ -285,6 +289,11 @@ export function scanTextStyles(nodes: readonly SceneNode[]): TextScanResult {
 function lhPxOf(fontSize: number, lh: LineHeight | typeof figma.mixed): number {
   if (lh === figma.mixed || lh.unit === 'AUTO') return 0;
   return lh.unit === 'PERCENT' ? roundN((fontSize * lh.value) / 100) : roundN(lh.value);
+}
+/** 행간이 %면 그 값(150 = 150%), 아니면 0. 등록 단위 결정·보존 판정의 단일 기준. */
+function lhPctOf(lh: LineHeight | typeof figma.mixed): number {
+  if (lh === figma.mixed || lh.unit !== 'PERCENT') return 0;
+  return roundN(lh.value);
 }
 function lsPxOf(fontSize: number, ls: LetterSpacing | typeof figma.mixed): number {
   if (ls === figma.mixed) return 0;
@@ -315,6 +324,8 @@ export interface TextStyleResult {
   bound: number;
   applied: number;
   missing: string[];
+  /** 경고가 아닌 알림(의도된 미바인딩 등). missing과 섞으면 정상 동작이 경고로 읽힌다. */
+  notes: string[];
 }
 
 /** 변수 보장 → 텍스트 스타일 upsert + 시맨틱 바인딩 → (apply) 원본 노드에 스타일 연결. */
@@ -323,7 +334,7 @@ export async function createSemanticTextStyles(
   apply: boolean,
   nodes: readonly SceneNode[],
 ): Promise<TextStyleResult> {
-  const res: TextStyleResult = { created: 0, updated: 0, bound: 0, applied: 0, missing: [] };
+  const res: TextStyleResult = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
   if (!specs.length) return res;
 
   // 0) 재스캔 rename 준비: boundStyleId가 **실제로 존재하는** 스타일을 가리킬 때만 rename.
@@ -381,12 +392,35 @@ export async function createSemanticTextStyles(
     }
   };
   const aliasMap: Record<string, string> = {};
-  const pushAlias = (role: string, fontSize: number, lineHeight: number, letterSpacing: number) => {
+  // 행간 토큰은 이름(=px)이 같아도 원본이 갈릴 수 있다(24px 역할 + 16px의 150% 역할).
+  // description은 이름당 하나뿐이라 한쪽의 "150%"가 다른 역할의 내보내기까지 오염시키므로,
+  // 원본이 어긋나면 px 스냅샷으로 통일하고(설명 없음) 알림만 남긴다.
+  const lhTokens = new Map<string, DraftToken>();
+  const pushLineHeightTok = (name: string, px: number, pct: number, fontSize: number) => {
+    const prev = lhTokens.get(name);
+    if (!prev) {
+      const t: DraftToken =
+        pct > 0
+          ? { name, category: 'lineHeight', value: pct, unit: 'percent', fontSize, sources: ['lineHeight'] }
+          : { name, category: 'lineHeight', value: px, unit: 'px', sources: ['lineHeight'] };
+      lhTokens.set(name, t);
+      pushTok(t);
+      return;
+    }
+    const prevPct = prev.unit === 'percent' ? Number(prev.value) : 0;
+    if (prevPct === pct && (pct === 0 || prev.fontSize === fontSize)) return; // 같은 원본 → 그대로
+    prev.value = px;
+    prev.unit = 'px';
+    prev.fontSize = undefined;
+    res.notes.push(`${name}: 역할마다 행간 원본이 달라 px로 기록(원본 표기 생략)`);
+  };
+  const pushAlias = (role: string, fontSize: number, lineHeight: number, letterSpacing: number, lineHeightPercent = 0) => {
     pushTok({ name: numberTokenName('font-size', fontSize), category: 'fontSize', value: fontSize, sources: ['fontSize'] });
     aliasMap[`font-size/${role}`] = numberTokenName('font-size', fontSize);
     if (lineHeight > 0) {
-      pushTok({ name: numberTokenName('line-height', lineHeight), category: 'lineHeight', value: lineHeight, unit: 'px', sources: ['lineHeight'] });
-      aliasMap[`line-height/${role}`] = numberTokenName('line-height', lineHeight);
+      const lhName = numberTokenName('line-height', lineHeight);
+      pushLineHeightTok(lhName, lineHeight, lineHeightPercent, fontSize);
+      aliasMap[`line-height/${role}`] = lhName;
     }
     if (letterSpacing !== 0) {
       pushTok({ name: numberTokenName('letter-spacing', letterSpacing), category: 'letterSpacing', value: letterSpacing, unit: 'px', sources: ['letterSpacing'] });
@@ -395,7 +429,7 @@ export async function createSemanticTextStyles(
   };
   for (const s of specs) {
     if (anchoredStyle(s)) continue; // rename: 스캔 값으로 시맨틱 upsert 금지
-    pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing);
+    pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing, s.lineHeightPercent ?? 0);
   }
   // rename인데 이동/기존 모두 없어 시맨틱이 비면, 스타일 **현재 값**으로만 생성(스캔 오버라이드 아님).
   {
@@ -410,7 +444,8 @@ export async function createSemanticTextStyles(
       if (!st) continue;
       if (semNames.has(`font-size/${s.name}`)) continue; // 이미 있음(이동됐거나 대상 역할 존재) → 덮지 않음
       const fontSize = roundN(st.fontSize);
-      pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing));
+      // 스펙(스캔)이 아니라 **스타일의 현재 단위**가 기준 — 앵커 행은 타이포를 건드리지 않으므로.
+      pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight));
     }
   }
   if (tokens.length) await createTokens(tokens, 16);
@@ -461,7 +496,15 @@ export async function createSemanticTextStyles(
       }
       style.fontName = loaded;
       style.fontSize = spec.fontSize;
-      style.lineHeight = spec.lineHeight > 0 ? { value: spec.lineHeight, unit: 'PIXELS' } : { unit: 'AUTO' };
+      // 원본이 %면 %로 등록한다(스캔에서 실어 온 값). 순서 주의: lineHeight를 나중에 대입하면
+      // 아래에서 건 바인딩이 조용히 풀린다 — 반드시 값 먼저, 바인딩 나중.
+      const pct = spec.lineHeightPercent ?? 0;
+      style.lineHeight =
+        spec.lineHeight > 0
+          ? pct > 0
+            ? { value: pct, unit: 'PERCENT' }
+            : { value: spec.lineHeight, unit: 'PIXELS' }
+          : { unit: 'AUTO' };
       // 0도 기록(잔여 자간 클리어). PIXELS 단위로 통일.
       style.letterSpacing = { value: spec.letterSpacing, unit: 'PIXELS' };
     }
@@ -473,13 +516,21 @@ export async function createSemanticTextStyles(
       res.bound++;
     } else res.missing.push(`font-size/${bindRole}`);
     if (spec.lineHeight > 0 || isRename) {
-      // rename은 스펙 lineHeight가 스캔값일 수 있어, 스타일에 바인딩할 시맨틱은 역할명 기준.
-      // lineHeight>0인 신규만 필수; rename은 역할에 lh 별칭이 있으면 연결.
-      const lhVar = semByName.get(`line-height/${bindRole}`);
-      if (lhVar) {
-        style.setBoundVariable('lineHeight', lhVar);
-        res.bound++;
-      } else if (spec.lineHeight > 0) res.missing.push(`line-height/${bindRole}`);
+      // 지금 스타일에 들어 있는 단위가 기준 — 신규는 방금 쓴 값, rename은 원래 스타일 값.
+      // Figma는 행간에 변수를 바인딩하면 단위를 PIXELS로 강제한다(실측). %를 지키려면 바인딩을 포기해야 하고,
+      // 반대로 여기서 바인딩하면 사용자가 %로 만들어 둔 기존 스타일이 px로 뭉개진다.
+      const pctNow = lhPctOf(style.lineHeight);
+      if (pctNow > 0) {
+        res.notes.push(`${bindRole}: 행간 ${pctNow}% 유지 — 변수 바인딩 생략`);
+      } else {
+        // rename은 스펙 lineHeight가 스캔값일 수 있어, 스타일에 바인딩할 시맨틱은 역할명 기준.
+        // lineHeight>0인 신규만 필수; rename은 역할에 lh 별칭이 있으면 연결.
+        const lhVar = semByName.get(`line-height/${bindRole}`);
+        if (lhVar) {
+          style.setBoundVariable('lineHeight', lhVar);
+          res.bound++;
+        } else if (spec.lineHeight > 0) res.missing.push(`line-height/${bindRole}`);
+      }
     }
     if (spec.letterSpacing !== 0 || isRename) {
       const lsVar = semByName.get(`letter-spacing/${bindRole}`);
@@ -541,7 +592,7 @@ export async function createSemanticTextStyles(
 /** 적용만(생성 없음): 선택 텍스트를 시그니처가 같은 **기존** 로컬 스타일에 바인딩.
    라이브러리에 없는 시그니처는 건드리지 않고 "먼저 등록 필요"로 보고(스타일·변수 생성/수정 없음). */
 export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Promise<TextStyleResult> {
-  const res: TextStyleResult = { created: 0, updated: 0, bound: 0, applied: 0, missing: [] };
+  const res: TextStyleResult = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
   // 기존 스타일 시그니처 인덱스(중복 시그니처는 모호 → 적용 제외).
   const styleBySig = new Map<string, TextStyle | null>(); // null = 같은 시그니처 2개 이상
   for (const s of await figma.getLocalTextStylesAsync()) {
