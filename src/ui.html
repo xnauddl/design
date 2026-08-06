@@ -387,10 +387,10 @@
 </head>
 <body>
   <div class="tabs" role="tablist" aria-label="작업 탭">
-    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard" data-i18n="tab.wizard">마법사</button>
+    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard" data-i18n="tab.wizard">시작</button>
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
-    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">관리</button>
+    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
   </div>
 
   <!-- 선택 동기화 (실시간) -->
@@ -407,11 +407,11 @@
 
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
     <div class="step" id="wizardCard">
-      <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
-      <div class="hint" data-i18n="wizardCard.hint">추출 → 토큰 → 바인딩 → 정돈</div>
+      <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
+      <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
       <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span> <span class="muted" id="wizComponentLock"></span></label>
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
+        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
       </div>
       <div class="row">
         <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
@@ -425,9 +425,9 @@
 
     <!-- 진행 — 만들기→적용 의존 파이프라인 상태(클릭하면 그 단계로) -->
     <div class="step" id="pipelineCard">
-      <h2 data-i18n="pipeline.title">진행</h2>
+      <h2 data-i18n="pipeline.title">준비 현황</h2>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 컴포넌트는 독립</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">이름·컴포넌트는 필요할 때 적용 탭에서</div>
     </div>
   </section>
 
@@ -436,7 +436,7 @@
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
       <button class="step-chip" data-make-step="token"><span class="n" data-i18n="rail.token">토큰</span><span data-i18n="rail.tokenSub">간격·크기</span></button>
-      <button class="step-chip" data-make-step="theme"><span class="n" data-i18n="rail.theme">테마</span><span data-i18n="rail.themeSub">다크</span></button>
+      <button class="step-chip" data-make-step="theme"><span class="n" data-i18n="rail.theme">테마</span><span data-i18n="rail.themeSub">다크 모드</span></button>
       <button class="step-chip" data-make-step="type"><span class="n" data-i18n="rail.type">타이포</span><span data-i18n="rail.typeSub">텍스트 스타일</span></button>
     </div>
 
@@ -444,7 +444,7 @@
          이후 '토큰' 단계는 색 외(간격·크기·폰트·효과)만 다룬다. -->
     <div class="step" id="colorCard" data-make-step="color">
       <h2><span data-i18n="color.title">색</span> <span class="muted" id="colorCount"></span> <span class="muted" data-i18n="color.scope">추출 → 변수 · 팔레트</span> <span class="muted" id="paletteLock"></span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">화면에서 뽑거나 시드로 만든 뒤, 역할을 정하고 변수로 만듭니다.</div>
+      <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
@@ -457,7 +457,7 @@
         <input id="brand" type="color" value="#3366ff" />
         <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
         <label class="inline"><input id="incNeutral" type="checkbox" checked /> <span data-i18n="palette.neutral">중립</span></label>
-        <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태색</span></label>
+        <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태</span></label>
         <span class="muted" id="paletteInfo"></span>
       </div>
       <div class="row">
@@ -496,14 +496,14 @@
     </div>
 
     <div class="step" id="createCard" data-make-step="token">
-      <h2><span data-i18n="create.title">토큰 생성</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
+      <h2><span data-i18n="create.title">간격·크기 토큰</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
       <div class="toolbar">
         <button id="btnCreate" data-i18n="create.previewBtn">미리보기</button>
         <button id="btnCreateApply" class="primary" style="display:none" data-i18n="create.apply">적용</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-make="theme" data-i18n="rail.next">다음 →</button>
       </div>
-      <div class="hint" data-i18n="create.scopeHint">간격·크기·폰트·효과만. 색은 이전 단계에서 변수화함.</div>
+      <div class="hint" data-i18n="create.scopeHint">여백·크기·폰트·효과만 다룹니다. 색은 이전 단계에서 이미 만들었어요</div>
       <div class="banner" id="tokenColorNote" style="display:none"></div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체</span></label>
@@ -532,22 +532,22 @@
     </div>
 
     <div class="step" id="darkCard" data-make-step="theme">
-      <h2><span data-i18n="dark.title">다크 테마</span> <span class="muted" id="darkLock"></span></h2>
-      <div class="hint" data-i18n="dark.hint" title="색상·채도는 그대로 두고 명도만 뒤집습니다. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 dark/…로 따로 만들어집니다.">라이트 명도 반전 → Dark 모드(없으면 추가).</div>
+      <h2><span data-i18n="dark.title">다크 모드</span> <span class="muted" id="darkLock"></span></h2>
+      <div class="hint" data-i18n="dark.hint" title="색상·채도는 그대로 두고 명도만 뒤집습니다. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 dark/…로 따로 만들어집니다.">밝은 모드 색을 뒤집어 다크 모드에 채웁니다. 목록 이름은 Figma 변수 컬렉션·모드예요</div>
       <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바에, 입력은 그 아래 한 줄(와이어 uxTheme). -->
       <div class="toolbar">
-        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 생성</button>
+        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 만들기</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-make="type" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row">
-        <label class="inline"><span data-i18n="dark.collection">컬렉션</span>
+        <label class="inline"><span data-i18n="dark.collection">역할 컬렉션</span>
           <select id="darkCollection"></select>
         </label>
-        <label class="inline"><span data-i18n="dark.fromMode">라이트</span>
+        <label class="inline"><span data-i18n="dark.fromMode">밝은 모드</span>
           <select id="darkFromMode"></select>
         </label>
-        <label class="inline"><span data-i18n="dark.toMode">다크</span>
+        <label class="inline"><span data-i18n="dark.toMode">어두운 모드</span>
           <select id="darkToMode"></select>
         </label>
       </div>
@@ -557,7 +557,7 @@
 
     <div class="step" data-make-step="type">
       <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted" id="tsCount"></span> <span class="muted" id="tsLock"></span></h2>
-      <div class="hint" data-i18n="textStyle.hint">이름만 수정 · ×N으로 같은 글자 선택</div>
+      <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 「기존만 연결」</div>
       <div class="toolbar">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
@@ -576,18 +576,18 @@
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <!-- 적용 단계 레일 — 바인딩 → 리네임 → 구조(컴포넌트·닮은 프레임). -->
     <div class="steps steps-3" id="applyRail" role="tablist" aria-label="적용 단계">
-      <button class="step-chip" data-apply-step="bind"><span class="n" data-i18n="rail.bind">바인딩</span><span data-i18n="rail.bindSub">변수 연결</span></button>
-      <button class="step-chip" data-apply-step="rename"><span class="n" data-i18n="rail.rename">리네임</span><span data-i18n="rail.renameSub">역할 이름</span></button>
-      <button class="step-chip" data-apply-step="structure"><span class="n" data-i18n="rail.structure">구조</span><span data-i18n="rail.structureSub">컴포넌트</span></button>
+      <button class="step-chip" data-apply-step="bind"><span class="n" data-i18n="rail.bind">연결</span><span data-i18n="rail.bindSub">변수 붙이기</span></button>
+      <button class="step-chip" data-apply-step="rename"><span class="n" data-i18n="rail.rename">이름</span><span data-i18n="rail.renameSub">레이어 이름</span></button>
+      <button class="step-chip" data-apply-step="structure"><span class="n" data-i18n="rail.structure">컴포넌트</span><span data-i18n="rail.structureSub">닮은 프레임</span></button>
     </div>
 
     <div class="step" data-apply-step="bind">
-      <h2><span data-i18n="bind.title">바인딩</span> <span class="muted" id="bindCount"></span></h2>
-      <div class="hint" data-i18n="bind.hint">미리보기 → 골라 → 연결</div>
+      <h2><span data-i18n="bind.title">변수 연결</span> <span class="muted" id="bindCount"></span></h2>
+      <div class="hint" data-i18n="bind.hint">먼저 미리보기로 확인하고, 연결할 항목만 고르세요</div>
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="toolbar">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
-        <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택에 바인딩</button>
+        <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택한 항목에 연결</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-apply="rename" data-i18n="rail.next">다음 →</button>
       </div>
@@ -609,8 +609,8 @@
     </div>
 
     <div class="step" data-apply-step="rename">
-      <h2><span data-i18n="rename.title">리네임</span> <span class="muted" id="renameCount"></span></h2>
-      <div class="hint" data-i18n="rename.hint">역할 이름으로 정돈 · 루트·인스턴스 보존</div>
+      <h2><span data-i18n="rename.title">이름 정리</span> <span class="muted" id="renameCount"></span></h2>
+      <div class="hint" data-i18n="rename.hint">역할에 맞는 레이어 이름으로 바꿉니다. 최상위·인스턴스 이름은 그대로 둡니다</div>
       <div class="toolbar">
         <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
         <button id="btnRename" class="primary" disabled data-i18n="rename.apply">이름 적용</button>
@@ -631,14 +631,14 @@
     <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
          목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
     <div class="step" id="structureCard" data-apply-step="structure">
-      <h2><span data-i18n="structure.title">구조</span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span> <span class="muted" data-i18n="structure.scope">컴포넌트 · 닮은 프레임</span></h2>
-      <div class="hint" data-i18n="component.hint">후보 스캔 후 등록 · 닮은 프레임은 스캔 Free</div>
+      <h2><span data-i18n="structure.title">컴포넌트</span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
+      <div class="hint" data-i18n="component.hint">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</div>
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.">후보 스캔</button>
         <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.">닮은 스캔</button>
         <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">컴포넌트 등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">컴포넌트화</button>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">묶기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
@@ -664,11 +664,11 @@
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
     <!-- #19: 기준 크기·맥락 깊이·허용오차는 여기서만. 만들기/적용 단계에는 노출하지 않는다. -->
     <div class="step" id="pluginSettingsCard">
-      <h2 data-i18n="settings.title">플러그인 설정</h2>
-      <div class="hint" data-i18n="settings.hint">만들기·적용 탭에서는 안 보임 · 여기서만 변경</div>
+      <h2 data-i18n="settings.title">기본값</h2>
+      <div class="hint" data-i18n="settings.hint">자주 안 바꾸는 값이에요. 만들기·적용 화면에는 안 보여요</div>
       <div class="row">
         <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
-        <label class="inline"><span data-i18n="settings.depth">리네임 맥락 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
+        <label class="inline"><span data-i18n="settings.depth">이름 정리 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
       </div>
       <!-- 허용오차는 못 바꾸지만 값은 보여준다 — 기준 크기·깊이와 같은 필드 문법이라야
            '무엇이 정해져 있는지'가 한눈에 들어온다(회색 문장은 읽히지 않고 사라진다). -->
@@ -678,8 +678,8 @@
     </div>
 
     <div class="step">
-      <h2 data-i18n="export.title">변수 → 코드</h2>
-      <div class="hint" data-i18n="export.hint">Figma 변수를 코드 파일로 · 패널 목록·미리보기 없음</div>
+      <h2 data-i18n="export.title">코드로 내보내기</h2>
+      <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
       <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바 오른쪽 끝. 선택지는 값 자체가 라벨이라
            '형식'·'폰트 크기' 머리말 없이 셀렉트만 둔다(툴팁으로 보완). -->
       <div class="toolbar flush">

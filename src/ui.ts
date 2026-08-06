@@ -870,7 +870,7 @@ $('btnApplyConfirm').addEventListener('click', () => {
     .filter((c) => bindChecked.has(candKey(c)))
     .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
   if (!items.length) return;
-  showApplyProgress('바인딩 중…'); // UX6
+  showApplyProgress('연결 중…'); // UX6
   send({ type: 'APPLY_SELECTED', items });
 });
 
@@ -1242,7 +1242,7 @@ function updateGates(): void {
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
   if (!isPaid) ($('btnSemantics') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
-  setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 바인딩할 변수를 만드세요.');
+  setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 연결할 변수를 만드세요.');
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
   // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');

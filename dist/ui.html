@@ -387,10 +387,10 @@
 </head>
 <body>
   <div class="tabs" role="tablist" aria-label="작업 탭">
-    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard" data-i18n="tab.wizard">마법사</button>
+    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard" data-i18n="tab.wizard">시작</button>
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
-    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">관리</button>
+    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
   </div>
 
   <!-- 선택 동기화 (실시간) -->
@@ -407,11 +407,11 @@
 
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
     <div class="step" id="wizardCard">
-      <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
-      <div class="hint" data-i18n="wizardCard.hint">추출 → 토큰 → 바인딩 → 정돈</div>
+      <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
+      <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
       <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span> <span class="muted" id="wizComponentLock"></span></label>
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
+        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
       </div>
       <div class="row">
         <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
@@ -425,9 +425,9 @@
 
     <!-- 진행 — 만들기→적용 의존 파이프라인 상태(클릭하면 그 단계로) -->
     <div class="step" id="pipelineCard">
-      <h2 data-i18n="pipeline.title">진행</h2>
+      <h2 data-i18n="pipeline.title">준비 현황</h2>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 컴포넌트는 독립</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">이름·컴포넌트는 필요할 때 적용 탭에서</div>
     </div>
   </section>
 
@@ -436,7 +436,7 @@
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
       <button class="step-chip" data-make-step="token"><span class="n" data-i18n="rail.token">토큰</span><span data-i18n="rail.tokenSub">간격·크기</span></button>
-      <button class="step-chip" data-make-step="theme"><span class="n" data-i18n="rail.theme">테마</span><span data-i18n="rail.themeSub">다크</span></button>
+      <button class="step-chip" data-make-step="theme"><span class="n" data-i18n="rail.theme">테마</span><span data-i18n="rail.themeSub">다크 모드</span></button>
       <button class="step-chip" data-make-step="type"><span class="n" data-i18n="rail.type">타이포</span><span data-i18n="rail.typeSub">텍스트 스타일</span></button>
     </div>
 
@@ -444,7 +444,7 @@
          이후 '토큰' 단계는 색 외(간격·크기·폰트·효과)만 다룬다. -->
     <div class="step" id="colorCard" data-make-step="color">
       <h2><span data-i18n="color.title">색</span> <span class="muted" id="colorCount"></span> <span class="muted" data-i18n="color.scope">추출 → 변수 · 팔레트</span> <span class="muted" id="paletteLock"></span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">화면에서 뽑거나 시드로 만든 뒤, 역할을 정하고 변수로 만듭니다.</div>
+      <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
@@ -457,7 +457,7 @@
         <input id="brand" type="color" value="#3366ff" />
         <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
         <label class="inline"><input id="incNeutral" type="checkbox" checked /> <span data-i18n="palette.neutral">중립</span></label>
-        <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태색</span></label>
+        <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태</span></label>
         <span class="muted" id="paletteInfo"></span>
       </div>
       <div class="row">
@@ -496,14 +496,14 @@
     </div>
 
     <div class="step" id="createCard" data-make-step="token">
-      <h2><span data-i18n="create.title">토큰 생성</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
+      <h2><span data-i18n="create.title">간격·크기 토큰</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
       <div class="toolbar">
         <button id="btnCreate" data-i18n="create.previewBtn">미리보기</button>
         <button id="btnCreateApply" class="primary" style="display:none" data-i18n="create.apply">적용</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-make="theme" data-i18n="rail.next">다음 →</button>
       </div>
-      <div class="hint" data-i18n="create.scopeHint">간격·크기·폰트·효과만. 색은 이전 단계에서 변수화함.</div>
+      <div class="hint" data-i18n="create.scopeHint">여백·크기·폰트·효과만 다룹니다. 색은 이전 단계에서 이미 만들었어요</div>
       <div class="banner" id="tokenColorNote" style="display:none"></div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체</span></label>
@@ -532,22 +532,22 @@
     </div>
 
     <div class="step" id="darkCard" data-make-step="theme">
-      <h2><span data-i18n="dark.title">다크 테마</span> <span class="muted" id="darkLock"></span></h2>
-      <div class="hint" data-i18n="dark.hint" title="색상·채도는 그대로 두고 명도만 뒤집습니다. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 dark/…로 따로 만들어집니다.">라이트 명도 반전 → Dark 모드(없으면 추가).</div>
+      <h2><span data-i18n="dark.title">다크 모드</span> <span class="muted" id="darkLock"></span></h2>
+      <div class="hint" data-i18n="dark.hint" title="색상·채도는 그대로 두고 명도만 뒤집습니다. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 dark/…로 따로 만들어집니다.">밝은 모드 색을 뒤집어 다크 모드에 채웁니다. 목록 이름은 Figma 변수 컬렉션·모드예요</div>
       <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바에, 입력은 그 아래 한 줄(와이어 uxTheme). -->
       <div class="toolbar">
-        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 생성</button>
+        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 만들기</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-make="type" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row">
-        <label class="inline"><span data-i18n="dark.collection">컬렉션</span>
+        <label class="inline"><span data-i18n="dark.collection">역할 컬렉션</span>
           <select id="darkCollection"></select>
         </label>
-        <label class="inline"><span data-i18n="dark.fromMode">라이트</span>
+        <label class="inline"><span data-i18n="dark.fromMode">밝은 모드</span>
           <select id="darkFromMode"></select>
         </label>
-        <label class="inline"><span data-i18n="dark.toMode">다크</span>
+        <label class="inline"><span data-i18n="dark.toMode">어두운 모드</span>
           <select id="darkToMode"></select>
         </label>
       </div>
@@ -557,7 +557,7 @@
 
     <div class="step" data-make-step="type">
       <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted" id="tsCount"></span> <span class="muted" id="tsLock"></span></h2>
-      <div class="hint" data-i18n="textStyle.hint">이름만 수정 · ×N으로 같은 글자 선택</div>
+      <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 「기존만 연결」</div>
       <div class="toolbar">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
@@ -576,18 +576,18 @@
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
     <!-- 적용 단계 레일 — 바인딩 → 리네임 → 구조(컴포넌트·닮은 프레임). -->
     <div class="steps steps-3" id="applyRail" role="tablist" aria-label="적용 단계">
-      <button class="step-chip" data-apply-step="bind"><span class="n" data-i18n="rail.bind">바인딩</span><span data-i18n="rail.bindSub">변수 연결</span></button>
-      <button class="step-chip" data-apply-step="rename"><span class="n" data-i18n="rail.rename">리네임</span><span data-i18n="rail.renameSub">역할 이름</span></button>
-      <button class="step-chip" data-apply-step="structure"><span class="n" data-i18n="rail.structure">구조</span><span data-i18n="rail.structureSub">컴포넌트</span></button>
+      <button class="step-chip" data-apply-step="bind"><span class="n" data-i18n="rail.bind">연결</span><span data-i18n="rail.bindSub">변수 붙이기</span></button>
+      <button class="step-chip" data-apply-step="rename"><span class="n" data-i18n="rail.rename">이름</span><span data-i18n="rail.renameSub">레이어 이름</span></button>
+      <button class="step-chip" data-apply-step="structure"><span class="n" data-i18n="rail.structure">컴포넌트</span><span data-i18n="rail.structureSub">닮은 프레임</span></button>
     </div>
 
     <div class="step" data-apply-step="bind">
-      <h2><span data-i18n="bind.title">바인딩</span> <span class="muted" id="bindCount"></span></h2>
-      <div class="hint" data-i18n="bind.hint">미리보기 → 골라 → 연결</div>
+      <h2><span data-i18n="bind.title">변수 연결</span> <span class="muted" id="bindCount"></span></h2>
+      <div class="hint" data-i18n="bind.hint">먼저 미리보기로 확인하고, 연결할 항목만 고르세요</div>
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="toolbar">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
-        <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택에 바인딩</button>
+        <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택한 항목에 연결</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-apply="rename" data-i18n="rail.next">다음 →</button>
       </div>
@@ -609,8 +609,8 @@
     </div>
 
     <div class="step" data-apply-step="rename">
-      <h2><span data-i18n="rename.title">리네임</span> <span class="muted" id="renameCount"></span></h2>
-      <div class="hint" data-i18n="rename.hint">역할 이름으로 정돈 · 루트·인스턴스 보존</div>
+      <h2><span data-i18n="rename.title">이름 정리</span> <span class="muted" id="renameCount"></span></h2>
+      <div class="hint" data-i18n="rename.hint">역할에 맞는 레이어 이름으로 바꿉니다. 최상위·인스턴스 이름은 그대로 둡니다</div>
       <div class="toolbar">
         <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
         <button id="btnRename" class="primary" disabled data-i18n="rename.apply">이름 적용</button>
@@ -631,14 +631,14 @@
     <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
          목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
     <div class="step" id="structureCard" data-apply-step="structure">
-      <h2><span data-i18n="structure.title">구조</span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span> <span class="muted" data-i18n="structure.scope">컴포넌트 · 닮은 프레임</span></h2>
-      <div class="hint" data-i18n="component.hint">후보 스캔 후 등록 · 닮은 프레임은 스캔 Free</div>
+      <h2><span data-i18n="structure.title">컴포넌트</span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
+      <div class="hint" data-i18n="component.hint">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</div>
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.">후보 스캔</button>
         <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.">닮은 스캔</button>
         <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">컴포넌트 등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">컴포넌트화</button>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">묶기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
@@ -664,11 +664,11 @@
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
     <!-- #19: 기준 크기·맥락 깊이·허용오차는 여기서만. 만들기/적용 단계에는 노출하지 않는다. -->
     <div class="step" id="pluginSettingsCard">
-      <h2 data-i18n="settings.title">플러그인 설정</h2>
-      <div class="hint" data-i18n="settings.hint">만들기·적용 탭에서는 안 보임 · 여기서만 변경</div>
+      <h2 data-i18n="settings.title">기본값</h2>
+      <div class="hint" data-i18n="settings.hint">자주 안 바꾸는 값이에요. 만들기·적용 화면에는 안 보여요</div>
       <div class="row">
         <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
-        <label class="inline"><span data-i18n="settings.depth">리네임 맥락 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
+        <label class="inline"><span data-i18n="settings.depth">이름 정리 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
       </div>
       <!-- 허용오차는 못 바꾸지만 값은 보여준다 — 기준 크기·깊이와 같은 필드 문법이라야
            '무엇이 정해져 있는지'가 한눈에 들어온다(회색 문장은 읽히지 않고 사라진다). -->
@@ -678,8 +678,8 @@
     </div>
 
     <div class="step">
-      <h2 data-i18n="export.title">변수 → 코드</h2>
-      <div class="hint" data-i18n="export.hint">Figma 변수를 코드 파일로 · 패널 목록·미리보기 없음</div>
+      <h2 data-i18n="export.title">코드로 내보내기</h2>
+      <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
       <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바 오른쪽 끝. 선택지는 값 자체가 라벨이라
            '형식'·'폰트 크기' 머리말 없이 셀렉트만 둔다(툴팁으로 보완). -->
       <div class="toolbar flush">
@@ -856,9 +856,9 @@
     "semantic.missing": " \xB7 \uB204\uB77D: {names}",
     // 바인딩(적용)
     "apply.cancelRequested": "\uCDE8\uC18C \uC694\uCCAD\uB428 \u2014 \uB2E4\uC74C \uC9C0\uC810\uC5D0\uC11C \uC911\uB2E8\uD569\uB2C8\uB2E4.",
-    "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 \uBC14\uC778\uB529 {bound}\uAC74\uB9CC \uC801\uC6A9{detail}",
-    "apply.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uBC14\uC778\uB529 {bound}\uAC74 \uD6C4\uBCF4{detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uC5D0 \uBC14\uC778\uB529\u2019",
-    "apply.done": "\uBC14\uC778\uB529 {bound}{detail}",
+    "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC5F0\uACB0{detail}",
+    "apply.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uD6C4\uBCF4 {bound}\uAC74{detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0\u2019",
+    "apply.done": "\uC5F0\uACB0 {bound}{detail}",
     // 리네임
     "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
     "rename.none": "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -881,15 +881,15 @@
     "wizard.stopped": "\uC911\uB2E8",
     "wizard.completed": "\uC644\uB8CC",
     // 다크 테마 생성
-    "dark.title": "\uB2E4\uD06C \uD14C\uB9C8",
-    "dark.hint": "\uB77C\uC774\uD2B8 \uBA85\uB3C4 \uBC18\uC804 \u2192 Dark \uBAA8\uB4DC(\uC5C6\uC73C\uBA74 \uCD94\uAC00).",
-    "dark.collection": "\uCEEC\uB809\uC158",
-    "dark.fromMode": "\uB77C\uC774\uD2B8",
-    "dark.toMode": "\uB2E4\uD06C",
-    "dark.genBtn": "\uB2E4\uD06C \uC0DD\uC131",
+    "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
+    "dark.hint": "\uBC1D\uC740 \uBAA8\uB4DC \uC0C9\uC744 \uB4A4\uC9D1\uC5B4 \uB2E4\uD06C \uBAA8\uB4DC\uC5D0 \uCC44\uC6C1\uB2C8\uB2E4. \uBAA9\uB85D \uC774\uB984\uC740 Figma \uBCC0\uC218 \uCEEC\uB809\uC158\xB7\uBAA8\uB4DC\uC608\uC694",
+    "dark.collection": "\uC5ED\uD560 \uCEEC\uB809\uC158",
+    "dark.fromMode": "\uBC1D\uC740 \uBAA8\uB4DC",
+    "dark.toMode": "\uC5B4\uB450\uC6B4 \uBAA8\uB4DC",
+    "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
     // 닮은 프레임 컴포넌트화
     "similar.scanBtn": "\uB2EE\uC740 \uC2A4\uCE94",
-    "similar.componentizeBtn": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
+    "similar.componentizeBtn": "\uBB36\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.",
@@ -898,12 +898,12 @@
     // 유료 게이팅
     "premium.required": "{message} (\uC720\uB8CC \uAE30\uB2A5: {feature})",
     // 마법사 단계 라벨(WIZARD_STEPS id 기준) + 건너뜀 사유
-    "wizard.step.extract": "\uD1A0\uD070 \uCD94\uCD9C",
-    "wizard.step.create": "\uD1A0\uD070 \uC0DD\uC131",
-    "wizard.step.semantics": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
-    "wizard.step.bind": "\uBC14\uC778\uB529",
-    "wizard.step.rename": "\uB808\uC774\uC5B4 \uC815\uB3C8",
-    "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
+    "wizard.step.extract": "\uCD94\uCD9C",
+    "wizard.step.create": "\uD1A0\uD070",
+    "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "wizard.step.bind": "\uBCC0\uC218\uC5F0\uACB0",
+    "wizard.step.rename": "\uC774\uB984",
+    "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
     "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
     "wizard.skip.paid": "Paid \uC804\uC6A9",
@@ -914,7 +914,7 @@
     // 바인딩 스킵 사유(라벨 맵)
     "reason.no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
     "reason.empty-text": "\uBE48 \uD14D\uC2A4\uD2B8",
-    "reason.error": "\uBC14\uC778\uB529 \uC2E4\uD328",
+    "reason.error": "\uC5F0\uACB0 \uC2E4\uD328",
     "reason.hug-fill": "HUG/FILL",
     "reason.no-autolayout": "\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uC544\uB2D8",
     "reason.size-free-layout": "\uC790\uC720 \uBC30\uCE58(\uD06C\uAE30 \uC81C\uC678)",
@@ -931,57 +931,57 @@
     "wizard.seq.semantics": "\uBCC4\uCE6D {aliased}",
     "wizard.seq.semanticsMissing": " \xB7 \uB204\uB77D {n}",
     "wizard.seq.bindCancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC801\uC6A9",
-    "wizard.seq.bindDone": "\uBC14\uC778\uB529 {bound}",
+    "wizard.seq.bindDone": "\uC5F0\uACB0 {bound}",
     "wizard.seq.bindSkip": " \xB7 \uC2A4\uD0B5 {n}",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
     "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
     "wizard.sum.tokens": "\uD1A0\uD070 {n}",
-    "wizard.sum.bound": "\uBC14\uC778\uB529 {n}",
-    "wizard.sum.renamed": "\uB9AC\uB124\uC784 {n}",
+    "wizard.sum.bound": "\uC5F0\uACB0 {n}",
+    "wizard.sum.renamed": "\uC774\uB984 {n}",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "wizard.sum.empty": "\uC644\uB8CC\uB41C \uC791\uC5C5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
     // 진행 안내 단계 라벨·안내
-    "pipeline.step.tokens": "\uD1A0\uD070 \uC0DD\uC131 (Global)",
-    "pipeline.step.semantics": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
-    "pipeline.step.bind": "\uBC14\uC778\uB529",
+    "pipeline.step.tokens": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
+    "pipeline.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "pipeline.step.bind": "\uBCC0\uC218 \uC5F0\uACB0",
     "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
-    "pipeline.hint.needBindable": "\uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
+    "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
     // 탭
-    "tab.wizard": "\uB9C8\uBC95\uC0AC",
+    "tab.wizard": "\uC2DC\uC791",
     "tab.tokens": "\uB9CC\uB4E4\uAE30",
     "tab.apply": "\uC801\uC6A9",
-    "tab.settings": "\uAD00\uB9AC",
+    "tab.settings": "\uC124\uC815",
     // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
     "rail.color": "\uC0C9",
     "rail.colorSub": "\uCD94\uCD9C\xB7\uBCC0\uC218",
     "rail.token": "\uD1A0\uD070",
     "rail.tokenSub": "\uAC04\uACA9\xB7\uD06C\uAE30",
     "rail.theme": "\uD14C\uB9C8",
-    "rail.themeSub": "\uB2E4\uD06C",
+    "rail.themeSub": "\uB2E4\uD06C \uBAA8\uB4DC",
     "rail.type": "\uD0C0\uC774\uD3EC",
     "rail.typeSub": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "rail.bind": "\uBC14\uC778\uB529",
-    "rail.bindSub": "\uBCC0\uC218 \uC5F0\uACB0",
-    "rail.rename": "\uB9AC\uB124\uC784",
-    "rail.renameSub": "\uC5ED\uD560 \uC774\uB984",
-    "rail.structure": "\uAD6C\uC870",
-    "rail.structureSub": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "rail.bind": "\uC5F0\uACB0",
+    "rail.bindSub": "\uBCC0\uC218 \uBD99\uC774\uAE30",
+    "rail.rename": "\uC774\uB984",
+    "rail.renameSub": "\uB808\uC774\uC5B4 \uC774\uB984",
+    "rail.structure": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "rail.structureSub": "\uB2EE\uC740 \uD504\uB808\uC784",
     "rail.next": "\uB2E4\uC74C \u2192",
     // 플러그인 설정(#19) — 관리 탭에만
-    "settings.title": "\uD50C\uB7EC\uADF8\uC778 \uC124\uC815",
-    "settings.hint": "\uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9 \uD0ED\uC5D0\uC11C\uB294 \uC548 \uBCF4\uC784 \xB7 \uC5EC\uAE30\uC11C\uB9CC \uBCC0\uACBD",
+    "settings.title": "\uAE30\uBCF8\uAC12",
+    "settings.hint": "\uC790\uC8FC \uC548 \uBC14\uAFB8\uB294 \uAC12\uC774\uC5D0\uC694. \uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9 \uD654\uBA74\uC5D0\uB294 \uC548 \uBCF4\uC5EC\uC694",
     "settings.base": "\uAE30\uC900 \uD06C\uAE30",
-    "settings.depth": "\uB9AC\uB124\uC784 \uB9E5\uB77D \uAE4A\uC774",
+    "settings.depth": "\uC774\uB984 \uC815\uB9AC \uAE4A\uC774",
     "settings.tol": "\uD5C8\uC6A9\uC624\uCC28",
     "settings.fixed": "\uACE0\uC815",
     // 마법사 카드
-    "wizardCard.title": "\uC2DC\uC2A4\uD15C\uD654 \uB9C8\uBC95\uC0AC",
-    "wizardCard.hint": "\uCD94\uCD9C \u2192 \uD1A0\uD070 \u2192 \uBC14\uC778\uB529 \u2192 \uC815\uB3C8",
-    "wizardCard.optSemantics": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
-    "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
+    "wizardCard.title": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
+    "wizardCard.hint": "\uC120\uD0DD \uD654\uBA74\uC744 \uD55C \uBC88\uC5D0 \uD1A0\uD070\xB7\uBCC0\uC218 \uC5F0\uACB0\uAE4C\uC9C0 \uC815\uB9AC\uD569\uB2C8\uB2E4",
+    "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4 \uC120\uD0DD",
@@ -991,8 +991,8 @@
     "onboard.banner": "\uCC98\uC74C\uC774\uBA74 \uC804\uCCB4 \uC2E4\uD589\uC73C\uB85C \uC2DC\uC791\uD558\uC138\uC694.",
     "onboard.hide": "\uB2E4\uC2DC \uBCF4\uC9C0 \uC54A\uAE30",
     // 진행(파이프라인 카드)
-    "pipeline.title": "\uC9C4\uD589",
-    "pipeline.indep": "\uB9AC\uB124\uC784 \xB7 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uB3C5\uB9BD",
+    "pipeline.title": "\uC900\uBE44 \uD604\uD669",
+    "pipeline.indep": "\uC774\uB984\xB7\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uC801\uC6A9 \uD0ED\uC5D0\uC11C",
     // 브랜드 팔레트
     "color.title": "\uC0C9",
     "color.scope": "\uCD94\uCD9C \u2192 \uBCC0\uC218 \xB7 \uD314\uB808\uD2B8",
@@ -1001,16 +1001,16 @@
     "palette.brand2": "\uBCF4\uC870\uC0C9",
     "palette.harmony": "\uD558\uBAA8\uB2C8",
     "palette.neutral": "\uC911\uB9BD",
-    "palette.status": "\uC0C1\uD0DC\uC0C9",
+    "palette.status": "\uC0C1\uD0DC",
     "palette.gen": "\uD314\uB808\uD2B8 \uC0DD\uC131",
     // 추출
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
-    "colorTidy.hint": "\uD654\uBA74\uC5D0\uC11C \uBF51\uAC70\uB098 \uC2DC\uB4DC\uB85C \uB9CC\uB4E0 \uB4A4, \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4.",
+    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694",
     "colorTidy.undo": "\uB418\uB3CC\uB9AC\uAE30",
     // 토큰 생성
-    "create.title": "\uD1A0\uD070 \uC0DD\uC131",
-    "create.scopeHint": "\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uBCC0\uC218\uD654\uD568.",
+    "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
+    "create.scopeHint": "\uC5EC\uBC31\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC \uB2E4\uB8F9\uB2C8\uB2E4. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uC774\uBBF8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
     "create.selectAll": "\uC804\uCCB4",
     "create.dropOnce": "1\xD7 \uD574\uC81C",
     "create.previewBtn": "\uBBF8\uB9AC\uBCF4\uAE30",
@@ -1022,7 +1022,7 @@
     "semantic.scanBtn": "\uAE30\uC874 \uC0C9\uC5D0\uC11C \uCD94\uCC9C",
     // 텍스트 스타일
     "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "textStyle.hint": "\uC774\uB984\uB9CC \uC218\uC815 \xB7 \xD7N\uC73C\uB85C \uAC19\uC740 \uAE00\uC790 \uC120\uD0DD",
+    "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uD654\uBA74 \uC5F0\uACB0\uC740 \u300C\uAE30\uC874\uB9CC \uC5F0\uACB0\u300D",
     "textStyle.scanBtn": "\uC2A4\uCE94",
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
     "textStyle.useRowLabels": "\uAC00\uB85C \uD589\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uC774\uB984\uC73C\uB85C",
@@ -1030,27 +1030,27 @@
     "textStyle.applyOriginal": "\uB4F1\uB85D \uC2DC \uD654\uBA74\uC5D0 \uC801\uC6A9",
     "textStyle.registerBtn": "\uB4F1\uB85D",
     // 적용(바인딩)
-    "bind.title": "\uBC14\uC778\uB529",
-    "bind.hint": "\uBBF8\uB9AC\uBCF4\uAE30 \u2192 \uACE8\uB77C \u2192 \uC5F0\uACB0",
+    "bind.title": "\uBCC0\uC218 \uC5F0\uACB0",
+    "bind.hint": "\uBA3C\uC800 \uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD655\uC778\uD558\uACE0, \uC5F0\uACB0\uD560 \uD56D\uBAA9\uB9CC \uACE0\uB974\uC138\uC694",
     "bind.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
-    "bind.confirm": "\uC120\uD0DD\uC5D0 \uBC14\uC778\uB529",
+    "bind.confirm": "\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0",
     "bind.progress": "\uC9C4\uD589\uB960",
     // 리네임
-    "rename.title": "\uB9AC\uB124\uC784",
-    "rename.hint": "\uC5ED\uD560 \uC774\uB984\uC73C\uB85C \uC815\uB3C8 \xB7 \uB8E8\uD2B8\xB7\uC778\uC2A4\uD134\uC2A4 \uBCF4\uC874",
+    "rename.title": "\uC774\uB984 \uC815\uB9AC",
+    "rename.hint": "\uC5ED\uD560\uC5D0 \uB9DE\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uC73C\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uCD5C\uC0C1\uC704\xB7\uC778\uC2A4\uD134\uC2A4 \uC774\uB984\uC740 \uADF8\uB300\uB85C \uB461\uB2C8\uB2E4",
     "rename.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
     "rename.apply": "\uC774\uB984 \uC801\uC6A9",
     "rename.undoTitle": "\uB418\uB3CC\uB9AC\uAE30 \uC548\uC804\uC7A5\uCE58",
     "rename.undoBody": "\uC774 \uC2E4\uD589\uC740 \uD55C \uBC88\uC758 \uB418\uB3CC\uB9AC\uAE30(Ctrl/\u2318Z)\uB85C \uC804\uCCB4\uB97C \uCDE8\uC18C\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
     // 컴포넌트 / 베리언트
-    "structure.title": "\uAD6C\uC870",
-    "structure.scope": "\uCEF4\uD3EC\uB10C\uD2B8 \xB7 \uB2EE\uC740 \uD504\uB808\uC784",
+    "structure.title": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "structure.scope": "\uB2EE\uC740 \uD504\uB808\uC784",
     "structure.groupComp": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4",
     "structure.groupSimilar": "\uB2EE\uC740 \uD504\uB808\uC784",
     "structure.groupVariant": "\uC120\uD0DD\uD55C \uCEF4\uD3EC\uB10C\uD2B8 \uC815\uB9AC",
-    "component.hint": "\uD6C4\uBCF4 \uC2A4\uCE94 \uD6C4 \uB4F1\uB85D \xB7 \uB2EE\uC740 \uD504\uB808\uC784\uC740 \uC2A4\uCE94 Free",
+    "component.hint": "\uC704\uB294 \uD6C4\uBCF4 \uB4F1\uB85D, \uC544\uB798\uB294 \uB2EE\uC740 \uD504\uB808\uC784 \uBB36\uAE30. \uB2EE\uC740 \uC2A4\uCE94\uC740 \uBB34\uB8CC",
     "component.scanBtn": "\uD6C4\uBCF4 \uC2A4\uCE94",
-    "component.registerBtn": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D",
+    "component.registerBtn": "\uB4F1\uB85D",
     "component.classifyBtn": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958",
     "component.genMissingBtn": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131",
     "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC2B5\uB2C8\uB2E4. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uC81C\uC678.",
@@ -1060,8 +1060,8 @@
     "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
     "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4.",
     // 내보내기
-    "export.title": "\uBCC0\uC218 \u2192 \uCF54\uB4DC",
-    "export.hint": "Figma \uBCC0\uC218\uB97C \uCF54\uB4DC \uD30C\uC77C\uB85C \xB7 \uD328\uB110 \uBAA9\uB85D\xB7\uBBF8\uB9AC\uBCF4\uAE30 \uC5C6\uC74C",
+    "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
+    "export.hint": "\uB204\uB974\uBA74 \uBC14\uB85C \uCF54\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uB429\uB2C8\uB2E4",
     "export.runBtn": "\uB0B4\uBCF4\uB0B4\uAE30",
     // 요금제 / 라이선스
     "license.title": "\uB77C\uC774\uC120\uC2A4",
@@ -2407,7 +2407,7 @@
   $("btnApplyConfirm").addEventListener("click", () => {
     const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
     if (!items.length) return;
-    showApplyProgress("\uBC14\uC778\uB529 \uC911\u2026");
+    showApplyProgress("\uC5F0\uACB0 \uC911\u2026");
     send({ type: "APPLY_SELECTED", items });
   });
   $("bindAll").addEventListener("change", (e) => {
@@ -2698,7 +2698,7 @@
     }
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!isPaid) $("btnSemantics").disabled = true;
-    setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
+    setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!hasBindable) $("btnApplyConfirm").disabled = true;
     setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
     if (!isPaid) $("btnApplyExistingText").disabled = true;

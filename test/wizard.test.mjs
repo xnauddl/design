@@ -63,7 +63,7 @@ test('planWizard — Free면 만드는 단계(생성·시맨틱·컴포넌트화
 test('summarize — 집계가 있는 항목만 표시', () => {
   assert.equal(
     summarize({ created: 12, bound: 30, renamed: 8, components: 3 }),
-    '토큰 12 · 바인딩 30 · 리네임 8 · 컴포넌트 3',
+    '토큰 12 · 연결 30 · 이름 8 · 컴포넌트 3',
   );
 });
 
