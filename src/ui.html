@@ -143,20 +143,16 @@
     }
     input::placeholder, textarea::placeholder { color: var(--muted); }
     input[type="number"] { width: 56px; }
-    /* 텍스트 스타일 표: 스피너 화살표 제거(폭 확보) */
-    #tsTable input[type="number"]::-webkit-inner-spin-button,
-    #tsTable input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-    /* 표 전체가 패널 폭 안에 들어오도록 셀·입력 패딩 축소(가로 스크롤·삭제 버튼 숨김 방지) */
-    #tsTable th, #tsTable td { padding: 0 1px; }
-    #tsTable input { padding: 4px 5px; }
-    #tsTable td:last-child button { padding: 2px 5px; }
-    /* 스캔 행의 잠긴 값(폰트·크기·행간·자간·스타일): 편집 불가 → 라벨처럼 표시 */
-    #tsTable input[readonly] { background: transparent; border-color: transparent; color: var(--muted); cursor: default; }
-    #tsTable input[readonly]:hover { border-color: transparent; }
-    #tsTable input[readonly]:focus { outline: none; box-shadow: none; border-color: transparent; background: transparent; }
-    /* 이름 칸 좌측 액센트로 행 구분: 파랑=이미 등록된 스타일(rename 대상), 앰버=새로 만들어질 스타일 */
-    #tsTable input.ts-bound { border-left: 2px solid var(--accent); padding-left: 5px; }
-    #tsTable input.ts-new { border-left: 2px solid var(--warn); padding-left: 5px; }
+    /* 텍스트 스타일 카드의 이름 칸 — 파랑=이미 등록된 스타일(이름만 rename), 앰버=새로 만들 스타일. */
+    .r-title input.ts-bound { color: var(--accent-strong); }
+    .r-title input.ts-new { color: var(--warn); }
+    /* ×N 배지 — 누르면 그 글자들을 캔버스에서 선택(1개면 이동). */
+    .r-badge {
+      font: 600 10px/1 var(--mono); color: var(--accent-strong);
+      background: var(--accent-subtle); border: 1px solid var(--accent-border);
+      border-radius: 999px; padding: 4px 8px; cursor: pointer; white-space: nowrap;
+    }
+    .r-badge:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
     input[type="color"] {
       width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
       border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
@@ -540,44 +536,19 @@
     </div>
 
     <div class="step" data-make-step="type">
-      <h2><span data-i18n="textStyle.title">텍스트 스타일 (화면 → 스타일)</span> <span class="muted" id="tsLock"></span></h2>
-      <div class="hint" data-i18n-html="textStyle.hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 행간·자간이 %였으면 표에 %로 보이고 그대로 등록됩니다(그 항목만 변수 연결 생략). 스타일 없는 텍스트·변수 바인딩 텍스트도 %를 복구합니다. 새 스타일은 ‘행 추가’로. (Paid)</div>
+      <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted" id="tsCount"></span> <span class="muted" id="tsLock"></span></h2>
+      <div class="hint" data-i18n="textStyle.hint">이름만 수정 · ×N으로 같은 글자 선택</div>
       <div class="toolbar">
-        <button id="btnScanText" data-i18n="textStyle.scanBtn">선택에서 스캔</button>
+        <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
         <span class="grow"></span>
-        <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">텍스트 스타일 등록</button>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 적용만</button>
+        <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">등록</button>
+        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존만 연결</button>
       </div>
-      <label class="inline" style="margin-top:6px;"><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 스타일 이름으로 사용</span></label>
-      <div class="hint muted" style="margin-top:4px;" data-i18n-html="textStyle.rowLabelsHint">ON이면 같은 가로 줄의 <b>왼쪽 텍스트를 라벨(이름)</b>으로, 큰 텍스트를 표본으로 봅니다. 이름은 화면에 적힌 글자 그대로입니다. 표본 오른쪽 텍스트는 표에 넣지 않습니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. (세션만 유지)</div>
-      <!-- 표 박스는 overflow를 받지 못하므로(스크롤 컨테이너가 못 된다) 이 래퍼가 목록 영역이다.
-           가로 스크롤도 같은 요소가 맡는다 — 축을 나누려 한 겹 더 감싸도 CSS가 overflow:visible을
-           auto로 올려버려 결국 한 요소가 두 축을 다 갖는다. 가로 스크롤바 높이는 layoutList가
-           offsetHeight−clientHeight로 함께 흡수하므로 세로 스냅은 어긋나지 않는다. -->
-      <div id="tsList" class="results">
-      <table id="tsTable" style="table-layout:fixed; width:100%; border-collapse:collapse; font-size:11px;">
-        <colgroup>
-          <col style="width:64px;" /><!-- 이름 -->
-          <col /><!-- 폰트(가변: 남는 폭 흡수) -->
-          <col style="width:38px;" /><!-- 크기 -->
-          <!-- 행간은 스캔 행에서 단위까지 함께 보여 준다("24px"/"150%") → 38px로는 모자라 46px.
-               열을 따로 만들면 남는 폭을 먹는 ‘폰트’ 열이 360px 패널에서 아예 사라진다.
-               늘린 8px은 자간에서 회수한다(자간은 "-0.5" 정도라 38px로 충분). -->
-          <col style="width:46px;" /><!-- 행간(단위 포함) -->
-          <col style="width:38px;" /><!-- 자간 -->
-          <col style="width:52px;" /><!-- 스타일 -->
-          <col style="width:28px;" /><!-- 삭제 -->
-        </colgroup>
-        <thead><tr style="text-align:left; color:var(--muted);">
-          <th data-i18n="textStyle.colName">이름</th><th data-i18n="textStyle.colFont">폰트</th><th data-i18n="textStyle.colSize">크기</th><th data-i18n="textStyle.colLineHeight" title="화면에서 쓰던 단위 그대로 등록합니다. %면 %로.">행간</th><th data-i18n="textStyle.colLetterSpacing">자간</th><th data-i18n="textStyle.colStyle">스타일</th><th></th>
-        </tr></thead>
-        <tbody id="tsRows"></tbody>
-      </table>
-      </div>
-      <!-- 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록할 때 화면의 글자에도 적용</span></label>
-      <div class="prereq" id="tsApplyPrereq" style="display:none; margin-top:4px;"><span class="prereq-text"></span></div>
+      <label class="inline"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록 시 화면에 적용</span></label>
+      <label class="inline"><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 이름으로</span></label>
+      <div id="tsList" class="results"></div>
+      <div class="prereq" id="tsApplyPrereq" style="display:none;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
     </div>
   </section>

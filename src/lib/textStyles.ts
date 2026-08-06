@@ -42,6 +42,9 @@ export interface StyleCluster {
   style: string;
   count: number; // 같은 시그니처 노드 수
   sample: string; // 대표 레이어 이름(명명 힌트)
+  /** 이 군집에 속한 텍스트 노드 id — ×N 배지에서 캔버스 선택으로 데려갈 때 쓴다(#17).
+      손으로 만든 군집(테스트·기본 램프)에는 없을 수 있다. */
+  nodeIds?: string[];
   /** 이 군집 노드들이 바인딩된 로컬 스타일 id(중복 제거, '' 제외). 정확히 1개면 rename 앵커. */
   styleIds: string[];
 }
@@ -61,6 +64,10 @@ export interface TextStyleSpec {
   style: string;
   /** 재스캔 시 이미 바인딩된 기존 스타일 id. 있으면 등록=이 스타일 rename(신규 생성 아님). */
   boundStyleId?: string;
+  /** 이 스타일로 묶인 화면 글자 수(#17 ×N 배지). 수동 추가 행은 없음. */
+  count?: number;
+  /** 그 글자들의 노드 id — 배지를 누르면 캔버스에서 선택한다(1개면 이동). */
+  nodeIds?: string[];
 }
 
 /** 이미 존재하는 로컬 텍스트 스타일(시그니처 매칭용). px 환산된 행간·자간.
@@ -111,10 +118,12 @@ export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
         style: s.style,
         count: 1,
         sample: s.layerName,
+        nodeIds: [],
         styleIds: [],
       });
       ids.set(k, new Set());
     }
+    if (s.id) ((map.get(k) as StyleCluster).nodeIds as string[]).push(s.id);
     if (s.styleId) (ids.get(k) as Set<string>).add(s.styleId);
   }
   for (const [k, c] of map) c.styleIds = [...(ids.get(k) as Set<string>)];
@@ -212,6 +221,8 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
         ...(lineHeightPercent ? { lineHeightPercent } : {}),
         ...(letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}),
         ...(boundId ? { boundStyleId: boundId } : {}),
+        count: c.count,
+        ...(c.nodeIds?.length ? { nodeIds: c.nodeIds } : {}),
       });
     }
   }

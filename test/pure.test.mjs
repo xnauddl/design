@@ -1710,6 +1710,27 @@ test('clusterTextStyles — 바인딩된 styleId를 군집별로 수집(중복 �
   assert.deepEqual(cl.find((c) => c.fontSize === 16).styleIds, []); // 미바인딩(빈 id) → 없음
 });
 
+test('clusterTextStyles / nameTextStyles — 군집 노드 id와 개수를 스펙까지 나른다(#17 ×N)', () => {
+  const cl = clusterTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b1', styleId: '', id: 'N:1' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b2', styleId: '', id: 'N:2' },
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h', styleId: '', id: 'N:3' },
+  ]);
+  const body = cl.find((c) => c.fontSize === 16);
+  assert.equal(body.count, 2);
+  assert.deepEqual(body.nodeIds, ['N:1', 'N:2']);
+
+  const specs = nameTextStyles(cl);
+  const bodySpec = specs.find((x) => x.fontSize === 16);
+  assert.equal(bodySpec.count, 2);
+  assert.deepEqual(bodySpec.nodeIds, ['N:1', 'N:2']); // ×N 배지가 이 id들을 선택한다
+  // id 없는 샘플(손으로 만든 군집)은 nodeIds를 만들지 않는다 — 배지 대신 삭제 버튼이 나온다.
+  const noIds = nameTextStyles(clusterTextStyles([
+    { fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'x', styleId: '' },
+  ]));
+  assert.equal(noIds[0].nodeIds, undefined);
+});
+
 test('nameTextStyles — 이미 바인딩된 군집은 기존 이름 유지 + boundStyleId(재스캔 rename)', () => {
   const clusters = clusterTextStyles([
     { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h', styleId: 'S:1' },

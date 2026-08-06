@@ -1177,10 +1177,12 @@
           style: s.style,
           count: 1,
           sample: s.layerName,
+          nodeIds: [],
           styleIds: []
         });
         ids.set(k, /* @__PURE__ */ new Set());
       }
+      if (s.id) map.get(k).nodeIds.push(s.id);
       if (s.styleId) ids.get(k).add(s.styleId);
     }
     for (const [k, c] of map) c.styleIds = [...ids.get(k)];
@@ -1188,7 +1190,7 @@
   }
   var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   function nameTextStyles(clusters, existing) {
-    var _a, _b;
+    var _a, _b, _c;
     const nameById = /* @__PURE__ */ new Map();
     const sigById = /* @__PURE__ */ new Map();
     const idBySig = /* @__PURE__ */ new Map();
@@ -1238,14 +1240,16 @@
         const ex = boundId ? existingById.get(boundId) : void 0;
         const lineHeightPercent = c.lineHeightPercent || (ex == null ? void 0 : ex.lineHeightPercent) || 0;
         const letterSpacingPercent = ((_a = c.letterSpacingPercent) != null ? _a : 0) !== 0 ? c.letterSpacingPercent : (_b = ex == null ? void 0 : ex.letterSpacingPercent) != null ? _b : 0;
-        specs.push(__spreadValues(__spreadValues(__spreadValues({
+        specs.push(__spreadValues(__spreadProps(__spreadValues(__spreadValues(__spreadValues({
           name,
           fontSize: c.fontSize,
           lineHeight: c.lineHeight,
           letterSpacing: c.letterSpacing,
           family: c.family,
           style: c.style
-        }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}), boundId ? { boundStyleId: boundId } : {}));
+        }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}), boundId ? { boundStyleId: boundId } : {}), {
+          count: c.count
+        }), ((_c = c.nodeIds) == null ? void 0 : _c.length) ? { nodeIds: c.nodeIds } : {}));
       }
     }
     return specs;

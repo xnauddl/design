@@ -143,20 +143,16 @@
     }
     input::placeholder, textarea::placeholder { color: var(--muted); }
     input[type="number"] { width: 56px; }
-    /* 텍스트 스타일 표: 스피너 화살표 제거(폭 확보) */
-    #tsTable input[type="number"]::-webkit-inner-spin-button,
-    #tsTable input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-    /* 표 전체가 패널 폭 안에 들어오도록 셀·입력 패딩 축소(가로 스크롤·삭제 버튼 숨김 방지) */
-    #tsTable th, #tsTable td { padding: 0 1px; }
-    #tsTable input { padding: 4px 5px; }
-    #tsTable td:last-child button { padding: 2px 5px; }
-    /* 스캔 행의 잠긴 값(폰트·크기·행간·자간·스타일): 편집 불가 → 라벨처럼 표시 */
-    #tsTable input[readonly] { background: transparent; border-color: transparent; color: var(--muted); cursor: default; }
-    #tsTable input[readonly]:hover { border-color: transparent; }
-    #tsTable input[readonly]:focus { outline: none; box-shadow: none; border-color: transparent; background: transparent; }
-    /* 이름 칸 좌측 액센트로 행 구분: 파랑=이미 등록된 스타일(rename 대상), 앰버=새로 만들어질 스타일 */
-    #tsTable input.ts-bound { border-left: 2px solid var(--accent); padding-left: 5px; }
-    #tsTable input.ts-new { border-left: 2px solid var(--warn); padding-left: 5px; }
+    /* 텍스트 스타일 카드의 이름 칸 — 파랑=이미 등록된 스타일(이름만 rename), 앰버=새로 만들 스타일. */
+    .r-title input.ts-bound { color: var(--accent-strong); }
+    .r-title input.ts-new { color: var(--warn); }
+    /* ×N 배지 — 누르면 그 글자들을 캔버스에서 선택(1개면 이동). */
+    .r-badge {
+      font: 600 10px/1 var(--mono); color: var(--accent-strong);
+      background: var(--accent-subtle); border: 1px solid var(--accent-border);
+      border-radius: 999px; padding: 4px 8px; cursor: pointer; white-space: nowrap;
+    }
+    .r-badge:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
     input[type="color"] {
       width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
       border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
@@ -540,44 +536,19 @@
     </div>
 
     <div class="step" data-make-step="type">
-      <h2><span data-i18n="textStyle.title">텍스트 스타일 (화면 → 스타일)</span> <span class="muted" id="tsLock"></span></h2>
-      <div class="hint" data-i18n-html="textStyle.hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 행간·자간이 %였으면 표에 %로 보이고 그대로 등록됩니다(그 항목만 변수 연결 생략). 스타일 없는 텍스트·변수 바인딩 텍스트도 %를 복구합니다. 새 스타일은 ‘행 추가’로. (Paid)</div>
+      <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted" id="tsCount"></span> <span class="muted" id="tsLock"></span></h2>
+      <div class="hint" data-i18n="textStyle.hint">이름만 수정 · ×N으로 같은 글자 선택</div>
       <div class="toolbar">
-        <button id="btnScanText" data-i18n="textStyle.scanBtn">선택에서 스캔</button>
+        <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
         <span class="grow"></span>
-        <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">텍스트 스타일 등록</button>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 적용만</button>
+        <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">등록</button>
+        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존만 연결</button>
       </div>
-      <label class="inline" style="margin-top:6px;"><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 스타일 이름으로 사용</span></label>
-      <div class="hint muted" style="margin-top:4px;" data-i18n-html="textStyle.rowLabelsHint">ON이면 같은 가로 줄의 <b>왼쪽 텍스트를 라벨(이름)</b>으로, 큰 텍스트를 표본으로 봅니다. 이름은 화면에 적힌 글자 그대로입니다. 표본 오른쪽 텍스트는 표에 넣지 않습니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. (세션만 유지)</div>
-      <!-- 표 박스는 overflow를 받지 못하므로(스크롤 컨테이너가 못 된다) 이 래퍼가 목록 영역이다.
-           가로 스크롤도 같은 요소가 맡는다 — 축을 나누려 한 겹 더 감싸도 CSS가 overflow:visible을
-           auto로 올려버려 결국 한 요소가 두 축을 다 갖는다. 가로 스크롤바 높이는 layoutList가
-           offsetHeight−clientHeight로 함께 흡수하므로 세로 스냅은 어긋나지 않는다. -->
-      <div id="tsList" class="results">
-      <table id="tsTable" style="table-layout:fixed; width:100%; border-collapse:collapse; font-size:11px;">
-        <colgroup>
-          <col style="width:64px;" /><!-- 이름 -->
-          <col /><!-- 폰트(가변: 남는 폭 흡수) -->
-          <col style="width:38px;" /><!-- 크기 -->
-          <!-- 행간은 스캔 행에서 단위까지 함께 보여 준다("24px"/"150%") → 38px로는 모자라 46px.
-               열을 따로 만들면 남는 폭을 먹는 ‘폰트’ 열이 360px 패널에서 아예 사라진다.
-               늘린 8px은 자간에서 회수한다(자간은 "-0.5" 정도라 38px로 충분). -->
-          <col style="width:46px;" /><!-- 행간(단위 포함) -->
-          <col style="width:38px;" /><!-- 자간 -->
-          <col style="width:52px;" /><!-- 스타일 -->
-          <col style="width:28px;" /><!-- 삭제 -->
-        </colgroup>
-        <thead><tr style="text-align:left; color:var(--muted);">
-          <th data-i18n="textStyle.colName">이름</th><th data-i18n="textStyle.colFont">폰트</th><th data-i18n="textStyle.colSize">크기</th><th data-i18n="textStyle.colLineHeight" title="화면에서 쓰던 단위 그대로 등록합니다. %면 %로.">행간</th><th data-i18n="textStyle.colLetterSpacing">자간</th><th data-i18n="textStyle.colStyle">스타일</th><th></th>
-        </tr></thead>
-        <tbody id="tsRows"></tbody>
-      </table>
-      </div>
-      <!-- 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록할 때 화면의 글자에도 적용</span></label>
-      <div class="prereq" id="tsApplyPrereq" style="display:none; margin-top:4px;"><span class="prereq-text"></span></div>
+      <label class="inline"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록 시 화면에 적용</span></label>
+      <label class="inline"><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 이름으로</span></label>
+      <div id="tsList" class="results"></div>
+      <div class="prereq" id="tsApplyPrereq" style="display:none;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
     </div>
   </section>
@@ -1036,21 +1007,14 @@
     "semantic.aliasBtn": "\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131",
     "semantic.scanBtn": "\uAE30\uC874 \uC0C9\uC5D0\uC11C \uCD94\uCC9C",
     // 텍스트 스타일
-    "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C (\uD654\uBA74 \u2192 \uC2A4\uD0C0\uC77C)",
-    "textStyle.hint": "\uD654\uBA74\uC758 \uAE00\uC790\uC5D0\uC11C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB9CC\uB4E4\uC5B4 \uB4F1\uB85D\uD569\uB2C8\uB2E4. \uC2A4\uCE94\uD55C \uAC12\uC740 \uBABB \uBC14\uAFB8\uACE0 <b>\uC774\uB984\uB9CC</b> \uC815\uB9AC\uD558\uBA74 \uB3FC\uC694. \uD589\uAC04\xB7\uC790\uAC04\uC774 %\uC600\uC73C\uBA74 \uD45C\uC5D0 %\uB85C \uBCF4\uC774\uACE0 \uADF8\uB300\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uADF8 \uD56D\uBAA9\uB9CC \uBCC0\uC218 \uC5F0\uACB0 \uC0DD\uB7B5). \uC2A4\uD0C0\uC77C \uC5C6\uB294 \uD14D\uC2A4\uD2B8\xB7\uBCC0\uC218 \uBC14\uC778\uB529 \uD14D\uC2A4\uD2B8\uB3C4 %\uB97C \uBCF5\uAD6C\uD569\uB2C8\uB2E4. \uC0C8 \uC2A4\uD0C0\uC77C\uC740 \u2018\uD589 \uCD94\uAC00\u2019\uB85C. (Paid)",
-    "textStyle.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uC2A4\uCE94",
+    "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "textStyle.hint": "\uC774\uB984\uB9CC \uC218\uC815 \xB7 \xD7N\uC73C\uB85C \uAC19\uC740 \uAE00\uC790 \uC120\uD0DD",
+    "textStyle.scanBtn": "\uC2A4\uCE94",
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
-    "textStyle.useRowLabels": "\uAC00\uB85C \uD589\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uC2A4\uD0C0\uC77C \uC774\uB984\uC73C\uB85C \uC0AC\uC6A9",
-    "textStyle.rowLabelsHint": "ON\uC774\uBA74 \uAC19\uC740 \uAC00\uB85C \uC904\uC758 <b>\uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)</b>\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uC774\uB984\uC740 \uD654\uBA74\uC5D0 \uC801\uD78C \uAE00\uC790 \uADF8\uB300\uB85C\uC785\uB2C8\uB2E4. \uD45C\uBCF8 \uC624\uB978\uCABD \uD14D\uC2A4\uD2B8\uB294 \uD45C\uC5D0 \uB123\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC9DD\uC744 \uBABB \uCC3E\uC73C\uBA74 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026)\uC73C\uB85C \uB461\uB2C8\uB2E4. (\uC138\uC158\uB9CC \uC720\uC9C0)",
-    "textStyle.applyExistingBtn": "\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC801\uC6A9\uB9CC",
-    "textStyle.colName": "\uC774\uB984",
-    "textStyle.colFont": "\uD3F0\uD2B8",
-    "textStyle.colSize": "\uD06C\uAE30",
-    "textStyle.colLineHeight": "\uD589\uAC04",
-    "textStyle.colLetterSpacing": "\uC790\uAC04",
-    "textStyle.colStyle": "\uC2A4\uD0C0\uC77C",
-    "textStyle.applyOriginal": "\uB4F1\uB85D\uD560 \uB54C \uD654\uBA74\uC758 \uAE00\uC790\uC5D0\uB3C4 \uC801\uC6A9",
-    "textStyle.registerBtn": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D",
+    "textStyle.useRowLabels": "\uAC00\uB85C \uD589\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uC774\uB984\uC73C\uB85C",
+    "textStyle.applyExistingBtn": "\uAE30\uC874\uB9CC \uC5F0\uACB0",
+    "textStyle.applyOriginal": "\uB4F1\uB85D \uC2DC \uD654\uBA74\uC5D0 \uC801\uC6A9",
+    "textStyle.registerBtn": "\uB4F1\uB85D",
     // 적용(바인딩)
     "bind.title": "\uC801\uC6A9 (\uBC14\uC778\uB529)",
     "bind.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
@@ -2305,107 +2269,57 @@
     send({ type: "CREATE_SEMANTICS", map });
   });
   var DEFAULT_TS_FAMILY = "Inter";
-  function textStyleRow(s, locked = false) {
-    var _a, _b;
-    const tr = document.createElement("tr");
-    if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
-    if (s.lineHeightPercent) tr.dataset.lineHeightPercent = String(s.lineHeightPercent);
-    if (s.letterSpacingPercent) tr.dataset.letterSpacingPercent = String(s.letterSpacingPercent);
-    const cell = (field, value, opts = {}) => {
-      const { type = "text", readonly = false } = opts;
-      const td = document.createElement("td");
-      const inp = document.createElement("input");
-      inp.type = type;
-      inp.value = value;
-      inp.dataset.field = field;
-      inp.style.width = "100%";
-      if (type === "number") inp.style.textAlign = "right";
-      if (readonly) {
-        inp.readOnly = true;
-        inp.tabIndex = -1;
-        inp.title = value ? `${value} \xB7 \uC2A4\uCE94\uD55C \uAC12\uC774\uB77C \uBABB \uBC14\uAFD4\uC694` : "\uC2A4\uCE94\uD55C \uAC12 \u2014 \uC0C8 \uAC12\uC740 \u2018\uD589 \uCD94\uAC00\u2019\uB85C";
-      }
-      td.appendChild(inp);
-      tr.appendChild(td);
-    };
-    cell("name", s.name);
-    {
-      const nameInp = tr.querySelector('input[data-field="name"]');
-      if (nameInp) {
-        if (s.boundStyleId) {
-          nameInp.classList.add("ts-bound");
-          nameInp.title = "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C\uC774\uC5D0\uC694. \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC774 \uC2A4\uD0C0\uC77C\uC758 \uC774\uB984\uB9CC \uBC14\uB01D\uB2C8\uB2E4(\uC0C8\uB85C \uC548 \uB9CC\uB4E6).";
-        } else {
-          nameInp.classList.add("ts-new");
-          nameInp.title = "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).";
-        }
-      }
-    }
-    cell("family", s.family, { readonly: locked });
-    cell("fontSize", String(s.fontSize), { type: "number", readonly: locked });
-    if (locked) {
-      const pct = (_a = s.lineHeightPercent) != null ? _a : 0;
-      tr.dataset.lineHeightPx = String(s.lineHeight);
-      cell("lineHeight", s.lineHeight > 0 ? pct > 0 ? `${pct}%` : `${s.lineHeight}px` : "AUTO", { readonly: true });
-      const lhInp = tr.querySelector('input[data-field="lineHeight"]');
-      if (lhInp) {
-        lhInp.title = pct > 0 ? `\uD654\uBA74\uC5D0\uC11C ${pct}%\uB85C \uC4F0\uB358 \uD589\uAC04(${s.lineHeight}px) \u2014 %\uB85C \uB4F1\uB85D\uD558\uACE0 \uD589\uAC04 \uBCC0\uC218\uB294 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC544\uC694(Figma\uAC00 px\uB85C \uBC14\uAFD4\uBC84\uB824\uC11C).` : "\uC2A4\uCE94\uD55C \uAC12\uC774\uB77C \uBABB \uBC14\uAFD4\uC694";
-      }
-    } else {
-      cell("lineHeight", String(s.lineHeight), { type: "number" });
-    }
-    if (locked) {
-      const lsPct = (_b = s.letterSpacingPercent) != null ? _b : 0;
-      tr.dataset.letterSpacingPx = String(s.letterSpacing);
-      cell("letterSpacing", lsPct !== 0 ? `${lsPct}%` : `${s.letterSpacing}px`, { readonly: true });
-      const lsInp = tr.querySelector('input[data-field="letterSpacing"]');
-      if (lsInp) {
-        lsInp.title = lsPct !== 0 ? `\uD654\uBA74\uC5D0\uC11C ${lsPct}%\uB85C \uC4F0\uB358 \uC790\uAC04(${s.letterSpacing}px) \u2014 %\uB85C \uB4F1\uB85D\uD558\uACE0 \uC790\uAC04 \uBCC0\uC218\uB294 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC544\uC694(Figma\uAC00 px\uB85C \uBC14\uAFD4\uBC84\uB824\uC11C).` : "\uC2A4\uCE94\uD55C \uAC12\uC774\uB77C \uBABB \uBC14\uAFD4\uC694";
-      }
-    } else {
-      cell("letterSpacing", String(s.letterSpacing), { type: "number" });
-    }
-    cell("style", s.style, { readonly: locked });
-    const tdDel = document.createElement("td");
-    const del = document.createElement("button");
-    del.textContent = "\u2715";
-    del.title = "\uD589 \uC0AD\uC81C";
-    del.addEventListener("click", () => {
-      tr.remove();
-    });
-    tdDel.appendChild(del);
-    tr.appendChild(tdDel);
-    return tr;
+  var tsSpecs = [];
+  function tsSummary(s) {
+    const lh = s.lineHeight > 0 ? s.lineHeightPercent ? `${s.lineHeightPercent}%` : `${s.lineHeight}px` : "AUTO";
+    const ls = s.letterSpacingPercent ? `${s.letterSpacingPercent}%` : `${s.letterSpacing}`;
+    return `${s.family} \xB7 ${s.fontSize} / ${lh} / ${ls} \xB7 ${s.style}`;
   }
-  function renderTextStyleRows(specs, locked = false) {
-    const tbody = $("tsRows");
-    tbody.innerHTML = "";
-    for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
+  function textStyleCard(s) {
+    var _a, _b;
+    const name = document.createElement("input");
+    name.value = s.name;
+    name.placeholder = "\uC2A4\uD0C0\uC77C \uC774\uB984";
+    name.addEventListener("input", () => {
+      s.name = name.value;
+    });
+    if (s.boundStyleId) {
+      name.classList.add("ts-bound");
+      name.title = "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C\uC774\uC5D0\uC694. \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC774 \uC2A4\uD0C0\uC77C\uC758 \uC774\uB984\uB9CC \uBC14\uB01D\uB2C8\uB2E4(\uC0C8\uB85C \uC548 \uB9CC\uB4E6).";
+    } else {
+      name.classList.add("ts-new");
+      name.title = "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).";
+    }
+    const card = resultCard({ title: name, summary: tsSummary(s), summaryMono: true });
+    const n = (_a = s.count) != null ? _a : 0;
+    const ids = (_b = s.nodeIds) != null ? _b : [];
+    if (n > 0 && ids.length) {
+      const badge = document.createElement("button");
+      badge.className = "r-badge";
+      badge.textContent = `\xD7${n}`;
+      badge.title = n === 1 ? "\uC774 \uAE00\uC790\uB85C \uC774\uB3D9" : `\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 ${n}\uAC1C \uC804\uCCB4 \uC120\uD0DD`;
+      badge.addEventListener("click", () => send({ type: "SELECT_NODES", ids }));
+      card.querySelector(".r-top").appendChild(badge);
+    } else {
+      const del = document.createElement("button");
+      del.className = "link";
+      del.textContent = "\uC0AD\uC81C";
+      del.addEventListener("click", () => {
+        tsSpecs = tsSpecs.filter((x) => x !== s);
+        renderTextStyles();
+      });
+      card.querySelector(".r-top").appendChild(del);
+    }
+    return card;
+  }
+  function renderTextStyles() {
+    const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
+    const bound = tsSpecs.length - fresh;
+    $("tsCount").textContent = tsSpecs.length ? `\xB7 \uC2E0\uADDC ${fresh} \xB7 \uB4F1\uB85D\uB428 ${bound}` : "";
+    renderChunked($("tsList"), tsSpecs, textStyleCard);
   }
   function readTextStyleRows() {
-    const specs = [];
-    for (const tr of Array.from($("tsRows").querySelectorAll("tr"))) {
-      const get = (f) => {
-        var _a, _b;
-        return (_b = (_a = tr.querySelector(`input[data-field="${f}"]`)) == null ? void 0 : _a.value) != null ? _b : "";
-      };
-      const name = get("name").trim();
-      if (!name) continue;
-      const boundStyleId = tr.dataset.boundStyleId;
-      const lineHeightPercent = Number(tr.dataset.lineHeightPercent) || 0;
-      const letterSpacingPercent = Number(tr.dataset.letterSpacingPercent) || 0;
-      const lineHeightPx = tr.dataset.lineHeightPx;
-      const letterSpacingPx = tr.dataset.letterSpacingPx;
-      specs.push(__spreadValues(__spreadValues(__spreadValues({
-        name,
-        fontSize: Number(get("fontSize")) || 0,
-        lineHeight: lineHeightPx !== void 0 ? Number(lineHeightPx) || 0 : Number(get("lineHeight")) || 0,
-        letterSpacing: letterSpacingPx !== void 0 ? Number(letterSpacingPx) || 0 : Number(get("letterSpacing")) || 0,
-        family: get("family").trim() || DEFAULT_TS_FAMILY,
-        style: get("style").trim() || "Regular"
-      }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}), boundStyleId ? { boundStyleId } : {}));
-    }
-    return specs;
+    return tsSpecs.filter((s) => s.name.trim()).map((s) => __spreadProps(__spreadValues({}, s), { name: s.name.trim() }));
   }
   $("btnScanText").addEventListener(
     "click",
@@ -2416,10 +2330,11 @@
   );
   $("btnTsAddRow").addEventListener("click", () => {
     var _a;
-    const tr = textStyleRow({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: "Regular" });
-    $("tsRows").appendChild(tr);
-    tr.scrollIntoView({ block: "nearest" });
-    (_a = tr.querySelector('input[data-field="name"]')) == null ? void 0 : _a.focus();
+    tsSpecs.push({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: "Regular" });
+    renderTextStyles();
+    const last = $("tsList").lastElementChild;
+    last == null ? void 0 : last.scrollIntoView({ block: "nearest" });
+    (_a = last == null ? void 0 : last.querySelector("input")) == null ? void 0 : _a.focus();
   });
   $("btnTextStyles").addEventListener("click", () => {
     const styles = readTextStyleRows();
@@ -3055,20 +2970,22 @@
         break;
       case "TEXT_STYLE_CANDIDATES": {
         if (msg.styles.length) {
-          renderTextStyleRows(msg.styles, true);
+          tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
+          renderTextStyles();
           const bound = msg.styles.filter((s) => s.boundStyleId).length;
           const fresh = msg.styles.length - bound;
           const labelPart = msg.labeled != null ? ` \xB7 \uB77C\uBCA8\uC774\uB984 ${msg.labeled} \xB7 \uB7AD\uD0B9\uD3F4\uBC31 ${(_d = msg.fallback) != null ? _d : 0}` : "";
           setStatus(
             "tsStatus",
-            `${msg.styles.length}\uAC1C \uCC3E\uC74C \xB7 \uC2E0\uADDC ${fresh}(\uC570\uBC84) \xB7 \uC774\uBBF8 \uB4F1\uB85D ${bound}(\uD30C\uB791) \xB7 \uD589\uAC04% ${msg.styles.filter((s) => s.lineHeightPercent).length} \xB7 \uC790\uAC04% ${msg.styles.filter((s) => {
+            `\uC2E0\uADDC ${fresh} \xB7 \uB4F1\uB85D\uB428 ${bound} \xB7 \uD589\uAC04% ${msg.styles.filter((s) => s.lineHeightPercent).length} \xB7 \uC790\uAC04% ${msg.styles.filter((s) => {
               var _a2;
               return ((_a2 = s.letterSpacingPercent) != null ? _a2 : 0) !== 0;
-            }).length} \xB7 build%recover` + labelPart + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
+            }).length}` + labelPart + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
             msg.warnings.length ? "warn" : "ok"
           );
         } else {
-          renderTextStyleRows(rampToSpecs(DEFAULT_TS_FAMILY));
+          tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY);
+          renderTextStyles();
           setStatus("tsStatus", "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC2B5\uB2C8\uB2E4. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694.", "warn");
         }
         break;

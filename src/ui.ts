@@ -718,127 +718,71 @@ const DEFAULT_TS_FAMILY = 'Inter';
 
 /** 표 1행 생성(스펙 → 입력 행). 폰트는 행별 셀로 보존(패밀리가 행마다 다를 수 있음).
    locked=true(스캔 행): 폰트·크기·행간·자간·스타일은 읽기 전용(이미 디자인된 사실) — 이름(role)만 편집. */
-function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
-  const tr = document.createElement('tr');
-  // 이미 바인딩된 스타일이면 id 보존 → 등록 시 신규 생성이 아니라 그 스타일 rename.
-  if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
-  // 행간·자간 원본 %는 표시용 셀이 아니라 행에 보관한다 — "150%"/"-2%" 문자열을 되파싱하지 않기 위해.
-  if (s.lineHeightPercent) tr.dataset.lineHeightPercent = String(s.lineHeightPercent);
-  if (s.letterSpacingPercent) tr.dataset.letterSpacingPercent = String(s.letterSpacingPercent);
-  // 컬럼 폭은 표의 <colgroup>이 정하고(폰트는 가변), 입력은 칸을 꽉 채운다.
-  const cell = (field: string, value: string, opts: { type?: string; readonly?: boolean } = {}): void => {
-    const { type = 'text', readonly = false } = opts;
-    const td = document.createElement('td');
-    const inp = document.createElement('input');
-    inp.type = type;
-    inp.value = value;
-    inp.dataset.field = field;
-    inp.style.width = '100%';
-    if (type === 'number') inp.style.textAlign = 'right';
-    if (readonly) {
-      inp.readOnly = true;
-      inp.tabIndex = -1;
-      // 잘려도 hover로 전체값 확인 가능(특히 긴 폰트 패밀리).
-      inp.title = value ? `${value} · 스캔한 값이라 못 바꿔요` : '스캔한 값 — 새 값은 ‘행 추가’로';
-    }
-    td.appendChild(inp);
-    tr.appendChild(td);
-  };
-  cell('name', s.name);
-  {
-    // 행 구분: 이미 등록된 스타일(파랑) vs 새로 만들어질 스타일(앰버) — 스캔 노이즈 식별용.
-    const nameInp = tr.querySelector('input[data-field="name"]') as HTMLInputElement | null;
-    if (nameInp) {
-      if (s.boundStyleId) {
-        nameInp.classList.add('ts-bound');
-        nameInp.title = '이미 등록된 스타일이에요. 이름을 바꾸면 이 스타일의 이름만 바뀝니다(새로 안 만듦).';
-      } else {
-        nameInp.classList.add('ts-new');
-        nameInp.title = '새 스타일로 등록됩니다(아직 등록 안 된 글자).';
-      }
-    }
-  }
-  cell('family', s.family, { readonly: locked });
-  cell('fontSize', String(s.fontSize), { type: 'number', readonly: locked });
-  // 행간 — 스캔 행은 단위까지 보여 준다("24px" / "150%"). %면 %로 등록되고 그 스타일의 행간 변수
-  // 바인딩은 생략되므로(Figma가 바인딩 시 px로 강제) 어느 쪽으로 등록될지가 표에서 보여야 한다.
-  // 등록에 쓰는 px 값은 표시 문자열을 되파싱하지 않고 행 dataset에서 읽는다.
-  if (locked) {
-    const pct = s.lineHeightPercent ?? 0;
-    tr.dataset.lineHeightPx = String(s.lineHeight);
-    cell('lineHeight', s.lineHeight > 0 ? (pct > 0 ? `${pct}%` : `${s.lineHeight}px`) : 'AUTO', { readonly: true });
-    const lhInp = tr.querySelector('input[data-field="lineHeight"]') as HTMLInputElement | null;
-    if (lhInp) {
-      lhInp.title =
-        pct > 0
-          ? `화면에서 ${pct}%로 쓰던 행간(${s.lineHeight}px) — %로 등록하고 행간 변수는 연결하지 않아요(Figma가 px로 바꿔버려서).`
-          : '스캔한 값이라 못 바꿔요';
-    }
-  } else {
-    cell('lineHeight', String(s.lineHeight), { type: 'number' }); // 수동 행은 px 입력
-  }
-  // 자간 — 스캔 행은 단위까지("0.32px" / "-2%"). %면 %로 등록·자간 변수 바인딩 생략(행간과 동일).
-  if (locked) {
-    const lsPct = s.letterSpacingPercent ?? 0;
-    tr.dataset.letterSpacingPx = String(s.letterSpacing);
-    cell('letterSpacing', lsPct !== 0 ? `${lsPct}%` : `${s.letterSpacing}px`, { readonly: true });
-    const lsInp = tr.querySelector('input[data-field="letterSpacing"]') as HTMLInputElement | null;
-    if (lsInp) {
-      lsInp.title =
-        lsPct !== 0
-          ? `화면에서 ${lsPct}%로 쓰던 자간(${s.letterSpacing}px) — %로 등록하고 자간 변수는 연결하지 않아요(Figma가 px로 바꿔버려서).`
-          : '스캔한 값이라 못 바꿔요';
-    }
-  } else {
-    cell('letterSpacing', String(s.letterSpacing), { type: 'number' });
-  }
-  cell('style', s.style, { readonly: locked });
-  const tdDel = document.createElement('td');
-  const del = document.createElement('button');
-  del.textContent = '✕';
-  del.title = '행 삭제';
-  // 행이 줄면 상한·개수 문구도 같이 줄어야 한다(안 하면 ‘총 40개 중 8개’가 남아 거짓말이 된다).
-  del.addEventListener('click', () => {
-    tr.remove();
+/* #17: 텍스트 스타일은 표가 아니라 리스트다. 열 폭을 두고 폰트·크기·행간·자간이 싸우는 대신
+   이름(편집) · 요약 한 줄 · ×N 배지로 읽는다. 스캔 값은 어차피 편집 대상이 아니라 요약이면 되고,
+   ×N을 누르면 그 글자들을 캔버스에서 선택한다(1개면 그리로 이동). */
+
+/** 편집 중인 스타일 목록 — 카드가 곧 편집기라 이름 외에는 이 배열이 단일 출처다. */
+let tsSpecs: TextStyleSpec[] = [];
+
+/** 요약 한 줄 — "Inter · 32 / 120% / 0 · Bold". 행간·자간은 원본 단위로 보여준다. */
+function tsSummary(s: TextStyleSpec): string {
+  const lh = s.lineHeight > 0 ? (s.lineHeightPercent ? `${s.lineHeightPercent}%` : `${s.lineHeight}px`) : 'AUTO';
+  const ls = s.letterSpacingPercent ? `${s.letterSpacingPercent}%` : `${s.letterSpacing}`;
+  return `${s.family} · ${s.fontSize} / ${lh} / ${ls} · ${s.style}`;
+}
+
+function textStyleCard(s: TextStyleSpec): HTMLElement {
+  const name = document.createElement('input');
+  name.value = s.name;
+  name.placeholder = '스타일 이름';
+  name.addEventListener('input', () => {
+    s.name = name.value;
   });
-  tdDel.appendChild(del);
-  tr.appendChild(tdDel);
-  return tr;
-}
-
-function renderTextStyleRows(specs: TextStyleSpec[], locked = false): void {
-  const tbody = $('tsRows');
-  tbody.innerHTML = '';
-  for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
-}
-
-/** 표 → 스펙. 폰트 패밀리는 행별 폰트 셀에서 읽는다(비면 DEFAULT_TS_FAMILY). */
-function readTextStyleRows(): TextStyleSpec[] {
-  const specs: TextStyleSpec[] = [];
-  for (const tr of Array.from($('tsRows').querySelectorAll('tr'))) {
-    const get = (f: string): string =>
-      (tr.querySelector(`input[data-field="${f}"]`) as HTMLInputElement | null)?.value ?? '';
-    const name = get('name').trim();
-    if (!name) continue;
-    const boundStyleId = (tr as HTMLTableRowElement).dataset.boundStyleId;
-    const lineHeightPercent = Number((tr as HTMLTableRowElement).dataset.lineHeightPercent) || 0;
-    const letterSpacingPercent = Number((tr as HTMLTableRowElement).dataset.letterSpacingPercent) || 0;
-    // 스캔 행의 행간·자간 칸은 "150%"/"-2%"처럼 단위가 붙은 표시용 문자열이라 되파싱하지 않는다 — px는 행에 보관된 값.
-    const lineHeightPx = (tr as HTMLTableRowElement).dataset.lineHeightPx;
-    const letterSpacingPx = (tr as HTMLTableRowElement).dataset.letterSpacingPx;
-    specs.push({
-      name,
-      fontSize: Number(get('fontSize')) || 0,
-      lineHeight: lineHeightPx !== undefined ? Number(lineHeightPx) || 0 : Number(get('lineHeight')) || 0,
-      letterSpacing: letterSpacingPx !== undefined ? Number(letterSpacingPx) || 0 : Number(get('letterSpacing')) || 0,
-      family: get('family').trim() || DEFAULT_TS_FAMILY,
-      style: get('style').trim() || 'Regular',
-      ...(lineHeightPercent ? { lineHeightPercent } : {}),
-      ...(letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}),
-      ...(boundStyleId ? { boundStyleId } : {}),
-    });
+  if (s.boundStyleId) {
+    name.classList.add('ts-bound');
+    name.title = '이미 등록된 스타일이에요. 이름을 바꾸면 이 스타일의 이름만 바뀝니다(새로 안 만듦).';
+  } else {
+    name.classList.add('ts-new');
+    name.title = '새 스타일로 등록됩니다(아직 등록 안 된 글자).';
   }
-  return specs;
+
+  const card = resultCard({ title: name, summary: tsSummary(s), summaryMono: true });
+
+  const n = s.count ?? 0;
+  const ids = s.nodeIds ?? [];
+  if (n > 0 && ids.length) {
+    // 1개면 그 글자로 이동, 여러 개면 전부 선택 — 어느 쪽이든 캔버스가 답을 보여준다.
+    const badge = document.createElement('button');
+    badge.className = 'r-badge';
+    badge.textContent = `×${n}`;
+    badge.title = n === 1 ? '이 글자로 이동' : `이 스타일을 쓰는 글자 ${n}개 전체 선택`;
+    badge.addEventListener('click', () => send({ type: 'SELECT_NODES', ids }));
+    (card.querySelector('.r-top') as HTMLElement).appendChild(badge);
+  } else {
+    // 수동 추가 행은 셀 글자가 없다 — 대신 지울 수 있어야 한다.
+    const del = document.createElement('button');
+    del.className = 'link';
+    del.textContent = '삭제';
+    del.addEventListener('click', () => {
+      tsSpecs = tsSpecs.filter((x) => x !== s);
+      renderTextStyles();
+    });
+    (card.querySelector('.r-top') as HTMLElement).appendChild(del);
+  }
+  return card;
+}
+
+function renderTextStyles(): void {
+  const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
+  const bound = tsSpecs.length - fresh;
+  $('tsCount').textContent = tsSpecs.length ? `· 신규 ${fresh} · 등록됨 ${bound}` : '';
+  renderChunked($('tsList'), tsSpecs, textStyleCard);
+}
+
+/** 등록에 넘길 스펙 — 이름이 빈 행은 뺀다(수동 추가 후 미입력). */
+function readTextStyleRows(): TextStyleSpec[] {
+  return tsSpecs.filter((s) => s.name.trim()).map((s) => ({ ...s, name: s.name.trim() }));
 }
 
 $('btnScanText').addEventListener('click', () =>
@@ -848,12 +792,12 @@ $('btnScanText').addEventListener('click', () =>
   }),
 );
 $('btnTsAddRow').addEventListener('click', () => {
-  const tr = textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
-  $('tsRows').appendChild(tr);
-  // 표가 상한에 걸린 뒤로는 새 행이 스크롤 밖에 생겨 "행 추가를 눌렀는데 아무 일도 없다"로 보인다.
-  // 추가한 행으로 데려가고 이름 칸에 커서를 둔다(어차피 다음 동작은 이름 입력).
-  tr.scrollIntoView({ block: 'nearest' });
-  (tr.querySelector('input[data-field="name"]') as HTMLInputElement | null)?.focus();
+  tsSpecs.push({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
+  renderTextStyles();
+  // 추가한 카드로 데려가고 이름 칸에 커서를 둔다(어차피 다음 동작은 이름 입력).
+  const last = $('tsList').lastElementChild as HTMLElement | null;
+  last?.scrollIntoView({ block: 'nearest' });
+  (last?.querySelector('input') as HTMLInputElement | null)?.focus();
 });
 $('btnTextStyles').addEventListener('click', () => {
   const styles = readTextStyleRows();
@@ -1642,25 +1586,24 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'TEXT_STYLE_CANDIDATES': {
       if (msg.styles.length) {
-        renderTextStyleRows(msg.styles, true);
+        tsSpecs = msg.styles.map((x) => ({ ...x }));
+        renderTextStyles();
         const bound = msg.styles.filter((s) => s.boundStyleId).length;
         const fresh = msg.styles.length - bound;
-        const labelPart =
-          msg.labeled != null
-            ? ` · 라벨이름 ${msg.labeled} · 랭킹폴백 ${msg.fallback ?? 0}`
-            : '';
+        const labelPart = msg.labeled != null ? ` · 라벨이름 ${msg.labeled} · 랭킹폴백 ${msg.fallback ?? 0}` : '';
+        // 와이어 상태 줄: 신규 · 등록됨 · 행간% · 자간%.
         setStatus(
           'tsStatus',
-          `${msg.styles.length}개 찾음 · 신규 ${fresh}(앰버) · 이미 등록 ${bound}(파랑)` +
+          `신규 ${fresh} · 등록됨 ${bound}` +
             ` · 행간% ${msg.styles.filter((s) => s.lineHeightPercent).length}` +
             ` · 자간% ${msg.styles.filter((s) => (s.letterSpacingPercent ?? 0) !== 0).length}` +
-            ' · build%recover' +
             labelPart +
             (msg.warnings.length ? ' · ' + msg.warnings.join(' ') : ''),
           msg.warnings.length ? 'warn' : 'ok',
         );
       } else {
-        renderTextStyleRows(rampToSpecs(DEFAULT_TS_FAMILY));
+        tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY);
+        renderTextStyles();
         setStatus('tsStatus', '선택에서 텍스트를 못 찾아 기본 램프로 채웠습니다. 폰트·값을 조정하세요.', 'warn');
       }
       break;
