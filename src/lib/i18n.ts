@@ -46,15 +46,6 @@ export const STRINGS: Record<string, string> = {
   'rename.none': '변경할 이름이 없습니다.',
   'rename.applied': '{count}개 이름 적용 완료.',
 
-  // 명도 대비
-  'contrast.checking': '대비 검사 중…',
-  'contrast.fixApplied': '보정 적용됨 — ‘대비 검사’로 다시 확인하세요.',
-  'contrast.none': '검사할 텍스트가 없습니다.{detail}',
-  'contrast.noneSkip': ' (건너뜀: {skip})',
-  'contrast.noneSelect': ' 텍스트가 있는 프레임을 선택하세요.',
-  'contrast.allPass': '{checked}개 모두 {level} 통과 ✓{skip}',
-  'contrast.someFail': '{checked}개 중 {fails}개 {level} 미달{skip}',
-
   // 컴포넌트 / 베리언트
   'component.scanning': '후보 스캔 중…',
   'component.registering': '컴포넌트 등록 중…',
@@ -74,15 +65,6 @@ export const STRINGS: Record<string, string> = {
   'wizard.stopped': '중단',
   'wizard.completed': '완료',
 
-  // 프리셋
-  'preset.needName': '프리셋 이름을 입력하세요.',
-  'preset.noneSelected': '선택된 프리셋이 없습니다.',
-  'preset.applied': '‘{name}’ 적용됨 — 아래 단계에서 실행하세요.',
-  'preset.needExport': '내보낼 프리셋을 선택하세요.',
-  'preset.exported': '‘{name}’ JSON을 내보냈습니다(복사해 공유).',
-  'preset.importFail': '가져오기 실패: {error}',
-  'preset.count': '프리셋 {count}개',
-
   // 다크 테마 생성
   'dark.title': '다크 테마 생성',
   'dark.hint': '라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)',
@@ -95,16 +77,11 @@ export const STRINGS: Record<string, string> = {
   'similar.hint': '구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.',
   'similar.scanBtn': '닮은 프레임 스캔',
   'similar.componentizeBtn': '컴포넌트화',
-  // 변수 편집기
-  'varedit.title': '변수 편집기',
-  'varedit.hint': '만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.',
-  'varedit.loadBtn': '변수 불러오기',
-  'varedit.collection': '컬렉션',
-  // 목록 공통(상한 해제 — 6개 카드가 같은 문구를 쓴다)
+  // 목록 공통(상한 해제 — 여러 카드가 같은 문구를 쓴다)
   'list.expandAll': '모두 펼치기',
   // 내보내기
-  'export.needFirst': '먼저 내보내기를 실행하세요.',
-  'export.done': '{format} 내보냄 — 복사 또는 다운로드.',
+  'export.saved': '{format} — {file}로 저장했습니다.',
+  'export.empty': '내보낼 변수가 없습니다. 먼저 토큰을 생성하세요.',
 
   // 라이선스
   'license.needKey': '라이선스 키를 입력하세요.',
@@ -118,7 +95,6 @@ export const STRINGS: Record<string, string> = {
   'wizard.step.semantics': '시맨틱 매핑',
   'wizard.step.bind': '바인딩',
   'wizard.step.rename': '레이어 정돈',
-  'wizard.step.contrast': '접근성 검수',
   'wizard.step.componentize': '컴포넌트화',
   'wizard.skip.optionOff': '옵션 꺼짐',
   'wizard.skip.noMapping': '매핑 없음',
@@ -142,11 +118,6 @@ export const STRINGS: Record<string, string> = {
   'reason.instance-children': '인스턴스 내부',
   'reason.font': '폰트 미로드',
 
-  // 명도 대비 스킵 사유(라벨 맵)
-  'contrastSkip.no-fill': '단색 글자색 없음',
-  'contrastSkip.no-bg': '배경 없음',
-  'contrastSkip.capped': '스캔 상한 도달',
-
   // 마법사 시퀀서 단계 결과
   'wizard.seq.stoppedPrev': '이전 단계 중단으로 건너뜀',
   'wizard.seq.running': '진행 중…',
@@ -159,15 +130,12 @@ export const STRINGS: Record<string, string> = {
   'wizard.seq.bindDone': '바인딩 {bound}',
   'wizard.seq.bindSkip': ' · 스킵 {n}',
   'wizard.seq.renameDone': '{count}개 이름 적용',
-  'wizard.seq.contrastNone': '검사할 텍스트 없음',
-  'wizard.seq.contrastPass': '{pass}/{checked} {level} 통과',
   'wizard.seq.componentize': '등록 {registered} · 세트 {sets}',
 
   // 마법사 완료 요약(summarize, wizard.ts)
   'wizard.sum.tokens': '토큰 {n}',
   'wizard.sum.bound': '바인딩 {n}',
   'wizard.sum.renamed': '리네임 {n}',
-  'wizard.sum.contrast': '대비 {passed}/{total} 통과',
   'wizard.sum.components': '컴포넌트 {n}',
   'wizard.sum.empty': '완료된 작업이 없습니다',
 
@@ -185,11 +153,31 @@ export const STRINGS: Record<string, string> = {
   'tab.tokens': '만들기',
   'tab.apply': '적용',
   'tab.settings': '관리',
+  // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
+  'rail.color': '색',
+  'rail.colorSub': '추출·변수',
+  'rail.token': '토큰',
+  'rail.tokenSub': '간격·크기',
+  'rail.theme': '테마',
+  'rail.themeSub': '다크',
+  'rail.type': '타이포',
+  'rail.typeSub': '텍스트 스타일',
+  'rail.bind': '바인딩',
+  'rail.bindSub': '변수 연결',
+  'rail.rename': '리네임',
+  'rail.renameSub': '역할 이름',
+  'rail.structure': '구조',
+  'rail.structureSub': '컴포넌트',
+  // 플러그인 설정(#19) — 관리 탭에만
+  'settings.title': '플러그인 설정',
+  'settings.hint': '만들기·적용 탭에서는 안 보입니다. 바꾸면 이 파일에 기억됩니다.',
+  'settings.base': '기준 크기',
+  'settings.depth': '리네임 맥락 깊이',
+  'settings.tol': '허용오차 0.5px 고정 · 여백·크기 격자 8px 고정',
   // 마법사 카드
   'wizardCard.title': '시스템화 마법사',
-  'wizardCard.hint': '선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.',
+  'wizardCard.hint': '선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈</b>. 기준 크기·맥락 깊이는 ‘관리’ 탭 설정을 따릅니다.',
   'wizardCard.optSemantics': '시맨틱 매핑',
-  'wizardCard.optContrast': '접근성 검수',
   'wizardCard.optComponentize': '컴포넌트화',
   'wizardCard.run': '전체 실행',
   // 공통(정적 라벨)
@@ -203,7 +191,7 @@ export const STRINGS: Record<string, string> = {
   // 진행 안내(파이프라인 카드)
   'pipeline.title': '진행 안내',
   'pipeline.hint': '권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.',
-  'pipeline.indep': '리네임 · 대비 점검 · 컴포넌트는 전제 없이 언제든 가능(독립).',
+  'pipeline.indep': '리네임 · 컴포넌트는 전제 없이 언제든 가능(독립).',
   // 브랜드 팔레트
   'palette.title': '브랜드 팔레트 생성',
   'palette.brand': '브랜드색',
@@ -224,13 +212,8 @@ export const STRINGS: Record<string, string> = {
   // 토큰 생성
   'create.title': '토큰 생성 (Global + Semantic)',
   'create.scopeHint': '색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.',
-  'create.base': 'base(px)',
   'create.selectAll': '전체 선택',
   'create.dropOnce': '1× 해제',
-  'create.tidyBase': '사다리',
-  'create.tidyRatio': '허용',
-  'create.tidyBtn': '정리',
-  'create.tidyUndo': '되돌리기',
   'create.hint': '미리보기로 변경 요약을 확인한 뒤 적용하세요.',
   'create.previewBtn': '미리보기',
   'create.apply': '적용',
@@ -258,23 +241,15 @@ export const STRINGS: Record<string, string> = {
   'textStyle.registerBtn': '텍스트 스타일 등록',
   // 적용(바인딩)
   'bind.title': '적용 (바인딩)',
-  'bind.tol': '허용오차',
-  'bind.tolExact': '정확',
   'bind.preview': '미리보기',
   'bind.confirm': '선택에 바인딩',
   'bind.progress': '진행률',
   // 리네임
   'rename.title': '리네임',
-  'rename.depth': '맥락 최대단계',
   'rename.preview': '미리보기',
   'rename.apply': '이름 적용',
   'rename.undoTitle': '되돌리기 안전장치',
   'rename.undoBody': '이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.',
-  // 명도 대비
-  'contrast.title': '명도 대비 점검 (WCAG)',
-  'contrast.hint': '선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).',
-  'contrast.level': '기준',
-  'contrast.checkBtn': '대비 검사',
   // 컴포넌트 / 베리언트
   'component.title': '컴포넌트 / 베리언트',
   'component.hint': '<b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·table·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.',
@@ -289,21 +264,12 @@ export const STRINGS: Record<string, string> = {
   'export.format': '형식',
   'export.fontUnit': '폰트 크기',
   'export.runBtn': '내보내기',
-  'export.downloadBtn': '다운로드',
   // 요금제 / 라이선스
   'license.title': '요금제 / 라이선스',
   'license.verify': '검증',
   'license.clear': '해제',
   'license.devTier': '개발용 강제 티어',
   'license.devTierNote': '(검증된 키가 없을 때만 적용)',
-  // 공유 프리셋
-  'preset.title': '공유 프리셋',
-  'preset.hint': 'base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Paid 전용)',
-  'preset.saveBtn': '현재 설정 저장',
-  'preset.loadBtn': '불러오기',
-  'preset.deleteBtn': '삭제',
-  'preset.exportBtn': '내보내기(JSON)',
-  'preset.importBtn': '가져오기(JSON)',
   // 접근성 · 국제화
   'a11y.title': '접근성 · 국제화',
   'a11y.body': '키보드 전용 조작 · 명도 대비 AA · i18n',

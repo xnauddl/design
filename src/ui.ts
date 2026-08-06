@@ -2,24 +2,22 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate } from './shared/messages';
-import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList, tidyNumberTokens } from './lib/tokens';
+import { type DraftToken, type Unit, resolvedTypeForToken, tidyNumberTokens } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier, type Feature } from './lib/entitlements';
 import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
-import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
-import type { ExportFormat } from './lib/exporters';
+import { exportHasTokens, type ExportFormat } from './lib/exporters';
 import type { FrameMeta } from './lib/similar';
 import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
-import { suggestTokenRoles } from './lib/roles';
+import { suggestTokenRoles, semanticMapToText, textToSemanticMap } from './lib/roles';
 import { pipelineSteps } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
-import type { WcagLevel, ContrastFinding } from './lib/contrast';
 import { planWizard, summarize, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
@@ -39,14 +37,11 @@ function readMaxDepth(): number {
 }
 
 let tokens: DraftToken[] = [];
-let presets: Preset[] = [];
 let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
-let paidDataRequested = false;
 // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
 let hasGlobal = false;
 let hasBindable = false;
 let hasTextStyles = false;
-let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
 
@@ -272,9 +267,7 @@ const LIST_REGIONS: ListRegion[] = [
   { mount: 'tokenList', row: '.tk', more: 'tokenListMore', count: 'tokenListCount', expand: 'btnTokenListExpand' },
   { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
   { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
-  { mount: 'contrastList', row: '.cfind', more: 'contrastListMore', count: 'contrastListCount', expand: 'btnContrastListExpand' },
   { mount: 'similarList', row: '.simrow', more: 'similarListMore', count: 'similarListCount', expand: 'btnSimilarListExpand' },
-  { mount: 'varList', row: '.vrow', more: 'varListMore', count: 'varListCount', expand: 'btnVarListExpand' },
   // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
   // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
   { mount: 'bindTree', row: '.tree-row', more: 'bindTreeMore', count: 'bindTreeCount', expand: 'btnBindTreeExpand' },
@@ -472,11 +465,9 @@ $('btnPalette').addEventListener('click', () => {
   );
 });
 
-/** 시맨틱 매핑 textarea를 `역할 = 변수명` 줄로 채움. */
+/** 시맨틱 매핑 textarea를 `역할 = 변수명` 줄로 채움(textToSemanticMap의 역방향). */
 function setSemMapText(map: Record<string, string>): void {
-  ($('semMap') as HTMLTextAreaElement).value = Object.entries(map)
-    .map(([role, global]) => `${role} = ${global}`)
-    .join('\n');
+  ($('semMap') as HTMLTextAreaElement).value = semanticMapToText(map);
 }
 
 /** #10·역할 어휘: 전 토큰에서 시맨틱 역할을 추천(매핑이 비어 있을 때만 — 사용자 편집 보존). */
@@ -663,61 +654,38 @@ $('btnExtract').addEventListener('click', () => {
   send({ type: 'EXTRACT' });
 });
 
-/* 스케일 사다리 정리 — 색 정리(tidyColors)와 같은 패턴: 누르면 정리하고 요약 한 줄 + 되돌리기.
-   색과 달리 자동이 아니라 버튼인 이유는, 값을 옮기면 토큰의 수치가 바뀌어 바인딩 결과까지
-   달라지기 때문이다(색 병합은 같은 hue-단계 안이라 훨씬 보수적). */
-let preNumTidy: DraftToken[] | null = null;
+/* 스케일 사다리 정리 — #19로 격자 8px·허용 15%에 고정하고 UI 입력·버튼을 없앴다.
+   미리보기를 만들 때 자동으로 한 번 돌린다: 손으로 그린 13·15 같은 값이 8 격자로 모여야
+   토큰 수가 줄고, 그 수치로 바인딩이 걸린다. 무엇이 옮겨졌는지는 요약 한 줄로 알린다. */
+const TIDY_GRID = 8; // 여백·크기 격자(고정)
+const TIDY_RATIO = 0.15; // 값 대비 이 비율 안이면 격자로 이동
 
-/** 정리 스냅샷·요약 줄을 함께 걷는다 — 남겨두면 다른 추출의 토큰으로 되돌아간다. */
+/** 요약 줄을 걷는다 — 남겨두면 다른 추출의 토큰에 옛 요약이 붙는다. */
 function clearNumTidy(): void {
-  preNumTidy = null;
   $('numTidySummary').style.display = 'none';
 }
 
-$('btnTidyNumbers').addEventListener('click', () => {
-  // 목록이 '표시'된 뒤에만 — 접힌 채로 값을 바꾸면 무엇이 어떻게 옮겨졌는지 볼 수 없다.
-  if (!previewRevealed) {
-    setStatus('createStatus', '먼저 ‘미리보기’를 눌러 정리할 토큰을 확인하세요.', 'warn');
-    return;
-  }
+/** 여백·크기 토큰을 격자 8 사다리로 스냅(#19). 미리보기 직전에 호출. */
+function tidyNumbers(): void {
   if (!creatableTokens().length) {
-    setStatus('createStatus', '정리할 여백·크기 토큰이 없어요.', 'warn');
+    clearNumTidy();
     return;
   }
-  const base = Number(($('tidyBase') as HTMLInputElement).value) || 0;
-  const ratio = (Number(($('tidyRatio') as HTMLInputElement).value) || 0) / 100;
-  const snapshot = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기용
-  const r = tidyNumberTokens(tokens, { base, ratio });
+  const snapshot = tokens.map((t) => ({ ...t, sources: [...t.sources] }));
+  const r = tidyNumberTokens(tokens, { base: TIDY_GRID, ratio: TIDY_RATIO });
   if (!r.snapped) {
-    setStatus('createStatus', r.before === 0
-      ? '정리할 여백·크기 토큰이 없어요.'
-      : `${base}px 사다리에서 ${Math.round(ratio * 100)}% 안에 드는 값이 없어요 — 허용을 올려보세요.`, '');
+    clearNumTidy();
     return;
   }
-  preNumTidy = snapshot;
   tokens = r.tokens;
   // 스냅으로 키(값)가 바뀌므로 체크를 그대로 두면 전부 풀린다. 그렇다고 전체 재선택을 하면
   // 사용자의 '1× 해제'가 조용히 되살아난다 → 정리 전 체크 상태를 새 키로 이월한다.
   carryTokenChecked(snapshot, r.tokens);
-  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 새 미리보기 필요
-  renderTokens();
   $('numTidySummary').style.display = '';
   // 이동과 병합은 다른 일이라 따로 센다 — 옮겼지만 같은 칸이 아니어서 안 합쳐진 토큰도 있다.
   const merged = r.merged ? ` · 같은 칸 ${r.merged}개 병합` : '';
-  $('numTidyText').textContent = `여백·크기 ${r.before} → ${r.after}개 (${base}px 사다리로 ${r.snapped}개 이동${merged})`;
-  setStatus('createStatus', `${base}px 사다리로 ${r.snapped}개를 옮겼어요${r.merged ? `, ${r.merged}개가 합쳐졌어요` : ''}.`, 'ok');
-});
-
-$('btnNumTidyUndo').addEventListener('click', () => {
-  if (!preNumTidy) return;
-  const restored = preNumTidy;
-  carryTokenChecked(tokens, restored); // 되돌릴 때도 체크를 잃지 않게
-  tokens = restored;
-  clearNumTidy();
-  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none';
-  renderTokens();
-  setStatus('createStatus', '수치 정리를 되돌렸어요.', '');
-});
+  $('numTidyText').textContent = `여백·크기 ${r.before} → ${r.after}개 (${TIDY_GRID}px 격자로 ${r.snapped}개 이동${merged})`;
+}
 
 // 전체 선택 / 1× 해제 — 목록이 상한에 잘려 있어도 전체에 적용된다(체크는 DOM이 아니라 집합이 보관).
 $('tokenAll').addEventListener('change', () => {
@@ -742,6 +710,7 @@ $('btnCreate').addEventListener('click', () => {
     send({ type: 'EXTRACT' });
     return;
   }
+  tidyNumbers(); // #19: 격자 8 스냅을 먼저 — 미리보기에 정리된 수치가 보이게
   renderTokens();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
@@ -759,6 +728,19 @@ $('btnCreateApply').addEventListener('click', () => {
 // 미리보기를 본 뒤 base만 바꾸면 옛 기준 요약이 남은 채 ‘적용’이 새 base로 실행돼 어긋나므로,
 // 즉시 ‘적용’을 감추고 새 base로 미리보기를 다시 돌린다(미리보기는 변수를 만들지 않는 읽기).
 let basePreviewTimer = 0;
+
+/* #19: 설정은 관리 탭에만 있고, 바뀌면 곧바로 파일에 기억한다(저장 버튼 없음).
+   타이핑 중 매 키마다 보내지 않도록 한 박자 늦춘다. */
+let settingsSaveTimer = 0;
+function saveSettings(): void {
+  clearTimeout(settingsSaveTimer);
+  settingsSaveTimer = window.setTimeout(() => {
+    send({ type: 'SET_SETTINGS', base: Number(($('base') as HTMLInputElement).value) || 16, maxDepth: readMaxDepth() });
+  }, 350);
+}
+($('base') as HTMLInputElement).addEventListener('input', saveSettings);
+($('depth') as HTMLInputElement).addEventListener('input', saveSettings);
+
 ($('base') as HTMLInputElement).addEventListener('input', () => {
   const applyBtn = $('btnCreateApply') as HTMLButtonElement;
   if (applyBtn.style.display === 'none') return; // 아직 미리보기 전 — 무효화할 결과가 없음
@@ -954,40 +936,14 @@ $('btnApplyExistingText').addEventListener('click', () => {
   send({ type: 'APPLY_TEXT_STYLES' });
 });
 
-/* 허용오차 프리셋 — 값이 무엇을 뜻하는지 숫자만으로는 안 보여서, 자주 쓰는 값을 칩으로 두고
-   현재 값이 어떤 성격인지 한 줄로 설명한다. 임의 값은 숫자 입력으로 계속 넣을 수 있다. */
-const TOL_HINTS: [number, string][] = [
-  [0, '정확히 같은 값만 바인딩합니다.'],
-  [0.5, '반올림 오차만 흡수합니다(기본).'],
-  [1, '1px 이내 근사값까지 붙습니다.'],
-  [Infinity, '근사 범위가 넓어 의도치 않은 값까지 붙을 수 있습니다.'],
-];
-function syncTolPresets(): void {
-  const v = Number(($('tol') as HTMLInputElement).value) || 0;
-  for (const el of Array.from(document.querySelectorAll('.tol-chip'))) {
-    el.classList.toggle('on', Number((el as HTMLElement).dataset.tol) === v);
-  }
-  $('tolHint').textContent = `허용오차 ${v}px — ${(TOL_HINTS.find(([t]) => v <= t) ?? TOL_HINTS[TOL_HINTS.length - 1])[1]}`;
-}
-for (const el of Array.from(document.querySelectorAll('.tol-chip'))) {
-  el.addEventListener('click', () => {
-    ($('tol') as HTMLInputElement).value = (el as HTMLElement).dataset.tol ?? '0.5';
-    syncTolPresets();
-    clearBindPreview(); // 허용오차가 바뀌면 이전 미리보기 후보는 무효
-  });
-}
-($('tol') as HTMLInputElement).addEventListener('input', () => {
-  syncTolPresets();
-  // 칩과 같은 처리 — 허용오차가 바뀌면 이전 값으로 계산된 후보는 무효다. 남겨두면
-  // 사용자가 0을 넣고 '선택에 바인딩'을 눌러도 옛 허용오차의 근사 매칭이 그대로 적용된다.
-  clearBindPreview();
-});
-syncTolPresets();
+/* #6: 허용오차는 0.5px 고정 — 반올림 오차만 흡수한다. 칩·입력으로 노출하던 값을 없앴다.
+   0은 소수점 반올림 때문에 실제로 안 붙고, 1 이상은 의도치 않은 값까지 끌어와 과매칭이 된다.
+   고정값이라는 사실은 관리 탭 '플러그인 설정'에 표시한다. */
+const BIND_TOLERANCE = 0.5;
 
 $('btnApply').addEventListener('click', () => {
-  const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
   showApplyProgress('미리보기 계산 중…'); // UX6
-  send({ type: 'APPLY', tolerance, preview: true }); // UX1: dry-run 미리보기 먼저
+  send({ type: 'APPLY', tolerance: BIND_TOLERANCE, preview: true }); // UX1: dry-run 미리보기 먼저
 });
 
 $('btnApplyConfirm').addEventListener('click', () => {
@@ -1015,16 +971,6 @@ $('btnApplyCancel').addEventListener('click', () => {
 
 $('btnPreview').addEventListener('click', () => {
   send({ type: 'RENAME', apply: false, maxDepth: readMaxDepth() });
-});
-
-$('btnContrast').addEventListener('click', () => {
-  const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
-  setStatus('contrastStatus', t('contrast.checking'), '');
-  // 지난 결과를 비운다 — 검사가 ERROR로 끝나면 결과는 그대로 남는데 아래 개수 줄이
-  // ‘총 n개 중 m개 표시’로 남아 지난 회차 수치를 이번 결과인 양 단언한다.
-  $('contrastList').innerHTML = '';
-  layoutListBy('contrastList');
-  send({ type: 'CHECK_CONTRAST', level });
 });
 
 $('btnRename').addEventListener('click', () => {
@@ -1138,16 +1084,14 @@ async function runWizard(): Promise<void> {
     setStatus('wizardSummary', t('wizard.needSelect'), 'warn');
     return;
   }
-  // 설정값은 각 단계의 기존 입력 필드에서 읽는다(단일 출처).
+  // 설정값은 관리 탭 '플러그인 설정'에서 읽는다(단일 출처). 허용오차는 고정.
   const base = Number(($('base') as HTMLInputElement).value) || 16;
-  const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
+  const tolerance = BIND_TOLERANCE;
   const maxDepth = readMaxDepth();
-  const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
   const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
 
   const options: WizardOptions = {
     semantics: ($('wizOptSemantics') as HTMLInputElement).checked,
-    contrast: ($('wizOptContrast') as HTMLInputElement).checked,
     componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
   };
   const ctx: WizardContext = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
@@ -1211,14 +1155,6 @@ async function runWizard(): Promise<void> {
           const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth }, ['RENAME_RESULT']);
           totals.renamed = r.changes.length;
           setWizardStep('rename', 'done', t('wizard.seq.renameDone', { count: r.changes.length }));
-          break;
-        }
-        case 'contrast': {
-          const r = await wizardRequest({ type: 'CHECK_CONTRAST', level }, ['CONTRAST_RESULT']);
-          totals.contrastChecked = r.checked;
-          totals.contrastFailed = r.failed;
-          // 미달 발견은 ‘실행 실패’가 아니라 ‘점검 결과’ — 흐름은 계속하되 주의 표시.
-          setWizardStep('contrast', r.failed ? 'fail' : 'done', r.checked === 0 ? t('wizard.seq.contrastNone') : t('wizard.seq.contrastPass', { pass: r.checked - r.failed, checked: r.checked, level: r.level }));
           break;
         }
         case 'componentize': {
@@ -1347,11 +1283,7 @@ const PREMIUM_STATUS_ID: Record<Feature, string> = {
   semantics: 'semStatus',
   components: 'componentStatus',
   textStyles: 'tsStatus',
-  presets: 'presetStatus',
 };
-const PRESET_FIELDS = [
-  'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
-];
 // btnScanSimilar(스캔)은 읽기 전용이라 Free — 잠그는 건 실제로 문서를 바꾸는 btnComponentize뿐.
 const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnComponentize'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
@@ -1360,7 +1292,6 @@ const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants
 // btnApplyExistingText도 code 쪽에서 requireTextStyles로 막히지만, 전제 가드(등록된 스타일 유무)와
 // 결합돼 있어 여기 목록이 아니라 updateGates 아래에서 별도로 잠근다.
 const PAID_FIELDS = [
-  ...PRESET_FIELDS,
   ...COMPONENT_FIELDS,
   'btnPalette', 'btnPaletteApply',
   'btnCreate', 'btnCreateApply',
@@ -1379,7 +1310,7 @@ function updateGates(): void {
     el.disabled = !isPaid;
     setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
   }
-  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
+  for (const id of ['paletteLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
   // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가
@@ -1396,11 +1327,6 @@ function updateGates(): void {
   // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
   if (!isPaid) ($('btnApplyExistingText') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
-
-  if (isPaid && !paidDataRequested) {
-    paidDataRequested = true;
-    send({ type: 'GET_PRESETS' });
-  }
 }
 
 /** 유료 잠금 사유를 툴팁으로. 원래 title(기능 설명)은 dataset에 1회 백업해 보존·복원한다. */
@@ -1422,6 +1348,7 @@ function setPrereq(btnId: string, noticeId: string, ok: boolean, msg: string): v
 /** 전제 미충족 안내의 ‘토큰 생성으로’ 바로가기 — 토큰 탭으로 이동 + 생성 카드 포커스. */
 function goToCreate(): void {
   showTab('tokens');
+  showMakeStep('token'); // 토큰 생성은 '토큰' 단계에 있다 — 단계를 안 맞추면 빈 화면으로 보낸다
   $('createCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
   ($('btnCreate') as HTMLButtonElement).focus();
 }
@@ -1432,12 +1359,14 @@ function goToCreate(): void {
 function gotoStep(id: 'tokens' | 'semantics' | 'bind'): void {
   if (id === 'bind') {
     showTab('apply');
+    showApplyStep('bind');
     const b = $('btnApply') as HTMLButtonElement;
     b.scrollIntoView({ behavior: 'smooth', block: 'center' });
     b.focus();
     return;
   }
   showTab('tokens');
+  showMakeStep('token'); // 토큰 생성·시맨틱 매핑 둘 다 '토큰' 단계
   const target = id === 'tokens' ? 'btnCreate' : 'btnSemantics';
   const b = $(target) as HTMLButtonElement;
   b.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1484,28 +1413,10 @@ $('btnScanComp').addEventListener('click', () => {
   send({ type: 'SCAN_COMPONENT_CANDIDATES' });
 });
 
-/* ---------- 변수 편집기 ---------- */
-// 마지막으로 받은 목록. 편집은 낙관적으로 반영하지 않고 EDIT_VARIABLE_RESULT로 되돌려받아 갱신한다
-// — figma가 이름을 정규화하거나 값을 거부할 수 있어서, 화면이 실제 상태와 어긋나면 안 된다.
+/* ---------- 다크 테마 생성 ---------- */
+// 문서의 3계층 변수 목록 — 다크 카드가 컬렉션·모드 선택지를 여기서 읽는다(값 편집은 Figma Variables 몫).
 let allVars: VarInfo[] = [];
 
-/** 컬렉션/이름 필터를 적용한 목록. */
-function visibleVars(): VarInfo[] {
-  const col = ($('varFilterCol') as HTMLSelectElement).value;
-  const q = ($('varFilterText') as HTMLInputElement).value.trim().toLowerCase();
-  return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
-}
-
-function requestVars(): void {
-  setStatus('varEditStatus', '변수를 불러오는 중…', '');
-  send({ type: 'GET_VARIABLES' });
-}
-
-$('btnLoadVars').addEventListener('click', requestVars);
-$('varFilterCol').addEventListener('change', () => renderVars());
-$('varFilterText').addEventListener('input', () => renderVars());
-
-/* ---------- 다크 테마 생성 ---------- */
 // 다크 채우기는 컬렉션의 모드 2개(라이트→다크)를 고르는 게 전부라, 변수 목록에서 모드를 읽어 채운다.
 function refreshDarkOptions(): void {
   const cols = new Map<string, VarInfo>();
@@ -1634,77 +1545,6 @@ $('btnGenMissing').addEventListener('click', () => {
   send({ type: 'GENERATE_MISSING_VARIANTS' });
 });
 
-function renderPresetList(): void {
-  const sel = $('presetList') as HTMLSelectElement;
-  sel.innerHTML = '';
-  for (const p of presets) {
-    const o = document.createElement('option');
-    o.value = p.name;
-    o.textContent = p.name;
-    sel.appendChild(o);
-  }
-}
-
-const gatherPreset = (name: string): Preset => ({
-  name,
-  base: Number(($('base') as HTMLInputElement).value) || 16,
-  tolerance: Number(($('tol') as HTMLInputElement).value) || 0,
-  maxDepth: readMaxDepth(),
-  semanticMap: textToSemanticMap(($('semMap') as HTMLTextAreaElement).value),
-});
-
-function applyPreset(p: Preset): void {
-  ($('base') as HTMLInputElement).value = String(p.base);
-  ($('tol') as HTMLInputElement).value = String(p.tolerance);
-  ($('depth') as HTMLInputElement).value = String(p.maxDepth);
-  ($('semMap') as HTMLTextAreaElement).value = semanticMapToText(p.semanticMap);
-}
-
-$('btnSavePreset').addEventListener('click', () => {
-  const name = ($('presetName') as HTMLInputElement).value.trim();
-  if (!name) {
-    setStatus('presetStatus', t('preset.needName'), 'warn');
-    return;
-  }
-  send({ type: 'SAVE_PRESET', preset: gatherPreset(name) });
-});
-
-$('btnLoadPreset').addEventListener('click', () => {
-  const name = ($('presetList') as HTMLSelectElement).value;
-  const p = presets.find((x) => x.name === name);
-  if (!p) {
-    setStatus('presetStatus', t('preset.noneSelected'), 'warn');
-    return;
-  }
-  applyPreset(p);
-  setStatus('presetStatus', t('preset.applied', { name }), 'ok');
-});
-
-$('btnDeletePreset').addEventListener('click', () => {
-  const name = ($('presetList') as HTMLSelectElement).value;
-  if (name) send({ type: 'DELETE_PRESET', name });
-});
-
-$('btnExportPreset').addEventListener('click', () => {
-  const name = ($('presetList') as HTMLSelectElement).value;
-  const p = presets.find((x) => x.name === name);
-  if (!p) {
-    setStatus('presetStatus', t('preset.needExport'), 'warn');
-    return;
-  }
-  ($('presetJson') as HTMLTextAreaElement).value = serializePreset(p);
-  setStatus('presetStatus', t('preset.exported', { name }), 'ok');
-});
-
-$('btnImportPreset').addEventListener('click', () => {
-  const parsed = parsePreset(($('presetJson') as HTMLTextAreaElement).value.trim());
-  if (!parsed.ok) {
-    setStatus('presetStatus', t('preset.importFail', { error: parsed.error }), 'warn');
-    return;
-  }
-  send({ type: 'SAVE_PRESET', preset: parsed.preset });
-});
-
 /* ---------- 내보내기 (코드) ---------- */
 $('btnExport').addEventListener('click', () => {
   const format = ($('exportFormat') as HTMLSelectElement).value as ExportFormat;
@@ -1714,13 +1554,9 @@ $('btnExport').addEventListener('click', () => {
   send({ type: 'EXPORT', format, fontSizeUnit, base });
 });
 
-$('btnDownloadExport').addEventListener('click', () => {
-  const content = ($('exportOut') as HTMLTextAreaElement).value;
-  if (!content) {
-    setStatus('exportStatus', t('export.needFirst'), 'warn');
-    return;
-  }
-  const css = lastExportFormat === 'css';
+/** 내보낸 코드를 그대로 파일로 저장 — 패널에 미리보기를 두지 않으므로 결과는 파일뿐이다. */
+function saveExportFile(content: string, format: ExportFormat): void {
+  const css = format === 'css';
   const blob = new Blob([content], { type: css ? 'text/css' : 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1730,7 +1566,7 @@ $('btnDownloadExport').addEventListener('click', () => {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-});
+}
 
 $('btnClearLicense').addEventListener('click', () => {
   ($('licenseKey') as HTMLInputElement).value = '';
@@ -1776,6 +1612,8 @@ window.onmessage = (event: MessageEvent) => {
       if (pendingCreatePreview) {
         // ‘미리보기’가 추출을 유발 → 추출 완료 후 생성 미리보기까지 이어감.
         pendingCreatePreview = false;
+        tidyNumbers(); // #19: 버튼 경로와 같게 격자 8 스냅 후 미리보기
+        renderTokens();
         const base = Number(($('base') as HTMLInputElement).value) || 16;
         createFrom = 'tokens';
         send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, preview: true });
@@ -1952,16 +1790,18 @@ window.onmessage = (event: MessageEvent) => {
       updateGates();
       break;
     }
-    case 'PRESETS':
-      presets = msg.presets;
-      renderPresetList();
-      setStatus('presetStatus', t('preset.count', { count: presets.length }), 'ok');
+    case 'EXPORT_RESULT': {
+      const label = msg.format === 'css' ? 'CSS' : 'W3C JSON';
+      // 변수가 없으면 껍데기만 남는다('{}' / ':root {}'). 빈 파일을 조용히 떨어뜨리면
+      // 저장된 줄 알고 넘어가니, 파일 대신 이유를 말한다.
+      if (!exportHasTokens(msg.content, msg.format)) {
+        setStatus('exportStatus', t('export.empty'), 'warn');
+        break;
+      }
+      saveExportFile(msg.content, msg.format);
+      setStatus('exportStatus', t('export.saved', { format: label, file: msg.format === 'css' ? 'tokens.css' : 'tokens.json' }), 'ok');
       break;
-    case 'EXPORT_RESULT':
-      lastExportFormat = msg.format;
-      ($('exportOut') as HTMLTextAreaElement).value = msg.content;
-      setStatus('exportStatus', t('export.done', { format: msg.format === 'css' ? 'CSS' : 'W3C JSON' }), 'ok');
-      break;
+    }
     case 'COMPONENT_CANDIDATES': {
       // #1: 하위 등록 후보를 트리로. **반복 이름(group) + 속성접힘(propsOnly)만 기본 체크** —
       // 잡음(컨테이너/래퍼 단발성)은 체크 해제 상태로 두고, 사용자가 필요시 추가 체크.
@@ -1999,54 +1839,14 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('componentStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
       break;
     }
-    case 'CONTRAST_RESULT':
-      renderContrast(msg);
+    case 'SETTINGS': {
+      ($('base') as HTMLInputElement).value = String(msg.base);
+      ($('depth') as HTMLInputElement).value = String(msg.maxDepth);
       break;
+    }
     case 'VARIABLES': {
       allVars = msg.vars;
-      // 컬렉션 필터 옵션은 실제로 존재하는 컬렉션에서만 만든다.
-      const sel = $('varFilterCol') as HTMLSelectElement;
-      const prev = sel.value;
-      sel.innerHTML = '<option value="">전체</option>';
-      for (const c of [...new Set(msg.vars.map((v) => v.collection))]) {
-        const o = document.createElement('option');
-        o.value = c;
-        o.textContent = c;
-        sel.appendChild(o);
-      }
-      if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
-      renderVars();
       refreshDarkOptions();
-      setStatus('varEditStatus', msg.vars.length ? `변수 ${msg.vars.length}개` : '편집할 변수가 없어요. 먼저 토큰을 생성하세요.', msg.vars.length ? 'ok' : 'warn');
-      break;
-    }
-    case 'EDIT_VARIABLE_RESULT': {
-      if (!msg.ok) {
-        setStatus('varEditStatus', `수정하지 못했어요 — ${msg.error ?? '알 수 없는 오류'}`, 'warn');
-        renderVars(); // 거부된 입력이 화면에 남지 않게 되돌린다
-        break;
-      }
-      if (msg.deleted) {
-        allVars = allVars.filter((v) => v.id !== msg.id);
-        setStatus('varEditStatus', '변수를 삭제했어요.', 'ok');
-      } else if (msg.var) {
-        const i = allVars.findIndex((v) => v.id === msg.id);
-        if (i >= 0) allVars[i] = msg.var;
-        setStatus('varEditStatus', `'${msg.var.name}' 수정했어요.`, 'ok');
-      }
-      renderVars();
-      refreshDarkOptions();
-      break;
-    }
-    case 'VARIABLE_USAGE': {
-      const v = allVars.find((x) => x.id === msg.id);
-      const parts: string[] = [];
-      parts.push(msg.nodes.length ? `레이어 ${msg.nodes.length}곳` : '쓰는 레이어 없음');
-      if (msg.aliasedBy.length) parts.push(`이 변수를 가리키는 변수 ${msg.aliasedBy.length}개(${msg.aliasedBy.slice(0, 3).map((a) => a.name).join(', ')}${msg.aliasedBy.length > 3 ? '…' : ''})`);
-      // 상한에 걸리면 "없음"이 아니라 "못 다 봤음"이다 — 삭제 판단이 갈리므로 반드시 알린다.
-      if (msg.capped) parts.push('※ 문서가 커서 일부만 확인했어요');
-      const used = msg.nodes.length || msg.aliasedBy.length;
-      setStatus('varEditStatus', `${v ? `'${v.name}' ` : ''}사용처 — ${parts.join(' · ')}`, used || msg.capped ? 'warn' : 'ok');
       break;
     }
     case 'DARK_MODE_RESULT': {
@@ -2121,10 +1921,6 @@ const OP_STATUS: Record<string, string> = {
   REGISTER_COMPONENTS: 'componentStatus',
   CLASSIFY_VARIANTS: 'componentStatus',
   GENERATE_MISSING_VARIANTS: 'componentStatus',
-  CHECK_CONTRAST: 'contrastStatus',
-  GET_PRESETS: 'presetStatus',
-  SAVE_PRESET: 'presetStatus',
-  DELETE_PRESET: 'presetStatus',
   SET_LICENSE: 'licenseStatus',
   LICENSE_VERIFIED: 'licenseStatus',
   CLEAR_LICENSE: 'licenseStatus',
@@ -2572,192 +2368,12 @@ function reasonsText(reasons: Record<string, number>): string {
     .join(' · ');
 }
 
-/* ---------- 명도 대비 점검 결과 렌더 ---------- */
-function contrastSkipText(skipped: Record<string, number>): string {
-  return Object.entries(skipped)
-    .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${t('contrastSkip.' + k)} ${n}`)
-    .join(' · ');
-}
-
-/** #2: 보정 적용 버튼(색 미리보기 + 라벨). 클릭 → 해당 노드 채움 교체 + ‘다시 검사’ 안내. */
-function contrastFixBtn(label: string, hex: string, nodeId: string): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.className = 'fixbtn';
-  btn.title = `${label} 색을 ${hex}로 보정`;
-  const sw = document.createElement('span');
-  sw.className = 'swatch';
-  sw.style.background = hex;
-  btn.appendChild(sw);
-  const text = document.createTextNode(` ${label}`);
-  btn.appendChild(text);
-  btn.addEventListener('click', () => {
-    send({ type: 'APPLY_CONTRAST_FIX', nodeId, hex });
-    btn.disabled = true;
-    // textContent로 통째로 갈아끼우면 스와치 span까지 지워진다 — 어떤 색을 넣었는지 사라지고,
-    // 버튼이 스와치 높이를 잃어 이 행만 낮아진다(행 높이 균일이 스냅의 전제, .cfind 주석).
-    text.textContent = ' ✓ 적용';
-    setStatus('contrastStatus', t('contrast.fixApplied'), 'ok');
-  });
-  return btn;
-}
-
-/** 실패 1행(색쌍 스와치 · 레이어명 · 대비비 · 보정 버튼). */
-function makeContrastRow(f: ContrastFinding): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'cfind';
-
-  const pair = document.createElement('span');
-  pair.className = 'cpair';
-  for (const hex of [f.bg, f.fg]) {
-    const sw = document.createElement('span');
-    sw.className = 'swatch';
-    sw.style.background = hex;
-    pair.appendChild(sw);
-  }
-  row.appendChild(pair);
-
-  const name = document.createElement('span');
-  name.className = 'cname';
-  name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
-  // 이름은 행 높이를 고르게 두려고 한 줄 말줄임이다(.cfind 주석) → 잘린 부분은 title로 읽는다.
-  name.title = name.textContent;
-  row.appendChild(name);
-
-  const ratio = document.createElement('span');
-  ratio.className = 'ratio warn';
-  ratio.textContent = `${f.ratio} / ${f.required}`;
-  row.appendChild(ratio);
-
-  // #2: 보정 제안 — 텍스트색(기본)·배경색(옵션). 클릭 시 해당 노드에 적용.
-  if (f.suggestedFg || f.suggestedBg) {
-    const fix = document.createElement('span');
-    fix.className = 'cfix';
-    if (f.suggestedFg) fix.appendChild(contrastFixBtn('텍스트', f.suggestedFg, f.id));
-    if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn('배경', f.suggestedBg, f.bgId));
-    row.appendChild(fix);
-  }
-  return row;
-}
-
-function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): void {
-  const box = $('contrastList');
-  const fails = msg.findings.filter((f) => !f.pass); // 실패 건만 나열(조치 대상)
-  // 스캔 상한이 2000이라 실패가 수백 건이면 동기 루프가 프레임을 통째로 막는다(§4).
-  // onDone에서 스냅해야 한다 — 청크가 남아 있는 동안 재면 행 수가 모자라 상한에 안 걸린
-  // 것으로 보이고, ‘총 n개 중 m개’ 줄이 안 뜬 채 반쪽 행만 남는다.
-  renderChunked(box, fails, makeContrastRow, () => layoutListBy('contrastList'));
-  const skip = contrastSkipText(msg.skipped);
-  const skipNote = skip ? ` · 건너뜀: ${skip}` : '';
-  if (msg.checked === 0) {
-    setStatus('contrastStatus', t('contrast.none', { detail: skip ? t('contrast.noneSkip', { skip }) : t('contrast.noneSelect') }), 'warn');
-  } else if (fails.length === 0) {
-    setStatus('contrastStatus', t('contrast.allPass', { checked: msg.checked, level: msg.level, skip: skipNote }), 'ok');
-  } else {
-    setStatus('contrastStatus', t('contrast.someFail', { checked: msg.checked, fails: fails.length, level: msg.level, skip: skipNote }), 'warn');
-  }
-}
-
 /* ---------- UX6: 진행률 바 ---------- */
 function showApplyProgress(label: string): void {
   $('applyProgress').style.display = '';
   ($('applyBarFill') as HTMLElement).style.width = '0%';
   $('applyProgressText').textContent = label;
 }
-/** 변수 한 줄 — 이름·값 즉시 편집 + 컬렉션 배지 + 사용처/삭제. */
-function makeVarRow(v: VarInfo): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'vrow';
-  row.dataset.id = v.id;
-
-  // 색이면 스와치를 앞에 — 목록에서 무슨 색인지 눈으로 바로 찾는다.
-  const cell = v.values[v.defaultModeId];
-  if (v.type === 'COLOR' && cell && cell.kind === 'literal' && /^#[0-9a-f]{6}$/i.test(cell.display)) {
-    const sw = document.createElement('span');
-    sw.className = 'vsw';
-    sw.style.background = cell.display;
-    row.appendChild(sw);
-  }
-
-  const nameWrap = document.createElement('span');
-  nameWrap.className = 'vname';
-  const name = document.createElement('input');
-  name.type = 'text';
-  name.value = v.name;
-  name.title = v.name;
-  // change(포커스 아웃/엔터)에서만 보낸다 — 타이핑마다 보내면 편집 한 번이 Undo 수십 개가 된다.
-  name.addEventListener('change', () => {
-    if (name.value.trim() === v.name) return;
-    send({ type: 'EDIT_VARIABLE', id: v.id, patch: { name: name.value } });
-  });
-  nameWrap.appendChild(name);
-  row.appendChild(nameWrap);
-
-  const valWrap = document.createElement('span');
-  valWrap.className = 'vval';
-  if (cell && cell.kind === 'alias') {
-    // 별칭은 같은 타입의 다른 변수로만 바꿀 수 있다 — 자유 입력이면 오타로 깨지기 쉽다.
-    const sel = document.createElement('select');
-    for (const other of allVars.filter((o) => o.type === v.type && o.id !== v.id)) {
-      const o = document.createElement('option');
-      o.value = other.id;
-      o.textContent = other.name;
-      sel.appendChild(o);
-    }
-    sel.value = cell.aliasId ?? '';
-    sel.title = `별칭 → ${cell.display}`;
-    sel.addEventListener('change', () => {
-      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, aliasId: sel.value } } });
-    });
-    valWrap.appendChild(sel);
-  } else {
-    const val = document.createElement('input');
-    val.type = 'text';
-    val.value = cell ? cell.display : '';
-    val.placeholder = v.type === 'COLOR' ? '#RRGGBB' : v.type === 'FLOAT' ? '숫자' : '';
-    val.addEventListener('change', () => {
-      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, literal: val.value } } });
-    });
-    valWrap.appendChild(val);
-  }
-  row.appendChild(valWrap);
-
-  const col = document.createElement('span');
-  col.className = 'vcol tag tag-set';
-  col.textContent = v.collection;
-  col.title = `${v.collection} · ${v.type} · 스코프 ${v.scopes.length}/${scopesForTypeList(v.type).length}`;
-  row.appendChild(col);
-
-  const act = document.createElement('span');
-  act.className = 'vact';
-  const usage = document.createElement('button');
-  usage.className = 'link';
-  usage.textContent = '사용처';
-  usage.addEventListener('click', () => {
-    setStatus('varEditStatus', `${v.name} 사용처를 찾는 중…`, '');
-    send({ type: 'GET_VARIABLE_USAGE', id: v.id });
-  });
-  act.appendChild(usage);
-  const del = document.createElement('button');
-  del.className = 'link';
-  del.textContent = '삭제';
-  del.addEventListener('click', () => {
-    // 되돌리기 어려운 작업이라 한 번 더 묻는다. 사용처를 먼저 보라는 안내도 같이.
-    if (!window.confirm(`'${v.name}' 변수를 삭제할까요?\n이 변수를 쓰던 레이어의 바인딩이 끊깁니다. '사용처'로 먼저 확인하세요.`)) return;
-    send({ type: 'DELETE_VARIABLE', id: v.id });
-  });
-  act.appendChild(del);
-  row.appendChild(act);
-
-  return row;
-}
-
-function renderVars(): void {
-  const vis = visibleVars();
-  $('varCount').textContent = allVars.length ? `· ${vis.length}/${allVars.length}개` : '';
-  renderChunked($('varList'), vis, makeVarRow, () => layoutListBy('varList'));
-}
-
 /** 닮은 프레임 멤버 한 줄 — 마스터 라디오 + 이름 + 완전성 근거(왜 이게 추천인지). */
 function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement {
   const row = document.createElement('label'); // 라디오와 한 덩어리로 — 줄 아무 데나 눌러도 선택된다
@@ -2861,7 +2477,7 @@ function escapeHtml(s: string): string {
 const TITLE_BTN_IDS = new Set([
   // btnColorRoles 제외: 색 정리는 추출 카드에 흡수돼 더 이상 독립 카드 머리가 아님(본문 버튼).
   'btnWizardRun', 'btnPalette', 'btnExtract', 'btnCreate',
-  'btnTextStyles', 'btnApply', 'btnPreview', 'btnContrast', 'btnExport',
+  'btnTextStyles', 'btnApply', 'btnPreview', 'btnExport',
 ]);
 /**
  * sticky 오프셋 동기화 — 탭 바·선택 바의 '실제' 높이를 CSS 변수로 넘긴다.
@@ -2951,6 +2567,8 @@ refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드도 시작 시 빈 �
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_PREREQ' }); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
+send({ type: 'GET_VARIABLES' }); // 다크 카드의 컬렉션·모드 선택지(편집기 '변수 불러오기'가 하던 일)
+send({ type: 'GET_SETTINGS' }); // #19: 기준 크기·맥락 깊이는 파일에 기억된 값으로 시작
 
 // #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
 document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
@@ -2970,8 +2588,8 @@ function showTab(name: (typeof TABS)[number]): void {
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
   // 비활성 탭은 .tab-section이 display:none이라 그 안에서 렌더된 목록은 행 높이가 0으로 측정되고
   // 스냅이 조용히 bail한다(접힌 카드와 같은 함정 — applyCardChrome 참고). 결과가 다른 탭에 있는
-  // 동안 도착하는 경로가 여럿이다: 마법사의 추출이 ‘만들기’ 탭 목록을, 대비 점검이 #contrastList를,
-  // componentize가 #variantReport를 채우고, 미리보기는 느려서 결과 전에 탭을 옮기는 일이 흔한데
+  // 동안 도착하는 경로가 여럿이다: 마법사의 추출이 ‘만들기’ 탭 목록을, componentize가
+  // #variantReport를 채우고, 미리보기는 느려서 결과 전에 탭을 옮기는 일이 흔한데
   // 트리 3종은 첫 화면이 아닌 ‘적용’ 탭에 있다. 탭이 보이는 순간 다시 재지 않으면
   // 돌아왔을 때 반쪽 행에 개수 줄도 없는 상태가 남는다.
   layoutAllLists();
@@ -2991,6 +2609,43 @@ TABS.forEach((t, i) => {
   });
 });
 showTab('wizard'); // #4: 첫 화면은 ‘시작’(시스템화 마법사)
+
+/* ---------- #5: 단계 레일 — 한 화면에 한 단계 ---------- */
+// 만들기 4단계·적용 3단계. 카드는 마크업의 data-make-step / data-apply-step으로 묶여 있고,
+// 레일은 그중 한 묶음만 보여준다. 탭 전환과 같은 함정이 있어(숨은 목록은 행 높이가 0으로
+// 측정된다) 단계를 바꿀 때도 layoutAllLists()로 다시 재야 한다.
+const MAKE_STEPS = ['color', 'token', 'theme', 'type'] as const;
+const APPLY_STEPS = ['bind', 'rename', 'structure'] as const;
+type MakeStep = (typeof MAKE_STEPS)[number];
+type ApplyStep = (typeof APPLY_STEPS)[number];
+
+function showStep(attr: 'make' | 'apply', step: string): void {
+  const key = attr === 'make' ? 'data-make-step' : 'data-apply-step';
+  const rail = $(attr === 'make' ? 'makeRail' : 'applyRail');
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>(`.step[${key}]`))) {
+    // 시맨틱 매핑처럼 원래부터 숨은 카드(자동 흡수)는 단계가 맞아도 계속 숨긴다.
+    if (el.dataset.alwaysHidden !== undefined) continue;
+    el.style.display = el.getAttribute(key) === step ? '' : 'none';
+  }
+  for (const b of Array.from(rail.querySelectorAll<HTMLElement>('.step-chip'))) {
+    const on = b.getAttribute(key) === step;
+    if (on) b.setAttribute('aria-current', 'step');
+    else b.removeAttribute('aria-current');
+  }
+  layoutAllLists();
+}
+
+const showMakeStep = (s: MakeStep): void => showStep('make', s);
+const showApplyStep = (s: ApplyStep): void => showStep('apply', s);
+
+for (const b of Array.from(document.querySelectorAll<HTMLElement>('#makeRail .step-chip'))) {
+  b.addEventListener('click', () => showMakeStep(b.dataset.makeStep as MakeStep));
+}
+for (const b of Array.from(document.querySelectorAll<HTMLElement>('#applyRail .step-chip'))) {
+  b.addEventListener('click', () => showApplyStep(b.dataset.applyStep as ApplyStep));
+}
+showMakeStep('color');
+showApplyStep('bind');
 
 /* ---------- #14: 창 리사이즈(우하단 핸들 드래그) ---------- */
 (() => {

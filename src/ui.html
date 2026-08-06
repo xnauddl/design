@@ -185,6 +185,18 @@
     .tab-section.active { display: block; }
     .tab-section > * { margin-bottom: 10px; }
 
+    /* ── 단계 레일 — 만들기 4단계 · 적용 3단계. 한 화면에 한 단계만 보인다. ── */
+    .steps { display: grid; gap: 3px; margin: 0 0 10px; }
+    .steps-4 { grid-template-columns: repeat(4, 1fr); }
+    .steps-3 { grid-template-columns: repeat(3, 1fr); }
+    .step-chip {
+      display: block; padding: 6px 2px; border: 1px solid var(--border); background: var(--surface);
+      border-radius: var(--r-sm); color: var(--text-2); font-size: 10px; line-height: 1.25; text-align: center;
+    }
+    .step-chip:hover:not([aria-current="step"]) { background: var(--surface-hover); color: var(--text); }
+    .step-chip[aria-current="step"] { border-color: var(--accent-border); background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+    .step-chip .n { display: block; font-size: 11px; font-weight: 600; }
+
     /* ── 선택 동기화 바 (탭 아래 sticky) ── */
     #selBarWrap {
       position: sticky; top: var(--tabs-h, 41px); z-index: 2; margin: 0 0 10px;
@@ -279,15 +291,6 @@
     /* 이름 입력만 늘어난다 — 체크박스까지 flex:1이면 행이 무너진다. */
     .tk input:not([type="checkbox"]) { font: 400 var(--fs) var(--mono); padding: 4px 6px; flex: 1 1 auto; min-width: 0; }
     .tk > .tk-check { flex: 0 0 auto; margin: 0; }
-    /* 허용오차 프리셋 — 숫자 입력 옆 칩. 현재 값과 같은 칩만 강조된다. */
-    .tol-presets { display: inline-flex; gap: 3px; }
-    .tol-chip {
-      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
-      background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: 4px; padding: 1px 7px; cursor: pointer;
-    }
-    .tol-chip:hover { border-color: var(--accent); color: var(--accent); }
-    .tol-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
     /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
     .skip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
     .skip-chip {
@@ -405,50 +408,17 @@
     .vr-row.vr-bullet::before { content: '• '; color: var(--muted); }
     .vr-row.vr-added::before { content: '+ '; color: var(--muted); }
 
-    /* ── 명도 대비 점검 결과 ── */
-    /* 상한이 160px 인라인이라 6행 남짓에서 잘렸고(행이 감싸지면 3행대), 경계도 없어
-       "점검이 몇 건에서 끝났는지" 자체가 안 읽혔다 → 공용 .list-region으로. 상한은
-       기본값(40vh·최대 560px)보다 낮춘다 — 이 목록은 아래 상태 문구가 결론이라
-       목록이 화면을 다 먹으면 그 결론까지 페이지를 또 스크롤해야 한다. */
-    #contrastList { font-family: var(--mono); font-size: var(--fs); --list-cap: clamp(200px, 32vh, 400px); }
-    /* 행 높이가 제각각이면 정수배 스냅이 성립하지 않는다 — layoutList는 rows[0] 하나를
-       표본으로 몇 행이 들어가는지 계산하기 때문. 이 행은 두 가지 이유로 불균일했다:
-       (1) flex-wrap:wrap이라 좁은 패널(최소 360px)에서 이름·보정 버튼이 다음 줄로 감싸지고,
-       (2) 보정 제안이 있는 행만 버튼 높이(≈17px)만큼 커져 없는 행(≈16.5px)과 어긋난다.
-       layoutList에 불균일 폴백을 넣는 대신 CSS에서 균일화한다 — 폴백은 스냅을 포기하는
-       것이고(반쪽 행이 그대로 남는다) 다른 목록까지 영향을 받는다.
-       한 줄 고정(nowrap) + 이름 말줄임 + 최소 높이로 모든 행을 같은 높이로 만든다.
-       28px = 세로 패딩 8 + 내용 20. 가장 높은 자식이 보정 버튼(≈17px)이라 여유 3px —
-       폰트 폴백으로 글자 줄상자가 조금 커져도 이 행만 높아지지 않는다. */
-    .cfind { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; }
-    /* 폭이 모자라면 줄바꿈 대신 이름을 줄인다(전체 이름은 title로). min-width:0이 없으면
-       flex 기본 min-width:auto가 내용 폭을 하한으로 잡아 행이 가로로 넘친다. */
-    .cfind .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .cfind .cpair, .cfind .ratio, .cfind .cfix { flex: 0 0 auto; }
-    .cpair { display: inline-flex; }
-    .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid rgba(0,0,0,.18); }
-    .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
-    .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
-    .cfind .ratio { font-variant-numeric: tabular-nums; white-space: nowrap; }
-    /* 닮은 프레임 멤버 줄 — .cfind와 같은 한 줄 규칙(이름만 늘어나고 나머지는 고정). label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
+    /* 닮은 프레임 멤버 줄 — 한 줄 고정(이름만 늘어나고 나머지는 고정). 행 높이가 제각각이면
+       목록의 정수배 스냅이 성립하지 않는다(layoutList는 rows[0]을 표본으로 잰다) → 감싸는 대신
+       이름을 말줄임한다. label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
     .simrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; cursor: pointer; }
     .simrow .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .simrow input[type="radio"], .simrow .tag, .simrow .simmeta { flex: 0 0 auto; }
     .simrow .simmeta { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
     /* 변수 편집기 한 줄 — 이름(늘어남) + 값 + 컬렉션 배지 + 액션. .simrow와 같은 한 줄 규칙. */
-    .vrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 3px 0; min-height: 30px; }
-    .vrow .vname { flex: 1 1 90px; min-width: 0; }
-    .vrow .vval { flex: 0 1 110px; min-width: 0; }
-    .vrow .vname input, .vrow .vval input, .vrow .vval select { width: 100%; min-width: 0; }
-    .vrow .vcol, .vrow .vact { flex: 0 0 auto; }
-    .vrow .vsw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
-    .vrow .vact button { padding: 0 6px; }
     /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
-    .cfix { display: inline-flex; gap: 4px; }
-    .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
-    .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
 
     /* ── 리사이즈 핸들(우하단) ── */
     #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
@@ -472,10 +442,9 @@
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
-      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
+      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈</b>. 기준 크기·맥락 깊이는 ‘관리’ 탭 설정을 따릅니다.</div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span></label>
-        <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> <span data-i18n="wizardCard.optContrast">접근성 검수</span></label>
         <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span></label>
         <span class="muted" id="wizComponentLock"></span>
       </div>
@@ -503,12 +472,20 @@
       <h2 data-i18n="pipeline.title">진행 안내</h2>
       <div class="hint" data-i18n="pipeline.hint">권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.</div>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 대비 점검 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
     </div>
   </section>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
-    <div class="step">
+    <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
+    <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
+      <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
+      <button class="step-chip" data-make-step="token"><span class="n" data-i18n="rail.token">토큰</span><span data-i18n="rail.tokenSub">간격·크기</span></button>
+      <button class="step-chip" data-make-step="theme"><span class="n" data-i18n="rail.theme">테마</span><span data-i18n="rail.themeSub">다크</span></button>
+      <button class="step-chip" data-make-step="type"><span class="n" data-i18n="rail.type">타이포</span><span data-i18n="rail.typeSub">텍스트 스타일</span></button>
+    </div>
+
+    <div class="step" data-make-step="color">
       <h2><span data-i18n="palette.title">브랜드 팔레트 생성</span> <span class="muted" id="paletteLock"></span></h2>
       <div class="row">
         <label class="inline"><span data-i18n="palette.brand">브랜드색</span> <input id="brand" type="color" value="#3366ff" /></label>
@@ -539,7 +516,7 @@
     </div>
 
     <!-- 추출 + 색 정리 통합 — 추출 후 같은 카드에서 바로 병합·역할 지정. -->
-    <div class="step">
+    <div class="step" data-make-step="color">
       <h2><span data-i18n="extract.title">추출 · 색 정리</span> <span class="muted" id="colorCount"></span></h2>
       <div class="row">
         <button id="btnExtract" class="primary" data-i18n="extract.scanBtn">선택에서 토큰 추출</button>
@@ -572,7 +549,7 @@
       </div>
     </div>
 
-    <div class="step" id="createCard">
+    <div class="step" id="createCard" data-make-step="token">
       <h2><span data-i18n="create.title">토큰 생성 (Global + Semantic)</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
       <div class="hint" data-i18n-html="create.scopeHint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.</div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
@@ -585,15 +562,8 @@
         <span class="list-count" id="tokenListCount"></span>
         <button class="link" id="btnTokenListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
-      <div class="row">
-        <label class="inline"><span data-i18n="create.base">base(px)</span> <input id="base" type="number" value="16" min="1" /></label>
-        <label class="inline"><span data-i18n="create.tidyBase">사다리</span> <input id="tidyBase" type="number" value="8" min="0" step="1" style="width:46px;" title="여백·크기를 이 값 기준 사다리에 맞춥니다. 8이면 …4·2·1 / 8·16·24·32. 기준 미만은 반분할이라 4·2가 보존됩니다. 0이면 정리하지 않습니다." />px</label>
-        <label class="inline"><span data-i18n="create.tidyRatio">허용</span> <input id="tidyRatio" type="number" value="15" min="0" max="50" step="5" style="width:46px;" title="값 대비 몇 %까지 옮길지. 비율이라 작은 값일수록 자동으로 보수적입니다(4는 거의 안 움직이고 40은 여유 있게)." />%</label>
-        <button id="btnTidyNumbers" data-i18n="create.tidyBtn">정리</button>
-      </div>
       <div class="tidy tidy-note" id="numTidySummary" style="display:none">
         <span id="numTidyText"></span>
-        <button id="btnNumTidyUndo" class="link" data-i18n="create.tidyUndo">되돌리기</button>
       </div>
       <div class="hint" data-i18n="create.hint">미리보기로 변경 요약을 확인한 뒤 적용하세요.</div>
       <div class="row">
@@ -605,7 +575,7 @@
 
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
          DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
-    <div class="step" style="display:none">
+    <div class="step" data-make-step="token" data-always-hidden style="display:none">
       <h2><span data-i18n="semantic.title">시맨틱 매핑 (역할 → 토큰)</span> <span class="muted" id="semLock"></span></h2>
       <div class="hint" data-i18n-html="semantic.formatLabel">형식: <code>역할 = Global변수이름</code></div>
       <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
@@ -617,7 +587,7 @@
       <div class="status" id="semStatus"></div>
     </div>
 
-    <div class="step" id="darkCard">
+    <div class="step" id="darkCard" data-make-step="theme">
       <h2><span data-i18n="dark.title">다크 테마 생성</span> <span class="muted" id="darkLock"></span></h2>
       <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
       <div class="row">
@@ -638,7 +608,7 @@
       <div class="status" id="darkStatus"></div>
     </div>
 
-    <div class="step">
+    <div class="step" data-make-step="type">
       <h2><span data-i18n="textStyle.title">텍스트 스타일 (화면 → 스타일)</span> <span class="muted" id="tsLock"></span></h2>
       <div class="hint" data-i18n-html="textStyle.hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 행간·자간이 %였으면 표에 %로 보이고 그대로 등록됩니다(그 항목만 변수 연결 생략). 스타일 없는 텍스트·변수 바인딩 텍스트도 %를 복구합니다. 새 스타일은 ‘행 추가’로. (Paid)</div>
       <div class="row" style="margin-top:6px;">
@@ -688,19 +658,16 @@
   </section>
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
-    <div class="step">
+    <!-- 적용 단계 레일 — 바인딩 → 리네임 → 구조(컴포넌트·닮은 프레임). -->
+    <div class="steps steps-3" id="applyRail" role="tablist" aria-label="적용 단계">
+      <button class="step-chip" data-apply-step="bind"><span class="n" data-i18n="rail.bind">바인딩</span><span data-i18n="rail.bindSub">변수 연결</span></button>
+      <button class="step-chip" data-apply-step="rename"><span class="n" data-i18n="rail.rename">리네임</span><span data-i18n="rail.renameSub">역할 이름</span></button>
+      <button class="step-chip" data-apply-step="structure"><span class="n" data-i18n="rail.structure">구조</span><span data-i18n="rail.structureSub">컴포넌트</span></button>
+    </div>
+
+    <div class="step" data-apply-step="bind">
       <h2><span data-i18n="bind.title">적용 (바인딩)</span> <span class="muted" id="bindCount"></span></h2>
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
-      <div class="row">
-        <label class="inline"><span data-i18n="bind.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
-        <span class="tol-presets">
-          <button class="tol-chip" data-tol="0" data-i18n="bind.tolExact" title="값이 정확히 같을 때만 바인딩">정확</button>
-          <button class="tol-chip" data-tol="0.5" title="반올림 오차만 흡수 — 기본값">0.5</button>
-          <button class="tol-chip" data-tol="1" title="1px 이내 근사값까지 바인딩">1</button>
-          <button class="tol-chip" data-tol="2" title="2px 이내 — 손으로 그린 값이 많은 화면용(과매칭 주의)">2</button>
-        </span>
-      </div>
-      <div class="hint" id="tolHint"></div>
       <div class="row">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택에 바인딩</button>
@@ -727,10 +694,9 @@
       <div class="status" id="applyStatus"></div>
     </div>
 
-    <div class="step">
+    <div class="step" data-apply-step="rename">
       <h2><span data-i18n="rename.title">리네임</span> <span class="muted" id="renameCount"></span></h2>
       <div class="row">
-        <label class="inline"><span data-i18n="rename.depth">맥락 최대단계</span> <input id="depth" type="number" value="8" min="1" /></label>
         <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
         <button id="btnRename" disabled data-i18n="rename.apply">이름 적용</button>
       </div>
@@ -750,28 +716,7 @@
       <div class="status" id="renameStatus"></div>
     </div>
 
-    <div class="step" id="contrastCard">
-      <h2 data-i18n="contrast.title">명도 대비 점검 (WCAG)</h2>
-      <div class="hint" data-i18n="contrast.hint">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
-      <div class="row">
-        <label class="inline"><span data-i18n="contrast.level">기준</span>
-          <select id="contrastLevel">
-            <option value="AA">AA (4.5 · 큰글자 3)</option>
-            <option value="AAA">AAA (7 · 큰글자 4.5)</option>
-          </select>
-        </label>
-        <button id="btnContrast" class="primary" data-i18n="contrast.checkBtn">대비 검사</button>
-      </div>
-      <div id="contrastList" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="contrastListMore" style="display:none">
-        <span class="list-count" id="contrastListCount"></span>
-        <button class="link" id="btnContrastListExpand" data-i18n="list.expandAll">모두 펼치기</button>
-      </div>
-      <div class="status" id="contrastStatus"></div>
-    </div>
-
-    <div class="step" id="componentCard">
+    <div class="step" id="componentCard" data-apply-step="structure">
       <!-- 이 카드엔 목록이 둘이다(후보 트리 · 결과 리포트). 세는 대상이 달라 각자 span을 갖고,
            비어 있으면 각자 숨는다 — 스캔 직후엔 후보만, 등록 직후엔 리포트만 뜬다. -->
       <h2><span data-i18n="component.title">컴포넌트 / 베리언트</span> <span class="muted" id="compCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span></h2>
@@ -800,7 +745,7 @@
       <div class="status" id="componentStatus"></div>
     </div>
 
-    <div class="step" id="similarCard">
+    <div class="step" id="similarCard" data-apply-step="structure">
       <h2><span data-i18n="similar.title">닮은 프레임 컴포넌트화</span> <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
       <div class="hint" data-i18n-html="similar.hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
       <div class="row">
@@ -818,6 +763,19 @@
   </section>
 
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
+    <!-- #19: 기준 크기·맥락 깊이·허용오차는 여기서만. 만들기/적용 단계에는 노출하지 않는다. -->
+    <div class="step" id="pluginSettingsCard">
+      <h2 data-i18n="settings.title">플러그인 설정</h2>
+      <div class="hint" data-i18n="settings.hint">만들기·적용 탭에서는 안 보입니다. 바꾸면 이 파일에 기억됩니다.</div>
+      <div class="row">
+        <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
+        <label class="inline"><span data-i18n="settings.depth">리네임 맥락 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
+      </div>
+      <div class="row">
+        <span class="muted" data-i18n="settings.tol">허용오차 0.5px 고정 · 여백·크기 격자 8px 고정</span>
+      </div>
+    </div>
+
     <div class="step">
       <h2 data-i18n="export.title">내보내기 (코드)</h2>
       <div class="hint" data-i18n="export.hint">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
@@ -837,29 +795,8 @@
       </div>
       <div class="row">
         <button id="btnExport" class="primary" data-i18n="export.runBtn">내보내기</button>
-        <button id="btnDownloadExport" data-i18n="export.downloadBtn">다운로드</button>
       </div>
-      <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%;"></textarea>
       <div class="status" id="exportStatus"></div>
-    </div>
-
-    <div class="step" id="varEditCard">
-      <h2><span data-i18n="varedit.title">변수 편집기</span> <span class="muted" id="varCount"></span></h2>
-      <div class="hint" data-i18n-html="varedit.hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.</div>
-      <div class="row">
-        <button id="btnLoadVars" data-i18n="varedit.loadBtn">변수 불러오기</button>
-        <label class="inline"><span data-i18n="varedit.collection">컬렉션</span>
-          <select id="varFilterCol"><option value="">전체</option></select>
-        </label>
-        <input id="varFilterText" type="text" placeholder="이름으로 거르기" />
-      </div>
-      <div id="varList" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="varListMore" style="display:none">
-        <span class="list-count" id="varListCount"></span>
-        <button class="link" id="btnVarListExpand" data-i18n="list.expandAll">모두 펼치기</button>
-      </div>
-      <div class="status" id="varEditStatus"></div>
     </div>
 
     <div class="step">
@@ -889,26 +826,6 @@
         <span class="muted" data-i18n="license.devTierNote">(검증된 키가 없을 때만 적용)</span>
       </div>
       <div class="status" id="licenseStatus"></div>
-    </div>
-
-    <div class="step" id="presetCard">
-      <h2><span data-i18n="preset.title">공유 프리셋</span> <span class="muted" id="presetLock"></span></h2>
-      <div class="hint" data-i18n="preset.hint">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Paid 전용)</div>
-      <div class="row">
-        <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px;" />
-        <button id="btnSavePreset" data-i18n="preset.saveBtn">현재 설정 저장</button>
-      </div>
-      <div class="row">
-        <select id="presetList" style="flex:1; min-width:120px;"></select>
-        <button id="btnLoadPreset" data-i18n="preset.loadBtn">불러오기</button>
-        <button id="btnDeletePreset" data-i18n="preset.deleteBtn">삭제</button>
-      </div>
-      <div class="row">
-        <button id="btnExportPreset" data-i18n="preset.exportBtn">내보내기(JSON)</button>
-        <button id="btnImportPreset" data-i18n="preset.importBtn">가져오기(JSON)</button>
-      </div>
-      <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%;"></textarea>
-      <div class="status" id="presetStatus"></div>
     </div>
 
     <!-- 접근성 / 국제화 -->

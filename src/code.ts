@@ -1,26 +1,23 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode, RenameChange, VarInfo, VarMode, VarValueCell, VarPatch, CodeToUi } from './shared/messages';
+import type { UiToCode, RenameChange, VarInfo, VarMode } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
-import { rgbToHex, hexToRgb, type ResolvedType, type ScopeName } from './lib/tokens';
-import { pascalCase } from './lib/naming';
+import { rgbToHex } from './lib/tokens';
+import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
-import { checkContrast, type ContrastSample } from './lib/contrast';
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
-import { parseVarValue, sanitizeScopes, aliasSelfReference, findAliasReferers } from './lib/variableEdit';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
-import { Preset, upsertPreset } from './lib/presets';
 import { commitUndo } from './lib/undo';
 
 // #14: 기본 창을 키우고(트리·편집표 수용) 사용자 리사이즈를 허용. 마지막 크기는 clientStorage에 기억.
@@ -52,11 +49,12 @@ const selection = () => figma.currentPage.selection;
    결과(LICENSE_VERIFIED)만 받아 캐시·적용한다. 여기서는 fetch/crypto를 직접 하지 않는다. */
 const DEV_TIER_KEY = 'dsl.devTier';
 const CACHE_KEY = 'dsl.licenseCache';
-const PRESETS_KEY = 'dsl.presets';
+// #19: 기준 크기·리네임 맥락 깊이는 관리 탭에서만 바꾸고 이 파일에 기억한다(입력을 단계에 두지 않으므로).
+const SETTINGS_KEY = 'dsl.settings';
+const SETTINGS_DEFAULT = { base: 16, maxDepth: 8 };
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
-let presets: Preset[] = []; // 공유 프리셋(Paid)
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
 
 function effective(): {
@@ -118,8 +116,6 @@ async function loadLicense(): Promise<void> {
         }
       }
     }
-    const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
-    if (Array.isArray(ps)) presets = ps as Preset[];
   } catch {
     /* 저장소 접근 실패 시 free 유지 */
   }
@@ -143,11 +139,6 @@ async function postPrereq(): Promise<void> {
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
-}
-
-/** Paid 게이트(공유 프리셋): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requirePresets(): boolean {
-  return requirePaid('presets', '공유 프리셋은 Paid 기능입니다.');
 }
 
 /** 베리언트 세트를 속성 기반 2D 그리드로 정렬하고 자식에 맞게 리사이즈. */
@@ -194,168 +185,28 @@ function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-/* ---------- 변수 편집기 / 다크 테마 생성 ---------- */
+/* ---------- 변수 목록(다크 테마 생성의 컬렉션·모드 선택용) ---------- */
 
-// 우리가 만든 3계층만 편집 대상 — 남의 라이브러리 컬렉션을 건드리지 않는다.
+// 우리가 만든 3계층만 목록 대상 — 남의 라이브러리 컬렉션은 다루지 않는다.
 const EDITABLE_COLLECTIONS = new Set([GLOBAL, SEMANTIC, COMPONENT]);
-// 사용처 조회는 문서 전체를 훑는다 — 큰 파일에서 UI가 굳지 않게 상한을 둔다(도달 시 capped 표시).
-const USAGE_SCAN_CAP = 5000;
 
-function isVariableAlias(raw: unknown): raw is VariableAlias {
-  return !!raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS';
-}
-
-function toValueCell(type: ResolvedType, raw: VariableValue | undefined, nameById: Map<string, string>): VarValueCell {
-  if (isVariableAlias(raw)) {
-    const aliasId = raw.id;
-    const aliasName = nameById.get(aliasId);
-    return { kind: 'alias', display: aliasName ?? '(알 수 없음)', aliasId, aliasName };
-  }
-  if (type === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) {
-    return { kind: 'literal', display: rgbToHex(raw as RGB) };
-  }
-  if (raw === undefined) return { kind: 'literal', display: '' };
-  return { kind: 'literal', display: String(raw) };
-}
-
-function toVarInfo(v: Variable, col: VariableCollection, nameById: Map<string, string>): VarInfo {
+function toVarInfo(v: Variable, col: VariableCollection): VarInfo {
   const modes: VarMode[] = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
-  const values: Record<string, VarValueCell> = {};
-  for (const m of col.modes) values[m.modeId] = toValueCell(v.resolvedType, v.valuesByMode[m.modeId], nameById);
-  return {
-    id: v.id,
-    name: v.name,
-    collectionId: col.id,
-    collection: col.name,
-    type: v.resolvedType,
-    description: v.description ?? '',
-    scopes: v.scopes as ScopeName[],
-    hidden: v.hiddenFromPublishing,
-    modes,
-    defaultModeId: col.defaultModeId,
-    values,
-  };
+  return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, modes };
 }
 
 async function collectVars(): Promise<VarInfo[]> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const colById = new Map(cols.map((c) => [c.id, c]));
   const vars = await figma.variables.getLocalVariablesAsync();
-  const nameById = new Map(vars.map((v) => [v.id, v.name]));
   const out: VarInfo[] = [];
   for (const v of vars) {
     const col = colById.get(v.variableCollectionId);
     if (!col || !EDITABLE_COLLECTIONS.has(col.name)) continue;
-    out.push(toVarInfo(v, col, nameById));
+    out.push(toVarInfo(v, col));
   }
   out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
   return out;
-}
-
-/** 별칭이 순환을 만드는지 — 대상에서 출발해 별칭 사슬을 따라가 source에 닿으면 순환. */
-async function aliasWouldCycle(sourceId: string, target: Variable): Promise<boolean> {
-  const seen = new Set<string>();
-  let frontier: Variable[] = [target];
-  while (frontier.length) {
-    const next: Variable[] = [];
-    for (const cur of frontier) {
-      if (cur.id === sourceId) return true;
-      if (seen.has(cur.id)) continue;
-      seen.add(cur.id);
-      for (const modeId of Object.keys(cur.valuesByMode)) {
-        const raw = cur.valuesByMode[modeId];
-        if (isVariableAlias(raw)) {
-          const nv = await figma.variables.getVariableByIdAsync(raw.id);
-          if (nv) next.push(nv);
-        }
-      }
-    }
-    frontier = next;
-  }
-  return false;
-}
-
-async function applyVarValue(v: Variable, col: VariableCollection, value: NonNullable<VarPatch['value']>): Promise<string | null> {
-  const modeId = value.modeId || col.defaultModeId;
-  if (!col.modes.some((m) => m.modeId === modeId)) return '대상 모드를 찾을 수 없습니다.';
-  if (value.aliasId !== undefined) {
-    if (aliasSelfReference(v.id, value.aliasId)) return '변수를 자기 자신에 별칭할 수 없습니다.';
-    const target = await figma.variables.getVariableByIdAsync(value.aliasId);
-    if (!target) return '별칭 대상을 찾을 수 없습니다.';
-    if (target.resolvedType !== v.resolvedType) return '별칭 대상의 타입이 다릅니다.';
-    if (await aliasWouldCycle(v.id, target)) return '별칭이 순환 참조를 만듭니다.';
-    v.setValueForMode(modeId, figma.variables.createVariableAlias(target));
-    return null;
-  }
-  if (value.literal !== undefined) {
-    const p = parseVarValue(v.resolvedType, value.literal);
-    if (!p.ok) return p.error;
-    v.setValueForMode(modeId, p.value as VariableValue);
-    return null;
-  }
-  return null;
-}
-
-async function editVariable(id: string, patch: VarPatch): Promise<Extract<CodeToUi, { type: 'EDIT_VARIABLE_RESULT' }>> {
-  const v = await figma.variables.getVariableByIdAsync(id);
-  if (!v) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '변수를 찾을 수 없습니다.' };
-  const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
-  if (!col || !EDITABLE_COLLECTIONS.has(col.name)) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '편집 대상이 아닌 컬렉션입니다.' };
-  try {
-    if (patch.name !== undefined) {
-      const nm = patch.name.trim();
-      if (!nm) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: '이름을 입력하세요.' };
-      v.name = nm;
-    }
-    if (patch.description !== undefined) v.description = patch.description;
-    if (patch.hidden !== undefined) v.hiddenFromPublishing = patch.hidden;
-    if (patch.scopes) v.scopes = sanitizeScopes(patch.scopes, v.resolvedType);
-    if (patch.value) {
-      const err = await applyVarValue(v, col, patch.value);
-      if (err) return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: err };
-    }
-  } catch (e) {
-    return { type: 'EDIT_VARIABLE_RESULT', id, ok: false, error: errText(e) };
-  }
-  const all = await figma.variables.getLocalVariablesAsync();
-  const nameById = new Map(all.map((x) => [x.id, x.name]));
-  return { type: 'EDIT_VARIABLE_RESULT', id, ok: true, var: toVarInfo(v, col, nameById) };
-}
-
-function nodeBindsVar(node: SceneNode, varId: string): boolean {
-  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
-  if (!bv) return false;
-  const hits = (a: unknown): boolean => !!a && typeof a === 'object' && (a as VariableAlias).id === varId;
-  for (const key of Object.keys(bv)) {
-    const entry = bv[key];
-    if (Array.isArray(entry)) {
-      if (entry.some(hits)) return true;
-    } else if (entry && typeof entry === 'object') {
-      if (hits(entry)) return true; // {type,id} 형태
-      for (const v of Object.values(entry as Record<string, unknown>)) if (hits(v)) return true;
-    }
-  }
-  return false;
-}
-
-async function collectBoundNodes(varId: string): Promise<{ nodes: { id: string; name: string }[]; capped: boolean }> {
-  await figma.loadAllPagesAsync();
-  const nodes: { id: string; name: string }[] = [];
-  const stack: SceneNode[] = [];
-  for (const page of figma.root.children) stack.push(...(page.children as readonly SceneNode[]));
-  let scanned = 0;
-  let capped = false;
-  while (stack.length) {
-    if (scanned >= USAGE_SCAN_CAP) {
-      capped = true;
-      break;
-    }
-    const n = stack.pop() as SceneNode;
-    scanned++;
-    if (nodeBindsVar(n, varId)) nodes.push({ id: n.id, name: n.name });
-    if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
-  }
-  return { nodes, capped };
 }
 
 /** 노드가 속한 페이지(없으면 null) — 부모를 PAGE까지 거슬러 올라간다. */
@@ -426,14 +277,6 @@ async function applySelectedBinding(item: { nodeId: string; field: string; index
 /** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireTextStyles(): boolean {
   return requirePaid('textStyles', '텍스트 스타일 등록은 Paid 기능입니다.');
-}
-
-async function savePresets(): Promise<void> {
-  try {
-    await figma.clientStorage.setAsync(PRESETS_KEY, presets);
-  } catch {
-    /* 무시 */
-  }
 }
 
 /** 변수 → 내보내기 kind 분류(scope 우선, 이름 폴백 — STRING line-height 등 scope 비어있음 대비). */
@@ -524,12 +367,6 @@ function postSelection(): void {
 }
 figma.on('selectionchange', postSelection);
 
-/* ---------- 명도 대비 점검(읽기 전용) ----------
-   선택 하위의 텍스트 노드마다 글자색(첫 단색 채움)과 유효 배경(가장 가까운 상위
-   단색 채움)을 뽑아 ContrastSample로 만든다. 판정은 순수 모듈(contrast.ts)에 위임.
-   한계: 부분 투명·겹친 형제·범위별 혼합색은 다루지 않고 사유별로 건너뛴다. */
-const CONTRAST_SCAN_CAP = 2000;
-
 /** 노드의 첫 '보이는 단색' 채움 hex. 없거나 혼합(mixed)이면 null. */
 function solidFillHex(node: SceneNode): string | null {
   const fills = (node as { fills?: readonly Paint[] | typeof figma.mixed }).fills;
@@ -540,7 +377,21 @@ function solidFillHex(node: SceneNode): string | null {
   return null;
 }
 
-/** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑을 읽어 순수 그룹화에 넘김. */
+/**
+ * 리네임이 남긴 역할(`dsRole`)을 읽는다 — 등록이 머리명사로 쓴다. 없으면 undefined
+ * (사람이 지은 이름이거나 리네임 전). API가 없는 노드도 안전하게 통과.
+ */
+function readRole(node: SceneNode): string | undefined {
+  const fn = (node as { getPluginData?: (key: string) => string }).getPluginData;
+  if (typeof fn !== 'function') return undefined;
+  try {
+    return fn.call(node, ROLE_KEY) || undefined;
+  } catch {
+    return undefined; // 읽기 실패 → 이름 기반 폴백
+  }
+}
+
+/** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑·역할을 읽어 순수 그룹화에 넘김. */
 function toStructNode(node: SceneNode): StructNode {
   const a = node as unknown as Record<string, unknown>;
   const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined);
@@ -576,6 +427,7 @@ function toStructNode(node: SceneNode): StructNode {
     fillHex: solidFillHex(node),
     characters,
     mainComponentKey,
+    role: readRole(node),
     // INSTANCE 안은 자식 컴포넌트 소관 — 접힘 비교·속성 노출과 동일하게 펼치지 않음.
     children: node.type === 'INSTANCE' ? [] : kids.map(toStructNode),
   };
@@ -634,7 +486,11 @@ function isEffectivelyVisible(node: SceneNode): boolean {
 
 /** 등록/스캔 공통: 실효 보임 + componentEligible. */
 function sceneComponentEligible(n: SceneNode): boolean {
-  return isEffectivelyVisible(n) && componentEligible(n as ScanNode);
+  if (!isEffectivelyVisible(n)) return false;
+  // FRAME/GROUP은 구조만으로 판정하므로 노드를 그대로 넘긴다.
+  if (n.type === 'FRAME' || n.type === 'GROUP') return componentEligible(n as ScanNode);
+  // 말단은 리네임이 남긴 dsRole로만 열린다 — SceneNode엔 그 필드가 없어 읽어 채운다.
+  return componentEligible({ id: n.id, name: n.name, type: n.type, locked: n.locked, visible: n.visible, role: readRole(n) });
 }
 
 /** 계획의 layerPath(우선) 또는 layerName으로 대상 레이어 찾기. */
@@ -786,50 +642,6 @@ function orderInnerFirst(groups: readonly StructGroup[], byId: Map<string, Scene
     out.push(remaining.splice(idx, 1)[0]);
   }
   return out;
-}
-
-/** 텍스트 위로 올라가며 가장 가까운 상위의 단색 배경(hex + 노드 id). 없으면 null. */
-function effectiveBg(node: SceneNode): { hex: string; id: string } | null {
-  let cur: BaseNode | null = node.parent;
-  while (cur && cur.type !== 'PAGE' && cur.type !== 'DOCUMENT') {
-    const hex = solidFillHex(cur as SceneNode);
-    if (hex) return { hex, id: cur.id };
-    cur = cur.parent;
-  }
-  return null;
-}
-
-function collectContrastSamples(sel: readonly SceneNode[]): { samples: ContrastSample[]; skipped: Record<string, number> } {
-  const samples: ContrastSample[] = [];
-  const skipped: Record<string, number> = {};
-  const note = (k: string): void => {
-    skipped[k] = (skipped[k] ?? 0) + 1;
-  };
-  const stack: SceneNode[] = sel.slice();
-  let scanned = 0;
-  while (stack.length) {
-    if (scanned >= CONTRAST_SCAN_CAP) {
-      note('capped');
-      break;
-    }
-    const n = stack.pop() as SceneNode;
-    scanned++;
-    if (n.type === 'TEXT' && n.visible) {
-      const fg = solidFillHex(n);
-      if (!fg) note('no-fill'); // 단색 글자색 없음(혼합/이미지/그라데이션 등)
-      else {
-        const bg = effectiveBg(n);
-        if (!bg) note('no-bg'); // 상위에 단색 배경이 없음
-        else {
-          const fontSize = typeof n.fontSize === 'number' ? n.fontSize : 16; // 혼합이면 보수적 기본값
-          const bold = typeof n.fontWeight === 'number' ? n.fontWeight >= 700 : false;
-          samples.push({ id: n.id, name: n.name, fg, bg: bg.hex, bgId: bg.id, fontSize, bold });
-        }
-      }
-    }
-    if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
-  }
-  return { samples, skipped };
 }
 
 figma.ui.onmessage = async (msg: UiToCode) => {
@@ -1104,25 +916,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         figma.openExternal(msg.target === 'purchase' ? PURCHASE_URL : PORTAL_URL);
         break;
       }
-      case 'GET_PRESETS': {
-        if (!requirePresets()) break;
-        post({ type: 'PRESETS', presets });
-        break;
-      }
-      case 'SAVE_PRESET': {
-        if (!requirePresets()) break;
-        presets = upsertPreset(presets, msg.preset);
-        await savePresets();
-        post({ type: 'PRESETS', presets });
-        break;
-      }
-      case 'DELETE_PRESET': {
-        if (!requirePresets()) break;
-        presets = presets.filter((p) => p.name !== msg.name);
-        await savePresets();
-        post({ type: 'PRESETS', presets });
-        break;
-      }
       case 'EXPORT': {
         // 모든 디자인 시스템 변수(Global+Semantic)를 코드로 내보내기. (현재 Free; 추후 게이팅 가능)
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
@@ -1165,7 +958,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!requireComponents()) break;
         // 숨긴 조상 아래 노드는 선택 루트여도 제외(실효 비가시).
         const roots = selection().filter(isEffectivelyVisible);
-        const candidates = scanComponentCandidates(roots);
+        // StructNode로 매핑해 넘긴다 — 말단 등록 자격이 `dsRole`에 달려 있다.
+        // toStructNode가 인스턴스 내부를 펼치지 않으므로 스캔 범위는 그대로다.
+        const candidates = scanComponentCandidates(roots.map(toStructNode));
         // 라이브 노드 인덱스 — 스캔과 동일하게 인스턴스·메인·세트 안은 펼치지 않는다.
         // (전체 재귀는 대용량 파일에서 UI가 ‘스캔 중’에 멈춘 것처럼 보이게 함.)
         const liveById = new Map<string, SceneNode>();
@@ -1234,7 +1029,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         await figma.loadAllPagesAsync(); // dynamic-page: 컴포넌트 페이지 이동 전 로드
         let registered = 0;
         let skipped = 0;
-        // 후보 필터: 실효 보임 + FRAME/GROUP·미잠금 + 고신뢰 시맨틱 역할.
+        // 후보 필터: 스캔(`componentEligible`)과 같은 규칙 — 실효 보임 + FRAME/GROUP은 고신뢰
+        // 시맨틱 역할, 말단은 리네임이 재사용 원자로 판정한 것(아바타·아이콘·썸네일…).
         const eligible = (n: SceneNode): boolean => sceneComponentEligible(n);
         // 대상 결정: 트리에서 체크한 nodeIds, 없으면(스캔 없이 등록) 선택 서브트리를 **재귀**로 모아
         // **반복 이름(2회+)만** 묶는다(단독 잡음 제외).
@@ -1329,8 +1125,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try { restore([{ inst: comp.createInstance(), o }]); } catch (e) { failures.push(`인스턴스 실패(${comp.name}): ${errText(e)}`); }
         };
 
-        for (const g of groups) {
-          const setName = commonBaseName(g.members.map((m) => m.name)); // 정확한 이름 → PascalCase
+        // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
+        const groupNames = resolveGroupNames(groups.map((g) => g.members));
+        for (let gi = 0; gi < groups.length; gi++) {
+          const g = groups[gi];
+          const setName = groupNames[gi];
           // 단독(1개) — 컴포넌트화 + 원위치 인스턴스.
           if (g.members.length === 1) {
             const node = byId.get(g.members[0].id);
@@ -1339,7 +1138,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             try {
               const comp = figma.createComponentFromNode(node);
               registered++;
-              placeSingle(comp, o, pascalCase(g.members[0].name));
+              placeSingle(comp, o, setName); // 단독·세트 동일 규칙
             } catch (e) {
               skipped++;
               failures.push(`단독 등록 실패(${g.members[0].name}): ${errText(e)}`);
@@ -1496,7 +1295,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const missing: string[] = [];
         const singles: string[] = [];
         const failures: string[] = [];
-        for (const g of groups) {
+        const groupNames = resolveGroupNames(groups.map((g) => g.members)); // 등록과 동일 규칙
+        for (let gi = 0; gi < groups.length; gi++) {
+          const g = groups[gi];
           const nodes = g.members.map((m) => byId.get(m.id)).filter((n): n is ComponentNode => !!n);
           if (nodes.length < 2) {
             if (nodes[0]) singles.push(nodes[0].name);
@@ -1506,7 +1307,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try {
             const parent = nodes[0].parent ?? figma.currentPage;
             const set = figma.combineAsVariants(nodes, parent);
-            set.name = commonBaseName(g.members.map((m) => m.name));
+            set.name = groupNames[gi];
             for (const m of g.members) {
               const node = byId.get(m.id);
               const v = variantById.get(m.id);
@@ -1518,7 +1319,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             if (miss.length) missing.push(`${set.name}: ${miss.join(' / ')}`);
             sets++;
           } catch (e) {
-            failures.push(`결합 실패(${commonBaseName(g.members.map((m) => m.name))}): ${errText(e)}`);
+            failures.push(`결합 실패(${groupNames[gi]}): ${errText(e)}`);
           }
         }
         post({ type: 'VARIANTS_RESULT', sets, missing, singles, failures });
@@ -1552,45 +1353,33 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (generated) commitUndo(figma); // UX2
         break;
       }
+      case 'GET_SETTINGS': {
+        let s = SETTINGS_DEFAULT;
+        try {
+          const raw = await figma.clientStorage.getAsync(SETTINGS_KEY);
+          if (raw && typeof raw === 'object') {
+            const o = raw as Record<string, unknown>;
+            s = {
+              base: typeof o.base === 'number' && isFinite(o.base) && o.base > 0 ? o.base : SETTINGS_DEFAULT.base,
+              maxDepth: typeof o.maxDepth === 'number' && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth,
+            };
+          }
+        } catch {
+          /* 저장소 접근 실패 → 기본값 */
+        }
+        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth });
+        break;
+      }
+      case 'SET_SETTINGS': {
+        try {
+          await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth });
+        } catch {
+          /* 보관 실패해도 이번 세션 동작에는 영향 없음 */
+        }
+        break;
+      }
       case 'GET_VARIABLES': {
         post({ type: 'VARIABLES', vars: await collectVars() });
-        break;
-      }
-      case 'EDIT_VARIABLE': {
-        const res = await editVariable(msg.id, msg.patch);
-        post(res);
-        if (res.ok) {
-          commitUndo(figma); // UX2: 행별 단일 Undo
-          await postPrereq(); // 값/이름 변경이 전제 상태에 영향 가능
-        }
-        break;
-      }
-      case 'DELETE_VARIABLE': {
-        const v = await figma.variables.getVariableByIdAsync(msg.id);
-        if (!v) {
-          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: '변수를 찾을 수 없습니다.' });
-          break;
-        }
-        const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
-        if (!col || !EDITABLE_COLLECTIONS.has(col.name)) {
-          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: '편집 대상이 아닌 컬렉션입니다.' });
-          break;
-        }
-        try {
-          v.remove();
-          commitUndo(figma); // UX2: 삭제도 단일 Undo
-          await postPrereq();
-          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: true, deleted: true });
-        } catch (e) {
-          post({ type: 'EDIT_VARIABLE_RESULT', id: msg.id, ok: false, error: errText(e) });
-        }
-        break;
-      }
-      case 'GET_VARIABLE_USAGE': {
-        // 읽기 전용 — 삭제/리네임 전에 "이걸 지우면 뭐가 깨지는지"를 먼저 보여준다.
-        const { nodes, capped } = await collectBoundNodes(msg.id);
-        const aliasedBy = findAliasReferers(msg.id, await collectVars());
-        post({ type: 'VARIABLE_USAGE', id: msg.id, nodes, aliasedBy, capped });
         break;
       }
       case 'GENERATE_DARK_MODE': {
@@ -1602,7 +1391,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           commitUndo(figma); // UX2: 다크 생성 전체를 단일 Undo로
           await postPrereq();
         }
-        post({ type: 'VARIABLES', vars: await collectVars() }); // 편집기 목록 갱신
+        post({ type: 'VARIABLES', vars: await collectVars() }); // 모드가 늘었을 수 있으니 목록 갱신
         break;
       }
       case 'SCAN_SIMILAR': {
@@ -1639,38 +1428,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const r = await componentizeSimilar(master as SceneNode, memberNodes);
         post({ type: 'COMPONENTIZE_RESULT', master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
         if (r.instances) commitUndo(figma); // UX2: 컴포넌트화 전체를 단일 Undo로
-        break;
-      }
-      case 'CHECK_CONTRAST': {
-        // 읽기 전용 감사 — 쓰기/Undo/이력 없음. 추출은 figma, 판정은 순수 모듈.
-        const { samples, skipped } = collectContrastSamples(selection());
-        const report = checkContrast(samples, msg.level);
-        post({
-          type: 'CONTRAST_RESULT',
-          level: report.level,
-          checked: report.checked,
-          passed: report.passed,
-          failed: report.failed,
-          findings: report.findings,
-          skipped,
-        });
-        break;
-      }
-      case 'APPLY_CONTRAST_FIX': {
-        // #2: 보정색을 대상 노드(텍스트=글자색 / 배경=배경 노드)의 첫 단색 채움에 적용.
-        const node = await figma.getNodeByIdAsync(msg.nodeId);
-        if (node && 'fills' in node) {
-          const fills = (node as { fills?: readonly Paint[] | typeof figma.mixed }).fills;
-          if (Array.isArray(fills)) {
-            const i = fills.findIndex((p) => p.type === 'SOLID' && p.visible !== false && (p.opacity ?? 1) > 0);
-            if (i >= 0) {
-              const next = fills.slice();
-              next[i] = { ...(next[i] as SolidPaint), color: hexToRgb(msg.hex) };
-              (node as unknown as { fills: Paint[] }).fills = next;
-              commitUndo(figma); // UX2: 보정 적용을 단일 Undo로
-            }
-          }
-        }
         break;
       }
     }

@@ -37,7 +37,9 @@ function fakeTokens(n) {
     name: `${cats[i % cats.length]}/step-${String(i + 1).padStart(3, '0')}`,
     category: cats[i % cats.length],
     sources: ['itemSpacing'],
-    value: 4 + i,
+    // 값은 격자 8의 배수로 — 미리보기가 격자 8 스냅(#19)을 자동으로 돌리므로, 격자 밖 값을
+    // 주면 일부가 옮겨지고 합쳐져 행 수가 시드보다 줄어든다(여기서 볼 건 행 높이·스냅이다).
+    value: 8 * (i + 1),
   }));
 }
 
@@ -83,31 +85,6 @@ function fakeColors(n) {
   }
   if (out.length < n) throw new Error(`고유 hue/step 버킷이 ${out.length}개뿐 — --count를 낮추세요(최대 110)`);
   return out;
-}
-
-/**
- * 대비 실패 n건. `#contrastList`는 `pass:false`만 그리므로 전부 실패로 만든다.
- * 행 높이가 고르게 유지되는지가 이 목록의 관건이라, 높이를 흔드는 조합을 일부러 섞는다:
- * 보정 버튼 0·1·2개, 긴 레이어명(감싸짐 유발), ‘큰글자’ 접미사.
- */
-function fakeContrastFindings(n) {
-  return Array.from({ length: n }, (_, i) => {
-    const kind = i % 3; // 0: 버튼 2개 · 1: 버튼 1개 · 2: 버튼 없음
-    const long = i % 5 === 0; // 폭을 넘기는 긴 이름
-    return {
-      id: `node-${i}`,
-      name: long ? `Page/Section/Card ${i} / 아주 긴 레이어 이름 텍스트 ${i}` : `Text ${i}`,
-      fg: '#8a8a8a',
-      bg: '#ffffff',
-      bgId: kind === 0 ? `bg-${i}` : undefined,
-      ratio: 2.5 + (i % 17) / 10,
-      required: 4.5,
-      large: i % 4 === 0,
-      pass: false,
-      suggestedFg: kind === 2 ? undefined : '#4a4a4a',
-      suggestedBg: kind === 0 ? '#f2f2f2' : undefined,
-    };
-  });
 }
 
 /** 리네임 미리보기 노드 n개 — 전부 `after` 보유(영향 노드)라 맥락 숨김에도 n행이 그대로 보인다. */
@@ -175,6 +152,7 @@ const LISTS = {
   tokenList: {
     label: '토큰 생성 미리보기',
     tab: 'tabbtn-tokens',
+    step: '.step-chip[data-make-step="token"]',
     row: '.tk',
     more: 'tokenListMore',
     count: 'tokenListCount',
@@ -187,6 +165,7 @@ const LISTS = {
   colorTable: {
     label: '추출 · 색 정리 표',
     tab: 'tabbtn-tokens',
+    step: '.step-chip[data-make-step="color"]',
     row: '.crow',
     more: 'colorTableMore',
     count: 'colorTableCount',
@@ -201,6 +180,7 @@ const LISTS = {
   variantReport: {
     label: '컴포넌트 등록/분류 리포트',
     tab: 'tabbtn-apply',
+    step: '.step-chip[data-apply-step="structure"]',
     row: '.vr-row',
     more: 'variantReportMore',
     count: 'variantReportCount',
@@ -216,35 +196,11 @@ const LISTS = {
       });
     },
   },
-  contrastList: {
-    label: '명도 대비 점검 결과',
-    tab: 'tabbtn-apply',
-    row: '.cfind',
-    more: 'contrastListMore',
-    count: 'contrastListCount',
-    expand: 'btnContrastListExpand',
-    // 이 목록만 행 높이 균일성을 따로 본다 — 감쌈·보정 버튼 유무로 높이가 흔들렸던 곳이라
-    // 반쪽 행이 0건이어도 원인이 되살아났는지 바로 보이게 한다.
-    uniformRows: true,
-    // 마법사(‘시작’ 탭)의 대비 점검이 이 목록을 채운다 — 결과가 숨은 탭에 그려지는 실제 경로.
-    hiddenFrom: 'tabbtn-wizard',
-    async setup(page, n) {
-      // 결과 메시지만 넣으면 된다 — 검사 버튼은 백엔드(code.ts)가 있어야 응답이 온다.
-      await seed(page, {
-        type: 'CONTRAST_RESULT',
-        level: 'AA',
-        checked: n,
-        passed: 0,
-        failed: n,
-        findings: fakeContrastFindings(n),
-        skipped: {},
-      });
-    },
-  },
   // 선택형 미리보기 트리 3종 — 셋 다 code(백엔드) 응답 한 방으로 렌더되므로 버튼 클릭이 필요 없다.
   bindTree: {
     label: '바인딩 미리보기 트리',
     tab: 'tabbtn-apply',
+    step: '.step-chip[data-apply-step="bind"]',
     row: '.tree-row',
     more: 'bindTreeMore',
     count: 'bindTreeCount',
@@ -257,6 +213,7 @@ const LISTS = {
   diff: {
     label: '리네임 미리보기 트리',
     tab: 'tabbtn-apply',
+    step: '.step-chip[data-apply-step="rename"]',
     row: '.tree-row',
     more: 'diffMore',
     count: 'diffCount',
@@ -268,6 +225,7 @@ const LISTS = {
   compTree: {
     label: '컴포넌트 등록 후보 트리',
     tab: 'tabbtn-apply',
+    step: '.step-chip[data-apply-step="structure"]',
     row: '.tree-row',
     more: 'compTreeMore',
     count: 'compTreeCount',
@@ -279,6 +237,7 @@ const LISTS = {
   tsRows: {
     label: '텍스트 스타일 표',
     tab: 'tabbtn-tokens',
+    step: '.step-chip[data-make-step="type"]',
     // 마운트는 표를 감싼 래퍼다 — 표 박스 자체는 스크롤 컨테이너가 못 된다.
     mount: 'tsList',
     row: 'tbody tr',
@@ -350,12 +309,18 @@ async function partialRows(page, mount, row, stickyHead) {
  * 빈 개수 줄이 그대로 남는다. 실제 경로다(마법사의 대비 점검이 ‘적용’ 탭 목록을 채운다).
  * 시드가 postMessage만으로 되는 목록에서만 켠다(버튼 클릭은 숨은 탭에서 안 된다).
  */
+/** 탭 + 단계 레일(#5) — 카드가 단계에 묶여 있어 탭만 눌러선 목록이 안 보인다. */
+async function openList(page, spec) {
+  await page.click(`#${spec.tab}`);
+  if (spec.step) await page.click(spec.step);
+}
+
 async function seedFromHiddenTab(page, spec, count) {
   await page.click(`#${spec.hiddenFrom}`);
   await unlock(page);
   await spec.setup(page, count);
   await page.waitForTimeout(200);
-  await page.click(`#${spec.tab}`);
+  await openList(page, spec);
 }
 
 async function verify(page, id, spec, count, shots, hidden = false) {
@@ -368,7 +333,7 @@ async function verify(page, id, spec, count, shots, hidden = false) {
   if (hidden) {
     await seedFromHiddenTab(page, spec, count);
   } else {
-    await page.click(`#${spec.tab}`);
+    await openList(page, spec);
     await unlock(page);
     await spec.setup(page, count);
   }
