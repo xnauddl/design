@@ -77,8 +77,6 @@ export const STRINGS: Record<string, string> = {
   'similar.hint': '구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.',
   'similar.scanBtn': '닮은 프레임 스캔',
   'similar.componentizeBtn': '컴포넌트화',
-  // 목록 공통(상한 해제 — 여러 카드가 같은 문구를 쓴다)
-  'list.expandAll': '모두 펼치기',
   // 내보내기
   'export.saved': '{format} — {file}로 저장했습니다.',
   'export.empty': '내보낼 변수가 없습니다. 먼저 토큰을 생성하세요.',

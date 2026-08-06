@@ -90,8 +90,6 @@ function renderChunked<T>(
  *
  * `innerHTML = ''`만 하면 rAF에 예약된 다음 청크가 그대로 살아나 이미 무효가 된 행을 계속
  * 붙인다(2000노드 미리보기 중 선택을 바꾸면 안내 문구 아래로 수천 행이 다시 쌓였다).
- * 예전엔 테두리도 개수 줄도 없어 눈에 덜 띄었지만, 이제 렌더 완료 후 layoutList가 돌아
- * 그 유령 행을 기준으로 테두리·높이·‘총 n개’까지 붙는다 — 취소가 필수가 됐다.
  */
 function clearMount(mount: HTMLElement): void {
   const prev = chunkPending.get(mount);
@@ -240,128 +238,10 @@ let colorRevealed = false;
 let previewRevealed = false;
 let lastTidy: { before: number; after: number; merged: number } = { before: 0, after: 0, merged: 0 };
 let pendingCreatePreview = false; // ‘미리보기’가 추출을 유발했을 때, 추출 후 생성 미리보기 전송
-/**
- * 스크롤되는 목록 하나의 배선. 행 클래스가 목록마다 다르므로(.tk · .crow · .tree-row …)
- * 셀렉터를 함께 받는다. 새 목록을 채택하려면 마운트에 class="list-region"을 주고,
- * 아래 ‘더 보기’ 줄(.list-more) 마크업을 붙인 뒤 LIST_REGIONS에 한 줄 추가하면 된다.
- */
-interface ListRegion {
-  /** 목록 마운트 요소 id */
-  mount: string;
-  /** 행 셀렉터 — 이 목록에서 ‘한 행’으로 셀 요소 */
-  row: string;
-  /** 마운트의 형제인 ‘총 n개 중 m개 표시’ 줄 id */
-  more: string;
-  /** 개수 문구 span id */
-  count: string;
-  /** 펼치기/접기 버튼 id */
-  expand: string;
-  /**
-   * 스크롤포트 상단을 덮는 고정 헤더 셀렉터(표 목록만). 헤더가 가린 만큼은 행을 놓을 수 없으니
-   * 높이 계산에서 빼고 스냅 위치도 그만큼 내린다. 없으면 0 — div 목록의 계산은 그대로다.
-   */
-  stickyHead?: string;
-}
-
-const LIST_REGIONS: ListRegion[] = [
-  { mount: 'tokenList', row: '.tk', more: 'tokenListMore', count: 'tokenListCount', expand: 'btnTokenListExpand' },
-  { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
-  { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
-  { mount: 'similarList', row: '.simrow', more: 'similarListMore', count: 'similarListCount', expand: 'btnSimilarListExpand' },
-  // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
-  // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
-  { mount: 'bindTree', row: '.tree-row', more: 'bindTreeMore', count: 'bindTreeCount', expand: 'btnBindTreeExpand' },
-  { mount: 'diff', row: '.tree-row', more: 'diffMore', count: 'diffCount', expand: 'btnDiffExpand' },
-  { mount: 'compTree', row: '.tree-row', more: 'compTreeMore', count: 'compTreeCount', expand: 'btnCompTreeExpand' },
-  // 텍스트 스타일 표 — 마운트는 표를 감싼 래퍼다(표 박스는 스크롤 컨테이너가 못 된다).
-  // 행은 tbody의 tr만(thead의 헤더 행이 한 행으로 세어지면 개수와 행 높이가 둘 다 틀어진다).
-  { mount: 'tsList', row: 'tbody tr', more: 'tsListMore', count: 'tsListCount', expand: 'btnTsListExpand', stickyHead: 'thead' },
-];
-
-// ‘모두 펼치기’로 상한을 푼 목록의 마운트 id. 목록별로 따로 기억해야 한 목록을 펼친 게
-// 다른 목록까지 펼치지 않는다. 행이 사라지면(빈 상태) 해제 — 다음 렌더가 펼친 채 시작하지 않게.
-const listExpanded = new Set<string>();
-
-/**
- * 목록의 스크롤 영역 높이를 **행 높이의 정수배로 내림 맞춤**하고, 가려진 개수를 알린다.
- *
- * CSS 상한(패널 높이 비례)이 행 높이와 맞을 이유가 없어 마지막 행이 늘 반쯤 잘린 채 끝났고,
- * 경계선·스크롤바도 없어서 "미리보기가 잘려 변수명과 타입이 안 보인다"로 읽혔다.
- * 보이는 행은 항상 온전한 행이 되게 하고, 남은 개수와 ‘모두 펼치기’를 목록 아래에 붙인다.
- * 행이 붙은 뒤(렌더 완료)와 패널 리사이즈 후에 호출해야 측정이 맞는다.
- */
-function layoutList(r: ListRegion): void {
-  // 아직 마크업이 없는 목록이 배선에 올라와 있어도 전체가 죽지 않게 개별로 건너뛴다.
-  const box = document.getElementById(r.mount);
-  const more = document.getElementById(r.more);
-  const label = document.getElementById(r.count);
-  const btn = document.getElementById(r.expand);
-  if (!box || !more || !label || !btn) return;
-  const expanded = listExpanded.has(r.mount);
-  box.style.height = ''; // 이전 스냅 해제 — 상한/내용을 다시 재야 한다
-  const rows = box.querySelectorAll(r.row);
-  if (!rows.length) {
-    listExpanded.delete(r.mount);
-    box.classList.remove('framed', 'scrolls', 'expanded'); // 안내 문구만 있을 땐 테두리 없이
-    more.style.display = 'none';
-    return;
-  }
-  box.classList.add('framed');
-  box.classList.toggle('expanded', expanded);
-  box.classList.toggle('scrolls', !expanded);
-  if (expanded) {
-    more.style.display = '';
-    label.textContent = `총 ${rows.length}개 모두 표시`;
-    btn.textContent = '접기';
-    return;
-  }
-  // offsetHeight는 정수로 반올림돼 행 높이가 소수(30.67px)면 어긋난다 → 실측 소수 높이 사용.
-  const rowH = rows[0].getBoundingClientRect().height;
-  if (!rowH || box.scrollHeight <= box.clientHeight + 1) {
-    more.style.display = 'none'; // 상한에 안 걸림 — 이미 전부 보인다
-    return;
-  }
-  const cs = getComputedStyle(box);
-  const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-  // 표 목록의 고정 헤더는 스크롤포트 상단을 늘 덮고 있어 그만큼은 행이 보일 수 없다.
-  // 빼지 않으면 스크롤포트만 정수배가 되고 ‘헤더 아래 남는 영역’은 정수배가 아니라
-  // 어느 위치에서든 한 행이 헤더에 반쯤 가린다. 스냅 위치도 헤더 아래로 내려야 한다.
-  const head = r.stickyHead ? box.querySelector(r.stickyHead) : null;
-  const headH = head ? head.getBoundingClientRect().height : 0;
-  box.style.scrollPaddingTop = headH ? `${headH}px` : '';
-  const shown = Math.max(1, Math.floor((box.clientHeight - padY - headH) / rowH));
-  // box-sizing:border-box라 height에 테두리까지 포함된다. 보정을 빼먹으면 그만큼(2px)
-  // 마지막 행이 다시 잘린다. 소수 높이는 올림해 잘림 대신 미세한 여백이 남게 한다.
-  // (offsetHeight−clientHeight는 테두리 + 가로 스크롤바 높이라, 가로로도 스크롤하는
-  //  표 목록에서 스크롤바가 먹는 높이까지 같이 흡수된다.)
-  const borderY = box.offsetHeight - box.clientHeight;
-  box.style.height = `${Math.ceil(shown * rowH + headH) + padY + borderY}px`; // 반쪽 행 제거
-  more.style.display = '';
-  label.textContent = `총 ${rows.length}개 중 ${shown}개 표시 — 스크롤하거나`;
-  btn.textContent = '모두 펼치기';
-}
-
-/** 마운트 id로 재계산 — renderChunked의 onDone에 그대로 넘기려고 얇게 감쌌다. */
-function layoutListBy(mountId: string): void {
-  const r = LIST_REGIONS.find((x) => x.mount === mountId);
-  if (r) layoutList(r);
-}
-
-/** 등록된 목록 전부 재계산 — 리사이즈·카드 펼침처럼 여러 목록이 한 번에 영향받을 때. */
-function layoutAllLists(): void {
-  for (const r of LIST_REGIONS) layoutList(r);
-}
-
-// 펼치기 버튼 배선은 배열을 돌며 한 번에 — 목록을 추가해도 핸들러를 따로 달 필요가 없다.
-for (const r of LIST_REGIONS) {
-  const btn = document.getElementById(r.expand);
-  if (!btn) continue;
-  btn.addEventListener('click', () => {
-    if (listExpanded.has(r.mount)) listExpanded.delete(r.mount);
-    else listExpanded.add(r.mount);
-    layoutList(r);
-  });
-}
+/* #18: 결과 목록은 흐름 레이아웃 — 목록마다 max-height 스크롤 박스를 두지 않고 패널 body가
+   스크롤한다. 상한이 없으니 '행 높이 정수배로 스냅 · 남은 개수 · 모두 펼치기' 기계장치도
+   함께 걷었다(반쪽 행은 상한이 만들던 문제였다). 대량 목록의 청크 렌더(renderChunked)는
+   렌더 비용을 나누는 별개 장치라 그대로 둔다. */
 
 // ‘토큰 생성’ 카드의 목록 — 색 외 토큰(간격·크기·폰트·효과)만.
 function renderTokens(): void {
@@ -375,7 +255,6 @@ function renderTokens(): void {
     hint.textContent = msg;
     box.appendChild(hint);
     updateTokenCreate();
-    layoutListBy('tokenList'); // 행이 없으니 경계·개수 줄을 걷어낸다
   };
   if (!tokens.length) {
     showHint(lastSelCount > 0
@@ -394,7 +273,7 @@ function renderTokens(): void {
   // 스와치가 실제로 쓰이는 목록에서만 14px 거터를 유지(그 외엔 이름 폭으로 넘긴다).
   box.classList.toggle('has-swatch', others.some((o) => o.category === 'effectColor' && typeof o.value === 'string'));
   ($('tokenCtrls') as HTMLElement).style.display = '';
-  renderChunked(box, others, makeTokenRow, () => layoutListBy('tokenList')); // §4: 대량 추출도 비차단
+  renderChunked(box, others, makeTokenRow); // §4: 대량 추출도 비차단
   updateTokenCreate();
 }
 
@@ -505,7 +384,6 @@ function renderColorTable(): void {
     $('colorCount').textContent = '';
     // 옛 행을 남겨 두면 다음 추출이 색 0개일 때 테두리·‘총 n개’ 줄이 실제와 어긋난 채 되살아난다.
     $('colorTable').innerHTML = '';
-    layoutListBy('colorTable'); // 행이 없으니 경계·개수 줄을 걷어낸다
     return;
   }
   card.style.display = '';
@@ -533,7 +411,7 @@ function renderColorTable(): void {
     role.dataset.name = t.name;
     row.append(sw, name, role);
     return row;
-  }, () => layoutListBy('colorTable')); // 행이 다 붙은 뒤라야 행 높이 측정이 맞는다
+  });
 }
 
 /** 색 편집표의 역할 입력 → 시맨틱 매핑 textarea로 반영(역할=이름). */
@@ -864,7 +742,6 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   // 행이 줄면 상한·개수 문구도 같이 줄어야 한다(안 하면 ‘총 40개 중 8개’가 남아 거짓말이 된다).
   del.addEventListener('click', () => {
     tr.remove();
-    layoutListBy('tsList');
   });
   tdDel.appendChild(del);
   tr.appendChild(tdDel);
@@ -875,7 +752,6 @@ function renderTextStyleRows(specs: TextStyleSpec[], locked = false): void {
   const tbody = $('tsRows');
   tbody.innerHTML = '';
   for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
-  layoutListBy('tsList'); // 행이 붙은 뒤에 재야 행 높이·상한이 맞는다
 }
 
 /** 표 → 스펙. 폰트 패밀리는 행별 폰트 셀에서 읽는다(비면 DEFAULT_TS_FAMILY). */
@@ -916,7 +792,6 @@ $('btnScanText').addEventListener('click', () =>
 $('btnTsAddRow').addEventListener('click', () => {
   const tr = textStyleRow({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
   $('tsRows').appendChild(tr);
-  layoutListBy('tsList');
   // 표가 상한에 걸린 뒤로는 새 행이 스크롤 밖에 생겨 "행 추가를 눌렀는데 아무 일도 없다"로 보인다.
   // 추가한 행으로 데려가고 이름 칸에 커서를 둔다(어차피 다음 동작은 이름 입력).
   tr.scrollIntoView({ block: 'nearest' });
@@ -2032,7 +1907,7 @@ function renderSelectableTree(
   const visible = rows.filter((r) => r.change !== undefined || r.header || !opts.hideContext);
   // 세 트리(#bindTree·#diff·#compTree)가 모두 이 호출부를 지난다 — 어느 목록인지는 마운트 id가
   // 말해 주므로 스냅·개수 줄 재계산도 여기 한 줄로 끝난다(행 0건이면 테두리·줄을 걷는다).
-  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange), () => layoutListBy(mount.id));
+  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
 }
 
 /* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
@@ -2091,7 +1966,6 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
   renameChecked.clear();
   clearMount($('diff'));
   $('renameCount').textContent = '';
-  layoutListBy('diff'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('btnRename') as HTMLButtonElement).disabled = true;
   setStatus('renameStatus', t('rename.applied', { count: msg.changes.length }), 'ok');
 }
@@ -2178,7 +2052,6 @@ function clearBindPreview(): void {
   bindChecked.clear();
   clearMount($('bindTree'));
   $('bindCount').textContent = '';
-  layoutListBy('bindTree'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
   ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
 }
@@ -2236,7 +2109,6 @@ function clearCompPreview(): void {
   compChecked.clear();
   clearMount($('compTree'));
   $('compCount').textContent = '';
-  layoutListBy('compTree'); // 행이 사라졌으니 테두리·개수 줄도 함께 걷는다
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';
 }
 
@@ -2296,7 +2168,7 @@ function renderVariantReport(sections: VariantReportSection[]): void {
   }
   // 빈 조합은 베리언트 속성의 곱집합이라 세트 하나로도 수백 줄이 된다 → 청크 렌더.
   // 줄이 0이어도 불러야 마운트가 비워지고 onDone이 테두리·푸터를 걷는다.
-  renderChunked($('variantReport'), lines, makeVariantReportRow, () => layoutListBy('variantReport'));
+  renderChunked($('variantReport'), lines, makeVariantReportRow);
 }
 
 /** 선택 의존 카드(바인딩·컴포넌트)의 빈 상태(캐논 108:2) — 미리보기/후보가 없을 때만,
@@ -2308,12 +2180,10 @@ function refreshTreeEmptyStates(): void {
   if (!hasBindPreview()) {
     if (lastSelCount === 0) renderEmptyState($('bindTree'), '선택한 노드가 없어요', guide);
     else clearMount($('bindTree'));
-    layoutListBy('bindTree');
   }
   if (compCandidates.length === 0) {
     if (lastSelCount === 0) renderEmptyState($('compTree'), '선택한 노드가 없어요', guide);
     else clearMount($('compTree'));
-    layoutListBy('compTree');
   }
 }
 
@@ -2421,7 +2291,7 @@ function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): 
   $('similarCount').textContent = msg.metas.length ? `· 대상 ${msg.metas.length}개` : '';
 
   const box = $('similarList');
-  renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId), () => layoutListBy('similarList'));
+  renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId));
 
   if (!msg.metas.length) {
     // 왜 대상이 없는지 알려준다 — 제외 사유가 있으면 그걸 그대로 보여주는 게 가장 빠른 안내다.
@@ -2518,9 +2388,6 @@ function applyCardChrome(): void {
     head.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('button')) return; // 버튼 클릭은 토글 제외
       card.classList.toggle('collapsed');
-      // 접힌 카드는 .step-body가 display:none이라 그 안에서 렌더된 목록은 높이 0으로 측정되고
-      // 스냅이 조용히 bail한다. 펼치는 순간 다시 재지 않으면 반쪽 행이 그대로 남는다.
-      if (!card.classList.contains('collapsed')) layoutAllLists();
     });
   });
 }
@@ -2555,11 +2422,6 @@ window.addEventListener('resize', syncStickyOffsets);
 // 목록 상한은 패널 높이 비례(40vh)라 리사이즈하면 몇 행이 들어가는지가 바뀐다 → 다시 스냅.
 // 목록마다 리스너를 달면 드래그 중 리사이즈 1회에 목록 수만큼 레이아웃이 돌아 끊긴다 →
 // 하나로 모아 디바운스한다(드래그가 멎은 뒤 한 번만 재계산해도 결과는 같다).
-let listResizeTimer = 0;
-window.addEventListener('resize', () => {
-  clearTimeout(listResizeTimer);
-  listResizeTimer = window.setTimeout(layoutAllLists, 100);
-});
 updateGates();
 renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
@@ -2586,13 +2448,6 @@ function showTab(name: (typeof TABS)[number]): void {
   }
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
-  // 비활성 탭은 .tab-section이 display:none이라 그 안에서 렌더된 목록은 행 높이가 0으로 측정되고
-  // 스냅이 조용히 bail한다(접힌 카드와 같은 함정 — applyCardChrome 참고). 결과가 다른 탭에 있는
-  // 동안 도착하는 경로가 여럿이다: 마법사의 추출이 ‘만들기’ 탭 목록을, componentize가
-  // #variantReport를 채우고, 미리보기는 느려서 결과 전에 탭을 옮기는 일이 흔한데
-  // 트리 3종은 첫 화면이 아닌 ‘적용’ 탭에 있다. 탭이 보이는 순간 다시 재지 않으면
-  // 돌아왔을 때 반쪽 행에 개수 줄도 없는 상태가 남는다.
-  layoutAllLists();
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
 }
 TABS.forEach((t, i) => {
@@ -2612,8 +2467,7 @@ showTab('wizard'); // #4: 첫 화면은 ‘시작’(시스템화 마법사)
 
 /* ---------- #5: 단계 레일 — 한 화면에 한 단계 ---------- */
 // 만들기 4단계·적용 3단계. 카드는 마크업의 data-make-step / data-apply-step으로 묶여 있고,
-// 레일은 그중 한 묶음만 보여준다. 탭 전환과 같은 함정이 있어(숨은 목록은 행 높이가 0으로
-// 측정된다) 단계를 바꿀 때도 layoutAllLists()로 다시 재야 한다.
+// 레일은 그중 한 묶음만 보여준다.
 const MAKE_STEPS = ['color', 'token', 'theme', 'type'] as const;
 const APPLY_STEPS = ['bind', 'rename', 'structure'] as const;
 type MakeStep = (typeof MAKE_STEPS)[number];
@@ -2632,7 +2486,6 @@ function showStep(attr: 'make' | 'apply', step: string): void {
     if (on) b.setAttribute('aria-current', 'step');
     else b.removeAttribute('aria-current');
   }
-  layoutAllLists();
 }
 
 const showMakeStep = (s: MakeStep): void => showStep('make', s);

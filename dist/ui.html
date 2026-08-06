@@ -262,26 +262,12 @@
     .wstep.fail .wnote { color: var(--warn); }
     #wizardBar { margin-top: 8px; }
 
-    /* ── 토큰 목록 / 색 편집표 ── */
-    /* 목록이 자기 스크롤 영역이라는 게 보여야 한다. 경계 없이 상한만 걸면 마지막 행이 반쯤
-       잘린 채 끝나 "미리보기가 잘렸다"로 읽힌다. 높이는 패널 높이를 따라가고(패널은
-       480–1200px 리사이즈 가능), ui.ts가 행 높이의 정수배로 스냅해 반쪽 행을 없앤다.
-       ‘모두 펼치기’(.expanded)면 상한을 풀어 페이지 스크롤로 전체를 본다.
-
-       높이 스냅만으로는 **맨 위에서만** 온전한 행이 보인다. 토큰이 수십 개면 사용자는 목록을
-       스크롤한 상태로 보게 되고, 그때는 위·아래 끝 행이 동시에 잘린다(실제 신고 화면).
-       그래서 스크롤 자체를 행 경계에 멈추게 한다 — 높이가 행 높이의 정수배이므로 어느 위치에
-       멈춰도 위아래 모두 온전한 행이 된다. */
-    /* 같은 결함이 목록마다 반복되므로 공용 클래스로 둔다. 채택하는 목록은 class="list-region"을
-       붙이고 ui.ts의 LIST_REGIONS에 배선 한 줄을 추가하면 된다. 높이 상한만 다르면 --list-cap. */
-    .list-region { overflow: auto; margin-top: 8px; }
-    /* 세로 패딩 금지 — 스크롤포트 높이가 행 높이의 정수배여야 스냅 위치마다 위아래가
-       딱 맞는다. 세로 여백은 행 자신의 padding(.tk 등)이 낸다. */
-    .list-region.framed { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0 7px; }
-    .list-region.scrolls { max-height: var(--list-cap, clamp(200px, 40vh, 560px)); scroll-snap-type: y mandatory; }
-    /* 행 클래스가 목록마다 다르므로(.tk · .crow · .tree-row …) 직계 자식 전부에 건다. */
-    .list-region.scrolls > * { scroll-snap-align: start; }
-    .list-region.expanded { max-height: none; overflow: visible; }
+    /* ── 결과 목록(#18) ── */
+    /* 목록마다 자기 스크롤 박스를 두지 않는다. 상한을 걸면 마지막 행이 반쯤 잘리고, 그걸
+       막으려고 행 높이 정수배로 스냅하고 '총 n개 중 m개 표시 · 모두 펼치기'를 달았는데,
+       결국 한 화면에 스크롤 영역이 여러 개 생겨 어디를 굴려야 하는지가 매번 문제였다.
+       흐름 레이아웃으로 두고 패널 body가 스크롤한다 — 잘릴 상한이 없으니 스냅도 필요 없다. */
+    .results { margin-top: 8px; }
     .tk { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
     /* 이름 폭 우선 — 이 목록은 색 외 토큰만 담아 스와치 없는 행이 대부분인데, 빈 14px 거터를
        늘 두면 좁은 패널(최소 360px)에서 이름 폭만 깎인다. 스와치가 실제로 있는 목록에서만
@@ -316,36 +302,8 @@
       border-radius: 4px; padding: 0 5px; white-space: nowrap;
       text-align: center; overflow: hidden; text-overflow: ellipsis;
     }
-    /* 목록 아래 ‘총 n개 중 m개 표시 — 스크롤하거나 [모두 펼치기]’ 줄 */
-    .list-more { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-    .list-more .list-count { color: var(--muted); }
-    /* 색 정리 표도 같은 결함이었다 — 220px 고정 상한 ÷ 행 31px ≈ 7.1행이라 마지막 행이
-       상시 반쯤 잘렸고, 바로 아래 ‘토큰 생성’ 목록만 고쳐 두면 한 화면에서 처리가 어긋나 보인다.
-       그래서 상한도 공용 값(패널 높이 비례)으로 넘긴다 — 고정 220px은 큰 패널에서 근거가 없다.
-       스냅은 행 높이가 균일할 때만 맞으므로 .crow의 padding·입력칸 높이는 행마다 같게 둘 것. */
-
-    /* ── 텍스트 스타일 표(#tsList)의 목록 영역 보정 ──
-       이 표만 결함의 방향이 반대였다. 세로 상한이 아예 없어 잘리는 게 아니라 무한히 자랐고,
-       스캔 행이 수십 개면 아래 ‘등록’·‘기존 스타일 적용만’·상태줄이 화면 밖으로 밀려나
-       "등록 버튼이 없어졌다"로 읽혔다. 공용 .list-region으로 상한을 걸되, 표라서 다른 둘을 덧댄다. */
-    /* (1) 헤더 고정 — div 목록과 달리 헤더가 스크롤을 벗어나면 어느 열이 크기고 행간인지 알 수 없다.
-       배경이 투명하면 지나가는 행이 헤더에 비쳐 보인다. border-collapse:collapse에서는 셀 테두리가
-       sticky를 따라오지 않으므로 구분선은 inset 그림자로 낸다.
-       ‘모두 펼치기’(overflow:visible)면 스크롤포트가 패널이 돼 헤더가 sticky 카드 헤더와 겹치므로
-       그때는 고정하지 않는다 — .scrolls일 때만.
-       z-index를 주면 안 된다: 카드 헤더(.step-head)도 sticky z-index:1이고 같은 스택 문맥이라
-       뒤에 오는 이 헤더가 이겨 ‘텍스트 스타일 등록’ 버튼 위에 글자가 겹쳐 그려진다(패널을
-       세로로 줄이고 페이지를 스크롤하면 재현). 행 위로 올라오는 데는 z-index가 필요 없다 —
-       positioned 요소는 흐름 속 행보다 나중에 그려진다. */
-    .list-region.scrolls #tsTable thead th {
-      position: sticky; top: 0;
-      background: var(--surface-2); box-shadow: inset 0 -1px 0 var(--border);
-    }
-    /* (2) 스냅 대상 — 공용 규칙(.list-region.scrolls > *)은 직계 자식에 걸리는데 표의 직계 자식은
-       thead/tbody라 행이 아니다. 행에 직접 걸어야 스크롤이 행 경계에 멈춘다.
-       고정 헤더가 스크롤포트 상단을 덮으므로 멈출 위치는 헤더 높이만큼 내려야 한다 →
-       ui.ts가 scroll-padding-top을 실측해 넣는다(헤더 높이는 폰트·확대율에 따라 달라진다). */
-    .list-region.scrolls #tsRows tr { scroll-snap-align: start; }
+    /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
+       상한이 사라져 함께 걷는다(표 자체는 #17에서 리스트로 대체). */
     .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 3px 0; }
     .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
     .crow .cn { font-family: var(--mono); font-size: var(--fs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -359,24 +317,13 @@
     .tidy-note #tidySumText { flex: 1 1 auto; font-weight: 600; }
 
     /* ── diff / 선택형 미리보기 트리 ── */
-    /* 세 트리도 .list-region(#tokenList와 같은 처리) — 행 높이 20.5px에 상한이 220px이라
-       220÷20.5≈10.7행, 마지막 행이 **상시** 반쪽으로 끝났다. 스캔 상한이 1500노드고 노드
-       헤더 + 후보 필드마다 한 행이라 수천 행이 되는 최대 목록이어서 증상도 가장 크다.
-       기존 :empty 규칙은 테두리를 걷어내지 못했다 — renderEmptyState가 채운 빈 상태는
-       자식이 있어 :empty가 아니라, 안내 문구 한 덩이가 스크롤 영역인 척 테두리를 달고 있었다.
-       이제 행 수로 판단하는 layoutList가 두 경우(빈 DOM·안내 문구)를 함께 처리한다.
-       상한은 기본값(40vh)보다 낮게 — 세 트리가 모두 ‘적용’ 탭에 있어 동시에 미리보기를 물면
-       카드 세 개가 각각 40vh를 먹고 탭이 화면 몇 배로 길어진다. */
+    /* 긴 이름은 nowrap이라 가로로 넘친다 — 가로만 스크롤시킨다(세로는 패널 body). */
     #diff, #bindTree, #compTree {
-      font-family: var(--mono); font-size: var(--fs);
-      --list-cap: clamp(200px, 30vh, 420px);
+      font-family: var(--mono); font-size: var(--fs); overflow-x: auto;
       /* 좌우 여백은 .tree-row가 낸다 — 컨테이너가 또 주면 짝수 행 줄무늬가 테두리에 못 닿아
          목록이 아니라 들여쓴 문단처럼 보인다. */
       padding: 0;
     }
-    /* 행이 nowrap이라 긴 이름은 가로로 넘친다. 펼침(.expanded)의 overflow:visible이면 그 행이
-       카드 밖으로 삐져나오므로, 세로 상한이 풀린 뒤에는 auto로 되돌려 가로만 스크롤시킨다. */
-    #diff.expanded, #bindTree.expanded, #compTree.expanded { overflow: auto; }
     .tree-row { display: flex; align-items: center; gap: 5px; padding: 2px 7px; white-space: nowrap; }
     .tree-row:nth-child(even) { background: var(--surface-2); }
     .tree-row.header { opacity: 1; color: var(--muted); background: none; }
@@ -398,7 +345,7 @@
        공백 들여쓰기는 폭이 좁아지면 줄바꿈에 먹혀 사라지고, 줄이 접히면 행 높이까지 들쭉날쭉해져
        "행 높이가 균일해야 스냅이 성립한다"는 전제가 깨진다 → 들여쓰기는 CSS, 줄바꿈은 금지.
        한 줄로 자른 대신 전체 문구는 ui.ts가 title로 붙인다(빈 조합 이름은 길다). */
-    #variantReport { font-family: var(--mono); font-size: 11px; --list-cap: clamp(160px, 28vh, 360px); }
+    #variantReport { font-family: var(--mono); font-size: 11px; overflow-x: auto; }
     .vr-row { line-height: 1.5; padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* 머리줄은 굵기·색만 다르게 — 글꼴 크기·패딩을 건드리면 행 높이가 어긋나 스냅이 깨진다. */
     .vr-row.vr-head { font-weight: 600; color: var(--text-2); }
@@ -531,12 +478,8 @@
           <span id="tidySumText"></span>
           <button id="btnTidyUndo" class="link" data-i18n="colorTidy.undo">되돌리기</button>
         </div>
-        <div id="colorTable" class="list-region"></div>
+        <div id="colorTable" class="results"></div>
         <!-- 표가 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-        <div class="list-more" id="colorTableMore" style="display:none">
-          <span class="list-count" id="colorTableCount"></span>
-          <button class="link" id="btnColorTableExpand" data-i18n="list.expandAll">모두 펼치기</button>
-        </div>
         <div class="row"><button id="btnColorRoles" data-i18n="colorTable.applyBtn">시맨틱 매핑에 반영</button></div>
         <datalist id="roleList">
           <option value="surface"></option><option value="surface/muted"></option>
@@ -556,12 +499,7 @@
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체 선택</span></label>
         <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
       </div>
-      <div id="tokenList" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="tokenListMore" style="display:none">
-        <span class="list-count" id="tokenListCount"></span>
-        <button class="link" id="btnTokenListExpand" data-i18n="list.expandAll">모두 펼치기</button>
-      </div>
+      <div id="tokenList" class="results"></div>
       <div class="tidy tidy-note" id="numTidySummary" style="display:none">
         <span id="numTidyText"></span>
       </div>
@@ -621,7 +559,7 @@
            가로 스크롤도 같은 요소가 맡는다 — 축을 나누려 한 겹 더 감싸도 CSS가 overflow:visible을
            auto로 올려버려 결국 한 요소가 두 축을 다 갖는다. 가로 스크롤바 높이는 layoutList가
            offsetHeight−clientHeight로 함께 흡수하므로 세로 스냅은 어긋나지 않는다. -->
-      <div id="tsList" class="list-region">
+      <div id="tsList" class="results">
       <table id="tsTable" style="table-layout:fixed; width:100%; border-collapse:collapse; font-size:11px;">
         <colgroup>
           <col style="width:64px;" /><!-- 이름 -->
@@ -642,10 +580,6 @@
       </table>
       </div>
       <!-- 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="tsListMore" style="display:none">
-        <span class="list-count" id="tsListCount"></span>
-        <button class="link" id="btnTsListExpand" data-i18n="list.expandAll">모두 펼치기</button>
-      </div>
       <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">텍스트 스타일 등록</button>
       <label class="inline" style="margin-top:6px;"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록할 때 화면의 글자에도 적용</span></label>
       <div class="row" style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border);">
@@ -675,12 +609,7 @@
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
       </div>
-      <div id="bindTree" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="bindTreeMore" style="display:none">
-        <span class="list-count" id="bindTreeCount"></span>
-        <button class="link" id="btnBindTreeExpand">모두 펼치기</button>
-      </div>
+      <div id="bindTree" class="results"></div>
       <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐). -->
       <div class="skip-row" id="bindSkips" style="display:none"></div>
       <div class="ux" id="applyProgress" style="display:none">
@@ -703,12 +632,7 @@
       <div class="row tree-ctrls">
         <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
       </div>
-      <div id="diff" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="diffMore" style="display:none">
-        <span class="list-count" id="diffCount"></span>
-        <button class="link" id="btnDiffExpand">모두 펼치기</button>
-      </div>
+      <div id="diff" class="results"></div>
       <div class="ux">
         <div class="ux-h"><span class="ux-t" data-i18n="rename.undoTitle">되돌리기 안전장치</span></div>
         <div data-i18n="rename.undoBody">이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
@@ -731,17 +655,8 @@
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
       </div>
-      <div id="compTree" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="compTreeMore" style="display:none">
-        <span class="list-count" id="compTreeCount"></span>
-        <button class="link" id="btnCompTreeExpand">모두 펼치기</button>
-      </div>
-      <div id="variantReport" class="list-region"></div>
-      <div class="list-more" id="variantReportMore" style="display:none">
-        <span class="list-count" id="variantReportCount"></span>
-        <button class="link" id="btnVariantReportExpand">모두 펼치기</button>
-      </div>
+      <div id="compTree" class="results"></div>
+      <div id="variantReport" class="results"></div>
       <div class="status" id="componentStatus"></div>
     </div>
 
@@ -752,12 +667,7 @@
         <button id="btnScanSimilar" data-i18n="similar.scanBtn" title="선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)">닮은 프레임 스캔</button>
         <button id="btnComponentize" class="primary" data-i18n="similar.componentizeBtn" title="추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체">컴포넌트화</button>
       </div>
-      <div id="similarList" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 '모두 펼치기'(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="similarListMore" style="display:none">
-        <span class="list-count" id="similarListCount"></span>
-        <button class="link" id="btnSimilarListExpand" data-i18n="list.expandAll">모두 펼치기</button>
-      </div>
+      <div id="similarList" class="results"></div>
       <div class="status" id="similarStatus"></div>
     </div>
   </section>
@@ -1010,8 +920,6 @@
     "similar.hint": "\uAD6C\uC870\uAC00 \uAC19\uACE0 <b>\uB0B4\uC6A9\uB9CC \uB2E4\uB978</b> \uD504\uB808\uC784 \uC5EC\uB7EC \uAC1C\uB97C \uACE8\uB77C \uC2A4\uCE94\uD558\uBA74, \uD558\uB098\uB97C <b>\uB9C8\uC2A4\uD130</b>\uB85C \uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uACE0 \uB098\uBA38\uC9C0\uB294 <b>\uC778\uC2A4\uD134\uC2A4</b>\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uD504\uB808\uC784\uB9C8\uB2E4 \uB2E4\uB978 \uD14D\uC2A4\uD2B8\xB7\uC544\uC774\uCF58\uC740 <b>\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131</b>\uC73C\uB85C \uC5F4\uB9AC\uACE0, \uC774\uBBF8\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uC5D0\uC11C \uAC1C\uBCC4 \uAD50\uCCB4\uB429\uB2C8\uB2E4. \uB9C8\uC2A4\uD130\uB294 <b>\uB0B4\uC6A9\uC774 \uAC00\uC7A5 \uC798 \uCC44\uC6CC\uC9C4</b> \uD504\uB808\uC784\uC744 \uCD94\uCC9C\uD569\uB2C8\uB2E4(\uBE48 \uD14D\uC2A4\uD2B8\uAC00 \uB9CE\uC73C\uBA74 \uAC10\uC810). <b>\uC2A4\uCE94\uC740 \uBB34\uB8CC</b>, \uC2E4\uC81C \uAD50\uCCB4\uB9CC Paid.",
     "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uC2A4\uCE94",
     "similar.componentizeBtn": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
-    // 목록 공통(상한 해제 — 여러 카드가 같은 문구를 쓴다)
-    "list.expandAll": "\uBAA8\uB450 \uD3BC\uCE58\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.",
@@ -2051,78 +1959,6 @@
   var previewRevealed = false;
   var lastTidy = { before: 0, after: 0, merged: 0 };
   var pendingCreatePreview = false;
-  var LIST_REGIONS = [
-    { mount: "tokenList", row: ".tk", more: "tokenListMore", count: "tokenListCount", expand: "btnTokenListExpand" },
-    { mount: "colorTable", row: ".crow", more: "colorTableMore", count: "colorTableCount", expand: "btnColorTableExpand" },
-    { mount: "variantReport", row: ".vr-row", more: "variantReportMore", count: "variantReportCount", expand: "btnVariantReportExpand" },
-    { mount: "similarList", row: ".simrow", more: "similarListMore", count: "similarListCount", expand: "btnSimilarListExpand" },
-    // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
-    // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
-    { mount: "bindTree", row: ".tree-row", more: "bindTreeMore", count: "bindTreeCount", expand: "btnBindTreeExpand" },
-    { mount: "diff", row: ".tree-row", more: "diffMore", count: "diffCount", expand: "btnDiffExpand" },
-    { mount: "compTree", row: ".tree-row", more: "compTreeMore", count: "compTreeCount", expand: "btnCompTreeExpand" },
-    // 텍스트 스타일 표 — 마운트는 표를 감싼 래퍼다(표 박스는 스크롤 컨테이너가 못 된다).
-    // 행은 tbody의 tr만(thead의 헤더 행이 한 행으로 세어지면 개수와 행 높이가 둘 다 틀어진다).
-    { mount: "tsList", row: "tbody tr", more: "tsListMore", count: "tsListCount", expand: "btnTsListExpand", stickyHead: "thead" }
-  ];
-  var listExpanded = /* @__PURE__ */ new Set();
-  function layoutList(r) {
-    const box = document.getElementById(r.mount);
-    const more = document.getElementById(r.more);
-    const label = document.getElementById(r.count);
-    const btn = document.getElementById(r.expand);
-    if (!box || !more || !label || !btn) return;
-    const expanded = listExpanded.has(r.mount);
-    box.style.height = "";
-    const rows = box.querySelectorAll(r.row);
-    if (!rows.length) {
-      listExpanded.delete(r.mount);
-      box.classList.remove("framed", "scrolls", "expanded");
-      more.style.display = "none";
-      return;
-    }
-    box.classList.add("framed");
-    box.classList.toggle("expanded", expanded);
-    box.classList.toggle("scrolls", !expanded);
-    if (expanded) {
-      more.style.display = "";
-      label.textContent = `\uCD1D ${rows.length}\uAC1C \uBAA8\uB450 \uD45C\uC2DC`;
-      btn.textContent = "\uC811\uAE30";
-      return;
-    }
-    const rowH = rows[0].getBoundingClientRect().height;
-    if (!rowH || box.scrollHeight <= box.clientHeight + 1) {
-      more.style.display = "none";
-      return;
-    }
-    const cs = getComputedStyle(box);
-    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    const head = r.stickyHead ? box.querySelector(r.stickyHead) : null;
-    const headH = head ? head.getBoundingClientRect().height : 0;
-    box.style.scrollPaddingTop = headH ? `${headH}px` : "";
-    const shown = Math.max(1, Math.floor((box.clientHeight - padY - headH) / rowH));
-    const borderY = box.offsetHeight - box.clientHeight;
-    box.style.height = `${Math.ceil(shown * rowH + headH) + padY + borderY}px`;
-    more.style.display = "";
-    label.textContent = `\uCD1D ${rows.length}\uAC1C \uC911 ${shown}\uAC1C \uD45C\uC2DC \u2014 \uC2A4\uD06C\uB864\uD558\uAC70\uB098`;
-    btn.textContent = "\uBAA8\uB450 \uD3BC\uCE58\uAE30";
-  }
-  function layoutListBy(mountId) {
-    const r = LIST_REGIONS.find((x) => x.mount === mountId);
-    if (r) layoutList(r);
-  }
-  function layoutAllLists() {
-    for (const r of LIST_REGIONS) layoutList(r);
-  }
-  for (const r of LIST_REGIONS) {
-    const btn = document.getElementById(r.expand);
-    if (!btn) continue;
-    btn.addEventListener("click", () => {
-      if (listExpanded.has(r.mount)) listExpanded.delete(r.mount);
-      else listExpanded.add(r.mount);
-      layoutList(r);
-    });
-  }
   function renderTokens() {
     const box = $("tokenList");
     const others = creatableTokens();
@@ -2134,7 +1970,6 @@
       hint.textContent = msg;
       box.appendChild(hint);
       updateTokenCreate();
-      layoutListBy("tokenList");
     };
     if (!tokens.length) {
       showHint(lastSelCount > 0 ? "\u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC740 \uC0C9\uC744, \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB294 \uC0C9 \uC678 \uD1A0\uD070\uC744 \uD45C\uC2DC\uD569\uB2C8\uB2E4." : "\uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uACE0 \u2018\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uC138\uC694.");
@@ -2150,7 +1985,7 @@
     }
     box.classList.toggle("has-swatch", others.some((o) => o.category === "effectColor" && typeof o.value === "string"));
     $("tokenCtrls").style.display = "";
-    renderChunked(box, others, makeTokenRow, () => layoutListBy("tokenList"));
+    renderChunked(box, others, makeTokenRow);
     updateTokenCreate();
   }
   function updateTokenCreate() {
@@ -2237,7 +2072,6 @@
       card.style.display = "none";
       $("colorCount").textContent = "";
       $("colorTable").innerHTML = "";
-      layoutListBy("colorTable");
       return;
     }
     card.style.display = "";
@@ -2264,7 +2098,7 @@
       role.dataset.name = t2.name;
       row.append(sw, name, role);
       return row;
-    }, () => layoutListBy("colorTable"));
+    });
   }
   function applyColorRoles() {
     const map = {};
@@ -2521,7 +2355,6 @@
     del.title = "\uD589 \uC0AD\uC81C";
     del.addEventListener("click", () => {
       tr.remove();
-      layoutListBy("tsList");
     });
     tdDel.appendChild(del);
     tr.appendChild(tdDel);
@@ -2531,7 +2364,6 @@
     const tbody = $("tsRows");
     tbody.innerHTML = "";
     for (const s of specs) tbody.appendChild(textStyleRow(s, locked));
-    layoutListBy("tsList");
   }
   function readTextStyleRows() {
     const specs = [];
@@ -2569,7 +2401,6 @@
     var _a;
     const tr = textStyleRow({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: "Regular" });
     $("tsRows").appendChild(tr);
-    layoutListBy("tsList");
     tr.scrollIntoView({ block: "nearest" });
     (_a = tr.querySelector('input[data-field="name"]')) == null ? void 0 : _a.focus();
   });
@@ -3456,7 +3287,7 @@
   function renderSelectableTree(mount, rows, checked, opts) {
     const base = rows.length ? baseDepth(rows) : 0;
     const visible = rows.filter((r) => r.change !== void 0 || r.header || !opts.hideContext);
-    renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange), () => layoutListBy(mount.id));
+    renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
   }
   var renameNodes = [];
   var renameChecked = /* @__PURE__ */ new Set();
@@ -3505,7 +3336,6 @@
     renameChecked.clear();
     clearMount($("diff"));
     $("renameCount").textContent = "";
-    layoutListBy("diff");
     $("btnRename").disabled = true;
     setStatus("renameStatus", t("rename.applied", { count: msg.changes.length }), "ok");
   }
@@ -3577,7 +3407,6 @@
     bindChecked.clear();
     clearMount($("bindTree"));
     $("bindCount").textContent = "";
-    layoutListBy("bindTree");
     $("bindTreeCtrls").style.display = "none";
     $("btnApplyConfirm").style.display = "none";
   }
@@ -3625,7 +3454,6 @@
     compChecked.clear();
     clearMount($("compTree"));
     $("compCount").textContent = "";
-    layoutListBy("compTree");
     $("compTreeCtrls").style.display = "none";
   }
   function makeVariantReportRow(l) {
@@ -3652,19 +3480,17 @@
       const marker = s.marker ? ` vr-${s.marker}` : "";
       for (const it of s.items) lines.push({ text: it, cls: `vr-row vr-item${warn}${marker}` });
     }
-    renderChunked($("variantReport"), lines, makeVariantReportRow, () => layoutListBy("variantReport"));
+    renderChunked($("variantReport"), lines, makeVariantReportRow);
   }
   function refreshTreeEmptyStates() {
     const guide = "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uB4DC\uB824\uC694.";
     if (!hasBindPreview()) {
       if (lastSelCount === 0) renderEmptyState($("bindTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC5B4\uC694", guide);
       else clearMount($("bindTree"));
-      layoutListBy("bindTree");
     }
     if (compCandidates.length === 0) {
       if (lastSelCount === 0) renderEmptyState($("compTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC5B4\uC694", guide);
       else clearMount($("compTree"));
-      layoutListBy("compTree");
     }
   }
   var bindSkips = [];
@@ -3747,7 +3573,7 @@
     similarMasterId = msg.recommendedMasterId;
     $("similarCount").textContent = msg.metas.length ? `\xB7 \uB300\uC0C1 ${msg.metas.length}\uAC1C` : "";
     const box = $("similarList");
-    renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId), () => layoutListBy("similarList"));
+    renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId));
     if (!msg.metas.length) {
       const why = msg.excluded.length ? msg.excluded[0].reason : "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC744 2\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD558\uC138\uC694.";
       setStatus("similarStatus", `\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD560 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 ${why}`, "warn");
@@ -3828,7 +3654,6 @@
       head.addEventListener("click", (e) => {
         if (e.target.closest("button")) return;
         card.classList.toggle("collapsed");
-        if (!card.classList.contains("collapsed")) layoutAllLists();
       });
     });
   }
@@ -3852,11 +3677,6 @@
     ro.observe($("selBarWrap"));
   }
   window.addEventListener("resize", syncStickyOffsets);
-  var listResizeTimer = 0;
-  window.addEventListener("resize", () => {
-    clearTimeout(listResizeTimer);
-    listResizeTimer = window.setTimeout(layoutAllLists, 100);
-  });
   updateGates();
   renderPipeline();
   renderTokens();
@@ -3878,7 +3698,6 @@
       btn.tabIndex = on ? 0 : -1;
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
-    layoutAllLists();
     if (name !== "settings") send({ type: "GET_PREREQ" });
   }
   TABS.forEach((t2, i) => {
@@ -3906,7 +3725,6 @@
       if (on) b.setAttribute("aria-current", "step");
       else b.removeAttribute("aria-current");
     }
-    layoutAllLists();
   }
   var showMakeStep = (s) => showStep("make", s);
   var showApplyStep = (s) => showStep("apply", s);
