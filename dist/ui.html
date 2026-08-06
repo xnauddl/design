@@ -294,6 +294,8 @@
       padding-bottom: 8px; border-bottom: 1px solid var(--border);
     }
     .toolbar .grow { flex: 1 1 auto; } /* 주 버튼을 오른쪽 끝으로 미는 공백 */
+    /* 아래에 목록이 없는 카드(내보내기)는 구분선을 긋지 않는다 — 가를 것이 없다. */
+    .toolbar.flush { padding-bottom: 0; border-bottom: 0; }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
     .btn-next { border-color: transparent; color: var(--text-2); }
@@ -665,40 +667,40 @@
         <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
         <label class="inline"><span data-i18n="settings.depth">리네임 맥락 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
       </div>
+      <!-- 허용오차는 못 바꾸지만 값은 보여준다 — 기준 크기·깊이와 같은 필드 문법이라야
+           '무엇이 정해져 있는지'가 한눈에 들어온다(회색 문장은 읽히지 않고 사라진다). -->
       <div class="row">
-        <span class="muted" data-i18n="settings.tol">허용오차 0.5px 고정 · 여백·크기 격자 8px 고정</span>
+        <label class="inline" title="바인딩은 값 차이가 0.5px 이하일 때 같은 값으로 봅니다. 여백·크기는 미리보기에서 8px 격자로 자동 스냅합니다."><span data-i18n="settings.tol">허용오차</span> <input id="tol" type="number" value="0.5" disabled />px <span class="muted" data-i18n="settings.fixed">고정</span></label>
       </div>
     </div>
 
     <div class="step">
-      <h2 data-i18n="export.title">내보내기 (코드)</h2>
+      <h2 data-i18n="export.title">변수 → 코드</h2>
       <div class="hint" data-i18n="export.hint">Figma 변수를 코드 파일로 · 패널 목록·미리보기 없음</div>
-      <div class="row">
-        <label class="inline"><span data-i18n="export.format">형식</span>
-          <select id="exportFormat">
-            <option value="w3c">W3C 토큰 JSON</option>
-            <option value="css">CSS 변수</option>
-          </select>
-        </label>
-        <label class="inline"><span data-i18n="export.fontUnit">폰트 크기</span>
-          <select id="exportFontUnit">
-            <option value="px">px</option>
-            <option value="rem">rem</option>
-          </select>
-        </label>
-      </div>
-      <div class="row">
+      <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바 오른쪽 끝. 선택지는 값 자체가 라벨이라
+           '형식'·'폰트 크기' 머리말 없이 셀렉트만 둔다(툴팁으로 보완). -->
+      <div class="toolbar flush">
+        <select id="exportFormat" title="내보낼 코드 형식">
+          <option value="w3c">W3C 토큰 JSON</option>
+          <option value="css">CSS 변수</option>
+        </select>
+        <select id="exportFontUnit" title="폰트 크기 단위 — rem은 기준 크기로 나눕니다">
+          <option value="px">px</option>
+          <option value="rem">rem</option>
+        </select>
+        <span class="grow"></span>
         <button id="btnExport" class="primary" data-i18n="export.runBtn">내보내기</button>
       </div>
       <div class="status" id="exportStatus"></div>
     </div>
 
     <div class="step">
-      <h2 data-i18n="license.title">요금제 / 라이선스</h2>
+      <h2 data-i18n="license.title">라이선스</h2>
       <div class="row">
         <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
         <button id="btnVerify" data-i18n="license.verify">검증</button>
-        <button id="btnClearLicense" data-i18n="license.clear">해제</button>
+        <!-- 와이어엔 없지만 남긴다: 기기 1대 한도라 이 버튼 없이는 기기를 옮길 방법이 없다. -->
+        <button id="btnClearLicense" title="이 기기의 활성화를 반납합니다. 새 기기에서 같은 키를 다시 검증하면 됩니다." data-i18n="license.clear">해제</button>
       </div>
       <div class="muted" id="licenseInfo"></div>
       <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유.
@@ -707,8 +709,8 @@
         <button id="btnBuy" class="primary">구독하기</button>
         <button id="btnPortal" title="구독·결제수단 변경, 기기 활성화 해제(기기 1대 한도)">구독 관리</button>
       </div>
-      <div class="hint" id="licenseLinkHint">Paid는 연 $39. 기기 1대까지 활성화되며, 기기를 옮기려면 ‘해제’ 후 새 기기에서 키를 다시 검증하세요.</div>
-      <div class="hint" id="licenseSetupHint" style="display:none">결제·검증 서버가 아직 연결되지 않았습니다(배포 전). 키 검증과 구독 링크는 배포 후 동작합니다.</div>
+      <div class="hint" id="licenseLinkHint">Free · Paid 연 $39 · 기기 1대</div>
+      <div class="hint" id="licenseSetupHint" style="display:none">배포 전 — 키 검증·구독 링크는 아직 동작하지 않습니다.</div>
       <!-- 개발용 강제 티어: 사용자 화면 비노출(개발 시 display 해제). #tier id는 ui.ts가 참조하므로 DOM 유지. -->
       <div class="row" id="devTierRow" style="display:none;">
         <label class="inline"><span data-i18n="license.devTier">개발용 강제 티어</span>
@@ -722,11 +724,6 @@
       <div class="status" id="licenseStatus"></div>
     </div>
 
-    <!-- 접근성 / 국제화 -->
-    <div class="ux">
-      <div class="ux-h"><span class="ux-t" data-i18n="a11y.title">접근성 · 국제화</span></div>
-      <div data-i18n="a11y.body">키보드 전용 조작 · 명도 대비 AA · i18n</div>
-    </div>
   </section>
 
   <!-- 창 리사이즈 핸들(우하단) -->
@@ -974,7 +971,8 @@
     "settings.hint": "\uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9 \uD0ED\uC5D0\uC11C\uB294 \uC548 \uBCF4\uC785\uB2C8\uB2E4. \uBC14\uAFB8\uBA74 \uC774 \uD30C\uC77C\uC5D0 \uAE30\uC5B5\uB429\uB2C8\uB2E4.",
     "settings.base": "\uAE30\uC900 \uD06C\uAE30",
     "settings.depth": "\uB9AC\uB124\uC784 \uB9E5\uB77D \uAE4A\uC774",
-    "settings.tol": "\uD5C8\uC6A9\uC624\uCC28 0.5px \uACE0\uC815 \xB7 \uC5EC\uBC31\xB7\uD06C\uAE30 \uACA9\uC790 8px \uACE0\uC815",
+    "settings.tol": "\uD5C8\uC6A9\uC624\uCC28",
+    "settings.fixed": "\uACE0\uC815",
     // 마법사 카드
     "wizardCard.title": "\uC2DC\uC2A4\uD15C\uD654 \uB9C8\uBC95\uC0AC",
     "wizardCard.hint": "\uCD94\uCD9C \u2192 \uD1A0\uD070 \u2192 \uBC14\uC778\uB529 \u2192 \uC815\uB3C8",
@@ -1055,20 +1053,16 @@
     "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
     "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4. (Paid)",
     // 내보내기
-    "export.title": "\uB0B4\uBCF4\uB0B4\uAE30 (\uCF54\uB4DC)",
+    "export.title": "\uBCC0\uC218 \u2192 \uCF54\uB4DC",
     "export.hint": "Figma \uBCC0\uC218\uB97C \uCF54\uB4DC \uD30C\uC77C\uB85C \xB7 \uD328\uB110 \uBAA9\uB85D\xB7\uBBF8\uB9AC\uBCF4\uAE30 \uC5C6\uC74C",
-    "export.format": "\uD615\uC2DD",
-    "export.fontUnit": "\uD3F0\uD2B8 \uD06C\uAE30",
     "export.runBtn": "\uB0B4\uBCF4\uB0B4\uAE30",
     // 요금제 / 라이선스
-    "license.title": "\uC694\uAE08\uC81C / \uB77C\uC774\uC120\uC2A4",
+    "license.title": "\uB77C\uC774\uC120\uC2A4",
     "license.verify": "\uAC80\uC99D",
     "license.clear": "\uD574\uC81C",
     "license.devTier": "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C \uD2F0\uC5B4",
-    "license.devTierNote": "(\uAC80\uC99D\uB41C \uD0A4\uAC00 \uC5C6\uC744 \uB54C\uB9CC \uC801\uC6A9)",
+    "license.devTierNote": "(\uAC80\uC99D\uB41C \uD0A4\uAC00 \uC5C6\uC744 \uB54C\uB9CC \uC801\uC6A9)"
     // 접근성 · 국제화
-    "a11y.title": "\uC811\uADFC\uC131 \xB7 \uAD6D\uC81C\uD654",
-    "a11y.body": "\uD0A4\uBCF4\uB4DC \uC804\uC6A9 \uC870\uC791 \xB7 \uBA85\uB3C4 \uB300\uBE44 AA \xB7 i18n"
   };
   function hasString(key) {
     return Object.prototype.hasOwnProperty.call(STRINGS, key);

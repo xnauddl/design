@@ -169,7 +169,8 @@ export const STRINGS: Record<string, string> = {
   'settings.hint': '만들기·적용 탭에서는 안 보입니다. 바꾸면 이 파일에 기억됩니다.',
   'settings.base': '기준 크기',
   'settings.depth': '리네임 맥락 깊이',
-  'settings.tol': '허용오차 0.5px 고정 · 여백·크기 격자 8px 고정',
+  'settings.tol': '허용오차',
+  'settings.fixed': '고정',
   // 마법사 카드
   'wizardCard.title': '시스템화 마법사',
   'wizardCard.hint': '추출 → 토큰 → 바인딩 → 정돈',
@@ -250,20 +251,16 @@ export const STRINGS: Record<string, string> = {
   'similar.scanHelp': '구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.',
   'similar.componentizeHelp': '마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다. (Paid)',
   // 내보내기
-  'export.title': '내보내기 (코드)',
+  'export.title': '변수 → 코드',
   'export.hint': 'Figma 변수를 코드 파일로 · 패널 목록·미리보기 없음',
-  'export.format': '형식',
-  'export.fontUnit': '폰트 크기',
   'export.runBtn': '내보내기',
   // 요금제 / 라이선스
-  'license.title': '요금제 / 라이선스',
+  'license.title': '라이선스',
   'license.verify': '검증',
   'license.clear': '해제',
   'license.devTier': '개발용 강제 티어',
   'license.devTierNote': '(검증된 키가 없을 때만 적용)',
   // 접근성 · 국제화
-  'a11y.title': '접근성 · 국제화',
-  'a11y.body': '키보드 전용 조작 · 명도 대비 AA · i18n',
 };
 
 /** 해당 키가 STRINGS에 정의돼 있는가. 정적 라벨 하이드레이션이 오타 키로 원문을 덮지 않도록 쓴다. */
