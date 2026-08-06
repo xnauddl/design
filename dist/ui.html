@@ -3827,6 +3827,7 @@
       lastSent = h;
       send({ type: "RESIZE", height: h, commit });
     };
+    const GRAB_MARGIN = 10;
     let startY = 0;
     let startH = 0;
     handle.addEventListener("pointerdown", (e) => {
@@ -3844,7 +3845,8 @@
     });
     handle.addEventListener("pointermove", (e) => {
       if (!resizing) return;
-      pending = Math.round(startH + (e.clientY - startY));
+      const y = e.clientY;
+      pending = Math.round(Math.max(startH + (y - startY), y + GRAB_MARGIN));
       if (!raf) raf = requestAnimationFrame(() => {
         raf = 0;
         flush(false);
@@ -3868,7 +3870,6 @@
     handle.addEventListener("pointercancel", end);
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
-    window.addEventListener("blur", () => end(new Event("blur")));
   })();
 })();
 

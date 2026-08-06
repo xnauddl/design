@@ -2653,6 +2653,10 @@ for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-ap
     lastSent = h;
     send({ type: 'RESIZE', height: h, commit });
   };
+  // 포인터 캡처는 iframe 경계를 넘지 못한다 — 포인터가 플러그인 창 밖으로 나가는 순간
+  // pointermove가 이 문서로 오지 않고, 드래그가 그대로 멎는다. 아래로 끌어 키울 때
+  // 정확히 이 일이 난다. 그래서 창을 늘 포인터보다 이만큼 크게 잡아 포인터를 창 안에 붙든다.
+  const GRAB_MARGIN = 10;
   // 잡은 지점을 기준으로 이동량만 더한다. 포인터 좌표를 그대로 높이로 쓰면 손잡이의
   // 위쪽을 잡았을 때 창이 그만큼 튀어 올라간다(손잡이가 18px이라 눈에 띈다).
   let startY = 0;
@@ -2669,7 +2673,10 @@ for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-ap
   });
   handle.addEventListener('pointermove', (e) => {
     if (!resizing) return;
-    pending = Math.round(startH + ((e as PointerEvent).clientY - startY));
+    const y = (e as PointerEvent).clientY;
+    // 둘 중 큰 값: 잡은 지점 기준 이동량(튐 없음)과, 포인터보다 GRAB_MARGIN만큼 큰 높이(안 멎음).
+    // 손잡이 위쪽을 잡으면 앞이, 아래 끝을 잡으면 뒤가 이긴다.
+    pending = Math.round(Math.max(startH + (y - startY), y + GRAB_MARGIN));
     if (!raf) raf = requestAnimationFrame(() => { raf = 0; flush(false); }); // rAF 스로틀
   });
   const end = (e: Event): void => {
@@ -2682,9 +2689,10 @@ for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-ap
   };
   handle.addEventListener('pointerup', end);
   handle.addEventListener('pointercancel', end);
-  // 드래그 중 창이 계속 리사이즈되므로 포인터가 iframe 밖으로 나가 캡처가 풀릴 수 있다.
-  // 그때 pointerup을 놓치면 commit이 영영 안 나가 높이가 저장되지 않는다 → 창에서도 받는다.
+  // 캡처가 풀려 손잡이가 pointerup을 놓쳐도 드래그는 끝나야 한다 → 창에서도 받는다.
+  // blur로는 끝내지 않는다: 포인터가 창 밖으로 나가는 순간 blur가 오는 환경이 있어,
+  // 드래그가 시작하자마자 취소돼 '움직여도 안 커지는' 증상이 된다. 저장은 code.ts의
+  // 트레일링 쓰기가 책임지므로 여기서 무리하게 끝낼 이유도 없다.
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
-  window.addEventListener('blur', () => end(new Event('blur')));
 })();
