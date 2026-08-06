@@ -28,8 +28,8 @@ export interface WizardStepDef {
  *  표시 라벨은 i18n `wizard.step.<id>` 키로 UI가 해석(외부화). */
 export const WIZARD_STEPS: readonly WizardStepDef[] = [
   { id: 'extract', write: false, optional: false },
-  { id: 'create', write: true, optional: false },
-  { id: 'semantics', write: true, optional: true },
+  { id: 'create', write: true, optional: false, paid: true },
+  { id: 'semantics', write: true, optional: true, paid: true },
   { id: 'bind', write: true, optional: false },
   { id: 'rename', write: true, optional: false },
   { id: 'componentize', write: true, optional: true, paid: true },
@@ -58,13 +58,15 @@ export interface WizardPlanItem {
 
 /**
  * 옵션·컨텍스트로 각 단계의 실행 여부를 결정한다.
- * - 필수 단계: 항상 실행.
+ * - Paid 단계: Free면 **필수 단계여도** 건너뛴다. 보내 봐야 code가 PREMIUM_REQUIRED로
+ *   거부해 시퀀스 전체가 그 자리에서 멈춘다 — Free의 마법사는 추출·바인딩·리네임으로 완주해야 한다.
+ * - 그 외 필수 단계: 항상 실행.
  * - 선택 단계: 옵션이 꺼져 있으면 건너뜀.
  * - 시맨틱: 옵션이 켜져도 매핑이 없으면 건너뜀(만들 별칭이 없음).
- * - Paid 단계: 옵션이 켜져도 Free면 건너뜀.
  */
 export function planWizard(options: WizardOptions, ctx: WizardContext): WizardPlanItem[] {
   return WIZARD_STEPS.map((step) => {
+    if (step.paid && !ctx.isPaid) return { step, run: false, skipReason: 'wizard.skip.paid' };
     if (!step.optional) return { step, run: true };
     // skipReason은 i18n 키(UI가 t()로 해석 — 외부화).
     const enabled = options[step.id as keyof WizardOptions];

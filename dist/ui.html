@@ -1715,14 +1715,15 @@
   // src/lib/wizard.ts
   var WIZARD_STEPS = [
     { id: "extract", write: false, optional: false },
-    { id: "create", write: true, optional: false },
-    { id: "semantics", write: true, optional: true },
+    { id: "create", write: true, optional: false, paid: true },
+    { id: "semantics", write: true, optional: true, paid: true },
     { id: "bind", write: true, optional: false },
     { id: "rename", write: true, optional: false },
     { id: "componentize", write: true, optional: true, paid: true }
   ];
   function planWizard(options, ctx) {
     return WIZARD_STEPS.map((step) => {
+      if (step.paid && !ctx.isPaid) return { step, run: false, skipReason: "wizard.skip.paid" };
       if (!step.optional) return { step, run: true };
       const enabled = options[step.id];
       if (!enabled) return { step, run: false, skipReason: "wizard.skip.optionOff" };
@@ -2468,6 +2469,7 @@
     renderWizardSteps(plan);
     const totals = {};
     let stopped = false;
+    let failNote = "";
     for (const p of plan) {
       if (!p.run) continue;
       if (stopped) {
@@ -2529,14 +2531,19 @@
       } catch (e) {
         hideWizardBar();
         const fe = explainError(e instanceof Error ? e.message : String(e));
-        setWizardStep(p.step.id, "fail", `${fe.message}${fe.action ? ` \u2014 ${fe.action}` : ""}`);
+        failNote = `${fe.message}${fe.action ? ` \u2014 ${fe.action}` : ""}`;
+        setWizardStep(p.step.id, "fail", failNote);
         stopped = true;
       }
     }
     wizardRunning = false;
     $("btnWizardRun").disabled = false;
     $("btnWizardCancel").style.display = "none";
-    setStatus("wizardSummary", t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }), stopped ? "warn" : "ok");
+    setStatus(
+      "wizardSummary",
+      t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + (failNote ? ` \xB7 ${failNote}` : ""),
+      stopped ? "warn" : "ok"
+    );
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
   $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));

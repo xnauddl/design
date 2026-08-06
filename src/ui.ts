@@ -996,6 +996,7 @@ async function runWizard(): Promise<void> {
 
   const totals: WizardTotals = {};
   let stopped = false;
+  let failNote = ''; // 실패 사유 — 칩 툴팁에만 두면 화면에서 사라진다(요약 줄에 함께 싣는다)
 
   for (const p of plan) {
     if (!p.run) continue; // renderWizardSteps에서 이미 skip 표시
@@ -1059,7 +1060,8 @@ async function runWizard(): Promise<void> {
     } catch (e) {
       hideWizardBar();
       const fe = explainError(e instanceof Error ? e.message : String(e));
-      setWizardStep(p.step.id, 'fail', `${fe.message}${fe.action ? ` — ${fe.action}` : ''}`);
+      failNote = `${fe.message}${fe.action ? ` — ${fe.action}` : ''}`;
+      setWizardStep(p.step.id, 'fail', failNote);
       stopped = true;
     }
   }
@@ -1067,7 +1069,12 @@ async function runWizard(): Promise<void> {
   wizardRunning = false;
   ($('btnWizardRun') as HTMLButtonElement).disabled = false;
   $('btnWizardCancel').style.display = 'none';
-  setStatus('wizardSummary', t('wizard.result', { state: stopped ? t('wizard.stopped') : t('wizard.completed'), summary: summarize(totals) }), stopped ? 'warn' : 'ok');
+  setStatus(
+    'wizardSummary',
+    t('wizard.result', { state: stopped ? t('wizard.stopped') : t('wizard.completed'), summary: summarize(totals) }) +
+      (failNote ? ` · ${failNote}` : ''),
+    stopped ? 'warn' : 'ok',
+  );
 }
 
 $('btnWizardRun').addEventListener('click', () => void runWizard());
