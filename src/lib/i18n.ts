@@ -97,7 +97,6 @@ export const STRINGS: Record<string, string> = {
   'wizard.skip.optionOff': '옵션 꺼짐',
   'wizard.skip.noMapping': '매핑 없음',
   'wizard.skip.paid': 'Paid 전용',
-  'wizard.skip.default': '건너뜀',
 
   // 진행 안내(파이프라인) 단계 상태
   'pipeline.stat.done': '완료',
