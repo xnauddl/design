@@ -66,12 +66,12 @@ export const STRINGS: Record<string, string> = {
   'wizard.completed': '완료',
 
   // 다크 테마 생성
-  'dark.title': '다크 테마 생성',
+  'dark.title': '다크 테마',
   'dark.hint': '라이트 명도 반전 → Dark 모드(없으면 추가).',
-  'dark.collection': '대상 컬렉션',
-  'dark.fromMode': '라이트 모드',
-  'dark.toMode': '다크 모드',
-  'dark.genBtn': '다크 채우기',
+  'dark.collection': '컬렉션',
+  'dark.fromMode': '라이트',
+  'dark.toMode': '다크',
+  'dark.genBtn': '다크 생성',
   // 닮은 프레임 컴포넌트화
   'similar.scanBtn': '닮은 스캔',
   'similar.componentizeBtn': '컴포넌트화',
@@ -166,7 +166,7 @@ export const STRINGS: Record<string, string> = {
   'rail.next': '다음 →',
   // 플러그인 설정(#19) — 관리 탭에만
   'settings.title': '플러그인 설정',
-  'settings.hint': '만들기·적용 탭에서는 안 보입니다. 바꾸면 이 파일에 기억됩니다.',
+  'settings.hint': '만들기·적용 탭에서는 안 보임 · 여기서만 변경',
   'settings.base': '기준 크기',
   'settings.depth': '리네임 맥락 깊이',
   'settings.tol': '허용오차',
@@ -189,6 +189,8 @@ export const STRINGS: Record<string, string> = {
   'pipeline.indep': '리네임 · 컴포넌트는 독립',
   // 브랜드 팔레트
   'color.title': '색',
+  'color.scope': '추출 → 변수 · 팔레트',
+  'color.listHint': '추출·정리된 색 · Global = hue · Semantic = 역할',
   'color.makeVars': '색 변수 만들기',
   'palette.brand2': '보조색',
   'palette.harmony': '하모니',
@@ -203,7 +205,7 @@ export const STRINGS: Record<string, string> = {
   // 토큰 생성
   'create.title': '토큰 생성',
   'create.scopeHint': '간격·크기·폰트·효과만. 색은 이전 단계에서 변수화함.',
-  'create.selectAll': '전체 선택',
+  'create.selectAll': '전체',
   'create.dropOnce': '1× 해제',
   'create.previewBtn': '미리보기',
   'create.apply': '적용',
@@ -222,7 +224,7 @@ export const STRINGS: Record<string, string> = {
   'textStyle.applyOriginal': '등록 시 화면에 적용',
   'textStyle.registerBtn': '등록',
   // 적용(바인딩)
-  'bind.title': '적용 (바인딩)',
+  'bind.title': '바인딩',
   'bind.hint': '미리보기 → 골라 → 연결',
   'bind.preview': '미리보기',
   'bind.confirm': '선택에 바인딩',
@@ -233,13 +235,14 @@ export const STRINGS: Record<string, string> = {
   'rename.preview': '미리보기',
   'rename.apply': '이름 적용',
   'rename.undoTitle': '되돌리기 안전장치',
-  'rename.undoBody': '이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.',
+  'rename.undoBody': '이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있습니다.',
   // 컴포넌트 / 베리언트
   'structure.title': '구조',
+  'structure.scope': '컴포넌트 · 닮은 프레임',
   'structure.groupComp': '컴포넌트 후보',
   'structure.groupSimilar': '닮은 프레임',
   'structure.groupVariant': '선택한 컴포넌트 정리',
-  'component.hint': '<b>후보 스캔</b> → 골라 <b>등록</b>. 닮은 프레임은 스캔만 무료.',
+  'component.hint': '후보 스캔 후 등록 · 닮은 프레임은 스캔 Free',
   'component.scanBtn': '후보 스캔',
   'component.registerBtn': '컴포넌트 등록',
   'component.classifyBtn': '베리언트 분류',

@@ -323,13 +323,11 @@ function renderTokens(): void {
     updateTokenCreate();
   };
   if (!tokens.length) {
-    showHint(lastSelCount > 0
-      ? '‘선택에서 토큰 추출’은 색을, ‘미리보기’는 색 외 토큰을 표시합니다.'
-      : '프레임을 선택하고 ‘선택에서 토큰 추출’을 누르세요.');
+    showHint(lastSelCount > 0 ? '‘미리보기’를 누르세요.' : '프레임을 먼저 선택하세요.');
     return;
   }
   if (!previewRevealed) {
-    showHint('‘미리보기’를 누르면 생성할 색 외 토큰(간격·크기·폰트·효과)이 표시됩니다.');
+    showHint('‘미리보기’를 누르면 만들 토큰이 표시됩니다.');
     return;
   }
   // 와이어: 색은 이전 단계에서 이미 변수화됐다는 사실을 이 단계 첫 줄로 알린다.
@@ -567,7 +565,7 @@ function undoTidy(): void {
   renderColorTable();
   suggestSemMapFrom(tokens);
   ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 집합 변경 → 새 미리보기 필요
-  setStatus('colorStatus', `정리를 되돌렸어요 · 추출 색 ${new Set(colorHexes()).size}개`, '');
+  setStatus('colorStatus', `정리 되돌림 · 추출 색 ${new Set(colorHexes()).size}개`, '');
 }
 $('btnTidyUndo').addEventListener('click', undoTidy);
 
@@ -641,7 +639,7 @@ $('btnTokenDropOnce').addEventListener('click', () => {
   const once = creatableTokens().filter((t) => (t.count ?? 0) <= 1);
   for (const t of once) tokenChecked.delete(tokenKey(t));
   renderTokens();
-  setStatus('createStatus', once.length ? `1회만 쓰인 ${once.length}개를 해제했어요.` : '1회만 쓰인 토큰이 없어요.', '');
+  setStatus('createStatus', once.length ? `1× 토큰 ${once.length}개 해제` : '1× 토큰이 없습니다', '');
 });
 
 $('btnCreate').addEventListener('click', () => {
@@ -767,7 +765,7 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
   });
   if (s.boundStyleId) {
     name.classList.add('ts-bound');
-    name.title = '이미 등록된 스타일이에요. 이름을 바꾸면 이 스타일의 이름만 바뀝니다(새로 안 만듦).';
+    name.title = '이미 등록된 스타일입니다. 이름을 바꾸면 이 스타일의 이름만 바뀝니다(새로 만들지 않음).';
   } else {
     name.classList.add('ts-new');
     name.title = '새 스타일로 등록됩니다(아직 등록 안 된 글자).';
@@ -1174,7 +1172,7 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
    Free/Paid 2티어. Paid에서 해금: 팔레트·토큰 생성(미리보기+적용)·시맨틱·텍스트 스타일·
    컴포넌트/베리언트·공유 프리셋.
    Free: 추출·색 정리·바인딩·리네임·명도 대비·내보내기. */
-const PAID_LOCK = '🔒 Paid 전용';
+const PAID_LOCK = '🔒'; // 와이어의 잠금 배지는 자물쇠 하나 — 사유는 버튼·배지 툴팁(setLockTitle)
 /** 유료 거부(PREMIUM_REQUIRED) 안내를 띄울 카드 — Feature별 상태 영역. */
 const PREMIUM_STATUS_ID: Record<Feature, string> = {
   tokens: 'createStatus',
@@ -1208,7 +1206,9 @@ function updateGates(): void {
     el.disabled = !isPaid;
     setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
   }
-  for (const id of ['paletteLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
+  // 색 카드는 Free('선택에서 추출')와 Paid('팔레트 생성')가 한 툴바에 섞여 있어
+  // 카드 배지만으로는 어느 쪽이 잠긴 건지 알 수 없다 → 그 버튼에도 자물쇠를 붙인다(와이어).
+  for (const id of ['paletteLock', 'paletteBtnLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
   // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가
@@ -1362,7 +1362,7 @@ function refreshDarkModes(): void {
     text.textContent = ok
       ? ''
       : modes.length
-        ? '이 컬렉션에 모드가 하나뿐이에요. Figma에서 다크 모드를 추가한 뒤 다시 시도하세요.'
+        ? '모드가 하나뿐입니다 — Figma에서 다크 모드를 추가하세요.'
         : '먼저 토큰을 생성해 변수를 만드세요.';
   }
   // 모드가 2개 이상이면 서로 다른 모드가 기본으로 잡히게 — 같은 모드끼리면 덮어써도 의미가 없다.
@@ -1486,10 +1486,9 @@ $('btnPortal').addEventListener('click', () => send({ type: 'OPEN_LICENSE_LINK',
 
 // 배포 전(자리표시자 URL)에는 구독 버튼을 숨긴다 — 눌러도 없는 페이지로 가서 혼란만 준다.
 // URL을 실제 값으로 갈아끼우면 조건이 자동으로 풀려 다시 노출된다.
-if (!licenseLinksConfigured()) {
-  $('licenseLinkRow').style.display = 'none';
-  $('licenseLinkHint').style.display = 'none';
-}
+// 요금 한 줄('Free · Paid 연 $39 · 기기 1대')은 링크와 무관한 사실이라 항상 남긴다 —
+// 와이어에도 카드 마지막 줄로 있고, 이게 없으면 Free 사용자는 값을 알 방법이 없다.
+if (!licenseLinksConfigured()) $('licenseLinkRow').style.display = 'none';
 // 검증 서버·공개키가 미설정이면 키를 넣어도 반드시 '서명 검증 실패'가 난다. 그 이유를 미리 밝힌다.
 if (!licenseVerifyConfigured()) $('licenseSetupHint').style.display = '';
 
@@ -1602,11 +1601,11 @@ window.onmessage = (event: MessageEvent) => {
     case 'SELECT_RESULT':
       // 미리보기 이후 레이어가 지워졌거나 다른 페이지로 옮겨졌으면 그만큼 못 찾는다 — 조용히 실패하지 않게.
       if (msg.capped) {
-        setStatus('applyStatus', `레이어 ${msg.found}개만 선택했어요 — 한 번에 보여줄 수 있는 상한(${msg.requested}개 중)입니다.`, 'warn');
+        setStatus('applyStatus', `레이어 ${msg.found}개만 선택 — 한 번에 보여줄 수 있는 상한(${msg.requested}개 중)입니다.`, 'warn');
       } else if (msg.found < msg.requested) {
         setStatus('applyStatus', msg.found
-          ? `레이어 ${msg.found}개 선택 — ${msg.requested - msg.found}개는 삭제됐거나 다른 페이지에 있어요.`
-          : '레이어를 찾지 못했어요 — 삭제됐거나 다른 페이지에 있습니다. 미리보기를 다시 실행해 주세요.', 'warn');
+          ? `레이어 ${msg.found}개 선택 — ${msg.requested - msg.found}개는 삭제됐거나 다른 페이지입니다.`
+          : '레이어를 찾지 못했습니다 — 삭제됐거나 다른 페이지입니다. 미리보기를 다시 실행하세요.', 'warn');
       }
       break;
     case 'RENAME_RESULT':
@@ -1765,8 +1764,8 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'DARK_MODE_RESULT': {
       if (!msg.realiased) {
-        const why = msg.skipped ? `Global을 가리키는 색이 없어요(건너뜀 ${msg.skipped}개)` : '대상 색이 없어요';
-        setStatus('darkStatus', `다크 값을 채우지 못했어요 — ${why}`, 'warn');
+        const why = msg.skipped ? `Global을 가리키는 색이 없습니다(건너뜀 ${msg.skipped}개)` : '대상 색이 없습니다';
+        setStatus('darkStatus', `다크 값을 채우지 못했습니다 — ${why}`, 'warn');
         break;
       }
       const skip = msg.skipped ? ` · 건너뜀 ${msg.skipped}개(값을 직접 넣은 색)` : '';
@@ -1779,7 +1778,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'COMPONENTIZE_RESULT': {
       if (!msg.instances) {
         // 교체가 하나도 없으면 실패다 — 경고를 그대로 보여줘야 원인을 안다.
-        setStatus('structureStatus', `컴포넌트화하지 못했어요${msg.warnings.length ? ` — ${msg.warnings[0]}` : ''}`, 'warn');
+        setStatus('structureStatus', `컴포넌트화하지 못했습니다${msg.warnings.length ? ` — ${msg.warnings[0]}` : ''}`, 'warn');
         break;
       }
       const parts = [`마스터 ${msg.master}`, `인스턴스 ${msg.instances}개`];
@@ -2219,15 +2218,15 @@ function renderVariantReport(sections: VariantReportSection[]): void {
 /** 선택 의존 카드(바인딩·컴포넌트)의 빈 상태(캐논 108:2) — 미리보기/후보가 없을 때만,
     무선택이면 캐논 빈 상태를 표시하고, 선택이 있으면 비워 둔다(액션 버튼이 흐름을 주도). */
 function refreshTreeEmptyStates(): void {
-  const guide = '프레임이나 레이어를 선택하면 후보를 찾아드려요.';
+  const guide = '프레임이나 레이어를 선택하세요.';
   // 어느 쪽이든 행은 0건이다 — 안내 문구는 스크롤 영역이 아니므로 테두리·개수 줄을 걷어야 한다.
   // (예전 :empty 규칙은 안내 문구가 들어찬 순간 자식이 생겨 안 먹었다.)
   if (!hasBindPreview()) {
-    if (lastSelCount === 0) renderEmptyState($('bindTree'), '선택한 노드가 없어요', guide);
+    if (lastSelCount === 0) renderEmptyState($('bindTree'), '선택한 노드가 없습니다', guide);
     else clearMount($('bindTree'));
   }
   if (compCandidates.length === 0) {
-    if (lastSelCount === 0) renderEmptyState($('compTree'), '선택한 노드가 없어요', guide);
+    if (lastSelCount === 0) renderEmptyState($('compTree'), '선택한 노드가 없습니다', guide);
     else clearMount($('compTree'));
   }
 }
@@ -2270,7 +2269,7 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     btn.title = `레이어 ${ids.length}개 선택 — ${bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ')}${ids.length > 5 ? ' 외' : ''}`;
     btn.addEventListener('click', () => {
       send({ type: 'SELECT_NODES', ids });
-      setStatus('applyStatus', `${t('reason.' + key)} 레이어 ${ids.length}개를 선택했어요.`, '');
+      setStatus('applyStatus', `${t('reason.' + key)} 레이어 ${ids.length}개 선택`, '');
     });
     box.appendChild(btn);
   }
@@ -2335,7 +2334,7 @@ function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): 
   if (!msg.metas.length) {
     // 왜 대상이 없는지 알려준다 — 제외 사유가 있으면 그걸 그대로 보여주는 게 가장 빠른 안내다.
     const why = msg.excluded.length ? msg.excluded[0].reason : '구조가 같은 프레임을 2개 이상 선택하세요.';
-    setStatus('structureStatus', `컴포넌트화할 프레임이 없어요 — ${why}`, 'warn');
+    setStatus('structureStatus', `컴포넌트화할 프레임이 없습니다 — ${why}`, 'warn');
     return;
   }
 
@@ -2367,7 +2366,7 @@ function renderSelBar(count: number, scanned: number, bindable: number, capped: 
   el.textContent =
     count > 0
       ? `● 선택 ${count}개 · 요소 ${scanned}${plus}개 · 바인딩 후보 ${bindable}${plus}개`
-      : '● 선택 없음 — 프레임을 선택하면 추출·바인딩할 수 있어요';
+      : '● 선택 없음 — 프레임을 선택하세요';
   el.className = count > 0 ? 'selbar' : 'selbar muted';
 }
 
