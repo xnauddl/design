@@ -1433,6 +1433,15 @@ $('compAll').addEventListener('change', (e) => {
 });
 
 
+/**
+ * 베리언트 줄(#variantRow) 노출 — 툴바는 와이어대로 스캔→등록 4개만 두고, '이미 만든
+ * 컴포넌트를 정리'하는 두 동작은 대상이 실제로 선택돼 있을 때만 결과 목록 아래에 띄운다.
+ * 판단 기준은 code 쪽 핸들러와 같다(낱개 COMPONENT=분류 / COMPONENT_SET=누락 조합).
+ */
+function refreshVariantRow(comps: number, sets: number): void {
+  $('variantRow').hidden = comps === 0 && sets === 0;
+}
+
 $('btnClassifyVariants').addEventListener('click', () => {
   setStatus('structureStatus', t('component.classifying'), '');
   send({ type: 'CLASSIFY_VARIANTS' });
@@ -1522,6 +1531,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
+      refreshVariantRow(msg.comps, msg.sets);
       // 스킵 칩이 만든 선택 변경이면 미리보기를 유지한다 — 지우면 칩을 한 번 누르는 순간
       // 칩 줄과 체크해둔 후보가 통째로 사라져 두 번째 사유를 볼 수 없다.
       if (!msg.selfSelect) clearBindPreview(); // 사용자의 선택 변경 → 바인딩 미리보기 무효화

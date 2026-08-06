@@ -631,8 +631,6 @@
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.">후보 스캔</button>
         <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.">닮은 스캔</button>
-        <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶습니다.">베리언트 분류</button>
-        <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채웁니다. (Paid)">누락 조합 생성</button>
         <span class="grow"></span>
         <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">컴포넌트 등록</button>
         <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다. (Paid)">컴포넌트화</button>
@@ -644,6 +642,15 @@
       <div id="compTree" class="results"></div>
       <div class="r-group" id="similarGroup" style="display:none" data-i18n="structure.groupSimilar">닮은 프레임</div>
       <div id="similarList" class="results"></div>
+      <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.
+           낱개 컴포넌트나 세트를 실제로 선택했을 때만 나타난다(SELECTION_STATE.comps/sets). -->
+      <div id="variantRow" hidden>
+        <div class="r-group" data-i18n="structure.groupVariant">선택한 컴포넌트 정리</div>
+        <div class="row">
+          <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶습니다.">베리언트 분류</button>
+          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채웁니다. (Paid)">누락 조합 생성</button>
+        </div>
+      </div>
       <div id="variantReport" class="results"></div>
       <div class="status" id="structureStatus"></div>
     </div>
@@ -1035,6 +1042,7 @@
     "structure.title": "\uAD6C\uC870",
     "structure.groupComp": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4",
     "structure.groupSimilar": "\uB2EE\uC740 \uD504\uB808\uC784",
+    "structure.groupVariant": "\uC120\uD0DD\uD55C \uCEF4\uD3EC\uB10C\uD2B8 \uC815\uB9AC",
     "component.hint": "<b>\uD6C4\uBCF4 \uC2A4\uCE94</b> \u2192 \uACE8\uB77C <b>\uB4F1\uB85D</b>. \uB2EE\uC740 \uD504\uB808\uC784\uC740 \uC2A4\uCE94\uB9CC \uBB34\uB8CC.",
     "component.scanBtn": "\uD6C4\uBCF4 \uC2A4\uCE94",
     "component.registerBtn": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D",
@@ -2845,6 +2853,9 @@
     }
     renderCompTree();
   });
+  function refreshVariantRow(comps, sets) {
+    $("variantRow").hidden = comps === 0 && sets === 0;
+  }
   $("btnClassifyVariants").addEventListener("click", () => {
     setStatus("structureStatus", t("component.classifying"), "");
     send({ type: "CLASSIFY_VARIANTS" });
@@ -2918,6 +2929,7 @@
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
+        refreshVariantRow(msg.comps, msg.sets);
         if (!msg.selfSelect) clearBindPreview();
         if (!tokens.length) renderTokens();
         refreshTreeEmptyStates();

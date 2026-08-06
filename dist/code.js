@@ -4366,6 +4366,11 @@
     let scanned = 0;
     let bindable = 0;
     let capped = false;
+    const comps = sel.filter((n) => {
+      var _a;
+      return n.type === "COMPONENT" && ((_a = n.parent) == null ? void 0 : _a.type) !== "COMPONENT_SET";
+    }).length;
+    const sets = sel.filter((n) => n.type === "COMPONENT_SET").length;
     const stack = sel.slice();
     while (stack.length) {
       if (scanned >= SCAN_CAP) {
@@ -4379,7 +4384,7 @@
       if (n.type === "INSTANCE") continue;
       if ("children" in n) for (const c of n.children) stack.push(c);
     }
-    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped, selfSelect });
+    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped, comps, sets, selfSelect });
     selfSelect = false;
   }
   figma.on("selectionchange", postSelection);

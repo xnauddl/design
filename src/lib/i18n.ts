@@ -237,6 +237,7 @@ export const STRINGS: Record<string, string> = {
   'structure.title': '구조',
   'structure.groupComp': '컴포넌트 후보',
   'structure.groupSimilar': '닮은 프레임',
+  'structure.groupVariant': '선택한 컴포넌트 정리',
   'component.hint': '<b>후보 스캔</b> → 골라 <b>등록</b>. 닮은 프레임은 스캔만 무료.',
   'component.scanBtn': '후보 스캔',
   'component.registerBtn': '컴포넌트 등록',

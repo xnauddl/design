@@ -348,6 +348,10 @@ function postSelection(): void {
   let scanned = 0;
   let bindable = 0;
   let capped = false;
+  // 베리언트 분류·누락 조합 생성이 실제로 잡는 것과 같은 기준(최상위 선택만).
+  // 분류는 세트에 안 속한 낱개 COMPONENT를, 생성은 COMPONENT_SET을 대상으로 한다.
+  const comps = sel.filter((n) => n.type === 'COMPONENT' && n.parent?.type !== 'COMPONENT_SET').length;
+  const sets = sel.filter((n) => n.type === 'COMPONENT_SET').length;
   const stack: SceneNode[] = sel.slice();
   while (stack.length) {
     if (scanned >= SCAN_CAP) {
@@ -362,7 +366,7 @@ function postSelection(): void {
     if (n.type === 'INSTANCE') continue; // 인스턴스 내부는 바인딩 대상이 아니다
     if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
   }
-  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, selfSelect });
+  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, comps, sets, selfSelect });
   selfSelect = false;
 }
 figma.on('selectionchange', postSelection);
