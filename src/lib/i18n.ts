@@ -166,6 +166,7 @@ export const STRINGS: Record<string, string> = {
   'rail.renameSub': '역할 이름',
   'rail.structure': '구조',
   'rail.structureSub': '컴포넌트',
+  'rail.next': '다음 →',
   // 플러그인 설정(#19) — 관리 탭에만
   'settings.title': '플러그인 설정',
   'settings.hint': '만들기·적용 탭에서는 안 보입니다. 바꾸면 이 파일에 기억됩니다.',
@@ -212,7 +213,6 @@ export const STRINGS: Record<string, string> = {
   'create.scopeHint': '색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.',
   'create.selectAll': '전체 선택',
   'create.dropOnce': '1× 해제',
-  'create.hint': '미리보기로 변경 요약을 확인한 뒤 적용하세요.',
   'create.previewBtn': '미리보기',
   'create.apply': '적용',
   // 시맨틱 매핑 카드
@@ -228,7 +228,6 @@ export const STRINGS: Record<string, string> = {
   'textStyle.useRowLabels': '가로 행의 왼쪽 텍스트를 스타일 이름으로 사용',
   'textStyle.rowLabelsHint': 'ON이면 같은 가로 줄의 <b>왼쪽 텍스트를 라벨(이름)</b>으로, 큰 텍스트를 표본으로 봅니다. 이름은 화면에 적힌 글자 그대로입니다. 표본 오른쪽 텍스트는 표에 넣지 않습니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. (세션만 유지)',
   'textStyle.applyExistingBtn': '기존 스타일 적용만',
-  'textStyle.applyExistingNote': '이미 만든 스타일에 연결만',
   'textStyle.colName': '이름',
   'textStyle.colFont': '폰트',
   'textStyle.colSize': '크기',

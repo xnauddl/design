@@ -2397,12 +2397,6 @@ function escapeHtml(s: string): string {
 }
 
 /* ---------- 캐논 패턴: 카드 접기(아코디언) + 주 버튼 타이틀 줄 이동 ---------- */
-// 카드별 '주 버튼'(타이틀 줄 우측으로 이동). 카드 안에서 첫 번째로 매칭되는 버튼만 옮긴다.
-const TITLE_BTN_IDS = new Set([
-  // btnColorRoles 제외: 색 정리는 추출 카드에 흡수돼 더 이상 독립 카드 머리가 아님(본문 버튼).
-  'btnWizardRun', 'btnPalette', 'btnExtract', 'btnCreate',
-  'btnTextStyles', 'btnApply', 'btnPreview', 'btnExport',
-]);
 /**
  * sticky 오프셋 동기화 — 탭 바·선택 바의 '실제' 높이를 CSS 변수로 넘긴다.
  * 카드 헤더(주 버튼 포함)가 그 아래에 정확히 붙어야 가려지지 않는다. 폭이 좁아져 선택 바가
@@ -2436,8 +2430,6 @@ function applyCardChrome(): void {
     chev.textContent = '›';
     head.appendChild(chev);
     head.appendChild(h2);
-    const btn = Array.from(body.querySelectorAll<HTMLButtonElement>('button')).find((b) => TITLE_BTN_IDS.has(b.id));
-    if (btn) head.appendChild(btn); // 주 버튼을 타이틀 줄로 이동
     card.appendChild(body);
     head.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('button')) return; // 버튼 클릭은 토글 제외
@@ -2553,6 +2545,14 @@ for (const b of Array.from(document.querySelectorAll<HTMLElement>('#applyRail .s
 }
 showMakeStep('color');
 showApplyStep('bind');
+
+// 카드 툴바의 '다음 →' — 레일 칩과 같은 이동을 카드 안에서(일이 끝난 자리에서 바로 다음으로).
+for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-make]'))) {
+  b.addEventListener('click', () => showMakeStep(b.dataset.nextMake as MakeStep));
+}
+for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-apply]'))) {
+  b.addEventListener('click', () => showApplyStep(b.dataset.nextApply as ApplyStep));
+}
 
 /* ---------- #14: 창 리사이즈(우하단 핸들 드래그) ---------- */
 (() => {
