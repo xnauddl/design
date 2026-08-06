@@ -1881,6 +1881,9 @@ window.onmessage = (event: MessageEvent) => {
         setStatus(
           'tsStatus',
           `${msg.styles.length}개 찾음 · 신규 ${fresh}(앰버) · 이미 등록 ${bound}(파랑)` +
+            ` · 행간% ${msg.styles.filter((s) => s.lineHeightPercent).length}` +
+            ` · 자간% ${msg.styles.filter((s) => (s.letterSpacingPercent ?? 0) !== 0).length}` +
+            ' · build%recover' +
             labelPart +
             (msg.warnings.length ? ' · ' + msg.warnings.join(' ') : ''),
           msg.warnings.length ? 'warn' : 'ok',

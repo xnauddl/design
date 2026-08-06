@@ -241,7 +241,7 @@ export const STRINGS: Record<string, string> = {
   'semantic.scanBtn': '기존 색에서 추천',
   // 텍스트 스타일
   'textStyle.title': '텍스트 스타일 (화면 → 스타일)',
-  'textStyle.hint': '화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 행간·자간이 %였으면 표에 %로 보이고 그대로 등록됩니다(그 항목만 변수 연결 생략). 새 스타일은 ‘행 추가’로. (Paid)',
+  'textStyle.hint': '화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 행간·자간이 %였으면 표에 %로 보이고 그대로 등록됩니다(그 항목만 변수 연결 생략). 스타일 없는 텍스트·변수 바인딩 텍스트도 %를 복구합니다. 새 스타일은 ‘행 추가’로. (Paid)',
   'textStyle.scanBtn': '선택에서 스캔',
   'textStyle.addRow': '행 추가',
   'textStyle.useRowLabels': '가로 행의 왼쪽 텍스트를 스타일 이름으로 사용',

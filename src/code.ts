@@ -973,7 +973,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'SCAN_TEXT_STYLES': {
         // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
-        const { samples, warnings } = scanTextStyles(selection());
+        const { samples, warnings } = await scanTextStyles(selection());
         const existing = await scanExistingTextStyles();
         if (msg.useRowLabels) {
           const r = nameTextStylesWithRowLabels(samples, existing);

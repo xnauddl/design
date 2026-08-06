@@ -640,7 +640,7 @@
 
     <div class="step">
       <h2><span data-i18n="textStyle.title">텍스트 스타일 (화면 → 스타일)</span> <span class="muted" id="tsLock"></span></h2>
-      <div class="hint" data-i18n-html="textStyle.hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 행간·자간이 %였으면 표에 %로 보이고 그대로 등록됩니다(그 항목만 변수 연결 생략). 새 스타일은 ‘행 추가’로. (Paid)</div>
+      <div class="hint" data-i18n-html="textStyle.hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 행간·자간이 %였으면 표에 %로 보이고 그대로 등록됩니다(그 항목만 변수 연결 생략). 스타일 없는 텍스트·변수 바인딩 텍스트도 %를 복구합니다. 새 스타일은 ‘행 추가’로. (Paid)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">선택에서 스캔</button>
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
@@ -1254,7 +1254,7 @@
     "semantic.scanBtn": "\uAE30\uC874 \uC0C9\uC5D0\uC11C \uCD94\uCC9C",
     // 텍스트 스타일
     "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C (\uD654\uBA74 \u2192 \uC2A4\uD0C0\uC77C)",
-    "textStyle.hint": "\uD654\uBA74\uC758 \uAE00\uC790\uC5D0\uC11C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB9CC\uB4E4\uC5B4 \uB4F1\uB85D\uD569\uB2C8\uB2E4. \uC2A4\uCE94\uD55C \uAC12\uC740 \uBABB \uBC14\uAFB8\uACE0 <b>\uC774\uB984\uB9CC</b> \uC815\uB9AC\uD558\uBA74 \uB3FC\uC694. \uD589\uAC04\xB7\uC790\uAC04\uC774 %\uC600\uC73C\uBA74 \uD45C\uC5D0 %\uB85C \uBCF4\uC774\uACE0 \uADF8\uB300\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uADF8 \uD56D\uBAA9\uB9CC \uBCC0\uC218 \uC5F0\uACB0 \uC0DD\uB7B5). \uC0C8 \uC2A4\uD0C0\uC77C\uC740 \u2018\uD589 \uCD94\uAC00\u2019\uB85C. (Paid)",
+    "textStyle.hint": "\uD654\uBA74\uC758 \uAE00\uC790\uC5D0\uC11C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB9CC\uB4E4\uC5B4 \uB4F1\uB85D\uD569\uB2C8\uB2E4. \uC2A4\uCE94\uD55C \uAC12\uC740 \uBABB \uBC14\uAFB8\uACE0 <b>\uC774\uB984\uB9CC</b> \uC815\uB9AC\uD558\uBA74 \uB3FC\uC694. \uD589\uAC04\xB7\uC790\uAC04\uC774 %\uC600\uC73C\uBA74 \uD45C\uC5D0 %\uB85C \uBCF4\uC774\uACE0 \uADF8\uB300\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uADF8 \uD56D\uBAA9\uB9CC \uBCC0\uC218 \uC5F0\uACB0 \uC0DD\uB7B5). \uC2A4\uD0C0\uC77C \uC5C6\uB294 \uD14D\uC2A4\uD2B8\xB7\uBCC0\uC218 \uBC14\uC778\uB529 \uD14D\uC2A4\uD2B8\uB3C4 %\uB97C \uBCF5\uAD6C\uD569\uB2C8\uB2E4. \uC0C8 \uC2A4\uD0C0\uC77C\uC740 \u2018\uD589 \uCD94\uAC00\u2019\uB85C. (Paid)",
     "textStyle.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uC2A4\uCE94",
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
     "textStyle.useRowLabels": "\uAC00\uB85C \uD589\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uC2A4\uD0C0\uC77C \uC774\uB984\uC73C\uB85C \uC0AC\uC6A9",
@@ -3456,7 +3456,10 @@
           const labelPart = msg.labeled != null ? ` \xB7 \uB77C\uBCA8\uC774\uB984 ${msg.labeled} \xB7 \uB7AD\uD0B9\uD3F4\uBC31 ${(_d = msg.fallback) != null ? _d : 0}` : "";
           setStatus(
             "tsStatus",
-            `${msg.styles.length}\uAC1C \uCC3E\uC74C \xB7 \uC2E0\uADDC ${fresh}(\uC570\uBC84) \xB7 \uC774\uBBF8 \uB4F1\uB85D ${bound}(\uD30C\uB791)` + labelPart + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
+            `${msg.styles.length}\uAC1C \uCC3E\uC74C \xB7 \uC2E0\uADDC ${fresh}(\uC570\uBC84) \xB7 \uC774\uBBF8 \uB4F1\uB85D ${bound}(\uD30C\uB791) \xB7 \uD589\uAC04% ${msg.styles.filter((s) => s.lineHeightPercent).length} \xB7 \uC790\uAC04% ${msg.styles.filter((s) => {
+              var _a2;
+              return ((_a2 = s.letterSpacingPercent) != null ? _a2 : 0) !== 0;
+            }).length} \xB7 build%recover` + labelPart + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
             msg.warnings.length ? "warn" : "ok"
           );
         } else {
