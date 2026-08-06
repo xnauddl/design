@@ -60,7 +60,7 @@
     * { box-sizing: border-box; }
     body {
       font: 400 var(--fs)/1.5 var(--font);
-      margin: 0; padding: 12px 12px 26px; /* 아래는 세로 리사이즈 손잡이(18px) 자리를 비워 둔다 */
+      margin: 0; padding: 12px;
       color: var(--text); background: var(--bg);
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden; /* 툴팁 등이 가로 스크롤을 만들지 않게 */
@@ -391,22 +391,6 @@
     .vusage.warn { color: var(--warn); }
 
     /* ── 리사이즈 핸들(우하단) ── */
-    /* #14: 가로는 400 고정이라 세로 전용 핸들 — 아래 가장자리 전체를 잡게 두고 가운데에 손잡이 선을 둔다.
-       우하단 삼각형은 대각 리사이즈를 약속하는 모양이라 가로가 안 늘면 오해가 된다.
-       높이 18px: 9px로는 창 맨 아래 몇 px를 창틀이 먹어 실제로 잡히는 띠가 너무 얇았다. */
-    #resizeHandle {
-      position: fixed; left: 0; right: 0; bottom: 0; height: 18px; cursor: ns-resize;
-      z-index: 20; touch-action: none; display: flex; align-items: center; justify-content: center;
-      background: linear-gradient(to top, var(--surface-2), transparent);
-      border-top: 1px solid transparent;
-    }
-    #resizeHandle::after {
-      content: ''; width: 40px; height: 3px; border-radius: 3px;
-      background: var(--border-2); transition: background .12s, width .12s;
-    }
-    #resizeHandle:hover { border-top-color: var(--border); }
-    #resizeHandle:hover::after  { background: var(--muted); width: 52px; }
-    #resizeHandle.dragging::after { background: var(--accent); width: 52px; }
   </style>
 </head>
 <body>
@@ -758,7 +742,6 @@
 
   <!-- 창 리사이즈 핸들(우하단) -->
   <div id="uiTip" role="tooltip" hidden></div>
-  <div id="resizeHandle" title="드래그해 크기 조절"></div>
 
   <!-- UI_SCRIPT -->
 </body>

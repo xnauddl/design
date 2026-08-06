@@ -20,37 +20,13 @@ import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normaliz
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
 
-// #14: 가로는 400px 고정, 세로만 리사이즈. 마지막 높이는 clientStorage에 기억.
-// 가로를 늘려 표 열을 버티는 패턴은 채택하지 않았다(#17) — 정보 밀도는 레이아웃으로 푼다.
-// 그래서 모든 화면은 400px 한 폭에서만 성립하면 되고, 검증도 그 한 폭으로 끝난다.
-const UI_SIZE_KEY = 'dsl.uiSize';
-const UI_W = 400;
-const UI_H = { min: 480, max: 1200, default: 660 };
-const clampHeight = (h: number) => Math.round(Math.min(UI_H.max, Math.max(UI_H.min, h)));
-
-figma.showUI(__html__, { width: UI_W, height: UI_H.default, themeColors: true });
-
-// 저장된 높이 복원(있으면). 폭이 함께 저장된 옛 값은 무시하고 400으로 되돌린다.
-figma.clientStorage.getAsync(UI_SIZE_KEY).then((s) => {
-  const v = s as { w?: number; h?: number } | undefined;
-  if (v && typeof v.h === 'number') figma.ui.resize(UI_W, clampHeight(v.h));
-}).catch(() => {});
-
-/* 높이 저장 — 드롭(commit)만 믿지 않는다. 드래그 중 창이 계속 커지면 포인터가 iframe을
-   벗어나 pointerup을 놓칠 수 있고, 그러면 마지막 크기가 영영 저장되지 않는다.
-   그래서 리사이즈될 때마다 뒤로 미루며 저장하고(트레일링), commit이 오면 즉시 쓴다. */
-let saveTimer: number | null = null;
-let pendingHeight = 0;
-function saveHeight(h: number, commit?: boolean): void {
-  pendingHeight = h;
-  if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null; }
-  const write = (): void => {
-    saveTimer = null;
-    void figma.clientStorage.setAsync(UI_SIZE_KEY, { h: pendingHeight }).catch(() => {});
-  };
-  if (commit) write();
-  else saveTimer = setTimeout(write, 400) as unknown as number;
-}
+/* #14: 창 크기 400×660 고정 — 리사이즈 없음.
+   가로는 와이어가 400으로 못 박았고(표를 가로로 버티는 패턴은 #17에서 비채택), 세로는
+   드래그 리사이즈를 붙여 봤지만 플러그인 iframe에서 제대로 동작하지 않았다: 포인터 캡처가
+   iframe 경계를 넘지 못해 아래로 끌면 이벤트가 끊기고, 그걸 우회하려 창을 포인터보다 크게
+   따라가게 해도 실기에서 멎었다. 크기가 고정이면 모든 화면이 한 크기에서만 성립하면 되고
+   검증도 거기서 끝난다 — 목록이 길면 패널 body가 스크롤한다(#18). */
+figma.showUI(__html__, { width: 400, height: 660, themeColors: true });
 
 const selection = () => figma.currentPage.selection;
 
@@ -862,13 +838,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           }
         }
         post({ type: 'GLOBAL_COLORS', colors });
-        break;
-      }
-      case 'RESIZE': {
-        // #14: 드래그 중엔 즉시 리사이즈. 폭은 고정이라 받지 않는다.
-        const h = clampHeight(msg.height);
-        figma.ui.resize(UI_W, h);
-        saveHeight(h, msg.commit);
         break;
       }
       case 'GET_LICENSE': {

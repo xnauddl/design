@@ -134,7 +134,6 @@ export type UiToCode =
   | { type: 'GET_COLLECTIONS' }
   | { type: 'GET_GLOBAL_COLORS' } // #10: 기존 Global 색 변수 스캔(재방문 시맨틱 매핑 추천용)
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
-  | { type: 'RESIZE'; height: number; commit?: boolean } // #14: 세로만 리사이즈(가로 400 고정, commit 시 높이 저장)
   | { type: 'GET_LICENSE' }
   | { type: 'SET_LICENSE'; tier: Tier } // M1: 개발용 강제 티어(검증 키 없을 때만 적용)
   | { type: 'LICENSE_VERIFIED'; key: string; result: VerifyResult } // M2.2: UI가 검증한 결과 보고
