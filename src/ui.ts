@@ -15,7 +15,7 @@ import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles, semanticMapToText, textToSemanticMap } from './lib/roles';
-import { pipelineSteps } from './lib/pipeline';
+import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planWizard, summarize, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
@@ -41,9 +41,13 @@ let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해�
 let hideOnboard = false; // 첫 실행 배너를 껐는가(파일에 기억)
 let colorsFromPalette = false; // 지금 목록의 색이 팔레트 생성으로 온 것인가(변수 생성 시 이전 팔레트 정리)
 let colorsCreated = false; // 이 세션에서 색 변수를 만들었는가(토큰 단계 안내용)
-// #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
+// #11: 단계 전제 — Global 변수 존재(역할 매핑) · 연결 가능 변수 존재(변수 연결) · 텍스트 스타일 존재(기존만 연결).
+// 색/색 외/다크는 게이트가 아니라 '준비 현황' 목록에만 쓴다(만들기 탭의 할 일).
+let hasColorVars = false;
+let hasScaleVars = false;
 let hasGlobal = false;
 let hasBindable = false;
+let hasDarkMode = false;
 let hasTextStyles = false;
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'colors' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
@@ -351,7 +355,7 @@ function renderTokens(): void {
 function updateTokenCreate(): void {
   const others = creatableTokens();
   const sel = others.filter((t) => tokenChecked.has(tokenKey(t))).length;
-  $('createCount').textContent = others.length ? `· 색 외 ${sel}/${others.length}개` : '';
+  $('createCount').textContent = others.length ? `· 후보 ${sel}/${others.length}` : '';
   const all = $('tokenAll') as HTMLInputElement;
   all.checked = sel === others.length && others.length > 0;
   all.indeterminate = sel > 0 && sel < others.length;
@@ -1278,20 +1282,26 @@ function goToCreate(): void {
 
 /* ---------- 진행 안내 파이프라인(§3) ---------- */
 
-/** 단계 클릭 → 해당 단계 카드/탭으로 이동. */
-function gotoStep(id: 'tokens' | 'semantics' | 'bind'): void {
-  if (id === 'bind') {
+/** 준비 현황 줄 클릭 → 그 일을 하는 단계로. 목록 순서 = 만들기 레일 순서 + 적용 첫 단계. */
+const PIPELINE_TARGET: Record<PipelineStep['id'], { make: MakeStep | null; btn: string }> = {
+  colors: { make: 'color', btn: 'btnColorVars' },
+  tokens: { make: 'token', btn: 'btnCreate' },
+  semantics: { make: 'token', btn: 'btnSemantics' }, // 역할 매핑은 토큰 단계에 흡수돼 있다
+  dark: { make: 'theme', btn: 'btnGenDark' },
+  textStyles: { make: 'type', btn: 'btnScanText' },
+  bind: { make: null, btn: 'btnApply' }, // 유일하게 적용 탭
+};
+
+function gotoStep(id: PipelineStep['id']): void {
+  const target = PIPELINE_TARGET[id];
+  if (target.make === null) {
     showTab('apply');
     showApplyStep('bind');
-    const b = $('btnApply') as HTMLButtonElement;
-    b.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    b.focus();
-    return;
+  } else {
+    showTab('tokens');
+    showMakeStep(target.make);
   }
-  showTab('tokens');
-  showMakeStep('token'); // 토큰 생성·시맨틱 매핑 둘 다 '토큰' 단계
-  const target = id === 'tokens' ? 'btnCreate' : 'btnSemantics';
-  const b = $(target) as HTMLButtonElement;
+  const b = $(target.btn) as HTMLButtonElement;
   b.scrollIntoView({ behavior: 'smooth', block: 'center' });
   b.focus();
 }
@@ -1300,7 +1310,7 @@ function gotoStep(id: 'tokens' | 'semantics' | 'bind'): void {
 function renderPipeline(): void {
   const box = $('pipelineSteps');
   box.innerHTML = '';
-  const steps = pipelineSteps({ hasGlobal, hasBindable });
+  const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
   steps.forEach((s, i) => {
     const row = document.createElement('div');
     row.className = `pstep ${s.status}`;
@@ -1700,8 +1710,11 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'PREREQ_STATE':
       // #11: 단계 전제 갱신 → 통합 게이트 재평가 + 진행 안내(§3).
+      hasColorVars = msg.hasColorVars;
+      hasScaleVars = msg.hasScaleVars;
       hasGlobal = msg.hasGlobal;
       hasBindable = msg.hasBindable;
+      hasDarkMode = msg.hasDarkMode;
       hasTextStyles = msg.hasTextStyles;
       updateGates();
       renderPipeline();
@@ -2005,7 +2018,7 @@ function updateRenameApply(): void {
   const total = affectedRenameCount();
   const sel = renameChecked.size;
   // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
-  $('renameCount').textContent = total ? `· 변경 ${total}개` : '';
+  $('renameCount').textContent = total ? `· 후보 ${total}` : '';
   ($('btnRename') as HTMLButtonElement).disabled = sel === 0;
   const all = $('renameAll') as HTMLInputElement;
   all.checked = total > 0 && sel === total;
@@ -2096,7 +2109,7 @@ function updateBindApply(): void {
   // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
   // 이 트리는 노드 헤더도 한 행이라 목록 아래 ‘총 n개’(행 수)와 수가 다르다 → 세는 단위를
   // ‘건’으로 구분해(상태 문구 ‘바인딩 n건 후보’와 같은 말) 같은 수의 오기로 읽히지 않게 한다.
-  $('bindCount').textContent = total ? `· 후보 ${total}건` : '';
+  $('bindCount').textContent = total ? `· 후보 ${total}` : '';
   const confirm = $('btnApplyConfirm') as HTMLButtonElement;
   confirm.style.display = hasBindPreview() ? '' : 'none';
   confirm.disabled = sel === 0;
@@ -2160,7 +2173,7 @@ function updateCompRegister(): void {
   const total = compEligibleCount();
   const sel = compChecked.size;
   // 카드 제목의 개수 — 트리에 뜨는 건 등록 가능한 후보뿐이라 그 수를 센다(스캔 노드 수가 아니라).
-  $('compCount').textContent = total ? `· 후보 ${total}개` : '';
+  $('compCount').textContent = total ? `· 후보 ${total}` : '';
   $('compTreeGroup').style.display = total ? '' : 'none';
   if (compCandidates.length) {
     const all = $('compAll') as HTMLInputElement;

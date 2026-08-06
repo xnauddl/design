@@ -132,10 +132,15 @@ async function postPrereq(): Promise<void> {
     const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
     const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
     const vars = await figma.variables.getLocalVariablesAsync();
-    const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
+    const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
+    const hasColorVars = globals.some((v) => v.resolvedType === 'COLOR');
+    const hasScaleVars = globals.some((v) => v.resolvedType !== 'COLOR'); // 간격·크기·폰트
+    const hasGlobal = globals.length > 0;
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
+    // 다크는 '모드가 둘 이상인 컬렉션'이 있으면 이미 만든 것으로 본다(다크 채우기의 전제와 같은 신호).
+    const hasDarkMode = cols.some((c) => c.modes.length > 1);
     const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // '기존 스타일 적용만' 전제
-    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable, hasTextStyles });
+    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }

@@ -99,8 +99,9 @@ export const STRINGS: Record<string, string> = {
 
   // 진행 안내(파이프라인) 단계 상태
   'pipeline.stat.done': '완료',
-  'pipeline.stat.ready': '준비됨',
+  'pipeline.stat.ready': '준비',
   'pipeline.stat.blocked': '전제 미충족',
+  'pipeline.stat.todo': '만들기',
 
   // 바인딩 스킵 사유(라벨 맵)
   'reason.no-match': '매칭 없음',
@@ -136,9 +137,12 @@ export const STRINGS: Record<string, string> = {
   'wizard.sum.empty': '완료된 작업이 없습니다',
 
   // 진행 안내 단계 라벨·안내
+  'pipeline.step.colors': '색 변수',
   'pipeline.step.tokens': '간격·크기 토큰',
   'pipeline.step.semantics': '역할 매핑',
   'pipeline.step.bind': '변수 연결',
+  'pipeline.step.dark': '다크 모드',
+  'pipeline.step.textStyles': '텍스트 스타일',
   'pipeline.hint.needTokens': '토큰을 먼저 생성하세요',
   'pipeline.hint.needBindable': '연결할 변수를 먼저 생성하세요',
 

@@ -4194,10 +4194,14 @@
       const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
       const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
       const vars = await figma.variables.getLocalVariablesAsync();
-      const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
+      const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
+      const hasColorVars = globals.some((v) => v.resolvedType === "COLOR");
+      const hasScaleVars = globals.some((v) => v.resolvedType !== "COLOR");
+      const hasGlobal = globals.length > 0;
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
+      const hasDarkMode = cols.some((c) => c.modes.length > 1);
       const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
-      post({ type: "PREREQ_STATE", hasGlobal, hasBindable, hasTextStyles });
+      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
     } catch (e) {
     }
   }

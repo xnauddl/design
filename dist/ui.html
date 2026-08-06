@@ -256,6 +256,9 @@
     .pstep.done .pdot  { background: var(--ok); border-color: var(--ok); color: #fff; }
     .pstep.ready .pdot { background: var(--accent); border-color: var(--accent); color: #fff; }
     .pstep.blocked { opacity: .55; }
+    /* todo = 막힌 게 아니라 아직 안 만든 것(다크·텍스트 스타일). blocked만큼 흐리게 두면
+       '못 한다'로 읽히므로 점만 비우고 글자는 그대로 둔다. */
+    .pstep.todo .pstat { color: var(--muted); }
     .pstep .plabel { color: var(--text); }
     .pstep .pstat  { font-size: 10px; }
     .pstep.done .pstat    { color: var(--ok); }
@@ -296,6 +299,9 @@
     .toolbar .grow { flex: 1 1 auto; } /* 주 버튼을 오른쪽 끝으로 미는 공백 */
     /* 아래에 목록이 없는 카드(내보내기)는 구분선을 긋지 않는다 — 가를 것이 없다. */
     .toolbar.flush { padding-bottom: 0; border-bottom: 0; }
+    /* 툴바가 두 줄인 카드(구조: 스캔 2 / 쓰기 2) — 윗줄은 선을 긋지 않고 아랫줄만 본문과 가른다. */
+    .toolbar:has(+ .toolbar-2) { padding-bottom: 0; border-bottom: 0; }
+    .toolbar-2 { margin-top: 0; }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
     .btn-next { border-color: transparent; color: var(--text-2); }
@@ -636,6 +642,9 @@
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.">후보 스캔</button>
         <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.">닮은 스캔</button>
+      </div>
+      <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
+      <div class="toolbar toolbar-2">
         <span class="grow"></span>
         <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">등록</button>
         <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">묶기</button>
@@ -909,8 +918,9 @@
     "wizard.skip.paid": "Paid \uC804\uC6A9",
     // 진행 안내(파이프라인) 단계 상태
     "pipeline.stat.done": "\uC644\uB8CC",
-    "pipeline.stat.ready": "\uC900\uBE44\uB428",
+    "pipeline.stat.ready": "\uC900\uBE44",
     "pipeline.stat.blocked": "\uC804\uC81C \uBBF8\uCDA9\uC871",
+    "pipeline.stat.todo": "\uB9CC\uB4E4\uAE30",
     // 바인딩 스킵 사유(라벨 맵)
     "reason.no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
     "reason.empty-text": "\uBE48 \uD14D\uC2A4\uD2B8",
@@ -942,9 +952,12 @@
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "wizard.sum.empty": "\uC644\uB8CC\uB41C \uC791\uC5C5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
     // 진행 안내 단계 라벨·안내
+    "pipeline.step.colors": "\uC0C9 \uBCC0\uC218",
     "pipeline.step.tokens": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
     "pipeline.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
     "pipeline.step.bind": "\uBCC0\uC218 \uC5F0\uACB0",
+    "pipeline.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
+    "pipeline.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
     "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
@@ -1695,7 +1708,8 @@
   // src/lib/pipeline.ts
   function pipelineSteps(s) {
     return [
-      { id: "tokens", status: s.hasGlobal ? "done" : "ready" },
+      { id: "colors", status: s.hasColorVars ? "done" : "ready" },
+      { id: "tokens", status: s.hasScaleVars ? "done" : "ready" },
       {
         id: "semantics",
         status: s.hasGlobal ? "ready" : "blocked",
@@ -1705,7 +1719,9 @@
         id: "bind",
         status: s.hasBindable ? "ready" : "blocked",
         hint: s.hasBindable ? void 0 : "pipeline.hint.needBindable"
-      }
+      },
+      { id: "dark", status: s.hasDarkMode ? "done" : "todo" },
+      { id: "textStyles", status: s.hasTextStyles ? "done" : "todo" }
     ];
   }
 
@@ -1792,8 +1808,11 @@
   var hideOnboard = false;
   var colorsFromPalette = false;
   var colorsCreated = false;
+  var hasColorVars = false;
+  var hasScaleVars = false;
   var hasGlobal = false;
   var hasBindable = false;
+  var hasDarkMode = false;
   var hasTextStyles = false;
   var lastSelCount = 0;
   var createFrom = "tokens";
@@ -2003,7 +2022,7 @@
   function updateTokenCreate() {
     const others = creatableTokens();
     const sel = others.filter((t2) => tokenChecked.has(tokenKey(t2))).length;
-    $("createCount").textContent = others.length ? `\xB7 \uC0C9 \uC678 ${sel}/${others.length}\uAC1C` : "";
+    $("createCount").textContent = others.length ? `\xB7 \uD6C4\uBCF4 ${sel}/${others.length}` : "";
     const all = $("tokenAll");
     all.checked = sel === others.length && others.length > 0;
     all.indeterminate = sel > 0 && sel < others.length;
@@ -2723,26 +2742,33 @@
     $("createCard").scrollIntoView({ behavior: "smooth", block: "center" });
     $("btnCreate").focus();
   }
+  var PIPELINE_TARGET = {
+    colors: { make: "color", btn: "btnColorVars" },
+    tokens: { make: "token", btn: "btnCreate" },
+    semantics: { make: "token", btn: "btnSemantics" },
+    // 역할 매핑은 토큰 단계에 흡수돼 있다
+    dark: { make: "theme", btn: "btnGenDark" },
+    textStyles: { make: "type", btn: "btnScanText" },
+    bind: { make: null, btn: "btnApply" }
+    // 유일하게 적용 탭
+  };
   function gotoStep(id) {
-    if (id === "bind") {
+    const target = PIPELINE_TARGET[id];
+    if (target.make === null) {
       showTab("apply");
       showApplyStep("bind");
-      const b2 = $("btnApply");
-      b2.scrollIntoView({ behavior: "smooth", block: "center" });
-      b2.focus();
-      return;
+    } else {
+      showTab("tokens");
+      showMakeStep(target.make);
     }
-    showTab("tokens");
-    showMakeStep("token");
-    const target = id === "tokens" ? "btnCreate" : "btnSemantics";
-    const b = $(target);
+    const b = $(target.btn);
     b.scrollIntoView({ behavior: "smooth", block: "center" });
     b.focus();
   }
   function renderPipeline() {
     const box = $("pipelineSteps");
     box.innerHTML = "";
-    const steps = pipelineSteps({ hasGlobal, hasBindable });
+    const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
     steps.forEach((s, i) => {
       const row = document.createElement("div");
       row.className = `pstep ${s.status}`;
@@ -3068,8 +3094,11 @@
         }
         break;
       case "PREREQ_STATE":
+        hasColorVars = msg.hasColorVars;
+        hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
+        hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
         updateGates();
         renderPipeline();
@@ -3298,7 +3327,7 @@
   function updateRenameApply() {
     const total = affectedRenameCount();
     const sel = renameChecked.size;
-    $("renameCount").textContent = total ? `\xB7 \uBCC0\uACBD ${total}\uAC1C` : "";
+    $("renameCount").textContent = total ? `\xB7 \uD6C4\uBCF4 ${total}` : "";
     $("btnRename").disabled = sel === 0;
     const all = $("renameAll");
     all.checked = total > 0 && sel === total;
@@ -3373,7 +3402,7 @@
   function updateBindApply() {
     const total = bindCandidates.length;
     const sel = bindChecked.size;
-    $("bindCount").textContent = total ? `\xB7 \uD6C4\uBCF4 ${total}\uAC74` : "";
+    $("bindCount").textContent = total ? `\xB7 \uD6C4\uBCF4 ${total}` : "";
     const confirm = $("btnApplyConfirm");
     confirm.style.display = hasBindPreview() ? "" : "none";
     confirm.disabled = sel === 0;
@@ -3426,7 +3455,7 @@
   function updateCompRegister() {
     const total = compEligibleCount();
     const sel = compChecked.size;
-    $("compCount").textContent = total ? `\xB7 \uD6C4\uBCF4 ${total}\uAC1C` : "";
+    $("compCount").textContent = total ? `\xB7 \uD6C4\uBCF4 ${total}` : "";
     $("compTreeGroup").style.display = total ? "" : "none";
     if (compCandidates.length) {
       const all = $("compAll");

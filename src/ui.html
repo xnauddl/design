@@ -256,6 +256,9 @@
     .pstep.done .pdot  { background: var(--ok); border-color: var(--ok); color: #fff; }
     .pstep.ready .pdot { background: var(--accent); border-color: var(--accent); color: #fff; }
     .pstep.blocked { opacity: .55; }
+    /* todo = 막힌 게 아니라 아직 안 만든 것(다크·텍스트 스타일). blocked만큼 흐리게 두면
+       '못 한다'로 읽히므로 점만 비우고 글자는 그대로 둔다. */
+    .pstep.todo .pstat { color: var(--muted); }
     .pstep .plabel { color: var(--text); }
     .pstep .pstat  { font-size: 10px; }
     .pstep.done .pstat    { color: var(--ok); }
@@ -296,6 +299,9 @@
     .toolbar .grow { flex: 1 1 auto; } /* 주 버튼을 오른쪽 끝으로 미는 공백 */
     /* 아래에 목록이 없는 카드(내보내기)는 구분선을 긋지 않는다 — 가를 것이 없다. */
     .toolbar.flush { padding-bottom: 0; border-bottom: 0; }
+    /* 툴바가 두 줄인 카드(구조: 스캔 2 / 쓰기 2) — 윗줄은 선을 긋지 않고 아랫줄만 본문과 가른다. */
+    .toolbar:has(+ .toolbar-2) { padding-bottom: 0; border-bottom: 0; }
+    .toolbar-2 { margin-top: 0; }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
     .btn-next { border-color: transparent; color: var(--text-2); }
@@ -636,6 +642,9 @@
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.">후보 스캔</button>
         <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.">닮은 스캔</button>
+      </div>
+      <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
+      <div class="toolbar toolbar-2">
         <span class="grow"></span>
         <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">등록</button>
         <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">묶기</button>
