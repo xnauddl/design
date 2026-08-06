@@ -2413,6 +2413,66 @@ function applyCardChrome(): void {
   });
 }
 
+/** 구조 툴바 버튼 호버 툴팁 — fixed #uiTip을 패널 안으로 클램프한다.
+ *  버튼 ::after는 줄바꿈·가장자리에서 잘리고 가로 스크롤을 만든다. */
+const STRUCTURE_TIPS: Record<string, string> = {
+  btnScanComp: 'component.scanHelp',
+  btnScanSimilar: 'similar.scanHelp',
+  btnClassifyVariants: 'component.classifyHelp',
+  btnGenMissing: 'component.genMissingHelp',
+  btnRegisterComp: 'component.registerHelp',
+  btnComponentize: 'similar.componentizeHelp',
+};
+
+const TIP_PAD = 8;
+
+function hideUiTip(): void {
+  const tip = $('uiTip');
+  tip.classList.remove('show');
+  tip.hidden = true;
+  tip.textContent = '';
+}
+
+function placeUiTip(anchor: HTMLElement, text: string): void {
+  const tip = $('uiTip');
+  tip.textContent = text;
+  tip.hidden = false;
+  tip.classList.remove('show'); // 측정만 — 아직 안 보이게
+  tip.style.left = '0px';
+  tip.style.top = '0px';
+  const rect = anchor.getBoundingClientRect();
+  const tw = tip.offsetWidth;
+  const th = tip.offsetHeight;
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  let left = rect.left + (rect.width - tw) / 2;
+  left = Math.max(TIP_PAD, Math.min(left, vw - tw - TIP_PAD));
+  let top = rect.bottom + 6;
+  if (top + th > vh - TIP_PAD) top = rect.top - th - 6;
+  top = Math.max(TIP_PAD, Math.min(top, vh - th - TIP_PAD));
+  tip.style.left = `${Math.round(left)}px`;
+  tip.style.top = `${Math.round(top)}px`;
+  tip.classList.add('show');
+}
+
+function applyButtonTips(): void {
+  for (const [id, key] of Object.entries(STRUCTURE_TIPS)) {
+    const el = document.getElementById(id);
+    if (el && hasString(key)) el.setAttribute('data-tip', t(key));
+  }
+  document.querySelectorAll<HTMLElement>('[data-tip]').forEach((el) => {
+    const show = () => {
+      const text = el.getAttribute('data-tip');
+      if (text) placeUiTip(el, text);
+    };
+    el.addEventListener('mouseenter', show);
+    el.addEventListener('focus', show);
+    el.addEventListener('mouseleave', hideUiTip);
+    el.addEventListener('blur', hideUiTip);
+  });
+  window.addEventListener('scroll', hideUiTip, true);
+}
+
 /** 정적 HTML 라벨 외부화: [data-i18n]=textContent, [data-i18n-html]=innerHTML(신뢰된 자체 문자열).
  *  텍스트 전용 요소는 data-i18n, <b>/<code> 등 마크업이 있으면 data-i18n-html을 쓴다.
  *  뱃지 span(예: …Lock)이 함께 있는 요소는 텍스트만 <span data-i18n>로 감싸 뱃지를 보존한다. */
@@ -2431,6 +2491,7 @@ function applyStaticI18n(root: ParentNode = document): void {
 // 초기: 컬렉션·전제·라이선스 조회. 유료 카드는 Paid 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
 applyStaticI18n(); // 정적 라벨 외부화(캐논 변형 전에 원본 요소에 적용)
 applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
+applyButtonTips(); // 구조 버튼 호버 툴팁
 syncStickyOffsets(); // 카드 헤더 sticky 오프셋(탭 바 + 선택 바 높이)
 // 선택 바는 문구가 바뀌며 높이가 변하고, 창 리사이즈로 두 바 모두 접힐 수 있다 → 계속 추적.
 if (typeof ResizeObserver !== 'undefined') {
