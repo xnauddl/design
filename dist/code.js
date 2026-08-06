@@ -4116,20 +4116,13 @@
 
   // src/code.ts
   var UI_SIZE_KEY = "dsl.uiSize";
-  var UI_MIN = { w: 360, h: 480 };
-  var UI_MAX = { w: 900, h: 1200 };
-  var UI_DEFAULT = { w: 460, h: 660 };
-  var clampSize = (w, h) => ({
-    w: Math.round(Math.min(UI_MAX.w, Math.max(UI_MIN.w, w))),
-    h: Math.round(Math.min(UI_MAX.h, Math.max(UI_MIN.h, h)))
-  });
-  figma.showUI(__html__, { width: UI_DEFAULT.w, height: UI_DEFAULT.h, themeColors: true });
+  var UI_W = 400;
+  var UI_H = { min: 480, max: 1200, default: 660 };
+  var clampHeight = (h) => Math.round(Math.min(UI_H.max, Math.max(UI_H.min, h)));
+  figma.showUI(__html__, { width: UI_W, height: UI_H.default, themeColors: true });
   figma.clientStorage.getAsync(UI_SIZE_KEY).then((s) => {
     const v = s;
-    if (v && typeof v.w === "number" && typeof v.h === "number") {
-      const c = clampSize(v.w, v.h);
-      figma.ui.resize(c.w, c.h);
-    }
+    if (v && typeof v.h === "number") figma.ui.resize(UI_W, clampHeight(v.h));
   }).catch(() => {
   });
   var selection = () => figma.currentPage.selection;
@@ -4800,9 +4793,9 @@
           break;
         }
         case "RESIZE": {
-          const c = clampSize(msg.width, msg.height);
-          figma.ui.resize(c.w, c.h);
-          if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { w: c.w, h: c.h }).catch(() => {
+          const h = clampHeight(msg.height);
+          figma.ui.resize(UI_W, h);
+          if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { h }).catch(() => {
           });
           break;
         }

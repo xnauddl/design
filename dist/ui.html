@@ -60,7 +60,7 @@
     * { box-sizing: border-box; }
     body {
       font: 400 var(--fs)/1.5 var(--font);
-      margin: 0; padding: 12px;
+      margin: 0; padding: 12px 12px 18px; /* 아래는 세로 리사이즈 손잡이(9px) 자리를 비워 둔다 */
       color: var(--text); background: var(--bg);
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden; /* 툴팁 등이 가로 스크롤을 만들지 않게 */
@@ -391,8 +391,11 @@
     .vusage.warn { color: var(--warn); }
 
     /* ── 리사이즈 핸들(우하단) ── */
-    #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
-    #resizeHandle::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 0; height: 0; border-left: 7px solid transparent; border-bottom: 7px solid var(--muted); opacity: 0.5; }
+    /* #14: 가로는 400 고정이라 세로 전용 핸들 — 아래 가장자리 전체를 잡게 두고 가운데에 손잡이 선을 둔다.
+       우하단 삼각형은 대각 리사이즈를 약속하는 모양이라 가로가 안 늘면 오해가 된다. */
+    #resizeHandle { position: fixed; left: 0; right: 0; bottom: 0; height: 9px; cursor: ns-resize; z-index: 20; touch-action: none; }
+    #resizeHandle::after { content: ''; position: absolute; left: 50%; bottom: 3px; width: 28px; height: 2px; margin-left: -14px; border-radius: 2px; background: var(--muted); opacity: 0.45; }
+    #resizeHandle:hover::after { opacity: 0.8; }
   </style>
 </head>
 <body>
@@ -3804,21 +3807,25 @@
     const handle = $("resizeHandle");
     let resizing = false;
     let pending = null;
+    let lastSent = null;
     let raf = 0;
     const flush = (commit) => {
-      if (!pending) return;
-      send({ type: "RESIZE", width: pending.w, height: pending.h, commit });
+      const h = pending != null ? pending : lastSent;
+      if (h === null) return;
       pending = null;
+      lastSent = h;
+      send({ type: "RESIZE", height: h, commit });
     };
     handle.addEventListener("pointerdown", (e) => {
       resizing = true;
+      lastSent = null;
       handle.setPointerCapture(e.pointerId);
       e.preventDefault();
     });
     handle.addEventListener("pointermove", (e) => {
       if (!resizing) return;
       const pe = e;
-      pending = { w: Math.ceil(pe.clientX + 6), h: Math.ceil(pe.clientY + 6) };
+      pending = Math.ceil(pe.clientY + 6);
       if (!raf) raf = requestAnimationFrame(() => {
         raf = 0;
         flush(false);

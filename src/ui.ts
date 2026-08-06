@@ -2637,26 +2637,32 @@ for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-ap
   b.addEventListener('click', () => showApplyStep(b.dataset.nextApply as ApplyStep));
 }
 
-/* ---------- #14: 창 리사이즈(우하단 핸들 드래그) ---------- */
+/* ---------- #14: 창 리사이즈(아래 가장자리 드래그 — 세로만) ---------- */
 (() => {
   const handle = $('resizeHandle');
   let resizing = false;
-  let pending: { w: number; h: number } | null = null;
+  let pending: number | null = null; // 다음 프레임에 보낼 높이
+  let lastSent: number | null = null; // 마지막으로 보낸 높이 — 드롭 시 저장할 값
   let raf = 0;
+  // 드롭(commit)은 rAF가 이미 pending을 비운 뒤에 오는 게 보통이다. pending만 보고 나가면
+  // 그 경우 commit이 통째로 생략돼 높이가 clientStorage에 저장되지 않는다 → lastSent로 되짚는다.
   const flush = (commit: boolean): void => {
-    if (!pending) return;
-    send({ type: 'RESIZE', width: pending.w, height: pending.h, commit });
+    const h = pending ?? lastSent;
+    if (h === null) return; // 드래그 없이 눌렀다 뗀 경우 — 보낼 것이 없다
     pending = null;
+    lastSent = h;
+    send({ type: 'RESIZE', height: h, commit });
   };
   handle.addEventListener('pointerdown', (e) => {
     resizing = true;
+    lastSent = null; // 새 드래그 — 지난 드래그의 값으로 commit하지 않도록
     handle.setPointerCapture((e as PointerEvent).pointerId);
     e.preventDefault();
   });
   handle.addEventListener('pointermove', (e) => {
     if (!resizing) return;
     const pe = e as PointerEvent;
-    pending = { w: Math.ceil(pe.clientX + 6), h: Math.ceil(pe.clientY + 6) };
+    pending = Math.ceil(pe.clientY + 6);
     if (!raf) raf = requestAnimationFrame(() => { raf = 0; flush(false); }); // rAF 스로틀
   });
   const end = (e: Event): void => {

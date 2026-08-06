@@ -20,25 +20,20 @@ import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normaliz
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
 
-// #14: 기본 창을 키우고(트리·편집표 수용) 사용자 리사이즈를 허용. 마지막 크기는 clientStorage에 기억.
+// #14: 가로는 400px 고정, 세로만 리사이즈. 마지막 높이는 clientStorage에 기억.
+// 가로를 늘려 표 열을 버티는 패턴은 채택하지 않았다(#17) — 정보 밀도는 레이아웃으로 푼다.
+// 그래서 모든 화면은 400px 한 폭에서만 성립하면 되고, 검증도 그 한 폭으로 끝난다.
 const UI_SIZE_KEY = 'dsl.uiSize';
-const UI_MIN = { w: 360, h: 480 };
-const UI_MAX = { w: 900, h: 1200 };
-const UI_DEFAULT = { w: 460, h: 660 };
-const clampSize = (w: number, h: number) => ({
-  w: Math.round(Math.min(UI_MAX.w, Math.max(UI_MIN.w, w))),
-  h: Math.round(Math.min(UI_MAX.h, Math.max(UI_MIN.h, h))),
-});
+const UI_W = 400;
+const UI_H = { min: 480, max: 1200, default: 660 };
+const clampHeight = (h: number) => Math.round(Math.min(UI_H.max, Math.max(UI_H.min, h)));
 
-figma.showUI(__html__, { width: UI_DEFAULT.w, height: UI_DEFAULT.h, themeColors: true });
+figma.showUI(__html__, { width: UI_W, height: UI_H.default, themeColors: true });
 
-// 저장된 창 크기 복원(있으면).
+// 저장된 높이 복원(있으면). 폭이 함께 저장된 옛 값은 무시하고 400으로 되돌린다.
 figma.clientStorage.getAsync(UI_SIZE_KEY).then((s) => {
   const v = s as { w?: number; h?: number } | undefined;
-  if (v && typeof v.w === 'number' && typeof v.h === 'number') {
-    const c = clampSize(v.w, v.h);
-    figma.ui.resize(c.w, c.h);
-  }
+  if (v && typeof v.h === 'number') figma.ui.resize(UI_W, clampHeight(v.h));
 }).catch(() => {});
 
 const selection = () => figma.currentPage.selection;
@@ -854,10 +849,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'RESIZE': {
-        // #14: 드래그 중엔 즉시 리사이즈, commit(드롭) 시 크기 저장.
-        const c = clampSize(msg.width, msg.height);
-        figma.ui.resize(c.w, c.h);
-        if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { w: c.w, h: c.h }).catch(() => {});
+        // #14: 드래그 중엔 즉시 리사이즈, commit(드롭) 시 높이 저장. 폭은 고정이라 받지 않는다.
+        const h = clampHeight(msg.height);
+        figma.ui.resize(UI_W, h);
+        if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { h }).catch(() => {});
         break;
       }
       case 'GET_LICENSE': {
