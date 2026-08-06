@@ -12,7 +12,6 @@ export * from './entitlements';
 export * from './license';
 export * from './licenseToken';
 export * from './exporters';
-export * from './variableEdit';
 export * from './themeGen';
 export * from './components';
 export * from './similar';

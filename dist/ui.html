@@ -413,13 +413,6 @@
     .simrow input[type="radio"], .simrow .tag, .simrow .simmeta { flex: 0 0 auto; }
     .simrow .simmeta { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
     /* 변수 편집기 한 줄 — 이름(늘어남) + 값 + 컬렉션 배지 + 액션. .simrow와 같은 한 줄 규칙. */
-    .vrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 3px 0; min-height: 30px; }
-    .vrow .vname { flex: 1 1 90px; min-width: 0; }
-    .vrow .vval { flex: 0 1 110px; min-width: 0; }
-    .vrow .vname input, .vrow .vval input, .vrow .vval select { width: 100%; min-width: 0; }
-    .vrow .vcol, .vrow .vact { flex: 0 0 auto; }
-    .vrow .vsw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
-    .vrow .vact button { padding: 0 6px; }
     /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
@@ -795,25 +788,6 @@
       <div class="status" id="exportStatus"></div>
     </div>
 
-    <div class="step" id="varEditCard">
-      <h2><span data-i18n="varedit.title">변수 편집기</span> <span class="muted" id="varCount"></span></h2>
-      <div class="hint" data-i18n-html="varedit.hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.</div>
-      <div class="row">
-        <button id="btnLoadVars" data-i18n="varedit.loadBtn">변수 불러오기</button>
-        <label class="inline"><span data-i18n="varedit.collection">컬렉션</span>
-          <select id="varFilterCol"><option value="">전체</option></select>
-        </label>
-        <input id="varFilterText" type="text" placeholder="이름으로 거르기" />
-      </div>
-      <div id="varList" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="varListMore" style="display:none">
-        <span class="list-count" id="varListCount"></span>
-        <button class="link" id="btnVarListExpand" data-i18n="list.expandAll">모두 펼치기</button>
-      </div>
-      <div class="status" id="varEditStatus"></div>
-    </div>
-
     <div class="step">
       <h2 data-i18n="license.title">요금제 / 라이선스</h2>
       <div class="row">
@@ -902,15 +876,6 @@
   }
   function resolvedTypeForToken(t2) {
     return resolvedTypeFor(t2.category);
-  }
-  var VALID_SCOPES = {
-    COLOR: /* @__PURE__ */ new Set(["ALL_SCOPES", "ALL_FILLS", "FRAME_FILL", "SHAPE_FILL", "TEXT_FILL", "STROKE_COLOR", "EFFECT_COLOR"]),
-    FLOAT: /* @__PURE__ */ new Set(["ALL_SCOPES", "GAP", "WIDTH_HEIGHT", "CORNER_RADIUS", "STROKE_FLOAT", "FONT_SIZE", "LINE_HEIGHT", "LETTER_SPACING", "FONT_WEIGHT", "EFFECT_FLOAT", "OPACITY"]),
-    STRING: /* @__PURE__ */ new Set(["ALL_SCOPES", "FONT_FAMILY"]),
-    BOOLEAN: /* @__PURE__ */ new Set(["ALL_SCOPES"])
-  };
-  function scopesForTypeList(type) {
-    return [...VALID_SCOPES[type]];
   }
   var SNAP_CATEGORIES = /* @__PURE__ */ new Set(["gap", "size"]);
   var TOKEN_GROUP = { gap: "spacing", size: "size" };
@@ -1034,12 +999,7 @@
     "similar.hint": "\uAD6C\uC870\uAC00 \uAC19\uACE0 <b>\uB0B4\uC6A9\uB9CC \uB2E4\uB978</b> \uD504\uB808\uC784 \uC5EC\uB7EC \uAC1C\uB97C \uACE8\uB77C \uC2A4\uCE94\uD558\uBA74, \uD558\uB098\uB97C <b>\uB9C8\uC2A4\uD130</b>\uB85C \uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uACE0 \uB098\uBA38\uC9C0\uB294 <b>\uC778\uC2A4\uD134\uC2A4</b>\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uD504\uB808\uC784\uB9C8\uB2E4 \uB2E4\uB978 \uD14D\uC2A4\uD2B8\xB7\uC544\uC774\uCF58\uC740 <b>\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131</b>\uC73C\uB85C \uC5F4\uB9AC\uACE0, \uC774\uBBF8\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uC5D0\uC11C \uAC1C\uBCC4 \uAD50\uCCB4\uB429\uB2C8\uB2E4. \uB9C8\uC2A4\uD130\uB294 <b>\uB0B4\uC6A9\uC774 \uAC00\uC7A5 \uC798 \uCC44\uC6CC\uC9C4</b> \uD504\uB808\uC784\uC744 \uCD94\uCC9C\uD569\uB2C8\uB2E4(\uBE48 \uD14D\uC2A4\uD2B8\uAC00 \uB9CE\uC73C\uBA74 \uAC10\uC810). <b>\uC2A4\uCE94\uC740 \uBB34\uB8CC</b>, \uC2E4\uC81C \uAD50\uCCB4\uB9CC Paid.",
     "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uC2A4\uCE94",
     "similar.componentizeBtn": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
-    // 변수 편집기
-    "varedit.title": "\uBCC0\uC218 \uD3B8\uC9D1\uAE30",
-    "varedit.hint": "\uB9CC\uB4E4\uC5B4 \uB454 \uBCC0\uC218\uC758 <b>\uC774\uB984\xB7\uAC12\xB7\uC2A4\uCF54\uD504</b>\uB97C \uC5EC\uAE30\uC11C \uACE0\uCE69\uB2C8\uB2E4. \uAC12 \uCE78\uC5D0 <code>#RRGGBB</code>\xB7\uC22B\uC790\uB97C \uB123\uC73C\uBA74 \uB9AC\uD130\uB7F4, \uB2E4\uB978 \uBCC0\uC218 \uC774\uB984\uC744 \uACE0\uB974\uBA74 \uBCC4\uCE6D\uC774 \uB429\uB2C8\uB2E4. \uD0C0\uC785\uACFC \uC18C\uC18D \uCEEC\uB809\uC158\uC740 \uBC14\uAFC0 \uC218 \uC5C6\uC5B4\uC694. <b>\uC9C0\uC6B0\uAE30 \uC804\uC5D0 \u2018\uC0AC\uC6A9\uCC98\u2019</b>\uB97C \uB20C\uB7EC \uC5B4\uB514\uC5D0 \uC4F0\uC774\uB294\uC9C0 \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
-    "varedit.loadBtn": "\uBCC0\uC218 \uBD88\uB7EC\uC624\uAE30",
-    "varedit.collection": "\uCEEC\uB809\uC158",
-    // 목록 공통(상한 해제 — 6개 카드가 같은 문구를 쓴다)
+    // 목록 공통(상한 해제 — 여러 카드가 같은 문구를 쓴다)
     "list.expandAll": "\uBAA8\uB450 \uD3BC\uCE58\uAE30",
     // 내보내기
     "export.needFirst": "\uBA3C\uC800 \uB0B4\uBCF4\uB0B4\uAE30\uB97C \uC2E4\uD589\uD558\uC138\uC694.",
@@ -2004,7 +1964,6 @@
     { mount: "colorTable", row: ".crow", more: "colorTableMore", count: "colorTableCount", expand: "btnColorTableExpand" },
     { mount: "variantReport", row: ".vr-row", more: "variantReportMore", count: "variantReportCount", expand: "btnVariantReportExpand" },
     { mount: "similarList", row: ".simrow", more: "similarListMore", count: "similarListCount", expand: "btnSimilarListExpand" },
-    { mount: "varList", row: ".vrow", more: "varListMore", count: "varListCount", expand: "btnVarListExpand" },
     // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
     // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
     { mount: "bindTree", row: ".tree-row", more: "bindTreeMore", count: "bindTreeCount", expand: "btnBindTreeExpand" },
@@ -2948,18 +2907,6 @@
     send({ type: "SCAN_COMPONENT_CANDIDATES" });
   });
   var allVars = [];
-  function visibleVars() {
-    const col = $("varFilterCol").value;
-    const q = $("varFilterText").value.trim().toLowerCase();
-    return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
-  }
-  function requestVars() {
-    setStatus("varEditStatus", "\uBCC0\uC218\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026", "");
-    send({ type: "GET_VARIABLES" });
-  }
-  $("btnLoadVars").addEventListener("click", requestVars);
-  $("varFilterCol").addEventListener("change", () => renderVars());
-  $("varFilterText").addEventListener("input", () => renderVars());
   function refreshDarkOptions() {
     var _a, _b;
     const cols = /* @__PURE__ */ new Map();
@@ -3102,7 +3049,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
@@ -3303,47 +3250,7 @@
       }
       case "VARIABLES": {
         allVars = msg.vars;
-        const sel = $("varFilterCol");
-        const prev = sel.value;
-        sel.innerHTML = '<option value="">\uC804\uCCB4</option>';
-        for (const c of [...new Set(msg.vars.map((v) => v.collection))]) {
-          const o = document.createElement("option");
-          o.value = c;
-          o.textContent = c;
-          sel.appendChild(o);
-        }
-        if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
-        renderVars();
         refreshDarkOptions();
-        setStatus("varEditStatus", msg.vars.length ? `\uBCC0\uC218 ${msg.vars.length}\uAC1C` : "\uD3B8\uC9D1\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.", msg.vars.length ? "ok" : "warn");
-        break;
-      }
-      case "EDIT_VARIABLE_RESULT": {
-        if (!msg.ok) {
-          setStatus("varEditStatus", `\uC218\uC815\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${(_e = msg.error) != null ? _e : "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958"}`, "warn");
-          renderVars();
-          break;
-        }
-        if (msg.deleted) {
-          allVars = allVars.filter((v) => v.id !== msg.id);
-          setStatus("varEditStatus", "\uBCC0\uC218\uB97C \uC0AD\uC81C\uD588\uC5B4\uC694.", "ok");
-        } else if (msg.var) {
-          const i = allVars.findIndex((v) => v.id === msg.id);
-          if (i >= 0) allVars[i] = msg.var;
-          setStatus("varEditStatus", `'${msg.var.name}' \uC218\uC815\uD588\uC5B4\uC694.`, "ok");
-        }
-        renderVars();
-        refreshDarkOptions();
-        break;
-      }
-      case "VARIABLE_USAGE": {
-        const v = allVars.find((x) => x.id === msg.id);
-        const parts = [];
-        parts.push(msg.nodes.length ? `\uB808\uC774\uC5B4 ${msg.nodes.length}\uACF3` : "\uC4F0\uB294 \uB808\uC774\uC5B4 \uC5C6\uC74C");
-        if (msg.aliasedBy.length) parts.push(`\uC774 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 ${msg.aliasedBy.length}\uAC1C(${msg.aliasedBy.slice(0, 3).map((a) => a.name).join(", ")}${msg.aliasedBy.length > 3 ? "\u2026" : ""})`);
-        if (msg.capped) parts.push("\u203B \uBB38\uC11C\uAC00 \uCEE4\uC11C \uC77C\uBD80\uB9CC \uD655\uC778\uD588\uC5B4\uC694");
-        const used = msg.nodes.length || msg.aliasedBy.length;
-        setStatus("varEditStatus", `${v ? `'${v.name}' ` : ""}\uC0AC\uC6A9\uCC98 \u2014 ${parts.join(" \xB7 ")}`, used || msg.capped ? "warn" : "ok");
         break;
       }
       case "DARK_MODE_RESULT": {
@@ -3376,7 +3283,7 @@
         break;
       }
       case "PREMIUM_REQUIRED": {
-        const statusId = (_f = PREMIUM_STATUS_ID[msg.feature]) != null ? _f : "createStatus";
+        const statusId = (_e = PREMIUM_STATUS_ID[msg.feature]) != null ? _e : "createStatus";
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }
@@ -3735,89 +3642,6 @@
     $("applyBarFill").style.width = "0%";
     $("applyProgressText").textContent = label;
   }
-  function makeVarRow(v) {
-    var _a;
-    const row = document.createElement("div");
-    row.className = "vrow";
-    row.dataset.id = v.id;
-    const cell = v.values[v.defaultModeId];
-    if (v.type === "COLOR" && cell && cell.kind === "literal" && /^#[0-9a-f]{6}$/i.test(cell.display)) {
-      const sw = document.createElement("span");
-      sw.className = "vsw";
-      sw.style.background = cell.display;
-      row.appendChild(sw);
-    }
-    const nameWrap = document.createElement("span");
-    nameWrap.className = "vname";
-    const name = document.createElement("input");
-    name.type = "text";
-    name.value = v.name;
-    name.title = v.name;
-    name.addEventListener("change", () => {
-      if (name.value.trim() === v.name) return;
-      send({ type: "EDIT_VARIABLE", id: v.id, patch: { name: name.value } });
-    });
-    nameWrap.appendChild(name);
-    row.appendChild(nameWrap);
-    const valWrap = document.createElement("span");
-    valWrap.className = "vval";
-    if (cell && cell.kind === "alias") {
-      const sel = document.createElement("select");
-      for (const other of allVars.filter((o) => o.type === v.type && o.id !== v.id)) {
-        const o = document.createElement("option");
-        o.value = other.id;
-        o.textContent = other.name;
-        sel.appendChild(o);
-      }
-      sel.value = (_a = cell.aliasId) != null ? _a : "";
-      sel.title = `\uBCC4\uCE6D \u2192 ${cell.display}`;
-      sel.addEventListener("change", () => {
-        send({ type: "EDIT_VARIABLE", id: v.id, patch: { value: { modeId: v.defaultModeId, aliasId: sel.value } } });
-      });
-      valWrap.appendChild(sel);
-    } else {
-      const val = document.createElement("input");
-      val.type = "text";
-      val.value = cell ? cell.display : "";
-      val.placeholder = v.type === "COLOR" ? "#RRGGBB" : v.type === "FLOAT" ? "\uC22B\uC790" : "";
-      val.addEventListener("change", () => {
-        send({ type: "EDIT_VARIABLE", id: v.id, patch: { value: { modeId: v.defaultModeId, literal: val.value } } });
-      });
-      valWrap.appendChild(val);
-    }
-    row.appendChild(valWrap);
-    const col = document.createElement("span");
-    col.className = "vcol tag tag-set";
-    col.textContent = v.collection;
-    col.title = `${v.collection} \xB7 ${v.type} \xB7 \uC2A4\uCF54\uD504 ${v.scopes.length}/${scopesForTypeList(v.type).length}`;
-    row.appendChild(col);
-    const act = document.createElement("span");
-    act.className = "vact";
-    const usage = document.createElement("button");
-    usage.className = "link";
-    usage.textContent = "\uC0AC\uC6A9\uCC98";
-    usage.addEventListener("click", () => {
-      setStatus("varEditStatus", `${v.name} \uC0AC\uC6A9\uCC98\uB97C \uCC3E\uB294 \uC911\u2026`, "");
-      send({ type: "GET_VARIABLE_USAGE", id: v.id });
-    });
-    act.appendChild(usage);
-    const del = document.createElement("button");
-    del.className = "link";
-    del.textContent = "\uC0AD\uC81C";
-    del.addEventListener("click", () => {
-      if (!window.confirm(`'${v.name}' \uBCC0\uC218\uB97C \uC0AD\uC81C\uD560\uAE4C\uC694?
-\uC774 \uBCC0\uC218\uB97C \uC4F0\uB358 \uB808\uC774\uC5B4\uC758 \uBC14\uC778\uB529\uC774 \uB04A\uAE41\uB2C8\uB2E4. '\uC0AC\uC6A9\uCC98'\uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.`)) return;
-      send({ type: "DELETE_VARIABLE", id: v.id });
-    });
-    act.appendChild(del);
-    row.appendChild(act);
-    return row;
-  }
-  function renderVars() {
-    const vis = visibleVars();
-    $("varCount").textContent = allVars.length ? `\xB7 ${vis.length}/${allVars.length}\uAC1C` : "";
-    renderChunked($("varList"), vis, makeVarRow, () => layoutListBy("varList"));
-  }
   function makeSimilarRow(m, recommendedId) {
     const row = document.createElement("label");
     row.className = "simrow";
@@ -3972,6 +3796,7 @@
   send({ type: "GET_COLLECTIONS" });
   send({ type: "GET_PREREQ" });
   send({ type: "GET_LICENSE" });
+  send({ type: "GET_VARIABLES" });
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
   var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {

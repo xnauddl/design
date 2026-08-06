@@ -2,7 +2,7 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate } from './shared/messages';
-import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList, tidyNumberTokens } from './lib/tokens';
+import { type DraftToken, type Unit, resolvedTypeForToken, tidyNumberTokens } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier, type Feature } from './lib/entitlements';
@@ -269,7 +269,6 @@ const LIST_REGIONS: ListRegion[] = [
   { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
   { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
   { mount: 'similarList', row: '.simrow', more: 'similarListMore', count: 'similarListCount', expand: 'btnSimilarListExpand' },
-  { mount: 'varList', row: '.vrow', more: 'varListMore', count: 'varListCount', expand: 'btnVarListExpand' },
   // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
   // 마운트 id로 한 줄이면 되고(아래 renderChunked 참고), 여기 항목만 목록마다 필요하다.
   { mount: 'bindTree', row: '.tree-row', more: 'bindTreeMore', count: 'bindTreeCount', expand: 'btnBindTreeExpand' },
@@ -1447,28 +1446,10 @@ $('btnScanComp').addEventListener('click', () => {
   send({ type: 'SCAN_COMPONENT_CANDIDATES' });
 });
 
-/* ---------- 변수 편집기 ---------- */
-// 마지막으로 받은 목록. 편집은 낙관적으로 반영하지 않고 EDIT_VARIABLE_RESULT로 되돌려받아 갱신한다
-// — figma가 이름을 정규화하거나 값을 거부할 수 있어서, 화면이 실제 상태와 어긋나면 안 된다.
+/* ---------- 다크 테마 생성 ---------- */
+// 문서의 3계층 변수 목록 — 다크 카드가 컬렉션·모드 선택지를 여기서 읽는다(값 편집은 Figma Variables 몫).
 let allVars: VarInfo[] = [];
 
-/** 컬렉션/이름 필터를 적용한 목록. */
-function visibleVars(): VarInfo[] {
-  const col = ($('varFilterCol') as HTMLSelectElement).value;
-  const q = ($('varFilterText') as HTMLInputElement).value.trim().toLowerCase();
-  return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
-}
-
-function requestVars(): void {
-  setStatus('varEditStatus', '변수를 불러오는 중…', '');
-  send({ type: 'GET_VARIABLES' });
-}
-
-$('btnLoadVars').addEventListener('click', requestVars);
-$('varFilterCol').addEventListener('change', () => renderVars());
-$('varFilterText').addEventListener('input', () => renderVars());
-
-/* ---------- 다크 테마 생성 ---------- */
 // 다크 채우기는 컬렉션의 모드 2개(라이트→다크)를 고르는 게 전부라, 변수 목록에서 모드를 읽어 채운다.
 function refreshDarkOptions(): void {
   const cols = new Map<string, VarInfo>();
@@ -1885,49 +1866,7 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'VARIABLES': {
       allVars = msg.vars;
-      // 컬렉션 필터 옵션은 실제로 존재하는 컬렉션에서만 만든다.
-      const sel = $('varFilterCol') as HTMLSelectElement;
-      const prev = sel.value;
-      sel.innerHTML = '<option value="">전체</option>';
-      for (const c of [...new Set(msg.vars.map((v) => v.collection))]) {
-        const o = document.createElement('option');
-        o.value = c;
-        o.textContent = c;
-        sel.appendChild(o);
-      }
-      if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
-      renderVars();
       refreshDarkOptions();
-      setStatus('varEditStatus', msg.vars.length ? `변수 ${msg.vars.length}개` : '편집할 변수가 없어요. 먼저 토큰을 생성하세요.', msg.vars.length ? 'ok' : 'warn');
-      break;
-    }
-    case 'EDIT_VARIABLE_RESULT': {
-      if (!msg.ok) {
-        setStatus('varEditStatus', `수정하지 못했어요 — ${msg.error ?? '알 수 없는 오류'}`, 'warn');
-        renderVars(); // 거부된 입력이 화면에 남지 않게 되돌린다
-        break;
-      }
-      if (msg.deleted) {
-        allVars = allVars.filter((v) => v.id !== msg.id);
-        setStatus('varEditStatus', '변수를 삭제했어요.', 'ok');
-      } else if (msg.var) {
-        const i = allVars.findIndex((v) => v.id === msg.id);
-        if (i >= 0) allVars[i] = msg.var;
-        setStatus('varEditStatus', `'${msg.var.name}' 수정했어요.`, 'ok');
-      }
-      renderVars();
-      refreshDarkOptions();
-      break;
-    }
-    case 'VARIABLE_USAGE': {
-      const v = allVars.find((x) => x.id === msg.id);
-      const parts: string[] = [];
-      parts.push(msg.nodes.length ? `레이어 ${msg.nodes.length}곳` : '쓰는 레이어 없음');
-      if (msg.aliasedBy.length) parts.push(`이 변수를 가리키는 변수 ${msg.aliasedBy.length}개(${msg.aliasedBy.slice(0, 3).map((a) => a.name).join(', ')}${msg.aliasedBy.length > 3 ? '…' : ''})`);
-      // 상한에 걸리면 "없음"이 아니라 "못 다 봤음"이다 — 삭제 판단이 갈리므로 반드시 알린다.
-      if (msg.capped) parts.push('※ 문서가 커서 일부만 확인했어요');
-      const used = msg.nodes.length || msg.aliasedBy.length;
-      setStatus('varEditStatus', `${v ? `'${v.name}' ` : ''}사용처 — ${parts.join(' · ')}`, used || msg.capped ? 'warn' : 'ok');
       break;
     }
     case 'DARK_MODE_RESULT': {
@@ -2455,100 +2394,6 @@ function showApplyProgress(label: string): void {
   ($('applyBarFill') as HTMLElement).style.width = '0%';
   $('applyProgressText').textContent = label;
 }
-/** 변수 한 줄 — 이름·값 즉시 편집 + 컬렉션 배지 + 사용처/삭제. */
-function makeVarRow(v: VarInfo): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'vrow';
-  row.dataset.id = v.id;
-
-  // 색이면 스와치를 앞에 — 목록에서 무슨 색인지 눈으로 바로 찾는다.
-  const cell = v.values[v.defaultModeId];
-  if (v.type === 'COLOR' && cell && cell.kind === 'literal' && /^#[0-9a-f]{6}$/i.test(cell.display)) {
-    const sw = document.createElement('span');
-    sw.className = 'vsw';
-    sw.style.background = cell.display;
-    row.appendChild(sw);
-  }
-
-  const nameWrap = document.createElement('span');
-  nameWrap.className = 'vname';
-  const name = document.createElement('input');
-  name.type = 'text';
-  name.value = v.name;
-  name.title = v.name;
-  // change(포커스 아웃/엔터)에서만 보낸다 — 타이핑마다 보내면 편집 한 번이 Undo 수십 개가 된다.
-  name.addEventListener('change', () => {
-    if (name.value.trim() === v.name) return;
-    send({ type: 'EDIT_VARIABLE', id: v.id, patch: { name: name.value } });
-  });
-  nameWrap.appendChild(name);
-  row.appendChild(nameWrap);
-
-  const valWrap = document.createElement('span');
-  valWrap.className = 'vval';
-  if (cell && cell.kind === 'alias') {
-    // 별칭은 같은 타입의 다른 변수로만 바꿀 수 있다 — 자유 입력이면 오타로 깨지기 쉽다.
-    const sel = document.createElement('select');
-    for (const other of allVars.filter((o) => o.type === v.type && o.id !== v.id)) {
-      const o = document.createElement('option');
-      o.value = other.id;
-      o.textContent = other.name;
-      sel.appendChild(o);
-    }
-    sel.value = cell.aliasId ?? '';
-    sel.title = `별칭 → ${cell.display}`;
-    sel.addEventListener('change', () => {
-      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, aliasId: sel.value } } });
-    });
-    valWrap.appendChild(sel);
-  } else {
-    const val = document.createElement('input');
-    val.type = 'text';
-    val.value = cell ? cell.display : '';
-    val.placeholder = v.type === 'COLOR' ? '#RRGGBB' : v.type === 'FLOAT' ? '숫자' : '';
-    val.addEventListener('change', () => {
-      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, literal: val.value } } });
-    });
-    valWrap.appendChild(val);
-  }
-  row.appendChild(valWrap);
-
-  const col = document.createElement('span');
-  col.className = 'vcol tag tag-set';
-  col.textContent = v.collection;
-  col.title = `${v.collection} · ${v.type} · 스코프 ${v.scopes.length}/${scopesForTypeList(v.type).length}`;
-  row.appendChild(col);
-
-  const act = document.createElement('span');
-  act.className = 'vact';
-  const usage = document.createElement('button');
-  usage.className = 'link';
-  usage.textContent = '사용처';
-  usage.addEventListener('click', () => {
-    setStatus('varEditStatus', `${v.name} 사용처를 찾는 중…`, '');
-    send({ type: 'GET_VARIABLE_USAGE', id: v.id });
-  });
-  act.appendChild(usage);
-  const del = document.createElement('button');
-  del.className = 'link';
-  del.textContent = '삭제';
-  del.addEventListener('click', () => {
-    // 되돌리기 어려운 작업이라 한 번 더 묻는다. 사용처를 먼저 보라는 안내도 같이.
-    if (!window.confirm(`'${v.name}' 변수를 삭제할까요?\n이 변수를 쓰던 레이어의 바인딩이 끊깁니다. '사용처'로 먼저 확인하세요.`)) return;
-    send({ type: 'DELETE_VARIABLE', id: v.id });
-  });
-  act.appendChild(del);
-  row.appendChild(act);
-
-  return row;
-}
-
-function renderVars(): void {
-  const vis = visibleVars();
-  $('varCount').textContent = allVars.length ? `· ${vis.length}/${allVars.length}개` : '';
-  renderChunked($('varList'), vis, makeVarRow, () => layoutListBy('varList'));
-}
-
 /** 닮은 프레임 멤버 한 줄 — 마스터 라디오 + 이름 + 완전성 근거(왜 이게 추천인지). */
 function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement {
   const row = document.createElement('label'); // 라디오와 한 덩어리로 — 줄 아무 데나 눌러도 선택된다
@@ -2742,6 +2587,7 @@ refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드도 시작 시 빈 �
 send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_PREREQ' }); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
+send({ type: 'GET_VARIABLES' }); // 다크 카드의 컬렉션·모드 선택지(편집기 '변수 불러오기'가 하던 일)
 
 // #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
 document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));

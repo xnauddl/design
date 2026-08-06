@@ -92,13 +92,7 @@ import {
   suggestTokenRoles,
   pipelineSteps,
   t,
-  parseVarValue,
-  displayVarValue,
-  validateVarName,
-  sanitizeScopes,
   scopesForTypeList,
-  aliasSelfReference,
-  findAliasReferers,
   hexToOklch,
   darkValueForLight,
   darkGlobalName,
@@ -2073,47 +2067,7 @@ test('nameTextStyles — 군집의 자간 %는 스펙으로 전달되고, px 군
   assert.equal(px.letterSpacingPercent, undefined);
 });
 
-/* ---------- 변수 편집기(R1)·다크 테마 생성(R2) 순수 헬퍼 ---------- */
-
-test('parseVarValue — 타입별 파싱/검증', () => {
-  // COLOR
-  assert.deepEqual(parseVarValue('COLOR', '#ffffff'), { ok: true, value: { r: 1, g: 1, b: 1 } });
-  assert.deepEqual(parseVarValue('COLOR', '000000'), { ok: true, value: { r: 0, g: 0, b: 0 } });
-  assert.equal(parseVarValue('COLOR', 'nope').ok, false);
-  assert.equal(parseVarValue('COLOR', '#fff').ok, false); // 3자리 거부
-  // FLOAT
-  assert.deepEqual(parseVarValue('FLOAT', '16'), { ok: true, value: 16 });
-  assert.deepEqual(parseVarValue('FLOAT', '-1.5'), { ok: true, value: -1.5 });
-  assert.equal(parseVarValue('FLOAT', '').ok, false);
-  assert.equal(parseVarValue('FLOAT', 'abc').ok, false);
-  // STRING
-  assert.deepEqual(parseVarValue('STRING', 'Inter'), { ok: true, value: 'Inter' });
-  assert.deepEqual(parseVarValue('STRING', '  Inter  '), { ok: true, value: 'Inter' }); // 앞뒤 공백 트림
-  assert.equal(parseVarValue('STRING', '   ').ok, false);
-  // BOOLEAN
-  assert.deepEqual(parseVarValue('BOOLEAN', 'true'), { ok: true, value: true });
-  assert.deepEqual(parseVarValue('BOOLEAN', 'FALSE'), { ok: true, value: false });
-  assert.equal(parseVarValue('BOOLEAN', 'yes').ok, false);
-});
-
-test('displayVarValue — 색은 hex, 그 외 문자열', () => {
-  assert.equal(displayVarValue('COLOR', { r: 1, g: 1, b: 1 }), '#ffffff');
-  assert.equal(displayVarValue('FLOAT', 16), '16');
-  assert.equal(displayVarValue('STRING', 'Inter'), 'Inter');
-});
-
-test('validateVarName — 빈 이름·중복 거부', () => {
-  assert.equal(validateVarName('surface', ['bg', 'text']), null);
-  assert.match(validateVarName('', []), /이름/);
-  assert.match(validateVarName('  ', []), /이름/);
-  assert.match(validateVarName('bg', ['bg', 'text']), /중복|이름/);
-});
-
-test('sanitizeScopes — 타입 무효 스코프 제거 + 중복 제거', () => {
-  // COLOR에 FLOAT 전용 스코프(GAP)는 제거, 중복은 1개로
-  const out = sanitizeScopes(['ALL_FILLS', 'GAP', 'ALL_FILLS', 'STROKE_COLOR'], 'COLOR');
-  assert.deepEqual(out.sort(), ['ALL_FILLS', 'STROKE_COLOR']);
-});
+/* ---------- 스코프 목록(R1)·다크 테마 생성(R2) 순수 헬퍼 ---------- */
 
 test('scopesForTypeList — 타입별 유효 스코프 노출', () => {
   const color = scopesForTypeList('COLOR');
@@ -2122,25 +2076,6 @@ test('scopesForTypeList — 타입별 유효 스코프 노출', () => {
   const float = scopesForTypeList('FLOAT');
   assert.ok(float.includes('GAP'));
   assert.ok(!float.includes('TEXT_FILL'));
-});
-
-test('aliasSelfReference — 자기참조만 차단', () => {
-  assert.equal(aliasSelfReference('a', 'a'), true);
-  assert.equal(aliasSelfReference('a', 'b'), false);
-});
-
-test('findAliasReferers — varId를 별칭하는 변수 수집(자기 제외, R2-C)', () => {
-  const vars = [
-    { id: 'g1', name: 'color/blue/500', values: { m: { kind: 'literal' } } },
-    { id: 's1', name: 'primary', values: { m: { kind: 'alias', aliasId: 'g1' } } },
-    { id: 's2', name: 'surface', values: { light: { kind: 'alias', aliasId: 'g1' }, dark: { kind: 'literal' } } },
-    { id: 's3', name: 'text', values: { m: { kind: 'alias', aliasId: 'other' } } },
-  ];
-  const refs = findAliasReferers('g1', vars);
-  assert.deepEqual(refs.map((r) => r.name).sort(), ['primary', 'surface']);
-  // 어느 모드든 한 번이라도 별칭하면 1회만(중복 없음)
-  assert.equal(refs.length, 2);
-  assert.deepEqual(findAliasReferers('none', vars), []);
 });
 
 test('darkValueForLight — OKLCH 명도 반전(밝음↔어두움)', () => {

@@ -212,7 +212,7 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 | 기능 | Free (무제한) | Paid |
 |---|:---:|:---:|
 | 토큰 추출 · 바인딩(기존 변수) · 레이어 리네임 | ✅ | ✅ |
-| 변수 편집(값·이름·스코프 수정/삭제) · 닮은 프레임 **스캔** | ✅ | ✅ |
+| 닮은 프레임 **스캔** | ✅ | ✅ |
 | 코드 내보내기(W3C JSON / CSS) | ✅ | ✅ |
 | **색상 팔레트 생성 · 적용** | — | ✅ |
 | **토큰(3계층 변수) 생성** | — | ✅ |
@@ -244,7 +244,7 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 
 ### 엔타이틀먼트 모델
 - `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`textStyles`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
-- `code.ts`: `requirePaid(feature, message)` 단일 게이트 — 토큰 생성·시맨틱·컴포넌트·텍스트 스타일, 그리고 기존 기능에 얹힌 둘: **다크 테마 생성**(`dark/` Global을 새로 만드니 `tokens`), **닮은 프레임 컴포넌트화**(`components`). 추출·바인딩·리네임·내보내기·변수 편집·닮은 프레임 스캔은 무게이팅.
+- `code.ts`: `requirePaid(feature, message)` 단일 게이트 — 토큰 생성·시맨틱·컴포넌트·텍스트 스타일, 그리고 기존 기능에 얹힌 둘: **다크 테마 생성**(`dark/` Global을 새로 만드니 `tokens`), **닮은 프레임 컴포넌트화**(`components`). 추출·바인딩·리네임·내보내기·닮은 프레임 스캔은 무게이팅.
 - **두 층으로 막는다.** code의 `requirePaid`가 최종 방어선이고, UI(`ui.ts`)는 그 전에 유료 버튼을 **클릭 전 사전 비활성**(`PAID_FIELDS` + 🔒 배지)한다. 그래서 code에 게이트가 없어도 UI에서 잠기는 항목이 있다 — 팔레트 '생성'(`btnPalette`)이 그 예로, postMessage 없이 UI에서만 도는데도 그 카드의 미리보기 역할이라 함께 잠근다.
 - 거부 안내는 `PREMIUM_STATUS_ID`로 **해당 기능의 카드**에 띄운다(클릭-후-거부 방지).
 - 메시지(`src/shared/messages.ts`): `CodeToUi.LICENSE_STATUS { tier, unlimited, source, … }` · `PREMIUM_REQUIRED { feature, message }`.
