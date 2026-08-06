@@ -372,7 +372,7 @@
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
-      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈</b>. 기준 크기·맥락 깊이는 ‘관리’ 탭 설정을 따릅니다.</div>
+      <div class="hint" data-i18n="wizardCard.hint">추출 → 토큰 → 바인딩 → 정돈</div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span></label>
         <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span></label>
@@ -460,7 +460,7 @@
       <!-- 색 정리 — 추출 색이 있을 때만. 변수 생성 전 드래프트 단계라 바인딩 영향 없음.
            색 외 토큰(간격·폰트·효과 등)은 아래 ‘토큰 생성’ 카드에 표시. -->
       <div id="colorSection" style="display:none">
-        <div class="hint" data-i18n-html="colorTidy.hint">비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). 역할(Semantic)을 정하세요. Global은 hue 패밀리(<code>color/blue/500</code>).</div>
+        <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">화면에서 뽑거나 시드로 만든 뒤, 역할을 정하고 변수로 만듭니다.</div>
         <div id="tidySummary" class="tidy tidy-note" style="display:none">
           <span id="tidySumText"></span>
           <button id="btnTidyUndo" class="link" data-i18n="colorTidy.undo">되돌리기</button>
@@ -486,7 +486,7 @@
         <span class="grow"></span>
         <button class="btn-next" data-next-make="theme" data-i18n="rail.next">다음 →</button>
       </div>
-      <div class="hint" data-i18n-html="create.scopeHint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.</div>
+      <div class="hint" data-i18n="create.scopeHint">간격·크기·폰트·효과만. 색은 이전 단계에서 변수화함.</div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체 선택</span></label>
         <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
@@ -514,7 +514,7 @@
 
     <div class="step" id="darkCard" data-make-step="theme">
       <h2><span data-i18n="dark.title">다크 테마 생성</span> <span class="muted" id="darkLock"></span></h2>
-      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
+      <div class="hint" data-i18n="dark.hint" title="색상·채도는 그대로 두고 명도만 뒤집습니다. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 dark/…로 따로 만들어집니다.">라이트 명도 반전 → Dark 모드(없으면 추가).</div>
       <div class="row">
         <label class="inline"><span data-i18n="dark.collection">대상 컬렉션</span>
           <select id="darkCollection"></select>
@@ -546,7 +546,7 @@
         <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존만 연결</button>
       </div>
       <label class="inline"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록 시 화면에 적용</span></label>
-      <label class="inline"><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 이름으로</span></label>
+      <label class="inline" title="ON이면 같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. 세션 동안만 유지."><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 이름으로</span></label>
       <div id="tsList" class="results"></div>
       <div class="prereq" id="tsApplyPrereq" style="display:none;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
@@ -563,6 +563,7 @@
 
     <div class="step" data-apply-step="bind">
       <h2><span data-i18n="bind.title">적용 (바인딩)</span> <span class="muted" id="bindCount"></span></h2>
+      <div class="hint" data-i18n="bind.hint">미리보기 → 골라 → 연결</div>
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
       <div class="toolbar">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
@@ -589,6 +590,7 @@
 
     <div class="step" data-apply-step="rename">
       <h2><span data-i18n="rename.title">리네임</span> <span class="muted" id="renameCount"></span></h2>
+      <div class="hint" data-i18n="rename.hint">역할 이름으로 정돈 · 루트·인스턴스 보존</div>
       <div class="toolbar">
         <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
         <button id="btnRename" class="primary" disabled data-i18n="rename.apply">이름 적용</button>
@@ -610,8 +612,7 @@
       <!-- 이 카드엔 목록이 둘이다(후보 트리 · 결과 리포트). 세는 대상이 달라 각자 span을 갖고,
            비어 있으면 각자 숨는다 — 스캔 직후엔 후보만, 등록 직후엔 리포트만 뜬다. -->
       <h2><span data-i18n="component.title">컴포넌트 / 베리언트</span> <span class="muted" id="compCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span></h2>
-      <div class="hint" data-i18n-html="component.hint"><b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·table·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.</div>
-      <div class="hint muted" data-i18n-html="component.hint2"><b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 이름끼리 다시 묶을 때만(프레임은 「컴포넌트 등록」). 등록 시 TEXT·스왑·<code>이름?</code> BOOLEAN 속성이 자동 노출됩니다(접힘=다른 슬롯만, 단독·세트=전체 API).</div>
+      <div class="hint" data-i18n="component.hint" title="선택한 부모는 컨테이너(등록 제외)이고, 고신뢰 구조(button·chip·table·card·list·field·nav·progress·figure·heading)로 보이는 FRAME/GROUP만 후보입니다. 같은 레이어 이름이 2개 이상이면 구조가 같고 텍스트·아이콘만 다를 때 속성으로 접히고, 크기·색·구조가 다르면 세트가 됩니다.">후보 스캔 후 등록 · 닮은 프레임은 스캔 Free</div>
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" title="선택 하위 고신뢰 구조 후보 스캔 — 같은 이름 반복은 세트/속성으로 자동 체크, 숨김 제외">후보 스캔</button>
         <button id="btnRegisterComp" data-i18n="component.registerBtn" title="체크한 후보를 컴포넌트 등록(Components 페이지) + 같은 이름 세트/속성 접힘 + TEXT·스왑·가시성 속성 노출">컴포넌트 등록</button>
@@ -628,7 +629,7 @@
 
     <div class="step" id="similarCard" data-apply-step="structure">
       <h2><span data-i18n="similar.title">닮은 프레임 컴포넌트화</span> <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
-      <div class="hint" data-i18n-html="similar.hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
+      <div class="hint" data-i18n="similar.hint">구조가 같고 내용만 다른 프레임 → 마스터 1개 + 인스턴스. 스캔은 무료.</div>
       <div class="row">
         <button id="btnScanSimilar" data-i18n="similar.scanBtn" title="선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)">닮은 프레임 스캔</button>
         <button id="btnComponentize" class="primary" data-i18n="similar.componentizeBtn" title="추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체">컴포넌트화</button>
@@ -654,7 +655,7 @@
 
     <div class="step">
       <h2 data-i18n="export.title">내보내기 (코드)</h2>
-      <div class="hint" data-i18n="export.hint">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>
+      <div class="hint" data-i18n="export.hint">Figma 변수를 코드 파일로 · 패널 목록·미리보기 없음</div>
       <div class="row">
         <label class="inline"><span data-i18n="export.format">형식</span>
           <select id="exportFormat">
@@ -862,14 +863,14 @@
     "wizard.completed": "\uC644\uB8CC",
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131",
-    "dark.hint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC \uC0C9\uC744 <b>\uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4</b> \uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCC44\uC6C1\uB2C8\uB2E4. \uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C\uB77C \uBE0C\uB79C\uB4DC\uC0C9\uC774 \uC720\uC9C0\uB3FC\uC694. Semantic\uC774 Global\uC744 <b>\uAC00\uB9AC\uD0A4\uACE0 \uC788\uB294 \uAC83\uB9CC</b> \uB300\uC0C1\uC774\uACE0, \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB701\uB2C8\uB2E4. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 <code>dark/\u2026</code>\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC9D1\uB2C8\uB2E4. (Paid)",
+    "dark.hint": "\uB77C\uC774\uD2B8 \uBA85\uB3C4 \uBC18\uC804 \u2192 Dark \uBAA8\uB4DC(\uC5C6\uC73C\uBA74 \uCD94\uAC00).",
     "dark.collection": "\uB300\uC0C1 \uCEEC\uB809\uC158",
     "dark.fromMode": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC",
     "dark.toMode": "\uB2E4\uD06C \uBAA8\uB4DC",
     "dark.genBtn": "\uB2E4\uD06C \uCC44\uC6B0\uAE30",
     // 닮은 프레임 컴포넌트화
     "similar.title": "\uB2EE\uC740 \uD504\uB808\uC784 \uCEF4\uD3EC\uB10C\uD2B8\uD654",
-    "similar.hint": "\uAD6C\uC870\uAC00 \uAC19\uACE0 <b>\uB0B4\uC6A9\uB9CC \uB2E4\uB978</b> \uD504\uB808\uC784 \uC5EC\uB7EC \uAC1C\uB97C \uACE8\uB77C \uC2A4\uCE94\uD558\uBA74, \uD558\uB098\uB97C <b>\uB9C8\uC2A4\uD130</b>\uB85C \uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uACE0 \uB098\uBA38\uC9C0\uB294 <b>\uC778\uC2A4\uD134\uC2A4</b>\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uD504\uB808\uC784\uB9C8\uB2E4 \uB2E4\uB978 \uD14D\uC2A4\uD2B8\xB7\uC544\uC774\uCF58\uC740 <b>\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131</b>\uC73C\uB85C \uC5F4\uB9AC\uACE0, \uC774\uBBF8\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uC5D0\uC11C \uAC1C\uBCC4 \uAD50\uCCB4\uB429\uB2C8\uB2E4. \uB9C8\uC2A4\uD130\uB294 <b>\uB0B4\uC6A9\uC774 \uAC00\uC7A5 \uC798 \uCC44\uC6CC\uC9C4</b> \uD504\uB808\uC784\uC744 \uCD94\uCC9C\uD569\uB2C8\uB2E4(\uBE48 \uD14D\uC2A4\uD2B8\uAC00 \uB9CE\uC73C\uBA74 \uAC10\uC810). <b>\uC2A4\uCE94\uC740 \uBB34\uB8CC</b>, \uC2E4\uC81C \uAD50\uCCB4\uB9CC Paid.",
+    "similar.hint": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784 \u2192 \uB9C8\uC2A4\uD130 1\uAC1C + \uC778\uC2A4\uD134\uC2A4. \uC2A4\uCE94\uC740 \uBB34\uB8CC.",
     "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uC2A4\uCE94",
     "similar.componentizeBtn": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
     // 내보내기
@@ -961,7 +962,7 @@
     "settings.tol": "\uD5C8\uC6A9\uC624\uCC28 0.5px \uACE0\uC815 \xB7 \uC5EC\uBC31\xB7\uD06C\uAE30 \uACA9\uC790 8px \uACE0\uC815",
     // 마법사 카드
     "wizardCard.title": "\uC2DC\uC2A4\uD15C\uD654 \uB9C8\uBC95\uC0AC",
-    "wizardCard.hint": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC744 \uD55C \uBC88\uC5D0 <b>\uD1A0\uD070\uD654 \xB7 \uBC14\uC778\uB529 \xB7 \uC815\uB3C8</b>. \uAE30\uC900 \uD06C\uAE30\xB7\uB9E5\uB77D \uAE4A\uC774\uB294 \u2018\uAD00\uB9AC\u2019 \uD0ED \uC124\uC815\uC744 \uB530\uB985\uB2C8\uB2E4.",
+    "wizardCard.hint": "\uCD94\uCD9C \u2192 \uD1A0\uD070 \u2192 \uBC14\uC778\uB529 \u2192 \uC815\uB3C8",
     "wizardCard.optSemantics": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
     "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
@@ -991,12 +992,12 @@
     "extract.title": "\uCD94\uCD9C \xB7 \uC0C9 \uC815\uB9AC",
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
-    "colorTidy.hint": "\uBE44\uC2B7\uD55C \uC0C9\uC740 \uCD94\uCD9C \uC2DC \uC790\uB3D9\uC73C\uB85C \uB300\uD45C 1\uC0C9\uC5D0 \uC815\uB9AC\uB429\uB2C8\uB2E4(\uB4DC\uB798\uD504\uD2B8 \uB2E8\uACC4 \u2014 \uBC14\uC778\uB529 \uC601\uD5A5 \uC5C6\uC74C). \uC5ED\uD560(Semantic)\uC744 \uC815\uD558\uC138\uC694. Global\uC740 hue \uD328\uBC00\uB9AC(<code>color/blue/500</code>).",
+    "colorTidy.hint": "\uD654\uBA74\uC5D0\uC11C \uBF51\uAC70\uB098 \uC2DC\uB4DC\uB85C \uB9CC\uB4E0 \uB4A4, \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4.",
     "colorTidy.undo": "\uB418\uB3CC\uB9AC\uAE30",
     "colorTable.applyBtn": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551\uC5D0 \uBC18\uC601",
     // 토큰 생성
     "create.title": "\uD1A0\uD070 \uC0DD\uC131 (Global + Semantic)",
-    "create.scopeHint": "\uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uC0C9\uC740 \uC704 \u2018\uC0C9 \uC815\uB9AC\u2019\uC5D0\uC11C \uB2E4\uB8F9\uB2C8\uB2E4. \uCCB4\uD06C\uD55C \uAC83\uB9CC \uC0DD\uC131\uB418\uACE0, <b>n\xD7</b>\uB294 \uADF8 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4 \uC218\uC785\uB2C8\uB2E4.",
+    "create.scopeHint": "\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uBCC0\uC218\uD654\uD568.",
     "create.selectAll": "\uC804\uCCB4 \uC120\uD0DD",
     "create.dropOnce": "1\xD7 \uD574\uC81C",
     "create.previewBtn": "\uBBF8\uB9AC\uBCF4\uAE30",
@@ -1017,26 +1018,27 @@
     "textStyle.registerBtn": "\uB4F1\uB85D",
     // 적용(바인딩)
     "bind.title": "\uC801\uC6A9 (\uBC14\uC778\uB529)",
+    "bind.hint": "\uBBF8\uB9AC\uBCF4\uAE30 \u2192 \uACE8\uB77C \u2192 \uC5F0\uACB0",
     "bind.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
     "bind.confirm": "\uC120\uD0DD\uC5D0 \uBC14\uC778\uB529",
     "bind.progress": "\uC9C4\uD589\uB960",
     // 리네임
     "rename.title": "\uB9AC\uB124\uC784",
+    "rename.hint": "\uC5ED\uD560 \uC774\uB984\uC73C\uB85C \uC815\uB3C8 \xB7 \uB8E8\uD2B8\xB7\uC778\uC2A4\uD134\uC2A4 \uBCF4\uC874",
     "rename.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
     "rename.apply": "\uC774\uB984 \uC801\uC6A9",
     "rename.undoTitle": "\uB418\uB3CC\uB9AC\uAE30 \uC548\uC804\uC7A5\uCE58",
     "rename.undoBody": "\uC774 \uC2E4\uD589\uC740 \uD55C \uBC88\uC758 \uB418\uB3CC\uB9AC\uAE30(Ctrl/\u2318Z)\uB85C \uC804\uCCB4\uB97C \uCDE8\uC18C\uD560 \uC218 \uC788\uC5B4\uC694.",
     // 컴포넌트 / 베리언트
     "component.title": "\uCEF4\uD3EC\uB10C\uD2B8 / \uBCA0\uB9AC\uC5B8\uD2B8",
-    "component.hint": "<b>\uD6C4\uBCF4 \uC2A4\uCE94</b> \u2192 \uACE8\uB77C \uB4F1\uB85D. \uC120\uD0DD\uD55C <b>\uBD80\uBAA8\uB294 \uCEE8\uD14C\uC774\uB108</b>(\uB4F1\uB85D \uC81C\uC678). <b>\uACE0\uC2E0\uB8B0 \uAD6C\uC870</b>(button\xB7chip\xB7table\xB7card\xB7list\xB7field\xB7nav\xB7progress\xB7figure\xB7heading)\uC778 \uBCF4\uC774\uB294 FRAME/GROUP\uB9CC \uD6C4\uBCF4 \u2014 \uC774\uB984\uACFC \uBB34\uAD00, <b>\uC228\uAE40\uC740 \uC81C\uC678</b>. heading\uC740 \uC139\uC158 \uBA38\uB9AC\uC904(\uAC00\uB85C\xB7\uB0AE\uC740 \uB192\uC774\xB7\uD0C0\uC774\uD2C0+\uC120\uD0DD \uC561\uC158/\uBA54\uD0C0)\uC774\uBA70 \uD398\uC774\uC9C0 header \uB79C\uB4DC\uB9C8\uD06C\uC640 \uB2E4\uB984. <b>\uAC19\uC740 \uB808\uC774\uC5B4 \uC774\uB984</b>\uC774 2\uAC1C+\uC774\uBA74: \uAD6C\uC870\uAC00 \uAC19\uACE0 \uD14D\uC2A4\uD2B8/\uC544\uC774\uCF58\uB9CC \uB2E4\uB974\uBA74 <b>\uC18D\uC131</b>(\uB2E8\uD488+TEXT/\uC2A4\uC651), heading\uC758 \uC561\uC158(buttonGroup) \uC720\uBB34\uB9CC \uB2EC\uB77C\uB3C4 <b>\uC18D\uC131</b>, \uAD6C\uC870\xB7\uD06C\uAE30\xB7\uC0C9\uC774 \uB2E4\uB974\uBA74 <b>\uC138\uD2B8</b>. \uC774\uB984\uC774 \uB2E4\uB974\uBA74 \uAC01\uAC01 <b>\uB2E8\uB3C5</b>. \uC18D\uC131\uC740 \uC774\uB984 \uC5B4\uD718(<code>Type</code>\xB7<code>State</code>\xB7<code>Size</code>) \uC6B0\uC120 + \uAE30\uD558 \uBCF4\uC644. \uBA54\uC778\uC740 <b>Components \uD398\uC774\uC9C0</b>, \uC6D0\uC704\uCE58\uC5D4 <b>\uC778\uC2A4\uD134\uC2A4</b>.",
-    "component.hint2": "<b>\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958</b>\uB294 \uC774\uBBF8 \uB9CC\uB4E4\uC5B4 \uB454 <b>\uAE30\uC874 \uCEF4\uD3EC\uB10C\uD2B8</b>\uB97C \uAC19\uC740 \uC774\uB984\uB07C\uB9AC \uB2E4\uC2DC \uBB36\uC744 \uB54C\uB9CC(\uD504\uB808\uC784\uC740 \u300C\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\u300D). \uB4F1\uB85D \uC2DC TEXT\xB7\uC2A4\uC651\xB7<code>\uC774\uB984?</code> BOOLEAN \uC18D\uC131\uC774 \uC790\uB3D9 \uB178\uCD9C\uB429\uB2C8\uB2E4(\uC811\uD798=\uB2E4\uB978 \uC2AC\uB86F\uB9CC, \uB2E8\uB3C5\xB7\uC138\uD2B8=\uC804\uCCB4 API).",
+    "component.hint": "\uD6C4\uBCF4 \uC2A4\uCE94 \uD6C4 \uB4F1\uB85D \xB7 \uB2EE\uC740 \uD504\uB808\uC784\uC740 \uC2A4\uCE94 Free",
     "component.scanBtn": "\uD6C4\uBCF4 \uC2A4\uCE94",
     "component.registerBtn": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D",
     "component.classifyBtn": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958",
     "component.genMissingBtn": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131",
     // 내보내기
     "export.title": "\uB0B4\uBCF4\uB0B4\uAE30 (\uCF54\uB4DC)",
-    "export.hint": "\uBAA8\uB4E0 \uB514\uC790\uC778 \uBCC0\uC218(\uC0C9\xB7\uD06C\uAE30\xB7\uAC04\uACA9\xB7\uBC18\uACBD\xB7\uD0C0\uC774\uD3EC)\uB97C \uCF54\uB4DC\uB85C. HUG/FILL\uC740 \uD1A0\uD070\uC774 \uC544\uB2C8\uB77C \uC81C\uC678.",
+    "export.hint": "Figma \uBCC0\uC218\uB97C \uCF54\uB4DC \uD30C\uC77C\uB85C \xB7 \uD328\uB110 \uBAA9\uB85D\xB7\uBBF8\uB9AC\uBCF4\uAE30 \uC5C6\uC74C",
     "export.format": "\uD615\uC2DD",
     "export.fontUnit": "\uD3F0\uD2B8 \uD06C\uAE30",
     "export.runBtn": "\uB0B4\uBCF4\uB0B4\uAE30",

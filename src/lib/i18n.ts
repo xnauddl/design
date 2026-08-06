@@ -67,14 +67,14 @@ export const STRINGS: Record<string, string> = {
 
   // 다크 테마 생성
   'dark.title': '다크 테마 생성',
-  'dark.hint': '라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)',
+  'dark.hint': '라이트 명도 반전 → Dark 모드(없으면 추가).',
   'dark.collection': '대상 컬렉션',
   'dark.fromMode': '라이트 모드',
   'dark.toMode': '다크 모드',
   'dark.genBtn': '다크 채우기',
   // 닮은 프레임 컴포넌트화
   'similar.title': '닮은 프레임 컴포넌트화',
-  'similar.hint': '구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.',
+  'similar.hint': '구조가 같고 내용만 다른 프레임 → 마스터 1개 + 인스턴스. 스캔은 무료.',
   'similar.scanBtn': '닮은 프레임 스캔',
   'similar.componentizeBtn': '컴포넌트화',
   // 내보내기
@@ -175,7 +175,7 @@ export const STRINGS: Record<string, string> = {
   'settings.tol': '허용오차 0.5px 고정 · 여백·크기 격자 8px 고정',
   // 마법사 카드
   'wizardCard.title': '시스템화 마법사',
-  'wizardCard.hint': '선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈</b>. 기준 크기·맥락 깊이는 ‘관리’ 탭 설정을 따릅니다.',
+  'wizardCard.hint': '추출 → 토큰 → 바인딩 → 정돈',
   'wizardCard.optSemantics': '시맨틱 매핑',
   'wizardCard.optComponentize': '컴포넌트화',
   'wizardCard.run': '전체 실행',
@@ -205,12 +205,12 @@ export const STRINGS: Record<string, string> = {
   'extract.title': '추출 · 색 정리',
   'extract.scanBtn': '선택에서 토큰 추출',
   // 색 정리(추출 카드에 흡수)
-  'colorTidy.hint': '비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). 역할(Semantic)을 정하세요. Global은 hue 패밀리(<code>color/blue/500</code>).',
+  'colorTidy.hint': '화면에서 뽑거나 시드로 만든 뒤, 역할을 정하고 변수로 만듭니다.',
   'colorTidy.undo': '되돌리기',
   'colorTable.applyBtn': '시맨틱 매핑에 반영',
   // 토큰 생성
   'create.title': '토큰 생성 (Global + Semantic)',
-  'create.scopeHint': '색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.',
+  'create.scopeHint': '간격·크기·폰트·효과만. 색은 이전 단계에서 변수화함.',
   'create.selectAll': '전체 선택',
   'create.dropOnce': '1× 해제',
   'create.previewBtn': '미리보기',
@@ -231,26 +231,27 @@ export const STRINGS: Record<string, string> = {
   'textStyle.registerBtn': '등록',
   // 적용(바인딩)
   'bind.title': '적용 (바인딩)',
+  'bind.hint': '미리보기 → 골라 → 연결',
   'bind.preview': '미리보기',
   'bind.confirm': '선택에 바인딩',
   'bind.progress': '진행률',
   // 리네임
   'rename.title': '리네임',
+  'rename.hint': '역할 이름으로 정돈 · 루트·인스턴스 보존',
   'rename.preview': '미리보기',
   'rename.apply': '이름 적용',
   'rename.undoTitle': '되돌리기 안전장치',
   'rename.undoBody': '이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.',
   // 컴포넌트 / 베리언트
   'component.title': '컴포넌트 / 베리언트',
-  'component.hint': '<b>후보 스캔</b> → 골라 등록. 선택한 <b>부모는 컨테이너</b>(등록 제외). <b>고신뢰 구조</b>(button·chip·table·card·list·field·nav·progress·figure·heading)인 보이는 FRAME/GROUP만 후보 — 이름과 무관, <b>숨김은 제외</b>. heading은 섹션 머리줄(가로·낮은 높이·타이틀+선택 액션/메타)이며 페이지 header 랜드마크와 다름. <b>같은 레이어 이름</b>이 2개+이면: 구조가 같고 텍스트/아이콘만 다르면 <b>속성</b>(단품+TEXT/스왑), heading의 액션(buttonGroup) 유무만 달라도 <b>속성</b>, 구조·크기·색이 다르면 <b>세트</b>. 이름이 다르면 각각 <b>단독</b>. 속성은 이름 어휘(<code>Type</code>·<code>State</code>·<code>Size</code>) 우선 + 기하 보완. 메인은 <b>Components 페이지</b>, 원위치엔 <b>인스턴스</b>.',
-  'component.hint2': '<b>베리언트 분류</b>는 이미 만들어 둔 <b>기존 컴포넌트</b>를 같은 이름끼리 다시 묶을 때만(프레임은 「컴포넌트 등록」). 등록 시 TEXT·스왑·<code>이름?</code> BOOLEAN 속성이 자동 노출됩니다(접힘=다른 슬롯만, 단독·세트=전체 API).',
+  'component.hint': '후보 스캔 후 등록 · 닮은 프레임은 스캔 Free',
   'component.scanBtn': '후보 스캔',
   'component.registerBtn': '컴포넌트 등록',
   'component.classifyBtn': '베리언트 분류',
   'component.genMissingBtn': '누락 조합 생성',
   // 내보내기
   'export.title': '내보내기 (코드)',
-  'export.hint': '모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.',
+  'export.hint': 'Figma 변수를 코드 파일로 · 패널 목록·미리보기 없음',
   'export.format': '형식',
   'export.fontUnit': '폰트 크기',
   'export.runBtn': '내보내기',
