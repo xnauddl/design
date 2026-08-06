@@ -4005,11 +4005,6 @@
   var PURCHASE_URL = "https://example.lemonsqueezy.com/buy/PLACEHOLDER";
   var PORTAL_URL = "https://app.lemonsqueezy.com/my-orders";
 
-  // src/lib/presets.ts
-  function upsertPreset(list, p) {
-    return [p, ...list.filter((x) => x.name !== p.name)];
-  }
-
   // src/lib/undo.ts
   function commitUndo(f) {
     if (typeof f.commitUndo === "function") f.commitUndo();
@@ -4036,10 +4031,8 @@
   var selection = () => figma.currentPage.selection;
   var DEV_TIER_KEY = "dsl.devTier";
   var CACHE_KEY = "dsl.licenseCache";
-  var PRESETS_KEY = "dsl.presets";
   var devTier = "free";
   var cache = null;
-  var presets = [];
   var bindCancel = false;
   function effective() {
     if (cache) {
@@ -4086,8 +4079,6 @@
           }
         }
       }
-      const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
-      if (Array.isArray(ps)) presets = ps;
     } catch (e) {
     }
   }
@@ -4103,9 +4094,6 @@
       post({ type: "PREREQ_STATE", hasGlobal, hasBindable, hasTextStyles });
     } catch (e) {
     }
-  }
-  function requirePresets() {
-    return requirePaid("presets", "\uACF5\uC720 \uD504\uB9AC\uC14B\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
   }
   function arrangeSet(set) {
     const children = set.children.filter((c) => c.type === "COMPONENT");
@@ -4349,12 +4337,6 @@
   }
   function requireTextStyles() {
     return requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
-  }
-  async function savePresets() {
-    try {
-      await figma.clientStorage.setAsync(PRESETS_KEY, presets);
-    } catch (e) {
-    }
   }
   function kindOf(v) {
     if (v.resolvedType === "COLOR") return "color";
@@ -4894,25 +4876,6 @@
         }
         case "OPEN_LICENSE_LINK": {
           figma.openExternal(msg.target === "purchase" ? PURCHASE_URL : PORTAL_URL);
-          break;
-        }
-        case "GET_PRESETS": {
-          if (!requirePresets()) break;
-          post({ type: "PRESETS", presets });
-          break;
-        }
-        case "SAVE_PRESET": {
-          if (!requirePresets()) break;
-          presets = upsertPreset(presets, msg.preset);
-          await savePresets();
-          post({ type: "PRESETS", presets });
-          break;
-        }
-        case "DELETE_PRESET": {
-          if (!requirePresets()) break;
-          presets = presets.filter((p) => p.name !== msg.name);
-          await savePresets();
-          post({ type: "PRESETS", presets });
           break;
         }
         case "EXPORT": {

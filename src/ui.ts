@@ -9,13 +9,12 @@ import { type Tier, type Feature } from './lib/entitlements';
 import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
-import { type Preset, serializePreset, parsePreset, semanticMapToText, textToSemanticMap } from './lib/presets';
 import type { ExportFormat } from './lib/exporters';
 import type { FrameMeta } from './lib/similar';
 import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { classifyColor, nameColorsByHue } from './lib/colorName';
-import { suggestTokenRoles } from './lib/roles';
+import { suggestTokenRoles, semanticMapToText, textToSemanticMap } from './lib/roles';
 import { pipelineSteps } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
@@ -38,9 +37,7 @@ function readMaxDepth(): number {
 }
 
 let tokens: DraftToken[] = [];
-let presets: Preset[] = [];
 let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
-let paidDataRequested = false;
 // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
 let hasGlobal = false;
 let hasBindable = false;
@@ -470,11 +467,9 @@ $('btnPalette').addEventListener('click', () => {
   );
 });
 
-/** 시맨틱 매핑 textarea를 `역할 = 변수명` 줄로 채움. */
+/** 시맨틱 매핑 textarea를 `역할 = 변수명` 줄로 채움(textToSemanticMap의 역방향). */
 function setSemMapText(map: Record<string, string>): void {
-  ($('semMap') as HTMLTextAreaElement).value = Object.entries(map)
-    .map(([role, global]) => `${role} = ${global}`)
-    .join('\n');
+  ($('semMap') as HTMLTextAreaElement).value = semanticMapToText(map);
 }
 
 /** #10·역할 어휘: 전 토큰에서 시맨틱 역할을 추천(매핑이 비어 있을 때만 — 사용자 편집 보존). */
@@ -1325,11 +1320,7 @@ const PREMIUM_STATUS_ID: Record<Feature, string> = {
   semantics: 'semStatus',
   components: 'componentStatus',
   textStyles: 'tsStatus',
-  presets: 'presetStatus',
 };
-const PRESET_FIELDS = [
-  'presetName', 'btnSavePreset', 'presetList', 'btnLoadPreset', 'btnDeletePreset', 'btnExportPreset', 'btnImportPreset', 'presetJson',
-];
 // btnScanSimilar(스캔)은 읽기 전용이라 Free — 잠그는 건 실제로 문서를 바꾸는 btnComponentize뿐.
 const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnComponentize'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
@@ -1338,7 +1329,6 @@ const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants
 // btnApplyExistingText도 code 쪽에서 requireTextStyles로 막히지만, 전제 가드(등록된 스타일 유무)와
 // 결합돼 있어 여기 목록이 아니라 updateGates 아래에서 별도로 잠근다.
 const PAID_FIELDS = [
-  ...PRESET_FIELDS,
   ...COMPONENT_FIELDS,
   'btnPalette', 'btnPaletteApply',
   'btnCreate', 'btnCreateApply',
@@ -1357,7 +1347,7 @@ function updateGates(): void {
     el.disabled = !isPaid;
     setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
   }
-  for (const id of ['paletteLock', 'presetLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
+  for (const id of ['paletteLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
   // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가
@@ -1374,11 +1364,6 @@ function updateGates(): void {
   // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
   if (!isPaid) ($('btnApplyExistingText') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
-
-  if (isPaid && !paidDataRequested) {
-    paidDataRequested = true;
-    send({ type: 'GET_PRESETS' });
-  }
 }
 
 /** 유료 잠금 사유를 툴팁으로. 원래 title(기능 설명)은 dataset에 1회 백업해 보존·복원한다. */
@@ -1610,77 +1595,6 @@ $('btnClassifyVariants').addEventListener('click', () => {
 $('btnGenMissing').addEventListener('click', () => {
   setStatus('componentStatus', t('component.generating'), '');
   send({ type: 'GENERATE_MISSING_VARIANTS' });
-});
-
-function renderPresetList(): void {
-  const sel = $('presetList') as HTMLSelectElement;
-  sel.innerHTML = '';
-  for (const p of presets) {
-    const o = document.createElement('option');
-    o.value = p.name;
-    o.textContent = p.name;
-    sel.appendChild(o);
-  }
-}
-
-const gatherPreset = (name: string): Preset => ({
-  name,
-  base: Number(($('base') as HTMLInputElement).value) || 16,
-  tolerance: Number(($('tol') as HTMLInputElement).value) || 0,
-  maxDepth: readMaxDepth(),
-  semanticMap: textToSemanticMap(($('semMap') as HTMLTextAreaElement).value),
-});
-
-function applyPreset(p: Preset): void {
-  ($('base') as HTMLInputElement).value = String(p.base);
-  ($('tol') as HTMLInputElement).value = String(p.tolerance);
-  ($('depth') as HTMLInputElement).value = String(p.maxDepth);
-  ($('semMap') as HTMLTextAreaElement).value = semanticMapToText(p.semanticMap);
-}
-
-$('btnSavePreset').addEventListener('click', () => {
-  const name = ($('presetName') as HTMLInputElement).value.trim();
-  if (!name) {
-    setStatus('presetStatus', t('preset.needName'), 'warn');
-    return;
-  }
-  send({ type: 'SAVE_PRESET', preset: gatherPreset(name) });
-});
-
-$('btnLoadPreset').addEventListener('click', () => {
-  const name = ($('presetList') as HTMLSelectElement).value;
-  const p = presets.find((x) => x.name === name);
-  if (!p) {
-    setStatus('presetStatus', t('preset.noneSelected'), 'warn');
-    return;
-  }
-  applyPreset(p);
-  setStatus('presetStatus', t('preset.applied', { name }), 'ok');
-});
-
-$('btnDeletePreset').addEventListener('click', () => {
-  const name = ($('presetList') as HTMLSelectElement).value;
-  if (name) send({ type: 'DELETE_PRESET', name });
-});
-
-$('btnExportPreset').addEventListener('click', () => {
-  const name = ($('presetList') as HTMLSelectElement).value;
-  const p = presets.find((x) => x.name === name);
-  if (!p) {
-    setStatus('presetStatus', t('preset.needExport'), 'warn');
-    return;
-  }
-  ($('presetJson') as HTMLTextAreaElement).value = serializePreset(p);
-  setStatus('presetStatus', t('preset.exported', { name }), 'ok');
-});
-
-$('btnImportPreset').addEventListener('click', () => {
-  const parsed = parsePreset(($('presetJson') as HTMLTextAreaElement).value.trim());
-  if (!parsed.ok) {
-    setStatus('presetStatus', t('preset.importFail', { error: parsed.error }), 'warn');
-    return;
-  }
-  send({ type: 'SAVE_PRESET', preset: parsed.preset });
 });
 
 /* ---------- 내보내기 (코드) ---------- */
@@ -1927,11 +1841,6 @@ window.onmessage = (event: MessageEvent) => {
       updateGates();
       break;
     }
-    case 'PRESETS':
-      presets = msg.presets;
-      renderPresetList();
-      setStatus('presetStatus', t('preset.count', { count: presets.length }), 'ok');
-      break;
     case 'EXPORT_RESULT':
       lastExportFormat = msg.format;
       ($('exportOut') as HTMLTextAreaElement).value = msg.content;
@@ -2093,9 +2002,6 @@ const OP_STATUS: Record<string, string> = {
   REGISTER_COMPONENTS: 'componentStatus',
   CLASSIFY_VARIANTS: 'componentStatus',
   GENERATE_MISSING_VARIANTS: 'componentStatus',
-  GET_PRESETS: 'presetStatus',
-  SAVE_PRESET: 'presetStatus',
-  DELETE_PRESET: 'presetStatus',
   SET_LICENSE: 'licenseStatus',
   LICENSE_VERIFIED: 'licenseStatus',
   CLEAR_LICENSE: 'licenseStatus',

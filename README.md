@@ -106,7 +106,6 @@ src/
     license.ts   라이선스 캐시 평가·grace·검증 응답 파싱 — 순수
     licenseToken.ts 서명 토큰(JWT) 디코드·클레임·서명검증 통합 — 순수
     licenseConfig.ts 검증 서버 URL·공개키·구매/관리 링크(자리표시) — UI/code 공용 설정
-    presets.ts   공유 프리셋 직렬화·검증·매핑(Paid) — 순수
     exporters.ts 변수 → W3C 토큰 JSON · CSS 변수 내보내기 — 순수
     components.ts 컴포넌트 등록 + 베리언트 분류 순수 파서(속성=값 추론·그룹화·빈 조합) — 적용은 code.ts
     pure.ts        순수 로직 배럴(→ dist/pure.mjs)
@@ -177,10 +176,10 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 
 단계가 늘어 길어진 단일 스크롤을 **탭 그룹**으로 재편한다.
 
-- **구조 재편 ✅ (v2 4탭)**: **`시작`(시스템화 마법사) / `만들기`(팔레트·추출·생성·시맨틱) / `적용`(바인딩·리네임·컴포넌트) / `관리`(내보내기·요금제·프리셋)**. 상단 sticky 탭 바, 첫 화면은 `시작`. 창은 우하단 핸들로 리사이즈(크기 기억).
+- **구조 재편 ✅ (v2 4탭)**: **`시작`(시스템화 마법사) / `만들기`(팔레트·추출·생성·시맨틱) / `적용`(바인딩·리네임·컴포넌트) / `관리`(설정·내보내기·라이선스)**. 상단 sticky 탭 바, 첫 화면은 `시작`. 창은 우하단 핸들로 리사이즈(크기 기억).
 - **통합 게이트 ✅ (v2 #11·#12)**: **전제 미충족 가드** — Global 변수가 없으면 시맨틱 매핑, 바인딩 가능 변수가 없으면 바인딩 카드를 **비활성+안내(+‘토큰 생성으로’ 바로가기)** 로 가드(조용히 0건 방지). 유료 잠금(Paid)과 함께 `updateGates` 한 메커니즘으로 처리(`PREREQ_STATE`로 상태 동기화).
 - **진행 안내 ✅ (의존관계 시각화)**: 시작 탭에 의존 파이프라인(토큰 생성→시맨틱 매핑→바인딩)의 **단계 상태**(완료/준비됨/전제 미충족)를 표시하고, 클릭하면 해당 단계로 이동합니다. 상태 로직은 순수(`pipeline.ts`)라 `node --test`로 검증. 리네임·컴포넌트는 독립이라 별도 표기.
-- **유료 게이팅 노출 ✅**: 토큰 생성·시맨틱·컴포넌트·프리셋 등 유료(Paid) 카드에 🔒 잠금·비활성 표시(미리보기·탐색은 무료).
+- **유료 게이팅 노출 ✅**: 토큰 생성·시맨틱·컴포넌트·텍스트 스타일 등 유료(Paid) 카드에 🔒 잠금·비활성 표시(미리보기·탐색은 무료).
 - **반응형·접근성**(부분): 탭 `role=tab/tabpanel`·`aria-selected`. 키보드 화살표 이동.
 
 > 비고: 기능 동작은 그대로 두고 **메뉴/레이아웃 표현만** 개편. `ui.html`/`ui.ts`만 변경(메시지·로직 불변).
@@ -222,7 +221,6 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 | **닮은 프레임 컴포넌트화** | — | ✅ |
 | **텍스트 스타일 등록 · 적용** | — | ✅ |
 | **다크 테마 생성** | — | ✅ |
-| **공유 프리셋** | — | ✅ |
 
 > 의존성: Free '바인딩'은 **기존 변수**에 연결만 가능하다. 빈 파일에서 새 변수 시스템을 만들려면 '토큰 생성'(Paid)이 필요 — 자연스러운 업셀 지점.
 >
@@ -245,8 +243,8 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 - **자리표시**: `licenseConfig.ts`의 `VERIFY_URL`·`LICENSE_PUBLIC_JWK`·`PURCHASE_URL`·`PORTAL_URL`, `manifest.json allowedDomains` → 배포 시 실제 값으로 교체. 키쌍 생성: `node scripts/gen-license-keys.mjs`. Worker 셋업: `workers/verify/README.md`.
 
 ### 엔타이틀먼트 모델
-- `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`textStyles`·`presets`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
-- `code.ts`: `requirePaid(feature, message)` 단일 게이트 — 토큰 생성·시맨틱·컴포넌트·텍스트 스타일·프리셋, 그리고 기존 기능에 얹힌 둘: **다크 테마 생성**(`dark/` Global을 새로 만드니 `tokens`), **닮은 프레임 컴포넌트화**(`components`). 추출·바인딩·리네임·내보내기·변수 편집·닮은 프레임 스캔은 무게이팅.
+- `src/lib/entitlements.ts`(순수, 테스트됨): `Tier = 'free' | 'paid'`, `hasEntitlement(tier, feature)` — 모든 유료 기능(`tokens`·`semantics`·`components`·`textStyles`)은 Paid에서 해금. **사용량 횟수 한도 없음**(기능 게이팅으로 대체).
+- `code.ts`: `requirePaid(feature, message)` 단일 게이트 — 토큰 생성·시맨틱·컴포넌트·텍스트 스타일, 그리고 기존 기능에 얹힌 둘: **다크 테마 생성**(`dark/` Global을 새로 만드니 `tokens`), **닮은 프레임 컴포넌트화**(`components`). 추출·바인딩·리네임·내보내기·변수 편집·닮은 프레임 스캔은 무게이팅.
 - **두 층으로 막는다.** code의 `requirePaid`가 최종 방어선이고, UI(`ui.ts`)는 그 전에 유료 버튼을 **클릭 전 사전 비활성**(`PAID_FIELDS` + 🔒 배지)한다. 그래서 code에 게이트가 없어도 UI에서 잠기는 항목이 있다 — 팔레트 '생성'(`btnPalette`)이 그 예로, postMessage 없이 UI에서만 도는데도 그 카드의 미리보기 역할이라 함께 잠근다.
 - 거부 안내는 `PREMIUM_STATUS_ID`로 **해당 기능의 카드**에 띄운다(클릭-후-거부 방지).
 - 메시지(`src/shared/messages.ts`): `CodeToUi.LICENSE_STATUS { tier, unlimited, source, … }` · `PREMIUM_REQUIRED { feature, message }`.
@@ -265,7 +263,7 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 - **M2 ✅ (구현됨, 서버 미배포)**: 라이선스 키 입력·검증(`license.ts` + UI fetch) + `clientStorage` 캐시·오프라인 grace. `VERIFY_URL`·`allowedDomains`는 자리표시 → 실제 검증 서버/결제 제공자 연동 시 교체.
 - **M2.1 ✅ (구현됨)**: 서명 토큰(JWT) 검증 코어(`licenseToken.ts`) — 서명+클레임 검사, `alg=none` 거부.
 - **M2.2 ✅ (구현됨)**: 네트워크+서명 검증을 **UI 아이프레임**으로 이동(`verifyAndReport`→`LICENSE_VERIFIED`), `code`는 캐시/grace/게이팅만. 시작 시 stale 캐시는 `REQUEST_VERIFY`로 재검증(보관된 `instanceId`로 같은 기기 validate). 키 해제 시 `REQUEST_DEACTIVATE`로 LemonSqueezy 활성화 슬롯 반납(best-effort).
-- **M3 ✅ (구현됨: 공유 프리셋)**: Paid 게이팅으로 **공유 프리셋**(`presets.ts`) — base·허용오차·맥락단계·시맨틱 매핑을 저장/불러오기 + JSON 내보내기/가져오기(`clientStorage` 보관). 비-Paid는 `PREMIUM_REQUIRED`.
+- **M3 ~~공유 프리셋~~ — v2에서 제거**: base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유하던 Paid 기능(`presets.ts`·프리셋 카드·`GET/SAVE/DELETE_PRESET`)을 전면 삭제했다. 설정 묶음을 이름 붙여 관리하는 건 설정이 세 개뿐인 플러그인에 과한 장치였고, 그 셋은 관리 탭에서 `clientStorage`로 자동 유지하는 편이 맞다(v2 IA). 그래서 남은 Paid 기능은 토큰 생성·시맨틱·컴포넌트·텍스트 스타일 넷.
 - **M3.1 ~~변경 이력~~ — v2에서 제거(PR #37)**: 불투명한 집계성 이력은 v2 재설계에서 비목표로 결정해 `history.ts`·이력 카드·메시지·기록 호출부를 전면 삭제했다. (선택형 미리보기 트리가 "무엇이 바뀌는지"를 더 투명하게 대체.)
 - **M3.2**(다음): 서버 기반 시트(seat) 관리 · 가격/프로모션 확정 · 팀 동기화(클라우드 공유).
 

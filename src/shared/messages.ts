@@ -5,7 +5,6 @@ import type { DraftToken } from '../lib/tokens';
 import type { TextStyleSpec } from '../lib/textStyles';
 import type { Tier, Feature } from '../lib/entitlements';
 import type { LicenseStatus, VerifyResult } from '../lib/license';
-import type { Preset } from '../lib/presets';
 import type { ExportFormat } from '../lib/exporters';
 import type { FrameMeta, VaryingPosition } from '../lib/similar';
 import type { ResolvedType, ScopeName } from '../lib/tokens';
@@ -170,9 +169,6 @@ export type UiToCode =
   // 결제/구독 관리 링크 열기. UI 아이프레임은 외부 링크를 못 열어 code의 openExternal 경유.
   // URL은 code가 licenseConfig에서 해석한다(임의 URL 전달 금지 — 열린 리다이렉트 방지).
   | { type: 'OPEN_LICENSE_LINK'; target: 'purchase' | 'portal' }
-  | { type: 'GET_PRESETS' } // M3(Paid): 저장된 프리셋 목록 요청
-  | { type: 'SAVE_PRESET'; preset: Preset } // M3(Paid): 프리셋 저장/갱신
-  | { type: 'DELETE_PRESET'; name: string } // M3(Paid): 프리셋 삭제
   | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number } // 토큰 코드 내보내기
   | { type: 'SCAN_COMPONENT_CANDIDATES' } // #1(Paid): 선택 하위 순회 → 등록 후보 트리
   | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[] } // Phase 3(Paid): 후보(트리 선택 nodeIds, 없으면 선택 프레임 '내부' 후보) → 메인 컴포넌트 등록 + 베이스 묶음 베리언트 세트
@@ -220,7 +216,6 @@ export type CodeToUi =
   | { type: 'PREMIUM_REQUIRED'; feature: Feature; message: string }
   | { type: 'REQUEST_VERIFY'; key: string; instanceId?: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서). instanceId: 같은 기기로 validate
   | { type: 'REQUEST_DEACTIVATE'; key: string; instanceId: string } // 해제 시 code → UI: 이 기기의 LS 활성화 슬롯 반납(best-effort)
-  | { type: 'PRESETS'; presets: Preset[] } // M3(Paid): 프리셋 목록
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단

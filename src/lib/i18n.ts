@@ -65,15 +65,6 @@ export const STRINGS: Record<string, string> = {
   'wizard.stopped': '중단',
   'wizard.completed': '완료',
 
-  // 프리셋
-  'preset.needName': '프리셋 이름을 입력하세요.',
-  'preset.noneSelected': '선택된 프리셋이 없습니다.',
-  'preset.applied': '‘{name}’ 적용됨 — 아래 단계에서 실행하세요.',
-  'preset.needExport': '내보낼 프리셋을 선택하세요.',
-  'preset.exported': '‘{name}’ JSON을 내보냈습니다(복사해 공유).',
-  'preset.importFail': '가져오기 실패: {error}',
-  'preset.count': '프리셋 {count}개',
-
   // 다크 테마 생성
   'dark.title': '다크 테마 생성',
   'dark.hint': '라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)',
@@ -272,14 +263,6 @@ export const STRINGS: Record<string, string> = {
   'license.clear': '해제',
   'license.devTier': '개발용 강제 티어',
   'license.devTierNote': '(검증된 키가 없을 때만 적용)',
-  // 공유 프리셋
-  'preset.title': '공유 프리셋',
-  'preset.hint': 'base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Paid 전용)',
-  'preset.saveBtn': '현재 설정 저장',
-  'preset.loadBtn': '불러오기',
-  'preset.deleteBtn': '삭제',
-  'preset.exportBtn': '내보내기(JSON)',
-  'preset.importBtn': '가져오기(JSON)',
   // 접근성 · 국제화
   'a11y.title': '접근성 · 국제화',
   'a11y.body': '키보드 전용 조작 · 명도 대비 AA · i18n',

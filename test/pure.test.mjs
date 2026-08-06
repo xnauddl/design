@@ -44,9 +44,6 @@ import {
   decodeJwt,
   validateLicenseClaims,
   verifyLicenseToken,
-  serializePreset,
-  parsePreset,
-  upsertPreset,
   semanticMapToText,
   textToSemanticMap,
   exportTokens,
@@ -340,7 +337,7 @@ test('hasEntitlement — Paid에서만 유료 기능 해금', () => {
   assert.equal(hasEntitlement('paid', 'tokens'), true);
   assert.equal(hasEntitlement('paid', 'semantics'), true);
   assert.equal(hasEntitlement('paid', 'components'), true);
-  assert.equal(hasEntitlement('paid', 'presets'), true);
+  assert.equal(hasEntitlement('paid', 'textStyles'), true);
 });
 
 test('isTier — 유효 티어 검증(free|paid)', () => {
@@ -481,29 +478,7 @@ test('validateLicenseClaims — 만료·iss·aud·tier', () => {
   assert.equal(validateLicenseClaims({ tier: 'paid' }, now).ok, false); // exp 없음
 });
 
-/* ================= presets.ts (M3 Paid) ================= */
-test('serializePreset / parsePreset — 라운드트립 + 검증', () => {
-  const p = { name: 'mobile', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: { surface: 'color/neutral/50' } };
-  const round = parsePreset(serializePreset(p));
-  assert.deepEqual(round, { ok: true, preset: p });
-  // name 누락 → 에러
-  assert.equal(parsePreset(JSON.stringify({ base: 16 })).ok, false);
-  // 깨진 JSON → 에러
-  assert.equal(parsePreset('{nope').ok, false);
-  // 누락 필드는 기본값으로 정규화
-  const def = parsePreset(JSON.stringify({ name: 'x' }));
-  assert.deepEqual(def, { ok: true, preset: { name: 'x', base: 16, tolerance: 0.5, maxDepth: 8, semanticMap: {} } });
-});
-
-test('upsertPreset — 이름 키 교체(최신 앞)', () => {
-  const a = { name: 'a', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: {} };
-  const a2 = { ...a, base: 10 };
-  const b = { name: 'b', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: {} };
-  const list = upsertPreset(upsertPreset([], a), b); // [b, a]
-  const next = upsertPreset(list, a2); // a 교체 → [a2, b]
-  assert.deepEqual(next, [a2, b]);
-});
-
+/* ================= roles.ts — 시맨틱 매핑 입력 변환 ================= */
 test('semanticMap 텍스트 ↔ 객체', () => {
   const map = { surface: 'color/neutral/50', text: 'color/neutral/900' };
   assert.deepEqual(textToSemanticMap(semanticMapToText(map)), map);
@@ -1638,7 +1613,7 @@ test('pipelineSteps — 전제에 따른 단계 상태', () => {
 test('t — 키 조회·보간·폴백', () => {
   assert.equal(t('rename.none'), '변경할 이름이 없습니다.');
   assert.equal(t('rename.applied', { count: 3 }), '3개 이름 적용 완료.');
-  assert.equal(t('preset.applied', { name: 'A' }), '‘A’ 적용됨 — 아래 단계에서 실행하세요.');
+  assert.equal(t('export.done', { format: 'CSS' }), 'CSS 내보냄 — 복사 또는 다운로드.');
   // 누락 변수는 자리표시자 유지
   assert.equal(t('rename.applied', {}), '{count}개 이름 적용 완료.');
   // 누락 키는 key 그대로 폴백

@@ -132,3 +132,21 @@ export function suggestTokenRoles(tokens: DraftToken[], base = 16): Record<strin
 
   return map;
 }
+
+/* 시맨틱 매핑 입력(`역할 = 변수` 줄 단위 텍스트) ↔ 맵 변환.
+   위 추천 맵과 같은 모양이라 여기 둔다(프리셋 제거 전에는 presets.ts에 있었다). */
+
+export function semanticMapToText(map: Record<string, string>): string {
+  return Object.entries(map)
+    .map(([role, global]) => `${role} = ${global}`)
+    .join('\n');
+}
+
+export function textToSemanticMap(text: string): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const line of text.split('\n')) {
+    const m = /^\s*([^=]+?)\s*=\s*(.+?)\s*$/.exec(line);
+    if (m) map[m[1]] = m[2];
+  }
+  return map;
+}

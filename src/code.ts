@@ -19,7 +19,6 @@ import { parseVarValue, sanitizeScopes, aliasSelfReference, findAliasReferers } 
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
-import { Preset, upsertPreset } from './lib/presets';
 import { commitUndo } from './lib/undo';
 
 // #14: 기본 창을 키우고(트리·편집표 수용) 사용자 리사이즈를 허용. 마지막 크기는 clientStorage에 기억.
@@ -51,11 +50,9 @@ const selection = () => figma.currentPage.selection;
    결과(LICENSE_VERIFIED)만 받아 캐시·적용한다. 여기서는 fetch/crypto를 직접 하지 않는다. */
 const DEV_TIER_KEY = 'dsl.devTier';
 const CACHE_KEY = 'dsl.licenseCache';
-const PRESETS_KEY = 'dsl.presets';
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
-let presets: Preset[] = []; // 공유 프리셋(Paid)
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
 
 function effective(): {
@@ -117,8 +114,6 @@ async function loadLicense(): Promise<void> {
         }
       }
     }
-    const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
-    if (Array.isArray(ps)) presets = ps as Preset[];
   } catch {
     /* 저장소 접근 실패 시 free 유지 */
   }
@@ -142,11 +137,6 @@ async function postPrereq(): Promise<void> {
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
-}
-
-/** Paid 게이트(공유 프리셋): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requirePresets(): boolean {
-  return requirePaid('presets', '공유 프리셋은 Paid 기능입니다.');
 }
 
 /** 베리언트 세트를 속성 기반 2D 그리드로 정렬하고 자식에 맞게 리사이즈. */
@@ -425,14 +415,6 @@ async function applySelectedBinding(item: { nodeId: string; field: string; index
 /** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireTextStyles(): boolean {
   return requirePaid('textStyles', '텍스트 스타일 등록은 Paid 기능입니다.');
-}
-
-async function savePresets(): Promise<void> {
-  try {
-    await figma.clientStorage.setAsync(PRESETS_KEY, presets);
-  } catch {
-    /* 무시 */
-  }
 }
 
 /** 변수 → 내보내기 kind 분류(scope 우선, 이름 폴백 — STRING line-height 등 scope 비어있음 대비). */
@@ -1070,25 +1052,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'OPEN_LICENSE_LINK': {
         // URL은 여기서만 해석 — UI가 임의 주소를 넘길 수 없게 한다.
         figma.openExternal(msg.target === 'purchase' ? PURCHASE_URL : PORTAL_URL);
-        break;
-      }
-      case 'GET_PRESETS': {
-        if (!requirePresets()) break;
-        post({ type: 'PRESETS', presets });
-        break;
-      }
-      case 'SAVE_PRESET': {
-        if (!requirePresets()) break;
-        presets = upsertPreset(presets, msg.preset);
-        await savePresets();
-        post({ type: 'PRESETS', presets });
-        break;
-      }
-      case 'DELETE_PRESET': {
-        if (!requirePresets()) break;
-        presets = presets.filter((p) => p.name !== msg.name);
-        await savePresets();
-        post({ type: 'PRESETS', presets });
         break;
       }
       case 'EXPORT': {

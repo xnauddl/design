@@ -11,7 +11,6 @@ export * from './i18n';
 export * from './entitlements';
 export * from './license';
 export * from './licenseToken';
-export * from './presets';
 export * from './exporters';
 export * from './variableEdit';
 export * from './themeGen';

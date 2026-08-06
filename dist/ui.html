@@ -843,26 +843,6 @@
       <div class="status" id="licenseStatus"></div>
     </div>
 
-    <div class="step" id="presetCard">
-      <h2><span data-i18n="preset.title">공유 프리셋</span> <span class="muted" id="presetLock"></span></h2>
-      <div class="hint" data-i18n="preset.hint">base·허용오차·맥락단계·시맨틱 매핑을 묶어 저장/공유합니다. (Paid 전용)</div>
-      <div class="row">
-        <input id="presetName" type="text" placeholder="프리셋 이름" spellcheck="false" style="flex:1; min-width:120px;" />
-        <button id="btnSavePreset" data-i18n="preset.saveBtn">현재 설정 저장</button>
-      </div>
-      <div class="row">
-        <select id="presetList" style="flex:1; min-width:120px;"></select>
-        <button id="btnLoadPreset" data-i18n="preset.loadBtn">불러오기</button>
-        <button id="btnDeletePreset" data-i18n="preset.deleteBtn">삭제</button>
-      </div>
-      <div class="row">
-        <button id="btnExportPreset" data-i18n="preset.exportBtn">내보내기(JSON)</button>
-        <button id="btnImportPreset" data-i18n="preset.importBtn">가져오기(JSON)</button>
-      </div>
-      <textarea id="presetJson" spellcheck="false" rows="4" placeholder="내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다." style="width:100%;"></textarea>
-      <div class="status" id="presetStatus"></div>
-    </div>
-
     <!-- 접근성 / 국제화 -->
     <div class="ux">
       <div class="ux-h"><span class="ux-t" data-i18n="a11y.title">접근성 · 국제화</span></div>
@@ -1042,14 +1022,6 @@
     "wizard.result": "{state} \u2014 {summary}",
     "wizard.stopped": "\uC911\uB2E8",
     "wizard.completed": "\uC644\uB8CC",
-    // 프리셋
-    "preset.needName": "\uD504\uB9AC\uC14B \uC774\uB984\uC744 \uC785\uB825\uD558\uC138\uC694.",
-    "preset.noneSelected": "\uC120\uD0DD\uB41C \uD504\uB9AC\uC14B\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
-    "preset.applied": "\u2018{name}\u2019 \uC801\uC6A9\uB428 \u2014 \uC544\uB798 \uB2E8\uACC4\uC5D0\uC11C \uC2E4\uD589\uD558\uC138\uC694.",
-    "preset.needExport": "\uB0B4\uBCF4\uB0BC \uD504\uB9AC\uC14B\uC744 \uC120\uD0DD\uD558\uC138\uC694.",
-    "preset.exported": "\u2018{name}\u2019 JSON\uC744 \uB0B4\uBCF4\uB0C8\uC2B5\uB2C8\uB2E4(\uBCF5\uC0AC\uD574 \uACF5\uC720).",
-    "preset.importFail": "\uAC00\uC838\uC624\uAE30 \uC2E4\uD328: {error}",
-    "preset.count": "\uD504\uB9AC\uC14B {count}\uAC1C",
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131",
     "dark.hint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC \uC0C9\uC744 <b>\uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4</b> \uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCC44\uC6C1\uB2C8\uB2E4. \uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C\uB77C \uBE0C\uB79C\uB4DC\uC0C9\uC774 \uC720\uC9C0\uB3FC\uC694. Semantic\uC774 Global\uC744 <b>\uAC00\uB9AC\uD0A4\uACE0 \uC788\uB294 \uAC83\uB9CC</b> \uB300\uC0C1\uC774\uACE0, \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB701\uB2C8\uB2E4. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 <code>dark/\u2026</code>\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC9D1\uB2C8\uB2E4. (Paid)",
@@ -1239,14 +1211,6 @@
     "license.clear": "\uD574\uC81C",
     "license.devTier": "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C \uD2F0\uC5B4",
     "license.devTierNote": "(\uAC80\uC99D\uB41C \uD0A4\uAC00 \uC5C6\uC744 \uB54C\uB9CC \uC801\uC6A9)",
-    // 공유 프리셋
-    "preset.title": "\uACF5\uC720 \uD504\uB9AC\uC14B",
-    "preset.hint": "base\xB7\uD5C8\uC6A9\uC624\uCC28\xB7\uB9E5\uB77D\uB2E8\uACC4\xB7\uC2DC\uB9E8\uD2F1 \uB9E4\uD551\uC744 \uBB36\uC5B4 \uC800\uC7A5/\uACF5\uC720\uD569\uB2C8\uB2E4. (Paid \uC804\uC6A9)",
-    "preset.saveBtn": "\uD604\uC7AC \uC124\uC815 \uC800\uC7A5",
-    "preset.loadBtn": "\uBD88\uB7EC\uC624\uAE30",
-    "preset.deleteBtn": "\uC0AD\uC81C",
-    "preset.exportBtn": "\uB0B4\uBCF4\uB0B4\uAE30(JSON)",
-    "preset.importBtn": "\uAC00\uC838\uC624\uAE30(JSON)",
     // 접근성 · 국제화
     "a11y.title": "\uC811\uADFC\uC131 \xB7 \uAD6D\uC81C\uD654",
     "a11y.body": "\uD0A4\uBCF4\uB4DC \uC804\uC6A9 \uC870\uC791 \xB7 \uBA85\uB3C4 \uB300\uBE44 AA \xB7 i18n"
@@ -1402,52 +1366,6 @@
   }
   function licenseVerifyConfigured() {
     return !VERIFY_URL.includes("example.") && LICENSE_PUBLIC_JWK.x !== "PLACEHOLDER";
-  }
-
-  // src/lib/presets.ts
-  var PRESET_VERSION = 1;
-  function serializePreset(p) {
-    return JSON.stringify(__spreadValues({ v: PRESET_VERSION }, p), null, 2);
-  }
-  var num = (v, d) => typeof v === "number" && isFinite(v) ? v : d;
-  function parsePreset(text) {
-    let raw;
-    try {
-      raw = JSON.parse(text);
-    } catch (e) {
-      return { ok: false, error: "JSON \uD30C\uC2F1 \uC2E4\uD328" };
-    }
-    if (!raw || typeof raw !== "object") return { ok: false, error: "\uD504\uB9AC\uC14B \uAC1D\uCCB4\uAC00 \uC544\uB2D8" };
-    const o = raw;
-    const name = typeof o.name === "string" ? o.name.trim() : "";
-    if (!name) return { ok: false, error: "name\uC774 \uBE44\uC5B4 \uC788\uC74C" };
-    const semanticMap = {};
-    if (o.semanticMap && typeof o.semanticMap === "object") {
-      for (const [k, val] of Object.entries(o.semanticMap)) {
-        if (typeof val === "string") semanticMap[k] = val;
-      }
-    }
-    return {
-      ok: true,
-      preset: {
-        name,
-        base: num(o.base, 16),
-        tolerance: num(o.tolerance, 0.5),
-        maxDepth: Math.max(1, Math.round(num(o.maxDepth, 8))),
-        semanticMap
-      }
-    };
-  }
-  function semanticMapToText(map) {
-    return Object.entries(map).map(([role, global]) => `${role} = ${global}`).join("\n");
-  }
-  function textToSemanticMap(text) {
-    const map = {};
-    for (const line of text.split("\n")) {
-      const m = /^\s*([^=]+?)\s*=\s*(.+?)\s*$/.exec(line);
-      if (m) map[m[1]] = m[2];
-    }
-    return map;
   }
 
   // src/lib/color.ts
@@ -1836,6 +1754,17 @@
     });
     return map;
   }
+  function semanticMapToText(map) {
+    return Object.entries(map).map(([role, global]) => `${role} = ${global}`).join("\n");
+  }
+  function textToSemanticMap(text) {
+    const map = {};
+    for (const line of text.split("\n")) {
+      const m = /^\s*([^=]+?)\s*=\s*(.+?)\s*$/.exec(line);
+      if (m) map[m[1]] = m[2];
+    }
+    return map;
+  }
 
   // src/lib/pipeline.ts
   function pipelineSteps(s) {
@@ -1932,9 +1861,7 @@
     return Number.isFinite(value) ? Math.max(1, Math.round(value)) : 8;
   }
   var tokens = [];
-  var presets = [];
   var isPaid = false;
-  var paidDataRequested = false;
   var hasGlobal = false;
   var hasBindable = false;
   var hasTextStyles = false;
@@ -2229,7 +2156,7 @@
     );
   });
   function setSemMapText(map) {
-    $("semMap").value = Object.entries(map).map(([role, global]) => `${role} = ${global}`).join("\n");
+    $("semMap").value = semanticMapToText(map);
   }
   function suggestSemMapFrom(toks) {
     if ($("semMap").value.trim()) return;
@@ -2923,22 +2850,10 @@
     tokens: "createStatus",
     semantics: "semStatus",
     components: "componentStatus",
-    textStyles: "tsStatus",
-    presets: "presetStatus"
+    textStyles: "tsStatus"
   };
-  var PRESET_FIELDS = [
-    "presetName",
-    "btnSavePreset",
-    "presetList",
-    "btnLoadPreset",
-    "btnDeletePreset",
-    "btnExportPreset",
-    "btnImportPreset",
-    "presetJson"
-  ];
   var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnComponentize"];
   var PAID_FIELDS = [
-    ...PRESET_FIELDS,
     ...COMPONENT_FIELDS,
     "btnPalette",
     "btnPaletteApply",
@@ -2954,7 +2869,7 @@
       el.disabled = !isPaid;
       setLockTitle(el, !isPaid);
     }
-    for (const id of ["paletteLock", "presetLock", "componentLock", "similarLock", "darkLock", "createLock", "semLock", "tsLock"]) {
+    for (const id of ["paletteLock", "componentLock", "similarLock", "darkLock", "createLock", "semLock", "tsLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     refreshDarkModes();
@@ -2966,10 +2881,6 @@
     if (!hasBindable) $("btnApplyConfirm").disabled = true;
     setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
     if (!isPaid) $("btnApplyExistingText").disabled = true;
-    if (isPaid && !paidDataRequested) {
-      paidDataRequested = true;
-      send({ type: "GET_PRESETS" });
-    }
   }
   function setLockTitle(el, locked) {
     if (el.dataset.baseTitle === void 0) el.dataset.baseTitle = el.title;
@@ -3154,69 +3065,6 @@
   $("btnGenMissing").addEventListener("click", () => {
     setStatus("componentStatus", t("component.generating"), "");
     send({ type: "GENERATE_MISSING_VARIANTS" });
-  });
-  function renderPresetList() {
-    const sel = $("presetList");
-    sel.innerHTML = "";
-    for (const p of presets) {
-      const o = document.createElement("option");
-      o.value = p.name;
-      o.textContent = p.name;
-      sel.appendChild(o);
-    }
-  }
-  var gatherPreset = (name) => ({
-    name,
-    base: Number($("base").value) || 16,
-    tolerance: Number($("tol").value) || 0,
-    maxDepth: readMaxDepth(),
-    semanticMap: textToSemanticMap($("semMap").value)
-  });
-  function applyPreset(p) {
-    $("base").value = String(p.base);
-    $("tol").value = String(p.tolerance);
-    $("depth").value = String(p.maxDepth);
-    $("semMap").value = semanticMapToText(p.semanticMap);
-  }
-  $("btnSavePreset").addEventListener("click", () => {
-    const name = $("presetName").value.trim();
-    if (!name) {
-      setStatus("presetStatus", t("preset.needName"), "warn");
-      return;
-    }
-    send({ type: "SAVE_PRESET", preset: gatherPreset(name) });
-  });
-  $("btnLoadPreset").addEventListener("click", () => {
-    const name = $("presetList").value;
-    const p = presets.find((x) => x.name === name);
-    if (!p) {
-      setStatus("presetStatus", t("preset.noneSelected"), "warn");
-      return;
-    }
-    applyPreset(p);
-    setStatus("presetStatus", t("preset.applied", { name }), "ok");
-  });
-  $("btnDeletePreset").addEventListener("click", () => {
-    const name = $("presetList").value;
-    if (name) send({ type: "DELETE_PRESET", name });
-  });
-  $("btnExportPreset").addEventListener("click", () => {
-    const name = $("presetList").value;
-    const p = presets.find((x) => x.name === name);
-    if (!p) {
-      setStatus("presetStatus", t("preset.needExport"), "warn");
-      return;
-    }
-    $("presetJson").value = serializePreset(p);
-    setStatus("presetStatus", t("preset.exported", { name }), "ok");
-  });
-  $("btnImportPreset").addEventListener("click", () => {
-    const parsed = parsePreset($("presetJson").value.trim());
-    if (!parsed.ok) {
-      setStatus("presetStatus", t("preset.importFail", { error: parsed.error }), "warn");
-      return;
-    }
-    send({ type: "SAVE_PRESET", preset: parsed.preset });
   });
   $("btnExport").addEventListener("click", () => {
     const format = $("exportFormat").value;
@@ -3417,11 +3265,6 @@
         updateGates();
         break;
       }
-      case "PRESETS":
-        presets = msg.presets;
-        renderPresetList();
-        setStatus("presetStatus", t("preset.count", { count: presets.length }), "ok");
-        break;
       case "EXPORT_RESULT":
         lastExportFormat = msg.format;
         $("exportOut").value = msg.content;
@@ -3565,9 +3408,6 @@
     REGISTER_COMPONENTS: "componentStatus",
     CLASSIFY_VARIANTS: "componentStatus",
     GENERATE_MISSING_VARIANTS: "componentStatus",
-    GET_PRESETS: "presetStatus",
-    SAVE_PRESET: "presetStatus",
-    DELETE_PRESET: "presetStatus",
     SET_LICENSE: "licenseStatus",
     LICENSE_VERIFIED: "licenseStatus",
     CLEAR_LICENSE: "licenseStatus",
