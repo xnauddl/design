@@ -47,7 +47,7 @@
 
     .shell {
       display: grid;
-      grid-template-columns: 200px minmax(300px, 380px) minmax(260px, 1fr);
+      grid-template-columns: 200px 400px minmax(260px, 1fr);
       gap: 14px; align-items: start;
     }
     @media (max-width: 1080px) {
@@ -74,7 +74,7 @@
     .stage { display: flex; flex-direction: column; align-items: center; gap: 6px; }
     .stage-meta { font-size: 11px; font-family: var(--mono); color: var(--muted); }
     .plugin {
-      width: var(--pw, 360px);
+      width: 400px;
       height: min(740px, 84vh);
       background: var(--panel);
       border: 1.5px solid var(--ink);
@@ -82,7 +82,6 @@
       display: flex; flex-direction: column;
       box-shadow: 10px 12px 0 rgba(23,23,23,0.07);
       overflow: hidden;
-      transition: width .18s ease;
     }
 
     /* —— Plugin chrome —— */
@@ -271,11 +270,11 @@
   </style>
 </head>
 <body>
-  <h1>플러그인 UX 제안 와이어프레임 <span style="font-size:12px;font-weight:500;color:var(--muted)">rev 2026-08-05c</span></h1>
+  <h1>플러그인 UX 제안 와이어프레임 <span style="font-size:12px;font-weight:500;color:var(--muted)">rev 2026-08-06j</span></h1>
   <p class="lede">
     같은 기능·탭을 유지한 채 <b>정보 구조와 밀도</b>만 바꿉니다. 기본은 제안 UX이고,
     「현재」로 전환하면 긴 안내·카드 세로 나열·텍스트 스타일 표를 그대로 볼 수 있습니다.
-    <br />최근: <b>변수 편집기 제거</b> — 기존 변수는 만들기 upsert + 적용 바인딩 · 값 수정은 Figma Variables · 관리=설정·내보내기·라이선스.
+    <br />최근(rev j): 잔여 미세 이슈 — 후보 N 통일 · 역할 한글 라벨 · 시작 용어 정리 · 준비 현황 · 다크 상태 · 이름「전체」 · 컴포넌트 툴바 2행 · 타이포 카피.
   </p>
 
   <div class="topbar">
@@ -285,33 +284,28 @@
         <button type="button" id="modeLegacy" aria-pressed="false">현재</button>
       </span>
     </label>
-    <label>폭
-      <span class="seg">
-        <button type="button" id="w360" aria-pressed="true">360</button>
-        <button type="button" id="w400" aria-pressed="false">400</button>
-      </span>
-    </label>
+    <span style="font-size:12px;color:var(--muted);font-family:var(--mono)">패널 폭 400px 고정</span>
   </div>
 
   <div class="shell">
     <nav class="nav" aria-label="탭·단계">
       <div class="g">탭</div>
-      <button type="button" data-tab="wizard">마법사</button>
+      <button type="button" data-tab="wizard">시작</button>
       <button type="button" data-tab="tokens" class="active">만들기</button>
       <button type="button" data-tab="apply">적용</button>
-      <button type="button" data-tab="settings">관리</button>
+      <button type="button" data-tab="settings">설정</button>
       <div class="g" id="navStepsLabel">만들기 단계 (제안)</div>
       <div id="navSteps"></div>
     </nav>
 
     <div class="stage">
       <div class="stage-meta" id="stageMeta">제안 UX · 만들기 · 타이포</div>
-      <div class="plugin" id="plugin" style="--pw:360px">
+      <div class="plugin" id="plugin">
         <div class="ptabs" role="tablist">
-          <button type="button" role="tab" data-tab="wizard">마법사</button>
+          <button type="button" role="tab" data-tab="wizard">시작</button>
           <button type="button" role="tab" data-tab="tokens" aria-selected="true">만들기</button>
           <button type="button" role="tab" data-tab="apply">적용</button>
-          <button type="button" role="tab" data-tab="settings">관리</button>
+          <button type="button" role="tab" data-tab="settings">설정</button>
         </div>
         <div class="selbar">
           <span>● 선택 1 · 요소 48 · 후보 32</span>
@@ -324,6 +318,16 @@
     <aside class="notes">
       <h2>이번 UX에서 바뀐 점</h2>
       <div class="change">
+        <span class="tag">카피</span>
+        <h3>타이틀을 쉬운 말로</h3>
+        <p>마법사→시작 · 관리→설정 · 바인딩→변수 연결 · 리네임→이름 정리 · 구조→컴포넌트 · 변수→코드→코드로 내보내기. 전문 용어는 hint로.</p>
+      </div>
+      <div class="change">
+        <span class="tag">#14</span>
+        <h3>패널 400px 고정</h3>
+        <p>가로 폭 400 고정. 360 토글 없음. 세로는 리사이즈 가능(구현 시).</p>
+      </div>
+      <div class="change">
         <span class="tag">#18</span>
         <h3>결과 = 카드 스택</h3>
         <p>스캔·미리보기 목록을 얇은 테두리 카드로 통일. <strong>max-height 박스 없음</strong> — 패널 body가 스크롤.</p>
@@ -334,19 +338,19 @@
         <p>미리보기·적용·다음을 제목 바로 아래 툴바에. sticky footer·하단 예약 영역 불필요.</p>
       </div>
       <div class="change">
-        <span class="tag">관리</span>
+        <span class="tag">설정</span>
         <h3>기준·오차·깊이 = 설정만</h3>
-        <p><b>기준 크기 · 허용오차 · 리네임 맥락 깊이</b>는 관리 탭에서만. 만들기/적용에는 미노출. <strong>프리셋 기능 제거</strong> — 설정은 clientStorage 자동 유지로 충분.</p>
+        <p><b>기준 크기 · 허용오차 · 이름 정리 깊이</b>는 <b>설정</b> 탭「기본값」카드에서만. 만들기/적용에는 미노출. <strong>프리셋 기능 제거</strong> — 값은 clientStorage 자동 유지.</p>
       </div>
       <div class="change">
         <span class="tag">토큰</span>
-        <h3>격자 8 고정 · 기준 크기는 관리로</h3>
-        <p>여백·크기 격자 <b>8px 고정</b>(사다리/정리 UI 없음). 기준 크기(기본 16)는 토큰 단계에서 빼고 <b>관리</b>에서만 변경.</p>
+        <h3>격자 8 고정 · 기준 크기는 설정으로</h3>
+        <p>여백·크기 격자 <b>8px 고정</b>(사다리/정리 UI 없음). 기준 크기(기본 16)는 토큰 단계에서 빼고 <b>설정</b>에서만 변경.</p>
       </div>
       <div class="change">
         <span class="tag">색 → 변수</span>
         <h3>추출 색을 이 단계에서 변수화</h3>
-        <p>역할 지정 후 <b>색 변수 만들기</b>(Global hue + Semantic 역할). 다음 토큰 단계는 간격·크기 등 색 외만. 팔레트 적용은 Paid 시드 경로.</p>
+        <p>역할 지정 후 <b>색 변수 만들기</b>(Global hue + Semantic 역할). 팔레트 시드: <b>주색 · 보조색(옵션) · 하모니</b> 유지(현행과 동일). 다음 토큰 단계는 색 외만.</p>
       </div>
       <div class="change">
         <span class="tag">만들기</span>
@@ -355,8 +359,8 @@
       </div>
       <div class="change">
         <span class="tag">#15</span>
-        <h3>긴 hint 제거</h3>
-        <p>카드 안 산문은 한 줄 이하. 상세는 툴팁/이 패널. 버튼·목록이 위로 올라옴.</p>
+        <h3>짧은 안내 · 친절한 톤</h3>
+        <p>한 줄 유지하되 명령·내부 메모 톤 완화. 「무엇을 하면 되는지」중심. Free/시드/현행 같은 말 제거.</p>
       </div>
       <div class="change">
         <span class="tag">#17</span>
@@ -364,19 +368,24 @@
         <p>표 열 싸움 대신 이름·요약·개수. 1개면 이동, 여러 개면 전체 선택. 가로 리사이즈에 의존하지 않음.</p>
       </div>
       <div class="change">
-        <span class="tag">마법사</span>
+        <span class="tag">시작</span>
         <h3>온보딩 흡수</h3>
-        <p>별도 온보딩 카드를 없애고, 첫 실행 배너만 마법사 안에. 진행 안내는 컴팩트 스트립.</p>
+        <p>별도 온보딩 카드를 없애고, 첫 실행 배너만 시작 탭 안에. 준비 현황은 컴팩트 목록.</p>
       </div>
       <div class="change">
         <span class="tag">적용</span>
         <h3>단계 레일 (만들기와 동일 패턴)</h3>
-        <p>바인딩 · 리네임 · 구조(컴포넌트·닮은 프레임)로 나눔. 한 화면·한 일. 미리보기→선택→적용은 단계 안에서.</p>
+        <p>변수 연결 · 이름 정리 · 컴포넌트로 나눔. 한 화면·한 일. 미리보기→선택→적용은 단계 안에서.</p>
       </div>
       <div class="change">
-        <span class="tag">바인딩</span>
+        <span class="tag">연결</span>
+        <h3>건너뜀 사유 칩</h3>
+        <p><b>HUG/FILL</b>=크기 비고정이라 스킵 · <b>매칭 없음</b>=변수 없음. 칩 클릭→캔버스에서 해당 레이어 선택(기존 기능).</p>
+      </div>
+      <div class="change">
+        <span class="tag">연결</span>
         <h3>허용오차 UI 숨김</h3>
-        <p>FLOAT만 해당. 적용 탭 칩 제거. <strong>관리 · 플러그인 설정</strong>에 0.5px 고정 표시.</p>
+        <p>FLOAT만 해당. 적용 탭 칩 제거. <strong>설정</strong>에 0.5px 고정 표시.</p>
       </div>
       <div class="change">
         <span class="tag">#8</span>
@@ -393,6 +402,16 @@
         <h3>명도 대비 점검 삭제</h3>
         <p>적용 탭·마법사 옵션·진행 단계에서 제외. 결과만 있고 후속이 약한 기능을 빼 흐름을 단순화.</p>
       </div>
+      <div class="change">
+        <span class="tag">검토</span>
+        <h3>rev i · 밀도·용어 정리</h3>
+        <p>설정 카드명「기본값」·색 hint 압축·타이포 예시 단일화·컴포넌트 CTA 역할 분리·시작 파이프에 다크/타이포 범위 안내·연결「후보 N」·라이선스 Paid 제거·다크 모드 쉬운 라벨.</p>
+      </div>
+      <div class="change">
+        <span class="tag">검토</span>
+        <h3>rev j · 잔여 미세 이슈</h3>
+        <p>토큰「후보 N」·역할 드롭다운 한글·시작「역할 매핑」/파이프「변수연결」구분·준비 현황에 색·다크·타이포·다크 상태줄·이름「전체」·컴포넌트 스캔/적용 2행·타이포 hint·예시 카피 실무톤.</p>
+      </div>
     </aside>
   </div>
 
@@ -401,7 +420,6 @@
   <script>
     const state = {
       mode: 'ux', // ux | legacy
-      width: 360,
       tab: 'tokens',
       makeStep: 'color', // color | token | theme | type
       applyStep: 'bind', // bind | rename | structure
@@ -410,14 +428,14 @@
     const MAKE_STEPS = [
       { id: 'color', label: '색', sub: '추출·변수' },
       { id: 'token', label: '토큰', sub: '간격·크기' },
-      { id: 'theme', label: '테마', sub: '다크' },
+      { id: 'theme', label: '테마', sub: '다크 모드' },
       { id: 'type', label: '타이포', sub: '텍스트 스타일' },
     ];
 
     const APPLY_STEPS = [
-      { id: 'bind', label: '바인딩', sub: '변수 연결' },
-      { id: 'rename', label: '리네임', sub: '역할 이름' },
-      { id: 'structure', label: '구조', sub: '컴포넌트' },
+      { id: 'bind', label: '연결', sub: '변수 붙이기' },
+      { id: 'rename', label: '이름', sub: '레이어 이름' },
+      { id: 'structure', label: '컴포넌트', sub: '닮은 프레임' },
     ];
 
     function toast(msg) {
@@ -469,28 +487,32 @@
       return `
         <div class="banner">처음이면 전체 실행으로 시작하세요. <button type="button" class="linkish">다시 보지 않기</button></div>
         <div class="card" data-id="wiz">
-          <h3>시스템화 마법사</h3>
-          <p class="hint tight">추출 → 토큰 → 바인딩 → 정돈</p>
+          <h3>한 번에 정리</h3>
+          <p class="hint tight">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</p>
           <div class="row">
-            <label class="field"><span class="check"></span> 시맨틱</label>
+            <label class="field"><span class="check"></span> 역할 매핑</label>
             <label class="field"><span class="check off"></span> 컴포넌트 <span class="lock">🔒</span></label>
           </div>
           <div class="row"><button type="button" class="btn primary">전체 실행</button></div>
           <div class="pipe-mini">
             <span class="wait">1 추출</span>
             <span class="wait">2 토큰</span>
-            <span class="wait">3 바인딩</span>
-            <span class="wait">4 리네임</span>
+            <span class="wait">3 변수연결</span>
+            <span class="wait">4 이름</span>
           </div>
+          <p class="hint" style="margin-top:6px">역할 매핑=색 역할 · 변수연결=화면에 붙이기. 다크·텍스트 스타일은 만들기에서</p>
         </div>
         <div class="card" data-id="pipe">
-          <h3>진행</h3>
+          <h3>준비 현황</h3>
           <div class="list" style="max-height:none">
-            <div class="list-row"><span class="check"></span><span>토큰</span><span class="meta">완료</span></div>
-            <div class="list-row"><span class="check"></span><span>시맨틱</span><span class="meta">준비</span></div>
-            <div class="list-row"><span class="check"></span><span>바인딩</span><span class="meta">가능</span></div>
+            <div class="list-row"><span class="check"></span><span>색 변수</span><span class="meta">완료</span></div>
+            <div class="list-row"><span class="check"></span><span>간격·크기 토큰</span><span class="meta">완료</span></div>
+            <div class="list-row"><span class="check"></span><span>역할 매핑</span><span class="meta">준비</span></div>
+            <div class="list-row"><span class="check"></span><span>변수 연결</span><span class="meta">가능</span></div>
+            <div class="list-row"><span class="check off"></span><span>다크 모드</span><span class="meta">만들기</span></div>
+            <div class="list-row"><span class="check off"></span><span>텍스트 스타일</span><span class="meta">만들기</span></div>
           </div>
-          <p class="hint" style="margin-top:6px">리네임 · 컴포넌트는 독립</p>
+          <p class="hint" style="margin-top:6px">이름·컴포넌트는 필요할 때 적용 탭에서</p>
         </div>`;
     }
 
@@ -516,8 +538,8 @@
       return `
         ${uxMakeRail()}
         <div class="card">
-          <h3>색 <span class="lock">추출 → 변수 · 팔레트 🔒</span></h3>
-          <p class="hint tight">화면에서 뽑거나 시드로 만든 뒤, 역할을 정하고 변수로 만듭니다.</p>
+          <h3>색</h3>
+          <p class="hint tight">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요</p>
           <div class="toolbar">
             <button type="button" class="btn">선택에서 추출</button>
             <button type="button" class="btn">팔레트 생성 <span class="lock">🔒</span></button>
@@ -526,17 +548,23 @@
             <button type="button" class="btn ghost" data-next="token">다음 →</button>
           </div>
           <div class="row" style="margin-top:0">
-            <span class="swatch" style="background:#3366ff"></span>
+            <span class="swatch" style="background:#3366ff" title="주색"></span>
             <span class="fake-input">#3366ff</span>
             <label class="field"><span class="check"></span> 중립</label>
             <label class="field"><span class="check"></span> 상태</label>
           </div>
+          <div class="row">
+            <label class="field"><span class="check"></span> 보조색</label>
+            <span class="swatch" style="background:#ff5722" title="보조색"></span>
+            <span class="fake-input">#ff5722</span>
+            <label class="field">하모니 <span class="fake-select">보색 ▾</span></label>
+          </div>
           <div class="palette-row">
             <i style="background:#e8eeff"></i><i style="background:#a8bfff"></i><i style="background:#3366ff"></i>
-            <i style="background:#1a3a99"></i><i style="background:#f0f0f0"></i><i style="background:#222"></i>
+            <i style="background:#1a3a99"></i><i style="background:#ffe0d6"></i><i style="background:#ff5722"></i>
+            <i style="background:#f0f0f0"></i><i style="background:#222"></i>
             <i style="background:#1b8f5a"></i><i style="background:#c62828"></i>
           </div>
-          <p class="hint" style="margin:10px 0 0">추출·정리된 색 · Global = hue · Semantic = 역할</p>
           <div class="result-cards">
             <div class="r-card">
               <div class="r-top no-check">
@@ -544,9 +572,20 @@
                   <div class="r-title" style="display:flex;align-items:center;gap:6px">
                     <span class="swatch" style="background:#3366ff;width:14px;height:14px"></span>color/blue/500
                   </div>
-                  <div class="r-sum">추출 · 12× 사용</div>
+                  <div class="r-sum">주색 · 12× 사용</div>
                 </div>
-                <span class="fake-select">primary ▾</span>
+                <span class="fake-select">주색 · primary ▾</span>
+              </div>
+            </div>
+            <div class="r-card">
+              <div class="r-top no-check">
+                <div>
+                  <div class="r-title" style="display:flex;align-items:center;gap:6px">
+                    <span class="swatch" style="background:#ff5722;width:14px;height:14px"></span>color/orange/500
+                  </div>
+                  <div class="r-sum">보조색 · 하모니</div>
+                </div>
+                <span class="fake-select">보조 · secondary ▾</span>
               </div>
             </div>
             <div class="r-card">
@@ -555,9 +594,9 @@
                   <div class="r-title" style="display:flex;align-items:center;gap:6px">
                     <span class="swatch" style="background:#121212;width:14px;height:14px"></span>color/gray/900
                   </div>
-                  <div class="r-sum">추출 · 8× 사용</div>
+                  <div class="r-sum">중립 · 8× 사용</div>
                 </div>
-                <span class="fake-select">text ▾</span>
+                <span class="fake-select">글자 · text ▾</span>
               </div>
             </div>
             <div class="r-card">
@@ -566,24 +605,24 @@
                   <div class="r-title" style="display:flex;align-items:center;gap:6px">
                     <span class="swatch" style="background:#f5f5f5;width:14px;height:14px"></span>color/gray/50
                   </div>
-                  <div class="r-sum">추출 · 6× 사용</div>
+                  <div class="r-sum">중립 · 6× 사용</div>
                 </div>
-                <span class="fake-select">surface ▾</span>
+                <span class="fake-select">면 · surface ▾</span>
               </div>
             </div>
             <div class="r-card">
               <div class="r-top no-check">
                 <div>
                   <div class="r-title" style="display:flex;align-items:center;gap:6px">
-                    <span class="swatch" style="background:#e0e0e0;width:14px;height:14px"></span>color/gray/200
+                    <span class="swatch" style="background:#1b8f5a;width:14px;height:14px"></span>color/green/500
                   </div>
-                  <div class="r-sum">추출 · 4× 사용</div>
+                  <div class="r-sum">상태 · success</div>
                 </div>
-                <span class="fake-select">border ▾</span>
+                <span class="fake-select">성공 · success ▾</span>
               </div>
             </div>
           </div>
-          <div class="status">색 12개 · 역할 지정 4 · 변수화 대기</div>
+          <div class="status">색 12개 · 역할 지정 5 · 변수화 대기</div>
         </div>`;
     }
 
@@ -591,15 +630,14 @@
       return `
         ${uxMakeRail()}
         <div class="card">
-          <h3>토큰 생성 <span class="lock">🔒 · 색 외 24</span></h3>
-          <p class="hint tight">간격·크기·폰트·효과만. 색은 이전 단계에서 변수화함.</p>
+          <h3>간격·크기 토큰 <span class="lock">🔒 · 후보 24</span></h3>
+          <p class="hint tight">여백·크기·폰트·효과만 다룹니다. 색은 이전 단계에서 이미 만들었어요</p>
           <div class="toolbar">
             <button type="button" class="btn">미리보기</button>
             <button type="button" class="btn primary">적용</button>
             <span class="grow"></span>
             <button type="button" class="btn ghost" data-next="theme">다음 →</button>
           </div>
-          <div class="banner" style="margin-bottom:8px">색 변수 12개 이미 생성됨 · 여기선 색 외만</div>
           <div class="row" style="margin-top:0">
             <label class="field"><span class="check"></span> 전체</label>
             <button type="button" class="btn link">1× 해제</button>
@@ -628,18 +666,19 @@
       return `
         ${uxMakeRail()}
         <div class="card">
-          <h3>다크 테마 <span class="lock">🔒</span></h3>
-          <p class="hint tight">라이트 명도 반전 → Dark 모드(없으면 추가).</p>
+          <h3>다크 모드 <span class="lock">🔒</span></h3>
+          <p class="hint tight">밝은 모드 색을 뒤집어 다크 모드에 채웁니다. 목록 이름은 Figma 변수 컬렉션·모드예요</p>
           <div class="toolbar">
-            <button type="button" class="btn primary">다크 생성</button>
+              <button type="button" class="btn primary">다크 만들기</button>
             <span class="grow"></span>
             <button type="button" class="btn ghost" data-next="type">다음 →</button>
           </div>
           <div class="row" style="margin-top:0">
-            <label class="field">컬렉션 <span class="fake-select">Semantic ▾</span></label>
-            <label class="field">라이트 <span class="fake-select">Mode 1 ▾</span></label>
-            <label class="field">다크 <span class="fake-select">Dark ▾</span></label>
+            <label class="field">역할 컬렉션 <span class="fake-select">역할(Semantic) ▾</span></label>
+            <label class="field">밝은 모드 <span class="fake-select">Light ▾</span></label>
+            <label class="field">어두운 모드 <span class="fake-select">Dark ▾</span></label>
           </div>
+          <div class="status">역할 변수 12 · Dark 채움 대기</div>
         </div>`;
     }
 
@@ -648,7 +687,7 @@
         ${uxMakeRail()}
         <div class="card">
           <h3>텍스트 스타일 <span class="lock">🔒</span></h3>
-          <p class="hint tight">이름만 수정 · ×N으로 같은 글자 선택</p>
+          <p class="hint tight">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 「기존만 연결」</p>
           <div class="toolbar">
             <button type="button" class="btn">스캔</button>
             <button type="button" class="btn ghost">행 추가</button>
@@ -656,13 +695,15 @@
             <button type="button" class="btn primary">등록</button>
             <button type="button" class="btn ghost">기존만 연결</button>
           </div>
-          <label class="field"><span class="check"></span> 등록 시 화면에 적용</label>
+          <div class="row" style="margin-top:0">
+            <button type="button" class="btn">왼쪽 글자로 이름 채우기</button>
+          </div>
           <div class="result-cards">
             <div class="r-card">
               <div class="r-top no-check">
                 <div>
                   <div class="r-title bound"><input value="display" readonly /></div>
-                  <div class="r-sum">Inter · 32 / 120% / 0 · Bold</div>
+                  <div class="r-sum">Inter · 32 / 120% / 0 · Bold · 이미 등록</div>
                 </div>
                 <button type="button" class="badge" data-count="1" data-name="display">×1</button>
               </div>
@@ -670,32 +711,23 @@
             <div class="r-card">
               <div class="r-top no-check">
                 <div>
-                  <div class="r-title new"><input value="h1" /></div>
-                  <div class="r-sum">Inter · 24 / 150% / -2% · SemiBold</div>
+                  <div class="r-title new"><input value="H1" /></div>
+                  <div class="r-sum">Inter · 24 / 150% / -2% · SemiBold · 왼쪽 글자</div>
                 </div>
-                <button type="button" class="badge" data-count="3" data-name="h1">×3</button>
+                <button type="button" class="badge" data-count="3" data-name="H1">×3</button>
               </div>
             </div>
             <div class="r-card">
               <div class="r-top no-check">
                 <div>
                   <div class="r-title new"><input value="body" /></div>
-                  <div class="r-sum">Inter · 16 / 150% / -2% · Regular</div>
+                  <div class="r-sum">Inter · 16 / 150% / -2% · Regular · 크기 순</div>
                 </div>
                 <button type="button" class="badge" data-count="12" data-name="body">×12</button>
               </div>
             </div>
-            <div class="r-card">
-              <div class="r-top no-check">
-                <div>
-                  <div class="r-title bound"><input value="caption" readonly /></div>
-                  <div class="r-sum">Inter · 12 / 140% / 0 · Regular</div>
-                </div>
-                <button type="button" class="badge" data-count="5" data-name="caption">×5</button>
-              </div>
-            </div>
           </div>
-          <div class="status">신규 2 · 등록됨 2 · 행간% 3 · 자간% 2</div>
+          <div class="status">신규 2 · 등록됨 1 · 왼쪽 글자 1 · 크기 순 1</div>
         </div>`;
     }
 
@@ -703,18 +735,19 @@
       return `
         ${uxApplyRail()}
         <div class="card">
-          <h3>바인딩 <span class="lock">32</span></h3>
-          <p class="hint tight">미리보기 → 골라 → 연결</p>
+          <h3>변수 연결 <span class="lock">후보 32</span></h3>
+          <p class="hint tight">먼저 미리보기로 확인하고, 연결할 항목만 고르세요</p>
           <div class="toolbar">
             <button type="button" class="btn">미리보기</button>
             <span class="grow"></span>
-            <button type="button" class="btn primary">선택에 바인딩</button>
+            <button type="button" class="btn primary">선택한 항목에 연결</button>
             <button type="button" class="btn ghost" data-next-apply="rename">다음 →</button>
           </div>
           <div class="row" style="margin-top:0">
-            <button type="button" class="btn chip">HUG 4</button>
-            <button type="button" class="btn chip">미매칭 2</button>
+            <button type="button" class="btn chip" title="클릭하면 해당 레이어 선택">HUG/FILL 4</button>
+            <button type="button" class="btn chip" title="클릭하면 해당 레이어 선택">매칭 없음 2</button>
           </div>
+          <p class="hint" style="margin:4px 0 0">건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다</p>
           <div class="result-cards">
             <div class="r-group">Home</div>
             <div class="r-card">
@@ -731,7 +764,7 @@
             </div>
             <div class="r-card dim">
               <div class="r-top"><span class="check off"></span>
-                <div><div class="r-title">Icon</div><div class="r-sum">크기 HUG — 스킵</div></div>
+                <div><div class="r-title">Icon</div><div class="r-sum">크기 HUG/FILL — 연결 안 함(Fixed만)</div></div>
                 <span class="r-meta">스킵</span>
               </div>
             </div>
@@ -743,13 +776,17 @@
       return `
         ${uxApplyRail()}
         <div class="card">
-          <h3>리네임 <span class="lock">18</span></h3>
-          <p class="hint tight">역할 이름으로 정돈 · 루트·인스턴스 보존</p>
+          <h3>이름 정리 <span class="lock">후보 18</span></h3>
+          <p class="hint tight">역할에 맞는 레이어 이름으로 바꿉니다. 최상위·인스턴스 이름은 그대로 둡니다</p>
           <div class="toolbar">
             <button type="button" class="btn">미리보기</button>
             <span class="grow"></span>
             <button type="button" class="btn primary">이름 적용</button>
             <button type="button" class="btn ghost" data-next-apply="structure">다음 →</button>
+          </div>
+          <div class="row" style="margin-top:0">
+            <label class="field"><span class="check"></span> 전체</label>
+            <button type="button" class="btn link">잠금 제외</button>
           </div>
           <div class="result-cards">
             <div class="r-card">
@@ -776,14 +813,16 @@
       return `
         ${uxApplyRail()}
         <div class="card">
-          <h3>구조 <span class="lock">🔒 컴포넌트 · 닮은 프레임</span></h3>
-          <p class="hint tight">후보 스캔 후 등록 · 닮은 프레임은 스캔 Free</p>
+          <h3>컴포넌트 <span class="lock">🔒 · 닮은 프레임</span></h3>
+          <p class="hint tight">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</p>
           <div class="toolbar">
-            <button type="button" class="btn">후보 스캔</button>
-            <button type="button" class="btn">닮은 스캔</button>
+            <button type="button" class="btn" title="컴포넌트 후보 스캔">후보 스캔</button>
+            <button type="button" class="btn" title="닮은 프레임 스캔">닮은 스캔</button>
+          </div>
+          <div class="toolbar" style="border-top:0;padding-top:0">
             <span class="grow"></span>
-            <button type="button" class="btn primary">컴포넌트 등록</button>
-            <button type="button" class="btn">컴포넌트화</button>
+            <button type="button" class="btn primary" title="선택한 후보를 컴포넌트로">등록</button>
+            <button type="button" class="btn" title="닮은 프레임을 인스턴스로">묶기</button>
           </div>
           <div class="result-cards">
             <div class="r-group">컴포넌트 후보</div>
@@ -824,19 +863,19 @@
     function uxSettings() {
       return `
         <div class="card">
-          <h3>플러그인 설정</h3>
-          <p class="hint tight">만들기·적용 탭에서는 안 보임 · 여기서만 변경</p>
+          <h3>기본값</h3>
+          <p class="hint tight">자주 안 바꾸는 값이에요. 만들기·적용 화면에는 안 보여요</p>
           <div class="row">
             <label class="field">기준 크기 <span class="fake-input">16</span>px</label>
-            <label class="field">리네임 맥락 깊이 <span class="fake-input">8</span></label>
+            <label class="field">이름 정리 깊이 <span class="fake-input">8</span></label>
           </div>
           <div class="row">
             <label class="field">허용오차 <span class="fake-input">0.5</span>px <span class="lock">고정</span></label>
           </div>
         </div>
         <div class="card">
-          <h3>변수 → 코드</h3>
-          <p class="hint tight">Figma 변수를 코드 파일로 · 패널 목록·미리보기 없음</p>
+          <h3>코드로 내보내기</h3>
+          <p class="hint tight">누르면 바로 코드 파일로 저장됩니다</p>
           <div class="toolbar" style="border-bottom:0;padding-bottom:0;margin-bottom:0">
             <span class="fake-select">W3C JSON ▾</span>
             <span class="fake-select">px ▾</span>
@@ -846,15 +885,14 @@
         </div>
         <div class="card">
           <h3>라이선스</h3>
+          <p class="hint tight">유료를 쓰면 🔒 잠긴 기능이 풀립니다</p>
           <div class="row">
             <span class="fake-input" style="flex:1">키</span>
             <button type="button" class="btn">검증</button>
           </div>
           <div class="row">
-            <button type="button" class="btn primary">구독</button>
-            <button type="button" class="btn">관리</button>
+            <button type="button" class="btn primary">결제 · 구독 관리</button>
           </div>
-          <p class="hint">Free · Paid 연 $39 · 기기 1대</p>
         </div>`;
     }
 
@@ -953,16 +991,15 @@
         else html = legacySettings();
       }
       body.innerHTML = html;
-      document.getElementById('plugin').style.setProperty('--pw', state.width + 'px');
       document.getElementById('selModeTag').textContent = state.mode === 'ux' ? 'UX' : '현재';
-      const tabL = { wizard: '마법사', tokens: '만들기', apply: '적용', settings: '관리' }[state.tab];
+      const tabL = { wizard: '시작', tokens: '만들기', apply: '적용', settings: '설정' }[state.tab];
       const makeStepL = MAKE_STEPS.find((s) => s.id === state.makeStep)?.label || '';
       const applyStepL = APPLY_STEPS.find((s) => s.id === state.applyStep)?.label || '';
       document.getElementById('stageMeta').textContent =
         `${state.mode === 'ux' ? '제안 UX' : '현재'} · ${tabL}` +
         (state.mode === 'ux' && state.tab === 'tokens' ? ` · ${makeStepL}` : '') +
         (state.mode === 'ux' && state.tab === 'apply' ? ` · ${applyStepL}` : '') +
-        ` · ${state.width}px`;
+        ` · 400px`;
 
       body.querySelectorAll('.steps button').forEach((b) => {
         b.onclick = () => {
@@ -1000,12 +1037,6 @@
     };
     document.getElementById('modeLegacy').onclick = function () {
       state.mode = 'legacy'; setSeg(this); render();
-    };
-    document.getElementById('w360').onclick = function () {
-      state.width = 360; setSeg(this); render();
-    };
-    document.getElementById('w400').onclick = function () {
-      state.width = 400; setSeg(this); render();
     };
 
     function goTab(tab) {
