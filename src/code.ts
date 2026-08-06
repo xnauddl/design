@@ -49,6 +49,9 @@ const selection = () => figma.currentPage.selection;
    결과(LICENSE_VERIFIED)만 받아 캐시·적용한다. 여기서는 fetch/crypto를 직접 하지 않는다. */
 const DEV_TIER_KEY = 'dsl.devTier';
 const CACHE_KEY = 'dsl.licenseCache';
+// #19: 기준 크기·리네임 맥락 깊이는 관리 탭에서만 바꾸고 이 파일에 기억한다(입력을 단계에 두지 않으므로).
+const SETTINGS_KEY = 'dsl.settings';
+const SETTINGS_DEFAULT = { base: 16, maxDepth: 8 };
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
@@ -1348,6 +1351,31 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
         if (generated) commitUndo(figma); // UX2
+        break;
+      }
+      case 'GET_SETTINGS': {
+        let s = SETTINGS_DEFAULT;
+        try {
+          const raw = await figma.clientStorage.getAsync(SETTINGS_KEY);
+          if (raw && typeof raw === 'object') {
+            const o = raw as Record<string, unknown>;
+            s = {
+              base: typeof o.base === 'number' && isFinite(o.base) && o.base > 0 ? o.base : SETTINGS_DEFAULT.base,
+              maxDepth: typeof o.maxDepth === 'number' && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth,
+            };
+          }
+        } catch {
+          /* 저장소 접근 실패 → 기본값 */
+        }
+        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth });
+        break;
+      }
+      case 'SET_SETTINGS': {
+        try {
+          await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth });
+        } catch {
+          /* 보관 실패해도 이번 세션 동작에는 영향 없음 */
+        }
         break;
       }
       case 'GET_VARIABLES': {

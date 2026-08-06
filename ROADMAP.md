@@ -118,6 +118,8 @@
 - [x] 명도 대비 **후속 보정**(텍스트색 기본 + 배경 옵션) — `suggestContrastFix`(OKLCH L 이분 탐색) + 행별 ‘텍스트/배경’ 적용(`APPLY_CONTRAST_FIX`) `(PR #37)` → **철회**: 대비 점검 자체를 제품 범위에서 뺐다(아래)
 - [x] **명도 대비 점검 제거** — 카드·마법사 단계(`접근성 검수`)·메시지(`CHECK_CONTRAST`/`CONTRAST_RESULT`)·`lib/contrast.ts`를 전부 삭제. 접근성 검사는 전용 플러그인의 영역이라 비목표로 확정
 - [x] **변경 이력 제거** — `history.ts`·이력 카드·메시지·기록 호출부 전면 삭제 `(PR #37)`
+- [x] **단계 레일** — 만들기 4단계(색·토큰·테마·타이포) · 적용 3단계(바인딩·리네임·구조), 한 화면에 한 단계. 바로가기(`goToCreate`·`gotoStep`)도 단계까지 맞춤
+- [x] **설정을 관리 탭으로** — 「플러그인 설정」 카드 신설(기준 크기·리네임 맥락 깊이) + `clientStorage` 자동 저장(`GET/SET_SETTINGS`). 허용오차 칩·입력 제거(0.5 고정), 사다리·허용 입력 제거(격자 8·15% 고정, 미리보기에서 자동 스냅)
 - [x] **변수 편집기 제거** — 카드·행 편집 UI·`lib/variableEdit.ts`·`EDIT_VARIABLE`/`DELETE_VARIABLE`/`GET_VARIABLE_USAGE`·문서 전체 사용처 스캔을 삭제. 변수 값·이름 수정은 Figma Variables 패널의 일이고, 플러그인은 만들기(upsert)·적용(바인딩)이 몫. `GET_VARIABLES`는 다크 테마 카드가 컬렉션·모드를 고르는 데 필요해 남기되 `VarInfo`를 목록용으로 축소(값·스코프 제거), 시작 시 1회 요청으로 배선
 - [x] **공유 프리셋 제거** — `presets.ts`·프리셋 카드·`GET/SAVE/DELETE_PRESET`·`PRESETS`·`presets` 엔타이틀먼트·`dsl.presets` 저장을 전면 삭제. base·허용오차·맥락단계는 관리 탭에서 `clientStorage` 자동 유지로 대체(설정 자동 유지는 IA 셸 작업). 시맨틱 매핑 텍스트 변환(`semanticMapToText`/`textToSemanticMap`)은 매핑 UI가 쓰므로 `roles.ts`로 이동
 - [x] 내보내기 미리보기 **비목표 확정**(현행 유지 — 코드 변경 없음) `(PR #37)`

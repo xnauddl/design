@@ -654,61 +654,38 @@ $('btnExtract').addEventListener('click', () => {
   send({ type: 'EXTRACT' });
 });
 
-/* 스케일 사다리 정리 — 색 정리(tidyColors)와 같은 패턴: 누르면 정리하고 요약 한 줄 + 되돌리기.
-   색과 달리 자동이 아니라 버튼인 이유는, 값을 옮기면 토큰의 수치가 바뀌어 바인딩 결과까지
-   달라지기 때문이다(색 병합은 같은 hue-단계 안이라 훨씬 보수적). */
-let preNumTidy: DraftToken[] | null = null;
+/* 스케일 사다리 정리 — #19로 격자 8px·허용 15%에 고정하고 UI 입력·버튼을 없앴다.
+   미리보기를 만들 때 자동으로 한 번 돌린다: 손으로 그린 13·15 같은 값이 8 격자로 모여야
+   토큰 수가 줄고, 그 수치로 바인딩이 걸린다. 무엇이 옮겨졌는지는 요약 한 줄로 알린다. */
+const TIDY_GRID = 8; // 여백·크기 격자(고정)
+const TIDY_RATIO = 0.15; // 값 대비 이 비율 안이면 격자로 이동
 
-/** 정리 스냅샷·요약 줄을 함께 걷는다 — 남겨두면 다른 추출의 토큰으로 되돌아간다. */
+/** 요약 줄을 걷는다 — 남겨두면 다른 추출의 토큰에 옛 요약이 붙는다. */
 function clearNumTidy(): void {
-  preNumTidy = null;
   $('numTidySummary').style.display = 'none';
 }
 
-$('btnTidyNumbers').addEventListener('click', () => {
-  // 목록이 '표시'된 뒤에만 — 접힌 채로 값을 바꾸면 무엇이 어떻게 옮겨졌는지 볼 수 없다.
-  if (!previewRevealed) {
-    setStatus('createStatus', '먼저 ‘미리보기’를 눌러 정리할 토큰을 확인하세요.', 'warn');
-    return;
-  }
+/** 여백·크기 토큰을 격자 8 사다리로 스냅(#19). 미리보기 직전에 호출. */
+function tidyNumbers(): void {
   if (!creatableTokens().length) {
-    setStatus('createStatus', '정리할 여백·크기 토큰이 없어요.', 'warn');
+    clearNumTidy();
     return;
   }
-  const base = Number(($('tidyBase') as HTMLInputElement).value) || 0;
-  const ratio = (Number(($('tidyRatio') as HTMLInputElement).value) || 0) / 100;
-  const snapshot = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기용
-  const r = tidyNumberTokens(tokens, { base, ratio });
+  const snapshot = tokens.map((t) => ({ ...t, sources: [...t.sources] }));
+  const r = tidyNumberTokens(tokens, { base: TIDY_GRID, ratio: TIDY_RATIO });
   if (!r.snapped) {
-    setStatus('createStatus', r.before === 0
-      ? '정리할 여백·크기 토큰이 없어요.'
-      : `${base}px 사다리에서 ${Math.round(ratio * 100)}% 안에 드는 값이 없어요 — 허용을 올려보세요.`, '');
+    clearNumTidy();
     return;
   }
-  preNumTidy = snapshot;
   tokens = r.tokens;
   // 스냅으로 키(값)가 바뀌므로 체크를 그대로 두면 전부 풀린다. 그렇다고 전체 재선택을 하면
   // 사용자의 '1× 해제'가 조용히 되살아난다 → 정리 전 체크 상태를 새 키로 이월한다.
   carryTokenChecked(snapshot, r.tokens);
-  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 새 미리보기 필요
-  renderTokens();
   $('numTidySummary').style.display = '';
   // 이동과 병합은 다른 일이라 따로 센다 — 옮겼지만 같은 칸이 아니어서 안 합쳐진 토큰도 있다.
   const merged = r.merged ? ` · 같은 칸 ${r.merged}개 병합` : '';
-  $('numTidyText').textContent = `여백·크기 ${r.before} → ${r.after}개 (${base}px 사다리로 ${r.snapped}개 이동${merged})`;
-  setStatus('createStatus', `${base}px 사다리로 ${r.snapped}개를 옮겼어요${r.merged ? `, ${r.merged}개가 합쳐졌어요` : ''}.`, 'ok');
-});
-
-$('btnNumTidyUndo').addEventListener('click', () => {
-  if (!preNumTidy) return;
-  const restored = preNumTidy;
-  carryTokenChecked(tokens, restored); // 되돌릴 때도 체크를 잃지 않게
-  tokens = restored;
-  clearNumTidy();
-  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none';
-  renderTokens();
-  setStatus('createStatus', '수치 정리를 되돌렸어요.', '');
-});
+  $('numTidyText').textContent = `여백·크기 ${r.before} → ${r.after}개 (${TIDY_GRID}px 격자로 ${r.snapped}개 이동${merged})`;
+}
 
 // 전체 선택 / 1× 해제 — 목록이 상한에 잘려 있어도 전체에 적용된다(체크는 DOM이 아니라 집합이 보관).
 $('tokenAll').addEventListener('change', () => {
@@ -733,6 +710,7 @@ $('btnCreate').addEventListener('click', () => {
     send({ type: 'EXTRACT' });
     return;
   }
+  tidyNumbers(); // #19: 격자 8 스냅을 먼저 — 미리보기에 정리된 수치가 보이게
   renderTokens();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
@@ -750,6 +728,19 @@ $('btnCreateApply').addEventListener('click', () => {
 // 미리보기를 본 뒤 base만 바꾸면 옛 기준 요약이 남은 채 ‘적용’이 새 base로 실행돼 어긋나므로,
 // 즉시 ‘적용’을 감추고 새 base로 미리보기를 다시 돌린다(미리보기는 변수를 만들지 않는 읽기).
 let basePreviewTimer = 0;
+
+/* #19: 설정은 관리 탭에만 있고, 바뀌면 곧바로 파일에 기억한다(저장 버튼 없음).
+   타이핑 중 매 키마다 보내지 않도록 한 박자 늦춘다. */
+let settingsSaveTimer = 0;
+function saveSettings(): void {
+  clearTimeout(settingsSaveTimer);
+  settingsSaveTimer = window.setTimeout(() => {
+    send({ type: 'SET_SETTINGS', base: Number(($('base') as HTMLInputElement).value) || 16, maxDepth: readMaxDepth() });
+  }, 350);
+}
+($('base') as HTMLInputElement).addEventListener('input', saveSettings);
+($('depth') as HTMLInputElement).addEventListener('input', saveSettings);
+
 ($('base') as HTMLInputElement).addEventListener('input', () => {
   const applyBtn = $('btnCreateApply') as HTMLButtonElement;
   if (applyBtn.style.display === 'none') return; // 아직 미리보기 전 — 무효화할 결과가 없음
@@ -945,40 +936,14 @@ $('btnApplyExistingText').addEventListener('click', () => {
   send({ type: 'APPLY_TEXT_STYLES' });
 });
 
-/* 허용오차 프리셋 — 값이 무엇을 뜻하는지 숫자만으로는 안 보여서, 자주 쓰는 값을 칩으로 두고
-   현재 값이 어떤 성격인지 한 줄로 설명한다. 임의 값은 숫자 입력으로 계속 넣을 수 있다. */
-const TOL_HINTS: [number, string][] = [
-  [0, '정확히 같은 값만 바인딩합니다.'],
-  [0.5, '반올림 오차만 흡수합니다(기본).'],
-  [1, '1px 이내 근사값까지 붙습니다.'],
-  [Infinity, '근사 범위가 넓어 의도치 않은 값까지 붙을 수 있습니다.'],
-];
-function syncTolPresets(): void {
-  const v = Number(($('tol') as HTMLInputElement).value) || 0;
-  for (const el of Array.from(document.querySelectorAll('.tol-chip'))) {
-    el.classList.toggle('on', Number((el as HTMLElement).dataset.tol) === v);
-  }
-  $('tolHint').textContent = `허용오차 ${v}px — ${(TOL_HINTS.find(([t]) => v <= t) ?? TOL_HINTS[TOL_HINTS.length - 1])[1]}`;
-}
-for (const el of Array.from(document.querySelectorAll('.tol-chip'))) {
-  el.addEventListener('click', () => {
-    ($('tol') as HTMLInputElement).value = (el as HTMLElement).dataset.tol ?? '0.5';
-    syncTolPresets();
-    clearBindPreview(); // 허용오차가 바뀌면 이전 미리보기 후보는 무효
-  });
-}
-($('tol') as HTMLInputElement).addEventListener('input', () => {
-  syncTolPresets();
-  // 칩과 같은 처리 — 허용오차가 바뀌면 이전 값으로 계산된 후보는 무효다. 남겨두면
-  // 사용자가 0을 넣고 '선택에 바인딩'을 눌러도 옛 허용오차의 근사 매칭이 그대로 적용된다.
-  clearBindPreview();
-});
-syncTolPresets();
+/* #6: 허용오차는 0.5px 고정 — 반올림 오차만 흡수한다. 칩·입력으로 노출하던 값을 없앴다.
+   0은 소수점 반올림 때문에 실제로 안 붙고, 1 이상은 의도치 않은 값까지 끌어와 과매칭이 된다.
+   고정값이라는 사실은 관리 탭 '플러그인 설정'에 표시한다. */
+const BIND_TOLERANCE = 0.5;
 
 $('btnApply').addEventListener('click', () => {
-  const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
   showApplyProgress('미리보기 계산 중…'); // UX6
-  send({ type: 'APPLY', tolerance, preview: true }); // UX1: dry-run 미리보기 먼저
+  send({ type: 'APPLY', tolerance: BIND_TOLERANCE, preview: true }); // UX1: dry-run 미리보기 먼저
 });
 
 $('btnApplyConfirm').addEventListener('click', () => {
@@ -1119,9 +1084,9 @@ async function runWizard(): Promise<void> {
     setStatus('wizardSummary', t('wizard.needSelect'), 'warn');
     return;
   }
-  // 설정값은 각 단계의 기존 입력 필드에서 읽는다(단일 출처).
+  // 설정값은 관리 탭 '플러그인 설정'에서 읽는다(단일 출처). 허용오차는 고정.
   const base = Number(($('base') as HTMLInputElement).value) || 16;
-  const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
+  const tolerance = BIND_TOLERANCE;
   const maxDepth = readMaxDepth();
   const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
 
@@ -1383,6 +1348,7 @@ function setPrereq(btnId: string, noticeId: string, ok: boolean, msg: string): v
 /** 전제 미충족 안내의 ‘토큰 생성으로’ 바로가기 — 토큰 탭으로 이동 + 생성 카드 포커스. */
 function goToCreate(): void {
   showTab('tokens');
+  showMakeStep('token'); // 토큰 생성은 '토큰' 단계에 있다 — 단계를 안 맞추면 빈 화면으로 보낸다
   $('createCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
   ($('btnCreate') as HTMLButtonElement).focus();
 }
@@ -1393,12 +1359,14 @@ function goToCreate(): void {
 function gotoStep(id: 'tokens' | 'semantics' | 'bind'): void {
   if (id === 'bind') {
     showTab('apply');
+    showApplyStep('bind');
     const b = $('btnApply') as HTMLButtonElement;
     b.scrollIntoView({ behavior: 'smooth', block: 'center' });
     b.focus();
     return;
   }
   showTab('tokens');
+  showMakeStep('token'); // 토큰 생성·시맨틱 매핑 둘 다 '토큰' 단계
   const target = id === 'tokens' ? 'btnCreate' : 'btnSemantics';
   const b = $(target) as HTMLButtonElement;
   b.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1644,6 +1612,8 @@ window.onmessage = (event: MessageEvent) => {
       if (pendingCreatePreview) {
         // ‘미리보기’가 추출을 유발 → 추출 완료 후 생성 미리보기까지 이어감.
         pendingCreatePreview = false;
+        tidyNumbers(); // #19: 버튼 경로와 같게 격자 8 스냅 후 미리보기
+        renderTokens();
         const base = Number(($('base') as HTMLInputElement).value) || 16;
         createFrom = 'tokens';
         send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, preview: true });
@@ -1864,6 +1834,11 @@ window.onmessage = (event: MessageEvent) => {
     case 'GENERATE_RESULT': {
       renderVariantReport([{ tag: '생성', items: msg.combos, marker: 'added' }]);
       setStatus('componentStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
+      break;
+    }
+    case 'SETTINGS': {
+      ($('base') as HTMLInputElement).value = String(msg.base);
+      ($('depth') as HTMLInputElement).value = String(msg.maxDepth);
       break;
     }
     case 'VARIABLES': {
@@ -2590,6 +2565,7 @@ send({ type: 'GET_COLLECTIONS' });
 send({ type: 'GET_PREREQ' }); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
 send({ type: 'GET_VARIABLES' }); // 다크 카드의 컬렉션·모드 선택지(편집기 '변수 불러오기'가 하던 일)
+send({ type: 'GET_SETTINGS' }); // #19: 기준 크기·맥락 깊이는 파일에 기억된 값으로 시작
 
 // #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
 document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
@@ -2630,6 +2606,43 @@ TABS.forEach((t, i) => {
   });
 });
 showTab('wizard'); // #4: 첫 화면은 ‘시작’(시스템화 마법사)
+
+/* ---------- #5: 단계 레일 — 한 화면에 한 단계 ---------- */
+// 만들기 4단계·적용 3단계. 카드는 마크업의 data-make-step / data-apply-step으로 묶여 있고,
+// 레일은 그중 한 묶음만 보여준다. 탭 전환과 같은 함정이 있어(숨은 목록은 행 높이가 0으로
+// 측정된다) 단계를 바꿀 때도 layoutAllLists()로 다시 재야 한다.
+const MAKE_STEPS = ['color', 'token', 'theme', 'type'] as const;
+const APPLY_STEPS = ['bind', 'rename', 'structure'] as const;
+type MakeStep = (typeof MAKE_STEPS)[number];
+type ApplyStep = (typeof APPLY_STEPS)[number];
+
+function showStep(attr: 'make' | 'apply', step: string): void {
+  const key = attr === 'make' ? 'data-make-step' : 'data-apply-step';
+  const rail = $(attr === 'make' ? 'makeRail' : 'applyRail');
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>(`.step[${key}]`))) {
+    // 시맨틱 매핑처럼 원래부터 숨은 카드(자동 흡수)는 단계가 맞아도 계속 숨긴다.
+    if (el.dataset.alwaysHidden !== undefined) continue;
+    el.style.display = el.getAttribute(key) === step ? '' : 'none';
+  }
+  for (const b of Array.from(rail.querySelectorAll<HTMLElement>('.step-chip'))) {
+    const on = b.getAttribute(key) === step;
+    if (on) b.setAttribute('aria-current', 'step');
+    else b.removeAttribute('aria-current');
+  }
+  layoutAllLists();
+}
+
+const showMakeStep = (s: MakeStep): void => showStep('make', s);
+const showApplyStep = (s: ApplyStep): void => showStep('apply', s);
+
+for (const b of Array.from(document.querySelectorAll<HTMLElement>('#makeRail .step-chip'))) {
+  b.addEventListener('click', () => showMakeStep(b.dataset.makeStep as MakeStep));
+}
+for (const b of Array.from(document.querySelectorAll<HTMLElement>('#applyRail .step-chip'))) {
+  b.addEventListener('click', () => showApplyStep(b.dataset.applyStep as ApplyStep));
+}
+showMakeStep('color');
+showApplyStep('bind');
 
 /* ---------- #14: 창 리사이즈(우하단 핸들 드래그) ---------- */
 (() => {

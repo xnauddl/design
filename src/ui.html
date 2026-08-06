@@ -185,6 +185,18 @@
     .tab-section.active { display: block; }
     .tab-section > * { margin-bottom: 10px; }
 
+    /* ── 단계 레일 — 만들기 4단계 · 적용 3단계. 한 화면에 한 단계만 보인다. ── */
+    .steps { display: grid; gap: 3px; margin: 0 0 10px; }
+    .steps-4 { grid-template-columns: repeat(4, 1fr); }
+    .steps-3 { grid-template-columns: repeat(3, 1fr); }
+    .step-chip {
+      display: block; padding: 6px 2px; border: 1px solid var(--border); background: var(--surface);
+      border-radius: var(--r-sm); color: var(--text-2); font-size: 10px; line-height: 1.25; text-align: center;
+    }
+    .step-chip:hover:not([aria-current="step"]) { background: var(--surface-hover); color: var(--text); }
+    .step-chip[aria-current="step"] { border-color: var(--accent-border); background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+    .step-chip .n { display: block; font-size: 11px; font-weight: 600; }
+
     /* ── 선택 동기화 바 (탭 아래 sticky) ── */
     #selBarWrap {
       position: sticky; top: var(--tabs-h, 41px); z-index: 2; margin: 0 0 10px;
@@ -279,15 +291,6 @@
     /* 이름 입력만 늘어난다 — 체크박스까지 flex:1이면 행이 무너진다. */
     .tk input:not([type="checkbox"]) { font: 400 var(--fs) var(--mono); padding: 4px 6px; flex: 1 1 auto; min-width: 0; }
     .tk > .tk-check { flex: 0 0 auto; margin: 0; }
-    /* 허용오차 프리셋 — 숫자 입력 옆 칩. 현재 값과 같은 칩만 강조된다. */
-    .tol-presets { display: inline-flex; gap: 3px; }
-    .tol-chip {
-      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
-      background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: 4px; padding: 1px 7px; cursor: pointer;
-    }
-    .tol-chip:hover { border-color: var(--accent); color: var(--accent); }
-    .tol-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
     /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
     .skip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
     .skip-chip {
@@ -439,7 +442,7 @@
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
-      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계)을 사용합니다.</div>
+      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈</b>. 기준 크기·맥락 깊이는 ‘관리’ 탭 설정을 따릅니다.</div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span></label>
         <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span></label>
@@ -474,7 +477,15 @@
   </section>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
-    <div class="step">
+    <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
+    <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
+      <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
+      <button class="step-chip" data-make-step="token"><span class="n" data-i18n="rail.token">토큰</span><span data-i18n="rail.tokenSub">간격·크기</span></button>
+      <button class="step-chip" data-make-step="theme"><span class="n" data-i18n="rail.theme">테마</span><span data-i18n="rail.themeSub">다크</span></button>
+      <button class="step-chip" data-make-step="type"><span class="n" data-i18n="rail.type">타이포</span><span data-i18n="rail.typeSub">텍스트 스타일</span></button>
+    </div>
+
+    <div class="step" data-make-step="color">
       <h2><span data-i18n="palette.title">브랜드 팔레트 생성</span> <span class="muted" id="paletteLock"></span></h2>
       <div class="row">
         <label class="inline"><span data-i18n="palette.brand">브랜드색</span> <input id="brand" type="color" value="#3366ff" /></label>
@@ -505,7 +516,7 @@
     </div>
 
     <!-- 추출 + 색 정리 통합 — 추출 후 같은 카드에서 바로 병합·역할 지정. -->
-    <div class="step">
+    <div class="step" data-make-step="color">
       <h2><span data-i18n="extract.title">추출 · 색 정리</span> <span class="muted" id="colorCount"></span></h2>
       <div class="row">
         <button id="btnExtract" class="primary" data-i18n="extract.scanBtn">선택에서 토큰 추출</button>
@@ -538,7 +549,7 @@
       </div>
     </div>
 
-    <div class="step" id="createCard">
+    <div class="step" id="createCard" data-make-step="token">
       <h2><span data-i18n="create.title">토큰 생성 (Global + Semantic)</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
       <div class="hint" data-i18n-html="create.scopeHint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.</div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
@@ -551,15 +562,8 @@
         <span class="list-count" id="tokenListCount"></span>
         <button class="link" id="btnTokenListExpand" data-i18n="list.expandAll">모두 펼치기</button>
       </div>
-      <div class="row">
-        <label class="inline"><span data-i18n="create.base">base(px)</span> <input id="base" type="number" value="16" min="1" /></label>
-        <label class="inline"><span data-i18n="create.tidyBase">사다리</span> <input id="tidyBase" type="number" value="8" min="0" step="1" style="width:46px;" title="여백·크기를 이 값 기준 사다리에 맞춥니다. 8이면 …4·2·1 / 8·16·24·32. 기준 미만은 반분할이라 4·2가 보존됩니다. 0이면 정리하지 않습니다." />px</label>
-        <label class="inline"><span data-i18n="create.tidyRatio">허용</span> <input id="tidyRatio" type="number" value="15" min="0" max="50" step="5" style="width:46px;" title="값 대비 몇 %까지 옮길지. 비율이라 작은 값일수록 자동으로 보수적입니다(4는 거의 안 움직이고 40은 여유 있게)." />%</label>
-        <button id="btnTidyNumbers" data-i18n="create.tidyBtn">정리</button>
-      </div>
       <div class="tidy tidy-note" id="numTidySummary" style="display:none">
         <span id="numTidyText"></span>
-        <button id="btnNumTidyUndo" class="link" data-i18n="create.tidyUndo">되돌리기</button>
       </div>
       <div class="hint" data-i18n="create.hint">미리보기로 변경 요약을 확인한 뒤 적용하세요.</div>
       <div class="row">
@@ -571,7 +575,7 @@
 
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
          DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
-    <div class="step" style="display:none">
+    <div class="step" data-make-step="token" data-always-hidden style="display:none">
       <h2><span data-i18n="semantic.title">시맨틱 매핑 (역할 → 토큰)</span> <span class="muted" id="semLock"></span></h2>
       <div class="hint" data-i18n-html="semantic.formatLabel">형식: <code>역할 = Global변수이름</code></div>
       <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
@@ -583,7 +587,7 @@
       <div class="status" id="semStatus"></div>
     </div>
 
-    <div class="step" id="darkCard">
+    <div class="step" id="darkCard" data-make-step="theme">
       <h2><span data-i18n="dark.title">다크 테마 생성</span> <span class="muted" id="darkLock"></span></h2>
       <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
       <div class="row">
@@ -604,7 +608,7 @@
       <div class="status" id="darkStatus"></div>
     </div>
 
-    <div class="step">
+    <div class="step" data-make-step="type">
       <h2><span data-i18n="textStyle.title">텍스트 스타일 (화면 → 스타일)</span> <span class="muted" id="tsLock"></span></h2>
       <div class="hint" data-i18n-html="textStyle.hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 행간·자간이 %였으면 표에 %로 보이고 그대로 등록됩니다(그 항목만 변수 연결 생략). 새 스타일은 ‘행 추가’로. (Paid)</div>
       <div class="row" style="margin-top:6px;">
@@ -654,19 +658,16 @@
   </section>
 
   <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
-    <div class="step">
+    <!-- 적용 단계 레일 — 바인딩 → 리네임 → 구조(컴포넌트·닮은 프레임). -->
+    <div class="steps steps-3" id="applyRail" role="tablist" aria-label="적용 단계">
+      <button class="step-chip" data-apply-step="bind"><span class="n" data-i18n="rail.bind">바인딩</span><span data-i18n="rail.bindSub">변수 연결</span></button>
+      <button class="step-chip" data-apply-step="rename"><span class="n" data-i18n="rail.rename">리네임</span><span data-i18n="rail.renameSub">역할 이름</span></button>
+      <button class="step-chip" data-apply-step="structure"><span class="n" data-i18n="rail.structure">구조</span><span data-i18n="rail.structureSub">컴포넌트</span></button>
+    </div>
+
+    <div class="step" data-apply-step="bind">
       <h2><span data-i18n="bind.title">적용 (바인딩)</span> <span class="muted" id="bindCount"></span></h2>
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create">토큰 생성으로 →</button></div>
-      <div class="row">
-        <label class="inline"><span data-i18n="bind.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" step="0.1" /></label>
-        <span class="tol-presets">
-          <button class="tol-chip" data-tol="0" data-i18n="bind.tolExact" title="값이 정확히 같을 때만 바인딩">정확</button>
-          <button class="tol-chip" data-tol="0.5" title="반올림 오차만 흡수 — 기본값">0.5</button>
-          <button class="tol-chip" data-tol="1" title="1px 이내 근사값까지 바인딩">1</button>
-          <button class="tol-chip" data-tol="2" title="2px 이내 — 손으로 그린 값이 많은 화면용(과매칭 주의)">2</button>
-        </span>
-      </div>
-      <div class="hint" id="tolHint"></div>
       <div class="row">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택에 바인딩</button>
@@ -693,10 +694,9 @@
       <div class="status" id="applyStatus"></div>
     </div>
 
-    <div class="step">
+    <div class="step" data-apply-step="rename">
       <h2><span data-i18n="rename.title">리네임</span> <span class="muted" id="renameCount"></span></h2>
       <div class="row">
-        <label class="inline"><span data-i18n="rename.depth">맥락 최대단계</span> <input id="depth" type="number" value="8" min="1" /></label>
         <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
         <button id="btnRename" disabled data-i18n="rename.apply">이름 적용</button>
       </div>
@@ -716,7 +716,7 @@
       <div class="status" id="renameStatus"></div>
     </div>
 
-    <div class="step" id="componentCard">
+    <div class="step" id="componentCard" data-apply-step="structure">
       <!-- 이 카드엔 목록이 둘이다(후보 트리 · 결과 리포트). 세는 대상이 달라 각자 span을 갖고,
            비어 있으면 각자 숨는다 — 스캔 직후엔 후보만, 등록 직후엔 리포트만 뜬다. -->
       <h2><span data-i18n="component.title">컴포넌트 / 베리언트</span> <span class="muted" id="compCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span></h2>
@@ -745,7 +745,7 @@
       <div class="status" id="componentStatus"></div>
     </div>
 
-    <div class="step" id="similarCard">
+    <div class="step" id="similarCard" data-apply-step="structure">
       <h2><span data-i18n="similar.title">닮은 프레임 컴포넌트화</span> <span class="muted" id="similarCount"></span> <span class="muted" id="similarLock"></span></h2>
       <div class="hint" data-i18n-html="similar.hint">구조가 같고 <b>내용만 다른</b> 프레임 여러 개를 골라 스캔하면, 하나를 <b>마스터</b>로 컴포넌트화하고 나머지는 <b>인스턴스</b>로 바꿉니다. 프레임마다 다른 텍스트·아이콘은 <b>컴포넌트 속성</b>으로 열리고, 이미지는 인스턴스에서 개별 교체됩니다. 마스터는 <b>내용이 가장 잘 채워진</b> 프레임을 추천합니다(빈 텍스트가 많으면 감점). <b>스캔은 무료</b>, 실제 교체만 Paid.</div>
       <div class="row">
@@ -763,6 +763,19 @@
   </section>
 
   <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
+    <!-- #19: 기준 크기·맥락 깊이·허용오차는 여기서만. 만들기/적용 단계에는 노출하지 않는다. -->
+    <div class="step" id="pluginSettingsCard">
+      <h2 data-i18n="settings.title">플러그인 설정</h2>
+      <div class="hint" data-i18n="settings.hint">만들기·적용 탭에서는 안 보입니다. 바꾸면 이 파일에 기억됩니다.</div>
+      <div class="row">
+        <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
+        <label class="inline"><span data-i18n="settings.depth">리네임 맥락 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
+      </div>
+      <div class="row">
+        <span class="muted" data-i18n="settings.tol">허용오차 0.5px 고정 · 여백·크기 격자 8px 고정</span>
+      </div>
+    </div>
+
     <div class="step">
       <h2 data-i18n="export.title">내보내기 (코드)</h2>
       <div class="hint" data-i18n="export.hint">모든 디자인 변수(색·크기·간격·반경·타이포)를 코드로. HUG/FILL은 토큰이 아니라 제외.</div>

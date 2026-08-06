@@ -37,7 +37,9 @@ function fakeTokens(n) {
     name: `${cats[i % cats.length]}/step-${String(i + 1).padStart(3, '0')}`,
     category: cats[i % cats.length],
     sources: ['itemSpacing'],
-    value: 4 + i,
+    // 값은 격자 8의 배수로 — 미리보기가 격자 8 스냅(#19)을 자동으로 돌리므로, 격자 밖 값을
+    // 주면 일부가 옮겨지고 합쳐져 행 수가 시드보다 줄어든다(여기서 볼 건 행 높이·스냅이다).
+    value: 8 * (i + 1),
   }));
 }
 
@@ -150,6 +152,7 @@ const LISTS = {
   tokenList: {
     label: '토큰 생성 미리보기',
     tab: 'tabbtn-tokens',
+    step: '.step-chip[data-make-step="token"]',
     row: '.tk',
     more: 'tokenListMore',
     count: 'tokenListCount',
@@ -162,6 +165,7 @@ const LISTS = {
   colorTable: {
     label: '추출 · 색 정리 표',
     tab: 'tabbtn-tokens',
+    step: '.step-chip[data-make-step="color"]',
     row: '.crow',
     more: 'colorTableMore',
     count: 'colorTableCount',
@@ -176,6 +180,7 @@ const LISTS = {
   variantReport: {
     label: '컴포넌트 등록/분류 리포트',
     tab: 'tabbtn-apply',
+    step: '.step-chip[data-apply-step="structure"]',
     row: '.vr-row',
     more: 'variantReportMore',
     count: 'variantReportCount',
@@ -195,6 +200,7 @@ const LISTS = {
   bindTree: {
     label: '바인딩 미리보기 트리',
     tab: 'tabbtn-apply',
+    step: '.step-chip[data-apply-step="bind"]',
     row: '.tree-row',
     more: 'bindTreeMore',
     count: 'bindTreeCount',
@@ -207,6 +213,7 @@ const LISTS = {
   diff: {
     label: '리네임 미리보기 트리',
     tab: 'tabbtn-apply',
+    step: '.step-chip[data-apply-step="rename"]',
     row: '.tree-row',
     more: 'diffMore',
     count: 'diffCount',
@@ -218,6 +225,7 @@ const LISTS = {
   compTree: {
     label: '컴포넌트 등록 후보 트리',
     tab: 'tabbtn-apply',
+    step: '.step-chip[data-apply-step="structure"]',
     row: '.tree-row',
     more: 'compTreeMore',
     count: 'compTreeCount',
@@ -229,6 +237,7 @@ const LISTS = {
   tsRows: {
     label: '텍스트 스타일 표',
     tab: 'tabbtn-tokens',
+    step: '.step-chip[data-make-step="type"]',
     // 마운트는 표를 감싼 래퍼다 — 표 박스 자체는 스크롤 컨테이너가 못 된다.
     mount: 'tsList',
     row: 'tbody tr',
@@ -300,12 +309,18 @@ async function partialRows(page, mount, row, stickyHead) {
  * 빈 개수 줄이 그대로 남는다. 실제 경로다(마법사의 대비 점검이 ‘적용’ 탭 목록을 채운다).
  * 시드가 postMessage만으로 되는 목록에서만 켠다(버튼 클릭은 숨은 탭에서 안 된다).
  */
+/** 탭 + 단계 레일(#5) — 카드가 단계에 묶여 있어 탭만 눌러선 목록이 안 보인다. */
+async function openList(page, spec) {
+  await page.click(`#${spec.tab}`);
+  if (spec.step) await page.click(spec.step);
+}
+
 async function seedFromHiddenTab(page, spec, count) {
   await page.click(`#${spec.hiddenFrom}`);
   await unlock(page);
   await spec.setup(page, count);
   await page.waitForTimeout(200);
-  await page.click(`#${spec.tab}`);
+  await openList(page, spec);
 }
 
 async function verify(page, id, spec, count, shots, hidden = false) {
@@ -318,7 +333,7 @@ async function verify(page, id, spec, count, shots, hidden = false) {
   if (hidden) {
     await seedFromHiddenTab(page, spec, count);
   } else {
-    await page.click(`#${spec.tab}`);
+    await openList(page, spec);
     await unlock(page);
     await spec.setup(page, count);
   }
