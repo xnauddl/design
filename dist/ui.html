@@ -449,13 +449,13 @@
     <!-- 색 — 추출/시드로 색을 모으고, 역할을 정한 뒤 여기서 변수로 만든다(#3·#10).
          이후 '토큰' 단계는 색 외(간격·크기·폰트·효과)만 다룬다. -->
     <div class="step" id="colorCard" data-make-step="color">
-      <h2><span data-i18n="color.title">색</span> <span class="muted" id="colorCount"></span> <span class="muted" data-i18n="color.scope">추출 → 변수 · 팔레트</span> <span class="muted" id="paletteLock"></span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요</div>
+      <h2><span data-i18n="color.title">색</span> <span class="muted" id="colorCount"></span> <span class="muted" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
+      <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
         <span class="grow"></span>
-        <button id="btnColorVars" class="primary" data-i18n="color.makeVars">색 변수 만들기</button>
+        <button id="btnColorVars" class="primary"><span data-i18n="color.makeVars">색 변수 만들기</span> <span class="muted" id="colorVarsLock"></span></button>
         <button class="btn-next" data-next-make="token" data-i18n="rail.next">다음 →</button>
       </div>
       <!-- 시드(팔레트 생성용) — 브랜드색 + 무엇을 함께 만들지. -->
@@ -1008,7 +1008,7 @@
     "pipeline.indep": "\uC774\uB984\xB7\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uC801\uC6A9 \uD0ED\uC5D0\uC11C",
     // 브랜드 팔레트
     "color.title": "\uC0C9",
-    "color.scope": "\uCD94\uCD9C \u2192 \uBCC0\uC218 \xB7 \uD314\uB808\uD2B8",
+    "color.scope": "\uBCC0\uC218\uD654",
     "color.listHint": "\uCD94\uCD9C\xB7\uC815\uB9AC\uB41C \uC0C9 \xB7 Global = hue \xB7 Semantic = \uC5ED\uD560",
     "color.makeVars": "\uC0C9 \uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "palette.brand2": "\uBCF4\uC870\uC0C9",
@@ -1019,7 +1019,7 @@
     // 추출
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
-    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694",
+    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
     "colorTidy.undo": "\uB418\uB3CC\uB9AC\uAE30",
     // 토큰 생성
     "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
@@ -2707,7 +2707,7 @@
       el.disabled = !isPaid;
       setLockTitle(el, !isPaid);
     }
-    for (const id of ["paletteLock", "paletteBtnLock", "componentLock", "darkLock", "createLock", "semLock", "tsLock"]) {
+    for (const id of ["paletteLock", "paletteBtnLock", "colorVarsLock", "componentLock", "darkLock", "createLock", "semLock", "tsLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     refreshDarkModes();

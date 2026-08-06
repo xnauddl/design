@@ -1227,10 +1227,10 @@ function updateGates(): void {
     el.disabled = !isPaid;
     setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
   }
-  // 색 카드는 Free('선택에서 추출')와 Paid가 한 툴바에 섞여 있어 카드 배지만으로는 어느 쪽이
-  // 잠긴 건지 알 수 없다 → '팔레트 생성'에 자물쇠를 붙인다. '색 변수 만들기'에는 붙이지 않는데,
-  // 와이어가 그렇고 400px에서 배지 하나를 더 넣으면 툴바가 '다음 →'을 두 줄로 밀어낸다.
-  for (const id of ['paletteLock', 'paletteBtnLock', 'componentLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
+  // 색 카드는 Free('선택에서 추출')와 Paid('팔레트 생성'·'색 변수 만들기')가 한 툴바에 섞여
+  // 있어 카드 배지만으로는 어느 쪽이 잠긴 건지 알 수 없다 → 두 버튼 모두에 자물쇠를 붙인다
+  // (와이어 rev k). 400px에서 툴바가 두 줄이 되는 건 감수 — 결론 버튼의 잠금이 먼저다.
+  for (const id of ['paletteLock', 'paletteBtnLock', 'colorVarsLock', 'componentLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
   // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가

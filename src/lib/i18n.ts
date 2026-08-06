@@ -194,7 +194,7 @@ export const STRINGS: Record<string, string> = {
   'pipeline.indep': '이름·컴포넌트는 필요할 때 적용 탭에서',
   // 브랜드 팔레트
   'color.title': '색',
-  'color.scope': '추출 → 변수 · 팔레트',
+  'color.scope': '변수화',
   'color.listHint': '추출·정리된 색 · Global = hue · Semantic = 역할',
   'color.makeVars': '색 변수 만들기',
   'palette.brand2': '보조색',
@@ -205,7 +205,7 @@ export const STRINGS: Record<string, string> = {
   // 추출
   'extract.scanBtn': '선택에서 추출',
   // 색 정리(추출 카드에 흡수)
-  'colorTidy.hint': '뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요',
+  'colorTidy.hint': '뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료',
   'colorTidy.undo': '되돌리기',
   // 토큰 생성
   'create.title': '간격·크기 토큰',
