@@ -39,12 +39,14 @@ function readMaxDepth(): number {
 let tokens: DraftToken[] = [];
 let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
 let hideOnboard = false; // 첫 실행 배너를 껐는가(파일에 기억)
+let colorsFromPalette = false; // 지금 목록의 색이 팔레트 생성으로 온 것인가(변수 생성 시 이전 팔레트 정리)
+let colorsCreated = false; // 이 세션에서 색 변수를 만들었는가(토큰 단계 안내용)
 // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
 let hasGlobal = false;
 let hasBindable = false;
 let hasTextStyles = false;
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
-let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
+let createFrom: 'colors' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
 
 /* ---------- 토큰 목록 렌더 ---------- */
 /* ---------- 점진(청크) 렌더 — 대량 목록을 프레임 단위로 나눠 비차단 렌더(§4) ----------
@@ -206,8 +208,9 @@ function resetTokenChecked(): void {
 }
 
 /** 실제로 생성할 토큰 — 색은 전부, 색 외는 체크한 것만. */
+/** '토큰' 단계가 만들 것 — 체크된 색 외 토큰만. 색은 '색' 단계의 「색 변수 만들기」가 맡는다. */
 function tokensToCreate(): DraftToken[] {
-  return tokens.filter((t) => t.category === 'color' || tokenChecked.has(tokenKey(t)));
+  return creatableTokens().filter((t) => tokenChecked.has(tokenKey(t)));
 }
 
 /**
@@ -329,6 +332,11 @@ function renderTokens(): void {
     showHint('‘미리보기’를 누르면 생성할 색 외 토큰(간격·크기·폰트·효과)이 표시됩니다.');
     return;
   }
+  // 와이어: 색은 이전 단계에서 이미 변수화됐다는 사실을 이 단계 첫 줄로 알린다.
+  const colorN = tokens.length - others.length;
+  const banner = $('tokenColorNote');
+  banner.style.display = colorsCreated && colorN ? '' : 'none';
+  if (colorsCreated && colorN) banner.textContent = t('create.colorsDone', { count: colorN });
   if (!others.length) {
     showHint('색 외 토큰이 없습니다(색만 추출됨).');
     return;
@@ -373,7 +381,7 @@ brandHex.addEventListener('input', () => {
 $('btnPalette').addEventListener('click', () => {
   const primary = brandHex.value.trim();
   if (!HEX6.test(primary)) {
-    setStatus('paletteStatus', t('palette.invalidHex'), 'warn');
+    setStatus('colorStatus', t('palette.invalidHex'), 'warn');
     return;
   }
   // 보조색 체크박스가 보조색 + 하모니 사용 여부를 함께 결정(미체크 시 둘 다 미적용).
@@ -386,6 +394,8 @@ $('btnPalette').addEventListener('click', () => {
     includeStatus: ($('incStatus') as HTMLInputElement).checked,
   });
   tokens = paletteToDraftTokens(p);
+  colorsFromPalette = true; // 이 색들은 시드에서 나왔다 → 변수 생성 시 이전 팔레트 색 정리
+  colorsCreated = false;
   resetTokenChecked();
   clearNumTidy();
   colorRevealed = true; // 팔레트 생성 = 색 노출
@@ -396,7 +406,6 @@ $('btnPalette').addEventListener('click', () => {
   renderColorTable(); // #3: 색 편집표(hue·역할) 표시
   hideTidySummary(); // 팔레트 스케일은 의도적 간격 — 정리 안 함
   preTidyTokens = null;
-  ($('btnPaletteApply') as HTMLButtonElement).style.display = ''; // 미리보기 후 ‘적용’ 노출
   $('paletteInfo').textContent = t('palette.summary', { count: p.scales.length, tokens: tokens.length });
   setStatus(
     'paletteStatus',
@@ -468,20 +477,29 @@ function renderColorTable(): void {
       summary: classifyColor(t.value as string).achromatic ? '무채' : 'hue',
       metaEl: role,
     });
+    role.addEventListener('input', updateColorSummary);
     addSwatch(card, t.value as string);
     return card;
   });
+  updateColorSummary();
+}
+
+/** 색 카드 상태 줄 — 몇 개를 모았고 역할을 몇 개 정했는지, 아직 변수로 만들기 전인지(와이어). */
+function updateColorSummary(): void {
+  const colors = tokens.filter((t) => t.category === 'color');
+  if (!colorRevealed || !colors.length) return;
+  setStatus('colorStatus', t('color.summary', { count: colors.length, roles: Object.keys(colorRoleMap()).length }), '');
 }
 
 /** 색 편집표의 역할 입력 → 시맨틱 매핑 textarea로 반영(역할=이름). */
-function applyColorRoles(): void {
+/** 색 목록의 역할 입력 → `역할 = Global변수이름` 맵. 같은 역할이 겹치면 뒤가 이긴다. */
+function colorRoleMap(): Record<string, string> {
   const map: Record<string, string> = {};
   $('colorTable').querySelectorAll<HTMLInputElement>('input[data-name]').forEach((inp) => {
     const role = inp.value.trim();
-    if (role) map[role] = inp.dataset.name as string; // 같은 역할 중복 시 뒤가 우선
+    if (role) map[role] = inp.dataset.name as string;
   });
-  setSemMapText(map);
-  setStatus('semStatus', t('semantic.rolesApplied', { count: Object.keys(map).length }), 'ok');
+  return map;
 }
 
 /* ---------- 색 정리 (ΔE 군집 N:1) ---------- */
@@ -549,7 +567,7 @@ function undoTidy(): void {
   renderColorTable();
   suggestSemMapFrom(tokens);
   ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 집합 변경 → 새 미리보기 필요
-  setStatus('extractStatus', `정리를 되돌렸어요 · 추출 색 ${new Set(colorHexes()).size}개`, '');
+  setStatus('colorStatus', `정리를 되돌렸어요 · 추출 색 ${new Set(colorHexes()).size}개`, '');
 }
 $('btnTidyUndo').addEventListener('click', undoTidy);
 
@@ -563,16 +581,6 @@ $('useBrand2').addEventListener('change', syncSecondaryControls);
 syncSecondaryControls();
 
 // 팔레트 ‘적용’ — 생성된 팔레트를 변수에 직접 커밋(생성=미리보기 / 적용=커밋).
-$('btnPaletteApply').addEventListener('click', () => {
-  if (!tokens.length) {
-    setStatus('paletteStatus', t('palette.needGenerate'), 'warn');
-    return;
-  }
-  const base = Number(($('base') as HTMLInputElement).value) || 16;
-  createFrom = 'palette';
-  send({ type: 'CREATE_TOKENS', tokens, base, replacePalette: true }); // 바로 변수 생성 + 이전 팔레트 색 정리
-  setStatus('paletteStatus', t('common.applyingVars'), '');
-});
 
 /* UX4 온보딩 — 카드 하나를 통째로 두는 대신 마법사 탭 첫 줄 배너로 흡수했다(와이어).
    '다시 보지 않기'는 세션이 아니라 파일에 기억한다 — 매번 다시 뜨면 그게 더 성가시다. */
@@ -690,7 +698,26 @@ function saveSettings(): void {
   }, 350); // 타이핑 중 매 키마다 보내지 않도록
 });
 
-$('btnColorRoles').addEventListener('click', applyColorRoles); // #3 색 편집표 → 시맨틱 매핑
+
+/* 「색 변수 만들기」 — 이 단계의 결론. 역할 입력을 시맨틱 매핑에 반영하고, 색 토큰만
+   Global(hue)로 만든 뒤 결과가 오면 역할 별칭(Semantic)까지 이어서 만든다(#3·#10).
+   팔레트로 만든 색이면 이전 팔레트 색을 함께 정리한다(replacePalette). */
+$('btnColorVars').addEventListener('click', () => {
+  const colors = tokens.filter((t) => t.category === 'color');
+  if (!colors.length) {
+    setStatus('colorStatus', t('color.needColors'), 'warn');
+    return;
+  }
+  setSemMapText(colorRoleMap()); // 역할 → 매핑(2.5 카드는 숨김이라 이 textarea가 단일 출처)
+  createFrom = 'colors';
+  send({
+    type: 'CREATE_TOKENS',
+    tokens: colors,
+    base: Number(($('base') as HTMLInputElement).value) || 16,
+    ...(colorsFromPalette ? { replacePalette: true } : {}),
+  });
+  setStatus('colorStatus', t('common.applyingVars'), '');
+});
 
 $('btnScanGlobals').addEventListener('click', () => {
   // #10: 기존 Global 색에서 시맨틱 역할 추천(재방문 매핑).
@@ -1157,7 +1184,7 @@ const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants
 // 결합돼 있어 여기 목록이 아니라 updateGates 아래에서 별도로 잠근다.
 const PAID_FIELDS = [
   ...COMPONENT_FIELDS,
-  'btnPalette', 'btnPaletteApply',
+  'btnPalette', 'btnColorVars',
   'btnCreate', 'btnCreateApply',
   'btnTextStyles',
   'btnGenDark', // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
@@ -1457,6 +1484,8 @@ window.onmessage = (event: MessageEvent) => {
   switch (msg.type) {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
+      colorsFromPalette = false; // 화면에서 뽑은 색 — 기존 팔레트를 지울 근거가 없다
+      colorsCreated = false;
       resetTokenChecked(); // 새 추출 = 새 집합 → 전체 선택으로 시작
       clearNumTidy(); // 이전 추출의 정리 스냅샷으로 되돌아가지 않게
       huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
@@ -1464,7 +1493,6 @@ window.onmessage = (event: MessageEvent) => {
       preTidyTokens = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기 스냅샷
       lastTidy = tidyColors();
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
-      ($('btnPaletteApply') as HTMLButtonElement).style.display = 'none'; // 추출이 팔레트 미리보기를 대체 → 팔레트 적용 숨김
       // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
       suggestSemMapFrom(tokens);
       renderColorTable(); // colorRevealed면 색 표(추출 버튼이 켬)
@@ -1472,7 +1500,7 @@ window.onmessage = (event: MessageEvent) => {
       renderTokens(); // previewRevealed면 색 외 목록(미리보기 버튼이 켬)
       const colorN = tokens.filter((tk) => tk.category === 'color').length;
       $('selInfo').textContent = `선택 ${msg.selection}개 · 색 ${colorN} · 그 외 ${tokens.length - colorN}`;
-      setStatus('extractStatus', msg.warnings.join(' ') || t('extract.done', { count: tokens.length }), msg.warnings.length ? 'warn' : 'ok');
+      if (msg.warnings.length) setStatus('colorStatus', msg.warnings.join(' '), 'warn'); // 경고가 없으면 renderColorTable의 요약 줄을 남긴다
       if (pendingCreatePreview) {
         // ‘미리보기’가 추출을 유발 → 추출 완료 후 생성 미리보기까지 이어감.
         pendingCreatePreview = false;
@@ -1500,10 +1528,14 @@ window.onmessage = (event: MessageEvent) => {
         // UX1: 변경 요약을 먼저 보여주고 ‘적용’ 버튼 노출.
         setStatus('createStatus', t('create.preview', { summary: msg.summary }), '');
         applyBtn.style.display = '';
-      } else if (createFrom === 'palette') {
-        // 팔레트 카드의 ‘적용’에서 온 결과 → 팔레트 상태에 표시.
-        setStatus('paletteStatus', msg.summary, 'ok');
+      } else if (createFrom === 'colors') {
+        // 「색 변수 만들기」 결과 — Global(hue)까지 끝났으니 역할 별칭(Semantic)을 이어서.
         createFrom = 'tokens';
+        colorsCreated = true;
+        const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
+        if (!wizardRunning && Object.keys(semMap).length) send({ type: 'CREATE_SEMANTICS', map: semMap });
+        setStatus('colorStatus', msg.summary, 'ok');
+        renderTokens(); // 토큰 단계의 '색 변수 N개 이미 생성됨' 안내 갱신
       } else {
         setStatus('createStatus', msg.summary, 'ok');
         applyBtn.style.display = 'none';
@@ -1763,7 +1795,7 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'ERROR': {
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
-      const statusId = (msg.op && OP_STATUS[msg.op]) || 'extractStatus';
+      const statusId = (msg.op && OP_STATUS[msg.op]) || 'colorStatus';
       if (msg.op === 'APPLY') hideApplyProgress();
       showError(statusId, explainError(msg.message));
       break;
@@ -1773,7 +1805,7 @@ window.onmessage = (event: MessageEvent) => {
 
 /* ---------- UX7: 오류 라우팅/표시 ---------- */
 const OP_STATUS: Record<string, string> = {
-  EXTRACT: 'extractStatus',
+  EXTRACT: 'colorStatus',
   CREATE_TOKENS: 'createStatus',
   CREATE_SEMANTICS: 'semStatus',
   SCAN_TEXT_STYLES: 'tsStatus',

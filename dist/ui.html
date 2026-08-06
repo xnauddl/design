@@ -421,11 +421,25 @@
       <button class="step-chip" data-make-step="type"><span class="n" data-i18n="rail.type">타이포</span><span data-i18n="rail.typeSub">텍스트 스타일</span></button>
     </div>
 
-    <div class="step" data-make-step="color">
-      <h2><span data-i18n="palette.title">브랜드 팔레트 생성</span> <span class="muted" id="paletteLock"></span></h2>
+    <!-- 색 — 추출/시드로 색을 모으고, 역할을 정한 뒤 여기서 변수로 만든다(#3·#10).
+         이후 '토큰' 단계는 색 외(간격·크기·폰트·효과)만 다룬다. -->
+    <div class="step" id="colorCard" data-make-step="color">
+      <h2><span data-i18n="color.title">색</span> <span class="muted" id="colorCount"></span> <span class="muted" id="paletteLock"></span></h2>
+      <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">화면에서 뽑거나 시드로 만든 뒤, 역할을 정하고 변수로 만듭니다.</div>
+      <div class="toolbar">
+        <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
+        <button id="btnPalette" data-i18n="palette.gen">팔레트 생성</button>
+        <span class="grow"></span>
+        <button id="btnColorVars" class="primary" data-i18n="color.makeVars">색 변수 만들기</button>
+        <button class="btn-next" data-next-make="token" data-i18n="rail.next">다음 →</button>
+      </div>
+      <!-- 시드(팔레트 생성용) — 브랜드색 + 무엇을 함께 만들지. -->
       <div class="row">
-        <label class="inline"><span data-i18n="palette.brand">브랜드색</span> <input id="brand" type="color" value="#3366ff" /></label>
+        <input id="brand" type="color" value="#3366ff" />
         <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
+        <label class="inline"><input id="incNeutral" type="checkbox" checked /> <span data-i18n="palette.neutral">중립</span></label>
+        <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태색</span></label>
+        <span class="muted" id="paletteInfo"></span>
       </div>
       <div class="row">
         <label class="inline"><input id="useBrand2" type="checkbox" /> <span data-i18n="palette.brand2">보조색</span></label>
@@ -439,40 +453,15 @@
             <option value="tetradic">사각</option>
           </select>
         </label>
-        <label class="inline"><input id="incNeutral" type="checkbox" checked /> <span data-i18n="palette.neutral">중립</span></label>
-        <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태색</span></label>
+        <span class="muted" id="selInfo"></span>
       </div>
-      <div class="hint" data-i18n="palette.previewHint">미리보기로 확인한 뒤 ‘적용’하면 변수로 반영됩니다.</div>
-      <div class="toolbar">
-        <button id="btnPalette" class="primary" data-i18n="palette.gen">팔레트 생성</button>
-        <button id="btnPaletteApply" style="display:none" data-i18n="palette.apply">적용 (변수 생성)</button>
-        <span class="grow"></span>
-        <span class="muted" id="paletteInfo"></span>
-      </div>
-      <div class="status" id="paletteStatus"></div>
-    </div>
-
-    <!-- 추출 + 색 정리 통합 — 추출 후 같은 카드에서 바로 병합·역할 지정. -->
-    <div class="step" data-make-step="color">
-      <h2><span data-i18n="extract.title">추출 · 색 정리</span> <span class="muted" id="colorCount"></span></h2>
-      <div class="toolbar">
-        <button id="btnExtract" class="primary" data-i18n="extract.scanBtn">선택에서 토큰 추출</button>
-        <button id="btnColorRoles" data-i18n="colorTable.applyBtn">시맨틱 매핑에 반영</button>
-        <span class="grow"></span>
-        <button class="btn-next" data-next-make="token" data-i18n="rail.next">다음 →</button>
-      </div>
-      <div class="row"><span class="muted" id="selInfo"></span></div>
-      <div class="status" id="extractStatus"></div>
-      <!-- 색 정리 — 추출 색이 있을 때만. 변수 생성 전 드래프트 단계라 바인딩 영향 없음.
-           색 외 토큰(간격·폰트·효과 등)은 아래 ‘토큰 생성’ 카드에 표시. -->
+      <!-- 추출·정리된 색 — 역할(Semantic)을 정하는 자리. Global 이름은 hue. -->
       <div id="colorSection" style="display:none">
-        <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">화면에서 뽑거나 시드로 만든 뒤, 역할을 정하고 변수로 만듭니다.</div>
         <div id="tidySummary" class="tidy tidy-note" style="display:none">
           <span id="tidySumText"></span>
           <button id="btnTidyUndo" class="link" data-i18n="colorTidy.undo">되돌리기</button>
         </div>
         <div id="colorTable" class="results"></div>
-        <!-- 표가 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
         <datalist id="roleList">
           <option value="surface"></option><option value="surface/muted"></option>
           <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
@@ -482,10 +471,11 @@
           <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
         </datalist>
       </div>
+      <div class="status" id="colorStatus"></div>
     </div>
 
     <div class="step" id="createCard" data-make-step="token">
-      <h2><span data-i18n="create.title">토큰 생성 (Global + Semantic)</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
+      <h2><span data-i18n="create.title">토큰 생성</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
       <div class="toolbar">
         <button id="btnCreate" data-i18n="create.previewBtn">미리보기</button>
         <button id="btnCreateApply" class="primary" style="display:none" data-i18n="create.apply">적용</button>
@@ -493,6 +483,7 @@
         <button class="btn-next" data-next-make="theme" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="hint" data-i18n="create.scopeHint">간격·크기·폰트·효과만. 색은 이전 단계에서 변수화함.</div>
+      <div class="banner" id="tokenColorNote" style="display:none"></div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체 선택</span></label>
         <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
@@ -826,15 +817,15 @@
     "common.running": "\uC2E4\uD589 \uC911\u2026",
     // 팔레트
     "palette.invalidHex": "\uBE0C\uB79C\uB4DC\uC0C9\uC744 #RRGGBB \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
-    "palette.needGenerate": "\uBA3C\uC800 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uB9CC\uB4DC\uC138\uC694.",
     "palette.summary": "{count}\uACC4\uC5F4 \xB7 {tokens}\uC0C9 \uC0DD\uC131",
     "palette.hint": "{warn}\uD558\uBAA8\uB2C8\uB97C \uBC14\uAFD4 \uB2E4\uC2DC \uC0DD\uC131\uD558\uAC70\uB098, \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBCC0\uC218\uC5D0 \uBC18\uC601\uD558\uC138\uC694.",
     // 추출 / 토큰 생성
-    "extract.done": "{count}\uAC1C \uD6C4\uBCF4 \uCD94\uCD9C \uC644\uB8CC.",
     "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
+    "create.colorsDone": "\uC0C9 \uBCC0\uC218 {count}\uAC1C \uC774\uBBF8 \uC0DD\uC131\uB428 \xB7 \uC5EC\uAE30\uC120 \uC0C9 \uC678\uB9CC",
+    "color.summary": "\uC0C9 {count}\uAC1C \xB7 \uC5ED\uD560 \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
+    "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019 \uB610\uB294 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC73C\uC138\uC694.",
     "create.baseChanged": "base {base}px\uB85C \uB2E4\uC2DC \uACC4\uC0B0 \uC911\u2026",
     // 시맨틱 매핑
-    "semantic.rolesApplied": "{count}\uAC1C \uC5ED\uD560 \uBC18\uC601\uB428 \u2014 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019\uC73C\uB85C \uC801\uC6A9.",
     "semantic.scanningGlobals": "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026",
     "semantic.formatHint": "\uB9E4\uD551\uC744 \uD55C \uC904\uC5D0 \u201C\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984\u201D \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
     "semantic.noGlobals": "\uAE30\uC874 Global \uC0C9 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.",
@@ -982,24 +973,20 @@
     "pipeline.title": "\uC9C4\uD589",
     "pipeline.indep": "\uB9AC\uB124\uC784 \xB7 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uB3C5\uB9BD",
     // 브랜드 팔레트
-    "palette.title": "\uBE0C\uB79C\uB4DC \uD314\uB808\uD2B8 \uC0DD\uC131",
-    "palette.brand": "\uBE0C\uB79C\uB4DC\uC0C9",
+    "color.title": "\uC0C9",
+    "color.makeVars": "\uC0C9 \uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "palette.brand2": "\uBCF4\uC870\uC0C9",
     "palette.harmony": "\uD558\uBAA8\uB2C8",
     "palette.neutral": "\uC911\uB9BD",
     "palette.status": "\uC0C1\uD0DC\uC0C9",
-    "palette.previewHint": "\uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD655\uC778\uD55C \uB4A4 \u2018\uC801\uC6A9\u2019\uD558\uBA74 \uBCC0\uC218\uB85C \uBC18\uC601\uB429\uB2C8\uB2E4.",
     "palette.gen": "\uD314\uB808\uD2B8 \uC0DD\uC131",
-    "palette.apply": "\uC801\uC6A9 (\uBCC0\uC218 \uC0DD\uC131)",
     // 추출
-    "extract.title": "\uCD94\uCD9C \xB7 \uC0C9 \uC815\uB9AC",
-    "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uD1A0\uD070 \uCD94\uCD9C",
+    "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
     "colorTidy.hint": "\uD654\uBA74\uC5D0\uC11C \uBF51\uAC70\uB098 \uC2DC\uB4DC\uB85C \uB9CC\uB4E0 \uB4A4, \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4.",
     "colorTidy.undo": "\uB418\uB3CC\uB9AC\uAE30",
-    "colorTable.applyBtn": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551\uC5D0 \uBC18\uC601",
     // 토큰 생성
-    "create.title": "\uD1A0\uD070 \uC0DD\uC131 (Global + Semantic)",
+    "create.title": "\uD1A0\uD070 \uC0DD\uC131",
     "create.scopeHint": "\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uBCC0\uC218\uD654\uD568.",
     "create.selectAll": "\uC804\uCCB4 \uC120\uD0DD",
     "create.dropOnce": "1\xD7 \uD574\uC81C",
@@ -1773,6 +1760,8 @@
   var tokens = [];
   var isPaid = false;
   var hideOnboard = false;
+  var colorsFromPalette = false;
+  var colorsCreated = false;
   var hasGlobal = false;
   var hasBindable = false;
   var hasTextStyles = false;
@@ -1881,7 +1870,7 @@
     for (const t2 of creatableTokens()) tokenChecked.add(tokenKey(t2));
   }
   function tokensToCreate() {
-    return tokens.filter((t2) => t2.category === "color" || tokenChecked.has(tokenKey(t2)));
+    return creatableTokens().filter((t2) => tokenChecked.has(tokenKey(t2)));
   }
   function carryTokenChecked(before, after) {
     const checkedNames = new Set(before.filter((t2) => tokenChecked.has(tokenKey(t2))).map((t2) => t2.name));
@@ -1969,6 +1958,10 @@
       showHint("\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uC0DD\uC131\uD560 \uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC774 \uD45C\uC2DC\uB429\uB2C8\uB2E4.");
       return;
     }
+    const colorN = tokens.length - others.length;
+    const banner = $("tokenColorNote");
+    banner.style.display = colorsCreated && colorN ? "" : "none";
+    if (colorsCreated && colorN) banner.textContent = t("create.colorsDone", { count: colorN });
     if (!others.length) {
       showHint("\uC0C9 \uC678 \uD1A0\uD070\uC774 \uC5C6\uC2B5\uB2C8\uB2E4(\uC0C9\uB9CC \uCD94\uCD9C\uB428).");
       return;
@@ -2001,7 +1994,7 @@
   $("btnPalette").addEventListener("click", () => {
     const primary = brandHex.value.trim();
     if (!HEX6.test(primary)) {
-      setStatus("paletteStatus", t("palette.invalidHex"), "warn");
+      setStatus("colorStatus", t("palette.invalidHex"), "warn");
       return;
     }
     const useSecondary = $("useBrand2").checked;
@@ -2013,6 +2006,8 @@
       includeStatus: $("incStatus").checked
     });
     tokens = paletteToDraftTokens(p);
+    colorsFromPalette = true;
+    colorsCreated = false;
     resetTokenChecked();
     clearNumTidy();
     colorRevealed = true;
@@ -2022,7 +2017,6 @@
     renderColorTable();
     hideTidySummary();
     preTidyTokens = null;
-    $("btnPaletteApply").style.display = "";
     $("paletteInfo").textContent = t("palette.summary", { count: p.scales.length, tokens: tokens.length });
     setStatus(
       "paletteStatus",
@@ -2083,18 +2077,24 @@
         summary: classifyColor(t2.value).achromatic ? "\uBB34\uCC44" : "hue",
         metaEl: role
       });
+      role.addEventListener("input", updateColorSummary);
       addSwatch(card2, t2.value);
       return card2;
     });
+    updateColorSummary();
   }
-  function applyColorRoles() {
+  function updateColorSummary() {
+    const colors = tokens.filter((t2) => t2.category === "color");
+    if (!colorRevealed || !colors.length) return;
+    setStatus("colorStatus", t("color.summary", { count: colors.length, roles: Object.keys(colorRoleMap()).length }), "");
+  }
+  function colorRoleMap() {
     const map = {};
     $("colorTable").querySelectorAll("input[data-name]").forEach((inp) => {
       const role = inp.value.trim();
       if (role) map[role] = inp.dataset.name;
     });
-    setSemMapText(map);
-    setStatus("semStatus", t("semantic.rolesApplied", { count: Object.keys(map).length }), "ok");
+    return map;
   }
   function colorHexes() {
     return tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string").map((t2) => t2.value.toLowerCase());
@@ -2145,7 +2145,7 @@
     renderColorTable();
     suggestSemMapFrom(tokens);
     $("btnCreateApply").style.display = "none";
-    setStatus("extractStatus", `\uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694 \xB7 \uCD94\uCD9C \uC0C9 ${new Set(colorHexes()).size}\uAC1C`, "");
+    setStatus("colorStatus", `\uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694 \xB7 \uCD94\uCD9C \uC0C9 ${new Set(colorHexes()).size}\uAC1C`, "");
   }
   $("btnTidyUndo").addEventListener("click", undoTidy);
   function syncSecondaryControls() {
@@ -2155,16 +2155,6 @@
   }
   $("useBrand2").addEventListener("change", syncSecondaryControls);
   syncSecondaryControls();
-  $("btnPaletteApply").addEventListener("click", () => {
-    if (!tokens.length) {
-      setStatus("paletteStatus", t("palette.needGenerate"), "warn");
-      return;
-    }
-    const base = Number($("base").value) || 16;
-    createFrom = "palette";
-    send({ type: "CREATE_TOKENS", tokens, base, replacePalette: true });
-    setStatus("paletteStatus", t("common.applyingVars"), "");
-  });
   $("btnOnboardHide").addEventListener("click", () => {
     $("onboardBanner").style.display = "none";
     hideOnboard = true;
@@ -2254,7 +2244,21 @@
       send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base: Number($("base").value) || 16, preview: true });
     }, 350);
   });
-  $("btnColorRoles").addEventListener("click", applyColorRoles);
+  $("btnColorVars").addEventListener("click", () => {
+    const colors = tokens.filter((t2) => t2.category === "color");
+    if (!colors.length) {
+      setStatus("colorStatus", t("color.needColors"), "warn");
+      return;
+    }
+    setSemMapText(colorRoleMap());
+    createFrom = "colors";
+    send(__spreadValues({
+      type: "CREATE_TOKENS",
+      tokens: colors,
+      base: Number($("base").value) || 16
+    }, colorsFromPalette ? { replacePalette: true } : {}));
+    setStatus("colorStatus", t("common.applyingVars"), "");
+  });
   $("btnScanGlobals").addEventListener("click", () => {
     setStatus("semStatus", t("semantic.scanningGlobals"), "");
     send({ type: "GET_GLOBAL_COLORS" });
@@ -2621,7 +2625,7 @@
   var PAID_FIELDS = [
     ...COMPONENT_FIELDS,
     "btnPalette",
-    "btnPaletteApply",
+    "btnColorVars",
     "btnCreate",
     "btnCreateApply",
     "btnTextStyles",
@@ -2859,20 +2863,21 @@
     switch (msg.type) {
       case "EXTRACT_RESULT": {
         tokens = msg.tokens;
+        colorsFromPalette = false;
+        colorsCreated = false;
         resetTokenChecked();
         clearNumTidy();
         huefyTokenColors(tokens);
         preTidyTokens = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
         lastTidy = tidyColors();
         $("btnCreateApply").style.display = "none";
-        $("btnPaletteApply").style.display = "none";
         suggestSemMapFrom(tokens);
         renderColorTable();
         renderTidySummary(lastTidy);
         renderTokens();
         const colorN = tokens.filter((tk) => tk.category === "color").length;
         $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uC0C9 ${colorN} \xB7 \uADF8 \uC678 ${tokens.length - colorN}`;
-        setStatus("extractStatus", msg.warnings.join(" ") || t("extract.done", { count: tokens.length }), msg.warnings.length ? "warn" : "ok");
+        if (msg.warnings.length) setStatus("colorStatus", msg.warnings.join(" "), "warn");
         if (pendingCreatePreview) {
           pendingCreatePreview = false;
           tidyNumbers();
@@ -2896,9 +2901,13 @@
         if (msg.preview) {
           setStatus("createStatus", t("create.preview", { summary: msg.summary }), "");
           applyBtn.style.display = "";
-        } else if (createFrom === "palette") {
-          setStatus("paletteStatus", msg.summary, "ok");
+        } else if (createFrom === "colors") {
           createFrom = "tokens";
+          colorsCreated = true;
+          const semMap = textToSemanticMap($("semMap").value);
+          if (!wizardRunning && Object.keys(semMap).length) send({ type: "CREATE_SEMANTICS", map: semMap });
+          setStatus("colorStatus", msg.summary, "ok");
+          renderTokens();
         } else {
           setStatus("createStatus", msg.summary, "ok");
           applyBtn.style.display = "none";
@@ -3117,7 +3126,7 @@
         void deactivateInstance(msg.key, msg.instanceId);
         break;
       case "ERROR": {
-        const statusId = msg.op && OP_STATUS[msg.op] || "extractStatus";
+        const statusId = msg.op && OP_STATUS[msg.op] || "colorStatus";
         if (msg.op === "APPLY") hideApplyProgress();
         showError(statusId, explainError(msg.message));
         break;
@@ -3125,7 +3134,7 @@
     }
   };
   var OP_STATUS = {
-    EXTRACT: "extractStatus",
+    EXTRACT: "colorStatus",
     CREATE_TOKENS: "createStatus",
     CREATE_SEMANTICS: "semStatus",
     SCAN_TEXT_STYLES: "tsStatus",

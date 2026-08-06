@@ -421,11 +421,25 @@
       <button class="step-chip" data-make-step="type"><span class="n" data-i18n="rail.type">타이포</span><span data-i18n="rail.typeSub">텍스트 스타일</span></button>
     </div>
 
-    <div class="step" data-make-step="color">
-      <h2><span data-i18n="palette.title">브랜드 팔레트 생성</span> <span class="muted" id="paletteLock"></span></h2>
+    <!-- 색 — 추출/시드로 색을 모으고, 역할을 정한 뒤 여기서 변수로 만든다(#3·#10).
+         이후 '토큰' 단계는 색 외(간격·크기·폰트·효과)만 다룬다. -->
+    <div class="step" id="colorCard" data-make-step="color">
+      <h2><span data-i18n="color.title">색</span> <span class="muted" id="colorCount"></span> <span class="muted" id="paletteLock"></span></h2>
+      <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">화면에서 뽑거나 시드로 만든 뒤, 역할을 정하고 변수로 만듭니다.</div>
+      <div class="toolbar">
+        <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
+        <button id="btnPalette" data-i18n="palette.gen">팔레트 생성</button>
+        <span class="grow"></span>
+        <button id="btnColorVars" class="primary" data-i18n="color.makeVars">색 변수 만들기</button>
+        <button class="btn-next" data-next-make="token" data-i18n="rail.next">다음 →</button>
+      </div>
+      <!-- 시드(팔레트 생성용) — 브랜드색 + 무엇을 함께 만들지. -->
       <div class="row">
-        <label class="inline"><span data-i18n="palette.brand">브랜드색</span> <input id="brand" type="color" value="#3366ff" /></label>
+        <input id="brand" type="color" value="#3366ff" />
         <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
+        <label class="inline"><input id="incNeutral" type="checkbox" checked /> <span data-i18n="palette.neutral">중립</span></label>
+        <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태색</span></label>
+        <span class="muted" id="paletteInfo"></span>
       </div>
       <div class="row">
         <label class="inline"><input id="useBrand2" type="checkbox" /> <span data-i18n="palette.brand2">보조색</span></label>
@@ -439,40 +453,15 @@
             <option value="tetradic">사각</option>
           </select>
         </label>
-        <label class="inline"><input id="incNeutral" type="checkbox" checked /> <span data-i18n="palette.neutral">중립</span></label>
-        <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태색</span></label>
+        <span class="muted" id="selInfo"></span>
       </div>
-      <div class="hint" data-i18n="palette.previewHint">미리보기로 확인한 뒤 ‘적용’하면 변수로 반영됩니다.</div>
-      <div class="toolbar">
-        <button id="btnPalette" class="primary" data-i18n="palette.gen">팔레트 생성</button>
-        <button id="btnPaletteApply" style="display:none" data-i18n="palette.apply">적용 (변수 생성)</button>
-        <span class="grow"></span>
-        <span class="muted" id="paletteInfo"></span>
-      </div>
-      <div class="status" id="paletteStatus"></div>
-    </div>
-
-    <!-- 추출 + 색 정리 통합 — 추출 후 같은 카드에서 바로 병합·역할 지정. -->
-    <div class="step" data-make-step="color">
-      <h2><span data-i18n="extract.title">추출 · 색 정리</span> <span class="muted" id="colorCount"></span></h2>
-      <div class="toolbar">
-        <button id="btnExtract" class="primary" data-i18n="extract.scanBtn">선택에서 토큰 추출</button>
-        <button id="btnColorRoles" data-i18n="colorTable.applyBtn">시맨틱 매핑에 반영</button>
-        <span class="grow"></span>
-        <button class="btn-next" data-next-make="token" data-i18n="rail.next">다음 →</button>
-      </div>
-      <div class="row"><span class="muted" id="selInfo"></span></div>
-      <div class="status" id="extractStatus"></div>
-      <!-- 색 정리 — 추출 색이 있을 때만. 변수 생성 전 드래프트 단계라 바인딩 영향 없음.
-           색 외 토큰(간격·폰트·효과 등)은 아래 ‘토큰 생성’ 카드에 표시. -->
+      <!-- 추출·정리된 색 — 역할(Semantic)을 정하는 자리. Global 이름은 hue. -->
       <div id="colorSection" style="display:none">
-        <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">화면에서 뽑거나 시드로 만든 뒤, 역할을 정하고 변수로 만듭니다.</div>
         <div id="tidySummary" class="tidy tidy-note" style="display:none">
           <span id="tidySumText"></span>
           <button id="btnTidyUndo" class="link" data-i18n="colorTidy.undo">되돌리기</button>
         </div>
         <div id="colorTable" class="results"></div>
-        <!-- 표가 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
         <datalist id="roleList">
           <option value="surface"></option><option value="surface/muted"></option>
           <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
@@ -482,10 +471,11 @@
           <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
         </datalist>
       </div>
+      <div class="status" id="colorStatus"></div>
     </div>
 
     <div class="step" id="createCard" data-make-step="token">
-      <h2><span data-i18n="create.title">토큰 생성 (Global + Semantic)</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
+      <h2><span data-i18n="create.title">토큰 생성</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
       <div class="toolbar">
         <button id="btnCreate" data-i18n="create.previewBtn">미리보기</button>
         <button id="btnCreateApply" class="primary" style="display:none" data-i18n="create.apply">적용</button>
@@ -493,6 +483,7 @@
         <button class="btn-next" data-next-make="theme" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="hint" data-i18n="create.scopeHint">간격·크기·폰트·효과만. 색은 이전 단계에서 변수화함.</div>
+      <div class="banner" id="tokenColorNote" style="display:none"></div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체 선택</span></label>
         <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>

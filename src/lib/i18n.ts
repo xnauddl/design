@@ -17,17 +17,17 @@ export const STRINGS: Record<string, string> = {
 
   // 팔레트
   'palette.invalidHex': '브랜드색을 #RRGGBB 형식으로 입력하세요.',
-  'palette.needGenerate': '먼저 ‘팔레트 생성’으로 색을 만드세요.',
   'palette.summary': '{count}계열 · {tokens}색 생성',
   'palette.hint': '{warn}하모니를 바꿔 다시 생성하거나, ‘적용’으로 변수에 반영하세요.',
 
   // 추출 / 토큰 생성
-  'extract.done': '{count}개 후보 추출 완료.',
   'create.preview': '미리보기 — {summary} · ‘적용’으로 반영',
+  'create.colorsDone': '색 변수 {count}개 이미 생성됨 · 여기선 색 외만',
+  'color.summary': '색 {count}개 · 역할 지정 {roles} · 변수화 대기',
+  'color.needColors': '먼저 ‘선택에서 추출’ 또는 ‘팔레트 생성’으로 색을 모으세요.',
   'create.baseChanged': 'base {base}px로 다시 계산 중…',
 
   // 시맨틱 매핑
-  'semantic.rolesApplied': '{count}개 역할 반영됨 — ‘시맨틱 별칭 생성’으로 적용.',
   'semantic.scanningGlobals': '기존 색 스캔 중…',
   'semantic.formatHint': '매핑을 한 줄에 “역할 = Global변수이름” 형식으로 입력하세요.',
   'semantic.noGlobals': '기존 Global 색 변수가 없습니다 — 먼저 토큰을 생성하세요.',
@@ -189,24 +189,20 @@ export const STRINGS: Record<string, string> = {
   'pipeline.title': '진행',
   'pipeline.indep': '리네임 · 컴포넌트는 독립',
   // 브랜드 팔레트
-  'palette.title': '브랜드 팔레트 생성',
-  'palette.brand': '브랜드색',
+  'color.title': '색',
+  'color.makeVars': '색 변수 만들기',
   'palette.brand2': '보조색',
   'palette.harmony': '하모니',
   'palette.neutral': '중립',
   'palette.status': '상태색',
-  'palette.previewHint': '미리보기로 확인한 뒤 ‘적용’하면 변수로 반영됩니다.',
   'palette.gen': '팔레트 생성',
-  'palette.apply': '적용 (변수 생성)',
   // 추출
-  'extract.title': '추출 · 색 정리',
-  'extract.scanBtn': '선택에서 토큰 추출',
+  'extract.scanBtn': '선택에서 추출',
   // 색 정리(추출 카드에 흡수)
   'colorTidy.hint': '화면에서 뽑거나 시드로 만든 뒤, 역할을 정하고 변수로 만듭니다.',
   'colorTidy.undo': '되돌리기',
-  'colorTable.applyBtn': '시맨틱 매핑에 반영',
   // 토큰 생성
-  'create.title': '토큰 생성 (Global + Semantic)',
+  'create.title': '토큰 생성',
   'create.scopeHint': '간격·크기·폰트·효과만. 색은 이전 단계에서 변수화함.',
   'create.selectAll': '전체 선택',
   'create.dropOnce': '1× 해제',
