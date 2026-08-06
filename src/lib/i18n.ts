@@ -73,9 +73,7 @@ export const STRINGS: Record<string, string> = {
   'dark.toMode': '다크 모드',
   'dark.genBtn': '다크 채우기',
   // 닮은 프레임 컴포넌트화
-  'similar.title': '닮은 프레임 컴포넌트화',
-  'similar.hint': '구조가 같고 내용만 다른 프레임 → 마스터 1개 + 인스턴스. 스캔은 무료.',
-  'similar.scanBtn': '닮은 프레임 스캔',
+  'similar.scanBtn': '닮은 스캔',
   'similar.componentizeBtn': '컴포넌트화',
   // 내보내기
   'export.saved': '{format} — {file}로 저장했습니다.',
@@ -236,7 +234,9 @@ export const STRINGS: Record<string, string> = {
   'rename.undoTitle': '되돌리기 안전장치',
   'rename.undoBody': '이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.',
   // 컴포넌트 / 베리언트
-  'component.title': '컴포넌트 / 베리언트',
+  'structure.title': '구조',
+  'structure.groupComp': '컴포넌트 후보',
+  'structure.groupSimilar': '닮은 프레임',
   'component.hint': '후보 스캔 후 등록 · 닮은 프레임은 스캔 Free',
   'component.scanBtn': '후보 스캔',
   'component.registerBtn': '컴포넌트 등록',

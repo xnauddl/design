@@ -1172,7 +1172,7 @@ const PAID_LOCK = '🔒 Paid 전용';
 const PREMIUM_STATUS_ID: Record<Feature, string> = {
   tokens: 'createStatus',
   semantics: 'semStatus',
-  components: 'componentStatus',
+  components: 'structureStatus',
   textStyles: 'tsStatus',
 };
 // btnScanSimilar(스캔)은 읽기 전용이라 Free — 잠그는 건 실제로 문서를 바꾸는 btnComponentize뿐.
@@ -1300,7 +1300,7 @@ function renderPipeline(): void {
 
 /* ---------- 컴포넌트 / 베리언트 (Phase 3, Paid) ---------- */
 $('btnScanComp').addEventListener('click', () => {
-  setStatus('componentStatus', t('component.scanning'), '');
+  setStatus('structureStatus', t('component.scanning'), '');
   send({ type: 'SCAN_COMPONENT_CANDIDATES' });
 });
 
@@ -1389,16 +1389,16 @@ let similarMemberIds: string[] = [];
 let similarMasterId: string | null = null;
 
 $('btnScanSimilar').addEventListener('click', () => {
-  setStatus('similarStatus', '닮은 프레임을 찾는 중…', '');
+  setStatus('structureStatus', '닮은 프레임을 찾는 중…', '');
   send({ type: 'SCAN_SIMILAR' });
 });
 
 $('btnComponentize').addEventListener('click', () => {
   if (similarMemberIds.length < 2 || !similarMasterId) {
-    setStatus('similarStatus', '먼저 스캔해서 마스터를 고르세요.', 'warn');
+    setStatus('structureStatus', '먼저 스캔해서 마스터를 고르세요.', 'warn');
     return;
   }
-  setStatus('similarStatus', '컴포넌트화하는 중…', '');
+  setStatus('structureStatus', '컴포넌트화하는 중…', '');
   send({ type: 'COMPONENTIZE_SIMILAR', masterId: similarMasterId, frameIds: similarMemberIds });
 });
 
@@ -1407,13 +1407,13 @@ $('btnRegisterComp').addEventListener('click', () => {
   if (compCandidates.length) {
     const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
     if (!nodeIds.length) {
-      setStatus('componentStatus', t('component.noChecked'), 'warn'); // 무반응 방지: 체크 0이면 안내
+      setStatus('structureStatus', t('component.noChecked'), 'warn'); // 무반응 방지: 체크 0이면 안내
       return;
     }
-    setStatus('componentStatus', t('component.registering'), '');
+    setStatus('structureStatus', t('component.registering'), '');
     send({ type: 'REGISTER_COMPONENTS', nodeIds });
   } else {
-    setStatus('componentStatus', t('component.registering'), '');
+    setStatus('structureStatus', t('component.registering'), '');
     send({ type: 'REGISTER_COMPONENTS' });
   }
 });
@@ -1427,12 +1427,12 @@ $('compAll').addEventListener('change', (e) => {
 
 
 $('btnClassifyVariants').addEventListener('click', () => {
-  setStatus('componentStatus', t('component.classifying'), '');
+  setStatus('structureStatus', t('component.classifying'), '');
   send({ type: 'CLASSIFY_VARIANTS' });
 });
 
 $('btnGenMissing').addEventListener('click', () => {
-  setStatus('componentStatus', t('component.generating'), '');
+  setStatus('structureStatus', t('component.generating'), '');
   send({ type: 'GENERATE_MISSING_VARIANTS' });
 });
 
@@ -1709,7 +1709,7 @@ window.onmessage = (event: MessageEvent) => {
       renderVariantReport([]);
       // 스캔 완료 시 반드시 ‘스캔 중’을 덮어쓴다(후보 0·비eligible만 있어도).
       if (!compCandidates.length || !compEligibleCount()) {
-        setStatus('componentStatus', t('component.noEligible'), 'warn');
+        setStatus('structureStatus', t('component.noEligible'), 'warn');
       } else {
         updateCompRegister();
       }
@@ -1718,7 +1718,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'COMPONENTS_RESULT': {
       clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
       const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.exposed ? ` · 속성 ${msg.exposed}` : ''}`;
-      setStatus('componentStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? 'ok' : 'warn');
+      setStatus('structureStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? 'ok' : 'warn');
       // 빈 조합(미생성) + 실패(진단) 리포트
       renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       break;
@@ -1726,12 +1726,12 @@ window.onmessage = (event: MessageEvent) => {
     case 'VARIANTS_RESULT': {
       renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       const extra = `${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.missing.length ? ' · 빈 조합 있음' : ''}`;
-      setStatus('componentStatus', t('component.variants', { sets: msg.sets, extra }), msg.sets ? 'ok' : 'warn');
+      setStatus('structureStatus', t('component.variants', { sets: msg.sets, extra }), msg.sets ? 'ok' : 'warn');
       break;
     }
     case 'GENERATE_RESULT': {
       renderVariantReport([{ tag: '생성', items: msg.combos, marker: 'added' }]);
-      setStatus('componentStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
+      setStatus('structureStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
       break;
     }
     case 'SETTINGS': {
@@ -1762,7 +1762,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'COMPONENTIZE_RESULT': {
       if (!msg.instances) {
         // 교체가 하나도 없으면 실패다 — 경고를 그대로 보여줘야 원인을 안다.
-        setStatus('similarStatus', `컴포넌트화하지 못했어요${msg.warnings.length ? ` — ${msg.warnings[0]}` : ''}`, 'warn');
+        setStatus('structureStatus', `컴포넌트화하지 못했어요${msg.warnings.length ? ` — ${msg.warnings[0]}` : ''}`, 'warn');
         break;
       }
       const parts = [`마스터 ${msg.master}`, `인스턴스 ${msg.instances}개`];
@@ -1770,12 +1770,13 @@ window.onmessage = (event: MessageEvent) => {
       if (msg.images) parts.push(`이미지 ${msg.images}개`);
       // 경고(제외·오버라이드 실패)는 성공했어도 반드시 노출 — 원본이 남아 있다는 신호다.
       const warn = msg.warnings.length ? ` · 남겨둔 것 ${msg.warnings.length}건: ${msg.warnings[0]}` : '';
-      setStatus('similarStatus', `${parts.join(' · ')}${warn}`, msg.warnings.length ? 'warn' : 'ok');
+      setStatus('structureStatus', `${parts.join(' · ')}${warn}`, msg.warnings.length ? 'warn' : 'ok');
       // 교체된 프레임은 더 이상 대상이 아니다 — 목록을 비워 이중 실행을 막는다.
       similarMemberIds = [];
       similarMasterId = null;
       $('similarList').innerHTML = '';
       $('similarCount').textContent = '';
+      $('similarGroup').style.display = 'none';
       break;
     }
     case 'PREMIUM_REQUIRED': {
@@ -1814,10 +1815,10 @@ const OP_STATUS: Record<string, string> = {
   SELECT_NODES: 'applyStatus',
   RENAME: 'renameStatus',
   EXPORT: 'exportStatus',
-  SCAN_COMPONENT_CANDIDATES: 'componentStatus',
-  REGISTER_COMPONENTS: 'componentStatus',
-  CLASSIFY_VARIANTS: 'componentStatus',
-  GENERATE_MISSING_VARIANTS: 'componentStatus',
+  SCAN_COMPONENT_CANDIDATES: 'structureStatus',
+  REGISTER_COMPONENTS: 'structureStatus',
+  CLASSIFY_VARIANTS: 'structureStatus',
+  GENERATE_MISSING_VARIANTS: 'structureStatus',
   SET_LICENSE: 'licenseStatus',
   LICENSE_VERIFIED: 'licenseStatus',
   CLEAR_LICENSE: 'licenseStatus',
@@ -2119,11 +2120,12 @@ function updateCompRegister(): void {
   const sel = compChecked.size;
   // 카드 제목의 개수 — 트리에 뜨는 건 등록 가능한 후보뿐이라 그 수를 센다(스캔 노드 수가 아니라).
   $('compCount').textContent = total ? `· 후보 ${total}개` : '';
+  $('compTreeGroup').style.display = total ? '' : 'none';
   if (compCandidates.length) {
     const all = $('compAll') as HTMLInputElement;
     all.checked = sel === total && total > 0;
     all.indeterminate = sel > 0 && sel < total;
-    setStatus('componentStatus', total === 0 ? t('component.noEligibleShort') : t('component.candidates', { total, sel }), '');
+    setStatus('structureStatus', total === 0 ? t('component.noEligibleShort') : t('component.candidates', { total, sel }), '');
   }
 }
 
@@ -2132,6 +2134,7 @@ function clearCompPreview(): void {
   compChecked.clear();
   clearMount($('compTree'));
   $('compCount').textContent = '';
+  $('compTreeGroup').style.display = 'none';
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';
 }
 
@@ -2306,7 +2309,8 @@ function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement
 function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): void {
   similarMemberIds = msg.metas.map((m) => m.id);
   similarMasterId = msg.recommendedMasterId;
-  $('similarCount').textContent = msg.metas.length ? `· 대상 ${msg.metas.length}개` : '';
+  $('similarCount').textContent = msg.metas.length ? `· 닮은 ${msg.metas.length}개` : '';
+  $('similarGroup').style.display = msg.metas.length ? '' : 'none';
 
   const box = $('similarList');
   renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId));
@@ -2314,7 +2318,7 @@ function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): 
   if (!msg.metas.length) {
     // 왜 대상이 없는지 알려준다 — 제외 사유가 있으면 그걸 그대로 보여주는 게 가장 빠른 안내다.
     const why = msg.excluded.length ? msg.excluded[0].reason : '구조가 같은 프레임을 2개 이상 선택하세요.';
-    setStatus('similarStatus', `컴포넌트화할 프레임이 없어요 — ${why}`, 'warn');
+    setStatus('structureStatus', `컴포넌트화할 프레임이 없어요 — ${why}`, 'warn');
     return;
   }
 
@@ -2326,7 +2330,7 @@ function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): 
   if (msg.imageVarying.length) opened.push(`이미지 ${msg.imageVarying.length}`);
   const openText = opened.length ? `속성으로 열림: ${opened.join(' · ')}` : '가변 위치가 없어 속성은 만들지 않아요';
   const skipText = msg.excluded.length ? ` · 제외 ${msg.excluded.length}개(${msg.excluded[0].reason})` : '';
-  setStatus('similarStatus', `대상 ${msg.metas.length}개 · ${openText}${skipText}`, 'ok');
+  setStatus('structureStatus', `대상 ${msg.metas.length}개 · ${openText}${skipText}`, 'ok');
 }
 
 function updateApplyProgress(done: number, total: number): void {
