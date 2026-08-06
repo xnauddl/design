@@ -355,7 +355,7 @@ function renderTokens(): void {
 function updateTokenCreate(): void {
   const others = creatableTokens();
   const sel = others.filter((t) => tokenChecked.has(tokenKey(t))).length;
-  $('createCount').textContent = others.length ? `· 후보 ${sel}/${others.length}` : '';
+  $('createCount').textContent = others.length ? `후보 ${sel}/${others.length}` : '';
   const all = $('tokenAll') as HTMLInputElement;
   all.checked = sel === others.length && others.length > 0;
   all.indeterminate = sel > 0 && sel < others.length;
@@ -476,7 +476,7 @@ function renderColorTable(): void {
   }
   card.style.display = '';
   // 카드 제목의 개수 — 표가 상한에 걸려 일부만 보여도 정리 대상 색이 몇 개인지 먼저 알린다.
-  $('colorCount').textContent = `· 색 ${colors.length}개`;
+  $('colorCount').textContent = `색 ${colors.length}개`;
   // 현 semMap을 역할→이름으로 읽어 이름→역할로 뒤집어 prefill.
   const roleByName = new Map<string, string>();
   for (const [role, name] of Object.entries(textToSemanticMap(($('semMap') as HTMLTextAreaElement).value))) {
@@ -821,7 +821,7 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
 function renderTextStyles(): void {
   const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
   const bound = tsSpecs.length - fresh;
-  $('tsCount').textContent = tsSpecs.length ? `· 신규 ${fresh} · 등록됨 ${bound}` : '';
+  $('tsCount').textContent = tsSpecs.length ? `신규 ${fresh} · 등록됨 ${bound}` : '';
   renderChunked($('tsList'), tsSpecs, textStyleCard);
 }
 
@@ -2018,7 +2018,7 @@ function updateRenameApply(): void {
   const total = affectedRenameCount();
   const sel = renameChecked.size;
   // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
-  $('renameCount').textContent = total ? `· 후보 ${total}` : '';
+  $('renameCount').textContent = total ? `후보 ${total}` : '';
   ($('btnRename') as HTMLButtonElement).disabled = sel === 0;
   const all = $('renameAll') as HTMLInputElement;
   all.checked = total > 0 && sel === total;
@@ -2109,7 +2109,7 @@ function updateBindApply(): void {
   // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
   // 이 트리는 노드 헤더도 한 행이라 목록 아래 ‘총 n개’(행 수)와 수가 다르다 → 세는 단위를
   // ‘건’으로 구분해(상태 문구 ‘바인딩 n건 후보’와 같은 말) 같은 수의 오기로 읽히지 않게 한다.
-  $('bindCount').textContent = total ? `· 후보 ${total}` : '';
+  $('bindCount').textContent = total ? `후보 ${total}` : '';
   const confirm = $('btnApplyConfirm') as HTMLButtonElement;
   confirm.style.display = hasBindPreview() ? '' : 'none';
   confirm.disabled = sel === 0;
@@ -2173,7 +2173,7 @@ function updateCompRegister(): void {
   const total = compEligibleCount();
   const sel = compChecked.size;
   // 카드 제목의 개수 — 트리에 뜨는 건 등록 가능한 후보뿐이라 그 수를 센다(스캔 노드 수가 아니라).
-  $('compCount').textContent = total ? `· 후보 ${total}` : '';
+  $('compCount').textContent = total ? `후보 ${total}` : '';
   $('compTreeGroup').style.display = total ? '' : 'none';
   if (compCandidates.length) {
     const all = $('compAll') as HTMLInputElement;
@@ -2242,7 +2242,7 @@ function renderVariantReport(sections: VariantReportSection[]): void {
   const filled = sections.filter((s) => s.items.length);
   // 카드 제목의 개수(#tokenList의 createCount와 같은 패턴) — 리포트가 상한에 걸리거나
   // 카드가 접혀 있어도 무엇이 몇 건인지 먼저 알린다.
-  $('componentCount').textContent = filled.map((s) => `· ${s.tag} ${s.items.length}개`).join(' ');
+  $('componentCount').textContent = filled.map((s) => `${s.tag} ${s.items.length}개`).join(' · ');
   const lines: VariantReportLine[] = [];
   for (const s of filled) {
     if (s.head) lines.push({ text: s.head, head: true, warn: s.warn });
@@ -2363,7 +2363,7 @@ function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement
 function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): void {
   similarMemberIds = msg.metas.map((m) => m.id);
   similarMasterId = msg.recommendedMasterId;
-  $('similarCount').textContent = msg.metas.length ? `· 닮은 ${msg.metas.length}개` : '';
+  $('similarCount').textContent = msg.metas.length ? `닮은 ${msg.metas.length}개` : '';
   $('similarGroup').style.display = msg.metas.length ? '' : 'none';
 
   const box = $('similarList');

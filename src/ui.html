@@ -71,6 +71,10 @@
       display: flex; align-items: center; gap: 6px;
     }
     .muted   { color: var(--muted); }
+    /* 카드 제목의 곁가지(자물쇠·개수·범위 라벨)는 가운뎃점으로 잇는다 — 와이어의 `🔒 · 후보 24`.
+       구분점을 각 문자열에 넣으면 앞이 비었을 때 점만 남는다(Paid는 자물쇠가 빈 칸).
+       :not(:empty)로 내용 있는 것끼리만 이어 그 경우를 없앴다. */
+    h2 .muted:not(:empty) ~ .muted:not(:empty)::before { content: '· '; }
     .warn    { color: var(--warn); }
     .ok      { color: var(--ok); }
     code     { font-family: var(--mono); font-size: 10.5px; color: var(--text-2); background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
@@ -449,7 +453,7 @@
     <!-- 색 — 추출/시드로 색을 모으고, 역할을 정한 뒤 여기서 변수로 만든다(#3·#10).
          이후 '토큰' 단계는 색 외(간격·크기·폰트·효과)만 다룬다. -->
     <div class="step" id="colorCard" data-make-step="color">
-      <h2><span data-i18n="color.title">색</span> <span class="muted" id="colorCount"></span> <span class="muted" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
+      <h2><span data-i18n="color.title">색</span> <span class="muted" id="paletteLock"></span> <span class="muted" id="colorCount"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
       <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
@@ -502,7 +506,7 @@
     </div>
 
     <div class="step" id="createCard" data-make-step="token">
-      <h2><span data-i18n="create.title">간격·크기 토큰</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
+      <h2><span data-i18n="create.title">간격·크기 토큰</span> <span class="muted" id="createLock"></span> <span class="muted" id="createCount"></span></h2>
       <div class="toolbar">
         <button id="btnCreate" data-i18n="create.previewBtn">미리보기</button>
         <button id="btnCreateApply" class="primary" style="display:none" data-i18n="create.apply">적용</button>
@@ -562,7 +566,7 @@
     </div>
 
     <div class="step" data-make-step="type">
-      <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted" id="tsCount"></span> <span class="muted" id="tsLock"></span></h2>
+      <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted" id="tsLock"></span> <span class="muted" id="tsCount"></span></h2>
       <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 「기존만 연결」</div>
       <div class="toolbar">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>
@@ -637,7 +641,7 @@
     <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
          목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
     <div class="step" id="structureCard" data-apply-step="structure">
-      <h2><span data-i18n="structure.title">컴포넌트</span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
+      <h2><span data-i18n="structure.title">컴포넌트</span> <span class="muted" id="componentLock"></span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
       <div class="hint" data-i18n="component.hint">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</div>
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.">후보 스캔</button>
