@@ -375,6 +375,16 @@ brandColor.addEventListener('input', () => {
 brandHex.addEventListener('input', () => {
   if (HEX6.test(brandHex.value)) brandColor.value = brandHex.value.toLowerCase();
 });
+// 보조색도 같은 피커 ↔ HEX 쌍(와이어 시드 둘째 줄). 피커만 두면 브랜드 가이드에 적힌
+// 코드를 그대로 넣을 방법이 없다 — 주색과 같은 입력 수단을 준다.
+const brand2Color = $('brand2') as HTMLInputElement;
+const brand2Hex = $('brand2Hex') as HTMLInputElement;
+brand2Color.addEventListener('input', () => {
+  brand2Hex.value = brand2Color.value;
+});
+brand2Hex.addEventListener('input', () => {
+  if (HEX6.test(brand2Hex.value)) brand2Color.value = brand2Hex.value.toLowerCase();
+});
 
 $('btnPalette').addEventListener('click', () => {
   const primary = brandHex.value.trim();
@@ -384,9 +394,15 @@ $('btnPalette').addEventListener('click', () => {
   }
   // 보조색 체크박스가 보조색 + 하모니 사용 여부를 함께 결정(미체크 시 둘 다 미적용).
   const useSecondary = ($('useBrand2') as HTMLInputElement).checked;
+  const secondary = brand2Hex.value.trim();
+  // 텍스트로 받는 값이니 주색과 같은 검사를 거친다(피커만 있을 땐 늘 유효했다).
+  if (useSecondary && !HEX6.test(secondary)) {
+    setStatus('colorStatus', t('palette.invalidHex2'), 'warn');
+    return;
+  }
   const harmonyVal = ($('harmony') as HTMLSelectElement).value as Harmony;
   const p = generatePalette({
-    brand: { primary, secondary: useSecondary ? ($('brand2') as HTMLInputElement).value : undefined },
+    brand: { primary, secondary: useSecondary ? secondary : undefined },
     harmony: useSecondary ? harmonyVal : undefined,
     includeNeutral: ($('incNeutral') as HTMLInputElement).checked,
     includeStatus: ($('incStatus') as HTMLInputElement).checked,
@@ -572,7 +588,8 @@ $('btnTidyUndo').addEventListener('click', undoTidy);
 // 보조색 사용 토글 → 보조색·하모니 입력 활성/비활성 동기화.
 function syncSecondaryControls(): void {
   const on = ($('useBrand2') as HTMLInputElement).checked;
-  ($('brand2') as HTMLInputElement).disabled = !on;
+  brand2Color.disabled = !on;
+  brand2Hex.disabled = !on;
   ($('harmony') as HTMLSelectElement).disabled = !on;
 }
 $('useBrand2').addEventListener('change', syncSecondaryControls);

@@ -463,6 +463,7 @@
       <div class="row">
         <label class="inline"><input id="useBrand2" type="checkbox" /> <span data-i18n="palette.brand2">보조색</span></label>
         <input id="brand2" type="color" value="#ff5722" disabled />
+        <input id="brand2Hex" type="text" value="#ff5722" spellcheck="false" style="width:90px;" disabled />
         <label class="inline"><span data-i18n="palette.harmony">하모니</span>
           <select id="harmony" disabled>
             <option value="complementary">보색</option>
@@ -837,6 +838,7 @@
     "common.running": "\uC2E4\uD589 \uC911\u2026",
     // 팔레트
     "palette.invalidHex": "\uBE0C\uB79C\uB4DC\uC0C9\uC744 #RRGGBB \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
+    "palette.invalidHex2": "\uBCF4\uC870\uC0C9\uC744 #RRGGBB \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
     "palette.summary": "{count}\uACC4\uC5F4 \xB7 {tokens}\uC0C9 \uC0DD\uC131",
     "palette.hint": "{warn}\uD558\uBAA8\uB2C8\uB97C \uBC14\uAFD4 \uB2E4\uC2DC \uC0DD\uC131\uD558\uAC70\uB098, \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBCC0\uC218\uC5D0 \uBC18\uC601\uD558\uC138\uC694.",
     // 추출 / 토큰 생성
@@ -2019,6 +2021,14 @@
   brandHex.addEventListener("input", () => {
     if (HEX6.test(brandHex.value)) brandColor.value = brandHex.value.toLowerCase();
   });
+  var brand2Color = $("brand2");
+  var brand2Hex = $("brand2Hex");
+  brand2Color.addEventListener("input", () => {
+    brand2Hex.value = brand2Color.value;
+  });
+  brand2Hex.addEventListener("input", () => {
+    if (HEX6.test(brand2Hex.value)) brand2Color.value = brand2Hex.value.toLowerCase();
+  });
   $("btnPalette").addEventListener("click", () => {
     const primary = brandHex.value.trim();
     if (!HEX6.test(primary)) {
@@ -2026,9 +2036,14 @@
       return;
     }
     const useSecondary = $("useBrand2").checked;
+    const secondary = brand2Hex.value.trim();
+    if (useSecondary && !HEX6.test(secondary)) {
+      setStatus("colorStatus", t("palette.invalidHex2"), "warn");
+      return;
+    }
     const harmonyVal = $("harmony").value;
     const p = generatePalette({
-      brand: { primary, secondary: useSecondary ? $("brand2").value : void 0 },
+      brand: { primary, secondary: useSecondary ? secondary : void 0 },
       harmony: useSecondary ? harmonyVal : void 0,
       includeNeutral: $("incNeutral").checked,
       includeStatus: $("incStatus").checked
@@ -2178,7 +2193,8 @@
   $("btnTidyUndo").addEventListener("click", undoTidy);
   function syncSecondaryControls() {
     const on = $("useBrand2").checked;
-    $("brand2").disabled = !on;
+    brand2Color.disabled = !on;
+    brand2Hex.disabled = !on;
     $("harmony").disabled = !on;
   }
   $("useBrand2").addEventListener("change", syncSecondaryControls);

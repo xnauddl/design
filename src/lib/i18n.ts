@@ -17,6 +17,7 @@ export const STRINGS: Record<string, string> = {
 
   // 팔레트
   'palette.invalidHex': '브랜드색을 #RRGGBB 형식으로 입력하세요.',
+  'palette.invalidHex2': '보조색을 #RRGGBB 형식으로 입력하세요.',
   'palette.summary': '{count}계열 · {tokens}색 생성',
   'palette.hint': '{warn}하모니를 바꿔 다시 생성하거나, ‘적용’으로 변수에 반영하세요.',
 
