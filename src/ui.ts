@@ -2653,25 +2653,38 @@ for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-ap
     lastSent = h;
     send({ type: 'RESIZE', height: h, commit });
   };
+  // 잡은 지점을 기준으로 이동량만 더한다. 포인터 좌표를 그대로 높이로 쓰면 손잡이의
+  // 위쪽을 잡았을 때 창이 그만큼 튀어 올라간다(손잡이가 18px이라 눈에 띈다).
+  let startY = 0;
+  let startH = 0;
   handle.addEventListener('pointerdown', (e) => {
+    const pe = e as PointerEvent;
     resizing = true;
     lastSent = null; // 새 드래그 — 지난 드래그의 값으로 commit하지 않도록
-    handle.setPointerCapture((e as PointerEvent).pointerId);
+    startY = pe.clientY;
+    startH = window.innerHeight;
+    handle.classList.add('dragging');
+    try { handle.setPointerCapture(pe.pointerId); } catch { /* 캡처 실패해도 창 리스너로 받는다 */ }
     e.preventDefault();
   });
   handle.addEventListener('pointermove', (e) => {
     if (!resizing) return;
-    const pe = e as PointerEvent;
-    pending = Math.ceil(pe.clientY + 6);
+    pending = Math.round(startH + ((e as PointerEvent).clientY - startY));
     if (!raf) raf = requestAnimationFrame(() => { raf = 0; flush(false); }); // rAF 스로틀
   });
   const end = (e: Event): void => {
     if (!resizing) return;
     resizing = false;
+    handle.classList.remove('dragging');
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
-    flush(true); // 드롭 시 최종 크기 저장
+    flush(true); // 드롭 시 최종 높이 저장
     try { handle.releasePointerCapture((e as PointerEvent).pointerId); } catch { /* 무시 */ }
   };
   handle.addEventListener('pointerup', end);
   handle.addEventListener('pointercancel', end);
+  // 드래그 중 창이 계속 리사이즈되므로 포인터가 iframe 밖으로 나가 캡처가 풀릴 수 있다.
+  // 그때 pointerup을 놓치면 commit이 영영 안 나가 높이가 저장되지 않는다 → 창에서도 받는다.
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
+  window.addEventListener('blur', () => end(new Event('blur')));
 })();

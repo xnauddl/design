@@ -4125,6 +4125,22 @@
     if (v && typeof v.h === "number") figma.ui.resize(UI_W, clampHeight(v.h));
   }).catch(() => {
   });
+  var saveTimer = null;
+  var pendingHeight = 0;
+  function saveHeight(h, commit) {
+    pendingHeight = h;
+    if (saveTimer !== null) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    const write = () => {
+      saveTimer = null;
+      void figma.clientStorage.setAsync(UI_SIZE_KEY, { h: pendingHeight }).catch(() => {
+      });
+    };
+    if (commit) write();
+    else saveTimer = setTimeout(write, 400);
+  }
   var selection = () => figma.currentPage.selection;
   var DEV_TIER_KEY = "dsl.devTier";
   var CACHE_KEY = "dsl.licenseCache";
@@ -4795,8 +4811,7 @@
         case "RESIZE": {
           const h = clampHeight(msg.height);
           figma.ui.resize(UI_W, h);
-          if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { h }).catch(() => {
-          });
+          saveHeight(h, msg.commit);
           break;
         }
         case "GET_LICENSE": {

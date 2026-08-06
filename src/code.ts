@@ -36,6 +36,22 @@ figma.clientStorage.getAsync(UI_SIZE_KEY).then((s) => {
   if (v && typeof v.h === 'number') figma.ui.resize(UI_W, clampHeight(v.h));
 }).catch(() => {});
 
+/* 높이 저장 — 드롭(commit)만 믿지 않는다. 드래그 중 창이 계속 커지면 포인터가 iframe을
+   벗어나 pointerup을 놓칠 수 있고, 그러면 마지막 크기가 영영 저장되지 않는다.
+   그래서 리사이즈될 때마다 뒤로 미루며 저장하고(트레일링), commit이 오면 즉시 쓴다. */
+let saveTimer: number | null = null;
+let pendingHeight = 0;
+function saveHeight(h: number, commit?: boolean): void {
+  pendingHeight = h;
+  if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null; }
+  const write = (): void => {
+    saveTimer = null;
+    void figma.clientStorage.setAsync(UI_SIZE_KEY, { h: pendingHeight }).catch(() => {});
+  };
+  if (commit) write();
+  else saveTimer = setTimeout(write, 400) as unknown as number;
+}
+
 const selection = () => figma.currentPage.selection;
 
 /* ---------- 라이선스/티어 ----------
@@ -849,10 +865,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'RESIZE': {
-        // #14: 드래그 중엔 즉시 리사이즈, commit(드롭) 시 높이 저장. 폭은 고정이라 받지 않는다.
+        // #14: 드래그 중엔 즉시 리사이즈. 폭은 고정이라 받지 않는다.
         const h = clampHeight(msg.height);
         figma.ui.resize(UI_W, h);
-        if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { h }).catch(() => {});
+        saveHeight(h, msg.commit);
         break;
       }
       case 'GET_LICENSE': {
