@@ -246,17 +246,27 @@
 
     /* ── 시스템화 마법사 스테퍼 ── */
     #wizardSteps { margin-top: 8px; }
-    .wstep { display: grid; grid-template-columns: 18px 1fr auto; gap: 7px; align-items: center; padding: 3px 0; }
-    .wstep .dot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface); font-size: 9px; line-height: 14px; text-align: center; color: var(--muted); font-weight: 600; }
-    .wstep.done .dot   { background: var(--ok); border-color: var(--ok); color: #fff; }
-    .wstep.active .dot { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .wstep.fail .dot   { background: var(--warn); border-color: var(--warn); color: #fff; }
-    .wstep .wlabel { color: var(--text); }
-    .wstep.skip { opacity: .55; }
-    .wstep.skip .wlabel { color: var(--muted); }
-    .wstep .wnote { font-size: 10px; color: var(--muted); }
-    .wstep.fail .wnote { color: var(--warn); }
     #wizardBar { margin-top: 8px; }
+
+    /* ── 첫 실행 배너 — 카드가 아니라 한 줄(온보딩 흡수) ── */
+    .banner {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      font-size: 10.5px; line-height: 1.35; padding: 7px 9px; margin-bottom: 10px;
+      border: 1px solid var(--accent-border); background: var(--accent-subtle);
+      border-radius: var(--r-sm); color: var(--accent-strong);
+    }
+    .banner .link { font-size: 10.5px; }
+
+    /* ── 마법사 미니 파이프 — 세로 목록 대신 칩 4개로 진행만 ── */
+    .pipe-mini { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pipe-mini span {
+      font: 500 10px/1.5 var(--mono); padding: 2px 7px; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--surface-2); color: var(--muted);
+    }
+    .pipe-mini span.active { border-color: var(--accent); background: var(--accent-subtle); color: var(--accent-strong); }
+    .pipe-mini span.done   { border-color: var(--ok); background: var(--ok-subtle); color: var(--ok); }
+    .pipe-mini span.fail   { border-color: var(--danger-border); background: var(--danger-subtle); color: var(--danger); }
+    .pipe-mini span.skip   { opacity: .55; }
 
     /* ── 카드 툴바(CTA 상단) ──
        미리보기·적용·다음은 제목 바로 아래 한 줄에 둔다. 결과 목록 위에 있어야 "무엇을 누르면
@@ -369,7 +379,13 @@
   </div>
 
   <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
-    <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
+    <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
+    <div class="banner" id="onboardBanner" style="display:none">
+      <span data-i18n="onboard.banner">처음이면 전체 실행으로 시작하세요.</span>
+      <button class="link" id="btnOnboardHide" data-i18n="onboard.hide">다시 보지 않기</button>
+    </div>
+
+    <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
       <div class="hint" data-i18n="wizardCard.hint">추출 → 토큰 → 바인딩 → 정돈</div>
@@ -382,27 +398,17 @@
         <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
         <button id="btnWizardCancel" style="display:none" data-i18n="common.cancel">취소</button>
       </div>
-      <div id="wizardSteps"></div>
+      <!-- 실행 단계는 세로 목록이 아니라 미니 파이프 칩 — 진행 상태만 한눈에(사유는 칩 툴팁). -->
+      <div id="wizardSteps" class="pipe-mini"></div>
       <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
       <div class="status" id="wizardSummary"></div>
     </div>
 
-    <!-- 온보딩 / 가이드 -->
-    <div class="ux" id="onboardCard">
-      <div class="ux-h"><span class="ux-t" data-i18n="onboard.title">온보딩 / 가이드</span></div>
-      <div data-i18n-html="onboard.body">처음이세요? <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 ‘만들기·적용’ 탭을 차례로 사용하세요.</div>
-      <div class="row">
-        <button id="btnGuide" data-i18n="onboard.run">전체 실행</button>
-        <button id="btnOnboardClose" data-i18n="onboard.close">닫기</button>
-      </div>
-    </div>
-
-    <!-- 진행 안내 — 만들기→적용 의존 파이프라인 단계 상태 -->
+    <!-- 진행 — 만들기→적용 의존 파이프라인 상태(클릭하면 그 단계로) -->
     <div class="step" id="pipelineCard">
-      <h2 data-i18n="pipeline.title">진행 안내</h2>
-      <div class="hint" data-i18n="pipeline.hint">권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.</div>
+      <h2 data-i18n="pipeline.title">진행</h2>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 컴포넌트는 독립</div>
     </div>
   </section>
 
@@ -970,14 +976,12 @@
     "common.selectAll": "\uC804\uCCB4 \uC120\uD0DD",
     "prereq.gotoCreate": "\uD1A0\uD070 \uC0DD\uC131\uC73C\uB85C \u2192",
     // 온보딩 / 가이드
-    "onboard.title": "\uC628\uBCF4\uB529 / \uAC00\uC774\uB4DC",
-    "onboard.body": "\uCC98\uC74C\uC774\uC138\uC694? <b>\u2018\uC2DC\uC2A4\uD15C\uD654 \uB9C8\uBC95\uC0AC\u2019</b>\uB85C \uCD94\uCD9C \u2192 \uD1A0\uD070 \u2192 \uBC14\uC778\uB529 \u2192 \uC815\uB3C8\uC744 \uD55C \uBC88\uC5D0 \uB05D\uB0BC \uC218 \uC788\uC5B4\uC694. \uB2E8\uACC4\uBCC4\uB85C \uC9C1\uC811 \uD558\uB824\uBA74 \u2018\uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9\u2019 \uD0ED\uC744 \uCC28\uB840\uB85C \uC0AC\uC6A9\uD558\uC138\uC694.",
-    "onboard.run": "\uC804\uCCB4 \uC2E4\uD589",
-    "onboard.close": "\uB2EB\uAE30",
-    // 진행 안내(파이프라인 카드)
-    "pipeline.title": "\uC9C4\uD589 \uC548\uB0B4",
-    "pipeline.hint": "\uAD8C\uC7A5 \uC21C\uC11C\uC640 \uB2E8\uACC4 \uC0C1\uD0DC(\uC804\uC81C \uCDA9\uC871 \uC5EC\uBD80). \uD074\uB9AD\uD558\uBA74 \uD574\uB2F9 \uB2E8\uACC4\uB85C \uC774\uB3D9.",
-    "pipeline.indep": "\uB9AC\uB124\uC784 \xB7 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uC804\uC81C \uC5C6\uC774 \uC5B8\uC81C\uB4E0 \uAC00\uB2A5(\uB3C5\uB9BD).",
+    // 첫 실행 배너(온보딩 흡수)
+    "onboard.banner": "\uCC98\uC74C\uC774\uBA74 \uC804\uCCB4 \uC2E4\uD589\uC73C\uB85C \uC2DC\uC791\uD558\uC138\uC694.",
+    "onboard.hide": "\uB2E4\uC2DC \uBCF4\uC9C0 \uC54A\uAE30",
+    // 진행(파이프라인 카드)
+    "pipeline.title": "\uC9C4\uD589",
+    "pipeline.indep": "\uB9AC\uB124\uC784 \xB7 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uB3C5\uB9BD",
     // 브랜드 팔레트
     "palette.title": "\uBE0C\uB79C\uB4DC \uD314\uB808\uD2B8 \uC0DD\uC131",
     "palette.brand": "\uBE0C\uB79C\uB4DC\uC0C9",
@@ -1769,6 +1773,7 @@
   }
   var tokens = [];
   var isPaid = false;
+  var hideOnboard = false;
   var hasGlobal = false;
   var hasBindable = false;
   var hasTextStyles = false;
@@ -2161,13 +2166,10 @@
     send({ type: "CREATE_TOKENS", tokens, base, replacePalette: true });
     setStatus("paletteStatus", t("common.applyingVars"), "");
   });
-  $("btnOnboardClose").addEventListener("click", () => {
-    $("onboardCard").style.display = "none";
-  });
-  $("btnGuide").addEventListener("click", () => {
-    showTab("wizard");
-    $("btnWizardRun").focus();
-    $("wizardCard").scrollIntoView({ block: "start", behavior: "smooth" });
+  $("btnOnboardHide").addEventListener("click", () => {
+    $("onboardBanner").style.display = "none";
+    hideOnboard = true;
+    saveSettings();
   });
   $("btnExtract").addEventListener("click", () => {
     colorRevealed = true;
@@ -2235,7 +2237,7 @@
   function saveSettings() {
     clearTimeout(settingsSaveTimer);
     settingsSaveTimer = window.setTimeout(() => {
-      send({ type: "SET_SETTINGS", base: Number($("base").value) || 16, maxDepth: readMaxDepth() });
+      send({ type: "SET_SETTINGS", base: Number($("base").value) || 16, maxDepth: readMaxDepth(), hideOnboard });
     }, 350);
   }
   $("base").addEventListener("input", saveSettings);
@@ -2431,34 +2433,19 @@
   function renderWizardSteps(plan) {
     const box = $("wizardSteps");
     box.innerHTML = "";
-    plan.forEach((p, i) => {
-      var _a;
-      const row = document.createElement("div");
-      row.className = "wstep" + (p.run ? "" : " skip");
-      row.id = `wstep-${p.step.id}`;
-      const dot = document.createElement("span");
-      dot.className = "dot";
-      dot.textContent = String(i + 1);
-      const label = document.createElement("span");
-      label.className = "wlabel";
-      label.textContent = t("wizard.step." + p.step.id);
-      const note = document.createElement("span");
-      note.className = "wnote";
-      note.textContent = p.run ? "" : t((_a = p.skipReason) != null ? _a : "wizard.skip.default");
-      row.append(dot, label, note);
-      box.appendChild(row);
+    plan.filter((p) => p.run).forEach((p, i) => {
+      const chip = document.createElement("span");
+      chip.id = `wstep-${p.step.id}`;
+      chip.textContent = `${i + 1} ${t("wizard.step." + p.step.id)}`;
+      box.appendChild(chip);
     });
   }
   function setWizardStep(id, state, note) {
-    const row = document.getElementById(`wstep-${id}`);
-    if (!row) return;
-    row.classList.remove("active", "done", "fail");
-    row.classList.add(state);
-    const dot = row.querySelector(".dot");
-    if (dot && state === "done") dot.textContent = "\u2713";
-    if (dot && state === "fail") dot.textContent = "!";
-    const n = row.querySelector(".wnote");
-    if (n) n.textContent = note;
+    const chip = document.getElementById(`wstep-${id}`);
+    if (!chip) return;
+    chip.classList.remove("active", "done", "fail");
+    chip.classList.add(state);
+    chip.title = note;
   }
   async function runWizard() {
     if (wizardRunning) return;
@@ -3081,6 +3068,8 @@
       case "SETTINGS": {
         $("base").value = String(msg.base);
         $("depth").value = String(msg.maxDepth);
+        hideOnboard = msg.hideOnboard;
+        $("onboardBanner").style.display = hideOnboard ? "none" : "";
         break;
       }
       case "VARIABLES": {

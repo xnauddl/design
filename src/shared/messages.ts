@@ -148,7 +148,7 @@ export type UiToCode =
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Paid): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Paid): 선택 세트의 빠진 조합 자동 생성
   | { type: 'GET_SETTINGS' } // #19: 관리 탭 설정(기준 크기·리네임 맥락 깊이) 불러오기
-  | { type: 'SET_SETTINGS'; base: number; maxDepth: number } // 바뀔 때마다 clientStorage에 보관
+  | { type: 'SET_SETTINGS'; base: number; maxDepth: number; hideOnboard: boolean } // 바뀔 때마다 clientStorage에 보관
   | { type: 'GET_VARIABLES' } // 3계층 변수 목록(다크 테마 생성의 컬렉션·모드 선택용)
   | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId: string; toModeId: string } // 라이트→다크 자동 채움
   | { type: 'SCAN_SIMILAR' } // 닮은 프레임: 선택 프레임 정렬 미리보기(읽기 전용 → Free)
@@ -193,7 +193,7 @@ export type CodeToUi =
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
-  | { type: 'SETTINGS'; base: number; maxDepth: number } // #19: 보관된 설정(없으면 기본값)
+  | { type: 'SETTINGS'; base: number; maxDepth: number; hideOnboard: boolean } // #19: 보관된 설정(없으면 기본값)
   | { type: 'VARIABLES'; vars: VarInfo[] } // 3계층 변수 목록(다크 카드의 컬렉션·모드 선택지)
   | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number }
   // 닮은 프레임 스캔 결과 — metas는 완전성 점수 내림차순(맨 앞이 추천 마스터).

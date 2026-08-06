@@ -183,14 +183,12 @@ export const STRINGS: Record<string, string> = {
   'common.selectAll': '전체 선택',
   'prereq.gotoCreate': '토큰 생성으로 →',
   // 온보딩 / 가이드
-  'onboard.title': '온보딩 / 가이드',
-  'onboard.body': '처음이세요? <b>‘시스템화 마법사’</b>로 추출 → 토큰 → 바인딩 → 정돈을 한 번에 끝낼 수 있어요. 단계별로 직접 하려면 ‘만들기·적용’ 탭을 차례로 사용하세요.',
-  'onboard.run': '전체 실행',
-  'onboard.close': '닫기',
-  // 진행 안내(파이프라인 카드)
-  'pipeline.title': '진행 안내',
-  'pipeline.hint': '권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.',
-  'pipeline.indep': '리네임 · 컴포넌트는 전제 없이 언제든 가능(독립).',
+  // 첫 실행 배너(온보딩 흡수)
+  'onboard.banner': '처음이면 전체 실행으로 시작하세요.',
+  'onboard.hide': '다시 보지 않기',
+  // 진행(파이프라인 카드)
+  'pipeline.title': '진행',
+  'pipeline.indep': '리네임 · 컴포넌트는 독립',
   // 브랜드 팔레트
   'palette.title': '브랜드 팔레트 생성',
   'palette.brand': '브랜드색',

@@ -38,6 +38,7 @@ function readMaxDepth(): number {
 
 let tokens: DraftToken[] = [];
 let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
+let hideOnboard = false; // 첫 실행 배너를 껐는가(파일에 기억)
 // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑) · 바인딩 가능 변수 존재(바인딩) · 텍스트 스타일 존재(적용만).
 let hasGlobal = false;
 let hasBindable = false;
@@ -573,14 +574,12 @@ $('btnPaletteApply').addEventListener('click', () => {
   setStatus('paletteStatus', t('common.applyingVars'), '');
 });
 
-/* ---------- UX4: 온보딩 카드 ---------- */
-$('btnOnboardClose').addEventListener('click', () => {
-  $('onboardCard').style.display = 'none';
-});
-$('btnGuide').addEventListener('click', () => {
-  showTab('wizard');
-  $('btnWizardRun').focus();
-  $('wizardCard').scrollIntoView({ block: 'start', behavior: 'smooth' });
+/* UX4 온보딩 — 카드 하나를 통째로 두는 대신 마법사 탭 첫 줄 배너로 흡수했다(와이어).
+   '다시 보지 않기'는 세션이 아니라 파일에 기억한다 — 매번 다시 뜨면 그게 더 성가시다. */
+$('btnOnboardHide').addEventListener('click', () => {
+  $('onboardBanner').style.display = 'none';
+  hideOnboard = true;
+  saveSettings();
 });
 
 /* ---------- 버튼 ---------- */
@@ -671,7 +670,7 @@ let settingsSaveTimer = 0;
 function saveSettings(): void {
   clearTimeout(settingsSaveTimer);
   settingsSaveTimer = window.setTimeout(() => {
-    send({ type: 'SET_SETTINGS', base: Number(($('base') as HTMLInputElement).value) || 16, maxDepth: readMaxDepth() });
+    send({ type: 'SET_SETTINGS', base: Number(($('base') as HTMLInputElement).value) || 16, maxDepth: readMaxDepth(), hideOnboard });
   }, 350);
 }
 ($('base') as HTMLInputElement).addEventListener('input', saveSettings);
@@ -921,38 +920,26 @@ function hideWizardBar(): void {
   $('wizardBar').style.display = 'none';
 }
 
-/** 계획에 따라 단계 행을 그린다(번호·라벨·사유). 실행 안 할 단계는 skip 표시. */
+/** 계획을 미니 파이프 칩으로 — 실제로 돌 단계만 번호순으로. 결과·사유는 칩 툴팁(와이어).
+    건너뛴 단계는 칩을 만들지 않는다: 왜 빠졌는지는 바로 위 옵션 체크박스가 이미 말한다. */
 function renderWizardSteps(plan: WizardPlanItem[]): void {
   const box = $('wizardSteps');
   box.innerHTML = '';
-  plan.forEach((p, i) => {
-    const row = document.createElement('div');
-    row.className = 'wstep' + (p.run ? '' : ' skip');
-    row.id = `wstep-${p.step.id}`;
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    dot.textContent = String(i + 1);
-    const label = document.createElement('span');
-    label.className = 'wlabel';
-    label.textContent = t('wizard.step.' + p.step.id);
-    const note = document.createElement('span');
-    note.className = 'wnote';
-    note.textContent = p.run ? '' : t(p.skipReason ?? 'wizard.skip.default');
-    row.append(dot, label, note);
-    box.appendChild(row);
+  plan.filter((p) => p.run).forEach((p, i) => {
+    const chip = document.createElement('span');
+    chip.id = `wstep-${p.step.id}`;
+    chip.textContent = `${i + 1} ${t('wizard.step.' + p.step.id)}`;
+    box.appendChild(chip);
   });
 }
 
 function setWizardStep(id: WizardStepId, state: 'active' | 'done' | 'fail', note: string): void {
-  const row = document.getElementById(`wstep-${id}`);
-  if (!row) return;
-  row.classList.remove('active', 'done', 'fail');
-  row.classList.add(state);
-  const dot = row.querySelector('.dot') as HTMLElement | null;
-  if (dot && state === 'done') dot.textContent = '✓';
-  if (dot && state === 'fail') dot.textContent = '!';
-  const n = row.querySelector('.wnote') as HTMLElement | null;
-  if (n) n.textContent = note;
+  const chip = document.getElementById(`wstep-${id}`);
+  if (!chip) return;
+  chip.classList.remove('active', 'done', 'fail');
+  chip.classList.add(state);
+  // 칩에는 번호·라벨만 둔다 — 단계별 결과("생성 3 · 갱신 2")는 툴팁으로, 총평은 아래 요약 줄로.
+  chip.title = note;
 }
 
 async function runWizard(): Promise<void> {
@@ -1718,6 +1705,8 @@ window.onmessage = (event: MessageEvent) => {
     case 'SETTINGS': {
       ($('base') as HTMLInputElement).value = String(msg.base);
       ($('depth') as HTMLInputElement).value = String(msg.maxDepth);
+      hideOnboard = msg.hideOnboard;
+      $('onboardBanner').style.display = hideOnboard ? 'none' : '';
       break;
     }
     case 'VARIABLES': {

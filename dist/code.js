@@ -4136,7 +4136,7 @@
   var DEV_TIER_KEY = "dsl.devTier";
   var CACHE_KEY = "dsl.licenseCache";
   var SETTINGS_KEY = "dsl.settings";
-  var SETTINGS_DEFAULT = { base: 16, maxDepth: 8 };
+  var SETTINGS_DEFAULT = { base: 16, maxDepth: 8, hideOnboard: false };
   var devTier = "free";
   var cache = null;
   var bindCancel = false;
@@ -5287,17 +5287,18 @@
               const o = raw;
               s = {
                 base: typeof o.base === "number" && isFinite(o.base) && o.base > 0 ? o.base : SETTINGS_DEFAULT.base,
-                maxDepth: typeof o.maxDepth === "number" && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth
+                maxDepth: typeof o.maxDepth === "number" && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth,
+                hideOnboard: o.hideOnboard === true
               };
             }
           } catch (e) {
           }
-          post({ type: "SETTINGS", base: s.base, maxDepth: s.maxDepth });
+          post({ type: "SETTINGS", base: s.base, maxDepth: s.maxDepth, hideOnboard: s.hideOnboard });
           break;
         }
         case "SET_SETTINGS": {
           try {
-            await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth });
+            await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, hideOnboard: msg.hideOnboard });
           } catch (e) {
           }
           break;

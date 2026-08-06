@@ -51,7 +51,7 @@ const DEV_TIER_KEY = 'dsl.devTier';
 const CACHE_KEY = 'dsl.licenseCache';
 // #19: 기준 크기·리네임 맥락 깊이는 관리 탭에서만 바꾸고 이 파일에 기억한다(입력을 단계에 두지 않으므로).
 const SETTINGS_KEY = 'dsl.settings';
-const SETTINGS_DEFAULT = { base: 16, maxDepth: 8 };
+const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, hideOnboard: false };
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
@@ -1362,17 +1362,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             s = {
               base: typeof o.base === 'number' && isFinite(o.base) && o.base > 0 ? o.base : SETTINGS_DEFAULT.base,
               maxDepth: typeof o.maxDepth === 'number' && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth,
+              hideOnboard: o.hideOnboard === true,
             };
           }
         } catch {
           /* 저장소 접근 실패 → 기본값 */
         }
-        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth });
+        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth, hideOnboard: s.hideOnboard });
         break;
       }
       case 'SET_SETTINGS': {
         try {
-          await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth });
+          await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, hideOnboard: msg.hideOnboard });
         } catch {
           /* 보관 실패해도 이번 세션 동작에는 영향 없음 */
         }
