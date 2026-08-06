@@ -250,9 +250,9 @@ export const STRINGS: Record<string, string> = {
   'component.scanHelp': '선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.',
   'component.registerHelp': '체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.',
   'component.classifyHelp': '이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶습니다.',
-  'component.genMissingHelp': '선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채웁니다. (Paid)',
+  'component.genMissingHelp': '선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채웁니다.',
   'similar.scanHelp': '구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.',
-  'similar.componentizeHelp': '마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다. (Paid)',
+  'similar.componentizeHelp': '마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.',
   // 내보내기
   'export.title': '변수 → 코드',
   'export.hint': 'Figma 변수를 코드 파일로 · 패널 목록·미리보기 없음',

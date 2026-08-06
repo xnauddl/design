@@ -410,9 +410,8 @@
       <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
       <div class="hint" data-i18n="wizardCard.hint">추출 → 토큰 → 바인딩 → 정돈</div>
       <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span></label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span></label>
-        <span class="muted" id="wizComponentLock"></span>
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
+        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span> <span class="muted" id="wizComponentLock"></span></label>
       </div>
       <div class="row">
         <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
@@ -631,14 +630,14 @@
     <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
          목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
     <div class="step" id="structureCard" data-apply-step="structure">
-      <h2><span data-i18n="structure.title">구조</span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span><span class="muted" id="similarLock" hidden></span> <span class="muted" data-i18n="structure.scope">컴포넌트 · 닮은 프레임</span></h2>
+      <h2><span data-i18n="structure.title">구조</span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span> <span class="muted" data-i18n="structure.scope">컴포넌트 · 닮은 프레임</span></h2>
       <div class="hint" data-i18n="component.hint">후보 스캔 후 등록 · 닮은 프레임은 스캔 Free</div>
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.">후보 스캔</button>
         <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.">닮은 스캔</button>
         <span class="grow"></span>
         <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">컴포넌트 등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다. (Paid)">컴포넌트화</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">컴포넌트화</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
@@ -653,7 +652,7 @@
         <div class="r-group" data-i18n="structure.groupVariant">선택한 컴포넌트 정리</div>
         <div class="row">
           <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶습니다.">베리언트 분류</button>
-          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채웁니다. (Paid)">누락 조합 생성</button>
+          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채웁니다.">누락 조합 생성</button>
         </div>
       </div>
       <div id="variantReport" class="results"></div>
@@ -1055,9 +1054,9 @@
     "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC2B5\uB2C8\uB2E4. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uC81C\uC678.",
     "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uAE41\uB2C8\uB2E4.",
     "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB9CC \uAC19\uC740 \uC774\uB984\uB07C\uB9AC \uC138\uD2B8\uB85C \uB2E4\uC2DC \uBB36\uC2B5\uB2C8\uB2E4.",
-    "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6C1\uB2C8\uB2E4. (Paid)",
+    "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6C1\uB2C8\uB2E4.",
     "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
-    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4. (Paid)",
+    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4.",
     // 내보내기
     "export.title": "\uBCC0\uC218 \u2192 \uCF54\uB4DC",
     "export.hint": "Figma \uBCC0\uC218\uB97C \uCF54\uB4DC \uD30C\uC77C\uB85C \xB7 \uD328\uB110 \uBAA9\uB85D\xB7\uBBF8\uB9AC\uBCF4\uAE30 \uC5C6\uC74C",
@@ -2673,12 +2672,14 @@
       el.disabled = !isPaid;
       setLockTitle(el, !isPaid);
     }
-    for (const id of ["paletteLock", "paletteBtnLock", "componentLock", "similarLock", "darkLock", "createLock", "semLock", "tsLock"]) {
+    for (const id of ["paletteLock", "paletteBtnLock", "componentLock", "darkLock", "createLock", "semLock", "tsLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     refreshDarkModes();
-    $("wizComponentLock").textContent = isPaid ? "" : PAID_LOCK;
-    $("wizOptComponentize").disabled = !isPaid;
+    for (const [box, lock] of [["wizOptSemantics", "wizSemanticLock"], ["wizOptComponentize", "wizComponentLock"]]) {
+      $(lock).textContent = isPaid ? "" : PAID_LOCK;
+      $(box).disabled = !isPaid;
+    }
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!isPaid) $("btnSemantics").disabled = true;
     setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBC14\uC778\uB529\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
@@ -2687,9 +2688,11 @@
     if (!isPaid) $("btnApplyExistingText").disabled = true;
   }
   function setLockTitle(el, locked) {
-    if (el.dataset.baseTitle === void 0) el.dataset.baseTitle = el.title;
-    const base = el.dataset.baseTitle;
-    el.title = locked ? base ? `${base} \xB7 ${PAID_LOCK}` : PAID_LOCK : base;
+    var _a;
+    const attr = el.hasAttribute("data-tip") ? "data-tip" : "title";
+    if (el.dataset.baseTip === void 0) el.dataset.baseTip = (_a = el.getAttribute(attr)) != null ? _a : "";
+    const base = el.dataset.baseTip;
+    el.setAttribute(attr, locked ? base ? `${base} \xB7 ${PAID_LOCK}` : PAID_LOCK : base);
   }
   function setPrereq(btnId, noticeId, ok, msg) {
     $(btnId).disabled = !ok;

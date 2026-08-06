@@ -1206,16 +1206,21 @@ function updateGates(): void {
     el.disabled = !isPaid;
     setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
   }
-  // 색 카드는 Free('선택에서 추출')와 Paid('팔레트 생성')가 한 툴바에 섞여 있어
-  // 카드 배지만으로는 어느 쪽이 잠긴 건지 알 수 없다 → 그 버튼에도 자물쇠를 붙인다(와이어).
-  for (const id of ['paletteLock', 'paletteBtnLock', 'componentLock', 'similarLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
+  // 색 카드는 Free('선택에서 추출')와 Paid가 한 툴바에 섞여 있어 카드 배지만으로는 어느 쪽이
+  // 잠긴 건지 알 수 없다 → '팔레트 생성'에 자물쇠를 붙인다. '색 변수 만들기'에는 붙이지 않는데,
+  // 와이어가 그렇고 400px에서 배지 하나를 더 넣으면 툴바가 '다음 →'을 두 줄로 밀어낸다.
+  for (const id of ['paletteLock', 'paletteBtnLock', 'componentLock', 'darkLock', 'createLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
   // 다크 채우기는 Paid에 더해 '모드 2개 이상'이라는 전제도 있다. PAID_FIELDS 루프가
   // 방금 disabled를 티어만 보고 덮었으니, 모드 조건을 여기서 다시 적용해야 한다(순서 의존).
   refreshDarkModes();
-  $('wizComponentLock').textContent = isPaid ? '' : PAID_LOCK;
-  ($('wizOptComponentize') as HTMLInputElement).disabled = !isPaid;
+  // 마법사 옵션 둘 다 Paid 단계다(WIZARD_STEPS의 semantics·componentize). 한쪽만 잠그면
+  // Free가 켤 수 있는 체크박스가 실행 계획에서 조용히 빠진다 — #11이 없애려던 바로 그 상태.
+  for (const [box, lock] of [['wizOptSemantics', 'wizSemanticLock'], ['wizOptComponentize', 'wizComponentLock']]) {
+    $(lock).textContent = isPaid ? '' : PAID_LOCK;
+    ($(box) as HTMLInputElement).disabled = !isPaid;
+  }
 
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
@@ -1227,11 +1232,14 @@ function updateGates(): void {
   if (!isPaid) ($('btnApplyExistingText') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
 }
 
-/** 유료 잠금 사유를 툴팁으로. 원래 title(기능 설명)은 dataset에 1회 백업해 보존·복원한다. */
+/** 유료 잠금 사유를 툴팁으로. 원래 문구(기능 설명)는 dataset에 1회 백업해 보존·복원한다.
+ *  구조 버튼은 native title이 아니라 커스텀 툴팁(data-tip)을 쓴다 — title에 넣으면 사유가
+ *  보이는 툴팁 옆에 겹쳐 뜨거나 아예 안 보인다. 그래서 실제로 뜨는 쪽 하나에만 얹는다. */
 function setLockTitle(el: HTMLElement, locked: boolean): void {
-  if (el.dataset.baseTitle === undefined) el.dataset.baseTitle = el.title;
-  const base = el.dataset.baseTitle;
-  el.title = locked ? (base ? `${base} · ${PAID_LOCK}` : PAID_LOCK) : base;
+  const attr = el.hasAttribute('data-tip') ? 'data-tip' : 'title';
+  if (el.dataset.baseTip === undefined) el.dataset.baseTip = el.getAttribute(attr) ?? '';
+  const base = el.dataset.baseTip;
+  el.setAttribute(attr, locked ? (base ? `${base} · ${PAID_LOCK}` : PAID_LOCK) : base);
 }
 
 /** 전제 충족 여부로 버튼 활성/안내(+바로가기) 토글. */

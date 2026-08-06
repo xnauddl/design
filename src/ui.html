@@ -410,9 +410,8 @@
       <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
       <div class="hint" data-i18n="wizardCard.hint">추출 → 토큰 → 바인딩 → 정돈</div>
       <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span></label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span></label>
-        <span class="muted" id="wizComponentLock"></span>
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
+        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span> <span class="muted" id="wizComponentLock"></span></label>
       </div>
       <div class="row">
         <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
@@ -631,14 +630,14 @@
     <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
          목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
     <div class="step" id="structureCard" data-apply-step="structure">
-      <h2><span data-i18n="structure.title">구조</span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span><span class="muted" id="similarLock" hidden></span> <span class="muted" data-i18n="structure.scope">컴포넌트 · 닮은 프레임</span></h2>
+      <h2><span data-i18n="structure.title">구조</span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" id="componentLock"></span> <span class="muted" data-i18n="structure.scope">컴포넌트 · 닮은 프레임</span></h2>
       <div class="hint" data-i18n="component.hint">후보 스캔 후 등록 · 닮은 프레임은 스캔 Free</div>
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.">후보 스캔</button>
         <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.">닮은 스캔</button>
         <span class="grow"></span>
         <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">컴포넌트 등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다. (Paid)">컴포넌트화</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">컴포넌트화</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
@@ -653,7 +652,7 @@
         <div class="r-group" data-i18n="structure.groupVariant">선택한 컴포넌트 정리</div>
         <div class="row">
           <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶습니다.">베리언트 분류</button>
-          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채웁니다. (Paid)">누락 조합 생성</button>
+          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채웁니다.">누락 조합 생성</button>
         </div>
       </div>
       <div id="variantReport" class="results"></div>
