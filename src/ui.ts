@@ -2,7 +2,7 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate } from './shared/messages';
-import { type DraftToken, type Unit, resolvedTypeForToken, tidyNumberTokens } from './lib/tokens';
+import { type DraftToken, type Unit, tidyNumberTokens } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier, type Feature } from './lib/entitlements';
@@ -100,6 +100,84 @@ function clearMount(mount: HTMLElement): void {
   mount.innerHTML = '';
 }
 
+/* ---------- #18: 결과 행 = 얇은 카드 ----------
+   목록마다 제각각이던 행 문법을 하나로 모은다. 열은 [체크 | 본문(제목·요약) | 메타] 셋뿐이고,
+   제목·메타는 문자열 대신 요소를 넘길 수 있다(이름 입력칸·역할 입력칸처럼 편집이 필요한 자리). */
+interface ResultCardSpec {
+  /** 왼쪽 체크박스/라디오. 없으면 체크 열을 접는다. */
+  check?: HTMLElement;
+  title: string | HTMLElement;
+  titleMono?: boolean;
+  summary?: string;
+  summaryMono?: boolean;
+  /** 오른쪽 끝 메타(개수·상태). 요소가 필요하면 metaEl. */
+  meta?: string;
+  metaTitle?: string;
+  metaEl?: HTMLElement;
+  /** 흐리게 — 대상이 아니거나(스킵·잠금) 근거가 약한 행(1×). */
+  dim?: boolean;
+}
+
+function resultCard(spec: ResultCardSpec): HTMLElement {
+  const card = document.createElement('div');
+  card.className = spec.dim ? 'r-card dim' : 'r-card';
+
+  const top = document.createElement('div');
+  top.className = spec.check ? 'r-top' : 'r-top no-check';
+  if (spec.check) top.appendChild(spec.check);
+
+  const main = document.createElement('div');
+  main.className = 'r-main';
+  const title = document.createElement('div');
+  title.className = spec.titleMono ? 'r-title mono' : 'r-title';
+  if (typeof spec.title === 'string') {
+    title.textContent = spec.title;
+    title.title = spec.title; // 한 줄 말줄임 — 잘린 부분은 툴팁으로 읽는다
+  } else {
+    title.appendChild(spec.title);
+  }
+  main.appendChild(title);
+  if (spec.summary) {
+    const sum = document.createElement('div');
+    sum.className = spec.summaryMono ? 'r-sum mono' : 'r-sum';
+    sum.textContent = spec.summary;
+    sum.title = spec.summary;
+    main.appendChild(sum);
+  }
+  top.appendChild(main);
+
+  if (spec.metaEl) top.appendChild(spec.metaEl);
+  else if (spec.meta) {
+    const meta = document.createElement('span');
+    meta.className = 'r-meta';
+    meta.textContent = spec.meta;
+    if (spec.metaTitle) meta.title = spec.metaTitle;
+    top.appendChild(meta);
+  }
+
+  card.appendChild(top);
+  return card;
+}
+
+/** 색 스와치를 제목 앞에 끼운다 — 목록에서 무슨 색인지 눈으로 먼저 찾는다. */
+function addSwatch(card: HTMLElement, hex: string): void {
+  const title = card.querySelector('.r-title') as HTMLElement;
+  const sw = document.createElement('span');
+  sw.className = 'r-swatch';
+  sw.style.background = hex;
+  title.prepend(sw);
+  title.classList.add('has-swatch');
+}
+
+/** 목록의 그룹 머리(트리 루트·리포트 구분줄) — 카드가 아니라 라벨이다. */
+function resultGroup(label: string): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'r-group';
+  el.textContent = label;
+  el.title = label;
+  return el;
+}
+
 /** 타입 칩 안의 단위 표기 — 칩이 88px 고정 폭이라 낱말 대신 기호로 줄인다
     (`letterSpacing·percent` 106px → `letterSpacing·%` 81px). 온전한 표기는 칩 title에 남는다.
     추출이 실제로 만드는 비-px 단위는 percent뿐이고(lineHeight·letterSpacing), 나머지는 대비용. */
@@ -154,34 +232,10 @@ function carryTokenChecked(before: readonly DraftToken[], after: readonly DraftT
  * 행 인덱스가 `tokens` 인덱스와 어긋난다(색 토큰이 앞에 있으면 남의 이름을 덮어썼다).
  */
 function makeTokenRow(t: DraftToken): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'tk';
+  const n = t.count ?? 0;
+  const unit = t.unit && t.unit !== 'px' ? ` · ${UNIT_CHIP[t.unit]}` : '';
 
-  // 체크한 토큰만 생성한다. 키는 이름이 아니라 값(category|value|unit) — 이름은 편집 대상이라
-  // 개명하는 순간 체크가 풀린다.
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.className = 'tk-check';
-  cb.checked = tokenChecked.has(tokenKey(t));
-  cb.title = '생성 대상';
-  cb.addEventListener('change', () => {
-    if (cb.checked) tokenChecked.add(tokenKey(t));
-    else tokenChecked.delete(tokenKey(t));
-    updateTokenCreate();
-  });
-  row.appendChild(cb);
-
-  const sw = document.createElement('span');
-  sw.className = 'tk-gutter'; // 스와치 없는 행은 CSS가 폭 0으로 접는다(#tokenList.has-swatch 참고)
-  // 색 토큰은 renderTokens가 걸러내 여기 오지 않는다(색은 위 ‘색 정리’ 표 담당) → effectColor만.
-  if (t.category === 'effectColor' && typeof t.value === 'string') {
-    sw.classList.add('swatch');
-    sw.style.background = t.value;
-  }
-  row.appendChild(sw);
-
-  // 좁은 패널에서는 긴 이름(예: font-family/…)이 입력칸 폭을 넘겨 앞부분만 보인다.
-  // 입력칸은 편집 대상이라 말줄임을 못 쓰므로 전체 이름을 title로 항상 읽을 수 있게 둔다.
+  // 이름은 편집 대상이라 제목 자리에 입력칸을 그대로 둔다(말줄임을 못 쓰므로 전체는 title로).
   const input = document.createElement('input');
   input.value = t.name;
   input.title = t.name;
@@ -189,25 +243,33 @@ function makeTokenRow(t: DraftToken): HTMLElement {
     t.name = input.value;
     input.title = input.value;
   });
-  row.appendChild(input);
 
-  // 등장 레이어 수 — 무엇을 남길지 고르는 근거. 1×는 대개 일회성 값이라 눈에 띄게 흐린다.
-  const n = t.count ?? 0;
-  if (n > 0) {
-    const use = document.createElement('span');
-    use.className = n === 1 ? 'tk-use once' : 'tk-use';
-    use.textContent = `${n}×`;
-    use.title = `이 값을 쓰는 레이어 ${n}개`;
-    row.appendChild(use);
-  }
+  // 체크한 토큰만 생성한다. 키는 이름이 아니라 값(category|value|unit) — 이름은 편집 대상이라
+  // 개명하는 순간 체크가 풀린다.
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = tokenChecked.has(tokenKey(t));
+  cb.title = '생성 대상';
+  cb.addEventListener('change', () => {
+    if (cb.checked) tokenChecked.add(tokenKey(t));
+    else tokenChecked.delete(tokenKey(t));
+    updateTokenCreate();
+  });
 
-  const cat = document.createElement('span');
-  cat.className = 'cat';
-  cat.textContent = t.unit && t.unit !== 'px' ? `${t.category}·${UNIT_CHIP[t.unit]}` : t.category;
-  // 칩은 좁으니 값·Figma 변수 타입은 title로 — 이름만으로 구분 안 되는 토큰(fontFamily 등) 확인용.
-  cat.title = `${t.category}${t.unit ? ` · ${t.unit}` : ''} · ${resolvedTypeForToken(t)} · ${t.value}`;
-  row.appendChild(cat);
-  return row;
+  const card = resultCard({
+    check: cb,
+    title: input,
+    titleMono: true,
+    // 값·타입까지 붙여 이름만으로 구분 안 되는 토큰(fontFamily 등)을 요약에서 바로 읽는다.
+    summary: `${t.category}${unit} · ${t.value}`,
+    // 등장 레이어 수 — 무엇을 남길지 고르는 근거. 1×는 대개 일회성 값이라 흐리게.
+    meta: n > 0 ? `${n}×` : '',
+    metaTitle: n > 0 ? `이 값을 쓰는 레이어 ${n}개` : '',
+    dim: n === 1,
+  });
+  // 색 토큰은 renderTokens가 걸러내 여기 오지 않는다(색은 위 ‘색 정리’ 담당) → effectColor만.
+  if (t.category === 'effectColor' && typeof t.value === 'string') addSwatch(card, t.value);
+  return card;
 }
 
 /** 공통 빈 상태 — 가운데 굵은 헤드라인 + 안내 + (선택) 비활성 버튼. 캐논 108:2 패턴. */
@@ -270,8 +332,6 @@ function renderTokens(): void {
     showHint('색 외 토큰이 없습니다(색만 추출됨).');
     return;
   }
-  // 스와치가 실제로 쓰이는 목록에서만 14px 거터를 유지(그 외엔 이름 폭으로 넘긴다).
-  box.classList.toggle('has-swatch', others.some((o) => o.category === 'effectColor' && typeof o.value === 'string'));
   ($('tokenCtrls') as HTMLElement).style.display = '';
   renderChunked(box, others, makeTokenRow); // §4: 대량 추출도 비차단
   updateTokenCreate();
@@ -395,22 +455,20 @@ function renderColorTable(): void {
     if (!roleByName.has(name)) roleByName.set(name, role);
   }
   renderChunked($('colorTable'), colors, (t) => {
-    const row = document.createElement('div');
-    row.className = 'crow';
-    const sw = document.createElement('span');
-    sw.className = 'swatch';
-    sw.style.background = t.value as string;
-    const name = document.createElement('span');
-    name.className = 'cn';
-    name.textContent = t.name;
-    name.title = `${t.name} · ${classifyColor(t.value as string).achromatic ? '무채' : 'hue'}`;
     const role = document.createElement('input');
     role.setAttribute('list', 'roleList');
     role.placeholder = '역할(선택)';
     role.value = roleByName.get(t.name) ?? '';
     role.dataset.name = t.name;
-    row.append(sw, name, role);
-    return row;
+    role.className = 'r-role';
+    const card = resultCard({
+      title: t.name,
+      titleMono: true,
+      summary: classifyColor(t.value as string).achromatic ? '무채' : 'hue',
+      metaEl: role,
+    });
+    addSwatch(card, t.value as string);
+    return card;
   });
 }
 
@@ -1862,38 +1920,39 @@ function baseDepth(rows: TreeRow[]): number {
 
 /** 선택형 트리 1행. base는 들여쓰기 기준 depth. */
 function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: () => void): HTMLElement {
-  const affected = r.change !== undefined;
-  const row = document.createElement('div');
-  row.className = affected ? 'tree-row affected' : r.header ? 'tree-row header' : 'tree-row context';
-  row.style.paddingLeft = `${(r.depth - base) * 12}px`;
+  const indent = `${(r.depth - base) * 12}px`;
 
-  if (affected) {
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = checked.has(r.id);
-    cb.addEventListener('change', () => {
-      if (cb.checked) checked.add(r.id);
-      else checked.delete(r.id);
-      onChange();
-    });
-    row.appendChild(cb);
-    if (r.badge) {
-      const tag = document.createElement('span');
-      tag.className = `tag tag-${r.badge.kind}`;
-      tag.textContent = r.badge.text;
-      row.appendChild(tag);
-    }
-    const label = document.createElement('span');
-    const nameCls = r.replace === false ? 'tree-name' : 'before'; // 이름 보존(컴포넌트)은 취소선 없음
-    label.innerHTML = ` <span class="${nameCls}">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change as string)}</span>`;
-    row.appendChild(label);
-  } else {
-    const label = document.createElement('span');
-    label.className = 'tree-ctx';
-    label.textContent = r.name;
-    row.appendChild(label);
+  // 맥락 노드·헤더는 카드가 아니라 그룹 머리다 — 고를 대상이 아니고, 어디에 속한
+  // 변경인지만 알려준다(#18: 트리 = 그룹 헤더 + 자식 카드).
+  if (r.change === undefined) {
+    const group = resultGroup(r.name);
+    group.style.marginLeft = indent;
+    if (!r.header) group.classList.add('ctx');
+    return group;
   }
-  return row;
+
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = checked.has(r.id);
+  cb.addEventListener('change', () => {
+    if (cb.checked) checked.add(r.id);
+    else checked.delete(r.id);
+    onChange();
+  });
+
+  // 이름 보존(컴포넌트 등록)은 취소선 없이 그대로, 교체(리네임·바인딩)는 before → after.
+  const title = document.createElement('span');
+  const nameCls = r.replace === false ? 'tree-name' : 'before';
+  title.innerHTML = `<span class="${nameCls}">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change)}</span>`;
+  title.title = `${r.name} → ${r.change}`;
+
+  const card = resultCard({ check: cb, title, titleMono: true, meta: r.badge?.text });
+  if (r.badge) {
+    const meta = card.querySelector('.r-meta') as HTMLElement;
+    meta.className = `tag tag-${r.badge.kind}`;
+  }
+  card.style.marginLeft = indent;
+  return card;
 }
 
 function renderSelectableTree(
@@ -2133,16 +2192,20 @@ interface VariantReportSection {
 
 interface VariantReportLine {
   text: string;
-  cls: string;
+  /** 구분줄(‘빈 조합(미생성):’)인가 — 항목 카드와 달리 그룹 머리로 그린다. */
+  head?: boolean;
+  warn?: boolean;
 }
 
 function makeVariantReportRow(l: VariantReportLine): HTMLElement {
-  const d = document.createElement('div');
-  d.className = l.cls;
-  d.textContent = l.text;
-  // 행 높이가 균일해야 스냅이 성립해 줄바꿈을 막았다 → 잘린 뒷부분은 title로 읽는다.
-  d.title = l.text;
-  return d;
+  if (l.head) {
+    const g = resultGroup(l.text);
+    if (l.warn) g.classList.add('warn');
+    return g;
+  }
+  const card = resultCard({ title: l.text, titleMono: true });
+  if (l.warn) (card.querySelector('.r-title') as HTMLElement).classList.add('warn');
+  return card;
 }
 
 /** 등록·분류가 공유하는 구획(빈 조합 + 실패 진단) — 두 결과가 같은 리포트를 그린다. */
@@ -2161,10 +2224,8 @@ function renderVariantReport(sections: VariantReportSection[]): void {
   $('componentCount').textContent = filled.map((s) => `· ${s.tag} ${s.items.length}개`).join(' ');
   const lines: VariantReportLine[] = [];
   for (const s of filled) {
-    const warn = s.warn ? ' vr-warn' : '';
-    if (s.head) lines.push({ text: s.head, cls: `vr-row vr-head${warn}` });
-    const marker = s.marker ? ` vr-${s.marker}` : '';
-    for (const it of s.items) lines.push({ text: it, cls: `vr-row vr-item${warn}${marker}` });
+    if (s.head) lines.push({ text: s.head, head: true, warn: s.warn });
+    for (const it of s.items) lines.push({ text: it, warn: s.warn });
   }
   // 빈 조합은 베리언트 속성의 곱집합이라 세트 하나로도 수백 줄이 된다 → 청크 렌더.
   // 줄이 0이어도 불러야 마운트가 비워지고 onDone이 테두리·푸터를 걷는다.
@@ -2246,9 +2307,6 @@ function showApplyProgress(label: string): void {
 }
 /** 닮은 프레임 멤버 한 줄 — 마스터 라디오 + 이름 + 완전성 근거(왜 이게 추천인지). */
 function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement {
-  const row = document.createElement('label'); // 라디오와 한 덩어리로 — 줄 아무 데나 눌러도 선택된다
-  row.className = 'simrow';
-
   const radio = document.createElement('input');
   radio.type = 'radio';
   radio.name = 'similarMaster';
@@ -2257,31 +2315,27 @@ function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement
   radio.addEventListener('change', () => {
     if (radio.checked) similarMasterId = m.id;
   });
-  row.appendChild(radio);
-
-  const name = document.createElement('span');
-  name.className = 'cname';
-  name.textContent = m.name;
-  name.title = m.name; // 한 줄 말줄임 → 잘린 부분은 title로 읽는다(.cfind와 동일 규칙)
-  row.appendChild(name);
-
-  if (m.id === recommendedId) {
-    const tag = document.createElement('span');
-    tag.className = 'tag tag-set'; // 기존 배지 규약 재사용
-    tag.textContent = '추천';
-    row.appendChild(tag);
-  }
 
   // 추천 근거를 숫자로 — 텍스트가 얼마나 채워졌는지가 마스터 선택의 핵심이다.
-  const meta = document.createElement('span');
-  meta.className = 'simmeta';
   const parts = [`텍스트 ${m.textFilled}/${m.textTotal}`];
   if (m.images) parts.push(`이미지 ${m.images}`);
   if (m.emptyLayers) parts.push(`빈 칸 ${m.emptyLayers}`);
-  meta.textContent = parts.join(' · ');
-  row.appendChild(meta);
 
-  return row;
+  const card = resultCard({
+    check: radio,
+    title: m.name,
+    summary: parts.join(' · '),
+    summaryMono: true,
+    meta: m.id === recommendedId ? '추천' : '',
+  });
+  if (m.id === recommendedId) (card.querySelector('.r-meta') as HTMLElement).className = 'tag tag-set';
+  // 줄 아무 데나 눌러도 라디오가 선택되게 — 라벨로 감싸던 예전 동작을 유지한다.
+  card.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    radio.checked = true;
+    radio.dispatchEvent(new Event('change'));
+  });
+  return card;
 }
 
 /** 스캔 결과 → 멤버 목록(마스터 라디오) + 무엇이 속성으로 열리는지 요약. */

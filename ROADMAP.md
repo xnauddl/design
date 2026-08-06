@@ -118,6 +118,7 @@
 - [x] 명도 대비 **후속 보정**(텍스트색 기본 + 배경 옵션) — `suggestContrastFix`(OKLCH L 이분 탐색) + 행별 ‘텍스트/배경’ 적용(`APPLY_CONTRAST_FIX`) `(PR #37)` → **철회**: 대비 점검 자체를 제품 범위에서 뺐다(아래)
 - [x] **명도 대비 점검 제거** — 카드·마법사 단계(`접근성 검수`)·메시지(`CHECK_CONTRAST`/`CONTRAST_RESULT`)·`lib/contrast.ts`를 전부 삭제. 접근성 검사는 전용 플러그인의 영역이라 비목표로 확정
 - [x] **변경 이력 제거** — `history.ts`·이력 카드·메시지·기록 호출부 전면 삭제 `(PR #37)`
+- [x] **결과 목록·행 통일(#18)** — 목록별 스크롤 박스(`list-region`·행 높이 스냅·‘모두 펼치기’) 제거 → 패널 body 스크롤. 행은 `.tk`·`.crow`·`.tree-row`·`.simrow`·`.vr-row` 다섯 문법을 `r-card`(체크·제목·요약·메타) 하나로. 트리는 그룹 머리 + 자식 카드. `scripts/verify-lists.mjs`는 상한이 만들던 ‘반쪽 행’을 지키던 하네스라 함께 삭제
 - [x] **단계 레일** — 만들기 4단계(색·토큰·테마·타이포) · 적용 3단계(바인딩·리네임·구조), 한 화면에 한 단계. 바로가기(`goToCreate`·`gotoStep`)도 단계까지 맞춤
 - [x] **설정을 관리 탭으로** — 「플러그인 설정」 카드 신설(기준 크기·리네임 맥락 깊이) + `clientStorage` 자동 저장(`GET/SET_SETTINGS`). 허용오차 칩·입력 제거(0.5 고정), 사다리·허용 입력 제거(격자 8·15% 고정, 미리보기에서 자동 스냅)
 - [x] **변수 편집기 제거** — 카드·행 편집 UI·`lib/variableEdit.ts`·`EDIT_VARIABLE`/`DELETE_VARIABLE`/`GET_VARIABLE_USAGE`·문서 전체 사용처 스캔을 삭제. 변수 값·이름 수정은 Figma Variables 패널의 일이고, 플러그인은 만들기(upsert)·적용(바인딩)이 몫. `GET_VARIABLES`는 다크 테마 카드가 컬렉션·모드를 고르는 데 필요해 남기되 `VarInfo`를 목록용으로 축소(값·스코프 제거), 시작 시 1회 요청으로 배선

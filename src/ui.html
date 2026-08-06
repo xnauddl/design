@@ -267,16 +267,36 @@
        막으려고 행 높이 정수배로 스냅하고 '총 n개 중 m개 표시 · 모두 펼치기'를 달았는데,
        결국 한 화면에 스크롤 영역이 여러 개 생겨 어디를 굴려야 하는지가 매번 문제였다.
        흐름 레이아웃으로 두고 패널 body가 스크롤한다 — 잘릴 상한이 없으니 스냅도 필요 없다. */
-    .results { margin-top: 8px; }
-    .tk { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
-    /* 이름 폭 우선 — 이 목록은 색 외 토큰만 담아 스와치 없는 행이 대부분인데, 빈 14px 거터를
-       늘 두면 좁은 패널(최소 360px)에서 이름 폭만 깎인다. 스와치가 실제로 있는 목록에서만
-       거터를 유지해(행마다 같은 들여쓰기로 정렬) 그 외에는 이름에 폭을 넘긴다. */
-    .tk > .tk-gutter { display: none; }
-    #tokenList.has-swatch .tk > .tk-gutter { display: block; flex: 0 0 14px; }
-    /* 이름 입력만 늘어난다 — 체크박스까지 flex:1이면 행이 무너진다. */
-    .tk input:not([type="checkbox"]) { font: 400 var(--fs) var(--mono); padding: 4px 6px; flex: 1 1 auto; min-width: 0; }
-    .tk > .tk-check { flex: 0 0 auto; margin: 0; }
+    .results { margin-top: 8px; display: grid; gap: 5px; }
+
+    /* 결과 행 = 얇은 카드(#18). 목록마다 달랐던 행 문법(.tk · .crow · .tree-row · .simrow ·
+       .vr-row)을 하나로 모은다. 열은 [체크 | 본문 | 메타] 셋뿐이고, 본문은 제목 한 줄 +
+       요약 한 줄이다. 큰 그림자 금지 — 연한 테두리와 짧은 패딩으로 밀도를 지킨다. */
+    .r-card {
+      border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface);
+      padding: 6px 8px; display: grid; gap: 3px;
+    }
+    .r-card.dim { opacity: .55; }
+    .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
+    .r-top.no-check { grid-template-columns: 1fr auto; }
+    .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */
+    .r-title { font-size: var(--fs); font-weight: 600; color: var(--text); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .r-title.mono, .r-sum.mono { font-family: var(--mono); }
+    .r-title input { font: inherit; border: 0; background: transparent; padding: 0; width: 100%; color: inherit; }
+    .r-title input:focus { outline: 1px solid var(--accent); border-radius: 3px; }
+    .r-sum { font-size: 10px; color: var(--muted); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .r-meta { font-size: 10px; font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+    .r-title.has-swatch { display: flex; align-items: center; gap: 6px; }
+    .r-swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
+    /* 역할 입력처럼 메타 자리에 오는 편집 요소 — 카드 폭을 밀지 않게 고정 폭. */
+    .r-role { width: 104px; font-size: 10px; padding: 3px 5px; }
+    .r-card input[type="checkbox"] { margin: 0; }
+    /* 그룹 머리 — 트리의 루트나 리포트의 구분줄. 카드가 아니라 라벨이다. */
+    .r-group {
+      font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .02em;
+      margin: 6px 0 0; padding-left: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .r-group:first-child { margin-top: 0; }
     /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
     .skip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
     .skip-chip {
@@ -287,27 +307,9 @@
     .skip-chip:hover { border-color: var(--accent); color: var(--accent); }
     .skip-chip.static { cursor: default; color: var(--muted); }
     .skip-chip.static:hover { border-color: var(--border); color: var(--muted); }
-    /* 등장 레이어 수 — 이름과 타입 칩 사이. 1×는 흐리게 해 훑을 때 바로 걸러진다. */
-    .tk-use { flex: 0 0 auto; font: 500 10px/1.6 var(--font); color: var(--text-2); white-space: nowrap; }
-    .tk-use.once { color: var(--muted); }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
-    /* 타입은 맨 끝 10px 흐린 글자였다 → 칩으로. 폭은 88px 고정 — 칩이 내용 폭이면 gap(28px)과
-       letterSpacing·%(81px)의 차이만큼 입력칸 폭이 행마다 어긋나 이름을 훑기 어려웠다.
-       88px = 최장 라벨 letterSpacing·%(81px) + 여유. 단위는 ui.ts가 기호로 줄여 넣는다.
-       그보다 긴 라벨이 들어오면 잘라내되(정렬 유지) 전체 표기는 칩 title에 남는다. */
-    .cat {
-      flex: 0 0 88px; margin-left: auto;
-      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
-      background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: 4px; padding: 0 5px; white-space: nowrap;
-      text-align: center; overflow: hidden; text-overflow: ellipsis;
-    }
     /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
        상한이 사라져 함께 걷는다(표 자체는 #17에서 리스트로 대체). */
-    .crow { display: grid; grid-template-columns: 16px 1fr 120px; gap: 6px; align-items: center; padding: 3px 0; }
-    .crow .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
-    .crow .cn { font-family: var(--mono); font-size: var(--fs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .crow input { font: 400 var(--fs) var(--mono); padding: 4px 6px; width: 100%; }
 
     /* ── 색 정리(ΔE 군집) 요약 ── */
     #colorSection { border-top: 1px solid var(--border); padding-top: 8px; }
@@ -320,17 +322,7 @@
     /* 긴 이름은 nowrap이라 가로로 넘친다 — 가로만 스크롤시킨다(세로는 패널 body). */
     #diff, #bindTree, #compTree {
       font-family: var(--mono); font-size: var(--fs); overflow-x: auto;
-      /* 좌우 여백은 .tree-row가 낸다 — 컨테이너가 또 주면 짝수 행 줄무늬가 테두리에 못 닿아
-         목록이 아니라 들여쓴 문단처럼 보인다. */
-      padding: 0;
     }
-    .tree-row { display: flex; align-items: center; gap: 5px; padding: 2px 7px; white-space: nowrap; }
-    .tree-row:nth-child(even) { background: var(--surface-2); }
-    .tree-row.header { opacity: 1; color: var(--muted); background: none; }
-    .tree-row.affected { font-weight: 500; }
-    .tree-row.context { opacity: 0.5; }
-    .tree-row .tree-ctx { color: var(--muted); }
-    .tree-row input { margin: 0; }
     .before { color: var(--muted); text-decoration: line-through; }
     .tree-name { color: inherit; }
     .after { color: var(--ok); }
@@ -340,29 +332,11 @@
     .tag-set { background: var(--accent-subtle); color: var(--accent-strong); border-color: var(--accent-border); }
     .tag-single { background: var(--ok-subtle); color: var(--ok); border-color: var(--ok); }
 
-    /* ── 컴포넌트 등록/분류 리포트(#variantReport) ── */
-    /* 이 목록만 행 추상화가 없어 클래스 없는 맨 <div>에 **리터럴 공백**(`  ${m}`)으로 들여썼다.
-       공백 들여쓰기는 폭이 좁아지면 줄바꿈에 먹혀 사라지고, 줄이 접히면 행 높이까지 들쭉날쭉해져
-       "행 높이가 균일해야 스냅이 성립한다"는 전제가 깨진다 → 들여쓰기는 CSS, 줄바꿈은 금지.
-       한 줄로 자른 대신 전체 문구는 ui.ts가 title로 붙인다(빈 조합 이름은 길다). */
+    /* 리포트(#variantReport) — 빈 조합 이름이 길어 가로만 넘긴다. 행은 r-card. */
     #variantReport { font-family: var(--mono); font-size: 11px; overflow-x: auto; }
-    .vr-row { line-height: 1.5; padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* 머리줄은 굵기·색만 다르게 — 글꼴 크기·패딩을 건드리면 행 높이가 어긋나 스냅이 깨진다. */
-    .vr-row.vr-head { font-weight: 600; color: var(--text-2); }
-    .vr-row.vr-item { padding-left: 10px; }
-    .vr-row.vr-warn { color: var(--warn); }
-    /* 불릿·‘+’는 내용이 아니라 표시 — textContent에 섞으면 title(전체 문구)에도 딸려 온다. */
-    .vr-row.vr-bullet::before { content: '• '; color: var(--muted); }
-    .vr-row.vr-added::before { content: '+ '; color: var(--muted); }
+    .r-group.warn, .r-title.warn { color: var(--warn); }
+    .r-group.ctx { font-weight: 500; opacity: .75; }
 
-    /* 닮은 프레임 멤버 줄 — 한 줄 고정(이름만 늘어나고 나머지는 고정). 행 높이가 제각각이면
-       목록의 정수배 스냅이 성립하지 않는다(layoutList는 rows[0]을 표본으로 잰다) → 감싸는 대신
-       이름을 말줄임한다. label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
-    .simrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; cursor: pointer; }
-    .simrow .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .simrow input[type="radio"], .simrow .tag, .simrow .simmeta { flex: 0 0 auto; }
-    .simrow .simmeta { color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-    /* 변수 편집기 한 줄 — 이름(늘어남) + 값 + 컬렉션 배지 + 액션. .simrow와 같은 한 줄 규칙. */
     /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
