@@ -517,7 +517,8 @@
     </div>
 
     <!-- 2.5 시맨틱 매핑: 카드 숨김(자동 흡수) — 토큰 생성 적용 시 역할 별칭 자동 생성.
-         DOM은 유지(프리셋의 semanticMap 저장/불러오기·자동 추천이 이 textarea를 사용). -->
+         DOM은 유지 — 카드가 숨김이라 이 textarea가 역할 맵의 단일 출처다
+         (팔레트·색 편집표가 채우고, 자동 추천이 비었을 때만 채우고, 마법사가 읽는다). -->
     <div class="step" data-make-step="token" data-always-hidden style="display:none">
       <h2><span data-i18n="semantic.title">시맨틱 매핑 (역할 → 토큰)</span> <span class="muted" id="semLock"></span></h2>
       <div class="hint" data-i18n-html="semantic.formatLabel">형식: <code>역할 = Global변수이름</code></div>
