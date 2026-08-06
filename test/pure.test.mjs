@@ -47,6 +47,7 @@ import {
   semanticMapToText,
   textToSemanticMap,
   exportTokens,
+  exportHasTokens,
   splitWeightStyle,
   parseVariantName,
   formatVariant,
@@ -557,6 +558,18 @@ test('exportTokens — 동일 이름 Semantic 미러 제거(Global 우선)', () 
 test('exportTokens — 빈 입력', () => {
   assert.equal(exportTokens([], OPTS), ':root {\n}');
   assert.equal(exportTokens([], { ...OPTS, format: 'w3c' }), '{}');
+});
+
+test('exportHasTokens — 껍데기만 있는 결과는 저장 대상이 아님(#8)', () => {
+  // 변수 0개 → 형식별 껍데기. 파일로 떨어뜨리면 안 된다.
+  assert.equal(exportHasTokens(exportTokens([], OPTS), 'css'), false);
+  assert.equal(exportHasTokens(exportTokens([], { ...OPTS, format: 'w3c' }), 'w3c'), false);
+  // 토큰이 하나라도 있으면 저장한다.
+  const tokens = [{ name: 'primary', collection: 'Global', type: 'COLOR', kind: 'color', value: '#2563eb' }];
+  assert.equal(exportHasTokens(exportTokens(tokens, OPTS), 'css'), true);
+  assert.equal(exportHasTokens(exportTokens(tokens, { ...OPTS, format: 'w3c' }), 'w3c'), true);
+  // 깨진 JSON은 저장하지 않는다(파싱 실패 = 내용 확인 불가).
+  assert.equal(exportHasTokens('{nope', 'w3c'), false);
 });
 
 /* ================= components.ts (Phase 3) ================= */
@@ -1607,7 +1620,7 @@ test('pipelineSteps — 전제에 따른 단계 상태', () => {
 test('t — 키 조회·보간·폴백', () => {
   assert.equal(t('rename.none'), '변경할 이름이 없습니다.');
   assert.equal(t('rename.applied', { count: 3 }), '3개 이름 적용 완료.');
-  assert.equal(t('export.done', { format: 'CSS' }), 'CSS 내보냄 — 복사 또는 다운로드.');
+  assert.equal(t('export.saved', { format: 'CSS', file: 'tokens.css' }), 'CSS — tokens.css로 저장했습니다.');
   // 누락 변수는 자리표시자 유지
   assert.equal(t('rename.applied', {}), '{count}개 이름 적용 완료.');
   // 누락 키는 key 그대로 폴백

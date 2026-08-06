@@ -159,7 +159,7 @@ hue·스텝 충돌 시 `…/500-2`)으로 정규화합니다. 역할을 확정�
 - **line-height·letter-spacing**(#16): `Variable.description`의 원본 단위(`160%`·`0.02em`)를 우선 출력(CSS 네이티브; W3C는 비표준 문자열), 없으면 px. 별도 `-px` 스냅샷·옵션은 폐기.
 - **fontWeight/italic**: italic은 굵기가 아니라 `font-style` → `splitWeightStyle`로 분리해 `font-weight` + (italic 시) `font-style: italic`/비표준 `fontStyle` 토큰 동반.
 - **HUG/FILL 비대상**: 레이어 오토레이아웃 sizing은 변수가 아니라 export 대상이 아니다(대응 토큰 없음).
-- UI "내보내기(코드)" 카드에서 형식·폰트단위 선택 → 결과 복사 또는 `tokens.json`/`tokens.css` 다운로드. 게이팅: **Free**(리드젠).
+- UI "내보내기(코드)" 카드에서 형식·폰트단위 선택 → **「내보내기」 한 번에 `tokens.json`/`tokens.css` 파일 저장**. 패널에 코드 미리보기는 두지 않는다(#8) — 좁은 패널의 textarea로 코드를 읽는 사람은 없고, 결과물은 파일이다. 내보낼 변수가 없으면 빈 껍데기(`{}`·`:root {}`)를 저장하는 대신 안내한다(`exportHasTokens`). 게이팅: **Free**(리드젠).
 
 ## 컴포넌트 등록 / 베리언트 분류 (UI 5단계 · Phase 3 구현됨, Paid)
 

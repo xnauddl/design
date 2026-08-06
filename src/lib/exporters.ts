@@ -224,3 +224,18 @@ export function exportTokens(tokens: ExportToken[], opts: ExportOptions): string
   const list = dedupeByName(tokens);
   return opts.format === 'css' ? toCss(list, opts) : toW3C(list, opts);
 }
+
+/**
+ * 내보낸 문자열에 토큰이 하나라도 담겼는가. 대상 변수가 없으면 형식별 껍데기
+ * (`{}` · `:root {\n}`)만 나오는데, 그걸 파일로 저장하면 "내보냈다"는 신호만 남고
+ * 내용은 비어 있다. 저장 전에 이걸로 거른다.
+ */
+export function exportHasTokens(content: string, format: ExportFormat): boolean {
+  if (format === 'css') return /--[\w-]+\s*:/.test(content);
+  try {
+    const root: unknown = JSON.parse(content);
+    return !!root && typeof root === 'object' && Object.keys(root as object).length > 0;
+  } catch {
+    return false;
+  }
+}

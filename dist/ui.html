@@ -782,9 +782,7 @@
       </div>
       <div class="row">
         <button id="btnExport" class="primary" data-i18n="export.runBtn">내보내기</button>
-        <button id="btnDownloadExport" data-i18n="export.downloadBtn">다운로드</button>
       </div>
-      <textarea id="exportOut" spellcheck="false" rows="6" placeholder="내보낸 코드가 여기에 표시됩니다." style="width:100%;"></textarea>
       <div class="status" id="exportStatus"></div>
     </div>
 
@@ -1002,8 +1000,8 @@
     // 목록 공통(상한 해제 — 여러 카드가 같은 문구를 쓴다)
     "list.expandAll": "\uBAA8\uB450 \uD3BC\uCE58\uAE30",
     // 내보내기
-    "export.needFirst": "\uBA3C\uC800 \uB0B4\uBCF4\uB0B4\uAE30\uB97C \uC2E4\uD589\uD558\uC138\uC694.",
-    "export.done": "{format} \uB0B4\uBCF4\uB0C4 \u2014 \uBCF5\uC0AC \uB610\uB294 \uB2E4\uC6B4\uB85C\uB4DC.",
+    "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
+    "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.",
     // 라이선스
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
@@ -1164,7 +1162,6 @@
     "export.format": "\uD615\uC2DD",
     "export.fontUnit": "\uD3F0\uD2B8 \uD06C\uAE30",
     "export.runBtn": "\uB0B4\uBCF4\uB0B4\uAE30",
-    "export.downloadBtn": "\uB2E4\uC6B4\uB85C\uB4DC",
     // 요금제 / 라이선스
     "license.title": "\uC694\uAE08\uC81C / \uB77C\uC774\uC120\uC2A4",
     "license.verify": "\uAC80\uC99D",
@@ -1326,6 +1323,76 @@
   }
   function licenseVerifyConfigured() {
     return !VERIFY_URL.includes("example.") && LICENSE_PUBLIC_JWK.x !== "PLACEHOLDER";
+  }
+
+  // src/lib/naming.ts
+  var EMITTED_ROLES = [
+    // 구조 폴백(역할을 못 정했을 때)
+    "container",
+    "wrapper",
+    "shape",
+    // HTML 랜드마크
+    "header",
+    "footer",
+    "main",
+    "aside",
+    "nav",
+    "section",
+    "article",
+    "figure",
+    // 컴포넌트
+    "button",
+    "chip",
+    "card",
+    "table",
+    "list",
+    "item",
+    "field",
+    "input",
+    "modal",
+    "overlay",
+    "progress",
+    "indicator",
+    // 요소
+    "icon",
+    "image",
+    "thumbnail",
+    "background",
+    "swatch",
+    "border",
+    "divider",
+    "badge",
+    "status",
+    "avatar"
+  ];
+  var RECOGNIZED_ROLES = [
+    "content",
+    "group",
+    "body",
+    "leading",
+    "trailing",
+    "hero",
+    "sidebar",
+    "sheet",
+    "drawer",
+    "dialog",
+    "popup",
+    "tab",
+    "label",
+    "title"
+  ];
+  var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
+  var ROLE_SET = new Set(ROLE_VOCAB);
+
+  // src/lib/exporters.ts
+  function exportHasTokens(content, format) {
+    if (format === "css") return /--[\w-]+\s*:/.test(content);
+    try {
+      const root = JSON.parse(content);
+      return !!root && typeof root === "object" && Object.keys(root).length > 0;
+    } catch (e) {
+      return false;
+    }
   }
 
   // src/lib/color.ts
@@ -1825,7 +1892,6 @@
   var hasGlobal = false;
   var hasBindable = false;
   var hasTextStyles = false;
-  var lastExportFormat = "w3c";
   var lastSelCount = 0;
   var createFrom = "tokens";
   var CHUNK = 150;
@@ -3020,13 +3086,8 @@
     setStatus("exportStatus", t("common.exporting"), "");
     send({ type: "EXPORT", format, fontSizeUnit, base });
   });
-  $("btnDownloadExport").addEventListener("click", () => {
-    const content = $("exportOut").value;
-    if (!content) {
-      setStatus("exportStatus", t("export.needFirst"), "warn");
-      return;
-    }
-    const css = lastExportFormat === "css";
+  function saveExportFile(content, format) {
+    const css = format === "css";
     const blob = new Blob([content], { type: css ? "text/css" : "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -3036,7 +3097,7 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  });
+  }
   $("btnClearLicense").addEventListener("click", () => {
     $("licenseKey").value = "";
     send({ type: "CLEAR_LICENSE" });
@@ -3212,11 +3273,16 @@
         updateGates();
         break;
       }
-      case "EXPORT_RESULT":
-        lastExportFormat = msg.format;
-        $("exportOut").value = msg.content;
-        setStatus("exportStatus", t("export.done", { format: msg.format === "css" ? "CSS" : "W3C JSON" }), "ok");
+      case "EXPORT_RESULT": {
+        const label = msg.format === "css" ? "CSS" : "W3C JSON";
+        if (!exportHasTokens(msg.content, msg.format)) {
+          setStatus("exportStatus", t("export.empty"), "warn");
+          break;
+        }
+        saveExportFile(msg.content, msg.format);
+        setStatus("exportStatus", t("export.saved", { format: label, file: msg.format === "css" ? "tokens.css" : "tokens.json" }), "ok");
         break;
+      }
       case "COMPONENT_CANDIDATES": {
         compCandidates = msg.nodes;
         compChecked.clear();

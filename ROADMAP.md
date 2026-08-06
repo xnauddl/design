@@ -121,3 +121,4 @@
 - [x] **변수 편집기 제거** — 카드·행 편집 UI·`lib/variableEdit.ts`·`EDIT_VARIABLE`/`DELETE_VARIABLE`/`GET_VARIABLE_USAGE`·문서 전체 사용처 스캔을 삭제. 변수 값·이름 수정은 Figma Variables 패널의 일이고, 플러그인은 만들기(upsert)·적용(바인딩)이 몫. `GET_VARIABLES`는 다크 테마 카드가 컬렉션·모드를 고르는 데 필요해 남기되 `VarInfo`를 목록용으로 축소(값·스코프 제거), 시작 시 1회 요청으로 배선
 - [x] **공유 프리셋 제거** — `presets.ts`·프리셋 카드·`GET/SAVE/DELETE_PRESET`·`PRESETS`·`presets` 엔타이틀먼트·`dsl.presets` 저장을 전면 삭제. base·허용오차·맥락단계는 관리 탭에서 `clientStorage` 자동 유지로 대체(설정 자동 유지는 IA 셸 작업). 시맨틱 매핑 텍스트 변환(`semanticMapToText`/`textToSemanticMap`)은 매핑 UI가 쓰므로 `roles.ts`로 이동
 - [x] 내보내기 미리보기 **비목표 확정**(현행 유지 — 코드 변경 없음) `(PR #37)`
+- [x] **내보내기 1버튼화** — 결과 textarea와 '다운로드' 버튼(이원화)을 없애고 「내보내기」가 곧바로 `tokens.json`/`tokens.css`를 저장. 변수가 없으면 껍데기 파일 대신 안내(`exportHasTokens`, 순수·테스트)

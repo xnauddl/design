@@ -9,7 +9,7 @@ import { type Tier, type Feature } from './lib/entitlements';
 import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
-import type { ExportFormat } from './lib/exporters';
+import { exportHasTokens, type ExportFormat } from './lib/exporters';
 import type { FrameMeta } from './lib/similar';
 import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
@@ -42,7 +42,6 @@ let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해�
 let hasGlobal = false;
 let hasBindable = false;
 let hasTextStyles = false;
-let lastExportFormat: ExportFormat = 'w3c';
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'palette' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
 
@@ -1587,13 +1586,9 @@ $('btnExport').addEventListener('click', () => {
   send({ type: 'EXPORT', format, fontSizeUnit, base });
 });
 
-$('btnDownloadExport').addEventListener('click', () => {
-  const content = ($('exportOut') as HTMLTextAreaElement).value;
-  if (!content) {
-    setStatus('exportStatus', t('export.needFirst'), 'warn');
-    return;
-  }
-  const css = lastExportFormat === 'css';
+/** 내보낸 코드를 그대로 파일로 저장 — 패널에 미리보기를 두지 않으므로 결과는 파일뿐이다. */
+function saveExportFile(content: string, format: ExportFormat): void {
+  const css = format === 'css';
   const blob = new Blob([content], { type: css ? 'text/css' : 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1603,7 +1598,7 @@ $('btnDownloadExport').addEventListener('click', () => {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
-});
+}
 
 $('btnClearLicense').addEventListener('click', () => {
   ($('licenseKey') as HTMLInputElement).value = '';
@@ -1822,11 +1817,18 @@ window.onmessage = (event: MessageEvent) => {
       updateGates();
       break;
     }
-    case 'EXPORT_RESULT':
-      lastExportFormat = msg.format;
-      ($('exportOut') as HTMLTextAreaElement).value = msg.content;
-      setStatus('exportStatus', t('export.done', { format: msg.format === 'css' ? 'CSS' : 'W3C JSON' }), 'ok');
+    case 'EXPORT_RESULT': {
+      const label = msg.format === 'css' ? 'CSS' : 'W3C JSON';
+      // 변수가 없으면 껍데기만 남는다('{}' / ':root {}'). 빈 파일을 조용히 떨어뜨리면
+      // 저장된 줄 알고 넘어가니, 파일 대신 이유를 말한다.
+      if (!exportHasTokens(msg.content, msg.format)) {
+        setStatus('exportStatus', t('export.empty'), 'warn');
+        break;
+      }
+      saveExportFile(msg.content, msg.format);
+      setStatus('exportStatus', t('export.saved', { format: label, file: msg.format === 'css' ? 'tokens.css' : 'tokens.json' }), 'ok');
       break;
+    }
     case 'COMPONENT_CANDIDATES': {
       // #1: 하위 등록 후보를 트리로. **반복 이름(group) + 속성접힘(propsOnly)만 기본 체크** —
       // 잡음(컨테이너/래퍼 단발성)은 체크 해제 상태로 두고, 사용자가 필요시 추가 체크.

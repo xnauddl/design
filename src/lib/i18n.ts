@@ -80,8 +80,8 @@ export const STRINGS: Record<string, string> = {
   // 목록 공통(상한 해제 — 여러 카드가 같은 문구를 쓴다)
   'list.expandAll': '모두 펼치기',
   // 내보내기
-  'export.needFirst': '먼저 내보내기를 실행하세요.',
-  'export.done': '{format} 내보냄 — 복사 또는 다운로드.',
+  'export.saved': '{format} — {file}로 저장했습니다.',
+  'export.empty': '내보낼 변수가 없습니다. 먼저 토큰을 생성하세요.',
 
   // 라이선스
   'license.needKey': '라이선스 키를 입력하세요.',
@@ -251,7 +251,6 @@ export const STRINGS: Record<string, string> = {
   'export.format': '형식',
   'export.fontUnit': '폰트 크기',
   'export.runBtn': '내보내기',
-  'export.downloadBtn': '다운로드',
   // 요금제 / 라이선스
   'license.title': '요금제 / 라이선스',
   'license.verify': '검증',
