@@ -935,6 +935,8 @@
     "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
     "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
     "wizard.skip.paid": "Paid \uC804\uC6A9",
+    "wizard.chip.paid": "Paid \uC804\uC6A9 \uB2E8\uACC4\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB701\uB2C8\uB2E4 \u2014 \uAD00\uB9AC \uD0ED\uC5D0\uC11C \uB77C\uC774\uC120\uC2A4\uB97C \uB4F1\uB85D\uD558\uBA74 \uD568\uAED8 \uB3D5\uB2C8\uB2E4",
+    "wizard.paidSkipped": " \xB7 Paid \uC804\uC6A9\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC73C\uB2C8 \uC774\uBBF8 \uC788\uB294 \uBCC0\uC218\uC5D0\uB9CC \uC5F0\uACB0\uD569\uB2C8\uB2E4",
     // 진행 안내(파이프라인) 단계 상태
     "pipeline.stat.done": "\uC644\uB8CC",
     "pipeline.stat.ready": "\uC900\uBE44",
@@ -1835,11 +1837,11 @@
   ];
   function planWizard(options, ctx) {
     return WIZARD_STEPS.map((step) => {
-      if (step.paid && !ctx.isPaid) return { step, run: false, skipReason: "wizard.skip.paid" };
-      if (!step.optional) return { step, run: true };
-      const enabled = options[step.id];
-      if (!enabled) return { step, run: false, skipReason: "wizard.skip.optionOff" };
-      if (step.id === "semantics" && !ctx.hasSemanticMap) return { step, run: false, skipReason: "wizard.skip.noMapping" };
+      if (step.optional) {
+        const enabled = options[step.id];
+        if (!enabled) return { step, run: false, skipReason: "wizard.skip.optionOff" };
+        if (step.id === "semantics" && !ctx.hasSemanticMap) return { step, run: false, skipReason: "wizard.skip.noMapping" };
+      }
       if (step.paid && !ctx.isPaid) return { step, run: false, skipReason: "wizard.skip.paid" };
       return { step, run: true };
     });
@@ -2699,15 +2701,28 @@
   function hideWizardBar() {
     $("wizardBar").style.display = "none";
   }
+  function paidSkippedSteps(plan) {
+    return plan.filter((p) => !p.run && p.skipReason === "wizard.skip.paid");
+  }
   function renderWizardSteps(plan) {
     const box = $("wizardSteps");
     box.innerHTML = "";
-    plan.filter((p) => p.run).forEach((p, i) => {
+    let n = 0;
+    for (const p of plan) {
+      const paidSkip = !p.run && p.skipReason === "wizard.skip.paid";
+      if (!p.run && !paidSkip) continue;
       const chip = document.createElement("span");
       chip.id = `wstep-${p.step.id}`;
-      chip.textContent = `${i + 1} ${t("wizard.step." + p.step.id)}`;
+      const label = t("wizard.step." + p.step.id);
+      if (p.run) {
+        chip.textContent = `${++n} ${label}`;
+      } else {
+        chip.className = "skip";
+        chip.textContent = `${PAID_LOCK} ${label}`;
+        chip.title = t("wizard.chip.paid");
+      }
       box.appendChild(chip);
-    });
+    }
   }
   function setWizardStep(id, state, note) {
     const chip = document.getElementById(`wstep-${id}`);
@@ -2809,10 +2824,12 @@
     wizardRunning = false;
     $("btnWizardRun").disabled = false;
     $("btnWizardCancel").style.display = "none";
+    const paidSkipped = paidSkippedSteps(plan);
+    const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
     setStatus(
       "wizardSummary",
-      t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + (failNote ? ` \xB7 ${failNote}` : ""),
-      stopped ? "warn" : "ok"
+      t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
+      stopped || paidSkipped.length ? "warn" : "ok"
     );
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());

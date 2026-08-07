@@ -60,6 +60,17 @@ test('planWizard — Free면 만드는 단계(생성·시맨틱·컴포넌트화
   assert.deepEqual(runIds(plan), ['extract', 'bind', 'rename']);
 });
 
+test('planWizard — Free라도 끄고 시작한 선택 단계는 Paid가 아니라 옵션 꺼짐', () => {
+  // UI가 skipReason='wizard.skip.paid'인 단계에 자물쇠 칩을 그린다 — 안 켠 단계까지 'Paid 전용'으로
+  // 적으면 살 생각도 없던 기능이 잠금으로 세어져 파이프가 자물쇠로 뒤덮인다.
+  const plan = planWizard(ALL_OFF, { isPaid: false, hasSemanticMap: true });
+  assert.equal(item(plan, 'semantics').skipReason, 'wizard.skip.optionOff');
+  assert.equal(item(plan, 'componentize').skipReason, 'wizard.skip.optionOff');
+  // 필수 단계인 '생성'은 끌 수 없으므로 그대로 Paid — 자물쇠 칩은 이것 하나만 뜬다.
+  assert.equal(item(plan, 'create').skipReason, 'wizard.skip.paid');
+  assert.deepEqual(runIds(plan), ['extract', 'bind', 'rename']);
+});
+
 test('summarize — 집계가 있는 항목만 표시', () => {
   assert.equal(
     summarize({ created: 12, bound: 30, renamed: 8, components: 3 }),

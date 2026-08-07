@@ -95,6 +95,8 @@ export const STRINGS: Record<string, string> = {
   'wizard.skip.optionOff': '옵션 꺼짐',
   'wizard.skip.noMapping': '매핑 없음',
   'wizard.skip.paid': 'Paid 전용',
+  'wizard.chip.paid': 'Paid 전용 단계라 이번 실행에서는 건너뜁니다 — 관리 탭에서 라이선스를 등록하면 함께 돕니다',
+  'wizard.paidSkipped': ' · Paid 전용이라 건너뜀: {steps} — 새 변수를 만들지 않았으니 이미 있는 변수에만 연결합니다',
 
   // 진행 안내(파이프라인) 단계 상태
   'pipeline.stat.done': '완료',

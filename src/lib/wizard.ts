@@ -66,12 +66,14 @@ export interface WizardPlanItem {
  */
 export function planWizard(options: WizardOptions, ctx: WizardContext): WizardPlanItem[] {
   return WIZARD_STEPS.map((step) => {
-    if (step.paid && !ctx.isPaid) return { step, run: false, skipReason: 'wizard.skip.paid' };
-    if (!step.optional) return { step, run: true };
     // skipReason은 i18n 키(UI가 t()로 해석 — 외부화).
-    const enabled = options[step.id as keyof WizardOptions];
-    if (!enabled) return { step, run: false, skipReason: 'wizard.skip.optionOff' };
-    if (step.id === 'semantics' && !ctx.hasSemanticMap) return { step, run: false, skipReason: 'wizard.skip.noMapping' };
+    // 선택 단계는 티어보다 옵션을 먼저 본다: 끄고 시작한 단계까지 'Paid 전용'으로 적으면
+    // 화면이 사지도 않을 것을 잠금으로 세고, UI가 그 사유로 자물쇠 칩을 그리게 된다.
+    if (step.optional) {
+      const enabled = options[step.id as keyof WizardOptions];
+      if (!enabled) return { step, run: false, skipReason: 'wizard.skip.optionOff' };
+      if (step.id === 'semantics' && !ctx.hasSemanticMap) return { step, run: false, skipReason: 'wizard.skip.noMapping' };
+    }
     if (step.paid && !ctx.isPaid) return { step, run: false, skipReason: 'wizard.skip.paid' };
     return { step, run: true };
   });

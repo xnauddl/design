@@ -1152,17 +1152,34 @@ function hideWizardBar(): void {
   $('wizardBar').style.display = 'none';
 }
 
-/** 계획을 미니 파이프 칩으로 — 실제로 돌 단계만 번호순으로. 결과·사유는 칩 툴팁(와이어).
-    건너뛴 단계는 칩을 만들지 않는다: 왜 빠졌는지는 바로 위 옵션 체크박스가 이미 말한다. */
+/** Paid라서 이번 실행에서 빠진 단계들. 칩과 요약 줄이 같은 목록을 쓴다. */
+function paidSkippedSteps(plan: WizardPlanItem[]): WizardPlanItem[] {
+  return plan.filter((p) => !p.run && p.skipReason === 'wizard.skip.paid');
+}
+
+/** 계획을 미니 파이프 칩으로 — 돌 단계는 번호순, 결과·사유는 칩 툴팁(와이어).
+    옵션을 꺼서 빠진 단계는 칩을 만들지 않는다: 왜 빠졌는지는 바로 위 체크박스가 이미 말한다.
+    반면 Paid로 빠진 단계는 화면 어디에도 단서가 없어, 칩까지 지우면 Free 사용자는 파이프가
+    왜 세 칸만 도는지 알 길이 없다 — 자물쇠 회색 칩으로 자리를 남긴다. */
 function renderWizardSteps(plan: WizardPlanItem[]): void {
   const box = $('wizardSteps');
   box.innerHTML = '';
-  plan.filter((p) => p.run).forEach((p, i) => {
+  let n = 0;
+  for (const p of plan) {
+    const paidSkip = !p.run && p.skipReason === 'wizard.skip.paid';
+    if (!p.run && !paidSkip) continue;
     const chip = document.createElement('span');
     chip.id = `wstep-${p.step.id}`;
-    chip.textContent = `${i + 1} ${t('wizard.step.' + p.step.id)}`;
+    const label = t('wizard.step.' + p.step.id);
+    if (p.run) {
+      chip.textContent = `${++n} ${label}`;
+    } else {
+      chip.className = 'skip';
+      chip.textContent = `${PAID_LOCK} ${label}`;
+      chip.title = t('wizard.chip.paid');
+    }
     box.appendChild(chip);
-  });
+  }
 }
 
 function setWizardStep(id: WizardStepId, state: 'active' | 'done' | 'fail', note: string): void {
@@ -1274,11 +1291,18 @@ async function runWizard(): Promise<void> {
   wizardRunning = false;
   ($('btnWizardRun') as HTMLButtonElement).disabled = false;
   $('btnWizardCancel').style.display = 'none';
+  // 칩 툴팁만으로는 사라진다 — 무엇이 왜 안 돌았는지는 요약 줄에도 적는다(#15).
+  // 특히 '토큰'이 빠지면 새 변수가 없어 연결 수가 0에 가까운데, 그 인과가 화면에 없었다.
+  const paidSkipped = paidSkippedSteps(plan);
+  const paidNote = paidSkipped.length
+    ? t('wizard.paidSkipped', { steps: paidSkipped.map((p) => t('wizard.step.' + p.step.id)).join(' · ') })
+    : '';
   setStatus(
     'wizardSummary',
     t('wizard.result', { state: stopped ? t('wizard.stopped') : t('wizard.completed'), summary: summarize(totals) }) +
+      paidNote +
       (failNote ? ` · ${failNote}` : ''),
-    stopped ? 'warn' : 'ok',
+    stopped || paidSkipped.length ? 'warn' : 'ok',
   );
 }
 
