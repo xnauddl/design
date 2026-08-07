@@ -286,6 +286,9 @@
 
     /* ── 마법사 미니 파이프 — 세로 목록 대신 칩 4개로 진행만 ── */
     .pipe-mini { display: flex; flex-wrap: wrap; gap: 4px; }
+    /* 칩은 실행을 눌러야 생긴다 — 그전까지 빈 채로 두면 높이는 0이어도 카드의 `* + *` 마진은
+       그대로 먹어, 아래 범례가 버튼에서 한 칸 더 떨어져 보인다. */
+    .pipe-mini:empty { display: none; }
     .pipe-mini span {
       font: 500 10px/1.5 var(--mono); padding: 2px 7px; border-radius: 999px;
       border: 1px solid var(--border); background: var(--surface-2); color: var(--muted);
@@ -446,6 +449,10 @@
       </div>
       <!-- 실행 단계는 세로 목록이 아니라 미니 파이프 칩 — 진행 상태만 한눈에(사유는 칩 툴팁). -->
       <div id="wizardSteps" class="pipe-mini"></div>
+      <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
+           파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
+           흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기. 다크·텍스트 스타일은 만들기에서</div>
       <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
       <div class="status" id="wizardSummary"></div>
     </div>

@@ -286,6 +286,9 @@
 
     /* ── 마법사 미니 파이프 — 세로 목록 대신 칩 4개로 진행만 ── */
     .pipe-mini { display: flex; flex-wrap: wrap; gap: 4px; }
+    /* 칩은 실행을 눌러야 생긴다 — 그전까지 빈 채로 두면 높이는 0이어도 카드의 `* + *` 마진은
+       그대로 먹어, 아래 범례가 버튼에서 한 칸 더 떨어져 보인다. */
+    .pipe-mini:empty { display: none; }
     .pipe-mini span {
       font: 500 10px/1.5 var(--mono); padding: 2px 7px; border-radius: 999px;
       border: 1px solid var(--border); background: var(--surface-2); color: var(--muted);
@@ -446,6 +449,10 @@
       </div>
       <!-- 실행 단계는 세로 목록이 아니라 미니 파이프 칩 — 진행 상태만 한눈에(사유는 칩 툴팁). -->
       <div id="wizardSteps" class="pipe-mini"></div>
+      <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
+           파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
+           흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기. 다크·텍스트 스타일은 만들기에서</div>
       <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
       <div class="status" id="wizardSummary"></div>
     </div>
@@ -939,7 +946,7 @@
     "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
     "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
     "wizard.skip.paid": "Paid \uC804\uC6A9",
-    "wizard.chip.paid": "Paid \uC804\uC6A9 \uB2E8\uACC4\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB701\uB2C8\uB2E4 \u2014 \uAD00\uB9AC \uD0ED\uC5D0\uC11C \uB77C\uC774\uC120\uC2A4\uB97C \uB4F1\uB85D\uD558\uBA74 \uD568\uAED8 \uB3D5\uB2C8\uB2E4",
+    "wizard.chip.paid": "Paid \uC804\uC6A9 \uB2E8\uACC4\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB701\uB2C8\uB2E4 \u2014 \uC124\uC815 \uD0ED\uC5D0\uC11C \uB77C\uC774\uC120\uC2A4\uB97C \uB4F1\uB85D\uD558\uBA74 \uD568\uAED8 \uB3D5\uB2C8\uB2E4",
     "wizard.paidSkipped": " \xB7 Paid \uC804\uC6A9\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC73C\uB2C8 \uC774\uBBF8 \uC788\uB294 \uBCC0\uC218\uC5D0\uB9CC \uC5F0\uACB0\uD569\uB2C8\uB2E4",
     // 진행 안내(파이프라인) 단계 상태
     "pipeline.stat.done": "\uC644\uB8CC",
@@ -1008,7 +1015,7 @@
     "rail.structure": "\uCEF4\uD3EC\uB10C\uD2B8",
     "rail.structureSub": "\uB2EE\uC740 \uD504\uB808\uC784",
     "rail.next": "\uB2E4\uC74C \u2192",
-    // 플러그인 설정(#19) — 관리 탭에만
+    // 플러그인 설정(#19) — 설정 탭에만
     "settings.title": "\uAE30\uBCF8\uAC12",
     "settings.hint": "\uC790\uC8FC \uC548 \uBC14\uAFB8\uB294 \uAC12\uC774\uC5D0\uC694. \uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9 \uD654\uBA74\uC5D0\uB294 \uC548 \uBCF4\uC5EC\uC694",
     "settings.base": "\uAE30\uC900 \uD06C\uAE30",
@@ -1031,6 +1038,9 @@
     "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
+    // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
+    // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
+    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uBCC0\uC218\uC5F0\uACB0=\uD654\uBA74\uC5D0 \uBD99\uC774\uAE30. \uB2E4\uD06C\xB7\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC740 \uB9CC\uB4E4\uAE30\uC5D0\uC11C",
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4",
     "prereq.gotoCreate": "\uD1A0\uD070 \uC0DD\uC131\uC73C\uB85C \u2192",

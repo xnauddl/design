@@ -36,10 +36,10 @@ const selection = () => figma.currentPage.selection;
    결과(LICENSE_VERIFIED)만 받아 캐시·적용한다. 여기서는 fetch/crypto를 직접 하지 않는다. */
 const DEV_TIER_KEY = 'dsl.devTier';
 const CACHE_KEY = 'dsl.licenseCache';
-// #19: 기준 크기·리네임 맥락 깊이는 관리 탭에서만 바꾸고 이 파일에 기억한다(입력을 단계에 두지 않으므로).
+// #19: 기준 크기·리네임 맥락 깊이는 설정 탭에서만 바꾸고 이 파일에 기억한다(입력을 단계에 두지 않으므로).
 const SETTINGS_KEY = 'dsl.settings';
 // grid=여백·크기 토큰을 모으는 격자, tolerance=바인딩이 같은 값으로 보는 차이. 둘은 한 쌍이라
-// 관리 탭에 나란히 두고 함께 보관한다(#19 결정 수정 2026-08-07).
+// 설정 탭에 나란히 두고 함께 보관한다(#19 결정 수정 2026-08-07).
 const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, hideOnboard: false, grid: 8, tolerance: 0.5 };
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)

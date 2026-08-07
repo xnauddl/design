@@ -684,10 +684,10 @@ $('btnExtract').addEventListener('click', () => {
 /* 스케일 사다리 정리 — #19로 만들기 단계의 입력·버튼을 없앴다. 미리보기를 만들 때 자동으로
    한 번 돌린다: 손으로 그린 13·15 같은 값이 격자로 모여야 토큰 수가 줄고, 그 수치로 바인딩이
    걸린다. 무엇이 옮겨졌는지는 요약 한 줄로 알린다.
-   격자 크기는 관리 탭에서만 고친다(허용오차와 한 쌍이라 거기서 같이 본다). */
+   격자 크기는 설정 탭에서만 고친다(허용오차와 한 쌍이라 거기서 같이 본다). */
 const TIDY_GRID_DEFAULT = 8;
 const TIDY_RATIO = 0.15; // 값 대비 이 비율 안이면 격자로 이동
-/** 관리 탭의 격자 값(없거나 이상하면 기본 8). */
+/** 설정 탭의 격자 값(없거나 이상하면 기본 8). */
 function tidyGrid(): number {
   const v = Math.round(Number(($('grid') as HTMLInputElement).value));
   return isFinite(v) && v >= 1 ? v : TIDY_GRID_DEFAULT;
@@ -768,7 +768,7 @@ $('btnCreateApply').addEventListener('click', () => {
 // 즉시 ‘적용’을 감추고 새 base로 미리보기를 다시 돌린다(미리보기는 변수를 만들지 않는 읽기).
 let basePreviewTimer = 0;
 
-/* #19: 설정은 관리 탭에만 있고, 바뀌면 곧바로 파일에 기억한다(저장 버튼 없음).
+/* #19: 설정은 설정 탭에만 있고, 바뀌면 곧바로 파일에 기억한다(저장 버튼 없음).
    타이핑 중 매 키마다 보내지 않도록 한 박자 늦춘다. */
 let settingsSaveTimer = 0;
 function saveSettings(): void {
@@ -1033,11 +1033,11 @@ $('btnApplyExistingText').addEventListener('click', () => {
   send({ type: 'APPLY_TEXT_STYLES' });
 });
 
-/* #6: 허용오차는 만들기·적용 단계에서 칩·입력으로 노출하지 않는다 — 값은 관리 탭에서만 고친다.
+/* #6: 허용오차는 만들기·적용 단계에서 칩·입력으로 노출하지 않는다 — 값은 설정 탭에서만 고친다.
    기본 0.5px는 반올림 오차만 흡수하는 값이다(0은 소수점 때문에 실제로 안 붙고, 크게 잡으면
    의도치 않은 값까지 끌어와 과매칭이 된다). 격자를 키운 사람은 여기도 같이 키워야 한다. */
 const BIND_TOLERANCE_DEFAULT = 0.5;
-/** 관리 탭의 허용오차(없거나 이상하면 기본 0.5). */
+/** 설정 탭의 허용오차(없거나 이상하면 기본 0.5). */
 function bindTolerance(): number {
   const v = Number(($('tol') as HTMLInputElement).value);
   return isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
@@ -1197,7 +1197,7 @@ async function runWizard(): Promise<void> {
     setStatus('wizardSummary', t('wizard.needSelect'), 'warn');
     return;
   }
-  // 설정값은 관리 탭 '플러그인 설정'에서 읽는다(단일 출처) — 격자·허용오차도 거기 값을 그대로 쓴다.
+  // 설정값은 설정 탭 '플러그인 설정'에서 읽는다(단일 출처) — 격자·허용오차도 거기 값을 그대로 쓴다.
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   const tolerance = bindTolerance();
   const maxDepth = readMaxDepth();

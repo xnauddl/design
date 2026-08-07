@@ -155,7 +155,7 @@ export type UiToCode =
   | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[] } // Phase 3(Paid): 후보(트리 선택 nodeIds, 없으면 선택 프레임 '내부' 후보) → 메인 컴포넌트 등록 + 베이스 묶음 베리언트 세트
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Paid): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Paid): 선택 세트의 빠진 조합 자동 생성
-  | { type: 'GET_SETTINGS' } // #19: 관리 탭 설정(기준 크기·리네임 맥락 깊이) 불러오기
+  | { type: 'GET_SETTINGS' } // #19: 설정 탭 설정(기준 크기·리네임 맥락 깊이) 불러오기
   | { type: 'SET_SETTINGS'; base: number; maxDepth: number; hideOnboard: boolean; grid: number; tolerance: number } // 바뀔 때마다 clientStorage에 보관
   | { type: 'GET_VARIABLES' } // 3계층 변수 목록(다크 테마 생성의 컬렉션·모드 선택용)
   // 모드 id는 선택 — 생략하면 themeApply가 Light를 고르고 Dark가 없으면 addMode('Dark')로 만든다.

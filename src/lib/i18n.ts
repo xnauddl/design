@@ -101,7 +101,7 @@ export const STRINGS: Record<string, string> = {
   'wizard.skip.optionOff': '옵션 꺼짐',
   'wizard.skip.noMapping': '매핑 없음',
   'wizard.skip.paid': 'Paid 전용',
-  'wizard.chip.paid': 'Paid 전용 단계라 이번 실행에서는 건너뜁니다 — 관리 탭에서 라이선스를 등록하면 함께 돕니다',
+  'wizard.chip.paid': 'Paid 전용 단계라 이번 실행에서는 건너뜁니다 — 설정 탭에서 라이선스를 등록하면 함께 돕니다',
   'wizard.paidSkipped': ' · Paid 전용이라 건너뜀: {steps} — 새 변수를 만들지 않았으니 이미 있는 변수에만 연결합니다',
 
   // 진행 안내(파이프라인) 단계 상태
@@ -176,7 +176,7 @@ export const STRINGS: Record<string, string> = {
   'rail.structure': '컴포넌트',
   'rail.structureSub': '닮은 프레임',
   'rail.next': '다음 →',
-  // 플러그인 설정(#19) — 관리 탭에만
+  // 플러그인 설정(#19) — 설정 탭에만
   'settings.title': '기본값',
   'settings.hint': '자주 안 바꾸는 값이에요. 만들기·적용 화면에는 안 보여요',
   'settings.base': '기준 크기',
@@ -199,6 +199,9 @@ export const STRINGS: Record<string, string> = {
   'wizardCard.optSemantics': '역할 매핑',
   'wizardCard.optComponentize': '컴포넌트',
   'wizardCard.run': '전체 실행',
+  // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
+  // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
+  'wizardCard.legend': '역할 매핑=색 역할 · 변수연결=화면에 붙이기. 다크·텍스트 스타일은 만들기에서',
   // 공통(정적 라벨)
   'common.selectAll': '전체',
   'prereq.gotoCreate': '토큰 생성으로 →',
