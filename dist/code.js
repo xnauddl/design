@@ -441,19 +441,6 @@
     }
     return { l: lch.l, c: lo, h: lch.h };
   }
-  function relativeLuminance(rgb) {
-    const r = srgbToLinear(rgb.r);
-    const g = srgbToLinear(rgb.g);
-    const b = srgbToLinear(rgb.b);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  }
-  function contrastRatio(a, b) {
-    const la = relativeLuminance(a);
-    const lb = relativeLuminance(b);
-    const hi = Math.max(la, lb);
-    const lo = Math.min(la, lb);
-    return (hi + 0.05) / (lo + 0.05);
-  }
 
   // src/lib/colorName.ts
   var STEP_LIST = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
@@ -674,8 +661,12 @@
         if (lh.unit === "PERCENT") lineHeightPercent = roundN(lh.value);
       }
       let letterSpacing = 0;
+      let letterSpacingPercent = 0;
       const ls = t.letterSpacing;
-      if (ls !== figma.mixed) letterSpacing = ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
+      if (ls !== figma.mixed) {
+        letterSpacing = ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
+        if (ls.unit === "PERCENT") letterSpacingPercent = roundN(ls.value);
+      }
       const sid = t.textStyleId;
       const styleId = sid === figma.mixed ? "" : sid;
       let characters = "";
@@ -697,6 +688,7 @@
         lineHeight,
         lineHeightPercent,
         letterSpacing,
+        letterSpacingPercent,
         family,
         style,
         layerName: t.name,
@@ -721,6 +713,10 @@
     if (ls === figma.mixed) return 0;
     return ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
   }
+  function lsPctOf(ls) {
+    if (ls === figma.mixed || ls.unit !== "PERCENT") return 0;
+    return roundN(ls.value);
+  }
   async function scanExistingTextStyles() {
     const out = [];
     for (const s of await figma.getLocalTextStylesAsync()) {
@@ -738,7 +734,7 @@
     return out;
   }
   async function createSemanticTextStyles(specs, apply, nodes) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g;
     const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
     if (!specs.length) return res;
     const existing = await figma.getLocalTextStylesAsync();
@@ -801,7 +797,23 @@
       prev.fontSize = void 0;
       res.notes.push(`${name}: \uC5ED\uD560\uB9C8\uB2E4 \uD589\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)`);
     };
-    const pushAlias = (role, fontSize, lineHeight, letterSpacing, lineHeightPercent = 0) => {
+    const lsTokens = /* @__PURE__ */ new Map();
+    const pushLetterSpacingTok = (name, px, pct, fontSize) => {
+      const prev = lsTokens.get(name);
+      if (!prev) {
+        const t = pct !== 0 ? { name, category: "letterSpacing", value: pct, unit: "percent", fontSize, sources: ["letterSpacing"] } : { name, category: "letterSpacing", value: px, unit: "px", sources: ["letterSpacing"] };
+        lsTokens.set(name, t);
+        pushTok(t);
+        return;
+      }
+      const prevPct = prev.unit === "percent" ? Number(prev.value) : 0;
+      if (prevPct === pct && (pct === 0 || prev.fontSize === fontSize)) return;
+      prev.value = px;
+      prev.unit = "px";
+      prev.fontSize = void 0;
+      res.notes.push(`${name}: \uC5ED\uD560\uB9C8\uB2E4 \uC790\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)`);
+    };
+    const pushAlias = (role, fontSize, lineHeight, letterSpacing, lineHeightPercent = 0, letterSpacingPercent = 0) => {
       pushTok({ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] });
       aliasMap[`font-size/${role}`] = numberTokenName("font-size", fontSize);
       if (lineHeight > 0) {
@@ -810,17 +822,18 @@
         aliasMap[`line-height/${role}`] = lhName;
       }
       if (letterSpacing !== 0) {
-        pushTok({ name: numberTokenName("letter-spacing", letterSpacing), category: "letterSpacing", value: letterSpacing, unit: "px", sources: ["letterSpacing"] });
-        aliasMap[`letter-spacing/${role}`] = numberTokenName("letter-spacing", letterSpacing);
+        const lsName = numberTokenName("letter-spacing", letterSpacing);
+        pushLetterSpacingTok(lsName, letterSpacing, letterSpacingPercent, fontSize);
+        aliasMap[`letter-spacing/${role}`] = lsName;
       }
     };
     for (const s of specs) {
       if (anchoredStyle(s)) continue;
-      pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing, (_b = s.lineHeightPercent) != null ? _b : 0);
+      pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing, (_b = s.lineHeightPercent) != null ? _b : 0, (_c = s.letterSpacingPercent) != null ? _c : 0);
     }
     {
       const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-      const semId0 = (_c = cols0.find((c) => c.name === SEMANTIC)) == null ? void 0 : _c.id;
+      const semId0 = (_d = cols0.find((c) => c.name === SEMANTIC)) == null ? void 0 : _d.id;
       const semNames = /* @__PURE__ */ new Set();
       if (semId0) {
         for (const v of await figma.variables.getLocalVariablesAsync())
@@ -831,13 +844,13 @@
         if (!st) continue;
         if (semNames.has(`font-size/${s.name}`)) continue;
         const fontSize = roundN(st.fontSize);
-        pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight));
+        pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing));
       }
     }
     if (tokens.length) await createTokens(tokens, 16);
     if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_d = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _d.id;
+    const semId = (_e = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _e.id;
     const semByName = /* @__PURE__ */ new Map();
     if (semId) {
       for (const v of await figma.variables.getLocalVariablesAsync())
@@ -876,9 +889,10 @@
         }
         style.fontName = loaded;
         style.fontSize = spec.fontSize;
-        const pct = (_e = spec.lineHeightPercent) != null ? _e : 0;
+        const pct = (_f = spec.lineHeightPercent) != null ? _f : 0;
         style.lineHeight = spec.lineHeight > 0 ? pct > 0 ? { value: pct, unit: "PERCENT" } : { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
-        style.letterSpacing = { value: spec.letterSpacing, unit: "PIXELS" };
+        const lsPct = (_g = spec.letterSpacingPercent) != null ? _g : 0;
+        style.letterSpacing = lsPct !== 0 ? { value: lsPct, unit: "PERCENT" } : { value: spec.letterSpacing, unit: "PIXELS" };
       }
       const bindRole = style.name;
       const fsVar = semByName.get(`font-size/${bindRole}`);
@@ -899,11 +913,16 @@
         }
       }
       if (spec.letterSpacing !== 0 || isRename) {
-        const lsVar = semByName.get(`letter-spacing/${bindRole}`);
-        if (lsVar) {
-          style.setBoundVariable("letterSpacing", lsVar);
-          res.bound++;
-        } else if (spec.letterSpacing !== 0) res.missing.push(`letter-spacing/${bindRole}`);
+        const lsPctNow = lsPctOf(style.letterSpacing);
+        if (lsPctNow !== 0) {
+          res.notes.push(`${bindRole}: \uC790\uAC04 ${lsPctNow}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uBC14\uC778\uB529 \uC0DD\uB7B5`);
+        } else {
+          const lsVar = semByName.get(`letter-spacing/${bindRole}`);
+          if (lsVar) {
+            style.setBoundVariable("letterSpacing", lsVar);
+            res.bound++;
+          } else if (spec.letterSpacing !== 0) res.missing.push(`letter-spacing/${bindRole}`);
+        }
       }
       res[created ? "created" : "updated"]++;
       styleByName.set(style.name, style);
@@ -996,6 +1015,7 @@
   var RAMP_NAMES = ["display", "h1", "h2", "h3", "title", "body", "caption", "overline"];
   var sigKey = (s) => `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
   function clusterTextStyles(samples) {
+    var _a;
     const map = /* @__PURE__ */ new Map();
     const ids = /* @__PURE__ */ new Map();
     for (const s of samples) {
@@ -1004,12 +1024,14 @@
       if (ex) {
         ex.count++;
         if (!ex.lineHeightPercent && s.lineHeightPercent) ex.lineHeightPercent = s.lineHeightPercent;
+        if (!ex.letterSpacingPercent && s.letterSpacingPercent) ex.letterSpacingPercent = s.letterSpacingPercent;
       } else {
         map.set(k, {
           fontSize: s.fontSize,
           lineHeight: s.lineHeight,
           lineHeightPercent: s.lineHeightPercent,
           letterSpacing: s.letterSpacing,
+          letterSpacingPercent: (_a = s.letterSpacingPercent) != null ? _a : 0,
           family: s.family,
           style: s.style,
           count: 1,
@@ -1025,6 +1047,7 @@
   }
   var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   function nameTextStyles(clusters, existing) {
+    var _a;
     const nameById = /* @__PURE__ */ new Map();
     const sigById = /* @__PURE__ */ new Map();
     const idBySig = /* @__PURE__ */ new Map();
@@ -1070,14 +1093,14 @@
       for (const c of group) {
         const boundId = boundIdOf(c);
         const name = boundId ? nameById.get(boundId) : unique(group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`);
-        specs.push(__spreadValues(__spreadValues({
+        specs.push(__spreadValues(__spreadValues(__spreadValues({
           name,
           fontSize: c.fontSize,
           lineHeight: c.lineHeight,
           letterSpacing: c.letterSpacing,
           family: c.family,
           style: c.style
-        }, c.lineHeightPercent ? { lineHeightPercent: c.lineHeightPercent } : {}), boundId ? { boundStyleId: boundId } : {}));
+        }, c.lineHeightPercent ? { lineHeightPercent: c.lineHeightPercent } : {}), ((_a = c.letterSpacingPercent) != null ? _a : 0) !== 0 ? { letterSpacingPercent: c.letterSpacingPercent } : {}), boundId ? { boundStyleId: boundId } : {}));
       }
     }
     return specs;
@@ -3646,70 +3669,6 @@
     });
   }
 
-  // src/lib/contrast.ts
-  function isLargeText(fontSizePx, bold) {
-    if (fontSizePx >= 24) return true;
-    return bold && fontSizePx >= 18.66;
-  }
-  function requiredRatio(level, large) {
-    if (level === "AAA") return large ? 4.5 : 7;
-    return large ? 3 : 4.5;
-  }
-  var round2 = (n) => Math.round(n * 100) / 100;
-  var clamp012 = (n) => Math.min(1, Math.max(0, n));
-  function adjustLForContrast(srcHex, otherHex, required) {
-    const src = hexToOklch(srcHex);
-    const otherRgb = hexToRgb(otherHex);
-    const at = (L) => {
-      const hex = oklchToHex(clampToGamut({ l: clamp012(L), c: src.c, h: src.h }));
-      return { hex, ratio: contrastRatio(hexToRgb(hex), otherRgb) };
-    };
-    if (at(src.l).ratio >= required) return srcHex;
-    const solve = (toL) => {
-      if (at(toL).ratio < required) return { ok: false, L: toL, hex: at(toL).hex };
-      let lo = src.l;
-      let hi = toL;
-      for (let i = 0; i < 24; i++) {
-        const mid = (lo + hi) / 2;
-        if (at(mid).ratio >= required) hi = mid;
-        else lo = mid;
-      }
-      return { ok: true, L: hi, hex: at(hi).hex };
-    };
-    const dark = solve(0);
-    const light = solve(1);
-    const ok = [dark, light].filter((c) => c.ok).sort((a, b) => Math.abs(a.L - src.l) - Math.abs(b.L - src.l));
-    if (ok.length) return ok[0].hex;
-    return at(0).ratio >= at(1).ratio ? at(0).hex : at(1).hex;
-  }
-  function suggestContrastFix(fg, bg, required) {
-    return {
-      suggestedFg: adjustLForContrast(fg, bg, required),
-      // 텍스트색 명도 조정(국소·파급 적음)
-      suggestedBg: adjustLForContrast(bg, fg, required)
-      // 배경색 명도 조정(옵션)
-    };
-  }
-  function evaluateSample(s, level) {
-    const large = isLargeText(s.fontSize, s.bold);
-    const required = requiredRatio(level, large);
-    const ratio = round2(contrastRatio(hexToRgb(s.fg), hexToRgb(s.bg)));
-    const pass = ratio >= required;
-    const f = { id: s.id, name: s.name, fg: s.fg, bg: s.bg, bgId: s.bgId, ratio, required, large, pass };
-    if (!pass) {
-      const fix = suggestContrastFix(s.fg, s.bg, required);
-      f.suggestedFg = fix.suggestedFg;
-      f.suggestedBg = fix.suggestedBg;
-    }
-    return f;
-  }
-  function checkContrast(samples, level) {
-    const findings = samples.map((s) => evaluateSample(s, level));
-    findings.sort((a, b) => Number(a.pass) - Number(b.pass) || a.ratio - b.ratio);
-    const failed = findings.reduce((n, f) => n + (f.pass ? 0 : 1), 0);
-    return { level, checked: findings.length, passed: findings.length - failed, failed, findings };
-  }
-
   // src/lib/similar.ts
   function flattenFrame(root) {
     const out = [];
@@ -4552,7 +4511,6 @@
     selfSelect = false;
   }
   figma.on("selectionchange", postSelection);
-  var CONTRAST_SCAN_CAP = 2e3;
   function solidFillHex(node) {
     var _a;
     const fills = node.fills;
@@ -4771,48 +4729,6 @@
       out.push(remaining.splice(idx, 1)[0]);
     }
     return out;
-  }
-  function effectiveBg(node) {
-    let cur = node.parent;
-    while (cur && cur.type !== "PAGE" && cur.type !== "DOCUMENT") {
-      const hex = solidFillHex(cur);
-      if (hex) return { hex, id: cur.id };
-      cur = cur.parent;
-    }
-    return null;
-  }
-  function collectContrastSamples(sel) {
-    const samples = [];
-    const skipped = {};
-    const note2 = (k) => {
-      var _a;
-      skipped[k] = ((_a = skipped[k]) != null ? _a : 0) + 1;
-    };
-    const stack = sel.slice();
-    let scanned = 0;
-    while (stack.length) {
-      if (scanned >= CONTRAST_SCAN_CAP) {
-        note2("capped");
-        break;
-      }
-      const n = stack.pop();
-      scanned++;
-      if (n.type === "TEXT" && n.visible) {
-        const fg = solidFillHex(n);
-        if (!fg) note2("no-fill");
-        else {
-          const bg = effectiveBg(n);
-          if (!bg) note2("no-bg");
-          else {
-            const fontSize = typeof n.fontSize === "number" ? n.fontSize : 16;
-            const bold = typeof n.fontWeight === "number" ? n.fontWeight >= 700 : false;
-            samples.push({ id: n.id, name: n.name, fg, bg: bg.hex, bgId: bg.id, fontSize, bold });
-          }
-        }
-      }
-      if ("children" in n) for (const c of n.children) stack.push(c);
-    }
-    return { samples, skipped };
   }
   figma.ui.onmessage = async (msg) => {
     var _a, _b, _c, _d, _e, _f, _g;
@@ -5595,39 +5511,6 @@
           const r = await componentizeSimilar(master, memberNodes);
           post({ type: "COMPONENTIZE_RESULT", master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
           if (r.instances) commitUndo(figma);
-          break;
-        }
-        case "CHECK_CONTRAST": {
-          const { samples, skipped } = collectContrastSamples(selection());
-          const report = checkContrast(samples, msg.level);
-          post({
-            type: "CONTRAST_RESULT",
-            level: report.level,
-            checked: report.checked,
-            passed: report.passed,
-            failed: report.failed,
-            findings: report.findings,
-            skipped
-          });
-          break;
-        }
-        case "APPLY_CONTRAST_FIX": {
-          const node = await figma.getNodeByIdAsync(msg.nodeId);
-          if (node && "fills" in node) {
-            const fills = node.fills;
-            if (Array.isArray(fills)) {
-              const i = fills.findIndex((p) => {
-                var _a2;
-                return p.type === "SOLID" && p.visible !== false && ((_a2 = p.opacity) != null ? _a2 : 1) > 0;
-              });
-              if (i >= 0) {
-                const next = fills.slice();
-                next[i] = __spreadProps(__spreadValues({}, next[i]), { color: hexToRgb(msg.hex) });
-                node.fills = next;
-                commitUndo(figma);
-              }
-            }
-          }
           break;
         }
       }

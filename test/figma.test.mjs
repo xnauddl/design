@@ -2997,6 +2997,104 @@ test('createSemanticTextStyles — 같은 px 이름에 원본이 갈리면 px로
   assert.deepEqual(figma._state.textStyles.find((s) => s.name === 'h2').lineHeight, { value: 24, unit: 'PIXELS' });
 });
 
+/* ---------- 자간 %: 행간과 동일 패턴(등록 단위 보존·바인딩 생략) ---------- */
+
+test('scanTextStyles — %자간은 px 환산과 원본 % 를 함께 싣는다', () => {
+  installFigma();
+  const mk = (id, fontSize, letterSpacing) => ({
+    type: 'TEXT', id, name: id, fontSize, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing, characters: 'x', textStyleId: '',
+  });
+  const { samples } = scanTextStyles([{
+    type: 'FRAME', id: 'f', name: 'F', children: [
+      mk('pct', 16, { unit: 'PERCENT', value: 2 }),
+      mk('neg', 16, { unit: 'PERCENT', value: -2 }),
+      mk('px', 20, { unit: 'PIXELS', value: 0.4 }),
+    ],
+  }]);
+  const pct = samples.find((s) => s.letterSpacingPercent === 2);
+  assert.equal(pct.letterSpacing, 0.32); // 2% × 16
+  assert.equal(pct.letterSpacingPercent, 2);
+  const neg = samples.find((s) => s.letterSpacingPercent === -2);
+  assert.equal(neg.letterSpacing, -0.32);
+  assert.equal(neg.letterSpacingPercent, -2);
+  assert.equal(samples.find((s) => s.fontSize === 20).letterSpacingPercent, 0);
+});
+
+test('createSemanticTextStyles — %자간은 PERCENT로 등록하고 자간 바인딩은 생략', async () => {
+  const figma = installFigma();
+  const r = await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const style = figma._state.textStyles.find((s) => s.name === 'body');
+  assert.deepEqual(style.letterSpacing, { value: 2, unit: 'PERCENT' });
+  assert.ok(style.boundVariables.fontSize);
+  assert.ok(style.boundVariables.lineHeight); // 행간은 px라 바인딩 유지
+  assert.equal(style.boundVariables.letterSpacing, undefined);
+  assert.equal(r.bound, 2); // fontSize + lineHeight
+  assert.deepEqual(r.missing, []);
+  assert.ok(r.notes.some((n) => n.includes('2%')));
+
+  const g = findVar(figma, 'Global', 'letter-spacing/0_32');
+  assert.equal(g.valuesByMode['mode:Global'], 0.32);
+  assert.equal(g.description, '2%');
+  assert.ok(findVar(figma, 'Semantic', 'letter-spacing/body'));
+});
+
+test('createSemanticTextStyles — 음수 %자간도 PERCENT로 등록·바인딩 생략', async () => {
+  const figma = installFigma();
+  const r = await createSemanticTextStyles(
+    [{ name: 'tight', fontSize: 16, lineHeight: 24, letterSpacing: -0.32, letterSpacingPercent: -2, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const style = figma._state.textStyles.find((s) => s.name === 'tight');
+  assert.deepEqual(style.letterSpacing, { value: -2, unit: 'PERCENT' });
+  assert.equal(style.boundVariables.letterSpacing, undefined);
+  assert.ok(r.notes.some((n) => n.includes('-2%')));
+  const g = findVar(figma, 'Global', 'letter-spacing/-0_32');
+  assert.equal(g.description, '-2%');
+});
+
+test('createSemanticTextStyles — 기존 %자간 스타일을 rename해도 %가 유지되고 바인딩되지 않는다', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles(
+    [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const style = figma._state.textStyles.find((s) => s.name === 'body');
+  const r = await createSemanticTextStyles(
+    [{ name: 'text/base', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular', boundStyleId: style.id }],
+    false,
+    [],
+  );
+  assert.equal(style.name, 'text/base');
+  assert.deepEqual(style.letterSpacing, { value: 2, unit: 'PERCENT' });
+  assert.equal(style.boundVariables.letterSpacing, undefined);
+  assert.ok(r.notes.some((n) => n.includes('2%')));
+});
+
+test('createSemanticTextStyles — 같은 px 자간 이름에 원본이 갈리면 px로 기록', async () => {
+  const figma = installFigma();
+  const r = await createSemanticTextStyles(
+    [
+      { name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular' },
+      { name: 'label', fontSize: 32, lineHeight: 40, letterSpacing: 0.32, family: 'Inter', style: 'Bold' }, // 같은 0.32px, 원본은 px
+    ],
+    false,
+    [],
+  );
+  const g = findVar(figma, 'Global', 'letter-spacing/0_32');
+  assert.equal(g.valuesByMode['mode:Global'], 0.32);
+  assert.equal(g.description, undefined);
+  assert.ok(r.notes.some((n) => n.includes('letter-spacing/0_32')));
+  assert.deepEqual(figma._state.textStyles.find((s) => s.name === 'body').letterSpacing, { value: 2, unit: 'PERCENT' });
+  assert.deepEqual(figma._state.textStyles.find((s) => s.name === 'label').letterSpacing, { value: 0.32, unit: 'PIXELS' });
+});
+
 /* ================= themeApply.ts ================= */
 function darkFixture() {
   const figma = installFigma();

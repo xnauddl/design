@@ -8,12 +8,11 @@ import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyle
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection, writeRoleFromName } from './lib/rename';
-import { rgbToHex, hexToRgb, type ResolvedType, type ScopeName } from './lib/tokens';
+import { rgbToHex, type ResolvedType, type ScopeName } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
-import { checkContrast, type ContrastSample } from './lib/contrast';
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
 import { parseVarValue, sanitizeScopes, aliasSelfReference, findAliasReferers } from './lib/variableEdit';
@@ -138,7 +137,7 @@ async function postPrereq(): Promise<void> {
     const vars = await figma.variables.getLocalVariablesAsync();
     const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-    const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // '기존 스타일 적용만' 전제
+    const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 적용 탭 ‘텍스트 스타일 적용’ 전제
     post({ type: 'PREREQ_STATE', hasGlobal, hasBindable, hasTextStyles });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
@@ -524,12 +523,6 @@ function postSelection(): void {
 }
 figma.on('selectionchange', postSelection);
 
-/* ---------- 명도 대비 점검(읽기 전용) ----------
-   선택 하위의 텍스트 노드마다 글자색(첫 단색 채움)과 유효 배경(가장 가까운 상위
-   단색 채움)을 뽑아 ContrastSample로 만든다. 판정은 순수 모듈(contrast.ts)에 위임.
-   한계: 부분 투명·겹친 형제·범위별 혼합색은 다루지 않고 사유별로 건너뛴다. */
-const CONTRAST_SCAN_CAP = 2000;
-
 /** 노드의 첫 '보이는 단색' 채움 hex. 없거나 혼합(mixed)이면 null. */
 function solidFillHex(node: SceneNode): string | null {
   const fills = (node as { fills?: readonly Paint[] | typeof figma.mixed }).fills;
@@ -807,50 +800,6 @@ function orderInnerFirst(groups: readonly StructGroup[], byId: Map<string, Scene
   return out;
 }
 
-/** 텍스트 위로 올라가며 가장 가까운 상위의 단색 배경(hex + 노드 id). 없으면 null. */
-function effectiveBg(node: SceneNode): { hex: string; id: string } | null {
-  let cur: BaseNode | null = node.parent;
-  while (cur && cur.type !== 'PAGE' && cur.type !== 'DOCUMENT') {
-    const hex = solidFillHex(cur as SceneNode);
-    if (hex) return { hex, id: cur.id };
-    cur = cur.parent;
-  }
-  return null;
-}
-
-function collectContrastSamples(sel: readonly SceneNode[]): { samples: ContrastSample[]; skipped: Record<string, number> } {
-  const samples: ContrastSample[] = [];
-  const skipped: Record<string, number> = {};
-  const note = (k: string): void => {
-    skipped[k] = (skipped[k] ?? 0) + 1;
-  };
-  const stack: SceneNode[] = sel.slice();
-  let scanned = 0;
-  while (stack.length) {
-    if (scanned >= CONTRAST_SCAN_CAP) {
-      note('capped');
-      break;
-    }
-    const n = stack.pop() as SceneNode;
-    scanned++;
-    if (n.type === 'TEXT' && n.visible) {
-      const fg = solidFillHex(n);
-      if (!fg) note('no-fill'); // 단색 글자색 없음(혼합/이미지/그라데이션 등)
-      else {
-        const bg = effectiveBg(n);
-        if (!bg) note('no-bg'); // 상위에 단색 배경이 없음
-        else {
-          const fontSize = typeof n.fontSize === 'number' ? n.fontSize : 16; // 혼합이면 보수적 기본값
-          const bold = typeof n.fontWeight === 'number' ? n.fontWeight >= 700 : false;
-          samples.push({ id: n.id, name: n.name, fg, bg: bg.hex, bgId: bg.id, fontSize, bold });
-        }
-      }
-    }
-    if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
-  }
-  return { samples, skipped };
-}
-
 figma.ui.onmessage = async (msg: UiToCode) => {
   try {
     switch (msg.type) {
@@ -1016,7 +965,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
         post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing, notes: r.notes });
         commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로
-        await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → '적용만' 등 전제 게이트 갱신
+        await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → 적용 탭 ‘텍스트 스타일 적용’ 전제 게이트 갱신
         break;
       }
       case 'APPLY_TEXT_STYLES': {
@@ -1670,38 +1619,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const r = await componentizeSimilar(master as SceneNode, memberNodes);
         post({ type: 'COMPONENTIZE_RESULT', master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
         if (r.instances) commitUndo(figma); // UX2: 컴포넌트화 전체를 단일 Undo로
-        break;
-      }
-      case 'CHECK_CONTRAST': {
-        // 읽기 전용 감사 — 쓰기/Undo/이력 없음. 추출은 figma, 판정은 순수 모듈.
-        const { samples, skipped } = collectContrastSamples(selection());
-        const report = checkContrast(samples, msg.level);
-        post({
-          type: 'CONTRAST_RESULT',
-          level: report.level,
-          checked: report.checked,
-          passed: report.passed,
-          failed: report.failed,
-          findings: report.findings,
-          skipped,
-        });
-        break;
-      }
-      case 'APPLY_CONTRAST_FIX': {
-        // #2: 보정색을 대상 노드(텍스트=글자색 / 배경=배경 노드)의 첫 단색 채움에 적용.
-        const node = await figma.getNodeByIdAsync(msg.nodeId);
-        if (node && 'fills' in node) {
-          const fills = (node as { fills?: readonly Paint[] | typeof figma.mixed }).fills;
-          if (Array.isArray(fills)) {
-            const i = fills.findIndex((p) => p.type === 'SOLID' && p.visible !== false && (p.opacity ?? 1) > 0);
-            if (i >= 0) {
-              const next = fills.slice();
-              next[i] = { ...(next[i] as SolidPaint), color: hexToRgb(msg.hex) };
-              (node as unknown as { fills: Paint[] }).fills = next;
-              commitUndo(figma); // UX2: 보정 적용을 단일 Undo로
-            }
-          }
-        }
         break;
       }
     }
