@@ -737,6 +737,7 @@
 
     <div class="step">
       <h2 data-i18n="license.title">라이선스</h2>
+      <div class="hint" data-i18n="license.hint">유료를 쓰면 🔒 잠긴 기능이 풀립니다</div>
       <div class="row">
         <input id="licenseKey" type="text" data-i18n-placeholder="license.keyPlaceholder" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
         <button id="btnVerify" data-i18n="license.verify">검증</button>
@@ -746,9 +747,10 @@
       <div class="muted" id="licenseInfo"></div>
       <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유.
            licenseConfig가 아직 자리표시자면 ui.ts가 이 행과 안내를 숨긴다(없는 페이지로 보내지 않기 위해). -->
+      <!-- 「구독」+「관리」 이원화 폐기(결정 2026-08-06) — 한 버튼이 티어에 따라 갈린다:
+           Free면 결제 페이지, Paid면 고객 포털. 사용자가 자기 상태를 알고 버튼을 고를 일이 아니다. -->
       <div class="row" id="licenseLinkRow">
-        <button id="btnBuy" class="primary">구독하기</button>
-        <button id="btnPortal" data-i18n-title="license.portalTip" title="구독·결제수단 변경, 기기 활성화 해제(기기 1대 한도)">구독 관리</button>
+        <button id="btnLicenseLink" class="primary" data-i18n-title="license.manageTip" title="Free면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 엽니다" data-i18n="license.manage">결제 · 구독 관리</button>
       </div>
       <div class="hint" id="licenseLinkHint">Free · Paid 연 $39 · 기기 1대</div>
       <div class="hint" id="licenseSetupHint" style="display:none">배포 전 — 키 검증·구독 링크는 아직 동작하지 않습니다.</div>
@@ -1185,7 +1187,10 @@
     "license.verify": "\uAC80\uC99D",
     "license.clear": "\uD574\uC81C",
     "license.clearTip": "\uC774 \uAE30\uAE30\uC758 \uD65C\uC131\uD654\uB97C \uBC18\uB0A9\uD569\uB2C8\uB2E4. \uC0C8 \uAE30\uAE30\uC5D0\uC11C \uAC19\uC740 \uD0A4\uB97C \uB2E4\uC2DC \uAC80\uC99D\uD558\uBA74 \uB429\uB2C8\uB2E4.",
-    "license.portalTip": "\uAD6C\uB3C5\xB7\uACB0\uC81C\uC218\uB2E8 \uBCC0\uACBD, \uAE30\uAE30 \uD65C\uC131\uD654 \uD574\uC81C(\uAE30\uAE30 1\uB300 \uD55C\uB3C4)",
+    "license.hint": "\uC720\uB8CC\uB97C \uC4F0\uBA74 \u{1F512} \uC7A0\uAE34 \uAE30\uB2A5\uC774 \uD480\uB9BD\uB2C8\uB2E4",
+    // 한 버튼이 티어에 따라 갈린다(결정 2026-08-06) — 라벨은 두 목적지를 함께 적는다.
+    "license.manage": "\uACB0\uC81C \xB7 \uAD6C\uB3C5 \uAD00\uB9AC",
+    "license.manageTip": "Free\uBA74 \uACB0\uC81C \uD398\uC774\uC9C0\uB85C, \uAD6C\uB3C5 \uC911\uC774\uBA74 \uACB0\uC81C\uC218\uB2E8\xB7\uAE30\uAE30 \uD65C\uC131\uD654\uB97C \uAD00\uB9AC\uD558\uB294 \uD398\uC774\uC9C0\uB85C \uC5FD\uB2C8\uB2E4",
     "license.devTier": "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C \uD2F0\uC5B4",
     "license.devTierNote": "(\uAC80\uC99D\uB41C \uD0A4\uAC00 \uC5C6\uC744 \uB54C\uB9CC \uC801\uC6A9)"
     // 접근성 · 국제화
@@ -3228,8 +3233,10 @@
     $("licenseKey").value = "";
     send({ type: "CLEAR_LICENSE" });
   });
-  $("btnBuy").addEventListener("click", () => send({ type: "OPEN_LICENSE_LINK", target: "purchase" }));
-  $("btnPortal").addEventListener("click", () => send({ type: "OPEN_LICENSE_LINK", target: "portal" }));
+  $("btnLicenseLink").addEventListener(
+    "click",
+    () => send({ type: "OPEN_LICENSE_LINK", target: isPaid ? "portal" : "purchase" })
+  );
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {

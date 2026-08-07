@@ -737,6 +737,7 @@
 
     <div class="step">
       <h2 data-i18n="license.title">라이선스</h2>
+      <div class="hint" data-i18n="license.hint">유료를 쓰면 🔒 잠긴 기능이 풀립니다</div>
       <div class="row">
         <input id="licenseKey" type="text" data-i18n-placeholder="license.keyPlaceholder" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
         <button id="btnVerify" data-i18n="license.verify">검증</button>
@@ -746,9 +747,10 @@
       <div class="muted" id="licenseInfo"></div>
       <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유.
            licenseConfig가 아직 자리표시자면 ui.ts가 이 행과 안내를 숨긴다(없는 페이지로 보내지 않기 위해). -->
+      <!-- 「구독」+「관리」 이원화 폐기(결정 2026-08-06) — 한 버튼이 티어에 따라 갈린다:
+           Free면 결제 페이지, Paid면 고객 포털. 사용자가 자기 상태를 알고 버튼을 고를 일이 아니다. -->
       <div class="row" id="licenseLinkRow">
-        <button id="btnBuy" class="primary">구독하기</button>
-        <button id="btnPortal" data-i18n-title="license.portalTip" title="구독·결제수단 변경, 기기 활성화 해제(기기 1대 한도)">구독 관리</button>
+        <button id="btnLicenseLink" class="primary" data-i18n-title="license.manageTip" title="Free면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 엽니다" data-i18n="license.manage">결제 · 구독 관리</button>
       </div>
       <div class="hint" id="licenseLinkHint">Free · Paid 연 $39 · 기기 1대</div>
       <div class="hint" id="licenseSetupHint" style="display:none">배포 전 — 키 검증·구독 링크는 아직 동작하지 않습니다.</div>

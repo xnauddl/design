@@ -1760,8 +1760,11 @@ $('btnClearLicense').addEventListener('click', () => {
 });
 
 // 결제·구독 관리는 LemonSqueezy 위임 — URL은 code가 licenseConfig에서 해석해 openExternal로 연다.
-$('btnBuy').addEventListener('click', () => send({ type: 'OPEN_LICENSE_LINK', target: 'purchase' }));
-$('btnPortal').addEventListener('click', () => send({ type: 'OPEN_LICENSE_LINK', target: 'portal' }));
+// 목적지는 티어가 정한다: Free면 결제, Paid면 포털. 버튼이 하나라 클릭 시점의 isPaid를 읽는다
+// (검증 직후 티어가 바뀌어도 다음 클릭부터 바로 반영된다).
+$('btnLicenseLink').addEventListener('click', () =>
+  send({ type: 'OPEN_LICENSE_LINK', target: isPaid ? 'portal' : 'purchase' }),
+);
 
 // 배포 전(자리표시자 URL)에는 구독 버튼을 숨긴다 — 눌러도 없는 페이지로 가서 혼란만 준다.
 // URL을 실제 값으로 갈아끼우면 조건이 자동으로 풀려 다시 노출된다.

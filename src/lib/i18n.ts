@@ -346,7 +346,10 @@ export const STRINGS: Record<string, string> = {
   'license.verify': '검증',
   'license.clear': '해제',
   'license.clearTip': '이 기기의 활성화를 반납합니다. 새 기기에서 같은 키를 다시 검증하면 됩니다.',
-  'license.portalTip': '구독·결제수단 변경, 기기 활성화 해제(기기 1대 한도)',
+  'license.hint': '유료를 쓰면 🔒 잠긴 기능이 풀립니다',
+  // 한 버튼이 티어에 따라 갈린다(결정 2026-08-06) — 라벨은 두 목적지를 함께 적는다.
+  'license.manage': '결제 · 구독 관리',
+  'license.manageTip': 'Free면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 엽니다',
   'license.devTier': '개발용 강제 티어',
   'license.devTierNote': '(검증된 키가 없을 때만 적용)',
   // 접근성 · 국제화
