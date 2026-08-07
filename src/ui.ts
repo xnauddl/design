@@ -1483,11 +1483,11 @@ function visibleVars(): VarInfo[] {
 }
 
 
-/** 토큰 생성에 실을 Semantic 맵 — textarea 값이 있으면 우선, 없으면 자동 추천. */
+/** 토큰 생성에 실을 Semantic 맵 — 자동 추천 위에 textarea 덮어쓰기(부분 맵이어도 나머지 카테고리 유지). */
 function semanticMapForCreate(toks: DraftToken[]): Record<string, string> {
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
   const fromUi = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
-  if (Object.keys(fromUi).length) return fromUi;
-  return suggestTokenRoles(toks, Number(($('base') as HTMLInputElement).value) || 16);
+  return { ...suggestTokenRoles(toks, base), ...fromUi };
 }
 
 function requestVars(quiet = false): void {

@@ -616,6 +616,11 @@
     });
     return map;
   }
+  function mergeTokenRoles(tokens, base = 16, overrides) {
+    const auto = suggestTokenRoles(tokens, base);
+    if (!overrides || !Object.keys(overrides).length) return auto;
+    return __spreadValues(__spreadValues({}, auto), overrides);
+  }
 
   // src/lib/variables.ts
   var GLOBAL = "Global";
@@ -664,7 +669,7 @@
   }
   async function createTokensAndRoles(tokens, base, semanticMap) {
     const summary = await createTokens(tokens, base);
-    const map = semanticMap && Object.keys(semanticMap).length ? semanticMap : suggestTokenRoles(tokens, base);
+    const map = mergeTokenRoles(tokens, base, semanticMap);
     if (!Object.keys(map).length) return summary;
     const sem = await createSemanticAliases(map);
     summary.created += sem.created;
@@ -692,7 +697,7 @@
       summary[existing.has(k) ? "updated" : "created"]++;
     };
     for (const t of tokens) tally(gId, t.name, "globals");
-    const map = semanticMap && Object.keys(semanticMap).length ? semanticMap : suggestTokenRoles(tokens, base);
+    const map = mergeTokenRoles(tokens, base, semanticMap);
     for (const semName of Object.keys(map)) tally(sId, semName, "semantics");
     return summary;
   }

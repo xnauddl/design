@@ -3174,9 +3174,9 @@
     return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
   }
   function semanticMapForCreate(toks) {
+    const base = Number($("base").value) || 16;
     const fromUi = textToSemanticMap($("semMap").value);
-    if (Object.keys(fromUi).length) return fromUi;
-    return suggestTokenRoles(toks, Number($("base").value) || 16);
+    return __spreadValues(__spreadValues({}, suggestTokenRoles(toks, base)), fromUi);
   }
   function requestVars(quiet = false) {
     if (!quiet) setStatus("varEditStatus", "\uBCC0\uC218\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026", "");

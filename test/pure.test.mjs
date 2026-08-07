@@ -100,6 +100,7 @@ import {
   weightRole,
   familyRole,
   suggestTokenRoles,
+  mergeTokenRoles,
   pipelineSteps,
   t,
   parseVarValue,
@@ -1705,6 +1706,19 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
   assert.equal(map['font-weight/bold'], 'font-weight/700');
   assert.equal(map['font-family/sans'], 'font-family/Inter');
   assert.equal(map['stroke-width/md'], 'stroke-width/2'); // 티셔츠 센터
+});
+
+test('mergeTokenRoles — 부분 덮어쓰기, 빠진 카테고리는 자동 유지', () => {
+  const tokens = [
+    { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+    { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+  ];
+  const merged = mergeTokenRoles(tokens, 16, { 'cta-background-color': 'color/0066ff', 'custom-role': 'spacing/16' });
+  assert.equal(merged['cta-background-color'], 'color/0066ff');
+  assert.equal(merged['custom-role'], 'spacing/16');
+  assert.equal(merged['spacing/md'], 'spacing/16'); // 자동 추천 유지
+  assert.equal(mergeTokenRoles(tokens, 16)['spacing/md'], 'spacing/16');
+  assert.equal(mergeTokenRoles(tokens, 16, {})['cta-background-color'], 'color/0066ff');
 });
 
 /* ================= pipeline.ts (진행 안내 §3) ================= */

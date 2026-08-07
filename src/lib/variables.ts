@@ -19,7 +19,7 @@ import {
   unitDescription,
 } from './tokens';
 import { paletteFamilyOf } from './palette';
-import { suggestTokenRoles } from './roles';
+import { mergeTokenRoles } from './roles';
 import { TextSample, TextStyleSpec, ExistingTextStyle } from './textStyles';
 
 export const GLOBAL = 'Global';
@@ -98,7 +98,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
 
 /**
  * Global 원시 + Semantic 역할 별칭을 한 번에.
- * semanticMap이 있으면 우선, 없으면 suggestTokenRoles로 기능명 맵 자동 생성.
+ * semanticMap 항목은 자동 추천 위에 덮어쓰고, 빠진 카테고리(간격·크기 등)는 추천으로 채운다.
  */
 export async function createTokensAndRoles(
   tokens: DraftToken[],
@@ -106,7 +106,7 @@ export async function createTokensAndRoles(
   semanticMap?: Record<string, string>,
 ): Promise<CreateSummary> {
   const summary = await createTokens(tokens, base);
-  const map = semanticMap && Object.keys(semanticMap).length ? semanticMap : suggestTokenRoles(tokens, base);
+  const map = mergeTokenRoles(tokens, base, semanticMap);
   if (!Object.keys(map).length) return summary;
   const sem = await createSemanticAliases(map);
   summary.created += sem.created;
@@ -141,7 +141,7 @@ export async function previewCreateTokens(
   };
 
   for (const t of tokens) tally(gId, t.name, 'globals');
-  const map = semanticMap && Object.keys(semanticMap).length ? semanticMap : suggestTokenRoles(tokens, base);
+  const map = mergeTokenRoles(tokens, base, semanticMap);
   for (const semName of Object.keys(map)) tally(sId, semName, 'semantics');
   return summary;
 }

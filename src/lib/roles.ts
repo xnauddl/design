@@ -132,3 +132,17 @@ export function suggestTokenRoles(tokens: DraftToken[], base = 16): Record<strin
 
   return map;
 }
+
+/**
+ * 자동 추천 역할 맵에 UI/호출자가 준 맵을 덮어쓴다.
+ * 부분 맵(색만 등)이 와도 spacing·size·typography 추천이 빠지지 않게 한다.
+ */
+export function mergeTokenRoles(
+  tokens: DraftToken[],
+  base = 16,
+  overrides?: Record<string, string>,
+): Record<string, string> {
+  const auto = suggestTokenRoles(tokens, base);
+  if (!overrides || !Object.keys(overrides).length) return auto;
+  return { ...auto, ...overrides };
+}

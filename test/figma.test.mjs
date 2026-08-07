@@ -591,16 +591,22 @@ test('createTokensAndRoles — Global hue + Semantic 역할 별칭(#3)', async (
   assert.equal(cta.valuesByMode['mode:Semantic'].type, 'VARIABLE_ALIAS');
 });
 
-test('createTokensAndRoles — 전달한 semanticMap 우선', async () => {
+test('createTokensAndRoles — 전달한 semanticMap은 덮어쓰고 빠진 역할은 자동 채움', async () => {
   const figma = installFigma();
   await createTokensAndRoles(
-    [{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }],
+    [
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+    ],
     16,
-    { 'cta-background-color': 'color/0066ff' },
+    { 'cta-background-color': 'color/0066ff' }, // 색만 — spacing은 자동 추천으로 채워야 함
   );
   const cta = findVar(figma, 'Semantic', 'cta-background-color');
   const g = findVar(figma, 'Global', 'color/0066ff');
   assert.equal(cta.valuesByMode['mode:Semantic'].id, g.id);
+  const spacing = findVar(figma, 'Semantic', 'spacing/md');
+  assert.ok(spacing, '부분 semanticMap이어도 spacing 역할이 등록되어야 한다');
+  assert.equal(spacing.valuesByMode['mode:Semantic'].id, findVar(figma, 'Global', 'spacing/16').id);
 });
 
 test('createTokens(#16) — letterSpacing(em)도 px FLOAT + description', async () => {
@@ -1327,13 +1333,13 @@ test('previewCreateTokens — 변수 생성 없이 생성/갱신 예정 집계',
   assert.ok(p.semantics >= 1); // cta-background-color 등
   assert.ok(p.created >= 3);
 
-  // Global만 만든 뒤 같은 맵으로 미리보기 → Global은 갱신, Semantic은 생성
+  // Global만 만든 뒤 색만 넘긴 맵으로 미리보기 → 자동 추천이 size도 채움
   await createTokens(tokens, 16);
   const p2 = await previewCreateTokens(tokens, 16, { 'cta-background-color': 'color/0066ff' });
   assert.equal(p2.globals, 2);
-  assert.equal(p2.semantics, 1);
+  assert.ok(p2.semantics >= 2); // cta + size/*
   assert.equal(p2.updated, 2); // Global 2
-  assert.equal(p2.created, 1); // Semantic 1
+  assert.ok(p2.created >= 2);
 });
 
 test('previewCreateTokens — base가 환산에 반영되고 실제 생성값과 일치', async () => {
