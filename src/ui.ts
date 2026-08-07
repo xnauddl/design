@@ -252,16 +252,16 @@ function carryTokenChecked(before: readonly DraftToken[], after: readonly DraftT
  * 이름 편집은 넘겨받은 토큰 객체를 그대로 고친다 — 목록은 `tokens`를 필터한 배열이라
  * 행 인덱스가 `tokens` 인덱스와 어긋난다(색 토큰이 앞에 있으면 남의 이름을 덮어썼다).
  */
-function makeTokenRow(t: DraftToken): HTMLElement {
-  const n = t.count ?? 0;
-  const unit = t.unit && t.unit !== 'px' ? ` · ${UNIT_CHIP[t.unit]}` : '';
+function makeTokenRow(tok: DraftToken): HTMLElement {
+  const n = tok.count ?? 0;
+  const unit = tok.unit && tok.unit !== 'px' ? ` · ${UNIT_CHIP[tok.unit]}` : '';
 
   // 이름은 편집 대상이라 제목 자리에 입력칸을 그대로 둔다(말줄임을 못 쓰므로 전체는 title로).
   const input = document.createElement('input');
-  input.value = t.name;
-  input.title = t.name;
+  input.value = tok.name;
+  input.title = tok.name;
   input.addEventListener('input', () => {
-    t.name = input.value;
+    tok.name = input.value;
     input.title = input.value;
   });
 
@@ -269,11 +269,11 @@ function makeTokenRow(t: DraftToken): HTMLElement {
   // 개명하는 순간 체크가 풀린다.
   const cb = document.createElement('input');
   cb.type = 'checkbox';
-  cb.checked = tokenChecked.has(tokenKey(t));
-  cb.title = '생성 대상';
+  cb.checked = tokenChecked.has(tokenKey(tok));
+  cb.title = t('create.rowCheckTip');
   cb.addEventListener('change', () => {
-    if (cb.checked) tokenChecked.add(tokenKey(t));
-    else tokenChecked.delete(tokenKey(t));
+    if (cb.checked) tokenChecked.add(tokenKey(tok));
+    else tokenChecked.delete(tokenKey(tok));
     updateTokenCreate();
   });
 
@@ -282,14 +282,14 @@ function makeTokenRow(t: DraftToken): HTMLElement {
     title: input,
     titleMono: true,
     // 값·타입까지 붙여 이름만으로 구분 안 되는 토큰(fontFamily 등)을 요약에서 바로 읽는다.
-    summary: `${t.category}${unit} · ${t.value}`,
+    summary: `${tok.category}${unit} · ${tok.value}`,
     // 등장 레이어 수 — 무엇을 남길지 고르는 근거. 1×는 대개 일회성 값이라 흐리게.
     meta: n > 0 ? `${n}×` : '',
-    metaTitle: n > 0 ? `이 값을 쓰는 레이어 ${n}개` : '',
+    metaTitle: n > 0 ? t('create.rowCountTip', { count: n }) : '',
     dim: n === 1,
   });
   // 색 토큰은 renderTokens가 걸러내 여기 오지 않는다(색은 위 ‘색 정리’ 담당) → effectColor만.
-  if (t.category === 'effectColor' && typeof t.value === 'string') addSwatch(card, t.value);
+  if (tok.category === 'effectColor' && typeof tok.value === 'string') addSwatch(card, tok.value);
   return card;
 }
 
@@ -952,16 +952,16 @@ function textStyleEditRow(s: TextStyleSpec): HTMLElement {
 function textStyleCard(s: TextStyleSpec): HTMLElement {
   const name = document.createElement('input');
   name.value = s.name;
-  name.placeholder = '스타일 이름';
+  name.placeholder = t('textStyle.namePlaceholder');
   name.addEventListener('input', () => {
     s.name = name.value;
   });
   if (s.boundStyleId) {
     name.classList.add('ts-bound');
-    name.title = '이미 등록된 스타일입니다. 이름을 바꾸면 이 스타일의 이름만 바뀝니다(새로 만들지 않음).';
+    name.title = t('textStyle.nameBoundTip');
   } else {
     name.classList.add('ts-new');
-    name.title = '새 스타일로 등록됩니다(아직 등록 안 된 글자).';
+    name.title = t('textStyle.nameNewTip');
   }
 
   // 고칠 수 있는 행은 요약 대신 그 값을 그대로 입력칸으로 — 같은 자리, 같은 순서.
@@ -976,7 +976,7 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
     const badge = document.createElement('button');
     badge.className = 'r-badge';
     badge.textContent = `×${n}`;
-    badge.title = n === 1 ? '이 글자로 이동' : `이 스타일을 쓰는 글자 ${n}개 전체 선택`;
+    badge.title = n === 1 ? t('textStyle.badgeGoTip') : t('textStyle.badgeSelectTip', { count: n });
     badge.addEventListener('click', () => send({ type: 'SELECT_NODES', ids }));
     (card.querySelector('.r-top') as HTMLElement).appendChild(badge);
   } else {
@@ -1642,7 +1642,7 @@ function refreshDarkModes(): void {
     // 플레이스홀더 — 값이 실제 modeId가 아니므로 전송하지 않는다(버튼은 from만 보냄).
     const o = document.createElement('option');
     o.value = '';
-    o.textContent = 'Dark (없으면 생성)';
+    o.textContent = t('dark.toPlaceholder');
     toSel.insertBefore(o, toSel.firstChild);
     toSel.value = '';
   }
@@ -2621,7 +2621,8 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     btn.className = 'skip-chip';
     btn.textContent = `${label} ›`;
     // 사유 건수(n)는 속성 단위, 레이어 수는 노드 단위라 서로 다를 수 있다(padding 4건 → 레이어 1개).
-    btn.title = `레이어 ${ids.length}개 선택 — ${bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ')}${ids.length > 5 ? ' 외' : ''}`;
+    const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ');
+    btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names });
     btn.addEventListener('click', () => {
       send({ type: 'SELECT_NODES', ids });
       setStatus('applyStatus', `${t('reason.' + key)} 레이어 ${ids.length}개 선택`, '');
@@ -2839,7 +2840,9 @@ function applyButtonTips(): void {
 
 /** 정적 HTML 라벨 외부화: [data-i18n]=textContent, [data-i18n-html]=innerHTML(신뢰된 자체 문자열).
  *  텍스트 전용 요소는 data-i18n, <b>/<code> 등 마크업이 있으면 data-i18n-html을 쓴다.
- *  뱃지 span(예: …Lock)이 함께 있는 요소는 텍스트만 <span data-i18n>로 감싸 뱃지를 보존한다. */
+ *  뱃지 span(예: …Lock)이 함께 있는 요소는 텍스트만 <span data-i18n>로 감싸 뱃지를 보존한다.
+ *  `<option>`도 textContent라 data-i18n으로 족하다 — value는 코드가 읽는 키라 건드리지 않는다.
+ *  보이는 문자열이 속성인 것(title 툴팁·placeholder)은 data-i18n-title/-placeholder로 같은 표를 쓴다. */
 function applyStaticI18n(root: ParentNode = document): void {
   // 정의된 키만 덮어쓴다 — 오타/누락 키에서 t()가 키 문자열을 반환해 HTML 원문을 파괴하지 않도록.
   root.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
@@ -2850,6 +2853,15 @@ function applyStaticI18n(root: ParentNode = document): void {
     const key = el.dataset.i18nHtml as string;
     if (hasString(key)) el.innerHTML = t(key);
   });
+  for (const [attr, prop] of [
+    ['title', 'i18nTitle'],
+    ['placeholder', 'i18nPlaceholder'],
+  ] as const) {
+    root.querySelectorAll<HTMLElement>(`[data-i18n-${attr}]`).forEach((el) => {
+      const key = el.dataset[prop] as string;
+      if (hasString(key)) el.setAttribute(attr, t(key));
+    });
+  }
 }
 
 // 초기: 컬렉션·전제·라이선스 조회. 유료 카드는 Paid 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.

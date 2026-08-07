@@ -2,7 +2,10 @@
    i18n.ts — UI 문자열 단일 소스 + 룩업/보간 (순수, figma 의존 없음)
    현재 로케일은 ko 단일. t(key, vars)로 조회하고 `{var}` 자리표시자를 치환한다.
    누락 키는 key를 그대로 반환(폴백) — 디버그·점진 도입 안전.
-   ※ 런타임 문자열(상태/피드백)을 외부화. HTML 정적 라벨은 후속.
+   ※ 화면에 보이는 한국어는 전부 여기에 있다 — 상태/피드백 · 정적 라벨(data-i18n[-html])
+     · 툴팁(data-i18n-title) · 선택지(<option>) · 자리표시자(data-i18n-placeholder).
+     ui.html의 인라인 텍스트·속성값은 폴백일 뿐이고, 화면에 나오는 값은 이 표다
+     (둘이 갈라지면 `npm run verify:i18n`이 잡는다).
    ============================================================ */
 
 export type StringVars = Record<string, string | number>;
@@ -68,10 +71,13 @@ export const STRINGS: Record<string, string> = {
   // 다크 테마 생성
   'dark.title': '다크 모드',
   'dark.hint': '밝은 모드 색을 뒤집어 다크 모드에 채웁니다. 목록 이름은 Figma 변수 컬렉션·모드예요',
+  'dark.hintTip': '색상·채도는 그대로 두고 명도만 뒤집습니다. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 dark/…로 따로 만들어집니다.',
   'dark.collection': '역할 컬렉션',
   'dark.fromMode': '밝은 모드',
   'dark.toMode': '어두운 모드',
   'dark.genBtn': '다크 만들기',
+  // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
+  'dark.toPlaceholder': 'Dark (없으면 생성)',
   // 닮은 프레임 컴포넌트화
   'similar.scanBtn': '닮은 스캔',
   'similar.componentizeBtn': '묶기',
@@ -182,7 +188,9 @@ export const STRINGS: Record<string, string> = {
   'ts.letterSpacing': '자간(px) · 음수도 됩니다',
   'ts.weight': '굵기 — Regular · Medium · SemiBold · Bold 처럼 Figma가 쓰는 이름',
   'settings.grid': '여백·크기 격자',
+  'settings.gridTip': '여백·크기 토큰을 미리보기에서 이 격자로 모읍니다. 예: 8이면 13·15가 16으로.',
   'settings.tol': '허용오차',
+  'settings.tolTip': '바인딩은 레이어 값과 변수 값의 차이가 이 값 이하일 때 같은 값으로 봅니다. 격자로 옮긴 토큰까지 붙이려면 격자의 절반쯤이 필요합니다.',
   // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
   'create.snapTolGap': ' · 옮긴 값은 허용오차 {tol}px로는 원래 레이어에 안 붙습니다(설정에서 {half}px로)',
   // 마법사 카드
@@ -211,18 +219,29 @@ export const STRINGS: Record<string, string> = {
   'palette.neutral': '중립',
   'palette.status': '상태',
   'palette.gen': '팔레트 생성',
+  // 하모니 선택지 — 보조색을 브랜드색에서 몇 도 돌려 뽑을지.
+  'harmony.complementary': '보색',
+  'harmony.analogous': '유사',
+  'harmony.triadic': '삼각',
+  'harmony.split': '분할보색',
+  'harmony.tetradic': '사각',
   // 추출
   'extract.scanBtn': '선택에서 추출',
   // 색 정리(추출 카드에 흡수)
   'colorTidy.hint': '뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료',
+  'colorTidy.hintTip': '비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.',
   'colorTidy.undo': '되돌리기',
   // 토큰 생성
   'create.title': '간격·크기 토큰',
   'create.scopeHint': '여백·크기·폰트·효과만 다룹니다. 색은 이전 단계에서 이미 만들었어요',
   'create.selectAll': '전체',
   'create.dropOnce': '1× 해제',
+  'create.dropOnceTip': '한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다',
   'create.previewBtn': '미리보기',
   'create.apply': '적용',
+  // 토큰 행 — 체크박스·등장 횟수(N×)는 라벨을 놓을 자리가 없어 툴팁으로만 뜻을 밝힌다.
+  'create.rowCheckTip': '생성 대상',
+  'create.rowCountTip': '이 값을 쓰는 레이어 {count}개',
   // 시맨틱 매핑 카드
   'semantic.title': '시맨틱 매핑 (역할 → 토큰)',
   'semantic.formatLabel': '형식: <code>역할 = Global변수이름</code>',
@@ -234,9 +253,18 @@ export const STRINGS: Record<string, string> = {
   'textStyle.scanBtn': '스캔',
   'textStyle.addRow': '행 추가',
   'textStyle.useRowLabels': '가로 행의 왼쪽 텍스트를 이름으로',
+  'textStyle.useRowLabelsTip': 'ON이면 같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. 세션 동안만 유지.',
   'textStyle.applyExistingBtn': '기존만 연결',
+  'textStyle.applyExistingTip': '선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.',
   'textStyle.applyOriginal': '등록 시 화면에 적용',
   'textStyle.registerBtn': '등록',
+  // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
+  'textStyle.namePlaceholder': '스타일 이름',
+  'textStyle.nameBoundTip': '이미 등록된 스타일입니다. 이름을 바꾸면 이 스타일의 이름만 바뀝니다(새로 만들지 않음).',
+  'textStyle.nameNewTip': '새 스타일로 등록됩니다(아직 등록 안 된 글자).',
+  // ×N 배지 — 1개면 그 글자로 이동, 여럿이면 전부 선택.
+  'textStyle.badgeGoTip': '이 글자로 이동',
+  'textStyle.badgeSelectTip': '이 스타일을 쓰는 글자 {count}개 전체 선택',
   // 적용(바인딩)
   'bind.title': '변수 연결',
   'bind.hint': '먼저 미리보기로 확인하고, 연결할 항목만 고르세요',
@@ -246,6 +274,9 @@ export const STRINGS: Record<string, string> = {
   'bind.skipHint': '건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다',
   'bind.skipCapped': '건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다 — 레이어가 많아 목록은 {shown}개까지만 보여줍니다(사유 옆 숫자는 전체)',
   'bind.skipMeta': '스킵',
+  // 스킵 칩 툴팁 — 사유 건수(속성 단위)와 레이어 수가 다를 수 있어 레이어 쪽을 따로 밝힌다.
+  'bind.skipChipTip': '레이어 {count}개 선택 — {names}',
+  'bind.skipChipTipMore': '레이어 {count}개 선택 — {names} 외',
   // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
   // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.
   'role.none': '역할 없음',
@@ -301,10 +332,18 @@ export const STRINGS: Record<string, string> = {
   'export.title': '코드로 내보내기',
   'export.hint': '누르면 바로 코드 파일로 저장됩니다',
   'export.runBtn': '내보내기',
+  // 셀렉트는 값이 곧 라벨이라 머리말이 없다 — 무엇을 고르는 칸인지는 툴팁이 맡는다.
+  'export.formatTip': '내보낼 코드 형식',
+  'export.fmtW3c': 'W3C 토큰 JSON',
+  'export.fmtCss': 'CSS 변수',
+  'export.fontUnitTip': '폰트 크기 단위 — rem은 기준 크기로 나눕니다',
   // 요금제 / 라이선스
   'license.title': '라이선스',
+  'license.keyPlaceholder': '라이선스 키 입력',
   'license.verify': '검증',
   'license.clear': '해제',
+  'license.clearTip': '이 기기의 활성화를 반납합니다. 새 기기에서 같은 키를 다시 검증하면 됩니다.',
+  'license.portalTip': '구독·결제수단 변경, 기기 활성화 해제(기기 1대 한도)',
   'license.devTier': '개발용 강제 티어',
   'license.devTierNote': '(검증된 키가 없을 때만 적용)',
   // 접근성 · 국제화

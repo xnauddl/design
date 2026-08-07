@@ -37,7 +37,8 @@
 - [x] **대량 선택 점진 렌더** — 토큰 목록·선택 트리·색 편집표를 프레임 단위 청크로 비차단 렌더(`renderChunked`, 소량은 즉시) `(PR #42)`
 - [x] **i18n 인프라 + 상태/피드백 외부화** — `i18n.ts`(`t()`·`STRINGS`·`{var}` 보간) + ui.ts의 `setStatus` 피드백 메시지 전부 키로 이전 `(PR #43)`
 - [x] **정적 라벨·마법사 문구·라벨 맵 외부화** — ui.html 정적 라벨 100개를 `data-i18n`/`data-i18n-html` + `applyStaticLabels()`로, 마법사 단계·건너뜀 사유·스킵 사유 맵을 `t()` 키로 이전 `(PR #70)`
-- [ ] **잔여** — `title` 툴팁·`<option>`·`placeholder` 외부화(같은 `t()` 패턴)
+- [x] **툴팁·선택지·자리표시자 외부화** — 화면에 보이는데 텍스트 노드가 아닌 문자열을 같은 표로. `title`은 `data-i18n-title`, `placeholder`는 `data-i18n-placeholder`(둘 다 `applyStaticI18n`이 하이드레이션), `<option>`은 라벨이 곧 textContent라 기존 `data-i18n` 그대로. 코드가 만드는 것(토큰 행 체크·N× 툴팁, 텍스트 스타일 이름 칸·×N 배지, 바인딩 스킵 칩, 다크 ‘없으면 생성’ 옵션)도 `t()`로. `verify-i18n.mjs`를 속성 짝(키 ↔ 인라인 폴백)까지 대조하도록 넓혔다 — 툴팁은 호버해야 보여 드리프트가 가장 늦게 들킨다. px·rem과 Free·Paid는 단위·티어 이름 그대로라 번역 대상이 아니다
+- [ ] **잔여** — ui.ts 런타임 조립 문자열(집계 배지 `후보 N`·빈 상태 안내·전제 미충족 문구·결과 요약 ~100건). PR #43이 옮긴 것은 `setStatus` 피드백까지였고, `textContent`로 직접 쓰는 쪽이 남았다
 
 ## 5. 유료화 / 상용 전환 — Free/Paid 2티어
 - **모델**: 오픈 코어 + Freemium. **Free / Paid 2티어** · 연 $39 · LemonSqueezy(웹 결제 → 키 발급 → 무료 서버리스 검증).

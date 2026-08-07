@@ -471,7 +471,7 @@
          이후 '토큰' 단계는 색 외(간격·크기·폰트·효과)만 다룬다. -->
     <div class="step" id="colorCard" data-make-step="color">
       <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" id="colorCount"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
+      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
@@ -493,11 +493,11 @@
         <input id="brand2Hex" type="text" value="#ff5722" spellcheck="false" style="width:90px;" disabled />
         <label class="inline"><span data-i18n="palette.harmony">하모니</span>
           <select id="harmony" disabled>
-            <option value="complementary">보색</option>
-            <option value="analogous">유사</option>
-            <option value="triadic">삼각</option>
-            <option value="split">분할보색</option>
-            <option value="tetradic">사각</option>
+            <option value="complementary" data-i18n="harmony.complementary">보색</option>
+            <option value="analogous" data-i18n="harmony.analogous">유사</option>
+            <option value="triadic" data-i18n="harmony.triadic">삼각</option>
+            <option value="split" data-i18n="harmony.split">분할보색</option>
+            <option value="tetradic" data-i18n="harmony.tetradic">사각</option>
           </select>
         </label>
         <span class="muted" id="selInfo"></span>
@@ -528,7 +528,7 @@
       <div class="banner" id="tokenColorNote" style="display:none"></div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체</span></label>
-        <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
+        <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" data-i18n-title="create.dropOnceTip" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
       </div>
       <div id="tokenList" class="results"></div>
       <div class="tidy tidy-note" id="numTidySummary" style="display:none">
@@ -554,7 +554,7 @@
 
     <div class="step" id="darkCard" data-make-step="theme">
       <h2><span data-i18n="dark.title">다크 모드</span> <span class="muted lock" id="darkLock"></span></h2>
-      <div class="hint" data-i18n="dark.hint" title="색상·채도는 그대로 두고 명도만 뒤집습니다. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 dark/…로 따로 만들어집니다.">밝은 모드 색을 뒤집어 다크 모드에 채웁니다. 목록 이름은 Figma 변수 컬렉션·모드예요</div>
+      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="색상·채도는 그대로 두고 명도만 뒤집습니다. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 dark/…로 따로 만들어집니다.">밝은 모드 색을 뒤집어 다크 모드에 채웁니다. 목록 이름은 Figma 변수 컬렉션·모드예요</div>
       <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바에, 입력은 그 아래 한 줄(와이어 uxTheme). -->
       <div class="toolbar">
         <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 만들기</button>
@@ -585,10 +585,10 @@
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
         <span class="grow"></span>
         <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">등록</button>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존만 연결</button>
+        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존만 연결</button>
       </div>
       <label class="inline"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록 시 화면에 적용</span></label>
-      <label class="inline" title="ON이면 같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. 세션 동안만 유지."><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 이름으로</span></label>
+      <label class="inline" data-i18n-title="textStyle.useRowLabelsTip" title="ON이면 같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. 세션 동안만 유지."><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 이름으로</span></label>
       <div id="tsList" class="results"></div>
       <div class="prereq" id="tsApplyPrereq" style="display:none;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
@@ -702,8 +702,8 @@
       <!-- 격자와 허용오차는 한 쌍이다 — 격자가 오차보다 크면 스냅한 토큰이 원래 레이어와
            안 맞아 연결 단계에서 도로 떨어진다. 그래서 같은 줄에 나란히 두고 함께 고치게 한다. -->
       <div class="row">
-        <label class="inline" title="여백·크기 토큰을 미리보기에서 이 격자로 모읍니다. 예: 8이면 13·15가 16으로."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
-        <label class="inline" title="바인딩은 레이어 값과 변수 값의 차이가 이 값 이하일 때 같은 값으로 봅니다. 격자로 옮긴 토큰까지 붙이려면 격자의 절반쯤이 필요합니다."><span data-i18n="settings.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" max="16" step="0.5" />px</label>
+        <label class="inline" data-i18n-title="settings.gridTip" title="여백·크기 토큰을 미리보기에서 이 격자로 모읍니다. 예: 8이면 13·15가 16으로."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
+        <label class="inline" data-i18n-title="settings.tolTip" title="바인딩은 레이어 값과 변수 값의 차이가 이 값 이하일 때 같은 값으로 봅니다. 격자로 옮긴 토큰까지 붙이려면 격자의 절반쯤이 필요합니다."><span data-i18n="settings.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" max="16" step="0.5" />px</label>
       </div>
     </div>
 
@@ -713,11 +713,12 @@
       <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바 오른쪽 끝. 선택지는 값 자체가 라벨이라
            '형식'·'폰트 크기' 머리말 없이 셀렉트만 둔다(툴팁으로 보완). -->
       <div class="toolbar flush">
-        <select id="exportFormat" title="내보낼 코드 형식">
-          <option value="w3c">W3C 토큰 JSON</option>
-          <option value="css">CSS 변수</option>
+        <select id="exportFormat" data-i18n-title="export.formatTip" title="내보낼 코드 형식">
+          <option value="w3c" data-i18n="export.fmtW3c">W3C 토큰 JSON</option>
+          <option value="css" data-i18n="export.fmtCss">CSS 변수</option>
         </select>
-        <select id="exportFontUnit" title="폰트 크기 단위 — rem은 기준 크기로 나눕니다">
+        <!-- px·rem은 단위 기호 그대로라 번역 대상이 아니다(Free·Paid 티어 이름도 같다). -->
+        <select id="exportFontUnit" data-i18n-title="export.fontUnitTip" title="폰트 크기 단위 — rem은 기준 크기로 나눕니다">
           <option value="px">px</option>
           <option value="rem">rem</option>
         </select>
@@ -730,17 +731,17 @@
     <div class="step">
       <h2 data-i18n="license.title">라이선스</h2>
       <div class="row">
-        <input id="licenseKey" type="text" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
+        <input id="licenseKey" type="text" data-i18n-placeholder="license.keyPlaceholder" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
         <button id="btnVerify" data-i18n="license.verify">검증</button>
         <!-- 와이어엔 없지만 남긴다: 기기 1대 한도라 이 버튼 없이는 기기를 옮길 방법이 없다. -->
-        <button id="btnClearLicense" title="이 기기의 활성화를 반납합니다. 새 기기에서 같은 키를 다시 검증하면 됩니다." data-i18n="license.clear">해제</button>
+        <button id="btnClearLicense" data-i18n-title="license.clearTip" title="이 기기의 활성화를 반납합니다. 새 기기에서 같은 키를 다시 검증하면 됩니다." data-i18n="license.clear">해제</button>
       </div>
       <div class="muted" id="licenseInfo"></div>
       <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유.
            licenseConfig가 아직 자리표시자면 ui.ts가 이 행과 안내를 숨긴다(없는 페이지로 보내지 않기 위해). -->
       <div class="row" id="licenseLinkRow">
         <button id="btnBuy" class="primary">구독하기</button>
-        <button id="btnPortal" title="구독·결제수단 변경, 기기 활성화 해제(기기 1대 한도)">구독 관리</button>
+        <button id="btnPortal" data-i18n-title="license.portalTip" title="구독·결제수단 변경, 기기 활성화 해제(기기 1대 한도)">구독 관리</button>
       </div>
       <div class="hint" id="licenseLinkHint">Free · Paid 연 $39 · 기기 1대</div>
       <div class="hint" id="licenseSetupHint" style="display:none">배포 전 — 키 검증·구독 링크는 아직 동작하지 않습니다.</div>
@@ -911,10 +912,13 @@
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
     "dark.hint": "\uBC1D\uC740 \uBAA8\uB4DC \uC0C9\uC744 \uB4A4\uC9D1\uC5B4 \uB2E4\uD06C \uBAA8\uB4DC\uC5D0 \uCC44\uC6C1\uB2C8\uB2E4. \uBAA9\uB85D \uC774\uB984\uC740 Figma \uBCC0\uC218 \uCEEC\uB809\uC158\xB7\uBAA8\uB4DC\uC608\uC694",
+    "dark.hintTip": "\uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC2B5\uB2C8\uB2E4. Semantic\uC774 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uAC83\uB9CC \uB300\uC0C1\uC774\uACE0 \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB701\uB2C8\uB2E4. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 dark/\u2026\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC9D1\uB2C8\uB2E4.",
     "dark.collection": "\uC5ED\uD560 \uCEEC\uB809\uC158",
     "dark.fromMode": "\uBC1D\uC740 \uBAA8\uB4DC",
     "dark.toMode": "\uC5B4\uB450\uC6B4 \uBAA8\uB4DC",
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
+    // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
+    "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uC0DD\uC131)",
     // 닮은 프레임 컴포넌트화
     "similar.scanBtn": "\uB2EE\uC740 \uC2A4\uCE94",
     "similar.componentizeBtn": "\uBB36\uAE30",
@@ -1016,7 +1020,9 @@
     "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB429\uB2C8\uB2E4",
     "ts.weight": "\uAD75\uAE30 \u2014 Regular \xB7 Medium \xB7 SemiBold \xB7 Bold \uCC98\uB7FC Figma\uAC00 \uC4F0\uB294 \uC774\uB984",
     "settings.grid": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uACA9\uC790",
+    "settings.gridTip": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC744 \uBBF8\uB9AC\uBCF4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC74D\uB2C8\uB2E4. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C.",
     "settings.tol": "\uD5C8\uC6A9\uC624\uCC28",
+    "settings.tolTip": "\uBC14\uC778\uB529\uC740 \uB808\uC774\uC5B4 \uAC12\uACFC \uBCC0\uC218 \uAC12\uC758 \uCC28\uC774\uAC00 \uC774 \uAC12 \uC774\uD558\uC77C \uB54C \uAC19\uC740 \uAC12\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uACA9\uC790\uB85C \uC62E\uAE34 \uD1A0\uD070\uAE4C\uC9C0 \uBD99\uC774\uB824\uBA74 \uACA9\uC790\uC758 \uC808\uBC18\uCBE4\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
     // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
     "create.snapTolGap": " \xB7 \uC62E\uAE34 \uAC12\uC740 \uD5C8\uC6A9\uC624\uCC28 {tol}px\uB85C\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC548 \uBD99\uC2B5\uB2C8\uB2E4(\uC124\uC815\uC5D0\uC11C {half}px\uB85C)",
     // 마법사 카드
@@ -1045,18 +1051,29 @@
     "palette.neutral": "\uC911\uB9BD",
     "palette.status": "\uC0C1\uD0DC",
     "palette.gen": "\uD314\uB808\uD2B8 \uC0DD\uC131",
+    // 하모니 선택지 — 보조색을 브랜드색에서 몇 도 돌려 뽑을지.
+    "harmony.complementary": "\uBCF4\uC0C9",
+    "harmony.analogous": "\uC720\uC0AC",
+    "harmony.triadic": "\uC0BC\uAC01",
+    "harmony.split": "\uBD84\uD560\uBCF4\uC0C9",
+    "harmony.tetradic": "\uC0AC\uAC01",
     // 추출
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
     "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
+    "colorTidy.hintTip": "\uBE44\uC2B7\uD55C \uC0C9\uC740 \uCD94\uCD9C \uC2DC \uC790\uB3D9\uC73C\uB85C \uB300\uD45C 1\uC0C9\uC5D0 \uC815\uB9AC\uB429\uB2C8\uB2E4(\uB4DC\uB798\uD504\uD2B8 \uB2E8\uACC4 \u2014 \uBC14\uC778\uB529 \uC601\uD5A5 \uC5C6\uC74C). Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500), \uC5ED\uD560\uC740 Semantic\uC73C\uB85C \uBD99\uC2B5\uB2C8\uB2E4.",
     "colorTidy.undo": "\uB418\uB3CC\uB9AC\uAE30",
     // 토큰 생성
     "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
     "create.scopeHint": "\uC5EC\uBC31\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC \uB2E4\uB8F9\uB2C8\uB2E4. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uC774\uBBF8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
     "create.selectAll": "\uC804\uCCB4",
     "create.dropOnce": "1\xD7 \uD574\uC81C",
+    "create.dropOnceTip": "\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C\uB9CC \uC4F0\uC778 \uAC12(1\xD7)\uC758 \uCCB4\uD06C\uB97C \uD574\uC81C\uD569\uB2C8\uB2E4 \u2014 \uB300\uAC1C \uC77C\uD68C\uC131\uC774\uB77C \uD1A0\uD070\uC73C\uB85C \uB0A8\uAE38 \uD544\uC694\uAC00 \uC801\uC2B5\uB2C8\uB2E4",
     "create.previewBtn": "\uBBF8\uB9AC\uBCF4\uAE30",
     "create.apply": "\uC801\uC6A9",
+    // 토큰 행 — 체크박스·등장 횟수(N×)는 라벨을 놓을 자리가 없어 툴팁으로만 뜻을 밝힌다.
+    "create.rowCheckTip": "\uC0DD\uC131 \uB300\uC0C1",
+    "create.rowCountTip": "\uC774 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4 {count}\uAC1C",
     // 시맨틱 매핑 카드
     "semantic.title": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551 (\uC5ED\uD560 \u2192 \uD1A0\uD070)",
     "semantic.formatLabel": "\uD615\uC2DD: <code>\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984</code>",
@@ -1068,9 +1085,18 @@
     "textStyle.scanBtn": "\uC2A4\uCE94",
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
     "textStyle.useRowLabels": "\uAC00\uB85C \uD589\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uC774\uB984\uC73C\uB85C",
+    "textStyle.useRowLabelsTip": "ON\uC774\uBA74 \uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uC9DD\uC744 \uBABB \uCC3E\uC73C\uBA74 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026)\uC73C\uB85C \uB461\uB2C8\uB2E4. \uC138\uC158 \uB3D9\uC548\uB9CC \uC720\uC9C0.",
     "textStyle.applyExistingBtn": "\uAE30\uC874\uB9CC \uC5F0\uACB0",
+    "textStyle.applyExistingTip": "\uC120\uD0DD\uD55C \uAE00\uC790\uB97C \uC774\uBBF8 \uB9CC\uB4E0 \uAC19\uC740 \uC2A4\uD0C0\uC77C\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4. \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694.",
     "textStyle.applyOriginal": "\uB4F1\uB85D \uC2DC \uD654\uBA74\uC5D0 \uC801\uC6A9",
     "textStyle.registerBtn": "\uB4F1\uB85D",
+    // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
+    "textStyle.namePlaceholder": "\uC2A4\uD0C0\uC77C \uC774\uB984",
+    "textStyle.nameBoundTip": "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C\uC785\uB2C8\uB2E4. \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC774 \uC2A4\uD0C0\uC77C\uC758 \uC774\uB984\uB9CC \uBC14\uB01D\uB2C8\uB2E4(\uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC74C).",
+    "textStyle.nameNewTip": "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).",
+    // ×N 배지 — 1개면 그 글자로 이동, 여럿이면 전부 선택.
+    "textStyle.badgeGoTip": "\uC774 \uAE00\uC790\uB85C \uC774\uB3D9",
+    "textStyle.badgeSelectTip": "\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 {count}\uAC1C \uC804\uCCB4 \uC120\uD0DD",
     // 적용(바인딩)
     "bind.title": "\uBCC0\uC218 \uC5F0\uACB0",
     "bind.hint": "\uBA3C\uC800 \uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD655\uC778\uD558\uACE0, \uC5F0\uACB0\uD560 \uD56D\uBAA9\uB9CC \uACE0\uB974\uC138\uC694",
@@ -1080,6 +1106,9 @@
     "bind.skipHint": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4",
     "bind.skipCapped": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4 \u2014 \uB808\uC774\uC5B4\uAC00 \uB9CE\uC544 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0\uB9CC \uBCF4\uC5EC\uC90D\uB2C8\uB2E4(\uC0AC\uC720 \uC606 \uC22B\uC790\uB294 \uC804\uCCB4)",
     "bind.skipMeta": "\uC2A4\uD0B5",
+    // 스킵 칩 툴팁 — 사유 건수(속성 단위)와 레이어 수가 다를 수 있어 레이어 쪽을 따로 밝힌다.
+    "bind.skipChipTip": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names}",
+    "bind.skipChipTipMore": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names} \uC678",
     // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
     // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.
     "role.none": "\uC5ED\uD560 \uC5C6\uC74C",
@@ -1135,10 +1164,18 @@
     "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
     "export.hint": "\uB204\uB974\uBA74 \uBC14\uB85C \uCF54\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uB429\uB2C8\uB2E4",
     "export.runBtn": "\uB0B4\uBCF4\uB0B4\uAE30",
+    // 셀렉트는 값이 곧 라벨이라 머리말이 없다 — 무엇을 고르는 칸인지는 툴팁이 맡는다.
+    "export.formatTip": "\uB0B4\uBCF4\uB0BC \uCF54\uB4DC \uD615\uC2DD",
+    "export.fmtW3c": "W3C \uD1A0\uD070 JSON",
+    "export.fmtCss": "CSS \uBCC0\uC218",
+    "export.fontUnitTip": "\uD3F0\uD2B8 \uD06C\uAE30 \uB2E8\uC704 \u2014 rem\uC740 \uAE30\uC900 \uD06C\uAE30\uB85C \uB098\uB215\uB2C8\uB2E4",
     // 요금제 / 라이선스
     "license.title": "\uB77C\uC774\uC120\uC2A4",
+    "license.keyPlaceholder": "\uB77C\uC774\uC120\uC2A4 \uD0A4 \uC785\uB825",
     "license.verify": "\uAC80\uC99D",
     "license.clear": "\uD574\uC81C",
+    "license.clearTip": "\uC774 \uAE30\uAE30\uC758 \uD65C\uC131\uD654\uB97C \uBC18\uB0A9\uD569\uB2C8\uB2E4. \uC0C8 \uAE30\uAE30\uC5D0\uC11C \uAC19\uC740 \uD0A4\uB97C \uB2E4\uC2DC \uAC80\uC99D\uD558\uBA74 \uB429\uB2C8\uB2E4.",
+    "license.portalTip": "\uAD6C\uB3C5\xB7\uACB0\uC81C\uC218\uB2E8 \uBCC0\uACBD, \uAE30\uAE30 \uD65C\uC131\uD654 \uD574\uC81C(\uAE30\uAE30 1\uB300 \uD55C\uB3C4)",
     "license.devTier": "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C \uD2F0\uC5B4",
     "license.devTierNote": "(\uAC80\uC99D\uB41C \uD0A4\uAC00 \uC5C6\uC744 \uB54C\uB9CC \uC801\uC6A9)"
     // 접근성 · 국제화
@@ -1999,24 +2036,24 @@
       if (checkedNames.has(t2.name) || !beforeNames.has(t2.name)) tokenChecked.add(tokenKey(t2));
     }
   }
-  function makeTokenRow(t2) {
+  function makeTokenRow(tok) {
     var _a;
-    const n = (_a = t2.count) != null ? _a : 0;
-    const unit = t2.unit && t2.unit !== "px" ? ` \xB7 ${UNIT_CHIP[t2.unit]}` : "";
+    const n = (_a = tok.count) != null ? _a : 0;
+    const unit = tok.unit && tok.unit !== "px" ? ` \xB7 ${UNIT_CHIP[tok.unit]}` : "";
     const input = document.createElement("input");
-    input.value = t2.name;
-    input.title = t2.name;
+    input.value = tok.name;
+    input.title = tok.name;
     input.addEventListener("input", () => {
-      t2.name = input.value;
+      tok.name = input.value;
       input.title = input.value;
     });
     const cb = document.createElement("input");
     cb.type = "checkbox";
-    cb.checked = tokenChecked.has(tokenKey(t2));
-    cb.title = "\uC0DD\uC131 \uB300\uC0C1";
+    cb.checked = tokenChecked.has(tokenKey(tok));
+    cb.title = t("create.rowCheckTip");
     cb.addEventListener("change", () => {
-      if (cb.checked) tokenChecked.add(tokenKey(t2));
-      else tokenChecked.delete(tokenKey(t2));
+      if (cb.checked) tokenChecked.add(tokenKey(tok));
+      else tokenChecked.delete(tokenKey(tok));
       updateTokenCreate();
     });
     const card = resultCard({
@@ -2024,13 +2061,13 @@
       title: input,
       titleMono: true,
       // 값·타입까지 붙여 이름만으로 구분 안 되는 토큰(fontFamily 등)을 요약에서 바로 읽는다.
-      summary: `${t2.category}${unit} \xB7 ${t2.value}`,
+      summary: `${tok.category}${unit} \xB7 ${tok.value}`,
       // 등장 레이어 수 — 무엇을 남길지 고르는 근거. 1×는 대개 일회성 값이라 흐리게.
       meta: n > 0 ? `${n}\xD7` : "",
-      metaTitle: n > 0 ? `\uC774 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4 ${n}\uAC1C` : "",
+      metaTitle: n > 0 ? t("create.rowCountTip", { count: n }) : "",
       dim: n === 1
     });
-    if (t2.category === "effectColor" && typeof t2.value === "string") addSwatch(card, t2.value);
+    if (tok.category === "effectColor" && typeof tok.value === "string") addSwatch(card, tok.value);
     return card;
   }
   function renderEmptyState(box, title, guide, actionLabel) {
@@ -2544,16 +2581,16 @@
     var _a, _b;
     const name = document.createElement("input");
     name.value = s.name;
-    name.placeholder = "\uC2A4\uD0C0\uC77C \uC774\uB984";
+    name.placeholder = t("textStyle.namePlaceholder");
     name.addEventListener("input", () => {
       s.name = name.value;
     });
     if (s.boundStyleId) {
       name.classList.add("ts-bound");
-      name.title = "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C\uC785\uB2C8\uB2E4. \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC774 \uC2A4\uD0C0\uC77C\uC758 \uC774\uB984\uB9CC \uBC14\uB01D\uB2C8\uB2E4(\uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC74C).";
+      name.title = t("textStyle.nameBoundTip");
     } else {
       name.classList.add("ts-new");
-      name.title = "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).";
+      name.title = t("textStyle.nameNewTip");
     }
     const editable = isEditableTextRow(s);
     const card = resultCard(editable ? { title: name } : { title: name, summary: tsSummary(s), summaryMono: true });
@@ -2564,7 +2601,7 @@
       const badge = document.createElement("button");
       badge.className = "r-badge";
       badge.textContent = `\xD7${n}`;
-      badge.title = n === 1 ? "\uC774 \uAE00\uC790\uB85C \uC774\uB3D9" : `\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 ${n}\uAC1C \uC804\uCCB4 \uC120\uD0DD`;
+      badge.title = n === 1 ? t("textStyle.badgeGoTip") : t("textStyle.badgeSelectTip", { count: n });
       badge.addEventListener("click", () => send({ type: "SELECT_NODES", ids }));
       card.querySelector(".r-top").appendChild(badge);
     } else {
@@ -3090,7 +3127,7 @@
     } else if (modes.length >= 1) {
       const o = document.createElement("option");
       o.value = "";
-      o.textContent = "Dark (\uC5C6\uC73C\uBA74 \uC0DD\uC131)";
+      o.textContent = t("dark.toPlaceholder");
       toSel.insertBefore(o, toSel.firstChild);
       toSel.value = "";
     }
@@ -3846,7 +3883,8 @@
       const btn = document.createElement("button");
       btn.className = "skip-chip";
       btn.textContent = `${label} \u203A`;
-      btn.title = `\uB808\uC774\uC5B4 ${ids.length}\uAC1C \uC120\uD0DD \u2014 ${bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(", ")}${ids.length > 5 ? " \uC678" : ""}`;
+      const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(", ");
+      btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names });
       btn.addEventListener("click", () => {
         send({ type: "SELECT_NODES", ids });
         setStatus("applyStatus", `${t("reason." + key)} \uB808\uC774\uC5B4 ${ids.length}\uAC1C \uC120\uD0DD`, "");
@@ -4028,6 +4066,15 @@
       const key = el.dataset.i18nHtml;
       if (hasString(key)) el.innerHTML = t(key);
     });
+    for (const [attr, prop] of [
+      ["title", "i18nTitle"],
+      ["placeholder", "i18nPlaceholder"]
+    ]) {
+      root.querySelectorAll(`[data-i18n-${attr}]`).forEach((el) => {
+        const key = el.dataset[prop];
+        if (hasString(key)) el.setAttribute(attr, t(key));
+      });
+    }
   }
   applyStaticI18n();
   applyCardChrome();

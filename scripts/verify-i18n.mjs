@@ -7,7 +7,11 @@
  * 실제로 두 번 났다(한쪽이 문구를 고치고 다른 쪽이 STRINGS를 그대로 둔 경우).
  * typecheck·테스트로는 안 잡힌다. 여기서 잡는다.
  *
- * 1. 누락  — `data-i18n` 키가 STRINGS에 없음(하이드레이션이 건너뛰어 조용히 폴백)
+ * 속성으로 보이는 문자열(`data-i18n-title` → `title`, `data-i18n-placeholder` →
+ * `placeholder`)도 같은 관계다 — 인라인 속성값이 폴백, STRINGS가 화면값. 툴팁은
+ * 호버해야 보여 드리프트가 더 오래 안 들킨다. 그래서 같은 잣대로 함께 본다.
+ *
+ * 1. 누락  — `data-i18n*` 키가 STRINGS에 없음(하이드레이션이 건너뛰어 조용히 폴백)
  * 2. 드리프트 — STRINGS 값 ≠ 인라인 폴백(둘 중 하나가 낡음)
  * 3. 미참조 — STRINGS에만 있고 아무도 안 쓰는 키(죽은 문자열)
  *
@@ -97,6 +101,35 @@ if (unparsed.length) {
   process.exit(2);
 }
 
+/* ---------- 속성 폴백 추출(data-i18n-title / -placeholder) ----------
+   짝이 되는 속성(title/placeholder)이 같은 여는 태그 안에 있어야 폴백이 성립한다.
+   없으면 하이드레이션 전 첫 프레임에 툴팁이 통째로 빈다 — 누락으로 잡는다. */
+const ATTR_FORMS = ['title', 'placeholder'];
+const unescape = (s) =>
+  s.replace(/&(amp|lt|gt|quot|#39);/g, (_, e) =>
+    ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e],
+  );
+
+const attrFound = []; // { key, inner, form }
+const noFallback = [];
+for (const form of ATTR_FORMS) {
+  const re = new RegExp(`data-i18n-${form}="([^"]+)"`, 'g');
+  let m;
+  while ((m = re.exec(html))) {
+    const start = html.lastIndexOf('<', m.index);
+    const end = endOfOpenTag(html, start);
+    const tag = html.slice(start, end < 0 ? undefined : end);
+    const pair = new RegExp(`\\s${form}="([^"]*)"`).exec(tag);
+    if (!pair) noFallback.push(m[1]);
+    else attrFound.push({ key: m[1], inner: unescape(pair[1]), form });
+  }
+}
+if (noFallback.length) {
+  console.error(`✗ 폴백 속성이 없는 키: ${noFallback.join(', ')} — 같은 태그에 title/placeholder를 함께 두세요`);
+  process.exit(2);
+}
+found.push(...attrFound);
+
 /* ---------- 1·2. 누락 / 드리프트 ---------- */
 const missing = [];
 const drift = [];
@@ -156,8 +189,8 @@ if (orphan.length) {
 }
 if (!failed) {
   console.log(
-    `✓ i18n 정합 — data-i18n ${found.length}개 · STRINGS ${Object.keys(STRINGS).length}개 · ` +
-      `누락 0 · 드리프트 0 · 미참조 0`,
+    `✓ i18n 정합 — 마크업 ${found.length}개(텍스트 ${found.length - attrFound.length} · 속성 ${attrFound.length}) · ` +
+      `STRINGS ${Object.keys(STRINGS).length}개 · 누락 0 · 드리프트 0 · 미참조 0`,
   );
 }
 process.exit(failed ? 1 : 0);
