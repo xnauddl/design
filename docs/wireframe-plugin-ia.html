@@ -270,11 +270,11 @@
   </style>
 </head>
 <body>
-  <h1>플러그인 UX 제안 와이어프레임 <span style="font-size:12px;font-weight:500;color:var(--muted)">rev 2026-08-06k</span></h1>
+  <h1>플러그인 UX 제안 와이어프레임 <span style="font-size:12px;font-weight:500;color:var(--muted)">rev 2026-08-06l</span></h1>
   <p class="lede">
     같은 기능·탭을 유지한 채 <b>정보 구조와 밀도</b>만 바꿉니다. 기본은 제안 UX이고,
     「현재」로 전환하면 긴 안내·카드 세로 나열·텍스트 스타일 표를 그대로 볼 수 있습니다.
-    <br />최근(rev k): 색 — 「색 변수 만들기」🔒 누락 보완(추출 Free · 팔레트·변수화 Paid).
+    <br />최근(rev l): 제목 잠금 배지 <code>🔒 라벨</code> 통일(색·토큰·컴포넌트) — 중점(<code>·</code>) 없이 구현과 동일.
   </p>
 
   <div class="topbar">
@@ -417,6 +417,11 @@
         <h3>색 유료 🔒</h3>
         <p>추출=Free. <b>팔레트 생성</b>·<b>색 변수 만들기</b>(Global+시맨틱)=Paid → 버튼·제목에 🔒. (rev k)</p>
       </div>
+      <div class="change">
+        <span class="tag">#12</span>
+        <h3>제목 잠금 표기 통일</h3>
+        <p>색·토큰·컴포넌트 제목 배지 = <b>🔒 라벨</b>(공백, 중점 없음). 예: <code>🔒 변수화</code> · <code>🔒 후보 24</code> · <code>🔒 닮은 프레임</code>. 구현 렌더와 맞춤. (rev l)</p>
+      </div>
     </aside>
   </div>
 
@@ -543,7 +548,7 @@
       return `
         ${uxMakeRail()}
         <div class="card">
-          <h3>색 <span class="lock">🔒 · 변수화</span></h3>
+          <h3>색 <span class="lock">🔒 변수화</span></h3>
           <p class="hint tight">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</p>
           <div class="toolbar">
             <button type="button" class="btn">선택에서 추출</button>
@@ -635,7 +640,7 @@
       return `
         ${uxMakeRail()}
         <div class="card">
-          <h3>간격·크기 토큰 <span class="lock">🔒 · 후보 24</span></h3>
+          <h3>간격·크기 토큰 <span class="lock">🔒 후보 24</span></h3>
           <p class="hint tight">여백·크기·폰트·효과만 다룹니다. 색은 이전 단계에서 이미 만들었어요</p>
           <div class="toolbar">
             <button type="button" class="btn">미리보기</button>
@@ -818,7 +823,7 @@
       return `
         ${uxApplyRail()}
         <div class="card">
-          <h3>컴포넌트 <span class="lock">🔒 · 닮은 프레임</span></h3>
+          <h3>컴포넌트 <span class="lock">🔒 닮은 프레임</span></h3>
           <p class="hint tight">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</p>
           <div class="toolbar">
             <button type="button" class="btn" title="컴포넌트 후보 스캔">후보 스캔</button>
