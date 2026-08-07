@@ -1459,7 +1459,7 @@ function updateGates(): void {
   if (!isPaid) ($('btnSemantics') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
   setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 연결할 변수를 만드세요.');
   if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
-  // '기존 스타일 적용만'은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
+  // 「기존만 연결」은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
   if (!isPaid) ($('btnApplyExistingText') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
 }
