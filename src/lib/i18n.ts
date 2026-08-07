@@ -234,6 +234,7 @@ export const STRINGS: Record<string, string> = {
   'bind.confirm': '선택한 항목에 연결',
   'bind.progress': '진행률',
   'bind.skipHint': '건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다',
+  'bind.skipCapped': '건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다 — 레이어가 많아 목록은 {shown}개까지만 보여줍니다(사유 옆 숫자는 전체)',
   'bind.skipMeta': '스킵',
   // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
   // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.

@@ -52,6 +52,19 @@ let hasTextStyles = false;
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'colors' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
 
+/**
+ * 2.5 시맨틱 카드는 자동 흡수라 늘 숨김(data-always-hidden) — 그 안의 #semStatus에 쓴 글은
+ * 화면에 뜨지 않는다. 시맨틱은 색·토큰 카드가 자동으로 부르므로, 결과·오류·유료 안내는
+ * 그 실행을 부른 카드의 상태 줄로 돌린다.
+ */
+let semStatusTarget = 'colorStatus';
+/** 그 카드가 이미 띄운 요약 — 시맨틱 결과가 덮어쓰지 않고 뒤에 이어 붙게 한다. */
+let semStatusPrefix = '';
+/** #semStatus로 향하는 상태 쓰기를 화면에 있는 카드로 옮긴다(그 외 id는 그대로). */
+function resolveStatusId(id: string): string {
+  return id === 'semStatus' ? semStatusTarget : id;
+}
+
 /* ---------- 토큰 목록 렌더 ---------- */
 /* ---------- 점진(청크) 렌더 — 대량 목록을 프레임 단위로 나눠 비차단 렌더(§4) ----------
    소량(≤CHUNK)은 즉시 동기 렌더(기존 동작), 대량은 requestAnimationFrame으로 청크 추가.
@@ -795,7 +808,7 @@ $('btnColorVars').addEventListener('click', () => {
 $('btnScanGlobals').addEventListener('click', () => {
   // #10: 기존 Global 색에서 시맨틱 역할 추천(재방문 매핑).
   autoGlobalScan = false;
-  setStatus('semStatus', t('semantic.scanningGlobals'), '');
+  setStatus(semStatusTarget, t('semantic.scanningGlobals'), '');
   send({ type: 'GET_GLOBAL_COLORS' });
 });
 
@@ -825,7 +838,7 @@ $('btnSemantics').addEventListener('click', () => {
     if (m) map[m[1]] = m[2];
   }
   if (!Object.keys(map).length) {
-    setStatus('semStatus', t('semantic.formatHint'), 'warn');
+    setStatus(semStatusTarget, t('semantic.formatHint'), 'warn');
     return;
   }
   send({ type: 'CREATE_SEMANTICS', map });
@@ -1698,7 +1711,11 @@ window.onmessage = (event: MessageEvent) => {
         createFrom = 'tokens';
         colorsCreated = true;
         const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
-        if (!wizardRunning && Object.keys(semMap).length) send({ type: 'CREATE_SEMANTICS', map: semMap });
+        semStatusTarget = 'colorStatus'; // 이어지는 시맨틱 결과는 방금 누른 색 카드에 뜬다
+        if (!wizardRunning && Object.keys(semMap).length) {
+          semStatusPrefix = msg.summary;
+          send({ type: 'CREATE_SEMANTICS', map: semMap });
+        }
         setStatus('colorStatus', msg.summary, 'ok');
         renderTokens(); // 토큰 단계의 '색 변수 N개 이미 생성됨' 안내 갱신
       } else {
@@ -1708,7 +1725,11 @@ window.onmessage = (event: MessageEvent) => {
         // 마법사는 자체 semantics 단계가 있어 제외(메인 핸들러와 동시 수신 → 이중 생성 방지).
         if (!wizardRunning) {
           const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
-          if (Object.keys(semMap).length) send({ type: 'CREATE_SEMANTICS', map: semMap });
+          semStatusTarget = 'createStatus'; // 이어지는 시맨틱 결과는 방금 누른 토큰 카드에 뜬다
+          if (Object.keys(semMap).length) {
+            semStatusPrefix = msg.summary;
+            send({ type: 'CREATE_SEMANTICS', map: semMap });
+          }
         }
       }
       break;
@@ -1720,6 +1741,8 @@ window.onmessage = (event: MessageEvent) => {
       hideApplyProgress(); // UX6
       const confirmBtn = $('btnApplyConfirm') as HTMLButtonElement;
       bindSkips = msg.skips ?? [];
+      // 스킵 목록은 상한에서 잘린다(bind.ts SKIP_PREVIEW_CAP) — 잘렸으면 힌트 줄이 그렇다고 말한다.
+      bindSkipsCapped = (msg.skipTotal ?? bindSkips.length) > bindSkips.length;
       const rt = reasonsText(msg.reasons); // UX3: 사유별 스킵
       // 칩(레이어로 이동)이 뜨면 상태 줄에는 사유를 중복해 쓰지 않는다.
       const asChips = bindSkips.length > 0;
@@ -1761,12 +1784,15 @@ window.onmessage = (event: MessageEvent) => {
       renderRenameResult(msg);
       break;
     case 'SEMANTICS_RESULT':
+      if (wizardRunning) break; // 마법사는 자체 단계 줄에 보고한다(setWizardStep)
       setStatus(
-        'semStatus',
-        t('semantic.result', { aliased: msg.aliased, created: msg.created, updated: msg.updated }) +
+        semStatusTarget,
+        (semStatusPrefix ? `${semStatusPrefix} · ` : '') +
+          t('semantic.result', { aliased: msg.aliased, created: msg.created, updated: msg.updated }) +
           (msg.missing.length ? t('semantic.missing', { names: msg.missing.join(', ') }) : ''),
         msg.missing.length ? 'warn' : 'ok',
       );
+      semStatusPrefix = '';
       break;
     case 'TEXT_STYLE_CANDIDATES': {
       if (msg.styles.length) {
@@ -1817,11 +1843,11 @@ window.onmessage = (event: MessageEvent) => {
       // #10: 기존 Global 색에서 역할 추천 → 시맨틱 매핑 textarea 채움(재방문 매핑).
       // 자동 요청은 비어 있을 때만 채운다 — 사용자가 이미 고른 역할을 덮으면 안 된다.
       if (!msg.colors.length) {
-        if (!autoGlobalScan) setStatus('semStatus', t('semantic.noGlobals'), 'warn');
+        if (!autoGlobalScan) setStatus(semStatusTarget, t('semantic.noGlobals'), 'warn');
       } else if (!autoGlobalScan || !($('semMap') as HTMLTextAreaElement).value.trim()) {
         setSemMapText(suggestSemanticMap(msg.colors));
         renderColorTable(); // 이미 색이 떠 있으면 역할 드롭다운을 새 맵으로 다시 채운다
-        if (!autoGlobalScan) setStatus('semStatus', t('semantic.suggested', { count: msg.colors.length }), 'ok');
+        if (!autoGlobalScan) setStatus(semStatusTarget, t('semantic.suggested', { count: msg.colors.length }), 'ok');
       }
       autoGlobalScan = false;
       break;
@@ -1961,7 +1987,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
       // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
-      const statusId = PREMIUM_STATUS_ID[msg.feature] ?? 'createStatus';
+      const statusId = resolveStatusId(PREMIUM_STATUS_ID[msg.feature] ?? 'createStatus');
       setStatus(statusId, t('premium.required', { message: msg.message, feature: msg.feature }), 'warn');
       break;
     }
@@ -1975,7 +2001,7 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'ERROR': {
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
-      const statusId = (msg.op && OP_STATUS[msg.op]) || 'colorStatus';
+      const statusId = resolveStatusId((msg.op && OP_STATUS[msg.op]) || 'colorStatus');
       if (msg.op === 'APPLY') hideApplyProgress();
       showError(statusId, explainError(msg.message));
       break;
@@ -2293,6 +2319,7 @@ function clearBindPreview(): void {
   bindCandidates = [];
   bindNodes = [];
   bindSkips = [];
+  bindSkipsCapped = false;
   clearMount($('bindSkips')); // 숨기기만 하면 낡은 칩이 DOM에 남는다
   ($('bindSkips') as HTMLElement).style.display = 'none';
   ($('bindSkipHint') as HTMLElement).style.display = 'none';
@@ -2444,6 +2471,8 @@ function refreshTreeEmptyStates(): void {
  * 사유 칩을 눌러 캔버스에서 선택할 수 있게 보관한다.
  */
 let bindSkips: BindSkip[] = [];
+/** 스킵 목록이 상한에서 잘렸는가 — 힌트 줄이 "목록은 N개까지"라고 밝힌다. */
+let bindSkipsCapped = false;
 
 /** 사유 칩 렌더 — 레이어 목록이 있는 사유만 버튼, 나머지는 글자. */
 function renderSkipReasons(reasons: Record<string, number>): void {
@@ -2458,6 +2487,7 @@ function renderSkipReasons(reasons: Record<string, number>): void {
   }
   box.style.display = '';
   hint.style.display = '';
+  hint.textContent = bindSkipsCapped ? t('bind.skipCapped', { shown: bindSkips.length }) : t('bind.skipHint');
   for (const [key, n] of entries) {
     const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
     const label = `${t('reason.' + key)} ${n}`;

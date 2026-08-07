@@ -172,7 +172,7 @@ export type CodeToUi =
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean } // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[] } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }

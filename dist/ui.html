@@ -1055,6 +1055,7 @@
     "bind.confirm": "\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0",
     "bind.progress": "\uC9C4\uD589\uB960",
     "bind.skipHint": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4",
+    "bind.skipCapped": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4 \u2014 \uB808\uC774\uC5B4\uAC00 \uB9CE\uC544 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0\uB9CC \uBCF4\uC5EC\uC90D\uB2C8\uB2E4(\uC0AC\uC720 \uC606 \uC22B\uC790\uB294 \uC804\uCCB4)",
     "bind.skipMeta": "\uC2A4\uD0B5",
     // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
     // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.
@@ -1856,6 +1857,11 @@
   var hasTextStyles = false;
   var lastSelCount = 0;
   var createFrom = "tokens";
+  var semStatusTarget = "colorStatus";
+  var semStatusPrefix = "";
+  function resolveStatusId(id) {
+    return id === "semStatus" ? semStatusTarget : id;
+  }
   var CHUNK = 150;
   var chunkPending = /* @__PURE__ */ new WeakMap();
   function renderChunked(mount, items, makeRow, onDone) {
@@ -2409,7 +2415,7 @@
   });
   $("btnScanGlobals").addEventListener("click", () => {
     autoGlobalScan = false;
-    setStatus("semStatus", t("semantic.scanningGlobals"), "");
+    setStatus(semStatusTarget, t("semantic.scanningGlobals"), "");
     send({ type: "GET_GLOBAL_COLORS" });
   });
   var autoGlobalScan = false;
@@ -2428,7 +2434,7 @@
       if (m) map[m[1]] = m[2];
     }
     if (!Object.keys(map).length) {
-      setStatus("semStatus", t("semantic.formatHint"), "warn");
+      setStatus(semStatusTarget, t("semantic.formatHint"), "warn");
       return;
     }
     send({ type: "CREATE_SEMANTICS", map });
@@ -3065,7 +3071,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
@@ -3114,7 +3120,11 @@
           createFrom = "tokens";
           colorsCreated = true;
           const semMap = textToSemanticMap($("semMap").value);
-          if (!wizardRunning && Object.keys(semMap).length) send({ type: "CREATE_SEMANTICS", map: semMap });
+          semStatusTarget = "colorStatus";
+          if (!wizardRunning && Object.keys(semMap).length) {
+            semStatusPrefix = msg.summary;
+            send({ type: "CREATE_SEMANTICS", map: semMap });
+          }
           setStatus("colorStatus", msg.summary, "ok");
           renderTokens();
         } else {
@@ -3122,7 +3132,11 @@
           applyBtn.style.display = "none";
           if (!wizardRunning) {
             const semMap = textToSemanticMap($("semMap").value);
-            if (Object.keys(semMap).length) send({ type: "CREATE_SEMANTICS", map: semMap });
+            semStatusTarget = "createStatus";
+            if (Object.keys(semMap).length) {
+              semStatusPrefix = msg.summary;
+              send({ type: "CREATE_SEMANTICS", map: semMap });
+            }
           }
         }
         break;
@@ -3134,6 +3148,7 @@
         hideApplyProgress();
         const confirmBtn = $("btnApplyConfirm");
         bindSkips = (_a = msg.skips) != null ? _a : [];
+        bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
         const rt = reasonsText(msg.reasons);
         const asChips = bindSkips.length > 0;
         const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt && !asChips ? ` \u2014 ${rt}` : ""}`;
@@ -3144,8 +3159,8 @@
           setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail: cancelDetail }), "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
-          bindCandidates = (_b = msg.candidates) != null ? _b : [];
-          bindNodes = (_c = msg.nodes) != null ? _c : [];
+          bindCandidates = (_c = msg.candidates) != null ? _c : [];
+          bindNodes = (_d = msg.nodes) != null ? _d : [];
           bindChecked.clear();
           for (const c of bindCandidates) bindChecked.add(candKey(c));
           renderBindTree();
@@ -3168,11 +3183,13 @@
         renderRenameResult(msg);
         break;
       case "SEMANTICS_RESULT":
+        if (wizardRunning) break;
         setStatus(
-          "semStatus",
-          t("semantic.result", { aliased: msg.aliased, created: msg.created, updated: msg.updated }) + (msg.missing.length ? t("semantic.missing", { names: msg.missing.join(", ") }) : ""),
+          semStatusTarget,
+          (semStatusPrefix ? `${semStatusPrefix} \xB7 ` : "") + t("semantic.result", { aliased: msg.aliased, created: msg.created, updated: msg.updated }) + (msg.missing.length ? t("semantic.missing", { names: msg.missing.join(", ") }) : ""),
           msg.missing.length ? "warn" : "ok"
         );
+        semStatusPrefix = "";
         break;
       case "TEXT_STYLE_CANDIDATES": {
         if (msg.styles.length) {
@@ -3180,7 +3197,7 @@
           renderTextStyles();
           const bound = msg.styles.filter((s) => s.boundStyleId).length;
           const fresh = msg.styles.length - bound;
-          const labelPart = msg.labeled != null ? ` \xB7 \uB77C\uBCA8\uC774\uB984 ${msg.labeled} \xB7 \uB7AD\uD0B9\uD3F4\uBC31 ${(_d = msg.fallback) != null ? _d : 0}` : "";
+          const labelPart = msg.labeled != null ? ` \xB7 \uB77C\uBCA8\uC774\uB984 ${msg.labeled} \xB7 \uB7AD\uD0B9\uD3F4\uBC31 ${(_e = msg.fallback) != null ? _e : 0}` : "";
           setStatus(
             "tsStatus",
             `\uC2E0\uADDC ${fresh} \xB7 \uB4F1\uB85D\uB428 ${bound} \xB7 \uD589\uAC04% ${msg.styles.filter((s) => s.lineHeightPercent).length} \xB7 \uC790\uAC04% ${msg.styles.filter((s) => {
@@ -3215,11 +3232,11 @@
         break;
       case "GLOBAL_COLORS":
         if (!msg.colors.length) {
-          if (!autoGlobalScan) setStatus("semStatus", t("semantic.noGlobals"), "warn");
+          if (!autoGlobalScan) setStatus(semStatusTarget, t("semantic.noGlobals"), "warn");
         } else if (!autoGlobalScan || !$("semMap").value.trim()) {
           setSemMapText(suggestSemanticMap(msg.colors));
           renderColorTable();
-          if (!autoGlobalScan) setStatus("semStatus", t("semantic.suggested", { count: msg.colors.length }), "ok");
+          if (!autoGlobalScan) setStatus(semStatusTarget, t("semantic.suggested", { count: msg.colors.length }), "ok");
         }
         autoGlobalScan = false;
         break;
@@ -3338,7 +3355,7 @@
         break;
       }
       case "PREMIUM_REQUIRED": {
-        const statusId = (_e = PREMIUM_STATUS_ID[msg.feature]) != null ? _e : "createStatus";
+        const statusId = resolveStatusId((_f = PREMIUM_STATUS_ID[msg.feature]) != null ? _f : "createStatus");
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }
@@ -3349,7 +3366,7 @@
         void deactivateInstance(msg.key, msg.instanceId);
         break;
       case "ERROR": {
-        const statusId = msg.op && OP_STATUS[msg.op] || "colorStatus";
+        const statusId = resolveStatusId(msg.op && OP_STATUS[msg.op] || "colorStatus");
         if (msg.op === "APPLY") hideApplyProgress();
         showError(statusId, explainError(msg.message));
         break;
@@ -3588,6 +3605,7 @@
     bindCandidates = [];
     bindNodes = [];
     bindSkips = [];
+    bindSkipsCapped = false;
     clearMount($("bindSkips"));
     $("bindSkips").style.display = "none";
     $("bindSkipHint").style.display = "none";
@@ -3684,6 +3702,7 @@
     }
   }
   var bindSkips = [];
+  var bindSkipsCapped = false;
   function renderSkipReasons(reasons) {
     const box = $("bindSkips");
     const hint = $("bindSkipHint");
@@ -3696,6 +3715,7 @@
     }
     box.style.display = "";
     hint.style.display = "";
+    hint.textContent = bindSkipsCapped ? t("bind.skipCapped", { shown: bindSkips.length }) : t("bind.skipHint");
     for (const [key, n] of entries) {
       const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
       const label = `${t("reason." + key)} ${n}`;

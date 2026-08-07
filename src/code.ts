@@ -733,7 +733,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           cancelled: r.cancelled,
           candidates: r.candidates, // #6: 미리보기 후보(dry-run만)
           nodes: r.nodes, // #13: 미리보기 트리 맥락
-          skips: r.skips, // 사유별 건너뛴 레이어(dry-run만)
+          skips: r.skips, // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
+          skipTotal: r.skipTotal, // 상한 전 실제 수 — 잘렸으면 UI가 알린다
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로

@@ -3,7 +3,7 @@
    순수 로직(tokens·naming)은 pure.test.mjs가 담당. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rgbToHex, hexToRgb, isKnownRole, nameTextStyles } from '../dist/pure.mjs';
+import { rgbToHex, hexToRgb, isKnownRole, nameTextStyles, clusterTextStyles } from '../dist/pure.mjs';
 import {
   extractFromSelection,
   createTokens,
@@ -877,6 +877,31 @@ test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사�
   // 실제 적용(apply=true)에서는 수집하지 않는다 — 미리보기 전용 페이로드.
   const real = await bindSelection([pad, free], 0.5, true);
   assert.equal(real.skips, undefined);
+});
+
+test('bindSelection — 스킵 목록·미리보기 트리는 고른 레이어 수가 아니라 상한에 묶인다', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
+  // 매칭되는 레이어 1개 + 매칭 안 되는 자유배치 레이어 500개.
+  const hit = {
+    type: 'FRAME', id: 'hit', name: 'Hit', fills: [], layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 200, height: 200,
+    setBoundVariable() {},
+  };
+  const misses = Array.from({ length: 500 }, (_, i) => ({
+    type: 'FRAME', id: `m${i}`, name: `Miss ${i}`, fills: [], layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 137, height: 137,
+    setBoundVariable() {},
+  }));
+
+  const dry = await bindSelection([hit, ...misses], 0.5, false);
+
+  assert.ok(dry.skipTotal >= 500); // 실제 스킵 수(노드×사유)는 그대로 보고
+  assert.equal(dry.skips.length, 200); // 실어 보내는 목록은 상한까지
+  assert.ok(dry.reasons['size-free-layout'] >= 500); // 사유 집계는 상한과 무관 — 칩 숫자는 진짜 수
+  // 트리도 상한을 따른다 — 501개 레이어를 골랐어도 행은 상한(+후보)만큼만.
+  assert.ok(dry.nodes.length <= 201);
+  assert.ok(dry.nodes.some((n) => n.id === 'hit')); // 후보는 잘려 나가지 않는다
 });
 
 test('bindSelection — 그리드 오토레이아웃의 row/column gap 바인딩', async () => {
@@ -2630,6 +2655,33 @@ test('scanTextStyles — TEXT 노드 시그니처 수집(+%행간 환산·mixed 
   assert.equal(samples.find((s) => s.fontSize === 16).lineHeight, 24); // 150% × 16
   assert.equal(samples.find((s) => s.fontSize === 32).style, 'Bold');
   assert.ok(warnings.length >= 1);
+});
+
+test('scanTextStyles — 세그먼트를 읽을 수 있어도 부분 서식 노드는 세지 않는다', async () => {
+  // 두 적용 경로(applyTextStylesToSelection·createTextStyles)가 mixed 노드를 건너뛰므로,
+  // 스캔이 가장 긴 세그먼트로 대표시켜 세면 ×N 배지와 '레이어 선택'이 손댈 수 없는 레이어를 가리킨다.
+  const figma = installFigma();
+  const plain = { type: 'TEXT', id: 'p1', name: 'Body', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'aaa', textStyleId: '' };
+  // 한 단어만 굵게 — 세그먼트 API는 멀쩡히 답하지만 노드 필드는 mixed.
+  const partial = {
+    type: 'TEXT', id: 'p2', name: 'Partial', fontSize: figma.mixed, fontName: figma.mixed,
+    lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'aaabb', textStyleId: '',
+    getStyledTextSegments: () => [
+      { start: 0, end: 3, fontSize: 16, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 } },
+      { start: 3, end: 5, fontSize: 16, fontName: { family: 'Inter', style: 'Bold' }, lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 } },
+    ],
+  };
+  const frame = { type: 'FRAME', id: 'f', name: 'F', children: [plain, partial] };
+
+  const { samples, warnings } = await scanTextStyles([frame]);
+  assert.equal(samples.length, 1);
+  assert.equal(samples[0].id, 'p1');
+  assert.ok(warnings.some((w) => w.includes('부분 서식')));
+
+  const clusters = clusterTextStyles(samples);
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].count, 1); // ×2가 아니라 ×1 — 적용이 실제로 바꿀 수 있는 수
+  assert.deepEqual(clusters[0].nodeIds, ['p1']);
 });
 
 test('scanTextStyles — 숨김 텍스트(visible=false)와 그 하위는 스캔하지 않음', async () => {

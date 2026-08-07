@@ -294,8 +294,12 @@ function measureLetterSpacing(fontSize: number, ls: LetterSpacing | typeof figma
 
 /**
  * 텍스트 노드의 균일 타이포.
- * 지정 단위(PERCENT)는 노드 필드에 있고, getStyledTextSegments는 해석된 px만
- * 돌려주는 경우가 있어 — **non-mixed면 노드 필드를 우선**한다. mixed일 때만 세그먼트.
+ * 지정 단위(PERCENT)는 노드 필드에 있고 getStyledTextSegments는 해석된 px만 돌려주는 경우가
+ * 있어 노드 필드를 읽는다.
+ *
+ * 부분 서식(mixed)은 null — 가장 긴 세그먼트로 대표시켜 세어 보기도 했으나, 두 적용 경로가
+ * 모두 mixed 노드를 건너뛴다(스타일을 붙이면 구간 서식이 뭉개진다). 세기만 하면 ×N 배지와
+ * '레이어 선택'이 손댈 수 없는 레이어를 가리키게 되므로 스캔도 같이 뺀다.
  */
 function readNodeTypography(t: TextNode): {
   fontSize: number;
@@ -304,34 +308,14 @@ function readNodeTypography(t: TextNode): {
   lineHeight: LineHeight | typeof figma.mixed;
   letterSpacing: LetterSpacing | typeof figma.mixed;
 } | null {
-  if (t.fontSize !== figma.mixed && t.fontName !== figma.mixed) {
-    return {
-      fontSize: t.fontSize,
-      family: t.fontName.family,
-      style: t.fontName.style,
-      lineHeight: t.lineHeight,
-      letterSpacing: t.letterSpacing,
-    };
-  }
-  try {
-    const segs = t.getStyledTextSegments(['fontSize', 'fontName', 'lineHeight', 'letterSpacing']);
-    if (segs.length > 0) {
-      let best = segs[0];
-      for (let i = 1; i < segs.length; i++) {
-        if (segs[i].end - segs[i].start > best.end - best.start) best = segs[i];
-      }
-      return {
-        fontSize: best.fontSize,
-        family: best.fontName.family,
-        style: best.fontName.style,
-        lineHeight: best.lineHeight,
-        letterSpacing: best.letterSpacing,
-      };
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
+  if (t.fontSize === figma.mixed || t.fontName === figma.mixed) return null;
+  return {
+    fontSize: t.fontSize,
+    family: t.fontName.family,
+    style: t.fontName.style,
+    lineHeight: t.lineHeight,
+    letterSpacing: t.letterSpacing,
+  };
 }
 
 /** 변수 description("150%" / "-2%")에서 % 숫자 추출. 별칭이면 Global까지 따라간다. */

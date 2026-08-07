@@ -667,33 +667,14 @@
     return { px, pct: 0 };
   }
   function readNodeTypography(t) {
-    if (t.fontSize !== figma.mixed && t.fontName !== figma.mixed) {
-      return {
-        fontSize: t.fontSize,
-        family: t.fontName.family,
-        style: t.fontName.style,
-        lineHeight: t.lineHeight,
-        letterSpacing: t.letterSpacing
-      };
-    }
-    try {
-      const segs = t.getStyledTextSegments(["fontSize", "fontName", "lineHeight", "letterSpacing"]);
-      if (segs.length > 0) {
-        let best = segs[0];
-        for (let i = 1; i < segs.length; i++) {
-          if (segs[i].end - segs[i].start > best.end - best.start) best = segs[i];
-        }
-        return {
-          fontSize: best.fontSize,
-          family: best.fontName.family,
-          style: best.fontName.style,
-          lineHeight: best.lineHeight,
-          letterSpacing: best.letterSpacing
-        };
-      }
-    } catch (e) {
-    }
-    return null;
+    if (t.fontSize === figma.mixed || t.fontName === figma.mixed) return null;
+    return {
+      fontSize: t.fontSize,
+      family: t.fontName.family,
+      style: t.fontName.style,
+      lineHeight: t.lineHeight,
+      letterSpacing: t.letterSpacing
+    };
   }
   async function percentFromVariableDescription(varId, cache2) {
     var _a;
@@ -1381,6 +1362,7 @@
     opacity: "OPACITY"
   };
   var OPACITY_TOL = 5e-3;
+  var SKIP_PREVIEW_CAP = 200;
   function addColorCand(preview, node, field, index, hex, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
   }
@@ -1456,8 +1438,10 @@
     res.flags = [...flagSet];
     if (preview) {
       res.candidates = preview.candidates;
-      res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates, preview.skips);
-      res.skips = preview.skips;
+      const skips = preview.skips.slice(0, SKIP_PREVIEW_CAP);
+      res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates, skips);
+      res.skips = skips;
+      res.skipTotal = preview.skips.length;
     }
     (_a = hooks.onProgress) == null ? void 0 : _a.call(hooks, prog.done, prog.total);
     return res;
@@ -4710,8 +4694,10 @@
             // #6: 미리보기 후보(dry-run만)
             nodes: r.nodes,
             // #13: 미리보기 트리 맥락
-            skips: r.skips
-            // 사유별 건너뛴 레이어(dry-run만)
+            skips: r.skips,
+            // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
+            skipTotal: r.skipTotal
+            // 상한 전 실제 수 — 잘렸으면 UI가 알린다
           });
           if (!msg.preview) {
             commitUndo(figma);
