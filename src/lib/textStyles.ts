@@ -10,8 +10,10 @@ export interface TextSample {
   lineHeight: number;
   /** 행간 원본이 %였을 때의 값(150 = 150%). 0 = px 원본 또는 AUTO. 등록 단위 결정에만 쓴다. */
   lineHeightPercent: number;
-  /** px 자간(없으면 0). */
+  /** px 자간(없으면 0). 시그니처·매칭의 단일 기준. */
   letterSpacing: number;
+  /** 자간 원본이 %였을 때의 값(2 = 2%). 0 = px 원본. 등록 단위 결정에만 쓴다. */
+  letterSpacingPercent: number;
   family: string;
   style: string; // 'Regular','Bold' 등 Figma fontName.style
   layerName: string;
@@ -34,6 +36,8 @@ export interface StyleCluster {
   /** 군집의 행간 원본 %(0 = px). 섞이면 %가 이긴다 — 아래 clusterTextStyles 참고. */
   lineHeightPercent: number;
   letterSpacing: number;
+  /** 군집의 자간 원본 %(0 = px). 섞이면 % 우선. */
+  letterSpacingPercent: number;
   family: string;
   style: string;
   count: number; // 같은 시그니처 노드 수
@@ -51,6 +55,8 @@ export interface TextStyleSpec {
   /** >0이면 스타일에 %로 등록하고 행간 변수 바인딩은 생략한다(Figma가 바인딩 시 px로 강제하므로). */
   lineHeightPercent?: number;
   letterSpacing: number;
+  /** ≠0이면 스타일에 %로 등록하고 자간 변수 바인딩은 생략한다(행간과 동일 이유). */
+  letterSpacingPercent?: number;
   family: string;
   style: string;
   /** 재스캔 시 이미 바인딩된 기존 스타일 id. 있으면 등록=이 스타일 rename(신규 생성 아님). */
@@ -87,12 +93,15 @@ export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
     if (ex) {
       ex.count++;
       if (!ex.lineHeightPercent && s.lineHeightPercent) ex.lineHeightPercent = s.lineHeightPercent; // % 우선
+      // 자간 %는 음수 가능(-2%) — 0만 "px 원본"으로 본다.
+      if (!ex.letterSpacingPercent && s.letterSpacingPercent) ex.letterSpacingPercent = s.letterSpacingPercent;
     } else {
       map.set(k, {
         fontSize: s.fontSize,
         lineHeight: s.lineHeight,
         lineHeightPercent: s.lineHeightPercent,
         letterSpacing: s.letterSpacing,
+        letterSpacingPercent: s.letterSpacingPercent ?? 0,
         family: s.family,
         style: s.style,
         count: 1,
@@ -190,6 +199,7 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
         family: c.family,
         style: c.style,
         ...(c.lineHeightPercent ? { lineHeightPercent: c.lineHeightPercent } : {}),
+        ...((c.letterSpacingPercent ?? 0) !== 0 ? { letterSpacingPercent: c.letterSpacingPercent } : {}),
         ...(boundId ? { boundStyleId: boundId } : {}),
       });
     }

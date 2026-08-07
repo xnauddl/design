@@ -405,32 +405,9 @@
     .vr-row.vr-bullet::before { content: '• '; color: var(--muted); }
     .vr-row.vr-added::before { content: '+ '; color: var(--muted); }
 
-    /* ── 명도 대비 점검 결과 ── */
-    /* 상한이 160px 인라인이라 6행 남짓에서 잘렸고(행이 감싸지면 3행대), 경계도 없어
-       "점검이 몇 건에서 끝났는지" 자체가 안 읽혔다 → 공용 .list-region으로. 상한은
-       기본값(40vh·최대 560px)보다 낮춘다 — 이 목록은 아래 상태 문구가 결론이라
-       목록이 화면을 다 먹으면 그 결론까지 페이지를 또 스크롤해야 한다. */
-    #contrastList { font-family: var(--mono); font-size: var(--fs); --list-cap: clamp(200px, 32vh, 400px); }
-    /* 행 높이가 제각각이면 정수배 스냅이 성립하지 않는다 — layoutList는 rows[0] 하나를
-       표본으로 몇 행이 들어가는지 계산하기 때문. 이 행은 두 가지 이유로 불균일했다:
-       (1) flex-wrap:wrap이라 좁은 패널(최소 360px)에서 이름·보정 버튼이 다음 줄로 감싸지고,
-       (2) 보정 제안이 있는 행만 버튼 높이(≈17px)만큼 커져 없는 행(≈16.5px)과 어긋난다.
-       layoutList에 불균일 폴백을 넣는 대신 CSS에서 균일화한다 — 폴백은 스냅을 포기하는
-       것이고(반쪽 행이 그대로 남는다) 다른 목록까지 영향을 받는다.
-       한 줄 고정(nowrap) + 이름 말줄임 + 최소 높이로 모든 행을 같은 높이로 만든다.
-       28px = 세로 패딩 8 + 내용 20. 가장 높은 자식이 보정 버튼(≈17px)이라 여유 3px —
-       폰트 폴백으로 글자 줄상자가 조금 커져도 이 행만 높아지지 않는다. */
-    .cfind { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; }
-    /* 폭이 모자라면 줄바꿈 대신 이름을 줄인다(전체 이름은 title로). min-width:0이 없으면
-       flex 기본 min-width:auto가 내용 폭을 하한으로 잡아 행이 가로로 넘친다. */
-    .cfind .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .cfind .cpair, .cfind .ratio, .cfind .cfix { flex: 0 0 auto; }
-    .cpair { display: inline-flex; }
-    .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid rgba(0,0,0,.18); }
-    .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
-    .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
-    .cfind .ratio { font-variant-numeric: tabular-nums; white-space: nowrap; }
-    /* 닮은 프레임 멤버 줄 — .cfind와 같은 한 줄 규칙(이름만 늘어나고 나머지는 고정). label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
+    /* 닮은 프레임 멤버 줄 — 한 줄 고정(이름만 늘어나고 나머지는 고정). 행 높이가 제각각이면
+       목록의 정수배 스냅이 성립하지 않는다(layoutList는 rows[0]을 표본으로 잰다) → 감싸는 대신
+       이름을 말줄임한다. label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
     .simrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; cursor: pointer; }
     .simrow .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .simrow input[type="radio"], .simrow .tag, .simrow .simmeta { flex: 0 0 auto; }
@@ -446,9 +423,6 @@
     /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
-    .cfix { display: inline-flex; gap: 4px; }
-    .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
-    .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
 
     /* ── 리사이즈 핸들(우하단) ── */
     #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
@@ -472,10 +446,9 @@
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
-      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
+      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계)을 사용합니다.</div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span></label>
-        <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> <span data-i18n="wizardCard.optContrast">접근성 검수</span></label>
         <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span></label>
         <span class="muted" id="wizComponentLock"></span>
       </div>
@@ -503,7 +476,7 @@
       <h2 data-i18n="pipeline.title">진행 안내</h2>
       <div class="hint" data-i18n="pipeline.hint">권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.</div>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 대비 점검 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
     </div>
   </section>
 
@@ -640,7 +613,7 @@
 
     <div class="step" id="tsCard">
       <h2><span data-i18n="textStyle.title">텍스트 스타일 (화면 → 스타일)</span> <span class="muted" id="tsLock"></span></h2>
-      <div class="hint" data-i18n-html="textStyle.hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 새 스타일은 ‘행 추가’로. (Paid)</div>
+      <div class="hint" data-i18n-html="textStyle.hint">화면의 글자에서 텍스트 스타일을 만들어 등록합니다. 스캔한 값은 못 바꾸고 <b>이름만</b> 정리하면 돼요. 행간·자간이 %였으면 표에 %로 보이고 그대로 등록됩니다(그 항목만 변수 연결 생략). 새 스타일은 ‘행 추가’로. (Paid)</div>
       <div class="row" style="margin-top:6px;">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">선택에서 스캔</button>
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
@@ -754,27 +727,6 @@
         <div data-i18n="rename.undoBody">이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있어요.</div>
       </div>
       <div class="status" id="renameStatus"></div>
-    </div>
-
-    <div class="step" id="contrastCard">
-      <h2 data-i18n="contrast.title">명도 대비 점검 (WCAG)</h2>
-      <div class="hint" data-i18n="contrast.hint">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
-      <div class="row">
-        <label class="inline"><span data-i18n="contrast.level">기준</span>
-          <select id="contrastLevel">
-            <option value="AA">AA (4.5 · 큰글자 3)</option>
-            <option value="AAA">AAA (7 · 큰글자 4.5)</option>
-          </select>
-        </label>
-        <button id="btnContrast" class="primary" data-i18n="contrast.checkBtn">대비 검사</button>
-      </div>
-      <div id="contrastList" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="contrastListMore" style="display:none">
-        <span class="list-count" id="contrastListCount"></span>
-        <button class="link" id="btnContrastListExpand" data-i18n="list.expandAll">모두 펼치기</button>
-      </div>
-      <div class="status" id="contrastStatus"></div>
     </div>
 
     <div class="step" id="componentCard">
@@ -920,7 +872,7 @@
     <!-- 접근성 / 국제화 -->
     <div class="ux">
       <div class="ux-h"><span class="ux-t" data-i18n="a11y.title">접근성 · 국제화</span></div>
-      <div data-i18n="a11y.body">키보드 전용 조작 · 명도 대비 AA · i18n</div>
+      <div data-i18n="a11y.body">키보드 전용 조작 · i18n</div>
     </div>
   </section>
 
@@ -1079,14 +1031,6 @@
     "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
     "rename.none": "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
     "rename.applied": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.",
-    // 명도 대비
-    "contrast.checking": "\uB300\uBE44 \uAC80\uC0AC \uC911\u2026",
-    "contrast.fixApplied": "\uBCF4\uC815 \uC801\uC6A9\uB428 \u2014 \u2018\uB300\uBE44 \uAC80\uC0AC\u2019\uB85C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694.",
-    "contrast.none": "\uAC80\uC0AC\uD560 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.{detail}",
-    "contrast.noneSkip": " (\uAC74\uB108\uB700: {skip})",
-    "contrast.noneSelect": " \uD14D\uC2A4\uD2B8\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694.",
-    "contrast.allPass": "{checked}\uAC1C \uBAA8\uB450 {level} \uD1B5\uACFC \u2713{skip}",
-    "contrast.someFail": "{checked}\uAC1C \uC911 {fails}\uAC1C {level} \uBBF8\uB2EC{skip}",
     // 컴포넌트 / 베리언트
     "component.scanning": "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026",
     "component.registering": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026",
@@ -1144,7 +1088,6 @@
     "wizard.step.semantics": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
     "wizard.step.bind": "\uBC14\uC778\uB529",
     "wizard.step.rename": "\uB808\uC774\uC5B4 \uC815\uB3C8",
-    "wizard.step.contrast": "\uC811\uADFC\uC131 \uAC80\uC218",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
     "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
     "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
@@ -1165,10 +1108,6 @@
     "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
     "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
-    // 명도 대비 스킵 사유(라벨 맵)
-    "contrastSkip.no-fill": "\uB2E8\uC0C9 \uAE00\uC790\uC0C9 \uC5C6\uC74C",
-    "contrastSkip.no-bg": "\uBC30\uACBD \uC5C6\uC74C",
-    "contrastSkip.capped": "\uC2A4\uCE94 \uC0C1\uD55C \uB3C4\uB2EC",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
@@ -1181,14 +1120,11 @@
     "wizard.seq.bindDone": "\uBC14\uC778\uB529 {bound}",
     "wizard.seq.bindSkip": " \xB7 \uC2A4\uD0B5 {n}",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
-    "wizard.seq.contrastNone": "\uAC80\uC0AC\uD560 \uD14D\uC2A4\uD2B8 \uC5C6\uC74C",
-    "wizard.seq.contrastPass": "{pass}/{checked} {level} \uD1B5\uACFC",
     "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
     "wizard.sum.tokens": "\uD1A0\uD070 {n}",
     "wizard.sum.bound": "\uBC14\uC778\uB529 {n}",
     "wizard.sum.renamed": "\uB9AC\uB124\uC784 {n}",
-    "wizard.sum.contrast": "\uB300\uBE44 {passed}/{total} \uD1B5\uACFC",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "wizard.sum.empty": "\uC644\uB8CC\uB41C \uC791\uC5C5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
     // 진행 안내 단계 라벨·안내
@@ -1206,9 +1142,8 @@
     "tab.settings": "\uAD00\uB9AC",
     // 마법사 카드
     "wizardCard.title": "\uC2DC\uC2A4\uD15C\uD654 \uB9C8\uBC95\uC0AC",
-    "wizardCard.hint": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC744 \uD55C \uBC88\uC5D0 <b>\uD1A0\uD070\uD654 \xB7 \uBC14\uC778\uB529 \xB7 \uC815\uB3C8 \xB7 \uC811\uADFC\uC131 \uAC80\uC218</b>. \uC138\uBD80\uAC12\uC740 \u2018\uB9CC\uB4E4\uAE30/\uC801\uC6A9\u2019 \uD0ED\uC758 \uAC01 \uC785\uB825(base\xB7\uD5C8\uC6A9\uC624\uCC28\xB7\uB9E5\uB77D\uB2E8\uACC4\xB7\uB300\uBE44 \uAE30\uC900)\uC744 \uC0AC\uC6A9\uD569\uB2C8\uB2E4.",
+    "wizardCard.hint": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC744 \uD55C \uBC88\uC5D0 <b>\uD1A0\uD070\uD654 \xB7 \uBC14\uC778\uB529 \xB7 \uC815\uB3C8</b>. \uC138\uBD80\uAC12\uC740 \u2018\uB9CC\uB4E4\uAE30/\uC801\uC6A9\u2019 \uD0ED\uC758 \uAC01 \uC785\uB825(base\xB7\uD5C8\uC6A9\uC624\uCC28\xB7\uB9E5\uB77D\uB2E8\uACC4)\uC744 \uC0AC\uC6A9\uD569\uB2C8\uB2E4.",
     "wizardCard.optSemantics": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551",
-    "wizardCard.optContrast": "\uC811\uADFC\uC131 \uAC80\uC218",
     "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 공통(정적 라벨)
@@ -1223,7 +1158,7 @@
     // 진행 안내(파이프라인 카드)
     "pipeline.title": "\uC9C4\uD589 \uC548\uB0B4",
     "pipeline.hint": "\uAD8C\uC7A5 \uC21C\uC11C\uC640 \uB2E8\uACC4 \uC0C1\uD0DC(\uC804\uC81C \uCDA9\uC871 \uC5EC\uBD80). \uD074\uB9AD\uD558\uBA74 \uD574\uB2F9 \uB2E8\uACC4\uB85C \uC774\uB3D9.",
-    "pipeline.indep": "\uB9AC\uB124\uC784 \xB7 \uB300\uBE44 \uC810\uAC80 \xB7 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uC804\uC81C \uC5C6\uC774 \uC5B8\uC81C\uB4E0 \uAC00\uB2A5(\uB3C5\uB9BD).",
+    "pipeline.indep": "\uB9AC\uB124\uC784 \xB7 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uC804\uC81C \uC5C6\uC774 \uC5B8\uC81C\uB4E0 \uAC00\uB2A5(\uB3C5\uB9BD).",
     // 브랜드 팔레트
     "palette.title": "\uBE0C\uB79C\uB4DC \uD314\uB808\uD2B8 \uC0DD\uC131",
     "palette.brand": "\uBE0C\uB79C\uB4DC\uC0C9",
@@ -1261,7 +1196,7 @@
     "semantic.scanBtn": "\uAE30\uC874 \uC0C9\uC5D0\uC11C \uCD94\uCC9C",
     // 텍스트 스타일
     "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C (\uD654\uBA74 \u2192 \uC2A4\uD0C0\uC77C)",
-    "textStyle.hint": "\uD654\uBA74\uC758 \uAE00\uC790\uC5D0\uC11C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB9CC\uB4E4\uC5B4 \uB4F1\uB85D\uD569\uB2C8\uB2E4. \uC2A4\uCE94\uD55C \uAC12\uC740 \uBABB \uBC14\uAFB8\uACE0 <b>\uC774\uB984\uB9CC</b> \uC815\uB9AC\uD558\uBA74 \uB3FC\uC694. \uC0C8 \uC2A4\uD0C0\uC77C\uC740 \u2018\uD589 \uCD94\uAC00\u2019\uB85C. (Paid)",
+    "textStyle.hint": "\uD654\uBA74\uC758 \uAE00\uC790\uC5D0\uC11C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB9CC\uB4E4\uC5B4 \uB4F1\uB85D\uD569\uB2C8\uB2E4. \uC2A4\uCE94\uD55C \uAC12\uC740 \uBABB \uBC14\uAFB8\uACE0 <b>\uC774\uB984\uB9CC</b> \uC815\uB9AC\uD558\uBA74 \uB3FC\uC694. \uD589\uAC04\xB7\uC790\uAC04\uC774 %\uC600\uC73C\uBA74 \uD45C\uC5D0 %\uB85C \uBCF4\uC774\uACE0 \uADF8\uB300\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uADF8 \uD56D\uBAA9\uB9CC \uBCC0\uC218 \uC5F0\uACB0 \uC0DD\uB7B5). \uC0C8 \uC2A4\uD0C0\uC77C\uC740 \u2018\uD589 \uCD94\uAC00\u2019\uB85C. (Paid)",
     "textStyle.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uC2A4\uCE94",
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
     "textStyle.useRowLabels": "\uAC00\uB85C \uD589\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uC2A4\uD0C0\uC77C \uC774\uB984\uC73C\uB85C \uC0AC\uC6A9",
@@ -1292,11 +1227,6 @@
     "rename.apply": "\uC774\uB984 \uC801\uC6A9",
     "rename.undoTitle": "\uB418\uB3CC\uB9AC\uAE30 \uC548\uC804\uC7A5\uCE58",
     "rename.undoBody": "\uC774 \uC2E4\uD589\uC740 \uD55C \uBC88\uC758 \uB418\uB3CC\uB9AC\uAE30(Ctrl/\u2318Z)\uB85C \uC804\uCCB4\uB97C \uCDE8\uC18C\uD560 \uC218 \uC788\uC5B4\uC694.",
-    // 명도 대비
-    "contrast.title": "\uBA85\uB3C4 \uB300\uBE44 \uC810\uAC80 (WCAG)",
-    "contrast.hint": "\uC120\uD0DD \uC548 \uD14D\uC2A4\uD2B8 \u2194 \uBC30\uACBD \uB300\uBE44\uB97C WCAG\uB85C \uAC80\uC0AC(\uC77D\uAE30 \uC804\uC6A9).",
-    "contrast.level": "\uAE30\uC900",
-    "contrast.checkBtn": "\uB300\uBE44 \uAC80\uC0AC",
     // 컴포넌트 / 베리언트
     "component.title": "\uCEF4\uD3EC\uB10C\uD2B8 / \uBCA0\uB9AC\uC5B8\uD2B8",
     "component.hint": "<b>\uD6C4\uBCF4 \uC2A4\uCE94</b> \u2192 \uACE8\uB77C \uB4F1\uB85D. \uC120\uD0DD\uD55C <b>\uBD80\uBAA8\uB294 \uCEE8\uD14C\uC774\uB108</b>(\uB4F1\uB85D \uC81C\uC678). <b>\uACE0\uC2E0\uB8B0 \uAD6C\uC870</b>(button\xB7chip\xB7table\xB7card\xB7list\xB7field\xB7nav\xB7progress\xB7figure\xB7heading)\uC778 \uBCF4\uC774\uB294 FRAME/GROUP\uB9CC \uD6C4\uBCF4 \u2014 \uC774\uB984\uACFC \uBB34\uAD00, <b>\uC228\uAE40\uC740 \uC81C\uC678</b>. heading\uC740 \uC139\uC158 \uBA38\uB9AC\uC904(\uAC00\uB85C\xB7\uB0AE\uC740 \uB192\uC774\xB7\uD0C0\uC774\uD2C0+\uC120\uD0DD \uC561\uC158/\uBA54\uD0C0)\uC774\uBA70 \uD398\uC774\uC9C0 header \uB79C\uB4DC\uB9C8\uD06C\uC640 \uB2E4\uB984. <b>\uAC19\uC740 \uB808\uC774\uC5B4 \uC774\uB984</b>\uC774 2\uAC1C+\uC774\uBA74: \uAD6C\uC870\uAC00 \uAC19\uACE0 \uD14D\uC2A4\uD2B8/\uC544\uC774\uCF58\uB9CC \uB2E4\uB974\uBA74 <b>\uC18D\uC131</b>(\uB2E8\uD488+TEXT/\uC2A4\uC651), heading\uC758 \uC561\uC158(buttonGroup) \uC720\uBB34\uB9CC \uB2EC\uB77C\uB3C4 <b>\uC18D\uC131</b>, \uAD6C\uC870\xB7\uD06C\uAE30\xB7\uC0C9\uC774 \uB2E4\uB974\uBA74 <b>\uC138\uD2B8</b>. \uC774\uB984\uC774 \uB2E4\uB974\uBA74 \uAC01\uAC01 <b>\uB2E8\uB3C5</b>. \uC18D\uC131\uC740 \uC774\uB984 \uC5B4\uD718(<code>Type</code>\xB7<code>State</code>\xB7<code>Size</code>) \uC6B0\uC120 + \uAE30\uD558 \uBCF4\uC644. \uBA54\uC778\uC740 <b>Components \uD398\uC774\uC9C0</b>, \uC6D0\uC704\uCE58\uC5D4 <b>\uC778\uC2A4\uD134\uC2A4</b>.",
@@ -1328,7 +1258,7 @@
     "preset.importBtn": "\uAC00\uC838\uC624\uAE30(JSON)",
     // 접근성 · 국제화
     "a11y.title": "\uC811\uADFC\uC131 \xB7 \uAD6D\uC81C\uD654",
-    "a11y.body": "\uD0A4\uBCF4\uB4DC \uC804\uC6A9 \uC870\uC791 \xB7 \uBA85\uB3C4 \uB300\uBE44 AA \xB7 i18n"
+    "a11y.body": "\uD0A4\uBCF4\uB4DC \uC804\uC6A9 \uC870\uC791 \xB7 i18n"
   };
   function hasString(key) {
     return Object.prototype.hasOwnProperty.call(STRINGS, key);
@@ -1977,7 +1907,6 @@
     { id: "semantics", write: true, optional: true },
     { id: "bind", write: true, optional: false },
     { id: "rename", write: true, optional: false },
-    { id: "contrast", write: false, optional: true },
     { id: "componentize", write: true, optional: true, paid: true }
   ];
   function planWizard(options, ctx) {
@@ -1991,15 +1920,10 @@
     });
   }
   function summarize(totals) {
-    var _a;
     const parts = [];
     if (totals.created != null) parts.push(t("wizard.sum.tokens", { n: totals.created }));
     if (totals.bound != null) parts.push(t("wizard.sum.bound", { n: totals.bound }));
     if (totals.renamed != null) parts.push(t("wizard.sum.renamed", { n: totals.renamed }));
-    if (totals.contrastChecked != null) {
-      const passed = totals.contrastChecked - ((_a = totals.contrastFailed) != null ? _a : 0);
-      parts.push(t("wizard.sum.contrast", { passed, total: totals.contrastChecked }));
-    }
     if (totals.components != null && totals.components > 0) parts.push(t("wizard.sum.components", { n: totals.components }));
     return parts.length ? parts.join(" \xB7 ") : t("wizard.sum.empty");
   }
@@ -2161,7 +2085,6 @@
     { mount: "tokenList", row: ".tk", more: "tokenListMore", count: "tokenListCount", expand: "btnTokenListExpand" },
     { mount: "colorTable", row: ".crow", more: "colorTableMore", count: "colorTableCount", expand: "btnColorTableExpand" },
     { mount: "variantReport", row: ".vr-row", more: "variantReportMore", count: "variantReportCount", expand: "btnVariantReportExpand" },
-    { mount: "contrastList", row: ".cfind", more: "contrastListMore", count: "contrastListCount", expand: "btnContrastListExpand" },
     { mount: "similarList", row: ".simrow", more: "similarListMore", count: "similarListCount", expand: "btnSimilarListExpand" },
     { mount: "varList", row: ".vrow", more: "varListMore", count: "varListCount", expand: "btnVarListExpand" },
     // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
@@ -2573,10 +2496,11 @@
   });
   var DEFAULT_TS_FAMILY = "Inter";
   function textStyleRow(s, locked = false) {
-    var _a;
+    var _a, _b;
     const tr = document.createElement("tr");
     if (s.boundStyleId) tr.dataset.boundStyleId = s.boundStyleId;
     if (s.lineHeightPercent) tr.dataset.lineHeightPercent = String(s.lineHeightPercent);
+    if (s.letterSpacingPercent) tr.dataset.letterSpacingPercent = String(s.letterSpacingPercent);
     const cell = (field, value, opts = {}) => {
       const { type = "text", readonly = false } = opts;
       const td = document.createElement("td");
@@ -2620,7 +2544,17 @@
     } else {
       cell("lineHeight", String(s.lineHeight), { type: "number" });
     }
-    cell("letterSpacing", String(s.letterSpacing), { type: "number", readonly: locked });
+    if (locked) {
+      const lsPct = (_b = s.letterSpacingPercent) != null ? _b : 0;
+      tr.dataset.letterSpacingPx = String(s.letterSpacing);
+      cell("letterSpacing", lsPct !== 0 ? `${lsPct}%` : `${s.letterSpacing}px`, { readonly: true });
+      const lsInp = tr.querySelector('input[data-field="letterSpacing"]');
+      if (lsInp) {
+        lsInp.title = lsPct !== 0 ? `\uD654\uBA74\uC5D0\uC11C ${lsPct}%\uB85C \uC4F0\uB358 \uC790\uAC04(${s.letterSpacing}px) \u2014 %\uB85C \uB4F1\uB85D\uD558\uACE0 \uC790\uAC04 \uBCC0\uC218\uB294 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC544\uC694(Figma\uAC00 px\uB85C \uBC14\uAFD4\uBC84\uB824\uC11C).` : "\uC2A4\uCE94\uD55C \uAC12\uC774\uB77C \uBABB \uBC14\uAFD4\uC694";
+      }
+    } else {
+      cell("letterSpacing", String(s.letterSpacing), { type: "number" });
+    }
     cell("style", s.style, { readonly: locked });
     const tdDel = document.createElement("td");
     const del = document.createElement("button");
@@ -2651,15 +2585,17 @@
       if (!name) continue;
       const boundStyleId = tr.dataset.boundStyleId;
       const lineHeightPercent = Number(tr.dataset.lineHeightPercent) || 0;
+      const letterSpacingPercent = Number(tr.dataset.letterSpacingPercent) || 0;
       const lineHeightPx = tr.dataset.lineHeightPx;
-      specs.push(__spreadValues(__spreadValues({
+      const letterSpacingPx = tr.dataset.letterSpacingPx;
+      specs.push(__spreadValues(__spreadValues(__spreadValues({
         name,
         fontSize: Number(get("fontSize")) || 0,
         lineHeight: lineHeightPx !== void 0 ? Number(lineHeightPx) || 0 : Number(get("lineHeight")) || 0,
-        letterSpacing: Number(get("letterSpacing")) || 0,
+        letterSpacing: letterSpacingPx !== void 0 ? Number(letterSpacingPx) || 0 : Number(get("letterSpacing")) || 0,
         family: get("family").trim() || DEFAULT_TS_FAMILY,
         style: get("style").trim() || "Regular"
-      }, lineHeightPercent ? { lineHeightPercent } : {}), boundStyleId ? { boundStyleId } : {}));
+      }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}), boundStyleId ? { boundStyleId } : {}));
     }
     return specs;
   }
@@ -2740,13 +2676,6 @@
   });
   $("btnPreview").addEventListener("click", () => {
     send({ type: "RENAME", apply: false, maxDepth: readMaxDepth() });
-  });
-  $("btnContrast").addEventListener("click", () => {
-    const level = $("contrastLevel").value;
-    setStatus("contrastStatus", t("contrast.checking"), "");
-    $("contrastList").innerHTML = "";
-    layoutListBy("contrastList");
-    send({ type: "CHECK_CONTRAST", level });
   });
   $("btnRename").addEventListener("click", () => {
     const items = renameNodes.filter((n) => n.after !== void 0 && renameChecked.has(n.id)).map((n) => ({ id: n.id, before: n.name, after: n.after }));
@@ -2843,11 +2772,9 @@
     const base = Number($("base").value) || 16;
     const tolerance = Number($("tol").value) || 0;
     const maxDepth = readMaxDepth();
-    const level = $("contrastLevel").value;
     const semMap = textToSemanticMap($("semMap").value);
     const options = {
       semantics: $("wizOptSemantics").checked,
-      contrast: $("wizOptContrast").checked,
       componentize: $("wizOptComponentize").checked
     };
     const ctx = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
@@ -2908,13 +2835,6 @@
             const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth }, ["RENAME_RESULT"]);
             totals.renamed = r.changes.length;
             setWizardStep("rename", "done", t("wizard.seq.renameDone", { count: r.changes.length }));
-            break;
-          }
-          case "contrast": {
-            const r = await wizardRequest({ type: "CHECK_CONTRAST", level }, ["CONTRAST_RESULT"]);
-            totals.contrastChecked = r.checked;
-            totals.contrastFailed = r.failed;
-            setWizardStep("contrast", r.failed ? "fail" : "done", r.checked === 0 ? t("wizard.seq.contrastNone") : t("wizard.seq.contrastPass", { pass: r.checked - r.failed, checked: r.checked, level: r.level }));
             break;
           }
           case "componentize": {
@@ -3552,9 +3472,6 @@
         setStatus("componentStatus", t("component.generated", { generated: msg.generated, sets: msg.sets }), msg.generated ? "ok" : "warn");
         break;
       }
-      case "CONTRAST_RESULT":
-        renderContrast(msg);
-        break;
       case "VARIABLES": {
         allVars = msg.vars;
         const sel = $("varFilterCol");
@@ -3665,7 +3582,6 @@
     REGISTER_COMPONENTS: "componentStatus",
     CLASSIFY_VARIANTS: "componentStatus",
     GENERATE_MISSING_VARIANTS: "componentStatus",
-    CHECK_CONTRAST: "contrastStatus",
     GET_PRESETS: "presetStatus",
     SAVE_PRESET: "presetStatus",
     DELETE_PRESET: "presetStatus",
@@ -3991,71 +3907,6 @@
   function reasonsText(reasons) {
     return Object.entries(reasons).filter(([, n]) => n > 0).map(([k, n]) => `${t("reason." + k)} ${n}`).join(" \xB7 ");
   }
-  function contrastSkipText(skipped) {
-    return Object.entries(skipped).filter(([, n]) => n > 0).map(([k, n]) => `${t("contrastSkip." + k)} ${n}`).join(" \xB7 ");
-  }
-  function contrastFixBtn(label, hex, nodeId) {
-    const btn = document.createElement("button");
-    btn.className = "fixbtn";
-    btn.title = `${label} \uC0C9\uC744 ${hex}\uB85C \uBCF4\uC815`;
-    const sw = document.createElement("span");
-    sw.className = "swatch";
-    sw.style.background = hex;
-    btn.appendChild(sw);
-    const text = document.createTextNode(` ${label}`);
-    btn.appendChild(text);
-    btn.addEventListener("click", () => {
-      send({ type: "APPLY_CONTRAST_FIX", nodeId, hex });
-      btn.disabled = true;
-      text.textContent = " \u2713 \uC801\uC6A9";
-      setStatus("contrastStatus", t("contrast.fixApplied"), "ok");
-    });
-    return btn;
-  }
-  function makeContrastRow(f) {
-    const row = document.createElement("div");
-    row.className = "cfind";
-    const pair = document.createElement("span");
-    pair.className = "cpair";
-    for (const hex of [f.bg, f.fg]) {
-      const sw = document.createElement("span");
-      sw.className = "swatch";
-      sw.style.background = hex;
-      pair.appendChild(sw);
-    }
-    row.appendChild(pair);
-    const name = document.createElement("span");
-    name.className = "cname";
-    name.textContent = `${f.name}${f.large ? " \xB7 \uD070\uAE00\uC790" : ""}`;
-    name.title = name.textContent;
-    row.appendChild(name);
-    const ratio = document.createElement("span");
-    ratio.className = "ratio warn";
-    ratio.textContent = `${f.ratio} / ${f.required}`;
-    row.appendChild(ratio);
-    if (f.suggestedFg || f.suggestedBg) {
-      const fix = document.createElement("span");
-      fix.className = "cfix";
-      if (f.suggestedFg) fix.appendChild(contrastFixBtn("\uD14D\uC2A4\uD2B8", f.suggestedFg, f.id));
-      if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn("\uBC30\uACBD", f.suggestedBg, f.bgId));
-      row.appendChild(fix);
-    }
-    return row;
-  }
-  function renderContrast(msg) {
-    const box = $("contrastList");
-    const fails = msg.findings.filter((f) => !f.pass);
-    renderChunked(box, fails, makeContrastRow, () => layoutListBy("contrastList"));
-    const skip = contrastSkipText(msg.skipped);
-    const skipNote = skip ? ` \xB7 \uAC74\uB108\uB700: ${skip}` : "";
-    if (msg.checked === 0) {
-      setStatus("contrastStatus", t("contrast.none", { detail: skip ? t("contrast.noneSkip", { skip }) : t("contrast.noneSelect") }), "warn");
-    } else if (fails.length === 0) {
-      setStatus("contrastStatus", t("contrast.allPass", { checked: msg.checked, level: msg.level, skip: skipNote }), "ok");
-    } else {
-      setStatus("contrastStatus", t("contrast.someFail", { checked: msg.checked, fails: fails.length, level: msg.level, skip: skipNote }), "warn");
-    }
-  }
   function showApplyProgress(label) {
     $("applyProgress").style.display = "";
     $("applyBarFill").style.width = "0%";
@@ -4229,7 +4080,6 @@
     "btnTextStyles",
     "btnApply",
     "btnPreview",
-    "btnContrast",
     "btnExport"
   ]);
   function syncStickyOffsets() {

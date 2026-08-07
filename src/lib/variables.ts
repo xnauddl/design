@@ -256,8 +256,12 @@ export function scanTextStyles(nodes: readonly SceneNode[]): TextScanResult {
       if (lh.unit === 'PERCENT') lineHeightPercent = roundN(lh.value);
     }
     let letterSpacing = 0;
+    let letterSpacingPercent = 0; // 원본이 %일 때만(등록 단위 결정용). 시그니처는 계속 px.
     const ls = t.letterSpacing;
-    if (ls !== figma.mixed) letterSpacing = ls.unit === 'PERCENT' ? roundN((fontSize * ls.value) / 100) : roundN(ls.value);
+    if (ls !== figma.mixed) {
+      letterSpacing = ls.unit === 'PERCENT' ? roundN((fontSize * ls.value) / 100) : roundN(ls.value);
+      if (ls.unit === 'PERCENT') letterSpacingPercent = roundN(ls.value);
+    }
     // 이미 바인딩된 로컬 텍스트 스타일 id(혼합/없음=''). 재스캔 rename 앵커로 군집에 전달.
     const sid = t.textStyleId;
     const styleId = sid === figma.mixed ? '' : sid;
@@ -278,7 +282,7 @@ export function scanTextStyles(nodes: readonly SceneNode[]): TextScanResult {
       if (indexInParent < 0) indexInParent = undefined;
     }
     samples.push({
-      fontSize, lineHeight, lineHeightPercent, letterSpacing, family, style,
+      fontSize, lineHeight, lineHeightPercent, letterSpacing, letterSpacingPercent, family, style,
       layerName: t.name, styleId, characters, id: t.id, rowId, indexInParent,
     });
   }
@@ -298,6 +302,11 @@ function lhPctOf(lh: LineHeight | typeof figma.mixed): number {
 function lsPxOf(fontSize: number, ls: LetterSpacing | typeof figma.mixed): number {
   if (ls === figma.mixed) return 0;
   return ls.unit === 'PERCENT' ? roundN((fontSize * ls.value) / 100) : roundN(ls.value);
+}
+/** 자간이 %면 그 값(2 = 2%, 음수 가능), 아니면 0(px 원본). */
+function lsPctOf(ls: LetterSpacing | typeof figma.mixed): number {
+  if (ls === figma.mixed || ls.unit !== 'PERCENT') return 0;
+  return roundN(ls.value);
 }
 
 /** 로컬 텍스트 스타일 → 시그니처 매칭용 목록(행간·자간 px 환산). 스캔 후보의 '이미 등록' 인식에 사용. */
@@ -414,7 +423,34 @@ export async function createSemanticTextStyles(
     prev.fontSize = undefined;
     res.notes.push(`${name}: 역할마다 행간 원본이 달라 px로 기록(원본 표기 생략)`);
   };
-  const pushAlias = (role: string, fontSize: number, lineHeight: number, letterSpacing: number, lineHeightPercent = 0) => {
+  // 자간도 행간과 같이 이름(=px)이 같아도 원본이 갈릴 수 있다(0.32px 역할 + 16px의 2% 역할).
+  const lsTokens = new Map<string, DraftToken>();
+  const pushLetterSpacingTok = (name: string, px: number, pct: number, fontSize: number) => {
+    const prev = lsTokens.get(name);
+    if (!prev) {
+      const t: DraftToken =
+        pct !== 0
+          ? { name, category: 'letterSpacing', value: pct, unit: 'percent', fontSize, sources: ['letterSpacing'] }
+          : { name, category: 'letterSpacing', value: px, unit: 'px', sources: ['letterSpacing'] };
+      lsTokens.set(name, t);
+      pushTok(t);
+      return;
+    }
+    const prevPct = prev.unit === 'percent' ? Number(prev.value) : 0;
+    if (prevPct === pct && (pct === 0 || prev.fontSize === fontSize)) return; // 같은 원본 → 그대로
+    prev.value = px;
+    prev.unit = 'px';
+    prev.fontSize = undefined;
+    res.notes.push(`${name}: 역할마다 자간 원본이 달라 px로 기록(원본 표기 생략)`);
+  };
+  const pushAlias = (
+    role: string,
+    fontSize: number,
+    lineHeight: number,
+    letterSpacing: number,
+    lineHeightPercent = 0,
+    letterSpacingPercent = 0,
+  ) => {
     pushTok({ name: numberTokenName('font-size', fontSize), category: 'fontSize', value: fontSize, sources: ['fontSize'] });
     aliasMap[`font-size/${role}`] = numberTokenName('font-size', fontSize);
     if (lineHeight > 0) {
@@ -423,13 +459,14 @@ export async function createSemanticTextStyles(
       aliasMap[`line-height/${role}`] = lhName;
     }
     if (letterSpacing !== 0) {
-      pushTok({ name: numberTokenName('letter-spacing', letterSpacing), category: 'letterSpacing', value: letterSpacing, unit: 'px', sources: ['letterSpacing'] });
-      aliasMap[`letter-spacing/${role}`] = numberTokenName('letter-spacing', letterSpacing);
+      const lsName = numberTokenName('letter-spacing', letterSpacing);
+      pushLetterSpacingTok(lsName, letterSpacing, letterSpacingPercent, fontSize);
+      aliasMap[`letter-spacing/${role}`] = lsName;
     }
   };
   for (const s of specs) {
     if (anchoredStyle(s)) continue; // rename: 스캔 값으로 시맨틱 upsert 금지
-    pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing, s.lineHeightPercent ?? 0);
+    pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing, s.lineHeightPercent ?? 0, s.letterSpacingPercent ?? 0);
   }
   // rename인데 이동/기존 모두 없어 시맨틱이 비면, 스타일 **현재 값**으로만 생성(스캔 오버라이드 아님).
   {
@@ -445,7 +482,7 @@ export async function createSemanticTextStyles(
       if (semNames.has(`font-size/${s.name}`)) continue; // 이미 있음(이동됐거나 대상 역할 존재) → 덮지 않음
       const fontSize = roundN(st.fontSize);
       // 스펙(스캔)이 아니라 **스타일의 현재 단위**가 기준 — 앵커 행은 타이포를 건드리지 않으므로.
-      pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight));
+      pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing));
     }
   }
   if (tokens.length) await createTokens(tokens, 16);
@@ -505,8 +542,12 @@ export async function createSemanticTextStyles(
             ? { value: pct, unit: 'PERCENT' }
             : { value: spec.lineHeight, unit: 'PIXELS' }
           : { unit: 'AUTO' };
-      // 0도 기록(잔여 자간 클리어). PIXELS 단위로 통일.
-      style.letterSpacing = { value: spec.letterSpacing, unit: 'PIXELS' };
+      // 원본이 %면 %로 등록(음수 가능). 0도 기록해 잔여 자간을 클리어한다.
+      const lsPct = spec.letterSpacingPercent ?? 0;
+      style.letterSpacing =
+        lsPct !== 0
+          ? { value: lsPct, unit: 'PERCENT' }
+          : { value: spec.letterSpacing, unit: 'PIXELS' };
     }
 
     const bindRole = style.name; // rename 후 실제 이름(충돌 스킵은 위에서 continue)
@@ -533,11 +574,17 @@ export async function createSemanticTextStyles(
       }
     }
     if (spec.letterSpacing !== 0 || isRename) {
-      const lsVar = semByName.get(`letter-spacing/${bindRole}`);
-      if (lsVar) {
-        style.setBoundVariable('letterSpacing', lsVar);
-        res.bound++;
-      } else if (spec.letterSpacing !== 0) res.missing.push(`letter-spacing/${bindRole}`);
+      // Figma는 자간 변수 바인딩도 PIXELS로 강제한다(행간과 동일). %를 지키려면 바인딩 생략.
+      const lsPctNow = lsPctOf(style.letterSpacing);
+      if (lsPctNow !== 0) {
+        res.notes.push(`${bindRole}: 자간 ${lsPctNow}% 유지 — 변수 바인딩 생략`);
+      } else {
+        const lsVar = semByName.get(`letter-spacing/${bindRole}`);
+        if (lsVar) {
+          style.setBoundVariable('letterSpacing', lsVar);
+          res.bound++;
+        } else if (spec.letterSpacing !== 0) res.missing.push(`letter-spacing/${bindRole}`);
+      }
     }
     res[created ? 'created' : 'updated']++;
     styleByName.set(style.name, style);
