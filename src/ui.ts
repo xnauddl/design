@@ -2,7 +2,8 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate } from './shared/messages';
-import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList, tidyNumberTokens } from './lib/tokens';
+import { type DraftToken, type Unit, resolvedTypeForToken, scopesForTypeList, tidyNumberTokens, type ScopeName, type ResolvedType } from './lib/tokens';
+import { groupVarsByPath, aliasTargetCollectionOk } from './lib/variableEdit';
 import { t, hasString } from './lib/i18n';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier, type Feature } from './lib/entitlements';
@@ -642,7 +643,7 @@ $('btnPaletteApply').addEventListener('click', () => {
   }
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'palette';
-  send({ type: 'CREATE_TOKENS', tokens, base, replacePalette: true }); // 바로 변수 생성 + 이전 팔레트 색 정리
+  send({ type: 'CREATE_TOKENS', tokens, base, replacePalette: true, semanticMap: semanticMapForCreate(tokens) }); // 변수 생성 + 역할 별칭 + 이전 팔레트 색 정리
   setStatus('paletteStatus', t('common.applyingVars'), '');
 });
 
@@ -745,14 +746,14 @@ $('btnCreate').addEventListener('click', () => {
   renderTokens();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
-  send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, preview: true }); // UX1: 미리보기 먼저
+  send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, preview: true, semanticMap: semanticMapForCreate(tokensToCreate()) }); // UX1: 미리보기 먼저
 });
 
 $('btnCreateApply').addEventListener('click', () => {
   if (!tokens.length) return;
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   createFrom = 'tokens';
-  send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base }); // 확인 후 실제 적용
+  send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, semanticMap: semanticMapForCreate(tokensToCreate()) }); // 확인 후 실제 적용
 });
 
 // base는 비-px 값(rem·%·em)을 px로 환산하는 기준이라 미리보기 결과가 base에 따라 달라진다.
@@ -769,7 +770,7 @@ let basePreviewTimer = 0;
   basePreviewTimer = window.setTimeout(() => {
     if (!tokens.length) return;
     createFrom = 'tokens';
-    send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base: Number(($('base') as HTMLInputElement).value) || 16, preview: true });
+    send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base: Number(($('base') as HTMLInputElement).value) || 16, preview: true, semanticMap: semanticMapForCreate(tokensToCreate()) });
   }, 350); // 타이핑 중 매 키마다 보내지 않도록
 });
 
@@ -1165,7 +1166,7 @@ async function runWizard(): Promise<void> {
           break;
         }
         case 'create': {
-          const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens, base }, ['CREATE_RESULT']);
+          const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens, base, semanticMap: Object.keys(semMap).length ? semMap : semanticMapForCreate(tokens) }, ['CREATE_RESULT']);
           totals.created = r.created + r.updated;
           setWizardStep('create', 'done', t('wizard.seq.createDone', { created: r.created, updated: r.updated }));
           break;
@@ -1481,6 +1482,14 @@ function visibleVars(): VarInfo[] {
   return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
 }
 
+
+/** 토큰 생성에 실을 Semantic 맵 — textarea 값이 있으면 우선, 없으면 자동 추천. */
+function semanticMapForCreate(toks: DraftToken[]): Record<string, string> {
+  const fromUi = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
+  if (Object.keys(fromUi).length) return fromUi;
+  return suggestTokenRoles(toks, Number(($('base') as HTMLInputElement).value) || 16);
+}
+
 function requestVars(quiet = false): void {
   if (!quiet) setStatus('varEditStatus', '변수를 불러오는 중…', '');
   send({ type: 'GET_VARIABLES' });
@@ -1489,6 +1498,29 @@ function requestVars(quiet = false): void {
 $('btnLoadVars').addEventListener('click', () => requestVars(false));
 $('varFilterCol').addEventListener('change', () => renderVars());
 $('varFilterText').addEventListener('input', () => renderVars());
+$('varCreateCol').addEventListener('change', syncVarCreateForm);
+$('varCreateType').addEventListener('change', syncVarCreateAliasOptions);
+$('btnCreateVar').addEventListener('click', () => {
+  const collection = ($('varCreateCol') as HTMLSelectElement).value as 'Global' | 'Semantic' | 'Component';
+  const name = ($('varCreateName') as HTMLInputElement).value.trim();
+  const resolvedType = ($('varCreateType') as HTMLSelectElement).value as ResolvedType;
+  if (!name) {
+    setStatus('varEditStatus', '이름을 입력하세요.', 'warn');
+    return;
+  }
+  if (collection === 'Global') {
+    const literal = ($('varCreateLiteral') as HTMLInputElement).value.trim();
+    send({ type: 'CREATE_VARIABLE', collection, name, resolvedType, literal });
+  } else {
+    const aliasId = ($('varCreateAlias') as HTMLSelectElement).value;
+    if (!aliasId) {
+      setStatus('varEditStatus', '별칭 대상을 고르세요.', 'warn');
+      return;
+    }
+    send({ type: 'CREATE_VARIABLE', collection, name, resolvedType, aliasId });
+  }
+});
+syncVarCreateForm();
 
 /* ---------- 다크 테마 생성 ---------- */
 // 라이트 모드 → Dark(없으면 addMode('Dark'))로 채운다. to는 플러그인이 ensure하므로
@@ -1794,7 +1826,7 @@ window.onmessage = (event: MessageEvent) => {
         pendingCreatePreview = false;
         const base = Number(($('base') as HTMLInputElement).value) || 16;
         createFrom = 'tokens';
-        send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, preview: true });
+        send({ type: 'CREATE_TOKENS', tokens: tokensToCreate(), base, preview: true, semanticMap: semanticMapForCreate(tokensToCreate()) });
       }
       break;
     }
@@ -1815,18 +1847,14 @@ window.onmessage = (event: MessageEvent) => {
         setStatus('createStatus', t('create.preview', { summary: msg.summary }), '');
         applyBtn.style.display = '';
       } else if (createFrom === 'palette') {
-        // 팔레트 카드의 ‘적용’에서 온 결과 → 팔레트 상태에 표시.
         setStatus('paletteStatus', msg.summary, 'ok');
         createFrom = 'tokens';
+        if (!wizardRunning) openVarEditor('Semantic');
       } else {
-        setStatus('createStatus', msg.summary, 'ok');
+        setStatus('createStatus', msg.summary + ' · ' + t('varedit.gotoEditor'), 'ok');
         applyBtn.style.display = 'none';
-        // 2.5 카드 숨김(자동 흡수): 토큰 생성 적용 시 자동 추천 매핑으로 역할 별칭(Semantic)도 자동 생성.
-        // 마법사는 자체 semantics 단계가 있어 제외(메인 핸들러와 동시 수신 → 이중 생성 방지).
-        if (!wizardRunning) {
-          const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
-          if (Object.keys(semMap).length) send({ type: 'CREATE_SEMANTICS', map: semMap });
-        }
+        // 역할 별칭은 code의 createTokensAndRoles가 토큰 생성과 함께 처리.
+        if (!wizardRunning) openVarEditor('Semantic');
       }
       break;
     }
@@ -2028,7 +2056,11 @@ window.onmessage = (event: MessageEvent) => {
         o.textContent = c;
         sel.appendChild(o);
       }
-      if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
+      const prefer = sel.dataset.prefer || 'Semantic';
+      delete sel.dataset.prefer;
+      if (prefer && msg.vars.some((v) => v.collection === prefer)) sel.value = prefer;
+      else if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
+      else if (msg.vars.some((v) => v.collection === 'Semantic')) sel.value = 'Semantic';
       renderVars();
       refreshDarkOptions();
       setStatus('varEditStatus', msg.vars.length ? `변수 ${msg.vars.length}개` : '편집할 변수가 없어요. 먼저 토큰을 생성하세요.', msg.vars.length ? 'ok' : 'warn');
@@ -2043,9 +2075,15 @@ window.onmessage = (event: MessageEvent) => {
       if (msg.deleted) {
         allVars = allVars.filter((v) => v.id !== msg.id);
         setStatus('varEditStatus', '변수를 삭제했어요.', 'ok');
+      } else if (msg.created && msg.var) {
+        allVars.push(msg.var);
+        allVars.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
+        ($('varCreateName') as HTMLInputElement).value = '';
+        setStatus('varEditStatus', t('varedit.created', { name: msg.var.name }), 'ok');
       } else if (msg.var) {
         const i = allVars.findIndex((v) => v.id === msg.id);
         if (i >= 0) allVars[i] = msg.var;
+        else allVars.push(msg.var);
         setStatus('varEditStatus', `'${msg.var.name}' 수정했어요.`, 'ok');
       }
       renderVars();
@@ -2684,20 +2722,98 @@ function showApplyProgress(label: string): void {
   ($('applyBarFill') as HTMLElement).style.width = '0%';
   $('applyProgressText').textContent = label;
 }
-/** 변수 한 줄 — 이름·값 즉시 편집 + 컬렉션 배지 + 사용처/삭제. */
+/** 별칭 사슬을 따라 최종 표시값(hex/숫자)과 스와치용 hex를 구한다. */
+function resolveVarDisplay(v: VarInfo, startModeId: string): { display: string; hex?: string } {
+  let cur: VarInfo | undefined = v;
+  let modeId = startModeId;
+  const seen = new Set<string>();
+  for (let i = 0; i < 12 && cur; i++) {
+    if (seen.has(cur.id)) break;
+    seen.add(cur.id);
+    const cell: VarInfo['values'][string] | undefined = cur.values[modeId] ?? cur.values[cur.defaultModeId];
+    if (!cell) return { display: '' };
+    if (cell.kind === 'literal') {
+      const hex = cur.type === 'COLOR' && /^#[0-9a-f]{6}$/i.test(cell.display) ? cell.display : undefined;
+      return { display: cell.display, hex };
+    }
+    cur = allVars.find((x) => x.id === cell.aliasId);
+    modeId = cur?.defaultModeId ?? modeId;
+  }
+  return { display: '(해석 실패)' };
+}
+
+function aliasOptionsFor(v: VarInfo): VarInfo[] {
+  return allVars.filter(
+    (o) => o.type === v.type && o.id !== v.id && aliasTargetCollectionOk(v.collection, o.collection),
+  );
+}
+
+function appendSwatch(parent: HTMLElement, hex?: string): void {
+  if (!hex) return;
+  const sw = document.createElement('span');
+  sw.className = 'vsw';
+  sw.style.background = hex;
+  parent.appendChild(sw);
+}
+
+function makeModeValueEditor(v: VarInfo, modeId: string, modeName: string): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'vmode';
+  if (v.modes.length > 1) {
+    const lab = document.createElement('span');
+    lab.className = 'mlabel';
+    lab.textContent = modeName;
+    wrap.appendChild(lab);
+  }
+  const cell = v.values[modeId];
+  const resolved = resolveVarDisplay(v, modeId);
+  appendSwatch(wrap, resolved.hex);
+
+  if (v.collection === 'Global') {
+    const val = document.createElement('input');
+    val.type = 'text';
+    val.value = cell && cell.kind === 'literal' ? cell.display : '';
+    val.placeholder = v.type === 'COLOR' ? '#RRGGBB' : v.type === 'FLOAT' ? '숫자' : '';
+    val.title = '리터럴 값';
+    val.addEventListener('change', () => {
+      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId, literal: val.value } } });
+    });
+    wrap.appendChild(val);
+  } else {
+    const sel = document.createElement('select');
+    const opts = aliasOptionsFor(v);
+    if (!opts.length) {
+      const o = document.createElement('option');
+      o.value = '';
+      o.textContent = '(별칭 대상 없음)';
+      sel.appendChild(o);
+    }
+    for (const other of opts) {
+      const o = document.createElement('option');
+      o.value = other.id;
+      o.textContent = other.name;
+      sel.appendChild(o);
+    }
+    sel.value = cell?.kind === 'alias' ? cell.aliasId ?? '' : '';
+    sel.title = cell?.kind === 'alias' ? `별칭 → ${cell.display} · 해석 ${resolved.display}` : '별칭 대상';
+    sel.addEventListener('change', () => {
+      if (!sel.value) return;
+      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId, aliasId: sel.value } } });
+    });
+    wrap.appendChild(sel);
+  }
+  return wrap;
+}
+
+/** 변수 한 줄 — 이름·모드별 값·확장(스코프/설명)·사용처/삭제. */
 function makeVarRow(v: VarInfo): HTMLElement {
+  const block = document.createElement('div');
   const row = document.createElement('div');
   row.className = 'vrow';
   row.dataset.id = v.id;
 
-  // 색이면 스와치를 앞에 — 목록에서 무슨 색인지 눈으로 바로 찾는다.
-  const cell = v.values[v.defaultModeId];
-  if (v.type === 'COLOR' && cell && cell.kind === 'literal' && /^#[0-9a-f]{6}$/i.test(cell.display)) {
-    const sw = document.createElement('span');
-    sw.className = 'vsw';
-    sw.style.background = cell.display;
-    row.appendChild(sw);
-  }
+  const defResolved = resolveVarDisplay(v, v.defaultModeId);
+  appendSwatch(row, defResolved.hex);
 
   const nameWrap = document.createElement('span');
   nameWrap.className = 'vname';
@@ -2705,7 +2821,6 @@ function makeVarRow(v: VarInfo): HTMLElement {
   name.type = 'text';
   name.value = v.name;
   name.title = v.name;
-  // change(포커스 아웃/엔터)에서만 보낸다 — 타이핑마다 보내면 편집 한 번이 Undo 수십 개가 된다.
   name.addEventListener('change', () => {
     if (name.value.trim() === v.name) return;
     send({ type: 'EDIT_VARIABLE', id: v.id, patch: { name: name.value } });
@@ -2713,34 +2828,10 @@ function makeVarRow(v: VarInfo): HTMLElement {
   nameWrap.appendChild(name);
   row.appendChild(nameWrap);
 
-  const valWrap = document.createElement('span');
-  valWrap.className = 'vval';
-  if (cell && cell.kind === 'alias') {
-    // 별칭은 같은 타입의 다른 변수로만 바꿀 수 있다 — 자유 입력이면 오타로 깨지기 쉽다.
-    const sel = document.createElement('select');
-    for (const other of allVars.filter((o) => o.type === v.type && o.id !== v.id)) {
-      const o = document.createElement('option');
-      o.value = other.id;
-      o.textContent = other.name;
-      sel.appendChild(o);
-    }
-    sel.value = cell.aliasId ?? '';
-    sel.title = `별칭 → ${cell.display}`;
-    sel.addEventListener('change', () => {
-      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, aliasId: sel.value } } });
-    });
-    valWrap.appendChild(sel);
-  } else {
-    const val = document.createElement('input');
-    val.type = 'text';
-    val.value = cell ? cell.display : '';
-    val.placeholder = v.type === 'COLOR' ? '#RRGGBB' : v.type === 'FLOAT' ? '숫자' : '';
-    val.addEventListener('change', () => {
-      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, literal: val.value } } });
-    });
-    valWrap.appendChild(val);
-  }
-  row.appendChild(valWrap);
+  const modesWrap = document.createElement('span');
+  modesWrap.className = 'vmodes';
+  for (const m of v.modes) modesWrap.appendChild(makeModeValueEditor(v, m.modeId, m.name));
+  row.appendChild(modesWrap);
 
   const col = document.createElement('span');
   col.className = 'vcol tag tag-set';
@@ -2750,6 +2841,15 @@ function makeVarRow(v: VarInfo): HTMLElement {
 
   const act = document.createElement('span');
   act.className = 'vact';
+  const more = document.createElement('button');
+  more.className = 'link';
+  more.textContent = '⋯';
+  more.title = '스코프·설명';
+  const exp = document.createElement('div');
+  exp.className = 'vexp';
+  more.addEventListener('click', () => exp.classList.toggle('open'));
+  act.appendChild(more);
+
   const usage = document.createElement('button');
   usage.className = 'link';
   usage.textContent = '사용처';
@@ -2762,21 +2862,117 @@ function makeVarRow(v: VarInfo): HTMLElement {
   del.className = 'link';
   del.textContent = '삭제';
   del.addEventListener('click', () => {
-    // 되돌리기 어려운 작업이라 한 번 더 묻는다. 사용처를 먼저 보라는 안내도 같이.
     if (!window.confirm(`'${v.name}' 변수를 삭제할까요?\n이 변수를 쓰던 레이어의 바인딩이 끊깁니다. '사용처'로 먼저 확인하세요.`)) return;
     send({ type: 'DELETE_VARIABLE', id: v.id });
   });
   act.appendChild(del);
   row.appendChild(act);
+  block.appendChild(row);
 
-  return row;
+  const descRow = document.createElement('div');
+  descRow.className = 'row';
+  const descLab = document.createElement('span');
+  descLab.className = 'muted';
+  descLab.textContent = '설명';
+  const desc = document.createElement('input');
+  desc.type = 'text';
+  desc.value = v.description;
+  desc.style.flex = '1';
+  desc.addEventListener('change', () => {
+    send({ type: 'EDIT_VARIABLE', id: v.id, patch: { description: desc.value } });
+  });
+  descRow.append(descLab, desc);
+  exp.appendChild(descRow);
+
+  const scopeRow = document.createElement('div');
+  scopeRow.className = 'row';
+  scopeRow.style.flexWrap = 'wrap';
+  const allowed = scopesForTypeList(v.type);
+  const selected = new Set(v.scopes as string[]);
+  for (const s of allowed) {
+    const lab = document.createElement('label');
+    lab.className = 'scope';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.dataset.scope = s;
+    cb.checked = selected.has(s) || selected.has('ALL_SCOPES');
+    cb.addEventListener('change', () => {
+      const next = allowed.filter((x) => {
+        const el = scopeRow.querySelector(`input[data-scope="${x}"]`) as HTMLInputElement | null;
+        return !!el?.checked;
+      }) as ScopeName[];
+      send({ type: 'EDIT_VARIABLE', id: v.id, patch: { scopes: next.length ? next : (['ALL_SCOPES'] as ScopeName[]) } });
+    });
+    lab.append(cb, document.createTextNode(s));
+    scopeRow.appendChild(lab);
+  }
+  exp.appendChild(scopeRow);
+  block.appendChild(exp);
+  return block;
 }
 
 function renderVars(): void {
   const vis = visibleVars();
   $('varCount').textContent = allVars.length ? `· ${vis.length}/${allVars.length}개` : '';
-  renderChunked($('varList'), vis, makeVarRow, () => layoutListBy('varList'));
+  const box = $('varList');
+  box.innerHTML = '';
+  const groups = groupVarsByPath(vis);
+  for (const g of groups) {
+    const h = document.createElement('div');
+    h.className = 'vgroup';
+    h.textContent = g.group;
+    box.appendChild(h);
+    for (const v of g.items) box.appendChild(makeVarRow(v));
+  }
+  layoutListBy('varList');
+  syncVarCreateAliasOptions();
 }
+
+function syncVarCreateForm(): void {
+  const col = ($('varCreateCol') as HTMLSelectElement).value;
+  const lit = $('varCreateLiteral') as HTMLInputElement;
+  const alias = $('varCreateAlias') as HTMLSelectElement;
+  const isGlobal = col === 'Global';
+  lit.style.display = isGlobal ? '' : 'none';
+  alias.style.display = isGlobal ? 'none' : '';
+  syncVarCreateAliasOptions();
+}
+
+function syncVarCreateAliasOptions(): void {
+  const col = ($('varCreateCol') as HTMLSelectElement).value;
+  const type = ($('varCreateType') as HTMLSelectElement).value as ResolvedType;
+  const sel = $('varCreateAlias') as HTMLSelectElement;
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '';
+  const targets = allVars.filter((v) => v.type === type && aliasTargetCollectionOk(col, v.collection));
+  if (!targets.length) {
+    const o = document.createElement('option');
+    o.value = '';
+    o.textContent = '(대상 없음 — 먼저 Global을 만드세요)';
+    sel.appendChild(o);
+  }
+  for (const v of targets) {
+    const o = document.createElement('option');
+    o.value = v.id;
+    o.textContent = `${v.name} (${v.collection})`;
+    sel.appendChild(o);
+  }
+  if (prev && targets.some((t) => t.id === prev)) sel.value = prev;
+}
+
+function openVarEditor(filterCollection = 'Semantic'): void {
+  showTab('settings');
+  const sel = $('varFilterCol') as HTMLSelectElement;
+  sel.dataset.prefer = filterCollection;
+  requestVars(true);
+  window.setTimeout(() => {
+    if (Array.from(sel.options).some((o) => o.value === filterCollection)) sel.value = filterCollection;
+    renderVars();
+    $('varEditCard').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, 80);
+}
+
 
 /** 닮은 프레임 멤버 한 줄 — 마스터 라디오 + 이름 + 완전성 근거(왜 이게 추천인지). */
 function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement {

@@ -109,6 +109,10 @@ import {
   scopesForTypeList,
   aliasSelfReference,
   findAliasReferers,
+  aliasTargetCollectionOk,
+  validateCreateVariable,
+  groupKeyForVarName,
+  groupVarsByPath,
   hexToOklch,
   darkValueForLight,
   darkGlobalName,
@@ -1690,7 +1694,8 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
     { name: 'stroke-width/4', category: 'strokeWidth', sources: ['strokeWidth'], value: 4 },
   ];
   const map = suggestTokenRoles(tokens, 16);
-  assert.equal(map['primary'], 'color/0066ff'); // 색(유일 유채) → primary
+  assert.equal(map['cta-background-color'], 'color/0066ff'); // 색(유일 유채) → CTA 배경
+  assert.equal(map['primary'], undefined);
   assert.equal(map['spacing/md'], 'spacing/16'); // 센터
   assert.equal(map['spacing/sm'], 'spacing/8');
   assert.equal(map['spacing/lg'], 'spacing/24');
@@ -2222,9 +2227,65 @@ test('findAliasReferers — varId를 별칭하는 변수 수집(자기 제외, R
   ];
   const refs = findAliasReferers('g1', vars);
   assert.deepEqual(refs.map((r) => r.name).sort(), ['primary', 'surface']);
-  // 어느 모드든 한 번이라도 별칭하면 1회만(중복 없음)
   assert.equal(refs.length, 2);
   assert.deepEqual(findAliasReferers('none', vars), []);
+});
+
+test('aliasTargetCollectionOk — Semantic→Global, Component→Semantic|Global, Global 금지', () => {
+  assert.equal(aliasTargetCollectionOk('Semantic', 'Global'), true);
+  assert.equal(aliasTargetCollectionOk('Semantic', 'Semantic'), false);
+  assert.equal(aliasTargetCollectionOk('Component', 'Semantic'), true);
+  assert.equal(aliasTargetCollectionOk('Component', 'Global'), true);
+  assert.equal(aliasTargetCollectionOk('Global', 'Semantic'), false);
+});
+
+test('validateCreateVariable — Global 리터럴 / Semantic·Component 별칭', () => {
+  assert.equal(
+    validateCreateVariable({ collection: 'Global', name: 'color/orange/400', existingNames: [], hasLiteral: true, hasAlias: false }),
+    null,
+  );
+  assert.match(
+    validateCreateVariable({ collection: 'Global', name: 'x', existingNames: [], hasLiteral: false, hasAlias: false }),
+    /리터럴/,
+  );
+  assert.equal(
+    validateCreateVariable({
+      collection: 'Semantic',
+      name: 'cta-background-color',
+      existingNames: [],
+      hasLiteral: false,
+      hasAlias: true,
+      aliasTargetCollection: 'Global',
+    }),
+    null,
+  );
+  assert.match(
+    validateCreateVariable({
+      collection: 'Semantic',
+      name: 'cta-background-color',
+      existingNames: [],
+      hasLiteral: true,
+      hasAlias: false,
+    }),
+    /별칭/,
+  );
+});
+
+test('groupKeyForVarName / groupVarsByPath — 경로 그룹', () => {
+  assert.equal(groupKeyForVarName('color/blue/500'), 'color');
+  assert.equal(groupKeyForVarName('cta-background-color'), 'cta-background-color');
+  const groups = groupVarsByPath([
+    { name: 'color/blue/500' },
+    { name: 'cta-background-color' },
+    { name: 'color/orange/400' },
+  ]);
+  assert.deepEqual(
+    groups.map((g) => ({ group: g.group, names: g.items.map((i) => i.name) })),
+    [
+      { group: 'color', names: ['color/blue/500', 'color/orange/400'] },
+      { group: 'cta-background-color', names: ['cta-background-color'] },
+    ],
+  );
 });
 
 test('darkValueForLight — OKLCH 명도 반전(밝음↔어두움)', () => {

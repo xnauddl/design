@@ -149,7 +149,7 @@ export interface ComponentCandidate {
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT' }
-  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
+  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean; semanticMap?: Record<string, string> } // preview: UX1 · replacePalette: 이전 팔레트 색 정리 · semanticMap: 역할 별칭(없으면 자동 추천)
   | { type: 'APPLY'; tolerance: number; preview?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[] } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
@@ -182,6 +182,16 @@ export type UiToCode =
   | { type: 'GET_VARIABLES' } // 변수 편집기: 3계층 변수 목록
   | { type: 'EDIT_VARIABLE'; id: string; patch: VarPatch } // 변수 속성 즉시 편집
   | { type: 'DELETE_VARIABLE'; id: string } // 변수 삭제
+  | {
+      type: 'CREATE_VARIABLE';
+      collection: 'Global' | 'Semantic' | 'Component';
+      name: string;
+      resolvedType: ResolvedType;
+      literal?: string;
+      aliasId?: string;
+      description?: string;
+      scopes?: ScopeName[];
+    } // 변수 신규 등록(Global=리터럴, Semantic/Component=별칭)
   | { type: 'GET_VARIABLE_USAGE'; id: string } // 삭제/리네임 전 사용처 조회
   | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId?: string; toModeId?: string } // 라이트→Dark(없으면 addMode) 자동 채움
   | { type: 'SCAN_SIMILAR' } // 닮은 프레임: 선택 프레임 정렬 미리보기(읽기 전용 → Free)
@@ -230,7 +240,7 @@ export type CodeToUi =
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'VARIABLES'; vars: VarInfo[] } // 편집기용 변수 목록
-  | { type: 'EDIT_VARIABLE_RESULT'; id: string; ok: boolean; error?: string; var?: VarInfo; deleted?: boolean }
+  | { type: 'EDIT_VARIABLE_RESULT'; id: string; ok: boolean; error?: string; var?: VarInfo; deleted?: boolean; created?: boolean }
   // 사용처 — nodes는 문서 전체 스캔(상한 도달 시 capped), aliasedBy는 이 변수를 별칭하는 변수.
   | { type: 'VARIABLE_USAGE'; id: string; nodes: { id: string; name: string }[]; aliasedBy: { id: string; name: string }[]; capped: boolean }
   | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number; modeCreated?: boolean; error?: string }

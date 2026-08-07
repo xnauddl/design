@@ -4,11 +4,11 @@
 import type { UiToCode, RenameChange, VarInfo, VarMode, VarValueCell, VarPatch, CodeToUi } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
+import { createTokensAndRoles, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection } from './lib/rename';
-import { rgbToHex, hexToRgb, type ResolvedType, type ScopeName } from './lib/tokens';
+import { rgbToHex, hexToRgb, scopeForSemanticRole, scopesForType, type ResolvedType, type ScopeName } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
@@ -16,7 +16,7 @@ import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } fr
 import { checkContrast, type ContrastSample } from './lib/contrast';
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
-import { parseVarValue, sanitizeScopes, aliasSelfReference, findAliasReferers } from './lib/variableEdit';
+import { parseVarValue, sanitizeScopes, aliasSelfReference, findAliasReferers, validateCreateVariable, aliasTargetCollectionOk } from './lib/variableEdit';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
@@ -279,21 +279,98 @@ async function applyVarValue(v: Variable, col: VariableCollection, value: NonNul
   const modeId = value.modeId || col.defaultModeId;
   if (!col.modes.some((m) => m.modeId === modeId)) return '대상 모드를 찾을 수 없습니다.';
   if (value.aliasId !== undefined) {
+    if (col.name === GLOBAL) return 'Global은 리터럴만 허용합니다(별칭 불가).';
     if (aliasSelfReference(v.id, value.aliasId)) return '변수를 자기 자신에 별칭할 수 없습니다.';
     const target = await figma.variables.getVariableByIdAsync(value.aliasId);
     if (!target) return '별칭 대상을 찾을 수 없습니다.';
     if (target.resolvedType !== v.resolvedType) return '별칭 대상의 타입이 다릅니다.';
+    const targetCol = await figma.variables.getVariableCollectionByIdAsync(target.variableCollectionId);
+    if (!targetCol || !aliasTargetCollectionOk(col.name, targetCol.name)) {
+      return col.name === SEMANTIC
+        ? 'Semantic은 Global만 별칭할 수 있습니다.'
+        : 'Component는 Semantic/Global만 별칭할 수 있습니다.';
+    }
     if (await aliasWouldCycle(v.id, target)) return '별칭이 순환 참조를 만듭니다.';
     v.setValueForMode(modeId, figma.variables.createVariableAlias(target));
     return null;
   }
   if (value.literal !== undefined) {
+    if (col.name === SEMANTIC || col.name === COMPONENT) return `${col.name}은 별칭만 허용합니다(리터럴 불가).`;
     const p = parseVarValue(v.resolvedType, value.literal);
     if (!p.ok) return p.error;
     v.setValueForMode(modeId, p.value as VariableValue);
     return null;
   }
   return null;
+}
+
+async function createVariableFromMsg(
+  msg: Extract<UiToCode, { type: 'CREATE_VARIABLE' }>,
+): Promise<Extract<CodeToUi, { type: 'EDIT_VARIABLE_RESULT' }>> {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  let col = cols.find((c) => c.name === msg.collection);
+  if (!col) {
+    if (!EDITABLE_COLLECTIONS.has(msg.collection)) {
+      return { type: 'EDIT_VARIABLE_RESULT', id: '', ok: false, error: '편집 대상이 아닌 컬렉션입니다.' };
+    }
+    col = figma.variables.createVariableCollection(msg.collection);
+  }
+  const existing = (await figma.variables.getLocalVariablesAsync())
+    .filter((x) => x.variableCollectionId === col!.id)
+    .map((x) => x.name);
+  let aliasTargetCollection: string | undefined;
+  if (msg.aliasId) {
+    const target = await figma.variables.getVariableByIdAsync(msg.aliasId);
+    if (!target) return { type: 'EDIT_VARIABLE_RESULT', id: '', ok: false, error: '별칭 대상을 찾을 수 없습니다.' };
+    const tc = await figma.variables.getVariableCollectionByIdAsync(target.variableCollectionId);
+    aliasTargetCollection = tc?.name;
+  }
+  const verr = validateCreateVariable({
+    collection: msg.collection,
+    name: msg.name,
+    existingNames: existing,
+    hasLiteral: msg.literal !== undefined && msg.literal !== '',
+    hasAlias: !!msg.aliasId,
+    aliasTargetCollection,
+  });
+  if (verr) return { type: 'EDIT_VARIABLE_RESULT', id: '', ok: false, error: verr };
+
+  try {
+    const v = figma.variables.createVariable(msg.name.trim(), col, msg.resolvedType);
+    if (msg.description) v.description = msg.description;
+    if (msg.scopes) v.scopes = sanitizeScopes(msg.scopes, msg.resolvedType);
+    else if (msg.collection === SEMANTIC) {
+      const roleScopes = scopeForSemanticRole(msg.name);
+      if (roleScopes) v.scopes = scopesForType(roleScopes, msg.resolvedType);
+    }
+    if (msg.collection === GLOBAL) v.hiddenFromPublishing = true;
+
+    const modeId = col.defaultModeId;
+    if (msg.aliasId) {
+      const target = await figma.variables.getVariableByIdAsync(msg.aliasId);
+      if (!target) {
+        v.remove();
+        return { type: 'EDIT_VARIABLE_RESULT', id: '', ok: false, error: '별칭 대상을 찾을 수 없습니다.' };
+      }
+      if (target.resolvedType !== msg.resolvedType) {
+        v.remove();
+        return { type: 'EDIT_VARIABLE_RESULT', id: '', ok: false, error: '별칭 대상의 타입이 다릅니다.' };
+      }
+      v.setValueForMode(modeId, figma.variables.createVariableAlias(target));
+    } else if (msg.literal !== undefined) {
+      const p = parseVarValue(msg.resolvedType, msg.literal);
+      if (!p.ok) {
+        v.remove();
+        return { type: 'EDIT_VARIABLE_RESULT', id: '', ok: false, error: p.error };
+      }
+      v.setValueForMode(modeId, p.value as VariableValue);
+    }
+    const all = await figma.variables.getLocalVariablesAsync();
+    const nameById = new Map(all.map((x) => [x.id, x.name]));
+    return { type: 'EDIT_VARIABLE_RESULT', id: v.id, ok: true, created: true, var: toVarInfo(v, col, nameById) };
+  } catch (e) {
+    return { type: 'EDIT_VARIABLE_RESULT', id: '', ok: false, error: errText(e) };
+  }
 }
 
 async function editVariable(id: string, patch: VarPatch): Promise<Extract<CodeToUi, { type: 'EDIT_VARIABLE_RESULT' }>> {
@@ -863,8 +940,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'CREATE_TOKENS': {
         // 실제 변수 생성만 Paid(미리보기는 비파괴 읽기라 백엔드는 허용 — UI가 무료 티어에서 버튼을 잠근다).
         if (!msg.preview && !requirePaid('tokens', '토큰(변수) 생성은 Paid 기능입니다. 미리보기는 무료로 제공됩니다.')) break;
-        // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
-        const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
+        // UX1: preview면 변수를 만들지 않고 예정 수만 집계. Global + 역할 Semantic을 함께 계산.
+        const s = msg.preview
+          ? await previewCreateTokens(msg.tokens, msg.base, msg.semanticMap)
+          : await createTokensAndRoles(msg.tokens, msg.base, msg.semanticMap);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
@@ -1581,6 +1660,16 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'GET_VARIABLES': {
         post({ type: 'VARIABLES', vars: await collectVars() });
+        break;
+      }
+      case 'CREATE_VARIABLE': {
+        const res = await createVariableFromMsg(msg);
+        post(res);
+        if (res.ok) {
+          commitUndo(figma);
+          await postPrereq();
+          post({ type: 'VARIABLES', vars: await collectVars() });
+        }
         break;
       }
       case 'EDIT_VARIABLE': {

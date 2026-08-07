@@ -101,7 +101,7 @@ function numericEntries(tokens: DraftToken[], category: TokenCategory): Array<{ 
 export function suggestTokenRoles(tokens: DraftToken[], base = 16): Record<string, string> {
   const map: Record<string, string> = {};
 
-  // 색 — 기존 휴리스틱(무채→surface/text/border, 채도최고→primary).
+  // 색 — 기능명 휴리스틱(무채→surface/text/border-color, 채도최고→cta-background-color).
   const colors = tokens
     .filter((t) => t.category === 'color' && typeof t.value === 'string')
     .map((t) => ({ name: t.name, hex: t.value as string }));

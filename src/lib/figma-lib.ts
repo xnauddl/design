@@ -4,6 +4,7 @@ export { extractFromSelection } from './extract';
 export type { ExtractResult } from './extract';
 export {
   createTokens,
+  createTokensAndRoles,
   previewCreateTokens,
   createSemanticAliases,
   scanTextStyles,

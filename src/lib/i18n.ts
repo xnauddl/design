@@ -97,9 +97,12 @@ export const STRINGS: Record<string, string> = {
   'similar.componentizeBtn': '컴포넌트화',
   // 변수 편집기
   'varedit.title': '변수 편집기',
-  'varedit.hint': '만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.',
+  'varedit.hint': '만들어 둔 변수의 <b>이름·값·스코프</b>를 고칩니다. <b>Global=리터럴</b>, <b>Semantic=Global 별칭</b>만 허용합니다. 새 기능명(예: <code>cta-background-color</code>)은 아래에서 등록하세요.',
   'varedit.loadBtn': '변수 불러오기',
   'varedit.collection': '컬렉션',
+  'varedit.createBtn': '등록',
+  'varedit.created': "'{name}' 등록했어요.",
+  'varedit.gotoEditor': '역할 편집으로 →',
   // 목록 공통(상한 해제 — 6개 카드가 같은 문구를 쓴다)
   'list.expandAll': '모두 펼치기',
   // 내보내기
@@ -222,8 +225,8 @@ export const STRINGS: Record<string, string> = {
   'colorTidy.undo': '되돌리기',
   'colorTable.applyBtn': '시맨틱 매핑에 반영',
   // 토큰 생성
-  'create.title': '토큰 생성 (Global + Semantic)',
-  'create.scopeHint': '색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.',
+  'create.title': '토큰 생성 (Global + 역할)',
+  'create.scopeHint': '색 외 토큰(간격·크기·폰트·효과)을 <b>Global 원시 변수</b>로 만들고, 색·수치는 <b>Semantic 역할</b>로 자동 매핑합니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.',
   'create.base': 'base(px)',
   'create.selectAll': '전체 선택',
   'create.dropOnce': '1× 해제',

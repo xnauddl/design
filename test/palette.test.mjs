@@ -110,11 +110,16 @@ test('mod360 — 음수·360+ 래핑', () => {
   assert.equal(mod360(0), 0);
 });
 
-test('scopeForSemanticRole — 역할별 스코프(미지정은 undefined)', () => {
+test('scopeForSemanticRole — 기능명·구 추상명 스코프', () => {
   assert.deepEqual(scopeForSemanticRole('text'), ['TEXT_FILL']);
   assert.deepEqual(scopeForSemanticRole('text/muted'), ['TEXT_FILL']);
+  assert.deepEqual(scopeForSemanticRole('text-color'), ['TEXT_FILL']);
+  assert.deepEqual(scopeForSemanticRole('text-color-muted'), ['TEXT_FILL']);
   assert.deepEqual(scopeForSemanticRole('border'), ['STROKE_COLOR']);
+  assert.deepEqual(scopeForSemanticRole('border-color'), ['STROKE_COLOR']);
   assert.deepEqual(scopeForSemanticRole('surface/muted'), ['FRAME_FILL']);
+  assert.deepEqual(scopeForSemanticRole('surface-background-color'), ['FRAME_FILL']);
+  assert.deepEqual(scopeForSemanticRole('cta-background-color'), ['ALL_FILLS']);
   assert.equal(scopeForSemanticRole('primary'), undefined);
 });
 
@@ -163,42 +168,41 @@ test('generatePalette + paletteToDraftTokens — DraftToken 형식', () => {
   }
 });
 
-test('paletteSemanticMap(#3) — Global=hue, 역할은 Semantic, 동일 hue 충돌 접미사', () => {
+test('paletteSemanticMap(#3) — Global=hue, Semantic=기능명, 동일 hue 충돌 접미사', () => {
   const p = generatePalette({ brand: { primary: '#3366ff' }, includeNeutral: true, includeStatus: true });
   const pf = classifyColor('#3366ff').family;
   const map = paletteSemanticMap(p);
-  assert.equal(map['primary'], `color/${pf}/500`);
-  assert.equal(map['primary/strong'], `color/${pf}/700`);
-  assert.equal(map['primary/subtle'], `color/${pf}/100`);
-  assert.equal(map['surface'], 'color/gray/50'); // neutral(저채도) → gray
-  assert.equal(map['text'], 'color/gray/900');
-  assert.equal(map['border'], 'color/gray/200');
-  assert.equal(map['success'], 'color/green/500');
-  assert.equal(map['error'], 'color/red/500');
-  assert.equal(map['secondary'], undefined); // 미생성
-  // primary가 blue면 info(h250)도 blue → 충돌 접미사
-  if (pf === 'blue') assert.equal(map['info'], 'color/blue-2/500');
-  // 모든 Global 토큰은 hue 패밀리 이름
+  assert.equal(map['cta-background-color'], `color/${pf}/500`);
+  assert.equal(map['cta-background-color-strong'], `color/${pf}/700`);
+  assert.equal(map['cta-background-color-subtle'], `color/${pf}/100`);
+  assert.equal(map['surface-background-color'], 'color/gray/50');
+  assert.equal(map['text-color'], 'color/gray/900');
+  assert.equal(map['border-color'], 'color/gray/200');
+  assert.equal(map['success-color'], 'color/green/500');
+  assert.equal(map['error-color'], 'color/red/500');
+  assert.equal(map['secondary-color'], undefined);
+  assert.equal(map['primary'], undefined); // 추상명은 기본 자동 등록 제외
+  if (pf === 'blue') assert.equal(map['info-color'], 'color/blue-2/500');
   for (const t of paletteToDraftTokens(p)) assert.equal(isPaletteColorName(t.name), true);
 
-  // neutral/status 제외 시 역할도 빠짐
   const map2 = paletteSemanticMap(generatePalette({ brand: { primary: '#3366ff' } }));
-  assert.equal(map2['surface'], undefined);
-  assert.equal(map2['success'], undefined);
-  assert.equal(map2['primary'], `color/${pf}/500`);
+  assert.equal(map2['surface-background-color'], undefined);
+  assert.equal(map2['success-color'], undefined);
+  assert.equal(map2['cta-background-color'], `color/${pf}/500`);
 });
 
-test('suggestSemanticMap(#10) — 임의 색에서 역할 추천(실제 이름 지시)', () => {
+test('suggestSemanticMap(#10) — 임의 색에서 기능명 추천(실제 이름 지시)', () => {
   const map = suggestSemanticMap([
-    { name: 'color/0066ff', hex: '#0066ff' }, // 유채(채도 최고) → primary
-    { name: 'color/f8f8f8', hex: '#f8f8f8' }, // 무채 밝음 → surface
-    { name: 'color/111111', hex: '#111111' }, // 무채 어둠 → text
-    { name: 'color/888888', hex: '#888888' }, // 무채 중간 → border
+    { name: 'color/0066ff', hex: '#0066ff' },
+    { name: 'color/f8f8f8', hex: '#f8f8f8' },
+    { name: 'color/111111', hex: '#111111' },
+    { name: 'color/888888', hex: '#888888' },
   ]);
-  assert.equal(map['primary'], 'color/0066ff');
-  assert.equal(map['surface'], 'color/f8f8f8');
-  assert.equal(map['text'], 'color/111111');
-  assert.equal(map['border'], 'color/888888');
+  assert.equal(map['cta-background-color'], 'color/0066ff');
+  assert.equal(map['surface-background-color'], 'color/f8f8f8');
+  assert.equal(map['text-color'], 'color/111111');
+  assert.equal(map['border-color'], 'color/888888');
+  assert.equal(map['primary'], undefined);
 });
 
 test('nameColorsByHue(#3) — hue-Global 이름 + 동일 (hue,step) 충돌 접미사', () => {

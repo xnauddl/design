@@ -19,6 +19,7 @@ import {
   unitDescription,
 } from './tokens';
 import { paletteFamilyOf } from './palette';
+import { suggestTokenRoles } from './roles';
 import { TextSample, TextStyleSpec, ExistingTextStyle } from './textStyles';
 
 export const GLOBAL = 'Global';
@@ -71,11 +72,10 @@ export interface CreateSummary {
   conversions: PxConversion[];
 }
 
-/** Global(원시) + Semantic(별칭 미러) 생성. v1은 Semantic을 1:1 미러로 자동 생성(이름 개명은 UI에서). */
+/** Global(원시 리터럴)만 생성. Semantic 1:1 미러는 만들지 않음(#3 — 역할 별칭만 Semantic). */
 export async function createTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
-  const { globalCol, semanticCol } = await resolveCollections();
+  const { globalCol } = await resolveCollections();
   const gMode = globalCol.defaultModeId;
-  const sMode = semanticCol.defaultModeId;
   const idx = await buildVarIndex();
 
   const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base) };
@@ -86,29 +86,41 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
     summary[g.created ? 'created' : 'updated']++;
     summary.globals++;
 
-    // Global 값 = 리터럴(#16: 비-px lineHeight/letterSpacing은 px FLOAT + 원본 단위는 description)
     setGlobalLiteral(g.variable, gMode, t, type, base);
     g.variable.scopes = scopesForType(scopesForSources(t.sources), type);
-    g.variable.hiddenFromPublishing = true; // 직접 사용 방지(3계층 규칙 보강)
+    g.variable.hiddenFromPublishing = true;
     const desc = unitDescription(t);
-    if (desc) g.variable.description = desc; // 예: "160%" — 내보내기·Figma 패널 표시
-
-    // Semantic 미러(별칭) — 리터럴 금지, 오직 Global 참조
-    const s = upsertVariable(t.name, semanticCol, type, idx);
-    s.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g.variable));
-    s.variable.scopes = scopesForType(scopesForSources(t.sources), type);
-    summary[s.created ? 'created' : 'updated']++;
-    summary.semantics++;
+    if (desc) g.variable.description = desc;
   }
 
   return summary;
 }
 
-/** UX1: 토큰 생성 미리보기 — 변수를 만들지 않고 생성/갱신 예정 수만 집계(읽기 전용).
-   createTokens 의 이름/부수 변수(px 스냅샷) 규칙을 그대로 모사한다.
-   base는 값 환산(비-px → px)에만 쓰이므로 개수는 안 바뀌지만, 무엇이 얼마로 환산될지를
-   conversions로 돌려줘 미리보기가 base 변경을 보여줄 수 있게 한다. */
-export async function previewCreateTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
+/**
+ * Global 원시 + Semantic 역할 별칭을 한 번에.
+ * semanticMap이 있으면 우선, 없으면 suggestTokenRoles로 기능명 맵 자동 생성.
+ */
+export async function createTokensAndRoles(
+  tokens: DraftToken[],
+  base: number,
+  semanticMap?: Record<string, string>,
+): Promise<CreateSummary> {
+  const summary = await createTokens(tokens, base);
+  const map = semanticMap && Object.keys(semanticMap).length ? semanticMap : suggestTokenRoles(tokens, base);
+  if (!Object.keys(map).length) return summary;
+  const sem = await createSemanticAliases(map);
+  summary.created += sem.created;
+  summary.updated += sem.updated;
+  summary.semantics += sem.aliased;
+  return summary;
+}
+
+/** UX1: 토큰 생성 미리보기 — 변수를 만들지 않고 생성/갱신 예정 수만 집계(읽기 전용). */
+export async function previewCreateTokens(
+  tokens: DraftToken[],
+  base: number,
+  semanticMap?: Record<string, string>,
+): Promise<CreateSummary> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const gId = cols.find((c) => c.name === GLOBAL)?.id ?? '#G';
   const sId = cols.find((c) => c.name === SEMANTIC)?.id ?? '#S';
@@ -121,18 +133,16 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
     const k = vkey(colId, name);
     summary[kind]++;
     if (seen.has(k)) {
-      summary.updated++; // 같은 실행 내 중복 이름 → 두 번째부터는 갱신
+      summary.updated++;
       return;
     }
     seen.add(k);
     summary[existing.has(k) ? 'updated' : 'created']++;
   };
 
-  // #16: 토큰당 Global + Semantic 미러 1쌍(스냅샷 변수 없음).
-  for (const t of tokens) {
-    tally(gId, t.name, 'globals');
-    tally(sId, t.name, 'semantics');
-  }
+  for (const t of tokens) tally(gId, t.name, 'globals');
+  const map = semanticMap && Object.keys(semanticMap).length ? semanticMap : suggestTokenRoles(tokens, base);
+  for (const semName of Object.keys(map)) tally(sId, semName, 'semantics');
   return summary;
 }
 

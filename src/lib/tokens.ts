@@ -244,21 +244,25 @@ export function scopesForTypeList(type: ResolvedType): ScopeName[] {
 }
 
 /**
- * 시맨틱 역할 이름 → 속성에 맞는 스코프. 역할 머리말(슬래시 앞)로 판단.
- * 미지정 역할(primary/secondary/accent/상태색 등)은 undefined → 호출자가 원시 스코프를 상속.
+ * 시맨틱 역할 이름 → 속성에 맞는 스코프.
+ * kebab 기능명(`text-color`, `cta-background-color`)과 구 추상명(`text`, `surface`) 모두 인식.
+ * 미지정은 undefined → 호출자가 원시 스코프를 상속.
  */
 export function scopeForSemanticRole(role: string): ScopeName[] | undefined {
-  switch (role.split('/')[0].toLowerCase()) {
-    case 'text':
-      return ['TEXT_FILL'];
-    case 'border':
-      return ['STROKE_COLOR'];
-    case 'surface':
-    case 'background':
-      return ['FRAME_FILL'];
-    default:
-      return undefined;
+  const r = role.toLowerCase();
+  const head = r.split('/')[0];
+  if (r.startsWith('text-color') || head === 'text') return ['TEXT_FILL'];
+  if (r.startsWith('border-color') || head === 'border') return ['STROKE_COLOR'];
+  if (r.startsWith('cta-background')) return ['ALL_FILLS'];
+  if (
+    r.startsWith('surface-background') ||
+    r.includes('background-color') ||
+    head === 'surface' ||
+    head === 'background'
+  ) {
+    return ['FRAME_FILL'];
   }
+  return undefined;
 }
 
 /* ---------- 단위 환산 (%/em/rem → px) ---------- */
