@@ -1317,7 +1317,7 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
 /* ---------- 유료(Paid) 기능 게이트 ----------
    Free/Paid 2티어. Paid에서 해금: 팔레트·토큰 생성(미리보기+적용)·시맨틱·텍스트 스타일·
    컴포넌트/베리언트·공유 프리셋.
-   Free: 추출·색 정리·바인딩·리네임·명도 대비·내보내기. */
+   Free: 추출·색 정리·바인딩·리네임·내보내기. */
 const PAID_LOCK = '🔒 Paid 전용';
 /** 유료 거부(PREMIUM_REQUIRED) 안내를 띄울 카드 — Feature별 상태 영역. */
 const PREMIUM_STATUS_ID: Record<Feature, string> = {

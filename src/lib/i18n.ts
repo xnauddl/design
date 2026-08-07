@@ -282,7 +282,7 @@ export const STRINGS: Record<string, string> = {
   'preset.importBtn': '가져오기(JSON)',
   // 접근성 · 국제화
   'a11y.title': '접근성 · 국제화',
-  'a11y.body': '키보드 전용 조작 · 명도 대비 AA · i18n',
+  'a11y.body': '키보드 전용 조작 · i18n',
 };
 
 /** 해당 키가 STRINGS에 정의돼 있는가. 정적 라벨 하이드레이션이 오타 키로 원문을 덮지 않도록 쓴다. */
