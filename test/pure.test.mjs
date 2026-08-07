@@ -44,12 +44,10 @@ import {
   decodeJwt,
   validateLicenseClaims,
   verifyLicenseToken,
-  serializePreset,
-  parsePreset,
-  upsertPreset,
   semanticMapToText,
   textToSemanticMap,
   exportTokens,
+  exportHasTokens,
   splitWeightStyle,
   parseVariantName,
   formatVariant,
@@ -93,15 +91,10 @@ import {
   weightRole,
   familyRole,
   suggestTokenRoles,
+  mergeTokenRoles,
   pipelineSteps,
   t,
-  parseVarValue,
-  displayVarValue,
-  validateVarName,
-  sanitizeScopes,
   scopesForTypeList,
-  aliasSelfReference,
-  findAliasReferers,
   hexToOklch,
   darkValueForLight,
   darkGlobalName,
@@ -340,7 +333,7 @@ test('hasEntitlement — Paid에서만 유료 기능 해금', () => {
   assert.equal(hasEntitlement('paid', 'tokens'), true);
   assert.equal(hasEntitlement('paid', 'semantics'), true);
   assert.equal(hasEntitlement('paid', 'components'), true);
-  assert.equal(hasEntitlement('paid', 'presets'), true);
+  assert.equal(hasEntitlement('paid', 'textStyles'), true);
 });
 
 test('isTier — 유효 티어 검증(free|paid)', () => {
@@ -481,29 +474,7 @@ test('validateLicenseClaims — 만료·iss·aud·tier', () => {
   assert.equal(validateLicenseClaims({ tier: 'paid' }, now).ok, false); // exp 없음
 });
 
-/* ================= presets.ts (M3 Paid) ================= */
-test('serializePreset / parsePreset — 라운드트립 + 검증', () => {
-  const p = { name: 'mobile', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: { surface: 'color/neutral/50' } };
-  const round = parsePreset(serializePreset(p));
-  assert.deepEqual(round, { ok: true, preset: p });
-  // name 누락 → 에러
-  assert.equal(parsePreset(JSON.stringify({ base: 16 })).ok, false);
-  // 깨진 JSON → 에러
-  assert.equal(parsePreset('{nope').ok, false);
-  // 누락 필드는 기본값으로 정규화
-  const def = parsePreset(JSON.stringify({ name: 'x' }));
-  assert.deepEqual(def, { ok: true, preset: { name: 'x', base: 16, tolerance: 0.5, maxDepth: 8, semanticMap: {} } });
-});
-
-test('upsertPreset — 이름 키 교체(최신 앞)', () => {
-  const a = { name: 'a', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: {} };
-  const a2 = { ...a, base: 10 };
-  const b = { name: 'b', base: 16, tolerance: 0.5, maxDepth: 3, semanticMap: {} };
-  const list = upsertPreset(upsertPreset([], a), b); // [b, a]
-  const next = upsertPreset(list, a2); // a 교체 → [a2, b]
-  assert.deepEqual(next, [a2, b]);
-});
-
+/* ================= roles.ts — 시맨틱 매핑 입력 변환 ================= */
 test('semanticMap 텍스트 ↔ 객체', () => {
   const map = { surface: 'color/neutral/50', text: 'color/neutral/900' };
   assert.deepEqual(textToSemanticMap(semanticMapToText(map)), map);
@@ -588,6 +559,18 @@ test('exportTokens — 동일 이름 Semantic 미러 제거(Global 우선)', () 
 test('exportTokens — 빈 입력', () => {
   assert.equal(exportTokens([], OPTS), ':root {\n}');
   assert.equal(exportTokens([], { ...OPTS, format: 'w3c' }), '{}');
+});
+
+test('exportHasTokens — 껍데기만 있는 결과는 저장 대상이 아님(#8)', () => {
+  // 변수 0개 → 형식별 껍데기. 파일로 떨어뜨리면 안 된다.
+  assert.equal(exportHasTokens(exportTokens([], OPTS), 'css'), false);
+  assert.equal(exportHasTokens(exportTokens([], { ...OPTS, format: 'w3c' }), 'w3c'), false);
+  // 토큰이 하나라도 있으면 저장한다.
+  const tokens = [{ name: 'primary', collection: 'Global', type: 'COLOR', kind: 'color', value: '#2563eb' }];
+  assert.equal(exportHasTokens(exportTokens(tokens, OPTS), 'css'), true);
+  assert.equal(exportHasTokens(exportTokens(tokens, { ...OPTS, format: 'w3c' }), 'w3c'), true);
+  // 깨진 JSON은 저장하지 않는다(파싱 실패 = 내용 확인 불가).
+  assert.equal(exportHasTokens('{nope', 'w3c'), false);
 });
 
 /* ================= components.ts (Phase 3) ================= */
@@ -838,6 +821,27 @@ test('scanComponentCandidates(#1) — 고신뢰만 eligible, 잠금/인스턴스
   assert.equal(byId.get('r').eligible, false); // 단일 선택 컨테이너
   assert.equal(byId.get('b').eligible, true);
   assert.equal(byId.has('bare'), false);
+});
+
+test('scanComponentCandidates(#1) — 채움·모서리·그림자를 잃으면 카드가 후보에서 빠진다(어댑터 계약)', () => {
+  // code.ts의 toStructNode가 이 필드들을 안 실으면 카드형 프레임이 통째로 사라진다.
+  // 실제로 그렇게 났던 회귀라, 무엇이 판정을 먹여 살리는지 여기에 못 박아 둔다.
+  const kids = [
+    { id: 'img', name: 'Image', type: 'RECTANGLE', width: 200, height: 120 },
+    { id: 'tt', name: 'Title', type: 'TEXT' },
+    { id: 'bd', name: 'Body', type: 'TEXT' },
+  ];
+  const card = (extra) => ({
+    id: 'c', name: 'Frame 12', type: 'FRAME', layoutMode: 'VERTICAL',
+    width: 240, height: 260, children: kids, ...extra,
+  });
+  const eligibleOf = (node) => {
+    const out = scanComponentCandidates([{ id: 'r', name: 'root', type: 'FRAME', children: [node] }]);
+    return out.find((c) => c.id === 'c')?.eligible ?? false;
+  };
+
+  assert.equal(eligibleOf(card({ fills: [{ type: 'SOLID', visible: true }], cornerRadius: 12 })), true);
+  assert.equal(eligibleOf(card({})), false, '채움·모서리를 떼면 같은 프레임이 후보가 아니게 된다');
 });
 
 test('scanComponentCandidates(#1) — 숨김(visible=false) 프레임은 후보·하위 스캔 제외', () => {
@@ -1355,6 +1359,21 @@ test('resolveGroupNames — 맥락 붕괴로 겹치면 맥락을 되살려 구�
   assert.deepEqual(resolveGroupNames([g('article-avatar', 'avatar')]), ['Avatar']);
 });
 
+test('resolveGroupNames — 지난 실행에서 등록한 이름과도 겹치지 않는다', () => {
+  const g = (name, role, n = 1) =>
+    Array.from({ length: n }, (_, i) => ({ id: `${name}${i}`, name, type: 'FRAME', role }));
+  // 회귀: 프레임 A의 아바타를 등록해 `Avatar`가 이미 있는 상태에서 프레임 B를 등록하면
+  // 둘 다 `Avatar`가 되고, 「베리언트 분류」가 정확한 이름으로 둘을 한 세트로 합쳤다.
+  assert.deepEqual(resolveGroupNames([g('profile-avatar', 'avatar', 2)], ['Avatar']), ['ProfileAvatar']);
+  // 맥락을 되살린 이름까지 이미 있으면 숫자로 물러선다.
+  assert.deepEqual(
+    resolveGroupNames([g('profile-avatar', 'avatar', 2)], ['Avatar', 'ProfileAvatar']),
+    ['ProfileAvatar2'],
+  );
+  // 무관한 이름만 있으면 영향 없음.
+  assert.deepEqual(resolveGroupNames([g('profile-avatar', 'avatar', 2)], ['Button', 'Card']), ['Avatar']);
+});
+
 test('groupByExactName — 정확한 이름끼리만 묶음(머리명사 병합 안 함)', () => {
   const mk = (id, name) => ({ id, name, type: 'FRAME', width: 100, height: 40, children: [] });
   // Like Button×2 + artist-button×1: 정확한 이름이 다르므로 별도 그룹(머리명사면 'Button'으로 합쳐짐).
@@ -1614,31 +1633,60 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
   assert.equal(map['stroke-width/md'], 'stroke-width/2'); // 티셔츠 센터
 });
 
+test('mergeTokenRoles — 부분 맵을 덮어쓰되 빠진 카테고리는 자동 추천을 남긴다', () => {
+  const tokens = [
+    { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+    { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+  ];
+  // 색 목록 화면이 주는 건 색 역할뿐 — 이걸로 통째 교체하면 spacing 역할이 사라진다.
+  const merged = mergeTokenRoles(tokens, 16, { primary: 'color/0066ff', accent: 'color/0066ff' });
+  assert.equal(merged['primary'], 'color/0066ff'); // 사용자가 정한 것 우선
+  assert.equal(merged['accent'], 'color/0066ff'); // 자동 추천에 없던 역할도 그대로
+  assert.equal(merged['spacing/md'], 'spacing/16'); // 색만 왔어도 간격 역할은 유지
+  // 덮어쓸 게 없으면 자동 추천 그대로.
+  assert.deepEqual(mergeTokenRoles(tokens, 16, {}), suggestTokenRoles(tokens, 16));
+  assert.deepEqual(mergeTokenRoles(tokens, 16), suggestTokenRoles(tokens, 16));
+});
+
 /* ================= pipeline.ts (진행 안내 §3) ================= */
 test('pipelineSteps — 전제에 따른 단계 상태', () => {
-  // 변수 없음: 토큰=ready, 시맨틱/바인딩=blocked(+안내)
-  const empty = pipelineSteps({ hasGlobal: false, hasBindable: false });
+  const none = {
+    hasColorVars: false, hasScaleVars: false, hasGlobal: false,
+    hasBindable: false, hasDarkMode: false, hasTextStyles: false,
+  };
+
+  // 아무것도 없음: 색·토큰=ready(언제든 시작), 역할·연결=blocked(+안내), 다크·타이포=todo
+  const empty = pipelineSteps(none);
   assert.deepEqual(empty.map((s) => [s.id, s.status]), [
-    ['tokens', 'ready'], ['semantics', 'blocked'], ['bind', 'blocked'],
+    ['colors', 'ready'], ['tokens', 'ready'], ['semantics', 'blocked'],
+    ['bind', 'blocked'], ['dark', 'todo'], ['textStyles', 'todo'],
   ]);
-  assert.ok(empty[1].hint && empty[2].hint); // blocked엔 안내
+  assert.ok(empty[2].hint && empty[3].hint); // blocked엔 안내
 
-  // Global만: 토큰=done, 시맨틱=ready, 바인딩=blocked
-  const g = pipelineSteps({ hasGlobal: true, hasBindable: false });
-  assert.deepEqual(g.map((s) => s.status), ['done', 'ready', 'blocked']);
+  // Global만: 색·토큰=done, 역할=ready, 연결=blocked
+  const g = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true });
+  assert.deepEqual(g.map((s) => s.status), ['done', 'done', 'ready', 'blocked', 'todo', 'todo']);
 
-  // 둘 다: 토큰=done, 시맨틱/바인딩=ready(안내 없음)
-  const both = pipelineSteps({ hasGlobal: true, hasBindable: true });
-  assert.deepEqual(both.map((s) => s.status), ['done', 'ready', 'ready']);
-  assert.equal(both[1].hint, undefined);
+  // 연결 변수까지: 역할·연결 모두 ready(안내 없음)
+  const both = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true });
+  assert.deepEqual(both.map((s) => s.status), ['done', 'done', 'ready', 'ready', 'todo', 'todo']);
   assert.equal(both[2].hint, undefined);
+  assert.equal(both[3].hint, undefined);
+
+  // 다크·텍스트 스타일은 전제가 아니라 '만들었는가' — 있으면 done
+  const made = pipelineSteps({ ...none, hasDarkMode: true, hasTextStyles: true });
+  assert.deepEqual(made.map((s) => s.status).slice(4), ['done', 'done']);
+
+  // 색만 만든 상태: 색=done, 간격·크기=아직 ready, 역할 매핑은 Global이 있으니 ready
+  const colorOnly = pipelineSteps({ ...none, hasColorVars: true, hasGlobal: true });
+  assert.deepEqual(colorOnly.map((s) => s.status), ['done', 'ready', 'ready', 'blocked', 'todo', 'todo']);
 });
 
 /* ================= i18n.ts (런타임 문자열 외부화) ================= */
 test('t — 키 조회·보간·폴백', () => {
   assert.equal(t('rename.none'), '변경할 이름이 없습니다.');
   assert.equal(t('rename.applied', { count: 3 }), '3개 이름 적용 완료.');
-  assert.equal(t('preset.applied', { name: 'A' }), '‘A’ 적용됨 — 아래 단계에서 실행하세요.');
+  assert.equal(t('export.saved', { format: 'CSS', file: 'tokens.css' }), 'CSS — tokens.css로 저장했습니다.');
   // 누락 변수는 자리표시자 유지
   assert.equal(t('rename.applied', {}), '{count}개 이름 적용 완료.');
   // 누락 키는 key 그대로 폴백
@@ -1726,6 +1774,27 @@ test('clusterTextStyles — 바인딩된 styleId를 군집별로 수집(중복 �
   const cl = clusterTextStyles(samples);
   assert.deepEqual(cl.find((c) => c.fontSize === 32).styleIds, ['S:1']); // 같은 스타일 → 1개로
   assert.deepEqual(cl.find((c) => c.fontSize === 16).styleIds, []); // 미바인딩(빈 id) → 없음
+});
+
+test('clusterTextStyles / nameTextStyles — 군집 노드 id와 개수를 스펙까지 나른다(#17 ×N)', () => {
+  const cl = clusterTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b1', styleId: '', id: 'N:1' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'b2', styleId: '', id: 'N:2' },
+    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h', styleId: '', id: 'N:3' },
+  ]);
+  const body = cl.find((c) => c.fontSize === 16);
+  assert.equal(body.count, 2);
+  assert.deepEqual(body.nodeIds, ['N:1', 'N:2']);
+
+  const specs = nameTextStyles(cl);
+  const bodySpec = specs.find((x) => x.fontSize === 16);
+  assert.equal(bodySpec.count, 2);
+  assert.deepEqual(bodySpec.nodeIds, ['N:1', 'N:2']); // ×N 배지가 이 id들을 선택한다
+  // id 없는 샘플(손으로 만든 군집)은 nodeIds를 만들지 않는다 — 배지 대신 삭제 버튼이 나온다.
+  const noIds = nameTextStyles(clusterTextStyles([
+    { fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'x', styleId: '' },
+  ]));
+  assert.equal(noIds[0].nodeIds, undefined);
 });
 
 test('nameTextStyles — 이미 바인딩된 군집은 기존 이름 유지 + boundStyleId(재스캔 rename)', () => {
@@ -2098,47 +2167,7 @@ test('nameTextStyles — 군집의 자간 %는 스펙으로 전달되고, px 군
   assert.equal(px.letterSpacingPercent, undefined);
 });
 
-/* ---------- 변수 편집기(R1)·다크 테마 생성(R2) 순수 헬퍼 ---------- */
-
-test('parseVarValue — 타입별 파싱/검증', () => {
-  // COLOR
-  assert.deepEqual(parseVarValue('COLOR', '#ffffff'), { ok: true, value: { r: 1, g: 1, b: 1 } });
-  assert.deepEqual(parseVarValue('COLOR', '000000'), { ok: true, value: { r: 0, g: 0, b: 0 } });
-  assert.equal(parseVarValue('COLOR', 'nope').ok, false);
-  assert.equal(parseVarValue('COLOR', '#fff').ok, false); // 3자리 거부
-  // FLOAT
-  assert.deepEqual(parseVarValue('FLOAT', '16'), { ok: true, value: 16 });
-  assert.deepEqual(parseVarValue('FLOAT', '-1.5'), { ok: true, value: -1.5 });
-  assert.equal(parseVarValue('FLOAT', '').ok, false);
-  assert.equal(parseVarValue('FLOAT', 'abc').ok, false);
-  // STRING
-  assert.deepEqual(parseVarValue('STRING', 'Inter'), { ok: true, value: 'Inter' });
-  assert.deepEqual(parseVarValue('STRING', '  Inter  '), { ok: true, value: 'Inter' }); // 앞뒤 공백 트림
-  assert.equal(parseVarValue('STRING', '   ').ok, false);
-  // BOOLEAN
-  assert.deepEqual(parseVarValue('BOOLEAN', 'true'), { ok: true, value: true });
-  assert.deepEqual(parseVarValue('BOOLEAN', 'FALSE'), { ok: true, value: false });
-  assert.equal(parseVarValue('BOOLEAN', 'yes').ok, false);
-});
-
-test('displayVarValue — 색은 hex, 그 외 문자열', () => {
-  assert.equal(displayVarValue('COLOR', { r: 1, g: 1, b: 1 }), '#ffffff');
-  assert.equal(displayVarValue('FLOAT', 16), '16');
-  assert.equal(displayVarValue('STRING', 'Inter'), 'Inter');
-});
-
-test('validateVarName — 빈 이름·중복 거부', () => {
-  assert.equal(validateVarName('surface', ['bg', 'text']), null);
-  assert.match(validateVarName('', []), /이름/);
-  assert.match(validateVarName('  ', []), /이름/);
-  assert.match(validateVarName('bg', ['bg', 'text']), /중복|이름/);
-});
-
-test('sanitizeScopes — 타입 무효 스코프 제거 + 중복 제거', () => {
-  // COLOR에 FLOAT 전용 스코프(GAP)는 제거, 중복은 1개로
-  const out = sanitizeScopes(['ALL_FILLS', 'GAP', 'ALL_FILLS', 'STROKE_COLOR'], 'COLOR');
-  assert.deepEqual(out.sort(), ['ALL_FILLS', 'STROKE_COLOR']);
-});
+/* ---------- 스코프 목록(R1)·다크 테마 생성(R2) 순수 헬퍼 ---------- */
 
 test('scopesForTypeList — 타입별 유효 스코프 노출', () => {
   const color = scopesForTypeList('COLOR');
@@ -2147,25 +2176,6 @@ test('scopesForTypeList — 타입별 유효 스코프 노출', () => {
   const float = scopesForTypeList('FLOAT');
   assert.ok(float.includes('GAP'));
   assert.ok(!float.includes('TEXT_FILL'));
-});
-
-test('aliasSelfReference — 자기참조만 차단', () => {
-  assert.equal(aliasSelfReference('a', 'a'), true);
-  assert.equal(aliasSelfReference('a', 'b'), false);
-});
-
-test('findAliasReferers — varId를 별칭하는 변수 수집(자기 제외, R2-C)', () => {
-  const vars = [
-    { id: 'g1', name: 'color/blue/500', values: { m: { kind: 'literal' } } },
-    { id: 's1', name: 'primary', values: { m: { kind: 'alias', aliasId: 'g1' } } },
-    { id: 's2', name: 'surface', values: { light: { kind: 'alias', aliasId: 'g1' }, dark: { kind: 'literal' } } },
-    { id: 's3', name: 'text', values: { m: { kind: 'alias', aliasId: 'other' } } },
-  ];
-  const refs = findAliasReferers('g1', vars);
-  assert.deepEqual(refs.map((r) => r.name).sort(), ['primary', 'surface']);
-  // 어느 모드든 한 번이라도 별칭하면 1회만(중복 없음)
-  assert.equal(refs.length, 2);
-  assert.deepEqual(findAliasReferers('none', vars), []);
 });
 
 test('darkValueForLight — OKLCH 명도 반전(밝음↔어두움)', () => {

@@ -235,36 +235,196 @@ export interface TextScanResult {
   warnings: string[];
 }
 
-/** 선택 트리의 TEXT 노드에서 타이포 시그니처 수집. 부분 서식(mixed)은 스킵+경고. */
-export function scanTextStyles(nodes: readonly SceneNode[]): TextScanResult {
+/** 디자인에서 자주 쓰는 행간 %(정수). PIXELS로만 남은 값을 비율로 되돌릴 때 허용 목록. */
+const COMMON_LH_PCTS = new Set([100, 110, 120, 125, 130, 140, 150, 160, 175, 180, 200, 220, 250]);
+
+/** 노드/세그먼트 행간 → px 시그니처 + 원본 %. */
+function measureLineHeight(fontSize: number, lh: LineHeight | typeof figma.mixed): { px: number; pct: number } {
+  if (lh === figma.mixed || !lh || lh.unit === 'AUTO') return { px: 0, pct: 0 };
+  const unit = String(lh.unit).toUpperCase();
+  if (unit === 'PERCENT') {
+    return { px: roundN((fontSize * lh.value) / 100), pct: roundN(lh.value) };
+  }
+  const v = roundN(lh.value);
+  // 스타일 없는 텍스트에서 단위가 PIXELS로 떨어지고 값만 150처럼 % 숫자인 경우 보정.
+  //
+  // 판정 기준은 **그 값을 px로 읽으면 말이 되는가**다. 폰트 대비 0.8~3배면 진짜 px 행간이므로
+  // 손대지 않는다 — 96px 활자에 104px 행간 같은 큰 램프가 여기 걸려 104%(=99.84px)로 바뀌었다.
+  // (예전 검사는 `asPx = fontSize*v/100` 을 같은 배율 범위와 비교했는데, 그건 fontSize가 약분돼
+  //  `80 ≤ v ≤ 300` 이라는 항등식이라 바깥 조건에 이미 포함돼 있었다 — 아무것도 거르지 못했다.)
+  if (unit === 'PIXELS' && fontSize > 0) {
+    const pxRatio = v / fontSize; // 값을 px 행간으로 읽었을 때의 배율
+    const plausibleAsPx = pxRatio >= 0.8 && pxRatio <= 3;
+    const plausibleAsPct = v >= 100 && v <= 300; // %로 읽으면 0.8~3배가 되는 구간
+    if (!plausibleAsPx && plausibleAsPct) return { px: roundN((fontSize * v) / 100), pct: v };
+  }
+  // UI는 150%인데 API가 24(PIXELS)만 주는 경우 — 폰트 대비 정수 %가 흔한 값이면 복구.
+  // (진짜 24px 의도와 구분 불가: 텍스트 스타일 등록 맥락에선 %가 맞는 경우가 대부분.)
+  if (unit === 'PIXELS' && fontSize > 0 && v > 0) {
+    const pct = roundN((v / fontSize) * 100);
+    const back = roundN((fontSize * pct) / 100);
+    if (COMMON_LH_PCTS.has(pct) && Math.abs(back - v) <= 0.05) return { px: back, pct };
+  }
+  return { px: v, pct: 0 };
+}
+
+function measureLetterSpacing(fontSize: number, ls: LetterSpacing | typeof figma.mixed): { px: number; pct: number } {
+  if (ls === figma.mixed || !ls) return { px: 0, pct: 0 };
+  const unit = String(ls.unit).toUpperCase();
+  if (unit === 'PERCENT') {
+    return { px: roundN((fontSize * ls.value) / 100), pct: roundN(ls.value) };
+  }
+  const px = roundN(ls.value);
+  // 스타일 없는 텍스트: UI는 -2%인데 API가 -0.32px만 주는 경우.
+  //
+  // px과 %는 이 폰트 크기에서 같은 값을 가리키므로 수치로는 못 가른다. 대신 **어느 쪽으로
+  // 읽어야 사람이 적어 넣은 값처럼 보이는가**를 본다 — 손으로 넣는 자간은 0.5 단위(1px·-0.5px)이고,
+  // %가 px로 환산돼 나온 값은 -0.32처럼 어중간하다. 0.5 배수면 px 의도로 보고 손대지 않는다.
+  // (`back` 검사는 pct가 정수면 거의 항상 통과라 혼자서는 아무것도 거르지 못한다 —
+  //  20px 활자에 1px 자간이 5%로 뒤집혀 변수 바인딩까지 끊겼다.)
+  if (unit === 'PIXELS' && fontSize > 0 && px !== 0) {
+    const authoredPx = Math.abs(px * 2 - Math.round(px * 2)) < 1e-9; // 0.5 단위 = 직접 넣은 px
+    const pct = roundN((px / fontSize) * 100);
+    const back = roundN((fontSize * pct) / 100);
+    const common = pct === Math.trunc(pct) && Math.abs(pct) >= 1 && Math.abs(pct) <= 10;
+    if (!authoredPx && common && Math.abs(back - px) <= 0.011) return { px: back, pct };
+  }
+  return { px, pct: 0 };
+}
+
+/**
+ * 텍스트 노드의 균일 타이포.
+ * 지정 단위(PERCENT)는 노드 필드에 있고 getStyledTextSegments는 해석된 px만 돌려주는 경우가
+ * 있어 노드 필드를 읽는다.
+ *
+ * 부분 서식(mixed)은 null — 가장 긴 세그먼트로 대표시켜 세어 보기도 했으나, 두 적용 경로가
+ * 모두 mixed 노드를 건너뛴다(스타일을 붙이면 구간 서식이 뭉개진다). 세기만 하면 ×N 배지와
+ * '레이어 선택'이 손댈 수 없는 레이어를 가리키게 되므로 스캔도 같이 뺀다.
+ */
+function readNodeTypography(t: TextNode): {
+  fontSize: number;
+  family: string;
+  style: string;
+  lineHeight: LineHeight | typeof figma.mixed;
+  letterSpacing: LetterSpacing | typeof figma.mixed;
+} | null {
+  if (t.fontSize === figma.mixed || t.fontName === figma.mixed) return null;
+  return {
+    fontSize: t.fontSize,
+    family: t.fontName.family,
+    style: t.fontName.style,
+    lineHeight: t.lineHeight,
+    letterSpacing: t.letterSpacing,
+  };
+}
+
+/** 변수 description("150%" / "-2%")에서 % 숫자 추출. 별칭이면 Global까지 따라간다. */
+async function percentFromVariableDescription(
+  varId: string,
+  cache: Map<string, Variable | null>,
+): Promise<number | undefined> {
+  let id: string | undefined = varId;
+  const seen = new Set<string>();
+  while (id && !seen.has(id)) {
+    seen.add(id);
+    let v = cache.get(id);
+    if (v === undefined) {
+      v = await figma.variables.getVariableByIdAsync(id);
+      cache.set(id, v);
+    }
+    if (!v) return undefined;
+    const desc = (v.description ?? '').trim();
+    const m = /^(-?\d+(?:\.\d+)?)%$/.exec(desc);
+    if (m) return roundN(Number(m[1]));
+    const modeIds = Object.keys(v.valuesByMode);
+    const raw = modeIds.length ? v.valuesByMode[modeIds[0]] : undefined;
+    if (raw && typeof raw === 'object' && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+      id = (raw as VariableAlias).id;
+      continue;
+    }
+    return undefined;
+  }
+  return undefined;
+}
+
+/** 노드에 행간/자간 변수가 묶여 있으면(해석값은 px) description의 %를 복구. */
+async function percentFromNodeBinding(
+  t: TextNode,
+  field: 'lineHeight' | 'letterSpacing',
+  cache: Map<string, Variable | null>,
+): Promise<number | undefined> {
+  const entry = t.boundVariables?.[field];
+  if (!entry) return undefined;
+  const alias = Array.isArray(entry) ? entry[0] : entry;
+  if (!alias?.id) return undefined;
+  return percentFromVariableDescription(alias.id, cache);
+}
+
+/** 선택 트리의 TEXT 노드에서 타이포 시그니처 수집. 부분 서식(mixed)은 스킵+경고.
+   단위 우선순위: (1) 노드 지정 % (2) 묶인 변수의 description % (3) 텍스트 스타일 정의 % (4) px. */
+export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextScanResult> {
   const texts: TextNode[] = [];
   for (const n of nodes) walkText(n, texts);
   const samples: TextSample[] = [];
   const warnings = new Set<string>();
+  const styleCache = new Map<string, TextStyle | null>();
+  const varCache = new Map<string, Variable | null>();
+  const styleOf = async (id: string): Promise<TextStyle | null> => {
+    if (styleCache.has(id)) return styleCache.get(id) ?? null;
+    const raw = await figma.getStyleByIdAsync(id);
+    const st = raw && raw.type === 'TEXT' ? (raw as TextStyle) : null;
+    styleCache.set(id, st);
+    return st;
+  };
   for (const t of texts) {
-    if (t.fontSize === figma.mixed || t.fontName === figma.mixed) {
+    const typo = readNodeTypography(t);
+    if (!typo) {
       warnings.add('부분 서식(혼합) 텍스트는 스킵했습니다.');
       continue;
     }
-    const fontSize = roundN(t.fontSize);
-    const { family, style } = t.fontName;
-    let lineHeight = 0;
-    let lineHeightPercent = 0; // 원본이 %일 때만(등록 단위 결정용). 시그니처는 계속 px.
-    const lh = t.lineHeight;
-    if (lh !== figma.mixed && lh.unit !== 'AUTO') {
-      lineHeight = lh.unit === 'PERCENT' ? roundN((fontSize * lh.value) / 100) : roundN(lh.value);
-      if (lh.unit === 'PERCENT') lineHeightPercent = roundN(lh.value);
+    const fontSize = roundN(typo.fontSize);
+    const { family, style } = { family: typo.family, style: typo.style };
+    const lhMeas = measureLineHeight(fontSize, typo.lineHeight);
+    let lineHeight = lhMeas.px;
+    let lineHeightPercent = lhMeas.pct;
+    const lsMeas = measureLetterSpacing(fontSize, typo.letterSpacing);
+    let letterSpacing = lsMeas.px;
+    let letterSpacingPercent = lsMeas.pct;
+
+    // 변수 바인딩 → 해석 px만 남는 경우 description("%")으로 복구(스타일 없는 텍스트 포함).
+    if (lineHeightPercent === 0) {
+      const fromVar = await percentFromNodeBinding(t, 'lineHeight', varCache);
+      if (fromVar !== undefined && fromVar > 0) {
+        lineHeightPercent = fromVar;
+        lineHeight = roundN((fontSize * fromVar) / 100);
+      }
     }
-    let letterSpacing = 0;
-    let letterSpacingPercent = 0; // 원본이 %일 때만(등록 단위 결정용). 시그니처는 계속 px.
-    const ls = t.letterSpacing;
-    if (ls !== figma.mixed) {
-      letterSpacing = ls.unit === 'PERCENT' ? roundN((fontSize * ls.value) / 100) : roundN(ls.value);
-      if (ls.unit === 'PERCENT') letterSpacingPercent = roundN(ls.value);
+    if (letterSpacingPercent === 0) {
+      const fromVar = await percentFromNodeBinding(t, 'letterSpacing', varCache);
+      if (fromVar !== undefined && fromVar !== 0) {
+        letterSpacingPercent = fromVar;
+        letterSpacing = roundN((fontSize * fromVar) / 100);
+      }
     }
+
     // 이미 바인딩된 로컬 텍스트 스타일 id(혼합/없음=''). 재스캔 rename 앵커로 군집에 전달.
     const sid = t.textStyleId;
     const styleId = sid === figma.mixed ? '' : sid;
+    if (styleId) {
+      const st = await styleOf(styleId);
+      if (st) {
+        const stLh = measureLineHeight(fontSize, st.lineHeight);
+        const stLs = measureLetterSpacing(fontSize, st.letterSpacing);
+        if (lineHeightPercent === 0 && stLh.pct > 0) {
+          lineHeightPercent = stLh.pct;
+          lineHeight = stLh.px;
+        }
+        if (letterSpacingPercent === 0 && stLs.pct !== 0) {
+          letterSpacingPercent = stLs.pct;
+          letterSpacing = stLs.px;
+        }
+      }
+    }
     let characters = '';
     try { characters = t.characters; } catch { characters = ''; }
     // HORIZONTAL 부모 = 행. 안쪽 H 행 단위 라벨 짝짓기용.
@@ -309,11 +469,13 @@ function lsPctOf(ls: LetterSpacing | typeof figma.mixed): number {
   return roundN(ls.value);
 }
 
-/** 로컬 텍스트 스타일 → 시그니처 매칭용 목록(행간·자간 px 환산). 스캔 후보의 '이미 등록' 인식에 사용. */
+/** 로컬 텍스트 스타일 → 시그니처 매칭용 목록(행간·자간 px 환산 + 원본 %). 스캔 후보의 '이미 등록' 인식에 사용. */
 export async function scanExistingTextStyles(): Promise<ExistingTextStyle[]> {
   const out: ExistingTextStyle[] = [];
   for (const s of await figma.getLocalTextStylesAsync()) {
     const fontSize = roundN(s.fontSize);
+    const lineHeightPercent = lhPctOf(s.lineHeight);
+    const letterSpacingPercent = lsPctOf(s.letterSpacing);
     out.push({
       id: s.id,
       name: s.name,
@@ -322,6 +484,8 @@ export async function scanExistingTextStyles(): Promise<ExistingTextStyle[]> {
       letterSpacing: lsPxOf(fontSize, s.letterSpacing),
       family: s.fontName.family,
       style: s.fontName.style,
+      ...(lineHeightPercent ? { lineHeightPercent } : {}),
+      ...(letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}),
     });
   }
   return out;
@@ -513,7 +677,10 @@ export async function createSemanticTextStyles(
       styleByName.delete(style.name); // 옛 이름 인덱스 제거 — 이후 동명 행이 rename된 스타일을 가로채지 않도록.
       style.name = spec.name; // 신규=이름 지정 / 바인딩=rename
     }
-    // 신규·수동 행만 정보 기록. rename은 정보를 건드리지 않으므로 폰트 로드도 불필요(미설치 폰트여도 안전).
+    // 신규·수동 행: 타이포 전체 기록. rename: 이름만 바꾸되, 스캔이 %를 실어 오면
+    // 예전에 px(+변수)로 굳은 스타일을 %로 교정한다(바인딩은 px 강제 → 반드시 해제).
+    const lhPct = spec.lineHeightPercent ?? 0;
+    const lsPct = spec.letterSpacingPercent ?? 0;
     if (!isRename) {
       const wanted: FontName = { family: spec.family, style: spec.style };
       let loaded: FontName;
@@ -533,21 +700,33 @@ export async function createSemanticTextStyles(
       }
       style.fontName = loaded;
       style.fontSize = spec.fontSize;
-      // 원본이 %면 %로 등록한다(스캔에서 실어 온 값). 순서 주의: lineHeight를 나중에 대입하면
-      // 아래에서 건 바인딩이 조용히 풀린다 — 반드시 값 먼저, 바인딩 나중.
-      const pct = spec.lineHeightPercent ?? 0;
+      // 순서 주의: 값을 먼저 쓰고 바인딩은 나중 — 나중에 대입하면 바인딩이 풀린다.
       style.lineHeight =
         spec.lineHeight > 0
-          ? pct > 0
-            ? { value: pct, unit: 'PERCENT' }
+          ? lhPct > 0
+            ? { value: lhPct, unit: 'PERCENT' }
             : { value: spec.lineHeight, unit: 'PIXELS' }
           : { unit: 'AUTO' };
       // 원본이 %면 %로 등록(음수 가능). 0도 기록해 잔여 자간을 클리어한다.
-      const lsPct = spec.letterSpacingPercent ?? 0;
       style.letterSpacing =
         lsPct !== 0
           ? { value: lsPct, unit: 'PERCENT' }
           : { value: spec.letterSpacing, unit: 'PIXELS' };
+    } else if (lhPct > 0 || lsPct !== 0) {
+      // rename인데 스캔 %가 있으면 단위만 교정(폰트·크기는 기존 유지).
+      //
+      // 단, **이미 변수가 묶여 있으면 손대지 않는다**. 그 연결은 사용자가(또는 이 플러그인이
+      // 지난 실행에서) 만든 명시적 사실이고, %는 px 값을 보고 세운 추측이다. 추측이 사실을
+      // 지우면 되돌릴 방법이 없다 — 값을 안 바꾼 재스캔·재등록만으로 디자인 시스템 연결이
+      // 끊기던 자리다. 바인딩이 없을 때만 단위를 교정한다.
+      if (lhPct > 0) {
+        if (style.boundVariables?.lineHeight) res.notes.push(`${spec.name}: 행간 변수 연결을 지켰습니다 — ${lhPct}% 교정 보류`);
+        else style.lineHeight = { value: lhPct, unit: 'PERCENT' };
+      }
+      if (lsPct !== 0) {
+        if (style.boundVariables?.letterSpacing) res.notes.push(`${spec.name}: 자간 변수 연결을 지켰습니다 — ${lsPct}% 교정 보류`);
+        else style.letterSpacing = { value: lsPct, unit: 'PERCENT' };
+      }
     }
 
     const bindRole = style.name; // rename 후 실제 이름(충돌 스킵은 위에서 continue)
@@ -557,11 +736,13 @@ export async function createSemanticTextStyles(
       res.bound++;
     } else res.missing.push(`font-size/${bindRole}`);
     if (spec.lineHeight > 0 || isRename) {
-      // 지금 스타일에 들어 있는 단위가 기준 — 신규는 방금 쓴 값, rename은 원래 스타일 값.
+      // 지금 스타일에 들어 있는 단위가 기준 — 신규는 방금 쓴 값, rename은 교정 후 값.
       // Figma는 행간에 변수를 바인딩하면 단위를 PIXELS로 강제한다(실측). %를 지키려면 바인딩을 포기해야 하고,
       // 반대로 여기서 바인딩하면 사용자가 %로 만들어 둔 기존 스타일이 px로 뭉개진다.
       const pctNow = lhPctOf(style.lineHeight);
       if (pctNow > 0) {
+        // 예전에 묶여 있던 px 변수가 남아 있으면 다시 풀린다(rename 교정 경로와 동일).
+        if (style.boundVariables?.lineHeight) style.setBoundVariable('lineHeight', null);
         res.notes.push(`${bindRole}: 행간 ${pctNow}% 유지 — 변수 바인딩 생략`);
       } else {
         // rename은 스펙 lineHeight가 스캔값일 수 있어, 스타일에 바인딩할 시맨틱은 역할명 기준.
@@ -577,6 +758,7 @@ export async function createSemanticTextStyles(
       // Figma는 자간 변수 바인딩도 PIXELS로 강제한다(행간과 동일). %를 지키려면 바인딩 생략.
       const lsPctNow = lsPctOf(style.letterSpacing);
       if (lsPctNow !== 0) {
+        if (style.boundVariables?.letterSpacing) style.setBoundVariable('letterSpacing', null);
         res.notes.push(`${bindRole}: 자간 ${lsPctNow}% 유지 — 변수 바인딩 생략`);
       } else {
         const lsVar = semByName.get(`letter-spacing/${bindRole}`);

@@ -65,9 +65,20 @@ export interface BindResult {
   candidates?: BindCandidate[];
   /** #13: dry-run일 때만 — 미리보기 트리 맥락(영향 노드 + 조상 체인). */
   nodes?: BindNode[];
-  /** dry-run일 때만 — 사유별로 건너뛴 레이어(노드×사유 중복 제거). */
+  /** dry-run일 때만 — 사유별로 건너뛴 레이어(노드×사유 중복 제거, SKIP_PREVIEW_CAP까지). */
   skips?: BindSkip[];
+  /** dry-run일 때만 — 상한 적용 전 실제 스킵 레이어 수(잘렸는지 알리려고). */
+  skipTotal?: number;
 }
+
+/**
+ * 미리보기에 실어 보낼 스킵 레이어 상한.
+ * 스킵은 노드마다 나므로(오토레이아웃 없음·매칭 없음…) 3천 레이어를 고르면 매칭이 20건이어도
+ * 스킵이 수천 건 — 메시지도 트리도 '고른 것'에 비례해 부풀고 후보가 그 아래 묻힌다.
+ * 사유별 총계(res.reasons)는 상한과 무관하게 전부 세므로 칩의 숫자는 진짜 수다.
+ * 칩의 '레이어 선택'도 code 쪽 SELECT_CAP과 같은 200에서 잘리니 수를 맞춘다.
+ */
+const SKIP_PREVIEW_CAP = 200;
 
 /** dry-run 미리보기 수집물(apply 시에는 null). */
 interface Preview {
@@ -90,12 +101,17 @@ function addStrCand(preview: Preview | null, node: SceneNode, field: string, val
   preview?.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
 }
 
-/** 미리보기 트리를 영향 노드 + 그 조상 체인으로 가지치기(pre-order 보존). */
-function pruneToAffected(nodeIndex: BindNode[], candidates: BindCandidate[]): BindNode[] {
+/**
+ * 미리보기 트리를 영향 노드 + 그 조상 체인으로 가지치기(pre-order 보존).
+ * 건너뛴 레이어도 남긴다 — 미리보기에서 "왜 이건 안 붙었나"를 목록 자리에서 답해야 한다.
+ * 단 `skips`는 이미 SKIP_PREVIEW_CAP으로 잘린 목록이라 트리도 그만큼에서 멈춘다.
+ */
+function pruneToAffected(nodeIndex: BindNode[], candidates: BindCandidate[], skips: BindSkip[]): BindNode[] {
   const byId = new Map(nodeIndex.map((n) => [n.id, n]));
-  const keep = new Set<string>(candidates.map((c) => c.nodeId));
-  for (const c of candidates) {
-    let p = byId.get(c.nodeId)?.parentId ?? null;
+  const seeds = [...candidates.map((c) => c.nodeId), ...skips.map((s) => s.nodeId)];
+  const keep = new Set<string>(seeds);
+  for (const id of seeds) {
+    let p = byId.get(id)?.parentId ?? null;
     while (p && !keep.has(p)) {
       keep.add(p);
       p = byId.get(p)?.parentId ?? null;
@@ -185,8 +201,11 @@ export async function bindSelection(
   res.flags = [...flagSet];
   if (preview) {
     res.candidates = preview.candidates;
-    res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates);
-    res.skips = preview.skips;
+    // 트리 씨앗도 잘린 목록으로 — 트리 크기가 '고른 레이어 수'가 아니라 '보낼 스킵 수'에 묶인다.
+    const skips = preview.skips.slice(0, SKIP_PREVIEW_CAP);
+    res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates, skips);
+    res.skips = skips;
+    res.skipTotal = preview.skips.length;
   }
   hooks.onProgress?.(prog.done, prog.total); // 최종 진행률(100%)
   return res;

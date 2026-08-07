@@ -193,15 +193,12 @@
     if (paints3 === figma.mixed || !Array.isArray(paints3)) return;
     for (const p of paints3) {
       if (p.visible === false) continue;
-      if (p.type === "SOLID") {
-        const hex = rgbToHex(p.color);
-        add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source, nodeId);
-        if (p.opacity != null && p.opacity < 1) {
-          const o = round(p.opacity);
-          add(acc, { name: numberTokenName("opacity", o), category: "opacity", value: o }, "opacity", node.id);
-        }
-      } else if (p.type.startsWith("GRADIENT") || p.type === "IMAGE" || p.type === "VIDEO") {
-        acc.warnings.add("\uADF8\uB77C\uB514\uC5B8\uD2B8/\uC774\uBBF8\uC9C0 \uCC44\uC6C0\uC740 \uBCC0\uC218 \uBC14\uC778\uB529 \uBD88\uAC00 \u2014 \uC2A4\uD0B5\uD588\uC2B5\uB2C8\uB2E4.");
+      if (p.type !== "SOLID") continue;
+      const hex = rgbToHex(p.color);
+      add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source, nodeId);
+      if (p.opacity != null && p.opacity < 1) {
+        const o = round(p.opacity);
+        add(acc, { name: numberTokenName("opacity", o), category: "opacity", value: o }, "opacity", node.id);
       }
     }
   }
@@ -327,10 +324,7 @@
     }
   }
   function walk(acc, node) {
-    if (node.visible === false) {
-      acc.warnings.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD1A0\uD070 \uD6C4\uBCF4\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
-      return;
-    }
+    if (node.visible === false) return;
     if ("fills" in node) collectPaints(acc, node, node.fills, "fill");
     if ("strokes" in node) collectPaints(acc, node, node.strokes, "stroke");
     if (node.type === "TEXT") collectText(acc, node);
@@ -342,10 +336,7 @@
     collectStroke(acc, node);
     collectOpacity(acc, node);
     collectEffects(acc, node);
-    if (node.type === "INSTANCE") {
-      if (node.children.length) acc.warnings.add("\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uB9C8\uC2A4\uD130 \uBCF5\uC0AC\uBCF8\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uAC12\uC774 \uD544\uC694\uD558\uBA74 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC120\uD0DD\uD574 \uCD94\uCD9C\uD558\uC138\uC694.");
-      return;
-    }
+    if (node.type === "INSTANCE") return;
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
   function isEffectivelyVisible(node) {
@@ -359,10 +350,7 @@
   function extractFromSelection(selection2) {
     const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map() };
     for (const node of selection2) {
-      if (!isEffectivelyVisible(node)) {
-        acc.warnings.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD1A0\uD070 \uD6C4\uBCF4\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
-        continue;
-      }
+      if (!isEffectivelyVisible(node)) continue;
       walk(acc, node);
     }
     const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -641,34 +629,146 @@
     if (node.type === "TEXT") out.push(node);
     else if ("children" in node) for (const c of node.children) walkText(c, out);
   }
-  function scanTextStyles(nodes) {
+  var COMMON_LH_PCTS = /* @__PURE__ */ new Set([100, 110, 120, 125, 130, 140, 150, 160, 175, 180, 200, 220, 250]);
+  function measureLineHeight(fontSize, lh) {
+    if (lh === figma.mixed || !lh || lh.unit === "AUTO") return { px: 0, pct: 0 };
+    const unit = String(lh.unit).toUpperCase();
+    if (unit === "PERCENT") {
+      return { px: roundN(fontSize * lh.value / 100), pct: roundN(lh.value) };
+    }
+    const v = roundN(lh.value);
+    if (unit === "PIXELS" && fontSize > 0) {
+      const pxRatio = v / fontSize;
+      const plausibleAsPx = pxRatio >= 0.8 && pxRatio <= 3;
+      const plausibleAsPct = v >= 100 && v <= 300;
+      if (!plausibleAsPx && plausibleAsPct) return { px: roundN(fontSize * v / 100), pct: v };
+    }
+    if (unit === "PIXELS" && fontSize > 0 && v > 0) {
+      const pct = roundN(v / fontSize * 100);
+      const back = roundN(fontSize * pct / 100);
+      if (COMMON_LH_PCTS.has(pct) && Math.abs(back - v) <= 0.05) return { px: back, pct };
+    }
+    return { px: v, pct: 0 };
+  }
+  function measureLetterSpacing(fontSize, ls) {
+    if (ls === figma.mixed || !ls) return { px: 0, pct: 0 };
+    const unit = String(ls.unit).toUpperCase();
+    if (unit === "PERCENT") {
+      return { px: roundN(fontSize * ls.value / 100), pct: roundN(ls.value) };
+    }
+    const px = roundN(ls.value);
+    if (unit === "PIXELS" && fontSize > 0 && px !== 0) {
+      const authoredPx = Math.abs(px * 2 - Math.round(px * 2)) < 1e-9;
+      const pct = roundN(px / fontSize * 100);
+      const back = roundN(fontSize * pct / 100);
+      const common = pct === Math.trunc(pct) && Math.abs(pct) >= 1 && Math.abs(pct) <= 10;
+      if (!authoredPx && common && Math.abs(back - px) <= 0.011) return { px: back, pct };
+    }
+    return { px, pct: 0 };
+  }
+  function readNodeTypography(t) {
+    if (t.fontSize === figma.mixed || t.fontName === figma.mixed) return null;
+    return {
+      fontSize: t.fontSize,
+      family: t.fontName.family,
+      style: t.fontName.style,
+      lineHeight: t.lineHeight,
+      letterSpacing: t.letterSpacing
+    };
+  }
+  async function percentFromVariableDescription(varId, cache2) {
+    var _a;
+    let id = varId;
+    const seen = /* @__PURE__ */ new Set();
+    while (id && !seen.has(id)) {
+      seen.add(id);
+      let v = cache2.get(id);
+      if (v === void 0) {
+        v = await figma.variables.getVariableByIdAsync(id);
+        cache2.set(id, v);
+      }
+      if (!v) return void 0;
+      const desc = ((_a = v.description) != null ? _a : "").trim();
+      const m = /^(-?\d+(?:\.\d+)?)%$/.exec(desc);
+      if (m) return roundN(Number(m[1]));
+      const modeIds = Object.keys(v.valuesByMode);
+      const raw = modeIds.length ? v.valuesByMode[modeIds[0]] : void 0;
+      if (raw && typeof raw === "object" && raw.type === "VARIABLE_ALIAS") {
+        id = raw.id;
+        continue;
+      }
+      return void 0;
+    }
+    return void 0;
+  }
+  async function percentFromNodeBinding(t, field, cache2) {
+    var _a;
+    const entry = (_a = t.boundVariables) == null ? void 0 : _a[field];
+    if (!entry) return void 0;
+    const alias = Array.isArray(entry) ? entry[0] : entry;
+    if (!(alias == null ? void 0 : alias.id)) return void 0;
+    return percentFromVariableDescription(alias.id, cache2);
+  }
+  async function scanTextStyles(nodes) {
     const texts = [];
     for (const n of nodes) walkText(n, texts);
     const samples = [];
     const warnings = /* @__PURE__ */ new Set();
+    const styleCache = /* @__PURE__ */ new Map();
+    const varCache = /* @__PURE__ */ new Map();
+    const styleOf = async (id) => {
+      var _a;
+      if (styleCache.has(id)) return (_a = styleCache.get(id)) != null ? _a : null;
+      const raw = await figma.getStyleByIdAsync(id);
+      const st = raw && raw.type === "TEXT" ? raw : null;
+      styleCache.set(id, st);
+      return st;
+    };
     for (const t of texts) {
-      if (t.fontSize === figma.mixed || t.fontName === figma.mixed) {
+      const typo = readNodeTypography(t);
+      if (!typo) {
         warnings.add("\uBD80\uBD84 \uC11C\uC2DD(\uD63C\uD569) \uD14D\uC2A4\uD2B8\uB294 \uC2A4\uD0B5\uD588\uC2B5\uB2C8\uB2E4.");
         continue;
       }
-      const fontSize = roundN(t.fontSize);
-      const { family, style } = t.fontName;
-      let lineHeight = 0;
-      let lineHeightPercent = 0;
-      const lh = t.lineHeight;
-      if (lh !== figma.mixed && lh.unit !== "AUTO") {
-        lineHeight = lh.unit === "PERCENT" ? roundN(fontSize * lh.value / 100) : roundN(lh.value);
-        if (lh.unit === "PERCENT") lineHeightPercent = roundN(lh.value);
+      const fontSize = roundN(typo.fontSize);
+      const { family, style } = { family: typo.family, style: typo.style };
+      const lhMeas = measureLineHeight(fontSize, typo.lineHeight);
+      let lineHeight = lhMeas.px;
+      let lineHeightPercent = lhMeas.pct;
+      const lsMeas = measureLetterSpacing(fontSize, typo.letterSpacing);
+      let letterSpacing = lsMeas.px;
+      let letterSpacingPercent = lsMeas.pct;
+      if (lineHeightPercent === 0) {
+        const fromVar = await percentFromNodeBinding(t, "lineHeight", varCache);
+        if (fromVar !== void 0 && fromVar > 0) {
+          lineHeightPercent = fromVar;
+          lineHeight = roundN(fontSize * fromVar / 100);
+        }
       }
-      let letterSpacing = 0;
-      let letterSpacingPercent = 0;
-      const ls = t.letterSpacing;
-      if (ls !== figma.mixed) {
-        letterSpacing = ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
-        if (ls.unit === "PERCENT") letterSpacingPercent = roundN(ls.value);
+      if (letterSpacingPercent === 0) {
+        const fromVar = await percentFromNodeBinding(t, "letterSpacing", varCache);
+        if (fromVar !== void 0 && fromVar !== 0) {
+          letterSpacingPercent = fromVar;
+          letterSpacing = roundN(fontSize * fromVar / 100);
+        }
       }
       const sid = t.textStyleId;
       const styleId = sid === figma.mixed ? "" : sid;
+      if (styleId) {
+        const st = await styleOf(styleId);
+        if (st) {
+          const stLh = measureLineHeight(fontSize, st.lineHeight);
+          const stLs = measureLetterSpacing(fontSize, st.letterSpacing);
+          if (lineHeightPercent === 0 && stLh.pct > 0) {
+            lineHeightPercent = stLh.pct;
+            lineHeight = stLh.px;
+          }
+          if (letterSpacingPercent === 0 && stLs.pct !== 0) {
+            letterSpacingPercent = stLs.pct;
+            letterSpacing = stLs.px;
+          }
+        }
+      }
       let characters = "";
       try {
         characters = t.characters;
@@ -721,7 +821,9 @@
     const out = [];
     for (const s of await figma.getLocalTextStylesAsync()) {
       const fontSize = roundN(s.fontSize);
-      out.push({
+      const lineHeightPercent = lhPctOf(s.lineHeight);
+      const letterSpacingPercent = lsPctOf(s.letterSpacing);
+      out.push(__spreadValues(__spreadValues({
         id: s.id,
         name: s.name,
         fontSize,
@@ -729,12 +831,12 @@
         letterSpacing: lsPxOf(fontSize, s.letterSpacing),
         family: s.fontName.family,
         style: s.fontName.style
-      });
+      }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}));
     }
     return out;
   }
   async function createSemanticTextStyles(specs, apply, nodes) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
     if (!specs.length) return res;
     const existing = await figma.getLocalTextStylesAsync();
@@ -870,6 +972,8 @@
         styleByName.delete(style.name);
         style.name = spec.name;
       }
+      const lhPct = (_f = spec.lineHeightPercent) != null ? _f : 0;
+      const lsPct = (_g = spec.letterSpacingPercent) != null ? _g : 0;
       if (!isRename) {
         const wanted = { family: spec.family, style: spec.style };
         let loaded;
@@ -889,10 +993,17 @@
         }
         style.fontName = loaded;
         style.fontSize = spec.fontSize;
-        const pct = (_f = spec.lineHeightPercent) != null ? _f : 0;
-        style.lineHeight = spec.lineHeight > 0 ? pct > 0 ? { value: pct, unit: "PERCENT" } : { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
-        const lsPct = (_g = spec.letterSpacingPercent) != null ? _g : 0;
+        style.lineHeight = spec.lineHeight > 0 ? lhPct > 0 ? { value: lhPct, unit: "PERCENT" } : { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
         style.letterSpacing = lsPct !== 0 ? { value: lsPct, unit: "PERCENT" } : { value: spec.letterSpacing, unit: "PIXELS" };
+      } else if (lhPct > 0 || lsPct !== 0) {
+        if (lhPct > 0) {
+          if ((_h = style.boundVariables) == null ? void 0 : _h.lineHeight) res.notes.push(`${spec.name}: \uD589\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC2B5\uB2C8\uB2E4 \u2014 ${lhPct}% \uAD50\uC815 \uBCF4\uB958`);
+          else style.lineHeight = { value: lhPct, unit: "PERCENT" };
+        }
+        if (lsPct !== 0) {
+          if ((_i = style.boundVariables) == null ? void 0 : _i.letterSpacing) res.notes.push(`${spec.name}: \uC790\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC2B5\uB2C8\uB2E4 \u2014 ${lsPct}% \uAD50\uC815 \uBCF4\uB958`);
+          else style.letterSpacing = { value: lsPct, unit: "PERCENT" };
+        }
       }
       const bindRole = style.name;
       const fsVar = semByName.get(`font-size/${bindRole}`);
@@ -903,6 +1014,7 @@
       if (spec.lineHeight > 0 || isRename) {
         const pctNow = lhPctOf(style.lineHeight);
         if (pctNow > 0) {
+          if ((_j = style.boundVariables) == null ? void 0 : _j.lineHeight) style.setBoundVariable("lineHeight", null);
           res.notes.push(`${bindRole}: \uD589\uAC04 ${pctNow}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uBC14\uC778\uB529 \uC0DD\uB7B5`);
         } else {
           const lhVar = semByName.get(`line-height/${bindRole}`);
@@ -915,6 +1027,7 @@
       if (spec.letterSpacing !== 0 || isRename) {
         const lsPctNow = lsPctOf(style.letterSpacing);
         if (lsPctNow !== 0) {
+          if ((_k = style.boundVariables) == null ? void 0 : _k.letterSpacing) style.setBoundVariable("letterSpacing", null);
           res.notes.push(`${bindRole}: \uC790\uAC04 ${lsPctNow}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uBC14\uC778\uB529 \uC0DD\uB7B5`);
         } else {
           const lsVar = semByName.get(`letter-spacing/${bindRole}`);
@@ -1036,10 +1149,12 @@
           style: s.style,
           count: 1,
           sample: s.layerName,
+          nodeIds: [],
           styleIds: []
         });
         ids.set(k, /* @__PURE__ */ new Set());
       }
+      if (s.id) map.get(k).nodeIds.push(s.id);
       if (s.styleId) ids.get(k).add(s.styleId);
     }
     for (const [k, c] of map) c.styleIds = [...ids.get(k)];
@@ -1047,7 +1162,7 @@
   }
   var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   function nameTextStyles(clusters, existing) {
-    var _a;
+    var _a, _b, _c;
     const nameById = /* @__PURE__ */ new Map();
     const sigById = /* @__PURE__ */ new Map();
     const idBySig = /* @__PURE__ */ new Map();
@@ -1057,6 +1172,7 @@
       sigById.set(e.id, k);
       idBySig.set(k, idBySig.has(k) ? null : e.id);
     }
+    const existingById = new Map((existing != null ? existing : []).map((e) => [e.id, e]));
     const boundIdOf = (c) => {
       if (!existing) return void 0;
       if (c.styleIds.length === 1) {
@@ -1093,14 +1209,19 @@
       for (const c of group) {
         const boundId = boundIdOf(c);
         const name = boundId ? nameById.get(boundId) : unique(group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`);
-        specs.push(__spreadValues(__spreadValues(__spreadValues({
+        const ex = boundId ? existingById.get(boundId) : void 0;
+        const lineHeightPercent = c.lineHeightPercent || (ex == null ? void 0 : ex.lineHeightPercent) || 0;
+        const letterSpacingPercent = ((_a = c.letterSpacingPercent) != null ? _a : 0) !== 0 ? c.letterSpacingPercent : (_b = ex == null ? void 0 : ex.letterSpacingPercent) != null ? _b : 0;
+        specs.push(__spreadValues(__spreadProps(__spreadValues(__spreadValues(__spreadValues({
           name,
           fontSize: c.fontSize,
           lineHeight: c.lineHeight,
           letterSpacing: c.letterSpacing,
           family: c.family,
           style: c.style
-        }, c.lineHeightPercent ? { lineHeightPercent: c.lineHeightPercent } : {}), ((_a = c.letterSpacingPercent) != null ? _a : 0) !== 0 ? { letterSpacingPercent: c.letterSpacingPercent } : {}), boundId ? { boundStyleId: boundId } : {}));
+        }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}), boundId ? { boundStyleId: boundId } : {}), {
+          count: c.count
+        }), ((_c = c.nodeIds) == null ? void 0 : _c.length) ? { nodeIds: c.nodeIds } : {}));
       }
     }
     return specs;
@@ -1241,6 +1362,7 @@
     opacity: "OPACITY"
   };
   var OPACITY_TOL = 5e-3;
+  var SKIP_PREVIEW_CAP = 200;
   function addColorCand(preview, node, field, index, hex, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
   }
@@ -1250,12 +1372,13 @@
   function addStrCand(preview, node, field, value, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
   }
-  function pruneToAffected(nodeIndex, candidates) {
+  function pruneToAffected(nodeIndex, candidates, skips) {
     var _a, _b, _c, _d;
     const byId = new Map(nodeIndex.map((n) => [n.id, n]));
-    const keep = new Set(candidates.map((c) => c.nodeId));
-    for (const c of candidates) {
-      let p = (_b = (_a = byId.get(c.nodeId)) == null ? void 0 : _a.parentId) != null ? _b : null;
+    const seeds = [...candidates.map((c) => c.nodeId), ...skips.map((s) => s.nodeId)];
+    const keep = new Set(seeds);
+    for (const id of seeds) {
+      let p = (_b = (_a = byId.get(id)) == null ? void 0 : _a.parentId) != null ? _b : null;
       while (p && !keep.has(p)) {
         keep.add(p);
         p = (_d = (_c = byId.get(p)) == null ? void 0 : _c.parentId) != null ? _d : null;
@@ -1315,8 +1438,10 @@
     res.flags = [...flagSet];
     if (preview) {
       res.candidates = preview.candidates;
-      res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates);
-      res.skips = preview.skips;
+      const skips = preview.skips.slice(0, SKIP_PREVIEW_CAP);
+      res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates, skips);
+      res.skips = skips;
+      res.skipTotal = preview.skips.length;
     }
     (_a = hooks.onProgress) == null ? void 0 : _a.call(hooks, prog.done, prog.total);
     return res;
@@ -1841,7 +1966,7 @@
         if (opts.apply && decided.role) writeRole(node, decided.role);
         contextForChildren = decided.passthrough ? ancestorName : decided.name;
       }
-      col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
+      col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role });
       if ("children" in node && !isSkippedSubtree(node)) {
         const childDims = decided.passthrough ? parentDims : dims(node);
         await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_c = decided.role) != null ? _c : null, childDims);
@@ -1850,13 +1975,13 @@
   }
   async function decide(node, ancestorName, pos, opts, parentRole) {
     var _a;
-    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true };
-    if (node.type === "TEXT") return { skip: true };
-    if (node.type === "INSTANCE") return { skip: true };
-    if (node.locked) return { skip: true };
+    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true, keep: "component" };
+    if (node.type === "TEXT") return { skip: true, keep: "text" };
+    if (node.type === "INSTANCE") return { skip: true, keep: "instance" };
+    if (node.locked) return { skip: true, keep: "locked" };
     if (pos.depth === 0 && isContainerType(node)) {
       const hc = highConfidenceRole(node);
-      if (!hc) return { skip: true };
+      if (!hc) return { skip: true, keep: "root" };
       let hcScope = ancestorName ? pickScope(ancestorName) : null;
       if (hcScope === hc) hcScope = null;
       return { skip: false, role: hc, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }) };
@@ -3569,10 +3694,11 @@
     const prefix = commonPrefixTokens(members.map((m) => m.name));
     return prefix.length ? pascalCase(prefix.join("-")) : commonBaseName(members.map((m) => m.name));
   }
-  function resolveGroupNames(groups) {
+  function resolveGroupNames(groups, existing = []) {
     const base = groups.map(componentBaseName);
-    const collides = new Set(base.filter((n, i) => base.indexOf(n) !== i));
-    const taken = /* @__PURE__ */ new Set();
+    const existingSet = new Set(existing);
+    const collides = new Set(base.filter((n, i) => base.indexOf(n) !== i || existingSet.has(n)));
+    const taken = new Set(existing);
     return base.map((n, i) => {
       let name = collides.has(n) ? contextualName(groups[i]) : n;
       if (taken.has(name)) {
@@ -3871,25 +3997,67 @@
   }
 
   // src/lib/themeApply.ts
+  var DARK_MODE_NAME = "Dark";
   function isVariableAlias(raw) {
     return !!raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS";
   }
+  function findModeByName(modes, name) {
+    const key = name.toLowerCase();
+    return modes.find((m) => m.name.toLowerCase() === key);
+  }
+  function ensureDarkMode(collection) {
+    const existing = findModeByName(collection.modes, DARK_MODE_NAME);
+    if (existing) return { modeId: existing.modeId, created: false };
+    const modeId = collection.addMode(DARK_MODE_NAME);
+    return { modeId, created: true };
+  }
   async function generateDarkMode(collectionId, fromModeId, toModeId) {
-    var _a;
+    var _a, _b, _c;
     let created = 0;
     let realiased = 0;
     let skipped = 0;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const semanticCol = cols.find((c) => c.id === collectionId);
-    if (!semanticCol) return { created, realiased, skipped };
-    const globalCol = (_a = cols.find((c) => c.name === GLOBAL)) != null ? _a : figma.variables.createVariableCollection(GLOBAL);
+    if (!semanticCol) return { created, realiased, skipped, error: "\uCEEC\uB809\uC158\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694." };
+    let modeCreated = false;
+    let to = toModeId;
+    if (!to) {
+      try {
+        const ensured = ensureDarkMode(semanticCol);
+        to = ensured.modeId;
+        modeCreated = ensured.created;
+      } catch (e) {
+        const why = e instanceof Error ? e.message : String(e);
+        return {
+          created: 0,
+          realiased: 0,
+          skipped: 0,
+          error: `Dark \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${why || "\uD50C\uB79C\uC5D0\uC11C \uBAA8\uB4DC\uB97C \uB354 \uB9CC\uB4E4 \uC218 \uC5C6\uC744 \uC218 \uC788\uC5B4\uC694."}`
+        };
+      }
+    }
+    let from = fromModeId;
+    if (!from) {
+      const def = semanticCol.defaultModeId;
+      from = def === to ? (_b = (_a = semanticCol.modes.find((m) => m.modeId !== to)) == null ? void 0 : _a.modeId) != null ? _b : def : def;
+    }
+    if (from === to) {
+      return __spreadProps(__spreadValues({
+        created: 0,
+        realiased: 0,
+        skipped: 0
+      }, modeCreated ? { modeCreated: true } : {}), {
+        error: "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694. \uB2E4\uB978 \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694."
+      });
+    }
+    const globalCol = (_c = cols.find((c) => c.name === GLOBAL)) != null ? _c : figma.variables.createVariableCollection(GLOBAL);
     const gMode = globalCol.defaultModeId;
     const allVars = await figma.variables.getLocalVariablesAsync();
     const byId = new Map(allVars.map((v) => [v.id, v]));
     const globalByName = new Map(allVars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
     for (const v of allVars) {
       if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
-      const fromRaw = v.valuesByMode[fromModeId];
+      const fromRaw = v.valuesByMode[from];
       if (!isVariableAlias(fromRaw)) {
         skipped++;
         continue;
@@ -3915,55 +4083,10 @@
         created++;
       }
       dark.setValueForMode(gMode, hexToRgb(darkHex));
-      v.setValueForMode(toModeId, figma.variables.createVariableAlias(dark));
+      v.setValueForMode(to, figma.variables.createVariableAlias(dark));
       realiased++;
     }
-    return { created, realiased, skipped };
-  }
-
-  // src/lib/variableEdit.ts
-  function parseVarValue(type, input) {
-    const s = input.trim();
-    switch (type) {
-      case "COLOR": {
-        if (!/^#?[0-9a-f]{6}$/i.test(s)) return { ok: false, error: "\uC0C9\uC740 #RRGGBB \uD615\uC2DD\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4." };
-        return { ok: true, value: hexToRgb(s) };
-      }
-      case "FLOAT": {
-        const n = Number(s);
-        if (s === "" || !Number.isFinite(n)) return { ok: false, error: "\uC22B\uC790\uB97C \uC785\uB825\uD558\uC138\uC694." };
-        return { ok: true, value: n };
-      }
-      case "STRING": {
-        if (s === "") return { ok: false, error: "\uBE48 \uBB38\uC790\uC5F4\uC740 \uD5C8\uC6A9\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4." };
-        return { ok: true, value: s };
-      }
-      case "BOOLEAN": {
-        const v = s.toLowerCase();
-        if (v === "true") return { ok: true, value: true };
-        if (v === "false") return { ok: true, value: false };
-        return { ok: false, error: "true \uB610\uB294 false\uB97C \uC785\uB825\uD558\uC138\uC694." };
-      }
-    }
-  }
-  function sanitizeScopes(scopes, type) {
-    return [...new Set(scopesForType(scopes, type))];
-  }
-  function aliasSelfReference(sourceId, targetId) {
-    return sourceId === targetId;
-  }
-  function findAliasReferers(varId, vars) {
-    const out = [];
-    for (const v of vars) {
-      if (v.id === varId) continue;
-      for (const cell of Object.values(v.values)) {
-        if (cell.kind === "alias" && cell.aliasId === varId) {
-          out.push({ id: v.id, name: v.name });
-          break;
-        }
-      }
-    }
-    return out;
+    return __spreadValues({ created, realiased, skipped }, modeCreated ? { modeCreated: true } : {});
   }
 
   // src/lib/entitlements.ts
@@ -4005,41 +4128,20 @@
   var PURCHASE_URL = "https://example.lemonsqueezy.com/buy/PLACEHOLDER";
   var PORTAL_URL = "https://app.lemonsqueezy.com/my-orders";
 
-  // src/lib/presets.ts
-  function upsertPreset(list, p) {
-    return [p, ...list.filter((x) => x.name !== p.name)];
-  }
-
   // src/lib/undo.ts
   function commitUndo(f) {
     if (typeof f.commitUndo === "function") f.commitUndo();
   }
 
   // src/code.ts
-  var UI_SIZE_KEY = "dsl.uiSize";
-  var UI_MIN = { w: 360, h: 480 };
-  var UI_MAX = { w: 900, h: 1200 };
-  var UI_DEFAULT = { w: 460, h: 660 };
-  var clampSize = (w, h) => ({
-    w: Math.round(Math.min(UI_MAX.w, Math.max(UI_MIN.w, w))),
-    h: Math.round(Math.min(UI_MAX.h, Math.max(UI_MIN.h, h)))
-  });
-  figma.showUI(__html__, { width: UI_DEFAULT.w, height: UI_DEFAULT.h, themeColors: true });
-  figma.clientStorage.getAsync(UI_SIZE_KEY).then((s) => {
-    const v = s;
-    if (v && typeof v.w === "number" && typeof v.h === "number") {
-      const c = clampSize(v.w, v.h);
-      figma.ui.resize(c.w, c.h);
-    }
-  }).catch(() => {
-  });
+  figma.showUI(__html__, { width: 400, height: 660, themeColors: true });
   var selection = () => figma.currentPage.selection;
   var DEV_TIER_KEY = "dsl.devTier";
   var CACHE_KEY = "dsl.licenseCache";
-  var PRESETS_KEY = "dsl.presets";
+  var SETTINGS_KEY = "dsl.settings";
+  var SETTINGS_DEFAULT = { base: 16, maxDepth: 8, hideOnboard: false, grid: 8, tolerance: 0.5 };
   var devTier = "free";
   var cache = null;
-  var presets = [];
   var bindCancel = false;
   function effective() {
     if (cache) {
@@ -4086,8 +4188,6 @@
           }
         }
       }
-      const ps = await figma.clientStorage.getAsync(PRESETS_KEY);
-      if (Array.isArray(ps)) presets = ps;
     } catch (e) {
     }
   }
@@ -4097,15 +4197,16 @@
       const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
       const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
       const vars = await figma.variables.getLocalVariablesAsync();
-      const hasGlobal = vars.some((v) => globalIds.has(v.variableCollectionId));
+      const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
+      const hasColorVars = globals.some((v) => v.resolvedType === "COLOR");
+      const hasScaleVars = globals.some((v) => v.resolvedType !== "COLOR");
+      const hasGlobal = globals.length > 0;
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
+      const hasDarkMode = cols.some((c) => c.modes.length > 1);
       const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
-      post({ type: "PREREQ_STATE", hasGlobal, hasBindable, hasTextStyles });
+      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
     } catch (e) {
     }
-  }
-  function requirePresets() {
-    return requirePaid("presets", "\uACF5\uC720 \uD504\uB9AC\uC14B\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
   }
   function arrangeSet(set) {
     const children = set.children.filter((c) => c.type === "COMPONENT");
@@ -4144,154 +4245,22 @@
     return e instanceof Error ? e.message : String(e);
   }
   var EDITABLE_COLLECTIONS = /* @__PURE__ */ new Set([GLOBAL, SEMANTIC, COMPONENT]);
-  var USAGE_SCAN_CAP = 5e3;
-  function isVariableAlias2(raw) {
-    return !!raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS";
-  }
-  function toValueCell(type, raw, nameById) {
-    if (isVariableAlias2(raw)) {
-      const aliasId = raw.id;
-      const aliasName = nameById.get(aliasId);
-      return { kind: "alias", display: aliasName != null ? aliasName : "(\uC54C \uC218 \uC5C6\uC74C)", aliasId, aliasName };
-    }
-    if (type === "COLOR" && raw && typeof raw === "object" && "r" in raw) {
-      return { kind: "literal", display: rgbToHex(raw) };
-    }
-    if (raw === void 0) return { kind: "literal", display: "" };
-    return { kind: "literal", display: String(raw) };
-  }
-  function toVarInfo(v, col, nameById) {
-    var _a;
+  function toVarInfo(v, col) {
     const modes = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
-    const values = {};
-    for (const m of col.modes) values[m.modeId] = toValueCell(v.resolvedType, v.valuesByMode[m.modeId], nameById);
-    return {
-      id: v.id,
-      name: v.name,
-      collectionId: col.id,
-      collection: col.name,
-      type: v.resolvedType,
-      description: (_a = v.description) != null ? _a : "",
-      scopes: v.scopes,
-      hidden: v.hiddenFromPublishing,
-      modes,
-      defaultModeId: col.defaultModeId,
-      values
-    };
+    return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, modes };
   }
   async function collectVars() {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const colById = new Map(cols.map((c) => [c.id, c]));
     const vars = await figma.variables.getLocalVariablesAsync();
-    const nameById = new Map(vars.map((v) => [v.id, v.name]));
     const out = [];
     for (const v of vars) {
       const col = colById.get(v.variableCollectionId);
       if (!col || !EDITABLE_COLLECTIONS.has(col.name)) continue;
-      out.push(toVarInfo(v, col, nameById));
+      out.push(toVarInfo(v, col));
     }
     out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
     return out;
-  }
-  async function aliasWouldCycle(sourceId, target) {
-    const seen = /* @__PURE__ */ new Set();
-    let frontier = [target];
-    while (frontier.length) {
-      const next = [];
-      for (const cur of frontier) {
-        if (cur.id === sourceId) return true;
-        if (seen.has(cur.id)) continue;
-        seen.add(cur.id);
-        for (const modeId of Object.keys(cur.valuesByMode)) {
-          const raw = cur.valuesByMode[modeId];
-          if (isVariableAlias2(raw)) {
-            const nv = await figma.variables.getVariableByIdAsync(raw.id);
-            if (nv) next.push(nv);
-          }
-        }
-      }
-      frontier = next;
-    }
-    return false;
-  }
-  async function applyVarValue(v, col, value) {
-    const modeId = value.modeId || col.defaultModeId;
-    if (!col.modes.some((m) => m.modeId === modeId)) return "\uB300\uC0C1 \uBAA8\uB4DC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
-    if (value.aliasId !== void 0) {
-      if (aliasSelfReference(v.id, value.aliasId)) return "\uBCC0\uC218\uB97C \uC790\uAE30 \uC790\uC2E0\uC5D0 \uBCC4\uCE6D\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
-      const target = await figma.variables.getVariableByIdAsync(value.aliasId);
-      if (!target) return "\uBCC4\uCE6D \uB300\uC0C1\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.";
-      if (target.resolvedType !== v.resolvedType) return "\uBCC4\uCE6D \uB300\uC0C1\uC758 \uD0C0\uC785\uC774 \uB2E4\uB985\uB2C8\uB2E4.";
-      if (await aliasWouldCycle(v.id, target)) return "\uBCC4\uCE6D\uC774 \uC21C\uD658 \uCC38\uC870\uB97C \uB9CC\uB4ED\uB2C8\uB2E4.";
-      v.setValueForMode(modeId, figma.variables.createVariableAlias(target));
-      return null;
-    }
-    if (value.literal !== void 0) {
-      const p = parseVarValue(v.resolvedType, value.literal);
-      if (!p.ok) return p.error;
-      v.setValueForMode(modeId, p.value);
-      return null;
-    }
-    return null;
-  }
-  async function editVariable(id, patch) {
-    const v = await figma.variables.getVariableByIdAsync(id);
-    if (!v) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: "\uBCC0\uC218\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4." };
-    const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
-    if (!col || !EDITABLE_COLLECTIONS.has(col.name)) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: "\uD3B8\uC9D1 \uB300\uC0C1\uC774 \uC544\uB2CC \uCEEC\uB809\uC158\uC785\uB2C8\uB2E4." };
-    try {
-      if (patch.name !== void 0) {
-        const nm = patch.name.trim();
-        if (!nm) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: "\uC774\uB984\uC744 \uC785\uB825\uD558\uC138\uC694." };
-        v.name = nm;
-      }
-      if (patch.description !== void 0) v.description = patch.description;
-      if (patch.hidden !== void 0) v.hiddenFromPublishing = patch.hidden;
-      if (patch.scopes) v.scopes = sanitizeScopes(patch.scopes, v.resolvedType);
-      if (patch.value) {
-        const err = await applyVarValue(v, col, patch.value);
-        if (err) return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: err };
-      }
-    } catch (e) {
-      return { type: "EDIT_VARIABLE_RESULT", id, ok: false, error: errText(e) };
-    }
-    const all = await figma.variables.getLocalVariablesAsync();
-    const nameById = new Map(all.map((x) => [x.id, x.name]));
-    return { type: "EDIT_VARIABLE_RESULT", id, ok: true, var: toVarInfo(v, col, nameById) };
-  }
-  function nodeBindsVar(node, varId) {
-    const bv = node.boundVariables;
-    if (!bv) return false;
-    const hits = (a) => !!a && typeof a === "object" && a.id === varId;
-    for (const key of Object.keys(bv)) {
-      const entry = bv[key];
-      if (Array.isArray(entry)) {
-        if (entry.some(hits)) return true;
-      } else if (entry && typeof entry === "object") {
-        if (hits(entry)) return true;
-        for (const v of Object.values(entry)) if (hits(v)) return true;
-      }
-    }
-    return false;
-  }
-  async function collectBoundNodes(varId) {
-    await figma.loadAllPagesAsync();
-    const nodes = [];
-    const stack = [];
-    for (const page of figma.root.children) stack.push(...page.children);
-    let scanned = 0;
-    let capped = false;
-    while (stack.length) {
-      if (scanned >= USAGE_SCAN_CAP) {
-        capped = true;
-        break;
-      }
-      const n = stack.pop();
-      scanned++;
-      if (nodeBindsVar(n, varId)) nodes.push({ id: n.id, name: n.name });
-      if ("children" in n) for (const c of n.children) stack.push(c);
-    }
-    return { nodes, capped };
   }
   function pageOf(node) {
     let n = node;
@@ -4350,12 +4319,6 @@
   function requireTextStyles() {
     return requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
   }
-  async function savePresets() {
-    try {
-      await figma.clientStorage.setAsync(PRESETS_KEY, presets);
-    } catch (e) {
-    }
-  }
   function kindOf(v) {
     if (v.resolvedType === "COLOR") return "color";
     const sc = v.scopes;
@@ -4410,6 +4373,11 @@
     let scanned = 0;
     let bindable = 0;
     let capped = false;
+    const comps = sel.filter((n) => {
+      var _a;
+      return n.type === "COMPONENT" && ((_a = n.parent) == null ? void 0 : _a.type) !== "COMPONENT_SET";
+    }).length;
+    const sets = sel.filter((n) => n.type === "COMPONENT_SET").length;
     const stack = sel.slice();
     while (stack.length) {
       if (scanned >= SCAN_CAP) {
@@ -4423,7 +4391,7 @@
       if (n.type === "INSTANCE") continue;
       if ("children" in n) for (const c of n.children) stack.push(c);
     }
-    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped, selfSelect });
+    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped, comps, sets, selfSelect });
     selfSelect = false;
   }
   figma.on("selectionchange", postSelection);
@@ -4444,6 +4412,23 @@
     } catch (e) {
       return void 0;
     }
+  }
+  async function existingComponentNames() {
+    try {
+      await figma.loadAllPagesAsync();
+      return figma.root.findAllWithCriteria({ types: ["COMPONENT", "COMPONENT_SET"] }).map((n) => n.name);
+    } catch (e) {
+      return [];
+    }
+  }
+  function paintsOf(v) {
+    if (typeof v === "symbol") return v;
+    if (!Array.isArray(v)) return void 0;
+    return v.map((p) => ({
+      visible: p.visible,
+      type: p.type,
+      opacity: p.opacity
+    }));
   }
   function toStructNode(node) {
     const a = node;
@@ -4482,6 +4467,17 @@
       counterAxisSpacing: num(a.counterAxisSpacing),
       layoutMode: typeof a.layoutMode === "string" ? a.layoutMode : void 0,
       fillHex: solidFillHex(node),
+      // 고신뢰 역할 판정(카드·figure·button…)이 읽는 값들 — 여기서 빼면 `componentEligible`이
+      // 채움도 모서리도 그림자도 없는 노드를 보게 되어 카드형 프레임이 후보에서 통째로 사라진다.
+      // 페인트/이펙트는 판정에 필요한 필드만 얕게 복사한다(원본 배열은 트리 전체로 무겁다).
+      cornerRadius: a.cornerRadius,
+      topLeftRadius: num(a.topLeftRadius),
+      opacity: num(a.opacity),
+      gridRowCount: num(a.gridRowCount),
+      gridColumnCount: num(a.gridColumnCount),
+      fills: paintsOf(a.fills),
+      strokes: paintsOf(a.strokes),
+      effects: Array.isArray(a.effects) ? a.effects.map((e) => ({ visible: e.visible, type: e.type })) : void 0,
       characters,
       mainComponentKey,
       role: readRole(node),
@@ -4698,8 +4694,10 @@
             // #6: 미리보기 후보(dry-run만)
             nodes: r.nodes,
             // #13: 미리보기 트리 맥락
-            skips: r.skips
-            // 사유별 건너뛴 레이어(dry-run만)
+            skips: r.skips,
+            // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
+            skipTotal: r.skipTotal
+            // 상한 전 실제 수 — 잘렸으면 UI가 알린다
           });
           if (!msg.preview) {
             commitUndo(figma);
@@ -4753,13 +4751,14 @@
         }
         case "RENAME_APPLY": {
           const changes = [];
-          for (const { id, before: expectedBefore, after } of msg.items) {
+          for (const { id, before: expectedBefore, after, role } of msg.items) {
             const node = await figma.getNodeByIdAsync(id);
             if (!node || !("name" in node)) continue;
             const before = node.name;
             if (before !== expectedBefore) continue;
             if (before === after) continue;
             node.name = after;
+            if (role) writeRole(node, role);
             changes.push({ id, before, after });
           }
           post({ type: "RENAME_RESULT", changes, nodes: [], applied: true });
@@ -4777,7 +4776,7 @@
           break;
         }
         case "SCAN_TEXT_STYLES": {
-          const { samples, warnings } = scanTextStyles(selection());
+          const { samples, warnings } = await scanTextStyles(selection());
           const existing = await scanExistingTextStyles();
           if (msg.useRowLabels) {
             const r = nameTextStylesWithRowLabels(samples, existing);
@@ -4834,13 +4833,6 @@
           post({ type: "GLOBAL_COLORS", colors });
           break;
         }
-        case "RESIZE": {
-          const c = clampSize(msg.width, msg.height);
-          figma.ui.resize(c.w, c.h);
-          if (msg.commit) void figma.clientStorage.setAsync(UI_SIZE_KEY, { w: c.w, h: c.h }).catch(() => {
-          });
-          break;
-        }
         case "GET_LICENSE": {
           postLicense();
           break;
@@ -4894,25 +4886,6 @@
         }
         case "OPEN_LICENSE_LINK": {
           figma.openExternal(msg.target === "purchase" ? PURCHASE_URL : PORTAL_URL);
-          break;
-        }
-        case "GET_PRESETS": {
-          if (!requirePresets()) break;
-          post({ type: "PRESETS", presets });
-          break;
-        }
-        case "SAVE_PRESET": {
-          if (!requirePresets()) break;
-          presets = upsertPreset(presets, msg.preset);
-          await savePresets();
-          post({ type: "PRESETS", presets });
-          break;
-        }
-        case "DELETE_PRESET": {
-          if (!requirePresets()) break;
-          presets = presets.filter((p) => p.name !== msg.name);
-          await savePresets();
-          post({ type: "PRESETS", presets });
           break;
         }
         case "EXPORT": {
@@ -4984,20 +4957,20 @@
           try {
             const eligibleNodes = pruned.filter((c) => c.eligible).map((c) => liveById.get(c.id)).filter((n) => !!n);
             const groups = groupForRegister(eligibleNodes);
+            const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
             const preview = /* @__PURE__ */ new Map();
-            for (const g of groups) {
+            groups.forEach((g, gi) => {
+              const name = groupNames[gi];
               if (g.members.length < 2) {
-                if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
-                continue;
+                if (g.members[0]) preview.set(g.members[0].id, { single: name });
+                return;
               }
               if (shouldCollapseToProperties(g.members)) {
-                const name = pascalCase(commonBaseName(g.members.map((m) => m.name)) || g.members[0].name);
                 for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true });
-                continue;
+                return;
               }
-              const base = commonBaseName(g.members.map((m) => m.name));
-              for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
-            }
+              for (const d of deriveVariants(g.members)) preview.set(d.id, { group: name, variant: d.variant });
+            });
             nodes = pruned.map((c) => {
               const p = preview.get(c.id);
               return p ? __spreadValues(__spreadValues({}, c), p) : c;
@@ -5110,7 +5083,7 @@
               failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${comp.name}): ${errText(e)}`);
             }
           };
-          const groupNames = resolveGroupNames(groups.map((g) => g.members));
+          const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
           for (let gi = 0; gi < groups.length; gi++) {
             const g = groups[gi];
             const setName = groupNames[gi];
@@ -5281,7 +5254,7 @@
           const missing = [];
           const singles = [];
           const failures = [];
-          const groupNames = resolveGroupNames(groups.map((g) => g.members));
+          const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
           for (let gi = 0; gi < groups.length; gi++) {
             const g = groups[gi];
             const nodes = g.members.map((m) => byId.get(m.id)).filter((n) => !!n);
@@ -5342,51 +5315,41 @@
           if (generated) commitUndo(figma);
           break;
         }
+        case "GET_SETTINGS": {
+          let s = SETTINGS_DEFAULT;
+          try {
+            const raw = await figma.clientStorage.getAsync(SETTINGS_KEY);
+            if (raw && typeof raw === "object") {
+              const o = raw;
+              s = {
+                base: typeof o.base === "number" && isFinite(o.base) && o.base > 0 ? o.base : SETTINGS_DEFAULT.base,
+                maxDepth: typeof o.maxDepth === "number" && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth,
+                hideOnboard: o.hideOnboard === true,
+                grid: typeof o.grid === "number" && isFinite(o.grid) && o.grid >= 1 ? Math.round(o.grid) : SETTINGS_DEFAULT.grid,
+                tolerance: typeof o.tolerance === "number" && isFinite(o.tolerance) && o.tolerance >= 0 ? o.tolerance : SETTINGS_DEFAULT.tolerance
+              };
+            }
+          } catch (e) {
+          }
+          post({ type: "SETTINGS", base: s.base, maxDepth: s.maxDepth, hideOnboard: s.hideOnboard, grid: s.grid, tolerance: s.tolerance });
+          break;
+        }
+        case "SET_SETTINGS": {
+          try {
+            await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, hideOnboard: msg.hideOnboard, grid: msg.grid, tolerance: msg.tolerance });
+          } catch (e) {
+          }
+          break;
+        }
         case "GET_VARIABLES": {
           post({ type: "VARIABLES", vars: await collectVars() });
-          break;
-        }
-        case "EDIT_VARIABLE": {
-          const res = await editVariable(msg.id, msg.patch);
-          post(res);
-          if (res.ok) {
-            commitUndo(figma);
-            await postPrereq();
-          }
-          break;
-        }
-        case "DELETE_VARIABLE": {
-          const v = await figma.variables.getVariableByIdAsync(msg.id);
-          if (!v) {
-            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: false, error: "\uBCC0\uC218\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4." });
-            break;
-          }
-          const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId);
-          if (!col || !EDITABLE_COLLECTIONS.has(col.name)) {
-            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: false, error: "\uD3B8\uC9D1 \uB300\uC0C1\uC774 \uC544\uB2CC \uCEEC\uB809\uC158\uC785\uB2C8\uB2E4." });
-            break;
-          }
-          try {
-            v.remove();
-            commitUndo(figma);
-            await postPrereq();
-            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: true, deleted: true });
-          } catch (e) {
-            post({ type: "EDIT_VARIABLE_RESULT", id: msg.id, ok: false, error: errText(e) });
-          }
-          break;
-        }
-        case "GET_VARIABLE_USAGE": {
-          const { nodes, capped } = await collectBoundNodes(msg.id);
-          const aliasedBy = findAliasReferers(msg.id, await collectVars());
-          post({ type: "VARIABLE_USAGE", id: msg.id, nodes, aliasedBy, capped });
           break;
         }
         case "GENERATE_DARK_MODE": {
           if (!requirePaid("tokens", "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
           post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
-          if (r.created || r.realiased) {
+          if (r.created || r.realiased || r.modeCreated) {
             commitUndo(figma);
             await postPrereq();
           }

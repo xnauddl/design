@@ -55,15 +55,12 @@ function collectPaints(
   if (paints === figma.mixed || !Array.isArray(paints)) return;
   for (const p of paints) {
     if (p.visible === false) continue;
-    if (p.type === 'SOLID') {
-      const hex = rgbToHex(p.color);
-      add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source, nodeId);
-      if (p.opacity != null && p.opacity < 1) {
-        const o = round(p.opacity);
-        add(acc, { name: numberTokenName('opacity', o), category: 'opacity', value: o }, 'opacity', node.id);
-      }
-    } else if (p.type.startsWith('GRADIENT') || p.type === 'IMAGE' || p.type === 'VIDEO') {
-      acc.warnings.add('그라디언트/이미지 채움은 변수 바인딩 불가 — 스킵했습니다.');
+    if (p.type !== 'SOLID') continue; // GRADIENT / IMAGE / VIDEO — 변수 바인딩 불가, 조용히 스킵
+    const hex = rgbToHex(p.color);
+    add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source, nodeId);
+    if (p.opacity != null && p.opacity < 1) {
+      const o = round(p.opacity);
+      add(acc, { name: numberTokenName('opacity', o), category: 'opacity', value: o }, 'opacity', node.id);
     }
   }
 }
@@ -218,10 +215,7 @@ function collectEffects(acc: Accumulator, node: SceneNode): void {
 
 function walk(acc: Accumulator, node: SceneNode): void {
   // 숨긴 레이어는 화면에 없는 값이라 토큰 후보에서 제외(하위까지 통째로).
-  if (node.visible === false) {
-    acc.warnings.add('숨긴 레이어는 토큰 후보에서 제외했습니다.');
-    return;
-  }
+  if (node.visible === false) return;
   if ('fills' in node) collectPaints(acc, node, node.fills, 'fill');
   if ('strokes' in node) collectPaints(acc, node, node.strokes, 'stroke');
   if (node.type === 'TEXT') collectText(acc, node);
@@ -235,10 +229,7 @@ function walk(acc: Accumulator, node: SceneNode): void {
   collectEffects(acc, node);
   // 인스턴스 내부는 마스터의 복사본이라 디자이너가 이 화면에서 결정한 값이 아니다 —
   // 인스턴스 자체 속성(크기·채움·효과)만 읽고 하위로는 내려가지 않는다.
-  if (node.type === 'INSTANCE') {
-    if (node.children.length) acc.warnings.add('인스턴스 내부는 마스터 복사본이라 건너뛰었습니다 — 값이 필요하면 컴포넌트를 선택해 추출하세요.');
-    return;
-  }
+  if (node.type === 'INSTANCE') return;
   if ('children' in node) for (const child of node.children) walk(acc, child);
 }
 
@@ -264,10 +255,7 @@ function isEffectivelyVisible(node: SceneNode): boolean {
 export function extractFromSelection(selection: readonly SceneNode[]): ExtractResult {
   const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map() };
   for (const node of selection) {
-    if (!isEffectivelyVisible(node)) {
-      acc.warnings.add('숨긴 레이어는 토큰 후보에서 제외했습니다.');
-      continue;
-    }
+    if (!isEffectivelyVisible(node)) continue;
     walk(acc, node);
   }
   const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
