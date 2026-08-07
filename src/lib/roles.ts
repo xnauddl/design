@@ -133,6 +133,21 @@ export function suggestTokenRoles(tokens: DraftToken[], base = 16): Record<strin
   return map;
 }
 
+/**
+ * 자동 추천 위에 사용자가 정한 역할을 덮어쓴다.
+ * 색만 담긴 부분 맵이 와도 간격·크기·타이포 역할이 딸려 빠지지 않게 하는 게 요점 —
+ * 색 목록에서 역할을 고르는 화면은 색밖에 모른다(그 맵으로 통째 교체하면 나머지가 사라진다).
+ */
+export function mergeTokenRoles(
+  tokens: DraftToken[],
+  base = 16,
+  overrides?: Record<string, string>,
+): Record<string, string> {
+  const auto = suggestTokenRoles(tokens, base);
+  if (!overrides || !Object.keys(overrides).length) return auto;
+  return { ...auto, ...overrides };
+}
+
 /* 시맨틱 매핑 입력(`역할 = 변수` 줄 단위 텍스트) ↔ 맵 변환.
    위 추천 맵과 같은 모양이라 여기 둔다(프리셋 제거 전에는 presets.ts에 있었다). */
 

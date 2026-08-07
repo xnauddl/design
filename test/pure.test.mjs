@@ -91,6 +91,7 @@ import {
   weightRole,
   familyRole,
   suggestTokenRoles,
+  mergeTokenRoles,
   pipelineSteps,
   t,
   scopesForTypeList,
@@ -1594,6 +1595,21 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
   assert.equal(map['font-weight/bold'], 'font-weight/700');
   assert.equal(map['font-family/sans'], 'font-family/Inter');
   assert.equal(map['stroke-width/md'], 'stroke-width/2'); // 티셔츠 센터
+});
+
+test('mergeTokenRoles — 부분 맵을 덮어쓰되 빠진 카테고리는 자동 추천을 남긴다', () => {
+  const tokens = [
+    { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+    { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+  ];
+  // 색 목록 화면이 주는 건 색 역할뿐 — 이걸로 통째 교체하면 spacing 역할이 사라진다.
+  const merged = mergeTokenRoles(tokens, 16, { primary: 'color/0066ff', accent: 'color/0066ff' });
+  assert.equal(merged['primary'], 'color/0066ff'); // 사용자가 정한 것 우선
+  assert.equal(merged['accent'], 'color/0066ff'); // 자동 추천에 없던 역할도 그대로
+  assert.equal(merged['spacing/md'], 'spacing/16'); // 색만 왔어도 간격 역할은 유지
+  // 덮어쓸 게 없으면 자동 추천 그대로.
+  assert.deepEqual(mergeTokenRoles(tokens, 16, {}), suggestTokenRoles(tokens, 16));
+  assert.deepEqual(mergeTokenRoles(tokens, 16), suggestTokenRoles(tokens, 16));
 });
 
 /* ================= pipeline.ts (진행 안내 §3) ================= */

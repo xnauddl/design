@@ -14,7 +14,7 @@ import type { FrameMeta } from './lib/similar';
 import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { nameColorsByHue } from './lib/colorName';
-import { suggestTokenRoles, semanticMapToText, textToSemanticMap } from './lib/roles';
+import { suggestTokenRoles, mergeTokenRoles, semanticMapToText, textToSemanticMap } from './lib/roles';
 import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
@@ -779,7 +779,9 @@ $('btnColorVars').addEventListener('click', () => {
     setStatus('colorStatus', t('color.needColors'), 'warn');
     return;
   }
-  setSemMapText(colorRoleMap()); // 역할 → 매핑(2.5 카드는 숨김이라 이 textarea가 단일 출처)
+  // 색 목록이 정한 역할을 매핑에 싣는다(2.5 카드는 숨김이라 이 textarea가 단일 출처).
+  // 통째로 갈아끼우면 추출 때 채워 둔 간격·크기·타이포 역할이 같이 날아간다 — 색만 덮어쓴다.
+  setSemMapText(mergeTokenRoles(tokens, Number(($('base') as HTMLInputElement).value) || 16, colorRoleMap()));
   createFrom = 'colors';
   send({
     type: 'CREATE_TOKENS',

@@ -1729,6 +1729,11 @@
     });
     return map;
   }
+  function mergeTokenRoles(tokens2, base = 16, overrides) {
+    const auto = suggestTokenRoles(tokens2, base);
+    if (!overrides || !Object.keys(overrides).length) return auto;
+    return __spreadValues(__spreadValues({}, auto), overrides);
+  }
   function semanticMapToText(map) {
     return Object.entries(map).map(([role, global]) => `${role} = ${global}`).join("\n");
   }
@@ -2398,7 +2403,7 @@
       setStatus("colorStatus", t("color.needColors"), "warn");
       return;
     }
-    setSemMapText(colorRoleMap());
+    setSemMapText(mergeTokenRoles(tokens, Number($("base").value) || 16, colorRoleMap()));
     createFrom = "colors";
     send(__spreadValues({
       type: "CREATE_TOKENS",
