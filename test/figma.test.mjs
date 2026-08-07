@@ -760,6 +760,88 @@ test('bindSelection — 이미 붙은 변수는 같은 값의 상위 tier 변수
   assert.equal(res.reasons['already-bound'], 1);
 });
 
+test('bindSelection — 노드 레벨 fills 바인딩만 있어도 이미 바인딩으로 보호', async () => {
+  // paint.boundVariables.color는 비어 있고 node.boundVariables.fills[i]만 있는 경우
+  // (테마 적용·외부 도구가 남기는 형태). paint만 보면 열린 자리로 오인해 덮어쓴다.
+  const figma = installFigma();
+  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
+  const sColor = findVar(figma, 'Semantic', 'color/0066ff');
+  const comp = figma.variables.createVariableCollection('Component');
+  const cv = figma.variables.createVariable('button/bg', comp, 'COLOR');
+  cv.scopes = ['ALL_SCOPES'];
+  cv.setValueForMode(comp.defaultModeId, { r: 0, g: 0.4, b: 1 });
+
+  const node = {
+    type: 'FRAME',
+    id: 'box',
+    name: 'box',
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }], // paint 쪽 boundVariables 없음
+    boundVariables: { fills: [{ type: 'VARIABLE_ALIAS', id: sColor.id }] },
+    layoutMode: 'NONE',
+    setBoundVariable() {},
+  };
+
+  const res = await bindSelection([node], 0.5);
+  assert.equal(res.bound, 0);
+  assert.equal(res.reasons['already-bound'], 1);
+  assert.equal(node.boundVariables.fills[0].id, sColor.id); // 노드 레벨 유지
+  assert.equal(node.fills[0].boundVariables, undefined); // paint는 여전히 비어 있음(덮어쓰지 않음)
+});
+
+test('bindSelection — 텍스트 앞구간만 바인딩된 채 글자를 늘리면 꼬리만 채움', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'font-size/16', category: 'fontSize', sources: ['fontSize'], value: 16 }], 16);
+  const sizeVar = findVar(figma, 'Semantic', 'font-size/16');
+
+  // 원래 "Hi"(0..2)만 바인딩된 뒤 글자를 "Hi!!!"로 늘린 상태 — 꼬리 2..5는 비어 있다.
+  const ranges = new Map(); // field → [{start,end,id}]
+  ranges.set('fontSize', [{ start: 0, end: 2, id: sizeVar.id }]);
+
+  const node = {
+    type: 'TEXT',
+    id: 't',
+    name: 't',
+    characters: 'Hi!!!',
+    fontSize: 16,
+    fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'AUTO' },
+    letterSpacing: { unit: 'PIXELS', value: 0 },
+    fills: [],
+    boundVariables: { fontSize: [{ type: 'VARIABLE_ALIAS', id: sizeVar.id }] }, // 비어 있지 않음(구 버그 트리거)
+    getRangeBoundVariable(start, end, field) {
+      const list = ranges.get(field) ?? [];
+      const hits = list.filter((r) => r.start < end && r.end > start);
+      if (!hits.length) return null;
+      const cover = hits.length === 1 && hits[0].start <= start && hits[0].end >= end;
+      if (!cover) return figma.mixed;
+      // 구간 안 단일 변수
+      const id = hits[0].id;
+      if (hits.some((h) => h.id !== id)) return figma.mixed;
+      return { type: 'VARIABLE_ALIAS', id };
+    },
+    setRangeBoundVariable(start, end, field, v) {
+      const list = ranges.get(field) ?? [];
+      list.push({ start, end, id: v.id });
+      ranges.set(field, list);
+      this.boundVariables[field] = list.map((r) => ({ type: 'VARIABLE_ALIAS', id: r.id }));
+    },
+  };
+
+  const res = await bindSelection([node], 0.5);
+  assert.equal(res.bound, 1);
+  assert.equal(res.reasons['already-bound'], undefined);
+  // 기존 0..2는 그대로, 꼬리 2..5만 새로 붙음
+  const fontRanges = ranges.get('fontSize');
+  assert.equal(fontRanges.length, 2);
+  assert.deepEqual(
+    fontRanges.map((r) => [r.start, r.end, r.id]),
+    [
+      [0, 2, sizeVar.id],
+      [2, 5, sizeVar.id],
+    ],
+  );
+});
+
 test('bindSelection — 허용오차 내 동률은 가장 가까운 값으로 바인딩', async () => {
   const figma = installFigma();
   await createTokens(
