@@ -2,7 +2,7 @@
    i18n.ts — UI 문자열 단일 소스 + 룩업/보간 (순수, figma 의존 없음)
    현재 로케일은 ko 단일. t(key, vars)로 조회하고 `{var}` 자리표시자를 치환한다.
    누락 키는 key를 그대로 반환(폴백) — 디버그·점진 도입 안전.
-   ※ 런타임 문자열(상태/피드백)을 외부화. HTML 정적 라벨은 후속.
+   ※ 런타임 문자열(상태/피드백)과 HTML 정적 라벨·툴팁·자리표시자·선택지를 외부화.
    ============================================================ */
 
 export type StringVars = Record<string, string | number>;
@@ -286,6 +286,67 @@ export const STRINGS: Record<string, string> = {
   // 접근성 · 국제화
   'a11y.title': '접근성 · 국제화',
   'a11y.body': '키보드 전용 조작 · i18n',
+
+  /* ---------- title 툴팁 · option · placeholder (data-i18n-title/placeholder + t()) ---------- */
+  // 팔레트 하모니 <option> (value는 영문 키, 표시만 번역)
+  'palette.harmonyComplementary': '보색',
+  'palette.harmonyAnalogous': '유사',
+  'palette.harmonyTriadic': '삼각',
+  'palette.harmonySplit': '분할보색',
+  'palette.harmonyTetradic': '사각',
+  // 토큰 생성 툴팁
+  'create.dropOnceTitle': '한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다',
+  'create.tidyBaseTitle': '여백·크기를 이 값 기준 사다리에 맞춥니다. 8이면 …4·2·1 / 8·16·24·32. 기준 미만은 반분할이라 4·2가 보존됩니다. 0이면 정리하지 않습니다.',
+  'create.tidyRatioTitle': '값 대비 몇 %까지 옮길지. 비율이라 작은 값일수록 자동으로 보수적입니다(4는 거의 안 움직이고 40은 여유 있게).',
+  'create.targetTitle': '생성 대상',
+  'create.useCountTitle': '이 값을 쓰는 레이어 {n}개',
+  // 색 표
+  'colorTable.rolePlaceholder': '역할(선택)',
+  'colorTable.nameKindTitle': '{name} · {kind}',
+  'color.kindAchromatic': '무채',
+  'color.kindHue': 'hue',
+  // 텍스트 스타일
+  'textStyle.colLineHeightTitle': '화면에서 쓰던 단위 그대로 등록합니다. %면 %로.',
+  'textStyle.applyExistingTitle': '선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.',
+  'textStyle.scannedValueTitle': '{value} · 스캔한 값이라 못 바꿔요',
+  'textStyle.scannedEmptyTitle': '스캔한 값 — 새 값은 ‘행 추가’로',
+  'textStyle.boundNameTitle': '이미 등록된 스타일이에요. 이름을 바꾸면 이 스타일의 이름만 바뀝니다(새로 안 만듦).',
+  'textStyle.newNameTitle': '새 스타일로 등록됩니다(아직 등록 안 된 글자).',
+  'textStyle.lineHeightPercentTitle': '화면에서 {pct}%로 쓰던 행간({px}px) — %로 등록하고 행간 변수는 연결하지 않아요(Figma가 px로 바꿔버려서).',
+  'textStyle.letterSpacingPercentTitle': '화면에서 {pct}%로 쓰던 자간({px}px) — %로 등록하고 자간 변수는 연결하지 않아요(Figma가 px로 바꿔버려서).',
+  'textStyle.scannedLockedTitle': '스캔한 값이라 못 바꿔요',
+  'textStyle.deleteRowTitle': '행 삭제',
+  // 바인딩 허용오차 칩
+  'bind.tolExactTitle': '값이 정확히 같을 때만 바인딩',
+  'bind.tol05Title': '반올림 오차만 흡수 — 기본값',
+  'bind.tol1Title': '1px 이내 근사값까지 바인딩',
+  'bind.tol2Title': '2px 이내 — 손으로 그린 값이 많은 화면용(과매칭 주의)',
+  'bind.skipHead': '건너뜀:',
+  'bind.skipChipTitle': '레이어 {count}개 선택 — {names}{more}',
+  'bind.skipMore': ' 외',
+  // 컴포넌트 / 닮은 프레임 버튼 툴팁
+  'component.scanBtnTitle': '선택 하위 고신뢰 구조 후보 스캔 — 같은 이름 반복은 세트/속성으로 자동 체크, 숨김 제외',
+  'component.registerBtnTitle': '체크한 후보를 컴포넌트 등록(Components 페이지) + 같은 이름 세트/속성 접힘 + TEXT·스왑·가시성 속성 노출',
+  'component.classifyBtnTitle': "이미 만들어 둔 기존 컴포넌트들을 같은 이름 기준으로 세트로 묶기 — 등록과 동일 기준(프레임은 '컴포넌트 등록' 사용)",
+  'component.genMissingBtnTitle': '선택한 베리언트 세트의 빠진 속성 조합 자동 생성',
+  'similar.scanBtnTitle': '선택한 프레임들을 구조로 묶어 마스터 후보와 가변 위치를 미리 봅니다(쓰기 없음)',
+  'similar.componentizeBtnTitle': '추천/선택한 마스터를 컴포넌트로 만들고 나머지를 오버라이드 인스턴스로 교체',
+  // 내보내기 형식 <option> (px/rem은 단위 기호라 번역 대상 아님)
+  'export.formatW3c': 'W3C 토큰 JSON',
+  'export.formatCss': 'CSS 변수',
+  'export.outPlaceholder': '내보낸 코드가 여기에 표시됩니다.',
+  // 변수 편집기
+  'varedit.filterAll': '전체',
+  'varedit.filterPlaceholder': '이름으로 거르기',
+  'varedit.numberPlaceholder': '숫자',
+  'varedit.aliasTitle': '별칭 → {name}',
+  'varedit.scopeTitle': '{collection} · {type} · 스코프 {used}/{total}',
+  // 라이선스 · 프리셋 · 리사이즈 (Free/Paid 티어명 번역 대상 아님)
+  'license.keyPlaceholder': '라이선스 키 입력',
+  'license.portalTitle': '구독·결제수단 변경, 기기 활성화 해제(기기 1대 한도)',
+  'preset.namePlaceholder': '프리셋 이름',
+  'preset.jsonPlaceholder': '내보낸 JSON이 여기에 표시되며, 붙여넣고 ‘가져오기’로 추가합니다.',
+  'ui.resizeTitle': '드래그해 크기 조절',
 };
 
 /** 해당 키가 STRINGS에 정의돼 있는가. 정적 라벨 하이드레이션이 오타 키로 원문을 덮지 않도록 쓴다. */
