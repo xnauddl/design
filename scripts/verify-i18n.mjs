@@ -7,7 +7,7 @@
  * 실제로 두 번 났다(한쪽이 문구를 고치고 다른 쪽이 STRINGS를 그대로 둔 경우).
  * typecheck·테스트로는 안 잡힌다. 여기서 잡는다.
  *
- * 1. 누락  — `data-i18n` 키가 STRINGS에 없음(하이드레이션이 건너뛰어 조용히 폴백)
+ * 1. 누락  — data-i18n* 키가 STRINGS에 없음(하이드레이션이 건너뛰어 조용히 폴백)
  * 2. 드리프트 — STRINGS 값 ≠ 인라인 폴백(둘 중 하나가 낡음)
  * 3. 미참조 — STRINGS에만 있고 아무도 안 쓰는 키(죽은 문자열)
  *
@@ -75,38 +75,67 @@ function innerHtmlAt(html, start) {
   return null; // 닫는 태그를 못 찾음
 }
 
+/** 열린 태그 문자열에서 attr="…" / attr='…' 값을 뽑는다. 없으면 null.
+ *  `data-i18n-title`처럼 kebab 접미로 붙은 동명 속성은 잡지 않는다(`\b`만으로는 `-title`에서 title을 잡음). */
+function attrValue(openTag, attr) {
+  const m = new RegExp(`(?<!-)${attr}\\s*=\\s*("([^"]*)"|'([^']*)')`).exec(openTag);
+  if (!m) return null;
+  return m[2] ?? m[3] ?? null;
+}
+
 const html = readFileSync(UI_HTML, 'utf8');
-const attrRe = /data-i18n(-html)?="([^"]+)"/g;
-const found = []; // { key, inner, html: bool }
+
+/* textContent / innerHTML 폴백 (data-i18n · data-i18n-html) */
+const contentRe = /data-i18n(-html)?="([^"]+)"/g;
+const found = []; // { key, fallback, kind: 'text'|'html'|'title'|'placeholder' }
 let am;
-while ((am = attrRe.exec(html))) {
+while ((am = contentRe.exec(html))) {
   const start = html.lastIndexOf('<', am.index);
   const inner = innerHtmlAt(html, start);
-  found.push({ key: am[2], inner, isHtml: !!am[1] });
+  found.push({ key: am[2], fallback: inner, kind: am[1] ? 'html' : 'text' });
+}
+
+/* title / placeholder 속성 폴백 (data-i18n-title · data-i18n-placeholder)
+   같은 요소에 data-i18n과 함께 있을 수 있어 별도 패스로 모은다. */
+const attrPairRe = /data-i18n-(title|placeholder)="([^"]+)"/g;
+while ((am = attrPairRe.exec(html))) {
+  const start = html.lastIndexOf('<', am.index);
+  const end = endOfOpenTag(html, start);
+  if (end < 0) {
+    found.push({ key: am[2], fallback: null, kind: am[1] });
+    continue;
+  }
+  const openTag = html.slice(start, end + 1);
+  const fallback = attrValue(openTag, am[1]);
+  found.push({ key: am[2], fallback, kind: am[1] });
 }
 
 /* 스캐너가 조용히 놓치면 검사 전체가 무의미해진다 — 속성 수와 추출 수를 맞춰본다. */
-const attrCount = (html.match(/data-i18n(-html)?="/g) ?? []).length;
+const contentAttrCount = (html.match(/data-i18n(-html)?="/g) ?? []).length;
+const pairAttrCount = (html.match(/data-i18n-(title|placeholder)="/g) ?? []).length;
+const attrCount = contentAttrCount + pairAttrCount;
 if (found.length !== attrCount) {
-  console.error(`✗ 추출 실패: data-i18n 속성 ${attrCount}개 중 ${found.length}개만 파싱됨`);
+  console.error(`✗ 추출 실패: data-i18n* 속성 ${attrCount}개 중 ${found.length}개만 파싱됨`);
   process.exit(2);
 }
-const unparsed = found.filter((f) => f.inner === null);
+const unparsed = found.filter((f) => f.fallback === null);
 if (unparsed.length) {
-  console.error(`✗ 닫는 태그를 못 찾은 요소: ${unparsed.map((f) => f.key).join(', ')}`);
+  console.error(
+    `✗ 폴백을 못 찾은 요소: ${unparsed.map((f) => `${f.key}(${f.kind})`).join(', ')}`,
+  );
   process.exit(2);
 }
 
 /* ---------- 1·2. 누락 / 드리프트 ---------- */
 const missing = [];
 const drift = [];
-for (const { key, inner } of found) {
+for (const { key, fallback } of found) {
   const val = STRINGS[key];
   if (val === undefined) {
     missing.push(key);
     continue;
   }
-  if (val.trim() !== inner.trim()) drift.push({ key, val, inner: inner.trim() });
+  if (val.trim() !== fallback.trim()) drift.push({ key, val, fallback: fallback.trim() });
 }
 
 /* ---------- 3. 미참조 ---------- */
@@ -146,7 +175,7 @@ if (drift.length) {
   for (const d of drift) {
     console.error(`   · ${d.key}`);
     console.error(`     STRINGS: ${d.val.slice(0, 100)}`);
-    console.error(`     인라인 : ${d.inner.slice(0, 100)}`);
+    console.error(`     인라인 : ${d.fallback.slice(0, 100)}`);
   }
 }
 if (orphan.length) {
@@ -155,8 +184,13 @@ if (orphan.length) {
   for (const k of orphan) console.error(`   · ${k}`);
 }
 if (!failed) {
+  const byKind = Object.create(null);
+  for (const f of found) byKind[f.kind] = (byKind[f.kind] ?? 0) + 1;
+  const kindSummary = Object.entries(byKind)
+    .map(([k, n]) => `${k} ${n}`)
+    .join(' · ');
   console.log(
-    `✓ i18n 정합 — data-i18n ${found.length}개 · STRINGS ${Object.keys(STRINGS).length}개 · ` +
+    `✓ i18n 정합 — data-i18n* ${found.length}개(${kindSummary}) · STRINGS ${Object.keys(STRINGS).length}개 · ` +
       `누락 0 · 드리프트 0 · 미참조 0`,
   );
 }
