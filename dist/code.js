@@ -649,9 +649,11 @@
       return { px: roundN(fontSize * lh.value / 100), pct: roundN(lh.value) };
     }
     const v = roundN(lh.value);
-    if (unit === "PIXELS" && fontSize > 0 && v >= 100 && v <= 400) {
-      const asPx = roundN(fontSize * v / 100);
-      if (asPx >= fontSize * 0.8 && asPx <= fontSize * 3) return { px: asPx, pct: v };
+    if (unit === "PIXELS" && fontSize > 0) {
+      const pxRatio = v / fontSize;
+      const plausibleAsPx = pxRatio >= 0.8 && pxRatio <= 3;
+      const plausibleAsPct = v >= 100 && v <= 300;
+      if (!plausibleAsPx && plausibleAsPct) return { px: roundN(fontSize * v / 100), pct: v };
     }
     if (unit === "PIXELS" && fontSize > 0 && v > 0) {
       const pct = roundN(v / fontSize * 100);

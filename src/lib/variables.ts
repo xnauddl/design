@@ -247,9 +247,16 @@ function measureLineHeight(fontSize: number, lh: LineHeight | typeof figma.mixed
   }
   const v = roundN(lh.value);
   // 스타일 없는 텍스트에서 단위가 PIXELS로 떨어지고 값만 150처럼 % 숫자인 경우 보정.
-  if (unit === 'PIXELS' && fontSize > 0 && v >= 100 && v <= 400) {
-    const asPx = roundN((fontSize * v) / 100);
-    if (asPx >= fontSize * 0.8 && asPx <= fontSize * 3) return { px: asPx, pct: v };
+  //
+  // 판정 기준은 **그 값을 px로 읽으면 말이 되는가**다. 폰트 대비 0.8~3배면 진짜 px 행간이므로
+  // 손대지 않는다 — 96px 활자에 104px 행간 같은 큰 램프가 여기 걸려 104%(=99.84px)로 바뀌었다.
+  // (예전 검사는 `asPx = fontSize*v/100` 을 같은 배율 범위와 비교했는데, 그건 fontSize가 약분돼
+  //  `80 ≤ v ≤ 300` 이라는 항등식이라 바깥 조건에 이미 포함돼 있었다 — 아무것도 거르지 못했다.)
+  if (unit === 'PIXELS' && fontSize > 0) {
+    const pxRatio = v / fontSize; // 값을 px 행간으로 읽었을 때의 배율
+    const plausibleAsPx = pxRatio >= 0.8 && pxRatio <= 3;
+    const plausibleAsPct = v >= 100 && v <= 300; // %로 읽으면 0.8~3배가 되는 구간
+    if (!plausibleAsPx && plausibleAsPct) return { px: roundN((fontSize * v) / 100), pct: v };
   }
   // UI는 150%인데 API가 24(PIXELS)만 주는 경우 — 폰트 대비 정수 %가 흔한 값이면 복구.
   // (진짜 24px 의도와 구분 불가: 텍스트 스타일 등록 맥락에선 %가 맞는 경우가 대부분.)

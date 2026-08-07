@@ -2804,6 +2804,29 @@ test('scanTextStyles — %행간은 px 환산과 원본 % 를 함께 싣는다',
   assert.equal(samples.find((s) => s.fontSize === 24).lineHeightPercent, 0); // AUTO
 });
 
+test('scanTextStyles — 폰트 대비 말이 되는 px 행간은 %로 오인하지 않는다', async () => {
+  installFigma();
+  const mk = (id, fontSize, value) => ({
+    type: 'TEXT', id, name: id, fontSize, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value }, letterSpacing: { unit: 'PIXELS', value: 0 },
+    characters: 'x', textStyleId: '',
+  });
+  const { samples } = await scanTextStyles([{
+    type: 'FRAME', id: 'f', name: 'F', children: [
+      mk('display', 96, 104), // 1.08배 — 진짜 px 행간(104% = 99.84px로 줄던 값)
+      mk('big', 48, 120), // 2.5배 — 진짜 px 행간(120% = 57.6px로 절반이 되던 값)
+      mk('pctish', 16, 150), // 9.4배 — px로는 불가능 → 150% 의도로 읽는다
+    ],
+  }]);
+  const at = (fs) => samples.find((s) => s.fontSize === fs);
+  // 시그니처(px)가 입력값 그대로여야 한다 — 여기가 틀리면 화면 행간이 실제로 바뀐다.
+  assert.equal(at(96).lineHeight, 104);
+  assert.equal(at(96).lineHeightPercent, 0); // % 축도 안 붙는다
+  assert.equal(at(48).lineHeight, 120);
+  assert.equal(at(16).lineHeight, 24); // 150% → 24px
+  assert.equal(at(16).lineHeightPercent, 150); // 이 경우만 % 의도
+});
+
 test('createSemanticTextStyles — %행간은 PERCENT로 등록하고 행간 바인딩은 생략(px 강제 회피)', async () => {
   const figma = installFigma();
   const r = await createSemanticTextStyles(
