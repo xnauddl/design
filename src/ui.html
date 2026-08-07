@@ -560,7 +560,8 @@
           <select id="darkToMode"></select>
         </label>
       </div>
-      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <!-- 바로가기는 '토큰이 없다'일 때만 뜬다 — 컬렉션·모드를 고르라는 안내에는 갈 곳이 없다. -->
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
       <div class="status" id="darkStatus"></div>
     </div>
 

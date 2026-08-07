@@ -15,6 +15,8 @@ import {
   bindSelection,
   renameSelection,
   generateDarkMode,
+  ensureDarkMode,
+  DARK_MODE_NAME,
 } from '../dist/figma-lib.mjs';
 
 /* ---------------- figma 전역 목 ---------------- */
@@ -31,6 +33,11 @@ function installFigma() {
       name,
       defaultModeId: `mode:${name}`,
       modes: [{ modeId: `mode:${name}`, name: 'Mode 1' }],
+      addMode(modeName) {
+        const modeId = `mode:${name}:${modeName}:${seq++}`;
+        this.modes.push({ modeId, name: modeName });
+        return modeId;
+      },
     };
     collections.push(col);
     return col;
@@ -3190,4 +3197,52 @@ test('generateDarkMode — 출처가 이미 dark/면 원본을 덮어쓰지 않�
   assert.equal(findVar(f.figma, 'Global', 'dark/dark/color/gray/0'), undefined, 'dark/dark/ 미생성');
   assert.equal(f.gVal(darkGlobal), '#121212', '원본 값 불변');
   assert.equal(surface.valuesByMode[f.LIGHT], undefined, '자기 참조 별칭 미생성');
+});
+
+test('ensureDarkMode — 모드 1개면 Dark를 추가하고, 이미 있으면 재사용', () => {
+  const figma = installFigma();
+  const col = figma.variables.createVariableCollection('Semantic');
+  assert.equal(col.modes.length, 1);
+  const first = ensureDarkMode(col);
+  assert.equal(first.created, true);
+  assert.equal(DARK_MODE_NAME, 'Dark');
+  assert.equal(col.modes.length, 2);
+  assert.equal(col.modes[1].name, 'Dark');
+  assert.equal(first.modeId, col.modes[1].modeId);
+
+  const again = ensureDarkMode(col);
+  assert.equal(again.created, false);
+  assert.equal(again.modeId, first.modeId);
+  assert.equal(col.modes.length, 2, '중복 Dark 미추가');
+
+  // 대소문자만 다른 기존 모드도 재사용
+  const col2 = figma.variables.createVariableCollection('Other');
+  const id = col2.addMode('dark');
+  const reused = ensureDarkMode(col2);
+  assert.equal(reused.created, false);
+  assert.equal(reused.modeId, id);
+});
+
+test('generateDarkMode — toModeId 생략 시 Dark 모드를 만든 뒤 채운다', async () => {
+  const f = darkFixture();
+  const lightId = f.semantic.defaultModeId;
+  const white = f.mkGlobal('color/gray/0', '#ffffff');
+  const surface = f.mkSemantic('surface');
+  surface.setValueForMode(lightId, f.figma.variables.createVariableAlias(white));
+
+  assert.equal(f.semantic.modes.length, 1);
+  const r = await generateDarkMode(f.semantic.id, lightId);
+  assert.equal(r.modeCreated, true);
+  assert.equal(r.created, 1);
+  assert.equal(r.realiased, 1);
+  assert.equal(f.semantic.modes.length, 2);
+  const darkMode = f.semantic.modes.find((m) => m.name === 'Dark');
+  assert.ok(darkMode);
+  const dark = findVar(f.figma, 'Global', 'dark/color/gray/0');
+  assert.deepEqual(surface.valuesByMode[darkMode.modeId], { type: 'VARIABLE_ALIAS', id: dark.id });
+
+  // 두 번째 실행은 모드를 다시 만들지 않는다
+  const r2 = await generateDarkMode(f.semantic.id, lightId);
+  assert.equal(r2.modeCreated, undefined);
+  assert.equal(f.semantic.modes.length, 2);
 });

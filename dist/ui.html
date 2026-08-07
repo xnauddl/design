@@ -560,7 +560,8 @@
           <select id="darkToMode"></select>
         </label>
       </div>
-      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <!-- 바로가기는 '토큰이 없다'일 때만 뜬다 — 컬렉션·모드를 고르라는 안내에는 갈 곳이 없다. -->
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
       <div class="status" id="darkStatus"></div>
     </div>
 
@@ -2898,8 +2899,9 @@
     send({ type: "SCAN_COMPONENT_CANDIDATES" });
   });
   var allVars = [];
+  var varsLoaded = false;
   function refreshDarkOptions() {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const cols = /* @__PURE__ */ new Map();
     for (const v of allVars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
     const sel = $("darkCollection");
@@ -2912,8 +2914,14 @@
       sel.appendChild(o);
     }
     if (prev && cols.has(prev)) sel.value = prev;
-    const usable = [...cols.values()].find((v) => v.modes.length >= 2);
-    if (usable && ((_b = (_a = cols.get(sel.value)) == null ? void 0 : _a.modes.length) != null ? _b : 0) < 2) sel.value = usable.collectionId;
+    const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
+    const usable = (_a = withModes.find((v) => v.collection === "Semantic")) != null ? _a : withModes[0];
+    if (usable && ((_c = (_b = cols.get(sel.value)) == null ? void 0 : _b.modes.length) != null ? _c : 0) < 1) sel.value = usable.collectionId;
+    if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.collection) === "Global") && usable.collection === "Semantic") {
+      sel.value = usable.collectionId;
+    } else if (usable && !sel.value) {
+      sel.value = usable.collectionId;
+    }
     refreshDarkModes();
   }
   function refreshDarkModes() {
@@ -2932,33 +2940,55 @@
       }
       if (prev && modes.some((m) => m.modeId === prev)) sel.value = prev;
     }
-    const ok = modes.length >= 2;
+    const hasCollection = !!colId && modes.length >= 1;
+    const ok = hasCollection && varsLoaded && allVars.length > 0;
     $("btnGenDark").disabled = !ok || !isPaid;
     const notice = $("darkPrereq");
+    const gotoCreate = $("darkPrereqGotoCreate");
     notice.style.display = ok ? "none" : "";
     const text = notice.querySelector(".prereq-text");
-    if (text) {
-      text.textContent = ok ? "" : modes.length ? "\uBAA8\uB4DC\uAC00 \uD558\uB098\uBFD0\uC785\uB2C8\uB2E4 \u2014 Figma\uC5D0\uC11C \uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC138\uC694." : "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.";
+    if (!ok && text) {
+      if (!varsLoaded) {
+        text.textContent = "\uBCC0\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026";
+        gotoCreate.style.display = "none";
+      } else if (allVars.length === 0) {
+        text.textContent = "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.";
+        gotoCreate.style.display = "";
+      } else if (!colId || modes.length === 0) {
+        text.textContent = "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158(\uBCF4\uD1B5 Semantic)\uC744 \uACE0\uB974\uC138\uC694.";
+        gotoCreate.style.display = "none";
+      } else {
+        text.textContent = "\uCEEC\uB809\uC158\uACFC \uBC1D\uC740 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.";
+        gotoCreate.style.display = "none";
+      }
     }
-    if (modes.length >= 2 && $("darkFromMode").value === $("darkToMode").value) {
-      $("darkToMode").value = modes[1].modeId;
+    const toSel = $("darkToMode");
+    const darkMode = modes.find((m) => m.name.toLowerCase() === "dark");
+    if (darkMode) {
+      toSel.value = darkMode.modeId;
+    } else if (modes.length >= 1) {
+      const o = document.createElement("option");
+      o.value = "";
+      o.textContent = "Dark (\uC5C6\uC73C\uBA74 \uC0DD\uC131)";
+      toSel.insertBefore(o, toSel.firstChild);
+      toSel.value = "";
+    }
+    const fromSel = $("darkFromMode");
+    if (modes.length >= 2 && darkMode && fromSel.value === darkMode.modeId) {
+      const other = modes.find((m) => m.modeId !== darkMode.modeId);
+      if (other) fromSel.value = other.modeId;
     }
   }
   $("darkCollection").addEventListener("change", refreshDarkModes);
   $("btnGenDark").addEventListener("click", () => {
     const collectionId = $("darkCollection").value;
     const fromModeId = $("darkFromMode").value;
-    const toModeId = $("darkToMode").value;
-    if (!collectionId || !fromModeId || !toModeId) {
-      setStatus("darkStatus", "\uCEEC\uB809\uC158\uACFC \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
+    if (!collectionId || !fromModeId) {
+      setStatus("darkStatus", "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
       return;
     }
-    if (fromModeId === toModeId) {
-      setStatus("darkStatus", "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694. \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
-      return;
-    }
-    setStatus("darkStatus", "\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026", "");
-    send({ type: "GENERATE_DARK_MODE", collectionId, fromModeId, toModeId });
+    setStatus("darkStatus", "Dark \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026", "");
+    send({ type: "GENERATE_DARK_MODE", collectionId, fromModeId });
   });
   var similarMemberIds = [];
   var similarMasterId = null;
@@ -3266,18 +3296,25 @@
         break;
       }
       case "VARIABLES": {
+        varsLoaded = true;
         allVars = msg.vars;
         refreshDarkOptions();
         break;
       }
       case "DARK_MODE_RESULT": {
-        if (!msg.realiased) {
-          const why = msg.skipped ? `Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4(\uAC74\uB108\uB700 ${msg.skipped}\uAC1C)` : "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4";
-          setStatus("darkStatus", `\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 \u2014 ${why}`, "warn");
+        if (msg.error) {
+          setStatus("darkStatus", msg.error, "warn");
           break;
         }
+        if (!msg.realiased) {
+          const why = msg.skipped ? `Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 ${msg.skipped}\uAC1C)` : "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694";
+          const mode2 = msg.modeCreated ? "Dark \uBAA8\uB4DC\uB294 \uCD94\uAC00\uB410\uC5B4\uC694. " : "";
+          setStatus("darkStatus", `${mode2}\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${why}`, "warn");
+          break;
+        }
+        const mode = msg.modeCreated ? "Dark \uBAA8\uB4DC \uCD94\uAC00 \xB7 " : "";
         const skip = msg.skipped ? ` \xB7 \uAC74\uB108\uB700 ${msg.skipped}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)` : "";
-        setStatus("darkStatus", `\uB2E4\uD06C ${msg.realiased}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 ${msg.created}\uAC1C${skip}`, "ok");
+        setStatus("darkStatus", `${mode}\uB2E4\uD06C ${msg.realiased}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 ${msg.created}\uAC1C${skip}`, "ok");
         break;
       }
       case "SIMILAR_CANDIDATES":
@@ -3875,6 +3912,7 @@
   send({ type: "GET_LICENSE" });
   send({ type: "GET_VARIABLES" });
   send({ type: "GET_SETTINGS" });
+  refreshDarkModes();
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
   var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {
@@ -3888,6 +3926,7 @@
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
     if (name !== "settings") send({ type: "GET_PREREQ" });
+    if (name === "tokens") send({ type: "GET_VARIABLES" });
   }
   TABS.forEach((t2, i) => {
     const btn = $(`tabbtn-${t2}`);
