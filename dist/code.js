@@ -658,10 +658,11 @@
     }
     const px = roundN(ls.value);
     if (unit === "PIXELS" && fontSize > 0 && px !== 0) {
+      const authoredPx = Math.abs(px * 2 - Math.round(px * 2)) < 1e-9;
       const pct = roundN(px / fontSize * 100);
       const back = roundN(fontSize * pct / 100);
       const common = pct === Math.trunc(pct) && Math.abs(pct) >= 1 && Math.abs(pct) <= 10;
-      if (common && Math.abs(back - px) <= 0.011) return { px: back, pct };
+      if (!authoredPx && common && Math.abs(back - px) <= 0.011) return { px: back, pct };
     }
     return { px, pct: 0 };
   }
@@ -854,7 +855,7 @@
     return out;
   }
   async function createSemanticTextStyles(specs, apply, nodes) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
     if (!specs.length) return res;
     const existing = await figma.getLocalTextStylesAsync();
@@ -1015,12 +1016,12 @@
         style.letterSpacing = lsPct !== 0 ? { value: lsPct, unit: "PERCENT" } : { value: spec.letterSpacing, unit: "PIXELS" };
       } else if (lhPct > 0 || lsPct !== 0) {
         if (lhPct > 0) {
-          style.setBoundVariable("lineHeight", null);
-          style.lineHeight = { value: lhPct, unit: "PERCENT" };
+          if ((_h = style.boundVariables) == null ? void 0 : _h.lineHeight) res.notes.push(`${spec.name}: \uD589\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC2B5\uB2C8\uB2E4 \u2014 ${lhPct}% \uAD50\uC815 \uBCF4\uB958`);
+          else style.lineHeight = { value: lhPct, unit: "PERCENT" };
         }
         if (lsPct !== 0) {
-          style.setBoundVariable("letterSpacing", null);
-          style.letterSpacing = { value: lsPct, unit: "PERCENT" };
+          if ((_i = style.boundVariables) == null ? void 0 : _i.letterSpacing) res.notes.push(`${spec.name}: \uC790\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC2B5\uB2C8\uB2E4 \u2014 ${lsPct}% \uAD50\uC815 \uBCF4\uB958`);
+          else style.letterSpacing = { value: lsPct, unit: "PERCENT" };
         }
       }
       const bindRole = style.name;
@@ -1032,7 +1033,7 @@
       if (spec.lineHeight > 0 || isRename) {
         const pctNow = lhPctOf(style.lineHeight);
         if (pctNow > 0) {
-          if ((_h = style.boundVariables) == null ? void 0 : _h.lineHeight) style.setBoundVariable("lineHeight", null);
+          if ((_j = style.boundVariables) == null ? void 0 : _j.lineHeight) style.setBoundVariable("lineHeight", null);
           res.notes.push(`${bindRole}: \uD589\uAC04 ${pctNow}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uBC14\uC778\uB529 \uC0DD\uB7B5`);
         } else {
           const lhVar = semByName.get(`line-height/${bindRole}`);
@@ -1045,7 +1046,7 @@
       if (spec.letterSpacing !== 0 || isRename) {
         const lsPctNow = lsPctOf(style.letterSpacing);
         if (lsPctNow !== 0) {
-          if ((_i = style.boundVariables) == null ? void 0 : _i.letterSpacing) style.setBoundVariable("letterSpacing", null);
+          if ((_k = style.boundVariables) == null ? void 0 : _k.letterSpacing) style.setBoundVariable("letterSpacing", null);
           res.notes.push(`${bindRole}: \uC790\uAC04 ${lsPctNow}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uBC14\uC778\uB529 \uC0DD\uB7B5`);
         } else {
           const lsVar = semByName.get(`letter-spacing/${bindRole}`);

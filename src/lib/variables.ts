@@ -276,12 +276,18 @@ function measureLetterSpacing(fontSize: number, ls: LetterSpacing | typeof figma
   }
   const px = roundN(ls.value);
   // 스타일 없는 텍스트: UI는 -2%인데 API가 -0.32px만 주는 경우.
-  // 흔한 정수 % 트래킹만 복구(임의 px를 %로 오인하지 않도록).
+  //
+  // px과 %는 이 폰트 크기에서 같은 값을 가리키므로 수치로는 못 가른다. 대신 **어느 쪽으로
+  // 읽어야 사람이 적어 넣은 값처럼 보이는가**를 본다 — 손으로 넣는 자간은 0.5 단위(1px·-0.5px)이고,
+  // %가 px로 환산돼 나온 값은 -0.32처럼 어중간하다. 0.5 배수면 px 의도로 보고 손대지 않는다.
+  // (`back` 검사는 pct가 정수면 거의 항상 통과라 혼자서는 아무것도 거르지 못한다 —
+  //  20px 활자에 1px 자간이 5%로 뒤집혀 변수 바인딩까지 끊겼다.)
   if (unit === 'PIXELS' && fontSize > 0 && px !== 0) {
+    const authoredPx = Math.abs(px * 2 - Math.round(px * 2)) < 1e-9; // 0.5 단위 = 직접 넣은 px
     const pct = roundN((px / fontSize) * 100);
     const back = roundN((fontSize * pct) / 100);
     const common = pct === Math.trunc(pct) && Math.abs(pct) >= 1 && Math.abs(pct) <= 10;
-    if (common && Math.abs(back - px) <= 0.011) return { px: back, pct };
+    if (!authoredPx && common && Math.abs(back - px) <= 0.011) return { px: back, pct };
   }
   return { px, pct: 0 };
 }
@@ -724,13 +730,18 @@ export async function createSemanticTextStyles(
           : { value: spec.letterSpacing, unit: 'PIXELS' };
     } else if (lhPct > 0 || lsPct !== 0) {
       // rename인데 스캔 %가 있으면 단위만 교정(폰트·크기는 기존 유지).
+      //
+      // 단, **이미 변수가 묶여 있으면 손대지 않는다**. 그 연결은 사용자가(또는 이 플러그인이
+      // 지난 실행에서) 만든 명시적 사실이고, %는 px 값을 보고 세운 추측이다. 추측이 사실을
+      // 지우면 되돌릴 방법이 없다 — 값을 안 바꾼 재스캔·재등록만으로 디자인 시스템 연결이
+      // 끊기던 자리다. 바인딩이 없을 때만 단위를 교정한다.
       if (lhPct > 0) {
-        style.setBoundVariable('lineHeight', null);
-        style.lineHeight = { value: lhPct, unit: 'PERCENT' };
+        if (style.boundVariables?.lineHeight) res.notes.push(`${spec.name}: 행간 변수 연결을 지켰습니다 — ${lhPct}% 교정 보류`);
+        else style.lineHeight = { value: lhPct, unit: 'PERCENT' };
       }
       if (lsPct !== 0) {
-        style.setBoundVariable('letterSpacing', null);
-        style.letterSpacing = { value: lsPct, unit: 'PERCENT' };
+        if (style.boundVariables?.letterSpacing) res.notes.push(`${spec.name}: 자간 변수 연결을 지켰습니다 — ${lsPct}% 교정 보류`);
+        else style.letterSpacing = { value: lsPct, unit: 'PERCENT' };
       }
     }
 

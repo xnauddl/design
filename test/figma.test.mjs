@@ -3102,7 +3102,7 @@ test('createSemanticTextStyles — 기존 %자간 스타일을 rename해도 %가
   assert.ok(r.notes.some((n) => n.includes('2%')));
 });
 
-test('createSemanticTextStyles — 예전에 px(+변수)로 굳은 스타일도 스캔 %로 교정한다', async () => {
+test('createSemanticTextStyles — 이미 변수가 묶인 스타일은 스캔 %가 와도 연결을 지킨다', async () => {
   const figma = installFigma();
   // 1차: % 없이 등록 → PIXELS + letterSpacing 변수 바인딩
   await createSemanticTextStyles(
@@ -3114,15 +3114,36 @@ test('createSemanticTextStyles — 예전에 px(+변수)로 굳은 스타일도 
   assert.deepEqual(style.letterSpacing, { value: 0.32, unit: 'PIXELS' });
   assert.ok(style.boundVariables.letterSpacing, '1차에 자간 변수 연결');
 
-  // 2차: 같은 앵커 + 스캔이 %를 실어 옴 → 단위 교정·바인딩 해제
+  // 2차: 같은 앵커 + 스캔이 %를 실어 옴. %는 px 값을 보고 세운 추측이고 바인딩은 사실이라,
+  // 값을 안 바꾼 재등록이 연결을 끊어선 안 된다 — 교정을 미루고 notes로 알린다.
   const r = await createSemanticTextStyles(
     [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular', boundStyleId: style.id }],
     false,
     [],
   );
-  assert.deepEqual(style.letterSpacing, { value: 2, unit: 'PERCENT' });
-  assert.equal(style.boundVariables.letterSpacing, undefined);
-  assert.ok(r.notes.some((n) => n.includes('2%')));
+  assert.deepEqual(style.letterSpacing, { value: 0.32, unit: 'PIXELS' }); // 그대로
+  assert.ok(style.boundVariables.letterSpacing, '연결 유지');
+  assert.ok(r.notes.some((n) => n.includes('자간 변수 연결을 지켰습니다')));
+});
+
+test('createSemanticTextStyles — 묶인 변수가 없으면 스캔 %로 단위를 교정한다', async () => {
+  const figma = installFigma();
+  // 자간 역할 변수가 없으니 1차 등록에서 바인딩이 생기지 않는다.
+  await createSemanticTextStyles(
+    [{ name: 'solo', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, family: 'Inter', style: 'Regular' }],
+    false,
+    [],
+  );
+  const style = figma._state.textStyles.find((s) => s.name === 'solo');
+  style.boundVariables = {}; // 연결 없는 상태(사용자가 직접 만든 스타일)
+  style.letterSpacing = { value: 0.32, unit: 'PIXELS' };
+
+  await createSemanticTextStyles(
+    [{ name: 'solo', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular', boundStyleId: style.id }],
+    false,
+    [],
+  );
+  assert.deepEqual(style.letterSpacing, { value: 2, unit: 'PERCENT' }); // 잃을 게 없으면 교정
 });
 
 test('createSemanticTextStyles — 같은 px 자간 이름에 원본이 갈리면 px로 기록', async () => {
