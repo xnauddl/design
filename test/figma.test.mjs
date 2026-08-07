@@ -372,7 +372,7 @@ test('extractFromSelection — 숨긴 레이어와 인스턴스 내부는 순회
   assert.equal(names.has('color/ff0000'), true); // 인스턴스 자체 속성은 수집
   assert.equal(names.has('size/120'), true);
   assert.equal(names.has('size/40'), true);
-  assert.equal(warnings.length, 2); // 숨김 · 인스턴스 안내
+  assert.equal(warnings.length, 0); // 스킵은 조용히 — 안내 문구 없음
 });
 
 test('extractFromSelection — count는 값을 쓰는 레이어 수(한 레이어의 중복 사용은 1)', () => {
@@ -472,9 +472,8 @@ test('extractFromSelection — 숨긴 조상 안의 레이어를 직접 선택�
   };
   inner.parent = { type: 'GROUP', id: 'hiddenGroup', visible: false, parent: null };
 
-  const { tokens, warnings } = extractFromSelection([inner]);
+  const { tokens } = extractFromSelection([inner]);
   assert.equal(tokens.length, 0); // 자신은 visible=true지만 조상이 숨김
-  assert.ok(warnings.some((w) => /숨긴 레이어/.test(w)));
 });
 
 test('bindSelection — 숨긴 조상 안의 선택 루트는 바인딩하지 않음', async () => {
@@ -524,7 +523,7 @@ test('extractFromSelection — 그리드 오토레이아웃은 gridRowGap/gridCo
   assert.equal(names.has('spacing/20'), true); // 가로 패딩
 });
 
-test('extractFromSelection — 그라디언트 채움은 경고', () => {
+test('extractFromSelection — 그라디언트 채움은 토큰에 포함하지 않음', () => {
   installFigma();
   const node = {
     type: 'RECTANGLE',
@@ -534,8 +533,7 @@ test('extractFromSelection — 그라디언트 채움은 경고', () => {
   };
   const { tokens, warnings } = extractFromSelection([node]);
   assert.equal(tokens.length, 0);
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /그라디언트/);
+  assert.equal(warnings.length, 0);
 });
 
 /* ================= variables.ts ================= */
