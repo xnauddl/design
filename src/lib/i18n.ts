@@ -122,6 +122,7 @@ export const STRINGS: Record<string, string> = {
 
   // 바인딩 스킵 사유(라벨 맵)
   'reason.no-match': '매칭 없음',
+  'reason.already-bound': '이미 바인딩됨',
   'reason.empty-text': '빈 텍스트',
   'reason.error': '바인딩 실패',
   'reason.hug-fill': 'HUG/FILL',

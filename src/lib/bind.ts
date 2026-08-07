@@ -118,6 +118,106 @@ interface Progress {
   every: number;
 }
 
+/* ---------- 이미 바인딩된 자리 보호 ---------- */
+/**
+ * 변수가 붙은 뒤에도 Figma는 `p.color`·`node.width`·`node.fontSize`를 **resolved 값 그대로**
+ * 돌려준다. 값만 보고 매칭하면 (1) 두 번째 미리보기에 이미 끝난 건이 다시 후보로 올라
+ * 남은 작업량을 알 수 없고, (2) 사용자가 직접 고른 변수도 같은 값의 상위 tier 변수로
+ * 말없이 교체된다. 그래서 이미 바인딩된 자리는 값이 맞아도 건드리지 않는다.
+ */
+function isAlias(x: unknown): boolean {
+  return !!x && typeof x === 'object' && (x as VariableAlias).type === 'VARIABLE_ALIAS';
+}
+
+function isNodeFieldBound(node: SceneNode, field: string): boolean {
+  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
+  const entry = bv?.[field];
+  if (!entry) return false;
+  // 텍스트 range 필드(fontSize·…)는 VariableAlias[] — 배열이 있다고 전 구간이 묶인 건 아니다.
+  // 부분 바인딩은 textFieldCoverage로 판정한다(여기선 스칼라 필드만).
+  if (Array.isArray(entry)) return false;
+  return isAlias(entry);
+}
+
+/**
+ * paint·effect 자신(`boundVariables.color`) **또는** 노드 쪽
+ * `boundVariables.fills|strokes|effects[index]`에 색 바인딩이 있는가.
+ * Figma는 setBoundVariableForPaint로 붙인 뒤 둘 다 채우지만, 테마 적용·외부 도구는
+ * 노드 배열만 남기는 경우가 있어 한쪽만 보면 이미 연결된 자리를 다시 덮는다.
+ */
+function isColorBound(
+  x: Paint | Effect,
+  node: SceneNode,
+  field: 'fills' | 'strokes' | 'effects',
+  index: number,
+): boolean {
+  if ((x as { boundVariables?: { color?: unknown } }).boundVariables?.color) return true;
+  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
+  const arr = bv?.[field];
+  return Array.isArray(arr) && isAlias(arr[index]);
+}
+
+/** 텍스트 필드 바인딩 커버리지 — 전 구간이 묶였는가 + 아직 빈 구간 목록. */
+interface TextCoverage {
+  fullyBound: boolean;
+  unbound: Array<[number, number]>;
+}
+
+/**
+ * 텍스트 range 바인딩은 글자 구간별이다. 기존 구간에만 변수가 붙은 채 글자를 늘리면
+ * `boundVariables[field]` 배열은 비어 있지 않은데 새 꼬리 구간은 비어 있다.
+ * 배열 length > 0만으로 skip하면 새 글자는 영원히 후보에 안 오른다.
+ */
+function textFieldCoverage(node: TextNode, field: VariableBindableTextField): TextCoverage {
+  const len = node.characters.length;
+  if (len === 0) return { fullyBound: false, unbound: [] };
+
+  const getRange = (
+    node as TextNode & {
+      getRangeBoundVariable?: (
+        start: number,
+        end: number,
+        f: VariableBindableTextField,
+      ) => VariableAlias | null | typeof figma.mixed;
+    }
+  ).getRangeBoundVariable;
+
+  if (typeof getRange === 'function') {
+    const full = getRange.call(node, 0, len, field);
+    if (full !== figma.mixed && isAlias(full)) return { fullyBound: true, unbound: [] };
+
+    const unbound: Array<[number, number]> = [];
+    let i = 0;
+    while (i < len) {
+      const v = getRange.call(node, i, i + 1, field);
+      if (v === figma.mixed || !isAlias(v)) {
+        let j = i + 1;
+        while (j < len) {
+          const w = getRange.call(node, j, j + 1, field);
+          if (w !== figma.mixed && isAlias(w)) break;
+          j++;
+        }
+        unbound.push([i, j]);
+        i = j;
+      } else {
+        i++;
+      }
+    }
+    return { fullyBound: unbound.length === 0, unbound };
+  }
+
+  // getRangeBoundVariable 없는 목/환경 — 부분 구간을 표현할 수 없으므로
+  // 기록이 있으면 전 구간 바인딩으로 본다(기존 테스트 호환).
+  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
+  const entry = bv?.[field];
+  if (!entry) return { fullyBound: false, unbound: [[0, len]] };
+  if (Array.isArray(entry)) {
+    if (entry.length === 0) return { fullyBound: false, unbound: [[0, len]] };
+    return { fullyBound: true, unbound: [] };
+  }
+  return isAlias(entry) ? { fullyBound: true, unbound: [] } : { fullyBound: false, unbound: [[0, len]] };
+}
+
 /** 조상까지 실제로 보이는가 — extract.ts와 같은 기준(숨긴 그룹 안의 레이어를 직접 고른 경우). */
 function isEffectivelyVisible(node: SceneNode): boolean {
   let p: BaseNode | null = node;
@@ -343,6 +443,10 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
     let changed = false;
     const next = paints.map((p, i) => {
       if (p.type !== 'SOLID') return p;
+      if (isColorBound(p, node, key, i)) {
+        note(res, 'already-bound', node, preview, key);
+        return p;
+      }
       const hex = rgbToHex(p.color);
       const e = matchColor(entries, hex, allowed);
       if (!e) {
@@ -473,6 +577,10 @@ function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, appl
   let changed = false;
   const next = (node as { effects: readonly Effect[] }).effects.map((e, i) => {
     if (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW') return e;
+    if (isColorBound(e, node, 'effects', i)) {
+      note(res, 'already-bound', node, preview, 'effects');
+      return e;
+    }
     const hex = rgbToHex(e.color);
     const ent = matchColor(entries, hex, EFFECT_SCOPES);
     if (!ent) {
@@ -508,17 +616,26 @@ async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: 
     tryBindText(node, 'letterSpacing', node.letterSpacing.value, entries, tol, res, apply, preview);
   }
   // fontFamily — STRING 변수(FONT_FAMILY)에 정확 일치 바인딩.
-  const fe = matchString(entries, node.fontName.family, 'FONT_FAMILY');
-  if (fe && node.characters.length > 0) {
-    if (!apply) {
-      res.bound++;
-      addStrCand(preview, node, 'fontFamily', node.fontName.family, fe);
-    } else {
-      try {
-        node.setRangeBoundVariable(0, node.characters.length, 'fontFamily', fe.variable);
+  {
+    const coverage = textFieldCoverage(node, 'fontFamily');
+    if (coverage.fullyBound) {
+      note(res, 'already-bound', node, preview, 'fontFamily');
+      return;
+    }
+    const fe = matchString(entries, node.fontName.family, 'FONT_FAMILY');
+    if (fe && coverage.unbound.length > 0) {
+      if (!apply) {
         res.bound++;
-      } catch {
-        skip(res, 'error', node, preview, 'fontFamily');
+        addStrCand(preview, node, 'fontFamily', node.fontName.family, fe);
+      } else {
+        try {
+          for (const [start, end] of coverage.unbound) {
+            node.setRangeBoundVariable(start, end, 'fontFamily', fe.variable);
+          }
+          res.bound++;
+        } catch {
+          skip(res, 'error', node, preview, 'fontFamily');
+        }
       }
     }
   }
@@ -534,12 +651,16 @@ function tryBindText(
   apply: boolean,
   preview: Preview | null,
 ): void {
-  const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
-  const len = node.characters.length;
-  if (len === 0) {
+  if (node.characters.length === 0) {
     skip(res, 'empty-text', node, preview, field);
     return;
   }
+  const coverage = textFieldCoverage(node, field);
+  if (coverage.fullyBound) {
+    note(res, 'already-bound', node, preview, field);
+    return;
+  }
+  const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   if (!e) {
     skip(res, 'no-match', node, preview, field);
     return;
@@ -550,7 +671,10 @@ function tryBindText(
     return;
   }
   try {
-    node.setRangeBoundVariable(0, len, field, e.variable);
+    // 이미 묶인 구간은 건드리지 않고, 비어 있는 구간만 채운다(글자 추가 후 꼬리 등).
+    for (const [start, end] of coverage.unbound) {
+      node.setRangeBoundVariable(start, end, field, e.variable);
+    }
     res.bound++;
   } catch {
     skip(res, 'error', node, preview, field);
@@ -569,6 +693,10 @@ function tryBind(
   /** 매칭 실패 사유 키 — 호출자가 좁힌 조건으로 실패했을 때 그 이유를 남긴다. */
   noMatchReason = 'no-match',
 ): void {
+  if (isNodeFieldBound(node, field)) {
+    note(res, 'already-bound', node, preview, field);
+    return;
+  }
   const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
   if (!e) {
     skip(res, noMatchReason, node, preview, field);

@@ -1263,6 +1263,58 @@
     }
     return nodeIndex.filter((n) => keep.has(n.id));
   }
+  function isAlias(x) {
+    return !!x && typeof x === "object" && x.type === "VARIABLE_ALIAS";
+  }
+  function isNodeFieldBound(node, field) {
+    const bv = node.boundVariables;
+    const entry = bv == null ? void 0 : bv[field];
+    if (!entry) return false;
+    if (Array.isArray(entry)) return false;
+    return isAlias(entry);
+  }
+  function isColorBound(x, node, field, index) {
+    var _a;
+    if ((_a = x.boundVariables) == null ? void 0 : _a.color) return true;
+    const bv = node.boundVariables;
+    const arr = bv == null ? void 0 : bv[field];
+    return Array.isArray(arr) && isAlias(arr[index]);
+  }
+  function textFieldCoverage(node, field) {
+    const len = node.characters.length;
+    if (len === 0) return { fullyBound: false, unbound: [] };
+    const getRange = node.getRangeBoundVariable;
+    if (typeof getRange === "function") {
+      const full = getRange.call(node, 0, len, field);
+      if (full !== figma.mixed && isAlias(full)) return { fullyBound: true, unbound: [] };
+      const unbound = [];
+      let i = 0;
+      while (i < len) {
+        const v = getRange.call(node, i, i + 1, field);
+        if (v === figma.mixed || !isAlias(v)) {
+          let j = i + 1;
+          while (j < len) {
+            const w = getRange.call(node, j, j + 1, field);
+            if (w !== figma.mixed && isAlias(w)) break;
+            j++;
+          }
+          unbound.push([i, j]);
+          i = j;
+        } else {
+          i++;
+        }
+      }
+      return { fullyBound: unbound.length === 0, unbound };
+    }
+    const bv = node.boundVariables;
+    const entry = bv == null ? void 0 : bv[field];
+    if (!entry) return { fullyBound: false, unbound: [[0, len]] };
+    if (Array.isArray(entry)) {
+      if (entry.length === 0) return { fullyBound: false, unbound: [[0, len]] };
+      return { fullyBound: true, unbound: [] };
+    }
+    return isAlias(entry) ? { fullyBound: true, unbound: [] } : { fullyBound: false, unbound: [[0, len]] };
+  }
   function isEffectivelyVisible2(node) {
     let p = node;
     while (p) {
@@ -1441,6 +1493,10 @@
       let changed = false;
       const next = paints3.map((p, i) => {
         if (p.type !== "SOLID") return p;
+        if (isColorBound(p, node, key, i)) {
+          note(res, "already-bound", node, preview, key);
+          return p;
+        }
         const hex = rgbToHex(p.color);
         const e = matchColor(entries, hex, allowed);
         if (!e) {
@@ -1534,6 +1590,10 @@
     let changed = false;
     const next = node.effects.map((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return e;
+      if (isColorBound(e, node, "effects", i)) {
+        note(res, "already-bound", node, preview, "effects");
+        return e;
+      }
       const hex = rgbToHex(e.color);
       const ent = matchColor(entries, hex, EFFECT_SCOPES);
       if (!ent) {
@@ -1566,28 +1626,41 @@
     if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") {
       tryBindText(node, "letterSpacing", node.letterSpacing.value, entries, tol, res, apply, preview);
     }
-    const fe = matchString(entries, node.fontName.family, "FONT_FAMILY");
-    if (fe && node.characters.length > 0) {
-      if (!apply) {
-        res.bound++;
-        addStrCand(preview, node, "fontFamily", node.fontName.family, fe);
-      } else {
-        try {
-          node.setRangeBoundVariable(0, node.characters.length, "fontFamily", fe.variable);
+    {
+      const coverage = textFieldCoverage(node, "fontFamily");
+      if (coverage.fullyBound) {
+        note(res, "already-bound", node, preview, "fontFamily");
+        return;
+      }
+      const fe = matchString(entries, node.fontName.family, "FONT_FAMILY");
+      if (fe && coverage.unbound.length > 0) {
+        if (!apply) {
           res.bound++;
-        } catch (e) {
-          skip(res, "error", node, preview, "fontFamily");
+          addStrCand(preview, node, "fontFamily", node.fontName.family, fe);
+        } else {
+          try {
+            for (const [start, end] of coverage.unbound) {
+              node.setRangeBoundVariable(start, end, "fontFamily", fe.variable);
+            }
+            res.bound++;
+          } catch (e) {
+            skip(res, "error", node, preview, "fontFamily");
+          }
         }
       }
     }
   }
   function tryBindText(node, field, value, entries, tol, res, apply, preview) {
-    const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
-    const len = node.characters.length;
-    if (len === 0) {
+    if (node.characters.length === 0) {
       skip(res, "empty-text", node, preview, field);
       return;
     }
+    const coverage = textFieldCoverage(node, field);
+    if (coverage.fullyBound) {
+      note(res, "already-bound", node, preview, field);
+      return;
+    }
+    const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     if (!e) {
       skip(res, "no-match", node, preview, field);
       return;
@@ -1598,13 +1671,19 @@
       return;
     }
     try {
-      node.setRangeBoundVariable(0, len, field, e.variable);
+      for (const [start, end] of coverage.unbound) {
+        node.setRangeBoundVariable(start, end, field, e.variable);
+      }
       res.bound++;
     } catch (e2) {
       skip(res, "error", node, preview, field);
     }
   }
   function tryBind(node, field, value, entries, tol, res, apply, preview, noMatchReason = "no-match") {
+    if (isNodeFieldBound(node, field)) {
+      note(res, "already-bound", node, preview, field);
+      return;
+    }
     const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
     if (!e) {
       skip(res, noMatchReason, node, preview, field);
@@ -1875,6 +1954,11 @@
       fn.call(node, ROLE_KEY, role);
     } catch (e) {
     }
+  }
+  function writeRoleFromName(node, name) {
+    const toks = kebab(name).split("-").filter(Boolean);
+    const role = toks[toks.length - 1];
+    if (role && isKnownRole(role)) writeRole(node, role);
   }
   var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper"]);
   function resolveRole(node, token, pos, parentRole, ctxScope) {
@@ -4760,6 +4844,7 @@
             if (before !== expectedBefore) continue;
             if (before === after) continue;
             node.name = after;
+            writeRoleFromName(node, after);
             changes.push({ id, before, after });
           }
           post({ type: "RENAME_RESULT", changes, nodes: [], applied: true });
@@ -4984,19 +5069,20 @@
           try {
             const eligibleNodes = pruned.filter((c) => c.eligible).map((c) => liveById.get(c.id)).filter((n) => !!n);
             const groups = groupForRegister(eligibleNodes);
+            const groupNames = resolveGroupNames(groups.map((g) => g.members));
             const preview = /* @__PURE__ */ new Map();
-            for (const g of groups) {
+            for (let gi = 0; gi < groups.length; gi++) {
+              const g = groups[gi];
+              const name = groupNames[gi];
               if (g.members.length < 2) {
-                if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
+                if (g.members[0]) preview.set(g.members[0].id, { single: name });
                 continue;
               }
               if (shouldCollapseToProperties(g.members)) {
-                const name = pascalCase(commonBaseName(g.members.map((m) => m.name)) || g.members[0].name);
                 for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true });
                 continue;
               }
-              const base = commonBaseName(g.members.map((m) => m.name));
-              for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
+              for (const d of deriveVariants(g.members)) preview.set(d.id, { group: name, variant: d.variant });
             }
             nodes = pruned.map((c) => {
               const p = preview.get(c.id);
