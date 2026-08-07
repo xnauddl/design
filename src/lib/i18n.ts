@@ -234,6 +234,8 @@ export const STRINGS: Record<string, string> = {
   'bind.preview': '미리보기',
   'bind.confirm': '선택한 항목에 연결',
   'bind.progress': '진행률',
+  'bind.skipHint': '건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다',
+  'bind.skipMeta': '스킵',
   // 리네임
   'rename.title': '이름 정리',
   'rename.hint': '역할에 맞는 레이어 이름으로 바꿉니다. 최상위·인스턴스 이름은 그대로 둡니다',

@@ -604,9 +604,11 @@
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
       </div>
-      <div id="bindTree" class="results"></div>
-      <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐). -->
+      <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐).
+           목록 위에 둔다: 몇 개가 왜 빠졌는지는 후보를 훑기 전에 알아야 하는 정보다. -->
       <div class="skip-row" id="bindSkips" style="display:none"></div>
+      <div class="hint" id="bindSkipHint" style="display:none" data-i18n="bind.skipHint">건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다</div>
+      <div id="bindTree" class="results"></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
@@ -1053,6 +1055,8 @@
     "bind.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
     "bind.confirm": "\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0",
     "bind.progress": "\uC9C4\uD589\uB960",
+    "bind.skipHint": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4",
+    "bind.skipMeta": "\uC2A4\uD0B5",
     // 리네임
     "rename.title": "\uC774\uB984 \uC815\uB9AC",
     "rename.hint": "\uC5ED\uD560\uC5D0 \uB9DE\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uC73C\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uCD5C\uC0C1\uC704\xB7\uC778\uC2A4\uD134\uC2A4 \uC774\uB984\uC740 \uADF8\uB300\uB85C \uB461\uB2C8\uB2E4",
@@ -3294,7 +3298,7 @@
       const title2 = document.createElement("span");
       title2.className = "tree-name";
       title2.textContent = r.name;
-      const card2 = resultCard({ title: title2, titleMono: true, summary: r.keep, meta: t("rename.keep.meta"), dim: true });
+      const card2 = resultCard({ title: title2, titleMono: true, summary: r.keep.reason, meta: r.keep.meta, dim: true });
       card2.style.marginLeft = indent;
       return card2;
     }
@@ -3346,7 +3350,7 @@
       depth: n.depth,
       parentId: n.parentId,
       change: n.after,
-      keep: n.keep ? t(`rename.keep.${n.keep}`) : void 0
+      keep: n.keep ? { reason: t(`rename.keep.${n.keep}`), meta: t("rename.keep.meta") } : void 0
     }));
     const keepBtn = $("btnRenameKeep");
     keepBtn.style.display = rows.some((r) => r.keep) ? "" : "none";
@@ -3398,6 +3402,10 @@
   function hasBindPreview() {
     return bindCandidates.length > 0;
   }
+  function skipReasonText(s) {
+    const why = t(`reason.${s.reason}`);
+    return s.field ? `${s.field} \xB7 ${why}` : why;
+  }
   function bindRows() {
     const byNode = /* @__PURE__ */ new Map();
     for (const c of bindCandidates) {
@@ -3405,9 +3413,23 @@
       if (arr) arr.push(c);
       else byNode.set(c.nodeId, [c]);
     }
+    const skipOf = /* @__PURE__ */ new Map();
+    for (const s of bindSkips) if (!byNode.has(s.nodeId) && !skipOf.has(s.nodeId)) skipOf.set(s.nodeId, s);
     const rows = [];
     for (const n of bindNodes) {
       const cands = byNode.get(n.id);
+      const skipped = skipOf.get(n.id);
+      if (!cands && skipped) {
+        rows.push({
+          id: n.id,
+          name: n.name,
+          type: n.type,
+          depth: n.depth,
+          parentId: n.parentId,
+          keep: { reason: skipReasonText(skipped), meta: t("bind.skipMeta") }
+        });
+        continue;
+      }
       rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands });
       if (cands) {
         for (const c of cands) {
@@ -3452,6 +3474,7 @@
     bindSkips = [];
     clearMount($("bindSkips"));
     $("bindSkips").style.display = "none";
+    $("bindSkipHint").style.display = "none";
     bindChecked.clear();
     clearMount($("bindTree"));
     $("bindCount").textContent = "";
@@ -3547,17 +3570,16 @@
   var bindSkips = [];
   function renderSkipReasons(reasons) {
     const box = $("bindSkips");
+    const hint = $("bindSkipHint");
     box.innerHTML = "";
     const entries = Object.entries(reasons).filter(([, n]) => n > 0);
     if (!entries.length || !bindSkips.length) {
       box.style.display = "none";
+      hint.style.display = "none";
       return;
     }
     box.style.display = "";
-    const head = document.createElement("span");
-    head.className = "muted";
-    head.textContent = "\uAC74\uB108\uB700:";
-    box.appendChild(head);
+    hint.style.display = "";
     for (const [key, n] of entries) {
       const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
       const label = `${t("reason." + key)} ${n}`;

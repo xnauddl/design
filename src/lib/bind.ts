@@ -90,12 +90,16 @@ function addStrCand(preview: Preview | null, node: SceneNode, field: string, val
   preview?.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
 }
 
-/** 미리보기 트리를 영향 노드 + 그 조상 체인으로 가지치기(pre-order 보존). */
-function pruneToAffected(nodeIndex: BindNode[], candidates: BindCandidate[]): BindNode[] {
+/**
+ * 미리보기 트리를 영향 노드 + 그 조상 체인으로 가지치기(pre-order 보존).
+ * 건너뛴 레이어도 남긴다 — 미리보기에서 "왜 이건 안 붙었나"를 목록 자리에서 답해야 한다.
+ */
+function pruneToAffected(nodeIndex: BindNode[], candidates: BindCandidate[], skips: BindSkip[]): BindNode[] {
   const byId = new Map(nodeIndex.map((n) => [n.id, n]));
-  const keep = new Set<string>(candidates.map((c) => c.nodeId));
-  for (const c of candidates) {
-    let p = byId.get(c.nodeId)?.parentId ?? null;
+  const seeds = [...candidates.map((c) => c.nodeId), ...skips.map((s) => s.nodeId)];
+  const keep = new Set<string>(seeds);
+  for (const id of seeds) {
+    let p = byId.get(id)?.parentId ?? null;
     while (p && !keep.has(p)) {
       keep.add(p);
       p = byId.get(p)?.parentId ?? null;
@@ -185,7 +189,7 @@ export async function bindSelection(
   res.flags = [...flagSet];
   if (preview) {
     res.candidates = preview.candidates;
-    res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates);
+    res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates, preview.skips);
     res.skips = preview.skips;
   }
   hooks.onProgress?.(prog.done, prog.total); // 최종 진행률(100%)

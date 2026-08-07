@@ -1249,6 +1249,30 @@ test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 
   assert.equal(byId.get('child').depth, 1);
 });
 
+test('bindSelection — 건너뛴 레이어도 미리보기 트리에 남는다(사유 표시용)', async () => {
+  installFigma();
+  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
+  // 형제 둘: hit=매칭, miss=매칭 없음. miss는 후보가 0이라 예전 가지치기에선 트리에서 사라졌다.
+  const mk = (id, g) => ({
+    type: 'FRAME', id, name: id,
+    fills: [{ type: 'SOLID', color: { r: 0, g: g, b: 1 } }],
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', layoutMode: 'NONE',
+    setBoundVariable() {},
+  });
+  const hit = mk('hit', 0.4); // #0066ff
+  const miss = mk('miss', 1); // #00ffff → 매칭 없음
+  const root = { type: 'FRAME', id: 'root', name: 'root', fills: [], layoutMode: 'VERTICAL', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, children: [hit, miss], setBoundVariable() {} };
+  hit.parent = root;
+  miss.parent = root;
+
+  const dry = await bindSelection([root], 0.5, false);
+
+  assert.equal(dry.candidates.filter((c) => c.nodeId === 'miss').length, 0); // 후보 없음
+  assert.ok(dry.skips.some((s) => s.nodeId === 'miss' && s.reason === 'no-match'));
+  assert.ok(dry.nodes.some((n) => n.id === 'miss'), '건너뛴 레이어가 트리에서 빠지면 사유를 보여줄 자리가 없다');
+  assert.deepEqual(dry.nodes.map((n) => n.id), ['root', 'hit', 'miss']); // pre-order 유지
+});
+
 test('bindSelection — 진행률 보고 + 취소(UX6)', async () => {
   installFigma();
   await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);

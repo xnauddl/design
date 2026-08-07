@@ -1936,8 +1936,9 @@ interface TreeRow {
   replace?: boolean;
   /** 행 앞 종류 배지(예: 세트/단독). text=라벨, kind=색 클래스(set|single). */
   badge?: { text: string; kind: 'set' | 'single' };
-  /** 대상이 아닌 이유(리네임 보존 등). 있으면 흐린 행 + 사유 표시, 체크 불가. */
-  keep?: string;
+  /** 대상이 아닌 이유. 있으면 흐린 행 + 사유(reason) + 꼬리표(meta), 체크 불가.
+   *  리네임=보존(잠금) · 바인딩=건너뜀(스킵). */
+  keep?: { reason: string; meta: string };
 }
 
 /** 선택 서브트리의 최소 depth(루트 기준)로 들여쓰기를 정규화한다. */
@@ -1949,13 +1950,13 @@ function baseDepth(rows: TreeRow[]): number {
 function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: () => void): HTMLElement {
   const indent = `${(r.depth - base) * 12}px`;
 
-  // 지켜지는 이름은 '아무 일도 안 일어난 것'과 구분해서 보여 준다 — 흐린 카드 + 사유.
-  // 그냥 빼 버리면 왜 그 레이어만 안 바뀌었는지 알 길이 없어 버그로 읽힌다(#7b).
+  // 손대지 않은 레이어는 '아무 일도 안 일어난 것'과 구분해서 보여 준다 — 흐린 카드 + 사유.
+  // 그냥 빼 버리면 왜 그 레이어만 빠졌는지 알 길이 없어 버그로 읽힌다(#7b 보존 · #6 건너뜀).
   if (r.change === undefined && r.keep) {
     const title = document.createElement('span');
     title.className = 'tree-name';
     title.textContent = r.name;
-    const card = resultCard({ title, titleMono: true, summary: r.keep, meta: t('rename.keep.meta'), dim: true });
+    const card = resultCard({ title, titleMono: true, summary: r.keep.reason, meta: r.keep.meta, dim: true });
     card.style.marginLeft = indent;
     return card;
   }
@@ -2028,7 +2029,7 @@ function renderRenameTree(): void {
     depth: n.depth,
     parentId: n.parentId,
     change: n.after,
-    keep: n.keep ? t(`rename.keep.${n.keep}`) : undefined,
+    keep: n.keep ? { reason: t(`rename.keep.${n.keep}`), meta: t('rename.keep.meta') } : undefined,
   }));
   // 보존 행이 없으면 토글할 것도 없다 — 버튼을 걷어 빈 스위치를 남기지 않는다.
   const keepBtn = $('btnRenameKeep');
@@ -2093,7 +2094,13 @@ function hasBindPreview(): boolean {
   return bindCandidates.length > 0;
 }
 
-/** code의 후보/노드를 트리 행으로: 노드 헤더 + 후보(체크) 행. */
+/** 건너뛴 레이어의 사유 요약 — '너비 · HUG/FILL'처럼 속성이 있으면 앞에 붙인다. */
+function skipReasonText(s: BindSkip): string {
+  const why = t(`reason.${s.reason}`);
+  return s.field ? `${s.field} · ${why}` : why;
+}
+
+/** code의 후보/노드를 트리 행으로: 노드 헤더 + 후보(체크) 행 + 건너뛴 레이어(흐림). */
 function bindRows(): TreeRow[] {
   const byNode = new Map<string, BindCandidate[]>();
   for (const c of bindCandidates) {
@@ -2101,9 +2108,22 @@ function bindRows(): TreeRow[] {
     if (arr) arr.push(c);
     else byNode.set(c.nodeId, [c]);
   }
+  // 붙은 게 하나도 없는 레이어만 '스킵' 행으로 — 일부라도 붙었으면 후보 쪽이 본론이고,
+  // 그 노드의 나머지 사유는 위쪽 사유 칩이 맡는다(같은 말을 두 번 하지 않게).
+  const skipOf = new Map<string, BindSkip>();
+  for (const s of bindSkips) if (!byNode.has(s.nodeId) && !skipOf.has(s.nodeId)) skipOf.set(s.nodeId, s);
+
   const rows: TreeRow[] = [];
   for (const n of bindNodes) {
     const cands = byNode.get(n.id);
+    const skipped = skipOf.get(n.id);
+    if (!cands && skipped) {
+      rows.push({
+        id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId,
+        keep: { reason: skipReasonText(skipped), meta: t('bind.skipMeta') },
+      });
+      continue;
+    }
     rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands });
     if (cands) {
       for (const c of cands) {
@@ -2156,6 +2176,7 @@ function clearBindPreview(): void {
   bindSkips = [];
   clearMount($('bindSkips')); // 숨기기만 하면 낡은 칩이 DOM에 남는다
   ($('bindSkips') as HTMLElement).style.display = 'none';
+  ($('bindSkipHint') as HTMLElement).style.display = 'none';
   bindChecked.clear();
   clearMount($('bindTree'));
   $('bindCount').textContent = '';
@@ -2308,17 +2329,16 @@ let bindSkips: BindSkip[] = [];
 /** 사유 칩 렌더 — 레이어 목록이 있는 사유만 버튼, 나머지는 글자. */
 function renderSkipReasons(reasons: Record<string, number>): void {
   const box = $('bindSkips');
+  const hint = $('bindSkipHint'); // 칩이 무엇이고 누르면 무슨 일이 나는지 — 칩과 생사를 같이 한다
   box.innerHTML = '';
   const entries = Object.entries(reasons).filter(([, n]) => n > 0);
   if (!entries.length || !bindSkips.length) {
     box.style.display = 'none';
+    hint.style.display = 'none';
     return;
   }
   box.style.display = '';
-  const head = document.createElement('span');
-  head.className = 'muted';
-  head.textContent = '건너뜀:';
-  box.appendChild(head);
+  hint.style.display = '';
   for (const [key, n] of entries) {
     const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
     const label = `${t('reason.' + key)} ${n}`;

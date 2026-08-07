@@ -1399,12 +1399,13 @@
   function addStrCand(preview, node, field, value, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
   }
-  function pruneToAffected(nodeIndex, candidates) {
+  function pruneToAffected(nodeIndex, candidates, skips) {
     var _a, _b, _c, _d;
     const byId = new Map(nodeIndex.map((n) => [n.id, n]));
-    const keep = new Set(candidates.map((c) => c.nodeId));
-    for (const c of candidates) {
-      let p = (_b = (_a = byId.get(c.nodeId)) == null ? void 0 : _a.parentId) != null ? _b : null;
+    const seeds = [...candidates.map((c) => c.nodeId), ...skips.map((s) => s.nodeId)];
+    const keep = new Set(seeds);
+    for (const id of seeds) {
+      let p = (_b = (_a = byId.get(id)) == null ? void 0 : _a.parentId) != null ? _b : null;
       while (p && !keep.has(p)) {
         keep.add(p);
         p = (_d = (_c = byId.get(p)) == null ? void 0 : _c.parentId) != null ? _d : null;
@@ -1464,7 +1465,7 @@
     res.flags = [...flagSet];
     if (preview) {
       res.candidates = preview.candidates;
-      res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates);
+      res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates, preview.skips);
       res.skips = preview.skips;
     }
     (_a = hooks.onProgress) == null ? void 0 : _a.call(hooks, prog.done, prog.total);
