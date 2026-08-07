@@ -134,7 +134,7 @@ async function recurse(
     }
 
     // 영향 여부와 무관하게 트리에 담는다(전체 서브트리 + 영향 노드 강조).
-    col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep });
+    col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role });
 
     // 제외 대상은 서브트리째 건너뛴다 — decide()가 노드 자신만 스킵하면 내부는 그대로 리네임돼
     // 메인 컴포넌트 내부 이름(→ 모든 인스턴스에 전파)과 잠금 레이어까지 덮어쓰게 된다.
@@ -189,7 +189,7 @@ async function decide(
  * 판정한 역할을 노드 pluginData에 기록한다. 실패해도 리네임은 계속 — 이름이 본체고
  * 기록은 등록 단계의 보조 신호다. (테스트 목처럼 API가 없는 노드도 안전하게 통과)
  */
-function writeRole(node: SceneNode, role: string): void {
+export function writeRole(node: SceneNode, role: string): void {
   const fn = (node as { setPluginData?: (key: string, value: string) => void }).setPluginData;
   if (typeof fn !== 'function') return;
   try {

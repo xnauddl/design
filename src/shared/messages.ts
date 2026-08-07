@@ -59,6 +59,8 @@ export interface RenameNode {
   /** 이름을 지킨 이유(#7b). 있으면 대상이 아니라는 뜻 — 미리보기에서 흐린 행으로 보인다.
    *  없고 after도 없으면 '역할이 지금 이름과 같아 바꿀 게 없는' 평범한 맥락 노드다. */
   keep?: KeepReason;
+  /** 이 이름을 만든 역할(card·thumbnail…). 적용 때 `dsRole`로 남겨 등록이 읽는다. */
+  role?: string;
 }
 
 /**
@@ -132,7 +134,8 @@ export type UiToCode =
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
-  | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string }[] } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
+  // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(등록이 머리명사로 읽는다).
+  | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string }[] } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   | { type: 'SCAN_TEXT_STYLES'; useRowLabels?: boolean } // Phase C: 선택 텍스트 후보(+가로 행 라벨→이름)
   | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[]; apply: boolean } // Phase C: 변수 보장+스타일 등록(+적용)

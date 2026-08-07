@@ -7,11 +7,11 @@ import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
-import { renameSelection } from './lib/rename';
+import { renameSelection, writeRole } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, commonBaseName, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
@@ -387,6 +387,32 @@ function readRole(node: SceneNode): string | undefined {
   }
 }
 
+/**
+ * 문서에 이미 있는 컴포넌트·세트 이름 — 이름 충돌 해소가 지난 실행분까지 보게 한다.
+ * 실패하면 빈 목록(충돌 해소가 이번 묶음 안에서만 되는, 예전 동작으로 안전하게 후퇴).
+ */
+async function existingComponentNames(): Promise<string[]> {
+  try {
+    await figma.loadAllPagesAsync();
+    return figma.root
+      .findAllWithCriteria({ types: ['COMPONENT', 'COMPONENT_SET'] })
+      .map((n) => n.name);
+  } catch {
+    return [];
+  }
+}
+
+/** 페인트 배열 → 판정에 필요한 필드만. figma.mixed(symbol)는 그대로 넘겨 판정이 구분하게 둔다. */
+function paintsOf(v: unknown): readonly { visible?: boolean; type?: string; opacity?: number }[] | symbol | undefined {
+  if (typeof v === 'symbol') return v; // figma.mixed
+  if (!Array.isArray(v)) return undefined;
+  return (v as readonly { visible?: boolean; type?: string; opacity?: number }[]).map((p) => ({
+    visible: p.visible,
+    type: p.type,
+    opacity: p.opacity,
+  }));
+}
+
 /** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑·역할을 읽어 순수 그룹화에 넘김. */
 function toStructNode(node: SceneNode): StructNode {
   const a = node as unknown as Record<string, unknown>;
@@ -421,6 +447,19 @@ function toStructNode(node: SceneNode): StructNode {
     counterAxisSpacing: num(a.counterAxisSpacing),
     layoutMode: typeof a.layoutMode === 'string' ? a.layoutMode : undefined,
     fillHex: solidFillHex(node),
+    // 고신뢰 역할 판정(카드·figure·button…)이 읽는 값들 — 여기서 빼면 `componentEligible`이
+    // 채움도 모서리도 그림자도 없는 노드를 보게 되어 카드형 프레임이 후보에서 통째로 사라진다.
+    // 페인트/이펙트는 판정에 필요한 필드만 얕게 복사한다(원본 배열은 트리 전체로 무겁다).
+    cornerRadius: a.cornerRadius as number | symbol | undefined,
+    topLeftRadius: num(a.topLeftRadius),
+    opacity: num(a.opacity),
+    gridRowCount: num(a.gridRowCount),
+    gridColumnCount: num(a.gridColumnCount),
+    fills: paintsOf(a.fills),
+    strokes: paintsOf(a.strokes),
+    effects: Array.isArray(a.effects)
+      ? (a.effects as readonly { visible?: boolean; type?: string }[]).map((e) => ({ visible: e.visible, type: e.type }))
+      : undefined,
     characters,
     mainComponentKey,
     role: readRole(node),
@@ -756,13 +795,17 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'RENAME_APPLY': {
         // #7: 미리보기 트리에서 체크한 항목만 직접 적용(재계산 없이 id→after 그대로).
         const changes: RenameChange[] = [];
-        for (const { id, before: expectedBefore, after } of msg.items) {
+        for (const { id, before: expectedBefore, after, role } of msg.items) {
           const node = await figma.getNodeByIdAsync(id);
           if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
           const before = node.name;
           if (before !== expectedBefore) continue; // 미리보기 이후 이름이 바뀐 노드는 stale 적용 방지
           if (before === after) continue;
           node.name = after;
+          // 이름만 바꾸면 등록이 읽을 역할이 남지 않는다 — 마법사 경로(renameSelection)는
+          // 이미 남기는데 판넬 경로만 빠져 있어, 말단 등록 후보와 머리명사 규칙이
+          // 판넬로 리네임한 사람에게는 통째로 죽어 있었다.
+          if (role) writeRole(node as SceneNode, role);
           changes.push({ id, before, after });
         }
         post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true });
@@ -988,20 +1031,23 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             .map((c) => liveById.get(c.id))
             .filter((n): n is SceneNode => !!n);
           const groups = groupForRegister(eligibleNodes);
+          // 등록과 **같은 함수**로 이름을 정한다. 예전엔 미리보기만 `commonBaseName`/`pascalCase(첫 멤버명)`을
+          // 써서, 트리에 `CardThumbnail`이라 보여 주고 실제로는 `Thumbnail`로 등록됐다.
+          // 문서에 이미 있는 컴포넌트 이름도 함께 넘겨 충돌 해소 결과까지 등록과 일치시킨다.
+          const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
           const preview = new Map<string, { group?: string; variant?: string; single?: string; propsOnly?: boolean }>();
-          for (const g of groups) {
+          groups.forEach((g, gi) => {
+            const name = groupNames[gi];
             if (g.members.length < 2) {
-              if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
-              continue;
+              if (g.members[0]) preview.set(g.members[0].id, { single: name });
+              return;
             }
             if (shouldCollapseToProperties(g.members)) {
-              const name = pascalCase(commonBaseName(g.members.map((m) => m.name)) || g.members[0].name);
               for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true });
-              continue;
+              return;
             }
-            const base = commonBaseName(g.members.map((m) => m.name));
-            for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
-          }
+            for (const d of deriveVariants(g.members)) preview.set(d.id, { group: name, variant: d.variant });
+          });
           nodes = pruned.map((c) => {
             const p = preview.get(c.id);
             return p ? { ...c, ...p } : c;
@@ -1115,7 +1161,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         };
 
         // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
-        const groupNames = resolveGroupNames(groups.map((g) => g.members));
+        const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
         for (let gi = 0; gi < groups.length; gi++) {
           const g = groups[gi];
           const setName = groupNames[gi];
@@ -1284,7 +1330,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const missing: string[] = [];
         const singles: string[] = [];
         const failures: string[] = [];
-        const groupNames = resolveGroupNames(groups.map((g) => g.members)); // 등록과 동일 규칙
+        const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames()); // 등록과 동일 규칙
         for (let gi = 0; gi < groups.length; gi++) {
           const g = groups[gi];
           const nodes = g.members.map((m) => byId.get(m.id)).filter((n): n is ComponentNode => !!n);

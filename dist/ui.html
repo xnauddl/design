@@ -2538,7 +2538,7 @@
     send({ type: "RENAME", apply: false, maxDepth: readMaxDepth() });
   });
   $("btnRename").addEventListener("click", () => {
-    const items = renameNodes.filter((n) => n.after !== void 0 && renameChecked.has(n.id)).map((n) => ({ id: n.id, before: n.name, after: n.after }));
+    const items = renameNodes.filter((n) => n.after !== void 0 && renameChecked.has(n.id)).map((n) => ({ id: n.id, before: n.name, after: n.after, role: n.role }));
     if (!items.length) return;
     send({ type: "RENAME_APPLY", items });
   });

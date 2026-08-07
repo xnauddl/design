@@ -973,7 +973,7 @@ $('btnRename').addEventListener('click', () => {
   // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG).
   const items = renameNodes
     .filter((n) => n.after !== undefined && renameChecked.has(n.id))
-    .map((n) => ({ id: n.id, before: n.name, after: n.after as string }));
+    .map((n) => ({ id: n.id, before: n.name, after: n.after as string, role: n.role }));
   if (!items.length) return;
   send({ type: 'RENAME_APPLY', items });
 });

@@ -1982,7 +1982,7 @@
         if (opts.apply && decided.role) writeRole(node, decided.role);
         contextForChildren = decided.passthrough ? ancestorName : decided.name;
       }
-      col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep });
+      col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role });
       if ("children" in node && !isSkippedSubtree(node)) {
         const childDims = decided.passthrough ? parentDims : dims(node);
         await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_c = decided.role) != null ? _c : null, childDims);
@@ -3710,10 +3710,11 @@
     const prefix = commonPrefixTokens(members.map((m) => m.name));
     return prefix.length ? pascalCase(prefix.join("-")) : commonBaseName(members.map((m) => m.name));
   }
-  function resolveGroupNames(groups) {
+  function resolveGroupNames(groups, existing = []) {
     const base = groups.map(componentBaseName);
-    const collides = new Set(base.filter((n, i) => base.indexOf(n) !== i));
-    const taken = /* @__PURE__ */ new Set();
+    const existingSet = new Set(existing);
+    const collides = new Set(base.filter((n, i) => base.indexOf(n) !== i || existingSet.has(n)));
+    const taken = new Set(existing);
     return base.map((n, i) => {
       let name = collides.has(n) ? contextualName(groups[i]) : n;
       if (taken.has(name)) {
@@ -4428,6 +4429,23 @@
       return void 0;
     }
   }
+  async function existingComponentNames() {
+    try {
+      await figma.loadAllPagesAsync();
+      return figma.root.findAllWithCriteria({ types: ["COMPONENT", "COMPONENT_SET"] }).map((n) => n.name);
+    } catch (e) {
+      return [];
+    }
+  }
+  function paintsOf(v) {
+    if (typeof v === "symbol") return v;
+    if (!Array.isArray(v)) return void 0;
+    return v.map((p) => ({
+      visible: p.visible,
+      type: p.type,
+      opacity: p.opacity
+    }));
+  }
   function toStructNode(node) {
     const a = node;
     const num = (v) => typeof v === "number" ? v : void 0;
@@ -4465,6 +4483,17 @@
       counterAxisSpacing: num(a.counterAxisSpacing),
       layoutMode: typeof a.layoutMode === "string" ? a.layoutMode : void 0,
       fillHex: solidFillHex(node),
+      // 고신뢰 역할 판정(카드·figure·button…)이 읽는 값들 — 여기서 빼면 `componentEligible`이
+      // 채움도 모서리도 그림자도 없는 노드를 보게 되어 카드형 프레임이 후보에서 통째로 사라진다.
+      // 페인트/이펙트는 판정에 필요한 필드만 얕게 복사한다(원본 배열은 트리 전체로 무겁다).
+      cornerRadius: a.cornerRadius,
+      topLeftRadius: num(a.topLeftRadius),
+      opacity: num(a.opacity),
+      gridRowCount: num(a.gridRowCount),
+      gridColumnCount: num(a.gridColumnCount),
+      fills: paintsOf(a.fills),
+      strokes: paintsOf(a.strokes),
+      effects: Array.isArray(a.effects) ? a.effects.map((e) => ({ visible: e.visible, type: e.type })) : void 0,
       characters,
       mainComponentKey,
       role: readRole(node),
@@ -4736,13 +4765,14 @@
         }
         case "RENAME_APPLY": {
           const changes = [];
-          for (const { id, before: expectedBefore, after } of msg.items) {
+          for (const { id, before: expectedBefore, after, role } of msg.items) {
             const node = await figma.getNodeByIdAsync(id);
             if (!node || !("name" in node)) continue;
             const before = node.name;
             if (before !== expectedBefore) continue;
             if (before === after) continue;
             node.name = after;
+            if (role) writeRole(node, role);
             changes.push({ id, before, after });
           }
           post({ type: "RENAME_RESULT", changes, nodes: [], applied: true });
@@ -4941,20 +4971,20 @@
           try {
             const eligibleNodes = pruned.filter((c) => c.eligible).map((c) => liveById.get(c.id)).filter((n) => !!n);
             const groups = groupForRegister(eligibleNodes);
+            const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
             const preview = /* @__PURE__ */ new Map();
-            for (const g of groups) {
+            groups.forEach((g, gi) => {
+              const name = groupNames[gi];
               if (g.members.length < 2) {
-                if (g.members[0]) preview.set(g.members[0].id, { single: pascalCase(g.members[0].name) });
-                continue;
+                if (g.members[0]) preview.set(g.members[0].id, { single: name });
+                return;
               }
               if (shouldCollapseToProperties(g.members)) {
-                const name = pascalCase(commonBaseName(g.members.map((m) => m.name)) || g.members[0].name);
                 for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true });
-                continue;
+                return;
               }
-              const base = commonBaseName(g.members.map((m) => m.name));
-              for (const d of deriveVariants(g.members)) preview.set(d.id, { group: base, variant: d.variant });
-            }
+              for (const d of deriveVariants(g.members)) preview.set(d.id, { group: name, variant: d.variant });
+            });
             nodes = pruned.map((c) => {
               const p = preview.get(c.id);
               return p ? __spreadValues(__spreadValues({}, c), p) : c;
@@ -5067,7 +5097,7 @@
               failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${comp.name}): ${errText(e)}`);
             }
           };
-          const groupNames = resolveGroupNames(groups.map((g) => g.members));
+          const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
           for (let gi = 0; gi < groups.length; gi++) {
             const g = groups[gi];
             const setName = groupNames[gi];
@@ -5238,7 +5268,7 @@
           const missing = [];
           const singles = [];
           const failures = [];
-          const groupNames = resolveGroupNames(groups.map((g) => g.members));
+          const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
           for (let gi = 0; gi < groups.length; gi++) {
             const g = groups[gi];
             const nodes = g.members.map((m) => byId.get(m.id)).filter((n) => !!n);

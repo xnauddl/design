@@ -823,6 +823,27 @@ test('scanComponentCandidates(#1) — 고신뢰만 eligible, 잠금/인스턴스
   assert.equal(byId.has('bare'), false);
 });
 
+test('scanComponentCandidates(#1) — 채움·모서리·그림자를 잃으면 카드가 후보에서 빠진다(어댑터 계약)', () => {
+  // code.ts의 toStructNode가 이 필드들을 안 실으면 카드형 프레임이 통째로 사라진다.
+  // 실제로 그렇게 났던 회귀라, 무엇이 판정을 먹여 살리는지 여기에 못 박아 둔다.
+  const kids = [
+    { id: 'img', name: 'Image', type: 'RECTANGLE', width: 200, height: 120 },
+    { id: 'tt', name: 'Title', type: 'TEXT' },
+    { id: 'bd', name: 'Body', type: 'TEXT' },
+  ];
+  const card = (extra) => ({
+    id: 'c', name: 'Frame 12', type: 'FRAME', layoutMode: 'VERTICAL',
+    width: 240, height: 260, children: kids, ...extra,
+  });
+  const eligibleOf = (node) => {
+    const out = scanComponentCandidates([{ id: 'r', name: 'root', type: 'FRAME', children: [node] }]);
+    return out.find((c) => c.id === 'c')?.eligible ?? false;
+  };
+
+  assert.equal(eligibleOf(card({ fills: [{ type: 'SOLID', visible: true }], cornerRadius: 12 })), true);
+  assert.equal(eligibleOf(card({})), false, '채움·모서리를 떼면 같은 프레임이 후보가 아니게 된다');
+});
+
 test('scanComponentCandidates(#1) — 숨김(visible=false) 프레임은 후보·하위 스캔 제외', () => {
   const solid = [{ type: 'SOLID', visible: true }];
   const mkBtn = (id, visible) => ({
@@ -1336,6 +1357,21 @@ test('resolveGroupNames — 맥락 붕괴로 겹치면 맥락을 되살려 구�
   );
   // 단독 그룹 하나만 있으면 충돌 없음.
   assert.deepEqual(resolveGroupNames([g('article-avatar', 'avatar')]), ['Avatar']);
+});
+
+test('resolveGroupNames — 지난 실행에서 등록한 이름과도 겹치지 않는다', () => {
+  const g = (name, role, n = 1) =>
+    Array.from({ length: n }, (_, i) => ({ id: `${name}${i}`, name, type: 'FRAME', role }));
+  // 회귀: 프레임 A의 아바타를 등록해 `Avatar`가 이미 있는 상태에서 프레임 B를 등록하면
+  // 둘 다 `Avatar`가 되고, 「베리언트 분류」가 정확한 이름으로 둘을 한 세트로 합쳤다.
+  assert.deepEqual(resolveGroupNames([g('profile-avatar', 'avatar', 2)], ['Avatar']), ['ProfileAvatar']);
+  // 맥락을 되살린 이름까지 이미 있으면 숫자로 물러선다.
+  assert.deepEqual(
+    resolveGroupNames([g('profile-avatar', 'avatar', 2)], ['Avatar', 'ProfileAvatar']),
+    ['ProfileAvatar2'],
+  );
+  // 무관한 이름만 있으면 영향 없음.
+  assert.deepEqual(resolveGroupNames([g('profile-avatar', 'avatar', 2)], ['Button', 'Card']), ['Avatar']);
 });
 
 test('groupByExactName — 정확한 이름끼리만 묶음(머리명사 병합 안 함)', () => {
