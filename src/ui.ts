@@ -911,6 +911,12 @@ $('renameAll').addEventListener('change', (e) => {
   renderRenameTree();
 });
 
+// 보존 행 감추기/보이기 — 체크에는 영향이 없다(보존 행은 애초에 체크 대상이 아님).
+$('btnRenameKeep').addEventListener('click', () => {
+  renameHideKeep = !renameHideKeep;
+  renderRenameTree();
+});
+
 
 /* ============================================================
    시스템화 마법사 — 기존 메시지(추출→생성→시맨틱→바인딩→정돈→검수→컴포넌트화)를
@@ -1930,6 +1936,8 @@ interface TreeRow {
   replace?: boolean;
   /** 행 앞 종류 배지(예: 세트/단독). text=라벨, kind=색 클래스(set|single). */
   badge?: { text: string; kind: 'set' | 'single' };
+  /** 대상이 아닌 이유(리네임 보존 등). 있으면 흐린 행 + 사유 표시, 체크 불가. */
+  keep?: string;
 }
 
 /** 선택 서브트리의 최소 depth(루트 기준)로 들여쓰기를 정규화한다. */
@@ -1940,6 +1948,17 @@ function baseDepth(rows: TreeRow[]): number {
 /** 선택형 트리 1행. base는 들여쓰기 기준 depth. */
 function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: () => void): HTMLElement {
   const indent = `${(r.depth - base) * 12}px`;
+
+  // 지켜지는 이름은 '아무 일도 안 일어난 것'과 구분해서 보여 준다 — 흐린 카드 + 사유.
+  // 그냥 빼 버리면 왜 그 레이어만 안 바뀌었는지 알 길이 없어 버그로 읽힌다(#7b).
+  if (r.change === undefined && r.keep) {
+    const title = document.createElement('span');
+    title.className = 'tree-name';
+    title.textContent = r.name;
+    const card = resultCard({ title, titleMono: true, summary: r.keep, meta: t('rename.keep.meta'), dim: true });
+    card.style.marginLeft = indent;
+    return card;
+  }
 
   // 맥락 노드·헤더는 카드가 아니라 그룹 머리다 — 고를 대상이 아니고, 어디에 속한
   // 변경인지만 알려준다(#18: 트리 = 그룹 헤더 + 자식 카드).
@@ -1978,11 +1997,14 @@ function renderSelectableTree(
   mount: HTMLElement,
   rows: TreeRow[],
   checked: Set<string>,
-  opts: { onChange: () => void; hideContext: boolean },
+  opts: { onChange: () => void; hideContext: boolean; hideKeep?: boolean },
 ): void {
   const base = rows.length ? baseDepth(rows) : 0;
   // 보이는 행만(맥락 숨김 시 비영향·비헤더 제외) → §4: 대형 서브트리도 청크로 비차단 렌더.
-  const visible = rows.filter((r) => r.change !== undefined || r.header || !opts.hideContext);
+  // 보존 행(keep)은 맥락이 아니라 '왜 안 바뀌는지'라 맥락 숨김과 별도로 켜고 끈다.
+  const visible = rows.filter(
+    (r) => r.change !== undefined || r.header || (r.keep ? !opts.hideKeep : !opts.hideContext),
+  );
   // 세 트리(#bindTree·#diff·#compTree)가 모두 이 호출부를 지난다 — 어느 목록인지는 마운트 id가
   // 말해 주므로 스냅·개수 줄 재계산도 여기 한 줄로 끝난다(행 0건이면 테두리·줄을 걷는다).
   renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
@@ -1992,6 +2014,7 @@ function renderSelectableTree(
 let renameNodes: RenameNode[] = []; // 마지막 미리보기 서브트리
 const renameChecked = new Set<string>(); // 체크된 영향 노드 id
 const renameHideContext = true; // 맥락(비영향) 노드는 항상 숨김(토글 없음)
+let renameHideKeep = false; // 보존 행(루트·인스턴스·잠금…)은 기본 표시, 「잠금 제외」로 감춤(와이어)
 
 function affectedRenameCount(): number {
   return renameNodes.reduce((n, r) => n + (r.after !== undefined ? 1 : 0), 0);
@@ -2005,9 +2028,15 @@ function renderRenameTree(): void {
     depth: n.depth,
     parentId: n.parentId,
     change: n.after,
+    keep: n.keep ? t(`rename.keep.${n.keep}`) : undefined,
   }));
+  // 보존 행이 없으면 토글할 것도 없다 — 버튼을 걷어 빈 스위치를 남기지 않는다.
+  const keepBtn = $('btnRenameKeep');
+  keepBtn.style.display = rows.some((r) => r.keep) ? '' : 'none';
+  keepBtn.textContent = t(renameHideKeep ? 'rename.showKeep' : 'rename.hideKeep');
   renderSelectableTree($('diff'), rows, renameChecked, {
     hideContext: renameHideContext,
+    hideKeep: renameHideKeep,
     onChange: updateRenameApply,
   });
   updateRenameApply();

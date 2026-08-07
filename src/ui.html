@@ -602,7 +602,7 @@
         <button class="btn-next" data-next-apply="rename" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
+        <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
       </div>
       <div id="bindTree" class="results"></div>
       <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐). -->
@@ -628,7 +628,9 @@
         <button class="btn-next" data-next-apply="structure" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row tree-ctrls">
-        <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
+        <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
+        <!-- 보존 행(루트·인스턴스·잠긴 레이어…)을 목록에서 걷어낸다 — 바뀔 것만 보고 싶을 때. -->
+        <button id="btnRenameKeep" class="link" data-i18n="rename.hideKeep">잠금 제외</button>
       </div>
       <div id="diff" class="results"></div>
       <div class="ux">
@@ -654,7 +656,7 @@
         <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">묶기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
+        <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
       </div>
       <div class="r-group" id="compTreeGroup" style="display:none" data-i18n="structure.groupComp">컴포넌트 후보</div>
       <div id="compTree" class="results"></div>

@@ -1414,6 +1414,27 @@ test('renameSelection — nodes: 전체 서브트리 + 계층(depth/parentId) + 
   assert.equal(changes.length, nodes.filter((n) => n.after !== undefined).length);
 });
 
+test('renameSelection — 보존 노드는 사유(keep)를 싣고, 바뀌는 노드는 싣지 않는다', async () => {
+  installFigma();
+  const icon = { type: 'VECTOR', id: 'ic', name: 'Vector 2' }; // 영향 → keep 없음
+  const text = { type: 'TEXT', id: 'tx', name: 'Label', characters: 'x' };
+  const inst = { type: 'INSTANCE', id: 'in', name: 'Button', children: [{ type: 'VECTOR', id: 'deep', name: 'Vector 9' }] };
+  const comp = { type: 'COMPONENT', id: 'cp', name: 'Chip' };
+  const lock = { type: 'RECTANGLE', id: 'lk', name: 'Rectangle 3', locked: true };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 1', children: [icon, text, inst, comp, lock] };
+
+  const { nodes } = await renameSelection([root], { apply: false, maxDepth: 3 });
+  const keepOf = new Map(nodes.map((n) => [n.id, n.keep]));
+
+  assert.equal(keepOf.get('root'), 'root'); // 선택 루트 보존
+  assert.equal(keepOf.get('tx'), 'text');
+  assert.equal(keepOf.get('in'), 'instance');
+  assert.equal(keepOf.get('cp'), 'component');
+  assert.equal(keepOf.get('lk'), 'locked');
+  assert.equal(keepOf.get('ic'), undefined); // 바뀌는 노드엔 사유가 없다
+  assert.equal(keepOf.has('deep'), false); // 인스턴스 하위는 서브트리째 제외 — 행 자체가 없다
+});
+
 test('renameSelection — 선택 루트 컨테이너는 사람이 지은 이름이어도 보존(맥락 기준)', async () => {
   installFigma();
   const node = { type: 'FRAME', id: 'f', name: 'OriginalName', children: [] };

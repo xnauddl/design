@@ -44,6 +44,9 @@ export interface RenameChange {
  * `depth`/`parentId`로 계층을 복원한다. `after`가 있으면 **영향 노드**(리네임 대상),
  * 없으면 회색 맥락(보존). 바인딩(#6)·컴포넌트(#1) 미리보기도 같은 형태를 재사용한다.
  */
+/** 리네임에서 이름을 지키는 사유(#7b). 라벨은 i18n `rename.keep.<reason>`. */
+export type KeepReason = 'root' | 'instance' | 'component' | 'text' | 'locked';
+
 export interface RenameNode {
   id: string;
   /** 현재 이름(=before). */
@@ -53,6 +56,9 @@ export interface RenameNode {
   parentId: string | null;
   /** 리네임 후 이름. 존재 시 영향 노드(체크 가능). */
   after?: string;
+  /** 이름을 지킨 이유(#7b). 있으면 대상이 아니라는 뜻 — 미리보기에서 흐린 행으로 보인다.
+   *  없고 after도 없으면 '역할이 지금 이름과 같아 바꿀 게 없는' 평범한 맥락 노드다. */
+  keep?: KeepReason;
 }
 
 /**

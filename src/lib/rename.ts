@@ -25,7 +25,7 @@
    ============================================================ */
 import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole, ROLE_KEY } from './naming';
 import type { ParsedToken } from './naming';
-import type { RenameChange, RenameNode } from '../shared/messages';
+import type { KeepReason, RenameChange, RenameNode } from '../shared/messages';
 
 /** 자식에게 내려보내는 위치 정보(영역 추론용). depth 0 = 선택 루트. */
 interface Pos {
@@ -134,7 +134,7 @@ async function recurse(
     }
 
     // 영향 여부와 무관하게 트리에 담는다(전체 서브트리 + 영향 노드 강조).
-    col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
+    col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep });
 
     // 제외 대상은 서브트리째 건너뛴다 — decide()가 노드 자신만 스킵하면 내부는 그대로 리네임돼
     // 메인 컴포넌트 내부 이름(→ 모든 인스턴스에 전파)과 잠금 레이어까지 덮어쓰게 된다.
@@ -153,18 +153,19 @@ async function decide(
   pos: Pos,
   opts: Opts,
   parentRole: string | null,
-): Promise<{ skip: boolean; name?: string; passthrough?: boolean; role?: string }> {
+): Promise<{ skip: boolean; name?: string; passthrough?: boolean; role?: string; keep?: KeepReason }> {
   // 제외 규칙(이름 유지). 일부 노드는 recurse()에서 서브트리째 중단한다.
-  if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return { skip: true };
-  if (node.type === 'TEXT') return { skip: true };
-  if (node.type === 'INSTANCE') return { skip: true };
-  if (node.locked) return { skip: true };
+  // keep은 미리보기에서 "왜 안 바뀌는지"를 보여 주려고 싣는다 — 조용히 빠지면 버그로 읽힌다.
+  if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return { skip: true, keep: 'component' };
+  if (node.type === 'TEXT') return { skip: true, keep: 'text' };
+  if (node.type === 'INSTANCE') return { skip: true, keep: 'instance' };
+  if (node.locked) return { skip: true, keep: 'locked' };
 
   // #7b-1: 선택 루트(depth 0) 컨테이너는 보존 — 자식의 맥락 앵커로만 쓴다.
   // 단, 구조로 "확실한" 시멘틱(card/list/field/button/chip)이면 루트라도 역할명으로 교체.
   if (pos.depth === 0 && isContainerType(node)) {
     const hc = highConfidenceRole(node);
-    if (!hc) return { skip: true };
+    if (!hc) return { skip: true, keep: 'root' };
     let hcScope = ancestorName ? pickScope(ancestorName) : null;
     if (hcScope === hc) hcScope = null;
     return { skip: false, role: hc, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }) };

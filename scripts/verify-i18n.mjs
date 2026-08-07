@@ -123,9 +123,9 @@ const code = srcFiles(join(ROOT, 'src'))
   .map((p) => readFileSync(p, 'utf8'))
   .join('\n');
 
-// `t('reason.' + key)`처럼 조립되는 키는 접두사만 보고 사용된 것으로 친다.
-// 접두사를 하드코딩하면 새 조립 지점이 생길 때마다 오탐이 나므로 코드에서 뽑는다.
-const dynPrefixes = [...code.matchAll(/\bt\(\s*'([\w.]+\.)'\s*\+/g)].map((m) => m[1]);
+// `t('reason.' + key)` / `` t(`rename.keep.${reason}`) ``처럼 조립되는 키는 접두사만 보고
+// 사용된 것으로 친다. 접두사를 하드코딩하면 새 조립 지점이 생길 때마다 오탐이 나므로 코드에서 뽑는다.
+const dynPrefixes = [...code.matchAll(/\bt\(\s*(?:'([\w.]+\.)'\s*\+|`([\w.]+\.)\$\{)/g)].map((m) => m[1] ?? m[2]);
 const literal = new Set([...code.matchAll(/['"`]([a-z][\w]*(?:\.[\w-]+)+)['"`]/gi)].map((m) => m[1]));
 const inMarkup = new Set(found.map((f) => f.key));
 

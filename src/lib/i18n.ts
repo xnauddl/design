@@ -183,7 +183,7 @@ export const STRINGS: Record<string, string> = {
   'wizardCard.optComponentize': '컴포넌트',
   'wizardCard.run': '전체 실행',
   // 공통(정적 라벨)
-  'common.selectAll': '전체 선택',
+  'common.selectAll': '전체',
   'prereq.gotoCreate': '토큰 생성으로 →',
   // 온보딩 / 가이드
   // 첫 실행 배너(온보딩 흡수)
@@ -241,6 +241,15 @@ export const STRINGS: Record<string, string> = {
   'rename.apply': '이름 적용',
   'rename.undoTitle': '되돌리기 안전장치',
   'rename.undoBody': '이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있습니다.',
+  // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
+  'rename.keep.root': '루트 보존',
+  'rename.keep.instance': '인스턴스 보존',
+  'rename.keep.component': '컴포넌트 보존',
+  'rename.keep.text': '텍스트 보존',
+  'rename.keep.locked': '잠긴 레이어',
+  'rename.keep.meta': '잠금',
+  'rename.hideKeep': '잠금 제외',
+  'rename.showKeep': '잠금 표시',
   // 컴포넌트 / 베리언트
   'structure.title': '컴포넌트',
   'structure.scope': '닮은 프레임',

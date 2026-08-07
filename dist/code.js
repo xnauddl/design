@@ -1990,7 +1990,7 @@
         if (opts.apply && decided.role) writeRole(node, decided.role);
         contextForChildren = decided.passthrough ? ancestorName : decided.name;
       }
-      col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after });
+      col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep });
       if ("children" in node && !isSkippedSubtree(node)) {
         const childDims = decided.passthrough ? parentDims : dims(node);
         await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_c = decided.role) != null ? _c : null, childDims);
@@ -1999,13 +1999,13 @@
   }
   async function decide(node, ancestorName, pos, opts, parentRole) {
     var _a;
-    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true };
-    if (node.type === "TEXT") return { skip: true };
-    if (node.type === "INSTANCE") return { skip: true };
-    if (node.locked) return { skip: true };
+    if (node.type === "COMPONENT" || node.type === "COMPONENT_SET") return { skip: true, keep: "component" };
+    if (node.type === "TEXT") return { skip: true, keep: "text" };
+    if (node.type === "INSTANCE") return { skip: true, keep: "instance" };
+    if (node.locked) return { skip: true, keep: "locked" };
     if (pos.depth === 0 && isContainerType(node)) {
       const hc = highConfidenceRole(node);
-      if (!hc) return { skip: true };
+      if (!hc) return { skip: true, keep: "root" };
       let hcScope = ancestorName ? pickScope(ancestorName) : null;
       if (hcScope === hc) hcScope = null;
       return { skip: false, role: hc, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }) };

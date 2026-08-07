@@ -602,7 +602,7 @@
         <button class="btn-next" data-next-apply="rename" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
+        <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
       </div>
       <div id="bindTree" class="results"></div>
       <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐). -->
@@ -628,7 +628,9 @@
         <button class="btn-next" data-next-apply="structure" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row tree-ctrls">
-        <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
+        <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
+        <!-- 보존 행(루트·인스턴스·잠긴 레이어…)을 목록에서 걷어낸다 — 바뀔 것만 보고 싶을 때. -->
+        <button id="btnRenameKeep" class="link" data-i18n="rename.hideKeep">잠금 제외</button>
       </div>
       <div id="diff" class="results"></div>
       <div class="ux">
@@ -654,7 +656,7 @@
         <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">묶기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체 선택</span></label>
+        <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
       </div>
       <div class="r-group" id="compTreeGroup" style="display:none" data-i18n="structure.groupComp">컴포넌트 후보</div>
       <div id="compTree" class="results"></div>
@@ -1000,7 +1002,7 @@
     "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 공통(정적 라벨)
-    "common.selectAll": "\uC804\uCCB4 \uC120\uD0DD",
+    "common.selectAll": "\uC804\uCCB4",
     "prereq.gotoCreate": "\uD1A0\uD070 \uC0DD\uC131\uC73C\uB85C \u2192",
     // 온보딩 / 가이드
     // 첫 실행 배너(온보딩 흡수)
@@ -1058,6 +1060,15 @@
     "rename.apply": "\uC774\uB984 \uC801\uC6A9",
     "rename.undoTitle": "\uB418\uB3CC\uB9AC\uAE30 \uC548\uC804\uC7A5\uCE58",
     "rename.undoBody": "\uC774 \uC2E4\uD589\uC740 \uD55C \uBC88\uC758 \uB418\uB3CC\uB9AC\uAE30(Ctrl/\u2318Z)\uB85C \uC804\uCCB4\uB97C \uCDE8\uC18C\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
+    "rename.keep.root": "\uB8E8\uD2B8 \uBCF4\uC874",
+    "rename.keep.instance": "\uC778\uC2A4\uD134\uC2A4 \uBCF4\uC874",
+    "rename.keep.component": "\uCEF4\uD3EC\uB10C\uD2B8 \uBCF4\uC874",
+    "rename.keep.text": "\uD14D\uC2A4\uD2B8 \uBCF4\uC874",
+    "rename.keep.locked": "\uC7A0\uAE34 \uB808\uC774\uC5B4",
+    "rename.keep.meta": "\uC7A0\uAE08",
+    "rename.hideKeep": "\uC7A0\uAE08 \uC81C\uC678",
+    "rename.showKeep": "\uC7A0\uAE08 \uD45C\uC2DC",
     // 컴포넌트 / 베리언트
     "structure.title": "\uCEF4\uD3EC\uB10C\uD2B8",
     "structure.scope": "\uB2EE\uC740 \uD504\uB808\uC784",
@@ -2458,6 +2469,10 @@
     }
     renderRenameTree();
   });
+  $("btnRenameKeep").addEventListener("click", () => {
+    renameHideKeep = !renameHideKeep;
+    renderRenameTree();
+  });
   var wizardRunning = false;
   var wizardWaiter = null;
   window.addEventListener("message", (event) => {
@@ -3275,6 +3290,14 @@
   function makeTreeRow(r, base, checked, onChange) {
     var _a;
     const indent = `${(r.depth - base) * 12}px`;
+    if (r.change === void 0 && r.keep) {
+      const title2 = document.createElement("span");
+      title2.className = "tree-name";
+      title2.textContent = r.name;
+      const card2 = resultCard({ title: title2, titleMono: true, summary: r.keep, meta: t("rename.keep.meta"), dim: true });
+      card2.style.marginLeft = indent;
+      return card2;
+    }
     if (r.change === void 0) {
       const group = resultGroup(r.name);
       group.style.marginLeft = indent;
@@ -3303,12 +3326,15 @@
   }
   function renderSelectableTree(mount, rows, checked, opts) {
     const base = rows.length ? baseDepth(rows) : 0;
-    const visible = rows.filter((r) => r.change !== void 0 || r.header || !opts.hideContext);
+    const visible = rows.filter(
+      (r) => r.change !== void 0 || r.header || (r.keep ? !opts.hideKeep : !opts.hideContext)
+    );
     renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
   }
   var renameNodes = [];
   var renameChecked = /* @__PURE__ */ new Set();
   var renameHideContext = true;
+  var renameHideKeep = false;
   function affectedRenameCount() {
     return renameNodes.reduce((n, r) => n + (r.after !== void 0 ? 1 : 0), 0);
   }
@@ -3319,10 +3345,15 @@
       type: n.type,
       depth: n.depth,
       parentId: n.parentId,
-      change: n.after
+      change: n.after,
+      keep: n.keep ? t(`rename.keep.${n.keep}`) : void 0
     }));
+    const keepBtn = $("btnRenameKeep");
+    keepBtn.style.display = rows.some((r) => r.keep) ? "" : "none";
+    keepBtn.textContent = t(renameHideKeep ? "rename.showKeep" : "rename.hideKeep");
     renderSelectableTree($("diff"), rows, renameChecked, {
       hideContext: renameHideContext,
+      hideKeep: renameHideKeep,
       onChange: updateRenameApply
     });
     updateRenameApply();
