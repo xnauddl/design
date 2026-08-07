@@ -193,15 +193,12 @@
     if (paints3 === figma.mixed || !Array.isArray(paints3)) return;
     for (const p of paints3) {
       if (p.visible === false) continue;
-      if (p.type === "SOLID") {
-        const hex = rgbToHex(p.color);
-        add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source, nodeId);
-        if (p.opacity != null && p.opacity < 1) {
-          const o = round(p.opacity);
-          add(acc, { name: numberTokenName("opacity", o), category: "opacity", value: o }, "opacity", node.id);
-        }
-      } else if (p.type.startsWith("GRADIENT") || p.type === "IMAGE" || p.type === "VIDEO") {
-        acc.warnings.add("\uADF8\uB77C\uB514\uC5B8\uD2B8/\uC774\uBBF8\uC9C0 \uCC44\uC6C0\uC740 \uBCC0\uC218 \uBC14\uC778\uB529 \uBD88\uAC00 \u2014 \uC2A4\uD0B5\uD588\uC2B5\uB2C8\uB2E4.");
+      if (p.type !== "SOLID") continue;
+      const hex = rgbToHex(p.color);
+      add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source, nodeId);
+      if (p.opacity != null && p.opacity < 1) {
+        const o = round(p.opacity);
+        add(acc, { name: numberTokenName("opacity", o), category: "opacity", value: o }, "opacity", node.id);
       }
     }
   }
@@ -327,10 +324,7 @@
     }
   }
   function walk(acc, node) {
-    if (node.visible === false) {
-      acc.warnings.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD1A0\uD070 \uD6C4\uBCF4\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
-      return;
-    }
+    if (node.visible === false) return;
     if ("fills" in node) collectPaints(acc, node, node.fills, "fill");
     if ("strokes" in node) collectPaints(acc, node, node.strokes, "stroke");
     if (node.type === "TEXT") collectText(acc, node);
@@ -342,10 +336,7 @@
     collectStroke(acc, node);
     collectOpacity(acc, node);
     collectEffects(acc, node);
-    if (node.type === "INSTANCE") {
-      if (node.children.length) acc.warnings.add("\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uB9C8\uC2A4\uD130 \uBCF5\uC0AC\uBCF8\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uAC12\uC774 \uD544\uC694\uD558\uBA74 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC120\uD0DD\uD574 \uCD94\uCD9C\uD558\uC138\uC694.");
-      return;
-    }
+    if (node.type === "INSTANCE") return;
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
   function isEffectivelyVisible(node) {
@@ -359,10 +350,7 @@
   function extractFromSelection(selection2) {
     const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map() };
     for (const node of selection2) {
-      if (!isEffectivelyVisible(node)) {
-        acc.warnings.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD1A0\uD070 \uD6C4\uBCF4\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
-        continue;
-      }
+      if (!isEffectivelyVisible(node)) continue;
       walk(acc, node);
     }
     const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
