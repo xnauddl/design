@@ -340,7 +340,12 @@
     .r-title.has-swatch { display: flex; align-items: center; gap: 6px; }
     .r-swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
     /* 역할 입력처럼 메타 자리에 오는 편집 요소 — 카드 폭을 밀지 않게 고정 폭. */
-    .r-role { width: 104px; font-size: 10px; padding: 3px 5px; }
+    /* 역할 드롭다운 — `한글 · role` 병기라 자유 입력칸보다 넓어야 잘리지 않는다. */
+    .r-role { width: 126px; font-size: 10px; padding: 3px 4px; }
+    /* 모아 놓은 색 한 줄 — 목록은 팔레트 한 벌이면 60행이 넘는다. 램프가 고른지, 빠진
+       계열이 없는지는 스크롤 전에 여기서 본다(와이어 `palette-row`). */
+    .palette-row { display: flex; gap: 3px; flex-wrap: wrap; }
+    .palette-row i { width: 16px; height: 16px; border-radius: 2px; border: 1px solid rgba(0,0,0,.1); display: block; }
     .r-card input[type="checkbox"] { margin: 0; }
     /* 그룹 머리 — 트리의 루트나 리포트의 구분줄. 카드가 아니라 라벨이다. */
     .r-group {
@@ -492,15 +497,9 @@
           <span id="tidySumText"></span>
           <button id="btnTidyUndo" class="link" data-i18n="colorTidy.undo">되돌리기</button>
         </div>
+        <!-- 모아 놓은 색 미리보기 한 줄(ui.ts가 채운다). -->
+        <div id="paletteRow" class="palette-row"></div>
         <div id="colorTable" class="results"></div>
-        <datalist id="roleList">
-          <option value="surface"></option><option value="surface/muted"></option>
-          <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
-          <option value="border"></option>
-          <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
-          <option value="secondary"></option><option value="accent"></option>
-          <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
-        </datalist>
       </div>
       <div class="status" id="colorStatus"></div>
     </div>

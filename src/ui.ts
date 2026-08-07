@@ -13,7 +13,7 @@ import { exportHasTokens, type ExportFormat } from './lib/exporters';
 import type { FrameMeta } from './lib/similar';
 import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
-import { classifyColor, nameColorsByHue } from './lib/colorName';
+import { nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles, semanticMapToText, textToSemanticMap } from './lib/roles';
 import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
@@ -463,6 +463,44 @@ function huefyTokenColors(toks: DraftToken[]): void {
 }
 
 /* ---------- #3 색 편집표 (hue → 역할) ---------- */
+/** 색에 붙일 수 있는 Semantic 역할 — 순서는 화면 표시 순서 그대로. */
+const COLOR_ROLES = [
+  'surface', 'surface/muted',
+  'text', 'text/muted', 'text/inverse',
+  'border',
+  'primary', 'primary/strong', 'primary/subtle',
+  'secondary', 'accent',
+  'success', 'warning', 'error', 'info',
+] as const;
+
+/**
+ * 역할 드롭다운(와이어: `주색 · primary ▾`). 자유 입력이던 것을 목록으로 바꾼 이유는
+ * 오타 하나가 그대로 Semantic 변수 이름이 되기 때문 — 어휘는 여기서 닫는다.
+ */
+function roleSelect(value: string): HTMLSelectElement {
+  const sel = document.createElement('select');
+  sel.className = 'r-role';
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = t('role.none');
+  sel.appendChild(none);
+  for (const r of COLOR_ROLES) {
+    const o = document.createElement('option');
+    o.value = r;
+    o.textContent = `${t(`role.${r.replace('/', '-')}`)} · ${r}`;
+    sel.appendChild(o);
+  }
+  // 추천이 어휘 밖 역할을 주면(옛 매핑 등) 그 값도 고를 수 있게 남긴다 — 조용히 지우지 않는다.
+  if (value && !COLOR_ROLES.includes(value as (typeof COLOR_ROLES)[number])) {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = value;
+    sel.appendChild(o);
+  }
+  sel.value = value;
+  return sel;
+}
+
 /** 색 토큰을 표로: 스와치 · hue 이름 · 역할 입력(현 semMap에서 prefill). */
 function renderColorTable(): void {
   const card = $('colorSection');
@@ -472,6 +510,7 @@ function renderColorTable(): void {
     $('colorCount').textContent = '';
     // 옛 행을 남겨 두면 다음 추출이 색 0개일 때 테두리·‘총 n개’ 줄이 실제와 어긋난 채 되살아난다.
     $('colorTable').innerHTML = '';
+    $('paletteRow').innerHTML = '';
     return;
   }
   card.style.display = '';
@@ -482,24 +521,37 @@ function renderColorTable(): void {
   for (const [role, name] of Object.entries(textToSemanticMap(($('semMap') as HTMLTextAreaElement).value))) {
     if (!roleByName.has(name)) roleByName.set(name, role);
   }
+  renderPaletteRow(colors);
   renderChunked($('colorTable'), colors, (t) => {
-    const role = document.createElement('input');
-    role.setAttribute('list', 'roleList');
-    role.placeholder = '역할(선택)';
-    role.value = roleByName.get(t.name) ?? '';
+    const role = roleSelect(roleByName.get(t.name) ?? '');
     role.dataset.name = t.name;
-    role.className = 'r-role';
+    // 값과 쓰임새 — 스와치는 색만 보여 주고 hue 이름은 계열만 말한다. 정확한 hex와
+    // ‘몇 군데서 쓰나’가 어느 색에 역할을 줄지 고르는 근거다(와이어 `주색 · 12× 사용`).
+    const used = t.count ? ` · ${t.count}× 사용` : '';
     const card = resultCard({
       title: t.name,
       titleMono: true,
-      summary: classifyColor(t.value as string).achromatic ? '무채' : 'hue',
+      summary: `${t.value}${used}`,
+      summaryMono: true,
       metaEl: role,
     });
-    role.addEventListener('input', updateColorSummary);
+    role.addEventListener('change', updateColorSummary);
     addSwatch(card, t.value as string);
     return card;
   });
   updateColorSummary();
+}
+
+/** 모아 놓은 색을 한 줄 스와치로 — 팔레트 한 벌이면 목록이 60행을 넘어 램프가 안 보인다. */
+function renderPaletteRow(colors: DraftToken[]): void {
+  const row = $('paletteRow');
+  row.innerHTML = '';
+  for (const c of colors) {
+    const i = document.createElement('i');
+    i.style.background = c.value as string;
+    i.title = `${c.name} · ${c.value}`;
+    row.appendChild(i);
+  }
 }
 
 /** 색 카드 상태 줄 — 몇 개를 모았고 역할을 몇 개 정했는지, 아직 변수로 만들기 전인지(와이어). */
@@ -513,9 +565,9 @@ function updateColorSummary(): void {
 /** 색 목록의 역할 입력 → `역할 = Global변수이름` 맵. 같은 역할이 겹치면 뒤가 이긴다. */
 function colorRoleMap(): Record<string, string> {
   const map: Record<string, string> = {};
-  $('colorTable').querySelectorAll<HTMLInputElement>('input[data-name]').forEach((inp) => {
-    const role = inp.value.trim();
-    if (role) map[role] = inp.dataset.name as string;
+  $('colorTable').querySelectorAll<HTMLSelectElement>('select[data-name]').forEach((sel) => {
+    const role = sel.value.trim();
+    if (role) map[role] = sel.dataset.name as string;
   });
   return map;
 }

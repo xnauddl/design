@@ -340,7 +340,12 @@
     .r-title.has-swatch { display: flex; align-items: center; gap: 6px; }
     .r-swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
     /* 역할 입력처럼 메타 자리에 오는 편집 요소 — 카드 폭을 밀지 않게 고정 폭. */
-    .r-role { width: 104px; font-size: 10px; padding: 3px 5px; }
+    /* 역할 드롭다운 — `한글 · role` 병기라 자유 입력칸보다 넓어야 잘리지 않는다. */
+    .r-role { width: 126px; font-size: 10px; padding: 3px 4px; }
+    /* 모아 놓은 색 한 줄 — 목록은 팔레트 한 벌이면 60행이 넘는다. 램프가 고른지, 빠진
+       계열이 없는지는 스크롤 전에 여기서 본다(와이어 `palette-row`). */
+    .palette-row { display: flex; gap: 3px; flex-wrap: wrap; }
+    .palette-row i { width: 16px; height: 16px; border-radius: 2px; border: 1px solid rgba(0,0,0,.1); display: block; }
     .r-card input[type="checkbox"] { margin: 0; }
     /* 그룹 머리 — 트리의 루트나 리포트의 구분줄. 카드가 아니라 라벨이다. */
     .r-group {
@@ -492,15 +497,9 @@
           <span id="tidySumText"></span>
           <button id="btnTidyUndo" class="link" data-i18n="colorTidy.undo">되돌리기</button>
         </div>
+        <!-- 모아 놓은 색 미리보기 한 줄(ui.ts가 채운다). -->
+        <div id="paletteRow" class="palette-row"></div>
         <div id="colorTable" class="results"></div>
-        <datalist id="roleList">
-          <option value="surface"></option><option value="surface/muted"></option>
-          <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
-          <option value="border"></option>
-          <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
-          <option value="secondary"></option><option value="accent"></option>
-          <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
-        </datalist>
       </div>
       <div class="status" id="colorStatus"></div>
     </div>
@@ -1057,6 +1056,24 @@
     "bind.progress": "\uC9C4\uD589\uB960",
     "bind.skipHint": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4",
     "bind.skipMeta": "\uC2A4\uD0B5",
+    // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
+    // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.
+    "role.none": "\uC5ED\uD560 \uC5C6\uC74C",
+    "role.surface": "\uBA74",
+    "role.surface-muted": "\uC605\uC740 \uBA74",
+    "role.text": "\uAE00\uC790",
+    "role.text-muted": "\uC605\uC740 \uAE00\uC790",
+    "role.text-inverse": "\uBC18\uC804 \uAE00\uC790",
+    "role.border": "\uD14C\uB450\uB9AC",
+    "role.primary": "\uC8FC\uC0C9",
+    "role.primary-strong": "\uC9C4\uD55C \uC8FC\uC0C9",
+    "role.primary-subtle": "\uC605\uC740 \uC8FC\uC0C9",
+    "role.secondary": "\uBCF4\uC870",
+    "role.accent": "\uAC15\uC870",
+    "role.success": "\uC131\uACF5",
+    "role.warning": "\uC8FC\uC758",
+    "role.error": "\uC624\uB958",
+    "role.info": "\uC548\uB0B4",
     // 리네임
     "rename.title": "\uC774\uB984 \uC815\uB9AC",
     "rename.hint": "\uC5ED\uD560\uC5D0 \uB9DE\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uC73C\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uCD5C\uC0C1\uC704\xB7\uC778\uC2A4\uD134\uC2A4 \uC774\uB984\uC740 \uADF8\uB300\uB85C \uB461\uB2C8\uB2E4",
@@ -2128,6 +2145,45 @@
       toks[ti].name = names[k];
     });
   }
+  var COLOR_ROLES = [
+    "surface",
+    "surface/muted",
+    "text",
+    "text/muted",
+    "text/inverse",
+    "border",
+    "primary",
+    "primary/strong",
+    "primary/subtle",
+    "secondary",
+    "accent",
+    "success",
+    "warning",
+    "error",
+    "info"
+  ];
+  function roleSelect(value) {
+    const sel = document.createElement("select");
+    sel.className = "r-role";
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = t("role.none");
+    sel.appendChild(none);
+    for (const r of COLOR_ROLES) {
+      const o = document.createElement("option");
+      o.value = r;
+      o.textContent = `${t(`role.${r.replace("/", "-")}`)} \xB7 ${r}`;
+      sel.appendChild(o);
+    }
+    if (value && !COLOR_ROLES.includes(value)) {
+      const o = document.createElement("option");
+      o.value = value;
+      o.textContent = value;
+      sel.appendChild(o);
+    }
+    sel.value = value;
+    return sel;
+  }
   function renderColorTable() {
     const card = $("colorSection");
     const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
@@ -2135,6 +2191,7 @@
       card.style.display = "none";
       $("colorCount").textContent = "";
       $("colorTable").innerHTML = "";
+      $("paletteRow").innerHTML = "";
       return;
     }
     card.style.display = "";
@@ -2143,25 +2200,34 @@
     for (const [role, name] of Object.entries(textToSemanticMap($("semMap").value))) {
       if (!roleByName.has(name)) roleByName.set(name, role);
     }
+    renderPaletteRow(colors);
     renderChunked($("colorTable"), colors, (t2) => {
       var _a;
-      const role = document.createElement("input");
-      role.setAttribute("list", "roleList");
-      role.placeholder = "\uC5ED\uD560(\uC120\uD0DD)";
-      role.value = (_a = roleByName.get(t2.name)) != null ? _a : "";
+      const role = roleSelect((_a = roleByName.get(t2.name)) != null ? _a : "");
       role.dataset.name = t2.name;
-      role.className = "r-role";
+      const used = t2.count ? ` \xB7 ${t2.count}\xD7 \uC0AC\uC6A9` : "";
       const card2 = resultCard({
         title: t2.name,
         titleMono: true,
-        summary: classifyColor(t2.value).achromatic ? "\uBB34\uCC44" : "hue",
+        summary: `${t2.value}${used}`,
+        summaryMono: true,
         metaEl: role
       });
-      role.addEventListener("input", updateColorSummary);
+      role.addEventListener("change", updateColorSummary);
       addSwatch(card2, t2.value);
       return card2;
     });
     updateColorSummary();
+  }
+  function renderPaletteRow(colors) {
+    const row = $("paletteRow");
+    row.innerHTML = "";
+    for (const c of colors) {
+      const i = document.createElement("i");
+      i.style.background = c.value;
+      i.title = `${c.name} \xB7 ${c.value}`;
+      row.appendChild(i);
+    }
   }
   function updateColorSummary() {
     const colors = tokens.filter((t2) => t2.category === "color");
@@ -2170,9 +2236,9 @@
   }
   function colorRoleMap() {
     const map = {};
-    $("colorTable").querySelectorAll("input[data-name]").forEach((inp) => {
-      const role = inp.value.trim();
-      if (role) map[role] = inp.dataset.name;
+    $("colorTable").querySelectorAll("select[data-name]").forEach((sel) => {
+      const role = sel.value.trim();
+      if (role) map[role] = sel.dataset.name;
     });
     return map;
   }
