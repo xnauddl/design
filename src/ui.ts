@@ -425,11 +425,11 @@ $('btnPalette').addEventListener('click', () => {
   hideTidySummary(); // 팔레트 스케일은 의도적 간격 — 정리 안 함
   preTidyTokens = null;
   $('paletteInfo').textContent = t('palette.summary', { count: p.scales.length, tokens: tokens.length });
-  setStatus(
-    'paletteStatus',
-    t('palette.hint', { warn: p.warnings.join(' ') ? p.warnings.join(' ') + ' ' : '' }),
-    p.warnings.length ? 'warn' : 'ok',
-  );
+  // 경고가 있을 때만 상태 줄을 쓴다 — 없으면 바로 위 renderColorTable이 채운 요약
+  // (`색 N개 · 역할 지정 M · 변수화 대기`)이 서 있어야 한다. 색 카드의 상태 줄은 하나다.
+  // 이 줄은 없어진 `paletteStatus`를 가리켜 팔레트를 만들 때마다 예외를 던졌고, 그래서
+  // '브랜드색 채도가 낮다' 같은 경고가 한 번도 화면에 닿지 못했다.
+  if (p.warnings.length) setStatus('colorStatus', p.warnings.join(' '), 'warn');
 });
 
 /** 시맨틱 매핑 textarea를 `역할 = 변수명` 줄로 채움(textToSemanticMap의 역방향). */

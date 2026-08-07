@@ -856,7 +856,6 @@
     "palette.invalidHex": "\uBE0C\uB79C\uB4DC\uC0C9\uC744 #RRGGBB \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
     "palette.invalidHex2": "\uBCF4\uC870\uC0C9\uC744 #RRGGBB \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
     "palette.summary": "{count}\uACC4\uC5F4 \xB7 {tokens}\uC0C9 \uC0DD\uC131",
-    "palette.hint": "{warn}\uD558\uBAA8\uB2C8\uB97C \uBC14\uAFD4 \uB2E4\uC2DC \uC0DD\uC131\uD558\uAC70\uB098, \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBCC0\uC218\uC5D0 \uBC18\uC601\uD558\uC138\uC694.",
     // 추출 / 토큰 생성
     "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
     "create.colorsDone": "\uC0C9 \uBCC0\uC218 {count}\uAC1C \uC774\uBBF8 \uC0DD\uC131\uB428 \xB7 \uC5EC\uAE30\uC120 \uC0C9 \uC678\uB9CC",
@@ -2121,11 +2120,7 @@
     hideTidySummary();
     preTidyTokens = null;
     $("paletteInfo").textContent = t("palette.summary", { count: p.scales.length, tokens: tokens.length });
-    setStatus(
-      "paletteStatus",
-      t("palette.hint", { warn: p.warnings.join(" ") ? p.warnings.join(" ") + " " : "" }),
-      p.warnings.length ? "warn" : "ok"
-    );
+    if (p.warnings.length) setStatus("colorStatus", p.warnings.join(" "), "warn");
   });
   function setSemMapText(map) {
     $("semMap").value = semanticMapToText(map);
