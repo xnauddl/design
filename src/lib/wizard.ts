@@ -11,7 +11,6 @@ export type WizardStepId =
   | 'semantics' // CREATE_SEMANTICS (쓰기, 선택)
   | 'bind' // APPLY (쓰기)
   | 'rename' // RENAME (쓰기) — bind 이후라야 토큰을 역할 신호로 활용 가능
-  | 'contrast' // CHECK_CONTRAST (읽기, 선택)
   // 등록이 같은 이름 묶음의 세트 결합까지 함께 수행하므로 별도 CLASSIFY_VARIANTS를 보내지 않는다.
   | 'componentize'; // REGISTER_COMPONENTS (쓰기, 선택, Paid)
 
@@ -33,14 +32,12 @@ export const WIZARD_STEPS: readonly WizardStepDef[] = [
   { id: 'semantics', write: true, optional: true },
   { id: 'bind', write: true, optional: false },
   { id: 'rename', write: true, optional: false },
-  { id: 'contrast', write: false, optional: true },
   { id: 'componentize', write: true, optional: true, paid: true },
 ];
 
 /** 사용자가 켠 선택 단계(필수 단계는 포함하지 않는다). */
 export interface WizardOptions {
   semantics: boolean;
-  contrast: boolean;
   componentize: boolean;
 }
 
@@ -84,8 +81,6 @@ export interface WizardTotals {
   semanticsAliased?: number;
   bound?: number;
   renamed?: number;
-  contrastChecked?: number;
-  contrastFailed?: number;
   components?: number;
 }
 
@@ -95,10 +90,6 @@ export function summarize(totals: WizardTotals): string {
   if (totals.created != null) parts.push(t('wizard.sum.tokens', { n: totals.created }));
   if (totals.bound != null) parts.push(t('wizard.sum.bound', { n: totals.bound }));
   if (totals.renamed != null) parts.push(t('wizard.sum.renamed', { n: totals.renamed }));
-  if (totals.contrastChecked != null) {
-    const passed = totals.contrastChecked - (totals.contrastFailed ?? 0);
-    parts.push(t('wizard.sum.contrast', { passed, total: totals.contrastChecked }));
-  }
   if (totals.components != null && totals.components > 0) parts.push(t('wizard.sum.components', { n: totals.components }));
   return parts.length ? parts.join(' · ') : t('wizard.sum.empty');
 }

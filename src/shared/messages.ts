@@ -7,7 +7,6 @@ import type { Tier, Feature } from '../lib/entitlements';
 import type { LicenseStatus, VerifyResult } from '../lib/license';
 import type { Preset } from '../lib/presets';
 import type { ExportFormat } from '../lib/exporters';
-import type { WcagLevel, ContrastFinding } from '../lib/contrast';
 import type { FrameMeta, VaryingPosition } from '../lib/similar';
 import type { ResolvedType, ScopeName } from '../lib/tokens';
 
@@ -185,9 +184,7 @@ export type UiToCode =
   | { type: 'GET_VARIABLE_USAGE'; id: string } // 삭제/리네임 전 사용처 조회
   | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId: string; toModeId: string } // 라이트→다크 자동 채움
   | { type: 'SCAN_SIMILAR' } // 닮은 프레임: 선택 프레임 정렬 미리보기(읽기 전용 → Free)
-  | { type: 'COMPONENTIZE_SIMILAR'; masterId: string; frameIds: string[] } // 닮은 프레임(Paid): 마스터 컴포넌트화 + 나머지를 오버라이드 인스턴스로 교체
-  | { type: 'CHECK_CONTRAST'; level: WcagLevel } // 명도 대비 점검(읽기 전용 감사)
-  | { type: 'APPLY_CONTRAST_FIX'; nodeId: string; hex: string }; // #2: 보정색을 해당 노드 단색 채움에 적용
+  | { type: 'COMPONENTIZE_SIMILAR'; masterId: string; frameIds: string[] }; // 닮은 프레임(Paid): 마스터 컴포넌트화 + 나머지를 오버라이드 인스턴스로 교체
 
 /** code → UI 응답. */
 export type CodeToUi =
@@ -238,8 +235,6 @@ export type CodeToUi =
   // varying/imageVarying는 "무엇이 속성으로 열리는지" 미리 보여주는 용도.
   | { type: 'SIMILAR_CANDIDATES'; metas: FrameMeta[]; recommendedMasterId: string | null; varying: VaryingPosition[]; imageVarying: string[]; excluded: { id: string; name: string; reason: string }[] }
   | { type: 'COMPONENTIZE_RESULT'; master: string; properties: number; instances: number; images: number; warnings: string[] }
-  // 명도 대비 점검: 텍스트-배경 쌍 평가 결과 + 추출 단계에서 건너뛴 사유별 집계(skipped).
-  | { type: 'CONTRAST_RESULT'; level: WcagLevel; checked: number; passed: number; failed: number; findings: ContrastFinding[]; skipped: Record<string, number> }
   | { type: 'ERROR'; message: string; op?: string }; // op: 실패한 UiToCode 종류(상태 라우팅용)
 
 /** code → UI 안전 전송. */

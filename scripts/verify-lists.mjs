@@ -85,31 +85,6 @@ function fakeColors(n) {
   return out;
 }
 
-/**
- * 대비 실패 n건. `#contrastList`는 `pass:false`만 그리므로 전부 실패로 만든다.
- * 행 높이가 고르게 유지되는지가 이 목록의 관건이라, 높이를 흔드는 조합을 일부러 섞는다:
- * 보정 버튼 0·1·2개, 긴 레이어명(감싸짐 유발), ‘큰글자’ 접미사.
- */
-function fakeContrastFindings(n) {
-  return Array.from({ length: n }, (_, i) => {
-    const kind = i % 3; // 0: 버튼 2개 · 1: 버튼 1개 · 2: 버튼 없음
-    const long = i % 5 === 0; // 폭을 넘기는 긴 이름
-    return {
-      id: `node-${i}`,
-      name: long ? `Page/Section/Card ${i} / 아주 긴 레이어 이름 텍스트 ${i}` : `Text ${i}`,
-      fg: '#8a8a8a',
-      bg: '#ffffff',
-      bgId: kind === 0 ? `bg-${i}` : undefined,
-      ratio: 2.5 + (i % 17) / 10,
-      required: 4.5,
-      large: i % 4 === 0,
-      pass: false,
-      suggestedFg: kind === 2 ? undefined : '#4a4a4a',
-      suggestedBg: kind === 0 ? '#f2f2f2' : undefined,
-    };
-  });
-}
-
 /** 리네임 미리보기 노드 n개 — 전부 `after` 보유(영향 노드)라 맥락 숨김에도 n행이 그대로 보인다. */
 function fakeRenameNodes(n) {
   return Array.from({ length: n }, (_, i) => ({
@@ -213,31 +188,6 @@ const LISTS = {
         generated: n,
         sets: 1,
         combos: Array.from({ length: n }, (_, i) => `Type=Primary, Size=M, State=state-${String(i + 1).padStart(3, '0')}`),
-      });
-    },
-  },
-  contrastList: {
-    label: '명도 대비 점검 결과',
-    tab: 'tabbtn-apply',
-    row: '.cfind',
-    more: 'contrastListMore',
-    count: 'contrastListCount',
-    expand: 'btnContrastListExpand',
-    // 이 목록만 행 높이 균일성을 따로 본다 — 감쌈·보정 버튼 유무로 높이가 흔들렸던 곳이라
-    // 반쪽 행이 0건이어도 원인이 되살아났는지 바로 보이게 한다.
-    uniformRows: true,
-    // 마법사(‘시작’ 탭)의 대비 점검이 이 목록을 채운다 — 결과가 숨은 탭에 그려지는 실제 경로.
-    hiddenFrom: 'tabbtn-wizard',
-    async setup(page, n) {
-      // 결과 메시지만 넣으면 된다 — 검사 버튼은 백엔드(code.ts)가 있어야 응답이 온다.
-      await seed(page, {
-        type: 'CONTRAST_RESULT',
-        level: 'AA',
-        checked: n,
-        passed: 0,
-        failed: n,
-        findings: fakeContrastFindings(n),
-        skipped: {},
       });
     },
   },

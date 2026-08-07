@@ -19,7 +19,6 @@ import { suggestTokenRoles } from './lib/roles';
 import { pipelineSteps } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
-import type { WcagLevel, ContrastFinding } from './lib/contrast';
 import { planWizard, summarize, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
@@ -272,7 +271,6 @@ const LIST_REGIONS: ListRegion[] = [
   { mount: 'tokenList', row: '.tk', more: 'tokenListMore', count: 'tokenListCount', expand: 'btnTokenListExpand' },
   { mount: 'colorTable', row: '.crow', more: 'colorTableMore', count: 'colorTableCount', expand: 'btnColorTableExpand' },
   { mount: 'variantReport', row: '.vr-row', more: 'variantReportMore', count: 'variantReportCount', expand: 'btnVariantReportExpand' },
-  { mount: 'contrastList', row: '.cfind', more: 'contrastListMore', count: 'contrastListCount', expand: 'btnContrastListExpand' },
   { mount: 'similarList', row: '.simrow', more: 'similarListMore', count: 'similarListCount', expand: 'btnSimilarListExpand' },
   { mount: 'varList', row: '.vrow', more: 'varListMore', count: 'varListCount', expand: 'btnVarListExpand' },
   // 선택형 미리보기 트리 3종 — 셋 다 renderSelectableTree 한 곳을 지나므로 렌더 쪽 배선은
@@ -1017,16 +1015,6 @@ $('btnPreview').addEventListener('click', () => {
   send({ type: 'RENAME', apply: false, maxDepth: readMaxDepth() });
 });
 
-$('btnContrast').addEventListener('click', () => {
-  const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
-  setStatus('contrastStatus', t('contrast.checking'), '');
-  // 지난 결과를 비운다 — 검사가 ERROR로 끝나면 결과는 그대로 남는데 아래 개수 줄이
-  // ‘총 n개 중 m개 표시’로 남아 지난 회차 수치를 이번 결과인 양 단언한다.
-  $('contrastList').innerHTML = '';
-  layoutListBy('contrastList');
-  send({ type: 'CHECK_CONTRAST', level });
-});
-
 $('btnRename').addEventListener('click', () => {
   // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG).
   const items = renameNodes
@@ -1142,12 +1130,10 @@ async function runWizard(): Promise<void> {
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   const tolerance = Number(($('tol') as HTMLInputElement).value) || 0;
   const maxDepth = readMaxDepth();
-  const level = ($('contrastLevel') as HTMLSelectElement).value as WcagLevel;
   const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
 
   const options: WizardOptions = {
     semantics: ($('wizOptSemantics') as HTMLInputElement).checked,
-    contrast: ($('wizOptContrast') as HTMLInputElement).checked,
     componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
   };
   const ctx: WizardContext = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
@@ -1211,14 +1197,6 @@ async function runWizard(): Promise<void> {
           const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth }, ['RENAME_RESULT']);
           totals.renamed = r.changes.length;
           setWizardStep('rename', 'done', t('wizard.seq.renameDone', { count: r.changes.length }));
-          break;
-        }
-        case 'contrast': {
-          const r = await wizardRequest({ type: 'CHECK_CONTRAST', level }, ['CONTRAST_RESULT']);
-          totals.contrastChecked = r.checked;
-          totals.contrastFailed = r.failed;
-          // 미달 발견은 ‘실행 실패’가 아니라 ‘점검 결과’ — 흐름은 계속하되 주의 표시.
-          setWizardStep('contrast', r.failed ? 'fail' : 'done', r.checked === 0 ? t('wizard.seq.contrastNone') : t('wizard.seq.contrastPass', { pass: r.checked - r.failed, checked: r.checked, level: r.level }));
           break;
         }
         case 'componentize': {
@@ -1339,7 +1317,7 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
 /* ---------- 유료(Paid) 기능 게이트 ----------
    Free/Paid 2티어. Paid에서 해금: 팔레트·토큰 생성(미리보기+적용)·시맨틱·텍스트 스타일·
    컴포넌트/베리언트·공유 프리셋.
-   Free: 추출·색 정리·바인딩·리네임·명도 대비·내보내기. */
+   Free: 추출·색 정리·바인딩·리네임·내보내기. */
 const PAID_LOCK = '🔒 Paid 전용';
 /** 유료 거부(PREMIUM_REQUIRED) 안내를 띄울 카드 — Feature별 상태 영역. */
 const PREMIUM_STATUS_ID: Record<Feature, string> = {
@@ -1996,9 +1974,6 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('componentStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
       break;
     }
-    case 'CONTRAST_RESULT':
-      renderContrast(msg);
-      break;
     case 'VARIABLES': {
       allVars = msg.vars;
       // 컬렉션 필터 옵션은 실제로 존재하는 컬렉션에서만 만든다.
@@ -2118,7 +2093,6 @@ const OP_STATUS: Record<string, string> = {
   REGISTER_COMPONENTS: 'componentStatus',
   CLASSIFY_VARIANTS: 'componentStatus',
   GENERATE_MISSING_VARIANTS: 'componentStatus',
-  CHECK_CONTRAST: 'contrastStatus',
   GET_PRESETS: 'presetStatus',
   SAVE_PRESET: 'presetStatus',
   DELETE_PRESET: 'presetStatus',
@@ -2569,92 +2543,6 @@ function reasonsText(reasons: Record<string, number>): string {
     .join(' · ');
 }
 
-/* ---------- 명도 대비 점검 결과 렌더 ---------- */
-function contrastSkipText(skipped: Record<string, number>): string {
-  return Object.entries(skipped)
-    .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${t('contrastSkip.' + k)} ${n}`)
-    .join(' · ');
-}
-
-/** #2: 보정 적용 버튼(색 미리보기 + 라벨). 클릭 → 해당 노드 채움 교체 + ‘다시 검사’ 안내. */
-function contrastFixBtn(label: string, hex: string, nodeId: string): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.className = 'fixbtn';
-  btn.title = `${label} 색을 ${hex}로 보정`;
-  const sw = document.createElement('span');
-  sw.className = 'swatch';
-  sw.style.background = hex;
-  btn.appendChild(sw);
-  const text = document.createTextNode(` ${label}`);
-  btn.appendChild(text);
-  btn.addEventListener('click', () => {
-    send({ type: 'APPLY_CONTRAST_FIX', nodeId, hex });
-    btn.disabled = true;
-    // textContent로 통째로 갈아끼우면 스와치 span까지 지워진다 — 어떤 색을 넣었는지 사라지고,
-    // 버튼이 스와치 높이를 잃어 이 행만 낮아진다(행 높이 균일이 스냅의 전제, .cfind 주석).
-    text.textContent = ' ✓ 적용';
-    setStatus('contrastStatus', t('contrast.fixApplied'), 'ok');
-  });
-  return btn;
-}
-
-/** 실패 1행(색쌍 스와치 · 레이어명 · 대비비 · 보정 버튼). */
-function makeContrastRow(f: ContrastFinding): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'cfind';
-
-  const pair = document.createElement('span');
-  pair.className = 'cpair';
-  for (const hex of [f.bg, f.fg]) {
-    const sw = document.createElement('span');
-    sw.className = 'swatch';
-    sw.style.background = hex;
-    pair.appendChild(sw);
-  }
-  row.appendChild(pair);
-
-  const name = document.createElement('span');
-  name.className = 'cname';
-  name.textContent = `${f.name}${f.large ? ' · 큰글자' : ''}`;
-  // 이름은 행 높이를 고르게 두려고 한 줄 말줄임이다(.cfind 주석) → 잘린 부분은 title로 읽는다.
-  name.title = name.textContent;
-  row.appendChild(name);
-
-  const ratio = document.createElement('span');
-  ratio.className = 'ratio warn';
-  ratio.textContent = `${f.ratio} / ${f.required}`;
-  row.appendChild(ratio);
-
-  // #2: 보정 제안 — 텍스트색(기본)·배경색(옵션). 클릭 시 해당 노드에 적용.
-  if (f.suggestedFg || f.suggestedBg) {
-    const fix = document.createElement('span');
-    fix.className = 'cfix';
-    if (f.suggestedFg) fix.appendChild(contrastFixBtn('텍스트', f.suggestedFg, f.id));
-    if (f.suggestedBg && f.bgId) fix.appendChild(contrastFixBtn('배경', f.suggestedBg, f.bgId));
-    row.appendChild(fix);
-  }
-  return row;
-}
-
-function renderContrast(msg: Extract<CodeToUi, { type: 'CONTRAST_RESULT' }>): void {
-  const box = $('contrastList');
-  const fails = msg.findings.filter((f) => !f.pass); // 실패 건만 나열(조치 대상)
-  // 스캔 상한이 2000이라 실패가 수백 건이면 동기 루프가 프레임을 통째로 막는다(§4).
-  // onDone에서 스냅해야 한다 — 청크가 남아 있는 동안 재면 행 수가 모자라 상한에 안 걸린
-  // 것으로 보이고, ‘총 n개 중 m개’ 줄이 안 뜬 채 반쪽 행만 남는다.
-  renderChunked(box, fails, makeContrastRow, () => layoutListBy('contrastList'));
-  const skip = contrastSkipText(msg.skipped);
-  const skipNote = skip ? ` · 건너뜀: ${skip}` : '';
-  if (msg.checked === 0) {
-    setStatus('contrastStatus', t('contrast.none', { detail: skip ? t('contrast.noneSkip', { skip }) : t('contrast.noneSelect') }), 'warn');
-  } else if (fails.length === 0) {
-    setStatus('contrastStatus', t('contrast.allPass', { checked: msg.checked, level: msg.level, skip: skipNote }), 'ok');
-  } else {
-    setStatus('contrastStatus', t('contrast.someFail', { checked: msg.checked, fails: fails.length, level: msg.level, skip: skipNote }), 'warn');
-  }
-}
-
 /* ---------- UX6: 진행률 바 ---------- */
 function showApplyProgress(label: string): void {
   $('applyProgress').style.display = '';
@@ -2858,7 +2746,7 @@ function escapeHtml(s: string): string {
 const TITLE_BTN_IDS = new Set([
   // btnColorRoles 제외: 색 정리는 추출 카드에 흡수돼 더 이상 독립 카드 머리가 아님(본문 버튼).
   'btnWizardRun', 'btnPalette', 'btnExtract', 'btnCreate',
-  'btnTextStyles', 'btnApply', 'btnPreview', 'btnContrast', 'btnExport',
+  'btnTextStyles', 'btnApply', 'btnPreview', 'btnExport',
 ]);
 /**
  * sticky 오프셋 동기화 — 탭 바·선택 바의 '실제' 높이를 CSS 변수로 넘긴다.
@@ -2967,8 +2855,8 @@ function showTab(name: (typeof TABS)[number]): void {
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
   // 비활성 탭은 .tab-section이 display:none이라 그 안에서 렌더된 목록은 행 높이가 0으로 측정되고
   // 스냅이 조용히 bail한다(접힌 카드와 같은 함정 — applyCardChrome 참고). 결과가 다른 탭에 있는
-  // 동안 도착하는 경로가 여럿이다: 마법사의 추출이 ‘만들기’ 탭 목록을, 대비 점검이 #contrastList를,
-  // componentize가 #variantReport를 채우고, 미리보기는 느려서 결과 전에 탭을 옮기는 일이 흔한데
+  // 동안 도착하는 경로가 여럿이다: 마법사의 추출이 ‘만들기’ 탭 목록을, componentize가
+  // #variantReport를 채우고, 미리보기는 느려서 결과 전에 탭을 옮기는 일이 흔한데
   // 트리 3종은 첫 화면이 아닌 ‘적용’ 탭에 있다. 탭이 보이는 순간 다시 재지 않으면
   // 돌아왔을 때 반쪽 행에 개수 줄도 없는 상태가 남는다.
   layoutAllLists();

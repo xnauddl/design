@@ -405,32 +405,9 @@
     .vr-row.vr-bullet::before { content: '• '; color: var(--muted); }
     .vr-row.vr-added::before { content: '+ '; color: var(--muted); }
 
-    /* ── 명도 대비 점검 결과 ── */
-    /* 상한이 160px 인라인이라 6행 남짓에서 잘렸고(행이 감싸지면 3행대), 경계도 없어
-       "점검이 몇 건에서 끝났는지" 자체가 안 읽혔다 → 공용 .list-region으로. 상한은
-       기본값(40vh·최대 560px)보다 낮춘다 — 이 목록은 아래 상태 문구가 결론이라
-       목록이 화면을 다 먹으면 그 결론까지 페이지를 또 스크롤해야 한다. */
-    #contrastList { font-family: var(--mono); font-size: var(--fs); --list-cap: clamp(200px, 32vh, 400px); }
-    /* 행 높이가 제각각이면 정수배 스냅이 성립하지 않는다 — layoutList는 rows[0] 하나를
-       표본으로 몇 행이 들어가는지 계산하기 때문. 이 행은 두 가지 이유로 불균일했다:
-       (1) flex-wrap:wrap이라 좁은 패널(최소 360px)에서 이름·보정 버튼이 다음 줄로 감싸지고,
-       (2) 보정 제안이 있는 행만 버튼 높이(≈17px)만큼 커져 없는 행(≈16.5px)과 어긋난다.
-       layoutList에 불균일 폴백을 넣는 대신 CSS에서 균일화한다 — 폴백은 스냅을 포기하는
-       것이고(반쪽 행이 그대로 남는다) 다른 목록까지 영향을 받는다.
-       한 줄 고정(nowrap) + 이름 말줄임 + 최소 높이로 모든 행을 같은 높이로 만든다.
-       28px = 세로 패딩 8 + 내용 20. 가장 높은 자식이 보정 버튼(≈17px)이라 여유 3px —
-       폰트 폴백으로 글자 줄상자가 조금 커져도 이 행만 높아지지 않는다. */
-    .cfind { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; }
-    /* 폭이 모자라면 줄바꿈 대신 이름을 줄인다(전체 이름은 title로). min-width:0이 없으면
-       flex 기본 min-width:auto가 내용 폭을 하한으로 잡아 행이 가로로 넘친다. */
-    .cfind .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .cfind .cpair, .cfind .ratio, .cfind .cfix { flex: 0 0 auto; }
-    .cpair { display: inline-flex; }
-    .cpair .swatch { width: 14px; height: 14px; border-radius: 0; border: 1px solid rgba(0,0,0,.18); }
-    .cpair .swatch:first-child { border-radius: 3px 0 0 3px; }
-    .cpair .swatch:last-child { border-radius: 0 3px 3px 0; border-left: none; }
-    .cfind .ratio { font-variant-numeric: tabular-nums; white-space: nowrap; }
-    /* 닮은 프레임 멤버 줄 — .cfind와 같은 한 줄 규칙(이름만 늘어나고 나머지는 고정). label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
+    /* 닮은 프레임 멤버 줄 — 한 줄 고정(이름만 늘어나고 나머지는 고정). 행 높이가 제각각이면
+       목록의 정수배 스냅이 성립하지 않는다(layoutList는 rows[0]을 표본으로 잰다) → 감싸는 대신
+       이름을 말줄임한다. label이라 줄 아무 데나 눌러도 라디오가 잡힌다. */
     .simrow { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; padding: 4px 0; min-height: 28px; cursor: pointer; }
     .simrow .cname { flex: 1 1 70px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .simrow input[type="radio"], .simrow .tag, .simrow .simmeta { flex: 0 0 auto; }
@@ -446,9 +423,6 @@
     /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
-    .cfix { display: inline-flex; gap: 4px; }
-    .fixbtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; font-size: 10px; width: auto; }
-    .fixbtn .swatch { width: 11px; height: 11px; border-radius: 2px; border: 1px solid rgba(0,0,0,.18); }
 
     /* ── 리사이즈 핸들(우하단) ── */
     #resizeHandle { position: fixed; right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; z-index: 20; touch-action: none; }
@@ -472,10 +446,9 @@
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈→검수를 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">시스템화 마법사</h2>
-      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈 · 접근성 검수</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계·대비 기준)을 사용합니다.</div>
+      <div class="hint" data-i18n-html="wizardCard.hint">선택한 프레임을 한 번에 <b>토큰화 · 바인딩 · 정돈</b>. 세부값은 ‘만들기/적용’ 탭의 각 입력(base·허용오차·맥락단계)을 사용합니다.</div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">시맨틱 매핑</span></label>
-        <label class="inline"><input id="wizOptContrast" type="checkbox" checked /> <span data-i18n="wizardCard.optContrast">접근성 검수</span></label>
         <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트화</span></label>
         <span class="muted" id="wizComponentLock"></span>
       </div>
@@ -503,7 +476,7 @@
       <h2 data-i18n="pipeline.title">진행 안내</h2>
       <div class="hint" data-i18n="pipeline.hint">권장 순서와 단계 상태(전제 충족 여부). 클릭하면 해당 단계로 이동.</div>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 대비 점검 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">리네임 · 컴포넌트는 전제 없이 언제든 가능(독립).</div>
     </div>
   </section>
 
@@ -750,27 +723,6 @@
       <div class="status" id="renameStatus"></div>
     </div>
 
-    <div class="step" id="contrastCard">
-      <h2 data-i18n="contrast.title">명도 대비 점검 (WCAG)</h2>
-      <div class="hint" data-i18n="contrast.hint">선택 안 텍스트 ↔ 배경 대비를 WCAG로 검사(읽기 전용).</div>
-      <div class="row">
-        <label class="inline"><span data-i18n="contrast.level">기준</span>
-          <select id="contrastLevel">
-            <option value="AA">AA (4.5 · 큰글자 3)</option>
-            <option value="AAA">AAA (7 · 큰글자 4.5)</option>
-          </select>
-        </label>
-        <button id="btnContrast" class="primary" data-i18n="contrast.checkBtn">대비 검사</button>
-      </div>
-      <div id="contrastList" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
-      <div class="list-more" id="contrastListMore" style="display:none">
-        <span class="list-count" id="contrastListCount"></span>
-        <button class="link" id="btnContrastListExpand" data-i18n="list.expandAll">모두 펼치기</button>
-      </div>
-      <div class="status" id="contrastStatus"></div>
-    </div>
-
     <div class="step" id="componentCard">
       <!-- 이 카드엔 목록이 둘이다(후보 트리 · 결과 리포트). 세는 대상이 달라 각자 span을 갖고,
            비어 있으면 각자 숨는다 — 스캔 직후엔 후보만, 등록 직후엔 리포트만 뜬다. -->
@@ -914,7 +866,7 @@
     <!-- 접근성 / 국제화 -->
     <div class="ux">
       <div class="ux-h"><span class="ux-t" data-i18n="a11y.title">접근성 · 국제화</span></div>
-      <div data-i18n="a11y.body">키보드 전용 조작 · 명도 대비 AA · i18n</div>
+      <div data-i18n="a11y.body">키보드 전용 조작 · i18n</div>
     </div>
   </section>
 
