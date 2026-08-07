@@ -2407,9 +2407,19 @@
     setStatus("colorStatus", t("common.applyingVars"), "");
   });
   $("btnScanGlobals").addEventListener("click", () => {
+    autoGlobalScan = false;
     setStatus("semStatus", t("semantic.scanningGlobals"), "");
     send({ type: "GET_GLOBAL_COLORS" });
   });
+  var autoGlobalScan = false;
+  var globalRolesAsked = false;
+  function requestGlobalRoles() {
+    if (globalRolesAsked || !hasColorVars) return;
+    if ($("semMap").value.trim()) return;
+    globalRolesAsked = true;
+    autoGlobalScan = true;
+    send({ type: "GET_GLOBAL_COLORS" });
+  }
   $("btnSemantics").addEventListener("click", () => {
     const map = {};
     for (const line of $("semMap").value.split("\n")) {
@@ -3175,11 +3185,13 @@
         break;
       case "GLOBAL_COLORS":
         if (!msg.colors.length) {
-          setStatus("semStatus", t("semantic.noGlobals"), "warn");
-        } else {
+          if (!autoGlobalScan) setStatus("semStatus", t("semantic.noGlobals"), "warn");
+        } else if (!autoGlobalScan || !$("semMap").value.trim()) {
           setSemMapText(suggestSemanticMap(msg.colors));
-          setStatus("semStatus", t("semantic.suggested", { count: msg.colors.length }), "ok");
+          renderColorTable();
+          if (!autoGlobalScan) setStatus("semStatus", t("semantic.suggested", { count: msg.colors.length }), "ok");
         }
+        autoGlobalScan = false;
         break;
       case "PREREQ_STATE":
         hasColorVars = msg.hasColorVars;
@@ -3190,6 +3202,7 @@
         hasTextStyles = msg.hasTextStyles;
         updateGates();
         renderPipeline();
+        requestGlobalRoles();
         break;
       case "LICENSE_STATUS": {
         const srcLabel = msg.source === "key" ? `\uB77C\uC774\uC120\uC2A4 \uD0A4${msg.status ? ` \xB7 ${msg.status}` : ""}` : msg.source === "dev" ? "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C" : "\uC5C6\uC74C";

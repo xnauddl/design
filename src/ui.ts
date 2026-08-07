@@ -792,9 +792,29 @@ $('btnColorVars').addEventListener('click', () => {
 
 $('btnScanGlobals').addEventListener('click', () => {
   // #10: 기존 Global 색에서 시맨틱 역할 추천(재방문 매핑).
+  autoGlobalScan = false;
   setStatus('semStatus', t('semantic.scanningGlobals'), '');
   send({ type: 'GET_GLOBAL_COLORS' });
 });
+
+/** 방금 보낸 Global 색 요청이 자동(전제 상태 감지)인가 — 사용자가 누른 것과 응답 처리가 다르다. */
+let autoGlobalScan = false;
+/** 자동 요청은 세션당 한 번 — 탭을 오갈 때마다 사용자가 고친 맵을 흔들지 않는다. */
+let globalRolesAsked = false;
+
+/**
+ * #10 재방문 매핑 — 색 변수가 이미 있는 파일이면 그때 정한 역할을 불러와 채운다.
+ * 수동 트리거(「기존 색에서 추천」)는 흡수된 시맨틱 카드 안에 있어 손이 닿지 않으므로,
+ * 전제 상태(hasColorVars)를 신호로 삼는다. 채우기는 맵이 비어 있을 때만 —
+ * 추측 휴리스틱(suggestSemMapFrom)보다 '지난번에 실제로 만든 것'이 언제나 낫다.
+ */
+function requestGlobalRoles(): void {
+  if (globalRolesAsked || !hasColorVars) return;
+  if (($('semMap') as HTMLTextAreaElement).value.trim()) return;
+  globalRolesAsked = true;
+  autoGlobalScan = true;
+  send({ type: 'GET_GLOBAL_COLORS' });
+}
 
 $('btnSemantics').addEventListener('click', () => {
   const map: Record<string, string> = {};
@@ -1759,12 +1779,15 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'GLOBAL_COLORS':
       // #10: 기존 Global 색에서 역할 추천 → 시맨틱 매핑 textarea 채움(재방문 매핑).
+      // 자동 요청은 비어 있을 때만 채운다 — 사용자가 이미 고른 역할을 덮으면 안 된다.
       if (!msg.colors.length) {
-        setStatus('semStatus', t('semantic.noGlobals'), 'warn');
-      } else {
+        if (!autoGlobalScan) setStatus('semStatus', t('semantic.noGlobals'), 'warn');
+      } else if (!autoGlobalScan || !($('semMap') as HTMLTextAreaElement).value.trim()) {
         setSemMapText(suggestSemanticMap(msg.colors));
-        setStatus('semStatus', t('semantic.suggested', { count: msg.colors.length }), 'ok');
+        renderColorTable(); // 이미 색이 떠 있으면 역할 드롭다운을 새 맵으로 다시 채운다
+        if (!autoGlobalScan) setStatus('semStatus', t('semantic.suggested', { count: msg.colors.length }), 'ok');
       }
+      autoGlobalScan = false;
       break;
     case 'PREREQ_STATE':
       // #11: 단계 전제 갱신 → 통합 게이트 재평가 + 진행 안내(§3).
@@ -1776,6 +1799,7 @@ window.onmessage = (event: MessageEvent) => {
       hasTextStyles = msg.hasTextStyles;
       updateGates();
       renderPipeline();
+      requestGlobalRoles(); // #10: 이미 색 변수가 있는 파일이면 지난번 역할을 불러온다
       break;
     case 'LICENSE_STATUS': {
       const srcLabel =
