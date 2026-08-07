@@ -173,8 +173,16 @@ export const STRINGS: Record<string, string> = {
   'settings.hint': '자주 안 바꾸는 값이에요. 만들기·적용 화면에는 안 보여요',
   'settings.base': '기준 크기',
   'settings.depth': '이름 정리 깊이',
+  // 수동·폴백 행의 값 입력 칸 툴팁(칸이 좁아 라벨 대신 툴팁으로 설명한다).
+  'ts.family': '폰트 이름 — 이 이름 그대로 스타일에 씁니다',
+  'ts.size': '글자 크기(px)',
+  'ts.lineHeight': '행간(px) · 0이면 AUTO',
+  'ts.letterSpacing': '자간(px) · 음수도 됩니다',
+  'ts.weight': '굵기 — Regular · Medium · SemiBold · Bold 처럼 Figma가 쓰는 이름',
+  'settings.grid': '여백·크기 격자',
   'settings.tol': '허용오차',
-  'settings.fixed': '고정',
+  // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
+  'create.snapTolGap': ' · 옮긴 값은 허용오차 {tol}px로는 원래 레이어에 안 붙습니다(설정에서 {half}px로)',
   // 마법사 카드
   'wizardCard.title': '한 번에 정리',
   'wizardCard.hint': '선택 화면을 한 번에 토큰·변수 연결까지 정리합니다',

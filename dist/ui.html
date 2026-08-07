@@ -347,6 +347,18 @@
     .palette-row { display: flex; gap: 3px; flex-wrap: wrap; }
     .palette-row i { width: 16px; height: 16px; border-radius: 2px; border: 1px solid rgba(0,0,0,.1); display: block; }
     .r-card input[type="checkbox"] { margin: 0; }
+    /* 값 입력 줄 — 스캔 행에는 없다. 캔버스에서 읽은 값은 사실이라 손대지 않고, 손으로 추가한
+       행과 기본 램프 폴백만 고칠 수 있다(둘 다 근거로 삼을 글자가 없다). 칸 순서는 스캔 행의
+       요약(`폰트 · 크기 / 행간 / 자간 · 굵기`)과 같게 둔다 — 같은 목록에서 눈이 옮겨 다닌다. */
+    /* min-width:0 — 카드가 grid라 이게 없으면 이 줄의 min-content가 카드 폭을 400px 밖으로 민다. */
+    .ts-edit { display: flex; align-items: center; gap: 3px; font-size: 10px; min-width: 0; }
+    .ts-edit input { font-family: var(--mono); font-size: 10px; padding: 2px 3px; min-width: 0; }
+    .ts-edit .ts-family { flex: 1 1 auto; }
+    .ts-edit .ts-sep { color: var(--muted); flex: 0 0 auto; }
+    /* 스피너를 걷어 폭을 숫자에 쓴다(400px 고정 패널) — 위/아래 키는 그대로 먹는다. */
+    .ts-edit input[type="number"] { -moz-appearance: textfield; }
+    .ts-edit input[type="number"]::-webkit-outer-spin-button,
+    .ts-edit input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     /* 그룹 머리 — 트리의 루트나 리포트의 구분줄. 카드가 아니라 라벨이다. */
     .r-group {
       font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .02em;
@@ -687,10 +699,11 @@
         <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
         <label class="inline"><span data-i18n="settings.depth">이름 정리 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
       </div>
-      <!-- 허용오차는 못 바꾸지만 값은 보여준다 — 기준 크기·깊이와 같은 필드 문법이라야
-           '무엇이 정해져 있는지'가 한눈에 들어온다(회색 문장은 읽히지 않고 사라진다). -->
+      <!-- 격자와 허용오차는 한 쌍이다 — 격자가 오차보다 크면 스냅한 토큰이 원래 레이어와
+           안 맞아 연결 단계에서 도로 떨어진다. 그래서 같은 줄에 나란히 두고 함께 고치게 한다. -->
       <div class="row">
-        <label class="inline" title="바인딩은 값 차이가 0.5px 이하일 때 같은 값으로 봅니다. 여백·크기는 미리보기에서 8px 격자로 자동 스냅합니다."><span data-i18n="settings.tol">허용오차</span> <input id="tol" type="number" value="0.5" disabled />px <span class="muted" data-i18n="settings.fixed">고정</span></label>
+        <label class="inline" title="여백·크기 토큰을 미리보기에서 이 격자로 모읍니다. 예: 8이면 13·15가 16으로."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
+        <label class="inline" title="바인딩은 레이어 값과 변수 값의 차이가 이 값 이하일 때 같은 값으로 봅니다. 격자로 옮긴 토큰까지 붙이려면 격자의 절반쯤이 필요합니다."><span data-i18n="settings.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" max="16" step="0.5" />px</label>
       </div>
     </div>
 
@@ -994,8 +1007,16 @@
     "settings.hint": "\uC790\uC8FC \uC548 \uBC14\uAFB8\uB294 \uAC12\uC774\uC5D0\uC694. \uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9 \uD654\uBA74\uC5D0\uB294 \uC548 \uBCF4\uC5EC\uC694",
     "settings.base": "\uAE30\uC900 \uD06C\uAE30",
     "settings.depth": "\uC774\uB984 \uC815\uB9AC \uAE4A\uC774",
+    // 수동·폴백 행의 값 입력 칸 툴팁(칸이 좁아 라벨 대신 툴팁으로 설명한다).
+    "ts.family": "\uD3F0\uD2B8 \uC774\uB984 \u2014 \uC774 \uC774\uB984 \uADF8\uB300\uB85C \uC2A4\uD0C0\uC77C\uC5D0 \uC501\uB2C8\uB2E4",
+    "ts.size": "\uAE00\uC790 \uD06C\uAE30(px)",
+    "ts.lineHeight": "\uD589\uAC04(px) \xB7 0\uC774\uBA74 AUTO",
+    "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB429\uB2C8\uB2E4",
+    "ts.weight": "\uAD75\uAE30 \u2014 Regular \xB7 Medium \xB7 SemiBold \xB7 Bold \uCC98\uB7FC Figma\uAC00 \uC4F0\uB294 \uC774\uB984",
+    "settings.grid": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uACA9\uC790",
     "settings.tol": "\uD5C8\uC6A9\uC624\uCC28",
-    "settings.fixed": "\uACE0\uC815",
+    // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
+    "create.snapTolGap": " \xB7 \uC62E\uAE34 \uAC12\uC740 \uD5C8\uC6A9\uC624\uCC28 {tol}px\uB85C\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC548 \uBD99\uC2B5\uB2C8\uB2E4(\uC124\uC815\uC5D0\uC11C {half}px\uB85C)",
     // 마법사 카드
     "wizardCard.title": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
     "wizardCard.hint": "\uC120\uD0DD \uD654\uBA74\uC744 \uD55C \uBC88\uC5D0 \uD1A0\uD070\xB7\uBCC0\uC218 \uC5F0\uACB0\uAE4C\uC9C0 \uC815\uB9AC\uD569\uB2C8\uB2E4",
@@ -2319,8 +2340,12 @@
     previewRevealed = false;
     send({ type: "EXTRACT" });
   });
-  var TIDY_GRID = 8;
+  var TIDY_GRID_DEFAULT = 8;
   var TIDY_RATIO = 0.15;
+  function tidyGrid() {
+    const v = Math.round(Number($("grid").value));
+    return isFinite(v) && v >= 1 ? v : TIDY_GRID_DEFAULT;
+  }
   function clearNumTidy() {
     $("numTidySummary").style.display = "none";
   }
@@ -2330,7 +2355,8 @@
       return;
     }
     const snapshot = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
-    const r = tidyNumberTokens(tokens, { base: TIDY_GRID, ratio: TIDY_RATIO });
+    const grid = tidyGrid();
+    const r = tidyNumberTokens(tokens, { base: grid, ratio: TIDY_RATIO });
     if (!r.snapped) {
       clearNumTidy();
       return;
@@ -2339,7 +2365,10 @@
     carryTokenChecked(snapshot, r.tokens);
     $("numTidySummary").style.display = "";
     const merged = r.merged ? ` \xB7 \uAC19\uC740 \uCE78 ${r.merged}\uAC1C \uBCD1\uD569` : "";
-    $("numTidyText").textContent = `\uC5EC\uBC31\xB7\uD06C\uAE30 ${r.before} \u2192 ${r.after}\uAC1C (${TIDY_GRID}px \uACA9\uC790\uB85C ${r.snapped}\uAC1C \uC774\uB3D9${merged})`;
+    const half = grid / 2;
+    const tol = bindTolerance();
+    const gap = tol < half ? t("create.snapTolGap", { tol, half }) : "";
+    $("numTidyText").textContent = `\uC5EC\uBC31\xB7\uD06C\uAE30 ${r.before} \u2192 ${r.after}\uAC1C (${grid}px \uACA9\uC790\uB85C ${r.snapped}\uAC1C \uC774\uB3D9${merged})${gap}`;
   }
   $("tokenAll").addEventListener("change", () => {
     const on = $("tokenAll").checked;
@@ -2380,11 +2409,20 @@
   function saveSettings() {
     clearTimeout(settingsSaveTimer);
     settingsSaveTimer = window.setTimeout(() => {
-      send({ type: "SET_SETTINGS", base: Number($("base").value) || 16, maxDepth: readMaxDepth(), hideOnboard });
+      send({
+        type: "SET_SETTINGS",
+        base: Number($("base").value) || 16,
+        maxDepth: readMaxDepth(),
+        hideOnboard,
+        grid: tidyGrid(),
+        tolerance: bindTolerance()
+      });
     }, 350);
   }
   $("base").addEventListener("input", saveSettings);
   $("depth").addEventListener("input", saveSettings);
+  $("grid").addEventListener("input", saveSettings);
+  $("tol").addEventListener("input", saveSettings);
   $("base").addEventListener("input", () => {
     const applyBtn = $("btnCreateApply");
     if (applyBtn.style.display === "none") return;
@@ -2446,6 +2484,60 @@
     const ls = s.letterSpacingPercent ? `${s.letterSpacingPercent}%` : `${s.letterSpacing}`;
     return `${s.family} \xB7 ${s.fontSize} / ${lh} / ${ls} \xB7 ${s.style}`;
   }
+  function isEditableTextRow(s) {
+    var _a;
+    return !s.boundStyleId && !((_a = s.count) != null ? _a : 0);
+  }
+  function textStyleEditRow(s) {
+    const row = document.createElement("div");
+    row.className = "ts-edit";
+    const sep = (ch) => {
+      const el = document.createElement("span");
+      el.className = "ts-sep";
+      el.textContent = ch;
+      return el;
+    };
+    const text = (cls, width, value, title, set) => {
+      const el = document.createElement("input");
+      el.type = "text";
+      el.className = cls;
+      el.value = value;
+      el.title = title;
+      if (width) el.style.width = width;
+      el.addEventListener("input", () => set(el.value));
+      return el;
+    };
+    const num = (width, value, title, min, set) => {
+      const el = document.createElement("input");
+      el.type = "number";
+      el.step = "any";
+      if (min) el.min = min;
+      el.value = String(value);
+      el.title = title;
+      el.style.width = width;
+      el.addEventListener("input", () => {
+        const v = Number(el.value);
+        if (el.value !== "" && isFinite(v)) set(v);
+      });
+      return el;
+    };
+    row.appendChild(text("ts-family", "", s.family, t("ts.family"), (v) => s.family = v));
+    row.appendChild(sep("\xB7"));
+    row.appendChild(num("40px", s.fontSize, t("ts.size"), "1", (n) => s.fontSize = n));
+    row.appendChild(sep("/"));
+    row.appendChild(num("44px", s.lineHeight, t("ts.lineHeight"), "0", (n) => {
+      s.lineHeight = n;
+      delete s.lineHeightPercent;
+    }));
+    row.appendChild(sep("/"));
+    row.appendChild(num("44px", s.letterSpacing, t("ts.letterSpacing"), "", (n) => {
+      s.letterSpacing = n;
+      delete s.letterSpacingPercent;
+    }));
+    row.appendChild(sep("\xB7"));
+    row.appendChild(text("", "72px", s.style, t("ts.weight"), (v) => s.style = v));
+    return row;
+  }
   function textStyleCard(s) {
     var _a, _b;
     const name = document.createElement("input");
@@ -2461,7 +2553,9 @@
       name.classList.add("ts-new");
       name.title = "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).";
     }
-    const card = resultCard({ title: name, summary: tsSummary(s), summaryMono: true });
+    const editable = isEditableTextRow(s);
+    const card = resultCard(editable ? { title: name } : { title: name, summary: tsSummary(s), summaryMono: true });
+    if (editable) card.appendChild(textStyleEditRow(s));
     const n = (_a = s.count) != null ? _a : 0;
     const ids = (_b = s.nodeIds) != null ? _b : [];
     if (n > 0 && ids.length) {
@@ -2519,10 +2613,14 @@
     setStatus("tsStatus", "\uC120\uD0DD \uD14D\uC2A4\uD2B8\uB97C \uAE30\uC874 \uC2A4\uD0C0\uC77C\uC5D0 \uC801\uC6A9 \uC911\u2026", "ok");
     send({ type: "APPLY_TEXT_STYLES" });
   });
-  var BIND_TOLERANCE = 0.5;
+  var BIND_TOLERANCE_DEFAULT = 0.5;
+  function bindTolerance() {
+    const v = Number($("tol").value);
+    return isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
+  }
   $("btnApply").addEventListener("click", () => {
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
-    send({ type: "APPLY", tolerance: BIND_TOLERANCE, preview: true });
+    send({ type: "APPLY", tolerance: bindTolerance(), preview: true });
   });
   $("btnApplyConfirm").addEventListener("click", () => {
     const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
@@ -2625,7 +2723,7 @@
       return;
     }
     const base = Number($("base").value) || 16;
-    const tolerance = BIND_TOLERANCE;
+    const tolerance = bindTolerance();
     const maxDepth = readMaxDepth();
     const semMap = textToSemanticMap($("semMap").value);
     const options = {
@@ -3308,6 +3406,8 @@
       case "SETTINGS": {
         $("base").value = String(msg.base);
         $("depth").value = String(msg.maxDepth);
+        $("grid").value = String(msg.grid);
+        $("tol").value = String(msg.tolerance);
         hideOnboard = msg.hideOnboard;
         $("onboardBanner").style.display = hideOnboard ? "none" : "";
         break;

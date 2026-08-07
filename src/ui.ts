@@ -681,11 +681,17 @@ $('btnExtract').addEventListener('click', () => {
   send({ type: 'EXTRACT' });
 });
 
-/* 스케일 사다리 정리 — #19로 격자 8px·허용 15%에 고정하고 UI 입력·버튼을 없앴다.
-   미리보기를 만들 때 자동으로 한 번 돌린다: 손으로 그린 13·15 같은 값이 8 격자로 모여야
-   토큰 수가 줄고, 그 수치로 바인딩이 걸린다. 무엇이 옮겨졌는지는 요약 한 줄로 알린다. */
-const TIDY_GRID = 8; // 여백·크기 격자(고정)
+/* 스케일 사다리 정리 — #19로 만들기 단계의 입력·버튼을 없앴다. 미리보기를 만들 때 자동으로
+   한 번 돌린다: 손으로 그린 13·15 같은 값이 격자로 모여야 토큰 수가 줄고, 그 수치로 바인딩이
+   걸린다. 무엇이 옮겨졌는지는 요약 한 줄로 알린다.
+   격자 크기는 관리 탭에서만 고친다(허용오차와 한 쌍이라 거기서 같이 본다). */
+const TIDY_GRID_DEFAULT = 8;
 const TIDY_RATIO = 0.15; // 값 대비 이 비율 안이면 격자로 이동
+/** 관리 탭의 격자 값(없거나 이상하면 기본 8). */
+function tidyGrid(): number {
+  const v = Math.round(Number(($('grid') as HTMLInputElement).value));
+  return isFinite(v) && v >= 1 ? v : TIDY_GRID_DEFAULT;
+}
 
 /** 요약 줄을 걷는다 — 남겨두면 다른 추출의 토큰에 옛 요약이 붙는다. */
 function clearNumTidy(): void {
@@ -699,7 +705,8 @@ function tidyNumbers(): void {
     return;
   }
   const snapshot = tokens.map((t) => ({ ...t, sources: [...t.sources] }));
-  const r = tidyNumberTokens(tokens, { base: TIDY_GRID, ratio: TIDY_RATIO });
+  const grid = tidyGrid();
+  const r = tidyNumberTokens(tokens, { base: grid, ratio: TIDY_RATIO });
   if (!r.snapped) {
     clearNumTidy();
     return;
@@ -711,7 +718,12 @@ function tidyNumbers(): void {
   $('numTidySummary').style.display = '';
   // 이동과 병합은 다른 일이라 따로 센다 — 옮겼지만 같은 칸이 아니어서 안 합쳐진 토큰도 있다.
   const merged = r.merged ? ` · 같은 칸 ${r.merged}개 병합` : '';
-  $('numTidyText').textContent = `여백·크기 ${r.before} → ${r.after}개 (${TIDY_GRID}px 격자로 ${r.snapped}개 이동${merged})`;
+  // 격자로 옮긴 값은 원래 레이어와 최대 grid/2만큼 어긋난다 — 허용오차가 그보다 좁으면
+  // 스냅은 성공하고 연결만 조용히 실패한다. 실제로 옮긴 게 있을 때만, 그 자리에서 알린다.
+  const half = grid / 2;
+  const tol = bindTolerance();
+  const gap = tol < half ? t('create.snapTolGap', { tol, half }) : '';
+  $('numTidyText').textContent = `여백·크기 ${r.before} → ${r.after}개 (${grid}px 격자로 ${r.snapped}개 이동${merged})${gap}`;
 }
 
 // 전체 선택 / 1× 해제 — 목록이 상한에 잘려 있어도 전체에 적용된다(체크는 DOM이 아니라 집합이 보관).
@@ -762,11 +774,21 @@ let settingsSaveTimer = 0;
 function saveSettings(): void {
   clearTimeout(settingsSaveTimer);
   settingsSaveTimer = window.setTimeout(() => {
-    send({ type: 'SET_SETTINGS', base: Number(($('base') as HTMLInputElement).value) || 16, maxDepth: readMaxDepth(), hideOnboard });
+    send({
+      type: 'SET_SETTINGS',
+      base: Number(($('base') as HTMLInputElement).value) || 16,
+      maxDepth: readMaxDepth(),
+      hideOnboard,
+      grid: tidyGrid(),
+      tolerance: bindTolerance(),
+    });
   }, 350);
 }
+
 ($('base') as HTMLInputElement).addEventListener('input', saveSettings);
 ($('depth') as HTMLInputElement).addEventListener('input', saveSettings);
+($('grid') as HTMLInputElement).addEventListener('input', saveSettings);
+($('tol') as HTMLInputElement).addEventListener('input', saveSettings);
 
 ($('base') as HTMLInputElement).addEventListener('input', () => {
   const applyBtn = $('btnCreateApply') as HTMLButtonElement;
@@ -864,6 +886,69 @@ function tsSummary(s: TextStyleSpec): string {
   return `${s.family} · ${s.fontSize} / ${lh} / ${ls} · ${s.style}`;
 }
 
+/**
+ * 값을 고칠 수 있는 행인가 — 손으로 추가한 행(`행 추가`)과 텍스트를 못 찾아 채운 기본 램프.
+ * 스캔 행은 캔버스에서 읽은 사실이라 읽기 전용으로 둔다(고치면 화면과 스타일이 어긋난다).
+ * 두 부류 모두 세고 있는 글자(count)도, 이미 묶인 스타일(boundStyleId)도 없다.
+ */
+function isEditableTextRow(s: TextStyleSpec): boolean {
+  return !s.boundStyleId && !(s.count ?? 0);
+}
+
+/** 값 입력 줄 — 스캔 행 요약과 같은 순서(`폰트 · 크기 / 행간 / 자간 · 굵기`). */
+function textStyleEditRow(s: TextStyleSpec): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'ts-edit';
+  const sep = (ch: string): HTMLElement => {
+    const el = document.createElement('span');
+    el.className = 'ts-sep';
+    el.textContent = ch;
+    return el;
+  };
+  const text = (cls: string, width: string, value: string, title: string, set: (v: string) => void): HTMLInputElement => {
+    const el = document.createElement('input');
+    el.type = 'text'; // 명시해야 기본 입력 스타일(input[type="text"])이 걸린다
+    el.className = cls;
+    el.value = value;
+    el.title = title;
+    if (width) el.style.width = width;
+    el.addEventListener('input', () => set(el.value));
+    return el;
+  };
+  const num = (width: string, value: number, title: string, min: string, set: (n: number) => void): HTMLInputElement => {
+    const el = document.createElement('input');
+    el.type = 'number';
+    el.step = 'any';
+    if (min) el.min = min;
+    el.value = String(value);
+    el.title = title;
+    el.style.width = width;
+    el.addEventListener('input', () => {
+      const v = Number(el.value);
+      if (el.value !== '' && isFinite(v)) set(v);
+    });
+    return el;
+  };
+
+  row.appendChild(text('ts-family', '', s.family, t('ts.family'), (v) => (s.family = v)));
+  row.appendChild(sep('·'));
+  row.appendChild(num('40px', s.fontSize, t('ts.size'), '1', (n) => (s.fontSize = n)));
+  row.appendChild(sep('/'));
+  // 행간·자간을 손으로 넣으면 %가 아니라 px다 — 남아 있던 %는 지워야 요약과 등록이 어긋나지 않는다.
+  row.appendChild(num('44px', s.lineHeight, t('ts.lineHeight'), '0', (n) => {
+    s.lineHeight = n;
+    delete s.lineHeightPercent;
+  }));
+  row.appendChild(sep('/'));
+  row.appendChild(num('44px', s.letterSpacing, t('ts.letterSpacing'), '', (n) => {
+    s.letterSpacing = n;
+    delete s.letterSpacingPercent;
+  }));
+  row.appendChild(sep('·'));
+  row.appendChild(text('', '72px', s.style, t('ts.weight'), (v) => (s.style = v)));
+  return row;
+}
+
 function textStyleCard(s: TextStyleSpec): HTMLElement {
   const name = document.createElement('input');
   name.value = s.name;
@@ -879,7 +964,10 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
     name.title = '새 스타일로 등록됩니다(아직 등록 안 된 글자).';
   }
 
-  const card = resultCard({ title: name, summary: tsSummary(s), summaryMono: true });
+  // 고칠 수 있는 행은 요약 대신 그 값을 그대로 입력칸으로 — 같은 자리, 같은 순서.
+  const editable = isEditableTextRow(s);
+  const card = resultCard(editable ? { title: name } : { title: name, summary: tsSummary(s), summaryMono: true });
+  if (editable) card.appendChild(textStyleEditRow(s));
 
   const n = s.count ?? 0;
   const ids = s.nodeIds ?? [];
@@ -945,14 +1033,19 @@ $('btnApplyExistingText').addEventListener('click', () => {
   send({ type: 'APPLY_TEXT_STYLES' });
 });
 
-/* #6: 허용오차는 0.5px 고정 — 반올림 오차만 흡수한다. 칩·입력으로 노출하던 값을 없앴다.
-   0은 소수점 반올림 때문에 실제로 안 붙고, 1 이상은 의도치 않은 값까지 끌어와 과매칭이 된다.
-   고정값이라는 사실은 관리 탭 '플러그인 설정'에 표시한다. */
-const BIND_TOLERANCE = 0.5;
+/* #6: 허용오차는 만들기·적용 단계에서 칩·입력으로 노출하지 않는다 — 값은 관리 탭에서만 고친다.
+   기본 0.5px는 반올림 오차만 흡수하는 값이다(0은 소수점 때문에 실제로 안 붙고, 크게 잡으면
+   의도치 않은 값까지 끌어와 과매칭이 된다). 격자를 키운 사람은 여기도 같이 키워야 한다. */
+const BIND_TOLERANCE_DEFAULT = 0.5;
+/** 관리 탭의 허용오차(없거나 이상하면 기본 0.5). */
+function bindTolerance(): number {
+  const v = Number(($('tol') as HTMLInputElement).value);
+  return isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
+}
 
 $('btnApply').addEventListener('click', () => {
   showApplyProgress('미리보기 계산 중…'); // UX6
-  send({ type: 'APPLY', tolerance: BIND_TOLERANCE, preview: true }); // UX1: dry-run 미리보기 먼저
+  send({ type: 'APPLY', tolerance: bindTolerance(), preview: true }); // UX1: dry-run 미리보기 먼저
 });
 
 $('btnApplyConfirm').addEventListener('click', () => {
@@ -1087,9 +1180,9 @@ async function runWizard(): Promise<void> {
     setStatus('wizardSummary', t('wizard.needSelect'), 'warn');
     return;
   }
-  // 설정값은 관리 탭 '플러그인 설정'에서 읽는다(단일 출처). 허용오차는 고정.
+  // 설정값은 관리 탭 '플러그인 설정'에서 읽는다(단일 출처) — 격자·허용오차도 거기 값을 그대로 쓴다.
   const base = Number(($('base') as HTMLInputElement).value) || 16;
-  const tolerance = BIND_TOLERANCE;
+  const tolerance = bindTolerance();
   const maxDepth = readMaxDepth();
   const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
 
@@ -1935,6 +2028,8 @@ window.onmessage = (event: MessageEvent) => {
     case 'SETTINGS': {
       ($('base') as HTMLInputElement).value = String(msg.base);
       ($('depth') as HTMLInputElement).value = String(msg.maxDepth);
+      ($('grid') as HTMLInputElement).value = String(msg.grid);
+      ($('tol') as HTMLInputElement).value = String(msg.tolerance);
       hideOnboard = msg.hideOnboard;
       $('onboardBanner').style.display = hideOnboard ? 'none' : '';
       break;
