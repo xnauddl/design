@@ -443,6 +443,15 @@
     .vrow .vcol, .vrow .vact { flex: 0 0 auto; }
     .vrow .vsw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
     .vrow .vact button { padding: 0 6px; }
+    .vrow .vmodes { display: flex; flex-direction: column; gap: 2px; flex: 0 1 160px; min-width: 0; }
+    .vrow .vmode { display: flex; gap: 4px; align-items: center; }
+    .vrow .vmode input, .vrow .vmode select { flex: 1 1 auto; min-width: 0; width: 100%; }
+    .vrow .vmode .mlabel { flex: 0 0 auto; font-size: 9px; color: var(--muted); min-width: 28px; }
+    .vgroup { margin: 8px 0 2px; font-size: 10px; font-weight: 600; color: var(--text-2); letter-spacing: 0.02em; }
+    .vexp { padding: 4px 0 8px 20px; display: none; border-bottom: 1px solid var(--border); }
+    .vexp.open { display: block; }
+    .vexp .row { margin: 2px 0; gap: 6px; align-items: center; }
+    .vexp label.scope { font-size: 10px; display: inline-flex; gap: 3px; align-items: center; }
     /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
@@ -562,19 +571,19 @@
         </div>
         <div class="row"><button id="btnColorRoles" data-i18n="colorTable.applyBtn">시맨틱 매핑에 반영</button></div>
         <datalist id="roleList">
-          <option value="surface"></option><option value="surface/muted"></option>
-          <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
-          <option value="border"></option>
-          <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
-          <option value="secondary"></option><option value="accent"></option>
-          <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
+          <option value="surface-background-color"></option><option value="surface-background-color-muted"></option>
+          <option value="text-color"></option><option value="text-color-muted"></option>
+          <option value="border-color"></option>
+          <option value="cta-background-color"></option><option value="cta-background-color-strong"></option><option value="cta-background-color-subtle"></option>
+          <option value="secondary-color"></option>
+          <option value="success-color"></option><option value="warning-color"></option><option value="error-color"></option><option value="info-color"></option>
         </datalist>
       </div>
     </div>
 
     <div class="step" id="createCard">
-      <h2><span data-i18n="create.title">토큰 생성 (Global + Semantic)</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
-      <div class="hint" data-i18n-html="create.scopeHint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.</div>
+      <h2><span data-i18n="create.title">토큰 생성 (Global + 역할)</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
+      <div class="hint" data-i18n-html="create.scopeHint">색 외 토큰(간격·크기·폰트·효과)을 <b>Global 원시 변수</b>로 만들고, 색·수치는 <b>Semantic 역할</b>로 자동 매핑합니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.</div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체 선택</span></label>
         <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
@@ -619,7 +628,7 @@
 
     <div class="step" id="darkCard">
       <h2><span data-i18n="dark.title">다크 테마 생성</span> <span class="muted" id="darkLock"></span></h2>
-      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
+      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> <code>Dark</code> 모드를 만듭니다. 모드가 없으면 컬렉션에 <code>Dark</code>를 추가한 뒤 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
       <div class="row">
         <label class="inline"><span data-i18n="dark.collection">대상 컬렉션</span>
           <select id="darkCollection"></select>
@@ -632,9 +641,9 @@
         <label class="inline"><span data-i18n="dark.toMode">다크 모드</span>
           <select id="darkToMode"></select>
         </label>
-        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 채우기</button>
+        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 생성</button>
       </div>
-      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate" style="display:none">토큰 생성으로 →</button></div>
       <div class="status" id="darkStatus"></div>
     </div>
 
@@ -845,7 +854,7 @@
 
     <div class="step" id="varEditCard">
       <h2><span data-i18n="varedit.title">변수 편집기</span> <span class="muted" id="varCount"></span></h2>
-      <div class="hint" data-i18n-html="varedit.hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.</div>
+      <div class="hint" data-i18n-html="varedit.hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 고칩니다. <b>Global=리터럴</b>, <b>Semantic=Global 별칭</b>만 허용합니다. 새 기능명(예: <code>cta-background-color</code>)은 아래에서 등록하세요.</div>
       <div class="row">
         <button id="btnLoadVars" data-i18n="varedit.loadBtn">변수 불러오기</button>
         <label class="inline"><span data-i18n="varedit.collection">컬렉션</span>
@@ -853,8 +862,24 @@
         </label>
         <input id="varFilterText" type="text" placeholder="이름으로 거르기" />
       </div>
+      <div class="row" id="varCreateRow" style="flex-wrap:wrap; gap:6px;">
+        <select id="varCreateCol" title="컬렉션">
+          <option value="Semantic">Semantic</option>
+          <option value="Global">Global</option>
+          <option value="Component">Component</option>
+        </select>
+        <input id="varCreateName" type="text" placeholder="이름 (cta-background-color)" spellcheck="false" style="flex:1; min-width:120px;" />
+        <select id="varCreateType" title="타입">
+          <option value="COLOR">COLOR</option>
+          <option value="FLOAT">FLOAT</option>
+          <option value="STRING">STRING</option>
+          <option value="BOOLEAN">BOOLEAN</option>
+        </select>
+        <input id="varCreateLiteral" type="text" placeholder="#RRGGBB / 숫자" style="width:110px; display:none;" />
+        <select id="varCreateAlias" title="별칭 대상(Global)" style="flex:1; min-width:120px;"></select>
+        <button id="btnCreateVar" class="primary" data-i18n="varedit.createBtn">등록</button>
+      </div>
       <div id="varList" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="varListMore" style="display:none">
         <span class="list-count" id="varListCount"></span>
         <button class="link" id="btnVarListExpand" data-i18n="list.expandAll">모두 펼치기</button>

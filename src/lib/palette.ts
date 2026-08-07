@@ -197,40 +197,40 @@ export function paletteFamilyOf(name: string): string | null {
 }
 
 /**
- * #3: 생성 팔레트의 **역할 → hue Global** 별칭 맵(정확). Global은 hue, 역할은 Semantic만.
- * 예: primary가 blue면 `primary → color/blue/500`.
+ * #3: 생성 팔레트의 **기능명 Semantic → hue Global** 별칭 맵(정확).
+ * 예: primary 패밀리가 blue면 `cta-background-color → color/blue/500`.
+ * 추상명(primary/surface)은 기본 자동 등록에서 제외 — 편집기에서 수동 추가.
  */
 export function paletteSemanticMap(p: PaletteResult): Record<string, string> {
   const byRole = new Map(p.roles.map((r) => [r.role, r.family]));
   const map: Record<string, string> = {};
-  const primary = byRole.get('primary');
-  if (primary) {
-    map['primary'] = `color/${primary}/500`;
-    map['primary/strong'] = `color/${primary}/700`;
-    map['primary/subtle'] = `color/${primary}/100`;
+  const accent = byRole.get('primary');
+  if (accent) {
+    map['cta-background-color'] = `color/${accent}/500`;
+    map['cta-background-color-strong'] = `color/${accent}/700`;
+    map['cta-background-color-subtle'] = `color/${accent}/100`;
   }
   const secondary = byRole.get('secondary');
-  if (secondary) map['secondary'] = `color/${secondary}/500`;
-  for (const r of p.roles) if (r.role.startsWith('accent-')) map[r.role] = `color/${r.family}/500`;
+  if (secondary) map['secondary-color'] = `color/${secondary}/500`;
+  for (const r of p.roles) if (r.role.startsWith('accent-')) map[`${r.role}-color`] = `color/${r.family}/500`;
   const neutral = byRole.get('neutral');
   if (neutral) {
-    map['surface'] = `color/${neutral}/50`;
-    map['surface/muted'] = `color/${neutral}/100`;
-    map['text'] = `color/${neutral}/900`;
-    map['text/muted'] = `color/${neutral}/600`;
-    map['border'] = `color/${neutral}/200`;
+    map['surface-background-color'] = `color/${neutral}/50`;
+    map['surface-background-color-muted'] = `color/${neutral}/100`;
+    map['text-color'] = `color/${neutral}/900`;
+    map['text-color-muted'] = `color/${neutral}/600`;
+    map['border-color'] = `color/${neutral}/200`;
   }
   for (const role of ['success', 'warning', 'error', 'info']) {
     const f = byRole.get(role);
-    if (f) map[role] = `color/${f}/500`;
+    if (f) map[`${role}-color`] = `color/${f}/500`;
   }
   return map;
 }
 
 /**
- * #10: 임의 색 목록(추출·기존 Global)에서 시맨틱 역할 → **실제 변수 이름** 추천(휴리스틱).
- * 색 소스(생성/추출/기존)와 무관하게 매핑 가능. 무채색 → surface/text/border(밝기 순),
- * 채도 최고 유채색 → primary. 이름은 입력의 실제 이름을 그대로 가리킨다.
+ * #10: 임의 색 목록에서 기능명 Semantic → **실제 Global 이름** 추천(휴리스틱).
+ * 무채색 → surface/text/border(밝기 순), 채도 최고 유채색 → cta-background-color.
  */
 export function suggestSemanticMap(colors: ReadonlyArray<{ name: string; hex: string }>): Record<string, string> {
   const classed = colors.map((c) => ({ name: c.name, o: hexToOklch(c.hex), achromatic: hexToOklch(c.hex).c < LOW_CHROMA }));
@@ -238,12 +238,12 @@ export function suggestSemanticMap(colors: ReadonlyArray<{ name: string; hex: st
 
   const neutrals = classed.filter((c) => c.achromatic).sort((a, b) => b.o.l - a.o.l); // 밝은→어두운
   if (neutrals.length) {
-    map['surface'] = neutrals[0].name;
-    map['text'] = neutrals[neutrals.length - 1].name;
-    if (neutrals.length >= 3) map['border'] = neutrals[Math.floor(neutrals.length / 2)].name;
+    map['surface-background-color'] = neutrals[0].name;
+    map['text-color'] = neutrals[neutrals.length - 1].name;
+    if (neutrals.length >= 3) map['border-color'] = neutrals[Math.floor(neutrals.length / 2)].name;
   }
   const chroma = classed.filter((c) => !c.achromatic).sort((a, b) => b.o.c - a.o.c); // 채도 높은 순
-  if (chroma.length) map['primary'] = chroma[0].name;
+  if (chroma.length) map['cta-background-color'] = chroma[0].name;
   return map;
 }
 

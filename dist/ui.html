@@ -443,6 +443,15 @@
     .vrow .vcol, .vrow .vact { flex: 0 0 auto; }
     .vrow .vsw { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
     .vrow .vact button { padding: 0 6px; }
+    .vrow .vmodes { display: flex; flex-direction: column; gap: 2px; flex: 0 1 160px; min-width: 0; }
+    .vrow .vmode { display: flex; gap: 4px; align-items: center; }
+    .vrow .vmode input, .vrow .vmode select { flex: 1 1 auto; min-width: 0; width: 100%; }
+    .vrow .vmode .mlabel { flex: 0 0 auto; font-size: 9px; color: var(--muted); min-width: 28px; }
+    .vgroup { margin: 8px 0 2px; font-size: 10px; font-weight: 600; color: var(--text-2); letter-spacing: 0.02em; }
+    .vexp { padding: 4px 0 8px 20px; display: none; border-bottom: 1px solid var(--border); }
+    .vexp.open { display: block; }
+    .vexp .row { margin: 2px 0; gap: 6px; align-items: center; }
+    .vexp label.scope { font-size: 10px; display: inline-flex; gap: 3px; align-items: center; }
     /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
@@ -562,19 +571,19 @@
         </div>
         <div class="row"><button id="btnColorRoles" data-i18n="colorTable.applyBtn">시맨틱 매핑에 반영</button></div>
         <datalist id="roleList">
-          <option value="surface"></option><option value="surface/muted"></option>
-          <option value="text"></option><option value="text/muted"></option><option value="text/inverse"></option>
-          <option value="border"></option>
-          <option value="primary"></option><option value="primary/strong"></option><option value="primary/subtle"></option>
-          <option value="secondary"></option><option value="accent"></option>
-          <option value="success"></option><option value="warning"></option><option value="error"></option><option value="info"></option>
+          <option value="surface-background-color"></option><option value="surface-background-color-muted"></option>
+          <option value="text-color"></option><option value="text-color-muted"></option>
+          <option value="border-color"></option>
+          <option value="cta-background-color"></option><option value="cta-background-color-strong"></option><option value="cta-background-color-subtle"></option>
+          <option value="secondary-color"></option>
+          <option value="success-color"></option><option value="warning-color"></option><option value="error-color"></option><option value="info-color"></option>
         </datalist>
       </div>
     </div>
 
     <div class="step" id="createCard">
-      <h2><span data-i18n="create.title">토큰 생성 (Global + Semantic)</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
-      <div class="hint" data-i18n-html="create.scopeHint">색 외 토큰(간격·크기·폰트·효과)을 변수로 만듭니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.</div>
+      <h2><span data-i18n="create.title">토큰 생성 (Global + 역할)</span> <span class="muted" id="createCount"></span> <span class="muted" id="createLock"></span></h2>
+      <div class="hint" data-i18n-html="create.scopeHint">색 외 토큰(간격·크기·폰트·효과)을 <b>Global 원시 변수</b>로 만들고, 색·수치는 <b>Semantic 역할</b>로 자동 매핑합니다. 색은 위 ‘색 정리’에서 다룹니다. 체크한 것만 생성되고, <b>n×</b>는 그 값을 쓰는 레이어 수입니다.</div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체 선택</span></label>
         <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
@@ -619,7 +628,7 @@
 
     <div class="step" id="darkCard">
       <h2><span data-i18n="dark.title">다크 테마 생성</span> <span class="muted" id="darkLock"></span></h2>
-      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> 다크 모드를 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
+      <div class="hint" data-i18n-html="dark.hint">라이트 모드 색을 <b>명도만 뒤집어</b> <code>Dark</code> 모드를 만듭니다. 모드가 없으면 컬렉션에 <code>Dark</code>를 추가한 뒤 채웁니다. 색상·채도는 그대로라 브랜드색이 유지돼요. Semantic이 Global을 <b>가리키고 있는 것만</b> 대상이고, 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 <code>dark/…</code>로 따로 만들어집니다. (Paid)</div>
       <div class="row">
         <label class="inline"><span data-i18n="dark.collection">대상 컬렉션</span>
           <select id="darkCollection"></select>
@@ -632,9 +641,9 @@
         <label class="inline"><span data-i18n="dark.toMode">다크 모드</span>
           <select id="darkToMode"></select>
         </label>
-        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 채우기</button>
+        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 생성</button>
       </div>
-      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate" style="display:none">토큰 생성으로 →</button></div>
       <div class="status" id="darkStatus"></div>
     </div>
 
@@ -845,7 +854,7 @@
 
     <div class="step" id="varEditCard">
       <h2><span data-i18n="varedit.title">변수 편집기</span> <span class="muted" id="varCount"></span></h2>
-      <div class="hint" data-i18n-html="varedit.hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 여기서 고칩니다. 값 칸에 <code>#RRGGBB</code>·숫자를 넣으면 리터럴, 다른 변수 이름을 고르면 별칭이 됩니다. 타입과 소속 컬렉션은 바꿀 수 없어요. <b>지우기 전에 ‘사용처’</b>를 눌러 어디에 쓰이는지 먼저 확인하세요.</div>
+      <div class="hint" data-i18n-html="varedit.hint">만들어 둔 변수의 <b>이름·값·스코프</b>를 고칩니다. <b>Global=리터럴</b>, <b>Semantic=Global 별칭</b>만 허용합니다. 새 기능명(예: <code>cta-background-color</code>)은 아래에서 등록하세요.</div>
       <div class="row">
         <button id="btnLoadVars" data-i18n="varedit.loadBtn">변수 불러오기</button>
         <label class="inline"><span data-i18n="varedit.collection">컬렉션</span>
@@ -853,8 +862,24 @@
         </label>
         <input id="varFilterText" type="text" placeholder="이름으로 거르기" />
       </div>
+      <div class="row" id="varCreateRow" style="flex-wrap:wrap; gap:6px;">
+        <select id="varCreateCol" title="컬렉션">
+          <option value="Semantic">Semantic</option>
+          <option value="Global">Global</option>
+          <option value="Component">Component</option>
+        </select>
+        <input id="varCreateName" type="text" placeholder="이름 (cta-background-color)" spellcheck="false" style="flex:1; min-width:120px;" />
+        <select id="varCreateType" title="타입">
+          <option value="COLOR">COLOR</option>
+          <option value="FLOAT">FLOAT</option>
+          <option value="STRING">STRING</option>
+          <option value="BOOLEAN">BOOLEAN</option>
+        </select>
+        <input id="varCreateLiteral" type="text" placeholder="#RRGGBB / 숫자" style="width:110px; display:none;" />
+        <select id="varCreateAlias" title="별칭 대상(Global)" style="flex:1; min-width:120px;"></select>
+        <button id="btnCreateVar" class="primary" data-i18n="varedit.createBtn">등록</button>
+      </div>
       <div id="varList" class="list-region"></div>
-      <!-- 목록이 높이 상한에 걸릴 때만 노출 — 총 개수와 ‘모두 펼치기’(상한 해제). 문구는 ui.ts가 채운다. -->
       <div class="list-more" id="varListMore" style="display:none">
         <span class="list-count" id="varListCount"></span>
         <button class="link" id="btnVarListExpand" data-i18n="list.expandAll">모두 펼치기</button>
@@ -1040,6 +1065,28 @@
     return `${group}/${v}`;
   }
 
+  // src/lib/variableEdit.ts
+  function aliasTargetCollectionOk(sourceCollection, targetCollection) {
+    if (sourceCollection === "Global") return false;
+    if (sourceCollection === "Semantic") return targetCollection === "Global";
+    if (sourceCollection === "Component") return targetCollection === "Semantic" || targetCollection === "Global";
+    return false;
+  }
+  function groupKeyForVarName(name) {
+    const i = name.indexOf("/");
+    return i <= 0 ? name : name.slice(0, i);
+  }
+  function groupVarsByPath(vars) {
+    const map = /* @__PURE__ */ new Map();
+    for (const v of vars) {
+      const g = groupKeyForVarName(v.name);
+      const list = map.get(g);
+      if (list) list.push(v);
+      else map.set(g, [v]);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([group, items]) => ({ group, items: [...items].sort((a, b) => a.name.localeCompare(b.name)) }));
+  }
+
   // src/lib/i18n.ts
   var STRINGS = {
     // 공통 진행/상태
@@ -1108,11 +1155,11 @@
     "preset.count": "\uD504\uB9AC\uC14B {count}\uAC1C",
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131",
-    "dark.hint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC \uC0C9\uC744 <b>\uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4</b> \uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCC44\uC6C1\uB2C8\uB2E4. \uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C\uB77C \uBE0C\uB79C\uB4DC\uC0C9\uC774 \uC720\uC9C0\uB3FC\uC694. Semantic\uC774 Global\uC744 <b>\uAC00\uB9AC\uD0A4\uACE0 \uC788\uB294 \uAC83\uB9CC</b> \uB300\uC0C1\uC774\uACE0, \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB701\uB2C8\uB2E4. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 <code>dark/\u2026</code>\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC9D1\uB2C8\uB2E4. (Paid)",
+    "dark.hint": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC \uC0C9\uC744 <b>\uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4</b> <code>Dark</code> \uBAA8\uB4DC\uB97C \uB9CC\uB4ED\uB2C8\uB2E4. \uBAA8\uB4DC\uAC00 \uC5C6\uC73C\uBA74 \uCEEC\uB809\uC158\uC5D0 <code>Dark</code>\uB97C \uCD94\uAC00\uD55C \uB4A4 \uCC44\uC6C1\uB2C8\uB2E4. \uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C\uB77C \uBE0C\uB79C\uB4DC\uC0C9\uC774 \uC720\uC9C0\uB3FC\uC694. Semantic\uC774 Global\uC744 <b>\uAC00\uB9AC\uD0A4\uACE0 \uC788\uB294 \uAC83\uB9CC</b> \uB300\uC0C1\uC774\uACE0, \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB701\uB2C8\uB2E4. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 <code>dark/\u2026</code>\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC9D1\uB2C8\uB2E4. (Paid)",
     "dark.collection": "\uB300\uC0C1 \uCEEC\uB809\uC158",
     "dark.fromMode": "\uB77C\uC774\uD2B8 \uBAA8\uB4DC",
     "dark.toMode": "\uB2E4\uD06C \uBAA8\uB4DC",
-    "dark.genBtn": "\uB2E4\uD06C \uCC44\uC6B0\uAE30",
+    "dark.genBtn": "\uB2E4\uD06C \uC0DD\uC131",
     // 닮은 프레임 컴포넌트화
     "similar.title": "\uB2EE\uC740 \uD504\uB808\uC784 \uCEF4\uD3EC\uB10C\uD2B8\uD654",
     "similar.hint": "\uAD6C\uC870\uAC00 \uAC19\uACE0 <b>\uB0B4\uC6A9\uB9CC \uB2E4\uB978</b> \uD504\uB808\uC784 \uC5EC\uB7EC \uAC1C\uB97C \uACE8\uB77C \uC2A4\uCE94\uD558\uBA74, \uD558\uB098\uB97C <b>\uB9C8\uC2A4\uD130</b>\uB85C \uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uACE0 \uB098\uBA38\uC9C0\uB294 <b>\uC778\uC2A4\uD134\uC2A4</b>\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uD504\uB808\uC784\uB9C8\uB2E4 \uB2E4\uB978 \uD14D\uC2A4\uD2B8\xB7\uC544\uC774\uCF58\uC740 <b>\uCEF4\uD3EC\uB10C\uD2B8 \uC18D\uC131</b>\uC73C\uB85C \uC5F4\uB9AC\uACE0, \uC774\uBBF8\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uC5D0\uC11C \uAC1C\uBCC4 \uAD50\uCCB4\uB429\uB2C8\uB2E4. \uB9C8\uC2A4\uD130\uB294 <b>\uB0B4\uC6A9\uC774 \uAC00\uC7A5 \uC798 \uCC44\uC6CC\uC9C4</b> \uD504\uB808\uC784\uC744 \uCD94\uCC9C\uD569\uB2C8\uB2E4(\uBE48 \uD14D\uC2A4\uD2B8\uAC00 \uB9CE\uC73C\uBA74 \uAC10\uC810). <b>\uC2A4\uCE94\uC740 \uBB34\uB8CC</b>, \uC2E4\uC81C \uAD50\uCCB4\uB9CC Paid.",
@@ -1120,9 +1167,12 @@
     "similar.componentizeBtn": "\uCEF4\uD3EC\uB10C\uD2B8\uD654",
     // 변수 편집기
     "varedit.title": "\uBCC0\uC218 \uD3B8\uC9D1\uAE30",
-    "varedit.hint": "\uB9CC\uB4E4\uC5B4 \uB454 \uBCC0\uC218\uC758 <b>\uC774\uB984\xB7\uAC12\xB7\uC2A4\uCF54\uD504</b>\uB97C \uC5EC\uAE30\uC11C \uACE0\uCE69\uB2C8\uB2E4. \uAC12 \uCE78\uC5D0 <code>#RRGGBB</code>\xB7\uC22B\uC790\uB97C \uB123\uC73C\uBA74 \uB9AC\uD130\uB7F4, \uB2E4\uB978 \uBCC0\uC218 \uC774\uB984\uC744 \uACE0\uB974\uBA74 \uBCC4\uCE6D\uC774 \uB429\uB2C8\uB2E4. \uD0C0\uC785\uACFC \uC18C\uC18D \uCEEC\uB809\uC158\uC740 \uBC14\uAFC0 \uC218 \uC5C6\uC5B4\uC694. <b>\uC9C0\uC6B0\uAE30 \uC804\uC5D0 \u2018\uC0AC\uC6A9\uCC98\u2019</b>\uB97C \uB20C\uB7EC \uC5B4\uB514\uC5D0 \uC4F0\uC774\uB294\uC9C0 \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694.",
+    "varedit.hint": "\uB9CC\uB4E4\uC5B4 \uB454 \uBCC0\uC218\uC758 <b>\uC774\uB984\xB7\uAC12\xB7\uC2A4\uCF54\uD504</b>\uB97C \uACE0\uCE69\uB2C8\uB2E4. <b>Global=\uB9AC\uD130\uB7F4</b>, <b>Semantic=Global \uBCC4\uCE6D</b>\uB9CC \uD5C8\uC6A9\uD569\uB2C8\uB2E4. \uC0C8 \uAE30\uB2A5\uBA85(\uC608: <code>cta-background-color</code>)\uC740 \uC544\uB798\uC5D0\uC11C \uB4F1\uB85D\uD558\uC138\uC694.",
     "varedit.loadBtn": "\uBCC0\uC218 \uBD88\uB7EC\uC624\uAE30",
     "varedit.collection": "\uCEEC\uB809\uC158",
+    "varedit.createBtn": "\uB4F1\uB85D",
+    "varedit.created": "'{name}' \uB4F1\uB85D\uD588\uC5B4\uC694.",
+    "varedit.gotoEditor": "\uC5ED\uD560 \uD3B8\uC9D1\uC73C\uB85C \u2192",
     // 목록 공통(상한 해제 — 6개 카드가 같은 문구를 쓴다)
     "list.expandAll": "\uBAA8\uB450 \uD3BC\uCE58\uAE30",
     // 내보내기
@@ -1235,8 +1285,8 @@
     "colorTidy.undo": "\uB418\uB3CC\uB9AC\uAE30",
     "colorTable.applyBtn": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551\uC5D0 \uBC18\uC601",
     // 토큰 생성
-    "create.title": "\uD1A0\uD070 \uC0DD\uC131 (Global + Semantic)",
-    "create.scopeHint": "\uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uC0C9\uC740 \uC704 \u2018\uC0C9 \uC815\uB9AC\u2019\uC5D0\uC11C \uB2E4\uB8F9\uB2C8\uB2E4. \uCCB4\uD06C\uD55C \uAC83\uB9CC \uC0DD\uC131\uB418\uACE0, <b>n\xD7</b>\uB294 \uADF8 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4 \uC218\uC785\uB2C8\uB2E4.",
+    "create.title": "\uD1A0\uD070 \uC0DD\uC131 (Global + \uC5ED\uD560)",
+    "create.scopeHint": "\uC0C9 \uC678 \uD1A0\uD070(\uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC)\uC744 <b>Global \uC6D0\uC2DC \uBCC0\uC218</b>\uB85C \uB9CC\uB4E4\uACE0, \uC0C9\xB7\uC218\uCE58\uB294 <b>Semantic \uC5ED\uD560</b>\uB85C \uC790\uB3D9 \uB9E4\uD551\uD569\uB2C8\uB2E4. \uC0C9\uC740 \uC704 \u2018\uC0C9 \uC815\uB9AC\u2019\uC5D0\uC11C \uB2E4\uB8F9\uB2C8\uB2E4. \uCCB4\uD06C\uD55C \uAC83\uB9CC \uC0DD\uC131\uB418\uACE0, <b>n\xD7</b>\uB294 \uADF8 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4 \uC218\uC785\uB2C8\uB2E4.",
     "create.base": "base(px)",
     "create.selectAll": "\uC804\uCCB4 \uC120\uD0DD",
     "create.dropOnce": "1\xD7 \uD574\uC81C",
@@ -1757,26 +1807,26 @@
   function paletteSemanticMap(p) {
     const byRole = new Map(p.roles.map((r) => [r.role, r.family]));
     const map = {};
-    const primary = byRole.get("primary");
-    if (primary) {
-      map["primary"] = `color/${primary}/500`;
-      map["primary/strong"] = `color/${primary}/700`;
-      map["primary/subtle"] = `color/${primary}/100`;
+    const accent = byRole.get("primary");
+    if (accent) {
+      map["cta-background-color"] = `color/${accent}/500`;
+      map["cta-background-color-strong"] = `color/${accent}/700`;
+      map["cta-background-color-subtle"] = `color/${accent}/100`;
     }
     const secondary = byRole.get("secondary");
-    if (secondary) map["secondary"] = `color/${secondary}/500`;
-    for (const r of p.roles) if (r.role.startsWith("accent-")) map[r.role] = `color/${r.family}/500`;
+    if (secondary) map["secondary-color"] = `color/${secondary}/500`;
+    for (const r of p.roles) if (r.role.startsWith("accent-")) map[`${r.role}-color`] = `color/${r.family}/500`;
     const neutral = byRole.get("neutral");
     if (neutral) {
-      map["surface"] = `color/${neutral}/50`;
-      map["surface/muted"] = `color/${neutral}/100`;
-      map["text"] = `color/${neutral}/900`;
-      map["text/muted"] = `color/${neutral}/600`;
-      map["border"] = `color/${neutral}/200`;
+      map["surface-background-color"] = `color/${neutral}/50`;
+      map["surface-background-color-muted"] = `color/${neutral}/100`;
+      map["text-color"] = `color/${neutral}/900`;
+      map["text-color-muted"] = `color/${neutral}/600`;
+      map["border-color"] = `color/${neutral}/200`;
     }
     for (const role of ["success", "warning", "error", "info"]) {
       const f = byRole.get(role);
-      if (f) map[role] = `color/${f}/500`;
+      if (f) map[`${role}-color`] = `color/${f}/500`;
     }
     return map;
   }
@@ -1785,12 +1835,12 @@
     const map = {};
     const neutrals = classed.filter((c) => c.achromatic).sort((a, b) => b.o.l - a.o.l);
     if (neutrals.length) {
-      map["surface"] = neutrals[0].name;
-      map["text"] = neutrals[neutrals.length - 1].name;
-      if (neutrals.length >= 3) map["border"] = neutrals[Math.floor(neutrals.length / 2)].name;
+      map["surface-background-color"] = neutrals[0].name;
+      map["text-color"] = neutrals[neutrals.length - 1].name;
+      if (neutrals.length >= 3) map["border-color"] = neutrals[Math.floor(neutrals.length / 2)].name;
     }
     const chroma = classed.filter((c) => !c.achromatic).sort((a, b) => b.o.c - a.o.c);
-    if (chroma.length) map["primary"] = chroma[0].name;
+    if (chroma.length) map["cta-background-color"] = chroma[0].name;
     return map;
   }
   function paletteToDraftTokens(p) {
@@ -2440,7 +2490,7 @@
     }
     const base = Number($("base").value) || 16;
     createFrom = "palette";
-    send({ type: "CREATE_TOKENS", tokens, base, replacePalette: true });
+    send({ type: "CREATE_TOKENS", tokens, base, replacePalette: true, semanticMap: semanticMapForCreate(tokens) });
     setStatus("paletteStatus", t("common.applyingVars"), "");
   });
   $("btnOnboardClose").addEventListener("click", () => {
@@ -2523,13 +2573,13 @@
     renderTokens();
     const base = Number($("base").value) || 16;
     createFrom = "tokens";
-    send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, preview: true });
+    send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, preview: true, semanticMap: semanticMapForCreate(tokensToCreate()) });
   });
   $("btnCreateApply").addEventListener("click", () => {
     if (!tokens.length) return;
     const base = Number($("base").value) || 16;
     createFrom = "tokens";
-    send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base });
+    send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, semanticMap: semanticMapForCreate(tokensToCreate()) });
   });
   var basePreviewTimer = 0;
   $("base").addEventListener("input", () => {
@@ -2542,7 +2592,7 @@
     basePreviewTimer = window.setTimeout(() => {
       if (!tokens.length) return;
       createFrom = "tokens";
-      send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base: Number($("base").value) || 16, preview: true });
+      send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base: Number($("base").value) || 16, preview: true, semanticMap: semanticMapForCreate(tokensToCreate()) });
     }, 350);
   });
   $("btnColorRoles").addEventListener("click", applyColorRoles);
@@ -2884,7 +2934,7 @@
             break;
           }
           case "create": {
-            const r = await wizardRequest({ type: "CREATE_TOKENS", tokens, base }, ["CREATE_RESULT"]);
+            const r = await wizardRequest({ type: "CREATE_TOKENS", tokens, base, semanticMap: Object.keys(semMap).length ? semMap : semanticMapForCreate(tokens) }, ["CREATE_RESULT"]);
             totals.created = r.created + r.updated;
             setWizardStep("create", "done", t("wizard.seq.createDone", { created: r.created, updated: r.updated }));
             break;
@@ -3130,20 +3180,49 @@
     send({ type: "SCAN_COMPONENT_CANDIDATES" });
   });
   var allVars = [];
+  var varsLoaded = false;
   function visibleVars() {
     const col = $("varFilterCol").value;
     const q = $("varFilterText").value.trim().toLowerCase();
     return allVars.filter((v) => (!col || v.collection === col) && (!q || v.name.toLowerCase().includes(q)));
   }
-  function requestVars() {
-    setStatus("varEditStatus", "\uBCC0\uC218\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026", "");
+  function semanticMapForCreate(toks) {
+    const base = Number($("base").value) || 16;
+    const fromUi = textToSemanticMap($("semMap").value);
+    return __spreadValues(__spreadValues({}, suggestTokenRoles(toks, base)), fromUi);
+  }
+  function requestVars(quiet = false) {
+    if (!quiet) setStatus("varEditStatus", "\uBCC0\uC218\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026", "");
     send({ type: "GET_VARIABLES" });
   }
-  $("btnLoadVars").addEventListener("click", requestVars);
+  $("btnLoadVars").addEventListener("click", () => requestVars(false));
   $("varFilterCol").addEventListener("change", () => renderVars());
   $("varFilterText").addEventListener("input", () => renderVars());
+  $("varCreateCol").addEventListener("change", syncVarCreateForm);
+  $("varCreateType").addEventListener("change", syncVarCreateAliasOptions);
+  $("btnCreateVar").addEventListener("click", () => {
+    const collection = $("varCreateCol").value;
+    const name = $("varCreateName").value.trim();
+    const resolvedType = $("varCreateType").value;
+    if (!name) {
+      setStatus("varEditStatus", "\uC774\uB984\uC744 \uC785\uB825\uD558\uC138\uC694.", "warn");
+      return;
+    }
+    if (collection === "Global") {
+      const literal = $("varCreateLiteral").value.trim();
+      send({ type: "CREATE_VARIABLE", collection, name, resolvedType, literal });
+    } else {
+      const aliasId = $("varCreateAlias").value;
+      if (!aliasId) {
+        setStatus("varEditStatus", "\uBCC4\uCE6D \uB300\uC0C1\uC744 \uACE0\uB974\uC138\uC694.", "warn");
+        return;
+      }
+      send({ type: "CREATE_VARIABLE", collection, name, resolvedType, aliasId });
+    }
+  });
+  syncVarCreateForm();
   function refreshDarkOptions() {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const cols = /* @__PURE__ */ new Map();
     for (const v of allVars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
     const sel = $("darkCollection");
@@ -3156,8 +3235,14 @@
       sel.appendChild(o);
     }
     if (prev && cols.has(prev)) sel.value = prev;
-    const usable = [...cols.values()].find((v) => v.modes.length >= 2);
-    if (usable && ((_b = (_a = cols.get(sel.value)) == null ? void 0 : _a.modes.length) != null ? _b : 0) < 2) sel.value = usable.collectionId;
+    const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
+    const usable = (_a = withModes.find((v) => v.collection === "Semantic")) != null ? _a : withModes[0];
+    if (usable && ((_c = (_b = cols.get(sel.value)) == null ? void 0 : _b.modes.length) != null ? _c : 0) < 1) sel.value = usable.collectionId;
+    if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.collection) === "Global") && usable.collection === "Semantic") {
+      sel.value = usable.collectionId;
+    } else if (usable && !sel.value) {
+      sel.value = usable.collectionId;
+    }
     refreshDarkModes();
   }
   function refreshDarkModes() {
@@ -3176,33 +3261,55 @@
       }
       if (prev && modes.some((m) => m.modeId === prev)) sel.value = prev;
     }
-    const ok = modes.length >= 2;
+    const hasCollection = !!colId && modes.length >= 1;
+    const ok = hasCollection && varsLoaded && allVars.length > 0;
     $("btnGenDark").disabled = !ok || !isPaid;
     const notice = $("darkPrereq");
+    const gotoCreate = $("darkPrereqGotoCreate");
     notice.style.display = ok ? "none" : "";
     const text = notice.querySelector(".prereq-text");
-    if (text) {
-      text.textContent = ok ? "" : modes.length ? "\uC774 \uCEEC\uB809\uC158\uC5D0 \uBAA8\uB4DC\uAC00 \uD558\uB098\uBFD0\uC774\uC5D0\uC694. Figma\uC5D0\uC11C \uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694." : "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.";
+    if (!ok && text) {
+      if (!varsLoaded) {
+        text.textContent = "\uBCC0\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026";
+        gotoCreate.style.display = "none";
+      } else if (allVars.length === 0) {
+        text.textContent = "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.";
+        gotoCreate.style.display = "";
+      } else if (!colId || modes.length === 0) {
+        text.textContent = "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158(\uBCF4\uD1B5 Semantic)\uC744 \uACE0\uB974\uC138\uC694.";
+        gotoCreate.style.display = "none";
+      } else {
+        text.textContent = "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.";
+        gotoCreate.style.display = "none";
+      }
     }
-    if (modes.length >= 2 && $("darkFromMode").value === $("darkToMode").value) {
-      $("darkToMode").value = modes[1].modeId;
+    const toSel = $("darkToMode");
+    const darkMode = modes.find((m) => m.name.toLowerCase() === "dark");
+    if (darkMode) {
+      toSel.value = darkMode.modeId;
+    } else if (modes.length >= 1) {
+      const o = document.createElement("option");
+      o.value = "";
+      o.textContent = "Dark (\uC5C6\uC73C\uBA74 \uC0DD\uC131)";
+      toSel.insertBefore(o, toSel.firstChild);
+      toSel.value = "";
+    }
+    const fromSel = $("darkFromMode");
+    if (modes.length >= 2 && darkMode && fromSel.value === darkMode.modeId) {
+      const other = modes.find((m) => m.modeId !== darkMode.modeId);
+      if (other) fromSel.value = other.modeId;
     }
   }
   $("darkCollection").addEventListener("change", refreshDarkModes);
   $("btnGenDark").addEventListener("click", () => {
     const collectionId = $("darkCollection").value;
     const fromModeId = $("darkFromMode").value;
-    const toModeId = $("darkToMode").value;
-    if (!collectionId || !fromModeId || !toModeId) {
-      setStatus("darkStatus", "\uCEEC\uB809\uC158\uACFC \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
+    if (!collectionId || !fromModeId) {
+      setStatus("darkStatus", "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
       return;
     }
-    if (fromModeId === toModeId) {
-      setStatus("darkStatus", "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694. \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
-      return;
-    }
-    setStatus("darkStatus", "\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026", "");
-    send({ type: "GENERATE_DARK_MODE", collectionId, fromModeId, toModeId });
+    setStatus("darkStatus", "Dark \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026", "");
+    send({ type: "GENERATE_DARK_MODE", collectionId, fromModeId });
   });
   var similarMemberIds = [];
   var similarMasterId = null;
@@ -3371,7 +3478,7 @@
           pendingCreatePreview = false;
           const base = Number($("base").value) || 16;
           createFrom = "tokens";
-          send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, preview: true });
+          send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, preview: true, semanticMap: semanticMapForCreate(tokensToCreate()) });
         }
         break;
       }
@@ -3391,13 +3498,11 @@
         } else if (createFrom === "palette") {
           setStatus("paletteStatus", msg.summary, "ok");
           createFrom = "tokens";
+          if (!wizardRunning) openVarEditor("Semantic");
         } else {
-          setStatus("createStatus", msg.summary, "ok");
+          setStatus("createStatus", msg.summary + " \xB7 " + t("varedit.gotoEditor"), "ok");
           applyBtn.style.display = "none";
-          if (!wizardRunning) {
-            const semMap = textToSemanticMap($("semMap").value);
-            if (Object.keys(semMap).length) send({ type: "CREATE_SEMANTICS", map: semMap });
-          }
+          if (!wizardRunning) openVarEditor("Semantic");
         }
         break;
       }
@@ -3555,6 +3660,7 @@
         renderContrast(msg);
         break;
       case "VARIABLES": {
+        varsLoaded = true;
         allVars = msg.vars;
         const sel = $("varFilterCol");
         const prev = sel.value;
@@ -3565,7 +3671,11 @@
           o.textContent = c;
           sel.appendChild(o);
         }
-        if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
+        const prefer = sel.dataset.prefer || "Semantic";
+        delete sel.dataset.prefer;
+        if (prefer && msg.vars.some((v) => v.collection === prefer)) sel.value = prefer;
+        else if (prev && msg.vars.some((v) => v.collection === prev)) sel.value = prev;
+        else if (msg.vars.some((v) => v.collection === "Semantic")) sel.value = "Semantic";
         renderVars();
         refreshDarkOptions();
         setStatus("varEditStatus", msg.vars.length ? `\uBCC0\uC218 ${msg.vars.length}\uAC1C` : "\uD3B8\uC9D1\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.", msg.vars.length ? "ok" : "warn");
@@ -3580,9 +3690,15 @@
         if (msg.deleted) {
           allVars = allVars.filter((v) => v.id !== msg.id);
           setStatus("varEditStatus", "\uBCC0\uC218\uB97C \uC0AD\uC81C\uD588\uC5B4\uC694.", "ok");
+        } else if (msg.created && msg.var) {
+          allVars.push(msg.var);
+          allVars.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
+          $("varCreateName").value = "";
+          setStatus("varEditStatus", t("varedit.created", { name: msg.var.name }), "ok");
         } else if (msg.var) {
           const i = allVars.findIndex((v) => v.id === msg.id);
           if (i >= 0) allVars[i] = msg.var;
+          else allVars.push(msg.var);
           setStatus("varEditStatus", `'${msg.var.name}' \uC218\uC815\uD588\uC5B4\uC694.`, "ok");
         }
         renderVars();
@@ -3600,13 +3716,19 @@
         break;
       }
       case "DARK_MODE_RESULT": {
-        if (!msg.realiased) {
-          const why = msg.skipped ? `Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 ${msg.skipped}\uAC1C)` : "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694";
-          setStatus("darkStatus", `\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${why}`, "warn");
+        if (msg.error) {
+          setStatus("darkStatus", msg.error, "warn");
           break;
         }
+        if (!msg.realiased) {
+          const why = msg.skipped ? `Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 ${msg.skipped}\uAC1C)` : "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694";
+          const mode2 = msg.modeCreated ? "Dark \uBAA8\uB4DC\uB294 \uCD94\uAC00\uB410\uC5B4\uC694. " : "";
+          setStatus("darkStatus", `${mode2}\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${why}`, "warn");
+          break;
+        }
+        const mode = msg.modeCreated ? "Dark \uBAA8\uB4DC \uCD94\uAC00 \xB7 " : "";
         const skip = msg.skipped ? ` \xB7 \uAC74\uB108\uB700 ${msg.skipped}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)` : "";
-        setStatus("darkStatus", `\uB2E4\uD06C ${msg.realiased}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 ${msg.created}\uAC1C${skip}`, "ok");
+        setStatus("darkStatus", `${mode}\uB2E4\uD06C ${msg.realiased}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 ${msg.created}\uAC1C${skip}`, "ok");
         break;
       }
       case "SIMILAR_CANDIDATES":
@@ -4057,18 +4179,92 @@
     $("applyBarFill").style.width = "0%";
     $("applyProgressText").textContent = label;
   }
-  function makeVarRow(v) {
+  function resolveVarDisplay(v, startModeId) {
+    var _a, _b;
+    let cur = v;
+    let modeId = startModeId;
+    const seen = /* @__PURE__ */ new Set();
+    for (let i = 0; i < 12 && cur; i++) {
+      if (seen.has(cur.id)) break;
+      seen.add(cur.id);
+      const cell = (_a = cur.values[modeId]) != null ? _a : cur.values[cur.defaultModeId];
+      if (!cell) return { display: "" };
+      if (cell.kind === "literal") {
+        const hex = cur.type === "COLOR" && /^#[0-9a-f]{6}$/i.test(cell.display) ? cell.display : void 0;
+        return { display: cell.display, hex };
+      }
+      cur = allVars.find((x) => x.id === cell.aliasId);
+      modeId = (_b = cur == null ? void 0 : cur.defaultModeId) != null ? _b : modeId;
+    }
+    return { display: "(\uD574\uC11D \uC2E4\uD328)" };
+  }
+  function aliasOptionsFor(v) {
+    return allVars.filter(
+      (o) => o.type === v.type && o.id !== v.id && aliasTargetCollectionOk(v.collection, o.collection)
+    );
+  }
+  function appendSwatch(parent2, hex) {
+    if (!hex) return;
+    const sw = document.createElement("span");
+    sw.className = "vsw";
+    sw.style.background = hex;
+    parent2.appendChild(sw);
+  }
+  function makeModeValueEditor(v, modeId, modeName) {
     var _a;
+    const wrap = document.createElement("div");
+    wrap.className = "vmode";
+    if (v.modes.length > 1) {
+      const lab = document.createElement("span");
+      lab.className = "mlabel";
+      lab.textContent = modeName;
+      wrap.appendChild(lab);
+    }
+    const cell = v.values[modeId];
+    const resolved = resolveVarDisplay(v, modeId);
+    appendSwatch(wrap, resolved.hex);
+    if (v.collection === "Global") {
+      const val = document.createElement("input");
+      val.type = "text";
+      val.value = cell && cell.kind === "literal" ? cell.display : "";
+      val.placeholder = v.type === "COLOR" ? "#RRGGBB" : v.type === "FLOAT" ? "\uC22B\uC790" : "";
+      val.title = "\uB9AC\uD130\uB7F4 \uAC12";
+      val.addEventListener("change", () => {
+        send({ type: "EDIT_VARIABLE", id: v.id, patch: { value: { modeId, literal: val.value } } });
+      });
+      wrap.appendChild(val);
+    } else {
+      const sel = document.createElement("select");
+      const opts = aliasOptionsFor(v);
+      if (!opts.length) {
+        const o = document.createElement("option");
+        o.value = "";
+        o.textContent = "(\uBCC4\uCE6D \uB300\uC0C1 \uC5C6\uC74C)";
+        sel.appendChild(o);
+      }
+      for (const other of opts) {
+        const o = document.createElement("option");
+        o.value = other.id;
+        o.textContent = other.name;
+        sel.appendChild(o);
+      }
+      sel.value = (cell == null ? void 0 : cell.kind) === "alias" ? (_a = cell.aliasId) != null ? _a : "" : "";
+      sel.title = (cell == null ? void 0 : cell.kind) === "alias" ? `\uBCC4\uCE6D \u2192 ${cell.display} \xB7 \uD574\uC11D ${resolved.display}` : "\uBCC4\uCE6D \uB300\uC0C1";
+      sel.addEventListener("change", () => {
+        if (!sel.value) return;
+        send({ type: "EDIT_VARIABLE", id: v.id, patch: { value: { modeId, aliasId: sel.value } } });
+      });
+      wrap.appendChild(sel);
+    }
+    return wrap;
+  }
+  function makeVarRow(v) {
+    const block = document.createElement("div");
     const row = document.createElement("div");
     row.className = "vrow";
     row.dataset.id = v.id;
-    const cell = v.values[v.defaultModeId];
-    if (v.type === "COLOR" && cell && cell.kind === "literal" && /^#[0-9a-f]{6}$/i.test(cell.display)) {
-      const sw = document.createElement("span");
-      sw.className = "vsw";
-      sw.style.background = cell.display;
-      row.appendChild(sw);
-    }
+    const defResolved = resolveVarDisplay(v, v.defaultModeId);
+    appendSwatch(row, defResolved.hex);
     const nameWrap = document.createElement("span");
     nameWrap.className = "vname";
     const name = document.createElement("input");
@@ -4081,33 +4277,10 @@
     });
     nameWrap.appendChild(name);
     row.appendChild(nameWrap);
-    const valWrap = document.createElement("span");
-    valWrap.className = "vval";
-    if (cell && cell.kind === "alias") {
-      const sel = document.createElement("select");
-      for (const other of allVars.filter((o) => o.type === v.type && o.id !== v.id)) {
-        const o = document.createElement("option");
-        o.value = other.id;
-        o.textContent = other.name;
-        sel.appendChild(o);
-      }
-      sel.value = (_a = cell.aliasId) != null ? _a : "";
-      sel.title = `\uBCC4\uCE6D \u2192 ${cell.display}`;
-      sel.addEventListener("change", () => {
-        send({ type: "EDIT_VARIABLE", id: v.id, patch: { value: { modeId: v.defaultModeId, aliasId: sel.value } } });
-      });
-      valWrap.appendChild(sel);
-    } else {
-      const val = document.createElement("input");
-      val.type = "text";
-      val.value = cell ? cell.display : "";
-      val.placeholder = v.type === "COLOR" ? "#RRGGBB" : v.type === "FLOAT" ? "\uC22B\uC790" : "";
-      val.addEventListener("change", () => {
-        send({ type: "EDIT_VARIABLE", id: v.id, patch: { value: { modeId: v.defaultModeId, literal: val.value } } });
-      });
-      valWrap.appendChild(val);
-    }
-    row.appendChild(valWrap);
+    const modesWrap = document.createElement("span");
+    modesWrap.className = "vmodes";
+    for (const m of v.modes) modesWrap.appendChild(makeModeValueEditor(v, m.modeId, m.name));
+    row.appendChild(modesWrap);
     const col = document.createElement("span");
     col.className = "vcol tag tag-set";
     col.textContent = v.collection;
@@ -4115,6 +4288,14 @@
     row.appendChild(col);
     const act = document.createElement("span");
     act.className = "vact";
+    const more = document.createElement("button");
+    more.className = "link";
+    more.textContent = "\u22EF";
+    more.title = "\uC2A4\uCF54\uD504\xB7\uC124\uBA85";
+    const exp = document.createElement("div");
+    exp.className = "vexp";
+    more.addEventListener("click", () => exp.classList.toggle("open"));
+    act.appendChild(more);
     const usage = document.createElement("button");
     usage.className = "link";
     usage.textContent = "\uC0AC\uC6A9\uCC98";
@@ -4133,12 +4314,104 @@
     });
     act.appendChild(del);
     row.appendChild(act);
-    return row;
+    block.appendChild(row);
+    const descRow = document.createElement("div");
+    descRow.className = "row";
+    const descLab = document.createElement("span");
+    descLab.className = "muted";
+    descLab.textContent = "\uC124\uBA85";
+    const desc = document.createElement("input");
+    desc.type = "text";
+    desc.value = v.description;
+    desc.style.flex = "1";
+    desc.addEventListener("change", () => {
+      send({ type: "EDIT_VARIABLE", id: v.id, patch: { description: desc.value } });
+    });
+    descRow.append(descLab, desc);
+    exp.appendChild(descRow);
+    const scopeRow = document.createElement("div");
+    scopeRow.className = "row";
+    scopeRow.style.flexWrap = "wrap";
+    const allowed = scopesForTypeList(v.type);
+    const selected = new Set(v.scopes);
+    for (const s of allowed) {
+      const lab = document.createElement("label");
+      lab.className = "scope";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.dataset.scope = s;
+      cb.checked = selected.has(s) || selected.has("ALL_SCOPES");
+      cb.addEventListener("change", () => {
+        const next = allowed.filter((x) => {
+          const el = scopeRow.querySelector(`input[data-scope="${x}"]`);
+          return !!(el == null ? void 0 : el.checked);
+        });
+        send({ type: "EDIT_VARIABLE", id: v.id, patch: { scopes: next.length ? next : ["ALL_SCOPES"] } });
+      });
+      lab.append(cb, document.createTextNode(s));
+      scopeRow.appendChild(lab);
+    }
+    exp.appendChild(scopeRow);
+    block.appendChild(exp);
+    return block;
   }
   function renderVars() {
     const vis = visibleVars();
     $("varCount").textContent = allVars.length ? `\xB7 ${vis.length}/${allVars.length}\uAC1C` : "";
-    renderChunked($("varList"), vis, makeVarRow, () => layoutListBy("varList"));
+    const box = $("varList");
+    box.innerHTML = "";
+    const groups = groupVarsByPath(vis);
+    for (const g of groups) {
+      const h = document.createElement("div");
+      h.className = "vgroup";
+      h.textContent = g.group;
+      box.appendChild(h);
+      for (const v of g.items) box.appendChild(makeVarRow(v));
+    }
+    layoutListBy("varList");
+    syncVarCreateAliasOptions();
+  }
+  function syncVarCreateForm() {
+    const col = $("varCreateCol").value;
+    const lit = $("varCreateLiteral");
+    const alias = $("varCreateAlias");
+    const isGlobal = col === "Global";
+    lit.style.display = isGlobal ? "" : "none";
+    alias.style.display = isGlobal ? "none" : "";
+    syncVarCreateAliasOptions();
+  }
+  function syncVarCreateAliasOptions() {
+    const col = $("varCreateCol").value;
+    const type = $("varCreateType").value;
+    const sel = $("varCreateAlias");
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = "";
+    const targets = allVars.filter((v) => v.type === type && aliasTargetCollectionOk(col, v.collection));
+    if (!targets.length) {
+      const o = document.createElement("option");
+      o.value = "";
+      o.textContent = "(\uB300\uC0C1 \uC5C6\uC74C \u2014 \uBA3C\uC800 Global\uC744 \uB9CC\uB4DC\uC138\uC694)";
+      sel.appendChild(o);
+    }
+    for (const v of targets) {
+      const o = document.createElement("option");
+      o.value = v.id;
+      o.textContent = `${v.name} (${v.collection})`;
+      sel.appendChild(o);
+    }
+    if (prev && targets.some((t2) => t2.id === prev)) sel.value = prev;
+  }
+  function openVarEditor(filterCollection = "Semantic") {
+    showTab("settings");
+    const sel = $("varFilterCol");
+    sel.dataset.prefer = filterCollection;
+    requestVars(true);
+    window.setTimeout(() => {
+      if (Array.from(sel.options).some((o) => o.value === filterCollection)) sel.value = filterCollection;
+      renderVars();
+      $("varEditCard").scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 80);
   }
   function makeSimilarRow(m, recommendedId) {
     const row = document.createElement("label");
@@ -4295,6 +4568,8 @@
   send({ type: "GET_COLLECTIONS" });
   send({ type: "GET_PREREQ" });
   send({ type: "GET_LICENSE" });
+  requestVars(true);
+  refreshDarkModes();
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
   var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {
@@ -4309,6 +4584,7 @@
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
     layoutAllLists();
     if (name !== "settings") send({ type: "GET_PREREQ" });
+    if (name === "tokens") requestVars(true);
   }
   TABS.forEach((t2, i) => {
     const btn = $(`tabbtn-${t2}`);

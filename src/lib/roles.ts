@@ -101,7 +101,7 @@ function numericEntries(tokens: DraftToken[], category: TokenCategory): Array<{ 
 export function suggestTokenRoles(tokens: DraftToken[], base = 16): Record<string, string> {
   const map: Record<string, string> = {};
 
-  // 색 — 기존 휴리스틱(무채→surface/text/border, 채도최고→primary).
+  // 색 — 기능명 휴리스틱(무채→surface/text/border-color, 채도최고→cta-background-color).
   const colors = tokens
     .filter((t) => t.category === 'color' && typeof t.value === 'string')
     .map((t) => ({ name: t.name, hex: t.value as string }));
@@ -131,4 +131,18 @@ export function suggestTokenRoles(tokens: DraftToken[], base = 16): Record<strin
   });
 
   return map;
+}
+
+/**
+ * 자동 추천 역할 맵에 UI/호출자가 준 맵을 덮어쓴다.
+ * 부분 맵(색만 등)이 와도 spacing·size·typography 추천이 빠지지 않게 한다.
+ */
+export function mergeTokenRoles(
+  tokens: DraftToken[],
+  base = 16,
+  overrides?: Record<string, string>,
+): Record<string, string> {
+  const auto = suggestTokenRoles(tokens, base);
+  if (!overrides || !Object.keys(overrides).length) return auto;
+  return { ...auto, ...overrides };
 }

@@ -104,3 +104,64 @@ export function findAliasReferers(varId: string, vars: readonly VarLike[]): { id
   }
   return out;
 }
+
+/** 3계층 별칭 허용 — Semantic→Global, Component→Semantic|Global. Global은 별칭 불가. */
+export function aliasTargetCollectionOk(
+  sourceCollection: string,
+  targetCollection: string,
+): boolean {
+  if (sourceCollection === 'Global') return false;
+  if (sourceCollection === 'Semantic') return targetCollection === 'Global';
+  if (sourceCollection === 'Component') return targetCollection === 'Semantic' || targetCollection === 'Global';
+  return false;
+}
+
+/**
+ * 신규 변수 생성 입력 검증(순수).
+ * Global=리터럴 필수·별칭 금지 / Semantic·Component=별칭 필수·리터럴 금지.
+ */
+export function validateCreateVariable(input: {
+  collection: string;
+  name: string;
+  existingNames: readonly string[];
+  hasLiteral: boolean;
+  hasAlias: boolean;
+  aliasTargetCollection?: string;
+}): string | null {
+  const nameErr = validateVarName(input.name, input.existingNames);
+  if (nameErr) return nameErr;
+  if (input.collection === 'Global') {
+    if (input.hasAlias) return 'Global은 리터럴만 허용합니다(별칭 불가).';
+    if (!input.hasLiteral) return 'Global에는 리터럴 값이 필요합니다.';
+    return null;
+  }
+  if (input.collection === 'Semantic' || input.collection === 'Component') {
+    if (input.hasLiteral) return `${input.collection}은 별칭만 허용합니다(리터럴 불가).`;
+    if (!input.hasAlias) return `${input.collection}에는 Global(또는 Semantic) 별칭이 필요합니다.`;
+    if (input.aliasTargetCollection && !aliasTargetCollectionOk(input.collection, input.aliasTargetCollection)) {
+      return `${input.collection}은 ${input.collection === 'Semantic' ? 'Global' : 'Semantic/Global'}만 별칭할 수 있습니다.`;
+    }
+    return null;
+  }
+  return '편집 대상이 아닌 컬렉션입니다.';
+}
+
+/** 이름 첫 토막으로 그룹 — `color/blue/500`→`color`, `cta-background-color`→이름 자체. */
+export function groupKeyForVarName(name: string): string {
+  const i = name.indexOf('/');
+  return i <= 0 ? name : name.slice(0, i);
+}
+
+/** 변수 목록을 그룹 키 오름차순 → 이름 오름차순으로 묶기. */
+export function groupVarsByPath<T extends { name: string }>(vars: readonly T[]): Array<{ group: string; items: T[] }> {
+  const map = new Map<string, T[]>();
+  for (const v of vars) {
+    const g = groupKeyForVarName(v.name);
+    const list = map.get(g);
+    if (list) list.push(v);
+    else map.set(g, [v]);
+  }
+  return [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([group, items]) => ({ group, items: [...items].sort((a, b) => a.name.localeCompare(b.name)) }));
+}

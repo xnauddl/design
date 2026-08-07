@@ -7,6 +7,7 @@ import { rgbToHex, hexToRgb, isKnownRole } from '../dist/pure.mjs';
 import {
   extractFromSelection,
   createTokens,
+  createTokensAndRoles,
   previewCreateTokens,
   createSemanticAliases,
   prunePaletteColors,
@@ -15,7 +16,17 @@ import {
   bindSelection,
   renameSelection,
   generateDarkMode,
+  ensureDarkMode,
+  DARK_MODE_NAME,
 } from '../dist/figma-lib.mjs';
+
+
+/** 바인딩 테스트용: Global 리터럴 + 같은 이름 Semantic 별칭(바인딩은 Semantic만 대상). */
+async function seedBindVars(tokens, base = 16) {
+  await createTokens(tokens, base);
+  const map = Object.fromEntries(tokens.map((t) => [t.name, t.name]));
+  await createSemanticAliases(map);
+}
 
 /* ---------------- figma 전역 목 ---------------- */
 function installFigma() {
@@ -31,6 +42,11 @@ function installFigma() {
       name,
       defaultModeId: `mode:${name}`,
       modes: [{ modeId: `mode:${name}`, name: 'Mode 1' }],
+      addMode(modeName) {
+        const modeId = `mode:${name}:${modeName}:${seq++}`;
+        this.modes.push({ modeId, name: modeName });
+        return modeId;
+      },
     };
     collections.push(col);
     return col;
@@ -358,7 +374,7 @@ test('extractFromSelection — 숨긴 레이어와 인스턴스 내부는 순회
   assert.equal(names.has('color/ff0000'), true); // 인스턴스 자체 속성은 수집
   assert.equal(names.has('size/120'), true);
   assert.equal(names.has('size/40'), true);
-  assert.equal(warnings.length, 2); // 숨김 · 인스턴스 안내
+  assert.equal(warnings.length, 0); // 스킵은 조용히 — 안내 문구 없음
 });
 
 test('extractFromSelection — count는 값을 쓰는 레이어 수(한 레이어의 중복 사용은 1)', () => {
@@ -458,14 +474,13 @@ test('extractFromSelection — 숨긴 조상 안의 레이어를 직접 선택�
   };
   inner.parent = { type: 'GROUP', id: 'hiddenGroup', visible: false, parent: null };
 
-  const { tokens, warnings } = extractFromSelection([inner]);
+  const { tokens } = extractFromSelection([inner]);
   assert.equal(tokens.length, 0); // 자신은 visible=true지만 조상이 숨김
-  assert.ok(warnings.some((w) => /숨긴 레이어/.test(w)));
 });
 
 test('bindSelection — 숨긴 조상 안의 선택 루트는 바인딩하지 않음', async () => {
   installFigma();
-  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
+  await seedBindVars([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
   const node = {
     type: 'FRAME',
     id: 'n',
@@ -510,7 +525,7 @@ test('extractFromSelection — 그리드 오토레이아웃은 gridRowGap/gridCo
   assert.equal(names.has('spacing/20'), true); // 가로 패딩
 });
 
-test('extractFromSelection — 그라디언트 채움은 경고', () => {
+test('extractFromSelection — 그라디언트 채움은 토큰에 포함하지 않음', () => {
   installFigma();
   const node = {
     type: 'RECTANGLE',
@@ -520,12 +535,11 @@ test('extractFromSelection — 그라디언트 채움은 경고', () => {
   };
   const { tokens, warnings } = extractFromSelection([node]);
   assert.equal(tokens.length, 0);
-  assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /그라디언트/);
+  assert.equal(warnings.length, 0);
 });
 
 /* ================= variables.ts ================= */
-test('createTokens — Global 리터럴 + Semantic 별칭 + scopes/hidden + px 스냅샷', async () => {
+test('createTokens — Global 리터럴만 + scopes/hidden (#3: Semantic 미러 없음)', async () => {
   const figma = installFigma();
   const summary = await createTokens(
     [
@@ -536,40 +550,63 @@ test('createTokens — Global 리터럴 + Semantic 별칭 + scopes/hidden + px �
     16,
   );
 
-  // #16: 토큰당 G+S 1쌍(스냅샷 없음). 색2 + 라인하이트2 + 간격2 = created 6
-  // conversions: base(16px) 환산 대상은 비-px인 lineHeight(150%)뿐
   assert.deepEqual(summary, {
-    created: 6,
+    created: 3,
     updated: 0,
     globals: 3,
-    semantics: 3,
+    semantics: 0,
     conversions: [{ name: 'line-height/150', from: '150%', to: 24 }],
   });
 
-  // Global 색: 리터럴 + scope + hidden
   const gColor = findVar(figma, 'Global', 'color/0066ff');
   assert.equal(gColor.hiddenFromPublishing, true);
   assert.deepEqual(gColor.scopes, ['ALL_FILLS']);
   assert.equal(rgbToHex(gColor.valuesByMode['mode:Global']), '#0066ff');
+  assert.equal(findVar(figma, 'Semantic', 'color/0066ff'), undefined);
 
-  // Semantic 색: 리터럴 금지 → 별칭만
-  const sColor = findVar(figma, 'Semantic', 'color/0066ff');
-  assert.equal(sColor.valuesByMode['mode:Semantic'].type, 'VARIABLE_ALIAS');
-  assert.equal(sColor.valuesByMode['mode:Semantic'].id, gColor.id);
-
-  // #16: 비-px lineHeight는 px FLOAT 단일(value=24=16*150/100) + 원본 단위는 description
   const gLh = findVar(figma, 'Global', 'line-height/150');
   assert.equal(gLh.resolvedType, 'FLOAT');
   assert.equal(gLh.valuesByMode['mode:Global'], 24);
   assert.equal(gLh.description, '150%');
-  assert.deepEqual(gLh.scopes, ['LINE_HEIGHT']); // FLOAT라 스코프 유지
-  // Semantic 미러(별칭)
-  const sLh = findVar(figma, 'Semantic', 'line-height/150');
-  assert.equal(sLh.resolvedType, 'FLOAT');
-  assert.equal(sLh.valuesByMode['mode:Semantic'].type, 'VARIABLE_ALIAS');
-  assert.equal(sLh.valuesByMode['mode:Semantic'].id, gLh.id);
-  // 스냅샷(-px) 변수는 생성하지 않음
+  assert.deepEqual(gLh.scopes, ['LINE_HEIGHT']);
+  assert.equal(findVar(figma, 'Semantic', 'line-height/150'), undefined);
   assert.equal(findVar(figma, 'Global', 'line-height/150-percent-px'), undefined);
+});
+
+test('createTokensAndRoles — Global hue + Semantic 역할 별칭(#3)', async () => {
+  const figma = installFigma();
+  const summary = await createTokensAndRoles(
+    [
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'color/f8f8f8', category: 'color', sources: ['fill'], value: '#f8f8f8' },
+      { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+    ],
+    16,
+  );
+  assert.ok(summary.globals >= 3);
+  assert.ok(summary.semantics >= 1);
+  assert.equal(findVar(figma, 'Semantic', 'color/0066ff'), undefined);
+  const cta = findVar(figma, 'Semantic', 'cta-background-color');
+  assert.ok(cta);
+  assert.equal(cta.valuesByMode['mode:Semantic'].type, 'VARIABLE_ALIAS');
+});
+
+test('createTokensAndRoles — 전달한 semanticMap은 덮어쓰고 빠진 역할은 자동 채움', async () => {
+  const figma = installFigma();
+  await createTokensAndRoles(
+    [
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+    ],
+    16,
+    { 'cta-background-color': 'color/0066ff' }, // 색만 — spacing은 자동 추천으로 채워야 함
+  );
+  const cta = findVar(figma, 'Semantic', 'cta-background-color');
+  const g = findVar(figma, 'Global', 'color/0066ff');
+  assert.equal(cta.valuesByMode['mode:Semantic'].id, g.id);
+  const spacing = findVar(figma, 'Semantic', 'spacing/md');
+  assert.ok(spacing, '부분 semanticMap이어도 spacing 역할이 등록되어야 한다');
+  assert.equal(spacing.valuesByMode['mode:Semantic'].id, findVar(figma, 'Global', 'spacing/16').id);
 });
 
 test('createTokens(#16) — letterSpacing(em)도 px FLOAT + description', async () => {
@@ -595,10 +632,10 @@ test('createTokens — 재실행 멱등(upsert): 두 번째는 모두 updated', 
   const second = await createTokens(tokens, 16);
   const afterCount = figma._state.variables.length;
 
-  assert.equal(first.created, 4);
+  assert.equal(first.created, 2);
   assert.deepEqual(
     { created: second.created, updated: second.updated },
-    { created: 0, updated: 4 },
+    { created: 0, updated: 2 },
   );
   assert.equal(beforeCount, afterCount); // 변수 개수 불변 → 중복 생성 없음
 });
@@ -650,7 +687,7 @@ test('createSemanticAliases — Global 컬렉션 없으면 전부 누락', async
 test('bindSelection — 색/크기 바인딩, 미매칭 skip, 오토레이아웃 아님 플래그', async () => {
   const figma = installFigma();
   // Semantic 토큰 시드(별칭→Global 리터럴): 색 #0066ff, 크기 200
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
       { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
@@ -691,7 +728,7 @@ test('bindSelection — 색/크기 바인딩, 미매칭 skip, 오토레이아웃
 
 test('bindSelection — 허용오차 내 동률은 가장 가까운 값으로 바인딩', async () => {
   const figma = installFigma();
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'size/8', category: 'size', sources: ['size'], value: 8 },
       { name: 'size/12', category: 'size', sources: ['size'], value: 12 },
@@ -720,7 +757,7 @@ test('bindSelection — 허용오차 내 동률은 가장 가까운 값으로 �
 
 test('bindSelection — HUG/FILL 사유는 두 축 모두 집계', async () => {
   installFigma();
-  await createTokens([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
+  await seedBindVars([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
   // 가로 FILL · 세로 HUG — 두 축 모두 건너뛰었으니 사유도 2건이어야 한다.
   const node = {
     type: 'FRAME',
@@ -747,7 +784,7 @@ test('bindSelection — HUG/FILL 사유는 두 축 모두 집계', async () => {
 
 test('bindSelection — 소수 크기는 근처 정수 토큰에 스냅하지 않음(정확 일치만)', async () => {
   const figma = installFigma();
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'size/344', category: 'size', sources: ['size'], value: 344 },
       { name: 'size/40', category: 'size', sources: ['size'], value: 40 },
@@ -792,7 +829,7 @@ test('bindSelection — 소수 크기는 근처 정수 토큰에 스냅하지 �
 
 test('bindSelection — 소수 크기라도 같은 값의 토큰이 있으면 바인딩', async () => {
   const figma = installFigma();
-  await createTokens([{ name: 'size/343_5', category: 'size', sources: ['size'], value: 343.5 }], 16);
+  await seedBindVars([{ name: 'size/343_5', category: 'size', sources: ['size'], value: 343.5 }], 16);
   const node = {
     type: 'FRAME',
     id: 'n',
@@ -819,7 +856,7 @@ test('bindSelection — 소수 크기라도 같은 값의 토큰이 있으면 �
 
 test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사유로 수집', async () => {
   installFigma();
-  await createTokens([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
+  await seedBindVars([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
   // 오토레이아웃 프레임 — padding 4방향이 모두 매칭 실패(GAP 변수 없음)지만 레이어는 1개다.
   const pad = {
     type: 'FRAME',
@@ -869,7 +906,7 @@ test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사�
 
 test('bindSelection — 그리드 오토레이아웃의 row/column gap 바인딩', async () => {
   const figma = installFigma();
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'spacing/12', category: 'gap', sources: ['gap'], value: 12 },
       { name: 'spacing/5', category: 'gap', sources: ['gap'], value: 5 },
@@ -906,7 +943,7 @@ test('bindSelection — 그리드 오토레이아웃의 row/column gap 바인딩
 
 test('bindSelection — 자유 배치 크기 제외 · 숨김/인스턴스 내부 미순회(extract.ts와 동일 기준)', async () => {
   const figma = installFigma();
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
       { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
@@ -986,7 +1023,7 @@ test('bindSelection — 자유 배치 크기 제외 · 숨김/인스턴스 내�
 test('bindSelection — 여백(padding/gap)은 GAP 변수에만 — size/line-height/letter-spacing 오매칭 방지', async () => {
   const figma = installFigma();
   // 값이 모두 24로 같은 네 변수: 간격(GAP)·크기(WIDTH_HEIGHT)·행간(LINE_HEIGHT)·자간(LETTER_SPACING)
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'spacing/24', category: 'gap', sources: ['gap'], value: 24 },
       { name: 'size/24', category: 'size', sources: ['size'], value: 24 },
@@ -1024,7 +1061,7 @@ test('bindSelection — 여백(padding/gap)은 GAP 변수에만 — size/line-he
 
 test('bindSelection — 선 두께(strokeWeight)는 STROKE_FLOAT 변수에 바인딩(여백 변수로 안 샘)', async () => {
   const figma = installFigma();
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'stroke-width/2', category: 'strokeWidth', sources: ['strokeWidth'], value: 2 },
       { name: 'spacing/2', category: 'gap', sources: ['gap'], value: 2 }, // 같은 값 2 — 오매칭 유혹
@@ -1055,7 +1092,7 @@ test('bindSelection — 선 두께(strokeWeight)는 STROKE_FLOAT 변수에 바�
 
 test('bindSelection — 색상도 용도 스코프로 분리(stroke 전용 색은 fill에 안 붙음)', async () => {
   const figma = installFigma();
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'color/aa0000', category: 'color', sources: ['fill'], value: '#aa0000' }, // ALL_FILLS
       { name: 'color/0000aa', category: 'color', sources: ['stroke'], value: '#0000aa' }, // STROKE_COLOR
@@ -1088,7 +1125,7 @@ test('bindSelection — 색상도 용도 스코프로 분리(stroke 전용 색�
 
 test('bindSelection — 레이어 불투명도(opacity)는 OPACITY 변수에 정밀 바인딩', async () => {
   const figma = installFigma();
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'opacity/0_5', category: 'opacity', sources: ['opacity'], value: 0.5 }, // OPACITY
       { name: 'size/0_5', category: 'size', sources: ['size'], value: 0.5 }, // WIDTH_HEIGHT — 같은 값, 오매칭 유혹
@@ -1118,7 +1155,7 @@ test('bindSelection — 레이어 불투명도(opacity)는 OPACITY 변수에 정
 
 test('bindSelection — fontFamily(STRING)는 FONT_FAMILY 변수에 정확 일치 바인딩', async () => {
   const figma = installFigma();
-  await createTokens([{ name: 'font-family/Inter', category: 'fontFamily', sources: ['fontFamily'], value: 'Inter' }], 16);
+  await seedBindVars([{ name: 'font-family/Inter', category: 'fontFamily', sources: ['fontFamily'], value: 'Inter' }], 16);
   const node = {
     type: 'TEXT',
     id: 'txt',
@@ -1144,7 +1181,7 @@ test('bindSelection — fontFamily(STRING)는 FONT_FAMILY 변수에 정확 일�
 
 test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + 사유', async () => {
   installFigma();
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
       { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
@@ -1193,7 +1230,7 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
 
 test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 필드/변수/인덱스', async () => {
   const figma = installFigma();
-  await createTokens(
+  await seedBindVars(
     [
       { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
       { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
@@ -1244,7 +1281,7 @@ test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 
 
 test('bindSelection — 진행률 보고 + 취소(UX6)', async () => {
   installFigma();
-  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
+  await seedBindVars([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
   const mk = (id) => ({
     type: 'FRAME',
     id,
@@ -1289,21 +1326,20 @@ test('previewCreateTokens — 변수 생성 없이 생성/갱신 예정 집계',
     { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
     { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
   ];
-  // 컬렉션/변수 없는 초기 상태 — 모두 생성 예정.
   const before = figma._state.variables.length;
-  const p = await previewCreateTokens(tokens, 16);
-  assert.equal(figma._state.variables.length, before); // 미생성(읽기 전용)
-  // 토큰 2개 → Global 2 + Semantic 2
+  const p = await previewCreateTokens(tokens, 16, {}); // 빈 맵 → 역할 자동 추천
+  assert.equal(figma._state.variables.length, before);
   assert.equal(p.globals, 2);
-  assert.equal(p.semantics, 2);
-  assert.equal(p.created, 4);
-  assert.equal(p.updated, 0);
+  assert.ok(p.semantics >= 1); // cta-background-color 등
+  assert.ok(p.created >= 3);
 
-  // 실제 생성 후 다시 미리보기 → 모두 갱신 예정.
+  // Global만 만든 뒤 색만 넘긴 맵으로 미리보기 → 자동 추천이 size도 채움
   await createTokens(tokens, 16);
-  const p2 = await previewCreateTokens(tokens, 16);
-  assert.equal(p2.created, 0);
-  assert.equal(p2.updated, 4);
+  const p2 = await previewCreateTokens(tokens, 16, { 'cta-background-color': 'color/0066ff' });
+  assert.equal(p2.globals, 2);
+  assert.ok(p2.semantics >= 2); // cta + size/*
+  assert.equal(p2.updated, 2); // Global 2
+  assert.ok(p2.created >= 2);
 });
 
 test('previewCreateTokens — base가 환산에 반영되고 실제 생성값과 일치', async () => {
@@ -2552,7 +2588,7 @@ test('prunePaletteColors(#3) — 재생성 hue 패밀리 안에서만 정리(다
   const keep = ['color/blue/500'];
   const removed = await prunePaletteColors(keep);
 
-  assert.equal(removed, 2); // blue/700 의 Global+Semantic
+  assert.equal(removed, 1); // blue/700 Global만(Semantic 미러 없음)
   assert.ok(!findVar(figma, 'Global', 'color/blue/700'));
   assert.ok(findVar(figma, 'Global', 'color/blue/500')); // keep
   assert.ok(findVar(figma, 'Global', 'color/green/500')); // 다른 패밀리 보존
@@ -2978,4 +3014,52 @@ test('generateDarkMode — 출처가 이미 dark/면 원본을 덮어쓰지 않�
   assert.equal(findVar(f.figma, 'Global', 'dark/dark/color/gray/0'), undefined, 'dark/dark/ 미생성');
   assert.equal(f.gVal(darkGlobal), '#121212', '원본 값 불변');
   assert.equal(surface.valuesByMode[f.LIGHT], undefined, '자기 참조 별칭 미생성');
+});
+
+test('ensureDarkMode — 모드 1개면 Dark를 추가하고, 이미 있으면 재사용', () => {
+  const figma = installFigma();
+  const col = figma.variables.createVariableCollection('Semantic');
+  assert.equal(col.modes.length, 1);
+  const first = ensureDarkMode(col);
+  assert.equal(first.created, true);
+  assert.equal(DARK_MODE_NAME, 'Dark');
+  assert.equal(col.modes.length, 2);
+  assert.equal(col.modes[1].name, 'Dark');
+  assert.equal(first.modeId, col.modes[1].modeId);
+
+  const again = ensureDarkMode(col);
+  assert.equal(again.created, false);
+  assert.equal(again.modeId, first.modeId);
+  assert.equal(col.modes.length, 2, '중복 Dark 미추가');
+
+  // 대소문자만 다른 기존 모드도 재사용
+  const col2 = figma.variables.createVariableCollection('Other');
+  const id = col2.addMode('dark');
+  const reused = ensureDarkMode(col2);
+  assert.equal(reused.created, false);
+  assert.equal(reused.modeId, id);
+});
+
+test('generateDarkMode — toModeId 생략 시 Dark 모드를 만든 뒤 채운다', async () => {
+  const f = darkFixture();
+  const lightId = f.semantic.defaultModeId;
+  const white = f.mkGlobal('color/gray/0', '#ffffff');
+  const surface = f.mkSemantic('surface');
+  surface.setValueForMode(lightId, f.figma.variables.createVariableAlias(white));
+
+  assert.equal(f.semantic.modes.length, 1);
+  const r = await generateDarkMode(f.semantic.id, lightId);
+  assert.equal(r.modeCreated, true);
+  assert.equal(r.created, 1);
+  assert.equal(r.realiased, 1);
+  assert.equal(f.semantic.modes.length, 2);
+  const darkMode = f.semantic.modes.find((m) => m.name === 'Dark');
+  assert.ok(darkMode);
+  const dark = findVar(f.figma, 'Global', 'dark/color/gray/0');
+  assert.deepEqual(surface.valuesByMode[darkMode.modeId], { type: 'VARIABLE_ALIAS', id: dark.id });
+
+  // 두 번째 실행은 모드를 다시 만들지 않는다
+  const r2 = await generateDarkMode(f.semantic.id, lightId);
+  assert.equal(r2.modeCreated, undefined);
+  assert.equal(f.semantic.modes.length, 2);
 });
