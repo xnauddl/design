@@ -304,8 +304,6 @@ export const STRINGS: Record<string, string> = {
   'rename.hint': '역할에 맞는 레이어 이름으로 바꿉니다. 최상위·인스턴스 이름은 그대로 둡니다',
   'rename.preview': '미리보기',
   'rename.apply': '이름 적용',
-  'rename.undoTitle': '되돌리기 안전장치',
-  'rename.undoBody': '이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있습니다.',
   // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
   'rename.keep.root': '루트 보존',
   'rename.keep.instance': '인스턴스 보존',

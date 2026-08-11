@@ -525,13 +525,15 @@
 
     <div class="step" id="createCard" data-make-step="token">
       <h2><span data-i18n="create.title">간격·크기 토큰</span> <span class="muted lock" id="createLock"></span> <span class="muted" id="createCount"></span></h2>
+      <!-- 설명 줄은 툴바 **위** — 나머지 여덟 카드가 다 그렇다. 여기만 아래에 있으면
+           「무엇을 하는 카드인가」를 버튼을 지나친 뒤에야 읽게 된다. -->
+      <div class="hint" data-i18n="create.scopeHint">여백·크기·폰트·효과만 다룹니다. 색은 이전 단계에서 이미 만들었어요</div>
       <div class="toolbar">
         <button id="btnCreate" data-i18n="create.previewBtn">미리보기</button>
         <button id="btnCreateApply" class="primary" style="display:none" data-i18n="create.apply">적용</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-make="theme" data-i18n="rail.next">다음 →</button>
       </div>
-      <div class="hint" data-i18n="create.scopeHint">여백·크기·폰트·효과만 다룹니다. 색은 이전 단계에서 이미 만들었어요</div>
       <div class="banner" id="tokenColorNote" style="display:none"></div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체</span></label>
@@ -658,10 +660,9 @@
         <button id="btnRenameKeep" class="link" data-i18n="rename.hideKeep">잠금 제외</button>
       </div>
       <div id="diff" class="results"></div>
-      <div class="ux">
-        <div class="ux-h"><span class="ux-t" data-i18n="rename.undoTitle">되돌리기 안전장치</span></div>
-        <div data-i18n="rename.undoBody">이 실행은 한 번의 되돌리기(Ctrl/⌘Z)로 전체를 취소할 수 있습니다.</div>
-      </div>
+      <!-- 「되돌리기 안전장치」 콜아웃 철거 — 와이어에 없고, 있으면 오히려 틀린 말을 한다.
+           한 번의 Ctrl/⌘Z로 되돌아가는 건 이 카드만이 아니라 commitUndo를 부르는 13개 동작
+           전부다. 이름 정리에만 붙여 두면 나머지는 안 그렇다는 뜻이 된다. -->
       <div class="status" id="renameStatus"></div>
     </div>
 
