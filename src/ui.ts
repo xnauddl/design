@@ -1005,12 +1005,12 @@ function readTextStyleRows(): TextStyleSpec[] {
   return tsSpecs.filter((s) => s.name.trim()).map((s) => ({ ...s, name: s.name.trim() }));
 }
 
-$('btnScanText').addEventListener('click', () =>
-  send({
-    type: 'SCAN_TEXT_STYLES',
-    useRowLabels: ($('tsUseRowLabels') as HTMLInputElement).checked,
-  }),
-);
+$('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
+// 스캔 후 액션 — 눌러야 생기는 이름이라, 스캔이 표를 채우기 전엔 잠가 둔다(TEXT_STYLE_CANDIDATES에서 해제).
+$('btnTsRowLabels').addEventListener('click', () => {
+  setStatus('tsStatus', '왼쪽 글자로 이름을 다시 매기는 중…', 'ok');
+  send({ type: 'NAME_TEXT_STYLES_BY_ROW' });
+});
 $('btnTsAddRow').addEventListener('click', () => {
   tsSpecs.push({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
   renderTextStyles();
@@ -1025,7 +1025,8 @@ $('btnTextStyles').addEventListener('click', () => {
     setStatus('tsStatus', '먼저 ‘선택에서 스캔’ 하거나 ‘행 추가’로 스타일을 정의하세요.', 'warn');
     return;
   }
-  send({ type: 'CREATE_TEXT_STYLES', styles, apply: ($('tsApply') as HTMLInputElement).checked });
+  // 등록은 스타일 생성까지 — 화면에 붙이는 건 옆의 「기존만 연결」 담당(결정 2026-08-06).
+  send({ type: 'CREATE_TEXT_STYLES', styles });
 });
 $('btnApplyExistingText').addEventListener('click', () => {
   // 적용만: 표/스캔과 무관하게 현재 선택의 텍스트를 기존 스타일에 바인딩(생성 없음).
@@ -1915,19 +1916,23 @@ window.onmessage = (event: MessageEvent) => {
       semStatusPrefix = '';
       break;
     case 'TEXT_STYLE_CANDIDATES': {
+      // 「왼쪽 글자로 이름 채우기」는 스캔이 실제 표본을 물어왔을 때만 누를 것이 있다.
+      // 램프 폴백(styles 0)은 캔버스에서 온 글자가 아니라 행 라벨을 찾을 데가 없다.
+      ($('btnTsRowLabels') as HTMLButtonElement).disabled = !msg.styles.length;
       if (msg.styles.length) {
         tsSpecs = msg.styles.map((x) => ({ ...x }));
         renderTextStyles();
         const bound = msg.styles.filter((s) => s.boundStyleId).length;
         const fresh = msg.styles.length - bound;
-        const labelPart = msg.labeled != null ? ` · 라벨이름 ${msg.labeled} · 랭킹폴백 ${msg.fallback ?? 0}` : '';
-        // 와이어 상태 줄: 신규 · 등록됨 · 행간% · 자간%.
+        // 이름 출처는 「왼쪽 글자로 이름 채우기」를 누른 뒤에만 적는다 — 맨 스캔은 전부 크기 순이라
+        // `왼쪽 글자 0`이 실패처럼 읽힌다. 와이어 상태 줄: 신규 · 등록됨 · 왼쪽 글자 · 크기 순.
+        const namePart = msg.labeled != null ? ` · 왼쪽 글자 ${msg.labeled} · 크기 순 ${msg.fallback ?? 0}` : '';
         setStatus(
           'tsStatus',
           `신규 ${fresh} · 등록됨 ${bound}` +
+            namePart +
             ` · 행간% ${msg.styles.filter((s) => s.lineHeightPercent).length}` +
             ` · 자간% ${msg.styles.filter((s) => (s.letterSpacingPercent ?? 0) !== 0).length}` +
-            labelPart +
             (msg.warnings.length ? ' · ' + msg.warnings.join(' ') : ''),
           msg.warnings.length ? 'warn' : 'ok',
         );
@@ -1942,7 +1947,6 @@ window.onmessage = (event: MessageEvent) => {
       setStatus(
         'tsStatus',
         `텍스트 스타일 ${msg.created + msg.updated}개 (생성 ${msg.created} / 갱신 ${msg.updated}) · 바인딩 ${msg.bound}` +
-          (msg.applied ? ` · 적용 ${msg.applied}` : '') +
           // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
           (msg.notes.length ? ` · ${msg.notes.join(' · ')}` : '') +
           (msg.missing.length ? ` · 미연결: ${msg.missing.join(', ')}` : ''),
@@ -2137,6 +2141,7 @@ const OP_STATUS: Record<string, string> = {
   CREATE_TOKENS: 'createStatus',
   CREATE_SEMANTICS: 'semStatus',
   SCAN_TEXT_STYLES: 'tsStatus',
+  NAME_TEXT_STYLES_BY_ROW: 'tsStatus',
   CREATE_TEXT_STYLES: 'tsStatus',
   APPLY: 'applyStatus',
   SELECT_NODES: 'applyStatus',

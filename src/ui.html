@@ -594,8 +594,12 @@
         <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">등록</button>
         <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존만 연결</button>
       </div>
-      <label class="inline"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록 시 화면에 적용</span></label>
-      <label class="inline" data-i18n-title="textStyle.useRowLabelsTip" title="ON이면 같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. 세션 동안만 유지."><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 이름으로</span></label>
+      <!-- 「가로 행의 왼쪽 텍스트를 이름으로」 체크박스 폐기(결정 2026-08-06) — 스캔 전에 켜고 끄는
+           옵션이라, 결과를 보기도 전에 이름 규칙을 고르라는 요구였다. 스캔은 늘 크기 순으로 두고,
+           이름이 마음에 안 들 때 눌러 덧입히는 뒤따르는 동작으로 바꾼다. 스캔해야 누를 것이 생긴다. -->
+      <div class="row">
+        <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둡니다.">왼쪽 글자로 이름 채우기</button>
+      </div>
       <div id="tsList" class="results"></div>
       <div class="prereq" id="tsApplyPrereq" style="display:none;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>

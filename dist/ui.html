@@ -594,8 +594,12 @@
         <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">등록</button>
         <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존만 연결</button>
       </div>
-      <label class="inline"><input id="tsApply" type="checkbox" /> <span data-i18n="textStyle.applyOriginal">등록 시 화면에 적용</span></label>
-      <label class="inline" data-i18n-title="textStyle.useRowLabelsTip" title="ON이면 같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. 세션 동안만 유지."><input id="tsUseRowLabels" type="checkbox" /> <span data-i18n="textStyle.useRowLabels">가로 행의 왼쪽 텍스트를 이름으로</span></label>
+      <!-- 「가로 행의 왼쪽 텍스트를 이름으로」 체크박스 폐기(결정 2026-08-06) — 스캔 전에 켜고 끄는
+           옵션이라, 결과를 보기도 전에 이름 규칙을 고르라는 요구였다. 스캔은 늘 크기 순으로 두고,
+           이름이 마음에 안 들 때 눌러 덧입히는 뒤따르는 동작으로 바꾼다. 스캔해야 누를 것이 생긴다. -->
+      <div class="row">
+        <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둡니다.">왼쪽 글자로 이름 채우기</button>
+      </div>
       <div id="tsList" class="results"></div>
       <div class="prereq" id="tsApplyPrereq" style="display:none;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
@@ -1096,11 +1100,12 @@
     "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uD654\uBA74 \uC5F0\uACB0\uC740 \u300C\uAE30\uC874\uB9CC \uC5F0\uACB0\u300D",
     "textStyle.scanBtn": "\uC2A4\uCE94",
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
-    "textStyle.useRowLabels": "\uAC00\uB85C \uD589\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uC774\uB984\uC73C\uB85C",
-    "textStyle.useRowLabelsTip": "ON\uC774\uBA74 \uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uC9DD\uC744 \uBABB \uCC3E\uC73C\uBA74 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026)\uC73C\uB85C \uB461\uB2C8\uB2E4. \uC138\uC158 \uB3D9\uC548\uB9CC \uC720\uC9C0.",
+    // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
+    // 지금 무슨 일이 일어나는지를 적는다.
+    "textStyle.rowLabelBtn": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984 \uCC44\uC6B0\uAE30",
+    "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026) \uADF8\uB300\uB85C \uB461\uB2C8\uB2E4.",
     "textStyle.applyExistingBtn": "\uAE30\uC874\uB9CC \uC5F0\uACB0",
     "textStyle.applyExistingTip": "\uC120\uD0DD\uD55C \uAE00\uC790\uB97C \uC774\uBBF8 \uB9CC\uB4E0 \uAC19\uC740 \uC2A4\uD0C0\uC77C\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4. \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694.",
-    "textStyle.applyOriginal": "\uB4F1\uB85D \uC2DC \uD654\uBA74\uC5D0 \uC801\uC6A9",
     "textStyle.registerBtn": "\uB4F1\uB85D",
     // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
     "textStyle.namePlaceholder": "\uC2A4\uD0C0\uC77C \uC774\uB984",
@@ -2640,13 +2645,11 @@
   function readTextStyleRows() {
     return tsSpecs.filter((s) => s.name.trim()).map((s) => __spreadProps(__spreadValues({}, s), { name: s.name.trim() }));
   }
-  $("btnScanText").addEventListener(
-    "click",
-    () => send({
-      type: "SCAN_TEXT_STYLES",
-      useRowLabels: $("tsUseRowLabels").checked
-    })
-  );
+  $("btnScanText").addEventListener("click", () => send({ type: "SCAN_TEXT_STYLES" }));
+  $("btnTsRowLabels").addEventListener("click", () => {
+    setStatus("tsStatus", "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE30\uB294 \uC911\u2026", "ok");
+    send({ type: "NAME_TEXT_STYLES_BY_ROW" });
+  });
   $("btnTsAddRow").addEventListener("click", () => {
     var _a;
     tsSpecs.push({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: "Regular" });
@@ -2661,7 +2664,7 @@
       setStatus("tsStatus", "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uC2A4\uCE94\u2019 \uD558\uAC70\uB098 \u2018\uD589 \uCD94\uAC00\u2019\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC815\uC758\uD558\uC138\uC694.", "warn");
       return;
     }
-    send({ type: "CREATE_TEXT_STYLES", styles, apply: $("tsApply").checked });
+    send({ type: "CREATE_TEXT_STYLES", styles });
   });
   $("btnApplyExistingText").addEventListener("click", () => {
     setStatus("tsStatus", "\uC120\uD0DD \uD14D\uC2A4\uD2B8\uB97C \uAE30\uC874 \uC2A4\uD0C0\uC77C\uC5D0 \uC801\uC6A9 \uC911\u2026", "ok");
@@ -3361,18 +3364,19 @@
         semStatusPrefix = "";
         break;
       case "TEXT_STYLE_CANDIDATES": {
+        $("btnTsRowLabels").disabled = !msg.styles.length;
         if (msg.styles.length) {
           tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
           renderTextStyles();
           const bound = msg.styles.filter((s) => s.boundStyleId).length;
           const fresh = msg.styles.length - bound;
-          const labelPart = msg.labeled != null ? ` \xB7 \uB77C\uBCA8\uC774\uB984 ${msg.labeled} \xB7 \uB7AD\uD0B9\uD3F4\uBC31 ${(_e = msg.fallback) != null ? _e : 0}` : "";
+          const namePart = msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_e = msg.fallback) != null ? _e : 0}` : "";
           setStatus(
             "tsStatus",
-            `\uC2E0\uADDC ${fresh} \xB7 \uB4F1\uB85D\uB428 ${bound} \xB7 \uD589\uAC04% ${msg.styles.filter((s) => s.lineHeightPercent).length} \xB7 \uC790\uAC04% ${msg.styles.filter((s) => {
+            `\uC2E0\uADDC ${fresh} \xB7 \uB4F1\uB85D\uB428 ${bound}` + namePart + ` \xB7 \uD589\uAC04% ${msg.styles.filter((s) => s.lineHeightPercent).length} \xB7 \uC790\uAC04% ${msg.styles.filter((s) => {
               var _a2;
               return ((_a2 = s.letterSpacingPercent) != null ? _a2 : 0) !== 0;
-            }).length}` + labelPart + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
+            }).length}` + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
             msg.warnings.length ? "warn" : "ok"
           );
         } else {
@@ -3385,7 +3389,7 @@
       case "TEXT_STYLES_RESULT":
         setStatus(
           "tsStatus",
-          `\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C ${msg.created + msg.updated}\uAC1C (\uC0DD\uC131 ${msg.created} / \uAC31\uC2E0 ${msg.updated}) \xB7 \uBC14\uC778\uB529 ${msg.bound}` + (msg.applied ? ` \xB7 \uC801\uC6A9 ${msg.applied}` : "") + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
+          `\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C ${msg.created + msg.updated}\uAC1C (\uC0DD\uC131 ${msg.created} / \uAC31\uC2E0 ${msg.updated}) \xB7 \uBC14\uC778\uB529 ${msg.bound}` + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
           (msg.notes.length ? ` \xB7 ${msg.notes.join(" \xB7 ")}` : "") + (msg.missing.length ? ` \xB7 \uBBF8\uC5F0\uACB0: ${msg.missing.join(", ")}` : ""),
           msg.missing.length ? "warn" : "ok"
         );
@@ -3549,6 +3553,7 @@
     CREATE_TOKENS: "createStatus",
     CREATE_SEMANTICS: "semStatus",
     SCAN_TEXT_STYLES: "tsStatus",
+    NAME_TEXT_STYLES_BY_ROW: "tsStatus",
     CREATE_TEXT_STYLES: "tsStatus",
     APPLY: "applyStatus",
     SELECT_NODES: "applyStatus",

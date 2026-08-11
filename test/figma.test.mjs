@@ -12,6 +12,7 @@ import {
   prunePaletteColors,
   scanTextStyles,
   createSemanticTextStyles,
+  applyExistingTextStyles,
   bindSelection,
   renameSelection,
   generateDarkMode,
@@ -2706,19 +2707,15 @@ test('scanTextStyles — 숨김 텍스트(visible=false)와 그 하위는 스캔
   assert.equal(samples[0].layerName, 'Show');
 });
 
-test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 적용 + 멱등', async () => {
+test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 멱등(화면은 안 건드림)', async () => {
   const figma = installFigma();
   const specs = [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }];
-  const node = {
-    type: 'TEXT', id: 'n1', name: 'b', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' },
-    lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 }, characters: 'hi',
-    _styleId: null, async setTextStyleIdAsync(id) { this._styleId = id; },
-  };
 
-  const r = await createSemanticTextStyles(specs, true, [node]);
+  const r = await createSemanticTextStyles(specs);
   assert.equal(r.created, 1);
   assert.equal(r.bound, 2); // fontSize + lineHeight
-  assert.equal(r.applied, 1);
+  // 등록은 라이브러리를 만드는 데까지 — 화면 연결은 「기존만 연결」 몫(결정 2026-08-06).
+  assert.equal(r.applied, 0);
   assert.deepEqual(r.missing, []);
 
   // 시맨틱 변수(역할명) 생성 + 스타일 바인딩
@@ -2728,13 +2725,37 @@ test('createSemanticTextStyles — 변수 보장 + 시맨틱 바인딩 + 적용 
   assert.equal(style.fontSize, 16);
   assert.ok(style.boundVariables.fontSize);
   assert.ok(style.boundVariables.lineHeight);
-  assert.equal(node._styleId, style.id); // 원본 적용됨
 
   // 멱등: 재실행 → updated(신규 0)
-  const r2 = await createSemanticTextStyles(specs, false, []);
+  const r2 = await createSemanticTextStyles(specs);
   assert.equal(r2.created, 0);
   assert.equal(r2.updated, 1);
   assert.equal(figma._state.textStyles.length, 1); // 중복 생성 없음
+});
+
+test('applyExistingTextStyles — 시그니처가 같은 기존 스타일에만 붙이고 미등록은 보고', async () => {
+  const figma = installFigma();
+  // 등록으로 라이브러리를 만든 뒤(생성만), 연결은 별도 호출이 한다 — 두 단계가 갈렸음을 그대로 확인.
+  await createSemanticTextStyles([
+    { name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+  ]);
+  const style = figma._state.textStyles.find((s) => s.name === 'body');
+
+  const mkText = (id, fontSize) => ({
+    type: 'TEXT', id, name: id, fontSize, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: fontSize * 1.5 }, letterSpacing: { unit: 'PIXELS', value: 0 },
+    characters: 'hi', visible: true,
+    _styleId: null, async setTextStyleIdAsync(sid) { this._styleId = sid; },
+  });
+  const hit = mkText('n1', 16); // 등록된 시그니처
+  const miss = mkText('n2', 40); // 라이브러리에 없는 크기
+
+  const r = await applyExistingTextStyles([hit, miss]);
+  assert.equal(r.applied, 1);
+  assert.equal(hit._styleId, style.id);
+  assert.equal(miss._styleId, null); // 없는 시그니처에 아무거나 붙이지 않는다
+  assert.equal(r.created, 0); // 연결만 — 스타일을 새로 만들지 않는다
+  assert.ok(r.missing.some((m) => m.includes('미등록')));
 });
 
 test('createSemanticTextStyles — 기존 역할로 rename은 충돌 보류(동명·시맨틱 보존)', async () => {
@@ -2745,8 +2766,6 @@ test('createSemanticTextStyles — 기존 역할로 rename은 충돌 보류(동�
       { name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
       { name: 'caption', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular' },
     ],
-    false,
-    [],
   );
   const bodySem = findVar(figma, 'Semantic', 'font-size/body');
   const bodyGlobalId = bodySem.valuesByMode['mode:Semantic'].id;
@@ -2758,8 +2777,6 @@ test('createSemanticTextStyles — 기존 역할로 rename은 충돌 보류(동�
   // caption → body: 대상 이름 점유 → rename 거부(동명 스타일·잘못된 바인딩 방지).
   const r = await createSemanticTextStyles(
     [{ name: 'body', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular', boundStyleId: caption.id }],
-    false,
-    [],
   );
   assert.equal(r.created, 0);
   assert.equal(r.updated, 0); // 충돌 스킵
@@ -2776,8 +2793,6 @@ test('createSemanticTextStyles — 빈 이름으로 rename하면 시맨틱 별�
   const figma = installFigma();
   await createSemanticTextStyles(
     [{ name: 'caption', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   const caption = figma._state.textStyles.find((s) => s.name === 'caption');
   const oldSem = findVar(figma, 'Semantic', 'font-size/caption');
@@ -2785,8 +2800,6 @@ test('createSemanticTextStyles — 빈 이름으로 rename하면 시맨틱 별�
 
   const r = await createSemanticTextStyles(
     [{ name: 'display', fontSize: 13, lineHeight: 18, letterSpacing: 0, family: 'Inter', style: 'Regular', boundStyleId: caption.id }],
-    false,
-    [],
   );
   assert.equal(r.updated, 1);
   assert.equal(caption.name, 'display');
@@ -2802,8 +2815,6 @@ test('createSemanticTextStyles — letterSpacing 0이면 기존 자간을 클리
   const figma = installFigma();
   await createSemanticTextStyles(
     [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 2, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   const body = figma._state.textStyles.find((s) => s.name === 'body');
   assert.equal(body.letterSpacing.value, 2);
@@ -2811,8 +2822,6 @@ test('createSemanticTextStyles — letterSpacing 0이면 기존 자간을 클리
   // stale 앵커 없이 동명 갱신 → 자간 0으로 클리어
   await createSemanticTextStyles(
     [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   assert.equal(body.letterSpacing.value, 0);
   assert.equal(body.letterSpacing.unit, 'PIXELS');
@@ -2822,15 +2831,11 @@ test('createSemanticTextStyles — stale boundStyleId는 rename 모드가 아님
   const figma = installFigma();
   await createSemanticTextStyles(
     [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   const body = figma._state.textStyles.find((s) => s.name === 'body');
   // 존재하지 않는 id + 같은 이름 → 이름 폴백으로 body를 찾지만, stale 앵커라 타이포를 스펙으로 갱신해야 함.
   const r = await createSemanticTextStyles(
     [{ name: 'body', fontSize: 18, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Medium', boundStyleId: 'style:gone' }],
-    false,
-    [],
   );
   assert.equal(r.created, 0);
   assert.equal(r.updated, 1);
@@ -2888,8 +2893,6 @@ test('createSemanticTextStyles — %행간은 PERCENT로 등록하고 행간 바
   const figma = installFigma();
   const r = await createSemanticTextStyles(
     [{ name: 'body', fontSize: 16, lineHeight: 24, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   const style = figma._state.textStyles.find((s) => s.name === 'body');
   assert.deepEqual(style.lineHeight, { value: 150, unit: 'PERCENT' }); // %로 등록
@@ -2911,8 +2914,6 @@ test('createSemanticTextStyles — %는 역할의 폰트 크기로 환산(base 1
   const figma = installFigma();
   await createSemanticTextStyles(
     [{ name: 'h1', fontSize: 24, lineHeight: 36, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Bold' }],
-    false,
-    [],
   );
   const g = findVar(figma, 'Global', 'line-height/36');
   assert.equal(g.valuesByMode['mode:Global'], 36); // 150% × 24 = 36 (base 16이면 24로 굳었다)
@@ -2923,16 +2924,12 @@ test('createSemanticTextStyles — 기존 %스타일을 rename해도 %가 유지
   const figma = installFigma();
   await createSemanticTextStyles(
     [{ name: 'body', fontSize: 16, lineHeight: 24, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   const style = figma._state.textStyles.find((s) => s.name === 'body');
 
   // 재스캔: 같은 스타일에 앵커된 채 이름만 바꿈
   const r = await createSemanticTextStyles(
     [{ name: 'text/base', fontSize: 16, lineHeight: 24, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Regular', boundStyleId: style.id }],
-    false,
-    [],
   );
   assert.equal(style.name, 'text/base'); // rename 됨
   assert.deepEqual(style.lineHeight, { value: 150, unit: 'PERCENT' }); // 타이포 보존
@@ -2947,8 +2944,6 @@ test('createSemanticTextStyles — 같은 px 이름에 원본이 갈리면 px로
       { name: 'body', fontSize: 16, lineHeight: 24, lineHeightPercent: 150, letterSpacing: 0, family: 'Inter', style: 'Regular' },
       { name: 'h2', fontSize: 24, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Bold' }, // 같은 24px, 원본은 px
     ],
-    false,
-    [],
   );
   const g = findVar(figma, 'Global', 'line-height/24');
   assert.equal(g.valuesByMode['mode:Global'], 24);
@@ -3102,8 +3097,6 @@ test('createSemanticTextStyles — %자간은 PERCENT로 등록하고 자간 바
   const figma = installFigma();
   const r = await createSemanticTextStyles(
     [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   const style = figma._state.textStyles.find((s) => s.name === 'body');
   assert.deepEqual(style.letterSpacing, { value: 2, unit: 'PERCENT' });
@@ -3124,8 +3117,6 @@ test('createSemanticTextStyles — 음수 %자간도 PERCENT로 등록·바인�
   const figma = installFigma();
   const r = await createSemanticTextStyles(
     [{ name: 'tight', fontSize: 16, lineHeight: 24, letterSpacing: -0.32, letterSpacingPercent: -2, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   const style = figma._state.textStyles.find((s) => s.name === 'tight');
   assert.deepEqual(style.letterSpacing, { value: -2, unit: 'PERCENT' });
@@ -3139,14 +3130,10 @@ test('createSemanticTextStyles — 기존 %자간 스타일을 rename해도 %가
   const figma = installFigma();
   await createSemanticTextStyles(
     [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   const style = figma._state.textStyles.find((s) => s.name === 'body');
   const r = await createSemanticTextStyles(
     [{ name: 'text/base', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular', boundStyleId: style.id }],
-    false,
-    [],
   );
   assert.equal(style.name, 'text/base');
   assert.deepEqual(style.letterSpacing, { value: 2, unit: 'PERCENT' });
@@ -3159,8 +3146,6 @@ test('createSemanticTextStyles — 이미 변수가 묶인 스타일은 스캔 %
   // 1차: % 없이 등록 → PIXELS + letterSpacing 변수 바인딩
   await createSemanticTextStyles(
     [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   const style = figma._state.textStyles.find((s) => s.name === 'body');
   assert.deepEqual(style.letterSpacing, { value: 0.32, unit: 'PIXELS' });
@@ -3170,8 +3155,6 @@ test('createSemanticTextStyles — 이미 변수가 묶인 스타일은 스캔 %
   // 값을 안 바꾼 재등록이 연결을 끊어선 안 된다 — 교정을 미루고 notes로 알린다.
   const r = await createSemanticTextStyles(
     [{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular', boundStyleId: style.id }],
-    false,
-    [],
   );
   assert.deepEqual(style.letterSpacing, { value: 0.32, unit: 'PIXELS' }); // 그대로
   assert.ok(style.boundVariables.letterSpacing, '연결 유지');
@@ -3183,8 +3166,6 @@ test('createSemanticTextStyles — 묶인 변수가 없으면 스캔 %로 단위
   // 자간 역할 변수가 없으니 1차 등록에서 바인딩이 생기지 않는다.
   await createSemanticTextStyles(
     [{ name: 'solo', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, family: 'Inter', style: 'Regular' }],
-    false,
-    [],
   );
   const style = figma._state.textStyles.find((s) => s.name === 'solo');
   style.boundVariables = {}; // 연결 없는 상태(사용자가 직접 만든 스타일)
@@ -3192,8 +3173,6 @@ test('createSemanticTextStyles — 묶인 변수가 없으면 스캔 %로 단위
 
   await createSemanticTextStyles(
     [{ name: 'solo', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular', boundStyleId: style.id }],
-    false,
-    [],
   );
   assert.deepEqual(style.letterSpacing, { value: 2, unit: 'PERCENT' }); // 잃을 게 없으면 교정
 });
@@ -3205,8 +3184,6 @@ test('createSemanticTextStyles — 같은 px 자간 이름에 원본이 갈리�
       { name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0.32, letterSpacingPercent: 2, family: 'Inter', style: 'Regular' },
       { name: 'label', fontSize: 32, lineHeight: 40, letterSpacing: 0.32, family: 'Inter', style: 'Bold' }, // 같은 0.32px, 원본은 px
     ],
-    false,
-    [],
   );
   const g = findVar(figma, 'Global', 'letter-spacing/0_32');
   assert.equal(g.valuesByMode['mode:Global'], 0.32);

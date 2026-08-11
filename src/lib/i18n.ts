@@ -255,11 +255,12 @@ export const STRINGS: Record<string, string> = {
   'textStyle.hint': '스캔 후 이름을 다듬고 등록하세요. 화면 연결은 「기존만 연결」',
   'textStyle.scanBtn': '스캔',
   'textStyle.addRow': '행 추가',
-  'textStyle.useRowLabels': '가로 행의 왼쪽 텍스트를 이름으로',
-  'textStyle.useRowLabelsTip': 'ON이면 같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾으면 크기 순 이름(display/h1…)으로 둡니다. 세션 동안만 유지.',
+  // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
+  // 지금 무슨 일이 일어나는지를 적는다.
+  'textStyle.rowLabelBtn': '왼쪽 글자로 이름 채우기',
+  'textStyle.rowLabelTip': '같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둡니다.',
   'textStyle.applyExistingBtn': '기존만 연결',
   'textStyle.applyExistingTip': '선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.',
-  'textStyle.applyOriginal': '등록 시 화면에 적용',
   'textStyle.registerBtn': '등록',
   // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
   'textStyle.namePlaceholder': '스타일 이름',

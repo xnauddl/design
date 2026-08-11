@@ -6,6 +6,7 @@ import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
+import type { TextSample } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
 import { renameSelection, writeRole } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
@@ -45,6 +46,9 @@ const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, hideOnboard: false, grid: 8, t
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
+// 마지막 스캔의 원본 표본 — 「왼쪽 글자로 이름 채우기」가 다시 훑지 않고 이름만 다시 매기게 한다.
+// 다시 훑으면 그 사이 선택이 바뀐 경우 표에 보이는 것과 다른 결과가 조용히 나온다.
+let lastTextSamples: TextSample[] = [];
 
 function effective(): {
   tier: Tier;
@@ -827,27 +831,31 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'SCAN_TEXT_STYLES': {
         // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
+        // 이름은 언제나 크기 순(display/h1…) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
         const { samples, warnings } = await scanTextStyles(selection());
+        lastTextSamples = samples;
         const existing = await scanExistingTextStyles();
-        if (msg.useRowLabels) {
-          const r = nameTextStylesWithRowLabels(samples, existing);
-          post({
-            type: 'TEXT_STYLE_CANDIDATES',
-            styles: r.styles,
-            warnings,
-            labeled: r.labeled,
-            fallback: r.fallback,
-          });
-        } else {
-          const styles = nameTextStyles(clusterTextStyles(samples), existing);
-          post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+        const styles = nameTextStyles(clusterTextStyles(samples), existing);
+        post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+        break;
+      }
+      case 'NAME_TEXT_STYLES_BY_ROW': {
+        // 방금 스캔한 표본을 그대로 다시 이름 짓는다(캔버스 재탐색 없음) — 사용자가 보고 있는 표와
+        // 같은 입력이어야 결과가 예측 가능하다. 등록된 스타일은 그 사이 바뀔 수 있어 새로 읽는다.
+        // 빈 후보를 돌려보내면 UI가 '텍스트를 못 찾음'으로 읽고 기본 램프로 표를 덮는다 — 오류로 알린다.
+        if (!lastTextSamples.length) {
+          post({ type: 'ERROR', message: '먼저 스캔하세요 — 이름을 다시 매길 표본이 없습니다.', op: 'NAME_TEXT_STYLES_BY_ROW' });
+          break;
         }
+        const existing = await scanExistingTextStyles();
+        const r = nameTextStylesWithRowLabels(lastTextSamples, existing);
+        post({ type: 'TEXT_STYLE_CANDIDATES', styles: r.styles, warnings: [], labeled: r.labeled, fallback: r.fallback });
         break;
       }
       case 'CREATE_TEXT_STYLES': {
         if (!requireTextStyles()) break;
-        const r = await createSemanticTextStyles(msg.styles, msg.apply, selection());
-        post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, applied: r.applied, missing: r.missing, notes: r.notes });
+        const r = await createSemanticTextStyles(msg.styles);
+        post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, missing: r.missing, notes: r.notes });
         commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로
         await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → 「기존만 연결」 등 전제 게이트 갱신
         break;

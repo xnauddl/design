@@ -495,18 +495,20 @@ export interface TextStyleResult {
   created: number;
   updated: number;
   bound: number;
+  /** 화면 노드에 스타일을 붙인 수 — `applyExistingTextStyles`만 채운다(등록은 생성까지, 결정 2026-08-06). */
   applied: number;
   missing: string[];
   /** 경고가 아닌 알림(의도된 미바인딩 등). missing과 섞으면 정상 동작이 경고로 읽힌다. */
   notes: string[];
 }
 
-/** 변수 보장 → 텍스트 스타일 upsert + 시맨틱 바인딩 → (apply) 원본 노드에 스타일 연결. */
-export async function createSemanticTextStyles(
-  specs: TextStyleSpec[],
-  apply: boolean,
-  nodes: readonly SceneNode[],
-): Promise<TextStyleResult> {
+/**
+ * 변수 보장 → 텍스트 스타일 upsert + 시맨틱 바인딩. 화면 연결은 하지 않는다.
+ * 「등록 시 화면에 적용」 옵션 폐기(결정 2026-08-06) — 등록은 라이브러리를 만드는 일이고,
+ * 화면에 붙이는 일은 「기존만 연결」(`applyExistingTextStyles`)이 맡는다. 한 버튼이 둘 다 하면
+ * 되돌릴 때 무엇까지 되돌려야 하는지가 흐려진다.
+ */
+export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<TextStyleResult> {
   const res: TextStyleResult = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
   if (!specs.length) return res;
 
@@ -772,49 +774,7 @@ export async function createSemanticTextStyles(
     styleByName.set(style.name, style);
   }
 
-  // 4) (옵션) 원본 텍스트에 스타일 적용 — 패밀리+크기+굵기 일치 노드에(패밀리는 행별로 보존됨).
-  if (apply) {
-    const texts: TextNode[] = [];
-    for (const n of nodes) walkText(n, texts);
-    const loaded = new Set<string>();
-    const ensureFont = async (fn: FontName): Promise<void> => {
-      const k = `${fn.family} ${fn.style}`;
-      if (loaded.has(k)) return;
-      await figma.loadFontAsync(fn); // 노드 수정엔 현재 폰트 로드가 필요. Figma가 캐시하지만 await 중복은 피함.
-      loaded.add(k);
-    };
-    let matched = 0;
-    for (const t of texts) {
-      if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
-      const fontSize = roundN(t.fontSize);
-      const fn = t.fontName; // 가드 후 FontName으로 narrowing(클로저에서 재확장 방지).
-      // 노드 행간·자간을 스캔과 동일 규칙으로 px 환산(AUTO/혼합=0). 전체 시그니처가 같은 스펙에만 적용 —
-      // 행간/자간을 빼고 매칭하면 같은 폰트·크기·굵기라도 행간이 다른 노드에 엉뚱한 스타일이 붙어 행간이 바뀜.
-      const lhPx = lhPxOf(fontSize, t.lineHeight);
-      const lsPx = lsPxOf(fontSize, t.letterSpacing);
-      const spec = specs.find(
-        (s) =>
-          s.fontSize === fontSize &&
-          s.family === fn.family &&
-          s.style === fn.style &&
-          s.lineHeight === lhPx &&
-          s.letterSpacing === lsPx,
-      );
-      if (!spec) continue;
-      const ts = styleByName.get(spec.name);
-      if (!ts) continue; // 스타일 생성이 폰트 부재로 스킵된 경우(step 3에서 이미 missing 보고).
-      matched++;
-      try {
-        await ensureFont(fn);
-        await t.setTextStyleIdAsync(ts.id);
-        res.applied++;
-      } catch {
-        res.missing.push(`적용 실패 '${t.name}'(폰트 로드 불가)`);
-      }
-    }
-    if (texts.length === 0) res.missing.push('적용 대상 없음 — 선택에 텍스트 노드가 없습니다(등록 후 선택이 풀렸을 수 있음)');
-    else if (matched === 0) res.missing.push('적용 매칭 0 — 선택이 스캔과 다르거나 폰트·크기·굵기·행간·자간 불일치');
-  }
+  // 화면 연결 단계는 여기 없다 — 「기존만 연결」이 시그니처로 붙인다(위 주석 참고).
   return res;
 }
 

@@ -216,8 +216,10 @@
 > 2026-08-05 논의. **구현 전 문서만.** 참고: [Design Lint](https://www.figma.com/community/plugin/801195587640428208/design-lint)
 > **확인용 와이어프레임**: [`docs/wireframe-plugin-ia.html`](docs/wireframe-plugin-ia.html)
 
-- **✅ 결정(등록 vs 화면 적용, 2026-08-06)**: 「등록 시 화면에 적용」**체크박스 제거**. `등록` = 스타일 생성만. 화면 연결은 기존 **「기존만 연결」** 버튼. (`CREATE_TEXT_STYLES`의 `apply` 플래그/UI 체크 제거 대상)
-- **✅ 결정(행 라벨 이름, 2026-08-06)**: 스캔 시 체크박스(`tsUseRowLabels`) **제거**. 기본 스캔 = **크기 순 이름**(display/h1…). 스캔 **후** 액션 **「왼쪽 글자로 이름 채우기」**로 가로 행 라벨→이름 적용(E안). 상태줄에 왼쪽 글자 N · 크기 순 N. 엔진 `nameTextStylesWithRowLabels`는 유지·트리거만 UI에서 분리.
+- **✅ 결정(등록 vs 화면 적용, 2026-08-06) — 구현 완료 2026-08-11**: 「등록 시 화면에 적용」**체크박스 제거**. `등록` = 스타일 생성만. 화면 연결은 기존 **「기존만 연결」** 버튼. `CREATE_TEXT_STYLES.apply`·`createSemanticTextStyles(specs, apply, nodes)`의 뒤 두 인자·step 4 블록·`TEXT_STYLES_RESULT.applied` 제거. `TextStyleResult.applied`는 남는다 — `applyExistingTextStyles`가 채운다.
+  - 옮겨간 연결 동작에 테스트가 없었으므로 `applyExistingTextStyles` 테스트를 새로 추가(등록된 시그니처만 붙고 미등록은 보고).
+- **✅ 결정(행 라벨 이름, 2026-08-06) — 구현 완료 2026-08-11**: 스캔 시 체크박스(`tsUseRowLabels`) **제거**. 기본 스캔 = **크기 순 이름**(display/h1…). 스캔 **후** 액션 **「왼쪽 글자로 이름 채우기」**(`NAME_TEXT_STYLES_BY_ROW`)로 가로 행 라벨→이름 적용(E안). 상태줄에 왼쪽 글자 N · 크기 순 N(누른 뒤에만 — 맨 스캔의 `왼쪽 글자 0`은 실패로 읽힌다). 엔진 `nameTextStylesWithRowLabels`는 유지·트리거만 UI에서 분리.
+  - **재스캔하지 않는다**: `code.ts`가 마지막 스캔의 `samples`를 들고 있다가 이름만 다시 매긴다. 다시 훑으면 그새 선택이 바뀐 경우 표에 보이는 것과 다른 결과가 조용히 나온다. 버튼은 스캔이 실제 표본을 물어오기 전까지 비활성(램프 폴백 포함 — 캔버스에서 온 글자가 아니라 행 라벨을 찾을 데가 없다).
 
 - **현재 문제**
   - `#tsTable`이 이름·폰트·크기·행간·자간·굵기를 **고정 열 표**로 나열 → ~360px에서 열 폭 싸움(행간을 늘리면 폰트 열이 사라짐 — ui.html 주석).
