@@ -590,7 +590,9 @@
     </div>
 
     <div class="step" data-make-step="type">
-      <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted lock" id="tsLock"></span> <span class="muted" id="tsCount"></span></h2>
+      <!-- 색 카드와 같은 이유로 제목 개수 없음 — 상태줄이 「신규 N · 등록됨 N · …」로 이미 말한다.
+           와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
+      <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted lock" id="tsLock"></span></h2>
       <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 「기존만 연결」</div>
       <div class="toolbar">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>

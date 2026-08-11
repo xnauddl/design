@@ -590,7 +590,9 @@
     </div>
 
     <div class="step" data-make-step="type">
-      <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted lock" id="tsLock"></span> <span class="muted" id="tsCount"></span></h2>
+      <!-- 색 카드와 같은 이유로 제목 개수 없음 — 상태줄이 「신규 N · 등록됨 N · …」로 이미 말한다.
+           와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
+      <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted lock" id="tsLock"></span></h2>
       <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 「기존만 연결」</div>
       <div class="toolbar">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>
@@ -2636,11 +2638,22 @@
     }
     return card;
   }
+  var tsScanNote = { namePart: "", warnings: [] };
   function renderTextStyles() {
-    const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
-    const bound = tsSpecs.length - fresh;
-    $("tsCount").textContent = tsSpecs.length ? `\uC2E0\uADDC ${fresh} \xB7 \uB4F1\uB85D\uB428 ${bound}` : "";
     renderChunked($("tsList"), tsSpecs, textStyleCard);
+    if (!tsSpecs.length) {
+      setStatus("tsStatus", "", "");
+      return;
+    }
+    const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
+    setStatus(
+      "tsStatus",
+      `\uC2E0\uADDC ${fresh} \xB7 \uB4F1\uB85D\uB428 ${tsSpecs.length - fresh}` + tsScanNote.namePart + ` \xB7 \uD589\uAC04% ${tsSpecs.filter((s) => s.lineHeightPercent).length} \xB7 \uC790\uAC04% ${tsSpecs.filter((s) => {
+        var _a;
+        return ((_a = s.letterSpacingPercent) != null ? _a : 0) !== 0;
+      }).length}` + (tsScanNote.warnings.length ? " \xB7 " + tsScanNote.warnings.join(" ") : ""),
+      tsScanNote.warnings.length ? "warn" : "ok"
+    );
   }
   function readTextStyleRows() {
     return tsSpecs.filter((s) => s.name.trim()).map((s) => __spreadProps(__spreadValues({}, s), { name: s.name.trim() }));
@@ -3367,20 +3380,14 @@
         $("btnTsRowLabels").disabled = !msg.styles.length;
         if (msg.styles.length) {
           tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
+          tsScanNote = {
+            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_e = msg.fallback) != null ? _e : 0}` : "",
+            warnings: msg.warnings
+          };
           renderTextStyles();
-          const bound = msg.styles.filter((s) => s.boundStyleId).length;
-          const fresh = msg.styles.length - bound;
-          const namePart = msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_e = msg.fallback) != null ? _e : 0}` : "";
-          setStatus(
-            "tsStatus",
-            `\uC2E0\uADDC ${fresh} \xB7 \uB4F1\uB85D\uB428 ${bound}` + namePart + ` \xB7 \uD589\uAC04% ${msg.styles.filter((s) => s.lineHeightPercent).length} \xB7 \uC790\uAC04% ${msg.styles.filter((s) => {
-              var _a2;
-              return ((_a2 = s.letterSpacingPercent) != null ? _a2 : 0) !== 0;
-            }).length}` + (msg.warnings.length ? " \xB7 " + msg.warnings.join(" ") : ""),
-            msg.warnings.length ? "warn" : "ok"
-          );
         } else {
           tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY);
+          tsScanNote = { namePart: "", warnings: [] };
           renderTextStyles();
           setStatus("tsStatus", "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC2B5\uB2C8\uB2E4. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694.", "warn");
         }

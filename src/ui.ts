@@ -992,11 +992,27 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
   return card;
 }
 
+/** 스캔만 알 수 있는 부가 정보 — 표를 편집해도 그 스캔의 사실이라 남는다(이름 출처·경고). */
+let tsScanNote = { namePart: '', warnings: [] as string[] };
+
 function renderTextStyles(): void {
-  const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
-  const bound = tsSpecs.length - fresh;
-  $('tsCount').textContent = tsSpecs.length ? `신규 ${fresh} · 등록됨 ${bound}` : '';
   renderChunked($('tsList'), tsSpecs, textStyleCard);
+  if (!tsSpecs.length) {
+    setStatus('tsStatus', '', ''); // 마지막 행까지 지웠다 — 남은 개수 요약은 거짓말이 된다
+    return;
+  }
+  // 개수는 상태줄 한 곳에서만 — 제목 배지(#tsCount)는 걷었다(ui.html 주석 참고).
+  // 표에서 세므로 행 추가·삭제가 바로 반영된다(스캔 시점 스냅샷이던 옛 상태줄의 문제).
+  const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
+  setStatus(
+    'tsStatus',
+    `신규 ${fresh} · 등록됨 ${tsSpecs.length - fresh}` +
+      tsScanNote.namePart +
+      ` · 행간% ${tsSpecs.filter((s) => s.lineHeightPercent).length}` +
+      ` · 자간% ${tsSpecs.filter((s) => (s.letterSpacingPercent ?? 0) !== 0).length}` +
+      (tsScanNote.warnings.length ? ' · ' + tsScanNote.warnings.join(' ') : ''),
+    tsScanNote.warnings.length ? 'warn' : 'ok',
+  );
 }
 
 /** 등록에 넘길 스펙 — 이름이 빈 행은 뺀다(수동 추가 후 미입력). */
@@ -1920,24 +1936,18 @@ window.onmessage = (event: MessageEvent) => {
       ($('btnTsRowLabels') as HTMLButtonElement).disabled = !msg.styles.length;
       if (msg.styles.length) {
         tsSpecs = msg.styles.map((x) => ({ ...x }));
-        renderTextStyles();
-        const bound = msg.styles.filter((s) => s.boundStyleId).length;
-        const fresh = msg.styles.length - bound;
         // 이름 출처는 「왼쪽 글자로 이름 채우기」를 누른 뒤에만 적는다 — 맨 스캔은 전부 크기 순이라
         // `왼쪽 글자 0`이 실패처럼 읽힌다. 와이어 상태 줄: 신규 · 등록됨 · 왼쪽 글자 · 크기 순.
-        const namePart = msg.labeled != null ? ` · 왼쪽 글자 ${msg.labeled} · 크기 순 ${msg.fallback ?? 0}` : '';
-        setStatus(
-          'tsStatus',
-          `신규 ${fresh} · 등록됨 ${bound}` +
-            namePart +
-            ` · 행간% ${msg.styles.filter((s) => s.lineHeightPercent).length}` +
-            ` · 자간% ${msg.styles.filter((s) => (s.letterSpacingPercent ?? 0) !== 0).length}` +
-            (msg.warnings.length ? ' · ' + msg.warnings.join(' ') : ''),
-          msg.warnings.length ? 'warn' : 'ok',
-        );
+        tsScanNote = {
+          namePart: msg.labeled != null ? ` · 왼쪽 글자 ${msg.labeled} · 크기 순 ${msg.fallback ?? 0}` : '',
+          warnings: msg.warnings,
+        };
+        renderTextStyles(); // 상태줄까지 여기서 쓴다
       } else {
         tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY);
+        tsScanNote = { namePart: '', warnings: [] };
         renderTextStyles();
+        // 램프는 스캔 결과가 아니라 폴백 — 개수 요약 대신 무슨 일이 있었는지를 덮어쓴다.
         setStatus('tsStatus', '선택에서 텍스트를 못 찾아 기본 램프로 채웠습니다. 폰트·값을 조정하세요.', 'warn');
       }
       break;
