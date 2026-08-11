@@ -520,15 +520,14 @@ function renderColorTable(): void {
   const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
   if (!colorRevealed || !colors.length) {
     card.style.display = 'none'; // 색은 ‘선택에서 토큰 추출’(colorRevealed) 후에만 노출
-    $('colorCount').textContent = '';
     // 옛 행을 남겨 두면 다음 추출이 색 0개일 때 테두리·‘총 n개’ 줄이 실제와 어긋난 채 되살아난다.
     $('colorTable').innerHTML = '';
     $('paletteRow').innerHTML = '';
     return;
   }
   card.style.display = '';
-  // 카드 제목의 개수 — 표가 상한에 걸려 일부만 보여도 정리 대상 색이 몇 개인지 먼저 알린다.
-  $('colorCount').textContent = `색 ${colors.length}개`;
+  // 개수는 상태줄(color.summary)만 말한다 — 제목 배지는 걷었다(ui.html 주석 참고).
+  // 표를 자르던 상한도 이제 없어서, 제목이 '보이는 것보다 많다'를 알릴 이유 자체가 사라졌다.
   // 현 semMap을 역할→이름으로 읽어 이름→역할로 뒤집어 prefill.
   const roleByName = new Map<string, string>();
   for (const [role, name] of Object.entries(textToSemanticMap(($('semMap') as HTMLTextAreaElement).value))) {

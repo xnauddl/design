@@ -477,7 +477,10 @@
     <!-- 색 — 추출/시드로 색을 모으고, 역할을 정한 뒤 여기서 변수로 만든다(#3·#10).
          이후 '토큰' 단계는 색 외(간격·크기·폰트·효과)만 다룬다. -->
     <div class="step" id="colorCard" data-make-step="color">
-      <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" id="colorCount"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
+      <!-- 제목에 개수를 달지 않는다 — 상태줄이 「색 N개 · 역할 지정 M · 변수화 대기」로 같은 수를
+           이미 말한다. 게다가 잠금 배지와 범위 라벨 사이에 끼어 「🔒 색 12개 변수화」로 읽혔다.
+           와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
+      <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
       <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
@@ -2275,13 +2278,11 @@
     const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
     if (!colorRevealed || !colors.length) {
       card.style.display = "none";
-      $("colorCount").textContent = "";
       $("colorTable").innerHTML = "";
       $("paletteRow").innerHTML = "";
       return;
     }
     card.style.display = "";
-    $("colorCount").textContent = `\uC0C9 ${colors.length}\uAC1C`;
     const roleByName = /* @__PURE__ */ new Map();
     for (const [role, name] of Object.entries(textToSemanticMap($("semMap").value))) {
       if (!roleByName.has(name)) roleByName.set(name, role);
