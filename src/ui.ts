@@ -63,6 +63,17 @@ let createFrom: 'colors' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호�
 let semStatusTarget = 'colorStatus';
 /** 그 카드가 이미 띄운 요약 — 시맨틱 결과가 덮어쓰지 않고 뒤에 이어 붙게 한다. */
 let semStatusPrefix = '';
+/**
+ * SELECT_NODES를 부른 자리의 상태 줄. 레이어 선택은 적용 탭의 스킵 칩만 쓰던 기능이라
+ * 결과를 #applyStatus에 고정으로 썼는데, 타이포 단계의 ×N 배지도 같은 메시지를 쓰면서
+ * ‘상한 200개에 잘렸다’는 경고가 다른 탭에 적혀 사용자에게 닿지 않는다 — 부른 쪽이 지정한다.
+ */
+let selectStatusTarget = 'applyStatus';
+/** 레이어 선택 요청 — 결과 경고가 돌아올 자리를 함께 기억한다. */
+function selectNodes(ids: string[], statusId: string): void {
+  selectStatusTarget = statusId;
+  send({ type: 'SELECT_NODES', ids });
+}
 /** #semStatus로 향하는 상태 쓰기를 화면에 있는 카드로 옮긴다(그 외 id는 그대로). */
 function resolveStatusId(id: string): string {
   return id === 'semStatus' ? semStatusTarget : id;
@@ -531,8 +542,16 @@ function renderColorTable(): void {
   card.style.display = '';
   // 개수는 상태줄(color.summary)만 말한다 — 제목 배지는 걷었다(ui.html 주석 참고).
   // 표를 자르던 상한도 이제 없어서, 제목이 '보이는 것보다 많다'를 알릴 이유 자체가 사라졌다.
-  // 현 semMap을 역할→이름으로 읽어 이름→역할로 뒤집어 prefill.
+  // 화면에 떠 있는 역할 지정을 먼저 거둔다. 이 드롭다운은 #semMap에 되쓰이지 않고
+  // (semMap은 「색 변수 만들기」 때 colorAuthoritativeRoles가 한 번 쓴다) 이 함수가
+  // 표를 통째로 다시 그리므로, 여기서 읽어 두지 않으면 되돌리기·재추출 한 번에
+  // 사용자가 정한 역할이 전부 ‘없음’으로 조용히 돌아간다.
   const roleByName = new Map<string, string>();
+  $('colorTable').querySelectorAll<HTMLSelectElement>('select[data-name]').forEach((sel) => {
+    const role = sel.value.trim();
+    if (role) roleByName.set(sel.dataset.name as string, role);
+  });
+  // 화면에 없던 이름은 semMap에서 채운다 — 역할→이름을 이름→역할로 뒤집어 prefill.
   for (const [role, name] of Object.entries(textToSemanticMap(($('semMap') as HTMLTextAreaElement).value))) {
     if (!roleByName.has(name)) roleByName.set(name, role);
   }
@@ -737,7 +756,11 @@ function tidyNumbers(): void {
   const grid = tidyGrid();
   const r = tidyNumberTokens(tokens, { base: grid, ratio: TIDY_RATIO });
   if (!r.snapped) {
-    clearNumTidy();
+    // 스냅은 멱등이라 「미리보기」를 두 번째로 누르면 옮길 게 없다. 그렇다고 먼저 한
+    // 스냅의 되돌리기까지 걷으면 원래 13·15px을 재추출 없이는 못 되찾는다 —
+    // 이미 잡아 둔 스냅샷이 있으면 요약 줄과 되돌리기를 그대로 둔다.
+    // (새 추출은 EXTRACT_RESULT에서 clearNumTidy로 따로 끊는다.)
+    if (!preNumTidyTokens) clearNumTidy();
     return;
   }
   tokens = r.tokens;
@@ -1025,7 +1048,7 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
     badge.className = 'r-badge';
     badge.textContent = `×${n}`;
     badge.title = n === 1 ? t('textStyle.badgeGoTip') : t('textStyle.badgeSelectTip', { count: n });
-    badge.addEventListener('click', () => send({ type: 'SELECT_NODES', ids }));
+    badge.addEventListener('click', () => selectNodes(ids, 'tsStatus'));
     (card.querySelector('.r-top') as HTMLElement).appendChild(badge);
   } else {
     // 수동 추가 행은 셀 글자가 없다 — 대신 지울 수 있어야 한다.
@@ -1066,7 +1089,17 @@ function renderTextStyles(): void {
 
 /** 등록에 넘길 스펙 — 이름이 빈 행은 뺀다(수동 추가 후 미입력). */
 function readTextStyleRows(): TextStyleSpec[] {
-  return tsSpecs.filter((s) => s.name.trim()).map((s) => ({ ...s, name: s.name.trim() }));
+  // 폰트가 빈 채로 넘어가면 code가 createTextStyle로 스타일을 먼저 만든 뒤
+  // loadFontAsync({family:''})에서 던져, 값도 변수도 없는 껍데기 스타일이 파일에
+  // 영구히 남는다. 편집 행은 입력칸을 그대로 s.family에 쓰므로(지우면 '') 여기서 받는다.
+  return tsSpecs
+    .filter((s) => s.name.trim())
+    .map((s) => ({
+      ...s,
+      name: s.name.trim(),
+      family: s.family?.trim() || DEFAULT_TS_FAMILY,
+      style: s.style?.trim() || 'Regular',
+    }));
 }
 
 $('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
@@ -1672,6 +1705,10 @@ function refreshDarkModes(): void {
   const colId = ($('darkCollection') as HTMLSelectElement).value;
   const v = allVars.find((x) => x.collectionId === colId);
   const modes = v ? v.modes : [];
+  // 이전 선택이 아직 유효하면 복원한다. 복원 여부를 기억해 둬야 아래 기본값이
+  // 사용자의 선택을 덮어쓰지 않는다 — 옵션을 새로 넣으면 sel.value는 첫 항목으로
+  // 잡히므로, value만 봐서는 ‘사용자가 고른 것’과 ‘브라우저 기본’을 구분 못 한다.
+  const restored: Record<string, boolean> = {};
   for (const id of ['darkFromMode', 'darkToMode']) {
     const sel = $(id) as HTMLSelectElement;
     const prev = sel.value;
@@ -1682,7 +1719,8 @@ function refreshDarkModes(): void {
       o.textContent = m.name;
       sel.appendChild(o);
     }
-    if (prev && modes.some((m) => m.modeId === prev)) sel.value = prev;
+    restored[id] = !!prev && modes.some((m) => m.modeId === prev);
+    if (restored[id]) sel.value = prev;
   }
   // 모드 ≥1 + Paid면 생성 가능(Dark 없으면 플러그인이 추가). 목록 미로드·토큰 없음만 막는다.
   const hasCollection = !!colId && modes.length >= 1;
@@ -1708,18 +1746,23 @@ function refreshDarkModes(): void {
       gotoCreate.style.display = 'none';
     }
   }
-  // to 셀렉트: 이미 Dark가 있으면 그걸, 없으면 안내 옵션(실제 생성은 플러그인).
+  // to 셀렉트 기본값: 이미 Dark가 있으면 그걸, 없으면 안내 옵션(실제 생성은 플러그인).
+  // 단 사용자가 이미 대상 모드를 골라 뒀으면 건드리지 않는다 — 탭을 오갈 때마다
+  // (showTab → PREREQ_STATE·VARIABLES → 이 함수) 선택이 Dark나 빈 값으로 되돌아가면
+  // 「다크 생성」이 toModeId 없이 나가 사용자의 모드 대신 빈 ‘Dark’를 새로 만든다.
   const toSel = $('darkToMode') as HTMLSelectElement;
   const darkMode = modes.find((m) => m.name.toLowerCase() === 'dark');
-  if (darkMode) {
-    toSel.value = darkMode.modeId;
-  } else if (modes.length >= 1) {
-    // 플레이스홀더 — 값이 실제 modeId가 아니므로 전송하지 않는다(버튼은 from만 보냄).
-    const o = document.createElement('option');
-    o.value = '';
-    o.textContent = t('dark.toPlaceholder');
-    toSel.insertBefore(o, toSel.firstChild);
-    toSel.value = '';
+  if (!restored['darkToMode']) {
+    if (darkMode) {
+      toSel.value = darkMode.modeId;
+    } else if (modes.length >= 1) {
+      // 플레이스홀더 — 값이 실제 modeId가 아니므로 전송하지 않는다(버튼은 from만 보냄).
+      const o = document.createElement('option');
+      o.value = '';
+      o.textContent = t('dark.toPlaceholder');
+      toSel.insertBefore(o, toSel.firstChild);
+      toSel.value = '';
+    }
   }
   // from: Dark가 기본으로 잡히면 다른 모드로.
   const fromSel = $('darkFromMode') as HTMLSelectElement;
@@ -1882,7 +1925,11 @@ window.onmessage = (event: MessageEvent) => {
       renderTokens(); // previewRevealed면 색 외 목록(미리보기 버튼이 켬)
       const colorN = tokens.filter((tk) => tk.category === 'color').length;
       $('selInfo').textContent = `선택 ${msg.selection}개 · 색 ${colorN} · 그 외 ${tokens.length - colorN}`;
-      if (msg.warnings.length) setStatus('colorStatus', msg.warnings.join(' '), 'warn'); // 경고가 없으면 renderColorTable의 요약 줄을 남긴다
+      // 경고가 있으면 그걸, 없는데 빈손이면 최소한 빈손이라는 말을. 둘 다 아니면
+      // renderColorTable이 쓴 요약 줄을 그대로 남긴다.
+      // (#colorStatus는 #colorSection 밖이라 색이 0개여도 보인다.)
+      if (msg.warnings.length) setStatus('colorStatus', msg.warnings.join(' '), 'warn');
+      else if (!tokens.length) setStatus('colorStatus', t('color.extractEmpty'), 'warn');
       if (pendingCreatePreview) {
         // ‘미리보기’가 추출을 유발 → 추출 완료 후 생성 미리보기까지 이어감.
         pendingCreatePreview = false;
@@ -1978,9 +2025,9 @@ window.onmessage = (event: MessageEvent) => {
     case 'SELECT_RESULT':
       // 미리보기 이후 레이어가 지워졌거나 다른 페이지로 옮겨졌으면 그만큼 못 찾는다 — 조용히 실패하지 않게.
       if (msg.capped) {
-        setStatus('applyStatus', `레이어 ${msg.found}개만 선택 — 한 번에 보여줄 수 있는 상한(${msg.requested}개 중)입니다.`, 'warn');
+        setStatus(selectStatusTarget, `레이어 ${msg.found}개만 선택 — 한 번에 보여줄 수 있는 상한(${msg.requested}개 중)입니다.`, 'warn');
       } else if (msg.found < msg.requested) {
-        setStatus('applyStatus', msg.found
+        setStatus(selectStatusTarget, msg.found
           ? `레이어 ${msg.found}개 선택 — ${msg.requested - msg.found}개는 삭제됐거나 다른 페이지입니다.`
           : '레이어를 찾지 못했습니다 — 삭제됐거나 다른 페이지입니다. 미리보기를 다시 실행하세요.', 'warn');
       }
@@ -2213,7 +2260,10 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'ERROR': {
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
-      const statusId = resolveStatusId((msg.op && OP_STATUS[msg.op]) || 'colorStatus');
+      // 레이어 선택은 부른 자리가 여럿이라 표를 못 쓴다 — 마지막으로 부른 쪽을 따른다.
+      const statusId = msg.op === 'SELECT_NODES'
+        ? selectStatusTarget
+        : resolveStatusId((msg.op && OP_STATUS[msg.op]) || 'colorStatus');
       if (msg.op === 'APPLY') hideApplyProgress();
       showError(statusId, explainError(msg.message));
       break;
@@ -2233,6 +2283,8 @@ const OP_STATUS: Record<string, string> = {
   // 그 줄은 다른 단계에 있어 숨겨져 있다 — 실패가 '적용 중…'인 채로 조용히 묻힌다.
   APPLY_TEXT_STYLES: 'tsStatus',
   APPLY: 'applyStatus',
+  // 실제 자리는 부른 쪽이 정한다(selectStatusTarget) — 여기 값은 resolveStatusId가 못 받는
+  // 경로를 위한 폴백일 뿐이다.
   SELECT_NODES: 'applyStatus',
   RENAME: 'renameStatus',
   EXPORT: 'exportStatus',
@@ -2721,7 +2773,7 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ');
     btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names });
     btn.addEventListener('click', () => {
-      send({ type: 'SELECT_NODES', ids });
+      selectNodes(ids, 'applyStatus');
       setStatus('applyStatus', `${t('reason.' + key)} 레이어 ${ids.length}개 선택`, '');
     });
     box.appendChild(btn);

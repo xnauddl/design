@@ -141,5 +141,17 @@ export async function generateDarkMode(
     v.setValueForMode(to, figma.variables.createVariableAlias(dark));
     realiased++;
   }
+  // 값을 하나도 못 채웠는데 모드만 남기면, 파일에는 Light와 똑같이 해석되는 Dark가 생긴다.
+  // 게다가 code의 postPrereq는 '바인딩 가능한 컬렉션에 모드 2개 이상 = 다크 있음'으로 읽어
+  // 시작 탭 준비 현황을 ✓ 완료로 뒤집는다 — 상태줄은 '다크 값을 채우지 못했어요'라고 하는데.
+  // 만든 걸 도로 걷어, 두 말이 어긋나지 않게 한다.
+  if (modeCreated && realiased === 0) {
+    try {
+      semanticCol.removeMode(to);
+      modeCreated = false;
+    } catch {
+      // 못 지우면(마지막 남은 모드 등) 그대로 둔다 — 채운 게 없다는 사실은 결과가 말한다.
+    }
+  }
   return { created, realiased, skipped, ...(modeCreated ? { modeCreated: true } : {}) };
 }

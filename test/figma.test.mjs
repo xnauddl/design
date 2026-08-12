@@ -39,6 +39,11 @@ function installFigma() {
         this.modes.push({ modeId, name: modeName });
         return modeId;
       },
+      // 실물 API와 같게 — 마지막 하나는 못 지운다(themeApply의 롤백이 이 실패를 삼킨다).
+      removeMode(modeId) {
+        if (this.modes.length <= 1) throw new Error('마지막 모드는 지울 수 없습니다');
+        this.modes = this.modes.filter((m) => m.modeId !== modeId);
+      },
     };
     collections.push(col);
     return col;
@@ -524,8 +529,25 @@ test('extractFromSelection — 그리드 오토레이아웃은 gridRowGap/gridCo
   assert.equal(names.has('spacing/20'), true); // 가로 패딩
 });
 
-test('extractFromSelection — 그라디언트 채움은 토큰에 포함하지 않음', () => {
+test('extractFromSelection — 그라디언트 채움은 토큰에 포함하지 않음(뽑은 게 있으면 조용히)', () => {
   installFigma();
+  const node = {
+    type: 'RECTANGLE',
+    id: 'g1',
+    name: 'Grad',
+    fills: [
+      { type: 'GRADIENT_LINEAR', visible: true },
+      { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, visible: true },
+    ],
+  };
+  const { tokens, warnings } = extractFromSelection([node]);
+  assert.equal(tokens.filter((t) => t.category === 'color').length, 1); // 그라디언트는 빠지고 솔리드만
+  assert.equal(warnings.length, 0); // 성공한 추출에 스킵 경고를 얹지 않는다(114393d)
+});
+
+test('extractFromSelection — 빈손이면 지나친 이유를 말한다', () => {
+  installFigma();
+  // 그라디언트뿐이라 뽑을 게 없다. 여기서까지 조용하면 버튼이 고장 난 것처럼 보인다.
   const node = {
     type: 'RECTANGLE',
     id: 'g1',
@@ -534,7 +556,21 @@ test('extractFromSelection — 그라디언트 채움은 토큰에 포함하지 
   };
   const { tokens, warnings } = extractFromSelection([node]);
   assert.equal(tokens.length, 0);
-  assert.equal(warnings.length, 0);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /그라디언트/);
+});
+
+test('extractFromSelection — 인스턴스 내부만 있으면 그 이유를 말한다', () => {
+  installFigma();
+  const node = {
+    type: 'INSTANCE',
+    id: 'i1',
+    name: 'Card',
+    children: [{ type: 'RECTANGLE', id: 'i1c', name: 'inner', fills: [] }],
+  };
+  const { tokens, warnings } = extractFromSelection([node]);
+  assert.equal(tokens.length, 0);
+  assert.match(warnings.join(' '), /인스턴스 내부/);
 });
 
 /* ================= variables.ts ================= */
@@ -2784,6 +2820,36 @@ test('applyExistingTextStyles — 스캔이 %로 되읽은 행간도 등록 직�
   assert.equal(r.missing.length, 0); // '미등록 — 먼저 등록 필요'가 나오면 안 된다
 });
 
+test('applyExistingTextStyles — 일부러 넓게 잡은 px 행간 스타일이 평범한 문단을 삼키지 않는다', async () => {
+  const figma = installFigma();
+  // 16pt / 200px — 편집 의도로 넓게 잡은 진짜 px 행간. 추측(sigLhPx)은 200/16=12.5배를
+  // px로는 비현실적이라 보고 200%(=32px)로 뒤집는다. 그 추측을 스타일 쪽에도 걸면
+  // 이 스타일이 16/32 시그니처를 차지해, 평범한 32px 문단이 여기 묶이고 행간이 200px로 뛴다.
+  await createSemanticTextStyles([{
+    name: 'hero', fontSize: 16, lineHeight: 200, letterSpacing: 0, family: 'Inter', style: 'Regular',
+  }]);
+  const hero = figma._state.textStyles.find((x) => x.name === 'hero');
+  assert.deepEqual(hero.lineHeight, { value: 200, unit: 'PIXELS' });
+
+  const para = {
+    type: 'TEXT', id: 'p1', name: 'Para', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: 32 }, letterSpacing: { unit: 'PIXELS', value: 0 },
+    characters: 'hi', visible: true, textStyleId: '',
+    _styleId: null, async setTextStyleIdAsync(sid) { this._styleId = sid; },
+  };
+  const r = await applyExistingTextStyles([para]);
+  assert.equal(para._styleId, null); // 캔버스를 건드리지 않는다
+  assert.equal(r.applied, 0);
+  assert.equal(r.missing.length, 1); // 대신 '미등록 — 먼저 등록 필요'로 보고
+
+  // 같은 200px 문단은 제 스타일에 제대로 붙는다(원값끼리 만난다).
+  const wide = { ...para, id: 'p2', lineHeight: { unit: 'PIXELS', value: 200 }, _styleId: null,
+    async setTextStyleIdAsync(sid) { this._styleId = sid; } };
+  const r2 = await applyExistingTextStyles([wide]);
+  assert.equal(wide._styleId, hero.id);
+  assert.equal(r2.applied, 1);
+});
+
 test('createSemanticTextStyles — 기존 역할로 rename은 충돌 보류(동명·시맨틱 보존)', async () => {
   const figma = installFigma();
   // body(16) · caption(13) 각각 등록
@@ -3340,4 +3406,20 @@ test('generateDarkMode — toModeId 생략 시 Dark 모드를 만든 뒤 채운�
   const r2 = await generateDarkMode(f.semantic.id, lightId);
   assert.equal(r2.modeCreated, undefined);
   assert.equal(f.semantic.modes.length, 2);
+});
+
+test('generateDarkMode — 한 값도 못 채우면 만든 Dark 모드를 도로 걷는다', async () => {
+  const f = darkFixture();
+  const lightId = f.semantic.defaultModeId;
+  // Global 별칭이 아니라 리터럴 색인 Semantic — generateDarkMode가 통째로 건너뛰는 경우.
+  const surface = f.mkSemantic('surface');
+  surface.setValueForMode(lightId, { r: 1, g: 1, b: 1 });
+
+  assert.equal(f.semantic.modes.length, 1);
+  const r = await generateDarkMode(f.semantic.id, lightId);
+  assert.equal(r.realiased, 0);
+  assert.equal(r.skipped, 1);
+  // 빈 모드를 남기면 postPrereq가 '모드 2개 = 다크 있음'으로 읽어 준비 현황을 완료로 뒤집는다.
+  assert.equal(f.semantic.modes.length, 1);
+  assert.equal(r.modeCreated, undefined);
 });

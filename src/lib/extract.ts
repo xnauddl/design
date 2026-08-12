@@ -15,11 +15,23 @@ interface Accumulator {
   map: Map<string, DraftToken>;
   warnings: Set<string>;
   /**
+   * 지나친 이유. 성공한 추출에서는 말하지 않는다 — 매번 뜨는 경고가 성가셔서 걷어냈다(114393d).
+   * 다만 한 개도 못 뽑았을 때는 이야기가 다르다: 아무 말이 없으면 버튼이 고장 난 것처럼 보인다.
+   * 그래서 모으기만 하고, 결과가 빈 경우에만 extractFromSelection이 warnings로 올린다.
+   */
+  skipped: Set<string>;
+  /**
    * 토큰 키 → 마지막으로 집계한 노드 id. walk가 한 노드를 끝까지 처리한 뒤 자식으로 내려가므로,
    * 같은 노드에서 온 연속 add는 이 비교로 걸러진다(padding 4방향이 count 4가 되지 않게).
    */
   lastNode: Map<string, string>;
 }
+
+/* 결과가 비었을 때만 쓰는 스킵 사유 — 왜 아무것도 안 나왔는지, 무엇을 바꾸면 되는지까지 말한다. */
+const SKIP_HIDDEN = '숨긴 레이어는 화면에 없는 값이라 건너뛰었습니다 — 보이게 한 뒤 다시 추출하세요.';
+const SKIP_INSTANCE =
+  '인스턴스 내부는 마스터 복사본이라 건너뛰었습니다 — 값이 필요하면 컴포넌트를 선택해 추출하세요.';
+const SKIP_GRADIENT = '그라디언트·이미지 채움은 변수로 묶을 수 없어 건너뛰었습니다.';
 
 const round = (n: number, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
 
@@ -55,7 +67,10 @@ function collectPaints(
   if (paints === figma.mixed || !Array.isArray(paints)) return;
   for (const p of paints) {
     if (p.visible === false) continue;
-    if (p.type !== 'SOLID') continue; // GRADIENT / IMAGE / VIDEO — 변수 바인딩 불가, 조용히 스킵
+    if (p.type !== 'SOLID') {
+      acc.skipped.add(SKIP_GRADIENT); // GRADIENT / IMAGE / VIDEO — 변수 바인딩 불가, 조용히 스킵
+      continue;
+    }
     const hex = rgbToHex(p.color);
     add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source, nodeId);
     if (p.opacity != null && p.opacity < 1) {
@@ -215,7 +230,10 @@ function collectEffects(acc: Accumulator, node: SceneNode): void {
 
 function walk(acc: Accumulator, node: SceneNode): void {
   // 숨긴 레이어는 화면에 없는 값이라 토큰 후보에서 제외(하위까지 통째로).
-  if (node.visible === false) return;
+  if (node.visible === false) {
+    acc.skipped.add(SKIP_HIDDEN);
+    return;
+  }
   if ('fills' in node) collectPaints(acc, node, node.fills, 'fill');
   if ('strokes' in node) collectPaints(acc, node, node.strokes, 'stroke');
   if (node.type === 'TEXT') collectText(acc, node);
@@ -229,7 +247,10 @@ function walk(acc: Accumulator, node: SceneNode): void {
   collectEffects(acc, node);
   // 인스턴스 내부는 마스터의 복사본이라 디자이너가 이 화면에서 결정한 값이 아니다 —
   // 인스턴스 자체 속성(크기·채움·효과)만 읽고 하위로는 내려가지 않는다.
-  if (node.type === 'INSTANCE') return;
+  if (node.type === 'INSTANCE') {
+    if ('children' in node && node.children.length) acc.skipped.add(SKIP_INSTANCE);
+    return;
+  }
   if ('children' in node) for (const child of node.children) walk(acc, child);
 }
 
@@ -253,11 +274,17 @@ function isEffectivelyVisible(node: SceneNode): boolean {
 
 /** 현재 선택(자식 포함)에서 토큰 후보를 추출. */
 export function extractFromSelection(selection: readonly SceneNode[]): ExtractResult {
-  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map() };
+  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map(), skipped: new Set() };
   for (const node of selection) {
-    if (!isEffectivelyVisible(node)) continue;
+    if (!isEffectivelyVisible(node)) {
+      acc.skipped.add(SKIP_HIDDEN); // 숨긴 그룹 안의 자식을 직접 고른 경우 — walk가 못 거른다
+      continue;
+    }
     walk(acc, node);
   }
   const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  return { tokens, warnings: [...acc.warnings] };
+  // 하나라도 뽑았으면 조용히 넘어간다. 빈손일 때만 지나친 이유를 올려, 사용자가
+  // ‘버튼이 안 먹는다’가 아니라 ‘무엇을 바꿔야 하는지’를 보게 한다.
+  const warnings = tokens.length ? [...acc.warnings] : [...acc.warnings, ...acc.skipped];
+  return { tokens, warnings };
 }

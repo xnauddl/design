@@ -28,6 +28,8 @@ export const STRINGS: Record<string, string> = {
   'create.colorsDone': '색 변수 {count}개 이미 생성됨 · 여기선 색 외만',
   'color.summary': '색 {count}개 · 역할 지정 {roles} · 변수화 대기',
   'color.needColors': '먼저 ‘선택에서 추출’ 또는 ‘팔레트 생성’으로 색을 모으세요.',
+  // 지나친 이유조차 없는 빈손 — 버튼이 고장 난 것처럼 보이지 않게 최소한의 말은 한다.
+  'color.extractEmpty': '고를 값을 찾지 못했습니다 — 색·여백·크기가 있는 프레임이나 레이어를 선택하세요.',
   'create.baseChanged': 'base {base}px로 다시 계산 중…',
 
   // 시맨틱 매핑

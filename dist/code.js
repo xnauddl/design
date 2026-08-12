@@ -172,6 +172,9 @@
   }
 
   // src/lib/extract.ts
+  var SKIP_HIDDEN = "\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD654\uBA74\uC5D0 \uC5C6\uB294 \uAC12\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uBCF4\uC774\uAC8C \uD55C \uB4A4 \uB2E4\uC2DC \uCD94\uCD9C\uD558\uC138\uC694.";
+  var SKIP_INSTANCE = "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uB9C8\uC2A4\uD130 \uBCF5\uC0AC\uBCF8\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uAC12\uC774 \uD544\uC694\uD558\uBA74 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC120\uD0DD\uD574 \uCD94\uCD9C\uD558\uC138\uC694.";
+  var SKIP_GRADIENT = "\uADF8\uB77C\uB514\uC5B8\uD2B8\xB7\uC774\uBBF8\uC9C0 \uCC44\uC6C0\uC740 \uBCC0\uC218\uB85C \uBB36\uC744 \uC218 \uC5C6\uC5B4 \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4.";
   var round = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
   function keyOf(category, value, unit) {
     return `${category}|${value}|${unit != null ? unit : ""}`;
@@ -193,7 +196,10 @@
     if (paints3 === figma.mixed || !Array.isArray(paints3)) return;
     for (const p of paints3) {
       if (p.visible === false) continue;
-      if (p.type !== "SOLID") continue;
+      if (p.type !== "SOLID") {
+        acc.skipped.add(SKIP_GRADIENT);
+        continue;
+      }
       const hex = rgbToHex(p.color);
       add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source, nodeId);
       if (p.opacity != null && p.opacity < 1) {
@@ -324,7 +330,10 @@
     }
   }
   function walk(acc, node) {
-    if (node.visible === false) return;
+    if (node.visible === false) {
+      acc.skipped.add(SKIP_HIDDEN);
+      return;
+    }
     if ("fills" in node) collectPaints(acc, node, node.fills, "fill");
     if ("strokes" in node) collectPaints(acc, node, node.strokes, "stroke");
     if (node.type === "TEXT") collectText(acc, node);
@@ -336,7 +345,10 @@
     collectStroke(acc, node);
     collectOpacity(acc, node);
     collectEffects(acc, node);
-    if (node.type === "INSTANCE") return;
+    if (node.type === "INSTANCE") {
+      if ("children" in node && node.children.length) acc.skipped.add(SKIP_INSTANCE);
+      return;
+    }
     if ("children" in node) for (const child of node.children) walk(acc, child);
   }
   function isEffectivelyVisible(node) {
@@ -348,13 +360,17 @@
     return true;
   }
   function extractFromSelection(selection2) {
-    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map() };
+    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set() };
     for (const node of selection2) {
-      if (!isEffectivelyVisible(node)) continue;
+      if (!isEffectivelyVisible(node)) {
+        acc.skipped.add(SKIP_HIDDEN);
+        continue;
+      }
       walk(acc, node);
     }
     const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
-    return { tokens, warnings: [...acc.warnings] };
+    const warnings = tokens.length ? [...acc.warnings] : [...acc.warnings, ...acc.skipped];
+    return { tokens, warnings };
   }
 
   // src/lib/color.ts
@@ -823,8 +839,10 @@
         id: s.id,
         name: s.name,
         fontSize,
-        lineHeight: sigLhPx(fontSize, s.lineHeight),
-        letterSpacing: sigLsPx(fontSize, s.letterSpacing),
+        // 등록된 스타일은 사실이라 원값으로 잰다(applyExistingTextStyles의 인덱스와 같은 이유).
+        // 스캔이 %로 등록해 둔 스타일은 lhPxOf가 %→px로 환산하므로 클러스터 측정값과 그대로 만난다.
+        lineHeight: lhPxOf(fontSize, s.lineHeight),
+        letterSpacing: lsPxOf(fontSize, s.letterSpacing),
         family: s.fontName.family,
         style: s.fontName.style
       }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}));
@@ -1043,7 +1061,7 @@
     const styleBySig = /* @__PURE__ */ new Map();
     for (const s of await figma.getLocalTextStylesAsync()) {
       const fontSize = roundN(s.fontSize);
-      const k = `${fontSize}|${sigLhPx(fontSize, s.lineHeight)}|${sigLsPx(fontSize, s.letterSpacing)}|${s.fontName.family}|${s.fontName.style}`;
+      const k = `${fontSize}|${lhPxOf(fontSize, s.lineHeight)}|${lsPxOf(fontSize, s.letterSpacing)}|${s.fontName.family}|${s.fontName.style}`;
       styleBySig.set(k, styleBySig.has(k) ? null : s);
     }
     const texts = [];
@@ -1061,8 +1079,10 @@
       if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
       const fontSize = roundN(t.fontSize);
       const fn = t.fontName;
-      const k = `${fontSize}|${sigLhPx(fontSize, t.lineHeight)}|${sigLsPx(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
-      const hit = styleBySig.get(k);
+      const kLiteral = `${fontSize}|${lhPxOf(fontSize, t.lineHeight)}|${lsPxOf(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
+      const kGuess = `${fontSize}|${sigLhPx(fontSize, t.lineHeight)}|${sigLsPx(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
+      let hit = styleBySig.get(kLiteral);
+      if (hit === void 0 && kGuess !== kLiteral) hit = styleBySig.get(kGuess);
       if (hit === void 0) {
         unregistered.add(`${fn.family} ${fn.style} ${fontSize}`);
         continue;
@@ -4046,6 +4066,13 @@
       dark.setValueForMode(gMode, hexToRgb(darkHex));
       v.setValueForMode(to, figma.variables.createVariableAlias(dark));
       realiased++;
+    }
+    if (modeCreated && realiased === 0) {
+      try {
+        semanticCol.removeMode(to);
+        modeCreated = false;
+      } catch (e) {
+      }
     }
     return __spreadValues({ created, realiased, skipped }, modeCreated ? { modeCreated: true } : {});
   }

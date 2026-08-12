@@ -486,8 +486,10 @@ export async function scanExistingTextStyles(): Promise<ExistingTextStyle[]> {
       id: s.id,
       name: s.name,
       fontSize,
-      lineHeight: sigLhPx(fontSize, s.lineHeight),
-      letterSpacing: sigLsPx(fontSize, s.letterSpacing),
+      // 등록된 스타일은 사실이라 원값으로 잰다(applyExistingTextStyles의 인덱스와 같은 이유).
+      // 스캔이 %로 등록해 둔 스타일은 lhPxOf가 %→px로 환산하므로 클러스터 측정값과 그대로 만난다.
+      lineHeight: lhPxOf(fontSize, s.lineHeight),
+      letterSpacing: lsPxOf(fontSize, s.letterSpacing),
       family: s.fontName.family,
       style: s.fontName.style,
       ...(lineHeightPercent ? { lineHeightPercent } : {}),
@@ -789,10 +791,15 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
 export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Promise<TextStyleResult> {
   const res: TextStyleResult = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
   // 기존 스타일 시그니처 인덱스(중복 시그니처는 모호 → 적용 제외).
+  //
+  // 스타일 쪽은 **원값 그대로**(lhPxOf) 재야 한다. 추측(sigLhPx)은 '캔버스에 아무렇게나
+  // 찍힌 PIXELS 150은 사실 150%더라'를 메우려고 있는 건데, 스타일은 누군가 정해 놓은
+  // 사실이라 메울 구멍이 없다. 여기에 추측을 걸면 16pt/200px처럼 일부러 넓게 잡은 스타일이
+  // 200%(=32px)로 읽혀, 평범한 16/32 문단이 그 스타일에 묶이고 캔버스 행간이 32→200으로 뛴다.
   const styleBySig = new Map<string, TextStyle | null>(); // null = 같은 시그니처 2개 이상
   for (const s of await figma.getLocalTextStylesAsync()) {
     const fontSize = roundN(s.fontSize);
-    const k = `${fontSize}|${sigLhPx(fontSize, s.lineHeight)}|${sigLsPx(fontSize, s.letterSpacing)}|${s.fontName.family}|${s.fontName.style}`;
+    const k = `${fontSize}|${lhPxOf(fontSize, s.lineHeight)}|${lsPxOf(fontSize, s.letterSpacing)}|${s.fontName.family}|${s.fontName.style}`;
     styleBySig.set(k, styleBySig.has(k) ? null : s);
   }
 
@@ -812,8 +819,13 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
     if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
     const fontSize = roundN(t.fontSize);
     const fn = t.fontName;
-    const k = `${fontSize}|${sigLhPx(fontSize, t.lineHeight)}|${sigLsPx(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
-    const hit = styleBySig.get(k);
+    // 캔버스는 두 번 물어본다. 먼저 원값 그대로 — 진짜 200px 문단은 200px 스타일에 붙어야 한다.
+    // 없으면 추측값으로 한 번 더 — 스캔이 PIXELS 150을 150%로 읽어 PERCENT로 등록해 둔
+    // 스타일은 원값 150으로는 영영 안 잡힌다(등록해 놓고 '미등록'이라 답하던 그 경우).
+    const kLiteral = `${fontSize}|${lhPxOf(fontSize, t.lineHeight)}|${lsPxOf(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
+    const kGuess = `${fontSize}|${sigLhPx(fontSize, t.lineHeight)}|${sigLsPx(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
+    let hit = styleBySig.get(kLiteral);
+    if (hit === undefined && kGuess !== kLiteral) hit = styleBySig.get(kGuess);
     if (hit === undefined) {
       unregistered.add(`${fn.family} ${fn.style} ${fontSize}`);
       continue;
