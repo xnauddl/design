@@ -8,7 +8,7 @@ import { kebab, pascalCase, capitalize } from './naming';
 import { tshirtRoles } from './roles';
 import { classifyColor } from './colorName';
 import { highConfidenceComponentRole, isHighConfidenceComponent, parseHeadingSlots } from './componentLike';
-import type { LikeNode } from './componentLike';
+import type { LikeNode, PaintLike, EffectLike } from './componentLike';
 
 /** 알려진 속성 어휘 — 값 → 속성명 추론. */
 const STATES = new Set(['default', 'hover', 'pressed', 'focus', 'active', 'disabled', 'loading']);
@@ -861,6 +861,17 @@ export interface StructNode extends ScanNode {
   layoutMode?: string;
   /** 프레임 자체의 첫 visible SOLID fill(hex). 없으면 null. */
   fillHex?: string | null;
+  /* 아래는 고신뢰 역할 판정(componentLike.LikeNode)이 읽는 값들 — 구조 비교에는 안 쓰지만
+     `componentEligible`이 같은 노드로 역할을 재므로 함께 실어야 한다. 빠지면 카드·figure처럼
+     둥근 모서리·채움·그림자로 알아보는 역할이 통째로 검출되지 않는다. */
+  cornerRadius?: number | symbol;
+  topLeftRadius?: number;
+  opacity?: number;
+  gridRowCount?: number;
+  gridColumnCount?: number;
+  fills?: readonly PaintLike[] | symbol;
+  strokes?: readonly PaintLike[] | symbol;
+  effects?: readonly EffectLike[];
   /** 리네임이 남긴 역할(pluginData `dsRole`). 사람이 지은 이름에는 없다. */
   role?: string;
   /** TEXT 레이어 문자열 — 속성 접힘(collapse) 판별용. */
@@ -1264,10 +1275,18 @@ function contextualName(members: readonly StructNode[]): string {
  * 병합한다(`article-avatar`·`profile-avatar` → 둘 다 `Avatar` → 병합).
  * 맥락을 되살려도 여전히 겹치면 마지막 수단으로 숫자를 붙인다.
  */
-export function resolveGroupNames(groups: readonly (readonly StructNode[])[]): string[] {
+export function resolveGroupNames(
+  groups: readonly (readonly StructNode[])[],
+  /** 문서에 이미 있는 컴포넌트 이름 — 지난 실행분과의 충돌도 같은 규칙으로 피한다. */
+  existing: readonly string[] = [],
+): string[] {
   const base = groups.map(componentBaseName);
-  const collides = new Set(base.filter((n, i) => base.indexOf(n) !== i));
-  const taken = new Set<string>();
+  // 이번 묶음 안의 충돌뿐 아니라 이미 등록된 이름과의 충돌도 맥락으로 푼다. 이게 없으면
+  // 프레임 A의 아바타를 등록한 뒤 프레임 B의 아바타를 등록할 때 둘 다 `Avatar`가 되고,
+  // 「베리언트 분류」가 정확한 이름으로 묶어 무관한 컴포넌트를 한 세트로 합친다.
+  const existingSet = new Set(existing);
+  const collides = new Set(base.filter((n, i) => base.indexOf(n) !== i || existingSet.has(n)));
+  const taken = new Set<string>(existing);
   return base.map((n, i) => {
     let name = collides.has(n) ? contextualName(groups[i]) : n;
     if (taken.has(name)) {

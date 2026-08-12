@@ -42,6 +42,9 @@ export interface StyleCluster {
   style: string;
   count: number; // 같은 시그니처 노드 수
   sample: string; // 대표 레이어 이름(명명 힌트)
+  /** 이 군집에 속한 텍스트 노드 id — ×N 배지에서 캔버스 선택으로 데려갈 때 쓴다(#17).
+      손으로 만든 군집(테스트·기본 램프)에는 없을 수 있다. */
+  nodeIds?: string[];
   /** 이 군집 노드들이 바인딩된 로컬 스타일 id(중복 제거, '' 제외). 정확히 1개면 rename 앵커. */
   styleIds: string[];
 }
@@ -61,9 +64,14 @@ export interface TextStyleSpec {
   style: string;
   /** 재스캔 시 이미 바인딩된 기존 스타일 id. 있으면 등록=이 스타일 rename(신규 생성 아님). */
   boundStyleId?: string;
+  /** 이 스타일로 묶인 화면 글자 수(#17 ×N 배지). 수동 추가 행은 없음. */
+  count?: number;
+  /** 그 글자들의 노드 id — 배지를 누르면 캔버스에서 선택한다(1개면 이동). */
+  nodeIds?: string[];
 }
 
-/** 이미 존재하는 로컬 텍스트 스타일(시그니처 매칭용). px 환산된 행간·자간. */
+/** 이미 존재하는 로컬 텍스트 스타일(시그니처 매칭용). px 환산된 행간·자간.
+   원본이 %면 lineHeightPercent/letterSpacingPercent도 실어, 노드가 px로 해석돼도 등록 단위를 살린다. */
 export interface ExistingTextStyle {
   id: string;
   name: string;
@@ -72,6 +80,10 @@ export interface ExistingTextStyle {
   letterSpacing: number;
   family: string;
   style: string;
+  /** 스타일 정의상 행간이 %일 때(150 = 150%). 0 = px/AUTO. */
+  lineHeightPercent?: number;
+  /** 스타일 정의상 자간이 %일 때(2 = 2%, 음수 가능). 0/없으면 px. */
+  letterSpacingPercent?: number;
 }
 
 /** 크기 랭킹 순으로 부여하는 기본 역할명. 초과분은 text-N. */
@@ -106,10 +118,12 @@ export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
         style: s.style,
         count: 1,
         sample: s.layerName,
+        nodeIds: [],
         styleIds: [],
       });
       ids.set(k, new Set());
     }
+    if (s.id) ((map.get(k) as StyleCluster).nodeIds as string[]).push(s.id);
     if (s.styleId) (ids.get(k) as Set<string>).add(s.styleId);
   }
   for (const [k, c] of map) c.styleIds = [...(ids.get(k) as Set<string>)];
@@ -145,6 +159,7 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
     sigById.set(e.id, k);
     idBySig.set(k, idBySig.has(k) ? null : e.id);
   }
+  const existingById = new Map((existing ?? []).map((e) => [e.id, e]));
   // 군집 → 앵커할 기존 스타일 id. 노드 바인딩은 시그니처 일치할 때만(오버라이드 어긋남 방지).
   const boundIdOf = (c: StyleCluster): string | undefined => {
     if (!existing) return undefined;
@@ -191,6 +206,11 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
       const name = boundId
         ? (nameById.get(boundId) as string) // 기존 이름 유지(예약됨 → unique 불필요)
         : unique(group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`);
+      // 노드가 px로 해석돼도, 앵커된 기존 스타일 정의가 %면 그 단위를 스펙에 살린다.
+      const ex = boundId ? existingById.get(boundId) : undefined;
+      const lineHeightPercent = c.lineHeightPercent || ex?.lineHeightPercent || 0;
+      const letterSpacingPercent =
+        (c.letterSpacingPercent ?? 0) !== 0 ? c.letterSpacingPercent! : (ex?.letterSpacingPercent ?? 0);
       specs.push({
         name,
         fontSize: c.fontSize,
@@ -198,9 +218,11 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
         letterSpacing: c.letterSpacing,
         family: c.family,
         style: c.style,
-        ...(c.lineHeightPercent ? { lineHeightPercent: c.lineHeightPercent } : {}),
-        ...((c.letterSpacingPercent ?? 0) !== 0 ? { letterSpacingPercent: c.letterSpacingPercent } : {}),
+        ...(lineHeightPercent ? { lineHeightPercent } : {}),
+        ...(letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}),
         ...(boundId ? { boundStyleId: boundId } : {}),
+        count: c.count,
+        ...(c.nodeIds?.length ? { nodeIds: c.nodeIds } : {}),
       });
     }
   }

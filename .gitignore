@@ -2,3 +2,6 @@ node_modules/
 dist/
 *.log
 .DS_Store
+# 에이전트 격리 워크트리 — 허브에 실체가 있고, 여기 잡히면 gitlink(mode 160000)로
+# 커밋돼 클론한 쪽에서 빈 서브모듈로 깨진다.
+.claude/worktrees/

@@ -23,6 +23,9 @@ test('WIZARD_STEPS — 순서와 필수/선택 분류', () => {
   assert.deepEqual(required, ['extract', 'create', 'bind', 'rename']);
   const optional = WIZARD_STEPS.filter((s) => s.optional).map((s) => s.id);
   assert.deepEqual(optional, ['semantics', 'componentize']);
+  // Paid 단계 — 변수·스타일·컴포넌트를 '만드는' 단계. Free 경계(ROADMAP §5)와 같아야 한다.
+  const paid = WIZARD_STEPS.filter((s) => s.paid).map((s) => s.id);
+  assert.deepEqual(paid, ['create', 'semantics', 'componentize']);
   // 바인딩이 리네임보다 앞(토큰 경로명 의존).
   const ids = WIZARD_STEPS.map((s) => s.id);
   assert.ok(ids.indexOf('bind') < ids.indexOf('rename'));
@@ -47,18 +50,31 @@ test('planWizard — 시맨틱 옵션 ON이지만 매핑 없음 → 건너뜀', 
   assert.ok(!runIds(plan).includes('semantics'));
 });
 
-test('planWizard — 컴포넌트화 옵션 ON이지만 Free → Paid 전용으로 건너뜀', () => {
+test('planWizard — Free면 만드는 단계(생성·시맨틱·컴포넌트화)를 전부 건너뛴다', () => {
   const plan = planWizard(ALL_ON, { isPaid: false, hasSemanticMap: true });
-  assert.equal(item(plan, 'componentize').run, false);
-  assert.equal(item(plan, 'componentize').skipReason, 'wizard.skip.paid');
-  // 필수 단계와 다른 선택 단계는 영향 없음.
-  assert.ok(runIds(plan).includes('semantics'));
+  for (const id of ['create', 'semantics', 'componentize']) {
+    assert.equal(item(plan, id).run, false, id);
+    assert.equal(item(plan, id).skipReason, 'wizard.skip.paid', id);
+  }
+  // Free도 완주해야 하는 단계 — 추출·바인딩·리네임(기존 변수에 붙이고 이름만 정돈).
+  assert.deepEqual(runIds(plan), ['extract', 'bind', 'rename']);
+});
+
+test('planWizard — Free라도 끄고 시작한 선택 단계는 Paid가 아니라 옵션 꺼짐', () => {
+  // UI가 skipReason='wizard.skip.paid'인 단계에 자물쇠 칩을 그린다 — 안 켠 단계까지 'Paid 전용'으로
+  // 적으면 살 생각도 없던 기능이 잠금으로 세어져 파이프가 자물쇠로 뒤덮인다.
+  const plan = planWizard(ALL_OFF, { isPaid: false, hasSemanticMap: true });
+  assert.equal(item(plan, 'semantics').skipReason, 'wizard.skip.optionOff');
+  assert.equal(item(plan, 'componentize').skipReason, 'wizard.skip.optionOff');
+  // 필수 단계인 '생성'은 끌 수 없으므로 그대로 Paid — 자물쇠 칩은 이것 하나만 뜬다.
+  assert.equal(item(plan, 'create').skipReason, 'wizard.skip.paid');
+  assert.deepEqual(runIds(plan), ['extract', 'bind', 'rename']);
 });
 
 test('summarize — 집계가 있는 항목만 표시', () => {
   assert.equal(
     summarize({ created: 12, bound: 30, renamed: 8, components: 3 }),
-    '토큰 12 · 바인딩 30 · 리네임 8 · 컴포넌트 3',
+    '토큰 12 · 연결 30 · 이름 8 · 컴포넌트 3',
   );
 });
 
