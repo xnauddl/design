@@ -67,6 +67,7 @@ import {
   isHighConfidenceComponent,
   shouldCollapseToProperties,
   inferVaryingComponentProperties,
+  inferVaryingImageSlots,
   pickCollapseMasterIndex,
   propValuesFromStruct,
   colorAxisLabels,
@@ -1083,6 +1084,60 @@ test('shouldCollapseToProperties — 텍스트/스왑/불리언만 다르면 접
     children: [{ id: id + '-t', name: text, type: 'TEXT', characters: text }],
   });
   assert.equal(shouldCollapseToProperties([named('a', '확인'), named('b', '취소')]), true);
+});
+
+test('shouldCollapseToProperties — 레이어 이름이 카피 따라 달라도 접힘', () => {
+  // 디자이너는 감싼 프레임에도 카피 이름을 준다(`title-price`/`title-name`). 이름만 다른 걸
+  // 구조 차로 보면 텍스트만 다른 반복이 `Variant=1·2`짜리 세트가 된다.
+  const card = (id, wrapName, text) => ({
+    id, name: 'card', type: 'FRAME', layoutMode: 'VERTICAL', width: 200, height: 120, fillHex: '#ffffff',
+    children: [{
+      id: id + '-w', name: wrapName, type: 'FRAME', layoutMode: 'VERTICAL', width: 200, height: 60,
+      children: [{ id: id + '-t', name: 'label', type: 'TEXT', characters: text }],
+    }],
+  });
+  assert.equal(shouldCollapseToProperties([card('a', 'title-price', '12,000'), card('b', 'title-name', '홍길동')]), true);
+
+  // 이름이 갈려도 `?` 규약은 한쪽에만 있으면 인정 — 가시성 차이는 BOOLEAN 속성.
+  const toggle = (id, name, visible) => ({
+    id, name: 'row', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 100, height: 32,
+    children: [{ id: id + '-b', name, type: 'FRAME', visible, width: 20, height: 20, children: [] }],
+  });
+  assert.equal(shouldCollapseToProperties([toggle('a', 'badge?', true), toggle('b', 'flag', false)]), true);
+});
+
+test('shouldCollapseToProperties — 그림은 이름이 아니라 내용(지문)으로 가른다', () => {
+  // 벡터: 같은 지문이면 이름이 달라도 같은 그림 · 지문이 다르면 스왑으로 담아 접는다.
+  const icon = (id, name, key) => ({
+    id, name: 'chip', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 40, height: 24,
+    children: [{ id: id + '-v', name, type: 'VECTOR', width: 16, height: 16, vectorKey: key }],
+  });
+  assert.equal(shouldCollapseToProperties([icon('a', 'icon-heart', 'k1'), icon('b', 'heart', 'k1')]), true);
+  assert.equal(shouldCollapseToProperties([icon('a', 'icon', 'k1'), icon('b', 'icon', 'k2')]), true);
+  // 그림이 다르면 스왑 속성 계획이 나온다(아이콘을 컴포넌트로 만들어 담는 재료).
+  const vplan = inferVaryingComponentProperties([icon('a', 'icon', 'k1'), icon('b', 'icon', 'k2')]);
+  assert.deepEqual(vplan.map((p) => [p.type, p.layerPath, p.fromVector]), [['INSTANCE_SWAP', '0', true]]);
+  assert.equal(inferVaryingComponentProperties([icon('a', 'icon', 'k1'), icon('b', 'icon', 'k1')]).length, 0);
+
+  // 사진: 같은 이름이어도 imageHash가 다르면 다른 그림 — 이미지 슬롯으로 잡아 fill을 이식한다.
+  const photo = (id, name, hash) => ({
+    id, name: 'card', type: 'FRAME', layoutMode: 'VERTICAL', width: 200, height: 120,
+    children: [{ id: id + '-p', name, type: 'RECTANGLE', width: 200, height: 80, imageHash: hash,
+      fills: [{ type: 'IMAGE', visible: true }] }],
+  });
+  const members = [photo('a', 'thumbnail', 'h1'), photo('b', 'thumbnail', 'h2')];
+  assert.equal(shouldCollapseToProperties(members), true);
+  assert.deepEqual(inferVaryingImageSlots(members), [{ layerName: 'thumbnail', layerPath: '0' }]);
+  // 같은 사진이면 이식할 것도 없다.
+  assert.deepEqual(inferVaryingImageSlots([photo('a', 'thumbnail', 'h1'), photo('b', 'photo', 'h1')]), []);
+
+  // 그림 ↔ 그림 아님은 슬롯 성격이 다르다 → 구조 차(세트).
+  const withIcon = icon('a', 'icon', 'k1');
+  const withText = {
+    id: 'b', name: 'chip', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 40, height: 24,
+    children: [{ id: 'b-t', name: 'icon', type: 'TEXT', characters: '♥' }],
+  };
+  assert.equal(shouldCollapseToProperties([withIcon, withText]), false);
 });
 
 test('shouldCollapseToProperties — heading 액션(buttonGroup) optional이면 접힘', () => {

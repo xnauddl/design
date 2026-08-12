@@ -9,6 +9,8 @@ export type WizardStepId =
   | 'extract' // EXTRACT (읽기)
   | 'create' // CREATE_TOKENS (쓰기)
   | 'semantics' // CREATE_SEMANTICS (쓰기, 선택)
+  | 'dark' // GENERATE_DARK_MODE (쓰기, 선택) — 시맨틱 별칭이 있어야 채울 게 많다
+  | 'textStyles' // SCAN_TEXT_STYLES → CREATE_TEXT_STYLES (쓰기, 선택)
   | 'bind' // APPLY (쓰기)
   | 'rename' // RENAME (쓰기) — bind 이후라야 토큰을 역할 신호로 활용 가능
   // 등록이 같은 이름 묶음의 세트 결합까지 함께 수행하므로 별도 CLASSIFY_VARIANTS를 보내지 않는다.
@@ -30,6 +32,9 @@ export const WIZARD_STEPS: readonly WizardStepDef[] = [
   { id: 'extract', write: false, optional: false },
   { id: 'create', write: true, optional: false, paid: true },
   { id: 'semantics', write: true, optional: true, paid: true },
+  // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
+  { id: 'dark', write: true, optional: true, paid: true },
+  { id: 'textStyles', write: true, optional: true, paid: true },
   { id: 'bind', write: true, optional: false },
   { id: 'rename', write: true, optional: false },
   { id: 'componentize', write: true, optional: true, paid: true },
@@ -38,6 +43,8 @@ export const WIZARD_STEPS: readonly WizardStepDef[] = [
 /** 사용자가 켠 선택 단계(필수 단계는 포함하지 않는다). */
 export interface WizardOptions {
   semantics: boolean;
+  dark: boolean;
+  textStyles: boolean;
   componentize: boolean;
 }
 
@@ -79,10 +86,41 @@ export function planWizard(options: WizardOptions, ctx: WizardContext): WizardPl
   });
 }
 
+/** 다크 단계가 보낼 대상(컬렉션·출처 모드·대상 모드). */
+export interface DarkTarget {
+  collectionId: string;
+  fromModeId: string;
+  /** 이미 있는 Dark 모드. 없으면 생략 — 플러그인이 `addMode('Dark')`로 만든다. */
+  toModeId?: string;
+}
+
+/**
+ * 변수 목록에서 다크 채움 대상을 고른다(순수) — 마법사는 테마 카드의 셀렉트 상태에
+ * 기대지 않는다. 그 셀렉트는 `VARIABLES` 응답을 받은 **다른 리스너**가 채우므로,
+ * 마법사가 같은 응답으로 깨어나 읽으면 아직 비어 있을 수 있다.
+ *
+ * 규칙은 테마 카드(`refreshDarkOptions`/`refreshDarkModes`)와 같다:
+ * 모드가 1개 이상인 컬렉션 중 `Semantic` 우선 → 출처는 Dark가 아닌 첫 모드 →
+ * 대상은 이미 있는 `Dark`(없으면 생략). 고를 게 없으면 null(단계는 건너뛴다).
+ */
+export function pickDarkTarget(vars: readonly { collectionId: string; collection: string; modes: readonly { modeId: string; name: string }[] }[]): DarkTarget | null {
+  const cols = new Map<string, (typeof vars)[number]>();
+  for (const v of vars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
+  const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
+  const target = withModes.find((v) => v.collection === 'Semantic') ?? withModes[0];
+  if (!target) return null;
+  const dark = target.modes.find((m) => m.name.toLowerCase() === 'dark');
+  const from = target.modes.find((m) => m.modeId !== dark?.modeId);
+  if (!from) return null; // 모드가 Dark 하나뿐 — 다크에서 다크를 채울 일은 없다
+  return { collectionId: target.collectionId, fromModeId: from.modeId, ...(dark ? { toModeId: dark.modeId } : {}) };
+}
+
 /** 마법사가 단계 결과로 누적하는 집계값(완료 요약용). */
 export interface WizardTotals {
   created?: number; // 생성/갱신된 토큰 변수 수
   semanticsAliased?: number;
+  darkFilled?: number; // 다크 모드로 다시 별칭된 색 수
+  textStyles?: number; // 생성/갱신된 텍스트 스타일 수
   bound?: number;
   renamed?: number;
   components?: number;
@@ -92,6 +130,8 @@ export interface WizardTotals {
 export function summarize(totals: WizardTotals): string {
   const parts: string[] = [];
   if (totals.created != null) parts.push(t('wizard.sum.tokens', { n: totals.created }));
+  if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t('wizard.sum.dark', { n: totals.darkFilled }));
+  if (totals.textStyles != null && totals.textStyles > 0) parts.push(t('wizard.sum.textStyles', { n: totals.textStyles }));
   if (totals.bound != null) parts.push(t('wizard.sum.bound', { n: totals.bound }));
   if (totals.renamed != null) parts.push(t('wizard.sum.renamed', { n: totals.renamed }));
   if (totals.components != null && totals.components > 0) parts.push(t('wizard.sum.components', { n: totals.components }));

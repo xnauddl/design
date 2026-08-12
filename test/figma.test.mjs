@@ -20,6 +20,9 @@ import {
   generateDarkMode,
   ensureDarkMode,
   DARK_MODE_NAME,
+  createIconRegistry,
+  swapVectorSlots,
+  transplantImageFills,
 } from '../dist/figma-lib.mjs';
 
 /* ---------------- figma 전역 목 ---------------- */
@@ -3650,4 +3653,147 @@ test('generateDarkMode — 한 값도 못 채우면 만든 Dark 모드를 도로
   // 빈 모드를 남기면 postPrereq가 '모드 2개 = 다크 있음'으로 읽어 준비 현황을 완료로 뒤집는다.
   assert.equal(f.semantic.modes.length, 1);
   assert.equal(r.modeCreated, undefined);
+});
+
+/* ================= artwork.ts (그림 슬롯 이식) ================= */
+/** 최소 씬그래프 목 — clone은 실물처럼 **형제로** 끼운다(코드가 즉시 페이지로 옮기는지 본다). */
+function sceneMock() {
+  let seq = 0;
+  const detach = (n) => {
+    if (n.parent) n.parent.children.splice(n.parent.children.indexOf(n), 1);
+    n.parent = null;
+  };
+  const mk = (props = {}) => {
+    const n = {
+      id: `n${seq++}`,
+      name: 'node',
+      type: 'FRAME',
+      x: 0,
+      y: 0,
+      width: 16,
+      height: 16,
+      fills: [],
+      parent: null,
+      removed: false,
+      ...props,
+      children: [], // 스프레드 뒤에 새 배열로 — props.children을 그대로 쓰면 아래 appendChild가 같은 배열에 또 담는다
+      appendChild(c) { detach(c); c.parent = this; this.children.push(c); },
+      insertChild(i, c) { detach(c); c.parent = this; this.children.splice(i, 0, c); },
+      resize(w, h) { this.width = w; this.height = h; },
+      remove() { detach(this); this.removed = true; },
+      clone() {
+        const copy = mk({ ...this, id: `n${seq++}`, children: [], parent: null });
+        for (const k of this.children) copy.appendChild(k.clone());
+        if (this.parent) this.parent.appendChild(copy); // 실물: 같은 부모의 형제로 들어온다
+        return copy;
+      },
+    };
+    for (const c of props.children ?? []) n.appendChild(c);
+    return n;
+  };
+  const page = mk({ name: 'Components', type: 'PAGE' });
+  globalThis.figma = {
+    createComponentFromNode(node) {
+      node.type = 'COMPONENT';
+      node.key = `key:${node.id}`;
+      node.createInstance = function () {
+        const inst = mk({ ...this, id: `n${seq++}`, type: 'INSTANCE', children: [], parent: null, mainComponent: this });
+        for (const k of this.children) inst.appendChild(k.clone());
+        page.appendChild(inst);
+        return inst;
+      };
+      return node;
+    },
+  };
+  return { mk, page };
+}
+
+test('createIconRegistry — 지문별 1개 · 복제본을 멤버 트리 밖으로 즉시 꺼낸다', () => {
+  const { mk, page } = sceneMock();
+  const placed = [];
+  const failures = [];
+  const reg = createIconRegistry({
+    page,
+    place: (c) => placed.push(c),
+    uniqueName: (b) => (placed.length ? `${b}${placed.length + 1}` : b),
+    onFailure: (m) => failures.push(m),
+  });
+
+  const heart = mk({ name: 'icon', type: 'VECTOR' });
+  const star = mk({ name: 'icon', type: 'VECTOR' });
+  const cardA = mk({ name: 'card', children: [heart, mk({ name: 'label', type: 'TEXT' })] });
+  const cardB = mk({ name: 'card', children: [star, mk({ name: 'label', type: 'TEXT' })] });
+
+  const a = reg.ensure('k1', heart, 'Icon');
+  const b = reg.ensure('k2', star, 'Icon');
+  const again = reg.ensure('k1', heart, 'Icon');
+
+  assert.equal(reg.created(), 2); // 같은 지문은 다시 만들지 않는다
+  assert.equal(again, a);
+  assert.notEqual(a, b);
+  assert.deepEqual(placed.map((c) => c.name), ['Icon', 'Icon2']);
+  assert.equal(a.type, 'COMPONENT');
+  // 복제본이 멤버 안에 남으면 뒤따르는 슬롯의 인덱스 경로가 어긋난다 — 자식 수는 그대로여야 한다.
+  assert.equal(cardA.children.length, 2);
+  assert.equal(cardB.children.length, 2);
+  assert.equal(reg.get('k1'), a);
+  assert.equal(reg.get('없는키'), null);
+  assert.deepEqual(failures, []);
+});
+
+test('swapVectorSlots — 벡터 자리를 아이콘 인스턴스로(자리·이름·크기 유지)', () => {
+  const { mk, page } = sceneMock();
+  const reg = createIconRegistry({ page, place: () => {}, uniqueName: (b) => b, onFailure: () => {} });
+  const icon = reg.ensure('k1', mk({ name: 'icon', type: 'VECTOR' }), 'Icon');
+
+  const vector = mk({ name: 'icon-heart', type: 'VECTOR', width: 20, height: 20, x: 4, y: 6 });
+  const master = mk({
+    name: 'Chip',
+    type: 'COMPONENT',
+    layoutMode: 'NONE',
+    children: [mk({ name: 'label', type: 'TEXT' }), vector, mk({ name: 'tail', type: 'TEXT' })],
+  });
+
+  const failures = swapVectorSlots(master, [{ layerName: 'icon-heart', layerPath: '1', icon }]);
+  assert.deepEqual(failures, []);
+  assert.equal(master.children.length, 3); // 자식 수 유지 → 다른 슬롯 경로가 살아 있다
+  const slot = master.children[1];
+  assert.equal(slot.type, 'INSTANCE');
+  assert.equal(slot.mainComponent, icon);
+  assert.equal(slot.name, 'icon-heart'); // 원래 레이어 이름 보존
+  assert.deepEqual([slot.width, slot.height, slot.x, slot.y], [20, 20, 4, 6]);
+  assert.equal(vector.removed, true);
+  assert.deepEqual(master.children.map((c) => c.name), ['label', 'icon-heart', 'tail']);
+});
+
+test('swapVectorSlots — 아이콘을 못 만들었으면 원본을 그대로 둔다(사유 보고)', () => {
+  const { mk } = sceneMock();
+  const vector = mk({ name: 'icon', type: 'VECTOR' });
+  const master = mk({ name: 'Chip', type: 'COMPONENT', children: [vector] });
+  const failures = swapVectorSlots(master, [{ layerName: 'icon', layerPath: '0', icon: null }]);
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /아이콘 자리 교체 실패/);
+  assert.equal(master.children[0], vector); // 그림을 잃지 않는다
+  assert.equal(vector.removed, false);
+});
+
+test('transplantImageFills — 인스턴스의 같은 경로에 원본 사진 fill을 이식', () => {
+  const { mk } = sceneMock();
+  const photo = [{ type: 'IMAGE', imageHash: 'h2', visible: true }];
+  const inst = mk({
+    name: 'Card',
+    type: 'INSTANCE',
+    children: [mk({ name: 'body', children: [mk({ name: 'thumbnail', type: 'RECTANGLE', fills: [{ type: 'IMAGE', imageHash: 'h1' }] })] })],
+  });
+
+  const ok = transplantImageFills(inst, { '0/0': photo });
+  assert.equal(ok.applied, 1);
+  assert.deepEqual(ok.failures, []);
+  assert.deepEqual(inst.children[0].children[0].fills, photo);
+
+  // 자리를 못 찾으면 조용히 넘어가지 않고 사유를 남긴다(사진이 마스터 것으로 통일된 셈).
+  const bad = transplantImageFills(inst, { '9/9': photo });
+  assert.equal(bad.applied, 0);
+  assert.equal(bad.failures.length, 1);
+  assert.match(bad.failures[0], /사진 이식 실패/);
 });

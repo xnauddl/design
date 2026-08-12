@@ -216,7 +216,8 @@ export type CodeToUi =
   | { type: 'REQUEST_DEACTIVATE'; key: string; instanceId: string } // 해제 시 code → UI: 이 기기의 LS 활성화 슬롯 반납(best-effort)
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
-  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단
+  // icons: 날 벡터가 그림마다 달라 새로 만든 아이콘 컴포넌트 수(스왑 속성의 재료 — 등록 수와 별개로 센다).
+  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'SETTINGS'; base: number; maxDepth: number; hideOnboard: boolean; grid: number; tolerance: number } // #19: 보관된 설정(없으면 기본값). grid=여백·크기 격자, tolerance=바인딩 허용오차

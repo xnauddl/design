@@ -219,6 +219,12 @@ export interface CompPropPlan {
   /** 연결할 노드 필드. */
   field: 'characters' | 'mainComponent' | 'visible';
   /**
+   * 날 벡터 슬롯 — 등록이 그림마다 아이콘 컴포넌트를 만들고 이 자리를 인스턴스로 바꾼 뒤
+   * 스왑 속성으로 노출한다. 값(`propValuesFromStruct`)은 컴포넌트 key가 아니라 **그림 지문**이라,
+   * 인스턴스에 적용하기 전에 등록이 지문 → 아이콘 컴포넌트 key로 옮겨야 한다.
+   */
+  fromVector?: boolean;
+  /**
    * heading 접힘 전용 — 멤버마다 자식 인덱스가 달라도(액션 optional)
    * 슬롯 종류·순서로 값을 읽는다. 노출(expose)은 여전히 `layerPath`(마스터).
    */
@@ -358,6 +364,20 @@ export function inferVaryingComponentProperties(members: readonly StructNode[]):
             layerName: rep.name,
             layerPath: path,
             field: 'mainComponent',
+          });
+        }
+      } else if (VECTOR_TYPES.has(rep.type)) {
+        // 날 벡터는 인스턴스 안에서 경로를 못 고친다 — 그림이 다르면 각각을 아이콘 컴포넌트로
+        // 만들고 이 자리를 인스턴스로 바꿔 스왑 속성으로 담는다(`fromVector`, 등록이 수행).
+        const vals = nodes.map((n) => n.vectorKey ?? n.name);
+        if (new Set(vals).size > 1) {
+          out.push({
+            propName: uniq(pascalCase(rep.name) || 'Icon'),
+            type: 'INSTANCE_SWAP',
+            layerName: rep.name,
+            layerPath: path,
+            field: 'mainComponent',
+            fromVector: true,
           });
         }
       }
@@ -577,8 +597,45 @@ export function propValuesFromStruct(
       if (p.type === 'BOOLEAN') out[p.propName] = false;
       continue;
     }
-    out[p.propName] = structPropValue(target, p.type);
+    // 날 벡터 슬롯의 값은 **그림 지문** — 아직 아이콘 컴포넌트가 없으니 key를 쓸 수 없다.
+    // 등록이 지문 → 아이콘 컴포넌트 key로 옮겨 인스턴스에 적용한다.
+    out[p.propName] = p.fromVector ? target.vectorKey ?? target.name : structPropValue(target, p.type);
   }
+  return out;
+}
+
+/** 그림(사진)이 멤버마다 다른 슬롯 — 컴포넌트 속성이 아니라 인스턴스 fill 오버라이드로 이식한다. */
+export interface ImageSlot {
+  layerName: string;
+  /** 루트 기준 자식 인덱스 경로(마스터 트리 기준, `CompPropPlan.layerPath`와 같은 규칙). */
+  layerPath: string;
+}
+
+/**
+ * 멤버들 사이에서 **사진이 다른 슬롯**을 찾는다(순수). 같은 자리·같은 구조에서
+ * `imageHash`만 갈리는 경우다 — Figma에 '이미지 속성'은 없지만 인스턴스의 `fills`는
+ * 오버라이드되므로, 등록이 멤버 원본 fill을 그 경로에 이식하면 사진이 살아남는다.
+ * (닮은 프레임 컴포넌트화가 쓰는 방식과 같다.)
+ */
+export function inferVaryingImageSlots(members: readonly StructNode[]): ImageSlot[] {
+  if (members.length < 2) return [];
+  const out: ImageSlot[] = [];
+  const visit = (nodes: readonly StructNode[], path: string): void => {
+    const rep = nodes[0];
+    if (!rep) return;
+    if (rep.type === 'INSTANCE') return; // 인스턴스 안은 자식 컴포넌트 소관
+    if (path !== '' && nodes.every((n) => n.imageHash !== undefined)) {
+      if (new Set(nodes.map((n) => n.imageHash)).size > 1) out.push({ layerName: rep.name, layerPath: path });
+    }
+    const lens = nodes.map((n) => (n.children ?? []).length);
+    if (new Set(lens).size !== 1) return;
+    for (let i = 0; i < (lens[0] ?? 0); i++) {
+      const kids = nodes.map((m) => (m.children ?? [])[i]).filter((c): c is StructNode => !!c);
+      if (kids.length !== nodes.length) return;
+      visit(kids, path === '' ? String(i) : `${path}/${i}`);
+    }
+  };
+  visit(members, '');
   return out;
 }
 
@@ -878,7 +935,29 @@ export interface StructNode extends ScanNode {
   characters?: string;
   /** INSTANCE의 mainComponent key(또는 id) — swap 접힘 판별용. */
   mainComponentKey?: string | null;
+  /** 첫 visible IMAGE 채움의 `imageHash` — 사진이 같은 그림인지 보는 지문. */
+  imageHash?: string;
+  /** 벡터류 도형의 경로 지문(fill/stroke geometry 해시) — 같은 그림인지 보는 지문. */
+  vectorKey?: string;
   children?: readonly StructNode[];
+}
+
+/** 경로 데이터를 비교할 수 없는 도형 타입 — 지문(`vectorKey`)으로 본다. */
+const VECTOR_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);
+
+/**
+ * 그림 슬롯의 **내용 지문**. 그림이 아니면 null.
+ * 레이어 이름은 못 쓴다 — 카피를 따라 갈리기도 하고(`icon-heart`/`icon-star`),
+ * 반대로 다 같은 이름인데 내용만 다르기도 한다(썸네일이 전부 `thumbnail`).
+ * 지문이 없으면(옛 페이로드·순수 테스트) 이름으로 물러선다.
+ */
+function artworkKey(n: StructNode): string | null {
+  if (VECTOR_TYPES.has(n.type)) return `v:${n.vectorKey ?? n.name}`;
+  if (n.imageHash !== undefined) return `i:${n.imageHash}`;
+  // fills가 figma.mixed(symbol)면 무엇이 들었는지 모른다 — 그림으로 보고 이름으로 가른다.
+  if (n.fills && !Array.isArray(n.fills)) return `i:${n.name}`;
+  if (Array.isArray(n.fills) && n.fills.some((p) => p.visible !== false && p.type === 'IMAGE')) return `i:${n.name}`;
+  return null;
 }
 
 /**
@@ -904,7 +983,8 @@ export function shouldCollapseToProperties(members: readonly StructNode[]): bool
   for (let i = 1; i < members.length; i++) {
     const d = diffForCollapse(base, members[i]);
     if (d.struct) return false;
-    if (d.size && !d.prop) return false;
+    // 크기만 다른 건 Size 세트다. 단 카피·그림이 함께 다르면 오토레이아웃이 밀린 결과로 본다.
+    if (d.size && !d.prop && !d.image && !d.swap) return false;
   }
   // 완전 동일 복제(prop 없음·struct/size 없음)도 단품 1개 + 인스턴스 N개로 접는다.
   return true;
@@ -930,6 +1010,9 @@ function shouldCollapseHeadingMembers(members: readonly StructNode[]): boolean {
   for (let i = 1; i < members.length; i++) {
     const d = diffHeadingPair(base, members[i], bundles[0]!, bundles[i]!);
     if (d.struct) return false;
+    // heading 계획(inferVaryingHeadingProperties)은 그림 슬롯을 담지 못한다 — 접으면
+    // 사진·아이콘이 마스터 것으로 통일되므로, 그림이 다르면 세트로 남긴다.
+    if (d.image || d.swap) return false;
     if (d.size && !d.prop) return false;
   }
   return true;
@@ -940,10 +1023,13 @@ function diffHeadingPair(
   b: StructNode,
   slotsA: NonNullable<ReturnType<typeof parseHeadingSlots>>,
   slotsB: NonNullable<ReturnType<typeof parseHeadingSlots>>,
-): { prop: boolean; struct: boolean; size: boolean } {
+): CollapseDiff {
   let prop = false;
   let struct = false;
   let size = false;
+  // 슬롯 안 그림 차이는 heading 계획이 담지 못한다 — 위로 올려 접힘을 막는 데 쓴다.
+  let image = false;
+  let swap = false;
 
   // 루트 크롬(자식 제외)
   if ((a.layoutMode ?? 'NONE') !== (b.layoutMode ?? 'NONE')) struct = true;
@@ -957,16 +1043,22 @@ function diffHeadingPair(
     struct = true;
   }
   if ((a.width ?? 0) !== (b.width ?? 0) || (a.height ?? 0) !== (b.height ?? 0)) size = true;
-  if (struct) return { prop, struct, size };
+  if (struct) return { prop, struct, size, image, swap };
 
   const kind = (s: typeof slotsA, k: 'title' | 'action' | 'meta') => s.filter((x) => x.kind === k);
+  /** 슬롯 비교 결과를 위로 접기 — 그림 차이는 그대로 실어 보낸다(접힘 판단이 본다). */
+  const fold = (d: CollapseDiff): void => {
+    if (d.prop) prop = true;
+    if (d.image) image = true;
+    if (d.swap) swap = true;
+  };
 
   const titlesA = kind(slotsA, 'title');
   const titlesB = kind(slotsB, 'title');
   for (let i = 0; i < titlesA.length; i++) {
     const d = diffForCollapse(titlesA[i].node as StructNode, titlesB[i].node as StructNode);
-    if (d.struct) return { prop: true, struct: true, size };
-    if (d.prop) prop = true;
+    if (d.struct) return { prop: true, struct: true, size, image, swap };
+    fold(d);
     if (d.size) size = true;
   }
 
@@ -974,8 +1066,8 @@ function diffHeadingPair(
   const metasB = kind(slotsB, 'meta');
   for (let i = 0; i < metasA.length; i++) {
     const d = diffForCollapse(metasA[i].node as StructNode, metasB[i].node as StructNode);
-    if (d.struct) return { prop, struct: true, size };
-    if (d.prop) prop = true;
+    if (d.struct) return { prop, struct: true, size, image, swap };
+    fold(d);
     if (d.size) size = true;
   }
 
@@ -986,18 +1078,31 @@ function diffHeadingPair(
   for (let i = 0; i < n; i++) {
     if (i >= actionsA.length || i >= actionsB.length) continue; // 결손은 prop으로 이미 처리
     const d = diffForCollapse(actionsA[i].node as StructNode, actionsB[i].node as StructNode);
-    if (d.struct) return { prop, struct: true, size };
-    if (d.prop) prop = true;
+    if (d.struct) return { prop, struct: true, size, image, swap };
+    fold(d);
   }
 
-  return { prop, struct, size };
+  return { prop, struct, size, image, swap };
 }
 
-/** 두 트리 비교 — 속성으로 흡수 가능한 차이 / 구조 / 크기. INSTANCE 안은 비교하지 않음. */
-function diffForCollapse(a: StructNode, b: StructNode): { prop: boolean; struct: boolean; size: boolean } {
+/** 두 트리 비교 — 흡수 가능한 차이(속성·이미지·스왑) / 구조 / 크기. INSTANCE 안은 비교하지 않음. */
+export interface CollapseDiff {
+  /** 컴포넌트 속성(TEXT·BOOLEAN·SWAP)으로 담을 수 있는 차이. */
+  prop: boolean;
+  struct: boolean;
+  size: boolean;
+  /** 사진이 다름 — 인스턴스 fill 오버라이드로 이식한다(속성 아님). */
+  image: boolean;
+  /** 날 벡터의 그림이 다름 — 아이콘을 컴포넌트로 만들고 INSTANCE_SWAP으로 담는다. */
+  swap: boolean;
+}
+
+function diffForCollapse(a: StructNode, b: StructNode): CollapseDiff {
   let prop = false;
   let struct = false;
   let size = false;
+  let image = false;
+  let swap = false;
 
   const walk = (x: StructNode, y: StructNode): void => {
     if (struct) return;
@@ -1017,15 +1122,26 @@ function diffForCollapse(a: StructNode, b: StructNode): { prop: boolean; struct:
       return; // 인스턴스 내부는 자식 컴포넌트 소관
     }
 
-    if (x.name !== y.name) {
-      struct = true;
-      return;
+    // 레이어 이름은 비교하지 않는다 — 이름은 대개 카피를 따라가고(`title-price` vs
+    // `title-name`), 반대로 이름이 같아도 내용이 다를 수 있다(썸네일이 전부 `thumbnail`).
+    // 이름으로 가르면 텍스트만 다른 반복이 `Variant=1·2…` 세트가 되고, 사진이 다른 반복은
+    // 조용히 접혀 한 장으로 통일된다. 타입·자식 구성·레이아웃·채움·여백·크기는 그대로
+    // 비교하고, 그림은 **내용 지문**으로 본다. 속성 대상도 이름이 아니라 경로로 찾는다.
+    const ka = artworkKey(x);
+    const kb = artworkKey(y);
+    if (ka !== kb) {
+      // 그림 ↔ 그림 아님, 벡터 ↔ 이미지처럼 슬롯 성격 자체가 다르면 구조 차다.
+      if (ka == null || kb == null || ka[0] !== kb[0]) struct = true;
+      else if (ka[0] === 'i') image = true; // 사진이 다름 → 인스턴스 fill 오버라이드
+      else swap = true; // 벡터 그림이 다름 → 아이콘 컴포넌트 + INSTANCE_SWAP
+      if (struct) return;
     }
 
     const xv = x.visible !== false;
     const yv = y.visible !== false;
     if (xv !== yv) {
-      if (x.name.trim().endsWith('?')) prop = true;
+      // `?` 규약은 어느 쪽 이름에 있어도 인정한다(이름이 갈린 같은 슬롯).
+      if (x.name.trim().endsWith('?') || y.name.trim().endsWith('?')) prop = true;
       else struct = true;
     }
 
@@ -1056,7 +1172,7 @@ function diffForCollapse(a: StructNode, b: StructNode): { prop: boolean; struct:
   };
 
   walk(a, b);
-  return { prop, struct, size };
+  return { prop, struct, size, image, swap };
 }
 
 export interface StructGroup {

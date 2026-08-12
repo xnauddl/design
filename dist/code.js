@@ -2624,6 +2624,96 @@
     return opts.format === "css" ? toCss(list, opts) : toW3C(list, opts);
   }
 
+  // src/lib/artwork.ts
+  function nodeAtPath(root, path) {
+    let cur = root;
+    for (const seg of path.split("/").filter(Boolean)) {
+      if (!("children" in cur)) return null;
+      const i = Number(seg);
+      if (!Number.isFinite(i)) return null;
+      const kids = cur.children;
+      if (!kids[i]) return null;
+      cur = kids[i];
+    }
+    return cur;
+  }
+  function createIconRegistry(opts) {
+    const byKey = /* @__PURE__ */ new Map();
+    let made = 0;
+    return {
+      get: (vectorKey) => {
+        var _a;
+        return (_a = byKey.get(vectorKey)) != null ? _a : null;
+      },
+      created: () => made,
+      ensure(vectorKey, node, baseName) {
+        const hit = byKey.get(vectorKey);
+        if (hit) return hit;
+        try {
+          const clone = node.clone();
+          opts.page.appendChild(clone);
+          const comp = figma.createComponentFromNode(clone);
+          comp.name = opts.uniqueName(baseName);
+          opts.place(comp);
+          byKey.set(vectorKey, comp);
+          made++;
+          return comp;
+        } catch (e) {
+          opts.onFailure(`\uC544\uC774\uCF58 \uCEF4\uD3EC\uB10C\uD2B8 \uC2E4\uD328(${baseName}): ${e instanceof Error ? e.message : String(e)}`);
+          return null;
+        }
+      }
+    };
+  }
+  function swapVectorSlots(master, slots) {
+    const failures = [];
+    for (const s of slots) {
+      const target = nodeAtPath(master, s.layerPath);
+      const parent = target == null ? void 0 : target.parent;
+      if (!target || !s.icon || !parent || !("children" in parent)) {
+        failures.push(`\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328(${s.layerName})`);
+        continue;
+      }
+      try {
+        const kids = parent;
+        const idx = kids.children.indexOf(target);
+        const inst = s.icon.createInstance();
+        inst.name = target.name;
+        try {
+          inst.resize(target.width, target.height);
+        } catch (e) {
+        }
+        kids.insertChild(Math.max(0, idx), inst);
+        if (!("layoutMode" in parent) || parent.layoutMode === "NONE") {
+          inst.x = target.x;
+          inst.y = target.y;
+        }
+        target.remove();
+      } catch (e) {
+        failures.push(`\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328(${s.layerName}): ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    return failures;
+  }
+  function transplantImageFills(inst, images) {
+    let applied = 0;
+    const failures = [];
+    for (const [path, paints3] of Object.entries(images)) {
+      const dst = nodeAtPath(inst, path);
+      if (!dst || !("fills" in dst)) {
+        failures.push(`\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328(${path}) \u2014 \uC790\uB9AC\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4`);
+        continue;
+      }
+      try {
+        dst.fills = paints3;
+        applied++;
+      } catch (e) {
+        failures.push(`\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328(${path}): ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    return { applied, failures };
+  }
+
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
   var TSHIRT_MID = TSHIRT.indexOf("md");
@@ -3222,6 +3312,21 @@
               field: "mainComponent"
             });
           }
+        } else if (VECTOR_TYPES.has(rep.type)) {
+          const vals = nodes.map((n2) => {
+            var _a2;
+            return (_a2 = n2.vectorKey) != null ? _a2 : n2.name;
+          });
+          if (new Set(vals).size > 1) {
+            out.push({
+              propName: uniq(pascalCase(rep.name) || "Icon"),
+              type: "INSTANCE_SWAP",
+              layerName: rep.name,
+              layerPath: path,
+              field: "mainComponent",
+              fromVector: true
+            });
+          }
         }
       }
       if (rep.type === "INSTANCE" || rep.type === "TEXT") return;
@@ -3410,6 +3515,7 @@
     }
   }
   function propValuesFromStruct(root, plan) {
+    var _a;
     const out = {};
     for (const p of plan) {
       if (p.headingSlot) {
@@ -3422,8 +3528,36 @@
         if (p.type === "BOOLEAN") out[p.propName] = false;
         continue;
       }
-      out[p.propName] = structPropValue(target, p.type);
+      out[p.propName] = p.fromVector ? (_a = target.vectorKey) != null ? _a : target.name : structPropValue(target, p.type);
     }
+    return out;
+  }
+  function inferVaryingImageSlots(members) {
+    if (members.length < 2) return [];
+    const out = [];
+    const visit = (nodes, path) => {
+      var _a;
+      const rep = nodes[0];
+      if (!rep) return;
+      if (rep.type === "INSTANCE") return;
+      if (path !== "" && nodes.every((n) => n.imageHash !== void 0)) {
+        if (new Set(nodes.map((n) => n.imageHash)).size > 1) out.push({ layerName: rep.name, layerPath: path });
+      }
+      const lens = nodes.map((n) => {
+        var _a2;
+        return ((_a2 = n.children) != null ? _a2 : []).length;
+      });
+      if (new Set(lens).size !== 1) return;
+      for (let i = 0; i < ((_a = lens[0]) != null ? _a : 0); i++) {
+        const kids = nodes.map((m) => {
+          var _a2;
+          return ((_a2 = m.children) != null ? _a2 : [])[i];
+        }).filter((c) => !!c);
+        if (kids.length !== nodes.length) return;
+        visit(kids, path === "" ? String(i) : `${path}/${i}`);
+      }
+    };
+    visit(members, "");
     return out;
   }
   function readHeadingSlotProp(root, p) {
@@ -3534,6 +3668,15 @@
     }
     return all.filter((c) => keep.has(c.id));
   }
+  var VECTOR_TYPES = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
+  function artworkKey(n) {
+    var _a;
+    if (VECTOR_TYPES.has(n.type)) return `v:${(_a = n.vectorKey) != null ? _a : n.name}`;
+    if (n.imageHash !== void 0) return `i:${n.imageHash}`;
+    if (n.fills && !Array.isArray(n.fills)) return `i:${n.name}`;
+    if (Array.isArray(n.fills) && n.fills.some((p) => p.visible !== false && p.type === "IMAGE")) return `i:${n.name}`;
+    return null;
+  }
   function shouldCollapseToProperties(members) {
     if (members.length < 2) return false;
     if (members.every((m) => highConfidenceComponentRole(m) === "heading")) {
@@ -3543,7 +3686,7 @@
     for (let i = 1; i < members.length; i++) {
       const d = diffForCollapse(base, members[i]);
       if (d.struct) return false;
-      if (d.size && !d.prop) return false;
+      if (d.size && !d.prop && !d.image && !d.swap) return false;
     }
     return true;
   }
@@ -3560,6 +3703,7 @@
     for (let i = 1; i < members.length; i++) {
       const d = diffHeadingPair(base, members[i], bundles[0], bundles[i]);
       if (d.struct) return false;
+      if (d.image || d.swap) return false;
       if (d.size && !d.prop) return false;
     }
     return true;
@@ -3569,28 +3713,35 @@
     let prop = false;
     let struct = false;
     let size = false;
+    let image = false;
+    let swap = false;
     if (((_a = a.layoutMode) != null ? _a : "NONE") !== ((_b = b.layoutMode) != null ? _b : "NONE")) struct = true;
     if (((_c = a.fillHex) != null ? _c : null) !== ((_d = b.fillHex) != null ? _d : null)) struct = true;
     if (((_e = a.paddingTop) != null ? _e : 0) !== ((_f = b.paddingTop) != null ? _f : 0) || ((_g = a.paddingRight) != null ? _g : 0) !== ((_h = b.paddingRight) != null ? _h : 0) || ((_i = a.paddingBottom) != null ? _i : 0) !== ((_j = b.paddingBottom) != null ? _j : 0) || ((_k = a.paddingLeft) != null ? _k : 0) !== ((_l = b.paddingLeft) != null ? _l : 0) || ((_m = a.itemSpacing) != null ? _m : 0) !== ((_n = b.itemSpacing) != null ? _n : 0) || ((_o = a.counterAxisSpacing) != null ? _o : 0) !== ((_p = b.counterAxisSpacing) != null ? _p : 0)) {
       struct = true;
     }
     if (((_q = a.width) != null ? _q : 0) !== ((_r = b.width) != null ? _r : 0) || ((_s = a.height) != null ? _s : 0) !== ((_t = b.height) != null ? _t : 0)) size = true;
-    if (struct) return { prop, struct, size };
+    if (struct) return { prop, struct, size, image, swap };
     const kind = (s, k) => s.filter((x) => x.kind === k);
+    const fold = (d) => {
+      if (d.prop) prop = true;
+      if (d.image) image = true;
+      if (d.swap) swap = true;
+    };
     const titlesA = kind(slotsA, "title");
     const titlesB = kind(slotsB, "title");
     for (let i = 0; i < titlesA.length; i++) {
       const d = diffForCollapse(titlesA[i].node, titlesB[i].node);
-      if (d.struct) return { prop: true, struct: true, size };
-      if (d.prop) prop = true;
+      if (d.struct) return { prop: true, struct: true, size, image, swap };
+      fold(d);
       if (d.size) size = true;
     }
     const metasA = kind(slotsA, "meta");
     const metasB = kind(slotsB, "meta");
     for (let i = 0; i < metasA.length; i++) {
       const d = diffForCollapse(metasA[i].node, metasB[i].node);
-      if (d.struct) return { prop, struct: true, size };
-      if (d.prop) prop = true;
+      if (d.struct) return { prop, struct: true, size, image, swap };
+      fold(d);
       if (d.size) size = true;
     }
     const actionsA = kind(slotsA, "action");
@@ -3600,15 +3751,17 @@
     for (let i = 0; i < n; i++) {
       if (i >= actionsA.length || i >= actionsB.length) continue;
       const d = diffForCollapse(actionsA[i].node, actionsB[i].node);
-      if (d.struct) return { prop, struct: true, size };
-      if (d.prop) prop = true;
+      if (d.struct) return { prop, struct: true, size, image, swap };
+      fold(d);
     }
-    return { prop, struct, size };
+    return { prop, struct, size, image, swap };
   }
   function diffForCollapse(a, b) {
     let prop = false;
     let struct = false;
     let size = false;
+    let image = false;
+    let swap = false;
     const walk3 = (x, y) => {
       var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
       if (struct) return;
@@ -3624,14 +3777,18 @@
         if (((_c = x.mainComponentKey) != null ? _c : "") !== ((_d = y.mainComponentKey) != null ? _d : "")) prop = true;
         return;
       }
-      if (x.name !== y.name) {
-        struct = true;
-        return;
+      const ka = artworkKey(x);
+      const kb = artworkKey(y);
+      if (ka !== kb) {
+        if (ka == null || kb == null || ka[0] !== kb[0]) struct = true;
+        else if (ka[0] === "i") image = true;
+        else swap = true;
+        if (struct) return;
       }
       const xv = x.visible !== false;
       const yv = y.visible !== false;
       if (xv !== yv) {
-        if (x.name.trim().endsWith("?")) prop = true;
+        if (x.name.trim().endsWith("?") || y.name.trim().endsWith("?")) prop = true;
         else struct = true;
       }
       if (((_e = x.layoutMode) != null ? _e : "NONE") !== ((_f = y.layoutMode) != null ? _f : "NONE")) struct = true;
@@ -3653,7 +3810,7 @@
       for (let i = 0; i < xc.length; i++) walk3(xc[i], yc[i]);
     };
     walk3(a, b);
-    return { prop, struct, size };
+    return { prop, struct, size, image, swap };
   }
   function exactNameKey(name) {
     return name.trim().toLowerCase().replace(/\s+/g, " ");
@@ -4529,6 +4686,36 @@
       opacity: p.opacity
     }));
   }
+  function imageHashOf(node) {
+    var _a;
+    const fills = node.fills;
+    if (!Array.isArray(fills)) return void 0;
+    const img = fills.find((p) => p.type === "IMAGE" && p.visible !== false);
+    if (!img) return void 0;
+    return (_a = img.imageHash) != null ? _a : "";
+  }
+  function fnv1a(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h.toString(36);
+  }
+  function vectorKeyOf(node) {
+    var _a, _b, _c, _d;
+    if (!VECTOR_TYPES2.has(node.type)) return void 0;
+    try {
+      const g = node;
+      const parts = [];
+      for (const p of (_a = g.fillGeometry) != null ? _a : []) parts.push((_b = p.data) != null ? _b : "");
+      for (const p of (_c = g.strokeGeometry) != null ? _c : []) parts.push((_d = p.data) != null ? _d : "");
+      return parts.length ? fnv1a(parts.join("|")) : `?${Math.round(node.width)}x${Math.round(node.height)}`;
+    } catch (e) {
+      return void 0;
+    }
+  }
+  var VECTOR_TYPES2 = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
   function toStructNode(node) {
     const a = node;
     const num = (v) => typeof v === "number" ? v : void 0;
@@ -4554,6 +4741,8 @@
       id: node.id,
       name: node.name,
       type: node.type,
+      imageHash: imageHashOf(node),
+      vectorKey: vectorKeyOf(node),
       locked: node.locked,
       visible: node.visible,
       width: num(a.width),
@@ -4601,17 +4790,15 @@
   function ownComponentLayers(root) {
     return ownComponentLayersWithPath(root).map((x) => x.node);
   }
-  function nodeAtPath(root, path) {
+  function structAtPathVectorKey(root, path) {
+    var _a, _b;
     let cur = root;
     for (const seg of path.split("/").filter(Boolean)) {
-      if (!("children" in cur)) return null;
-      const i = Number(seg);
-      if (!Number.isFinite(i)) return null;
-      const kids = cur.children;
-      if (!kids[i]) return null;
-      cur = kids[i];
+      const kids = (_a = cur == null ? void 0 : cur.children) != null ? _a : [];
+      cur = kids[Number(seg)];
+      if (!cur) return null;
     }
-    return cur;
+    return (_b = cur == null ? void 0 : cur.vectorKey) != null ? _b : null;
   }
   function propDefaultFor(target, type) {
     if (type === "TEXT") return target.type === "TEXT" ? target.characters : "";
@@ -4742,7 +4929,7 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -5188,10 +5375,25 @@
               failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${comp.name}): ${errText(e)}`);
             }
           };
+          const existingNames = await existingComponentNames(new Set(valid.map((n) => n.id)));
           const resolved = resolveGroupNames(
             groups.map((g) => g.members),
-            await existingComponentNames(new Set(valid.map((n) => n.id)))
+            existingNames
           );
+          const takenNames = /* @__PURE__ */ new Set([...existingNames, ...resolved]);
+          const iconRegistry = createIconRegistry({
+            page,
+            place: placeOnPage,
+            uniqueName: (base) => {
+              const b = pascalCase(base) || "Icon";
+              let n = b;
+              let i = 2;
+              while (takenNames.has(n)) n = `${b}${i++}`;
+              takenNames.add(n);
+              return n;
+            },
+            onFailure: (m) => failures.push(m)
+          });
           const shownNames = (_c = msg.names) != null ? _c : {};
           const groupNames = groups.map((g, gi) => {
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
@@ -5236,60 +5438,105 @@
               }
               const structs = live.map(toStructNode);
               const plan = inferVaryingComponentProperties(structs);
-              const snapshots = [];
-              const made2 = [];
-              const madeFromLive = [];
+              const imageSlots = inferVaryingImageSlots(structs);
+              const vectorPlans = plan.filter((p) => p.fromVector && p.layerPath != null);
+              const imagesOf = (root) => {
+                const out = {};
+                for (const s of imageSlots) {
+                  const n = nodeAtPath(root, s.layerPath);
+                  const f = n && "fills" in n ? n.fills : null;
+                  if (Array.isArray(f)) out[s.layerPath] = f;
+                }
+                return out;
+              };
+              let iconsReady = true;
               for (let i = 0; i < live.length; i++) {
-                const n = live[i];
-                const snap = { o: captureOrigin(n), vals: propValuesFromNode(n, plan) };
-                try {
-                  made2.push(figma.createComponentFromNode(n));
-                  snapshots.push(snap);
-                  madeFromLive.push(i);
-                } catch (e) {
-                  skipped++;
-                  failures.push(`\uC18D\uC131\uC811\uD798 \uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328(${n.name}): ${errText(e)}`);
+                for (const p of vectorPlans) {
+                  const node = nodeAtPath(live[i], p.layerPath);
+                  const key = structAtPathVectorKey(structs[i], p.layerPath);
+                  const icon = node && key ? iconRegistry.ensure(key, node, p.layerName) : null;
+                  if (!icon) iconsReady = false;
                 }
               }
-              if (!made2.length) continue;
-              const preferLive = pickCollapseMasterIndex(structs);
-              let masterMade = madeFromLive.indexOf(preferLive);
-              if (masterMade < 0) masterMade = 0;
-              const master = made2[masterMade];
-              for (let i = 0; i < made2.length; i++) {
-                if (i === masterMade) continue;
+              if (!iconsReady) {
+                failures.push(`\uC544\uC774\uCF58\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD574 \uC138\uD2B8\uB85C \uB4F1\uB85D\uD569\uB2C8\uB2E4(${setName})`);
+              } else {
+                const snapshots = [];
+                const made2 = [];
+                const madeFromLive = [];
+                for (let i = 0; i < live.length; i++) {
+                  const n = live[i];
+                  const snap = { o: captureOrigin(n), vals: propValuesFromNode(n, plan), images: imagesOf(n) };
+                  try {
+                    made2.push(figma.createComponentFromNode(n));
+                    snapshots.push(snap);
+                    madeFromLive.push(i);
+                  } catch (e) {
+                    skipped++;
+                    failures.push(`\uC18D\uC131\uC811\uD798 \uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328(${n.name}): ${errText(e)}`);
+                  }
+                }
+                if (!made2.length) continue;
+                const preferLive = pickCollapseMasterIndex(structs);
+                let masterMade = madeFromLive.indexOf(preferLive);
+                if (masterMade < 0) masterMade = 0;
+                const master = made2[masterMade];
+                for (let i = 0; i < made2.length; i++) {
+                  if (i === masterMade) continue;
+                  try {
+                    made2[i].remove();
+                  } catch (e) {
+                  }
+                }
                 try {
-                  made2[i].remove();
+                  master.name = setName || pascalCase((_e = (_d = live[preferLive]) == null ? void 0 : _d.name) != null ? _e : live[0].name);
                 } catch (e) {
                 }
-              }
-              try {
-                master.name = setName || pascalCase((_e = (_d = live[preferLive]) == null ? void 0 : _d.name) != null ? _e : live[0].name);
-              } catch (e) {
-              }
-              placeOnPage(master);
-              singles.push(master.name);
-              registered++;
-              let collapsedExposed = 0;
-              try {
-                collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
-              } catch (e) {
-                failures.push(`\uC18D\uC131 \uB178\uCD9C \uC2E4\uD328(${master.name}): ${errText(e)}`);
-              }
-              exposedEarly += collapsedExposed;
-              const ids = propIdsByName(master);
-              const places2 = [];
-              for (const snap of snapshots) {
+                placeOnPage(master);
+                singles.push(master.name);
+                registered++;
+                const masterSnap = snapshots[masterMade];
+                failures.push(
+                  ...swapVectorSlots(
+                    master,
+                    vectorPlans.map((p) => {
+                      var _a2;
+                      return {
+                        layerName: p.layerName,
+                        layerPath: p.layerPath,
+                        icon: iconRegistry.get(String((_a2 = masterSnap == null ? void 0 : masterSnap.vals[p.propName]) != null ? _a2 : ""))
+                      };
+                    })
+                  )
+                );
+                let collapsedExposed = 0;
                 try {
-                  const inst = master.createInstance();
-                  applyInstancePropValues(inst, ids, snap.vals);
-                  places2.push({ inst, o: snap.o });
+                  collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
                 } catch (e) {
-                  failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${master.name}): ${errText(e)}`);
+                  failures.push(`\uC18D\uC131 \uB178\uCD9C \uC2E4\uD328(${master.name}): ${errText(e)}`);
                 }
+                exposedEarly += collapsedExposed;
+                const ids = propIdsByName(master);
+                const places2 = [];
+                for (const snap of snapshots) {
+                  try {
+                    const inst = master.createInstance();
+                    const vals = __spreadValues({}, snap.vals);
+                    for (const p of vectorPlans) {
+                      const icon = iconRegistry.get(String((_f = vals[p.propName]) != null ? _f : ""));
+                      if (icon) vals[p.propName] = icon.key || icon.id;
+                      else delete vals[p.propName];
+                    }
+                    applyInstancePropValues(inst, ids, vals);
+                    failures.push(...transplantImageFills(inst, snap.images).failures);
+                    places2.push({ inst, o: snap.o });
+                  } catch (e) {
+                    failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${master.name}): ${errText(e)}`);
+                  }
+                }
+                restore(places2);
+                continue;
               }
-              restore(places2);
-              continue;
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             const made = [];
@@ -5298,7 +5545,7 @@
               if (!node) continue;
               const o = captureOrigin(node);
               try {
-                made.push({ comp: figma.createComponentFromNode(node), variant: (_f = variantById.get(m.id)) != null ? _f : "", o });
+                made.push({ comp: figma.createComponentFromNode(node), variant: (_g = variantById.get(m.id)) != null ? _g : "", o });
                 registered++;
               } catch (e) {
                 skipped++;
@@ -5311,7 +5558,7 @@
             }
             let set;
             try {
-              const home = (_g = pageOf(made[0].comp)) != null ? _g : figma.currentPage;
+              const home = (_h = pageOf(made[0].comp)) != null ? _h : figma.currentPage;
               set = figma.combineAsVariants(made.map((x) => x.comp), home);
             } catch (e) {
               failures.push(`\uACB0\uD569 \uC2E4\uD328(${setName}): ${errText(e)}`);
@@ -5349,7 +5596,7 @@
               failures.push(`\uC18D\uC131 \uB178\uCD9C \uC2E4\uD328: ${errText(e)}`);
             }
           }
-          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, missing: [], failures });
+          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures });
           if (registered || sets) commitUndo(figma);
           break;
         }
@@ -5380,7 +5627,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_h = nodes[0].parent) != null ? _h : figma.currentPage;
+              const parent = (_i = nodes[0].parent) != null ? _i : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {

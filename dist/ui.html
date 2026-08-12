@@ -442,6 +442,8 @@
       <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
+        <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
+        <label class="inline"><input id="wizOptTextStyles" type="checkbox" /> <span data-i18n="wizardCard.optTextStyles">텍스트 스타일</span> <span class="muted" id="wizTextStylesLock"></span></label>
         <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
       </div>
       <div class="row">
@@ -453,7 +455,7 @@
       <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
            파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
            흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기. 다크·텍스트 스타일은 만들기에서</div>
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기 · 다크=라이트 모드에서 어두운 값 채우기</div>
       <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
       <div class="status" id="wizardSummary"></div>
     </div>
@@ -958,6 +960,8 @@
     "wizard.step.extract": "\uCD94\uCD9C",
     "wizard.step.create": "\uD1A0\uD070",
     "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "wizard.step.dark": "\uB2E4\uD06C",
+    "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "wizard.step.bind": "\uBCC0\uC218\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
@@ -991,6 +995,13 @@
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.semantics": "\uBCC4\uCE6D {aliased}",
     "wizard.seq.semanticsMissing": " \xB7 \uB204\uB77D {n}",
+    "wizard.seq.dark": "\uB2E4\uD06C {realiased}\uAC1C \uC5F0\uACB0",
+    "wizard.seq.darkModeCreated": " \xB7 Dark \uBAA8\uB4DC \uCD94\uAC00",
+    "wizard.seq.darkSkip": " \xB7 \uAC74\uB108\uB700 {n}(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
+    "wizard.seq.darkNoTarget": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694",
+    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD569\uB2C8\uB2E4",
+    "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
+    "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
     "wizard.seq.bindCancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC801\uC6A9",
     "wizard.seq.bindDone": "\uC5F0\uACB0 {bound}",
     "wizard.seq.bindSkip": " \xB7 \uC2A4\uD0B5 {n}",
@@ -998,6 +1009,8 @@
     "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
     "wizard.sum.tokens": "\uD1A0\uD070 {n}",
+    "wizard.sum.dark": "\uB2E4\uD06C {n}",
+    "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
     "wizard.sum.bound": "\uC5F0\uACB0 {n}",
     "wizard.sum.renamed": "\uC774\uB984 {n}",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
@@ -1057,11 +1070,13 @@
     "wizardCard.title": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
     "wizardCard.hint": "\uC120\uD0DD \uD654\uBA74\uC744 \uD55C \uBC88\uC5D0 \uD1A0\uD070\xB7\uBCC0\uC218 \uC5F0\uACB0\uAE4C\uC9C0 \uC815\uB9AC\uD569\uB2C8\uB2E4",
     "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "wizardCard.optDark": "\uB2E4\uD06C",
+    "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
     // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uBCC0\uC218\uC5F0\uACB0=\uD654\uBA74\uC5D0 \uBD99\uC774\uAE30. \uB2E4\uD06C\xB7\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC740 \uB9CC\uB4E4\uAE30\uC5D0\uC11C",
+    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uBCC0\uC218\uC5F0\uACB0=\uD654\uBA74\uC5D0 \uBD99\uC774\uAE30 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8 \uBAA8\uB4DC\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4",
     "prereq.gotoCreate": "\uD1A0\uD070 \uC0DD\uC131\uC73C\uB85C \u2192",
@@ -1901,6 +1916,9 @@
     { id: "extract", write: false, optional: false },
     { id: "create", write: true, optional: false, paid: true },
     { id: "semantics", write: true, optional: true, paid: true },
+    // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
+    { id: "dark", write: true, optional: true, paid: true },
+    { id: "textStyles", write: true, optional: true, paid: true },
     { id: "bind", write: true, optional: false },
     { id: "rename", write: true, optional: false },
     { id: "componentize", write: true, optional: true, paid: true }
@@ -1916,9 +1934,23 @@
       return { step, run: true };
     });
   }
+  function pickDarkTarget(vars) {
+    var _a;
+    const cols = /* @__PURE__ */ new Map();
+    for (const v of vars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
+    const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
+    const target = (_a = withModes.find((v) => v.collection === "Semantic")) != null ? _a : withModes[0];
+    if (!target) return null;
+    const dark = target.modes.find((m) => m.name.toLowerCase() === "dark");
+    const from = target.modes.find((m) => m.modeId !== (dark == null ? void 0 : dark.modeId));
+    if (!from) return null;
+    return __spreadValues({ collectionId: target.collectionId, fromModeId: from.modeId }, dark ? { toModeId: dark.modeId } : {});
+  }
   function summarize(totals) {
     const parts = [];
     if (totals.created != null) parts.push(t("wizard.sum.tokens", { n: totals.created }));
+    if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t("wizard.sum.dark", { n: totals.darkFilled }));
+    if (totals.textStyles != null && totals.textStyles > 0) parts.push(t("wizard.sum.textStyles", { n: totals.textStyles }));
     if (totals.bound != null) parts.push(t("wizard.sum.bound", { n: totals.bound }));
     if (totals.renamed != null) parts.push(t("wizard.sum.renamed", { n: totals.renamed }));
     if (totals.components != null && totals.components > 0) parts.push(t("wizard.sum.components", { n: totals.components }));
@@ -2867,6 +2899,8 @@
     const semMap = textToSemanticMap($("semMap").value);
     const options = {
       semantics: $("wizOptSemantics").checked,
+      dark: $("wizOptDark").checked,
+      textStyles: $("wizOptTextStyles").checked,
       componentize: $("wizOptComponentize").checked
     };
     const ctx = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
@@ -2909,6 +2943,44 @@
             const r = await wizardRequest({ type: "CREATE_SEMANTICS", map: semMap }, ["SEMANTICS_RESULT"]);
             totals.semanticsAliased = r.aliased;
             setWizardStep("semantics", "done", t("wizard.seq.semantics", { aliased: r.aliased }) + (r.missing.length ? t("wizard.seq.semanticsMissing", { n: r.missing.length }) : ""));
+            break;
+          }
+          case "dark": {
+            const vars = await wizardRequest({ type: "GET_VARIABLES" }, ["VARIABLES"]);
+            const target = pickDarkTarget(vars.vars);
+            if (!target) {
+              setWizardStep("dark", "done", t("wizard.seq.darkNoTarget"));
+              break;
+            }
+            const r = await wizardRequest(
+              __spreadValues({ type: "GENERATE_DARK_MODE", collectionId: target.collectionId, fromModeId: target.fromModeId }, target.toModeId ? { toModeId: target.toModeId } : {}),
+              ["DARK_MODE_RESULT"]
+            );
+            if (r.error) {
+              setWizardStep("dark", "fail", r.error);
+              break;
+            }
+            totals.darkFilled = r.realiased;
+            if (!r.realiased) {
+              setWizardStep("dark", "fail", t("wizard.seq.darkNothing"));
+              break;
+            }
+            setWizardStep(
+              "dark",
+              "done",
+              t("wizard.seq.dark", { realiased: r.realiased }) + (r.modeCreated ? t("wizard.seq.darkModeCreated") : "") + (r.skipped ? t("wizard.seq.darkSkip", { n: r.skipped }) : "")
+            );
+            break;
+          }
+          case "textStyles": {
+            const scan = await wizardRequest({ type: "SCAN_TEXT_STYLES" }, ["TEXT_STYLE_CANDIDATES"]);
+            if (!scan.styles.length) {
+              setWizardStep("textStyles", "done", t("wizard.seq.textStylesNone"));
+              break;
+            }
+            const r = await wizardRequest({ type: "CREATE_TEXT_STYLES", styles: scan.styles }, ["TEXT_STYLES_RESULT"]);
+            totals.textStyles = r.created + r.updated;
+            setWizardStep("textStyles", "done", t("wizard.seq.textStyles", { created: r.created, updated: r.updated }));
             break;
           }
           case "bind": {
@@ -3055,7 +3127,12 @@
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     refreshDarkModes();
-    for (const [box, lock] of [["wizOptSemantics", "wizSemanticLock"], ["wizOptComponentize", "wizComponentLock"]]) {
+    for (const [box, lock] of [
+      ["wizOptSemantics", "wizSemanticLock"],
+      ["wizOptDark", "wizDarkLock"],
+      ["wizOptTextStyles", "wizTextStylesLock"],
+      ["wizOptComponentize", "wizComponentLock"]
+    ]) {
       $(lock).textContent = isPaid ? "" : PAID_LOCK;
       $(box).disabled = !isPaid;
     }
@@ -3543,7 +3620,7 @@
       }
       case "COMPONENTS_RESULT": {
         clearCompPreview();
-        const extra = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.exposed ? ` \xB7 \uC18D\uC131 ${msg.exposed}` : ""}`;
+        const extra = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.exposed ? ` \xB7 \uC18D\uC131 ${msg.exposed}` : ""}${msg.icons ? ` \xB7 \uC544\uC774\uCF58 ${msg.icons}` : ""}`;
         setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
         break;

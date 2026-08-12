@@ -14,7 +14,8 @@ import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 import { rgbToHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
+import { createIconRegistry, swapVectorSlots, transplantImageFills, nodeAtPath } from './lib/artwork';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
@@ -428,6 +429,42 @@ function paintsOf(v: unknown): readonly { visible?: boolean; type?: string; opac
   }));
 }
 
+/** 첫 visible IMAGE 채움의 해시. 이미지가 없으면 undefined(= 사진 슬롯이 아님). */
+function imageHashOf(node: SceneNode): string | undefined {
+  const fills = (node as { fills?: unknown }).fills;
+  if (!Array.isArray(fills)) return undefined;
+  const img = fills.find((p) => (p as Paint).type === 'IMAGE' && (p as Paint).visible !== false) as ImagePaint | undefined;
+  if (!img) return undefined;
+  return img.imageHash ?? '';
+}
+
+/** 문자열 지문(FNV-1a 32bit) — 경로 데이터를 그대로 트리에 싣지 않으려고 해시로 줄인다. */
+function fnv1a(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/** 벡터류 도형의 그림 지문 — fill/stroke geometry의 경로 데이터. 도형이 아니면 undefined. */
+function vectorKeyOf(node: SceneNode): string | undefined {
+  if (!VECTOR_TYPES.has(node.type)) return undefined;
+  try {
+    const g = node as unknown as { fillGeometry?: readonly { data?: string }[]; strokeGeometry?: readonly { data?: string }[] };
+    const parts: string[] = [];
+    for (const p of g.fillGeometry ?? []) parts.push(p.data ?? '');
+    for (const p of g.strokeGeometry ?? []) parts.push(p.data ?? '');
+    // 기하를 못 읽으면 크기라도 지문에 넣는다 — 빈 문자열끼리 같다고 보면 다른 그림이 합쳐진다.
+    return parts.length ? fnv1a(parts.join('|')) : `?${Math.round((node as LayoutMixin).width)}x${Math.round((node as LayoutMixin).height)}`;
+  } catch {
+    return undefined;
+  }
+}
+
+const VECTOR_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);
+
 /** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑·역할을 읽어 순수 그룹화에 넘김. */
 function toStructNode(node: SceneNode): StructNode {
   const a = node as unknown as Record<string, unknown>;
@@ -450,6 +487,8 @@ function toStructNode(node: SceneNode): StructNode {
     id: node.id,
     name: node.name,
     type: node.type,
+    imageHash: imageHashOf(node),
+    vectorKey: vectorKeyOf(node),
     locked: node.locked,
     visible: node.visible,
     width: num(a.width),
@@ -504,18 +543,15 @@ function ownComponentLayers(root: ComponentNode | SceneNode): SceneNode[] {
   return ownComponentLayersWithPath(root).map((x) => x.node);
 }
 
-/** 루트 기준 자식 인덱스 경로(`0/1`)로 노드 찾기. */
-function nodeAtPath(root: SceneNode, path: string): SceneNode | null {
-  let cur: SceneNode = root;
+/** StructNode 트리에서 인덱스 경로의 그림 지문(`vectorKey`)을 읽는다. 없으면 null. */
+function structAtPathVectorKey(root: StructNode, path: string): string | null {
+  let cur: StructNode | undefined = root;
   for (const seg of path.split('/').filter(Boolean)) {
-    if (!('children' in cur)) return null;
-    const i = Number(seg);
-    if (!Number.isFinite(i)) return null;
-    const kids = cur.children as readonly SceneNode[];
-    if (!kids[i]) return null;
-    cur = kids[i];
+    const kids: readonly StructNode[] = cur?.children ?? [];
+    cur = kids[Number(seg)];
+    if (!cur) return null;
   }
-  return cur;
+  return cur?.vectorKey ?? null;
 }
 
 function propDefaultFor(target: SceneNode, type: CompPropType): string | boolean {
@@ -1203,10 +1239,29 @@ figma.ui.onmessage = async (msg: UiToCode) => {
 
         // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
         // 등록 대상 자신은 '기존 이름'에서 제외(스캔 미리보기와 같은 규칙).
+        const existingNames = await existingComponentNames(new Set(valid.map((n) => n.id)));
         const resolved = resolveGroupNames(
           groups.map((g) => g.members),
-          await existingComponentNames(new Set(valid.map((n) => n.id))),
+          existingNames,
         );
+
+        /* 아이콘(날 벡터) 컴포넌트 — 그림이 다른 슬롯은 인스턴스 안에서 경로를 못 고치므로,
+           그림마다 컴포넌트를 만들고 그 자리를 인스턴스로 바꿔 INSTANCE_SWAP으로 담는다.
+           지문(vectorKey) 기준으로 문서 전체에서 한 번만 만든다(그룹이 달라도 같은 아이콘은 하나). */
+        const takenNames = new Set<string>([...existingNames, ...resolved]);
+        const iconRegistry = createIconRegistry({
+          page,
+          place: placeOnPage,
+          uniqueName: (base) => {
+            const b = pascalCase(base) || 'Icon';
+            let n = b;
+            let i = 2;
+            while (takenNames.has(n)) n = `${b}${i++}`;
+            takenNames.add(n);
+            return n;
+          },
+          onFailure: (m) => failures.push(m),
+        });
         // 트리가 보여 준 이름이 있으면 그것이 최종이다 — 충돌 해소는 **후보 전체**를 봐야
         // 같은 답이 나오는데 여기는 체크한 것만 받는다. 다시 풀면 `ProfileAvatar`로 보여 주고
         // `Avatar`로 등록하는 어긋남이 생긴다(미리보기 없는 폴백 경로만 여기서 정한다).
@@ -1258,58 +1313,112 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             }
             const structs = live.map(toStructNode);
             const plan = inferVaryingComponentProperties(structs);
-            type Snap = { o: Origin; vals: Record<string, string | boolean> };
-            const snapshots: Snap[] = [];
-            const made: ComponentNode[] = [];
-            const madeFromLive: number[] = [];
+            // 사진이 다른 슬롯 — 컴포넌트 속성이 아니라 인스턴스 fill 오버라이드로 이식한다.
+            const imageSlots = inferVaryingImageSlots(structs);
+            // 날 벡터 슬롯 — 아래에서 아이콘 컴포넌트를 만들고 마스터 자리를 인스턴스로 바꾼다.
+            const vectorPlans = plan.filter((p) => p.fromVector && p.layerPath != null);
+            /** 멤버 원본의 사진 fill(경로별) — 멤버 노드가 사라지기 전에 떠 둔다. */
+            const imagesOf = (root: SceneNode): Record<string, readonly Paint[]> => {
+              const out: Record<string, readonly Paint[]> = {};
+              for (const s of imageSlots) {
+                const n = nodeAtPath(root, s.layerPath);
+                const f = n && 'fills' in n ? (n as GeometryMixin).fills : null;
+                if (Array.isArray(f)) out[s.layerPath] = f as readonly Paint[];
+              }
+              return out;
+            };
+            // 아이콘 컴포넌트는 멤버가 컴포넌트로 바뀌기 **전에** 만든다 — 마스터가 아닌 멤버는
+            // 곧 제거되고, 그때 그 안의 그림도 함께 사라진다.
+            // 하나라도 못 만들면 접지 않는다 — 멤버를 지운 뒤엔 그 그림을 되살릴 수 없다.
+            let iconsReady = true;
             for (let i = 0; i < live.length; i++) {
-              const n = live[i];
-              const snap: Snap = { o: captureOrigin(n), vals: propValuesFromNode(n, plan) };
-              try {
-                made.push(figma.createComponentFromNode(n));
-                snapshots.push(snap);
-                madeFromLive.push(i);
-              } catch (e) {
-                skipped++;
-                failures.push(`속성접힘 컴포넌트화 실패(${n.name}): ${errText(e)}`);
+              for (const p of vectorPlans) {
+                const node = nodeAtPath(live[i], p.layerPath!);
+                const key = structAtPathVectorKey(structs[i], p.layerPath!);
+                const icon = node && key ? iconRegistry.ensure(key, node, p.layerName) : null;
+                if (!icon) iconsReady = false;
               }
             }
-            if (!made.length) continue;
-            // 액션 슬롯이 있는 쪽을 마스터로 — optional 결손 멤버의 트리를 대표로 쓰면 BOOLEAN 경로가 사라짐.
-            const preferLive = pickCollapseMasterIndex(structs);
-            let masterMade = madeFromLive.indexOf(preferLive);
-            if (masterMade < 0) masterMade = 0;
-            const master = made[masterMade];
-            for (let i = 0; i < made.length; i++) {
-              if (i === masterMade) continue;
-              try { made[i].remove(); } catch { /* 이미 제거됨 */ }
-            }
-            try { master.name = setName || pascalCase(live[preferLive]?.name ?? live[0].name); } catch { /* 이름 실패 무시 */ }
-            placeOnPage(master);
-            singles.push(master.name);
-            registered++; // 남긴 단품 1개만 집계(중간 변환분은 제거)
-            // 값이 다른 슬롯만 TEXT/SWAP/BOOLEAN으로 노출(공통 텍스트는 속성 제외).
-            let collapsedExposed = 0;
-            try {
-              collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
-            } catch (e) {
-              failures.push(`속성 노출 실패(${master.name}): ${errText(e)}`);
-            }
-            exposedEarly += collapsedExposed;
-            const ids = propIdsByName(master);
-            const places: { inst: InstanceNode; o: Origin }[] = [];
-            for (const snap of snapshots) {
-              try {
-                const inst = master.createInstance();
-                applyInstancePropValues(inst, ids, snap.vals);
-                places.push({ inst, o: snap.o });
-              } catch (e) {
-                failures.push(`인스턴스 실패(${master.name}): ${errText(e)}`);
+            if (!iconsReady) {
+              // 세트로 남긴다(아래 경로) — 멤버가 그대로라 그림도 그대로다.
+              failures.push(`아이콘을 만들지 못해 세트로 등록합니다(${setName})`);
+            } else {
+              type Snap = { o: Origin; vals: Record<string, string | boolean>; images: Record<string, readonly Paint[]> };
+              const snapshots: Snap[] = [];
+              const made: ComponentNode[] = [];
+              const madeFromLive: number[] = [];
+              for (let i = 0; i < live.length; i++) {
+                const n = live[i];
+                const snap: Snap = { o: captureOrigin(n), vals: propValuesFromNode(n, plan), images: imagesOf(n) };
+                try {
+                  made.push(figma.createComponentFromNode(n));
+                  snapshots.push(snap);
+                  madeFromLive.push(i);
+                } catch (e) {
+                  skipped++;
+                  failures.push(`속성접힘 컴포넌트화 실패(${n.name}): ${errText(e)}`);
+                }
               }
+              if (!made.length) continue;
+              // 액션 슬롯이 있는 쪽을 마스터로 — optional 결손 멤버의 트리를 대표로 쓰면 BOOLEAN 경로가 사라짐.
+              const preferLive = pickCollapseMasterIndex(structs);
+              let masterMade = madeFromLive.indexOf(preferLive);
+              if (masterMade < 0) masterMade = 0;
+              const master = made[masterMade];
+              for (let i = 0; i < made.length; i++) {
+                if (i === masterMade) continue;
+                try { made[i].remove(); } catch { /* 이미 제거됨 */ }
+              }
+              try { master.name = setName || pascalCase(live[preferLive]?.name ?? live[0].name); } catch { /* 이름 실패 무시 */ }
+              placeOnPage(master);
+              singles.push(master.name);
+              registered++; // 남긴 단품 1개만 집계(중간 변환분은 제거)
+              // 마스터의 날 벡터 자리를 아이콘 인스턴스로 교체 — INSTANCE_SWAP은 대상이
+              // 인스턴스일 때만 붙으므로 **속성 노출보다 먼저** 한다. 먼저 끼우고 뒤에 지워
+              // 인덱스 경로가 흔들리지 않게 한다(자식 수가 잠깐도 줄지 않는다).
+              const masterSnap = snapshots[masterMade];
+              failures.push(
+                ...swapVectorSlots(
+                  master,
+                  vectorPlans.map((p) => ({
+                    layerName: p.layerName,
+                    layerPath: p.layerPath!,
+                    icon: iconRegistry.get(String(masterSnap?.vals[p.propName] ?? '')),
+                  })),
+                ),
+              );
+              // 값이 다른 슬롯만 TEXT/SWAP/BOOLEAN으로 노출(공통 텍스트는 속성 제외).
+              let collapsedExposed = 0;
+              try {
+                collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
+              } catch (e) {
+                failures.push(`속성 노출 실패(${master.name}): ${errText(e)}`);
+              }
+              exposedEarly += collapsedExposed;
+              const ids = propIdsByName(master);
+              const places: { inst: InstanceNode; o: Origin }[] = [];
+              for (const snap of snapshots) {
+                try {
+                  const inst = master.createInstance();
+                  // 벡터 슬롯의 값은 그림 지문이다 — 방금 만든 아이콘 컴포넌트 key로 옮겨 적는다.
+                  const vals = { ...snap.vals };
+                  for (const p of vectorPlans) {
+                    const icon = iconRegistry.get(String(vals[p.propName] ?? ''));
+                    if (icon) vals[p.propName] = icon.key || icon.id;
+                    else delete vals[p.propName]; // 못 만든 그림은 마스터 것 그대로(빈 값으로 덮지 않는다)
+                  }
+                  applyInstancePropValues(inst, ids, vals);
+                  // 사진은 속성이 아니라 fill 오버라이드 — 멤버 원본을 같은 경로에 이식한다.
+                  failures.push(...transplantImageFills(inst, snap.images).failures);
+                  places.push({ inst, o: snap.o });
+                } catch (e) {
+                  failures.push(`인스턴스 실패(${master.name}): ${errText(e)}`);
+                }
+              }
+              restore(places);
+              // 루프 끝 일괄 expose는 중복 방지 — 이미 노출했으므로 containers에 넣지 않음.
+              continue;
             }
-            restore(places);
-            // 루프 끝 일괄 expose는 중복 방지 — 이미 노출했으므로 containers에 넣지 않음.
-            continue;
           }
 
           // 2개+ → 각 멤버 컴포넌트화(원위치 기록) 후 세트 결합 → 원위치에 변형 인스턴스 복원.
@@ -1366,7 +1475,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(`속성 노출 실패: ${errText(e)}`); }
         }
 
-        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, missing: [], failures });
+        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures });
         if (registered || sets) commitUndo(figma); // UX2
         break;
       }

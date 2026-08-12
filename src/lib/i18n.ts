@@ -97,6 +97,8 @@ export const STRINGS: Record<string, string> = {
   'wizard.step.extract': '추출',
   'wizard.step.create': '토큰',
   'wizard.step.semantics': '역할 매핑',
+  'wizard.step.dark': '다크',
+  'wizard.step.textStyles': '텍스트 스타일',
   'wizard.step.bind': '변수연결',
   'wizard.step.rename': '이름',
   'wizard.step.componentize': '컴포넌트',
@@ -133,6 +135,13 @@ export const STRINGS: Record<string, string> = {
   'wizard.seq.createDone': '생성 {created} · 갱신 {updated}',
   'wizard.seq.semantics': '별칭 {aliased}',
   'wizard.seq.semanticsMissing': ' · 누락 {n}',
+  'wizard.seq.dark': '다크 {realiased}개 연결',
+  'wizard.seq.darkModeCreated': ' · Dark 모드 추가',
+  'wizard.seq.darkSkip': ' · 건너뜀 {n}(값을 직접 넣은 색)',
+  'wizard.seq.darkNoTarget': '모드가 있는 컬렉션이 없어 건너뜀 — 먼저 토큰을 생성하세요',
+  'wizard.seq.darkNothing': '채울 색이 없음 — Global을 가리키는 시맨틱 색이 필요합니다',
+  'wizard.seq.textStyles': '스타일 생성 {created} · 갱신 {updated}',
+  'wizard.seq.textStylesNone': '선택에 텍스트가 없어 건너뜀',
   'wizard.seq.bindCancelled': '취소됨 — {bound}건만 적용',
   'wizard.seq.bindDone': '연결 {bound}',
   'wizard.seq.bindSkip': ' · 스킵 {n}',
@@ -141,6 +150,8 @@ export const STRINGS: Record<string, string> = {
 
   // 마법사 완료 요약(summarize, wizard.ts)
   'wizard.sum.tokens': '토큰 {n}',
+  'wizard.sum.dark': '다크 {n}',
+  'wizard.sum.textStyles': '텍스트 스타일 {n}',
   'wizard.sum.bound': '연결 {n}',
   'wizard.sum.renamed': '이름 {n}',
   'wizard.sum.components': '컴포넌트 {n}',
@@ -202,11 +213,13 @@ export const STRINGS: Record<string, string> = {
   'wizardCard.title': '한 번에 정리',
   'wizardCard.hint': '선택 화면을 한 번에 토큰·변수 연결까지 정리합니다',
   'wizardCard.optSemantics': '역할 매핑',
+  'wizardCard.optDark': '다크',
+  'wizardCard.optTextStyles': '텍스트 스타일',
   'wizardCard.optComponentize': '컴포넌트',
   'wizardCard.run': '전체 실행',
   // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
   // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-  'wizardCard.legend': '역할 매핑=색 역할 · 변수연결=화면에 붙이기. 다크·텍스트 스타일은 만들기에서',
+  'wizardCard.legend': '역할 매핑=색 역할 · 변수연결=화면에 붙이기 · 다크=라이트 모드에서 어두운 값 채우기',
   // 공통(정적 라벨)
   'common.selectAll': '전체',
   'prereq.gotoCreate': '토큰 생성으로 →',

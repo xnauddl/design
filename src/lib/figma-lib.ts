@@ -20,6 +20,8 @@ export { bindSelection } from './bind';
 export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName } from './rename';
 export type { RenameOutcome } from './rename';
+export { createIconRegistry, swapVectorSlots, transplantImageFills, nodeAtPath } from './artwork';
+export type { IconRegistry, VectorSlot } from './artwork';
 export { scanSimilar, componentizeSimilar } from './similarApply';
 export type { ComponentizeResult } from './similarApply';
 export { generateDarkMode, ensureDarkMode, findModeByName, DARK_MODE_NAME } from './themeApply';

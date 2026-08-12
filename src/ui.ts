@@ -18,7 +18,7 @@ import { suggestTokenRoles, mergeTokenRoles, semanticMapToText, textToSemanticMa
 import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
-import { planWizard, summarize, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
+import { planWizard, summarize, pickDarkTarget, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -1313,6 +1313,8 @@ async function runWizard(): Promise<void> {
 
   const options: WizardOptions = {
     semantics: ($('wizOptSemantics') as HTMLInputElement).checked,
+    dark: ($('wizOptDark') as HTMLInputElement).checked,
+    textStyles: ($('wizOptTextStyles') as HTMLInputElement).checked,
     componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
   };
   const ctx: WizardContext = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
@@ -1358,6 +1360,50 @@ async function runWizard(): Promise<void> {
           const r = await wizardRequest({ type: 'CREATE_SEMANTICS', map: semMap }, ['SEMANTICS_RESULT']);
           totals.semanticsAliased = r.aliased;
           setWizardStep('semantics', 'done', t('wizard.seq.semantics', { aliased: r.aliased }) + (r.missing.length ? t('wizard.seq.semanticsMissing', { n: r.missing.length }) : ''));
+          break;
+        }
+        case 'dark': {
+          // 대상은 변수 목록에서 직접 고른다 — 테마 카드의 셀렉트는 다른 리스너가 채우므로
+          // 같은 응답으로 깨어난 이 자리에서 읽으면 아직 비어 있을 수 있다.
+          const vars = await wizardRequest({ type: 'GET_VARIABLES' }, ['VARIABLES']);
+          const target = pickDarkTarget(vars.vars);
+          if (!target) {
+            setWizardStep('dark', 'done', t('wizard.seq.darkNoTarget'));
+            break;
+          }
+          const r = await wizardRequest(
+            { type: 'GENERATE_DARK_MODE', collectionId: target.collectionId, fromModeId: target.fromModeId, ...(target.toModeId ? { toModeId: target.toModeId } : {}) },
+            ['DARK_MODE_RESULT'],
+          );
+          if (r.error) {
+            setWizardStep('dark', 'fail', r.error);
+            break;
+          }
+          totals.darkFilled = r.realiased;
+          if (!r.realiased) {
+            // 모드만 생기고 값이 안 찬 상태 — '완료'로 적으면 다크가 된 줄 안다.
+            setWizardStep('dark', 'fail', t('wizard.seq.darkNothing'));
+            break;
+          }
+          setWizardStep(
+            'dark',
+            'done',
+            t('wizard.seq.dark', { realiased: r.realiased }) +
+              (r.modeCreated ? t('wizard.seq.darkModeCreated') : '') +
+              (r.skipped ? t('wizard.seq.darkSkip', { n: r.skipped }) : ''),
+          );
+          break;
+        }
+        case 'textStyles': {
+          // 스캔(읽기) → 후보 그대로 등록. 화면의 표는 같은 응답을 받은 타이포 카드가 그린다.
+          const scan = await wizardRequest({ type: 'SCAN_TEXT_STYLES' }, ['TEXT_STYLE_CANDIDATES']);
+          if (!scan.styles.length) {
+            setWizardStep('textStyles', 'done', t('wizard.seq.textStylesNone'));
+            break;
+          }
+          const r = await wizardRequest({ type: 'CREATE_TEXT_STYLES', styles: scan.styles }, ['TEXT_STYLES_RESULT']);
+          totals.textStyles = r.created + r.updated;
+          setWizardStep('textStyles', 'done', t('wizard.seq.textStyles', { created: r.created, updated: r.updated }));
           break;
         }
         case 'bind': {
@@ -1555,9 +1601,14 @@ function updateGates(): void {
   // 방금 disabled를 티어만 보고 덮었으니, 전제를 여기서 다시 적용해야 한다(순서 의존).
   // Dark 모드는 없으면 생성하므로 모드 2개 전제는 더 이상 없다.
   refreshDarkModes();
-  // 마법사 옵션 둘 다 Paid 단계다(WIZARD_STEPS의 semantics·componentize). 한쪽만 잠그면
-  // Free가 켤 수 있는 체크박스가 실행 계획에서 조용히 빠진다 — #11이 없애려던 바로 그 상태.
-  for (const [box, lock] of [['wizOptSemantics', 'wizSemanticLock'], ['wizOptComponentize', 'wizComponentLock']]) {
+  // 마법사 옵션은 모두 Paid 단계다(WIZARD_STEPS의 semantics·dark·textStyles·componentize).
+  // 하나라도 빠뜨리면 Free가 켤 수 있는 체크박스가 실행 계획에서 조용히 빠진다 — #11이 없애려던 바로 그 상태.
+  for (const [box, lock] of [
+    ['wizOptSemantics', 'wizSemanticLock'],
+    ['wizOptDark', 'wizDarkLock'],
+    ['wizOptTextStyles', 'wizTextStylesLock'],
+    ['wizOptComponentize', 'wizComponentLock'],
+  ]) {
     $(lock).textContent = isPaid ? '' : PAID_LOCK;
     ($(box) as HTMLInputElement).disabled = !isPaid;
   }
@@ -2172,7 +2223,7 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'COMPONENTS_RESULT': {
       clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
-      const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.exposed ? ` · 속성 ${msg.exposed}` : ''}`;
+      const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.exposed ? ` · 속성 ${msg.exposed}` : ''}${msg.icons ? ` · 아이콘 ${msg.icons}` : ''}`;
       setStatus('structureStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? 'ok' : 'warn');
       // 빈 조합(미생성) + 실패(진단) 리포트
       renderVariantReport(variantIssueSections(msg.missing, msg.failures));
