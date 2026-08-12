@@ -193,6 +193,8 @@ export const STRINGS: Record<string, string> = {
   'settings.tolTip': '바인딩은 레이어 값과 변수 값의 차이가 이 값 이하일 때 같은 값으로 봅니다. 격자로 옮긴 토큰까지 붙이려면 격자의 절반쯤이 필요합니다.',
   // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
   'create.snapTolGap': ' · 옮긴 값은 허용오차 {tol}px로는 원래 레이어에 안 붙습니다(설정에서 {half}px로)',
+  // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
+  'create.tidyUndo': '되돌리기',
   // 마법사 카드
   'wizardCard.title': '한 번에 정리',
   'wizardCard.hint': '선택 화면을 한 번에 토큰·변수 연결까지 정리합니다',

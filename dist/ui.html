@@ -543,8 +543,11 @@
         <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" data-i18n-title="create.dropOnceTip" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
       </div>
       <div id="tokenList" class="results"></div>
+      <!-- 격자 값이 설정 입력으로 돌아온 뒤로는 스냅이 '정책'이 아니라 사용자의 선택이다.
+           색 자동 정리와 같은 자리에 되돌리기를 둔다. -->
       <div class="tidy tidy-note" id="numTidySummary" style="display:none">
         <span id="numTidyText"></span>
+        <button id="btnNumTidyUndo" class="link" data-i18n="create.tidyUndo">되돌리기</button>
       </div>
       <div class="status" id="createStatus"></div>
     </div>
@@ -1044,6 +1047,8 @@
     "settings.tolTip": "\uBC14\uC778\uB529\uC740 \uB808\uC774\uC5B4 \uAC12\uACFC \uBCC0\uC218 \uAC12\uC758 \uCC28\uC774\uAC00 \uC774 \uAC12 \uC774\uD558\uC77C \uB54C \uAC19\uC740 \uAC12\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uACA9\uC790\uB85C \uC62E\uAE34 \uD1A0\uD070\uAE4C\uC9C0 \uBD99\uC774\uB824\uBA74 \uACA9\uC790\uC758 \uC808\uBC18\uCBE4\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
     // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
     "create.snapTolGap": " \xB7 \uC62E\uAE34 \uAC12\uC740 \uD5C8\uC6A9\uC624\uCC28 {tol}px\uB85C\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC548 \uBD99\uC2B5\uB2C8\uB2E4(\uC124\uC815\uC5D0\uC11C {half}px\uB85C)",
+    // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
+    "create.tidyUndo": "\uB418\uB3CC\uB9AC\uAE30",
     // 마법사 카드
     "wizardCard.title": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
     "wizardCard.hint": "\uC120\uD0DD \uD654\uBA74\uC744 \uD55C \uBC88\uC5D0 \uD1A0\uD070\xB7\uBCC0\uC218 \uC5F0\uACB0\uAE4C\uC9C0 \uC815\uB9AC\uD569\uB2C8\uB2E4",
@@ -2419,8 +2424,10 @@
     const v = Math.round(Number($("grid").value));
     return isFinite(v) && v >= 1 ? v : TIDY_GRID_DEFAULT;
   }
+  var preNumTidyTokens = null;
   function clearNumTidy() {
     $("numTidySummary").style.display = "none";
+    preNumTidyTokens = null;
   }
   function tidyNumbers() {
     if (!creatableTokens().length) {
@@ -2435,6 +2442,7 @@
       return;
     }
     tokens = r.tokens;
+    preNumTidyTokens = snapshot;
     carryTokenChecked(snapshot, r.tokens);
     $("numTidySummary").style.display = "";
     const merged = r.merged ? ` \xB7 \uAC19\uC740 \uCE78 ${r.merged}\uAC1C \uBCD1\uD569` : "";
@@ -2443,6 +2451,17 @@
     const gap = tol < half ? t("create.snapTolGap", { tol, half }) : "";
     $("numTidyText").textContent = `\uC5EC\uBC31\xB7\uD06C\uAE30 ${r.before} \u2192 ${r.after}\uAC1C (${grid}px \uACA9\uC790\uB85C ${r.snapped}\uAC1C \uC774\uB3D9${merged})${gap}`;
   }
+  function undoNumTidy() {
+    if (!preNumTidyTokens) return;
+    const restored = preNumTidyTokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
+    carryTokenChecked(tokens, restored);
+    tokens = restored;
+    clearNumTidy();
+    renderTokens();
+    $("btnCreateApply").style.display = "none";
+    setStatus("createStatus", "\uACA9\uC790 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC2B5\uB2C8\uB2E4 \u2014 \u300C\uBBF8\uB9AC\uBCF4\uAE30\u300D\uB97C \uB2E4\uC2DC \uB204\uB974\uBA74 \uB610 \uC815\uB9AC\uB429\uB2C8\uB2E4.", "");
+  }
+  $("btnNumTidyUndo").addEventListener("click", undoNumTidy);
   $("tokenAll").addEventListener("change", () => {
     const on = $("tokenAll").checked;
     tokenChecked.clear();

@@ -718,9 +718,13 @@ function tidyGrid(): number {
   return isFinite(v) && v >= 1 ? v : TIDY_GRID_DEFAULT;
 }
 
+/** 격자 스냅 직전의 토큰 스냅샷(되돌리기용). null이면 되돌릴 것 없음. */
+let preNumTidyTokens: DraftToken[] | null = null;
+
 /** 요약 줄을 걷는다 — 남겨두면 다른 추출의 토큰에 옛 요약이 붙는다. */
 function clearNumTidy(): void {
   $('numTidySummary').style.display = 'none';
+  preNumTidyTokens = null; // 요약이 없으면 되돌릴 대상도 없다
 }
 
 /** 여백·크기 토큰을 격자 8 사다리로 스냅(#19). 미리보기 직전에 호출. */
@@ -737,6 +741,7 @@ function tidyNumbers(): void {
     return;
   }
   tokens = r.tokens;
+  preNumTidyTokens = snapshot; // 격자는 이제 설정 값이라 '정책'이 아니다 — 되돌릴 수 있어야 한다
   // 스냅으로 키(값)가 바뀌므로 체크를 그대로 두면 전부 풀린다. 그렇다고 전체 재선택을 하면
   // 사용자의 '1× 해제'가 조용히 되살아난다 → 정리 전 체크 상태를 새 키로 이월한다.
   carryTokenChecked(snapshot, r.tokens);
@@ -750,6 +755,19 @@ function tidyNumbers(): void {
   const gap = tol < half ? t('create.snapTolGap', { tol, half }) : '';
   $('numTidyText').textContent = `여백·크기 ${r.before} → ${r.after}개 (${grid}px 격자로 ${r.snapped}개 이동${merged})${gap}`;
 }
+
+/** 격자 정리 되돌리기 — 스냅 직전 값으로 복원(색 자동 정리의 되돌리기와 같은 모양). */
+function undoNumTidy(): void {
+  if (!preNumTidyTokens) return;
+  const restored = preNumTidyTokens.map((t) => ({ ...t, sources: [...t.sources] }));
+  carryTokenChecked(tokens, restored); // 스냅으로 바뀐 키를 원래 값으로 되돌리며 체크를 이월
+  tokens = restored;
+  clearNumTidy(); // 요약 줄·스냅샷 정리
+  renderTokens();
+  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 집합 변경 → 새 미리보기 필요
+  setStatus('createStatus', '격자 정리를 되돌렸습니다 — 「미리보기」를 다시 누르면 또 정리됩니다.', '');
+}
+$('btnNumTidyUndo').addEventListener('click', undoNumTidy);
 
 // 전체 선택 / 1× 해제 — 목록이 상한에 잘려 있어도 전체에 적용된다(체크는 DOM이 아니라 집합이 보관).
 $('tokenAll').addEventListener('change', () => {
