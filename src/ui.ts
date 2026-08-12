@@ -159,7 +159,7 @@ function carryTokenChecked(before: readonly DraftToken[], after: readonly DraftT
  * 이름 편집은 넘겨받은 토큰 객체를 그대로 고친다 — 목록은 `tokens`를 필터한 배열이라
  * 행 인덱스가 `tokens` 인덱스와 어긋난다(색 토큰이 앞에 있으면 남의 이름을 덮어썼다).
  */
-function makeTokenRow(t: DraftToken): HTMLElement {
+function makeTokenRow(tok: DraftToken): HTMLElement {
   const row = document.createElement('div');
   row.className = 'tk';
 
@@ -168,11 +168,11 @@ function makeTokenRow(t: DraftToken): HTMLElement {
   const cb = document.createElement('input');
   cb.type = 'checkbox';
   cb.className = 'tk-check';
-  cb.checked = tokenChecked.has(tokenKey(t));
-  cb.title = '생성 대상';
+  cb.checked = tokenChecked.has(tokenKey(tok));
+  cb.title = t('create.targetTitle');
   cb.addEventListener('change', () => {
-    if (cb.checked) tokenChecked.add(tokenKey(t));
-    else tokenChecked.delete(tokenKey(t));
+    if (cb.checked) tokenChecked.add(tokenKey(tok));
+    else tokenChecked.delete(tokenKey(tok));
     updateTokenCreate();
   });
   row.appendChild(cb);
@@ -180,38 +180,38 @@ function makeTokenRow(t: DraftToken): HTMLElement {
   const sw = document.createElement('span');
   sw.className = 'tk-gutter'; // 스와치 없는 행은 CSS가 폭 0으로 접는다(#tokenList.has-swatch 참고)
   // 색 토큰은 renderTokens가 걸러내 여기 오지 않는다(색은 위 ‘색 정리’ 표 담당) → effectColor만.
-  if (t.category === 'effectColor' && typeof t.value === 'string') {
+  if (tok.category === 'effectColor' && typeof tok.value === 'string') {
     sw.classList.add('swatch');
-    sw.style.background = t.value;
+    sw.style.background = tok.value;
   }
   row.appendChild(sw);
 
   // 좁은 패널에서는 긴 이름(예: font-family/…)이 입력칸 폭을 넘겨 앞부분만 보인다.
   // 입력칸은 편집 대상이라 말줄임을 못 쓰므로 전체 이름을 title로 항상 읽을 수 있게 둔다.
   const input = document.createElement('input');
-  input.value = t.name;
-  input.title = t.name;
+  input.value = tok.name;
+  input.title = tok.name;
   input.addEventListener('input', () => {
-    t.name = input.value;
+    tok.name = input.value;
     input.title = input.value;
   });
   row.appendChild(input);
 
   // 등장 레이어 수 — 무엇을 남길지 고르는 근거. 1×는 대개 일회성 값이라 눈에 띄게 흐린다.
-  const n = t.count ?? 0;
+  const n = tok.count ?? 0;
   if (n > 0) {
     const use = document.createElement('span');
     use.className = n === 1 ? 'tk-use once' : 'tk-use';
     use.textContent = `${n}×`;
-    use.title = `이 값을 쓰는 레이어 ${n}개`;
+    use.title = t('create.useCountTitle', { n });
     row.appendChild(use);
   }
 
   const cat = document.createElement('span');
   cat.className = 'cat';
-  cat.textContent = t.unit && t.unit !== 'px' ? `${t.category}·${UNIT_CHIP[t.unit]}` : t.category;
+  cat.textContent = tok.unit && tok.unit !== 'px' ? `${tok.category}·${UNIT_CHIP[tok.unit]}` : tok.category;
   // 칩은 좁으니 값·Figma 변수 타입은 title로 — 이름만으로 구분 안 되는 토큰(fontFamily 등) 확인용.
-  cat.title = `${t.category}${t.unit ? ` · ${t.unit}` : ''} · ${resolvedTypeForToken(t)} · ${t.value}`;
+  cat.title = `${tok.category}${tok.unit ? ` · ${tok.unit}` : ''} · ${resolvedTypeForToken(tok)} · ${tok.value}`;
   row.appendChild(cat);
   return row;
 }
@@ -523,21 +523,24 @@ function renderColorTable(): void {
   for (const [role, name] of Object.entries(textToSemanticMap(($('semMap') as HTMLTextAreaElement).value))) {
     if (!roleByName.has(name)) roleByName.set(name, role);
   }
-  renderChunked($('colorTable'), colors, (t) => {
+  renderChunked($('colorTable'), colors, (tok) => {
     const row = document.createElement('div');
     row.className = 'crow';
     const sw = document.createElement('span');
     sw.className = 'swatch';
-    sw.style.background = t.value as string;
+    sw.style.background = tok.value as string;
     const name = document.createElement('span');
     name.className = 'cn';
-    name.textContent = t.name;
-    name.title = `${t.name} · ${classifyColor(t.value as string).achromatic ? '무채' : 'hue'}`;
+    name.textContent = tok.name;
+    name.title = t('colorTable.nameKindTitle', {
+      name: tok.name,
+      kind: classifyColor(tok.value as string).achromatic ? t('color.kindAchromatic') : t('color.kindHue'),
+    });
     const role = document.createElement('input');
     role.setAttribute('list', 'roleList');
-    role.placeholder = '역할(선택)';
-    role.value = roleByName.get(t.name) ?? '';
-    role.dataset.name = t.name;
+    role.placeholder = t('colorTable.rolePlaceholder');
+    role.value = roleByName.get(tok.name) ?? '';
+    role.dataset.name = tok.name;
     row.append(sw, name, role);
     return row;
   }, () => layoutListBy('colorTable')); // 행이 다 붙은 뒤라야 행 높이 측정이 맞는다
@@ -819,7 +822,9 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
       inp.readOnly = true;
       inp.tabIndex = -1;
       // 잘려도 hover로 전체값 확인 가능(특히 긴 폰트 패밀리).
-      inp.title = value ? `${value} · 스캔한 값이라 못 바꿔요` : '스캔한 값 — 새 값은 ‘행 추가’로';
+      inp.title = value
+        ? t('textStyle.scannedValueTitle', { value })
+        : t('textStyle.scannedEmptyTitle');
     }
     td.appendChild(inp);
     tr.appendChild(td);
@@ -831,10 +836,10 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
     if (nameInp) {
       if (s.boundStyleId) {
         nameInp.classList.add('ts-bound');
-        nameInp.title = '이미 등록된 스타일이에요. 이름을 바꾸면 이 스타일의 이름만 바뀝니다(새로 안 만듦).';
+        nameInp.title = t('textStyle.boundNameTitle');
       } else {
         nameInp.classList.add('ts-new');
-        nameInp.title = '새 스타일로 등록됩니다(아직 등록 안 된 글자).';
+        nameInp.title = t('textStyle.newNameTitle');
       }
     }
   }
@@ -851,8 +856,8 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
     if (lhInp) {
       lhInp.title =
         pct > 0
-          ? `화면에서 ${pct}%로 쓰던 행간(${s.lineHeight}px) — %로 등록하고 행간 변수는 연결하지 않아요(Figma가 px로 바꿔버려서).`
-          : '스캔한 값이라 못 바꿔요';
+          ? t('textStyle.lineHeightPercentTitle', { pct, px: s.lineHeight })
+          : t('textStyle.scannedLockedTitle');
     }
   } else {
     cell('lineHeight', String(s.lineHeight), { type: 'number' }); // 수동 행은 px 입력
@@ -866,8 +871,8 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
     if (lsInp) {
       lsInp.title =
         lsPct !== 0
-          ? `화면에서 ${lsPct}%로 쓰던 자간(${s.letterSpacing}px) — %로 등록하고 자간 변수는 연결하지 않아요(Figma가 px로 바꿔버려서).`
-          : '스캔한 값이라 못 바꿔요';
+          ? t('textStyle.letterSpacingPercentTitle', { pct: lsPct, px: s.letterSpacing })
+          : t('textStyle.scannedLockedTitle');
     }
   } else {
     cell('letterSpacing', String(s.letterSpacing), { type: 'number' });
@@ -876,7 +881,7 @@ function textStyleRow(s: TextStyleSpec, locked = false): HTMLTableRowElement {
   const tdDel = document.createElement('td');
   const del = document.createElement('button');
   del.textContent = '✕';
-  del.title = '행 삭제';
+  del.title = t('textStyle.deleteRowTitle');
   // 행이 줄면 상한·개수 문구도 같이 줄어야 한다(안 하면 ‘총 40개 중 8개’가 남아 거짓말이 된다).
   del.addEventListener('click', () => {
     tr.remove();
@@ -1986,7 +1991,11 @@ window.onmessage = (event: MessageEvent) => {
       // 컬렉션 필터 옵션은 실제로 존재하는 컬렉션에서만 만든다.
       const sel = $('varFilterCol') as HTMLSelectElement;
       const prev = sel.value;
-      sel.innerHTML = '<option value="">전체</option>';
+      sel.innerHTML = '';
+      const allOpt = document.createElement('option');
+      allOpt.value = '';
+      allOpt.textContent = t('varedit.filterAll');
+      sel.appendChild(allOpt);
       for (const c of [...new Set(msg.vars.map((v) => v.collection))]) {
         const o = document.createElement('option');
         o.value = c;
@@ -2522,7 +2531,7 @@ function renderSkipReasons(reasons: Record<string, number>): void {
   box.style.display = '';
   const head = document.createElement('span');
   head.className = 'muted';
-  head.textContent = '건너뜀:';
+  head.textContent = t('bind.skipHead');
   box.appendChild(head);
   for (const [key, n] of entries) {
     const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
@@ -2538,7 +2547,12 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     btn.className = 'skip-chip';
     btn.textContent = `${label} ›`;
     // 사유 건수(n)는 속성 단위, 레이어 수는 노드 단위라 서로 다를 수 있다(padding 4건 → 레이어 1개).
-    btn.title = `레이어 ${ids.length}개 선택 — ${bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ')}${ids.length > 5 ? ' 외' : ''}`;
+    const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ');
+    btn.title = t('bind.skipChipTitle', {
+      count: ids.length,
+      names,
+      more: ids.length > 5 ? t('bind.skipMore') : '',
+    });
     btn.addEventListener('click', () => {
       send({ type: 'SELECT_NODES', ids });
       setStatus('applyStatus', `${t('reason.' + key)} 레이어 ${ids.length}개를 선택했어요.`, '');
@@ -2601,7 +2615,7 @@ function makeVarRow(v: VarInfo): HTMLElement {
       sel.appendChild(o);
     }
     sel.value = cell.aliasId ?? '';
-    sel.title = `별칭 → ${cell.display}`;
+    sel.title = t('varedit.aliasTitle', { name: cell.display });
     sel.addEventListener('change', () => {
       send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, aliasId: sel.value } } });
     });
@@ -2610,7 +2624,7 @@ function makeVarRow(v: VarInfo): HTMLElement {
     const val = document.createElement('input');
     val.type = 'text';
     val.value = cell ? cell.display : '';
-    val.placeholder = v.type === 'COLOR' ? '#RRGGBB' : v.type === 'FLOAT' ? '숫자' : '';
+    val.placeholder = v.type === 'COLOR' ? '#RRGGBB' : v.type === 'FLOAT' ? t('varedit.numberPlaceholder') : '';
     val.addEventListener('change', () => {
       send({ type: 'EDIT_VARIABLE', id: v.id, patch: { value: { modeId: v.defaultModeId, literal: val.value } } });
     });
@@ -2621,7 +2635,12 @@ function makeVarRow(v: VarInfo): HTMLElement {
   const col = document.createElement('span');
   col.className = 'vcol tag tag-set';
   col.textContent = v.collection;
-  col.title = `${v.collection} · ${v.type} · 스코프 ${v.scopes.length}/${scopesForTypeList(v.type).length}`;
+  col.title = t('varedit.scopeTitle', {
+    collection: v.collection,
+    type: v.type,
+    used: v.scopes.length,
+    total: scopesForTypeList(v.type).length,
+  });
   row.appendChild(col);
 
   const act = document.createElement('span');
@@ -2805,9 +2824,12 @@ function applyCardChrome(): void {
   });
 }
 
-/** 정적 HTML 라벨 외부화: [data-i18n]=textContent, [data-i18n-html]=innerHTML(신뢰된 자체 문자열).
+/** 정적 HTML 라벨 외부화:
+ *  [data-i18n]=textContent, [data-i18n-html]=innerHTML(신뢰된 자체 문자열),
+ *  [data-i18n-title]=title, [data-i18n-placeholder]=placeholder.
  *  텍스트 전용 요소는 data-i18n, <b>/<code> 등 마크업이 있으면 data-i18n-html을 쓴다.
- *  뱃지 span(예: …Lock)이 함께 있는 요소는 텍스트만 <span data-i18n>로 감싸 뱃지를 보존한다. */
+ *  뱃지 span(예: …Lock)이 함께 있는 요소는 텍스트만 <span data-i18n>로 감싸 뱃지를 보존한다.
+ *  툴팁·자리표시자는 속성 키로 — option 표시 문구는 data-i18n(본문)으로 둔다. */
 function applyStaticI18n(root: ParentNode = document): void {
   // 정의된 키만 덮어쓴다 — 오타/누락 키에서 t()가 키 문자열을 반환해 HTML 원문을 파괴하지 않도록.
   root.querySelectorAll<HTMLElement>('[data-i18n]').forEach((el) => {
@@ -2817,6 +2839,16 @@ function applyStaticI18n(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>('[data-i18n-html]').forEach((el) => {
     const key = el.dataset.i18nHtml as string;
     if (hasString(key)) el.innerHTML = t(key);
+  });
+  root.querySelectorAll<HTMLElement>('[data-i18n-title]').forEach((el) => {
+    const key = el.dataset.i18nTitle as string;
+    if (hasString(key)) el.title = t(key);
+  });
+  root.querySelectorAll<HTMLElement>('[data-i18n-placeholder]').forEach((el) => {
+    const key = el.dataset.i18nPlaceholder as string;
+    if (hasString(key) && 'placeholder' in el) {
+      (el as HTMLInputElement | HTMLTextAreaElement).placeholder = t(key);
+    }
   });
 }
 
