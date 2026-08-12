@@ -8,7 +8,9 @@ import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyle
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection } from './lib/bind';
-import { renameSelection, writeRole } from './lib/rename';
+import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
+// ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
+// 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
@@ -808,6 +810,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'RENAME_APPLY': {
         // #7: 미리보기 트리에서 체크한 항목만 직접 적용(재계산 없이 id→after 그대로).
+        // 이름과 함께 dsRole도 기록 — 말단 후보 자격·등록 머리명사가 readRole에 의존한다.
         const changes: RenameChange[] = [];
         for (const { id, before: expectedBefore, after, role } of msg.items) {
           const node = await figma.getNodeByIdAsync(id);
@@ -820,7 +823,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           // 판넬로 리네임한 사람에게는 통째로 죽어 있었다.
           // **이름이 그대로인 노드에도** 기록한다(멱등) — 옛 리네임 결과·손으로 지은 이름에
           // 역할을 채워 넣는 유일한 경로다. 다만 '바뀐 것'으로 세지는 않는다.
+          // 두 브랜치가 같은 구멍을 다르게 막았다 — 둘 다 남긴다. 미리보기가 이미 역할을
+          // 정해 보냈으면(role) 그 값을 그대로 쓰고, 없을 때만 origin/main의 이름 기반
+          // 추론으로 물러선다. 이름에서 뽑는 쪽은 알려진 역할 토큰으로 끝나는 이름만
+          // 건지므로, 앞의 경로를 이걸로 대체하면 그 외 이름의 역할이 도로 안 남는다.
           if (role) writeRole(node as SceneNode, role);
+          else writeRoleFromName(node as SceneNode, after);
+          // node.name은 위(before !== after)에서 이미 썼다 — origin/main이 여기 둔 대입은
+          // 그 줄과 겹쳐서 걷는다.
           if (before === after) continue;
           changes.push({ id, before, after });
         }
@@ -1055,6 +1065,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           // 써서, 트리에 `CardThumbnail`이라 보여 주고 실제로는 `Thumbnail`로 등록됐다.
           // 문서에 이미 있는 컴포넌트 이름도 함께 넘겨 충돌 해소 결과까지 등록과 일치시킨다.
           // (후보 자신은 제외 — 이미 COMPONENT인 말단이 후보면 자기 이름과 충돌해 숫자가 붙는다.)
+          // origin/main은 같은 자리를 for 루프로 바꿨는데 동작은 같아서, 인자가 하나 더 붙는
+          // 이쪽을 남긴다.
           const groupNames = resolveGroupNames(
             groups.map((g) => g.members),
             await existingComponentNames(new Set(eligibleNodes.map((n) => n.id))),
