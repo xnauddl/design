@@ -155,7 +155,9 @@ export type UiToCode =
   | { type: 'OPEN_LICENSE_LINK'; target: 'purchase' | 'portal' }
   | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number } // 토큰 코드 내보내기
   | { type: 'SCAN_COMPONENT_CANDIDATES' } // #1(Paid): 선택 하위 순회 → 등록 후보 트리
-  | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[] } // Phase 3(Paid): 후보(트리 선택 nodeIds, 없으면 선택 프레임 '내부' 후보) → 메인 컴포넌트 등록 + 베이스 묶음 베리언트 세트
+  // names: 트리가 보여 준 노드별 이름(WYSIWYG). 이름 충돌 해소는 후보 전체를 봐야 같은 답이
+  // 나오는데 등록은 체크한 것만 받으므로, 미리보기의 결론을 그대로 실어 보낸다.
+  | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[]; names?: Record<string, string> } // Phase 3(Paid): 후보(트리 선택 nodeIds, 없으면 선택 프레임 '내부' 후보) → 메인 컴포넌트 등록 + 베이스 묶음 베리언트 세트
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Paid): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Paid): 선택 세트의 빠진 조합 자동 생성
   | { type: 'GET_SETTINGS' } // #19: 설정 탭 설정(기준 크기·리네임 맥락 깊이) 불러오기

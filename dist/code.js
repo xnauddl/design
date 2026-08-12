@@ -4170,7 +4170,7 @@
       const hasScaleVars = globals.some((v) => v.resolvedType !== "COLOR");
       const hasGlobal = globals.length > 0;
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-      const hasDarkMode = cols.some((c) => c.modes.length > 1);
+      const hasDarkMode = cols.some((c) => bindableIds.has(c.id) && c.modes.length > 1);
       const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
       post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
     } catch (e) {
@@ -4611,7 +4611,7 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -4724,9 +4724,9 @@
             if (!node || !("name" in node)) continue;
             const before = node.name;
             if (before !== expectedBefore) continue;
-            if (before === after) continue;
-            node.name = after;
+            if (before !== after) node.name = after;
             if (role) writeRole(node, role);
+            if (before === after) continue;
             changes.push({ id, before, after });
           }
           post({ type: "RENAME_RESULT", changes, nodes: [], applied: true });
@@ -5054,10 +5054,15 @@
               failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${comp.name}): ${errText(e)}`);
             }
           };
-          const groupNames = resolveGroupNames(
+          const resolved = resolveGroupNames(
             groups.map((g) => g.members),
             await existingComponentNames(new Set(valid.map((n) => n.id)))
           );
+          const shownNames = (_c = msg.names) != null ? _c : {};
+          const groupNames = groups.map((g, gi) => {
+            const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
+            return shown != null ? shown : resolved[gi];
+          });
           for (let gi = 0; gi < groups.length; gi++) {
             const g = groups[gi];
             const setName = groupNames[gi];
@@ -5125,7 +5130,7 @@
                 }
               }
               try {
-                master.name = setName || pascalCase((_d = (_c = live[preferLive]) == null ? void 0 : _c.name) != null ? _d : live[0].name);
+                master.name = setName || pascalCase((_e = (_d = live[preferLive]) == null ? void 0 : _d.name) != null ? _e : live[0].name);
               } catch (e) {
               }
               placeOnPage(master);
@@ -5159,7 +5164,7 @@
               if (!node) continue;
               const o = captureOrigin(node);
               try {
-                made.push({ comp: figma.createComponentFromNode(node), variant: (_e = variantById.get(m.id)) != null ? _e : "", o });
+                made.push({ comp: figma.createComponentFromNode(node), variant: (_f = variantById.get(m.id)) != null ? _f : "", o });
                 registered++;
               } catch (e) {
                 skipped++;
@@ -5172,7 +5177,7 @@
             }
             let set;
             try {
-              const home = (_f = pageOf(made[0].comp)) != null ? _f : figma.currentPage;
+              const home = (_g = pageOf(made[0].comp)) != null ? _g : figma.currentPage;
               set = figma.combineAsVariants(made.map((x) => x.comp), home);
             } catch (e) {
               failures.push(`\uACB0\uD569 \uC2E4\uD328(${setName}): ${errText(e)}`);
@@ -5241,7 +5246,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_g = nodes[0].parent) != null ? _g : figma.currentPage;
+              const parent = (_h = nodes[0].parent) != null ? _h : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {

@@ -130,8 +130,10 @@ async function postPrereq(): Promise<void> {
     const hasScaleVars = globals.some((v) => v.resolvedType !== 'COLOR'); // 간격·크기·폰트
     const hasGlobal = globals.length > 0;
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-    // 다크는 '모드가 둘 이상인 컬렉션'이 있으면 이미 만든 것으로 본다(다크 채우기의 전제와 같은 신호).
-    const hasDarkMode = cols.some((c) => c.modes.length > 1);
+    // 다크는 '모드가 둘 이상인 **바인딩 대상** 컬렉션'이 있으면 이미 만든 것으로 본다.
+    // 문서 전체로 보면 Breakpoint(Desktop/Mobile) 같은 무관한 컬렉션 하나가 다크 단계를
+    // 「완료」로 만들어, 다크 테마가 없는 파일에서 사용자가 그 단계를 건너뛴다.
+    const hasDarkMode = cols.some((c) => bindableIds.has(c.id) && c.modes.length > 1);
     const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 타이포 단계 「기존만 연결」 전제
     post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
   } catch {
@@ -812,12 +814,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
           const before = node.name;
           if (before !== expectedBefore) continue; // 미리보기 이후 이름이 바뀐 노드는 stale 적용 방지
-          if (before === after) continue;
-          node.name = after;
+          if (before !== after) node.name = after;
           // 이름만 바꾸면 등록이 읽을 역할이 남지 않는다 — 마법사 경로(renameSelection)는
           // 이미 남기는데 판넬 경로만 빠져 있어, 말단 등록 후보와 머리명사 규칙이
           // 판넬로 리네임한 사람에게는 통째로 죽어 있었다.
+          // **이름이 그대로인 노드에도** 기록한다(멱등) — 옛 리네임 결과·손으로 지은 이름에
+          // 역할을 채워 넣는 유일한 경로다. 다만 '바뀐 것'으로 세지는 않는다.
           if (role) writeRole(node as SceneNode, role);
+          if (before === after) continue;
           changes.push({ id, before, after });
         }
         post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true });
@@ -1182,10 +1186,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
 
         // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
         // 등록 대상 자신은 '기존 이름'에서 제외(스캔 미리보기와 같은 규칙).
-        const groupNames = resolveGroupNames(
+        const resolved = resolveGroupNames(
           groups.map((g) => g.members),
           await existingComponentNames(new Set(valid.map((n) => n.id))),
         );
+        // 트리가 보여 준 이름이 있으면 그것이 최종이다 — 충돌 해소는 **후보 전체**를 봐야
+        // 같은 답이 나오는데 여기는 체크한 것만 받는다. 다시 풀면 `ProfileAvatar`로 보여 주고
+        // `Avatar`로 등록하는 어긋남이 생긴다(미리보기 없는 폴백 경로만 여기서 정한다).
+        const shownNames = msg.names ?? {};
+        const groupNames = groups.map((g, gi) => {
+          const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
+          return shown ?? resolved[gi];
+        });
         for (let gi = 0; gi < groups.length; gi++) {
           const g = groups[gi];
           const setName = groupNames[gi];

@@ -1925,8 +1925,9 @@
   var HEX6 = /^#[0-9a-fA-F]{6}$/;
   var $ = (id) => document.getElementById(id);
   function readMaxDepth() {
-    const value = Number($("depth").value);
-    return Number.isFinite(value) ? Math.max(1, Math.round(value)) : 8;
+    const raw = $("depth").value.trim();
+    const value = Number(raw);
+    return raw && Number.isFinite(value) ? Math.max(1, Math.round(value)) : 8;
   }
   var tokens = [];
   var isPaid = false;
@@ -2331,11 +2332,21 @@
     });
     return map;
   }
+  function colorAuthoritativeRoles(base) {
+    const auto = mergeTokenRoles(tokens, base);
+    const picks = colorRoleMap();
+    if (!$("colorTable").querySelector("select[data-name]")) return __spreadValues(__spreadValues({}, auto), picks);
+    const colorTokenNames = new Set(tokens.filter((t2) => t2.category === "color").map((t2) => t2.name));
+    const nonColor = {};
+    for (const [role, name] of Object.entries(auto)) if (!colorTokenNames.has(name)) nonColor[role] = name;
+    return __spreadValues(__spreadValues({}, nonColor), picks);
+  }
   function colorHexes() {
     return tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string").map((t2) => t2.value.toLowerCase());
   }
   var preTidyTokens = null;
   function tidyColors() {
+    var _a;
     const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
     const before = colors.length;
     const baseName = (name) => name.replace(/-\d+$/, "");
@@ -2348,6 +2359,7 @@
         keep.set(k, t2);
       } else {
         for (const s of t2.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+        if (t2.count) rep.count = Math.max((_a = rep.count) != null ? _a : 0, t2.count);
         drop.add(t2);
       }
     }
@@ -2506,7 +2518,7 @@
       setStatus("colorStatus", t("color.needColors"), "warn");
       return;
     }
-    setSemMapText(mergeTokenRoles(tokens, Number($("base").value) || 16, colorRoleMap()));
+    setSemMapText(colorAuthoritativeRoles(Number($("base").value) || 16));
     createFrom = "colors";
     send(__spreadValues({
       type: "CREATE_TOKENS",
@@ -2688,8 +2700,9 @@
   });
   var BIND_TOLERANCE_DEFAULT = 0.5;
   function bindTolerance() {
-    const v = Number($("tol").value);
-    return isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
+    const raw = $("tol").value.trim();
+    const v = Number(raw);
+    return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
   }
   $("btnApply").addEventListener("click", () => {
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
@@ -2717,7 +2730,8 @@
   $("btnRename").addEventListener("click", () => {
     const items = renameNodes.filter((n) => n.after !== void 0 && renameChecked.has(n.id)).map((n) => ({ id: n.id, before: n.name, after: n.after, role: n.role }));
     if (!items.length) return;
-    send({ type: "RENAME_APPLY", items });
+    const roleOnly = renameNodes.filter((n) => n.after === void 0 && n.role).map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role }));
+    send({ type: "RENAME_APPLY", items: [...items, ...roleOnly] });
   });
   $("renameAll").addEventListener("change", (e) => {
     const on = e.target.checked;
@@ -3198,6 +3212,7 @@
     send({ type: "COMPONENTIZE_SIMILAR", masterId: similarMasterId, frameIds: similarMemberIds });
   });
   $("btnRegisterComp").addEventListener("click", () => {
+    var _a;
     if (compCandidates.length) {
       const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
       if (!nodeIds.length) {
@@ -3205,7 +3220,12 @@
         return;
       }
       setStatus("structureStatus", t("component.registering"), "");
-      send({ type: "REGISTER_COMPONENTS", nodeIds });
+      const names = {};
+      for (const c of compCandidates) {
+        const shown = (_a = c.group) != null ? _a : c.single;
+        if (shown && compChecked.has(c.id)) names[c.id] = shown;
+      }
+      send({ type: "REGISTER_COMPONENTS", nodeIds, names });
     } else {
       setStatus("structureStatus", t("component.registering"), "");
       send({ type: "REGISTER_COMPONENTS" });
@@ -3383,7 +3403,13 @@
       case "TEXT_STYLE_CANDIDATES": {
         $("btnTsRowLabels").disabled = !msg.styles.length;
         if (msg.styles.length) {
-          tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
+          const tsSig = (s) => `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
+          const incoming = new Set(msg.styles.map(tsSig));
+          const manual = msg.labeled != null ? tsSpecs.filter((s) => {
+            var _a2;
+            return !((_a2 = s.nodeIds) == null ? void 0 : _a2.length) && !incoming.has(tsSig(s));
+          }) : [];
+          tsSpecs = [...msg.styles.map((x) => __spreadValues({}, x)), ...manual];
           tsScanNote = {
             namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_e = msg.fallback) != null ? _e : 0}` : "",
             warnings: msg.warnings
@@ -3566,6 +3592,9 @@
     SCAN_TEXT_STYLES: "tsStatus",
     NAME_TEXT_STYLES_BY_ROW: "tsStatus",
     CREATE_TEXT_STYLES: "tsStatus",
+    // 옛 `tsApplyStatus`가 사라졌다고 매핑까지 빼면 폴백(colorStatus)으로 흘러가는데,
+    // 그 줄은 다른 단계에 있어 숨겨져 있다 — 실패가 '적용 중…'인 채로 조용히 묻힌다.
+    APPLY_TEXT_STYLES: "tsStatus",
     APPLY: "applyStatus",
     SELECT_NODES: "applyStatus",
     RENAME: "renameStatus",

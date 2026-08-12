@@ -32,8 +32,11 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
   document.getElementById(id) as T;
 
 function readMaxDepth(): number {
-  const value = Number(($('depth') as HTMLInputElement).value);
-  return Number.isFinite(value) ? Math.max(1, Math.round(value)) : 8;
+  // 빈 칸은 '0'이 아니라 '아직 안 정함' — Number('')=0을 그대로 받으면 깊이 1이 파일에 굳어
+  // 이후 모든 세션이 맥락 없는 이름(`button`)을 만든다(설정은 바뀔 때마다 저장된다).
+  const raw = ($('depth') as HTMLInputElement).value.trim();
+  const value = Number(raw);
+  return raw && Number.isFinite(value) ? Math.max(1, Math.round(value)) : 8;
 }
 
 let tokens: DraftToken[] = [];
@@ -584,6 +587,25 @@ function colorRoleMap(): Record<string, string> {
   return map;
 }
 
+/**
+ * 시맨틱 매핑 = 자동 추천(수치·타이포) + **색 목록이 정한 색 역할**.
+ *
+ * `{...auto, ...picks}`만 하면 사용자가 지운 역할을 지울 방법이 없다 — 「없음」은 키가 빠지는
+ * 것이라 자동 추천값이 그대로 살아남아, 지운 역할의 Semantic 별칭이 만들어지고 표를 다시
+ * 그리면 그 역할이 드롭다운에 되살아난다. 색 역할만큼은 표가 유일한 출처다.
+ * (수치·크기·타이포 역할은 색 목록이 모르므로 자동 추천을 그대로 둔다.)
+ */
+function colorAuthoritativeRoles(base: number): Record<string, string> {
+  const auto = mergeTokenRoles(tokens, base);
+  const picks = colorRoleMap();
+  // 표가 아직 안 그려졌으면(색 카드 미노출) 지운 것과 구분할 수 없다 — 예전대로 추천을 남긴다.
+  if (!$('colorTable').querySelector('select[data-name]')) return { ...auto, ...picks };
+  const colorTokenNames = new Set(tokens.filter((t) => t.category === 'color').map((t) => t.name));
+  const nonColor: Record<string, string> = {};
+  for (const [role, name] of Object.entries(auto)) if (!colorTokenNames.has(name)) nonColor[role] = name;
+  return { ...nonColor, ...picks };
+}
+
 /* ---------- 색 정리 (ΔE 군집 N:1) ---------- */
 /** 현재 색 토큰 hex 목록. */
 function colorHexes(): string[] {
@@ -612,6 +634,10 @@ function tidyColors(): { before: number; after: number; merged: number } {
       keep.set(k, t);
     } else {
       for (const s of t.sources) if (!rep.sources.includes(s)) rep.sources.push(s); // 스코프 union 보존
+      // 흡수된 색의 사용 수도 대표가 물려받는다 — 안 그러면 20개 레이어가 쓰던 회색이
+      // 「1× 사용」으로 보여, 그 수치로 역할을 고르는 사람이 제일 많이 쓰는 색을 내린다.
+      // 합산이 아니라 최댓값인 이유는 tidyNumberTokens와 같다(같은 레이어가 두 색을 함께 쓸 수 있다).
+      if (t.count) rep.count = Math.max(rep.count ?? 0, t.count);
       drop.add(t);
     }
   }
@@ -820,7 +846,7 @@ $('btnColorVars').addEventListener('click', () => {
   }
   // 색 목록이 정한 역할을 매핑에 싣는다(2.5 카드는 숨김이라 이 textarea가 단일 출처).
   // 통째로 갈아끼우면 추출 때 채워 둔 간격·크기·타이포 역할이 같이 날아간다 — 색만 덮어쓴다.
-  setSemMapText(mergeTokenRoles(tokens, Number(($('base') as HTMLInputElement).value) || 16, colorRoleMap()));
+  setSemMapText(colorAuthoritativeRoles(Number(($('base') as HTMLInputElement).value) || 16));
   createFrom = 'colors';
   send({
     type: 'CREATE_TOKENS',
@@ -1060,8 +1086,11 @@ $('btnApplyExistingText').addEventListener('click', () => {
 const BIND_TOLERANCE_DEFAULT = 0.5;
 /** 설정 탭의 허용오차(없거나 이상하면 기본 0.5). */
 function bindTolerance(): number {
-  const v = Number(($('tol') as HTMLInputElement).value);
-  return isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
+  // 빈 칸을 Number('')=0으로 받으면 0(정확히 일치만)이 파일에 저장돼, 소수점 때문에 연결이
+  // 영영 0건이 된다. '안 정함'과 '0으로 정함'을 가른다(격자 입력의 `v >= 1` 가드와 같은 취지).
+  const raw = ($('tol') as HTMLInputElement).value.trim();
+  const v = Number(raw);
+  return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
 }
 
 $('btnApply').addEventListener('click', () => {
@@ -1102,7 +1131,14 @@ $('btnRename').addEventListener('click', () => {
     .filter((n) => n.after !== undefined && renameChecked.has(n.id))
     .map((n) => ({ id: n.id, before: n.name, after: n.after as string, role: n.role }));
   if (!items.length) return;
-  send({ type: 'RENAME_APPLY', items });
+  // 이름이 안 바뀐 노드도 역할은 남긴다 — 마법사 경로(renameSelection)는 이미 그렇게 하고(멱등),
+  // 판넬만 빠져 있어 옛 빌드로 리네임한 파일·손으로 이름 지은 레이어에는 역할 기록이 영영 안 생겼다.
+  // 그러면 「컴포넌트 등록」의 말단 후보(아바타·아이콘·썸네일)가 통째로 죽는다.
+  // 체크 대상이 아닌 이유는 '바꿀 이름이 없어서'지 역할까지 남기지 말라는 뜻이 아니다.
+  const roleOnly = renameNodes
+    .filter((n) => n.after === undefined && n.role)
+    .map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role }));
+  send({ type: 'RENAME_APPLY', items: [...items, ...roleOnly] });
 });
 
 $('renameAll').addEventListener('change', (e) => {
@@ -1584,8 +1620,8 @@ let allVars: VarInfo[] = [];
 /** GET_VARIABLES 응답을 한 번이라도 받았는지 — 다크 카드가 ‘목록 미로드’와 ‘토큰 없음’을 구분한다. */
 let varsLoaded = false;
 
-// 밝은 모드 → Dark로 채운다. Dark가 없으면 플러그인이 addMode('Dark')로 만들므로,
-// 화면의 ‘어두운 모드’ 셀렉트는 안내용이고 버튼은 from만 보낸다(to는 생략).
+// 밝은 모드 → 고른 어두운 모드로 채운다. 셀렉트가 플레이스홀더(모드가 아직 없음)일 때만
+// to를 생략하고, 그때 플러그인이 addMode('Dark')로 만든다.
 // 목록은 시작할 때 한 번 받아 둔다 — 안 받으면 토큰이 있어도 modes=[]로 보여
 // ‘토큰 생성으로’라는 엉뚱한 안내가 뜬다.
 function refreshDarkOptions(): void {
@@ -1721,7 +1757,14 @@ $('btnRegisterComp').addEventListener('click', () => {
       return;
     }
     setStatus('structureStatus', t('component.registering'), '');
-    send({ type: 'REGISTER_COMPONENTS', nodeIds });
+    // 트리에 보여 준 이름을 그대로 보낸다(WYSIWYG). 이름 충돌은 **후보 전체**를 보고 풀리므로,
+    // 일부만 체크해 보내면 code 쪽에서 충돌이 사라져 `ProfileAvatar`가 `Avatar`로 등록됐다.
+    const names: Record<string, string> = {};
+    for (const c of compCandidates) {
+      const shown = c.group ?? c.single;
+      if (shown && compChecked.has(c.id)) names[c.id] = shown;
+    }
+    send({ type: 'REGISTER_COMPONENTS', nodeIds, names });
   } else {
     setStatus('structureStatus', t('component.registering'), '');
     send({ type: 'REGISTER_COMPONENTS' });
@@ -1943,7 +1986,15 @@ window.onmessage = (event: MessageEvent) => {
       // 램프 폴백(styles 0)은 캔버스에서 온 글자가 아니라 행 라벨을 찾을 데가 없다.
       ($('btnTsRowLabels') as HTMLButtonElement).disabled = !msg.styles.length;
       if (msg.styles.length) {
-        tsSpecs = msg.styles.map((x) => ({ ...x }));
+        // 「왼쪽 글자로 이름 채우기」(labeled)는 **스캔 표본의 이름만** 다시 매기는 동작이다.
+        // 표를 통째로 갈아끼우면 그 사이 「행 추가」로 손수 만든 행이 말없이 사라진다 —
+        // 캔버스에서 온 행이 아니라(nodeIds 없음) 다시 계산해 줄 수 없는 행이라 남긴다.
+        // (맨 스캔은 '선택에서 다시 만들기'라 통째 교체가 맞다.)
+        const tsSig = (s: TextStyleSpec) => `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
+        const incoming = new Set(msg.styles.map(tsSig)); // 같은 타이포가 두 줄로 늘어나지 않게
+        const manual =
+          msg.labeled != null ? tsSpecs.filter((s) => !s.nodeIds?.length && !incoming.has(tsSig(s))) : [];
+        tsSpecs = [...msg.styles.map((x) => ({ ...x })), ...manual];
         // 이름 출처는 「왼쪽 글자로 이름 채우기」를 누른 뒤에만 적는다 — 맨 스캔은 전부 크기 순이라
         // `왼쪽 글자 0`이 실패처럼 읽힌다. 와이어 상태 줄: 신규 · 등록됨 · 왼쪽 글자 · 크기 순.
         tsScanNote = {
@@ -2160,6 +2211,9 @@ const OP_STATUS: Record<string, string> = {
   SCAN_TEXT_STYLES: 'tsStatus',
   NAME_TEXT_STYLES_BY_ROW: 'tsStatus',
   CREATE_TEXT_STYLES: 'tsStatus',
+  // 옛 `tsApplyStatus`가 사라졌다고 매핑까지 빼면 폴백(colorStatus)으로 흘러가는데,
+  // 그 줄은 다른 단계에 있어 숨겨져 있다 — 실패가 '적용 중…'인 채로 조용히 묻힌다.
+  APPLY_TEXT_STYLES: 'tsStatus',
   APPLY: 'applyStatus',
   SELECT_NODES: 'applyStatus',
   RENAME: 'renameStatus',
