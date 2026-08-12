@@ -116,19 +116,20 @@
       cursor: pointer; transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
       white-space: nowrap;
     }
-    button:hover { background: var(--surface-2); border-color: var(--border-2); }
-    button:active { background: var(--surface-hover); }
+    /* hover/active는 누를 수 있는 버튼에만 — 비활성 버튼에 얹으면 primary의 파란 배경을 흰색으로
+       덮어써 흰 글씨가 사라진다(실행 중 잠긴 「전체 실행」이 그랬다). */
+    button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-2); }
+    button:active:not(:disabled) { background: var(--surface-hover); }
     button.primary {
       background: var(--accent); color: var(--on-accent); border-color: var(--accent);
       box-shadow: var(--shadow-sm);
     }
-    button.primary:hover  { background: var(--accent-hover); border-color: var(--accent-hover); }
-    button.primary:active { background: var(--accent-press); border-color: var(--accent-press); }
+    button.primary:hover:not(:disabled)  { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button.primary:active:not(:disabled) { background: var(--accent-press); border-color: var(--accent-press); }
     button:focus-visible {
       outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
     }
     button:disabled { opacity: .42; cursor: default; box-shadow: none; }
-    button:disabled:hover { background: var(--surface); border-color: var(--border-2); }
     button.link {
       border: none; background: none; padding: 0; width: auto;
       color: var(--accent-strong); cursor: pointer; font: inherit; font-weight: 600;
