@@ -2758,6 +2758,32 @@ test('applyExistingTextStyles — 시그니처가 같은 기존 스타일에만 
   assert.ok(r.missing.some((m) => m.includes('미등록')));
 });
 
+test('applyExistingTextStyles — 스캔이 %로 되읽은 행간도 등록 직후 그 노드에 붙는다', async () => {
+  const figma = installFigma();
+  // 단위만 PIXELS로 떨어진 150 — 스캔은 이걸 150%(=24px)로 읽어 스타일을 %로 등록한다.
+  // 연결 쪽이 원값 150을 그대로 쓰면 키가 어긋나 방금 등록한 스타일을 '미등록'이라 보고했다.
+  const node = {
+    type: 'TEXT', id: 'n1', name: 'Raw', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: 150 }, letterSpacing: { unit: 'PIXELS', value: 0 },
+    characters: 'hi', visible: true, textStyleId: '',
+    _styleId: null, async setTextStyleIdAsync(sid) { this._styleId = sid; },
+  };
+  const { samples } = await scanTextStyles([node]);
+  const s = samples[0];
+  assert.equal(s.lineHeight, 24); // 150% × 16
+  await createSemanticTextStyles([{
+    name: 'body', fontSize: s.fontSize, lineHeight: s.lineHeight, lineHeightPercent: s.lineHeightPercent,
+    letterSpacing: s.letterSpacing, family: s.family, style: s.style,
+  }]);
+  const style = figma._state.textStyles.find((x) => x.name === 'body');
+  assert.deepEqual(style.lineHeight, { value: 150, unit: 'PERCENT' }); // %로 등록됨
+
+  const r = await applyExistingTextStyles([node]);
+  assert.equal(r.applied, 1);
+  assert.equal(node._styleId, style.id);
+  assert.equal(r.missing.length, 0); // '미등록 — 먼저 등록 필요'가 나오면 안 된다
+});
+
 test('createSemanticTextStyles — 기존 역할로 rename은 충돌 보류(동명·시맨틱 보존)', async () => {
   const figma = installFigma();
   // body(16) · caption(13) 각각 등록

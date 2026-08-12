@@ -787,7 +787,12 @@ function saveSettings(): void {
 ($('base') as HTMLInputElement).addEventListener('input', saveSettings);
 ($('depth') as HTMLInputElement).addEventListener('input', saveSettings);
 ($('grid') as HTMLInputElement).addEventListener('input', saveSettings);
-($('tol') as HTMLInputElement).addEventListener('input', saveSettings);
+($('tol') as HTMLInputElement).addEventListener('input', () => {
+  saveSettings();
+  // 허용오차가 바뀌면 이전 값으로 계산된 후보는 무효다. 남겨두면 설정에서 0(정확히 일치만)으로
+  // 바꾼 뒤 「선택한 항목에 연결」을 눌러도 옛 허용오차의 근사 매칭이 그대로 적용된다.
+  clearBindPreview();
+});
 
 ($('base') as HTMLInputElement).addEventListener('input', () => {
   const applyBtn = $('btnCreateApply') as HTMLButtonElement;
@@ -1680,8 +1685,11 @@ $('btnGenDark').addEventListener('click', () => {
     return;
   }
   setStatus('darkStatus', 'Dark 모드를 만들고 값을 채우는 중…', '');
-  // toModeId 생략 → code/themeApply가 Dark를 ensure.
-  send({ type: 'GENERATE_DARK_MODE', collectionId, fromModeId });
+  // 고른 대상 모드를 그대로 보낸다 — 플레이스홀더(값 '')일 때만 생략해 themeApply가 Dark를 ensure.
+  // 안 보내면 사용자가 고른 `Night` 대신 새 `Dark` 모드가 생기고, 모드 상한에 걸린 파일에선
+  // addMode가 실패해 생성 자체가 막힌다.
+  const toModeId = ($('darkToMode') as HTMLSelectElement).value;
+  send({ type: 'GENERATE_DARK_MODE', collectionId, fromModeId, ...(toModeId ? { toModeId } : {}) });
 });
 
 /* ---------- 닮은 프레임 컴포넌트화 ---------- */

@@ -449,7 +449,16 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
   return { samples, warnings: [...warnings] };
 }
 
-/** 노드의 행간/자간을 스캔과 동일 규칙으로 px 환산(AUTO/혼합=0). 시그니처 일치 판정의 단일 기준. */
+/**
+ * **시그니처 매칭용** 행간/자간 px — 스캔(`measureLineHeight`/`measureLetterSpacing`)과 **같은 함수**로
+ * 재야 한다. 스캔이 PIXELS 150을 150%(=24px)로 읽어 스타일을 등록했는데 매칭 쪽에서 원값 150을
+ * 그대로 쓰면 키가 어긋나, 「기존만 연결」이 방금 등록한 스타일을 '미등록 — 먼저 등록 필요'로 보고한다.
+ * (값을 **쓰는** 경로는 아래 `lhPxOf`/`lsPxOf`로 스타일의 현재 값을 그대로 읽는다.)
+ */
+const sigLhPx = (fontSize: number, lh: LineHeight | typeof figma.mixed): number => measureLineHeight(fontSize, lh).px;
+const sigLsPx = (fontSize: number, ls: LetterSpacing | typeof figma.mixed): number => measureLetterSpacing(fontSize, ls).px;
+
+/** 스타일/노드의 행간을 있는 그대로 px 환산(AUTO/혼합=0) — 값을 기록하는 경로용. */
 function lhPxOf(fontSize: number, lh: LineHeight | typeof figma.mixed): number {
   if (lh === figma.mixed || lh.unit === 'AUTO') return 0;
   return lh.unit === 'PERCENT' ? roundN((fontSize * lh.value) / 100) : roundN(lh.value);
@@ -480,8 +489,8 @@ export async function scanExistingTextStyles(): Promise<ExistingTextStyle[]> {
       id: s.id,
       name: s.name,
       fontSize,
-      lineHeight: lhPxOf(fontSize, s.lineHeight),
-      letterSpacing: lsPxOf(fontSize, s.letterSpacing),
+      lineHeight: sigLhPx(fontSize, s.lineHeight),
+      letterSpacing: sigLsPx(fontSize, s.letterSpacing),
       family: s.fontName.family,
       style: s.fontName.style,
       ...(lineHeightPercent ? { lineHeightPercent } : {}),
@@ -786,7 +795,7 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
   const styleBySig = new Map<string, TextStyle | null>(); // null = 같은 시그니처 2개 이상
   for (const s of await figma.getLocalTextStylesAsync()) {
     const fontSize = roundN(s.fontSize);
-    const k = `${fontSize}|${lhPxOf(fontSize, s.lineHeight)}|${lsPxOf(fontSize, s.letterSpacing)}|${s.fontName.family}|${s.fontName.style}`;
+    const k = `${fontSize}|${sigLhPx(fontSize, s.lineHeight)}|${sigLsPx(fontSize, s.letterSpacing)}|${s.fontName.family}|${s.fontName.style}`;
     styleBySig.set(k, styleBySig.has(k) ? null : s);
   }
 
@@ -806,7 +815,7 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
     if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
     const fontSize = roundN(t.fontSize);
     const fn = t.fontName;
-    const k = `${fontSize}|${lhPxOf(fontSize, t.lineHeight)}|${lsPxOf(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
+    const k = `${fontSize}|${sigLhPx(fontSize, t.lineHeight)}|${sigLsPx(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
     const hit = styleBySig.get(k);
     if (hit === undefined) {
       unregistered.add(`${fn.family} ${fn.style} ${fontSize}`);

@@ -396,12 +396,17 @@ function readRole(node: SceneNode): string | undefined {
 /**
  * 문서에 이미 있는 컴포넌트·세트 이름 — 이름 충돌 해소가 지난 실행분까지 보게 한다.
  * 실패하면 빈 목록(충돌 해소가 이번 묶음 안에서만 되는, 예전 동작으로 안전하게 후퇴).
+ *
+ * **이번에 이름을 정할 노드는 반드시 빼야 한다**(`exclude`) — 「베리언트 분류」의 대상은
+ * 이미 문서에 있는 COMPONENT라, 안 빼면 자기 이름과 충돌한 것으로 읽혀 `Button` → `Button2`가
+ * 되고 다시 누를 때마다 숫자가 올라간다.
  */
-async function existingComponentNames(): Promise<string[]> {
+async function existingComponentNames(exclude?: ReadonlySet<string>): Promise<string[]> {
   try {
     await figma.loadAllPagesAsync();
     return figma.root
       .findAllWithCriteria({ types: ['COMPONENT', 'COMPONENT_SET'] })
+      .filter((n) => !exclude?.has(n.id))
       .map((n) => n.name);
   } catch {
     return [];
@@ -1045,7 +1050,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           // 등록과 **같은 함수**로 이름을 정한다. 예전엔 미리보기만 `commonBaseName`/`pascalCase(첫 멤버명)`을
           // 써서, 트리에 `CardThumbnail`이라 보여 주고 실제로는 `Thumbnail`로 등록됐다.
           // 문서에 이미 있는 컴포넌트 이름도 함께 넘겨 충돌 해소 결과까지 등록과 일치시킨다.
-          const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
+          // (후보 자신은 제외 — 이미 COMPONENT인 말단이 후보면 자기 이름과 충돌해 숫자가 붙는다.)
+          const groupNames = resolveGroupNames(
+            groups.map((g) => g.members),
+            await existingComponentNames(new Set(eligibleNodes.map((n) => n.id))),
+          );
           const preview = new Map<string, { group?: string; variant?: string; single?: string; propsOnly?: boolean }>();
           groups.forEach((g, gi) => {
             const name = groupNames[gi];
@@ -1172,7 +1181,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         };
 
         // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
-        const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
+        // 등록 대상 자신은 '기존 이름'에서 제외(스캔 미리보기와 같은 규칙).
+        const groupNames = resolveGroupNames(
+          groups.map((g) => g.members),
+          await existingComponentNames(new Set(valid.map((n) => n.id))),
+        );
         for (let gi = 0; gi < groups.length; gi++) {
           const g = groups[gi];
           const setName = groupNames[gi];
@@ -1341,7 +1354,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const missing: string[] = [];
         const singles: string[] = [];
         const failures: string[] = [];
-        const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames()); // 등록과 동일 규칙
+        // 분류 대상 자신은 문서의 '기존 이름'에서 뺀다 — 안 그러면 자기와 충돌해 세트가 `Button2`가 된다.
+        const groupNames = resolveGroupNames(
+          groups.map((g) => g.members),
+          await existingComponentNames(new Set(comps.map((c) => c.id))),
+        ); // 등록과 동일 규칙
         for (let gi = 0; gi < groups.length; gi++) {
           const g = groups[gi];
           const nodes = g.members.map((m) => byId.get(m.id)).filter((n): n is ComponentNode => !!n);

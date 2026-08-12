@@ -801,6 +801,8 @@
     }
     return { samples, warnings: [...warnings] };
   }
+  var sigLhPx = (fontSize, lh) => measureLineHeight(fontSize, lh).px;
+  var sigLsPx = (fontSize, ls) => measureLetterSpacing(fontSize, ls).px;
   function lhPxOf(fontSize, lh) {
     if (lh === figma.mixed || lh.unit === "AUTO") return 0;
     return lh.unit === "PERCENT" ? roundN(fontSize * lh.value / 100) : roundN(lh.value);
@@ -827,8 +829,8 @@
         id: s.id,
         name: s.name,
         fontSize,
-        lineHeight: lhPxOf(fontSize, s.lineHeight),
-        letterSpacing: lsPxOf(fontSize, s.letterSpacing),
+        lineHeight: sigLhPx(fontSize, s.lineHeight),
+        letterSpacing: sigLsPx(fontSize, s.letterSpacing),
         family: s.fontName.family,
         style: s.fontName.style
       }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}));
@@ -1047,7 +1049,7 @@
     const styleBySig = /* @__PURE__ */ new Map();
     for (const s of await figma.getLocalTextStylesAsync()) {
       const fontSize = roundN(s.fontSize);
-      const k = `${fontSize}|${lhPxOf(fontSize, s.lineHeight)}|${lsPxOf(fontSize, s.letterSpacing)}|${s.fontName.family}|${s.fontName.style}`;
+      const k = `${fontSize}|${sigLhPx(fontSize, s.lineHeight)}|${sigLsPx(fontSize, s.letterSpacing)}|${s.fontName.family}|${s.fontName.style}`;
       styleBySig.set(k, styleBySig.has(k) ? null : s);
     }
     const texts = [];
@@ -1065,7 +1067,7 @@
       if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
       const fontSize = roundN(t.fontSize);
       const fn = t.fontName;
-      const k = `${fontSize}|${lhPxOf(fontSize, t.lineHeight)}|${lsPxOf(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
+      const k = `${fontSize}|${sigLhPx(fontSize, t.lineHeight)}|${sigLsPx(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
       const hit = styleBySig.get(k);
       if (hit === void 0) {
         unregistered.add(`${fn.family} ${fn.style} ${fontSize}`);
@@ -4379,10 +4381,10 @@
       return void 0;
     }
   }
-  async function existingComponentNames() {
+  async function existingComponentNames(exclude) {
     try {
       await figma.loadAllPagesAsync();
-      return figma.root.findAllWithCriteria({ types: ["COMPONENT", "COMPONENT_SET"] }).map((n) => n.name);
+      return figma.root.findAllWithCriteria({ types: ["COMPONENT", "COMPONENT_SET"] }).filter((n) => !(exclude == null ? void 0 : exclude.has(n.id))).map((n) => n.name);
     } catch (e) {
       return [];
     }
@@ -4923,7 +4925,10 @@
           try {
             const eligibleNodes = pruned.filter((c) => c.eligible).map((c) => liveById.get(c.id)).filter((n) => !!n);
             const groups = groupForRegister(eligibleNodes);
-            const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
+            const groupNames = resolveGroupNames(
+              groups.map((g) => g.members),
+              await existingComponentNames(new Set(eligibleNodes.map((n) => n.id)))
+            );
             const preview = /* @__PURE__ */ new Map();
             groups.forEach((g, gi) => {
               const name = groupNames[gi];
@@ -5049,7 +5054,10 @@
               failures.push(`\uC778\uC2A4\uD134\uC2A4 \uC2E4\uD328(${comp.name}): ${errText(e)}`);
             }
           };
-          const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
+          const groupNames = resolveGroupNames(
+            groups.map((g) => g.members),
+            await existingComponentNames(new Set(valid.map((n) => n.id)))
+          );
           for (let gi = 0; gi < groups.length; gi++) {
             const g = groups[gi];
             const setName = groupNames[gi];
@@ -5220,7 +5228,10 @@
           const missing = [];
           const singles = [];
           const failures = [];
-          const groupNames = resolveGroupNames(groups.map((g) => g.members), await existingComponentNames());
+          const groupNames = resolveGroupNames(
+            groups.map((g) => g.members),
+            await existingComponentNames(new Set(comps.map((c) => c.id)))
+          );
           for (let gi = 0; gi < groups.length; gi++) {
             const g = groups[gi];
             const nodes = g.members.map((m) => byId.get(m.id)).filter((n) => !!n);

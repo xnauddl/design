@@ -2483,7 +2483,10 @@
   $("base").addEventListener("input", saveSettings);
   $("depth").addEventListener("input", saveSettings);
   $("grid").addEventListener("input", saveSettings);
-  $("tol").addEventListener("input", saveSettings);
+  $("tol").addEventListener("input", () => {
+    saveSettings();
+    clearBindPreview();
+  });
   $("base").addEventListener("input", () => {
     const applyBtn = $("btnCreateApply");
     if (applyBtn.style.display === "none") return;
@@ -3177,7 +3180,8 @@
       return;
     }
     setStatus("darkStatus", "Dark \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026", "");
-    send({ type: "GENERATE_DARK_MODE", collectionId, fromModeId });
+    const toModeId = $("darkToMode").value;
+    send(__spreadValues({ type: "GENERATE_DARK_MODE", collectionId, fromModeId }, toModeId ? { toModeId } : {}));
   });
   var similarMemberIds = [];
   var similarMasterId = null;
