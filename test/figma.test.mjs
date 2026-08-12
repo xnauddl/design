@@ -3065,18 +3065,39 @@ test('scanTextStyles — 스타일 없는 텍스트도 PIXELS로 떨어진 % 행
   assert.equal(samples[0].letterSpacingPercent, -2);
 });
 
-test('scanTextStyles — 흔한 비율의 px 행간(16→24)은 150%로 복구', async () => {
+test('scanTextStyles — 흔한 비율(16→24=150%)이어도 px 행간은 px로 둔다', async () => {
   installFigma();
+  // 24px 의도와 150% 의도는 이 값만으로 구분할 수 없다. %로 뒤집으면 등록 단위가 바뀌고
+  // 행간 변수 바인딩이 생략돼, 같은 램프에서 24/32는 변수가 있고 24/36은 없는 상태가 된다.
   const { samples } = await scanTextStyles([{
     type: 'TEXT', id: 't1', name: 'PxRatio', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' },
     lineHeight: { unit: 'PIXELS', value: 24 },
     letterSpacing: { unit: 'PIXELS', value: 1 },
     characters: 'x', textStyleId: '',
   }]);
-  assert.equal(samples[0].lineHeightPercent, 150);
+  assert.equal(samples[0].lineHeightPercent, 0);
   assert.equal(samples[0].lineHeight, 24);
   assert.equal(samples[0].letterSpacingPercent, 0);
   assert.equal(samples[0].letterSpacing, 1);
+});
+
+test('createSemanticTextStyles — px 행간으로 스캔한 스타일은 행간 변수까지 연결한다', async () => {
+  const figma = installFigma();
+  const { samples } = await scanTextStyles([{
+    type: 'TEXT', id: 't1', name: 'Body', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 },
+    characters: 'x', textStyleId: '',
+  }]);
+  const s = samples[0];
+  const r = await createSemanticTextStyles([{
+    name: 'body', fontSize: s.fontSize, lineHeight: s.lineHeight, lineHeightPercent: s.lineHeightPercent,
+    letterSpacing: s.letterSpacing, family: s.family, style: s.style,
+  }]);
+  const style = figma._state.textStyles.find((x) => x.name === 'body');
+  assert.equal(style.lineHeight.unit, 'PIXELS'); // %로 뒤집히지 않는다
+  assert.equal(style.lineHeight.value, 24);
+  assert.ok(style.boundVariables?.lineHeight, 'line-height 변수가 연결돼야 한다');
+  assert.ok(!r.notes.some((n) => n.includes('바인딩 생략')));
 });
 
 test('scanTextStyles — 흔하지 않은 px 행간(23px)은 %로 오인하지 않는다', async () => {

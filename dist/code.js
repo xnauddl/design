@@ -629,7 +629,6 @@
     if (node.type === "TEXT") out.push(node);
     else if ("children" in node) for (const c of node.children) walkText(c, out);
   }
-  var COMMON_LH_PCTS = /* @__PURE__ */ new Set([100, 110, 120, 125, 130, 140, 150, 160, 175, 180, 200, 220, 250]);
   function measureLineHeight(fontSize, lh) {
     if (lh === figma.mixed || !lh || lh.unit === "AUTO") return { px: 0, pct: 0 };
     const unit = String(lh.unit).toUpperCase();
@@ -642,11 +641,6 @@
       const plausibleAsPx = pxRatio >= 0.8 && pxRatio <= 3;
       const plausibleAsPct = v >= 100 && v <= 300;
       if (!plausibleAsPx && plausibleAsPct) return { px: roundN(fontSize * v / 100), pct: v };
-    }
-    if (unit === "PIXELS" && fontSize > 0 && v > 0) {
-      const pct = roundN(v / fontSize * 100);
-      const back = roundN(fontSize * pct / 100);
-      if (COMMON_LH_PCTS.has(pct) && Math.abs(back - v) <= 0.05) return { px: back, pct };
     }
     return { px: v, pct: 0 };
   }

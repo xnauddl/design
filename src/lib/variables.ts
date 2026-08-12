@@ -235,9 +235,6 @@ export interface TextScanResult {
   warnings: string[];
 }
 
-/** 디자인에서 자주 쓰는 행간 %(정수). PIXELS로만 남은 값을 비율로 되돌릴 때 허용 목록. */
-const COMMON_LH_PCTS = new Set([100, 110, 120, 125, 130, 140, 150, 160, 175, 180, 200, 220, 250]);
-
 /** 노드/세그먼트 행간 → px 시그니처 + 원본 %. */
 function measureLineHeight(fontSize: number, lh: LineHeight | typeof figma.mixed): { px: number; pct: number } {
   if (lh === figma.mixed || !lh || lh.unit === 'AUTO') return { px: 0, pct: 0 };
@@ -258,13 +255,13 @@ function measureLineHeight(fontSize: number, lh: LineHeight | typeof figma.mixed
     const plausibleAsPct = v >= 100 && v <= 300; // %로 읽으면 0.8~3배가 되는 구간
     if (!plausibleAsPx && plausibleAsPct) return { px: roundN((fontSize * v) / 100), pct: v };
   }
-  // UI는 150%인데 API가 24(PIXELS)만 주는 경우 — 폰트 대비 정수 %가 흔한 값이면 복구.
-  // (진짜 24px 의도와 구분 불가: 텍스트 스타일 등록 맥락에선 %가 맞는 경우가 대부분.)
-  if (unit === 'PIXELS' && fontSize > 0 && v > 0) {
-    const pct = roundN((v / fontSize) * 100);
-    const back = roundN((fontSize * pct) / 100);
-    if (COMMON_LH_PCTS.has(pct) && Math.abs(back - v) <= 0.05) return { px: back, pct };
-  }
+  // 여기서 멈춘다 — 폰트 대비 비율이 흔한 %(16/24=150%)라는 이유만으로 px를 %로 뒤집지 않는다.
+  // 그 보정은 램프의 절반(16/24·24/36·32/48…)을 %로 만들고, %로 등록된 스타일은 행간 변수
+  // 바인딩이 생략돼(Figma가 바인딩 시 px를 강제) 같은 램프에서 24/32는 변수가 있고 24/36은
+  // 없는 상태가 됐다. 무엇보다 24px 의도와 150% 의도는 이 값만으로 구분할 수 없다 —
+  // 진짜 %가 PIXELS로 떨어지는 경우는 위 판정(px로 읽으면 말이 안 되는 값)과 변수
+  // description·스타일 단위 복구가 맡는다. 자간의 `authoredPx` 가드와 같은 원칙:
+  // **추측이 사용자가 만든 사실을 이기면 안 된다.**
   return { px: v, pct: 0 };
 }
 
