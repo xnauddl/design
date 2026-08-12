@@ -1344,6 +1344,28 @@
   };
   var OPACITY_TOL = 5e-3;
   var SKIP_PREVIEW_CAP = 200;
+  function capSkipsByReason(skips, cap) {
+    if (skips.length <= cap) return skips;
+    const byReason = /* @__PURE__ */ new Map();
+    for (const s of skips) {
+      const list = byReason.get(s.reason);
+      if (list) list.push(s);
+      else byReason.set(s.reason, [s]);
+    }
+    const queues = [...byReason.values()];
+    const out = [];
+    for (let i = 0; out.length < cap; i++) {
+      let progressed = false;
+      for (const q of queues) {
+        if (i >= q.length) continue;
+        out.push(q[i]);
+        progressed = true;
+        if (out.length === cap) break;
+      }
+      if (!progressed) break;
+    }
+    return out;
+  }
   function addColorCand(preview, node, field, index, hex, e) {
     preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
   }
@@ -1471,7 +1493,7 @@
     res.flags = [...flagSet];
     if (preview) {
       res.candidates = preview.candidates;
-      const skips = preview.skips.slice(0, SKIP_PREVIEW_CAP);
+      const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
       res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates, skips);
       res.skips = skips;
       res.skipTotal = preview.skips.length;
@@ -2055,16 +2077,20 @@
   }
   function writeRole(node, role) {
     const fn = node.setPluginData;
-    if (typeof fn !== "function") return;
+    if (typeof fn !== "function") return false;
     try {
+      const read = node.getPluginData;
+      if (typeof read === "function" && read.call(node, ROLE_KEY) === role) return false;
       fn.call(node, ROLE_KEY, role);
+      return true;
     } catch (e) {
+      return false;
     }
   }
   function writeRoleFromName(node, name) {
     const toks = kebab(name).split("-").filter(Boolean);
     const role = toks[toks.length - 1];
-    if (role && isKnownRole(role)) writeRole(node, role);
+    return role && isKnownRole(role) ? writeRole(node, role) : false;
   }
   var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper"]);
   function resolveRole(node, token, pos, parentRole, ctxScope) {
@@ -4824,19 +4850,21 @@
         }
         case "RENAME_APPLY": {
           const changes = [];
+          let roleWrites = 0;
           for (const { id, before: expectedBefore, after, role } of msg.items) {
             const node = await figma.getNodeByIdAsync(id);
             if (!node || !("name" in node)) continue;
             const before = node.name;
             if (before !== expectedBefore) continue;
             if (before !== after) node.name = after;
-            if (role) writeRole(node, role);
-            else writeRoleFromName(node, after);
+            if (role ? writeRole(node, role) : writeRoleFromName(node, after)) {
+              roleWrites++;
+            }
             if (before === after) continue;
             changes.push({ id, before, after });
           }
           post({ type: "RENAME_RESULT", changes, nodes: [], applied: true });
-          if (changes.length) {
+          if (changes.length || roleWrites) {
             commitUndo(figma);
           }
           break;

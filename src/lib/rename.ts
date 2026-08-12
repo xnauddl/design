@@ -189,13 +189,19 @@ async function decide(
  * 판정한 역할을 노드 pluginData에 기록한다. 실패해도 리네임은 계속 — 이름이 본체고
  * 기록은 등록 단계의 보조 신호다. (테스트 목처럼 API가 없는 노드도 안전하게 통과)
  */
-export function writeRole(node: SceneNode, role: string): void {
+export function writeRole(node: SceneNode, role: string): boolean {
   const fn = (node as { setPluginData?: (key: string, value: string) => void }).setPluginData;
-  if (typeof fn !== 'function') return;
+  if (typeof fn !== 'function') return false;
   try {
+    // 이미 같은 값이면 쓰지 않는다. RENAME_APPLY는 이름이 그대로인 노드에도 역할을 남기므로
+    // (멱등), 한 번 정리한 3천 레이어 서브트리를 다시 적용하면 3천 번을 도로 쓰게 된다.
+    // 읽기는 싸고 쓰기는 문서를 더럽히니 — 실제로 바뀔 때만 쓴다.
+    const read = (node as { getPluginData?: (key: string) => string }).getPluginData;
+    if (typeof read === 'function' && read.call(node, ROLE_KEY) === role) return false;
     fn.call(node, ROLE_KEY, role);
+    return true;
   } catch {
-    /* 기록 실패 무시 */
+    return false; /* 기록 실패 무시 */
   }
 }
 
@@ -205,10 +211,10 @@ export function writeRole(node: SceneNode, role: string): void {
  * WYSIWYG 적용은 id→after만 받으므로 이름 말단(역할)을 복원한다.
  * `layerNameFromRole`이 역할을 항상 마지막 토큰에 두므로 말단만 보면 된다.
  */
-export function writeRoleFromName(node: SceneNode, name: string): void {
+export function writeRoleFromName(node: SceneNode, name: string): boolean {
   const toks = kebab(name).split('-').filter(Boolean);
   const role = toks[toks.length - 1];
-  if (role && isKnownRole(role)) writeRole(node, role);
+  return role && isKnownRole(role) ? writeRole(node, role) : false;
 }
 
 /** 역할 없는 순수 레이아웃 폴백 — 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과. */

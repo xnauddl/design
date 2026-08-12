@@ -15,6 +15,7 @@ import {
   applyExistingTextStyles,
   bindSelection,
   renameSelection,
+  writeRole,
   writeRoleFromName,
   generateDarkMode,
   ensureDarkMode,
@@ -1094,6 +1095,39 @@ test('bindSelection — 스킵 목록·미리보기 트리는 고른 레이어 �
   assert.ok(dry.nodes.some((n) => n.id === 'hit')); // 후보는 잘려 나가지 않는다
 });
 
+test('bindSelection — 스킵 상한을 사유별로 나눠 드문 사유도 레이어 목록을 지킨다', async () => {
+  installFigma();
+  await createTokens([
+    { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+    { name: 'spacing/12', category: 'gap', sources: ['gap'], value: 12 },
+  ], 16);
+  // 사유가 노드별로 갈려야 이 테스트가 뜻이 있다 — 한 노드가 두 사유를 다 내면 순회만으로
+  // 자연히 섞여서, 앞에서 자르든 나눠 담든 결과가 같다.
+  // 흔한 사유(매칭 없음) 400개가 먼저 순회되고, 드문 사유(HUG/FILL) 10개가 뒤에 온다.
+  const common = Array.from({ length: 400 }, (_, i) => ({
+    type: 'FRAME', id: `c${i}`, name: `NoMatch ${i}`, fills: [], layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 200, height: 200,
+    itemSpacing: 13, // 토큰 없는 간격 → no-match (크기 200은 붙으므로 크기 사유는 안 난다)
+    setBoundVariable() {},
+  }));
+  const rare = Array.from({ length: 10 }, (_, i) => ({
+    type: 'FRAME', id: `r${i}`, name: `Hug ${i}`, fills: [], layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', width: 200, height: 200,
+    itemSpacing: 12, // 토큰 있는 간격 → 붙는다. 남는 사유는 HUG/FILL뿐.
+    setBoundVariable() {},
+  }));
+
+  const dry = await bindSelection([...common, ...rare], 0.5, false);
+
+  assert.equal(dry.skips.length, 200); // 상한은 그대로
+  const reasonsInList = new Set(dry.skips.map((s) => s.reason));
+  const reasonsCounted = Object.keys(dry.reasons).filter((k) => dry.reasons[k] > 0);
+  // 사유가 하나뿐이면 이 테스트는 아무것도 안 지킨다 — 갈라지는지부터 확인한다.
+  assert.ok(reasonsCounted.length >= 2, `사유가 ${reasonsCounted.length}종뿐이라 상한 분배를 검증할 수 없다`);
+  // 집계에 잡힌 사유는 전부 목록에도 한 건 이상 남아야 한다 — 그래야 칩이 살아 있다.
+  for (const r of reasonsCounted) assert.ok(reasonsInList.has(r), `사유 '${r}'의 레이어 목록이 비었다`);
+});
+
 test('bindSelection — 그리드 오토레이아웃의 row/column gap 바인딩', async () => {
   const figma = installFigma();
   await createTokens(
@@ -1904,6 +1938,31 @@ test('renameSelection — apply:false면 역할도 기록하지 않는다(미리
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [icon] };
   await renameSelection([root], { apply: false, maxDepth: 3 });
   assert.equal(icon.getPluginData('dsRole'), '');
+});
+
+test('writeRole — 같은 값이면 다시 쓰지 않고 false를 돌려준다', () => {
+  installFigma();
+  let writes = 0;
+  const node = withPluginData({ type: 'FRAME', id: 'f', name: 'Card', width: 100, height: 40 });
+  const raw = node.setPluginData;
+  node.setPluginData = (k, v) => { writes++; return raw(k, v); };
+
+  assert.equal(writeRole(node, 'card'), true); // 처음엔 쓴다
+  assert.equal(writes, 1);
+  // RENAME_APPLY는 이름이 그대로인 노드에도 역할을 남기므로(멱등), 재실행이면 같은 값이
+  // 다시 온다. 그때마다 쓰면 3천 레이어 서브트리에 3천 번을 도로 쓰고, 이름 변경이 0이라
+  // commitUndo도 안 걸려 그 쓰기가 다음 작업의 undo에 접혀 들어간다.
+  assert.equal(writeRole(node, 'card'), false);
+  assert.equal(writes, 1); // 늘지 않았다
+  assert.equal(node.getPluginData('dsRole'), 'card');
+
+  assert.equal(writeRole(node, 'icon'), true); // 값이 실제로 바뀌면 쓴다
+  assert.equal(writes, 2);
+  assert.equal(node.getPluginData('dsRole'), 'icon');
+
+  // writeRoleFromName도 같은 판단을 물려받는다(내부에서 writeRole을 부른다).
+  assert.equal(writeRoleFromName(node, 'header-icon'), false); // 이미 icon
+  assert.equal(writes, 2);
 });
 
 test('writeRoleFromName — RENAME_APPLY 경로: 이름 말단 역할을 dsRole로 기록', () => {

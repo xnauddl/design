@@ -812,6 +812,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // #7: 미리보기 트리에서 체크한 항목만 직접 적용(재계산 없이 id→after 그대로).
         // 이름과 함께 dsRole도 기록 — 말단 후보 자격·등록 머리명사가 readRole에 의존한다.
         const changes: RenameChange[] = [];
+        let roleWrites = 0; // 이름은 그대로면서 역할만 새로 기록된 노드 수(undo 묶음 판단용)
         for (const { id, before: expectedBefore, after, role } of msg.items) {
           const node = await figma.getNodeByIdAsync(id);
           if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
@@ -827,15 +828,19 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           // 정해 보냈으면(role) 그 값을 그대로 쓰고, 없을 때만 origin/main의 이름 기반
           // 추론으로 물러선다. 이름에서 뽑는 쪽은 알려진 역할 토큰으로 끝나는 이름만
           // 건지므로, 앞의 경로를 이걸로 대체하면 그 외 이름의 역할이 도로 안 남는다.
-          if (role) writeRole(node as SceneNode, role);
-          else writeRoleFromName(node as SceneNode, after);
+          if (role ? writeRole(node as SceneNode, role) : writeRoleFromName(node as SceneNode, after)) {
+            roleWrites++;
+          }
           // node.name은 위(before !== after)에서 이미 썼다 — origin/main이 여기 둔 대입은
           // 그 줄과 겹쳐서 걷는다.
           if (before === after) continue;
           changes.push({ id, before, after });
         }
         post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true });
-        if (changes.length) {
+        // 이름이 하나도 안 바뀌어도 역할을 새로 기록했으면 커밋한다. 안 하면 그 pluginData
+        // 쓰기가 다음에 undo를 커밋하는 **무관한 작업**의 묶음에 접혀 들어가, 그 작업을
+        // 되돌릴 때 역할 기록까지 조용히 함께 revert된다.
+        if (changes.length || roleWrites) {
           commitUndo(figma); // UX2: 선택 리네임 전체를 단일 Undo로
         }
         break;

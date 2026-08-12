@@ -80,6 +80,38 @@ export interface BindResult {
  */
 const SKIP_PREVIEW_CAP = 200;
 
+/**
+ * 상한을 사유별로 고르게 나눈다.
+ *
+ * 앞에서 그냥 자르면 순회 순서상 흔한 사유(트리 위쪽의 `오토레이아웃 없음`)가 예산을 다 먹는다.
+ * 그런데 칩의 숫자는 res.reasons가 상한과 무관하게 전수로 세므로, 화면에는 클릭되는
+ * `오토레이아웃 없음 2400 ›` 옆에 죽은 평문 `매칭 없음 180`이 나란히 뜬다 — 정작 사용자가
+ * 고쳐야 할 180개로는 점프할 수 없다. 사유를 돌아가며 한 개씩 담아 채우면, 드문 사유는
+ * 제 몫을 통째로 지키고 흔한 사유만 잘린다(사유 안에서는 순회 순서 유지).
+ */
+function capSkipsByReason(skips: BindSkip[], cap: number): BindSkip[] {
+  if (skips.length <= cap) return skips;
+  const byReason = new Map<string, BindSkip[]>();
+  for (const s of skips) {
+    const list = byReason.get(s.reason);
+    if (list) list.push(s);
+    else byReason.set(s.reason, [s]);
+  }
+  const queues = [...byReason.values()];
+  const out: BindSkip[] = [];
+  for (let i = 0; out.length < cap; i++) {
+    let progressed = false;
+    for (const q of queues) {
+      if (i >= q.length) continue;
+      out.push(q[i]);
+      progressed = true;
+      if (out.length === cap) break;
+    }
+    if (!progressed) break; // 모든 큐가 바닥
+  }
+  return out;
+}
+
 /** dry-run 미리보기 수집물(apply 시에는 null). */
 interface Preview {
   candidates: BindCandidate[];
@@ -302,7 +334,7 @@ export async function bindSelection(
   if (preview) {
     res.candidates = preview.candidates;
     // 트리 씨앗도 잘린 목록으로 — 트리 크기가 '고른 레이어 수'가 아니라 '보낼 스킵 수'에 묶인다.
-    const skips = preview.skips.slice(0, SKIP_PREVIEW_CAP);
+    const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
     res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates, skips);
     res.skips = skips;
     res.skipTotal = preview.skips.length;
