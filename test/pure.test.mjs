@@ -495,6 +495,35 @@ test('splitWeightStyle — weight/italic 분리', () => {
   assert.deepEqual(splitWeightStyle('Italic'), { weight: 400, italic: true });
 });
 
+test('exportTokens — 텍스트 스타일은 typography로, 행간·자간 %는 그대로(변수 아님)', () => {
+  const styles = [
+    { name: 'body', fontFamily: 'Inter', fontStyle: 'Regular', fontSize: 16, lineHeight: { unit: 'percent', value: 150 }, letterSpacing: { unit: 'percent', value: -2 } },
+    { name: 'heading/h1', fontFamily: 'Inter', fontStyle: 'Semi Bold Italic', fontSize: 32, lineHeight: { unit: 'px', value: 40 }, letterSpacing: { unit: 'px', value: 0 } },
+    { name: 'auto', fontFamily: 'Inter', fontStyle: 'Regular', fontSize: 14, lineHeight: { unit: 'auto', value: 0 }, letterSpacing: { unit: 'px', value: 0 } },
+  ];
+  const tokens = [{ name: 'font-size/16', collection: 'Global', type: 'FLOAT', kind: 'fontSize', value: 16 }];
+  const css = exportTokens(tokens, OPTS, styles);
+  assert.ok(css.includes('--typography-body-line-height: 150%;'));
+  assert.ok(css.includes('--typography-body-letter-spacing: -2%;'));
+  assert.ok(css.includes('--typography-heading-h1-line-height: 40px;'));
+  assert.ok(css.includes('--typography-heading-h1-font-weight: 600;'));
+  assert.ok(css.includes('--typography-heading-h1-font-style: italic;'));
+  assert.ok(css.includes('--typography-auto-line-height: normal;'));
+  assert.ok(css.trim().endsWith('}'));
+  assert.ok(css.includes('--font-size-16: 16px;')); // 기존 토큰도 그대로
+
+  const W3C = { ...OPTS, format: 'w3c' };
+  const json = JSON.parse(exportTokens(tokens, W3C, styles));
+  assert.equal(json.typography.body.$type, 'typography');
+  assert.deepEqual(json.typography.body.$value, { fontFamily: 'Inter', fontSize: '16px', fontWeight: 400, lineHeight: '150%', letterSpacing: '-2%' });
+  assert.equal(json.typography.heading.h1.$value.fontStyle, 'italic');
+  assert.equal(json.typography.heading.h1.$value.lineHeight, '40px');
+  assert.equal(json['font-size']['16'].$value, '16px');
+  // 스타일 없이 호출하면 예전과 동일
+  assert.equal(exportTokens(tokens, OPTS), exportTokens(tokens, OPTS, []));
+  assert.equal(exportTokens(tokens, W3C), exportTokens(tokens, W3C, []));
+});
+
 test('exportTokens — strokeWidth/effectFloat는 px 치수로 출력', () => {
   const tokens = [
     { name: 'stroke-width/2', collection: 'Global', type: 'FLOAT', kind: 'strokeWidth', value: 2 },

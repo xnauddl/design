@@ -13,7 +13,7 @@ import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
-import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
+import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { createIconRegistry, swapVectorSlots, transplantImageFills, nodeAtPath } from './lib/artwork';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
@@ -1049,11 +1049,24 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           tokens.push(t);
         }
         tokens.sort((a, b) => a.name.localeCompare(b.name));
+        // 텍스트 스타일도 함께 — 행간·자간 %는 변수가 아니라 스타일에 있다(A안). %는 그대로 낸다.
+        const styles: ExportTextStyle[] = (await figma.getLocalTextStylesAsync()).map((st) => ({
+          name: st.name,
+          fontFamily: st.fontName.family,
+          fontStyle: st.fontName.style,
+          fontSize: st.fontSize,
+          lineHeight:
+            st.lineHeight.unit === 'AUTO'
+              ? { unit: 'auto', value: 0 }
+              : { unit: st.lineHeight.unit === 'PERCENT' ? 'percent' : 'px', value: st.lineHeight.value },
+          letterSpacing: { unit: st.letterSpacing.unit === 'PERCENT' ? 'percent' : 'px', value: st.letterSpacing.value },
+        }));
+        styles.sort((a, b) => a.name.localeCompare(b.name));
         const content = exportTokens(tokens, {
           format: msg.format,
           fontSizeUnit: msg.fontSizeUnit,
           base: msg.base,
-        });
+        }, styles);
         post({ type: 'EXPORT_RESULT', format: msg.format, content });
         break;
       }
