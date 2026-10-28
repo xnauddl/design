@@ -14,6 +14,7 @@ import {
   createSemanticTextStyles,
   applyExistingTextStyles,
   bindSelection,
+  scanBindings,
   renameSelection,
   writeRole,
   writeRoleFromName,
@@ -185,11 +186,8 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
   // 타이포
   assert.equal(byName.get('font-size/24')?.category, 'fontSize');
   assert.equal(byName.get('font-family/Inter')?.category, 'fontFamily');
-  assert.deepEqual(
-    { v: byName.get('line-height/150')?.value, u: byName.get('line-height/150')?.unit },
-    { v: 150, u: 'percent' },
-  );
-  assert.equal(byName.get('letter-spacing/2')?.unit, 'px');
+  assert.equal(byName.get('line-height/150'), undefined); // %행간은 변수 후보가 아니다(A안 — 텍스트 스타일이 보관)
+  assert.equal(byName.get('letter-spacing/2')?.unit, 'px'); // px 정수 자간은 후보
   // 간격/크기/반경
   assert.equal(byName.get('spacing/16')?.category, 'gap');
   assert.equal(byName.get('spacing/8')?.category, 'gap');
@@ -579,7 +577,7 @@ test('extractFromSelection — 인스턴스 내부만 있으면 그 이유를 �
 });
 
 /* ================= variables.ts ================= */
-test('createTokens — Global 리터럴 + Semantic 별칭 + scopes/hidden + px 스냅샷', async () => {
+test('createTokens — Global 리터럴 + scopes/hidden + px 환산 (Semantic 거울 없음)', async () => {
   const figma = installFigma();
   const summary = await createTokens(
     [
@@ -1068,9 +1066,9 @@ test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사�
   assert.deepEqual(byReason('hug-fill').map((s) => s.nodeId), ['pad']);
   assert.equal(byReason('hug-fill')[0].field, 'width'); // 첫 축의 필드가 남는다
 
-  // 실제 적용(apply=true)에서는 수집하지 않는다 — 미리보기 전용 페이로드.
+  // 실제 적용(apply=true)에서도 사유 목록을 모은다(결과 트리의 사유 칩).
   const real = await bindSelection([pad, free], 0.5, true);
-  assert.equal(real.skips, undefined);
+  assert.ok(Array.isArray(real.skips)); // 적용 모드도 사유 목록을 싣는다(결과 트리의 사유 칩)
 });
 
 test('bindSelection — 스킵 목록·미리보기 트리는 고른 레이어 수가 아니라 상한에 묶인다', async () => {
@@ -1450,9 +1448,9 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
   assert.equal(real.bound, 2);
   assert.equal(real.skipped, 1);
   assert.equal(node2.fills[0].boundVariables.color.type, 'VARIABLE_ALIAS');
-  // apply=true(실제)에서는 미리보기 후보/노드를 수집하지 않음
-  assert.equal(real.candidates, undefined);
-  assert.equal(real.nodes, undefined);
+  // 적용 모드도 '어디에 어느 변수가 붙었나' 목록을 싣는다(결과 트리). 실제로 붙은 것만.
+  assert.equal(real.candidates.length, 2);
+  assert.ok(real.nodes.length >= 1);
 });
 
 test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 필드/변수/인덱스', async () => {
@@ -1493,7 +1491,7 @@ test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 
   assert.equal(fillC.index, 0);
   assert.equal(fillC.currentValue, '#0066ff');
   assert.equal(fillC.variableName, 'color/0066ff');
-  assert.ok(fillC.tier >= 2);
+  assert.ok(fillC.tier >= 1); // 역할 없는 색은 Global(tier 1)에 붙는다
   const widthC = dry.candidates.find((c) => c.field === 'width');
   assert.equal(widthC.nodeId, 'child');
   assert.equal(widthC.distance, 0); // 정확 매칭

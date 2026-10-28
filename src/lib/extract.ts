@@ -35,6 +35,20 @@ const SKIP_GRADIENT = '그라디언트·이미지 채움은 변수로 묶을 수
 
 const round = (n: number, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
 
+const SKIP_FRACTION = '소수 값(26.67px 등)은 척도가 아니라 스케일 잔값이라 토큰에서 제외했습니다.';
+/**
+ * 척도 값인가 — 변수는 소수점을 갖지 않는다: 폰트 크기·간격·반경·행간·자간·그림자 수치는 정수,
+ * 선 두께만 0.5 단위(hairline·아이콘 선). 불투명도(0~1)는 본질이 소수라 이 규칙 밖(collectOpacity).
+ * 26.67·13.33·58.29 같은 값은 그룹 스케일(×1.333)이 남긴 잔값이지 디자이너가 정한 척도가 아니다.
+ * (크기 size는 이미 같은 규칙 — addSize의 Number.isInteger.) 토큰으로 만들면 변수 목록이
+ * `font-size/26_67`로 지저분해지고, 바인딩은 허용오차로 근처 정수에 붙여 디자인을 바꾼다.
+ */
+function onScale(acc: Accumulator, v: number, step = 1): boolean {
+  const ok = Math.abs(v / step - Math.round(v / step)) < 1e-6;
+  if (!ok) acc.skipped.add(SKIP_FRACTION);
+  return ok;
+}
+
 function keyOf(category: TokenCategory, value: string | number, unit?: Unit): string {
   return `${category}|${value}|${unit ?? ''}`;
 }
@@ -73,10 +87,9 @@ function collectPaints(
     }
     const hex = rgbToHex(p.color);
     add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source, nodeId);
-    if (p.opacity != null && p.opacity < 1) {
-      const o = round(p.opacity);
-      add(acc, { name: numberTokenName('opacity', o), category: 'opacity', value: o }, 'opacity', node.id);
-    }
+    // 페인트 불투명도(p.opacity)는 토큰화하지 않는다 — Figma에는 페인트 opacity에 붙는 변수가 없다
+    // (OPACITY 스코프는 **레이어** 불투명도 전용, collectOpacity가 따로 모은다). 만들어 봐야
+    // 어디에도 연결되지 않는 `opacity/0.08` 변수만 남았다. 반투명 색 자체는 bind가 건너뛴다(bind.ts).
   }
 }
 
@@ -84,23 +97,26 @@ function collectPaints(
 function collectText(acc: Accumulator, node: TextNode): void {
   if (node.fontSize !== figma.mixed) {
     const v = round(node.fontSize);
-    add(acc, { name: numberTokenName('font-size', v), category: 'fontSize', value: v }, 'fontSize', node.id);
+    if (onScale(acc, v)) add(acc, { name: numberTokenName('font-size', v), category: 'fontSize', value: v }, 'fontSize', node.id);
   }
   if (node.fontName !== figma.mixed) {
     const fam = node.fontName.family;
     add(acc, { name: `font-family/${fam}`, category: 'fontFamily', value: fam }, 'fontFamily', node.id);
   }
-  if (node.lineHeight !== figma.mixed && node.lineHeight.unit !== 'AUTO') {
-    const lh = node.lineHeight;
-    const unit: Unit = lh.unit === 'PERCENT' ? 'percent' : 'px';
-    const v = round(lh.value);
-    add(acc, { name: numberTokenName('line-height', v), category: 'lineHeight', value: v, unit }, 'lineHeight', node.id);
+  // 행간·자간은 **px로 직접 입력된 정수 값만** 변수 후보다. %는 변수로 만들지 않는다(A안, 2026-10-28):
+  // Figma는 행간·자간 변수를 px로만 바인딩하므로 150%를 변수로 두려면 글자 크기마다 다른 px가
+  // 필요하다 — `line-height/150 = 24`(16px 기준)는 28px 제목의 150%(42)와 안 맞아 한 번도
+  // 바인딩되지 않았고, 2%×16 = 0.32 같은 소수만 남겼다. %는 텍스트 스타일이 보관한다
+  // (Lightning은 비율, Atlassian은 폰트 스타일에 묶음 — 둘 다 px 행간 변수가 없다).
+  if (node.lineHeight !== figma.mixed && node.lineHeight.unit === 'PIXELS') {
+    const v = round(node.lineHeight.value);
+    const unit: Unit = 'px';
+    if (v > 0 && onScale(acc, v)) add(acc, { name: numberTokenName('line-height', v), category: 'lineHeight', value: v, unit }, 'lineHeight', node.id);
   }
-  if (node.letterSpacing !== figma.mixed) {
-    const ls = node.letterSpacing;
-    const unit: Unit = ls.unit === 'PERCENT' ? 'percent' : 'px';
-    const v = round(ls.value);
-    add(acc, { name: numberTokenName('letter-spacing', v), category: 'letterSpacing', value: v, unit }, 'letterSpacing', node.id);
+  if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === 'PIXELS') {
+    const v = round(node.letterSpacing.value);
+    const unit: Unit = 'px';
+    if (v !== 0 && onScale(acc, v)) add(acc, { name: numberTokenName('letter-spacing', v), category: 'letterSpacing', value: v, unit }, 'letterSpacing', node.id);
   }
 }
 
@@ -119,7 +135,7 @@ function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | Inst
   for (const g of gaps) {
     if (typeof g === 'number' && g > 0) {
       const v = round(g);
-      add(acc, { name: numberTokenName('spacing', v), category: 'gap', value: v }, 'gap', node.id);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('spacing', v), category: 'gap', value: v }, 'gap', node.id);
     }
   }
 }
@@ -166,7 +182,7 @@ function collectRadius(acc: Accumulator, node: SceneNode): void {
   for (const rv of values) {
     if (rv > 0) {
       const v = round(rv);
-      add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id);
     }
   }
 }
@@ -190,7 +206,7 @@ function collectStroke(acc: Accumulator, node: SceneNode): void {
   for (const wv of widths) {
     if (wv > 0) {
       const v = round(wv);
-      add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id);
+      if (onScale(acc, v, 0.5)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id);
     }
   }
 }
@@ -219,11 +235,11 @@ function collectEffects(acc: Accumulator, node: SceneNode): void {
         ['shadow-y', e.offset.y],
       ] as const) {
         const v = round(val);
-        add(acc, { name: numberTokenName(g, v), category: 'effectFloat', value: v }, 'effectFloat', node.id);
+        if (onScale(acc, v)) add(acc, { name: numberTokenName(g, v), category: 'effectFloat', value: v }, 'effectFloat', node.id);
       }
     } else if (e.type === 'LAYER_BLUR' || e.type === 'BACKGROUND_BLUR') {
       const v = round(e.radius);
-      add(acc, { name: numberTokenName('blur', v), category: 'effectFloat', value: v }, 'effectFloat', node.id);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('blur', v), category: 'effectFloat', value: v }, 'effectFloat', node.id);
     }
   }
 }
