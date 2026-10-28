@@ -88,6 +88,8 @@ import {
   // roles (전 토큰 역할 어휘)
   tshirtRoles,
   radiusRoles,
+  spacingRoles,
+  strokeRoles,
   fontSizeRoles,
   weightRole,
   familyRole,
@@ -1638,10 +1640,28 @@ test('tshirtRoles — 센터(md) 정렬 티셔츠', () => {
   assert.deepEqual(tshirtRoles([4, 8, 16, 24, 32, 48]), ['xs', 'sm', 'md', 'lg', 'xl', '2xl']);
 });
 
-test('radiusRoles — 0→none · 큰값→full · 나머지 티셔츠', () => {
-  assert.deepEqual(radiusRoles([0, 4, 8]), ['none', 'md', 'lg']);
+test('radiusRoles — 고정 사다리(2 xs·4 sm·8 md·12 lg·16 xl·24 2xl) · 0→none · 큰값→full · 사다리 밖은 역할 없음', () => {
+  assert.deepEqual(radiusRoles([0, 4, 8]), ['none', 'sm', 'md']); // 파일에 몇 개가 있든 같은 값=같은 역할
   assert.deepEqual(radiusRoles([0, 8, 9999]), ['none', 'md', 'full']);
+  assert.deepEqual(radiusRoles([6, 12, 58]), ['', 'lg', '']); // 6·58은 척도 밖 → Global만
 });
+
+test('spacingRoles/strokeRoles — Lightning·Atlassian 고정 사다리, 척도 밖 값은 역할 없음', () => {
+  assert.deepEqual(spacingRoles([4, 8, 16, 24, 32]), ['2xs', 'xs', 'md', 'lg', 'xl']);
+  assert.deepEqual(spacingRoles([13, 16, 51]), ['', 'md', '']);
+  assert.deepEqual(strokeRoles([0.5, 1, 2, 4]), ['hairline', 'thin', 'thick', '']);
+});
+
+test('suggestTokenRoles — 사다리 밖 간격은 역할 맵에서 빠진다', () => {
+  const map = suggestTokenRoles([
+    { name: 'spacing/16', category: 'gap', value: 16, sources: ['gap'] },
+    { name: 'spacing/13', category: 'gap', value: 13, sources: ['gap'] },
+    { name: 'radius/8', category: 'radius', value: 8, sources: ['radius'] },
+    { name: 'stroke-width/1', category: 'strokeWidth', value: 1, sources: ['strokeWidth'] },
+  ]);
+  assert.deepEqual(map, { 'spacing/md': 'spacing/16', 'radius/md': 'radius/8', 'stroke-width/thin': 'stroke-width/1' });
+});
+
 
 test('fontSizeRoles — base(16) 중심 type 스케일', () => {
   assert.deepEqual(fontSizeRoles([12, 16, 24], 16), ['caption', 'body', 'title']);
@@ -1676,16 +1696,18 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
     { name: 'stroke-width/4', category: 'strokeWidth', sources: ['strokeWidth'], value: 4 },
   ];
   const map = suggestTokenRoles(tokens, 16);
-  assert.equal(map['primary'], 'color/0066ff'); // 색(유일 유채) → primary
-  assert.equal(map['spacing/md'], 'spacing/16'); // 센터
-  assert.equal(map['spacing/sm'], 'spacing/8');
+  assert.equal(map['color/background/brand'], 'color/0066ff'); // 색(유일 유채) → brand 면
+  assert.equal(map['spacing/md'], 'spacing/16'); // 고정 사다리: 16=md
+  assert.equal(map['spacing/xs'], 'spacing/8'); // 8=xs (Lightning x-small 8px)
   assert.equal(map['spacing/lg'], 'spacing/24');
   assert.equal(map['radius/none'], 'radius/0');
   assert.equal(map['font-size/body'], 'font-size/16');
   assert.equal(map['font-size/title'], 'font-size/24');
   assert.equal(map['font-weight/bold'], 'font-weight/700');
   assert.equal(map['font-family/sans'], 'font-family/Inter');
-  assert.equal(map['stroke-width/md'], 'stroke-width/2'); // 티셔츠 센터
+  assert.equal(map['stroke-width/thin'], 'stroke-width/1'); // Lightning borderWidthThin
+  assert.equal(map['stroke-width/thick'], 'stroke-width/2');
+  assert.equal(Object.values(map).includes('stroke-width/4'), false); // 척도 밖 → 역할 없음
 });
 
 test('mergeTokenRoles — 부분 맵을 덮어쓰되 빠진 카테고리는 자동 추천을 남긴다', () => {

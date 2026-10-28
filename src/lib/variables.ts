@@ -71,14 +71,21 @@ export interface CreateSummary {
   conversions: PxConversion[];
 }
 
-/** Global(원시) + Semantic(별칭 미러) 생성. v1은 Semantic을 1:1 미러로 자동 생성(이름 개명은 UI에서). */
+/**
+ * Global(원시) 생성. Semantic은 **역할 별칭만**(createSemanticAliases) — 예전의 1:1 거울
+ * (`color/gray/950` 같은 Global 이름을 Semantic에도 복사)은 걷었다. 디자이너가 보는 Semantic이
+ * Global 복사본 106개 + 역할 4개로 보여 "시맨틱이 아니다"가 됐고, Lightning·Atlassian 어느 쪽도
+ * 거울 계층을 두지 않는다. 역할 없는 값은 바인딩이 Global에 직접 붙는다(bind.ts).
+ * Semantic 컬렉션은 역할 단계가 쓸 수 있게 미리 만들어 둔다(빈 컬렉션).
+ */
 export async function createTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
-  const { globalCol, semanticCol } = await resolveCollections();
+  const { globalCol } = await resolveCollections();
   const gMode = globalCol.defaultModeId;
-  const sMode = semanticCol.defaultModeId;
   const idx = await buildVarIndex();
 
   const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base) };
+  // 같은 실행에서 같은 이름이 두 번 오면(채움색 #000 + 그림자색 #000) 스코프를 덮지 않고 합친다.
+  const touched = new Set<string>();
 
   for (const t of tokens) {
     const type = resolvedTypeForToken(t);
@@ -88,17 +95,14 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
 
     // Global 값 = 리터럴(#16: 비-px lineHeight/letterSpacing은 px FLOAT + 원본 단위는 description)
     setGlobalLiteral(g.variable, gMode, t, type, base);
-    g.variable.scopes = scopesForType(scopesForSources(t.sources), type);
+    const scopes = scopesForType(scopesForSources(t.sources), type);
+    const key = vkey(globalCol.id, t.name);
+    const merged = touched.has(key) ? scopesForType([...new Set([...(g.variable.scopes as ScopeName[]), ...scopes])], type) : scopes;
+    touched.add(key);
+    g.variable.scopes = merged;
     g.variable.hiddenFromPublishing = true; // 직접 사용 방지(3계층 규칙 보강)
     const desc = unitDescription(t);
     if (desc) g.variable.description = desc; // 예: "160%" — 내보내기·Figma 패널 표시
-
-    // Semantic 미러(별칭) — 리터럴 금지, 오직 Global 참조
-    const s = upsertVariable(t.name, semanticCol, type, idx);
-    s.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g.variable));
-    s.variable.scopes = scopesForType(scopesForSources(t.sources), type);
-    summary[s.created ? 'created' : 'updated']++;
-    summary.semantics++;
   }
 
   return summary;
@@ -111,7 +115,6 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
 export async function previewCreateTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const gId = cols.find((c) => c.name === GLOBAL)?.id ?? '#G';
-  const sId = cols.find((c) => c.name === SEMANTIC)?.id ?? '#S';
   const existing = new Set<string>();
   for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
 
@@ -128,11 +131,8 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
     summary[existing.has(k) ? 'updated' : 'created']++;
   };
 
-  // #16: 토큰당 Global + Semantic 미러 1쌍(스냅샷 변수 없음).
-  for (const t of tokens) {
-    tally(gId, t.name, 'globals');
-    tally(sId, t.name, 'semantics');
-  }
+  // 토큰당 Global 1개(거울 없음 — createTokens와 동일).
+  for (const t of tokens) tally(gId, t.name, 'globals');
   return summary;
 }
 
@@ -627,14 +627,17 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
   ) => {
     pushTok({ name: numberTokenName('font-size', fontSize), category: 'fontSize', value: fontSize, sources: ['fontSize'] });
     aliasMap[`font-size/${role}`] = numberTokenName('font-size', fontSize);
-    if (lineHeight > 0) {
+    // 행간·자간 변수는 **px 정수로 직접 지정된 스타일만**(A안). %는 스타일이 보관하고 변수를 만들지
+    // 않는다 — 글자 크기마다 px가 달라 역할 하나에 변수 하나가 성립하지 않고(19.2·28.8 소수),
+    // 스타일마다 변수가 생겨 49개까지 불었다(extract.ts 같은 자리의 설명 참고).
+    if (lineHeight > 0 && lineHeightPercent === 0 && Number.isInteger(lineHeight)) {
       const lhName = numberTokenName('line-height', lineHeight);
-      pushLineHeightTok(lhName, lineHeight, lineHeightPercent, fontSize);
+      pushLineHeightTok(lhName, lineHeight, 0, fontSize);
       aliasMap[`line-height/${role}`] = lhName;
     }
-    if (letterSpacing !== 0) {
+    if (letterSpacing !== 0 && letterSpacingPercent === 0 && Number.isInteger(letterSpacing)) {
       const lsName = numberTokenName('letter-spacing', letterSpacing);
-      pushLetterSpacingTok(lsName, letterSpacing, letterSpacingPercent, fontSize);
+      pushLetterSpacingTok(lsName, letterSpacing, 0, fontSize);
       aliasMap[`letter-spacing/${role}`] = lsName;
     }
   };
@@ -761,7 +764,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
         if (lhVar) {
           style.setBoundVariable('lineHeight', lhVar);
           res.bound++;
-        } else if (spec.lineHeight > 0) res.missing.push(`line-height/${bindRole}`);
+        } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight)) res.missing.push(`line-height/${bindRole}`); // 소수 px는 변수를 안 만드는 게 규칙이라 누락이 아니다
       }
     }
     if (spec.letterSpacing !== 0 || isRename) {
@@ -775,7 +778,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
         if (lsVar) {
           style.setBoundVariable('letterSpacing', lsVar);
           res.bound++;
-        } else if (spec.letterSpacing !== 0) res.missing.push(`letter-spacing/${bindRole}`);
+        } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(`letter-spacing/${bindRole}`);
       }
     }
     res[created ? 'created' : 'updated']++;
