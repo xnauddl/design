@@ -180,8 +180,51 @@ interface Progress {
  * 남은 작업량을 알 수 없고, (2) 사용자가 직접 고른 변수도 같은 값의 상위 tier 변수로
  * 말없이 교체된다. 그래서 이미 바인딩된 자리는 값이 맞아도 건드리지 않는다.
  */
+/**
+ * 지금 살아 있는 변수 id — 로컬 전부 + 선택에서 참조된 라이브러리 변수(비동기로 확인).
+ * 컬렉션을 지운 뒤에도 레이어의 바인딩 참조는 남는다(잔상). 그걸 '이미 연결됨'으로 보면
+ * 변수를 다시 만들어도 영영 재연결이 안 된다 — QA에서 컬렉션 삭제 → 재실행 시 802건 중 25건만 붙은 원인.
+ */
+let liveVarIds: Set<string> = new Set();
+
 function isAlias(x: unknown): boolean {
   return !!x && typeof x === 'object' && (x as VariableAlias).type === 'VARIABLE_ALIAS';
+}
+/** 별칭이면서 그 변수가 아직 존재하는가(지워진 변수의 잔상은 '연결 안 됨'). */
+function isLiveAlias(x: unknown): boolean {
+  return isAlias(x) && liveVarIds.has((x as VariableAlias).id);
+}
+
+/** 선택 안의 모든 바인딩 id를 모아 살아 있는지 확인(로컬은 인덱스, 그 외는 라이브러리 조회). */
+async function collectLiveVarIds(selection: readonly SceneNode[], local: ReadonlySet<string>): Promise<Set<string>> {
+  const seen = new Set<string>();
+  const stack: SceneNode[] = selection.slice();
+  const take = (raw: unknown): void => {
+    if (!raw) return;
+    for (const a of Array.isArray(raw) ? raw : [raw]) if (isAlias(a)) seen.add((a as VariableAlias).id);
+  };
+  while (stack.length) {
+    const n = stack.pop() as SceneNode;
+    const bv = (n as { boundVariables?: Record<string, unknown> }).boundVariables;
+    if (bv) for (const v of Object.values(bv)) take(v);
+    for (const key of ['fills', 'strokes'] as const) {
+      const ps = (n as unknown as Record<string, unknown>)[key];
+      if (Array.isArray(ps)) for (const p of ps) take((p as { boundVariables?: { color?: unknown } }).boundVariables?.color);
+    }
+    const ef = (n as { effects?: readonly Effect[] }).effects;
+    if (Array.isArray(ef)) for (const e of ef) take((e as { boundVariables?: { color?: unknown } }).boundVariables?.color);
+    if ('children' in n) for (const c of n.children) stack.push(c);
+  }
+  const live = new Set<string>(local);
+  for (const id of seen) {
+    if (live.has(id)) continue;
+    try {
+      if (await figma.variables.getVariableByIdAsync(id)) live.add(id); // 라이브러리(원격) 변수
+    } catch {
+      /* 없음 — 잔상 */
+    }
+  }
+  return live;
 }
 
 function isNodeFieldBound(node: SceneNode, field: string): boolean {
@@ -191,7 +234,7 @@ function isNodeFieldBound(node: SceneNode, field: string): boolean {
   // 텍스트 range 필드(fontSize·…)는 VariableAlias[] — 배열이 있다고 전 구간이 묶인 건 아니다.
   // 부분 바인딩은 textFieldCoverage로 판정한다(여기선 스칼라 필드만).
   if (Array.isArray(entry)) return false;
-  return isAlias(entry);
+  return isLiveAlias(entry);
 }
 
 /**
@@ -206,10 +249,10 @@ function isColorBound(
   field: 'fills' | 'strokes' | 'effects',
   index: number,
 ): boolean {
-  if ((x as { boundVariables?: { color?: unknown } }).boundVariables?.color) return true;
+  if (isLiveAlias((x as { boundVariables?: { color?: unknown } }).boundVariables?.color)) return true;
   const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
   const arr = bv?.[field];
-  return Array.isArray(arr) && isAlias(arr[index]);
+  return Array.isArray(arr) && isLiveAlias(arr[index]);
 }
 
 /** 텍스트 필드 바인딩 커버리지 — 전 구간이 묶였는가 + 아직 빈 구간 목록. */
@@ -239,17 +282,17 @@ function textFieldCoverage(node: TextNode, field: VariableBindableTextField): Te
 
   if (typeof getRange === 'function') {
     const full = getRange.call(node, 0, len, field);
-    if (full !== figma.mixed && isAlias(full)) return { fullyBound: true, unbound: [] };
+    if (full !== figma.mixed && isLiveAlias(full)) return { fullyBound: true, unbound: [] };
 
     const unbound: Array<[number, number]> = [];
     let i = 0;
     while (i < len) {
       const v = getRange.call(node, i, i + 1, field);
-      if (v === figma.mixed || !isAlias(v)) {
+      if (v === figma.mixed || !isLiveAlias(v)) {
         let j = i + 1;
         while (j < len) {
           const w = getRange.call(node, j, j + 1, field);
-          if (w !== figma.mixed && isAlias(w)) break;
+          if (w !== figma.mixed && isLiveAlias(w)) break;
           j++;
         }
         unbound.push([i, j]);
@@ -270,7 +313,7 @@ function textFieldCoverage(node: TextNode, field: VariableBindableTextField): Te
     if (entry.length === 0) return { fullyBound: false, unbound: [[0, len]] };
     return { fullyBound: true, unbound: [] };
   }
-  return isAlias(entry) ? { fullyBound: true, unbound: [] } : { fullyBound: false, unbound: [[0, len]] };
+  return isLiveAlias(entry) ? { fullyBound: true, unbound: [] } : { fullyBound: false, unbound: [[0, len]] };
 }
 
 /** 조상까지 실제로 보이는가 — extract.ts와 같은 기준(숨긴 그룹 안의 레이어를 직접 고른 경우). */
@@ -323,6 +366,7 @@ export async function bindSelection(
   hooks: BindHooks = {}, // UX6: 진행률·취소.
 ): Promise<BindResult> {
   const entries = await buildIndex();
+  liveVarIds = await collectLiveVarIds(selection, new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
   const res: BindResult = { bound: 0, skipped: 0, flags: [], reasons: {} };
   const flagSet = new Set<string>();
   const prog: Progress = { done: 0, total: hooks.onProgress ? countNodes(selection) : 0, every: 50 };

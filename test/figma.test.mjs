@@ -1442,6 +1442,28 @@ test('scanBindings — 파일에 붙어 있는 바인딩을 결과 트리 모양
   assert.ok(r.nodes.some((n) => n.id === 'sb'));
 });
 
+test('bindSelection — 지워진 변수를 가리키는 바인딩 잔상은 "이미 연결됨"이 아니다(재연결된다)', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'color/aa0000', category: 'color', sources: ['fill'], value: '#aa0000' }], 16);
+  const live = findVar(figma, 'Global', 'color/aa0000');
+  const node = {
+    type: 'FRAME', id: 'dg', name: 'dg',
+    // 컬렉션을 지운 뒤 남은 잔상: 존재하지 않는 변수 id를 가리킨다.
+    fills: [{ type: 'SOLID', color: { r: 0.6667, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'VariableID:deleted' } } }],
+    boundVariables: { fills: [{ type: 'VARIABLE_ALIAS', id: 'VariableID:deleted' }] },
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', layoutMode: 'NONE',
+  };
+  const res = await bindSelection([node], 0.5);
+  assert.equal(res.bound, 1);
+  assert.equal(node.fills[0].boundVariables.color.id, live.id); // 잔상을 살아 있는 변수로 교체
+  assert.equal(res.reasons['already-bound'], undefined);
+
+  // 반대로 살아 있는 변수에 붙어 있으면 그대로 보호
+  const res2 = await bindSelection([node], 0.5);
+  assert.equal(res2.bound, 0);
+  assert.equal(res2.reasons['already-bound'], 1);
+});
+
 test('bindSelection — 레이어 불투명도(opacity)는 OPACITY 변수에 정밀 바인딩', async () => {
   const figma = installFigma();
   await createTokens(

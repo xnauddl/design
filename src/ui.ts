@@ -1440,8 +1440,9 @@ let lastSelRenamed = 0;
  * 프레임) 이전 이름 정리 기록이 남아 있어도 '처음'으로 본다 — 변수가 없으면 어차피 전부 다시 한다.
  */
 function applySelectionDone(): void {
+  // 변수 컬렉션이 없으면 레이어에 남은 바인딩은 지워진 변수를 가리키는 잔상이다 — 연결도 '처음'으로 본다.
   const fresh = !hasGlobal && !hasSemanticRoles;
-  hasBoundNodes = lastSelBound > 0;
+  hasBoundNodes = !fresh && lastSelBound > 0;
   hasRenamedNodes = !fresh && lastSelRenamed > 0;
   renderPipeline();
   if (!wizardRunning) setWizardRunLabel(hasBoundNodes || hasRenamedNodes);

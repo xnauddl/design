@@ -1391,22 +1391,56 @@
     }
     return nodeIndex.filter((n) => keep.has(n.id));
   }
+  var liveVarIds = /* @__PURE__ */ new Set();
   function isAlias(x) {
     return !!x && typeof x === "object" && x.type === "VARIABLE_ALIAS";
+  }
+  function isLiveAlias(x) {
+    return isAlias(x) && liveVarIds.has(x.id);
+  }
+  async function collectLiveVarIds(selection2, local) {
+    var _a, _b;
+    const seen = /* @__PURE__ */ new Set();
+    const stack = selection2.slice();
+    const take = (raw) => {
+      if (!raw) return;
+      for (const a of Array.isArray(raw) ? raw : [raw]) if (isAlias(a)) seen.add(a.id);
+    };
+    while (stack.length) {
+      const n = stack.pop();
+      const bv = n.boundVariables;
+      if (bv) for (const v of Object.values(bv)) take(v);
+      for (const key of ["fills", "strokes"]) {
+        const ps = n[key];
+        if (Array.isArray(ps)) for (const p of ps) take((_a = p.boundVariables) == null ? void 0 : _a.color);
+      }
+      const ef = n.effects;
+      if (Array.isArray(ef)) for (const e of ef) take((_b = e.boundVariables) == null ? void 0 : _b.color);
+      if ("children" in n) for (const c of n.children) stack.push(c);
+    }
+    const live = new Set(local);
+    for (const id of seen) {
+      if (live.has(id)) continue;
+      try {
+        if (await figma.variables.getVariableByIdAsync(id)) live.add(id);
+      } catch (e) {
+      }
+    }
+    return live;
   }
   function isNodeFieldBound(node, field) {
     const bv = node.boundVariables;
     const entry = bv == null ? void 0 : bv[field];
     if (!entry) return false;
     if (Array.isArray(entry)) return false;
-    return isAlias(entry);
+    return isLiveAlias(entry);
   }
   function isColorBound(x, node, field, index) {
     var _a;
-    if ((_a = x.boundVariables) == null ? void 0 : _a.color) return true;
+    if (isLiveAlias((_a = x.boundVariables) == null ? void 0 : _a.color)) return true;
     const bv = node.boundVariables;
     const arr = bv == null ? void 0 : bv[field];
-    return Array.isArray(arr) && isAlias(arr[index]);
+    return Array.isArray(arr) && isLiveAlias(arr[index]);
   }
   function textFieldCoverage(node, field) {
     const len = node.characters.length;
@@ -1414,16 +1448,16 @@
     const getRange = node.getRangeBoundVariable;
     if (typeof getRange === "function") {
       const full = getRange.call(node, 0, len, field);
-      if (full !== figma.mixed && isAlias(full)) return { fullyBound: true, unbound: [] };
+      if (full !== figma.mixed && isLiveAlias(full)) return { fullyBound: true, unbound: [] };
       const unbound = [];
       let i = 0;
       while (i < len) {
         const v = getRange.call(node, i, i + 1, field);
-        if (v === figma.mixed || !isAlias(v)) {
+        if (v === figma.mixed || !isLiveAlias(v)) {
           let j = i + 1;
           while (j < len) {
             const w = getRange.call(node, j, j + 1, field);
-            if (w !== figma.mixed && isAlias(w)) break;
+            if (w !== figma.mixed && isLiveAlias(w)) break;
             j++;
           }
           unbound.push([i, j]);
@@ -1441,7 +1475,7 @@
       if (entry.length === 0) return { fullyBound: false, unbound: [[0, len]] };
       return { fullyBound: true, unbound: [] };
     }
-    return isAlias(entry) ? { fullyBound: true, unbound: [] } : { fullyBound: false, unbound: [[0, len]] };
+    return isLiveAlias(entry) ? { fullyBound: true, unbound: [] } : { fullyBound: false, unbound: [[0, len]] };
   }
   function isEffectivelyVisible2(node) {
     let p = node;
@@ -1479,6 +1513,7 @@
   async function bindSelection(selection2, tolerance, apply = true, hooks = {}) {
     var _a;
     const entries = await buildIndex();
+    liveVarIds = await collectLiveVarIds(selection2, new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
     const res = { bound: 0, skipped: 0, flags: [], reasons: {} };
     const flagSet = /* @__PURE__ */ new Set();
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };

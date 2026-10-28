@@ -3096,7 +3096,7 @@
   var lastSelRenamed = 0;
   function applySelectionDone() {
     const fresh = !hasGlobal && !hasSemanticRoles;
-    hasBoundNodes = lastSelBound > 0;
+    hasBoundNodes = !fresh && lastSelBound > 0;
     hasRenamedNodes = !fresh && lastSelRenamed > 0;
     renderPipeline();
     if (!wizardRunning) setWizardRunLabel(hasBoundNodes || hasRenamedNodes);
