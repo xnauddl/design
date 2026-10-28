@@ -388,7 +388,6 @@
     #colorSection > * + * { margin-top: 6px; }
     .tidy { border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
     .tidy-note { display: flex; align-items: center; gap: 8px; }
-    .tidy-note #tidySumText { flex: 1 1 auto; font-weight: 600; }
 
     /* ── diff / 선택형 미리보기 트리 ── */
     /* 긴 이름은 nowrap이라 가로로 넘친다 — 가로만 스크롤시킨다(세로는 패널 body). */
@@ -441,10 +440,12 @@
       <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
       <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
       <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
         <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
         <label class="inline"><input id="wizOptTextStyles" type="checkbox" /> <span data-i18n="wizardCard.optTextStyles">텍스트 스타일</span> <span class="muted" id="wizTextStylesLock"></span></label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
+        <!-- v1.0: 컴포넌트 등록은 마법사에서 뺀다(출시 범위 = 추출→생성→바인딩→리네임→내보내기).
+             리네임 직후 이름 기준 묶기가 섹션들을 한 세트로 합쳐 내용을 덮어쓴 사고(QA 파일). 적용 탭의 수동 등록만 남긴다. -->
+        <label class="inline" style="display:none"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
       </div>
       <div class="row">
         <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
@@ -464,7 +465,7 @@
     <div class="step" id="pipelineCard">
       <h2 data-i18n="pipeline.title">준비 현황</h2>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">이름·컴포넌트는 필요할 때 적용 탭에서</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">컴포넌트는 필요할 때 적용 탭에서</div>
     </div>
   </section>
 
@@ -484,7 +485,7 @@
            이미 말한다. 게다가 잠금 배지와 범위 라벨 사이에 끼어 「🔒 색 12개 변수화」로 읽혔다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
+      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 됩니다. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
@@ -518,10 +519,7 @@
       <!-- 추출·정리된 색 — 역할(Semantic)을 정하는 자리. Global 이름은 hue. -->
       <div id="colorSection" style="display:none">
         <div class="hint" data-i18n="color.listHint">추출·정리된 색 · Global = hue · Semantic = 역할</div>
-        <div id="tidySummary" class="tidy tidy-note" style="display:none">
-          <span id="tidySumText"></span>
-          <button id="btnTidyUndo" class="link" data-i18n="colorTidy.undo">되돌리기</button>
-        </div>
+        <!-- 색 N:1 자동 병합 요약/되돌리기 줄은 걷었다(ui.ts 참고) — 이제 색은 이름만 정리하고 전부 변수가 된다. -->
         <!-- 모아 놓은 색 미리보기 한 줄(ui.ts가 채운다). -->
         <div id="paletteRow" class="palette-row"></div>
         <div id="colorTable" class="results"></div>
@@ -634,11 +632,20 @@
       <div class="toolbar">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택한 항목에 연결</button>
+        <!-- 연결 현황 — 파일에 이미 붙어 있는 바인딩을 읽는다(읽기 전용). 작은 선택(≤300 노드)은 자동, 큰 선택은 이 버튼. -->
+        <button id="btnScanBindings" data-i18n="bind.scanBtn" data-tip="선택 안에 이미 연결된 변수를 읽어 목록으로 보여줍니다. 파일은 안 바꿉니다.">연결 현황</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-apply="rename" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
+      </div>
+      <!-- 보기 축 토글 — 레이어별(캔버스 순서로 검증) / 변수별(Tokens Studio Inspect처럼 변수 행 + 레이어 수, 관리용). -->
+      <div class="row tree-ctrls" id="bindViewRow" style="display:none">
+        <label class="inline"><input type="radio" name="bindView" value="layer" checked /> <span data-i18n="bind.viewLayer">레이어별</span></label>
+        <label class="inline"><input type="radio" name="bindView" value="variable" /> <span data-i18n="bind.viewVariable">변수별</span></label>
+        <span class="grow"></span>
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:140px" />
       </div>
       <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐).
            목록 위에 둔다: 몇 개가 왜 빠졌는지는 후보를 훑기 전에 알아야 하는 정보다. -->
@@ -900,6 +907,8 @@
     "create.colorsDone": "\uC0C9 \uBCC0\uC218 {count}\uAC1C \uC774\uBBF8 \uC0DD\uC131\uB428 \xB7 \uC5EC\uAE30\uC120 \uC0C9 \uC678\uB9CC",
     "color.summary": "\uC0C9 {count}\uAC1C \xB7 \uC5ED\uD560 \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
     "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019 \uB610\uB294 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC73C\uC138\uC694.",
+    "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 \uC5ED\uD560 {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC2B5\uB2C8\uB2E4",
+    "create.fileVars": "\uD30C\uC77C\uC5D0 \uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8 \uBCC0\uC218 {n}\uAC1C \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uAC12\uC744 \uC77D\uC2B5\uB2C8\uB2E4",
     // 지나친 이유조차 없는 빈손 — 버튼이 고장 난 것처럼 보이지 않게 최소한의 말은 한다.
     "color.extractEmpty": "\uACE0\uB97C \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 \u2014 \uC0C9\xB7\uC5EC\uBC31\xB7\uD06C\uAE30\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.",
     "create.baseChanged": "base {base}px\uB85C \uB2E4\uC2DC \uACC4\uC0B0 \uC911\u2026",
@@ -915,6 +924,17 @@
     "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC5F0\uACB0{detail}",
     "apply.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uD6C4\uBCF4 {bound}\uAC74{detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0\u2019",
     "apply.done": "\uC5F0\uACB0 {bound}{detail}",
+    "apply.resultCapped": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC74\uAE4C\uC9C0\uB9CC \uD45C\uC2DC",
+    "bind.scanBtn": "\uC5F0\uACB0 \uD604\uD669",
+    "bind.scanHelp": "\uC120\uD0DD \uC548\uC5D0 \uC774\uBBF8 \uC5F0\uACB0\uB41C \uBCC0\uC218\uB97C \uC77D\uC5B4 \uBAA9\uB85D\uC73C\uB85C \uBCF4\uC5EC\uC90D\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
+    "bind.scanned": "\uC5F0\uACB0 \uD604\uD669 \u2014 {total}\uAC74 \xB7 \uB808\uC774\uC5B4 {nodes}\uAC1C",
+    "bind.scannedNone": "\uC774 \uC120\uD0DD\uC5D0\uB294 \uC5F0\uACB0\uB41C \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD6C4\uBCF4\uB97C \uD655\uC778\uD558\uC138\uC694.",
+    "bind.scanHintLarge": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC558\uC5B4\uC694 \u2014 \u2018\uC5F0\uACB0 \uD604\uD669\u2019\uC744 \uB204\uB974\uC138\uC694.",
+    "bind.filterPlaceholder": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
+    "bind.viewLayer": "\uB808\uC774\uC5B4\uBCC4",
+    "bind.viewVariable": "\uBCC0\uC218\uBCC4",
+    "bind.varLayers": "\uB808\uC774\uC5B4 {n}",
+    "bind.varSelect": "\uC120\uD0DD",
     // 리네임
     "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
     "rename.none": "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -965,6 +985,8 @@
     "wizard.step.bind": "\uBCC0\uC218\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
+    "wizard.rerunHint": "\uC774\uBBF8 \uC815\uB9AC\uD55C \uC120\uD0DD\uC785\uB2C8\uB2E4 \u2014 \uB2E4\uC2DC \uC2E4\uD589\uD558\uBA74 \uBCC0\uC218\uB294 \uAC31\uC2E0\uB418\uACE0 \uC774\uB984\uC740 \uADF8\uB300\uB85C\uC608\uC694.",
     "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
     "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
     "wizard.skip.paid": "Paid \uC804\uC6A9",
@@ -987,6 +1009,7 @@
     "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
     "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
+    "reason.translucent": "\uBC18\uD22C\uBA85(\uBCC0\uC218 alpha\uAC00 \uB36E\uC5B4\uC500)",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
@@ -1022,6 +1045,7 @@
     "pipeline.step.bind": "\uBCC0\uC218 \uC5F0\uACB0",
     "pipeline.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
     "pipeline.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "pipeline.step.rename": "\uC774\uB984 \uC815\uB9AC",
     "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
     "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
@@ -1086,7 +1110,7 @@
     "onboard.hide": "\uB2E4\uC2DC \uBCF4\uC9C0 \uC54A\uAE30",
     // 진행(파이프라인 카드)
     "pipeline.title": "\uC900\uBE44 \uD604\uD669",
-    "pipeline.indep": "\uC774\uB984\xB7\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uC801\uC6A9 \uD0ED\uC5D0\uC11C",
+    "pipeline.indep": "\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uC801\uC6A9 \uD0ED\uC5D0\uC11C",
     // 브랜드 팔레트
     "color.title": "\uC0C9",
     "color.scope": "\uBCC0\uC218\uD654",
@@ -1107,8 +1131,7 @@
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
     "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
-    "colorTidy.hintTip": "\uBE44\uC2B7\uD55C \uC0C9\uC740 \uCD94\uCD9C \uC2DC \uC790\uB3D9\uC73C\uB85C \uB300\uD45C 1\uC0C9\uC5D0 \uC815\uB9AC\uB429\uB2C8\uB2E4(\uB4DC\uB798\uD504\uD2B8 \uB2E8\uACC4 \u2014 \uBC14\uC778\uB529 \uC601\uD5A5 \uC5C6\uC74C). Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500), \uC5ED\uD560\uC740 Semantic\uC73C\uB85C \uBD99\uC2B5\uB2C8\uB2E4.",
-    "colorTidy.undo": "\uB418\uB3CC\uB9AC\uAE30",
+    "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB429\uB2C8\uB2E4. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC5ED\uD560\uC740 Semantic\uC73C\uB85C \uBD99\uC2B5\uB2C8\uB2E4.",
     // 토큰 생성
     "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
     "create.scopeHint": "\uC5EC\uBC31\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC \uB2E4\uB8F9\uB2C8\uB2E4. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uC774\uBBF8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
@@ -1158,22 +1181,34 @@
     "bind.skipChipTipMore": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names} \uC678",
     // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
     // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.
+    // 키 = `color/` 접두사를 뗀 역할 경로의 `/`→`-` (color/background/brand-bold → background-brand-bold).
     "role.none": "\uC5ED\uD560 \uC5C6\uC74C",
-    "role.surface": "\uBA74",
-    "role.surface-muted": "\uC605\uC740 \uBA74",
-    "role.text": "\uAE00\uC790",
-    "role.text-muted": "\uC605\uC740 \uAE00\uC790",
+    "role.background-default": "\uBA74",
+    "role.background-subtle": "\uC605\uC740 \uBA74",
+    "role.background-inverse": "\uBC18\uC804 \uBA74",
+    "role.background-brand": "\uC8FC\uC0C9 \uBA74",
+    "role.background-brand-bold": "\uC9C4\uD55C \uC8FC\uC0C9 \uBA74",
+    "role.background-brand-subtle": "\uC605\uC740 \uC8FC\uC0C9 \uBA74",
+    "role.background-accent": "\uAC15\uC870 \uBA74",
+    "role.background-success": "\uC131\uACF5 \uBA74",
+    "role.background-warning": "\uC8FC\uC758 \uBA74",
+    "role.background-danger": "\uC624\uB958 \uBA74",
+    "role.background-info": "\uC548\uB0B4 \uBA74",
+    "role.text-default": "\uAE00\uC790",
+    "role.text-subtle": "\uC605\uC740 \uAE00\uC790",
     "role.text-inverse": "\uBC18\uC804 \uAE00\uC790",
-    "role.border": "\uD14C\uB450\uB9AC",
-    "role.primary": "\uC8FC\uC0C9",
-    "role.primary-strong": "\uC9C4\uD55C \uC8FC\uC0C9",
-    "role.primary-subtle": "\uC605\uC740 \uC8FC\uC0C9",
-    "role.secondary": "\uBCF4\uC870",
-    "role.accent": "\uAC15\uC870",
-    "role.success": "\uC131\uACF5",
-    "role.warning": "\uC8FC\uC758",
-    "role.error": "\uC624\uB958",
-    "role.info": "\uC548\uB0B4",
+    "role.text-brand": "\uC8FC\uC0C9 \uAE00\uC790",
+    "role.text-success": "\uC131\uACF5 \uAE00\uC790",
+    "role.text-warning": "\uC8FC\uC758 \uAE00\uC790",
+    "role.text-danger": "\uC624\uB958 \uAE00\uC790",
+    "role.text-info": "\uC548\uB0B4 \uAE00\uC790",
+    "role.border-default": "\uD14C\uB450\uB9AC",
+    "role.border-bold": "\uC9C4\uD55C \uD14C\uB450\uB9AC",
+    "role.border-brand": "\uC8FC\uC0C9 \uD14C\uB450\uB9AC",
+    "role.border-danger": "\uC624\uB958 \uD14C\uB450\uB9AC",
+    "role.icon-default": "\uC544\uC774\uCF58",
+    "role.icon-subtle": "\uC605\uC740 \uC544\uC774\uCF58",
+    "role.icon-brand": "\uC8FC\uC0C9 \uC544\uC774\uCF58",
     // 리네임
     "rename.title": "\uC774\uB984 \uC815\uB9AC",
     "rename.hint": "\uC5ED\uD560\uC5D0 \uB9DE\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uC73C\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uCD5C\uC0C1\uC704\xB7\uC778\uC2A4\uD134\uC2A4 \uC774\uB984\uC740 \uADF8\uB300\uB85C \uB461\uB2C8\uB2E4",
@@ -1205,6 +1240,8 @@
     "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6C1\uB2C8\uB2E4.",
     "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
     "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4.",
+    "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC73C\uB85C \uBB36\uC744 \uD504\uB808\uC784\uACFC \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.",
+    "similar.needScanAfterComp": "\u2018\uD6C4\uBCF4 \uC2A4\uCE94\u2019 \uACB0\uACFC\uB294 \u2018\uB4F1\uB85D\u2019\uC774 \uC501\uB2C8\uB2E4. \uBB36\uAE30\uB294 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC744 \uBA3C\uC800 \uC2E4\uD589\uD558\uC138\uC694.",
     // 내보내기
     "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
     "export.hint": "\uB204\uB974\uBA74 \uBC14\uB85C \uCF54\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uB429\uB2C8\uB2E4",
@@ -1394,6 +1431,12 @@
     "aside",
     "nav",
     "section",
+    "hero",
+    // 본문 첫 블록(큰 제목 + 이미지) — section보다 구체적
+    "logo",
+    // 헤더 첫 자리의 작은 묶음(마크·워드마크)
+    "actions",
+    // 헤더 끝의 링크/버튼 2~3개(Sign in · Sign up)
     "article",
     "figure",
     // 컴포넌트
@@ -1427,7 +1470,6 @@
     "body",
     "leading",
     "trailing",
-    "hero",
     "sidebar",
     "sheet",
     "drawer",
@@ -1571,6 +1613,8 @@
   function classifyColor(hex) {
     const o = hexToOklch(hex);
     const achromatic = o.c < ACHROMATIC_C;
+    if (achromatic && o.l >= 0.985) return { family: "gray", step: 0, achromatic };
+    if (achromatic && o.l <= 0.05) return { family: "gray", step: 1e3, achromatic };
     return { family: achromatic ? "gray" : hueName(o.h), step: stepForL(o.l), achromatic };
   }
   function nameColorsByHue(hexes) {
@@ -1690,24 +1734,34 @@
     const map = {};
     const primary = byRole.get("primary");
     if (primary) {
-      map["primary"] = `color/${primary}/500`;
-      map["primary/strong"] = `color/${primary}/700`;
-      map["primary/subtle"] = `color/${primary}/100`;
+      map["color/background/brand"] = `color/${primary}/500`;
+      map["color/background/brand-bold"] = `color/${primary}/700`;
+      map["color/background/brand-subtle"] = `color/${primary}/100`;
+      map["color/text/brand"] = `color/${primary}/600`;
+      map["color/border/brand"] = `color/${primary}/500`;
     }
     const secondary = byRole.get("secondary");
-    if (secondary) map["secondary"] = `color/${secondary}/500`;
-    for (const r of p.roles) if (r.role.startsWith("accent-")) map[r.role] = `color/${r.family}/500`;
+    if (secondary) map["color/background/accent"] = `color/${secondary}/500`;
+    for (const r of p.roles) if (r.role.startsWith("accent-")) map[`color/background/${r.role}`] = `color/${r.family}/500`;
     const neutral = byRole.get("neutral");
     if (neutral) {
-      map["surface"] = `color/${neutral}/50`;
-      map["surface/muted"] = `color/${neutral}/100`;
-      map["text"] = `color/${neutral}/900`;
-      map["text/muted"] = `color/${neutral}/600`;
-      map["border"] = `color/${neutral}/200`;
+      map["color/background/default"] = `color/${neutral}/50`;
+      map["color/background/subtle"] = `color/${neutral}/100`;
+      map["color/background/inverse"] = `color/${neutral}/900`;
+      map["color/text/default"] = `color/${neutral}/900`;
+      map["color/text/subtle"] = `color/${neutral}/600`;
+      map["color/text/inverse"] = `color/${neutral}/50`;
+      map["color/border/default"] = `color/${neutral}/200`;
+      map["color/border/bold"] = `color/${neutral}/400`;
+      map["color/icon/default"] = `color/${neutral}/700`;
     }
     for (const role of ["success", "warning", "error", "info"]) {
       const f = byRole.get(role);
-      if (f) map[role] = `color/${f}/500`;
+      const name = role === "error" ? "danger" : role;
+      if (f) {
+        map[`color/background/${name}`] = `color/${f}/500`;
+        map[`color/text/${name}`] = `color/${f}/700`;
+      }
     }
     return map;
   }
@@ -1716,12 +1770,12 @@
     const map = {};
     const neutrals = classed.filter((c) => c.achromatic).sort((a, b) => b.o.l - a.o.l);
     if (neutrals.length) {
-      map["surface"] = neutrals[0].name;
-      map["text"] = neutrals[neutrals.length - 1].name;
-      if (neutrals.length >= 3) map["border"] = neutrals[Math.floor(neutrals.length / 2)].name;
+      map["color/background/default"] = neutrals[0].name;
+      map["color/text/default"] = neutrals[neutrals.length - 1].name;
+      if (neutrals.length >= 3) map["color/border/default"] = neutrals[Math.floor(neutrals.length / 2)].name;
     }
     const chroma = classed.filter((c) => !c.achromatic).sort((a, b) => b.o.c - a.o.c);
-    if (chroma.length) map["primary"] = chroma[0].name;
+    if (chroma.length) map["color/background/brand"] = chroma[0].name;
     return map;
   }
   function paletteToDraftTokens(p) {
@@ -1742,19 +1796,50 @@
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
   var TSHIRT_MID = TSHIRT.indexOf("md");
-  function tshirtRoles(values) {
-    const n = values.length;
-    if (!n) return [];
-    let start = TSHIRT_MID - Math.floor((n - 1) / 2);
-    start = Math.max(0, Math.min(start, Math.max(0, TSHIRT.length - n)));
-    return values.map((_, i) => {
-      const idx = start + i;
-      return idx < TSHIRT.length ? TSHIRT[idx] : `${TSHIRT[TSHIRT.length - 1]}-${idx - TSHIRT.length + 2}`;
+  function ladderRoles(values, ladder) {
+    return values.map((v) => {
+      var _a;
+      return (_a = ladder.get(v)) != null ? _a : "";
     });
   }
+  var SPACING_LADDER = /* @__PURE__ */ new Map([
+    [0, "none"],
+    [2, "3xs"],
+    [4, "2xs"],
+    [8, "xs"],
+    [12, "sm"],
+    [16, "md"],
+    [24, "lg"],
+    [32, "xl"],
+    [48, "2xl"],
+    [64, "3xl"],
+    [80, "4xl"]
+  ]);
+  var RADIUS_LADDER = /* @__PURE__ */ new Map([
+    [0, "none"],
+    [2, "xs"],
+    [4, "sm"],
+    [8, "md"],
+    [12, "lg"],
+    [16, "xl"],
+    [24, "2xl"]
+  ]);
+  var STROKE_LADDER = /* @__PURE__ */ new Map([
+    [0.5, "hairline"],
+    [1, "thin"],
+    [2, "thick"]
+  ]);
+  function spacingRoles(values) {
+    return ladderRoles(values, SPACING_LADDER);
+  }
+  function strokeRoles(values) {
+    return ladderRoles(values, STROKE_LADDER);
+  }
   function radiusRoles(values) {
-    const base = tshirtRoles(values);
-    return values.map((v, i) => v === 0 ? "none" : v >= 999 ? "full" : base[i]);
+    return values.map((v) => {
+      var _a;
+      return v >= 999 ? "full" : (_a = RADIUS_LADDER.get(v)) != null ? _a : "";
+    });
   }
   var FS_UP = ["title", "h3", "h2", "h1", "display"];
   var FS_DOWN = ["caption", "overline"];
@@ -1822,13 +1907,12 @@
       const entries = numericEntries(tokens2, category);
       const roles = roleFn(entries.map((e) => e.value));
       entries.forEach((e, i) => {
-        map[`${prefix}/${roles[i]}`] = e.name;
+        if (roles[i]) map[`${prefix}/${roles[i]}`] = e.name;
       });
     };
-    scale("gap", "spacing", tshirtRoles);
+    scale("gap", "spacing", spacingRoles);
     scale("radius", "radius", radiusRoles);
-    scale("size", "size", tshirtRoles);
-    scale("strokeWidth", "stroke-width", tshirtRoles);
+    scale("strokeWidth", "stroke-width", strokeRoles);
     scale("fontSize", "font-size", (vals) => fontSizeRoles(vals, base));
     for (const e of numericEntries(tokens2, "fontWeight")) map[`font-weight/${weightRole(e.value)}`] = e.name;
     const families = tokens2.filter((t2) => t2.category === "fontFamily" && typeof t2.value === "string");
@@ -1861,16 +1945,17 @@
       { id: "tokens", status: s.hasScaleVars ? "done" : "ready" },
       {
         id: "semantics",
-        status: s.hasGlobal ? "ready" : "blocked",
-        hint: s.hasGlobal ? void 0 : "pipeline.hint.needTokens"
-      },
-      {
-        id: "bind",
-        status: s.hasBindable ? "ready" : "blocked",
-        hint: s.hasBindable ? void 0 : "pipeline.hint.needBindable"
+        status: s.hasSemanticRoles ? "done" : s.hasGlobal ? "ready" : "blocked",
+        hint: s.hasGlobal || s.hasSemanticRoles ? void 0 : "pipeline.hint.needTokens"
       },
       { id: "dark", status: s.hasDarkMode ? "done" : "todo" },
-      { id: "textStyles", status: s.hasTextStyles ? "done" : "todo" }
+      { id: "textStyles", status: s.hasTextStyles ? "done" : "todo" },
+      {
+        id: "bind",
+        status: s.hasBoundNodes ? "done" : s.hasBindable ? "ready" : "blocked",
+        hint: s.hasBindable || s.hasBoundNodes ? void 0 : "pipeline.hint.needBindable"
+      },
+      { id: "rename", status: s.hasRenamedNodes ? "done" : "ready" }
     ];
   }
 
@@ -1981,6 +2066,9 @@
   var hasBindable = false;
   var hasDarkMode = false;
   var hasTextStyles = false;
+  var hasSemanticRoles = false;
+  var hasBoundNodes = false;
+  var hasRenamedNodes = false;
   var lastSelCount = 0;
   var createFrom = "tokens";
   var semStatusTarget = "colorStatus";
@@ -2162,7 +2250,6 @@
   }
   var colorRevealed = false;
   var previewRevealed = false;
-  var lastTidy = { before: 0, after: 0, merged: 0 };
   var pendingCreatePreview = false;
   function renderTokens() {
     const box = $("tokenList");
@@ -2254,8 +2341,6 @@
     renderTokens();
     setSemMapText(paletteSemanticMap(p));
     renderColorTable();
-    hideTidySummary();
-    preTidyTokens = null;
     $("paletteInfo").textContent = t("palette.summary", { count: p.scales.length, tokens: tokens.length });
     if (p.warnings.length) setStatus("colorStatus", p.warnings.join(" "), "warn");
   });
@@ -2272,33 +2357,47 @@
     const idx = [];
     const hexes = [];
     toks.forEach((t2, i) => {
-      if (t2.category === "color" && typeof t2.value === "string") {
+      if ((t2.category === "color" || t2.category === "effectColor") && typeof t2.value === "string") {
         idx.push(i);
         hexes.push(t2.value);
       }
     });
     if (!idx.length) return;
-    const names = nameColorsByHue(hexes);
+    const uniq = [...new Set(hexes.map((h) => h.toLowerCase()))];
+    const names = nameColorsByHue(uniq);
+    const nameOf = new Map(uniq.map((h, i) => [h, names[i]]));
     idx.forEach((ti, k) => {
-      toks[ti].name = names[k];
+      var _a;
+      toks[ti].name = (_a = nameOf.get(hexes[k].toLowerCase())) != null ? _a : toks[ti].name;
     });
   }
   var COLOR_ROLES = [
-    "surface",
-    "surface/muted",
-    "text",
-    "text/muted",
-    "text/inverse",
-    "border",
-    "primary",
-    "primary/strong",
-    "primary/subtle",
-    "secondary",
-    "accent",
-    "success",
-    "warning",
-    "error",
-    "info"
+    "color/background/default",
+    "color/background/subtle",
+    "color/background/inverse",
+    "color/background/brand",
+    "color/background/brand-bold",
+    "color/background/brand-subtle",
+    "color/background/accent",
+    "color/background/success",
+    "color/background/warning",
+    "color/background/danger",
+    "color/background/info",
+    "color/text/default",
+    "color/text/subtle",
+    "color/text/inverse",
+    "color/text/brand",
+    "color/text/success",
+    "color/text/warning",
+    "color/text/danger",
+    "color/text/info",
+    "color/border/default",
+    "color/border/bold",
+    "color/border/brand",
+    "color/border/danger",
+    "color/icon/default",
+    "color/icon/subtle",
+    "color/icon/brand"
   ];
   function roleSelect(value) {
     const sel = document.createElement("select");
@@ -2310,7 +2409,7 @@
     for (const r of COLOR_ROLES) {
       const o = document.createElement("option");
       o.value = r;
-      o.textContent = `${t(`role.${r.replace("/", "-")}`)} \xB7 ${r}`;
+      o.textContent = `${t(`role.${r.replace(/^color\//, "").replace(/\//g, "-")}`)} \xB7 ${r}`;
       sel.appendChild(o);
     }
     if (value && !COLOR_ROLES.includes(value)) {
@@ -2391,60 +2490,6 @@
     for (const [role, name] of Object.entries(auto)) if (!colorTokenNames.has(name)) nonColor[role] = name;
     return __spreadValues(__spreadValues({}, nonColor), picks);
   }
-  function colorHexes() {
-    return tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string").map((t2) => t2.value.toLowerCase());
-  }
-  var preTidyTokens = null;
-  function tidyColors() {
-    var _a;
-    const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
-    const before = colors.length;
-    const baseName = (name) => name.replace(/-\d+$/, "");
-    const keep = /* @__PURE__ */ new Map();
-    const drop = /* @__PURE__ */ new Set();
-    for (const t2 of colors) {
-      const k = baseName(t2.name);
-      const rep = keep.get(k);
-      if (!rep) {
-        keep.set(k, t2);
-      } else {
-        for (const s of t2.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
-        if (t2.count) rep.count = Math.max((_a = rep.count) != null ? _a : 0, t2.count);
-        drop.add(t2);
-      }
-    }
-    if (drop.size) {
-      tokens = tokens.filter((t2) => !drop.has(t2));
-      for (const [base, rep] of keep) rep.name = base;
-    }
-    return { before, after: keep.size, merged: drop.size };
-  }
-  function renderTidySummary(s) {
-    const box = $("tidySummary");
-    if (s.merged <= 0) {
-      box.style.display = "none";
-      return;
-    }
-    box.style.display = "";
-    $("tidySumText").textContent = `\uBE44\uC2B7\uD55C \uC0C9 ${s.before} \u2192 ${s.after}\uAC1C\uB85C \uC790\uB3D9 \uC815\uB9AC\uB428`;
-  }
-  function hideTidySummary() {
-    $("tidySummary").style.display = "none";
-  }
-  function undoTidy() {
-    if (!preTidyTokens) return;
-    const restored = preTidyTokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
-    carryTokenChecked(tokens, restored);
-    tokens = restored;
-    preTidyTokens = null;
-    hideTidySummary();
-    renderTokens();
-    renderColorTable();
-    suggestSemMapFrom(tokens);
-    $("btnCreateApply").style.display = "none";
-    setStatus("colorStatus", `\uC815\uB9AC \uB418\uB3CC\uB9BC \xB7 \uCD94\uCD9C \uC0C9 ${new Set(colorHexes()).size}\uAC1C`, "");
-  }
-  $("btnTidyUndo").addEventListener("click", undoTidy);
   function syncSecondaryControls() {
     const on = $("useBrand2").checked;
     brand2Color.disabled = !on;
@@ -2775,6 +2820,11 @@
     const v = Number(raw);
     return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
   }
+  var AUTO_SCAN_MAX = 300;
+  $("btnScanBindings").addEventListener("click", () => {
+    setStatus("applyStatus", t("common.running"), "");
+    send({ type: "SCAN_BINDINGS" });
+  });
   $("btnApply").addEventListener("click", () => {
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
     send({ type: "APPLY", tolerance: bindTolerance(), preview: true });
@@ -2832,7 +2882,7 @@
     if (wizardWaiter.types.includes(m.type)) {
       const w = wizardWaiter;
       wizardWaiter = null;
-      w.resolve(m);
+      setTimeout(() => w.resolve(m), 0);
     }
   });
   function wizardRequest(msg, expect) {
@@ -2896,12 +2946,13 @@
     const base = Number($("base").value) || 16;
     const tolerance = bindTolerance();
     const maxDepth = readMaxDepth();
-    const semMap = textToSemanticMap($("semMap").value);
+    let semMap = textToSemanticMap($("semMap").value);
     const options = {
       semantics: $("wizOptSemantics").checked,
       dark: $("wizOptDark").checked,
       textStyles: $("wizOptTextStyles").checked,
-      componentize: $("wizOptComponentize").checked
+      // v1.0: 마법사에서 컴포넌트 등록 제외(체크박스 숨김) — 리네임 뒤 이름 기준 묶기가 디자인을 덮어쓴다.
+      componentize: false
     };
     const ctx = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
     const plan = planWizard(options, ctx);
@@ -2923,12 +2974,24 @@
       try {
         switch (p.step.id) {
           case "extract": {
-            const r = await wizardRequest({ type: "EXTRACT" }, ["EXTRACT_RESULT"]);
-            tokens = r.tokens;
+            await wizardRequest({ type: "EXTRACT" }, ["EXTRACT_RESULT"]);
             if (!tokens.length) {
               setWizardStep("extract", "fail", t("wizard.seq.noExtract"));
               stopped = true;
               break;
+            }
+            colorRevealed = true;
+            previewRevealed = true;
+            renderColorTable();
+            renderTokens();
+            setSemMapText(colorAuthoritativeRoles(base));
+            semMap = textToSemanticMap($("semMap").value);
+            const sem = plan.find((x) => x.step.id === "semantics");
+            if (sem && !sem.run && sem.skipReason === "wizard.skip.noMapping" && Object.keys(semMap).length) {
+              sem.run = true;
+              sem.skipReason = void 0;
+              renderWizardSteps(plan);
+              setWizardStep("extract", "active", t("wizard.seq.running"));
             }
             setWizardStep("extract", "done", t("wizard.seq.extractDone", { count: tokens.length }));
             break;
@@ -3019,6 +3082,7 @@
     }
     wizardRunning = false;
     $("btnWizardRun").disabled = false;
+    setWizardRunLabel(!stopped);
     $("btnWizardCancel").style.display = "none";
     const paidSkipped = paidSkippedSteps(plan);
     const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
@@ -3027,6 +3091,20 @@
       t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
       stopped || paidSkipped.length ? "warn" : "ok"
     );
+  }
+  var lastSelBound = 0;
+  var lastSelRenamed = 0;
+  function applySelectionDone() {
+    const fresh = !hasGlobal && !hasSemanticRoles;
+    hasBoundNodes = lastSelBound > 0;
+    hasRenamedNodes = !fresh && lastSelRenamed > 0;
+    renderPipeline();
+    if (!wizardRunning) setWizardRunLabel(hasBoundNodes || hasRenamedNodes);
+  }
+  function setWizardRunLabel(rerun) {
+    const b = $("btnWizardRun");
+    b.textContent = rerun ? t("wizard.rerun") : t("wizardCard.run");
+    b.title = rerun ? t("wizard.rerunHint") : "";
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
   $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
@@ -3170,14 +3248,17 @@
     // 역할 매핑은 토큰 단계에 흡수돼 있다
     dark: { make: "theme", btn: "btnGenDark" },
     textStyles: { make: "type", btn: "btnScanText" },
-    bind: { make: null, btn: "btnApply" }
-    // 유일하게 적용 탭
+    bind: { make: null, btn: "btnApply" },
+    // 적용 탭
+    rename: { make: null, btn: "btnPreview", apply: "rename" }
+    // 적용 탭 · 이름 정리
   };
   function gotoStep(id) {
+    var _a;
     const target = PIPELINE_TARGET[id];
     if (target.make === null) {
       showTab("apply");
-      showApplyStep("bind");
+      showApplyStep((_a = target.apply) != null ? _a : "bind");
     } else {
       showTab("tokens");
       showMakeStep(target.make);
@@ -3189,7 +3270,7 @@
   function renderPipeline() {
     const box = $("pipelineSteps");
     box.innerHTML = "";
-    const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
+    const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes });
     steps.forEach((s, i) => {
       const row = document.createElement("div");
       row.className = `pstep ${s.status}`;
@@ -3325,7 +3406,7 @@
   });
   $("btnComponentize").addEventListener("click", () => {
     if (similarMemberIds.length < 2 || !similarMasterId) {
-      setStatus("structureStatus", "\uBA3C\uC800 \uC2A4\uCE94\uD574\uC11C \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.", "warn");
+      setStatus("structureStatus", t(compCandidates.length ? "similar.needScanAfterComp" : "similar.needScan"), "warn");
       return;
     }
     setStatus("structureStatus", "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uB294 \uC911\u2026", "");
@@ -3400,7 +3481,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
@@ -3411,12 +3492,9 @@
         resetTokenChecked();
         clearNumTidy();
         huefyTokenColors(tokens);
-        preTidyTokens = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
-        lastTidy = tidyColors();
         $("btnCreateApply").style.display = "none";
         suggestSemMapFrom(tokens);
         renderColorTable();
-        renderTidySummary(lastTidy);
         renderTokens();
         const colorN = tokens.filter((tk) => tk.category === "color").length;
         $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uC0C9 ${colorN} \xB7 \uADF8 \uC678 ${tokens.length - colorN}`;
@@ -3435,6 +3513,13 @@
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
+        lastSelBound = msg.bound;
+        lastSelRenamed = msg.renamed;
+        applySelectionDone();
+        if (!msg.selfSelect && !wizardRunning) {
+          if (msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX) send({ type: "SCAN_BINDINGS" });
+          else if (msg.bound > 0) setStatus("applyStatus", t("bind.scanHintLarge"), "");
+        }
         refreshVariantRow(msg.comps, msg.sets);
         if (!msg.selfSelect) clearBindPreview();
         if (!tokens.length) renderTokens();
@@ -3497,9 +3582,28 @@
           setStatus("applyStatus", t("apply.preview", { bound: msg.bound, detail }), msg.skipped ? "warn" : "");
         } else {
           clearBindPreview();
-          setStatus("applyStatus", t("apply.done", { bound: msg.bound, detail }), msg.skipped ? "warn" : "ok");
+          bindResultMode = true;
+          bindCandidates = (_e = msg.candidates) != null ? _e : [];
+          bindNodes = (_f = msg.nodes) != null ? _f : [];
+          bindSkips = (_g = msg.skips) != null ? _g : [];
+          bindSkipsCapped = ((_h = msg.skipTotal) != null ? _h : bindSkips.length) > bindSkips.length;
+          renderSkipReasons(msg.reasons);
+          renderBindTree();
+          const capped = ((_i = msg.candidateTotal) != null ? _i : bindCandidates.length) > bindCandidates.length;
+          const capNote = capped ? t("apply.resultCapped", { shown: bindCandidates.length }) : "";
+          setStatus("applyStatus", t("apply.done", { bound: msg.bound, detail }) + capNote, msg.skipped ? "warn" : "ok");
           confirmBtn.style.display = "none";
         }
+        break;
+      }
+      case "BINDINGS_RESULT": {
+        clearBindPreview();
+        bindResultMode = true;
+        bindCandidates = msg.candidates;
+        bindNodes = msg.nodes;
+        renderBindTree();
+        const capNote = msg.total > msg.candidates.length ? t("apply.resultCapped", { shown: msg.candidates.length }) : "";
+        setStatus("applyStatus", msg.total ? t("bind.scanned", { total: msg.total, nodes: msg.boundNodes }) + capNote : t("bind.scannedNone"), msg.total ? "" : "warn");
         break;
       }
       case "SELECT_RESULT":
@@ -3513,7 +3617,6 @@
         renderRenameResult(msg);
         break;
       case "SEMANTICS_RESULT":
-        if (wizardRunning) break;
         setStatus(
           semStatusTarget,
           (semStatusPrefix ? `${semStatusPrefix} \xB7 ` : "") + t("semantic.result", { aliased: msg.aliased, created: msg.created, updated: msg.updated }) + (msg.missing.length ? t("semantic.missing", { names: msg.missing.join(", ") }) : ""),
@@ -3532,7 +3635,7 @@
           }) : [];
           tsSpecs = [...msg.styles.map((x) => __spreadValues({}, x)), ...manual];
           tsScanNote = {
-            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_e = msg.fallback) != null ? _e : 0}` : "",
+            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_j = msg.fallback) != null ? _j : 0}` : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -3578,8 +3681,9 @@
         hasBindable = msg.hasBindable;
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
+        hasSemanticRoles = msg.hasSemanticRoles;
         updateGates();
-        renderPipeline();
+        applySelectionDone();
         requestGlobalRoles();
         break;
       case "LICENSE_STATUS": {
@@ -3649,6 +3753,16 @@
         varsLoaded = true;
         allVars = msg.vars;
         refreshDarkOptions();
+        if (!tokens.length) {
+          const globals = allVars.filter((v) => v.collection === "Global");
+          const colors = globals.filter((v) => v.name.startsWith("color/")).length;
+          const others = globals.length - colors;
+          const roles = allVars.filter((v) => v.collection === "Semantic").length;
+          if (globals.length) {
+            setStatus("colorStatus", t("color.fileVars", { n: colors, roles }), "");
+            setStatus("createStatus", t("create.fileVars", { n: others }), "");
+          }
+        }
         break;
       }
       case "DARK_MODE_RESULT": {
@@ -3688,7 +3802,7 @@
         break;
       }
       case "PREMIUM_REQUIRED": {
-        const statusId = resolveStatusId((_f = PREMIUM_STATUS_ID[msg.feature]) != null ? _f : "createStatus");
+        const statusId = resolveStatusId((_k = PREMIUM_STATUS_ID[msg.feature]) != null ? _k : "createStatus");
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }
@@ -3763,7 +3877,7 @@
   function baseDepth(rows) {
     return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
   }
-  function makeTreeRow(r, base, checked, onChange) {
+  function makeTreeRow(r, base, checked, onChange, readOnly = false) {
     var _a;
     const indent = `${(r.depth - base) * 12}px`;
     if (r.change === void 0 && r.keep) {
@@ -3792,7 +3906,7 @@
     const nameCls = r.replace === false ? "tree-name" : "before";
     title.innerHTML = `<span class="${nameCls}">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
     title.title = `${r.name} \u2192 ${r.change}`;
-    const card = resultCard({ check: cb, title, titleMono: true, meta: (_a = r.badge) == null ? void 0 : _a.text });
+    const card = resultCard(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title, titleMono: true, meta: (_a = r.badge) == null ? void 0 : _a.text }));
     if (r.badge) {
       const meta = card.querySelector(".r-meta");
       meta.className = `tag tag-${r.badge.kind}`;
@@ -3805,7 +3919,7 @@
     const visible = rows.filter(
       (r) => r.change !== void 0 || r.header || (r.keep ? !opts.hideKeep : !opts.hideContext)
     );
-    renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
+    renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange, opts.readOnly));
   }
   var renameNodes = [];
   var renameChecked = /* @__PURE__ */ new Set();
@@ -3871,8 +3985,9 @@
     var _a;
     return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}`;
   }
+  var bindResultMode = false;
   function hasBindPreview() {
-    return bindCandidates.length > 0;
+    return bindCandidates.length > 0 && !bindResultMode;
   }
   function skipReasonText(s) {
     const why = t(`reason.${s.reason}`);
@@ -3880,7 +3995,7 @@
   }
   function bindRows() {
     const byNode = /* @__PURE__ */ new Map();
-    for (const c of bindCandidates) {
+    for (const c of filteredCandidates()) {
       const arr = byNode.get(c.nodeId);
       if (arr) arr.push(c);
       else byNode.set(c.nodeId, [c]);
@@ -3919,18 +4034,74 @@
     }
     return rows;
   }
+  var bindView = "layer";
   function renderBindTree() {
+    const has = bindCandidates.length > 0;
+    $("bindViewRow").style.display = has ? "" : "none";
+    if (has && bindView === "variable") {
+      $("bindTreeCtrls").style.display = "none";
+      renderBindByVariable();
+      updateBindApply();
+      return;
+    }
     $("bindTreeCtrls").style.display = hasBindPreview() ? "" : "none";
     renderSelectableTree($("bindTree"), bindRows(), bindChecked, {
       hideContext: bindHideContext,
-      onChange: updateBindApply
+      onChange: updateBindApply,
+      readOnly: bindResultMode
+      // 적용 결과: 어느 레이어에 어느 변수가 붙었는지 보기만
     });
     updateBindApply();
   }
+  function bindFilterText() {
+    var _a;
+    return ((_a = $("bindFilter").value) != null ? _a : "").trim().toLowerCase();
+  }
+  function filteredCandidates() {
+    const q = bindFilterText();
+    return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
+  }
+  function renderBindByVariable() {
+    var _a;
+    const mount = $("bindTree");
+    clearMount(mount);
+    const groups = /* @__PURE__ */ new Map();
+    for (const c of filteredCandidates()) {
+      const prop = c.field === "fills" || c.field === "strokes" || c.field === "effects" ? c.field : /Radius$/.test(c.field) ? "radius" : /^padding|Spacing$|Gap$/.test(c.field) ? "spacing" : c.field;
+      if (!groups.has(prop)) groups.set(prop, /* @__PURE__ */ new Map());
+      const byVar = groups.get(prop);
+      const row = (_a = byVar.get(c.variableId)) != null ? _a : { name: c.variableName, ids: /* @__PURE__ */ new Set() };
+      row.ids.add(c.nodeId);
+      byVar.set(c.variableId, row);
+    }
+    const props = [...groups.keys()].sort();
+    for (const prop of props) {
+      mount.appendChild(resultGroup(prop));
+      const rows = [...groups.get(prop).values()].sort((a, b) => b.ids.size - a.ids.size || a.name.localeCompare(b.name));
+      for (const r of rows) {
+        const ids = [...r.ids];
+        const sel = document.createElement("button");
+        sel.className = "link";
+        sel.textContent = t("bind.varSelect");
+        sel.title = t("bind.varLayers", { n: ids.length });
+        sel.addEventListener("click", () => selectNodes(ids, "applyStatus"));
+        const card = resultCard({ title: r.name, titleMono: true, summary: t("bind.varLayers", { n: ids.length }), metaEl: sel });
+        mount.appendChild(card);
+      }
+    }
+  }
+  $("bindFilter").addEventListener("input", () => renderBindTree());
+  document.querySelectorAll('input[name="bindView"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      if (!radio.checked) return;
+      bindView = radio.value === "variable" ? "variable" : "layer";
+      renderBindTree();
+    });
+  });
   function updateBindApply() {
     const total = bindCandidates.length;
     const sel = bindChecked.size;
-    $("bindCount").textContent = total ? `\uD6C4\uBCF4 ${total}` : "";
+    $("bindCount").textContent = total ? bindResultMode ? `\uC5F0\uACB0 ${total}` : `\uD6C4\uBCF4 ${total}` : "";
     const confirm = $("btnApplyConfirm");
     confirm.style.display = hasBindPreview() ? "" : "none";
     confirm.disabled = sel === 0;
@@ -3941,6 +4112,7 @@
     }
   }
   function clearBindPreview() {
+    bindResultMode = false;
     bindCandidates = [];
     bindNodes = [];
     bindSkips = [];
@@ -3952,6 +4124,7 @@
     clearMount($("bindTree"));
     $("bindCount").textContent = "";
     $("bindTreeCtrls").style.display = "none";
+    $("bindViewRow").style.display = "none";
     $("btnApplyConfirm").style.display = "none";
   }
   var compCandidates = [];
@@ -4192,6 +4365,7 @@
   var STRUCTURE_TIPS = {
     btnScanComp: "component.scanHelp",
     btnScanSimilar: "similar.scanHelp",
+    btnScanBindings: "bind.scanHelp",
     btnClassifyVariants: "component.classifyHelp",
     btnGenMissing: "component.genMissingHelp",
     btnRegisterComp: "component.registerHelp",

@@ -7,7 +7,7 @@ import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
-import { bindSelection } from './lib/bind';
+import { bindSelection, scanBindings } from './lib/bind';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
@@ -126,7 +126,8 @@ async function postPrereq(): Promise<void> {
   try {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
-    const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+    // 거울 폐지 후 바인딩 대상은 3계층 전부 — 역할 없는 값은 Global에 붙는다(bind.ts).
+    const bindableIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
     const vars = await figma.variables.getLocalVariablesAsync();
     const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
     const hasColorVars = globals.some((v) => v.resolvedType === 'COLOR');
@@ -136,9 +137,11 @@ async function postPrereq(): Promise<void> {
     // 다크는 '모드가 둘 이상인 **바인딩 대상** 컬렉션'이 있으면 이미 만든 것으로 본다.
     // 문서 전체로 보면 Breakpoint(Desktop/Mobile) 같은 무관한 컬렉션 하나가 다크 단계를
     // 「완료」로 만들어, 다크 테마가 없는 파일에서 사용자가 그 단계를 건너뛴다.
-    const hasDarkMode = cols.some((c) => bindableIds.has(c.id) && c.modes.length > 1);
+    const semanticIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+    const hasDarkMode = cols.some((c) => semanticIds.has(c.id) && c.modes.length > 1);
     const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 타이포 단계 「기존만 연결」 전제
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
+    const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId)); // 역할 별칭 존재 = 역할 매핑 완료
+    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -339,6 +342,16 @@ function isBindableCandidate(n: SceneNode): boolean {
   const hasGap = !!lm && lm !== 'NONE' && typeof (n as { itemSpacing?: number }).itemSpacing === 'number';
   return hasFills || hasStrokes || hasRadius || hasFont || hasGap;
 }
+/** 노드 필드 또는 fills/strokes/effects 페인트에 변수 바인딩이 하나라도 있는가. */
+function hasAnyBinding(n: SceneNode): boolean {
+  const bv = (n as { boundVariables?: Record<string, unknown> }).boundVariables;
+  if (bv && Object.keys(bv).length) return true;
+  for (const key of ['fills', 'strokes'] as const) {
+    const ps = (n as unknown as Record<string, unknown>)[key];
+    if (Array.isArray(ps) && ps.some((p) => !!(p as { boundVariables?: { color?: unknown } }).boundVariables?.color)) return true;
+  }
+  return false;
+}
 /**
  * 이번 selectionchange가 플러그인 자신이 만든 것인가(스킵 칩 → 레이어 이동).
  * UI는 선택이 바뀌면 바인딩 미리보기를 버리는데, 칩이 그 미리보기에서 나온 것이라
@@ -350,6 +363,8 @@ function postSelection(): void {
   const sel = selection();
   let scanned = 0;
   let bindable = 0;
+  let bound = 0; // 변수가 하나라도 붙은 레이어(준비 현황 '변수 연결 완료')
+  let renamed = 0; // 이름 정리가 역할을 기록한 레이어(준비 현황 '이름 정리 완료')
   let capped = false;
   // 베리언트 분류·누락 조합 생성이 실제로 잡는 것과 같은 기준(최상위 선택만).
   // 분류는 세트에 안 속한 낱개 COMPONENT를, 생성은 COMPONENT_SET을 대상으로 한다.
@@ -366,10 +381,12 @@ function postSelection(): void {
     if (n.visible === false) continue;
     scanned++;
     if (isBindableCandidate(n)) bindable++;
+    if (hasAnyBinding(n)) bound++;
+    if (readRole(n)) renamed++;
     if (n.type === 'INSTANCE') continue; // 인스턴스 내부는 바인딩 대상이 아니다
     if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
   }
-  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, comps, sets, selfSelect });
+  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, comps, sets, selfSelect, bound, renamed });
   selfSelect = false;
 }
 figma.on('selectionchange', postSelection);
@@ -786,10 +803,19 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           nodes: r.nodes, // #13: 미리보기 트리 맥락
           skips: r.skips, // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
           skipTotal: r.skipTotal, // 상한 전 실제 수 — 잘렸으면 UI가 알린다
+          candidateTotal: r.candidateTotal, // 결과/미리보기 목록 상한 전 실제 수
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
+          selfSelect = true; // 선택이 바뀐 게 아니다 — UI가 방금 그린 결과 트리를 지우지 않게
+          postSelection(); // 준비 현황 '변수 연결 완료' 판정 갱신(선택은 그대로라 selectionchange가 안 온다)
         }
+        break;
+      }
+      case 'SCAN_BINDINGS': {
+        // 읽기 전용 — 파일에 남은 바인딩을 결과 트리 모양으로. 플러그인을 닫았다 열어도 '뭐가 붙어 있나'가 보인다.
+        const r = await scanBindings(selection());
+        post({ type: 'BINDINGS_RESULT', candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes });
         break;
       }
       case 'CANCEL': {
@@ -833,6 +859,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'APPLY_RESULT', bound, skipped, flags: [], reasons: {} });
         if (bound) {
           commitUndo(figma); // UX2: 선택 바인딩 전체를 단일 Undo로
+          selfSelect = true;
+          postSelection();
         }
         break;
       }
@@ -841,6 +869,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied });
         if (r.applied && r.changes.length) {
           commitUndo(figma); // UX2: 리네임 전체를 단일 Undo로
+        }
+        if (r.applied) {
+          selfSelect = true;
+          postSelection(); // 준비 현황 '이름 정리 완료' 판정 갱신
         }
         break;
       }
@@ -873,6 +905,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           changes.push({ id, before, after });
         }
         post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true });
+        selfSelect = true;
+        postSelection();
         // 이름이 하나도 안 바뀌어도 역할을 새로 기록했으면 커밋한다. 안 하면 그 pluginData
         // 쓰기가 다음에 undo를 커밋하는 **무관한 작업**의 묶음에 접혀 들어가, 그 작업을
         // 되돌릴 때 역할 기록까지 조용히 함께 revert된다.

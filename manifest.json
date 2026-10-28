@@ -4,10 +4,14 @@
   "api": "1.0.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",
-  "editorType": ["figma"],
+  "editorType": [
+    "figma"
+  ],
   "documentAccess": "dynamic-page",
   "networkAccess": {
-    "allowedDomains": ["https://license.example.com"],
-    "reasoning": "라이선스 키 검증 요청(M2). 디자인 데이터는 전송하지 않음. 배포 시 실제 검증 서버 도메인으로 교체."
+    "allowedDomains": [
+      "none"
+    ],
+    "reasoning": "v1.0은 네트워크를 쓰지 않습니다(라이선스 검증은 v1.1에서 활성화 — 그때 검증 서버 도메인으로 교체)."
   }
 }

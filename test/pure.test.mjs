@@ -1767,31 +1767,36 @@ test('pipelineSteps — 전제에 따른 단계 상태', () => {
     hasBindable: false, hasDarkMode: false, hasTextStyles: false,
   };
 
-  // 아무것도 없음: 색·토큰=ready(언제든 시작), 역할·연결=blocked(+안내), 다크·타이포=todo
+  // 순서 = 마법사 순서: 색·토큰·역할·다크·타이포·연결·이름.
+  // 아무것도 없음: 색·토큰=ready(언제든 시작), 역할·연결=blocked(+안내), 다크·타이포=todo, 이름=ready
   const empty = pipelineSteps(none);
   assert.deepEqual(empty.map((s) => [s.id, s.status]), [
     ['colors', 'ready'], ['tokens', 'ready'], ['semantics', 'blocked'],
-    ['bind', 'blocked'], ['dark', 'todo'], ['textStyles', 'todo'],
+    ['dark', 'todo'], ['textStyles', 'todo'], ['bind', 'blocked'], ['rename', 'ready'],
   ]);
-  assert.ok(empty[2].hint && empty[3].hint); // blocked엔 안내
+  assert.ok(empty[2].hint && empty[5].hint); // blocked엔 안내
 
   // Global만: 색·토큰=done, 역할=ready, 연결=blocked
   const g = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true });
-  assert.deepEqual(g.map((s) => s.status), ['done', 'done', 'ready', 'blocked', 'todo', 'todo']);
+  assert.deepEqual(g.map((s) => s.status), ['done', 'done', 'ready', 'todo', 'todo', 'blocked', 'ready']);
 
   // 연결 변수까지: 역할·연결 모두 ready(안내 없음)
   const both = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true });
-  assert.deepEqual(both.map((s) => s.status), ['done', 'done', 'ready', 'ready', 'todo', 'todo']);
+  assert.deepEqual(both.map((s) => s.status), ['done', 'done', 'ready', 'todo', 'todo', 'ready', 'ready']);
   assert.equal(both[2].hint, undefined);
-  assert.equal(both[3].hint, undefined);
+  assert.equal(both[5].hint, undefined);
 
   // 다크·텍스트 스타일은 전제가 아니라 '만들었는가' — 있으면 done
   const made = pipelineSteps({ ...none, hasDarkMode: true, hasTextStyles: true });
-  assert.deepEqual(made.map((s) => s.status).slice(4), ['done', 'done']);
+  assert.deepEqual(made.map((s) => s.status).slice(3, 5), ['done', 'done']);
 
   // 색만 만든 상태: 색=done, 간격·크기=아직 ready, 역할 매핑은 Global이 있으니 ready
   const colorOnly = pipelineSteps({ ...none, hasColorVars: true, hasGlobal: true });
-  assert.deepEqual(colorOnly.map((s) => s.status), ['done', 'ready', 'ready', 'blocked', 'todo', 'todo']);
+  assert.deepEqual(colorOnly.map((s) => s.status), ['done', 'ready', 'ready', 'todo', 'todo', 'blocked', 'ready']);
+
+  // 전체 실행 뒤: 역할 별칭·바인딩·이름 기록이 있으면 역할·연결·이름도 done(예전엔 '준비'로 남았다)
+  const ran = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true, hasTextStyles: true, hasSemanticRoles: true, hasBoundNodes: true, hasRenamedNodes: true });
+  assert.deepEqual(ran.map((s) => s.status), ['done', 'done', 'done', 'todo', 'done', 'done', 'done']);
 });
 
 /* ================= i18n.ts (런타임 문자열 외부화) ================= */

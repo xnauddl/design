@@ -21,10 +21,16 @@ export interface PrereqState {
   hasDarkMode: boolean;
   /** 등록된 텍스트 스타일 존재. */
   hasTextStyles: boolean;
+  /** Semantic에 역할 별칭이 하나라도 있음(역할 매핑 완료). 없으면 false(이전 파일 호환). */
+  hasSemanticRoles?: boolean;
+  /** 현재 선택 안에 변수가 붙은 레이어가 있음(변수 연결 완료). */
+  hasBoundNodes?: boolean;
+  /** 현재 선택 안에 이름 정리된(역할 기록이 있는) 레이어가 있음(이름 정리 완료). */
+  hasRenamedNodes?: boolean;
 }
 
 export interface PipelineStep {
-  id: 'colors' | 'tokens' | 'semantics' | 'bind' | 'dark' | 'textStyles';
+  id: 'colors' | 'tokens' | 'semantics' | 'dark' | 'textStyles' | 'bind' | 'rename';
   status: StepStatus;
   /** blocked일 때 다음 행동 안내(i18n 키, UI가 t()로 해석). 표시 라벨은 `pipeline.step.<id>`. */
   hint?: string;
@@ -38,20 +44,23 @@ export interface PipelineStep {
  * - 다크 모드 / 텍스트 스타일: 있으면 done, 없으면 todo — 막힌 게 아니라 만들기 탭의 할 일.
  */
 export function pipelineSteps(s: PrereqState): PipelineStep[] {
+  // 순서 = '한 번에 정리'(마법사)가 도는 순서. 전체 실행 뒤에는 전부 ✓가 돼야 한다 —
+  // 예전엔 역할 매핑·변수 연결에 '완료' 신호가 없어 실행 뒤에도 '준비'로 남았다.
   return [
     { id: 'colors', status: s.hasColorVars ? 'done' : 'ready' },
     { id: 'tokens', status: s.hasScaleVars ? 'done' : 'ready' },
     {
       id: 'semantics',
-      status: s.hasGlobal ? 'ready' : 'blocked',
-      hint: s.hasGlobal ? undefined : 'pipeline.hint.needTokens',
-    },
-    {
-      id: 'bind',
-      status: s.hasBindable ? 'ready' : 'blocked',
-      hint: s.hasBindable ? undefined : 'pipeline.hint.needBindable',
+      status: s.hasSemanticRoles ? 'done' : s.hasGlobal ? 'ready' : 'blocked',
+      hint: s.hasGlobal || s.hasSemanticRoles ? undefined : 'pipeline.hint.needTokens',
     },
     { id: 'dark', status: s.hasDarkMode ? 'done' : 'todo' },
     { id: 'textStyles', status: s.hasTextStyles ? 'done' : 'todo' },
+    {
+      id: 'bind',
+      status: s.hasBoundNodes ? 'done' : s.hasBindable ? 'ready' : 'blocked',
+      hint: s.hasBindable || s.hasBoundNodes ? undefined : 'pipeline.hint.needBindable',
+    },
+    { id: 'rename', status: s.hasRenamedNodes ? 'done' : 'ready' },
   ];
 }

@@ -52,6 +52,9 @@ let hasGlobal = false;
 let hasBindable = false;
 let hasDarkMode = false;
 let hasTextStyles = false;
+let hasSemanticRoles = false; // 역할 별칭 존재(역할 매핑 완료)
+let hasBoundNodes = false; // 현재 선택에 변수 붙은 레이어 존재(변수 연결 완료)
+let hasRenamedNodes = false; // 현재 선택에 이름 정리된 레이어 존재(이름 정리 완료)
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'colors' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
 
@@ -333,7 +336,6 @@ function renderEmptyState(box: HTMLElement, title: string, guide: string, action
 // 먼저 눌러도 추출이 실행되고(자동 추출) 각자 자기 영역만 펼친다.
 let colorRevealed = false;
 let previewRevealed = false;
-let lastTidy: { before: number; after: number; merged: number } = { before: 0, after: 0, merged: 0 };
 let pendingCreatePreview = false; // ‘미리보기’가 추출을 유발했을 때, 추출 후 생성 미리보기 전송
 /* #18: 결과 목록은 흐름 레이아웃 — 목록마다 max-height 스크롤 박스를 두지 않고 패널 body가
    스크롤한다. 상한이 없으니 '행 높이 정수배로 스냅 · 남은 개수 · 모두 펼치기' 기계장치도
@@ -449,8 +451,6 @@ $('btnPalette').addEventListener('click', () => {
   // 시맨틱 매핑 textarea를 추천값으로 채움(편집 가능). #3: 역할 → hue Global(정확).
   setSemMapText(paletteSemanticMap(p));
   renderColorTable(); // #3: 색 편집표(hue·역할) 표시
-  hideTidySummary(); // 팔레트 스케일은 의도적 간격 — 정리 안 함
-  preTidyTokens = null;
   $('paletteInfo').textContent = t('palette.summary', { count: p.scales.length, tokens: tokens.length });
   // 경고가 있을 때만 상태 줄을 쓴다 — 없으면 바로 위 renderColorTable이 채운 요약
   // (`색 N개 · 역할 지정 M · 변수화 대기`)이 서 있어야 한다. 색 카드의 상태 줄은 하나다.
@@ -477,27 +477,35 @@ function huefyTokenColors(toks: DraftToken[]): void {
   const idx: number[] = [];
   const hexes: string[] = [];
   toks.forEach((t, i) => {
-    if (t.category === 'color' && typeof t.value === 'string') {
+    // 그림자 색(effectColor)도 같은 `color/` 이름 공간이다 — 빼면 `color/000000`이 hex 이름으로 남는다.
+    if ((t.category === 'color' || t.category === 'effectColor') && typeof t.value === 'string') {
       idx.push(i);
       hexes.push(t.value);
     }
   });
   if (!idx.length) return;
-  const names = nameColorsByHue(hexes);
+  // 같은 hex는 같은 이름 — 채움색과 그림자색이 둘 다 #000000이면 `gray/950`·`gray/950-2` 두 변수가
+  // 아니라 한 변수(스코프 합집합)가 돼야 한다. 고유 hex만 이름 짓고 되돌려 붙인다.
+  const uniq = [...new Set(hexes.map((h) => h.toLowerCase()))];
+  const names = nameColorsByHue(uniq);
+  const nameOf = new Map(uniq.map((h, i) => [h, names[i]]));
   idx.forEach((ti, k) => {
-    toks[ti].name = names[k];
+    toks[ti].name = nameOf.get(hexes[k].toLowerCase()) ?? toks[ti].name;
   });
 }
 
 /* ---------- #3 색 편집표 (hue → 역할) ---------- */
 /** 색에 붙일 수 있는 Semantic 역할 — 순서는 화면 표시 순서 그대로. */
+// property-first 어휘(Atlassian `color.background.brand` · Lightning `$color-text-default`).
+// property(background/text/border/icon)가 곧 Figma 스코프라 역할을 고르면 스코프가 따라온다.
 const COLOR_ROLES = [
-  'surface', 'surface/muted',
-  'text', 'text/muted', 'text/inverse',
-  'border',
-  'primary', 'primary/strong', 'primary/subtle',
-  'secondary', 'accent',
-  'success', 'warning', 'error', 'info',
+  'color/background/default', 'color/background/subtle', 'color/background/inverse',
+  'color/background/brand', 'color/background/brand-bold', 'color/background/brand-subtle', 'color/background/accent',
+  'color/background/success', 'color/background/warning', 'color/background/danger', 'color/background/info',
+  'color/text/default', 'color/text/subtle', 'color/text/inverse', 'color/text/brand',
+  'color/text/success', 'color/text/warning', 'color/text/danger', 'color/text/info',
+  'color/border/default', 'color/border/bold', 'color/border/brand', 'color/border/danger',
+  'color/icon/default', 'color/icon/subtle', 'color/icon/brand',
 ] as const;
 
 /**
@@ -514,7 +522,7 @@ function roleSelect(value: string): HTMLSelectElement {
   for (const r of COLOR_ROLES) {
     const o = document.createElement('option');
     o.value = r;
-    o.textContent = `${t(`role.${r.replace('/', '-')}`)} · ${r}`;
+    o.textContent = `${t(`role.${r.replace(/^color\//, '').replace(/\//g, '-')}`)} · ${r}`;
     sel.appendChild(o);
   }
   // 추천이 어휘 밖 역할을 주면(옛 매핑 등) 그 값도 고를 수 있게 남긴다 — 조용히 지우지 않는다.
@@ -625,78 +633,9 @@ function colorAuthoritativeRoles(base: number): Record<string, string> {
   return { ...nonColor, ...picks };
 }
 
-/* ---------- 색 정리 (ΔE 군집 N:1) ---------- */
-/** 현재 색 토큰 hex 목록. */
-function colorHexes(): string[] {
-  return tokens
-    .filter((t) => t.category === 'color' && typeof t.value === 'string')
-    .map((t) => (t.value as string).toLowerCase());
-}
+/* 색 N:1 자동 병합(tidyColors)은 걷었다 — 합쳐진 색의 hex가 사라져 바인딩이 그 레이어를
+   `매칭 없음`으로 남겼다. 이제 이름만 정리하고(huefyTokenColors) 색은 전부 변수가 된다. */
 
-/** 자동 정리 직전의 추출 토큰 스냅샷(되돌리기용). null이면 되돌릴 것 없음. */
-let preTidyTokens: DraftToken[] | null = null;
-
-/** 색 토큰을 hue-단계 이름 기준으로 N:1 병합(드래프트 단계 — 변수·바인딩 영향 없음).
-   huefy가 같은 단계로 본 색(예: color/gray/50 와 color/gray/50-2)은 한 대표로 합친다
-   (sources union, 대표는 접미사 없는 base 이름). 단계 버킷이 ΔE(군집)보다 관대해
-   실데이터에서 확실히 정리됨 — 같은 단계 색이 두 변수로 남지 않는다. 통계 반환. */
-function tidyColors(): { before: number; after: number; merged: number } {
-  const colors = tokens.filter((t) => t.category === 'color' && typeof t.value === 'string');
-  const before = colors.length;
-  const baseName = (name: string) => name.replace(/-\d+$/, ''); // 충돌 접미사(-2,-3…) 제거
-  const keep = new Map<string, DraftToken>(); // base 이름 → 남길 대표 토큰
-  const drop = new Set<DraftToken>();
-  for (const t of colors) {
-    const k = baseName(t.name);
-    const rep = keep.get(k);
-    if (!rep) {
-      keep.set(k, t);
-    } else {
-      for (const s of t.sources) if (!rep.sources.includes(s)) rep.sources.push(s); // 스코프 union 보존
-      // 흡수된 색의 사용 수도 대표가 물려받는다 — 안 그러면 20개 레이어가 쓰던 회색이
-      // 「1× 사용」으로 보여, 그 수치로 역할을 고르는 사람이 제일 많이 쓰는 색을 내린다.
-      // 합산이 아니라 최댓값인 이유는 tidyNumberTokens와 같다(같은 레이어가 두 색을 함께 쓸 수 있다).
-      if (t.count) rep.count = Math.max(rep.count ?? 0, t.count);
-      drop.add(t);
-    }
-  }
-  if (drop.size) {
-    tokens = tokens.filter((t) => !drop.has(t));
-    for (const [base, rep] of keep) rep.name = base; // 대표 이름을 base로 정규화(접미사 제거)
-  }
-  return { before, after: keep.size, merged: drop.size };
-}
-
-/** 정리 결과 요약 한 줄 + 되돌리기. merged=0이면 숨김. */
-function renderTidySummary(s: { before: number; after: number; merged: number }): void {
-  const box = $('tidySummary');
-  if (s.merged <= 0) {
-    box.style.display = 'none';
-    return;
-  }
-  box.style.display = '';
-  $('tidySumText').textContent = `비슷한 색 ${s.before} → ${s.after}개로 자동 정리됨`;
-}
-
-function hideTidySummary(): void {
-  $('tidySummary').style.display = 'none';
-}
-
-/** 자동 정리 되돌리기 — 정리 직전 추출 색으로 복원(이번 추출 한정). */
-function undoTidy(): void {
-  if (!preTidyTokens) return;
-  const restored = preTidyTokens.map((t) => ({ ...t, sources: [...t.sources] }));
-  carryTokenChecked(tokens, restored); // 수치 정리 후라면 키가 어긋나 전부 풀린다
-  tokens = restored;
-  preTidyTokens = null;
-  hideTidySummary();
-  renderTokens();
-  renderColorTable();
-  suggestSemMapFrom(tokens);
-  ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 집합 변경 → 새 미리보기 필요
-  setStatus('colorStatus', `정리 되돌림 · 추출 색 ${new Set(colorHexes()).size}개`, '');
-}
-$('btnTidyUndo').addEventListener('click', undoTidy);
 
 // 보조색 사용 토글 → 보조색·하모니 입력 활성/비활성 동기화.
 function syncSecondaryControls(): void {
@@ -1144,6 +1083,12 @@ function bindTolerance(): number {
   return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
 }
 
+/** 연결 현황을 선택 변경 시 자동으로 읽는 상한(노드 수). 랜딩 한 장(≈250)은 자동, 페이지 통째는 버튼. */
+const AUTO_SCAN_MAX = 300;
+$('btnScanBindings').addEventListener('click', () => {
+  setStatus('applyStatus', t('common.running'), '');
+  send({ type: 'SCAN_BINDINGS' });
+});
 $('btnApply').addEventListener('click', () => {
   showApplyProgress('미리보기 계산 중…'); // UX6
   send({ type: 'APPLY', tolerance: bindTolerance(), preview: true }); // UX1: dry-run 미리보기 먼저
@@ -1231,7 +1176,11 @@ window.addEventListener('message', (event: MessageEvent) => {
   if (wizardWaiter.types.includes(m.type)) {
     const w = wizardWaiter;
     wizardWaiter = null;
-    w.resolve(m);
+    // 메인 핸들러(window.onmessage)가 같은 메시지를 **다 처리한 뒤** 깨운다. 이 리스너가 먼저
+    // 등록돼 있어, 바로 resolve하면 리스너 사이의 마이크로태스크 체크포인트에서 마법사가 재개돼
+    // EXTRACT_RESULT의 hue 이름 정규화(`color/0066ff`→`color/blue/500`)·색 정리·역할 추천이
+    // 적용되기 전의 raw 토큰으로 CREATE_TOKENS를 보냈다 — Semantic에 hex 이름이 남던 원인.
+    setTimeout(() => w.resolve(m), 0);
   }
 });
 
@@ -1309,13 +1258,14 @@ async function runWizard(): Promise<void> {
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   const tolerance = bindTolerance();
   const maxDepth = readMaxDepth();
-  const semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
+  let semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
 
   const options: WizardOptions = {
     semantics: ($('wizOptSemantics') as HTMLInputElement).checked,
     dark: ($('wizOptDark') as HTMLInputElement).checked,
     textStyles: ($('wizOptTextStyles') as HTMLInputElement).checked,
-    componentize: ($('wizOptComponentize') as HTMLInputElement).checked,
+    // v1.0: 마법사에서 컴포넌트 등록 제외(체크박스 숨김) — 리네임 뒤 이름 기준 묶기가 디자인을 덮어쓴다.
+    componentize: false,
   };
   const ctx: WizardContext = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
   const plan = planWizard(options, ctx);
@@ -1340,12 +1290,33 @@ async function runWizard(): Promise<void> {
     try {
       switch (p.step.id) {
         case 'extract': {
-          const r = await wizardRequest({ type: 'EXTRACT' }, ['EXTRACT_RESULT']);
-          tokens = r.tokens; // 모듈 변수 동기화(다음 단계 일관성)
+          // 응답은 메인 핸들러가 먼저 받아 `tokens`를 정규화(hue 이름·색 정리·역할 추천)해 둔다 —
+          // 여기서는 raw `r.tokens`가 아니라 그 결과(모듈 변수)를 쓴다. 버튼 경로와 같은 토큰이다.
+          await wizardRequest({ type: 'EXTRACT' }, ['EXTRACT_RESULT']);
           if (!tokens.length) {
             setWizardStep('extract', 'fail', t('wizard.seq.noExtract'));
             stopped = true;
             break;
+          }
+          // 만들기 탭의 색 표·토큰 목록은 '추출'/'미리보기' 버튼이 켜는 플래그로 가려져 있다 —
+          // 마법사가 같은 추출을 했으니 둘 다 펼쳐, 탭을 열면 무엇을 만들었는지 목록으로 보이게 한다.
+          colorRevealed = true;
+          previewRevealed = true;
+          renderColorTable();
+          renderTokens();
+          // 역할 매핑은 **이번 추출 토큰 기준으로 다시** 만든다(자동 추천 + 색 표에서 고른 역할) —
+          // '색 변수 만들기' 버튼과 같은 출처. 이전 세션의 textarea를 그대로 쓰면 지금은 없는
+          // 이름(옛 hex 이름 `color/000000`)에 역할이 붙거나, 색 4개만 남고 간격·크기·타이포
+          // 역할(spacing/sm, radius/md, font-size/body…)이 통째로 빠진다.
+          setSemMapText(colorAuthoritativeRoles(base));
+          semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
+          // 시작 시점엔 매핑이 없어 '매핑 없음'으로 빠졌어도 지금은 만들 별칭이 있다 — 단계를 되살린다.
+          const sem = plan.find((x) => x.step.id === 'semantics');
+          if (sem && !sem.run && sem.skipReason === 'wizard.skip.noMapping' && Object.keys(semMap).length) {
+            sem.run = true;
+            sem.skipReason = undefined;
+            renderWizardSteps(plan);
+            setWizardStep('extract', 'active', t('wizard.seq.running'));
           }
           setWizardStep('extract', 'done', t('wizard.seq.extractDone', { count: tokens.length }));
           break;
@@ -1444,6 +1415,7 @@ async function runWizard(): Promise<void> {
 
   wizardRunning = false;
   ($('btnWizardRun') as HTMLButtonElement).disabled = false;
+  setWizardRunLabel(!stopped); // 완주했으면 '다시 실행' — 같은 선택을 또 돌리는 건 갱신이지 첫 실행이 아니다
   $('btnWizardCancel').style.display = 'none';
   // 칩 툴팁만으로는 사라진다 — 무엇이 왜 안 돌았는지는 요약 줄에도 적는다(#15).
   // 특히 '토큰'이 빠지면 새 변수가 없어 연결 수가 0에 가까운데, 그 인과가 화면에 없었다.
@@ -1460,6 +1432,27 @@ async function runWizard(): Promise<void> {
   );
 }
 
+let lastSelBound = 0;
+let lastSelRenamed = 0;
+/**
+ * 선택 기준 '완료' 판정 + 전체 실행 라벨. SELECTION_STATE와 PREREQ_STATE 어느 쪽이 먼저 와도 같은 답이 나오게
+ * 둘 다 여기로 모은다. Global/Semantic이 없으면(컬렉션을 지우고 처음부터 하는 QA 흐름, 다른 파일에서 복사해 온
+ * 프레임) 이전 이름 정리 기록이 남아 있어도 '처음'으로 본다 — 변수가 없으면 어차피 전부 다시 한다.
+ */
+function applySelectionDone(): void {
+  const fresh = !hasGlobal && !hasSemanticRoles;
+  hasBoundNodes = lastSelBound > 0;
+  hasRenamedNodes = !fresh && lastSelRenamed > 0;
+  renderPipeline();
+  if (!wizardRunning) setWizardRunLabel(hasBoundNodes || hasRenamedNodes);
+}
+
+/** 전체 실행 버튼 라벨 — 이미 정리한 선택이면 '다시 실행'(툴팁에 무엇이 달라지는지). */
+function setWizardRunLabel(rerun: boolean): void {
+  const b = $('btnWizardRun') as HTMLButtonElement;
+  b.textContent = rerun ? t('wizard.rerun') : t('wizardCard.run');
+  b.title = rerun ? t('wizard.rerunHint') : '';
+}
 $('btnWizardRun').addEventListener('click', () => void runWizard());
 $('btnWizardCancel').addEventListener('click', () => send({ type: 'CANCEL' }));
 
@@ -1653,20 +1646,21 @@ function goToCreate(): void {
 /* ---------- 진행 안내 파이프라인(§3) ---------- */
 
 /** 준비 현황 줄 클릭 → 그 일을 하는 단계로. 목록 순서 = 만들기 레일 순서 + 적용 첫 단계. */
-const PIPELINE_TARGET: Record<PipelineStep['id'], { make: MakeStep | null; btn: string }> = {
+const PIPELINE_TARGET: Record<PipelineStep['id'], { make: MakeStep | null; btn: string; apply?: ApplyStep }> = {
   colors: { make: 'color', btn: 'btnColorVars' },
   tokens: { make: 'token', btn: 'btnCreate' },
   semantics: { make: 'token', btn: 'btnSemantics' }, // 역할 매핑은 토큰 단계에 흡수돼 있다
   dark: { make: 'theme', btn: 'btnGenDark' },
   textStyles: { make: 'type', btn: 'btnScanText' },
-  bind: { make: null, btn: 'btnApply' }, // 유일하게 적용 탭
+  bind: { make: null, btn: 'btnApply' }, // 적용 탭
+  rename: { make: null, btn: 'btnPreview', apply: 'rename' }, // 적용 탭 · 이름 정리
 };
 
 function gotoStep(id: PipelineStep['id']): void {
   const target = PIPELINE_TARGET[id];
   if (target.make === null) {
     showTab('apply');
-    showApplyStep('bind');
+    showApplyStep(target.apply ?? 'bind');
   } else {
     showTab('tokens');
     showMakeStep(target.make);
@@ -1680,7 +1674,7 @@ function gotoStep(id: PipelineStep['id']): void {
 function renderPipeline(): void {
   const box = $('pipelineSteps');
   box.innerHTML = '';
-  const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
+  const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes });
   steps.forEach((s, i) => {
     const row = document.createElement('div');
     row.className = `pstep ${s.status}`;
@@ -1853,7 +1847,8 @@ $('btnScanSimilar').addEventListener('click', () => {
 
 $('btnComponentize').addEventListener('click', () => {
   if (similarMemberIds.length < 2 || !similarMasterId) {
-    setStatus('structureStatus', '먼저 스캔해서 마스터를 고르세요.', 'warn');
+    // '후보 스캔'을 하고 '묶기'를 누르는 경우가 잦다 — 묶기는 '닮은 스캔' 결과만 받는다는 걸 말해 준다.
+    setStatus('structureStatus', t(compCandidates.length ? 'similar.needScanAfterComp' : 'similar.needScan'), 'warn');
     return;
   }
   setStatus('structureStatus', '컴포넌트화하는 중…', '');
@@ -1964,15 +1959,15 @@ window.onmessage = (event: MessageEvent) => {
       colorsCreated = false;
       resetTokenChecked(); // 새 추출 = 새 집합 → 전체 선택으로 시작
       clearNumTidy(); // 이전 추출의 정리 스냅샷으로 되돌아가지 않게
-      huefyTokenColors(tokens); // #3: 추출 색을 hue-Global 이름으로 정규화
-      // 추출 색 자동 정리(같은 hue-단계 N:1 병합) — 드래프트 단계라 바인딩 영향 없음.
-      preTidyTokens = tokens.map((t) => ({ ...t, sources: [...t.sources] })); // 되돌리기 스냅샷
-      lastTidy = tidyColors();
+      // #3: 추출 색을 hue-Global 이름으로 정규화. **이름만** 정리하고 색은 합치지 않는다 —
+      // 같은 hue·단계에 떨어진 색은 `color/gray/100`, `color/gray/100-2`로 각자 변수가 된다.
+      // (예전 N:1 병합은 합쳐진 색의 hex를 버려, 바인딩이 그 레이어를 `매칭 없음`으로 남겼다.
+      //  "변수가 몇 개 더 생긴다"보다 "내 색이 연결 안 됐다/바뀌었다"가 훨씬 큰 불만이다.)
+      huefyTokenColors(tokens);
       ($('btnCreateApply') as HTMLButtonElement).style.display = 'none'; // 토큰 집합 변경 → 새 미리보기 필요
       // #10: 추출 색에서도 시맨틱 매핑 추천(비어 있을 때만 — 사용자 편집 보존).
       suggestSemMapFrom(tokens);
       renderColorTable(); // colorRevealed면 색 표(추출 버튼이 켬)
-      renderTidySummary(lastTidy); // 정리 요약 한 줄 + 되돌리기
       renderTokens(); // previewRevealed면 색 외 목록(미리보기 버튼이 켬)
       const colorN = tokens.filter((tk) => tk.category === 'color').length;
       $('selInfo').textContent = `선택 ${msg.selection}개 · 색 ${colorN} · 그 외 ${tokens.length - colorN}`;
@@ -1995,6 +1990,18 @@ window.onmessage = (event: MessageEvent) => {
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
+      // 준비 현황의 '완료'는 현재 선택 기준 — 선택이 바뀌면 다시 판정한다.
+      // Global/Semantic이 없으면(컬렉션을 지우고 처음부터 하는 QA 흐름, 또는 다른 파일에서 복사해 온
+      // 프레임) 이전 이름 정리 기록이 남아 있어도 '처음'으로 본다 — 변수가 없으면 어차피 전부 다시 한다.
+      lastSelBound = msg.bound;
+      lastSelRenamed = msg.renamed;
+      applySelectionDone();
+      // 연결 현황 자동 읽기 — 선택이 작고(≤ AUTO_SCAN_MAX) 바인딩이 있을 때만(Tokens Studio처럼 선택 기준 표시).
+      // 큰 선택은 버튼으로(Design Lint 방식) — 선택만 바꿔도 플러그인이 버벅이면 안 된다.
+      if (!msg.selfSelect && !wizardRunning) {
+        if (msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX) send({ type: 'SCAN_BINDINGS' });
+        else if (msg.bound > 0) setStatus('applyStatus', t('bind.scanHintLarge'), '');
+      }
       refreshVariantRow(msg.comps, msg.sets);
       // 스킵 칩이 만든 선택 변경이면 미리보기를 유지한다 — 지우면 칩을 한 번 누르는 순간
       // 칩 줄과 체크해둔 후보가 통째로 사라져 두 번째 사유를 볼 수 없다.
@@ -2067,10 +2074,32 @@ window.onmessage = (event: MessageEvent) => {
         renderBindTree();
         setStatus('applyStatus', t('apply.preview', { bound: msg.bound, detail }), msg.skipped ? 'warn' : '');
       } else {
+        // 적용 결과도 목록으로 — "어느 변수가 어디에 걸렸나"를 숫자 한 줄로 끝내지 않는다.
+        // 미리보기와 같은 트리를 읽기 전용으로 그린다(체크박스·적용 버튼 없음, 사유 칩은 유지).
         clearBindPreview();
-        setStatus('applyStatus', t('apply.done', { bound: msg.bound, detail }), msg.skipped ? 'warn' : 'ok');
+        bindResultMode = true;
+        bindCandidates = msg.candidates ?? [];
+        bindNodes = msg.nodes ?? [];
+        bindSkips = msg.skips ?? [];
+        bindSkipsCapped = (msg.skipTotal ?? bindSkips.length) > bindSkips.length;
+        renderSkipReasons(msg.reasons);
+        renderBindTree();
+        const capped = (msg.candidateTotal ?? bindCandidates.length) > bindCandidates.length;
+        const capNote = capped ? t('apply.resultCapped', { shown: bindCandidates.length }) : '';
+        setStatus('applyStatus', t('apply.done', { bound: msg.bound, detail }) + capNote, msg.skipped ? 'warn' : 'ok');
         confirmBtn.style.display = 'none';
       }
+      break;
+    }
+    case 'BINDINGS_RESULT': {
+      // 연결 현황(읽기 전용) — 결과 트리와 같은 모양. 사유 칩은 없다(실행이 아니라 조회).
+      clearBindPreview();
+      bindResultMode = true;
+      bindCandidates = msg.candidates;
+      bindNodes = msg.nodes;
+      renderBindTree();
+      const capNote = msg.total > msg.candidates.length ? t('apply.resultCapped', { shown: msg.candidates.length }) : '';
+      setStatus('applyStatus', msg.total ? t('bind.scanned', { total: msg.total, nodes: msg.boundNodes }) + capNote : t('bind.scannedNone'), msg.total ? '' : 'warn');
       break;
     }
     case 'SELECT_RESULT':
@@ -2087,7 +2116,7 @@ window.onmessage = (event: MessageEvent) => {
       renderRenameResult(msg);
       break;
     case 'SEMANTICS_RESULT':
-      if (wizardRunning) break; // 마법사는 자체 단계 줄에 보고한다(setWizardStep)
+      // 마법사가 돌려도 만들기 탭의 역할 카드에 결과를 남긴다 — 탭을 열었을 때 "무슨 일이 있었나"가 보여야 한다.
       setStatus(
         semStatusTarget,
         (semStatusPrefix ? `${semStatusPrefix} · ` : '') +
@@ -2167,8 +2196,9 @@ window.onmessage = (event: MessageEvent) => {
       hasBindable = msg.hasBindable;
       hasDarkMode = msg.hasDarkMode;
       hasTextStyles = msg.hasTextStyles;
+      hasSemanticRoles = msg.hasSemanticRoles;
       updateGates();
-      renderPipeline();
+      applySelectionDone(); // renderPipeline 포함 — 변수 유무가 '처음/다시' 판정을 바꾼다
       requestGlobalRoles(); // #10: 이미 색 변수가 있는 파일이면 지난번 역할을 불러온다
       break;
     case 'LICENSE_STATUS': {
@@ -2253,6 +2283,17 @@ window.onmessage = (event: MessageEvent) => {
       varsLoaded = true;
       allVars = msg.vars;
       refreshDarkOptions();
+      // 만들기 탭이 비어 보이지 않게 — 파일에 이미 있는 변수 수를 카드 상태 줄에(목록은 다음 버전).
+      if (!tokens.length) {
+        const globals = allVars.filter((v) => v.collection === 'Global');
+        const colors = globals.filter((v) => v.name.startsWith('color/')).length;
+        const others = globals.length - colors;
+        const roles = allVars.filter((v) => v.collection === 'Semantic').length;
+        if (globals.length) {
+          setStatus('colorStatus', t('color.fileVars', { n: colors, roles }), '');
+          setStatus('createStatus', t('create.fileVars', { n: others }), '');
+        }
+      }
       break;
     }
     case 'DARK_MODE_RESULT': {
@@ -2411,7 +2452,7 @@ function baseDepth(rows: TreeRow[]): number {
 }
 
 /** 선택형 트리 1행. base는 들여쓰기 기준 depth. */
-function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: () => void): HTMLElement {
+function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: () => void, readOnly = false): HTMLElement {
   const indent = `${(r.depth - base) * 12}px`;
 
   // 손대지 않은 레이어는 '아무 일도 안 일어난 것'과 구분해서 보여 준다 — 흐린 카드 + 사유.
@@ -2449,7 +2490,7 @@ function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: (
   title.innerHTML = `<span class="${nameCls}">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change)}</span>`;
   title.title = `${r.name} → ${r.change}`;
 
-  const card = resultCard({ check: cb, title, titleMono: true, meta: r.badge?.text });
+  const card = resultCard({ ...(readOnly ? {} : { check: cb }), title, titleMono: true, meta: r.badge?.text });
   if (r.badge) {
     const meta = card.querySelector('.r-meta') as HTMLElement;
     meta.className = `tag tag-${r.badge.kind}`;
@@ -2462,7 +2503,7 @@ function renderSelectableTree(
   mount: HTMLElement,
   rows: TreeRow[],
   checked: Set<string>,
-  opts: { onChange: () => void; hideContext: boolean; hideKeep?: boolean },
+  opts: { onChange: () => void; hideContext: boolean; hideKeep?: boolean; readOnly?: boolean },
 ): void {
   const base = rows.length ? baseDepth(rows) : 0;
   // 보이는 행만(맥락 숨김 시 비영향·비헤더 제외) → §4: 대형 서브트리도 청크로 비차단 렌더.
@@ -2472,7 +2513,7 @@ function renderSelectableTree(
   );
   // 세 트리(#bindTree·#diff·#compTree)가 모두 이 호출부를 지난다 — 어느 목록인지는 마운트 id가
   // 말해 주므로 스냅·개수 줄 재계산도 여기 한 줄로 끝난다(행 0건이면 테두리·줄을 걷는다).
-  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
+  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange, opts.readOnly));
 }
 
 /* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
@@ -2554,8 +2595,10 @@ function candKey(c: { nodeId: string; field: string; index?: number }): string {
 }
 
 /** 미리보기 후보를 트리에 표시 가능 여부. */
+/** 트리가 '적용 결과'(읽기 전용)인지 — 미리보기(체크·적용 버튼)와 같은 행을 쓰되 체크박스를 숨긴다. */
+let bindResultMode = false;
 function hasBindPreview(): boolean {
-  return bindCandidates.length > 0;
+  return bindCandidates.length > 0 && !bindResultMode;
 }
 
 /** 건너뛴 레이어의 사유 요약 — '너비 · HUG/FILL'처럼 속성이 있으면 앞에 붙인다. */
@@ -2567,7 +2610,7 @@ function skipReasonText(s: BindSkip): string {
 /** code의 후보/노드를 트리 행으로: 노드 헤더 + 후보(체크) 행 + 건너뛴 레이어(흐림). */
 function bindRows(): TreeRow[] {
   const byNode = new Map<string, BindCandidate[]>();
-  for (const c of bindCandidates) {
+  for (const c of filteredCandidates()) {
     const arr = byNode.get(c.nodeId);
     if (arr) arr.push(c);
     else byNode.set(c.nodeId, [c]);
@@ -2606,14 +2649,78 @@ function bindRows(): TreeRow[] {
   return rows;
 }
 
+/** 보기 축 — 'layer'(캔버스 순서 트리) / 'variable'(변수 행 + 레이어 수, 관리용). */
+let bindView: 'layer' | 'variable' = 'layer';
+
 function renderBindTree(): void {
+  const has = bindCandidates.length > 0;
+  ($('bindViewRow') as HTMLElement).style.display = has ? '' : 'none';
+  if (has && bindView === 'variable') {
+    ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
+    renderBindByVariable();
+    updateBindApply();
+    return;
+  }
   ($('bindTreeCtrls') as HTMLElement).style.display = hasBindPreview() ? '' : 'none';
   renderSelectableTree($('bindTree'), bindRows(), bindChecked, {
     hideContext: bindHideContext,
     onChange: updateBindApply,
+    readOnly: bindResultMode, // 적용 결과: 어느 레이어에 어느 변수가 붙었는지 보기만
   });
   updateBindApply();
 }
+
+/**
+ * 변수별 보기 — Tokens Studio Inspect와 같은 축: 속성 그룹 → 변수 행(`변수명 · 레이어 N · 선택`).
+ * '선택'은 그 변수가 붙은 레이어를 캔버스에서 고른다. 미리보기(후보)·적용 결과 모두 같은 데이터.
+ */
+/** 변수 이름 필터(소문자 부분 일치). 비어 있으면 전부. */
+function bindFilterText(): string {
+  return (($('bindFilter') as HTMLInputElement).value ?? '').trim().toLowerCase();
+}
+function filteredCandidates(): BindCandidate[] {
+  const q = bindFilterText();
+  return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
+}
+
+function renderBindByVariable(): void {
+  const mount = $('bindTree');
+  clearMount(mount);
+  // 속성 → 변수 → 레이어 id 집합
+  const groups = new Map<string, Map<string, { name: string; ids: Set<string> }>>();
+  for (const c of filteredCandidates()) {
+    const prop = c.field === 'fills' || c.field === 'strokes' || c.field === 'effects' ? c.field : /Radius$/.test(c.field) ? 'radius' : /^padding|Spacing$|Gap$/.test(c.field) ? 'spacing' : c.field;
+    if (!groups.has(prop)) groups.set(prop, new Map());
+    const byVar = groups.get(prop)!;
+    const row = byVar.get(c.variableId) ?? { name: c.variableName, ids: new Set<string>() };
+    row.ids.add(c.nodeId);
+    byVar.set(c.variableId, row);
+  }
+  const props = [...groups.keys()].sort();
+  for (const prop of props) {
+    mount.appendChild(resultGroup(prop));
+    const rows = [...groups.get(prop)!.values()].sort((a, b) => b.ids.size - a.ids.size || a.name.localeCompare(b.name));
+    for (const r of rows) {
+      const ids = [...r.ids];
+      const sel = document.createElement('button');
+      sel.className = 'link';
+      sel.textContent = t('bind.varSelect');
+      sel.title = t('bind.varLayers', { n: ids.length });
+      sel.addEventListener('click', () => selectNodes(ids, 'applyStatus'));
+      const card = resultCard({ title: r.name, titleMono: true, summary: t('bind.varLayers', { n: ids.length }), metaEl: sel });
+      mount.appendChild(card);
+    }
+  }
+}
+
+$('bindFilter').addEventListener('input', () => renderBindTree());
+document.querySelectorAll<HTMLInputElement>('input[name="bindView"]').forEach((radio) => {
+  radio.addEventListener('change', () => {
+    if (!radio.checked) return;
+    bindView = radio.value === 'variable' ? 'variable' : 'layer';
+    renderBindTree();
+  });
+});
 
 /** 선택에 바인딩 버튼 활성/라벨 + 전체선택 마스터 동기화. */
 function updateBindApply(): void {
@@ -2622,7 +2729,7 @@ function updateBindApply(): void {
   // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
   // 이 트리는 노드 헤더도 한 행이라 목록 아래 ‘총 n개’(행 수)와 수가 다르다 → 세는 단위를
   // ‘건’으로 구분해(상태 문구 ‘바인딩 n건 후보’와 같은 말) 같은 수의 오기로 읽히지 않게 한다.
-  $('bindCount').textContent = total ? `후보 ${total}` : '';
+  $('bindCount').textContent = total ? (bindResultMode ? `연결 ${total}` : `후보 ${total}`) : '';
   const confirm = $('btnApplyConfirm') as HTMLButtonElement;
   confirm.style.display = hasBindPreview() ? '' : 'none';
   confirm.disabled = sel === 0;
@@ -2635,6 +2742,7 @@ function updateBindApply(): void {
 
 /** 바인딩 미리보기/적용 상태를 초기화(선택 변경·적용 완료 시). */
 function clearBindPreview(): void {
+  bindResultMode = false;
   bindCandidates = [];
   bindNodes = [];
   bindSkips = [];
@@ -2646,6 +2754,7 @@ function clearBindPreview(): void {
   clearMount($('bindTree'));
   $('bindCount').textContent = '';
   ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
+  ($('bindViewRow') as HTMLElement).style.display = 'none';
   ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
 }
 
@@ -2983,6 +3092,7 @@ function applyCardChrome(): void {
 const STRUCTURE_TIPS: Record<string, string> = {
   btnScanComp: 'component.scanHelp',
   btnScanSimilar: 'similar.scanHelp',
+  btnScanBindings: 'bind.scanHelp',
   btnClassifyVariants: 'component.classifyHelp',
   btnGenMissing: 'component.genMissingHelp',
   btnRegisterComp: 'component.registerHelp',
