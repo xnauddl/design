@@ -2148,6 +2148,14 @@ test('renameSelection — 헤더 안 logo/nav/actions + 본문 첫 블록 hero (
           children: [{ type: 'ELLIPSE', id: 'dot', name: 'Ellipse 1', width: 4, height: 4 }] },
         { type: 'FRAME', id: 'nav', name: 'Frame 7', layoutMode: 'HORIZONTAL', width: 300, height: 20,
           children: [txt('n1', 'About'), txt('n2', 'Services'), txt('n3', 'Offers')] },
+        // QA#1 불합격: header > row > container(H) > 첫 자식 — 깊은 중첩의 첫 자리는 logo가 아니다.
+        { type: 'FRAME', id: 'util', name: 'Frame 10', layoutMode: 'HORIZONTAL', width: 200, height: 20,
+          children: [
+            { type: 'FRAME', id: 'sup', name: 'Frame 11', layoutMode: 'HORIZONTAL', width: 60, height: 20,
+              children: [txt('s1', 'Support'), { type: 'VECTOR', id: 'sv', name: 'Vector 3', width: 8, height: 8 }] },
+            { type: 'FRAME', id: 'lang', name: 'Frame 12', layoutMode: 'HORIZONTAL', width: 80, height: 20,
+              children: [{ type: 'VECTOR', id: 'lv', name: 'Vector 4', width: 8, height: 8 }, txt('l1', 'Language')] },
+          ] },
         { type: 'FRAME', id: 'act', name: 'Frame 8', layoutMode: 'HORIZONTAL', width: 144, height: 20,
           children: [txt('a1', 'Sign In'), txt('a2', 'Sign Up')] },
       ],
@@ -2164,6 +2172,10 @@ test('renameSelection — 헤더 안 logo/nav/actions + 본문 첫 블록 hero (
   assert.equal(after.get('logo'), 'header-logo'); // 헤더 첫 자리의 작은 묶음
   assert.equal(after.get('nav'), 'header-nav'); // 헤더 안이면 깊이 3이어도 nav
   assert.equal(after.get('act'), 'header-actions'); // 마지막 자리의 텍스트 2개
+  // 중첩 컨테이너(ctxDepth 2)의 첫·끝 자리는 logo/actions가 아니라 일반 구조어로 남는다.
+  for (const id of ['util', 'sup', 'lang']) {
+    assert.ok(['container', 'wrapper'].includes(after.get(id)), `${id} → ${after.get(id)}`);
+  }
   assert.equal(after.get('hero'), 'hero'); // 본문 첫 블록
   assert.equal(after.get('s2'), 'section');
   assert.equal(after.get('ft'), 'footer');

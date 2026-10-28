@@ -2113,13 +2113,13 @@
   async function renameSelection(selection2, opts) {
     const col = { changes: [], nodes: [] };
     const safeOpts = __spreadProps(__spreadValues({}, opts), { maxDepth: normalizeMaxDepth(opts.maxDepth) });
-    await recurse(selection2, null, safeOpts, col, 0, null, null, null, null);
+    await recurse(selection2, null, safeOpts, col, 0, null, null, null, null, 0);
     return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
   }
   function normalizeMaxDepth(v) {
     return Number.isFinite(v) ? Math.max(1, Math.round(v)) : 8;
   }
-  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentRole, parentDims) {
+  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentRole, parentDims, ctxDepth) {
     var _a, _b;
     const total = nodes.length;
     const slotOf = /* @__PURE__ */ new Map();
@@ -2145,10 +2145,12 @@
         regionTotal: slots,
         isOverlay: i === overlayAt,
         afterOverlay: overlayAt >= 0 && i > overlayAt,
-        hasAvatarSibling
+        hasAvatarSibling,
+        ctxDepth
       };
       const decided = await decide(node, ancestorName, pos, opts, parentRole);
       let contextForChildren = before;
+      let ctxDepthForChildren = 0;
       let after;
       if (!decided.skip && decided.name) {
         if (decided.name !== before) {
@@ -2158,11 +2160,12 @@
         }
         if (opts.apply && decided.role) writeRole(node, decided.role);
         contextForChildren = decided.passthrough ? ancestorName : decided.name;
+        if (decided.passthrough) ctxDepthForChildren = ctxDepth + 1;
       }
       col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role });
       if ("children" in node && !isSkippedSubtree(node)) {
         const childDims = decided.passthrough ? parentDims : dims(node);
-        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_b = decided.role) != null ? _b : null, childDims);
+        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_b = decided.role) != null ? _b : null, childDims, ctxDepthForChildren);
       }
     }
   }
@@ -2503,7 +2506,7 @@
     return kids.every((k) => k.type === "TEXT" || k.type === "FRAME" && hasDirectText(k));
   }
   function isLogoLike(node, pos, ctxScope) {
-    if (ctxScope !== "header") return false;
+    if (ctxScope !== "header" || pos.ctxDepth > 1) return false;
     if (!isContainerType(node) || !("children" in node) || node.children.length === 0) return false;
     if (pos.index !== 0 || pos.parentLayout === "vertical") return false;
     const d = dims(node);
@@ -2511,7 +2514,7 @@
     return true;
   }
   function isActionsLike(node, pos, ctxScope) {
-    if (ctxScope !== "header") return false;
+    if (ctxScope !== "header" || pos.ctxDepth > 1) return false;
     if (node.type !== "FRAME" || layoutOf(node) !== "horizontal") return false;
     if (pos.total < 2 || pos.index !== pos.total - 1) return false;
     const kids = node.children;

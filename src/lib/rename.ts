@@ -49,6 +49,11 @@ interface Pos {
   afterOverlay: boolean;
   /** 형제 중 아바타(이미지 원)가 있는지(작은 점 → status). */
   hasAvatarSibling: boolean;
+  /**
+   * 맥락을 정한 조상으로부터의 거리 — 그 조상의 직계 자식 = 0, passthrough 한 단계마다 +1.
+   * 이름(node.parent.name)이 아니라 ctx 체인으로 센다: 미리보기에선 부모 이름이 아직 안 바뀐다.
+   */
+  ctxDepth: number;
 }
 
 interface Opts {
@@ -75,7 +80,7 @@ export async function renameSelection(
 ): Promise<RenameOutcome> {
   const col: Collect = { changes: [], nodes: [] };
   const safeOpts: Opts = { ...opts, maxDepth: normalizeMaxDepth(opts.maxDepth) };
-  await recurse(selection, null, safeOpts, col, 0, null, null, null, null);
+  await recurse(selection, null, safeOpts, col, 0, null, null, null, null, 0);
   return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
 }
 
@@ -93,6 +98,7 @@ async function recurse(
   parentId: string | null,
   parentRole: string | null,
   parentDims: { w: number; h: number } | null,
+  ctxDepth: number,
 ): Promise<void> {
   const total = nodes.length;
   // 랜드마크 슬롯 — 실제로 리네임 대상이 되는 "보이는 컨테이너"만 센다.
@@ -117,9 +123,11 @@ async function recurse(
       isOverlay: i === overlayAt,
       afterOverlay: overlayAt >= 0 && i > overlayAt,
       hasAvatarSibling,
+      ctxDepth,
     };
     const decided = await decide(node, ancestorName, pos, opts, parentRole);
     let contextForChildren: string | null = before;
+    let ctxDepthForChildren = 0;
     let after: string | undefined;
 
     if (!decided.skip && decided.name) {
@@ -134,6 +142,7 @@ async function recurse(
       if (opts.apply && decided.role) writeRole(node, decided.role);
       // 맥락: 일반 레이아웃(passthrough)은 받은 맥락을 그대로 통과, 그 외엔 내 새 이름.
       contextForChildren = decided.passthrough ? ancestorName : decided.name;
+      if (decided.passthrough) ctxDepthForChildren = ctxDepth + 1;
     }
 
     // 영향 여부와 무관하게 트리에 담는다(전체 서브트리 + 영향 노드 강조).
@@ -145,7 +154,7 @@ async function recurse(
       // 자식 역할은 부모에게 "실제로 부여된" 역할에서만 파생한다(구조 재판정 금지) —
       // 그래야 nav처럼 list를 앞지르는 역할이 붙었을 때 자식이 엉뚱하게 item이 되지 않는다.
       const childDims = decided.passthrough ? parentDims : dims(node);
-      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, decided.role ?? null, childDims);
+      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, decided.role ?? null, childDims, ctxDepthForChildren);
     }
   }
 }
@@ -661,9 +670,12 @@ function isNavLike(node: SceneNode, depth: number, ctxScope: string | null = nul
   return kids.every((k) => k.type === 'TEXT' || (k.type === 'FRAME' && hasDirectText(k)));
 }
 
-/** 헤더 맥락의 가로(또는 자유 배치) 행에서 **첫 자리**의 작은 묶음 → logo(마크·워드마크). */
+/**
+ * 헤더 맥락의 가로(또는 자유 배치) 행에서 **첫 자리**의 작은 묶음 → logo(마크·워드마크).
+ * header > logo, header > row > logo 까지만(ctxDepth ≤ 1) — 더 깊은 중첩 컨테이너의 첫 자식은 아니다.
+ */
 function isLogoLike(node: SceneNode, pos: Pos, ctxScope: string | null): boolean {
-  if (ctxScope !== 'header') return false;
+  if (ctxScope !== 'header' || pos.ctxDepth > 1) return false;
   if (!isContainerType(node) || !('children' in node) || node.children.length === 0) return false;
   if (pos.index !== 0 || pos.parentLayout === 'vertical') return false;
   const d = dims(node);
@@ -671,9 +683,9 @@ function isLogoLike(node: SceneNode, pos: Pos, ctxScope: string | null): boolean
   return true;
 }
 
-/** 헤더 맥락의 가로 행에서 **마지막 자리**의 텍스트·버튼 2~3개 → actions(Sign in · Sign up). */
+/** 헤더 맥락의 가로 행에서 **마지막 자리**의 텍스트·버튼 2~3개 → actions(Sign in · Sign up). 깊이 제한은 logo와 같다. */
 function isActionsLike(node: SceneNode, pos: Pos, ctxScope: string | null): boolean {
-  if (ctxScope !== 'header') return false;
+  if (ctxScope !== 'header' || pos.ctxDepth > 1) return false;
   if (node.type !== 'FRAME' || layoutOf(node) !== 'horizontal') return false;
   if (pos.total < 2 || pos.index !== pos.total - 1) return false;
   const kids = node.children;
