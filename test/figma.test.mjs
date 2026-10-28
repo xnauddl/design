@@ -2109,6 +2109,66 @@ test('renameSelection — 영역 추론: 페이지 세로 스택의 첫=header, 
   assert.equal(after.get('fi'), 'footer-icon');
 });
 
+test('renameSelection — 영역 추론: [header, 본문] 2분할에서 키 큰 블록은 footer가 아니라 main, 그 자식은 section/footer', async () => {
+  installFigma();
+  // Flightin QA 파일 형태: 1440x4970 페이지 = header 80px + 본문 4890px(섹션 4 + 진짜 푸터).
+  const sec = (id, h) => ({ type: 'FRAME', id, name: `Frame ${id}`, layoutMode: 'VERTICAL', width: 1440, height: h,
+    children: [{ type: 'VECTOR', id: `${id}-v`, name: 'Vector' }] });
+  const body = {
+    type: 'FRAME', id: 'body', name: 'Frame 9', layoutMode: 'VERTICAL', width: 1440, height: 4890,
+    children: [sec('hero', 700), sec('s2', 900), sec('s3', 900), sec('s4', 900), sec('ft', 312)],
+  };
+  const page = {
+    type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'VERTICAL', width: 1440, height: 4970,
+    children: [
+      { type: 'FRAME', id: 'hd', name: 'Frame 2', width: 1440, height: 80, children: [{ type: 'VECTOR', id: 'hi', name: 'Vector 1' }] },
+      body,
+    ],
+  };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 4 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('hd'), 'header');
+  assert.equal(after.get('body'), 'main'); // 페이지 높이 98% → footer 아님
+  assert.equal(after.get('hero'), 'hero'); // 본문 첫 블록은 header가 아니라 hero
+  assert.equal(after.get('s2'), 'section');
+  assert.equal(after.get('ft'), 'footer'); // 본문 마지막 작은 블록 = 진짜 푸터
+  assert.equal(after.get('ft-v'), 'footer-icon');
+  assert.equal(after.get('hero-v'), 'hero-icon'); // hero는 역할 어휘라 맥락으로 번진다(section은 일반 구조어라 안 번짐)
+});
+
+test('renameSelection — 헤더 안 logo/nav/actions + 본문 첫 블록 hero (Flightin 헤더 형태)', async () => {
+  installFigma();
+  const txt = (id, ch) => ({ type: 'TEXT', id, name: ch, characters: ch, width: 50, height: 20 });
+  const header = {
+    type: 'FRAME', id: 'hd', name: 'Frame 2', layoutMode: 'VERTICAL', width: 1440, height: 80,
+    children: [{
+      type: 'FRAME', id: 'row', name: 'Frame 5', layoutMode: 'NONE', width: 1240, height: 20, // 자유 배치 행
+      children: [
+        { type: 'FRAME', id: 'logo', name: 'Frame 6', layoutMode: 'GRID', width: 20, height: 20,
+          children: [{ type: 'ELLIPSE', id: 'dot', name: 'Ellipse 1', width: 4, height: 4 }] },
+        { type: 'FRAME', id: 'nav', name: 'Frame 7', layoutMode: 'HORIZONTAL', width: 300, height: 20,
+          children: [txt('n1', 'About'), txt('n2', 'Services'), txt('n3', 'Offers')] },
+        { type: 'FRAME', id: 'act', name: 'Frame 8', layoutMode: 'HORIZONTAL', width: 144, height: 20,
+          children: [txt('a1', 'Sign In'), txt('a2', 'Sign Up')] },
+      ],
+    }],
+  };
+  const sec = (id, h) => ({ type: 'FRAME', id, name: `Frame ${id}`, layoutMode: 'VERTICAL', width: 1440, height: h,
+    children: [{ type: 'VECTOR', id: `${id}-v`, name: 'Vector' }] });
+  const body = { type: 'FRAME', id: 'body', name: 'Frame 9', layoutMode: 'VERTICAL', width: 1440, height: 4890,
+    children: [sec('hero', 700), sec('s2', 900), sec('ft', 312)] };
+  const page = { type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'VERTICAL', width: 1440, height: 4970, children: [header, body] };
+  const { changes } = await renameSelection([page], { apply: true, maxDepth: 5 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('hd'), 'header');
+  assert.equal(after.get('logo'), 'header-logo'); // 헤더 첫 자리의 작은 묶음
+  assert.equal(after.get('nav'), 'header-nav'); // 헤더 안이면 깊이 3이어도 nav
+  assert.equal(after.get('act'), 'header-actions'); // 마지막 자리의 텍스트 2개
+  assert.equal(after.get('hero'), 'hero'); // 본문 첫 블록
+  assert.equal(after.get('s2'), 'section');
+  assert.equal(after.get('ft'), 'footer');
+});
+
 test('renameSelection — 버튼 추론: 오토레이아웃+라운드+채움+텍스트 → button', async () => {
   installFigma();
   const btn = {

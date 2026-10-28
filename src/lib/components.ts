@@ -1194,12 +1194,24 @@ function exactNameKey(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+/**
+ * 이름만으로는 "같은 것"이라고 볼 수 없는 일반 구조어 — 리네임이 역할 없는 프레임에 붙이는 이름들.
+ * 마법사는 리네임 **다음에** 컴포넌트 등록을 돌리므로, 이걸 빼지 않으면 페이지의 모든 `container`가
+ * 한 세트가 되고 인스턴스 교체로 서로 다른 섹션이 한 내용(마스터)으로 덮인다(QA 파일에서 실제 발생:
+ * 히어로 이미지가 바뀌고 카드 3종이 "Book & relax" 하나로 통일됨).
+ */
+export const GENERIC_GROUP_NAMES: ReadonlySet<string> = new Set([
+  'container', 'wrapper', 'content', 'frame', 'group', 'section', 'main', 'header', 'footer', 'nav', 'aside',
+  'item', 'list', 'image', 'icon', 'background', 'border', 'shape', 'text', 'divider', 'swatch', 'figure',
+]);
+
 export function groupByExactName(children: readonly StructNode[]): StructGroup[] {
   const map = new Map<string, StructNode[]>();
   const order: string[] = [];
   for (const c of children) {
     const k = exactNameKey(c.name);
     if (!k) continue; // 빈 이름 제외
+    if (GENERIC_GROUP_NAMES.has(k)) continue; // 일반 구조어는 이름이 같아도 같은 컴포넌트가 아니다
     if (!map.has(k)) {
       map.set(k, []);
       order.push(k);

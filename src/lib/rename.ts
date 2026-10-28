@@ -35,6 +35,8 @@ interface Pos {
   depth: number;
   /** 가로 부모에서 형제 최대폭 대비 비율(aside 판정용). 세로/없음이면 null. */
   widthFrac: number | null;
+  /** 부모 높이 대비 비율 — 페이지의 절반을 넘는 블록은 header/footer가 아니라 본문(main)이다. */
+  heightFrac: number | null;
   /** 부모 치수(풀블리드·면적비 판정용). 알 수 없으면 null. */
   parentDims: { w: number; h: number } | null;
   /** 랜드마크 슬롯 번호 — 보이는 컨테이너 형제만 센 순번(대상 아니면 -1). */
@@ -105,10 +107,11 @@ async function recurse(
     const node = nodes[i];
     const before = node.name; // apply 시 node.name이 바뀌므로 먼저 캡처
     // 좁은 컬럼(aside) 비율은 형제 최대폭이 아니라 부모 폭 대비로 잰다.
-    const w = dims(node)?.w;
-    const widthFrac = w != null && parentDims && parentDims.w > 0 ? w / parentDims.w : null;
+    const d = dims(node);
+    const widthFrac = d != null && parentDims && parentDims.w > 0 ? d.w / parentDims.w : null;
+    const heightFrac = d != null && parentDims && parentDims.h > 0 ? d.h / parentDims.h : null;
     const pos: Pos = {
-      index: i, total, parentLayout, depth, widthFrac, parentDims,
+      index: i, total, parentLayout, depth, widthFrac, heightFrac, parentDims,
       regionIndex: slotOf.get(i) ?? -1,
       regionTotal: slots,
       isOverlay: i === overlayAt,
@@ -219,6 +222,9 @@ export function writeRoleFromName(node: SceneNode, name: string): boolean {
 
 /** 역할 없는 순수 레이아웃 폴백 — 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과. */
 const PASSTHROUGH_ROLES = new Set(['container', 'wrapper']);
+/** 페인트(채움·선)에서 온 색 역할 — 자식 있는 컨테이너의 구조 역할을 덮지 못한다. */
+const PAINT_ROLES = new Set(['background', 'border', 'surface']);
+const hasChildren = (node: SceneNode): boolean => 'children' in node && node.children.length > 0;
 
 /* ---------- 역할 판정: 전역 고우선 → 토큰 신호 → 컨테이너 시맨틱/랜드마크 → 타입/기하 ---------- */
 function resolveRole(
@@ -236,10 +242,16 @@ function resolveRole(
   // 입력은 field 맥락에서만 인정 — 맥락 없이는 아웃라인 버튼과 구분되지 않는다.
   if (ctxScope === 'field' && isInputBox(node)) return 'input';
   if (isButtonLike(node)) return isChipLike(node) ? 'chip' : 'button'; // 버튼은 토큰 채움색보다 우선
-  if (isNavLike(node, pos.depth)) return 'nav'; // HTML 랜드마크: 페이지 수준 가로 링크행
+  if (isNavLike(node, pos.depth, ctxScope)) return 'nav'; // HTML 랜드마크: 페이지 수준·헤더 안 가로 링크행
+  if (isLogoLike(node, pos, ctxScope)) return 'logo'; // 헤더 첫 자리의 작은 묶음
+  if (isActionsLike(node, pos, ctxScope)) return 'actions'; // 헤더 끝의 링크·버튼 2~3개
   if (isStatusDot(node, pos)) return 'status'; // 아바타 곁의 작은 점(온라인 표시 등)
   if (isThumbnail(node, pos, ctxScope)) return 'thumbnail'; // 카드/항목 맥락의 작은 미리보기
-  if (token?.roleLeaf) return token.roleLeaf; // 토큰 말단이 역할이면 신호로 사용
+  // 토큰 말단이 역할이면 신호로 사용 — 단, 자식이 있는 컨테이너에는 **색 역할**(background/border)을
+  // 그대로 쓰지 않는다. 역할 별칭이 바인딩에서 거울을 이기게 되면서 페이지 본문 프레임의 채움이
+  // `surface`(→background)에 붙고, 그 한 줄이 랜드마크 판정(main/section)을 덮어 본문이
+  // `website-background`가 됐다. 컨테이너의 채움색은 그 안의 구조를 말해 주지 않는다.
+  if (token?.roleLeaf && !(hasChildren(node) && PAINT_ROLES.has(token.roleLeaf))) return token.roleLeaf;
 
   switch (node.type) {
     case 'VECTOR':
@@ -266,7 +278,7 @@ function resolveRole(
         if (hasImageFill(node)) return 'image';
         if (hasColorFill(node)) return 'swatch';
         // 빈 컨테이너도 페이지 랜드마크 자리는 차지한다(자리표시 섹션).
-        const emptyRegion = regionRole(node, pos, ctxScope);
+        const emptyRegion = regionRole(node, pos, ctxScope, parentRole);
         if (emptyRegion) return emptyRegion;
         return 'container';
       }
@@ -281,7 +293,9 @@ function resolveRole(
       if (isListLike(node, kids)) return 'list';
       // 리스트·네비의 직속 컨테이너 자식 → item(= list-item / nav-item)
       if (parentRole === 'list' || parentRole === 'nav') return 'item';
-      const region = regionRole(node, pos, ctxScope); // HTML 랜드마크: header/footer/main/aside
+      // 본문(main)의 첫 블록은 히어로 — section보다 구체적이고, header로 오인하지 않는다.
+      if (parentRole === 'main' && pos.regionIndex === 0 && pos.parentLayout === 'vertical') return 'hero';
+      const region = regionRole(node, pos, ctxScope, parentRole); // HTML 랜드마크: header/footer/main/aside
       if (region) return region;
       if (isPageSection(pos, ctxScope)) return 'section'; // 역할 없는 페이지 중간 블록
       return kids.length === 1 ? 'wrapper' : 'container';
@@ -444,6 +458,12 @@ function isPageParent(pos: Pos, ctxScope: string | null): boolean {
   if (ctxScope && isKnownRole(ctxScope)) return false;
   const p = pos.parentDims;
   if (!p || p.w <= 0 || p.h <= 0) return true; // 치수 미상 → 이름 판정에만 의존
+  return isPageSized(p);
+}
+
+/** 치수만으로 "화면"인가 — 좁으면 세로 모바일 화면(≥700·세로형), 넓으면 화면 높이(≥800). */
+function isPageSized(p: { w: number; h: number } | null): boolean {
+  if (!p || p.w <= 0 || p.h <= 0) return false;
   // 좁은 프레임: 시트/드로어/다이얼로그 vs 세로 모바일 화면
   if (p.w < 768) return p.h >= 700 && p.h >= p.w;
   // 데스크톱·태블릿 폭: 납작한 히어로·패널은 배제, 화면 크롬만 통과
@@ -457,8 +477,11 @@ function isPageParent(pos: Pos, ctxScope: string | null): boolean {
  * - 가로: 페이지 수준 스플릿에서 부모 폭 대비 ≤35%인 좁은 컬럼 → aside
  * - 세로: 첫 → header, 마지막 → footer, 정확히 3분할이면 가운데 → main
  */
-function regionRole(node: SceneNode, pos: Pos, ctxScope: string | null): string | null {
-  if (pos.depth !== 1 || !isContainerType(node)) return null;
+function regionRole(node: SceneNode, pos: Pos, ctxScope: string | null, parentRole: string | null): string | null {
+  // 본문(main) 바로 아래도 페이지 수준이다 — 페이지가 [header, 본문] 둘로만 나뉜 파일에서
+  // 본문의 자식들이 실제 섹션·푸터인데, depth 1만 보면 전부 container로 남는다.
+  const underMain = parentRole === 'main';
+  if ((pos.depth !== 1 && !underMain) || !isContainerType(node)) return null;
   if (pos.regionIndex < 0) return null;
   if (pos.parentLayout === 'horizontal') {
     if (!isPageParent(pos, ctxScope)) return null; // 카드·패널 안 좁은 열은 aside 아님
@@ -467,8 +490,12 @@ function regionRole(node: SceneNode, pos: Pos, ctxScope: string | null): string 
   }
   if (pos.parentLayout !== 'vertical' || pos.regionTotal < 2) return null;
   if (!isPageParent(pos, ctxScope)) return null; // 히어로·카드·시트 안에는 header/footer가 없다
-  if (pos.regionIndex === 0) return 'header';
-  if (pos.regionIndex === pos.regionTotal - 1) return 'footer';
+  // 페이지 높이의 절반을 넘는 블록은 머리/꼬리가 아니라 본문이다 — [header 80px, 본문 4890px]
+  // 같은 2분할에서 본문이 footer가 되고, 그 안의 히어로·기사 목록까지 footer-* 접두사를 받았다.
+  const tall = pos.heightFrac != null && pos.heightFrac > 0.5;
+  if (pos.regionIndex === 0 && !underMain) return tall ? 'main' : 'header';
+  if (pos.regionIndex === pos.regionTotal - 1) return tall ? 'main' : 'footer';
+  if (underMain) return 'section'; // 본문의 중간 블록(첫 블록은 히어로일 뿐 header가 아니다)
   if (pos.regionTotal === 3) return 'main'; // 가운데(0·마지막은 위에서 처리됨)
   return null;
 }
@@ -621,16 +648,39 @@ function isInputBox(node: SceneNode): boolean {
  * depth 제한과 버튼 크롬 제외가 없으면 카드 안 통계 행·테이블 헤더·세그먼트 라벨이
  * 전부 nav 랜드마크로 덮인다.
  */
-function isNavLike(node: SceneNode, depth: number): boolean {
+function isNavLike(node: SceneNode, depth: number, ctxScope: string | null = null): boolean {
   if (node.type !== 'FRAME') return false;
   if (layoutOf(node) !== 'horizontal') return false;
-  if (depth > 1) return false; // 페이지 수준 링크 행만
+  // 페이지 수준 링크 행, 또는 헤더 안이면 깊이 무관(헤더 > container > 링크행이 흔하다).
+  if (depth > 1 && ctxScope !== 'header') return false;
   if (cornerRadiusOf(node) > 0 && (hasVisibleFill(node) || hasVisibleStroke(node))) return false; // 버튼 크롬
   const kids = node.children;
   if (kids.length < 3) return false;
   const d = dims(node);
   if (d && d.h > 80) return false; // 너무 크면 nav 아님(카드/섹션 행)
   return kids.every((k) => k.type === 'TEXT' || (k.type === 'FRAME' && hasDirectText(k)));
+}
+
+/** 헤더 맥락의 가로(또는 자유 배치) 행에서 **첫 자리**의 작은 묶음 → logo(마크·워드마크). */
+function isLogoLike(node: SceneNode, pos: Pos, ctxScope: string | null): boolean {
+  if (ctxScope !== 'header') return false;
+  if (!isContainerType(node) || !('children' in node) || node.children.length === 0) return false;
+  if (pos.index !== 0 || pos.parentLayout === 'vertical') return false;
+  const d = dims(node);
+  if (!d || d.h > 80 || d.w > 320) return false; // 헤더 높이 안의 작은 묶음만
+  return true;
+}
+
+/** 헤더 맥락의 가로 행에서 **마지막 자리**의 텍스트·버튼 2~3개 → actions(Sign in · Sign up). */
+function isActionsLike(node: SceneNode, pos: Pos, ctxScope: string | null): boolean {
+  if (ctxScope !== 'header') return false;
+  if (node.type !== 'FRAME' || layoutOf(node) !== 'horizontal') return false;
+  if (pos.total < 2 || pos.index !== pos.total - 1) return false;
+  const kids = node.children;
+  if (kids.length < 2 || kids.length > 3) return false;
+  const d = dims(node);
+  if (d && d.h > 80) return false;
+  return kids.every((k) => k.type === 'TEXT' || (k.type === 'FRAME' && (isButtonLike(k) || hasDirectText(k))));
 }
 
 /** 피겨: 이미지(채움) 자식 + 캡션(텍스트)으로 이뤄진 프레임 — 카드 크롬이 없을 때만(카드 우선). */

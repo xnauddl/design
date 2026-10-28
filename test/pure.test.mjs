@@ -1440,6 +1440,12 @@ test('groupByExactName — 정확한 이름끼리만 묶음(머리명사 병합 
   assert.deepEqual(groups[1].members.map((m) => m.id), ['c']); // artist-button 단독
 });
 
+test('groupByExactName — 일반 구조어(container/item/image…)는 이름이 같아도 묶지 않는다', () => {
+  const mk = (id, name) => ({ id, name, type: 'FRAME', children: [] });
+  const groups = groupByExactName([mk('a', 'container'), mk('b', 'container'), mk('c', 'item'), mk('d', 'card'), mk('e', 'card')]);
+  assert.deepEqual(groups.map((g) => [g.key, g.members.map((m) => m.id)]), [['card', ['d', 'e']]]);
+});
+
 test('groupByExactName — 명사 사전에 없는 이름도 묶음(row-container/preview-container)', () => {
   const mk = (id, name) => ({ id, name, type: 'FRAME', width: 280, height: 397, children: [] });
   const groups = groupByExactName([
