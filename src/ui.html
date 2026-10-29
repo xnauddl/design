@@ -116,19 +116,20 @@
       cursor: pointer; transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
       white-space: nowrap;
     }
-    button:hover { background: var(--surface-2); border-color: var(--border-2); }
-    button:active { background: var(--surface-hover); }
+    /* hover/active는 누를 수 있는 버튼에만 — 비활성 버튼에 얹으면 primary의 파란 배경을 흰색으로
+       덮어써 흰 글씨가 사라진다(실행 중 잠긴 「전체 실행」이 그랬다). */
+    button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-2); }
+    button:active:not(:disabled) { background: var(--surface-hover); }
     button.primary {
       background: var(--accent); color: var(--on-accent); border-color: var(--accent);
       box-shadow: var(--shadow-sm);
     }
-    button.primary:hover  { background: var(--accent-hover); border-color: var(--accent-hover); }
-    button.primary:active { background: var(--accent-press); border-color: var(--accent-press); }
+    button.primary:hover:not(:disabled)  { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button.primary:active:not(:disabled) { background: var(--accent-press); border-color: var(--accent-press); }
     button:focus-visible {
       outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
     }
     button:disabled { opacity: .42; cursor: default; box-shadow: none; }
-    button:disabled:hover { background: var(--surface); border-color: var(--border-2); }
     button.link {
       border: none; background: none; padding: 0; width: auto;
       color: var(--accent-strong); cursor: pointer; font: inherit; font-weight: 600;
@@ -387,7 +388,6 @@
     #colorSection > * + * { margin-top: 6px; }
     .tidy { border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
     .tidy-note { display: flex; align-items: center; gap: 8px; }
-    .tidy-note #tidySumText { flex: 1 1 auto; font-weight: 600; }
 
     /* ── diff / 선택형 미리보기 트리 ── */
     /* 긴 이름은 nowrap이라 가로로 넘친다 — 가로만 스크롤시킨다(세로는 패널 body). */
@@ -412,7 +412,15 @@
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
 
-    /* ── 리사이즈 핸들(우하단) ── */
+    /* ── 창 높이 전환(QA #2 ①) — 탭 바 오른쪽 끝, 드래그 대신 버튼(#14) ── */
+    .tab-size {
+      flex: 0 0 28px; padding: 6px 0; border: none; background: transparent;
+      color: var(--text-2); border-radius: var(--r-sm); line-height: 1;
+    }
+    .tab-size:hover { background: var(--surface-hover); color: var(--text); }
+    .tab-size[aria-pressed="true"] { color: var(--accent-strong); }
+    .tab-size svg { display: block; margin: 0 auto; }
+    .tab-size[aria-pressed="true"] .ic-grow, .tab-size[aria-pressed="false"] .ic-shrink { display: none; }
   </style>
 </head>
 <body>
@@ -421,6 +429,12 @@
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
+    <button class="tab-size" id="btnUiSize" type="button" aria-pressed="false" data-i18n-title="ui.sizeGrow" title="창 높이 크게 (860)">
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <g class="ic-grow"><path d="M6 1v10M3 3.5 6 1l3 2.5M3 8.5 6 11l3-2.5"/></g>
+        <g class="ic-shrink"><path d="M6 1v3.5M6 7.5V11M3 2l3 2.5L9 2M3 10l3-2.5L9 10"/></g>
+      </svg>
+    </button>
   </div>
 
   <!-- 선택 동기화 (실시간) -->
@@ -440,8 +454,12 @@
       <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
       <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
       <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
+        <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
+        <label class="inline"><input id="wizOptTextStyles" type="checkbox" /> <span data-i18n="wizardCard.optTextStyles">텍스트 스타일</span> <span class="muted" id="wizTextStylesLock"></span></label>
+        <!-- v1.0: 컴포넌트 등록은 마법사에서 뺀다(출시 범위 = 추출→생성→바인딩→리네임→내보내기).
+             리네임 직후 이름 기준 묶기가 섹션들을 한 세트로 합쳐 내용을 덮어쓴 사고(QA 파일). 적용 탭의 수동 등록만 남긴다. -->
+        <label class="inline" style="display:none"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
       </div>
       <div class="row">
         <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
@@ -452,7 +470,7 @@
       <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
            파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
            흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기. 다크·텍스트 스타일은 만들기에서</div>
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기 · 다크=라이트 모드에서 어두운 값 채우기</div>
       <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
       <div class="status" id="wizardSummary"></div>
     </div>
@@ -461,7 +479,7 @@
     <div class="step" id="pipelineCard">
       <h2 data-i18n="pipeline.title">준비 현황</h2>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">이름·컴포넌트는 필요할 때 적용 탭에서</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">컴포넌트는 필요할 때 적용 탭에서</div>
     </div>
   </section>
 
@@ -481,7 +499,7 @@
            이미 말한다. 게다가 잠금 배지와 범위 라벨 사이에 끼어 「🔒 색 12개 변수화」로 읽혔다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
+      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 됩니다. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
@@ -515,10 +533,7 @@
       <!-- 추출·정리된 색 — 역할(Semantic)을 정하는 자리. Global 이름은 hue. -->
       <div id="colorSection" style="display:none">
         <div class="hint" data-i18n="color.listHint">추출·정리된 색 · Global = hue · Semantic = 역할</div>
-        <div id="tidySummary" class="tidy tidy-note" style="display:none">
-          <span id="tidySumText"></span>
-          <button id="btnTidyUndo" class="link" data-i18n="colorTidy.undo">되돌리기</button>
-        </div>
+        <!-- 색 N:1 자동 병합 요약/되돌리기 줄은 걷었다(ui.ts 참고) — 이제 색은 이름만 정리하고 전부 변수가 된다. -->
         <!-- 모아 놓은 색 미리보기 한 줄(ui.ts가 채운다). -->
         <div id="paletteRow" class="palette-row"></div>
         <div id="colorTable" class="results"></div>
@@ -631,11 +646,20 @@
       <div class="toolbar">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택한 항목에 연결</button>
+        <!-- 연결 현황 — 파일에 이미 붙어 있는 바인딩을 읽는다(읽기 전용). 작은 선택(≤300 노드)은 자동, 큰 선택은 이 버튼. -->
+        <button id="btnScanBindings" data-i18n="bind.scanBtn" data-tip="선택 안에 이미 연결된 변수를 읽어 목록으로 보여줍니다. 파일은 안 바꿉니다.">연결 현황</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-apply="rename" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
+      </div>
+      <!-- 보기 축 토글 — 레이어별(캔버스 순서로 검증) / 변수별(Tokens Studio Inspect처럼 변수 행 + 레이어 수, 관리용). -->
+      <div class="row tree-ctrls" id="bindViewRow" style="display:none">
+        <label class="inline"><input type="radio" name="bindView" value="layer" checked /> <span data-i18n="bind.viewLayer">레이어별</span></label>
+        <label class="inline"><input type="radio" name="bindView" value="variable" /> <span data-i18n="bind.viewVariable">변수별</span></label>
+        <span class="grow"></span>
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:140px" />
       </div>
       <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐).
            목록 위에 둔다: 몇 개가 왜 빠졌는지는 후보를 훑기 전에 알아야 하는 정보다. -->

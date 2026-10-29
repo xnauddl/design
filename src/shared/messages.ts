@@ -132,6 +132,7 @@ export type UiToCode =
   | { type: 'APPLY'; tolerance: number; preview?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[] } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
+  | { type: 'SCAN_BINDINGS' } // 선택 안에 이미 붙은 변수 바인딩 읽기(연결 현황 · 읽기 전용)
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
   // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(등록이 머리명사로 읽는다).
@@ -144,6 +145,8 @@ export type UiToCode =
   | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[] } // Phase C: 변수 보장+스타일 등록(화면 연결 없음)
   | { type: 'APPLY_TEXT_STYLES' } // Phase C: 적용만(생성 없음) — 선택 텍스트를 기존 스타일에 바인딩
   | { type: 'GET_COLLECTIONS' }
+  | { type: 'GET_UI_SIZE' } // QA #2 ①: 창 높이 단계 조회(시작 시 버튼 표시용)
+  | { type: 'SET_UI_SIZE'; mode: 'default' | 'large' } // QA #2 ①: 창 높이 2단계 전환(660 ↔ 860), 기억됨
   | { type: 'GET_GLOBAL_COLORS' } // #10: 기존 Global 색 변수 스캔(재방문 시맨틱 매핑 추천용)
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
   | { type: 'GET_LICENSE' }
@@ -170,14 +173,16 @@ export type UiToCode =
 
 /** code → UI 응답. */
 export type CodeToUi =
+  | { type: 'UI_SIZE'; mode: 'default' | 'large' } // 현재 창 높이 단계
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
   // comps/sets: 선택 안의 낱개 COMPONENT·COMPONENT_SET 수. 구조 카드의 베리언트 줄을
   // '정리할 대상이 실제로 선택돼 있을 때만' 띄우는 데 쓴다(툴바는 와이어대로 4개 고정).
-  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean } // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
+  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
+  | { type: 'BINDINGS_RESULT'; candidates: BindCandidate[]; nodes: BindNode[]; total: number; boundNodes: number } // 연결 현황(읽기 전용)
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; candidateTotal?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
@@ -197,6 +202,8 @@ export type CodeToUi =
       hasBindable: boolean;
       hasDarkMode: boolean;
       hasTextStyles: boolean;
+      /** Semantic에 역할 별칭이 있음(역할 매핑 완료). */
+      hasSemanticRoles: boolean;
     }
   | {
       type: 'LICENSE_STATUS';
@@ -216,7 +223,8 @@ export type CodeToUi =
   | { type: 'REQUEST_DEACTIVATE'; key: string; instanceId: string } // 해제 시 code → UI: 이 기기의 LS 활성화 슬롯 반납(best-effort)
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
-  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단
+  // icons: 날 벡터가 그림마다 달라 새로 만든 아이콘 컴포넌트 수(스왑 속성의 재료 — 등록 수와 별개로 센다).
+  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'SETTINGS'; base: number; maxDepth: number; hideOnboard: boolean; grid: number; tolerance: number } // #19: 보관된 설정(없으면 기본값). grid=여백·크기 격자, tolerance=바인딩 허용오차

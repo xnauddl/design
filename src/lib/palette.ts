@@ -204,25 +204,38 @@ export function paletteSemanticMap(p: PaletteResult): Record<string, string> {
   const byRole = new Map(p.roles.map((r) => [r.role, r.family]));
   const map: Record<string, string> = {};
   const primary = byRole.get('primary');
+  // 역할 이름은 property-first(`color/{background|text|border|icon}/{role}`) — Atlassian
+  // `color.background.brand.bold`·Lightning `$color-text-default`와 같은 구조. property가 곧
+  // Figma 스코프(background→채움, text→글자, border→선)라 오매칭이 구조적으로 사라진다.
   if (primary) {
-    map['primary'] = `color/${primary}/500`;
-    map['primary/strong'] = `color/${primary}/700`;
-    map['primary/subtle'] = `color/${primary}/100`;
+    map['color/background/brand'] = `color/${primary}/500`;
+    map['color/background/brand-bold'] = `color/${primary}/700`;
+    map['color/background/brand-subtle'] = `color/${primary}/100`;
+    map['color/text/brand'] = `color/${primary}/600`;
+    map['color/border/brand'] = `color/${primary}/500`;
   }
   const secondary = byRole.get('secondary');
-  if (secondary) map['secondary'] = `color/${secondary}/500`;
-  for (const r of p.roles) if (r.role.startsWith('accent-')) map[r.role] = `color/${r.family}/500`;
+  if (secondary) map['color/background/accent'] = `color/${secondary}/500`;
+  for (const r of p.roles) if (r.role.startsWith('accent-')) map[`color/background/${r.role}`] = `color/${r.family}/500`;
   const neutral = byRole.get('neutral');
   if (neutral) {
-    map['surface'] = `color/${neutral}/50`;
-    map['surface/muted'] = `color/${neutral}/100`;
-    map['text'] = `color/${neutral}/900`;
-    map['text/muted'] = `color/${neutral}/600`;
-    map['border'] = `color/${neutral}/200`;
+    map['color/background/default'] = `color/${neutral}/50`;
+    map['color/background/subtle'] = `color/${neutral}/100`;
+    map['color/background/inverse'] = `color/${neutral}/900`;
+    map['color/text/default'] = `color/${neutral}/900`;
+    map['color/text/subtle'] = `color/${neutral}/600`;
+    map['color/text/inverse'] = `color/${neutral}/50`;
+    map['color/border/default'] = `color/${neutral}/200`;
+    map['color/border/bold'] = `color/${neutral}/400`;
+    map['color/icon/default'] = `color/${neutral}/700`;
   }
   for (const role of ['success', 'warning', 'error', 'info']) {
     const f = byRole.get(role);
-    if (f) map[role] = `color/${f}/500`;
+    const name = role === 'error' ? 'danger' : role; // Atlassian·Lightning 모두 danger/error 중 danger
+    if (f) {
+      map[`color/background/${name}`] = `color/${f}/500`;
+      map[`color/text/${name}`] = `color/${f}/700`;
+    }
   }
   return map;
 }
@@ -238,12 +251,12 @@ export function suggestSemanticMap(colors: ReadonlyArray<{ name: string; hex: st
 
   const neutrals = classed.filter((c) => c.achromatic).sort((a, b) => b.o.l - a.o.l); // 밝은→어두운
   if (neutrals.length) {
-    map['surface'] = neutrals[0].name;
-    map['text'] = neutrals[neutrals.length - 1].name;
-    if (neutrals.length >= 3) map['border'] = neutrals[Math.floor(neutrals.length / 2)].name;
+    map['color/background/default'] = neutrals[0].name;
+    map['color/text/default'] = neutrals[neutrals.length - 1].name;
+    if (neutrals.length >= 3) map['color/border/default'] = neutrals[Math.floor(neutrals.length / 2)].name;
   }
   const chroma = classed.filter((c) => !c.achromatic).sort((a, b) => b.o.c - a.o.c); // 채도 높은 순
-  if (chroma.length) map['primary'] = chroma[0].name;
+  if (chroma.length) map['color/background/brand'] = chroma[0].name;
   return map;
 }
 

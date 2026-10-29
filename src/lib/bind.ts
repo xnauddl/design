@@ -1,6 +1,7 @@
 /* ============================================================
    bind.ts — 토큰(변수)을 레이어 속성에 바인딩 (top-down)
-   - 매칭은 resolved 값 기준, Component > Semantic 우선. Global 직접 바인딩 제외.
+   - 매칭은 resolved 값 기준, Component > Semantic > Global. 역할 별칭이 있으면 그것이 이기고,
+     역할 없는 값은 Global 원시 변수에 붙는다(Semantic 거울 폐지 — variables.ts 참고).
    - 프레임 크기(Fixed)·여백(오토레이아웃)·반경·효과·텍스트 지원.
    ============================================================ */
 import { rgbToHex } from './tokens';
@@ -10,6 +11,8 @@ import type { BindCandidate, BindNode, BindSkip } from '../shared/messages';
 interface VarEntry {
   variable: Variable;
   tier: number; // Component 3 > Semantic 2 > Global 1
+  /** Global과 같은 이름의 Semantic 거울(createTokens의 1:1 미러) — 같은 tier의 역할 별칭보다 뒤. */
+  mirror?: boolean;
   type: VariableResolvedDataType;
   scopes: readonly VariableScope[]; // 용도 스코프 — 필드와 안 맞는 변수 오매칭 차단
   colorHex?: string;
@@ -54,6 +57,8 @@ const FIELD_SCOPE: Record<string, VariableScope> = {
 const OPACITY_TOL = 0.005;
 
 export interface BindResult {
+  /** 상한(RESULT_CAP) 전 실제 후보 수 — 잘렸으면 UI가 알린다. */
+  candidateTotal?: number;
   bound: number;
   skipped: number;
   flags: string[];
@@ -79,6 +84,8 @@ export interface BindResult {
  * 칩의 '레이어 선택'도 code 쪽 SELECT_CAP과 같은 200에서 잘리니 수를 맞춘다.
  */
 const SKIP_PREVIEW_CAP = 200;
+/** 결과/미리보기 트리에 실을 바인딩 후보 상한 — 수천 레이어 파일에서 UI 메시지가 터지지 않게. */
+const RESULT_CAP = 600;
 
 /**
  * 상한을 사유별로 고르게 나눈다.
@@ -173,8 +180,51 @@ interface Progress {
  * 남은 작업량을 알 수 없고, (2) 사용자가 직접 고른 변수도 같은 값의 상위 tier 변수로
  * 말없이 교체된다. 그래서 이미 바인딩된 자리는 값이 맞아도 건드리지 않는다.
  */
+/**
+ * 지금 살아 있는 변수 id — 로컬 전부 + 선택에서 참조된 라이브러리 변수(비동기로 확인).
+ * 컬렉션을 지운 뒤에도 레이어의 바인딩 참조는 남는다(잔상). 그걸 '이미 연결됨'으로 보면
+ * 변수를 다시 만들어도 영영 재연결이 안 된다 — QA에서 컬렉션 삭제 → 재실행 시 802건 중 25건만 붙은 원인.
+ */
+let liveVarIds: Set<string> = new Set();
+
 function isAlias(x: unknown): boolean {
   return !!x && typeof x === 'object' && (x as VariableAlias).type === 'VARIABLE_ALIAS';
+}
+/** 별칭이면서 그 변수가 아직 존재하는가(지워진 변수의 잔상은 '연결 안 됨'). */
+function isLiveAlias(x: unknown): boolean {
+  return isAlias(x) && liveVarIds.has((x as VariableAlias).id);
+}
+
+/** 선택 안의 모든 바인딩 id를 모아 살아 있는지 확인(로컬은 인덱스, 그 외는 라이브러리 조회). */
+async function collectLiveVarIds(selection: readonly SceneNode[], local: ReadonlySet<string>): Promise<Set<string>> {
+  const seen = new Set<string>();
+  const stack: SceneNode[] = selection.slice();
+  const take = (raw: unknown): void => {
+    if (!raw) return;
+    for (const a of Array.isArray(raw) ? raw : [raw]) if (isAlias(a)) seen.add((a as VariableAlias).id);
+  };
+  while (stack.length) {
+    const n = stack.pop() as SceneNode;
+    const bv = (n as { boundVariables?: Record<string, unknown> }).boundVariables;
+    if (bv) for (const v of Object.values(bv)) take(v);
+    for (const key of ['fills', 'strokes'] as const) {
+      const ps = (n as unknown as Record<string, unknown>)[key];
+      if (Array.isArray(ps)) for (const p of ps) take((p as { boundVariables?: { color?: unknown } }).boundVariables?.color);
+    }
+    const ef = (n as { effects?: readonly Effect[] }).effects;
+    if (Array.isArray(ef)) for (const e of ef) take((e as { boundVariables?: { color?: unknown } }).boundVariables?.color);
+    if ('children' in n) for (const c of n.children) stack.push(c);
+  }
+  const live = new Set<string>(local);
+  for (const id of seen) {
+    if (live.has(id)) continue;
+    try {
+      if (await figma.variables.getVariableByIdAsync(id)) live.add(id); // 라이브러리(원격) 변수
+    } catch {
+      /* 없음 — 잔상 */
+    }
+  }
+  return live;
 }
 
 function isNodeFieldBound(node: SceneNode, field: string): boolean {
@@ -184,7 +234,7 @@ function isNodeFieldBound(node: SceneNode, field: string): boolean {
   // 텍스트 range 필드(fontSize·…)는 VariableAlias[] — 배열이 있다고 전 구간이 묶인 건 아니다.
   // 부분 바인딩은 textFieldCoverage로 판정한다(여기선 스칼라 필드만).
   if (Array.isArray(entry)) return false;
-  return isAlias(entry);
+  return isLiveAlias(entry);
 }
 
 /**
@@ -199,10 +249,10 @@ function isColorBound(
   field: 'fills' | 'strokes' | 'effects',
   index: number,
 ): boolean {
-  if ((x as { boundVariables?: { color?: unknown } }).boundVariables?.color) return true;
+  if (isLiveAlias((x as { boundVariables?: { color?: unknown } }).boundVariables?.color)) return true;
   const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
   const arr = bv?.[field];
-  return Array.isArray(arr) && isAlias(arr[index]);
+  return Array.isArray(arr) && isLiveAlias(arr[index]);
 }
 
 /** 텍스트 필드 바인딩 커버리지 — 전 구간이 묶였는가 + 아직 빈 구간 목록. */
@@ -232,17 +282,17 @@ function textFieldCoverage(node: TextNode, field: VariableBindableTextField): Te
 
   if (typeof getRange === 'function') {
     const full = getRange.call(node, 0, len, field);
-    if (full !== figma.mixed && isAlias(full)) return { fullyBound: true, unbound: [] };
+    if (full !== figma.mixed && isLiveAlias(full)) return { fullyBound: true, unbound: [] };
 
     const unbound: Array<[number, number]> = [];
     let i = 0;
     while (i < len) {
       const v = getRange.call(node, i, i + 1, field);
-      if (v === figma.mixed || !isAlias(v)) {
+      if (v === figma.mixed || !isLiveAlias(v)) {
         let j = i + 1;
         while (j < len) {
           const w = getRange.call(node, j, j + 1, field);
-          if (w !== figma.mixed && isAlias(w)) break;
+          if (w !== figma.mixed && isLiveAlias(w)) break;
           j++;
         }
         unbound.push([i, j]);
@@ -263,7 +313,7 @@ function textFieldCoverage(node: TextNode, field: VariableBindableTextField): Te
     if (entry.length === 0) return { fullyBound: false, unbound: [[0, len]] };
     return { fullyBound: true, unbound: [] };
   }
-  return isAlias(entry) ? { fullyBound: true, unbound: [] } : { fullyBound: false, unbound: [[0, len]] };
+  return isLiveAlias(entry) ? { fullyBound: true, unbound: [] } : { fullyBound: false, unbound: [[0, len]] };
 }
 
 /** 조상까지 실제로 보이는가 — extract.ts와 같은 기준(숨긴 그룹 안의 레이어를 직접 고른 경우). */
@@ -316,10 +366,13 @@ export async function bindSelection(
   hooks: BindHooks = {}, // UX6: 진행률·취소.
 ): Promise<BindResult> {
   const entries = await buildIndex();
+  liveVarIds = await collectLiveVarIds(selection, new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
   const res: BindResult = { bound: 0, skipped: 0, flags: [], reasons: {} };
   const flagSet = new Set<string>();
   const prog: Progress = { done: 0, total: hooks.onProgress ? countNodes(selection) : 0, every: 50 };
-  const preview: Preview | null = apply ? null : { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
+  // 적용 모드에서도 "어느 레이어에 어느 변수가 붙었나" 목록을 모은다(결과 트리). dry-run과 같은 수집기 —
+  // 차이는 실제로 setBoundVariable을 부르느냐뿐. 목록은 RESULT_CAP에서 멈춘다(대형 파일 보호).
+  const preview: Preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
   for (const node of selection) {
     // 선택 루트가 숨긴 그룹 안이면 walk의 자체 visible 검사로는 못 거른다(루트 자신은 보임).
     if (!isEffectivelyVisible(node)) {
@@ -331,11 +384,12 @@ export async function bindSelection(
     if (res.cancelled) break;
   }
   res.flags = [...flagSet];
-  if (preview) {
-    res.candidates = preview.candidates;
+  {
+    res.candidateTotal = preview.candidates.length;
+    res.candidates = preview.candidates.slice(0, RESULT_CAP);
     // 트리 씨앗도 잘린 목록으로 — 트리 크기가 '고른 레이어 수'가 아니라 '보낼 스킵 수'에 묶인다.
     const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
-    res.nodes = pruneToAffected(preview.nodeIndex, preview.candidates, skips);
+    res.nodes = pruneToAffected(preview.nodeIndex, res.candidates, skips);
     res.skips = skips;
     res.skipTotal = preview.skips.length;
   }
@@ -349,20 +403,26 @@ async function buildIndex(): Promise<VarEntry[]> {
   const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
   const tierOf = new Map(cols.map((c) => [c.id, TIER[c.name] ?? 0]));
   const vars = await figma.variables.getLocalVariablesAsync();
+  // 예전 파일에 남은 Semantic 거울(Global과 같은 이름)은 역할 별칭보다 뒤로 — 같은 tier라
+  // 생성 순서로 거울이 이기면 역할을 매핑해도 레이어가 거울 이름에 붙는다.
+  const globalNames = new Set(
+    vars.filter((v) => tierOf.get(v.variableCollectionId) === TIER[GLOBAL]).map((v) => v.name),
+  );
   const entries: VarEntry[] = [];
   for (const v of vars) {
     const tier = tierOf.get(v.variableCollectionId) ?? 0;
-    if (tier < 2) continue; // Component/Semantic만 바인딩 대상
+    if (tier < 1) continue; // Global/Semantic/Component 3계층만(다른 컬렉션 제외)
     const val = await resolveValue(v, modeOf);
     if (val == null) continue;
     const e: VarEntry = { variable: v, tier, type: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'] };
+    if (tier === TIER[SEMANTIC] && globalNames.has(v.name)) e.mirror = true;
     if (v.resolvedType === 'COLOR' && isRGB(val)) e.colorHex = rgbToHex(val);
     else if (v.resolvedType === 'FLOAT' && typeof val === 'number') e.num = val;
     else if (v.resolvedType === 'STRING' && typeof val === 'string') e.str = val;
     entries.push(e);
   }
-  // 높은 tier 우선
-  entries.sort((a, b) => b.tier - a.tier);
+  // 높은 tier 우선, 같은 tier면 역할 별칭이 거울보다 먼저(matchColor는 첫 일치를 고른다).
+  entries.sort((a, b) => b.tier - a.tier || Number(a.mirror ?? false) - Number(b.mirror ?? false));
   return entries;
 }
 
@@ -381,6 +441,25 @@ async function resolveValue(
     }
   }
   return undefined;
+}
+
+/**
+ * 소수 값(26.67 등)은 허용오차로 근처 토큰에 스냅하지 않는다 — extract가 척도 잔값으로 보고 토큰을
+ * 만들지 않았는데, 바인딩이 26.67을 font-size/27에 붙이면 추출이 거부한 값을 되살리며 디자인을 바꾼다.
+ * 같은 값의 토큰이 있으면(1.5px 선) 붙는 게 맞으므로 허용오차만 0으로 좁힌다. (크기 축은 bindFrame이 이미 동일 규칙.)
+ */
+function tolForValue(value: number, tol: number): number {
+  return Math.abs(value - Math.round(value)) >= 0.005 && Math.abs(value * 2 - Math.round(value * 2)) >= 0.005 ? 0 : tol;
+}
+
+/** 페인트가 반투명인가(opacity<1). 변수 alpha가 페인트 불투명도를 덮어쓰므로 바인딩 제외 기준. */
+function isTranslucentPaint(p: SolidPaint): boolean {
+  return typeof p.opacity === 'number' && p.opacity < 1;
+}
+/** 그림자 색의 alpha<1 인가(effect color는 RGBA). */
+function isTranslucentEffectColor(e: DropShadowEffect | InnerShadowEffect): boolean {
+  const a = (e.color as RGBA).a;
+  return typeof a === 'number' && a < 1;
 }
 
 function isRGB(v: VariableValue): v is RGB | RGBA {
@@ -410,8 +489,8 @@ function matchFloat(entries: VarEntry[], value: number, tol: number, scope?: Var
     if (scope && !e.scopes.includes('ALL_SCOPES') && !e.scopes.includes(scope)) continue;
     const dist = Math.abs(e.num - value);
     if (dist > tol) continue;
-    // 가장 가까운 값 우선, 동률이면 높은 tier 우선.
-    if (dist < bestDist || (dist === bestDist && best !== null && best.tier < e.tier)) {
+    // 가장 가까운 값 우선, 동률이면 높은 tier 우선, 같은 tier면 역할 별칭(거울 아님) 우선.
+    if (dist < bestDist || (dist === bestDist && best !== null && (best.tier < e.tier || (best.tier === e.tier && best.mirror && !e.mirror)))) {
       best = e;
       bestDist = dist;
     }
@@ -498,6 +577,13 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
         note(res, 'already-bound', node, preview, key);
         return p;
       }
+      // 반투명 페인트(opacity<1)는 연결하지 않는다 — 색 변수가 붙으면 Figma가 페인트 불투명도를
+      // 변수의 alpha(우리 변수는 항상 1)로 덮어써, 8% 검정 테두리가 100% 검정으로 바뀐다.
+      // 알파를 가진 변수(`color/…/a8`)는 별도 토큰 체계가 필요하므로 지금은 사유만 남긴다.
+      if (isTranslucentPaint(p)) {
+        skip(res, 'translucent', node, preview, key);
+        return p;
+      }
       const hex = rgbToHex(p.color);
       const e = matchColor(entries, hex, allowed);
       if (!e) {
@@ -505,10 +591,8 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
         return p;
       }
       res.bound++;
-      if (!apply) {
-        addColorCand(preview, node, key, i, hex, e);
-        return p;
-      }
+      addColorCand(preview, node, key, i, hex, e);
+      if (!apply) return p;
       changed = true;
       return figma.variables.setBoundVariableForPaint(p, 'color', e.variable);
     });
@@ -632,6 +716,11 @@ function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, appl
       note(res, 'already-bound', node, preview, 'effects');
       return e;
     }
+    // 그림자 색은 RGBA다 — 25% 그림자를 alpha 1 변수에 붙이면 100% 검정 그림자가 된다(위 페인트와 같은 이유).
+    if (isTranslucentEffectColor(e)) {
+      skip(res, 'translucent', node, preview, 'effects');
+      return e;
+    }
     const hex = rgbToHex(e.color);
     const ent = matchColor(entries, hex, EFFECT_SCOPES);
     if (!ent) {
@@ -639,10 +728,8 @@ function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, appl
       return e;
     }
     res.bound++;
-    if (!apply) {
-      addColorCand(preview, node, 'effects', i, hex, ent);
-      return e;
-    }
+    addColorCand(preview, node, 'effects', i, hex, ent);
+    if (!apply) return e;
     changed = true;
     return figma.variables.setBoundVariableForEffect(e, 'color', ent.variable);
   });
@@ -684,6 +771,7 @@ async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: 
             node.setRangeBoundVariable(start, end, 'fontFamily', fe.variable);
           }
           res.bound++;
+          addStrCand(preview, node, 'fontFamily', node.fontName.family, fe); // 결과 트리(실제로 붙은 것만)
         } catch {
           skip(res, 'error', node, preview, 'fontFamily');
         }
@@ -711,7 +799,7 @@ function tryBindText(
     note(res, 'already-bound', node, preview, field);
     return;
   }
-  const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
+  const e = matchFloat(entries, value, tolForValue(value, tol), FIELD_SCOPE[field]);
   if (!e) {
     skip(res, 'no-match', node, preview, field);
     return;
@@ -727,6 +815,7 @@ function tryBindText(
       node.setRangeBoundVariable(start, end, field, e.variable);
     }
     res.bound++;
+    addFloatCand(preview, node, field, value, e); // 결과 트리(실제로 붙은 것만)
   } catch {
     skip(res, 'error', node, preview, field);
   }
@@ -748,7 +837,7 @@ function tryBind(
     note(res, 'already-bound', node, preview, field);
     return;
   }
-  const e = matchFloat(entries, value, tol, FIELD_SCOPE[field]);
+  const e = matchFloat(entries, value, field === 'opacity' ? tol : tolForValue(value, tol), FIELD_SCOPE[field]);
   if (!e) {
     skip(res, noMatchReason, node, preview, field);
     return;
@@ -761,7 +850,98 @@ function tryBind(
   try {
     (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(field, e.variable);
     res.bound++;
+    addFloatCand(preview, node, field, value, e); // 결과 트리(실제로 붙은 것만)
   } catch {
     skip(res, 'error', node, preview, field);
   }
+}
+
+
+/* ---------- 연결 현황 스캔(읽기 전용) ---------- */
+/**
+ * 선택 안에서 **이미 붙어 있는** 변수 바인딩을 읽어 결과 트리와 같은 모양으로 돌려준다.
+ * 플러그인을 닫았다 열어도 파일에 남은 상태를 그대로 보여 주기 위한 것(Tokens Studio Inspect와
+ * 같은 "상태 조회" — 실행 기록이 아니다). 변수 해석은 하지 않고 이름만 붙인다. 상한 RESULT_CAP.
+ */
+export interface BindingsScan {
+  candidates: BindCandidate[];
+  nodes: BindNode[];
+  /** 상한 전 실제 건수. */
+  total: number;
+  /** 바인딩이 하나라도 있는 레이어 수. */
+  boundNodes: number;
+}
+
+const TEXT_RANGE_FIELDS = ['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily'] as const;
+
+export async function scanBindings(selection: readonly SceneNode[]): Promise<BindingsScan> {
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const tierOf = new Map(cols.map((c) => [c.id, TIER[c.name] ?? 0]));
+  const byId = new Map(vars.map((v) => [v.id, v]));
+  const nameOf = (id: string): { name: string; tier: number } => {
+    const v = byId.get(id);
+    return v ? { name: v.name, tier: tierOf.get(v.variableCollectionId) ?? 0 } : { name: '(삭제된 변수)', tier: 0 };
+  };
+  const candidates: BindCandidate[] = [];
+  const nodeIndex: BindNode[] = [];
+  let total = 0;
+  let boundNodes = 0;
+  const push = (c: BindCandidate): void => {
+    total++;
+    if (candidates.length < RESULT_CAP) candidates.push(c);
+  };
+  const aliasId = (raw: unknown): string | undefined => {
+    if (!raw) return undefined;
+    const a = Array.isArray(raw) ? raw[0] : raw;
+    return a && typeof a === 'object' && 'id' in a ? (a as VariableAlias).id : undefined;
+  };
+  const walkNode = (node: SceneNode, depth: number, parentId: string | null): void => {
+    if (node.visible === false) return;
+    nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
+    let any = false;
+    // 페인트·효과 색
+    for (const key of ['fills', 'strokes'] as const) {
+      const ps = (node as unknown as Record<string, unknown>)[key];
+      if (!Array.isArray(ps)) continue;
+      ps.forEach((p, i) => {
+        const id = (p as { boundVariables?: { color?: VariableAlias } }).boundVariables?.color?.id;
+        if (!id) return;
+        const v = nameOf(id);
+        const hex = (p as SolidPaint).type === 'SOLID' ? rgbToHex((p as SolidPaint).color) : '';
+        push({ nodeId: node.id, field: key, index: i, currentValue: hex, variableId: id, variableName: v.name, tier: v.tier });
+        any = true;
+      });
+    }
+    const effects = (node as { effects?: readonly Effect[] }).effects;
+    if (Array.isArray(effects)) {
+      effects.forEach((e, i) => {
+        const id = (e as { boundVariables?: { color?: VariableAlias } }).boundVariables?.color?.id;
+        if (!id) return;
+        const v = nameOf(id);
+        push({ nodeId: node.id, field: 'effects', index: i, currentValue: 'color' in e ? rgbToHex((e as DropShadowEffect).color) : '', variableId: id, variableName: v.name, tier: v.tier });
+        any = true;
+      });
+    }
+    // 노드 스칼라 필드 + 텍스트 구간 필드
+    const bv = (node as { boundVariables?: Record<string, unknown> }).boundVariables ?? {};
+    for (const [field, raw] of Object.entries(bv)) {
+      if (field === 'fills' || field === 'strokes' || field === 'effects' || field === 'componentProperties' || field === 'textRangeFills') continue;
+      const id = aliasId(raw);
+      if (!id) continue;
+      const v = nameOf(id);
+      const cur = (node as unknown as Record<string, unknown>)[field];
+      let currentValue = '';
+      if (typeof cur === 'number') currentValue = String(Math.round(cur * 100) / 100);
+      else if (field === 'fontFamily' && typeof (node as TextNode).fontName === 'object' && (node as TextNode).fontName !== figma.mixed) currentValue = ((node as TextNode).fontName as FontName).family;
+      else if ((TEXT_RANGE_FIELDS as readonly string[]).includes(field) && cur && typeof cur === 'object' && 'value' in (cur as object)) currentValue = String((cur as { value: number }).value);
+      push({ nodeId: node.id, field, currentValue, variableId: id, variableName: v.name, tier: v.tier });
+      any = true;
+    }
+    if (any) boundNodes++;
+    if (node.type === 'INSTANCE') return; // 인스턴스 내부는 메인 컴포넌트의 몫
+    if ('children' in node) for (const c of node.children) walkNode(c, depth + 1, node.id);
+  };
+  for (const n of selection) if (isEffectivelyVisible(n)) walkNode(n, 0, null);
+  return { candidates, nodes: pruneToAffected(nodeIndex, candidates, []), total, boundNodes };
 }

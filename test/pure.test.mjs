@@ -67,6 +67,7 @@ import {
   isHighConfidenceComponent,
   shouldCollapseToProperties,
   inferVaryingComponentProperties,
+  inferVaryingImageSlots,
   pickCollapseMasterIndex,
   propValuesFromStruct,
   colorAxisLabels,
@@ -87,6 +88,8 @@ import {
   // roles (전 토큰 역할 어휘)
   tshirtRoles,
   radiusRoles,
+  spacingRoles,
+  strokeRoles,
   fontSizeRoles,
   weightRole,
   familyRole,
@@ -490,6 +493,35 @@ test('splitWeightStyle — weight/italic 분리', () => {
   assert.deepEqual(splitWeightStyle('Bold'), { weight: 700, italic: false });
   assert.deepEqual(splitWeightStyle('Semi Bold Italic'), { weight: 600, italic: true });
   assert.deepEqual(splitWeightStyle('Italic'), { weight: 400, italic: true });
+});
+
+test('exportTokens — 텍스트 스타일은 typography로, 행간·자간 %는 그대로(변수 아님)', () => {
+  const styles = [
+    { name: 'body', fontFamily: 'Inter', fontStyle: 'Regular', fontSize: 16, lineHeight: { unit: 'percent', value: 150 }, letterSpacing: { unit: 'percent', value: -2 } },
+    { name: 'heading/h1', fontFamily: 'Inter', fontStyle: 'Semi Bold Italic', fontSize: 32, lineHeight: { unit: 'px', value: 40 }, letterSpacing: { unit: 'px', value: 0 } },
+    { name: 'auto', fontFamily: 'Inter', fontStyle: 'Regular', fontSize: 14, lineHeight: { unit: 'auto', value: 0 }, letterSpacing: { unit: 'px', value: 0 } },
+  ];
+  const tokens = [{ name: 'font-size/16', collection: 'Global', type: 'FLOAT', kind: 'fontSize', value: 16 }];
+  const css = exportTokens(tokens, OPTS, styles);
+  assert.ok(css.includes('--typography-body-line-height: 150%;'));
+  assert.ok(css.includes('--typography-body-letter-spacing: -2%;'));
+  assert.ok(css.includes('--typography-heading-h1-line-height: 40px;'));
+  assert.ok(css.includes('--typography-heading-h1-font-weight: 600;'));
+  assert.ok(css.includes('--typography-heading-h1-font-style: italic;'));
+  assert.ok(css.includes('--typography-auto-line-height: normal;'));
+  assert.ok(css.trim().endsWith('}'));
+  assert.ok(css.includes('--font-size-16: 16px;')); // 기존 토큰도 그대로
+
+  const W3C = { ...OPTS, format: 'w3c' };
+  const json = JSON.parse(exportTokens(tokens, W3C, styles));
+  assert.equal(json.typography.body.$type, 'typography');
+  assert.deepEqual(json.typography.body.$value, { fontFamily: 'Inter', fontSize: '16px', fontWeight: 400, lineHeight: '150%', letterSpacing: '-2%' });
+  assert.equal(json.typography.heading.h1.$value.fontStyle, 'italic');
+  assert.equal(json.typography.heading.h1.$value.lineHeight, '40px');
+  assert.equal(json['font-size']['16'].$value, '16px');
+  // 스타일 없이 호출하면 예전과 동일
+  assert.equal(exportTokens(tokens, OPTS), exportTokens(tokens, OPTS, []));
+  assert.equal(exportTokens(tokens, W3C), exportTokens(tokens, W3C, []));
 });
 
 test('exportTokens — strokeWidth/effectFloat는 px 치수로 출력', () => {
@@ -1085,6 +1117,60 @@ test('shouldCollapseToProperties — 텍스트/스왑/불리언만 다르면 접
   assert.equal(shouldCollapseToProperties([named('a', '확인'), named('b', '취소')]), true);
 });
 
+test('shouldCollapseToProperties — 레이어 이름이 카피 따라 달라도 접힘', () => {
+  // 디자이너는 감싼 프레임에도 카피 이름을 준다(`title-price`/`title-name`). 이름만 다른 걸
+  // 구조 차로 보면 텍스트만 다른 반복이 `Variant=1·2`짜리 세트가 된다.
+  const card = (id, wrapName, text) => ({
+    id, name: 'card', type: 'FRAME', layoutMode: 'VERTICAL', width: 200, height: 120, fillHex: '#ffffff',
+    children: [{
+      id: id + '-w', name: wrapName, type: 'FRAME', layoutMode: 'VERTICAL', width: 200, height: 60,
+      children: [{ id: id + '-t', name: 'label', type: 'TEXT', characters: text }],
+    }],
+  });
+  assert.equal(shouldCollapseToProperties([card('a', 'title-price', '12,000'), card('b', 'title-name', '홍길동')]), true);
+
+  // 이름이 갈려도 `?` 규약은 한쪽에만 있으면 인정 — 가시성 차이는 BOOLEAN 속성.
+  const toggle = (id, name, visible) => ({
+    id, name: 'row', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 100, height: 32,
+    children: [{ id: id + '-b', name, type: 'FRAME', visible, width: 20, height: 20, children: [] }],
+  });
+  assert.equal(shouldCollapseToProperties([toggle('a', 'badge?', true), toggle('b', 'flag', false)]), true);
+});
+
+test('shouldCollapseToProperties — 그림은 이름이 아니라 내용(지문)으로 가른다', () => {
+  // 벡터: 같은 지문이면 이름이 달라도 같은 그림 · 지문이 다르면 스왑으로 담아 접는다.
+  const icon = (id, name, key) => ({
+    id, name: 'chip', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 40, height: 24,
+    children: [{ id: id + '-v', name, type: 'VECTOR', width: 16, height: 16, vectorKey: key }],
+  });
+  assert.equal(shouldCollapseToProperties([icon('a', 'icon-heart', 'k1'), icon('b', 'heart', 'k1')]), true);
+  assert.equal(shouldCollapseToProperties([icon('a', 'icon', 'k1'), icon('b', 'icon', 'k2')]), true);
+  // 그림이 다르면 스왑 속성 계획이 나온다(아이콘을 컴포넌트로 만들어 담는 재료).
+  const vplan = inferVaryingComponentProperties([icon('a', 'icon', 'k1'), icon('b', 'icon', 'k2')]);
+  assert.deepEqual(vplan.map((p) => [p.type, p.layerPath, p.fromVector]), [['INSTANCE_SWAP', '0', true]]);
+  assert.equal(inferVaryingComponentProperties([icon('a', 'icon', 'k1'), icon('b', 'icon', 'k1')]).length, 0);
+
+  // 사진: 같은 이름이어도 imageHash가 다르면 다른 그림 — 이미지 슬롯으로 잡아 fill을 이식한다.
+  const photo = (id, name, hash) => ({
+    id, name: 'card', type: 'FRAME', layoutMode: 'VERTICAL', width: 200, height: 120,
+    children: [{ id: id + '-p', name, type: 'RECTANGLE', width: 200, height: 80, imageHash: hash,
+      fills: [{ type: 'IMAGE', visible: true }] }],
+  });
+  const members = [photo('a', 'thumbnail', 'h1'), photo('b', 'thumbnail', 'h2')];
+  assert.equal(shouldCollapseToProperties(members), true);
+  assert.deepEqual(inferVaryingImageSlots(members), [{ layerName: 'thumbnail', layerPath: '0' }]);
+  // 같은 사진이면 이식할 것도 없다.
+  assert.deepEqual(inferVaryingImageSlots([photo('a', 'thumbnail', 'h1'), photo('b', 'photo', 'h1')]), []);
+
+  // 그림 ↔ 그림 아님은 슬롯 성격이 다르다 → 구조 차(세트).
+  const withIcon = icon('a', 'icon', 'k1');
+  const withText = {
+    id: 'b', name: 'chip', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 40, height: 24,
+    children: [{ id: 'b-t', name: 'icon', type: 'TEXT', characters: '♥' }],
+  };
+  assert.equal(shouldCollapseToProperties([withIcon, withText]), false);
+});
+
 test('shouldCollapseToProperties — heading 액션(buttonGroup) optional이면 접힘', () => {
   const txt = (id, chars) => ({ id, name: 'Label', type: 'TEXT', characters: chars });
   const num = (id, n) => ({
@@ -1383,6 +1469,12 @@ test('groupByExactName — 정확한 이름끼리만 묶음(머리명사 병합 
   assert.deepEqual(groups[1].members.map((m) => m.id), ['c']); // artist-button 단독
 });
 
+test('groupByExactName — 일반 구조어(container/item/image…)는 이름이 같아도 묶지 않는다', () => {
+  const mk = (id, name) => ({ id, name, type: 'FRAME', children: [] });
+  const groups = groupByExactName([mk('a', 'container'), mk('b', 'container'), mk('c', 'item'), mk('d', 'card'), mk('e', 'card')]);
+  assert.deepEqual(groups.map((g) => [g.key, g.members.map((m) => m.id)]), [['card', ['d', 'e']]]);
+});
+
 test('groupByExactName — 명사 사전에 없는 이름도 묶음(row-container/preview-container)', () => {
   const mk = (id, name) => ({ id, name, type: 'FRAME', width: 280, height: 397, children: [] });
   const groups = groupByExactName([
@@ -1583,10 +1675,28 @@ test('tshirtRoles — 센터(md) 정렬 티셔츠', () => {
   assert.deepEqual(tshirtRoles([4, 8, 16, 24, 32, 48]), ['xs', 'sm', 'md', 'lg', 'xl', '2xl']);
 });
 
-test('radiusRoles — 0→none · 큰값→full · 나머지 티셔츠', () => {
-  assert.deepEqual(radiusRoles([0, 4, 8]), ['none', 'md', 'lg']);
+test('radiusRoles — 고정 사다리(2 xs·4 sm·8 md·12 lg·16 xl·24 2xl) · 0→none · 큰값→full · 사다리 밖은 역할 없음', () => {
+  assert.deepEqual(radiusRoles([0, 4, 8]), ['none', 'sm', 'md']); // 파일에 몇 개가 있든 같은 값=같은 역할
   assert.deepEqual(radiusRoles([0, 8, 9999]), ['none', 'md', 'full']);
+  assert.deepEqual(radiusRoles([6, 12, 58]), ['', 'lg', '']); // 6·58은 척도 밖 → Global만
 });
+
+test('spacingRoles/strokeRoles — Lightning·Atlassian 고정 사다리, 척도 밖 값은 역할 없음', () => {
+  assert.deepEqual(spacingRoles([4, 8, 16, 24, 32]), ['2xs', 'xs', 'md', 'lg', 'xl']);
+  assert.deepEqual(spacingRoles([13, 16, 51]), ['', 'md', '']);
+  assert.deepEqual(strokeRoles([0.5, 1, 2, 4]), ['hairline', 'thin', 'thick', '']);
+});
+
+test('suggestTokenRoles — 사다리 밖 간격은 역할 맵에서 빠진다', () => {
+  const map = suggestTokenRoles([
+    { name: 'spacing/16', category: 'gap', value: 16, sources: ['gap'] },
+    { name: 'spacing/13', category: 'gap', value: 13, sources: ['gap'] },
+    { name: 'radius/8', category: 'radius', value: 8, sources: ['radius'] },
+    { name: 'stroke-width/1', category: 'strokeWidth', value: 1, sources: ['strokeWidth'] },
+  ]);
+  assert.deepEqual(map, { 'spacing/md': 'spacing/16', 'radius/md': 'radius/8', 'stroke-width/thin': 'stroke-width/1' });
+});
+
 
 test('fontSizeRoles — base(16) 중심 type 스케일', () => {
   assert.deepEqual(fontSizeRoles([12, 16, 24], 16), ['caption', 'body', 'title']);
@@ -1621,16 +1731,18 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
     { name: 'stroke-width/4', category: 'strokeWidth', sources: ['strokeWidth'], value: 4 },
   ];
   const map = suggestTokenRoles(tokens, 16);
-  assert.equal(map['primary'], 'color/0066ff'); // 색(유일 유채) → primary
-  assert.equal(map['spacing/md'], 'spacing/16'); // 센터
-  assert.equal(map['spacing/sm'], 'spacing/8');
+  assert.equal(map['color/background/brand'], 'color/0066ff'); // 색(유일 유채) → brand 면
+  assert.equal(map['spacing/md'], 'spacing/16'); // 고정 사다리: 16=md
+  assert.equal(map['spacing/xs'], 'spacing/8'); // 8=xs (Lightning x-small 8px)
   assert.equal(map['spacing/lg'], 'spacing/24');
   assert.equal(map['radius/none'], 'radius/0');
   assert.equal(map['font-size/body'], 'font-size/16');
   assert.equal(map['font-size/title'], 'font-size/24');
   assert.equal(map['font-weight/bold'], 'font-weight/700');
   assert.equal(map['font-family/sans'], 'font-family/Inter');
-  assert.equal(map['stroke-width/md'], 'stroke-width/2'); // 티셔츠 센터
+  assert.equal(map['stroke-width/thin'], 'stroke-width/1'); // Lightning borderWidthThin
+  assert.equal(map['stroke-width/thick'], 'stroke-width/2');
+  assert.equal(Object.values(map).includes('stroke-width/4'), false); // 척도 밖 → 역할 없음
 });
 
 test('mergeTokenRoles — 부분 맵을 덮어쓰되 빠진 카테고리는 자동 추천을 남긴다', () => {
@@ -1655,31 +1767,36 @@ test('pipelineSteps — 전제에 따른 단계 상태', () => {
     hasBindable: false, hasDarkMode: false, hasTextStyles: false,
   };
 
-  // 아무것도 없음: 색·토큰=ready(언제든 시작), 역할·연결=blocked(+안내), 다크·타이포=todo
+  // 순서 = 마법사 순서: 색·토큰·역할·다크·타이포·연결·이름.
+  // 아무것도 없음: 색·토큰=ready(언제든 시작), 역할·연결=blocked(+안내), 다크·타이포=todo, 이름=ready
   const empty = pipelineSteps(none);
   assert.deepEqual(empty.map((s) => [s.id, s.status]), [
     ['colors', 'ready'], ['tokens', 'ready'], ['semantics', 'blocked'],
-    ['bind', 'blocked'], ['dark', 'todo'], ['textStyles', 'todo'],
+    ['dark', 'todo'], ['textStyles', 'todo'], ['bind', 'blocked'], ['rename', 'ready'],
   ]);
-  assert.ok(empty[2].hint && empty[3].hint); // blocked엔 안내
+  assert.ok(empty[2].hint && empty[5].hint); // blocked엔 안내
 
   // Global만: 색·토큰=done, 역할=ready, 연결=blocked
   const g = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true });
-  assert.deepEqual(g.map((s) => s.status), ['done', 'done', 'ready', 'blocked', 'todo', 'todo']);
+  assert.deepEqual(g.map((s) => s.status), ['done', 'done', 'ready', 'todo', 'todo', 'blocked', 'ready']);
 
   // 연결 변수까지: 역할·연결 모두 ready(안내 없음)
   const both = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true });
-  assert.deepEqual(both.map((s) => s.status), ['done', 'done', 'ready', 'ready', 'todo', 'todo']);
+  assert.deepEqual(both.map((s) => s.status), ['done', 'done', 'ready', 'todo', 'todo', 'ready', 'ready']);
   assert.equal(both[2].hint, undefined);
-  assert.equal(both[3].hint, undefined);
+  assert.equal(both[5].hint, undefined);
 
   // 다크·텍스트 스타일은 전제가 아니라 '만들었는가' — 있으면 done
   const made = pipelineSteps({ ...none, hasDarkMode: true, hasTextStyles: true });
-  assert.deepEqual(made.map((s) => s.status).slice(4), ['done', 'done']);
+  assert.deepEqual(made.map((s) => s.status).slice(3, 5), ['done', 'done']);
 
   // 색만 만든 상태: 색=done, 간격·크기=아직 ready, 역할 매핑은 Global이 있으니 ready
   const colorOnly = pipelineSteps({ ...none, hasColorVars: true, hasGlobal: true });
-  assert.deepEqual(colorOnly.map((s) => s.status), ['done', 'ready', 'ready', 'blocked', 'todo', 'todo']);
+  assert.deepEqual(colorOnly.map((s) => s.status), ['done', 'ready', 'ready', 'todo', 'todo', 'blocked', 'ready']);
+
+  // 전체 실행 뒤: 역할 별칭·바인딩·이름 기록이 있으면 역할·연결·이름도 done(예전엔 '준비'로 남았다)
+  const ran = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true, hasTextStyles: true, hasSemanticRoles: true, hasBoundNodes: true, hasRenamedNodes: true });
+  assert.deepEqual(ran.map((s) => s.status), ['done', 'done', 'done', 'todo', 'done', 'done', 'done']);
 });
 
 /* ================= i18n.ts (런타임 문자열 외부화) ================= */
@@ -2217,4 +2334,26 @@ test('darkGlobalName — dark/ 그룹 접두 · 멱등', () => {
   assert.equal(darkGlobalName(darkGlobalName('color/blue/500')), 'dark/color/blue/500');
   assert.equal(isDarkGlobalName('dark/color/blue/500'), true);
   assert.equal(isDarkGlobalName('color/blue/500'), false);
+});
+
+/* ---------- QA #2 ①: 창 높이 2단계(uiSize) ---------- */
+test('normalizeUiSize — 정식 값, 옛 {h} 저장값, 깨진 값', async () => {
+  const { normalizeUiSize, uiHeight, UI_WIDTH, UI_HEIGHT } = await import('../dist/pure.mjs');
+  // 정식 문자열
+  assert.equal(normalizeUiSize('large'), 'large');
+  assert.equal(normalizeUiSize('default'), 'default');
+  // 철회 전 드래그 리사이즈가 남긴 { h } — 두 단계의 가운데(760) 기준으로 가까운 쪽
+  assert.equal(normalizeUiSize({ h: 1200 }), 'large');
+  assert.equal(normalizeUiSize({ h: 760 }), 'large');
+  assert.equal(normalizeUiSize({ h: 759 }), 'default');
+  assert.equal(normalizeUiSize({ w: 900, h: 480 }), 'default');
+  // 없음·깨짐 → 기본
+  for (const v of [undefined, null, '', 'huge', 42, NaN, {}, { h: NaN }, { h: '900' }]) {
+    assert.equal(normalizeUiSize(v), 'default', String(v));
+  }
+  // 높이·폭
+  assert.equal(uiHeight('default'), 660);
+  assert.equal(uiHeight('large'), 860);
+  assert.equal(UI_WIDTH, 400); // #17: 가로 고정
+  assert.ok(UI_HEIGHT.large > UI_HEIGHT.default);
 });
