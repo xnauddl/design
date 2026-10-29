@@ -23,14 +23,29 @@ import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
+import { UI_SIZE_KEY, UI_WIDTH, UiSizeMode, normalizeUiSize, uiHeight } from './lib/uiSize';
 
-/* #14: 창 크기 400×660 고정 — 리사이즈 없음.
-   가로는 와이어가 400으로 못 박았고(표를 가로로 버티는 패턴은 #17에서 비채택), 세로는
-   드래그 리사이즈를 붙여 봤지만 플러그인 iframe에서 제대로 동작하지 않았다: 포인터 캡처가
-   iframe 경계를 넘지 못해 아래로 끌면 이벤트가 끊기고, 그걸 우회하려 창을 포인터보다 크게
-   따라가게 해도 실기에서 멎었다. 크기가 고정이면 모든 화면이 한 크기에서만 성립하면 되고
-   검증도 거기서 끝난다 — 목록이 길면 패널 body가 스크롤한다(#18). */
-figma.showUI(__html__, { width: 400, height: 660, themeColors: true });
+/* #14: 드래그 리사이즈는 없다 — 플러그인 iframe에서 포인터 캡처가 iframe 경계를 넘지 못해
+   아래로 끌면 이벤트가 끊기고, 창을 포인터보다 크게 따라가게 하는 우회까지 실기에서 멎었다.
+   가로는 와이어대로 400 고정(#17). 대신 QA #2 ①(팝업 크기)로 높이 2단계 전환 버튼을 둔다
+   (660 ↔ 860, `lib/uiSize.ts`). 포인터 추적이 없어 실기에서도 결과가 같다. 마지막 단계는
+   clientStorage에 기억해 다음 실행에 복원한다. 긴 목록은 여전히 패널 body가 스크롤한다(#18). */
+figma.showUI(__html__, { width: UI_WIDTH, height: uiHeight('default'), themeColors: true });
+
+let uiSizeMode: UiSizeMode = 'default';
+async function applyUiSize(mode: UiSizeMode, persist: boolean): Promise<void> {
+  uiSizeMode = mode;
+  figma.ui.resize(UI_WIDTH, uiHeight(mode));
+  if (persist) await figma.clientStorage.setAsync(UI_SIZE_KEY, mode).catch(() => {});
+}
+// 시작 시 복원 — 저장값이 없거나 깨졌으면 기본(660) 그대로.
+const uiSizeReady: Promise<void> = figma.clientStorage
+  .getAsync(UI_SIZE_KEY)
+  .then((v) => {
+    const mode = normalizeUiSize(v);
+    return mode === 'default' ? undefined : applyUiSize(mode, false);
+  })
+  .catch(() => {});
 
 const selection = () => figma.currentPage.selection;
 
@@ -1599,6 +1614,16 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
         if (generated) commitUndo(figma); // UX2
+        break;
+      }
+      case 'GET_UI_SIZE': {
+        await uiSizeReady; // 복원이 끝난 뒤의 상태를 알려야 버튼 표시가 맞다
+        post({ type: 'UI_SIZE', mode: uiSizeMode });
+        break;
+      }
+      case 'SET_UI_SIZE': {
+        await applyUiSize(normalizeUiSize(msg.mode), true);
+        post({ type: 'UI_SIZE', mode: uiSizeMode });
         break;
       }
       case 'GET_SETTINGS': {
