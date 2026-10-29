@@ -1347,7 +1347,7 @@ const PAID_FIELDS = [
   ...COMPONENT_FIELDS,
   'btnPalette', 'btnPaletteApply',
   'btnCreate', 'btnCreateApply',
-  'btnTextStyles',
+  'btnScanText', 'btnTextStyles', // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
   'btnGenDark', // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
 ];
 

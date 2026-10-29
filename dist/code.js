@@ -4862,6 +4862,7 @@
           break;
         }
         case "SCAN_TEXT_STYLES": {
+          if (!requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const { samples, warnings } = scanTextStyles(selection());
           const existing = await scanExistingTextStyles();
           if (msg.useRowLabels) {

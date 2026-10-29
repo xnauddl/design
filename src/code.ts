@@ -942,7 +942,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'SCAN_TEXT_STYLES': {
-        // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
+        // 스캔(미리보기)도 Paid — 등록이 Paid라 스캔만 열어두면 막다른 길(ROADMAP §5).
+        if (!requirePaid('textStyles', '텍스트 스타일은 Paid 기능입니다.')) break;
         const { samples, warnings } = scanTextStyles(selection());
         const existing = await scanExistingTextStyles();
         if (msg.useRowLabels) {
