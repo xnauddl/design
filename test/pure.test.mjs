@@ -2335,3 +2335,25 @@ test('darkGlobalName — dark/ 그룹 접두 · 멱등', () => {
   assert.equal(isDarkGlobalName('dark/color/blue/500'), true);
   assert.equal(isDarkGlobalName('color/blue/500'), false);
 });
+
+/* ---------- QA #2 ①: 창 높이 2단계(uiSize) ---------- */
+test('normalizeUiSize — 정식 값, 옛 {h} 저장값, 깨진 값', async () => {
+  const { normalizeUiSize, uiHeight, UI_WIDTH, UI_HEIGHT } = await import('../dist/pure.mjs');
+  // 정식 문자열
+  assert.equal(normalizeUiSize('large'), 'large');
+  assert.equal(normalizeUiSize('default'), 'default');
+  // 철회 전 드래그 리사이즈가 남긴 { h } — 두 단계의 가운데(760) 기준으로 가까운 쪽
+  assert.equal(normalizeUiSize({ h: 1200 }), 'large');
+  assert.equal(normalizeUiSize({ h: 760 }), 'large');
+  assert.equal(normalizeUiSize({ h: 759 }), 'default');
+  assert.equal(normalizeUiSize({ w: 900, h: 480 }), 'default');
+  // 없음·깨짐 → 기본
+  for (const v of [undefined, null, '', 'huge', 42, NaN, {}, { h: NaN }, { h: '900' }]) {
+    assert.equal(normalizeUiSize(v), 'default', String(v));
+  }
+  // 높이·폭
+  assert.equal(uiHeight('default'), 660);
+  assert.equal(uiHeight('large'), 860);
+  assert.equal(UI_WIDTH, 400); // #17: 가로 고정
+  assert.ok(UI_HEIGHT.large > UI_HEIGHT.default);
+});

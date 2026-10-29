@@ -2271,6 +2271,10 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('structureStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
       break;
     }
+    case 'UI_SIZE': {
+      renderUiSize(msg.mode);
+      break;
+    }
     case 'SETTINGS': {
       ($('base') as HTMLInputElement).value = String(msg.base);
       ($('depth') as HTMLInputElement).value = String(msg.maxDepth);
@@ -3188,6 +3192,25 @@ if (typeof ResizeObserver !== 'undefined') {
   ro.observe($('selBarWrap'));
 }
 window.addEventListener('resize', syncStickyOffsets);
+
+/* QA #2 ①: 창 높이 2단계 전환(660 ↔ 860). 드래그 리사이즈는 #14에서 철회 — 버튼만. */
+let uiSizeMode: 'default' | 'large' = 'default';
+function renderUiSize(mode: 'default' | 'large'): void {
+  uiSizeMode = mode;
+  const btn = $('btnUiSize');
+  const key = mode === 'large' ? 'ui.sizeShrink' : 'ui.sizeGrow';
+  btn.setAttribute('aria-pressed', String(mode === 'large'));
+  btn.dataset.i18nTitle = key; // 정적 i18n 재적용 때도 현재 상태 문구가 유지되게
+  btn.title = t(key);
+  btn.setAttribute('aria-label', t(key));
+}
+$('btnUiSize').addEventListener('click', () => {
+  const next = uiSizeMode === 'large' ? 'default' : 'large';
+  renderUiSize(next); // 즉시 반영 — code의 UI_SIZE 회신이 같은 값으로 확정
+  send({ type: 'SET_UI_SIZE', mode: next });
+});
+renderUiSize('default');
+send({ type: 'GET_UI_SIZE' });
 // 목록 상한은 패널 높이 비례(40vh)라 리사이즈하면 몇 행이 들어가는지가 바뀐다 → 다시 스냅.
 // 목록마다 리스너를 달면 드래그 중 리사이즈 1회에 목록 수만큼 레이아웃이 돌아 끊긴다 →
 // 하나로 모아 디바운스한다(드래그가 멎은 뒤 한 번만 재계산해도 결과는 같다).

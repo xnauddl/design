@@ -145,6 +145,8 @@ export type UiToCode =
   | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[] } // Phase C: 변수 보장+스타일 등록(화면 연결 없음)
   | { type: 'APPLY_TEXT_STYLES' } // Phase C: 적용만(생성 없음) — 선택 텍스트를 기존 스타일에 바인딩
   | { type: 'GET_COLLECTIONS' }
+  | { type: 'GET_UI_SIZE' } // QA #2 ①: 창 높이 단계 조회(시작 시 버튼 표시용)
+  | { type: 'SET_UI_SIZE'; mode: 'default' | 'large' } // QA #2 ①: 창 높이 2단계 전환(660 ↔ 860), 기억됨
   | { type: 'GET_GLOBAL_COLORS' } // #10: 기존 Global 색 변수 스캔(재방문 시맨틱 매핑 추천용)
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
   | { type: 'GET_LICENSE' }
@@ -171,6 +173,7 @@ export type UiToCode =
 
 /** code → UI 응답. */
 export type CodeToUi =
+  | { type: 'UI_SIZE'; mode: 'default' | 'large' } // 현재 창 높이 단계
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
   // comps/sets: 선택 안의 낱개 COMPONENT·COMPONENT_SET 수. 구조 카드의 베리언트 줄을

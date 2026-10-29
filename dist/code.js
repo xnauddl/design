@@ -4651,8 +4651,39 @@
     if (typeof f.commitUndo === "function") f.commitUndo();
   }
 
+  // src/lib/uiSize.ts
+  var UI_WIDTH = 400;
+  var UI_HEIGHT = { default: 660, large: 860 };
+  var UI_SIZE_KEY = "dsl.uiSize";
+  function normalizeUiSize(v) {
+    if (v === "large" || v === "default") return v;
+    if (v && typeof v === "object") {
+      const h = v.h;
+      if (typeof h === "number" && isFinite(h)) {
+        const mid = (UI_HEIGHT.default + UI_HEIGHT.large) / 2;
+        return h >= mid ? "large" : "default";
+      }
+    }
+    return "default";
+  }
+  function uiHeight(mode) {
+    return UI_HEIGHT[mode];
+  }
+
   // src/code.ts
-  figma.showUI(__html__, { width: 400, height: 660, themeColors: true });
+  figma.showUI(__html__, { width: UI_WIDTH, height: uiHeight("default"), themeColors: true });
+  var uiSizeMode = "default";
+  async function applyUiSize(mode, persist) {
+    uiSizeMode = mode;
+    figma.ui.resize(UI_WIDTH, uiHeight(mode));
+    if (persist) await figma.clientStorage.setAsync(UI_SIZE_KEY, mode).catch(() => {
+    });
+  }
+  var uiSizeReady = figma.clientStorage.getAsync(UI_SIZE_KEY).then((v) => {
+    const mode = normalizeUiSize(v);
+    return mode === "default" ? void 0 : applyUiSize(mode, false);
+  }).catch(() => {
+  });
   var selection = () => figma.currentPage.selection;
   var DEV_TIER_KEY = "dsl.devTier";
   var CACHE_KEY = "dsl.licenseCache";
@@ -5983,6 +6014,16 @@
           }
           post({ type: "GENERATE_RESULT", generated, sets: sets.length, combos });
           if (generated) commitUndo(figma);
+          break;
+        }
+        case "GET_UI_SIZE": {
+          await uiSizeReady;
+          post({ type: "UI_SIZE", mode: uiSizeMode });
+          break;
+        }
+        case "SET_UI_SIZE": {
+          await applyUiSize(normalizeUiSize(msg.mode), true);
+          post({ type: "UI_SIZE", mode: uiSizeMode });
           break;
         }
         case "GET_SETTINGS": {

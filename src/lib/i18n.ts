@@ -191,6 +191,8 @@ export const STRINGS: Record<string, string> = {
   'tab.tokens': '만들기',
   'tab.apply': '적용',
   'tab.settings': '설정',
+  'ui.sizeGrow': '창 높이 크게 (860)',
+  'ui.sizeShrink': '창 높이 기본으로 (660)',
   // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
   'rail.color': '색',
   'rail.colorSub': '추출·변수',
