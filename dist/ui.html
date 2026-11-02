@@ -340,6 +340,12 @@
     }
     .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
     .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
+    /* 컬렉션 계층 — 한 줄: 이름(변수 수) · 추천 · 선택 */
+    .col-role { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
+    .col-role:first-child { border-top: none; }
+    .col-role .name { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .col-role .sub { grid-column: 1 / -1; font-size: 10px; color: var(--muted); }
+    .col-role select { max-width: 150px; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
     .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */
@@ -759,6 +765,14 @@
       </div>
     </div>
 
+    <!-- 기존 자산 편입(§9): 이름이 Global/Semantic/Component가 아닌 컬렉션도 계층으로 쓰게 지정. -->
+    <div class="step" id="collectionRolesCard">
+      <h2 data-i18n="colRoles.title">컬렉션 계층</h2>
+      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
+      <div id="collectionRoles"></div>
+      <div class="status" id="colRolesStatus"></div>
+    </div>
+
     <div class="step">
       <h2 data-i18n="export.title">코드로 내보내기</h2>
       <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
@@ -1107,6 +1121,17 @@
     "rail.next": "\uB2E4\uC74C \u2192",
     // 플러그인 설정(#19) — 설정 탭에만
     "settings.title": "\uAE30\uBCF8\uAC12",
+    "colRoles.title": "\uCEEC\uB809\uC158 \uACC4\uCE35",
+    "colRoles.hint": "\uC774\uB984\uC774 Global\xB7Semantic\xB7Component\uAC00 \uC544\uB2CC \uCEEC\uB809\uC158\uB3C4 \uACC4\uCE35\uC73C\uB85C \uC4F0\uAC8C \uC9C0\uC815\uD569\uB2C8\uB2E4. \uD30C\uC77C\uC5D0 \uC800\uC7A5\uB3FC \uC774 \uD30C\uC77C\uC744 \uC5EC\uB294 \uBAA8\uB450\uC5D0\uAC8C \uC801\uC6A9\uB429\uB2C8\uB2E4",
+    "colRoles.empty": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218 \uCEEC\uB809\uC158\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "colRoles.vars": "\uBCC0\uC218 {n}",
+    "colRoles.auto": "\uC790\uB3D9 \u2014 {role}",
+    "colRoles.autoNone": "\uC790\uB3D9 \u2014 \uACC4\uCE35 \uC544\uB2D8",
+    "colRoles.none": "\uACC4\uCE35 \uC544\uB2D8",
+    "colRoles.guess": "\uCD94\uCC9C: {role}",
+    "colRoles.useGuess": "\uCD94\uCC9C\uB300\uB85C",
+    "colRoles.saved": "{name} \u2192 {role}. \uBC14\uC778\uB529\xB7\uC5ED\uD560 \uCD94\uCC9C\xB7\uB0B4\uBCF4\uB0B4\uAE30\uAC00 \uC774 \uC9C0\uC815\uC744 \uB530\uB985\uB2C8\uB2E4.",
+    "colRoles.dup": "{role}\uC740(\uB294) \uD55C \uCEEC\uB809\uC158\uB9CC \uB9E1\uC2B5\uB2C8\uB2E4 \u2014 {prev}\uC758 \uC9C0\uC815\uC740 \uD480\uB838\uC2B5\uB2C8\uB2E4.",
     "settings.hint": "\uC790\uC8FC \uC548 \uBC14\uAFB8\uB294 \uAC12\uC774\uC5D0\uC694. \uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9 \uD654\uBA74\uC5D0\uB294 \uC548 \uBCF4\uC5EC\uC694",
     "settings.base": "\uAE30\uC900 \uD06C\uAE30",
     "settings.depth": "\uC774\uB984 \uC815\uB9AC \uAE4A\uC774",
@@ -2058,7 +2083,10 @@
     const cols = /* @__PURE__ */ new Map();
     for (const v of vars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
     const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-    const target = (_a = withModes.find((v) => v.collection === "Semantic")) != null ? _a : withModes[0];
+    const target = (_a = withModes.find((v) => {
+      var _a2;
+      return ((_a2 = v.tier) != null ? _a2 : v.collection === "Semantic" ? 2 : 0) === 2;
+    })) != null ? _a : withModes[0];
     if (!target) return null;
     const dark = target.modes.find((m) => m.name.toLowerCase() === "dark");
     const from = target.modes.find((m) => m.modeId !== (dark == null ? void 0 : dark.modeId));
@@ -3354,9 +3382,9 @@
     }
     if (prev && cols.has(prev)) sel.value = prev;
     const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-    const usable = (_a = withModes.find((v) => v.collection === "Semantic")) != null ? _a : withModes[0];
+    const usable = (_a = withModes.find((v) => v.tier === 2)) != null ? _a : withModes[0];
     if (usable && ((_c = (_b = cols.get(sel.value)) == null ? void 0 : _b.modes.length) != null ? _c : 0) < 1) sel.value = usable.collectionId;
-    if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.collection) === "Global") && usable.collection === "Semantic") {
+    if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.tier) === 1) && usable.tier === 2) {
       sel.value = usable.collectionId;
     } else if (usable && !sel.value) {
       sel.value = usable.collectionId;
@@ -3718,6 +3746,9 @@
         break;
       case "COLLECTIONS":
         break;
+      case "COLLECTION_ROLES":
+        renderCollectionRoles(msg.collections);
+        break;
       case "GLOBAL_COLORS":
         if (!msg.colors.length) {
           if (!autoGlobalScan) setStatus(semStatusTarget, t("semantic.noGlobals"), "warn");
@@ -3812,10 +3843,10 @@
         allVars = msg.vars;
         refreshDarkOptions();
         if (!tokens.length) {
-          const globals = allVars.filter((v) => v.collection === "Global");
+          const globals = allVars.filter((v) => v.tier === 1);
           const colors = globals.filter((v) => v.name.startsWith("color/")).length;
           const others = globals.length - colors;
-          const roles = allVars.filter((v) => v.collection === "Semantic").length;
+          const roles = allVars.filter((v) => v.tier === 2).length;
           if (globals.length) {
             setStatus("colorStatus", t("color.fileVars", { n: colors, roles }), "");
             setStatus("createStatus", t("create.fileVars", { n: others }), "");
@@ -4621,7 +4652,80 @@
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
     if (name !== "settings") send({ type: "GET_PREREQ" });
     if (name === "tokens") send({ type: "GET_VARIABLES" });
+    if (name === "settings") send({ type: "GET_COLLECTION_ROLES" });
   }
+  var ROLE_LABEL = { global: "Global", semantic: "Semantic", component: "Component" };
+  var colRoleRows = [];
+  function renderCollectionRoles(rows) {
+    var _a;
+    const prev = colRoleRows;
+    colRoleRows = rows;
+    const box = $("collectionRoles");
+    clearMount(box);
+    if (!rows.length) {
+      const p = document.createElement("div");
+      p.className = "hint";
+      p.textContent = t("colRoles.empty");
+      box.appendChild(p);
+      return;
+    }
+    for (const r of rows) {
+      const row = document.createElement("div");
+      row.className = "col-role";
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = r.name;
+      name.title = r.name;
+      const sel = document.createElement("select");
+      sel.setAttribute("aria-label", r.name);
+      const opts = [
+        ["", !r.set && r.role ? t("colRoles.auto", { role: ROLE_LABEL[r.role] }) : t("colRoles.autoNone")],
+        ["global", "Global"],
+        ["semantic", "Semantic"],
+        ["component", "Component"],
+        ["none", t("colRoles.none")]
+      ];
+      for (const [v, label] of opts) {
+        const o = document.createElement("option");
+        o.value = v;
+        o.textContent = label;
+        sel.appendChild(o);
+      }
+      sel.value = (_a = r.set) != null ? _a : "";
+      sel.addEventListener("change", () => {
+        const role = sel.value || null;
+        const holder = role && role !== "none" ? colRoleRows.find((x) => x.id !== r.id && x.set === role) : void 0;
+        pendingRoleNote = { id: r.id, name: r.name, role, prev: holder == null ? void 0 : holder.name };
+        send({ type: "SET_COLLECTION_ROLE", collectionId: r.id, role });
+      });
+      const sub = document.createElement("div");
+      sub.className = "sub";
+      sub.append(t("colRoles.vars", { n: r.vars }));
+      if (!r.set && r.guess && r.guess !== r.role) {
+        sub.append(" \xB7 ", t("colRoles.guess", { role: ROLE_LABEL[r.guess] }), " ");
+        const use = document.createElement("button");
+        use.className = "link";
+        use.textContent = t("colRoles.useGuess");
+        use.addEventListener("click", () => {
+          const holder = colRoleRows.find((x) => x.id !== r.id && x.set === r.guess);
+          pendingRoleNote = { id: r.id, name: r.name, role: r.guess, prev: holder == null ? void 0 : holder.name };
+          send({ type: "SET_COLLECTION_ROLE", collectionId: r.id, role: r.guess });
+        });
+        sub.appendChild(use);
+      }
+      row.append(name, sel, sub);
+      box.appendChild(row);
+    }
+    if (pendingRoleNote && prev.length) {
+      const n = pendingRoleNote;
+      pendingRoleNote = null;
+      const now = rows.find((x) => x.id === n.id);
+      const label = n.role === null ? (now == null ? void 0 : now.role) ? t("colRoles.auto", { role: ROLE_LABEL[now.role] }) : t("colRoles.autoNone") : n.role === "none" ? t("colRoles.none") : ROLE_LABEL[n.role];
+      const dup = n.prev && n.role && n.role !== "none" ? " " + t("colRoles.dup", { role: ROLE_LABEL[n.role], prev: n.prev }) : "";
+      setStatus("colRolesStatus", t("colRoles.saved", { name: n.name, role: label }) + dup, dup ? "warn" : "ok");
+    }
+  }
+  var pendingRoleNote = null;
   TABS.forEach((t2, i) => {
     const btn = $(`tabbtn-${t2}`);
     btn.addEventListener("click", () => showTab(t2));

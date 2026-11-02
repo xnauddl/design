@@ -11,7 +11,7 @@ import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { exportHasTokens, type ExportFormat } from './lib/exporters';
 import type { FrameMeta } from './lib/similar';
-import type { VarInfo } from './shared/messages';
+import type { VarInfo, CollectionRoleInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
 import { nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles, mergeTokenRoles, semanticMapToText, textToSemanticMap } from './lib/roles';
@@ -1736,10 +1736,10 @@ function refreshDarkOptions(): void {
   if (prev && cols.has(prev)) sel.value = prev;
   // Semantic을 우선(다크 채움 대상). 모드 1개여도 Dark를 만들 수 있으므로 ≥1이면 충분.
   const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-  const usable = withModes.find((v) => v.collection === 'Semantic') ?? withModes[0];
+  const usable = withModes.find((v) => v.tier === 2) ?? withModes[0];
   if (usable && (cols.get(sel.value)?.modes.length ?? 0) < 1) sel.value = usable.collectionId;
   // 선택이 비었거나 Global만 잡힌 경우 Semantic으로 끌어올린다.
-  if (usable && (!sel.value || cols.get(sel.value)?.collection === 'Global') && usable.collection === 'Semantic') {
+  if (usable && (!sel.value || cols.get(sel.value)?.tier === 1) && usable.tier === 2) {
     sel.value = usable.collectionId;
   } else if (usable && !sel.value) {
     sel.value = usable.collectionId;
@@ -2195,6 +2195,9 @@ window.onmessage = (event: MessageEvent) => {
     case 'COLLECTIONS':
       // 존재 확인용 프로브(별도 UI 없음).
       break;
+    case 'COLLECTION_ROLES':
+      renderCollectionRoles(msg.collections);
+      break;
     case 'GLOBAL_COLORS':
       // #10: 기존 Global 색에서 역할 추천 → 시맨틱 매핑 textarea 채움(재방문 매핑).
       // 자동 요청은 비어 있을 때만 채운다 — 사용자가 이미 고른 역할을 덮으면 안 된다.
@@ -2308,10 +2311,10 @@ window.onmessage = (event: MessageEvent) => {
       refreshDarkOptions();
       // 만들기 탭이 비어 보이지 않게 — 파일에 이미 있는 변수 수를 카드 상태 줄에(목록은 다음 버전).
       if (!tokens.length) {
-        const globals = allVars.filter((v) => v.collection === 'Global');
+        const globals = allVars.filter((v) => v.tier === 1);
         const colors = globals.filter((v) => v.name.startsWith('color/')).length;
         const others = globals.length - colors;
-        const roles = allVars.filter((v) => v.collection === 'Semantic').length;
+        const roles = allVars.filter((v) => v.tier === 2).length;
         if (globals.length) {
           setStatus('colorStatus', t('color.fileVars', { n: colors, roles }), '');
           setStatus('createStatus', t('create.fileVars', { n: others }), '');
@@ -3353,7 +3356,90 @@ function showTab(name: (typeof TABS)[number]): void {
   if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
   // 만들기 탭의 다크 카드는 allVars에 의존 — 탭 들어올 때마다 최신화(외부에서 모드/변수 추가 대비).
   if (name === 'tokens') send({ type: 'GET_VARIABLES' });
+  if (name === 'settings') send({ type: 'GET_COLLECTION_ROLES' }); // 다른 사람이 지정을 바꿨을 수 있다
 }
+
+/* ---------- 컬렉션 계층(§9) — 이름이 아니라 지정으로 Global/Semantic/Component ---------- */
+type RoleKey = 'global' | 'semantic' | 'component';
+const ROLE_LABEL: Record<RoleKey, string> = { global: 'Global', semantic: 'Semantic', component: 'Component' };
+let colRoleRows: CollectionRoleInfo[] = [];
+
+function renderCollectionRoles(rows: CollectionRoleInfo[]): void {
+  const prev = colRoleRows;
+  colRoleRows = rows;
+  const box = $('collectionRoles');
+  clearMount(box);
+  if (!rows.length) {
+    const p = document.createElement('div');
+    p.className = 'hint';
+    p.textContent = t('colRoles.empty');
+    box.appendChild(p);
+    return;
+  }
+  for (const r of rows) {
+    const row = document.createElement('div');
+    row.className = 'col-role';
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = r.name;
+    name.title = r.name;
+    const sel = document.createElement('select');
+    sel.setAttribute('aria-label', r.name);
+    // 자동 = 지정 없음(이름으로 판정). 지금 이름 판정 결과를 함께 보여 준다.
+    const opts: [string, string][] = [
+      ['', !r.set && r.role ? t('colRoles.auto', { role: ROLE_LABEL[r.role] }) : t('colRoles.autoNone')],
+      ['global', 'Global'],
+      ['semantic', 'Semantic'],
+      ['component', 'Component'],
+      ['none', t('colRoles.none')],
+    ];
+    for (const [v, label] of opts) {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = label;
+      sel.appendChild(o);
+    }
+    sel.value = r.set ?? '';
+    sel.addEventListener('change', () => {
+      const role = (sel.value || null) as RoleKey | 'none' | null;
+      // 같은 역할을 맡던 다른 컬렉션은 풀린다(한 역할 = 한 컬렉션) — 미리 알려 준다.
+      const holder = role && role !== 'none' ? colRoleRows.find((x) => x.id !== r.id && x.set === role) : undefined;
+      pendingRoleNote = { id: r.id, name: r.name, role, prev: holder?.name };
+      send({ type: 'SET_COLLECTION_ROLE', collectionId: r.id, role });
+    });
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.append(t('colRoles.vars', { n: r.vars }));
+    // 추천은 지정이 없고, 추측이 지금 판정과 다를 때만 — 이미 맞으면 소음이다.
+    if (!r.set && r.guess && r.guess !== r.role) {
+      sub.append(' · ', t('colRoles.guess', { role: ROLE_LABEL[r.guess] }), ' ');
+      const use = document.createElement('button');
+      use.className = 'link';
+      use.textContent = t('colRoles.useGuess');
+      use.addEventListener('click', () => {
+        const holder = colRoleRows.find((x) => x.id !== r.id && x.set === r.guess);
+        pendingRoleNote = { id: r.id, name: r.name, role: r.guess, prev: holder?.name };
+        send({ type: 'SET_COLLECTION_ROLE', collectionId: r.id, role: r.guess });
+      });
+      sub.appendChild(use);
+    }
+    row.append(name, sel, sub);
+    box.appendChild(row);
+  }
+  // 방금 바꾼 지정의 결과 문구(지정 응답일 때만).
+  if (pendingRoleNote && prev.length) {
+    const n = pendingRoleNote;
+    pendingRoleNote = null;
+    // 해제(null)는 이름 판정으로 돌아간다 — 실제 결과는 방금 받은 행의 role이 말해 준다.
+    const now = rows.find((x) => x.id === n.id);
+    const label = n.role === null
+      ? now?.role ? t('colRoles.auto', { role: ROLE_LABEL[now.role] }) : t('colRoles.autoNone')
+      : n.role === 'none' ? t('colRoles.none') : ROLE_LABEL[n.role];
+    const dup = n.prev && n.role && n.role !== 'none' ? ' ' + t('colRoles.dup', { role: ROLE_LABEL[n.role], prev: n.prev }) : '';
+    setStatus('colRolesStatus', t('colRoles.saved', { name: n.name, role: label }) + dup, dup ? 'warn' : 'ok');
+  }
+}
+let pendingRoleNote: { id: string; name: string; role: RoleKey | 'none' | null; prev?: string } | null = null;
 TABS.forEach((t, i) => {
   const btn = $(`tabbtn-${t}`);
   btn.addEventListener('click', () => showTab(t));

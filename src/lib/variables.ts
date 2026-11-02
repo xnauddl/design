@@ -19,6 +19,7 @@ import {
   unitDescription,
 } from './tokens';
 import { paletteFamilyOf } from './palette';
+import { findCollection, ensureCollection, collectionTiers } from './collectionRoles'; // 이름이 아니라 지정된 역할로(Primitives→Global 등)
 import { TextSample, TextStyleSpec, ExistingTextStyle } from './textStyles';
 
 export const GLOBAL = 'Global';
@@ -57,8 +58,8 @@ function upsertVariable(name: string, collection: VariableCollection, type: Reso
 
 async function resolveCollections(): Promise<{ globalCol: VariableCollection; semanticCol: VariableCollection }> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const globalCol = cols.find((c) => c.name === GLOBAL) ?? figma.variables.createVariableCollection(GLOBAL);
-  const semanticCol = cols.find((c) => c.name === SEMANTIC) ?? figma.variables.createVariableCollection(SEMANTIC);
+  const globalCol = ensureCollection(cols, 'global', GLOBAL);
+  const semanticCol = ensureCollection(cols, 'semantic', SEMANTIC);
   return { globalCol, semanticCol };
 }
 
@@ -114,7 +115,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
    conversions로 돌려줘 미리보기가 base 변경을 보여줄 수 있게 한다. */
 export async function previewCreateTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const gId = cols.find((c) => c.name === GLOBAL)?.id ?? '#G';
+  const gId = findCollection(cols, 'global')?.id ?? '#G';
   const existing = new Set<string>();
   for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
 
@@ -175,7 +176,8 @@ export async function prunePaletteColors(keep: string[]): Promise<number> {
   // 이번 팔레트가 쓰는 hue 패밀리(이 안에서만 정리 — 무관 색 보존).
   const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f): f is string => f !== null));
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const palIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC).map((c) => c.id));
+  const tiers = collectionTiers(cols);
+  const palIds = new Set(cols.filter((c) => tiers.get(c.id) === 1 || tiers.get(c.id) === 2).map((c) => c.id));
   let removed = 0;
   for (const v of await figma.variables.getLocalVariablesAsync()) {
     if (!palIds.has(v.variableCollectionId)) continue;
@@ -192,12 +194,12 @@ export async function prunePaletteColors(keep: string[]): Promise<number> {
 export async function createSemanticAliases(map: Record<string, string>): Promise<SemanticSummary> {
   const summary: SemanticSummary = { created: 0, updated: 0, aliased: 0, missing: [] };
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const globalCol = cols.find((c) => c.name === GLOBAL);
+  const globalCol = findCollection(cols, 'global');
   if (!globalCol) {
     summary.missing = Object.values(map);
     return summary; // Global이 없으면 먼저 토큰을 생성해야 함
   }
-  const semanticCol = cols.find((c) => c.name === SEMANTIC) ?? figma.variables.createVariableCollection(SEMANTIC);
+  const semanticCol = ensureCollection(cols, 'semantic', SEMANTIC);
   const sMode = semanticCol.defaultModeId;
   const idx = await buildVarIndex();
 
@@ -546,7 +548,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
   }
   if (roleRenames.length) {
     const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId0 = cols0.find((c) => c.name === SEMANTIC)?.id;
+    const semId0 = findCollection(cols0, 'semantic')?.id;
     if (semId0) {
       const byName = new Map<string, Variable>();
       for (const v of await figma.variables.getLocalVariablesAsync())
@@ -648,7 +650,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
   // rename인데 이동/기존 모두 없어 시맨틱이 비면, 스타일 **현재 값**으로만 생성(스캔 오버라이드 아님).
   {
     const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId0 = cols0.find((c) => c.name === SEMANTIC)?.id;
+    const semId0 = findCollection(cols0, 'semantic')?.id;
     const semNames = new Set<string>();
     if (semId0)
       for (const v of await figma.variables.getLocalVariablesAsync())
@@ -667,7 +669,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
 
   // 2) 시맨틱 변수 인덱스(이름→변수). 기존 텍스트 스타일 맵은 step 0에서 준비됨.
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const semId = cols.find((c) => c.name === SEMANTIC)?.id;
+  const semId = findCollection(cols, 'semantic')?.id;
   const semByName = new Map<string, Variable>();
   if (semId)
     for (const v of await figma.variables.getLocalVariablesAsync())

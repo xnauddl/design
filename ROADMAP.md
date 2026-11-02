@@ -151,7 +151,7 @@
 > Tokens Studio의 Inspect·Remap(#5)과 변수·스타일 가져오기(#7)를 우리 구조(변수가 원본, 토큰 JSON 없음)에 맞게 옮긴다.
 > 티어는 원칙대로 — 기존 변수를 다루는 일은 Free, 새 변수를 만드는 일은 Paid.
 - [x] **변수 일괄 교체(Remap)** — 연결 현황 › 변수별 보기의 행마다 ‘교체’: 선택 안에서 변수 A(그 속성 그룹만)를 B로 다시 연결. 후보는 A가 쓰이던 **모든** 필드에 타입·용도(scope)가 맞는 변수만(`lib/scopes.ts` `remapTargets`, 자동 바인딩과 같은 규칙). 교체 때 선택을 다시 훑고(`remapBindings`), 텍스트는 A 구간만 바꿔 다른 변수 구간 보존, 지워진 변수 잔상도 교체 가능, 단일 Undo. Free
-- [ ] **다른 이름 컬렉션 인식** — `Primitives`·`Tokens` 등을 Global/Semantic으로 지정(파일 pluginData에 저장, 이름으로 첫 추측). 이름 하드코딩 ~15곳을 한 판정 함수로. Free
+- [x] **다른 이름 컬렉션 인식** — 설정 › 컬렉션 계층에서 `Primitives`·`Tokens` 등을 Global/Semantic/Component(또는 계층 아님)로 지정. 파일 pluginData(`dsl.collectionRoles`)에 저장돼 같은 파일을 여는 모두에게 적용. 판정은 `lib/tiers.ts`(순수) 한 곳 — 이름 하드코딩 18곳(variables·bind·themeApply·code·ui·wizard)을 대체. **지정이 없으면 예전과 동일**(정확한 이름만). 한 역할 = 한 컬렉션(쓰기 대상), 이름이 `Global`인 기존 컬렉션은 읽기 계층으로 남아 기존 연결 유지. 이름 추천은 표시만(자동 적용 안 함). Free
 - [ ] **색·효과 스타일 → 변수** — 단색 페인트·그림자 스타일 값으로 Global 변수를 만들고 **스타일은 유지한 채 변수로 받친다**(레이어 불변). Paid
 - [ ] **팀 라이브러리 변수 사용** — `teamlibrary` 권한, 사용자가 고른 라이브러리 컬렉션만 가져와 바인딩·교체 후보로. 실기 검증 필수. Free
 

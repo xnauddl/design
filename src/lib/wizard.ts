@@ -103,11 +103,12 @@ export interface DarkTarget {
  * 모드가 1개 이상인 컬렉션 중 `Semantic` 우선 → 출처는 Dark가 아닌 첫 모드 →
  * 대상은 이미 있는 `Dark`(없으면 생략). 고를 게 없으면 null(단계는 건너뛴다).
  */
-export function pickDarkTarget(vars: readonly { collectionId: string; collection: string; modes: readonly { modeId: string; name: string }[] }[]): DarkTarget | null {
+export function pickDarkTarget(vars: readonly { collectionId: string; collection: string; tier?: number; modes: readonly { modeId: string; name: string }[] }[]): DarkTarget | null {
   const cols = new Map<string, (typeof vars)[number]>();
   for (const v of vars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
   const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-  const target = withModes.find((v) => v.collection === 'Semantic') ?? withModes[0];
+  // Semantic 역할(지정 또는 이름) 우선 — tier가 없으면 예전처럼 이름으로.
+  const target = withModes.find((v) => (v.tier ?? (v.collection === 'Semantic' ? 2 : 0)) === 2) ?? withModes[0];
   if (!target) return null;
   const dark = target.modes.find((m) => m.name.toLowerCase() === 'dark');
   const from = target.modes.find((m) => m.modeId !== dark?.modeId);

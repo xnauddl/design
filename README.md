@@ -28,6 +28,11 @@
 - 크기(`width`/`height`)는 **Fixed**일 때만 바인딩(HUG/FILL 충돌 시 스킵·플래그).
 - `padding`·`gap`은 **오토레이아웃 프레임**에만 존재 → 일반 프레임은 스킵·안내.
 
+### 컬렉션 계층 지정 (Free)
+- 계층은 기본적으로 컬렉션 **이름**(`Global`/`Semantic`/`Component`)으로 읽는다. 다른 이름의 컬렉션(`Primitives`·`Tokens` 등)은 **설정 › 컬렉션 계층**에서 계층을 지정하면 바인딩 우선순위·역할 추천·내보내기·토큰 생성이 그 지정을 따른다.
+- 지정은 파일(`figma.root` pluginData)에 저장된다 — 같은 파일을 여는 모두에게 같다. 한 역할은 한 컬렉션만 맡고(새 변수를 쓰는 곳), 이름이 `Global`인 기존 컬렉션은 ‘계층 아님’으로 빼지 않는 한 읽기 계층으로 남는다.
+- 이름으로 추측한 **추천**을 보여 주지만 자동 적용하지 않는다 — 지정을 안 하면 동작이 예전과 같다.
+
 ### 변수 일괄 교체 (Free)
 - 연결 현황 › **변수별 보기**에서 행마다 ‘교체’ — 선택 안에서 변수 A가 붙은 자리(그 행의 속성만)를 변수 B로 다시 연결한다.
 - B 후보는 A가 쓰이던 모든 필드에 **타입·용도(scope)가 맞는 변수만**(자동 바인딩과 같은 규칙, `lib/scopes.ts`). 지워진 변수 잔상도 A로 골라 한 번에 살릴 수 있다.
@@ -107,6 +112,8 @@ src/
     textStyles.ts 텍스트 스타일 순수 로직(시그니처 군집·크기 랭킹 명명·기본 램프) — Phase C
     bind.ts     resolved 값 매칭 → 변수 바인딩 · 일괄 교체(remapBindings)
     scopes.ts   바인딩 필드 ↔ 변수 용도·타입 규칙 + 교체 후보 판정 — 순수
+    tiers.ts    컬렉션 → 계층 판정(지정 우선, 없으면 정확한 이름) — 순수
+    collectionRoles.ts 계층 지정 저장(figma.root pluginData)·조회
     rename.ts   boundVariables·역할 추론 → 리네임
     entitlements.ts 요금제 티어(Free/Paid)·기능 게이팅 — 순수
     license.ts   라이선스 캐시 평가·grace·검증 응답 파싱 — 순수

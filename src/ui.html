@@ -340,6 +340,12 @@
     }
     .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
     .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
+    /* 컬렉션 계층 — 한 줄: 이름(변수 수) · 추천 · 선택 */
+    .col-role { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
+    .col-role:first-child { border-top: none; }
+    .col-role .name { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .col-role .sub { grid-column: 1 / -1; font-size: 10px; color: var(--muted); }
+    .col-role select { max-width: 150px; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
     .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */
@@ -757,6 +763,14 @@
         <label class="inline" data-i18n-title="settings.gridTip" title="여백·크기 토큰을 미리보기에서 이 격자로 모읍니다. 예: 8이면 13·15가 16으로."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
         <label class="inline" data-i18n-title="settings.tolTip" title="바인딩은 레이어 값과 변수 값의 차이가 이 값 이하일 때 같은 값으로 봅니다. 격자로 옮긴 토큰까지 붙이려면 격자의 절반쯤이 필요합니다."><span data-i18n="settings.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" max="16" step="0.5" />px</label>
       </div>
+    </div>
+
+    <!-- 기존 자산 편입(§9): 이름이 Global/Semantic/Component가 아닌 컬렉션도 계층으로 쓰게 지정. -->
+    <div class="step" id="collectionRolesCard">
+      <h2 data-i18n="colRoles.title">컬렉션 계층</h2>
+      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
+      <div id="collectionRoles"></div>
+      <div class="status" id="colRolesStatus"></div>
     </div>
 
     <div class="step">

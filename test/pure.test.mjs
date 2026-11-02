@@ -2388,3 +2388,44 @@ test('remapTargets — 타입·용도가 모든 필드에 맞는 변수만, A �
   assert.equal(scopeFitsField('fontFamily', ['FONT_FAMILY']), true);
   assert.equal(scopeFitsField('fontFamily', []), false);
 });
+
+/* ---------- 컬렉션 계층 판정(tiers.ts) ---------- */
+test('tiers — 지정 우선, 없으면 정확한 이름, none으로 빼기, 한 역할 한 컬렉션', async () => {
+  const { parseRoleMap, roleOfCollection, tierOfCollection, pickCollection, assignRole, guessRole } = await import('../dist/pure.mjs');
+  const cols = [
+    { id: 'g', name: 'Global' },
+    { id: 'p', name: 'Primitives' },
+    { id: 's', name: 'Semantic' },
+    { id: 'x', name: 'Breakpoints' },
+  ];
+  // 지정 없음 = 예전 동작(정확한 이름만)
+  assert.deepEqual(cols.map((c) => tierOfCollection(c, {})), [1, 0, 2, 0]);
+  assert.equal(pickCollection(cols, {}, 'global').id, 'g');
+  // Primitives를 Global로 지정 → 쓰기 대상은 Primitives, 기존 'Global'도 여전히 계층(읽기)
+  let map = assignRole({}, 'p', 'global');
+  assert.equal(pickCollection(cols, map, 'global').id, 'p');
+  assert.deepEqual(cols.map((c) => tierOfCollection(c, map)), [1, 1, 2, 0]);
+  // 'Global'을 계층 아님으로 못 박기
+  map = assignRole(map, 'g', 'none');
+  assert.equal(roleOfCollection(cols[0], map), null);
+  assert.equal(pickCollection(cols, map, 'global').id, 'p');
+  // 한 역할 한 컬렉션 — 다른 컬렉션에 global을 주면 p의 지정은 풀린다
+  map = assignRole(map, 'x', 'global');
+  assert.equal(map.p, undefined);
+  assert.equal(map.x, 'global');
+  // 해제(null)는 이름 판정으로 복귀
+  map = assignRole(map, 'g', null);
+  assert.equal(map.g, undefined);
+  // 저장 문자열 파싱 — 깨졌거나 모르는 값은 버린다
+  assert.deepEqual(parseRoleMap('{"a":"global","b":"weird","c":"none"}'), { a: 'global', c: 'none' });
+  assert.deepEqual(parseRoleMap('not json'), {});
+  assert.deepEqual(parseRoleMap('[1]'), {});
+  assert.deepEqual(parseRoleMap(''), {});
+  // 이름 추천(자동 적용 안 함)
+  assert.equal(guessRole('Primitives'), 'global');
+  assert.equal(guessRole('Core colors'), 'global');
+  assert.equal(guessRole('Tokens'), 'semantic');
+  assert.equal(guessRole('Theme'), 'semantic');
+  assert.equal(guessRole('Components'), 'component');
+  assert.equal(guessRole('Breakpoints'), null);
+});

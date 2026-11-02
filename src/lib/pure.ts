@@ -23,3 +23,4 @@ export * from './a11y';
 export * from './wizard';
 export * from './uiSize';
 export * from './scopes';
+export * from './tiers';

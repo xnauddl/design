@@ -1,14 +1,16 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode, RenameChange, VarInfo, VarMode } from './shared/messages';
+import type { UiToCode, RenameChange, VarInfo, VarMode, CollectionRoleInfo } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
+import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, scanBindings, remapBindings } from './lib/bind';
 import { remapTargets } from './lib/scopes';
+import { collectionTiers, findCollection, readRoleMap, writeRoleMap } from './lib/collectionRoles';
+import { assignRole, roleOfCollection, guessRole } from './lib/tiers';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
@@ -141,9 +143,11 @@ async function loadLicense(): Promise<void> {
 async function postPrereq(): Promise<void> {
   try {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
+    // 계층은 컬렉션 이름이 아니라 지정된 역할로(Primitives→Global 등, tiers.ts).
+    const tiers = collectionTiers(cols);
+    const globalIds = new Set(cols.filter((c) => tiers.get(c.id) === 1).map((c) => c.id));
     // 거울 폐지 후 바인딩 대상은 3계층 전부 — 역할 없는 값은 Global에 붙는다(bind.ts).
-    const bindableIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+    const bindableIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) > 0).map((c) => c.id));
     const vars = await figma.variables.getLocalVariablesAsync();
     const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
     const hasColorVars = globals.some((v) => v.resolvedType === 'COLOR');
@@ -153,7 +157,7 @@ async function postPrereq(): Promise<void> {
     // 다크는 '모드가 둘 이상인 **바인딩 대상** 컬렉션'이 있으면 이미 만든 것으로 본다.
     // 문서 전체로 보면 Breakpoint(Desktop/Mobile) 같은 무관한 컬렉션 하나가 다크 단계를
     // 「완료」로 만들어, 다크 테마가 없는 파일에서 사용자가 그 단계를 건너뛴다.
-    const semanticIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+    const semanticIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) >= 2).map((c) => c.id));
     const hasDarkMode = cols.some((c) => semanticIds.has(c.id) && c.modes.length > 1);
     const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 타이포 단계 「기존만 연결」 전제
     const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId)); // 역할 별칭 존재 = 역할 매핑 완료
@@ -209,23 +213,32 @@ function errText(e: unknown): string {
 
 /* ---------- 변수 목록(다크 테마 생성의 컬렉션·모드 선택용) ---------- */
 
-// 우리가 만든 3계층만 목록 대상 — 남의 라이브러리 컬렉션은 다루지 않는다.
-const EDITABLE_COLLECTIONS = new Set([GLOBAL, SEMANTIC, COMPONENT]);
-
-function toVarInfo(v: Variable, col: VariableCollection): VarInfo {
+// 3계층(이름 또는 지정된 역할)만 목록 대상 — 계층이 아닌 컬렉션은 다루지 않는다.
+function toVarInfo(v: Variable, col: VariableCollection, tier: number): VarInfo {
   const modes: VarMode[] = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
-  return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, modes };
+  return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, tier, modes };
+}
+
+/** 설정 탭 '컬렉션 계층' 목록 — 로컬 컬렉션 전부(계층 아닌 것도 지정할 수 있게). */
+async function collectionRoleInfos(): Promise<CollectionRoleInfo[]> {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const map = readRoleMap();
+  const count = new Map<string, number>();
+  for (const v of await figma.variables.getLocalVariablesAsync()) count.set(v.variableCollectionId, (count.get(v.variableCollectionId) ?? 0) + 1);
+  return cols.map((c) => ({ id: c.id, name: c.name, vars: count.get(c.id) ?? 0, set: map[c.id] ?? null, role: roleOfCollection(c, map), guess: guessRole(c.name) }));
 }
 
 async function collectVars(): Promise<VarInfo[]> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const colById = new Map(cols.map((c) => [c.id, c]));
+  const tiers = collectionTiers(cols);
   const vars = await figma.variables.getLocalVariablesAsync();
   const out: VarInfo[] = [];
   for (const v of vars) {
     const col = colById.get(v.variableCollectionId);
-    if (!col || !EDITABLE_COLLECTIONS.has(col.name)) continue;
-    out.push(toVarInfo(v, col));
+    const tier = col ? tiers.get(col.id) ?? 0 : 0;
+    if (!col || !tier) continue;
+    out.push(toVarInfo(v, col, tier));
   }
   out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
   return out;
@@ -1018,6 +1031,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         postSelection(); // UI 초기화 시점 — 현재 선택 상태도 함께 전송(UX5).
         break;
       }
+      case 'GET_COLLECTION_ROLES': {
+        post({ type: 'COLLECTION_ROLES', collections: await collectionRoleInfos() });
+        break;
+      }
+      case 'SET_COLLECTION_ROLE': {
+        // 컬렉션 계층 지정(Free — 기존 변수를 다루는 일). 파일 pluginData라 같은 파일을 여는 모두에게 적용.
+        writeRoleMap(assignRole(readRoleMap(), msg.collectionId, msg.role));
+        post({ type: 'COLLECTION_ROLES', collections: await collectionRoleInfos() });
+        await postPrereq(); // 계층이 바뀌면 '토큰 있음/바인딩 대상 있음' 판정도 바뀐다
+        post({ type: 'VARIABLES', vars: await collectVars() });
+        break;
+      }
       case 'GET_PREREQ': {
         await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
         break;
@@ -1025,7 +1050,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'GET_GLOBAL_COLORS': {
         // #10: 기존 Global 색 변수(리터럴 COLOR)를 이름+hex로 수집 → 재방문 시맨틱 매핑 추천.
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
-        const globalCol = cols.find((c) => c.name === GLOBAL);
+        const globalCol = findCollection(cols, 'global');
         const colors: { name: string; hex: string }[] = [];
         if (globalCol) {
           const mode = globalCol.defaultModeId;
@@ -1107,16 +1132,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 모든 디자인 시스템 변수(Global+Semantic)를 코드로 내보내기. (현재 Free; 추후 게이팅 가능)
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
         const colById = new Map(cols.map((c) => [c.id, c]));
+        const tiers = collectionTiers(cols);
         const vars = await figma.variables.getLocalVariablesAsync();
         const nameById = new Map(vars.map((v) => [v.id, v.name]));
         const tokens: ExportToken[] = [];
         for (const v of vars) {
           const col = colById.get(v.variableCollectionId);
-          if (!col || (col.name !== GLOBAL && col.name !== SEMANTIC)) continue;
+          const tier = col ? tiers.get(col.id) : 0;
+          if (!col || (tier !== 1 && tier !== 2)) continue; // 내보내기는 Global·Semantic 계층(이름 무관)
           const raw = v.valuesByMode[col.defaultModeId];
           const t: ExportToken = {
             name: v.name,
-            collection: col.name as 'Global' | 'Semantic',
+            collection: tier === 1 ? 'Global' : 'Semantic', // 출력 그룹은 계층 이름(컬렉션 실제 이름과 무관)
             type: v.resolvedType,
             kind: kindOf(v),
           };
