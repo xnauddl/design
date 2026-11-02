@@ -7,7 +7,8 @@ import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
-import { bindSelection, scanBindings } from './lib/bind';
+import { bindSelection, scanBindings, remapBindings } from './lib/bind';
+import { remapTargets } from './lib/scopes';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
@@ -831,6 +832,37 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 읽기 전용 — 파일에 남은 바인딩을 결과 트리 모양으로. 플러그인을 닫았다 열어도 '뭐가 붙어 있나'가 보인다.
         const r = await scanBindings(selection());
         post({ type: 'BINDINGS_RESULT', candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes });
+        break;
+      }
+      case 'REMAP_TARGETS': {
+        // 일괄 교체(Free — 기존 변수를 다루는 일): A가 쓰이던 필드들에 맞는 로컬 변수만 후보로.
+        const vars = await figma.variables.getLocalVariablesAsync();
+        const colName = new Map((await figma.variables.getLocalVariableCollectionsAsync()).map((c) => [c.id, c.name]));
+        const from = vars.find((v) => v.id === msg.fromId) ?? null; // 지워진 변수(잔상)면 null — 필드 규칙으로 타입을 정한다
+        const targets = remapTargets(
+          msg.fromId,
+          from ? from.resolvedType : null,
+          msg.fields,
+          vars.map((v) => ({ id: v.id, name: v.name, resolvedType: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'], collection: colName.get(v.variableCollectionId) ?? '' })),
+        ).map((v) => ({ id: v.id, name: v.name, collection: v.collection }));
+        post({ type: 'REMAP_TARGETS_RESULT', fromId: msg.fromId, targets });
+        break;
+      }
+      case 'REMAP_BINDINGS': {
+        const to = await figma.variables.getVariableByIdAsync(msg.toId);
+        if (!to) {
+          post({ type: 'ERROR', message: '바꿀 변수를 찾지 못했습니다 — 지워졌을 수 있습니다. 연결 현황을 다시 보세요.', op: 'REMAP_BINDINGS' });
+          break;
+        }
+        // 미리보기 목록은 그사이 낡았을 수 있어 선택을 다시 훑으며 바꾼다.
+        const r = await remapBindings(selection(), msg.fromId, to, msg.fields);
+        if (r.replaced) {
+          commitUndo(figma); // UX2: 일괄 교체 전체를 단일 Undo로
+          await postPrereq();
+        }
+        post({ type: 'REMAP_RESULT', ...r, toName: to.name });
+        const scan = await scanBindings(selection()); // 연결 현황을 바뀐 상태로 다시 그린다
+        post({ type: 'BINDINGS_RESULT', candidates: scan.candidates, nodes: scan.nodes, total: scan.total, boundNodes: scan.boundNodes });
         break;
       }
       case 'CANCEL': {

@@ -332,6 +332,14 @@
       padding: 6px 8px; display: grid; gap: 3px;
     }
     .r-card.dim { opacity: .55; }
+    /* 일괄 교체 패널 — 변수별 보기의 행 바로 아래에 붙는다. 좁은 폭에서는 줄바꿈. */
+    .remap-panel {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      margin: -2px 0 6px; padding: 7px 8px; border: 1px solid var(--accent-border);
+      border-radius: var(--r-sm); background: var(--accent-subtle); font-size: 11px;
+    }
+    .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
+    .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
     .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */
@@ -949,6 +957,16 @@
     "bind.viewVariable": "\uBCC0\uC218\uBCC4",
     "bind.varLayers": "\uB808\uC774\uC5B4 {n}",
     "bind.varSelect": "\uC120\uD0DD",
+    "bind.varRemap": "\uAD50\uCCB4",
+    "bind.varRemapTip": "\uC774 \uBCC0\uC218\uAC00 \uBD99\uC740 \uC790\uB9AC\uB97C \uB2E4\uB978 \uBCC0\uC218\uB85C \uBC14\uAFC9\uB2C8\uB2E4 \u2014 \uC120\uD0DD \uC548, \uC774 \uC18D\uC131\uB9CC",
+    "bind.remapLabel": "\uBC14\uAFC0 \uBCC0\uC218",
+    "bind.remapLoading": "\uBC14\uAFC0 \uC218 \uC788\uB294 \uBCC0\uC218\uB97C \uCC3E\uB294 \uC911\u2026",
+    "bind.remapNone": "\uBC14\uAFC0 \uC218 \uC788\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uAC19\uC740 \uC885\uB958\xB7\uC6A9\uB3C4\uC758 \uBCC0\uC218\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.",
+    "bind.remapApply": "{n}\uACF3 \uAD50\uCCB4",
+    "bind.remapCancel": "\uCDE8\uC18C",
+    "bind.remapDone": "{replaced}\uACF3\uC744 {to}(\uC73C)\uB85C \uBC14\uAFE8\uC2B5\uB2C8\uB2E4 \xB7 \uB808\uC774\uC5B4 {nodes}\uAC1C \u2014 \uB418\uB3CC\uB9AC\uB824\uBA74 Ctrl/\u2318+Z",
+    "bind.remapSkipped": " \xB7 {skipped}\uACF3\uC740 \uC885\uB958\xB7\uC6A9\uB3C4\uAC00 \uB9DE\uC9C0 \uC54A\uAC70\uB098 \uD3F0\uD2B8\uAC00 \uC5C6\uC5B4 \uADF8\uB300\uB85C \uB480\uC2B5\uB2C8\uB2E4",
+    "bind.remapNothing": "\uBC14\uAFC0 \uC790\uB9AC\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 \u2014 \uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC5F0\uACB0 \uD604\uD669\uC744 \uB2E4\uC2DC \uBCF4\uC138\uC694.",
     // 리네임
     "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
     "rename.none": "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -3614,6 +3632,23 @@
         }
         break;
       }
+      case "REMAP_TARGETS_RESULT": {
+        if (!remapOpen || remapOpen.fromId !== msg.fromId) break;
+        remapOpen.targets = msg.targets;
+        renderBindTree();
+        break;
+      }
+      case "REMAP_RESULT": {
+        remapOpen = null;
+        if (!msg.replaced) {
+          setStatus("applyStatus", t("bind.remapNothing"), "warn");
+          break;
+        }
+        keepRemapStatus = true;
+        const skippedNote = msg.skipped ? t("bind.remapSkipped", { skipped: msg.skipped }) : "";
+        setStatus("applyStatus", t("bind.remapDone", { replaced: msg.replaced, to: msg.toName, nodes: msg.nodes }) + skippedNote, msg.skipped ? "warn" : "ok");
+        break;
+      }
       case "BINDINGS_RESULT": {
         clearBindPreview();
         bindResultMode = true;
@@ -3621,7 +3656,8 @@
         bindNodes = msg.nodes;
         renderBindTree();
         const capNote = msg.total > msg.candidates.length ? t("apply.resultCapped", { shown: msg.candidates.length }) : "";
-        setStatus("applyStatus", msg.total ? t("bind.scanned", { total: msg.total, nodes: msg.boundNodes }) + capNote : t("bind.scannedNone"), msg.total ? "" : "warn");
+        if (keepRemapStatus) keepRemapStatus = false;
+        else setStatus("applyStatus", msg.total ? t("bind.scanned", { total: msg.total, nodes: msg.boundNodes }) + capNote : t("bind.scannedNone"), msg.total ? "" : "warn");
         break;
       }
       case "SELECT_RESULT":
@@ -3843,6 +3879,8 @@
     }
   };
   var OP_STATUS = {
+    REMAP_TARGETS: "applyStatus",
+    REMAP_BINDINGS: "applyStatus",
     EXTRACT: "colorStatus",
     CREATE_TOKENS: "createStatus",
     CREATE_SEMANTICS: "semStatus",
@@ -4092,8 +4130,10 @@
       const prop = c.field === "fills" || c.field === "strokes" || c.field === "effects" ? c.field : /Radius$/.test(c.field) ? "radius" : /^padding|Spacing$|Gap$/.test(c.field) ? "spacing" : c.field;
       if (!groups.has(prop)) groups.set(prop, /* @__PURE__ */ new Map());
       const byVar = groups.get(prop);
-      const row = (_a = byVar.get(c.variableId)) != null ? _a : { name: c.variableName, ids: /* @__PURE__ */ new Set() };
+      const row = (_a = byVar.get(c.variableId)) != null ? _a : { id: c.variableId, name: c.variableName, ids: /* @__PURE__ */ new Set(), fields: /* @__PURE__ */ new Set(), sites: 0 };
       row.ids.add(c.nodeId);
+      row.fields.add(c.field);
+      row.sites++;
       byVar.set(c.variableId, row);
     }
     const props = [...groups.keys()].sort();
@@ -4107,10 +4147,81 @@
         sel.textContent = t("bind.varSelect");
         sel.title = t("bind.varLayers", { n: ids.length });
         sel.addEventListener("click", () => selectNodes(ids, "applyStatus"));
-        const card = resultCard({ title: r.name, titleMono: true, summary: t("bind.varLayers", { n: ids.length }), metaEl: sel });
+        const key = `${prop}|${r.id}`;
+        let meta = sel;
+        if (bindResultMode) {
+          meta = document.createElement("span");
+          const rm = document.createElement("button");
+          rm.className = "link";
+          rm.textContent = t("bind.varRemap");
+          rm.title = t("bind.varRemapTip");
+          rm.addEventListener("click", () => openRemap({ key, fromId: r.id, fromName: r.name, fields: [...r.fields], sites: r.sites }));
+          meta.append(sel, " \xB7 ", rm);
+        }
+        const card = resultCard({ title: r.name, titleMono: true, summary: t("bind.varLayers", { n: ids.length }), metaEl: meta });
         mount.appendChild(card);
+        if (remapOpen && remapOpen.key === key) mount.appendChild(renderRemapPanel(remapOpen));
       }
     }
+  }
+  var remapOpen = null;
+  var keepRemapStatus = false;
+  function openRemap(o) {
+    remapOpen = o;
+    send({ type: "REMAP_TARGETS", fromId: o.fromId, fields: o.fields });
+    renderBindTree();
+  }
+  function closeRemap() {
+    remapOpen = null;
+    renderBindTree();
+  }
+  function renderRemapPanel(o) {
+    const box = document.createElement("div");
+    box.className = "remap-panel";
+    if (!o.targets) {
+      box.textContent = t("bind.remapLoading");
+      return box;
+    }
+    const cancel = document.createElement("button");
+    cancel.className = "link";
+    cancel.textContent = t("bind.remapCancel");
+    cancel.addEventListener("click", closeRemap);
+    if (!o.targets.length) {
+      const note = document.createElement("span");
+      note.className = "muted";
+      note.textContent = t("bind.remapNone");
+      box.append(note, " ", cancel);
+      return box;
+    }
+    const label = document.createElement("label");
+    label.className = "inline";
+    label.textContent = t("bind.remapLabel");
+    const select = document.createElement("select");
+    select.id = "remapTarget";
+    const byCol = /* @__PURE__ */ new Map();
+    for (const v of o.targets) {
+      let g = byCol.get(v.collection);
+      if (!g) {
+        g = document.createElement("optgroup");
+        g.label = v.collection || "\u2014";
+        byCol.set(v.collection, g);
+        select.appendChild(g);
+      }
+      const opt = document.createElement("option");
+      opt.value = v.id;
+      opt.textContent = v.name;
+      g.appendChild(opt);
+    }
+    label.appendChild(select);
+    const apply = document.createElement("button");
+    apply.className = "primary";
+    apply.textContent = t("bind.remapApply", { n: o.sites });
+    apply.addEventListener("click", () => {
+      apply.disabled = true;
+      send({ type: "REMAP_BINDINGS", fromId: o.fromId, toId: select.value, fields: o.fields });
+    });
+    box.append(label, apply, cancel);
+    return box;
   }
   $("bindFilter").addEventListener("input", () => renderBindTree());
   document.querySelectorAll('input[name="bindView"]').forEach((radio) => {
@@ -4134,6 +4245,7 @@
     }
   }
   function clearBindPreview() {
+    remapOpen = null;
     bindResultMode = false;
     bindCandidates = [];
     bindNodes = [];

@@ -332,6 +332,14 @@
       padding: 6px 8px; display: grid; gap: 3px;
     }
     .r-card.dim { opacity: .55; }
+    /* 일괄 교체 패널 — 변수별 보기의 행 바로 아래에 붙는다. 좁은 폭에서는 줄바꿈. */
+    .remap-panel {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      margin: -2px 0 6px; padding: 7px 8px; border: 1px solid var(--accent-border);
+      border-radius: var(--r-sm); background: var(--accent-subtle); font-size: 11px;
+    }
+    .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
+    .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
     .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */

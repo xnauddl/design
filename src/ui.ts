@@ -2092,6 +2092,23 @@ window.onmessage = (event: MessageEvent) => {
       }
       break;
     }
+    case 'REMAP_TARGETS_RESULT': {
+      if (!remapOpen || remapOpen.fromId !== msg.fromId) break; // 그사이 다른 행을 열었으면 버린다
+      remapOpen.targets = msg.targets;
+      renderBindTree();
+      break;
+    }
+    case 'REMAP_RESULT': {
+      remapOpen = null; // 곧 오는 BINDINGS_RESULT가 바뀐 상태로 다시 그린다
+      if (!msg.replaced) {
+        setStatus('applyStatus', t('bind.remapNothing'), 'warn');
+        break;
+      }
+      keepRemapStatus = true;
+      const skippedNote = msg.skipped ? t('bind.remapSkipped', { skipped: msg.skipped }) : '';
+      setStatus('applyStatus', t('bind.remapDone', { replaced: msg.replaced, to: msg.toName, nodes: msg.nodes }) + skippedNote, msg.skipped ? 'warn' : 'ok');
+      break;
+    }
     case 'BINDINGS_RESULT': {
       // 연결 현황(읽기 전용) — 결과 트리와 같은 모양. 사유 칩은 없다(실행이 아니라 조회).
       clearBindPreview();
@@ -2100,7 +2117,8 @@ window.onmessage = (event: MessageEvent) => {
       bindNodes = msg.nodes;
       renderBindTree();
       const capNote = msg.total > msg.candidates.length ? t('apply.resultCapped', { shown: msg.candidates.length }) : '';
-      setStatus('applyStatus', msg.total ? t('bind.scanned', { total: msg.total, nodes: msg.boundNodes }) + capNote : t('bind.scannedNone'), msg.total ? '' : 'warn');
+      if (keepRemapStatus) keepRemapStatus = false; // 방금 쓴 교체 결과 문구를 남긴다
+      else setStatus('applyStatus', msg.total ? t('bind.scanned', { total: msg.total, nodes: msg.boundNodes }) + capNote : t('bind.scannedNone'), msg.total ? '' : 'warn');
       break;
     }
     case 'SELECT_RESULT':
@@ -2370,6 +2388,8 @@ window.onmessage = (event: MessageEvent) => {
 
 /* ---------- UX7: 오류 라우팅/표시 ---------- */
 const OP_STATUS: Record<string, string> = {
+  REMAP_TARGETS: 'applyStatus',
+  REMAP_BINDINGS: 'applyStatus',
   EXTRACT: 'colorStatus',
   CREATE_TOKENS: 'createStatus',
   CREATE_SEMANTICS: 'semStatus',
@@ -2692,13 +2712,15 @@ function renderBindByVariable(): void {
   const mount = $('bindTree');
   clearMount(mount);
   // 속성 → 변수 → 레이어 id 집합
-  const groups = new Map<string, Map<string, { name: string; ids: Set<string> }>>();
+  const groups = new Map<string, Map<string, { id: string; name: string; ids: Set<string>; fields: Set<string>; sites: number }>>();
   for (const c of filteredCandidates()) {
     const prop = c.field === 'fills' || c.field === 'strokes' || c.field === 'effects' ? c.field : /Radius$/.test(c.field) ? 'radius' : /^padding|Spacing$|Gap$/.test(c.field) ? 'spacing' : c.field;
     if (!groups.has(prop)) groups.set(prop, new Map());
     const byVar = groups.get(prop)!;
-    const row = byVar.get(c.variableId) ?? { name: c.variableName, ids: new Set<string>() };
+    const row = byVar.get(c.variableId) ?? { id: c.variableId, name: c.variableName, ids: new Set<string>(), fields: new Set<string>(), sites: 0 };
     row.ids.add(c.nodeId);
+    row.fields.add(c.field);
+    row.sites++;
     byVar.set(c.variableId, row);
   }
   const props = [...groups.keys()].sort();
@@ -2712,10 +2734,96 @@ function renderBindByVariable(): void {
       sel.textContent = t('bind.varSelect');
       sel.title = t('bind.varLayers', { n: ids.length });
       sel.addEventListener('click', () => selectNodes(ids, 'applyStatus'));
-      const card = resultCard({ title: r.name, titleMono: true, summary: t('bind.varLayers', { n: ids.length }), metaEl: sel });
+      const key = `${prop}|${r.id}`;
+      let meta: HTMLElement = sel;
+      // 일괄 교체는 '파일에 붙어 있는 것'(연결 현황·적용 결과)에서만 — 미리보기 후보는 아직 안 붙었다.
+      if (bindResultMode) {
+        meta = document.createElement('span');
+        const rm = document.createElement('button');
+        rm.className = 'link';
+        rm.textContent = t('bind.varRemap');
+        rm.title = t('bind.varRemapTip');
+        rm.addEventListener('click', () => openRemap({ key, fromId: r.id, fromName: r.name, fields: [...r.fields], sites: r.sites }));
+        meta.append(sel, ' · ', rm);
+      }
+      const card = resultCard({ title: r.name, titleMono: true, summary: t('bind.varLayers', { n: ids.length }), metaEl: meta });
       mount.appendChild(card);
+      if (remapOpen && remapOpen.key === key) mount.appendChild(renderRemapPanel(remapOpen));
     }
   }
+}
+
+/* ---------- 일괄 교체 — 변수별 보기의 한 행(속성 그룹 × 변수)을 다른 변수로 ---------- */
+interface RemapOpen {
+  key: string; // `${속성 그룹}|${변수 id}` — 어느 행 아래에 패널을 붙일지
+  fromId: string;
+  fromName: string;
+  fields: string[];
+  sites: number; // 목록에 보이는 자리 수(상한에 잘렸을 수 있음 — 실제 수는 결과가 알려준다)
+  targets?: { id: string; name: string; collection: string }[];
+}
+let remapOpen: RemapOpen | null = null;
+/** 교체 직후 따라오는 BINDINGS_RESULT가 '교체 결과' 상태 문구를 '연결 현황 n건'으로 덮지 않게 한 번 막는다. */
+let keepRemapStatus = false;
+
+function openRemap(o: RemapOpen): void {
+  remapOpen = o;
+  send({ type: 'REMAP_TARGETS', fromId: o.fromId, fields: o.fields });
+  renderBindTree();
+}
+function closeRemap(): void {
+  remapOpen = null;
+  renderBindTree();
+}
+
+function renderRemapPanel(o: RemapOpen): HTMLElement {
+  const box = document.createElement('div');
+  box.className = 'remap-panel';
+  if (!o.targets) {
+    box.textContent = t('bind.remapLoading');
+    return box;
+  }
+  const cancel = document.createElement('button');
+  cancel.className = 'link';
+  cancel.textContent = t('bind.remapCancel');
+  cancel.addEventListener('click', closeRemap);
+  if (!o.targets.length) {
+    const note = document.createElement('span');
+    note.className = 'muted';
+    note.textContent = t('bind.remapNone');
+    box.append(note, ' ', cancel);
+    return box;
+  }
+  const label = document.createElement('label');
+  label.className = 'inline';
+  label.textContent = t('bind.remapLabel');
+  const select = document.createElement('select');
+  select.id = 'remapTarget';
+  // 컬렉션별로 묶는다(Global/Semantic…) — 같은 이름이 두 컬렉션에 있어도 구별된다.
+  const byCol = new Map<string, HTMLOptGroupElement>();
+  for (const v of o.targets) {
+    let g = byCol.get(v.collection);
+    if (!g) {
+      g = document.createElement('optgroup');
+      g.label = v.collection || '—';
+      byCol.set(v.collection, g);
+      select.appendChild(g);
+    }
+    const opt = document.createElement('option');
+    opt.value = v.id;
+    opt.textContent = v.name;
+    g.appendChild(opt);
+  }
+  label.appendChild(select);
+  const apply = document.createElement('button');
+  apply.className = 'primary';
+  apply.textContent = t('bind.remapApply', { n: o.sites });
+  apply.addEventListener('click', () => {
+    apply.disabled = true;
+    send({ type: 'REMAP_BINDINGS', fromId: o.fromId, toId: select.value, fields: o.fields });
+  });
+  box.append(label, apply, cancel);
+  return box;
 }
 
 $('bindFilter').addEventListener('input', () => renderBindTree());
@@ -2747,6 +2855,7 @@ function updateBindApply(): void {
 
 /** 바인딩 미리보기/적용 상태를 초기화(선택 변경·적용 완료 시). */
 function clearBindPreview(): void {
+  remapOpen = null; // 선택이 바뀌면 열어 둔 교체 패널은 낡은 대상을 가리킨다
   bindResultMode = false;
   bindCandidates = [];
   bindNodes = [];
