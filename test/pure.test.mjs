@@ -2357,3 +2357,34 @@ test('normalizeUiSize — 정식 값, 옛 {h} 저장값, 깨진 값', async () =
   assert.equal(UI_WIDTH, 400); // #17: 가로 고정
   assert.ok(UI_HEIGHT.large > UI_HEIGHT.default);
 });
+
+/* ---------- 일괄 교체: 후보 판정(scopes.ts) ---------- */
+test('remapTargets — 타입·용도가 모든 필드에 맞는 변수만, A 자신 제외, 컬렉션→이름 정렬', async () => {
+  const { remapTargets, scopeFitsField } = await import('../dist/pure.mjs');
+  const vars = [
+    { id: 'a', name: 'spacing/8', resolvedType: 'FLOAT', scopes: ['GAP'], collection: 'Global' },
+    { id: 'b', name: 'spacing/sm', resolvedType: 'FLOAT', scopes: ['GAP'], collection: 'Semantic' },
+    { id: 'c', name: 'line-height/24', resolvedType: 'FLOAT', scopes: ['LINE_HEIGHT'], collection: 'Global' },
+    { id: 'd', name: 'any/num', resolvedType: 'FLOAT', scopes: ['ALL_SCOPES'], collection: 'Global' },
+    { id: 'e', name: 'color/fg', resolvedType: 'COLOR', scopes: ['TEXT_FILL'], collection: 'Semantic' },
+    { id: 'f', name: 'color/line', resolvedType: 'COLOR', scopes: ['STROKE_COLOR'], collection: 'Semantic' },
+    { id: 'g', name: 'color/all', resolvedType: 'COLOR', scopes: ['ALL_FILLS', 'STROKE_COLOR'], collection: 'Global' },
+  ];
+  // 여백: GAP 또는 ALL_SCOPES만 — 행간 변수(c)는 값 종류가 같아도 제외
+  assert.deepEqual(remapTargets('a', 'FLOAT', ['paddingLeft', 'itemSpacing'], vars).map((v) => v.id), ['d', 'b']);
+  // 채움+선 둘 다 쓰던 색 → 둘 다 맞는 변수만(g). 채움 전용(e)·선 전용(f)은 일부만 바뀌게 되므로 제외
+  assert.deepEqual(remapTargets('x', 'COLOR', ['fills', 'strokes'], vars).map((v) => v.id), ['g']);
+  assert.deepEqual(remapTargets('x', 'COLOR', ['fills'], vars).map((v) => v.id), ['g', 'e']);
+  // 지워진 변수(fromType 모름)라도 필드 규칙으로 타입을 정한다
+  assert.deepEqual(remapTargets('gone', null, ['strokes'], vars).map((v) => v.id), ['g', 'f']);
+  // 규칙 없는 필드 + 타입 모름 → 후보 없음(무엇을 붙여도 되는지 알 수 없다)
+  assert.deepEqual(remapTargets('gone', null, ['visible'], vars), []);
+  // 규칙 없는 필드는 A의 타입을 따르고 스코프는 따지지 않는다
+  assert.deepEqual(remapTargets('a', 'FLOAT', ['minWidth'], vars).map((v) => v.id), ['d', 'c', 'b']);
+  assert.deepEqual(remapTargets('a', 'FLOAT', [], vars), []);
+  // 스코프 판정 단위
+  assert.equal(scopeFitsField('effects', ['EFFECT_COLOR']), true);
+  assert.equal(scopeFitsField('effects', ['ALL_FILLS']), false);
+  assert.equal(scopeFitsField('fontFamily', ['FONT_FAMILY']), true);
+  assert.equal(scopeFitsField('fontFamily', []), false);
+});

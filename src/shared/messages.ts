@@ -133,6 +133,8 @@ export type UiToCode =
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[] } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'SCAN_BINDINGS' } // 선택 안에 이미 붙은 변수 바인딩 읽기(연결 현황 · 읽기 전용)
+  | { type: 'REMAP_TARGETS'; fromId: string; fields: string[] } // 일괄 교체: A 자리에 붙일 수 있는 변수 후보(읽기 전용)
+  | { type: 'REMAP_BINDINGS'; fromId: string; toId: string; fields: string[] } // 일괄 교체: 선택 안의 A(그 필드들) → B
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
   // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(등록이 머리명사로 읽는다).
@@ -179,6 +181,8 @@ export type CodeToUi =
   // comps/sets: 선택 안의 낱개 COMPONENT·COMPONENT_SET 수. 구조 카드의 베리언트 줄을
   // '정리할 대상이 실제로 선택돼 있을 때만' 띄우는 데 쓴다(툴바는 와이어대로 4개 고정).
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
+  | { type: 'REMAP_TARGETS_RESULT'; fromId: string; targets: { id: string; name: string; collection: string }[] }
+  | { type: 'REMAP_RESULT'; replaced: number; nodes: number; skipped: number; toName: string }
   | { type: 'BINDINGS_RESULT'; candidates: BindCandidate[]; nodes: BindNode[]; total: number; boundNodes: number } // 연결 현황(읽기 전용)
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }

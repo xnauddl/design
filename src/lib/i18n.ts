@@ -58,6 +58,16 @@ export const STRINGS: Record<string, string> = {
   'bind.viewVariable': '변수별',
   'bind.varLayers': '레이어 {n}',
   'bind.varSelect': '선택',
+  'bind.varRemap': '교체',
+  'bind.varRemapTip': '이 변수가 붙은 자리를 다른 변수로 바꿉니다 — 선택 안, 이 속성만',
+  'bind.remapLabel': '바꿀 변수',
+  'bind.remapLoading': '바꿀 수 있는 변수를 찾는 중…',
+  'bind.remapNone': '바꿀 수 있는 변수가 없습니다 — 같은 종류·용도의 변수가 필요합니다.',
+  'bind.remapApply': '{n}곳 교체',
+  'bind.remapCancel': '취소',
+  'bind.remapDone': '{replaced}곳을 {to}(으)로 바꿨습니다 · 레이어 {nodes}개 — 되돌리려면 Ctrl/⌘+Z',
+  'bind.remapSkipped': ' · {skipped}곳은 종류·용도가 맞지 않거나 폰트가 없어 그대로 뒀습니다',
+  'bind.remapNothing': '바꿀 자리를 찾지 못했습니다 — 선택이 바뀌었을 수 있습니다. 연결 현황을 다시 보세요.',
 
   // 리네임
   'rename.previewCount': '{total}개 변경 예정 · {sel}개 선택 — ‘이름 적용’.',
