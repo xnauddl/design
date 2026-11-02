@@ -314,7 +314,8 @@
     .toolbar-2 { margin-top: 0; }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
-    .btn-next { border-color: transparent; color: var(--text-2); }
+    /* 툴바가 좁아 줄이 넘어가도 ‘다음 →’은 오른쪽 끝에 — 혼자 왼쪽에 떨어지면 다른 버튼처럼 보인다. */
+    .btn-next { border-color: transparent; color: var(--text-2); margin-left: auto; }
     .btn-next:hover { color: var(--text); }
 
     /* ── 결과 목록(#18) ── */
@@ -339,6 +340,8 @@
       border-radius: var(--r-sm); background: var(--accent-subtle); font-size: 11px;
     }
     .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
+    /* 연결 현황 대기 — 선택이 멎을 때까지 이전 목록을 흐리게 둔다(비웠다 채우는 깜빡임 대신). 누를 수 없음. */
+    .results.stale { opacity: .45; pointer-events: none; transition: opacity .12s; }
     .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
     /* 컬렉션 계층 — 한 줄: 이름(변수 수) · 추천 · 선택 */
     .col-role { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
@@ -2126,6 +2129,16 @@
   var hasScaleVars = false;
   var hasGlobal = false;
   var hasBindable = false;
+  var prereqKnown = false;
+  var prereqInFlight = false;
+  function requestPrereq() {
+    if (prereqInFlight) return;
+    prereqInFlight = true;
+    send({ type: "GET_PREREQ" });
+    setTimeout(() => {
+      prereqInFlight = false;
+    }, 3e3);
+  }
   var hasDarkMode = false;
   var hasTextStyles = false;
   var hasSemanticRoles = false;
@@ -2883,19 +2896,41 @@
     return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
   }
   var AUTO_SCAN_MAX = 300;
+  var AUTO_SCAN_DELAY = 250;
+  var bindReqSeq = 0;
+  var bindLatest = 0;
+  var autoScanTimer = null;
+  function nextBindReq() {
+    if (autoScanTimer) {
+      clearTimeout(autoScanTimer);
+      autoScanTimer = null;
+    }
+    bindLatest = ++bindReqSeq;
+    return bindLatest;
+  }
+  function isCurrentBindReply(reqId) {
+    return reqId === void 0 || reqId === bindLatest;
+  }
+  function requestBindingsScan() {
+    send({ type: "SCAN_BINDINGS", reqId: nextBindReq() });
+  }
+  function markBindStale(on) {
+    $("bindTree").classList.toggle("stale", on);
+    if (on) $("btnApplyConfirm").style.display = "none";
+  }
   $("btnScanBindings").addEventListener("click", () => {
     setStatus("applyStatus", t("common.running"), "");
-    send({ type: "SCAN_BINDINGS" });
+    requestBindingsScan();
   });
   $("btnApply").addEventListener("click", () => {
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
-    send({ type: "APPLY", tolerance: bindTolerance(), preview: true });
+    send({ type: "APPLY", tolerance: bindTolerance(), preview: true, reqId: nextBindReq() });
   });
   $("btnApplyConfirm").addEventListener("click", () => {
     const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
     if (!items.length) return;
     showApplyProgress("\uC5F0\uACB0 \uC911\u2026");
-    send({ type: "APPLY_SELECTED", items });
+    send({ type: "APPLY_SELECTED", items, reqId: nextBindReq() });
   });
   $("bindAll").addEventListener("change", (e) => {
     const on = e.target.checked;
@@ -3281,7 +3316,7 @@
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!isPaid) $("btnSemantics").disabled = true;
     setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
-    if (!hasBindable) $("btnApplyConfirm").disabled = true;
+    if (prereqKnown && !hasBindable) $("btnApplyConfirm").disabled = true;
     setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
     if (!isPaid) $("btnApplyExistingText").disabled = true;
   }
@@ -3292,7 +3327,8 @@
     const base = el.dataset.baseTip;
     el.setAttribute(attr, locked ? base ? `${base} \xB7 ${PAID_LOCK}` : PAID_LOCK : base);
   }
-  function setPrereq(btnId, noticeId, ok, msg) {
+  function setPrereq(btnId, noticeId, okRaw, msg) {
+    const ok = okRaw || !prereqKnown;
     $(btnId).disabled = !ok;
     const notice = $(noticeId);
     notice.style.display = ok ? "none" : "";
@@ -3580,12 +3616,22 @@
         lastSelBound = msg.bound;
         lastSelRenamed = msg.renamed;
         applySelectionDone();
-        if (!msg.selfSelect && !wizardRunning) {
-          if (msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX) send({ type: "SCAN_BINDINGS" });
-          else if (msg.bound > 0) setStatus("applyStatus", t("bind.scanHintLarge"), "");
-        }
         refreshVariantRow(msg.comps, msg.sets);
-        if (!msg.selfSelect) clearBindPreview();
+        if (!msg.selfSelect) {
+          nextBindReq();
+          hideApplyProgress();
+          const autoScan = !wizardRunning && msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX;
+          if (autoScan) {
+            markBindStale(true);
+            autoScanTimer = setTimeout(() => {
+              autoScanTimer = null;
+              requestBindingsScan();
+            }, AUTO_SCAN_DELAY);
+          } else {
+            clearBindPreview();
+            if (!wizardRunning && msg.bound > 0) setStatus("applyStatus", t("bind.scanHintLarge"), "");
+          }
+        }
         if (!tokens.length) renderTokens();
         refreshTreeEmptyStates();
         break;
@@ -3624,7 +3670,9 @@
         if (msg.op === "bind") updateApplyProgress(msg.done, msg.total);
         break;
       case "APPLY_RESULT": {
+        if (!isCurrentBindReply(msg.reqId)) break;
         hideApplyProgress();
+        markBindStale(false);
         const confirmBtn = $("btnApplyConfirm");
         bindSkips = (_a = msg.skips) != null ? _a : [];
         bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
@@ -3638,6 +3686,8 @@
           setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail: cancelDetail }), "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
+          bindResultMode = false;
+          remapOpen = null;
           bindCandidates = (_c = msg.candidates) != null ? _c : [];
           bindNodes = (_d = msg.nodes) != null ? _d : [];
           bindChecked.clear();
@@ -3678,6 +3728,7 @@
         break;
       }
       case "BINDINGS_RESULT": {
+        if (!isCurrentBindReply(msg.reqId)) break;
         clearBindPreview();
         bindResultMode = true;
         bindCandidates = msg.candidates;
@@ -3760,6 +3811,8 @@
         autoGlobalScan = false;
         break;
       case "PREREQ_STATE":
+        prereqKnown = true;
+        prereqInFlight = false;
         hasColorVars = msg.hasColorVars;
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
@@ -4249,7 +4302,7 @@
     apply.textContent = t("bind.remapApply", { n: o.sites });
     apply.addEventListener("click", () => {
       apply.disabled = true;
-      send({ type: "REMAP_BINDINGS", fromId: o.fromId, toId: select.value, fields: o.fields });
+      send({ type: "REMAP_BINDINGS", fromId: o.fromId, toId: select.value, fields: o.fields, reqId: nextBindReq() });
     });
     box.append(label, apply, cancel);
     return box;
@@ -4277,6 +4330,7 @@
   }
   function clearBindPreview() {
     remapOpen = null;
+    $("bindTree").classList.remove("stale");
     bindResultMode = false;
     bindCandidates = [];
     bindNodes = [];
@@ -4369,7 +4423,7 @@
   }
   function refreshTreeEmptyStates() {
     const guide = "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.";
-    if (!hasBindPreview()) {
+    if (!hasBindPreview() && !$("bindTree").classList.contains("stale")) {
       if (lastSelCount === 0) renderEmptyState($("bindTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", guide);
       else clearMount($("bindTree"));
     }
@@ -4633,7 +4687,7 @@
   renderTokens();
   refreshTreeEmptyStates();
   send({ type: "GET_COLLECTIONS" });
-  send({ type: "GET_PREREQ" });
+  requestPrereq();
   send({ type: "GET_LICENSE" });
   send({ type: "GET_VARIABLES" });
   send({ type: "GET_SETTINGS" });
@@ -4650,7 +4704,7 @@
       btn.tabIndex = on ? 0 : -1;
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
-    if (name !== "settings") send({ type: "GET_PREREQ" });
+    if (name !== "settings") requestPrereq();
     if (name === "tokens") send({ type: "GET_VARIABLES" });
     if (name === "settings") send({ type: "GET_COLLECTION_ROLES" });
   }

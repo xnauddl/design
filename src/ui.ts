@@ -50,6 +50,17 @@ let hasColorVars = false;
 let hasScaleVars = false;
 let hasGlobal = false;
 let hasBindable = false;
+/** 첫 PREREQ_STATE를 받았는가 — 받기 전엔 전제를 '모름'으로 보고 경고를 띄우지 않는다. */
+let prereqKnown = false;
+/** GET_PREREQ 응답 대기 중 — 시작 직후 같은 요청이 여러 번 겹쳐 나가지 않게. */
+let prereqInFlight = false;
+function requestPrereq(): void {
+  if (prereqInFlight) return;
+  prereqInFlight = true;
+  send({ type: 'GET_PREREQ' });
+  // 응답이 끝내 안 오면(플러그인 쪽 오류) 다음 요청이 영영 막히지 않게 풀어 둔다.
+  setTimeout(() => { prereqInFlight = false; }, 3000);
+}
 let hasDarkMode = false;
 let hasTextStyles = false;
 let hasSemanticRoles = false; // 역할 별칭 존재(역할 매핑 완료)
@@ -1085,13 +1096,40 @@ function bindTolerance(): number {
 
 /** 연결 현황을 선택 변경 시 자동으로 읽는 상한(노드 수). 랜딩 한 장(≈250)은 자동, 페이지 통째는 버튼. */
 const AUTO_SCAN_MAX = 300;
+/** 선택이 멎은 뒤 이만큼 기다렸다 연결 현황을 읽는다 — 드래그 선택 중 매 이벤트마다 목록이 비었다 찼다 하지 않게. */
+const AUTO_SCAN_DELAY = 250;
+
+/* 연결 카드 요청 번호 — 연결 현황·미리보기·연결·교체 응답이 순서 없이 와도(플러그인은 요청을
+   동시에 처리한다) 마지막 요청의 응답만 화면에 그린다. 선택이 바뀌면 번호를 올려 진행 중이던
+   요청의 응답을 무효로 만든다(이전 선택의 미리보기가 새 선택 위에 그려지지 않게). */
+let bindReqSeq = 0;
+let bindLatest = 0;
+let autoScanTimer: ReturnType<typeof setTimeout> | null = null;
+function nextBindReq(): number {
+  if (autoScanTimer) { clearTimeout(autoScanTimer); autoScanTimer = null; } // 새 요청이 예약된 자동 조회보다 우선
+  bindLatest = ++bindReqSeq;
+  return bindLatest;
+}
+/** 응답이 지금 화면이 기다리는 요청의 것인가. reqId가 없는 응답(마법사 등 다른 경로)은 예전처럼 받는다. */
+function isCurrentBindReply(reqId: number | undefined): boolean {
+  return reqId === undefined || reqId === bindLatest;
+}
+function requestBindingsScan(): void {
+  send({ type: 'SCAN_BINDINGS', reqId: nextBindReq() });
+}
+/** 자동 연결 현황 대기 중 — 기존 목록은 지우지 않고 흐리게(깜빡임 대신), 낡은 후보로 연결하지 못하게 버튼은 숨김. */
+function markBindStale(on: boolean): void {
+  $('bindTree').classList.toggle('stale', on);
+  if (on) ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
+}
+
 $('btnScanBindings').addEventListener('click', () => {
   setStatus('applyStatus', t('common.running'), '');
-  send({ type: 'SCAN_BINDINGS' });
+  requestBindingsScan();
 });
 $('btnApply').addEventListener('click', () => {
   showApplyProgress('미리보기 계산 중…'); // UX6
-  send({ type: 'APPLY', tolerance: bindTolerance(), preview: true }); // UX1: dry-run 미리보기 먼저
+  send({ type: 'APPLY', tolerance: bindTolerance(), preview: true, reqId: nextBindReq() }); // UX1: dry-run 미리보기 먼저
 });
 
 $('btnApplyConfirm').addEventListener('click', () => {
@@ -1101,7 +1139,7 @@ $('btnApplyConfirm').addEventListener('click', () => {
     .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
   if (!items.length) return;
   showApplyProgress('연결 중…'); // UX6
-  send({ type: 'APPLY_SELECTED', items });
+  send({ type: 'APPLY_SELECTED', items, reqId: nextBindReq() });
 });
 
 $('bindAll').addEventListener('change', (e) => {
@@ -1611,7 +1649,7 @@ function updateGates(): void {
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
   if (!isPaid) ($('btnSemantics') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
   setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 연결할 변수를 만드세요.');
-  if (!hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
+  if (prereqKnown && !hasBindable) ($('btnApplyConfirm') as HTMLButtonElement).disabled = true;
   // 「기존만 연결」은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
   setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
   if (!isPaid) ($('btnApplyExistingText') as HTMLButtonElement).disabled = true; // 유료 잠금이 전제보다 우선
@@ -1628,7 +1666,10 @@ function setLockTitle(el: HTMLElement, locked: boolean): void {
 }
 
 /** 전제 충족 여부로 버튼 활성/안내(+바로가기) 토글. */
-function setPrereq(btnId: string, noticeId: string, ok: boolean, msg: string): void {
+function setPrereq(btnId: string, noticeId: string, okRaw: boolean, msg: string): void {
+  // 첫 PREREQ_STATE 전에는 '모름' — 변수가 있는 파일에서도 '먼저 토큰을 생성…' 경고가 번쩍이고
+  // 카드 높이가 출렁이지 않게, 모를 때는 경고를 띄우지 않고 버튼도 막지 않는다.
+  const ok = okRaw || !prereqKnown;
   ($(btnId) as HTMLButtonElement).disabled = !ok;
   const notice = $(noticeId);
   notice.style.display = ok ? 'none' : '';
@@ -1999,14 +2040,23 @@ window.onmessage = (event: MessageEvent) => {
       applySelectionDone();
       // 연결 현황 자동 읽기 — 선택이 작고(≤ AUTO_SCAN_MAX) 바인딩이 있을 때만(Tokens Studio처럼 선택 기준 표시).
       // 큰 선택은 버튼으로(Design Lint 방식) — 선택만 바꿔도 플러그인이 버벅이면 안 된다.
-      if (!msg.selfSelect && !wizardRunning) {
-        if (msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX) send({ type: 'SCAN_BINDINGS' });
-        else if (msg.bound > 0) setStatus('applyStatus', t('bind.scanHintLarge'), '');
-      }
       refreshVariantRow(msg.comps, msg.sets);
-      // 스킵 칩이 만든 선택 변경이면 미리보기를 유지한다 — 지우면 칩을 한 번 누르는 순간
+      // 스킵 칩이 만든 선택 변경(selfSelect)이면 미리보기를 유지한다 — 지우면 칩을 한 번 누르는 순간
       // 칩 줄과 체크해둔 후보가 통째로 사라져 두 번째 사유를 볼 수 없다.
-      if (!msg.selfSelect) clearBindPreview(); // 사용자의 선택 변경 → 바인딩 미리보기 무효화
+      if (!msg.selfSelect) {
+        // 사용자의 선택 변경 → 진행 중이던 연결 카드 요청은 무효(이전 선택의 결과가 늦게 와도 버린다).
+        nextBindReq();
+        hideApplyProgress();
+        const autoScan = !wizardRunning && msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX;
+        if (autoScan) {
+          // 목록을 바로 비우지 않는다 — 선택이 멎으면 새 연결 현황으로 한 번에 바꾼다.
+          markBindStale(true);
+          autoScanTimer = setTimeout(() => { autoScanTimer = null; requestBindingsScan(); }, AUTO_SCAN_DELAY);
+        } else {
+          clearBindPreview();
+          if (!wizardRunning && msg.bound > 0) setStatus('applyStatus', t('bind.scanHintLarge'), '');
+        }
+      }
       if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
       refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드 빈 상태 갱신
       break;
@@ -2049,7 +2099,9 @@ window.onmessage = (event: MessageEvent) => {
       if (msg.op === 'bind') updateApplyProgress(msg.done, msg.total); // UX6
       break;
     case 'APPLY_RESULT': {
+      if (!isCurrentBindReply(msg.reqId)) break; // 선택이 바뀐 뒤 도착한 이전 요청의 결과
       hideApplyProgress(); // UX6
+      markBindStale(false);
       const confirmBtn = $('btnApplyConfirm') as HTMLButtonElement;
       bindSkips = msg.skips ?? [];
       // 스킵 목록은 상한에서 잘린다(bind.ts SKIP_PREVIEW_CAP) — 잘렸으면 힌트 줄이 그렇다고 말한다.
@@ -2068,6 +2120,10 @@ window.onmessage = (event: MessageEvent) => {
         confirmBtn.style.display = 'none';
       } else if (msg.preview) {
         // #6: 후보를 선택형 미리보기 트리로. 기본 전체 체크.
+        // 직전에 연결 현황(읽기 전용)이 떠 있었으면 그 모드를 끈다 — 안 끄면 후보가 읽기 전용으로
+        // 그려져 체크박스·‘선택한 항목에 연결’이 사라진다(연결할 방법이 없어진다).
+        bindResultMode = false;
+        remapOpen = null;
         bindCandidates = msg.candidates ?? [];
         bindNodes = msg.nodes ?? [];
         bindChecked.clear();
@@ -2111,6 +2167,7 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'BINDINGS_RESULT': {
       // 연결 현황(읽기 전용) — 결과 트리와 같은 모양. 사유 칩은 없다(실행이 아니라 조회).
+      if (!isCurrentBindReply(msg.reqId)) break; // 미리보기를 누른 뒤·선택을 바꾼 뒤 늦게 온 조회 결과
       clearBindPreview();
       bindResultMode = true;
       bindCandidates = msg.candidates;
@@ -2212,6 +2269,8 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'PREREQ_STATE':
       // #11: 단계 전제 갱신 → 통합 게이트 재평가 + 진행 안내(§3).
+      prereqKnown = true;
+      prereqInFlight = false;
       hasColorVars = msg.hasColorVars;
       hasScaleVars = msg.hasScaleVars;
       hasGlobal = msg.hasGlobal;
@@ -2823,7 +2882,7 @@ function renderRemapPanel(o: RemapOpen): HTMLElement {
   apply.textContent = t('bind.remapApply', { n: o.sites });
   apply.addEventListener('click', () => {
     apply.disabled = true;
-    send({ type: 'REMAP_BINDINGS', fromId: o.fromId, toId: select.value, fields: o.fields });
+    send({ type: 'REMAP_BINDINGS', fromId: o.fromId, toId: select.value, fields: o.fields, reqId: nextBindReq() });
   });
   box.append(label, apply, cancel);
   return box;
@@ -2859,6 +2918,7 @@ function updateBindApply(): void {
 /** 바인딩 미리보기/적용 상태를 초기화(선택 변경·적용 완료 시). */
 function clearBindPreview(): void {
   remapOpen = null; // 선택이 바뀌면 열어 둔 교체 패널은 낡은 대상을 가리킨다
+  $('bindTree').classList.remove('stale');
   bindResultMode = false;
   bindCandidates = [];
   bindNodes = [];
@@ -3000,7 +3060,8 @@ function refreshTreeEmptyStates(): void {
   const guide = '프레임이나 레이어를 선택하세요.';
   // 어느 쪽이든 행은 0건이다 — 안내 문구는 스크롤 영역이 아니므로 테두리·개수 줄을 걷어야 한다.
   // (예전 :empty 규칙은 안내 문구가 들어찬 순간 자식이 생겨 안 먹었다.)
-  if (!hasBindPreview()) {
+  // 자동 연결 현황을 기다리는 동안(stale)은 이전 목록을 흐리게 남겨 둔다 — 여기서 비우면 깜빡인다.
+  if (!hasBindPreview() && !$('bindTree').classList.contains('stale')) {
     if (lastSelCount === 0) renderEmptyState($('bindTree'), '선택한 노드가 없습니다', guide);
     else clearMount($('bindTree'));
   }
@@ -3331,7 +3392,7 @@ renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
 refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드도 시작 시 빈 상태 표시
 send({ type: 'GET_COLLECTIONS' });
-send({ type: 'GET_PREREQ' }); // #11: 단계 전제 상태
+requestPrereq(); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
 send({ type: 'GET_VARIABLES' }); // 다크 카드의 컬렉션·모드 선택지
 send({ type: 'GET_SETTINGS' }); // #19: 기준 크기·맥락 깊이는 파일에 기억된 값으로 시작
@@ -3353,7 +3414,7 @@ function showTab(name: (typeof TABS)[number]): void {
   }
   // UX5 상태 카드는 ‘관리’ 탭에선 숨김(목업 기준 — 만들기·적용에서만 노출).
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
-  if (name !== 'settings') send({ type: 'GET_PREREQ' }); // #11: 전제 상태 최신화(외부 변경 대비)
+  if (name !== 'settings') requestPrereq(); // #11: 전제 상태 최신화(외부 변경 대비) — 이미 요청 중이면 그 응답을 쓴다
   // 만들기 탭의 다크 카드는 allVars에 의존 — 탭 들어올 때마다 최신화(외부에서 모드/변수 추가 대비).
   if (name === 'tokens') send({ type: 'GET_VARIABLES' });
   if (name === 'settings') send({ type: 'GET_COLLECTION_ROLES' }); // 다른 사람이 지정을 바꿨을 수 있다

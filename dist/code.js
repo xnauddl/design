@@ -5530,8 +5530,10 @@
             // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
             skipTotal: r.skipTotal,
             // 상한 전 실제 수 — 잘렸으면 UI가 알린다
-            candidateTotal: r.candidateTotal
+            candidateTotal: r.candidateTotal,
             // 결과/미리보기 목록 상한 전 실제 수
+            reqId: msg.reqId
+            // UI가 낡은 응답을 가려낸다
           });
           if (!msg.preview) {
             commitUndo(figma);
@@ -5542,7 +5544,7 @@
         }
         case "SCAN_BINDINGS": {
           const r = await scanBindings(selection());
-          post({ type: "BINDINGS_RESULT", candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes });
+          post({ type: "BINDINGS_RESULT", candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId });
           break;
         }
         case "REMAP_TARGETS": {
@@ -5574,7 +5576,7 @@
           }
           post(__spreadProps(__spreadValues({ type: "REMAP_RESULT" }, r), { toName: to.name }));
           const scan = await scanBindings(selection());
-          post({ type: "BINDINGS_RESULT", candidates: scan.candidates, nodes: scan.nodes, total: scan.total, boundNodes: scan.boundNodes });
+          post({ type: "BINDINGS_RESULT", candidates: scan.candidates, nodes: scan.nodes, total: scan.total, boundNodes: scan.boundNodes, reqId: msg.reqId });
           break;
         }
         case "CANCEL": {
@@ -5608,7 +5610,7 @@
             if (await applySelectedBinding(item)) bound++;
             else skipped++;
           }
-          post({ type: "APPLY_RESULT", bound, skipped, flags: [], reasons: {} });
+          post({ type: "APPLY_RESULT", bound, skipped, flags: [], reasons: {}, reqId: msg.reqId });
           if (bound) {
             commitUndo(figma);
             selfSelect = true;

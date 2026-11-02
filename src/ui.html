@@ -314,7 +314,8 @@
     .toolbar-2 { margin-top: 0; }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
-    .btn-next { border-color: transparent; color: var(--text-2); }
+    /* 툴바가 좁아 줄이 넘어가도 ‘다음 →’은 오른쪽 끝에 — 혼자 왼쪽에 떨어지면 다른 버튼처럼 보인다. */
+    .btn-next { border-color: transparent; color: var(--text-2); margin-left: auto; }
     .btn-next:hover { color: var(--text); }
 
     /* ── 결과 목록(#18) ── */
@@ -339,6 +340,8 @@
       border-radius: var(--r-sm); background: var(--accent-subtle); font-size: 11px;
     }
     .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
+    /* 연결 현황 대기 — 선택이 멎을 때까지 이전 목록을 흐리게 둔다(비웠다 채우는 깜빡임 대신). 누를 수 없음. */
+    .results.stale { opacity: .45; pointer-events: none; transition: opacity .12s; }
     .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
     /* 컬렉션 계층 — 한 줄: 이름(변수 수) · 추천 · 선택 */
     .col-role { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }

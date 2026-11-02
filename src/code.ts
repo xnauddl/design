@@ -833,6 +833,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           skips: r.skips, // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
           skipTotal: r.skipTotal, // 상한 전 실제 수 — 잘렸으면 UI가 알린다
           candidateTotal: r.candidateTotal, // 결과/미리보기 목록 상한 전 실제 수
+          reqId: msg.reqId, // UI가 낡은 응답을 가려낸다
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
@@ -844,7 +845,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_BINDINGS': {
         // 읽기 전용 — 파일에 남은 바인딩을 결과 트리 모양으로. 플러그인을 닫았다 열어도 '뭐가 붙어 있나'가 보인다.
         const r = await scanBindings(selection());
-        post({ type: 'BINDINGS_RESULT', candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes });
+        post({ type: 'BINDINGS_RESULT', candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId });
         break;
       }
       case 'REMAP_TARGETS': {
@@ -875,7 +876,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'REMAP_RESULT', ...r, toName: to.name });
         const scan = await scanBindings(selection()); // 연결 현황을 바뀐 상태로 다시 그린다
-        post({ type: 'BINDINGS_RESULT', candidates: scan.candidates, nodes: scan.nodes, total: scan.total, boundNodes: scan.boundNodes });
+        post({ type: 'BINDINGS_RESULT', candidates: scan.candidates, nodes: scan.nodes, total: scan.total, boundNodes: scan.boundNodes, reqId: msg.reqId });
         break;
       }
       case 'CANCEL': {
@@ -916,7 +917,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (await applySelectedBinding(item)) bound++;
           else skipped++; // 노드/변수 소실·실패는 graceful skip
         }
-        post({ type: 'APPLY_RESULT', bound, skipped, flags: [], reasons: {} });
+        post({ type: 'APPLY_RESULT', bound, skipped, flags: [], reasons: {}, reqId: msg.reqId });
         if (bound) {
           commitUndo(figma); // UX2: 선택 바인딩 전체를 단일 Undo로
           selfSelect = true;
