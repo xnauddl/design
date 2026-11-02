@@ -5394,6 +5394,7 @@
           break;
         }
         case "SCAN_TEXT_STYLES": {
+          if (!requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           const { samples, warnings } = await scanTextStyles(selection());
           lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
@@ -5402,6 +5403,7 @@
           break;
         }
         case "NAME_TEXT_STYLES_BY_ROW": {
+          if (!requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
           if (!lastTextSamples.length) {
             post({ type: "ERROR", message: "\uBA3C\uC800 \uC2A4\uCE94\uD558\uC138\uC694 \u2014 \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE38 \uD45C\uBCF8\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.", op: "NAME_TEXT_STYLES_BY_ROW" });
             break;
