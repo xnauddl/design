@@ -412,6 +412,20 @@
       font-family: var(--mono); font-size: var(--fs); overflow-x: auto;
     }
     .before { color: var(--muted); text-decoration: line-through; }
+    /* 연결 줄 — `채움 색 ■ #fff = color/bg`. 속성 이름은 본문 글꼴(디자인 말), 값·변수는 고정폭. 취소선 없음(값은 바뀌지 않는다). */
+    .bf-label { font-family: var(--font); font-weight: 500; color: var(--text-2); }
+    .bf-val { color: var(--muted); font-weight: 400; }
+    .bf-op { color: var(--muted); font-weight: 400; padding: 0 1px; }
+    .bf-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--border); vertical-align: -1px; margin-right: 4px; }
+    /* 레이어 머리 — 누르면 캔버스에서 그 레이어 선택 */
+    .r-group.pick { cursor: pointer; color: var(--text-2); }
+    .r-group.pick:hover, .r-group.pick:focus-visible { color: var(--accent-strong); text-decoration: underline; outline: none; }
+    /* 변수별 보기 › 어디에? — 레이어 · 속성 목록(누르면 그 레이어 선택) */
+    .var-uses { display: flex; flex-direction: column; gap: 2px; margin: -2px 0 6px 10px; padding-left: 8px; border-left: 2px solid var(--border); }
+    .var-use { text-align: left; border: none; background: transparent; padding: 3px 4px; border-radius: var(--r-sm); font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .var-use:hover { background: var(--surface-hover); }
+    .vu-layer { font-family: var(--mono); }
+    .vu-props { color: var(--muted); }
     .tree-name { color: inherit; }
     .after { color: var(--ok); }
     .tree-ctrls { font-size: var(--fs); margin-top: 6px; }
@@ -460,6 +474,8 @@
   </div>
 
   <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
+    <!-- 이미 있는 변수 안내 — 변수가 있는 파일에서 '만들기'를 거쳐 확인하게 하지 않는다(바로 연결로). -->
+    <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button></div>
     <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
     <div class="banner" id="onboardBanner" style="display:none">
       <span data-i18n="onboard.banner">처음이면 전체 실행으로 시작하세요.</span>
@@ -501,6 +517,7 @@
   </section>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
+    <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>

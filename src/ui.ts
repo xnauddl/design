@@ -4,6 +4,7 @@
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate } from './shared/messages';
 import { type DraftToken, type Unit, tidyNumberTokens } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
+import { groupBindLines, fieldGroupKey, isHexColor } from './lib/bindDisplay';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier, type Feature } from './lib/entitlements';
 import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
@@ -2271,6 +2272,7 @@ window.onmessage = (event: MessageEvent) => {
       // #11: 단계 전제 갱신 → 통합 게이트 재평가 + 진행 안내(§3).
       prereqKnown = true;
       prereqInFlight = false;
+      renderExistingVars(msg.tierVars ?? 0, msg.tierColorVars ?? 0, msg.otherVars ?? 0);
       hasColorVars = msg.hasColorVars;
       hasScaleVars = msg.hasScaleVars;
       hasGlobal = msg.hasGlobal;
@@ -2531,6 +2533,12 @@ interface TreeRow {
   /** 대상이 아닌 이유. 있으면 흐린 행 + 사유(reason) + 꼬리표(meta), 체크 불가.
    *  리네임=보존(잠금) · 바인딩=건너뜀(스킵). */
   keep?: { reason: string; meta: string };
+  /** 바인딩 줄 — `채움 색 ■ #fff = color/bg`. connected=이미 연결됨('='), 아니면 연결 예정('→'). 취소선 없음(값은 그대로다). */
+  bind?: { label: string; value: string; variable: string; connected: boolean; tip: string };
+  /** 한 줄이 여러 후보를 합친 것(네 방향 여백 등) — 체크는 이 키들을 함께 켜고 끈다. */
+  keys?: string[];
+  /** 그룹 머리를 누르면 캔버스에서 이 레이어를 선택한다. */
+  selectId?: string;
 }
 
 /** 선택 서브트리의 최소 depth(루트 기준)로 들여쓰기를 정규화한다. */
@@ -2559,17 +2567,43 @@ function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: (
     const group = resultGroup(r.name);
     group.style.marginLeft = indent;
     if (!r.header) group.classList.add('ctx');
+    if (r.selectId) {
+      // 어느 레이어인지 캔버스에서 바로 찾게 — 목록의 이름만으로는 같은 이름이 여럿일 때 모른다.
+      const id = r.selectId;
+      group.classList.add('pick');
+      group.title = t('bind.layerSelectTip');
+      group.setAttribute('role', 'button');
+      group.tabIndex = 0;
+      group.addEventListener('click', () => selectNodes([id], 'applyStatus'));
+      group.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectNodes([id], 'applyStatus'); } });
+    }
     return group;
   }
 
+  const keys = r.keys ?? [r.id];
   const cb = document.createElement('input');
   cb.type = 'checkbox';
-  cb.checked = checked.has(r.id);
+  cb.checked = keys.every((k) => checked.has(k));
   cb.addEventListener('change', () => {
-    if (cb.checked) checked.add(r.id);
-    else checked.delete(r.id);
+    for (const k of keys) {
+      if (cb.checked) checked.add(k);
+      else checked.delete(k);
+    }
     onChange();
   });
+
+  if (r.bind) {
+    const b = r.bind;
+    const title = document.createElement('span');
+    const swatch = isHexColor(b.value) ? `<span class="bf-swatch" style="background:${escapeHtml(b.value)}"></span>` : '';
+    title.innerHTML =
+      `<span class="bf-label">${escapeHtml(b.label)}</span> ${swatch}<span class="bf-val">${escapeHtml(b.value)}</span> ` +
+      `<span class="bf-op">${b.connected ? '=' : '→'}</span> <span class="after">${escapeHtml(b.variable)}</span>`;
+    title.title = b.tip;
+    const card = resultCard({ ...(readOnly ? {} : { check: cb }), title, titleMono: true });
+    card.style.marginLeft = indent;
+    return card;
+  }
 
   // 이름 보존(컴포넌트 등록)은 취소선 없이 그대로, 교체(리네임·바인딩)는 before → after.
   const title = document.createElement('span');
@@ -2718,22 +2752,44 @@ function bindRows(): TreeRow[] {
       });
       continue;
     }
-    rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands });
+    rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands, ...(cands ? { selectId: n.id } : {}) });
     if (cands) {
-      for (const c of cands) {
-        const dist = c.distance && c.distance > 0 ? ` ~${Math.round(c.distance * 100) / 100}` : '';
+      // 같은 변수에 묶인 네 방향 여백·모서리는 한 줄로(좌우 여백 = spacing/lg).
+      for (const line of groupBindLines(cands)) {
+        const lead = line.items[0] as BindCandidate;
+        const dist = lead.distance && lead.distance > 0 ? ` ~${Math.round(lead.distance * 100) / 100}` : '';
+        const label = fieldLabel(line.label, line.fields[0]);
+        const variable = `${line.variableName}${dist}`;
+        const tipArgs = { label, fields: line.fields.join(', '), variable: line.variableName };
         rows.push({
-          id: candKey(c),
-          name: `${c.field} ${c.currentValue}`,
-          type: c.field,
+          id: candKey(lead),
+          keys: line.items.map((it) => candKey(it as BindCandidate)),
+          name: `${label} ${line.currentValue}`,
+          type: line.fields[0],
           depth: n.depth + 1,
           parentId: n.id,
-          change: `${c.variableName}${dist}`,
+          change: variable,
+          bind: {
+            label,
+            value: line.currentValue,
+            variable,
+            connected: bindResultMode,
+            tip: t(bindResultMode ? 'bind.connectedTip' : 'bind.willConnectTip', tipArgs),
+          },
         });
       }
     }
   }
   return rows;
+}
+
+/** 속성 라벨 — i18n 키가 없으면(새 필드) 원래 API 이름을 그대로. */
+function fieldLabel(label: string, rawField: string): string {
+  return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
+}
+/** 변수별 보기 묶음 이름(색·여백…). */
+function fieldGroupLabel(group: string): string {
+  return t(`fieldGroup.${group}`);
 }
 
 /** 보기 축 — 'layer'(캔버스 순서 트리) / 'variable'(변수 행 + 레이어 수, 관리용). */
@@ -2770,46 +2826,80 @@ function filteredCandidates(): BindCandidate[] {
   return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
 }
 
+/** 변수별 보기에서 '어디에?'를 펼친 행(`${묶음 키}|${변수 id}`). */
+const varUsesOpen = new Set<string>();
+const FIELD_GROUP_ORDER = ['color', 'space', 'radius', 'size', 'text', 'other'];
+
 function renderBindByVariable(): void {
   const mount = $('bindTree');
   clearMount(mount);
-  // 속성 → 변수 → 레이어 id 집합
-  const groups = new Map<string, Map<string, { id: string; name: string; ids: Set<string>; fields: Set<string>; sites: number }>>();
+  const nodeName = new Map(bindNodes.map((n) => [n.id, n.name]));
+  // 묶음(색·여백…) → 변수 → 쓰인 곳
+  type VarRow = { id: string; name: string; value: string; fields: Set<string>; byNode: Map<string, BindCandidate[]> };
+  const groups = new Map<string, Map<string, VarRow>>();
   for (const c of filteredCandidates()) {
-    const prop = c.field === 'fills' || c.field === 'strokes' || c.field === 'effects' ? c.field : /Radius$/.test(c.field) ? 'radius' : /^padding|Spacing$|Gap$/.test(c.field) ? 'spacing' : c.field;
-    if (!groups.has(prop)) groups.set(prop, new Map());
-    const byVar = groups.get(prop)!;
-    const row = byVar.get(c.variableId) ?? { id: c.variableId, name: c.variableName, ids: new Set<string>(), fields: new Set<string>(), sites: 0 };
-    row.ids.add(c.nodeId);
+    const g = fieldGroupKey(c.field);
+    if (!groups.has(g)) groups.set(g, new Map());
+    const byVar = groups.get(g)!;
+    const row = byVar.get(c.variableId) ?? { id: c.variableId, name: c.variableName, value: c.currentValue, fields: new Set<string>(), byNode: new Map() };
     row.fields.add(c.field);
-    row.sites++;
+    const list = row.byNode.get(c.nodeId) ?? [];
+    list.push(c);
+    row.byNode.set(c.nodeId, list);
     byVar.set(c.variableId, row);
   }
-  const props = [...groups.keys()].sort();
-  for (const prop of props) {
-    mount.appendChild(resultGroup(prop));
-    const rows = [...groups.get(prop)!.values()].sort((a, b) => b.ids.size - a.ids.size || a.name.localeCompare(b.name));
+  const order = [...groups.keys()].sort((a, b) => FIELD_GROUP_ORDER.indexOf(a) - FIELD_GROUP_ORDER.indexOf(b));
+  for (const g of order) {
+    mount.appendChild(resultGroup(fieldGroupLabel(g)));
+    const rows = [...groups.get(g)!.values()].sort((a, b) => b.byNode.size - a.byNode.size || a.name.localeCompare(b.name));
     for (const r of rows) {
-      const ids = [...r.ids];
-      const sel = document.createElement('button');
-      sel.className = 'link';
-      sel.textContent = t('bind.varSelect');
-      sel.title = t('bind.varLayers', { n: ids.length });
-      sel.addEventListener('click', () => selectNodes(ids, 'applyStatus'));
-      const key = `${prop}|${r.id}`;
-      let meta: HTMLElement = sel;
+      const key = `${g}|${r.id}`;
+      const ids = [...r.byNode.keys()];
+      // 레이어별로 같은 변수에 묶인 속성을 한 줄 라벨로(네 방향 여백 → '여백').
+      const uses = ids.map((nid) => ({ nid, labels: groupBindLines(r.byNode.get(nid)!).map((l) => fieldLabel(l.label, l.fields[0])) }));
+      const props = uses.reduce((n, u) => n + u.labels.length, 0);
+
+      const meta = document.createElement('span');
+      const link = (text: string, tip: string, on: () => void): HTMLButtonElement => {
+        const b = document.createElement('button');
+        b.className = 'link';
+        b.textContent = text;
+        b.title = tip;
+        b.addEventListener('click', on);
+        return b;
+      };
+      const open = varUsesOpen.has(key);
+      meta.append(link(t(open ? 'bind.varHideUses' : 'bind.varShowUses'), '', () => {
+        if (open) varUsesOpen.delete(key); else varUsesOpen.add(key);
+        renderBindTree();
+      }));
+      meta.append(' · ', link(t('bind.varSelect'), t('bind.varLayers', { n: ids.length }), () => selectNodes(ids, 'applyStatus')));
       // 일괄 교체는 '파일에 붙어 있는 것'(연결 현황·적용 결과)에서만 — 미리보기 후보는 아직 안 붙었다.
       if (bindResultMode) {
-        meta = document.createElement('span');
-        const rm = document.createElement('button');
-        rm.className = 'link';
-        rm.textContent = t('bind.varRemap');
-        rm.title = t('bind.varRemapTip');
-        rm.addEventListener('click', () => openRemap({ key, fromId: r.id, fromName: r.name, fields: [...r.fields], sites: r.sites }));
-        meta.append(sel, ' · ', rm);
+        meta.append(' · ', link(t('bind.varRemap'), t('bind.varRemapTip'), () => openRemap({ key, fromId: r.id, fromName: r.name, fields: [...r.fields], sites: [...r.byNode.values()].reduce((n, l) => n + l.length, 0) })));
       }
-      const card = resultCard({ title: r.name, titleMono: true, summary: t('bind.varLayers', { n: ids.length }), metaEl: meta });
-      mount.appendChild(card);
+
+      const title = document.createElement('span');
+      const swatch = isHexColor(r.value) ? `<span class="bf-swatch" style="background:${escapeHtml(r.value)}"></span>` : '';
+      // 색은 견본으로 충분하다 — hex 글자까지 붙이면 좁은 폭에서 변수 이름이 잘린다(값은 툴팁에).
+      const valueText = !isHexColor(r.value) && r.value ? ` <span class="bf-val">= ${escapeHtml(r.value)}</span>` : '';
+      title.innerHTML = `${swatch}${escapeHtml(r.name)}${valueText}`;
+      title.title = r.value ? `${r.name} = ${r.value}` : r.name;
+      mount.appendChild(resultCard({ title, titleMono: true, summary: t('bind.varUses', { layers: ids.length, props }), metaEl: meta }));
+
+      if (open) {
+        const box = document.createElement('div');
+        box.className = 'var-uses';
+        for (const u of uses) {
+          const b = document.createElement('button');
+          b.className = 'var-use';
+          b.title = t('bind.layerSelectTip');
+          b.innerHTML = `<span class="vu-layer">${escapeHtml(nodeName.get(u.nid) ?? u.nid)}</span> <span class="vu-props">${escapeHtml(u.labels.join(', '))}</span>`;
+          b.addEventListener('click', () => selectNodes([u.nid], 'applyStatus'));
+          box.appendChild(b);
+        }
+        mount.appendChild(box);
+      }
       if (remapOpen && remapOpen.key === key) mount.appendChild(renderRemapPanel(remapOpen));
     }
   }
@@ -3418,6 +3508,42 @@ function showTab(name: (typeof TABS)[number]): void {
   // 만들기 탭의 다크 카드는 allVars에 의존 — 탭 들어올 때마다 최신화(외부에서 모드/변수 추가 대비).
   if (name === 'tokens') send({ type: 'GET_VARIABLES' });
   if (name === 'settings') send({ type: 'GET_COLLECTION_ROLES' }); // 다른 사람이 지정을 바꿨을 수 있다
+}
+
+/* ---------- 이미 있는 변수 안내 — 시작·만들기 탭 맨 위 ----------
+   변수가 있는 파일에서 사용자가 '만들기'에 들어가 확인한 뒤에야 '적용'으로 가던 흐름을 끊는다. */
+function goToBindStatus(): void {
+  showTab('apply');
+  showApplyStep('bind');
+  if (lastSelCount > 0) {
+    setStatus('applyStatus', t('common.running'), '');
+    requestBindingsScan();
+  } else setStatus('applyStatus', t('existingVars.selectFirst'), '');
+}
+function goToCollectionRoles(): void {
+  showTab('settings');
+  $('collectionRolesCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function renderExistingVars(tierVars: number, tierColor: number, other: number): void {
+  for (const [id, onMake] of [['existingVarsStart', false], ['existingVarsMake', true]] as const) {
+    const box = $(id);
+    const text = box.querySelector('.ev-text') as HTMLElement;
+    const go = box.querySelector('.ev-go') as HTMLButtonElement;
+    if (tierVars > 0) {
+      text.textContent = onMake
+        ? t('existingVars.hasMake', { n: tierVars })
+        : t('existingVars.has', { n: tierVars, color: tierColor, other: tierVars - tierColor });
+      go.textContent = t('existingVars.gotoBind');
+      go.onclick = goToBindStatus;
+      box.style.display = '';
+    } else if (other > 0) {
+      // 변수는 있는데 계층(이름 또는 지정)이 아니라 연결에 못 쓴다 — 계층 지정으로 보낸다.
+      text.textContent = t('existingVars.unknown', { n: other });
+      go.textContent = t('existingVars.gotoRoles');
+      go.onclick = goToCollectionRoles;
+      box.style.display = '';
+    } else box.style.display = 'none';
+  }
 }
 
 /* ---------- 컬렉션 계층(§9) — 이름이 아니라 지정으로 Global/Semantic/Component ---------- */

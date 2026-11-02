@@ -161,7 +161,12 @@ async function postPrereq(): Promise<void> {
     const hasDarkMode = cols.some((c) => semanticIds.has(c.id) && c.modes.length > 1);
     const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 타이포 단계 「기존만 연결」 전제
     const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId)); // 역할 별칭 존재 = 역할 매핑 완료
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles });
+    // '이미 변수가 있다'를 먼저 알리는 안내용 개수 — 계층 안/밖을 나눠 센다(밖이면 연결에 못 쓴다).
+    const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
+    const tierVars = tierVarList.length;
+    const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
+    const otherVars = vars.length - tierVars;
+    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }

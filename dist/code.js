@@ -4977,7 +4977,11 @@
       const hasDarkMode = cols.some((c) => semanticIds.has(c.id) && c.modes.length > 1);
       const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
       const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId));
-      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles });
+      const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
+      const tierVars = tierVarList.length;
+      const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
+      const otherVars = vars.length - tierVars;
+      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
     } catch (e) {
     }
   }

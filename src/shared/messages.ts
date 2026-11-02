@@ -228,6 +228,11 @@ export type CodeToUi =
       hasTextStyles: boolean;
       /** Semantic에 역할 별칭이 있음(역할 매핑 완료). */
       hasSemanticRoles: boolean;
+      /** 계층(Global·Semantic·Component) 안의 변수 수 · 그중 색 — '이미 변수 N개' 안내용. */
+      tierVars?: number;
+      tierColorVars?: number;
+      /** 계층으로 인식되지 않은 컬렉션의 변수 수 — 있으면 '계층 지정' 안내. */
+      otherVars?: number;
     }
   | {
       type: 'LICENSE_STATUS';

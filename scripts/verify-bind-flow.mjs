@@ -10,6 +10,7 @@
      5 미리보기 중 선택이 바뀌면 진행률을 숨긴다
      6 시작 직후 GET_PREREQ는 한 번
      7 좁은 폭에서도 ‘다음 →’은 툴바 오른쪽 끝
+     8 연결 현황 줄은 디자인 말 + ‘=’(취소선 없음), 미리보기는 ‘→’, 네 방향 여백은 한 줄, 레이어 머리는 캔버스 선택
    사용: npm run verify:bind  (Chromium 경로가 다르면 CHROMIUM_PATH로 지정)
    ============================================================ */
 import { chromium } from 'playwright';
@@ -97,6 +98,26 @@ const preview = (reqId) => ({ type: 'APPLY_RESULT', preview: true, bound: 2, ski
   check('5 미리보기 중 선택 변경 → 진행률 숨김', !(await visible(p, '#applyProgress')));
   await recv(p, preview(oldPreview));
   check('2 이전 선택의 미리보기 결과는 버림', !(await visible(p, '#btnApplyConfirm')));
+  await p.close();
+}
+
+/* 8 — 연결 목록 표시 */
+{
+  const p = await open();
+  await recv(p, PREREQ);
+  const sides = ['paddingLeft', 'paddingRight'].map((f) => c(f, 'vLg'));
+  await recv(p, scanResult(undefined, [{ ...c('fills'), index: 0, currentValue: '#ffffff', variableName: 'color/bg' }, ...sides]));
+  const rows = await p.$$eval('#bindTree .r-card', (cs) => cs.map((x) => ({ text: x.textContent, strike: [...x.querySelectorAll('*')].some((e) => getComputedStyle(e).textDecorationLine.includes('line-through')) })));
+  check('8 연결 현황 줄은 ‘=’', rows.length > 0 && rows.every((r) => r.text.includes('=')));
+  check('8 취소선 없음', rows.every((r) => !r.strike));
+  check('8 속성은 디자인 말(채움 색)', rows.some((r) => r.text.includes('채움 색')));
+  check('8 같은 변수의 좌우 여백은 한 줄', rows.filter((r) => r.text.includes('좌우 여백')).length === 1 && !rows.some((r) => r.text.includes('paddingLeft')));
+  await p.click('#bindTree .r-group.pick');
+  check('8 레이어 머리 → 캔버스 선택', (await sent(p, 'SELECT_NODES')).at(-1)?.ids?.[0] === 'n1');
+  await p.click('#btnApply');
+  await recv(p, preview(await lastReq(p, 'APPLY')));
+  const ops = await p.$$eval('#bindTree .bf-op', (e) => [...new Set(e.map((x) => x.textContent))]);
+  check('8 미리보기 줄은 ‘→’', ops.length === 1 && ops[0] === '→', ops.join(','));
   await p.close();
 }
 
