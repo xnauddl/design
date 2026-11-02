@@ -939,7 +939,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'SCAN_TEXT_STYLES': {
-        // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
+        // 스캔(미리보기)도 Paid — 등록이 Paid라 스캔만 열어두면 막다른 길(ROADMAP §5).
+        // 마법사의 텍스트 스타일 단계도 Paid 전용이라 Free 마법사는 여기 오지 않는다.
+        if (!requirePaid('textStyles', '텍스트 스타일은 Paid 기능입니다.')) break;
         // 이름은 언제나 크기 순(display/h1…) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
         const { samples, warnings } = await scanTextStyles(selection());
         lastTextSamples = samples;
@@ -949,6 +951,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'NAME_TEXT_STYLES_BY_ROW': {
+        if (!requirePaid('textStyles', '텍스트 스타일은 Paid 기능입니다.')) break; // 스캔 후속 — 스캔과 같은 등급
         // 방금 스캔한 표본을 그대로 다시 이름 짓는다(캔버스 재탐색 없음) — 사용자가 보고 있는 표와
         // 같은 입력이어야 결과가 예측 가능하다. 등록된 스타일은 그 사이 바뀔 수 있어 새로 읽는다.
         // 빈 후보를 돌려보내면 UI가 '텍스트를 못 찾음'으로 읽고 기본 램프로 표를 덮는다 — 오류로 알린다.
