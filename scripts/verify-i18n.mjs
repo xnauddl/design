@@ -7,7 +7,11 @@
  * 실제로 두 번 났다(한쪽이 문구를 고치고 다른 쪽이 STRINGS를 그대로 둔 경우).
  * typecheck·테스트로는 안 잡힌다. 여기서 잡는다.
  *
- * 1. 누락  — data-i18n* 키가 STRINGS에 없음(하이드레이션이 건너뛰어 조용히 폴백)
+ * 속성으로 보이는 문자열(`data-i18n-title` → `title`, `data-i18n-placeholder` →
+ * `placeholder`)도 같은 관계다 — 인라인 속성값이 폴백, STRINGS가 화면값. 툴팁은
+ * 호버해야 보여 드리프트가 더 오래 안 들킨다. 그래서 같은 잣대로 함께 본다.
+ *
+ * 1. 누락  — `data-i18n*` 키가 STRINGS에 없음(하이드레이션이 건너뛰어 조용히 폴백)
  * 2. 드리프트 — STRINGS 값 ≠ 인라인 폴백(둘 중 하나가 낡음)
  * 3. 미참조 — STRINGS에만 있고 아무도 안 쓰는 키(죽은 문자열)
  *
@@ -75,67 +79,67 @@ function innerHtmlAt(html, start) {
   return null; // 닫는 태그를 못 찾음
 }
 
-/** 열린 태그 문자열에서 attr="…" / attr='…' 값을 뽑는다. 없으면 null.
- *  `data-i18n-title`처럼 kebab 접미로 붙은 동명 속성은 잡지 않는다(`\b`만으로는 `-title`에서 title을 잡음). */
-function attrValue(openTag, attr) {
-  const m = new RegExp(`(?<!-)${attr}\\s*=\\s*("([^"]*)"|'([^']*)')`).exec(openTag);
-  if (!m) return null;
-  return m[2] ?? m[3] ?? null;
-}
-
 const html = readFileSync(UI_HTML, 'utf8');
-
-/* textContent / innerHTML 폴백 (data-i18n · data-i18n-html) */
-const contentRe = /data-i18n(-html)?="([^"]+)"/g;
-const found = []; // { key, fallback, kind: 'text'|'html'|'title'|'placeholder' }
+const attrRe = /data-i18n(-html)?="([^"]+)"/g;
+const found = []; // { key, inner, html: bool }
 let am;
-while ((am = contentRe.exec(html))) {
+while ((am = attrRe.exec(html))) {
   const start = html.lastIndexOf('<', am.index);
   const inner = innerHtmlAt(html, start);
-  found.push({ key: am[2], fallback: inner, kind: am[1] ? 'html' : 'text' });
-}
-
-/* title / placeholder 속성 폴백 (data-i18n-title · data-i18n-placeholder)
-   같은 요소에 data-i18n과 함께 있을 수 있어 별도 패스로 모은다. */
-const attrPairRe = /data-i18n-(title|placeholder)="([^"]+)"/g;
-while ((am = attrPairRe.exec(html))) {
-  const start = html.lastIndexOf('<', am.index);
-  const end = endOfOpenTag(html, start);
-  if (end < 0) {
-    found.push({ key: am[2], fallback: null, kind: am[1] });
-    continue;
-  }
-  const openTag = html.slice(start, end + 1);
-  const fallback = attrValue(openTag, am[1]);
-  found.push({ key: am[2], fallback, kind: am[1] });
+  found.push({ key: am[2], inner, isHtml: !!am[1] });
 }
 
 /* 스캐너가 조용히 놓치면 검사 전체가 무의미해진다 — 속성 수와 추출 수를 맞춰본다. */
-const contentAttrCount = (html.match(/data-i18n(-html)?="/g) ?? []).length;
-const pairAttrCount = (html.match(/data-i18n-(title|placeholder)="/g) ?? []).length;
-const attrCount = contentAttrCount + pairAttrCount;
+const attrCount = (html.match(/data-i18n(-html)?="/g) ?? []).length;
 if (found.length !== attrCount) {
-  console.error(`✗ 추출 실패: data-i18n* 속성 ${attrCount}개 중 ${found.length}개만 파싱됨`);
+  console.error(`✗ 추출 실패: data-i18n 속성 ${attrCount}개 중 ${found.length}개만 파싱됨`);
   process.exit(2);
 }
-const unparsed = found.filter((f) => f.fallback === null);
+const unparsed = found.filter((f) => f.inner === null);
 if (unparsed.length) {
-  console.error(
-    `✗ 폴백을 못 찾은 요소: ${unparsed.map((f) => `${f.key}(${f.kind})`).join(', ')}`,
-  );
+  console.error(`✗ 닫는 태그를 못 찾은 요소: ${unparsed.map((f) => f.key).join(', ')}`);
   process.exit(2);
 }
+
+/* ---------- 속성 폴백 추출(data-i18n-title / -placeholder) ----------
+   짝이 되는 속성(title/placeholder)이 같은 여는 태그 안에 있어야 폴백이 성립한다.
+   없으면 하이드레이션 전 첫 프레임에 툴팁이 통째로 빈다 — 누락으로 잡는다. */
+const ATTR_FORMS = ['title', 'placeholder'];
+const unescape = (s) =>
+  s.replace(/&(amp|lt|gt|quot|#39);/g, (_, e) =>
+    ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e],
+  );
+
+const attrFound = []; // { key, inner, form }
+const noFallback = [];
+for (const form of ATTR_FORMS) {
+  const re = new RegExp(`data-i18n-${form}="([^"]+)"`, 'g');
+  let m;
+  while ((m = re.exec(html))) {
+    const start = html.lastIndexOf('<', m.index);
+    const end = endOfOpenTag(html, start);
+    const tag = html.slice(start, end < 0 ? undefined : end);
+    const pair = new RegExp(`\\s${form}="([^"]*)"`).exec(tag);
+    if (!pair) noFallback.push(m[1]);
+    else attrFound.push({ key: m[1], inner: unescape(pair[1]), form });
+  }
+}
+if (noFallback.length) {
+  console.error(`✗ 폴백 속성이 없는 키: ${noFallback.join(', ')} — 같은 태그에 title/placeholder를 함께 두세요`);
+  process.exit(2);
+}
+found.push(...attrFound);
 
 /* ---------- 1·2. 누락 / 드리프트 ---------- */
 const missing = [];
 const drift = [];
-for (const { key, fallback } of found) {
+for (const { key, inner } of found) {
   const val = STRINGS[key];
   if (val === undefined) {
     missing.push(key);
     continue;
   }
-  if (val.trim() !== fallback.trim()) drift.push({ key, val, fallback: fallback.trim() });
+  if (val.trim() !== inner.trim()) drift.push({ key, val, inner: inner.trim() });
 }
 
 /* ---------- 3. 미참조 ---------- */
@@ -152,9 +156,9 @@ const code = srcFiles(join(ROOT, 'src'))
   .map((p) => readFileSync(p, 'utf8'))
   .join('\n');
 
-// `t('reason.' + key)`처럼 조립되는 키는 접두사만 보고 사용된 것으로 친다.
-// 접두사를 하드코딩하면 새 조립 지점이 생길 때마다 오탐이 나므로 코드에서 뽑는다.
-const dynPrefixes = [...code.matchAll(/\bt\(\s*'([\w.]+\.)'\s*\+/g)].map((m) => m[1]);
+// `t('reason.' + key)` / `` t(`rename.keep.${reason}`) ``처럼 조립되는 키는 접두사만 보고
+// 사용된 것으로 친다. 접두사를 하드코딩하면 새 조립 지점이 생길 때마다 오탐이 나므로 코드에서 뽑는다.
+const dynPrefixes = [...code.matchAll(/\bt\(\s*(?:'([\w.]+\.)'\s*\+|`([\w.]+\.)\$\{)/g)].map((m) => m[1] ?? m[2]);
 const literal = new Set([...code.matchAll(/['"`]([a-z][\w]*(?:\.[\w-]+)+)['"`]/gi)].map((m) => m[1]));
 const inMarkup = new Set(found.map((f) => f.key));
 
@@ -175,7 +179,7 @@ if (drift.length) {
   for (const d of drift) {
     console.error(`   · ${d.key}`);
     console.error(`     STRINGS: ${d.val.slice(0, 100)}`);
-    console.error(`     인라인 : ${d.fallback.slice(0, 100)}`);
+    console.error(`     인라인 : ${d.inner.slice(0, 100)}`);
   }
 }
 if (orphan.length) {
@@ -184,14 +188,9 @@ if (orphan.length) {
   for (const k of orphan) console.error(`   · ${k}`);
 }
 if (!failed) {
-  const byKind = Object.create(null);
-  for (const f of found) byKind[f.kind] = (byKind[f.kind] ?? 0) + 1;
-  const kindSummary = Object.entries(byKind)
-    .map(([k, n]) => `${k} ${n}`)
-    .join(' · ');
   console.log(
-    `✓ i18n 정합 — data-i18n* ${found.length}개(${kindSummary}) · STRINGS ${Object.keys(STRINGS).length}개 · ` +
-      `누락 0 · 드리프트 0 · 미참조 0`,
+    `✓ i18n 정합 — 마크업 ${found.length}개(텍스트 ${found.length - attrFound.length} · 속성 ${attrFound.length}) · ` +
+      `STRINGS ${Object.keys(STRINGS).length}개 · 누락 0 · 드리프트 0 · 미참조 0`,
   );
 }
 process.exit(failed ? 1 : 0);

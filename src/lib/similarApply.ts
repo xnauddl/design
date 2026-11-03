@@ -126,10 +126,21 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
     if (!leaves) continue;
     try {
       const inst = comp.createInstance();
-      inst.x = n.x;
-      inst.y = n.y;
       try { inst.resize(n.width, n.height); } catch { /* 제약상 불가 시 기본 크기 */ }
-      if (n.parent) (n.parent as ChildrenMixin).appendChild(inst);
+      // 원본이 있던 **자리**에 끼운다. appendChild는 부모 맨 끝에 붙여, 오토레이아웃 리스트·그리드에서
+      // 교체된 카드가 전부 마지막으로 밀려 순서가 뒤섞였다(등록 경로의 restore와 같은 규칙).
+      // 오토레이아웃 부모면 위치는 레이아웃이 정하므로 x/y를 쓰지 않는다.
+      const parent = n.parent as (BaseNode & ChildrenMixin) | null;
+      if (parent) {
+        const idx = 'children' in parent ? parent.children.indexOf(n) : -1;
+        if (idx >= 0 && typeof parent.insertChild === 'function') parent.insertChild(idx, inst);
+        else parent.appendChild(inst);
+      }
+      const autolayout = !!parent && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE';
+      if (!autolayout) {
+        inst.x = n.x;
+        inst.y = n.y;
+      }
       // 컴포넌트 속성 오버라이드(TEXT/INSTANCE_SWAP).
       const ov = overridesForFrame(flattenFrame(leaves), plan);
       const props: Record<string, string> = {};
