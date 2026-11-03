@@ -15,6 +15,8 @@
        검색, 행 메뉴(교체 없음)·사용 레이어 선택 200개, 상세, 알약 이동·되돌리기, 키보드, ⋯ 팝업, 시작 시 스크립트 오류 0
     10 IA v3 셸(PR 1): 첫 화면 변수 탭, 탭 전환에 크기 요청 0, 선택 표시줄, 하위 화면 기억, 창 다시 들어옴,
        최소화, 잠금 사유, 버튼 줄 고정, 24×24, §8 목록 높이 실측
+    12 변수 고치기(PR 3.5): 열 때 포커스, 이름 오류·바뀌는 것 줄, 별칭 고르개(계층·Global·순환·검색), 값 ↔ 별칭,
+       저장(고친 것만 + base), 저장 중 잠금, 성공·일부 실패·다른 곳에서 바뀜·삭제됨·이름 거절, ERROR·10초, 버리기 확인, 닫은 뒤 포커스
    사용: npm run verify:bind  (Chromium 경로가 다르면 CHROMIUM_PATH로 지정)
    ============================================================ */
 import { chromium } from 'playwright';
@@ -348,7 +350,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   // 우클릭 메뉴 — 교체 없음
   await rightClick(p, '.vt-row[data-id="tx"]');
   const items = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
-  check('9 행 메뉴(복사 3 · 사용 레이어 선택 · 이동 · 상세, 교체 없음)', JSON.stringify(items) === JSON.stringify(['이름 복사', '값 복사', 'CSS 변수명 복사', '사용 레이어 선택', '가리키는 변수로 이동', '상세 보기…']), items.join('|'));
+  check('9 행 메뉴(복사 3 · 사용 레이어 선택 · 이동 · 상세 · 고치기, 교체 없음)', JSON.stringify(items) === JSON.stringify(['이름 복사', '값 복사', 'CSS 변수명 복사', '사용 레이어 선택', '가리키는 변수로 이동', '상세 보기…', '고치기…']), items.join('|'));
   await p.click('.ctx-menu button >> text=사용 레이어 선택');
   const selReq = (await sent(p, 'SELECT_VAR_USERS')).at(-1);
   check('9 사용 레이어 선택 → 기준 안에서 새로 찾기', selReq?.varIds?.[0] === 'tx' && selReq?.nodeIds?.[0] === '1:2');
@@ -729,6 +731,233 @@ const reenter = (p) => p.evaluate(() => {
   await p.waitForTimeout(500);
   check('11 300개 초과 복귀 → "피그마에서 바뀌었을 수 있어요 · [다시 찾기]"', (await p.textContent('#bindNotice')).includes('피그마에서 바뀌었을 수 있어요') && (await sent(p, 'APPLY')).length === 1);
   check('11 300개 초과 안내 → 단계는 찾은 뒤와 같음 · 연결 가능', JSON.stringify(await steps(p)) === JSON.stringify(['done', 'now', 'todo']) && !(await locked(p, '#btnApplyConfirm')));
+  await p.close();
+}
+
+/* 12 — 변수 고치기(§4.4 고치기 · PR 3.5) */
+const ECOLS = [
+  ...COLS,
+  { id: 'x', name: 'Misc', tier: 0, modes: [{ modeId: 'x1', name: 'Mode 1' }], defaultModeId: 'x1', tierSet: null },
+];
+const EVARS = [
+  ...VARS,
+  { id: 'tm', name: 'color/text/muted', collectionId: 's', type: 'COLOR', values: { l: { kind: 'alias', aliasId: 'g9', aliasName: 'color/gray/900' }, d: { kind: 'color', hex: '#888888' } }, scopes: [], description: '' },
+  { id: 'xa', name: 'misc/a', collectionId: 'x', type: 'COLOR', values: { x1: { kind: 'alias', aliasId: 'xb', aliasName: 'misc/b' } }, scopes: [], description: '' },
+  { id: 'xb', name: 'misc/b', collectionId: 'x', type: 'COLOR', values: { x1: { kind: 'color', hex: '#FF0000' } }, scopes: [], description: '' },
+];
+const NAME = '.modal input[aria-label="이름(전체 경로)"]';
+const edAlert = (p) => p.$eval('.modal .ed-alert', (e) => (e.hidden ? '' : e.textContent));
+const edSaveLocked = (p) => p.$eval('.modal .m-foot button.primary', (e) => e.getAttribute('aria-disabled') === 'true');
+const edSaveText = (p) => p.textContent('.modal .m-foot button.primary');
+const edCloseText = (p) => p.textContent('.modal .m-foot button:not(.primary)');
+const activeText = (p) => p.evaluate(() => document.activeElement?.textContent ?? '');
+const activeLabel = (p) => p.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? '');
+const pickerOpts = (p) => p.$$eval('.ed-picker [role="option"]', (e) => e.map((x) => x.textContent));
+const pickerNotes = (p) => p.$$eval('.ed-picker .ed-pnote, .ed-picker .ed-pnone', (e) => e.map((x) => x.textContent));
+async function openEditList(opts = {}) {
+  let p;
+  if (opts.clock) {
+    // 10초 시간 초과는 가짜 시계로 — 설치는 페이지를 열기 전에.
+    p = await browser.newPage({ viewport: { width: 400, height: 510 } });
+    p.on('pageerror', (e) => pageErrors.push(e.message));
+    await p.clock.install();
+    await p.addInitScript(() => {
+      window.__sent = [];
+      window.parent.postMessage = (m) => window.__sent.push(m.pluginMessage);
+    });
+    await p.goto(url);
+  } else p = await open(400, null);
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS });
+  await recv(p, { ...sel(1, 2), scanned: 40, firstName: 'Card', ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 8, layers: 5 } }));
+  return p;
+}
+async function menuEdit(p, id) {
+  await rightClick(p, `.vt-row[data-id="${id}"]`);
+  await p.click('.ctx-menu button >> text=고치기…');
+}
+async function saveAndGet(p) {
+  await p.click('.modal .m-foot button.primary');
+  return (await sent(p, 'UPDATE_VARIABLE')).at(-1);
+}
+{
+  const p = await openEditList();
+  // 열 때 포커스 — 상세(더블클릭) → [닫기]
+  await p.dblclick('.vt-row[data-id="tx"] .nm');
+  check('12 상세로 열면 [닫기]에 포커스 · [저장] 잠김', (await activeText(p)) === '닫기' && (await edSaveLocked(p)) && (await edCloseText(p)) === '닫기');
+  check('12 이름 칸 · 모드마다 값 칸(별칭은 알약) · [▾]', (await p.inputValue(NAME)) === 'color/text/default' && (await p.$$('.modal .ed-pillbtn')).length === 2 && (await p.$$('.modal button.ed-dd')).length === 2);
+  await p.click('.modal .m-foot button.primary', { force: true });
+  check('12 고친 것 없이 [저장] → 알림 줄 "고친 것이 없어요"(상태 줄 아님)', (await edAlert(p)) === '고친 것이 없어요');
+  await p.keyboard.press('Escape');
+  check('12 고친 것 없으면 Esc로 바로 닫힘 · 원래 행으로', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx');
+  // 고치기… → 이름 칸
+  await menuEdit(p, 'tx');
+  check('12 고치기…로 열면 이름 칸에 포커스', (await activeLabel(p)) === '이름(전체 경로)');
+  await p.fill(NAME, 'color//default');
+  check('12 빈 토막 → "이름의 \'/\' 사이가 비어 있어요" · [취소] · [저장] 잠김', (await p.textContent('.modal .ed-ferr')) === "이름의 '/' 사이가 비어 있어요" && (await edCloseText(p)) === '취소' && (await edSaveLocked(p)));
+  await p.fill(NAME, 'color/text/muted');
+  check('12 같은 이름 → "이 컬렉션에 같은 이름이 있어요"', (await p.textContent('.modal .ed-ferr')) === '이 컬렉션에 같은 이름이 있어요');
+  await p.click('.modal .m-foot button.primary', { force: true });
+  check('12 입력 오류로 [저장] → "입력을 확인해 주세요" + 첫 오류 칸', (await edAlert(p)) === '입력을 확인해 주세요' && (await activeLabel(p)) === '이름(전체 경로)');
+  await p.fill(NAME, ' color / fg /default');
+  check('12 칸을 고치면 사건 문구를 지움', (await edAlert(p)) === '');
+  const changes = await p.$eval('.modal .ed-changes', (e) => (e.hidden ? '' : e.textContent));
+  check('12 바뀌는 것 줄: 그룹 이동(새 그룹) + CSS', changes.includes('그룹 이동: color/text → color/fg') && changes.includes('(새 그룹)') && changes.includes('CSS: --color-text-default → --color-fg-default') && !changes.includes('비어서 사라져요'), changes);
+  // 별칭 고르개 — Semantic: Global 색만, 지금 대상 ✓
+  await p.click('.modal button[aria-label="Light 별칭 고르기"]');
+  check('12 고르개 열면 검색 칸 포커스 · listbox', (await p.evaluate(() => document.activeElement?.classList.contains('ed-psearch'))) && (await p.$$('.ed-picker [role="listbox"]')).length === 1);
+  const opts = await pickerOpts(p);
+  check('12 후보: 값으로 적기 + 같은 타입 · 낮은 계층(Global)만 · 지금 대상 ✓', JSON.stringify(opts.map((x) => x.replace(/\s+/g, ' ').trim())) === JSON.stringify(['값으로 적기 #111111', '0', '900✓']), JSON.stringify(opts));
+  check('12 경로 머리 "G Global › color/gray" · 안내 줄 라이브러리', (await p.textContent('.ed-picker .ed-phead')) === 'G Global › color/gray' && (await pickerNotes(p)).includes('라이브러리 변수는 대상으로 고를 수 없어요'));
+  check('12 후보 목록 최대 200px', (await p.$eval('.ed-pscroll', (e) => getComputedStyle(e).maxHeight)) === '200px');
+  await p.click('.modal button[aria-label="Dark 별칭 고르기"]');
+  check('12 고르개는 하나만 열림', (await p.$$('.ed-picker')).length === 1 && (await p.$eval('.ed-picker', (e) => !!e.closest('dd')?.querySelector('[aria-label="Dark 별칭 고르기"]'))));
+  await p.keyboard.press('Escape');
+  check('12 고르개 Esc → 고르개만 닫고 그 [▾]로', (await p.$$('.ed-picker')).length === 0 && (await p.$('.modal')) !== null && (await activeLabel(p)) === 'Dark 별칭 고르기');
+  // 별칭 → 값으로 적기 → 다시 별칭
+  await p.click('.modal button[aria-label="Dark 별칭 고르기"]');
+  await p.keyboard.press('ArrowDown');
+  await p.keyboard.press('Enter');
+  check('12 값으로 적기 → 따라간 값(대상 컬렉션 기본 모드)', (await p.inputValue('.modal input[aria-label="Dark 값"]')) === '#FFFFFF' && (await activeLabel(p)) === 'Dark 값');
+  await p.fill('.modal input[aria-label="Dark 값"]', '#FFFFF');
+  check('12 틀린 색 → "#RRGGBB 형식으로 적어 주세요"', (await p.$$eval('.modal .ed-ferr', (e) => e.map((x) => x.textContent))).includes('#RRGGBB 형식으로 적어 주세요'));
+  await p.fill('.modal input[aria-label="Dark 값"]', '#ffffff80');
+  // 저장 — 고친 것만, base와 함께
+  const u = await saveAndGet(p);
+  check('12 저장 → UPDATE_VARIABLE(정리한 이름 · 고친 모드만 · base)', u?.id === 'tx' && u.name === 'color/fg/default' && JSON.stringify(Object.keys(u.values)) === JSON.stringify(['d']) && u.values.d.kind === 'color' && u.values.d.hex === '#FFFFFF' && Math.round(u.values.d.alpha * 255) === 128 && u.base.name === 'color/text/default' && u.base.values.d.aliasId === 'g0' && !('l' in u.base.values), JSON.stringify(u));
+  check('12 저장 중: [저장 중…] 잠김 · 칸 잠김', (await edSaveText(p)) === '저장 중…' && (await edSaveLocked(p)) && (await p.$eval(NAME, (e) => e.disabled)));
+  await p.keyboard.press('Escape');
+  check('12 저장 중에는 Esc로 닫히지 않음 · "저장 중이에요"', (await p.$('.modal')) !== null && (await edAlert(p)) === '저장 중이에요');
+  const tables0 = (await sent(p, 'GET_VAR_TABLE')).length;
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: true, applied: ['name', 'd'] });
+  check('12 바뀐 응답 → 다시 읽기(GET_VAR_TABLE) · 표가 올 때까지 저장 중 유지', (await sent(p, 'GET_VAR_TABLE')).length === tables0 + 1 && (await edSaveText(p)) === '저장 중…');
+  const V2 = EVARS.map((v) => (v.id === 'tx' ? { ...v, name: 'color/fg/default', values: { ...v.values, d: { kind: 'color', hex: '#FFFFFF', alpha: 128 / 255 } } } : v));
+  await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: V2 });
+  check('12 성공 → 문구 없음 · [닫기] 포커스 · [저장] 잠김 · 칸이 새 값', (await edAlert(p)) === '' && (await activeText(p)) === '닫기' && (await edSaveLocked(p)) && (await edSaveText(p)) === '저장' && (await p.inputValue(NAME)) === 'color/fg/default' && (await p.inputValue('.modal input[aria-label="Dark 값"]')) === '#FFFFFF80' && (await p.textContent('.modal h3')).includes('color/fg/default'));
+  check('12 성공 뒤 고친 표시 없음', (await p.$$('.modal .ed-field.changed')).length === 0);
+  await p.keyboard.press('Escape');
+  check('12 닫은 뒤 변수 id로 행 다시 찾아 포커스 · 상태 줄 문구 없음', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx' && !(await p.textContent('#statusText')).includes('행은'));
+  await p.close();
+}
+{
+  // 행이 지금 목록에 없게 됨(그룹 이동) → 오른쪽 목록 머리 + 상태 줄
+  const p = await openEditList();
+  await p.click('#varSide [data-key="side:col:s"]');
+  await p.click('#varSide [data-key="side:grp:s|color/text"]');
+  await menuEdit(p, 'tx');
+  await p.fill(NAME, 'color/fg/default');
+  const u = await saveAndGet(p);
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: true, applied: ['name'] });
+  await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS.map((v) => (v.id === 'tx' ? { ...v, name: 'color/fg/default' } : v)) });
+  await p.click('.modal .m-foot button:not(.primary)');
+  check('12 행이 목록에 없으면 오른쪽 목록 머리로 · "{새 이름} 행은 지금 고른 목록에 없어요"', (await p.evaluate(() => document.activeElement?.id)) === 'varMainTitle' && (await p.textContent('#statusText')) === 'color/fg/default 행은 지금 고른 목록에 없어요', await p.textContent('#statusText'));
+  // 고르개 후보: Global은 없음 · 계층 없음은 모든 컬렉션(순환 제외)
+  await p.click('#varSide [data-key="side:col:g"]');
+  await menuEdit(p, 'g0');
+  await p.click('.modal button[aria-label="Mode 1 별칭 고르기"]');
+  check('12 Global → "Global은 다른 변수를 가리키지 않아요"', (await pickerNotes(p)).includes('Global은 다른 변수를 가리키지 않아요') && (await pickerOpts(p)).length === 0);
+  await p.keyboard.press('Escape');
+  await p.keyboard.press('Escape');
+  await p.click('#varSide [data-key="side:col:x"]');
+  await menuEdit(p, 'xb');
+  await p.click('.modal button[aria-label="Mode 1 별칭 고르기"]');
+  const xo = await p.$$eval('.ed-picker [role="option"]', (e) => e.map((x) => x.title));
+  check('12 계층 없음 → 모든 컬렉션 · 자기 · 순환(misc/a → misc/b) 제외 · 안내 줄', !xo.includes('misc/a') && !xo.includes('misc/b') && xo.includes('color/gray/0') && xo.includes('color/fg/default') && (await pickerNotes(p)).includes('계층이 없는 컬렉션이라 모든 변수를 보여요'), JSON.stringify(xo));
+  await p.fill('.ed-psearch', 'GRAY/9');
+  check('12 고르개 검색(전체 경로 · 대소문자 무시)', JSON.stringify(await p.$$eval('.ed-picker [role="option"]', (e) => e.map((x) => x.title))) === JSON.stringify(['color/gray/900']));
+  await p.keyboard.press('ArrowDown');
+  await p.keyboard.press('Enter');
+  check('12 후보 고르면 별칭 알약 · 고르개 닫힘', (await p.$$('.ed-picker')).length === 0 && (await p.textContent('.modal .ed-pill')).includes('→ color/gray/900'));
+  await p.close();
+}
+{
+  // 일부 실패 · 버리기 확인 · 닫을 때 "일부만 저장됐어요"
+  const p = await openEditList();
+  await p.click('#varSide [data-key="side:col:s"]');
+  await menuEdit(p, 'tm');
+  await p.click('.modal button[aria-label="Light 별칭 고르기"]');
+  await p.click('.ed-picker [role="option"][title="color/gray/0"]');
+  await p.fill('.modal input[aria-label="Dark 값"]', '#777777');
+  const u = await saveAndGet(p);
+  check('12 별칭으로 바꿈 → {kind:alias, targetId}', u.values.l?.kind === 'alias' && u.values.l.targetId === 'g0' && u.values.d?.hex === '#777777');
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: false, applied: ['l'], error: { code: 'value', modeId: 'd', message: 'Invalid value' } });
+  await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS.map((v) => (v.id === 'tm' ? { ...v, values: { ...v.values, l: { kind: 'alias', aliasId: 'g0', aliasName: 'color/gray/0' } } } : v)) });
+  check('12 일부 실패 → "피그마가 이 값을 받지 않아요 · 일부만 저장됐어요" · 남은 칸만 입력 유지 · 첫 오류 칸', (await edAlert(p)) === '피그마가 이 값을 받지 않아요 · 일부만 저장됐어요' && (await p.inputValue('.modal input[aria-label="Dark 값"]')) === '#777777' && (await activeLabel(p)) === 'Dark 값' && !(await edSaveLocked(p)) && (await p.$$('.modal .ed-field.changed')).length === 1);
+  check('12 피그마 거절 원문은 툴팁', (await p.getAttribute('.modal .ed-alert', 'title')) === 'Invalid value');
+  const u2 = await saveAndGet(p);
+  check('12 다시 저장하면 남은 것만 · base는 새 표', JSON.stringify(Object.keys(u2.values)) === JSON.stringify(['d']) && u2.base.values.d.hex === '#888888' && u2.name === undefined);
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: u2.reqId, ok: false, applied: [], error: { code: 'value', modeId: 'd', message: 'Invalid value' } });
+  check('12 첫 변경부터 실패 → 잠그지 않음 · 다시 읽기 없음', !(await edSaveLocked(p)) && (await edAlert(p)) === '피그마가 이 값을 받지 않아요');
+  await p.keyboard.press('Escape');
+  check('12 고친 것이 있으면 Esc → 확인 줄 · [계속 고치기]에 포커스', (await p.$eval('.modal .ed-confirm', (e) => !e.hidden && e.textContent.includes('고친 내용을 버릴까요?'))) && (await activeText(p)) === '계속 고치기');
+  check('12 확인 줄이 떠도 알림 줄은 그대로', (await edAlert(p)) === '피그마가 이 값을 받지 않아요');
+  await p.keyboard.press('Escape');
+  check('12 확인 줄에서 Esc = [계속 고치기] → 확인 줄 닫고 직전 칸', (await p.$eval('.modal .ed-confirm', (e) => e.hidden)) && (await activeLabel(p)) === 'Dark 값');
+  await p.click('.modal .m-foot button:not(.primary)');
+  await p.click('.modal .ed-confirm button >> text=버리기');
+  check('12 [버리기] → 닫힘 · "일부만 저장됐어요"(행 있음) · 원래 행', (await p.$('.modal')) === null && (await p.textContent('#statusText')) === '일부만 저장됐어요' && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tm');
+  await p.close();
+}
+{
+  // 다른 곳에서 바뀜 · 삭제됨 · 이름 거절
+  const p = await openEditList();
+  await menuEdit(p, 'tx');
+  await p.fill(NAME, 'color/text/main');
+  let u = await saveAndGet(p);
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: false, applied: [], error: { code: 'name', message: 'Invalid name' } });
+  check('12 이름 거절 → 이름 칸 아래 "피그마가 이 이름을 받지 않아요"(툴팁 원문) · 잠그지 않음 · 이름 칸 포커스', (await p.textContent('.modal .ed-ferr')) === '피그마가 이 이름을 받지 않아요' && (await p.getAttribute('.modal .ed-ferr', 'title')) === 'Invalid name' && !(await edSaveLocked(p)) && (await activeLabel(p)) === '이름(전체 경로)');
+  await p.fill(NAME, 'color/text/main2');
+  check('12 이름 칸을 고치면 거절 문구 지움', (await p.$eval('.modal .ed-ferr', (e) => e.hidden)));
+  const tables0 = (await sent(p, 'GET_VAR_TABLE')).length;
+  u = await saveAndGet(p);
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: false, applied: [], error: { code: 'conflict' } });
+  check('12 다른 곳에서 바뀜 → 남는 문구 · [저장] 잠김 · 칸 유지 · 다시 읽기 없음', (await edAlert(p)) === '다른 곳에서 바뀌었어요 · 닫고 다시 열어 주세요' && (await edSaveLocked(p)) && (await p.inputValue(NAME)) === 'color/text/main2' && (await sent(p, 'GET_VAR_TABLE')).length === tables0);
+  await p.fill(NAME, 'color/text/main3');
+  await p.click('.modal .m-foot button.primary', { force: true });
+  check('12 남는 문구는 칸을 고쳐도 · [저장]을 눌러도 그대로', (await edAlert(p)) === '다른 곳에서 바뀌었어요 · 닫고 다시 열어 주세요' && (await edSaveLocked(p)));
+  await p.keyboard.press('Escape');
+  await p.click('.modal .ed-confirm button >> text=버리기');
+  check('12 바뀐 응답이 없었으면 닫을 때 상태 줄 문구 없음', !(await p.textContent('#statusText')).includes('저장'));
+  await menuEdit(p, 'tx');
+  await p.fill(NAME, 'color/text/main');
+  u = await saveAndGet(p);
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: false, applied: [], error: { code: 'deleted' } });
+  check('12 삭제됨 → "변수가 삭제됐어요" · [저장] 잠김', (await edAlert(p)) === '변수가 삭제됐어요' && (await edSaveLocked(p)));
+  await p.close();
+}
+{
+  // 응답·표가 오지 않음 — ERROR · 10초 → "저장됐을 수 있어요", 늦은 응답·표로는 팝업을 다시 그리지 않음
+  const p = await openEditList({ clock: true });
+  await menuEdit(p, 'tx');
+  await p.fill(NAME, 'color/text/main');
+  let u = await saveAndGet(p);
+  await recv(p, { type: 'ERROR', message: 'boom', op: 'UPDATE_VARIABLE' });
+  check('12 ERROR(UPDATE_VARIABLE) → "저장됐을 수 있어요 · 닫고 다시 열어 주세요" · [저장] 잠김 · 칸 풀림', (await edAlert(p)) === '저장됐을 수 있어요 · 닫고 다시 열어 주세요' && (await edSaveLocked(p)) && (await edSaveText(p)) === '저장' && !(await p.$eval(NAME, (e) => e.disabled)));
+  const t0 = (await sent(p, 'GET_VAR_TABLE')).length;
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: true, applied: ['name'] });
+  await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS.map((v) => (v.id === 'tx' ? { ...v, name: 'color/text/main' } : v)) });
+  check('12 늦은 바뀐 응답 → 목록만 다시 읽음 · 팝업은 다시 그리지 않음', (await sent(p, 'GET_VAR_TABLE')).length === t0 + 1 && (await edAlert(p)) === '저장됐을 수 있어요 · 닫고 다시 열어 주세요' && (await edCloseText(p)) === '취소' && (await p.textContent('.modal h3')).includes('color/text/default'));
+  await p.keyboard.press('Escape');
+  await p.click('.modal .ed-confirm button >> text=버리기');
+  check('12 늦은 응답도 닫을 때 판정에 넣음(행 있음 → 문구 없음) · 닫기는 다시 됨', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx');
+  // 10초 시간 초과
+  await p.click('#varSide [data-key="side:col:s"]');
+  await menuEdit(p, 'tm');
+  await p.fill('.modal input[aria-label="Dark 값"]', '#777777');
+  u = await saveAndGet(p);
+  await p.clock.fastForward(10100);
+  check('12 10초 동안 응답 없음 → "저장됐을 수 있어요"', (await edAlert(p)) === '저장됐을 수 있어요 · 닫고 다시 열어 주세요' && (await edSaveLocked(p)));
+  // 바뀐 응답 뒤 표가 오지 않음(ERROR GET_VAR_TABLE)
+  await p.keyboard.press('Escape');
+  await p.click('.modal .ed-confirm button >> text=버리기');
+  await menuEdit(p, 'tm');
+  await p.fill('.modal input[aria-label="Dark 값"]', '#777777');
+  u = await saveAndGet(p);
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: true, applied: ['d'] });
+  await recv(p, { type: 'ERROR', message: 'table', op: 'GET_VAR_TABLE' });
+  check('12 바뀐 응답 뒤 표 ERROR → "저장됐을 수 있어요"', (await edAlert(p)) === '저장됐을 수 있어요 · 닫고 다시 열어 주세요' && (await edSaveText(p)) === '저장');
   await p.close();
 }
 

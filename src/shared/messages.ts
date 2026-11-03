@@ -1,7 +1,7 @@
 /* ============================================================
    messages.ts — code(샌드박스) ↔ ui(iframe) 메시지 타입 단일 소스
    ============================================================ */
-import type { VarCollection, VarRow, LibraryVar } from '../lib/varTable';
+import type { VarCollection, VarRow, LibraryVar, VarCell, EditValue } from '../lib/varTable';
 import type { DraftToken } from '../lib/tokens';
 import type { TextStyleSpec } from '../lib/textStyles';
 import type { Tier, Feature } from '../lib/entitlements';
@@ -153,6 +153,16 @@ export interface ComponentCandidate {
  */
 export type TextStyleSkipReason = 'hasStyle' | 'noStyle' | 'ambiguous' | 'boundVars' | 'mixed' | 'instance';
 
+/**
+ * 변수 고치기 실패 사유 — deleted: 변수가 없음(1단계) · conflict: 다른 곳에서 바뀜(2단계, 아무것도 안 바꿈) ·
+ * name / value: 피그마가 이름·값을 받지 않음(3단계, modeId는 값일 때) · other: 그 밖. message는 피그마가 준 원문.
+ */
+export interface VarUpdateError {
+  code: 'deleted' | 'conflict' | 'name' | 'value' | 'other';
+  modeId?: string;
+  message?: string;
+}
+
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT' }
@@ -163,6 +173,8 @@ export type UiToCode =
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'GET_VAR_TABLE' } // 변수 관리: 로컬 변수 전부(모드별 값·별칭 이름·용도·설명)
+  // 변수 고치기(§4.4 고치기, PR 3.5) — 고친 것만. base = 팝업을 열 때(또는 마지막 저장 응답 뒤)의 이름과 고친 모드의 칸(값 없음은 null).
+  | { type: 'UPDATE_VARIABLE'; reqId: number; id: string; name?: string; values?: Record<string, EditValue>; base: { name: string; values: Record<string, VarCell | null> } }
   // IA v3 변수 목록(§4.4) — 보기 전용 사용 수. nodeIds = 목록 기준(없으면 지금 선택). 인스턴스 안쪽 포함, 상한 없음.
   | { type: 'SCAN_USAGE'; reqId: number; nodeIds?: string[] }
   // 상세 "쓰인 곳" — 변수들(간접이면 그 변수를 가리키는 별칭들까지) 중 하나라도 쓰는 레이어, 이름은 최대 limit개.
@@ -218,6 +230,8 @@ export type CodeToUi =
   // '정리할 대상이 실제로 선택돼 있을 때만' 띄우는 데 쓴다(툴바는 와이어대로 4개 고정).
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number; firstName?: string; ids?: string[] } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
   | { type: 'VAR_TABLE'; collections: VarCollection[]; vars: VarRow[] }
+  // 변수 고치기 응답 — applied: 바꾼 것('name' 또는 modeId), 순서대로. 변수 표는 따로 보내지 않는다(UI가 다시 읽는다).
+  | { type: 'VARIABLE_UPDATED'; reqId: number; ok: boolean; applied: string[]; error?: VarUpdateError }
   | { type: 'USAGE_RESULT'; reqId: number; usage: Record<string, { places: number; layers: number }>; libraryVars: LibraryVar[]; deleted: { count: number; nodeIds: string[] }; scanned: number }
   | { type: 'VAR_USERS'; reqId: number; layers: { id: string; name: string }[]; totalLayers: number; places: number }
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)

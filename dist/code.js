@@ -4941,6 +4941,25 @@
     return UI_HEIGHT[mode];
   }
 
+  // src/lib/varTable.ts
+  function cellKey(c) {
+    var _a;
+    if (!c) return "";
+    switch (c.kind) {
+      case "color":
+        return `c:${c.hex.toUpperCase()}:${Math.round(((_a = c.alpha) != null ? _a : 1) * 255)}`;
+      case "number":
+        return `n:${Number("value" in c ? c.value : c.text)}`;
+      case "string":
+        return `s:${c.text}`;
+      case "bool":
+        return `b:${"value" in c ? String(c.value) : c.text}`;
+      case "alias":
+        return `a:${"targetId" in c ? c.targetId : c.aliasId}`;
+    }
+  }
+  var sameCell = (a, b) => cellKey(a) === cellKey(b);
+
   // src/code.ts
   figma.showUI(__html__, { width: UI_WIDTH, height: uiHeight("default"), themeColors: true });
   figma.clientStorage.deleteAsync(UI_SIZE_KEY).catch(() => {
@@ -5083,6 +5102,23 @@
       return { id: c.id, name: c.name, vars: (_a2 = count.get(c.id)) != null ? _a2 : 0, set: (_b = map[c.id]) != null ? _b : null, role: roleOfCollection(c, map), guess: guessRole(c.name) };
     });
   }
+  function tableCell(raw, aliasInfo) {
+    var _a;
+    if (raw === void 0 || raw === null) return void 0;
+    if (typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+      const id = raw.id;
+      const info = aliasInfo(id);
+      if (info.name !== null && !info.remote) return { kind: "alias", aliasId: id, aliasName: info.name };
+      return { kind: "alias", aliasId: id, aliasName: (_a = info.name) != null ? _a : "(\uC0AD\uC81C\uB41C \uBCC0\uC218)", remote: info.name ? true : void 0 };
+    }
+    if (typeof raw === "object" && "r" in raw) {
+      const a = "a" in raw && typeof raw.a === "number" ? Math.round(raw.a * 255) / 255 : 1;
+      return a < 1 ? { kind: "color", hex: rgbToHex(raw), alpha: a } : { kind: "color", hex: rgbToHex(raw) };
+    }
+    if (typeof raw === "number") return { kind: "number", text: String(Math.round(raw * 1e3) / 1e3) };
+    if (typeof raw === "boolean") return { kind: "bool", text: raw ? "true" : "false" };
+    return { kind: "string", text: String(raw) };
+  }
   async function collectVarTable() {
     var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
@@ -5101,20 +5137,12 @@
         }
       }
     }
-    const cell = (raw) => {
-      if (raw === void 0 || raw === null) return void 0;
-      if (typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
-        const id = raw.id;
-        const local = nameById.get(id);
-        if (local !== void 0) return { kind: "alias", aliasId: id, aliasName: local };
-        const rn = remoteName.get(id);
-        return { kind: "alias", aliasId: id, aliasName: rn != null ? rn : "(\uC0AD\uC81C\uB41C \uBCC0\uC218)", remote: rn ? true : void 0 };
-      }
-      if (typeof raw === "object" && "r" in raw) return { kind: "color", hex: rgbToHex(raw) };
-      if (typeof raw === "number") return { kind: "number", text: String(Math.round(raw * 1e3) / 1e3) };
-      if (typeof raw === "boolean") return { kind: "bool", text: raw ? "true" : "false" };
-      return { kind: "string", text: String(raw) };
-    };
+    const cell = (raw) => tableCell(raw, (id) => {
+      const local = nameById.get(id);
+      if (local !== void 0) return { name: local, remote: false };
+      const rn = remoteName.get(id);
+      return { name: rn != null ? rn : null, remote: !!rn };
+    });
     const vars = [];
     for (const v of all) {
       const col = colById.get(v.variableCollectionId);
@@ -5150,15 +5178,54 @@
     return out;
   }
   async function libCell(raw) {
-    if (raw === void 0 || raw === null) return void 0;
-    if (typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+    let info = { name: null, remote: false };
+    if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
       const t = await figma.variables.getVariableByIdAsync(raw.id).catch(() => null);
-      return { kind: "alias", aliasId: raw.id, aliasName: t ? t.name : "(\uC0AD\uC81C\uB41C \uBCC0\uC218)", remote: (t == null ? void 0 : t.remote) || void 0 };
+      info = { name: t ? t.name : null, remote: !!(t == null ? void 0 : t.remote) };
     }
-    if (typeof raw === "object" && "r" in raw) return { kind: "color", hex: rgbToHex(raw) };
-    if (typeof raw === "number") return { kind: "number", text: String(Math.round(raw * 1e3) / 1e3) };
-    if (typeof raw === "boolean") return { kind: "bool", text: raw ? "true" : "false" };
-    return { kind: "string", text: String(raw) };
+    return tableCell(raw, () => info);
+  }
+  async function updateVariable(msg) {
+    var _a;
+    const done = (applied2, error) => {
+      if (applied2.length) commitUndo(figma);
+      post({ type: "VARIABLE_UPDATED", reqId: msg.reqId, ok: !error, applied: applied2, error });
+    };
+    const v = await figma.variables.getVariableByIdAsync(msg.id).catch(() => null);
+    if (!v || v.remote) return done([], { code: "deleted" });
+    if (v.name !== msg.base.name) return done([], { code: "conflict" });
+    for (const [modeId, b] of Object.entries(msg.base.values)) {
+      const now = await libCell(v.valuesByMode[modeId]);
+      if (!sameCell(now, b)) return done([], { code: "conflict" });
+    }
+    const applied = [];
+    if (msg.name !== void 0 && msg.name !== v.name) {
+      try {
+        v.name = msg.name;
+        applied.push("name");
+      } catch (e) {
+        return done(applied, { code: "name", message: errText(e) });
+      }
+    }
+    for (const [modeId, ev] of Object.entries((_a = msg.values) != null ? _a : {})) {
+      try {
+        let value;
+        if (ev.kind === "color") value = __spreadProps(__spreadValues({}, hexToRgb(ev.hex)), { a: Math.max(0, Math.min(1, ev.alpha)) });
+        else if (ev.kind === "number") value = ev.value;
+        else if (ev.kind === "string") value = ev.text;
+        else if (ev.kind === "bool") value = ev.value;
+        else {
+          const target = await figma.variables.getVariableByIdAsync(ev.targetId).catch(() => null);
+          if (!target) throw new Error("alias target not found");
+          value = figma.variables.createVariableAlias(target);
+        }
+        v.setValueForMode(modeId, value);
+        applied.push(modeId);
+      } catch (e) {
+        return done(applied, { code: "value", modeId, message: errText(e) });
+      }
+    }
+    done(applied);
   }
   async function collectUsage(nodeIds) {
     var _a;
@@ -6417,6 +6484,10 @@
         }
         case "GET_VAR_TABLE": {
           post(__spreadValues({ type: "VAR_TABLE" }, await collectVarTable()));
+          break;
+        }
+        case "UPDATE_VARIABLE": {
+          await updateVariable(msg);
           break;
         }
         case "SET_UI_SIZE": {

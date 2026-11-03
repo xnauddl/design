@@ -1335,16 +1335,16 @@
 
 ## A.3c PR 3.5 — 변수 고치기 (A.3b 다음, PR 4 전)
 
-- [ ] 메시지: `UPDATE_VARIABLE`(UI → 플러그인) · `VARIABLE_UPDATED`(플러그인 → UI) 추가(`src/shared/messages.ts`)
-- [ ] 변수 표 색 칸에 투명도: `VarCell` color에 `alpha`(0–1, 없으면 1) 추가(`src/lib/varTable.ts`, `src/code.ts` 변수 표 변환). VarCell `alpha`는 1/255 단위로 반올림. 목록 74px 열 · 값 복사는 지금처럼 6자리. `bindExamples`는 alpha가 1인 색 변수만 예시로 고름
-- [ ] 플러그인: 변수 확인 → `base` 비교(변수 표와 같은 변환) → 이름 → 값(`setValueForMode`, 별칭은 `createVariableAlias`) → `commitUndo` → `VARIABLE_UPDATED`(`src/code.ts`). 변수 표는 UI가 다시 읽기로 요청
-- [ ] UI: 응답 뒤 작업 다시 읽기(`readScreen('work')`), 응답 뒤 첫 `VAR_TABLE`은 직전과 같아도 팝업 `base` 처리(`onVarTable`의 같은 표 조기 반환보다 앞). 바뀐 응답이면 그 표를 받을 때까지 "저장 중" 잠금 유지. 저장 중 `ERROR`(op `UPDATE_VARIABLE`·`GET_VAR_TABLE`) · 10초 시간 초과 처리
-- [ ] 순수 함수(`src/lib/varTable.ts`): 이름 검사(빈 토막 · 같은 이름), 그룹 이동 문구 재료, 별칭 후보(타입 · 계층 · 자기 · 순환), 값으로 적기 값(로컬 5단계), 입력 값 검사(#RRGGBB(AA) · 숫자)
-- [ ] 상세 팝업: 이름 칸 · 모드별 값 칸 · [▾] 별칭 고르개(`listbox`, 검색, 경로 머리) · 바뀌는 것 줄(이름만) · [닫기]/[취소] · [저장] 잠금 · 버리기 확인 · 다른 곳에서 바뀜 · 삭제됨
-- [ ] `openModal` 확장: 첫 포커스 지정, 닫기 전 확인(Esc · 바깥 누름 · [취소]를 가로챔), 단추 줄 고정. 고르개 Esc는 팝업으로 올리지 않음
-- [ ] 열 때 포커스(상세 → [닫기], 고치기… → 이름 칸), 닫은 뒤 변수 id로 행 다시 찾기, 행 메뉴 "고치기…"(로컬만)
+- [x] 메시지: `UPDATE_VARIABLE`(UI → 플러그인) · `VARIABLE_UPDATED`(플러그인 → UI) 추가(`src/shared/messages.ts`)
+- [x] 변수 표 색 칸에 투명도: `VarCell` color에 `alpha`(0–1, 없으면 1) 추가(`src/lib/varTable.ts`, `src/code.ts` 변수 표 변환). VarCell `alpha`는 1/255 단위로 반올림. 목록 74px 열 · 값 복사는 지금처럼 6자리. `bindExamples`는 alpha가 1인 색 변수만 예시로 고름
+- [x] 플러그인: 변수 확인 → `base` 비교(변수 표와 같은 변환) → 이름 → 값(`setValueForMode`, 별칭은 `createVariableAlias`) → `commitUndo` → `VARIABLE_UPDATED`(`src/code.ts`). 변수 표는 UI가 다시 읽기로 요청
+- [x] UI: 응답 뒤 작업 다시 읽기(`readScreen('work')`), 응답 뒤 첫 `VAR_TABLE`은 직전과 같아도 팝업 `base` 처리(`onVarTable`의 같은 표 조기 반환보다 앞). 바뀐 응답이면 그 표를 받을 때까지 "저장 중" 잠금 유지. 저장 중 `ERROR`(op `UPDATE_VARIABLE`·`GET_VAR_TABLE`) · 10초 시간 초과 처리
+- [x] 순수 함수(`src/lib/varTable.ts`): 이름 검사(빈 토막 · 같은 이름), 그룹 이동 문구 재료, 별칭 후보(타입 · 계층 · 자기 · 순환), 값으로 적기 값(로컬 5단계), 입력 값 검사(#RRGGBB(AA) · 숫자)
+- [x] 상세 팝업: 이름 칸 · 모드별 값 칸 · [▾] 별칭 고르개(`listbox`, 검색, 경로 머리) · 바뀌는 것 줄(이름만) · [닫기]/[취소] · [저장] 잠금 · 버리기 확인 · 다른 곳에서 바뀜 · 삭제됨
+- [x] `openModal` 확장: 첫 포커스 지정, 닫기 전 확인(Esc · 바깥 누름 · [취소]를 가로챔), 단추 줄 고정. 고르개 Esc는 팝업으로 올리지 않음
+- [x] 열 때 포커스(상세 → [닫기], 고치기… → 이름 칸), 닫은 뒤 변수 id로 행 다시 찾기, 행 메뉴 "고치기…"(로컬만)
 - [ ] 실기 확인: 피그마가 거절하는 이름 글자, 대소문자만 다른 이름 허용 여부 → 결과를 이름 칸 미리 검사에 더함
-- [ ] i18n 새 문구, 단위 테스트, `verify:bind`에 고치기 흐름(이름 오류 · 별칭 후보 · 저장 · 실패 · 다른 곳에서 바뀜 · 버리기 확인)
+- [x] i18n 새 문구, 단위 테스트, `verify:bind`에 고치기 흐름(이름 오류 · 별칭 후보 · 저장 · 실패 · 다른 곳에서 바뀜 · 버리기 확인)
 
 ## A.4 PR 4 — 정리·문구·문서
 

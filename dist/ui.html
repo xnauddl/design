@@ -458,9 +458,58 @@
     .ctx-menu button:disabled { color: var(--muted); }
     .ctx-menu hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
     .modal-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.28); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; }
-    .modal { width: min(440px, 100%); max-height: calc(100vh - 80px); overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+    /* 팝업 — 최대 높이 창 − 80px, 내용은 안에서 스크롤하고 단추 줄(오류 줄 · 확인 줄 · 단추)은 아래에 고정(§2.5 예외, PR 3.5). */
+    .modal { width: min(440px, 100%); max-height: calc(100vh - 80px); overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 0; display: flex; flex-direction: column; }
+    .modal .m-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 10px; }
+    .modal .m-foot-wrap { flex: 0 0 auto; padding: 8px 14px 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; background: var(--surface); }
     .modal h3 { margin: 0; font-size: 13px; display: flex; align-items: center; gap: 6px; }
     .modal .m-foot { display: flex; gap: 6px; justify-content: flex-end; }
+    /* ── 변수 고치기(§4.4 고치기) ── */
+    .modal dl.ed-dl { grid-template-columns: 52px minmax(0, 1fr); gap: 6px 8px; align-items: start; font-size: 11px; }
+    .modal dl.ed-dl dt { line-height: 26px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .modal dl.ed-dl dd.ed-plain { line-height: 26px; }
+    .modal dl.ed-dl dd.ed-text { font-family: var(--font); color: var(--text-2); line-height: 1.5; padding-top: 5px; }
+    .ed-field { display: flex; align-items: center; gap: 6px; min-height: 26px; border: 1px solid var(--border-2); border-radius: var(--r-sm); padding: 0 0 0 6px; background: var(--surface); font: 11px var(--mono); min-width: 0; }
+    .ed-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-subtle); }
+    .ed-field.changed { background: var(--warn-subtle); }
+    .ed-field.err { border-color: var(--danger); }
+    .ed-field.locked { background: var(--surface-2); color: var(--text-2); }
+    .ed-field input[type="text"] { flex: 1 1 auto; min-width: 0; height: 24px; border: 0; padding: 0; margin: 0; background: transparent; font: inherit; color: inherit; box-shadow: none; outline: none; }
+    .ed-field input[type="text"]:focus { box-shadow: none; border: 0; }
+    .ed-field .bf-swatch { margin: 0; flex: 0 0 auto; }
+    .ed-field .ed-grow { flex: 1 1 auto; min-width: 0; }
+    button.ed-dd { flex: 0 0 auto; width: 24px; height: 24px; min-height: 24px; padding: 0; border: 0; border-left: 1px solid var(--border); border-radius: 0 var(--r-sm) var(--r-sm) 0; background: none; color: var(--text-2); font-size: 10px; }
+    button.ed-pillbtn { flex: 1 1 auto; min-width: 0; height: 24px; min-height: 24px; padding: 0; border: 0; background: none; text-align: left; display: flex; align-items: center; }
+    button.ed-pillbtn:hover:not(:disabled) { background: none; }
+    .ed-pill { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; background: var(--accent-subtle); color: var(--accent-strong); border-radius: 4px; padding: 1px 6px; font: 11px var(--mono); }
+    .ed-pill .bf-swatch { margin: 0; }
+    .ed-pill.warn { background: var(--warn-subtle); color: var(--warn); }
+    .ed-ferr { color: var(--danger); font: 10.5px/1.4 var(--font); margin-top: 3px; }
+    .ed-fwarn { color: var(--warn); font: 10.5px/1.4 var(--font); margin-top: 3px; }
+    .ed-changes { border-top: 1px dashed var(--border-2); padding-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+    .ed-changes .ed-ch-h { color: var(--muted); font-size: 10.5px; }
+    .ed-changes .mono { font-family: var(--mono); font-size: 10.5px; }
+    .ed-changes .muted { color: var(--muted); }
+    .ed-changes .w { color: var(--warn); }
+    .ed-picker { border: 1px solid var(--accent); border-radius: 6px; margin-top: 4px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); font-family: var(--font); background: var(--surface); }
+    .ed-picker input.ed-psearch { width: 100%; height: 28px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0 8px; font-size: 11px; box-shadow: none; }
+    .ed-picker input.ed-psearch:focus { box-shadow: inset 0 0 0 1.5px var(--accent); border-color: var(--border); }
+    .ed-pscroll { max-height: 200px; overflow-y: auto; }
+    .ed-phead { padding: 5px 8px 2px; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ed-opt { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 8px; font: 11px var(--mono); cursor: pointer; outline: none; }
+    .ed-opt:hover, .ed-opt:focus { background: var(--accent-subtle); }
+    .ed-opt[aria-disabled="true"] { color: var(--muted); cursor: not-allowed; }
+    .ed-opt .bf-swatch { margin: 0; }
+    .ed-opt .ed-ov { color: var(--text-2); font-size: 10px; }
+    .ed-opt .ck { margin-left: auto; color: var(--accent-strong); }
+    .ed-opt.ed-raw { font-family: var(--font); color: var(--accent-strong); border-bottom: 1px solid var(--border); }
+    .ed-opt.ed-raw .mono { font-family: var(--mono); color: var(--text-2); }
+    .ed-pnote { padding: 5px 8px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; }
+    .ed-pnone { padding: 8px; color: var(--text-2); font-size: 11px; }
+    .ed-alert { padding: 5px 8px; border-radius: 5px; font-size: 11px; background: var(--surface-2); color: var(--text-2); }
+    .ed-alert.err { background: var(--danger-subtle); color: var(--danger); }
+    .ed-confirm { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; }
+    .ed-confirm span { flex: 1 1 auto; }
     .modal dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 0; font-size: 11.5px; }
     .modal dt { color: var(--muted); }
     .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
@@ -1461,6 +1510,49 @@
     "vm.copyEmpty": "\uBCF5\uC0AC\uD560 \uAC12\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
     "vm.selectLayers": "\uC0AC\uC6A9 \uB808\uC774\uC5B4 \uC120\uD0DD",
     "vm.detail": "\uC0C1\uC138 \uBCF4\uAE30\u2026",
+    "vm.edit": "\uACE0\uCE58\uAE30\u2026",
+    // 변수 고치기(§4.4 고치기, PR 3.5)
+    "edit.name": "\uC774\uB984",
+    "edit.nameAria": "\uC774\uB984(\uC804\uCCB4 \uACBD\uB85C)",
+    "edit.valueAria": "{mode} \uAC12",
+    "edit.save": "\uC800\uC7A5",
+    "edit.savingBtn": "\uC800\uC7A5 \uC911\u2026",
+    "edit.saving": "\uC800\uC7A5 \uC911\uC774\uC5D0\uC694",
+    "edit.noChange": "\uACE0\uCE5C \uAC83\uC774 \uC5C6\uC5B4\uC694",
+    "edit.checkInput": "\uC785\uB825\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694",
+    "edit.deleted": "\uBCC0\uC218\uAC00 \uC0AD\uC81C\uB410\uC5B4\uC694",
+    "edit.conflict": "\uB2E4\uB978 \uACF3\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uB2EB\uACE0 \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694",
+    "edit.maybeSaved": "\uC800\uC7A5\uB410\uC744 \uC218 \uC788\uC5B4\uC694 \xB7 \uB2EB\uACE0 \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694",
+    "edit.partial": "\uC77C\uBD80\uB9CC \uC800\uC7A5\uB410\uC5B4\uC694",
+    "edit.closedMissing": "{name} \uD589\uC740 \uC9C0\uAE08 \uACE0\uB978 \uBAA9\uB85D\uC5D0 \uC5C6\uC5B4\uC694",
+    "edit.closedPartialMissing": "\uC77C\uBD80\uB9CC \uC800\uC7A5\uB410\uC5B4\uC694 \xB7 {name} \uD589\uC740 \uC9C0\uAE08 \uACE0\uB978 \uBAA9\uB85D\uC5D0 \uC5C6\uC5B4\uC694",
+    "edit.nameEmptySeg": "\uC774\uB984\uC758 '/' \uC0AC\uC774\uAC00 \uBE44\uC5B4 \uC788\uC5B4\uC694",
+    "edit.nameDup": "\uC774 \uCEEC\uB809\uC158\uC5D0 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4\uC694",
+    "edit.nameRejected": "\uD53C\uADF8\uB9C8\uAC00 \uC774 \uC774\uB984\uC744 \uBC1B\uC9C0 \uC54A\uC544\uC694",
+    "edit.valueRejected": "\uD53C\uADF8\uB9C8\uAC00 \uC774 \uAC12\uC744 \uBC1B\uC9C0 \uC54A\uC544\uC694",
+    "edit.saveFailed": "\uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "edit.errColor": "#RRGGBB \uD615\uC2DD\uC73C\uB85C \uC801\uC5B4 \uC8FC\uC138\uC694",
+    "edit.errNumber": "\uC22B\uC790\uB97C \uC801\uC5B4 \uC8FC\uC138\uC694",
+    "edit.errNeedValue": "\uAC12\uC744 \uC801\uC5B4 \uC8FC\uC138\uC694",
+    "edit.targetDeleted": "\uAC00\uB9AC\uD0A4\uB358 \uBCC0\uC218\uAC00 \uC0AD\uC81C\uB410\uC5B4\uC694",
+    "edit.deletedTarget": "(\uC0AD\uC81C\uB41C \uBCC0\uC218)",
+    "edit.changesHead": "\uC800\uC7A5\uD558\uBA74 \uBC14\uB00C\uB294 \uAC83",
+    "edit.groupMove": "\uADF8\uB8F9 \uC774\uB3D9: {from} \u2192 {to}",
+    "edit.newGroup": "(\uC0C8 \uADF8\uB8F9)",
+    "edit.groupEmptied": "\xB7 {group} \uADF8\uB8F9\uC740 \uBE44\uC5B4\uC11C \uC0AC\uB77C\uC838\uC694",
+    "edit.cssLabel": "CSS:",
+    "edit.cssClash": "\xB7 {name}\uACFC CSS \uC774\uB984\uC774 \uAC19\uC544\uC838\uC694",
+    "edit.pickAria": "{mode} \uBCC4\uCE6D \uACE0\uB974\uAE30",
+    "edit.pickSearch": "\uBCC0\uC218 \uC774\uB984\uC73C\uB85C \uCC3E\uAE30",
+    "edit.writeValue": "\uAC12\uC73C\uB85C \uC801\uAE30",
+    "edit.pickGlobal": "Global\uC740 \uB2E4\uB978 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uC9C0 \uC54A\uC544\uC694",
+    "edit.pickAllTiers": "\uACC4\uCE35\uC774 \uC5C6\uB294 \uCEEC\uB809\uC158\uC774\uB77C \uBAA8\uB4E0 \uBCC0\uC218\uB97C \uBCF4\uC5EC\uC694",
+    "edit.pickNoLib": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB294 \uB300\uC0C1\uC73C\uB85C \uACE0\uB97C \uC218 \uC5C6\uC5B4\uC694",
+    "edit.pickOutOfRules": "\uC9C0\uAE08 \uB300\uC0C1\uC740 \uADDC\uCE59 \uBC16\uC774\uB77C \uB2E4\uC2DC \uACE0\uB97C \uC218 \uC5C6\uC5B4\uC694 \xB7 \uADF8\uB300\uB85C \uB450\uBA74 \uBC14\uB00C\uC9C0 \uC54A\uC544\uC694",
+    "edit.pickNoMatch": "\uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "edit.confirm": "\uACE0\uCE5C \uB0B4\uC6A9\uC744 \uBC84\uB9B4\uAE4C\uC694?",
+    "edit.discard": "\uBC84\uB9AC\uAE30",
+    "edit.keep": "\uACC4\uC18D \uACE0\uCE58\uAE30",
     "vm.noTier": "\uACC4\uCE35 \uC544\uB2D8",
     "vm.dCollection": "\uCEEC\uB809\uC158",
     "vm.dScopes": "\uC6A9\uB3C4",
@@ -1989,14 +2081,15 @@
     return "\xB7";
   }
   function bindExamples(cols, vars) {
+    var _a;
     const rank = (t2) => t2 === 3 ? 0 : t2 === 2 ? 1 : 2;
     const tiered = cols.map((c, i) => ({ c, i })).filter((x) => x.c.tier > 0).sort((a, b) => rank(a.c.tier) - rank(b.c.tier) || a.i - b.i).map((x) => x.c);
     const colById = new Map(cols.map((c) => [c.id, c]));
     const varById = new Map(vars.map((v) => [v.id, v]));
     const defaultCell = (v) => {
-      var _a, _b, _c;
+      var _a2, _b, _c;
       const col = colById.get(v.collectionId);
-      const mode = (_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a.modeId) != null ? _c : "";
+      const mode = (_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a2 = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a2.modeId) != null ? _c : "";
       return v.values[mode];
     };
     const resolve = (v) => {
@@ -2013,7 +2106,7 @@
         if (v.collectionId !== col.id) continue;
         if (!out.color && v.type === "COLOR") {
           const cell = resolve(v);
-          if ((cell == null ? void 0 : cell.kind) === "color" && cell.hex) out.color = { value: cell.hex.slice(0, 7).toUpperCase(), name: v.name };
+          if ((cell == null ? void 0 : cell.kind) === "color" && cell.hex && ((_a = cell.alpha) != null ? _a : 1) === 1) out.color = { value: cell.hex.slice(0, 7).toUpperCase(), name: v.name };
         } else if (!out.number && v.type === "FLOAT") {
           const cell = resolve(v);
           if ((cell == null ? void 0 : cell.kind) === "number" && cell.text != null) out.number = { value: cell.text, name: v.name };
@@ -2408,6 +2501,112 @@
     }
     if (sel.kind === "lib") return hasLib ? sel : initial();
     return hasDeleted ? sel : initial();
+  }
+  function normalizeVarName(name) {
+    return name.trim().split("/").map((s) => s.trim()).join("/");
+  }
+  function nameError(name, self, vars) {
+    const n = normalizeVarName(name);
+    if (!n || n.split("/").some((s) => !s)) return "emptySegment";
+    if (vars.some((v) => v.id !== self.id && v.collectionId === self.collectionId && v.name === n)) return "duplicate";
+    return null;
+  }
+  function groupHasOthers(g, self, vars) {
+    return vars.some((v) => v.id !== self.id && v.collectionId === self.collectionId && (g ? v.name.startsWith(`${g}/`) : !v.name.includes("/")));
+  }
+  function groupMove(oldName, newName, self, vars) {
+    const from = groupPath(oldName);
+    const to = groupPath(normalizeVarName(newName));
+    if (from === to) return null;
+    return { from: from || NO_GROUP, to: to || NO_GROUP, newGroup: !groupHasOthers(to, self, vars), emptied: !groupHasOthers(from, self, vars) };
+  }
+  function cssRename(oldName, newName, selfId, vars, cssName) {
+    const from = cssName(oldName);
+    const to = cssName(normalizeVarName(newName));
+    if (from === to) return null;
+    const other = vars.find((v) => v.id !== selfId && cssName(v.name) === to);
+    return other ? { from, to, clash: other.name } : { from, to };
+  }
+  function cellKey(c) {
+    var _a;
+    if (!c) return "";
+    switch (c.kind) {
+      case "color":
+        return `c:${c.hex.toUpperCase()}:${Math.round(((_a = c.alpha) != null ? _a : 1) * 255)}`;
+      case "number":
+        return `n:${Number("value" in c ? c.value : c.text)}`;
+      case "string":
+        return `s:${c.text}`;
+      case "bool":
+        return `b:${"value" in c ? String(c.value) : c.text}`;
+      case "alias":
+        return `a:${"targetId" in c ? c.targetId : c.aliasId}`;
+    }
+  }
+  var sameCell = (a, b) => cellKey(a) === cellKey(b);
+  function colorText(hex, alpha = 1) {
+    const a = Math.round(alpha * 255);
+    return a >= 255 ? hex.toUpperCase() : `${hex.toUpperCase()}${a.toString(16).padStart(2, "0").toUpperCase()}`;
+  }
+  function parseColorInput(s) {
+    const m = /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(s.trim());
+    if (!m) return null;
+    return { hex: `#${m[1].toUpperCase()}`, alpha: m[2] ? Math.round(parseInt(m[2], 16) / 255 * 1e6) / 1e6 : 1 };
+  }
+  function parseNumberInput(s) {
+    const t2 = s.trim();
+    if (!t2) return null;
+    const n = Number(t2);
+    return Number.isFinite(n) ? n : null;
+  }
+  function cellInputText(c) {
+    if (!c || c.kind === "alias") return "";
+    if (c.kind === "color") return colorText(c.hex, c.alpha);
+    return c.text;
+  }
+  function resolveEditValue(cell, cols, vars, maxDepth = 5) {
+    var _a, _b, _c;
+    let c = cell;
+    for (let d = 0; c && c.kind === "alias"; d++) {
+      if (d >= maxDepth) return null;
+      const id = c.aliasId;
+      const t2 = vars.find((v) => v.id === id);
+      if (!t2) return null;
+      const col = cols.find((x) => x.id === t2.collectionId);
+      c = t2.values[(_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a.modeId) != null ? _c : ""];
+    }
+    return c != null ? c : null;
+  }
+  function reaches(fromId, targetId, vars) {
+    const byId = new Map(vars.map((v) => [v.id, v]));
+    const seen = /* @__PURE__ */ new Set();
+    const stack = [fromId];
+    while (stack.length) {
+      const id = stack.pop();
+      if (id === targetId) return true;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const v = byId.get(id);
+      if (!v) continue;
+      for (const c of Object.values(v.values)) if (c.kind === "alias") stack.push(c.aliasId);
+    }
+    return false;
+  }
+  function aliasCandidates(self, cols, vars, query2 = "") {
+    var _a;
+    const own = cols.find((c) => c.id === self.collectionId);
+    const tier = (_a = own == null ? void 0 : own.tier) != null ? _a : 0;
+    if (tier === 1) return { global: true, allTiers: false, groups: [] };
+    const okCol = (c) => tier === 0 ? true : c.tier >= 1 && c.tier < tier;
+    const groups = [];
+    for (const side of sidebarCollections(cols.filter(okCol), vars, null, /* @__PURE__ */ new Set())) {
+      const badge = tierBadge(side.collection);
+      for (const g of side.groups) {
+        const rows = vars.filter((v) => v.collectionId === side.collection.id && groupKey(v.collectionId, v.name) === g.key && v.id !== self.id && v.type === self.type && matchesQuery(v.name, query2) && !reaches(v.id, self.id, vars));
+        if (rows.length) groups.push({ collection: side.collection, label: `${badge} ${side.collection.name} \u203A ${g.label}`, rows });
+      }
+    }
+    return { global: false, allTiers: tier === 0, groups };
   }
 
   // src/lib/reread.ts
@@ -3016,7 +3215,7 @@
   // src/ui.ts
   var lastSentMsg = null;
   function send(msg) {
-    if (msg.type !== "CANCEL") lastSentMsg = msg;
+    if (msg.type !== "CANCEL" && msg.type !== "UPDATE_VARIABLE") lastSentMsg = msg;
     opSent(msg);
     parent.postMessage({ pluginMessage: msg }, "*");
   }
@@ -4626,6 +4825,9 @@
       case "VAR_USERS":
         onVarUsers(msg);
         break;
+      case "VARIABLE_UPDATED":
+        onVariableUpdated(msg);
+        break;
       case "SELECT_RESULT":
         if (selectStatusTarget === "list") {
           if (msg.capped) showStatusLine(t("list.selectCapped", { n: msg.requested }), { cls: "warn" });
@@ -4847,6 +5049,8 @@
         void deactivateInstance(msg.key, msg.instanceId);
         break;
       case "ERROR": {
+        if (msg.op === "UPDATE_VARIABLE" || msg.op === "GET_VAR_TABLE") edMaybeSaved();
+        if (msg.op === "UPDATE_VARIABLE") break;
         const statusId = msg.op === "SELECT_NODES" ? selectStatusTarget : resolveStatusId(msg.op && OP_STATUS[msg.op] || "colorStatus");
         if (msg.op === "APPLY") hideApplyProgress();
         showError(statusId, explainError(msg.message));
@@ -5778,6 +5982,7 @@
     e.stopImmediatePropagation();
     if (e.type === "click" || e.type === "keydown") {
       if (el.dataset.lock === "paid") showPaidReason();
+      else if (el.dataset.lock === "edit") edLockedSave();
       else if (el.id === "btnApplyExistingText" && curSel.count && !hasTextStyles) {
         showStatusLine(t("bind.tsNoneText"), { cls: "warn", action: { label: t("bind.tsGotoType"), run: () => showMake("type") } });
       } else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: "warn" });
@@ -6292,23 +6497,32 @@
   var modalEl = null;
   var modalReturnFocus = null;
   var modalOnClose = null;
+  var modalBeforeClose = null;
   function closeModal() {
+    var _a;
     if (!modalEl) return;
     const cb = modalOnClose;
     modalOnClose = null;
+    modalBeforeClose = null;
     cb == null ? void 0 : cb();
     modalEl.remove();
     modalEl = null;
-    modalReturnFocus == null ? void 0 : modalReturnFocus.focus();
+    const rf = modalReturnFocus;
     modalReturnFocus = null;
+    (_a = typeof rf === "function" ? rf() : rf) == null ? void 0 : _a.focus();
     reentry.release();
   }
-  function openModal(title, body, foot, returnFocus, onClose) {
-    var _a;
+  function requestCloseModal(how) {
+    if (modalBeforeClose && !modalBeforeClose(how)) return;
+    closeModal();
+  }
+  function openModal(title, body, foot, returnFocus, onClose, opts = {}) {
+    var _a, _b, _c, _d;
     closeModal();
     closeMenu();
     modalReturnFocus = returnFocus != null ? returnFocus : document.activeElement;
     modalOnClose = onClose != null ? onClose : null;
+    modalBeforeClose = (_a = opts.beforeClose) != null ? _a : null;
     const back = document.createElement("div");
     back.className = "modal-backdrop";
     const box = document.createElement("div");
@@ -6318,22 +6532,28 @@
     const h = document.createElement("h3");
     if (typeof title === "string") h.textContent = title;
     else h.appendChild(title);
+    const scroll = document.createElement("div");
+    scroll.className = "m-scroll";
+    scroll.append(h, body);
+    const fw = document.createElement("div");
+    fw.className = "m-foot-wrap";
     const f = document.createElement("div");
     f.className = "m-foot";
     f.append(...foot);
-    box.append(h, body, f);
+    fw.append(...(_b = opts.footTop) != null ? _b : [], f);
+    box.append(scroll, fw);
     back.appendChild(box);
     back.addEventListener("pointerdown", (e) => {
-      if (e.target === back) closeModal();
+      if (e.target === back) requestCloseModal("backdrop");
     });
     box.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        closeModal();
+        requestCloseModal("esc");
         return;
       }
       if (e.key !== "Tab") return;
-      const focusables = Array.from(box.querySelectorAll('button:not(:disabled), select, input, [tabindex="0"]'));
+      const focusables = Array.from(box.querySelectorAll('button:not(:disabled), select:not(:disabled), input:not(:disabled), [tabindex="0"]')).filter((x) => !x.closest("[hidden]"));
       if (!focusables.length) return;
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
@@ -6347,7 +6567,7 @@
     });
     $("overlayRoot").appendChild(back);
     modalEl = back;
-    ((_a = box.querySelector("select, input, button.primary, button")) != null ? _a : box).focus();
+    ((_d = (_c = opts.focus) != null ? _c : box.querySelector("select, input, button.primary, button")) != null ? _d : box).focus();
     return box;
   }
   function modalButton(label, onClick, primary = false) {
@@ -6563,10 +6783,13 @@
     })), alias);
   }
   function onVarTable(msg) {
+    var _a;
     const sig = JSON.stringify([msg.collections, msg.vars]);
+    const edRebase = !!((_a = ed == null ? void 0 : ed.saving) == null ? void 0 : _a.awaitingTable);
     const first = !vmTableKnown;
     vmTableKnown = true;
     if (sig === vmTableSig && !first) {
+      if (edRebase) edOnVarTable(msg);
       if (refreshBefore) finishRefresh();
       return;
     }
@@ -6581,6 +6804,7 @@
     recomputeIndirect();
     if (refreshBefore) finishRefresh();
     if (vmOpen || first) renderVarScreen();
+    if (edRebase) edOnVarTable(msg);
   }
   function refreshList() {
     const btn = $("btnVarRefresh");
@@ -7292,6 +7516,7 @@ ${v.description}` : v.name;
     }
     if (cell && cell.kind === "alias") items.push({ label: t("vm.jumpAlias"), onSelect: () => jumpToVar(cell.aliasId, rowEl2.dataset.key), focusElsewhere: true });
     items.push({ label: t("vm.detail"), onSelect: () => openDetail(ref, rowEl2), focusElsewhere: true });
+    if (ref.local) items.push({ label: t("vm.edit"), onSelect: () => openDetail(ref, rowEl2, true), focusElsewhere: true });
     openMenu(x != null ? x : r.left + 24, y != null ? y : r.bottom, items, rowEl2, () => rowEl2.classList.remove("menu-open"));
   }
   function selectVarUsers(varIds) {
@@ -7301,15 +7526,65 @@ ${v.description}` : v.name;
   }
   var detailReq = 0;
   var detailBox = null;
-  function openDetail(ref, returnRow) {
+  var detailUsesEl = null;
+  function focusRowOrHead(key) {
+    const tree = $("varTree");
+    const row = tree.querySelector(`[data-key="${CSS.escape(key)}"]`);
+    if (!row) return $("varMainTitle");
+    tree.querySelectorAll("[data-key]").forEach((x) => x.tabIndex = -1);
+    row.tabIndex = 0;
+    focusKey = key;
+    return row;
+  }
+  function usesBlock(id) {
     var _a, _b, _c;
-    const id = ref.local ? ref.local.id : ref.lib.id;
-    const name = ref.local ? ref.local.name : ref.lib.name;
-    const type = ref.local ? ref.local.type : ref.lib.type;
-    const col = ref.local ? vmCols.find((c) => c.id === ref.local.collectionId) : void 0;
+    const usesBox = document.createElement("div");
+    usesBox.className = "var-uses";
+    const via0 = ((_b = (_a = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0 ? [] : (_c = indirectMap.get(id)) != null ? _c : [];
+    if (via0.length) {
+      const names = via0.map((x) => {
+        var _a2, _b2, _c2, _d;
+        return (_d = (_c2 = (_a2 = vmVars.find((v) => v.id === x)) == null ? void 0 : _a2.name) != null ? _c2 : (_b2 = libVars.find((l) => l.id === x)) == null ? void 0 : _b2.name) != null ? _d : x;
+      });
+      const p = document.createElement("div");
+      p.className = "hint";
+      p.textContent = t("list.viaAlias", { names: names.join(", ") });
+      usesBox.appendChild(p);
+    }
+    const usesList = document.createElement("div");
+    usesBox.appendChild(usesList);
+    const findUses = () => {
+      var _a2, _b2, _c2;
+      if (!baseline) return;
+      const direct = ((_b2 = (_a2 = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a2.places) != null ? _b2 : 0) > 0;
+      const via = direct ? [] : (_c2 = indirectMap.get(id)) != null ? _c2 : [];
+      detailReq = ++bindReqSeq;
+      usesList.textContent = t("common.running");
+      send({ type: "FIND_VAR_USERS", reqId: detailReq, varIds: direct ? [id] : via.length ? via : [id], nodeIds: baseline.ids, limit: DETAIL_LIMIT });
+    };
+    const run = () => {
+      clearMount(usesList);
+      if (!baseline) usesList.textContent = t("list.selectFirstNote");
+      else if (baseline.scanned > BIG_SELECTION) {
+        usesList.append(t("list.detailBig"), " ");
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "link";
+        b.textContent = t("list.find");
+        b.addEventListener("click", findUses);
+        usesList.appendChild(b);
+      } else findUses();
+    };
+    return { box: usesBox, list: usesList, run };
+  }
+  function openDetail(ref, _returnRow, focusName = false) {
+    if (ref.local) {
+      openEditor(ref.local, focusName);
+      return;
+    }
+    const l = ref.lib;
     const title = document.createElement("span");
-    const first = ref.local ? currentModeCell(ref.local) : ref.lib.value;
-    title.innerHTML = `${type === "COLOR" ? swatchHtml(resolveSwatch(first)) : ""}<span class="vm-val">${escapeHtml(name)}</span>${ref.lib ? ' <span class="lib-tag">LIB</span>' : ""}`;
+    title.innerHTML = `${l.type === "COLOR" ? swatchHtml(resolveSwatch(l.value)) : ""}<span class="vm-val">${escapeHtml(l.name)}</span> <span class="lib-tag">LIB</span>`;
     const body = document.createElement("div");
     const dl = document.createElement("dl");
     const row = (k, val) => {
@@ -7320,68 +7595,22 @@ ${v.description}` : v.name;
       else dd.appendChild(val);
       dl.append(dt, dd);
     };
-    if (ref.local && col) {
-      const tierName = col.tier ? ["", "Global", "Semantic", "Component"][col.tier] : t("vm.noTier");
-      row(t("vm.dCollection"), col.name === tierName ? col.name : `${col.name} \xB7 ${tierName}`);
-      for (const m of col.modes) row(m.name, valueEl(ref.local.values[m.modeId]));
-      const scopes = document.createElement("span");
-      for (const sc of ref.local.scopes) {
-        const c = document.createElement("span");
-        c.className = "chip";
-        c.textContent = sc;
-        scopes.appendChild(c);
-      }
-      row(t("vm.dScopes"), ref.local.scopes.length ? scopes : "\u2014");
-      row(t("vm.dDesc"), ref.local.description || "\u2014");
-    } else if (ref.lib) {
-      row(t("vm.dCollection"), t("list.libCollection", { name: ref.lib.collection }));
-      row(t("list.dValue"), valueEl(ref.lib.value));
-    }
-    const direct = ((_b = (_a = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0;
-    const via = direct ? [] : (_c = indirectMap.get(id)) != null ? _c : [];
-    const usesBox = document.createElement("div");
-    usesBox.className = "var-uses";
-    if (via.length) {
-      const names = via.map((x) => {
-        var _a2, _b2, _c2, _d;
-        return (_d = (_c2 = (_a2 = vmVars.find((v) => v.id === x)) == null ? void 0 : _a2.name) != null ? _c2 : (_b2 = libVars.find((l) => l.id === x)) == null ? void 0 : _b2.name) != null ? _d : x;
-      });
-      const p = document.createElement("div");
-      p.className = "hint";
-      p.textContent = t("list.viaAlias", { names: names.join(", ") });
-      usesBox.appendChild(p);
-    }
-    const findUses = () => {
-      if (!baseline) return;
-      detailReq = ++bindReqSeq;
-      usesList.textContent = t("common.running");
-      send({ type: "FIND_VAR_USERS", reqId: detailReq, varIds: direct ? [id] : via.length ? via : [id], nodeIds: baseline.ids, limit: DETAIL_LIMIT });
-    };
-    const usesList = document.createElement("div");
-    usesBox.appendChild(usesList);
-    if (!baseline) usesList.textContent = t("list.selectFirstNote");
-    else if (baseline.scanned > BIG_SELECTION) {
-      usesList.append(t("list.detailBig"), " ");
-      const b = document.createElement("button");
-      b.className = "link";
-      b.textContent = t("list.find");
-      b.addEventListener("click", findUses);
-      usesList.appendChild(b);
-    }
-    row(t("list.dUses"), usesBox);
+    row(t("vm.dCollection"), t("list.libCollection", { name: l.collection }));
+    row(t("list.dValue"), valueEl(l.value));
+    const uses = usesBlock(l.id);
+    row(t("list.dUses"), uses.box);
     body.appendChild(dl);
-    if (ref.lib) {
-      const n = document.createElement("div");
-      n.className = "hint";
-      n.textContent = t("list.libManaged");
-      body.appendChild(n);
-    }
-    const box = openModal(title, body, [modalButton(t("common.close"), closeModal, true)], returnRow);
+    const n = document.createElement("div");
+    n.className = "hint";
+    n.textContent = t("list.libManaged");
+    body.appendChild(n);
+    const key = `lib:${l.id}`;
+    const close = modalButton(t("common.close"), () => requestCloseModal("button"), true);
+    const box = openModal(title, body, [close], () => focusRowOrHead(key), void 0, { focus: close });
     detailBox = box;
-    detailUsesEl = usesList;
-    if (baseline && baseline.scanned <= BIG_SELECTION) findUses();
+    detailUsesEl = uses.list;
+    uses.run();
   }
-  var detailUsesEl = null;
   function onVarUsers(msg) {
     if (msg.reqId !== detailReq || !detailUsesEl || !detailBox || !modalEl) return;
     const box = detailUsesEl;
@@ -7409,6 +7638,777 @@ ${v.description}` : v.name;
       more.textContent = t("list.usesMore", { n: msg.totalLayers - msg.layers.length });
       box.appendChild(more);
     }
+  }
+  var ed = null;
+  var edDeadReqs = /* @__PURE__ */ new Set();
+  var EDIT_TIMEOUT = 1e4;
+  function edTarget(f, id) {
+    var _a;
+    const local = vmVars.find((v) => v.id === id);
+    if (local) return { name: local.name, remote: false, deleted: false };
+    const b = ((_a = f.base) == null ? void 0 : _a.kind) === "alias" && f.base.aliasId === id ? f.base : void 0;
+    if (b == null ? void 0 : b.remote) return { name: b.aliasName, remote: true, deleted: false };
+    return { name: t("edit.deletedTarget"), remote: false, deleted: true };
+  }
+  function edSwatch(cell) {
+    const r = resolveEditValue(cell, vmCols, vmVars);
+    return r && r.kind === "color" ? r.hex : null;
+  }
+  function edDraft(f, type) {
+    var _a, _b;
+    if (f.mode === "alias") {
+      const changed = !(((_a = f.base) == null ? void 0 : _a.kind) === "alias" && f.base.aliasId === f.aliasId);
+      return { changed, err: null, value: { kind: "alias", targetId: (_b = f.aliasId) != null ? _b : "" } };
+    }
+    if (!f.touched) return { changed: false, err: null };
+    if (type === "BOOLEAN") {
+      if (f.needValue) return { changed: true, err: t("edit.errNeedValue") };
+      const value2 = { kind: "bool", value: f.bool };
+      return { changed: !sameCell(f.base, value2), err: null, value: value2 };
+    }
+    const raw = f.text;
+    if (f.needValue && raw === "") return { changed: true, err: t("edit.errNeedValue") };
+    if (!f.base && raw.trim() === "") return { changed: false, err: null };
+    let value;
+    if (type === "COLOR") {
+      const p = parseColorInput(raw);
+      if (!p) return { changed: true, err: t("edit.errColor") };
+      value = { kind: "color", hex: p.hex, alpha: p.alpha };
+    } else if (type === "FLOAT") {
+      const n = parseNumberInput(raw);
+      if (n === null) return { changed: true, err: t("edit.errNumber") };
+      value = { kind: "number", value: n };
+    } else value = { kind: "string", text: raw };
+    return { changed: !sameCell(f.base, value), err: null, value };
+  }
+  function edNameState(e) {
+    const name = normalizeVarName(e.nameText);
+    const changed = name !== normalizeVarName(e.v.name);
+    const ne = changed ? nameError(e.nameText, e.v, vmVars) : null;
+    return { changed, err: ne === "emptySegment" ? t("edit.nameEmptySeg") : ne === "duplicate" ? t("edit.nameDup") : null, name };
+  }
+  function edState(e) {
+    const n = edNameState(e);
+    let changed = n.changed;
+    let firstErr = n.err ? e.nameInput : null;
+    for (const f of e.fields) {
+      const d = edDraft(f, e.v.type);
+      if (d.changed) changed = true;
+      if (d.err && !firstErr) firstErr = f.ctl;
+    }
+    return { changed, hasErr: !!firstErr, firstErr };
+  }
+  function edFirstErrorCtl(e) {
+    if (edNameState(e).err || e.nameFigmaErr !== null) return e.nameInput;
+    for (const f of e.fields) if (edDraft(f, e.v.type).err || f.figmaErr !== null) return f.ctl;
+    return null;
+  }
+  function edChrome() {
+    var _a, _b, _c, _d, _e, _f;
+    const e = ed;
+    if (!e) return;
+    const st = edState(e);
+    const saving = !!e.saving;
+    const n = edNameState(e);
+    e.nameField.classList.toggle("changed", n.changed);
+    e.nameField.classList.toggle("err", !!n.err || e.nameFigmaErr !== null);
+    e.nameInput.disabled = saving;
+    e.nameErr.textContent = (_a = n.err) != null ? _a : e.nameFigmaErr !== null ? t("edit.nameRejected") : "";
+    e.nameErr.title = !n.err && e.nameFigmaErr ? e.nameFigmaErr : "";
+    e.nameErr.hidden = !e.nameErr.textContent;
+    for (const f of e.fields) {
+      const d = edDraft(f, e.v.type);
+      const wrap = f.dd.querySelector(".ed-field");
+      wrap == null ? void 0 : wrap.classList.toggle("changed", d.changed);
+      wrap == null ? void 0 : wrap.classList.toggle("err", !!d.err || f.figmaErr !== null);
+      f.dd.querySelectorAll("input, button").forEach((x) => {
+        if (!x.closest(".ed-picker")) x.disabled = saving;
+      });
+      const errEl = f.dd.querySelector(".ed-ferr");
+      if (errEl) {
+        errEl.textContent = (_b = d.err) != null ? _b : f.figmaErr !== null ? t("edit.valueRejected") : "";
+        errEl.title = !d.err && f.figmaErr ? f.figmaErr : "";
+        errEl.hidden = !errEl.textContent;
+      }
+      if (f.mode === "value" && e.v.type === "COLOR") {
+        const sw = f.dd.querySelector(".ed-field > .bf-swatch");
+        const p = parseColorInput(f.text);
+        if (sw) sw.style.background = p ? p.hex : "transparent";
+      }
+    }
+    clearMount(e.changes);
+    const showCh = n.changed && n.err !== t("edit.nameEmptySeg");
+    const gm = showCh ? groupMove(e.v.name, n.name, e.v, vmVars) : null;
+    const cr = showCh ? cssRename(e.v.name, n.name, e.v.id, vmVars, cssVarName) : null;
+    if (gm || cr) {
+      const h = document.createElement("span");
+      h.className = "ed-ch-h";
+      h.textContent = t("edit.changesHead");
+      e.changes.appendChild(h);
+      if (gm) {
+        const d = document.createElement("div");
+        d.append(`\xB7 ${t("edit.groupMove", { from: gm.from, to: gm.to })}`);
+        if (gm.newGroup) {
+          const m = document.createElement("span");
+          m.className = "muted";
+          m.textContent = ` ${t("edit.newGroup")}`;
+          d.appendChild(m);
+        }
+        if (gm.emptied) {
+          const m = document.createElement("span");
+          m.className = "muted";
+          m.textContent = ` ${t("edit.groupEmptied", { group: gm.from })}`;
+          d.appendChild(m);
+        }
+        e.changes.appendChild(d);
+      }
+      if (cr) {
+        const d = document.createElement("div");
+        d.append(`\xB7 ${t("edit.cssLabel")} `);
+        const m = document.createElement("span");
+        m.className = "mono";
+        m.textContent = `${cr.from} \u2192 ${cr.to}`;
+        d.appendChild(m);
+        if (cr.clash) {
+          const w = document.createElement("span");
+          w.className = "w";
+          w.textContent = ` ${t("edit.cssClash", { name: cr.clash })}`;
+          d.appendChild(w);
+        }
+        e.changes.appendChild(d);
+      }
+    }
+    e.changes.hidden = !(gm || cr);
+    const stickyText = e.sticky === "deleted" ? t("edit.deleted") : e.sticky === "conflict" ? t("edit.conflict") : e.sticky === "maybe" ? t("edit.maybeSaved") : null;
+    const text = (_d = stickyText != null ? stickyText : (_c = e.event) == null ? void 0 : _c.text) != null ? _d : "";
+    e.alert.textContent = text;
+    e.alert.title = !stickyText && ((_e = e.event) == null ? void 0 : _e.tip) ? e.event.tip : "";
+    e.alert.hidden = !text;
+    e.alert.classList.toggle("err", !!stickyText || !!((_f = e.event) == null ? void 0 : _f.err));
+    e.confirmRow.hidden = !e.confirm;
+    e.btnClose.textContent = st.changed ? t("common.cancel") : t("common.close");
+    e.btnSave.textContent = saving ? t("edit.savingBtn") : t("edit.save");
+    const locked = saving || !!e.sticky || !st.changed || st.hasErr;
+    if (locked) {
+      e.btnSave.setAttribute("aria-disabled", "true");
+      e.btnSave.dataset.lock = "edit";
+    } else {
+      e.btnSave.removeAttribute("aria-disabled");
+      delete e.btnSave.dataset.lock;
+    }
+  }
+  function edEdited() {
+    if (!ed) return;
+    ed.event = null;
+    edChrome();
+  }
+  function edLockedSave() {
+    var _a;
+    const e = ed;
+    if (!e || e.saving || e.sticky) return;
+    const st = edState(e);
+    if (!st.changed) e.event = { text: t("edit.noChange"), err: false };
+    else if (st.hasErr) {
+      e.event = { text: t("edit.checkInput"), err: true };
+      (_a = st.firstErr) == null ? void 0 : _a.focus();
+    }
+    edChrome();
+  }
+  function edRenderField(f) {
+    var _a;
+    const e = ed;
+    clearMount(f.dd);
+    const wrap = document.createElement("div");
+    wrap.className = "ed-field";
+    f.ctl = null;
+    if (f.mode === "alias" && f.aliasId) {
+      const tg = edTarget(f, f.aliasId);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "ed-pillbtn";
+      b.setAttribute("aria-label", t("edit.valueAria", { mode: f.modeName }));
+      const pill = document.createElement("span");
+      pill.className = `ed-pill${tg.deleted ? " warn" : ""}`;
+      const hex = e.v.type === "COLOR" && !tg.deleted ? edSwatch({ kind: "alias", aliasId: f.aliasId, aliasName: tg.name }) : null;
+      pill.innerHTML = `${swatchHtml(hex)}\u2192 ${escapeHtml(tg.name)}${tg.remote ? ' <span class="lib-tag">LIB</span>' : ""}`;
+      pill.title = tg.name;
+      b.appendChild(pill);
+      b.addEventListener("click", () => edTogglePicker(f));
+      wrap.appendChild(b);
+      f.ctl = b;
+    } else if (e.v.type === "BOOLEAN") {
+      const sw = document.createElement("button");
+      sw.type = "button";
+      sw.className = "bv-switch";
+      sw.setAttribute("role", "switch");
+      sw.setAttribute("aria-checked", String(f.bool));
+      sw.setAttribute("aria-label", t("edit.valueAria", { mode: f.modeName }));
+      const track = document.createElement("span");
+      track.className = "bv-track";
+      track.setAttribute("aria-hidden", "true");
+      sw.appendChild(track);
+      sw.addEventListener("click", () => {
+        f.bool = !f.bool;
+        f.touched = true;
+        f.needValue = false;
+        f.figmaErr = null;
+        sw.setAttribute("aria-checked", String(f.bool));
+        edEdited();
+      });
+      const grow = document.createElement("span");
+      grow.className = "ed-grow";
+      wrap.append(sw, grow);
+      f.ctl = sw;
+    } else {
+      if (e.v.type === "COLOR") {
+        const sw = document.createElement("span");
+        sw.className = "bf-swatch";
+        const p = parseColorInput(f.text);
+        sw.style.background = p ? p.hex : "transparent";
+        wrap.appendChild(sw);
+      }
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.value = f.text;
+      inp.placeholder = "\u2014";
+      inp.spellcheck = false;
+      inp.setAttribute("aria-label", t("edit.valueAria", { mode: f.modeName }));
+      inp.addEventListener("input", () => {
+        f.text = inp.value;
+        f.touched = true;
+        f.needValue = false;
+        f.figmaErr = null;
+        edEdited();
+      });
+      wrap.appendChild(inp);
+      f.ctl = inp;
+    }
+    const dd = document.createElement("button");
+    dd.type = "button";
+    dd.className = "ed-dd";
+    const open = ((_a = e.picker) == null ? void 0 : _a.modeId) === f.modeId;
+    dd.textContent = open ? "\u25B4" : "\u25BE";
+    dd.setAttribute("aria-label", t("edit.pickAria", { mode: f.modeName }));
+    dd.setAttribute("aria-haspopup", "listbox");
+    dd.setAttribute("aria-expanded", String(open));
+    dd.addEventListener("click", () => edTogglePicker(f));
+    wrap.appendChild(dd);
+    f.ddBtn = dd;
+    f.dd.appendChild(wrap);
+    const err = document.createElement("div");
+    err.className = "ed-ferr";
+    err.hidden = true;
+    f.dd.appendChild(err);
+    if (f.mode === "alias" && f.aliasId && edTarget(f, f.aliasId).deleted) {
+      const w = document.createElement("div");
+      w.className = "ed-fwarn";
+      w.textContent = t("edit.targetDeleted");
+      f.dd.appendChild(w);
+    }
+    if (open) f.dd.appendChild(edPicker(f));
+  }
+  function edTogglePicker(f) {
+    var _a;
+    const e = ed;
+    if (!e || e.saving) return;
+    const prev = e.picker ? e.fields.find((x) => x.modeId === e.picker.modeId) : void 0;
+    if (prev === f) {
+      edClosePicker(true);
+      return;
+    }
+    e.picker = { modeId: f.modeId, query: "" };
+    if (prev) edRenderField(prev);
+    edRenderField(f);
+    edChrome();
+    (_a = f.dd.querySelector(".ed-psearch")) == null ? void 0 : _a.focus();
+  }
+  function edClosePicker(focusDd) {
+    var _a;
+    const e = ed;
+    if (!(e == null ? void 0 : e.picker)) return;
+    const f = e.fields.find((x) => x.modeId === e.picker.modeId);
+    e.picker = null;
+    if (!f) return;
+    edRenderField(f);
+    edChrome();
+    if (focusDd) (_a = f.ddBtn) == null ? void 0 : _a.focus();
+  }
+  function edPick(f, id) {
+    f.mode = "alias";
+    f.aliasId = id;
+    f.touched = true;
+    f.needValue = false;
+    f.figmaErr = null;
+    ed.event = null;
+    edClosePicker(true);
+  }
+  function edWriteValue(f) {
+    var _a;
+    const r = f.aliasId ? resolveEditValue({ kind: "alias", aliasId: f.aliasId, aliasName: "" }, vmCols, vmVars) : null;
+    f.mode = "value";
+    f.touched = true;
+    f.figmaErr = null;
+    if (r) {
+      f.text = cellInputText(r);
+      f.bool = r.kind === "bool" && r.text === "true";
+      f.needValue = false;
+    } else {
+      f.text = "";
+      f.bool = false;
+      f.needValue = true;
+    }
+    ed.event = null;
+    edClosePicker(false);
+    (_a = f.ctl) == null ? void 0 : _a.focus();
+  }
+  function edPicker(f) {
+    var _a, _b;
+    const e = ed;
+    const el = document.createElement("div");
+    el.className = "ed-picker";
+    const search = document.createElement("input");
+    search.type = "text";
+    search.className = "ed-psearch";
+    search.placeholder = t("edit.pickSearch");
+    search.setAttribute("aria-label", t("edit.pickSearch"));
+    search.value = (_b = (_a = e.picker) == null ? void 0 : _a.query) != null ? _b : "";
+    const lb = document.createElement("div");
+    lb.setAttribute("role", "listbox");
+    lb.setAttribute("aria-label", t("edit.pickAria", { mode: f.modeName }));
+    const notes = document.createElement("div");
+    const opts = [];
+    const option = (cls, html, title, onPick, selected = false) => {
+      const o = document.createElement("div");
+      o.className = `ed-opt${cls ? ` ${cls}` : ""}`;
+      o.setAttribute("role", "option");
+      o.setAttribute("aria-selected", String(selected));
+      o.tabIndex = -1;
+      o.innerHTML = html;
+      if (title) o.title = title;
+      if (!onPick) o.setAttribute("aria-disabled", "true");
+      else o.addEventListener("click", onPick);
+      o.addEventListener("keydown", (ev) => {
+        var _a2;
+        const i = opts.indexOf(o);
+        if (ev.key === "ArrowDown") (_a2 = opts[Math.min(opts.length - 1, i + 1)]) == null ? void 0 : _a2.focus();
+        else if (ev.key === "ArrowUp") (i <= 0 ? search : opts[i - 1]).focus();
+        else if ((ev.key === "Enter" || ev.key === " ") && onPick) onPick();
+        else return;
+        ev.preventDefault();
+      });
+      opts.push(o);
+      return o;
+    };
+    const curId = f.mode === "alias" ? f.aliasId : null;
+    const valHtml = (cell) => {
+      const r = resolveEditValue(cell, vmCols, vmVars);
+      if (!r) return "";
+      if (r.kind === "color") return swatchHtml(r.hex);
+      return `<span class="ed-ov">${escapeHtml(r.text)}</span>`;
+    };
+    const render = () => {
+      var _a2, _b2, _c, _d, _e;
+      clearMount(lb);
+      clearMount(notes);
+      opts.length = 0;
+      const q = (_b2 = (_a2 = e.picker) == null ? void 0 : _a2.query) != null ? _b2 : "";
+      if (curId) {
+        const r = resolveEditValue({ kind: "alias", aliasId: curId, aliasName: "" }, vmCols, vmVars);
+        const preview = r ? r.kind === "color" ? colorText(r.hex, r.alpha) : r.text : "\u2014";
+        lb.appendChild(option("ed-raw", `${escapeHtml(t("edit.writeValue"))} <span class="mono">${escapeHtml(preview)}</span>`, "", () => edWriteValue(f)));
+      }
+      const all = aliasCandidates(e.v, vmCols, vmVars);
+      const inRules = !!curId && all.groups.some((g) => g.rows.some((r) => r.id === curId));
+      const note = (text) => {
+        const d = document.createElement("div");
+        d.className = "ed-pnote";
+        d.textContent = text;
+        notes.appendChild(d);
+      };
+      if (curId && !inRules) {
+        const tg = edTarget(f, curId);
+        lb.appendChild(option("", `${escapeHtml(tg.name)}${tg.remote ? ' <span class="lib-tag">LIB</span>' : ""}<span class="ck">\u2713</span>`, tg.name, null, true));
+      }
+      if (all.global) {
+        const d = document.createElement("div");
+        d.className = "ed-pnone";
+        d.textContent = t("edit.pickGlobal");
+        lb.appendChild(d);
+      } else {
+        const cands = aliasCandidates(e.v, vmCols, vmVars, q);
+        const sc = document.createElement("div");
+        sc.className = "ed-pscroll";
+        sc.setAttribute("role", "presentation");
+        for (const g of cands.groups) {
+          const h = document.createElement("div");
+          h.className = "ed-phead";
+          h.setAttribute("role", "presentation");
+          h.textContent = g.label;
+          sc.appendChild(h);
+          for (const r of g.rows) {
+            const col = vmCols.find((c) => c.id === r.collectionId);
+            const cell = r.values[(_e = (_d = col == null ? void 0 : col.defaultModeId) != null ? _d : (_c = col == null ? void 0 : col.modes[0]) == null ? void 0 : _c.modeId) != null ? _e : ""];
+            sc.appendChild(option("", `${valHtml(cell)}${escapeHtml(leafName(r.name))}${r.id === curId ? '<span class="ck">\u2713</span>' : ""}`, r.name, () => edPick(f, r.id), r.id === curId));
+          }
+        }
+        if (!cands.groups.length) {
+          const d = document.createElement("div");
+          d.className = "ed-pnone";
+          d.textContent = t("edit.pickNoMatch");
+          sc.appendChild(d);
+        }
+        lb.appendChild(sc);
+      }
+      if (curId && !inRules) note(t("edit.pickOutOfRules"));
+      if (all.allTiers) note(t("edit.pickAllTiers"));
+      if (!all.global) note(t("edit.pickNoLib"));
+      opts.forEach((o, i) => o.tabIndex = i === 0 ? 0 : -1);
+    };
+    search.addEventListener("input", () => {
+      if (e.picker) e.picker.query = search.value;
+      render();
+    });
+    search.addEventListener("keydown", (ev) => {
+      var _a2;
+      if (ev.key === "ArrowDown") {
+        ev.preventDefault();
+        (_a2 = opts[0]) == null ? void 0 : _a2.focus();
+      }
+    });
+    el.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      edClosePicker(true);
+    });
+    render();
+    el.append(search, lb, notes);
+    return el;
+  }
+  function edResetField(f, base, type) {
+    f.base = base;
+    f.mode = (base == null ? void 0 : base.kind) === "alias" ? "alias" : "value";
+    f.aliasId = (base == null ? void 0 : base.kind) === "alias" ? base.aliasId : null;
+    f.text = cellInputText(base);
+    f.bool = type === "BOOLEAN" && (base == null ? void 0 : base.kind) === "bool" && base.text === "true";
+    f.touched = false;
+    f.needValue = false;
+    f.figmaErr = null;
+  }
+  function edTitle(e) {
+    var _a, _b, _c;
+    const col = vmCols.find((c) => c.id === e.v.collectionId);
+    const first = e.v.values[(_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a.modeId) != null ? _c : ""];
+    e.title.innerHTML = `${e.v.type === "COLOR" ? swatchHtml(edSwatch(first)) : ""}<span class="vm-val">${escapeHtml(e.v.name)}</span>`;
+  }
+  function openEditor(v, focusName) {
+    var _a;
+    const col = vmCols.find((c) => c.id === v.collectionId);
+    const title = document.createElement("span");
+    const body = document.createElement("div");
+    const dl = document.createElement("dl");
+    dl.className = "ed-dl";
+    const row = (k, val, cls = "") => {
+      const dt = document.createElement("dt");
+      dt.textContent = k;
+      dt.title = k;
+      const dd = document.createElement("dd");
+      if (cls) dd.className = cls;
+      if (typeof val === "string") dd.textContent = val;
+      else dd.appendChild(val);
+      dl.append(dt, dd);
+      return dd;
+    };
+    if (col) {
+      const tierName = col.tier ? ["", "Global", "Semantic", "Component"][col.tier] : t("vm.noTier");
+      row(t("vm.dCollection"), col.name === tierName ? col.name : `${col.name} \xB7 ${tierName}`, "ed-plain");
+    }
+    const nameField = document.createElement("div");
+    nameField.className = "ed-field";
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = v.name;
+    nameInput.spellcheck = false;
+    nameInput.setAttribute("aria-label", t("edit.nameAria"));
+    nameField.appendChild(nameInput);
+    const nameErr = document.createElement("div");
+    nameErr.className = "ed-ferr";
+    nameErr.hidden = true;
+    const nameBox = document.createElement("div");
+    nameBox.append(nameField, nameErr);
+    row(t("edit.name"), nameBox);
+    const fields = [];
+    for (const m of (_a = col == null ? void 0 : col.modes) != null ? _a : []) {
+      const dd = row(m.name, "");
+      const f = { modeId: m.modeId, modeName: m.name, base: void 0, mode: "value", text: "", bool: false, aliasId: null, touched: false, needValue: false, figmaErr: null, dd, ctl: null, ddBtn: null };
+      edResetField(f, v.values[m.modeId], v.type);
+      fields.push(f);
+    }
+    const scopes = document.createElement("span");
+    for (const sc of v.scopes) {
+      const c = document.createElement("span");
+      c.className = "chip";
+      c.textContent = sc;
+      scopes.appendChild(c);
+    }
+    row(t("vm.dScopes"), v.scopes.length ? scopes : "\u2014", "ed-text");
+    row(t("vm.dDesc"), v.description || "\u2014", "ed-text");
+    const uses = usesBlock(v.id);
+    row(t("list.dUses"), uses.box, "ed-text");
+    body.appendChild(dl);
+    const changes = document.createElement("div");
+    changes.className = "ed-changes";
+    changes.hidden = true;
+    body.appendChild(changes);
+    const alert = document.createElement("div");
+    alert.className = "ed-alert";
+    alert.setAttribute("role", "status");
+    alert.hidden = true;
+    const confirmRow = document.createElement("div");
+    confirmRow.className = "ed-confirm";
+    confirmRow.hidden = true;
+    const cq = document.createElement("span");
+    cq.textContent = t("edit.confirm");
+    const btnDiscard = modalButton(t("edit.discard"), () => closeModal());
+    const btnKeep = modalButton(t("edit.keep"), () => edKeepEditing());
+    confirmRow.append(cq, btnDiscard, btnKeep);
+    const btnClose = modalButton(t("common.close"), () => requestCloseModal("button"));
+    const btnSave = modalButton(t("edit.save"), () => edSave(), true);
+    const e = {
+      v,
+      nameText: v.name,
+      nameFigmaErr: null,
+      fields,
+      saving: null,
+      timer: null,
+      sticky: null,
+      event: null,
+      confirm: false,
+      picker: null,
+      lastField: null,
+      dead: /* @__PURE__ */ new Set(),
+      appliedAny: false,
+      lastPartial: false,
+      title,
+      nameInput,
+      nameField,
+      nameErr,
+      changes,
+      alert,
+      confirmRow,
+      btnKeep,
+      btnClose,
+      btnSave,
+      usesRun: uses.run
+    };
+    ed = e;
+    edTitle(e);
+    for (const f of fields) edRenderField(f);
+    nameInput.addEventListener("input", () => {
+      e.nameText = nameInput.value;
+      e.nameFigmaErr = null;
+      edEdited();
+    });
+    body.addEventListener("focusin", (ev) => {
+      e.lastField = ev.target;
+    });
+    const box = openModal(title, body, [btnClose, btnSave], () => edAfterClose(e), () => edCleanup(e), {
+      focus: focusName ? nameInput : btnClose,
+      beforeClose: (how) => edBeforeClose(e, how),
+      footTop: [alert, confirmRow]
+    });
+    detailBox = box;
+    detailUsesEl = uses.list;
+    edChrome();
+    uses.run();
+  }
+  function edBeforeClose(e, how) {
+    if (e.saving) {
+      e.event = { text: t("edit.saving"), err: false };
+      edChrome();
+      return false;
+    }
+    if (e.confirm) {
+      if (how === "esc") edKeepEditing();
+      else e.btnKeep.focus();
+      return false;
+    }
+    if (!edState(e).changed) return true;
+    e.confirm = true;
+    edChrome();
+    e.btnKeep.focus();
+    return false;
+  }
+  function edKeepEditing() {
+    const e = ed;
+    if (!e) return;
+    e.confirm = false;
+    edChrome();
+    const back = e.lastField && e.lastField.isConnected && !e.lastField.closest("[hidden]") ? e.lastField : e.nameInput;
+    back.focus();
+  }
+  function edCleanup(e) {
+    if (e.timer) clearTimeout(e.timer);
+    e.timer = null;
+    if (ed === e) ed = null;
+    detailUsesEl = null;
+    detailBox = null;
+  }
+  function edAfterClose(e) {
+    var _a, _b;
+    const target = focusRowOrHead(`row:${e.v.id}`);
+    if (e.appliedAny) {
+      const present = target !== $("varMainTitle");
+      const name = (_b = (_a = vmVars.find((x) => x.id === e.v.id)) == null ? void 0 : _a.name) != null ? _b : e.v.name;
+      if (e.lastPartial) showStatusLine(present ? t("edit.partial") : t("edit.closedPartialMissing", { name }), { cls: "warn" });
+      else if (!present) showStatusLine(t("edit.closedMissing", { name }));
+    }
+    return target;
+  }
+  function edSave() {
+    var _a;
+    const e = ed;
+    if (!e || e.saving || e.sticky) return;
+    const st = edState(e);
+    if (!st.changed || st.hasErr) {
+      edLockedSave();
+      return;
+    }
+    const n = edNameState(e);
+    const values = {};
+    const baseValues = {};
+    for (const f of e.fields) {
+      const d = edDraft(f, e.v.type);
+      if (!d.changed || !d.value) continue;
+      values[f.modeId] = d.value;
+      baseValues[f.modeId] = (_a = f.base) != null ? _a : null;
+    }
+    const reqId = ++bindReqSeq;
+    e.saving = { reqId, awaitingTable: false };
+    e.event = null;
+    e.confirm = false;
+    if (e.picker) edClosePicker(false);
+    e.timer = setTimeout(() => edMaybeSaved(reqId), EDIT_TIMEOUT);
+    const msg = { type: "UPDATE_VARIABLE", reqId, id: e.v.id, base: { name: e.v.name, values: baseValues } };
+    if (n.changed) msg.name = n.name;
+    if (Object.keys(values).length) msg.values = values;
+    send(msg);
+    edChrome();
+  }
+  function edEndSaving(e) {
+    e.saving = null;
+    if (e.timer) clearTimeout(e.timer);
+    e.timer = null;
+  }
+  function edSetSticky(e, s) {
+    if (e.sticky === "deleted") return;
+    e.sticky = s;
+  }
+  function edMaybeSaved(reqId) {
+    const e = ed;
+    if (!(e == null ? void 0 : e.saving) || reqId !== void 0 && e.saving.reqId !== reqId) return;
+    e.dead.add(e.saving.reqId);
+    edDeadReqs.add(e.saving.reqId);
+    edEndSaving(e);
+    edSetSticky(e, "maybe");
+    edChrome();
+  }
+  function edReasonText(err) {
+    if (!err) return { text: "" };
+    if (err.code === "name") return { text: t("edit.nameRejected"), tip: err.message };
+    if (err.code === "value") return { text: t("edit.valueRejected"), tip: err.message };
+    return { text: t("edit.saveFailed"), tip: err.message };
+  }
+  function onVariableUpdated(msg) {
+    var _a, _b;
+    const e = ed;
+    if (edDeadReqs.has(msg.reqId)) {
+      edDeadReqs.delete(msg.reqId);
+      if (msg.applied.length) {
+        readScreen("work");
+        if (e && e.dead.has(msg.reqId)) {
+          e.appliedAny = true;
+          e.lastPartial = !!msg.error;
+        }
+      }
+      return;
+    }
+    if (!(e == null ? void 0 : e.saving) || e.saving.reqId !== msg.reqId) return;
+    if (!msg.applied.length) {
+      edEndSaving(e);
+      const err = msg.error;
+      let focus = null;
+      if ((err == null ? void 0 : err.code) === "deleted") edSetSticky(e, "deleted");
+      else if ((err == null ? void 0 : err.code) === "conflict") edSetSticky(e, "conflict");
+      else {
+        if ((err == null ? void 0 : err.code) === "name") {
+          e.nameFigmaErr = (_a = err.message) != null ? _a : "";
+          focus = e.nameInput;
+        } else if ((err == null ? void 0 : err.code) === "value") {
+          const f = e.fields.find((x) => x.modeId === err.modeId);
+          if (f) {
+            f.figmaErr = (_b = err.message) != null ? _b : "";
+            focus = f.ctl;
+          }
+        }
+        const r = edReasonText(err);
+        e.event = { text: r.text, err: true, tip: r.tip };
+        if (!focus) focus = e.btnSave;
+      }
+      edChrome();
+      focus == null ? void 0 : focus.focus();
+      return;
+    }
+    e.appliedAny = true;
+    e.lastPartial = !!msg.error;
+    e.saving.awaitingTable = true;
+    e.saving.res = msg;
+    readScreen("work");
+  }
+  function edOnVarTable(msg) {
+    var _a, _b, _c, _d;
+    const e = ed;
+    if (!((_a = e == null ? void 0 : e.saving) == null ? void 0 : _a.awaitingTable) || !e.saving.res) return;
+    const res = e.saving.res;
+    edEndSaving(e);
+    const row = msg.vars.find((x) => x.id === e.v.id);
+    if (!row) {
+      edSetSticky(e, "deleted");
+      edChrome();
+      return;
+    }
+    const applied = new Set(res.applied);
+    const prev = e.v;
+    const remaining = /* @__PURE__ */ new Map();
+    for (const f of e.fields) remaining.set(f.modeId, !applied.has(f.modeId) && edDraft(f, prev.type).changed);
+    const nameRemains = !applied.has("name") && normalizeVarName(e.nameText) !== normalizeVarName(prev.name);
+    e.v = row;
+    e.nameFigmaErr = null;
+    if (!nameRemains) {
+      e.nameText = row.name;
+      e.nameInput.value = row.name;
+    }
+    for (const f of e.fields) {
+      const base = row.values[f.modeId];
+      if (remaining.get(f.modeId)) {
+        f.base = base;
+        if (((_b = res.error) == null ? void 0 : _b.code) === "value" && res.error.modeId === f.modeId) f.figmaErr = (_c = res.error.message) != null ? _c : "";
+      } else edResetField(f, base, row.type);
+      edRenderField(f);
+    }
+    edTitle(e);
+    let focus;
+    if (res.error) {
+      const r = edReasonText(res.error);
+      e.event = { text: `${r.text} \xB7 ${t("edit.partial")}`, err: true, tip: r.tip };
+      focus = (_d = edFirstErrorCtl(e)) != null ? _d : e.btnSave;
+    } else {
+      e.event = null;
+      focus = e.btnClose;
+    }
+    edChrome();
+    focus.focus();
+    if (res.applied.some((k) => k !== "name")) e.usesRun();
   }
   function openPopupFrom(storeId, title, returnFocus) {
     const content = $(storeId);

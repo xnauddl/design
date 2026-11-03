@@ -131,13 +131,13 @@ export interface BindExample {
   name: string;
 }
 interface ExCol { id: string; tier: number; modes: { modeId: string }[]; defaultModeId?: string }
-type ExCell = { kind: string; hex?: string; text?: string; aliasId?: string };
+type ExCell = { kind: string; hex?: string; alpha?: number; text?: string; aliasId?: string };
 interface ExVar { id: string; name: string; collectionId: string; type: string; values: Record<string, ExCell> }
 
 /**
  * 찾기 전 예시 — 계층이 지정된 로컬 컬렉션을 사이드바 순서(Component → Semantic → Global, 같으면 피그마 순서)로
  * 훑어 첫 색 변수와 첫 숫자 변수. 값은 그 컬렉션 기본 모드(별칭이면 로컬 대상을 따라 최대 5단계).
- * 값을 못 읽는 변수(라이브러리 별칭 등)는 건너뛴다. 없으면 그 종류는 빠진다.
+ * 값을 못 읽는 변수(라이브러리 별칭 등)와 투명도가 1이 아닌 색은 건너뛴다. 없으면 그 종류는 빠진다.
  */
 export function bindExamples(cols: readonly ExCol[], vars: readonly ExVar[]): { color?: BindExample; number?: BindExample } {
   const rank = (t: number): number => (t === 3 ? 0 : t === 2 ? 1 : 2);
@@ -164,7 +164,8 @@ export function bindExamples(cols: readonly ExCol[], vars: readonly ExVar[]): { 
       if (v.collectionId !== col.id) continue;
       if (!out.color && v.type === 'COLOR') {
         const cell = resolve(v);
-        if (cell?.kind === 'color' && cell.hex) out.color = { value: cell.hex.slice(0, 7).toUpperCase(), name: v.name };
+        // 투명도가 1이 아닌 색 변수는 연결 대상이 아니다(§2.11) — 예시로도 고르지 않는다.
+        if (cell?.kind === 'color' && cell.hex && (cell.alpha ?? 1) === 1) out.color = { value: cell.hex.slice(0, 7).toUpperCase(), name: v.name };
       } else if (!out.number && v.type === 'FLOAT') {
         const cell = resolve(v);
         if (cell?.kind === 'number' && cell.text != null) out.number = { value: cell.text, name: v.name };
