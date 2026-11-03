@@ -76,6 +76,10 @@ export interface ColorClass {
 export function classifyColor(hex: string): ColorClass {
   const o = hexToOklch(hex);
   const achromatic = o.c < ACHROMATIC_C;
+  // 순백·순흑은 스텝 밖의 끝점이다(Atlassian Neutral0 / Neutral1000). 50·950에 끼워 넣으면
+  // #ffffff가 `gray/50-4`, #000000이 `gray/950-2`로 밀려 가장 많이 쓰는 두 색이 제일 이상한 이름을 받는다.
+  if (achromatic && o.l >= 0.985) return { family: 'gray', step: 0, achromatic };
+  if (achromatic && o.l <= 0.05) return { family: 'gray', step: 1000, achromatic };
   return { family: achromatic ? 'gray' : hueName(o.h), step: stepForL(o.l), achromatic };
 }
 

@@ -67,6 +67,7 @@ import {
   isHighConfidenceComponent,
   shouldCollapseToProperties,
   inferVaryingComponentProperties,
+  inferVaryingImageSlots,
   pickCollapseMasterIndex,
   propValuesFromStruct,
   colorAxisLabels,
@@ -87,6 +88,8 @@ import {
   // roles (전 토큰 역할 어휘)
   tshirtRoles,
   radiusRoles,
+  spacingRoles,
+  strokeRoles,
   fontSizeRoles,
   weightRole,
   familyRole,
@@ -490,6 +493,35 @@ test('splitWeightStyle — weight/italic 분리', () => {
   assert.deepEqual(splitWeightStyle('Bold'), { weight: 700, italic: false });
   assert.deepEqual(splitWeightStyle('Semi Bold Italic'), { weight: 600, italic: true });
   assert.deepEqual(splitWeightStyle('Italic'), { weight: 400, italic: true });
+});
+
+test('exportTokens — 텍스트 스타일은 typography로, 행간·자간 %는 그대로(변수 아님)', () => {
+  const styles = [
+    { name: 'body', fontFamily: 'Inter', fontStyle: 'Regular', fontSize: 16, lineHeight: { unit: 'percent', value: 150 }, letterSpacing: { unit: 'percent', value: -2 } },
+    { name: 'heading/h1', fontFamily: 'Inter', fontStyle: 'Semi Bold Italic', fontSize: 32, lineHeight: { unit: 'px', value: 40 }, letterSpacing: { unit: 'px', value: 0 } },
+    { name: 'auto', fontFamily: 'Inter', fontStyle: 'Regular', fontSize: 14, lineHeight: { unit: 'auto', value: 0 }, letterSpacing: { unit: 'px', value: 0 } },
+  ];
+  const tokens = [{ name: 'font-size/16', collection: 'Global', type: 'FLOAT', kind: 'fontSize', value: 16 }];
+  const css = exportTokens(tokens, OPTS, styles);
+  assert.ok(css.includes('--typography-body-line-height: 150%;'));
+  assert.ok(css.includes('--typography-body-letter-spacing: -2%;'));
+  assert.ok(css.includes('--typography-heading-h1-line-height: 40px;'));
+  assert.ok(css.includes('--typography-heading-h1-font-weight: 600;'));
+  assert.ok(css.includes('--typography-heading-h1-font-style: italic;'));
+  assert.ok(css.includes('--typography-auto-line-height: normal;'));
+  assert.ok(css.trim().endsWith('}'));
+  assert.ok(css.includes('--font-size-16: 16px;')); // 기존 토큰도 그대로
+
+  const W3C = { ...OPTS, format: 'w3c' };
+  const json = JSON.parse(exportTokens(tokens, W3C, styles));
+  assert.equal(json.typography.body.$type, 'typography');
+  assert.deepEqual(json.typography.body.$value, { fontFamily: 'Inter', fontSize: '16px', fontWeight: 400, lineHeight: '150%', letterSpacing: '-2%' });
+  assert.equal(json.typography.heading.h1.$value.fontStyle, 'italic');
+  assert.equal(json.typography.heading.h1.$value.lineHeight, '40px');
+  assert.equal(json['font-size']['16'].$value, '16px');
+  // 스타일 없이 호출하면 예전과 동일
+  assert.equal(exportTokens(tokens, OPTS), exportTokens(tokens, OPTS, []));
+  assert.equal(exportTokens(tokens, W3C), exportTokens(tokens, W3C, []));
 });
 
 test('exportTokens — strokeWidth/effectFloat는 px 치수로 출력', () => {
@@ -1085,6 +1117,60 @@ test('shouldCollapseToProperties — 텍스트/스왑/불리언만 다르면 접
   assert.equal(shouldCollapseToProperties([named('a', '확인'), named('b', '취소')]), true);
 });
 
+test('shouldCollapseToProperties — 레이어 이름이 카피 따라 달라도 접힘', () => {
+  // 디자이너는 감싼 프레임에도 카피 이름을 준다(`title-price`/`title-name`). 이름만 다른 걸
+  // 구조 차로 보면 텍스트만 다른 반복이 `Variant=1·2`짜리 세트가 된다.
+  const card = (id, wrapName, text) => ({
+    id, name: 'card', type: 'FRAME', layoutMode: 'VERTICAL', width: 200, height: 120, fillHex: '#ffffff',
+    children: [{
+      id: id + '-w', name: wrapName, type: 'FRAME', layoutMode: 'VERTICAL', width: 200, height: 60,
+      children: [{ id: id + '-t', name: 'label', type: 'TEXT', characters: text }],
+    }],
+  });
+  assert.equal(shouldCollapseToProperties([card('a', 'title-price', '12,000'), card('b', 'title-name', '홍길동')]), true);
+
+  // 이름이 갈려도 `?` 규약은 한쪽에만 있으면 인정 — 가시성 차이는 BOOLEAN 속성.
+  const toggle = (id, name, visible) => ({
+    id, name: 'row', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 100, height: 32,
+    children: [{ id: id + '-b', name, type: 'FRAME', visible, width: 20, height: 20, children: [] }],
+  });
+  assert.equal(shouldCollapseToProperties([toggle('a', 'badge?', true), toggle('b', 'flag', false)]), true);
+});
+
+test('shouldCollapseToProperties — 그림은 이름이 아니라 내용(지문)으로 가른다', () => {
+  // 벡터: 같은 지문이면 이름이 달라도 같은 그림 · 지문이 다르면 스왑으로 담아 접는다.
+  const icon = (id, name, key) => ({
+    id, name: 'chip', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 40, height: 24,
+    children: [{ id: id + '-v', name, type: 'VECTOR', width: 16, height: 16, vectorKey: key }],
+  });
+  assert.equal(shouldCollapseToProperties([icon('a', 'icon-heart', 'k1'), icon('b', 'heart', 'k1')]), true);
+  assert.equal(shouldCollapseToProperties([icon('a', 'icon', 'k1'), icon('b', 'icon', 'k2')]), true);
+  // 그림이 다르면 스왑 속성 계획이 나온다(아이콘을 컴포넌트로 만들어 담는 재료).
+  const vplan = inferVaryingComponentProperties([icon('a', 'icon', 'k1'), icon('b', 'icon', 'k2')]);
+  assert.deepEqual(vplan.map((p) => [p.type, p.layerPath, p.fromVector]), [['INSTANCE_SWAP', '0', true]]);
+  assert.equal(inferVaryingComponentProperties([icon('a', 'icon', 'k1'), icon('b', 'icon', 'k1')]).length, 0);
+
+  // 사진: 같은 이름이어도 imageHash가 다르면 다른 그림 — 이미지 슬롯으로 잡아 fill을 이식한다.
+  const photo = (id, name, hash) => ({
+    id, name: 'card', type: 'FRAME', layoutMode: 'VERTICAL', width: 200, height: 120,
+    children: [{ id: id + '-p', name, type: 'RECTANGLE', width: 200, height: 80, imageHash: hash,
+      fills: [{ type: 'IMAGE', visible: true }] }],
+  });
+  const members = [photo('a', 'thumbnail', 'h1'), photo('b', 'thumbnail', 'h2')];
+  assert.equal(shouldCollapseToProperties(members), true);
+  assert.deepEqual(inferVaryingImageSlots(members), [{ layerName: 'thumbnail', layerPath: '0' }]);
+  // 같은 사진이면 이식할 것도 없다.
+  assert.deepEqual(inferVaryingImageSlots([photo('a', 'thumbnail', 'h1'), photo('b', 'photo', 'h1')]), []);
+
+  // 그림 ↔ 그림 아님은 슬롯 성격이 다르다 → 구조 차(세트).
+  const withIcon = icon('a', 'icon', 'k1');
+  const withText = {
+    id: 'b', name: 'chip', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 40, height: 24,
+    children: [{ id: 'b-t', name: 'icon', type: 'TEXT', characters: '♥' }],
+  };
+  assert.equal(shouldCollapseToProperties([withIcon, withText]), false);
+});
+
 test('shouldCollapseToProperties — heading 액션(buttonGroup) optional이면 접힘', () => {
   const txt = (id, chars) => ({ id, name: 'Label', type: 'TEXT', characters: chars });
   const num = (id, n) => ({
@@ -1383,6 +1469,12 @@ test('groupByExactName — 정확한 이름끼리만 묶음(머리명사 병합 
   assert.deepEqual(groups[1].members.map((m) => m.id), ['c']); // artist-button 단독
 });
 
+test('groupByExactName — 일반 구조어(container/item/image…)는 이름이 같아도 묶지 않는다', () => {
+  const mk = (id, name) => ({ id, name, type: 'FRAME', children: [] });
+  const groups = groupByExactName([mk('a', 'container'), mk('b', 'container'), mk('c', 'item'), mk('d', 'card'), mk('e', 'card')]);
+  assert.deepEqual(groups.map((g) => [g.key, g.members.map((m) => m.id)]), [['card', ['d', 'e']]]);
+});
+
 test('groupByExactName — 명사 사전에 없는 이름도 묶음(row-container/preview-container)', () => {
   const mk = (id, name) => ({ id, name, type: 'FRAME', width: 280, height: 397, children: [] });
   const groups = groupByExactName([
@@ -1583,10 +1675,28 @@ test('tshirtRoles — 센터(md) 정렬 티셔츠', () => {
   assert.deepEqual(tshirtRoles([4, 8, 16, 24, 32, 48]), ['xs', 'sm', 'md', 'lg', 'xl', '2xl']);
 });
 
-test('radiusRoles — 0→none · 큰값→full · 나머지 티셔츠', () => {
-  assert.deepEqual(radiusRoles([0, 4, 8]), ['none', 'md', 'lg']);
+test('radiusRoles — 고정 사다리(2 xs·4 sm·8 md·12 lg·16 xl·24 2xl) · 0→none · 큰값→full · 사다리 밖은 역할 없음', () => {
+  assert.deepEqual(radiusRoles([0, 4, 8]), ['none', 'sm', 'md']); // 파일에 몇 개가 있든 같은 값=같은 역할
   assert.deepEqual(radiusRoles([0, 8, 9999]), ['none', 'md', 'full']);
+  assert.deepEqual(radiusRoles([6, 12, 58]), ['', 'lg', '']); // 6·58은 척도 밖 → Global만
 });
+
+test('spacingRoles/strokeRoles — Lightning·Atlassian 고정 사다리, 척도 밖 값은 역할 없음', () => {
+  assert.deepEqual(spacingRoles([4, 8, 16, 24, 32]), ['2xs', 'xs', 'md', 'lg', 'xl']);
+  assert.deepEqual(spacingRoles([13, 16, 51]), ['', 'md', '']);
+  assert.deepEqual(strokeRoles([0.5, 1, 2, 4]), ['hairline', 'thin', 'thick', '']);
+});
+
+test('suggestTokenRoles — 사다리 밖 간격은 역할 맵에서 빠진다', () => {
+  const map = suggestTokenRoles([
+    { name: 'spacing/16', category: 'gap', value: 16, sources: ['gap'] },
+    { name: 'spacing/13', category: 'gap', value: 13, sources: ['gap'] },
+    { name: 'radius/8', category: 'radius', value: 8, sources: ['radius'] },
+    { name: 'stroke-width/1', category: 'strokeWidth', value: 1, sources: ['strokeWidth'] },
+  ]);
+  assert.deepEqual(map, { 'spacing/md': 'spacing/16', 'radius/md': 'radius/8', 'stroke-width/thin': 'stroke-width/1' });
+});
+
 
 test('fontSizeRoles — base(16) 중심 type 스케일', () => {
   assert.deepEqual(fontSizeRoles([12, 16, 24], 16), ['caption', 'body', 'title']);
@@ -1621,16 +1731,18 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
     { name: 'stroke-width/4', category: 'strokeWidth', sources: ['strokeWidth'], value: 4 },
   ];
   const map = suggestTokenRoles(tokens, 16);
-  assert.equal(map['primary'], 'color/0066ff'); // 색(유일 유채) → primary
-  assert.equal(map['spacing/md'], 'spacing/16'); // 센터
-  assert.equal(map['spacing/sm'], 'spacing/8');
+  assert.equal(map['color/background/brand'], 'color/0066ff'); // 색(유일 유채) → brand 면
+  assert.equal(map['spacing/md'], 'spacing/16'); // 고정 사다리: 16=md
+  assert.equal(map['spacing/xs'], 'spacing/8'); // 8=xs (Lightning x-small 8px)
   assert.equal(map['spacing/lg'], 'spacing/24');
   assert.equal(map['radius/none'], 'radius/0');
   assert.equal(map['font-size/body'], 'font-size/16');
   assert.equal(map['font-size/title'], 'font-size/24');
   assert.equal(map['font-weight/bold'], 'font-weight/700');
   assert.equal(map['font-family/sans'], 'font-family/Inter');
-  assert.equal(map['stroke-width/md'], 'stroke-width/2'); // 티셔츠 센터
+  assert.equal(map['stroke-width/thin'], 'stroke-width/1'); // Lightning borderWidthThin
+  assert.equal(map['stroke-width/thick'], 'stroke-width/2');
+  assert.equal(Object.values(map).includes('stroke-width/4'), false); // 척도 밖 → 역할 없음
 });
 
 test('mergeTokenRoles — 부분 맵을 덮어쓰되 빠진 카테고리는 자동 추천을 남긴다', () => {
@@ -1655,31 +1767,36 @@ test('pipelineSteps — 전제에 따른 단계 상태', () => {
     hasBindable: false, hasDarkMode: false, hasTextStyles: false,
   };
 
-  // 아무것도 없음: 색·토큰=ready(언제든 시작), 역할·연결=blocked(+안내), 다크·타이포=todo
+  // 순서 = 마법사 순서: 색·토큰·역할·다크·타이포·연결·이름.
+  // 아무것도 없음: 색·토큰=ready(언제든 시작), 역할·연결=blocked(+안내), 다크·타이포=todo, 이름=ready
   const empty = pipelineSteps(none);
   assert.deepEqual(empty.map((s) => [s.id, s.status]), [
     ['colors', 'ready'], ['tokens', 'ready'], ['semantics', 'blocked'],
-    ['bind', 'blocked'], ['dark', 'todo'], ['textStyles', 'todo'],
+    ['dark', 'todo'], ['textStyles', 'todo'], ['bind', 'blocked'], ['rename', 'ready'],
   ]);
-  assert.ok(empty[2].hint && empty[3].hint); // blocked엔 안내
+  assert.ok(empty[2].hint && empty[5].hint); // blocked엔 안내
 
   // Global만: 색·토큰=done, 역할=ready, 연결=blocked
   const g = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true });
-  assert.deepEqual(g.map((s) => s.status), ['done', 'done', 'ready', 'blocked', 'todo', 'todo']);
+  assert.deepEqual(g.map((s) => s.status), ['done', 'done', 'ready', 'todo', 'todo', 'blocked', 'ready']);
 
   // 연결 변수까지: 역할·연결 모두 ready(안내 없음)
   const both = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true });
-  assert.deepEqual(both.map((s) => s.status), ['done', 'done', 'ready', 'ready', 'todo', 'todo']);
+  assert.deepEqual(both.map((s) => s.status), ['done', 'done', 'ready', 'todo', 'todo', 'ready', 'ready']);
   assert.equal(both[2].hint, undefined);
-  assert.equal(both[3].hint, undefined);
+  assert.equal(both[5].hint, undefined);
 
   // 다크·텍스트 스타일은 전제가 아니라 '만들었는가' — 있으면 done
   const made = pipelineSteps({ ...none, hasDarkMode: true, hasTextStyles: true });
-  assert.deepEqual(made.map((s) => s.status).slice(4), ['done', 'done']);
+  assert.deepEqual(made.map((s) => s.status).slice(3, 5), ['done', 'done']);
 
   // 색만 만든 상태: 색=done, 간격·크기=아직 ready, 역할 매핑은 Global이 있으니 ready
   const colorOnly = pipelineSteps({ ...none, hasColorVars: true, hasGlobal: true });
-  assert.deepEqual(colorOnly.map((s) => s.status), ['done', 'ready', 'ready', 'blocked', 'todo', 'todo']);
+  assert.deepEqual(colorOnly.map((s) => s.status), ['done', 'ready', 'ready', 'todo', 'todo', 'blocked', 'ready']);
+
+  // 전체 실행 뒤: 역할 별칭·바인딩·이름 기록이 있으면 역할·연결·이름도 done(예전엔 '준비'로 남았다)
+  const ran = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true, hasTextStyles: true, hasSemanticRoles: true, hasBoundNodes: true, hasRenamedNodes: true });
+  assert.deepEqual(ran.map((s) => s.status), ['done', 'done', 'done', 'todo', 'done', 'done', 'done']);
 });
 
 /* ================= i18n.ts (런타임 문자열 외부화) ================= */
@@ -2217,4 +2334,174 @@ test('darkGlobalName — dark/ 그룹 접두 · 멱등', () => {
   assert.equal(darkGlobalName(darkGlobalName('color/blue/500')), 'dark/color/blue/500');
   assert.equal(isDarkGlobalName('dark/color/blue/500'), true);
   assert.equal(isDarkGlobalName('color/blue/500'), false);
+});
+
+/* ---------- QA #2 ①: 창 높이 2단계(uiSize) ---------- */
+test('normalizeUiSize — 정식 값, 옛 {h} 저장값, 깨진 값', async () => {
+  const { normalizeUiSize, uiHeight, UI_WIDTH, UI_HEIGHT } = await import('../dist/pure.mjs');
+  // 정식 문자열
+  assert.equal(normalizeUiSize('large'), 'large');
+  assert.equal(normalizeUiSize('default'), 'default');
+  // 철회 전 드래그 리사이즈가 남긴 { h } — 두 단계의 가운데(760) 기준으로 가까운 쪽
+  assert.equal(normalizeUiSize({ h: 1200 }), 'large');
+  assert.equal(normalizeUiSize({ h: 760 }), 'large');
+  assert.equal(normalizeUiSize({ h: 759 }), 'default');
+  assert.equal(normalizeUiSize({ w: 900, h: 480 }), 'default');
+  // 없음·깨짐 → 기본
+  for (const v of [undefined, null, '', 'huge', 42, NaN, {}, { h: NaN }, { h: '900' }]) {
+    assert.equal(normalizeUiSize(v), 'default', String(v));
+  }
+  // 높이·폭
+  assert.equal(uiHeight('default'), 660);
+  assert.equal(uiHeight('large'), 860);
+  assert.equal(UI_WIDTH, 400); // #17: 가로 고정
+  assert.ok(UI_HEIGHT.large > UI_HEIGHT.default);
+});
+
+/* ---------- 일괄 교체: 후보 판정(scopes.ts) ---------- */
+test('remapTargets — 타입·용도가 모든 필드에 맞는 변수만, A 자신 제외, 컬렉션→이름 정렬', async () => {
+  const { remapTargets, scopeFitsField } = await import('../dist/pure.mjs');
+  const vars = [
+    { id: 'a', name: 'spacing/8', resolvedType: 'FLOAT', scopes: ['GAP'], collection: 'Global' },
+    { id: 'b', name: 'spacing/sm', resolvedType: 'FLOAT', scopes: ['GAP'], collection: 'Semantic' },
+    { id: 'c', name: 'line-height/24', resolvedType: 'FLOAT', scopes: ['LINE_HEIGHT'], collection: 'Global' },
+    { id: 'd', name: 'any/num', resolvedType: 'FLOAT', scopes: ['ALL_SCOPES'], collection: 'Global' },
+    { id: 'e', name: 'color/fg', resolvedType: 'COLOR', scopes: ['TEXT_FILL'], collection: 'Semantic' },
+    { id: 'f', name: 'color/line', resolvedType: 'COLOR', scopes: ['STROKE_COLOR'], collection: 'Semantic' },
+    { id: 'g', name: 'color/all', resolvedType: 'COLOR', scopes: ['ALL_FILLS', 'STROKE_COLOR'], collection: 'Global' },
+  ];
+  // 여백: GAP 또는 ALL_SCOPES만 — 행간 변수(c)는 값 종류가 같아도 제외
+  assert.deepEqual(remapTargets('a', 'FLOAT', ['paddingLeft', 'itemSpacing'], vars).map((v) => v.id), ['d', 'b']);
+  // 채움+선 둘 다 쓰던 색 → 둘 다 맞는 변수만(g). 채움 전용(e)·선 전용(f)은 일부만 바뀌게 되므로 제외
+  assert.deepEqual(remapTargets('x', 'COLOR', ['fills', 'strokes'], vars).map((v) => v.id), ['g']);
+  assert.deepEqual(remapTargets('x', 'COLOR', ['fills'], vars).map((v) => v.id), ['g', 'e']);
+  // 지워진 변수(fromType 모름)라도 필드 규칙으로 타입을 정한다
+  assert.deepEqual(remapTargets('gone', null, ['strokes'], vars).map((v) => v.id), ['g', 'f']);
+  // 규칙 없는 필드 + 타입 모름 → 후보 없음(무엇을 붙여도 되는지 알 수 없다)
+  assert.deepEqual(remapTargets('gone', null, ['visible'], vars), []);
+  // 규칙 없는 필드는 A의 타입을 따르고 스코프는 따지지 않는다
+  assert.deepEqual(remapTargets('a', 'FLOAT', ['minWidth'], vars).map((v) => v.id), ['d', 'c', 'b']);
+  assert.deepEqual(remapTargets('a', 'FLOAT', [], vars), []);
+  // 스코프 판정 단위
+  assert.equal(scopeFitsField('effects', ['EFFECT_COLOR']), true);
+  assert.equal(scopeFitsField('effects', ['ALL_FILLS']), false);
+  assert.equal(scopeFitsField('fontFamily', ['FONT_FAMILY']), true);
+  assert.equal(scopeFitsField('fontFamily', []), false);
+});
+
+/* ---------- 컬렉션 계층 판정(tiers.ts) ---------- */
+test('tiers — 지정 우선, 없으면 정확한 이름, none으로 빼기, 한 역할 한 컬렉션', async () => {
+  const { parseRoleMap, roleOfCollection, tierOfCollection, pickCollection, assignRole, guessRole } = await import('../dist/pure.mjs');
+  const cols = [
+    { id: 'g', name: 'Global' },
+    { id: 'p', name: 'Primitives' },
+    { id: 's', name: 'Semantic' },
+    { id: 'x', name: 'Breakpoints' },
+  ];
+  // 지정 없음 = 예전 동작(정확한 이름만)
+  assert.deepEqual(cols.map((c) => tierOfCollection(c, {})), [1, 0, 2, 0]);
+  assert.equal(pickCollection(cols, {}, 'global').id, 'g');
+  // Primitives를 Global로 지정 → 쓰기 대상은 Primitives, 기존 'Global'도 여전히 계층(읽기)
+  let map = assignRole({}, 'p', 'global');
+  assert.equal(pickCollection(cols, map, 'global').id, 'p');
+  assert.deepEqual(cols.map((c) => tierOfCollection(c, map)), [1, 1, 2, 0]);
+  // 'Global'을 계층 아님으로 못 박기
+  map = assignRole(map, 'g', 'none');
+  assert.equal(roleOfCollection(cols[0], map), null);
+  assert.equal(pickCollection(cols, map, 'global').id, 'p');
+  // 한 역할 한 컬렉션 — 다른 컬렉션에 global을 주면 p의 지정은 풀린다
+  map = assignRole(map, 'x', 'global');
+  assert.equal(map.p, undefined);
+  assert.equal(map.x, 'global');
+  // 해제(null)는 이름 판정으로 복귀
+  map = assignRole(map, 'g', null);
+  assert.equal(map.g, undefined);
+  // 저장 문자열 파싱 — 깨졌거나 모르는 값은 버린다
+  assert.deepEqual(parseRoleMap('{"a":"global","b":"weird","c":"none"}'), { a: 'global', c: 'none' });
+  assert.deepEqual(parseRoleMap('not json'), {});
+  assert.deepEqual(parseRoleMap('[1]'), {});
+  assert.deepEqual(parseRoleMap(''), {});
+  // 이름 추천(자동 적용 안 함)
+  assert.equal(guessRole('Primitives'), 'global');
+  assert.equal(guessRole('Core colors'), 'global');
+  assert.equal(guessRole('Tokens'), 'semantic');
+  assert.equal(guessRole('Theme'), 'semantic');
+  assert.equal(guessRole('Components'), 'component');
+  assert.equal(guessRole('Breakpoints'), null);
+});
+
+/* ---------- 연결 목록 표시(bindDisplay.ts) ---------- */
+test('groupBindLines — 같은 변수의 네 방향 여백·모서리를 한 줄로, 다른 변수는 따로, 순서 유지', async () => {
+  const { groupBindLines, isHexColor } = await import('../dist/pure.mjs');
+  const it = (field, variableId, index) => ({ field, index, variableId, variableName: variableId, currentValue: '8' });
+  const lines = groupBindLines([
+    it('fills', 'bg', 0),
+    it('paddingLeft', 'lg'), it('paddingRight', 'lg'), // 좌우
+    it('paddingTop', 'sm'), it('paddingBottom', 'sm'), // 위아래(다른 변수)
+    it('itemSpacing', 'md'),
+    it('topLeftRadius', 'r'), it('topRightRadius', 'r'), it('bottomRightRadius', 'r'), it('bottomLeftRadius', 'r'),
+    it('strokes', 'line', 0),
+  ]);
+  assert.deepEqual(lines.map((l) => [l.label, l.variableId, l.fields.length]), [
+    ['fills', 'bg', 1],
+    ['paddingX', 'lg', 2],
+    ['paddingY', 'sm', 2],
+    ['itemSpacing', 'md', 1],
+    ['radius', 'r', 4],
+    ['strokes', 'line', 1],
+  ]);
+  // 네 방향 같은 변수 → '여백', 한 방향 → 그 방향, 세 방향 → '일부'
+  assert.equal(groupBindLines(['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].map((f) => it(f, 'x')))[0].label, 'padding');
+  assert.equal(groupBindLines([it('paddingLeft', 'x')])[0].label, 'paddingLeft');
+  assert.equal(groupBindLines(['paddingTop', 'paddingRight', 'paddingLeft'].map((f) => it(f, 'x')))[0].label, 'paddingSome');
+  assert.equal(groupBindLines([it('topLeftRadius', 'x'), it('bottomLeftRadius', 'x')])[0].label, 'radiusSome');
+  // 같은 필드라도 페인트 순번이 다르면 따로(채움 두 겹)
+  assert.equal(groupBindLines([it('fills', 'a', 0), it('fills', 'a', 1)]).length, 2);
+  // 합쳐진 줄은 원래 항목을 모두 들고 있다(체크·교체 대상)
+  assert.equal(lines[1].items.length, 2);
+  assert.equal(isHexColor('#2563eb'), true);
+  assert.equal(isHexColor('24'), false);
+});
+
+/* ---------- 변수 관리 표(varTable.ts) ---------- */
+test('varTable — 그룹 경로·트리·필터·묶음·복사 문자열', async () => {
+  const { groupPath, leafName, buildVarTree, filterVars, groupRows, cellCopyText, pickInitialCollection, cssVarName } = await import('../dist/pure.mjs');
+  assert.equal(groupPath('color/background/default'), 'color/background');
+  assert.equal(leafName('color/background/default'), 'default');
+  assert.equal(groupPath('primary'), '');
+  const cols = [
+    { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }] },
+    { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }] },
+  ];
+  const v = (id, name, collectionId) => ({ id, name, collectionId, type: 'COLOR', values: {}, scopes: [], description: '' });
+  const vars = [
+    v('a', 'color/blue/500', 'g'), v('b', 'color/gray/50', 'g'), v('c', 'spacing/8', 'g'),
+    v('d', 'color/background/default', 's'), v('e', 'color/background/muted', 's'), v('f', 'color/text/default', 's'),
+  ];
+  const usage = new Map([['d', 3], ['f', 1]]);
+  const tree = buildVarTree(cols, vars, (x) => (usage.get(x.id) ?? 0) > 0);
+  assert.deepEqual(tree.map((n) => [n.label, n.count]), [['Global', 0], ['Semantic', 2]]);
+  assert.deepEqual(tree[1].children.map((n) => [n.path, n.count]), [['color', 2]]);
+  assert.deepEqual(tree[1].children[0].children.map((n) => [n.path, n.count]), [['color/background', 1], ['color/text', 1]]);
+  assert.equal(pickInitialCollection(tree), 's');
+  // 전체(include 모두)면 Global에 그룹 color(2)·spacing(1)
+  const all = buildVarTree(cols, vars, () => true);
+  assert.deepEqual(all[0].children.map((n) => [n.label, n.count]), [['color', 2], ['spacing', 1]]);
+  // 필터: 컬렉션 · 경로(하위 포함) · 검색 · 선택에서 쓰는 것만
+  const f = (o) => filterVars(vars, { collectionId: 's', path: '', query: '', onlyUsed: false, ...o }, usage).map((x) => x.id);
+  assert.deepEqual(f({}), ['d', 'e', 'f']);
+  assert.deepEqual(f({ path: 'color/background' }), ['d', 'e']);
+  assert.deepEqual(f({ path: 'color' }), ['d', 'e', 'f']);
+  assert.deepEqual(f({ query: 'MUTED' }), ['e']);
+  assert.deepEqual(f({ onlyUsed: true }), ['d', 'f']);
+  // 'color/back'은 'color/background'의 접두어지만 경로가 아니다
+  assert.deepEqual(f({ path: 'color/back' }), []);
+  // 묶음 — 첫 등장 순서
+  assert.deepEqual(groupRows(vars.slice(3)).map((g) => [g.path, g.rows.length]), [['color/background', 2], ['color/text', 1]]);
+  // 복사 문자열
+  assert.equal(cellCopyText({ kind: 'color', hex: '#2563eb' }), '#2563EB');
+  assert.equal(cellCopyText({ kind: 'alias', aliasId: 'x', aliasName: 'color/blue/500' }), 'color/blue/500');
+  assert.equal(cellCopyText({ kind: 'number', text: '16' }), '16');
+  assert.equal(cellCopyText(undefined), '');
+  assert.equal(cssVarName('color/background/default'), '--color-background-default');
 });

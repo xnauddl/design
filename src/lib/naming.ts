@@ -20,6 +20,9 @@ export const EMITTED_ROLES = [
   'aside',
   'nav',
   'section',
+  'hero', // 본문 첫 블록(큰 제목 + 이미지) — section보다 구체적
+  'logo', // 헤더 첫 자리의 작은 묶음(마크·워드마크)
+  'actions', // 헤더 끝의 링크/버튼 2~3개(Sign in · Sign up)
   'article',
   'figure',
   // 컴포넌트
@@ -60,7 +63,6 @@ export const RECOGNIZED_ROLES = [
   'body',
   'leading',
   'trailing',
-  'hero',
   'sidebar',
   'sheet',
   'drawer',

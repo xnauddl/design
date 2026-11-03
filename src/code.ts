@@ -1,20 +1,24 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode, RenameChange, VarInfo, VarMode } from './shared/messages';
+import type { UiToCode, RenameChange, VarInfo, VarMode, CollectionRoleInfo } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors, GLOBAL, SEMANTIC, COMPONENT } from './lib/variables';
+import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
-import { bindSelection } from './lib/bind';
+import { bindSelection, scanBindings, remapBindings } from './lib/bind';
+import { remapTargets } from './lib/scopes';
+import { collectionTiers, findCollection, readRoleMap, writeRoleMap } from './lib/collectionRoles';
+import { assignRole, roleOfCollection, guessRole } from './lib/tiers';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
-import { ExportToken, TokenKind, exportTokens } from './lib/exporters';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct } from './lib/components';
+import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
+import { createIconRegistry, swapVectorSlots, transplantImageFills, nodeAtPath } from './lib/artwork';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
@@ -22,14 +26,33 @@ import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
+import { UI_SIZE_KEY, UI_WIDTH, UI_WIDE_WIDTH, UiSizeMode, normalizeUiSize, uiHeight } from './lib/uiSize';
+import type { VarCell, VarCollection, VarRow, VarType } from './lib/varTable';
 
-/* #14: 창 크기 400×660 고정 — 리사이즈 없음.
-   가로는 와이어가 400으로 못 박았고(표를 가로로 버티는 패턴은 #17에서 비채택), 세로는
-   드래그 리사이즈를 붙여 봤지만 플러그인 iframe에서 제대로 동작하지 않았다: 포인터 캡처가
-   iframe 경계를 넘지 못해 아래로 끌면 이벤트가 끊기고, 그걸 우회하려 창을 포인터보다 크게
-   따라가게 해도 실기에서 멎었다. 크기가 고정이면 모든 화면이 한 크기에서만 성립하면 되고
-   검증도 거기서 끝난다 — 목록이 길면 패널 body가 스크롤한다(#18). */
-figma.showUI(__html__, { width: 400, height: 660, themeColors: true });
+/* #14: 드래그 리사이즈는 없다 — 플러그인 iframe에서 포인터 캡처가 iframe 경계를 넘지 못해
+   아래로 끌면 이벤트가 끊기고, 창을 포인터보다 크게 따라가게 하는 우회까지 실기에서 멎었다.
+   가로는 와이어대로 400 고정(#17). 대신 QA #2 ①(팝업 크기)로 높이 2단계 전환 버튼을 둔다
+   (660 ↔ 860, `lib/uiSize.ts`). 포인터 추적이 없어 실기에서도 결과가 같다. 마지막 단계는
+   clientStorage에 기억해 다음 실행에 복원한다. 긴 목록은 여전히 패널 body가 스크롤한다(#18). */
+figma.showUI(__html__, { width: UI_WIDTH, height: uiHeight('default'), themeColors: true });
+
+let uiSizeMode: UiSizeMode = 'default';
+/** 변수 관리 화면을 보는 동안만 넓다 — 저장하지 않는다(다음 실행은 늘 400). */
+let uiWide = false;
+const uiWidth = (): number => (uiWide ? UI_WIDE_WIDTH : UI_WIDTH);
+async function applyUiSize(mode: UiSizeMode, persist: boolean): Promise<void> {
+  uiSizeMode = mode;
+  figma.ui.resize(uiWidth(), uiHeight(mode));
+  if (persist) await figma.clientStorage.setAsync(UI_SIZE_KEY, mode).catch(() => {});
+}
+// 시작 시 복원 — 저장값이 없거나 깨졌으면 기본(660) 그대로.
+const uiSizeReady: Promise<void> = figma.clientStorage
+  .getAsync(UI_SIZE_KEY)
+  .then((v) => {
+    const mode = normalizeUiSize(v);
+    return mode === 'default' ? undefined : applyUiSize(mode, false);
+  })
+  .catch(() => {});
 
 const selection = () => figma.currentPage.selection;
 
@@ -124,8 +147,11 @@ async function loadLicense(): Promise<void> {
 async function postPrereq(): Promise<void> {
   try {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
-    const bindableIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+    // 계층은 컬렉션 이름이 아니라 지정된 역할로(Primitives→Global 등, tiers.ts).
+    const tiers = collectionTiers(cols);
+    const globalIds = new Set(cols.filter((c) => tiers.get(c.id) === 1).map((c) => c.id));
+    // 거울 폐지 후 바인딩 대상은 3계층 전부 — 역할 없는 값은 Global에 붙는다(bind.ts).
+    const bindableIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) > 0).map((c) => c.id));
     const vars = await figma.variables.getLocalVariablesAsync();
     const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
     const hasColorVars = globals.some((v) => v.resolvedType === 'COLOR');
@@ -135,9 +161,16 @@ async function postPrereq(): Promise<void> {
     // 다크는 '모드가 둘 이상인 **바인딩 대상** 컬렉션'이 있으면 이미 만든 것으로 본다.
     // 문서 전체로 보면 Breakpoint(Desktop/Mobile) 같은 무관한 컬렉션 하나가 다크 단계를
     // 「완료」로 만들어, 다크 테마가 없는 파일에서 사용자가 그 단계를 건너뛴다.
-    const hasDarkMode = cols.some((c) => bindableIds.has(c.id) && c.modes.length > 1);
+    const semanticIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) >= 2).map((c) => c.id));
+    const hasDarkMode = cols.some((c) => semanticIds.has(c.id) && c.modes.length > 1);
     const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 타이포 단계 「기존만 연결」 전제
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
+    const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId)); // 역할 별칭 존재 = 역할 매핑 완료
+    // '이미 변수가 있다'를 먼저 알리는 안내용 개수 — 계층 안/밖을 나눠 센다(밖이면 연결에 못 쓴다).
+    const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
+    const tierVars = tierVarList.length;
+    const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
+    const otherVars = vars.length - tierVars;
+    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -189,23 +222,65 @@ function errText(e: unknown): string {
 
 /* ---------- 변수 목록(다크 테마 생성의 컬렉션·모드 선택용) ---------- */
 
-// 우리가 만든 3계층만 목록 대상 — 남의 라이브러리 컬렉션은 다루지 않는다.
-const EDITABLE_COLLECTIONS = new Set([GLOBAL, SEMANTIC, COMPONENT]);
-
-function toVarInfo(v: Variable, col: VariableCollection): VarInfo {
+// 3계층(이름 또는 지정된 역할)만 목록 대상 — 계층이 아닌 컬렉션은 다루지 않는다.
+function toVarInfo(v: Variable, col: VariableCollection, tier: number): VarInfo {
   const modes: VarMode[] = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
-  return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, modes };
+  return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, tier, modes };
+}
+
+/** 설정 탭 '컬렉션 계층' 목록 — 로컬 컬렉션 전부(계층 아닌 것도 지정할 수 있게). */
+async function collectionRoleInfos(): Promise<CollectionRoleInfo[]> {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const map = readRoleMap();
+  const count = new Map<string, number>();
+  for (const v of await figma.variables.getLocalVariablesAsync()) count.set(v.variableCollectionId, (count.get(v.variableCollectionId) ?? 0) + 1);
+  return cols.map((c) => ({ id: c.id, name: c.name, vars: count.get(c.id) ?? 0, set: map[c.id] ?? null, role: roleOfCollection(c, map), guess: guessRole(c.name) }));
+}
+
+/** 변수 관리 표 — 로컬 컬렉션·변수 전부(계층 아닌 것도 — 관리 대상은 파일의 변수 전체다). */
+async function collectVarTable(): Promise<{ collections: VarCollection[]; vars: VarRow[] }> {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const tiers = collectionTiers(cols);
+  const all = await figma.variables.getLocalVariablesAsync();
+  const nameById = new Map(all.map((v) => [v.id, v.name]));
+  const colById = new Map(cols.map((c) => [c.id, c]));
+  const cell = (raw: VariableValue | undefined): VarCell | undefined => {
+    if (raw === undefined || raw === null) return undefined;
+    if (typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+      const id = (raw as VariableAlias).id;
+      return { kind: 'alias', aliasId: id, aliasName: nameById.get(id) ?? '(다른 파일 변수)' };
+    }
+    if (typeof raw === 'object' && 'r' in raw) return { kind: 'color', hex: rgbToHex(raw as RGB) };
+    if (typeof raw === 'number') return { kind: 'number', text: String(Math.round(raw * 1000) / 1000) };
+    if (typeof raw === 'boolean') return { kind: 'bool', text: raw ? 'true' : 'false' };
+    return { kind: 'string', text: String(raw) };
+  };
+  const vars: VarRow[] = [];
+  for (const v of all) {
+    const col = colById.get(v.variableCollectionId);
+    if (!col) continue;
+    const values: Record<string, VarCell> = {};
+    for (const m of col.modes) {
+      const c = cell(v.valuesByMode[m.modeId]);
+      if (c) values[m.modeId] = c;
+    }
+    vars.push({ id: v.id, name: v.name, collectionId: col.id, type: v.resolvedType as VarType, values, scopes: [...(v.scopes ?? [])], description: v.description ?? '' });
+  }
+  const collections: VarCollection[] = cols.map((c) => ({ id: c.id, name: c.name, tier: tiers.get(c.id) ?? 0, modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })) }));
+  return { collections, vars };
 }
 
 async function collectVars(): Promise<VarInfo[]> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const colById = new Map(cols.map((c) => [c.id, c]));
+  const tiers = collectionTiers(cols);
   const vars = await figma.variables.getLocalVariablesAsync();
   const out: VarInfo[] = [];
   for (const v of vars) {
     const col = colById.get(v.variableCollectionId);
-    if (!col || !EDITABLE_COLLECTIONS.has(col.name)) continue;
-    out.push(toVarInfo(v, col));
+    const tier = col ? tiers.get(col.id) ?? 0 : 0;
+    if (!col || !tier) continue;
+    out.push(toVarInfo(v, col, tier));
   }
   out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
   return out;
@@ -338,6 +413,16 @@ function isBindableCandidate(n: SceneNode): boolean {
   const hasGap = !!lm && lm !== 'NONE' && typeof (n as { itemSpacing?: number }).itemSpacing === 'number';
   return hasFills || hasStrokes || hasRadius || hasFont || hasGap;
 }
+/** 노드 필드 또는 fills/strokes/effects 페인트에 변수 바인딩이 하나라도 있는가. */
+function hasAnyBinding(n: SceneNode): boolean {
+  const bv = (n as { boundVariables?: Record<string, unknown> }).boundVariables;
+  if (bv && Object.keys(bv).length) return true;
+  for (const key of ['fills', 'strokes'] as const) {
+    const ps = (n as unknown as Record<string, unknown>)[key];
+    if (Array.isArray(ps) && ps.some((p) => !!(p as { boundVariables?: { color?: unknown } }).boundVariables?.color)) return true;
+  }
+  return false;
+}
 /**
  * 이번 selectionchange가 플러그인 자신이 만든 것인가(스킵 칩 → 레이어 이동).
  * UI는 선택이 바뀌면 바인딩 미리보기를 버리는데, 칩이 그 미리보기에서 나온 것이라
@@ -349,6 +434,8 @@ function postSelection(): void {
   const sel = selection();
   let scanned = 0;
   let bindable = 0;
+  let bound = 0; // 변수가 하나라도 붙은 레이어(준비 현황 '변수 연결 완료')
+  let renamed = 0; // 이름 정리가 역할을 기록한 레이어(준비 현황 '이름 정리 완료')
   let capped = false;
   // 베리언트 분류·누락 조합 생성이 실제로 잡는 것과 같은 기준(최상위 선택만).
   // 분류는 세트에 안 속한 낱개 COMPONENT를, 생성은 COMPONENT_SET을 대상으로 한다.
@@ -365,10 +452,12 @@ function postSelection(): void {
     if (n.visible === false) continue;
     scanned++;
     if (isBindableCandidate(n)) bindable++;
+    if (hasAnyBinding(n)) bound++;
+    if (readRole(n)) renamed++;
     if (n.type === 'INSTANCE') continue; // 인스턴스 내부는 바인딩 대상이 아니다
     if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
   }
-  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, comps, sets, selfSelect });
+  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, comps, sets, selfSelect, bound, renamed });
   selfSelect = false;
 }
 figma.on('selectionchange', postSelection);
@@ -428,6 +517,42 @@ function paintsOf(v: unknown): readonly { visible?: boolean; type?: string; opac
   }));
 }
 
+/** 첫 visible IMAGE 채움의 해시. 이미지가 없으면 undefined(= 사진 슬롯이 아님). */
+function imageHashOf(node: SceneNode): string | undefined {
+  const fills = (node as { fills?: unknown }).fills;
+  if (!Array.isArray(fills)) return undefined;
+  const img = fills.find((p) => (p as Paint).type === 'IMAGE' && (p as Paint).visible !== false) as ImagePaint | undefined;
+  if (!img) return undefined;
+  return img.imageHash ?? '';
+}
+
+/** 문자열 지문(FNV-1a 32bit) — 경로 데이터를 그대로 트리에 싣지 않으려고 해시로 줄인다. */
+function fnv1a(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/** 벡터류 도형의 그림 지문 — fill/stroke geometry의 경로 데이터. 도형이 아니면 undefined. */
+function vectorKeyOf(node: SceneNode): string | undefined {
+  if (!VECTOR_TYPES.has(node.type)) return undefined;
+  try {
+    const g = node as unknown as { fillGeometry?: readonly { data?: string }[]; strokeGeometry?: readonly { data?: string }[] };
+    const parts: string[] = [];
+    for (const p of g.fillGeometry ?? []) parts.push(p.data ?? '');
+    for (const p of g.strokeGeometry ?? []) parts.push(p.data ?? '');
+    // 기하를 못 읽으면 크기라도 지문에 넣는다 — 빈 문자열끼리 같다고 보면 다른 그림이 합쳐진다.
+    return parts.length ? fnv1a(parts.join('|')) : `?${Math.round((node as LayoutMixin).width)}x${Math.round((node as LayoutMixin).height)}`;
+  } catch {
+    return undefined;
+  }
+}
+
+const VECTOR_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);
+
 /** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑·역할을 읽어 순수 그룹화에 넘김. */
 function toStructNode(node: SceneNode): StructNode {
   const a = node as unknown as Record<string, unknown>;
@@ -450,6 +575,8 @@ function toStructNode(node: SceneNode): StructNode {
     id: node.id,
     name: node.name,
     type: node.type,
+    imageHash: imageHashOf(node),
+    vectorKey: vectorKeyOf(node),
     locked: node.locked,
     visible: node.visible,
     width: num(a.width),
@@ -504,18 +631,15 @@ function ownComponentLayers(root: ComponentNode | SceneNode): SceneNode[] {
   return ownComponentLayersWithPath(root).map((x) => x.node);
 }
 
-/** 루트 기준 자식 인덱스 경로(`0/1`)로 노드 찾기. */
-function nodeAtPath(root: SceneNode, path: string): SceneNode | null {
-  let cur: SceneNode = root;
+/** StructNode 트리에서 인덱스 경로의 그림 지문(`vectorKey`)을 읽는다. 없으면 null. */
+function structAtPathVectorKey(root: StructNode, path: string): string | null {
+  let cur: StructNode | undefined = root;
   for (const seg of path.split('/').filter(Boolean)) {
-    if (!('children' in cur)) return null;
-    const i = Number(seg);
-    if (!Number.isFinite(i)) return null;
-    const kids = cur.children as readonly SceneNode[];
-    if (!kids[i]) return null;
-    cur = kids[i];
+    const kids: readonly StructNode[] = cur?.children ?? [];
+    cur = kids[Number(seg)];
+    if (!cur) return null;
   }
-  return cur;
+  return cur?.vectorKey ?? null;
 }
 
 function propDefaultFor(target: SceneNode, type: CompPropType): string | boolean {
@@ -710,7 +834,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
-        let summary = `Global ${s.globals}개 · Semantic ${s.semantics}개 (생성 ${s.created} / 갱신 ${s.updated})`;
+        let summary = `Global ${s.globals}개 (생성 ${s.created} / 갱신 ${s.updated})`;
         if (pruned) summary += ` · 이전 색 ${pruned}개 정리`;
         // base 반영 — 비-px 값이 실제로 얼마가 되는지 요약에 노출. base를 바꾸면 이 줄이 바뀐다.
         if (s.conversions.length) {
@@ -750,10 +874,51 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           nodes: r.nodes, // #13: 미리보기 트리 맥락
           skips: r.skips, // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
           skipTotal: r.skipTotal, // 상한 전 실제 수 — 잘렸으면 UI가 알린다
+          candidateTotal: r.candidateTotal, // 결과/미리보기 목록 상한 전 실제 수
+          reqId: msg.reqId, // UI가 낡은 응답을 가려낸다
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
+          selfSelect = true; // 선택이 바뀐 게 아니다 — UI가 방금 그린 결과 트리를 지우지 않게
+          postSelection(); // 준비 현황 '변수 연결 완료' 판정 갱신(선택은 그대로라 selectionchange가 안 온다)
         }
+        break;
+      }
+      case 'SCAN_BINDINGS': {
+        // 읽기 전용 — 파일에 남은 바인딩을 결과 트리 모양으로. 플러그인을 닫았다 열어도 '뭐가 붙어 있나'가 보인다.
+        const r = await scanBindings(selection());
+        post({ type: 'BINDINGS_RESULT', candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId, forManager: msg.forManager });
+        break;
+      }
+      case 'REMAP_TARGETS': {
+        // 일괄 교체(Free — 기존 변수를 다루는 일): A가 쓰이던 필드들에 맞는 로컬 변수만 후보로.
+        const vars = await figma.variables.getLocalVariablesAsync();
+        const colName = new Map((await figma.variables.getLocalVariableCollectionsAsync()).map((c) => [c.id, c.name]));
+        const from = vars.find((v) => v.id === msg.fromId) ?? null; // 지워진 변수(잔상)면 null — 필드 규칙으로 타입을 정한다
+        const targets = remapTargets(
+          msg.fromId,
+          from ? from.resolvedType : null,
+          msg.fields,
+          vars.map((v) => ({ id: v.id, name: v.name, resolvedType: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'], collection: colName.get(v.variableCollectionId) ?? '' })),
+        ).map((v) => ({ id: v.id, name: v.name, collection: v.collection }));
+        post({ type: 'REMAP_TARGETS_RESULT', fromId: msg.fromId, targets });
+        break;
+      }
+      case 'REMAP_BINDINGS': {
+        const to = await figma.variables.getVariableByIdAsync(msg.toId);
+        if (!to) {
+          post({ type: 'ERROR', message: '바꿀 변수를 찾지 못했습니다 — 지워졌을 수 있습니다. 연결 현황을 다시 보세요.', op: 'REMAP_BINDINGS' });
+          break;
+        }
+        // 미리보기 목록은 그사이 낡았을 수 있어 선택을 다시 훑으며 바꾼다.
+        const r = await remapBindings(selection(), msg.fromId, to, msg.fields);
+        if (r.replaced) {
+          commitUndo(figma); // UX2: 일괄 교체 전체를 단일 Undo로
+          await postPrereq();
+        }
+        post({ type: 'REMAP_RESULT', ...r, toName: to.name });
+        const scan = await scanBindings(selection()); // 연결 현황을 바뀐 상태로 다시 그린다
+        post({ type: 'BINDINGS_RESULT', candidates: scan.candidates, nodes: scan.nodes, total: scan.total, boundNodes: scan.boundNodes, reqId: msg.reqId });
         break;
       }
       case 'CANCEL': {
@@ -794,9 +959,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (await applySelectedBinding(item)) bound++;
           else skipped++; // 노드/변수 소실·실패는 graceful skip
         }
-        post({ type: 'APPLY_RESULT', bound, skipped, flags: [], reasons: {} });
+        post({ type: 'APPLY_RESULT', bound, skipped, flags: [], reasons: {}, reqId: msg.reqId });
         if (bound) {
           commitUndo(figma); // UX2: 선택 바인딩 전체를 단일 Undo로
+          selfSelect = true;
+          postSelection();
         }
         break;
       }
@@ -805,6 +972,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied });
         if (r.applied && r.changes.length) {
           commitUndo(figma); // UX2: 리네임 전체를 단일 Undo로
+        }
+        if (r.applied) {
+          selfSelect = true;
+          postSelection(); // 준비 현황 '이름 정리 완료' 판정 갱신
         }
         break;
       }
@@ -837,6 +1008,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           changes.push({ id, before, after });
         }
         post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true });
+        selfSelect = true;
+        postSelection();
         // 이름이 하나도 안 바뀌어도 역할을 새로 기록했으면 커밋한다. 안 하면 그 pluginData
         // 쓰기가 다음에 undo를 커밋하는 **무관한 작업**의 묶음에 접혀 들어가, 그 작업을
         // 되돌릴 때 역할 기록까지 조용히 함께 revert된다.
@@ -854,7 +1027,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'SCAN_TEXT_STYLES': {
-        // 미리보기(읽기 전용)는 무게이팅 — 후보를 보여주고 등록 단계에서 게이팅.
+        // 스캔(미리보기)도 Paid — 등록이 Paid라 스캔만 열어두면 막다른 길(ROADMAP §5).
+        // 마법사의 텍스트 스타일 단계도 Paid 전용이라 Free 마법사는 여기 오지 않는다.
+        if (!requirePaid('textStyles', '텍스트 스타일은 Paid 기능입니다.')) break;
         // 이름은 언제나 크기 순(display/h1…) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
         const { samples, warnings } = await scanTextStyles(selection());
         lastTextSamples = samples;
@@ -864,6 +1039,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'NAME_TEXT_STYLES_BY_ROW': {
+        if (!requirePaid('textStyles', '텍스트 스타일은 Paid 기능입니다.')) break; // 스캔 후속 — 스캔과 같은 등급
         // 방금 스캔한 표본을 그대로 다시 이름 짓는다(캔버스 재탐색 없음) — 사용자가 보고 있는 표와
         // 같은 입력이어야 결과가 예측 가능하다. 등록된 스타일은 그 사이 바뀔 수 있어 새로 읽는다.
         // 빈 후보를 돌려보내면 UI가 '텍스트를 못 찾음'으로 읽고 기본 램프로 표를 덮는다 — 오류로 알린다.
@@ -898,6 +1074,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         postSelection(); // UI 초기화 시점 — 현재 선택 상태도 함께 전송(UX5).
         break;
       }
+      case 'GET_COLLECTION_ROLES': {
+        post({ type: 'COLLECTION_ROLES', collections: await collectionRoleInfos() });
+        break;
+      }
+      case 'SET_COLLECTION_ROLE': {
+        // 컬렉션 계층 지정(Free — 기존 변수를 다루는 일). 파일 pluginData라 같은 파일을 여는 모두에게 적용.
+        writeRoleMap(assignRole(readRoleMap(), msg.collectionId, msg.role));
+        post({ type: 'COLLECTION_ROLES', collections: await collectionRoleInfos() });
+        await postPrereq(); // 계층이 바뀌면 '토큰 있음/바인딩 대상 있음' 판정도 바뀐다
+        post({ type: 'VARIABLES', vars: await collectVars() });
+        break;
+      }
       case 'GET_PREREQ': {
         await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
         break;
@@ -905,7 +1093,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'GET_GLOBAL_COLORS': {
         // #10: 기존 Global 색 변수(리터럴 COLOR)를 이름+hex로 수집 → 재방문 시맨틱 매핑 추천.
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
-        const globalCol = cols.find((c) => c.name === GLOBAL);
+        const globalCol = findCollection(cols, 'global');
         const colors: { name: string; hex: string }[] = [];
         if (globalCol) {
           const mode = globalCol.defaultModeId;
@@ -987,16 +1175,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 모든 디자인 시스템 변수(Global+Semantic)를 코드로 내보내기. (현재 Free; 추후 게이팅 가능)
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
         const colById = new Map(cols.map((c) => [c.id, c]));
+        const tiers = collectionTiers(cols);
         const vars = await figma.variables.getLocalVariablesAsync();
         const nameById = new Map(vars.map((v) => [v.id, v.name]));
         const tokens: ExportToken[] = [];
         for (const v of vars) {
           const col = colById.get(v.variableCollectionId);
-          if (!col || (col.name !== GLOBAL && col.name !== SEMANTIC)) continue;
+          const tier = col ? tiers.get(col.id) : 0;
+          if (!col || (tier !== 1 && tier !== 2)) continue; // 내보내기는 Global·Semantic 계층(이름 무관)
           const raw = v.valuesByMode[col.defaultModeId];
           const t: ExportToken = {
             name: v.name,
-            collection: col.name as 'Global' | 'Semantic',
+            collection: tier === 1 ? 'Global' : 'Semantic', // 출력 그룹은 계층 이름(컬렉션 실제 이름과 무관)
             type: v.resolvedType,
             kind: kindOf(v),
           };
@@ -1013,11 +1203,24 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           tokens.push(t);
         }
         tokens.sort((a, b) => a.name.localeCompare(b.name));
+        // 텍스트 스타일도 함께 — 행간·자간 %는 변수가 아니라 스타일에 있다(A안). %는 그대로 낸다.
+        const styles: ExportTextStyle[] = (await figma.getLocalTextStylesAsync()).map((st) => ({
+          name: st.name,
+          fontFamily: st.fontName.family,
+          fontStyle: st.fontName.style,
+          fontSize: st.fontSize,
+          lineHeight:
+            st.lineHeight.unit === 'AUTO'
+              ? { unit: 'auto', value: 0 }
+              : { unit: st.lineHeight.unit === 'PERCENT' ? 'percent' : 'px', value: st.lineHeight.value },
+          letterSpacing: { unit: st.letterSpacing.unit === 'PERCENT' ? 'percent' : 'px', value: st.letterSpacing.value },
+        }));
+        styles.sort((a, b) => a.name.localeCompare(b.name));
         const content = exportTokens(tokens, {
           format: msg.format,
           fontSizeUnit: msg.fontSizeUnit,
           base: msg.base,
-        });
+        }, styles);
         post({ type: 'EXPORT_RESULT', format: msg.format, content });
         break;
       }
@@ -1203,10 +1406,29 @@ figma.ui.onmessage = async (msg: UiToCode) => {
 
         // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
         // 등록 대상 자신은 '기존 이름'에서 제외(스캔 미리보기와 같은 규칙).
+        const existingNames = await existingComponentNames(new Set(valid.map((n) => n.id)));
         const resolved = resolveGroupNames(
           groups.map((g) => g.members),
-          await existingComponentNames(new Set(valid.map((n) => n.id))),
+          existingNames,
         );
+
+        /* 아이콘(날 벡터) 컴포넌트 — 그림이 다른 슬롯은 인스턴스 안에서 경로를 못 고치므로,
+           그림마다 컴포넌트를 만들고 그 자리를 인스턴스로 바꿔 INSTANCE_SWAP으로 담는다.
+           지문(vectorKey) 기준으로 문서 전체에서 한 번만 만든다(그룹이 달라도 같은 아이콘은 하나). */
+        const takenNames = new Set<string>([...existingNames, ...resolved]);
+        const iconRegistry = createIconRegistry({
+          page,
+          place: placeOnPage,
+          uniqueName: (base) => {
+            const b = pascalCase(base) || 'Icon';
+            let n = b;
+            let i = 2;
+            while (takenNames.has(n)) n = `${b}${i++}`;
+            takenNames.add(n);
+            return n;
+          },
+          onFailure: (m) => failures.push(m),
+        });
         // 트리가 보여 준 이름이 있으면 그것이 최종이다 — 충돌 해소는 **후보 전체**를 봐야
         // 같은 답이 나오는데 여기는 체크한 것만 받는다. 다시 풀면 `ProfileAvatar`로 보여 주고
         // `Avatar`로 등록하는 어긋남이 생긴다(미리보기 없는 폴백 경로만 여기서 정한다).
@@ -1258,58 +1480,112 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             }
             const structs = live.map(toStructNode);
             const plan = inferVaryingComponentProperties(structs);
-            type Snap = { o: Origin; vals: Record<string, string | boolean> };
-            const snapshots: Snap[] = [];
-            const made: ComponentNode[] = [];
-            const madeFromLive: number[] = [];
+            // 사진이 다른 슬롯 — 컴포넌트 속성이 아니라 인스턴스 fill 오버라이드로 이식한다.
+            const imageSlots = inferVaryingImageSlots(structs);
+            // 날 벡터 슬롯 — 아래에서 아이콘 컴포넌트를 만들고 마스터 자리를 인스턴스로 바꾼다.
+            const vectorPlans = plan.filter((p) => p.fromVector && p.layerPath != null);
+            /** 멤버 원본의 사진 fill(경로별) — 멤버 노드가 사라지기 전에 떠 둔다. */
+            const imagesOf = (root: SceneNode): Record<string, readonly Paint[]> => {
+              const out: Record<string, readonly Paint[]> = {};
+              for (const s of imageSlots) {
+                const n = nodeAtPath(root, s.layerPath);
+                const f = n && 'fills' in n ? (n as GeometryMixin).fills : null;
+                if (Array.isArray(f)) out[s.layerPath] = f as readonly Paint[];
+              }
+              return out;
+            };
+            // 아이콘 컴포넌트는 멤버가 컴포넌트로 바뀌기 **전에** 만든다 — 마스터가 아닌 멤버는
+            // 곧 제거되고, 그때 그 안의 그림도 함께 사라진다.
+            // 하나라도 못 만들면 접지 않는다 — 멤버를 지운 뒤엔 그 그림을 되살릴 수 없다.
+            let iconsReady = true;
             for (let i = 0; i < live.length; i++) {
-              const n = live[i];
-              const snap: Snap = { o: captureOrigin(n), vals: propValuesFromNode(n, plan) };
-              try {
-                made.push(figma.createComponentFromNode(n));
-                snapshots.push(snap);
-                madeFromLive.push(i);
-              } catch (e) {
-                skipped++;
-                failures.push(`속성접힘 컴포넌트화 실패(${n.name}): ${errText(e)}`);
+              for (const p of vectorPlans) {
+                const node = nodeAtPath(live[i], p.layerPath!);
+                const key = structAtPathVectorKey(structs[i], p.layerPath!);
+                const icon = node && key ? iconRegistry.ensure(key, node, p.layerName) : null;
+                if (!icon) iconsReady = false;
               }
             }
-            if (!made.length) continue;
-            // 액션 슬롯이 있는 쪽을 마스터로 — optional 결손 멤버의 트리를 대표로 쓰면 BOOLEAN 경로가 사라짐.
-            const preferLive = pickCollapseMasterIndex(structs);
-            let masterMade = madeFromLive.indexOf(preferLive);
-            if (masterMade < 0) masterMade = 0;
-            const master = made[masterMade];
-            for (let i = 0; i < made.length; i++) {
-              if (i === masterMade) continue;
-              try { made[i].remove(); } catch { /* 이미 제거됨 */ }
-            }
-            try { master.name = setName || pascalCase(live[preferLive]?.name ?? live[0].name); } catch { /* 이름 실패 무시 */ }
-            placeOnPage(master);
-            singles.push(master.name);
-            registered++; // 남긴 단품 1개만 집계(중간 변환분은 제거)
-            // 값이 다른 슬롯만 TEXT/SWAP/BOOLEAN으로 노출(공통 텍스트는 속성 제외).
-            let collapsedExposed = 0;
-            try {
-              collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
-            } catch (e) {
-              failures.push(`속성 노출 실패(${master.name}): ${errText(e)}`);
-            }
-            exposedEarly += collapsedExposed;
-            const ids = propIdsByName(master);
-            const places: { inst: InstanceNode; o: Origin }[] = [];
-            for (const snap of snapshots) {
-              try {
-                const inst = master.createInstance();
-                applyInstancePropValues(inst, ids, snap.vals);
-                places.push({ inst, o: snap.o });
-              } catch (e) {
-                failures.push(`인스턴스 실패(${master.name}): ${errText(e)}`);
+            if (!iconsReady) {
+              // 세트로 남긴다(아래 경로) — 멤버가 그대로라 그림도 그대로다.
+              failures.push(`아이콘을 만들지 못해 세트로 등록합니다(${setName})`);
+            } else {
+              type Snap = { o: Origin; vals: Record<string, string | boolean>; images: Record<string, readonly Paint[]> };
+              const snapshots: Snap[] = [];
+              const made: ComponentNode[] = [];
+              const madeFromLive: number[] = [];
+              for (let i = 0; i < live.length; i++) {
+                const n = live[i];
+                const snap: Snap = { o: captureOrigin(n), vals: propValuesFromNode(n, plan), images: imagesOf(n) };
+                try {
+                  made.push(figma.createComponentFromNode(n));
+                  snapshots.push(snap);
+                  madeFromLive.push(i);
+                } catch (e) {
+                  skipped++;
+                  failures.push(`속성접힘 컴포넌트화 실패(${n.name}): ${errText(e)}`);
+                }
               }
+              if (!made.length) continue;
+              // 액션 슬롯이 있는 쪽을 마스터로 — optional 결손 멤버의 트리를 대표로 쓰면 BOOLEAN 경로가 사라짐.
+              const preferLive = pickCollapseMasterIndex(structs);
+              let masterMade = madeFromLive.indexOf(preferLive);
+              if (masterMade < 0) masterMade = 0;
+              const master = made[masterMade];
+              for (let i = 0; i < made.length; i++) {
+                if (i === masterMade) continue;
+                try { made[i].remove(); } catch { /* 이미 제거됨 */ }
+              }
+              try { master.name = setName || pascalCase(live[preferLive]?.name ?? live[0].name); } catch { /* 이름 실패 무시 */ }
+              placeOnPage(master);
+              singles.push(master.name);
+              registered++; // 남긴 단품 1개만 집계(중간 변환분은 제거)
+              // 마스터의 날 벡터 자리를 아이콘 인스턴스로 교체 — INSTANCE_SWAP은 대상이
+              // 인스턴스일 때만 붙으므로 **속성 노출보다 먼저** 한다. 먼저 끼우고 뒤에 지워
+              // 인덱스 경로가 흔들리지 않게 한다(자식 수가 잠깐도 줄지 않는다).
+              const masterSnap = snapshots[masterMade];
+              failures.push(
+                ...swapVectorSlots(
+                  master,
+                  vectorPlans.map((p) => ({
+                    layerName: p.layerName,
+                    layerPath: p.layerPath!,
+                    icon: iconRegistry.get(String(masterSnap?.vals[p.propName] ?? '')),
+                  })),
+                ),
+              );
+              // 값이 다른 슬롯만 TEXT/SWAP/BOOLEAN으로 노출(공통 텍스트는 속성 제외).
+              let collapsedExposed = 0;
+              try {
+                collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
+              } catch (e) {
+                failures.push(`속성 노출 실패(${master.name}): ${errText(e)}`);
+              }
+              exposedEarly += collapsedExposed;
+              const ids = propIdsByName(master);
+              const places: { inst: InstanceNode; o: Origin }[] = [];
+              for (const snap of snapshots) {
+                try {
+                  const inst = master.createInstance();
+                  // 벡터 슬롯의 값은 그림 지문이다 — 방금 만든 아이콘 컴포넌트 key로 옮겨 적는다.
+                  const vals = { ...snap.vals };
+                  for (const p of vectorPlans) {
+                    const icon = iconRegistry.get(String(vals[p.propName] ?? ''));
+                    if (icon) vals[p.propName] = icon.key || icon.id;
+                    else delete vals[p.propName]; // 못 만든 그림은 마스터 것 그대로(빈 값으로 덮지 않는다)
+                  }
+                  applyInstancePropValues(inst, ids, vals);
+                  // 사진은 속성이 아니라 fill 오버라이드 — 멤버 원본을 같은 경로에 이식한다.
+                  failures.push(...transplantImageFills(inst, snap.images).failures);
+                  places.push({ inst, o: snap.o });
+                } catch (e) {
+                  failures.push(`인스턴스 실패(${master.name}): ${errText(e)}`);
+                }
+              }
+              restore(places);
+              // 루프 끝 일괄 expose는 중복 방지 — 이미 노출했으므로 containers에 넣지 않음.
+              continue;
             }
-            restore(places);
-            // 루프 끝 일괄 expose는 중복 방지 — 이미 노출했으므로 containers에 넣지 않음.
-            continue;
           }
 
           // 2개+ → 각 멤버 컴포넌트화(원위치 기록) 후 세트 결합 → 원위치에 변형 인스턴스 복원.
@@ -1366,7 +1642,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(`속성 노출 실패: ${errText(e)}`); }
         }
 
-        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, missing: [], failures });
+        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures });
         if (registered || sets) commitUndo(figma); // UX2
         break;
       }
@@ -1443,6 +1719,25 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
         if (generated) commitUndo(figma); // UX2
+        break;
+      }
+      case 'GET_UI_SIZE': {
+        await uiSizeReady; // 복원이 끝난 뒤의 상태를 알려야 버튼 표시가 맞다
+        post({ type: 'UI_SIZE', mode: uiSizeMode });
+        break;
+      }
+      case 'SET_UI_WIDE': {
+        uiWide = msg.wide === true;
+        figma.ui.resize(uiWidth(), uiHeight(uiSizeMode));
+        break;
+      }
+      case 'GET_VAR_TABLE': {
+        post({ type: 'VAR_TABLE', ...(await collectVarTable()) });
+        break;
+      }
+      case 'SET_UI_SIZE': {
+        await applyUiSize(normalizeUiSize(msg.mode), true);
+        post({ type: 'UI_SIZE', mode: uiSizeMode });
         break;
       }
       case 'GET_SETTINGS': {

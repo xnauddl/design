@@ -116,19 +116,20 @@
       cursor: pointer; transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
       white-space: nowrap;
     }
-    button:hover { background: var(--surface-2); border-color: var(--border-2); }
-    button:active { background: var(--surface-hover); }
+    /* hover/active는 누를 수 있는 버튼에만 — 비활성 버튼에 얹으면 primary의 파란 배경을 흰색으로
+       덮어써 흰 글씨가 사라진다(실행 중 잠긴 「전체 실행」이 그랬다). */
+    button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-2); }
+    button:active:not(:disabled) { background: var(--surface-hover); }
     button.primary {
       background: var(--accent); color: var(--on-accent); border-color: var(--accent);
       box-shadow: var(--shadow-sm);
     }
-    button.primary:hover  { background: var(--accent-hover); border-color: var(--accent-hover); }
-    button.primary:active { background: var(--accent-press); border-color: var(--accent-press); }
+    button.primary:hover:not(:disabled)  { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button.primary:active:not(:disabled) { background: var(--accent-press); border-color: var(--accent-press); }
     button:focus-visible {
       outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
     }
     button:disabled { opacity: .42; cursor: default; box-shadow: none; }
-    button:disabled:hover { background: var(--surface); border-color: var(--border-2); }
     button.link {
       border: none; background: none; padding: 0; width: auto;
       color: var(--accent-strong); cursor: pointer; font: inherit; font-weight: 600;
@@ -313,7 +314,8 @@
     .toolbar-2 { margin-top: 0; }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
-    .btn-next { border-color: transparent; color: var(--text-2); }
+    /* 툴바가 좁아 줄이 넘어가도 ‘다음 →’은 오른쪽 끝에 — 혼자 왼쪽에 떨어지면 다른 버튼처럼 보인다. */
+    .btn-next { border-color: transparent; color: var(--text-2); margin-left: auto; }
     .btn-next:hover { color: var(--text); }
 
     /* ── 결과 목록(#18) ── */
@@ -331,6 +333,22 @@
       padding: 6px 8px; display: grid; gap: 3px;
     }
     .r-card.dim { opacity: .55; }
+    /* 일괄 교체 패널 — 변수별 보기의 행 바로 아래에 붙는다. 좁은 폭에서는 줄바꿈. */
+    .remap-panel {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      margin: -2px 0 6px; padding: 7px 8px; border: 1px solid var(--accent-border);
+      border-radius: var(--r-sm); background: var(--accent-subtle); font-size: 11px;
+    }
+    .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
+    /* 연결 현황 대기 — 선택이 멎을 때까지 이전 목록을 흐리게 둔다(비웠다 채우는 깜빡임 대신). 누를 수 없음. */
+    .results.stale { opacity: .45; pointer-events: none; transition: opacity .12s; }
+    .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
+    /* 컬렉션 계층 — 한 줄: 이름(변수 수) · 추천 · 선택 */
+    .col-role { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
+    .col-role:first-child { border-top: none; }
+    .col-role .name { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .col-role .sub { grid-column: 1 / -1; font-size: 10px; color: var(--muted); }
+    .col-role select { max-width: 150px; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
     .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */
@@ -387,7 +405,6 @@
     #colorSection > * + * { margin-top: 6px; }
     .tidy { border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
     .tidy-note { display: flex; align-items: center; gap: 8px; }
-    .tidy-note #tidySumText { flex: 1 1 auto; font-weight: 600; }
 
     /* ── diff / 선택형 미리보기 트리 ── */
     /* 긴 이름은 nowrap이라 가로로 넘친다 — 가로만 스크롤시킨다(세로는 패널 body). */
@@ -395,6 +412,20 @@
       font-family: var(--mono); font-size: var(--fs); overflow-x: auto;
     }
     .before { color: var(--muted); text-decoration: line-through; }
+    /* 연결 줄 — `채움 색 ■ #fff = color/bg`. 속성 이름은 본문 글꼴(디자인 말), 값·변수는 고정폭. 취소선 없음(값은 바뀌지 않는다). */
+    .bf-label { font-family: var(--font); font-weight: 500; color: var(--text-2); }
+    .bf-val { color: var(--muted); font-weight: 400; }
+    .bf-op { color: var(--muted); font-weight: 400; padding: 0 1px; }
+    .bf-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--border); vertical-align: -1px; margin-right: 4px; }
+    /* 레이어 머리 — 누르면 캔버스에서 그 레이어 선택 */
+    .r-group.pick { cursor: pointer; color: var(--text-2); }
+    .r-group.pick:hover, .r-group.pick:focus-visible { color: var(--accent-strong); text-decoration: underline; outline: none; }
+    /* 변수별 보기 › 어디에? — 레이어 · 속성 목록(누르면 그 레이어 선택) */
+    .var-uses { display: flex; flex-direction: column; gap: 2px; margin: -2px 0 6px 10px; padding-left: 8px; border-left: 2px solid var(--border); }
+    .var-use { text-align: left; border: none; background: transparent; padding: 3px 4px; border-radius: var(--r-sm); font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .var-use:hover { background: var(--surface-hover); }
+    .vu-layer { font-family: var(--mono); }
+    .vu-props { color: var(--muted); }
     .tree-name { color: inherit; }
     .after { color: var(--ok); }
     .tree-ctrls { font-size: var(--fs); margin-top: 6px; }
@@ -412,7 +443,69 @@
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
 
-    /* ── 리사이즈 핸들(우하단) ── */
+    /* ── 창 높이 전환(QA #2 ①) — 탭 바 오른쪽 끝, 드래그 대신 버튼(#14) ── */
+    .tab-vars {
+      display: inline-flex; align-items: center; gap: 4px;
+      flex: 0 0 auto; padding: 6px 8px; border: none; background: transparent;
+      color: var(--text-2); font-weight: 600; border-radius: var(--r-sm); white-space: nowrap;
+    }
+    .tab-vars:hover { background: var(--surface-hover); color: var(--text); }
+    .tab-vars[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+    /* ── 변수 관리(넓은 화면) ── */
+    .var-manager { display: flex; flex-direction: column; gap: 8px; }
+    .vm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .vm-head h2 { margin: 0; font-size: 12px; }
+    .vm-head input[type=search] { width: 160px; }
+    .vm-body { display: grid; grid-template-columns: 170px 1fr; gap: 8px; min-height: 0; }
+    .vm-tree { border: 1px solid var(--border); border-radius: var(--r); padding: 4px; overflow: auto; max-height: calc(100vh - 150px); }
+    .vm-node { display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; border: none; background: transparent; padding: 4px 6px; border-radius: var(--r-sm); color: var(--text); font-size: 11px; }
+    .vm-node:hover { background: var(--surface-hover); }
+    .vm-node[aria-current="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+    .vm-node .tw { width: 10px; flex: 0 0 10px; color: var(--muted); }
+    .vm-node .lbl { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vm-node .cnt { color: var(--muted); font-size: 10px; }
+    .vm-node.empty .lbl { color: var(--muted); }
+    .vm-tier { font-size: 9px; padding: 0 4px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
+    .vm-table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow: auto; max-height: calc(100vh - 150px); }
+    .vm-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
+    .vm-table th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-2); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); z-index: 1; white-space: nowrap; }
+    .vm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .vm-table td.name, .vm-table th.name { position: sticky; left: 0; background: var(--surface); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+    .vm-table th.name { background: var(--surface-2); z-index: 2; }
+    .vm-group td { background: var(--surface-2); color: var(--text-2); font-weight: 600; cursor: pointer; }
+    .vm-row { cursor: default; outline: none; }
+    .vm-row:hover td { background: var(--surface-hover); }
+    .vm-row[aria-selected="true"] td { background: var(--accent-subtle); }
+    .vm-row .ic { display: inline-block; width: 12px; text-align: center; color: var(--muted); margin-right: 4px; font-family: var(--mono); }
+    .vm-row .more { visibility: hidden; border: none; background: transparent; padding: 0 4px; color: var(--text-2); }
+    .vm-row:hover .more, .vm-row:focus-within .more, .vm-row[aria-selected="true"] .more { visibility: visible; }
+    .vm-val { font-family: var(--mono); color: var(--text); }
+    .vm-alias { font-family: var(--mono); font-size: 10.5px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; background: var(--surface-2); color: var(--text-2); }
+    .vm-alias:hover { color: var(--accent-strong); border-color: var(--accent-border); }
+    .vm-use { color: var(--text-2); text-align: right; }
+    .vm-empty { padding: 16px; color: var(--muted); }
+    /* ── 우클릭 메뉴 · 팝업(공용) ── */
+    .ctx-menu { position: fixed; z-index: 50; min-width: 170px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 4px; }
+    .ctx-menu button { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: var(--r-sm); font-size: 11.5px; color: var(--text); }
+    .ctx-menu button:hover:not(:disabled), .ctx-menu button:focus-visible { background: var(--accent-subtle); color: var(--accent-strong); outline: none; }
+    .ctx-menu button:disabled { color: var(--muted); }
+    .ctx-menu hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.28); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; }
+    .modal { width: min(440px, 100%); max-height: calc(100vh - 80px); overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+    .modal h3 { margin: 0; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .modal .m-foot { display: flex; gap: 6px; justify-content: flex-end; }
+    .modal dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 0; font-size: 11.5px; }
+    .modal dt { color: var(--muted); }
+    .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
+    .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
+    .tab-size {
+      flex: 0 0 28px; padding: 6px 0; border: none; background: transparent;
+      color: var(--text-2); border-radius: var(--r-sm); line-height: 1;
+    }
+    .tab-size:hover { background: var(--surface-hover); color: var(--text); }
+    .tab-size[aria-pressed="true"] { color: var(--accent-strong); }
+    .tab-size svg { display: block; margin: 0 auto; }
+    .tab-size[aria-pressed="true"] .ic-grow, .tab-size[aria-pressed="false"] .ic-shrink { display: none; }
   </style>
 </head>
 <body>
@@ -421,6 +514,14 @@
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
+    <!-- 변수 관리 — Figma Variables처럼 컬렉션·그룹 트리 + 표. 누르면 창이 넓어지고(760), 돌아가면 400. -->
+    <button class="tab-vars" id="btnVarManager" type="button" aria-pressed="false" data-i18n-title="vm.openTip" title="변수 관리 — 창이 넓어집니다"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1.5" width="10" height="9" rx="1.5"/><path d="M1 4.5h10M4.5 4.5v6"/></svg> <span data-i18n="vm.tab">변수</span></button>
+    <button class="tab-size" id="btnUiSize" type="button" aria-pressed="false" data-i18n-title="ui.sizeGrow" title="창 높이 크게 (860)">
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <g class="ic-grow"><path d="M6 1v10M3 3.5 6 1l3 2.5M3 8.5 6 11l3-2.5"/></g>
+        <g class="ic-shrink"><path d="M6 1v3.5M6 7.5V11M3 2l3 2.5L9 2M3 10l3-2.5L9 10"/></g>
+      </svg>
+    </button>
   </div>
 
   <!-- 선택 동기화 (실시간) -->
@@ -429,6 +530,8 @@
   </div>
 
   <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
+    <!-- 이미 있는 변수 안내 — 변수가 있는 파일에서 '만들기'를 거쳐 확인하게 하지 않는다(바로 연결로). -->
+    <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
     <div class="banner" id="onboardBanner" style="display:none">
       <span data-i18n="onboard.banner">처음이면 전체 실행으로 시작하세요.</span>
@@ -440,8 +543,12 @@
       <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
       <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
       <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
+        <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
+        <label class="inline"><input id="wizOptTextStyles" type="checkbox" /> <span data-i18n="wizardCard.optTextStyles">텍스트 스타일</span> <span class="muted" id="wizTextStylesLock"></span></label>
+        <!-- v1.0: 컴포넌트 등록은 마법사에서 뺀다(출시 범위 = 추출→생성→바인딩→리네임→내보내기).
+             리네임 직후 이름 기준 묶기가 섹션들을 한 세트로 합쳐 내용을 덮어쓴 사고(QA 파일). 적용 탭의 수동 등록만 남긴다. -->
+        <label class="inline" style="display:none"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
       </div>
       <div class="row">
         <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
@@ -452,7 +559,7 @@
       <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
            파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
            흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기. 다크·텍스트 스타일은 만들기에서</div>
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기 · 다크=라이트 모드에서 어두운 값 채우기</div>
       <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
       <div class="status" id="wizardSummary"></div>
     </div>
@@ -461,11 +568,12 @@
     <div class="step" id="pipelineCard">
       <h2 data-i18n="pipeline.title">준비 현황</h2>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">이름·컴포넌트는 필요할 때 적용 탭에서</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">컴포넌트는 필요할 때 적용 탭에서</div>
     </div>
   </section>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
+    <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
@@ -481,7 +589,7 @@
            이미 말한다. 게다가 잠금 배지와 범위 라벨 사이에 끼어 「🔒 색 12개 변수화」로 읽혔다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
+      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 됩니다. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
@@ -515,10 +623,7 @@
       <!-- 추출·정리된 색 — 역할(Semantic)을 정하는 자리. Global 이름은 hue. -->
       <div id="colorSection" style="display:none">
         <div class="hint" data-i18n="color.listHint">추출·정리된 색 · Global = hue · Semantic = 역할</div>
-        <div id="tidySummary" class="tidy tidy-note" style="display:none">
-          <span id="tidySumText"></span>
-          <button id="btnTidyUndo" class="link" data-i18n="colorTidy.undo">되돌리기</button>
-        </div>
+        <!-- 색 N:1 자동 병합 요약/되돌리기 줄은 걷었다(ui.ts 참고) — 이제 색은 이름만 정리하고 전부 변수가 된다. -->
         <!-- 모아 놓은 색 미리보기 한 줄(ui.ts가 채운다). -->
         <div id="paletteRow" class="palette-row"></div>
         <div id="colorTable" class="results"></div>
@@ -631,11 +736,20 @@
       <div class="toolbar">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택한 항목에 연결</button>
+        <!-- 연결 현황 — 파일에 이미 붙어 있는 바인딩을 읽는다(읽기 전용). 작은 선택(≤300 노드)은 자동, 큰 선택은 이 버튼. -->
+        <button id="btnScanBindings" data-i18n="bind.scanBtn" data-tip="선택 안에 이미 연결된 변수를 읽어 목록으로 보여줍니다. 파일은 안 바꿉니다.">연결 현황</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-apply="rename" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
+      </div>
+      <!-- 보기 축 토글 — 레이어별(캔버스 순서로 검증) / 변수별(Tokens Studio Inspect처럼 변수 행 + 레이어 수, 관리용). -->
+      <!-- 변수 쪽 일(교체·복사·이름·삭제)은 변수 관리 화면이 맡는다 — 연결 카드는 '무엇이 무엇에 연결됐나'(레이어별)만. -->
+      <div class="row tree-ctrls" id="bindViewRow" style="display:none">
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:140px" />
+        <span class="grow"></span>
+        <button class="link" id="btnBindToManager" data-i18n="vm.fromBind">변수 관리에서 보기 ↗</button>
       </div>
       <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐).
            목록 위에 둔다: 몇 개가 왜 빠졌는지는 후보를 훑기 전에 알아야 하는 정보다. -->
@@ -727,6 +841,14 @@
       </div>
     </div>
 
+    <!-- 기존 자산 편입(§9): 이름이 Global/Semantic/Component가 아닌 컬렉션도 계층으로 쓰게 지정. -->
+    <div class="step" id="collectionRolesCard">
+      <h2 data-i18n="colRoles.title">컬렉션 계층</h2>
+      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
+      <div id="collectionRoles"></div>
+      <div class="status" id="colRolesStatus"></div>
+    </div>
+
     <div class="step">
       <h2 data-i18n="export.title">코드로 내보내기</h2>
       <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
@@ -785,6 +907,27 @@
   <!-- 창 리사이즈 핸들(우하단) -->
   <div id="uiTip" role="tooltip" hidden></div>
 
+  <!-- 변수 관리(넓은 화면) — 탭 바의 [변수]로 연다. 탭 내용을 덮고, ‘돌아가기’로 보던 탭·스크롤로 복귀. -->
+  <section class="var-manager" id="varManager" style="display:none" aria-labelledby="vmTitle">
+    <div class="vm-head">
+      <button class="link" id="vmBack" data-i18n="vm.back">← 돌아가기</button>
+      <h2 id="vmTitle" data-i18n="vm.title">변수 관리</h2>
+      <span class="grow"></span>
+      <input id="vmSearch" type="search" data-i18n-placeholder="vm.search" placeholder="변수 검색" />
+      <label class="inline"><input type="checkbox" id="vmOnlyUsed" checked /> <span data-i18n="vm.onlyUsed">선택에서 쓰는 것만</span></label>
+      <span class="muted" id="vmCount"></span>
+    </div>
+    <div class="vm-body">
+      <nav class="vm-tree" id="vmTree" aria-label="컬렉션·그룹"></nav>
+      <div class="vm-table-wrap" id="vmTableWrap"></div>
+    </div>
+    <div class="status" id="vmStatus"></div>
+  </section>
+
+  <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->
+  <div id="overlayRoot"></div>
+
   <!-- UI_SCRIPT -->
+  <!-- 스크립트는 반드시 마지막 — 위 마크업이 모두 있어야 리스너가 붙는다. -->
 </body>
 </html>

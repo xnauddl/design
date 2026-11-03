@@ -116,19 +116,20 @@
       cursor: pointer; transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
       white-space: nowrap;
     }
-    button:hover { background: var(--surface-2); border-color: var(--border-2); }
-    button:active { background: var(--surface-hover); }
+    /* hover/active는 누를 수 있는 버튼에만 — 비활성 버튼에 얹으면 primary의 파란 배경을 흰색으로
+       덮어써 흰 글씨가 사라진다(실행 중 잠긴 「전체 실행」이 그랬다). */
+    button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-2); }
+    button:active:not(:disabled) { background: var(--surface-hover); }
     button.primary {
       background: var(--accent); color: var(--on-accent); border-color: var(--accent);
       box-shadow: var(--shadow-sm);
     }
-    button.primary:hover  { background: var(--accent-hover); border-color: var(--accent-hover); }
-    button.primary:active { background: var(--accent-press); border-color: var(--accent-press); }
+    button.primary:hover:not(:disabled)  { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button.primary:active:not(:disabled) { background: var(--accent-press); border-color: var(--accent-press); }
     button:focus-visible {
       outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
     }
     button:disabled { opacity: .42; cursor: default; box-shadow: none; }
-    button:disabled:hover { background: var(--surface); border-color: var(--border-2); }
     button.link {
       border: none; background: none; padding: 0; width: auto;
       color: var(--accent-strong); cursor: pointer; font: inherit; font-weight: 600;
@@ -313,7 +314,8 @@
     .toolbar-2 { margin-top: 0; }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
-    .btn-next { border-color: transparent; color: var(--text-2); }
+    /* 툴바가 좁아 줄이 넘어가도 ‘다음 →’은 오른쪽 끝에 — 혼자 왼쪽에 떨어지면 다른 버튼처럼 보인다. */
+    .btn-next { border-color: transparent; color: var(--text-2); margin-left: auto; }
     .btn-next:hover { color: var(--text); }
 
     /* ── 결과 목록(#18) ── */
@@ -331,6 +333,22 @@
       padding: 6px 8px; display: grid; gap: 3px;
     }
     .r-card.dim { opacity: .55; }
+    /* 일괄 교체 패널 — 변수별 보기의 행 바로 아래에 붙는다. 좁은 폭에서는 줄바꿈. */
+    .remap-panel {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      margin: -2px 0 6px; padding: 7px 8px; border: 1px solid var(--accent-border);
+      border-radius: var(--r-sm); background: var(--accent-subtle); font-size: 11px;
+    }
+    .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
+    /* 연결 현황 대기 — 선택이 멎을 때까지 이전 목록을 흐리게 둔다(비웠다 채우는 깜빡임 대신). 누를 수 없음. */
+    .results.stale { opacity: .45; pointer-events: none; transition: opacity .12s; }
+    .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
+    /* 컬렉션 계층 — 한 줄: 이름(변수 수) · 추천 · 선택 */
+    .col-role { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
+    .col-role:first-child { border-top: none; }
+    .col-role .name { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .col-role .sub { grid-column: 1 / -1; font-size: 10px; color: var(--muted); }
+    .col-role select { max-width: 150px; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
     .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */
@@ -387,7 +405,6 @@
     #colorSection > * + * { margin-top: 6px; }
     .tidy { border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
     .tidy-note { display: flex; align-items: center; gap: 8px; }
-    .tidy-note #tidySumText { flex: 1 1 auto; font-weight: 600; }
 
     /* ── diff / 선택형 미리보기 트리 ── */
     /* 긴 이름은 nowrap이라 가로로 넘친다 — 가로만 스크롤시킨다(세로는 패널 body). */
@@ -395,6 +412,20 @@
       font-family: var(--mono); font-size: var(--fs); overflow-x: auto;
     }
     .before { color: var(--muted); text-decoration: line-through; }
+    /* 연결 줄 — `채움 색 ■ #fff = color/bg`. 속성 이름은 본문 글꼴(디자인 말), 값·변수는 고정폭. 취소선 없음(값은 바뀌지 않는다). */
+    .bf-label { font-family: var(--font); font-weight: 500; color: var(--text-2); }
+    .bf-val { color: var(--muted); font-weight: 400; }
+    .bf-op { color: var(--muted); font-weight: 400; padding: 0 1px; }
+    .bf-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--border); vertical-align: -1px; margin-right: 4px; }
+    /* 레이어 머리 — 누르면 캔버스에서 그 레이어 선택 */
+    .r-group.pick { cursor: pointer; color: var(--text-2); }
+    .r-group.pick:hover, .r-group.pick:focus-visible { color: var(--accent-strong); text-decoration: underline; outline: none; }
+    /* 변수별 보기 › 어디에? — 레이어 · 속성 목록(누르면 그 레이어 선택) */
+    .var-uses { display: flex; flex-direction: column; gap: 2px; margin: -2px 0 6px 10px; padding-left: 8px; border-left: 2px solid var(--border); }
+    .var-use { text-align: left; border: none; background: transparent; padding: 3px 4px; border-radius: var(--r-sm); font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .var-use:hover { background: var(--surface-hover); }
+    .vu-layer { font-family: var(--mono); }
+    .vu-props { color: var(--muted); }
     .tree-name { color: inherit; }
     .after { color: var(--ok); }
     .tree-ctrls { font-size: var(--fs); margin-top: 6px; }
@@ -412,7 +443,69 @@
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
 
-    /* ── 리사이즈 핸들(우하단) ── */
+    /* ── 창 높이 전환(QA #2 ①) — 탭 바 오른쪽 끝, 드래그 대신 버튼(#14) ── */
+    .tab-vars {
+      display: inline-flex; align-items: center; gap: 4px;
+      flex: 0 0 auto; padding: 6px 8px; border: none; background: transparent;
+      color: var(--text-2); font-weight: 600; border-radius: var(--r-sm); white-space: nowrap;
+    }
+    .tab-vars:hover { background: var(--surface-hover); color: var(--text); }
+    .tab-vars[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+    /* ── 변수 관리(넓은 화면) ── */
+    .var-manager { display: flex; flex-direction: column; gap: 8px; }
+    .vm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .vm-head h2 { margin: 0; font-size: 12px; }
+    .vm-head input[type=search] { width: 160px; }
+    .vm-body { display: grid; grid-template-columns: 170px 1fr; gap: 8px; min-height: 0; }
+    .vm-tree { border: 1px solid var(--border); border-radius: var(--r); padding: 4px; overflow: auto; max-height: calc(100vh - 150px); }
+    .vm-node { display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; border: none; background: transparent; padding: 4px 6px; border-radius: var(--r-sm); color: var(--text); font-size: 11px; }
+    .vm-node:hover { background: var(--surface-hover); }
+    .vm-node[aria-current="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+    .vm-node .tw { width: 10px; flex: 0 0 10px; color: var(--muted); }
+    .vm-node .lbl { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vm-node .cnt { color: var(--muted); font-size: 10px; }
+    .vm-node.empty .lbl { color: var(--muted); }
+    .vm-tier { font-size: 9px; padding: 0 4px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
+    .vm-table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow: auto; max-height: calc(100vh - 150px); }
+    .vm-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
+    .vm-table th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-2); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); z-index: 1; white-space: nowrap; }
+    .vm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .vm-table td.name, .vm-table th.name { position: sticky; left: 0; background: var(--surface); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+    .vm-table th.name { background: var(--surface-2); z-index: 2; }
+    .vm-group td { background: var(--surface-2); color: var(--text-2); font-weight: 600; cursor: pointer; }
+    .vm-row { cursor: default; outline: none; }
+    .vm-row:hover td { background: var(--surface-hover); }
+    .vm-row[aria-selected="true"] td { background: var(--accent-subtle); }
+    .vm-row .ic { display: inline-block; width: 12px; text-align: center; color: var(--muted); margin-right: 4px; font-family: var(--mono); }
+    .vm-row .more { visibility: hidden; border: none; background: transparent; padding: 0 4px; color: var(--text-2); }
+    .vm-row:hover .more, .vm-row:focus-within .more, .vm-row[aria-selected="true"] .more { visibility: visible; }
+    .vm-val { font-family: var(--mono); color: var(--text); }
+    .vm-alias { font-family: var(--mono); font-size: 10.5px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; background: var(--surface-2); color: var(--text-2); }
+    .vm-alias:hover { color: var(--accent-strong); border-color: var(--accent-border); }
+    .vm-use { color: var(--text-2); text-align: right; }
+    .vm-empty { padding: 16px; color: var(--muted); }
+    /* ── 우클릭 메뉴 · 팝업(공용) ── */
+    .ctx-menu { position: fixed; z-index: 50; min-width: 170px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 4px; }
+    .ctx-menu button { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: var(--r-sm); font-size: 11.5px; color: var(--text); }
+    .ctx-menu button:hover:not(:disabled), .ctx-menu button:focus-visible { background: var(--accent-subtle); color: var(--accent-strong); outline: none; }
+    .ctx-menu button:disabled { color: var(--muted); }
+    .ctx-menu hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.28); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; }
+    .modal { width: min(440px, 100%); max-height: calc(100vh - 80px); overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+    .modal h3 { margin: 0; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .modal .m-foot { display: flex; gap: 6px; justify-content: flex-end; }
+    .modal dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 0; font-size: 11.5px; }
+    .modal dt { color: var(--muted); }
+    .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
+    .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
+    .tab-size {
+      flex: 0 0 28px; padding: 6px 0; border: none; background: transparent;
+      color: var(--text-2); border-radius: var(--r-sm); line-height: 1;
+    }
+    .tab-size:hover { background: var(--surface-hover); color: var(--text); }
+    .tab-size[aria-pressed="true"] { color: var(--accent-strong); }
+    .tab-size svg { display: block; margin: 0 auto; }
+    .tab-size[aria-pressed="true"] .ic-grow, .tab-size[aria-pressed="false"] .ic-shrink { display: none; }
   </style>
 </head>
 <body>
@@ -421,6 +514,14 @@
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
+    <!-- 변수 관리 — Figma Variables처럼 컬렉션·그룹 트리 + 표. 누르면 창이 넓어지고(760), 돌아가면 400. -->
+    <button class="tab-vars" id="btnVarManager" type="button" aria-pressed="false" data-i18n-title="vm.openTip" title="변수 관리 — 창이 넓어집니다"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1.5" width="10" height="9" rx="1.5"/><path d="M1 4.5h10M4.5 4.5v6"/></svg> <span data-i18n="vm.tab">변수</span></button>
+    <button class="tab-size" id="btnUiSize" type="button" aria-pressed="false" data-i18n-title="ui.sizeGrow" title="창 높이 크게 (860)">
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <g class="ic-grow"><path d="M6 1v10M3 3.5 6 1l3 2.5M3 8.5 6 11l3-2.5"/></g>
+        <g class="ic-shrink"><path d="M6 1v3.5M6 7.5V11M3 2l3 2.5L9 2M3 10l3-2.5L9 10"/></g>
+      </svg>
+    </button>
   </div>
 
   <!-- 선택 동기화 (실시간) -->
@@ -429,6 +530,8 @@
   </div>
 
   <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
+    <!-- 이미 있는 변수 안내 — 변수가 있는 파일에서 '만들기'를 거쳐 확인하게 하지 않는다(바로 연결로). -->
+    <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
     <div class="banner" id="onboardBanner" style="display:none">
       <span data-i18n="onboard.banner">처음이면 전체 실행으로 시작하세요.</span>
@@ -440,8 +543,12 @@
       <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
       <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
       <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
-        <label class="inline"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
+        <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
+        <label class="inline"><input id="wizOptTextStyles" type="checkbox" /> <span data-i18n="wizardCard.optTextStyles">텍스트 스타일</span> <span class="muted" id="wizTextStylesLock"></span></label>
+        <!-- v1.0: 컴포넌트 등록은 마법사에서 뺀다(출시 범위 = 추출→생성→바인딩→리네임→내보내기).
+             리네임 직후 이름 기준 묶기가 섹션들을 한 세트로 합쳐 내용을 덮어쓴 사고(QA 파일). 적용 탭의 수동 등록만 남긴다. -->
+        <label class="inline" style="display:none"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
       </div>
       <div class="row">
         <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
@@ -452,7 +559,7 @@
       <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
            파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
            흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기. 다크·텍스트 스타일은 만들기에서</div>
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기 · 다크=라이트 모드에서 어두운 값 채우기</div>
       <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
       <div class="status" id="wizardSummary"></div>
     </div>
@@ -461,11 +568,12 @@
     <div class="step" id="pipelineCard">
       <h2 data-i18n="pipeline.title">준비 현황</h2>
       <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">이름·컴포넌트는 필요할 때 적용 탭에서</div>
+      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">컴포넌트는 필요할 때 적용 탭에서</div>
     </div>
   </section>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
+    <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
@@ -481,7 +589,7 @@
            이미 말한다. 게다가 잠금 배지와 범위 라벨 사이에 끼어 「🔒 색 12개 변수화」로 읽혔다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="비슷한 색은 추출 시 자동으로 대표 1색에 정리됩니다(드래프트 단계 — 바인딩 영향 없음). Global 이름은 hue 패밀리(color/blue/500), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
+      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 됩니다. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
@@ -515,10 +623,7 @@
       <!-- 추출·정리된 색 — 역할(Semantic)을 정하는 자리. Global 이름은 hue. -->
       <div id="colorSection" style="display:none">
         <div class="hint" data-i18n="color.listHint">추출·정리된 색 · Global = hue · Semantic = 역할</div>
-        <div id="tidySummary" class="tidy tidy-note" style="display:none">
-          <span id="tidySumText"></span>
-          <button id="btnTidyUndo" class="link" data-i18n="colorTidy.undo">되돌리기</button>
-        </div>
+        <!-- 색 N:1 자동 병합 요약/되돌리기 줄은 걷었다(ui.ts 참고) — 이제 색은 이름만 정리하고 전부 변수가 된다. -->
         <!-- 모아 놓은 색 미리보기 한 줄(ui.ts가 채운다). -->
         <div id="paletteRow" class="palette-row"></div>
         <div id="colorTable" class="results"></div>
@@ -631,11 +736,20 @@
       <div class="toolbar">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
         <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택한 항목에 연결</button>
+        <!-- 연결 현황 — 파일에 이미 붙어 있는 바인딩을 읽는다(읽기 전용). 작은 선택(≤300 노드)은 자동, 큰 선택은 이 버튼. -->
+        <button id="btnScanBindings" data-i18n="bind.scanBtn" data-tip="선택 안에 이미 연결된 변수를 읽어 목록으로 보여줍니다. 파일은 안 바꿉니다.">연결 현황</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-apply="rename" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
+      </div>
+      <!-- 보기 축 토글 — 레이어별(캔버스 순서로 검증) / 변수별(Tokens Studio Inspect처럼 변수 행 + 레이어 수, 관리용). -->
+      <!-- 변수 쪽 일(교체·복사·이름·삭제)은 변수 관리 화면이 맡는다 — 연결 카드는 '무엇이 무엇에 연결됐나'(레이어별)만. -->
+      <div class="row tree-ctrls" id="bindViewRow" style="display:none">
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:140px" />
+        <span class="grow"></span>
+        <button class="link" id="btnBindToManager" data-i18n="vm.fromBind">변수 관리에서 보기 ↗</button>
       </div>
       <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐).
            목록 위에 둔다: 몇 개가 왜 빠졌는지는 후보를 훑기 전에 알아야 하는 정보다. -->
@@ -727,6 +841,14 @@
       </div>
     </div>
 
+    <!-- 기존 자산 편입(§9): 이름이 Global/Semantic/Component가 아닌 컬렉션도 계층으로 쓰게 지정. -->
+    <div class="step" id="collectionRolesCard">
+      <h2 data-i18n="colRoles.title">컬렉션 계층</h2>
+      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
+      <div id="collectionRoles"></div>
+      <div class="status" id="colRolesStatus"></div>
+    </div>
+
     <div class="step">
       <h2 data-i18n="export.title">코드로 내보내기</h2>
       <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
@@ -784,6 +906,26 @@
 
   <!-- 창 리사이즈 핸들(우하단) -->
   <div id="uiTip" role="tooltip" hidden></div>
+
+  <!-- 변수 관리(넓은 화면) — 탭 바의 [변수]로 연다. 탭 내용을 덮고, ‘돌아가기’로 보던 탭·스크롤로 복귀. -->
+  <section class="var-manager" id="varManager" style="display:none" aria-labelledby="vmTitle">
+    <div class="vm-head">
+      <button class="link" id="vmBack" data-i18n="vm.back">← 돌아가기</button>
+      <h2 id="vmTitle" data-i18n="vm.title">변수 관리</h2>
+      <span class="grow"></span>
+      <input id="vmSearch" type="search" data-i18n-placeholder="vm.search" placeholder="변수 검색" />
+      <label class="inline"><input type="checkbox" id="vmOnlyUsed" checked /> <span data-i18n="vm.onlyUsed">선택에서 쓰는 것만</span></label>
+      <span class="muted" id="vmCount"></span>
+    </div>
+    <div class="vm-body">
+      <nav class="vm-tree" id="vmTree" aria-label="컬렉션·그룹"></nav>
+      <div class="vm-table-wrap" id="vmTableWrap"></div>
+    </div>
+    <div class="status" id="vmStatus"></div>
+  </section>
+
+  <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->
+  <div id="overlayRoot"></div>
 
   <script>
 "use strict";
@@ -897,6 +1039,8 @@
     "create.colorsDone": "\uC0C9 \uBCC0\uC218 {count}\uAC1C \uC774\uBBF8 \uC0DD\uC131\uB428 \xB7 \uC5EC\uAE30\uC120 \uC0C9 \uC678\uB9CC",
     "color.summary": "\uC0C9 {count}\uAC1C \xB7 \uC5ED\uD560 \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
     "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019 \uB610\uB294 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC73C\uC138\uC694.",
+    "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 \uC5ED\uD560 {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC2B5\uB2C8\uB2E4",
+    "create.fileVars": "\uD30C\uC77C\uC5D0 \uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8 \uBCC0\uC218 {n}\uAC1C \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uAC12\uC744 \uC77D\uC2B5\uB2C8\uB2E4",
     // 지나친 이유조차 없는 빈손 — 버튼이 고장 난 것처럼 보이지 않게 최소한의 말은 한다.
     "color.extractEmpty": "\uACE0\uB97C \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 \u2014 \uC0C9\xB7\uC5EC\uBC31\xB7\uD06C\uAE30\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.",
     "create.baseChanged": "base {base}px\uB85C \uB2E4\uC2DC \uACC4\uC0B0 \uC911\u2026",
@@ -912,6 +1056,60 @@
     "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC5F0\uACB0{detail}",
     "apply.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uD6C4\uBCF4 {bound}\uAC74{detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0\u2019",
     "apply.done": "\uC5F0\uACB0 {bound}{detail}",
+    "apply.resultCapped": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC74\uAE4C\uC9C0\uB9CC \uD45C\uC2DC",
+    "bind.scanBtn": "\uC5F0\uACB0 \uD604\uD669",
+    "bind.scanHelp": "\uC120\uD0DD \uC548\uC5D0 \uC774\uBBF8 \uC5F0\uACB0\uB41C \uBCC0\uC218\uB97C \uC77D\uC5B4 \uBAA9\uB85D\uC73C\uB85C \uBCF4\uC5EC\uC90D\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
+    "bind.scanned": "\uC5F0\uACB0 \uD604\uD669 \u2014 {total}\uAC74 \xB7 \uB808\uC774\uC5B4 {nodes}\uAC1C",
+    "bind.scannedNone": "\uC774 \uC120\uD0DD\uC5D0\uB294 \uC5F0\uACB0\uB41C \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD6C4\uBCF4\uB97C \uD655\uC778\uD558\uC138\uC694.",
+    "bind.scanHintLarge": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC558\uC5B4\uC694 \u2014 \u2018\uC5F0\uACB0 \uD604\uD669\u2019\uC744 \uB204\uB974\uC138\uC694.",
+    "bind.filterPlaceholder": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
+    // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
+    "field.fills": "\uCC44\uC6C0 \uC0C9",
+    "field.strokes": "\uC120 \uC0C9",
+    "field.effects": "\uADF8\uB9BC\uC790 \uC0C9",
+    "field.itemSpacing": "\uAC04\uACA9",
+    "field.counterAxisSpacing": "\uC904 \uAC04\uACA9",
+    "field.gridRowGap": "\uD589 \uAC04\uACA9",
+    "field.gridColumnGap": "\uC5F4 \uAC04\uACA9",
+    "field.padding": "\uC5EC\uBC31",
+    "field.paddingX": "\uC88C\uC6B0 \uC5EC\uBC31",
+    "field.paddingY": "\uC704\uC544\uB798 \uC5EC\uBC31",
+    "field.paddingSome": "\uC5EC\uBC31 \uC77C\uBD80",
+    "field.paddingTop": "\uC704 \uC5EC\uBC31",
+    "field.paddingRight": "\uC624\uB978\uCABD \uC5EC\uBC31",
+    "field.paddingBottom": "\uC544\uB798 \uC5EC\uBC31",
+    "field.paddingLeft": "\uC67C\uCABD \uC5EC\uBC31",
+    "field.radius": "\uBAA8\uC11C\uB9AC",
+    "field.radiusSome": "\uBAA8\uC11C\uB9AC \uC77C\uBD80",
+    "field.topLeftRadius": "\uC67C\uCABD \uC704 \uBAA8\uC11C\uB9AC",
+    "field.topRightRadius": "\uC624\uB978\uCABD \uC704 \uBAA8\uC11C\uB9AC",
+    "field.bottomRightRadius": "\uC624\uB978\uCABD \uC544\uB798 \uBAA8\uC11C\uB9AC",
+    "field.bottomLeftRadius": "\uC67C\uCABD \uC544\uB798 \uBAA8\uC11C\uB9AC",
+    "field.strokeWeight": "\uC120 \uB450\uAED8",
+    "field.strokeSome": "\uC120 \uB450\uAED8 \uC77C\uBD80",
+    "field.strokeTopWeight": "\uC704 \uC120 \uB450\uAED8",
+    "field.strokeRightWeight": "\uC624\uB978\uCABD \uC120 \uB450\uAED8",
+    "field.strokeBottomWeight": "\uC544\uB798 \uC120 \uB450\uAED8",
+    "field.strokeLeftWeight": "\uC67C\uCABD \uC120 \uB450\uAED8",
+    "field.width": "\uB108\uBE44",
+    "field.height": "\uB192\uC774",
+    "field.opacity": "\uBD88\uD22C\uBA85\uB3C4",
+    "field.fontSize": "\uAE00\uC790 \uD06C\uAE30",
+    "field.lineHeight": "\uD589\uAC04",
+    "field.letterSpacing": "\uC790\uAC04",
+    "field.fontFamily": "\uAE00\uAF34",
+    "field.fontWeight": "\uAD75\uAE30",
+    "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD569\uB2C8\uB2E4",
+    "bind.connectedTip": "{label}({fields})\uC774(\uAC00) {variable}\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC2B5\uB2C8\uB2E4",
+    "bind.willConnectTip": "{label}({fields})\uC744(\uB97C) {variable}\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4",
+    "bind.remapLabel": "\uBC14\uAFC0 \uBCC0\uC218",
+    "bind.remapLoading": "\uBC14\uAFC0 \uC218 \uC788\uB294 \uBCC0\uC218\uB97C \uCC3E\uB294 \uC911\u2026",
+    "bind.remapNone": "\uBC14\uAFC0 \uC218 \uC788\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uAC19\uC740 \uC885\uB958\xB7\uC6A9\uB3C4\uC758 \uBCC0\uC218\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.",
+    "bind.remapApply": "{n}\uACF3 \uAD50\uCCB4",
+    "bind.remapCancel": "\uCDE8\uC18C",
+    "bind.remapDone": "{replaced}\uACF3\uC744 {to}(\uC73C)\uB85C \uBC14\uAFE8\uC2B5\uB2C8\uB2E4 \xB7 \uB808\uC774\uC5B4 {nodes}\uAC1C \u2014 \uB418\uB3CC\uB9AC\uB824\uBA74 Ctrl/\u2318+Z",
+    "bind.remapSkipped": " \xB7 {skipped}\uACF3\uC740 \uC885\uB958\xB7\uC6A9\uB3C4\uAC00 \uB9DE\uC9C0 \uC54A\uAC70\uB098 \uD3F0\uD2B8\uAC00 \uC5C6\uC5B4 \uADF8\uB300\uB85C \uB480\uC2B5\uB2C8\uB2E4",
+    "bind.remapNothing": "\uBC14\uAFC0 \uC790\uB9AC\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 \u2014 \uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC5F0\uACB0 \uD604\uD669\uC744 \uB2E4\uC2DC \uBCF4\uC138\uC694.",
     // 리네임
     "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
     "rename.none": "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -957,9 +1155,13 @@
     "wizard.step.extract": "\uCD94\uCD9C",
     "wizard.step.create": "\uD1A0\uD070",
     "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "wizard.step.dark": "\uB2E4\uD06C",
+    "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "wizard.step.bind": "\uBCC0\uC218\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
+    "wizard.rerunHint": "\uC774\uBBF8 \uC815\uB9AC\uD55C \uC120\uD0DD\uC785\uB2C8\uB2E4 \u2014 \uB2E4\uC2DC \uC2E4\uD589\uD558\uBA74 \uBCC0\uC218\uB294 \uAC31\uC2E0\uB418\uACE0 \uC774\uB984\uC740 \uADF8\uB300\uB85C\uC608\uC694.",
     "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
     "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
     "wizard.skip.paid": "Paid \uC804\uC6A9",
@@ -982,6 +1184,7 @@
     "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
     "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
+    "reason.translucent": "\uBC18\uD22C\uBA85(\uBCC0\uC218 alpha\uAC00 \uB36E\uC5B4\uC500)",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
@@ -990,6 +1193,13 @@
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.semantics": "\uBCC4\uCE6D {aliased}",
     "wizard.seq.semanticsMissing": " \xB7 \uB204\uB77D {n}",
+    "wizard.seq.dark": "\uB2E4\uD06C {realiased}\uAC1C \uC5F0\uACB0",
+    "wizard.seq.darkModeCreated": " \xB7 Dark \uBAA8\uB4DC \uCD94\uAC00",
+    "wizard.seq.darkSkip": " \xB7 \uAC74\uB108\uB700 {n}(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
+    "wizard.seq.darkNoTarget": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694",
+    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD569\uB2C8\uB2E4",
+    "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
+    "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
     "wizard.seq.bindCancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC801\uC6A9",
     "wizard.seq.bindDone": "\uC5F0\uACB0 {bound}",
     "wizard.seq.bindSkip": " \xB7 \uC2A4\uD0B5 {n}",
@@ -997,6 +1207,8 @@
     "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
     "wizard.sum.tokens": "\uD1A0\uD070 {n}",
+    "wizard.sum.dark": "\uB2E4\uD06C {n}",
+    "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
     "wizard.sum.bound": "\uC5F0\uACB0 {n}",
     "wizard.sum.renamed": "\uC774\uB984 {n}",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
@@ -1008,15 +1220,62 @@
     "pipeline.step.bind": "\uBCC0\uC218 \uC5F0\uACB0",
     "pipeline.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
     "pipeline.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "pipeline.step.rename": "\uC774\uB984 \uC815\uB9AC",
     "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
     "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
+    "common.close": "\uB2EB\uAE30",
+    // 변수 관리(넓은 화면)
+    "vm.tab": "\uBCC0\uC218",
+    "vm.openTip": "\uBCC0\uC218 \uAD00\uB9AC \u2014 \uCC3D\uC774 \uB113\uC5B4\uC9D1\uB2C8\uB2E4",
+    "vm.fromBind": "\uBCC0\uC218 \uAD00\uB9AC\uC5D0\uC11C \uBCF4\uAE30 \u2197",
+    "vm.fromBanner": "\uBCC0\uC218 \uAD00\uB9AC",
+    "vm.back": "\u2190 \uB3CC\uC544\uAC00\uAE30",
+    "vm.title": "\uBCC0\uC218 \uAD00\uB9AC",
+    "vm.search": "\uBCC0\uC218 \uAC80\uC0C9",
+    "vm.onlyUsed": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uAC83\uB9CC",
+    "vm.count": "{total}\uAC1C \uC911 {shown}\uAC1C",
+    "vm.colName": "\uC774\uB984",
+    "vm.colUsage": "\uC0AC\uC6A9",
+    "vm.uses": "{n}\uACF3",
+    "vm.moreTip": "\uBA54\uB274 (\uC6B0\uD074\uB9AD\uACFC \uAC19\uC74C)",
+    "vm.jumpAlias": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uB85C \uC774\uB3D9",
+    "vm.aliasOutside": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uAC00 \uC774 \uD30C\uC77C\uC5D0 \uC5C6\uC2B5\uB2C8\uB2E4(\uB2E4\uB978 \uD30C\uC77C\xB7\uB77C\uC774\uBE0C\uB7EC\uB9AC).",
+    "vm.noVars": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "vm.selectFirst": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uBA74 \uAC70\uAE30\uC11C \uC4F0\uB294 \uBCC0\uC218\uAC00 \uBCF4\uC5EC\uC694.",
+    "vm.usageLoading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218\uB97C \uC77D\uB294 \uC911\u2026",
+    "vm.noneUsed": "\uC774 \uCEEC\uB809\uC158\uC758 \uBCC0\uC218\uB294 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
+    "vm.showAll": "\uC804\uCCB4 \uBCF4\uAE30",
+    "vm.noMatch": "\uC870\uAC74\uC5D0 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "vm.usageCapped": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC0AC\uC6A9 \uC218\uB294 \uC77C\uBD80\uB9CC \uC14C\uC2B5\uB2C8\uB2E4.",
+    "vm.copyName": "\uC774\uB984 \uBCF5\uC0AC",
+    "vm.copyValue": "\uAC12 \uBCF5\uC0AC",
+    "vm.copyCss": "CSS \uBCC0\uC218\uBA85 \uBCF5\uC0AC",
+    "vm.whatName": "\uC774\uB984",
+    "vm.whatValue": "\uAC12",
+    "vm.whatCss": "CSS \uBCC0\uC218\uBA85",
+    "vm.copied": "{what}\uC744(\uB97C) \uBCF5\uC0AC\uD588\uC5B4\uC694: {text}",
+    "vm.copyFailed": "\uBCF5\uC0AC\uAC00 \uB9C9\uD614\uC5B4\uC694 \u2014 \uC9C1\uC811 \uBCF5\uC0AC\uD558\uC138\uC694: {text}",
+    "vm.copyEmpty": "\uBCF5\uC0AC\uD560 \uAC12\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "vm.selectLayers": "\uC0AC\uC6A9 \uB808\uC774\uC5B4 \uC120\uD0DD",
+    "vm.detail": "\uC0C1\uC138 \uBCF4\uAE30\u2026",
+    "vm.remap": "\uB2E4\uB978 \uBCC0\uC218\uB85C \uAD50\uCCB4\u2026",
+    "vm.remapTitle": "{name} \uAD50\uCCB4",
+    "vm.noTier": "\uACC4\uCE35 \uC544\uB2D8",
+    "vm.dCollection": "\uCEEC\uB809\uC158",
+    "vm.dScopes": "\uC6A9\uB3C4",
+    "vm.dDesc": "\uC124\uBA85",
+    "vm.dUses": "\uC4F0\uC778 \uACF3 {n}",
+    "vm.dNoUses": "\uC120\uD0DD \uC548\uC5D0\uC11C\uB294 \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
+    "vm.dSelectFirst": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uBA74 \uC4F0\uC778 \uACF3\uC774 \uBCF4\uC5EC\uC694.",
     // 탭
     "tab.wizard": "\uC2DC\uC791",
     "tab.tokens": "\uB9CC\uB4E4\uAE30",
     "tab.apply": "\uC801\uC6A9",
     "tab.settings": "\uC124\uC815",
+    "ui.sizeGrow": "\uCC3D \uB192\uC774 \uD06C\uAC8C (860)",
+    "ui.sizeShrink": "\uCC3D \uB192\uC774 \uAE30\uBCF8\uC73C\uB85C (660)",
     // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
     "rail.color": "\uC0C9",
     "rail.colorSub": "\uCD94\uCD9C\xB7\uBCC0\uC218",
@@ -1035,6 +1294,23 @@
     "rail.next": "\uB2E4\uC74C \u2192",
     // 플러그인 설정(#19) — 설정 탭에만
     "settings.title": "\uAE30\uBCF8\uAC12",
+    "colRoles.title": "\uCEEC\uB809\uC158 \uACC4\uCE35",
+    "existingVars.has": "\uC774 \uD30C\uC77C\uC5D0 \uBCC0\uC218 {n}\uAC1C\uAC00 \uC774\uBBF8 \uC788\uC5B4\uC694 (\uC0C9 {color} \xB7 \uADF8 \uBC16 {other}).",
+    "existingVars.hasMake": "\uC774 \uD30C\uC77C\uC5D0 \uBCC0\uC218 {n}\uAC1C\uAC00 \uC774\uBBF8 \uC788\uC5B4\uC694 \u2014 \uC0C8\uB85C \uB9CC\uB4E4 \uAC8C \uC5C6\uB2E4\uBA74 \uBC14\uB85C \uC5F0\uACB0\uD558\uC138\uC694.",
+    "existingVars.gotoBind": "\uC5F0\uACB0 \uD655\uC778\uD558\uAE30 \u2192",
+    "existingVars.unknown": "\uBCC0\uC218 {n}\uAC1C\uAC00 \uC788\uC9C0\uB9CC \uC5B4\uB290 \uACC4\uCE35(Global\xB7Semantic)\uC778\uC9C0 \uBAB0\uB77C \uC5F0\uACB0\uC5D0 \uC4F0\uC9C0 \uBABB\uD574\uC694.",
+    "existingVars.gotoRoles": "\uACC4\uCE35 \uC9C0\uC815\uD558\uAE30 \u2192",
+    "existingVars.selectFirst": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uBA74 \uC5F0\uACB0 \uD604\uD669\uC774 \uBCF4\uC5EC\uC694.",
+    "colRoles.hint": "\uC774\uB984\uC774 Global\xB7Semantic\xB7Component\uAC00 \uC544\uB2CC \uCEEC\uB809\uC158\uB3C4 \uACC4\uCE35\uC73C\uB85C \uC4F0\uAC8C \uC9C0\uC815\uD569\uB2C8\uB2E4. \uD30C\uC77C\uC5D0 \uC800\uC7A5\uB3FC \uC774 \uD30C\uC77C\uC744 \uC5EC\uB294 \uBAA8\uB450\uC5D0\uAC8C \uC801\uC6A9\uB429\uB2C8\uB2E4",
+    "colRoles.empty": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218 \uCEEC\uB809\uC158\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "colRoles.vars": "\uBCC0\uC218 {n}",
+    "colRoles.auto": "\uC790\uB3D9 \u2014 {role}",
+    "colRoles.autoNone": "\uC790\uB3D9 \u2014 \uACC4\uCE35 \uC544\uB2D8",
+    "colRoles.none": "\uACC4\uCE35 \uC544\uB2D8",
+    "colRoles.guess": "\uCD94\uCC9C: {role}",
+    "colRoles.useGuess": "\uCD94\uCC9C\uB300\uB85C",
+    "colRoles.saved": "{name} \u2192 {role}. \uBC14\uC778\uB529\xB7\uC5ED\uD560 \uCD94\uCC9C\xB7\uB0B4\uBCF4\uB0B4\uAE30\uAC00 \uC774 \uC9C0\uC815\uC744 \uB530\uB985\uB2C8\uB2E4.",
+    "colRoles.dup": "{role}\uC740(\uB294) \uD55C \uCEEC\uB809\uC158\uB9CC \uB9E1\uC2B5\uB2C8\uB2E4 \u2014 {prev}\uC758 \uC9C0\uC815\uC740 \uD480\uB838\uC2B5\uB2C8\uB2E4.",
     "settings.hint": "\uC790\uC8FC \uC548 \uBC14\uAFB8\uB294 \uAC12\uC774\uC5D0\uC694. \uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9 \uD654\uBA74\uC5D0\uB294 \uC548 \uBCF4\uC5EC\uC694",
     "settings.base": "\uAE30\uC900 \uD06C\uAE30",
     "settings.depth": "\uC774\uB984 \uC815\uB9AC \uAE4A\uC774",
@@ -1056,11 +1332,13 @@
     "wizardCard.title": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
     "wizardCard.hint": "\uC120\uD0DD \uD654\uBA74\uC744 \uD55C \uBC88\uC5D0 \uD1A0\uD070\xB7\uBCC0\uC218 \uC5F0\uACB0\uAE4C\uC9C0 \uC815\uB9AC\uD569\uB2C8\uB2E4",
     "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "wizardCard.optDark": "\uB2E4\uD06C",
+    "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
     // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uBCC0\uC218\uC5F0\uACB0=\uD654\uBA74\uC5D0 \uBD99\uC774\uAE30. \uB2E4\uD06C\xB7\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC740 \uB9CC\uB4E4\uAE30\uC5D0\uC11C",
+    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uBCC0\uC218\uC5F0\uACB0=\uD654\uBA74\uC5D0 \uBD99\uC774\uAE30 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8 \uBAA8\uB4DC\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4",
     "prereq.gotoCreate": "\uD1A0\uD070 \uC0DD\uC131\uC73C\uB85C \u2192",
@@ -1070,7 +1348,7 @@
     "onboard.hide": "\uB2E4\uC2DC \uBCF4\uC9C0 \uC54A\uAE30",
     // 진행(파이프라인 카드)
     "pipeline.title": "\uC900\uBE44 \uD604\uD669",
-    "pipeline.indep": "\uC774\uB984\xB7\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uC801\uC6A9 \uD0ED\uC5D0\uC11C",
+    "pipeline.indep": "\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uC801\uC6A9 \uD0ED\uC5D0\uC11C",
     // 브랜드 팔레트
     "color.title": "\uC0C9",
     "color.scope": "\uBCC0\uC218\uD654",
@@ -1091,8 +1369,7 @@
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
     "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
-    "colorTidy.hintTip": "\uBE44\uC2B7\uD55C \uC0C9\uC740 \uCD94\uCD9C \uC2DC \uC790\uB3D9\uC73C\uB85C \uB300\uD45C 1\uC0C9\uC5D0 \uC815\uB9AC\uB429\uB2C8\uB2E4(\uB4DC\uB798\uD504\uD2B8 \uB2E8\uACC4 \u2014 \uBC14\uC778\uB529 \uC601\uD5A5 \uC5C6\uC74C). Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500), \uC5ED\uD560\uC740 Semantic\uC73C\uB85C \uBD99\uC2B5\uB2C8\uB2E4.",
-    "colorTidy.undo": "\uB418\uB3CC\uB9AC\uAE30",
+    "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB429\uB2C8\uB2E4. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC5ED\uD560\uC740 Semantic\uC73C\uB85C \uBD99\uC2B5\uB2C8\uB2E4.",
     // 토큰 생성
     "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
     "create.scopeHint": "\uC5EC\uBC31\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC \uB2E4\uB8F9\uB2C8\uB2E4. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uC774\uBBF8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
@@ -1142,22 +1419,34 @@
     "bind.skipChipTipMore": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names} \uC678",
     // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
     // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.
+    // 키 = `color/` 접두사를 뗀 역할 경로의 `/`→`-` (color/background/brand-bold → background-brand-bold).
     "role.none": "\uC5ED\uD560 \uC5C6\uC74C",
-    "role.surface": "\uBA74",
-    "role.surface-muted": "\uC605\uC740 \uBA74",
-    "role.text": "\uAE00\uC790",
-    "role.text-muted": "\uC605\uC740 \uAE00\uC790",
+    "role.background-default": "\uBA74",
+    "role.background-subtle": "\uC605\uC740 \uBA74",
+    "role.background-inverse": "\uBC18\uC804 \uBA74",
+    "role.background-brand": "\uC8FC\uC0C9 \uBA74",
+    "role.background-brand-bold": "\uC9C4\uD55C \uC8FC\uC0C9 \uBA74",
+    "role.background-brand-subtle": "\uC605\uC740 \uC8FC\uC0C9 \uBA74",
+    "role.background-accent": "\uAC15\uC870 \uBA74",
+    "role.background-success": "\uC131\uACF5 \uBA74",
+    "role.background-warning": "\uC8FC\uC758 \uBA74",
+    "role.background-danger": "\uC624\uB958 \uBA74",
+    "role.background-info": "\uC548\uB0B4 \uBA74",
+    "role.text-default": "\uAE00\uC790",
+    "role.text-subtle": "\uC605\uC740 \uAE00\uC790",
     "role.text-inverse": "\uBC18\uC804 \uAE00\uC790",
-    "role.border": "\uD14C\uB450\uB9AC",
-    "role.primary": "\uC8FC\uC0C9",
-    "role.primary-strong": "\uC9C4\uD55C \uC8FC\uC0C9",
-    "role.primary-subtle": "\uC605\uC740 \uC8FC\uC0C9",
-    "role.secondary": "\uBCF4\uC870",
-    "role.accent": "\uAC15\uC870",
-    "role.success": "\uC131\uACF5",
-    "role.warning": "\uC8FC\uC758",
-    "role.error": "\uC624\uB958",
-    "role.info": "\uC548\uB0B4",
+    "role.text-brand": "\uC8FC\uC0C9 \uAE00\uC790",
+    "role.text-success": "\uC131\uACF5 \uAE00\uC790",
+    "role.text-warning": "\uC8FC\uC758 \uAE00\uC790",
+    "role.text-danger": "\uC624\uB958 \uAE00\uC790",
+    "role.text-info": "\uC548\uB0B4 \uAE00\uC790",
+    "role.border-default": "\uD14C\uB450\uB9AC",
+    "role.border-bold": "\uC9C4\uD55C \uD14C\uB450\uB9AC",
+    "role.border-brand": "\uC8FC\uC0C9 \uD14C\uB450\uB9AC",
+    "role.border-danger": "\uC624\uB958 \uD14C\uB450\uB9AC",
+    "role.icon-default": "\uC544\uC774\uCF58",
+    "role.icon-subtle": "\uC605\uC740 \uC544\uC774\uCF58",
+    "role.icon-brand": "\uC8FC\uC0C9 \uC544\uC774\uCF58",
     // 리네임
     "rename.title": "\uC774\uB984 \uC815\uB9AC",
     "rename.hint": "\uC5ED\uD560\uC5D0 \uB9DE\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uC73C\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uCD5C\uC0C1\uC704\xB7\uC778\uC2A4\uD134\uC2A4 \uC774\uB984\uC740 \uADF8\uB300\uB85C \uB461\uB2C8\uB2E4",
@@ -1189,6 +1478,8 @@
     "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6C1\uB2C8\uB2E4.",
     "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
     "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4.",
+    "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC73C\uB85C \uBB36\uC744 \uD504\uB808\uC784\uACFC \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.",
+    "similar.needScanAfterComp": "\u2018\uD6C4\uBCF4 \uC2A4\uCE94\u2019 \uACB0\uACFC\uB294 \u2018\uB4F1\uB85D\u2019\uC774 \uC501\uB2C8\uB2E4. \uBB36\uAE30\uB294 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC744 \uBA3C\uC800 \uC2E4\uD589\uD558\uC138\uC694.",
     // 내보내기
     "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
     "export.hint": "\uB204\uB974\uBA74 \uBC14\uB85C \uCF54\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uB429\uB2C8\uB2E4",
@@ -1220,6 +1511,55 @@
     const tpl = (_a = STRINGS[key]) != null ? _a : key;
     if (!vars) return tpl;
     return tpl.replace(/\{(\w+)\}/g, (_, k) => k in vars ? String(vars[k]) : `{${k}}`);
+  }
+
+  // src/lib/bindDisplay.ts
+  var PADDING = ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"];
+  var RADIUS = ["topLeftRadius", "topRightRadius", "bottomRightRadius", "bottomLeftRadius"];
+  var STROKE_SIDES = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
+  function familyOf(field) {
+    if (PADDING.includes(field)) return "padding";
+    if (RADIUS.includes(field)) return "radius";
+    if (STROKE_SIDES.includes(field)) return "strokeSides";
+    return null;
+  }
+  function familyLabel(fam, fields) {
+    const has = (f) => fields.includes(f);
+    if (fam === "padding") {
+      if (fields.length === 4) return "padding";
+      if (fields.length === 2 && has("paddingLeft") && has("paddingRight")) return "paddingX";
+      if (fields.length === 2 && has("paddingTop") && has("paddingBottom")) return "paddingY";
+      if (fields.length === 1) return fields[0];
+      return "paddingSome";
+    }
+    if (fam === "radius") return fields.length === 4 ? "radius" : fields.length === 1 ? fields[0] : "radiusSome";
+    return fields.length === 4 ? "strokeWeight" : fields.length === 1 ? fields[0] : "strokeSome";
+  }
+  function groupBindLines(items) {
+    var _a;
+    const lines = [];
+    const byKey = /* @__PURE__ */ new Map();
+    for (const it of items) {
+      const fam = familyOf(it.field);
+      const key = fam ? `${fam}|${it.variableId}` : `${it.field}|${(_a = it.index) != null ? _a : 0}|${it.variableId}`;
+      const hit = byKey.get(key);
+      if (hit) {
+        hit.fields.push(it.field);
+        hit.items.push(it);
+        continue;
+      }
+      const line = { label: "", fields: [it.field], items: [it], variableId: it.variableId, variableName: it.variableName, currentValue: it.currentValue };
+      byKey.set(key, line);
+      lines.push(line);
+    }
+    for (const l of lines) {
+      const fam = familyOf(l.fields[0]);
+      l.label = fam ? familyLabel(fam, l.fields) : l.fields[0];
+    }
+    return lines;
+  }
+  function isHexColor(v) {
+    return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v.trim());
   }
 
   // src/lib/textStyles.ts
@@ -1378,6 +1718,12 @@
     "aside",
     "nav",
     "section",
+    "hero",
+    // 본문 첫 블록(큰 제목 + 이미지) — section보다 구체적
+    "logo",
+    // 헤더 첫 자리의 작은 묶음(마크·워드마크)
+    "actions",
+    // 헤더 끝의 링크/버튼 2~3개(Sign in · Sign up)
     "article",
     "figure",
     // 컴포넌트
@@ -1411,7 +1757,6 @@
     "body",
     "leading",
     "trailing",
-    "hero",
     "sidebar",
     "sheet",
     "drawer",
@@ -1423,8 +1768,15 @@
   ];
   var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
   var ROLE_SET = new Set(ROLE_VOCAB);
+  function kebab(input) {
+    return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s/]+/g, "-").replace(/_/g, (_m, i, s) => /\d/.test(s[i - 1] || "") && /\d/.test(s[i + 1] || "") ? "_" : "-").replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+  }
 
   // src/lib/exporters.ts
+  var cssVar = (name) => `--${kebab(name)}`;
+  function cssVarName(name) {
+    return cssVar(name);
+  }
   function exportHasTokens(content, format) {
     if (format === "css") return /--[\w-]+\s*:/.test(content);
     try {
@@ -1433,6 +1785,87 @@
     } catch (e) {
       return false;
     }
+  }
+
+  // src/lib/varTable.ts
+  function groupPath(name) {
+    const i = name.lastIndexOf("/");
+    return i < 0 ? "" : name.slice(0, i);
+  }
+  function leafName(name) {
+    const i = name.lastIndexOf("/");
+    return i < 0 ? name : name.slice(i + 1);
+  }
+  function buildVarTree(cols, vars, include) {
+    const out = [];
+    for (const c of cols) {
+      const root = { collectionId: c.id, path: "", label: c.name, depth: 0, count: 0, children: [] };
+      const index = /* @__PURE__ */ new Map([["", root]]);
+      for (const v of vars) {
+        if (v.collectionId !== c.id || !include(v)) continue;
+        root.count++;
+        const parts = groupPath(v.name).split("/").filter(Boolean);
+        let parent2 = root;
+        let path = "";
+        parts.forEach((p, i) => {
+          path = path ? `${path}/${p}` : p;
+          let node = index.get(path);
+          if (!node) {
+            node = { collectionId: c.id, path, label: p, depth: i + 1, count: 0, children: [] };
+            index.set(path, node);
+            parent2.children.push(node);
+          }
+          node.count++;
+          parent2 = node;
+        });
+      }
+      out.push(root);
+    }
+    return out;
+  }
+  function inPath(name, path) {
+    if (!path) return true;
+    const g = groupPath(name);
+    return g === path || g.startsWith(path + "/");
+  }
+  function filterVars(vars, f, usage) {
+    const q = f.query.trim().toLowerCase();
+    return vars.filter(
+      (v) => {
+        var _a;
+        return v.collectionId === f.collectionId && inPath(v.name, f.path) && (!q || v.name.toLowerCase().includes(q)) && (!f.onlyUsed || ((_a = usage.get(v.id)) != null ? _a : 0) > 0);
+      }
+    );
+  }
+  function groupRows(rows) {
+    const out = [];
+    const idx = /* @__PURE__ */ new Map();
+    for (const r of rows) {
+      const p = groupPath(r.name);
+      let g = idx.get(p);
+      if (!g) {
+        g = { path: p, rows: [] };
+        idx.set(p, g);
+        out.push(g);
+      }
+      g.rows.push(r);
+    }
+    return out;
+  }
+  function cellCopyText(cell) {
+    if (!cell) return "";
+    switch (cell.kind) {
+      case "color":
+        return cell.hex.toUpperCase();
+      case "alias":
+        return cell.aliasName;
+      default:
+        return cell.text;
+    }
+  }
+  function pickInitialCollection(tree) {
+    var _a, _b, _c;
+    return (_c = (_b = (_a = tree.find((n) => n.count > 0)) != null ? _a : tree[0]) == null ? void 0 : _b.collectionId) != null ? _c : null;
   }
 
   // src/lib/color.ts
@@ -1555,6 +1988,8 @@
   function classifyColor(hex) {
     const o = hexToOklch(hex);
     const achromatic = o.c < ACHROMATIC_C;
+    if (achromatic && o.l >= 0.985) return { family: "gray", step: 0, achromatic };
+    if (achromatic && o.l <= 0.05) return { family: "gray", step: 1e3, achromatic };
     return { family: achromatic ? "gray" : hueName(o.h), step: stepForL(o.l), achromatic };
   }
   function nameColorsByHue(hexes) {
@@ -1674,24 +2109,34 @@
     const map = {};
     const primary = byRole.get("primary");
     if (primary) {
-      map["primary"] = `color/${primary}/500`;
-      map["primary/strong"] = `color/${primary}/700`;
-      map["primary/subtle"] = `color/${primary}/100`;
+      map["color/background/brand"] = `color/${primary}/500`;
+      map["color/background/brand-bold"] = `color/${primary}/700`;
+      map["color/background/brand-subtle"] = `color/${primary}/100`;
+      map["color/text/brand"] = `color/${primary}/600`;
+      map["color/border/brand"] = `color/${primary}/500`;
     }
     const secondary = byRole.get("secondary");
-    if (secondary) map["secondary"] = `color/${secondary}/500`;
-    for (const r of p.roles) if (r.role.startsWith("accent-")) map[r.role] = `color/${r.family}/500`;
+    if (secondary) map["color/background/accent"] = `color/${secondary}/500`;
+    for (const r of p.roles) if (r.role.startsWith("accent-")) map[`color/background/${r.role}`] = `color/${r.family}/500`;
     const neutral = byRole.get("neutral");
     if (neutral) {
-      map["surface"] = `color/${neutral}/50`;
-      map["surface/muted"] = `color/${neutral}/100`;
-      map["text"] = `color/${neutral}/900`;
-      map["text/muted"] = `color/${neutral}/600`;
-      map["border"] = `color/${neutral}/200`;
+      map["color/background/default"] = `color/${neutral}/50`;
+      map["color/background/subtle"] = `color/${neutral}/100`;
+      map["color/background/inverse"] = `color/${neutral}/900`;
+      map["color/text/default"] = `color/${neutral}/900`;
+      map["color/text/subtle"] = `color/${neutral}/600`;
+      map["color/text/inverse"] = `color/${neutral}/50`;
+      map["color/border/default"] = `color/${neutral}/200`;
+      map["color/border/bold"] = `color/${neutral}/400`;
+      map["color/icon/default"] = `color/${neutral}/700`;
     }
     for (const role of ["success", "warning", "error", "info"]) {
       const f = byRole.get(role);
-      if (f) map[role] = `color/${f}/500`;
+      const name = role === "error" ? "danger" : role;
+      if (f) {
+        map[`color/background/${name}`] = `color/${f}/500`;
+        map[`color/text/${name}`] = `color/${f}/700`;
+      }
     }
     return map;
   }
@@ -1700,12 +2145,12 @@
     const map = {};
     const neutrals = classed.filter((c) => c.achromatic).sort((a, b) => b.o.l - a.o.l);
     if (neutrals.length) {
-      map["surface"] = neutrals[0].name;
-      map["text"] = neutrals[neutrals.length - 1].name;
-      if (neutrals.length >= 3) map["border"] = neutrals[Math.floor(neutrals.length / 2)].name;
+      map["color/background/default"] = neutrals[0].name;
+      map["color/text/default"] = neutrals[neutrals.length - 1].name;
+      if (neutrals.length >= 3) map["color/border/default"] = neutrals[Math.floor(neutrals.length / 2)].name;
     }
     const chroma = classed.filter((c) => !c.achromatic).sort((a, b) => b.o.c - a.o.c);
-    if (chroma.length) map["primary"] = chroma[0].name;
+    if (chroma.length) map["color/background/brand"] = chroma[0].name;
     return map;
   }
   function paletteToDraftTokens(p) {
@@ -1726,19 +2171,50 @@
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
   var TSHIRT_MID = TSHIRT.indexOf("md");
-  function tshirtRoles(values) {
-    const n = values.length;
-    if (!n) return [];
-    let start = TSHIRT_MID - Math.floor((n - 1) / 2);
-    start = Math.max(0, Math.min(start, Math.max(0, TSHIRT.length - n)));
-    return values.map((_, i) => {
-      const idx = start + i;
-      return idx < TSHIRT.length ? TSHIRT[idx] : `${TSHIRT[TSHIRT.length - 1]}-${idx - TSHIRT.length + 2}`;
+  function ladderRoles(values, ladder) {
+    return values.map((v) => {
+      var _a;
+      return (_a = ladder.get(v)) != null ? _a : "";
     });
   }
+  var SPACING_LADDER = /* @__PURE__ */ new Map([
+    [0, "none"],
+    [2, "3xs"],
+    [4, "2xs"],
+    [8, "xs"],
+    [12, "sm"],
+    [16, "md"],
+    [24, "lg"],
+    [32, "xl"],
+    [48, "2xl"],
+    [64, "3xl"],
+    [80, "4xl"]
+  ]);
+  var RADIUS_LADDER = /* @__PURE__ */ new Map([
+    [0, "none"],
+    [2, "xs"],
+    [4, "sm"],
+    [8, "md"],
+    [12, "lg"],
+    [16, "xl"],
+    [24, "2xl"]
+  ]);
+  var STROKE_LADDER = /* @__PURE__ */ new Map([
+    [0.5, "hairline"],
+    [1, "thin"],
+    [2, "thick"]
+  ]);
+  function spacingRoles(values) {
+    return ladderRoles(values, SPACING_LADDER);
+  }
+  function strokeRoles(values) {
+    return ladderRoles(values, STROKE_LADDER);
+  }
   function radiusRoles(values) {
-    const base = tshirtRoles(values);
-    return values.map((v, i) => v === 0 ? "none" : v >= 999 ? "full" : base[i]);
+    return values.map((v) => {
+      var _a;
+      return v >= 999 ? "full" : (_a = RADIUS_LADDER.get(v)) != null ? _a : "";
+    });
   }
   var FS_UP = ["title", "h3", "h2", "h1", "display"];
   var FS_DOWN = ["caption", "overline"];
@@ -1806,13 +2282,12 @@
       const entries = numericEntries(tokens2, category);
       const roles = roleFn(entries.map((e) => e.value));
       entries.forEach((e, i) => {
-        map[`${prefix}/${roles[i]}`] = e.name;
+        if (roles[i]) map[`${prefix}/${roles[i]}`] = e.name;
       });
     };
-    scale("gap", "spacing", tshirtRoles);
+    scale("gap", "spacing", spacingRoles);
     scale("radius", "radius", radiusRoles);
-    scale("size", "size", tshirtRoles);
-    scale("strokeWidth", "stroke-width", tshirtRoles);
+    scale("strokeWidth", "stroke-width", strokeRoles);
     scale("fontSize", "font-size", (vals) => fontSizeRoles(vals, base));
     for (const e of numericEntries(tokens2, "fontWeight")) map[`font-weight/${weightRole(e.value)}`] = e.name;
     const families = tokens2.filter((t2) => t2.category === "fontFamily" && typeof t2.value === "string");
@@ -1845,16 +2320,17 @@
       { id: "tokens", status: s.hasScaleVars ? "done" : "ready" },
       {
         id: "semantics",
-        status: s.hasGlobal ? "ready" : "blocked",
-        hint: s.hasGlobal ? void 0 : "pipeline.hint.needTokens"
-      },
-      {
-        id: "bind",
-        status: s.hasBindable ? "ready" : "blocked",
-        hint: s.hasBindable ? void 0 : "pipeline.hint.needBindable"
+        status: s.hasSemanticRoles ? "done" : s.hasGlobal ? "ready" : "blocked",
+        hint: s.hasGlobal || s.hasSemanticRoles ? void 0 : "pipeline.hint.needTokens"
       },
       { id: "dark", status: s.hasDarkMode ? "done" : "todo" },
-      { id: "textStyles", status: s.hasTextStyles ? "done" : "todo" }
+      { id: "textStyles", status: s.hasTextStyles ? "done" : "todo" },
+      {
+        id: "bind",
+        status: s.hasBoundNodes ? "done" : s.hasBindable ? "ready" : "blocked",
+        hint: s.hasBindable || s.hasBoundNodes ? void 0 : "pipeline.hint.needBindable"
+      },
+      { id: "rename", status: s.hasRenamedNodes ? "done" : "ready" }
     ];
   }
 
@@ -1900,6 +2376,9 @@
     { id: "extract", write: false, optional: false },
     { id: "create", write: true, optional: false, paid: true },
     { id: "semantics", write: true, optional: true, paid: true },
+    // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
+    { id: "dark", write: true, optional: true, paid: true },
+    { id: "textStyles", write: true, optional: true, paid: true },
     { id: "bind", write: true, optional: false },
     { id: "rename", write: true, optional: false },
     { id: "componentize", write: true, optional: true, paid: true }
@@ -1915,9 +2394,26 @@
       return { step, run: true };
     });
   }
+  function pickDarkTarget(vars) {
+    var _a;
+    const cols = /* @__PURE__ */ new Map();
+    for (const v of vars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
+    const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
+    const target = (_a = withModes.find((v) => {
+      var _a2;
+      return ((_a2 = v.tier) != null ? _a2 : v.collection === "Semantic" ? 2 : 0) === 2;
+    })) != null ? _a : withModes[0];
+    if (!target) return null;
+    const dark = target.modes.find((m) => m.name.toLowerCase() === "dark");
+    const from = target.modes.find((m) => m.modeId !== (dark == null ? void 0 : dark.modeId));
+    if (!from) return null;
+    return __spreadValues({ collectionId: target.collectionId, fromModeId: from.modeId }, dark ? { toModeId: dark.modeId } : {});
+  }
   function summarize(totals) {
     const parts = [];
     if (totals.created != null) parts.push(t("wizard.sum.tokens", { n: totals.created }));
+    if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t("wizard.sum.dark", { n: totals.darkFilled }));
+    if (totals.textStyles != null && totals.textStyles > 0) parts.push(t("wizard.sum.textStyles", { n: totals.textStyles }));
     if (totals.bound != null) parts.push(t("wizard.sum.bound", { n: totals.bound }));
     if (totals.renamed != null) parts.push(t("wizard.sum.renamed", { n: totals.renamed }));
     if (totals.components != null && totals.components > 0) parts.push(t("wizard.sum.components", { n: totals.components }));
@@ -1946,8 +2442,21 @@
   var hasScaleVars = false;
   var hasGlobal = false;
   var hasBindable = false;
+  var prereqKnown = false;
+  var prereqInFlight = false;
+  function requestPrereq() {
+    if (prereqInFlight) return;
+    prereqInFlight = true;
+    send({ type: "GET_PREREQ" });
+    setTimeout(() => {
+      prereqInFlight = false;
+    }, 3e3);
+  }
   var hasDarkMode = false;
   var hasTextStyles = false;
+  var hasSemanticRoles = false;
+  var hasBoundNodes = false;
+  var hasRenamedNodes = false;
   var lastSelCount = 0;
   var createFrom = "tokens";
   var semStatusTarget = "colorStatus";
@@ -2129,7 +2638,6 @@
   }
   var colorRevealed = false;
   var previewRevealed = false;
-  var lastTidy = { before: 0, after: 0, merged: 0 };
   var pendingCreatePreview = false;
   function renderTokens() {
     const box = $("tokenList");
@@ -2221,8 +2729,6 @@
     renderTokens();
     setSemMapText(paletteSemanticMap(p));
     renderColorTable();
-    hideTidySummary();
-    preTidyTokens = null;
     $("paletteInfo").textContent = t("palette.summary", { count: p.scales.length, tokens: tokens.length });
     if (p.warnings.length) setStatus("colorStatus", p.warnings.join(" "), "warn");
   });
@@ -2239,33 +2745,47 @@
     const idx = [];
     const hexes = [];
     toks.forEach((t2, i) => {
-      if (t2.category === "color" && typeof t2.value === "string") {
+      if ((t2.category === "color" || t2.category === "effectColor") && typeof t2.value === "string") {
         idx.push(i);
         hexes.push(t2.value);
       }
     });
     if (!idx.length) return;
-    const names = nameColorsByHue(hexes);
+    const uniq = [...new Set(hexes.map((h) => h.toLowerCase()))];
+    const names = nameColorsByHue(uniq);
+    const nameOf = new Map(uniq.map((h, i) => [h, names[i]]));
     idx.forEach((ti, k) => {
-      toks[ti].name = names[k];
+      var _a;
+      toks[ti].name = (_a = nameOf.get(hexes[k].toLowerCase())) != null ? _a : toks[ti].name;
     });
   }
   var COLOR_ROLES = [
-    "surface",
-    "surface/muted",
-    "text",
-    "text/muted",
-    "text/inverse",
-    "border",
-    "primary",
-    "primary/strong",
-    "primary/subtle",
-    "secondary",
-    "accent",
-    "success",
-    "warning",
-    "error",
-    "info"
+    "color/background/default",
+    "color/background/subtle",
+    "color/background/inverse",
+    "color/background/brand",
+    "color/background/brand-bold",
+    "color/background/brand-subtle",
+    "color/background/accent",
+    "color/background/success",
+    "color/background/warning",
+    "color/background/danger",
+    "color/background/info",
+    "color/text/default",
+    "color/text/subtle",
+    "color/text/inverse",
+    "color/text/brand",
+    "color/text/success",
+    "color/text/warning",
+    "color/text/danger",
+    "color/text/info",
+    "color/border/default",
+    "color/border/bold",
+    "color/border/brand",
+    "color/border/danger",
+    "color/icon/default",
+    "color/icon/subtle",
+    "color/icon/brand"
   ];
   function roleSelect(value) {
     const sel = document.createElement("select");
@@ -2277,7 +2797,7 @@
     for (const r of COLOR_ROLES) {
       const o = document.createElement("option");
       o.value = r;
-      o.textContent = `${t(`role.${r.replace("/", "-")}`)} \xB7 ${r}`;
+      o.textContent = `${t(`role.${r.replace(/^color\//, "").replace(/\//g, "-")}`)} \xB7 ${r}`;
       sel.appendChild(o);
     }
     if (value && !COLOR_ROLES.includes(value)) {
@@ -2358,60 +2878,6 @@
     for (const [role, name] of Object.entries(auto)) if (!colorTokenNames.has(name)) nonColor[role] = name;
     return __spreadValues(__spreadValues({}, nonColor), picks);
   }
-  function colorHexes() {
-    return tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string").map((t2) => t2.value.toLowerCase());
-  }
-  var preTidyTokens = null;
-  function tidyColors() {
-    var _a;
-    const colors = tokens.filter((t2) => t2.category === "color" && typeof t2.value === "string");
-    const before = colors.length;
-    const baseName = (name) => name.replace(/-\d+$/, "");
-    const keep = /* @__PURE__ */ new Map();
-    const drop = /* @__PURE__ */ new Set();
-    for (const t2 of colors) {
-      const k = baseName(t2.name);
-      const rep = keep.get(k);
-      if (!rep) {
-        keep.set(k, t2);
-      } else {
-        for (const s of t2.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
-        if (t2.count) rep.count = Math.max((_a = rep.count) != null ? _a : 0, t2.count);
-        drop.add(t2);
-      }
-    }
-    if (drop.size) {
-      tokens = tokens.filter((t2) => !drop.has(t2));
-      for (const [base, rep] of keep) rep.name = base;
-    }
-    return { before, after: keep.size, merged: drop.size };
-  }
-  function renderTidySummary(s) {
-    const box = $("tidySummary");
-    if (s.merged <= 0) {
-      box.style.display = "none";
-      return;
-    }
-    box.style.display = "";
-    $("tidySumText").textContent = `\uBE44\uC2B7\uD55C \uC0C9 ${s.before} \u2192 ${s.after}\uAC1C\uB85C \uC790\uB3D9 \uC815\uB9AC\uB428`;
-  }
-  function hideTidySummary() {
-    $("tidySummary").style.display = "none";
-  }
-  function undoTidy() {
-    if (!preTidyTokens) return;
-    const restored = preTidyTokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
-    carryTokenChecked(tokens, restored);
-    tokens = restored;
-    preTidyTokens = null;
-    hideTidySummary();
-    renderTokens();
-    renderColorTable();
-    suggestSemMapFrom(tokens);
-    $("btnCreateApply").style.display = "none";
-    setStatus("colorStatus", `\uC815\uB9AC \uB418\uB3CC\uB9BC \xB7 \uCD94\uCD9C \uC0C9 ${new Set(colorHexes()).size}\uAC1C`, "");
-  }
-  $("btnTidyUndo").addEventListener("click", undoTidy);
   function syncSecondaryControls() {
     const on = $("useBrand2").checked;
     brand2Color.disabled = !on;
@@ -2742,15 +3208,42 @@
     const v = Number(raw);
     return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
   }
+  var AUTO_SCAN_MAX = 300;
+  var AUTO_SCAN_DELAY = 250;
+  var bindReqSeq = 0;
+  var bindLatest = 0;
+  var autoScanTimer = null;
+  function nextBindReq() {
+    if (autoScanTimer) {
+      clearTimeout(autoScanTimer);
+      autoScanTimer = null;
+    }
+    bindLatest = ++bindReqSeq;
+    return bindLatest;
+  }
+  function isCurrentBindReply(reqId) {
+    return reqId === void 0 || reqId === bindLatest;
+  }
+  function requestBindingsScan() {
+    send({ type: "SCAN_BINDINGS", reqId: nextBindReq() });
+  }
+  function markBindStale(on) {
+    $("bindTree").classList.toggle("stale", on);
+    if (on) $("btnApplyConfirm").style.display = "none";
+  }
+  $("btnScanBindings").addEventListener("click", () => {
+    setStatus("applyStatus", t("common.running"), "");
+    requestBindingsScan();
+  });
   $("btnApply").addEventListener("click", () => {
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
-    send({ type: "APPLY", tolerance: bindTolerance(), preview: true });
+    send({ type: "APPLY", tolerance: bindTolerance(), preview: true, reqId: nextBindReq() });
   });
   $("btnApplyConfirm").addEventListener("click", () => {
     const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
     if (!items.length) return;
     showApplyProgress("\uC5F0\uACB0 \uC911\u2026");
-    send({ type: "APPLY_SELECTED", items });
+    send({ type: "APPLY_SELECTED", items, reqId: nextBindReq() });
   });
   $("bindAll").addEventListener("change", (e) => {
     const on = e.target.checked;
@@ -2799,7 +3292,7 @@
     if (wizardWaiter.types.includes(m.type)) {
       const w = wizardWaiter;
       wizardWaiter = null;
-      w.resolve(m);
+      setTimeout(() => w.resolve(m), 0);
     }
   });
   function wizardRequest(msg, expect) {
@@ -2863,10 +3356,13 @@
     const base = Number($("base").value) || 16;
     const tolerance = bindTolerance();
     const maxDepth = readMaxDepth();
-    const semMap = textToSemanticMap($("semMap").value);
+    let semMap = textToSemanticMap($("semMap").value);
     const options = {
       semantics: $("wizOptSemantics").checked,
-      componentize: $("wizOptComponentize").checked
+      dark: $("wizOptDark").checked,
+      textStyles: $("wizOptTextStyles").checked,
+      // v1.0: 마법사에서 컴포넌트 등록 제외(체크박스 숨김) — 리네임 뒤 이름 기준 묶기가 디자인을 덮어쓴다.
+      componentize: false
     };
     const ctx = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
     const plan = planWizard(options, ctx);
@@ -2888,12 +3384,24 @@
       try {
         switch (p.step.id) {
           case "extract": {
-            const r = await wizardRequest({ type: "EXTRACT" }, ["EXTRACT_RESULT"]);
-            tokens = r.tokens;
+            await wizardRequest({ type: "EXTRACT" }, ["EXTRACT_RESULT"]);
             if (!tokens.length) {
               setWizardStep("extract", "fail", t("wizard.seq.noExtract"));
               stopped = true;
               break;
+            }
+            colorRevealed = true;
+            previewRevealed = true;
+            renderColorTable();
+            renderTokens();
+            setSemMapText(colorAuthoritativeRoles(base));
+            semMap = textToSemanticMap($("semMap").value);
+            const sem = plan.find((x) => x.step.id === "semantics");
+            if (sem && !sem.run && sem.skipReason === "wizard.skip.noMapping" && Object.keys(semMap).length) {
+              sem.run = true;
+              sem.skipReason = void 0;
+              renderWizardSteps(plan);
+              setWizardStep("extract", "active", t("wizard.seq.running"));
             }
             setWizardStep("extract", "done", t("wizard.seq.extractDone", { count: tokens.length }));
             break;
@@ -2908,6 +3416,44 @@
             const r = await wizardRequest({ type: "CREATE_SEMANTICS", map: semMap }, ["SEMANTICS_RESULT"]);
             totals.semanticsAliased = r.aliased;
             setWizardStep("semantics", "done", t("wizard.seq.semantics", { aliased: r.aliased }) + (r.missing.length ? t("wizard.seq.semanticsMissing", { n: r.missing.length }) : ""));
+            break;
+          }
+          case "dark": {
+            const vars = await wizardRequest({ type: "GET_VARIABLES" }, ["VARIABLES"]);
+            const target = pickDarkTarget(vars.vars);
+            if (!target) {
+              setWizardStep("dark", "done", t("wizard.seq.darkNoTarget"));
+              break;
+            }
+            const r = await wizardRequest(
+              __spreadValues({ type: "GENERATE_DARK_MODE", collectionId: target.collectionId, fromModeId: target.fromModeId }, target.toModeId ? { toModeId: target.toModeId } : {}),
+              ["DARK_MODE_RESULT"]
+            );
+            if (r.error) {
+              setWizardStep("dark", "fail", r.error);
+              break;
+            }
+            totals.darkFilled = r.realiased;
+            if (!r.realiased) {
+              setWizardStep("dark", "fail", t("wizard.seq.darkNothing"));
+              break;
+            }
+            setWizardStep(
+              "dark",
+              "done",
+              t("wizard.seq.dark", { realiased: r.realiased }) + (r.modeCreated ? t("wizard.seq.darkModeCreated") : "") + (r.skipped ? t("wizard.seq.darkSkip", { n: r.skipped }) : "")
+            );
+            break;
+          }
+          case "textStyles": {
+            const scan = await wizardRequest({ type: "SCAN_TEXT_STYLES" }, ["TEXT_STYLE_CANDIDATES"]);
+            if (!scan.styles.length) {
+              setWizardStep("textStyles", "done", t("wizard.seq.textStylesNone"));
+              break;
+            }
+            const r = await wizardRequest({ type: "CREATE_TEXT_STYLES", styles: scan.styles }, ["TEXT_STYLES_RESULT"]);
+            totals.textStyles = r.created + r.updated;
+            setWizardStep("textStyles", "done", t("wizard.seq.textStyles", { created: r.created, updated: r.updated }));
             break;
           }
           case "bind": {
@@ -2946,6 +3492,7 @@
     }
     wizardRunning = false;
     $("btnWizardRun").disabled = false;
+    setWizardRunLabel(!stopped);
     $("btnWizardCancel").style.display = "none";
     const paidSkipped = paidSkippedSteps(plan);
     const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
@@ -2954,6 +3501,20 @@
       t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
       stopped || paidSkipped.length ? "warn" : "ok"
     );
+  }
+  var lastSelBound = 0;
+  var lastSelRenamed = 0;
+  function applySelectionDone() {
+    const fresh = !hasGlobal && !hasSemanticRoles;
+    hasBoundNodes = !fresh && lastSelBound > 0;
+    hasRenamedNodes = !fresh && lastSelRenamed > 0;
+    renderPipeline();
+    if (!wizardRunning) setWizardRunLabel(hasBoundNodes || hasRenamedNodes);
+  }
+  function setWizardRunLabel(rerun) {
+    const b = $("btnWizardRun");
+    b.textContent = rerun ? t("wizard.rerun") : t("wizardCard.run");
+    b.title = rerun ? t("wizard.rerunHint") : "";
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
   $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
@@ -3040,7 +3601,9 @@
     "btnColorVars",
     "btnCreate",
     "btnCreateApply",
+    "btnScanText",
     "btnTextStyles",
+    // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
     "btnGenDark"
     // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
   ];
@@ -3054,14 +3617,19 @@
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     refreshDarkModes();
-    for (const [box, lock] of [["wizOptSemantics", "wizSemanticLock"], ["wizOptComponentize", "wizComponentLock"]]) {
+    for (const [box, lock] of [
+      ["wizOptSemantics", "wizSemanticLock"],
+      ["wizOptDark", "wizDarkLock"],
+      ["wizOptTextStyles", "wizTextStylesLock"],
+      ["wizOptComponentize", "wizComponentLock"]
+    ]) {
       $(lock).textContent = isPaid ? "" : PAID_LOCK;
       $(box).disabled = !isPaid;
     }
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!isPaid) $("btnSemantics").disabled = true;
     setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
-    if (!hasBindable) $("btnApplyConfirm").disabled = true;
+    if (prereqKnown && !hasBindable) $("btnApplyConfirm").disabled = true;
     setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
     if (!isPaid) $("btnApplyExistingText").disabled = true;
   }
@@ -3072,7 +3640,8 @@
     const base = el.dataset.baseTip;
     el.setAttribute(attr, locked ? base ? `${base} \xB7 ${PAID_LOCK}` : PAID_LOCK : base);
   }
-  function setPrereq(btnId, noticeId, ok, msg) {
+  function setPrereq(btnId, noticeId, okRaw, msg) {
+    const ok = okRaw || !prereqKnown;
     $(btnId).disabled = !ok;
     const notice = $(noticeId);
     notice.style.display = ok ? "none" : "";
@@ -3092,14 +3661,17 @@
     // 역할 매핑은 토큰 단계에 흡수돼 있다
     dark: { make: "theme", btn: "btnGenDark" },
     textStyles: { make: "type", btn: "btnScanText" },
-    bind: { make: null, btn: "btnApply" }
-    // 유일하게 적용 탭
+    bind: { make: null, btn: "btnApply" },
+    // 적용 탭
+    rename: { make: null, btn: "btnPreview", apply: "rename" }
+    // 적용 탭 · 이름 정리
   };
   function gotoStep(id) {
+    var _a;
     const target = PIPELINE_TARGET[id];
     if (target.make === null) {
       showTab("apply");
-      showApplyStep("bind");
+      showApplyStep((_a = target.apply) != null ? _a : "bind");
     } else {
       showTab("tokens");
       showMakeStep(target.make);
@@ -3111,7 +3683,7 @@
   function renderPipeline() {
     const box = $("pipelineSteps");
     box.innerHTML = "";
-    const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles });
+    const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes });
     steps.forEach((s, i) => {
       const row = document.createElement("div");
       row.className = `pstep ${s.status}`;
@@ -3159,9 +3731,9 @@
     }
     if (prev && cols.has(prev)) sel.value = prev;
     const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-    const usable = (_a = withModes.find((v) => v.collection === "Semantic")) != null ? _a : withModes[0];
+    const usable = (_a = withModes.find((v) => v.tier === 2)) != null ? _a : withModes[0];
     if (usable && ((_c = (_b = cols.get(sel.value)) == null ? void 0 : _b.modes.length) != null ? _c : 0) < 1) sel.value = usable.collectionId;
-    if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.collection) === "Global") && usable.collection === "Semantic") {
+    if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.tier) === 1) && usable.tier === 2) {
       sel.value = usable.collectionId;
     } else if (usable && !sel.value) {
       sel.value = usable.collectionId;
@@ -3247,7 +3819,7 @@
   });
   $("btnComponentize").addEventListener("click", () => {
     if (similarMemberIds.length < 2 || !similarMasterId) {
-      setStatus("structureStatus", "\uBA3C\uC800 \uC2A4\uCE94\uD574\uC11C \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.", "warn");
+      setStatus("structureStatus", t(compCandidates.length ? "similar.needScanAfterComp" : "similar.needScan"), "warn");
       return;
     }
     setStatus("structureStatus", "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uB294 \uC911\u2026", "");
@@ -3322,7 +3894,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
@@ -3333,12 +3905,9 @@
         resetTokenChecked();
         clearNumTidy();
         huefyTokenColors(tokens);
-        preTidyTokens = tokens.map((t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }));
-        lastTidy = tidyColors();
         $("btnCreateApply").style.display = "none";
         suggestSemMapFrom(tokens);
         renderColorTable();
-        renderTidySummary(lastTidy);
         renderTokens();
         const colorN = tokens.filter((tk) => tk.category === "color").length;
         $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uC0C9 ${colorN} \xB7 \uADF8 \uC678 ${tokens.length - colorN}`;
@@ -3357,8 +3926,26 @@
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
+        lastSelBound = msg.bound;
+        lastSelRenamed = msg.renamed;
+        applySelectionDone();
         refreshVariantRow(msg.comps, msg.sets);
-        if (!msg.selfSelect) clearBindPreview();
+        if (!msg.selfSelect) {
+          scheduleManagerUsage();
+          nextBindReq();
+          hideApplyProgress();
+          const autoScan = !wizardRunning && msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX;
+          if (autoScan) {
+            markBindStale(true);
+            autoScanTimer = setTimeout(() => {
+              autoScanTimer = null;
+              requestBindingsScan();
+            }, AUTO_SCAN_DELAY);
+          } else {
+            clearBindPreview();
+            if (!wizardRunning && msg.bound > 0) setStatus("applyStatus", t("bind.scanHintLarge"), "");
+          }
+        }
         if (!tokens.length) renderTokens();
         refreshTreeEmptyStates();
         break;
@@ -3397,7 +3984,9 @@
         if (msg.op === "bind") updateApplyProgress(msg.done, msg.total);
         break;
       case "APPLY_RESULT": {
+        if (!isCurrentBindReply(msg.reqId)) break;
         hideApplyProgress();
+        markBindStale(false);
         const confirmBtn = $("btnApplyConfirm");
         bindSkips = (_a = msg.skips) != null ? _a : [];
         bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
@@ -3411,6 +4000,7 @@
           setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail: cancelDetail }), "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
+          bindResultMode = false;
           bindCandidates = (_c = msg.candidates) != null ? _c : [];
           bindNodes = (_d = msg.nodes) != null ? _d : [];
           bindChecked.clear();
@@ -3419,9 +4009,55 @@
           setStatus("applyStatus", t("apply.preview", { bound: msg.bound, detail }), msg.skipped ? "warn" : "");
         } else {
           clearBindPreview();
-          setStatus("applyStatus", t("apply.done", { bound: msg.bound, detail }), msg.skipped ? "warn" : "ok");
+          bindResultMode = true;
+          bindCandidates = (_e = msg.candidates) != null ? _e : [];
+          bindNodes = (_f = msg.nodes) != null ? _f : [];
+          bindSkips = (_g = msg.skips) != null ? _g : [];
+          bindSkipsCapped = ((_h = msg.skipTotal) != null ? _h : bindSkips.length) > bindSkips.length;
+          renderSkipReasons(msg.reasons);
+          renderBindTree();
+          const capped = ((_i = msg.candidateTotal) != null ? _i : bindCandidates.length) > bindCandidates.length;
+          const capNote = capped ? t("apply.resultCapped", { shown: bindCandidates.length }) : "";
+          setStatus("applyStatus", t("apply.done", { bound: msg.bound, detail }) + capNote, msg.skipped ? "warn" : "ok");
           confirmBtn.style.display = "none";
         }
+        break;
+      }
+      case "REMAP_TARGETS_RESULT":
+        onRemapTargets(msg.fromId, msg.targets);
+        break;
+      case "REMAP_RESULT": {
+        closeModal();
+        const statusId = vmOpen ? "vmStatus" : "applyStatus";
+        if (!msg.replaced) {
+          setStatus(statusId, t("bind.remapNothing"), "warn");
+          break;
+        }
+        keepRemapStatus = !vmOpen;
+        const skippedNote = msg.skipped ? t("bind.remapSkipped", { skipped: msg.skipped }) : "";
+        setStatus(statusId, t("bind.remapDone", { replaced: msg.replaced, to: msg.toName, nodes: msg.nodes }) + skippedNote, msg.skipped ? "warn" : "ok");
+        if (vmOpen) requestManagerUsage();
+        break;
+      }
+      case "VAR_TABLE":
+        vmCols = msg.collections;
+        vmVars = msg.vars;
+        renderVarManager();
+        break;
+      case "BINDINGS_RESULT": {
+        if (msg.forManager) {
+          if (msg.reqId === vmUsageReq) setManagerUsage(msg.candidates, msg.nodes, msg.total > msg.candidates.length);
+          break;
+        }
+        if (!isCurrentBindReply(msg.reqId)) break;
+        clearBindPreview();
+        bindResultMode = true;
+        bindCandidates = msg.candidates;
+        bindNodes = msg.nodes;
+        renderBindTree();
+        const capNote = msg.total > msg.candidates.length ? t("apply.resultCapped", { shown: msg.candidates.length }) : "";
+        if (keepRemapStatus) keepRemapStatus = false;
+        else setStatus("applyStatus", msg.total ? t("bind.scanned", { total: msg.total, nodes: msg.boundNodes }) + capNote : t("bind.scannedNone"), msg.total ? "" : "warn");
         break;
       }
       case "SELECT_RESULT":
@@ -3435,7 +4071,6 @@
         renderRenameResult(msg);
         break;
       case "SEMANTICS_RESULT":
-        if (wizardRunning) break;
         setStatus(
           semStatusTarget,
           (semStatusPrefix ? `${semStatusPrefix} \xB7 ` : "") + t("semantic.result", { aliased: msg.aliased, created: msg.created, updated: msg.updated }) + (msg.missing.length ? t("semantic.missing", { names: msg.missing.join(", ") }) : ""),
@@ -3454,7 +4089,7 @@
           }) : [];
           tsSpecs = [...msg.styles.map((x) => __spreadValues({}, x)), ...manual];
           tsScanNote = {
-            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_e = msg.fallback) != null ? _e : 0}` : "",
+            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_j = msg.fallback) != null ? _j : 0}` : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -3483,6 +4118,9 @@
         break;
       case "COLLECTIONS":
         break;
+      case "COLLECTION_ROLES":
+        renderCollectionRoles(msg.collections);
+        break;
       case "GLOBAL_COLORS":
         if (!msg.colors.length) {
           if (!autoGlobalScan) setStatus(semStatusTarget, t("semantic.noGlobals"), "warn");
@@ -3494,14 +4132,18 @@
         autoGlobalScan = false;
         break;
       case "PREREQ_STATE":
+        prereqKnown = true;
+        prereqInFlight = false;
+        renderExistingVars((_k = msg.tierVars) != null ? _k : 0, (_l = msg.tierColorVars) != null ? _l : 0, (_m = msg.otherVars) != null ? _m : 0);
         hasColorVars = msg.hasColorVars;
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
+        hasSemanticRoles = msg.hasSemanticRoles;
         updateGates();
-        renderPipeline();
+        applySelectionDone();
         requestGlobalRoles();
         break;
       case "LICENSE_STATUS": {
@@ -3542,7 +4184,7 @@
       }
       case "COMPONENTS_RESULT": {
         clearCompPreview();
-        const extra = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.exposed ? ` \xB7 \uC18D\uC131 ${msg.exposed}` : ""}`;
+        const extra = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.exposed ? ` \xB7 \uC18D\uC131 ${msg.exposed}` : ""}${msg.icons ? ` \xB7 \uC544\uC774\uCF58 ${msg.icons}` : ""}`;
         setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extra }), msg.registered || msg.sets ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
         break;
@@ -3558,6 +4200,10 @@
         setStatus("structureStatus", t("component.generated", { generated: msg.generated, sets: msg.sets }), msg.generated ? "ok" : "warn");
         break;
       }
+      case "UI_SIZE": {
+        renderUiSize(msg.mode);
+        break;
+      }
       case "SETTINGS": {
         $("base").value = String(msg.base);
         $("depth").value = String(msg.maxDepth);
@@ -3571,6 +4217,16 @@
         varsLoaded = true;
         allVars = msg.vars;
         refreshDarkOptions();
+        if (!tokens.length) {
+          const globals = allVars.filter((v) => v.tier === 1);
+          const colors = globals.filter((v) => v.name.startsWith("color/")).length;
+          const others = globals.length - colors;
+          const roles = allVars.filter((v) => v.tier === 2).length;
+          if (globals.length) {
+            setStatus("colorStatus", t("color.fileVars", { n: colors, roles }), "");
+            setStatus("createStatus", t("create.fileVars", { n: others }), "");
+          }
+        }
         break;
       }
       case "DARK_MODE_RESULT": {
@@ -3610,7 +4266,7 @@
         break;
       }
       case "PREMIUM_REQUIRED": {
-        const statusId = resolveStatusId((_f = PREMIUM_STATUS_ID[msg.feature]) != null ? _f : "createStatus");
+        const statusId = resolveStatusId((_n = PREMIUM_STATUS_ID[msg.feature]) != null ? _n : "createStatus");
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }
@@ -3629,6 +4285,8 @@
     }
   };
   var OP_STATUS = {
+    REMAP_TARGETS: "applyStatus",
+    REMAP_BINDINGS: "applyStatus",
     EXTRACT: "colorStatus",
     CREATE_TOKENS: "createStatus",
     CREATE_SEMANTICS: "semStatus",
@@ -3685,8 +4343,8 @@
   function baseDepth(rows) {
     return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
   }
-  function makeTreeRow(r, base, checked, onChange) {
-    var _a;
+  function makeTreeRow(r, base, checked, onChange, readOnly = false) {
+    var _a, _b;
     const indent = `${(r.depth - base) * 12}px`;
     if (r.change === void 0 && r.keep) {
       const title2 = document.createElement("span");
@@ -3700,21 +4358,48 @@
       const group = resultGroup(r.name);
       group.style.marginLeft = indent;
       if (!r.header) group.classList.add("ctx");
+      if (r.selectId) {
+        const id = r.selectId;
+        group.classList.add("pick");
+        group.title = t("bind.layerSelectTip");
+        group.setAttribute("role", "button");
+        group.tabIndex = 0;
+        group.addEventListener("click", () => selectNodes([id], "applyStatus"));
+        group.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            selectNodes([id], "applyStatus");
+          }
+        });
+      }
       return group;
     }
+    const keys = (_a = r.keys) != null ? _a : [r.id];
     const cb = document.createElement("input");
     cb.type = "checkbox";
-    cb.checked = checked.has(r.id);
+    cb.checked = keys.every((k) => checked.has(k));
     cb.addEventListener("change", () => {
-      if (cb.checked) checked.add(r.id);
-      else checked.delete(r.id);
+      for (const k of keys) {
+        if (cb.checked) checked.add(k);
+        else checked.delete(k);
+      }
       onChange();
     });
+    if (r.bind) {
+      const b = r.bind;
+      const title2 = document.createElement("span");
+      const swatch = isHexColor(b.value) ? `<span class="bf-swatch" style="background:${escapeHtml(b.value)}"></span>` : "";
+      title2.innerHTML = `<span class="bf-label">${escapeHtml(b.label)}</span> ${swatch}<span class="bf-val">${escapeHtml(b.value)}</span> <span class="bf-op">${b.connected ? "=" : "\u2192"}</span> <span class="after">${escapeHtml(b.variable)}</span>`;
+      title2.title = b.tip;
+      const card2 = resultCard(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title: title2, titleMono: true }));
+      card2.style.marginLeft = indent;
+      return card2;
+    }
     const title = document.createElement("span");
     const nameCls = r.replace === false ? "tree-name" : "before";
     title.innerHTML = `<span class="${nameCls}">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
     title.title = `${r.name} \u2192 ${r.change}`;
-    const card = resultCard({ check: cb, title, titleMono: true, meta: (_a = r.badge) == null ? void 0 : _a.text });
+    const card = resultCard(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title, titleMono: true, meta: (_b = r.badge) == null ? void 0 : _b.text }));
     if (r.badge) {
       const meta = card.querySelector(".r-meta");
       meta.className = `tag tag-${r.badge.kind}`;
@@ -3727,7 +4412,7 @@
     const visible = rows.filter(
       (r) => r.change !== void 0 || r.header || (r.keep ? !opts.hideKeep : !opts.hideContext)
     );
-    renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange));
+    renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange, opts.readOnly));
   }
   var renameNodes = [];
   var renameChecked = /* @__PURE__ */ new Set();
@@ -3793,8 +4478,9 @@
     var _a;
     return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}`;
   }
+  var bindResultMode = false;
   function hasBindPreview() {
-    return bindCandidates.length > 0;
+    return bindCandidates.length > 0 && !bindResultMode;
   }
   function skipReasonText(s) {
     const why = t(`reason.${s.reason}`);
@@ -3802,7 +4488,7 @@
   }
   function bindRows() {
     const byNode = /* @__PURE__ */ new Map();
-    for (const c of bindCandidates) {
+    for (const c of filteredCandidates()) {
       const arr = byNode.get(c.nodeId);
       if (arr) arr.push(c);
       else byNode.set(c.nodeId, [c]);
@@ -3824,35 +4510,64 @@
         });
         continue;
       }
-      rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands });
+      rows.push(__spreadValues({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands }, cands ? { selectId: n.id } : {}));
       if (cands) {
-        for (const c of cands) {
-          const dist = c.distance && c.distance > 0 ? ` ~${Math.round(c.distance * 100) / 100}` : "";
+        for (const line of groupBindLines(cands)) {
+          const lead = line.items[0];
+          const dist = lead.distance && lead.distance > 0 ? ` ~${Math.round(lead.distance * 100) / 100}` : "";
+          const label = fieldLabel(line.label, line.fields[0]);
+          const variable = `${line.variableName}${dist}`;
+          const tipArgs = { label, fields: line.fields.join(", "), variable: line.variableName };
           rows.push({
-            id: candKey(c),
-            name: `${c.field} ${c.currentValue}`,
-            type: c.field,
+            id: candKey(lead),
+            keys: line.items.map((it) => candKey(it)),
+            name: `${label} ${line.currentValue}`,
+            type: line.fields[0],
             depth: n.depth + 1,
             parentId: n.id,
-            change: `${c.variableName}${dist}`
+            change: variable,
+            bind: {
+              label,
+              value: line.currentValue,
+              variable,
+              connected: bindResultMode,
+              tip: t(bindResultMode ? "bind.connectedTip" : "bind.willConnectTip", tipArgs)
+            }
           });
         }
       }
     }
     return rows;
   }
+  function fieldLabel(label, rawField) {
+    return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
+  }
   function renderBindTree() {
+    const has = bindCandidates.length > 0;
+    $("bindViewRow").style.display = has ? "" : "none";
     $("bindTreeCtrls").style.display = hasBindPreview() ? "" : "none";
     renderSelectableTree($("bindTree"), bindRows(), bindChecked, {
       hideContext: bindHideContext,
-      onChange: updateBindApply
+      onChange: updateBindApply,
+      readOnly: bindResultMode
+      // 적용 결과: 어느 레이어에 어느 변수가 붙었는지 보기만
     });
     updateBindApply();
   }
+  function bindFilterText() {
+    var _a;
+    return ((_a = $("bindFilter").value) != null ? _a : "").trim().toLowerCase();
+  }
+  function filteredCandidates() {
+    const q = bindFilterText();
+    return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
+  }
+  $("bindFilter").addEventListener("input", () => renderBindTree());
+  $("btnBindToManager").addEventListener("click", () => openVarManager({ onlyUsed: true }));
   function updateBindApply() {
     const total = bindCandidates.length;
     const sel = bindChecked.size;
-    $("bindCount").textContent = total ? `\uD6C4\uBCF4 ${total}` : "";
+    $("bindCount").textContent = total ? bindResultMode ? `\uC5F0\uACB0 ${total}` : `\uD6C4\uBCF4 ${total}` : "";
     const confirm = $("btnApplyConfirm");
     confirm.style.display = hasBindPreview() ? "" : "none";
     confirm.disabled = sel === 0;
@@ -3863,6 +4578,8 @@
     }
   }
   function clearBindPreview() {
+    $("bindTree").classList.remove("stale");
+    bindResultMode = false;
     bindCandidates = [];
     bindNodes = [];
     bindSkips = [];
@@ -3874,6 +4591,7 @@
     clearMount($("bindTree"));
     $("bindCount").textContent = "";
     $("bindTreeCtrls").style.display = "none";
+    $("bindViewRow").style.display = "none";
     $("btnApplyConfirm").style.display = "none";
   }
   var compCandidates = [];
@@ -3953,7 +4671,7 @@
   }
   function refreshTreeEmptyStates() {
     const guide = "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.";
-    if (!hasBindPreview()) {
+    if (!hasBindPreview() && !$("bindTree").classList.contains("stale")) {
       if (lastSelCount === 0) renderEmptyState($("bindTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", guide);
       else clearMount($("bindTree"));
     }
@@ -4114,6 +4832,7 @@
   var STRUCTURE_TIPS = {
     btnScanComp: "component.scanHelp",
     btnScanSimilar: "similar.scanHelp",
+    btnScanBindings: "bind.scanHelp",
     btnClassifyVariants: "component.classifyHelp",
     btnGenMissing: "component.genMissingHelp",
     btnRegisterComp: "component.registerHelp",
@@ -4194,12 +4913,29 @@
     ro.observe($("selBarWrap"));
   }
   window.addEventListener("resize", syncStickyOffsets);
+  var uiSizeMode = "default";
+  function renderUiSize(mode) {
+    uiSizeMode = mode;
+    const btn = $("btnUiSize");
+    const key = mode === "large" ? "ui.sizeShrink" : "ui.sizeGrow";
+    btn.setAttribute("aria-pressed", String(mode === "large"));
+    btn.dataset.i18nTitle = key;
+    btn.title = t(key);
+    btn.setAttribute("aria-label", t(key));
+  }
+  $("btnUiSize").addEventListener("click", () => {
+    const next = uiSizeMode === "large" ? "default" : "large";
+    renderUiSize(next);
+    send({ type: "SET_UI_SIZE", mode: next });
+  });
+  renderUiSize("default");
+  send({ type: "GET_UI_SIZE" });
   updateGates();
   renderPipeline();
   renderTokens();
   refreshTreeEmptyStates();
   send({ type: "GET_COLLECTIONS" });
-  send({ type: "GET_PREREQ" });
+  requestPrereq();
   send({ type: "GET_LICENSE" });
   send({ type: "GET_VARIABLES" });
   send({ type: "GET_SETTINGS" });
@@ -4207,6 +4943,7 @@
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
   var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {
+    if (vmOpen) leaveManagerUi();
     for (const t2 of TABS) {
       $(`tab-${t2}`).classList.toggle("active", t2 === name);
       const btn = $(`tabbtn-${t2}`);
@@ -4216,9 +4953,116 @@
       btn.tabIndex = on ? 0 : -1;
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
-    if (name !== "settings") send({ type: "GET_PREREQ" });
+    if (name !== "settings") requestPrereq();
     if (name === "tokens") send({ type: "GET_VARIABLES" });
+    if (name === "settings") send({ type: "GET_COLLECTION_ROLES" });
   }
+  function goToBindStatus() {
+    showTab("apply");
+    showApplyStep("bind");
+    if (lastSelCount > 0) {
+      setStatus("applyStatus", t("common.running"), "");
+      requestBindingsScan();
+    } else setStatus("applyStatus", t("existingVars.selectFirst"), "");
+  }
+  function goToCollectionRoles() {
+    showTab("settings");
+    $("collectionRolesCard").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function renderExistingVars(tierVars, tierColor, other) {
+    for (const [id, onMake] of [["existingVarsStart", false], ["existingVarsMake", true]]) {
+      const box = $(id);
+      const text = box.querySelector(".ev-text");
+      const go = box.querySelector(".ev-go");
+      const manage = box.querySelector(".ev-manage");
+      manage.textContent = t("vm.fromBanner");
+      manage.onclick = () => openVarManager({ onlyUsed: false });
+      manage.style.display = tierVars + other > 0 ? "" : "none";
+      if (tierVars > 0) {
+        text.textContent = onMake ? t("existingVars.hasMake", { n: tierVars }) : t("existingVars.has", { n: tierVars, color: tierColor, other: tierVars - tierColor });
+        go.textContent = t("existingVars.gotoBind");
+        go.onclick = goToBindStatus;
+        box.style.display = "";
+      } else if (other > 0) {
+        text.textContent = t("existingVars.unknown", { n: other });
+        go.textContent = t("existingVars.gotoRoles");
+        go.onclick = goToCollectionRoles;
+        box.style.display = "";
+      } else box.style.display = "none";
+    }
+  }
+  var ROLE_LABEL = { global: "Global", semantic: "Semantic", component: "Component" };
+  var colRoleRows = [];
+  function renderCollectionRoles(rows) {
+    var _a;
+    const prev = colRoleRows;
+    colRoleRows = rows;
+    const box = $("collectionRoles");
+    clearMount(box);
+    if (!rows.length) {
+      const p = document.createElement("div");
+      p.className = "hint";
+      p.textContent = t("colRoles.empty");
+      box.appendChild(p);
+      return;
+    }
+    for (const r of rows) {
+      const row = document.createElement("div");
+      row.className = "col-role";
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = r.name;
+      name.title = r.name;
+      const sel = document.createElement("select");
+      sel.setAttribute("aria-label", r.name);
+      const opts = [
+        ["", !r.set && r.role ? t("colRoles.auto", { role: ROLE_LABEL[r.role] }) : t("colRoles.autoNone")],
+        ["global", "Global"],
+        ["semantic", "Semantic"],
+        ["component", "Component"],
+        ["none", t("colRoles.none")]
+      ];
+      for (const [v, label] of opts) {
+        const o = document.createElement("option");
+        o.value = v;
+        o.textContent = label;
+        sel.appendChild(o);
+      }
+      sel.value = (_a = r.set) != null ? _a : "";
+      sel.addEventListener("change", () => {
+        const role = sel.value || null;
+        const holder = role && role !== "none" ? colRoleRows.find((x) => x.id !== r.id && x.set === role) : void 0;
+        pendingRoleNote = { id: r.id, name: r.name, role, prev: holder == null ? void 0 : holder.name };
+        send({ type: "SET_COLLECTION_ROLE", collectionId: r.id, role });
+      });
+      const sub = document.createElement("div");
+      sub.className = "sub";
+      sub.append(t("colRoles.vars", { n: r.vars }));
+      if (!r.set && r.guess && r.guess !== r.role) {
+        sub.append(" \xB7 ", t("colRoles.guess", { role: ROLE_LABEL[r.guess] }), " ");
+        const use = document.createElement("button");
+        use.className = "link";
+        use.textContent = t("colRoles.useGuess");
+        use.addEventListener("click", () => {
+          const holder = colRoleRows.find((x) => x.id !== r.id && x.set === r.guess);
+          pendingRoleNote = { id: r.id, name: r.name, role: r.guess, prev: holder == null ? void 0 : holder.name };
+          send({ type: "SET_COLLECTION_ROLE", collectionId: r.id, role: r.guess });
+        });
+        sub.appendChild(use);
+      }
+      row.append(name, sel, sub);
+      box.appendChild(row);
+    }
+    if (pendingRoleNote && prev.length) {
+      const n = pendingRoleNote;
+      pendingRoleNote = null;
+      const now = rows.find((x) => x.id === n.id);
+      const label = n.role === null ? (now == null ? void 0 : now.role) ? t("colRoles.auto", { role: ROLE_LABEL[now.role] }) : t("colRoles.autoNone") : n.role === "none" ? t("colRoles.none") : ROLE_LABEL[n.role];
+      const dup = n.prev && n.role && n.role !== "none" ? " " + t("colRoles.dup", { role: ROLE_LABEL[n.role], prev: n.prev }) : "";
+      setStatus("colRolesStatus", t("colRoles.saved", { name: n.name, role: label }) + dup, dup ? "warn" : "ok");
+    }
+  }
+  var pendingRoleNote = null;
   TABS.forEach((t2, i) => {
     const btn = $(`tabbtn-${t2}`);
     btn.addEventListener("click", () => showTab(t2));
@@ -4261,8 +5105,667 @@
   for (const b of Array.from(document.querySelectorAll("[data-next-apply]"))) {
     b.addEventListener("click", () => showApplyStep(b.dataset.nextApply));
   }
+  var menuEl = null;
+  function closeMenu() {
+    menuEl == null ? void 0 : menuEl.remove();
+    menuEl = null;
+  }
+  function openMenu(x, y, items, returnFocus) {
+    var _a;
+    closeMenu();
+    const m = document.createElement("div");
+    m.className = "ctx-menu";
+    m.setAttribute("role", "menu");
+    const buttons = [];
+    for (const it of items) {
+      if (it.separatorBefore) m.appendChild(document.createElement("hr"));
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "menuitem");
+      b.textContent = it.label;
+      b.disabled = !!it.disabled;
+      b.addEventListener("click", () => {
+        closeMenu();
+        returnFocus == null ? void 0 : returnFocus.focus();
+        it.onSelect();
+      });
+      m.appendChild(b);
+      buttons.push(b);
+    }
+    $("overlayRoot").appendChild(m);
+    const r = m.getBoundingClientRect();
+    m.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
+    m.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
+    const enabled = buttons.filter((b) => !b.disabled);
+    (_a = enabled[0]) == null ? void 0 : _a.focus();
+    m.addEventListener("keydown", (e) => {
+      var _a2, _b;
+      const i = enabled.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        (_a2 = enabled[(i + 1) % enabled.length]) == null ? void 0 : _a2.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        (_b = enabled[(i - 1 + enabled.length) % enabled.length]) == null ? void 0 : _b.focus();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeMenu();
+        returnFocus == null ? void 0 : returnFocus.focus();
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+      }
+    });
+    menuEl = m;
+  }
+  document.addEventListener("pointerdown", (e) => {
+    if (menuEl && !menuEl.contains(e.target)) closeMenu();
+  }, true);
+  window.addEventListener("resize", closeMenu);
+  document.addEventListener("scroll", closeMenu, true);
+  var modalEl = null;
+  var modalReturnFocus = null;
+  function closeModal() {
+    if (!modalEl) return;
+    modalEl.remove();
+    modalEl = null;
+    modalReturnFocus == null ? void 0 : modalReturnFocus.focus();
+    modalReturnFocus = null;
+  }
+  function openModal(title, body, foot) {
+    var _a;
+    closeModal();
+    closeMenu();
+    modalReturnFocus = document.activeElement;
+    const back = document.createElement("div");
+    back.className = "modal-backdrop";
+    const box = document.createElement("div");
+    box.className = "modal";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    const h = document.createElement("h3");
+    if (typeof title === "string") h.textContent = title;
+    else h.appendChild(title);
+    const f = document.createElement("div");
+    f.className = "m-foot";
+    f.append(...foot);
+    box.append(h, body, f);
+    back.appendChild(box);
+    back.addEventListener("pointerdown", (e) => {
+      if (e.target === back) closeModal();
+    });
+    box.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeModal();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const focusables = Array.from(box.querySelectorAll('button:not(:disabled), select, input, [tabindex="0"]'));
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+    $("overlayRoot").appendChild(back);
+    modalEl = back;
+    ((_a = box.querySelector("select, input, button.primary, button")) != null ? _a : box).focus();
+    return box;
+  }
+  function modalButton(label, onClick, primary = false) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    if (primary) b.className = "primary";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+  async function copyText(text) {
+    var _a;
+    try {
+      if ((_a = navigator.clipboard) == null ? void 0 : _a.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (e) {
+      ok = false;
+    }
+    ta.remove();
+    return ok;
+  }
+  var vmOpen = false;
+  var vmCols = [];
+  var vmVars = [];
+  var vmScope = null;
+  var vmScopeUser = false;
+  var vmSelected = null;
+  var vmCollapsed = /* @__PURE__ */ new Set();
+  var vmUsage = null;
+  var vmUsageNodes = /* @__PURE__ */ new Map();
+  var vmUsageCapped = false;
+  var vmUsageReq = 0;
+  var vmReturn = null;
+  function currentTab() {
+    var _a;
+    return (_a = TABS.find((t2) => $(`tab-${t2}`).classList.contains("active"))) != null ? _a : "wizard";
+  }
+  function openVarManager(opts = {}) {
+    if (!vmOpen) {
+      vmReturn = { tab: currentTab(), scrollY: window.scrollY };
+      vmScopeUser = false;
+    }
+    vmOpen = true;
+    if (opts.onlyUsed !== void 0) $("vmOnlyUsed").checked = opts.onlyUsed;
+    for (const t2 of TABS) $(`tab-${t2}`).classList.remove("active");
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    $("varManager").style.display = "";
+    $("btnVarManager").setAttribute("aria-pressed", "true");
+    send({ type: "SET_UI_WIDE", wide: true });
+    send({ type: "GET_VAR_TABLE" });
+    requestManagerUsage();
+    renderVarManager();
+    window.scrollTo(0, 0);
+  }
+  function leaveManagerUi() {
+    vmOpen = false;
+    if (vmUsageTimer) {
+      clearTimeout(vmUsageTimer);
+      vmUsageTimer = null;
+    }
+    closeMenu();
+    closeModal();
+    $("varManager").style.display = "none";
+    $("btnVarManager").setAttribute("aria-pressed", "false");
+    send({ type: "SET_UI_WIDE", wide: false });
+  }
+  function closeVarManager() {
+    var _a;
+    if (!vmOpen) return;
+    const back = vmReturn;
+    vmReturn = null;
+    showTab((_a = back == null ? void 0 : back.tab) != null ? _a : "wizard");
+    if (back) requestAnimationFrame(() => window.scrollTo(0, back.scrollY));
+  }
+  var vmUsageTimer = null;
+  function scheduleManagerUsage() {
+    if (!vmOpen) return;
+    if (vmUsageTimer) clearTimeout(vmUsageTimer);
+    vmUsage = null;
+    vmUsageReq = 0;
+    renderVarManager();
+    vmUsageTimer = setTimeout(() => {
+      vmUsageTimer = null;
+      requestManagerUsage();
+    }, AUTO_SCAN_DELAY);
+  }
+  $("btnVarManager").addEventListener("click", () => vmOpen ? closeVarManager() : openVarManager());
+  $("vmBack").addEventListener("click", () => closeVarManager());
+  $("vmSearch").addEventListener("input", () => renderVarManager());
+  $("vmOnlyUsed").addEventListener("change", () => {
+    vmScopeUser = false;
+    renderVarManager();
+  });
+  function requestManagerUsage() {
+    if (lastSelCount === 0) {
+      setManagerUsage([], [], false);
+      return;
+    }
+    vmUsageReq = ++bindReqSeq;
+    send({ type: "SCAN_BINDINGS", reqId: vmUsageReq, forManager: true });
+  }
+  function setManagerUsage(cands, nodes, capped) {
+    var _a;
+    const m = /* @__PURE__ */ new Map();
+    for (const c of cands) {
+      const list = (_a = m.get(c.variableId)) != null ? _a : [];
+      list.push(c);
+      m.set(c.variableId, list);
+    }
+    vmUsage = m;
+    vmUsageNodes = new Map(nodes.map((n) => [n.id, n.name]));
+    vmUsageCapped = capped;
+    if (vmOpen) renderVarManager();
+  }
+  function usageCount(id) {
+    var _a, _b;
+    return (_b = (_a = vmUsage == null ? void 0 : vmUsage.get(id)) == null ? void 0 : _a.length) != null ? _b : 0;
+  }
+  function renderVarManager() {
+    if (!vmOpen) return;
+    const onlyUsed = $("vmOnlyUsed").checked;
+    const query = $("vmSearch").value;
+    const usage = new Map([...(vmUsage != null ? vmUsage : /* @__PURE__ */ new Map()).entries()].map(([k, v]) => [k, v.length]));
+    const q = query.trim().toLowerCase();
+    const include = (v) => {
+      var _a;
+      return (!onlyUsed || ((_a = usage.get(v.id)) != null ? _a : 0) > 0) && (!q || v.name.toLowerCase().includes(q));
+    };
+    const tree = buildVarTree(vmCols, vmVars, include);
+    if (!vmScopeUser || !vmScope || !vmCols.some((c) => c.id === vmScope.collectionId)) {
+      vmScopeUser = false;
+      const first = pickInitialCollection(tree);
+      vmScope = first ? { collectionId: first, path: "" } : null;
+    }
+    const total = vmVars.length;
+    const shown = vmVars.filter(include).length;
+    $("vmCount").textContent = t("vm.count", { shown, total });
+    renderVmTree(tree);
+    renderVmTable(onlyUsed, query, usage);
+  }
+  function renderVmTree(tree) {
+    const box = $("vmTree");
+    clearMount(box);
+    const walk = (n) => {
+      const key = `${n.collectionId}|${n.path}`;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = n.count ? "vm-node" : "vm-node empty";
+      b.style.paddingLeft = `${6 + n.depth * 12}px`;
+      const current = vmScope && vmScope.collectionId === n.collectionId && vmScope.path === n.path;
+      b.setAttribute("aria-current", String(!!current));
+      const collapsed = vmCollapsed.has(`tree:${key}`);
+      const tw = document.createElement("span");
+      tw.className = "tw";
+      tw.textContent = n.children.length ? collapsed ? "\u25B8" : "\u25BE" : "";
+      tw.addEventListener("click", (e) => {
+        if (!n.children.length) return;
+        e.stopPropagation();
+        if (collapsed) vmCollapsed.delete(`tree:${key}`);
+        else vmCollapsed.add(`tree:${key}`);
+        renderVarManager();
+      });
+      const lbl = document.createElement("span");
+      lbl.className = "lbl";
+      lbl.textContent = n.label;
+      lbl.title = n.path || n.label;
+      b.append(tw, lbl);
+      if (n.depth === 0) {
+        const col = vmCols.find((c) => c.id === n.collectionId);
+        const tierName = col && col.tier ? ["", "Global", "Semantic", "Component"][col.tier] : "";
+        if (tierName && tierName !== n.label) {
+          const tag = document.createElement("span");
+          tag.className = "vm-tier";
+          tag.textContent = tierName;
+          b.appendChild(tag);
+        }
+      }
+      const cnt = document.createElement("span");
+      cnt.className = "cnt";
+      cnt.textContent = String(n.count);
+      b.appendChild(cnt);
+      b.addEventListener("click", () => {
+        vmScope = { collectionId: n.collectionId, path: n.path };
+        vmScopeUser = true;
+        renderVarManager();
+      });
+      box.appendChild(b);
+      if (!collapsed) n.children.forEach(walk);
+    };
+    tree.forEach(walk);
+  }
+  function resolveColor(cell) {
+    var _a;
+    let c = cell;
+    for (let i = 0; i < 8 && c; i++) {
+      if (c.kind === "color") return c.hex;
+      if (c.kind !== "alias") return null;
+      const target = vmVars.find((v) => v.id === c.aliasId);
+      if (!target) return null;
+      const col = vmCols.find((x) => x.id === target.collectionId);
+      c = col ? target.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId] : void 0;
+    }
+    return null;
+  }
+  var swatchHtml = (hex) => hex ? `<span class="bf-swatch" style="background:${escapeHtml(hex)}"></span>` : "";
+  function vmCellEl(cell) {
+    const span = document.createElement("span");
+    if (!cell) {
+      span.textContent = "\u2014";
+      span.className = "muted";
+      return span;
+    }
+    if (cell.kind === "alias") {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "vm-alias";
+      b.innerHTML = `${swatchHtml(resolveColor(cell))}= ${escapeHtml(cell.aliasName)}`;
+      b.title = t("vm.jumpAlias");
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        jumpToVar(cell.aliasId);
+      });
+      return b;
+    }
+    span.className = "vm-val";
+    if (cell.kind === "color") span.innerHTML = `<span class="bf-swatch" style="background:${escapeHtml(cell.hex)}"></span>${escapeHtml(cell.hex.toUpperCase())}`;
+    else span.textContent = cell.text;
+    return span;
+  }
+  function jumpToVar(id) {
+    var _a;
+    const v = vmVars.find((x) => x.id === id);
+    if (!v) {
+      setStatus("vmStatus", t("vm.aliasOutside"), "warn");
+      return;
+    }
+    $("vmOnlyUsed").checked = false;
+    $("vmSearch").value = "";
+    vmScope = { collectionId: v.collectionId, path: "" };
+    vmScopeUser = true;
+    vmSelected = id;
+    renderVarManager();
+    (_a = document.querySelector(`.vm-row[data-id="${CSS.escape(id)}"]`)) == null ? void 0 : _a.focus();
+  }
+  function typeIcon(v) {
+    return v.type === "COLOR" ? "" : v.type === "FLOAT" ? "#" : v.type === "STRING" ? "T" : "\u25D0";
+  }
+  function renderVmTable(onlyUsed, query, usage) {
+    var _a;
+    const wrap = $("vmTableWrap");
+    clearMount(wrap);
+    const empty = (text, action) => {
+      const d = document.createElement("div");
+      d.className = "vm-empty";
+      d.textContent = text;
+      if (action) {
+        const b = document.createElement("button");
+        b.className = "link";
+        b.textContent = action[0];
+        b.addEventListener("click", action[1]);
+        d.append(" ", b);
+      }
+      wrap.appendChild(d);
+    };
+    if (!vmVars.length && vmCols.length === 0) {
+      empty(t("vm.noVars"));
+      return;
+    }
+    if (!vmScope) {
+      empty(t("vm.noVars"));
+      return;
+    }
+    const col = vmCols.find((c) => c.id === vmScope.collectionId);
+    if (!col) return;
+    const rows = filterVars(vmVars, { collectionId: col.id, path: vmScope.path, query, onlyUsed }, usage);
+    if (!rows.length) {
+      const showAll = [t("vm.showAll"), () => {
+        $("vmOnlyUsed").checked = false;
+        vmScopeUser = false;
+        renderVarManager();
+      }];
+      if (onlyUsed && lastSelCount === 0) empty(t("vm.selectFirst"), showAll);
+      else if (onlyUsed && vmUsage === null) empty(t("vm.usageLoading"));
+      else if (onlyUsed) empty(t("vm.noneUsed"), showAll);
+      else empty(t("vm.noMatch"));
+      return;
+    }
+    const table = document.createElement("table");
+    table.className = "vm-table";
+    const head = document.createElement("tr");
+    const th = (text, cls = "") => {
+      const c = document.createElement("th");
+      c.textContent = text;
+      if (cls) c.className = cls;
+      head.appendChild(c);
+    };
+    th(t("vm.colName"), "name");
+    for (const m of col.modes) th(m.name);
+    th(t("vm.colUsage"), "vm-use");
+    th("");
+    const thead = document.createElement("thead");
+    thead.appendChild(head);
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    const span = col.modes.length + 3;
+    for (const g of groupRows(rows)) {
+      const gkey = `grp:${col.id}|${g.path}`;
+      const collapsed = vmCollapsed.has(gkey);
+      if (g.path) {
+        const tr = document.createElement("tr");
+        tr.className = "vm-group";
+        const td = document.createElement("td");
+        td.colSpan = span;
+        td.textContent = `${collapsed ? "\u25B8" : "\u25BE"} ${g.path.split("/").join(" / ")}`;
+        tr.appendChild(td);
+        tr.addEventListener("click", () => {
+          if (collapsed) vmCollapsed.delete(gkey);
+          else vmCollapsed.add(gkey);
+          renderVarManager();
+        });
+        tbody.appendChild(tr);
+      }
+      if (collapsed) continue;
+      for (const v of g.rows) tbody.appendChild(vmRowEl(v, col, (_a = usage.get(v.id)) != null ? _a : 0));
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    if (vmUsageCapped) setStatus("vmStatus", t("vm.usageCapped"), "warn");
+  }
+  function vmRowEl(v, col, uses) {
+    var _a;
+    const tr = document.createElement("tr");
+    tr.className = "vm-row";
+    tr.dataset.id = v.id;
+    tr.tabIndex = 0;
+    tr.setAttribute("aria-selected", String(vmSelected === v.id));
+    const name = document.createElement("td");
+    name.className = "name";
+    name.title = v.description ? `${v.name}
+${v.description}` : v.name;
+    const ic = document.createElement("span");
+    ic.className = "ic";
+    const firstCell = v.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId];
+    const hex = v.type === "COLOR" ? resolveColor(firstCell) : null;
+    if (hex) ic.innerHTML = swatchHtml(hex);
+    else ic.textContent = typeIcon(v);
+    name.append(ic, leafName(v.name));
+    tr.appendChild(name);
+    for (const m of col.modes) {
+      const td = document.createElement("td");
+      td.appendChild(vmCellEl(v.values[m.modeId]));
+      tr.appendChild(td);
+    }
+    const use = document.createElement("td");
+    use.className = "vm-use";
+    use.textContent = vmUsage === null || lastSelCount === 0 ? "\u2014" : uses ? t("vm.uses", { n: uses }) : "\u2014";
+    tr.appendChild(use);
+    const more = document.createElement("td");
+    const mb = document.createElement("button");
+    mb.type = "button";
+    mb.className = "more";
+    mb.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg>';
+    mb.title = t("vm.moreTip");
+    mb.setAttribute("aria-label", t("vm.moreTip"));
+    mb.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const r = mb.getBoundingClientRect();
+      selectVmRow(v.id);
+      openVarMenu(v, r.left, r.bottom, tr);
+    });
+    more.appendChild(mb);
+    tr.appendChild(more);
+    tr.addEventListener("click", () => selectVmRow(v.id));
+    tr.addEventListener("dblclick", () => openVarDetail(v));
+    tr.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      selectVmRow(v.id);
+      openVarMenu(v, e.clientX, e.clientY, tr);
+    });
+    tr.addEventListener("keydown", (e) => {
+      var _a2;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        openVarDetail(v);
+      } else if (e.key === "ContextMenu" || e.key === "F10" && e.shiftKey) {
+        e.preventDefault();
+        const r = tr.getBoundingClientRect();
+        openVarMenu(v, r.left + 24, r.bottom, tr);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const sib = e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
+        const target = sib && sib.classList.contains("vm-row") ? sib : null;
+        if (target) {
+          target.focus();
+          selectVmRow((_a2 = target.dataset.id) != null ? _a2 : null);
+        }
+      }
+    });
+    return tr;
+  }
+  function selectVmRow(id) {
+    vmSelected = id;
+    document.querySelectorAll(".vm-row").forEach((r) => r.setAttribute("aria-selected", String(r.dataset.id === id)));
+  }
+  function currentModeCell(v) {
+    var _a;
+    const col = vmCols.find((c) => c.id === v.collectionId);
+    return col ? v.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId] : void 0;
+  }
+  async function copyAndReport(text, what) {
+    if (!text) {
+      setStatus("vmStatus", t("vm.copyEmpty"), "warn");
+      return;
+    }
+    const ok = await copyText(text);
+    setStatus("vmStatus", ok ? t("vm.copied", { what, text }) : t("vm.copyFailed", { text }), ok ? "ok" : "warn");
+  }
+  function openVarMenu(v, x, y, returnFocus) {
+    var _a;
+    const uses = usageCount(v.id);
+    const nodeIds = [...new Set(((_a = vmUsage == null ? void 0 : vmUsage.get(v.id)) != null ? _a : []).map((c) => c.nodeId))];
+    openMenu(x, y, [
+      { label: t("vm.copyName"), onSelect: () => void copyAndReport(v.name, t("vm.whatName")) },
+      { label: t("vm.copyValue"), onSelect: () => void copyAndReport(cellCopyText(currentModeCell(v)), t("vm.whatValue")) },
+      { label: t("vm.copyCss"), onSelect: () => void copyAndReport(cssVarName(v.name), t("vm.whatCss")) },
+      { label: t("vm.selectLayers"), disabled: !nodeIds.length, separatorBefore: true, onSelect: () => selectNodes(nodeIds, "vmStatus") },
+      { label: t("vm.detail"), onSelect: () => openVarDetail(v) },
+      { label: t("vm.remap"), disabled: !uses, onSelect: () => openRemapModal(v) }
+    ], returnFocus);
+  }
+  function openVarDetail(v) {
+    var _a, _b, _c, _d, _e, _f;
+    const col = vmCols.find((c) => c.id === v.collectionId);
+    const title = document.createElement("span");
+    const first = col ? v.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId] : void 0;
+    title.innerHTML = `${v.type === "COLOR" ? swatchHtml(resolveColor(first)) : ""}<span class="vm-val">${escapeHtml(v.name)}</span>`;
+    const body = document.createElement("div");
+    const dl = document.createElement("dl");
+    const row = (k, val) => {
+      const dt = document.createElement("dt");
+      dt.textContent = k;
+      const dd = document.createElement("dd");
+      if (typeof val === "string") dd.textContent = val;
+      else dd.appendChild(val);
+      dl.append(dt, dd);
+    };
+    const tierName = col && col.tier ? ["", "Global", "Semantic", "Component"][col.tier] : t("vm.noTier");
+    row(t("vm.dCollection"), col && col.name === tierName ? col.name : `${(_b = col == null ? void 0 : col.name) != null ? _b : ""} \xB7 ${tierName}`);
+    for (const m of (_c = col == null ? void 0 : col.modes) != null ? _c : []) row(m.name, vmCellEl(v.values[m.modeId]));
+    const scopes = document.createElement("span");
+    for (const sc of v.scopes) {
+      const c = document.createElement("span");
+      c.className = "chip";
+      c.textContent = sc;
+      scopes.appendChild(c);
+    }
+    row(t("vm.dScopes"), v.scopes.length ? scopes : "\u2014");
+    row(t("vm.dDesc"), v.description || "\u2014");
+    const usesBox = document.createElement("div");
+    const list = (_d = vmUsage == null ? void 0 : vmUsage.get(v.id)) != null ? _d : [];
+    if (!list.length) usesBox.textContent = lastSelCount ? t("vm.dNoUses") : t("vm.dSelectFirst");
+    else {
+      const byNode = /* @__PURE__ */ new Map();
+      for (const c of list) byNode.set(c.nodeId, [...(_e = byNode.get(c.nodeId)) != null ? _e : [], c]);
+      for (const [nid, cs] of byNode) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "var-use";
+        b.title = t("bind.layerSelectTip");
+        const labels = groupBindLines(cs).map((l) => fieldLabel(l.label, l.fields[0])).join(", ");
+        b.innerHTML = `<span class="vu-layer">${escapeHtml((_f = vmUsageNodes.get(nid)) != null ? _f : nid)}</span> <span class="vu-props">${escapeHtml(labels)}</span>`;
+        b.addEventListener("click", () => selectNodes([nid], "vmStatus"));
+        usesBox.appendChild(b);
+      }
+    }
+    usesBox.className = "var-uses";
+    row(t("vm.dUses", { n: list.length }), usesBox);
+    body.appendChild(dl);
+    const foot = [modalButton(t("vm.remap"), () => openRemapModal(v)), modalButton(t("common.close"), closeModal, true)];
+    foot[0].disabled = !list.length;
+    openModal(title, body, foot);
+  }
+  var remapModal = null;
+  var keepRemapStatus = false;
+  function openRemapModal(v) {
+    var _a;
+    const list = (_a = vmUsage == null ? void 0 : vmUsage.get(v.id)) != null ? _a : [];
+    const fields = [...new Set(list.map((c) => c.field))];
+    const body = document.createElement("div");
+    body.textContent = t("bind.remapLoading");
+    const box = openModal(t("vm.remapTitle", { name: v.name }), body, [modalButton(t("bind.remapCancel"), closeModal)]);
+    remapModal = { fromId: v.id, fields, sites: list.length, box };
+    send({ type: "REMAP_TARGETS", fromId: v.id, fields });
+  }
+  function onRemapTargets(fromId, targets) {
+    if (!remapModal || remapModal.fromId !== fromId || !modalEl) return;
+    const { box, fields, sites } = remapModal;
+    const body = document.createElement("div");
+    const foot = box.querySelector(".m-foot");
+    clearMount(foot);
+    if (!targets.length) {
+      body.textContent = t("bind.remapNone");
+      foot.append(modalButton(t("common.close"), closeModal, true));
+    } else {
+      const label = document.createElement("label");
+      label.className = "inline";
+      label.textContent = t("bind.remapLabel") + " ";
+      const select = document.createElement("select");
+      select.id = "remapTarget";
+      const byCol = /* @__PURE__ */ new Map();
+      for (const tv of targets) {
+        let g = byCol.get(tv.collection);
+        if (!g) {
+          g = document.createElement("optgroup");
+          g.label = tv.collection || "\u2014";
+          byCol.set(tv.collection, g);
+          select.appendChild(g);
+        }
+        const opt = document.createElement("option");
+        opt.value = tv.id;
+        opt.textContent = tv.name;
+        g.appendChild(opt);
+      }
+      label.appendChild(select);
+      body.appendChild(label);
+      const apply = modalButton(t("bind.remapApply", { n: sites }), () => {
+        apply.disabled = true;
+        send({ type: "REMAP_BINDINGS", fromId, toId: select.value, fields, reqId: nextBindReq() });
+      }, true);
+      foot.append(modalButton(t("bind.remapCancel"), closeModal), apply);
+      select.focus();
+    }
+    box.replaceChild(body, box.children[1]);
+  }
 })();
 
 </script>
+  <!-- 스크립트는 반드시 마지막 — 위 마크업이 모두 있어야 리스너가 붙는다. -->
 </body>
 </html>

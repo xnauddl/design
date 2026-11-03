@@ -5,6 +5,7 @@
    ============================================================ */
 import { rgbToHex, hexToRgb } from './tokens';
 import { GLOBAL } from './variables';
+import { ensureCollection } from './collectionRoles';
 import { darkValueForLight, darkGlobalName, isDarkGlobalName } from './themeGen';
 
 /** Semantic(대상) 컬렉션에 만들/재사용할 다크 모드 표시 이름. */
@@ -102,7 +103,7 @@ export async function generateDarkMode(
     };
   }
 
-  const globalCol = cols.find((c) => c.name === GLOBAL) ?? figma.variables.createVariableCollection(GLOBAL);
+  const globalCol = ensureCollection(cols, 'global', GLOBAL);
   const gMode = globalCol.defaultModeId;
   const allVars = await figma.variables.getLocalVariablesAsync();
   const byId = new Map(allVars.map((v) => [v.id, v]));

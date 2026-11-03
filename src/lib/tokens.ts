@@ -248,14 +248,19 @@ export function scopesForTypeList(type: ResolvedType): ScopeName[] {
  * 미지정 역할(primary/secondary/accent/상태색 등)은 undefined → 호출자가 원시 스코프를 상속.
  */
 export function scopeForSemanticRole(role: string): ScopeName[] | undefined {
-  switch (role.split('/')[0].toLowerCase()) {
+  const segs = role.toLowerCase().split('/');
+  // property-first(`color/background/default`)면 둘째 세그먼트가 property, 구식(`text/muted`)은 첫째.
+  const prop = segs[0] === 'color' && segs.length >= 2 ? segs[1] : segs[0];
+  switch (prop) {
     case 'text':
       return ['TEXT_FILL'];
     case 'border':
       return ['STROKE_COLOR'];
+    case 'icon':
+      return ['SHAPE_FILL'];
     case 'surface':
     case 'background':
-      return ['FRAME_FILL'];
+      return ['FRAME_FILL', 'SHAPE_FILL'];
     default:
       return undefined;
   }

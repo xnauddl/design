@@ -177,3 +177,30 @@ test('componentizeSimilar — 오버라이드 실패 시 인스턴스를 버리�
   assert.equal(r.instances, 0, '실패한 교체는 집계하지 않는다');
   assert.ok(r.warnings.some((w) => w.includes('Card')), '남겨둔 이유가 경고에 있어야 한다');
 });
+
+test('componentizeSimilar — 오토레이아웃 부모에서 인스턴스는 원본 자리(index)에 들어간다', async () => {
+  installFigma();
+  // 리스트: [A, B, X, C] — B·C가 교체돼도 X 앞뒤 순서가 유지돼야 한다(맨 끝으로 밀리면 안 됨).
+  const list = {
+    id: 'list', name: 'List', type: 'FRAME', layoutMode: 'VERTICAL', children: [],
+    appendChild(n) { n.parent = this; this.children.push(n); },
+    insertChild(i, n) { n.parent = this; this.children.splice(i, 0, n); },
+  };
+  const a = card('A', { title: 'A', imgKey: 'k1' }, list);
+  const b = card('B', { title: 'B', imgKey: 'k2' }, list);
+  const x = { id: 'X', name: 'Divider', type: 'RECTANGLE', parent: list };
+  const c = card('C', { title: 'C', imgKey: 'k3' }, list);
+  list.children.push(a, b, x, c);
+  // 원본 remove는 부모 children에서도 빠져야 순서를 볼 수 있다.
+  for (const n of [b, c]) n.remove = function () { this.removed = true; list.children.splice(list.children.indexOf(this), 1); };
+
+  const r = await componentizeSimilar(a, [a, b, c]);
+  assert.equal(r.instances, 2);
+  const tag = (n) => (Object.values(n.applied).includes('B') ? 'B' : Object.values(n.applied).includes('C') ? 'C' : '?');
+  const order = list.children.map((n) => (n.type === 'INSTANCE' ? `inst(${tag(n)})` : n.id));
+  // A(마스터, 그 자리 유지) → B 자리 인스턴스 → X → C 자리 인스턴스
+  assert.deepEqual(order, ['A', 'inst(B)', 'X', 'inst(C)']);
+  // 오토레이아웃이라 x/y를 덮지 않는다(0,0 그대로).
+  const insts = list.children.filter((n) => n.type === 'INSTANCE');
+  assert.deepEqual(insts.map((i) => [i.x, i.y]), [[0, 0], [0, 0]]);
+});
