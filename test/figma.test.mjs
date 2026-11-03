@@ -15,6 +15,8 @@ import {
   applyExistingTextStyles,
   bindSelection,
   scanBindings,
+  countUsage,
+  findUsers,
   renameSelection,
   writeRole,
   writeRoleFromName,
@@ -4111,4 +4113,27 @@ test('컬렉션 계층 지정 — 지정이 없으면 예전처럼 이름이 Glo
   const v = figma._state.variables.find((x) => x.name === 'spacing/8');
   const col = figma._state.collections.find((c) => c.id === v.variableCollectionId);
   assert.equal(col.name, 'Global');
+});
+
+
+/* ---------- IA v3 §4.4: 변수 사용 수(보기 전용) — 인스턴스 안쪽 포함, 숨김 제외, 상한 없음 ---------- */
+test('countUsage — 인스턴스 안쪽까지 세고 숨긴 레이어는 뺀다, 곳·레이어 수', async () => {
+  const leaf = (id, varId, extra = {}) => ({ type: 'RECTANGLE', id, name: id, visible: true, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: varId } } }], boundVariables: {}, ...extra });
+  const inst = { type: 'INSTANCE', id: 'i', name: 'i', visible: true, boundVariables: {}, children: [leaf('in1', 'vA')] };
+  const hidden = { ...leaf('h', 'vA'), visible: false };
+  const two = { ...leaf('two', 'vA'), boundVariables: { itemSpacing: { type: 'VARIABLE_ALIAS', id: 'vB' }, paddingLeft: { type: 'VARIABLE_ALIAS', id: 'vB' } } };
+  const root = { type: 'FRAME', id: 'r', name: 'r', visible: true, boundVariables: {}, children: [inst, hidden, two], parent: null };
+  const r = countUsage([root]);
+  assert.deepEqual(r.usage.get('vA'), { places: 2, layers: 2 }); // in1(인스턴스 안쪽) + two, 숨긴 h 제외
+  assert.deepEqual(r.usage.get('vB'), { places: 2, layers: 1 }); // 한 레이어의 두 자리
+  assert.deepEqual(r.nodesById.get('vA').sort(), ['in1', 'two']);
+  assert.equal(r.scanned, 4); // r, i, in1, two
+});
+test('countUsage · findUsers — 600개를 넘어도 상한 없이 센다', async () => {
+  const kids = Array.from({ length: 700 }, (_, i) => ({ type: 'RECTANGLE', id: `n${i}`, name: `n${i}`, visible: true, fills: [], boundVariables: { width: { type: 'VARIABLE_ALIAS', id: 'vW' } } }));
+  const root = { type: 'FRAME', id: 'r', name: 'r', visible: true, boundVariables: {}, children: kids, parent: null };
+  assert.deepEqual(countUsage([root]).usage.get('vW'), { places: 700, layers: 700 });
+  const f = findUsers([root], new Set(['vW', 'other']));
+  assert.equal(f.nodes.length, 700);
+  assert.equal(f.places, 700);
 });

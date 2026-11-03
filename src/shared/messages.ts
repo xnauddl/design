@@ -1,7 +1,7 @@
 /* ============================================================
    messages.ts — code(샌드박스) ↔ ui(iframe) 메시지 타입 단일 소스
    ============================================================ */
-import type { VarCollection, VarRow } from '../lib/varTable';
+import type { VarCollection, VarRow, LibraryVar } from '../lib/varTable';
 import type { DraftToken } from '../lib/tokens';
 import type { TextStyleSpec } from '../lib/textStyles';
 import type { Tier, Feature } from '../lib/entitlements';
@@ -151,6 +151,12 @@ export type UiToCode =
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[]; reqId?: number } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'GET_VAR_TABLE' } // 변수 관리: 로컬 변수 전부(모드별 값·별칭 이름·용도·설명)
+  // IA v3 변수 목록(§4.4) — 보기 전용 사용 수. nodeIds = 목록 기준(없으면 지금 선택). 인스턴스 안쪽 포함, 상한 없음.
+  | { type: 'SCAN_USAGE'; reqId: number; nodeIds?: string[] }
+  // 상세 "쓰인 곳" — 변수들(간접이면 그 변수를 가리키는 별칭들까지) 중 하나라도 쓰는 레이어, 이름은 최대 limit개.
+  | { type: 'FIND_VAR_USERS'; reqId: number; varIds: string[]; nodeIds: string[]; limit: number }
+  // 사용 레이어 선택 / 별칭으로 쓰는 레이어 선택 — 그때 새로 찾아 최대 200개 선택(응답은 SELECT_RESULT).
+  | { type: 'SELECT_VAR_USERS'; varIds: string[]; nodeIds: string[] }
   | { type: 'SCAN_BINDINGS'; reqId?: number; forManager?: boolean } // 선택 안에 이미 붙은 변수 바인딩 읽기(연결 현황 · 읽기 전용)
   | { type: 'REMAP_TARGETS'; fromId: string; fields: string[] } // 일괄 교체: A 자리에 붙일 수 있는 변수 후보(읽기 전용)
   | { type: 'REMAP_BINDINGS'; fromId: string; toId: string; fields: string[]; reqId?: number } // 일괄 교체: 선택 안의 A(그 필드들) → B
@@ -205,6 +211,8 @@ export type CodeToUi =
   | { type: 'REMAP_TARGETS_RESULT'; fromId: string; targets: { id: string; name: string; collection: string }[] }
   | { type: 'REMAP_RESULT'; replaced: number; nodes: number; skipped: number; toName: string }
   | { type: 'VAR_TABLE'; collections: VarCollection[]; vars: VarRow[] }
+  | { type: 'USAGE_RESULT'; reqId: number; usage: Record<string, { places: number; layers: number }>; libraryVars: LibraryVar[]; deleted: { count: number; nodeIds: string[] }; scanned: number }
+  | { type: 'VAR_USERS'; reqId: number; layers: { id: string; name: string }[]; totalLayers: number; places: number }
   | { type: 'BINDINGS_RESULT'; candidates: BindCandidate[]; nodes: BindNode[]; total: number; boundNodes: number; reqId?: number; forManager?: boolean } // 연결 현황(읽기 전용)
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }

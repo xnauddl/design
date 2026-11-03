@@ -1,13 +1,13 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode, RenameChange, VarInfo, VarMode, CollectionRoleInfo } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, CollectionRoleInfo } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
-import { bindSelection, scanBindings, remapBindings } from './lib/bind';
+import { bindSelection, scanBindings, remapBindings, countUsage, findUsers } from './lib/bind';
 import { remapTargets } from './lib/scopes';
 import { collectionTiers, findCollection, readRoleMap, writeRoleMap } from './lib/collectionRoles';
 import { assignRole, roleOfCollection, guessRole } from './lib/tiers';
@@ -27,7 +27,7 @@ import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normaliz
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
 import { UI_SIZE_KEY, UI_WIDTH, normalizeUiSize, uiHeight, uiWidth } from './lib/uiSize';
-import type { VarCell, VarCollection, VarRow, VarType } from './lib/varTable';
+import type { VarCell, VarCollection, VarRow, VarType, LibraryVar } from './lib/varTable';
 
 /* IA v3: 창은 400 × 510 고정, [—]로 최소화(140 × 104, 펼치기 버튼만). 높이 전환(660 ↔ 860)과 넓은 창(760)은 없앴다.
    최소화는 기억하지 않는다 — 다시 열면 늘 펼친 크기다. 긴 목록은 패널 body가 스크롤한다(#18). */
@@ -225,11 +225,26 @@ async function collectVarTable(): Promise<{ collections: VarCollection[]; vars: 
   const all = await figma.variables.getLocalVariablesAsync();
   const nameById = new Map(all.map((v) => [v.id, v.name]));
   const colById = new Map(cols.map((c) => [c.id, c]));
+  // 로컬에 없는 별칭 대상은 라이브러리 변수일 수 있다 — 이름을 실제로 읽는다(§12.1, 91/91 검증).
+  const remoteName = new Map<string, string | null>();
+  for (const v of all) {
+    for (const raw of Object.values(v.valuesByMode)) {
+      if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+        const id = (raw as VariableAlias).id;
+        if (nameById.has(id) || remoteName.has(id)) continue;
+        const rv = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+        remoteName.set(id, rv ? rv.name : null);
+      }
+    }
+  }
   const cell = (raw: VariableValue | undefined): VarCell | undefined => {
     if (raw === undefined || raw === null) return undefined;
     if (typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
       const id = (raw as VariableAlias).id;
-      return { kind: 'alias', aliasId: id, aliasName: nameById.get(id) ?? '(다른 파일 변수)' };
+      const local = nameById.get(id);
+      if (local !== undefined) return { kind: 'alias', aliasId: id, aliasName: local };
+      const rn = remoteName.get(id);
+      return { kind: 'alias', aliasId: id, aliasName: rn ?? '(삭제된 변수)', remote: rn ? true : undefined };
     }
     if (typeof raw === 'object' && 'r' in raw) return { kind: 'color', hex: rgbToHex(raw as RGB) };
     if (typeof raw === 'number') return { kind: 'number', text: String(Math.round(raw * 1000) / 1000) };
@@ -247,8 +262,88 @@ async function collectVarTable(): Promise<{ collections: VarCollection[]; vars: 
     }
     vars.push({ id: v.id, name: v.name, collectionId: col.id, type: v.resolvedType as VarType, values, scopes: [...(v.scopes ?? [])], description: v.description ?? '' });
   }
-  const collections: VarCollection[] = cols.map((c) => ({ id: c.id, name: c.name, tier: tiers.get(c.id) ?? 0, modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })) }));
+  const roleMap = readRoleMap();
+  const collections: VarCollection[] = cols.map((c) => ({
+    id: c.id,
+    name: c.name,
+    tier: tiers.get(c.id) ?? 0,
+    modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })),
+    defaultModeId: c.defaultModeId,
+    tierSet: roleMap[c.id] ?? null,
+  }));
   return { collections, vars };
+}
+
+/** 목록 기준 노드 id → 지금 있는 노드(지워진 것은 뺀다). 비었으면 지금 선택. */
+async function resolveRoots(nodeIds: readonly string[] | undefined): Promise<SceneNode[]> {
+  if (!nodeIds || !nodeIds.length) return selection().slice();
+  const out: SceneNode[] = [];
+  for (const id of nodeIds) {
+    const n = await figma.getNodeByIdAsync(id).catch(() => null);
+    if (n && n.type !== 'PAGE' && n.type !== 'DOCUMENT' && (n as SceneNode).parent) out.push(n as SceneNode);
+  }
+  return out;
+}
+
+/** 값 한 칸(라이브러리 변수용) — 별칭이면 이름을 읽는다. */
+async function libCell(raw: VariableValue | undefined): Promise<VarCell | undefined> {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+    const t = await figma.variables.getVariableByIdAsync((raw as VariableAlias).id).catch(() => null);
+    return { kind: 'alias', aliasId: (raw as VariableAlias).id, aliasName: t ? t.name : '(삭제된 변수)', remote: t?.remote || undefined };
+  }
+  if (typeof raw === 'object' && 'r' in raw) return { kind: 'color', hex: rgbToHex(raw as RGB) };
+  if (typeof raw === 'number') return { kind: 'number', text: String(Math.round(raw * 1000) / 1000) };
+  if (typeof raw === 'boolean') return { kind: 'bool', text: raw ? 'true' : 'false' };
+  return { kind: 'string', text: String(raw) };
+}
+
+/**
+ * 변수 사용 조회(IA v3 §4.4) — 로컬이 아닌 id를 라이브러리 / 삭제됨으로 가른다.
+ * 라이브러리 변수는 별칭 사슬을 5단계까지 따라가 함께 돌려준다(간접 사용 판정용).
+ */
+async function collectUsage(nodeIds: readonly string[] | undefined): Promise<Omit<Extract<CodeToUi, { type: 'USAGE_RESULT' }>, 'type' | 'reqId'>> {
+  const roots = await resolveRoots(nodeIds);
+  const { usage, nodesById, scanned } = countUsage(roots);
+  const local = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
+  const out: Record<string, { places: number; layers: number }> = {};
+  const libraryVars: LibraryVar[] = [];
+  const libSeen = new Set<string>();
+  let deletedCount = 0;
+  const deletedNodes = new Set<string>();
+  const addLibrary = async (id: string, depth: number): Promise<boolean> => {
+    if (libSeen.has(id)) return true;
+    const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+    if (!v) return false;
+    libSeen.add(id);
+    const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId).catch(() => null);
+    const modeId = col?.defaultModeId ?? Object.keys(v.valuesByMode)[0];
+    const aliasTargets: string[] = [];
+    for (const raw of Object.values(v.valuesByMode)) {
+      if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') aliasTargets.push((raw as VariableAlias).id);
+    }
+    libraryVars.push({ id: v.id, name: v.name, collection: col?.name ?? '', type: v.resolvedType as VarType, value: await libCell(modeId ? v.valuesByMode[modeId] : undefined), aliasTargets });
+    if (depth < 5) for (const t of aliasTargets) if (!local.has(t)) await addLibrary(t, depth + 1);
+    return true;
+  };
+  for (const [id, u] of usage) {
+    if (local.has(id)) { out[id] = u; continue; }
+    if (await addLibrary(id, 1)) { out[id] = u; continue; }
+    deletedCount += u.places;
+    for (const n of nodesById.get(id) ?? []) deletedNodes.add(n);
+  }
+  // 로컬 변수가 가리키는 라이브러리 변수도 간접 사용 판정에 필요하다 — 직접 쓰는 로컬 변수의 별칭 사슬.
+  const localVars = await figma.variables.getLocalVariablesAsync();
+  for (const v of localVars) {
+    if (!out[v.id]) continue;
+    for (const raw of Object.values(v.valuesByMode)) {
+      if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+        const t = (raw as VariableAlias).id;
+        if (!local.has(t)) await addLibrary(t, 2);
+      }
+    }
+  }
+  return { usage: out, libraryVars, deleted: { count: deletedCount, nodeIds: [...deletedNodes] }, scanned };
 }
 
 async function collectVars(): Promise<VarInfo[]> {
@@ -866,6 +961,29 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           selfSelect = true; // 선택이 바뀐 게 아니다 — UI가 방금 그린 결과 트리를 지우지 않게
           postSelection(); // 준비 현황 '변수 연결 완료' 판정 갱신(선택은 그대로라 selectionchange가 안 온다)
         }
+        break;
+      }
+      case 'SCAN_USAGE': {
+        // 변수 목록의 사용 수(보기 전용) — 연결 카드의 미리보기·결과와 무관하다.
+        post({ type: 'USAGE_RESULT', reqId: msg.reqId, ...(await collectUsage(msg.nodeIds)) });
+        break;
+      }
+      case 'FIND_VAR_USERS': {
+        const r = findUsers(await resolveRoots(msg.nodeIds), new Set(msg.varIds));
+        post({ type: 'VAR_USERS', reqId: msg.reqId, layers: r.nodes.slice(0, msg.limit).map((n) => ({ id: n.id, name: n.name })), totalLayers: r.nodes.length, places: r.places });
+        break;
+      }
+      case 'SELECT_VAR_USERS': {
+        // 그때 새로 찾아서 고른다 — 600개 결과 상한과 무관, 선택은 최대 200개(SELECT_CAP).
+        const r = findUsers(await resolveRoots(msg.nodeIds), new Set(msg.varIds));
+        const pick = r.nodes.slice(0, SELECT_CAP);
+        if (pick.length) {
+          const cur = figma.currentPage.selection;
+          if (pick.length !== cur.length || pick.some((n, i) => cur[i] !== n)) selfSelect = true;
+          figma.currentPage.selection = pick;
+          figma.viewport.scrollAndZoomIntoView(pick);
+        }
+        post({ type: 'SELECT_RESULT', found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
         break;
       }
       case 'SCAN_BINDINGS': {

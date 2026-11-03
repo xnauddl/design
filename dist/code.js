@@ -2062,6 +2062,84 @@
     for (const n of selection2) if (isEffectivelyVisible2(n)) walkNode(n, 0, null);
     return { candidates, nodes: pruneToAffected(nodeIndex, candidates, []), total, boundNodes };
   }
+  function boundVariableIds(node) {
+    var _a, _b, _c, _d, _e;
+    const out = [];
+    const aliasId = (raw) => {
+      if (!raw) return void 0;
+      const a = Array.isArray(raw) ? raw[0] : raw;
+      return a && typeof a === "object" && "id" in a ? a.id : void 0;
+    };
+    for (const key of ["fills", "strokes"]) {
+      const ps = node[key];
+      if (!Array.isArray(ps)) continue;
+      for (const p of ps) {
+        const id = (_b = (_a = p.boundVariables) == null ? void 0 : _a.color) == null ? void 0 : _b.id;
+        if (id) out.push(id);
+      }
+    }
+    const effects = node.effects;
+    if (Array.isArray(effects)) {
+      for (const e of effects) {
+        const id = (_d = (_c = e.boundVariables) == null ? void 0 : _c.color) == null ? void 0 : _d.id;
+        if (id) out.push(id);
+      }
+    }
+    const bv = (_e = node.boundVariables) != null ? _e : {};
+    for (const [field, raw] of Object.entries(bv)) {
+      if (field === "fills" || field === "strokes" || field === "effects" || field === "componentProperties" || field === "textRangeFills") continue;
+      const id = aliasId(raw);
+      if (id) out.push(id);
+    }
+    return out;
+  }
+  function walkVisibleDeep(roots, visit) {
+    let scanned = 0;
+    const stack = [];
+    for (const r of roots) if (isEffectivelyVisible2(r)) stack.push(r);
+    while (stack.length) {
+      const n = stack.pop();
+      if (n.visible === false) continue;
+      scanned++;
+      visit(n);
+      if ("children" in n) for (const c of n.children) stack.push(c);
+    }
+    return scanned;
+  }
+  function countUsage(roots) {
+    const usage = /* @__PURE__ */ new Map();
+    const nodesById = /* @__PURE__ */ new Map();
+    const scanned = walkVisibleDeep(roots, (n) => {
+      var _a, _b;
+      const ids = boundVariableIds(n);
+      if (!ids.length) return;
+      const seen = /* @__PURE__ */ new Set();
+      for (const id of ids) {
+        const u = (_a = usage.get(id)) != null ? _a : { places: 0, layers: 0 };
+        u.places++;
+        if (!seen.has(id)) {
+          u.layers++;
+          seen.add(id);
+          const list = (_b = nodesById.get(id)) != null ? _b : [];
+          list.push(n.id);
+          nodesById.set(id, list);
+        }
+        usage.set(id, u);
+      }
+    });
+    return { usage, nodesById, scanned };
+  }
+  function findUsers(roots, varIds) {
+    const nodes = [];
+    let places = 0;
+    walkVisibleDeep(roots, (n) => {
+      const hits = boundVariableIds(n).filter((id) => varIds.has(id)).length;
+      if (!hits) return;
+      places += hits;
+      nodes.push(n);
+    });
+    return { nodes, places };
+  }
   var TEXT_RANGE_ALL = /* @__PURE__ */ new Set(["fontFamily", "fontSize", "fontStyle", "fontWeight", "letterSpacing", "lineHeight", "paragraphSpacing", "paragraphIndent"]);
   function rangesBoundTo(node, field, fromId) {
     var _a;
@@ -5029,12 +5107,25 @@
     const all = await figma.variables.getLocalVariablesAsync();
     const nameById = new Map(all.map((v) => [v.id, v.name]));
     const colById = new Map(cols.map((c) => [c.id, c]));
+    const remoteName = /* @__PURE__ */ new Map();
+    for (const v of all) {
+      for (const raw of Object.values(v.valuesByMode)) {
+        if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+          const id = raw.id;
+          if (nameById.has(id) || remoteName.has(id)) continue;
+          const rv = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+          remoteName.set(id, rv ? rv.name : null);
+        }
+      }
+    }
     const cell = (raw) => {
-      var _a2;
       if (raw === void 0 || raw === null) return void 0;
       if (typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
         const id = raw.id;
-        return { kind: "alias", aliasId: id, aliasName: (_a2 = nameById.get(id)) != null ? _a2 : "(\uB2E4\uB978 \uD30C\uC77C \uBCC0\uC218)" };
+        const local = nameById.get(id);
+        if (local !== void 0) return { kind: "alias", aliasId: id, aliasName: local };
+        const rn = remoteName.get(id);
+        return { kind: "alias", aliasId: id, aliasName: rn != null ? rn : "(\uC0AD\uC81C\uB41C \uBCC0\uC218)", remote: rn ? true : void 0 };
       }
       if (typeof raw === "object" && "r" in raw) return { kind: "color", hex: rgbToHex(raw) };
       if (typeof raw === "number") return { kind: "number", text: String(Math.round(raw * 1e3) / 1e3) };
@@ -5052,11 +5143,91 @@
       }
       vars.push({ id: v.id, name: v.name, collectionId: col.id, type: v.resolvedType, values, scopes: [...(_a = v.scopes) != null ? _a : []], description: (_b = v.description) != null ? _b : "" });
     }
+    const roleMap = readRoleMap();
     const collections = cols.map((c) => {
-      var _a2;
-      return { id: c.id, name: c.name, tier: (_a2 = tiers.get(c.id)) != null ? _a2 : 0, modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })) };
+      var _a2, _b2;
+      return {
+        id: c.id,
+        name: c.name,
+        tier: (_a2 = tiers.get(c.id)) != null ? _a2 : 0,
+        modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })),
+        defaultModeId: c.defaultModeId,
+        tierSet: (_b2 = roleMap[c.id]) != null ? _b2 : null
+      };
     });
     return { collections, vars };
+  }
+  async function resolveRoots(nodeIds) {
+    if (!nodeIds || !nodeIds.length) return selection().slice();
+    const out = [];
+    for (const id of nodeIds) {
+      const n = await figma.getNodeByIdAsync(id).catch(() => null);
+      if (n && n.type !== "PAGE" && n.type !== "DOCUMENT" && n.parent) out.push(n);
+    }
+    return out;
+  }
+  async function libCell(raw) {
+    if (raw === void 0 || raw === null) return void 0;
+    if (typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+      const t = await figma.variables.getVariableByIdAsync(raw.id).catch(() => null);
+      return { kind: "alias", aliasId: raw.id, aliasName: t ? t.name : "(\uC0AD\uC81C\uB41C \uBCC0\uC218)", remote: (t == null ? void 0 : t.remote) || void 0 };
+    }
+    if (typeof raw === "object" && "r" in raw) return { kind: "color", hex: rgbToHex(raw) };
+    if (typeof raw === "number") return { kind: "number", text: String(Math.round(raw * 1e3) / 1e3) };
+    if (typeof raw === "boolean") return { kind: "bool", text: raw ? "true" : "false" };
+    return { kind: "string", text: String(raw) };
+  }
+  async function collectUsage(nodeIds) {
+    var _a;
+    const roots = await resolveRoots(nodeIds);
+    const { usage, nodesById, scanned } = countUsage(roots);
+    const local = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
+    const out = {};
+    const libraryVars = [];
+    const libSeen = /* @__PURE__ */ new Set();
+    let deletedCount = 0;
+    const deletedNodes = /* @__PURE__ */ new Set();
+    const addLibrary = async (id, depth) => {
+      var _a2, _b;
+      if (libSeen.has(id)) return true;
+      const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+      if (!v) return false;
+      libSeen.add(id);
+      const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId).catch(() => null);
+      const modeId = (_a2 = col == null ? void 0 : col.defaultModeId) != null ? _a2 : Object.keys(v.valuesByMode)[0];
+      const aliasTargets = [];
+      for (const raw of Object.values(v.valuesByMode)) {
+        if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") aliasTargets.push(raw.id);
+      }
+      libraryVars.push({ id: v.id, name: v.name, collection: (_b = col == null ? void 0 : col.name) != null ? _b : "", type: v.resolvedType, value: await libCell(modeId ? v.valuesByMode[modeId] : void 0), aliasTargets });
+      if (depth < 5) {
+        for (const t of aliasTargets) if (!local.has(t)) await addLibrary(t, depth + 1);
+      }
+      return true;
+    };
+    for (const [id, u] of usage) {
+      if (local.has(id)) {
+        out[id] = u;
+        continue;
+      }
+      if (await addLibrary(id, 1)) {
+        out[id] = u;
+        continue;
+      }
+      deletedCount += u.places;
+      for (const n of (_a = nodesById.get(id)) != null ? _a : []) deletedNodes.add(n);
+    }
+    const localVars = await figma.variables.getLocalVariablesAsync();
+    for (const v of localVars) {
+      if (!out[v.id]) continue;
+      for (const raw of Object.values(v.valuesByMode)) {
+        if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+          const t = raw.id;
+          if (!local.has(t)) await addLibrary(t, 2);
+        }
+      }
+    }
+    return { usage: out, libraryVars, deleted: { count: deletedCount, nodeIds: [...deletedNodes] }, scanned };
   }
   async function collectVars() {
     var _a;
@@ -5569,6 +5740,27 @@
             selfSelect = true;
             postSelection();
           }
+          break;
+        }
+        case "SCAN_USAGE": {
+          post(__spreadValues({ type: "USAGE_RESULT", reqId: msg.reqId }, await collectUsage(msg.nodeIds)));
+          break;
+        }
+        case "FIND_VAR_USERS": {
+          const r = findUsers(await resolveRoots(msg.nodeIds), new Set(msg.varIds));
+          post({ type: "VAR_USERS", reqId: msg.reqId, layers: r.nodes.slice(0, msg.limit).map((n) => ({ id: n.id, name: n.name })), totalLayers: r.nodes.length, places: r.places });
+          break;
+        }
+        case "SELECT_VAR_USERS": {
+          const r = findUsers(await resolveRoots(msg.nodeIds), new Set(msg.varIds));
+          const pick = r.nodes.slice(0, SELECT_CAP);
+          if (pick.length) {
+            const cur = figma.currentPage.selection;
+            if (pick.length !== cur.length || pick.some((n, i) => cur[i] !== n)) selfSelect = true;
+            figma.currentPage.selection = pick;
+            figma.viewport.scrollAndZoomIntoView(pick);
+          }
+          post({ type: "SELECT_RESULT", found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
           break;
         }
         case "SCAN_BINDINGS": {

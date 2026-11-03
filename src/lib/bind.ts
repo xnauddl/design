@@ -911,6 +911,101 @@ export async function scanBindings(selection: readonly SceneNode[]): Promise<Bin
   return { candidates, nodes: pruneToAffected(nodeIndex, candidates, []), total, boundNodes };
 }
 
+/* ---------- 변수 사용 조회(IA v3 §4.4 — 보기 전용) ----------
+   연결 작업과 범위가 다르다: 인스턴스 안쪽 레이어도 센다(보기 전용, 재검토 ⑥). 숨긴 레이어는 세지 않는다.
+   상한이 없다 — 숫자만 모으고 후보 목록을 만들지 않으므로 600개 결과 상한(RESULT_CAP)과 무관하다. */
+
+/** 한 레이어에 연결된 변수 id들(속성 자리마다 하나 — 같은 변수가 두 자리면 두 번). */
+export function boundVariableIds(node: SceneNode): string[] {
+  const out: string[] = [];
+  const aliasId = (raw: unknown): string | undefined => {
+    if (!raw) return undefined;
+    const a = Array.isArray(raw) ? raw[0] : raw;
+    return a && typeof a === 'object' && 'id' in a ? (a as VariableAlias).id : undefined;
+  };
+  for (const key of ['fills', 'strokes'] as const) {
+    const ps = (node as unknown as Record<string, unknown>)[key];
+    if (!Array.isArray(ps)) continue;
+    for (const p of ps) {
+      const id = (p as { boundVariables?: { color?: VariableAlias } }).boundVariables?.color?.id;
+      if (id) out.push(id);
+    }
+  }
+  const effects = (node as { effects?: readonly Effect[] }).effects;
+  if (Array.isArray(effects)) {
+    for (const e of effects) {
+      const id = (e as { boundVariables?: { color?: VariableAlias } }).boundVariables?.color?.id;
+      if (id) out.push(id);
+    }
+  }
+  const bv = (node as { boundVariables?: Record<string, unknown> }).boundVariables ?? {};
+  for (const [field, raw] of Object.entries(bv)) {
+    if (field === 'fills' || field === 'strokes' || field === 'effects' || field === 'componentProperties' || field === 'textRangeFills') continue;
+    const id = aliasId(raw);
+    if (id) out.push(id);
+  }
+  return out;
+}
+
+/** 보이는 레이어를 인스턴스 안쪽까지 돈다. 루트가 숨겨져 있으면 건너뛴다. */
+export function walkVisibleDeep(roots: readonly SceneNode[], visit: (node: SceneNode) => void): number {
+  let scanned = 0;
+  const stack: SceneNode[] = [];
+  for (const r of roots) if (isEffectivelyVisible(r)) stack.push(r);
+  while (stack.length) {
+    const n = stack.pop() as SceneNode;
+    if (n.visible === false) continue;
+    scanned++;
+    visit(n);
+    if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
+  }
+  return scanned;
+}
+
+export interface UsageCount {
+  /** 연결된 속성 자리 수("곳") */
+  places: number;
+  /** 그 변수를 쓰는 레이어 수 */
+  layers: number;
+}
+
+/** 루트들 안의 변수 사용 수(변수 id → 곳·레이어). 어떤 변수인지(로컬/라이브러리/삭제)는 부르는 쪽이 가린다. */
+export function countUsage(roots: readonly SceneNode[]): { usage: Map<string, UsageCount>; nodesById: Map<string, string[]>; scanned: number } {
+  const usage = new Map<string, UsageCount>();
+  const nodesById = new Map<string, string[]>();
+  const scanned = walkVisibleDeep(roots, (n) => {
+    const ids = boundVariableIds(n);
+    if (!ids.length) return;
+    const seen = new Set<string>();
+    for (const id of ids) {
+      const u = usage.get(id) ?? { places: 0, layers: 0 };
+      u.places++;
+      if (!seen.has(id)) {
+        u.layers++;
+        seen.add(id);
+        const list = nodesById.get(id) ?? [];
+        list.push(n.id);
+        nodesById.set(id, list);
+      }
+      usage.set(id, u);
+    }
+  });
+  return { usage, nodesById, scanned };
+}
+
+/** 주어진 변수들 중 하나라도 쓰는 레이어(인스턴스 안쪽 포함) — 사용 레이어 선택·상세 "쓰인 곳". */
+export function findUsers(roots: readonly SceneNode[], varIds: ReadonlySet<string>): { nodes: SceneNode[]; places: number } {
+  const nodes: SceneNode[] = [];
+  let places = 0;
+  walkVisibleDeep(roots, (n) => {
+    const hits = boundVariableIds(n).filter((id) => varIds.has(id)).length;
+    if (!hits) return;
+    places += hits;
+    nodes.push(n);
+  });
+  return { nodes, places };
+}
+
 /* ---------- 일괄 교체(remap) — 변수 A를 쓰던 자리를 변수 B로 ---------- */
 
 export interface RemapResult {
