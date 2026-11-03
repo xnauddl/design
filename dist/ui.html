@@ -58,6 +58,8 @@
     }
 
     * { box-sizing: border-box; }
+    /* hidden 속성은 display를 지정한 클래스보다 앞선다(검색칸·칩 더 보기 등이 늘 보이던 문제). */
+    [hidden] { display: none !important; }
     body {
       font: 400 var(--fs)/1.5 var(--font);
       margin: 0; padding: 12px 12px 36px; /* 아래 36 = 공통 상태 줄(24) + 여백 */
@@ -226,6 +228,12 @@
     .selbar .sel-name:only-child, .selbar .sel-name:has(+ .sel-sub:empty) { max-width: none; }
     .selbar .sel-sub { flex: 0 0 auto; }
     .selbar .sel-sub:empty { display: none; }
+    .selbar .sel-base { flex: 0 1 auto; min-width: 0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); font-weight: 400; }
+    .selbar .sel-base:empty { display: none; }
+    .selbar .sel-rebase { margin-left: auto; flex: 0 0 auto; font-weight: 600; }
+    .ctx-menu .menu-note { display: block; font-size: 10px; color: var(--muted); font-weight: 400; }
+    .ctx-menu button[aria-disabled="true"] { color: var(--muted); }
+    .wiz-done { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .selbar.muted { color: var(--muted); font-weight: 400; }
 
     /* ── 콜아웃(안내 노트) ── */
@@ -527,6 +535,76 @@
     }
     .tier-chip[aria-checked="true"] { background: var(--accent-subtle); border-color: var(--accent-border); color: var(--accent-strong); }
 
+    /* ── IA v3 변수 탭(§4.2~§4.4) ── */
+    .var-loading { padding: 16px 4px; color: var(--text-2); }
+    .start-head { font-size: 12px; font-weight: 600; margin: 4px 0 2px; }
+    #varStart > * + * { margin-top: 10px; }
+    .start-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .grow { flex: 1 1 auto; }
+    button.link-btn { min-height: 24px; padding: 0 2px; text-decoration: none; color: var(--accent-strong); }
+    button.link-btn:hover { text-decoration: underline; }
+    .icon-btn {
+      width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid transparent; background: transparent; color: var(--text-2); border-radius: var(--r-sm); flex: 0 0 auto;
+    }
+    .icon-btn:hover:not([aria-disabled="true"]) { background: var(--surface-hover); color: var(--text); border-color: transparent; }
+    .icon-btn.spinning svg { animation: mini-spin 1s linear infinite; }
+    @media (prefers-reduced-motion: reduce) { .icon-btn.spinning svg { animation: none; } }
+    /* 머리줄·칩 줄은 선택 표시줄 아래에 붙지 않는다 — 고정은 구역·그룹 머리(최대 두 겹). */
+    .list-head { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; }
+    .chip-bar { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; min-width: 0; }
+    .chip-row { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; min-width: 0; scroll-behavior: smooth; }
+    .chip-row::-webkit-scrollbar { display: none; }
+    .tier-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .tier-chip .badge { font: 700 9px/14px var(--font); min-width: 14px; height: 14px; padding: 0 3px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); text-align: center; }
+    .tier-chip .num { font-weight: 500; color: var(--text-2); }
+    .tier-chip[aria-checked="true"] .num { color: var(--accent-strong); }
+    .mode-select { height: 24px; padding: 0 4px; font-size: 10.5px; max-width: 96px; }
+    .search-box { display: inline-flex; align-items: center; gap: 2px; flex: 0 1 auto; min-width: 160px; }
+    .search-box input { width: 100%; height: 24px; padding: 2px 6px; }
+    .situation { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 6px; padding: 6px 8px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-2); font-size: 10.5px; }
+    .situation[hidden] { display: none; }
+    /* 목록(treegrid) — 행은 28px. 구역 머리·그룹 머리는 고정(두 겹). */
+    .var-tree { display: flex; flex-direction: column; }
+    .vt-section {
+      position: sticky; top: var(--head-top, 81px); z-index: 2; display: flex; align-items: center; gap: 6px;
+      height: 26px; padding: 0 6px; background: var(--surface); border-bottom: 1px solid var(--border-2);
+      font-weight: 700; color: var(--text); cursor: default;
+    }
+    .vt-section .badge { font: 700 9px/14px var(--font); padding: 0 3px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); }
+    .vt-section .num, .vt-group .num { margin-left: auto; font-weight: 500; color: var(--text-2); font-size: 10.5px; }
+    .vt-group {
+      position: sticky; top: calc(var(--head-top, 81px) + 26px); z-index: 1; display: flex; align-items: center; gap: 6px;
+      height: 26px; padding: 0 6px; background: var(--surface); border-bottom: 1px solid var(--border);
+      color: var(--text-2); font-weight: 600; cursor: pointer; user-select: none;
+    }
+    .vt-group .tw { width: 10px; color: var(--muted); }
+    .vt-group .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .vt-group .more-unused { flex: 0 0 auto; min-height: 24px; font-size: 10.5px; }
+    .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 118px 48px 24px; align-items: center; height: 28px; padding: 0 6px 0 18px; border-bottom: 1px solid var(--border); cursor: default; }
+    .vt-row:hover, .vt-row:focus-visible, .vt-group:focus-visible, .vt-section:focus-visible, .vt-line:focus-visible { background: var(--surface-hover); outline: none; }
+    .vt-row[aria-selected="true"] { background: var(--accent-subtle); }
+    .vt-row .nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .vt-row .nm .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vt-row.direct .nm { font-weight: 600; color: var(--text); }
+    .vt-row.indirect .nm, .vt-row.none .nm { font-weight: 400; color: var(--text); }
+    .vt-row.unused .nm { color: var(--text-2); }
+    .vt-row .val { font-family: var(--mono); font-size: 10.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+    .vt-row .use { text-align: right; font-size: 10.5px; color: var(--text-2); white-space: nowrap; }
+    .vt-row .ic { width: 13px; flex: 0 0 13px; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 10px; }
+    .vt-row .more { visibility: hidden; width: 24px; height: 24px; padding: 0; border: none; background: transparent; color: var(--text-2); }
+    .vt-row:hover .more, .vt-row:focus-within .more, .vt-row.menu-open .more, .vt-row:focus .more { visibility: visible; }
+    .alias-pill { font-family: var(--mono); font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; background: var(--surface-2); color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 0; line-height: 1.4; }
+    .alias-pill:hover { color: var(--accent-strong); border-color: var(--accent-border); }
+    .lib-tag { font: 700 8.5px/12px var(--font); padding: 0 3px; border-radius: 3px; border: 1px solid var(--border-2); color: var(--text-2); flex: 0 0 auto; }
+    .vt-line { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; color: var(--text-2); border-bottom: 1px solid var(--border); cursor: pointer; }
+    .vt-lib { margin-top: 10px; }
+    .vt-empty { padding: 14px 6px; color: var(--text-2); }
+    .popover { position: fixed; z-index: 45; width: 240px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 6px; }
+    .popover[hidden] { display: none; }
+    .popover .pop-note { font-size: 10px; padding: 4px 6px 2px; }
+    #wizardSlotMake .step { margin-bottom: 10px; }
+
     /* ── 하위 화면 돌아가기 링크 ── */
     .back-link { display: inline-block; margin: 0 0 10px; padding: 4px 0; min-height: 24px; }
 
@@ -587,24 +665,64 @@
 
   <!-- 선택 동기화 (실시간) -->
   <div id="selBarWrap">
-    <div class="selbar muted" id="selBar"><span class="sel-name" id="selName">● 선택 상태를 불러오는 중…</span><span class="sel-sub" id="selSub"></span></div>
+    <div class="selbar muted" id="selBar"><span class="sel-name" id="selName">● 선택 상태를 불러오는 중…</span><span class="sel-sub" id="selSub"></span><span class="sel-base" id="selBase"></span><button class="link link-btn sel-rebase" id="btnRebase" type="button" data-i18n="list.rebase" hidden>기준 바꾸기</button></div>
   </div>
 
   <section class="tab-section" id="tab-variables" role="tabpanel" aria-labelledby="tabbtn-variables" tabindex="0">
-   <!-- PR 1 중간 상태(IA v3 §10): 첫 화면 = 지금 시작 탭 내용 + 변수 관리(세로 배치), [만들기]는 하위 화면. -->
-   <div id="varHome">
-    <!-- 이미 있는 변수 안내 — 변수가 있는 파일에서 '만들기'를 거쳐 확인하게 하지 않는다(바로 연결로). -->
-    <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
-    <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
-    <div class="banner" id="onboardBanner" style="display:none">
-      <span data-i18n="onboard.banner">처음이면 전체 실행으로 시작하세요.</span>
-      <button class="link" id="btnOnboardHide" data-i18n="onboard.hide">다시 보지 않기</button>
-    </div>
+   <!-- IA v3 변수 탭(§4.2~§4.4): 불러오는 중 / 시작 화면(로컬 변수 0개) / 변수 목록. 만들기는 아래 하위 화면. -->
+   <div id="varLoading" class="var-loading" data-i18n="var.loading">변수 정보를 불러오는 중…</div>
 
+   <!-- 시작 화면(§4.3) — 로컬 변수 0개일 때, 또는 그때 시작한 마법사가 실행 중·요약 표시 중. -->
+   <div id="varStart" style="display:none">
+    <div class="start-head" id="startHead" data-i18n="start.head">아직 로컬 변수가 없어요</div>
+    <div class="hint" id="startSub" data-i18n="start.sub">선택한 프레임에서 만들어 보세요</div>
+    <div class="ux" id="startFree" style="display:none">
+      <div><span data-i18n="start.freeNote">ⓘ 무료 버전에서는 변수를 새로 만들 수 없어요</span></div>
+      <div class="hint"><span data-i18n="start.freeNote2">이름 정리와 기존 변수 연결은 무료</span> · <button class="link" id="btnStartLicense" data-i18n="status.paidAction">라이선스 →</button></div>
+    </div>
+    <div id="wizardSlotStart"></div>
+    <div id="startLib"></div>
+    <div class="start-foot">
+      <button id="btnGoMake" data-i18n="var.goMake">색부터 하나씩 만들기 →</button>
+      <span class="muted" id="goMakeFree" data-i18n="start.freeExtract" style="display:none">(추출까지 무료)</span>
+      <span class="grow"></span>
+      <button class="link link-btn" id="btnReadinessStart" aria-haspopup="menu"></button>
+    </div>
+   </div>
+
+   <!-- 변수 목록(§4.4) -->
+   <div id="varList" style="display:none">
+    <div class="list-head" id="listHead">
+      <button class="link link-btn" id="btnReadiness" aria-haspopup="menu"></button>
+      <button class="link link-btn" id="btnFindUnbound" data-i18n="list.findUnbound" data-i18n-title="list.findUnboundTip" title="선택에서 변수로 바꿀 수 있는 색·간격을 찾아 연결 미리보기를 엽니다">변수 없는 값 찾기 →</button>
+      <span class="grow"></span>
+      <button class="icon-btn" id="btnAddVar" type="button" data-i18n-title="list.addTip" title="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)" aria-label="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
+      <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
+      <button class="icon-btn" id="btnVarRefresh" type="button" data-i18n-title="list.refreshTip" title="다시 읽기" aria-label="다시 읽기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg></button>
+    </div>
+    <div class="chip-bar" id="chipBar">
+      <div class="chip-row" id="chipRow" role="radiogroup" aria-label="컬렉션"></div>
+      <button class="icon-btn chip-more" id="btnChipMore" type="button" data-i18n-title="list.chipMore" title="칩 더 보기" aria-label="칩 더 보기" hidden>›</button>
+      <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
+      <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+      <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" aria-label="검색 지우기">✕</button></span>
+    </div>
+    <div class="situation" id="situationLine" hidden></div>
+    <div class="var-tree" id="varTree" role="treegrid" aria-label="변수 목록"></div>
+   </div>
+
+   <!-- 준비 현황 팝오버(§4.4 머리줄) — 메뉴 모양, 목록을 밀지 않는다. -->
+   <div class="popover" id="readinessPop" role="menu" hidden>
+    <div id="pipelineSteps"></div>
+    <div class="muted pop-note" data-i18n="pipeline.indep">컴포넌트는 필요할 때 레이어 › 컴포넌트에서</div>
+   </div>
+
+   <!-- 마법사 카드(요소 1개) — 시작 화면 또는 만들기 맨 위 중 보이는 곳에 붙는다(§4.3). -->
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
       <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
+      <div class="wiz-done" id="wizDone" hidden><b id="wizDoneText"></b> <button class="link link-btn" id="btnWizListView" type="button" data-i18n="start.viewList">변수 목록 보기</button></div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
         <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
@@ -627,35 +745,10 @@
       <div class="status" id="wizardSummary"></div>
     </div>
 
-    <!-- 진행 — 만들기→적용 의존 파이프라인 상태(클릭하면 그 단계로) -->
-    <div class="step" id="pipelineCard">
-      <h2 data-i18n="pipeline.title">준비 현황</h2>
-      <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">컴포넌트는 필요할 때 적용 탭에서</div>
-    </div>
-
-    <div class="row"><button id="btnGoMake" data-i18n="var.goMake">색부터 하나씩 만들기 →</button></div>
-    <!-- 변수 관리 — PR 2에서 변수 목록으로 바뀐다. 400에서는 트리를 표 위에 쌓는다. -->
-    <section class="var-manager" id="varManager" aria-labelledby="vmTitle">
-      <div class="vm-head">
-        <h2 id="vmTitle" data-i18n="vm.title">변수 관리</h2>
-        <span class="grow"></span>
-        <input id="vmSearch" type="search" data-i18n-placeholder="vm.search" placeholder="변수 검색" />
-        <label class="inline"><input type="checkbox" id="vmOnlyUsed" checked /> <span data-i18n="vm.onlyUsed">선택에서 쓰는 것만</span></label>
-        <span class="muted" id="vmCount"></span>
-      </div>
-      <div class="vm-body">
-        <nav class="vm-tree" id="vmTree" aria-label="컬렉션·그룹"></nav>
-        <div class="vm-table-wrap" id="vmTableWrap"></div>
-      </div>
-      <div class="status" id="vmStatus"></div>
-    </section>
-   </div>
-
    <!-- 만들기 하위 화면 — "← 돌아가기"로 변수 탭 첫 화면. -->
    <div id="varMake" style="display:none">
     <button class="link back-link" id="btnMakeBack" data-i18n="make.back">← 돌아가기</button>
-    <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
+    <div id="wizardSlotMake"></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
@@ -924,35 +1017,6 @@
       </div>
     </div>
 
-    <!-- 기존 자산 편입(§9): 이름이 Global/Semantic/Component가 아닌 컬렉션도 계층으로 쓰게 지정. -->
-    <div class="step" id="collectionRolesCard">
-      <h2 data-i18n="colRoles.title">컬렉션 계층</h2>
-      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
-      <div id="collectionRoles"></div>
-      <div class="status" id="colRolesStatus"></div>
-    </div>
-
-    <div class="step">
-      <h2 data-i18n="export.title">코드로 내보내기</h2>
-      <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
-      <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바 오른쪽 끝. 선택지는 값 자체가 라벨이라
-           '형식'·'폰트 크기' 머리말 없이 셀렉트만 둔다(툴팁으로 보완). -->
-      <div class="toolbar flush">
-        <select id="exportFormat" data-i18n-title="export.formatTip" title="내보낼 코드 형식">
-          <option value="w3c" data-i18n="export.fmtW3c">W3C 토큰 JSON</option>
-          <option value="css" data-i18n="export.fmtCss">CSS 변수</option>
-        </select>
-        <!-- px·rem은 단위 기호 그대로라 번역 대상이 아니다(Free·Paid 티어 이름도 같다). -->
-        <select id="exportFontUnit" data-i18n-title="export.fontUnitTip" title="폰트 크기 단위 — rem은 기준 크기로 나눕니다">
-          <option value="px">px</option>
-          <option value="rem">rem</option>
-        </select>
-        <span class="grow"></span>
-        <button id="btnExport" class="primary" data-i18n="export.runBtn">내보내기</button>
-      </div>
-      <div class="status" id="exportStatus"></div>
-    </div>
-
     <div class="step">
       <h2 data-i18n="license.title">라이선스</h2>
       <div class="hint" data-i18n="license.hint">유료를 쓰면 🔒 잠긴 기능이 풀립니다</div>
@@ -1002,6 +1066,33 @@
       <svg width="16" height="16" viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3h6v6M19 3l-7 7M9 19H3v-6M3 19l7-7"/></svg>
       <span class="mini-badge" id="miniBadge" hidden></span>
     </button>
+  </div>
+
+
+  <!-- 팝업 보관함(§4.4 ⋯) — 계층 팝업·내보내기 팝업이 열릴 때 내용을 빌려 가고 닫히면 돌려준다. -->
+  <div id="popupStore" hidden>
+    <div id="tierPopBody" hidden>
+      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
+      <div id="collectionRoles"></div>
+      <div class="status" id="colRolesStatus"></div>
+    </div>
+    <div id="exportPopBody" hidden>
+      <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
+      <div class="row">
+        <select id="exportFormat" data-i18n-title="export.formatTip" title="내보낼 코드 형식">
+          <option value="w3c" data-i18n="export.fmtW3c">W3C 토큰 JSON</option>
+          <option value="css" data-i18n="export.fmtCss">CSS 변수</option>
+        </select>
+        <!-- px·rem은 단위 기호 그대로라 번역 대상이 아니다(Free·Paid 티어 이름도 같다). -->
+        <select id="exportFontUnit" data-i18n-title="export.fontUnitTip" title="폰트 크기 단위 — rem은 기준 크기로 나눕니다">
+          <option value="px">px</option>
+          <option value="rem">rem</option>
+        </select>
+        <span class="grow"></span>
+        <button id="btnExport" class="primary" data-i18n="export.runBtn">내보내기</button>
+      </div>
+      <div class="status" id="exportStatus"></div>
+    </div>
   </div>
 
   <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->
@@ -1182,14 +1273,6 @@
     "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD569\uB2C8\uB2E4",
     "bind.connectedTip": "{label}({fields})\uC774(\uAC00) {variable}\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC2B5\uB2C8\uB2E4",
     "bind.willConnectTip": "{label}({fields})\uC744(\uB97C) {variable}\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4",
-    "bind.remapLabel": "\uBC14\uAFC0 \uBCC0\uC218",
-    "bind.remapLoading": "\uBC14\uAFC0 \uC218 \uC788\uB294 \uBCC0\uC218\uB97C \uCC3E\uB294 \uC911\u2026",
-    "bind.remapNone": "\uBC14\uAFC0 \uC218 \uC788\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uAC19\uC740 \uC885\uB958\xB7\uC6A9\uB3C4\uC758 \uBCC0\uC218\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.",
-    "bind.remapApply": "{n}\uACF3 \uAD50\uCCB4",
-    "bind.remapCancel": "\uCDE8\uC18C",
-    "bind.remapDone": "{replaced}\uACF3\uC744 {to}(\uC73C)\uB85C \uBC14\uAFE8\uC2B5\uB2C8\uB2E4 \xB7 \uB808\uC774\uC5B4 {nodes}\uAC1C \u2014 \uB418\uB3CC\uB9AC\uB824\uBA74 Ctrl/\u2318+Z",
-    "bind.remapSkipped": " \xB7 {skipped}\uACF3\uC740 \uC885\uB958\xB7\uC6A9\uB3C4\uAC00 \uB9DE\uC9C0 \uC54A\uAC70\uB098 \uD3F0\uD2B8\uAC00 \uC5C6\uC5B4 \uADF8\uB300\uB85C \uB480\uC2B5\uB2C8\uB2E4",
-    "bind.remapNothing": "\uBC14\uAFC0 \uC790\uB9AC\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 \u2014 \uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC5F0\uACB0 \uD604\uD669\uC744 \uB2E4\uC2DC \uBCF4\uC138\uC694.",
     // 리네임
     "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
     "rename.none": "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -1307,24 +1390,11 @@
     "common.close": "\uB2EB\uAE30",
     // 변수 관리(넓은 화면)
     "vm.fromBind": "\uBCC0\uC218 \uAD00\uB9AC\uC5D0\uC11C \uBCF4\uAE30 \u2197",
-    "vm.fromBanner": "\uBCC0\uC218 \uAD00\uB9AC",
-    "vm.title": "\uBCC0\uC218 \uAD00\uB9AC",
     "vm.search": "\uBCC0\uC218 \uAC80\uC0C9",
-    "vm.onlyUsed": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uAC83\uB9CC",
-    "vm.count": "{total}\uAC1C \uC911 {shown}\uAC1C",
-    "vm.colName": "\uC774\uB984",
-    "vm.colUsage": "\uC0AC\uC6A9",
     "vm.uses": "{n}\uACF3",
     "vm.moreTip": "\uBA54\uB274 (\uC6B0\uD074\uB9AD\uACFC \uAC19\uC74C)",
     "vm.jumpAlias": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uB85C \uC774\uB3D9",
-    "vm.aliasOutside": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uAC00 \uC774 \uD30C\uC77C\uC5D0 \uC5C6\uC2B5\uB2C8\uB2E4(\uB2E4\uB978 \uD30C\uC77C\xB7\uB77C\uC774\uBE0C\uB7EC\uB9AC).",
     "vm.noVars": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
-    "vm.selectFirst": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uBA74 \uAC70\uAE30\uC11C \uC4F0\uB294 \uBCC0\uC218\uAC00 \uBCF4\uC5EC\uC694.",
-    "vm.usageLoading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218\uB97C \uC77D\uB294 \uC911\u2026",
-    "vm.noneUsed": "\uC774 \uCEEC\uB809\uC158\uC758 \uBCC0\uC218\uB294 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
-    "vm.showAll": "\uC804\uCCB4 \uBCF4\uAE30",
-    "vm.noMatch": "\uC870\uAC74\uC5D0 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
-    "vm.usageCapped": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC0AC\uC6A9 \uC218\uB294 \uC77C\uBD80\uB9CC \uC14C\uC2B5\uB2C8\uB2E4.",
     "vm.copyName": "\uC774\uB984 \uBCF5\uC0AC",
     "vm.copyValue": "\uAC12 \uBCF5\uC0AC",
     "vm.copyCss": "CSS \uBCC0\uC218\uBA85 \uBCF5\uC0AC",
@@ -1336,16 +1406,92 @@
     "vm.copyEmpty": "\uBCF5\uC0AC\uD560 \uAC12\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
     "vm.selectLayers": "\uC0AC\uC6A9 \uB808\uC774\uC5B4 \uC120\uD0DD",
     "vm.detail": "\uC0C1\uC138 \uBCF4\uAE30\u2026",
-    "vm.remap": "\uB2E4\uB978 \uBCC0\uC218\uB85C \uAD50\uCCB4\u2026",
-    "vm.remapTitle": "{name} \uAD50\uCCB4",
     "vm.noTier": "\uACC4\uCE35 \uC544\uB2D8",
     "vm.dCollection": "\uCEEC\uB809\uC158",
     "vm.dScopes": "\uC6A9\uB3C4",
     "vm.dDesc": "\uC124\uBA85",
-    "vm.dUses": "\uC4F0\uC778 \uACF3 {n}",
     "vm.dNoUses": "\uC120\uD0DD \uC548\uC5D0\uC11C\uB294 \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
-    "vm.dSelectFirst": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uBA74 \uC4F0\uC778 \uACF3\uC774 \uBCF4\uC5EC\uC694.",
     // 탭
+    // IA v3 변수 탭(§4.2~§4.4)
+    "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
+    "start.head": "\uC544\uC9C1 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "start.sub": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uB9CC\uB4E4\uC5B4 \uBCF4\uC138\uC694",
+    "start.freeNote": "\u24D8 \uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uBCC0\uC218\uB97C \uC0C8\uB85C \uB9CC\uB4E4 \uC218 \uC5C6\uC5B4\uC694",
+    "start.freeNote2": "\uC774\uB984 \uC815\uB9AC\uC640 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uC740 \uBB34\uB8CC",
+    "start.freeExtract": "(\uCD94\uCD9C\uAE4C\uC9C0 \uBB34\uB8CC)",
+    "start.libNote": "\u24D8 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB294 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694. \uAC19\uC740 \uBCC0\uC218\uB97C \uC5EC\uAE30\uC11C \uB610 \uB9CC\uB4E4 \uD544\uC694\uB294 \uC5C6\uC5B4\uC694.",
+    "start.made": "\uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
+    "start.viewList": "\uBCC0\uC218 \uBAA9\uB85D \uBCF4\uAE30",
+    "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uACE0 \uC5F0\uACB0\uD574\uC694",
+    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uB9CC \uC815\uB9AC\uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
+    "wizardCard.hintFreeVars": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uACC4\uCE35\uC774 \uC788\uB294 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uACFC \uB808\uC774\uC5B4 \uC774\uB984 \uC815\uB9AC\uB9CC \uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
+    "wizardCard.runFree": "\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
+    "wizardCard.runFreeVars": "\uC5F0\uACB0\xB7\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
+    "wizard.freeSumNoVars": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "wizard.freeSumVars": "\uC5F0\uACB0 {m}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "wizard.freeNoTier": " \xB7 \uACC4\uCE35\uC774 \uC9C0\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694 \u2014 \uBCC0\uC218 \uD0ED \u22EF \u203A \uCEEC\uB809\uC158 \uACC4\uCE35 \uC9C0\uC815",
+    "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
+    "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total} \u25BE",
+    "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
+    "list.findUnboundTip": "\uC120\uD0DD\uC5D0\uC11C \uBCC0\uC218\uB85C \uBC14\uAFC0 \uC218 \uC788\uB294 \uC0C9\xB7\uAC04\uACA9\uC744 \uCC3E\uC544 \uC5F0\uACB0 \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uC5FD\uB2C8\uB2E4",
+    "list.addTip": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30(\uC0C9\xB7\uD1A0\uD070\xB7\uD14C\uB9C8\xB7\uD0C0\uC774\uD3EC)",
+    "list.moreTip": "\uB354 \uBCF4\uAE30",
+    "list.refreshTip": "\uB2E4\uC2DC \uC77D\uAE30",
+    "list.chipMore": "\uCE69 \uB354 \uBCF4\uAE30",
+    "list.modeTip": "\uBAA8\uB4DC",
+    "list.modeDefault": "\uAE30\uBCF8 \uBAA8\uB4DC",
+    "list.searchTip": "\uAC80\uC0C9",
+    "list.chipAll": "\uBAA8\uB450",
+    "list.chipTip": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 {used}\uAC1C(\uC9C1\uC811 {direct} \xB7 \uAC04\uC811 {indirect}) / \uC804\uCCB4 {total}\uAC1C",
+    "list.reading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 \uC77D\uB294 \uC911\u2026",
+    "list.refreshSame": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uBCC0\uACBD \uC5C6\uC74C",
+    "list.refreshUsage": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uC0AC\uC6A9 \uC218\uAC00 \uBC14\uB010 \uBCC0\uC218 {n}\uAC1C",
+    "list.refreshTable": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uBCC0\uC218 \uBAA9\uB85D\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694",
+    "list.refreshCountSuffix": " \xB7 \uC0AC\uC6A9 \uC218\uAC00 \uBC14\uB010 \uBCC0\uC218 {n}\uAC1C",
+    "list.big": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC544\uC694",
+    "list.read": "\uC77D\uAE30",
+    "list.wizardWait": "\uB9C8\uBC95\uC0AC\uAC00 \uB05D\uB098\uBA74 \uC77D\uC5B4\uC694",
+    "list.noneUsed": "\uC774 \uC120\uD0DD\uC740 \uB85C\uCEEC \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694",
+    "list.selectHint": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uB9CC \uD3BC\uCCD0\uC838\uC694",
+    "list.base": "\xB7 \uBAA9\uB85D \uAE30\uC900: {name}",
+    "list.baseMany": "\uB808\uC774\uC5B4 {m}\uAC1C",
+    "list.rebase": "\uAE30\uC900 \uBC14\uAFB8\uAE30",
+    "list.unused": "\uC548 \uC500",
+    "list.indirect": "\u21B3 \uAC04\uC811",
+    "list.indirectTip": "\uC9C1\uC811 \uBD99\uC5B4 \uC788\uC9C4 \uC54A\uACE0, {alias} \uAC19\uC740 \uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC5EC\uC694",
+    "list.usesTip": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3",
+    "list.showUnused": "+{m} \uC548 \uC500",
+    "list.hideUnused": "\uC228\uAE30\uAE30",
+    "list.unusedGroups": "\u25B8 \uC548 \uC4F0\uB294 \uADF8\uB8F9 {n}\uAC1C",
+    "list.hiddenRow": "\uC120\uD0DD\uC5D0\uC11C \uC548 \uC4F0\uC5EC \uC228\uACBC\uC5B4\uC694",
+    "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "list.searchAll": "\uBAA8\uB450\uC5D0\uC11C \uCC3E\uAE30",
+    "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
+    "list.libSection": "LIB \xB7 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uAC83",
+    "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
+    "list.libCollection": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \xB7 {name}",
+    "list.libManaged": "\uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
+    "list.deleted": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB41C \uACF3 {n}\uAC1C",
+    "list.select": "\uC120\uD0DD",
+    "list.jumped": "{name} \uD589\uC73C\uB85C \uC62E\uACBC\uC5B4\uC694",
+    "list.undo": "\u2190 \uB418\uB3CC\uB9AC\uAE30",
+    "list.selectFirstNote": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC5D0\uC11C \uCC3E\uC544\uC694",
+    "list.selectViaAlias": "\uBCC4\uCE6D\uC73C\uB85C \uC4F0\uB294 \uB808\uC774\uC5B4 \uC120\uD0DD",
+    "list.selectCapped": "\uB808\uC774\uC5B4 200\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694(\uC804\uCCB4 {n}\uAC1C)",
+    "list.selectNone": "\uC120\uD0DD\uD560 \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
+    "list.selectPartial": "\uB808\uC774\uC5B4 {found}\uAC1C \uC120\uD0DD \u2014 {missing}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
+    "list.dValue": "\uAC12",
+    "list.dUses": "\uC4F0\uC778 \uACF3",
+    "list.detailBig": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uCC3E\uC9C0 \uC54A\uC544\uC694",
+    "list.find": "\uCC3E\uAE30",
+    "list.usesHead": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3 \xB7 \uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
+    "list.usesMore": "\uC678 {n}\uAC1C",
+    "list.viaAlias": "\uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC784: {names}",
+    "list.menuTiers": "\uCEEC\uB809\uC158 \uACC4\uCE35 \uC9C0\uC815\u2026",
+    "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
+    "list.menuExpandAll": "\uBAA8\uB4E0 \uADF8\uB8F9 \uD3BC\uCE58\uAE30",
+    "list.menuCollapseAll": "\uBAA8\uB4E0 \uADF8\uB8F9 \uC811\uAE30",
+    "list.semanticsNote": "\uC5ED\uD560 \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uC801\uC6A9\uD560 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
     "tab.variables": "\uBCC0\uC218",
     "tab.layer": "\uB808\uC774\uC5B4",
     "tab.settings": "\uC124\uC815",
@@ -1403,12 +1549,6 @@
     // 플러그인 설정(#19) — 설정 탭에만
     "settings.title": "\uAE30\uBCF8\uAC12",
     "colRoles.title": "\uCEEC\uB809\uC158 \uACC4\uCE35",
-    "existingVars.has": "\uC774 \uD30C\uC77C\uC5D0 \uBCC0\uC218 {n}\uAC1C\uAC00 \uC774\uBBF8 \uC788\uC5B4\uC694 (\uC0C9 {color} \xB7 \uADF8 \uBC16 {other}).",
-    "existingVars.hasMake": "\uC774 \uD30C\uC77C\uC5D0 \uBCC0\uC218 {n}\uAC1C\uAC00 \uC774\uBBF8 \uC788\uC5B4\uC694 \u2014 \uC0C8\uB85C \uB9CC\uB4E4 \uAC8C \uC5C6\uB2E4\uBA74 \uBC14\uB85C \uC5F0\uACB0\uD558\uC138\uC694.",
-    "existingVars.gotoBind": "\uC5F0\uACB0 \uD655\uC778\uD558\uAE30 \u2192",
-    "existingVars.unknown": "\uBCC0\uC218 {n}\uAC1C\uAC00 \uC788\uC9C0\uB9CC \uC5B4\uB290 \uACC4\uCE35(Global\xB7Semantic)\uC778\uC9C0 \uBAB0\uB77C \uC5F0\uACB0\uC5D0 \uC4F0\uC9C0 \uBABB\uD574\uC694.",
-    "existingVars.gotoRoles": "\uACC4\uCE35 \uC9C0\uC815\uD558\uAE30 \u2192",
-    "existingVars.selectFirst": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uBA74 \uC5F0\uACB0 \uD604\uD669\uC774 \uBCF4\uC5EC\uC694.",
     "colRoles.hint": "\uC774\uB984\uC774 Global\xB7Semantic\xB7Component\uAC00 \uC544\uB2CC \uCEEC\uB809\uC158\uB3C4 \uACC4\uCE35\uC73C\uB85C \uC4F0\uAC8C \uC9C0\uC815\uD569\uB2C8\uB2E4. \uD30C\uC77C\uC5D0 \uC800\uC7A5\uB3FC \uC774 \uD30C\uC77C\uC744 \uC5EC\uB294 \uBAA8\uB450\uC5D0\uAC8C \uC801\uC6A9\uB429\uB2C8\uB2E4",
     "colRoles.empty": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218 \uCEEC\uB809\uC158\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
     "colRoles.vars": "\uBCC0\uC218 {n}",
@@ -1452,11 +1592,8 @@
     "prereq.gotoCreate": "\uD1A0\uD070 \uC0DD\uC131\uC73C\uB85C \u2192",
     // 온보딩 / 가이드
     // 첫 실행 배너(온보딩 흡수)
-    "onboard.banner": "\uCC98\uC74C\uC774\uBA74 \uC804\uCCB4 \uC2E4\uD589\uC73C\uB85C \uC2DC\uC791\uD558\uC138\uC694.",
-    "onboard.hide": "\uB2E4\uC2DC \uBCF4\uC9C0 \uC54A\uAE30",
     // 진행(파이프라인 카드)
-    "pipeline.title": "\uC900\uBE44 \uD604\uD669",
-    "pipeline.indep": "\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uC801\uC6A9 \uD0ED\uC5D0\uC11C",
+    "pipeline.indep": "\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uB808\uC774\uC5B4 \u203A \uCEF4\uD3EC\uB10C\uD2B8\uC5D0\uC11C",
     // 브랜드 팔레트
     "color.title": "\uC0C9",
     "color.scope": "\uBCC0\uC218\uD654",
@@ -1904,62 +2041,6 @@
     const i = name.lastIndexOf("/");
     return i < 0 ? name : name.slice(i + 1);
   }
-  function buildVarTree(cols, vars, include) {
-    const out = [];
-    for (const c of cols) {
-      const root = { collectionId: c.id, path: "", label: c.name, depth: 0, count: 0, children: [] };
-      const index = /* @__PURE__ */ new Map([["", root]]);
-      for (const v of vars) {
-        if (v.collectionId !== c.id || !include(v)) continue;
-        root.count++;
-        const parts = groupPath(v.name).split("/").filter(Boolean);
-        let parent2 = root;
-        let path = "";
-        parts.forEach((p, i) => {
-          path = path ? `${path}/${p}` : p;
-          let node = index.get(path);
-          if (!node) {
-            node = { collectionId: c.id, path, label: p, depth: i + 1, count: 0, children: [] };
-            index.set(path, node);
-            parent2.children.push(node);
-          }
-          node.count++;
-          parent2 = node;
-        });
-      }
-      out.push(root);
-    }
-    return out;
-  }
-  function inPath(name, path) {
-    if (!path) return true;
-    const g = groupPath(name);
-    return g === path || g.startsWith(path + "/");
-  }
-  function filterVars(vars, f, usage) {
-    const q = f.query.trim().toLowerCase();
-    return vars.filter(
-      (v) => {
-        var _a;
-        return v.collectionId === f.collectionId && inPath(v.name, f.path) && (!q || v.name.toLowerCase().includes(q)) && (!f.onlyUsed || ((_a = usage.get(v.id)) != null ? _a : 0) > 0);
-      }
-    );
-  }
-  function groupRows(rows) {
-    const out = [];
-    const idx = /* @__PURE__ */ new Map();
-    for (const r of rows) {
-      const p = groupPath(r.name);
-      let g = idx.get(p);
-      if (!g) {
-        g = { path: p, rows: [] };
-        idx.set(p, g);
-        out.push(g);
-      }
-      g.rows.push(r);
-    }
-    return out;
-  }
   function cellCopyText(cell) {
     if (!cell) return "";
     switch (cell.kind) {
@@ -1971,9 +2052,129 @@
         return cell.text;
     }
   }
-  function pickInitialCollection(tree) {
+  function tierBadge(c) {
+    if (c.tier === 1) return "G";
+    if (c.tier === 2) return "S";
+    if (c.tier === 3) return "C";
+    return c.tierSet === "none" ? "\u2013" : "?";
+  }
+  function orderCollections(cols) {
+    const rank = (t2) => t2 === 3 ? 0 : t2 === 2 ? 1 : t2 === 1 ? 2 : 3;
+    return cols.map((c, i) => ({ c, i })).sort((a, b) => rank(a.c.tier) - rank(b.c.tier) || a.i - b.i).map((x) => x.c);
+  }
+  var NO_GROUP = "(\uADF8\uB8F9 \uC5C6\uC74C)";
+  function groupKey(collectionId, name) {
+    return `${collectionId}|${groupPath(name)}`;
+  }
+  function matchesQuery(name, query2) {
+    const q = query2.trim().toLowerCase();
+    return !q || name.toLowerCase().includes(q);
+  }
+  function indirectUsage(direct, aliasTargets, maxDepth = 5) {
+    var _a, _b;
+    const out = /* @__PURE__ */ new Map();
+    for (const start of direct) {
+      let frontier = [start];
+      const seen = /* @__PURE__ */ new Set([start]);
+      for (let d = 0; d < maxDepth && frontier.length; d++) {
+        const next = [];
+        for (const id of frontier) {
+          for (const t2 of (_a = aliasTargets.get(id)) != null ? _a : []) {
+            if (seen.has(t2)) continue;
+            seen.add(t2);
+            next.push(t2);
+            if (!direct.has(t2)) {
+              const via = (_b = out.get(t2)) != null ? _b : [];
+              if (!via.includes(start)) via.push(start);
+              out.set(t2, via);
+            }
+          }
+        }
+        frontier = next;
+      }
+    }
+    return out;
+  }
+  function aliasTargetsOf(vars) {
+    const m = /* @__PURE__ */ new Map();
+    for (const v of vars) {
+      const ids = Object.values(v.values).filter((c) => c.kind === "alias").map((c) => c.aliasId);
+      if (ids.length) m.set(v.id, [...new Set(ids)]);
+    }
+    return m;
+  }
+  function buildList(inp) {
     var _a, _b, _c;
-    return (_c = (_b = (_a = tree.find((n) => n.count > 0)) != null ? _a : tree[0]) == null ? void 0 : _b.collectionId) != null ? _c : null;
+    const known = inp.direct !== null;
+    const searching = inp.query.trim() !== "";
+    const cols = orderCollections(inp.collections).filter((c) => inp.chip === "all" || c.id === inp.chip);
+    const stateOf = (v) => {
+      var _a2;
+      return !known ? "none" : ((_a2 = inp.direct.get(v.id)) != null ? _a2 : 0) > 0 ? "direct" : inp.indirect.has(v.id) ? "indirect" : "unused";
+    };
+    const byCol = /* @__PURE__ */ new Map();
+    for (const c of cols) byCol.set(c.id, []);
+    const idx = /* @__PURE__ */ new Map();
+    for (const v of inp.vars) {
+      const list = byCol.get(v.collectionId);
+      if (!list) continue;
+      if (searching && !matchesQuery(v.name, inp.query)) continue;
+      const key = groupKey(v.collectionId, v.name);
+      let g = idx.get(key);
+      if (!g) {
+        g = { key, path: groupPath(v.name), rows: [] };
+        idx.set(key, g);
+        list.push(g);
+      }
+      g.rows.push(v);
+    }
+    const groupCount = [...byCol.values()].reduce((n, gs) => n + gs.length, 0);
+    const out = [];
+    for (const c of cols) {
+      const groups = (_a = byCol.get(c.id)) != null ? _a : [];
+      if (searching && !groups.length) continue;
+      const all = inp.vars.filter((v) => v.collectionId === c.id);
+      const usedIn = (rows) => rows.filter((v) => {
+        const s = stateOf(v);
+        return s === "direct" || s === "indirect";
+      }).length;
+      out.push({ kind: "section", collection: c, used: known ? usedIn(all) : 0, total: all.length });
+      const unusedGroups = [];
+      for (const g of groups) {
+        const used = usedIn(g.rows);
+        const unused = known ? g.rows.length - used : 0;
+        const label = g.path || NO_GROUP;
+        if (searching) {
+          out.push({ kind: "group", key: g.key, collectionId: c.id, path: g.path, label, used, total: g.rows.length, expanded: true, unused: 0, showingUnused: true });
+          for (const v of g.rows) out.push({ kind: "row", v, state: stateOf(v), groupKey: g.key });
+          continue;
+        }
+        if (known && used === 0) {
+          unusedGroups.push(g);
+          continue;
+        }
+        const auto = known ? true : groupCount <= 10;
+        const expanded = (_b = inp.userExpanded.get(g.key)) != null ? _b : auto;
+        const showingUnused = inp.showUnusedIn.has(g.key);
+        out.push({ kind: "group", key: g.key, collectionId: c.id, path: g.path, label, used, total: g.rows.length, expanded, unused, showingUnused });
+        if (!expanded) continue;
+        for (const v of g.rows) {
+          const st = stateOf(v);
+          if (known && st === "unused" && !showingUnused) continue;
+          out.push({ kind: "row", v, state: st, groupKey: g.key });
+        }
+      }
+      if (unusedGroups.length) {
+        if (inp.showUnusedGroups.has(c.id)) {
+          for (const g of unusedGroups) {
+            const expanded = (_c = inp.userExpanded.get(g.key)) != null ? _c : false;
+            out.push({ kind: "group", key: g.key, collectionId: c.id, path: g.path, label: g.path || NO_GROUP, used: 0, total: g.rows.length, expanded, unused: g.rows.length, showingUnused: true });
+            if (expanded) for (const v of g.rows) out.push({ kind: "row", v, state: "unused", groupKey: g.key });
+          }
+        } else out.push({ kind: "unusedGroups", collectionId: c.id, count: unusedGroups.length });
+      }
+    }
+    return out;
   }
 
   // src/lib/reread.ts
@@ -3053,11 +3254,6 @@
   }
   $("useBrand2").addEventListener("change", syncSecondaryControls);
   syncSecondaryControls();
-  $("btnOnboardHide").addEventListener("click", () => {
-    $("onboardBanner").style.display = "none";
-    hideOnboard = true;
-    saveSettings();
-  });
   $("btnExtract").addEventListener("click", () => {
     colorRevealed = true;
     previewRevealed = false;
@@ -3494,29 +3690,30 @@
     for (const p of plan) {
       const paidSkip = !p.run && p.skipReason === "wizard.skip.paid";
       if (!p.run && !paidSkip) continue;
-      const chip = document.createElement("span");
-      chip.id = `wstep-${p.step.id}`;
+      const chip2 = document.createElement("span");
+      chip2.id = `wstep-${p.step.id}`;
       const label = t("wizard.step." + p.step.id);
       if (p.run) {
-        chip.textContent = `${++n} ${label}`;
+        chip2.textContent = `${++n} ${label}`;
       } else {
-        chip.className = "skip";
-        chip.textContent = `${PAID_LOCK} ${label}`;
-        chip.title = t("wizard.chip.paid");
+        chip2.className = "skip";
+        chip2.textContent = `${PAID_LOCK} ${label}`;
+        chip2.title = t("wizard.chip.paid");
       }
-      box.appendChild(chip);
+      box.appendChild(chip2);
     }
   }
   var wizardFailed = false;
   function setWizardStep(id, state, note) {
     if (state === "fail" && note !== t("wizard.seq.stoppedPrev")) wizardFailed = true;
-    const chip = document.getElementById(`wstep-${id}`);
-    if (!chip) return;
-    chip.classList.remove("active", "done", "fail");
-    chip.classList.add(state);
-    chip.title = note;
+    const chip2 = document.getElementById(`wstep-${id}`);
+    if (!chip2) return;
+    chip2.classList.remove("active", "done", "fail");
+    chip2.classList.add(state);
+    chip2.title = note;
   }
   async function runWizard() {
+    var _a, _b;
     if (wizardRunning) return;
     if (lastSelCount <= 0) {
       setStatus("wizardSummary", t("wizard.needSelect"), "warn");
@@ -3537,6 +3734,9 @@
     const plan = planWizard(options, ctx);
     wizardRunning = true;
     wizardFailed = false;
+    wizBeforeCount = localVarCount();
+    wizFrom = activeTab === "variables" && varSub === "make" ? "make" : "start";
+    wizLatch = wizBeforeCount === 0 ? { from: wizFrom, before: 0, summarySeen: false, done: false } : null;
     opWizardStart();
     $("btnWizardRun").disabled = true;
     $("btnWizardCancel").style.display = "";
@@ -3663,17 +3863,27 @@
     }
     wizardRunning = false;
     opWizardEnd(wizardFailed ? "fail" : stopped ? "cancel" : "ok");
+    if (wizLatch) wizLatch.done = true;
     $("btnWizardRun").disabled = false;
     setWizardRunLabel(!stopped);
     $("btnWizardCancel").style.display = "none";
     const paidSkipped = paidSkippedSteps(plan);
     const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
-    setStatus(
+    if (!isPaid && !stopped && !wizardFailed) {
+      const renamed = (_a = totals.renamed) != null ? _a : 0;
+      const bound = (_b = totals.bound) != null ? _b : 0;
+      let text = wizBeforeCount === 0 ? t("wizard.freeSumNoVars", { n: renamed }) : t("wizard.freeSumVars", { m: bound, n: renamed });
+      if (wizBeforeCount > 0 && bound === 0 && !vmCols.some((c) => c.tier > 0)) text += t("wizard.freeNoTier");
+      setStatus("wizardSummary", text, "ok");
+    } else setStatus(
       "wizardSummary",
       t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
-      stopped || paidSkipped.length ? "warn" : "ok"
+      stopped || paidSkipped.length || wizardFailed ? "warn" : "ok"
     );
+    wizCountPending = wizFrom === "make" && wizBeforeCount > 0;
+    renderVarScreen();
   }
+  var wizCountPending = false;
   var lastSelBound = 0;
   var lastSelRenamed = 0;
   function applySelectionDone() {
@@ -3685,8 +3895,9 @@
   }
   function setWizardRunLabel(rerun) {
     const b = $("btnWizardRun");
-    b.textContent = rerun ? t("wizard.rerun") : t("wizardCard.run");
-    b.title = rerun ? t("wizard.rerunHint") : "";
+    b.dataset.rerun = rerun ? "1" : "";
+    b.title = rerun && isPaid ? t("wizard.rerunHint") : "";
+    renderWizardCopy();
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
   $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
@@ -3832,8 +4043,8 @@
   var PIPELINE_TARGET = {
     colors: { make: "color", btn: "btnColorVars" },
     tokens: { make: "token", btn: "btnCreate" },
-    semantics: { make: "token", btn: "btnSemantics" },
-    // 역할 매핑은 토큰 단계에 흡수돼 있다
+    semantics: { make: "token", btn: "btnCreate" },
+    // 역할 매핑은 토큰을 적용할 때 함께 만들어진다(숨은 카드 대신)
     dark: { make: "theme", btn: "btnGenDark" },
     textStyles: { make: "type", btn: "btnScanText" },
     bind: { make: null, btn: "btnApply" },
@@ -3843,7 +4054,9 @@
   };
   function gotoStep(id) {
     var _a;
+    closeReadiness();
     const target = PIPELINE_TARGET[id];
+    if (id === "semantics") showStatusLine(t("list.semanticsNote"));
     if (target.make === null) {
       showTab("layer");
       showApplyStep((_a = target.apply) != null ? _a : "bind");
@@ -4070,7 +4283,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -4102,6 +4315,7 @@
       }
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
+        onSelectionForList(msg);
         renderSelBar(msg.count, msg.scanned, msg.capped, (_a = msg.firstName) != null ? _a : "");
         lastSelBound = msg.bound;
         lastSelRenamed = msg.renamed;
@@ -4200,44 +4414,16 @@
         }
         break;
       }
-      case "REMAP_TARGETS_RESULT":
-        onRemapTargets(msg.fromId, msg.targets);
+      case "VAR_TABLE":
+        onVarTable(msg);
         break;
-      case "REMAP_RESULT": {
-        closeModal();
-        const statusId = vmOpen ? "vmStatus" : "applyStatus";
-        if (!msg.replaced) {
-          setStatus(statusId, t("bind.remapNothing"), "warn");
-          break;
-        }
-        keepRemapStatus = !vmOpen;
-        const skippedNote = msg.skipped ? t("bind.remapSkipped", { skipped: msg.skipped }) : "";
-        setStatus(statusId, t("bind.remapDone", { replaced: msg.replaced, to: msg.toName, nodes: msg.nodes }) + skippedNote, msg.skipped ? "warn" : "ok");
-        if (vmOpen) requestManagerUsage();
+      case "USAGE_RESULT":
+        onUsageResult(msg);
         break;
-      }
-      case "VAR_TABLE": {
-        const sig = JSON.stringify([msg.collections, msg.vars]);
-        if (sig === vmTableSig) break;
-        vmTableSig = sig;
-        vmCols = msg.collections;
-        vmVars = msg.vars;
-        renderVarManager();
+      case "VAR_USERS":
+        onVarUsers(msg);
         break;
-      }
       case "BINDINGS_RESULT": {
-        if (msg.forManager) {
-          if (msg.reqId === vmUsageReq) {
-            vmUsageInFlight = false;
-            const sig = JSON.stringify([msg.candidates.map((c) => [c.variableId, c.nodeId, c.field]), msg.total]);
-            if (sig !== vmUsageSig || vmUsage === null) {
-              vmUsageSig = sig;
-              setManagerUsage(msg.candidates, msg.nodes, msg.total > msg.candidates.length);
-            }
-            reentry.release();
-          }
-          break;
-        }
         if (!isCurrentBindReply(msg.reqId)) break;
         clearBindPreview();
         bindResultMode = true;
@@ -4245,11 +4431,16 @@
         bindNodes = msg.nodes;
         renderBindTree();
         const capNote = msg.total > msg.candidates.length ? t("apply.resultCapped", { shown: msg.candidates.length }) : "";
-        if (keepRemapStatus) keepRemapStatus = false;
-        else setStatus("applyStatus", msg.total ? t("bind.scanned", { total: msg.total, nodes: msg.boundNodes }) + capNote : t("bind.scannedNone"), msg.total ? "" : "warn");
+        setStatus("applyStatus", msg.total ? t("bind.scanned", { total: msg.total, nodes: msg.boundNodes }) + capNote : t("bind.scannedNone"), msg.total ? "" : "warn");
         break;
       }
       case "SELECT_RESULT":
+        if (selectStatusTarget === "list") {
+          if (msg.capped) showStatusLine(t("list.selectCapped", { n: msg.requested }), { cls: "warn" });
+          else if (!msg.found) showStatusLine(t("list.selectNone"), { cls: "warn" });
+          else if (msg.found < msg.requested) showStatusLine(t("list.selectPartial", { found: msg.found, missing: msg.requested - msg.found }), { cls: "warn" });
+          break;
+        }
         if (msg.capped) {
           setStatus(selectStatusTarget, `\uB808\uC774\uC5B4 ${msg.found}\uAC1C\uB9CC \uC120\uD0DD \u2014 \uD55C \uBC88\uC5D0 \uBCF4\uC5EC\uC904 \uC218 \uC788\uB294 \uC0C1\uD55C(${msg.requested}\uAC1C \uC911)\uC785\uB2C8\uB2E4.`, "warn");
         } else if (msg.found < msg.requested) {
@@ -4324,7 +4515,6 @@
         prereqKnown = true;
         prereqInFlight = false;
         reentry.release();
-        renderExistingVars((_l = msg.tierVars) != null ? _l : 0, (_m = msg.tierColorVars) != null ? _m : 0, (_n = msg.otherVars) != null ? _n : 0);
         hasColorVars = msg.hasColorVars;
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
@@ -4400,7 +4590,6 @@
         $("grid").value = String(msg.grid);
         $("tol").value = String(msg.tolerance);
         hideOnboard = msg.hideOnboard;
-        $("onboardBanner").style.display = hideOnboard ? "none" : "";
         break;
       }
       case "VARIABLES": {
@@ -4752,7 +4941,7 @@
     return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
   }
   $("bindFilter").addEventListener("input", () => renderBindTree());
-  $("btnBindToManager").addEventListener("click", () => showManager({ onlyUsed: true }));
+  $("btnBindToManager").addEventListener("click", () => showManager());
   function updateBindApply() {
     const total = bindCandidates.length;
     const sel = bindChecked.size;
@@ -5369,8 +5558,6 @@
       requestManagerUsage(why === "work" ? "work" : "quiet");
     } else if (activeTab === "variables" && varSub === "make") {
       send({ type: "GET_VARIABLES" });
-    } else if (activeTab === "settings") {
-      send({ type: "GET_COLLECTION_ROLES" });
     }
     if (why === "work" && !(activeTab === "variables" && varSub === "home")) send({ type: "GET_VAR_TABLE" });
   }
@@ -5445,6 +5632,8 @@
       btn.tabIndex = on ? 0 : -1;
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
+    renderSelBase();
+    if (changed && name !== "variables" && wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
     syncManagerVisibility(false);
     syncStickyOffsets();
     if (changed) {
@@ -5458,8 +5647,8 @@
     if (sub === varSub) return;
     if (activeTab === "variables") screenScroll.set(screenKey(), window.scrollY);
     varSub = sub;
-    $("varHome").style.display = sub === "home" ? "" : "none";
     $("varMake").style.display = sub === "make" ? "" : "none";
+    renderVarScreen();
     syncManagerVisibility(false);
     syncStickyOffsets();
     if (activeTab === "variables") {
@@ -5472,40 +5661,6 @@
     showTab("variables");
     showVarSub("make");
     if (step) showMakeStep(step);
-  }
-  function goToBindStatus() {
-    showTab("layer");
-    showApplyStep("bind");
-    if (lastSelCount > 0) {
-      setStatus("applyStatus", t("common.running"), "");
-      requestBindingsScan();
-    } else setStatus("applyStatus", t("existingVars.selectFirst"), "");
-  }
-  function goToCollectionRoles() {
-    showTab("settings");
-    $("collectionRolesCard").scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-  function renderExistingVars(tierVars, tierColor, other) {
-    for (const [id, onMake] of [["existingVarsStart", false], ["existingVarsMake", true]]) {
-      const box = $(id);
-      const text = box.querySelector(".ev-text");
-      const go = box.querySelector(".ev-go");
-      const manage = box.querySelector(".ev-manage");
-      manage.textContent = t("vm.fromBanner");
-      manage.onclick = () => showManager({ onlyUsed: false });
-      manage.style.display = tierVars + other > 0 ? "" : "none";
-      if (tierVars > 0) {
-        text.textContent = onMake ? t("existingVars.hasMake", { n: tierVars }) : t("existingVars.has", { n: tierVars, color: tierColor, other: tierVars - tierColor });
-        go.textContent = t("existingVars.gotoBind");
-        go.onclick = goToBindStatus;
-        box.style.display = "";
-      } else if (other > 0) {
-        text.textContent = t("existingVars.unknown", { n: other });
-        go.textContent = t("existingVars.gotoRoles");
-        go.onclick = goToCollectionRoles;
-        box.style.display = "";
-      } else box.style.display = "none";
-    }
   }
   var ROLE_LABEL = { global: "Global", semantic: "Semantic", component: "Component" };
   var colRoleRows = [];
@@ -5625,16 +5780,21 @@
   for (const b of Array.from(document.querySelectorAll("[data-next-apply]"))) {
     b.addEventListener("click", () => showApplyStep(b.dataset.nextApply));
   }
+  var menuOnClose = null;
   var menuEl = null;
   function closeMenu() {
     if (!menuEl) return;
     menuEl.remove();
     menuEl = null;
+    const cb = menuOnClose;
+    menuOnClose = null;
+    cb == null ? void 0 : cb();
     reentry.release();
   }
-  function openMenu(x, y, items, returnFocus) {
+  function openMenu(x, y, items, returnFocus, onClose) {
     var _a;
     closeMenu();
+    menuOnClose = onClose != null ? onClose : null;
     const m = document.createElement("div");
     m.className = "ctx-menu";
     m.setAttribute("role", "menu");
@@ -5645,10 +5805,19 @@
       b.type = "button";
       b.setAttribute("role", "menuitem");
       b.textContent = it.label;
-      b.disabled = !!it.disabled;
+      if (it.disabled) {
+        b.setAttribute("aria-disabled", "true");
+        if (it.note) {
+          const n = document.createElement("span");
+          n.className = "menu-note";
+          n.textContent = it.note;
+          b.appendChild(n);
+        }
+      }
       b.addEventListener("click", () => {
+        if (it.disabled) return;
         closeMenu();
-        returnFocus == null ? void 0 : returnFocus.focus();
+        if (!it.focusElsewhere) returnFocus == null ? void 0 : returnFocus.focus();
         it.onSelect();
       });
       m.appendChild(b);
@@ -5658,7 +5827,7 @@
     const r = m.getBoundingClientRect();
     m.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
     m.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
-    const enabled = buttons.filter((b) => !b.disabled);
+    const enabled = buttons;
     (_a = enabled[0]) == null ? void 0 : _a.focus();
     m.addEventListener("keydown", (e) => {
       var _a2, _b;
@@ -5686,19 +5855,24 @@
   document.addEventListener("scroll", closeMenu, true);
   var modalEl = null;
   var modalReturnFocus = null;
+  var modalOnClose = null;
   function closeModal() {
     if (!modalEl) return;
+    const cb = modalOnClose;
+    modalOnClose = null;
+    cb == null ? void 0 : cb();
     modalEl.remove();
     modalEl = null;
     modalReturnFocus == null ? void 0 : modalReturnFocus.focus();
     modalReturnFocus = null;
     reentry.release();
   }
-  function openModal(title, body, foot) {
+  function openModal(title, body, foot, returnFocus, onClose) {
     var _a;
     closeModal();
     closeMenu();
-    modalReturnFocus = document.activeElement;
+    modalReturnFocus = returnFocus != null ? returnFocus : document.activeElement;
+    modalOnClose = onClose != null ? onClose : null;
     const back = document.createElement("div");
     back.className = "modal-backdrop";
     const box = document.createElement("div");
@@ -5773,26 +5947,56 @@
     ta.remove();
     return ok;
   }
+  var BIG_SELECTION = 300;
+  var DETAIL_LIMIT = 50;
   var vmOpen = false;
   var vmCols = [];
   var vmVars = [];
-  var vmScope = null;
-  var vmScopeUser = false;
-  var vmSelected = null;
-  var vmCollapsed = /* @__PURE__ */ new Set();
-  var vmUsage = null;
-  var vmUsageNodes = /* @__PURE__ */ new Map();
-  var vmUsageCapped = false;
-  var vmUsageReq = 0;
-  var vmUsageSig = "";
+  var vmTableKnown = false;
   var vmTableSig = "";
+  var libVars = [];
+  var usageMap = null;
+  var indirectMap = /* @__PURE__ */ new Map();
+  var deletedUse = { count: 0, nodeIds: [] };
+  var vmUsageReq = 0;
   var vmUsageInFlight = false;
+  var vmUsageVisible = false;
+  var vmUsageSig = "";
+  var refreshBefore = null;
+  var curSel = { ids: [], count: 0, scanned: 0, name: "" };
+  var baseline = null;
+  var bigSkipped = false;
+  var chip = "all";
+  var query = "";
+  var searchOpen = false;
+  var modeName = null;
+  var userExpanded = /* @__PURE__ */ new Map();
+  var showUnusedIn = /* @__PURE__ */ new Set();
+  var showUnusedGroups = /* @__PURE__ */ new Set();
+  var focusKey = null;
+  var vmSelected = null;
+  var sameIds = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+  var localVarCount = () => vmVars.length;
+  function varScreen() {
+    if (!vmTableKnown) return "loading";
+    if (startLatched() || localVarCount() === 0) return "start";
+    return "list";
+  }
+  function renderVarScreen() {
+    const scr = varSub === "home" ? varScreen() : null;
+    $("varLoading").style.display = scr === "loading" ? "" : "none";
+    $("varStart").style.display = scr === "start" ? "" : "none";
+    $("varList").style.display = scr === "list" ? "" : "none";
+    placeWizard();
+    if (scr === "start") renderStart();
+    if (scr === "list") renderVarList();
+    renderReadinessButtons();
+  }
   function syncManagerVisibility(read) {
     const want = activeTab === "variables" && varSub === "home";
     if (want && !vmOpen) {
       vmOpen = true;
-      vmScopeUser = false;
-      renderVarManager();
+      renderVarScreen();
       if (read) {
         send({ type: "GET_VAR_TABLE" });
         requestManagerUsage("quiet");
@@ -5800,6 +6004,7 @@
     } else if (!want && vmOpen) {
       leaveManagerUi();
     }
+    placeWizard();
   }
   function leaveManagerUi() {
     vmOpen = false;
@@ -5809,379 +6014,819 @@
     }
     closeMenu();
     closeModal();
+    closeReadiness();
+    if (wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
   }
-  function showManager(opts = {}) {
-    if (opts.onlyUsed !== void 0) $("vmOnlyUsed").checked = opts.onlyUsed;
+  function showManager() {
     showTab("variables");
     showVarSub("home");
-    vmScopeUser = false;
-    renderVarManager();
-    requestAnimationFrame(() => $("varManager").scrollIntoView({ block: "start" }));
+    rebaseToCurrent();
   }
-  var vmUsageTimer = null;
-  function scheduleManagerUsage() {
-    if (!vmOpen || isMini) return;
-    if (vmUsageTimer) clearTimeout(vmUsageTimer);
-    vmUsage = null;
+  function onSelectionForList(m) {
+    var _a, _b;
+    curSel = { ids: (_a = m.ids) != null ? _a : [], count: m.count, scanned: m.scanned, name: (_b = m.firstName) != null ? _b : "" };
+    if (m.selfSelect) {
+      renderSelBase();
+      return;
+    }
+    setBaseline(curSel.count ? __spreadValues({}, curSel) : null);
+  }
+  function rebaseToCurrent() {
+    setBaseline(curSel.count ? __spreadValues({}, curSel) : null);
+  }
+  function setBaseline(b) {
+    baseline = b;
+    renderSelBase();
+    if (vmUsageTimer) {
+      clearTimeout(vmUsageTimer);
+      vmUsageTimer = null;
+    }
     vmUsageReq = 0;
     vmUsageInFlight = false;
-    vmUsageCapped = false;
-    renderVarManager();
+    bigSkipped = false;
+    if (!b) {
+      usageMap = null;
+      indirectMap = /* @__PURE__ */ new Map();
+      libVars = [];
+      deletedUse = { count: 0, nodeIds: [] };
+      vmUsageSig = "";
+      if (vmOpen) renderVarScreen();
+      return;
+    }
+    if (b.scanned > BIG_SELECTION || wizardRunning) {
+      bigSkipped = b.scanned > BIG_SELECTION;
+      usageMap = null;
+      if (vmOpen) renderVarScreen();
+      return;
+    }
+    if (!vmOpen || isMini) return;
     vmUsageTimer = setTimeout(() => {
       vmUsageTimer = null;
       requestManagerUsage("selection");
     }, AUTO_SCAN_DELAY);
   }
-  $("vmSearch").addEventListener("input", () => renderVarManager());
-  $("vmOnlyUsed").addEventListener("change", () => {
-    vmScopeUser = false;
-    renderVarManager();
-  });
-  function requestManagerUsage(_why = "quiet") {
-    if (lastSelCount === 0) {
-      setManagerUsage([], [], false);
+  var vmUsageTimer = null;
+  function scheduleManagerUsage() {
+  }
+  function requestManagerUsage(why = "quiet") {
+    if (!baseline) {
+      usageMap = null;
+      if (vmOpen) renderVarScreen();
       return;
     }
-    if (vmUsageInFlight) return;
+    const auto = why !== "user";
+    if (auto && (baseline.scanned > BIG_SELECTION || wizardRunning)) {
+      bigSkipped = baseline.scanned > BIG_SELECTION;
+      if (vmOpen) renderVarScreen();
+      return;
+    }
+    if (vmUsageInFlight && why !== "user") return;
     vmUsageReq = ++bindReqSeq;
     vmUsageInFlight = true;
-    send({ type: "SCAN_BINDINGS", reqId: vmUsageReq, forManager: true });
-  }
-  function setManagerUsage(cands, nodes, capped) {
-    var _a;
-    const m = /* @__PURE__ */ new Map();
-    for (const c of cands) {
-      const list = (_a = m.get(c.variableId)) != null ? _a : [];
-      list.push(c);
-      m.set(c.variableId, list);
+    vmUsageVisible = why === "selection" || why === "user";
+    if (vmUsageVisible && vmOpen) {
+      showStatusLine(t("list.reading"), { background: true });
+      renderChips();
     }
-    vmUsage = m;
-    vmUsageNodes = new Map(nodes.map((n) => [n.id, n.name]));
-    vmUsageCapped = capped;
-    if (vmOpen) renderVarManager();
+    send({ type: "SCAN_USAGE", reqId: vmUsageReq, nodeIds: baseline.ids });
   }
-  function usageCount(id) {
+  function onUsageResult(msg) {
+    if (msg.reqId !== vmUsageReq) return;
+    vmUsageInFlight = false;
+    const wasVisible = vmUsageVisible;
+    vmUsageVisible = false;
+    bigSkipped = false;
+    const sig = JSON.stringify([msg.usage, msg.libraryVars.map((l) => l.id), msg.deleted.count]);
+    const changed = sig !== vmUsageSig || usageMap === null;
+    vmUsageSig = sig;
+    if (changed) {
+      usageMap = new Map(Object.entries(msg.usage));
+      libVars = msg.libraryVars;
+      deletedUse = msg.deleted;
+      recomputeIndirect();
+    }
+    if (wasVisible && $("statusText").textContent === t("list.reading")) clearStatusLine();
+    if (refreshBefore) finishRefresh();
+    if (changed || wasVisible) renderVarScreen();
+    reentry.release();
+  }
+  function recomputeIndirect() {
+    if (!usageMap) {
+      indirectMap = /* @__PURE__ */ new Map();
+      return;
+    }
+    const alias = aliasTargetsOf(vmVars);
+    for (const l of libVars) if (l.aliasTargets.length) alias.set(l.id, l.aliasTargets);
+    indirectMap = indirectUsage(new Set([...usageMap.keys()].filter((k) => {
+      var _a, _b;
+      return ((_b = (_a = usageMap.get(k)) == null ? void 0 : _a.places) != null ? _b : 0) > 0;
+    })), alias);
+  }
+  function onVarTable(msg) {
+    const sig = JSON.stringify([msg.collections, msg.vars]);
+    const first = !vmTableKnown;
+    vmTableKnown = true;
+    if (sig === vmTableSig && !first) {
+      if (refreshBefore) finishRefresh();
+      return;
+    }
+    vmTableSig = sig;
+    vmCols = msg.collections;
+    vmVars = msg.vars;
+    if (chip !== "all" && !vmCols.some((c) => c.id === chip)) chip = "all";
+    if (wizCountPending) {
+      wizCountPending = false;
+      const n = vmVars.length - wizBeforeCount;
+      if (n > 0) showStatusLine(t("wizard.madeStatus", { n }), { cls: "ok" });
+    }
+    recomputeIndirect();
+    if (refreshBefore) finishRefresh();
+    if (vmOpen || first) renderVarScreen();
+  }
+  function refreshList() {
+    const btn = $("btnVarRefresh");
+    btn.classList.add("spinning");
+    refreshBefore = { table: vmTableSig, usage: new Map([...(usageMap != null ? usageMap : /* @__PURE__ */ new Map()).entries()].map(([k, v]) => [k, v.places])) };
+    refreshPending = baseline ? 2 : 1;
+    requestPrereq();
+    send({ type: "GET_VAR_TABLE" });
+    if (baseline) requestManagerUsage("user");
+  }
+  var refreshPending = 0;
+  function finishRefresh() {
     var _a, _b;
-    return (_b = (_a = vmUsage == null ? void 0 : vmUsage.get(id)) == null ? void 0 : _a.length) != null ? _b : 0;
-  }
-  function renderVarManager() {
-    if (!vmOpen) return;
-    const onlyUsed = $("vmOnlyUsed").checked;
-    const query = $("vmSearch").value;
-    const usage = new Map([...(vmUsage != null ? vmUsage : /* @__PURE__ */ new Map()).entries()].map(([k, v]) => [k, v.length]));
-    const q = query.trim().toLowerCase();
-    const include = (v) => {
-      var _a;
-      return (!onlyUsed || ((_a = usage.get(v.id)) != null ? _a : 0) > 0) && (!q || v.name.toLowerCase().includes(q));
-    };
-    const tree = buildVarTree(vmCols, vmVars, include);
-    if (!vmScopeUser || !vmScope || !vmCols.some((c) => c.id === vmScope.collectionId)) {
-      vmScopeUser = false;
-      const first = pickInitialCollection(tree);
-      vmScope = first ? { collectionId: first, path: "" } : null;
+    if (!refreshBefore) return;
+    refreshPending--;
+    if (refreshPending > 0) return;
+    const before = refreshBefore;
+    refreshBefore = null;
+    $("btnVarRefresh").classList.remove("spinning");
+    const tableChanged = before.table !== vmTableSig;
+    let n = 0;
+    const now = new Map([...(usageMap != null ? usageMap : /* @__PURE__ */ new Map()).entries()].map(([k, v]) => [k, v.places]));
+    for (const k of /* @__PURE__ */ new Set([...before.usage.keys(), ...now.keys()])) if (((_a = before.usage.get(k)) != null ? _a : 0) !== ((_b = now.get(k)) != null ? _b : 0)) n++;
+    const text = tableChanged ? t("list.refreshTable") + (n ? t("list.refreshCountSuffix", { n }) : "") : n ? t("list.refreshUsage", { n }) : t("list.refreshSame");
+    showStatusLine(text);
+    if (statusTimer) {
+      clearTimeout(statusTimer);
+      statusTimer = setTimeout(clearStatusLine, 2e3);
     }
-    const total = vmVars.length;
-    const shown = vmVars.filter(include).length;
-    $("vmCount").textContent = t("vm.count", { shown, total });
-    renderVmTree(tree);
-    renderVmTable(onlyUsed, query, usage);
   }
-  function renderVmTree(tree) {
-    const box = $("vmTree");
-    clearMount(box);
-    const walk = (n) => {
-      const key = `${n.collectionId}|${n.path}`;
+  function renderSelBase() {
+    const base = $("selBase");
+    const btn = $("btnRebase");
+    const show = activeTab === "variables" && !!baseline && !sameIds(baseline.ids, curSel.ids);
+    if (!show) {
+      base.textContent = "";
+      btn.hidden = true;
+      return;
+    }
+    const name = baseline.count === 1 ? baseline.name || t("sel.unnamed") : t("list.baseMany", { m: baseline.count });
+    base.textContent = t("list.base", { name });
+    base.title = name;
+    btn.hidden = false;
+  }
+  function chipCounts(colId) {
+    var _a, _b;
+    const vars = colId === "all" ? vmVars : vmVars.filter((v) => v.collectionId === colId);
+    let direct = 0;
+    let indirect = 0;
+    if (usageMap) for (const v of vars) {
+      if (((_b = (_a = usageMap.get(v.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0) direct++;
+      else if (indirectMap.has(v.id)) indirect++;
+    }
+    return { used: direct + indirect, total: vars.length, direct, indirect };
+  }
+  function chipNumText(colId) {
+    const c = chipCounts(colId);
+    if (vmUsageInFlight && vmUsageVisible) return { text: "\u2026", tip: "" };
+    if (!usageMap) return { text: String(c.total), tip: "" };
+    return { text: `${c.used}/${c.total}`, tip: t("list.chipTip", { used: c.used, direct: c.direct, indirect: c.indirect, total: c.total }) };
+  }
+  function renderChips() {
+    const row = $("chipRow");
+    clearMount(row);
+    const make = (id, label, badge) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = n.count ? "vm-node" : "vm-node empty";
-      b.style.paddingLeft = `${6 + n.depth * 12}px`;
-      const current = vmScope && vmScope.collectionId === n.collectionId && vmScope.path === n.path;
-      b.setAttribute("aria-current", String(!!current));
-      const collapsed = vmCollapsed.has(`tree:${key}`);
-      const tw = document.createElement("span");
-      tw.className = "tw";
-      tw.textContent = n.children.length ? collapsed ? "\u25B8" : "\u25BE" : "";
-      tw.addEventListener("click", (e) => {
-        if (!n.children.length) return;
-        e.stopPropagation();
-        if (collapsed) vmCollapsed.delete(`tree:${key}`);
-        else vmCollapsed.add(`tree:${key}`);
-        renderVarManager();
-      });
-      const lbl = document.createElement("span");
-      lbl.className = "lbl";
-      lbl.textContent = n.label;
-      lbl.title = n.path || n.label;
-      b.append(tw, lbl);
-      if (n.depth === 0) {
-        const col = vmCols.find((c) => c.id === n.collectionId);
-        const tierName = col && col.tier ? ["", "Global", "Semantic", "Component"][col.tier] : "";
-        if (tierName && tierName !== n.label) {
-          const tag = document.createElement("span");
-          tag.className = "vm-tier";
-          tag.textContent = tierName;
-          b.appendChild(tag);
-        }
+      b.className = "tier-chip";
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", String(chip === id));
+      b.tabIndex = chip === id ? 0 : -1;
+      b.dataset.chip = id;
+      const nm = document.createElement("span");
+      nm.textContent = label;
+      b.appendChild(nm);
+      if (badge) {
+        const bg = document.createElement("span");
+        bg.className = "badge";
+        bg.textContent = badge;
+        bg.setAttribute("aria-hidden", "true");
+        b.appendChild(bg);
       }
-      const cnt = document.createElement("span");
-      cnt.className = "cnt";
-      cnt.textContent = String(n.count);
-      b.appendChild(cnt);
+      const num = chipNumText(id);
+      const n = document.createElement("span");
+      n.className = "num";
+      n.textContent = num.text;
+      b.appendChild(n);
+      if (num.tip) b.title = num.tip;
       b.addEventListener("click", () => {
-        vmScope = { collectionId: n.collectionId, path: n.path };
-        vmScopeUser = true;
-        renderVarManager();
+        chip = id;
+        renderVarList();
       });
-      box.appendChild(b);
-      if (!collapsed) n.children.forEach(walk);
+      b.addEventListener("keydown", (e) => {
+        var _a, _b;
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        e.preventDefault();
+        const all = Array.from(row.querySelectorAll(".tier-chip"));
+        const i = all.indexOf(b) + (e.key === "ArrowRight" ? 1 : -1);
+        const target = all[(i + all.length) % all.length];
+        chip = (_a = target.dataset.chip) != null ? _a : "all";
+        renderVarList();
+        (_b = row.querySelector(`[data-chip="${CSS.escape(chip)}"]`)) == null ? void 0 : _b.focus();
+      });
+      row.appendChild(b);
     };
-    tree.forEach(walk);
+    make("all", t("list.chipAll"), null);
+    for (const c of orderCollections(vmCols)) make(c.id, c.name, tierBadge(c));
+    requestAnimationFrame(() => {
+      const over = row.scrollWidth > row.clientWidth + 1;
+      $("btnChipMore").hidden = !over;
+    });
+    renderModeSelect();
   }
-  function resolveColor(cell) {
+  function renderModeSelect() {
+    const sel = $("modeSelect");
+    const visible = chip === "all" ? vmCols : vmCols.filter((c) => c.id === chip);
+    const names = [...new Set(visible.flatMap((c) => c.modes.map((m) => m.name)))];
+    if (names.length <= 1) {
+      sel.hidden = true;
+      return;
+    }
+    sel.hidden = false;
+    clearMount(sel);
+    const def = document.createElement("option");
+    def.value = "";
+    def.textContent = t("list.modeDefault");
+    sel.appendChild(def);
+    for (const n of names) {
+      const o = document.createElement("option");
+      o.value = n;
+      o.textContent = n;
+      sel.appendChild(o);
+    }
+    sel.value = modeName && names.includes(modeName) ? modeName : "";
+  }
+  function modeIdFor(col) {
+    var _a, _b;
+    if (!col) return void 0;
+    if (modeName) {
+      const m = col.modes.find((x) => x.name === modeName);
+      if (m) return m.modeId;
+    }
+    return (_b = col.defaultModeId) != null ? _b : (_a = col.modes[0]) == null ? void 0 : _a.modeId;
+  }
+  function currentModeCell(v) {
     var _a;
+    return v.values[(_a = modeIdFor(vmCols.find((c) => c.id === v.collectionId))) != null ? _a : ""];
+  }
+  function renderSituation() {
+    const line = $("situationLine");
+    clearMount(line);
+    const add = (text, action) => {
+      const s = document.createElement("span");
+      s.textContent = text;
+      line.appendChild(s);
+      if (action) {
+        const b = document.createElement("button");
+        b.className = "link link-btn";
+        b.type = "button";
+        b.textContent = action[0];
+        b.addEventListener("click", action[1]);
+        line.appendChild(b);
+      }
+    };
+    let shown = true;
+    const groups = new Set(vmVars.filter((v) => chip === "all" || v.collectionId === chip).map((v) => groupKey(v.collectionId, v.name))).size;
+    if (baseline && bigSkipped && !usageMap) add(t("list.big"), [t("list.read"), () => requestManagerUsage("user")]);
+    else if (baseline && wizardRunning && !usageMap) add(t("list.wizardWait"));
+    else if (baseline && usageMap && chipCounts("all").direct === 0) add(t("list.noneUsed"), [t("list.findUnbound"), findUnbound]);
+    else if (!baseline && groups > 10) add(t("list.selectHint"));
+    else shown = false;
+    line.hidden = !shown;
+  }
+  function resolveSwatch(cell) {
     let c = cell;
     for (let i = 0; i < 8 && c; i++) {
       if (c.kind === "color") return c.hex;
       if (c.kind !== "alias") return null;
-      const target = vmVars.find((v) => v.id === c.aliasId);
-      if (!target) return null;
-      const col = vmCols.find((x) => x.id === target.collectionId);
-      c = col ? target.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId] : void 0;
+      const id = c.aliasId;
+      const local = vmVars.find((v) => v.id === id);
+      if (local) {
+        c = currentModeCell(local);
+        continue;
+      }
+      const lib = libVars.find((l) => l.id === id);
+      c = lib == null ? void 0 : lib.value;
     }
     return null;
   }
   var swatchHtml = (hex) => hex ? `<span class="bf-swatch" style="background:${escapeHtml(hex)}"></span>` : "";
-  function vmCellEl(cell) {
+  function typeIcon(type) {
+    return type === "COLOR" ? "" : type === "FLOAT" ? "#" : type === "STRING" ? "T" : "\u25D0";
+  }
+  function valueEl(cell) {
     const span = document.createElement("span");
+    span.className = "val";
     if (!cell) {
       span.textContent = "\u2014";
-      span.className = "muted";
       return span;
     }
     if (cell.kind === "alias") {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "vm-alias";
-      b.innerHTML = `${swatchHtml(resolveColor(cell))}= ${escapeHtml(cell.aliasName)}`;
+      b.className = "alias-pill";
+      b.tabIndex = -1;
+      b.innerHTML = `${swatchHtml(resolveSwatch(cell))}\u2192 ${escapeHtml(cell.aliasName)}${cell.remote ? ' <span class="lib-tag">LIB</span>' : ""}`;
       b.title = t("vm.jumpAlias");
       b.addEventListener("click", (e) => {
         e.stopPropagation();
         jumpToVar(cell.aliasId);
       });
-      return b;
+      span.appendChild(b);
+      return span;
     }
-    span.className = "vm-val";
-    if (cell.kind === "color") span.innerHTML = `<span class="bf-swatch" style="background:${escapeHtml(cell.hex)}"></span>${escapeHtml(cell.hex.toUpperCase())}`;
+    if (cell.kind === "color") span.innerHTML = `${swatchHtml(cell.hex)}${escapeHtml(cell.hex.toUpperCase())}`;
     else span.textContent = cell.text;
     return span;
   }
-  function jumpToVar(id) {
-    var _a;
-    const v = vmVars.find((x) => x.id === id);
-    if (!v) {
-      setStatus("vmStatus", t("vm.aliasOutside"), "warn");
-      return;
+  function renderVarList() {
+    var _a, _b;
+    if (!vmOpen || varScreen() !== "list") return;
+    renderChips();
+    renderSituation();
+    renderReadinessButtons();
+    $("btnFindUnbound").toggleAttribute("data-x", false);
+    setLock($("btnFindUnbound"), curSel.count ? null : "prereq", t("status.noSelection"));
+    const tree = $("varTree");
+    const prevScroll = window.scrollY;
+    clearMount(tree);
+    const entries = buildList({
+      collections: vmCols,
+      vars: vmVars,
+      chip,
+      query,
+      direct: usageMap ? new Map([...usageMap.entries()].map(([k, v]) => [k, v.places])) : null,
+      indirect: new Set(indirectMap.keys()),
+      userExpanded,
+      showUnusedIn,
+      showUnusedGroups
+    });
+    const lines = [];
+    for (const e of entries) {
+      if (e.kind === "section") lines.push(sectionEl(e));
+      else if (e.kind === "group") lines.push(groupEl(e));
+      else if (e.kind === "row") lines.push(rowEl(e.v, e.state));
+      else lines.push(unusedGroupsEl(e.collectionId, e.count));
     }
-    $("vmOnlyUsed").checked = false;
-    $("vmSearch").value = "";
-    vmScope = { collectionId: v.collectionId, path: "" };
-    vmScopeUser = true;
-    vmSelected = id;
-    renderVarManager();
-    (_a = document.querySelector(`.vm-row[data-id="${CSS.escape(id)}"]`)) == null ? void 0 : _a.focus();
-  }
-  function typeIcon(v) {
-    return v.type === "COLOR" ? "" : v.type === "FLOAT" ? "#" : v.type === "STRING" ? "T" : "\u25D0";
-  }
-  function renderVmTable(onlyUsed, query, usage) {
-    var _a;
-    const wrap = $("vmTableWrap");
-    clearMount(wrap);
-    const empty = (text, action) => {
+    if (query.trim() && !entries.some((e) => e.kind === "row") && !libRowsMatching().length) {
       const d = document.createElement("div");
-      d.className = "vm-empty";
-      d.textContent = text;
-      if (action) {
-        const b = document.createElement("button");
-        b.className = "link";
-        b.textContent = action[0];
-        b.addEventListener("click", action[1]);
-        d.append(" ", b);
-      }
-      wrap.appendChild(d);
-    };
-    if (!vmVars.length && vmCols.length === 0) {
-      empty(t("vm.noVars"));
-      return;
-    }
-    if (!vmScope) {
-      empty(t("vm.noVars"));
-      return;
-    }
-    const col = vmCols.find((c) => c.id === vmScope.collectionId);
-    if (!col) return;
-    const rows = filterVars(vmVars, { collectionId: col.id, path: vmScope.path, query, onlyUsed }, usage);
-    if (!rows.length) {
-      const showAll = [t("vm.showAll"), () => {
-        $("vmOnlyUsed").checked = false;
-        vmScopeUser = false;
-        renderVarManager();
-      }];
-      if (onlyUsed && lastSelCount === 0) empty(t("vm.selectFirst"), showAll);
-      else if (onlyUsed && vmUsage === null) empty(t("vm.usageLoading"));
-      else if (onlyUsed) empty(t("vm.noneUsed"), showAll);
-      else empty(t("vm.noMatch"));
-      return;
-    }
-    const table = document.createElement("table");
-    table.className = "vm-table";
-    const head = document.createElement("tr");
-    const th = (text, cls = "") => {
-      const c = document.createElement("th");
-      c.textContent = text;
-      if (cls) c.className = cls;
-      head.appendChild(c);
-    };
-    th(t("vm.colName"), "name");
-    for (const m of col.modes) th(m.name);
-    th(t("vm.colUsage"), "vm-use");
-    th("");
-    const thead = document.createElement("thead");
-    thead.appendChild(head);
-    table.appendChild(thead);
-    const tbody = document.createElement("tbody");
-    const span = col.modes.length + 3;
-    for (const g of groupRows(rows)) {
-      const gkey = `grp:${col.id}|${g.path}`;
-      const collapsed = vmCollapsed.has(gkey);
-      if (g.path) {
-        const tr = document.createElement("tr");
-        tr.className = "vm-group";
-        const td = document.createElement("td");
-        td.colSpan = span;
-        td.textContent = `${collapsed ? "\u25B8" : "\u25BE"} ${g.path.split("/").join(" / ")}`;
-        tr.appendChild(td);
-        tr.addEventListener("click", () => {
-          if (collapsed) vmCollapsed.delete(gkey);
-          else vmCollapsed.add(gkey);
-          renderVarManager();
+      d.className = "vt-empty";
+      d.append(t("list.noMatch", { q: query.trim() }), " \xB7 ");
+      if (chip !== "all") {
+        const a = document.createElement("button");
+        a.className = "link";
+        a.textContent = t("list.searchAll");
+        a.addEventListener("click", () => {
+          chip = "all";
+          renderVarList();
         });
-        tbody.appendChild(tr);
+        d.append(a, " ");
       }
-      if (collapsed) continue;
-      for (const v of g.rows) tbody.appendChild(vmRowEl(v, col, (_a = usage.get(v.id)) != null ? _a : 0));
+      const c = document.createElement("button");
+      c.className = "link";
+      c.textContent = t("list.searchClear");
+      c.addEventListener("click", () => clearSearch(true));
+      d.append(c);
+      lines.push(d);
     }
-    table.appendChild(tbody);
-    wrap.appendChild(table);
-    if (vmUsageCapped) setStatus("vmStatus", t("vm.usageCapped"), "warn");
+    if (chip === "all") {
+      const libRows = libRowsMatching();
+      if (libRows.length) {
+        const h = document.createElement("div");
+        h.className = "vt-section vt-lib";
+        h.dataset.key = "sec:lib";
+        h.setAttribute("role", "row");
+        h.innerHTML = `<span>${escapeHtml(t("list.libSection"))}</span>`;
+        lines.push(h);
+        for (const l of libRows) lines.push(libRowEl(l));
+      }
+    }
+    if (deletedUse.count > 0 && baseline) lines.push(deletedEl());
+    if (!lines.length) {
+      const d = document.createElement("div");
+      d.className = "vt-empty";
+      d.textContent = t("vm.noVars");
+      lines.push(d);
+    }
+    tree.append(...lines);
+    const focusables = Array.from(tree.querySelectorAll("[data-key]"));
+    let target = focusKey ? focusables.find((x) => x.dataset.key === focusKey) : void 0;
+    if (focusKey && !target && focusKey.startsWith("row:")) {
+      const gk = rowGroupOf.get(focusKey.slice(4));
+      target = gk ? focusables.find((x) => x.dataset.key === `grp:${gk}`) : void 0;
+      if (target && tree.contains(document.activeElement)) showStatusLine(t("list.hiddenRow"));
+    }
+    for (const f of focusables) f.tabIndex = -1;
+    (_a = target != null ? target : focusables[0]) == null ? void 0 : _a.setAttribute("tabindex", "0");
+    if (target && ((_b = document.activeElement) == null ? void 0 : _b.closest("#varTree"))) target.focus({ preventScroll: true });
+    if (Math.abs(window.scrollY - prevScroll) > 1) window.scrollTo(0, prevScroll);
   }
-  function vmRowEl(v, col, uses) {
-    var _a;
-    const tr = document.createElement("tr");
-    tr.className = "vm-row";
-    tr.dataset.id = v.id;
-    tr.tabIndex = 0;
-    tr.setAttribute("aria-selected", String(vmSelected === v.id));
-    const name = document.createElement("td");
-    name.className = "name";
-    name.title = v.description ? `${v.name}
-${v.description}` : v.name;
+  var rowGroupOf = /* @__PURE__ */ new Map();
+  function libRowsMatching() {
+    if (!usageMap) return [];
+    return libVars.filter((l) => {
+      var _a, _b;
+      return (((_b = (_a = usageMap.get(l.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0 || indirectMap.has(l.id)) && matchesQuery(l.name, query);
+    });
+  }
+  function sectionEl(e) {
+    const d = document.createElement("div");
+    d.className = "vt-section";
+    d.dataset.key = `sec:${e.collection.id}`;
+    d.setAttribute("role", "row");
+    d.setAttribute("aria-level", "1");
+    d.innerHTML = `<span>${escapeHtml(e.collection.name)}</span><span class="badge" aria-hidden="true">${escapeHtml(tierBadge(e.collection))}</span><span class="num">${usageMap ? `${e.used}/${e.total}` : e.total}</span>`;
+    d.addEventListener("keydown", (ev) => treeKey(ev, d));
+    return d;
+  }
+  function groupEl(e) {
+    const d = document.createElement("div");
+    d.className = "vt-group";
+    d.dataset.key = `grp:${e.key}`;
+    d.setAttribute("role", "row");
+    d.setAttribute("aria-level", "2");
+    d.setAttribute("aria-expanded", String(e.expanded));
+    const tw = document.createElement("span");
+    tw.className = "tw";
+    tw.textContent = e.expanded ? "\u25BE" : "\u25B8";
+    const lbl = document.createElement("span");
+    lbl.className = "lbl";
+    lbl.textContent = e.label;
+    lbl.title = e.label;
+    const num = document.createElement("span");
+    num.className = "num";
+    num.textContent = usageMap ? `${e.used}/${e.total}` : String(e.total);
+    d.append(tw, lbl, num);
+    if (usageMap && e.unused > 0 && e.used > 0 && !query.trim()) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "link link-btn more-unused";
+      b.tabIndex = -1;
+      b.textContent = e.showingUnused ? t("list.hideUnused") : t("list.showUnused", { m: e.unused });
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        toggleUnused(e.key);
+      });
+      d.appendChild(b);
+    }
+    d.addEventListener("click", (ev) => {
+      var _a;
+      if (ev.altKey) {
+        setSectionExpanded(e.collectionId, !e.expanded);
+        return;
+      }
+      focusKey = (_a = d.dataset.key) != null ? _a : null;
+      toggleGroup(e.key, e.expanded);
+    });
+    d.addEventListener("keydown", (ev) => treeKey(ev, d, e));
+    return d;
+  }
+  function toggleGroup(key, expanded) {
+    userExpanded.set(key, !expanded);
+    renderVarList();
+  }
+  function toggleUnused(key) {
+    if (showUnusedIn.has(key)) showUnusedIn.delete(key);
+    else showUnusedIn.add(key);
+    renderVarList();
+  }
+  function setSectionExpanded(colId, on) {
+    for (const v of vmVars) if (v.collectionId === colId) userExpanded.set(groupKey(colId, v.name), on);
+    renderVarList();
+  }
+  function setAllExpanded(on) {
+    for (const v of vmVars) userExpanded.set(groupKey(v.collectionId, v.name), on);
+    if (on) for (const c of vmCols) showUnusedGroups.add(c.id);
+    renderVarList();
+  }
+  function unusedGroupsEl(colId, count) {
+    const d = document.createElement("div");
+    d.className = "vt-line";
+    d.dataset.key = `ug:${colId}`;
+    d.setAttribute("role", "row");
+    d.textContent = t("list.unusedGroups", { n: count });
+    const open = () => {
+      showUnusedGroups.add(colId);
+      renderVarList();
+    };
+    d.addEventListener("click", open);
+    d.addEventListener("keydown", (ev) => treeKey(ev, d, void 0, open));
+    return d;
+  }
+  function useText(id, state) {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    if (state === "none") return { text: "\u2014", tip: "" };
+    if (state === "unused") return { text: t("list.unused"), tip: "" };
+    if (state === "indirect") {
+      const via = (_a = indirectMap.get(id)) != null ? _a : [];
+      const first = (_e = (_d = (_b = vmVars.find((v) => v.id === via[0])) == null ? void 0 : _b.name) != null ? _d : (_c = libVars.find((l) => l.id === via[0])) == null ? void 0 : _c.name) != null ? _e : "";
+      return { text: t("list.indirect"), tip: t("list.indirectTip", { alias: first }) };
+    }
+    const u = usageMap == null ? void 0 : usageMap.get(id);
+    return { text: t("vm.uses", { n: (_f = u == null ? void 0 : u.places) != null ? _f : 0 }), tip: t("list.usesTip", { k: (_g = u == null ? void 0 : u.layers) != null ? _g : 0, n: (_h = u == null ? void 0 : u.places) != null ? _h : 0 }) };
+  }
+  function rowEl(v, state) {
+    rowGroupOf.set(v.id, groupKey(v.collectionId, v.name));
+    const d = document.createElement("div");
+    d.className = `vt-row ${state}`;
+    d.dataset.key = `row:${v.id}`;
+    d.dataset.id = v.id;
+    d.setAttribute("role", "row");
+    d.setAttribute("aria-level", "3");
+    d.setAttribute("aria-selected", String(vmSelected === v.id));
+    const cell = currentModeCell(v);
+    const nm = document.createElement("span");
+    nm.className = "nm";
     const ic = document.createElement("span");
     ic.className = "ic";
-    const firstCell = v.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId];
-    const hex = v.type === "COLOR" ? resolveColor(firstCell) : null;
+    const hex = v.type === "COLOR" ? resolveSwatch(cell) : null;
     if (hex) ic.innerHTML = swatchHtml(hex);
-    else ic.textContent = typeIcon(v);
-    name.append(ic, leafName(v.name));
-    tr.appendChild(name);
-    for (const m of col.modes) {
-      const td = document.createElement("td");
-      td.appendChild(vmCellEl(v.values[m.modeId]));
-      tr.appendChild(td);
-    }
-    const use = document.createElement("td");
-    use.className = "vm-use";
-    use.textContent = vmUsage === null || lastSelCount === 0 ? "\u2014" : uses ? t("vm.uses", { n: uses }) : "\u2014";
-    tr.appendChild(use);
-    const more = document.createElement("td");
+    else ic.textContent = typeIcon(v.type);
+    const tx = document.createElement("span");
+    tx.className = "t";
+    tx.textContent = leafName(v.name);
+    nm.title = v.description ? `${v.name}
+${v.description}` : v.name;
+    nm.append(ic, tx);
+    const use = document.createElement("span");
+    use.className = "use";
+    const u = useText(v.id, state);
+    use.textContent = u.text;
+    if (u.tip) use.title = u.tip;
+    const more = moreButton(() => openVarMenuFor({ local: v }, d));
+    d.append(nm, valueEl(cell), use, more);
+    wireRow(d, { local: v });
+    return d;
+  }
+  function libRowEl(l) {
+    var _a, _b;
+    const d = document.createElement("div");
+    const direct = ((_b = (_a = usageMap == null ? void 0 : usageMap.get(l.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0;
+    const state = direct ? "direct" : "indirect";
+    d.className = `vt-row ${state}`;
+    d.dataset.key = `lib:${l.id}`;
+    d.dataset.id = l.id;
+    d.setAttribute("role", "row");
+    const nm = document.createElement("span");
+    nm.className = "nm";
+    const ic = document.createElement("span");
+    ic.className = "ic";
+    const hex = l.type === "COLOR" ? resolveSwatch(l.value) : null;
+    if (hex) ic.innerHTML = swatchHtml(hex);
+    else ic.textContent = typeIcon(l.type);
+    const tx = document.createElement("span");
+    tx.className = "t";
+    tx.textContent = l.name;
+    const tag = document.createElement("span");
+    tag.className = "lib-tag";
+    tag.textContent = "LIB";
+    nm.title = `${l.name} \xB7 ${l.collection}`;
+    nm.append(ic, tx, tag);
+    const use = document.createElement("span");
+    use.className = "use";
+    const ut = useText(l.id, state);
+    use.textContent = ut.text;
+    if (ut.tip) use.title = ut.tip;
+    d.append(nm, valueEl(l.value), use, moreButton(() => openVarMenuFor({ lib: l }, d)));
+    wireRow(d, { lib: l });
+    return d;
+  }
+  function deletedEl() {
+    const d = document.createElement("div");
+    d.className = "vt-line";
+    d.dataset.key = "deleted";
+    d.setAttribute("role", "row");
+    const s = document.createElement("span");
+    s.textContent = t("list.deleted", { n: deletedUse.count });
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "link link-btn";
+    b.tabIndex = -1;
+    b.textContent = t("list.select");
+    const pick = () => selectNodes(deletedUse.nodeIds, "list");
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      pick();
+    });
+    d.append(s, b);
+    d.addEventListener("keydown", (ev) => treeKey(ev, d, void 0, pick));
+    return d;
+  }
+  function moreButton(open) {
     const mb = document.createElement("button");
     mb.type = "button";
     mb.className = "more";
+    mb.tabIndex = -1;
     mb.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg>';
     mb.title = t("vm.moreTip");
     mb.setAttribute("aria-label", t("vm.moreTip"));
     mb.addEventListener("click", (e) => {
       e.stopPropagation();
-      const r = mb.getBoundingClientRect();
-      selectVmRow(v.id);
-      openVarMenu(v, r.left, r.bottom, tr);
+      open();
     });
-    more.appendChild(mb);
-    tr.appendChild(more);
-    tr.addEventListener("click", () => selectVmRow(v.id));
-    tr.addEventListener("dblclick", () => openVarDetail(v));
-    tr.addEventListener("contextmenu", (e) => {
+    return mb;
+  }
+  function wireRow(d, ref) {
+    d.addEventListener("click", () => {
+      var _a, _b;
+      vmSelected = (_a = d.dataset.id) != null ? _a : null;
+      focusKey = (_b = d.dataset.key) != null ? _b : null;
+      d.focus();
+      markSelected();
+    });
+    d.addEventListener("dblclick", () => openDetail(ref, d));
+    d.addEventListener("contextmenu", (e) => {
+      var _a;
       e.preventDefault();
-      selectVmRow(v.id);
-      openVarMenu(v, e.clientX, e.clientY, tr);
+      vmSelected = (_a = d.dataset.id) != null ? _a : null;
+      markSelected();
+      openVarMenuFor(ref, d, e.clientX, e.clientY);
     });
-    tr.addEventListener("keydown", (e) => {
+    d.addEventListener("keydown", (ev) => treeKey(ev, d, void 0, () => openDetail(ref, d), () => openVarMenuFor(ref, d)));
+  }
+  function markSelected() {
+    document.querySelectorAll("#varTree .vt-row").forEach((r) => r.setAttribute("aria-selected", String(r.dataset.id === vmSelected)));
+  }
+  function treeKey(ev, el, group, onEnter, onMenu) {
+    var _a, _b, _c, _d, _e;
+    const all = Array.from($("varTree").querySelectorAll("[data-key]"));
+    const i = all.indexOf(el);
+    const go = (j) => {
       var _a2;
-      if (e.key === "Enter") {
-        e.preventDefault();
-        openVarDetail(v);
-      } else if (e.key === "ContextMenu" || e.key === "F10" && e.shiftKey) {
-        e.preventDefault();
-        const r = tr.getBoundingClientRect();
-        openVarMenu(v, r.left + 24, r.bottom, tr);
-      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        e.preventDefault();
-        const sib = e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
-        const target = sib && sib.classList.contains("vm-row") ? sib : null;
-        if (target) {
-          target.focus();
-          selectVmRow((_a2 = target.dataset.id) != null ? _a2 : null);
+      const target = all[Math.max(0, Math.min(all.length - 1, j))];
+      if (!target) return;
+      all.forEach((x) => x.tabIndex = -1);
+      target.tabIndex = 0;
+      focusKey = (_a2 = target.dataset.key) != null ? _a2 : null;
+      target.focus();
+    };
+    const k = ev.key;
+    if (k === "ArrowDown") go(i + 1);
+    else if (k === "ArrowUp") go(i - 1);
+    else if (k === "Home") go(0);
+    else if (k === "End") go(all.length - 1);
+    else if (k === "PageDown") go(i + 10);
+    else if (k === "PageUp") go(i - 10);
+    else if (k === "ArrowRight" && group) {
+      focusKey = (_a = el.dataset.key) != null ? _a : null;
+      if (ev.altKey) setSectionExpanded(group.collectionId, true);
+      else if (!group.expanded) toggleGroup(group.key, false);
+      else if (group.unused > 0 && !group.showingUnused) toggleUnused(group.key);
+    } else if (k === "ArrowLeft") {
+      if (group) {
+        focusKey = (_b = el.dataset.key) != null ? _b : null;
+        if (ev.altKey) setSectionExpanded(group.collectionId, false);
+        else if (group.expanded) toggleGroup(group.key, true);
+      } else if (el.classList.contains("vt-row")) {
+        const gk = rowGroupOf.get((_c = el.dataset.id) != null ? _c : "");
+        const gi = all.findIndex((x) => x.dataset.key === `grp:${gk}`);
+        if (gi >= 0) go(gi);
+      }
+    } else if (k === "Enter" && group && ev.shiftKey) {
+      focusKey = (_d = el.dataset.key) != null ? _d : null;
+      toggleUnused(group.key);
+    } else if (k === "Enter" && group) {
+      focusKey = (_e = el.dataset.key) != null ? _e : null;
+      toggleGroup(group.key, group.expanded);
+    } else if (k === "Enter" && onEnter) onEnter();
+    else if ((k === "ContextMenu" || k === "F10" && ev.shiftKey) && onMenu) onMenu();
+    else return;
+    ev.preventDefault();
+  }
+  function jumpToVar(id) {
+    var _a;
+    const v = vmVars.find((x) => x.id === id);
+    if (!v) {
+      const lib = libVars.find((l) => l.id === id);
+      if (lib && chip === "all" && libRowsMatching().some((l) => l.id === id)) {
+        (_a = document.querySelector(`#varTree [data-key="lib:${CSS.escape(id)}"]`)) == null ? void 0 : _a.focus();
+      } else showStatusLine(t("list.libVar"));
+      return;
+    }
+    const undo = { chip, query, searchOpen, userExpanded: new Map(userExpanded), showUnusedIn: new Set(showUnusedIn), showUnusedGroups: new Set(showUnusedGroups), scroll: window.scrollY, focusKey };
+    chip = "all";
+    clearSearch(false);
+    const gk = groupKey(v.collectionId, v.name);
+    userExpanded.set(gk, true);
+    showUnusedGroups.add(v.collectionId);
+    showUnusedIn.add(gk);
+    focusKey = `row:${v.id}`;
+    vmSelected = v.id;
+    renderVarList();
+    const row = document.querySelector(`#varTree [data-key="row:${CSS.escape(v.id)}"]`);
+    row == null ? void 0 : row.scrollIntoView({ block: "center" });
+    row == null ? void 0 : row.focus({ preventScroll: true });
+    showStatusLine(t("list.jumped", { name: v.name }), {
+      action: {
+        label: t("list.undo"),
+        run: () => {
+          chip = undo.chip;
+          query = undo.query;
+          searchOpen = undo.searchOpen;
+          $("varSearch").value = query;
+          $("searchBox").hidden = !searchOpen;
+          userExpanded.clear();
+          undo.userExpanded.forEach((val, key) => userExpanded.set(key, val));
+          showUnusedIn.clear();
+          undo.showUnusedIn.forEach((x) => showUnusedIn.add(x));
+          showUnusedGroups.clear();
+          undo.showUnusedGroups.forEach((x) => showUnusedGroups.add(x));
+          focusKey = undo.focusKey;
+          renderVarList();
+          window.scrollTo(0, undo.scroll);
+          const back = focusKey ? document.querySelector(`#varTree [data-key="${CSS.escape(focusKey)}"]`) : null;
+          back == null ? void 0 : back.focus({ preventScroll: true });
         }
       }
     });
-    return tr;
   }
-  function selectVmRow(id) {
-    vmSelected = id;
-    document.querySelectorAll(".vm-row").forEach((r) => r.setAttribute("aria-selected", String(r.dataset.id === id)));
+  function openSearch() {
+    searchOpen = true;
+    $("searchBox").hidden = false;
+    $("varSearch").focus();
   }
-  function currentModeCell(v) {
-    var _a;
-    const col = vmCols.find((c) => c.id === v.collectionId);
-    return col ? v.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId] : void 0;
+  function clearSearch(render = true) {
+    query = "";
+    searchOpen = false;
+    $("varSearch").value = "";
+    $("searchBox").hidden = true;
+    if (render) {
+      renderVarList();
+      $("btnSearch").focus();
+    }
   }
   async function copyAndReport(text, what) {
     if (!text) {
-      setStatus("vmStatus", t("vm.copyEmpty"), "warn");
+      showStatusLine(t("vm.copyEmpty"), { cls: "warn" });
       return;
     }
     const ok = await copyText(text);
-    setStatus("vmStatus", ok ? t("vm.copied", { what, text }) : t("vm.copyFailed", { text }), ok ? "ok" : "warn");
+    showStatusLine(ok ? t("vm.copied", { what, text }) : t("vm.copyFailed", { text }), { cls: ok ? "ok" : "warn" });
   }
-  function openVarMenu(v, x, y, returnFocus) {
-    var _a;
-    const uses = usageCount(v.id);
-    const nodeIds = [...new Set(((_a = vmUsage == null ? void 0 : vmUsage.get(v.id)) != null ? _a : []).map((c) => c.nodeId))];
-    openMenu(x, y, [
-      { label: t("vm.copyName"), onSelect: () => void copyAndReport(v.name, t("vm.whatName")) },
-      { label: t("vm.copyValue"), onSelect: () => void copyAndReport(cellCopyText(currentModeCell(v)), t("vm.whatValue")) },
-      { label: t("vm.copyCss"), onSelect: () => void copyAndReport(cssVarName(v.name), t("vm.whatCss")) },
-      { label: t("vm.selectLayers"), disabled: !nodeIds.length, separatorBefore: true, onSelect: () => selectNodes(nodeIds, "vmStatus") },
-      { label: t("vm.detail"), onSelect: () => openVarDetail(v) },
-      { label: t("vm.remap"), disabled: !uses, onSelect: () => openRemapModal(v) }
-    ], returnFocus);
+  function openVarMenuFor(ref, rowEl2, x, y) {
+    var _a, _b, _c;
+    const id = ref.local ? ref.local.id : ref.lib.id;
+    const name = ref.local ? ref.local.name : ref.lib.name;
+    const cell = ref.local ? currentModeCell(ref.local) : ref.lib.value;
+    const direct = ((_b = (_a = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0;
+    const via = (_c = indirectMap.get(id)) != null ? _c : [];
+    const known = !!usageMap && !!baseline;
+    const r = rowEl2.getBoundingClientRect();
+    rowEl2.classList.add("menu-open");
+    const items = [
+      { label: t("vm.copyName"), onSelect: () => void copyAndReport(name, t("vm.whatName")) },
+      { label: t("vm.copyValue"), onSelect: () => void copyAndReport(cellCopyText(cell), t("vm.whatValue")) },
+      { label: t("vm.copyCss"), onSelect: () => void copyAndReport(cssVarName(name), t("vm.whatCss")) }
+    ];
+    if (!known) {
+      items.push({ label: t("vm.selectLayers"), separatorBefore: true, disabled: true, note: t("list.selectFirstNote"), onSelect: () => {
+      } });
+    } else if (direct) {
+      items.push({ label: t("vm.selectLayers"), separatorBefore: true, onSelect: () => selectVarUsers([id]) });
+    } else if (via.length) {
+      items.push({ label: t("list.selectViaAlias"), separatorBefore: true, onSelect: () => selectVarUsers(via) });
+    }
+    if (cell && cell.kind === "alias") items.push({ label: t("vm.jumpAlias"), onSelect: () => jumpToVar(cell.aliasId), focusElsewhere: true });
+    items.push({ label: t("vm.detail"), onSelect: () => openDetail(ref, rowEl2), focusElsewhere: true });
+    openMenu(x != null ? x : r.left + 24, y != null ? y : r.bottom, items, rowEl2, () => rowEl2.classList.remove("menu-open"));
   }
-  function openVarDetail(v) {
-    var _a, _b, _c, _d, _e, _f;
-    const col = vmCols.find((c) => c.id === v.collectionId);
+  function selectVarUsers(varIds) {
+    if (!baseline) return;
+    selectStatusTarget = "list";
+    send({ type: "SELECT_VAR_USERS", varIds, nodeIds: baseline.ids });
+  }
+  var detailReq = 0;
+  var detailBox = null;
+  function openDetail(ref, returnRow) {
+    var _a, _b, _c;
+    const id = ref.local ? ref.local.id : ref.lib.id;
+    const name = ref.local ? ref.local.name : ref.lib.name;
+    const type = ref.local ? ref.local.type : ref.lib.type;
+    const col = ref.local ? vmCols.find((c) => c.id === ref.local.collectionId) : void 0;
     const title = document.createElement("span");
-    const first = col ? v.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId] : void 0;
-    title.innerHTML = `${v.type === "COLOR" ? swatchHtml(resolveColor(first)) : ""}<span class="vm-val">${escapeHtml(v.name)}</span>`;
+    const first = ref.local ? currentModeCell(ref.local) : ref.lib.value;
+    title.innerHTML = `${type === "COLOR" ? swatchHtml(resolveSwatch(first)) : ""}<span class="vm-val">${escapeHtml(name)}</span>${ref.lib ? ' <span class="lib-tag">LIB</span>' : ""}`;
     const body = document.createElement("div");
     const dl = document.createElement("dl");
     const row = (k, val) => {
@@ -6192,94 +6837,300 @@ ${v.description}` : v.name;
       else dd.appendChild(val);
       dl.append(dt, dd);
     };
-    const tierName = col && col.tier ? ["", "Global", "Semantic", "Component"][col.tier] : t("vm.noTier");
-    row(t("vm.dCollection"), col && col.name === tierName ? col.name : `${(_b = col == null ? void 0 : col.name) != null ? _b : ""} \xB7 ${tierName}`);
-    for (const m of (_c = col == null ? void 0 : col.modes) != null ? _c : []) row(m.name, vmCellEl(v.values[m.modeId]));
-    const scopes = document.createElement("span");
-    for (const sc of v.scopes) {
-      const c = document.createElement("span");
-      c.className = "chip";
-      c.textContent = sc;
-      scopes.appendChild(c);
+    if (ref.local && col) {
+      const tierName = col.tier ? ["", "Global", "Semantic", "Component"][col.tier] : t("vm.noTier");
+      row(t("vm.dCollection"), col.name === tierName ? col.name : `${col.name} \xB7 ${tierName}`);
+      for (const m of col.modes) row(m.name, valueEl(ref.local.values[m.modeId]));
+      const scopes = document.createElement("span");
+      for (const sc of ref.local.scopes) {
+        const c = document.createElement("span");
+        c.className = "chip";
+        c.textContent = sc;
+        scopes.appendChild(c);
+      }
+      row(t("vm.dScopes"), ref.local.scopes.length ? scopes : "\u2014");
+      row(t("vm.dDesc"), ref.local.description || "\u2014");
+    } else if (ref.lib) {
+      row(t("vm.dCollection"), t("list.libCollection", { name: ref.lib.collection }));
+      row(t("list.dValue"), valueEl(ref.lib.value));
     }
-    row(t("vm.dScopes"), v.scopes.length ? scopes : "\u2014");
-    row(t("vm.dDesc"), v.description || "\u2014");
+    const direct = ((_b = (_a = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0;
+    const via = direct ? [] : (_c = indirectMap.get(id)) != null ? _c : [];
     const usesBox = document.createElement("div");
-    const list = (_d = vmUsage == null ? void 0 : vmUsage.get(v.id)) != null ? _d : [];
-    if (!list.length) usesBox.textContent = lastSelCount ? t("vm.dNoUses") : t("vm.dSelectFirst");
-    else {
-      const byNode = /* @__PURE__ */ new Map();
-      for (const c of list) byNode.set(c.nodeId, [...(_e = byNode.get(c.nodeId)) != null ? _e : [], c]);
-      for (const [nid, cs] of byNode) {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "var-use";
-        b.title = t("bind.layerSelectTip");
-        const labels = groupBindLines(cs).map((l) => fieldLabel(l.label, l.fields[0])).join(", ");
-        b.innerHTML = `<span class="vu-layer">${escapeHtml((_f = vmUsageNodes.get(nid)) != null ? _f : nid)}</span> <span class="vu-props">${escapeHtml(labels)}</span>`;
-        b.addEventListener("click", () => selectNodes([nid], "vmStatus"));
-        usesBox.appendChild(b);
-      }
-    }
     usesBox.className = "var-uses";
-    row(t("vm.dUses", { n: list.length }), usesBox);
-    body.appendChild(dl);
-    const foot = [modalButton(t("vm.remap"), () => openRemapModal(v)), modalButton(t("common.close"), closeModal, true)];
-    foot[0].disabled = !list.length;
-    openModal(title, body, foot);
-  }
-  var remapModal = null;
-  var keepRemapStatus = false;
-  function openRemapModal(v) {
-    var _a;
-    const list = (_a = vmUsage == null ? void 0 : vmUsage.get(v.id)) != null ? _a : [];
-    const fields = [...new Set(list.map((c) => c.field))];
-    const body = document.createElement("div");
-    body.textContent = t("bind.remapLoading");
-    const box = openModal(t("vm.remapTitle", { name: v.name }), body, [modalButton(t("bind.remapCancel"), closeModal)]);
-    remapModal = { fromId: v.id, fields, sites: list.length, box };
-    send({ type: "REMAP_TARGETS", fromId: v.id, fields });
-  }
-  function onRemapTargets(fromId, targets) {
-    if (!remapModal || remapModal.fromId !== fromId || !modalEl) return;
-    const { box, fields, sites } = remapModal;
-    const body = document.createElement("div");
-    const foot = box.querySelector(".m-foot");
-    clearMount(foot);
-    if (!targets.length) {
-      body.textContent = t("bind.remapNone");
-      foot.append(modalButton(t("common.close"), closeModal, true));
-    } else {
-      const label = document.createElement("label");
-      label.className = "inline";
-      label.textContent = t("bind.remapLabel") + " ";
-      const select = document.createElement("select");
-      select.id = "remapTarget";
-      const byCol = /* @__PURE__ */ new Map();
-      for (const tv of targets) {
-        let g = byCol.get(tv.collection);
-        if (!g) {
-          g = document.createElement("optgroup");
-          g.label = tv.collection || "\u2014";
-          byCol.set(tv.collection, g);
-          select.appendChild(g);
-        }
-        const opt = document.createElement("option");
-        opt.value = tv.id;
-        opt.textContent = tv.name;
-        g.appendChild(opt);
-      }
-      label.appendChild(select);
-      body.appendChild(label);
-      const apply = modalButton(t("bind.remapApply", { n: sites }), () => {
-        apply.disabled = true;
-        send({ type: "REMAP_BINDINGS", fromId, toId: select.value, fields, reqId: nextBindReq() });
-      }, true);
-      foot.append(modalButton(t("bind.remapCancel"), closeModal), apply);
-      select.focus();
+    if (via.length) {
+      const names = via.map((x) => {
+        var _a2, _b2, _c2, _d;
+        return (_d = (_c2 = (_a2 = vmVars.find((v) => v.id === x)) == null ? void 0 : _a2.name) != null ? _c2 : (_b2 = libVars.find((l) => l.id === x)) == null ? void 0 : _b2.name) != null ? _d : x;
+      });
+      const p = document.createElement("div");
+      p.className = "hint";
+      p.textContent = t("list.viaAlias", { names: names.join(", ") });
+      usesBox.appendChild(p);
     }
-    box.replaceChild(body, box.children[1]);
+    const findUses = () => {
+      if (!baseline) return;
+      detailReq = ++bindReqSeq;
+      usesList.textContent = t("common.running");
+      send({ type: "FIND_VAR_USERS", reqId: detailReq, varIds: direct ? [id] : via.length ? via : [id], nodeIds: baseline.ids, limit: DETAIL_LIMIT });
+    };
+    const usesList = document.createElement("div");
+    usesBox.appendChild(usesList);
+    if (!baseline) usesList.textContent = t("list.selectFirstNote");
+    else if (baseline.scanned > BIG_SELECTION) {
+      usesList.append(t("list.detailBig"), " ");
+      const b = document.createElement("button");
+      b.className = "link";
+      b.textContent = t("list.find");
+      b.addEventListener("click", findUses);
+      usesList.appendChild(b);
+    }
+    row(t("list.dUses"), usesBox);
+    body.appendChild(dl);
+    if (ref.lib) {
+      const n = document.createElement("div");
+      n.className = "hint";
+      n.textContent = t("list.libManaged");
+      body.appendChild(n);
+    }
+    const box = openModal(title, body, [modalButton(t("common.close"), closeModal, true)], returnRow);
+    detailBox = box;
+    detailUsesEl = usesList;
+    if (baseline && baseline.scanned <= BIG_SELECTION) findUses();
   }
+  var detailUsesEl = null;
+  function onVarUsers(msg) {
+    if (msg.reqId !== detailReq || !detailUsesEl || !detailBox || !modalEl) return;
+    const box = detailUsesEl;
+    clearMount(box);
+    if (!msg.totalLayers) {
+      box.textContent = t("vm.dNoUses");
+      return;
+    }
+    const head = document.createElement("div");
+    head.className = "hint";
+    head.textContent = t("list.usesHead", { k: msg.totalLayers, n: msg.places });
+    box.appendChild(head);
+    for (const l of msg.layers) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "var-use";
+      b.title = t("bind.layerSelectTip");
+      b.innerHTML = `<span class="vu-layer">${escapeHtml(l.name)}</span>`;
+      b.addEventListener("click", () => selectNodes([l.id], "list"));
+      box.appendChild(b);
+    }
+    if (msg.totalLayers > msg.layers.length) {
+      const more = document.createElement("div");
+      more.className = "hint";
+      more.textContent = t("list.usesMore", { n: msg.totalLayers - msg.layers.length });
+      box.appendChild(more);
+    }
+  }
+  function openPopupFrom(storeId, title, returnFocus) {
+    const content = $(storeId);
+    const body = document.createElement("div");
+    body.appendChild(content);
+    content.hidden = false;
+    openModal(title, body, [modalButton(t("common.close"), closeModal, true)], returnFocus, () => {
+      content.hidden = true;
+      $("popupStore").appendChild(content);
+    });
+  }
+  function openTierPopup(returnFocus) {
+    send({ type: "GET_COLLECTION_ROLES" });
+    openPopupFrom("tierPopBody", t("colRoles.title"), returnFocus);
+  }
+  function openExportPopup(returnFocus) {
+    openPopupFrom("exportPopBody", t("export.title"), returnFocus);
+  }
+  function openMoreMenu() {
+    const btn = $("btnVarMore");
+    const r = btn.getBoundingClientRect();
+    openMenu(r.left, r.bottom + 2, [
+      { label: t("list.menuTiers"), onSelect: () => openTierPopup(btn), focusElsewhere: true },
+      { label: t("list.menuExport"), onSelect: () => openExportPopup(btn), focusElsewhere: true },
+      { label: t("list.menuExpandAll"), separatorBefore: true, onSelect: () => setAllExpanded(true) },
+      { label: t("list.menuCollapseAll"), onSelect: () => setAllExpanded(false) }
+    ], btn);
+  }
+  function findUnbound() {
+    if (!curSel.count) {
+      showStatusLine(t("status.noSelection"), { cls: "warn" });
+      return;
+    }
+    showTab("layer");
+    showApplyStep("bind");
+    $("btnApply").click();
+  }
+  $("btnVarRefresh").addEventListener("click", refreshList);
+  $("btnAddVar").addEventListener("click", () => showMake("color"));
+  $("btnVarMore").addEventListener("click", openMoreMenu);
+  $("btnFindUnbound").addEventListener("click", findUnbound);
+  $("btnSearch").addEventListener("click", () => searchOpen ? $("varSearch").focus() : openSearch());
+  $("varSearch").addEventListener("input", () => {
+    query = $("varSearch").value;
+    renderVarList();
+  });
+  $("varSearch").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      clearSearch();
+    }
+  });
+  $("btnSearchClear").addEventListener("click", () => clearSearch(true));
+  $("modeSelect").addEventListener("change", () => {
+    modeName = $("modeSelect").value || null;
+    renderVarList();
+  });
+  $("btnChipMore").addEventListener("click", () => {
+    const row = $("chipRow");
+    const chips = Array.from(row.querySelectorAll(".tier-chip"));
+    const next = chips.find((c) => c.offsetLeft + c.offsetWidth > row.scrollLeft + row.clientWidth + 1);
+    row.scrollLeft = next ? next.offsetLeft + next.offsetWidth - row.clientWidth : row.scrollWidth;
+  });
+  $("chipRow").addEventListener("wheel", (e) => {
+    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    e.preventDefault();
+    $("chipRow").scrollLeft += e.deltaY;
+  }, { passive: false });
+  $("btnRebase").addEventListener("click", () => {
+    rebaseToCurrent();
+    const tree = $("varTree");
+    const target = focusKey && tree.querySelector(`[data-key="${CSS.escape(focusKey)}"]`) || tree.querySelector("[data-key]");
+    target == null ? void 0 : target.focus();
+  });
+  var wizLatch = null;
+  var wizBeforeCount = 0;
+  var wizFrom = "start";
+  function startLatched() {
+    return !!wizLatch;
+  }
+  function placeWizard() {
+    const card = $("wizardCard");
+    const inMake = activeTab === "variables" && varSub === "make";
+    const slot = $(inMake ? "wizardSlotMake" : "wizardSlotStart");
+    if (card.parentElement !== slot) slot.appendChild(card);
+    if (inMake) card.classList.toggle("collapsed", !wizardRunning && !wizHasSummary());
+    else card.classList.remove("collapsed");
+    const visible = activeTab === "variables" && !isMini && (inMake || varScreen() === "start");
+    if (wizLatch && wizLatch.done && visible) wizLatch.summarySeen = true;
+    renderWizardCopy();
+  }
+  var wizHasSummary = () => !!$("wizardSummary").textContent;
+  function renderWizardCopy() {
+    const hint = $("wizardCard").querySelector('[data-i18n="wizardCard.hint"]');
+    const key = isPaid ? "wizardCard.hintPaid" : localVarCount() === 0 ? "wizardCard.hintFree" : "wizardCard.hintFreeVars";
+    if (hint) hint.textContent = t(key);
+    const btn = $("btnWizardRun");
+    if (!wizardRunning) btn.textContent = isPaid ? t(btn.dataset.rerun === "1" ? "wizard.rerun" : "wizardCard.run") : localVarCount() === 0 ? t("wizardCard.runFree") : t("wizardCard.runFreeVars");
+    if (!wizardRunning) setLock(btn, curSel.count ? null : "prereq", t("status.noSelection"));
+    const done = $("wizDone");
+    const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
+    if (made > 0) {
+      $("wizDoneText").textContent = t("start.made", { n: made });
+      done.hidden = false;
+    } else done.hidden = true;
+  }
+  function renderStart() {
+    const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
+    $("startHead").textContent = made > 0 ? t("start.made", { n: made }) : t("start.head");
+    $("startSub").hidden = made > 0;
+    $("startFree").style.display = isPaid ? "none" : "";
+    $("goMakeFree").style.display = isPaid ? "none" : "";
+    const lib = $("startLib");
+    clearMount(lib);
+    if (baseline && bigSkipped && !usageMap) {
+      const d = document.createElement("div");
+      d.className = "situation";
+      d.append(t("list.big"), " ");
+      const b = document.createElement("button");
+      b.className = "link link-btn";
+      b.textContent = t("list.read");
+      b.addEventListener("click", () => requestManagerUsage("user"));
+      d.appendChild(b);
+      lib.appendChild(d);
+    } else {
+      const rows = libRowsMatching();
+      if (rows.length) {
+        const h = document.createElement("div");
+        h.className = "vt-section vt-lib";
+        h.textContent = t("list.libSection");
+        const note = document.createElement("div");
+        note.className = "hint";
+        note.textContent = t("start.libNote");
+        lib.append(h, note, ...rows.map(libRowEl));
+      }
+    }
+    renderWizardCopy();
+  }
+  function readinessDone() {
+    return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === "done").length;
+  }
+  function renderReadinessButtons() {
+    const label = t("list.readiness", { n: readinessDone(), total: 7 });
+    for (const id of ["btnReadiness", "btnReadinessStart"]) $(id).textContent = label;
+  }
+  var readinessReturn = null;
+  function openReadiness(btn) {
+    var _a;
+    if (!$("readinessPop").hidden) {
+      closeReadiness();
+      return;
+    }
+    closeMenu();
+    renderPipeline();
+    const pop = $("readinessPop");
+    pop.hidden = false;
+    const r = btn.getBoundingClientRect();
+    const w = pop.offsetWidth;
+    pop.style.left = `${Math.max(4, Math.min(r.left, window.innerWidth - w - 4))}px`;
+    pop.style.top = `${Math.min(r.bottom + 2, window.innerHeight - pop.offsetHeight - 28)}px`;
+    readinessReturn = btn;
+    btn.setAttribute("aria-expanded", "true");
+    (_a = pop.querySelector(".pstep")) == null ? void 0 : _a.focus();
+  }
+  function closeReadiness(returnFocus = false) {
+    const pop = $("readinessPop");
+    if (pop.hidden) return;
+    pop.hidden = true;
+    readinessReturn == null ? void 0 : readinessReturn.setAttribute("aria-expanded", "false");
+    if (returnFocus) readinessReturn == null ? void 0 : readinessReturn.focus();
+    readinessReturn = null;
+    reentry.release();
+  }
+  $("btnReadiness").addEventListener("click", () => openReadiness($("btnReadiness")));
+  $("btnReadinessStart").addEventListener("click", () => openReadiness($("btnReadinessStart")));
+  $("readinessPop").addEventListener("keydown", (e) => {
+    var _a, _b;
+    const rows = Array.from($("readinessPop").querySelectorAll(".pstep"));
+    const i = rows.indexOf(document.activeElement);
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeReadiness(true);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      (_a = rows[(i + 1) % rows.length]) == null ? void 0 : _a.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      (_b = rows[(i - 1 + rows.length) % rows.length]) == null ? void 0 : _b.focus();
+    } else if (e.key === "Tab") e.preventDefault();
+  });
+  document.addEventListener("pointerdown", (e) => {
+    const pop = $("readinessPop");
+    if (pop.hidden) return;
+    const tgt = e.target;
+    if (pop.contains(tgt) || (readinessReturn == null ? void 0 : readinessReturn.contains(tgt))) return;
+    closeReadiness();
+  }, true);
+  $("btnWizListView").addEventListener("click", () => {
+    var _a;
+    wizLatch = null;
+    showVarSub("home");
+    renderVarScreen();
+    (_a = $("varTree").querySelector("[data-key]")) == null ? void 0 : _a.focus();
+  });
+  $("btnStartLicense").addEventListener("click", goToLicense);
   activeTab = "settings";
   showTab("variables");
 })();
