@@ -515,10 +515,84 @@
     return name.split("/")[1];
   }
 
+  // src/lib/tiers.ts
+  var TIER_ROLES = ["global", "semantic", "component"];
+  var TIER_NUM = { global: 1, semantic: 2, component: 3 };
+  var CANONICAL_NAME = { global: "Global", semantic: "Semantic", component: "Component" };
+  var isRoleValue = (v) => v === "none" || TIER_ROLES.includes(v);
+  function parseRoleMap(raw) {
+    if (!raw) return {};
+    try {
+      const o = JSON.parse(raw);
+      if (!o || typeof o !== "object" || Array.isArray(o)) return {};
+      const out = {};
+      for (const [k, v] of Object.entries(o)) if (isRoleValue(v)) out[k] = v;
+      return out;
+    } catch (e) {
+      return {};
+    }
+  }
+  function roleOfCollection(col, map) {
+    var _a;
+    const set = map[col.id];
+    if (set) return set === "none" ? null : set;
+    return (_a = TIER_ROLES.find((r) => CANONICAL_NAME[r] === col.name)) != null ? _a : null;
+  }
+  function tierOfCollection(col, map) {
+    const r = roleOfCollection(col, map);
+    return r ? TIER_NUM[r] : 0;
+  }
+  function pickCollection(cols, map, role) {
+    var _a;
+    return (_a = cols.find((c) => map[c.id] === role)) != null ? _a : cols.find((c) => !map[c.id] && c.name === CANONICAL_NAME[role]);
+  }
+  function assignRole(map, colId, role) {
+    const out = {};
+    for (const [k, v] of Object.entries(map)) {
+      if (k === colId) continue;
+      if (role && role !== "none" && v === role) continue;
+      out[k] = v;
+    }
+    if (role) out[colId] = role;
+    return out;
+  }
+  function guessRole(name) {
+    const n = name.toLowerCase();
+    if (/\bcomponents?\b/.test(n)) return "component";
+    if (/semantic|alias|theme|role|system|^tokens?$/.test(n)) return "semantic";
+    if (/global|primitive|core|base|palette|foundation|raw|ref(erence)?s?\b/.test(n)) return "global";
+    return null;
+  }
+
+  // src/lib/collectionRoles.ts
+  var ROLE_MAP_KEY = "dsl.collectionRoles";
+  function readRoleMap() {
+    var _a;
+    try {
+      const root = figma.root;
+      return parseRoleMap((_a = root == null ? void 0 : root.getPluginData) == null ? void 0 : _a.call(root, ROLE_MAP_KEY));
+    } catch (e) {
+      return {};
+    }
+  }
+  function writeRoleMap(map) {
+    figma.root.setPluginData(ROLE_MAP_KEY, JSON.stringify(map));
+  }
+  function findCollection(cols, role) {
+    return pickCollection(cols, readRoleMap(), role);
+  }
+  function ensureCollection(cols, role, name) {
+    var _a;
+    return (_a = findCollection(cols, role)) != null ? _a : figma.variables.createVariableCollection(name);
+  }
+  function collectionTiers(cols) {
+    const map = readRoleMap();
+    return new Map(cols.map((c) => [c.id, tierOfCollection(c, map)]));
+  }
+
   // src/lib/variables.ts
   var GLOBAL = "Global";
   var SEMANTIC = "Semantic";
-  var COMPONENT = "Component";
   var vkey = (collectionId, name) => `${collectionId}\0${name}`;
   async function buildVarIndex() {
     const idx = /* @__PURE__ */ new Map();
@@ -536,10 +610,9 @@
     return { variable, created: true };
   }
   async function resolveCollections() {
-    var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const globalCol = (_a = cols.find((c) => c.name === GLOBAL)) != null ? _a : figma.variables.createVariableCollection(GLOBAL);
-    const semanticCol = (_b = cols.find((c) => c.name === SEMANTIC)) != null ? _b : figma.variables.createVariableCollection(SEMANTIC);
+    const globalCol = ensureCollection(cols, "global", GLOBAL);
+    const semanticCol = ensureCollection(cols, "semantic", SEMANTIC);
     return { globalCol, semanticCol };
   }
   async function createTokens(tokens, base) {
@@ -568,7 +641,7 @@
   async function previewCreateTokens(tokens, base) {
     var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const gId = (_b = (_a = cols.find((c) => c.name === GLOBAL)) == null ? void 0 : _a.id) != null ? _b : "#G";
+    const gId = (_b = (_a = findCollection(cols, "global")) == null ? void 0 : _a.id) != null ? _b : "#G";
     const existing = /* @__PURE__ */ new Set();
     for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
     const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base) };
@@ -602,7 +675,8 @@
     const keepSet = new Set(keep);
     const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f) => f !== null));
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const palIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC).map((c) => c.id));
+    const tiers = collectionTiers(cols);
+    const palIds = new Set(cols.filter((c) => tiers.get(c.id) === 1 || tiers.get(c.id) === 2).map((c) => c.id));
     let removed = 0;
     for (const v of await figma.variables.getLocalVariablesAsync()) {
       if (!palIds.has(v.variableCollectionId)) continue;
@@ -615,15 +689,15 @@
     return removed;
   }
   async function createSemanticAliases(map) {
-    var _a, _b;
+    var _a;
     const summary = { created: 0, updated: 0, aliased: 0, missing: [] };
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const globalCol = cols.find((c) => c.name === GLOBAL);
+    const globalCol = findCollection(cols, "global");
     if (!globalCol) {
       summary.missing = Object.values(map);
       return summary;
     }
-    const semanticCol = (_a = cols.find((c) => c.name === SEMANTIC)) != null ? _a : figma.variables.createVariableCollection(SEMANTIC);
+    const semanticCol = ensureCollection(cols, "semantic", SEMANTIC);
     const sMode = semanticCol.defaultModeId;
     const idx = await buildVarIndex();
     for (const [semName, globalName] of Object.entries(map)) {
@@ -634,7 +708,7 @@
       }
       const u = upsertVariable(semName, semanticCol, g.resolvedType, idx);
       u.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g));
-      u.variable.scopes = scopesForType((_b = scopeForSemanticRole(semName)) != null ? _b : g.scopes, g.resolvedType);
+      u.variable.scopes = scopesForType((_a = scopeForSemanticRole(semName)) != null ? _a : g.scopes, g.resolvedType);
       summary[u.created ? "created" : "updated"]++;
       summary.aliased++;
     }
@@ -873,7 +947,7 @@
     }
     if (roleRenames.length) {
       const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-      const semId0 = (_a = cols0.find((c) => c.name === SEMANTIC)) == null ? void 0 : _a.id;
+      const semId0 = (_a = findCollection(cols0, "semantic")) == null ? void 0 : _a.id;
       if (semId0) {
         const byName = /* @__PURE__ */ new Map();
         for (const v of await figma.variables.getLocalVariablesAsync())
@@ -950,7 +1024,7 @@
     }
     {
       const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-      const semId0 = (_d = cols0.find((c) => c.name === SEMANTIC)) == null ? void 0 : _d.id;
+      const semId0 = (_d = findCollection(cols0, "semantic")) == null ? void 0 : _d.id;
       const semNames = /* @__PURE__ */ new Set();
       if (semId0) {
         for (const v of await figma.variables.getLocalVariablesAsync())
@@ -967,7 +1041,7 @@
     if (tokens.length) await createTokens(tokens, 16);
     if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_e = cols.find((c) => c.name === SEMANTIC)) == null ? void 0 : _e.id;
+    const semId = (_e = findCollection(cols, "semantic")) == null ? void 0 : _e.id;
     const semByName = /* @__PURE__ */ new Map();
     if (semId) {
       for (const v of await figma.variables.getLocalVariablesAsync())
@@ -1372,7 +1446,6 @@
   }
 
   // src/lib/bind.ts
-  var TIER = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
   var OPACITY_TOL = 5e-3;
   var SKIP_PREVIEW_CAP = 200;
   var RESULT_CAP = 600;
@@ -1573,13 +1646,10 @@
     var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const tierOf = new Map(cols.map((c) => {
-      var _a2;
-      return [c.id, (_a2 = TIER[c.name]) != null ? _a2 : 0];
-    }));
+    const tierOf = collectionTiers(cols);
     const vars = await figma.variables.getLocalVariablesAsync();
     const globalNames = new Set(
-      vars.filter((v) => tierOf.get(v.variableCollectionId) === TIER[GLOBAL]).map((v) => v.name)
+      vars.filter((v) => tierOf.get(v.variableCollectionId) === 1).map((v) => v.name)
     );
     const entries = [];
     for (const v of vars) {
@@ -1588,7 +1658,7 @@
       const val = await resolveValue(v, modeOf);
       if (val == null) continue;
       const e = { variable: v, tier, type: v.resolvedType, scopes: (_b = v.scopes) != null ? _b : ["ALL_SCOPES"] };
-      if (tier === TIER[SEMANTIC] && globalNames.has(v.name)) e.mirror = true;
+      if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
       if (v.resolvedType === "COLOR" && isRGB(val)) e.colorHex = rgbToHex(val);
       else if (v.resolvedType === "FLOAT" && typeof val === "number") e.num = val;
       else if (v.resolvedType === "STRING" && typeof val === "string") e.str = val;
@@ -1922,10 +1992,7 @@
   async function scanBindings(selection2) {
     const vars = await figma.variables.getLocalVariablesAsync();
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const tierOf = new Map(cols.map((c) => {
-      var _a;
-      return [c.id, (_a = TIER[c.name]) != null ? _a : 0];
-    }));
+    const tierOf = collectionTiers(cols);
     const byId = new Map(vars.map((v) => [v.id, v]));
     const nameOf = (id) => {
       var _a;
@@ -4670,7 +4737,7 @@
     return { modeId, created: true };
   }
   async function generateDarkMode(collectionId, fromModeId, toModeId) {
-    var _a, _b, _c;
+    var _a, _b;
     let created = 0;
     let realiased = 0;
     let skipped = 0;
@@ -4708,7 +4775,7 @@
         error: "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694. \uB2E4\uB978 \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694."
       });
     }
-    const globalCol = (_c = cols.find((c) => c.name === GLOBAL)) != null ? _c : figma.variables.createVariableCollection(GLOBAL);
+    const globalCol = ensureCollection(cols, "global", GLOBAL);
     const gMode = globalCol.defaultModeId;
     const allVars = await figma.variables.getLocalVariablesAsync();
     const byId = new Map(allVars.map((v) => [v.id, v]));
@@ -4891,19 +4958,30 @@
   async function postPrereq() {
     try {
       const cols = await figma.variables.getLocalVariableCollectionsAsync();
-      const globalIds = new Set(cols.filter((c) => c.name === GLOBAL).map((c) => c.id));
-      const bindableIds = new Set(cols.filter((c) => c.name === GLOBAL || c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+      const tiers = collectionTiers(cols);
+      const globalIds = new Set(cols.filter((c) => tiers.get(c.id) === 1).map((c) => c.id));
+      const bindableIds = new Set(cols.filter((c) => {
+        var _a;
+        return ((_a = tiers.get(c.id)) != null ? _a : 0) > 0;
+      }).map((c) => c.id));
       const vars = await figma.variables.getLocalVariablesAsync();
       const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
       const hasColorVars = globals.some((v) => v.resolvedType === "COLOR");
       const hasScaleVars = globals.some((v) => v.resolvedType !== "COLOR");
       const hasGlobal = globals.length > 0;
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-      const semanticIds = new Set(cols.filter((c) => c.name === SEMANTIC || c.name === COMPONENT).map((c) => c.id));
+      const semanticIds = new Set(cols.filter((c) => {
+        var _a;
+        return ((_a = tiers.get(c.id)) != null ? _a : 0) >= 2;
+      }).map((c) => c.id));
       const hasDarkMode = cols.some((c) => semanticIds.has(c.id) && c.modes.length > 1);
       const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
       const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId));
-      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles });
+      const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
+      const tierVars = tierVarList.length;
+      const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
+      const otherVars = vars.length - tierVars;
+      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
     } catch (e) {
     }
   }
@@ -4943,20 +5021,33 @@
   function errText(e) {
     return e instanceof Error ? e.message : String(e);
   }
-  var EDITABLE_COLLECTIONS = /* @__PURE__ */ new Set([GLOBAL, SEMANTIC, COMPONENT]);
-  function toVarInfo(v, col) {
+  function toVarInfo(v, col, tier) {
     const modes = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
-    return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, modes };
+    return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, tier, modes };
+  }
+  async function collectionRoleInfos() {
+    var _a;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const map = readRoleMap();
+    const count = /* @__PURE__ */ new Map();
+    for (const v of await figma.variables.getLocalVariablesAsync()) count.set(v.variableCollectionId, ((_a = count.get(v.variableCollectionId)) != null ? _a : 0) + 1);
+    return cols.map((c) => {
+      var _a2, _b;
+      return { id: c.id, name: c.name, vars: (_a2 = count.get(c.id)) != null ? _a2 : 0, set: (_b = map[c.id]) != null ? _b : null, role: roleOfCollection(c, map), guess: guessRole(c.name) };
+    });
   }
   async function collectVars() {
+    var _a;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const colById = new Map(cols.map((c) => [c.id, c]));
+    const tiers = collectionTiers(cols);
     const vars = await figma.variables.getLocalVariablesAsync();
     const out = [];
     for (const v of vars) {
       const col = colById.get(v.variableCollectionId);
-      if (!col || !EDITABLE_COLLECTIONS.has(col.name)) continue;
-      out.push(toVarInfo(v, col));
+      const tier = col ? (_a = tiers.get(col.id)) != null ? _a : 0 : 0;
+      if (!col || !tier) continue;
+      out.push(toVarInfo(v, col, tier));
     }
     out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
     return out;
@@ -5443,8 +5534,10 @@
             // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
             skipTotal: r.skipTotal,
             // 상한 전 실제 수 — 잘렸으면 UI가 알린다
-            candidateTotal: r.candidateTotal
+            candidateTotal: r.candidateTotal,
             // 결과/미리보기 목록 상한 전 실제 수
+            reqId: msg.reqId
+            // UI가 낡은 응답을 가려낸다
           });
           if (!msg.preview) {
             commitUndo(figma);
@@ -5455,7 +5548,7 @@
         }
         case "SCAN_BINDINGS": {
           const r = await scanBindings(selection());
-          post({ type: "BINDINGS_RESULT", candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes });
+          post({ type: "BINDINGS_RESULT", candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId });
           break;
         }
         case "REMAP_TARGETS": {
@@ -5487,7 +5580,7 @@
           }
           post(__spreadProps(__spreadValues({ type: "REMAP_RESULT" }, r), { toName: to.name }));
           const scan = await scanBindings(selection());
-          post({ type: "BINDINGS_RESULT", candidates: scan.candidates, nodes: scan.nodes, total: scan.total, boundNodes: scan.boundNodes });
+          post({ type: "BINDINGS_RESULT", candidates: scan.candidates, nodes: scan.nodes, total: scan.total, boundNodes: scan.boundNodes, reqId: msg.reqId });
           break;
         }
         case "CANCEL": {
@@ -5521,7 +5614,7 @@
             if (await applySelectedBinding(item)) bound++;
             else skipped++;
           }
-          post({ type: "APPLY_RESULT", bound, skipped, flags: [], reasons: {} });
+          post({ type: "APPLY_RESULT", bound, skipped, flags: [], reasons: {}, reqId: msg.reqId });
           if (bound) {
             commitUndo(figma);
             selfSelect = true;
@@ -5613,13 +5706,24 @@
           postSelection();
           break;
         }
+        case "GET_COLLECTION_ROLES": {
+          post({ type: "COLLECTION_ROLES", collections: await collectionRoleInfos() });
+          break;
+        }
+        case "SET_COLLECTION_ROLE": {
+          writeRoleMap(assignRole(readRoleMap(), msg.collectionId, msg.role));
+          post({ type: "COLLECTION_ROLES", collections: await collectionRoleInfos() });
+          await postPrereq();
+          post({ type: "VARIABLES", vars: await collectVars() });
+          break;
+        }
         case "GET_PREREQ": {
           await postPrereq();
           break;
         }
         case "GET_GLOBAL_COLORS": {
           const cols = await figma.variables.getLocalVariableCollectionsAsync();
-          const globalCol = cols.find((c) => c.name === GLOBAL);
+          const globalCol = findCollection(cols, "global");
           const colors = [];
           if (globalCol) {
             const mode = globalCol.defaultModeId;
@@ -5690,16 +5794,19 @@
         case "EXPORT": {
           const cols = await figma.variables.getLocalVariableCollectionsAsync();
           const colById = new Map(cols.map((c) => [c.id, c]));
+          const tiers = collectionTiers(cols);
           const vars = await figma.variables.getLocalVariablesAsync();
           const nameById = new Map(vars.map((v) => [v.id, v.name]));
           const tokens = [];
           for (const v of vars) {
             const col = colById.get(v.variableCollectionId);
-            if (!col || col.name !== GLOBAL && col.name !== SEMANTIC) continue;
+            const tier = col ? tiers.get(col.id) : 0;
+            if (!col || tier !== 1 && tier !== 2) continue;
             const raw = v.valuesByMode[col.defaultModeId];
             const t = {
               name: v.name,
-              collection: col.name,
+              collection: tier === 1 ? "Global" : "Semantic",
+              // 출력 그룹은 계층 이름(컬렉션 실제 이름과 무관)
               type: v.resolvedType,
               kind: kindOf(v)
             };

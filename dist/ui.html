@@ -314,7 +314,8 @@
     .toolbar-2 { margin-top: 0; }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
-    .btn-next { border-color: transparent; color: var(--text-2); }
+    /* 툴바가 좁아 줄이 넘어가도 ‘다음 →’은 오른쪽 끝에 — 혼자 왼쪽에 떨어지면 다른 버튼처럼 보인다. */
+    .btn-next { border-color: transparent; color: var(--text-2); margin-left: auto; }
     .btn-next:hover { color: var(--text); }
 
     /* ── 결과 목록(#18) ── */
@@ -339,7 +340,15 @@
       border-radius: var(--r-sm); background: var(--accent-subtle); font-size: 11px;
     }
     .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
+    /* 연결 현황 대기 — 선택이 멎을 때까지 이전 목록을 흐리게 둔다(비웠다 채우는 깜빡임 대신). 누를 수 없음. */
+    .results.stale { opacity: .45; pointer-events: none; transition: opacity .12s; }
     .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
+    /* 컬렉션 계층 — 한 줄: 이름(변수 수) · 추천 · 선택 */
+    .col-role { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
+    .col-role:first-child { border-top: none; }
+    .col-role .name { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .col-role .sub { grid-column: 1 / -1; font-size: 10px; color: var(--muted); }
+    .col-role select { max-width: 150px; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
     .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */
@@ -403,6 +412,20 @@
       font-family: var(--mono); font-size: var(--fs); overflow-x: auto;
     }
     .before { color: var(--muted); text-decoration: line-through; }
+    /* 연결 줄 — `채움 색 ■ #fff = color/bg`. 속성 이름은 본문 글꼴(디자인 말), 값·변수는 고정폭. 취소선 없음(값은 바뀌지 않는다). */
+    .bf-label { font-family: var(--font); font-weight: 500; color: var(--text-2); }
+    .bf-val { color: var(--muted); font-weight: 400; }
+    .bf-op { color: var(--muted); font-weight: 400; padding: 0 1px; }
+    .bf-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--border); vertical-align: -1px; margin-right: 4px; }
+    /* 레이어 머리 — 누르면 캔버스에서 그 레이어 선택 */
+    .r-group.pick { cursor: pointer; color: var(--text-2); }
+    .r-group.pick:hover, .r-group.pick:focus-visible { color: var(--accent-strong); text-decoration: underline; outline: none; }
+    /* 변수별 보기 › 어디에? — 레이어 · 속성 목록(누르면 그 레이어 선택) */
+    .var-uses { display: flex; flex-direction: column; gap: 2px; margin: -2px 0 6px 10px; padding-left: 8px; border-left: 2px solid var(--border); }
+    .var-use { text-align: left; border: none; background: transparent; padding: 3px 4px; border-radius: var(--r-sm); font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .var-use:hover { background: var(--surface-hover); }
+    .vu-layer { font-family: var(--mono); }
+    .vu-props { color: var(--muted); }
     .tree-name { color: inherit; }
     .after { color: var(--ok); }
     .tree-ctrls { font-size: var(--fs); margin-top: 6px; }
@@ -451,6 +474,8 @@
   </div>
 
   <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
+    <!-- 이미 있는 변수 안내 — 변수가 있는 파일에서 '만들기'를 거쳐 확인하게 하지 않는다(바로 연결로). -->
+    <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button></div>
     <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
     <div class="banner" id="onboardBanner" style="display:none">
       <span data-i18n="onboard.banner">처음이면 전체 실행으로 시작하세요.</span>
@@ -492,6 +517,7 @@
   </section>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
+    <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
@@ -759,6 +785,14 @@
       </div>
     </div>
 
+    <!-- 기존 자산 편입(§9): 이름이 Global/Semantic/Component가 아닌 컬렉션도 계층으로 쓰게 지정. -->
+    <div class="step" id="collectionRolesCard">
+      <h2 data-i18n="colRoles.title">컬렉션 계층</h2>
+      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
+      <div id="collectionRoles"></div>
+      <div class="status" id="colRolesStatus"></div>
+    </div>
+
     <div class="step">
       <h2 data-i18n="export.title">코드로 내보내기</h2>
       <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
@@ -957,6 +991,54 @@
     "bind.viewVariable": "\uBCC0\uC218\uBCC4",
     "bind.varLayers": "\uB808\uC774\uC5B4 {n}",
     "bind.varSelect": "\uC120\uD0DD",
+    // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
+    "field.fills": "\uCC44\uC6C0 \uC0C9",
+    "field.strokes": "\uC120 \uC0C9",
+    "field.effects": "\uADF8\uB9BC\uC790 \uC0C9",
+    "field.itemSpacing": "\uAC04\uACA9",
+    "field.counterAxisSpacing": "\uC904 \uAC04\uACA9",
+    "field.gridRowGap": "\uD589 \uAC04\uACA9",
+    "field.gridColumnGap": "\uC5F4 \uAC04\uACA9",
+    "field.padding": "\uC5EC\uBC31",
+    "field.paddingX": "\uC88C\uC6B0 \uC5EC\uBC31",
+    "field.paddingY": "\uC704\uC544\uB798 \uC5EC\uBC31",
+    "field.paddingSome": "\uC5EC\uBC31 \uC77C\uBD80",
+    "field.paddingTop": "\uC704 \uC5EC\uBC31",
+    "field.paddingRight": "\uC624\uB978\uCABD \uC5EC\uBC31",
+    "field.paddingBottom": "\uC544\uB798 \uC5EC\uBC31",
+    "field.paddingLeft": "\uC67C\uCABD \uC5EC\uBC31",
+    "field.radius": "\uBAA8\uC11C\uB9AC",
+    "field.radiusSome": "\uBAA8\uC11C\uB9AC \uC77C\uBD80",
+    "field.topLeftRadius": "\uC67C\uCABD \uC704 \uBAA8\uC11C\uB9AC",
+    "field.topRightRadius": "\uC624\uB978\uCABD \uC704 \uBAA8\uC11C\uB9AC",
+    "field.bottomRightRadius": "\uC624\uB978\uCABD \uC544\uB798 \uBAA8\uC11C\uB9AC",
+    "field.bottomLeftRadius": "\uC67C\uCABD \uC544\uB798 \uBAA8\uC11C\uB9AC",
+    "field.strokeWeight": "\uC120 \uB450\uAED8",
+    "field.strokeSome": "\uC120 \uB450\uAED8 \uC77C\uBD80",
+    "field.strokeTopWeight": "\uC704 \uC120 \uB450\uAED8",
+    "field.strokeRightWeight": "\uC624\uB978\uCABD \uC120 \uB450\uAED8",
+    "field.strokeBottomWeight": "\uC544\uB798 \uC120 \uB450\uAED8",
+    "field.strokeLeftWeight": "\uC67C\uCABD \uC120 \uB450\uAED8",
+    "field.width": "\uB108\uBE44",
+    "field.height": "\uB192\uC774",
+    "field.opacity": "\uBD88\uD22C\uBA85\uB3C4",
+    "field.fontSize": "\uAE00\uC790 \uD06C\uAE30",
+    "field.lineHeight": "\uD589\uAC04",
+    "field.letterSpacing": "\uC790\uAC04",
+    "field.fontFamily": "\uAE00\uAF34",
+    "field.fontWeight": "\uAD75\uAE30",
+    "fieldGroup.color": "\uC0C9",
+    "fieldGroup.space": "\uC5EC\uBC31\xB7\uAC04\uACA9",
+    "fieldGroup.radius": "\uBAA8\uC11C\uB9AC",
+    "fieldGroup.size": "\uD06C\uAE30\xB7\uC120",
+    "fieldGroup.text": "\uAE00\uC790",
+    "fieldGroup.other": "\uAE30\uD0C0",
+    "bind.varUses": "\uB808\uC774\uC5B4 {layers} \xB7 \uC18D\uC131 {props}",
+    "bind.varShowUses": "\uC5B4\uB514\uC5D0?",
+    "bind.varHideUses": "\uC811\uAE30",
+    "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD569\uB2C8\uB2E4",
+    "bind.connectedTip": "{label}({fields})\uC774(\uAC00) {variable}\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC2B5\uB2C8\uB2E4",
+    "bind.willConnectTip": "{label}({fields})\uC744(\uB97C) {variable}\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4",
     "bind.varRemap": "\uAD50\uCCB4",
     "bind.varRemapTip": "\uC774 \uBCC0\uC218\uAC00 \uBD99\uC740 \uC790\uB9AC\uB97C \uB2E4\uB978 \uBCC0\uC218\uB85C \uBC14\uAFC9\uB2C8\uB2E4 \u2014 \uC120\uD0DD \uC548, \uC774 \uC18D\uC131\uB9CC",
     "bind.remapLabel": "\uBC14\uAFC0 \uBCC0\uC218",
@@ -1107,6 +1189,23 @@
     "rail.next": "\uB2E4\uC74C \u2192",
     // 플러그인 설정(#19) — 설정 탭에만
     "settings.title": "\uAE30\uBCF8\uAC12",
+    "colRoles.title": "\uCEEC\uB809\uC158 \uACC4\uCE35",
+    "existingVars.has": "\uC774 \uD30C\uC77C\uC5D0 \uBCC0\uC218 {n}\uAC1C\uAC00 \uC774\uBBF8 \uC788\uC5B4\uC694 (\uC0C9 {color} \xB7 \uADF8 \uBC16 {other}).",
+    "existingVars.hasMake": "\uC774 \uD30C\uC77C\uC5D0 \uBCC0\uC218 {n}\uAC1C\uAC00 \uC774\uBBF8 \uC788\uC5B4\uC694 \u2014 \uC0C8\uB85C \uB9CC\uB4E4 \uAC8C \uC5C6\uB2E4\uBA74 \uBC14\uB85C \uC5F0\uACB0\uD558\uC138\uC694.",
+    "existingVars.gotoBind": "\uC5F0\uACB0 \uD655\uC778\uD558\uAE30 \u2192",
+    "existingVars.unknown": "\uBCC0\uC218 {n}\uAC1C\uAC00 \uC788\uC9C0\uB9CC \uC5B4\uB290 \uACC4\uCE35(Global\xB7Semantic)\uC778\uC9C0 \uBAB0\uB77C \uC5F0\uACB0\uC5D0 \uC4F0\uC9C0 \uBABB\uD574\uC694.",
+    "existingVars.gotoRoles": "\uACC4\uCE35 \uC9C0\uC815\uD558\uAE30 \u2192",
+    "existingVars.selectFirst": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uBA74 \uC5F0\uACB0 \uD604\uD669\uC774 \uBCF4\uC5EC\uC694.",
+    "colRoles.hint": "\uC774\uB984\uC774 Global\xB7Semantic\xB7Component\uAC00 \uC544\uB2CC \uCEEC\uB809\uC158\uB3C4 \uACC4\uCE35\uC73C\uB85C \uC4F0\uAC8C \uC9C0\uC815\uD569\uB2C8\uB2E4. \uD30C\uC77C\uC5D0 \uC800\uC7A5\uB3FC \uC774 \uD30C\uC77C\uC744 \uC5EC\uB294 \uBAA8\uB450\uC5D0\uAC8C \uC801\uC6A9\uB429\uB2C8\uB2E4",
+    "colRoles.empty": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218 \uCEEC\uB809\uC158\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "colRoles.vars": "\uBCC0\uC218 {n}",
+    "colRoles.auto": "\uC790\uB3D9 \u2014 {role}",
+    "colRoles.autoNone": "\uC790\uB3D9 \u2014 \uACC4\uCE35 \uC544\uB2D8",
+    "colRoles.none": "\uACC4\uCE35 \uC544\uB2D8",
+    "colRoles.guess": "\uCD94\uCC9C: {role}",
+    "colRoles.useGuess": "\uCD94\uCC9C\uB300\uB85C",
+    "colRoles.saved": "{name} \u2192 {role}. \uBC14\uC778\uB529\xB7\uC5ED\uD560 \uCD94\uCC9C\xB7\uB0B4\uBCF4\uB0B4\uAE30\uAC00 \uC774 \uC9C0\uC815\uC744 \uB530\uB985\uB2C8\uB2E4.",
+    "colRoles.dup": "{role}\uC740(\uB294) \uD55C \uCEEC\uB809\uC158\uB9CC \uB9E1\uC2B5\uB2C8\uB2E4 \u2014 {prev}\uC758 \uC9C0\uC815\uC740 \uD480\uB838\uC2B5\uB2C8\uB2E4.",
     "settings.hint": "\uC790\uC8FC \uC548 \uBC14\uAFB8\uB294 \uAC12\uC774\uC5D0\uC694. \uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9 \uD654\uBA74\uC5D0\uB294 \uC548 \uBCF4\uC5EC\uC694",
     "settings.base": "\uAE30\uC900 \uD06C\uAE30",
     "settings.depth": "\uC774\uB984 \uC815\uB9AC \uAE4A\uC774",
@@ -1307,6 +1406,63 @@
     const tpl = (_a = STRINGS[key]) != null ? _a : key;
     if (!vars) return tpl;
     return tpl.replace(/\{(\w+)\}/g, (_, k) => k in vars ? String(vars[k]) : `{${k}}`);
+  }
+
+  // src/lib/bindDisplay.ts
+  var PADDING = ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"];
+  var RADIUS = ["topLeftRadius", "topRightRadius", "bottomRightRadius", "bottomLeftRadius"];
+  var STROKE_SIDES = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
+  function familyOf(field) {
+    if (PADDING.includes(field)) return "padding";
+    if (RADIUS.includes(field)) return "radius";
+    if (STROKE_SIDES.includes(field)) return "strokeSides";
+    return null;
+  }
+  function familyLabel(fam, fields) {
+    const has = (f) => fields.includes(f);
+    if (fam === "padding") {
+      if (fields.length === 4) return "padding";
+      if (fields.length === 2 && has("paddingLeft") && has("paddingRight")) return "paddingX";
+      if (fields.length === 2 && has("paddingTop") && has("paddingBottom")) return "paddingY";
+      if (fields.length === 1) return fields[0];
+      return "paddingSome";
+    }
+    if (fam === "radius") return fields.length === 4 ? "radius" : fields.length === 1 ? fields[0] : "radiusSome";
+    return fields.length === 4 ? "strokeWeight" : fields.length === 1 ? fields[0] : "strokeSome";
+  }
+  function groupBindLines(items) {
+    var _a;
+    const lines = [];
+    const byKey = /* @__PURE__ */ new Map();
+    for (const it of items) {
+      const fam = familyOf(it.field);
+      const key = fam ? `${fam}|${it.variableId}` : `${it.field}|${(_a = it.index) != null ? _a : 0}|${it.variableId}`;
+      const hit = byKey.get(key);
+      if (hit) {
+        hit.fields.push(it.field);
+        hit.items.push(it);
+        continue;
+      }
+      const line = { label: "", fields: [it.field], items: [it], variableId: it.variableId, variableName: it.variableName, currentValue: it.currentValue };
+      byKey.set(key, line);
+      lines.push(line);
+    }
+    for (const l of lines) {
+      const fam = familyOf(l.fields[0]);
+      l.label = fam ? familyLabel(fam, l.fields) : l.fields[0];
+    }
+    return lines;
+  }
+  function fieldGroupKey(field) {
+    if (field === "fills" || field === "strokes" || field === "effects") return "color";
+    if (familyOf(field) === "padding" || /Spacing$|Gap$/.test(field)) return "space";
+    if (familyOf(field) === "radius") return "radius";
+    if (field === "width" || field === "height" || /^stroke.*Weight$/.test(field) || /^(min|max)(Width|Height)$/.test(field)) return "size";
+    if (/^font|^lineHeight$|^letterSpacing$|^paragraph/.test(field)) return "text";
+    return "other";
+  }
+  function isHexColor(v) {
+    return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v.trim());
   }
 
   // src/lib/textStyles.ts
@@ -2058,7 +2214,10 @@
     const cols = /* @__PURE__ */ new Map();
     for (const v of vars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
     const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-    const target = (_a = withModes.find((v) => v.collection === "Semantic")) != null ? _a : withModes[0];
+    const target = (_a = withModes.find((v) => {
+      var _a2;
+      return ((_a2 = v.tier) != null ? _a2 : v.collection === "Semantic" ? 2 : 0) === 2;
+    })) != null ? _a : withModes[0];
     if (!target) return null;
     const dark = target.modes.find((m) => m.name.toLowerCase() === "dark");
     const from = target.modes.find((m) => m.modeId !== (dark == null ? void 0 : dark.modeId));
@@ -2098,6 +2257,16 @@
   var hasScaleVars = false;
   var hasGlobal = false;
   var hasBindable = false;
+  var prereqKnown = false;
+  var prereqInFlight = false;
+  function requestPrereq() {
+    if (prereqInFlight) return;
+    prereqInFlight = true;
+    send({ type: "GET_PREREQ" });
+    setTimeout(() => {
+      prereqInFlight = false;
+    }, 3e3);
+  }
   var hasDarkMode = false;
   var hasTextStyles = false;
   var hasSemanticRoles = false;
@@ -2855,19 +3024,41 @@
     return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
   }
   var AUTO_SCAN_MAX = 300;
+  var AUTO_SCAN_DELAY = 250;
+  var bindReqSeq = 0;
+  var bindLatest = 0;
+  var autoScanTimer = null;
+  function nextBindReq() {
+    if (autoScanTimer) {
+      clearTimeout(autoScanTimer);
+      autoScanTimer = null;
+    }
+    bindLatest = ++bindReqSeq;
+    return bindLatest;
+  }
+  function isCurrentBindReply(reqId) {
+    return reqId === void 0 || reqId === bindLatest;
+  }
+  function requestBindingsScan() {
+    send({ type: "SCAN_BINDINGS", reqId: nextBindReq() });
+  }
+  function markBindStale(on) {
+    $("bindTree").classList.toggle("stale", on);
+    if (on) $("btnApplyConfirm").style.display = "none";
+  }
   $("btnScanBindings").addEventListener("click", () => {
     setStatus("applyStatus", t("common.running"), "");
-    send({ type: "SCAN_BINDINGS" });
+    requestBindingsScan();
   });
   $("btnApply").addEventListener("click", () => {
     showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
-    send({ type: "APPLY", tolerance: bindTolerance(), preview: true });
+    send({ type: "APPLY", tolerance: bindTolerance(), preview: true, reqId: nextBindReq() });
   });
   $("btnApplyConfirm").addEventListener("click", () => {
     const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
     if (!items.length) return;
     showApplyProgress("\uC5F0\uACB0 \uC911\u2026");
-    send({ type: "APPLY_SELECTED", items });
+    send({ type: "APPLY_SELECTED", items, reqId: nextBindReq() });
   });
   $("bindAll").addEventListener("change", (e) => {
     const on = e.target.checked;
@@ -3253,7 +3444,7 @@
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!isPaid) $("btnSemantics").disabled = true;
     setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
-    if (!hasBindable) $("btnApplyConfirm").disabled = true;
+    if (prereqKnown && !hasBindable) $("btnApplyConfirm").disabled = true;
     setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
     if (!isPaid) $("btnApplyExistingText").disabled = true;
   }
@@ -3264,7 +3455,8 @@
     const base = el.dataset.baseTip;
     el.setAttribute(attr, locked ? base ? `${base} \xB7 ${PAID_LOCK}` : PAID_LOCK : base);
   }
-  function setPrereq(btnId, noticeId, ok, msg) {
+  function setPrereq(btnId, noticeId, okRaw, msg) {
+    const ok = okRaw || !prereqKnown;
     $(btnId).disabled = !ok;
     const notice = $(noticeId);
     notice.style.display = ok ? "none" : "";
@@ -3354,9 +3546,9 @@
     }
     if (prev && cols.has(prev)) sel.value = prev;
     const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-    const usable = (_a = withModes.find((v) => v.collection === "Semantic")) != null ? _a : withModes[0];
+    const usable = (_a = withModes.find((v) => v.tier === 2)) != null ? _a : withModes[0];
     if (usable && ((_c = (_b = cols.get(sel.value)) == null ? void 0 : _b.modes.length) != null ? _c : 0) < 1) sel.value = usable.collectionId;
-    if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.collection) === "Global") && usable.collection === "Semantic") {
+    if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.tier) === 1) && usable.tier === 2) {
       sel.value = usable.collectionId;
     } else if (usable && !sel.value) {
       sel.value = usable.collectionId;
@@ -3517,7 +3709,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     switch (msg.type) {
@@ -3552,12 +3744,22 @@
         lastSelBound = msg.bound;
         lastSelRenamed = msg.renamed;
         applySelectionDone();
-        if (!msg.selfSelect && !wizardRunning) {
-          if (msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX) send({ type: "SCAN_BINDINGS" });
-          else if (msg.bound > 0) setStatus("applyStatus", t("bind.scanHintLarge"), "");
-        }
         refreshVariantRow(msg.comps, msg.sets);
-        if (!msg.selfSelect) clearBindPreview();
+        if (!msg.selfSelect) {
+          nextBindReq();
+          hideApplyProgress();
+          const autoScan = !wizardRunning && msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX;
+          if (autoScan) {
+            markBindStale(true);
+            autoScanTimer = setTimeout(() => {
+              autoScanTimer = null;
+              requestBindingsScan();
+            }, AUTO_SCAN_DELAY);
+          } else {
+            clearBindPreview();
+            if (!wizardRunning && msg.bound > 0) setStatus("applyStatus", t("bind.scanHintLarge"), "");
+          }
+        }
         if (!tokens.length) renderTokens();
         refreshTreeEmptyStates();
         break;
@@ -3596,7 +3798,9 @@
         if (msg.op === "bind") updateApplyProgress(msg.done, msg.total);
         break;
       case "APPLY_RESULT": {
+        if (!isCurrentBindReply(msg.reqId)) break;
         hideApplyProgress();
+        markBindStale(false);
         const confirmBtn = $("btnApplyConfirm");
         bindSkips = (_a = msg.skips) != null ? _a : [];
         bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
@@ -3610,6 +3814,8 @@
           setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail: cancelDetail }), "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
+          bindResultMode = false;
+          remapOpen = null;
           bindCandidates = (_c = msg.candidates) != null ? _c : [];
           bindNodes = (_d = msg.nodes) != null ? _d : [];
           bindChecked.clear();
@@ -3650,6 +3856,7 @@
         break;
       }
       case "BINDINGS_RESULT": {
+        if (!isCurrentBindReply(msg.reqId)) break;
         clearBindPreview();
         bindResultMode = true;
         bindCandidates = msg.candidates;
@@ -3718,6 +3925,9 @@
         break;
       case "COLLECTIONS":
         break;
+      case "COLLECTION_ROLES":
+        renderCollectionRoles(msg.collections);
+        break;
       case "GLOBAL_COLORS":
         if (!msg.colors.length) {
           if (!autoGlobalScan) setStatus(semStatusTarget, t("semantic.noGlobals"), "warn");
@@ -3729,6 +3939,9 @@
         autoGlobalScan = false;
         break;
       case "PREREQ_STATE":
+        prereqKnown = true;
+        prereqInFlight = false;
+        renderExistingVars((_k = msg.tierVars) != null ? _k : 0, (_l = msg.tierColorVars) != null ? _l : 0, (_m = msg.otherVars) != null ? _m : 0);
         hasColorVars = msg.hasColorVars;
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
@@ -3812,10 +4025,10 @@
         allVars = msg.vars;
         refreshDarkOptions();
         if (!tokens.length) {
-          const globals = allVars.filter((v) => v.collection === "Global");
+          const globals = allVars.filter((v) => v.tier === 1);
           const colors = globals.filter((v) => v.name.startsWith("color/")).length;
           const others = globals.length - colors;
-          const roles = allVars.filter((v) => v.collection === "Semantic").length;
+          const roles = allVars.filter((v) => v.tier === 2).length;
           if (globals.length) {
             setStatus("colorStatus", t("color.fileVars", { n: colors, roles }), "");
             setStatus("createStatus", t("create.fileVars", { n: others }), "");
@@ -3860,7 +4073,7 @@
         break;
       }
       case "PREMIUM_REQUIRED": {
-        const statusId = resolveStatusId((_k = PREMIUM_STATUS_ID[msg.feature]) != null ? _k : "createStatus");
+        const statusId = resolveStatusId((_n = PREMIUM_STATUS_ID[msg.feature]) != null ? _n : "createStatus");
         setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
         break;
       }
@@ -3938,7 +4151,7 @@
     return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
   }
   function makeTreeRow(r, base, checked, onChange, readOnly = false) {
-    var _a;
+    var _a, _b;
     const indent = `${(r.depth - base) * 12}px`;
     if (r.change === void 0 && r.keep) {
       const title2 = document.createElement("span");
@@ -3952,21 +4165,48 @@
       const group = resultGroup(r.name);
       group.style.marginLeft = indent;
       if (!r.header) group.classList.add("ctx");
+      if (r.selectId) {
+        const id = r.selectId;
+        group.classList.add("pick");
+        group.title = t("bind.layerSelectTip");
+        group.setAttribute("role", "button");
+        group.tabIndex = 0;
+        group.addEventListener("click", () => selectNodes([id], "applyStatus"));
+        group.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            selectNodes([id], "applyStatus");
+          }
+        });
+      }
       return group;
     }
+    const keys = (_a = r.keys) != null ? _a : [r.id];
     const cb = document.createElement("input");
     cb.type = "checkbox";
-    cb.checked = checked.has(r.id);
+    cb.checked = keys.every((k) => checked.has(k));
     cb.addEventListener("change", () => {
-      if (cb.checked) checked.add(r.id);
-      else checked.delete(r.id);
+      for (const k of keys) {
+        if (cb.checked) checked.add(k);
+        else checked.delete(k);
+      }
       onChange();
     });
+    if (r.bind) {
+      const b = r.bind;
+      const title2 = document.createElement("span");
+      const swatch = isHexColor(b.value) ? `<span class="bf-swatch" style="background:${escapeHtml(b.value)}"></span>` : "";
+      title2.innerHTML = `<span class="bf-label">${escapeHtml(b.label)}</span> ${swatch}<span class="bf-val">${escapeHtml(b.value)}</span> <span class="bf-op">${b.connected ? "=" : "\u2192"}</span> <span class="after">${escapeHtml(b.variable)}</span>`;
+      title2.title = b.tip;
+      const card2 = resultCard(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title: title2, titleMono: true }));
+      card2.style.marginLeft = indent;
+      return card2;
+    }
     const title = document.createElement("span");
     const nameCls = r.replace === false ? "tree-name" : "before";
     title.innerHTML = `<span class="${nameCls}">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
     title.title = `${r.name} \u2192 ${r.change}`;
-    const card = resultCard(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title, titleMono: true, meta: (_a = r.badge) == null ? void 0 : _a.text }));
+    const card = resultCard(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title, titleMono: true, meta: (_b = r.badge) == null ? void 0 : _b.text }));
     if (r.badge) {
       const meta = card.querySelector(".r-meta");
       meta.className = `tag tag-${r.badge.kind}`;
@@ -4077,22 +4317,40 @@
         });
         continue;
       }
-      rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands });
+      rows.push(__spreadValues({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands }, cands ? { selectId: n.id } : {}));
       if (cands) {
-        for (const c of cands) {
-          const dist = c.distance && c.distance > 0 ? ` ~${Math.round(c.distance * 100) / 100}` : "";
+        for (const line of groupBindLines(cands)) {
+          const lead = line.items[0];
+          const dist = lead.distance && lead.distance > 0 ? ` ~${Math.round(lead.distance * 100) / 100}` : "";
+          const label = fieldLabel(line.label, line.fields[0]);
+          const variable = `${line.variableName}${dist}`;
+          const tipArgs = { label, fields: line.fields.join(", "), variable: line.variableName };
           rows.push({
-            id: candKey(c),
-            name: `${c.field} ${c.currentValue}`,
-            type: c.field,
+            id: candKey(lead),
+            keys: line.items.map((it) => candKey(it)),
+            name: `${label} ${line.currentValue}`,
+            type: line.fields[0],
             depth: n.depth + 1,
             parentId: n.id,
-            change: `${c.variableName}${dist}`
+            change: variable,
+            bind: {
+              label,
+              value: line.currentValue,
+              variable,
+              connected: bindResultMode,
+              tip: t(bindResultMode ? "bind.connectedTip" : "bind.willConnectTip", tipArgs)
+            }
           });
         }
       }
     }
     return rows;
+  }
+  function fieldLabel(label, rawField) {
+    return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
+  }
+  function fieldGroupLabel(group) {
+    return t(`fieldGroup.${group}`);
   }
   var bindView = "layer";
   function renderBindTree() {
@@ -4121,45 +4379,72 @@
     const q = bindFilterText();
     return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
   }
+  var varUsesOpen = /* @__PURE__ */ new Set();
+  var FIELD_GROUP_ORDER = ["color", "space", "radius", "size", "text", "other"];
   function renderBindByVariable() {
-    var _a;
+    var _a, _b, _c;
     const mount = $("bindTree");
     clearMount(mount);
+    const nodeName = new Map(bindNodes.map((n) => [n.id, n.name]));
     const groups = /* @__PURE__ */ new Map();
     for (const c of filteredCandidates()) {
-      const prop = c.field === "fills" || c.field === "strokes" || c.field === "effects" ? c.field : /Radius$/.test(c.field) ? "radius" : /^padding|Spacing$|Gap$/.test(c.field) ? "spacing" : c.field;
-      if (!groups.has(prop)) groups.set(prop, /* @__PURE__ */ new Map());
-      const byVar = groups.get(prop);
-      const row = (_a = byVar.get(c.variableId)) != null ? _a : { id: c.variableId, name: c.variableName, ids: /* @__PURE__ */ new Set(), fields: /* @__PURE__ */ new Set(), sites: 0 };
-      row.ids.add(c.nodeId);
+      const g = fieldGroupKey(c.field);
+      if (!groups.has(g)) groups.set(g, /* @__PURE__ */ new Map());
+      const byVar = groups.get(g);
+      const row = (_a = byVar.get(c.variableId)) != null ? _a : { id: c.variableId, name: c.variableName, value: c.currentValue, fields: /* @__PURE__ */ new Set(), byNode: /* @__PURE__ */ new Map() };
       row.fields.add(c.field);
-      row.sites++;
+      const list = (_b = row.byNode.get(c.nodeId)) != null ? _b : [];
+      list.push(c);
+      row.byNode.set(c.nodeId, list);
       byVar.set(c.variableId, row);
     }
-    const props = [...groups.keys()].sort();
-    for (const prop of props) {
-      mount.appendChild(resultGroup(prop));
-      const rows = [...groups.get(prop).values()].sort((a, b) => b.ids.size - a.ids.size || a.name.localeCompare(b.name));
+    const order = [...groups.keys()].sort((a, b) => FIELD_GROUP_ORDER.indexOf(a) - FIELD_GROUP_ORDER.indexOf(b));
+    for (const g of order) {
+      mount.appendChild(resultGroup(fieldGroupLabel(g)));
+      const rows = [...groups.get(g).values()].sort((a, b) => b.byNode.size - a.byNode.size || a.name.localeCompare(b.name));
       for (const r of rows) {
-        const ids = [...r.ids];
-        const sel = document.createElement("button");
-        sel.className = "link";
-        sel.textContent = t("bind.varSelect");
-        sel.title = t("bind.varLayers", { n: ids.length });
-        sel.addEventListener("click", () => selectNodes(ids, "applyStatus"));
-        const key = `${prop}|${r.id}`;
-        let meta = sel;
+        const key = `${g}|${r.id}`;
+        const ids = [...r.byNode.keys()];
+        const uses = ids.map((nid) => ({ nid, labels: groupBindLines(r.byNode.get(nid)).map((l) => fieldLabel(l.label, l.fields[0])) }));
+        const props = uses.reduce((n, u) => n + u.labels.length, 0);
+        const meta = document.createElement("span");
+        const link = (text, tip, on) => {
+          const b = document.createElement("button");
+          b.className = "link";
+          b.textContent = text;
+          b.title = tip;
+          b.addEventListener("click", on);
+          return b;
+        };
+        const open = varUsesOpen.has(key);
+        meta.append(link(t(open ? "bind.varHideUses" : "bind.varShowUses"), "", () => {
+          if (open) varUsesOpen.delete(key);
+          else varUsesOpen.add(key);
+          renderBindTree();
+        }));
+        meta.append(" \xB7 ", link(t("bind.varSelect"), t("bind.varLayers", { n: ids.length }), () => selectNodes(ids, "applyStatus")));
         if (bindResultMode) {
-          meta = document.createElement("span");
-          const rm = document.createElement("button");
-          rm.className = "link";
-          rm.textContent = t("bind.varRemap");
-          rm.title = t("bind.varRemapTip");
-          rm.addEventListener("click", () => openRemap({ key, fromId: r.id, fromName: r.name, fields: [...r.fields], sites: r.sites }));
-          meta.append(sel, " \xB7 ", rm);
+          meta.append(" \xB7 ", link(t("bind.varRemap"), t("bind.varRemapTip"), () => openRemap({ key, fromId: r.id, fromName: r.name, fields: [...r.fields], sites: [...r.byNode.values()].reduce((n, l) => n + l.length, 0) })));
         }
-        const card = resultCard({ title: r.name, titleMono: true, summary: t("bind.varLayers", { n: ids.length }), metaEl: meta });
-        mount.appendChild(card);
+        const title = document.createElement("span");
+        const swatch = isHexColor(r.value) ? `<span class="bf-swatch" style="background:${escapeHtml(r.value)}"></span>` : "";
+        const valueText = !isHexColor(r.value) && r.value ? ` <span class="bf-val">= ${escapeHtml(r.value)}</span>` : "";
+        title.innerHTML = `${swatch}${escapeHtml(r.name)}${valueText}`;
+        title.title = r.value ? `${r.name} = ${r.value}` : r.name;
+        mount.appendChild(resultCard({ title, titleMono: true, summary: t("bind.varUses", { layers: ids.length, props }), metaEl: meta }));
+        if (open) {
+          const box = document.createElement("div");
+          box.className = "var-uses";
+          for (const u of uses) {
+            const b = document.createElement("button");
+            b.className = "var-use";
+            b.title = t("bind.layerSelectTip");
+            b.innerHTML = `<span class="vu-layer">${escapeHtml((_c = nodeName.get(u.nid)) != null ? _c : u.nid)}</span> <span class="vu-props">${escapeHtml(u.labels.join(", "))}</span>`;
+            b.addEventListener("click", () => selectNodes([u.nid], "applyStatus"));
+            box.appendChild(b);
+          }
+          mount.appendChild(box);
+        }
         if (remapOpen && remapOpen.key === key) mount.appendChild(renderRemapPanel(remapOpen));
       }
     }
@@ -4218,7 +4503,7 @@
     apply.textContent = t("bind.remapApply", { n: o.sites });
     apply.addEventListener("click", () => {
       apply.disabled = true;
-      send({ type: "REMAP_BINDINGS", fromId: o.fromId, toId: select.value, fields: o.fields });
+      send({ type: "REMAP_BINDINGS", fromId: o.fromId, toId: select.value, fields: o.fields, reqId: nextBindReq() });
     });
     box.append(label, apply, cancel);
     return box;
@@ -4246,6 +4531,7 @@
   }
   function clearBindPreview() {
     remapOpen = null;
+    $("bindTree").classList.remove("stale");
     bindResultMode = false;
     bindCandidates = [];
     bindNodes = [];
@@ -4338,7 +4624,7 @@
   }
   function refreshTreeEmptyStates() {
     const guide = "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.";
-    if (!hasBindPreview()) {
+    if (!hasBindPreview() && !$("bindTree").classList.contains("stale")) {
       if (lastSelCount === 0) renderEmptyState($("bindTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", guide);
       else clearMount($("bindTree"));
     }
@@ -4602,7 +4888,7 @@
   renderTokens();
   refreshTreeEmptyStates();
   send({ type: "GET_COLLECTIONS" });
-  send({ type: "GET_PREREQ" });
+  requestPrereq();
   send({ type: "GET_LICENSE" });
   send({ type: "GET_VARIABLES" });
   send({ type: "GET_SETTINGS" });
@@ -4619,9 +4905,112 @@
       btn.tabIndex = on ? 0 : -1;
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
-    if (name !== "settings") send({ type: "GET_PREREQ" });
+    if (name !== "settings") requestPrereq();
     if (name === "tokens") send({ type: "GET_VARIABLES" });
+    if (name === "settings") send({ type: "GET_COLLECTION_ROLES" });
   }
+  function goToBindStatus() {
+    showTab("apply");
+    showApplyStep("bind");
+    if (lastSelCount > 0) {
+      setStatus("applyStatus", t("common.running"), "");
+      requestBindingsScan();
+    } else setStatus("applyStatus", t("existingVars.selectFirst"), "");
+  }
+  function goToCollectionRoles() {
+    showTab("settings");
+    $("collectionRolesCard").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function renderExistingVars(tierVars, tierColor, other) {
+    for (const [id, onMake] of [["existingVarsStart", false], ["existingVarsMake", true]]) {
+      const box = $(id);
+      const text = box.querySelector(".ev-text");
+      const go = box.querySelector(".ev-go");
+      if (tierVars > 0) {
+        text.textContent = onMake ? t("existingVars.hasMake", { n: tierVars }) : t("existingVars.has", { n: tierVars, color: tierColor, other: tierVars - tierColor });
+        go.textContent = t("existingVars.gotoBind");
+        go.onclick = goToBindStatus;
+        box.style.display = "";
+      } else if (other > 0) {
+        text.textContent = t("existingVars.unknown", { n: other });
+        go.textContent = t("existingVars.gotoRoles");
+        go.onclick = goToCollectionRoles;
+        box.style.display = "";
+      } else box.style.display = "none";
+    }
+  }
+  var ROLE_LABEL = { global: "Global", semantic: "Semantic", component: "Component" };
+  var colRoleRows = [];
+  function renderCollectionRoles(rows) {
+    var _a;
+    const prev = colRoleRows;
+    colRoleRows = rows;
+    const box = $("collectionRoles");
+    clearMount(box);
+    if (!rows.length) {
+      const p = document.createElement("div");
+      p.className = "hint";
+      p.textContent = t("colRoles.empty");
+      box.appendChild(p);
+      return;
+    }
+    for (const r of rows) {
+      const row = document.createElement("div");
+      row.className = "col-role";
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = r.name;
+      name.title = r.name;
+      const sel = document.createElement("select");
+      sel.setAttribute("aria-label", r.name);
+      const opts = [
+        ["", !r.set && r.role ? t("colRoles.auto", { role: ROLE_LABEL[r.role] }) : t("colRoles.autoNone")],
+        ["global", "Global"],
+        ["semantic", "Semantic"],
+        ["component", "Component"],
+        ["none", t("colRoles.none")]
+      ];
+      for (const [v, label] of opts) {
+        const o = document.createElement("option");
+        o.value = v;
+        o.textContent = label;
+        sel.appendChild(o);
+      }
+      sel.value = (_a = r.set) != null ? _a : "";
+      sel.addEventListener("change", () => {
+        const role = sel.value || null;
+        const holder = role && role !== "none" ? colRoleRows.find((x) => x.id !== r.id && x.set === role) : void 0;
+        pendingRoleNote = { id: r.id, name: r.name, role, prev: holder == null ? void 0 : holder.name };
+        send({ type: "SET_COLLECTION_ROLE", collectionId: r.id, role });
+      });
+      const sub = document.createElement("div");
+      sub.className = "sub";
+      sub.append(t("colRoles.vars", { n: r.vars }));
+      if (!r.set && r.guess && r.guess !== r.role) {
+        sub.append(" \xB7 ", t("colRoles.guess", { role: ROLE_LABEL[r.guess] }), " ");
+        const use = document.createElement("button");
+        use.className = "link";
+        use.textContent = t("colRoles.useGuess");
+        use.addEventListener("click", () => {
+          const holder = colRoleRows.find((x) => x.id !== r.id && x.set === r.guess);
+          pendingRoleNote = { id: r.id, name: r.name, role: r.guess, prev: holder == null ? void 0 : holder.name };
+          send({ type: "SET_COLLECTION_ROLE", collectionId: r.id, role: r.guess });
+        });
+        sub.appendChild(use);
+      }
+      row.append(name, sel, sub);
+      box.appendChild(row);
+    }
+    if (pendingRoleNote && prev.length) {
+      const n = pendingRoleNote;
+      pendingRoleNote = null;
+      const now = rows.find((x) => x.id === n.id);
+      const label = n.role === null ? (now == null ? void 0 : now.role) ? t("colRoles.auto", { role: ROLE_LABEL[now.role] }) : t("colRoles.autoNone") : n.role === "none" ? t("colRoles.none") : ROLE_LABEL[n.role];
+      const dup = n.prev && n.role && n.role !== "none" ? " " + t("colRoles.dup", { role: ROLE_LABEL[n.role], prev: n.prev }) : "";
+      setStatus("colRolesStatus", t("colRoles.saved", { name: n.name, role: label }) + dup, dup ? "warn" : "ok");
+    }
+  }
+  var pendingRoleNote = null;
   TABS.forEach((t2, i) => {
     const btn = $(`tabbtn-${t2}`);
     btn.addEventListener("click", () => showTab(t2));

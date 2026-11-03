@@ -4075,3 +4075,40 @@ test('remapBindings — 텍스트는 A에 묶인 구간만 바꾸고 다른 변�
   assert.deepEqual(per, [B.id, B.id, B.id, K.id, K.id, K.id]); // K 구간 보존
   assert.deepEqual(loaded, ['Inter']); // 바꾸기 전에 폰트 로드
 });
+
+/* ================= 컬렉션 계층 지정(collectionRoles) ================= */
+test('컬렉션 계층 지정 — Primitives를 Global로 지정하면 토큰은 Primitives에, 바인딩도 그 변수를 쓴다', async () => {
+  const figma = installFigma();
+  const data = {};
+  figma.root = { getPluginData: (k) => data[k] ?? '', setPluginData: (k, v) => { data[k] = v; } };
+  const prim = figma.variables.createVariableCollection('Primitives');
+  data['dsl.collectionRoles'] = JSON.stringify({ [prim.id]: 'global' });
+  await createTokens([{ name: 'color/aa0000', category: 'color', sources: ['fill'], value: '#aa0000' }], 16);
+  assert.equal(figma._state.collections.some((c) => c.name === 'Global'), false); // 새 Global을 만들지 않는다
+  const v = figma._state.variables.find((x) => x.name === 'color/aa0000');
+  assert.equal(v.variableCollectionId, prim.id);
+  // 역할 별칭의 원본(Global)도 Primitives에서 찾는다
+  const sem = await createSemanticAliases({ 'color/text/default': 'color/aa0000' });
+  assert.deepEqual(sem.missing, []);
+  // 바인딩: Primitives(=Global 계층) 변수가 후보가 된다
+  const node = {
+    type: 'FRAME', id: 'cr', name: 'cr',
+    fills: [{ type: 'SOLID', color: { r: 0.6667, g: 0, b: 0 } }],
+    layoutMode: 'NONE', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
+    boundVariables: {}, setBoundVariable() {}, children: [],
+  };
+  const r = await bindSelection([node], 0.5);
+  assert.equal(r.bound, 1);
+  const scan = await scanBindings([node]);
+  assert.equal(scan.candidates[0].tier, 2); // 역할 별칭(Semantic)이 이긴다 — 계층 판정이 살아 있다
+});
+
+test('컬렉션 계층 지정 — 지정이 없으면 예전처럼 이름이 Global인 컬렉션만 계층(Primitives는 무시)', async () => {
+  const figma = installFigma();
+  figma.root = { getPluginData: () => '', setPluginData() {} };
+  figma.variables.createVariableCollection('Primitives');
+  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const v = figma._state.variables.find((x) => x.name === 'spacing/8');
+  const col = figma._state.collections.find((c) => c.id === v.variableCollectionId);
+  assert.equal(col.name, 'Global');
+});

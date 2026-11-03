@@ -23,9 +23,25 @@ export interface VarInfo {
   name: string;
   /** 소속 컬렉션 id(다크 생성 등 컬렉션 단위 작업용). */
   collectionId: string;
-  /** 소속 컬렉션 이름('Global'|'Semantic'|'Component'). */
+  /** 소속 컬렉션 이름(표시용 — 'Primitives' 등 무엇이든 될 수 있다). */
   collection: string;
+  /** 계층(Global 1 · Semantic 2 · Component 3) — 이름이 아니라 지정된 역할로 판정(tiers.ts). */
+  tier: number;
   modes: VarMode[];
+}
+
+/** 설정 탭 '컬렉션 계층' 한 행. */
+export interface CollectionRoleInfo {
+  id: string;
+  name: string;
+  /** 컬렉션 안 변수 수. */
+  vars: number;
+  /** 파일에 저장된 명시적 지정(없으면 null = 이름으로 판정). */
+  set: 'global' | 'semantic' | 'component' | 'none' | null;
+  /** 실제로 쓰이는 역할(지정 또는 정확한 이름). 계층 아님이면 null. */
+  role: 'global' | 'semantic' | 'component' | null;
+  /** 이름으로 추측한 역할 — 추천 표시용(자동 적용 안 함). */
+  guess: 'global' | 'semantic' | 'component' | null;
 }
 
 export interface CollectionInfo {
@@ -129,12 +145,13 @@ export interface ComponentCandidate {
 export type UiToCode =
   | { type: 'EXTRACT' }
   | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
-  | { type: 'APPLY'; tolerance: number; preview?: boolean } // preview: UX1 dry-run(바인딩 없음)
-  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[] } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
+  // reqId: 연결 카드 요청 번호 — 결과에 그대로 돌려줘 UI가 낡은 응답(선택이 바뀐 뒤 도착한 것)을 버린다.
+  | { type: 'APPLY'; tolerance: number; preview?: boolean; reqId?: number } // preview: UX1 dry-run(바인딩 없음)
+  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[]; reqId?: number } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
-  | { type: 'SCAN_BINDINGS' } // 선택 안에 이미 붙은 변수 바인딩 읽기(연결 현황 · 읽기 전용)
+  | { type: 'SCAN_BINDINGS'; reqId?: number } // 선택 안에 이미 붙은 변수 바인딩 읽기(연결 현황 · 읽기 전용)
   | { type: 'REMAP_TARGETS'; fromId: string; fields: string[] } // 일괄 교체: A 자리에 붙일 수 있는 변수 후보(읽기 전용)
-  | { type: 'REMAP_BINDINGS'; fromId: string; toId: string; fields: string[] } // 일괄 교체: 선택 안의 A(그 필드들) → B
+  | { type: 'REMAP_BINDINGS'; fromId: string; toId: string; fields: string[]; reqId?: number } // 일괄 교체: 선택 안의 A(그 필드들) → B
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
   // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(등록이 머리명사로 읽는다).
@@ -147,6 +164,8 @@ export type UiToCode =
   | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[] } // Phase C: 변수 보장+스타일 등록(화면 연결 없음)
   | { type: 'APPLY_TEXT_STYLES' } // Phase C: 적용만(생성 없음) — 선택 텍스트를 기존 스타일에 바인딩
   | { type: 'GET_COLLECTIONS' }
+  | { type: 'GET_COLLECTION_ROLES' } // 컬렉션 → 계층 지정 현황(설정 탭)
+  | { type: 'SET_COLLECTION_ROLE'; collectionId: string; role: 'global' | 'semantic' | 'component' | 'none' | null } // null=지정 해제(이름으로 판정)
   | { type: 'GET_UI_SIZE' } // QA #2 ①: 창 높이 단계 조회(시작 시 버튼 표시용)
   | { type: 'SET_UI_SIZE'; mode: 'default' | 'large' } // QA #2 ①: 창 높이 2단계 전환(660 ↔ 860), 기억됨
   | { type: 'GET_GLOBAL_COLORS' } // #10: 기존 Global 색 변수 스캔(재방문 시맨틱 매핑 추천용)
@@ -175,6 +194,7 @@ export type UiToCode =
 
 /** code → UI 응답. */
 export type CodeToUi =
+  | { type: 'COLLECTION_ROLES'; collections: CollectionRoleInfo[] }
   | { type: 'UI_SIZE'; mode: 'default' | 'large' } // 현재 창 높이 단계
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
@@ -183,10 +203,10 @@ export type CodeToUi =
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
   | { type: 'REMAP_TARGETS_RESULT'; fromId: string; targets: { id: string; name: string; collection: string }[] }
   | { type: 'REMAP_RESULT'; replaced: number; nodes: number; skipped: number; toName: string }
-  | { type: 'BINDINGS_RESULT'; candidates: BindCandidate[]; nodes: BindNode[]; total: number; boundNodes: number } // 연결 현황(읽기 전용)
+  | { type: 'BINDINGS_RESULT'; candidates: BindCandidate[]; nodes: BindNode[]; total: number; boundNodes: number; reqId?: number } // 연결 현황(읽기 전용)
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; candidateTotal?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; candidateTotal?: number; reqId?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
@@ -208,6 +228,11 @@ export type CodeToUi =
       hasTextStyles: boolean;
       /** Semantic에 역할 별칭이 있음(역할 매핑 완료). */
       hasSemanticRoles: boolean;
+      /** 계층(Global·Semantic·Component) 안의 변수 수 · 그중 색 — '이미 변수 N개' 안내용. */
+      tierVars?: number;
+      tierColorVars?: number;
+      /** 계층으로 인식되지 않은 컬렉션의 변수 수 — 있으면 '계층 지정' 안내. */
+      otherVars?: number;
     }
   | {
       type: 'LICENSE_STATUS';

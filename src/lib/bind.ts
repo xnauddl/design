@@ -5,7 +5,7 @@
    - 프레임 크기(Fixed)·여백(오토레이아웃)·반경·효과·텍스트 지원.
    ============================================================ */
 import { rgbToHex } from './tokens';
-import { GLOBAL, SEMANTIC, COMPONENT } from './variables';
+import { collectionTiers } from './collectionRoles'; // 계층은 컬렉션 이름이 아니라 지정된 역할로
 import { FIELD_SCOPE, FILL_SCOPES, STROKE_SCOPES, EFFECT_SCOPES, scopeFitsField, fieldResolvedType } from './scopes'; // 용도 규칙 — 일괄 교체와 공유
 import type { BindCandidate, BindNode, BindSkip } from '../shared/messages';
 
@@ -21,7 +21,6 @@ interface VarEntry {
   str?: string;
 }
 
-const TIER: Record<string, number> = { [COMPONENT]: 3, [SEMANTIC]: 2, [GLOBAL]: 1 };
 
 
 /** 불투명도는 0~1 범위라 px 허용오차 대신 정밀 매칭(추출 시 소수 2자리 반올림 대응). */
@@ -372,12 +371,12 @@ export async function bindSelection(
 async function buildIndex(): Promise<VarEntry[]> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-  const tierOf = new Map(cols.map((c) => [c.id, TIER[c.name] ?? 0]));
+  const tierOf = collectionTiers(cols);
   const vars = await figma.variables.getLocalVariablesAsync();
   // 예전 파일에 남은 Semantic 거울(Global과 같은 이름)은 역할 별칭보다 뒤로 — 같은 tier라
   // 생성 순서로 거울이 이기면 역할을 매핑해도 레이어가 거울 이름에 붙는다.
   const globalNames = new Set(
-    vars.filter((v) => tierOf.get(v.variableCollectionId) === TIER[GLOBAL]).map((v) => v.name),
+    vars.filter((v) => tierOf.get(v.variableCollectionId) === 1).map((v) => v.name),
   );
   const entries: VarEntry[] = [];
   for (const v of vars) {
@@ -386,7 +385,7 @@ async function buildIndex(): Promise<VarEntry[]> {
     const val = await resolveValue(v, modeOf);
     if (val == null) continue;
     const e: VarEntry = { variable: v, tier, type: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'] };
-    if (tier === TIER[SEMANTIC] && globalNames.has(v.name)) e.mirror = true;
+    if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
     if (v.resolvedType === 'COLOR' && isRGB(val)) e.colorHex = rgbToHex(val);
     else if (v.resolvedType === 'FLOAT' && typeof val === 'number') e.num = val;
     else if (v.resolvedType === 'STRING' && typeof val === 'string') e.str = val;
@@ -843,7 +842,7 @@ const TEXT_RANGE_FIELDS = ['fontSize', 'lineHeight', 'letterSpacing', 'fontFamil
 export async function scanBindings(selection: readonly SceneNode[]): Promise<BindingsScan> {
   const vars = await figma.variables.getLocalVariablesAsync();
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const tierOf = new Map(cols.map((c) => [c.id, TIER[c.name] ?? 0]));
+  const tierOf = collectionTiers(cols);
   const byId = new Map(vars.map((v) => [v.id, v]));
   const nameOf = (id: string): { name: string; tier: number } => {
     const v = byId.get(id);

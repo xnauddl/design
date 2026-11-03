@@ -2388,3 +2388,80 @@ test('remapTargets — 타입·용도가 모든 필드에 맞는 변수만, A �
   assert.equal(scopeFitsField('fontFamily', ['FONT_FAMILY']), true);
   assert.equal(scopeFitsField('fontFamily', []), false);
 });
+
+/* ---------- 컬렉션 계층 판정(tiers.ts) ---------- */
+test('tiers — 지정 우선, 없으면 정확한 이름, none으로 빼기, 한 역할 한 컬렉션', async () => {
+  const { parseRoleMap, roleOfCollection, tierOfCollection, pickCollection, assignRole, guessRole } = await import('../dist/pure.mjs');
+  const cols = [
+    { id: 'g', name: 'Global' },
+    { id: 'p', name: 'Primitives' },
+    { id: 's', name: 'Semantic' },
+    { id: 'x', name: 'Breakpoints' },
+  ];
+  // 지정 없음 = 예전 동작(정확한 이름만)
+  assert.deepEqual(cols.map((c) => tierOfCollection(c, {})), [1, 0, 2, 0]);
+  assert.equal(pickCollection(cols, {}, 'global').id, 'g');
+  // Primitives를 Global로 지정 → 쓰기 대상은 Primitives, 기존 'Global'도 여전히 계층(읽기)
+  let map = assignRole({}, 'p', 'global');
+  assert.equal(pickCollection(cols, map, 'global').id, 'p');
+  assert.deepEqual(cols.map((c) => tierOfCollection(c, map)), [1, 1, 2, 0]);
+  // 'Global'을 계층 아님으로 못 박기
+  map = assignRole(map, 'g', 'none');
+  assert.equal(roleOfCollection(cols[0], map), null);
+  assert.equal(pickCollection(cols, map, 'global').id, 'p');
+  // 한 역할 한 컬렉션 — 다른 컬렉션에 global을 주면 p의 지정은 풀린다
+  map = assignRole(map, 'x', 'global');
+  assert.equal(map.p, undefined);
+  assert.equal(map.x, 'global');
+  // 해제(null)는 이름 판정으로 복귀
+  map = assignRole(map, 'g', null);
+  assert.equal(map.g, undefined);
+  // 저장 문자열 파싱 — 깨졌거나 모르는 값은 버린다
+  assert.deepEqual(parseRoleMap('{"a":"global","b":"weird","c":"none"}'), { a: 'global', c: 'none' });
+  assert.deepEqual(parseRoleMap('not json'), {});
+  assert.deepEqual(parseRoleMap('[1]'), {});
+  assert.deepEqual(parseRoleMap(''), {});
+  // 이름 추천(자동 적용 안 함)
+  assert.equal(guessRole('Primitives'), 'global');
+  assert.equal(guessRole('Core colors'), 'global');
+  assert.equal(guessRole('Tokens'), 'semantic');
+  assert.equal(guessRole('Theme'), 'semantic');
+  assert.equal(guessRole('Components'), 'component');
+  assert.equal(guessRole('Breakpoints'), null);
+});
+
+/* ---------- 연결 목록 표시(bindDisplay.ts) ---------- */
+test('groupBindLines — 같은 변수의 네 방향 여백·모서리를 한 줄로, 다른 변수는 따로, 순서 유지', async () => {
+  const { groupBindLines, fieldGroupKey, isHexColor } = await import('../dist/pure.mjs');
+  const it = (field, variableId, index) => ({ field, index, variableId, variableName: variableId, currentValue: '8' });
+  const lines = groupBindLines([
+    it('fills', 'bg', 0),
+    it('paddingLeft', 'lg'), it('paddingRight', 'lg'), // 좌우
+    it('paddingTop', 'sm'), it('paddingBottom', 'sm'), // 위아래(다른 변수)
+    it('itemSpacing', 'md'),
+    it('topLeftRadius', 'r'), it('topRightRadius', 'r'), it('bottomRightRadius', 'r'), it('bottomLeftRadius', 'r'),
+    it('strokes', 'line', 0),
+  ]);
+  assert.deepEqual(lines.map((l) => [l.label, l.variableId, l.fields.length]), [
+    ['fills', 'bg', 1],
+    ['paddingX', 'lg', 2],
+    ['paddingY', 'sm', 2],
+    ['itemSpacing', 'md', 1],
+    ['radius', 'r', 4],
+    ['strokes', 'line', 1],
+  ]);
+  // 네 방향 같은 변수 → '여백', 한 방향 → 그 방향, 세 방향 → '일부'
+  assert.equal(groupBindLines(['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].map((f) => it(f, 'x')))[0].label, 'padding');
+  assert.equal(groupBindLines([it('paddingLeft', 'x')])[0].label, 'paddingLeft');
+  assert.equal(groupBindLines(['paddingTop', 'paddingRight', 'paddingLeft'].map((f) => it(f, 'x')))[0].label, 'paddingSome');
+  assert.equal(groupBindLines([it('topLeftRadius', 'x'), it('bottomLeftRadius', 'x')])[0].label, 'radiusSome');
+  // 같은 필드라도 페인트 순번이 다르면 따로(채움 두 겹)
+  assert.equal(groupBindLines([it('fills', 'a', 0), it('fills', 'a', 1)]).length, 2);
+  // 합쳐진 줄은 원래 항목을 모두 들고 있다(체크·교체 대상)
+  assert.equal(lines[1].items.length, 2);
+  // 묶음
+  assert.deepEqual(['fills', 'paddingLeft', 'itemSpacing', 'topLeftRadius', 'strokeWeight', 'width', 'fontSize', 'lineHeight', 'visible'].map(fieldGroupKey),
+    ['color', 'space', 'space', 'radius', 'size', 'size', 'text', 'text', 'other']);
+  assert.equal(isHexColor('#2563eb'), true);
+  assert.equal(isHexColor('24'), false);
+});
