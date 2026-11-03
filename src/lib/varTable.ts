@@ -8,7 +8,8 @@ export type VarType = 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
 
 /** 한 모드의 값 표시. 별칭은 가리키는 변수 이름(그 변수가 이 파일에 없으면 aliasId만). */
 export type VarCell =
-  | { kind: 'color'; hex: string }
+  /** hex는 언제나 6자리(#RRGGBB) — 목록 74px 열·값 복사는 지금처럼 6자리. alpha는 0–1(1/255 단위 반올림), 없으면 1. */
+  | { kind: 'color'; hex: string; alpha?: number }
   | { kind: 'number'; text: string }
   | { kind: 'string'; text: string }
   | { kind: 'bool'; text: string }
@@ -413,4 +414,181 @@ export function validSideSel(
   }
   if (sel.kind === 'lib') return hasLib ? sel : initial();
   return hasDeleted ? sel : initial();
+}
+
+/* ============================================================
+   변수 고치기(PR 3.5, §4.4 고치기) — 이름 검사 · 바뀌는 것 줄 재료 · 별칭 후보 · 값으로 적기 · 입력 검사
+   ============================================================ */
+
+/** UI → 플러그인 고친 값(UPDATE_VARIABLE). hex는 #RRGGBB, alpha는 0–1. */
+export type EditValue =
+  | { kind: 'color'; hex: string; alpha: number }
+  | { kind: 'number'; value: number }
+  | { kind: 'string'; text: string }
+  | { kind: 'bool'; value: boolean }
+  | { kind: 'alias'; targetId: string };
+
+/** 이름 정리 — 앞뒤 공백과 토막마다 앞뒤 공백을 뗀다(`color/ text` → `color/text`). */
+export function normalizeVarName(name: string): string {
+  return name.trim().split('/').map((s) => s.trim()).join('/');
+}
+
+export type NameError = 'emptySegment' | 'duplicate';
+/**
+ * 이름 칸 검사(정리한 이름으로). 비었거나 "/" 사이가 빔 → emptySegment.
+ * 같은 컬렉션에 같은 이름(대소문자까지 같을 때)인 다른 변수 → duplicate.
+ */
+export function nameError(name: string, self: Pick<VarRow, 'id' | 'collectionId'>, vars: readonly Pick<VarRow, 'id' | 'name' | 'collectionId'>[]): NameError | null {
+  const n = normalizeVarName(name);
+  if (!n || n.split('/').some((s) => !s)) return 'emptySegment';
+  if (vars.some((v) => v.id !== self.id && v.collectionId === self.collectionId && v.name === n)) return 'duplicate';
+  return null;
+}
+
+/** 그룹 표시 이름 — 마지막 "/" 앞 경로, 없으면 "(그룹 없음)". */
+export const groupLabel = (name: string): string => groupPath(name) || NO_GROUP;
+
+/** 같은 컬렉션의 다른 변수 중 그룹 g(경로)에 드는 것이 있나 — 이름이 `{g}/`로 시작(그룹 없음이면 "/"가 없는 이름). */
+function groupHasOthers(g: string, self: Pick<VarRow, 'id' | 'collectionId'>, vars: readonly Pick<VarRow, 'id' | 'name' | 'collectionId'>[]): boolean {
+  return vars.some((v) => v.id !== self.id && v.collectionId === self.collectionId && (g ? v.name.startsWith(`${g}/`) : !v.name.includes('/')));
+}
+
+export interface GroupMove {
+  from: string;
+  to: string;
+  /** 새 그룹에 다른 변수가 없다 → "(새 그룹)". */
+  newGroup: boolean;
+  /** 이전 그룹에 다른 변수가 없다 → "· {이전} 그룹은 비어서 사라져요". */
+  emptied: boolean;
+}
+/** 바뀌는 것 줄 — 그룹 이동(그룹이 바뀔 때만, 아니면 null). 이름은 정리한 것으로 본다. */
+export function groupMove(oldName: string, newName: string, self: Pick<VarRow, 'id' | 'collectionId'>, vars: readonly Pick<VarRow, 'id' | 'name' | 'collectionId'>[]): GroupMove | null {
+  const from = groupPath(oldName);
+  const to = groupPath(normalizeVarName(newName));
+  if (from === to) return null;
+  return { from: from || NO_GROUP, to: to || NO_GROUP, newGroup: !groupHasOthers(to, self, vars), emptied: !groupHasOthers(from, self, vars) };
+}
+
+export interface CssRename {
+  from: string;
+  to: string;
+  /** 같은 CSS 이름이 되는 다른 로컬 변수(모든 컬렉션)의 이름 — 경고만. */
+  clash?: string;
+}
+/** 바뀌는 것 줄 — CSS 이름(코드 내보내기와 같은 규칙)이 다를 때만. cssName은 exporters.cssVarName. */
+export function cssRename(oldName: string, newName: string, selfId: string, vars: readonly Pick<VarRow, 'id' | 'name'>[], cssName: (n: string) => string): CssRename | null {
+  const from = cssName(oldName);
+  const to = cssName(normalizeVarName(newName));
+  if (from === to) return null;
+  const other = vars.find((v) => v.id !== selfId && cssName(v.name) === to);
+  return other ? { from, to, clash: other.name } : { from, to };
+}
+
+/** 칸 비교 열쇠 — 같은 값이면 같은 문자열. 색은 대문자 hex + 투명도(0–255 정수), 숫자는 읽은 수, 별칭은 대상 id. */
+export function cellKey(c: VarCell | EditValue | undefined | null): string {
+  if (!c) return '';
+  switch (c.kind) {
+    case 'color': return `c:${c.hex.toUpperCase()}:${Math.round((c.alpha ?? 1) * 255)}`;
+    case 'number': return `n:${Number('value' in c ? c.value : c.text)}`;
+    case 'string': return `s:${c.text}`;
+    case 'bool': return `b:${'value' in c ? String(c.value) : c.text}`;
+    case 'alias': return `a:${'targetId' in c ? c.targetId : c.aliasId}`;
+  }
+}
+/** 같은 값인가(변수 표 칸끼리, 또는 표 칸과 고친 값). 별칭은 대상 id만 본다(대상 이름이 바뀐 것은 이 변수의 변경이 아니다). */
+export const sameCell = (a: VarCell | EditValue | undefined | null, b: VarCell | EditValue | undefined | null): boolean => cellKey(a) === cellKey(b);
+
+/** 색 칸 글자 — 불투명이면 #RRGGBB, 투명도가 있으면 #RRGGBBAA. */
+export function colorText(hex: string, alpha = 1): string {
+  const a = Math.round(alpha * 255);
+  return a >= 255 ? hex.toUpperCase() : `${hex.toUpperCase()}${a.toString(16).padStart(2, '0').toUpperCase()}`;
+}
+/** 색 입력 — #RRGGBB(불투명) 또는 #RRGGBBAA. 앞 "#"는 없어도 된다. 틀리면 null. */
+export function parseColorInput(s: string): { hex: string; alpha: number } | null {
+  const m = /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(s.trim());
+  if (!m) return null;
+  return { hex: `#${m[1].toUpperCase()}`, alpha: m[2] ? Math.round((parseInt(m[2], 16) / 255) * 1e6) / 1e6 : 1 };
+}
+/** 숫자 입력 — 빈 칸·숫자가 아님 → null. */
+export function parseNumberInput(s: string): number | null {
+  const t = s.trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+/** 표 칸 → 칸에 보일 글자(값일 때). */
+export function cellInputText(c: VarCell | undefined): string {
+  if (!c || c.kind === 'alias') return '';
+  if (c.kind === 'color') return colorText(c.hex, c.alpha);
+  return c.text;
+}
+
+/**
+ * 값으로 적기 · 견본 색(§4.4 고치기) — 그 모드 줄의 칸에서 시작해, 별칭 대상은 **대상 컬렉션의 기본 모드** 값을 본다.
+ * 로컬 별칭만 최대 5단계. 따라갈 수 없으면(라이브러리 · 삭제된 대상 · 더 깊음) null.
+ */
+export function resolveEditValue(cell: VarCell | undefined, cols: readonly VarCollection[], vars: readonly VarRow[], maxDepth = 5): Exclude<VarCell, { kind: 'alias' }> | null {
+  let c = cell;
+  for (let d = 0; c && c.kind === 'alias'; d++) {
+    if (d >= maxDepth) return null;
+    const id = c.aliasId;
+    const t = vars.find((v) => v.id === id);
+    if (!t) return null;
+    const col = cols.find((x) => x.id === t.collectionId);
+    c = t.values[col?.defaultModeId ?? col?.modes[0]?.modeId ?? ''];
+  }
+  return c ?? null;
+}
+
+/** 변수 v의 별칭을 어느 모드든 따라가면 target에 닿는가(순환 판정). */
+function reaches(fromId: string, targetId: string, vars: readonly VarRow[]): boolean {
+  const byId = new Map(vars.map((v) => [v.id, v]));
+  const seen = new Set<string>();
+  const stack = [fromId];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (id === targetId) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const v = byId.get(id);
+    if (!v) continue;
+    for (const c of Object.values(v.values)) if (c.kind === 'alias') stack.push(c.aliasId);
+  }
+  return false;
+}
+
+export interface AliasCandidateGroup {
+  collection: VarCollection;
+  /** 경로 머리("G Global › gray"). */
+  label: string;
+  rows: VarRow[];
+}
+export interface AliasCandidates {
+  /** Global(1) — 후보 없음. */
+  global: boolean;
+  /** 계층이 없는 컬렉션(0) — 모든 로컬 컬렉션에서. */
+  allTiers: boolean;
+  groups: AliasCandidateGroup[];
+}
+/**
+ * 별칭 후보(§4.4 고치기) — 같은 타입의 로컬 변수만, 자기 자신과 순환이 생기는 변수는 뺀다.
+ * 계층 규칙: Semantic(2)·Component(3)은 계층이 자기보다 낮은(1 이상) 컬렉션, Global(1)은 없음, 계층 없음(0)은 모든 컬렉션.
+ * 순서는 사이드바와 같다(계층 순서 → 그룹 첫 등장 → 피그마 순서). query는 전체 경로에 들어 있으면 맞음(대소문자 무시).
+ */
+export function aliasCandidates(self: VarRow, cols: readonly VarCollection[], vars: readonly VarRow[], query = ''): AliasCandidates {
+  const own = cols.find((c) => c.id === self.collectionId);
+  const tier = own?.tier ?? 0;
+  if (tier === 1) return { global: true, allTiers: false, groups: [] };
+  const okCol = (c: VarCollection): boolean => (tier === 0 ? true : c.tier >= 1 && c.tier < tier);
+  const groups: AliasCandidateGroup[] = [];
+  for (const side of sidebarCollections(cols.filter(okCol), vars, null, new Set())) {
+    const badge = tierBadge(side.collection);
+    for (const g of side.groups) {
+      const rows = vars.filter((v) =>
+        v.collectionId === side.collection.id && groupKey(v.collectionId, v.name) === g.key &&
+        v.id !== self.id && v.type === self.type && matchesQuery(v.name, query) && !reaches(v.id, self.id, vars));
+      if (rows.length) groups.push({ collection: side.collection, label: `${badge} ${side.collection.name} › ${g.label}`, rows });
+    }
+  }
+  return { global: false, allTiers: tier === 0, groups };
 }

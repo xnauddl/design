@@ -458,9 +458,58 @@
     .ctx-menu button:disabled { color: var(--muted); }
     .ctx-menu hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
     .modal-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.28); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; }
-    .modal { width: min(440px, 100%); max-height: calc(100vh - 80px); overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+    /* 팝업 — 최대 높이 창 − 80px, 내용은 안에서 스크롤하고 단추 줄(오류 줄 · 확인 줄 · 단추)은 아래에 고정(§2.5 예외, PR 3.5). */
+    .modal { width: min(440px, 100%); max-height: calc(100vh - 80px); overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 0; display: flex; flex-direction: column; }
+    .modal .m-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 12px 14px 10px; display: flex; flex-direction: column; gap: 10px; }
+    .modal .m-foot-wrap { flex: 0 0 auto; padding: 8px 14px 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; background: var(--surface); }
     .modal h3 { margin: 0; font-size: 13px; display: flex; align-items: center; gap: 6px; }
     .modal .m-foot { display: flex; gap: 6px; justify-content: flex-end; }
+    /* ── 변수 고치기(§4.4 고치기) ── */
+    .modal dl.ed-dl { grid-template-columns: 52px minmax(0, 1fr); gap: 6px 8px; align-items: start; font-size: 11px; }
+    .modal dl.ed-dl dt { line-height: 26px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .modal dl.ed-dl dd.ed-plain { line-height: 26px; }
+    .modal dl.ed-dl dd.ed-text { font-family: var(--font); color: var(--text-2); line-height: 1.5; padding-top: 5px; }
+    .ed-field { display: flex; align-items: center; gap: 6px; min-height: 26px; border: 1px solid var(--border-2); border-radius: var(--r-sm); padding: 0 0 0 6px; background: var(--surface); font: 11px var(--mono); min-width: 0; }
+    .ed-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-subtle); }
+    .ed-field.changed { background: var(--warn-subtle); }
+    .ed-field.err { border-color: var(--danger); }
+    .ed-field.locked { background: var(--surface-2); color: var(--text-2); }
+    .ed-field input[type="text"] { flex: 1 1 auto; min-width: 0; height: 24px; border: 0; padding: 0; margin: 0; background: transparent; font: inherit; color: inherit; box-shadow: none; outline: none; }
+    .ed-field input[type="text"]:focus { box-shadow: none; border: 0; }
+    .ed-field .bf-swatch { margin: 0; flex: 0 0 auto; }
+    .ed-field .ed-grow { flex: 1 1 auto; min-width: 0; }
+    button.ed-dd { flex: 0 0 auto; width: 24px; height: 24px; min-height: 24px; padding: 0; border: 0; border-left: 1px solid var(--border); border-radius: 0 var(--r-sm) var(--r-sm) 0; background: none; color: var(--text-2); font-size: 10px; }
+    button.ed-pillbtn { flex: 1 1 auto; min-width: 0; height: 24px; min-height: 24px; padding: 0; border: 0; background: none; text-align: left; display: flex; align-items: center; }
+    button.ed-pillbtn:hover:not(:disabled) { background: none; }
+    .ed-pill { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; background: var(--accent-subtle); color: var(--accent-strong); border-radius: 4px; padding: 1px 6px; font: 11px var(--mono); }
+    .ed-pill .bf-swatch { margin: 0; }
+    .ed-pill.warn { background: var(--warn-subtle); color: var(--warn); }
+    .ed-ferr { color: var(--danger); font: 10.5px/1.4 var(--font); margin-top: 3px; }
+    .ed-fwarn { color: var(--warn); font: 10.5px/1.4 var(--font); margin-top: 3px; }
+    .ed-changes { border-top: 1px dashed var(--border-2); padding-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+    .ed-changes .ed-ch-h { color: var(--muted); font-size: 10.5px; }
+    .ed-changes .mono { font-family: var(--mono); font-size: 10.5px; }
+    .ed-changes .muted { color: var(--muted); }
+    .ed-changes .w { color: var(--warn); }
+    .ed-picker { border: 1px solid var(--accent); border-radius: 6px; margin-top: 4px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); font-family: var(--font); background: var(--surface); }
+    .ed-picker input.ed-psearch { width: 100%; height: 28px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0 8px; font-size: 11px; box-shadow: none; }
+    .ed-picker input.ed-psearch:focus { box-shadow: inset 0 0 0 1.5px var(--accent); border-color: var(--border); }
+    .ed-pscroll { max-height: 200px; overflow-y: auto; }
+    .ed-phead { padding: 5px 8px 2px; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ed-opt { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 8px; font: 11px var(--mono); cursor: pointer; outline: none; }
+    .ed-opt:hover, .ed-opt:focus { background: var(--accent-subtle); }
+    .ed-opt[aria-disabled="true"] { color: var(--muted); cursor: not-allowed; }
+    .ed-opt .bf-swatch { margin: 0; }
+    .ed-opt .ed-ov { color: var(--text-2); font-size: 10px; }
+    .ed-opt .ck { margin-left: auto; color: var(--accent-strong); }
+    .ed-opt.ed-raw { font-family: var(--font); color: var(--accent-strong); border-bottom: 1px solid var(--border); }
+    .ed-opt.ed-raw .mono { font-family: var(--mono); color: var(--text-2); }
+    .ed-pnote { padding: 5px 8px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; }
+    .ed-pnone { padding: 8px; color: var(--text-2); font-size: 11px; }
+    .ed-alert { padding: 5px 8px; border-radius: 5px; font-size: 11px; background: var(--surface-2); color: var(--text-2); }
+    .ed-alert.err { background: var(--danger-subtle); color: var(--danger); }
+    .ed-confirm { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; }
+    .ed-confirm span { flex: 1 1 auto; }
     .modal dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 0; font-size: 11.5px; }
     .modal dt { color: var(--muted); }
     .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }

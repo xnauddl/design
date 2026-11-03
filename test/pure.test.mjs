@@ -2733,3 +2733,118 @@ test('bindExamples — 계층 컬렉션을 사이드바 순서로 훑어 첫 색
   assert.deepEqual(bindExamples(cols, vars.filter((x) => x.type === 'COLOR')), { color: { value: '#111111', name: 'text' } });
   assert.deepEqual(bindExamples(cols, [vars[0]]), {}, '계층 없는 컬렉션은 보지 않는다');
 });
+
+test('bindExamples — 투명도가 1이 아닌 색 변수는 예시로 고르지 않는다(§2.11 · A.3c)', async () => {
+  const { bindExamples } = await import('../dist/pure.mjs');
+  const cols = [{ id: 's', tier: 2, modes: [{ modeId: 'l' }], defaultModeId: 'l' }];
+  const vars = [
+    { id: 'a', name: 'overlay', collectionId: 's', type: 'COLOR', values: { l: { kind: 'color', hex: '#000000', alpha: 0.5 } } },
+    { id: 'b', name: 'text', collectionId: 's', type: 'COLOR', values: { l: { kind: 'color', hex: '#111111', alpha: 1 } } },
+  ];
+  assert.deepEqual(bindExamples(cols, vars), { color: { value: '#111111', name: 'text' } });
+  assert.deepEqual(bindExamples(cols, [vars[0]]), {});
+});
+
+/* ---------- 변수 고치기(§4.4 고치기 · PR 3.5) ---------- */
+const edCols = [
+  { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }], defaultModeId: 'm' },
+  { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }], defaultModeId: 'l' },
+  { id: 'c', name: 'Component', tier: 3, modes: [{ modeId: 'c1', name: 'Mode 1' }], defaultModeId: 'c1' },
+  { id: 'x', name: 'Misc', tier: 0, modes: [{ modeId: 'x1', name: 'Mode 1' }], defaultModeId: 'x1' },
+];
+const ev = (id, name, collectionId, type, values) => ({ id, name, collectionId, type, values, scopes: [], description: '' });
+const edVars = [
+  ev('g0', 'gray/0', 'g', 'COLOR', { m: { kind: 'color', hex: '#FFFFFF' } }),
+  ev('g9', 'gray/900', 'g', 'COLOR', { m: { kind: 'color', hex: '#111111', alpha: 0.5 } }),
+  ev('sp', 'space/8', 'g', 'FLOAT', { m: { kind: 'number', text: '8' } }),
+  ev('tx', 'color/text/default', 's', 'COLOR', { l: { kind: 'alias', aliasId: 'g9', aliasName: 'gray/900' }, d: { kind: 'alias', aliasId: 'g0', aliasName: 'gray/0' } }),
+  ev('tm', 'color/text/muted', 's', 'COLOR', { l: { kind: 'alias', aliasId: 'g9', aliasName: 'gray/900' } }),
+  ev('bt', 'button/bg', 'c', 'COLOR', { c1: { kind: 'alias', aliasId: 'tx', aliasName: 'color/text/default' } }),
+  ev('xa', 'a', 'x', 'COLOR', { x1: { kind: 'alias', aliasId: 'xb', aliasName: 'b' } }),
+  ev('xb', 'b', 'x', 'COLOR', { x1: { kind: 'color', hex: '#FF0000' } }),
+  ev('xl', 'lib', 'x', 'COLOR', { x1: { kind: 'alias', aliasId: 'R', aliasName: 'core/x', remote: true } }),
+];
+
+test('normalizeVarName · nameError — 토막 공백 정리, 빈 토막, 같은 컬렉션 같은 이름(대소문자까지)', async () => {
+  const { normalizeVarName, nameError } = await import('../dist/pure.mjs');
+  assert.equal(normalizeVarName('  color/ text /default '), 'color/text/default');
+  const self = edVars[3];
+  assert.equal(nameError('', self, edVars), 'emptySegment');
+  assert.equal(nameError('a//b', self, edVars), 'emptySegment');
+  assert.equal(nameError('/a', self, edVars), 'emptySegment');
+  assert.equal(nameError('a/', self, edVars), 'emptySegment');
+  assert.equal(nameError('color/ text/muted', self, edVars), 'duplicate', '정리한 이름으로 검사');
+  assert.equal(nameError('color/text/Muted', self, edVars), null, '대소문자가 다르면 같은 이름이 아니다');
+  assert.equal(nameError('gray/0', self, edVars), null, '다른 컬렉션은 상관없다');
+  assert.equal(nameError('color/text/default', self, edVars), null, '자기 자신');
+});
+
+test('groupMove · cssRename — 그룹 이동(새 그룹 · 비는 그룹), CSS 이름이 다를 때만 + 같아지는 변수', async () => {
+  const { groupMove, cssRename, cssVarName } = await import('../dist/pure.mjs');
+  const self = edVars[3];
+  assert.equal(groupMove(self.name, 'color/text/primary', self, edVars), null, '그룹이 같으면 없음');
+  assert.deepEqual(groupMove(self.name, 'color/fg/default', self, edVars), { from: 'color/text', to: 'color/fg', newGroup: true, emptied: false });
+  const lone = edVars[4];
+  assert.deepEqual(groupMove(lone.name, 'color/fg/muted', lone, edVars.filter((v) => v.id !== 'tx')), { from: 'color/text', to: 'color/fg', newGroup: true, emptied: true });
+  assert.deepEqual(groupMove(self.name, 'default', self, edVars), { from: 'color/text', to: '(그룹 없음)', newGroup: true, emptied: false });
+  assert.equal(groupMove(self.name, 'color/text/x', self, edVars), null);
+  assert.equal(cssRename('a/b', 'a/b', 'z', edVars, cssVarName), null);
+  assert.deepEqual(cssRename(self.name, 'color/fg/default', 'tx', edVars, cssVarName), { from: '--color-text-default', to: '--color-fg-default' });
+  assert.deepEqual(cssRename(self.name, 'gray/0', 'tx', edVars, cssVarName), { from: '--color-text-default', to: '--gray-0', clash: 'gray/0' }, '다른 컬렉션도 본다');
+});
+
+test('입력 검사 · 비교 — #RRGGBB(AA), 숫자, 정규화한 값 비교', async () => {
+  const { parseColorInput, parseNumberInput, colorText, cellInputText, sameCell } = await import('../dist/pure.mjs');
+  assert.deepEqual(parseColorInput('#ffffff'), { hex: '#FFFFFF', alpha: 1 });
+  assert.deepEqual(parseColorInput(' 112233 '), { hex: '#112233', alpha: 1 });
+  assert.equal(Math.round(parseColorInput('#11223380').alpha * 255), 128);
+  assert.equal(parseColorInput('#FFFFF'), null);
+  assert.equal(parseColorInput('#GGGGGG'), null);
+  assert.equal(parseNumberInput('1.0'), 1);
+  assert.equal(parseNumberInput(''), null);
+  assert.equal(parseNumberInput('abc'), null);
+  assert.equal(colorText('#ffffff'), '#FFFFFF');
+  assert.equal(colorText('#000000', 128 / 255), '#00000080');
+  assert.equal(cellInputText({ kind: 'color', hex: '#abcdef', alpha: 0.5 }), '#ABCDEF80');
+  assert.equal(cellInputText({ kind: 'number', text: '8' }), '8');
+  assert.ok(sameCell({ kind: 'color', hex: '#ffffff' }, { kind: 'color', hex: '#FFFFFF', alpha: 1 }), '#ffffff = #FFFFFF');
+  assert.ok(!sameCell({ kind: 'color', hex: '#FFFFFF' }, { kind: 'color', hex: '#FFFFFF', alpha: 0.5 }));
+  assert.ok(sameCell({ kind: 'color', hex: '#000000', alpha: 128 / 255 }, { kind: 'color', hex: '#000000', alpha: 0.5 }), '투명도는 0–255 정수로');
+  assert.ok(sameCell({ kind: 'number', text: '1' }, { kind: 'number', value: 1.0 }), '1 = 1.0');
+  assert.ok(sameCell({ kind: 'bool', text: 'true' }, { kind: 'bool', value: true }));
+  assert.ok(sameCell({ kind: 'alias', aliasId: 'a', aliasName: 'x' }, { kind: 'alias', aliasId: 'a', aliasName: 'renamed' }), '별칭은 대상 id');
+  assert.ok(sameCell(undefined, null));
+  assert.ok(!sameCell(undefined, { kind: 'string', text: '' }));
+});
+
+test('resolveEditValue — 별칭은 대상 컬렉션 기본 모드, 로컬만 최대 5단계', async () => {
+  const { resolveEditValue } = await import('../dist/pure.mjs');
+  assert.deepEqual(resolveEditValue({ kind: 'alias', aliasId: 'tx' }, edCols, edVars), { kind: 'color', hex: '#111111', alpha: 0.5 }, 'tx의 기본 모드(Light) → g9');
+  assert.equal(resolveEditValue({ kind: 'alias', aliasId: 'R' }, edCols, edVars), null, '라이브러리');
+  assert.equal(resolveEditValue({ kind: 'alias', aliasId: 'gone' }, edCols, edVars), null, '삭제됨');
+  assert.deepEqual(resolveEditValue({ kind: 'number', text: '4' }, edCols, edVars), { kind: 'number', text: '4' });
+  const chain = Array.from({ length: 7 }, (_, i) => ev(`k${i}`, `k${i}`, 'x', 'FLOAT', { x1: i === 6 ? { kind: 'number', text: '1' } : { kind: 'alias', aliasId: `k${i + 1}` } }));
+  assert.deepEqual(resolveEditValue({ kind: 'alias', aliasId: 'k2' }, edCols, chain), { kind: 'number', text: '1' }, '5단계');
+  assert.equal(resolveEditValue({ kind: 'alias', aliasId: 'k0' }, edCols, chain), null, '6단계는 따라가지 않는다');
+});
+
+test('aliasCandidates — 같은 타입 · 계층 규칙 · 자기/순환 제외 · Global 없음 · 계층 없음은 전부 · 검색', async () => {
+  const { aliasCandidates } = await import('../dist/pure.mjs');
+  const ids = (r) => r.groups.flatMap((g) => g.rows.map((x) => x.id));
+  const byId = (id) => edVars.find((v) => v.id === id);
+  const s = aliasCandidates(byId('tx'), edCols, edVars);
+  assert.deepEqual(ids(s), ['g0', 'g9'], 'Semantic → Global 색만(숫자 · 같은 계층 · 계층 없음 제외)');
+  assert.deepEqual(s.groups.map((g) => g.label), ['G Global › gray']);
+  assert.deepEqual(ids(aliasCandidates(byId('bt'), edCols, edVars)), ['tx', 'tm', 'g0', 'g9'], 'Component → Semantic · Global(사이드바 순서)');
+  const g = aliasCandidates(byId('g0'), edCols, edVars);
+  assert.ok(g.global && !g.groups.length, 'Global은 후보 없음');
+  const x = aliasCandidates(byId('xb'), edCols, edVars);
+  assert.ok(x.allTiers);
+  assert.deepEqual(ids(x).sort(), ['bt', 'g0', 'g9', 'tm', 'tx', 'xl'].sort(), '계층 없음 → 모든 컬렉션, 자기(xb) · 순환(xa→xb) 제외');
+  assert.ok(!ids(aliasCandidates(byId('g9'), edCols, edVars)).length);
+  // tx를 고칠 때 bt(→tx)는 순환 — 계층 없는 컬렉션에서 확인
+  const cyc = [...edVars, ev('xc', 'c', 'x', 'COLOR', { x1: { kind: 'alias', aliasId: 'bt' } })];
+  assert.ok(ids(aliasCandidates(byId('xa'), edCols, cyc)).includes('xb') && ids(aliasCandidates(byId('xa'), edCols, cyc)).includes('xc'), '지금 대상(xb)을 다시 고르는 것은 순환이 아니다');
+  assert.ok(!ids(aliasCandidates({ ...byId('tx'), collectionId: 'x' }, edCols, cyc)).includes('xc'), 'xc → bt → tx: 순환');
+  assert.deepEqual(ids(aliasCandidates(byId('bt'), edCols, edVars, 'GRAY/9')), ['g9'], '검색은 전체 경로 · 대소문자 무시');
+});

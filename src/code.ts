@@ -1,7 +1,7 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, CollectionRoleInfo } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, CollectionRoleInfo, VarUpdateError } from './shared/messages';
 import { post } from './shared/messages';
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
@@ -13,7 +13,7 @@ import { assignRole, roleOfCollection, guessRole } from './lib/tiers';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
-import { rgbToHex } from './lib/tokens';
+import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { createIconRegistry, swapVectorSlots, transplantImageFills, nodeAtPath } from './lib/artwork';
@@ -27,6 +27,7 @@ import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
 import { UI_SIZE_KEY, UI_WIDTH, normalizeUiSize, uiHeight, uiWidth } from './lib/uiSize';
 import type { VarCell, VarCollection, VarRow, VarType, LibraryVar } from './lib/varTable';
+import { sameCell } from './lib/varTable';
 
 /* IA v3: 창은 400 × 510 고정, [—]로 최소화(140 × 104, 펼치기 버튼만). 높이 전환(660 ↔ 860)과 넓은 창(760)은 없앴다.
    최소화는 기억하지 않는다 — 다시 열면 늘 펼친 크기다. 긴 목록은 패널 body가 스크롤한다(#18). */
@@ -217,6 +218,28 @@ async function collectionRoleInfos(): Promise<CollectionRoleInfo[]> {
   return cols.map((c) => ({ id: c.id, name: c.name, vars: count.get(c.id) ?? 0, set: map[c.id] ?? null, role: roleOfCollection(c, map), guess: guessRole(c.name) }));
 }
 
+/**
+ * 변수 표의 값 한 칸 — 변수 표를 만들 때와 고치기의 base 비교(§4.4 고치기 2단계)가 같은 변환을 쓴다.
+ * 색은 #RRGGBB(6자리) + 투명도(1/255 단위 반올림, 1이면 생략). 숫자는 소수 셋째 자리 반올림 글자.
+ * aliasInfo: 별칭 대상의 이름(로컬이 아니면 remote, 못 읽으면 name null = 삭제된 변수).
+ */
+function tableCell(raw: VariableValue | undefined, aliasInfo: (id: string) => { name: string | null; remote: boolean }): VarCell | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+    const id = (raw as VariableAlias).id;
+    const info = aliasInfo(id);
+    if (info.name !== null && !info.remote) return { kind: 'alias', aliasId: id, aliasName: info.name };
+    return { kind: 'alias', aliasId: id, aliasName: info.name ?? '(삭제된 변수)', remote: info.name ? true : undefined };
+  }
+  if (typeof raw === 'object' && 'r' in raw) {
+    const a = 'a' in raw && typeof (raw as RGBA).a === 'number' ? Math.round((raw as RGBA).a * 255) / 255 : 1;
+    return a < 1 ? { kind: 'color', hex: rgbToHex(raw as RGB), alpha: a } : { kind: 'color', hex: rgbToHex(raw as RGB) };
+  }
+  if (typeof raw === 'number') return { kind: 'number', text: String(Math.round(raw * 1000) / 1000) };
+  if (typeof raw === 'boolean') return { kind: 'bool', text: raw ? 'true' : 'false' };
+  return { kind: 'string', text: String(raw) };
+}
+
 /** 변수 관리 표 — 로컬 컬렉션·변수 전부(계층 아닌 것도 — 관리 대상은 파일의 변수 전체다). */
 async function collectVarTable(): Promise<{ collections: VarCollection[]; vars: VarRow[] }> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
@@ -236,20 +259,13 @@ async function collectVarTable(): Promise<{ collections: VarCollection[]; vars: 
       }
     }
   }
-  const cell = (raw: VariableValue | undefined): VarCell | undefined => {
-    if (raw === undefined || raw === null) return undefined;
-    if (typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
-      const id = (raw as VariableAlias).id;
+  const cell = (raw: VariableValue | undefined): VarCell | undefined =>
+    tableCell(raw, (id) => {
       const local = nameById.get(id);
-      if (local !== undefined) return { kind: 'alias', aliasId: id, aliasName: local };
+      if (local !== undefined) return { name: local, remote: false };
       const rn = remoteName.get(id);
-      return { kind: 'alias', aliasId: id, aliasName: rn ?? '(삭제된 변수)', remote: rn ? true : undefined };
-    }
-    if (typeof raw === 'object' && 'r' in raw) return { kind: 'color', hex: rgbToHex(raw as RGB) };
-    if (typeof raw === 'number') return { kind: 'number', text: String(Math.round(raw * 1000) / 1000) };
-    if (typeof raw === 'boolean') return { kind: 'bool', text: raw ? 'true' : 'false' };
-    return { kind: 'string', text: String(raw) };
-  };
+      return { name: rn ?? null, remote: !!rn };
+    });
   const vars: VarRow[] = [];
   for (const v of all) {
     const col = colById.get(v.variableCollectionId);
@@ -284,17 +300,62 @@ async function resolveRoots(nodeIds: readonly string[] | undefined): Promise<Sce
   return out;
 }
 
-/** 값 한 칸(라이브러리 변수용) — 별칭이면 이름을 읽는다. */
+/** 값 한 칸(라이브러리 변수용 · 고치기 base 비교) — 별칭이면 대상을 읽는다. 변수 표와 같은 변환(tableCell). */
 async function libCell(raw: VariableValue | undefined): Promise<VarCell | undefined> {
-  if (raw === undefined || raw === null) return undefined;
-  if (typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+  let info: { name: string | null; remote: boolean } = { name: null, remote: false };
+  if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
     const t = await figma.variables.getVariableByIdAsync((raw as VariableAlias).id).catch(() => null);
-    return { kind: 'alias', aliasId: (raw as VariableAlias).id, aliasName: t ? t.name : '(삭제된 변수)', remote: t?.remote || undefined };
+    info = { name: t ? t.name : null, remote: !!t?.remote };
   }
-  if (typeof raw === 'object' && 'r' in raw) return { kind: 'color', hex: rgbToHex(raw as RGB) };
-  if (typeof raw === 'number') return { kind: 'number', text: String(Math.round(raw * 1000) / 1000) };
-  if (typeof raw === 'boolean') return { kind: 'bool', text: raw ? 'true' : 'false' };
-  return { kind: 'string', text: String(raw) };
+  return tableCell(raw, () => info);
+}
+
+/**
+ * 변수 고치기(§4.4 고치기 · PR 3.5) — 1 변수 확인 → 2 base 비교(변수 표와 같은 변환) → 3 이름 → 값(첫 실패에서 멈춤)
+ * → 4 하나라도 바꿨으면 commitUndo → 5 VARIABLE_UPDATED. 변수 표는 보내지 않는다(UI가 다시 읽는다).
+ */
+async function updateVariable(msg: Extract<UiToCode, { type: 'UPDATE_VARIABLE' }>): Promise<void> {
+  const done = (applied: string[], error?: VarUpdateError): void => {
+    if (applied.length) commitUndo(figma);
+    post({ type: 'VARIABLE_UPDATED', reqId: msg.reqId, ok: !error, applied, error });
+  };
+  const v = await figma.variables.getVariableByIdAsync(msg.id).catch(() => null);
+  if (!v || v.remote) return done([], { code: 'deleted' });
+  // 2 — 지금 이름과 고친 모드의 값이 base와 같아야 한다(팝업이 열린 동안 피그마에서 바뀐 것은 저장할 때 알린다).
+  if (v.name !== msg.base.name) return done([], { code: 'conflict' });
+  for (const [modeId, b] of Object.entries(msg.base.values)) {
+    const now = await libCell(v.valuesByMode[modeId]);
+    if (!sameCell(now, b)) return done([], { code: 'conflict' });
+  }
+  // 3 — 이름 → 값. 중간에 실패하면 멈추고 이미 바뀐 것과 사유를 돌려준다.
+  const applied: string[] = [];
+  if (msg.name !== undefined && msg.name !== v.name) {
+    try {
+      v.name = msg.name;
+      applied.push('name');
+    } catch (e) {
+      return done(applied, { code: 'name', message: errText(e) });
+    }
+  }
+  for (const [modeId, ev] of Object.entries(msg.values ?? {})) {
+    try {
+      let value: VariableValue;
+      if (ev.kind === 'color') value = { ...hexToRgb(ev.hex), a: Math.max(0, Math.min(1, ev.alpha)) };
+      else if (ev.kind === 'number') value = ev.value;
+      else if (ev.kind === 'string') value = ev.text;
+      else if (ev.kind === 'bool') value = ev.value;
+      else {
+        const target = await figma.variables.getVariableByIdAsync(ev.targetId).catch(() => null);
+        if (!target) throw new Error('alias target not found');
+        value = figma.variables.createVariableAlias(target);
+      }
+      v.setValueForMode(modeId, value);
+      applied.push(modeId);
+    } catch (e) {
+      return done(applied, { code: 'value', modeId, message: errText(e) });
+    }
+  }
+  done(applied);
 }
 
 /**
@@ -1729,6 +1790,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'GET_VAR_TABLE': {
         post({ type: 'VAR_TABLE', ...(await collectVarTable()) });
+        break;
+      }
+      case 'UPDATE_VARIABLE': {
+        await updateVariable(msg);
         break;
       }
       case 'SET_UI_SIZE': {
