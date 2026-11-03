@@ -474,32 +474,86 @@
     }
     .subtab:hover:not([aria-selected="true"]) { background: none; color: var(--text); }
     .subtab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
-    /* 연결 후보 — 변수별 묶음(§4.6). 목록 머리는 버튼 줄 아래에 고정(두 겹, §2.5), 묶음 줄은 고정하지 않는다. */
-    .bind-desc { margin: 8px 0 6px; color: var(--text-2); font-size: 11px; line-height: 1.5; }
-    .bind-head {
-      position: sticky; top: calc(var(--toolbar-top, 95px) + var(--toolbar-h, 36px)); z-index: 1;
-      display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 6px; margin-top: 6px;
-      background: var(--surface); border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 10.5px; font-weight: 600;
+    /* ── 레이어 › 연결(§4.6 그림 개편) ── */
+    /* 카드 제목이 없다 — 버튼 줄(단계 표시 포함)이 카드 맨 위. */
+    .bind-card > .prereq:first-child { margin-top: 0; }
+    /* 단계 표시 — 버튼 줄 안 첫 줄(함께 고정). 누를 수 없는 표시. */
+    .bind-steps { flex: 1 0 100%; display: flex; align-items: center; gap: 6px; list-style: none; margin: 0 0 2px; padding: 0; font-size: var(--fs); }
+    .bind-steps .bs { display: flex; align-items: center; gap: 5px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+    .bind-steps .bs + .bs::before { content: ''; width: 18px; height: 1px; background: var(--border-2); margin-right: 1px; }
+    .bs-dot {
+      width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+      font: 600 9.5px/1 var(--font); border: 1px solid var(--border-2); color: var(--muted); background: var(--surface); box-sizing: border-box;
     }
-    .bind-head .grow { flex: 1 1 auto; }
-    .bind-head .outside { font-weight: 500; color: var(--muted); }
-    .bind-list { display: flex; flex-direction: column; font-size: var(--fs); }
-    .bg-val, .bg-text { font-variant-numeric: tabular-nums; }
-    .bg-head, .bg-place { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; border-bottom: 1px solid var(--border); }
-    .bg-head { font-weight: 600; color: var(--text); }
-    .bg-place { padding-left: 42px; color: var(--text); }
-    .bg-place.off { color: var(--text-2); }
-    .bg-head.off { color: var(--text-2); }
-    .skip-total { color: var(--text-2); font-size: 10.5px; margin-right: 2px; align-self: center; }
-    .bg-tw { width: 24px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; }
-    /* 색 견본은 원 — 네모 체크박스와 헷갈리지 않게(흰색 견본이 빈 체크박스로 보였다). */
-    .bg-sw { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border-2); flex: 0 0 auto; }
-    .bg-type { width: 12px; text-align: center; color: var(--muted); font-family: var(--mono); flex: 0 0 auto; }
-    .bg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-    .bg-val { color: var(--text-2); font-weight: 500; white-space: nowrap; }
-    .bg-num { margin-left: auto; color: var(--text-2); font-weight: 500; font-size: 10.5px; }
-    .bg-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-    .bg-layer { padding: 0; min-height: 0; }
+    .bs.now { color: var(--text); font-weight: 600; }
+    .bs.now .bs-dot { background: var(--text); border-color: var(--text); color: var(--on-accent); }
+    .bs.done { color: var(--ok); }
+    .bs.done .bs-dot { border-color: var(--ok); color: var(--ok); }
+    /* 찾는 중 — 지금 단계 동그라미에 도는 테두리 */
+    .bs.busy .bs-dot { background: var(--surface); color: var(--text); border: 2px solid var(--border-2); border-top-color: var(--text); animation: mini-spin .9s linear infinite; }
+    @media (prefers-reduced-motion: reduce) { .bs.busy .bs-dot { animation: none; } }
+    /* 버튼 — 아이콘은 글자 앞 14px(접근성 이름은 글자만) */
+    .bind-btn { display: inline-flex; align-items: center; gap: 5px; }
+    .bind-btn .bi { flex: 0 0 auto; }
+    /* 배지 줄 */
+    .bind-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 24px; }
+    .bind-badges .grow { flex: 1 1 auto; }
+    .bd { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font: 600 10.5px/1 var(--font); white-space: nowrap; }
+    .bd-found { background: var(--ok-subtle); color: var(--ok); cursor: default; }
+    button.bd-skip { min-height: 24px; height: 24px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); }
+    button.bd-skip:hover:not([aria-disabled="true"]) { background: var(--surface-hover); }
+    .bind-badges .skip-row { order: 10; flex: 1 0 100%; margin-top: 0; }
+    button.bd-all { min-height: 24px; height: 24px; padding: 0 6px; border: none; background: none; color: var(--accent-strong); font-size: 10.5px; }
+    button.bd-all:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
+    .bind-filter-row input { width: 170px; }
+    /* 빈 상태 — 목록 자리 점선 상자 */
+    .bind-empty {
+      border: 1px dashed var(--border-2); border-radius: 8px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+      color: var(--text-2); text-align: center;
+    }
+    .be-art { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+    .be-art.icon { font-size: 18px; line-height: 1; color: var(--muted); align-items: center; flex-direction: row; gap: 2px; }
+    .be-row { display: flex; align-items: center; gap: 6px; }
+    .be-text { font-size: var(--fs); }
+    /* 변수 카드 "값 → 변수" — 카드 사이 6, 모서리 8, 머리 32 */
+    .bind-list { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs); }
+    .bind-list:empty { display: none; }
+    .bv-card { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+    .bv-head { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 2px 0 8px; }
+    .bv-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 4px; font: 500 10.5px/1 var(--mono); white-space: nowrap; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+    .bv-val { background: var(--surface); border: 1px solid var(--border-2); color: var(--text); }
+    .bv-sw { width: 10px; height: 10px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); flex: 0 0 auto; }
+    .bv-arrow { color: var(--accent-strong); font-weight: 600; flex: 0 0 auto; }
+    .bv-var { background: var(--accent-subtle); color: var(--accent-strong); border: 1px solid transparent; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+    .bv-var .bv-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .bv-mark { flex: 0 0 auto; font-family: var(--font); font-weight: 700; }
+    .bind-empty .bv-var { max-width: 140px; }
+    .bv-head .grow { flex: 1 1 auto; min-width: 4px; }
+    button.bv-tw { height: 24px; min-height: 24px; padding: 0 4px; border: none; background: none; color: var(--text-2); font-weight: 500; font-size: 10.5px; flex: 0 0 auto; }
+    button.bv-tw:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
+    /* 스위치 — 보이는 트랙 28×16, 누를 수 있는 영역 32×24 */
+    button.bv-switch { width: 32px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    button.bv-switch:hover:not([aria-disabled="true"]) { background: none; }
+    .bv-track { position: relative; width: 28px; height: 16px; border-radius: 999px; background: var(--accent); transition: background .12s; }
+    .bv-track::after { content: ''; position: absolute; top: 2px; left: 14px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 1px rgba(0,0,0,.2); transition: left .12s; }
+    button.bv-switch[aria-checked="false"] .bv-track { background: var(--border-2); }
+    button.bv-switch[aria-checked="false"] .bv-track::after { left: 2px; }
+    button.bv-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+    /* 끈 카드 — 글자·칩을 회색으로(opacity 쓰지 않음) */
+    .bv-card.off .bv-val, .bv-card.off .bv-var { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
+    .bv-card.off .bv-arrow, .bv-card.off .bv-tw, .bv-card.off .bv-place { color: var(--text-2); }
+    .bv-card.off .bv-sw { filter: grayscale(1); }
+    /* 자리 줄(보기만) — [속성 아이콘] 레이어 · 속성 */
+    .bv-places { border-top: 1px solid var(--border); padding: 3px 8px 5px; display: flex; flex-direction: column; }
+    .bv-place { display: flex; align-items: center; gap: 6px; min-height: 24px; color: var(--text); }
+    .bv-ic { width: 14px; height: 14px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); font: 600 9px/14px var(--font); text-align: center; flex: 0 0 auto; }
+    .bv-place .bv-layer { padding: 0 2px; min-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
+    .bv-card.off .bv-place .bv-layer { color: var(--text-2); }
+    .bv-prop { color: var(--text-2); white-space: nowrap; flex: 0 0 auto; }
+    /* 연결 후 결과 카드 */
+    .bind-done { display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 6px 4px 10px; border-radius: 8px; background: var(--ok-subtle); color: var(--ok); font-weight: 600; }
+    .bind-done .grow { flex: 1 1 auto; }
+    .ts-aa { font: 700 11px/1 var(--font); color: var(--text-2); width: 16px; }
     .tier-chip {
       height: 24px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
       border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
@@ -872,42 +926,20 @@
       <button class="subtab" role="tab" data-apply-step="structure" data-i18n="rail.structure">컴포넌트</button>
     </div>
 
-    <div class="step" data-apply-step="bind">
-      <h2><span data-i18n="bind.title">변수 연결</span></h2>
+    <!-- 레이어 › 연결(§4.6 그림 개편) — 카드 제목 없음. 단계 표시 + 버튼 줄(함께 고정) → 배지 줄 → 빈 상태/변수 카드 → 텍스트 스타일. -->
+    <div class="step bind-card" data-apply-step="bind">
       <!-- 연결할 변수가 없을 때의 안내(§4.6 표 4행) — 문구와 버튼은 ui.ts가 정한다. -->
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
-      <div class="toolbar">
-        <button id="btnApply" data-i18n="bind.preview">미리보기</button>
-        <button id="btnApplyConfirm" class="primary" data-i18n="bind.confirm">체크한 곳 연결</button>
+      <div class="toolbar bind-toolbar">
+        <!-- 단계 표시 — 누를 수 없는 표시(정지점 아님). 상태는 ui.ts renderBindSteps가 정한다. -->
+        <ol class="bind-steps" id="bindSteps" role="list" aria-label="연결 단계">
+          <li class="bs" data-s="find"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.find">찾기</span></li>
+          <li class="bs" data-s="pick"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.stepPick">고르기</span></li>
+          <li class="bs" data-s="link"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.link">연결</span></li>
+        </ol>
+        <button id="btnApply" class="primary bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg><span class="bl" id="btnApplyLabel">찾기</span></button>
+        <button id="btnApplyConfirm" class="bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span class="bl" id="btnApplyConfirmLabel">연결</span></button>
       </div>
-      <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 있는 자산을 쓰는 일이라 연결 화면에 둔다(§4.6). -->
-      <div class="row ts-apply-row">
-        <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
-        <span class="grow"></span>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 연결</button>
-      </div>
-      <div class="hint" id="tsApplyResult" hidden></div>
-      <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
-      <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">미리보기 다시</button></div>
-      <!-- 미리보기 전 한 줄 / 미리보기 뒤 목록 설명(§4.6) — 문구는 ui.ts가 정한다. -->
-      <div class="bind-desc" id="bindIntro" hidden data-i18n="bind.intro">[미리보기]를 누르면 선택한 레이어에서 변수 값과 같은 색·크기·간격 값을 찾아요</div>
-      <div class="bind-desc" id="bindDesc" hidden></div>
-      <!-- 건너뜀 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다. 목록 위: 몇 개가 왜 빠졌는지 먼저. -->
-      <div class="skip-row" id="bindSkips" style="display:none"></div>
-      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
-        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:160px" />
-      </div>
-      <div class="bind-head" id="bindHead" hidden>
-        <input type="checkbox" id="bindAll" />
-        <span data-i18n="bind.headCol">연결</span>
-        <span data-i18n="bind.headVar">변수</span>
-        <span class="grow"></span>
-        <span class="outside" id="bindOutside"></span>
-        <span data-i18n="bind.headCount">곳</span>
-      </div>
-      <div id="bindTree" class="bind-list"></div>
-      <!-- 연결 후 — 요약 한 줄 + 사유 칩만(§4.6). -->
-      <div class="row" id="bindDone" hidden><span id="bindDoneText"></span> <button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
@@ -916,6 +948,35 @@
           <button id="btnApplyCancel" data-i18n="common.cancel">취소</button>
         </div>
       </div>
+      <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
+      <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">다시 찾기</button></div>
+      <!-- 연결 후 결과 카드(§4.6) -->
+      <div class="bind-done" id="bindDone" hidden><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span id="bindDoneText"></span><span class="grow"></span><button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
+      <!-- 배지 줄(찾은 뒤) — (찾음 n) (건너뜀 m ▸) … [모두 켜기/끄기] [필터]. 사유 칩 줄은 DOM에서 건너뜀 바로 뒤(포커스 순서), 화면에서는 아랫줄. -->
+      <div class="bind-badges" id="bindBadges" hidden>
+        <span class="bd bd-found" id="bindFound"></span>
+        <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
+        <div class="skip-row" id="bindSkips" hidden></div>
+        <span class="grow"></span>
+        <button class="bd-all" id="bindAll" type="button"></button>
+        <button class="icon-btn" id="bindFilterBtn" type="button" aria-expanded="false" aria-controls="bindFilterRow" data-i18n-title="bind.filterBtn" title="변수 이름 필터" aria-label="변수 이름 필터"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+      </div>
+      <div class="row bind-filter-row" id="bindFilterRow" hidden>
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" />
+        <span class="muted" id="bindOutside"></span>
+      </div>
+      <!-- 빈 상태(목록 자리, 점선 상자) — 찾기 전(예시 두 줄) · 선택 없음 · 찾은 곳 0. -->
+      <div class="bind-empty" id="bindEmpty" hidden></div>
+      <!-- 변수 카드 "값 → 변수"(§4.6) -->
+      <div id="bindTree" class="bind-list"></div>
+      <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 카드 목록 아래 한 줄(§4.6). -->
+      <div class="row ts-apply-row">
+        <span class="ts-aa" aria-hidden="true">Aa</span>
+        <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
+        <span class="grow"></span>
+        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 연결</button>
+      </div>
+      <div class="hint" id="tsApplyResult" hidden></div>
       <div class="status" id="applyStatus"></div>
     </div>
 
