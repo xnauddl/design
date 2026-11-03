@@ -151,7 +151,6 @@ export type UiToCode =
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[]; reqId?: number } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'GET_VAR_TABLE' } // 변수 관리: 로컬 변수 전부(모드별 값·별칭 이름·용도·설명)
-  | { type: 'SET_UI_WIDE'; wide: boolean } // 변수 관리를 볼 때만 넓게(760), 나가면 400
   | { type: 'SCAN_BINDINGS'; reqId?: number; forManager?: boolean } // 선택 안에 이미 붙은 변수 바인딩 읽기(연결 현황 · 읽기 전용)
   | { type: 'REMAP_TARGETS'; fromId: string; fields: string[] } // 일괄 교체: A 자리에 붙일 수 있는 변수 후보(읽기 전용)
   | { type: 'REMAP_BINDINGS'; fromId: string; toId: string; fields: string[]; reqId?: number } // 일괄 교체: 선택 안의 A(그 필드들) → B
@@ -169,8 +168,7 @@ export type UiToCode =
   | { type: 'GET_COLLECTIONS' }
   | { type: 'GET_COLLECTION_ROLES' } // 컬렉션 → 계층 지정 현황(설정 탭)
   | { type: 'SET_COLLECTION_ROLE'; collectionId: string; role: 'global' | 'semantic' | 'component' | 'none' | null } // null=지정 해제(이름으로 판정)
-  | { type: 'GET_UI_SIZE' } // QA #2 ①: 창 높이 단계 조회(시작 시 버튼 표시용)
-  | { type: 'SET_UI_SIZE'; mode: 'default' | 'large' } // QA #2 ①: 창 높이 2단계 전환(660 ↔ 860), 기억됨
+  | { type: 'SET_UI_SIZE'; mode: 'default' | 'mini' } // IA v3: 최소화(400×48) / 펼치기(400×510), 저장 안 함
   | { type: 'GET_GLOBAL_COLORS' } // #10: 기존 Global 색 변수 스캔(재방문 시맨틱 매핑 추천용)
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
   | { type: 'GET_LICENSE' }
@@ -198,12 +196,12 @@ export type UiToCode =
 /** code → UI 응답. */
 export type CodeToUi =
   | { type: 'COLLECTION_ROLES'; collections: CollectionRoleInfo[] }
-  | { type: 'UI_SIZE'; mode: 'default' | 'large' } // 현재 창 높이 단계
+  | { type: 'UI_SIZE'; mode: 'default' | 'mini' } // 지금 창 크기(최소화 여부)
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
   // comps/sets: 선택 안의 낱개 COMPONENT·COMPONENT_SET 수. 구조 카드의 베리언트 줄을
   // '정리할 대상이 실제로 선택돼 있을 때만' 띄우는 데 쓴다(툴바는 와이어대로 4개 고정).
-  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
+  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number; firstName?: string; ids?: string[] } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
   | { type: 'REMAP_TARGETS_RESULT'; fromId: string; targets: { id: string; name: string; collection: string }[] }
   | { type: 'REMAP_RESULT'; replaced: number; nodes: number; skipped: number; toName: string }
   | { type: 'VAR_TABLE'; collections: VarCollection[]; vars: VarRow[] }

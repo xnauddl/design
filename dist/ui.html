@@ -60,7 +60,7 @@
     * { box-sizing: border-box; }
     body {
       font: 400 var(--fs)/1.5 var(--font);
-      margin: 0; padding: 12px;
+      margin: 0; padding: 12px 12px 36px; /* 아래 36 = 공통 상태 줄(24) + 여백 */
       color: var(--text); background: var(--bg);
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden; /* 툴팁 등이 가로 스크롤을 만들지 않게 */
@@ -118,18 +118,24 @@
     }
     /* hover/active는 누를 수 있는 버튼에만 — 비활성 버튼에 얹으면 primary의 파란 배경을 흰색으로
        덮어써 흰 글씨가 사라진다(실행 중 잠긴 「전체 실행」이 그랬다). */
-    button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-2); }
+    button:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--surface-2); border-color: var(--border-2); }
     button:active:not(:disabled) { background: var(--surface-hover); }
+    /* 주 버튼은 진한 강조색 — 흰 글자 대비 4.5:1 이상(IA v3 §2.10). */
     button.primary {
-      background: var(--accent); color: var(--on-accent); border-color: var(--accent);
+      background: var(--accent-strong); color: var(--on-accent); border-color: var(--accent-strong);
       box-shadow: var(--shadow-sm);
     }
-    button.primary:hover:not(:disabled)  { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button.primary:hover:not(:disabled):not([aria-disabled="true"])  { background: var(--accent-press); border-color: var(--accent-press); }
     button.primary:active:not(:disabled) { background: var(--accent-press); border-color: var(--accent-press); }
     button:focus-visible {
       outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
     }
     button:disabled { opacity: .42; cursor: default; box-shadow: none; }
+    /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 공통 상태 줄에 사유. opacity는 쓰지 않는다. */
+    [aria-disabled="true"] { color: var(--muted); cursor: not-allowed; box-shadow: none; }
+    button[aria-disabled="true"], button[aria-disabled="true"]:hover, button[aria-disabled="true"]:active { background: var(--surface); border-color: var(--border); color: var(--muted); }
+    button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover, button.primary[aria-disabled="true"]:active { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
+    label.inline:has(input[aria-disabled="true"]) { color: var(--muted); cursor: not-allowed; }
     button.link {
       border: none; background: none; padding: 0; width: auto;
       color: var(--accent-strong); cursor: pointer; font: inherit; font-weight: 600;
@@ -175,10 +181,18 @@
 
     /* ── 탭바 (세그먼트 컨트롤) ── */
     .tabs {
-      display: flex; gap: 3px; position: sticky; top: 0; z-index: 3;
+      display: flex; gap: 3px; align-items: center; position: sticky; top: 0; z-index: 3;
       background: var(--surface-2); border: 1px solid var(--border);
       padding: 3px; border-radius: var(--r); margin: 0 0 10px;
     }
+    .tab-list { display: flex; gap: 3px; flex: 1 1 auto; min-width: 0; }
+    /* [—] 최소화 — 24×24 이상(§2.10). */
+    .tab-min {
+      flex: 0 0 28px; height: 28px; padding: 0; border: none; background: transparent;
+      color: var(--text-2); border-radius: var(--r-sm); line-height: 1;
+    }
+    .tab-min:hover { background: var(--surface-hover); color: var(--text); }
+    .tab-min svg { display: block; margin: 0 auto; }
     .tab-btn {
       flex: 1; padding: 6px 4px; border: none; background: transparent;
       color: var(--text-2); font-weight: 600; border-radius: var(--r-sm);
@@ -207,7 +221,11 @@
       background: var(--surface-2); border: 1px solid var(--border);
       border-radius: var(--r); padding: 7px 10px;
     }
-    .selbar { color: var(--text); font-weight: 500; }
+    .selbar { color: var(--text); font-weight: 500; display: flex; align-items: center; gap: 0; min-width: 0; white-space: nowrap; }
+    .selbar .sel-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+    .selbar .sel-name:only-child, .selbar .sel-name:has(+ .sel-sub:empty) { max-width: none; }
+    .selbar .sel-sub { flex: 0 0 auto; }
+    .selbar .sel-sub:empty { display: none; }
     .selbar.muted { color: var(--muted); font-weight: 400; }
 
     /* ── 콜아웃(안내 노트) ── */
@@ -302,16 +320,20 @@
     /* ── 카드 툴바(CTA 상단) ──
        미리보기·적용·다음은 제목 바로 아래 한 줄에 둔다. 결과 목록 위에 있어야 "무엇을 누르면
        뭐가 나오는지"가 읽히고, 하단 sticky footer나 예약 영역이 필요 없어진다. */
+    /* 버튼 줄은 카드 머리 아래에 고정(IA v3 §2.5) — 긴 목록을 내려도 주 버튼이 보인다.
+       --toolbar-top = 탭 바 + 선택 표시줄 + 카드 머리 높이(ui.ts syncStickyOffsets가 잰다). */
     .toolbar {
       display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
       padding-bottom: 8px; border-bottom: 1px solid var(--border);
+      position: sticky; top: var(--toolbar-top, 95px); z-index: 1; background: var(--surface);
     }
     .toolbar .grow { flex: 1 1 auto; } /* 주 버튼을 오른쪽 끝으로 미는 공백 */
     /* 아래에 목록이 없는 카드(내보내기)는 구분선을 긋지 않는다 — 가를 것이 없다. */
     .toolbar.flush { padding-bottom: 0; border-bottom: 0; }
     /* 툴바가 두 줄인 카드(구조: 스캔 2 / 쓰기 2) — 윗줄은 선을 긋지 않고 아랫줄만 본문과 가른다. */
     .toolbar:has(+ .toolbar-2) { padding-bottom: 0; border-bottom: 0; }
-    .toolbar-2 { margin-top: 0; }
+    /* 둘째 버튼 줄은 첫째 줄(버튼 높이 27px) 바로 아래에 고정 — 같은 높이에 붙으면 겹친다. */
+    .toolbar-2 { margin-top: 0; top: calc(var(--toolbar-top, 95px) + 27px); }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
     /* 툴바가 좁아 줄이 넘어가도 ‘다음 →’은 오른쪽 끝에 — 혼자 왼쪽에 떨어지면 다른 버튼처럼 보인다. */
@@ -443,21 +465,14 @@
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
 
-    /* ── 창 높이 전환(QA #2 ①) — 탭 바 오른쪽 끝, 드래그 대신 버튼(#14) ── */
-    .tab-vars {
-      display: inline-flex; align-items: center; gap: 4px;
-      flex: 0 0 auto; padding: 6px 8px; border: none; background: transparent;
-      color: var(--text-2); font-weight: 600; border-radius: var(--r-sm); white-space: nowrap;
-    }
-    .tab-vars:hover { background: var(--surface-hover); color: var(--text); }
-    .tab-vars[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
-    /* ── 변수 관리(넓은 화면) ── */
+    /* ── 변수 관리 ── */
     .var-manager { display: flex; flex-direction: column; gap: 8px; }
     .vm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .vm-head h2 { margin: 0; font-size: 12px; }
     .vm-head input[type=search] { width: 160px; }
-    .vm-body { display: grid; grid-template-columns: 170px 1fr; gap: 8px; min-height: 0; }
-    .vm-tree { border: 1px solid var(--border); border-radius: var(--r); padding: 4px; overflow: auto; max-height: calc(100vh - 150px); }
+    /* PR 1 중간 상태 — 400에서는 트리를 표 위에 쌓는다. 목록마다 스크롤 상자를 두지 않는다(#18): 패널이 스크롤. */
+    .vm-body { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+    .vm-tree { border: 1px solid var(--border); border-radius: var(--r); padding: 4px; }
     .vm-node { display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; border: none; background: transparent; padding: 4px 6px; border-radius: var(--r-sm); color: var(--text); font-size: 11px; }
     .vm-node:hover { background: var(--surface-hover); }
     .vm-node[aria-current="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
@@ -466,7 +481,7 @@
     .vm-node .cnt { color: var(--muted); font-size: 10px; }
     .vm-node.empty .lbl { color: var(--muted); }
     .vm-tier { font-size: 9px; padding: 0 4px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
-    .vm-table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow: auto; max-height: calc(100vh - 150px); }
+    .vm-table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow-x: auto; }
     .vm-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
     .vm-table th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-2); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); z-index: 1; white-space: nowrap; }
     .vm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -498,38 +513,86 @@
     .modal dt { color: var(--muted); }
     .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
     .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
-    .tab-size {
-      flex: 0 0 28px; padding: 6px 0; border: none; background: transparent;
-      color: var(--text-2); border-radius: var(--r-sm); line-height: 1;
+    /* ── 탭 모양 3단계(§4.1) — 상단 탭(.tabs) · 레이어 하위 탭(밑줄, PR 3) · 계층 칩(PR 2) ── */
+    .subtabs { display: flex; gap: 14px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
+    .subtab {
+      border: none; background: none; border-radius: 0; padding: 6px 0 5px; min-height: 24px;
+      font: 600 11px/1 var(--font); color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px;
     }
-    .tab-size:hover { background: var(--surface-hover); color: var(--text); }
-    .tab-size[aria-pressed="true"] { color: var(--accent-strong); }
-    .tab-size svg { display: block; margin: 0 auto; }
-    .tab-size[aria-pressed="true"] .ic-grow, .tab-size[aria-pressed="false"] .ic-shrink { display: none; }
+    .subtab:hover:not([aria-selected="true"]) { background: none; color: var(--text); }
+    .subtab[aria-selected="true"] { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
+    .tier-chip {
+      height: 24px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+    }
+    .tier-chip[aria-checked="true"] { background: var(--accent-subtle); border-color: var(--accent-border); color: var(--accent-strong); }
+
+    /* ── 하위 화면 돌아가기 링크 ── */
+    .back-link { display: inline-block; margin: 0 0 10px; padding: 4px 0; min-height: 24px; }
+
+    /* ── 공통 상태 줄(§4.1) — 창 맨 아래 고정, 높이 24, 한 줄 말줄임. 끝 버튼은 말줄임 밖. ── */
+    .status-line {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: 24px;
+      display: flex; align-items: center; gap: 6px; padding: 0 12px;
+      background: var(--surface-2); border-top: 1px solid var(--border);
+      font-size: 10.5px; color: var(--text-2);
+    }
+    .status-line .sl-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status-line .sl-action { flex: 0 0 auto; font-size: 10.5px; min-height: 20px; }
+    .status-line.ok .sl-text { color: var(--ok); }
+    .status-line.warn .sl-text { color: var(--warn); }
+
+    /* ── 최소화(§4.9) — 창 400×48. 펼친 내용은 숨기고 마크만. ── */
+    body.is-mini { padding: 0; overflow: hidden; }
+    body.is-mini > :not(#miniView):not(#overlayRoot):not(script) { display: none !important; }
+    .mini { height: 48px; display: flex; align-items: center; padding: 0 12px; }
+    .mini[hidden] { display: none; }
+    .mini-mark {
+      position: relative; height: 32px; min-width: 44px; padding: 0 8px; border-radius: var(--r);
+      border: 2px solid transparent; background: var(--accent-strong); color: #fff;
+      font: 700 12px/1 var(--font); letter-spacing: .02em;
+    }
+    .mini-mark:hover { background: var(--accent-press); }
+    /* 진행 테두리 — 진행률이 있으면 그 비율(conic), 없으면 회전. */
+    .mini-mark.busy { border-color: transparent; background-clip: padding-box; }
+    .mini-mark.busy::before {
+      content: ''; position: absolute; inset: -4px; border-radius: calc(var(--r) + 3px); z-index: -1;
+      background: conic-gradient(var(--accent) var(--prog, 25%), var(--border) 0);
+    }
+    .mini-mark.busy.spin::before { animation: mini-spin 1s linear infinite; }
+    @keyframes mini-spin { to { transform: rotate(360deg); } }
+    .mini-badge {
+      position: absolute; right: -6px; top: -6px; width: 14px; height: 14px; border-radius: 50%;
+      font: 700 9px/14px var(--font); text-align: center; color: #fff;
+    }
+    .mini-badge.ok { background: var(--ok); }
+    .mini-badge.fail { background: var(--danger); }
+    @media (prefers-reduced-motion: reduce) {
+      .mini-mark.busy.spin::before { animation: none; background: var(--accent); }
+    }
   </style>
 </head>
 <body>
-  <div class="tabs" role="tablist" aria-label="작업 탭">
-    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard" data-i18n="tab.wizard">시작</button>
-    <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
-    <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
-    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
-    <!-- 변수 관리 — Figma Variables처럼 컬렉션·그룹 트리 + 표. 누르면 창이 넓어지고(760), 돌아가면 400. -->
-    <button class="tab-vars" id="btnVarManager" type="button" aria-pressed="false" data-i18n-title="vm.openTip" title="변수 관리 — 창이 넓어집니다"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1.5" width="10" height="9" rx="1.5"/><path d="M1 4.5h10M4.5 4.5v6"/></svg> <span data-i18n="vm.tab">변수</span></button>
-    <button class="tab-size" id="btnUiSize" type="button" aria-pressed="false" data-i18n-title="ui.sizeGrow" title="창 높이 크게 (860)">
-      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-        <g class="ic-grow"><path d="M6 1v10M3 3.5 6 1l3 2.5M3 8.5 6 11l3-2.5"/></g>
-        <g class="ic-shrink"><path d="M6 1v3.5M6 7.5V11M3 2l3 2.5L9 2M3 10l3-2.5L9 10"/></g>
-      </svg>
+  <!-- 탭 바 — 다루는 대상별 3탭(IA v3) + 오른쪽 끝 최소화. [—]는 탭이 아니라 창 조작이라 tablist 밖에 둔다. -->
+  <div class="tabs" id="tabBar">
+    <div class="tab-list" role="tablist" aria-label="작업 탭">
+      <button class="tab-btn" id="tabbtn-variables" role="tab" aria-controls="tab-variables" data-i18n="tab.variables">변수</button>
+      <button class="tab-btn" id="tabbtn-layer" role="tab" aria-controls="tab-layer" data-i18n="tab.layer">레이어</button>
+      <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
+    </div>
+    <button class="tab-min" id="btnMinimize" type="button" data-i18n-title="ui.minimize" title="최소화" aria-label="최소화">
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 6h7"/></svg>
     </button>
   </div>
 
   <!-- 선택 동기화 (실시간) -->
   <div id="selBarWrap">
-    <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
+    <div class="selbar muted" id="selBar"><span class="sel-name" id="selName">● 선택 상태를 불러오는 중…</span><span class="sel-sub" id="selSub"></span></div>
   </div>
 
-  <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
+  <section class="tab-section" id="tab-variables" role="tabpanel" aria-labelledby="tabbtn-variables" tabindex="0">
+   <!-- PR 1 중간 상태(IA v3 §10): 첫 화면 = 지금 시작 탭 내용 + 변수 관리(세로 배치), [만들기]는 하위 화면. -->
+   <div id="varHome">
     <!-- 이미 있는 변수 안내 — 변수가 있는 파일에서 '만들기'를 거쳐 확인하게 하지 않는다(바로 연결로). -->
     <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
@@ -570,9 +633,28 @@
       <div id="pipelineSteps"></div>
       <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">컴포넌트는 필요할 때 적용 탭에서</div>
     </div>
-  </section>
 
-  <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
+    <div class="row"><button id="btnGoMake" data-i18n="var.goMake">색부터 하나씩 만들기 →</button></div>
+    <!-- 변수 관리 — PR 2에서 변수 목록으로 바뀐다. 400에서는 트리를 표 위에 쌓는다. -->
+    <section class="var-manager" id="varManager" aria-labelledby="vmTitle">
+      <div class="vm-head">
+        <h2 id="vmTitle" data-i18n="vm.title">변수 관리</h2>
+        <span class="grow"></span>
+        <input id="vmSearch" type="search" data-i18n-placeholder="vm.search" placeholder="변수 검색" />
+        <label class="inline"><input type="checkbox" id="vmOnlyUsed" checked /> <span data-i18n="vm.onlyUsed">선택에서 쓰는 것만</span></label>
+        <span class="muted" id="vmCount"></span>
+      </div>
+      <div class="vm-body">
+        <nav class="vm-tree" id="vmTree" aria-label="컬렉션·그룹"></nav>
+        <div class="vm-table-wrap" id="vmTableWrap"></div>
+      </div>
+      <div class="status" id="vmStatus"></div>
+    </section>
+   </div>
+
+   <!-- 만들기 하위 화면 — "← 돌아가기"로 변수 탭 첫 화면. -->
+   <div id="varMake" style="display:none">
+    <button class="link back-link" id="btnMakeBack" data-i18n="make.back">← 돌아가기</button>
     <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
@@ -719,9 +801,10 @@
       <div class="prereq" id="tsApplyPrereq" style="display:none;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
     </div>
+   </div>
   </section>
 
-  <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
+  <section class="tab-section" id="tab-layer" role="tabpanel" aria-labelledby="tabbtn-layer" tabindex="0">
     <!-- 적용 단계 레일 — 바인딩 → 리네임 → 구조(컴포넌트·닮은 프레임). -->
     <div class="steps steps-3" id="applyRail" role="tablist" aria-label="적용 단계">
       <button class="step-chip" data-apply-step="bind"><span class="n" data-i18n="rail.bind">연결</span><span data-i18n="rail.bindSub">변수 붙이기</span></button>
@@ -907,22 +990,16 @@
   <!-- 창 리사이즈 핸들(우하단) -->
   <div id="uiTip" role="tooltip" hidden></div>
 
-  <!-- 변수 관리(넓은 화면) — 탭 바의 [변수]로 연다. 탭 내용을 덮고, ‘돌아가기’로 보던 탭·스크롤로 복귀. -->
-  <section class="var-manager" id="varManager" style="display:none" aria-labelledby="vmTitle">
-    <div class="vm-head">
-      <button class="link" id="vmBack" data-i18n="vm.back">← 돌아가기</button>
-      <h2 id="vmTitle" data-i18n="vm.title">변수 관리</h2>
-      <span class="grow"></span>
-      <input id="vmSearch" type="search" data-i18n-placeholder="vm.search" placeholder="변수 검색" />
-      <label class="inline"><input type="checkbox" id="vmOnlyUsed" checked /> <span data-i18n="vm.onlyUsed">선택에서 쓰는 것만</span></label>
-      <span class="muted" id="vmCount"></span>
-    </div>
-    <div class="vm-body">
-      <nav class="vm-tree" id="vmTree" aria-label="컬렉션·그룹"></nav>
-      <div class="vm-table-wrap" id="vmTableWrap"></div>
-    </div>
-    <div class="status" id="vmStatus"></div>
-  </section>
+  <!-- 공통 상태 줄(§4.1) — 창 맨 아래 고정, 모든 탭 공통. 알림은 여기서만 한다. 버튼은 말줄임 밖. -->
+  <div class="status-line" id="statusLine" aria-live="polite">
+    <span class="sl-text" id="statusText"></span>
+    <button class="link sl-action" id="statusAction" type="button" hidden></button>
+  </div>
+
+  <!-- 최소화 상태(§4.9) — 창 400×48. 마크를 누르면 펼친다. -->
+  <div class="mini" id="miniView" hidden>
+    <button class="mini-mark" id="btnExpand" type="button" aria-label="펼치기"><span class="mark-text">DSL</span><span class="mini-badge" id="miniBadge" hidden></span></button>
+  </div>
 
   <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->
   <div id="overlayRoot"></div>
@@ -1150,7 +1227,6 @@
     // 라이선스
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
-    "premium.required": "{message} (\uC720\uB8CC \uAE30\uB2A5: {feature})",
     // 마법사 단계 라벨(WIZARD_STEPS id 기준) + 건너뜀 사유
     "wizard.step.extract": "\uCD94\uCD9C",
     "wizard.step.create": "\uD1A0\uD070",
@@ -1227,11 +1303,8 @@
     "common.cancel": "\uCDE8\uC18C",
     "common.close": "\uB2EB\uAE30",
     // 변수 관리(넓은 화면)
-    "vm.tab": "\uBCC0\uC218",
-    "vm.openTip": "\uBCC0\uC218 \uAD00\uB9AC \u2014 \uCC3D\uC774 \uB113\uC5B4\uC9D1\uB2C8\uB2E4",
     "vm.fromBind": "\uBCC0\uC218 \uAD00\uB9AC\uC5D0\uC11C \uBCF4\uAE30 \u2197",
     "vm.fromBanner": "\uBCC0\uC218 \uAD00\uB9AC",
-    "vm.back": "\u2190 \uB3CC\uC544\uAC00\uAE30",
     "vm.title": "\uBCC0\uC218 \uAD00\uB9AC",
     "vm.search": "\uBCC0\uC218 \uAC80\uC0C9",
     "vm.onlyUsed": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uAC83\uB9CC",
@@ -1270,12 +1343,44 @@
     "vm.dNoUses": "\uC120\uD0DD \uC548\uC5D0\uC11C\uB294 \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
     "vm.dSelectFirst": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uBA74 \uC4F0\uC778 \uACF3\uC774 \uBCF4\uC5EC\uC694.",
     // 탭
-    "tab.wizard": "\uC2DC\uC791",
-    "tab.tokens": "\uB9CC\uB4E4\uAE30",
-    "tab.apply": "\uC801\uC6A9",
+    "tab.variables": "\uBCC0\uC218",
+    "tab.layer": "\uB808\uC774\uC5B4",
     "tab.settings": "\uC124\uC815",
-    "ui.sizeGrow": "\uCC3D \uB192\uC774 \uD06C\uAC8C (860)",
-    "ui.sizeShrink": "\uCC3D \uB192\uC774 \uAE30\uBCF8\uC73C\uB85C (660)",
+    // 최소화(IA v3 §4.9)
+    "ui.minimize": "\uCD5C\uC18C\uD654",
+    "ui.expand": "\uD3BC\uCE58\uAE30",
+    "ui.expandBusy": "\uD3BC\uCE58\uAE30 \xB7 \uC791\uC5C5 \uC911",
+    "ui.expandFail": "\uD3BC\uCE58\uAE30 \xB7 \uC2E4\uD328\uD55C \uC791\uC5C5 \uC788\uC74C",
+    // 선택 표시줄(§4.1)
+    "sel.none": "\u25CF \uC120\uD0DD \uC5C6\uC74C \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    "sel.unnamed": "(\uC774\uB984 \uC5C6\uC74C)",
+    "sel.many": "\u25CF \uB808\uC774\uC5B4 {k}\uAC1C",
+    "sel.sub": "\xA0\xB7 \uD558\uC704 {n}",
+    // 앞 공백은 줄바꿈 없는 공백 — 플렉스 항목 앞 공백은 사라진다
+    // 공통 상태 줄(§4.1·§2.3)
+    "status.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4\uC5D0\uC11C \uD480 \uC218 \uC788\uC5B4\uC694",
+    "status.paidAction": "\uB77C\uC774\uC120\uC2A4 \u2192",
+    "lock.tipSuffix": "\uC720\uB8CC \uAE30\uB2A5 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4",
+    "status.noSelection": "\uC120\uD0DD\uC774 \uC5C6\uC5B4\uC694 \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    "status.failed": "{op} \uC2E4\uD328",
+    "status.view": "\uBCF4\uAE30",
+    // 작업 이름 — 최소화 중 실패 안내("{op} 실패 · [보기]")
+    "op.extract": "\uCD94\uCD9C",
+    "op.create": "\uD1A0\uD070 \uB9CC\uB4E4\uAE30",
+    "op.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "op.dark": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
+    "op.textScan": "\uD14D\uC2A4\uD2B8 \uC2A4\uCE94",
+    "op.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D",
+    "op.textApply": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
+    "op.bind": "\uC5F0\uACB0",
+    "op.rename": "\uC774\uB984 \uC815\uB9AC",
+    "op.components": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "op.export": "\uB0B4\uBCF4\uB0B4\uAE30",
+    "op.roles": "\uACC4\uCE35 \uC9C0\uC815",
+    "op.wizard": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
+    // 변수 탭 하위 화면(PR 1 중간 상태)
+    "var.goMake": "\uC0C9\uBD80\uD130 \uD558\uB098\uC529 \uB9CC\uB4E4\uAE30 \u2192",
+    "make.back": "\u2190 \uB3CC\uC544\uAC00\uAE30",
     // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
     "rail.color": "\uC0C9",
     "rail.colorSub": "\uCD94\uCD9C\xB7\uBCC0\uC218",
@@ -1868,6 +1973,64 @@
     return (_c = (_b = (_a = tree.find((n) => n.count > 0)) != null ? _a : tree[0]) == null ? void 0 : _b.collectionId) != null ? _c : null;
   }
 
+  // src/lib/reread.ts
+  function createReentryScheduler(run, isHeld, clock, opts = {}) {
+    var _a, _b;
+    const debounceMs = (_a = opts.debounceMs) != null ? _a : 400;
+    const minIntervalMs = (_b = opts.minIntervalMs) != null ? _b : 2e3;
+    let debounce = null;
+    let interval = null;
+    let held = false;
+    let lastRun = -Infinity;
+    const attempt = () => {
+      if (isHeld()) {
+        held = true;
+        return;
+      }
+      const wait = lastRun + minIntervalMs - clock.now();
+      if (wait > 0) {
+        if (interval === null) {
+          interval = clock.set(() => {
+            interval = null;
+            attempt();
+          }, wait);
+        }
+        return;
+      }
+      held = false;
+      lastRun = clock.now();
+      run();
+    };
+    return {
+      signal() {
+        if (debounce !== null) clock.clear(debounce);
+        debounce = clock.set(() => {
+          debounce = null;
+          attempt();
+        }, debounceMs);
+      },
+      release() {
+        if (!held || debounce !== null || interval !== null) return;
+        attempt();
+      },
+      cancel() {
+        if (debounce !== null) clock.clear(debounce);
+        if (interval !== null) clock.clear(interval);
+        debounce = null;
+        interval = null;
+        held = false;
+      },
+      pending() {
+        return held || debounce !== null || interval !== null;
+      }
+    };
+  }
+  function selectionSummary(count, scanned, capped) {
+    if (count <= 0) return { kind: "none", sub: "" };
+    const n = Math.max(0, scanned - count);
+    return { kind: count === 1 ? "one" : "many", sub: `${n}${capped ? "+" : ""}` };
+  }
+
   // src/lib/color.ts
   var mod360 = (h) => (h % 360 + 360) % 360;
   function srgbToLinear(c) {
@@ -2424,6 +2587,7 @@
   var lastSentMsg = null;
   function send(msg) {
     if (msg.type !== "CANCEL") lastSentMsg = msg;
+    opSent(msg);
     parent.postMessage({ pluginMessage: msg }, "*");
   }
   var HEX6 = /^#[0-9a-fA-F]{6}$/;
@@ -2458,6 +2622,7 @@
   var hasBoundNodes = false;
   var hasRenamedNodes = false;
   var lastSelCount = 0;
+  var lastSelScanned = 0;
   var createFrom = "tokens";
   var semStatusTarget = "colorStatus";
   var semStatusPrefix = "";
@@ -3340,7 +3505,9 @@
       box.appendChild(chip);
     }
   }
+  var wizardFailed = false;
   function setWizardStep(id, state, note) {
+    if (state === "fail" && note !== t("wizard.seq.stoppedPrev")) wizardFailed = true;
     const chip = document.getElementById(`wstep-${id}`);
     if (!chip) return;
     chip.classList.remove("active", "done", "fail");
@@ -3367,6 +3534,8 @@
     const ctx = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
     const plan = planWizard(options, ctx);
     wizardRunning = true;
+    wizardFailed = false;
+    opWizardStart();
     $("btnWizardRun").disabled = true;
     $("btnWizardCancel").style.display = "";
     setStatus("wizardSummary", t("common.running"), "");
@@ -3491,6 +3660,7 @@
       }
     }
     wizardRunning = false;
+    opWizardEnd(wizardFailed ? "fail" : stopped ? "cancel" : "ok");
     $("btnWizardRun").disabled = false;
     setWizardRunLabel(!stopped);
     $("btnWizardCancel").style.display = "none";
@@ -3588,12 +3758,6 @@
     }
   }
   var PAID_LOCK = "\u{1F512}";
-  var PREMIUM_STATUS_ID = {
-    tokens: "createStatus",
-    semantics: "semStatus",
-    components: "structureStatus",
-    textStyles: "tsStatus"
-  };
   var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnComponentize"];
   var PAID_FIELDS = [
     ...COMPONENT_FIELDS,
@@ -3610,7 +3774,7 @@
   function updateGates() {
     for (const id of PAID_FIELDS) {
       const el = $(id);
-      el.disabled = !isPaid;
+      setLock(el, isPaid ? null : "paid");
       setLockTitle(el, !isPaid);
     }
     for (const id of ["paletteLock", "paletteBtnLock", "colorVarsLock", "componentLock", "darkLock", "createLock", "semLock", "tsLock"]) {
@@ -3624,33 +3788,42 @@
       ["wizOptComponentize", "wizComponentLock"]
     ]) {
       $(lock).textContent = isPaid ? "" : PAID_LOCK;
-      $(box).disabled = !isPaid;
+      const input = $(box);
+      if (!isPaid && !isLocked(input)) {
+        input.dataset.wasChecked = String(input.checked);
+        input.checked = false;
+      }
+      if (isPaid && isLocked(input) && input.dataset.wasChecked !== void 0) {
+        input.checked = input.dataset.wasChecked === "true";
+        delete input.dataset.wasChecked;
+      }
+      setLock(input, isPaid ? null : "paid");
     }
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
-    if (!isPaid) $("btnSemantics").disabled = true;
+    if (!isPaid) setLock($("btnSemantics"), "paid");
     setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
-    if (prereqKnown && !hasBindable) $("btnApplyConfirm").disabled = true;
+    setLock($("btnApplyConfirm"), prereqKnown && !hasBindable ? "prereq" : null, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
-    if (!isPaid) $("btnApplyExistingText").disabled = true;
+    if (!isPaid) setLock($("btnApplyExistingText"), "paid");
   }
   function setLockTitle(el, locked) {
     var _a;
     const attr = el.hasAttribute("data-tip") ? "data-tip" : "title";
     if (el.dataset.baseTip === void 0) el.dataset.baseTip = (_a = el.getAttribute(attr)) != null ? _a : "";
     const base = el.dataset.baseTip;
-    el.setAttribute(attr, locked ? base ? `${base} \xB7 ${PAID_LOCK}` : PAID_LOCK : base);
+    const note = t("lock.tipSuffix");
+    el.setAttribute(attr, locked ? base ? `${base} \xB7 ${note}` : note : base);
   }
   function setPrereq(btnId, noticeId, okRaw, msg) {
     const ok = okRaw || !prereqKnown;
-    $(btnId).disabled = !ok;
+    setLock($(btnId), ok ? null : "prereq", msg);
     const notice = $(noticeId);
     notice.style.display = ok ? "none" : "";
     const text = notice.querySelector(".prereq-text");
     if (text) text.textContent = ok ? "" : msg;
   }
   function goToCreate() {
-    showTab("tokens");
-    showMakeStep("token");
+    showMake("token");
     $("createCard").scrollIntoView({ behavior: "smooth", block: "center" });
     $("btnCreate").focus();
   }
@@ -3670,11 +3843,10 @@
     var _a;
     const target = PIPELINE_TARGET[id];
     if (target.make === null) {
-      showTab("apply");
+      showTab("layer");
       showApplyStep((_a = target.apply) != null ? _a : "bind");
     } else {
-      showTab("tokens");
-      showMakeStep(target.make);
+      showMake(target.make);
     }
     const b = $(target.btn);
     b.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -3741,6 +3913,7 @@
     refreshDarkModes();
   }
   function refreshDarkModes() {
+    var _a;
     const colId = $("darkCollection").value;
     const v = allVars.find((x) => x.collectionId === colId);
     const modes = v ? v.modes : [];
@@ -3760,7 +3933,6 @@
     }
     const hasCollection = !!colId && modes.length >= 1;
     const ok = hasCollection && varsLoaded && allVars.length > 0;
-    $("btnGenDark").disabled = !ok || !isPaid;
     const notice = $("darkPrereq");
     const gotoCreate = $("darkPrereqGotoCreate");
     notice.style.display = ok ? "none" : "";
@@ -3780,6 +3952,8 @@
         gotoCreate.style.display = "none";
       }
     }
+    const darkBtn = $("btnGenDark");
+    setLock(darkBtn, !isPaid ? "paid" : ok ? null : "prereq", ((_a = text == null ? void 0 : text.textContent) != null ? _a : "") || t("status.noSelection"));
     const toSel = $("darkToMode");
     const darkMode = modes.find((m) => m.name.toLowerCase() === "dark");
     if (!restored["darkToMode"]) {
@@ -3897,6 +4071,7 @@
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     const msg = event.data.pluginMessage;
     if (!msg) return;
+    opReceived(msg);
     switch (msg.type) {
       case "EXTRACT_RESULT": {
         tokens = msg.tokens;
@@ -3925,7 +4100,8 @@
       }
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
-        renderSelBar(msg.count, msg.scanned, msg.bindable, msg.capped);
+        lastSelScanned = msg.scanned;
+        renderSelBar(msg.count, msg.scanned, msg.capped, (_a = msg.firstName) != null ? _a : "");
         lastSelBound = msg.bound;
         lastSelRenamed = msg.renamed;
         applySelectionDone();
@@ -3988,8 +4164,8 @@
         hideApplyProgress();
         markBindStale(false);
         const confirmBtn = $("btnApplyConfirm");
-        bindSkips = (_a = msg.skips) != null ? _a : [];
-        bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
+        bindSkips = (_b = msg.skips) != null ? _b : [];
+        bindSkipsCapped = ((_c = msg.skipTotal) != null ? _c : bindSkips.length) > bindSkips.length;
         const rt = reasonsText(msg.reasons);
         const asChips = bindSkips.length > 0;
         const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt && !asChips ? ` \u2014 ${rt}` : ""}`;
@@ -4001,8 +4177,8 @@
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
           bindResultMode = false;
-          bindCandidates = (_c = msg.candidates) != null ? _c : [];
-          bindNodes = (_d = msg.nodes) != null ? _d : [];
+          bindCandidates = (_d = msg.candidates) != null ? _d : [];
+          bindNodes = (_e = msg.nodes) != null ? _e : [];
           bindChecked.clear();
           for (const c of bindCandidates) bindChecked.add(candKey(c));
           renderBindTree();
@@ -4010,13 +4186,13 @@
         } else {
           clearBindPreview();
           bindResultMode = true;
-          bindCandidates = (_e = msg.candidates) != null ? _e : [];
-          bindNodes = (_f = msg.nodes) != null ? _f : [];
-          bindSkips = (_g = msg.skips) != null ? _g : [];
-          bindSkipsCapped = ((_h = msg.skipTotal) != null ? _h : bindSkips.length) > bindSkips.length;
+          bindCandidates = (_f = msg.candidates) != null ? _f : [];
+          bindNodes = (_g = msg.nodes) != null ? _g : [];
+          bindSkips = (_h = msg.skips) != null ? _h : [];
+          bindSkipsCapped = ((_i = msg.skipTotal) != null ? _i : bindSkips.length) > bindSkips.length;
           renderSkipReasons(msg.reasons);
           renderBindTree();
-          const capped = ((_i = msg.candidateTotal) != null ? _i : bindCandidates.length) > bindCandidates.length;
+          const capped = ((_j = msg.candidateTotal) != null ? _j : bindCandidates.length) > bindCandidates.length;
           const capNote = capped ? t("apply.resultCapped", { shown: bindCandidates.length }) : "";
           setStatus("applyStatus", t("apply.done", { bound: msg.bound, detail }) + capNote, msg.skipped ? "warn" : "ok");
           confirmBtn.style.display = "none";
@@ -4039,14 +4215,26 @@
         if (vmOpen) requestManagerUsage();
         break;
       }
-      case "VAR_TABLE":
+      case "VAR_TABLE": {
+        const sig = JSON.stringify([msg.collections, msg.vars]);
+        if (sig === vmTableSig) break;
+        vmTableSig = sig;
         vmCols = msg.collections;
         vmVars = msg.vars;
         renderVarManager();
         break;
+      }
       case "BINDINGS_RESULT": {
         if (msg.forManager) {
-          if (msg.reqId === vmUsageReq) setManagerUsage(msg.candidates, msg.nodes, msg.total > msg.candidates.length);
+          if (msg.reqId === vmUsageReq) {
+            vmUsageInFlight = false;
+            const sig = JSON.stringify([msg.candidates.map((c) => [c.variableId, c.nodeId, c.field]), msg.total]);
+            if (sig !== vmUsageSig || vmUsage === null) {
+              vmUsageSig = sig;
+              setManagerUsage(msg.candidates, msg.nodes, msg.total > msg.candidates.length);
+            }
+            reentry.release();
+          }
           break;
         }
         if (!isCurrentBindReply(msg.reqId)) break;
@@ -4089,7 +4277,7 @@
           }) : [];
           tsSpecs = [...msg.styles.map((x) => __spreadValues({}, x)), ...manual];
           tsScanNote = {
-            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_j = msg.fallback) != null ? _j : 0}` : "",
+            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_k = msg.fallback) != null ? _k : 0}` : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -4134,7 +4322,8 @@
       case "PREREQ_STATE":
         prereqKnown = true;
         prereqInFlight = false;
-        renderExistingVars((_k = msg.tierVars) != null ? _k : 0, (_l = msg.tierColorVars) != null ? _l : 0, (_m = msg.otherVars) != null ? _m : 0);
+        reentry.release();
+        renderExistingVars((_l = msg.tierVars) != null ? _l : 0, (_m = msg.tierColorVars) != null ? _m : 0, (_n = msg.otherVars) != null ? _n : 0);
         hasColorVars = msg.hasColorVars;
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
@@ -4201,7 +4390,7 @@
         break;
       }
       case "UI_SIZE": {
-        renderUiSize(msg.mode);
+        if (msg.mode === "mini" !== isMini) setMini(msg.mode === "mini", false);
         break;
       }
       case "SETTINGS": {
@@ -4266,8 +4455,7 @@
         break;
       }
       case "PREMIUM_REQUIRED": {
-        const statusId = resolveStatusId((_n = PREMIUM_STATUS_ID[msg.feature]) != null ? _n : "createStatus");
-        setStatus(statusId, t("premium.required", { message: msg.message, feature: msg.feature }), "warn");
+        showPaidReason();
         break;
       }
       case "REQUEST_VERIFY":
@@ -4563,7 +4751,7 @@
     return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
   }
   $("bindFilter").addEventListener("input", () => renderBindTree());
-  $("btnBindToManager").addEventListener("click", () => openVarManager({ onlyUsed: true }));
+  $("btnBindToManager").addEventListener("click", () => showManager({ onlyUsed: true }));
   function updateBindApply() {
     const total = bindCandidates.length;
     const sel = bindChecked.size;
@@ -4783,11 +4971,19 @@
   function hideApplyProgress() {
     $("applyProgress").style.display = "none";
   }
-  function renderSelBar(count, scanned, bindable, capped) {
-    const el = $("selBar");
-    const plus = capped ? "+" : "";
-    el.textContent = count > 0 ? `\u25CF \uC120\uD0DD ${count}\uAC1C \xB7 \uC694\uC18C ${scanned}${plus}\uAC1C \xB7 \uBC14\uC778\uB529 \uD6C4\uBCF4 ${bindable}${plus}\uAC1C` : "\u25CF \uC120\uD0DD \uC5C6\uC74C \u2014 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694";
-    el.className = count > 0 ? "selbar" : "selbar muted";
+  function renderSelBar(count, scanned, capped, firstName) {
+    const sum = selectionSummary(count, scanned, capped);
+    const name = $("selName");
+    const sub = $("selSub");
+    if (sum.kind === "none") {
+      name.textContent = t("sel.none");
+      sub.textContent = "";
+    } else {
+      name.textContent = sum.kind === "one" ? `\u25CF ${firstName || t("sel.unnamed")}` : t("sel.many", { k: count });
+      sub.textContent = t("sel.sub", { n: sum.sub });
+    }
+    name.title = sum.kind === "one" ? firstName : "";
+    $("selBar").className = count > 0 ? "selbar" : "selbar muted";
   }
   function setStatus(id, text, cls) {
     const el = $(id);
@@ -4804,8 +5000,12 @@
     const tabsH = Math.round(tabs.getBoundingClientRect().height);
     const barH = Math.round(bar.getBoundingClientRect().height);
     const root = document.documentElement;
+    const headTop = tabsH + (bar.style.display === "none" ? 0 : barH);
     root.style.setProperty("--tabs-h", `${tabsH}px`);
-    root.style.setProperty("--head-top", `${tabsH + barH}px`);
+    root.style.setProperty("--head-top", `${headTop}px`);
+    const head = document.querySelector(".tab-section.active .step:not(.collapsed) .step-head");
+    const headH = head && head.offsetParent ? Math.round(head.getBoundingClientRect().height) : 26;
+    root.style.setProperty("--toolbar-top", `${headTop + headH}px`);
   }
   function applyCardChrome() {
     document.querySelectorAll(".step").forEach((card) => {
@@ -4902,6 +5102,307 @@
       });
     }
   }
+  var statusTimer = null;
+  var statusSticky = false;
+  function showStatusLine(text, opts = {}) {
+    var _a;
+    if (opts.background && statusSticky) return;
+    const line = $("statusLine");
+    const txt = $("statusText");
+    const btn = $("statusAction");
+    if (statusTimer) {
+      clearTimeout(statusTimer);
+      statusTimer = null;
+    }
+    txt.textContent = text;
+    txt.title = text;
+    line.className = `status-line ${(_a = opts.cls) != null ? _a : ""}`.trim();
+    if (opts.action) {
+      btn.textContent = opts.action.label;
+      btn.onclick = () => {
+        const a = opts.action;
+        clearStatusLine();
+        a.run();
+      };
+      btn.hidden = false;
+      statusSticky = true;
+    } else {
+      btn.hidden = true;
+      btn.onclick = null;
+      statusSticky = false;
+      if (text) statusTimer = setTimeout(clearStatusLine, 4e3);
+    }
+  }
+  function clearStatusLine() {
+    if (statusTimer) {
+      clearTimeout(statusTimer);
+      statusTimer = null;
+    }
+    statusSticky = false;
+    $("statusText").textContent = "";
+    $("statusText").title = "";
+    const btn = $("statusAction");
+    btn.hidden = true;
+    btn.onclick = null;
+    $("statusLine").className = "status-line";
+  }
+  function dismissStickyOnAction(e) {
+    if (!statusSticky) return;
+    const target = e.target;
+    if (target && target.closest("#statusAction")) return;
+    if (e.type === "keydown") {
+      const k = e.key;
+      if (k === "Tab" || k.startsWith("Arrow") || k === "Shift" || k === "Home" || k === "End" || k === "PageUp" || k === "PageDown" || k === "Escape") return;
+    }
+    clearStatusLine();
+  }
+  document.addEventListener("pointerdown", dismissStickyOnAction, true);
+  document.addEventListener("keydown", dismissStickyOnAction, true);
+  function showPaidReason() {
+    showStatusLine(t("status.paid"), { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
+  }
+  function goToLicense() {
+    showTab("settings");
+    requestAnimationFrame(() => {
+      $("licenseKey").scrollIntoView({ block: "center" });
+      $("licenseKey").focus();
+    });
+  }
+  function setLock(el, reason, prereqMsg = "") {
+    if (reason) {
+      el.setAttribute("aria-disabled", "true");
+      el.dataset.lock = reason;
+      if (reason === "prereq") el.dataset.lockMsg = prereqMsg;
+      else delete el.dataset.lockMsg;
+    } else {
+      el.removeAttribute("aria-disabled");
+      delete el.dataset.lock;
+      delete el.dataset.lockMsg;
+    }
+  }
+  function isLocked(el) {
+    return el.getAttribute("aria-disabled") === "true";
+  }
+  function onLockedActivate(e) {
+    var _a;
+    const el = (_a = e.target) == null ? void 0 : _a.closest('[aria-disabled="true"]');
+    if (!el) return;
+    if (e.type === "keydown") {
+      const k = e.key;
+      if (k !== "Enter" && k !== " ") return;
+    }
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.type === "click" || e.type === "keydown") {
+      if (el.dataset.lock === "paid") showPaidReason();
+      else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: "warn" });
+    }
+  }
+  document.addEventListener("click", onLockedActivate, true);
+  document.addEventListener("keydown", onLockedActivate, true);
+  var isMini = false;
+  var miniFailure = null;
+  var miniOkTimer = null;
+  function setMini(on, notify = true) {
+    if (on === isMini) return;
+    isMini = on;
+    if (on) {
+      closeMenu();
+      closeModal();
+      hideUiTip();
+      reentry.cancel();
+    }
+    document.body.classList.toggle("is-mini", on);
+    $("miniView").hidden = !on;
+    if (notify) send({ type: "SET_UI_SIZE", mode: on ? "mini" : "default" });
+    if (on) {
+      renderMiniMark();
+      $("btnExpand").focus();
+      return;
+    }
+    const fail = miniFailure;
+    miniFailure = null;
+    if (miniOkTimer) {
+      clearTimeout(miniOkTimer);
+      miniOkTimer = null;
+    }
+    $("miniBadge").hidden = true;
+    if (fail) showStatusLine(t("status.failed", { op: fail.label }), { cls: "warn", action: { label: t("status.view"), run: fail.go } });
+    syncStickyOffsets();
+    $("btnMinimize").focus();
+    readScreen("expand");
+  }
+  function renderMiniMark() {
+    const mark = $("btnExpand");
+    const busy = opBusy();
+    mark.classList.toggle("busy", busy);
+    const prog = opProgress();
+    mark.classList.toggle("spin", busy && prog === null);
+    mark.style.setProperty("--prog", `${prog === null ? 25 : Math.round(prog * 100)}%`);
+    const label = miniFailure ? t("ui.expandFail") : busy ? t("ui.expandBusy") : t("ui.expand");
+    mark.setAttribute("aria-label", label);
+    mark.title = label;
+  }
+  function showMiniResult(ok, fail) {
+    if (!isMini) return;
+    const badge = $("miniBadge");
+    if (miniOkTimer) {
+      clearTimeout(miniOkTimer);
+      miniOkTimer = null;
+    }
+    if (ok) {
+      if (miniFailure) return;
+      badge.className = "mini-badge ok";
+      badge.textContent = "\u2713";
+      badge.hidden = false;
+      miniOkTimer = setTimeout(() => {
+        badge.hidden = true;
+        miniOkTimer = null;
+      }, 3e3);
+    } else if (fail) {
+      miniFailure = fail;
+      badge.className = "mini-badge fail";
+      badge.textContent = "!";
+      badge.hidden = false;
+    }
+    renderMiniMark();
+  }
+  $("btnMinimize").addEventListener("click", () => setMini(true));
+  $("btnExpand").addEventListener("click", () => setMini(false));
+  var goLayer = (step) => () => {
+    showTab("layer");
+    showApplyStep(step);
+  };
+  var OPS = {
+    EXTRACT: { results: ["EXTRACT_RESULT"], label: "op.extract", go: () => showMake("color"), write: false },
+    CREATE_TOKENS: { results: ["CREATE_RESULT"], label: "op.create", go: () => showMake("token"), write: true },
+    CREATE_SEMANTICS: { results: ["SEMANTICS_RESULT"], label: "op.semantics", go: () => showMake("token"), write: true },
+    GENERATE_DARK_MODE: { results: ["DARK_MODE_RESULT"], label: "op.dark", go: () => showMake("theme"), write: true },
+    SCAN_TEXT_STYLES: { results: ["TEXT_STYLE_CANDIDATES"], label: "op.textScan", go: () => showMake("type"), write: false },
+    CREATE_TEXT_STYLES: { results: ["TEXT_STYLES_RESULT"], label: "op.textStyles", go: () => showMake("type"), write: true },
+    APPLY_TEXT_STYLES: { results: ["TEXT_STYLES_APPLIED"], label: "op.textApply", go: () => showMake("type"), write: true },
+    APPLY: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: false },
+    APPLY_SELECTED: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: true },
+    RENAME: { results: ["RENAME_RESULT"], label: "op.rename", go: goLayer("rename"), write: false },
+    RENAME_APPLY: { results: ["RENAME_RESULT"], label: "op.rename", go: goLayer("rename"), write: true },
+    SCAN_COMPONENT_CANDIDATES: { results: ["COMPONENT_CANDIDATES"], label: "op.components", go: goLayer("structure"), write: false },
+    REGISTER_COMPONENTS: { results: ["COMPONENTS_RESULT"], label: "op.components", go: goLayer("structure"), write: true },
+    CLASSIFY_VARIANTS: { results: ["VARIANTS_RESULT"], label: "op.components", go: goLayer("structure"), write: true },
+    GENERATE_MISSING_VARIANTS: { results: ["GENERATE_RESULT"], label: "op.components", go: goLayer("structure"), write: true },
+    SCAN_SIMILAR: { results: ["SIMILAR_CANDIDATES"], label: "op.components", go: goLayer("structure"), write: false },
+    COMPONENTIZE_SIMILAR: { results: ["COMPONENTIZE_RESULT"], label: "op.components", go: goLayer("structure"), write: true },
+    EXPORT: { results: ["EXPORT_RESULT"], label: "op.export", go: () => showTab("settings"), write: false },
+    SET_COLLECTION_ROLE: { results: ["COLLECTION_ROLES"], label: "op.roles", go: () => showTab("settings"), write: true }
+  };
+  var opPending = /* @__PURE__ */ new Map();
+  var opWizard = false;
+  var opProg = null;
+  var opBusy = () => opWizard || opPending.size > 0;
+  var opProgress = () => opProg;
+  function opSent(msg) {
+    if (wizardRunning) return;
+    const def = OPS[msg.type];
+    if (!def) return;
+    opPending.set(msg.type, def);
+    if (msg.type === "APPLY_SELECTED" || msg.type === "APPLY") opProg = null;
+    if (isMini) renderMiniMark();
+  }
+  function opReceived(m) {
+    var _a, _b;
+    if (m.type === "PROGRESS") {
+      opProg = m.total > 0 ? Math.min(1, m.done / m.total) : null;
+      if (isMini) renderMiniMark();
+      return;
+    }
+    if (wizardRunning) return;
+    if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
+      const defs = [...opPending.values()];
+      if (!defs.length) return;
+      opPending.clear();
+      opProg = null;
+      opFinished(false, defs[0]);
+      return;
+    }
+    for (const [type, def] of opPending) {
+      if (!def.results.includes(m.type)) continue;
+      opPending.delete(type);
+      opProg = null;
+      let failed = false;
+      let cancelled = false;
+      if (m.type === "DARK_MODE_RESULT" && m.error) failed = true;
+      if ((m.type === "COMPONENTS_RESULT" || m.type === "VARIANTS_RESULT") && ((_b = (_a = m.failures) == null ? void 0 : _a.length) != null ? _b : 0) > 0) failed = true;
+      if (m.type === "APPLY_RESULT" && m.cancelled) cancelled = true;
+      if (cancelled) {
+        if (isMini) renderMiniMark();
+      } else opFinished(!failed, def);
+      if (def.write && !failed) readScreen("work");
+      return;
+    }
+  }
+  function opFinished(ok, def) {
+    if (!isMini) return;
+    if (ok) showMiniResult(true);
+    else showMiniResult(false, { label: t(def.label), go: def.go });
+    renderMiniMark();
+  }
+  function opWizardStart() {
+    opWizard = true;
+    if (isMini) renderMiniMark();
+  }
+  function opWizardEnd(result) {
+    opWizard = false;
+    opProg = null;
+    if (result !== "cancel") opFinished(result === "ok", { results: [], label: "op.wizard", go: () => {
+      showTab("variables");
+      showVarSub("home");
+    }, write: true });
+    else if (isMini) renderMiniMark();
+    readScreen("work");
+    reentry.release();
+  }
+  function readScreen(why) {
+    if (isMini) return;
+    if (activeTab !== "settings" || why === "work") requestPrereq();
+    if (activeTab === "variables" && varSub === "home") {
+      send({ type: "GET_VAR_TABLE" });
+      requestManagerUsage(why === "work" ? "work" : "quiet");
+    } else if (activeTab === "variables" && varSub === "make") {
+      send({ type: "GET_VARIABLES" });
+    } else if (activeTab === "settings") {
+      send({ type: "GET_COLLECTION_ROLES" });
+    }
+    if (why === "work" && !(activeTab === "variables" && varSub === "home")) send({ type: "GET_VAR_TABLE" });
+  }
+  var pointerDown = false;
+  var reentryHeld = () => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || vmUsageReq !== 0;
+  var reentry = createReentryScheduler(() => readScreen("reentry"), reentryHeld, {
+    now: () => Date.now(),
+    set: (fn, ms) => setTimeout(fn, ms),
+    clear: (h) => clearTimeout(h)
+  });
+  var pointerOutside = false;
+  document.documentElement.addEventListener("pointerleave", () => {
+    pointerOutside = true;
+  });
+  document.documentElement.addEventListener("pointerenter", () => {
+    if (!pointerOutside) return;
+    pointerOutside = false;
+    if (!isMini) reentry.signal();
+  });
+  window.addEventListener("focus", () => {
+    if (!isMini) reentry.signal();
+  });
+  document.addEventListener("pointerdown", () => {
+    pointerDown = true;
+  }, true);
+  document.addEventListener("pointerup", () => {
+    pointerDown = false;
+    reentry.release();
+  }, true);
+  document.addEventListener("pointercancel", () => {
+    pointerDown = false;
+    reentry.release();
+  }, true);
   applyStaticI18n();
   applyCardChrome();
   applyButtonTips();
@@ -4913,23 +5414,6 @@
     ro.observe($("selBarWrap"));
   }
   window.addEventListener("resize", syncStickyOffsets);
-  var uiSizeMode = "default";
-  function renderUiSize(mode) {
-    uiSizeMode = mode;
-    const btn = $("btnUiSize");
-    const key = mode === "large" ? "ui.sizeShrink" : "ui.sizeGrow";
-    btn.setAttribute("aria-pressed", String(mode === "large"));
-    btn.dataset.i18nTitle = key;
-    btn.title = t(key);
-    btn.setAttribute("aria-label", t(key));
-  }
-  $("btnUiSize").addEventListener("click", () => {
-    const next = uiSizeMode === "large" ? "default" : "large";
-    renderUiSize(next);
-    send({ type: "SET_UI_SIZE", mode: next });
-  });
-  renderUiSize("default");
-  send({ type: "GET_UI_SIZE" });
   updateGates();
   renderPipeline();
   renderTokens();
@@ -4941,24 +5425,55 @@
   send({ type: "GET_SETTINGS" });
   refreshDarkModes();
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
-  var TABS = ["wizard", "tokens", "apply", "settings"];
+  var TABS = ["variables", "layer", "settings"];
+  var activeTab = "variables";
+  var varSub = "home";
+  var screenScroll = /* @__PURE__ */ new Map();
+  var screenKey = () => activeTab === "variables" ? `variables:${varSub}` : activeTab;
   function showTab(name) {
-    if (vmOpen) leaveManagerUi();
-    for (const t2 of TABS) {
-      $(`tab-${t2}`).classList.toggle("active", t2 === name);
-      const btn = $(`tabbtn-${t2}`);
-      const on = t2 === name;
+    var _a;
+    const changed = name !== activeTab;
+    if (changed) screenScroll.set(screenKey(), window.scrollY);
+    activeTab = name;
+    for (const tb of TABS) {
+      $(`tab-${tb}`).classList.toggle("active", tb === name);
+      const btn = $(`tabbtn-${tb}`);
+      const on = tb === name;
       btn.classList.toggle("active", on);
       btn.setAttribute("aria-selected", String(on));
       btn.tabIndex = on ? 0 : -1;
     }
     $("selBarWrap").style.display = name === "settings" ? "none" : "";
-    if (name !== "settings") requestPrereq();
-    if (name === "tokens") send({ type: "GET_VARIABLES" });
-    if (name === "settings") send({ type: "GET_COLLECTION_ROLES" });
+    syncManagerVisibility(false);
+    syncStickyOffsets();
+    if (changed) {
+      const y = (_a = screenScroll.get(screenKey())) != null ? _a : 0;
+      requestAnimationFrame(() => window.scrollTo(0, y));
+      readScreen("enter");
+    }
+  }
+  function showVarSub(sub) {
+    var _a;
+    if (sub === varSub) return;
+    if (activeTab === "variables") screenScroll.set(screenKey(), window.scrollY);
+    varSub = sub;
+    $("varHome").style.display = sub === "home" ? "" : "none";
+    $("varMake").style.display = sub === "make" ? "" : "none";
+    syncManagerVisibility(false);
+    syncStickyOffsets();
+    if (activeTab === "variables") {
+      const y = (_a = screenScroll.get(screenKey())) != null ? _a : 0;
+      requestAnimationFrame(() => window.scrollTo(0, y));
+      readScreen("enter");
+    }
+  }
+  function showMake(step) {
+    showTab("variables");
+    showVarSub("make");
+    if (step) showMakeStep(step);
   }
   function goToBindStatus() {
-    showTab("apply");
+    showTab("layer");
     showApplyStep("bind");
     if (lastSelCount > 0) {
       setStatus("applyStatus", t("common.running"), "");
@@ -4976,7 +5491,7 @@
       const go = box.querySelector(".ev-go");
       const manage = box.querySelector(".ev-manage");
       manage.textContent = t("vm.fromBanner");
-      manage.onclick = () => openVarManager({ onlyUsed: false });
+      manage.onclick = () => showManager({ onlyUsed: false });
       manage.style.display = tierVars + other > 0 ? "" : "none";
       if (tierVars > 0) {
         text.textContent = onMake ? t("existingVars.hasMake", { n: tierVars }) : t("existingVars.has", { n: tierVars, color: tierColor, other: tierVars - tierColor });
@@ -5075,7 +5590,11 @@
       $(`tabbtn-${target}`).focus();
     });
   });
-  showTab("wizard");
+  $("btnGoMake").addEventListener("click", () => showMake("color"));
+  $("btnMakeBack").addEventListener("click", () => {
+    showVarSub("home");
+    $("btnGoMake").focus();
+  });
   function showStep(attr, step) {
     const key = attr === "make" ? "data-make-step" : "data-apply-step";
     const rail = $(attr === "make" ? "makeRail" : "applyRail");
@@ -5107,8 +5626,10 @@
   }
   var menuEl = null;
   function closeMenu() {
-    menuEl == null ? void 0 : menuEl.remove();
+    if (!menuEl) return;
+    menuEl.remove();
     menuEl = null;
+    reentry.release();
   }
   function openMenu(x, y, items, returnFocus) {
     var _a;
@@ -5170,6 +5691,7 @@
     modalEl = null;
     modalReturnFocus == null ? void 0 : modalReturnFocus.focus();
     modalReturnFocus = null;
+    reentry.release();
   }
   function openModal(title, body, foot) {
     var _a;
@@ -5261,27 +5783,22 @@
   var vmUsageNodes = /* @__PURE__ */ new Map();
   var vmUsageCapped = false;
   var vmUsageReq = 0;
-  var vmReturn = null;
-  function currentTab() {
-    var _a;
-    return (_a = TABS.find((t2) => $(`tab-${t2}`).classList.contains("active"))) != null ? _a : "wizard";
-  }
-  function openVarManager(opts = {}) {
-    if (!vmOpen) {
-      vmReturn = { tab: currentTab(), scrollY: window.scrollY };
+  var vmUsageSig = "";
+  var vmTableSig = "";
+  var vmUsageInFlight = false;
+  function syncManagerVisibility(read) {
+    const want = activeTab === "variables" && varSub === "home";
+    if (want && !vmOpen) {
+      vmOpen = true;
       vmScopeUser = false;
+      renderVarManager();
+      if (read) {
+        send({ type: "GET_VAR_TABLE" });
+        requestManagerUsage("quiet");
+      }
+    } else if (!want && vmOpen) {
+      leaveManagerUi();
     }
-    vmOpen = true;
-    if (opts.onlyUsed !== void 0) $("vmOnlyUsed").checked = opts.onlyUsed;
-    for (const t2 of TABS) $(`tab-${t2}`).classList.remove("active");
-    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-    $("varManager").style.display = "";
-    $("btnVarManager").setAttribute("aria-pressed", "true");
-    send({ type: "SET_UI_WIDE", wide: true });
-    send({ type: "GET_VAR_TABLE" });
-    requestManagerUsage();
-    renderVarManager();
-    window.scrollTo(0, 0);
   }
   function leaveManagerUi() {
     vmOpen = false;
@@ -5291,43 +5808,42 @@
     }
     closeMenu();
     closeModal();
-    $("varManager").style.display = "none";
-    $("btnVarManager").setAttribute("aria-pressed", "false");
-    send({ type: "SET_UI_WIDE", wide: false });
   }
-  function closeVarManager() {
-    var _a;
-    if (!vmOpen) return;
-    const back = vmReturn;
-    vmReturn = null;
-    showTab((_a = back == null ? void 0 : back.tab) != null ? _a : "wizard");
-    if (back) requestAnimationFrame(() => window.scrollTo(0, back.scrollY));
+  function showManager(opts = {}) {
+    if (opts.onlyUsed !== void 0) $("vmOnlyUsed").checked = opts.onlyUsed;
+    showTab("variables");
+    showVarSub("home");
+    vmScopeUser = false;
+    renderVarManager();
+    requestAnimationFrame(() => $("varManager").scrollIntoView({ block: "start" }));
   }
   var vmUsageTimer = null;
   function scheduleManagerUsage() {
-    if (!vmOpen) return;
+    if (!vmOpen || isMini) return;
     if (vmUsageTimer) clearTimeout(vmUsageTimer);
     vmUsage = null;
     vmUsageReq = 0;
+    vmUsageInFlight = false;
     renderVarManager();
     vmUsageTimer = setTimeout(() => {
       vmUsageTimer = null;
-      requestManagerUsage();
+      requestManagerUsage("selection");
     }, AUTO_SCAN_DELAY);
   }
-  $("btnVarManager").addEventListener("click", () => vmOpen ? closeVarManager() : openVarManager());
-  $("vmBack").addEventListener("click", () => closeVarManager());
   $("vmSearch").addEventListener("input", () => renderVarManager());
   $("vmOnlyUsed").addEventListener("change", () => {
     vmScopeUser = false;
     renderVarManager();
   });
-  function requestManagerUsage() {
+  function requestManagerUsage(_why = "quiet") {
     if (lastSelCount === 0) {
       setManagerUsage([], [], false);
       return;
     }
+    if (lastSelScanned > AUTO_SCAN_MAX || wizardRunning) return;
+    if (vmUsageInFlight) return;
     vmUsageReq = ++bindReqSeq;
+    vmUsageInFlight = true;
     send({ type: "SCAN_BINDINGS", reqId: vmUsageReq, forManager: true });
   }
   function setManagerUsage(cands, nodes, capped) {
@@ -5763,6 +6279,8 @@ ${v.description}` : v.name;
     }
     box.replaceChild(body, box.children[1]);
   }
+  activeTab = "settings";
+  showTab("variables");
 })();
 
 </script>

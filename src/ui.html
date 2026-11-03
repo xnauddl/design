@@ -60,7 +60,7 @@
     * { box-sizing: border-box; }
     body {
       font: 400 var(--fs)/1.5 var(--font);
-      margin: 0; padding: 12px;
+      margin: 0; padding: 12px 12px 36px; /* 아래 36 = 공통 상태 줄(24) + 여백 */
       color: var(--text); background: var(--bg);
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden; /* 툴팁 등이 가로 스크롤을 만들지 않게 */
@@ -118,18 +118,24 @@
     }
     /* hover/active는 누를 수 있는 버튼에만 — 비활성 버튼에 얹으면 primary의 파란 배경을 흰색으로
        덮어써 흰 글씨가 사라진다(실행 중 잠긴 「전체 실행」이 그랬다). */
-    button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-2); }
+    button:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--surface-2); border-color: var(--border-2); }
     button:active:not(:disabled) { background: var(--surface-hover); }
+    /* 주 버튼은 진한 강조색 — 흰 글자 대비 4.5:1 이상(IA v3 §2.10). */
     button.primary {
-      background: var(--accent); color: var(--on-accent); border-color: var(--accent);
+      background: var(--accent-strong); color: var(--on-accent); border-color: var(--accent-strong);
       box-shadow: var(--shadow-sm);
     }
-    button.primary:hover:not(:disabled)  { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button.primary:hover:not(:disabled):not([aria-disabled="true"])  { background: var(--accent-press); border-color: var(--accent-press); }
     button.primary:active:not(:disabled) { background: var(--accent-press); border-color: var(--accent-press); }
     button:focus-visible {
       outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
     }
     button:disabled { opacity: .42; cursor: default; box-shadow: none; }
+    /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 공통 상태 줄에 사유. opacity는 쓰지 않는다. */
+    [aria-disabled="true"] { color: var(--muted); cursor: not-allowed; box-shadow: none; }
+    button[aria-disabled="true"], button[aria-disabled="true"]:hover, button[aria-disabled="true"]:active { background: var(--surface); border-color: var(--border); color: var(--muted); }
+    button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover, button.primary[aria-disabled="true"]:active { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
+    label.inline:has(input[aria-disabled="true"]) { color: var(--muted); cursor: not-allowed; }
     button.link {
       border: none; background: none; padding: 0; width: auto;
       color: var(--accent-strong); cursor: pointer; font: inherit; font-weight: 600;
@@ -175,10 +181,18 @@
 
     /* ── 탭바 (세그먼트 컨트롤) ── */
     .tabs {
-      display: flex; gap: 3px; position: sticky; top: 0; z-index: 3;
+      display: flex; gap: 3px; align-items: center; position: sticky; top: 0; z-index: 3;
       background: var(--surface-2); border: 1px solid var(--border);
       padding: 3px; border-radius: var(--r); margin: 0 0 10px;
     }
+    .tab-list { display: flex; gap: 3px; flex: 1 1 auto; min-width: 0; }
+    /* [—] 최소화 — 24×24 이상(§2.10). */
+    .tab-min {
+      flex: 0 0 28px; height: 28px; padding: 0; border: none; background: transparent;
+      color: var(--text-2); border-radius: var(--r-sm); line-height: 1;
+    }
+    .tab-min:hover { background: var(--surface-hover); color: var(--text); }
+    .tab-min svg { display: block; margin: 0 auto; }
     .tab-btn {
       flex: 1; padding: 6px 4px; border: none; background: transparent;
       color: var(--text-2); font-weight: 600; border-radius: var(--r-sm);
@@ -207,7 +221,11 @@
       background: var(--surface-2); border: 1px solid var(--border);
       border-radius: var(--r); padding: 7px 10px;
     }
-    .selbar { color: var(--text); font-weight: 500; }
+    .selbar { color: var(--text); font-weight: 500; display: flex; align-items: center; gap: 0; min-width: 0; white-space: nowrap; }
+    .selbar .sel-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+    .selbar .sel-name:only-child, .selbar .sel-name:has(+ .sel-sub:empty) { max-width: none; }
+    .selbar .sel-sub { flex: 0 0 auto; }
+    .selbar .sel-sub:empty { display: none; }
     .selbar.muted { color: var(--muted); font-weight: 400; }
 
     /* ── 콜아웃(안내 노트) ── */
@@ -302,16 +320,20 @@
     /* ── 카드 툴바(CTA 상단) ──
        미리보기·적용·다음은 제목 바로 아래 한 줄에 둔다. 결과 목록 위에 있어야 "무엇을 누르면
        뭐가 나오는지"가 읽히고, 하단 sticky footer나 예약 영역이 필요 없어진다. */
+    /* 버튼 줄은 카드 머리 아래에 고정(IA v3 §2.5) — 긴 목록을 내려도 주 버튼이 보인다.
+       --toolbar-top = 탭 바 + 선택 표시줄 + 카드 머리 높이(ui.ts syncStickyOffsets가 잰다). */
     .toolbar {
       display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
       padding-bottom: 8px; border-bottom: 1px solid var(--border);
+      position: sticky; top: var(--toolbar-top, 95px); z-index: 1; background: var(--surface);
     }
     .toolbar .grow { flex: 1 1 auto; } /* 주 버튼을 오른쪽 끝으로 미는 공백 */
     /* 아래에 목록이 없는 카드(내보내기)는 구분선을 긋지 않는다 — 가를 것이 없다. */
     .toolbar.flush { padding-bottom: 0; border-bottom: 0; }
     /* 툴바가 두 줄인 카드(구조: 스캔 2 / 쓰기 2) — 윗줄은 선을 긋지 않고 아랫줄만 본문과 가른다. */
     .toolbar:has(+ .toolbar-2) { padding-bottom: 0; border-bottom: 0; }
-    .toolbar-2 { margin-top: 0; }
+    /* 둘째 버튼 줄은 첫째 줄(버튼 높이 27px) 바로 아래에 고정 — 같은 높이에 붙으면 겹친다. */
+    .toolbar-2 { margin-top: 0; top: calc(var(--toolbar-top, 95px) + 27px); }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
     /* 툴바가 좁아 줄이 넘어가도 ‘다음 →’은 오른쪽 끝에 — 혼자 왼쪽에 떨어지면 다른 버튼처럼 보인다. */
@@ -443,21 +465,14 @@
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
 
-    /* ── 창 높이 전환(QA #2 ①) — 탭 바 오른쪽 끝, 드래그 대신 버튼(#14) ── */
-    .tab-vars {
-      display: inline-flex; align-items: center; gap: 4px;
-      flex: 0 0 auto; padding: 6px 8px; border: none; background: transparent;
-      color: var(--text-2); font-weight: 600; border-radius: var(--r-sm); white-space: nowrap;
-    }
-    .tab-vars:hover { background: var(--surface-hover); color: var(--text); }
-    .tab-vars[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
-    /* ── 변수 관리(넓은 화면) ── */
+    /* ── 변수 관리 ── */
     .var-manager { display: flex; flex-direction: column; gap: 8px; }
     .vm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .vm-head h2 { margin: 0; font-size: 12px; }
     .vm-head input[type=search] { width: 160px; }
-    .vm-body { display: grid; grid-template-columns: 170px 1fr; gap: 8px; min-height: 0; }
-    .vm-tree { border: 1px solid var(--border); border-radius: var(--r); padding: 4px; overflow: auto; max-height: calc(100vh - 150px); }
+    /* PR 1 중간 상태 — 400에서는 트리를 표 위에 쌓는다. 목록마다 스크롤 상자를 두지 않는다(#18): 패널이 스크롤. */
+    .vm-body { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+    .vm-tree { border: 1px solid var(--border); border-radius: var(--r); padding: 4px; }
     .vm-node { display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; border: none; background: transparent; padding: 4px 6px; border-radius: var(--r-sm); color: var(--text); font-size: 11px; }
     .vm-node:hover { background: var(--surface-hover); }
     .vm-node[aria-current="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
@@ -466,7 +481,7 @@
     .vm-node .cnt { color: var(--muted); font-size: 10px; }
     .vm-node.empty .lbl { color: var(--muted); }
     .vm-tier { font-size: 9px; padding: 0 4px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
-    .vm-table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow: auto; max-height: calc(100vh - 150px); }
+    .vm-table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow-x: auto; }
     .vm-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
     .vm-table th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-2); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); z-index: 1; white-space: nowrap; }
     .vm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -498,38 +513,86 @@
     .modal dt { color: var(--muted); }
     .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
     .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
-    .tab-size {
-      flex: 0 0 28px; padding: 6px 0; border: none; background: transparent;
-      color: var(--text-2); border-radius: var(--r-sm); line-height: 1;
+    /* ── 탭 모양 3단계(§4.1) — 상단 탭(.tabs) · 레이어 하위 탭(밑줄, PR 3) · 계층 칩(PR 2) ── */
+    .subtabs { display: flex; gap: 14px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
+    .subtab {
+      border: none; background: none; border-radius: 0; padding: 6px 0 5px; min-height: 24px;
+      font: 600 11px/1 var(--font); color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px;
     }
-    .tab-size:hover { background: var(--surface-hover); color: var(--text); }
-    .tab-size[aria-pressed="true"] { color: var(--accent-strong); }
-    .tab-size svg { display: block; margin: 0 auto; }
-    .tab-size[aria-pressed="true"] .ic-grow, .tab-size[aria-pressed="false"] .ic-shrink { display: none; }
+    .subtab:hover:not([aria-selected="true"]) { background: none; color: var(--text); }
+    .subtab[aria-selected="true"] { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
+    .tier-chip {
+      height: 24px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+    }
+    .tier-chip[aria-checked="true"] { background: var(--accent-subtle); border-color: var(--accent-border); color: var(--accent-strong); }
+
+    /* ── 하위 화면 돌아가기 링크 ── */
+    .back-link { display: inline-block; margin: 0 0 10px; padding: 4px 0; min-height: 24px; }
+
+    /* ── 공통 상태 줄(§4.1) — 창 맨 아래 고정, 높이 24, 한 줄 말줄임. 끝 버튼은 말줄임 밖. ── */
+    .status-line {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: 24px;
+      display: flex; align-items: center; gap: 6px; padding: 0 12px;
+      background: var(--surface-2); border-top: 1px solid var(--border);
+      font-size: 10.5px; color: var(--text-2);
+    }
+    .status-line .sl-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status-line .sl-action { flex: 0 0 auto; font-size: 10.5px; min-height: 20px; }
+    .status-line.ok .sl-text { color: var(--ok); }
+    .status-line.warn .sl-text { color: var(--warn); }
+
+    /* ── 최소화(§4.9) — 창 400×48. 펼친 내용은 숨기고 마크만. ── */
+    body.is-mini { padding: 0; overflow: hidden; }
+    body.is-mini > :not(#miniView):not(#overlayRoot):not(script) { display: none !important; }
+    .mini { height: 48px; display: flex; align-items: center; padding: 0 12px; }
+    .mini[hidden] { display: none; }
+    .mini-mark {
+      position: relative; height: 32px; min-width: 44px; padding: 0 8px; border-radius: var(--r);
+      border: 2px solid transparent; background: var(--accent-strong); color: #fff;
+      font: 700 12px/1 var(--font); letter-spacing: .02em;
+    }
+    .mini-mark:hover { background: var(--accent-press); }
+    /* 진행 테두리 — 진행률이 있으면 그 비율(conic), 없으면 회전. */
+    .mini-mark.busy { border-color: transparent; background-clip: padding-box; }
+    .mini-mark.busy::before {
+      content: ''; position: absolute; inset: -4px; border-radius: calc(var(--r) + 3px); z-index: -1;
+      background: conic-gradient(var(--accent) var(--prog, 25%), var(--border) 0);
+    }
+    .mini-mark.busy.spin::before { animation: mini-spin 1s linear infinite; }
+    @keyframes mini-spin { to { transform: rotate(360deg); } }
+    .mini-badge {
+      position: absolute; right: -6px; top: -6px; width: 14px; height: 14px; border-radius: 50%;
+      font: 700 9px/14px var(--font); text-align: center; color: #fff;
+    }
+    .mini-badge.ok { background: var(--ok); }
+    .mini-badge.fail { background: var(--danger); }
+    @media (prefers-reduced-motion: reduce) {
+      .mini-mark.busy.spin::before { animation: none; background: var(--accent); }
+    }
   </style>
 </head>
 <body>
-  <div class="tabs" role="tablist" aria-label="작업 탭">
-    <button class="tab-btn" id="tabbtn-wizard" role="tab" aria-controls="tab-wizard" data-i18n="tab.wizard">시작</button>
-    <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
-    <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
-    <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
-    <!-- 변수 관리 — Figma Variables처럼 컬렉션·그룹 트리 + 표. 누르면 창이 넓어지고(760), 돌아가면 400. -->
-    <button class="tab-vars" id="btnVarManager" type="button" aria-pressed="false" data-i18n-title="vm.openTip" title="변수 관리 — 창이 넓어집니다"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1.5" width="10" height="9" rx="1.5"/><path d="M1 4.5h10M4.5 4.5v6"/></svg> <span data-i18n="vm.tab">변수</span></button>
-    <button class="tab-size" id="btnUiSize" type="button" aria-pressed="false" data-i18n-title="ui.sizeGrow" title="창 높이 크게 (860)">
-      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-        <g class="ic-grow"><path d="M6 1v10M3 3.5 6 1l3 2.5M3 8.5 6 11l3-2.5"/></g>
-        <g class="ic-shrink"><path d="M6 1v3.5M6 7.5V11M3 2l3 2.5L9 2M3 10l3-2.5L9 10"/></g>
-      </svg>
+  <!-- 탭 바 — 다루는 대상별 3탭(IA v3) + 오른쪽 끝 최소화. [—]는 탭이 아니라 창 조작이라 tablist 밖에 둔다. -->
+  <div class="tabs" id="tabBar">
+    <div class="tab-list" role="tablist" aria-label="작업 탭">
+      <button class="tab-btn" id="tabbtn-variables" role="tab" aria-controls="tab-variables" data-i18n="tab.variables">변수</button>
+      <button class="tab-btn" id="tabbtn-layer" role="tab" aria-controls="tab-layer" data-i18n="tab.layer">레이어</button>
+      <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
+    </div>
+    <button class="tab-min" id="btnMinimize" type="button" data-i18n-title="ui.minimize" title="최소화" aria-label="최소화">
+      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 6h7"/></svg>
     </button>
   </div>
 
   <!-- 선택 동기화 (실시간) -->
   <div id="selBarWrap">
-    <div class="selbar muted" id="selBar">● 선택 상태를 불러오는 중…</div>
+    <div class="selbar muted" id="selBar"><span class="sel-name" id="selName">● 선택 상태를 불러오는 중…</span><span class="sel-sub" id="selSub"></span></div>
   </div>
 
-  <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
+  <section class="tab-section" id="tab-variables" role="tabpanel" aria-labelledby="tabbtn-variables" tabindex="0">
+   <!-- PR 1 중간 상태(IA v3 §10): 첫 화면 = 지금 시작 탭 내용 + 변수 관리(세로 배치), [만들기]는 하위 화면. -->
+   <div id="varHome">
     <!-- 이미 있는 변수 안내 — 변수가 있는 파일에서 '만들기'를 거쳐 확인하게 하지 않는다(바로 연결로). -->
     <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
@@ -570,9 +633,28 @@
       <div id="pipelineSteps"></div>
       <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">컴포넌트는 필요할 때 적용 탭에서</div>
     </div>
-  </section>
 
-  <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
+    <div class="row"><button id="btnGoMake" data-i18n="var.goMake">색부터 하나씩 만들기 →</button></div>
+    <!-- 변수 관리 — PR 2에서 변수 목록으로 바뀐다. 400에서는 트리를 표 위에 쌓는다. -->
+    <section class="var-manager" id="varManager" aria-labelledby="vmTitle">
+      <div class="vm-head">
+        <h2 id="vmTitle" data-i18n="vm.title">변수 관리</h2>
+        <span class="grow"></span>
+        <input id="vmSearch" type="search" data-i18n-placeholder="vm.search" placeholder="변수 검색" />
+        <label class="inline"><input type="checkbox" id="vmOnlyUsed" checked /> <span data-i18n="vm.onlyUsed">선택에서 쓰는 것만</span></label>
+        <span class="muted" id="vmCount"></span>
+      </div>
+      <div class="vm-body">
+        <nav class="vm-tree" id="vmTree" aria-label="컬렉션·그룹"></nav>
+        <div class="vm-table-wrap" id="vmTableWrap"></div>
+      </div>
+      <div class="status" id="vmStatus"></div>
+    </section>
+   </div>
+
+   <!-- 만들기 하위 화면 — "← 돌아가기"로 변수 탭 첫 화면. -->
+   <div id="varMake" style="display:none">
+    <button class="link back-link" id="btnMakeBack" data-i18n="make.back">← 돌아가기</button>
     <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
@@ -719,9 +801,10 @@
       <div class="prereq" id="tsApplyPrereq" style="display:none;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
     </div>
+   </div>
   </section>
 
-  <section class="tab-section" id="tab-apply" role="tabpanel" aria-labelledby="tabbtn-apply" tabindex="0">
+  <section class="tab-section" id="tab-layer" role="tabpanel" aria-labelledby="tabbtn-layer" tabindex="0">
     <!-- 적용 단계 레일 — 바인딩 → 리네임 → 구조(컴포넌트·닮은 프레임). -->
     <div class="steps steps-3" id="applyRail" role="tablist" aria-label="적용 단계">
       <button class="step-chip" data-apply-step="bind"><span class="n" data-i18n="rail.bind">연결</span><span data-i18n="rail.bindSub">변수 붙이기</span></button>
@@ -907,22 +990,16 @@
   <!-- 창 리사이즈 핸들(우하단) -->
   <div id="uiTip" role="tooltip" hidden></div>
 
-  <!-- 변수 관리(넓은 화면) — 탭 바의 [변수]로 연다. 탭 내용을 덮고, ‘돌아가기’로 보던 탭·스크롤로 복귀. -->
-  <section class="var-manager" id="varManager" style="display:none" aria-labelledby="vmTitle">
-    <div class="vm-head">
-      <button class="link" id="vmBack" data-i18n="vm.back">← 돌아가기</button>
-      <h2 id="vmTitle" data-i18n="vm.title">변수 관리</h2>
-      <span class="grow"></span>
-      <input id="vmSearch" type="search" data-i18n-placeholder="vm.search" placeholder="변수 검색" />
-      <label class="inline"><input type="checkbox" id="vmOnlyUsed" checked /> <span data-i18n="vm.onlyUsed">선택에서 쓰는 것만</span></label>
-      <span class="muted" id="vmCount"></span>
-    </div>
-    <div class="vm-body">
-      <nav class="vm-tree" id="vmTree" aria-label="컬렉션·그룹"></nav>
-      <div class="vm-table-wrap" id="vmTableWrap"></div>
-    </div>
-    <div class="status" id="vmStatus"></div>
-  </section>
+  <!-- 공통 상태 줄(§4.1) — 창 맨 아래 고정, 모든 탭 공통. 알림은 여기서만 한다. 버튼은 말줄임 밖. -->
+  <div class="status-line" id="statusLine" aria-live="polite">
+    <span class="sl-text" id="statusText"></span>
+    <button class="link sl-action" id="statusAction" type="button" hidden></button>
+  </div>
+
+  <!-- 최소화 상태(§4.9) — 창 400×48. 마크를 누르면 펼친다. -->
+  <div class="mini" id="miniView" hidden>
+    <button class="mini-mark" id="btnExpand" type="button" aria-label="펼치기"><span class="mark-text">DSL</span><span class="mini-badge" id="miniBadge" hidden></span></button>
+  </div>
 
   <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->
   <div id="overlayRoot"></div>
