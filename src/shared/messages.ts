@@ -98,6 +98,8 @@ export interface BindCandidate {
   tier: number;
   /** FLOAT 매칭 거리(0/undefined=정확). */
   distance?: number;
+  /** 변수 값(표시용 — 연결 목록의 변수 묶음 줄, §4.6). */
+  variableValue?: string;
 }
 
 /**

@@ -4,7 +4,8 @@
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate } from './shared/messages';
 import { type DraftToken, type Unit, tidyNumberTokens } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
-import { groupBindLines, isHexColor } from './lib/bindDisplay';
+import { isHexColor } from './lib/bindDisplay';
+import { groupByVariable, placeKey, carryChecks, type VarGroup, type PlaceLine } from './lib/bindGroups';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier } from './lib/entitlements';
 import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
@@ -1124,6 +1125,7 @@ function runBindPreview(silent = false): void {
   send({ type: 'APPLY', tolerance: bindTolerance(), preview: true, reqId });
   opSilent = false;
   bindPreviewSel = curSel.ids.slice();
+  if (!silent) bindPreviewName = curSel.count === 1 ? curSel.name || t('sel.unnamed') : t('bind.selMany', { k: curSel.count });
 }
 $('btnBindRepreview').addEventListener('click', () => runBindPreview());
 $('btnBindToList').addEventListener('click', () => showManager());
@@ -1138,10 +1140,10 @@ $('btnApplyConfirm').addEventListener('click', () => {
   send({ type: 'APPLY_SELECTED', items, reqId: nextBindReq() });
 });
 
+// 전체 체크는 보이는 묶음에만(필터 중 보이지 않는 체크는 그대로, §4.6).
 $('bindAll').addEventListener('change', (e) => {
   const on = (e.target as HTMLInputElement).checked;
-  bindChecked.clear();
-  if (on) for (const c of bindCandidates) bindChecked.add(candKey(c));
+  for (const g of bindGroups().shown) for (const k of g.keys) on ? bindChecked.add(k) : bindChecked.delete(k);
   renderBindTree();
 });
 
@@ -2126,14 +2128,10 @@ window.onmessage = (event: MessageEvent) => {
       const silent = msg.preview && msg.reqId !== undefined && msg.reqId === bindSilentReq;
       bindSilentReq = 0;
       if (isMini && msg.preview) bindPreviewMini = true; // 최소화 중에 끝난 미리보기 — 펼쳐도 다시 계산하지 않는다
-      const confirmBtn = $('btnApplyConfirm') as HTMLButtonElement;
       bindSkips = msg.skips ?? [];
       // 스킵 목록은 상한에서 잘린다(bind.ts SKIP_PREVIEW_CAP) — 잘렸으면 힌트 줄이 그렇다고 말한다.
       bindSkipsCapped = (msg.skipTotal ?? bindSkips.length) > bindSkips.length;
       const rt = reasonsText(msg.reasons); // UX3: 사유별 스킵
-      // 칩(레이어로 이동)이 뜨면 상태 줄에는 사유를 중복해 쓰지 않는다.
-      const asChips = bindSkips.length > 0;
-      const detail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt && !asChips ? ` — ${rt}` : ''}`;
       renderSkipReasons(msg.reasons);
       if (msg.cancelled) {
         // UX6: 취소 — 처리한 만큼만 적용(비파괴). clearBindPreview가 칩을 숨기므로
@@ -2141,30 +2139,28 @@ window.onmessage = (event: MessageEvent) => {
         clearBindPreview();
         const cancelDetail = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${rt ? ` — ${rt}` : ''}`;
         setStatus('applyStatus', t('apply.cancelled', { bound: msg.bound, detail: cancelDetail }), 'warn');
-        confirmBtn.style.display = 'none';
       } else if (msg.preview) {
         // #6: 후보를 선택형 미리보기 트리로. 기본 전체 체크.
         // 직전에 연결 현황(읽기 전용)이 떠 있었으면 그 모드를 끈다 — 안 끄면 후보가 읽기 전용으로
         // 그려져 체크박스·‘선택한 항목에 연결’이 사라진다(연결할 방법이 없어진다).
-        const prevKeys = new Set(bindCandidates.map(candKey));
+        const prev = bindCandidates;
         const prevChecked = new Set(bindChecked);
         bindCandidates = msg.candidates ?? [];
         bindNodes = msg.nodes ?? [];
+        bindPreviewed = true;
         bindChecked.clear();
-        // 조용한 재계산: 체크 상태는 유지하고(새 후보는 체크), 후보가 달라졌을 때만 알린다(§4.6 ⑧).
-        for (const c of bindCandidates) {
-          const k = candKey(c);
-          if (!silent || !prevKeys.has(k) || prevChecked.has(k)) bindChecked.add(k);
-        }
         if (silent) {
-          const now = new Set(bindCandidates.map(candKey));
-          const added = [...now].filter((k) => !prevKeys.has(k)).length;
-          const removed = [...prevKeys].filter((k) => !now.has(k)).length;
-          if (added || removed) showStatusLine(t('bind.candChanged', { a: added, b: removed }));
+          // 조용한 재계산: 같은 곳은 체크 유지, 새 곳은 묶음 규칙대로, 달라졌을 때만 알린다(§4.6 ⑧).
+          const r = carryChecks(prev, prevChecked, bindCandidates);
+          for (const k of r.checked) bindChecked.add(k);
+          if (r.added || r.removed) showStatusLine(t('bind.candChanged', { a: r.added, b: r.removed }));
+        } else {
+          // 미리보기 직후에는 모든 곳을 체크한다.
+          for (const c of bindCandidates) bindChecked.add(candKey(c));
         }
-        setLock(confirmBtn, null);
         renderBindTree();
-        setStatus('applyStatus', t('apply.preview', { bound: msg.bound, detail }), msg.skipped ? 'warn' : '');
+        // 찾은 곳·건너뜀은 목록 설명과 사유 칩이 말한다 — 상태 글은 비운다.
+        setStatus('applyStatus', '', '');
       } else {
         // 연결 후 — 요약 한 줄 + 사유 칩만(§4.6). 결과 트리는 그리지 않는다(변수 탭 목록이 대신한다).
         clearBindPreview();
@@ -2174,7 +2170,6 @@ window.onmessage = (event: MessageEvent) => {
         setStatus('applyStatus', '', '');
         $('bindDoneText').textContent = t('bind.doneLine', { n: msg.bound }) + (msg.skipped ? t('bind.doneSkipped', { m: msg.skipped }) : '') + ' ·';
         $('bindDone').hidden = false;
-        confirmBtn.style.display = 'none';
       }
       break;
     }
@@ -2723,17 +2718,20 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
 let bindCandidates: BindCandidate[] = [];
 let bindNodes: BindNode[] = [];
 const bindChecked = new Set<string>(); // 체크된 후보 키
-const bindHideContext = true; // 항상 숨김(토글 없음)
 
-/** 후보 고유 키(노드+필드+인덱스). */
-function candKey(c: { nodeId: string; field: string; index?: number }): string {
-  return `${c.nodeId}|${c.field}|${c.index ?? ''}`;
-}
+/** 후보 고유 키 — 같은 곳 = 같은 레이어 · 같은 속성 · 같은 변수(§4.6 ⑧). */
+const candKey = placeKey;
 
-/** 미리보기 결과가 있는가(연결 후보 트리가 떠 있음). */
+/** 미리보기 결과가 있는가(연결 후보가 떠 있음). */
 function hasBindPreview(): boolean {
   return bindCandidates.length > 0;
 }
+/** 미리보기를 마쳤는가(찾은 곳이 0이어도 참) — 설명·버튼 사유를 정한다. */
+let bindPreviewed = false;
+/** 목록 설명의 선택 이름 — 미리보기 때의 이름으로 고정(§4.6). */
+let bindPreviewName = '';
+/** 사용자가 직접 펼치거나 접은 묶음(변수 id → 펼침) — 세션 동안 기억(§2.6). */
+const bindExpanded = new Map<string, boolean>();
 /* 복귀 규칙(§4.6 ⑧) 상태 */
 let bindPreviewSel: string[] | null = null; // 미리보기를 만든 선택
 let bindLeftSince = false; // 미리보기 뒤 창·탭을 떠났었다
@@ -2746,109 +2744,179 @@ let bindSilentReq = 0;
 let layerLibUse: boolean | null = null;
 let layerLibReq = 0;
 
-/** 건너뛴 레이어의 사유 요약 — '너비 · HUG/FILL'처럼 속성이 있으면 앞에 붙인다. */
-function skipReasonText(s: BindSkip): string {
-  const why = t(`reason.${s.reason}`);
-  return s.field ? `${s.field} · ${why}` : why;
-}
-
-/** code의 후보/노드를 트리 행으로: 노드 헤더 + 후보(체크) 행 + 건너뛴 레이어(흐림). */
-function bindRows(): TreeRow[] {
-  const byNode = new Map<string, BindCandidate[]>();
-  for (const c of filteredCandidates()) {
-    const arr = byNode.get(c.nodeId);
-    if (arr) arr.push(c);
-    else byNode.set(c.nodeId, [c]);
-  }
-  // 붙은 게 하나도 없는 레이어만 '스킵' 행으로 — 일부라도 붙었으면 후보 쪽이 본론이고,
-  // 그 노드의 나머지 사유는 위쪽 사유 칩이 맡는다(같은 말을 두 번 하지 않게).
-  const skipOf = new Map<string, BindSkip>();
-  for (const s of bindSkips) if (!byNode.has(s.nodeId) && !skipOf.has(s.nodeId)) skipOf.set(s.nodeId, s);
-
-  const rows: TreeRow[] = [];
-  for (const n of bindNodes) {
-    const cands = byNode.get(n.id);
-    const skipped = skipOf.get(n.id);
-    if (!cands && skipped) {
-      rows.push({
-        id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId,
-        keep: { reason: skipReasonText(skipped), meta: t('bind.skipMeta') },
-      });
-      continue;
-    }
-    rows.push({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands, ...(cands ? { selectId: n.id } : {}) });
-    if (cands) {
-      // 같은 변수에 묶인 네 방향 여백·모서리는 한 줄로(좌우 여백 = spacing/lg).
-      for (const line of groupBindLines(cands)) {
-        const lead = line.items[0] as BindCandidate;
-        const dist = lead.distance && lead.distance > 0 ? ` ~${Math.round(lead.distance * 100) / 100}` : '';
-        const label = fieldLabel(line.label, line.fields[0]);
-        const variable = `${line.variableName}${dist}`;
-        const tipArgs = { label, fields: line.fields.join(', '), variable: line.variableName };
-        rows.push({
-          id: candKey(lead),
-          keys: line.items.map((it) => candKey(it as BindCandidate)),
-          name: `${label} ${line.currentValue}`,
-          type: line.fields[0],
-          depth: n.depth + 1,
-          parentId: n.id,
-          change: variable,
-          bind: {
-            label,
-            value: line.currentValue,
-            variable,
-            connected: false,
-            tip: t('bind.willConnectTip', tipArgs),
-          },
-        });
-      }
-    }
-  }
-  return rows;
-}
-
 /** 속성 라벨 — i18n 키가 없으면(새 필드) 원래 API 이름을 그대로. */
 function fieldLabel(label: string, rawField: string): string {
   return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
 }
 
-function renderBindTree(): void {
-  // 필터는 미리보기가 있을 때 트리 바로 위에(§4.6).
-  ($('bindTreeCtrls') as HTMLElement).style.display = hasBindPreview() ? '' : 'none';
-  renderSelectableTree($('bindTree'), bindRows(), bindChecked, {
-    hideContext: bindHideContext,
-    onChange: updateBindApply,
-  });
-  updateBindApply();
-}
+/** 소수 둘째 자리까지(차이 표시). */
+const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 /** 변수 이름 필터(소문자 부분 일치). 비어 있으면 전부. */
 function bindFilterText(): string {
   return (($('bindFilter') as HTMLInputElement).value ?? '').trim().toLowerCase();
 }
-function filteredCandidates(): BindCandidate[] {
+/** 변수 묶음 — 전체와 필터에 걸린 것. */
+function bindGroups(): { all: VarGroup[]; shown: VarGroup[] } {
+  const all = groupByVariable(bindCandidates);
   const q = bindFilterText();
-  return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
+  return { all, shown: q ? all.filter((g) => g.variableName.toLowerCase().includes(q)) : all };
+}
+/** 묶음이 펼쳐져 있나 — 직접 바꾼 게 있으면 그것, 없으면 10개 이하면 펼침(§4.6). */
+function groupOpen(g: VarGroup, total: number): boolean {
+  return bindExpanded.get(g.variableId) ?? total <= 10;
+}
+/** 체크박스 상태(☑ / ▣ / ☐)를 키 목록에서. */
+function setTri(box: HTMLInputElement, keys: readonly string[]): void {
+  const on = keys.filter((k) => bindChecked.has(k)).length;
+  box.checked = on > 0 && on === keys.length;
+  box.indeterminate = on > 0 && on < keys.length;
+}
+
+function placeEl(l: PlaceLine): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'bg-place';
+  row.dataset.key = l.keys[0];
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  setTri(box, l.keys);
+  const node = bindNodes.find((n) => n.id === l.nodeId);
+  const layerName = node?.name ?? l.nodeId;
+  const label = fieldLabel(l.label, l.fields[0]);
+  box.setAttribute('aria-label', `${layerName} › ${label}`);
+  box.addEventListener('change', () => {
+    for (const k of l.keys) box.checked ? bindChecked.add(k) : bindChecked.delete(k);
+    renderBindTree();
+  });
+  const on = l.keys.some((k) => bindChecked.has(k));
+  row.classList.toggle('off', !on);
+  if (!on) row.title = t('bind.uncheckedTip');
+  const layer = document.createElement('button');
+  layer.type = 'button';
+  layer.className = 'link link-btn bg-layer';
+  layer.textContent = layerName;
+  layer.title = t('bind.layerTip');
+  layer.addEventListener('click', () => selectNodes([l.nodeId], 'applyStatus'));
+  const text = document.createElement('span');
+  text.className = 'bg-text';
+  text.textContent = ` › ${label} ${isHexColor(l.currentValue) ? l.currentValue.toUpperCase() : l.currentValue}`;
+  row.append(box, layer, text);
+  if (l.distance) {
+    const d = round2(l.distance);
+    const ap = document.createElement('span');
+    ap.className = 'bg-approx';
+    ap.textContent = `~${d}`;
+    ap.title = t('bind.approxTip', { d });
+    row.appendChild(ap);
+  }
+  if (l.keys.length > 1) row.append(t('bind.placeCount', { k: l.keys.length }));
+  return row;
+}
+
+function bindGroupEl(g: VarGroup, total: number): HTMLElement {
+  const wrap = document.createElement('div');
+  wrap.className = 'bg-group';
+  wrap.setAttribute('role', 'group');
+  wrap.dataset.var = g.variableId;
+  const head = document.createElement('div');
+  head.className = 'bg-head';
+  head.title = t('bind.groupTip', { name: g.variableName, k: g.count });
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.setAttribute('aria-label', g.variableName);
+  setTri(box, g.keys);
+  box.addEventListener('change', () => {
+    for (const k of g.keys) box.checked ? bindChecked.add(k) : bindChecked.delete(k);
+    renderBindTree();
+  });
+  const open = groupOpen(g, total);
+  const tw = document.createElement('button');
+  tw.type = 'button';
+  tw.className = 'bg-tw';
+  tw.textContent = open ? '▾' : '▸';
+  tw.setAttribute('aria-expanded', String(open));
+  tw.setAttribute('aria-label', t(open ? 'bind.collapse' : 'bind.expand'));
+  tw.addEventListener('click', () => {
+    bindExpanded.set(g.variableId, !open);
+    renderBindTree();
+    $('bindTree').querySelector<HTMLElement>(`.bg-group[data-var="${CSS.escape(g.variableId)}"] .bg-tw`)?.focus();
+  });
+  const color = isHexColor(g.variableValue);
+  const mark = document.createElement('span');
+  if (color) {
+    mark.className = 'bg-sw';
+    mark.style.background = g.variableValue;
+  } else {
+    mark.className = 'bg-type';
+    mark.textContent = /^-?\d/.test(g.variableValue) ? '#' : 'T';
+  }
+  const name = document.createElement('span');
+  name.className = 'bg-name';
+  name.textContent = g.variableName;
+  const val = document.createElement('span');
+  val.className = 'bg-val';
+  val.textContent = color ? g.variableValue.toUpperCase() : `= ${g.variableValue}`;
+  const num = document.createElement('span');
+  num.className = 'bg-num';
+  num.textContent = String(g.count);
+  head.append(box, tw, mark, name, val, num);
+  wrap.appendChild(head);
+  if (open) for (const l of g.lines) wrap.appendChild(placeEl(l));
+  return wrap;
+}
+
+/** 미리보기 전 한 줄 — 선택이 있고, 연결할 변수가 없다는 안내가 없을 때만(§4.6). */
+function renderBindIntro(): void {
+  const prereqShown = $('bindPrereq').style.display !== 'none';
+  $('bindIntro').hidden = bindPreviewed || !curSel || !curSel.count || prereqShown;
+}
+
+/** 연결 화면 그리기 — 미리보기 전 한 줄 / 설명 / 목록 머리 / 변수 묶음(§4.6). */
+function renderBindTree(): void {
+  const { all, shown } = bindGroups();
+  const has = hasBindPreview();
+  renderBindIntro();
+  // 목록 설명
+  const desc = $('bindDesc');
+  if (bindPreviewed) {
+    const approx = bindCandidates.some((c) => (c.distance ?? 0) > 0);
+    desc.textContent = has
+      ? t('bind.desc', { name: bindPreviewName, n: bindCandidates.length }) + (approx ? t('bind.descApprox') : '')
+      : t('bind.descNone', { name: bindPreviewName });
+    desc.hidden = false;
+  } else desc.hidden = true;
+  ($('bindTreeCtrls') as HTMLElement).style.display = has ? '' : 'none';
+  $('bindHead').hidden = !has;
+  const tree = $('bindTree');
+  clearMount(tree);
+  if (has) for (const g of shown) tree.appendChild(bindGroupEl(g, all.length));
+  updateBindApply();
 }
 
 $('bindFilter').addEventListener('input', () => renderBindTree());
 
-/** 선택에 바인딩 버튼 활성/라벨 + 전체선택 마스터 동기화. */
+/** 버튼 이름·잠금 + 목록 머리 체크(보이는 묶음 기준) + 필터 밖 체크 수. */
 function updateBindApply(): void {
-  const total = bindCandidates.length;
-  const sel = bindChecked.size;
-  // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
-  // 이 트리는 노드 헤더도 한 행이라 목록 아래 ‘총 n개’(행 수)와 수가 다르다 → 세는 단위를
-  // ‘건’으로 구분해(상태 문구 ‘바인딩 n건 후보’와 같은 말) 같은 수의 오기로 읽히지 않게 한다.
-  $('bindCount').textContent = total ? `후보 ${total}` : '';
+  if (!curSel) return;
   const confirm = $('btnApplyConfirm') as HTMLButtonElement;
-  confirm.style.display = hasBindPreview() ? '' : 'none';
-  confirm.disabled = sel === 0;
-  if (hasBindPreview()) {
-    const all = $('bindAll') as HTMLInputElement;
-    all.checked = sel === total && total > 0;
-    all.indeterminate = sel > 0 && sel < total;
-  }
+  const n = bindChecked.size;
+  confirm.textContent = bindPreviewed && hasBindPreview() ? t('bind.confirmN', { n }) : t('bind.confirm');
+  // 사유 순서: 선택 없음 → 다른 선택의 결과 → 미리보기 전 → 찾은 곳 0 → 체크 0(§4.6).
+  if (!curSel.count) setLock(confirm, 'prereq', t('status.noSelection'));
+  else if (bindForeignSel && !$('bindNotice').hidden) setLock(confirm, 'prereq', t('bind.selChanged'));
+  else if (!bindPreviewed) setLock(confirm, 'prereq', t('bind.needPreview'));
+  else if (!hasBindPreview()) setLock(confirm, 'prereq', t('bind.nothing'));
+  else if (!n) setLock(confirm, 'prereq', t('bind.needCheck'));
+  else setLock(confirm, null);
+  if (!hasBindPreview()) return;
+  const { shown } = bindGroups();
+  const shownKeys = shown.flatMap((g) => g.keys);
+  const all = $('bindAll') as HTMLInputElement;
+  all.setAttribute('aria-label', t('bind.allAria'));
+  setTri(all, shownKeys);
+  const shownSet = new Set(shownKeys);
+  const outside = [...bindChecked].filter((k) => !shownSet.has(k)).length;
+  $('bindOutside').textContent = bindFilterText() && outside ? t('bind.outside', { h: outside }) : '';
 }
 
 /** 바인딩 미리보기/적용 상태를 초기화(선택 변경·적용 완료 시). */
@@ -2857,6 +2925,7 @@ function clearBindPreview(): void {
   bindPreviewSel = null;
   bindForeignSel = false;
   bindHereSel = false;
+  bindPreviewed = false;
   bindCandidates = [];
   bindNodes = [];
   bindSkips = [];
@@ -2865,10 +2934,7 @@ function clearBindPreview(): void {
   ($('bindSkips') as HTMLElement).style.display = 'none';
   ($('bindSkipHint') as HTMLElement).style.display = 'none';
   bindChecked.clear();
-  clearMount($('bindTree'));
-  $('bindCount').textContent = '';
-  ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
-  ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
+  renderBindTree();
 }
 
 /* ---------- 컴포넌트 등록(#1): 하위 후보 트리 + 선택 등록 ---------- */
@@ -3185,6 +3251,9 @@ function syncStickyOffsets(): void {
   const head = document.querySelector<HTMLElement>('.tab-section.active .step:not(.collapsed) .step-head');
   const headH = head && head.offsetParent ? Math.round(head.getBoundingClientRect().height) : 26;
   root.style.setProperty('--toolbar-top', `${headTop + headH}px`);
+  // 목록 머리(레이어 › 연결)는 버튼 줄 바로 아래에 고정 — 버튼 줄 높이를 잰다(두 겹, §2.5).
+  const bar2 = document.querySelector<HTMLElement>('.tab-section.active .step:not(.collapsed) .toolbar');
+  if (bar2 && bar2.offsetParent) root.style.setProperty('--toolbar-h', `${Math.round(bar2.getBoundingClientRect().height)}px`);
 }
 
 /** 모든 .step 카드를 접이식으로 + 주 버튼을 타이틀 줄로. 노드 이동이라 id/리스너 보존, 멱등. */
@@ -5213,15 +5282,13 @@ function renderBindPrereq(): void {
   }
   notice.style.display = msg ? '' : 'none';
   text.textContent = msg;
+  renderBindIntro();
   act.hidden = !action;
   if (action) { act.textContent = action[0]; act.onclick = action[1]; }
   // 선택이 없을 때 세 버튼은 aria-disabled(누르면 사유).
   const noSel = !curSel.count;
   setLock($('btnApply'), noSel ? 'prereq' : msg ? 'prereq' : null, noSel ? t('status.noSelection') : msg);
-  const confirm = $('btnApplyConfirm');
-  if (noSel) setLock(confirm, 'prereq', t('status.noSelection'));
-  else if (bindForeignSel && !$('bindNotice').hidden) setLock(confirm, 'prereq', t('bind.selChanged'));
-  else setLock(confirm, null);
+  updateBindApply();
   // 기존 스타일 연결(무료) — 선택 없음 / 등록된 텍스트 스타일 없음.
   const ts = $('btnApplyExistingText');
   if (noSel) setLock(ts, 'prereq', t('status.noSelection'));

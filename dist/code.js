@@ -1447,13 +1447,13 @@
     return out;
   }
   function addColorCand(preview, node, field, index, hex, e) {
-    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
+    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, variableValue: hex });
   }
   function addFloatCand(preview, node, field, value, e) {
-    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : void 0 });
+    preview == null ? void 0 : preview.candidates.push(__spreadValues({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : void 0 }, e.num != null ? { variableValue: String(Math.round(e.num * 100) / 100) } : {}));
   }
   function addStrCand(preview, node, field, value, e) {
-    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
+    preview == null ? void 0 : preview.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, variableValue: value });
   }
   function pruneToAffected(nodeIndex, candidates, skips) {
     var _a, _b, _c, _d;

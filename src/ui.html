@@ -430,7 +430,7 @@
 
     /* ── diff / 선택형 미리보기 트리 ── */
     /* 긴 이름은 nowrap이라 가로로 넘친다 — 가로만 스크롤시킨다(세로는 패널 body). */
-    #diff, #bindTree, #compTree {
+    #diff, #compTree {
       font-family: var(--mono); font-size: var(--fs); overflow-x: auto;
     }
     .before { color: var(--muted); text-decoration: line-through; }
@@ -482,13 +482,39 @@
     .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
     .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
     /* ── 탭 모양 3단계(§4.1) — 상단 탭(.tabs) · 레이어 하위 탭(밑줄, PR 3) · 계층 칩(PR 2) ── */
-    .subtabs { display: flex; gap: 14px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
+    /* 하위 탭 13px · 높이 32 · 간격 20(§4.6 — 11px은 실기에서 탭으로 읽히지 않았다) */
+    .subtabs { display: flex; gap: 20px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
     .subtab {
-      border: none; background: none; border-radius: 0; padding: 6px 0 5px; min-height: 24px;
-      font: 600 11px/1 var(--font); color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px;
+      border: none; background: none; border-radius: 0; padding: 0; height: 32px; min-height: 32px;
+      font: 600 13px/1 var(--font); color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px;
     }
     .subtab:hover:not([aria-selected="true"]) { background: none; color: var(--text); }
-    .subtab[aria-selected="true"] { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
+    .subtab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
+    /* 연결 후보 — 변수별 묶음(§4.6). 목록 머리는 버튼 줄 아래에 고정(두 겹, §2.5), 묶음 줄은 고정하지 않는다. */
+    .bind-desc { margin: 8px 0 6px; color: var(--text-2); font-size: 11px; line-height: 1.5; }
+    .bind-head {
+      position: sticky; top: calc(var(--toolbar-top, 95px) + var(--toolbar-h, 36px)); z-index: 1;
+      display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 6px; margin-top: 6px;
+      background: var(--surface); border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 10.5px; font-weight: 600;
+    }
+    .bind-head .grow { flex: 1 1 auto; }
+    .bind-head .outside { font-weight: 500; color: var(--muted); }
+    .bind-list { display: flex; flex-direction: column; font-size: var(--fs); }
+    .bg-val, .bg-text { font-variant-numeric: tabular-nums; }
+    .bg-head, .bg-place { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; border-bottom: 1px solid var(--border); }
+    .bg-head { font-weight: 600; color: var(--text); }
+    .bg-place { padding-left: 42px; color: var(--text); }
+    .bg-place.off { color: var(--text-2); }
+    .bg-tw { width: 24px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; }
+    /* 색 견본은 원 — 네모 체크박스와 헷갈리지 않게(흰색 견본이 빈 체크박스로 보였다). */
+    .bg-sw { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border-2); flex: 0 0 auto; }
+    .bg-type { width: 12px; text-align: center; color: var(--muted); font-family: var(--mono); flex: 0 0 auto; }
+    .bg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .bg-val { color: var(--text-2); font-weight: 500; white-space: nowrap; }
+    .bg-num { margin-left: auto; color: var(--text-2); font-weight: 500; font-size: 10.5px; }
+    .bg-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .bg-layer { padding: 0; min-height: 0; }
+    .bg-approx { color: var(--warn, var(--text-2)); }
     .tier-chip {
       height: 24px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
       border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
@@ -864,13 +890,12 @@
     </div>
 
     <div class="step" data-apply-step="bind">
-      <h2><span data-i18n="bind.title">변수 연결</span> <span class="muted" id="bindCount"></span></h2>
-      <div class="hint" data-i18n="bind.hint">먼저 미리보기로 확인하고, 연결할 항목만 고르세요</div>
+      <h2><span data-i18n="bind.title">변수 연결</span></h2>
       <!-- 연결할 변수가 없을 때의 안내(§4.6 표 4행) — 문구와 버튼은 ui.ts가 정한다. -->
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
       <div class="toolbar">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
-        <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">체크한 항목 연결</button>
+        <button id="btnApplyConfirm" class="primary" data-i18n="bind.confirm">체크한 곳 연결</button>
       </div>
       <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 있는 자산을 쓰는 일이라 연결 화면에 둔다(§4.6). -->
       <div class="row ts-apply-row">
@@ -881,15 +906,24 @@
       <div class="hint" id="tsApplyResult" hidden></div>
       <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
       <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">미리보기 다시</button></div>
-      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
-        <span class="grow"></span>
-        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:160px" />
-      </div>
+      <!-- 미리보기 전 한 줄 / 미리보기 뒤 목록 설명(§4.6) — 문구는 ui.ts가 정한다. -->
+      <div class="bind-desc" id="bindIntro" hidden data-i18n="bind.intro">[미리보기]를 누르면 선택한 레이어에서 변수 값과 같은 색·크기·간격 값을 찾아요</div>
+      <div class="bind-desc" id="bindDesc" hidden></div>
       <!-- 건너뜀 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다. 목록 위: 몇 개가 왜 빠졌는지 먼저. -->
       <div class="skip-row" id="bindSkips" style="display:none"></div>
       <div class="hint" id="bindSkipHint" style="display:none" data-i18n="bind.skipHint">건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다</div>
-      <div id="bindTree" class="results"></div>
+      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:160px" />
+      </div>
+      <div class="bind-head" id="bindHead" hidden>
+        <input type="checkbox" id="bindAll" />
+        <span data-i18n="bind.headCol">연결</span>
+        <span data-i18n="bind.headVar">변수 · 연결할 자리</span>
+        <span class="grow"></span>
+        <span class="outside" id="bindOutside"></span>
+        <span data-i18n="bind.headCount">곳</span>
+      </div>
+      <div id="bindTree" class="bind-list"></div>
       <!-- 연결 후 — 요약 한 줄 + 사유 칩만(§4.6). -->
       <div class="row" id="bindDone" hidden><span id="bindDoneText"></span> <button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
       <div class="ux" id="applyProgress" style="display:none">

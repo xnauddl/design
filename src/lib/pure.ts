@@ -26,4 +26,5 @@ export * from './reread';
 export * from './scopes';
 export * from './tiers';
 export * from './bindDisplay';
+export * from './bindGroups';
 export * from './varTable';

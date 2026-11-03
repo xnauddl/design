@@ -101,13 +101,13 @@ interface Preview {
 }
 
 function addColorCand(preview: Preview | null, node: SceneNode, field: string, index: number, hex: string, e: VarEntry): void {
-  preview?.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
+  preview?.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, variableValue: hex });
 }
 function addFloatCand(preview: Preview | null, node: SceneNode, field: string, value: number, e: VarEntry): void {
-  preview?.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : undefined });
+  preview?.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : undefined, ...(e.num != null ? { variableValue: String(Math.round(e.num * 100) / 100) } : {}) });
 }
 function addStrCand(preview: Preview | null, node: SceneNode, field: string, value: string, e: VarEntry): void {
-  preview?.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
+  preview?.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, variableValue: value });
 }
 
 /**

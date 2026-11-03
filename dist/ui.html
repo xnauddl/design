@@ -430,7 +430,7 @@
 
     /* ── diff / 선택형 미리보기 트리 ── */
     /* 긴 이름은 nowrap이라 가로로 넘친다 — 가로만 스크롤시킨다(세로는 패널 body). */
-    #diff, #bindTree, #compTree {
+    #diff, #compTree {
       font-family: var(--mono); font-size: var(--fs); overflow-x: auto;
     }
     .before { color: var(--muted); text-decoration: line-through; }
@@ -482,13 +482,39 @@
     .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
     .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
     /* ── 탭 모양 3단계(§4.1) — 상단 탭(.tabs) · 레이어 하위 탭(밑줄, PR 3) · 계층 칩(PR 2) ── */
-    .subtabs { display: flex; gap: 14px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
+    /* 하위 탭 13px · 높이 32 · 간격 20(§4.6 — 11px은 실기에서 탭으로 읽히지 않았다) */
+    .subtabs { display: flex; gap: 20px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
     .subtab {
-      border: none; background: none; border-radius: 0; padding: 6px 0 5px; min-height: 24px;
-      font: 600 11px/1 var(--font); color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px;
+      border: none; background: none; border-radius: 0; padding: 0; height: 32px; min-height: 32px;
+      font: 600 13px/1 var(--font); color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px;
     }
     .subtab:hover:not([aria-selected="true"]) { background: none; color: var(--text); }
-    .subtab[aria-selected="true"] { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
+    .subtab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
+    /* 연결 후보 — 변수별 묶음(§4.6). 목록 머리는 버튼 줄 아래에 고정(두 겹, §2.5), 묶음 줄은 고정하지 않는다. */
+    .bind-desc { margin: 8px 0 6px; color: var(--text-2); font-size: 11px; line-height: 1.5; }
+    .bind-head {
+      position: sticky; top: calc(var(--toolbar-top, 95px) + var(--toolbar-h, 36px)); z-index: 1;
+      display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 6px; margin-top: 6px;
+      background: var(--surface); border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 10.5px; font-weight: 600;
+    }
+    .bind-head .grow { flex: 1 1 auto; }
+    .bind-head .outside { font-weight: 500; color: var(--muted); }
+    .bind-list { display: flex; flex-direction: column; font-size: var(--fs); }
+    .bg-val, .bg-text { font-variant-numeric: tabular-nums; }
+    .bg-head, .bg-place { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; border-bottom: 1px solid var(--border); }
+    .bg-head { font-weight: 600; color: var(--text); }
+    .bg-place { padding-left: 42px; color: var(--text); }
+    .bg-place.off { color: var(--text-2); }
+    .bg-tw { width: 24px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; }
+    /* 색 견본은 원 — 네모 체크박스와 헷갈리지 않게(흰색 견본이 빈 체크박스로 보였다). */
+    .bg-sw { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border-2); flex: 0 0 auto; }
+    .bg-type { width: 12px; text-align: center; color: var(--muted); font-family: var(--mono); flex: 0 0 auto; }
+    .bg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .bg-val { color: var(--text-2); font-weight: 500; white-space: nowrap; }
+    .bg-num { margin-left: auto; color: var(--text-2); font-weight: 500; font-size: 10.5px; }
+    .bg-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .bg-layer { padding: 0; min-height: 0; }
+    .bg-approx { color: var(--warn, var(--text-2)); }
     .tier-chip {
       height: 24px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
       border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
@@ -864,13 +890,12 @@
     </div>
 
     <div class="step" data-apply-step="bind">
-      <h2><span data-i18n="bind.title">변수 연결</span> <span class="muted" id="bindCount"></span></h2>
-      <div class="hint" data-i18n="bind.hint">먼저 미리보기로 확인하고, 연결할 항목만 고르세요</div>
+      <h2><span data-i18n="bind.title">변수 연결</span></h2>
       <!-- 연결할 변수가 없을 때의 안내(§4.6 표 4행) — 문구와 버튼은 ui.ts가 정한다. -->
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
       <div class="toolbar">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
-        <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">체크한 항목 연결</button>
+        <button id="btnApplyConfirm" class="primary" data-i18n="bind.confirm">체크한 곳 연결</button>
       </div>
       <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 있는 자산을 쓰는 일이라 연결 화면에 둔다(§4.6). -->
       <div class="row ts-apply-row">
@@ -881,15 +906,24 @@
       <div class="hint" id="tsApplyResult" hidden></div>
       <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
       <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">미리보기 다시</button></div>
-      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
-        <span class="grow"></span>
-        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:160px" />
-      </div>
+      <!-- 미리보기 전 한 줄 / 미리보기 뒤 목록 설명(§4.6) — 문구는 ui.ts가 정한다. -->
+      <div class="bind-desc" id="bindIntro" hidden data-i18n="bind.intro">[미리보기]를 누르면 선택한 레이어에서 변수 값과 같은 색·크기·간격 값을 찾아요</div>
+      <div class="bind-desc" id="bindDesc" hidden></div>
       <!-- 건너뜀 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다. 목록 위: 몇 개가 왜 빠졌는지 먼저. -->
       <div class="skip-row" id="bindSkips" style="display:none"></div>
       <div class="hint" id="bindSkipHint" style="display:none" data-i18n="bind.skipHint">건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다</div>
-      <div id="bindTree" class="results"></div>
+      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:160px" />
+      </div>
+      <div class="bind-head" id="bindHead" hidden>
+        <input type="checkbox" id="bindAll" />
+        <span data-i18n="bind.headCol">연결</span>
+        <span data-i18n="bind.headVar">변수 · 연결할 자리</span>
+        <span class="grow"></span>
+        <span class="outside" id="bindOutside"></span>
+        <span data-i18n="bind.headCount">곳</span>
+      </div>
+      <div id="bindTree" class="bind-list"></div>
       <!-- 연결 후 — 요약 한 줄 + 사유 칩만(§4.6). -->
       <div class="row" id="bindDone" hidden><span id="bindDoneText"></span> <button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
       <div class="ux" id="applyProgress" style="display:none">
@@ -1182,8 +1216,7 @@
     "semantic.missing": " \xB7 \uB204\uB77D: {names}",
     // 바인딩(적용)
     "apply.cancelRequested": "\uCDE8\uC18C \uC694\uCCAD\uB428 \u2014 \uB2E4\uC74C \uC9C0\uC810\uC5D0\uC11C \uC911\uB2E8\uD569\uB2C8\uB2E4.",
-    "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC5F0\uACB0{detail}",
-    "apply.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uD6C4\uBCF4 {bound}\uAC74{detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0\u2019",
+    "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uACF3\uB9CC \uC5F0\uACB0{detail}",
     "bind.filterPlaceholder": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
     // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
     "field.fills": "\uCC44\uC6C0 \uC0C9",
@@ -1222,7 +1255,6 @@
     "field.fontFamily": "\uAE00\uAF34",
     "field.fontWeight": "\uAD75\uAE30",
     "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD569\uB2C8\uB2E4",
-    "bind.willConnectTip": "{label}({fields})\uC744(\uB97C) {variable}\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4",
     // 리네임
     "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
     "rename.none": "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -1365,9 +1397,9 @@
     "bind.tsLabel": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "bind.repreview": "\uBBF8\uB9AC\uBCF4\uAE30 \uB2E4\uC2DC",
     "bind.toList": "\uBCC0\uC218 \uD0ED\uC5D0\uC11C \uBCF4\uAE30 \u2192",
-    "bind.doneLine": "\u2713 {n}\uAC1C \uC5F0\uACB0",
+    "bind.doneLine": "\u2713 {n}\uACF3 \uC5F0\uACB0",
     "bind.doneSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
-    "bind.candChanged": "\uD6C4\uBCF4\uAC00 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 {a}\uAC1C \uCD94\uAC00 \xB7 {b}\uAC1C \uC81C\uC678",
+    "bind.candChanged": "\uD6C4\uBCF4\uAC00 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 {a}\uACF3 \uCD94\uAC00 \xB7 {b}\uACF3 \uC81C\uC678",
     "bind.otherSel": "\uB2E4\uB978 \uC120\uD0DD\uC5D0\uC11C \uB9CC\uB4E0 \uACB0\uACFC\uC608\uC694",
     "bind.maybeChanged": "\uD53C\uADF8\uB9C8\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC744 \uC218 \uC788\uC5B4\uC694",
     "bind.selChanged": "\uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
@@ -1617,13 +1649,32 @@
     "textStyle.badgeSelectTip": "\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 {count}\uAC1C \uC804\uCCB4 \uC120\uD0DD",
     // 적용(바인딩)
     "bind.title": "\uBCC0\uC218 \uC5F0\uACB0",
-    "bind.hint": "\uBA3C\uC800 \uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD655\uC778\uD558\uACE0, \uC5F0\uACB0\uD560 \uD56D\uBAA9\uB9CC \uACE0\uB974\uC138\uC694",
     "bind.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
-    "bind.confirm": "\uCCB4\uD06C\uD55C \uD56D\uBAA9 \uC5F0\uACB0",
+    "bind.confirm": "\uCCB4\uD06C\uD55C \uACF3 \uC5F0\uACB0",
+    "bind.confirmN": "\uCCB4\uD06C\uD55C {n}\uACF3 \uC5F0\uACB0",
+    "bind.needPreview": "\uBA3C\uC800 [\uBBF8\uB9AC\uBCF4\uAE30]\uB97C \uB204\uB974\uC138\uC694",
+    "bind.nothing": "\uC5F0\uACB0\uD560 \uACF3\uC774 \uC5C6\uC5B4\uC694",
+    "bind.needCheck": "\uC5F0\uACB0\uD560 \uACF3\uC744 \uCCB4\uD06C\uD558\uC138\uC694",
+    "bind.intro": "[\uBBF8\uB9AC\uBCF4\uAE30]\uB97C \uB204\uB974\uBA74 \uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C \uBCC0\uC218 \uAC12\uACFC \uAC19\uC740 \uC0C9\xB7\uD06C\uAE30\xB7\uAC04\uACA9 \uAC12\uC744 \uCC3E\uC544\uC694",
+    "bind.desc": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12 {n}\uACF3\uC744 \uCC3E\uC558\uC5B4\uC694. \uBAA8\uB450 \uCCB4\uD06C\uD574 \uB480\uC5B4\uC694. \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC744 \uACF3\uC740 \uCCB4\uD06C\uB97C \uD478\uC138\uC694. \uCCB4\uD06C\uB97C \uD47C \uACF3\uC740 \uADF8\uB300\uB85C \uB46C\uC694.",
+    "bind.descApprox": " \uAC12\uC774 \uC870\uAE08 \uB2E4\uB978 \uACF3(~)\uC740 \uC5F0\uACB0\uD558\uBA74 \uBCC0\uC218 \uAC12\uC73C\uB85C \uB9DE\uCDB0\uC838\uC694.",
+    "bind.descNone": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "bind.selMany": "\uB808\uC774\uC5B4 {k}\uAC1C",
+    "bind.headCol": "\uC5F0\uACB0",
+    "bind.headVar": "\uBCC0\uC218 \xB7 \uC5F0\uACB0\uD560 \uC790\uB9AC",
+    "bind.headCount": "\uACF3",
+    "bind.allAria": "\uBCF4\uC774\uB294 \uBB36\uC74C \uC804\uCCB4 \uCCB4\uD06C",
+    "bind.outside": "\uD544\uD130 \uBC16 \uCCB4\uD06C {h}\uACF3 \uD3EC\uD568",
+    "bind.groupTip": "{name}\uC744(\uB97C) \uC774 {k}\uACF3\uC5D0 \uC5F0\uACB0\uD574\uC694",
+    "bind.placeCount": " \xB7 {k}\uACF3",
+    "bind.approxTip": "\uBCC0\uC218 \uAC12\uACFC {d} \uCC28\uC774 \xB7 \uC5F0\uACB0\uD558\uBA74 \uBCC0\uC218 \uAC12\uC73C\uB85C \uBC14\uB00C\uC5B4\uC694",
+    "bind.layerTip": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uC120\uD0DD \xB7 \uC774 \uBAA9\uB85D\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
+    "bind.uncheckedTip": "\uCCB4\uD06C\uB97C \uD480\uBA74 \uC774 \uAC12\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
+    "bind.expand": "\uD3BC\uCE58\uAE30",
+    "bind.collapse": "\uC811\uAE30",
     "bind.progress": "\uC9C4\uD589\uB960",
     "bind.skipHint": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4",
     "bind.skipCapped": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4 \u2014 \uB808\uC774\uC5B4\uAC00 \uB9CE\uC544 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0\uB9CC \uBCF4\uC5EC\uC90D\uB2C8\uB2E4(\uC0AC\uC720 \uC606 \uC22B\uC790\uB294 \uC804\uCCB4)",
-    "bind.skipMeta": "\uC2A4\uD0B5",
     // 스킵 칩 툴팁 — 사유 건수(속성 단위)와 레이어 수가 다를 수 있어 레이어 쪽을 따로 밝힌다.
     "bind.skipChipTip": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names}",
     "bind.skipChipTipMore": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names} \uC678",
@@ -1770,6 +1821,78 @@
   }
   function isHexColor(v) {
     return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v.trim());
+  }
+
+  // src/lib/bindGroups.ts
+  function placeKey(c) {
+    var _a;
+    return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}|${c.variableId}`;
+  }
+  function groupByVariable(cands) {
+    var _a, _b;
+    const byVar = /* @__PURE__ */ new Map();
+    for (const c of cands) {
+      const arr = byVar.get(c.variableId);
+      if (arr) arr.push(c);
+      else byVar.set(c.variableId, [c]);
+    }
+    const groups = [];
+    for (const [variableId, list] of byVar) {
+      const byNode = /* @__PURE__ */ new Map();
+      for (const c of list) {
+        const arr = byNode.get(c.nodeId);
+        if (arr) arr.push(c);
+        else byNode.set(c.nodeId, [c]);
+      }
+      const lines = [];
+      for (const [nodeId, items] of byNode) {
+        for (const l of groupBindLines(items)) {
+          const its = l.items;
+          const d = Math.max(...its.map((x) => {
+            var _a2;
+            return (_a2 = x.distance) != null ? _a2 : 0;
+          }));
+          lines.push(__spreadValues({
+            nodeId,
+            label: l.label,
+            fields: l.fields,
+            keys: its.map((x) => placeKey(__spreadProps(__spreadValues({}, x), { nodeId }))),
+            currentValue: l.currentValue
+          }, d > 0 ? { distance: d } : {}));
+        }
+      }
+      const exact = list.find((c) => !c.distance);
+      const variableValue = (_b = (_a = list.find((c) => c.variableValue != null)) == null ? void 0 : _a.variableValue) != null ? _b : (exact != null ? exact : list[0]).currentValue;
+      const keys = lines.flatMap((l) => l.keys);
+      groups.push({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines });
+    }
+    groups.sort((a, b) => b.count - a.count || a.variableName.localeCompare(b.variableName));
+    return groups;
+  }
+  function carryChecks(prev, prevChecked, next) {
+    var _a;
+    const prevKeys = new Set(prev.map(placeKey));
+    const anyChecked = /* @__PURE__ */ new Map();
+    for (const c of prev) {
+      const on = prevChecked.has(placeKey(c));
+      anyChecked.set(c.variableId, ((_a = anyChecked.get(c.variableId)) != null ? _a : false) || on);
+    }
+    const checked = /* @__PURE__ */ new Set();
+    const nextKeys = /* @__PURE__ */ new Set();
+    let added = 0;
+    for (const c of next) {
+      const k = placeKey(c);
+      nextKeys.add(k);
+      if (prevKeys.has(k)) {
+        if (prevChecked.has(k)) checked.add(k);
+        continue;
+      }
+      added++;
+      if (anyChecked.get(c.variableId) !== false) checked.add(k);
+    }
+    let removed = 0;
+    for (const k of prevKeys) if (!nextKeys.has(k)) removed++;
+    return { checked, added, removed };
   }
 
   // src/lib/textStyles.ts
@@ -3565,6 +3688,7 @@
     send({ type: "APPLY", tolerance: bindTolerance(), preview: true, reqId });
     opSilent = false;
     bindPreviewSel = curSel.ids.slice();
+    if (!silent) bindPreviewName = curSel.count === 1 ? curSel.name || t("sel.unnamed") : t("bind.selMany", { k: curSel.count });
   }
   $("btnBindRepreview").addEventListener("click", () => runBindPreview());
   $("btnBindToList").addEventListener("click", () => showManager());
@@ -3576,8 +3700,7 @@
   });
   $("bindAll").addEventListener("change", (e) => {
     const on = e.target.checked;
-    bindChecked.clear();
-    if (on) for (const c of bindCandidates) bindChecked.add(candKey(c));
+    for (const g of bindGroups().shown) for (const k of g.keys) on ? bindChecked.add(k) : bindChecked.delete(k);
     renderBindTree();
   });
   $("btnApplyCancel").addEventListener("click", () => {
@@ -4342,37 +4465,30 @@
         const silent = msg.preview && msg.reqId !== void 0 && msg.reqId === bindSilentReq;
         bindSilentReq = 0;
         if (isMini && msg.preview) bindPreviewMini = true;
-        const confirmBtn = $("btnApplyConfirm");
         bindSkips = (_b = msg.skips) != null ? _b : [];
         bindSkipsCapped = ((_c = msg.skipTotal) != null ? _c : bindSkips.length) > bindSkips.length;
         const rt = reasonsText(msg.reasons);
-        const asChips = bindSkips.length > 0;
-        const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt && !asChips ? ` \u2014 ${rt}` : ""}`;
         renderSkipReasons(msg.reasons);
         if (msg.cancelled) {
           clearBindPreview();
           const cancelDetail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}`;
           setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail: cancelDetail }), "warn");
-          confirmBtn.style.display = "none";
         } else if (msg.preview) {
-          const prevKeys = new Set(bindCandidates.map(candKey));
+          const prev = bindCandidates;
           const prevChecked = new Set(bindChecked);
           bindCandidates = (_d = msg.candidates) != null ? _d : [];
           bindNodes = (_e = msg.nodes) != null ? _e : [];
+          bindPreviewed = true;
           bindChecked.clear();
-          for (const c of bindCandidates) {
-            const k = candKey(c);
-            if (!silent || !prevKeys.has(k) || prevChecked.has(k)) bindChecked.add(k);
-          }
           if (silent) {
-            const now = new Set(bindCandidates.map(candKey));
-            const added = [...now].filter((k) => !prevKeys.has(k)).length;
-            const removed = [...prevKeys].filter((k) => !now.has(k)).length;
-            if (added || removed) showStatusLine(t("bind.candChanged", { a: added, b: removed }));
+            const r = carryChecks(prev, prevChecked, bindCandidates);
+            for (const k of r.checked) bindChecked.add(k);
+            if (r.added || r.removed) showStatusLine(t("bind.candChanged", { a: r.added, b: r.removed }));
+          } else {
+            for (const c of bindCandidates) bindChecked.add(candKey(c));
           }
-          setLock(confirmBtn, null);
           renderBindTree();
-          setStatus("applyStatus", t("apply.preview", { bound: msg.bound, detail }), msg.skipped ? "warn" : "");
+          setStatus("applyStatus", "", "");
         } else {
           clearBindPreview();
           bindSkips = (_f = msg.skips) != null ? _f : [];
@@ -4381,7 +4497,6 @@
           setStatus("applyStatus", "", "");
           $("bindDoneText").textContent = t("bind.doneLine", { n: msg.bound }) + (msg.skipped ? t("bind.doneSkipped", { m: msg.skipped }) : "") + " \xB7";
           $("bindDone").hidden = false;
-          confirmBtn.style.display = "none";
         }
         break;
       }
@@ -4810,14 +4925,13 @@
   var bindCandidates = [];
   var bindNodes = [];
   var bindChecked = /* @__PURE__ */ new Set();
-  var bindHideContext = true;
-  function candKey(c) {
-    var _a;
-    return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}`;
-  }
+  var candKey = placeKey;
   function hasBindPreview() {
     return bindCandidates.length > 0;
   }
+  var bindPreviewed = false;
+  var bindPreviewName = "";
+  var bindExpanded = /* @__PURE__ */ new Map();
   var bindPreviewSel = null;
   var bindLeftSince = false;
   var bindForeignSel = false;
@@ -4827,101 +4941,172 @@
   var bindSilentReq = 0;
   var layerLibUse = null;
   var layerLibReq = 0;
-  function skipReasonText(s) {
-    const why = t(`reason.${s.reason}`);
-    return s.field ? `${s.field} \xB7 ${why}` : why;
-  }
-  function bindRows() {
-    const byNode = /* @__PURE__ */ new Map();
-    for (const c of filteredCandidates()) {
-      const arr = byNode.get(c.nodeId);
-      if (arr) arr.push(c);
-      else byNode.set(c.nodeId, [c]);
-    }
-    const skipOf = /* @__PURE__ */ new Map();
-    for (const s of bindSkips) if (!byNode.has(s.nodeId) && !skipOf.has(s.nodeId)) skipOf.set(s.nodeId, s);
-    const rows = [];
-    for (const n of bindNodes) {
-      const cands = byNode.get(n.id);
-      const skipped = skipOf.get(n.id);
-      if (!cands && skipped) {
-        rows.push({
-          id: n.id,
-          name: n.name,
-          type: n.type,
-          depth: n.depth,
-          parentId: n.parentId,
-          keep: { reason: skipReasonText(skipped), meta: t("bind.skipMeta") }
-        });
-        continue;
-      }
-      rows.push(__spreadValues({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands }, cands ? { selectId: n.id } : {}));
-      if (cands) {
-        for (const line of groupBindLines(cands)) {
-          const lead = line.items[0];
-          const dist = lead.distance && lead.distance > 0 ? ` ~${Math.round(lead.distance * 100) / 100}` : "";
-          const label = fieldLabel(line.label, line.fields[0]);
-          const variable = `${line.variableName}${dist}`;
-          const tipArgs = { label, fields: line.fields.join(", "), variable: line.variableName };
-          rows.push({
-            id: candKey(lead),
-            keys: line.items.map((it) => candKey(it)),
-            name: `${label} ${line.currentValue}`,
-            type: line.fields[0],
-            depth: n.depth + 1,
-            parentId: n.id,
-            change: variable,
-            bind: {
-              label,
-              value: line.currentValue,
-              variable,
-              connected: false,
-              tip: t("bind.willConnectTip", tipArgs)
-            }
-          });
-        }
-      }
-    }
-    return rows;
-  }
   function fieldLabel(label, rawField) {
     return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
   }
-  function renderBindTree() {
-    $("bindTreeCtrls").style.display = hasBindPreview() ? "" : "none";
-    renderSelectableTree($("bindTree"), bindRows(), bindChecked, {
-      hideContext: bindHideContext,
-      onChange: updateBindApply
-    });
-    updateBindApply();
-  }
+  var round2 = (n) => Math.round(n * 100) / 100;
   function bindFilterText() {
     var _a;
     return ((_a = $("bindFilter").value) != null ? _a : "").trim().toLowerCase();
   }
-  function filteredCandidates() {
+  function bindGroups() {
+    const all = groupByVariable(bindCandidates);
     const q = bindFilterText();
-    return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
+    return { all, shown: q ? all.filter((g) => g.variableName.toLowerCase().includes(q)) : all };
+  }
+  function groupOpen(g, total) {
+    var _a;
+    return (_a = bindExpanded.get(g.variableId)) != null ? _a : total <= 10;
+  }
+  function setTri(box, keys) {
+    const on = keys.filter((k) => bindChecked.has(k)).length;
+    box.checked = on > 0 && on === keys.length;
+    box.indeterminate = on > 0 && on < keys.length;
+  }
+  function placeEl(l) {
+    var _a;
+    const row = document.createElement("div");
+    row.className = "bg-place";
+    row.dataset.key = l.keys[0];
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    setTri(box, l.keys);
+    const node = bindNodes.find((n) => n.id === l.nodeId);
+    const layerName = (_a = node == null ? void 0 : node.name) != null ? _a : l.nodeId;
+    const label = fieldLabel(l.label, l.fields[0]);
+    box.setAttribute("aria-label", `${layerName} \u203A ${label}`);
+    box.addEventListener("change", () => {
+      for (const k of l.keys) box.checked ? bindChecked.add(k) : bindChecked.delete(k);
+      renderBindTree();
+    });
+    const on = l.keys.some((k) => bindChecked.has(k));
+    row.classList.toggle("off", !on);
+    if (!on) row.title = t("bind.uncheckedTip");
+    const layer = document.createElement("button");
+    layer.type = "button";
+    layer.className = "link link-btn bg-layer";
+    layer.textContent = layerName;
+    layer.title = t("bind.layerTip");
+    layer.addEventListener("click", () => selectNodes([l.nodeId], "applyStatus"));
+    const text = document.createElement("span");
+    text.className = "bg-text";
+    text.textContent = ` \u203A ${label} ${isHexColor(l.currentValue) ? l.currentValue.toUpperCase() : l.currentValue}`;
+    row.append(box, layer, text);
+    if (l.distance) {
+      const d = round2(l.distance);
+      const ap = document.createElement("span");
+      ap.className = "bg-approx";
+      ap.textContent = `~${d}`;
+      ap.title = t("bind.approxTip", { d });
+      row.appendChild(ap);
+    }
+    if (l.keys.length > 1) row.append(t("bind.placeCount", { k: l.keys.length }));
+    return row;
+  }
+  function bindGroupEl(g, total) {
+    const wrap = document.createElement("div");
+    wrap.className = "bg-group";
+    wrap.setAttribute("role", "group");
+    wrap.dataset.var = g.variableId;
+    const head = document.createElement("div");
+    head.className = "bg-head";
+    head.title = t("bind.groupTip", { name: g.variableName, k: g.count });
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.setAttribute("aria-label", g.variableName);
+    setTri(box, g.keys);
+    box.addEventListener("change", () => {
+      for (const k of g.keys) box.checked ? bindChecked.add(k) : bindChecked.delete(k);
+      renderBindTree();
+    });
+    const open = groupOpen(g, total);
+    const tw = document.createElement("button");
+    tw.type = "button";
+    tw.className = "bg-tw";
+    tw.textContent = open ? "\u25BE" : "\u25B8";
+    tw.setAttribute("aria-expanded", String(open));
+    tw.setAttribute("aria-label", t(open ? "bind.collapse" : "bind.expand"));
+    tw.addEventListener("click", () => {
+      var _a;
+      bindExpanded.set(g.variableId, !open);
+      renderBindTree();
+      (_a = $("bindTree").querySelector(`.bg-group[data-var="${CSS.escape(g.variableId)}"] .bg-tw`)) == null ? void 0 : _a.focus();
+    });
+    const color = isHexColor(g.variableValue);
+    const mark = document.createElement("span");
+    if (color) {
+      mark.className = "bg-sw";
+      mark.style.background = g.variableValue;
+    } else {
+      mark.className = "bg-type";
+      mark.textContent = /^-?\d/.test(g.variableValue) ? "#" : "T";
+    }
+    const name = document.createElement("span");
+    name.className = "bg-name";
+    name.textContent = g.variableName;
+    const val = document.createElement("span");
+    val.className = "bg-val";
+    val.textContent = color ? g.variableValue.toUpperCase() : `= ${g.variableValue}`;
+    const num = document.createElement("span");
+    num.className = "bg-num";
+    num.textContent = String(g.count);
+    head.append(box, tw, mark, name, val, num);
+    wrap.appendChild(head);
+    if (open) for (const l of g.lines) wrap.appendChild(placeEl(l));
+    return wrap;
+  }
+  function renderBindIntro() {
+    const prereqShown = $("bindPrereq").style.display !== "none";
+    $("bindIntro").hidden = bindPreviewed || !curSel || !curSel.count || prereqShown;
+  }
+  function renderBindTree() {
+    const { all, shown } = bindGroups();
+    const has = hasBindPreview();
+    renderBindIntro();
+    const desc = $("bindDesc");
+    if (bindPreviewed) {
+      const approx = bindCandidates.some((c) => {
+        var _a;
+        return ((_a = c.distance) != null ? _a : 0) > 0;
+      });
+      desc.textContent = has ? t("bind.desc", { name: bindPreviewName, n: bindCandidates.length }) + (approx ? t("bind.descApprox") : "") : t("bind.descNone", { name: bindPreviewName });
+      desc.hidden = false;
+    } else desc.hidden = true;
+    $("bindTreeCtrls").style.display = has ? "" : "none";
+    $("bindHead").hidden = !has;
+    const tree = $("bindTree");
+    clearMount(tree);
+    if (has) for (const g of shown) tree.appendChild(bindGroupEl(g, all.length));
+    updateBindApply();
   }
   $("bindFilter").addEventListener("input", () => renderBindTree());
   function updateBindApply() {
-    const total = bindCandidates.length;
-    const sel = bindChecked.size;
-    $("bindCount").textContent = total ? `\uD6C4\uBCF4 ${total}` : "";
+    if (!curSel) return;
     const confirm = $("btnApplyConfirm");
-    confirm.style.display = hasBindPreview() ? "" : "none";
-    confirm.disabled = sel === 0;
-    if (hasBindPreview()) {
-      const all = $("bindAll");
-      all.checked = sel === total && total > 0;
-      all.indeterminate = sel > 0 && sel < total;
-    }
+    const n = bindChecked.size;
+    confirm.textContent = bindPreviewed && hasBindPreview() ? t("bind.confirmN", { n }) : t("bind.confirm");
+    if (!curSel.count) setLock(confirm, "prereq", t("status.noSelection"));
+    else if (bindForeignSel && !$("bindNotice").hidden) setLock(confirm, "prereq", t("bind.selChanged"));
+    else if (!bindPreviewed) setLock(confirm, "prereq", t("bind.needPreview"));
+    else if (!hasBindPreview()) setLock(confirm, "prereq", t("bind.nothing"));
+    else if (!n) setLock(confirm, "prereq", t("bind.needCheck"));
+    else setLock(confirm, null);
+    if (!hasBindPreview()) return;
+    const { shown } = bindGroups();
+    const shownKeys = shown.flatMap((g) => g.keys);
+    const all = $("bindAll");
+    all.setAttribute("aria-label", t("bind.allAria"));
+    setTri(all, shownKeys);
+    const shownSet = new Set(shownKeys);
+    const outside = [...bindChecked].filter((k) => !shownSet.has(k)).length;
+    $("bindOutside").textContent = bindFilterText() && outside ? t("bind.outside", { h: outside }) : "";
   }
   function clearBindPreview() {
     $("bindNotice").hidden = true;
     bindPreviewSel = null;
     bindForeignSel = false;
     bindHereSel = false;
+    bindPreviewed = false;
     bindCandidates = [];
     bindNodes = [];
     bindSkips = [];
@@ -4930,10 +5115,7 @@
     $("bindSkips").style.display = "none";
     $("bindSkipHint").style.display = "none";
     bindChecked.clear();
-    clearMount($("bindTree"));
-    $("bindCount").textContent = "";
-    $("bindTreeCtrls").style.display = "none";
-    $("btnApplyConfirm").style.display = "none";
+    renderBindTree();
   }
   var compCandidates = [];
   var compChecked = /* @__PURE__ */ new Set();
@@ -5159,6 +5341,8 @@
     const head = document.querySelector(".tab-section.active .step:not(.collapsed) .step-head");
     const headH = head && head.offsetParent ? Math.round(head.getBoundingClientRect().height) : 26;
     root.style.setProperty("--toolbar-top", `${headTop + headH}px`);
+    const bar2 = document.querySelector(".tab-section.active .step:not(.collapsed) .toolbar");
+    if (bar2 && bar2.offsetParent) root.style.setProperty("--toolbar-h", `${Math.round(bar2.getBoundingClientRect().height)}px`);
   }
   function applyCardChrome() {
     document.querySelectorAll(".step").forEach((card) => {
@@ -7167,6 +7351,7 @@ ${v.description}` : v.name;
     }
     notice.style.display = msg ? "" : "none";
     text.textContent = msg;
+    renderBindIntro();
     act.hidden = !action;
     if (action) {
       act.textContent = action[0];
@@ -7174,10 +7359,7 @@ ${v.description}` : v.name;
     }
     const noSel = !curSel.count;
     setLock($("btnApply"), noSel ? "prereq" : msg ? "prereq" : null, noSel ? t("status.noSelection") : msg);
-    const confirm = $("btnApplyConfirm");
-    if (noSel) setLock(confirm, "prereq", t("status.noSelection"));
-    else if (bindForeignSel && !$("bindNotice").hidden) setLock(confirm, "prereq", t("bind.selChanged"));
-    else setLock(confirm, null);
+    updateBindApply();
     const ts = $("btnApplyExistingText");
     if (noSel) setLock(ts, "prereq", t("status.noSelection"));
     else if (prereqKnown && !hasTextStyles) setLock(ts, "prereq", t("bind.tsNone"));
