@@ -45,7 +45,6 @@ function readMaxDepth(): number {
 
 let tokens: DraftToken[] = [];
 let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
-let hideOnboard = false; // 첫 실행 배너를 껐는가(파일에 기억)
 let colorsFromPalette = false; // 지금 목록의 색이 팔레트 생성으로 온 것인가(변수 생성 시 이전 팔레트 정리)
 let colorsCreated = false; // 이 세션에서 색 변수를 만들었는가(토큰 단계 안내용)
 // #11: 단계 전제 — Global 변수 존재(역할 매핑) · 연결 가능 변수 존재(변수 연결) · 텍스트 스타일 존재(기존만 연결).
@@ -790,7 +789,6 @@ function saveSettings(): void {
       type: 'SET_SETTINGS',
       base: Number(($('base') as HTMLInputElement).value) || 16,
       maxDepth: readMaxDepth(),
-      hideOnboard,
       grid: tidyGrid(),
       tolerance: bindTolerance(),
     });
@@ -2384,7 +2382,6 @@ window.onmessage = (event: MessageEvent) => {
       ($('depth') as HTMLInputElement).value = String(msg.maxDepth);
       ($('grid') as HTMLInputElement).value = String(msg.grid);
       ($('tol') as HTMLInputElement).value = String(msg.tolerance);
-      hideOnboard = msg.hideOnboard;
       break;
     }
     case 'VARIABLES': {
@@ -2473,8 +2470,6 @@ window.onmessage = (event: MessageEvent) => {
 
 /* ---------- UX7: 오류 라우팅/표시 ---------- */
 const OP_STATUS: Record<string, string> = {
-  REMAP_TARGETS: 'applyStatus',
-  REMAP_BINDINGS: 'applyStatus',
   EXTRACT: 'colorStatus',
   CREATE_TOKENS: 'createStatus',
   CREATE_SEMANTICS: 'semStatus',
@@ -4303,7 +4298,8 @@ function renderModeSelect(): void {
   const sel = $('modeSelect') as HTMLSelectElement;
   const visible = chip === 'all' ? vmCols : vmCols.filter((c) => c.id === chip);
   const names = [...new Set(visible.flatMap((c) => c.modes.map((m) => m.name)))];
-  if (names.length <= 1) { sel.hidden = true; return; }
+  // 보이는 모드가 1개면 숨긴다. 검색 중에도 숨겨 칩 줄 자리를 남긴다.
+  if (names.length <= 1 || searchOpen) { sel.hidden = true; return; }
   sel.hidden = false;
   clearMount(sel);
   const def = document.createElement('option');
@@ -4387,7 +4383,11 @@ function valueEl(cell: VarCell | undefined): HTMLElement {
     b.tabIndex = -1; // 행 안의 알약은 Tab 정지점이 아니다 — 키보드는 메뉴로
     b.innerHTML = `${swatchHtml(resolveSwatch(cell))}→ ${escapeHtml(cell.aliasName)}${cell.remote ? ' <span class="lib-tag">LIB</span>' : ''}`;
     b.title = t('vm.jumpAlias');
-    b.addEventListener('click', (e) => { e.stopPropagation(); jumpToVar(cell.aliasId); });
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      jumpToVar(cell.aliasId, (e.currentTarget as HTMLElement).closest<HTMLElement>('[data-key]')?.dataset.key);
+    });
+    b.addEventListener('dblclick', (e) => e.stopPropagation()); // 알약 더블클릭이 행 상세를 함께 열지 않게
     span.appendChild(b);
     return span;
   }
@@ -4406,6 +4406,16 @@ function renderVarList(): void {
   const tree = $('varTree');
   const prevScroll = window.scrollY;
   clearMount(tree);
+  // §4.2 — 선택이 있는 채로 처음 목록에 들어오면 사용 수가 올 때까지 이 한 줄만(접힘 → 펼침으로 튀지 않게).
+  // 자동으로 읽지 않는 경우(큰 선택, 마법사 중)는 목록 + 상황 안내 줄을 바로 보여 준다.
+  if (baseline && !usageMap && !bigSkipped && !wizardRunning && (vmUsageInFlight || vmUsageTimer) && !usageEverShown) {
+    const d = document.createElement('div');
+    d.className = 'vt-empty';
+    d.textContent = t('list.reading');
+    tree.appendChild(d);
+    return;
+  }
+  usageEverShown = true;
   const entries = buildList({
     collections: vmCols,
     vars: vmVars,
@@ -4479,6 +4489,8 @@ function renderVarList(): void {
   if (Math.abs(window.scrollY - prevScroll) > 1) window.scrollTo(0, prevScroll);
 }
 const rowGroupOf = new Map<string, string>();
+/** 목록을 한 번이라도 그렸는가 — §4.2 "읽는 중" 한 줄은 처음 들어올 때만. */
+let usageEverShown = false;
 
 function libRowsMatching(): LibraryVar[] {
   if (!usageMap) return [];
@@ -4723,7 +4735,8 @@ function treeKey(ev: KeyboardEvent, el: HTMLElement, group?: Extract<ListEntry, 
 }
 
 /* ---------- 알약 / "가리키는 변수로 이동" + 되돌리기 ---------- */
-function jumpToVar(id: string): void {
+/** fromKey: 이동 전 원래 행 — 되돌리기는 그 행으로 포커스를 돌린다(§4.1). */
+function jumpToVar(id: string, fromKey?: string): void {
   const v = vmVars.find((x) => x.id === id);
   if (!v) {
     const lib = libVars.find((l) => l.id === id);
@@ -4732,7 +4745,7 @@ function jumpToVar(id: string): void {
     } else showStatusLine(t('list.libVar'));
     return;
   }
-  const undo = { chip, query, searchOpen, userExpanded: new Map(userExpanded), showUnusedIn: new Set(showUnusedIn), showUnusedGroups: new Set(showUnusedGroups), scroll: window.scrollY, focusKey };
+  const undo = { chip, query, searchOpen, userExpanded: new Map(userExpanded), showUnusedIn: new Set(showUnusedIn), showUnusedGroups: new Set(showUnusedGroups), scroll: window.scrollY, focusKey: fromKey ?? focusKey };
   chip = 'all';
   clearSearch(false);
   const gk = groupKey(v.collectionId, v.name);
@@ -4771,6 +4784,7 @@ function jumpToVar(id: string): void {
 function openSearch(): void {
   searchOpen = true;
   $('searchBox').hidden = false;
+  renderModeSelect();
   ($('varSearch') as HTMLInputElement).focus();
 }
 function clearSearch(render = true): void {
@@ -4808,7 +4822,7 @@ function openVarMenuFor(ref: RowRef, rowEl: HTMLElement, x?: number, y?: number)
   } else if (via.length) {
     items.push({ label: t('list.selectViaAlias'), separatorBefore: true, onSelect: () => selectVarUsers(via) });
   }
-  if (cell && cell.kind === 'alias') items.push({ label: t('vm.jumpAlias'), onSelect: () => jumpToVar(cell.aliasId), focusElsewhere: true });
+  if (cell && cell.kind === 'alias') items.push({ label: t('vm.jumpAlias'), onSelect: () => jumpToVar(cell.aliasId, rowEl.dataset.key), focusElsewhere: true });
   items.push({ label: t('vm.detail'), onSelect: () => openDetail(ref, rowEl), focusElsewhere: true });
   openMenu(x ?? r.left + 24, y ?? r.bottom, items, rowEl, () => rowEl.classList.remove('menu-open'));
 }
@@ -5005,10 +5019,14 @@ function placeWizard(): void {
   const card = $('wizardCard');
   const inMake = activeTab === 'variables' && varSub === 'make';
   const slot = $(inMake ? 'wizardSlotMake' : 'wizardSlotStart');
-  if (card.parentElement !== slot) slot.appendChild(card);
+  // 자리를 옮길 때만 기본 펼침을 정한다 — 다시 그릴 때마다 접으면 사용자가 펼친 것이 풀린다.
   // 만들기 쪽에서는 접힌 채, 실행 중이거나 요약이 있으면 펼친다.
-  if (inMake) card.classList.toggle('collapsed', !wizardRunning && !wizHasSummary());
-  else card.classList.remove('collapsed');
+  if (card.parentElement !== slot) {
+    slot.appendChild(card);
+    if (inMake) card.classList.toggle('collapsed', !wizardRunning && !wizHasSummary());
+    else card.classList.remove('collapsed');
+  }
+  if (wizardRunning) card.classList.remove('collapsed');
   // 요약을 화면에서 봤다(①) — 끝난 뒤 카드가 실제로 보이면.
   const visible = activeTab === 'variables' && !isMini && (inMake || varScreen() === 'start');
   if (wizLatch && wizLatch.done && visible) wizLatch.summarySeen = true;

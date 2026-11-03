@@ -2440,29 +2440,8 @@ test('selectionSummary — 하위 수는 선택 자신을 뺀 수, capped면 +',
 });
 
 /* ---------- 일괄 교체: 후보 판정(scopes.ts) ---------- */
-test('remapTargets — 타입·용도가 모든 필드에 맞는 변수만, A 자신 제외, 컬렉션→이름 정렬', async () => {
-  const { remapTargets, scopeFitsField } = await import('../dist/pure.mjs');
-  const vars = [
-    { id: 'a', name: 'spacing/8', resolvedType: 'FLOAT', scopes: ['GAP'], collection: 'Global' },
-    { id: 'b', name: 'spacing/sm', resolvedType: 'FLOAT', scopes: ['GAP'], collection: 'Semantic' },
-    { id: 'c', name: 'line-height/24', resolvedType: 'FLOAT', scopes: ['LINE_HEIGHT'], collection: 'Global' },
-    { id: 'd', name: 'any/num', resolvedType: 'FLOAT', scopes: ['ALL_SCOPES'], collection: 'Global' },
-    { id: 'e', name: 'color/fg', resolvedType: 'COLOR', scopes: ['TEXT_FILL'], collection: 'Semantic' },
-    { id: 'f', name: 'color/line', resolvedType: 'COLOR', scopes: ['STROKE_COLOR'], collection: 'Semantic' },
-    { id: 'g', name: 'color/all', resolvedType: 'COLOR', scopes: ['ALL_FILLS', 'STROKE_COLOR'], collection: 'Global' },
-  ];
-  // 여백: GAP 또는 ALL_SCOPES만 — 행간 변수(c)는 값 종류가 같아도 제외
-  assert.deepEqual(remapTargets('a', 'FLOAT', ['paddingLeft', 'itemSpacing'], vars).map((v) => v.id), ['d', 'b']);
-  // 채움+선 둘 다 쓰던 색 → 둘 다 맞는 변수만(g). 채움 전용(e)·선 전용(f)은 일부만 바뀌게 되므로 제외
-  assert.deepEqual(remapTargets('x', 'COLOR', ['fills', 'strokes'], vars).map((v) => v.id), ['g']);
-  assert.deepEqual(remapTargets('x', 'COLOR', ['fills'], vars).map((v) => v.id), ['g', 'e']);
-  // 지워진 변수(fromType 모름)라도 필드 규칙으로 타입을 정한다
-  assert.deepEqual(remapTargets('gone', null, ['strokes'], vars).map((v) => v.id), ['g', 'f']);
-  // 규칙 없는 필드 + 타입 모름 → 후보 없음(무엇을 붙여도 되는지 알 수 없다)
-  assert.deepEqual(remapTargets('gone', null, ['visible'], vars), []);
-  // 규칙 없는 필드는 A의 타입을 따르고 스코프는 따지지 않는다
-  assert.deepEqual(remapTargets('a', 'FLOAT', ['minWidth'], vars).map((v) => v.id), ['d', 'c', 'b']);
-  assert.deepEqual(remapTargets('a', 'FLOAT', [], vars), []);
+test('scopeFitsField — 스코프 판정 단위', async () => {
+  const { scopeFitsField } = await import('../dist/pure.mjs');
   // 스코프 판정 단위
   assert.equal(scopeFitsField('effects', ['EFFECT_COLOR']), true);
   assert.equal(scopeFitsField('effects', ['ALL_FILLS']), false);
@@ -2545,40 +2524,11 @@ test('groupBindLines — 같은 변수의 네 방향 여백·모서리를 한 �
 });
 
 /* ---------- 변수 관리 표(varTable.ts) ---------- */
-test('varTable — 그룹 경로·트리·필터·묶음·복사 문자열', async () => {
-  const { groupPath, leafName, buildVarTree, filterVars, groupRows, cellCopyText, pickInitialCollection, cssVarName } = await import('../dist/pure.mjs');
+test('varTable — 그룹 경로·복사 문자열', async () => {
+  const { groupPath, leafName, cellCopyText, cssVarName } = await import('../dist/pure.mjs');
   assert.equal(groupPath('color/background/default'), 'color/background');
   assert.equal(leafName('color/background/default'), 'default');
   assert.equal(groupPath('primary'), '');
-  const cols = [
-    { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }] },
-    { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }] },
-  ];
-  const v = (id, name, collectionId) => ({ id, name, collectionId, type: 'COLOR', values: {}, scopes: [], description: '' });
-  const vars = [
-    v('a', 'color/blue/500', 'g'), v('b', 'color/gray/50', 'g'), v('c', 'spacing/8', 'g'),
-    v('d', 'color/background/default', 's'), v('e', 'color/background/muted', 's'), v('f', 'color/text/default', 's'),
-  ];
-  const usage = new Map([['d', 3], ['f', 1]]);
-  const tree = buildVarTree(cols, vars, (x) => (usage.get(x.id) ?? 0) > 0);
-  assert.deepEqual(tree.map((n) => [n.label, n.count]), [['Global', 0], ['Semantic', 2]]);
-  assert.deepEqual(tree[1].children.map((n) => [n.path, n.count]), [['color', 2]]);
-  assert.deepEqual(tree[1].children[0].children.map((n) => [n.path, n.count]), [['color/background', 1], ['color/text', 1]]);
-  assert.equal(pickInitialCollection(tree), 's');
-  // 전체(include 모두)면 Global에 그룹 color(2)·spacing(1)
-  const all = buildVarTree(cols, vars, () => true);
-  assert.deepEqual(all[0].children.map((n) => [n.label, n.count]), [['color', 2], ['spacing', 1]]);
-  // 필터: 컬렉션 · 경로(하위 포함) · 검색 · 선택에서 쓰는 것만
-  const f = (o) => filterVars(vars, { collectionId: 's', path: '', query: '', onlyUsed: false, ...o }, usage).map((x) => x.id);
-  assert.deepEqual(f({}), ['d', 'e', 'f']);
-  assert.deepEqual(f({ path: 'color/background' }), ['d', 'e']);
-  assert.deepEqual(f({ path: 'color' }), ['d', 'e', 'f']);
-  assert.deepEqual(f({ query: 'MUTED' }), ['e']);
-  assert.deepEqual(f({ onlyUsed: true }), ['d', 'f']);
-  // 'color/back'은 'color/background'의 접두어지만 경로가 아니다
-  assert.deepEqual(f({ path: 'color/back' }), []);
-  // 묶음 — 첫 등장 순서
-  assert.deepEqual(groupRows(vars.slice(3)).map((g) => [g.path, g.rows.length]), [['color/background', 2], ['color/text', 1]]);
   // 복사 문자열
   assert.equal(cellCopyText({ kind: 'color', hex: '#2563eb' }), '#2563EB');
   assert.equal(cellCopyText({ kind: 'alias', aliasId: 'x', aliasName: 'color/blue/500' }), 'color/blue/500');

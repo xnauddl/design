@@ -363,16 +363,8 @@
       padding: 6px 8px; display: grid; gap: 3px;
     }
     .r-card.dim { opacity: .55; }
-    /* 일괄 교체 패널 — 변수별 보기의 행 바로 아래에 붙는다. 좁은 폭에서는 줄바꿈. */
-    .remap-panel {
-      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-      margin: -2px 0 6px; padding: 7px 8px; border: 1px solid var(--accent-border);
-      border-radius: var(--r-sm); background: var(--accent-subtle); font-size: 11px;
-    }
-    .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
     /* 연결 현황 대기 — 선택이 멎을 때까지 이전 목록을 흐리게 둔다(비웠다 채우는 깜빡임 대신). 누를 수 없음. */
     .results.stale { opacity: .45; pointer-events: none; transition: opacity .12s; }
-    .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
     /* 컬렉션 계층 — 한 줄: 이름(변수 수) · 추천 · 선택 */
     .col-role { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
     .col-role:first-child { border-top: none; }
@@ -473,40 +465,8 @@
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
 
-    /* ── 변수 관리 ── */
-    .var-manager { display: flex; flex-direction: column; gap: 8px; }
-    .vm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .vm-head h2 { margin: 0; font-size: 12px; }
-    .vm-head input[type=search] { width: 160px; }
-    /* PR 1 중간 상태 — 400에서는 트리를 표 위에 쌓는다. 목록마다 스크롤 상자를 두지 않는다(#18): 패널이 스크롤. */
-    .vm-body { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-    .vm-tree { border: 1px solid var(--border); border-radius: var(--r); padding: 4px; }
-    .vm-node { display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; border: none; background: transparent; padding: 4px 6px; border-radius: var(--r-sm); color: var(--text); font-size: 11px; }
-    .vm-node:hover { background: var(--surface-hover); }
-    .vm-node[aria-current="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
-    .vm-node .tw { width: 10px; flex: 0 0 10px; color: var(--muted); }
-    .vm-node .lbl { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .vm-node .cnt { color: var(--muted); font-size: 10px; }
-    .vm-node.empty .lbl { color: var(--muted); }
-    .vm-tier { font-size: 9px; padding: 0 4px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
-    .vm-table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow-x: auto; }
-    .vm-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
-    .vm-table th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-2); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); z-index: 1; white-space: nowrap; }
-    .vm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-    .vm-table td.name, .vm-table th.name { position: sticky; left: 0; background: var(--surface); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
-    .vm-table th.name { background: var(--surface-2); z-index: 2; }
-    .vm-group td { background: var(--surface-2); color: var(--text-2); font-weight: 600; cursor: pointer; }
-    .vm-row { cursor: default; outline: none; }
-    .vm-row:hover td { background: var(--surface-hover); }
-    .vm-row[aria-selected="true"] td { background: var(--accent-subtle); }
-    .vm-row .ic { display: inline-block; width: 12px; text-align: center; color: var(--muted); margin-right: 4px; font-family: var(--mono); }
-    .vm-row .more { visibility: hidden; border: none; background: transparent; padding: 0 4px; color: var(--text-2); }
-    .vm-row:hover .more, .vm-row:focus-within .more, .vm-row[aria-selected="true"] .more { visibility: visible; }
+    /* ── 상세 팝업의 값 글꼴 ── */
     .vm-val { font-family: var(--mono); color: var(--text); }
-    .vm-alias { font-family: var(--mono); font-size: 10.5px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; background: var(--surface-2); color: var(--text-2); }
-    .vm-alias:hover { color: var(--accent-strong); border-color: var(--accent-border); }
-    .vm-use { color: var(--text-2); text-align: right; }
-    .vm-empty { padding: 16px; color: var(--muted); }
     /* ── 우클릭 메뉴 · 팝업(공용) ── */
     .ctx-menu { position: fixed; z-index: 50; min-width: 170px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 4px; }
     .ctx-menu button { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: var(--r-sm); font-size: 11.5px; color: var(--text); }

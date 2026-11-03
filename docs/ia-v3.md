@@ -800,7 +800,7 @@
 |---|---|
 | 창 | 400 × 510 고정, 최소화 140 × 104 |
 | 내용 폭 | 376px |
-| 목록에 보이는 줄 | 약 11~12줄 (PR 1 실측: 선택 표시줄 33px, 스크롤 중 탭 내용 영역 418px. 줄 수는 행 28px 기준 추정, PR 2에서 확정. 부록 A.1) |
+| 목록에 보이는 줄 | 첫 화면 11줄(구역·그룹 머리 포함, 변수 행 9개) — PR 2 실측: 목록 영역 326px, 행 28px·머리 26px. 내리면 머리줄·칩 줄이 올라가 더 보인다 |
 | 머리줄 | 한 줄 (시안 346/376px) |
 | 13인치에서 가리는 높이 (추정) | 510: 약 58% · 최소화: 140×104 작은 창 |
 
@@ -931,48 +931,49 @@
 - [x] 새 컨트롤 24×24 이상
 - [x] §8 목록 줄 수 실측값 기록 — 2026-11-03: 선택 표시줄 33px, 스크롤 중 탭 내용 영역 418px(탭 바·선택 표시줄 고정, 상태 줄 24px 제외). 목록 머리(머리줄·칩 줄·구역 머리 약 88px)를 빼면 약 330px, 행 28px 기준 약 11~12줄(추정, PR 2 행 높이로 확정)
 
-## A.2 PR 2 — 변수 탭
+## A.2 PR 2 — 변수 탭 (완료)
 
 **메시지·데이터**
-- [ ] `SCAN_BINDINGS{forManager, nodeIds?, includeInstances:true}` → `BINDINGS_RESULT`에 `usage: Record<id,{places,layers}>`(상한 없음), `libraryVars`(원격 변수 이름·컬렉션·값·`remote`, 라이브러리 별칭 체인 포함), `deleted:{count,nodeIds}`(`bind.ts` `scanBindings` 842~, `nameOf` 849). 연결용 스캔은 인스턴스 제외 유지
-- [ ] `SELECT_VAR_USERS{varId, nodeIds, viaAlias?}` → 기존 `SELECT_RESULT`로 응답, 상한 200(`SELECT_CAP`), 상태는 공통 상태 줄. 삭제된 변수 [선택]은 `SELECT_NODES` 재사용
-- [ ] 상세 "쓰인 곳"용 단일 변수 조회(최대 50개 이름 + 총계)
-- [ ] `VAR_TABLE`: 컬렉션에 `defaultModeId`, 계층 상태(`set` 여부·'none' 구분), 라이브러리 별칭 대상 이름 + `remote`(`collectVarTable`, `code.ts` 251)
-- [ ] 계층 저장 응답 뒤 `GET_VAR_TABLE` 재요청(`code.ts` 1081~1087)
-- [ ] 마법사 n = 전후 로컬 변수 수 차이, 시작 화면 고정(latch) 조건(`code.ts` 848 `postPrereq` 중간 갱신 대응)
+- 구현 메모(2026-11-03): 사용 수 조회는 연결 현황(`SCAN_BINDINGS`)과 섞지 않고 새 메시지 `SCAN_USAGE` → `USAGE_RESULT`로 분리했다(필드는 아래 항목과 같다). 상세 "쓰인 곳"은 `FIND_VAR_USERS` → `VAR_USERS`.
+- [x] `SCAN_BINDINGS{forManager, nodeIds?, includeInstances:true}` → `BINDINGS_RESULT`에 `usage: Record<id,{places,layers}>`(상한 없음), `libraryVars`(원격 변수 이름·컬렉션·값·`remote`, 라이브러리 별칭 체인 포함), `deleted:{count,nodeIds}`(`bind.ts` `scanBindings` 842~, `nameOf` 849). 연결용 스캔은 인스턴스 제외 유지
+- [x] `SELECT_VAR_USERS{varId, nodeIds, viaAlias?}` → 기존 `SELECT_RESULT`로 응답, 상한 200(`SELECT_CAP`), 상태는 공통 상태 줄. 삭제된 변수 [선택]은 `SELECT_NODES` 재사용
+- [x] 상세 "쓰인 곳"용 단일 변수 조회(최대 50개 이름 + 총계)
+- [x] `VAR_TABLE`: 컬렉션에 `defaultModeId`, 계층 상태(`set` 여부·'none' 구분), 라이브러리 별칭 대상 이름 + `remote`(`collectVarTable`, `code.ts` 251)
+- [x] 계층 저장 응답 뒤 `GET_VAR_TABLE` 재요청(`code.ts` 1081~1087)
+- [x] 마법사 n = 전후 로컬 변수 수 차이, 시작 화면 고정(latch) 조건(`code.ts` 848 `postPrereq` 중간 갱신 대응)
 
 **순수 로직**
-- [ ] `groupRows` 키 = 컬렉션 + 경로, "(그룹 없음)"
-- [ ] 간접 사용 함수(모든 모드, 5단계)
-- [ ] 계층 순서 정렬
+- [x] `groupRows` 키 = 컬렉션 + 경로, "(그룹 없음)"
+- [x] 간접 사용 함수(모든 모드, 5단계)
+- [x] 계층 순서 정렬
 
 **UI**
-- [ ] 불러오는 중 / 시작 화면(무료 문구 `wizardCard.hintFree`, 버튼, 라이브러리, latch) / 목록(머리줄, 팝오버, 칩, 모드, 검색, 상황 안내 줄, 구역·그룹, 펼침, 행, ⋯ 표시 규칙, LIB, 삭제된 변수, 기준, 메뉴, 상세, treegrid 키, 되돌리기) / 만들기 하위 화면 / 계층·내보내기 팝업
-- [ ] 큰 선택: `SELECTION_STATE.scanned > 300` 자동 요청 안 함, `wizardRunning` 중 자동 요청 안 함(새 규칙)
+- [x] 불러오는 중 / 시작 화면(무료 문구 `wizardCard.hintFree`, 버튼, 라이브러리, latch) / 목록(머리줄, 팝오버, 칩, 모드, 검색, 상황 안내 줄, 구역·그룹, 펼침, 행, ⋯ 표시 규칙, LIB, 삭제된 변수, 기준, 메뉴, 상세, treegrid 키, 되돌리기) / 만들기 하위 화면 / 계층·내보내기 팝업
+- [x] 큰 선택: `SELECTION_STATE.scanned > 300` 자동 요청 안 함, `wizardRunning` 중 자동 요청 안 함(새 규칙)
 
 **삭제**
-- [ ] `renderVmTree`, `#vmOnlyUsed`, `#vmCount`(칩 숫자로 대체), `#vmStatus`(공통 상태 줄로), `buildVarTree`, `pickInitialCollection`, `vmScopeUser`, `filterVars` `onlyUsed`, `setManagerUsage(candidates…)` 방식, CSS `.vm-tree`/`.vm-node`/`.vm-table*`
-- [ ] `renderExistingVars`, `goToBindStatus`, `goToCollectionRoles`, `#onboardBanner`, `btnOnboardHide`, `hideOnboard`(`SETTINGS`/`SET_SETTINGS`/`SETTINGS_DEFAULT`, `code.ts` 69·1752·1765, `ui.ts` 46·665~·799·2375)
-- [ ] 일괄 교체 전체
+- [x] `renderVmTree`, `#vmOnlyUsed`, `#vmCount`(칩 숫자로 대체), `#vmStatus`(공통 상태 줄로), `buildVarTree`, `pickInitialCollection`, `vmScopeUser`, `filterVars` `onlyUsed`, `setManagerUsage(candidates…)` 방식, CSS `.vm-tree`/`.vm-node`/`.vm-table*`
+- [x] `renderExistingVars`, `goToBindStatus`, `goToCollectionRoles`, `#onboardBanner`, `btnOnboardHide`, `hideOnboard`(`SETTINGS`/`SET_SETTINGS`/`SETTINGS_DEFAULT`, `code.ts` 69·1752·1765, `ui.ts` 46·665~·799·2375)
+- [x] 일괄 교체 전체
   - 메시지 4종, `bind.ts` 914~(`RemapResult`, `TEXT_RANGE_ALL`, `rangesBoundTo`)·969~(`remapBindings`), `scopes.ts` 67~75(`RemapVar`)·85~(`remapTargets`)
   - `figma-lib.ts` 47~48 재수출
   - `openRemapModal`, `onRemapTargets`, i18n `bind.remap*`·`vm.remap`, CSS `.remap-panel`
   - 테스트 `figma.test.mjs` 3995~4077. `pure.test.mjs` 2362는 `scopeFitsField` 단언은 남기고 remap 부분만 삭제
-- [ ] `PIPELINE_TARGET.semantics` → `btnCreate` + 상태 줄 안내
-- [ ] 설정의 `#collectionRolesCard`, 내보내기 카드 → 팝업
+- [x] `PIPELINE_TARGET.semantics` → `btnCreate` + 상태 줄 안내
+- [x] 설정의 `#collectionRolesCard`, 내보내기 카드 → 팝업
 
 **`verify:bind` 수정**
-- [ ] "9 쓰는 것만(기본)" → 쓰는 그룹만 펼침
-- [ ] "9 표 머리 모드 열" → 모드 ▾(보이는 모드 2개 이상)
-- [ ] "9 우클릭 메뉴" → 복사 3 · 선택 · (별칭) 이동 · 상세, 교체 없음
-- [ ] "9 관리 조회 forManager" → 새 응답 형식
+- [x] "9 쓰는 것만(기본)" → 쓰는 그룹만 펼침
+- [x] "9 표 머리 모드 열" → 모드 ▾(보이는 모드 2개 이상)
+- [x] "9 우클릭 메뉴" → 복사 3 · 선택 · (별칭) 이동 · 상세, 교체 없음
+- [x] "9 관리 조회 forManager" → 새 응답 형식
 
 **단위 테스트**
-- [ ] `figma.test.mjs` 1413·4102의 `scanBindings` 테스트를 새 필드에 맞게 고치고, 모의 객체에 `getVariableByIdAsync`(원격·null) 추가
-- [ ] 그룹 키, 간접 사용, 계층 순서, `usage` 상한 없음(600 초과), 인스턴스 포함 테스트 추가
+- [x] `figma.test.mjs` 1413·4102의 `scanBindings` 테스트를 새 필드에 맞게 고치고, 모의 객체에 `getVariableByIdAsync`(원격·null) 추가
+- [x] 그룹 키, 간접 사용, 계층 순서, `usage` 상한 없음(600 초과), 인스턴스 포함 테스트 추가
 
 **새 검사**
-- [ ] §4.2~§4.5 동작 전부(시작/목록 판정, latch, 무료 문구, 칩 순서·숫자·"…", 모드, 검색 두 경우, 상황 안내 4종, 펼침 규칙, "+n 안 씀", 간접, LIB, 삭제된 변수, 기준·[기준 바꾸기], ↻ 결과 3종, 메뉴 항목·`aria-disabled`, 200개 상한 문구, 상세 50개, 키보드 표, 되돌리기, 계층 팝업 후 갱신)
+- [x] §4.2~§4.5 동작 전부(시작/목록 판정, latch, 무료 문구, 칩 순서·숫자·"…", 모드, 검색 두 경우, 상황 안내 4종, 펼침 규칙, "+n 안 씀", 간접, LIB, 삭제된 변수, 기준·[기준 바꾸기], ↻ 결과 3종, 메뉴 항목·`aria-disabled`, 200개 상한 문구, 상세 50개, 키보드 표, 되돌리기, 계층 팝업 후 갱신)
 
 ## A.3 PR 3 — 레이어 탭
 

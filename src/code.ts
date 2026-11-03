@@ -7,8 +7,7 @@ import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
-import { bindSelection, scanBindings, remapBindings, countUsage, findUsers } from './lib/bind';
-import { remapTargets } from './lib/scopes';
+import { bindSelection, scanBindings, countUsage, findUsers } from './lib/bind';
 import { collectionTiers, findCollection, readRoleMap, writeRoleMap } from './lib/collectionRoles';
 import { assignRole, roleOfCollection, guessRole } from './lib/tiers';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
@@ -47,7 +46,7 @@ const CACHE_KEY = 'dsl.licenseCache';
 const SETTINGS_KEY = 'dsl.settings';
 // grid=여백·크기 토큰을 모으는 격자, tolerance=바인딩이 같은 값으로 보는 차이. 둘은 한 쌍이라
 // 설정 탭에 나란히 두고 함께 보관한다(#19 결정 수정 2026-08-07).
-const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, hideOnboard: false, grid: 8, tolerance: 0.5 };
+const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8, tolerance: 0.5 };
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
@@ -992,37 +991,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'BINDINGS_RESULT', candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId, forManager: msg.forManager });
         break;
       }
-      case 'REMAP_TARGETS': {
-        // 일괄 교체(Free — 기존 변수를 다루는 일): A가 쓰이던 필드들에 맞는 로컬 변수만 후보로.
-        const vars = await figma.variables.getLocalVariablesAsync();
-        const colName = new Map((await figma.variables.getLocalVariableCollectionsAsync()).map((c) => [c.id, c.name]));
-        const from = vars.find((v) => v.id === msg.fromId) ?? null; // 지워진 변수(잔상)면 null — 필드 규칙으로 타입을 정한다
-        const targets = remapTargets(
-          msg.fromId,
-          from ? from.resolvedType : null,
-          msg.fields,
-          vars.map((v) => ({ id: v.id, name: v.name, resolvedType: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'], collection: colName.get(v.variableCollectionId) ?? '' })),
-        ).map((v) => ({ id: v.id, name: v.name, collection: v.collection }));
-        post({ type: 'REMAP_TARGETS_RESULT', fromId: msg.fromId, targets });
-        break;
-      }
-      case 'REMAP_BINDINGS': {
-        const to = await figma.variables.getVariableByIdAsync(msg.toId);
-        if (!to) {
-          post({ type: 'ERROR', message: '바꿀 변수를 찾지 못했습니다 — 지워졌을 수 있습니다. 연결 현황을 다시 보세요.', op: 'REMAP_BINDINGS' });
-          break;
-        }
-        // 미리보기 목록은 그사이 낡았을 수 있어 선택을 다시 훑으며 바꾼다.
-        const r = await remapBindings(selection(), msg.fromId, to, msg.fields);
-        if (r.replaced) {
-          commitUndo(figma); // UX2: 일괄 교체 전체를 단일 Undo로
-          await postPrereq();
-        }
-        post({ type: 'REMAP_RESULT', ...r, toName: to.name });
-        const scan = await scanBindings(selection()); // 연결 현황을 바뀐 상태로 다시 그린다
-        post({ type: 'BINDINGS_RESULT', candidates: scan.candidates, nodes: scan.nodes, total: scan.total, boundNodes: scan.boundNodes, reqId: msg.reqId });
-        break;
-      }
       case 'CANCEL': {
         bindCancel = true; // UX6: 다음 양보 지점에서 중단
         break;
@@ -1843,7 +1811,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             s = {
               base: typeof o.base === 'number' && isFinite(o.base) && o.base > 0 ? o.base : SETTINGS_DEFAULT.base,
               maxDepth: typeof o.maxDepth === 'number' && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth,
-              hideOnboard: o.hideOnboard === true,
               grid: typeof o.grid === 'number' && isFinite(o.grid) && o.grid >= 1 ? Math.round(o.grid) : SETTINGS_DEFAULT.grid,
               tolerance: typeof o.tolerance === 'number' && isFinite(o.tolerance) && o.tolerance >= 0 ? o.tolerance : SETTINGS_DEFAULT.tolerance,
             };
@@ -1851,12 +1818,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         } catch {
           /* 저장소 접근 실패 → 기본값 */
         }
-        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth, hideOnboard: s.hideOnboard, grid: s.grid, tolerance: s.tolerance });
+        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth, grid: s.grid, tolerance: s.tolerance });
         break;
       }
       case 'SET_SETTINGS': {
         try {
-          await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, hideOnboard: msg.hideOnboard, grid: msg.grid, tolerance: msg.tolerance });
+          await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, grid: msg.grid, tolerance: msg.tolerance });
         } catch {
           /* 보관 실패해도 이번 세션 동작에는 영향 없음 */
         }

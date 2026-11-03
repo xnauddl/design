@@ -158,8 +158,6 @@ export type UiToCode =
   // 사용 레이어 선택 / 별칭으로 쓰는 레이어 선택 — 그때 새로 찾아 최대 200개 선택(응답은 SELECT_RESULT).
   | { type: 'SELECT_VAR_USERS'; varIds: string[]; nodeIds: string[] }
   | { type: 'SCAN_BINDINGS'; reqId?: number; forManager?: boolean } // 선택 안에 이미 붙은 변수 바인딩 읽기(연결 현황 · 읽기 전용)
-  | { type: 'REMAP_TARGETS'; fromId: string; fields: string[] } // 일괄 교체: A 자리에 붙일 수 있는 변수 후보(읽기 전용)
-  | { type: 'REMAP_BINDINGS'; fromId: string; toId: string; fields: string[]; reqId?: number } // 일괄 교체: 선택 안의 A(그 필드들) → B
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
   | { type: 'RENAME'; apply: boolean; maxDepth: number }
   // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(등록이 머리명사로 읽는다).
@@ -192,7 +190,7 @@ export type UiToCode =
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Paid): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Paid): 선택 세트의 빠진 조합 자동 생성
   | { type: 'GET_SETTINGS' } // #19: 설정 탭 설정(기준 크기·리네임 맥락 깊이) 불러오기
-  | { type: 'SET_SETTINGS'; base: number; maxDepth: number; hideOnboard: boolean; grid: number; tolerance: number } // 바뀔 때마다 clientStorage에 보관
+  | { type: 'SET_SETTINGS'; base: number; maxDepth: number; grid: number; tolerance: number } // 바뀔 때마다 clientStorage에 보관
   | { type: 'GET_VARIABLES' } // 3계층 변수 목록(다크 테마 생성의 컬렉션·모드 선택용)
   // 모드 id는 선택 — 생략하면 themeApply가 Light를 고르고 Dark가 없으면 addMode('Dark')로 만든다.
   | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId?: string; toModeId?: string } // 라이트→Dark(없으면 추가) 자동 채움
@@ -208,8 +206,6 @@ export type CodeToUi =
   // comps/sets: 선택 안의 낱개 COMPONENT·COMPONENT_SET 수. 구조 카드의 베리언트 줄을
   // '정리할 대상이 실제로 선택돼 있을 때만' 띄우는 데 쓴다(툴바는 와이어대로 4개 고정).
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number; firstName?: string; ids?: string[] } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
-  | { type: 'REMAP_TARGETS_RESULT'; fromId: string; targets: { id: string; name: string; collection: string }[] }
-  | { type: 'REMAP_RESULT'; replaced: number; nodes: number; skipped: number; toName: string }
   | { type: 'VAR_TABLE'; collections: VarCollection[]; vars: VarRow[] }
   | { type: 'USAGE_RESULT'; reqId: number; usage: Record<string, { places: number; layers: number }>; libraryVars: LibraryVar[]; deleted: { count: number; nodeIds: string[] }; scanned: number }
   | { type: 'VAR_USERS'; reqId: number; layers: { id: string; name: string }[]; totalLayers: number; places: number }
@@ -266,7 +262,7 @@ export type CodeToUi =
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
-  | { type: 'SETTINGS'; base: number; maxDepth: number; hideOnboard: boolean; grid: number; tolerance: number } // #19: 보관된 설정(없으면 기본값). grid=여백·크기 격자, tolerance=바인딩 허용오차
+  | { type: 'SETTINGS'; base: number; maxDepth: number; grid: number; tolerance: number } // #19: 보관된 설정(없으면 기본값). grid=여백·크기 격자, tolerance=바인딩 허용오차
   | { type: 'VARIABLES'; vars: VarInfo[] } // 3계층 변수 목록(다크 카드의 컬렉션·모드 선택지)
   // modeCreated: Dark 모드를 이번에 만들었는가(안내 문구가 달라진다). error: 채우기 전 단계 실패.
   | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number; modeCreated?: boolean; error?: string }
