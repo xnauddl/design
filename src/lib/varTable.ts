@@ -243,3 +243,174 @@ export function buildList(inp: ListInput): ListEntry[] {
   }
   return out;
 }
+
+/* ============================================================
+   결정 B(2026-11-03) — 사이드바(★ Inspect · 컬렉션 › 그룹 · LIB · 삭제된 변수) + 오른쪽 목록
+   ============================================================ */
+
+/** 사이드바에서 고른 것. */
+export type SideSel =
+  | { kind: 'inspect' }
+  | { kind: 'col'; id: string }
+  | { kind: 'grp'; key: string }
+  | { kind: 'lib' }
+  | { kind: 'deleted' };
+
+export const sideSelKey = (s: SideSel): string =>
+  s.kind === 'col' ? `col:${s.id}` : s.kind === 'grp' ? `grp:${s.key}` : s.kind;
+
+export interface SideCount {
+  used: number;
+  total: number;
+  direct: number;
+  indirect: number;
+}
+export interface SideGroup extends SideCount {
+  key: string;
+  path: string;
+  label: string;
+}
+export interface SideCollection extends SideCount {
+  collection: VarCollection;
+  groups: SideGroup[];
+}
+
+/** 행 상태 — 사용 판정이 없으면 'none'. */
+export function rowState(id: string, direct: ReadonlyMap<string, number> | null, indirect: ReadonlySet<string>): RowState {
+  if (!direct) return 'none';
+  if ((direct.get(id) ?? 0) > 0) return 'direct';
+  if (indirect.has(id)) return 'indirect';
+  return 'unused';
+}
+
+function countOf(vars: readonly VarRow[], direct: ReadonlyMap<string, number> | null, indirect: ReadonlySet<string>): SideCount {
+  let d = 0;
+  let i = 0;
+  if (direct) for (const v of vars) {
+    const s = rowState(v.id, direct, indirect);
+    if (s === 'direct') d++;
+    else if (s === 'indirect') i++;
+  }
+  return { used: d + i, total: vars.length, direct: d, indirect: i };
+}
+
+/** 사이드바 컬렉션·그룹 — 계층 순서, 그룹은 피그마(변수) 순서의 첫 등장 순. */
+export function sidebarCollections(
+  cols: readonly VarCollection[],
+  vars: readonly VarRow[],
+  direct: ReadonlyMap<string, number> | null,
+  indirect: ReadonlySet<string>,
+): SideCollection[] {
+  return orderCollections(cols).map((c) => {
+    const cv = vars.filter((v) => v.collectionId === c.id);
+    const byKey = new Map<string, VarRow[]>();
+    for (const v of cv) {
+      const k = groupKey(c.id, v.name);
+      const arr = byKey.get(k);
+      if (arr) arr.push(v);
+      else byKey.set(k, [v]);
+    }
+    const groups: SideGroup[] = [...byKey.entries()].map(([key, gv]) => {
+      const path = groupPath(gv[0].name);
+      return { key, path, label: path || NO_GROUP, ...countOf(gv, direct, indirect) };
+    });
+    return { collection: c, groups, ...countOf(cv, direct, indirect) };
+  });
+}
+
+/** ★ Inspect 숫자 — 쓰는 로컬 변수 수(라이브러리 제외). */
+export function inspectCount(vars: readonly VarRow[], direct: ReadonlyMap<string, number> | null, indirect: ReadonlySet<string>): number {
+  return countOf(vars, direct, indirect).used;
+}
+
+export type RightEntry = { kind: 'path'; label: string; collectionId: string } | { kind: 'row'; v: VarRow; state: RowState };
+
+/**
+ * 오른쪽 목록(§4.4).
+ * - inspect: 쓰는 행만, 경로 머리("S Semantic › color/text")로 묶음. 컬렉션 계층 순 → 그룹 → 피그마 순.
+ * - col: 모든 행, 그룹마다 경로 머리. 쓰는 행 먼저(그룹 안), 안 쓰는 행 뒤.
+ * - grp: 그 그룹의 모든 행(쓰는 행 먼저), 경로 머리 없음.
+ * - 검색어가 있으면 고른 항목과 관계없이 모든 로컬 컬렉션에서 맞는 행을 경로 머리로(쓰는 행 먼저).
+ */
+export function rightEntries(
+  sel: SideSel,
+  cols: readonly VarCollection[],
+  vars: readonly VarRow[],
+  direct: ReadonlyMap<string, number> | null,
+  indirect: ReadonlySet<string>,
+  query = '',
+): RightEntry[] {
+  const out: RightEntry[] = [];
+  const rank = (s: RowState): number => (s === 'direct' || s === 'indirect' ? 0 : 1);
+  const pushGroups = (side: SideCollection, filter: (v: VarRow) => boolean, withPath: 'full' | 'path' | 'none', usedOnly: boolean) => {
+    const badge = tierBadge(side.collection);
+    for (const g of side.groups) {
+      const rows = vars
+        .filter((v) => v.collectionId === side.collection.id && groupKey(v.collectionId, v.name) === g.key && filter(v))
+        .map((v) => ({ v, state: rowState(v.id, direct, indirect) }))
+        .filter((r) => !usedOnly || rank(r.state) === 0);
+      if (!rows.length) continue;
+      rows.sort((a, b) => rank(a.state) - rank(b.state)); // 안정 정렬 — 같은 순위는 피그마 순서
+      if (withPath !== 'none') {
+        const label = withPath === 'full' ? `${badge} ${side.collection.name} › ${g.label}` : g.label;
+        out.push({ kind: 'path', label, collectionId: side.collection.id });
+      }
+      for (const r of rows) out.push({ kind: 'row', ...r });
+    }
+  };
+  const sides = sidebarCollections(cols, vars, direct, indirect);
+  if (query.trim()) {
+    for (const side of sides) pushGroups(side, (v) => matchesQuery(v.name, query), 'full', false);
+    return out;
+  }
+  if (sel.kind === 'inspect') {
+    if (!direct) return out;
+    for (const side of sides) pushGroups(side, () => true, 'full', true);
+  } else if (sel.kind === 'col') {
+    const side = sides.find((s) => s.collection.id === sel.id);
+    if (side) pushGroups(side, () => true, 'path', false);
+  } else if (sel.kind === 'grp') {
+    const side = sides.find((s) => s.groups.some((g) => g.key === sel.key));
+    if (side) pushGroups({ ...side, groups: side.groups.filter((g) => g.key === sel.key) }, () => true, 'none', false);
+  }
+  return out;
+}
+
+/**
+ * 처음 고르는 항목(§4.4) — 선택이 있고 사용 수를 읽었으며 쓰는 로컬 변수가 1개 이상이면 ★,
+ * 아직 읽는 중이면 ★(읽는 중 빈 상태), 그 밖(선택 없음 · 큰 선택 · 쓰는 변수 0)은 계층 순서의 첫 컬렉션.
+ */
+export function initialSideSel(
+  cols: readonly VarCollection[],
+  vars: readonly VarRow[],
+  hasBaseline: boolean,
+  bigSkipped: boolean,
+  direct: ReadonlyMap<string, number> | null,
+  indirect: ReadonlySet<string>,
+): SideSel {
+  const first = orderCollections(cols)[0];
+  const fallback: SideSel = first ? { kind: 'col', id: first.id } : { kind: 'inspect' };
+  if (!hasBaseline || bigSkipped) return fallback;
+  if (!direct) return { kind: 'inspect' }; // 읽는 중 — 사용 수가 오면 다시 정한다
+  return inspectCount(vars, direct, indirect) > 0 ? { kind: 'inspect' } : fallback;
+}
+
+/** 고른 항목이 사라졌으면 대체 항목(§4.4). 그룹 → 같은 컬렉션 → 처음 규칙. */
+export function validSideSel(
+  sel: SideSel,
+  cols: readonly VarCollection[],
+  vars: readonly VarRow[],
+  hasLib: boolean,
+  hasDeleted: boolean,
+  initial: () => SideSel,
+): SideSel {
+  if (sel.kind === 'inspect') return sel;
+  if (sel.kind === 'col') return cols.some((c) => c.id === sel.id) ? sel : initial();
+  if (sel.kind === 'grp') {
+    if (vars.some((v) => groupKey(v.collectionId, v.name) === sel.key)) return sel;
+    const colId = sel.key.slice(0, sel.key.indexOf('|'));
+    return cols.some((c) => c.id === colId) ? { kind: 'col', id: colId } : initial();
+  }
+  if (sel.kind === 'lib') return hasLib ? sel : initial();
+  return hasDeleted ? sel : initial();
+}

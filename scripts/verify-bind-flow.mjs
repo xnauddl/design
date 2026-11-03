@@ -182,6 +182,9 @@ const VARS = [
 ];
 const usageResult = (reqId, usage, extra = {}) => ({ type: 'USAGE_RESULT', reqId, usage, libraryVars: [], deleted: { count: 0, nodeIds: [] }, scanned: 40, ...extra });
 const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset.id));
+/** 사이드바 항목 [이름, 숫자] (결정 B). */
+const sideItems = (p) => p.$$eval('#varSide .vs-item', (e) => e.map((x) => [x.querySelector('.vs-name').textContent, x.querySelector('.vs-num').textContent]));
+const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.dataset.key).catch(() => null);
 {
   const p = await open(400, null);
   await recv(p, PREREQ);
@@ -191,27 +194,33 @@ const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset
   check('9 무료 시작 화면: 무료 안내 + [이름 정리 실행]', (await visible(p, '#startFree')) && (await p.textContent('#btnWizardRun')) === '이름 정리 실행');
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   check('9 로컬 변수 있음 → 목록', await visible(p, '#varList'));
-  // 칩: [모두] + 계층 순서(S → G), 선택 없으면 전체 수
-  const chips = await p.$$eval('#chipRow .tier-chip', (e) => e.map((x) => x.textContent));
-  check('9 칩 순서·숫자(선택 없음)', JSON.stringify(chips) === JSON.stringify(['모두5', 'SemanticS1', 'GlobalG4']), JSON.stringify(chips));
+  // 사이드바(결정 B): ★ Inspect · 계층 순서(S → G), 선택 없으면 전체 수, 첫 컬렉션만 펼침
+  check('9 사이드바 항목·숫자(선택 없음)', JSON.stringify(await sideItems(p)) === JSON.stringify([['★ Inspect', '—'], ['Semantic', '1'], ['color/text', '1'], ['Global', '4']]), JSON.stringify(await sideItems(p)));
+  check('9 칩 줄 없음', (await p.$('#chipRow')) === null);
+  check('9 선택 없음 → 첫 컬렉션 고름 + 상황 안내 줄', (await sideSelected(p)) === 'side:col:s' && (await p.textContent('#situationLine')) === '레이어를 선택하면 쓰는 변수가 ★ Inspect에 모여요');
   check('9 모드 ▾(보이는 모드 2개 이상)', await visible(p, '#modeSelect'));
-  check('9 선택 없음: 그룹 10개 이하 모두 펼침 · 사용 "—"', (await rowIds(p)).length === 5 && (await p.$$eval('#varTree .vt-row .use', (e) => e.every((x) => x.textContent === '—'))));
+  check('9 선택 없음: 사용 "—"', JSON.stringify(await rowIds(p)) === JSON.stringify(['tx']) && (await p.textContent('.vt-row[data-id="tx"] .use')) === '—');
   // 선택 → 400ms 뒤 SCAN_USAGE(목록 기준 = 지금 선택), 응답 동안 칩 "…"
   await recv(p, { ...sel(1, 2), scanned: 40, firstName: 'Card', ids: ['1:2'] });
   await p.waitForTimeout(450);
   const req = (await sent(p, 'SCAN_USAGE')).at(-1);
   check('9 선택 변경 → SCAN_USAGE(기준 = 지금 선택)', req?.nodeIds?.[0] === '1:2');
-  check('9 읽는 중 칩 숫자 "…"', (await p.textContent('#chipRow')).includes('…'));
+  check('9 읽는 중 사이드바 숫자 "…"', (await p.textContent('#varSide')).includes('…'));
   await recv(p, usageResult(req.reqId, { tx: { places: 8, layers: 5 }, sp8: { places: 3, layers: 2 } }));
   const ids = await rowIds(p);
   // tx는 Light에서 g9, Dark에서 g0을 가리킨다 — 간접은 모든 모드를 본다.
-  check('9 쓰는 행만 펼침(직접 + 간접, 모든 모드)', JSON.stringify(ids) === JSON.stringify(['tx', 'g0', 'g9', 'sp8']), ids.join(','));
-  check('9 간접 사용 "↳ 간접"', (await p.textContent('.vt-row[data-id="g9"] .use')) === '↳ 간접');
+  check('9 쓰는 변수 있음 → ★ Inspect 고름', (await sideSelected(p)) === 'side:inspect');
+  check('9 ★ Inspect: 쓰는 행만(직접 + 간접, 모든 모드)', JSON.stringify(ids) === JSON.stringify(['tx', 'g0', 'g9', 'sp8']), ids.join(','));
+  check('9 ★ Inspect: 경로 머리', JSON.stringify(await p.$$eval('#varTree .vt-path', (e) => e.map((x) => x.textContent))) === JSON.stringify(['S Semantic › color/text', 'G Global › color/gray', 'G Global › spacing']));
+  check('9 간접 사용 "↳"', (await p.textContent('.vt-row[data-id="g9"] .use')) === '↳');
   check('9 사용 수 "곳"', (await p.textContent('.vt-row[data-id="tx"] .use')) === '8곳');
-  check('9 안 쓰는 그룹은 구역 끝 한 줄', (await p.textContent('#varTree')).includes('안 쓰는 그룹 1개'));
-  check('9 칩 사용/전체', (await p.textContent('#chipRow')).includes('모두4/5'));
-  await p.click('#varTree .vt-line');
-  check('9 안 쓰는 그룹 펼치기 → 접힌 그룹 머리', (await p.textContent('#varTree')).includes('radius') && !(await rowIds(p)).includes('r4'));
+  check('9 사이드바 사용/전체', JSON.stringify((await sideItems(p)).slice(0, 2)) === JSON.stringify([['★ Inspect', '4'], ['Semantic', '1/1']]), JSON.stringify(await sideItems(p)));
+  await p.click('#varSide [data-key="side:col:g"]');
+  check('9 컬렉션 고름 → 모든 행(쓰는 것 먼저, 안 쓰는 행 "안 씀")', JSON.stringify(await rowIds(p)) === JSON.stringify(['g0', 'g9', 'sp8', 'r4']) && (await p.textContent('.vt-row[data-id="r4"] .use')) === '안 씀');
+  check('9 컬렉션 고르면 그룹이 사이드바에 펼쳐짐', (await sideItems(p)).some(([n]) => n === 'radius'));
+  await p.click('#varSide [data-key="side:grp:g|radius"]');
+  check('9 그룹 고름 → 그 그룹만', JSON.stringify(await rowIds(p)) === JSON.stringify(['r4']) && (await p.textContent('#varMainTitle')) === 'radius');
+  await p.click('#varSide [data-key="side:inspect"]');
   // 우클릭 메뉴 — 교체 없음
   await rightClick(p, '.vt-row[data-id="tx"]');
   const items = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
@@ -234,11 +243,11 @@ const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset
   const s0 = (await sent(p, 'SCAN_USAGE')).length;
   await recv(p, { ...sel(1, 2), scanned: 1200, ids: ['big'] });
   await p.waitForTimeout(450);
-  check('9 큰 선택은 자동으로 읽지 않음', (await sent(p, 'SCAN_USAGE')).length === s0 && (await p.textContent('#situationLine')).includes('선택이 커서 자동으로 읽지 않아요'));
-  await p.click('#situationLine button');
+  check('9 큰 선택은 자동으로 읽지 않음 — ★ 빈 상태에만(상황 안내 줄엔 없음)', (await sent(p, 'SCAN_USAGE')).length === s0 && (await p.textContent('#varTree')).includes('선택이 커서 자동으로 읽지 않아요') && !(await visible(p, '#situationLine')));
+  await p.click('#varTree .vt-empty button');
   check('9 [읽기] → 300개 무시하고 읽기', (await sent(p, 'SCAN_USAGE')).length === s0 + 1);
   await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
-  check('9 안 쓰는 선택 안내', (await p.textContent('#situationLine')).includes('이 선택은 로컬 변수를 쓰지 않아요'));
+  check('9 안 쓰는 선택 안내(★ 빈 상태)', (await p.textContent('#varTree')).includes('이 선택은 로컬 변수를 쓰지 않아요'));
   // ↻ — 결과 문구
   await p.click('#btnVarRefresh');
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -270,13 +279,17 @@ const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset
   check('9 알약 → 가리키는 행으로 포커스', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g9');
   await p.click('#statusAction');
   check('9 되돌리기 → 원래 행', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx');
-  // 키보드(treegrid)
-  await p.keyboard.press('ArrowLeft');
-  check('9 ← 행 → 그룹 머리', (await p.evaluate(() => document.activeElement?.dataset?.key)) === 'grp:s|color/text');
+  // 키보드 — 사이드바(tree): ↑↓ 이동, Enter 고르기
+  await p.focus('#varSide [data-key="side:inspect"]');
+  await p.keyboard.press('ArrowDown');
+  check('9 사이드바 ↓ → 다음 항목(고르지 않음)', (await p.evaluate(() => document.activeElement?.dataset?.key)) === 'side:col:s' && (await sideSelected(p)) === 'side:inspect');
+  await p.keyboard.press('Enter');
+  check('9 사이드바 Enter → 고르기', (await sideSelected(p)) === 'side:col:s');
+  await p.click('#varSide [data-key="side:inspect"]');
   // ⋯ → 계층 팝업 · 내보내기 팝업, 설정 탭에는 없다
   await p.click('#btnVarMore');
   const more = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
-  check('9 ⋯ 메뉴', JSON.stringify(more) === JSON.stringify(['컬렉션 계층 지정…', '코드로 내보내기…', '모든 그룹 펼치기', '모든 그룹 접기']), more.join('|'));
+  check('9 ⋯ 메뉴', JSON.stringify(more) === JSON.stringify(['컬렉션 계층 지정…', '코드로 내보내기…', '사이드바 모두 펼치기', '사이드바 모두 접기']), more.join('|'));
   await p.click('.ctx-menu button >> text=컬렉션 계층 지정…');
   check('9 계층 팝업 열 때 계층 정보 읽기', (await sent(p, 'GET_COLLECTION_ROLES')).length > 0 && (await p.textContent('.modal')).includes('컬렉션 계층'));
   await p.keyboard.press('Escape');
@@ -305,8 +318,11 @@ const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset
   await recv(p, { ...sel(1, 2), scanned: 40, ids: ['1:2'] });
   await p.waitForTimeout(450);
   await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { L1: { places: 2, layers: 1 } }, { libraryVars: [{ id: 'L1', name: 'core/blue/500', collection: 'Core', type: 'COLOR', value: { kind: 'color', hex: '#3366FF' }, aliasTargets: [] }], deleted: { count: 3, nodeIds: ['x'] } }));
-  check('9 LIB 구역: 실제 이름 + LIB', (await p.textContent('#varTree')).includes('LIB · 선택에서 쓰는 것') && (await p.textContent('.vt-row[data-id="L1"]')).includes('core/blue/500LIB'));
-  check('9 삭제된 변수에 연결된 곳 n개', (await p.textContent('#varTree')).includes('삭제된 변수에 연결된 곳 3개'));
+  check('9 쓰는 로컬 변수 0 → 첫 컬렉션', (await sideSelected(p)) === 'side:col:s');
+  await p.click('#varSide [data-key="side:lib"]');
+  check('9 사이드바 라이브러리: 실제 이름 + LIB', (await p.textContent('.vt-row[data-id="L1"]')).includes('core/blue/500LIB'));
+  await p.click('#varSide [data-key="side:deleted"]');
+  check('9 사이드바 삭제된 변수 → 삭제된 변수에 연결된 곳 n개', (await p.textContent('#varTree')).includes('삭제된 변수에 연결된 곳 3개'));
   await p.close();
 }
 

@@ -552,7 +552,36 @@
     .vt-group .tw { width: 10px; color: var(--muted); }
     .vt-group .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .vt-group .more-unused { flex: 0 0 auto; min-height: 24px; font-size: 10.5px; }
-    .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 118px 48px 24px; align-items: center; height: 28px; padding: 0 6px 0 18px; border-bottom: 1px solid var(--border); cursor: default; }
+    /* ── 변수 목록 결정 B(§4.4): 머리줄 고정 · 사이드바(112px, 고정 + 따로 스크롤) · 오른쪽 목록 머리 고정 ── */
+    #varList .list-head { position: sticky; top: var(--tabs-h, 41px); z-index: 3; background: var(--bg); padding: 2px 0 6px; margin: 0; }
+    .vl-split { display: flex; align-items: flex-start; border-top: 1px solid var(--border); }
+    .vl-side {
+      width: 112px; flex: 0 0 112px; position: sticky; top: var(--side-top, 75px); align-self: flex-start;
+      max-height: calc(100vh - var(--side-top, 75px) - 24px); overflow-y: auto; border-right: 1px solid var(--border);
+      padding: 4px 3px; background: var(--surface);
+    }
+    .vs-item { display: flex; align-items: center; gap: 3px; min-height: 28px; padding: 0 4px; border-radius: 5px; color: var(--text); cursor: pointer; font-size: 11px; }
+    .vs-item.lv2 { padding-left: 18px; color: var(--text); }
+    .vs-item.muted { color: var(--text-2); }
+    .vs-item.danger { color: var(--danger); }
+    .vs-item[aria-selected="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+    .vs-item:hover:not([aria-selected="true"]), .vs-item:focus-visible { background: var(--surface-hover); outline: none; }
+    .vs-item:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .vs-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vs-num { flex: 0 0 auto; font-size: 9.5px; color: var(--text-2); font-weight: 500; }
+    .vs-item[aria-selected="true"] .vs-num { color: var(--accent-strong); }
+    .vs-tw { width: 12px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; font-size: 9px; margin-left: -3px; }
+    .vs-badge { font: 700 9px/14px var(--font); min-width: 12px; padding: 0 2px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); text-align: center; flex: 0 0 auto; }
+    .vs-item[aria-selected="true"] .vs-badge { background: #d6ebff; color: var(--accent-strong); }
+    .vs-sep { height: 1px; background: var(--border); margin: 5px 4px; }
+    .vl-main { flex: 1 1 auto; min-width: 0; }
+    .vl-head { position: sticky; top: var(--side-top, 75px); z-index: 2; display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 4px 0 8px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .vl-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; outline: none; }
+    .vl-head .search-box:not([hidden]) { position: absolute; inset: 3px 4px; display: flex; gap: 4px; align-items: center; background: var(--surface); }
+    .vl-head .search-box input { flex: 1 1 auto; min-width: 0; }
+    .vt-path { min-height: 22px; display: flex; align-items: center; padding: 0 8px; font-size: 10px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vt-path:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 74px 34px 24px; align-items: center; height: 28px; padding: 0 2px 0 8px; border-bottom: 1px solid var(--border); cursor: default; }
     .vt-row:hover, .vt-row:focus-visible, .vt-group:focus-visible, .vt-section:focus-visible, .vt-line:focus-visible { background: var(--surface-hover); outline: none; }
     .vt-row[aria-selected="true"] { background: var(--accent-subtle); }
     .vt-row .nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -667,15 +696,21 @@
       <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
       <button class="icon-btn" id="btnVarRefresh" type="button" data-i18n-title="list.refreshTip" title="다시 읽기" aria-label="다시 읽기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg></button>
     </div>
-    <div class="chip-bar" id="chipBar">
-      <div class="chip-row" id="chipRow" role="radiogroup" aria-label="컬렉션"></div>
-      <button class="icon-btn chip-more" id="btnChipMore" type="button" data-i18n-title="list.chipMore" title="칩 더 보기" aria-label="칩 더 보기" hidden>›</button>
-      <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
-      <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
-      <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" aria-label="검색 지우기">✕</button></span>
-    </div>
     <div class="situation" id="situationLine" hidden></div>
-    <div class="var-tree" id="varTree" role="treegrid" aria-label="변수 목록"></div>
+    <!-- 결정 B(§4.4): 왼쪽 사이드바(★ Inspect · 컬렉션 › 그룹 · LIB · 삭제된 변수) + 오른쪽 목록 -->
+    <div class="vl-split">
+      <div class="vl-side" id="varSide" role="tree" aria-label="변수 컬렉션"></div>
+      <div class="vl-main">
+        <div class="vl-head" id="chipBar">
+          <b class="vl-title" id="varMainTitle" tabindex="-1"></b>
+          <span class="grow"></span>
+          <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
+          <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+          <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" aria-label="검색 지우기">✕</button></span>
+        </div>
+        <div class="var-tree" id="varTree" role="grid" aria-label="변수 목록"></div>
+      </div>
+    </div>
    </div>
 
    <!-- 준비 현황 팝오버(§4.4 머리줄) — 메뉴 모양, 목록을 밀지 않는다. -->

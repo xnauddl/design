@@ -552,7 +552,36 @@
     .vt-group .tw { width: 10px; color: var(--muted); }
     .vt-group .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .vt-group .more-unused { flex: 0 0 auto; min-height: 24px; font-size: 10.5px; }
-    .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 118px 48px 24px; align-items: center; height: 28px; padding: 0 6px 0 18px; border-bottom: 1px solid var(--border); cursor: default; }
+    /* ── 변수 목록 결정 B(§4.4): 머리줄 고정 · 사이드바(112px, 고정 + 따로 스크롤) · 오른쪽 목록 머리 고정 ── */
+    #varList .list-head { position: sticky; top: var(--tabs-h, 41px); z-index: 3; background: var(--bg); padding: 2px 0 6px; margin: 0; }
+    .vl-split { display: flex; align-items: flex-start; border-top: 1px solid var(--border); }
+    .vl-side {
+      width: 112px; flex: 0 0 112px; position: sticky; top: var(--side-top, 75px); align-self: flex-start;
+      max-height: calc(100vh - var(--side-top, 75px) - 24px); overflow-y: auto; border-right: 1px solid var(--border);
+      padding: 4px 3px; background: var(--surface);
+    }
+    .vs-item { display: flex; align-items: center; gap: 3px; min-height: 28px; padding: 0 4px; border-radius: 5px; color: var(--text); cursor: pointer; font-size: 11px; }
+    .vs-item.lv2 { padding-left: 18px; color: var(--text); }
+    .vs-item.muted { color: var(--text-2); }
+    .vs-item.danger { color: var(--danger); }
+    .vs-item[aria-selected="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+    .vs-item:hover:not([aria-selected="true"]), .vs-item:focus-visible { background: var(--surface-hover); outline: none; }
+    .vs-item:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .vs-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vs-num { flex: 0 0 auto; font-size: 9.5px; color: var(--text-2); font-weight: 500; }
+    .vs-item[aria-selected="true"] .vs-num { color: var(--accent-strong); }
+    .vs-tw { width: 12px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; font-size: 9px; margin-left: -3px; }
+    .vs-badge { font: 700 9px/14px var(--font); min-width: 12px; padding: 0 2px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); text-align: center; flex: 0 0 auto; }
+    .vs-item[aria-selected="true"] .vs-badge { background: #d6ebff; color: var(--accent-strong); }
+    .vs-sep { height: 1px; background: var(--border); margin: 5px 4px; }
+    .vl-main { flex: 1 1 auto; min-width: 0; }
+    .vl-head { position: sticky; top: var(--side-top, 75px); z-index: 2; display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 4px 0 8px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .vl-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; outline: none; }
+    .vl-head .search-box:not([hidden]) { position: absolute; inset: 3px 4px; display: flex; gap: 4px; align-items: center; background: var(--surface); }
+    .vl-head .search-box input { flex: 1 1 auto; min-width: 0; }
+    .vt-path { min-height: 22px; display: flex; align-items: center; padding: 0 8px; font-size: 10px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vt-path:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 74px 34px 24px; align-items: center; height: 28px; padding: 0 2px 0 8px; border-bottom: 1px solid var(--border); cursor: default; }
     .vt-row:hover, .vt-row:focus-visible, .vt-group:focus-visible, .vt-section:focus-visible, .vt-line:focus-visible { background: var(--surface-hover); outline: none; }
     .vt-row[aria-selected="true"] { background: var(--accent-subtle); }
     .vt-row .nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -667,15 +696,21 @@
       <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
       <button class="icon-btn" id="btnVarRefresh" type="button" data-i18n-title="list.refreshTip" title="다시 읽기" aria-label="다시 읽기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg></button>
     </div>
-    <div class="chip-bar" id="chipBar">
-      <div class="chip-row" id="chipRow" role="radiogroup" aria-label="컬렉션"></div>
-      <button class="icon-btn chip-more" id="btnChipMore" type="button" data-i18n-title="list.chipMore" title="칩 더 보기" aria-label="칩 더 보기" hidden>›</button>
-      <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
-      <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
-      <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" aria-label="검색 지우기">✕</button></span>
-    </div>
     <div class="situation" id="situationLine" hidden></div>
-    <div class="var-tree" id="varTree" role="treegrid" aria-label="변수 목록"></div>
+    <!-- 결정 B(§4.4): 왼쪽 사이드바(★ Inspect · 컬렉션 › 그룹 · LIB · 삭제된 변수) + 오른쪽 목록 -->
+    <div class="vl-split">
+      <div class="vl-side" id="varSide" role="tree" aria-label="변수 컬렉션"></div>
+      <div class="vl-main">
+        <div class="vl-head" id="chipBar">
+          <b class="vl-title" id="varMainTitle" tabindex="-1"></b>
+          <span class="grow"></span>
+          <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
+          <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+          <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" aria-label="검색 지우기">✕</button></span>
+        </div>
+        <div class="var-tree" id="varTree" role="grid" aria-label="변수 목록"></div>
+      </div>
+    </div>
    </div>
 
    <!-- 준비 현황 팝오버(§4.4 머리줄) — 메뉴 모양, 목록을 밀지 않는다. -->
@@ -1420,11 +1455,9 @@
     "list.addTip": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30(\uC0C9\xB7\uD1A0\uD070\xB7\uD14C\uB9C8\xB7\uD0C0\uC774\uD3EC)",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
     "list.refreshTip": "\uB2E4\uC2DC \uC77D\uAE30",
-    "list.chipMore": "\uCE69 \uB354 \uBCF4\uAE30",
     "list.modeTip": "\uBAA8\uB4DC",
     "list.modeDefault": "\uAE30\uBCF8 \uBAA8\uB4DC",
     "list.searchTip": "\uAC80\uC0C9",
-    "list.chipAll": "\uBAA8\uB450",
     "list.chipTip": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 {used}\uAC1C(\uC9C1\uC811 {direct} \xB7 \uAC04\uC811 {indirect}) / \uC804\uCCB4 {total}\uAC1C",
     "list.reading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 \uC77D\uB294 \uC911\u2026",
     "list.refreshSame": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uBCC0\uACBD \uC5C6\uC74C",
@@ -1435,21 +1468,32 @@
     "list.read": "\uC77D\uAE30",
     "list.wizardWait": "\uB9C8\uBC95\uC0AC\uAC00 \uB05D\uB098\uBA74 \uC77D\uC5B4\uC694",
     "list.noneUsed": "\uC774 \uC120\uD0DD\uC740 \uB85C\uCEEC \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694",
-    "list.selectHint": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uB9CC \uD3BC\uCCD0\uC838\uC694",
+    "list.selectHint": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \u2605 Inspect\uC5D0 \uBAA8\uC5EC\uC694",
+    "list.inspect": "\u2605 Inspect",
+    "list.inspectTip": "Inspect \u2014 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218",
+    "list.inspectAria": "Inspect \u2014 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218, {n}\uAC1C",
+    "list.inspectNoSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5EC\uAE30\uC5D0 \uBAA8\uC5EC\uC694",
+    "list.libItem": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
+    "list.libItemAria": "\uB77C\uC774\uBE0C\uB7EC\uB9AC, \uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
+    "list.deletedItem": "\uC0AD\uC81C\uB41C \uBCC0\uC218",
+    "list.deletedItemAria": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB41C \uACF3 {n}\uAC1C",
+    "list.sideColAria": "{name}, \uACC4\uCE35 {badge}, {num}",
+    "list.sideGrpAria": "{name}, {num}",
+    "list.sideExpand": "\uD3BC\uCE58\uAE30",
+    "list.sideCollapse": "\uC811\uAE30",
+    "list.searchTitle": "'{q}' \uAC80\uC0C9 \uACB0\uACFC",
+    "list.noGroup": "(\uADF8\uB8F9 \uC5C6\uC74C)",
+    "list.totalTip": "\uC804\uCCB4 {total}\uAC1C",
     "list.baseDiff": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694 \xB7 ",
     "list.baseDiffNoSel": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD \uC5C6\uC74C \xB7 ",
     "list.baseMany": "\uB808\uC774\uC5B4 {m}\uAC1C",
     "list.rebase": "\uAE30\uC900 \uBC14\uAFB8\uAE30",
     "list.unused": "\uC548 \uC500",
-    "list.indirect": "\u21B3 \uAC04\uC811",
+    "list.indirect": "\u21B3",
     "list.indirectTip": "\uC9C1\uC811 \uBD99\uC5B4 \uC788\uC9C4 \uC54A\uACE0, {alias} \uAC19\uC740 \uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC5EC\uC694",
     "list.usesTip": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3",
-    "list.showUnused": "+{m} \uC548 \uC500",
-    "list.hideUnused": "\uC228\uAE30\uAE30",
-    "list.unusedGroups": "\u25B8 \uC548 \uC4F0\uB294 \uADF8\uB8F9 {n}\uAC1C",
-    "list.hiddenRow": "\uC120\uD0DD\uC5D0\uC11C \uC548 \uC4F0\uC5EC \uC228\uACBC\uC5B4\uC694",
+    "list.hiddenRow": "\uC120\uD0DD\uC5D0\uC11C \uC548 \uC4F0\uC5EC \uBAA9\uB85D\uC5D0\uC11C \uBE60\uC84C\uC5B4\uC694",
     "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
-    "list.searchAll": "\uBAA8\uB450\uC5D0\uC11C \uCC3E\uAE30",
     "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
     "list.libSection": "LIB \xB7 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uAC83",
     "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
@@ -1473,8 +1517,8 @@
     "list.viaAlias": "\uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC784: {names}",
     "list.menuTiers": "\uCEEC\uB809\uC158 \uACC4\uCE35 \uC9C0\uC815\u2026",
     "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
-    "list.menuExpandAll": "\uBAA8\uB4E0 \uADF8\uB8F9 \uD3BC\uCE58\uAE30",
-    "list.menuCollapseAll": "\uBAA8\uB4E0 \uADF8\uB8F9 \uC811\uAE30",
+    "list.menuExpandAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uD3BC\uCE58\uAE30",
+    "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
     "list.semanticsNote": "\uC5ED\uD560 \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uC801\uC6A9\uD560 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
     "tab.variables": "\uBCC0\uC218",
     "tab.layer": "\uB808\uC774\uC5B4",
@@ -2159,78 +2203,94 @@
     }
     return m;
   }
-  function buildList(inp) {
-    var _a, _b, _c;
-    const known = inp.direct !== null;
-    const searching = inp.query.trim() !== "";
-    const cols = orderCollections(inp.collections).filter((c) => inp.chip === "all" || c.id === inp.chip);
-    const stateOf = (v) => {
-      var _a2;
-      return !known ? "none" : ((_a2 = inp.direct.get(v.id)) != null ? _a2 : 0) > 0 ? "direct" : inp.indirect.has(v.id) ? "indirect" : "unused";
-    };
-    const byCol = /* @__PURE__ */ new Map();
-    for (const c of cols) byCol.set(c.id, []);
-    const idx = /* @__PURE__ */ new Map();
-    for (const v of inp.vars) {
-      const list = byCol.get(v.collectionId);
-      if (!list) continue;
-      if (searching && !matchesQuery(v.name, inp.query)) continue;
-      const key = groupKey(v.collectionId, v.name);
-      let g = idx.get(key);
-      if (!g) {
-        g = { key, path: groupPath(v.name), rows: [] };
-        idx.set(key, g);
-        list.push(g);
-      }
-      g.rows.push(v);
+  var sideSelKey = (s) => s.kind === "col" ? `col:${s.id}` : s.kind === "grp" ? `grp:${s.key}` : s.kind;
+  function rowState(id, direct, indirect) {
+    var _a;
+    if (!direct) return "none";
+    if (((_a = direct.get(id)) != null ? _a : 0) > 0) return "direct";
+    if (indirect.has(id)) return "indirect";
+    return "unused";
+  }
+  function countOf(vars, direct, indirect) {
+    let d = 0;
+    let i = 0;
+    if (direct) for (const v of vars) {
+      const s = rowState(v.id, direct, indirect);
+      if (s === "direct") d++;
+      else if (s === "indirect") i++;
     }
-    const groupCount = [...byCol.values()].reduce((n, gs) => n + gs.length, 0);
+    return { used: d + i, total: vars.length, direct: d, indirect: i };
+  }
+  function sidebarCollections(cols, vars, direct, indirect) {
+    return orderCollections(cols).map((c) => {
+      const cv = vars.filter((v) => v.collectionId === c.id);
+      const byKey = /* @__PURE__ */ new Map();
+      for (const v of cv) {
+        const k = groupKey(c.id, v.name);
+        const arr = byKey.get(k);
+        if (arr) arr.push(v);
+        else byKey.set(k, [v]);
+      }
+      const groups = [...byKey.entries()].map(([key, gv]) => {
+        const path = groupPath(gv[0].name);
+        return __spreadValues({ key, path, label: path || NO_GROUP }, countOf(gv, direct, indirect));
+      });
+      return __spreadValues({ collection: c, groups }, countOf(cv, direct, indirect));
+    });
+  }
+  function inspectCount(vars, direct, indirect) {
+    return countOf(vars, direct, indirect).used;
+  }
+  function rightEntries(sel, cols, vars, direct, indirect, query2 = "") {
     const out = [];
-    for (const c of cols) {
-      const groups = (_a = byCol.get(c.id)) != null ? _a : [];
-      if (searching && !groups.length) continue;
-      const all = inp.vars.filter((v) => v.collectionId === c.id);
-      const usedIn = (rows) => rows.filter((v) => {
-        const s = stateOf(v);
-        return s === "direct" || s === "indirect";
-      }).length;
-      out.push({ kind: "section", collection: c, used: known ? usedIn(all) : 0, total: all.length });
-      const unusedGroups = [];
-      for (const g of groups) {
-        const used = usedIn(g.rows);
-        const unused = known ? g.rows.length - used : 0;
-        const label = g.path || NO_GROUP;
-        if (searching) {
-          out.push({ kind: "group", key: g.key, collectionId: c.id, path: g.path, label, used, total: g.rows.length, expanded: true, unused: 0, showingUnused: true });
-          for (const v of g.rows) out.push({ kind: "row", v, state: stateOf(v), groupKey: g.key });
-          continue;
+    const rank = (s) => s === "direct" || s === "indirect" ? 0 : 1;
+    const pushGroups = (side, filter, withPath, usedOnly) => {
+      const badge = tierBadge(side.collection);
+      for (const g of side.groups) {
+        const rows = vars.filter((v) => v.collectionId === side.collection.id && groupKey(v.collectionId, v.name) === g.key && filter(v)).map((v) => ({ v, state: rowState(v.id, direct, indirect) })).filter((r) => !usedOnly || rank(r.state) === 0);
+        if (!rows.length) continue;
+        rows.sort((a, b) => rank(a.state) - rank(b.state));
+        if (withPath !== "none") {
+          const label = withPath === "full" ? `${badge} ${side.collection.name} \u203A ${g.label}` : g.label;
+          out.push({ kind: "path", label, collectionId: side.collection.id });
         }
-        if (known && used === 0) {
-          unusedGroups.push(g);
-          continue;
-        }
-        const auto = known ? true : groupCount <= 10;
-        const expanded = (_b = inp.userExpanded.get(g.key)) != null ? _b : auto;
-        const showingUnused = inp.showUnusedIn.has(g.key);
-        out.push({ kind: "group", key: g.key, collectionId: c.id, path: g.path, label, used, total: g.rows.length, expanded, unused, showingUnused });
-        if (!expanded) continue;
-        for (const v of g.rows) {
-          const st = stateOf(v);
-          if (known && st === "unused" && !showingUnused) continue;
-          out.push({ kind: "row", v, state: st, groupKey: g.key });
-        }
+        for (const r of rows) out.push(__spreadValues({ kind: "row" }, r));
       }
-      if (unusedGroups.length) {
-        if (inp.showUnusedGroups.has(c.id)) {
-          for (const g of unusedGroups) {
-            const expanded = (_c = inp.userExpanded.get(g.key)) != null ? _c : false;
-            out.push({ kind: "group", key: g.key, collectionId: c.id, path: g.path, label: g.path || NO_GROUP, used: 0, total: g.rows.length, expanded, unused: g.rows.length, showingUnused: true });
-            if (expanded) for (const v of g.rows) out.push({ kind: "row", v, state: "unused", groupKey: g.key });
-          }
-        } else out.push({ kind: "unusedGroups", collectionId: c.id, count: unusedGroups.length });
-      }
+    };
+    const sides = sidebarCollections(cols, vars, direct, indirect);
+    if (query2.trim()) {
+      for (const side of sides) pushGroups(side, (v) => matchesQuery(v.name, query2), "full", false);
+      return out;
+    }
+    if (sel.kind === "inspect") {
+      if (!direct) return out;
+      for (const side of sides) pushGroups(side, () => true, "full", true);
+    } else if (sel.kind === "col") {
+      const side = sides.find((s) => s.collection.id === sel.id);
+      if (side) pushGroups(side, () => true, "path", false);
+    } else if (sel.kind === "grp") {
+      const side = sides.find((s) => s.groups.some((g) => g.key === sel.key));
+      if (side) pushGroups(__spreadProps(__spreadValues({}, side), { groups: side.groups.filter((g) => g.key === sel.key) }), () => true, "none", false);
     }
     return out;
+  }
+  function initialSideSel(cols, vars, hasBaseline, bigSkipped2, direct, indirect) {
+    const first = orderCollections(cols)[0];
+    const fallback = first ? { kind: "col", id: first.id } : { kind: "inspect" };
+    if (!hasBaseline || bigSkipped2) return fallback;
+    if (!direct) return { kind: "inspect" };
+    return inspectCount(vars, direct, indirect) > 0 ? { kind: "inspect" } : fallback;
+  }
+  function validSideSel(sel, cols, vars, hasLib, hasDeleted, initial) {
+    if (sel.kind === "inspect") return sel;
+    if (sel.kind === "col") return cols.some((c) => c.id === sel.id) ? sel : initial();
+    if (sel.kind === "grp") {
+      if (vars.some((v) => groupKey(v.collectionId, v.name) === sel.key)) return sel;
+      const colId = sel.key.slice(0, sel.key.indexOf("|"));
+      return cols.some((c) => c.id === colId) ? { kind: "col", id: colId } : initial();
+    }
+    if (sel.kind === "lib") return hasLib ? sel : initial();
+    return hasDeleted ? sel : initial();
   }
 
   // src/lib/reread.ts
@@ -3714,27 +3774,27 @@
     for (const p of plan) {
       const paidSkip = !p.run && p.skipReason === "wizard.skip.paid";
       if (!p.run && !paidSkip) continue;
-      const chip2 = document.createElement("span");
-      chip2.id = `wstep-${p.step.id}`;
+      const chip = document.createElement("span");
+      chip.id = `wstep-${p.step.id}`;
       const label = t("wizard.step." + p.step.id);
       if (p.run) {
-        chip2.textContent = `${++n} ${label}`;
+        chip.textContent = `${++n} ${label}`;
       } else {
-        chip2.className = "skip";
-        chip2.textContent = `${PAID_LOCK} ${label}`;
-        chip2.title = t("wizard.chip.paid");
+        chip.className = "skip";
+        chip.textContent = `${PAID_LOCK} ${label}`;
+        chip.title = t("wizard.chip.paid");
       }
-      box.appendChild(chip2);
+      box.appendChild(chip);
     }
   }
   var wizardFailed = false;
   function setWizardStep(id, state, note) {
     if (state === "fail" && note !== t("wizard.seq.stoppedPrev")) wizardFailed = true;
-    const chip2 = document.getElementById(`wstep-${id}`);
-    if (!chip2) return;
-    chip2.classList.remove("active", "done", "fail");
-    chip2.classList.add(state);
-    chip2.title = note;
+    const chip = document.getElementById(`wstep-${id}`);
+    if (!chip) return;
+    chip.classList.remove("active", "done", "fail");
+    chip.classList.add(state);
+    chip.title = note;
   }
   async function runWizard() {
     var _a;
@@ -5245,6 +5305,8 @@
     const head = document.querySelector(".tab-section.active .step:not(.collapsed) .step-head");
     const headH = head && head.offsetParent ? Math.round(head.getBoundingClientRect().height) : 26;
     root.style.setProperty("--toolbar-top", `${headTop + headH}px`);
+    const lh = document.getElementById("listHead");
+    if (lh && lh.offsetParent) root.style.setProperty("--side-top", `${headTop + Math.round(lh.getBoundingClientRect().height)}px`);
     const bar2 = document.querySelector(".tab-section.active .step:not(.collapsed) .toolbar");
     if (bar2 && bar2.offsetParent) root.style.setProperty("--toolbar-h", `${Math.round(bar2.getBoundingClientRect().height)}px`);
   }
@@ -5659,6 +5721,7 @@
     const ro = new ResizeObserver(() => syncStickyOffsets());
     const tabsEl = document.querySelector(".tabs");
     if (tabsEl) ro.observe(tabsEl);
+    ro.observe($("listHead"));
   }
   window.addEventListener("resize", syncStickyOffsets);
   updateGates();
@@ -6058,13 +6121,12 @@
   var curSel = { ids: [], count: 0, scanned: 0, name: "" };
   var baseline = null;
   var bigSkipped = false;
-  var chip = "all";
+  var sideSel = null;
+  var sidePicked = false;
+  var sideOpen = /* @__PURE__ */ new Map();
   var query = "";
   var searchOpen = false;
   var modeName = null;
-  var userExpanded = /* @__PURE__ */ new Map();
-  var showUnusedIn = /* @__PURE__ */ new Set();
-  var showUnusedGroups = /* @__PURE__ */ new Set();
   var focusKey = null;
   var vmSelected = null;
   var sameIds = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -6177,7 +6239,7 @@
     vmUsageVisible = why === "selection" || why === "user";
     if (vmUsageVisible && vmOpen) {
       showStatusLine(t("list.reading"), { background: true });
-      renderChips();
+      if (varScreen() === "list") renderVarList();
     }
     send({ type: "SCAN_USAGE", reqId: vmUsageReq, nodeIds: baseline.ids });
   }
@@ -6230,7 +6292,6 @@
     vmTableSig = sig;
     vmCols = msg.collections;
     vmVars = msg.vars;
-    if (chip !== "all" && !vmCols.some((c) => c.id === chip)) chip = "all";
     if (wizCountPending) {
       wizCountPending = false;
       const n = vmVars.length - wizBeforeCount;
@@ -6309,78 +6370,180 @@
     }
     return d;
   }
-  function chipCounts(colId) {
-    var _a, _b;
-    const vars = colId === "all" ? vmVars : vmVars.filter((v) => v.collectionId === colId);
-    let direct = 0;
-    let indirect = 0;
-    if (usageMap) for (const v of vars) {
-      if (((_b = (_a = usageMap.get(v.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0) direct++;
-      else if (indirectMap.has(v.id)) indirect++;
-    }
-    return { used: direct + indirect, total: vars.length, direct, indirect };
-  }
-  function chipNumText(colId) {
-    const c = chipCounts(colId);
-    if (vmUsageInFlight && vmUsageVisible) return { text: "\u2026", tip: "" };
-    if (!usageMap) return { text: String(c.total), tip: "" };
+  var directMap = () => usageMap ? new Map([...usageMap.entries()].map(([k, v]) => [k, v.places])) : null;
+  var indirectSet = () => new Set(indirectMap.keys());
+  var usageReadingVisible = () => vmUsageInFlight && vmUsageVisible;
+  function sideNum(c) {
+    if (usageReadingVisible()) return { text: "\u2026", tip: "" };
+    if (!usageMap) return { text: String(c.total), tip: t("list.totalTip", { total: c.total }) };
     return { text: `${c.used}/${c.total}`, tip: t("list.chipTip", { used: c.used, direct: c.direct, indirect: c.indirect, total: c.total }) };
   }
-  function renderChips() {
-    const row = $("chipRow");
-    clearMount(row);
-    const make = (id, label, badge) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "tier-chip";
-      b.setAttribute("role", "radio");
-      b.setAttribute("aria-checked", String(chip === id));
-      b.tabIndex = chip === id ? 0 : -1;
-      b.dataset.chip = id;
-      const nm = document.createElement("span");
-      nm.textContent = label;
-      b.appendChild(nm);
-      if (badge) {
-        const bg = document.createElement("span");
-        bg.className = "badge";
-        bg.textContent = badge;
-        bg.setAttribute("aria-hidden", "true");
-        b.appendChild(bg);
+  function initialSel() {
+    return initialSideSel(vmCols, vmVars, !!baseline, bigSkipped || wizardRunning && !usageMap, directMap(), indirectSet());
+  }
+  function currentSel() {
+    var _a;
+    const hasLib = libRowsAll().length > 0;
+    const hasDeleted = deletedUse.count > 0 && !!baseline;
+    if (!sidePicked || !sideSel) {
+      sideSel = baseline && wizardRunning && !usageMap && !bigSkipped ? { kind: "inspect" } : initialSel();
+      return sideSel;
+    }
+    const next = validSideSel(sideSel, vmCols, vmVars, hasLib, hasDeleted, initialSel);
+    if (sideSelKey(next) !== sideSelKey(sideSel)) {
+      if ((_a = document.activeElement) == null ? void 0 : _a.closest("#varSide")) focusSideKey = `side:${sideSelKey(next)}`;
+      sideSel = next;
+    }
+    return sideSel;
+  }
+  var focusSideKey = null;
+  function sideIsOpen(side, all, sel) {
+    const user = sideOpen.get(side.collection.id);
+    if (user !== void 0) return user;
+    if (sel.kind === "grp" && sel.key.startsWith(`${side.collection.id}|`)) return true;
+    if (usageMap && all.some((x) => x.used > 0)) return side.used > 0;
+    return all[0] === side;
+  }
+  function pickSide(sel, focus = true) {
+    if (searchOpen || query) clearSearch(false);
+    sideSel = sel;
+    sidePicked = true;
+    if (sel.kind === "col") sideOpen.set(sel.id, true);
+    focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
+    focusKey = null;
+    renderVarList();
+  }
+  function renderSidebar(sel) {
+    var _a;
+    const nav = $("varSide");
+    const hadFocus = nav.contains(document.activeElement) ? (_a = document.activeElement.dataset.key) != null ? _a : null : null;
+    clearMount(nav);
+    const dm = directMap();
+    const ind = indirectSet();
+    const sides = sidebarCollections(vmCols, vmVars, dm, ind);
+    const selKey = searchOpen && query.trim() ? "" : sideSelKey(sel);
+    const item = (key, level, label, num, aria, opts) => {
+      var _a2;
+      const d = document.createElement("div");
+      d.className = `vs-item lv${level}${opts.muted ? " muted" : ""}${opts.danger ? " danger" : ""}`;
+      d.dataset.key = `side:${key}`;
+      d.setAttribute("role", "treeitem");
+      d.setAttribute("aria-level", String(level));
+      d.setAttribute("aria-selected", String(selKey === key));
+      d.setAttribute("aria-label", aria);
+      if (opts.open !== void 0) d.setAttribute("aria-expanded", String(opts.open));
+      d.tabIndex = -1;
+      if (opts.onToggle) {
+        const tw = document.createElement("button");
+        tw.type = "button";
+        tw.className = "vs-tw";
+        tw.tabIndex = -1;
+        tw.textContent = opts.open ? "\u25BE" : "\u25B8";
+        tw.setAttribute("aria-label", t(opts.open ? "list.sideCollapse" : "list.sideExpand"));
+        tw.addEventListener("click", (e) => {
+          e.stopPropagation();
+          opts.onToggle();
+        });
+        d.appendChild(tw);
       }
-      const num = chipNumText(id);
+      if (opts.badge) {
+        const b = document.createElement("span");
+        b.className = "vs-badge";
+        b.setAttribute("aria-hidden", "true");
+        b.textContent = opts.badge;
+        d.appendChild(b);
+      }
+      const nm = document.createElement("span");
+      nm.className = "vs-name";
+      nm.textContent = label;
+      d.title = (_a2 = opts.title) != null ? _a2 : label;
       const n = document.createElement("span");
-      n.className = "num";
+      n.className = "vs-num";
       n.textContent = num.text;
-      b.appendChild(n);
-      if (num.tip) b.title = num.tip;
-      b.addEventListener("click", () => {
-        chip = id;
-        renderVarList();
-      });
-      b.addEventListener("keydown", (e) => {
-        var _a, _b;
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-        e.preventDefault();
-        const all = Array.from(row.querySelectorAll(".tier-chip"));
-        const i = all.indexOf(b) + (e.key === "ArrowRight" ? 1 : -1);
-        const target = all[(i + all.length) % all.length];
-        chip = (_a = target.dataset.chip) != null ? _a : "all";
-        renderVarList();
-        (_b = row.querySelector(`[data-chip="${CSS.escape(chip)}"]`)) == null ? void 0 : _b.focus();
-      });
-      row.appendChild(b);
+      if (num.tip) n.title = num.tip;
+      d.append(nm, n);
+      d.addEventListener("click", opts.onPick);
+      d.addEventListener("keydown", (ev) => sideKey(ev, d, opts));
+      nav.appendChild(d);
+      return d;
     };
-    make("all", t("list.chipAll"), null);
-    for (const c of orderCollections(vmCols)) make(c.id, c.name, tierBadge(c));
-    requestAnimationFrame(() => {
-      const over = row.scrollWidth > row.clientWidth + 1;
-      $("btnChipMore").hidden = !over;
-    });
-    renderModeSelect();
+    const insN = inspectCount(vmVars, dm, ind);
+    const insNum = usageReadingVisible() ? "\u2026" : !baseline || !usageMap ? "\u2014" : String(insN);
+    item("inspect", 1, t("list.inspect"), { text: insNum, tip: t("list.inspectTip") }, t("list.inspectAria", { n: insNum }), { onPick: () => pickSide({ kind: "inspect" }), title: t("list.inspectTip") });
+    for (const side of sides) {
+      const c = side.collection;
+      const open = sideIsOpen(side, sides, sel);
+      const badge = tierBadge(c);
+      const num = sideNum(side);
+      item(`col:${c.id}`, 1, c.name, num, t("list.sideColAria", { name: c.name, badge, num: num.text }), {
+        badge,
+        open,
+        muted: !!usageMap && side.used === 0,
+        onToggle: () => {
+          sideOpen.set(c.id, !open);
+          focusSideKey = `side:col:${c.id}`;
+          renderVarList();
+        },
+        onPick: () => pickSide({ kind: "col", id: c.id })
+      });
+      if (open) for (const g of side.groups) {
+        const gn = sideNum(g);
+        item(`grp:${g.key}`, 2, g.label, gn, t("list.sideGrpAria", { name: g.label, num: gn.text }), {
+          muted: !!usageMap && g.used === 0,
+          onPick: () => pickSide({ kind: "grp", key: g.key })
+        });
+      }
+    }
+    const libN = libRowsAll().length;
+    const hasDeleted = deletedUse.count > 0 && !!baseline;
+    if (libN || hasDeleted) {
+      const sep = document.createElement("div");
+      sep.className = "vs-sep";
+      sep.setAttribute("role", "separator");
+      nav.appendChild(sep);
+    }
+    if (libN) item("lib", 1, t("list.libItem"), { text: String(libN), tip: "" }, t("list.libItemAria", { n: libN }), { onPick: () => pickSide({ kind: "lib" }) });
+    if (hasDeleted) item("deleted", 1, t("list.deletedItem"), { text: String(deletedUse.count), tip: "" }, t("list.deletedItemAria", { n: deletedUse.count }), { danger: true, onPick: () => pickSide({ kind: "deleted" }) });
+    const items = Array.from(nav.querySelectorAll(".vs-item"));
+    const want = focusSideKey != null ? focusSideKey : hadFocus;
+    const target = want && items.find((x) => x.dataset.key === want) || items.find((x) => x.getAttribute("aria-selected") === "true") || items[0];
+    if (target) target.tabIndex = 0;
+    if (want && target && (focusSideKey || hadFocus)) target.focus({ preventScroll: true });
+    focusSideKey = null;
+  }
+  function sideKey(ev, el, opts) {
+    const items = Array.from($("varSide").querySelectorAll(".vs-item"));
+    const i = items.indexOf(el);
+    const go = (j) => {
+      const target = items[Math.max(0, Math.min(items.length - 1, j))];
+      if (!target) return;
+      items.forEach((x) => x.tabIndex = -1);
+      target.tabIndex = 0;
+      target.focus();
+    };
+    const k = ev.key;
+    if (k === "ArrowDown") go(i + 1);
+    else if (k === "ArrowUp") go(i - 1);
+    else if (k === "Home") go(0);
+    else if (k === "End") go(items.length - 1);
+    else if (k === "ArrowRight" && opts.onToggle) {
+      if (!opts.open) opts.onToggle();
+      else go(i + 1);
+    } else if (k === "ArrowLeft") {
+      if (el.classList.contains("lv2")) {
+        for (let j = i - 1; j >= 0; j--) if (items[j].classList.contains("lv1")) {
+          go(j);
+          break;
+        }
+      } else if (opts.onToggle && opts.open) opts.onToggle();
+    } else if (k === "Enter" || k === " ") opts.onPick();
+    else return;
+    ev.preventDefault();
   }
   function renderModeSelect() {
     const sel = $("modeSelect");
-    const visible = chip === "all" ? vmCols : vmCols.filter((c) => c.id === chip);
+    const shownCols = new Set(lastRightCols);
+    const visible = vmCols.filter((c) => shownCols.has(c.id));
     const names = [...new Set(visible.flatMap((c) => c.modes.map((m) => m.name)))];
     if (names.length <= 1 || searchOpen) {
       sel.hidden = true;
@@ -6430,12 +6593,13 @@
       }
     };
     let shown = true;
-    const groups = new Set(vmVars.filter((v) => chip === "all" || v.collectionId === chip).map((v) => groupKey(v.collectionId, v.name))).size;
+    const insShown = !!sideSel && sideSel.kind === "inspect" && !(searchOpen && query.trim());
     if (baseDiffers()) add(baseNoticeText(), [t("list.rebase"), () => doRebase(false)]);
+    else if (insShown && (!baseline || !usageMap || inspectCount(vmVars, directMap(), indirectSet()) === 0)) shown = false;
     else if (baseline && bigSkipped && !usageMap) add(t("list.big"), [t("list.read"), () => requestManagerUsage("user")]);
     else if (baseline && wizardRunning && !usageMap) add(t("list.wizardWait"));
-    else if (baseline && usageMap && chipCounts("all").direct === 0) add(t("list.noneUsed"), [t("list.findUnbound"), findUnbound]);
-    else if (!baseline && groups > 10) add(t("list.selectHint"));
+    else if (baseline && usageMap && inspectCount(vmVars, directMap(), indirectSet()) === 0) add(t("list.noneUsed"), [t("list.findUnbound"), findUnbound]);
+    else if (!baseline) add(t("list.selectHint"));
     else shown = false;
     line.hidden = !shown;
   }
@@ -6486,188 +6650,118 @@
     else span.textContent = cell.text;
     return span;
   }
+  var lastRightCols = [];
   function renderVarList() {
-    var _a, _b;
+    var _a;
     if (!vmOpen || varScreen() !== "list") return;
-    renderChips();
+    const sel = currentSel();
+    renderSidebar(sel);
     renderSituation();
     renderReadinessButtons();
-    $("btnFindUnbound").toggleAttribute("data-x", false);
     setLock($("btnFindUnbound"), curSel.count ? null : "prereq", t("status.noSelection"));
     const tree = $("varTree");
     const prevScroll = window.scrollY;
+    const hadFocus = tree.contains(document.activeElement);
     clearMount(tree);
-    if (baseline && !usageMap && !bigSkipped && !wizardRunning && (vmUsageInFlight || vmUsageTimer) && !usageEverShown) {
-      const d = document.createElement("div");
-      d.className = "vt-empty";
-      d.textContent = t("list.reading");
-      tree.appendChild(d);
-      return;
-    }
-    usageEverShown = true;
-    const entries = buildList({
-      collections: vmCols,
-      vars: vmVars,
-      chip,
-      query,
-      direct: usageMap ? new Map([...usageMap.entries()].map(([k, v]) => [k, v.places])) : null,
-      indirect: new Set(indirectMap.keys()),
-      userExpanded,
-      showUnusedIn,
-      showUnusedGroups
-    });
+    const searching = !!query.trim();
+    const title = $("varMainTitle");
+    if (searching) title.textContent = t("list.searchTitle", { q: query.trim() });
+    else if (sel.kind === "inspect") title.textContent = t("list.inspect");
+    else if (sel.kind === "lib") title.textContent = t("list.libItem");
+    else if (sel.kind === "deleted") title.textContent = t("list.deletedItem");
+    else if (sel.kind === "col") {
+      const c = vmCols.find((x) => x.id === sel.id);
+      title.textContent = c ? `${tierBadge(c)} ${c.name}` : "";
+    } else title.textContent = sel.key.slice(sel.key.indexOf("|") + 1) || t("list.noGroup");
     const lines = [];
-    for (const e of entries) {
-      if (e.kind === "section") lines.push(sectionEl(e));
-      else if (e.kind === "group") lines.push(groupEl(e));
-      else if (e.kind === "row") lines.push(rowEl(e.v, e.state));
-      else lines.push(unusedGroupsEl(e.collectionId, e.count));
-    }
-    if (query.trim() && !entries.some((e) => e.kind === "row") && !libRowsMatching().length) {
+    const dm = directMap();
+    const ind = indirectSet();
+    lastRightCols = [];
+    const empty = (text, action) => {
       const d = document.createElement("div");
       d.className = "vt-empty";
-      d.append(t("list.noMatch", { q: query.trim() }), " \xB7 ");
-      if (chip !== "all") {
-        const a = document.createElement("button");
-        a.className = "link";
-        a.textContent = t("list.searchAll");
-        a.addEventListener("click", () => {
-          chip = "all";
-          renderVarList();
-        });
-        d.append(a, " ");
+      d.append(text);
+      if (action) {
+        const b = document.createElement("button");
+        b.className = "link link-btn";
+        b.type = "button";
+        b.textContent = action[0];
+        b.addEventListener("click", action[1]);
+        d.append(" \xB7 ", b);
       }
-      const c = document.createElement("button");
-      c.className = "link";
-      c.textContent = t("list.searchClear");
-      c.addEventListener("click", () => clearSearch(true));
-      d.append(c);
       lines.push(d);
-    }
-    if (chip === "all") {
-      const libRows = libRowsMatching();
-      if (libRows.length) {
-        const h = document.createElement("div");
-        h.className = "vt-section vt-lib";
-        h.dataset.key = "sec:lib";
-        h.setAttribute("role", "row");
-        h.innerHTML = `<span>${escapeHtml(t("list.libSection"))}</span>`;
-        lines.push(h);
-        for (const l of libRows) lines.push(libRowEl(l));
+    };
+    if (sel.kind === "lib" && !searching) {
+      for (const l of libRowsAll()) lines.push(libRowEl(l));
+    } else if (sel.kind === "deleted" && !searching) {
+      if (deletedUse.count > 0) lines.push(deletedEl());
+    } else {
+      const entries = rightEntries(sel, vmCols, vmVars, dm, ind, query);
+      let pi = 0;
+      for (const e of entries) {
+        if (e.kind === "path") {
+          lines.push(pathEl(e.label, pi++));
+          if (!lastRightCols.includes(e.collectionId)) lastRightCols.push(e.collectionId);
+        } else lines.push(rowEl(e.v, e.state));
       }
+      if (sel.kind === "col" && !searching) lastRightCols = [sel.id];
+      if (sel.kind === "grp" && !searching) lastRightCols = [sel.key.slice(0, sel.key.indexOf("|"))];
+      if (searching) {
+        const libs = libRowsMatching();
+        if (libs.length) {
+          lines.push(pathEl(t("list.libItem"), pi++));
+          for (const l of libs) lines.push(libRowEl(l));
+        }
+        if (!entries.length && !libs.length) empty(t("list.noMatch", { q: query.trim() }), [t("list.searchClear"), () => clearSearch(true)]);
+      } else if (sel.kind === "inspect" && !entries.length) {
+        if (!baseline) empty(t("list.inspectNoSel"));
+        else if (bigSkipped && !usageMap) empty(t("list.big"), [t("list.read"), () => requestManagerUsage("user")]);
+        else if (wizardRunning && !usageMap) empty(t("list.wizardWait"));
+        else if (!usageMap) empty(t("list.reading"));
+        else empty(t("list.noneUsed"), [t("list.findUnbound"), findUnbound]);
+      } else if (!entries.length) empty(t("vm.noVars"));
     }
-    if (deletedUse.count > 0 && baseline) lines.push(deletedEl());
-    if (!lines.length) {
-      const d = document.createElement("div");
-      d.className = "vt-empty";
-      d.textContent = t("vm.noVars");
-      lines.push(d);
-    }
+    renderModeSelect();
     tree.append(...lines);
     const focusables = Array.from(tree.querySelectorAll("[data-key]"));
     let target = focusKey ? focusables.find((x) => x.dataset.key === focusKey) : void 0;
-    if (focusKey && !target && focusKey.startsWith("row:")) {
-      const gk = rowGroupOf.get(focusKey.slice(4));
-      target = gk ? focusables.find((x) => x.dataset.key === `grp:${gk}`) : void 0;
-      if (target && tree.contains(document.activeElement)) showStatusLine(t("list.hiddenRow"));
+    if (focusKey && !target && focusKey.startsWith("row:") && hadFocus) {
+      showStatusLine(t("list.hiddenRow"));
+      focusKey = null;
+      $("varMainTitle").focus({ preventScroll: true });
     }
     for (const f of focusables) f.tabIndex = -1;
     (_a = target != null ? target : focusables[0]) == null ? void 0 : _a.setAttribute("tabindex", "0");
-    if (target && ((_b = document.activeElement) == null ? void 0 : _b.closest("#varTree"))) target.focus({ preventScroll: true });
+    if (target && hadFocus) target.focus({ preventScroll: true });
     if (Math.abs(window.scrollY - prevScroll) > 1) window.scrollTo(0, prevScroll);
   }
-  var rowGroupOf = /* @__PURE__ */ new Map();
-  var usageEverShown = false;
+  function pathEl(label, i) {
+    const d = document.createElement("div");
+    d.className = "vt-path";
+    d.dataset.key = `path:${i}`;
+    d.setAttribute("role", "row");
+    d.textContent = label;
+    d.title = label;
+    d.addEventListener("keydown", (ev) => treeKey(ev, d));
+    return d;
+  }
+  function setAllExpanded(on) {
+    for (const c of vmCols) sideOpen.set(c.id, on);
+    renderVarList();
+  }
+  function libRowsAll() {
+    if (!usageMap) return [];
+    return libVars.filter((l) => {
+      var _a, _b;
+      return ((_b = (_a = usageMap.get(l.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0 || indirectMap.has(l.id);
+    });
+  }
   function libRowsMatching() {
     if (!usageMap) return [];
     return libVars.filter((l) => {
       var _a, _b;
       return (((_b = (_a = usageMap.get(l.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0 || indirectMap.has(l.id)) && matchesQuery(l.name, query);
     });
-  }
-  function sectionEl(e) {
-    const d = document.createElement("div");
-    d.className = "vt-section";
-    d.dataset.key = `sec:${e.collection.id}`;
-    d.setAttribute("role", "row");
-    d.setAttribute("aria-level", "1");
-    d.innerHTML = `<span>${escapeHtml(e.collection.name)}</span><span class="badge" aria-hidden="true">${escapeHtml(tierBadge(e.collection))}</span><span class="num">${usageMap ? `${e.used}/${e.total}` : e.total}</span>`;
-    d.addEventListener("keydown", (ev) => treeKey(ev, d));
-    return d;
-  }
-  function groupEl(e) {
-    const d = document.createElement("div");
-    d.className = "vt-group";
-    d.dataset.key = `grp:${e.key}`;
-    d.setAttribute("role", "row");
-    d.setAttribute("aria-level", "2");
-    d.setAttribute("aria-expanded", String(e.expanded));
-    const tw = document.createElement("span");
-    tw.className = "tw";
-    tw.textContent = e.expanded ? "\u25BE" : "\u25B8";
-    const lbl = document.createElement("span");
-    lbl.className = "lbl";
-    lbl.textContent = e.label;
-    lbl.title = e.label;
-    const num = document.createElement("span");
-    num.className = "num";
-    num.textContent = usageMap ? `${e.used}/${e.total}` : String(e.total);
-    d.append(tw, lbl, num);
-    if (usageMap && e.unused > 0 && e.used > 0 && !query.trim()) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "link link-btn more-unused";
-      b.tabIndex = -1;
-      b.textContent = e.showingUnused ? t("list.hideUnused") : t("list.showUnused", { m: e.unused });
-      b.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        toggleUnused(e.key);
-      });
-      d.appendChild(b);
-    }
-    d.addEventListener("click", (ev) => {
-      var _a;
-      if (ev.altKey) {
-        setSectionExpanded(e.collectionId, !e.expanded);
-        return;
-      }
-      focusKey = (_a = d.dataset.key) != null ? _a : null;
-      toggleGroup(e.key, e.expanded);
-    });
-    d.addEventListener("keydown", (ev) => treeKey(ev, d, e));
-    return d;
-  }
-  function toggleGroup(key, expanded) {
-    userExpanded.set(key, !expanded);
-    renderVarList();
-  }
-  function toggleUnused(key) {
-    if (showUnusedIn.has(key)) showUnusedIn.delete(key);
-    else showUnusedIn.add(key);
-    renderVarList();
-  }
-  function setSectionExpanded(colId, on) {
-    for (const v of vmVars) if (v.collectionId === colId) userExpanded.set(groupKey(colId, v.name), on);
-    renderVarList();
-  }
-  function setAllExpanded(on) {
-    for (const v of vmVars) userExpanded.set(groupKey(v.collectionId, v.name), on);
-    if (on) for (const c of vmCols) showUnusedGroups.add(c.id);
-    renderVarList();
-  }
-  function unusedGroupsEl(colId, count) {
-    const d = document.createElement("div");
-    d.className = "vt-line";
-    d.dataset.key = `ug:${colId}`;
-    d.setAttribute("role", "row");
-    d.textContent = t("list.unusedGroups", { n: count });
-    const open = () => {
-      showUnusedGroups.add(colId);
-      renderVarList();
-    };
-    d.addEventListener("click", open);
-    d.addEventListener("keydown", (ev) => treeKey(ev, d, void 0, open));
-    return d;
   }
   function useText(id, state) {
     var _a, _b, _c, _d, _e, _f, _g, _h;
@@ -6682,13 +6776,11 @@
     return { text: t("vm.uses", { n: (_f = u == null ? void 0 : u.places) != null ? _f : 0 }), tip: t("list.usesTip", { k: (_g = u == null ? void 0 : u.layers) != null ? _g : 0, n: (_h = u == null ? void 0 : u.places) != null ? _h : 0 }) };
   }
   function rowEl(v, state) {
-    rowGroupOf.set(v.id, groupKey(v.collectionId, v.name));
     const d = document.createElement("div");
     d.className = `vt-row ${state}`;
     d.dataset.key = `row:${v.id}`;
     d.dataset.id = v.id;
     d.setAttribute("role", "row");
-    d.setAttribute("aria-level", "3");
     d.setAttribute("aria-selected", String(vmSelected === v.id));
     const cell = currentModeCell(v);
     const nm = document.createElement("span");
@@ -6765,7 +6857,7 @@ ${v.description}` : v.name;
       pick();
     });
     d.append(s, b);
-    d.addEventListener("keydown", (ev) => treeKey(ev, d, void 0, pick));
+    d.addEventListener("keydown", (ev) => treeKey(ev, d, pick));
     return d;
   }
   function moreButton(open) {
@@ -6798,22 +6890,21 @@ ${v.description}` : v.name;
       markSelected();
       openVarMenuFor(ref, d, e.clientX, e.clientY);
     });
-    d.addEventListener("keydown", (ev) => treeKey(ev, d, void 0, () => openDetail(ref, d), () => openVarMenuFor(ref, d)));
+    d.addEventListener("keydown", (ev) => treeKey(ev, d, () => openDetail(ref, d), () => openVarMenuFor(ref, d)));
   }
   function markSelected() {
     document.querySelectorAll("#varTree .vt-row").forEach((r) => r.setAttribute("aria-selected", String(r.dataset.id === vmSelected)));
   }
-  function treeKey(ev, el, group, onEnter, onMenu) {
-    var _a, _b, _c, _d, _e;
+  function treeKey(ev, el, onEnter, onMenu) {
     const all = Array.from($("varTree").querySelectorAll("[data-key]"));
     const i = all.indexOf(el);
     const go = (j) => {
-      var _a2;
+      var _a;
       const target = all[Math.max(0, Math.min(all.length - 1, j))];
       if (!target) return;
       all.forEach((x) => x.tabIndex = -1);
       target.tabIndex = 0;
-      focusKey = (_a2 = target.dataset.key) != null ? _a2 : null;
+      focusKey = (_a = target.dataset.key) != null ? _a : null;
       target.focus();
     };
     const k = ev.key;
@@ -6823,28 +6914,8 @@ ${v.description}` : v.name;
     else if (k === "End") go(all.length - 1);
     else if (k === "PageDown") go(i + 10);
     else if (k === "PageUp") go(i - 10);
-    else if (k === "ArrowRight" && group) {
-      focusKey = (_a = el.dataset.key) != null ? _a : null;
-      if (ev.altKey) setSectionExpanded(group.collectionId, true);
-      else if (!group.expanded) toggleGroup(group.key, false);
-      else if (group.unused > 0 && !group.showingUnused) toggleUnused(group.key);
-    } else if (k === "ArrowLeft") {
-      if (group) {
-        focusKey = (_b = el.dataset.key) != null ? _b : null;
-        if (ev.altKey) setSectionExpanded(group.collectionId, false);
-        else if (group.expanded) toggleGroup(group.key, true);
-      } else if (el.classList.contains("vt-row")) {
-        const gk = rowGroupOf.get((_c = el.dataset.id) != null ? _c : "");
-        const gi = all.findIndex((x) => x.dataset.key === `grp:${gk}`);
-        if (gi >= 0) go(gi);
-      }
-    } else if (k === "Enter" && group && ev.shiftKey) {
-      focusKey = (_d = el.dataset.key) != null ? _d : null;
-      toggleUnused(group.key);
-    } else if (k === "Enter" && group) {
-      focusKey = (_e = el.dataset.key) != null ? _e : null;
-      toggleGroup(group.key, group.expanded);
-    } else if (k === "Enter" && onEnter) onEnter();
+    else if (k === "Escape" && (searchOpen || query)) clearSearch(true);
+    else if (k === "Enter" && onEnter) onEnter();
     else if ((k === "ContextMenu" || k === "F10" && ev.shiftKey) && onMenu) onMenu();
     else return;
     ev.preventDefault();
@@ -6853,19 +6924,17 @@ ${v.description}` : v.name;
     var _a;
     const v = vmVars.find((x) => x.id === id);
     if (!v) {
-      const lib = libVars.find((l) => l.id === id);
-      if (lib && chip === "all" && libRowsMatching().some((l) => l.id === id)) {
+      if (libRowsAll().some((l) => l.id === id)) {
+        pickSide({ kind: "lib" }, false);
         (_a = document.querySelector(`#varTree [data-key="lib:${CSS.escape(id)}"]`)) == null ? void 0 : _a.focus();
       } else showStatusLine(t("list.libVar"));
       return;
     }
-    const undo = { chip, query, searchOpen, userExpanded: new Map(userExpanded), showUnusedIn: new Set(showUnusedIn), showUnusedGroups: new Set(showUnusedGroups), scroll: window.scrollY, focusKey: fromKey != null ? fromKey : focusKey };
-    chip = "all";
+    const undo = { sel: sideSel, picked: sidePicked, open: new Map(sideOpen), query, searchOpen, scroll: window.scrollY, focusKey: fromKey != null ? fromKey : focusKey };
     clearSearch(false);
-    const gk = groupKey(v.collectionId, v.name);
-    userExpanded.set(gk, true);
-    showUnusedGroups.add(v.collectionId);
-    showUnusedIn.add(gk);
+    sideSel = { kind: "grp", key: groupKey(v.collectionId, v.name) };
+    sidePicked = true;
+    sideOpen.set(v.collectionId, true);
     focusKey = `row:${v.id}`;
     vmSelected = v.id;
     renderVarList();
@@ -6876,17 +6945,14 @@ ${v.description}` : v.name;
       action: {
         label: t("list.undo"),
         run: () => {
-          chip = undo.chip;
+          sideSel = undo.sel;
+          sidePicked = undo.picked;
+          sideOpen.clear();
+          undo.open.forEach((val, key) => sideOpen.set(key, val));
           query = undo.query;
           searchOpen = undo.searchOpen;
           $("varSearch").value = query;
           $("searchBox").hidden = !searchOpen;
-          userExpanded.clear();
-          undo.userExpanded.forEach((val, key) => userExpanded.set(key, val));
-          showUnusedIn.clear();
-          undo.showUnusedIn.forEach((x) => showUnusedIn.add(x));
-          showUnusedGroups.clear();
-          undo.showUnusedGroups.forEach((x) => showUnusedGroups.add(x));
           focusKey = undo.focusKey;
           renderVarList();
           window.scrollTo(0, undo.scroll);
@@ -7126,17 +7192,6 @@ ${v.description}` : v.name;
     modeName = $("modeSelect").value || null;
     renderVarList();
   });
-  $("btnChipMore").addEventListener("click", () => {
-    const row = $("chipRow");
-    const chips = Array.from(row.querySelectorAll(".tier-chip"));
-    const next = chips.find((c) => c.offsetLeft + c.offsetWidth > row.scrollLeft + row.clientWidth + 1);
-    row.scrollLeft = next ? next.offsetLeft + next.offsetWidth - row.clientWidth : row.scrollWidth;
-  });
-  $("chipRow").addEventListener("wheel", (e) => {
-    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-    e.preventDefault();
-    $("chipRow").scrollLeft += e.deltaY;
-  }, { passive: false });
   var wizLatch = null;
   var wizBeforeCount = 0;
   var wizFrom = "start";
