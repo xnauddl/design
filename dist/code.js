@@ -4867,19 +4867,14 @@
 
   // src/lib/uiSize.ts
   var UI_WIDTH = 400;
-  var UI_WIDE_WIDTH = 760;
-  var UI_HEIGHT = { default: 660, large: 860 };
+  var UI_WIDTHS = { default: UI_WIDTH, mini: 140 };
+  var UI_HEIGHT = { default: 510, mini: 104 };
   var UI_SIZE_KEY = "dsl.uiSize";
   function normalizeUiSize(v) {
-    if (v === "large" || v === "default") return v;
-    if (v && typeof v === "object") {
-      const h = v.h;
-      if (typeof h === "number" && isFinite(h)) {
-        const mid = (UI_HEIGHT.default + UI_HEIGHT.large) / 2;
-        return h >= mid ? "large" : "default";
-      }
-    }
-    return "default";
+    return v === "mini" ? "mini" : "default";
+  }
+  function uiWidth(mode) {
+    return UI_WIDTHS[mode];
   }
   function uiHeight(mode) {
     return UI_HEIGHT[mode];
@@ -4887,19 +4882,7 @@
 
   // src/code.ts
   figma.showUI(__html__, { width: UI_WIDTH, height: uiHeight("default"), themeColors: true });
-  var uiSizeMode = "default";
-  var uiWide = false;
-  var uiWidth = () => uiWide ? UI_WIDE_WIDTH : UI_WIDTH;
-  async function applyUiSize(mode, persist) {
-    uiSizeMode = mode;
-    figma.ui.resize(uiWidth(), uiHeight(mode));
-    if (persist) await figma.clientStorage.setAsync(UI_SIZE_KEY, mode).catch(() => {
-    });
-  }
-  var uiSizeReady = figma.clientStorage.getAsync(UI_SIZE_KEY).then((v) => {
-    const mode = normalizeUiSize(v);
-    return mode === "default" ? void 0 : applyUiSize(mode, false);
-  }).catch(() => {
+  figma.clientStorage.deleteAsync(UI_SIZE_KEY).catch(() => {
   });
   var selection = () => figma.currentPage.selection;
   var DEV_TIER_KEY = "dsl.devTier";
@@ -5210,6 +5193,7 @@
   }
   var selfSelect = false;
   function postSelection() {
+    var _a, _b;
     const sel = selection();
     let scanned = 0;
     let bindable = 0;
@@ -5217,8 +5201,8 @@
     let renamed = 0;
     let capped = false;
     const comps = sel.filter((n) => {
-      var _a;
-      return n.type === "COMPONENT" && ((_a = n.parent) == null ? void 0 : _a.type) !== "COMPONENT_SET";
+      var _a2;
+      return n.type === "COMPONENT" && ((_a2 = n.parent) == null ? void 0 : _a2.type) !== "COMPONENT_SET";
     }).length;
     const sets = sel.filter((n) => n.type === "COMPONENT_SET").length;
     const stack = sel.slice();
@@ -5236,7 +5220,9 @@
       if (n.type === "INSTANCE") continue;
       if ("children" in n) for (const c of n.children) stack.push(c);
     }
-    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped, comps, sets, selfSelect, bound, renamed });
+    const firstName = (_b = (_a = sel[0]) == null ? void 0 : _a.name) != null ? _b : "";
+    const ids = sel.map((n) => n.id);
+    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped, comps, sets, selfSelect, bound, renamed, firstName, ids });
     selfSelect = false;
   }
   figma.on("selectionchange", postSelection);
@@ -6343,23 +6329,14 @@
           if (generated) commitUndo(figma);
           break;
         }
-        case "GET_UI_SIZE": {
-          await uiSizeReady;
-          post({ type: "UI_SIZE", mode: uiSizeMode });
-          break;
-        }
-        case "SET_UI_WIDE": {
-          uiWide = msg.wide === true;
-          figma.ui.resize(uiWidth(), uiHeight(uiSizeMode));
-          break;
-        }
         case "GET_VAR_TABLE": {
           post(__spreadValues({ type: "VAR_TABLE" }, await collectVarTable()));
           break;
         }
         case "SET_UI_SIZE": {
-          await applyUiSize(normalizeUiSize(msg.mode), true);
-          post({ type: "UI_SIZE", mode: uiSizeMode });
+          const mode = normalizeUiSize(msg.mode);
+          figma.ui.resize(uiWidth(mode), uiHeight(mode));
+          post({ type: "UI_SIZE", mode });
           break;
         }
         case "GET_SETTINGS": {

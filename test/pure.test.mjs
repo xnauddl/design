@@ -2336,26 +2336,107 @@ test('darkGlobalName — dark/ 그룹 접두 · 멱등', () => {
   assert.equal(isDarkGlobalName('color/blue/500'), false);
 });
 
-/* ---------- QA #2 ①: 창 높이 2단계(uiSize) ---------- */
-test('normalizeUiSize — 정식 값, 옛 {h} 저장값, 깨진 값', async () => {
-  const { normalizeUiSize, uiHeight, UI_WIDTH, UI_HEIGHT } = await import('../dist/pure.mjs');
-  // 정식 문자열
-  assert.equal(normalizeUiSize('large'), 'large');
+/* ---------- IA v3: 창 크기(400×510 고정 + 최소화 140×104) ---------- */
+test('normalizeUiSize — mini만 최소화, 예전 large·{h}·깨진 값은 전부 기본', async () => {
+  const { normalizeUiSize, uiHeight, uiWidth, UI_WIDTH, UI_HEIGHT } = await import('../dist/pure.mjs');
+  assert.equal(normalizeUiSize('mini'), 'mini');
   assert.equal(normalizeUiSize('default'), 'default');
-  // 철회 전 드래그 리사이즈가 남긴 { h } — 두 단계의 가운데(760) 기준으로 가까운 쪽
-  assert.equal(normalizeUiSize({ h: 1200 }), 'large');
-  assert.equal(normalizeUiSize({ h: 760 }), 'large');
-  assert.equal(normalizeUiSize({ h: 759 }), 'default');
-  assert.equal(normalizeUiSize({ w: 900, h: 480 }), 'default');
-  // 없음·깨짐 → 기본
-  for (const v of [undefined, null, '', 'huge', 42, NaN, {}, { h: NaN }, { h: '900' }]) {
+  // 예전 높이 전환이 저장한 값은 v3에서 기본으로 돌아간다.
+  for (const v of ['large', { h: 1200 }, { h: 760 }, undefined, null, '', 'huge', 42, NaN, {}]) {
     assert.equal(normalizeUiSize(v), 'default', String(v));
   }
-  // 높이·폭
-  assert.equal(uiHeight('default'), 660);
-  assert.equal(uiHeight('large'), 860);
+  assert.equal(uiHeight('default'), 510);
+  assert.equal(uiHeight('mini'), 104);
+  assert.equal(uiWidth('default'), 400);
+  assert.equal(uiWidth('mini'), 140); // 최소화는 폭도 줄인다(Tokens Studio처럼 작은 사각형)
+  assert.ok(uiWidth('mini') >= 70); // 피그마 창 최소 폭
   assert.equal(UI_WIDTH, 400); // #17: 가로 고정
-  assert.ok(UI_HEIGHT.large > UI_HEIGHT.default);
+  assert.deepEqual(Object.keys(UI_HEIGHT).sort(), ['default', 'mini']); // 크게(860)는 없다
+});
+
+/* ---------- IA v3 §4.1: 창 다시 들어옴 반영(reread.ts) ---------- */
+function fakeClock() {
+  let now = 0;
+  let seq = 0;
+  const timers = new Map();
+  return {
+    now: () => now,
+    set: (fn, ms) => { const id = ++seq; timers.set(id, { at: now + ms, fn }); return id; },
+    clear: (id) => timers.delete(id),
+    advance(ms) {
+      const end = now + ms;
+      for (;;) {
+        let next = null;
+        for (const [id, tm] of timers) if (tm.at <= end && (!next || tm.at < next[1].at)) next = [id, tm];
+        if (!next) break;
+        timers.delete(next[0]);
+        now = next[1].at;
+        next[1].fn();
+      }
+      now = end;
+    },
+  };
+}
+test('createReentryScheduler — 두 신호를 400ms로 합쳐 1번', async () => {
+  const { createReentryScheduler } = await import('../dist/pure.mjs');
+  const c = fakeClock();
+  let runs = 0;
+  const s = createReentryScheduler(() => runs++, () => false, c);
+  s.signal(); // 포인터 들어옴
+  c.advance(100);
+  s.signal(); // 창 포커스 회복
+  c.advance(399);
+  assert.equal(runs, 0);
+  c.advance(1);
+  assert.equal(runs, 1);
+  assert.equal(s.pending(), false);
+});
+test('createReentryScheduler — 2초 안 재진입은 버리지 않고 간격 끝에 1번만', async () => {
+  const { createReentryScheduler } = await import('../dist/pure.mjs');
+  const c = fakeClock();
+  let runs = 0;
+  const s = createReentryScheduler(() => runs++, () => false, c);
+  s.signal();
+  c.advance(400); // t=400 반영
+  assert.equal(runs, 1);
+  s.signal();
+  c.advance(400); // t=800 — 간격(2초) 안: 미룬다
+  assert.equal(runs, 1);
+  s.signal();
+  c.advance(400); // t=1200 — 여러 번 들어와도 미룬 반영은 1번
+  assert.equal(runs, 1);
+  c.advance(1200); // t=2400 — 간격이 찬 때(직전 반영 400 + 2000)
+  assert.equal(runs, 2);
+  c.advance(5000);
+  assert.equal(runs, 2);
+});
+test('createReentryScheduler — 보류 중이면 미루고 풀리면 1번, cancel은 모두 버림', async () => {
+  const { createReentryScheduler } = await import('../dist/pure.mjs');
+  const c = fakeClock();
+  let runs = 0;
+  let held = true;
+  const s = createReentryScheduler(() => runs++, () => held, c);
+  s.signal();
+  c.advance(400);
+  assert.equal(runs, 0);
+  assert.equal(s.pending(), true);
+  held = false;
+  s.release();
+  assert.equal(runs, 1);
+  s.release(); // 미뤄 둔 것이 없으면 아무것도 안 한다
+  assert.equal(runs, 1);
+  c.advance(3000);
+  s.signal();
+  s.cancel(); // 최소화
+  c.advance(3000);
+  assert.equal(runs, 1);
+});
+test('selectionSummary — 하위 수는 선택 자신을 뺀 수, capped면 +', async () => {
+  const { selectionSummary } = await import('../dist/pure.mjs');
+  assert.deepEqual(selectionSummary(0, 0, false), { kind: 'none', sub: '' });
+  assert.deepEqual(selectionSummary(1, 43, false), { kind: 'one', sub: '42' });
+  assert.deepEqual(selectionSummary(3, 3, false), { kind: 'many', sub: '0' });
+  assert.deepEqual(selectionSummary(1, 5000, true), { kind: 'one', sub: '4999+' });
 });
 
 /* ---------- 일괄 교체: 후보 판정(scopes.ts) ---------- */

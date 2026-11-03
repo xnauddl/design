@@ -26,33 +26,14 @@ import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
-import { UI_SIZE_KEY, UI_WIDTH, UI_WIDE_WIDTH, UiSizeMode, normalizeUiSize, uiHeight } from './lib/uiSize';
+import { UI_SIZE_KEY, UI_WIDTH, normalizeUiSize, uiHeight, uiWidth } from './lib/uiSize';
 import type { VarCell, VarCollection, VarRow, VarType } from './lib/varTable';
 
-/* #14: 드래그 리사이즈는 없다 — 플러그인 iframe에서 포인터 캡처가 iframe 경계를 넘지 못해
-   아래로 끌면 이벤트가 끊기고, 창을 포인터보다 크게 따라가게 하는 우회까지 실기에서 멎었다.
-   가로는 와이어대로 400 고정(#17). 대신 QA #2 ①(팝업 크기)로 높이 2단계 전환 버튼을 둔다
-   (660 ↔ 860, `lib/uiSize.ts`). 포인터 추적이 없어 실기에서도 결과가 같다. 마지막 단계는
-   clientStorage에 기억해 다음 실행에 복원한다. 긴 목록은 여전히 패널 body가 스크롤한다(#18). */
+/* IA v3: 창은 400 × 510 고정, [—]로 최소화(140 × 104, 펼치기 버튼만). 높이 전환(660 ↔ 860)과 넓은 창(760)은 없앴다.
+   최소화는 기억하지 않는다 — 다시 열면 늘 펼친 크기다. 긴 목록은 패널 body가 스크롤한다(#18). */
 figma.showUI(__html__, { width: UI_WIDTH, height: uiHeight('default'), themeColors: true });
-
-let uiSizeMode: UiSizeMode = 'default';
-/** 변수 관리 화면을 보는 동안만 넓다 — 저장하지 않는다(다음 실행은 늘 400). */
-let uiWide = false;
-const uiWidth = (): number => (uiWide ? UI_WIDE_WIDTH : UI_WIDTH);
-async function applyUiSize(mode: UiSizeMode, persist: boolean): Promise<void> {
-  uiSizeMode = mode;
-  figma.ui.resize(uiWidth(), uiHeight(mode));
-  if (persist) await figma.clientStorage.setAsync(UI_SIZE_KEY, mode).catch(() => {});
-}
-// 시작 시 복원 — 저장값이 없거나 깨졌으면 기본(660) 그대로.
-const uiSizeReady: Promise<void> = figma.clientStorage
-  .getAsync(UI_SIZE_KEY)
-  .then((v) => {
-    const mode = normalizeUiSize(v);
-    return mode === 'default' ? undefined : applyUiSize(mode, false);
-  })
-  .catch(() => {});
+// 예전 높이 전환이 남긴 저장값('large')은 더 이상 쓰지 않는다 — 지워 둔다.
+figma.clientStorage.deleteAsync(UI_SIZE_KEY).catch(() => {});
 
 const selection = () => figma.currentPage.selection;
 
@@ -457,7 +438,10 @@ function postSelection(): void {
     if (n.type === 'INSTANCE') continue; // 인스턴스 내부는 바인딩 대상이 아니다
     if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
   }
-  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, comps, sets, selfSelect, bound, renamed });
+  // 선택 표시줄 문구(§4.1)와 목록 기준 비교(PR 2)용 — 첫 레이어 이름과 선택 노드 ID.
+  const firstName = sel[0]?.name ?? '';
+  const ids = sel.map((n) => n.id);
+  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, comps, sets, selfSelect, bound, renamed, firstName, ids });
   selfSelect = false;
 }
 figma.on('selectionchange', postSelection);
@@ -1721,23 +1705,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (generated) commitUndo(figma); // UX2
         break;
       }
-      case 'GET_UI_SIZE': {
-        await uiSizeReady; // 복원이 끝난 뒤의 상태를 알려야 버튼 표시가 맞다
-        post({ type: 'UI_SIZE', mode: uiSizeMode });
-        break;
-      }
-      case 'SET_UI_WIDE': {
-        uiWide = msg.wide === true;
-        figma.ui.resize(uiWidth(), uiHeight(uiSizeMode));
-        break;
-      }
       case 'GET_VAR_TABLE': {
         post({ type: 'VAR_TABLE', ...(await collectVarTable()) });
         break;
       }
       case 'SET_UI_SIZE': {
-        await applyUiSize(normalizeUiSize(msg.mode), true);
-        post({ type: 'UI_SIZE', mode: uiSizeMode });
+        // 최소화/펼치기만 — 저장하지 않는다.
+        const mode = normalizeUiSize(msg.mode);
+        figma.ui.resize(uiWidth(mode), uiHeight(mode));
+        post({ type: 'UI_SIZE', mode });
         break;
       }
       case 'GET_SETTINGS': {

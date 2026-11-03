@@ -147,7 +147,6 @@ export const STRINGS: Record<string, string> = {
   'license.needKey': '라이선스 키를 입력하세요.',
 
   // 유료 게이팅
-  'premium.required': '{message} (유료 기능: {feature})',
 
   // 마법사 단계 라벨(WIZARD_STEPS id 기준) + 건너뜀 사유
   'wizard.step.extract': '추출',
@@ -231,11 +230,8 @@ export const STRINGS: Record<string, string> = {
   'common.cancel': '취소',
   'common.close': '닫기',
   // 변수 관리(넓은 화면)
-  'vm.tab': '변수',
-  'vm.openTip': '변수 관리 — 창이 넓어집니다',
   'vm.fromBind': '변수 관리에서 보기 ↗',
   'vm.fromBanner': '변수 관리',
-  'vm.back': '← 돌아가기',
   'vm.title': '변수 관리',
   'vm.search': '변수 검색',
   'vm.onlyUsed': '선택에서 쓰는 것만',
@@ -274,12 +270,43 @@ export const STRINGS: Record<string, string> = {
   'vm.dNoUses': '선택 안에서는 쓰이지 않아요.',
   'vm.dSelectFirst': '캔버스에서 프레임을 선택하면 쓰인 곳이 보여요.',
   // 탭
-  'tab.wizard': '시작',
-  'tab.tokens': '만들기',
-  'tab.apply': '적용',
+  'tab.variables': '변수',
+  'tab.layer': '레이어',
   'tab.settings': '설정',
-  'ui.sizeGrow': '창 높이 크게 (860)',
-  'ui.sizeShrink': '창 높이 기본으로 (660)',
+  // 최소화(IA v3 §4.9)
+  'ui.minimize': '최소화',
+  'ui.expand': '펼치기',
+  'ui.expandBusy': '펼치기 · 작업 중',
+  'ui.expandFail': '펼치기 · 실패한 작업 있음',
+  // 선택 표시줄(§4.1)
+  'sel.none': '● 선택 없음 — 캔버스에서 레이어를 선택하세요',
+  'sel.unnamed': '(이름 없음)',
+  'sel.many': '● 레이어 {k}개',
+  'sel.sub': '\u00a0· 하위 {n}', // 앞 공백은 줄바꿈 없는 공백 — 플렉스 항목 앞 공백은 사라진다
+  // 공통 상태 줄(§4.1·§2.3)
+  'status.paid': '유료 기능이에요 · 설정 › 라이선스에서 풀 수 있어요',
+  'status.paidAction': '라이선스 →',
+  'lock.tipSuffix': '유료 기능 · 설정 › 라이선스',
+  'status.noSelection': '선택이 없어요 — 캔버스에서 레이어를 선택하세요',
+  'status.failed': '{op} 실패',
+  'status.view': '보기',
+  // 작업 이름 — 최소화 중 실패 안내("{op} 실패 · [보기]")
+  'op.extract': '추출',
+  'op.create': '토큰 만들기',
+  'op.semantics': '역할 매핑',
+  'op.dark': '다크 만들기',
+  'op.textScan': '텍스트 스캔',
+  'op.textStyles': '텍스트 스타일 등록',
+  'op.textApply': '텍스트 스타일 연결',
+  'op.bind': '연결',
+  'op.rename': '이름 정리',
+  'op.components': '컴포넌트',
+  'op.export': '내보내기',
+  'op.roles': '계층 지정',
+  'op.wizard': '한 번에 정리',
+  // 변수 탭 하위 화면(PR 1 중간 상태)
+  'var.goMake': '색부터 하나씩 만들기 →',
+  'make.back': '← 돌아가기',
   // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
   'rail.color': '색',
   'rail.colorSub': '추출·변수',
