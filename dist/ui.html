@@ -542,21 +542,21 @@
     .status-line.ok .sl-text { color: var(--ok); }
     .status-line.warn .sl-text { color: var(--warn); }
 
-    /* ── 최소화(§4.9) — 창 400×48. 펼친 내용은 숨기고 마크만. ── */
+    /* ── 최소화(§4.9) — 창 140×104(Tokens Studio처럼 작은 사각형). 펼친 내용은 숨기고 가운데 펼치기 버튼만. ── */
     body.is-mini { padding: 0; overflow: hidden; }
     body.is-mini > :not(#miniView):not(#overlayRoot):not(script) { display: none !important; }
-    .mini { height: 48px; display: flex; align-items: center; padding: 0 12px; }
+    .mini { height: 100vh; display: flex; align-items: center; justify-content: center; }
     .mini[hidden] { display: none; }
     .mini-mark {
-      position: relative; height: 32px; min-width: 44px; padding: 0 8px; border-radius: var(--r);
-      border: 2px solid transparent; background: var(--accent-strong); color: #fff;
-      font: 700 12px/1 var(--font); letter-spacing: .02em;
+      position: relative; width: 80px; height: 80px; padding: 0; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+      display: flex; align-items: center; justify-content: center;
     }
-    .mini-mark:hover { background: var(--accent-press); }
+    .mini-mark:hover { background: var(--surface-hover); color: var(--text); }
+    .mini-mark svg { display: block; }
     /* 진행 테두리 — 진행률이 있으면 그 비율(conic), 없으면 회전. */
-    .mini-mark.busy { border-color: transparent; background-clip: padding-box; }
     .mini-mark.busy::before {
-      content: ''; position: absolute; inset: -4px; border-radius: calc(var(--r) + 3px); z-index: -1;
+      content: ''; position: absolute; inset: -4px; border-radius: 15px; z-index: -1;
       background: conic-gradient(var(--accent) var(--prog, 25%), var(--border) 0);
     }
     .mini-mark.busy.spin::before { animation: mini-spin 1s linear infinite; }
@@ -996,9 +996,12 @@
     <button class="link sl-action" id="statusAction" type="button" hidden></button>
   </div>
 
-  <!-- 최소화 상태(§4.9) — 창 400×48. 마크를 누르면 펼친다. -->
+  <!-- 최소화 상태(§4.9) — 창 140×104, 가운데 펼치기 버튼(↙↗)만. 누르면 펼친다. -->
   <div class="mini" id="miniView" hidden>
-    <button class="mini-mark" id="btnExpand" type="button" aria-label="펼치기"><span class="mark-text">DSL</span><span class="mini-badge" id="miniBadge" hidden></span></button>
+    <button class="mini-mark" id="btnExpand" type="button" aria-label="펼치기">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3h6v6M19 3l-7 7M9 19H3v-6M3 19l7-7"/></svg>
+      <span class="mini-badge" id="miniBadge" hidden></span>
+    </button>
   </div>
 
   <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->
@@ -2622,7 +2625,6 @@
   var hasBoundNodes = false;
   var hasRenamedNodes = false;
   var lastSelCount = 0;
-  var lastSelScanned = 0;
   var createFrom = "tokens";
   var semStatusTarget = "colorStatus";
   var semStatusPrefix = "";
@@ -4100,7 +4102,6 @@
       }
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
-        lastSelScanned = msg.scanned;
         renderSelBar(msg.count, msg.scanned, msg.capped, (_a = msg.firstName) != null ? _a : "");
         lastSelBound = msg.bound;
         lastSelRenamed = msg.renamed;
@@ -5824,6 +5825,7 @@
     vmUsage = null;
     vmUsageReq = 0;
     vmUsageInFlight = false;
+    vmUsageCapped = false;
     renderVarManager();
     vmUsageTimer = setTimeout(() => {
       vmUsageTimer = null;
@@ -5840,7 +5842,6 @@
       setManagerUsage([], [], false);
       return;
     }
-    if (lastSelScanned > AUTO_SCAN_MAX || wizardRunning) return;
     if (vmUsageInFlight) return;
     vmUsageReq = ++bindReqSeq;
     vmUsageInFlight = true;

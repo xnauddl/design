@@ -140,6 +140,12 @@ const preview = (reqId) => ({ type: 'APPLY_RESULT', preview: true, bound: 2, ski
   await recv(p, { ...sel(1, 2), selfSelect: true });
   await p.click('#tabbtn-variables');
   check('9 변수 탭 첫 화면에 변수 관리', await visible(p, '#varManager'));
+  // 큰 선택(300개 초과)도 사용 수를 읽는다 — [읽기] 줄이 없는 PR 1에서 막으면 목록이 빈 채로 남는다(실기 확인).
+  const beforeBig = (await sent(p, 'SCAN_BINDINGS')).length;
+  await recv(p, { ...sel(1, 2), scanned: 1200, capped: true });
+  await p.waitForTimeout(500);
+  check('9 큰 선택도 사용 수 조회(PR 1)', (await sent(p, 'SCAN_BINDINGS')).slice(beforeBig).some((m) => m.forManager));
+  await recv(p, { ...sel(1, 2), selfSelect: true });
   const usageReq = (await sent(p, 'SCAN_BINDINGS')).at(-1);
   check('9 사용 수 조회는 관리 전용(forManager)', usageReq?.forManager === true);
   const cols = [{ id: 's', name: 'Tokens', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }] }];

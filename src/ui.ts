@@ -71,7 +71,6 @@ let hasSemanticRoles = false; // 역할 별칭 존재(역할 매핑 완료)
 let hasBoundNodes = false; // 현재 선택에 변수 붙은 레이어 존재(변수 연결 완료)
 let hasRenamedNodes = false; // 현재 선택에 이름 정리된 레이어 존재(이름 정리 완료)
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
-let lastSelScanned = 0; // 선택 노드 수 — 사용 수 자동 읽기의 300개 규칙(⑤)
 let createFrom: 'colors' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
 
 /**
@@ -2042,7 +2041,6 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
-      lastSelScanned = msg.scanned;
       renderSelBar(msg.count, msg.scanned, msg.capped, msg.firstName ?? '');
       // 준비 현황의 '완료'는 현재 선택 기준 — 선택이 바뀌면 다시 판정한다.
       // Global/Semantic이 없으면(컬렉션을 지우고 처음부터 하는 QA 흐름, 또는 다른 파일에서 복사해 온
@@ -3415,7 +3413,7 @@ function onLockedActivate(e: Event): void {
 document.addEventListener('click', onLockedActivate, true);
 document.addEventListener('keydown', onLockedActivate, true);
 
-/* ---------- 최소화(§4.9) — 400×48, 마크만. 기억하지 않는다. ---------- */
+/* ---------- 최소화(§4.9) — 140×104, 펼치기 버튼만. 기억하지 않는다. ---------- */
 let isMini = false;
 /** 최소화 중 실패한 작업 — 펼칠 때 "{작업} 실패 · [보기]". */
 let miniFailure: { label: string; go: () => void } | null = null;
@@ -4078,6 +4076,7 @@ function scheduleManagerUsage(): void {
   vmUsage = null; // 모름 — 이전 선택의 사용 수를 새 선택에 보여주지 않는다
   vmUsageReq = 0;
   vmUsageInFlight = false; // 이전 요청의 응답은 reqId가 달라 버려진다
+  vmUsageCapped = false; // 이전 선택의 '일부만 셌다' 안내를 새 선택에 남기지 않는다
   renderVarManager();
   vmUsageTimer = setTimeout(() => { vmUsageTimer = null; requestManagerUsage('selection'); }, AUTO_SCAN_DELAY);
 }
@@ -4090,8 +4089,8 @@ function requestManagerUsage(_why: 'quiet' | 'work' | 'selection' = 'quiet'): vo
     setManagerUsage([], [], false);
     return;
   }
-  // 큰 선택(⑤): 노드가 300개를 넘으면 자동으로 읽지 않는다. 마법사 실행 중에도 읽지 않는다.
-  if (lastSelScanned > AUTO_SCAN_MAX || wizardRunning) return;
+  // 큰 선택(⑤) 300개 규칙은 PR 2에서 "선택이 커서 자동으로 읽지 않아요 · [읽기]" 줄과 함께 넣는다.
+  // 그 줄 없이 먼저 막으면 큰 선택에서 목록이 빈 채로 남는다(PR 1 실기 확인). 지금은 예전처럼 상한(600)까지 읽는다.
   if (vmUsageInFlight) return; // 같은 종류의 직전 요청이 아직 끝나지 않았다(보류)
   vmUsageReq = ++bindReqSeq;
   vmUsageInFlight = true;

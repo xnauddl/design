@@ -4867,10 +4867,14 @@
 
   // src/lib/uiSize.ts
   var UI_WIDTH = 400;
-  var UI_HEIGHT = { default: 510, mini: 48 };
+  var UI_WIDTHS = { default: UI_WIDTH, mini: 140 };
+  var UI_HEIGHT = { default: 510, mini: 104 };
   var UI_SIZE_KEY = "dsl.uiSize";
   function normalizeUiSize(v) {
     return v === "mini" ? "mini" : "default";
+  }
+  function uiWidth(mode) {
+    return UI_WIDTHS[mode];
   }
   function uiHeight(mode) {
     return UI_HEIGHT[mode];
@@ -6331,7 +6335,7 @@
         }
         case "SET_UI_SIZE": {
           const mode = normalizeUiSize(msg.mode);
-          figma.ui.resize(UI_WIDTH, uiHeight(mode));
+          figma.ui.resize(uiWidth(mode), uiHeight(mode));
           post({ type: "UI_SIZE", mode });
           break;
         }

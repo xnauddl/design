@@ -2336,9 +2336,9 @@ test('darkGlobalName — dark/ 그룹 접두 · 멱등', () => {
   assert.equal(isDarkGlobalName('color/blue/500'), false);
 });
 
-/* ---------- IA v3: 창 크기(400×510 고정 + 최소화 400×48) ---------- */
+/* ---------- IA v3: 창 크기(400×510 고정 + 최소화 140×104) ---------- */
 test('normalizeUiSize — mini만 최소화, 예전 large·{h}·깨진 값은 전부 기본', async () => {
-  const { normalizeUiSize, uiHeight, UI_WIDTH, UI_HEIGHT } = await import('../dist/pure.mjs');
+  const { normalizeUiSize, uiHeight, uiWidth, UI_WIDTH, UI_HEIGHT } = await import('../dist/pure.mjs');
   assert.equal(normalizeUiSize('mini'), 'mini');
   assert.equal(normalizeUiSize('default'), 'default');
   // 예전 높이 전환이 저장한 값은 v3에서 기본으로 돌아간다.
@@ -2346,7 +2346,10 @@ test('normalizeUiSize — mini만 최소화, 예전 large·{h}·깨진 값은 �
     assert.equal(normalizeUiSize(v), 'default', String(v));
   }
   assert.equal(uiHeight('default'), 510);
-  assert.equal(uiHeight('mini'), 48);
+  assert.equal(uiHeight('mini'), 104);
+  assert.equal(uiWidth('default'), 400);
+  assert.equal(uiWidth('mini'), 140); // 최소화는 폭도 줄인다(Tokens Studio처럼 작은 사각형)
+  assert.ok(uiWidth('mini') >= 70); // 피그마 창 최소 폭
   assert.equal(UI_WIDTH, 400); // #17: 가로 고정
   assert.deepEqual(Object.keys(UI_HEIGHT).sort(), ['default', 'mini']); // 크게(860)는 없다
 });

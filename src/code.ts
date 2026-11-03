@@ -26,10 +26,10 @@ import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
-import { UI_SIZE_KEY, UI_WIDTH, normalizeUiSize, uiHeight } from './lib/uiSize';
+import { UI_SIZE_KEY, UI_WIDTH, normalizeUiSize, uiHeight, uiWidth } from './lib/uiSize';
 import type { VarCell, VarCollection, VarRow, VarType } from './lib/varTable';
 
-/* IA v3: 창은 400 × 510 고정, [—]로 최소화(400 × 48). 높이 전환(660 ↔ 860)과 넓은 창(760)은 없앴다.
+/* IA v3: 창은 400 × 510 고정, [—]로 최소화(140 × 104, 펼치기 버튼만). 높이 전환(660 ↔ 860)과 넓은 창(760)은 없앴다.
    최소화는 기억하지 않는다 — 다시 열면 늘 펼친 크기다. 긴 목록은 패널 body가 스크롤한다(#18). */
 figma.showUI(__html__, { width: UI_WIDTH, height: uiHeight('default'), themeColors: true });
 // 예전 높이 전환이 남긴 저장값('large')은 더 이상 쓰지 않는다 — 지워 둔다.
@@ -1712,7 +1712,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SET_UI_SIZE': {
         // 최소화/펼치기만 — 저장하지 않는다.
         const mode = normalizeUiSize(msg.mode);
-        figma.ui.resize(UI_WIDTH, uiHeight(mode));
+        figma.ui.resize(uiWidth(mode), uiHeight(mode));
         post({ type: 'UI_SIZE', mode });
         break;
       }
