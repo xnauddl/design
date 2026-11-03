@@ -2612,3 +2612,124 @@ test('buildList — 판정 없음: 그룹 10개 이하 펼침 / 넘으면 접힘
   // 칩: 다른 컬렉션은 빠진다
   assert.equal(buildList({ ...base, collections: COLS, vars: few, chip: 's' }).filter((x) => x.kind === 'section').length, 1);
 });
+
+test('groupByVariable — 변수별 묶음 · 곳 수 많은 순 · 네 방향 여백 한 줄 · 변수 값', async () => {
+  const { groupByVariable, placeKey } = await import('../dist/pure.mjs');
+  const c = (nodeId, field, variableId, variableName, currentValue, extra = {}) => ({ nodeId, field, variableId, variableName, currentValue, ...extra });
+  const groups = groupByVariable([
+    c('card', 'fills', 'vC', 'color/bg/surface', '#ffffff', { index: 0 }),
+    c('card', 'topLeftRadius', 'vR', 'radius/4', '4', { variableValue: '4' }),
+    c('badge', 'paddingLeft', 'v16', 'spacing/16', '16'),
+    c('badge', 'paddingRight', 'v16', 'spacing/16', '16'),
+    c('title', 'fills', 'vC', 'color/bg/surface', '#ffffff', { index: 0 }),
+    c('footer', 'fills', 'vC', 'color/bg/surface', '#ffffff', { index: 0 }),
+  ]);
+  assert.deepEqual(groups.map((g) => [g.variableName, g.count]), [['color/bg/surface', 3], ['spacing/16', 2], ['radius/4', 1]]);
+  assert.deepEqual(groups[0].lines.map((l) => l.nodeId), ['card', 'title', 'footer'], '자리 줄은 들어온 순서');
+  assert.equal(groups[1].lines.length, 1, '좌우 여백은 한 줄');
+  assert.equal(groups[1].lines[0].label, 'paddingX');
+  assert.equal(groups[1].lines[0].keys.length, 2, '한 줄이 2곳');
+  assert.equal(groups[2].variableValue, '4', '변수 값은 variableValue');
+  assert.equal('distance' in groups[2].lines[0], false, '허용오차 삭제 — 차이 표시 없음');
+  assert.equal(groups[0].variableValue, '#ffffff', '변수 값이 없으면 후보의 값');
+  assert.equal(groups[0].keys[0], placeKey({ nodeId: 'card', field: 'fills', index: 0, variableId: 'vC' }));
+  // 곳 수가 같으면 이름 순
+  const tie = groupByVariable([c('a', 'width', 'v2', 'size/b', '8'), c('a', 'height', 'v1', 'size/a', '8')]);
+  assert.deepEqual(tie.map((g) => g.variableName), ['size/a', 'size/b']);
+});
+
+test('carryChecks — 체크는 변수 단위로 이어받음: 푼 변수의 새 곳은 체크 안 함, 새 변수는 체크, 추가·제외는 곳 단위', async () => {
+  const { carryChecks, placeKey } = await import('../dist/pure.mjs');
+  const c = (nodeId, field, variableId) => ({ nodeId, field, variableId, variableName: variableId, currentValue: '1' });
+  const prev = [c('a', 'width', 'v8'), c('b', 'width', 'v8'), c('a', 'height', 'v4'), c('x', 'width', 'v2')];
+  const prevChecked = new Set([placeKey(c('a', 'height', 'v4'))]); // v8 전부 풀림, v2 풀림
+  const next = [
+    c('a', 'width', 'v8'), // 같은 곳(풀림 유지)
+    c('c', 'width', 'v8'), // 새 곳 — v8은 전부 풀려 있었다 → 체크 안 함
+    c('a', 'height', 'v4'), // 같은 곳(체크 유지)
+    c('d', 'height', 'v4'), // 새 곳 — v4는 체크가 있었다 → 체크
+    c('e', 'width', 'v99'), // 새 묶음 → 체크
+    c('b', 'width', 'v4'), // b.width의 변수가 v8 → v4로 바뀜: 추가 1 + 제외 1
+  ];
+  const r = carryChecks(prev, prevChecked, next);
+  assert.deepEqual([...r.checked].sort(), [placeKey(c('a', 'height', 'v4')), placeKey(c('b', 'width', 'v4')), placeKey(c('d', 'height', 'v4')), placeKey(c('e', 'width', 'v99'))].sort());
+  assert.equal(r.added, 4);
+  assert.equal(r.removed, 2, 'b.width(v8) · x.width(v2)');
+});
+
+test('사이드바 B — sidebarCollections · rightEntries · initialSideSel · validSideSel', async () => {
+  const { sidebarCollections, rightEntries, initialSideSel, validSideSel, inspectCount } = await import('../dist/pure.mjs');
+  const cols = [
+    { id: 'G', name: 'Global', tier: 1, tierSet: true, modes: [{ modeId: 'm', name: 'Light' }], defaultModeId: 'm' },
+    { id: 'S', name: 'Semantic', tier: 2, tierSet: true, modes: [{ modeId: 'm', name: 'Light' }], defaultModeId: 'm' },
+  ];
+  const v = (id, collectionId, name) => ({ id, collectionId, name, type: 'COLOR', values: {}, scopes: [], description: '' });
+  const vars = [v('g1', 'G', 'gray/0'), v('g2', 'G', 'gray/100'), v('t1', 'S', 'color/text/default'), v('t2', 'S', 'color/text/muted'), v('t3', 'S', 'color/text/subtle'), v('b1', 'S', 'color/bg/surface'), v('x', 'S', 'flat')];
+  const direct = new Map([['t2', 3], ['b1', 5]]);
+  const indirect = new Set(['g1']);
+  const side = sidebarCollections(cols, vars, direct, indirect);
+  assert.deepEqual(side.map((s) => s.collection.id), ['S', 'G'], '계층 순서(Semantic → Global)');
+  assert.deepEqual(side[0].groups.map((g) => [g.label, g.used, g.total]), [['color/text', 1, 3], ['color/bg', 1, 1], ['(그룹 없음)', 0, 1]]);
+  assert.deepEqual([side[0].used, side[0].total, side[1].used, side[1].direct, side[1].indirect], [2, 5, 1, 0, 1]);
+  assert.equal(inspectCount(vars, direct, indirect), 3);
+  // ★ Inspect: 쓰는 행만, 경로 머리
+  const ins = rightEntries({ kind: 'inspect' }, cols, vars, direct, indirect);
+  assert.deepEqual(ins.map((e) => (e.kind === 'path' ? `# ${e.label}` : `${e.v.id}:${e.state}`)), ['# S Semantic › color/text', 't2:direct', '# S Semantic › color/bg', 'b1:direct', '# G Global › gray', 'g1:indirect']);
+  assert.deepEqual(rightEntries({ kind: 'inspect' }, cols, vars, null, new Set()), [], '사용 판정 없으면 비어 있음');
+  // 그룹: 쓰는 행 먼저, 경로 머리 없음
+  const grp = rightEntries({ kind: 'grp', key: 'S|color/text' }, cols, vars, direct, indirect);
+  assert.deepEqual(grp.map((e) => `${e.v.id}:${e.state}`), ['t2:direct', 't1:unused', 't3:unused']);
+  // 컬렉션: 그룹마다 경로 머리
+  const col = rightEntries({ kind: 'col', id: 'S' }, cols, vars, null, new Set());
+  assert.deepEqual(col.filter((e) => e.kind === 'path').map((e) => e.label), ['color/text', 'color/bg', '(그룹 없음)']);
+  assert.ok(col.filter((e) => e.kind === 'row').every((e) => e.state === 'none'));
+  // 검색: 고른 항목과 관계없이 모든 컬렉션
+  const q = rightEntries({ kind: 'grp', key: 'S|color/bg' }, cols, vars, direct, indirect, 'GRAY');
+  assert.deepEqual(q.map((e) => (e.kind === 'path' ? `# ${e.label}` : e.v.id)), ['# G Global › gray', 'g1', 'g2']);
+  // 처음 고르는 항목
+  assert.deepEqual(initialSideSel(cols, vars, true, false, direct, indirect), { kind: 'inspect' });
+  assert.deepEqual(initialSideSel(cols, vars, true, false, null, new Set()), { kind: 'inspect' }, '읽는 중엔 ★');
+  assert.deepEqual(initialSideSel(cols, vars, true, false, new Map(), new Set()), { kind: 'col', id: 'S' }, '쓰는 변수 0 → 첫 컬렉션');
+  assert.deepEqual(initialSideSel(cols, vars, false, false, null, new Set()), { kind: 'col', id: 'S' }, '선택 없음');
+  assert.deepEqual(initialSideSel(cols, vars, true, true, null, new Set()), { kind: 'col', id: 'S' }, '큰 선택');
+  // 사라진 항목
+  const init = () => ({ kind: 'col', id: 'S' });
+  assert.deepEqual(validSideSel({ kind: 'grp', key: 'S|gone' }, cols, vars, false, false, init), { kind: 'col', id: 'S' }, '그룹 → 같은 컬렉션');
+  assert.deepEqual(validSideSel({ kind: 'grp', key: 'Z|x' }, cols, vars, false, false, init), { kind: 'col', id: 'S' }, '컬렉션도 없음 → 처음 규칙');
+  assert.deepEqual(validSideSel({ kind: 'lib' }, cols, vars, false, false, init), { kind: 'col', id: 'S' });
+  assert.deepEqual(validSideSel({ kind: 'deleted' }, cols, vars, false, true, init), { kind: 'deleted' });
+});
+
+test('fieldIcon — 자리 줄 속성 아이콘(§4.6 표), 표에 없는 필드는 "·"', async () => {
+  const { fieldIcon } = await import('../dist/pure.mjs');
+  const cases = {
+    fills: '▣', strokes: '▢', strokeWeight: '┃', strokeLeftWeight: '┃', cornerRadius: '◰', topLeftRadius: '◰',
+    paddingTop: '⇔', itemSpacing: '⇔', counterAxisSpacing: '⇔', gridRowGap: '⇔', gridColumnGap: '⇔',
+    width: '↔', height: '↔', minWidth: '↔', maxHeight: '↔', opacity: '◑',
+    fontSize: 'T', lineHeight: 'T', letterSpacing: 'T', fontFamily: 'T', paragraphSpacing: 'T', effects: '◐', somethingNew: '·',
+  };
+  for (const [f, ic] of Object.entries(cases)) assert.equal(fieldIcon(f), ic, f);
+});
+
+test('bindExamples — 계층 컬렉션을 사이드바 순서로 훑어 첫 색·첫 숫자, 기본 모드 값(별칭은 대상), 없으면 뺀다', async () => {
+  const { bindExamples } = await import('../dist/pure.mjs');
+  const cols = [
+    { id: 'g', tier: 1, modes: [{ modeId: 'm' }], defaultModeId: 'm' },
+    { id: 'x', tier: 0, modes: [{ modeId: 'x1' }] },
+    { id: 's', tier: 2, modes: [{ modeId: 'l' }, { modeId: 'd' }], defaultModeId: 'd' },
+    { id: 'c', tier: 3, modes: [{ modeId: 'c1' }] },
+  ];
+  const v = (id, collectionId, type, values) => ({ id, name: id, collectionId, type, values });
+  const vars = [
+    v('misc', 'x', 'COLOR', { x1: { kind: 'color', hex: '#ff0000' } }),
+    v('gray0', 'g', 'COLOR', { m: { kind: 'color', hex: '#ffffff' } }),
+    v('gray9', 'g', 'COLOR', { m: { kind: 'color', hex: '#111111ff' } }),
+    v('sp8', 'g', 'FLOAT', { m: { kind: 'number', text: '8' } }),
+    v('lib', 'c', 'COLOR', { c1: { kind: 'alias', aliasId: 'remote', aliasName: 'x', remote: true } }),
+    v('text', 's', 'COLOR', { l: { kind: 'alias', aliasId: 'gray0' }, d: { kind: 'alias', aliasId: 'gray9' } }),
+    v('gap', 's', 'FLOAT', { d: { kind: 'alias', aliasId: 'sp8' } }),
+  ];
+  assert.deepEqual(bindExamples(cols, vars), { color: { value: '#111111', name: 'text' }, number: { value: '8', name: 'gap' } }, 'Component(못 읽는 별칭) 건너뜀 → Semantic, 기본 모드 Dark');
+  assert.deepEqual(bindExamples(cols, vars.filter((x) => x.type === 'COLOR')), { color: { value: '#111111', name: 'text' } });
+  assert.deepEqual(bindExamples(cols, [vars[0]]), {}, '계층 없는 컬렉션은 보지 않는다');
+});

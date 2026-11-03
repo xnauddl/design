@@ -7,7 +7,7 @@ import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
-import { bindSelection, scanBindings, countUsage, findUsers } from './lib/bind';
+import { bindSelection, bindSelectedItems, countUsage, findUsers } from './lib/bind';
 import { collectionTiers, findCollection, readRoleMap, writeRoleMap } from './lib/collectionRoles';
 import { assignRole, roleOfCollection, guessRole } from './lib/tiers';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
@@ -44,9 +44,9 @@ const DEV_TIER_KEY = 'dsl.devTier';
 const CACHE_KEY = 'dsl.licenseCache';
 // #19: 기준 크기·리네임 맥락 깊이는 설정 탭에서만 바꾸고 이 파일에 기억한다(입력을 단계에 두지 않으므로).
 const SETTINGS_KEY = 'dsl.settings';
-// grid=여백·크기 토큰을 모으는 격자, tolerance=바인딩이 같은 값으로 보는 차이. 둘은 한 쌍이라
-// 설정 탭에 나란히 두고 함께 보관한다(#19 결정 수정 2026-08-07).
-const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8, tolerance: 0.5 };
+// grid=만들기가 값을 맞추는 간격. 허용오차는 없앴다(IA v3 §4.8, 2026-11-03) — 연결은 언제나
+// "같은 값"만 찾는다. 예전 버전이 저장한 `tolerance` 필드는 읽지도 쓰지도 않는다.
+const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8 };
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
@@ -371,59 +371,6 @@ function pageOf(node: BaseNode): PageNode | null {
 /** Paid 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireComponents(): boolean {
   return requirePaid('components', '컴포넌트 등록·베리언트 분류는 Paid 기능입니다.');
-}
-
-/** #6: 텍스트 범위 바인딩 필드(나머지는 노드 스칼라 필드). */
-const TEXT_BIND_FIELDS = new Set(['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily']);
-
-/**
- * #6: 미리보기에서 체크한 후보 1건을 재매칭 없이 그대로 바인딩한다.
- * 노드/변수 소실·미스매치는 false(graceful skip). 성공 시 true.
- */
-async function applySelectedBinding(item: { nodeId: string; field: string; index?: number; variableId: string }): Promise<boolean> {
-  const node = await figma.getNodeByIdAsync(item.nodeId);
-  if (!node || !('type' in node)) return false;
-  const variable = await figma.variables.getVariableByIdAsync(item.variableId);
-  if (!variable) return false;
-  const sn = node as SceneNode;
-  try {
-    if (item.field === 'fills' || item.field === 'strokes') {
-      if (!(item.field in sn)) return false;
-      const paints = (sn as unknown as Record<string, Paint[] | typeof figma.mixed>)[item.field];
-      if (paints === figma.mixed || !Array.isArray(paints)) return false;
-      const i = item.index ?? 0;
-      const p = paints[i];
-      if (!p || p.type !== 'SOLID') return false;
-      const arr = paints.slice();
-      arr[i] = figma.variables.setBoundVariableForPaint(p, 'color', variable);
-      (sn as unknown as Record<string, Paint[]>)[item.field] = arr;
-      return true;
-    }
-    if (item.field === 'effects') {
-      if (!('effects' in sn)) return false;
-      const effects = (sn as unknown as { effects: readonly Effect[] }).effects;
-      const i = item.index ?? 0;
-      const e = effects[i];
-      if (!e || (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW')) return false;
-      const arr = effects.slice();
-      arr[i] = figma.variables.setBoundVariableForEffect(e, 'color', variable);
-      (sn as unknown as { effects: readonly Effect[] }).effects = arr;
-      return true;
-    }
-    if (TEXT_BIND_FIELDS.has(item.field)) {
-      if (sn.type !== 'TEXT' || sn.fontName === figma.mixed) return false;
-      await figma.loadFontAsync(sn.fontName);
-      const len = sn.characters.length;
-      if (len === 0) return false;
-      sn.setRangeBoundVariable(0, len, item.field as VariableBindableTextField, variable);
-      return true;
-    }
-    // 스칼라 노드 필드(width/height/padding…/cornerRadius…)
-    (sn as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(item.field as VariableBindableNodeField, variable);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
@@ -932,7 +879,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // UX1: preview면 dry-run(바인딩 없이 집계). UX3: 사유별 스킵(reasons). UX6: 진행률·취소.
         const r = await bindSelection(
           selection(),
-          msg.tolerance,
           !msg.preview,
           {
             onProgress: (done, total) => post({ type: 'PROGRESS', op: 'bind', done, total }),
@@ -985,12 +931,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'SELECT_RESULT', found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
         break;
       }
-      case 'SCAN_BINDINGS': {
-        // 읽기 전용 — 파일에 남은 바인딩을 결과 트리 모양으로. 플러그인을 닫았다 열어도 '뭐가 붙어 있나'가 보인다.
-        const r = await scanBindings(selection());
-        post({ type: 'BINDINGS_RESULT', candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId, forManager: msg.forManager });
-        break;
-      }
       case 'CANCEL': {
         bindCancel = true; // UX6: 다음 양보 지점에서 중단
         break;
@@ -1022,14 +962,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'APPLY_SELECTED': {
-        // #6: 미리보기 트리에서 체크한 후보만 재매칭 없이 그대로 바인딩(WYSIWYG).
-        let bound = 0;
-        let skipped = 0;
-        for (const item of msg.items) {
-          if (await applySelectedBinding(item)) bound++;
-          else skipped++; // 노드/변수 소실·실패는 graceful skip
-        }
-        post({ type: 'APPLY_RESULT', bound, skipped, flags: [], reasons: {}, reqId: msg.reqId });
+        // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해, 그 사이 붙었거나(일부 구간 포함)
+        // 스타일이 생겼거나 값이 달라진 곳은 건너뛰고 사유로 돌려준다(IA v3 §4.6 "찾는 범위" · "연결 후").
+        const r = await bindSelectedItems(msg.items);
+        const bound = r.bound;
+        post({ type: 'APPLY_RESULT', bound, skipped: r.skipped, flags: [], reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
         if (bound) {
           commitUndo(figma); // UX2: 선택 바인딩 전체를 단일 Undo로
           selfSelect = true;
@@ -1131,10 +1068,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'APPLY_TEXT_STYLES': {
-        // 적용만(생성 없음): 선택 텍스트를 시그니처가 같은 기존 스타일에 바인딩.
-        if (!requireTextStyles()) break;
+        // 적용만(생성 없음, 무료 — IA v3 §4.6): 선택 텍스트를 시그니처가 같은 기존 스타일에 연결.
         const r = await applyExistingTextStyles(selection());
-        post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, missing: r.missing });
+        post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, missing: r.missing });
         commitUndo(figma);
         break;
       }
@@ -1812,18 +1748,17 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               base: typeof o.base === 'number' && isFinite(o.base) && o.base > 0 ? o.base : SETTINGS_DEFAULT.base,
               maxDepth: typeof o.maxDepth === 'number' && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth,
               grid: typeof o.grid === 'number' && isFinite(o.grid) && o.grid >= 1 ? Math.round(o.grid) : SETTINGS_DEFAULT.grid,
-              tolerance: typeof o.tolerance === 'number' && isFinite(o.tolerance) && o.tolerance >= 0 ? o.tolerance : SETTINGS_DEFAULT.tolerance,
             };
           }
         } catch {
           /* 저장소 접근 실패 → 기본값 */
         }
-        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth, grid: s.grid, tolerance: s.tolerance });
+        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth, grid: s.grid });
         break;
       }
       case 'SET_SETTINGS': {
         try {
-          await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, grid: msg.grid, tolerance: msg.tolerance });
+          await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, grid: msg.grid });
         } catch {
           /* 보관 실패해도 이번 세션 동작에는 영향 없음 */
         }

@@ -11,8 +11,8 @@ export type WizardStepId =
   | 'semantics' // CREATE_SEMANTICS (쓰기, 선택)
   | 'dark' // GENERATE_DARK_MODE (쓰기, 선택) — 시맨틱 별칭이 있어야 채울 게 많다
   | 'textStyles' // SCAN_TEXT_STYLES → CREATE_TEXT_STYLES (쓰기, 선택)
-  | 'bind' // APPLY (쓰기)
-  | 'rename' // RENAME (쓰기) — bind 이후라야 토큰을 역할 신호로 활용 가능
+  // 연결(APPLY) 단계는 없다(IA v3 §2.11 — 레이어에 변수를 붙이는 일은 사용자가 레이어 › 연결에서 버튼을 눌러서만).
+  | 'rename' // RENAME (쓰기) — 연결 전이라 붙은 변수 이름(역할 신호) 없이 정리한다
   // 등록이 같은 이름 묶음의 세트 결합까지 함께 수행하므로 별도 CLASSIFY_VARIANTS를 보내지 않는다.
   | 'componentize'; // REGISTER_COMPONENTS (쓰기, 선택, Paid)
 
@@ -26,7 +26,7 @@ export interface WizardStepDef {
   paid?: boolean;
 }
 
-/** 단계 순서 = 실제 데이터 의존 순서. 바인딩(bind) 후 리네임(rename).
+/** 단계 순서 = 실제 데이터 의존 순서. 마법사는 레이어에 변수를 붙이지 않는다(§2.11) — 요약 끝에서 레이어 › 연결로 안내.
  *  표시 라벨은 i18n `wizard.step.<id>` 키로 UI가 해석(외부화). */
 export const WIZARD_STEPS: readonly WizardStepDef[] = [
   { id: 'extract', write: false, optional: false },
@@ -35,7 +35,6 @@ export const WIZARD_STEPS: readonly WizardStepDef[] = [
   // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
   { id: 'dark', write: true, optional: true, paid: true },
   { id: 'textStyles', write: true, optional: true, paid: true },
-  { id: 'bind', write: true, optional: false },
   { id: 'rename', write: true, optional: false },
   { id: 'componentize', write: true, optional: true, paid: true },
 ];
@@ -66,7 +65,7 @@ export interface WizardPlanItem {
 /**
  * 옵션·컨텍스트로 각 단계의 실행 여부를 결정한다.
  * - Paid 단계: Free면 **필수 단계여도** 건너뛴다. 보내 봐야 code가 PREMIUM_REQUIRED로
- *   거부해 시퀀스 전체가 그 자리에서 멈춘다 — Free의 마법사는 추출·바인딩·리네임으로 완주해야 한다.
+ *   거부해 시퀀스 전체가 그 자리에서 멈춘다 — Free의 마법사는 추출·이름 정리로 완주해야 한다.
  * - 그 외 필수 단계: 항상 실행.
  * - 선택 단계: 옵션이 꺼져 있으면 건너뜀.
  * - 시맨틱: 옵션이 켜져도 매핑이 없으면 건너뜀(만들 별칭이 없음).
@@ -122,7 +121,6 @@ export interface WizardTotals {
   semanticsAliased?: number;
   darkFilled?: number; // 다크 모드로 다시 별칭된 색 수
   textStyles?: number; // 생성/갱신된 텍스트 스타일 수
-  bound?: number;
   renamed?: number;
   components?: number;
 }
@@ -133,7 +131,6 @@ export function summarize(totals: WizardTotals): string {
   if (totals.created != null) parts.push(t('wizard.sum.tokens', { n: totals.created }));
   if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t('wizard.sum.dark', { n: totals.darkFilled }));
   if (totals.textStyles != null && totals.textStyles > 0) parts.push(t('wizard.sum.textStyles', { n: totals.textStyles }));
-  if (totals.bound != null) parts.push(t('wizard.sum.bound', { n: totals.bound }));
   if (totals.renamed != null) parts.push(t('wizard.sum.renamed', { n: totals.renamed }));
   if (totals.components != null && totals.components > 0) parts.push(t('wizard.sum.components', { n: totals.components }));
   return parts.length ? parts.join(' · ') : t('wizard.sum.empty');

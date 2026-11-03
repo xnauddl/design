@@ -21,10 +21,14 @@ interface VarEntry {
   str?: string;
 }
 
-
-
-/** 불투명도는 0~1 범위라 px 허용오차 대신 정밀 매칭(추출 시 소수 2자리 반올림 대응). */
-const OPACITY_TOL = 0.005;
+/**
+ * "같은 값"(IA v3 §2.11) — 숫자는 소수 둘째 자리까지 같으면 같다(화면에 보이는 값).
+ * 허용오차는 없앴다: 레이어 값을 바꾸는 연결은 하지 않는다.
+ */
+export const round2 = (n: number): number => Math.round(n * 100) / 100;
+export function sameNumber(a: number, b: number): boolean {
+  return round2(a) === round2(b);
+}
 
 export interface BindResult {
   /** 상한(RESULT_CAP) 전 실제 후보 수 — 잘렸으면 UI가 알린다. */
@@ -101,13 +105,13 @@ interface Preview {
 }
 
 function addColorCand(preview: Preview | null, node: SceneNode, field: string, index: number, hex: string, e: VarEntry): void {
-  preview?.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
+  preview?.candidates.push({ nodeId: node.id, field, index, currentValue: hex, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, variableValue: hex });
 }
 function addFloatCand(preview: Preview | null, node: SceneNode, field: string, value: number, e: VarEntry): void {
-  preview?.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, distance: e.num != null ? Math.abs(e.num - value) : undefined });
+  preview?.candidates.push({ nodeId: node.id, field, currentValue: String(value), variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, ...(e.num != null ? { variableValue: String(round2(e.num)) } : {}) });
 }
 function addStrCand(preview: Preview | null, node: SceneNode, field: string, value: string, e: VarEntry): void {
-  preview?.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier });
+  preview?.candidates.push({ nodeId: node.id, field, currentValue: value, variableId: e.variable.id, variableName: e.variable.name, tier: e.tier, variableValue: value });
 }
 
 /**
@@ -166,7 +170,7 @@ function isLiveAlias(x: unknown): boolean {
 }
 
 /** 선택 안의 모든 바인딩 id를 모아 살아 있는지 확인(로컬은 인덱스, 그 외는 라이브러리 조회). */
-async function collectLiveVarIds(selection: readonly SceneNode[], local: ReadonlySet<string>): Promise<Set<string>> {
+async function collectLiveVarIds(selection: readonly SceneNode[], local: ReadonlySet<string>, deep = true): Promise<Set<string>> {
   const seen = new Set<string>();
   const stack: SceneNode[] = selection.slice();
   const take = (raw: unknown): void => {
@@ -183,7 +187,7 @@ async function collectLiveVarIds(selection: readonly SceneNode[], local: Readonl
     }
     const ef = (n as { effects?: readonly Effect[] }).effects;
     if (Array.isArray(ef)) for (const e of ef) take((e as { boundVariables?: { color?: unknown } }).boundVariables?.color);
-    if ('children' in n) for (const c of n.children) stack.push(c);
+    if (deep && 'children' in n) for (const c of n.children) stack.push(c);
   }
   const live = new Set<string>(local);
   for (const id of seen) {
@@ -197,93 +201,84 @@ async function collectLiveVarIds(selection: readonly SceneNode[], local: Readonl
   return live;
 }
 
-function isNodeFieldBound(node: SceneNode, field: string): boolean {
+/**
+ * 자리 하나의 연결 상태(IA v3 §2.11).
+ * - 'none': 붙은 변수 없음 → 연결 대상
+ * - 'bound': 살아 있는 변수가 붙음 → "이미 연결됨"
+ * - 'deleted': 지워졌거나 찾을 수 없는 변수를 가리킴 → "삭제된 변수에 연결됨"(덮어쓰지 않는다 —
+ *   다시 붙이는 일은 피그마에서, §4.4 "삭제된 변수에 연결된 곳")
+ */
+export type SlotState = 'none' | 'bound' | 'deleted';
+
+/** 별칭 목록의 상태 — 하나라도 지워진 변수면 'deleted', 아니면 하나라도 있으면 'bound'. */
+function aliasesState(list: readonly unknown[]): SlotState {
+  const aliases = list.filter(isAlias);
+  if (!aliases.length) return 'none';
+  return aliases.some((a) => !isLiveAlias(a)) ? 'deleted' : 'bound';
+}
+
+function nodeFieldState(node: SceneNode, field: string): SlotState {
   const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
   const entry = bv?.[field];
-  if (!entry) return false;
-  // 텍스트 range 필드(fontSize·…)는 VariableAlias[] — 배열이 있다고 전 구간이 묶인 건 아니다.
-  // 부분 바인딩은 textFieldCoverage로 판정한다(여기선 스칼라 필드만).
-  if (Array.isArray(entry)) return false;
-  return isLiveAlias(entry);
+  if (!entry) return 'none';
+  return aliasesState(Array.isArray(entry) ? entry : [entry]);
 }
 
 /**
  * paint·effect 자신(`boundVariables.color`) **또는** 노드 쪽
- * `boundVariables.fills|strokes|effects[index]`에 색 바인딩이 있는가.
+ * `boundVariables.fills|strokes|effects[index]`의 색 연결 상태.
  * Figma는 setBoundVariableForPaint로 붙인 뒤 둘 다 채우지만, 테마 적용·외부 도구는
  * 노드 배열만 남기는 경우가 있어 한쪽만 보면 이미 연결된 자리를 다시 덮는다.
  */
-function isColorBound(
+function colorState(
   x: Paint | Effect,
   node: SceneNode,
   field: 'fills' | 'strokes' | 'effects',
   index: number,
-): boolean {
-  if (isLiveAlias((x as { boundVariables?: { color?: unknown } }).boundVariables?.color)) return true;
+): SlotState {
+  const own = (x as { boundVariables?: { color?: unknown } }).boundVariables?.color;
   const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
   const arr = bv?.[field];
-  return Array.isArray(arr) && isLiveAlias(arr[index]);
-}
-
-/** 텍스트 필드 바인딩 커버리지 — 전 구간이 묶였는가 + 아직 빈 구간 목록. */
-interface TextCoverage {
-  fullyBound: boolean;
-  unbound: Array<[number, number]>;
+  return aliasesState([own, Array.isArray(arr) ? arr[index] : undefined]);
 }
 
 /**
- * 텍스트 range 바인딩은 글자 구간별이다. 기존 구간에만 변수가 붙은 채 글자를 늘리면
- * `boundVariables[field]` 배열은 비어 있지 않은데 새 꼬리 구간은 비어 있다.
- * 배열 length > 0만으로 skip하면 새 글자는 영원히 후보에 안 오른다.
+ * 텍스트 range 필드의 연결 상태. 일부 구간에만 붙어 있어도 속성 전체를 'bound'로 본다 —
+ * 빈 구간을 채우지 않는다(§2.11 "글자는 일부 구간에만 붙어 있어도 그 속성 전체를 건너뛴다").
+ * `boundVariables[field]`는 구간들에 붙은 별칭 배열이다. 그게 비어 있는 환경을 위해
+ * 전 구간 조회(`getRangeBoundVariable`)도 본다(mixed = 일부 구간 연결).
  */
-function textFieldCoverage(node: TextNode, field: VariableBindableTextField): TextCoverage {
+function textFieldState(node: TextNode, field: VariableBindableTextField): SlotState {
+  const fromBv = nodeFieldState(node, field);
+  if (fromBv !== 'none') return fromBv;
   const len = node.characters.length;
-  if (len === 0) return { fullyBound: false, unbound: [] };
-
   const getRange = (
     node as TextNode & {
-      getRangeBoundVariable?: (
-        start: number,
-        end: number,
-        f: VariableBindableTextField,
-      ) => VariableAlias | null | typeof figma.mixed;
+      getRangeBoundVariable?: (start: number, end: number, f: VariableBindableTextField) => VariableAlias | null | typeof figma.mixed;
     }
   ).getRangeBoundVariable;
+  if (len === 0 || typeof getRange !== 'function') return 'none';
+  const full = getRange.call(node, 0, len, field);
+  if (full === figma.mixed) return 'bound';
+  return aliasesState([full]);
+}
 
-  if (typeof getRange === 'function') {
-    const full = getRange.call(node, 0, len, field);
-    if (full !== figma.mixed && isLiveAlias(full)) return { fullyBound: true, unbound: [] };
+/** 스타일이 붙어 있는가(빈 문자열 = 없음, mixed = 일부 구간에 있음 → 붙은 것으로). */
+function hasStyleId(node: SceneNode, key: 'fillStyleId' | 'strokeStyleId' | 'effectStyleId' | 'textStyleId'): boolean {
+  const v = (node as unknown as Record<string, unknown>)[key];
+  if (v === figma.mixed) return true;
+  return typeof v === 'string' && v !== '';
+}
 
-    const unbound: Array<[number, number]> = [];
-    let i = 0;
-    while (i < len) {
-      const v = getRange.call(node, i, i + 1, field);
-      if (v === figma.mixed || !isLiveAlias(v)) {
-        let j = i + 1;
-        while (j < len) {
-          const w = getRange.call(node, j, j + 1, field);
-          if (w !== figma.mixed && isLiveAlias(w)) break;
-          j++;
-        }
-        unbound.push([i, j]);
-        i = j;
-      } else {
-        i++;
-      }
-    }
-    return { fullyBound: unbound.length === 0, unbound };
-  }
+/** 텍스트 range 필드(글자 구간에 붙는 변수 자리). */
+const TEXT_RANGE_FIELDS = ['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily'] as const;
 
-  // getRangeBoundVariable 없는 목/환경 — 부분 구간을 표현할 수 없으므로
-  // 기록이 있으면 전 구간 바인딩으로 본다(기존 테스트 호환).
-  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
-  const entry = bv?.[field];
-  if (!entry) return { fullyBound: false, unbound: [[0, len]] };
-  if (Array.isArray(entry)) {
-    if (entry.length === 0) return { fullyBound: false, unbound: [[0, len]] };
-    return { fullyBound: true, unbound: [] };
-  }
-  return isLiveAlias(entry) ? { fullyBound: true, unbound: [] } : { fullyBound: false, unbound: [[0, len]] };
+/** 색 칠하기 필드 → 그 필드를 덮는 스타일 id 키. */
+const STYLE_KEY_OF = { fills: 'fillStyleId', strokes: 'strokeStyleId', effects: 'effectStyleId' } as const;
+
+/** 상태 → 사유 키(연결 대상이면 null). */
+function stateReason(s: SlotState): 'already-bound' | 'deleted-var' | null {
+  return s === 'bound' ? 'already-bound' : s === 'deleted' ? 'deleted-var' : null;
 }
 
 /** 조상까지 실제로 보이는가 — extract.ts와 같은 기준(숨긴 그룹 안의 레이어를 직접 고른 경우). */
@@ -331,7 +326,6 @@ function skip(res: BindResult, key: string, node?: SceneNode, preview?: Preview 
 
 export async function bindSelection(
   selection: readonly SceneNode[],
-  tolerance: number,
   apply = true, // UX1: false면 dry-run(미리보기) — 변경 없이 동일 집계만.
   hooks: BindHooks = {}, // UX6: 진행률·취소.
 ): Promise<BindResult> {
@@ -350,7 +344,7 @@ export async function bindSelection(
       note(res, 'hidden', node, preview);
       continue;
     }
-    await walk(node, entries, tolerance, res, flagSet, apply, hooks, prog, preview, 0, null);
+    await walk(node, entries, res, flagSet, apply, hooks, prog, preview, 0, null);
     if (res.cancelled) break;
   }
   res.flags = [...flagSet];
@@ -386,8 +380,11 @@ async function buildIndex(): Promise<VarEntry[]> {
     if (val == null) continue;
     const e: VarEntry = { variable: v, tier, type: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'] };
     if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
-    if (v.resolvedType === 'COLOR' && isRGB(val)) e.colorHex = rgbToHex(val);
-    else if (v.resolvedType === 'FLOAT' && typeof val === 'number') e.num = val;
+    // 투명도가 1이 아닌 색 변수는 연결 대상에서 뺀다(§2.11) — 붙이면 칠하기 불투명도가 변수 값으로 바뀐다.
+    // 그 색의 칠하기는 같은 색의 다른 불투명 변수에 붙거나 '매칭 없음'이 된다.
+    if (v.resolvedType === 'COLOR' && isRGB(val)) {
+      if (isOpaqueColorValue(val)) e.colorHex = rgbToHex(val);
+    } else if (v.resolvedType === 'FLOAT' && typeof val === 'number') e.num = val;
     else if (v.resolvedType === 'STRING' && typeof val === 'string') e.str = val;
     entries.push(e);
   }
@@ -413,13 +410,10 @@ async function resolveValue(
   return undefined;
 }
 
-/**
- * 소수 값(26.67 등)은 허용오차로 근처 토큰에 스냅하지 않는다 — extract가 척도 잔값으로 보고 토큰을
- * 만들지 않았는데, 바인딩이 26.67을 font-size/27에 붙이면 추출이 거부한 값을 되살리며 디자인을 바꾼다.
- * 같은 값의 토큰이 있으면(1.5px 선) 붙는 게 맞으므로 허용오차만 0으로 좁힌다. (크기 축은 bindFrame이 이미 동일 규칙.)
- */
-function tolForValue(value: number, tol: number): number {
-  return Math.abs(value - Math.round(value)) >= 0.005 && Math.abs(value * 2 - Math.round(value * 2)) >= 0.005 ? 0 : tol;
+/** 색 변수 값이 불투명한가(RGB이거나 alpha가 1). */
+function isOpaqueColorValue(v: RGB | RGBA): boolean {
+  const a = (v as RGBA).a;
+  return typeof a !== 'number' || a === 1;
 }
 
 /** 페인트가 반투명인가(opacity<1). 변수 alpha가 페인트 불투명도를 덮어쓰므로 바인딩 제외 기준. */
@@ -441,20 +435,20 @@ function colorScopeOk(e: VarEntry, allowed: readonly VariableScope[]): boolean {
 }
 
 function matchColor(entries: VarEntry[], hex: string, allowed: readonly VariableScope[]): VarEntry | null {
-  // 용도(스코프) 일치 + 정확한 hex. stroke 전용 색이 fill에, effect 색이 fill에 붙는 오매칭 방지.
+  // 용도(스코프) 일치 + 화면의 #RRGGBB가 같음. stroke 전용 색이 fill에, effect 색이 fill에 붙는 오매칭 방지.
   for (const e of entries) if (e.colorHex === hex && colorScopeOk(e, allowed)) return e;
   return null;
 }
-function matchFloat(entries: VarEntry[], value: number, tol: number, scope?: VariableScope): VarEntry | null {
+function matchFloat(entries: VarEntry[], value: number, scope?: VariableScope): VarEntry | null {
   let best: VarEntry | null = null;
   let bestDist = Infinity;
   for (const e of entries) {
     if (e.num == null) continue;
     // 용도(스코프) 불일치 변수는 제외 — 여백이 line-height/letter-spacing 등에 붙는 오매칭 방지.
     if (scope && !e.scopes.includes('ALL_SCOPES') && !e.scopes.includes(scope)) continue;
+    if (!sameNumber(e.num, value)) continue; // "같은 값"만(§2.11)
     const dist = Math.abs(e.num - value);
-    if (dist > tol) continue;
-    // 가장 가까운 값 우선, 동률이면 높은 tier 우선, 같은 tier면 역할 별칭(거울 아님) 우선.
+    // 같은 값 안에서는 더 가까운 값 우선, 동률이면 높은 tier, 같은 tier면 역할 별칭(거울 아님) 우선.
     if (dist < bestDist || (dist === bestDist && best !== null && (best.tier < e.tier || (best.tier === e.tier && best.mirror && !e.mirror)))) {
       best = e;
       bestDist = dist;
@@ -477,7 +471,6 @@ function matchString(entries: VarEntry[], str: string, scope: VariableScope): Va
 async function walk(
   node: SceneNode,
   entries: VarEntry[],
-  tol: number,
   res: BindResult,
   flags: Set<string>,
   apply: boolean,
@@ -497,12 +490,12 @@ async function walk(
   // 미리보기 트리(#13)용: 방문한 모든 노드를 기록(나중에 영향+조상으로 가지치기).
   preview?.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
   bindPaints(node, entries, res, apply, preview);
-  bindFrame(node, entries, tol, res, flags, apply, preview);
-  bindRadius(node, entries, tol, res, apply, preview);
-  bindStroke(node, entries, tol, res, apply, preview);
-  bindOpacity(node, entries, tol, res, apply, preview);
+  bindFrame(node, entries, res, flags, apply, preview);
+  bindRadius(node, entries, res, apply, preview);
+  bindStroke(node, entries, res, apply, preview);
+  bindOpacity(node, entries, res, apply, preview);
   bindEffects(node, entries, res, apply, preview);
-  await bindText(node, entries, tol, res, apply, preview);
+  await bindText(node, entries, res, apply, preview);
   // UX6: 주기적으로 진행률 보고 + 이벤트 루프 양보(취소 메시지 수신 가능) + 취소 확인.
   prog.done++;
   if (hooks.onProgress && prog.done % prog.every === 0) {
@@ -524,7 +517,7 @@ async function walk(
   }
   if ('children' in node)
     for (const c of node.children) {
-      await walk(c, entries, tol, res, flags, apply, hooks, prog, preview, depth + 1, node.id);
+      await walk(c, entries, res, flags, apply, hooks, prog, preview, depth + 1, node.id);
       if (res.cancelled) return;
     }
 }
@@ -534,17 +527,23 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
     if (!(key in node)) continue;
     const paints = (node as unknown as Record<string, Paint[] | typeof figma.mixed>)[key];
     if (paints === figma.mixed || !Array.isArray(paints)) continue;
+    if (!paints.some((p) => p.type === 'SOLID')) continue;
+    // 색 스타일이 붙은 칠하기·선은 건너뛴다 — 변수를 붙이면 스타일 연결이 끊긴다(§2.11 "스타일 사용 중").
+    if (hasStyleId(node, STYLE_KEY_OF[key])) {
+      note(res, 'styled', node, preview, key);
+      continue;
+    }
     const allowed = key === 'fills' ? FILL_SCOPES : STROKE_SCOPES;
     let changed = false;
     const next = paints.map((p, i) => {
       if (p.type !== 'SOLID') return p;
-      if (isColorBound(p, node, key, i)) {
-        note(res, 'already-bound', node, preview, key);
+      const st = stateReason(colorState(p, node, key, i));
+      if (st) {
+        note(res, st, node, preview, key);
         return p;
       }
       // 반투명 페인트(opacity<1)는 연결하지 않는다 — 색 변수가 붙으면 Figma가 페인트 불투명도를
-      // 변수의 alpha(우리 변수는 항상 1)로 덮어써, 8% 검정 테두리가 100% 검정으로 바뀐다.
-      // 알파를 가진 변수(`color/…/a8`)는 별도 토큰 체계가 필요하므로 지금은 사유만 남긴다.
+      // 변수의 alpha로 덮어써, 8% 검정 테두리가 100% 검정으로 바뀐다.
       if (isTranslucentPaint(p)) {
         skip(res, 'translucent', node, preview, key);
         return p;
@@ -568,7 +567,6 @@ function bindPaints(node: SceneNode, entries: VarEntry[], res: BindResult, apply
 function bindFrame(
   node: SceneNode,
   entries: VarEntry[],
-  tol: number,
   res: BindResult,
   flags: Set<string>,
   apply: boolean,
@@ -589,13 +587,9 @@ function bindFrame(
       (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE'));
   if (inAutoLayout) {
     /**
-     * 축 하나를 처리 — 두 축이 같은 규칙을 쓰도록 한 곳에 모은다(세로 축만 사유 집계가
-     * 빠져 HUG/FILL 건수가 실제보다 적게 보이던 문제).
-     *
-     * 소수 크기는 **정확히 같은 값의 토큰에만** 붙인다. extract가 소수 size를 토큰으로
-     * 만들지 않으므로(자유 리사이즈 잔값), 허용오차로 343.5를 size/344에 스냅하면
-     * 추출이 거부한 값을 바인딩이 되살리면서 지오메트리까지 바꾸게 된다. 반대로 같은 값의
-     * 토큰이 이미 있다면 붙이는 게 맞으므로 허용오차만 0으로 좁힌다.
+     * 축 하나를 처리 — 두 축이 같은 규칙을 쓰도록 한 곳에 모은다.
+     * 소수 크기에 같은 값의 토큰이 없으면 사유를 'size-fraction'으로 따로 남긴다
+     * (extract가 소수 size를 토큰으로 만들지 않으므로 '매칭 없음'과 원인이 다르다).
      */
     const bindAxis = (sizing: 'FIXED' | 'HUG' | 'FILL', field: 'width' | 'height', v: number): void => {
       if (sizing !== 'FIXED') {
@@ -604,7 +598,7 @@ function bindFrame(
         return;
       }
       const fraction = Math.abs(v - Math.round(v)) >= 0.005; // extract의 소수 2자리 반올림과 같은 판정
-      tryBind(node, field, v, entries, fraction ? 0 : tol, res, apply, preview, fraction ? 'size-fraction' : undefined);
+      tryBind(node, field, v, entries, res, apply, preview, fraction ? 'size-fraction' : undefined);
     };
     bindAxis(node.layoutSizingHorizontal, 'width', node.width);
     bindAxis(node.layoutSizingVertical, 'height', node.height);
@@ -621,64 +615,71 @@ function bindFrame(
   }
   if (node.layoutMode === 'GRID') {
     // 그리드 모드의 간격은 gridRowGap/gridColumnGap(extract.ts와 동일 기준).
-    tryBind(node, 'gridRowGap', node.gridRowGap, entries, tol, res, apply, preview);
-    tryBind(node, 'gridColumnGap', node.gridColumnGap, entries, tol, res, apply, preview);
+    tryBind(node, 'gridRowGap', node.gridRowGap, entries, res, apply, preview);
+    tryBind(node, 'gridColumnGap', node.gridColumnGap, entries, res, apply, preview);
   } else {
-    tryBind(node, 'itemSpacing', node.itemSpacing, entries, tol, res, apply, preview);
-    if (typeof node.counterAxisSpacing === 'number') tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, tol, res, apply, preview);
+    tryBind(node, 'itemSpacing', node.itemSpacing, entries, res, apply, preview);
+    if (typeof node.counterAxisSpacing === 'number') tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, res, apply, preview);
   }
-  tryBind(node, 'paddingLeft', node.paddingLeft, entries, tol, res, apply, preview);
-  tryBind(node, 'paddingRight', node.paddingRight, entries, tol, res, apply, preview);
-  tryBind(node, 'paddingTop', node.paddingTop, entries, tol, res, apply, preview);
-  tryBind(node, 'paddingBottom', node.paddingBottom, entries, tol, res, apply, preview);
+  tryBind(node, 'paddingLeft', node.paddingLeft, entries, res, apply, preview);
+  tryBind(node, 'paddingRight', node.paddingRight, entries, res, apply, preview);
+  tryBind(node, 'paddingTop', node.paddingTop, entries, res, apply, preview);
+  tryBind(node, 'paddingBottom', node.paddingBottom, entries, res, apply, preview);
 }
 
-function bindRadius(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): void {
+function bindRadius(node: SceneNode, entries: VarEntry[], res: BindResult, apply: boolean, preview: Preview | null): void {
   if (!('cornerRadius' in node)) return;
   const r = (node as { cornerRadius: number | typeof figma.mixed }).cornerRadius;
   const corners = ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'] as const;
   if (r !== figma.mixed && typeof r === 'number' && r > 0) {
-    for (const c of corners) tryBind(node, c, r, entries, tol, res, apply, preview);
+    for (const c of corners) tryBind(node, c, r, entries, res, apply, preview);
   } else if (r === figma.mixed) {
     for (const c of corners) {
       const cv = (node as unknown as Record<string, number>)[c];
-      if (typeof cv === 'number' && cv > 0) tryBind(node, c, cv, entries, tol, res, apply, preview);
+      if (typeof cv === 'number' && cv > 0) tryBind(node, c, cv, entries, res, apply, preview);
     }
   }
 }
 
-function bindOpacity(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): void {
+function bindOpacity(node: SceneNode, entries: VarEntry[], res: BindResult, apply: boolean, preview: Preview | null): void {
   if (!('opacity' in node)) return;
   const o = (node as { opacity: number }).opacity;
   if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1/0은 바인딩 대상 아님
-  // 0~1 범위라 px 허용오차를 쓰지 않고 정밀(OPACITY_TOL) 매칭.
-  tryBind(node, 'opacity', o, entries, Math.min(tol, OPACITY_TOL), res, apply, preview);
+  tryBind(node, 'opacity', o, entries, res, apply, preview);
 }
 
-function bindStroke(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): void {
+function bindStroke(node: SceneNode, entries: VarEntry[], res: BindResult, apply: boolean, preview: Preview | null): void {
   if (!('strokes' in node) || !('strokeWeight' in node)) return;
   // 보이는 선이 있을 때만 두께 바인딩(선 없는 노드의 strokeWeight는 무의미).
   const strokes = (node as { strokes: readonly Paint[] | typeof figma.mixed }).strokes;
   if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
   const w = (node as { strokeWeight: number | typeof figma.mixed }).strokeWeight;
   if (w !== figma.mixed && typeof w === 'number') {
-    if (w > 0) tryBind(node, 'strokeWeight', w, entries, tol, res, apply, preview);
+    if (w > 0) tryBind(node, 'strokeWeight', w, entries, res, apply, preview);
     return;
   }
   // 변별 두께(상/우/하/좌)
   for (const side of ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const) {
     const sv = (node as unknown as Record<string, number>)[side];
-    if (typeof sv === 'number' && sv > 0) tryBind(node, side, sv, entries, tol, res, apply, preview);
+    if (typeof sv === 'number' && sv > 0) tryBind(node, side, sv, entries, res, apply, preview);
   }
 }
 
 function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, apply: boolean, preview: Preview | null): void {
   if (!('effects' in node)) return;
+  const effects = (node as { effects: readonly Effect[] }).effects;
+  if (!effects.some((e) => e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW')) return;
+  // 효과 스타일이 붙은 효과는 건너뛴다(스타일 사용 중).
+  if (hasStyleId(node, 'effectStyleId')) {
+    note(res, 'styled', node, preview, 'effects');
+    return;
+  }
   let changed = false;
-  const next = (node as { effects: readonly Effect[] }).effects.map((e, i) => {
+  const next = effects.map((e, i) => {
     if (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW') return e;
-    if (isColorBound(e, node, 'effects', i)) {
-      note(res, 'already-bound', node, preview, 'effects');
+    const st = stateReason(colorState(e, node, 'effects', i));
+    if (st) {
+      note(res, st, node, preview, 'effects');
       return e;
     }
     // 그림자 색은 RGBA다 — 25% 그림자를 alpha 1 변수에 붙이면 100% 검정 그림자가 된다(위 페인트와 같은 이유).
@@ -701,47 +702,52 @@ function bindEffects(node: SceneNode, entries: VarEntry[], res: BindResult, appl
   if (changed && apply) (node as unknown as { effects: readonly Effect[] }).effects = next;
 }
 
-async function bindText(node: SceneNode, entries: VarEntry[], tol: number, res: BindResult, apply: boolean, preview: Preview | null): Promise<void> {
+async function bindText(node: SceneNode, entries: VarEntry[], res: BindResult, apply: boolean, preview: Preview | null): Promise<void> {
   if (node.type !== 'TEXT') return;
   if (node.fontName === figma.mixed) return;
+  // 텍스트 스타일이 붙은 글자는 글자 속성을 건너뛴다(스타일 사용 중) — 속성 단위로 센다.
+  if (hasStyleId(node, 'textStyleId')) {
+    // 스타일이 없었다면 시도했을 자리만 센다(px 아닌 줄 높이·자간, 같은 글꼴 변수가 없는 글꼴은 원래 대상이 아님).
+    if (node.fontSize !== figma.mixed) note(res, 'styled', node, preview, 'fontSize');
+    if (node.lineHeight !== figma.mixed && node.lineHeight.unit === 'PIXELS') note(res, 'styled', node, preview, 'lineHeight');
+    if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === 'PIXELS') note(res, 'styled', node, preview, 'letterSpacing');
+    if (matchString(entries, node.fontName.family, 'FONT_FAMILY')) note(res, 'styled', node, preview, 'fontFamily');
+    return;
+  }
   try {
     await figma.loadFontAsync(node.fontName); // 텍스트 속성 변경 전 폰트 로드 필수(미리보기에서도 가용성 확인)
   } catch {
     note(res, 'font', node, preview);
     return;
   }
-  if (node.fontSize !== figma.mixed) tryBindText(node, 'fontSize', node.fontSize, entries, tol, res, apply, preview);
+  if (node.fontSize !== figma.mixed) tryBindText(node, 'fontSize', node.fontSize, entries, res, apply, preview);
   // lineHeight/letterSpacing은 노드 단위가 px일 때만 직접 바인딩(비-px 노드는 변수 바인딩 불가)
   if (node.lineHeight !== figma.mixed && node.lineHeight.unit === 'PIXELS') {
-    tryBindText(node, 'lineHeight', node.lineHeight.value, entries, tol, res, apply, preview);
+    tryBindText(node, 'lineHeight', node.lineHeight.value, entries, res, apply, preview);
   }
   if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === 'PIXELS') {
-    tryBindText(node, 'letterSpacing', node.letterSpacing.value, entries, tol, res, apply, preview);
+    tryBindText(node, 'letterSpacing', node.letterSpacing.value, entries, res, apply, preview);
   }
   // fontFamily — STRING 변수(FONT_FAMILY)에 정확 일치 바인딩.
-  {
-    const coverage = textFieldCoverage(node, 'fontFamily');
-    if (coverage.fullyBound) {
-      note(res, 'already-bound', node, preview, 'fontFamily');
-      return;
-    }
-    const fe = matchString(entries, node.fontName.family, 'FONT_FAMILY');
-    if (fe && coverage.unbound.length > 0) {
-      if (!apply) {
-        res.bound++;
-        addStrCand(preview, node, 'fontFamily', node.fontName.family, fe);
-      } else {
-        try {
-          for (const [start, end] of coverage.unbound) {
-            node.setRangeBoundVariable(start, end, 'fontFamily', fe.variable);
-          }
-          res.bound++;
-          addStrCand(preview, node, 'fontFamily', node.fontName.family, fe); // 결과 트리(실제로 붙은 것만)
-        } catch {
-          skip(res, 'error', node, preview, 'fontFamily');
-        }
-      }
-    }
+  if (node.characters.length === 0) return;
+  const st = stateReason(textFieldState(node, 'fontFamily'));
+  if (st) {
+    note(res, st, node, preview, 'fontFamily');
+    return;
+  }
+  const fe = matchString(entries, node.fontName.family, 'FONT_FAMILY');
+  if (!fe) return;
+  if (!apply) {
+    res.bound++;
+    addStrCand(preview, node, 'fontFamily', node.fontName.family, fe);
+    return;
+  }
+  try {
+    node.setRangeBoundVariable(0, node.characters.length, 'fontFamily', fe.variable);
+    res.bound++;
+    addStrCand(preview, node, 'fontFamily', node.fontName.family, fe); // 결과 트리(실제로 붙은 것만)
+  } catch {
+    skip(res, 'error', node, preview, 'fontFamily');
   }
 }
 
@@ -750,7 +756,6 @@ function tryBindText(
   field: VariableBindableTextField,
   value: number,
   entries: VarEntry[],
-  tol: number,
   res: BindResult,
   apply: boolean,
   preview: Preview | null,
@@ -759,12 +764,13 @@ function tryBindText(
     skip(res, 'empty-text', node, preview, field);
     return;
   }
-  const coverage = textFieldCoverage(node, field);
-  if (coverage.fullyBound) {
-    note(res, 'already-bound', node, preview, field);
+  // 일부 구간에만 붙어 있어도 속성 전체를 건너뛴다 — 빈 구간을 채우지 않는다(§2.11).
+  const st = stateReason(textFieldState(node, field));
+  if (st) {
+    note(res, st, node, preview, field);
     return;
   }
-  const e = matchFloat(entries, value, tolForValue(value, tol), FIELD_SCOPE[field]);
+  const e = matchFloat(entries, value, FIELD_SCOPE[field]);
   if (!e) {
     skip(res, 'no-match', node, preview, field);
     return;
@@ -775,10 +781,7 @@ function tryBindText(
     return;
   }
   try {
-    // 이미 묶인 구간은 건드리지 않고, 비어 있는 구간만 채운다(글자 추가 후 꼬리 등).
-    for (const [start, end] of coverage.unbound) {
-      node.setRangeBoundVariable(start, end, field, e.variable);
-    }
+    node.setRangeBoundVariable(0, node.characters.length, field, e.variable);
     res.bound++;
     addFloatCand(preview, node, field, value, e); // 결과 트리(실제로 붙은 것만)
   } catch {
@@ -791,18 +794,18 @@ function tryBind(
   field: VariableBindableNodeField,
   value: number,
   entries: VarEntry[],
-  tol: number,
   res: BindResult,
   apply: boolean,
   preview: Preview | null,
   /** 매칭 실패 사유 키 — 호출자가 좁힌 조건으로 실패했을 때 그 이유를 남긴다. */
   noMatchReason = 'no-match',
 ): void {
-  if (isNodeFieldBound(node, field)) {
-    note(res, 'already-bound', node, preview, field);
+  const st = stateReason(nodeFieldState(node, field));
+  if (st) {
+    note(res, st, node, preview, field);
     return;
   }
-  const e = matchFloat(entries, value, field === 'opacity' ? tol : tolForValue(value, tol), FIELD_SCOPE[field]);
+  const e = matchFloat(entries, value, FIELD_SCOPE[field]);
   if (!e) {
     skip(res, noMatchReason, node, preview, field);
     return;
@@ -821,6 +824,189 @@ function tryBind(
   }
 }
 
+/* ---------- 체크한 자리 연결(APPLY_SELECTED) — 연결 직전 다시 확인(§4.6 "찾는 범위") ---------- */
+
+/** 체크한 자리 한 건(미리보기 후보에서 온 것). */
+export interface SelectedBindItem {
+  nodeId: string;
+  field: string;
+  index?: number;
+  variableId: string;
+}
+
+export interface SelectedBindResult {
+  bound: number;
+  /** 다시 확인에서 건너뛴 자리 수(속성 단위) — reasons 합과 같다. */
+  skipped: number;
+  /** 사유별 자리 수: 'already-bound' · 'deleted-var' · 'styled' · 'changed' · 'error'. */
+  reasons: Record<string, number>;
+  /** 사유별 건너뛴 레이어(노드×사유 중복 제거, SKIP_PREVIEW_CAP까지). */
+  skips: BindSkip[];
+  /** 상한 전 실제 스킵 레이어 수. */
+  skipTotal: number;
+}
+
+/**
+ * 미리보기에서 체크한 자리를 연결한다. 미리보기와 연결 사이에 피그마에서 바뀐 곳이 있을 수 있어
+ * 각 자리를 **다시 확인**하고, 그 사이 붙었거나(일부 구간 포함) 스타일이 생겼거나 값이 달라진 곳은
+ * 연결하지 않고 사유로 센다(§2.11 · §4.6).
+ * - 'already-bound': 살아 있는 변수가 붙음(글자는 어느 구간이든)
+ * - 'deleted-var': 지워진 변수를 가리킴
+ * - 'styled': 해당 칠하기·선·효과·글자에 스타일이 붙음
+ * - 'changed': 값이 변수 값과 더는 같지 않음, 칠하기 자리가 없어짐·반투명이 됨, 레이어·변수가 없어짐
+ * - 'error': 연결 호출이 실패함
+ */
+export async function bindSelectedItems(items: readonly SelectedBindItem[]): Promise<SelectedBindResult> {
+  const res: BindResult = { bound: 0, skipped: 0, flags: [], reasons: {} };
+  const preview: Preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+  const localIds = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
+
+  // 노드를 한 번씩만 찾고, 살아 있는 변수 집합은 그 노드들(하위 제외)로 만든다.
+  const nodes = new Map<string, SceneNode | null>();
+  for (const it of items) {
+    if (nodes.has(it.nodeId)) continue;
+    const n = await figma.getNodeByIdAsync(it.nodeId);
+    nodes.set(it.nodeId, n && 'type' in n && n.type !== 'PAGE' && n.type !== 'DOCUMENT' ? (n as SceneNode) : null);
+  }
+  const roots = [...nodes.values()].filter((n): n is SceneNode => !!n);
+  liveVarIds = await collectLiveVarIds(roots, localIds, false);
+
+  const valueCache = new Map<string, { variable: Variable; value: VariableValue | undefined } | null>();
+  const variableOf = async (id: string) => {
+    if (valueCache.has(id)) return valueCache.get(id) ?? null;
+    const v = await figma.variables.getVariableByIdAsync(id);
+    const entry = v ? { variable: v, value: await resolveValue(v, modeOf) } : null;
+    valueCache.set(id, entry);
+    return entry;
+  };
+
+  const changedPaints = new Map<SceneNode, Map<'fills' | 'strokes' | 'effects', (Paint | Effect)[]>>();
+  const fail = (key: string, node: SceneNode | null, field: string): void => {
+    if (node) skip(res, key, node, preview, field);
+    else {
+      res.skipped++;
+      res.reasons[key] = (res.reasons[key] ?? 0) + 1;
+    }
+  };
+
+  for (const it of items) {
+    const node = nodes.get(it.nodeId) ?? null;
+    const vv = await variableOf(it.variableId);
+    if (!node || !vv) {
+      fail('changed', node, it.field);
+      continue;
+    }
+    const { variable, value } = vv;
+    try {
+      if (it.field === 'fills' || it.field === 'strokes' || it.field === 'effects') {
+        const key = it.field;
+        if (hasStyleId(node, STYLE_KEY_OF[key])) {
+          fail('styled', node, key);
+          continue;
+        }
+        const pending = changedPaints.get(node)?.get(key);
+        const list = pending ?? ((node as unknown as Record<string, unknown>)[key] as (Paint | Effect)[] | typeof figma.mixed | undefined);
+        const i = it.index ?? 0;
+        const x = Array.isArray(list) ? list[i] : undefined;
+        const isColorItem = !!x && (key === 'effects' ? x.type === 'DROP_SHADOW' || x.type === 'INNER_SHADOW' : x.type === 'SOLID');
+        if (!Array.isArray(list) || !x || !isColorItem) {
+          fail('changed', node, key);
+          continue;
+        }
+        const st = stateReason(colorState(x, node, key, i));
+        if (st) {
+          fail(st, node, key);
+          continue;
+        }
+        const translucent = key === 'effects' ? isTranslucentEffectColor(x as DropShadowEffect) : isTranslucentPaint(x as SolidPaint);
+        const hex = rgbToHex((x as SolidPaint | DropShadowEffect).color);
+        if (translucent || variable.resolvedType !== 'COLOR' || !value || !isRGB(value) || !isOpaqueColorValue(value) || rgbToHex(value) !== hex) {
+          fail('changed', node, key);
+          continue;
+        }
+        const arr = list.slice();
+        arr[i] =
+          key === 'effects'
+            ? figma.variables.setBoundVariableForEffect(x as Effect, 'color', variable)
+            : figma.variables.setBoundVariableForPaint(x as SolidPaint, 'color', variable);
+        let m = changedPaints.get(node);
+        if (!m) changedPaints.set(node, (m = new Map()));
+        m.set(key, arr);
+        res.bound++;
+        continue;
+      }
+      if ((TEXT_RANGE_FIELDS as readonly string[]).includes(it.field)) {
+        const field = it.field as VariableBindableTextField;
+        if (node.type !== 'TEXT') {
+          fail('changed', node, field);
+          continue;
+        }
+        if (hasStyleId(node, 'textStyleId')) {
+          fail('styled', node, field);
+          continue;
+        }
+        const st = stateReason(textFieldState(node, field));
+        if (st) {
+          fail(st, node, field);
+          continue;
+        }
+        if (node.characters.length === 0 || node.fontName === figma.mixed || !textValueEqual(node, field, value)) {
+          fail('changed', node, field);
+          continue;
+        }
+        await figma.loadFontAsync(node.fontName);
+        node.setRangeBoundVariable(0, node.characters.length, field, variable);
+        res.bound++;
+        continue;
+      }
+      // 스칼라 노드 필드(width/height/padding…/cornerRadius…/opacity)
+      const st = stateReason(nodeFieldState(node, it.field));
+      if (st) {
+        fail(st, node, it.field);
+        continue;
+      }
+      const cur = (node as unknown as Record<string, unknown>)[it.field];
+      if (typeof cur !== 'number' || typeof value !== 'number' || !sameNumber(cur, value)) {
+        fail('changed', node, it.field);
+        continue;
+      }
+      (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(it.field as VariableBindableNodeField, variable);
+      res.bound++;
+    } catch {
+      fail('error', node, it.field);
+    }
+  }
+  for (const [node, m] of changedPaints) {
+    for (const [key, arr] of m) {
+      try {
+        (node as unknown as Record<string, unknown>)[key] = arr;
+      } catch {
+        /* 배열 쓰기 실패 — 이미 센 bound는 되돌릴 수 없어 그대로 둔다(드묾) */
+      }
+    }
+  }
+  const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
+  return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, skipTotal: preview.skips.length };
+}
+
+/** 글자 속성 값이 변수 값과 "같은 값"인가(연결 직전 확인). */
+function textValueEqual(node: TextNode, field: VariableBindableTextField, value: VariableValue | undefined): boolean {
+  if (field === 'fontFamily') return node.fontName !== figma.mixed && typeof value === 'string' && node.fontName.family === value;
+  if (typeof value !== 'number') return false;
+  if (field === 'fontSize') return node.fontSize !== figma.mixed && sameNumber(node.fontSize, value);
+  if (field === 'lineHeight') {
+    const lh = node.lineHeight;
+    return lh !== figma.mixed && lh.unit === 'PIXELS' && sameNumber(lh.value, value);
+  }
+  if (field === 'letterSpacing') {
+    const ls = node.letterSpacing;
+    return ls !== figma.mixed && ls.unit === 'PIXELS' && sameNumber(ls.value, value);
+  }
+  return false;
+}
+
 
 /* ---------- 연결 현황 스캔(읽기 전용) ---------- */
 /**
@@ -836,8 +1022,6 @@ export interface BindingsScan {
   /** 바인딩이 하나라도 있는 레이어 수. */
   boundNodes: number;
 }
-
-const TEXT_RANGE_FIELDS = ['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily'] as const;
 
 export async function scanBindings(selection: readonly SceneNode[]): Promise<BindingsScan> {
   const vars = await figma.variables.getLocalVariablesAsync();

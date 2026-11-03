@@ -217,24 +217,9 @@
     .step-chip[aria-current="step"] { border-color: var(--accent-border); background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
     .step-chip .n { display: block; font-size: 11px; font-weight: 600; }
 
-    /* ── 선택 동기화 바 (탭 아래 sticky) ── */
-    #selBarWrap {
-      position: sticky; top: var(--tabs-h, 41px); z-index: 2; margin: 0 0 10px;
-      background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 7px 10px;
-    }
-    .selbar { color: var(--text); font-weight: 500; display: flex; align-items: center; gap: 0; min-width: 0; white-space: nowrap; }
-    .selbar .sel-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
-    .selbar .sel-name:only-child, .selbar .sel-name:has(+ .sel-sub:empty) { max-width: none; }
-    .selbar .sel-sub { flex: 0 0 auto; }
-    .selbar .sel-sub:empty { display: none; }
-    .selbar .sel-base { flex: 0 1 auto; min-width: 0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); font-weight: 400; }
-    .selbar .sel-base:empty { display: none; }
-    .selbar .sel-rebase { margin-left: auto; flex: 0 0 auto; font-weight: 600; }
     .ctx-menu .menu-note { display: block; font-size: 10px; color: var(--muted); font-weight: 400; }
     .ctx-menu button[aria-disabled="true"] { color: var(--muted); }
     .wiz-done { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    .selbar.muted { color: var(--muted); font-weight: 400; }
 
     /* ── 콜아웃(안내 노트) ── */
     .ux {
@@ -300,7 +285,6 @@
 
     /* ── 시스템화 마법사 스테퍼 ── */
     #wizardSteps { margin-top: 8px; }
-    #wizardBar { margin-top: 8px; }
 
     /* ── 첫 실행 배너 — 카드가 아니라 한 줄(온보딩 흡수) ── */
     .banner {
@@ -430,7 +414,7 @@
 
     /* ── diff / 선택형 미리보기 트리 ── */
     /* 긴 이름은 nowrap이라 가로로 넘친다 — 가로만 스크롤시킨다(세로는 패널 body). */
-    #diff, #bindTree, #compTree {
+    #diff, #compTree {
       font-family: var(--mono); font-size: var(--fs); overflow-x: auto;
     }
     .before { color: var(--muted); text-decoration: line-through; }
@@ -482,13 +466,94 @@
     .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
     .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
     /* ── 탭 모양 3단계(§4.1) — 상단 탭(.tabs) · 레이어 하위 탭(밑줄, PR 3) · 계층 칩(PR 2) ── */
-    .subtabs { display: flex; gap: 14px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
+    /* 하위 탭 13px · 높이 32 · 간격 20(§4.6 — 11px은 실기에서 탭으로 읽히지 않았다) */
+    .subtabs { display: flex; gap: 20px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
     .subtab {
-      border: none; background: none; border-radius: 0; padding: 6px 0 5px; min-height: 24px;
-      font: 600 11px/1 var(--font); color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px;
+      border: none; background: none; border-radius: 0; padding: 0; height: 32px; min-height: 32px;
+      font: 600 13px/1 var(--font); color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px;
     }
     .subtab:hover:not([aria-selected="true"]) { background: none; color: var(--text); }
-    .subtab[aria-selected="true"] { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
+    .subtab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
+    /* ── 레이어 › 연결(§4.6 그림 개편) ── */
+    /* 카드 제목이 없다 — 버튼 줄(단계 표시 포함)이 카드 맨 위. */
+    .bind-card > .prereq:first-child { margin-top: 0; }
+    /* 단계 표시 — 버튼 줄 안 첫 줄(함께 고정). 누를 수 없는 표시. */
+    .bind-steps { flex: 1 0 100%; display: flex; align-items: center; gap: 6px; list-style: none; margin: 0 0 2px; padding: 0; font-size: var(--fs); }
+    .bind-steps .bs { display: flex; align-items: center; gap: 5px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+    .bind-steps .bs + .bs::before { content: ''; width: 18px; height: 1px; background: var(--border-2); margin-right: 1px; }
+    .bs-dot {
+      width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+      font: 600 9.5px/1 var(--font); border: 1px solid var(--border-2); color: var(--muted); background: var(--surface); box-sizing: border-box;
+    }
+    .bs.now { color: var(--text); font-weight: 600; }
+    .bs.now .bs-dot { background: var(--text); border-color: var(--text); color: var(--on-accent); }
+    .bs.done { color: var(--ok); }
+    .bs.done .bs-dot { border-color: var(--ok); color: var(--ok); }
+    /* 찾는 중 — 지금 단계 동그라미에 도는 테두리 */
+    .bs.busy .bs-dot { background: var(--surface); color: var(--text); border: 2px solid var(--border-2); border-top-color: var(--text); animation: mini-spin .9s linear infinite; }
+    @media (prefers-reduced-motion: reduce) { .bs.busy .bs-dot { animation: none; } }
+    /* 버튼 — 아이콘은 글자 앞 14px(접근성 이름은 글자만) */
+    .bind-btn { display: inline-flex; align-items: center; gap: 5px; }
+    .bind-btn .bi { flex: 0 0 auto; }
+    /* 배지 줄 */
+    .bind-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 24px; }
+    .bind-badges .grow { flex: 1 1 auto; }
+    .bd { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font: 600 10.5px/1 var(--font); white-space: nowrap; }
+    .bd-found { background: var(--ok-subtle); color: var(--ok); cursor: default; }
+    button.bd-skip { min-height: 24px; height: 24px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); }
+    button.bd-skip:hover:not([aria-disabled="true"]) { background: var(--surface-hover); }
+    .bind-badges .skip-row { order: 10; flex: 1 0 100%; margin-top: 0; }
+    button.bd-all { min-height: 24px; height: 24px; padding: 0 6px; border: none; background: none; color: var(--accent-strong); font-size: 10.5px; }
+    button.bd-all:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
+    .bind-filter-row input { width: 170px; }
+    /* 빈 상태 — 목록 자리 점선 상자 */
+    .bind-empty {
+      border: 1px dashed var(--border-2); border-radius: 8px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+      color: var(--text-2); text-align: center;
+    }
+    .be-art { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+    .be-art.icon { font-size: 18px; line-height: 1; color: var(--muted); align-items: center; flex-direction: row; gap: 2px; }
+    .be-row { display: flex; align-items: center; gap: 6px; }
+    .be-text { font-size: var(--fs); }
+    /* 변수 카드 "값 → 변수" — 카드 사이 6, 모서리 8, 머리 32 */
+    .bind-list { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs); }
+    .bind-list:empty { display: none; }
+    .bv-card { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+    .bv-head { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 2px 0 8px; }
+    .bv-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 4px; font: 500 10.5px/1 var(--mono); white-space: nowrap; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+    .bv-val { background: var(--surface); border: 1px solid var(--border-2); color: var(--text); }
+    .bv-sw { width: 10px; height: 10px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); flex: 0 0 auto; }
+    .bv-arrow { color: var(--accent-strong); font-weight: 600; flex: 0 0 auto; }
+    .bv-var { background: var(--accent-subtle); color: var(--accent-strong); border: 1px solid transparent; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+    .bv-var .bv-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .bv-mark { flex: 0 0 auto; font-family: var(--font); font-weight: 700; }
+    .bind-empty .bv-var { max-width: 140px; }
+    .bv-head .grow { flex: 1 1 auto; min-width: 4px; }
+    button.bv-tw { height: 24px; min-height: 24px; padding: 0 4px; border: none; background: none; color: var(--text-2); font-weight: 500; font-size: 10.5px; flex: 0 0 auto; }
+    button.bv-tw:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
+    /* 스위치 — 보이는 트랙 28×16, 누를 수 있는 영역 32×24 */
+    button.bv-switch { width: 32px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    button.bv-switch:hover:not([aria-disabled="true"]) { background: none; }
+    .bv-track { position: relative; width: 28px; height: 16px; border-radius: 999px; background: var(--accent); transition: background .12s; }
+    .bv-track::after { content: ''; position: absolute; top: 2px; left: 14px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 1px rgba(0,0,0,.2); transition: left .12s; }
+    button.bv-switch[aria-checked="false"] .bv-track { background: var(--border-2); }
+    button.bv-switch[aria-checked="false"] .bv-track::after { left: 2px; }
+    button.bv-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+    /* 끈 카드 — 글자·칩을 회색으로(opacity 쓰지 않음) */
+    .bv-card.off .bv-val, .bv-card.off .bv-var { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
+    .bv-card.off .bv-arrow, .bv-card.off .bv-tw, .bv-card.off .bv-place { color: var(--text-2); }
+    .bv-card.off .bv-sw { filter: grayscale(1); }
+    /* 자리 줄(보기만) — [속성 아이콘] 레이어 · 속성 */
+    .bv-places { border-top: 1px solid var(--border); padding: 3px 8px 5px; display: flex; flex-direction: column; }
+    .bv-place { display: flex; align-items: center; gap: 6px; min-height: 24px; color: var(--text); }
+    .bv-ic { width: 14px; height: 14px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); font: 600 9px/14px var(--font); text-align: center; flex: 0 0 auto; }
+    .bv-place .bv-layer { padding: 0 2px; min-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
+    .bv-card.off .bv-place .bv-layer { color: var(--text-2); }
+    .bv-prop { color: var(--text-2); white-space: nowrap; flex: 0 0 auto; }
+    /* 연결 후 결과 카드 */
+    .bind-done { display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 6px 4px 10px; border-radius: 8px; background: var(--ok-subtle); color: var(--ok); font-weight: 600; }
+    .bind-done .grow { flex: 1 1 auto; }
+    .ts-aa { font: 700 11px/1 var(--font); color: var(--text-2); width: 16px; }
     .tier-chip {
       height: 24px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
       border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
@@ -541,7 +606,36 @@
     .vt-group .tw { width: 10px; color: var(--muted); }
     .vt-group .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .vt-group .more-unused { flex: 0 0 auto; min-height: 24px; font-size: 10.5px; }
-    .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 118px 48px 24px; align-items: center; height: 28px; padding: 0 6px 0 18px; border-bottom: 1px solid var(--border); cursor: default; }
+    /* ── 변수 목록 결정 B(§4.4): 머리줄 고정 · 사이드바(112px, 고정 + 따로 스크롤) · 오른쪽 목록 머리 고정 ── */
+    #varList .list-head { position: sticky; top: var(--tabs-h, 41px); z-index: 3; background: var(--bg); padding: 2px 0 6px; margin: 0; }
+    .vl-split { display: flex; align-items: flex-start; border-top: 1px solid var(--border); }
+    .vl-side {
+      width: 112px; flex: 0 0 112px; position: sticky; top: var(--side-top, 75px); align-self: flex-start;
+      max-height: calc(100vh - var(--side-top, 75px) - 24px); overflow-y: auto; border-right: 1px solid var(--border);
+      padding: 4px 3px; background: var(--surface);
+    }
+    .vs-item { display: flex; align-items: center; gap: 3px; min-height: 28px; padding: 0 4px; border-radius: 5px; color: var(--text); cursor: pointer; font-size: 11px; }
+    .vs-item.lv2 { padding-left: 18px; color: var(--text); }
+    .vs-item.muted { color: var(--text-2); }
+    .vs-item.danger { color: var(--danger); }
+    .vs-item[aria-selected="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+    .vs-item:hover:not([aria-selected="true"]), .vs-item:focus-visible { background: var(--surface-hover); outline: none; }
+    .vs-item:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .vs-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vs-num { flex: 0 0 auto; font-size: 9.5px; color: var(--text-2); font-weight: 500; }
+    .vs-item[aria-selected="true"] .vs-num { color: var(--accent-strong); }
+    .vs-tw { width: 12px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; font-size: 9px; margin-left: -3px; }
+    .vs-badge { font: 700 9px/14px var(--font); min-width: 12px; padding: 0 2px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); text-align: center; flex: 0 0 auto; }
+    .vs-item[aria-selected="true"] .vs-badge { background: #d6ebff; color: var(--accent-strong); }
+    .vs-sep { height: 1px; background: var(--border); margin: 5px 4px; }
+    .vl-main { flex: 1 1 auto; min-width: 0; }
+    .vl-head { position: sticky; top: var(--side-top, 75px); z-index: 2; display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 4px 0 8px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .vl-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; outline: none; }
+    .vl-head .search-box:not([hidden]) { position: absolute; inset: 3px 4px; display: flex; gap: 4px; align-items: center; background: var(--surface); }
+    .vl-head .search-box input { flex: 1 1 auto; min-width: 0; }
+    .vt-path { min-height: 22px; display: flex; align-items: center; padding: 0 8px; font-size: 10px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vt-path:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 74px 34px 24px; align-items: center; height: 28px; padding: 0 2px 0 8px; border-bottom: 1px solid var(--border); cursor: default; }
     .vt-row:hover, .vt-row:focus-visible, .vt-group:focus-visible, .vt-section:focus-visible, .vt-line:focus-visible { background: var(--surface-hover); outline: none; }
     .vt-row[aria-selected="true"] { background: var(--accent-subtle); }
     .vt-row .nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -623,10 +717,6 @@
     </button>
   </div>
 
-  <!-- 선택 동기화 (실시간) -->
-  <div id="selBarWrap">
-    <div class="selbar muted" id="selBar"><span class="sel-name" id="selName">● 선택 상태를 불러오는 중…</span><span class="sel-sub" id="selSub"></span><span class="sel-base" id="selBase"></span><button class="link link-btn sel-rebase" id="btnRebase" type="button" data-i18n="list.rebase" hidden>기준 바꾸기</button></div>
-  </div>
 
   <section class="tab-section" id="tab-variables" role="tabpanel" aria-labelledby="tabbtn-variables" tabindex="0">
    <!-- IA v3 변수 탭(§4.2~§4.4): 불러오는 중 / 시작 화면(로컬 변수 0개) / 변수 목록. 만들기는 아래 하위 화면. -->
@@ -660,15 +750,21 @@
       <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
       <button class="icon-btn" id="btnVarRefresh" type="button" data-i18n-title="list.refreshTip" title="다시 읽기" aria-label="다시 읽기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg></button>
     </div>
-    <div class="chip-bar" id="chipBar">
-      <div class="chip-row" id="chipRow" role="radiogroup" aria-label="컬렉션"></div>
-      <button class="icon-btn chip-more" id="btnChipMore" type="button" data-i18n-title="list.chipMore" title="칩 더 보기" aria-label="칩 더 보기" hidden>›</button>
-      <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
-      <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
-      <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" aria-label="검색 지우기">✕</button></span>
-    </div>
     <div class="situation" id="situationLine" hidden></div>
-    <div class="var-tree" id="varTree" role="treegrid" aria-label="변수 목록"></div>
+    <!-- 결정 B(§4.4): 왼쪽 사이드바(★ Inspect · 컬렉션 › 그룹 · LIB · 삭제된 변수) + 오른쪽 목록 -->
+    <div class="vl-split">
+      <div class="vl-side" id="varSide" role="tree" aria-label="변수 컬렉션"></div>
+      <div class="vl-main">
+        <div class="vl-head" id="chipBar">
+          <b class="vl-title" id="varMainTitle" tabindex="-1"></b>
+          <span class="grow"></span>
+          <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
+          <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+          <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" aria-label="검색 지우기">✕</button></span>
+        </div>
+        <div class="var-tree" id="varTree" role="grid" aria-label="변수 목록"></div>
+      </div>
+    </div>
    </div>
 
    <!-- 준비 현황 팝오버(§4.4 머리줄) — 메뉴 모양, 목록을 밀지 않는다. -->
@@ -681,7 +777,8 @@
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
-      <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
+      <div class="hint" data-i18n="wizardCard.hint">선택한 프레임의 색·간격을 변수로 만들고 레이어 이름을 정리해요</div>
+      <div class="hint" id="wizNoSel" hidden data-i18n="wizardCard.noSel">레이어를 선택하면 실행할 수 있어요</div>
       <div class="wiz-done" id="wizDone" hidden><b id="wizDoneText"></b> <button class="link link-btn" id="btnWizListView" type="button" data-i18n="start.viewList">변수 목록 보기</button></div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
@@ -700,9 +797,10 @@
       <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
            파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
            흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기 · 다크=라이트 모드에서 어두운 값 채우기</div>
-      <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 다크=라이트 모드에서 어두운 값 채우기</div>
       <div class="status" id="wizardSummary"></div>
+      <!-- 요약 끝 연결 안내(§4.3) — 마법사는 레이어에 변수를 붙이지 않는다. 누르면 레이어 › 연결 + 미리보기. -->
+      <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">레이어 › 연결에서 확인하고 연결하기 →</button>
     </div>
 
    <!-- 만들기 하위 화면 — "← 돌아가기"로 변수 탭 첫 화면. -->
@@ -836,13 +934,12 @@
       <!-- 색 카드와 같은 이유로 제목 개수 없음 — 상태줄이 「신규 N · 등록됨 N · …」로 이미 말한다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted lock" id="tsLock"></span></h2>
-      <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 「기존만 연결」</div>
+      <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 레이어 › 연결에서</div>
       <div class="toolbar">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
         <span class="grow"></span>
         <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">등록</button>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존만 연결</button>
       </div>
       <!-- 「가로 행의 왼쪽 텍스트를 이름으로」 체크박스 폐기(결정 2026-08-06) — 스캔 전에 켜고 끄는
            옵션이라, 결과를 보기도 전에 이름 규칙을 고르라는 요구였다. 스캔은 늘 크기 순으로 두고,
@@ -851,47 +948,33 @@
         <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둡니다.">왼쪽 글자로 이름 채우기</button>
       </div>
       <div id="tsList" class="results"></div>
-      <div class="prereq" id="tsApplyPrereq" style="display:none;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
     </div>
    </div>
   </section>
 
   <section class="tab-section" id="tab-layer" role="tabpanel" aria-labelledby="tabbtn-layer" tabindex="0">
-    <!-- 적용 단계 레일 — 바인딩 → 리네임 → 구조(컴포넌트·닮은 프레임). -->
-    <div class="steps steps-3" id="applyRail" role="tablist" aria-label="적용 단계">
-      <button class="step-chip" data-apply-step="bind"><span class="n" data-i18n="rail.bind">연결</span><span data-i18n="rail.bindSub">변수 붙이기</span></button>
-      <button class="step-chip" data-apply-step="rename"><span class="n" data-i18n="rail.rename">이름</span><span data-i18n="rail.renameSub">레이어 이름</span></button>
-      <button class="step-chip" data-apply-step="structure"><span class="n" data-i18n="rail.structure">컴포넌트</span><span data-i18n="rail.structureSub">닮은 프레임</span></button>
+    <!-- 레이어 하위 탭(밑줄, §4.1 탭 모양 2단계) — 연결 · 이름 · 컴포넌트. 세 작업은 순서가 없다(§4.7). -->
+    <div class="subtabs" id="applyRail" role="tablist" aria-label="레이어 작업">
+      <button class="subtab" role="tab" data-apply-step="bind" data-i18n="rail.bind">연결</button>
+      <button class="subtab" role="tab" data-apply-step="rename" data-i18n="rail.rename">이름</button>
+      <button class="subtab" role="tab" data-apply-step="structure" data-i18n="rail.structure">컴포넌트</button>
     </div>
 
-    <div class="step" data-apply-step="bind">
-      <h2><span data-i18n="bind.title">변수 연결</span> <span class="muted" id="bindCount"></span></h2>
-      <div class="hint" data-i18n="bind.hint">먼저 미리보기로 확인하고, 연결할 항목만 고르세요</div>
-      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
-      <div class="toolbar">
-        <button id="btnApply" data-i18n="bind.preview">미리보기</button>
-        <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택한 항목에 연결</button>
-        <!-- 연결 현황 — 파일에 이미 붙어 있는 바인딩을 읽는다(읽기 전용). 작은 선택(≤300 노드)은 자동, 큰 선택은 이 버튼. -->
-        <button id="btnScanBindings" data-i18n="bind.scanBtn" data-tip="선택 안에 이미 연결된 변수를 읽어 목록으로 보여줍니다. 파일은 안 바꿉니다.">연결 현황</button>
-        <span class="grow"></span>
-        <button class="btn-next" data-next-apply="rename" data-i18n="rail.next">다음 →</button>
+    <!-- 레이어 › 연결(§4.6 그림 개편) — 카드 제목 없음. 단계 표시 + 버튼 줄(함께 고정) → 배지 줄 → 빈 상태/변수 카드 → 텍스트 스타일. -->
+    <div class="step bind-card" data-apply-step="bind">
+      <!-- 연결할 변수가 없을 때의 안내(§4.6 표 4행) — 문구와 버튼은 ui.ts가 정한다. -->
+      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
+      <div class="toolbar bind-toolbar">
+        <!-- 단계 표시 — 누를 수 없는 표시(정지점 아님). 상태는 ui.ts renderBindSteps가 정한다. -->
+        <ol class="bind-steps" id="bindSteps" role="list" aria-label="연결 단계">
+          <li class="bs" data-s="find"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.find">찾기</span></li>
+          <li class="bs" data-s="pick"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.stepPick">고르기</span></li>
+          <li class="bs" data-s="link"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.link">연결</span></li>
+        </ol>
+        <button id="btnApply" class="primary bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg><span class="bl" id="btnApplyLabel">찾기</span></button>
+        <button id="btnApplyConfirm" class="bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span class="bl" id="btnApplyConfirmLabel">연결</span></button>
       </div>
-      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
-      </div>
-      <!-- 보기 축 토글 — 레이어별(캔버스 순서로 검증) / 변수별(Tokens Studio Inspect처럼 변수 행 + 레이어 수, 관리용). -->
-      <!-- 변수 쪽 일(교체·복사·이름·삭제)은 변수 관리 화면이 맡는다 — 연결 카드는 '무엇이 무엇에 연결됐나'(레이어별)만. -->
-      <div class="row tree-ctrls" id="bindViewRow" style="display:none">
-        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:140px" />
-        <span class="grow"></span>
-        <button class="link" id="btnBindToManager" data-i18n="vm.fromBind">변수 관리에서 보기 ↗</button>
-      </div>
-      <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐).
-           목록 위에 둔다: 몇 개가 왜 빠졌는지는 후보를 훑기 전에 알아야 하는 정보다. -->
-      <div class="skip-row" id="bindSkips" style="display:none"></div>
-      <div class="hint" id="bindSkipHint" style="display:none" data-i18n="bind.skipHint">건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다</div>
-      <div id="bindTree" class="results"></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
@@ -900,6 +983,35 @@
           <button id="btnApplyCancel" data-i18n="common.cancel">취소</button>
         </div>
       </div>
+      <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
+      <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">다시 찾기</button></div>
+      <!-- 연결 후 결과 카드(§4.6) -->
+      <div class="bind-done" id="bindDone" hidden><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span id="bindDoneText"></span><span class="grow"></span><button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
+      <!-- 배지 줄(찾은 뒤) — (찾음 n) (건너뜀 m ▸) … [모두 켜기/끄기] [필터]. 사유 칩 줄은 DOM에서 건너뜀 바로 뒤(포커스 순서), 화면에서는 아랫줄. -->
+      <div class="bind-badges" id="bindBadges" hidden>
+        <span class="bd bd-found" id="bindFound"></span>
+        <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
+        <div class="skip-row" id="bindSkips" hidden></div>
+        <span class="grow"></span>
+        <button class="bd-all" id="bindAll" type="button"></button>
+        <button class="icon-btn" id="bindFilterBtn" type="button" aria-expanded="false" aria-controls="bindFilterRow" data-i18n-title="bind.filterBtn" title="변수 이름 필터" aria-label="변수 이름 필터"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+      </div>
+      <div class="row bind-filter-row" id="bindFilterRow" hidden>
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" />
+        <span class="muted" id="bindOutside"></span>
+      </div>
+      <!-- 빈 상태(목록 자리, 점선 상자) — 찾기 전(예시 두 줄) · 선택 없음 · 찾은 곳 0. -->
+      <div class="bind-empty" id="bindEmpty" hidden></div>
+      <!-- 변수 카드 "값 → 변수"(§4.6) -->
+      <div id="bindTree" class="bind-list"></div>
+      <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 카드 목록 아래 한 줄(§4.6). -->
+      <div class="row ts-apply-row">
+        <span class="ts-aa" aria-hidden="true">Aa</span>
+        <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
+        <span class="grow"></span>
+        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 연결</button>
+      </div>
+      <div class="hint" id="tsApplyResult" hidden></div>
       <div class="status" id="applyStatus"></div>
     </div>
 
@@ -909,8 +1021,6 @@
       <div class="toolbar">
         <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
         <button id="btnRename" class="primary" disabled data-i18n="rename.apply">이름 적용</button>
-        <span class="grow"></span>
-        <button class="btn-next" data-next-apply="structure" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row tree-ctrls">
         <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -936,8 +1046,8 @@
       <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
       <div class="toolbar toolbar-2">
         <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">묶기</button>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다. 원본의 연결과 값은 마스터를 따라요.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다. 원본의 연결과 값은 마스터를 따라요.">묶기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -969,11 +1079,9 @@
         <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
         <label class="inline"><span data-i18n="settings.depth">이름 정리 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
       </div>
-      <!-- 격자와 허용오차는 한 쌍이다 — 격자가 오차보다 크면 스냅한 토큰이 원래 레이어와
-           안 맞아 연결 단계에서 도로 떨어진다. 그래서 같은 줄에 나란히 두고 함께 고치게 한다. -->
+      <!-- 허용오차는 없앴다(§4.8) — 연결은 언제나 같은 값만. 격자는 만들기가 값을 맞추는 간격이다. -->
       <div class="row">
-        <label class="inline" data-i18n-title="settings.gridTip" title="여백·크기 토큰을 미리보기에서 이 격자로 모읍니다. 예: 8이면 13·15가 16으로."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
-        <label class="inline" data-i18n-title="settings.tolTip" title="바인딩은 레이어 값과 변수 값의 차이가 이 값 이하일 때 같은 값으로 봅니다. 격자로 옮긴 토큰까지 붙이려면 격자의 절반쯤이 필요합니다."><span data-i18n="settings.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" max="16" step="0.5" />px</label>
+        <label class="inline" data-i18n-title="settings.gridTip" title="여백·크기 토큰을 만들기에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
       </div>
     </div>
 
@@ -1184,15 +1292,7 @@
     "semantic.missing": " \xB7 \uB204\uB77D: {names}",
     // 바인딩(적용)
     "apply.cancelRequested": "\uCDE8\uC18C \uC694\uCCAD\uB428 \u2014 \uB2E4\uC74C \uC9C0\uC810\uC5D0\uC11C \uC911\uB2E8\uD569\uB2C8\uB2E4.",
-    "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC5F0\uACB0{detail}",
-    "apply.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uD6C4\uBCF4 {bound}\uAC74{detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0\u2019",
-    "apply.done": "\uC5F0\uACB0 {bound}{detail}",
-    "apply.resultCapped": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC74\uAE4C\uC9C0\uB9CC \uD45C\uC2DC",
-    "bind.scanBtn": "\uC5F0\uACB0 \uD604\uD669",
-    "bind.scanHelp": "\uC120\uD0DD \uC548\uC5D0 \uC774\uBBF8 \uC5F0\uACB0\uB41C \uBCC0\uC218\uB97C \uC77D\uC5B4 \uBAA9\uB85D\uC73C\uB85C \uBCF4\uC5EC\uC90D\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
-    "bind.scanned": "\uC5F0\uACB0 \uD604\uD669 \u2014 {total}\uAC74 \xB7 \uB808\uC774\uC5B4 {nodes}\uAC1C",
-    "bind.scannedNone": "\uC774 \uC120\uD0DD\uC5D0\uB294 \uC5F0\uACB0\uB41C \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD6C4\uBCF4\uB97C \uD655\uC778\uD558\uC138\uC694.",
-    "bind.scanHintLarge": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC558\uC5B4\uC694 \u2014 \u2018\uC5F0\uACB0 \uD604\uD669\u2019\uC744 \uB204\uB974\uC138\uC694.",
+    "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uACF3\uB9CC \uC5F0\uACB0{detail}",
     "bind.filterPlaceholder": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
     // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
     "field.fills": "\uCC44\uC6C0 \uC0C9",
@@ -1231,8 +1331,6 @@
     "field.fontFamily": "\uAE00\uAF34",
     "field.fontWeight": "\uAD75\uAE30",
     "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD569\uB2C8\uB2E4",
-    "bind.connectedTip": "{label}({fields})\uC774(\uAC00) {variable}\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC2B5\uB2C8\uB2E4",
-    "bind.willConnectTip": "{label}({fields})\uC744(\uB97C) {variable}\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4",
     // 리네임
     "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
     "rename.none": "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
@@ -1279,7 +1377,6 @@
     "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizard.step.dark": "\uB2E4\uD06C",
     "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "wizard.step.bind": "\uBCC0\uC218\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
@@ -1288,7 +1385,7 @@
     "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
     "wizard.skip.paid": "Paid \uC804\uC6A9",
     "wizard.chip.paid": "Paid \uC804\uC6A9 \uB2E8\uACC4\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB701\uB2C8\uB2E4 \u2014 \uC124\uC815 \uD0ED\uC5D0\uC11C \uB77C\uC774\uC120\uC2A4\uB97C \uB4F1\uB85D\uD558\uBA74 \uD568\uAED8 \uB3D5\uB2C8\uB2E4",
-    "wizard.paidSkipped": " \xB7 Paid \uC804\uC6A9\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC73C\uB2C8 \uC774\uBBF8 \uC788\uB294 \uBCC0\uC218\uC5D0\uB9CC \uC5F0\uACB0\uD569\uB2C8\uB2E4",
+    "wizard.paidSkipped": " \xB7 \uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     // 진행 안내(파이프라인) 단계 상태
     "pipeline.stat.done": "\uC644\uB8CC",
     "pipeline.stat.ready": "\uC900\uBE44",
@@ -1296,7 +1393,10 @@
     "pipeline.stat.todo": "\uB9CC\uB4E4\uAE30",
     // 바인딩 스킵 사유(라벨 맵)
     "reason.no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
-    "reason.already-bound": "\uC774\uBBF8 \uBC14\uC778\uB529\uB428",
+    "reason.already-bound": "\uC774\uBBF8 \uC5F0\uACB0\uB428",
+    "reason.styled": "\uC2A4\uD0C0\uC77C \uC0AC\uC6A9 \uC911",
+    "reason.deleted-var": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB428",
+    "reason.changed": "\uADF8 \uC0AC\uC774 \uBC14\uB01C",
     "reason.empty-text": "\uBE48 \uD14D\uC2A4\uD2B8",
     "reason.error": "\uC5F0\uACB0 \uC2E4\uD328",
     "reason.hug-fill": "HUG/FILL",
@@ -1306,7 +1406,7 @@
     "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
     "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
-    "reason.translucent": "\uBC18\uD22C\uBA85(\uBCC0\uC218 alpha\uAC00 \uB36E\uC5B4\uC500)",
+    "reason.translucent": "\uBC18\uD22C\uBA85",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
@@ -1322,16 +1422,12 @@
     "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD569\uB2C8\uB2E4",
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
-    "wizard.seq.bindCancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC801\uC6A9",
-    "wizard.seq.bindDone": "\uC5F0\uACB0 {bound}",
-    "wizard.seq.bindSkip": " \xB7 \uC2A4\uD0B5 {n}",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
     "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
     "wizard.sum.tokens": "\uD1A0\uD070 {n}",
     "wizard.sum.dark": "\uB2E4\uD06C {n}",
     "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
-    "wizard.sum.bound": "\uC5F0\uACB0 {n}",
     "wizard.sum.renamed": "\uC774\uB984 {n}",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "wizard.sum.empty": "\uC644\uB8CC\uB41C \uC791\uC5C5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
@@ -1349,7 +1445,6 @@
     "common.cancel": "\uCDE8\uC18C",
     "common.close": "\uB2EB\uAE30",
     // 변수 관리(넓은 화면)
-    "vm.fromBind": "\uBCC0\uC218 \uAD00\uB9AC\uC5D0\uC11C \uBCF4\uAE30 \u2197",
     "vm.search": "\uBCC0\uC218 \uAC80\uC0C9",
     "vm.uses": "{n}\uACF3",
     "vm.moreTip": "\uBA54\uB274 (\uC6B0\uD074\uB9AD\uACFC \uAC19\uC74C)",
@@ -1372,6 +1467,58 @@
     "vm.dDesc": "\uC124\uBA85",
     "vm.dNoUses": "\uC120\uD0DD \uC548\uC5D0\uC11C\uB294 \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
     // 탭
+    // IA v3 레이어 › 연결(§4.6)
+    "bind.tsLabel": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    // 단계 표시 · 버튼(§4.6 그림 개편 — "찾기"는 이전의 "미리보기")
+    "bind.stepsAria": "\uC5F0\uACB0 \uB2E8\uACC4",
+    "bind.find": "\uCC3E\uAE30",
+    "bind.refind": "\uB2E4\uC2DC \uCC3E\uAE30",
+    "bind.stepPick": "\uACE0\uB974\uAE30",
+    "bind.link": "\uC5F0\uACB0",
+    "bind.linkN": "{n}\uACF3 \uC5F0\uACB0",
+    "bind.finding": "\uCC3E\uB294 \uC911\u2026",
+    "bind.needFind": "\uBA3C\uC800 [\uCC3E\uAE30]\uB97C \uB204\uB974\uC138\uC694",
+    "bind.needOn": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uCF1C\uC138\uC694",
+    // 빈 상태(목록 자리)
+    "bind.emptyIntro": "\uAC12\uC774 \uBCC0\uC218\uC640 \uAC19\uC740 \uACF3\uC744 \uCC3E\uC544 \uC5F0\uACB0\uD574\uC694",
+    "bind.emptyNoSel": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    // 배지 줄
+    "bind.found": "\uCC3E\uC74C {n}",
+    "bind.foundTip": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12 {n}\uACF3\uC744 \uCC3E\uC558\uC5B4\uC694 \xB7 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC744 \uBCC0\uC218\uB294 \uB044\uC138\uC694",
+    "bind.skipAria": "\uAC74\uB108\uB700 {m}\uACF3 \uC0AC\uC720 \uBCF4\uAE30",
+    "bind.allOn": "\uBAA8\uB450 \uCF1C\uAE30",
+    "bind.allOff": "\uBAA8\uB450 \uB044\uAE30",
+    "bind.filterBtn": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
+    // 변수 카드 "값 → 변수"
+    "bind.cardTip": "{name}\uC744(\uB97C) \uC774 {k}\uACF3\uC5D0 \uC5F0\uACB0\uD574\uC694 \xB7 \uC77C\uBD80\uB9CC \uBE7C\uB824\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uBE80 \uB098\uBA38\uC9C0\uB97C \uC120\uD0DD\uD558\uACE0 \uB2E4\uC2DC \uCC3E\uAE30",
+    "bind.offTip": "\uB044\uBA74 \uC774 {k}\uACF3\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
+    "bind.count": "{k}\uACF3",
+    "bind.placesAria": "{name} {k}\uACF3",
+    "bind.switchAria": "{name} \uC5F0\uACB0",
+    // 연결 후 결과 카드
+    "bind.doneCard": "{n}\uACF3 \uC5F0\uACB0\uB428",
+    "bind.repreview": "\uB2E4\uC2DC \uCC3E\uAE30",
+    "bind.toList": "\uBCC0\uC218 \uD0ED\uC5D0\uC11C \uBCF4\uAE30 \u2192",
+    "bind.doneSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
+    "bind.candChanged": "\uD6C4\uBCF4\uAC00 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 {a}\uACF3 \uCD94\uAC00 \xB7 {b}\uACF3 \uC81C\uC678",
+    "bind.otherSel": "\uB2E4\uB978 \uC120\uD0DD\uC5D0\uC11C \uB9CC\uB4E0 \uACB0\uACFC\uC608\uC694",
+    "bind.maybeChanged": "\uD53C\uADF8\uB9C8\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC744 \uC218 \uC788\uC5B4\uC694",
+    "bind.selChanged": "\uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uB2E4\uC2DC \uCC3E\uC544 \uC8FC\uC138\uC694",
+    "bind.noLocalLib": "\uC774 \uD30C\uC77C\uC5D4 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
+    "bind.noTier": "\uBCC0\uC218\uB294 \uC788\uC9C0\uB9CC \uACC4\uCE35\uC774 \uC9C0\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "bind.gotoTiers": "\uACC4\uCE35 \uC9C0\uC815\uD558\uAE30 \u2192",
+    "bind.noVarsPaid": "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
+    "bind.noVarsFree": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694",
+    "bind.tsDone": "\u2713 \uD14D\uC2A4\uD2B8 {n}\uAC1C\uC5D0 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
+    "tsSkip.hasStyle": "\uC774\uBBF8 \uC2A4\uD0C0\uC77C \uC788\uC74C",
+    "tsSkip.noStyle": "\uAC19\uC740 \uC2A4\uD0C0\uC77C \uC5C6\uC74C",
+    "tsSkip.ambiguous": "\uAC19\uC740 \uBAA8\uC591 \uC2A4\uD0C0\uC77C\uC774 \uB458 \uC774\uC0C1",
+    "tsSkip.boundVars": "\uAE00\uC790 \uC18D\uC131\uC5D0 \uBCC0\uC218 \uC788\uC74C",
+    "tsSkip.mixed": "\uC11C\uC2DD\uC774 \uC11E\uC784",
+    "tsSkip.instance": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD",
+    "bind.tsNone": "\uB4F1\uB85D\uB41C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694 \xB7 \uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
+    "bind.tsNoneText": "\uB4F1\uB85D\uB41C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694",
+    "bind.tsGotoType": "\uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
     // IA v3 변수 탭(§4.2~§4.4)
     "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
     "start.head": "\uC544\uC9C1 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
@@ -1382,14 +1529,13 @@
     "start.libNote": "\u24D8 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB294 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694. \uAC19\uC740 \uBCC0\uC218\uB97C \uC5EC\uAE30\uC11C \uB610 \uB9CC\uB4E4 \uD544\uC694\uB294 \uC5C6\uC5B4\uC694.",
     "start.made": "\uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
     "start.viewList": "\uBCC0\uC218 \uBAA9\uB85D \uBCF4\uAE30",
-    "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uACE0 \uC5F0\uACB0\uD574\uC694",
+    "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uB808\uC774\uC5B4 \uC5F0\uACB0\uC740 \uB05D\uB09C \uB4A4 \uD655\uC778\uD558\uACE0 \uD574\uC694",
+    "wizardCard.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC2E4\uD589\uD560 \uC218 \uC788\uC5B4\uC694",
+    "wizard.toBind": "\uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.seq.cancelSkipped": "\uCDE8\uC18C\uB85C \uAC74\uB108\uB700",
     "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uB9CC \uC815\uB9AC\uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
-    "wizardCard.hintFreeVars": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uACC4\uCE35\uC774 \uC788\uB294 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uACFC \uB808\uC774\uC5B4 \uC774\uB984 \uC815\uB9AC\uB9CC \uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
     "wizardCard.runFree": "\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
-    "wizardCard.runFreeVars": "\uC5F0\uACB0\xB7\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
-    "wizard.freeSumNoVars": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
-    "wizard.freeSumVars": "\uC5F0\uACB0 {m}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
-    "wizard.freeNoTier": " \xB7 \uACC4\uCE35\uC774 \uC9C0\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694 \u2014 \uBCC0\uC218 \uD0ED \u22EF \u203A \uCEEC\uB809\uC158 \uACC4\uCE35 \uC9C0\uC815",
+    "wizard.freeSum": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
     "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total} \u25BE",
     "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
@@ -1397,11 +1543,9 @@
     "list.addTip": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30(\uC0C9\xB7\uD1A0\uD070\xB7\uD14C\uB9C8\xB7\uD0C0\uC774\uD3EC)",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
     "list.refreshTip": "\uB2E4\uC2DC \uC77D\uAE30",
-    "list.chipMore": "\uCE69 \uB354 \uBCF4\uAE30",
     "list.modeTip": "\uBAA8\uB4DC",
     "list.modeDefault": "\uAE30\uBCF8 \uBAA8\uB4DC",
     "list.searchTip": "\uAC80\uC0C9",
-    "list.chipAll": "\uBAA8\uB450",
     "list.chipTip": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 {used}\uAC1C(\uC9C1\uC811 {direct} \xB7 \uAC04\uC811 {indirect}) / \uC804\uCCB4 {total}\uAC1C",
     "list.reading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 \uC77D\uB294 \uC911\u2026",
     "list.refreshSame": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uBCC0\uACBD \uC5C6\uC74C",
@@ -1412,20 +1556,32 @@
     "list.read": "\uC77D\uAE30",
     "list.wizardWait": "\uB9C8\uBC95\uC0AC\uAC00 \uB05D\uB098\uBA74 \uC77D\uC5B4\uC694",
     "list.noneUsed": "\uC774 \uC120\uD0DD\uC740 \uB85C\uCEEC \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694",
-    "list.selectHint": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uB9CC \uD3BC\uCCD0\uC838\uC694",
-    "list.base": "\xB7 \uBAA9\uB85D \uAE30\uC900: {name}",
+    "list.selectHint": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \u2605 Inspect\uC5D0 \uBAA8\uC5EC\uC694",
+    "list.inspect": "\u2605 Inspect",
+    "list.inspectTip": "Inspect \u2014 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218",
+    "list.inspectAria": "Inspect \u2014 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218, {n}\uAC1C",
+    "list.inspectNoSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5EC\uAE30\uC5D0 \uBAA8\uC5EC\uC694",
+    "list.libItem": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
+    "list.libItemAria": "\uB77C\uC774\uBE0C\uB7EC\uB9AC, \uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
+    "list.deletedItem": "\uC0AD\uC81C\uB41C \uBCC0\uC218",
+    "list.deletedItemAria": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB41C \uACF3 {n}\uAC1C",
+    "list.sideColAria": "{name}, \uACC4\uCE35 {badge}, {num}",
+    "list.sideGrpAria": "{name}, {num}",
+    "list.sideExpand": "\uD3BC\uCE58\uAE30",
+    "list.sideCollapse": "\uC811\uAE30",
+    "list.searchTitle": "'{q}' \uAC80\uC0C9 \uACB0\uACFC",
+    "list.noGroup": "(\uADF8\uB8F9 \uC5C6\uC74C)",
+    "list.totalTip": "\uC804\uCCB4 {total}\uAC1C",
+    "list.baseDiff": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694 \xB7 ",
+    "list.baseDiffNoSel": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD \uC5C6\uC74C \xB7 ",
     "list.baseMany": "\uB808\uC774\uC5B4 {m}\uAC1C",
     "list.rebase": "\uAE30\uC900 \uBC14\uAFB8\uAE30",
     "list.unused": "\uC548 \uC500",
-    "list.indirect": "\u21B3 \uAC04\uC811",
+    "list.indirect": "\u21B3",
     "list.indirectTip": "\uC9C1\uC811 \uBD99\uC5B4 \uC788\uC9C4 \uC54A\uACE0, {alias} \uAC19\uC740 \uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC5EC\uC694",
     "list.usesTip": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3",
-    "list.showUnused": "+{m} \uC548 \uC500",
-    "list.hideUnused": "\uC228\uAE30\uAE30",
-    "list.unusedGroups": "\u25B8 \uC548 \uC4F0\uB294 \uADF8\uB8F9 {n}\uAC1C",
-    "list.hiddenRow": "\uC120\uD0DD\uC5D0\uC11C \uC548 \uC4F0\uC5EC \uC228\uACBC\uC5B4\uC694",
+    "list.hiddenRow": "\uC120\uD0DD\uC5D0\uC11C \uC548 \uC4F0\uC5EC \uBAA9\uB85D\uC5D0\uC11C \uBE60\uC84C\uC5B4\uC694",
     "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
-    "list.searchAll": "\uBAA8\uB450\uC5D0\uC11C \uCC3E\uAE30",
     "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
     "list.libSection": "LIB \xB7 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uAC83",
     "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
@@ -1449,8 +1605,8 @@
     "list.viaAlias": "\uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC784: {names}",
     "list.menuTiers": "\uCEEC\uB809\uC158 \uACC4\uCE35 \uC9C0\uC815\u2026",
     "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
-    "list.menuExpandAll": "\uBAA8\uB4E0 \uADF8\uB8F9 \uD3BC\uCE58\uAE30",
-    "list.menuCollapseAll": "\uBAA8\uB4E0 \uADF8\uB8F9 \uC811\uAE30",
+    "list.menuExpandAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uD3BC\uCE58\uAE30",
+    "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
     "list.semanticsNote": "\uC5ED\uD560 \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uC801\uC6A9\uD560 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
     "tab.variables": "\uBCC0\uC218",
     "tab.layer": "\uB808\uC774\uC5B4",
@@ -1461,11 +1617,9 @@
     "ui.expandBusy": "\uD3BC\uCE58\uAE30 \xB7 \uC791\uC5C5 \uC911",
     "ui.expandFail": "\uD3BC\uCE58\uAE30 \xB7 \uC2E4\uD328\uD55C \uC791\uC5C5 \uC788\uC74C",
     // 선택 표시줄(§4.1)
-    "sel.none": "\u25CF \uC120\uD0DD \uC5C6\uC74C \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
     "sel.unnamed": "(\uC774\uB984 \uC5C6\uC74C)",
-    "sel.many": "\u25CF \uB808\uC774\uC5B4 {k}\uAC1C",
-    "sel.sub": "\xA0\xB7 \uD558\uC704 {n}",
-    // 앞 공백은 줄바꿈 없는 공백 — 플렉스 항목 앞 공백은 사라진다
+    "sel.noneHere": "\uC120\uD0DD\uC774 \uC5C6\uC5B4\uC694 \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    "make.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC758 \uAC12\uC73C\uB85C \uB9CC\uB4E4\uC5B4\uC694",
     // 공통 상태 줄(§4.1·§2.3)
     "status.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4\uC5D0\uC11C \uD480 \uC218 \uC788\uC5B4\uC694",
     "status.paidAction": "\uB77C\uC774\uC120\uC2A4 \u2192",
@@ -1500,11 +1654,8 @@
     "rail.type": "\uD0C0\uC774\uD3EC",
     "rail.typeSub": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "rail.bind": "\uC5F0\uACB0",
-    "rail.bindSub": "\uBCC0\uC218 \uBD99\uC774\uAE30",
     "rail.rename": "\uC774\uB984",
-    "rail.renameSub": "\uB808\uC774\uC5B4 \uC774\uB984",
     "rail.structure": "\uCEF4\uD3EC\uB10C\uD2B8",
-    "rail.structureSub": "\uB2EE\uC740 \uD504\uB808\uC784",
     "rail.next": "\uB2E4\uC74C \u2192",
     // 플러그인 설정(#19) — 설정 탭에만
     "settings.title": "\uAE30\uBCF8\uAC12",
@@ -1529,16 +1680,14 @@
     "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB429\uB2C8\uB2E4",
     "ts.weight": "\uAD75\uAE30 \u2014 Regular \xB7 Medium \xB7 SemiBold \xB7 Bold \uCC98\uB7FC Figma\uAC00 \uC4F0\uB294 \uC774\uB984",
     "settings.grid": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uACA9\uC790",
-    "settings.gridTip": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC744 \uBBF8\uB9AC\uBCF4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC74D\uB2C8\uB2E4. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C.",
-    "settings.tol": "\uD5C8\uC6A9\uC624\uCC28",
-    "settings.tolTip": "\uBC14\uC778\uB529\uC740 \uB808\uC774\uC5B4 \uAC12\uACFC \uBCC0\uC218 \uAC12\uC758 \uCC28\uC774\uAC00 \uC774 \uAC12 \uC774\uD558\uC77C \uB54C \uAC19\uC740 \uAC12\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uACA9\uC790\uB85C \uC62E\uAE34 \uD1A0\uD070\uAE4C\uC9C0 \uBD99\uC774\uB824\uBA74 \uACA9\uC790\uC758 \uC808\uBC18\uCBE4\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
+    "settings.gridTip": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC744 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
     // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
-    "create.snapTolGap": " \xB7 \uC62E\uAE34 \uAC12\uC740 \uD5C8\uC6A9\uC624\uCC28 {tol}px\uB85C\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC548 \uBD99\uC2B5\uB2C8\uB2E4(\uC124\uC815\uC5D0\uC11C {half}px\uB85C)",
+    "create.snapNoBind": " \xB7 \uACA9\uC790\uB85C \uC62E\uAE34 {k}\uAC1C \uAC12\uC740 \uC6D0\uB798 \uB808\uC774\uC5B4\uC640 \uB2EC\uB77C \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694",
     // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
     "create.tidyUndo": "\uB418\uB3CC\uB9AC\uAE30",
     // 마법사 카드
     "wizardCard.title": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
-    "wizardCard.hint": "\uC120\uD0DD \uD654\uBA74\uC744 \uD55C \uBC88\uC5D0 \uD1A0\uD070\xB7\uBCC0\uC218 \uC5F0\uACB0\uAE4C\uC9C0 \uC815\uB9AC\uD569\uB2C8\uB2E4",
+    "wizardCard.hint": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uACE0 \uB808\uC774\uC5B4 \uC774\uB984\uC744 \uC815\uB9AC\uD574\uC694",
     "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizardCard.optDark": "\uB2E4\uD06C",
     "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
@@ -1546,7 +1695,7 @@
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
     // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uBCC0\uC218\uC5F0\uACB0=\uD654\uBA74\uC5D0 \uBD99\uC774\uAE30 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8 \uBAA8\uB4DC\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
+    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8 \uBAA8\uB4DC\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4",
     "prereq.gotoCreate": "\uD1A0\uD070 \uC0DD\uC131\uC73C\uB85C \u2192",
@@ -1593,14 +1742,14 @@
     "semantic.scanBtn": "\uAE30\uC874 \uC0C9\uC5D0\uC11C \uCD94\uCC9C",
     // 텍스트 스타일
     "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uD654\uBA74 \uC5F0\uACB0\uC740 \u300C\uAE30\uC874\uB9CC \uC5F0\uACB0\u300D",
+    "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uD654\uBA74 \uC5F0\uACB0\uC740 \uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C",
     "textStyle.scanBtn": "\uC2A4\uCE94",
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
     // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
     // 지금 무슨 일이 일어나는지를 적는다.
     "textStyle.rowLabelBtn": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984 \uCC44\uC6B0\uAE30",
     "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026) \uADF8\uB300\uB85C \uB461\uB2C8\uB2E4.",
-    "textStyle.applyExistingBtn": "\uAE30\uC874\uB9CC \uC5F0\uACB0",
+    "textStyle.applyExistingBtn": "\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
     "textStyle.applyExistingTip": "\uC120\uD0DD\uD55C \uAE00\uC790\uB97C \uC774\uBBF8 \uB9CC\uB4E0 \uAC19\uC740 \uC2A4\uD0C0\uC77C\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4. \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694.",
     "textStyle.registerBtn": "\uB4F1\uB85D",
     // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
@@ -1611,14 +1760,15 @@
     "textStyle.badgeGoTip": "\uC774 \uAE00\uC790\uB85C \uC774\uB3D9",
     "textStyle.badgeSelectTip": "\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 {count}\uAC1C \uC804\uCCB4 \uC120\uD0DD",
     // 적용(바인딩)
-    "bind.title": "\uBCC0\uC218 \uC5F0\uACB0",
-    "bind.hint": "\uBA3C\uC800 \uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD655\uC778\uD558\uACE0, \uC5F0\uACB0\uD560 \uD56D\uBAA9\uB9CC \uACE0\uB974\uC138\uC694",
-    "bind.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
-    "bind.confirm": "\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0",
+    "bind.nothing": "\uC5F0\uACB0\uD560 \uACF3\uC774 \uC5C6\uC5B4\uC694",
+    "bind.skipTotal": "\uAC74\uB108\uB700 {m}",
+    "bind.skipCappedTip": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0",
+    "bind.descNone": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "bind.selMany": "\uB808\uC774\uC5B4 {k}\uAC1C",
+    "bind.outside": "\uD544\uD130 \uBC16 {h}\uACF3 \uD3EC\uD568",
+    "bind.placeCount": " \xB7 {k}\uACF3",
+    "bind.layerTip": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uC120\uD0DD \xB7 \uC774 \uBAA9\uB85D\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
     "bind.progress": "\uC9C4\uD589\uB960",
-    "bind.skipHint": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4",
-    "bind.skipCapped": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4 \u2014 \uB808\uC774\uC5B4\uAC00 \uB9CE\uC544 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0\uB9CC \uBCF4\uC5EC\uC90D\uB2C8\uB2E4(\uC0AC\uC720 \uC606 \uC22B\uC790\uB294 \uC804\uCCB4)",
-    "bind.skipMeta": "\uC2A4\uD0B5",
     // 스킵 칩 툴팁 — 사유 건수(속성 단위)와 레이어 수가 다를 수 있어 레이어 쪽을 따로 밝힌다.
     "bind.skipChipTip": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names}",
     "bind.skipChipTipMore": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names} \uC678",
@@ -1678,11 +1828,11 @@
     "component.classifyBtn": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958",
     "component.genMissingBtn": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131",
     "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC2B5\uB2C8\uB2E4. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uC81C\uC678.",
-    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uAE41\uB2C8\uB2E4.",
+    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uAE41\uB2C8\uB2E4. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
     "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB9CC \uAC19\uC740 \uC774\uB984\uB07C\uB9AC \uC138\uD2B8\uB85C \uB2E4\uC2DC \uBB36\uC2B5\uB2C8\uB2E4.",
     "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6C1\uB2C8\uB2E4.",
     "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
-    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4.",
+    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
     "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC73C\uB85C \uBB36\uC744 \uD504\uB808\uC784\uACFC \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.",
     "similar.needScanAfterComp": "\u2018\uD6C4\uBCF4 \uC2A4\uCE94\u2019 \uACB0\uACFC\uB294 \u2018\uB4F1\uB85D\u2019\uC774 \uC501\uB2C8\uB2E4. \uBB36\uAE30\uB294 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC744 \uBA3C\uC800 \uC2E4\uD589\uD558\uC138\uC694.",
     // 내보내기
@@ -1765,6 +1915,113 @@
   }
   function isHexColor(v) {
     return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v.trim());
+  }
+
+  // src/lib/bindGroups.ts
+  function placeKey(c) {
+    var _a;
+    return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}|${c.variableId}`;
+  }
+  function groupByVariable(cands) {
+    var _a, _b;
+    const byVar = /* @__PURE__ */ new Map();
+    for (const c of cands) {
+      const arr = byVar.get(c.variableId);
+      if (arr) arr.push(c);
+      else byVar.set(c.variableId, [c]);
+    }
+    const groups = [];
+    for (const [variableId, list] of byVar) {
+      const byNode = /* @__PURE__ */ new Map();
+      for (const c of list) {
+        const arr = byNode.get(c.nodeId);
+        if (arr) arr.push(c);
+        else byNode.set(c.nodeId, [c]);
+      }
+      const lines = [];
+      for (const [nodeId, items] of byNode) {
+        for (const l of groupBindLines(items)) {
+          const its = l.items;
+          lines.push({
+            nodeId,
+            label: l.label,
+            fields: l.fields,
+            keys: its.map((x) => placeKey(__spreadProps(__spreadValues({}, x), { nodeId }))),
+            currentValue: l.currentValue
+          });
+        }
+      }
+      const variableValue = (_b = (_a = list.find((c) => c.variableValue != null)) == null ? void 0 : _a.variableValue) != null ? _b : list[0].currentValue;
+      const keys = lines.flatMap((l) => l.keys);
+      groups.push({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines });
+    }
+    groups.sort((a, b) => b.count - a.count || a.variableName.localeCompare(b.variableName));
+    return groups;
+  }
+  function carryChecks(prev, prevChecked, next) {
+    var _a, _b;
+    const prevKeys = new Set(prev.map(placeKey));
+    const varOn = /* @__PURE__ */ new Map();
+    for (const c of prev) varOn.set(c.variableId, ((_a = varOn.get(c.variableId)) != null ? _a : false) || prevChecked.has(placeKey(c)));
+    const checked = /* @__PURE__ */ new Set();
+    const nextKeys = /* @__PURE__ */ new Set();
+    let added = 0;
+    for (const c of next) {
+      const k = placeKey(c);
+      nextKeys.add(k);
+      if (!prevKeys.has(k)) added++;
+      if ((_b = varOn.get(c.variableId)) != null ? _b : true) checked.add(k);
+    }
+    let removed = 0;
+    for (const k of prevKeys) if (!nextKeys.has(k)) removed++;
+    return { checked, added, removed };
+  }
+  function fieldIcon(field) {
+    if (field === "fills") return "\u25A3";
+    if (field === "strokes") return "\u25A2";
+    if (field === "effects") return "\u25D0";
+    if (field === "opacity") return "\u25D1";
+    if (field === "strokeWeight" || /^stroke(Top|Right|Bottom|Left)Weight$/.test(field)) return "\u2503";
+    if (field === "cornerRadius" || /^(topLeft|topRight|bottomRight|bottomLeft)Radius$/.test(field)) return "\u25F0";
+    if (/^padding(Top|Right|Bottom|Left)$/.test(field) || ["itemSpacing", "counterAxisSpacing", "gridRowGap", "gridColumnGap"].includes(field)) return "\u21D4";
+    if (/^(width|height|minWidth|maxWidth|minHeight|maxHeight)$/.test(field)) return "\u2194";
+    if (["fontSize", "lineHeight", "letterSpacing", "fontFamily", "fontWeight", "fontStyle", "paragraphSpacing", "paragraphIndent"].includes(field)) return "T";
+    return "\xB7";
+  }
+  function bindExamples(cols, vars) {
+    const rank = (t2) => t2 === 3 ? 0 : t2 === 2 ? 1 : 2;
+    const tiered = cols.map((c, i) => ({ c, i })).filter((x) => x.c.tier > 0).sort((a, b) => rank(a.c.tier) - rank(b.c.tier) || a.i - b.i).map((x) => x.c);
+    const colById = new Map(cols.map((c) => [c.id, c]));
+    const varById = new Map(vars.map((v) => [v.id, v]));
+    const defaultCell = (v) => {
+      var _a, _b, _c;
+      const col = colById.get(v.collectionId);
+      const mode = (_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a.modeId) != null ? _c : "";
+      return v.values[mode];
+    };
+    const resolve = (v) => {
+      let cell = defaultCell(v);
+      for (let depth = 0; cell && cell.kind === "alias" && depth < 5; depth++) {
+        const next = cell.aliasId ? varById.get(cell.aliasId) : void 0;
+        cell = next ? defaultCell(next) : void 0;
+      }
+      return cell && cell.kind !== "alias" ? cell : void 0;
+    };
+    const out = {};
+    for (const col of tiered) {
+      for (const v of vars) {
+        if (v.collectionId !== col.id) continue;
+        if (!out.color && v.type === "COLOR") {
+          const cell = resolve(v);
+          if ((cell == null ? void 0 : cell.kind) === "color" && cell.hex) out.color = { value: cell.hex.slice(0, 7).toUpperCase(), name: v.name };
+        } else if (!out.number && v.type === "FLOAT") {
+          const cell = resolve(v);
+          if ((cell == null ? void 0 : cell.kind) === "number" && cell.text != null) out.number = { value: cell.text, name: v.name };
+        }
+        if (out.color && out.number) return out;
+      }
+    }
+    return out;
   }
 
   // src/lib/textStyles.ts
@@ -2063,78 +2320,94 @@
     }
     return m;
   }
-  function buildList(inp) {
-    var _a, _b, _c;
-    const known = inp.direct !== null;
-    const searching = inp.query.trim() !== "";
-    const cols = orderCollections(inp.collections).filter((c) => inp.chip === "all" || c.id === inp.chip);
-    const stateOf = (v) => {
-      var _a2;
-      return !known ? "none" : ((_a2 = inp.direct.get(v.id)) != null ? _a2 : 0) > 0 ? "direct" : inp.indirect.has(v.id) ? "indirect" : "unused";
-    };
-    const byCol = /* @__PURE__ */ new Map();
-    for (const c of cols) byCol.set(c.id, []);
-    const idx = /* @__PURE__ */ new Map();
-    for (const v of inp.vars) {
-      const list = byCol.get(v.collectionId);
-      if (!list) continue;
-      if (searching && !matchesQuery(v.name, inp.query)) continue;
-      const key = groupKey(v.collectionId, v.name);
-      let g = idx.get(key);
-      if (!g) {
-        g = { key, path: groupPath(v.name), rows: [] };
-        idx.set(key, g);
-        list.push(g);
-      }
-      g.rows.push(v);
+  var sideSelKey = (s) => s.kind === "col" ? `col:${s.id}` : s.kind === "grp" ? `grp:${s.key}` : s.kind;
+  function rowState(id, direct, indirect) {
+    var _a;
+    if (!direct) return "none";
+    if (((_a = direct.get(id)) != null ? _a : 0) > 0) return "direct";
+    if (indirect.has(id)) return "indirect";
+    return "unused";
+  }
+  function countOf(vars, direct, indirect) {
+    let d = 0;
+    let i = 0;
+    if (direct) for (const v of vars) {
+      const s = rowState(v.id, direct, indirect);
+      if (s === "direct") d++;
+      else if (s === "indirect") i++;
     }
-    const groupCount = [...byCol.values()].reduce((n, gs) => n + gs.length, 0);
+    return { used: d + i, total: vars.length, direct: d, indirect: i };
+  }
+  function sidebarCollections(cols, vars, direct, indirect) {
+    return orderCollections(cols).map((c) => {
+      const cv = vars.filter((v) => v.collectionId === c.id);
+      const byKey = /* @__PURE__ */ new Map();
+      for (const v of cv) {
+        const k = groupKey(c.id, v.name);
+        const arr = byKey.get(k);
+        if (arr) arr.push(v);
+        else byKey.set(k, [v]);
+      }
+      const groups = [...byKey.entries()].map(([key, gv]) => {
+        const path = groupPath(gv[0].name);
+        return __spreadValues({ key, path, label: path || NO_GROUP }, countOf(gv, direct, indirect));
+      });
+      return __spreadValues({ collection: c, groups }, countOf(cv, direct, indirect));
+    });
+  }
+  function inspectCount(vars, direct, indirect) {
+    return countOf(vars, direct, indirect).used;
+  }
+  function rightEntries(sel, cols, vars, direct, indirect, query2 = "") {
     const out = [];
-    for (const c of cols) {
-      const groups = (_a = byCol.get(c.id)) != null ? _a : [];
-      if (searching && !groups.length) continue;
-      const all = inp.vars.filter((v) => v.collectionId === c.id);
-      const usedIn = (rows) => rows.filter((v) => {
-        const s = stateOf(v);
-        return s === "direct" || s === "indirect";
-      }).length;
-      out.push({ kind: "section", collection: c, used: known ? usedIn(all) : 0, total: all.length });
-      const unusedGroups = [];
-      for (const g of groups) {
-        const used = usedIn(g.rows);
-        const unused = known ? g.rows.length - used : 0;
-        const label = g.path || NO_GROUP;
-        if (searching) {
-          out.push({ kind: "group", key: g.key, collectionId: c.id, path: g.path, label, used, total: g.rows.length, expanded: true, unused: 0, showingUnused: true });
-          for (const v of g.rows) out.push({ kind: "row", v, state: stateOf(v), groupKey: g.key });
-          continue;
+    const rank = (s) => s === "direct" || s === "indirect" ? 0 : 1;
+    const pushGroups = (side, filter, withPath, usedOnly) => {
+      const badge = tierBadge(side.collection);
+      for (const g of side.groups) {
+        const rows = vars.filter((v) => v.collectionId === side.collection.id && groupKey(v.collectionId, v.name) === g.key && filter(v)).map((v) => ({ v, state: rowState(v.id, direct, indirect) })).filter((r) => !usedOnly || rank(r.state) === 0);
+        if (!rows.length) continue;
+        rows.sort((a, b) => rank(a.state) - rank(b.state));
+        if (withPath !== "none") {
+          const label = withPath === "full" ? `${badge} ${side.collection.name} \u203A ${g.label}` : g.label;
+          out.push({ kind: "path", label, collectionId: side.collection.id });
         }
-        if (known && used === 0) {
-          unusedGroups.push(g);
-          continue;
-        }
-        const auto = known ? true : groupCount <= 10;
-        const expanded = (_b = inp.userExpanded.get(g.key)) != null ? _b : auto;
-        const showingUnused = inp.showUnusedIn.has(g.key);
-        out.push({ kind: "group", key: g.key, collectionId: c.id, path: g.path, label, used, total: g.rows.length, expanded, unused, showingUnused });
-        if (!expanded) continue;
-        for (const v of g.rows) {
-          const st = stateOf(v);
-          if (known && st === "unused" && !showingUnused) continue;
-          out.push({ kind: "row", v, state: st, groupKey: g.key });
-        }
+        for (const r of rows) out.push(__spreadValues({ kind: "row" }, r));
       }
-      if (unusedGroups.length) {
-        if (inp.showUnusedGroups.has(c.id)) {
-          for (const g of unusedGroups) {
-            const expanded = (_c = inp.userExpanded.get(g.key)) != null ? _c : false;
-            out.push({ kind: "group", key: g.key, collectionId: c.id, path: g.path, label: g.path || NO_GROUP, used: 0, total: g.rows.length, expanded, unused: g.rows.length, showingUnused: true });
-            if (expanded) for (const v of g.rows) out.push({ kind: "row", v, state: "unused", groupKey: g.key });
-          }
-        } else out.push({ kind: "unusedGroups", collectionId: c.id, count: unusedGroups.length });
-      }
+    };
+    const sides = sidebarCollections(cols, vars, direct, indirect);
+    if (query2.trim()) {
+      for (const side of sides) pushGroups(side, (v) => matchesQuery(v.name, query2), "full", false);
+      return out;
+    }
+    if (sel.kind === "inspect") {
+      if (!direct) return out;
+      for (const side of sides) pushGroups(side, () => true, "full", true);
+    } else if (sel.kind === "col") {
+      const side = sides.find((s) => s.collection.id === sel.id);
+      if (side) pushGroups(side, () => true, "path", false);
+    } else if (sel.kind === "grp") {
+      const side = sides.find((s) => s.groups.some((g) => g.key === sel.key));
+      if (side) pushGroups(__spreadProps(__spreadValues({}, side), { groups: side.groups.filter((g) => g.key === sel.key) }), () => true, "none", false);
     }
     return out;
+  }
+  function initialSideSel(cols, vars, hasBaseline, bigSkipped2, direct, indirect) {
+    const first = orderCollections(cols)[0];
+    const fallback = first ? { kind: "col", id: first.id } : { kind: "inspect" };
+    if (!hasBaseline || bigSkipped2) return fallback;
+    if (!direct) return { kind: "inspect" };
+    return inspectCount(vars, direct, indirect) > 0 ? { kind: "inspect" } : fallback;
+  }
+  function validSideSel(sel, cols, vars, hasLib, hasDeleted, initial) {
+    if (sel.kind === "inspect") return sel;
+    if (sel.kind === "col") return cols.some((c) => c.id === sel.id) ? sel : initial();
+    if (sel.kind === "grp") {
+      if (vars.some((v) => groupKey(v.collectionId, v.name) === sel.key)) return sel;
+      const colId = sel.key.slice(0, sel.key.indexOf("|"));
+      return cols.some((c) => c.id === colId) ? { kind: "col", id: colId } : initial();
+    }
+    if (sel.kind === "lib") return hasLib ? sel : initial();
+    return hasDeleted ? sel : initial();
   }
 
   // src/lib/reread.ts
@@ -2188,11 +2461,6 @@
         return held || debounce !== null || interval !== null;
       }
     };
-  }
-  function selectionSummary(count, scanned, capped) {
-    if (count <= 0) return { kind: "none", sub: "" };
-    const n = Math.max(0, scanned - count);
-    return { kind: count === 1 ? "one" : "many", sub: `${n}${capped ? "+" : ""}` };
   }
 
   // src/lib/color.ts
@@ -2706,7 +2974,6 @@
     // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
     { id: "dark", write: true, optional: true, paid: true },
     { id: "textStyles", write: true, optional: true, paid: true },
-    { id: "bind", write: true, optional: false },
     { id: "rename", write: true, optional: false },
     { id: "componentize", write: true, optional: true, paid: true }
   ];
@@ -2741,7 +3008,6 @@
     if (totals.created != null) parts.push(t("wizard.sum.tokens", { n: totals.created }));
     if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t("wizard.sum.dark", { n: totals.darkFilled }));
     if (totals.textStyles != null && totals.textStyles > 0) parts.push(t("wizard.sum.textStyles", { n: totals.textStyles }));
-    if (totals.bound != null) parts.push(t("wizard.sum.bound", { n: totals.bound }));
     if (totals.renamed != null) parts.push(t("wizard.sum.renamed", { n: totals.renamed }));
     if (totals.components != null && totals.components > 0) parts.push(t("wizard.sum.components", { n: totals.components }));
     return parts.length ? parts.join(" \xB7 ") : t("wizard.sum.empty");
@@ -2769,6 +3035,7 @@
   var hasScaleVars = false;
   var hasGlobal = false;
   var hasBindable = false;
+  var prereqLocalVars = 0;
   var prereqKnown = false;
   var prereqInFlight = false;
   function requestPrereq() {
@@ -2791,6 +3058,7 @@
   var selectStatusTarget = "applyStatus";
   function selectNodes(ids, statusId) {
     selectStatusTarget = statusId;
+    if (statusId === "applyStatus" && activeTab === "layer") bindLayerSelectPending = true;
     send({ type: "SELECT_NODES", ids });
   }
   function resolveStatusId(id) {
@@ -3246,9 +3514,7 @@
     carryTokenChecked(snapshot, r.tokens);
     $("numTidySummary").style.display = "";
     const merged = r.merged ? ` \xB7 \uAC19\uC740 \uCE78 ${r.merged}\uAC1C \uBCD1\uD569` : "";
-    const half = grid / 2;
-    const tol = bindTolerance();
-    const gap = tol < half ? t("create.snapTolGap", { tol, half }) : "";
+    const gap = r.snapped ? t("create.snapNoBind", { k: r.snapped }) : "";
     $("numTidyText").textContent = `\uC5EC\uBC31\xB7\uD06C\uAE30 ${r.before} \u2192 ${r.after}\uAC1C (${grid}px \uACA9\uC790\uB85C ${r.snapped}\uAC1C \uC774\uB3D9${merged})${gap}`;
   }
   function undoNumTidy() {
@@ -3305,18 +3571,13 @@
         type: "SET_SETTINGS",
         base: Number($("base").value) || 16,
         maxDepth: readMaxDepth(),
-        grid: tidyGrid(),
-        tolerance: bindTolerance()
+        grid: tidyGrid()
       });
     }, 350);
   }
   $("base").addEventListener("input", saveSettings);
   $("depth").addEventListener("input", saveSettings);
   $("grid").addEventListener("input", saveSettings);
-  $("tol").addEventListener("input", () => {
-    saveSettings();
-    clearBindPreview();
-  });
   $("base").addEventListener("input", () => {
     const applyBtn = $("btnCreateApply");
     if (applyBtn.style.display === "none") return;
@@ -3520,16 +3781,9 @@
     send({ type: "CREATE_TEXT_STYLES", styles });
   });
   $("btnApplyExistingText").addEventListener("click", () => {
-    setStatus("tsStatus", "\uC120\uD0DD \uD14D\uC2A4\uD2B8\uB97C \uAE30\uC874 \uC2A4\uD0C0\uC77C\uC5D0 \uC801\uC6A9 \uC911\u2026", "ok");
+    $("tsApplyResult").hidden = true;
     send({ type: "APPLY_TEXT_STYLES" });
   });
-  var BIND_TOLERANCE_DEFAULT = 0.5;
-  function bindTolerance() {
-    const raw = $("tol").value.trim();
-    const v = Number(raw);
-    return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
-  }
-  var AUTO_SCAN_MAX = 300;
   var AUTO_SCAN_DELAY = 250;
   var bindReqSeq = 0;
   var bindLatest = 0;
@@ -3545,32 +3799,39 @@
   function isCurrentBindReply(reqId) {
     return reqId === void 0 || reqId === bindLatest;
   }
-  function requestBindingsScan() {
-    send({ type: "SCAN_BINDINGS", reqId: nextBindReq() });
+  $("btnApply").addEventListener("click", () => runBindPreview());
+  function runBindPreview(silent = false) {
+    $("bindNotice").hidden = true;
+    const wasDone = bindIsDone();
+    $("bindDone").hidden = true;
+    if (wasDone) {
+      bindSkipReasons = {};
+      bindSkipsOpen = false;
+    }
+    bindForeignSel = false;
+    bindHereSel = false;
+    bindLeftSince = false;
+    if (!silent) {
+      bindFinding = true;
+      showApplyProgress(t("bind.finding"));
+    }
+    const reqId = nextBindReq();
+    bindSilentReq = silent ? reqId : 0;
+    opSilent = silent;
+    send({ type: "APPLY", preview: true, reqId });
+    opSilent = false;
+    bindPreviewSel = curSel.ids.slice();
+    if (!silent) bindPreviewName = curSel.count === 1 ? shortName(curSel.name || t("sel.unnamed")) : t("bind.selMany", { k: curSel.count });
+    renderBindChrome();
   }
-  function markBindStale(on) {
-    $("bindTree").classList.toggle("stale", on);
-    if (on) $("btnApplyConfirm").style.display = "none";
-  }
-  $("btnScanBindings").addEventListener("click", () => {
-    setStatus("applyStatus", t("common.running"), "");
-    requestBindingsScan();
-  });
-  $("btnApply").addEventListener("click", () => {
-    showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
-    send({ type: "APPLY", tolerance: bindTolerance(), preview: true, reqId: nextBindReq() });
-  });
+  $("btnBindRepreview").addEventListener("click", () => runBindPreview());
+  $("btnBindToList").addEventListener("click", () => showManager());
   $("btnApplyConfirm").addEventListener("click", () => {
     const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
     if (!items.length) return;
+    bindFinding = false;
     showApplyProgress("\uC5F0\uACB0 \uC911\u2026");
     send({ type: "APPLY_SELECTED", items, reqId: nextBindReq() });
-  });
-  $("bindAll").addEventListener("change", (e) => {
-    const on = e.target.checked;
-    bindChecked.clear();
-    if (on) for (const c of bindCandidates) bindChecked.add(candKey(c));
-    renderBindTree();
   });
   $("btnApplyCancel").addEventListener("click", () => {
     send({ type: "CANCEL" });
@@ -3602,7 +3863,6 @@
   window.addEventListener("message", (event) => {
     const m = event.data.pluginMessage;
     if (!m) return;
-    if (wizardRunning && m.type === "PROGRESS" && m.op === "bind") updateWizardBar(m.done, m.total);
     if (!wizardWaiter) return;
     if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
       const w = wizardWaiter;
@@ -3626,18 +3886,6 @@
       send(msg);
     });
   }
-  function showWizardBar() {
-    $("wizardBar").style.display = "";
-    $("wizardBarFill").style.width = "0%";
-  }
-  function updateWizardBar(done, total) {
-    $("wizardBar").style.display = "";
-    const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
-    $("wizardBarFill").style.width = `${pct}%`;
-  }
-  function hideWizardBar() {
-    $("wizardBar").style.display = "none";
-  }
   function paidSkippedSteps(plan) {
     return plan.filter((p) => !p.run && p.skipReason === "wizard.skip.paid");
   }
@@ -3648,37 +3896,36 @@
     for (const p of plan) {
       const paidSkip = !p.run && p.skipReason === "wizard.skip.paid";
       if (!p.run && !paidSkip) continue;
-      const chip2 = document.createElement("span");
-      chip2.id = `wstep-${p.step.id}`;
+      const chip = document.createElement("span");
+      chip.id = `wstep-${p.step.id}`;
       const label = t("wizard.step." + p.step.id);
       if (p.run) {
-        chip2.textContent = `${++n} ${label}`;
+        chip.textContent = `${++n} ${label}`;
       } else {
-        chip2.className = "skip";
-        chip2.textContent = `${PAID_LOCK} ${label}`;
-        chip2.title = t("wizard.chip.paid");
+        chip.className = "skip";
+        chip.textContent = `${PAID_LOCK} ${label}`;
+        chip.title = t("wizard.chip.paid");
       }
-      box.appendChild(chip2);
+      box.appendChild(chip);
     }
   }
   var wizardFailed = false;
   function setWizardStep(id, state, note) {
     if (state === "fail" && note !== t("wizard.seq.stoppedPrev")) wizardFailed = true;
-    const chip2 = document.getElementById(`wstep-${id}`);
-    if (!chip2) return;
-    chip2.classList.remove("active", "done", "fail");
-    chip2.classList.add(state);
-    chip2.title = note;
+    const chip = document.getElementById(`wstep-${id}`);
+    if (!chip) return;
+    chip.classList.remove("active", "done", "fail");
+    chip.classList.add(state);
+    chip.title = note;
   }
   async function runWizard() {
-    var _a, _b;
+    var _a;
     if (wizardRunning) return;
     if (lastSelCount <= 0) {
       setStatus("wizardSummary", t("wizard.needSelect"), "warn");
       return;
     }
     const base = Number($("base").value) || 16;
-    const tolerance = bindTolerance();
     const maxDepth = readMaxDepth();
     let semMap = textToSemanticMap($("semMap").value);
     const options = {
@@ -3703,10 +3950,14 @@
     const totals = {};
     let stopped = false;
     let failNote = "";
+    wizCancelReq = false;
+    wizEnded = false;
+    renderWizToBind();
     for (const p of plan) {
       if (!p.run) continue;
+      if (wizCancelReq && !stopped) stopped = true;
       if (stopped) {
-        setWizardStep(p.step.id, "fail", t("wizard.seq.stoppedPrev"));
+        setWizardStep(p.step.id, "fail", wizCancelReq ? t("wizard.seq.cancelSkipped") : t("wizard.seq.stoppedPrev"));
         continue;
       }
       setWizardStep(p.step.id, "active", t("wizard.seq.running"));
@@ -3785,19 +4036,6 @@
             setWizardStep("textStyles", "done", t("wizard.seq.textStyles", { created: r.created, updated: r.updated }));
             break;
           }
-          case "bind": {
-            showWizardBar();
-            const r = await wizardRequest({ type: "APPLY", tolerance }, ["APPLY_RESULT"]);
-            hideWizardBar();
-            totals.bound = r.bound;
-            if (r.cancelled) {
-              setWizardStep("bind", "done", t("wizard.seq.bindCancelled", { bound: r.bound }));
-              stopped = true;
-              break;
-            }
-            setWizardStep("bind", "done", t("wizard.seq.bindDone", { bound: r.bound }) + (r.skipped ? t("wizard.seq.bindSkip", { n: r.skipped }) : ""));
-            break;
-          }
           case "rename": {
             const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth }, ["RENAME_RESULT"]);
             totals.renamed = r.changes.length;
@@ -3812,7 +4050,6 @@
           }
         }
       } catch (e) {
-        hideWizardBar();
         const fe = explainError(e instanceof Error ? e.message : String(e));
         failNote = `${fe.message}${fe.action ? ` \u2014 ${fe.action}` : ""}`;
         setWizardStep(p.step.id, "fail", failNote);
@@ -3828,18 +4065,23 @@
     const paidSkipped = paidSkippedSteps(plan);
     const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
     if (!isPaid && !stopped && !wizardFailed) {
-      const renamed = (_a = totals.renamed) != null ? _a : 0;
-      const bound = (_b = totals.bound) != null ? _b : 0;
-      let text = wizBeforeCount === 0 ? t("wizard.freeSumNoVars", { n: renamed }) : t("wizard.freeSumVars", { m: bound, n: renamed });
-      if (wizBeforeCount > 0 && bound === 0 && !vmCols.some((c) => c.tier > 0)) text += t("wizard.freeNoTier");
-      setStatus("wizardSummary", text, "ok");
+      setStatus("wizardSummary", t("wizard.freeSum", { n: (_a = totals.renamed) != null ? _a : 0 }), "ok");
     } else setStatus(
       "wizardSummary",
       t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
       stopped || paidSkipped.length || wizardFailed ? "warn" : "ok"
     );
     wizCountPending = wizFrom === "make" && wizBeforeCount > 0;
+    wizEnded = true;
+    renderWizToBind();
     renderVarScreen();
+  }
+  var wizCancelReq = false;
+  var wizEnded = false;
+  function renderWizToBind() {
+    const b = $("btnWizToBind");
+    b.hidden = !wizEnded || wizardRunning || prereqKnown && !hasBindable;
+    if (curSel) setLock(b, curSel.count ? null : "prereq", t("status.noSelection"));
   }
   var wizCountPending = false;
   var lastSelBound = 0;
@@ -3858,7 +4100,11 @@
     renderWizardCopy();
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
-  $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
+  $("btnWizardCancel").addEventListener("click", () => {
+    wizCancelReq = true;
+    send({ type: "CANCEL" });
+  });
+  $("btnWizToBind").addEventListener("click", () => findUnbound());
   if (false) {
     $("devTierRow").style.display = "";
     $("tier").addEventListener("change", () => {
@@ -3972,10 +4218,7 @@
     }
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!isPaid) setLock($("btnSemantics"), "paid");
-    setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
-    setLock($("btnApplyConfirm"), prereqKnown && !hasBindable ? "prereq" : null, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
-    setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
-    if (!isPaid) setLock($("btnApplyExistingText"), "paid");
+    renderBindPrereq();
   }
   function setLockTitle(el, locked) {
     var _a;
@@ -4241,7 +4484,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -4274,27 +4517,25 @@
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         onSelectionForList(msg);
-        renderSelBar(msg.count, msg.scanned, msg.capped, (_a = msg.firstName) != null ? _a : "");
         lastSelBound = msg.bound;
         lastSelRenamed = msg.renamed;
         applySelectionDone();
         refreshVariantRow(msg.comps, msg.sets);
         if (!msg.selfSelect) {
-          scheduleManagerUsage();
           nextBindReq();
           hideApplyProgress();
-          const autoScan = !wizardRunning && msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX;
-          if (autoScan) {
-            markBindStale(true);
-            autoScanTimer = setTimeout(() => {
-              autoScanTimer = null;
-              requestBindingsScan();
-            }, AUTO_SCAN_DELAY);
-          } else {
-            clearBindPreview();
-            if (!wizardRunning && msg.bound > 0) setStatus("applyStatus", t("bind.scanHintLarge"), "");
-          }
+          clearBindPreview();
+          $("bindDone").hidden = true;
+          $("tsApplyResult").hidden = true;
+          layerLibUse = null;
+          if (activeTab === "layer") readLayerLibUse();
+        } else if (bindLayerSelectPending) {
+          bindHereSel = true;
+        } else if (hasBindPreview()) {
+          bindForeignSel = true;
         }
+        bindLayerSelectPending = false;
+        renderBindPrereq();
         if (!tokens.length) renderTokens();
         refreshTreeEmptyStates();
         break;
@@ -4335,45 +4576,49 @@
       case "APPLY_RESULT": {
         if (!isCurrentBindReply(msg.reqId)) break;
         hideApplyProgress();
-        markBindStale(false);
-        const confirmBtn = $("btnApplyConfirm");
-        bindSkips = (_b = msg.skips) != null ? _b : [];
-        bindSkipsCapped = ((_c = msg.skipTotal) != null ? _c : bindSkips.length) > bindSkips.length;
+        const silent = msg.preview && msg.reqId !== void 0 && msg.reqId === bindSilentReq;
+        bindSilentReq = 0;
+        if (isMini && msg.preview) bindPreviewMini = true;
+        bindSkips = (_a = msg.skips) != null ? _a : [];
+        bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
         const rt = reasonsText(msg.reasons);
-        const asChips = bindSkips.length > 0;
-        const detail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt && !asChips ? ` \u2014 ${rt}` : ""}`;
-        renderSkipReasons(msg.reasons);
         if (msg.cancelled) {
           clearBindPreview();
           const cancelDetail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}`;
           setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail: cancelDetail }), "warn");
-          confirmBtn.style.display = "none";
         } else if (msg.preview) {
-          bindResultMode = false;
-          bindCandidates = (_d = msg.candidates) != null ? _d : [];
-          bindNodes = (_e = msg.nodes) != null ? _e : [];
+          const prev = bindCandidates;
+          const prevChecked = new Set(bindChecked);
+          bindCandidates = (_c = msg.candidates) != null ? _c : [];
+          bindNodes = (_d = msg.nodes) != null ? _d : [];
+          bindPreviewed = true;
           bindChecked.clear();
-          for (const c of bindCandidates) bindChecked.add(candKey(c));
+          renderSkipReasons((_e = msg.reasons) != null ? _e : {});
+          if (silent) {
+            const r = carryChecks(prev, prevChecked, bindCandidates);
+            for (const k of r.checked) bindChecked.add(k);
+            if (r.added || r.removed) showStatusLine(t("bind.candChanged", { a: r.added, b: r.removed }));
+          } else {
+            bindSkipsOpen = false;
+            for (const c of bindCandidates) bindChecked.add(candKey(c));
+          }
           renderBindTree();
-          setStatus("applyStatus", t("apply.preview", { bound: msg.bound, detail }), msg.skipped ? "warn" : "");
+          setStatus("applyStatus", "", "");
         } else {
           clearBindPreview();
-          bindResultMode = true;
-          bindCandidates = (_f = msg.candidates) != null ? _f : [];
-          bindNodes = (_g = msg.nodes) != null ? _g : [];
-          bindSkips = (_h = msg.skips) != null ? _h : [];
-          bindSkipsCapped = ((_i = msg.skipTotal) != null ? _i : bindSkips.length) > bindSkips.length;
-          renderSkipReasons(msg.reasons);
+          bindSkips = (_f = msg.skips) != null ? _f : [];
+          bindSkipsCapped = ((_g = msg.skipTotal) != null ? _g : bindSkips.length) > bindSkips.length;
+          renderSkipReasons((_h = msg.reasons) != null ? _h : {});
+          setStatus("applyStatus", "", "");
+          $("bindDoneText").textContent = t("bind.doneCard", { n: msg.bound });
+          $("bindDone").hidden = false;
           renderBindTree();
-          const capped = ((_j = msg.candidateTotal) != null ? _j : bindCandidates.length) > bindCandidates.length;
-          const capNote = capped ? t("apply.resultCapped", { shown: bindCandidates.length }) : "";
-          setStatus("applyStatus", t("apply.done", { bound: msg.bound, detail }) + capNote, msg.skipped ? "warn" : "ok");
-          confirmBtn.style.display = "none";
         }
         break;
       }
       case "VAR_TABLE":
         onVarTable(msg);
+        renderBindEmpty();
         break;
       case "USAGE_RESULT":
         onUsageResult(msg);
@@ -4381,17 +4626,6 @@
       case "VAR_USERS":
         onVarUsers(msg);
         break;
-      case "BINDINGS_RESULT": {
-        if (!isCurrentBindReply(msg.reqId)) break;
-        clearBindPreview();
-        bindResultMode = true;
-        bindCandidates = msg.candidates;
-        bindNodes = msg.nodes;
-        renderBindTree();
-        const capNote = msg.total > msg.candidates.length ? t("apply.resultCapped", { shown: msg.candidates.length }) : "";
-        setStatus("applyStatus", msg.total ? t("bind.scanned", { total: msg.total, nodes: msg.boundNodes }) + capNote : t("bind.scannedNone"), msg.total ? "" : "warn");
-        break;
-      }
       case "SELECT_RESULT":
         if (selectStatusTarget === "list") {
           if (msg.capped) showStatusLine(t("list.selectCapped", { n: msg.requested }), { cls: "warn" });
@@ -4427,7 +4661,7 @@
           }) : [];
           tsSpecs = [...msg.styles.map((x) => __spreadValues({}, x)), ...manual];
           tsScanNote = {
-            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_k = msg.fallback) != null ? _k : 0}` : "",
+            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_i = msg.fallback) != null ? _i : 0}` : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -4447,13 +4681,13 @@
           msg.missing.length ? "warn" : "ok"
         );
         break;
-      case "TEXT_STYLES_APPLIED":
-        setStatus(
-          "tsStatus",
-          `\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC801\uC6A9 ${msg.applied}\uAC74` + (msg.missing.length ? ` \xB7 ${msg.missing.join(" \xB7 ")}` : ""),
-          msg.applied === 0 || msg.missing.length ? "warn" : "ok"
-        );
+      case "TEXT_STYLES_APPLIED": {
+        const line = $("tsApplyResult");
+        line.textContent = t("bind.tsDone", { n: msg.applied }) + (msg.skipped ? t("bind.doneSkipped", { m: msg.skipped }) : "");
+        line.title = Object.entries((_j = msg.skipReasons) != null ? _j : {}).filter(([, n]) => n > 0).map(([k, n]) => `${t("tsSkip." + k)} ${n}`).join(" \xB7 ");
+        line.hidden = false;
         break;
+      }
       case "COLLECTIONS":
         break;
       case "COLLECTION_ROLES":
@@ -4477,6 +4711,8 @@
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
+        prereqLocalVars = ((_k = msg.tierVars) != null ? _k : 0) + ((_l = msg.otherVars) != null ? _l : 0);
+        if (activeTab === "layer") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
         hasSemanticRoles = msg.hasSemanticRoles;
@@ -4546,7 +4782,6 @@
         $("base").value = String(msg.base);
         $("depth").value = String(msg.maxDepth);
         $("grid").value = String(msg.grid);
-        $("tol").value = String(msg.tolerance);
         break;
       }
       case "VARIABLES": {
@@ -4628,7 +4863,7 @@
     CREATE_TEXT_STYLES: "tsStatus",
     // 옛 `tsApplyStatus`가 사라졌다고 매핑까지 빼면 폴백(colorStatus)으로 흘러가는데,
     // 그 줄은 다른 단계에 있어 숨겨져 있다 — 실패가 '적용 중…'인 채로 조용히 묻힌다.
-    APPLY_TEXT_STYLES: "tsStatus",
+    APPLY_TEXT_STYLES: "applyStatus",
     APPLY: "applyStatus",
     // 실제 자리는 부른 쪽이 정한다(selectStatusTarget) — 여기 값은 resolveStatusId가 못 받는
     // 경로를 위한 폴백일 뿐이다.
@@ -4806,126 +5041,345 @@
   var bindCandidates = [];
   var bindNodes = [];
   var bindChecked = /* @__PURE__ */ new Set();
-  var bindHideContext = true;
-  function candKey(c) {
-    var _a;
-    return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}`;
-  }
-  var bindResultMode = false;
+  var candKey = placeKey;
   function hasBindPreview() {
-    return bindCandidates.length > 0 && !bindResultMode;
+    return bindCandidates.length > 0;
   }
-  function skipReasonText(s) {
-    const why = t(`reason.${s.reason}`);
-    return s.field ? `${s.field} \xB7 ${why}` : why;
-  }
-  function bindRows() {
-    const byNode = /* @__PURE__ */ new Map();
-    for (const c of filteredCandidates()) {
-      const arr = byNode.get(c.nodeId);
-      if (arr) arr.push(c);
-      else byNode.set(c.nodeId, [c]);
-    }
-    const skipOf = /* @__PURE__ */ new Map();
-    for (const s of bindSkips) if (!byNode.has(s.nodeId) && !skipOf.has(s.nodeId)) skipOf.set(s.nodeId, s);
-    const rows = [];
-    for (const n of bindNodes) {
-      const cands = byNode.get(n.id);
-      const skipped = skipOf.get(n.id);
-      if (!cands && skipped) {
-        rows.push({
-          id: n.id,
-          name: n.name,
-          type: n.type,
-          depth: n.depth,
-          parentId: n.parentId,
-          keep: { reason: skipReasonText(skipped), meta: t("bind.skipMeta") }
-        });
-        continue;
-      }
-      rows.push(__spreadValues({ id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, header: !!cands }, cands ? { selectId: n.id } : {}));
-      if (cands) {
-        for (const line of groupBindLines(cands)) {
-          const lead = line.items[0];
-          const dist = lead.distance && lead.distance > 0 ? ` ~${Math.round(lead.distance * 100) / 100}` : "";
-          const label = fieldLabel(line.label, line.fields[0]);
-          const variable = `${line.variableName}${dist}`;
-          const tipArgs = { label, fields: line.fields.join(", "), variable: line.variableName };
-          rows.push({
-            id: candKey(lead),
-            keys: line.items.map((it) => candKey(it)),
-            name: `${label} ${line.currentValue}`,
-            type: line.fields[0],
-            depth: n.depth + 1,
-            parentId: n.id,
-            change: variable,
-            bind: {
-              label,
-              value: line.currentValue,
-              variable,
-              connected: bindResultMode,
-              tip: t(bindResultMode ? "bind.connectedTip" : "bind.willConnectTip", tipArgs)
-            }
-          });
-        }
-      }
-    }
-    return rows;
-  }
+  var bindPreviewed = false;
+  var bindPreviewName = "";
+  var bindExpanded = /* @__PURE__ */ new Map();
+  var bindFinding = false;
+  var bindSkipsOpen = false;
+  var bindSkipReasons = {};
+  var bindPreviewSel = null;
+  var bindLeftSince = false;
+  var bindForeignSel = false;
+  var bindHereSel = false;
+  var bindLayerSelectPending = false;
+  var bindPreviewMini = false;
+  var bindSilentReq = 0;
+  var layerLibUse = null;
+  var layerLibReq = 0;
   function fieldLabel(label, rawField) {
     return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
-  }
-  function renderBindTree() {
-    const has = bindCandidates.length > 0;
-    $("bindViewRow").style.display = has ? "" : "none";
-    $("bindTreeCtrls").style.display = hasBindPreview() ? "" : "none";
-    renderSelectableTree($("bindTree"), bindRows(), bindChecked, {
-      hideContext: bindHideContext,
-      onChange: updateBindApply,
-      readOnly: bindResultMode
-      // 적용 결과: 어느 레이어에 어느 변수가 붙었는지 보기만
-    });
-    updateBindApply();
   }
   function bindFilterText() {
     var _a;
     return ((_a = $("bindFilter").value) != null ? _a : "").trim().toLowerCase();
   }
-  function filteredCandidates() {
+  function bindGroups() {
+    const all = groupByVariable(bindCandidates);
     const q = bindFilterText();
-    return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
+    return { all, shown: q ? all.filter((g) => g.variableName.toLowerCase().includes(q)) : all };
   }
-  $("bindFilter").addEventListener("input", () => renderBindTree());
-  $("btnBindToManager").addEventListener("click", () => showManager());
-  function updateBindApply() {
-    const total = bindCandidates.length;
-    const sel = bindChecked.size;
-    $("bindCount").textContent = total ? bindResultMode ? `\uC5F0\uACB0 ${total}` : `\uD6C4\uBCF4 ${total}` : "";
-    const confirm = $("btnApplyConfirm");
-    confirm.style.display = hasBindPreview() ? "" : "none";
-    confirm.disabled = sel === 0;
-    if (hasBindPreview()) {
-      const all = $("bindAll");
-      all.checked = sel === total && total > 0;
-      all.indeterminate = sel > 0 && sel < total;
+  function groupOpen(g) {
+    var _a;
+    return (_a = bindExpanded.get(g.variableId)) != null ? _a : false;
+  }
+  var groupOn = (g) => g.keys.every((k) => bindChecked.has(k));
+  var bindOnCount = () => bindChecked.size;
+  var bindIsDone = () => !$("bindDone").hidden;
+  var bindPrereqShown = () => $("bindPrereq").style.display !== "none";
+  var bindOtherSel = () => bindForeignSel && !$("bindNotice").hidden;
+  function typeMark(value) {
+    return isHexColor(value) ? "\u25CF" : /^-?\d/.test(value) ? "#" : "T";
+  }
+  function valueChip(value) {
+    const chip = document.createElement("span");
+    chip.className = "bv-chip bv-val";
+    if (isHexColor(value)) {
+      const sw = document.createElement("span");
+      sw.className = "bv-sw";
+      sw.style.background = value;
+      chip.append(sw, value.toUpperCase());
+    } else chip.textContent = value;
+    return chip;
+  }
+  function varChip(name, value) {
+    const chip = document.createElement("span");
+    chip.className = "bv-chip bv-var";
+    const mark = document.createElement("span");
+    mark.className = "bv-mark";
+    mark.setAttribute("aria-hidden", "true");
+    mark.textContent = typeMark(value);
+    const nm = document.createElement("span");
+    nm.className = "bv-name";
+    nm.textContent = name;
+    chip.append(mark, nm);
+    return chip;
+  }
+  var arrowEl = () => {
+    const a = document.createElement("span");
+    a.className = "bv-arrow";
+    a.setAttribute("aria-hidden", "true");
+    a.textContent = "\u2192";
+    return a;
+  };
+  function tipTruncatedNames(root) {
+    requestAnimationFrame(() => {
+      var _a;
+      for (const nm of Array.from(root.querySelectorAll(".bv-name"))) {
+        const chip = nm.parentElement;
+        if (nm.scrollWidth > nm.clientWidth + 1) chip.title = (_a = nm.textContent) != null ? _a : "";
+        else chip.removeAttribute("title");
+      }
+    });
+  }
+  function placeEl(l) {
+    var _a;
+    const row = document.createElement("div");
+    row.className = "bv-place";
+    row.dataset.key = l.keys[0];
+    const ic = document.createElement("span");
+    ic.className = "bv-ic";
+    ic.setAttribute("aria-hidden", "true");
+    ic.textContent = fieldIcon(l.fields[0]);
+    const node = bindNodes.find((n) => n.id === l.nodeId);
+    const layer = document.createElement("button");
+    layer.type = "button";
+    layer.className = "link link-btn bv-layer";
+    layer.textContent = (_a = node == null ? void 0 : node.name) != null ? _a : l.nodeId;
+    layer.title = t("bind.layerTip");
+    layer.addEventListener("click", () => selectNodes([l.nodeId], "applyStatus"));
+    const prop = document.createElement("span");
+    prop.className = "bv-prop";
+    prop.textContent = fieldLabel(l.label, l.fields[0]) + (l.keys.length > 1 ? t("bind.placeCount", { k: l.keys.length }) : "");
+    row.append(ic, layer, prop);
+    return row;
+  }
+  function bindGroupEl(g) {
+    const on = groupOn(g);
+    const open = groupOpen(g);
+    const card = document.createElement("div");
+    card.className = "bv-card";
+    card.classList.toggle("off", !on);
+    card.dataset.var = g.variableId;
+    const head = document.createElement("div");
+    head.className = "bv-head";
+    head.title = on ? t("bind.cardTip", { name: g.variableName, k: g.count }) : t("bind.offTip", { k: g.count });
+    const grow = document.createElement("span");
+    grow.className = "grow";
+    const tw = document.createElement("button");
+    tw.type = "button";
+    tw.className = "bv-tw";
+    tw.textContent = `${t("bind.count", { k: g.count })} ${open ? "\u25BE" : "\u25B8"}`;
+    tw.setAttribute("aria-expanded", String(open));
+    tw.setAttribute("aria-label", t("bind.placesAria", { name: g.variableName, k: g.count }));
+    tw.addEventListener("click", () => {
+      bindExpanded.set(g.variableId, !open);
+      renderBindTree();
+      focusCardControl(g.variableId, ".bv-tw");
+    });
+    const sw = document.createElement("button");
+    sw.type = "button";
+    sw.className = "bv-switch";
+    sw.setAttribute("role", "switch");
+    sw.setAttribute("aria-checked", String(on));
+    sw.setAttribute("aria-label", t("bind.switchAria", { name: g.variableName }));
+    const track = document.createElement("span");
+    track.className = "bv-track";
+    track.setAttribute("aria-hidden", "true");
+    sw.appendChild(track);
+    sw.addEventListener("click", () => {
+      for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k);
+      renderBindTree();
+      focusCardControl(g.variableId, ".bv-switch");
+    });
+    head.append(valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue), grow, tw, sw);
+    card.appendChild(head);
+    if (open) {
+      const places = document.createElement("div");
+      places.className = "bv-places";
+      for (const l of g.lines) places.appendChild(placeEl(l));
+      card.appendChild(places);
     }
+    return card;
+  }
+  function focusCardControl(variableId, sel) {
+    var _a;
+    (_a = $("bindTree").querySelector(`.bv-card[data-var="${CSS.escape(variableId)}"] ${sel}`)) == null ? void 0 : _a.focus();
+  }
+  function shortName(name) {
+    return name.length > 20 ? `${name.slice(0, 20)}\u2026` : name;
+  }
+  function bindStepStates() {
+    if (!curSel.count || bindPrereqShown()) return ["todo", "todo", "todo"];
+    if (bindIsDone()) return ["done", "done", "done"];
+    if (bindFinding && $("applyProgress").style.display !== "none") return ["now", "todo", "todo"];
+    if (bindOtherSel()) return ["now", "todo", "todo"];
+    if (bindPreviewed) return hasBindPreview() ? ["done", "now", "todo"] : ["done", "todo", "todo"];
+    return ["now", "todo", "todo"];
+  }
+  function renderBindSteps() {
+    const states = bindStepStates();
+    const busy = bindFinding && $("applyProgress").style.display !== "none";
+    $("bindSteps").querySelectorAll(".bs").forEach((li, i) => {
+      const st = states[i];
+      li.classList.toggle("now", st === "now");
+      li.classList.toggle("done", st === "done");
+      const spin = i === 0 && busy && st === "now";
+      li.classList.toggle("busy", spin);
+      if (st === "now") li.setAttribute("aria-current", "step");
+      else li.removeAttribute("aria-current");
+      li.querySelector(".bs-dot").textContent = spin ? "" : st === "done" ? "\u2713" : String(i + 1);
+    });
+  }
+  function renderBindEmpty() {
+    const box = $("bindEmpty");
+    clearMount(box);
+    let kind = null;
+    if (bindPrereqShown() || bindIsDone()) kind = null;
+    else if (!curSel.count) kind = "nosel";
+    else if (!bindPreviewed) kind = "intro";
+    else if (!hasBindPreview()) kind = "none";
+    box.hidden = !kind;
+    if (!kind) return;
+    const text = document.createElement("div");
+    text.className = "be-text";
+    if (kind === "intro") {
+      const ex = bindExamples(vmCols, vmVars);
+      const rows = [ex.color, ex.number].filter((x) => !!x);
+      if (rows.length) {
+        const art = document.createElement("div");
+        art.className = "be-art";
+        art.setAttribute("aria-hidden", "true");
+        for (const r of rows) {
+          const row = document.createElement("div");
+          row.className = "be-row";
+          const vc = varChip(r.name, r.value);
+          vc.title = r.name;
+          row.append(valueChip(r.value), arrowEl(), vc);
+          art.appendChild(row);
+        }
+        box.appendChild(art);
+      }
+      text.textContent = t("bind.emptyIntro");
+    } else {
+      const art = document.createElement("div");
+      art.className = "be-art icon";
+      art.setAttribute("aria-hidden", "true");
+      art.textContent = kind === "nosel" ? "\u2B1A \u2196" : "\u2205";
+      box.appendChild(art);
+      text.textContent = kind === "nosel" ? t("bind.emptyNoSel") : t("bind.descNone", { name: bindPreviewName });
+    }
+    box.appendChild(text);
+  }
+  function renderBindBadges() {
+    const done = bindIsDone();
+    const has = hasBindPreview() && !done;
+    const m = Object.values(bindSkipReasons).reduce((a, n) => a + (n > 0 ? n : 0), 0);
+    const showSkip = m > 0 && (bindPreviewed || done);
+    $("bindBadges").hidden = !has && !showSkip;
+    const found = $("bindFound");
+    found.hidden = !has;
+    if (has) {
+      found.textContent = t("bind.found", { n: bindCandidates.length });
+      found.title = t("bind.foundTip", { name: bindPreviewName, n: bindCandidates.length });
+    }
+    const skip = $("bindSkipToggle");
+    skip.hidden = !showSkip;
+    skip.textContent = `${t("bind.skipTotal", { m })} ${bindSkipsOpen ? "\u25BE" : "\u25B8"}`;
+    skip.setAttribute("aria-expanded", String(showSkip && bindSkipsOpen));
+    skip.setAttribute("aria-label", t("bind.skipAria", { m }));
+    $("bindSkips").hidden = !(showSkip && bindSkipsOpen);
+    const { all, shown } = bindGroups();
+    const allBtn = $("bindAll");
+    allBtn.hidden = !has;
+    allBtn.textContent = shown.some((g) => !groupOn(g)) ? t("bind.allOn") : t("bind.allOff");
+    const filterOn = has && (all.length > 6 || !!bindFilterText());
+    const fbtn = $("bindFilterBtn");
+    fbtn.hidden = !filterOn;
+    const row = $("bindFilterRow");
+    if (!filterOn) row.hidden = true;
+    fbtn.setAttribute("aria-expanded", String(!row.hidden));
+    const shownSet = new Set(shown.flatMap((g) => g.keys));
+    const outside = [...bindChecked].filter((k) => !shownSet.has(k)).length;
+    $("bindOutside").textContent = bindFilterText() && outside ? t("bind.outside", { h: outside }) : "";
+  }
+  function renderBindTree() {
+    const tree = $("bindTree");
+    clearMount(tree);
+    if (hasBindPreview() && !bindIsDone()) for (const g of bindGroups().shown) tree.appendChild(bindGroupEl(g));
+    tipTruncatedNames(tree);
+    renderBindChrome();
+  }
+  function renderBindChrome() {
+    if (!curSel) return;
+    renderBindEmpty();
+    renderBindBadges();
+    updateBindApply();
+  }
+  $("bindSteps").setAttribute("aria-label", t("bind.stepsAria"));
+  $("bindFilterBtn").setAttribute("aria-label", t("bind.filterBtn"));
+  $("btnApplyLabel").textContent = t("bind.find");
+  $("btnApplyConfirmLabel").textContent = t("bind.link");
+  $("bindFilter").addEventListener("input", () => renderBindTree());
+  $("bindFilter").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeBindFilter();
+    }
+  });
+  function closeBindFilter() {
+    $("bindFilter").value = "";
+    $("bindFilterRow").hidden = true;
+    renderBindTree();
+    if (!$("bindFilterBtn").hidden) $("bindFilterBtn").focus();
+  }
+  $("bindFilterBtn").addEventListener("click", () => {
+    const row = $("bindFilterRow");
+    if (row.hidden) {
+      row.hidden = false;
+      renderBindBadges();
+      $("bindFilter").focus();
+    } else closeBindFilter();
+  });
+  $("bindSkipToggle").addEventListener("click", () => {
+    bindSkipsOpen = !bindSkipsOpen;
+    renderBindBadges();
+  });
+  $("bindAll").addEventListener("click", () => {
+    const { shown } = bindGroups();
+    const turnOn = shown.some((g) => !groupOn(g));
+    for (const g of shown) for (const k of g.keys) turnOn ? bindChecked.add(k) : bindChecked.delete(k);
+    renderBindTree();
+  });
+  function updateBindApply() {
+    if (!curSel) return;
+    renderBindSteps();
+    const done = bindIsDone();
+    const has = bindPreviewed && hasBindPreview() && !done;
+    const find = $("btnApply");
+    $("btnApplyLabel").textContent = bindPreviewed || done ? t("bind.refind") : t("bind.find");
+    find.classList.toggle("primary", !bindPreviewed || done);
+    const confirm = $("btnApplyConfirm");
+    const n = bindOnCount();
+    $("btnApplyConfirmLabel").textContent = has ? t("bind.linkN", { n }) : t("bind.link");
+    confirm.classList.toggle("primary", has);
+    if (!curSel.count) setLock(confirm, "prereq", t("status.noSelection"));
+    else if (bindOtherSel()) setLock(confirm, "prereq", t("bind.selChanged"));
+    else if (!bindPreviewed || done) setLock(confirm, "prereq", t("bind.needFind"));
+    else if (!hasBindPreview()) setLock(confirm, "prereq", t("bind.nothing"));
+    else if (!n) setLock(confirm, "prereq", t("bind.needOn"));
+    else setLock(confirm, null);
   }
   function clearBindPreview() {
-    $("bindTree").classList.remove("stale");
-    bindResultMode = false;
+    $("bindNotice").hidden = true;
+    bindPreviewSel = null;
+    bindForeignSel = false;
+    bindHereSel = false;
+    bindPreviewed = false;
     bindCandidates = [];
     bindNodes = [];
     bindSkips = [];
     bindSkipsCapped = false;
+    bindSkipReasons = {};
+    bindSkipsOpen = false;
     clearMount($("bindSkips"));
-    $("bindSkips").style.display = "none";
-    $("bindSkipHint").style.display = "none";
+    $("bindFilter").value = "";
+    $("bindFilterRow").hidden = true;
     bindChecked.clear();
-    clearMount($("bindTree"));
-    $("bindCount").textContent = "";
-    $("bindTreeCtrls").style.display = "none";
-    $("bindViewRow").style.display = "none";
-    $("btnApplyConfirm").style.display = "none";
+    renderBindTree();
   }
   var compCandidates = [];
   var compChecked = /* @__PURE__ */ new Set();
@@ -5003,31 +5457,24 @@
     renderChunked($("variantReport"), lines, makeVariantReportRow);
   }
   function refreshTreeEmptyStates() {
-    const guide = "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.";
-    if (!hasBindPreview() && !$("bindTree").classList.contains("stale")) {
-      if (lastSelCount === 0) renderEmptyState($("bindTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", guide);
-      else clearMount($("bindTree"));
-    }
     if (compCandidates.length === 0) {
-      if (lastSelCount === 0) renderEmptyState($("compTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", guide);
+      if (lastSelCount === 0) renderEmptyState($("compTree"), t("sel.noneHere"), "");
       else clearMount($("compTree"));
     }
+    if (renameNodes.length === 0) {
+      if (lastSelCount === 0) renderEmptyState($("diff"), t("sel.noneHere"), "");
+      else clearMount($("diff"));
+    }
+    renderMakeNoSel();
   }
   var bindSkips = [];
   var bindSkipsCapped = false;
   function renderSkipReasons(reasons) {
+    bindSkipReasons = __spreadValues({}, reasons);
     const box = $("bindSkips");
-    const hint = $("bindSkipHint");
-    box.innerHTML = "";
+    clearMount(box);
     const entries = Object.entries(reasons).filter(([, n]) => n > 0);
-    if (!entries.length || !bindSkips.length) {
-      box.style.display = "none";
-      hint.style.display = "none";
-      return;
-    }
-    box.style.display = "";
-    hint.style.display = "";
-    hint.textContent = bindSkipsCapped ? t("bind.skipCapped", { shown: bindSkips.length }) : t("bind.skipHint");
+    const capNote = bindSkipsCapped ? t("bind.skipCappedTip", { shown: bindSkips.length }) : "";
     for (const [key, n] of entries) {
       const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
       const label = `${t("reason." + key)} ${n}`;
@@ -5039,10 +5486,11 @@
         continue;
       }
       const btn = document.createElement("button");
+      btn.type = "button";
       btn.className = "skip-chip";
       btn.textContent = `${label} \u203A`;
       const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(", ");
-      btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names });
+      btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names }) + capNote;
       btn.addEventListener("click", () => {
         selectNodes(ids, "applyStatus");
         setStatus("applyStatus", `${t("reason." + key)} \uB808\uC774\uC5B4 ${ids.length}\uAC1C \uC120\uD0DD`, "");
@@ -5115,20 +5563,8 @@
   }
   function hideApplyProgress() {
     $("applyProgress").style.display = "none";
-  }
-  function renderSelBar(count, scanned, capped, firstName) {
-    const sum = selectionSummary(count, scanned, capped);
-    const name = $("selName");
-    const sub = $("selSub");
-    if (sum.kind === "none") {
-      name.textContent = t("sel.none");
-      sub.textContent = "";
-    } else {
-      name.textContent = sum.kind === "one" ? `\u25CF ${firstName || t("sel.unnamed")}` : t("sel.many", { k: count });
-      sub.textContent = t("sel.sub", { n: sum.sub });
-    }
-    name.title = sum.kind === "one" ? firstName : "";
-    $("selBar").className = count > 0 ? "selbar" : "selbar muted";
+    bindFinding = false;
+    if (curSel) renderBindSteps();
   }
   function setStatus(id, text, cls) {
     const el = $(id);
@@ -5140,17 +5576,20 @@
   }
   function syncStickyOffsets() {
     const tabs = document.querySelector(".tabs");
-    const bar = $("selBarWrap");
     if (!tabs) return;
     const tabsH = Math.round(tabs.getBoundingClientRect().height);
-    const barH = Math.round(bar.getBoundingClientRect().height);
     const root = document.documentElement;
-    const headTop = tabsH + (bar.style.display === "none" ? 0 : barH);
+    const headTop = tabsH;
     root.style.setProperty("--tabs-h", `${tabsH}px`);
     root.style.setProperty("--head-top", `${headTop}px`);
+    const shownCard = Array.from(document.querySelectorAll(".tab-section.active .step:not(.collapsed)")).find((c) => c.offsetParent);
     const head = document.querySelector(".tab-section.active .step:not(.collapsed) .step-head");
-    const headH = head && head.offsetParent ? Math.round(head.getBoundingClientRect().height) : 26;
+    const headH = shownCard && !shownCard.querySelector(".step-head") ? 0 : head && head.offsetParent ? Math.round(head.getBoundingClientRect().height) : 26;
     root.style.setProperty("--toolbar-top", `${headTop + headH}px`);
+    const lh = document.getElementById("listHead");
+    if (lh && lh.offsetParent) root.style.setProperty("--side-top", `${headTop + Math.round(lh.getBoundingClientRect().height)}px`);
+    const bar2 = document.querySelector(".tab-section.active .step:not(.collapsed) .toolbar");
+    if (bar2 && bar2.offsetParent) root.style.setProperty("--toolbar-h", `${Math.round(bar2.getBoundingClientRect().height)}px`);
   }
   function applyCardChrome() {
     document.querySelectorAll(".step").forEach((card) => {
@@ -5177,7 +5616,6 @@
   var STRUCTURE_TIPS = {
     btnScanComp: "component.scanHelp",
     btnScanSimilar: "similar.scanHelp",
-    btnScanBindings: "bind.scanHelp",
     btnClassifyVariants: "component.classifyHelp",
     btnGenMissing: "component.genMissingHelp",
     btnRegisterComp: "component.registerHelp",
@@ -5340,7 +5778,9 @@
     e.stopImmediatePropagation();
     if (e.type === "click" || e.type === "keydown") {
       if (el.dataset.lock === "paid") showPaidReason();
-      else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: "warn" });
+      else if (el.id === "btnApplyExistingText" && curSel.count && !hasTextStyles) {
+        showStatusLine(t("bind.tsNoneText"), { cls: "warn", action: { label: t("bind.tsGotoType"), run: () => showMake("type") } });
+      } else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: "warn" });
     }
   }
   document.addEventListener("click", onLockedActivate, true);
@@ -5425,7 +5865,10 @@
     GENERATE_DARK_MODE: { results: ["DARK_MODE_RESULT"], label: "op.dark", go: () => showMake("theme"), write: true },
     SCAN_TEXT_STYLES: { results: ["TEXT_STYLE_CANDIDATES"], label: "op.textScan", go: () => showMake("type"), write: false },
     CREATE_TEXT_STYLES: { results: ["TEXT_STYLES_RESULT"], label: "op.textStyles", go: () => showMake("type"), write: true },
-    APPLY_TEXT_STYLES: { results: ["TEXT_STYLES_APPLIED"], label: "op.textApply", go: () => showMake("type"), write: true },
+    APPLY_TEXT_STYLES: { results: ["TEXT_STYLES_APPLIED"], label: "op.textApply", go: () => {
+      showTab("layer");
+      showApplyStep("bind");
+    }, write: true },
     APPLY: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: false },
     APPLY_SELECTED: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: true },
     RENAME: { results: ["RENAME_RESULT"], label: "op.rename", go: goLayer("rename"), write: false },
@@ -5444,8 +5887,9 @@
   var opProg = null;
   var opBusy = () => opWizard || opPending.size > 0;
   var opProgress = () => opProg;
+  var opSilent = false;
   function opSent(msg) {
-    if (wizardRunning) return;
+    if (wizardRunning || opSilent) return;
     const def = OPS[msg.type];
     if (!def) return;
     opPending.set(msg.type, def);
@@ -5515,9 +5959,13 @@
       send({ type: "GET_VARIABLES" });
     }
     if (why === "work" && !(activeTab === "variables" && varSub === "home")) send({ type: "GET_VAR_TABLE" });
+    if (activeTab === "layer") {
+      readLayerLibUse();
+      if (why !== "work") bindOnReturn();
+    }
   }
   var pointerDown = false;
-  var reentryHeld = () => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || vmUsageReq !== 0;
+  var reentryHeld = () => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || activeTab === "variables" && vmUsageInFlight || !$("readinessPop").hidden;
   var reentry = createReentryScheduler(() => readScreen("reentry"), reentryHeld, {
     now: () => Date.now(),
     set: (fn, ms) => setTimeout(fn, ms),
@@ -5554,7 +6002,7 @@
     const ro = new ResizeObserver(() => syncStickyOffsets());
     const tabsEl = document.querySelector(".tabs");
     if (tabsEl) ro.observe(tabsEl);
-    ro.observe($("selBarWrap"));
+    ro.observe($("listHead"));
   }
   window.addEventListener("resize", syncStickyOffsets);
   updateGates();
@@ -5577,6 +6025,7 @@
     var _a;
     const changed = name !== activeTab;
     if (changed) screenScroll.set(screenKey(), window.scrollY);
+    if (changed && activeTab === "layer" && hasBindPreview()) bindLeftSince = true;
     activeTab = name;
     for (const tb of TABS) {
       $(`tab-${tb}`).classList.toggle("active", tb === name);
@@ -5586,7 +6035,6 @@
       btn.setAttribute("aria-selected", String(on));
       btn.tabIndex = on ? 0 : -1;
     }
-    $("selBarWrap").style.display = name === "settings" ? "none" : "";
     renderSelBase();
     if (changed && name !== "variables" && wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
     syncManagerVisibility(false);
@@ -5706,6 +6154,7 @@
     showVarSub("home");
     $("btnGoMake").focus();
   });
+  var APPLY_STEPS = ["bind", "rename", "structure"];
   function showStep(attr, step) {
     const key = attr === "make" ? "data-make-step" : "data-apply-step";
     const rail = $(attr === "make" ? "makeRail" : "applyRail");
@@ -5713,27 +6162,59 @@
       if (el.dataset.alwaysHidden !== void 0) continue;
       el.style.display = el.getAttribute(key) === step ? "" : "none";
     }
-    for (const b of Array.from(rail.querySelectorAll(".step-chip"))) {
+    for (const b of Array.from(rail.querySelectorAll(".step-chip, .subtab"))) {
       const on = b.getAttribute(key) === step;
-      if (on) b.setAttribute("aria-current", "step");
+      if (b.classList.contains("subtab")) {
+        b.setAttribute("aria-selected", String(on));
+        b.tabIndex = on ? 0 : -1;
+      } else if (on) b.setAttribute("aria-current", "step");
       else b.removeAttribute("aria-current");
     }
+    if (attr === "apply") {
+      const changed = currentApplyStep !== step;
+      currentApplyStep = step;
+      if (changed) syncStickyOffsets();
+    }
   }
-  var showMakeStep = (s) => showStep("make", s);
+  var currentApplyStep = "bind";
+  var curMakeStep = "color";
+  var showMakeStep = (s) => {
+    curMakeStep = s;
+    showStep("make", s);
+    renderMakeNoSel();
+  };
+  function renderMakeNoSel() {
+    let hint = document.getElementById("makeNoSel");
+    if (!hint) {
+      hint = document.createElement("div");
+      hint.id = "makeNoSel";
+      hint.className = "hint";
+      hint.textContent = t("make.noSel");
+    }
+    const card = document.querySelector(`#varMake .step[data-make-step="${curMakeStep}"]:not([data-always-hidden])`);
+    const bar = card == null ? void 0 : card.querySelector(".toolbar");
+    if (bar && hint.previousElementSibling !== bar) bar.after(hint);
+    hint.hidden = lastSelCount > 0;
+  }
   var showApplyStep = (s) => showStep("apply", s);
   for (const b of Array.from(document.querySelectorAll("#makeRail .step-chip"))) {
     b.addEventListener("click", () => showMakeStep(b.dataset.makeStep));
   }
-  for (const b of Array.from(document.querySelectorAll("#applyRail .step-chip"))) {
+  for (const b of Array.from(document.querySelectorAll("#applyRail .subtab"))) {
     b.addEventListener("click", () => showApplyStep(b.dataset.applyStep));
+    b.addEventListener("keydown", (e) => {
+      var _a;
+      const ni = nextTabIndex(e.key, APPLY_STEPS.indexOf(b.dataset.applyStep), APPLY_STEPS.length);
+      if (ni < 0) return;
+      e.preventDefault();
+      showApplyStep(APPLY_STEPS[ni]);
+      (_a = document.querySelector(`#applyRail [data-apply-step="${APPLY_STEPS[ni]}"]`)) == null ? void 0 : _a.focus();
+    });
   }
   showMakeStep("color");
   showApplyStep("bind");
   for (const b of Array.from(document.querySelectorAll("[data-next-make]"))) {
     b.addEventListener("click", () => showMakeStep(b.dataset.nextMake));
-  }
-  for (const b of Array.from(document.querySelectorAll("[data-next-apply]"))) {
-    b.addEventListener("click", () => showApplyStep(b.dataset.nextApply));
   }
   var menuOnClose = null;
   var menuEl = null;
@@ -5921,13 +6402,12 @@
   var curSel = { ids: [], count: 0, scanned: 0, name: "" };
   var baseline = null;
   var bigSkipped = false;
-  var chip = "all";
+  var sideSel = null;
+  var sidePicked = false;
+  var sideOpen = /* @__PURE__ */ new Map();
   var query = "";
   var searchOpen = false;
   var modeName = null;
-  var userExpanded = /* @__PURE__ */ new Map();
-  var showUnusedIn = /* @__PURE__ */ new Set();
-  var showUnusedGroups = /* @__PURE__ */ new Set();
   var focusKey = null;
   var vmSelected = null;
   var sameIds = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -5980,6 +6460,7 @@
   function onSelectionForList(m) {
     var _a, _b;
     curSel = { ids: (_a = m.ids) != null ? _a : [], count: m.count, scanned: m.scanned, name: (_b = m.firstName) != null ? _b : "" };
+    setLock($("btnFindUnbound"), curSel.count ? null : "prereq", t("status.noSelection"));
     if (m.selfSelect) {
       renderSelBase();
       return;
@@ -6021,8 +6502,6 @@
     }, AUTO_SCAN_DELAY);
   }
   var vmUsageTimer = null;
-  function scheduleManagerUsage() {
-  }
   function requestManagerUsage(why = "quiet") {
     if (!baseline) {
       usageMap = null;
@@ -6041,11 +6520,17 @@
     vmUsageVisible = why === "selection" || why === "user";
     if (vmUsageVisible && vmOpen) {
       showStatusLine(t("list.reading"), { background: true });
-      renderChips();
+      if (varScreen() === "list") renderVarList();
     }
     send({ type: "SCAN_USAGE", reqId: vmUsageReq, nodeIds: baseline.ids });
   }
   function onUsageResult(msg) {
+    if (msg.reqId === layerLibReq) {
+      layerLibReq = 0;
+      layerLibUse = msg.libraryVars.length > 0;
+      renderBindPrereq();
+      return;
+    }
     if (msg.reqId !== vmUsageReq) return;
     vmUsageInFlight = false;
     const wasVisible = vmUsageVisible;
@@ -6088,7 +6573,6 @@
     vmTableSig = sig;
     vmCols = msg.collections;
     vmVars = msg.vars;
-    if (chip !== "all" && !vmCols.some((c) => c.id === chip)) chip = "all";
     if (wizCountPending) {
       wizCountPending = false;
       const n = vmVars.length - wizBeforeCount;
@@ -6127,92 +6611,220 @@
       statusTimer = setTimeout(clearStatusLine, 2e3);
     }
   }
+  function baseDiffers() {
+    return !!baseline && !!curSel && !sameIds(baseline.ids, curSel.ids);
+  }
+  function baseNoticeText() {
+    const b = baseline;
+    const name = b.count === 1 ? b.name || t("sel.unnamed") : t("list.baseMany", { m: b.count });
+    return t(curSel.count ? "list.baseDiff" : "list.baseDiffNoSel", { name });
+  }
   function renderSelBase() {
-    const base = $("selBase");
-    const btn = $("btnRebase");
-    const show = activeTab === "variables" && !!baseline && !sameIds(baseline.ids, curSel.ids);
-    if (!show) {
-      base.textContent = "";
-      btn.hidden = true;
+    if (!vmCols) return;
+    renderSituation();
+    if (activeTab === "variables" && varScreen() === "start") renderStart();
+  }
+  function doRebase(fromStart) {
+    var _a;
+    rebaseToCurrent();
+    if (fromStart) {
+      ((_a = $("startLib").querySelector("[data-key]")) != null ? _a : $("btnWizardRun")).focus();
       return;
     }
-    const name = baseline.count === 1 ? baseline.name || t("sel.unnamed") : t("list.baseMany", { m: baseline.count });
-    base.textContent = t("list.base", { name });
-    base.title = name;
-    btn.hidden = false;
+    const tree = $("varTree");
+    const target = focusKey && tree.querySelector(`[data-key="${CSS.escape(focusKey)}"]`) || tree.querySelector("[data-key]");
+    target == null ? void 0 : target.focus();
   }
-  function chipCounts(colId) {
-    var _a, _b;
-    const vars = colId === "all" ? vmVars : vmVars.filter((v) => v.collectionId === colId);
-    let direct = 0;
-    let indirect = 0;
-    if (usageMap) for (const v of vars) {
-      if (((_b = (_a = usageMap.get(v.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0) direct++;
-      else if (indirectMap.has(v.id)) indirect++;
+  function situationEl(text, action) {
+    const d = document.createElement("div");
+    d.className = "situation";
+    const sp = document.createElement("span");
+    sp.textContent = text;
+    d.appendChild(sp);
+    if (action) {
+      const b = document.createElement("button");
+      b.className = "link link-btn";
+      b.type = "button";
+      b.textContent = action[0];
+      b.addEventListener("click", action[1]);
+      d.appendChild(b);
     }
-    return { used: direct + indirect, total: vars.length, direct, indirect };
+    return d;
   }
-  function chipNumText(colId) {
-    const c = chipCounts(colId);
-    if (vmUsageInFlight && vmUsageVisible) return { text: "\u2026", tip: "" };
-    if (!usageMap) return { text: String(c.total), tip: "" };
+  var directMap = () => usageMap ? new Map([...usageMap.entries()].map(([k, v]) => [k, v.places])) : null;
+  var indirectSet = () => new Set(indirectMap.keys());
+  var usageReadingVisible = () => vmUsageInFlight && vmUsageVisible;
+  function sideNum(c) {
+    if (usageReadingVisible()) return { text: "\u2026", tip: "" };
+    if (!usageMap) return { text: String(c.total), tip: t("list.totalTip", { total: c.total }) };
     return { text: `${c.used}/${c.total}`, tip: t("list.chipTip", { used: c.used, direct: c.direct, indirect: c.indirect, total: c.total }) };
   }
-  function renderChips() {
-    const row = $("chipRow");
-    clearMount(row);
-    const make = (id, label, badge) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "tier-chip";
-      b.setAttribute("role", "radio");
-      b.setAttribute("aria-checked", String(chip === id));
-      b.tabIndex = chip === id ? 0 : -1;
-      b.dataset.chip = id;
-      const nm = document.createElement("span");
-      nm.textContent = label;
-      b.appendChild(nm);
-      if (badge) {
-        const bg = document.createElement("span");
-        bg.className = "badge";
-        bg.textContent = badge;
-        bg.setAttribute("aria-hidden", "true");
-        b.appendChild(bg);
+  function initialSel() {
+    return initialSideSel(vmCols, vmVars, !!baseline, bigSkipped || wizardRunning && !usageMap, directMap(), indirectSet());
+  }
+  function currentSel() {
+    var _a;
+    const hasLib = libRowsAll().length > 0;
+    const hasDeleted = deletedUse.count > 0 && !!baseline;
+    if (!sidePicked || !sideSel) {
+      sideSel = baseline && wizardRunning && !usageMap && !bigSkipped ? { kind: "inspect" } : initialSel();
+      return sideSel;
+    }
+    const next = validSideSel(sideSel, vmCols, vmVars, hasLib, hasDeleted, initialSel);
+    if (sideSelKey(next) !== sideSelKey(sideSel)) {
+      if ((_a = document.activeElement) == null ? void 0 : _a.closest("#varSide")) focusSideKey = `side:${sideSelKey(next)}`;
+      sideSel = next;
+    }
+    return sideSel;
+  }
+  var focusSideKey = null;
+  function sideIsOpen(side, all, sel) {
+    const user = sideOpen.get(side.collection.id);
+    if (user !== void 0) return user;
+    if (sel.kind === "grp" && sel.key.startsWith(`${side.collection.id}|`)) return true;
+    if (usageMap && all.some((x) => x.used > 0)) return side.used > 0;
+    return all[0] === side;
+  }
+  function pickSide(sel, focus = true) {
+    if (searchOpen || query) clearSearch(false);
+    sideSel = sel;
+    sidePicked = true;
+    if (sel.kind === "col") sideOpen.set(sel.id, true);
+    focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
+    focusKey = null;
+    renderVarList();
+  }
+  function renderSidebar(sel) {
+    var _a;
+    const nav = $("varSide");
+    const hadFocus = nav.contains(document.activeElement) ? (_a = document.activeElement.dataset.key) != null ? _a : null : null;
+    clearMount(nav);
+    const dm = directMap();
+    const ind = indirectSet();
+    const sides = sidebarCollections(vmCols, vmVars, dm, ind);
+    const selKey = searchOpen && query.trim() ? "" : sideSelKey(sel);
+    const item = (key, level, label, num, aria, opts) => {
+      var _a2;
+      const d = document.createElement("div");
+      d.className = `vs-item lv${level}${opts.muted ? " muted" : ""}${opts.danger ? " danger" : ""}`;
+      d.dataset.key = `side:${key}`;
+      d.setAttribute("role", "treeitem");
+      d.setAttribute("aria-level", String(level));
+      d.setAttribute("aria-selected", String(selKey === key));
+      d.setAttribute("aria-label", aria);
+      if (opts.open !== void 0) d.setAttribute("aria-expanded", String(opts.open));
+      d.tabIndex = -1;
+      if (opts.onToggle) {
+        const tw = document.createElement("button");
+        tw.type = "button";
+        tw.className = "vs-tw";
+        tw.tabIndex = -1;
+        tw.textContent = opts.open ? "\u25BE" : "\u25B8";
+        tw.setAttribute("aria-label", t(opts.open ? "list.sideCollapse" : "list.sideExpand"));
+        tw.addEventListener("click", (e) => {
+          e.stopPropagation();
+          opts.onToggle();
+        });
+        d.appendChild(tw);
       }
-      const num = chipNumText(id);
+      if (opts.badge) {
+        const b = document.createElement("span");
+        b.className = "vs-badge";
+        b.setAttribute("aria-hidden", "true");
+        b.textContent = opts.badge;
+        d.appendChild(b);
+      }
+      const nm = document.createElement("span");
+      nm.className = "vs-name";
+      nm.textContent = label;
+      d.title = (_a2 = opts.title) != null ? _a2 : label;
       const n = document.createElement("span");
-      n.className = "num";
+      n.className = "vs-num";
       n.textContent = num.text;
-      b.appendChild(n);
-      if (num.tip) b.title = num.tip;
-      b.addEventListener("click", () => {
-        chip = id;
-        renderVarList();
-      });
-      b.addEventListener("keydown", (e) => {
-        var _a, _b;
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-        e.preventDefault();
-        const all = Array.from(row.querySelectorAll(".tier-chip"));
-        const i = all.indexOf(b) + (e.key === "ArrowRight" ? 1 : -1);
-        const target = all[(i + all.length) % all.length];
-        chip = (_a = target.dataset.chip) != null ? _a : "all";
-        renderVarList();
-        (_b = row.querySelector(`[data-chip="${CSS.escape(chip)}"]`)) == null ? void 0 : _b.focus();
-      });
-      row.appendChild(b);
+      if (num.tip) n.title = num.tip;
+      d.append(nm, n);
+      d.addEventListener("click", opts.onPick);
+      d.addEventListener("keydown", (ev) => sideKey(ev, d, opts));
+      nav.appendChild(d);
+      return d;
     };
-    make("all", t("list.chipAll"), null);
-    for (const c of orderCollections(vmCols)) make(c.id, c.name, tierBadge(c));
-    requestAnimationFrame(() => {
-      const over = row.scrollWidth > row.clientWidth + 1;
-      $("btnChipMore").hidden = !over;
-    });
-    renderModeSelect();
+    const insN = inspectCount(vmVars, dm, ind);
+    const insNum = usageReadingVisible() ? "\u2026" : !baseline || !usageMap ? "\u2014" : String(insN);
+    item("inspect", 1, t("list.inspect"), { text: insNum, tip: t("list.inspectTip") }, t("list.inspectAria", { n: insNum }), { onPick: () => pickSide({ kind: "inspect" }), title: t("list.inspectTip") });
+    for (const side of sides) {
+      const c = side.collection;
+      const open = sideIsOpen(side, sides, sel);
+      const badge = tierBadge(c);
+      const num = sideNum(side);
+      item(`col:${c.id}`, 1, c.name, num, t("list.sideColAria", { name: c.name, badge, num: num.text }), {
+        badge,
+        open,
+        muted: !!usageMap && side.used === 0,
+        onToggle: () => {
+          sideOpen.set(c.id, !open);
+          focusSideKey = `side:col:${c.id}`;
+          renderVarList();
+        },
+        onPick: () => pickSide({ kind: "col", id: c.id })
+      });
+      if (open) for (const g of side.groups) {
+        const gn = sideNum(g);
+        item(`grp:${g.key}`, 2, g.label, gn, t("list.sideGrpAria", { name: g.label, num: gn.text }), {
+          muted: !!usageMap && g.used === 0,
+          onPick: () => pickSide({ kind: "grp", key: g.key })
+        });
+      }
+    }
+    const libN = libRowsAll().length;
+    const hasDeleted = deletedUse.count > 0 && !!baseline;
+    if (libN || hasDeleted) {
+      const sep = document.createElement("div");
+      sep.className = "vs-sep";
+      sep.setAttribute("role", "separator");
+      nav.appendChild(sep);
+    }
+    if (libN) item("lib", 1, t("list.libItem"), { text: String(libN), tip: "" }, t("list.libItemAria", { n: libN }), { onPick: () => pickSide({ kind: "lib" }) });
+    if (hasDeleted) item("deleted", 1, t("list.deletedItem"), { text: String(deletedUse.count), tip: "" }, t("list.deletedItemAria", { n: deletedUse.count }), { danger: true, onPick: () => pickSide({ kind: "deleted" }) });
+    const items = Array.from(nav.querySelectorAll(".vs-item"));
+    const want = focusSideKey != null ? focusSideKey : hadFocus;
+    const target = want && items.find((x) => x.dataset.key === want) || items.find((x) => x.getAttribute("aria-selected") === "true") || items[0];
+    if (target) target.tabIndex = 0;
+    if (want && target && (focusSideKey || hadFocus)) target.focus({ preventScroll: true });
+    focusSideKey = null;
+  }
+  function sideKey(ev, el, opts) {
+    const items = Array.from($("varSide").querySelectorAll(".vs-item"));
+    const i = items.indexOf(el);
+    const go = (j) => {
+      const target = items[Math.max(0, Math.min(items.length - 1, j))];
+      if (!target) return;
+      items.forEach((x) => x.tabIndex = -1);
+      target.tabIndex = 0;
+      target.focus();
+    };
+    const k = ev.key;
+    if (k === "ArrowDown") go(i + 1);
+    else if (k === "ArrowUp") go(i - 1);
+    else if (k === "Home") go(0);
+    else if (k === "End") go(items.length - 1);
+    else if (k === "ArrowRight" && opts.onToggle) {
+      if (!opts.open) opts.onToggle();
+      else go(i + 1);
+    } else if (k === "ArrowLeft") {
+      if (el.classList.contains("lv2")) {
+        for (let j = i - 1; j >= 0; j--) if (items[j].classList.contains("lv1")) {
+          go(j);
+          break;
+        }
+      } else if (opts.onToggle && opts.open) opts.onToggle();
+    } else if (k === "Enter" || k === " ") opts.onPick();
+    else return;
+    ev.preventDefault();
   }
   function renderModeSelect() {
     const sel = $("modeSelect");
-    const visible = chip === "all" ? vmCols : vmCols.filter((c) => c.id === chip);
+    const shownCols = new Set(lastRightCols);
+    const visible = vmCols.filter((c) => shownCols.has(c.id));
     const names = [...new Set(visible.flatMap((c) => c.modes.map((m) => m.name)))];
     if (names.length <= 1 || searchOpen) {
       sel.hidden = true;
@@ -6262,11 +6874,13 @@
       }
     };
     let shown = true;
-    const groups = new Set(vmVars.filter((v) => chip === "all" || v.collectionId === chip).map((v) => groupKey(v.collectionId, v.name))).size;
-    if (baseline && bigSkipped && !usageMap) add(t("list.big"), [t("list.read"), () => requestManagerUsage("user")]);
+    const insShown = !!sideSel && sideSel.kind === "inspect" && !(searchOpen && query.trim());
+    if (baseDiffers()) add(baseNoticeText(), [t("list.rebase"), () => doRebase(false)]);
+    else if (insShown && (!baseline || !usageMap || inspectCount(vmVars, directMap(), indirectSet()) === 0)) shown = false;
+    else if (baseline && bigSkipped && !usageMap) add(t("list.big"), [t("list.read"), () => requestManagerUsage("user")]);
     else if (baseline && wizardRunning && !usageMap) add(t("list.wizardWait"));
-    else if (baseline && usageMap && chipCounts("all").direct === 0) add(t("list.noneUsed"), [t("list.findUnbound"), findUnbound]);
-    else if (!baseline && groups > 10) add(t("list.selectHint"));
+    else if (baseline && usageMap && inspectCount(vmVars, directMap(), indirectSet()) === 0) add(t("list.noneUsed"), [t("list.findUnbound"), findUnbound]);
+    else if (!baseline) add(t("list.selectHint"));
     else shown = false;
     line.hidden = !shown;
   }
@@ -6317,188 +6931,118 @@
     else span.textContent = cell.text;
     return span;
   }
+  var lastRightCols = [];
   function renderVarList() {
-    var _a, _b;
+    var _a;
     if (!vmOpen || varScreen() !== "list") return;
-    renderChips();
+    const sel = currentSel();
+    renderSidebar(sel);
     renderSituation();
     renderReadinessButtons();
-    $("btnFindUnbound").toggleAttribute("data-x", false);
     setLock($("btnFindUnbound"), curSel.count ? null : "prereq", t("status.noSelection"));
     const tree = $("varTree");
     const prevScroll = window.scrollY;
+    const hadFocus = tree.contains(document.activeElement);
     clearMount(tree);
-    if (baseline && !usageMap && !bigSkipped && !wizardRunning && (vmUsageInFlight || vmUsageTimer) && !usageEverShown) {
-      const d = document.createElement("div");
-      d.className = "vt-empty";
-      d.textContent = t("list.reading");
-      tree.appendChild(d);
-      return;
-    }
-    usageEverShown = true;
-    const entries = buildList({
-      collections: vmCols,
-      vars: vmVars,
-      chip,
-      query,
-      direct: usageMap ? new Map([...usageMap.entries()].map(([k, v]) => [k, v.places])) : null,
-      indirect: new Set(indirectMap.keys()),
-      userExpanded,
-      showUnusedIn,
-      showUnusedGroups
-    });
+    const searching = !!query.trim();
+    const title = $("varMainTitle");
+    if (searching) title.textContent = t("list.searchTitle", { q: query.trim() });
+    else if (sel.kind === "inspect") title.textContent = t("list.inspect");
+    else if (sel.kind === "lib") title.textContent = t("list.libItem");
+    else if (sel.kind === "deleted") title.textContent = t("list.deletedItem");
+    else if (sel.kind === "col") {
+      const c = vmCols.find((x) => x.id === sel.id);
+      title.textContent = c ? `${tierBadge(c)} ${c.name}` : "";
+    } else title.textContent = sel.key.slice(sel.key.indexOf("|") + 1) || t("list.noGroup");
     const lines = [];
-    for (const e of entries) {
-      if (e.kind === "section") lines.push(sectionEl(e));
-      else if (e.kind === "group") lines.push(groupEl(e));
-      else if (e.kind === "row") lines.push(rowEl(e.v, e.state));
-      else lines.push(unusedGroupsEl(e.collectionId, e.count));
-    }
-    if (query.trim() && !entries.some((e) => e.kind === "row") && !libRowsMatching().length) {
+    const dm = directMap();
+    const ind = indirectSet();
+    lastRightCols = [];
+    const empty = (text, action) => {
       const d = document.createElement("div");
       d.className = "vt-empty";
-      d.append(t("list.noMatch", { q: query.trim() }), " \xB7 ");
-      if (chip !== "all") {
-        const a = document.createElement("button");
-        a.className = "link";
-        a.textContent = t("list.searchAll");
-        a.addEventListener("click", () => {
-          chip = "all";
-          renderVarList();
-        });
-        d.append(a, " ");
+      d.append(text);
+      if (action) {
+        const b = document.createElement("button");
+        b.className = "link link-btn";
+        b.type = "button";
+        b.textContent = action[0];
+        b.addEventListener("click", action[1]);
+        d.append(" \xB7 ", b);
       }
-      const c = document.createElement("button");
-      c.className = "link";
-      c.textContent = t("list.searchClear");
-      c.addEventListener("click", () => clearSearch(true));
-      d.append(c);
       lines.push(d);
-    }
-    if (chip === "all") {
-      const libRows = libRowsMatching();
-      if (libRows.length) {
-        const h = document.createElement("div");
-        h.className = "vt-section vt-lib";
-        h.dataset.key = "sec:lib";
-        h.setAttribute("role", "row");
-        h.innerHTML = `<span>${escapeHtml(t("list.libSection"))}</span>`;
-        lines.push(h);
-        for (const l of libRows) lines.push(libRowEl(l));
+    };
+    if (sel.kind === "lib" && !searching) {
+      for (const l of libRowsAll()) lines.push(libRowEl(l));
+    } else if (sel.kind === "deleted" && !searching) {
+      if (deletedUse.count > 0) lines.push(deletedEl());
+    } else {
+      const entries = rightEntries(sel, vmCols, vmVars, dm, ind, query);
+      let pi = 0;
+      for (const e of entries) {
+        if (e.kind === "path") {
+          lines.push(pathEl(e.label, pi++));
+          if (!lastRightCols.includes(e.collectionId)) lastRightCols.push(e.collectionId);
+        } else lines.push(rowEl(e.v, e.state));
       }
+      if (sel.kind === "col" && !searching) lastRightCols = [sel.id];
+      if (sel.kind === "grp" && !searching) lastRightCols = [sel.key.slice(0, sel.key.indexOf("|"))];
+      if (searching) {
+        const libs = libRowsMatching();
+        if (libs.length) {
+          lines.push(pathEl(t("list.libItem"), pi++));
+          for (const l of libs) lines.push(libRowEl(l));
+        }
+        if (!entries.length && !libs.length) empty(t("list.noMatch", { q: query.trim() }), [t("list.searchClear"), () => clearSearch(true)]);
+      } else if (sel.kind === "inspect" && !entries.length) {
+        if (!baseline) empty(t("list.inspectNoSel"));
+        else if (bigSkipped && !usageMap) empty(t("list.big"), [t("list.read"), () => requestManagerUsage("user")]);
+        else if (wizardRunning && !usageMap) empty(t("list.wizardWait"));
+        else if (!usageMap) empty(t("list.reading"));
+        else empty(t("list.noneUsed"), [t("list.findUnbound"), findUnbound]);
+      } else if (!entries.length) empty(t("vm.noVars"));
     }
-    if (deletedUse.count > 0 && baseline) lines.push(deletedEl());
-    if (!lines.length) {
-      const d = document.createElement("div");
-      d.className = "vt-empty";
-      d.textContent = t("vm.noVars");
-      lines.push(d);
-    }
+    renderModeSelect();
     tree.append(...lines);
     const focusables = Array.from(tree.querySelectorAll("[data-key]"));
     let target = focusKey ? focusables.find((x) => x.dataset.key === focusKey) : void 0;
-    if (focusKey && !target && focusKey.startsWith("row:")) {
-      const gk = rowGroupOf.get(focusKey.slice(4));
-      target = gk ? focusables.find((x) => x.dataset.key === `grp:${gk}`) : void 0;
-      if (target && tree.contains(document.activeElement)) showStatusLine(t("list.hiddenRow"));
+    if (focusKey && !target && focusKey.startsWith("row:") && hadFocus) {
+      showStatusLine(t("list.hiddenRow"));
+      focusKey = null;
+      $("varMainTitle").focus({ preventScroll: true });
     }
     for (const f of focusables) f.tabIndex = -1;
     (_a = target != null ? target : focusables[0]) == null ? void 0 : _a.setAttribute("tabindex", "0");
-    if (target && ((_b = document.activeElement) == null ? void 0 : _b.closest("#varTree"))) target.focus({ preventScroll: true });
+    if (target && hadFocus) target.focus({ preventScroll: true });
     if (Math.abs(window.scrollY - prevScroll) > 1) window.scrollTo(0, prevScroll);
   }
-  var rowGroupOf = /* @__PURE__ */ new Map();
-  var usageEverShown = false;
+  function pathEl(label, i) {
+    const d = document.createElement("div");
+    d.className = "vt-path";
+    d.dataset.key = `path:${i}`;
+    d.setAttribute("role", "row");
+    d.textContent = label;
+    d.title = label;
+    d.addEventListener("keydown", (ev) => treeKey(ev, d));
+    return d;
+  }
+  function setAllExpanded(on) {
+    for (const c of vmCols) sideOpen.set(c.id, on);
+    renderVarList();
+  }
+  function libRowsAll() {
+    if (!usageMap) return [];
+    return libVars.filter((l) => {
+      var _a, _b;
+      return ((_b = (_a = usageMap.get(l.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0 || indirectMap.has(l.id);
+    });
+  }
   function libRowsMatching() {
     if (!usageMap) return [];
     return libVars.filter((l) => {
       var _a, _b;
       return (((_b = (_a = usageMap.get(l.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0 || indirectMap.has(l.id)) && matchesQuery(l.name, query);
     });
-  }
-  function sectionEl(e) {
-    const d = document.createElement("div");
-    d.className = "vt-section";
-    d.dataset.key = `sec:${e.collection.id}`;
-    d.setAttribute("role", "row");
-    d.setAttribute("aria-level", "1");
-    d.innerHTML = `<span>${escapeHtml(e.collection.name)}</span><span class="badge" aria-hidden="true">${escapeHtml(tierBadge(e.collection))}</span><span class="num">${usageMap ? `${e.used}/${e.total}` : e.total}</span>`;
-    d.addEventListener("keydown", (ev) => treeKey(ev, d));
-    return d;
-  }
-  function groupEl(e) {
-    const d = document.createElement("div");
-    d.className = "vt-group";
-    d.dataset.key = `grp:${e.key}`;
-    d.setAttribute("role", "row");
-    d.setAttribute("aria-level", "2");
-    d.setAttribute("aria-expanded", String(e.expanded));
-    const tw = document.createElement("span");
-    tw.className = "tw";
-    tw.textContent = e.expanded ? "\u25BE" : "\u25B8";
-    const lbl = document.createElement("span");
-    lbl.className = "lbl";
-    lbl.textContent = e.label;
-    lbl.title = e.label;
-    const num = document.createElement("span");
-    num.className = "num";
-    num.textContent = usageMap ? `${e.used}/${e.total}` : String(e.total);
-    d.append(tw, lbl, num);
-    if (usageMap && e.unused > 0 && e.used > 0 && !query.trim()) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "link link-btn more-unused";
-      b.tabIndex = -1;
-      b.textContent = e.showingUnused ? t("list.hideUnused") : t("list.showUnused", { m: e.unused });
-      b.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        toggleUnused(e.key);
-      });
-      d.appendChild(b);
-    }
-    d.addEventListener("click", (ev) => {
-      var _a;
-      if (ev.altKey) {
-        setSectionExpanded(e.collectionId, !e.expanded);
-        return;
-      }
-      focusKey = (_a = d.dataset.key) != null ? _a : null;
-      toggleGroup(e.key, e.expanded);
-    });
-    d.addEventListener("keydown", (ev) => treeKey(ev, d, e));
-    return d;
-  }
-  function toggleGroup(key, expanded) {
-    userExpanded.set(key, !expanded);
-    renderVarList();
-  }
-  function toggleUnused(key) {
-    if (showUnusedIn.has(key)) showUnusedIn.delete(key);
-    else showUnusedIn.add(key);
-    renderVarList();
-  }
-  function setSectionExpanded(colId, on) {
-    for (const v of vmVars) if (v.collectionId === colId) userExpanded.set(groupKey(colId, v.name), on);
-    renderVarList();
-  }
-  function setAllExpanded(on) {
-    for (const v of vmVars) userExpanded.set(groupKey(v.collectionId, v.name), on);
-    if (on) for (const c of vmCols) showUnusedGroups.add(c.id);
-    renderVarList();
-  }
-  function unusedGroupsEl(colId, count) {
-    const d = document.createElement("div");
-    d.className = "vt-line";
-    d.dataset.key = `ug:${colId}`;
-    d.setAttribute("role", "row");
-    d.textContent = t("list.unusedGroups", { n: count });
-    const open = () => {
-      showUnusedGroups.add(colId);
-      renderVarList();
-    };
-    d.addEventListener("click", open);
-    d.addEventListener("keydown", (ev) => treeKey(ev, d, void 0, open));
-    return d;
   }
   function useText(id, state) {
     var _a, _b, _c, _d, _e, _f, _g, _h;
@@ -6513,13 +7057,11 @@
     return { text: t("vm.uses", { n: (_f = u == null ? void 0 : u.places) != null ? _f : 0 }), tip: t("list.usesTip", { k: (_g = u == null ? void 0 : u.layers) != null ? _g : 0, n: (_h = u == null ? void 0 : u.places) != null ? _h : 0 }) };
   }
   function rowEl(v, state) {
-    rowGroupOf.set(v.id, groupKey(v.collectionId, v.name));
     const d = document.createElement("div");
     d.className = `vt-row ${state}`;
     d.dataset.key = `row:${v.id}`;
     d.dataset.id = v.id;
     d.setAttribute("role", "row");
-    d.setAttribute("aria-level", "3");
     d.setAttribute("aria-selected", String(vmSelected === v.id));
     const cell = currentModeCell(v);
     const nm = document.createElement("span");
@@ -6596,7 +7138,7 @@ ${v.description}` : v.name;
       pick();
     });
     d.append(s, b);
-    d.addEventListener("keydown", (ev) => treeKey(ev, d, void 0, pick));
+    d.addEventListener("keydown", (ev) => treeKey(ev, d, pick));
     return d;
   }
   function moreButton(open) {
@@ -6629,22 +7171,21 @@ ${v.description}` : v.name;
       markSelected();
       openVarMenuFor(ref, d, e.clientX, e.clientY);
     });
-    d.addEventListener("keydown", (ev) => treeKey(ev, d, void 0, () => openDetail(ref, d), () => openVarMenuFor(ref, d)));
+    d.addEventListener("keydown", (ev) => treeKey(ev, d, () => openDetail(ref, d), () => openVarMenuFor(ref, d)));
   }
   function markSelected() {
     document.querySelectorAll("#varTree .vt-row").forEach((r) => r.setAttribute("aria-selected", String(r.dataset.id === vmSelected)));
   }
-  function treeKey(ev, el, group, onEnter, onMenu) {
-    var _a, _b, _c, _d, _e;
+  function treeKey(ev, el, onEnter, onMenu) {
     const all = Array.from($("varTree").querySelectorAll("[data-key]"));
     const i = all.indexOf(el);
     const go = (j) => {
-      var _a2;
+      var _a;
       const target = all[Math.max(0, Math.min(all.length - 1, j))];
       if (!target) return;
       all.forEach((x) => x.tabIndex = -1);
       target.tabIndex = 0;
-      focusKey = (_a2 = target.dataset.key) != null ? _a2 : null;
+      focusKey = (_a = target.dataset.key) != null ? _a : null;
       target.focus();
     };
     const k = ev.key;
@@ -6654,28 +7195,8 @@ ${v.description}` : v.name;
     else if (k === "End") go(all.length - 1);
     else if (k === "PageDown") go(i + 10);
     else if (k === "PageUp") go(i - 10);
-    else if (k === "ArrowRight" && group) {
-      focusKey = (_a = el.dataset.key) != null ? _a : null;
-      if (ev.altKey) setSectionExpanded(group.collectionId, true);
-      else if (!group.expanded) toggleGroup(group.key, false);
-      else if (group.unused > 0 && !group.showingUnused) toggleUnused(group.key);
-    } else if (k === "ArrowLeft") {
-      if (group) {
-        focusKey = (_b = el.dataset.key) != null ? _b : null;
-        if (ev.altKey) setSectionExpanded(group.collectionId, false);
-        else if (group.expanded) toggleGroup(group.key, true);
-      } else if (el.classList.contains("vt-row")) {
-        const gk = rowGroupOf.get((_c = el.dataset.id) != null ? _c : "");
-        const gi = all.findIndex((x) => x.dataset.key === `grp:${gk}`);
-        if (gi >= 0) go(gi);
-      }
-    } else if (k === "Enter" && group && ev.shiftKey) {
-      focusKey = (_d = el.dataset.key) != null ? _d : null;
-      toggleUnused(group.key);
-    } else if (k === "Enter" && group) {
-      focusKey = (_e = el.dataset.key) != null ? _e : null;
-      toggleGroup(group.key, group.expanded);
-    } else if (k === "Enter" && onEnter) onEnter();
+    else if (k === "Escape" && (searchOpen || query)) clearSearch(true);
+    else if (k === "Enter" && onEnter) onEnter();
     else if ((k === "ContextMenu" || k === "F10" && ev.shiftKey) && onMenu) onMenu();
     else return;
     ev.preventDefault();
@@ -6684,19 +7205,17 @@ ${v.description}` : v.name;
     var _a;
     const v = vmVars.find((x) => x.id === id);
     if (!v) {
-      const lib = libVars.find((l) => l.id === id);
-      if (lib && chip === "all" && libRowsMatching().some((l) => l.id === id)) {
+      if (libRowsAll().some((l) => l.id === id)) {
+        pickSide({ kind: "lib" }, false);
         (_a = document.querySelector(`#varTree [data-key="lib:${CSS.escape(id)}"]`)) == null ? void 0 : _a.focus();
       } else showStatusLine(t("list.libVar"));
       return;
     }
-    const undo = { chip, query, searchOpen, userExpanded: new Map(userExpanded), showUnusedIn: new Set(showUnusedIn), showUnusedGroups: new Set(showUnusedGroups), scroll: window.scrollY, focusKey: fromKey != null ? fromKey : focusKey };
-    chip = "all";
+    const undo = { sel: sideSel, picked: sidePicked, open: new Map(sideOpen), query, searchOpen, scroll: window.scrollY, focusKey: fromKey != null ? fromKey : focusKey };
     clearSearch(false);
-    const gk = groupKey(v.collectionId, v.name);
-    userExpanded.set(gk, true);
-    showUnusedGroups.add(v.collectionId);
-    showUnusedIn.add(gk);
+    sideSel = { kind: "grp", key: groupKey(v.collectionId, v.name) };
+    sidePicked = true;
+    sideOpen.set(v.collectionId, true);
     focusKey = `row:${v.id}`;
     vmSelected = v.id;
     renderVarList();
@@ -6707,17 +7226,14 @@ ${v.description}` : v.name;
       action: {
         label: t("list.undo"),
         run: () => {
-          chip = undo.chip;
+          sideSel = undo.sel;
+          sidePicked = undo.picked;
+          sideOpen.clear();
+          undo.open.forEach((val, key) => sideOpen.set(key, val));
           query = undo.query;
           searchOpen = undo.searchOpen;
           $("varSearch").value = query;
           $("searchBox").hidden = !searchOpen;
-          userExpanded.clear();
-          undo.userExpanded.forEach((val, key) => userExpanded.set(key, val));
-          showUnusedIn.clear();
-          undo.showUnusedIn.forEach((x) => showUnusedIn.add(x));
-          showUnusedGroups.clear();
-          undo.showUnusedGroups.forEach((x) => showUnusedGroups.add(x));
           focusKey = undo.focusKey;
           renderVarList();
           window.scrollTo(0, undo.scroll);
@@ -6926,9 +7442,16 @@ ${v.description}` : v.name;
       showStatusLine(t("status.noSelection"), { cls: "warn" });
       return;
     }
+    const sameResult = hasBindPreview() && !!bindPreviewSel && sameIds(bindPreviewSel, curSel.ids) && !bindForeignSel;
+    bindLeftSince = false;
     showTab("layer");
     showApplyStep("bind");
-    $("btnApply").click();
+    if (sameResult || bindBusy()) return;
+    if (prereqKnown && !hasBindable) {
+      renderBindPrereq();
+      return;
+    }
+    runBindPreview();
   }
   $("btnVarRefresh").addEventListener("click", refreshList);
   $("btnAddVar").addEventListener("click", () => showMake("color"));
@@ -6949,23 +7472,6 @@ ${v.description}` : v.name;
   $("modeSelect").addEventListener("change", () => {
     modeName = $("modeSelect").value || null;
     renderVarList();
-  });
-  $("btnChipMore").addEventListener("click", () => {
-    const row = $("chipRow");
-    const chips = Array.from(row.querySelectorAll(".tier-chip"));
-    const next = chips.find((c) => c.offsetLeft + c.offsetWidth > row.scrollLeft + row.clientWidth + 1);
-    row.scrollLeft = next ? next.offsetLeft + next.offsetWidth - row.clientWidth : row.scrollWidth;
-  });
-  $("chipRow").addEventListener("wheel", (e) => {
-    if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-    e.preventDefault();
-    $("chipRow").scrollLeft += e.deltaY;
-  }, { passive: false });
-  $("btnRebase").addEventListener("click", () => {
-    rebaseToCurrent();
-    const tree = $("varTree");
-    const target = focusKey && tree.querySelector(`[data-key="${CSS.escape(focusKey)}"]`) || tree.querySelector("[data-key]");
-    target == null ? void 0 : target.focus();
   });
   var wizLatch = null;
   var wizBeforeCount = 0;
@@ -6990,11 +7496,12 @@ ${v.description}` : v.name;
   var wizHasSummary = () => !!$("wizardSummary").textContent;
   function renderWizardCopy() {
     const hint = $("wizardCard").querySelector('[data-i18n="wizardCard.hint"]');
-    const key = isPaid ? "wizardCard.hintPaid" : localVarCount() === 0 ? "wizardCard.hintFree" : "wizardCard.hintFreeVars";
-    if (hint) hint.textContent = t(key);
+    if (hint) hint.textContent = t(isPaid ? "wizardCard.hintPaid" : "wizardCard.hintFree");
     const btn = $("btnWizardRun");
-    if (!wizardRunning) btn.textContent = isPaid ? t(btn.dataset.rerun === "1" ? "wizard.rerun" : "wizardCard.run") : localVarCount() === 0 ? t("wizardCard.runFree") : t("wizardCard.runFreeVars");
+    if (!wizardRunning) btn.textContent = isPaid ? t(btn.dataset.rerun === "1" ? "wizard.rerun" : "wizardCard.run") : t("wizardCard.runFree");
     if (!wizardRunning) setLock(btn, curSel.count ? null : "prereq", t("status.noSelection"));
+    $("wizNoSel").hidden = wizardRunning || !!curSel.count;
+    renderWizToBind();
     const done = $("wizDone");
     const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
     if (made > 0) {
@@ -7010,6 +7517,7 @@ ${v.description}` : v.name;
     $("goMakeFree").style.display = isPaid ? "none" : "";
     const lib = $("startLib");
     clearMount(lib);
+    if (baseDiffers()) lib.appendChild(situationEl(baseNoticeText(), [t("list.rebase"), () => doRebase(true)]));
     if (baseline && bigSkipped && !usageMap) {
       const d = document.createElement("div");
       d.className = "situation";
@@ -7101,6 +7609,87 @@ ${v.description}` : v.name;
     (_a = $("varTree").querySelector("[data-key]")) == null ? void 0 : _a.focus();
   });
   $("btnStartLicense").addEventListener("click", goToLicense);
+  function renderBindPrereq() {
+    if (!curSel) return;
+    const notice = $("bindPrereq");
+    const text = notice.querySelector(".prereq-text");
+    const act = $("bindPrereqAction");
+    let msg = "";
+    let action = null;
+    if (prereqKnown && !hasBindable) {
+      if (prereqLocalVars === 0) {
+        if (layerLibUse === true) msg = t("bind.noLocalLib");
+        else if (isPaid) {
+          msg = t("bind.noVarsPaid");
+          action = [t("prereq.gotoCreate"), goToCreate];
+        } else {
+          msg = t("bind.noVarsFree");
+          action = [t("status.paidAction"), goToLicense];
+        }
+      } else {
+        msg = t("bind.noTier");
+        action = [t("bind.gotoTiers"), goToTiers];
+      }
+    }
+    notice.style.display = msg ? "" : "none";
+    text.textContent = msg;
+    act.hidden = !action;
+    if (action) {
+      act.textContent = action[0];
+      act.onclick = action[1];
+    }
+    const noSel = !curSel.count;
+    setLock($("btnApply"), noSel ? "prereq" : msg ? "prereq" : null, noSel ? t("status.noSelection") : msg);
+    renderBindChrome();
+    const ts = $("btnApplyExistingText");
+    if (noSel) setLock(ts, "prereq", t("status.noSelection"));
+    else if (prereqKnown && !hasTextStyles) setLock(ts, "prereq", t("bind.tsNone"));
+    else setLock(ts, null);
+  }
+  function goToTiers() {
+    showTab("variables");
+    showVarSub("home");
+    requestAnimationFrame(() => openTierPopup($("btnVarMore")));
+  }
+  function readLayerLibUse() {
+    if (!prereqKnown || hasBindable || prereqLocalVars > 0 || !curSel.count || curSel.scanned > BIG_SELECTION || layerLibUse !== null || layerLibReq) return;
+    layerLibReq = ++bindReqSeq;
+    send({ type: "SCAN_USAGE", reqId: layerLibReq, nodeIds: curSel.ids });
+  }
+  function bindOnReturn() {
+    if (activeTab !== "layer" || currentApplyStep !== "bind" || !hasBindPreview()) return;
+    if (bindPreviewMini) {
+      bindPreviewMini = false;
+      return;
+    }
+    const notice = $("bindNotice");
+    if (bindForeignSel || bindPreviewSel && !sameIds(bindPreviewSel, curSel.ids)) {
+      bindForeignSel = true;
+      $("bindNoticeText").textContent = t("bind.otherSel");
+      notice.hidden = false;
+      renderBindPrereq();
+      return;
+    }
+    if (bindHereSel) {
+      bindHereSel = false;
+      return;
+    }
+    if (!bindLeftSince) return;
+    bindLeftSince = false;
+    if (curSel.scanned > BIG_SELECTION) {
+      $("bindNoticeText").textContent = t("bind.maybeChanged");
+      notice.hidden = false;
+      return;
+    }
+    runBindPreview(true);
+  }
+  document.documentElement.addEventListener("pointerleave", () => {
+    if (hasBindPreview()) bindLeftSince = true;
+  });
+  window.addEventListener("blur", () => {
+    if (hasBindPreview()) bindLeftSince = true;
+  });
+  var bindBusy = () => opPending.has("APPLY") || opPending.has("APPLY_SELECTED");
   activeTab = "settings";
   showTab("variables");
 })();
