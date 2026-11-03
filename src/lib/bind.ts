@@ -6,7 +6,7 @@
    ============================================================ */
 import { rgbToHex } from './tokens';
 import { collectionTiers } from './collectionRoles'; // 계층은 컬렉션 이름이 아니라 지정된 역할로
-import { FIELD_SCOPE, FILL_SCOPES, STROKE_SCOPES, EFFECT_SCOPES, scopeFitsField, fieldResolvedType } from './scopes'; // 용도 규칙 — 일괄 교체와 공유
+import { FIELD_SCOPE, FILL_SCOPES, STROKE_SCOPES, EFFECT_SCOPES } from './scopes'; // 용도 규칙
 import type { BindCandidate, BindNode, BindSkip } from '../shared/messages';
 
 interface VarEntry {
@@ -911,141 +911,98 @@ export async function scanBindings(selection: readonly SceneNode[]): Promise<Bin
   return { candidates, nodes: pruneToAffected(nodeIndex, candidates, []), total, boundNodes };
 }
 
-/* ---------- 일괄 교체(remap) — 변수 A를 쓰던 자리를 변수 B로 ---------- */
+/* ---------- 변수 사용 조회(IA v3 §4.4 — 보기 전용) ----------
+   연결 작업과 범위가 다르다: 인스턴스 안쪽 레이어도 센다(보기 전용, 재검토 ⑥). 숨긴 레이어는 세지 않는다.
+   상한이 없다 — 숫자만 모으고 후보 목록을 만들지 않으므로 600개 결과 상한(RESULT_CAP)과 무관하다. */
 
-export interface RemapResult {
-  /** 바꾼 자리 수(페인트 1장·필드 1개·텍스트 필드 1개 = 1). */
-  replaced: number;
-  /** 하나라도 바뀐 레이어 수. */
-  nodes: number;
-  /** A를 쓰지만 B를 붙일 수 없어 그대로 둔 자리(타입·용도 불일치, 폰트 없음 등). */
-  skipped: number;
-}
-
-/** 텍스트에서 구간 단위로 묶이는 필드(노드 boundVariables에는 배열로 나온다). */
-const TEXT_RANGE_ALL = new Set<string>(['fontFamily', 'fontSize', 'fontStyle', 'fontWeight', 'letterSpacing', 'lineHeight', 'paragraphSpacing', 'paragraphIndent']);
-
-/** 텍스트 노드에서 field가 변수 fromId에 묶인 구간들. getRangeBoundVariable이 없는 목 환경은 노드 기록으로 전 구간을 본다. */
-function rangesBoundTo(node: TextNode, field: VariableBindableTextField, fromId: string): Array<[number, number]> {
-  const len = node.characters.length;
-  if (len === 0) return [];
-  const getRange = (node as TextNode & {
-    getRangeBoundVariable?: (s: number, e: number, f: VariableBindableTextField) => VariableAlias | null | typeof figma.mixed;
-  }).getRangeBoundVariable;
-  if (typeof getRange !== 'function') {
-    const raw = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables?.[field];
-    const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
-    return list.some((a) => (a as VariableAlias)?.id === fromId) ? [[0, len]] : [];
+/** 한 레이어에 연결된 변수 id들(속성 자리마다 하나 — 같은 변수가 두 자리면 두 번). */
+export function boundVariableIds(node: SceneNode): string[] {
+  const out: string[] = [];
+  const aliasId = (raw: unknown): string | undefined => {
+    if (!raw) return undefined;
+    const a = Array.isArray(raw) ? raw[0] : raw;
+    return a && typeof a === 'object' && 'id' in a ? (a as VariableAlias).id : undefined;
+  };
+  for (const key of ['fills', 'strokes'] as const) {
+    const ps = (node as unknown as Record<string, unknown>)[key];
+    if (!Array.isArray(ps)) continue;
+    for (const p of ps) {
+      const id = (p as { boundVariables?: { color?: VariableAlias } }).boundVariables?.color?.id;
+      if (id) out.push(id);
+    }
   }
-  const full = getRange.call(node, 0, len, field);
-  if (full !== figma.mixed) return full && full.id === fromId ? [[0, len]] : [];
-  // 섞여 있으면 글자 단위로 연속 구간을 모은다 — 다른 변수에 묶인 구간은 건드리지 않는다.
-  const out: Array<[number, number]> = [];
-  let i = 0;
-  while (i < len) {
-    const v = getRange.call(node, i, i + 1, field);
-    if (v !== figma.mixed && v && v.id === fromId) {
-      let j = i + 1;
-      while (j < len) {
-        const w = getRange.call(node, j, j + 1, field);
-        if (w === figma.mixed || !w || w.id !== fromId) break;
-        j++;
-      }
-      out.push([i, j]);
-      i = j;
-    } else i++;
+  const effects = (node as { effects?: readonly Effect[] }).effects;
+  if (Array.isArray(effects)) {
+    for (const e of effects) {
+      const id = (e as { boundVariables?: { color?: VariableAlias } }).boundVariables?.color?.id;
+      if (id) out.push(id);
+    }
+  }
+  const bv = (node as { boundVariables?: Record<string, unknown> }).boundVariables ?? {};
+  for (const [field, raw] of Object.entries(bv)) {
+    if (field === 'fills' || field === 'strokes' || field === 'effects' || field === 'componentProperties' || field === 'textRangeFills') continue;
+    const id = aliasId(raw);
+    if (id) out.push(id);
   }
   return out;
 }
 
-/**
- * 선택 안에서 변수 fromId에 묶인 자리를 변수 to로 다시 묶는다.
- * - fields가 있으면 그 필드만(변수별 보기의 한 행 = 한 속성 그룹). 없으면 전부.
- * - 지워진 변수(잔상) id도 fromId로 받는다 — 끊긴 연결을 한 번에 살리는 용도.
- * - 자리마다 타입·용도를 다시 확인한다(scopes.ts). 안 맞으면 그대로 두고 skipped로 센다.
- * - 텍스트 구간 필드는 A에 묶인 구간만 바꾼다(다른 변수 구간 보존).
- * - 순회 규칙은 scanBindings와 같다: 숨김 제외, 인스턴스 내부 제외.
- */
-export async function remapBindings(
-  selection: readonly SceneNode[],
-  fromId: string,
-  to: Variable,
-  fields?: readonly string[],
-): Promise<RemapResult> {
-  const want = fields && fields.length ? new Set(fields) : null;
-  const fits = (field: string): boolean => {
-    const t = fieldResolvedType(field);
-    if (t && to.resolvedType !== t) return false;
-    return scopeFitsField(field, to.scopes ?? ['ALL_SCOPES']);
-  };
-  const res: RemapResult = { replaced: 0, nodes: 0, skipped: 0 };
-  const isFrom = (a: unknown): boolean => !!a && typeof a === 'object' && (a as VariableAlias).id === fromId;
-
-  const visit = async (node: SceneNode): Promise<void> => {
-    if (node.visible === false) return;
-    let touched = false;
-    const rec = node as unknown as Record<string, unknown>;
-    // 채움·선 색
-    for (const key of ['fills', 'strokes'] as const) {
-      if (want && !want.has(key)) continue;
-      const ps = rec[key];
-      if (!Array.isArray(ps)) continue;
-      let changed = false;
-      const next = (ps as Paint[]).map((p) => {
-        if (!isFrom((p as { boundVariables?: { color?: unknown } }).boundVariables?.color)) return p;
-        if (!fits(key) || p.type !== 'SOLID') { res.skipped++; return p; }
-        changed = true;
-        res.replaced++;
-        return figma.variables.setBoundVariableForPaint(p, 'color', to);
-      });
-      if (changed) { rec[key] = next; touched = true; }
-    }
-    // 효과 색
-    if (!want || want.has('effects')) {
-      const effects = (node as { effects?: readonly Effect[] }).effects;
-      if (Array.isArray(effects)) {
-        let changed = false;
-        const next = effects.map((e) => {
-          if (!isFrom((e as { boundVariables?: { color?: unknown } }).boundVariables?.color)) return e;
-          if (!fits('effects') || (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW')) { res.skipped++; return e; }
-          changed = true;
-          res.replaced++;
-          return figma.variables.setBoundVariableForEffect(e, 'color', to);
-        });
-        if (changed) { (node as unknown as { effects: readonly Effect[] }).effects = next; touched = true; }
-      }
-    }
-    // 노드 스칼라 필드 · 텍스트 구간 필드
-    const bv = (node as { boundVariables?: Record<string, unknown> }).boundVariables ?? {};
-    for (const [field, raw] of Object.entries(bv)) {
-      if (field === 'fills' || field === 'strokes' || field === 'effects' || field === 'componentProperties' || field === 'textRangeFills') continue;
-      if (want && !want.has(field)) continue;
-      const list = Array.isArray(raw) ? raw : [raw];
-      if (!list.some(isFrom)) continue;
-      if (!fits(field)) { res.skipped++; continue; }
-      try {
-        if (node.type === 'TEXT' && TEXT_RANGE_ALL.has(field)) {
-          const ranges = rangesBoundTo(node, field as VariableBindableTextField, fromId);
-          if (!ranges.length) continue;
-          // 텍스트 속성을 바꾸기 전에 쓰인 폰트를 모두 로드한다(구간마다 폰트가 다를 수 있다).
-          const fonts = typeof node.getRangeAllFontNames === 'function'
-            ? node.getRangeAllFontNames(0, node.characters.length)
-            : node.fontName !== figma.mixed ? [node.fontName] : [];
-          for (const f of fonts) await figma.loadFontAsync(f);
-          for (const [s, e] of ranges) node.setRangeBoundVariable(s, e, field as VariableBindableTextField, to);
-        } else {
-          (node as unknown as { setBoundVariable: (f: string, v: Variable) => void }).setBoundVariable(field, to);
-        }
-        res.replaced++;
-        touched = true;
-      } catch {
-        res.skipped++; // 폰트 없음·잠긴 속성 등 — 이 자리만 남기고 계속
-      }
-    }
-    if (touched) res.nodes++;
-    if (node.type === 'INSTANCE') return; // 인스턴스 내부는 메인 컴포넌트의 몫
-    if ('children' in node) for (const c of node.children) await visit(c);
-  };
-  for (const n of selection) if (isEffectivelyVisible(n)) await visit(n);
-  return res;
+/** 보이는 레이어를 인스턴스 안쪽까지 돈다. 루트가 숨겨져 있으면 건너뛴다. */
+export function walkVisibleDeep(roots: readonly SceneNode[], visit: (node: SceneNode) => void): number {
+  let scanned = 0;
+  const stack: SceneNode[] = [];
+  for (const r of roots) if (isEffectivelyVisible(r)) stack.push(r);
+  while (stack.length) {
+    const n = stack.pop() as SceneNode;
+    if (n.visible === false) continue;
+    scanned++;
+    visit(n);
+    if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
+  }
+  return scanned;
 }
+
+export interface UsageCount {
+  /** 연결된 속성 자리 수("곳") */
+  places: number;
+  /** 그 변수를 쓰는 레이어 수 */
+  layers: number;
+}
+
+/** 루트들 안의 변수 사용 수(변수 id → 곳·레이어). 어떤 변수인지(로컬/라이브러리/삭제)는 부르는 쪽이 가린다. */
+export function countUsage(roots: readonly SceneNode[]): { usage: Map<string, UsageCount>; nodesById: Map<string, string[]>; scanned: number } {
+  const usage = new Map<string, UsageCount>();
+  const nodesById = new Map<string, string[]>();
+  const scanned = walkVisibleDeep(roots, (n) => {
+    const ids = boundVariableIds(n);
+    if (!ids.length) return;
+    const seen = new Set<string>();
+    for (const id of ids) {
+      const u = usage.get(id) ?? { places: 0, layers: 0 };
+      u.places++;
+      if (!seen.has(id)) {
+        u.layers++;
+        seen.add(id);
+        const list = nodesById.get(id) ?? [];
+        list.push(n.id);
+        nodesById.set(id, list);
+      }
+      usage.set(id, u);
+    }
+  });
+  return { usage, nodesById, scanned };
+}
+
+/** 주어진 변수들 중 하나라도 쓰는 레이어(인스턴스 안쪽 포함) — 사용 레이어 선택·상세 "쓰인 곳". */
+export function findUsers(roots: readonly SceneNode[], varIds: ReadonlySet<string>): { nodes: SceneNode[]; places: number } {
+  const nodes: SceneNode[] = [];
+  let places = 0;
+  walkVisibleDeep(roots, (n) => {
+    const hits = boundVariableIds(n).filter((id) => varIds.has(id)).length;
+    if (!hits) return;
+    places += hits;
+    nodes.push(n);
+  });
+  return { nodes, places };
+}
+

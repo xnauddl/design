@@ -16,8 +16,8 @@ export {
   COMPONENT,
 } from './variables';
 export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult } from './variables';
-export { bindSelection, scanBindings, remapBindings } from './bind';
-export type { BindResult, RemapResult } from './bind';
+export { bindSelection, scanBindings, countUsage, findUsers, boundVariableIds } from './bind';
+export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName } from './rename';
 export type { RenameOutcome } from './rename';
 export { createIconRegistry, swapVectorSlots, transplantImageFills, nodeAtPath } from './artwork';

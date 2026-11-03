@@ -58,6 +58,8 @@
     }
 
     * { box-sizing: border-box; }
+    /* hidden 속성은 display를 지정한 클래스보다 앞선다(검색칸·칩 더 보기 등이 늘 보이던 문제). */
+    [hidden] { display: none !important; }
     body {
       font: 400 var(--fs)/1.5 var(--font);
       margin: 0; padding: 12px 12px 36px; /* 아래 36 = 공통 상태 줄(24) + 여백 */
@@ -226,6 +228,12 @@
     .selbar .sel-name:only-child, .selbar .sel-name:has(+ .sel-sub:empty) { max-width: none; }
     .selbar .sel-sub { flex: 0 0 auto; }
     .selbar .sel-sub:empty { display: none; }
+    .selbar .sel-base { flex: 0 1 auto; min-width: 0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); font-weight: 400; }
+    .selbar .sel-base:empty { display: none; }
+    .selbar .sel-rebase { margin-left: auto; flex: 0 0 auto; font-weight: 600; }
+    .ctx-menu .menu-note { display: block; font-size: 10px; color: var(--muted); font-weight: 400; }
+    .ctx-menu button[aria-disabled="true"] { color: var(--muted); }
+    .wiz-done { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .selbar.muted { color: var(--muted); font-weight: 400; }
 
     /* ── 콜아웃(안내 노트) ── */
@@ -355,16 +363,8 @@
       padding: 6px 8px; display: grid; gap: 3px;
     }
     .r-card.dim { opacity: .55; }
-    /* 일괄 교체 패널 — 변수별 보기의 행 바로 아래에 붙는다. 좁은 폭에서는 줄바꿈. */
-    .remap-panel {
-      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-      margin: -2px 0 6px; padding: 7px 8px; border: 1px solid var(--accent-border);
-      border-radius: var(--r-sm); background: var(--accent-subtle); font-size: 11px;
-    }
-    .remap-panel select { max-width: 100%; min-width: 0; flex: 1 1 140px; }
     /* 연결 현황 대기 — 선택이 멎을 때까지 이전 목록을 흐리게 둔다(비웠다 채우는 깜빡임 대신). 누를 수 없음. */
     .results.stale { opacity: .45; pointer-events: none; transition: opacity .12s; }
-    .remap-panel label.inline { flex: 1 1 200px; min-width: 0; }
     /* 컬렉션 계층 — 한 줄: 이름(변수 수) · 추천 · 선택 */
     .col-role { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
     .col-role:first-child { border-top: none; }
@@ -465,40 +465,8 @@
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
 
-    /* ── 변수 관리 ── */
-    .var-manager { display: flex; flex-direction: column; gap: 8px; }
-    .vm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .vm-head h2 { margin: 0; font-size: 12px; }
-    .vm-head input[type=search] { width: 160px; }
-    /* PR 1 중간 상태 — 400에서는 트리를 표 위에 쌓는다. 목록마다 스크롤 상자를 두지 않는다(#18): 패널이 스크롤. */
-    .vm-body { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-    .vm-tree { border: 1px solid var(--border); border-radius: var(--r); padding: 4px; }
-    .vm-node { display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; border: none; background: transparent; padding: 4px 6px; border-radius: var(--r-sm); color: var(--text); font-size: 11px; }
-    .vm-node:hover { background: var(--surface-hover); }
-    .vm-node[aria-current="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
-    .vm-node .tw { width: 10px; flex: 0 0 10px; color: var(--muted); }
-    .vm-node .lbl { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .vm-node .cnt { color: var(--muted); font-size: 10px; }
-    .vm-node.empty .lbl { color: var(--muted); }
-    .vm-tier { font-size: 9px; padding: 0 4px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
-    .vm-table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow-x: auto; }
-    .vm-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
-    .vm-table th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-2); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); z-index: 1; white-space: nowrap; }
-    .vm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-    .vm-table td.name, .vm-table th.name { position: sticky; left: 0; background: var(--surface); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
-    .vm-table th.name { background: var(--surface-2); z-index: 2; }
-    .vm-group td { background: var(--surface-2); color: var(--text-2); font-weight: 600; cursor: pointer; }
-    .vm-row { cursor: default; outline: none; }
-    .vm-row:hover td { background: var(--surface-hover); }
-    .vm-row[aria-selected="true"] td { background: var(--accent-subtle); }
-    .vm-row .ic { display: inline-block; width: 12px; text-align: center; color: var(--muted); margin-right: 4px; font-family: var(--mono); }
-    .vm-row .more { visibility: hidden; border: none; background: transparent; padding: 0 4px; color: var(--text-2); }
-    .vm-row:hover .more, .vm-row:focus-within .more, .vm-row[aria-selected="true"] .more { visibility: visible; }
+    /* ── 상세 팝업의 값 글꼴 ── */
     .vm-val { font-family: var(--mono); color: var(--text); }
-    .vm-alias { font-family: var(--mono); font-size: 10.5px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; background: var(--surface-2); color: var(--text-2); }
-    .vm-alias:hover { color: var(--accent-strong); border-color: var(--accent-border); }
-    .vm-use { color: var(--text-2); text-align: right; }
-    .vm-empty { padding: 16px; color: var(--muted); }
     /* ── 우클릭 메뉴 · 팝업(공용) ── */
     .ctx-menu { position: fixed; z-index: 50; min-width: 170px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 4px; }
     .ctx-menu button { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: var(--r-sm); font-size: 11.5px; color: var(--text); }
@@ -526,6 +494,76 @@
       border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
     }
     .tier-chip[aria-checked="true"] { background: var(--accent-subtle); border-color: var(--accent-border); color: var(--accent-strong); }
+
+    /* ── IA v3 변수 탭(§4.2~§4.4) ── */
+    .var-loading { padding: 16px 4px; color: var(--text-2); }
+    .start-head { font-size: 12px; font-weight: 600; margin: 4px 0 2px; }
+    #varStart > * + * { margin-top: 10px; }
+    .start-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .grow { flex: 1 1 auto; }
+    button.link-btn { min-height: 24px; padding: 0 2px; text-decoration: none; color: var(--accent-strong); }
+    button.link-btn:hover { text-decoration: underline; }
+    .icon-btn {
+      width: 24px; height: 24px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid transparent; background: transparent; color: var(--text-2); border-radius: var(--r-sm); flex: 0 0 auto;
+    }
+    .icon-btn:hover:not([aria-disabled="true"]) { background: var(--surface-hover); color: var(--text); border-color: transparent; }
+    .icon-btn.spinning svg { animation: mini-spin 1s linear infinite; }
+    @media (prefers-reduced-motion: reduce) { .icon-btn.spinning svg { animation: none; } }
+    /* 머리줄·칩 줄은 선택 표시줄 아래에 붙지 않는다 — 고정은 구역·그룹 머리(최대 두 겹). */
+    .list-head { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; }
+    .chip-bar { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; min-width: 0; }
+    .chip-row { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; min-width: 0; scroll-behavior: smooth; }
+    .chip-row::-webkit-scrollbar { display: none; }
+    .tier-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .tier-chip .badge { font: 700 9px/14px var(--font); min-width: 14px; height: 14px; padding: 0 3px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); text-align: center; }
+    .tier-chip .num { font-weight: 500; color: var(--text-2); }
+    .tier-chip[aria-checked="true"] .num { color: var(--accent-strong); }
+    .mode-select { height: 24px; padding: 0 4px; font-size: 10.5px; max-width: 96px; }
+    .search-box { display: inline-flex; align-items: center; gap: 2px; flex: 0 1 auto; min-width: 160px; }
+    .search-box input { width: 100%; height: 24px; padding: 2px 6px; }
+    .situation { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 6px; padding: 6px 8px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-2); font-size: 10.5px; }
+    .situation[hidden] { display: none; }
+    /* 목록(treegrid) — 행은 28px. 구역 머리·그룹 머리는 고정(두 겹). */
+    .var-tree { display: flex; flex-direction: column; }
+    .vt-section {
+      position: sticky; top: var(--head-top, 81px); z-index: 2; display: flex; align-items: center; gap: 6px;
+      height: 26px; padding: 0 6px; background: var(--surface); border-bottom: 1px solid var(--border-2);
+      font-weight: 700; color: var(--text); cursor: default;
+    }
+    .vt-section .badge { font: 700 9px/14px var(--font); padding: 0 3px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); }
+    .vt-section .num, .vt-group .num { margin-left: auto; font-weight: 500; color: var(--text-2); font-size: 10.5px; }
+    .vt-group {
+      position: sticky; top: calc(var(--head-top, 81px) + 26px); z-index: 1; display: flex; align-items: center; gap: 6px;
+      height: 26px; padding: 0 6px; background: var(--surface); border-bottom: 1px solid var(--border);
+      color: var(--text-2); font-weight: 600; cursor: pointer; user-select: none;
+    }
+    .vt-group .tw { width: 10px; color: var(--muted); }
+    .vt-group .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .vt-group .more-unused { flex: 0 0 auto; min-height: 24px; font-size: 10.5px; }
+    .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 118px 48px 24px; align-items: center; height: 28px; padding: 0 6px 0 18px; border-bottom: 1px solid var(--border); cursor: default; }
+    .vt-row:hover, .vt-row:focus-visible, .vt-group:focus-visible, .vt-section:focus-visible, .vt-line:focus-visible { background: var(--surface-hover); outline: none; }
+    .vt-row[aria-selected="true"] { background: var(--accent-subtle); }
+    .vt-row .nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .vt-row .nm .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vt-row.direct .nm { font-weight: 600; color: var(--text); }
+    .vt-row.indirect .nm, .vt-row.none .nm { font-weight: 400; color: var(--text); }
+    .vt-row.unused .nm { color: var(--text-2); }
+    .vt-row .val { font-family: var(--mono); font-size: 10.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+    .vt-row .use { text-align: right; font-size: 10.5px; color: var(--text-2); white-space: nowrap; }
+    .vt-row .ic { width: 13px; flex: 0 0 13px; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 10px; }
+    .vt-row .more { visibility: hidden; width: 24px; height: 24px; padding: 0; border: none; background: transparent; color: var(--text-2); }
+    .vt-row:hover .more, .vt-row:focus-within .more, .vt-row.menu-open .more, .vt-row:focus .more { visibility: visible; }
+    .alias-pill { font-family: var(--mono); font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; background: var(--surface-2); color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 0; line-height: 1.4; }
+    .alias-pill:hover { color: var(--accent-strong); border-color: var(--accent-border); }
+    .lib-tag { font: 700 8.5px/12px var(--font); padding: 0 3px; border-radius: 3px; border: 1px solid var(--border-2); color: var(--text-2); flex: 0 0 auto; }
+    .vt-line { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; color: var(--text-2); border-bottom: 1px solid var(--border); cursor: pointer; }
+    .vt-lib { margin-top: 10px; }
+    .vt-empty { padding: 14px 6px; color: var(--text-2); }
+    .popover { position: fixed; z-index: 45; width: 240px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 6px; }
+    .popover[hidden] { display: none; }
+    .popover .pop-note { font-size: 10px; padding: 4px 6px 2px; }
+    #wizardSlotMake .step { margin-bottom: 10px; }
 
     /* ── 하위 화면 돌아가기 링크 ── */
     .back-link { display: inline-block; margin: 0 0 10px; padding: 4px 0; min-height: 24px; }
@@ -587,24 +625,64 @@
 
   <!-- 선택 동기화 (실시간) -->
   <div id="selBarWrap">
-    <div class="selbar muted" id="selBar"><span class="sel-name" id="selName">● 선택 상태를 불러오는 중…</span><span class="sel-sub" id="selSub"></span></div>
+    <div class="selbar muted" id="selBar"><span class="sel-name" id="selName">● 선택 상태를 불러오는 중…</span><span class="sel-sub" id="selSub"></span><span class="sel-base" id="selBase"></span><button class="link link-btn sel-rebase" id="btnRebase" type="button" data-i18n="list.rebase" hidden>기준 바꾸기</button></div>
   </div>
 
   <section class="tab-section" id="tab-variables" role="tabpanel" aria-labelledby="tabbtn-variables" tabindex="0">
-   <!-- PR 1 중간 상태(IA v3 §10): 첫 화면 = 지금 시작 탭 내용 + 변수 관리(세로 배치), [만들기]는 하위 화면. -->
-   <div id="varHome">
-    <!-- 이미 있는 변수 안내 — 변수가 있는 파일에서 '만들기'를 거쳐 확인하게 하지 않는다(바로 연결로). -->
-    <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
-    <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
-    <div class="banner" id="onboardBanner" style="display:none">
-      <span data-i18n="onboard.banner">처음이면 전체 실행으로 시작하세요.</span>
-      <button class="link" id="btnOnboardHide" data-i18n="onboard.hide">다시 보지 않기</button>
-    </div>
+   <!-- IA v3 변수 탭(§4.2~§4.4): 불러오는 중 / 시작 화면(로컬 변수 0개) / 변수 목록. 만들기는 아래 하위 화면. -->
+   <div id="varLoading" class="var-loading" data-i18n="var.loading">변수 정보를 불러오는 중…</div>
 
+   <!-- 시작 화면(§4.3) — 로컬 변수 0개일 때, 또는 그때 시작한 마법사가 실행 중·요약 표시 중. -->
+   <div id="varStart" style="display:none">
+    <div class="start-head" id="startHead" data-i18n="start.head">아직 로컬 변수가 없어요</div>
+    <div class="hint" id="startSub" data-i18n="start.sub">선택한 프레임에서 만들어 보세요</div>
+    <div class="ux" id="startFree" style="display:none">
+      <div><span data-i18n="start.freeNote">ⓘ 무료 버전에서는 변수를 새로 만들 수 없어요</span></div>
+      <div class="hint"><span data-i18n="start.freeNote2">이름 정리와 기존 변수 연결은 무료</span> · <button class="link" id="btnStartLicense" data-i18n="status.paidAction">라이선스 →</button></div>
+    </div>
+    <div id="wizardSlotStart"></div>
+    <div id="startLib"></div>
+    <div class="start-foot">
+      <button id="btnGoMake" data-i18n="var.goMake">색부터 하나씩 만들기 →</button>
+      <span class="muted" id="goMakeFree" data-i18n="start.freeExtract" style="display:none">(추출까지 무료)</span>
+      <span class="grow"></span>
+      <button class="link link-btn" id="btnReadinessStart" aria-haspopup="menu"></button>
+    </div>
+   </div>
+
+   <!-- 변수 목록(§4.4) -->
+   <div id="varList" style="display:none">
+    <div class="list-head" id="listHead">
+      <button class="link link-btn" id="btnReadiness" aria-haspopup="menu"></button>
+      <button class="link link-btn" id="btnFindUnbound" data-i18n="list.findUnbound" data-i18n-title="list.findUnboundTip" title="선택에서 변수로 바꿀 수 있는 색·간격을 찾아 연결 미리보기를 엽니다">변수 없는 값 찾기 →</button>
+      <span class="grow"></span>
+      <button class="icon-btn" id="btnAddVar" type="button" data-i18n-title="list.addTip" title="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)" aria-label="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
+      <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
+      <button class="icon-btn" id="btnVarRefresh" type="button" data-i18n-title="list.refreshTip" title="다시 읽기" aria-label="다시 읽기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg></button>
+    </div>
+    <div class="chip-bar" id="chipBar">
+      <div class="chip-row" id="chipRow" role="radiogroup" aria-label="컬렉션"></div>
+      <button class="icon-btn chip-more" id="btnChipMore" type="button" data-i18n-title="list.chipMore" title="칩 더 보기" aria-label="칩 더 보기" hidden>›</button>
+      <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
+      <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+      <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" aria-label="검색 지우기">✕</button></span>
+    </div>
+    <div class="situation" id="situationLine" hidden></div>
+    <div class="var-tree" id="varTree" role="treegrid" aria-label="변수 목록"></div>
+   </div>
+
+   <!-- 준비 현황 팝오버(§4.4 머리줄) — 메뉴 모양, 목록을 밀지 않는다. -->
+   <div class="popover" id="readinessPop" role="menu" hidden>
+    <div id="pipelineSteps"></div>
+    <div class="muted pop-note" data-i18n="pipeline.indep">컴포넌트는 필요할 때 레이어 › 컴포넌트에서</div>
+   </div>
+
+   <!-- 마법사 카드(요소 1개) — 시작 화면 또는 만들기 맨 위 중 보이는 곳에 붙는다(§4.3). -->
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
       <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
+      <div class="wiz-done" id="wizDone" hidden><b id="wizDoneText"></b> <button class="link link-btn" id="btnWizListView" type="button" data-i18n="start.viewList">변수 목록 보기</button></div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
         <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
@@ -627,35 +705,10 @@
       <div class="status" id="wizardSummary"></div>
     </div>
 
-    <!-- 진행 — 만들기→적용 의존 파이프라인 상태(클릭하면 그 단계로) -->
-    <div class="step" id="pipelineCard">
-      <h2 data-i18n="pipeline.title">준비 현황</h2>
-      <div id="pipelineSteps"></div>
-      <div class="muted" style="font-size:10px" data-i18n="pipeline.indep">컴포넌트는 필요할 때 적용 탭에서</div>
-    </div>
-
-    <div class="row"><button id="btnGoMake" data-i18n="var.goMake">색부터 하나씩 만들기 →</button></div>
-    <!-- 변수 관리 — PR 2에서 변수 목록으로 바뀐다. 400에서는 트리를 표 위에 쌓는다. -->
-    <section class="var-manager" id="varManager" aria-labelledby="vmTitle">
-      <div class="vm-head">
-        <h2 id="vmTitle" data-i18n="vm.title">변수 관리</h2>
-        <span class="grow"></span>
-        <input id="vmSearch" type="search" data-i18n-placeholder="vm.search" placeholder="변수 검색" />
-        <label class="inline"><input type="checkbox" id="vmOnlyUsed" checked /> <span data-i18n="vm.onlyUsed">선택에서 쓰는 것만</span></label>
-        <span class="muted" id="vmCount"></span>
-      </div>
-      <div class="vm-body">
-        <nav class="vm-tree" id="vmTree" aria-label="컬렉션·그룹"></nav>
-        <div class="vm-table-wrap" id="vmTableWrap"></div>
-      </div>
-      <div class="status" id="vmStatus"></div>
-    </section>
-   </div>
-
    <!-- 만들기 하위 화면 — "← 돌아가기"로 변수 탭 첫 화면. -->
    <div id="varMake" style="display:none">
     <button class="link back-link" id="btnMakeBack" data-i18n="make.back">← 돌아가기</button>
-    <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
+    <div id="wizardSlotMake"></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
@@ -924,35 +977,6 @@
       </div>
     </div>
 
-    <!-- 기존 자산 편입(§9): 이름이 Global/Semantic/Component가 아닌 컬렉션도 계층으로 쓰게 지정. -->
-    <div class="step" id="collectionRolesCard">
-      <h2 data-i18n="colRoles.title">컬렉션 계층</h2>
-      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
-      <div id="collectionRoles"></div>
-      <div class="status" id="colRolesStatus"></div>
-    </div>
-
-    <div class="step">
-      <h2 data-i18n="export.title">코드로 내보내기</h2>
-      <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
-      <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바 오른쪽 끝. 선택지는 값 자체가 라벨이라
-           '형식'·'폰트 크기' 머리말 없이 셀렉트만 둔다(툴팁으로 보완). -->
-      <div class="toolbar flush">
-        <select id="exportFormat" data-i18n-title="export.formatTip" title="내보낼 코드 형식">
-          <option value="w3c" data-i18n="export.fmtW3c">W3C 토큰 JSON</option>
-          <option value="css" data-i18n="export.fmtCss">CSS 변수</option>
-        </select>
-        <!-- px·rem은 단위 기호 그대로라 번역 대상이 아니다(Free·Paid 티어 이름도 같다). -->
-        <select id="exportFontUnit" data-i18n-title="export.fontUnitTip" title="폰트 크기 단위 — rem은 기준 크기로 나눕니다">
-          <option value="px">px</option>
-          <option value="rem">rem</option>
-        </select>
-        <span class="grow"></span>
-        <button id="btnExport" class="primary" data-i18n="export.runBtn">내보내기</button>
-      </div>
-      <div class="status" id="exportStatus"></div>
-    </div>
-
     <div class="step">
       <h2 data-i18n="license.title">라이선스</h2>
       <div class="hint" data-i18n="license.hint">유료를 쓰면 🔒 잠긴 기능이 풀립니다</div>
@@ -1002,6 +1026,33 @@
       <svg width="16" height="16" viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3h6v6M19 3l-7 7M9 19H3v-6M3 19l7-7"/></svg>
       <span class="mini-badge" id="miniBadge" hidden></span>
     </button>
+  </div>
+
+
+  <!-- 팝업 보관함(§4.4 ⋯) — 계층 팝업·내보내기 팝업이 열릴 때 내용을 빌려 가고 닫히면 돌려준다. -->
+  <div id="popupStore" hidden>
+    <div id="tierPopBody" hidden>
+      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
+      <div id="collectionRoles"></div>
+      <div class="status" id="colRolesStatus"></div>
+    </div>
+    <div id="exportPopBody" hidden>
+      <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
+      <div class="row">
+        <select id="exportFormat" data-i18n-title="export.formatTip" title="내보낼 코드 형식">
+          <option value="w3c" data-i18n="export.fmtW3c">W3C 토큰 JSON</option>
+          <option value="css" data-i18n="export.fmtCss">CSS 변수</option>
+        </select>
+        <!-- px·rem은 단위 기호 그대로라 번역 대상이 아니다(Free·Paid 티어 이름도 같다). -->
+        <select id="exportFontUnit" data-i18n-title="export.fontUnitTip" title="폰트 크기 단위 — rem은 기준 크기로 나눕니다">
+          <option value="px">px</option>
+          <option value="rem">rem</option>
+        </select>
+        <span class="grow"></span>
+        <button id="btnExport" class="primary" data-i18n="export.runBtn">내보내기</button>
+      </div>
+      <div class="status" id="exportStatus"></div>
+    </div>
   </div>
 
   <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->

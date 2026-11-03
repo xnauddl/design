@@ -11,7 +11,7 @@ import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/lic
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { exportHasTokens, cssVarName, type ExportFormat } from './lib/exporters';
-import { buildVarTree, filterVars, groupRows, leafName, cellCopyText, pickInitialCollection, type VarCell, type VarCollection, type VarRow, type TreeNode } from './lib/varTable';
+import { leafName, cellCopyText, tierBadge, orderCollections, groupKey, matchesQuery, indirectUsage, aliasTargetsOf, buildList, type VarCell, type VarCollection, type VarRow, type LibraryVar, type ListEntry, type RowState } from './lib/varTable';
 import { createReentryScheduler, selectionSummary } from './lib/reread';
 import type { FrameMeta } from './lib/similar';
 import type { VarInfo, CollectionRoleInfo } from './shared/messages';
@@ -45,7 +45,6 @@ function readMaxDepth(): number {
 
 let tokens: DraftToken[] = [];
 let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해금
-let hideOnboard = false; // 첫 실행 배너를 껐는가(파일에 기억)
 let colorsFromPalette = false; // 지금 목록의 색이 팔레트 생성으로 온 것인가(변수 생성 시 이전 팔레트 정리)
 let colorsCreated = false; // 이 세션에서 색 변수를 만들었는가(토큰 단계 안내용)
 // #11: 단계 전제 — Global 변수 존재(역할 매핑) · 연결 가능 변수 존재(변수 연결) · 텍스트 스타일 존재(기존만 연결).
@@ -664,14 +663,6 @@ syncSecondaryControls();
 
 // 팔레트 ‘적용’ — 생성된 팔레트를 변수에 직접 커밋(생성=미리보기 / 적용=커밋).
 
-/* UX4 온보딩 — 카드 하나를 통째로 두는 대신 마법사 탭 첫 줄 배너로 흡수했다(와이어).
-   '다시 보지 않기'는 세션이 아니라 파일에 기억한다 — 매번 다시 뜨면 그게 더 성가시다. */
-$('btnOnboardHide').addEventListener('click', () => {
-  $('onboardBanner').style.display = 'none';
-  hideOnboard = true;
-  saveSettings();
-});
-
 /* ---------- 버튼 ---------- */
 $('btnExtract').addEventListener('click', () => {
   colorRevealed = true; // 추출 버튼 역할: 색 노출
@@ -798,7 +789,6 @@ function saveSettings(): void {
       type: 'SET_SETTINGS',
       base: Number(($('base') as HTMLInputElement).value) || 16,
       maxDepth: readMaxDepth(),
-      hideOnboard,
       grid: tidyGrid(),
       tolerance: bindTolerance(),
     });
@@ -1317,6 +1307,10 @@ async function runWizard(): Promise<void> {
 
   wizardRunning = true;
   wizardFailed = false;
+  // 시작 화면 고정(①) — 로컬 변수 0개일 때 시작했으면 실행 중·요약 동안 시작 화면 유지.
+  wizBeforeCount = localVarCount();
+  wizFrom = activeTab === 'variables' && varSub === 'make' ? 'make' : 'start';
+  wizLatch = wizBeforeCount === 0 ? { from: wizFrom, before: 0, summarySeen: false, done: false } : null;
   opWizardStart();
   ($('btnWizardRun') as HTMLButtonElement).disabled = true;
   $('btnWizardCancel').style.display = '';
@@ -1462,6 +1456,7 @@ async function runWizard(): Promise<void> {
 
   wizardRunning = false;
   opWizardEnd(wizardFailed ? 'fail' : stopped ? 'cancel' : 'ok');
+  if (wizLatch) wizLatch.done = true;
   ($('btnWizardRun') as HTMLButtonElement).disabled = false;
   setWizardRunLabel(!stopped); // 완주했으면 '다시 실행' — 같은 선택을 또 돌리는 건 갱신이지 첫 실행이 아니다
   $('btnWizardCancel').style.display = 'none';
@@ -1471,14 +1466,27 @@ async function runWizard(): Promise<void> {
   const paidNote = paidSkipped.length
     ? t('wizard.paidSkipped', { steps: paidSkipped.map((p) => t('wizard.step.' + p.step.id)).join(' · ') })
     : '';
-  setStatus(
+  if (!isPaid && !stopped && !wizardFailed) {
+    // 무료 완료 요약(§4.3) — 로컬 변수 0개면 이름만, 있으면 연결 + 이름. 계층이 없어 연결 0곳이면 안내.
+    const renamed = totals.renamed ?? 0;
+    const bound = totals.bound ?? 0;
+    let text = wizBeforeCount === 0 ? t('wizard.freeSumNoVars', { n: renamed }) : t('wizard.freeSumVars', { m: bound, n: renamed });
+    if (wizBeforeCount > 0 && bound === 0 && !vmCols.some((c) => c.tier > 0)) text += t('wizard.freeNoTier');
+    setStatus('wizardSummary', text, 'ok');
+  } else setStatus(
     'wizardSummary',
     t('wizard.result', { state: stopped ? t('wizard.stopped') : t('wizard.completed'), summary: summarize(totals) }) +
       paidNote +
       (failNote ? ` · ${failNote}` : ''),
-    stopped || paidSkipped.length ? 'warn' : 'ok',
+    stopped || paidSkipped.length || wizardFailed ? 'warn' : 'ok',
   );
+  // 만들기 맨 위에서 실행했고 로컬 변수가 이미 있었으면 머리는 그대로, "변수 {n}개 생성"은 상태 줄에(§4.3).
+  // 변수 수는 작업 직후 다시 읽기로 오는 표에서 센다.
+  wizCountPending = wizFrom === 'make' && wizBeforeCount > 0;
+  renderVarScreen();
 }
+/** 만들기 맨 위(로컬 변수 있음) 마법사가 끝난 뒤 — 다음 변수 표에서 "변수 {n}개 생성"을 상태 줄에. */
+let wizCountPending = false;
 
 let lastSelBound = 0;
 let lastSelRenamed = 0;
@@ -1499,8 +1507,9 @@ function applySelectionDone(): void {
 /** 전체 실행 버튼 라벨 — 이미 정리한 선택이면 '다시 실행'(툴팁에 무엇이 달라지는지). */
 function setWizardRunLabel(rerun: boolean): void {
   const b = $('btnWizardRun') as HTMLButtonElement;
-  b.textContent = rerun ? t('wizard.rerun') : t('wizardCard.run');
-  b.title = rerun ? t('wizard.rerunHint') : '';
+  b.dataset.rerun = rerun ? '1' : '';
+  b.title = rerun && isPaid ? t('wizard.rerunHint') : '';
+  renderWizardCopy(); // 유료/무료·로컬 변수 유무에 따라 문구가 다르다(§4.3)
 }
 $('btnWizardRun').addEventListener('click', () => void runWizard());
 $('btnWizardCancel').addEventListener('click', () => send({ type: 'CANCEL' }));
@@ -1699,7 +1708,7 @@ function goToCreate(): void {
 const PIPELINE_TARGET: Record<PipelineStep['id'], { make: MakeStep | null; btn: string; apply?: ApplyStep }> = {
   colors: { make: 'color', btn: 'btnColorVars' },
   tokens: { make: 'token', btn: 'btnCreate' },
-  semantics: { make: 'token', btn: 'btnSemantics' }, // 역할 매핑은 토큰 단계에 흡수돼 있다
+  semantics: { make: 'token', btn: 'btnCreate' }, // 역할 매핑은 토큰을 적용할 때 함께 만들어진다(숨은 카드 대신)
   dark: { make: 'theme', btn: 'btnGenDark' },
   textStyles: { make: 'type', btn: 'btnScanText' },
   bind: { make: null, btn: 'btnApply' }, // 적용 탭
@@ -1707,7 +1716,9 @@ const PIPELINE_TARGET: Record<PipelineStep['id'], { make: MakeStep | null; btn: 
 };
 
 function gotoStep(id: PipelineStep['id']): void {
+  closeReadiness();
   const target = PIPELINE_TARGET[id];
+  if (id === 'semantics') showStatusLine(t('list.semanticsNote'));
   if (target.make === null) {
     showTab('layer');
     showApplyStep(target.apply ?? 'bind');
@@ -2041,6 +2052,7 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
+      onSelectionForList(msg); // 변수 목록 기준(③) — 플러그인이 만든 선택은 기준을 바꾸지 않는다
       renderSelBar(msg.count, msg.scanned, msg.capped, msg.firstName ?? '');
       // 준비 현황의 '완료'는 현재 선택 기준 — 선택이 바뀌면 다시 판정한다.
       // Global/Semantic이 없으면(컬렉션을 지우고 처음부터 하는 QA 흐름, 또는 다른 파일에서 복사해 온
@@ -2158,47 +2170,16 @@ window.onmessage = (event: MessageEvent) => {
       }
       break;
     }
-    case 'REMAP_TARGETS_RESULT':
-      onRemapTargets(msg.fromId, msg.targets); // 변수 관리 › 교체 팝업
+    case 'VAR_TABLE':
+      onVarTable(msg);
       break;
-    case 'REMAP_RESULT': {
-      closeModal(); // 교체 팝업 닫기 — 곧 오는 BINDINGS_RESULT가 바뀐 상태로 다시 그린다
-      const statusId = vmOpen ? 'vmStatus' : 'applyStatus';
-      if (!msg.replaced) {
-        setStatus(statusId, t('bind.remapNothing'), 'warn');
-        break;
-      }
-      keepRemapStatus = !vmOpen;
-      const skippedNote = msg.skipped ? t('bind.remapSkipped', { skipped: msg.skipped }) : '';
-      setStatus(statusId, t('bind.remapDone', { replaced: msg.replaced, to: msg.toName, nodes: msg.nodes }) + skippedNote, msg.skipped ? 'warn' : 'ok');
-      if (vmOpen) requestManagerUsage(); // 사용 수 갱신
+    case 'USAGE_RESULT':
+      onUsageResult(msg);
       break;
-    }
-    case 'VAR_TABLE': {
-      // 조용한 반영 — 같은 표면 다시 그리지 않는다.
-      const sig = JSON.stringify([msg.collections, msg.vars]);
-      if (sig === vmTableSig) break;
-      vmTableSig = sig;
-      vmCols = msg.collections;
-      vmVars = msg.vars;
-      renderVarManager();
+    case 'VAR_USERS':
+      onVarUsers(msg);
       break;
-    }
     case 'BINDINGS_RESULT': {
-      // 변수 관리의 사용 수 조회 — 연결 카드(미리보기·결과)는 건드리지 않는다.
-      if (msg.forManager) {
-        if (msg.reqId === vmUsageReq) {
-          vmUsageInFlight = false;
-          // 조용한 반영 — 응답이 이전과 같으면 다시 그리지 않는다(스크롤·포커스 행 유지).
-          const sig = JSON.stringify([msg.candidates.map((c) => [c.variableId, c.nodeId, c.field]), msg.total]);
-          if (sig !== vmUsageSig || vmUsage === null) {
-            vmUsageSig = sig;
-            setManagerUsage(msg.candidates, msg.nodes, msg.total > msg.candidates.length);
-          }
-          reentry.release();
-        }
-        break;
-      }
       // 연결 현황(읽기 전용) — 결과 트리와 같은 모양. 사유 칩은 없다(실행이 아니라 조회).
       if (!isCurrentBindReply(msg.reqId)) break; // 미리보기를 누른 뒤·선택을 바꾼 뒤 늦게 온 조회 결과
       clearBindPreview();
@@ -2207,11 +2188,17 @@ window.onmessage = (event: MessageEvent) => {
       bindNodes = msg.nodes;
       renderBindTree();
       const capNote = msg.total > msg.candidates.length ? t('apply.resultCapped', { shown: msg.candidates.length }) : '';
-      if (keepRemapStatus) keepRemapStatus = false; // 방금 쓴 교체 결과 문구를 남긴다
-      else setStatus('applyStatus', msg.total ? t('bind.scanned', { total: msg.total, nodes: msg.boundNodes }) + capNote : t('bind.scannedNone'), msg.total ? '' : 'warn');
+      setStatus('applyStatus', msg.total ? t('bind.scanned', { total: msg.total, nodes: msg.boundNodes }) + capNote : t('bind.scannedNone'), msg.total ? '' : 'warn');
       break;
     }
     case 'SELECT_RESULT':
+      // 변수 탭에서 고른 레이어 선택 — 결과는 공통 상태 줄(§4.4: 한 번에 최대 200개).
+      if (selectStatusTarget === 'list') {
+        if (msg.capped) showStatusLine(t('list.selectCapped', { n: msg.requested }), { cls: 'warn' });
+        else if (!msg.found) showStatusLine(t('list.selectNone'), { cls: 'warn' });
+        else if (msg.found < msg.requested) showStatusLine(t('list.selectPartial', { found: msg.found, missing: msg.requested - msg.found }), { cls: 'warn' });
+        break;
+      }
       // 미리보기 이후 레이어가 지워졌거나 다른 페이지로 옮겨졌으면 그만큼 못 찾는다 — 조용히 실패하지 않게.
       if (msg.capped) {
         setStatus(selectStatusTarget, `레이어 ${msg.found}개만 선택 — 한 번에 보여줄 수 있는 상한(${msg.requested}개 중)입니다.`, 'warn');
@@ -2305,7 +2292,6 @@ window.onmessage = (event: MessageEvent) => {
       prereqKnown = true;
       prereqInFlight = false;
       reentry.release();
-      renderExistingVars(msg.tierVars ?? 0, msg.tierColorVars ?? 0, msg.otherVars ?? 0);
       hasColorVars = msg.hasColorVars;
       hasScaleVars = msg.hasScaleVars;
       hasGlobal = msg.hasGlobal;
@@ -2396,8 +2382,6 @@ window.onmessage = (event: MessageEvent) => {
       ($('depth') as HTMLInputElement).value = String(msg.maxDepth);
       ($('grid') as HTMLInputElement).value = String(msg.grid);
       ($('tol') as HTMLInputElement).value = String(msg.tolerance);
-      hideOnboard = msg.hideOnboard;
-      $('onboardBanner').style.display = hideOnboard ? 'none' : '';
       break;
     }
     case 'VARIABLES': {
@@ -2486,8 +2470,6 @@ window.onmessage = (event: MessageEvent) => {
 
 /* ---------- UX7: 오류 라우팅/표시 ---------- */
 const OP_STATUS: Record<string, string> = {
-  REMAP_TARGETS: 'applyStatus',
-  REMAP_BINDINGS: 'applyStatus',
   EXTRACT: 'colorStatus',
   CREATE_TOKENS: 'createStatus',
   CREATE_SEMANTICS: 'semStatus',
@@ -2844,7 +2826,7 @@ function filteredCandidates(): BindCandidate[] {
 }
 
 $('bindFilter').addEventListener('input', () => renderBindTree());
-$('btnBindToManager').addEventListener('click', () => showManager({ onlyUsed: true }));
+$('btnBindToManager').addEventListener('click', () => showManager());
 
 /** 선택에 바인딩 버튼 활성/라벨 + 전체선택 마스터 동기화. */
 function updateBindApply(): void {
@@ -3576,7 +3558,7 @@ function opWizardEnd(result: 'ok' | 'fail' | 'cancel'): void {
 /* ---------- 다시 읽기(§4.1) ----------
    때: 탭·하위 화면에 들어갈 때 / 작업 직후 / 창에 다시 들어올 때(400ms 합침, 2초 간격) / ↻ / 펼칠 때.
    화면별로 읽는 것: 변수 첫 화면 = 준비 상태 + 변수 표 + 사용 수(300개 규칙),
-   변수 › 만들기 = 준비 상태 + 다크 카드용 컬렉션, 레이어 = 준비 상태, 설정 = (PR 1 중간: 컬렉션 계층 카드). */
+   변수 › 만들기 = 준비 상태 + 다크 카드용 컬렉션, 레이어 = 준비 상태, 설정 = 없음(계층은 팝업을 열 때 읽는다). */
 type ReadWhy = 'enter' | 'work' | 'reentry' | 'expand';
 function readScreen(why: ReadWhy): void {
   if (isMini) return; // 최소화 상태에서는 다시 읽지 않는다
@@ -3586,8 +3568,6 @@ function readScreen(why: ReadWhy): void {
     requestManagerUsage(why === 'work' ? 'work' : 'quiet');
   } else if (activeTab === 'variables' && varSub === 'make') {
     send({ type: 'GET_VARIABLES' });
-  } else if (activeTab === 'settings') {
-    send({ type: 'GET_COLLECTION_ROLES' }); // 다른 사람이 지정을 바꿨을 수 있다
   }
   if (why === 'work' && !(activeTab === 'variables' && varSub === 'home')) send({ type: 'GET_VAR_TABLE' });
 }
@@ -3667,8 +3647,11 @@ function showTab(name: TabName): void {
     btn.setAttribute('aria-selected', String(on));
     btn.tabIndex = on ? 0 : -1; // UX8: roving tabindex — 탭 묶음은 한 번의 Tab 정지점
   }
-  // 선택 표시줄은 설정에서만 숨긴다(§3).
+  // 선택 표시줄은 설정에서만 숨긴다(§3). "목록 기준"은 변수 탭에서만.
   $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
+  renderSelBase();
+  // 시작 화면 고정(①): 요약을 본 뒤 변수 탭을 떠나면 푼다.
+  if (changed && name !== 'variables' && wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
   syncManagerVisibility(false);
   syncStickyOffsets();
   if (changed) {
@@ -3683,8 +3666,8 @@ function showVarSub(sub: VarSub): void {
   if (sub === varSub) return;
   if (activeTab === 'variables') screenScroll.set(screenKey(), window.scrollY);
   varSub = sub;
-  $('varHome').style.display = sub === 'home' ? '' : 'none';
   $('varMake').style.display = sub === 'make' ? '' : 'none';
+  renderVarScreen(); // 첫 화면(불러오는 중·시작 화면·목록)은 만들기 동안 숨긴다
   syncManagerVisibility(false);
   syncStickyOffsets();
   if (activeTab === 'variables') {
@@ -3701,46 +3684,6 @@ function showMake(step?: MakeStep): void {
   if (step) showMakeStep(step);
 }
 
-
-/* ---------- 이미 있는 변수 안내 — 시작·만들기 탭 맨 위 ----------
-   변수가 있는 파일에서 사용자가 '만들기'에 들어가 확인한 뒤에야 '적용'으로 가던 흐름을 끊는다. */
-function goToBindStatus(): void {
-  showTab('layer');
-  showApplyStep('bind');
-  if (lastSelCount > 0) {
-    setStatus('applyStatus', t('common.running'), '');
-    requestBindingsScan();
-  } else setStatus('applyStatus', t('existingVars.selectFirst'), '');
-}
-function goToCollectionRoles(): void {
-  showTab('settings');
-  $('collectionRolesCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-function renderExistingVars(tierVars: number, tierColor: number, other: number): void {
-  for (const [id, onMake] of [['existingVarsStart', false], ['existingVarsMake', true]] as const) {
-    const box = $(id);
-    const text = box.querySelector('.ev-text') as HTMLElement;
-    const go = box.querySelector('.ev-go') as HTMLButtonElement;
-    const manage = box.querySelector('.ev-manage') as HTMLButtonElement;
-    manage.textContent = t('vm.fromBanner');
-    manage.onclick = () => showManager({ onlyUsed: false });
-    manage.style.display = tierVars + other > 0 ? '' : 'none';
-    if (tierVars > 0) {
-      text.textContent = onMake
-        ? t('existingVars.hasMake', { n: tierVars })
-        : t('existingVars.has', { n: tierVars, color: tierColor, other: tierVars - tierColor });
-      go.textContent = t('existingVars.gotoBind');
-      go.onclick = goToBindStatus;
-      box.style.display = '';
-    } else if (other > 0) {
-      // 변수는 있는데 계층(이름 또는 지정)이 아니라 연결에 못 쓴다 — 계층 지정으로 보낸다.
-      text.textContent = t('existingVars.unknown', { n: other });
-      go.textContent = t('existingVars.gotoRoles');
-      go.onclick = goToCollectionRoles;
-      box.style.display = '';
-    } else box.style.display = 'none';
-  }
-}
 
 /* ---------- 컬렉션 계층(§9) — 이름이 아니라 지정으로 Global/Semantic/Component ---------- */
 type RoleKey = 'global' | 'semantic' | 'component';
@@ -3895,17 +3838,26 @@ interface MenuItem {
   onSelect: () => void;
   disabled?: boolean;
   separatorBefore?: boolean;
+  /** 잠긴 항목의 보조 문구(aria-disabled 항목 아래 작은 글씨). */
+  note?: string;
+  /** 고르면 다른 곳으로 포커스가 가는 항목(§2.10 예외) — 여는 버튼으로 되돌리지 않는다. */
+  focusElsewhere?: boolean;
 }
+let menuOnClose: (() => void) | null = null;
 let menuEl: HTMLElement | null = null;
 function closeMenu(): void {
   if (!menuEl) return;
   menuEl.remove();
   menuEl = null;
+  const cb = menuOnClose;
+  menuOnClose = null;
+  cb?.();
   reentry.release(); // 메뉴가 열려 있어 미뤄 둔 다시 읽기
 }
 /** (x, y)에 메뉴. 창 밖으로 안 넘치게 당기고, ↑↓·Enter·Esc, 바깥 클릭·스크롤·크기 변경에 닫는다. */
-function openMenu(x: number, y: number, items: MenuItem[], returnFocus?: HTMLElement): void {
+function openMenu(x: number, y: number, items: MenuItem[], returnFocus?: HTMLElement, onClose?: () => void): void {
   closeMenu();
+  menuOnClose = onClose ?? null;
   const m = document.createElement('div');
   m.className = 'ctx-menu';
   m.setAttribute('role', 'menu');
@@ -3916,10 +3868,20 @@ function openMenu(x: number, y: number, items: MenuItem[], returnFocus?: HTMLEle
     b.type = 'button';
     b.setAttribute('role', 'menuitem');
     b.textContent = it.label;
-    b.disabled = !!it.disabled;
+    // 잠긴 항목은 aria-disabled(포커스는 받음) + 보조 문구.
+    if (it.disabled) {
+      b.setAttribute('aria-disabled', 'true');
+      if (it.note) {
+        const n = document.createElement('span');
+        n.className = 'menu-note';
+        n.textContent = it.note;
+        b.appendChild(n);
+      }
+    }
     b.addEventListener('click', () => {
+      if (it.disabled) return;
       closeMenu();
-      returnFocus?.focus();
+      if (!it.focusElsewhere) returnFocus?.focus();
       it.onSelect();
     });
     m.appendChild(b);
@@ -3929,7 +3891,7 @@ function openMenu(x: number, y: number, items: MenuItem[], returnFocus?: HTMLEle
   const r = m.getBoundingClientRect();
   m.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
   m.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
-  const enabled = buttons.filter((b) => !b.disabled);
+  const enabled = buttons;
   enabled[0]?.focus();
   m.addEventListener('keydown', (e) => {
     const i = enabled.indexOf(document.activeElement as HTMLButtonElement);
@@ -3946,8 +3908,12 @@ document.addEventListener('scroll', closeMenu, true);
 
 let modalEl: HTMLElement | null = null;
 let modalReturnFocus: HTMLElement | null = null;
+let modalOnClose: (() => void) | null = null;
 function closeModal(): void {
   if (!modalEl) return;
+  const cb = modalOnClose;
+  modalOnClose = null;
+  cb?.(); // 팝업에 빌려 온 요소를 원래 자리로 — 지우기 전에
   modalEl.remove();
   modalEl = null;
   modalReturnFocus?.focus();
@@ -3955,10 +3921,11 @@ function closeModal(): void {
   reentry.release();
 }
 /** 창 안 오버레이 팝업 — Esc·바깥 클릭으로 닫힘, Tab은 팝업 안에서만 돈다. */
-function openModal(title: HTMLElement | string, body: HTMLElement, foot: HTMLElement[]): HTMLElement {
+function openModal(title: HTMLElement | string, body: HTMLElement, foot: HTMLElement[], returnFocus?: HTMLElement, onClose?: () => void): HTMLElement {
   closeModal();
   closeMenu();
-  modalReturnFocus = document.activeElement as HTMLElement | null;
+  modalReturnFocus = returnFocus ?? (document.activeElement as HTMLElement | null);
+  modalOnClose = onClose ?? null;
   const back = document.createElement('div');
   back.className = 'modal-backdrop';
   const box = document.createElement('div');
@@ -4020,376 +3987,862 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /* =====================================================================
-   변수 관리(넓은 화면) — Figma Variables를 닮은 컬렉션·그룹 트리 + 표
+   변수 탭(IA v3 §4.2~§4.4) — 불러오는 중 / 시작 화면 / 변수 목록
+   - 목록은 항상 전체: [모두] + 컬렉션 칩, 계층 순서 구역(C → S → G → 계층 없음).
+   - 선택(목록 기준)이 쓰는 변수(직접 + ↳ 간접)만 펼친다. 사용 수 단위는 "곳"(인스턴스 안쪽 포함).
+   - 목록 기준(③): 플러그인이 만든 선택은 기준을 바꾸지 않는다. [기준 바꾸기]·캔버스 직접 선택으로만.
    ===================================================================== */
-let vmOpen = false;
+const BIG_SELECTION = 300; // ⑤ 이보다 크면 자동으로 읽지 않는다(↻·[읽기]는 무시)
+const DETAIL_LIMIT = 50; // 상세 "쓰인 곳" 이름 최대 수
+
+let vmOpen = false; // 변수 탭 첫 화면(시작 화면·목록)이 보이는가
 let vmCols: VarCollection[] = [];
 let vmVars: VarRow[] = [];
-let vmScope: { collectionId: string; path: string } | null = null;
-/** 사용자가 트리에서 직접 고른 범위인가 — 아니면(자동 선택) 사용 수가 도착할 때마다 결과가 있는 컬렉션으로 다시 고른다. */
-let vmScopeUser = false;
-let vmSelected: string | null = null;
-const vmCollapsed = new Set<string>(); // 접은 트리 노드·표 그룹 키
-/** 선택 안에서의 사용처(변수 id → 후보들) — 관리 전용 조회 결과. null = 아직 모름. */
-let vmUsage: Map<string, BindCandidate[]> | null = null;
-let vmUsageNodes = new Map<string, string>(); // 노드 id → 이름
-let vmUsageCapped = false;
-let vmUsageReq = 0;
-let vmUsageSig = '';
+let vmTableKnown = false;
 let vmTableSig = '';
+let libVars: LibraryVar[] = [];
+/** 직접 사용(변수 id → 곳·레이어). null = 판정 없음(기준 없음 · 아직 안 읽음). */
+let usageMap: Map<string, { places: number; layers: number }> | null = null;
+let indirectMap = new Map<string, string[]>();
+let deletedUse: { count: number; nodeIds: string[] } = { count: 0, nodeIds: [] };
+let vmUsageReq = 0;
 /** 사용 수 조회가 응답을 기다리는 중 — 겹쳐 보내지 않고, 창 다시 들어옴은 보류한다. */
 let vmUsageInFlight = false;
+/** 사용자가 일으킨 읽기(↻·[읽기]·선택 변경)인가 — 칩 숫자 "…"·상태 줄 문구는 이때만(조용한 반영 아님). */
+let vmUsageVisible = false;
+let vmUsageSig = '';
+/** ↻ 결과 비교용 — 누르기 전 표·사용 수. */
+let refreshBefore: { table: string; usage: Map<string, number> } | null = null;
 
-/** 변수 관리가 보이는가 = 변수 탭 첫 화면(PR 1 중간 상태). 보이게 될 때 표와 사용 수를 읽는다. */
+interface SelInfo { ids: string[]; count: number; scanned: number; name: string }
+let curSel: SelInfo = { ids: [], count: 0, scanned: 0, name: '' };
+/** 목록 기준(③) — 사용 수를 셀 레이어. 플러그인이 만든 선택은 이것을 바꾸지 않는다. */
+let baseline: SelInfo | null = null;
+/** 큰 선택이라 자동으로 읽지 않았다(⑤) — 상황 안내 줄 [읽기]. */
+let bigSkipped = false;
+
+let chip = 'all';
+let query = '';
+let searchOpen = false;
+let modeName: string | null = null; // 고른 모드 이름(없으면 각 컬렉션 기본 모드)
+const userExpanded = new Map<string, boolean>();
+const showUnusedIn = new Set<string>();
+const showUnusedGroups = new Set<string>();
+/** 키보드 포커스 줄 — 다시 그려도 지킨다. */
+let focusKey: string | null = null;
+let vmSelected: string | null = null;
+
+const sameIds = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
+const localVarCount = (): number => vmVars.length;
+
+/* ---------- 화면 고르기(§4.2·§4.3) ---------- */
+type VarScreen = 'loading' | 'start' | 'list';
+function varScreen(): VarScreen {
+  if (!vmTableKnown) return 'loading';
+  if (startLatched() || localVarCount() === 0) return 'start';
+  return 'list';
+}
+function renderVarScreen(): void {
+  const scr = varSub === 'home' ? varScreen() : null;
+  $('varLoading').style.display = scr === 'loading' ? '' : 'none';
+  $('varStart').style.display = scr === 'start' ? '' : 'none';
+  $('varList').style.display = scr === 'list' ? '' : 'none';
+  placeWizard();
+  if (scr === 'start') renderStart();
+  if (scr === 'list') renderVarList();
+  renderReadinessButtons();
+}
+
+/** 변수 첫 화면이 보이는가 = 변수 탭 + 첫 화면. 보이게 될 때 표와 사용 수를 읽는다(부르는 쪽이 read). */
 function syncManagerVisibility(read: boolean): void {
   const want = activeTab === 'variables' && varSub === 'home';
   if (want && !vmOpen) {
     vmOpen = true;
-    vmScopeUser = false;
-    renderVarManager();
+    renderVarScreen();
     if (read) { send({ type: 'GET_VAR_TABLE' }); requestManagerUsage('quiet'); }
   } else if (!want && vmOpen) {
     leaveManagerUi();
   }
+  placeWizard();
 }
-/** 변수 관리를 걷는다(다른 탭·하위 화면으로 갈 때) — 메뉴·팝업을 닫고 대기 중 조회를 버린다. */
 function leaveManagerUi(): void {
   vmOpen = false;
   if (vmUsageTimer) { clearTimeout(vmUsageTimer); vmUsageTimer = null; }
   closeMenu();
   closeModal();
+  closeReadiness();
+  // 시작 화면 고정(①): 요약을 본 뒤 변수 탭을 떠나면 푼다.
+  if (wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
 }
-/** 배너·연결 카드의 "변수 관리에서 보기" — 변수 탭 첫 화면의 변수 관리로 스크롤. */
-function showManager(opts: { onlyUsed?: boolean } = {}): void {
-  if (opts.onlyUsed !== undefined) ($('vmOnlyUsed') as HTMLInputElement).checked = opts.onlyUsed;
+/** 다른 화면에서 "변수 탭에서 보기 →" — 목록, 기준은 지금 선택으로(§3.1). */
+function showManager(): void {
   showTab('variables');
   showVarSub('home');
-  vmScopeUser = false;
-  renderVarManager();
-  requestAnimationFrame(() => $('varManager').scrollIntoView({ block: 'start' }));
+  rebaseToCurrent();
 }
-/** 변수 관리를 보는 중 선택이 바뀌면 사용 수를 다시 읽는다(드래그 선택 중엔 멎은 뒤 한 번). */
-let vmUsageTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleManagerUsage(): void {
-  if (!vmOpen || isMini) return;
-  if (vmUsageTimer) clearTimeout(vmUsageTimer);
-  vmUsage = null; // 모름 — 이전 선택의 사용 수를 새 선택에 보여주지 않는다
-  vmUsageReq = 0;
-  vmUsageInFlight = false; // 이전 요청의 응답은 reqId가 달라 버려진다
-  vmUsageCapped = false; // 이전 선택의 '일부만 셌다' 안내를 새 선택에 남기지 않는다
-  renderVarManager();
-  vmUsageTimer = setTimeout(() => { vmUsageTimer = null; requestManagerUsage('selection'); }, AUTO_SCAN_DELAY);
-}
-$('vmSearch').addEventListener('input', () => renderVarManager());
-$('vmOnlyUsed').addEventListener('change', () => { vmScopeUser = false; renderVarManager(); });
 
-/** 관리 전용 사용처 조회 — 연결 카드의 미리보기·결과는 건드리지 않는다(forManager). */
-function requestManagerUsage(_why: 'quiet' | 'work' | 'selection' = 'quiet'): void {
-  if (lastSelCount === 0) {
-    setManagerUsage([], [], false);
+/* ---------- 선택과 목록 기준 ---------- */
+function onSelectionForList(m: { count: number; scanned: number; ids?: string[]; firstName?: string; selfSelect?: boolean }): void {
+  curSel = { ids: m.ids ?? [], count: m.count, scanned: m.scanned, name: m.firstName ?? '' };
+  if (m.selfSelect) { renderSelBase(); return; } // 플러그인이 만든 선택 — 기준 유지
+  setBaseline(curSel.count ? { ...curSel } : null);
+}
+function rebaseToCurrent(): void {
+  setBaseline(curSel.count ? { ...curSel } : null);
+}
+function setBaseline(b: SelInfo | null): void {
+  baseline = b;
+  renderSelBase();
+  if (vmUsageTimer) { clearTimeout(vmUsageTimer); vmUsageTimer = null; }
+  vmUsageReq = 0;
+  vmUsageInFlight = false;
+  bigSkipped = false;
+  if (!b) {
+    usageMap = null;
+    indirectMap = new Map();
+    libVars = [];
+    deletedUse = { count: 0, nodeIds: [] };
+    vmUsageSig = '';
+    if (vmOpen) renderVarScreen();
     return;
   }
-  // 큰 선택(⑤) 300개 규칙은 PR 2에서 "선택이 커서 자동으로 읽지 않아요 · [읽기]" 줄과 함께 넣는다.
-  // 그 줄 없이 먼저 막으면 큰 선택에서 목록이 빈 채로 남는다(PR 1 실기 확인). 지금은 예전처럼 상한(600)까지 읽는다.
-  if (vmUsageInFlight) return; // 같은 종류의 직전 요청이 아직 끝나지 않았다(보류)
+  // 목록은 비우지 않는다 — 응답이 오면 한 번에 바꾼다. 큰 선택·마법사 중이면 자동으로 읽지 않는다.
+  if (b.scanned > BIG_SELECTION || wizardRunning) {
+    bigSkipped = b.scanned > BIG_SELECTION;
+    usageMap = null;
+    if (vmOpen) renderVarScreen();
+    return;
+  }
+  if (!vmOpen || isMini) return; // 보이지 않으면 들어올 때 읽는다
+  vmUsageTimer = setTimeout(() => { vmUsageTimer = null; requestManagerUsage('selection'); }, AUTO_SCAN_DELAY);
+}
+let vmUsageTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleManagerUsage(): void { /* 선택 변경은 onSelectionForList가 맡는다(호환용 빈 함수) */ }
+
+/** 사용 수 요청 — why: quiet(진입·창 다시 들어옴) / work(작업 직후) / selection(선택 변경) / user(↻·[읽기]). */
+function requestManagerUsage(why: 'quiet' | 'work' | 'selection' | 'user' = 'quiet'): void {
+  if (!baseline) {
+    usageMap = null;
+    if (vmOpen) renderVarScreen();
+    return;
+  }
+  const auto = why !== 'user';
+  if (auto && (baseline.scanned > BIG_SELECTION || wizardRunning)) {
+    bigSkipped = baseline.scanned > BIG_SELECTION;
+    if (vmOpen) renderVarScreen();
+    return;
+  }
+  if (vmUsageInFlight && why !== 'user') return; // 같은 종류의 직전 요청이 아직 끝나지 않았다(보류)
   vmUsageReq = ++bindReqSeq;
   vmUsageInFlight = true;
-  send({ type: 'SCAN_BINDINGS', reqId: vmUsageReq, forManager: true });
-}
-function setManagerUsage(cands: BindCandidate[], nodes: BindNode[], capped: boolean): void {
-  const m = new Map<string, BindCandidate[]>();
-  for (const c of cands) {
-    const list = m.get(c.variableId) ?? [];
-    list.push(c);
-    m.set(c.variableId, list);
+  vmUsageVisible = why === 'selection' || why === 'user';
+  if (vmUsageVisible && vmOpen) {
+    showStatusLine(t('list.reading'), { background: true });
+    renderChips();
   }
-  vmUsage = m;
-  vmUsageNodes = new Map(nodes.map((n) => [n.id, n.name]));
-  vmUsageCapped = capped;
-  if (vmOpen) renderVarManager();
-}
-function usageCount(id: string): number {
-  return vmUsage?.get(id)?.length ?? 0;
+  send({ type: 'SCAN_USAGE', reqId: vmUsageReq, nodeIds: baseline.ids });
 }
 
-function renderVarManager(): void {
-  if (!vmOpen) return;
-  const onlyUsed = ($('vmOnlyUsed') as HTMLInputElement).checked;
-  const query = ($('vmSearch') as HTMLInputElement).value;
-  const usage = new Map([...(vmUsage ?? new Map<string, BindCandidate[]>()).entries()].map(([k, v]) => [k, v.length]));
-  const q = query.trim().toLowerCase();
-  const include = (v: VarRow): boolean => (!onlyUsed || (usage.get(v.id) ?? 0) > 0) && (!q || v.name.toLowerCase().includes(q));
-  const tree = buildVarTree(vmCols, vmVars, include);
-  if (!vmScopeUser || !vmScope || !vmCols.some((c) => c.id === vmScope!.collectionId)) {
-    vmScopeUser = false;
-    const first = pickInitialCollection(tree);
-    vmScope = first ? { collectionId: first, path: '' } : null;
+function onUsageResult(msg: Extract<CodeToUi, { type: 'USAGE_RESULT' }>): void {
+  if (msg.reqId !== vmUsageReq) return; // 늦게 온 이전 기준의 응답
+  vmUsageInFlight = false;
+  const wasVisible = vmUsageVisible;
+  vmUsageVisible = false;
+  bigSkipped = false;
+  // 조용한 반영 — 응답이 이전과 같으면 다시 그리지 않는다(스크롤·포커스 행 유지).
+  const sig = JSON.stringify([msg.usage, msg.libraryVars.map((l) => l.id), msg.deleted.count]);
+  const changed = sig !== vmUsageSig || usageMap === null;
+  vmUsageSig = sig;
+  if (changed) {
+    usageMap = new Map(Object.entries(msg.usage));
+    libVars = msg.libraryVars;
+    deletedUse = msg.deleted;
+    recomputeIndirect();
   }
-  const total = vmVars.length;
-  const shown = vmVars.filter(include).length;
-  $('vmCount').textContent = t('vm.count', { shown, total });
-  renderVmTree(tree);
-  renderVmTable(onlyUsed, query, usage);
+  if (wasVisible && $('statusText').textContent === t('list.reading')) clearStatusLine();
+  if (refreshBefore) finishRefresh();
+  if (changed || wasVisible) renderVarScreen();
+  reentry.release();
+}
+function recomputeIndirect(): void {
+  if (!usageMap) { indirectMap = new Map(); return; }
+  const alias = aliasTargetsOf(vmVars);
+  for (const l of libVars) if (l.aliasTargets.length) alias.set(l.id, l.aliasTargets);
+  indirectMap = indirectUsage(new Set([...usageMap.keys()].filter((k) => (usageMap!.get(k)?.places ?? 0) > 0)), alias);
 }
 
-function renderVmTree(tree: TreeNode[]): void {
-  const box = $('vmTree');
-  clearMount(box);
-  const walk = (n: TreeNode): void => {
-    const key = `${n.collectionId}|${n.path}`;
+function onVarTable(msg: Extract<CodeToUi, { type: 'VAR_TABLE' }>): void {
+  const sig = JSON.stringify([msg.collections, msg.vars]);
+  const first = !vmTableKnown;
+  vmTableKnown = true;
+  if (sig === vmTableSig && !first) { if (refreshBefore) finishRefresh(); return; }
+  vmTableSig = sig;
+  vmCols = msg.collections;
+  vmVars = msg.vars;
+  if (chip !== 'all' && !vmCols.some((c) => c.id === chip)) chip = 'all';
+  if (wizCountPending) {
+    wizCountPending = false;
+    const n = vmVars.length - wizBeforeCount;
+    if (n > 0) showStatusLine(t('wizard.madeStatus', { n }), { cls: 'ok' });
+  }
+  recomputeIndirect();
+  if (refreshBefore) finishRefresh();
+  if (vmOpen || first) renderVarScreen();
+}
+
+/* ---------- ↻ 다시 읽기 ---------- */
+function refreshList(): void {
+  const btn = $('btnVarRefresh');
+  btn.classList.add('spinning');
+  refreshBefore = { table: vmTableSig, usage: new Map([...(usageMap ?? new Map()).entries()].map(([k, v]) => [k, v.places])) };
+  refreshPending = baseline ? 2 : 1;
+  requestPrereq();
+  send({ type: 'GET_VAR_TABLE' });
+  if (baseline) requestManagerUsage('user'); // 300개 제한 무시, 기준 유지
+}
+let refreshPending = 0;
+function finishRefresh(): void {
+  if (!refreshBefore) return;
+  refreshPending--;
+  if (refreshPending > 0) return;
+  const before = refreshBefore;
+  refreshBefore = null;
+  $('btnVarRefresh').classList.remove('spinning');
+  const tableChanged = before.table !== vmTableSig;
+  let n = 0;
+  const now = new Map([...(usageMap ?? new Map()).entries()].map(([k, v]) => [k, v.places]));
+  for (const k of new Set([...before.usage.keys(), ...now.keys()])) if ((before.usage.get(k) ?? 0) !== (now.get(k) ?? 0)) n++;
+  const text = tableChanged ? t('list.refreshTable') + (n ? t('list.refreshCountSuffix', { n }) : '') : n ? t('list.refreshUsage', { n }) : t('list.refreshSame');
+  showStatusLine(text);
+  if (statusTimer) { clearTimeout(statusTimer); statusTimer = setTimeout(clearStatusLine, 2000); }
+}
+
+/* ---------- 선택 표시줄의 목록 기준(§4.1) ---------- */
+function renderSelBase(): void {
+  const base = $('selBase');
+  const btn = $('btnRebase') as HTMLButtonElement;
+  const show = activeTab === 'variables' && !!baseline && !sameIds(baseline.ids, curSel.ids);
+  if (!show) { base.textContent = ''; btn.hidden = true; return; }
+  const name = baseline!.count === 1 ? baseline!.name || t('sel.unnamed') : t('list.baseMany', { m: baseline!.count });
+  base.textContent = t('list.base', { name });
+  base.title = name;
+  btn.hidden = false;
+}
+
+/* ---------- 칩 줄 ---------- */
+function chipCounts(colId: string | 'all'): { used: number; total: number; direct: number; indirect: number } {
+  const vars = colId === 'all' ? vmVars : vmVars.filter((v) => v.collectionId === colId);
+  let direct = 0;
+  let indirect = 0;
+  if (usageMap) for (const v of vars) {
+    if ((usageMap.get(v.id)?.places ?? 0) > 0) direct++;
+    else if (indirectMap.has(v.id)) indirect++;
+  }
+  return { used: direct + indirect, total: vars.length, direct, indirect };
+}
+function chipNumText(colId: string | 'all'): { text: string; tip: string } {
+  const c = chipCounts(colId);
+  if (vmUsageInFlight && vmUsageVisible) return { text: '…', tip: '' };
+  if (!usageMap) return { text: String(c.total), tip: '' };
+  return { text: `${c.used}/${c.total}`, tip: t('list.chipTip', { used: c.used, direct: c.direct, indirect: c.indirect, total: c.total }) };
+}
+function renderChips(): void {
+  const row = $('chipRow');
+  clearMount(row);
+  const make = (id: string, label: string, badge: string | null): void => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = n.count ? 'vm-node' : 'vm-node empty';
-    b.style.paddingLeft = `${6 + n.depth * 12}px`;
-    const current = vmScope && vmScope.collectionId === n.collectionId && vmScope.path === n.path;
-    b.setAttribute('aria-current', String(!!current));
-    const collapsed = vmCollapsed.has(`tree:${key}`);
-    const tw = document.createElement('span');
-    tw.className = 'tw';
-    tw.textContent = n.children.length ? (collapsed ? '▸' : '▾') : '';
-    tw.addEventListener('click', (e) => {
-      if (!n.children.length) return;
-      e.stopPropagation();
-      if (collapsed) vmCollapsed.delete(`tree:${key}`); else vmCollapsed.add(`tree:${key}`);
-      renderVarManager();
-    });
-    const lbl = document.createElement('span');
-    lbl.className = 'lbl';
-    lbl.textContent = n.label;
-    lbl.title = n.path || n.label;
-    b.append(tw, lbl);
-    if (n.depth === 0) {
-      const col = vmCols.find((c) => c.id === n.collectionId);
-      const tierName = col && col.tier ? ['', 'Global', 'Semantic', 'Component'][col.tier] : '';
-      if (tierName && tierName !== n.label) {
-        const tag = document.createElement('span');
-        tag.className = 'vm-tier';
-        tag.textContent = tierName;
-        b.appendChild(tag);
-      }
+    b.className = 'tier-chip';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(chip === id));
+    b.tabIndex = chip === id ? 0 : -1;
+    b.dataset.chip = id;
+    const nm = document.createElement('span');
+    nm.textContent = label;
+    b.appendChild(nm);
+    if (badge) {
+      const bg = document.createElement('span');
+      bg.className = 'badge';
+      bg.textContent = badge;
+      bg.setAttribute('aria-hidden', 'true');
+      b.appendChild(bg);
     }
-    const cnt = document.createElement('span');
-    cnt.className = 'cnt';
-    cnt.textContent = String(n.count);
-    b.appendChild(cnt);
-    b.addEventListener('click', () => { vmScope = { collectionId: n.collectionId, path: n.path }; vmScopeUser = true; renderVarManager(); });
-    box.appendChild(b);
-    if (!collapsed) n.children.forEach(walk);
+    const num = chipNumText(id);
+    const n = document.createElement('span');
+    n.className = 'num';
+    n.textContent = num.text;
+    b.appendChild(n);
+    if (num.tip) b.title = num.tip;
+    b.addEventListener('click', () => { chip = id; renderVarList(); });
+    b.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      e.preventDefault();
+      const all = Array.from(row.querySelectorAll<HTMLElement>('.tier-chip'));
+      const i = all.indexOf(b) + (e.key === 'ArrowRight' ? 1 : -1);
+      const target = all[(i + all.length) % all.length];
+      chip = target.dataset.chip ?? 'all';
+      renderVarList();
+      row.querySelector<HTMLElement>(`[data-chip="${CSS.escape(chip)}"]`)?.focus();
+    });
+    row.appendChild(b);
   };
-  tree.forEach(walk);
+  make('all', t('list.chipAll'), null);
+  for (const c of orderCollections(vmCols)) make(c.id, c.name, tierBadge(c));
+  requestAnimationFrame(() => {
+    const over = row.scrollWidth > row.clientWidth + 1;
+    $('btnChipMore').hidden = !over;
+  });
+  renderModeSelect();
+}
+function renderModeSelect(): void {
+  const sel = $('modeSelect') as HTMLSelectElement;
+  const visible = chip === 'all' ? vmCols : vmCols.filter((c) => c.id === chip);
+  const names = [...new Set(visible.flatMap((c) => c.modes.map((m) => m.name)))];
+  // 보이는 모드가 1개면 숨긴다. 검색 중에도 숨겨 칩 줄 자리를 남긴다.
+  if (names.length <= 1 || searchOpen) { sel.hidden = true; return; }
+  sel.hidden = false;
+  clearMount(sel);
+  const def = document.createElement('option');
+  def.value = '';
+  def.textContent = t('list.modeDefault');
+  sel.appendChild(def);
+  for (const n of names) {
+    const o = document.createElement('option');
+    o.value = n;
+    o.textContent = n;
+    sel.appendChild(o);
+  }
+  sel.value = modeName && names.includes(modeName) ? modeName : '';
+}
+/** 행에 보일 모드 — 고른 모드 이름이 그 컬렉션에 있으면 그것, 없으면 기본 모드(defaultModeId). */
+function modeIdFor(col: VarCollection | undefined): string | undefined {
+  if (!col) return undefined;
+  if (modeName) {
+    const m = col.modes.find((x) => x.name === modeName);
+    if (m) return m.modeId;
+  }
+  return col.defaultModeId ?? col.modes[0]?.modeId;
+}
+function currentModeCell(v: VarRow): VarCell | undefined {
+  return v.values[modeIdFor(vmCols.find((c) => c.id === v.collectionId)) ?? ''];
 }
 
-/** 별칭을 따라가 실제 색(hex)을 찾는다 — 가리키는 변수의 첫 모드 기준, 순환·외부 변수는 포기(최대 8단). */
-function resolveColor(cell: VarCell | undefined): string | null {
+/* ---------- 상황 안내 줄(위 행 하나만) ---------- */
+function renderSituation(): void {
+  const line = $('situationLine');
+  clearMount(line);
+  const add = (text: string, action?: [string, () => void]): void => {
+    const s = document.createElement('span');
+    s.textContent = text;
+    line.appendChild(s);
+    if (action) {
+      const b = document.createElement('button');
+      b.className = 'link link-btn';
+      b.type = 'button';
+      b.textContent = action[0];
+      b.addEventListener('click', action[1]);
+      line.appendChild(b);
+    }
+  };
+  let shown = true;
+  const groups = new Set(vmVars.filter((v) => chip === 'all' || v.collectionId === chip).map((v) => groupKey(v.collectionId, v.name))).size;
+  if (baseline && bigSkipped && !usageMap) add(t('list.big'), [t('list.read'), () => requestManagerUsage('user')]);
+  else if (baseline && wizardRunning && !usageMap) add(t('list.wizardWait'));
+  else if (baseline && usageMap && chipCounts('all').direct === 0) add(t('list.noneUsed'), [t('list.findUnbound'), findUnbound]);
+  else if (!baseline && groups > 10) add(t('list.selectHint'));
+  else shown = false;
+  line.hidden = !shown;
+}
+
+/* ---------- 목록 ---------- */
+function resolveSwatch(cell: VarCell | undefined): string | null {
   let c = cell;
   for (let i = 0; i < 8 && c; i++) {
     if (c.kind === 'color') return c.hex;
     if (c.kind !== 'alias') return null;
-    const target = vmVars.find((v) => v.id === (c as { aliasId: string }).aliasId);
-    if (!target) return null;
-    const col = vmCols.find((x) => x.id === target.collectionId);
-    c = col ? target.values[col.modes[0]?.modeId] : undefined;
+    const id = c.aliasId;
+    const local = vmVars.find((v) => v.id === id);
+    if (local) { c = currentModeCell(local); continue; }
+    const lib = libVars.find((l) => l.id === id);
+    c = lib?.value;
   }
   return null;
 }
 const swatchHtml = (hex: string | null): string => (hex ? `<span class="bf-swatch" style="background:${escapeHtml(hex)}"></span>` : '');
-
-function vmCellEl(cell: VarCell | undefined): HTMLElement {
+function typeIcon(type: VarRow['type']): string {
+  return type === 'COLOR' ? '' : type === 'FLOAT' ? '#' : type === 'STRING' ? 'T' : '◐';
+}
+function valueEl(cell: VarCell | undefined): HTMLElement {
   const span = document.createElement('span');
-  if (!cell) { span.textContent = '—'; span.className = 'muted'; return span; }
+  span.className = 'val';
+  if (!cell) { span.textContent = '—'; return span; }
   if (cell.kind === 'alias') {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'vm-alias';
-    b.innerHTML = `${swatchHtml(resolveColor(cell))}= ${escapeHtml(cell.aliasName)}`;
+    b.className = 'alias-pill';
+    b.tabIndex = -1; // 행 안의 알약은 Tab 정지점이 아니다 — 키보드는 메뉴로
+    b.innerHTML = `${swatchHtml(resolveSwatch(cell))}→ ${escapeHtml(cell.aliasName)}${cell.remote ? ' <span class="lib-tag">LIB</span>' : ''}`;
     b.title = t('vm.jumpAlias');
-    b.addEventListener('click', (e) => { e.stopPropagation(); jumpToVar(cell.aliasId); });
-    return b;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      jumpToVar(cell.aliasId, (e.currentTarget as HTMLElement).closest<HTMLElement>('[data-key]')?.dataset.key);
+    });
+    b.addEventListener('dblclick', (e) => e.stopPropagation()); // 알약 더블클릭이 행 상세를 함께 열지 않게
+    span.appendChild(b);
+    return span;
   }
-  span.className = 'vm-val';
-  if (cell.kind === 'color') span.innerHTML = `<span class="bf-swatch" style="background:${escapeHtml(cell.hex)}"></span>${escapeHtml(cell.hex.toUpperCase())}`;
+  if (cell.kind === 'color') span.innerHTML = `${swatchHtml(cell.hex)}${escapeHtml(cell.hex.toUpperCase())}`;
   else span.textContent = cell.text;
   return span;
 }
 
-function jumpToVar(id: string): void {
-  const v = vmVars.find((x) => x.id === id);
-  if (!v) { setStatus('vmStatus', t('vm.aliasOutside'), 'warn'); return; }
-  ($('vmOnlyUsed') as HTMLInputElement).checked = false;
-  ($('vmSearch') as HTMLInputElement).value = '';
-  vmScope = { collectionId: v.collectionId, path: '' };
-  vmScopeUser = true;
-  vmSelected = id;
-  renderVarManager();
-  document.querySelector<HTMLElement>(`.vm-row[data-id="${CSS.escape(id)}"]`)?.focus();
-}
-
-function typeIcon(v: VarRow): string {
-  return v.type === 'COLOR' ? '' : v.type === 'FLOAT' ? '#' : v.type === 'STRING' ? 'T' : '◐';
-}
-
-function renderVmTable(onlyUsed: boolean, query: string, usage: Map<string, number>): void {
-  const wrap = $('vmTableWrap');
-  clearMount(wrap);
-  const empty = (text: string, action?: [string, () => void]): void => {
+function renderVarList(): void {
+  if (!vmOpen || varScreen() !== 'list') return;
+  renderChips();
+  renderSituation();
+  renderReadinessButtons();
+  ($('btnFindUnbound') as HTMLElement).toggleAttribute('data-x', false);
+  setLock($('btnFindUnbound'), curSel.count ? null : 'prereq', t('status.noSelection'));
+  const tree = $('varTree');
+  const prevScroll = window.scrollY;
+  clearMount(tree);
+  // §4.2 — 선택이 있는 채로 처음 목록에 들어오면 사용 수가 올 때까지 이 한 줄만(접힘 → 펼침으로 튀지 않게).
+  // 자동으로 읽지 않는 경우(큰 선택, 마법사 중)는 목록 + 상황 안내 줄을 바로 보여 준다.
+  if (baseline && !usageMap && !bigSkipped && !wizardRunning && (vmUsageInFlight || vmUsageTimer) && !usageEverShown) {
     const d = document.createElement('div');
-    d.className = 'vm-empty';
-    d.textContent = text;
-    if (action) {
-      const b = document.createElement('button');
-      b.className = 'link';
-      b.textContent = action[0];
-      b.addEventListener('click', action[1]);
-      d.append(' ', b);
-    }
-    wrap.appendChild(d);
-  };
-  if (!vmVars.length && vmCols.length === 0) { empty(t('vm.noVars')); return; }
-  if (!vmScope) { empty(t('vm.noVars')); return; }
-  const col = vmCols.find((c) => c.id === vmScope!.collectionId);
-  if (!col) return;
-  const rows = filterVars(vmVars, { collectionId: col.id, path: vmScope.path, query, onlyUsed }, usage);
-  if (!rows.length) {
-    const showAll: [string, () => void] = [t('vm.showAll'), () => { ($('vmOnlyUsed') as HTMLInputElement).checked = false; vmScopeUser = false; renderVarManager(); }];
-    if (onlyUsed && lastSelCount === 0) empty(t('vm.selectFirst'), showAll);
-    else if (onlyUsed && vmUsage === null) empty(t('vm.usageLoading'));
-    else if (onlyUsed) empty(t('vm.noneUsed'), showAll);
-    else empty(t('vm.noMatch'));
+    d.className = 'vt-empty';
+    d.textContent = t('list.reading');
+    tree.appendChild(d);
     return;
   }
-  const table = document.createElement('table');
-  table.className = 'vm-table';
-  const head = document.createElement('tr');
-  const th = (text: string, cls = ''): void => { const c = document.createElement('th'); c.textContent = text; if (cls) c.className = cls; head.appendChild(c); };
-  th(t('vm.colName'), 'name');
-  for (const m of col.modes) th(m.name);
-  th(t('vm.colUsage'), 'vm-use');
-  th('');
-  const thead = document.createElement('thead');
-  thead.appendChild(head);
-  table.appendChild(thead);
-  const tbody = document.createElement('tbody');
-  const span = col.modes.length + 3;
-  for (const g of groupRows(rows)) {
-    const gkey = `grp:${col.id}|${g.path}`;
-    const collapsed = vmCollapsed.has(gkey);
-    if (g.path) {
-      const tr = document.createElement('tr');
-      tr.className = 'vm-group';
-      const td = document.createElement('td');
-      td.colSpan = span;
-      td.textContent = `${collapsed ? '▸' : '▾'} ${g.path.split('/').join(' / ')}`;
-      tr.appendChild(td);
-      tr.addEventListener('click', () => { if (collapsed) vmCollapsed.delete(gkey); else vmCollapsed.add(gkey); renderVarManager(); });
-      tbody.appendChild(tr);
-    }
-    if (collapsed) continue;
-    for (const v of g.rows) tbody.appendChild(vmRowEl(v, col, usage.get(v.id) ?? 0));
+  usageEverShown = true;
+  const entries = buildList({
+    collections: vmCols,
+    vars: vmVars,
+    chip,
+    query,
+    direct: usageMap ? new Map([...usageMap.entries()].map(([k, v]) => [k, v.places])) : null,
+    indirect: new Set(indirectMap.keys()),
+    userExpanded,
+    showUnusedIn,
+    showUnusedGroups,
+  });
+  const lines: HTMLElement[] = [];
+  for (const e of entries) {
+    if (e.kind === 'section') lines.push(sectionEl(e));
+    else if (e.kind === 'group') lines.push(groupEl(e));
+    else if (e.kind === 'row') lines.push(rowEl(e.v, e.state));
+    else lines.push(unusedGroupsEl(e.collectionId, e.count));
   }
-  table.appendChild(tbody);
-  wrap.appendChild(table);
-  if (vmUsageCapped) setStatus('vmStatus', t('vm.usageCapped'), 'warn');
+  // 검색 결과 없음
+  if (query.trim() && !entries.some((e) => e.kind === 'row') && !libRowsMatching().length) {
+    const d = document.createElement('div');
+    d.className = 'vt-empty';
+    d.append(t('list.noMatch', { q: query.trim() }), ' · ');
+    if (chip !== 'all') {
+      const a = document.createElement('button');
+      a.className = 'link';
+      a.textContent = t('list.searchAll');
+      a.addEventListener('click', () => { chip = 'all'; renderVarList(); });
+      d.append(a, ' ');
+    }
+    const c = document.createElement('button');
+    c.className = 'link';
+    c.textContent = t('list.searchClear');
+    c.addEventListener('click', () => clearSearch(true));
+    d.append(c);
+    lines.push(d);
+  }
+  // LIB 구역 — [모두]일 때만, 목록 기준이 라이브러리 변수를 쓸 때만.
+  if (chip === 'all') {
+    const libRows = libRowsMatching();
+    if (libRows.length) {
+      const h = document.createElement('div');
+      h.className = 'vt-section vt-lib';
+      h.dataset.key = 'sec:lib';
+      h.setAttribute('role', 'row');
+      h.innerHTML = `<span>${escapeHtml(t('list.libSection'))}</span>`;
+      lines.push(h);
+      for (const l of libRows) lines.push(libRowEl(l));
+    }
+  }
+  if (deletedUse.count > 0 && baseline) lines.push(deletedEl());
+  if (!lines.length) {
+    const d = document.createElement('div');
+    d.className = 'vt-empty';
+    d.textContent = t('vm.noVars');
+    lines.push(d);
+  }
+  tree.append(...lines);
+  // 키보드: 정지점 1개(roving tabindex). 포커스 줄을 지킨다.
+  const focusables = Array.from(tree.querySelectorAll<HTMLElement>('[data-key]'));
+  let target = focusKey ? focusables.find((x) => x.dataset.key === focusKey) : undefined;
+  if (focusKey && !target && focusKey.startsWith('row:')) {
+    // 포커스 행이 숨겨졌다 — 그룹 머리로 옮기고 알린다.
+    const gk = rowGroupOf.get(focusKey.slice(4));
+    target = gk ? focusables.find((x) => x.dataset.key === `grp:${gk}`) : undefined;
+    if (target && tree.contains(document.activeElement)) showStatusLine(t('list.hiddenRow'));
+  }
+  for (const f of focusables) f.tabIndex = -1;
+  (target ?? focusables[0])?.setAttribute('tabindex', '0');
+  if (target && document.activeElement?.closest('#varTree')) target.focus({ preventScroll: true });
+  if (Math.abs(window.scrollY - prevScroll) > 1) window.scrollTo(0, prevScroll);
+}
+const rowGroupOf = new Map<string, string>();
+/** 목록을 한 번이라도 그렸는가 — §4.2 "읽는 중" 한 줄은 처음 들어올 때만. */
+let usageEverShown = false;
+
+function libRowsMatching(): LibraryVar[] {
+  if (!usageMap) return [];
+  return libVars.filter((l) => ((usageMap!.get(l.id)?.places ?? 0) > 0 || indirectMap.has(l.id)) && matchesQuery(l.name, query));
 }
 
-function vmRowEl(v: VarRow, col: VarCollection, uses: number): HTMLElement {
-  const tr = document.createElement('tr');
-  tr.className = 'vm-row';
-  tr.dataset.id = v.id;
-  tr.tabIndex = 0;
-  tr.setAttribute('aria-selected', String(vmSelected === v.id));
-  const name = document.createElement('td');
-  name.className = 'name';
-  name.title = v.description ? `${v.name}\n${v.description}` : v.name;
+function sectionEl(e: Extract<ListEntry, { kind: 'section' }>): HTMLElement {
+  const d = document.createElement('div');
+  d.className = 'vt-section';
+  d.dataset.key = `sec:${e.collection.id}`;
+  d.setAttribute('role', 'row');
+  d.setAttribute('aria-level', '1');
+  d.innerHTML = `<span>${escapeHtml(e.collection.name)}</span><span class="badge" aria-hidden="true">${escapeHtml(tierBadge(e.collection))}</span><span class="num">${usageMap ? `${e.used}/${e.total}` : e.total}</span>`;
+  d.addEventListener('keydown', (ev) => treeKey(ev, d));
+  return d;
+}
+function groupEl(e: Extract<ListEntry, { kind: 'group' }>): HTMLElement {
+  const d = document.createElement('div');
+  d.className = 'vt-group';
+  d.dataset.key = `grp:${e.key}`;
+  d.setAttribute('role', 'row');
+  d.setAttribute('aria-level', '2');
+  d.setAttribute('aria-expanded', String(e.expanded));
+  const tw = document.createElement('span');
+  tw.className = 'tw';
+  tw.textContent = e.expanded ? '▾' : '▸';
+  const lbl = document.createElement('span');
+  lbl.className = 'lbl';
+  lbl.textContent = e.label;
+  lbl.title = e.label;
+  const num = document.createElement('span');
+  num.className = 'num';
+  num.textContent = usageMap ? `${e.used}/${e.total}` : String(e.total);
+  d.append(tw, lbl, num);
+  if (usageMap && e.unused > 0 && e.used > 0 && !query.trim()) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'link link-btn more-unused';
+    b.tabIndex = -1;
+    b.textContent = e.showingUnused ? t('list.hideUnused') : t('list.showUnused', { m: e.unused });
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); toggleUnused(e.key); });
+    d.appendChild(b);
+  }
+  d.addEventListener('click', (ev) => {
+    if (ev.altKey) { setSectionExpanded(e.collectionId, !e.expanded); return; }
+    focusKey = d.dataset.key ?? null;
+    toggleGroup(e.key, e.expanded);
+  });
+  d.addEventListener('keydown', (ev) => treeKey(ev, d, e));
+  return d;
+}
+function toggleGroup(key: string, expanded: boolean): void {
+  userExpanded.set(key, !expanded);
+  renderVarList();
+}
+function toggleUnused(key: string): void {
+  if (showUnusedIn.has(key)) showUnusedIn.delete(key); else showUnusedIn.add(key);
+  renderVarList();
+}
+function setSectionExpanded(colId: string, on: boolean): void {
+  for (const v of vmVars) if (v.collectionId === colId) userExpanded.set(groupKey(colId, v.name), on);
+  renderVarList();
+}
+function setAllExpanded(on: boolean): void {
+  for (const v of vmVars) userExpanded.set(groupKey(v.collectionId, v.name), on);
+  if (on) for (const c of vmCols) showUnusedGroups.add(c.id);
+  renderVarList();
+}
+function unusedGroupsEl(colId: string, count: number): HTMLElement {
+  const d = document.createElement('div');
+  d.className = 'vt-line';
+  d.dataset.key = `ug:${colId}`;
+  d.setAttribute('role', 'row');
+  d.textContent = t('list.unusedGroups', { n: count });
+  const open = (): void => { showUnusedGroups.add(colId); renderVarList(); };
+  d.addEventListener('click', open);
+  d.addEventListener('keydown', (ev) => treeKey(ev, d, undefined, open));
+  return d;
+}
+function useText(id: string, state: RowState): { text: string; tip: string } {
+  if (state === 'none') return { text: '—', tip: '' };
+  if (state === 'unused') return { text: t('list.unused'), tip: '' };
+  if (state === 'indirect') {
+    const via = indirectMap.get(id) ?? [];
+    const first = vmVars.find((v) => v.id === via[0])?.name ?? libVars.find((l) => l.id === via[0])?.name ?? '';
+    return { text: t('list.indirect'), tip: t('list.indirectTip', { alias: first }) };
+  }
+  const u = usageMap?.get(id);
+  return { text: t('vm.uses', { n: u?.places ?? 0 }), tip: t('list.usesTip', { k: u?.layers ?? 0, n: u?.places ?? 0 }) };
+}
+function rowEl(v: VarRow, state: RowState): HTMLElement {
+  rowGroupOf.set(v.id, groupKey(v.collectionId, v.name));
+  const d = document.createElement('div');
+  d.className = `vt-row ${state}`;
+  d.dataset.key = `row:${v.id}`;
+  d.dataset.id = v.id;
+  d.setAttribute('role', 'row');
+  d.setAttribute('aria-level', '3');
+  d.setAttribute('aria-selected', String(vmSelected === v.id));
+  const cell = currentModeCell(v);
+  const nm = document.createElement('span');
+  nm.className = 'nm';
   const ic = document.createElement('span');
   ic.className = 'ic';
-  const firstCell = v.values[col.modes[0]?.modeId];
-  const hex = v.type === 'COLOR' ? resolveColor(firstCell) : null;
-  if (hex) ic.innerHTML = swatchHtml(hex);
-  else ic.textContent = typeIcon(v);
-  name.append(ic, leafName(v.name));
-  tr.appendChild(name);
-  for (const m of col.modes) {
-    const td = document.createElement('td');
-    td.appendChild(vmCellEl(v.values[m.modeId]));
-    tr.appendChild(td);
-  }
-  const use = document.createElement('td');
-  use.className = 'vm-use';
-  use.textContent = vmUsage === null || lastSelCount === 0 ? '—' : uses ? t('vm.uses', { n: uses }) : '—';
-  tr.appendChild(use);
-  const more = document.createElement('td');
+  const hex = v.type === 'COLOR' ? resolveSwatch(cell) : null;
+  if (hex) ic.innerHTML = swatchHtml(hex); else ic.textContent = typeIcon(v.type);
+  const tx = document.createElement('span');
+  tx.className = 't';
+  tx.textContent = leafName(v.name);
+  nm.title = v.description ? `${v.name}\n${v.description}` : v.name;
+  nm.append(ic, tx);
+  const use = document.createElement('span');
+  use.className = 'use';
+  const u = useText(v.id, state);
+  use.textContent = u.text;
+  if (u.tip) use.title = u.tip;
+  const more = moreButton(() => openVarMenuFor({ local: v }, d));
+  d.append(nm, valueEl(cell), use, more);
+  wireRow(d, { local: v });
+  return d;
+}
+function libRowEl(l: LibraryVar): HTMLElement {
+  const d = document.createElement('div');
+  const direct = (usageMap?.get(l.id)?.places ?? 0) > 0;
+  const state: RowState = direct ? 'direct' : 'indirect';
+  d.className = `vt-row ${state}`;
+  d.dataset.key = `lib:${l.id}`;
+  d.dataset.id = l.id;
+  d.setAttribute('role', 'row');
+  const nm = document.createElement('span');
+  nm.className = 'nm';
+  const ic = document.createElement('span');
+  ic.className = 'ic';
+  const hex = l.type === 'COLOR' ? resolveSwatch(l.value) : null;
+  if (hex) ic.innerHTML = swatchHtml(hex); else ic.textContent = typeIcon(l.type);
+  const tx = document.createElement('span');
+  tx.className = 't';
+  tx.textContent = l.name;
+  const tag = document.createElement('span');
+  tag.className = 'lib-tag';
+  tag.textContent = 'LIB';
+  nm.title = `${l.name} · ${l.collection}`;
+  nm.append(ic, tx, tag);
+  const use = document.createElement('span');
+  use.className = 'use';
+  const ut = useText(l.id, state);
+  use.textContent = ut.text;
+  if (ut.tip) use.title = ut.tip;
+  d.append(nm, valueEl(l.value), use, moreButton(() => openVarMenuFor({ lib: l }, d)));
+  wireRow(d, { lib: l });
+  return d;
+}
+function deletedEl(): HTMLElement {
+  const d = document.createElement('div');
+  d.className = 'vt-line';
+  d.dataset.key = 'deleted';
+  d.setAttribute('role', 'row');
+  const s = document.createElement('span');
+  s.textContent = t('list.deleted', { n: deletedUse.count });
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'link link-btn';
+  b.tabIndex = -1;
+  b.textContent = t('list.select');
+  const pick = (): void => selectNodes(deletedUse.nodeIds, 'list'); // 기준은 유지(플러그인이 만든 선택)
+  b.addEventListener('click', (e) => { e.stopPropagation(); pick(); });
+  d.append(s, b);
+  d.addEventListener('keydown', (ev) => treeKey(ev, d, undefined, pick));
+  return d;
+}
+function moreButton(open: () => void): HTMLButtonElement {
   const mb = document.createElement('button');
   mb.type = 'button';
   mb.className = 'more';
+  mb.tabIndex = -1;
   mb.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg>';
   mb.title = t('vm.moreTip');
   mb.setAttribute('aria-label', t('vm.moreTip'));
-  mb.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const r = mb.getBoundingClientRect();
-    selectVmRow(v.id);
-    openVarMenu(v, r.left, r.bottom, tr);
-  });
-  more.appendChild(mb);
-  tr.appendChild(more);
-  tr.addEventListener('click', () => selectVmRow(v.id));
-  tr.addEventListener('dblclick', () => openVarDetail(v));
-  tr.addEventListener('contextmenu', (e) => {
+  mb.addEventListener('click', (e) => { e.stopPropagation(); open(); });
+  return mb;
+}
+type RowRef = { local: VarRow; lib?: undefined } | { lib: LibraryVar; local?: undefined };
+function wireRow(d: HTMLElement, ref: RowRef): void {
+  d.addEventListener('click', () => { vmSelected = d.dataset.id ?? null; focusKey = d.dataset.key ?? null; d.focus(); markSelected(); });
+  d.addEventListener('dblclick', () => openDetail(ref, d));
+  d.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    selectVmRow(v.id);
-    openVarMenu(v, e.clientX, e.clientY, tr);
+    vmSelected = d.dataset.id ?? null;
+    markSelected();
+    openVarMenuFor(ref, d, e.clientX, e.clientY);
   });
-  tr.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); openVarDetail(v); }
-    else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
-      e.preventDefault();
-      const r = tr.getBoundingClientRect();
-      openVarMenu(v, r.left + 24, r.bottom, tr);
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      const sib = (e.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling) as HTMLElement | null;
-      const target = sib && sib.classList.contains('vm-row') ? sib : null;
-      if (target) { target.focus(); selectVmRow(target.dataset.id ?? null); }
+  d.addEventListener('keydown', (ev) => treeKey(ev, d, undefined, () => openDetail(ref, d), () => openVarMenuFor(ref, d)));
+}
+function markSelected(): void {
+  document.querySelectorAll<HTMLElement>('#varTree .vt-row').forEach((r) => r.setAttribute('aria-selected', String(r.dataset.id === vmSelected)));
+}
+
+/** treegrid 키(§4.4 키보드 표). onEnter: 줄의 기본 동작, onMenu: Shift+F10. */
+function treeKey(ev: KeyboardEvent, el: HTMLElement, group?: Extract<ListEntry, { kind: 'group' }>, onEnter?: () => void, onMenu?: () => void): void {
+  const all = Array.from($('varTree').querySelectorAll<HTMLElement>('[data-key]'));
+  const i = all.indexOf(el);
+  const go = (j: number): void => {
+    const target = all[Math.max(0, Math.min(all.length - 1, j))];
+    if (!target) return;
+    all.forEach((x) => (x.tabIndex = -1));
+    target.tabIndex = 0;
+    focusKey = target.dataset.key ?? null;
+    target.focus();
+  };
+  const k = ev.key;
+  if (k === 'ArrowDown') go(i + 1);
+  else if (k === 'ArrowUp') go(i - 1);
+  else if (k === 'Home') go(0);
+  else if (k === 'End') go(all.length - 1);
+  else if (k === 'PageDown') go(i + 10);
+  else if (k === 'PageUp') go(i - 10);
+  else if (k === 'ArrowRight' && group) {
+    focusKey = el.dataset.key ?? null;
+    if (ev.altKey) setSectionExpanded(group.collectionId, true);
+    else if (!group.expanded) toggleGroup(group.key, false);
+    else if (group.unused > 0 && !group.showingUnused) toggleUnused(group.key);
+  } else if (k === 'ArrowLeft') {
+    if (group) {
+      focusKey = el.dataset.key ?? null;
+      if (ev.altKey) setSectionExpanded(group.collectionId, false);
+      else if (group.expanded) toggleGroup(group.key, true);
+    } else if (el.classList.contains('vt-row')) {
+      const gk = rowGroupOf.get(el.dataset.id ?? '');
+      const gi = all.findIndex((x) => x.dataset.key === `grp:${gk}`);
+      if (gi >= 0) go(gi);
     }
+  } else if (k === 'Enter' && group && ev.shiftKey) {
+    focusKey = el.dataset.key ?? null;
+    toggleUnused(group.key);
+  } else if (k === 'Enter' && group) {
+    focusKey = el.dataset.key ?? null;
+    toggleGroup(group.key, group.expanded);
+  } else if (k === 'Enter' && onEnter) onEnter();
+  else if ((k === 'ContextMenu' || (k === 'F10' && ev.shiftKey)) && onMenu) onMenu();
+  else return;
+  ev.preventDefault();
+}
+
+/* ---------- 알약 / "가리키는 변수로 이동" + 되돌리기 ---------- */
+/** fromKey: 이동 전 원래 행 — 되돌리기는 그 행으로 포커스를 돌린다(§4.1). */
+function jumpToVar(id: string, fromKey?: string): void {
+  const v = vmVars.find((x) => x.id === id);
+  if (!v) {
+    const lib = libVars.find((l) => l.id === id);
+    if (lib && chip === 'all' && libRowsMatching().some((l) => l.id === id)) {
+      document.querySelector<HTMLElement>(`#varTree [data-key="lib:${CSS.escape(id)}"]`)?.focus();
+    } else showStatusLine(t('list.libVar'));
+    return;
+  }
+  const undo = { chip, query, searchOpen, userExpanded: new Map(userExpanded), showUnusedIn: new Set(showUnusedIn), showUnusedGroups: new Set(showUnusedGroups), scroll: window.scrollY, focusKey: fromKey ?? focusKey };
+  chip = 'all';
+  clearSearch(false);
+  const gk = groupKey(v.collectionId, v.name);
+  userExpanded.set(gk, true);
+  showUnusedGroups.add(v.collectionId);
+  showUnusedIn.add(gk);
+  focusKey = `row:${v.id}`;
+  vmSelected = v.id;
+  renderVarList();
+  const row = document.querySelector<HTMLElement>(`#varTree [data-key="row:${CSS.escape(v.id)}"]`);
+  row?.scrollIntoView({ block: 'center' });
+  row?.focus({ preventScroll: true });
+  showStatusLine(t('list.jumped', { name: v.name }), {
+    action: {
+      label: t('list.undo'),
+      run: () => {
+        chip = undo.chip;
+        query = undo.query;
+        searchOpen = undo.searchOpen;
+        ($('varSearch') as HTMLInputElement).value = query;
+        $('searchBox').hidden = !searchOpen;
+        userExpanded.clear(); undo.userExpanded.forEach((val, key) => userExpanded.set(key, val));
+        showUnusedIn.clear(); undo.showUnusedIn.forEach((x) => showUnusedIn.add(x));
+        showUnusedGroups.clear(); undo.showUnusedGroups.forEach((x) => showUnusedGroups.add(x));
+        focusKey = undo.focusKey;
+        renderVarList();
+        window.scrollTo(0, undo.scroll);
+        const back = focusKey ? document.querySelector<HTMLElement>(`#varTree [data-key="${CSS.escape(focusKey)}"]`) : null;
+        back?.focus({ preventScroll: true });
+      },
+    },
   });
-  return tr;
 }
 
-function selectVmRow(id: string | null): void {
-  vmSelected = id;
-  document.querySelectorAll<HTMLElement>('.vm-row').forEach((r) => r.setAttribute('aria-selected', String(r.dataset.id === id)));
+/* ---------- 검색 ---------- */
+function openSearch(): void {
+  searchOpen = true;
+  $('searchBox').hidden = false;
+  renderModeSelect();
+  ($('varSearch') as HTMLInputElement).focus();
+}
+function clearSearch(render = true): void {
+  query = '';
+  searchOpen = false;
+  ($('varSearch') as HTMLInputElement).value = '';
+  $('searchBox').hidden = true;
+  if (render) { renderVarList(); ($('btnSearch') as HTMLElement).focus(); }
 }
 
-function currentModeCell(v: VarRow): VarCell | undefined {
-  const col = vmCols.find((c) => c.id === v.collectionId);
-  return col ? v.values[col.modes[0]?.modeId] : undefined;
-}
-
+/* ---------- 행 메뉴(§4.4) ---------- */
 async function copyAndReport(text: string, what: string): Promise<void> {
-  if (!text) { setStatus('vmStatus', t('vm.copyEmpty'), 'warn'); return; }
+  if (!text) { showStatusLine(t('vm.copyEmpty'), { cls: 'warn' }); return; }
   const ok = await copyText(text);
-  setStatus('vmStatus', ok ? t('vm.copied', { what, text }) : t('vm.copyFailed', { text }), ok ? 'ok' : 'warn');
+  showStatusLine(ok ? t('vm.copied', { what, text }) : t('vm.copyFailed', { text }), { cls: ok ? 'ok' : 'warn' });
+}
+function openVarMenuFor(ref: RowRef, rowEl: HTMLElement, x?: number, y?: number): void {
+  const id = ref.local ? ref.local.id : ref.lib.id;
+  const name = ref.local ? ref.local.name : ref.lib.name;
+  const cell = ref.local ? currentModeCell(ref.local) : ref.lib.value;
+  const direct = (usageMap?.get(id)?.places ?? 0) > 0;
+  const via = indirectMap.get(id) ?? [];
+  const known = !!usageMap && !!baseline;
+  const r = rowEl.getBoundingClientRect();
+  rowEl.classList.add('menu-open');
+  const items: MenuItem[] = [
+    { label: t('vm.copyName'), onSelect: () => void copyAndReport(name, t('vm.whatName')) },
+    { label: t('vm.copyValue'), onSelect: () => void copyAndReport(cellCopyText(cell), t('vm.whatValue')) },
+    { label: t('vm.copyCss'), onSelect: () => void copyAndReport(cssVarName(name), t('vm.whatCss')) },
+  ];
+  if (!known) {
+    items.push({ label: t('vm.selectLayers'), separatorBefore: true, disabled: true, note: t('list.selectFirstNote'), onSelect: () => {} });
+  } else if (direct) {
+    items.push({ label: t('vm.selectLayers'), separatorBefore: true, onSelect: () => selectVarUsers([id]) });
+  } else if (via.length) {
+    items.push({ label: t('list.selectViaAlias'), separatorBefore: true, onSelect: () => selectVarUsers(via) });
+  }
+  if (cell && cell.kind === 'alias') items.push({ label: t('vm.jumpAlias'), onSelect: () => jumpToVar(cell.aliasId, rowEl.dataset.key), focusElsewhere: true });
+  items.push({ label: t('vm.detail'), onSelect: () => openDetail(ref, rowEl), focusElsewhere: true });
+  openMenu(x ?? r.left + 24, y ?? r.bottom, items, rowEl, () => rowEl.classList.remove('menu-open'));
+}
+function selectVarUsers(varIds: string[]): void {
+  if (!baseline) return;
+  selectStatusTarget = 'list';
+  send({ type: 'SELECT_VAR_USERS', varIds, nodeIds: baseline.ids });
 }
 
-function openVarMenu(v: VarRow, x: number, y: number, returnFocus: HTMLElement): void {
-  const uses = usageCount(v.id);
-  const nodeIds = [...new Set((vmUsage?.get(v.id) ?? []).map((c) => c.nodeId))];
-  openMenu(x, y, [
-    { label: t('vm.copyName'), onSelect: () => void copyAndReport(v.name, t('vm.whatName')) },
-    { label: t('vm.copyValue'), onSelect: () => void copyAndReport(cellCopyText(currentModeCell(v)), t('vm.whatValue')) },
-    { label: t('vm.copyCss'), onSelect: () => void copyAndReport(cssVarName(v.name), t('vm.whatCss')) },
-    { label: t('vm.selectLayers'), disabled: !nodeIds.length, separatorBefore: true, onSelect: () => selectNodes(nodeIds, 'vmStatus') },
-    { label: t('vm.detail'), onSelect: () => openVarDetail(v) },
-    { label: t('vm.remap'), disabled: !uses, onSelect: () => openRemapModal(v) },
-  ], returnFocus);
-}
-
-/** 상세 팝업 — 값(모드별)·용도·설명·쓰인 곳. */
-function openVarDetail(v: VarRow): void {
-  const col = vmCols.find((c) => c.id === v.collectionId);
+/* ---------- 상세 팝업 ---------- */
+let detailReq = 0;
+let detailBox: HTMLElement | null = null;
+function openDetail(ref: RowRef, returnRow: HTMLElement): void {
+  const id = ref.local ? ref.local.id : ref.lib.id;
+  const name = ref.local ? ref.local.name : ref.lib.name;
+  const type = ref.local ? ref.local.type : ref.lib.type;
+  const col = ref.local ? vmCols.find((c) => c.id === ref.local!.collectionId) : undefined;
   const title = document.createElement('span');
-  const first = col ? v.values[col.modes[0]?.modeId] : undefined;
-  title.innerHTML = `${v.type === 'COLOR' ? swatchHtml(resolveColor(first)) : ''}<span class="vm-val">${escapeHtml(v.name)}</span>`;
+  const first = ref.local ? currentModeCell(ref.local) : ref.lib.value;
+  title.innerHTML = `${type === 'COLOR' ? swatchHtml(resolveSwatch(first)) : ''}<span class="vm-val">${escapeHtml(name)}</span>${ref.lib ? ' <span class="lib-tag">LIB</span>' : ''}`;
   const body = document.createElement('div');
   const dl = document.createElement('dl');
   const row = (k: string, val: HTMLElement | string): void => {
@@ -4399,97 +4852,296 @@ function openVarDetail(v: VarRow): void {
     if (typeof val === 'string') dd.textContent = val; else dd.appendChild(val);
     dl.append(dt, dd);
   };
-  const tierName = col && col.tier ? ['', 'Global', 'Semantic', 'Component'][col.tier] : t('vm.noTier');
-  row(t('vm.dCollection'), col && col.name === tierName ? col.name : `${col?.name ?? ''} · ${tierName}`);
-  for (const m of col?.modes ?? []) row(m.name, vmCellEl(v.values[m.modeId]));
-  const scopes = document.createElement('span');
-  for (const sc of v.scopes) {
-    const c = document.createElement('span');
-    c.className = 'chip';
-    c.textContent = sc;
-    scopes.appendChild(c);
-  }
-  row(t('vm.dScopes'), v.scopes.length ? scopes : '—');
-  row(t('vm.dDesc'), v.description || '—');
-  // 쓰인 곳 — 선택 안(관리 전용 조회)
-  const usesBox = document.createElement('div');
-  const list = vmUsage?.get(v.id) ?? [];
-  if (!list.length) usesBox.textContent = lastSelCount ? t('vm.dNoUses') : t('vm.dSelectFirst');
-  else {
-    const byNode = new Map<string, BindCandidate[]>();
-    for (const c of list) byNode.set(c.nodeId, [...(byNode.get(c.nodeId) ?? []), c]);
-    for (const [nid, cs] of byNode) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'var-use';
-      b.title = t('bind.layerSelectTip');
-      const labels = groupBindLines(cs).map((l) => fieldLabel(l.label, l.fields[0])).join(', ');
-      b.innerHTML = `<span class="vu-layer">${escapeHtml(vmUsageNodes.get(nid) ?? nid)}</span> <span class="vu-props">${escapeHtml(labels)}</span>`;
-      b.addEventListener('click', () => selectNodes([nid], 'vmStatus'));
-      usesBox.appendChild(b);
+  if (ref.local && col) {
+    const tierName = col.tier ? ['', 'Global', 'Semantic', 'Component'][col.tier] : t('vm.noTier');
+    row(t('vm.dCollection'), col.name === tierName ? col.name : `${col.name} · ${tierName}`);
+    for (const m of col.modes) row(m.name, valueEl(ref.local.values[m.modeId]));
+    const scopes = document.createElement('span');
+    for (const sc of ref.local.scopes) {
+      const c = document.createElement('span');
+      c.className = 'chip';
+      c.textContent = sc;
+      scopes.appendChild(c);
     }
+    row(t('vm.dScopes'), ref.local.scopes.length ? scopes : '—');
+    row(t('vm.dDesc'), ref.local.description || '—');
+  } else if (ref.lib) {
+    row(t('vm.dCollection'), t('list.libCollection', { name: ref.lib.collection }));
+    row(t('list.dValue'), valueEl(ref.lib.value));
   }
+  // 쓰인 곳 — 목록 기준 레이어 안에서 새로 찾는다. 간접이면 그 별칭들이 쓰인 곳.
+  const direct = (usageMap?.get(id)?.places ?? 0) > 0;
+  const via = direct ? [] : indirectMap.get(id) ?? [];
+  const usesBox = document.createElement('div');
   usesBox.className = 'var-uses';
-  row(t('vm.dUses', { n: list.length }), usesBox);
+  if (via.length) {
+    const names = via.map((x) => vmVars.find((v) => v.id === x)?.name ?? libVars.find((l) => l.id === x)?.name ?? x);
+    const p = document.createElement('div');
+    p.className = 'hint';
+    p.textContent = t('list.viaAlias', { names: names.join(', ') });
+    usesBox.appendChild(p);
+  }
+  const findUses = (): void => {
+    if (!baseline) return;
+    detailReq = ++bindReqSeq;
+    usesList.textContent = t('common.running');
+    send({ type: 'FIND_VAR_USERS', reqId: detailReq, varIds: direct ? [id] : via.length ? via : [id], nodeIds: baseline.ids, limit: DETAIL_LIMIT });
+  };
+  const usesList = document.createElement('div');
+  usesBox.appendChild(usesList);
+  if (!baseline) usesList.textContent = t('list.selectFirstNote');
+  else if (baseline.scanned > BIG_SELECTION) {
+    usesList.append(t('list.detailBig'), ' ');
+    const b = document.createElement('button');
+    b.className = 'link';
+    b.textContent = t('list.find');
+    b.addEventListener('click', findUses);
+    usesList.appendChild(b);
+  }
+  row(t('list.dUses'), usesBox);
   body.appendChild(dl);
-  const foot = [modalButton(t('vm.remap'), () => openRemapModal(v)), modalButton(t('common.close'), closeModal, true)];
-  foot[0].disabled = !list.length;
-  openModal(title, body, foot);
+  if (ref.lib) {
+    const n = document.createElement('div');
+    n.className = 'hint';
+    n.textContent = t('list.libManaged');
+    body.appendChild(n);
+  }
+  const box = openModal(title, body, [modalButton(t('common.close'), closeModal, true)], returnRow);
+  detailBox = box;
+  detailUsesEl = usesList;
+  if (baseline && baseline.scanned <= BIG_SELECTION) findUses();
+}
+let detailUsesEl: HTMLElement | null = null;
+function onVarUsers(msg: Extract<CodeToUi, { type: 'VAR_USERS' }>): void {
+  if (msg.reqId !== detailReq || !detailUsesEl || !detailBox || !modalEl) return;
+  const box = detailUsesEl;
+  clearMount(box);
+  if (!msg.totalLayers) { box.textContent = t('vm.dNoUses'); return; }
+  const head = document.createElement('div');
+  head.className = 'hint';
+  head.textContent = t('list.usesHead', { k: msg.totalLayers, n: msg.places });
+  box.appendChild(head);
+  for (const l of msg.layers) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'var-use';
+    b.title = t('bind.layerSelectTip');
+    b.innerHTML = `<span class="vu-layer">${escapeHtml(l.name)}</span>`;
+    b.addEventListener('click', () => selectNodes([l.id], 'list'));
+    box.appendChild(b);
+  }
+  if (msg.totalLayers > msg.layers.length) {
+    const more = document.createElement('div');
+    more.className = 'hint';
+    more.textContent = t('list.usesMore', { n: msg.totalLayers - msg.layers.length });
+    box.appendChild(more);
+  }
 }
 
-/* 교체 팝업 — 선택 안에서 이 변수를 쓰던 자리를 다른 변수로(기존 REMAP_* 메시지). */
-let remapModal: { fromId: string; fields: string[]; sites: number; box: HTMLElement } | null = null;
-/** 교체 직후 따라오는 BINDINGS_RESULT가 '교체 결과' 상태 문구를 '연결 현황 n건'으로 덮지 않게 한 번 막는다. */
-let keepRemapStatus = false;
-function openRemapModal(v: VarRow): void {
-  const list = vmUsage?.get(v.id) ?? [];
-  const fields = [...new Set(list.map((c) => c.field))];
+/* ---------- 계층 팝업 · 내보내기 팝업(⋯) ---------- */
+function openPopupFrom(storeId: string, title: string, returnFocus: HTMLElement): void {
+  const content = $(storeId);
   const body = document.createElement('div');
-  body.textContent = t('bind.remapLoading');
-  const box = openModal(t('vm.remapTitle', { name: v.name }), body, [modalButton(t('bind.remapCancel'), closeModal)]);
-  remapModal = { fromId: v.id, fields, sites: list.length, box };
-  send({ type: 'REMAP_TARGETS', fromId: v.id, fields });
+  body.appendChild(content);
+  content.hidden = false;
+  openModal(title, body, [modalButton(t('common.close'), closeModal, true)], returnFocus, () => {
+    content.hidden = true;
+    $('popupStore').appendChild(content); // 팝업이 지워지기 전에 원래 자리로
+  });
 }
-function onRemapTargets(fromId: string, targets: { id: string; name: string; collection: string }[]): void {
-  if (!remapModal || remapModal.fromId !== fromId || !modalEl) return;
-  const { box, fields, sites } = remapModal;
-  const body = document.createElement('div');
-  const foot = box.querySelector('.m-foot') as HTMLElement;
-  clearMount(foot);
-  if (!targets.length) {
-    body.textContent = t('bind.remapNone');
-    foot.append(modalButton(t('common.close'), closeModal, true));
-  } else {
-    const label = document.createElement('label');
-    label.className = 'inline';
-    label.textContent = t('bind.remapLabel') + ' ';
-    const select = document.createElement('select');
-    select.id = 'remapTarget';
-    const byCol = new Map<string, HTMLOptGroupElement>();
-    for (const tv of targets) {
-      let g = byCol.get(tv.collection);
-      if (!g) {
-        g = document.createElement('optgroup');
-        g.label = tv.collection || '—';
-        byCol.set(tv.collection, g);
-        select.appendChild(g);
-      }
-      const opt = document.createElement('option');
-      opt.value = tv.id;
-      opt.textContent = tv.name;
-      g.appendChild(opt);
-    }
-    label.appendChild(select);
-    body.appendChild(label);
-    const apply = modalButton(t('bind.remapApply', { n: sites }), () => {
-      apply.disabled = true;
-      send({ type: 'REMAP_BINDINGS', fromId, toId: select.value, fields, reqId: nextBindReq() });
-    }, true);
-    foot.append(modalButton(t('bind.remapCancel'), closeModal), apply);
-    select.focus();
+function openTierPopup(returnFocus: HTMLElement): void {
+  send({ type: 'GET_COLLECTION_ROLES' });
+  openPopupFrom('tierPopBody', t('colRoles.title'), returnFocus);
+}
+function openExportPopup(returnFocus: HTMLElement): void {
+  openPopupFrom('exportPopBody', t('export.title'), returnFocus);
+}
+function openMoreMenu(): void {
+  const btn = $('btnVarMore');
+  const r = btn.getBoundingClientRect();
+  openMenu(r.left, r.bottom + 2, [
+    { label: t('list.menuTiers'), onSelect: () => openTierPopup(btn), focusElsewhere: true },
+    { label: t('list.menuExport'), onSelect: () => openExportPopup(btn), focusElsewhere: true },
+    { label: t('list.menuExpandAll'), separatorBefore: true, onSelect: () => setAllExpanded(true) },
+    { label: t('list.menuCollapseAll'), onSelect: () => setAllExpanded(false) },
+  ], btn);
+}
+
+/* ---------- 변수 없는 값 찾기 → 레이어 › 연결(§4.6 예외 규칙은 PR 3) ---------- */
+function findUnbound(): void {
+  if (!curSel.count) { showStatusLine(t('status.noSelection'), { cls: 'warn' }); return; }
+  showTab('layer');
+  showApplyStep('bind');
+  ($('btnApply') as HTMLButtonElement).click();
+}
+
+/* ---------- 리스너 ---------- */
+$('btnVarRefresh').addEventListener('click', refreshList);
+$('btnAddVar').addEventListener('click', () => showMake('color'));
+$('btnVarMore').addEventListener('click', openMoreMenu);
+$('btnFindUnbound').addEventListener('click', findUnbound);
+$('btnSearch').addEventListener('click', () => (searchOpen ? ($('varSearch') as HTMLInputElement).focus() : openSearch()));
+$('varSearch').addEventListener('input', () => { query = ($('varSearch') as HTMLInputElement).value; renderVarList(); });
+$('varSearch').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); clearSearch(); } });
+$('btnSearchClear').addEventListener('click', () => clearSearch(true));
+$('modeSelect').addEventListener('change', () => { modeName = ($('modeSelect') as HTMLSelectElement).value || null; renderVarList(); });
+$('btnChipMore').addEventListener('click', () => {
+  const row = $('chipRow');
+  const chips = Array.from(row.querySelectorAll<HTMLElement>('.tier-chip'));
+  const next = chips.find((c) => c.offsetLeft + c.offsetWidth > row.scrollLeft + row.clientWidth + 1);
+  row.scrollLeft = next ? next.offsetLeft + next.offsetWidth - row.clientWidth : row.scrollWidth;
+});
+$('chipRow').addEventListener('wheel', (e) => {
+  if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+  e.preventDefault();
+  $('chipRow').scrollLeft += e.deltaY;
+}, { passive: false });
+$('btnRebase').addEventListener('click', () => {
+  rebaseToCurrent();
+  const tree = $('varTree');
+  const target = (focusKey && tree.querySelector<HTMLElement>(`[data-key="${CSS.escape(focusKey)}"]`)) || tree.querySelector<HTMLElement>('[data-key]');
+  target?.focus();
+});
+
+/* =====================================================================
+   시작 화면(§4.3) · 마법사 위치 · 준비 현황 팝오버
+   ===================================================================== */
+/** 시작 화면 고정(①) — 로컬 변수 0개일 때 시작한 마법사가 실행 중이거나 그 요약이 보이는 동안. */
+let wizLatch: { from: 'start' | 'make'; before: number; summarySeen: boolean; done: boolean } | null = null;
+/** 이번 실행 시작 때 로컬 변수 수 — 완료 n = 전후 차이(만들기 맨 위, 로컬 변수 있음). */
+let wizBeforeCount = 0;
+let wizFrom: 'start' | 'make' = 'start';
+function startLatched(): boolean {
+  return !!wizLatch;
+}
+/** 마법사 카드(요소 1개)를 보이는 곳에 붙인다 — 만들기 하위 화면이면 맨 위, 아니면 시작 화면. */
+function placeWizard(): void {
+  const card = $('wizardCard');
+  const inMake = activeTab === 'variables' && varSub === 'make';
+  const slot = $(inMake ? 'wizardSlotMake' : 'wizardSlotStart');
+  // 자리를 옮길 때만 기본 펼침을 정한다 — 다시 그릴 때마다 접으면 사용자가 펼친 것이 풀린다.
+  // 만들기 쪽에서는 접힌 채, 실행 중이거나 요약이 있으면 펼친다.
+  if (card.parentElement !== slot) {
+    slot.appendChild(card);
+    if (inMake) card.classList.toggle('collapsed', !wizardRunning && !wizHasSummary());
+    else card.classList.remove('collapsed');
   }
-  box.replaceChild(body, box.children[1]);
+  if (wizardRunning) card.classList.remove('collapsed');
+  // 요약을 화면에서 봤다(①) — 끝난 뒤 카드가 실제로 보이면.
+  const visible = activeTab === 'variables' && !isMini && (inMake || varScreen() === 'start');
+  if (wizLatch && wizLatch.done && visible) wizLatch.summarySeen = true;
+  renderWizardCopy();
 }
+const wizHasSummary = (): boolean => !!$('wizardSummary').textContent;
+
+/** 마법사 카드 문구(§4.3 표) — 유료 / 무료(로컬 변수 0개) / 무료(로컬 변수 있음). */
+function renderWizardCopy(): void {
+  const hint = $('wizardCard').querySelector<HTMLElement>('[data-i18n="wizardCard.hint"]');
+  const key = isPaid ? 'wizardCard.hintPaid' : localVarCount() === 0 ? 'wizardCard.hintFree' : 'wizardCard.hintFreeVars';
+  if (hint) hint.textContent = t(key);
+  const btn = $('btnWizardRun') as HTMLButtonElement;
+  if (!wizardRunning) btn.textContent = isPaid ? t(btn.dataset.rerun === '1' ? 'wizard.rerun' : 'wizardCard.run') : localVarCount() === 0 ? t('wizardCard.runFree') : t('wizardCard.runFreeVars');
+  // 선택이 없으면 주 버튼은 aria-disabled, 누르면 상태 줄에 사유.
+  if (!wizardRunning) setLock(btn, curSel.count ? null : 'prereq', t('status.noSelection'));
+  // 완료 머리 — 로컬 변수 0개에서 시작했고 변수가 늘었을 때.
+  const done = $('wizDone');
+  const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
+  if (made > 0) {
+    $('wizDoneText').textContent = t('start.made', { n: made });
+    done.hidden = false;
+  } else done.hidden = true;
+}
+
+/** 시작 화면 내용 — 머리, 무료 안내, LIB 구역, 무료 표시. */
+function renderStart(): void {
+  const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
+  $('startHead').textContent = made > 0 ? t('start.made', { n: made }) : t('start.head');
+  $('startSub').hidden = made > 0;
+  $('startFree').style.display = isPaid ? 'none' : '';
+  $('goMakeFree').style.display = isPaid ? 'none' : '';
+  const lib = $('startLib');
+  clearMount(lib);
+  if (baseline && bigSkipped && !usageMap) {
+    const d = document.createElement('div');
+    d.className = 'situation';
+    d.append(t('list.big'), ' ');
+    const b = document.createElement('button');
+    b.className = 'link link-btn';
+    b.textContent = t('list.read');
+    b.addEventListener('click', () => requestManagerUsage('user'));
+    d.appendChild(b);
+    lib.appendChild(d);
+  } else {
+    const rows = libRowsMatching();
+    if (rows.length) {
+      const h = document.createElement('div');
+      h.className = 'vt-section vt-lib';
+      h.textContent = t('list.libSection');
+      const note = document.createElement('div');
+      note.className = 'hint';
+      note.textContent = t('start.libNote');
+      lib.append(h, note, ...rows.map(libRowEl));
+    }
+  }
+  renderWizardCopy();
+}
+
+/* ---------- 준비 현황 팝오버 ---------- */
+function readinessDone(): number {
+  return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === 'done').length;
+}
+function renderReadinessButtons(): void {
+  const label = t('list.readiness', { n: readinessDone(), total: 7 });
+  for (const id of ['btnReadiness', 'btnReadinessStart']) $(id).textContent = label;
+}
+let readinessReturn: HTMLElement | null = null;
+function openReadiness(btn: HTMLElement): void {
+  if (!$('readinessPop').hidden) { closeReadiness(); return; }
+  closeMenu();
+  renderPipeline();
+  const pop = $('readinessPop');
+  pop.hidden = false;
+  const r = btn.getBoundingClientRect();
+  const w = pop.offsetWidth;
+  pop.style.left = `${Math.max(4, Math.min(r.left, window.innerWidth - w - 4))}px`;
+  pop.style.top = `${Math.min(r.bottom + 2, window.innerHeight - pop.offsetHeight - 28)}px`;
+  readinessReturn = btn;
+  btn.setAttribute('aria-expanded', 'true');
+  pop.querySelector<HTMLElement>('.pstep')?.focus();
+}
+function closeReadiness(returnFocus = false): void {
+  const pop = $('readinessPop');
+  if (pop.hidden) return;
+  pop.hidden = true;
+  readinessReturn?.setAttribute('aria-expanded', 'false');
+  if (returnFocus) readinessReturn?.focus();
+  readinessReturn = null;
+  reentry.release();
+}
+$('btnReadiness').addEventListener('click', () => openReadiness($('btnReadiness')));
+$('btnReadinessStart').addEventListener('click', () => openReadiness($('btnReadinessStart')));
+$('readinessPop').addEventListener('keydown', (e) => {
+  const rows = Array.from($('readinessPop').querySelectorAll<HTMLElement>('.pstep'));
+  const i = rows.indexOf(document.activeElement as HTMLElement);
+  if (e.key === 'Escape') { e.preventDefault(); closeReadiness(true); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); rows[(i + 1) % rows.length]?.focus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); rows[(i - 1 + rows.length) % rows.length]?.focus(); }
+  else if (e.key === 'Tab') e.preventDefault();
+});
+document.addEventListener('pointerdown', (e) => {
+  const pop = $('readinessPop');
+  if (pop.hidden) return;
+  const tgt = e.target as Node;
+  if (pop.contains(tgt) || readinessReturn?.contains(tgt)) return;
+  closeReadiness();
+}, true);
+$('btnWizListView').addEventListener('click', () => {
+  wizLatch = null;
+  showVarSub('home');
+  renderVarScreen();
+  $('varTree').querySelector<HTMLElement>('[data-key]')?.focus();
+});
+$('btnStartLicense').addEventListener('click', goToLicense);
 
 /* ---------- 첫 화면 — 변수 탭(IA v3) ----------
    파일 맨 끝에서 부른다: 첫 화면이 변수 관리를 그리고 사용 수를 읽으므로, 그 상태 변수가 모두 선언된 뒤여야 한다.

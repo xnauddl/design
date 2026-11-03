@@ -15,6 +15,8 @@ import {
   applyExistingTextStyles,
   bindSelection,
   scanBindings,
+  countUsage,
+  findUsers,
   renameSelection,
   writeRole,
   writeRoleFromName,
@@ -3992,90 +3994,6 @@ test('transplantImageFills — 인스턴스의 같은 경로에 원본 사진 fi
   assert.match(bad.failures[0], /사진 이식 실패/);
 });
 
-/* ================= 일괄 교체(remapBindings) ================= */
-test('remapBindings — A에 묶인 자리만 B로, 필드 범위·용도 확인, 숨김·인스턴스 내부 제외, 잔상도 교체', async () => {
-  const figma = installFigma();
-  const { remapBindings } = await import('../dist/figma-lib.mjs');
-  const col = figma.variables.createVariableCollection('Global');
-  const mk = (name, type, scopes) => { const v = figma.variables.createVariable(name, col, type); v.scopes = scopes; return v; };
-  const A = mk('spacing/8', 'FLOAT', ['GAP']);
-  const B = mk('spacing/12', 'FLOAT', ['GAP']);
-  const LH = mk('line-height/24', 'FLOAT', ['LINE_HEIGHT']);
-  const C1 = mk('color/a', 'COLOR', ['ALL_FILLS']);
-  const C2 = mk('color/b', 'COLOR', ['ALL_FILLS']);
-  const alias = (v) => ({ type: 'VARIABLE_ALIAS', id: v.id });
-  const frame = (id, extra = {}) => ({
-    type: 'FRAME', id, name: id, visible: true,
-    boundVariables: {},
-    setBoundVariable(field, v) { this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id }; },
-    children: [],
-    ...extra,
-  });
-  const inner = frame('inner', { boundVariables: { itemSpacing: alias(A) } });
-  const inst = frame('inst', { type: 'INSTANCE', boundVariables: {}, children: [inner] });
-  const hidden = frame('hidden', { visible: false, boundVariables: { itemSpacing: alias(A) } });
-  const other = frame('other', { boundVariables: { paddingLeft: alias(B) } }); // A가 아님 — 그대로
-  const root = frame('root', {
-    boundVariables: { itemSpacing: alias(A), paddingTop: alias(A) },
-    fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 }, boundVariables: { color: alias(C1) } }],
-    children: [inst, hidden, other],
-  });
-
-  // 1) 필드 범위: itemSpacing만
-  let r = await remapBindings([root], A.id, B, ['itemSpacing']);
-  assert.deepEqual(r, { replaced: 1, nodes: 1, skipped: 0 });
-  assert.equal(root.boundVariables.itemSpacing.id, B.id);
-  assert.equal(root.boundVariables.paddingTop.id, A.id); // 범위 밖은 그대로
-  assert.equal(inner.boundVariables.itemSpacing.id, A.id); // 인스턴스 내부 제외
-  assert.equal(hidden.boundVariables.itemSpacing.id, A.id); // 숨김 제외
-  assert.equal(other.boundVariables.paddingLeft.id, B.id);
-
-  // 2) 용도 불일치(행간 변수를 여백 자리에) → 바꾸지 않고 skipped
-  r = await remapBindings([root], A.id, LH, ['paddingTop']);
-  assert.deepEqual(r, { replaced: 0, nodes: 0, skipped: 1 });
-  assert.equal(root.boundVariables.paddingTop.id, A.id);
-
-  // 3) 색 페인트
-  r = await remapBindings([root], C1.id, C2, ['fills']);
-  assert.equal(r.replaced, 1);
-  assert.equal(root.fills[0].boundVariables.color.id, C2.id);
-
-  // 4) 지워진 변수 잔상도 fromId로 받아 교체
-  const ghost = frame('ghost', { boundVariables: { paddingLeft: { type: 'VARIABLE_ALIAS', id: 'VariableID:deleted' } } });
-  r = await remapBindings([ghost], 'VariableID:deleted', B);
-  assert.equal(r.replaced, 1);
-  assert.equal(ghost.boundVariables.paddingLeft.id, B.id);
-});
-
-test('remapBindings — 텍스트는 A에 묶인 구간만 바꾸고 다른 변수 구간은 보존한다', async () => {
-  const figma = installFigma();
-  const { remapBindings } = await import('../dist/figma-lib.mjs');
-  const col = figma.variables.createVariableCollection('Global');
-  const mk = (name) => { const v = figma.variables.createVariable(name, col, 'FLOAT'); v.scopes = ['FONT_SIZE']; return v; };
-  const A = mk('font-size/14');
-  const B = mk('font-size/16');
-  const K = mk('font-size/20');
-  // 글자별 바인딩: "abcdef" — 0..3은 A, 3..6은 K
-  const per = ['A', 'A', 'A', 'K', 'K', 'K'].map((x) => (x === 'A' ? A.id : K.id));
-  const loaded = [];
-  figma.loadFontAsync = async (f) => { loaded.push(f.family); };
-  const text = {
-    type: 'TEXT', id: 't', name: 't', visible: true, characters: 'abcdef',
-    fontName: { family: 'Inter', style: 'Regular' },
-    boundVariables: { fontSize: [{ type: 'VARIABLE_ALIAS', id: A.id }, { type: 'VARIABLE_ALIAS', id: K.id }] },
-    getRangeAllFontNames: () => [{ family: 'Inter', style: 'Regular' }],
-    getRangeBoundVariable(s, e) {
-      const ids = new Set(per.slice(s, e));
-      return ids.size > 1 ? figma.mixed : { type: 'VARIABLE_ALIAS', id: [...ids][0] };
-    },
-    setRangeBoundVariable(s, e, field, v) { for (let i = s; i < e; i++) per[i] = v.id; },
-  };
-  const r = await remapBindings([text], A.id, B, ['fontSize']);
-  assert.deepEqual(r, { replaced: 1, nodes: 1, skipped: 0 });
-  assert.deepEqual(per, [B.id, B.id, B.id, K.id, K.id, K.id]); // K 구간 보존
-  assert.deepEqual(loaded, ['Inter']); // 바꾸기 전에 폰트 로드
-});
-
 /* ================= 컬렉션 계층 지정(collectionRoles) ================= */
 test('컬렉션 계층 지정 — Primitives를 Global로 지정하면 토큰은 Primitives에, 바인딩도 그 변수를 쓴다', async () => {
   const figma = installFigma();
@@ -4111,4 +4029,27 @@ test('컬렉션 계층 지정 — 지정이 없으면 예전처럼 이름이 Glo
   const v = figma._state.variables.find((x) => x.name === 'spacing/8');
   const col = figma._state.collections.find((c) => c.id === v.variableCollectionId);
   assert.equal(col.name, 'Global');
+});
+
+
+/* ---------- IA v3 §4.4: 변수 사용 수(보기 전용) — 인스턴스 안쪽 포함, 숨김 제외, 상한 없음 ---------- */
+test('countUsage — 인스턴스 안쪽까지 세고 숨긴 레이어는 뺀다, 곳·레이어 수', async () => {
+  const leaf = (id, varId, extra = {}) => ({ type: 'RECTANGLE', id, name: id, visible: true, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: varId } } }], boundVariables: {}, ...extra });
+  const inst = { type: 'INSTANCE', id: 'i', name: 'i', visible: true, boundVariables: {}, children: [leaf('in1', 'vA')] };
+  const hidden = { ...leaf('h', 'vA'), visible: false };
+  const two = { ...leaf('two', 'vA'), boundVariables: { itemSpacing: { type: 'VARIABLE_ALIAS', id: 'vB' }, paddingLeft: { type: 'VARIABLE_ALIAS', id: 'vB' } } };
+  const root = { type: 'FRAME', id: 'r', name: 'r', visible: true, boundVariables: {}, children: [inst, hidden, two], parent: null };
+  const r = countUsage([root]);
+  assert.deepEqual(r.usage.get('vA'), { places: 2, layers: 2 }); // in1(인스턴스 안쪽) + two, 숨긴 h 제외
+  assert.deepEqual(r.usage.get('vB'), { places: 2, layers: 1 }); // 한 레이어의 두 자리
+  assert.deepEqual(r.nodesById.get('vA').sort(), ['in1', 'two']);
+  assert.equal(r.scanned, 4); // r, i, in1, two
+});
+test('countUsage · findUsers — 600개를 넘어도 상한 없이 센다', async () => {
+  const kids = Array.from({ length: 700 }, (_, i) => ({ type: 'RECTANGLE', id: `n${i}`, name: `n${i}`, visible: true, fills: [], boundVariables: { width: { type: 'VARIABLE_ALIAS', id: 'vW' } } }));
+  const root = { type: 'FRAME', id: 'r', name: 'r', visible: true, boundVariables: {}, children: kids, parent: null };
+  assert.deepEqual(countUsage([root]).usage.get('vW'), { places: 700, layers: 700 });
+  const f = findUsers([root], new Set(['vW', 'other']));
+  assert.equal(f.nodes.length, 700);
+  assert.equal(f.places, 700);
 });

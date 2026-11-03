@@ -1,6 +1,6 @@
 /* ============================================================
    scopes.ts — 바인딩 필드 ↔ 변수 용도(scope)·타입 규칙 (순수, figma 의존 없음)
-   자동 바인딩(bind.ts)과 일괄 교체(remap)가 같은 규칙을 쓰도록 한 곳에 둔다.
+   자동 바인딩(bind.ts)이 쓰는 용도 규칙을 한 곳에 둔다.
    여백(GAP) 변수가 행간에, 채움 색이 선 색에 붙는 오매칭을 막는 기준이다.
    ============================================================ */
 
@@ -64,34 +64,3 @@ export function scopeFitsField(field: string, scopes: readonly VariableScope[]):
   return scopes.includes('ALL_SCOPES') || need.some((s) => scopes.includes(s));
 }
 
-/** 교체 후보 판정에 쓰는 변수 요약(figma Variable에서 필요한 것만). */
-export interface RemapVar {
-  id: string;
-  name: string;
-  resolvedType: VariableResolvedDataType;
-  scopes: readonly VariableScope[];
-  collection: string;
-}
-
-/**
- * 일괄 교체 — 변수 A(fromId)를 쓰던 필드들(fields)에 대신 붙일 수 있는 변수 B 후보.
- * - A 자신은 뺀다.
- * - 타입: 필드가 요구하는 타입(색·수치·문자). 규칙이 없는 필드뿐이면 A의 타입(fromType)을 따른다.
- *   A가 지워져 타입을 모르고 필드 규칙도 없으면 후보가 없다(무엇을 붙여도 되는지 알 수 없다).
- * - 용도: A가 쓰이던 **모든** 필드에 맞아야 한다 — 일부만 맞는 변수를 고르면 나머지가 남아
- *   '교체했는데 일부만 바뀜'이 된다.
- * 정렬: 컬렉션 이름 → 변수 이름.
- */
-export function remapTargets(
-  fromId: string,
-  fromType: VariableResolvedDataType | null,
-  fields: readonly string[],
-  vars: readonly RemapVar[],
-): RemapVar[] {
-  const typed = fields.map(fieldResolvedType).find((t): t is VariableResolvedDataType => t !== null) ?? null;
-  const type = typed ?? fromType;
-  if (!type || fields.length === 0) return [];
-  return vars
-    .filter((v) => v.id !== fromId && v.resolvedType === type && fields.every((f) => scopeFitsField(f, v.scopes)))
-    .sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
-}

@@ -2440,29 +2440,8 @@ test('selectionSummary — 하위 수는 선택 자신을 뺀 수, capped면 +',
 });
 
 /* ---------- 일괄 교체: 후보 판정(scopes.ts) ---------- */
-test('remapTargets — 타입·용도가 모든 필드에 맞는 변수만, A 자신 제외, 컬렉션→이름 정렬', async () => {
-  const { remapTargets, scopeFitsField } = await import('../dist/pure.mjs');
-  const vars = [
-    { id: 'a', name: 'spacing/8', resolvedType: 'FLOAT', scopes: ['GAP'], collection: 'Global' },
-    { id: 'b', name: 'spacing/sm', resolvedType: 'FLOAT', scopes: ['GAP'], collection: 'Semantic' },
-    { id: 'c', name: 'line-height/24', resolvedType: 'FLOAT', scopes: ['LINE_HEIGHT'], collection: 'Global' },
-    { id: 'd', name: 'any/num', resolvedType: 'FLOAT', scopes: ['ALL_SCOPES'], collection: 'Global' },
-    { id: 'e', name: 'color/fg', resolvedType: 'COLOR', scopes: ['TEXT_FILL'], collection: 'Semantic' },
-    { id: 'f', name: 'color/line', resolvedType: 'COLOR', scopes: ['STROKE_COLOR'], collection: 'Semantic' },
-    { id: 'g', name: 'color/all', resolvedType: 'COLOR', scopes: ['ALL_FILLS', 'STROKE_COLOR'], collection: 'Global' },
-  ];
-  // 여백: GAP 또는 ALL_SCOPES만 — 행간 변수(c)는 값 종류가 같아도 제외
-  assert.deepEqual(remapTargets('a', 'FLOAT', ['paddingLeft', 'itemSpacing'], vars).map((v) => v.id), ['d', 'b']);
-  // 채움+선 둘 다 쓰던 색 → 둘 다 맞는 변수만(g). 채움 전용(e)·선 전용(f)은 일부만 바뀌게 되므로 제외
-  assert.deepEqual(remapTargets('x', 'COLOR', ['fills', 'strokes'], vars).map((v) => v.id), ['g']);
-  assert.deepEqual(remapTargets('x', 'COLOR', ['fills'], vars).map((v) => v.id), ['g', 'e']);
-  // 지워진 변수(fromType 모름)라도 필드 규칙으로 타입을 정한다
-  assert.deepEqual(remapTargets('gone', null, ['strokes'], vars).map((v) => v.id), ['g', 'f']);
-  // 규칙 없는 필드 + 타입 모름 → 후보 없음(무엇을 붙여도 되는지 알 수 없다)
-  assert.deepEqual(remapTargets('gone', null, ['visible'], vars), []);
-  // 규칙 없는 필드는 A의 타입을 따르고 스코프는 따지지 않는다
-  assert.deepEqual(remapTargets('a', 'FLOAT', ['minWidth'], vars).map((v) => v.id), ['d', 'c', 'b']);
-  assert.deepEqual(remapTargets('a', 'FLOAT', [], vars), []);
+test('scopeFitsField — 스코프 판정 단위', async () => {
+  const { scopeFitsField } = await import('../dist/pure.mjs');
   // 스코프 판정 단위
   assert.equal(scopeFitsField('effects', ['EFFECT_COLOR']), true);
   assert.equal(scopeFitsField('effects', ['ALL_FILLS']), false);
@@ -2545,44 +2524,91 @@ test('groupBindLines — 같은 변수의 네 방향 여백·모서리를 한 �
 });
 
 /* ---------- 변수 관리 표(varTable.ts) ---------- */
-test('varTable — 그룹 경로·트리·필터·묶음·복사 문자열', async () => {
-  const { groupPath, leafName, buildVarTree, filterVars, groupRows, cellCopyText, pickInitialCollection, cssVarName } = await import('../dist/pure.mjs');
+test('varTable — 그룹 경로·복사 문자열', async () => {
+  const { groupPath, leafName, cellCopyText, cssVarName } = await import('../dist/pure.mjs');
   assert.equal(groupPath('color/background/default'), 'color/background');
   assert.equal(leafName('color/background/default'), 'default');
   assert.equal(groupPath('primary'), '');
-  const cols = [
-    { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }] },
-    { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }] },
-  ];
-  const v = (id, name, collectionId) => ({ id, name, collectionId, type: 'COLOR', values: {}, scopes: [], description: '' });
-  const vars = [
-    v('a', 'color/blue/500', 'g'), v('b', 'color/gray/50', 'g'), v('c', 'spacing/8', 'g'),
-    v('d', 'color/background/default', 's'), v('e', 'color/background/muted', 's'), v('f', 'color/text/default', 's'),
-  ];
-  const usage = new Map([['d', 3], ['f', 1]]);
-  const tree = buildVarTree(cols, vars, (x) => (usage.get(x.id) ?? 0) > 0);
-  assert.deepEqual(tree.map((n) => [n.label, n.count]), [['Global', 0], ['Semantic', 2]]);
-  assert.deepEqual(tree[1].children.map((n) => [n.path, n.count]), [['color', 2]]);
-  assert.deepEqual(tree[1].children[0].children.map((n) => [n.path, n.count]), [['color/background', 1], ['color/text', 1]]);
-  assert.equal(pickInitialCollection(tree), 's');
-  // 전체(include 모두)면 Global에 그룹 color(2)·spacing(1)
-  const all = buildVarTree(cols, vars, () => true);
-  assert.deepEqual(all[0].children.map((n) => [n.label, n.count]), [['color', 2], ['spacing', 1]]);
-  // 필터: 컬렉션 · 경로(하위 포함) · 검색 · 선택에서 쓰는 것만
-  const f = (o) => filterVars(vars, { collectionId: 's', path: '', query: '', onlyUsed: false, ...o }, usage).map((x) => x.id);
-  assert.deepEqual(f({}), ['d', 'e', 'f']);
-  assert.deepEqual(f({ path: 'color/background' }), ['d', 'e']);
-  assert.deepEqual(f({ path: 'color' }), ['d', 'e', 'f']);
-  assert.deepEqual(f({ query: 'MUTED' }), ['e']);
-  assert.deepEqual(f({ onlyUsed: true }), ['d', 'f']);
-  // 'color/back'은 'color/background'의 접두어지만 경로가 아니다
-  assert.deepEqual(f({ path: 'color/back' }), []);
-  // 묶음 — 첫 등장 순서
-  assert.deepEqual(groupRows(vars.slice(3)).map((g) => [g.path, g.rows.length]), [['color/background', 2], ['color/text', 1]]);
   // 복사 문자열
   assert.equal(cellCopyText({ kind: 'color', hex: '#2563eb' }), '#2563EB');
   assert.equal(cellCopyText({ kind: 'alias', aliasId: 'x', aliasName: 'color/blue/500' }), 'color/blue/500');
   assert.equal(cellCopyText({ kind: 'number', text: '16' }), '16');
   assert.equal(cellCopyText(undefined), '');
   assert.equal(cssVarName('color/background/default'), '--color-background-default');
+});
+
+/* ---------- IA v3 §4.4 변수 목록(varTable.ts) ---------- */
+const V = (id, name, collectionId, values = {}) => ({ id, name, collectionId, type: 'FLOAT', values, scopes: [], description: '' });
+const COLS = [
+  { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }], tierSet: null },
+  { id: 'x', name: 'Misc', tier: 0, modes: [{ modeId: 'm', name: 'Mode 1' }], tierSet: 'none' },
+  { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'm', name: 'Mode 1' }], tierSet: null },
+  { id: 'c', name: 'Comp', tier: 3, modes: [{ modeId: 'm', name: 'Mode 1' }], tierSet: 'component' },
+  { id: 'q', name: 'Other', tier: 0, modes: [{ modeId: 'm', name: 'Mode 1' }], tierSet: null },
+];
+test('orderCollections · tierBadge — C → S → G → 계층 없음(피그마 순서), 배지 G/S/C/–/?', async () => {
+  const { orderCollections, tierBadge } = await import('../dist/pure.mjs');
+  assert.deepEqual(orderCollections(COLS).map((c) => c.id), ['c', 's', 'g', 'x', 'q']);
+  assert.deepEqual(COLS.map(tierBadge), ['G', '–', 'S', 'C', '?']);
+});
+test('groupKey · matchesQuery — 키는 컬렉션+경로, 검색은 전체 경로 부분 일치·대소문자 무시', async () => {
+  const { groupKey, matchesQuery } = await import('../dist/pure.mjs');
+  assert.equal(groupKey('g', 'color/gray/500'), 'g|color/gray');
+  assert.notEqual(groupKey('g', 'color/gray/500'), groupKey('s', 'color/gray/500'));
+  assert.equal(groupKey('g', 'radius'), 'g|');
+  assert.equal(matchesQuery('color/Text/default', 'text/DEF'), true);
+  assert.equal(matchesQuery('color/text/default', 'blue'), false);
+  assert.equal(matchesQuery('anything', '  '), true);
+});
+test('indirectUsage — 모든 모드·5단계, 직접과 겹치면 직접, 통로 기록', async () => {
+  const { indirectUsage } = await import('../dist/pure.mjs');
+  const alias = new Map([['s1', ['g1', 'g2']], ['g1', ['g3']], ['a', ['b']], ['b', ['c']], ['c', ['d']], ['d', ['e']], ['e', ['f']], ['f', ['z']]]);
+  const r = indirectUsage(new Set(['s1', 'g2']), alias);
+  assert.deepEqual([...r.keys()].sort(), ['g1', 'g3']); // g2는 직접
+  assert.deepEqual(r.get('g3'), ['s1']);
+  const deep = indirectUsage(new Set(['a']), alias);
+  assert.equal(deep.has('f'), true); // 5단계: b c d e f
+  assert.equal(deep.has('z'), false); // 6단계는 안 따라감
+  // 순환 별칭에도 멈춘다
+  const loop = indirectUsage(new Set(['p']), new Map([['p', ['q']], ['q', ['p']]]));
+  assert.deepEqual([...loop.keys()], ['q']);
+});
+test('buildList — 사용 판정 있음: 쓰는 행만, 안 쓰는 그룹은 구역 끝 한 줄', async () => {
+  const { buildList } = await import('../dist/pure.mjs');
+  const vars = [V('a', 'space/1', 'g'), V('b', 'space/2', 'g'), V('c', 'radius/1', 'g'), V('d', 'text/default', 's'), V('e', 'solo', 's')];
+  const e = buildList({ collections: COLS, vars, chip: 'all', query: '', direct: new Map([['d', 3]]), indirect: new Set(['a']), userExpanded: new Map(), showUnusedIn: new Set(), showUnusedGroups: new Set() });
+  const kinds = e.map((x) => x.kind === 'row' ? `row:${x.v.id}:${x.state}` : x.kind === 'group' ? `group:${x.label}:${x.used}/${x.total}:+${x.unused}` : x.kind === 'section' ? `section:${x.collection.id}:${x.used}/${x.total}` : `unused:${x.collectionId}:${x.count}`);
+  assert.deepEqual(kinds, [
+    'section:c:0/0', 'section:s:1/2', 'group:text:1/1:+0', 'row:d:direct', 'unused:s:1',
+    'section:g:1/3', 'group:space:1/2:+1', 'row:a:indirect', 'unused:g:1',
+    'section:x:0/0', 'section:q:0/0',
+  ]);
+});
+test('buildList — 안 씀 펼치기·안 쓰는 그룹 펼치기·사용자 접기', async () => {
+  const { buildList } = await import('../dist/pure.mjs');
+  const vars = [V('a', 'space/1', 'g'), V('b', 'space/2', 'g'), V('c', 'radius/1', 'g')];
+  const base = { collections: COLS.filter((c) => c.id === 'g'), vars, chip: 'all', query: '', direct: new Map([['a', 1]]), indirect: new Set(), userExpanded: new Map(), showUnusedIn: new Set(), showUnusedGroups: new Set() };
+  const rows = (e) => e.filter((x) => x.kind === 'row').map((x) => `${x.v.id}:${x.state}`);
+  assert.deepEqual(rows(buildList({ ...base, showUnusedIn: new Set(['g|space']) })), ['a:direct', 'b:unused']);
+  const reveal = buildList({ ...base, showUnusedGroups: new Set(['g']) });
+  assert.ok(reveal.some((x) => x.kind === 'group' && x.label === 'radius' && !x.expanded));
+  assert.deepEqual(rows(buildList({ ...base, showUnusedGroups: new Set(['g']), userExpanded: new Map([['g|radius', true]]) })), ['a:direct', 'c:unused']);
+  assert.deepEqual(rows(buildList({ ...base, userExpanded: new Map([['g|space', false]]) })), []);
+});
+test('buildList — 판정 없음: 그룹 10개 이하 펼침 / 넘으면 접힘, 검색은 모두 보임, "(그룹 없음)"', async () => {
+  const { buildList, NO_GROUP } = await import('../dist/pure.mjs');
+  const few = [V('a', 'space/1', 'g'), V('b', 'solo', 'g')];
+  const base = { collections: COLS.filter((c) => c.id === 'g'), chip: 'all', query: '', direct: null, indirect: new Set(), userExpanded: new Map(), showUnusedIn: new Set(), showUnusedGroups: new Set() };
+  const e = buildList({ ...base, vars: few });
+  assert.deepEqual(e.filter((x) => x.kind === 'row').map((x) => x.state), ['none', 'none']);
+  assert.ok(e.some((x) => x.kind === 'group' && x.label === NO_GROUP));
+  const many = Array.from({ length: 11 }, (_, i) => V(`v${i}`, `grp${i}/x`, 'g'));
+  assert.equal(buildList({ ...base, vars: many }).filter((x) => x.kind === 'row').length, 0);
+  const found = buildList({ ...base, vars: many, query: 'GRP3/' });
+  assert.deepEqual(found.filter((x) => x.kind === 'row').map((x) => x.v.id), ['v3']);
+  // 검색 중에는 판정이 있어도 안 쓰는 행까지 보인다
+  const s2 = buildList({ ...base, vars: few, direct: new Map(), query: 'space' });
+  assert.deepEqual(s2.filter((x) => x.kind === 'row').map((x) => x.state), ['unused']);
+  // 칩: 다른 컬렉션은 빠진다
+  assert.equal(buildList({ ...base, collections: COLS, vars: few, chip: 's' }).filter((x) => x.kind === 'section').length, 1);
 });

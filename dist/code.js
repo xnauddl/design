@@ -1419,31 +1419,6 @@
   var FILL_SCOPES = ["ALL_FILLS", "FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"];
   var STROKE_SCOPES = ["STROKE_COLOR"];
   var EFFECT_SCOPES = ["EFFECT_COLOR"];
-  function fieldScopes(field) {
-    if (field === "fills") return FILL_SCOPES;
-    if (field === "strokes") return STROKE_SCOPES;
-    if (field === "effects") return EFFECT_SCOPES;
-    if (field === "fontFamily") return ["FONT_FAMILY"];
-    const s = FIELD_SCOPE[field];
-    return s ? [s] : null;
-  }
-  function fieldResolvedType(field) {
-    if (field === "fills" || field === "strokes" || field === "effects") return "COLOR";
-    if (field === "fontFamily") return "STRING";
-    return FIELD_SCOPE[field] ? "FLOAT" : null;
-  }
-  function scopeFitsField(field, scopes) {
-    const need = fieldScopes(field);
-    if (!need) return true;
-    return scopes.includes("ALL_SCOPES") || need.some((s) => scopes.includes(s));
-  }
-  function remapTargets(fromId, fromType, fields, vars) {
-    var _a;
-    const typed = (_a = fields.map(fieldResolvedType).find((t) => t !== null)) != null ? _a : null;
-    const type = typed != null ? typed : fromType;
-    if (!type || fields.length === 0) return [];
-    return vars.filter((v) => v.id !== fromId && v.resolvedType === type && fields.every((f) => scopeFitsField(f, v.scopes))).sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
-  }
 
   // src/lib/bind.ts
   var OPACITY_TOL = 5e-3;
@@ -2062,125 +2037,83 @@
     for (const n of selection2) if (isEffectivelyVisible2(n)) walkNode(n, 0, null);
     return { candidates, nodes: pruneToAffected(nodeIndex, candidates, []), total, boundNodes };
   }
-  var TEXT_RANGE_ALL = /* @__PURE__ */ new Set(["fontFamily", "fontSize", "fontStyle", "fontWeight", "letterSpacing", "lineHeight", "paragraphSpacing", "paragraphIndent"]);
-  function rangesBoundTo(node, field, fromId) {
-    var _a;
-    const len = node.characters.length;
-    if (len === 0) return [];
-    const getRange = node.getRangeBoundVariable;
-    if (typeof getRange !== "function") {
-      const raw = (_a = node.boundVariables) == null ? void 0 : _a[field];
-      const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
-      return list.some((a) => (a == null ? void 0 : a.id) === fromId) ? [[0, len]] : [];
-    }
-    const full = getRange.call(node, 0, len, field);
-    if (full !== figma.mixed) return full && full.id === fromId ? [[0, len]] : [];
+  function boundVariableIds(node) {
+    var _a, _b, _c, _d, _e;
     const out = [];
-    let i = 0;
-    while (i < len) {
-      const v = getRange.call(node, i, i + 1, field);
-      if (v !== figma.mixed && v && v.id === fromId) {
-        let j = i + 1;
-        while (j < len) {
-          const w = getRange.call(node, j, j + 1, field);
-          if (w === figma.mixed || !w || w.id !== fromId) break;
-          j++;
-        }
-        out.push([i, j]);
-        i = j;
-      } else i++;
+    const aliasId = (raw) => {
+      if (!raw) return void 0;
+      const a = Array.isArray(raw) ? raw[0] : raw;
+      return a && typeof a === "object" && "id" in a ? a.id : void 0;
+    };
+    for (const key of ["fills", "strokes"]) {
+      const ps = node[key];
+      if (!Array.isArray(ps)) continue;
+      for (const p of ps) {
+        const id = (_b = (_a = p.boundVariables) == null ? void 0 : _a.color) == null ? void 0 : _b.id;
+        if (id) out.push(id);
+      }
+    }
+    const effects = node.effects;
+    if (Array.isArray(effects)) {
+      for (const e of effects) {
+        const id = (_d = (_c = e.boundVariables) == null ? void 0 : _c.color) == null ? void 0 : _d.id;
+        if (id) out.push(id);
+      }
+    }
+    const bv = (_e = node.boundVariables) != null ? _e : {};
+    for (const [field, raw] of Object.entries(bv)) {
+      if (field === "fills" || field === "strokes" || field === "effects" || field === "componentProperties" || field === "textRangeFills") continue;
+      const id = aliasId(raw);
+      if (id) out.push(id);
     }
     return out;
   }
-  async function remapBindings(selection2, fromId, to, fields) {
-    const want = fields && fields.length ? new Set(fields) : null;
-    const fits = (field) => {
-      var _a;
-      const t = fieldResolvedType(field);
-      if (t && to.resolvedType !== t) return false;
-      return scopeFitsField(field, (_a = to.scopes) != null ? _a : ["ALL_SCOPES"]);
-    };
-    const res = { replaced: 0, nodes: 0, skipped: 0 };
-    const isFrom = (a) => !!a && typeof a === "object" && a.id === fromId;
-    const visit = async (node) => {
-      var _a;
-      if (node.visible === false) return;
-      let touched = false;
-      const rec = node;
-      for (const key of ["fills", "strokes"]) {
-        if (want && !want.has(key)) continue;
-        const ps = rec[key];
-        if (!Array.isArray(ps)) continue;
-        let changed = false;
-        const next = ps.map((p) => {
-          var _a2;
-          if (!isFrom((_a2 = p.boundVariables) == null ? void 0 : _a2.color)) return p;
-          if (!fits(key) || p.type !== "SOLID") {
-            res.skipped++;
-            return p;
-          }
-          changed = true;
-          res.replaced++;
-          return figma.variables.setBoundVariableForPaint(p, "color", to);
-        });
-        if (changed) {
-          rec[key] = next;
-          touched = true;
+  function walkVisibleDeep(roots, visit) {
+    let scanned = 0;
+    const stack = [];
+    for (const r of roots) if (isEffectivelyVisible2(r)) stack.push(r);
+    while (stack.length) {
+      const n = stack.pop();
+      if (n.visible === false) continue;
+      scanned++;
+      visit(n);
+      if ("children" in n) for (const c of n.children) stack.push(c);
+    }
+    return scanned;
+  }
+  function countUsage(roots) {
+    const usage = /* @__PURE__ */ new Map();
+    const nodesById = /* @__PURE__ */ new Map();
+    const scanned = walkVisibleDeep(roots, (n) => {
+      var _a, _b;
+      const ids = boundVariableIds(n);
+      if (!ids.length) return;
+      const seen = /* @__PURE__ */ new Set();
+      for (const id of ids) {
+        const u = (_a = usage.get(id)) != null ? _a : { places: 0, layers: 0 };
+        u.places++;
+        if (!seen.has(id)) {
+          u.layers++;
+          seen.add(id);
+          const list = (_b = nodesById.get(id)) != null ? _b : [];
+          list.push(n.id);
+          nodesById.set(id, list);
         }
+        usage.set(id, u);
       }
-      if (!want || want.has("effects")) {
-        const effects = node.effects;
-        if (Array.isArray(effects)) {
-          let changed = false;
-          const next = effects.map((e) => {
-            var _a2;
-            if (!isFrom((_a2 = e.boundVariables) == null ? void 0 : _a2.color)) return e;
-            if (!fits("effects") || e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") {
-              res.skipped++;
-              return e;
-            }
-            changed = true;
-            res.replaced++;
-            return figma.variables.setBoundVariableForEffect(e, "color", to);
-          });
-          if (changed) {
-            node.effects = next;
-            touched = true;
-          }
-        }
-      }
-      const bv = (_a = node.boundVariables) != null ? _a : {};
-      for (const [field, raw] of Object.entries(bv)) {
-        if (field === "fills" || field === "strokes" || field === "effects" || field === "componentProperties" || field === "textRangeFills") continue;
-        if (want && !want.has(field)) continue;
-        const list = Array.isArray(raw) ? raw : [raw];
-        if (!list.some(isFrom)) continue;
-        if (!fits(field)) {
-          res.skipped++;
-          continue;
-        }
-        try {
-          if (node.type === "TEXT" && TEXT_RANGE_ALL.has(field)) {
-            const ranges = rangesBoundTo(node, field, fromId);
-            if (!ranges.length) continue;
-            const fonts = typeof node.getRangeAllFontNames === "function" ? node.getRangeAllFontNames(0, node.characters.length) : node.fontName !== figma.mixed ? [node.fontName] : [];
-            for (const f of fonts) await figma.loadFontAsync(f);
-            for (const [s, e] of ranges) node.setRangeBoundVariable(s, e, field, to);
-          } else {
-            node.setBoundVariable(field, to);
-          }
-          res.replaced++;
-          touched = true;
-        } catch (e) {
-          res.skipped++;
-        }
-      }
-      if (touched) res.nodes++;
-      if (node.type === "INSTANCE") return;
-      if ("children" in node) for (const c of node.children) await visit(c);
-    };
-    for (const n of selection2) if (isEffectivelyVisible2(n)) await visit(n);
-    return res;
+    });
+    return { usage, nodesById, scanned };
+  }
+  function findUsers(roots, varIds) {
+    const nodes = [];
+    let places = 0;
+    walkVisibleDeep(roots, (n) => {
+      const hits = boundVariableIds(n).filter((id) => varIds.has(id)).length;
+      if (!hits) return;
+      places += hits;
+      nodes.push(n);
+    });
+    return { nodes, places };
   }
 
   // src/lib/naming.ts
@@ -4888,7 +4821,7 @@
   var DEV_TIER_KEY = "dsl.devTier";
   var CACHE_KEY = "dsl.licenseCache";
   var SETTINGS_KEY = "dsl.settings";
-  var SETTINGS_DEFAULT = { base: 16, maxDepth: 8, hideOnboard: false, grid: 8, tolerance: 0.5 };
+  var SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8, tolerance: 0.5 };
   var devTier = "free";
   var cache = null;
   var bindCancel = false;
@@ -5029,12 +4962,25 @@
     const all = await figma.variables.getLocalVariablesAsync();
     const nameById = new Map(all.map((v) => [v.id, v.name]));
     const colById = new Map(cols.map((c) => [c.id, c]));
+    const remoteName = /* @__PURE__ */ new Map();
+    for (const v of all) {
+      for (const raw of Object.values(v.valuesByMode)) {
+        if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+          const id = raw.id;
+          if (nameById.has(id) || remoteName.has(id)) continue;
+          const rv = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+          remoteName.set(id, rv ? rv.name : null);
+        }
+      }
+    }
     const cell = (raw) => {
-      var _a2;
       if (raw === void 0 || raw === null) return void 0;
       if (typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
         const id = raw.id;
-        return { kind: "alias", aliasId: id, aliasName: (_a2 = nameById.get(id)) != null ? _a2 : "(\uB2E4\uB978 \uD30C\uC77C \uBCC0\uC218)" };
+        const local = nameById.get(id);
+        if (local !== void 0) return { kind: "alias", aliasId: id, aliasName: local };
+        const rn = remoteName.get(id);
+        return { kind: "alias", aliasId: id, aliasName: rn != null ? rn : "(\uC0AD\uC81C\uB41C \uBCC0\uC218)", remote: rn ? true : void 0 };
       }
       if (typeof raw === "object" && "r" in raw) return { kind: "color", hex: rgbToHex(raw) };
       if (typeof raw === "number") return { kind: "number", text: String(Math.round(raw * 1e3) / 1e3) };
@@ -5052,11 +4998,91 @@
       }
       vars.push({ id: v.id, name: v.name, collectionId: col.id, type: v.resolvedType, values, scopes: [...(_a = v.scopes) != null ? _a : []], description: (_b = v.description) != null ? _b : "" });
     }
+    const roleMap = readRoleMap();
     const collections = cols.map((c) => {
-      var _a2;
-      return { id: c.id, name: c.name, tier: (_a2 = tiers.get(c.id)) != null ? _a2 : 0, modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })) };
+      var _a2, _b2;
+      return {
+        id: c.id,
+        name: c.name,
+        tier: (_a2 = tiers.get(c.id)) != null ? _a2 : 0,
+        modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })),
+        defaultModeId: c.defaultModeId,
+        tierSet: (_b2 = roleMap[c.id]) != null ? _b2 : null
+      };
     });
     return { collections, vars };
+  }
+  async function resolveRoots(nodeIds) {
+    if (!nodeIds || !nodeIds.length) return selection().slice();
+    const out = [];
+    for (const id of nodeIds) {
+      const n = await figma.getNodeByIdAsync(id).catch(() => null);
+      if (n && n.type !== "PAGE" && n.type !== "DOCUMENT" && n.parent) out.push(n);
+    }
+    return out;
+  }
+  async function libCell(raw) {
+    if (raw === void 0 || raw === null) return void 0;
+    if (typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+      const t = await figma.variables.getVariableByIdAsync(raw.id).catch(() => null);
+      return { kind: "alias", aliasId: raw.id, aliasName: t ? t.name : "(\uC0AD\uC81C\uB41C \uBCC0\uC218)", remote: (t == null ? void 0 : t.remote) || void 0 };
+    }
+    if (typeof raw === "object" && "r" in raw) return { kind: "color", hex: rgbToHex(raw) };
+    if (typeof raw === "number") return { kind: "number", text: String(Math.round(raw * 1e3) / 1e3) };
+    if (typeof raw === "boolean") return { kind: "bool", text: raw ? "true" : "false" };
+    return { kind: "string", text: String(raw) };
+  }
+  async function collectUsage(nodeIds) {
+    var _a;
+    const roots = await resolveRoots(nodeIds);
+    const { usage, nodesById, scanned } = countUsage(roots);
+    const local = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
+    const out = {};
+    const libraryVars = [];
+    const libSeen = /* @__PURE__ */ new Set();
+    let deletedCount = 0;
+    const deletedNodes = /* @__PURE__ */ new Set();
+    const addLibrary = async (id, depth) => {
+      var _a2, _b;
+      if (libSeen.has(id)) return true;
+      const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+      if (!v) return false;
+      libSeen.add(id);
+      const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId).catch(() => null);
+      const modeId = (_a2 = col == null ? void 0 : col.defaultModeId) != null ? _a2 : Object.keys(v.valuesByMode)[0];
+      const aliasTargets = [];
+      for (const raw of Object.values(v.valuesByMode)) {
+        if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") aliasTargets.push(raw.id);
+      }
+      libraryVars.push({ id: v.id, name: v.name, collection: (_b = col == null ? void 0 : col.name) != null ? _b : "", type: v.resolvedType, value: await libCell(modeId ? v.valuesByMode[modeId] : void 0), aliasTargets });
+      if (depth < 5) {
+        for (const t of aliasTargets) if (!local.has(t)) await addLibrary(t, depth + 1);
+      }
+      return true;
+    };
+    for (const [id, u] of usage) {
+      if (local.has(id)) {
+        out[id] = u;
+        continue;
+      }
+      if (await addLibrary(id, 1)) {
+        out[id] = u;
+        continue;
+      }
+      deletedCount += u.places;
+      for (const n of (_a = nodesById.get(id)) != null ? _a : []) deletedNodes.add(n);
+    }
+    const localVars = await figma.variables.getLocalVariablesAsync();
+    for (const v of localVars) {
+      if (!out[v.id]) continue;
+      for (const raw of Object.values(v.valuesByMode)) {
+        if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+          const t = raw.id;
+          if (!local.has(t)) await addLibrary(t, 2);
+        }
+      }
+    }
+    return { usage: out, libraryVars, deleted: { count: deletedCount, nodeIds: [...deletedNodes] }, scanned };
   }
   async function collectVars() {
     var _a;
@@ -5504,7 +5530,7 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -5571,41 +5597,30 @@
           }
           break;
         }
+        case "SCAN_USAGE": {
+          post(__spreadValues({ type: "USAGE_RESULT", reqId: msg.reqId }, await collectUsage(msg.nodeIds)));
+          break;
+        }
+        case "FIND_VAR_USERS": {
+          const r = findUsers(await resolveRoots(msg.nodeIds), new Set(msg.varIds));
+          post({ type: "VAR_USERS", reqId: msg.reqId, layers: r.nodes.slice(0, msg.limit).map((n) => ({ id: n.id, name: n.name })), totalLayers: r.nodes.length, places: r.places });
+          break;
+        }
+        case "SELECT_VAR_USERS": {
+          const r = findUsers(await resolveRoots(msg.nodeIds), new Set(msg.varIds));
+          const pick = r.nodes.slice(0, SELECT_CAP);
+          if (pick.length) {
+            const cur = figma.currentPage.selection;
+            if (pick.length !== cur.length || pick.some((n, i) => cur[i] !== n)) selfSelect = true;
+            figma.currentPage.selection = pick;
+            figma.viewport.scrollAndZoomIntoView(pick);
+          }
+          post({ type: "SELECT_RESULT", found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
+          break;
+        }
         case "SCAN_BINDINGS": {
           const r = await scanBindings(selection());
           post({ type: "BINDINGS_RESULT", candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId, forManager: msg.forManager });
-          break;
-        }
-        case "REMAP_TARGETS": {
-          const vars = await figma.variables.getLocalVariablesAsync();
-          const colName = new Map((await figma.variables.getLocalVariableCollectionsAsync()).map((c) => [c.id, c.name]));
-          const from = (_a = vars.find((v) => v.id === msg.fromId)) != null ? _a : null;
-          const targets = remapTargets(
-            msg.fromId,
-            from ? from.resolvedType : null,
-            msg.fields,
-            vars.map((v) => {
-              var _a2, _b2;
-              return { id: v.id, name: v.name, resolvedType: v.resolvedType, scopes: (_a2 = v.scopes) != null ? _a2 : ["ALL_SCOPES"], collection: (_b2 = colName.get(v.variableCollectionId)) != null ? _b2 : "" };
-            })
-          ).map((v) => ({ id: v.id, name: v.name, collection: v.collection }));
-          post({ type: "REMAP_TARGETS_RESULT", fromId: msg.fromId, targets });
-          break;
-        }
-        case "REMAP_BINDINGS": {
-          const to = await figma.variables.getVariableByIdAsync(msg.toId);
-          if (!to) {
-            post({ type: "ERROR", message: "\uBC14\uAFC0 \uBCC0\uC218\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 \u2014 \uC9C0\uC6CC\uC84C\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC5F0\uACB0 \uD604\uD669\uC744 \uB2E4\uC2DC \uBCF4\uC138\uC694.", op: "REMAP_BINDINGS" });
-            break;
-          }
-          const r = await remapBindings(selection(), msg.fromId, to, msg.fields);
-          if (r.replaced) {
-            commitUndo(figma);
-            await postPrereq();
-          }
-          post(__spreadProps(__spreadValues({ type: "REMAP_RESULT" }, r), { toName: to.name }));
-          const scan = await scanBindings(selection());
-          post({ type: "BINDINGS_RESULT", candidates: scan.candidates, nodes: scan.nodes, total: scan.total, boundNodes: scan.boundNodes, reqId: msg.reqId });
           break;
         }
         case "CANCEL": {
@@ -5889,7 +5904,7 @@
             let p = c.parentId;
             while (p && !keepIds.has(p)) {
               keepIds.add(p);
-              p = (_c = (_b = byCand.get(p)) == null ? void 0 : _b.parentId) != null ? _c : null;
+              p = (_b = (_a = byCand.get(p)) == null ? void 0 : _a.parentId) != null ? _b : null;
             }
           }
           const pruned = gated.filter((c) => keepIds.has(c.id));
@@ -6045,7 +6060,7 @@
             },
             onFailure: (m) => failures.push(m)
           });
-          const shownNames = (_d = msg.names) != null ? _d : {};
+          const shownNames = (_c = msg.names) != null ? _c : {};
           const groupNames = groups.map((g, gi) => {
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
             return shown != null ? shown : resolved[gi];
@@ -6140,7 +6155,7 @@
                   }
                 }
                 try {
-                  master.name = setName || pascalCase((_f = (_e = live[preferLive]) == null ? void 0 : _e.name) != null ? _f : live[0].name);
+                  master.name = setName || pascalCase((_e = (_d = live[preferLive]) == null ? void 0 : _d.name) != null ? _e : live[0].name);
                 } catch (e) {
                 }
                 placeOnPage(master);
@@ -6174,7 +6189,7 @@
                     const inst = master.createInstance();
                     const vals = __spreadValues({}, snap.vals);
                     for (const p of vectorPlans) {
-                      const icon = iconRegistry.get(String((_g = vals[p.propName]) != null ? _g : ""));
+                      const icon = iconRegistry.get(String((_f = vals[p.propName]) != null ? _f : ""));
                       if (icon) vals[p.propName] = icon.key || icon.id;
                       else delete vals[p.propName];
                     }
@@ -6196,7 +6211,7 @@
               if (!node) continue;
               const o = captureOrigin(node);
               try {
-                made.push({ comp: figma.createComponentFromNode(node), variant: (_h = variantById.get(m.id)) != null ? _h : "", o });
+                made.push({ comp: figma.createComponentFromNode(node), variant: (_g = variantById.get(m.id)) != null ? _g : "", o });
                 registered++;
               } catch (e) {
                 skipped++;
@@ -6209,7 +6224,7 @@
             }
             let set;
             try {
-              const home = (_i = pageOf(made[0].comp)) != null ? _i : figma.currentPage;
+              const home = (_h = pageOf(made[0].comp)) != null ? _h : figma.currentPage;
               set = figma.combineAsVariants(made.map((x) => x.comp), home);
             } catch (e) {
               failures.push(`\uACB0\uD569 \uC2E4\uD328(${setName}): ${errText(e)}`);
@@ -6278,7 +6293,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_j = nodes[0].parent) != null ? _j : figma.currentPage;
+              const parent = (_i = nodes[0].parent) != null ? _i : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {
@@ -6348,19 +6363,18 @@
               s = {
                 base: typeof o.base === "number" && isFinite(o.base) && o.base > 0 ? o.base : SETTINGS_DEFAULT.base,
                 maxDepth: typeof o.maxDepth === "number" && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth,
-                hideOnboard: o.hideOnboard === true,
                 grid: typeof o.grid === "number" && isFinite(o.grid) && o.grid >= 1 ? Math.round(o.grid) : SETTINGS_DEFAULT.grid,
                 tolerance: typeof o.tolerance === "number" && isFinite(o.tolerance) && o.tolerance >= 0 ? o.tolerance : SETTINGS_DEFAULT.tolerance
               };
             }
           } catch (e) {
           }
-          post({ type: "SETTINGS", base: s.base, maxDepth: s.maxDepth, hideOnboard: s.hideOnboard, grid: s.grid, tolerance: s.tolerance });
+          post({ type: "SETTINGS", base: s.base, maxDepth: s.maxDepth, grid: s.grid, tolerance: s.tolerance });
           break;
         }
         case "SET_SETTINGS": {
           try {
-            await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, hideOnboard: msg.hideOnboard, grid: msg.grid, tolerance: msg.tolerance });
+            await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, grid: msg.grid, tolerance: msg.tolerance });
           } catch (e) {
           }
           break;
