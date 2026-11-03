@@ -25,3 +25,4 @@ export * from './uiSize';
 export * from './scopes';
 export * from './tiers';
 export * from './bindDisplay';
+export * from './varTable';

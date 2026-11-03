@@ -4,13 +4,14 @@
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate } from './shared/messages';
 import { type DraftToken, type Unit, tidyNumberTokens } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
-import { groupBindLines, fieldGroupKey, isHexColor } from './lib/bindDisplay';
+import { groupBindLines, isHexColor } from './lib/bindDisplay';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier, type Feature } from './lib/entitlements';
 import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
-import { exportHasTokens, type ExportFormat } from './lib/exporters';
+import { exportHasTokens, cssVarName, type ExportFormat } from './lib/exporters';
+import { buildVarTree, filterVars, groupRows, leafName, cellCopyText, pickInitialCollection, type VarCell, type VarCollection, type VarRow, type TreeNode } from './lib/varTable';
 import type { FrameMeta } from './lib/similar';
 import type { VarInfo, CollectionRoleInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
@@ -2045,6 +2046,7 @@ window.onmessage = (event: MessageEvent) => {
       // 스킵 칩이 만든 선택 변경(selfSelect)이면 미리보기를 유지한다 — 지우면 칩을 한 번 누르는 순간
       // 칩 줄과 체크해둔 후보가 통째로 사라져 두 번째 사유를 볼 수 없다.
       if (!msg.selfSelect) {
+        scheduleManagerUsage(); // 변수 관리를 보는 중이면 사용 수를 새 선택으로
         // 사용자의 선택 변경 → 진행 중이던 연결 카드 요청은 무효(이전 선택의 결과가 늦게 와도 버린다).
         nextBindReq();
         hideApplyProgress();
@@ -2124,7 +2126,6 @@ window.onmessage = (event: MessageEvent) => {
         // 직전에 연결 현황(읽기 전용)이 떠 있었으면 그 모드를 끈다 — 안 끄면 후보가 읽기 전용으로
         // 그려져 체크박스·‘선택한 항목에 연결’이 사라진다(연결할 방법이 없어진다).
         bindResultMode = false;
-        remapOpen = null;
         bindCandidates = msg.candidates ?? [];
         bindNodes = msg.nodes ?? [];
         bindChecked.clear();
@@ -2149,24 +2150,33 @@ window.onmessage = (event: MessageEvent) => {
       }
       break;
     }
-    case 'REMAP_TARGETS_RESULT': {
-      if (!remapOpen || remapOpen.fromId !== msg.fromId) break; // 그사이 다른 행을 열었으면 버린다
-      remapOpen.targets = msg.targets;
-      renderBindTree();
+    case 'REMAP_TARGETS_RESULT':
+      onRemapTargets(msg.fromId, msg.targets); // 변수 관리 › 교체 팝업
       break;
-    }
     case 'REMAP_RESULT': {
-      remapOpen = null; // 곧 오는 BINDINGS_RESULT가 바뀐 상태로 다시 그린다
+      closeModal(); // 교체 팝업 닫기 — 곧 오는 BINDINGS_RESULT가 바뀐 상태로 다시 그린다
+      const statusId = vmOpen ? 'vmStatus' : 'applyStatus';
       if (!msg.replaced) {
-        setStatus('applyStatus', t('bind.remapNothing'), 'warn');
+        setStatus(statusId, t('bind.remapNothing'), 'warn');
         break;
       }
-      keepRemapStatus = true;
+      keepRemapStatus = !vmOpen;
       const skippedNote = msg.skipped ? t('bind.remapSkipped', { skipped: msg.skipped }) : '';
-      setStatus('applyStatus', t('bind.remapDone', { replaced: msg.replaced, to: msg.toName, nodes: msg.nodes }) + skippedNote, msg.skipped ? 'warn' : 'ok');
+      setStatus(statusId, t('bind.remapDone', { replaced: msg.replaced, to: msg.toName, nodes: msg.nodes }) + skippedNote, msg.skipped ? 'warn' : 'ok');
+      if (vmOpen) requestManagerUsage(); // 사용 수 갱신
       break;
     }
+    case 'VAR_TABLE':
+      vmCols = msg.collections;
+      vmVars = msg.vars;
+      renderVarManager();
+      break;
     case 'BINDINGS_RESULT': {
+      // 변수 관리의 사용 수 조회 — 연결 카드(미리보기·결과)는 건드리지 않는다.
+      if (msg.forManager) {
+        if (msg.reqId === vmUsageReq) setManagerUsage(msg.candidates, msg.nodes, msg.total > msg.candidates.length);
+        break;
+      }
       // 연결 현황(읽기 전용) — 결과 트리와 같은 모양. 사유 칩은 없다(실행이 아니라 조회).
       if (!isCurrentBindReply(msg.reqId)) break; // 미리보기를 누른 뒤·선택을 바꾼 뒤 늦게 온 조회 결과
       clearBindPreview();
@@ -2787,23 +2797,10 @@ function bindRows(): TreeRow[] {
 function fieldLabel(label: string, rawField: string): string {
   return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
 }
-/** 변수별 보기 묶음 이름(색·여백…). */
-function fieldGroupLabel(group: string): string {
-  return t(`fieldGroup.${group}`);
-}
-
-/** 보기 축 — 'layer'(캔버스 순서 트리) / 'variable'(변수 행 + 레이어 수, 관리용). */
-let bindView: 'layer' | 'variable' = 'layer';
 
 function renderBindTree(): void {
   const has = bindCandidates.length > 0;
   ($('bindViewRow') as HTMLElement).style.display = has ? '' : 'none';
-  if (has && bindView === 'variable') {
-    ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
-    renderBindByVariable();
-    updateBindApply();
-    return;
-  }
   ($('bindTreeCtrls') as HTMLElement).style.display = hasBindPreview() ? '' : 'none';
   renderSelectableTree($('bindTree'), bindRows(), bindChecked, {
     hideContext: bindHideContext,
@@ -2813,10 +2810,6 @@ function renderBindTree(): void {
   updateBindApply();
 }
 
-/**
- * 변수별 보기 — Tokens Studio Inspect와 같은 축: 속성 그룹 → 변수 행(`변수명 · 레이어 N · 선택`).
- * '선택'은 그 변수가 붙은 레이어를 캔버스에서 고른다. 미리보기(후보)·적용 결과 모두 같은 데이터.
- */
 /** 변수 이름 필터(소문자 부분 일치). 비어 있으면 전부. */
 function bindFilterText(): string {
   return (($('bindFilter') as HTMLInputElement).value ?? '').trim().toLowerCase();
@@ -2826,166 +2819,8 @@ function filteredCandidates(): BindCandidate[] {
   return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
 }
 
-/** 변수별 보기에서 '어디에?'를 펼친 행(`${묶음 키}|${변수 id}`). */
-const varUsesOpen = new Set<string>();
-const FIELD_GROUP_ORDER = ['color', 'space', 'radius', 'size', 'text', 'other'];
-
-function renderBindByVariable(): void {
-  const mount = $('bindTree');
-  clearMount(mount);
-  const nodeName = new Map(bindNodes.map((n) => [n.id, n.name]));
-  // 묶음(색·여백…) → 변수 → 쓰인 곳
-  type VarRow = { id: string; name: string; value: string; fields: Set<string>; byNode: Map<string, BindCandidate[]> };
-  const groups = new Map<string, Map<string, VarRow>>();
-  for (const c of filteredCandidates()) {
-    const g = fieldGroupKey(c.field);
-    if (!groups.has(g)) groups.set(g, new Map());
-    const byVar = groups.get(g)!;
-    const row = byVar.get(c.variableId) ?? { id: c.variableId, name: c.variableName, value: c.currentValue, fields: new Set<string>(), byNode: new Map() };
-    row.fields.add(c.field);
-    const list = row.byNode.get(c.nodeId) ?? [];
-    list.push(c);
-    row.byNode.set(c.nodeId, list);
-    byVar.set(c.variableId, row);
-  }
-  const order = [...groups.keys()].sort((a, b) => FIELD_GROUP_ORDER.indexOf(a) - FIELD_GROUP_ORDER.indexOf(b));
-  for (const g of order) {
-    mount.appendChild(resultGroup(fieldGroupLabel(g)));
-    const rows = [...groups.get(g)!.values()].sort((a, b) => b.byNode.size - a.byNode.size || a.name.localeCompare(b.name));
-    for (const r of rows) {
-      const key = `${g}|${r.id}`;
-      const ids = [...r.byNode.keys()];
-      // 레이어별로 같은 변수에 묶인 속성을 한 줄 라벨로(네 방향 여백 → '여백').
-      const uses = ids.map((nid) => ({ nid, labels: groupBindLines(r.byNode.get(nid)!).map((l) => fieldLabel(l.label, l.fields[0])) }));
-      const props = uses.reduce((n, u) => n + u.labels.length, 0);
-
-      const meta = document.createElement('span');
-      const link = (text: string, tip: string, on: () => void): HTMLButtonElement => {
-        const b = document.createElement('button');
-        b.className = 'link';
-        b.textContent = text;
-        b.title = tip;
-        b.addEventListener('click', on);
-        return b;
-      };
-      const open = varUsesOpen.has(key);
-      meta.append(link(t(open ? 'bind.varHideUses' : 'bind.varShowUses'), '', () => {
-        if (open) varUsesOpen.delete(key); else varUsesOpen.add(key);
-        renderBindTree();
-      }));
-      meta.append(' · ', link(t('bind.varSelect'), t('bind.varLayers', { n: ids.length }), () => selectNodes(ids, 'applyStatus')));
-      // 일괄 교체는 '파일에 붙어 있는 것'(연결 현황·적용 결과)에서만 — 미리보기 후보는 아직 안 붙었다.
-      if (bindResultMode) {
-        meta.append(' · ', link(t('bind.varRemap'), t('bind.varRemapTip'), () => openRemap({ key, fromId: r.id, fromName: r.name, fields: [...r.fields], sites: [...r.byNode.values()].reduce((n, l) => n + l.length, 0) })));
-      }
-
-      const title = document.createElement('span');
-      const swatch = isHexColor(r.value) ? `<span class="bf-swatch" style="background:${escapeHtml(r.value)}"></span>` : '';
-      // 색은 견본으로 충분하다 — hex 글자까지 붙이면 좁은 폭에서 변수 이름이 잘린다(값은 툴팁에).
-      const valueText = !isHexColor(r.value) && r.value ? ` <span class="bf-val">= ${escapeHtml(r.value)}</span>` : '';
-      title.innerHTML = `${swatch}${escapeHtml(r.name)}${valueText}`;
-      title.title = r.value ? `${r.name} = ${r.value}` : r.name;
-      mount.appendChild(resultCard({ title, titleMono: true, summary: t('bind.varUses', { layers: ids.length, props }), metaEl: meta }));
-
-      if (open) {
-        const box = document.createElement('div');
-        box.className = 'var-uses';
-        for (const u of uses) {
-          const b = document.createElement('button');
-          b.className = 'var-use';
-          b.title = t('bind.layerSelectTip');
-          b.innerHTML = `<span class="vu-layer">${escapeHtml(nodeName.get(u.nid) ?? u.nid)}</span> <span class="vu-props">${escapeHtml(u.labels.join(', '))}</span>`;
-          b.addEventListener('click', () => selectNodes([u.nid], 'applyStatus'));
-          box.appendChild(b);
-        }
-        mount.appendChild(box);
-      }
-      if (remapOpen && remapOpen.key === key) mount.appendChild(renderRemapPanel(remapOpen));
-    }
-  }
-}
-
-/* ---------- 일괄 교체 — 변수별 보기의 한 행(속성 그룹 × 변수)을 다른 변수로 ---------- */
-interface RemapOpen {
-  key: string; // `${속성 그룹}|${변수 id}` — 어느 행 아래에 패널을 붙일지
-  fromId: string;
-  fromName: string;
-  fields: string[];
-  sites: number; // 목록에 보이는 자리 수(상한에 잘렸을 수 있음 — 실제 수는 결과가 알려준다)
-  targets?: { id: string; name: string; collection: string }[];
-}
-let remapOpen: RemapOpen | null = null;
-/** 교체 직후 따라오는 BINDINGS_RESULT가 '교체 결과' 상태 문구를 '연결 현황 n건'으로 덮지 않게 한 번 막는다. */
-let keepRemapStatus = false;
-
-function openRemap(o: RemapOpen): void {
-  remapOpen = o;
-  send({ type: 'REMAP_TARGETS', fromId: o.fromId, fields: o.fields });
-  renderBindTree();
-}
-function closeRemap(): void {
-  remapOpen = null;
-  renderBindTree();
-}
-
-function renderRemapPanel(o: RemapOpen): HTMLElement {
-  const box = document.createElement('div');
-  box.className = 'remap-panel';
-  if (!o.targets) {
-    box.textContent = t('bind.remapLoading');
-    return box;
-  }
-  const cancel = document.createElement('button');
-  cancel.className = 'link';
-  cancel.textContent = t('bind.remapCancel');
-  cancel.addEventListener('click', closeRemap);
-  if (!o.targets.length) {
-    const note = document.createElement('span');
-    note.className = 'muted';
-    note.textContent = t('bind.remapNone');
-    box.append(note, ' ', cancel);
-    return box;
-  }
-  const label = document.createElement('label');
-  label.className = 'inline';
-  label.textContent = t('bind.remapLabel');
-  const select = document.createElement('select');
-  select.id = 'remapTarget';
-  // 컬렉션별로 묶는다(Global/Semantic…) — 같은 이름이 두 컬렉션에 있어도 구별된다.
-  const byCol = new Map<string, HTMLOptGroupElement>();
-  for (const v of o.targets) {
-    let g = byCol.get(v.collection);
-    if (!g) {
-      g = document.createElement('optgroup');
-      g.label = v.collection || '—';
-      byCol.set(v.collection, g);
-      select.appendChild(g);
-    }
-    const opt = document.createElement('option');
-    opt.value = v.id;
-    opt.textContent = v.name;
-    g.appendChild(opt);
-  }
-  label.appendChild(select);
-  const apply = document.createElement('button');
-  apply.className = 'primary';
-  apply.textContent = t('bind.remapApply', { n: o.sites });
-  apply.addEventListener('click', () => {
-    apply.disabled = true;
-    send({ type: 'REMAP_BINDINGS', fromId: o.fromId, toId: select.value, fields: o.fields, reqId: nextBindReq() });
-  });
-  box.append(label, apply, cancel);
-  return box;
-}
-
 $('bindFilter').addEventListener('input', () => renderBindTree());
-document.querySelectorAll<HTMLInputElement>('input[name="bindView"]').forEach((radio) => {
-  radio.addEventListener('change', () => {
-    if (!radio.checked) return;
-    bindView = radio.value === 'variable' ? 'variable' : 'layer';
-    renderBindTree();
-  });
-});
+$('btnBindToManager').addEventListener('click', () => openVarManager({ onlyUsed: true }));
 
 /** 선택에 바인딩 버튼 활성/라벨 + 전체선택 마스터 동기화. */
 function updateBindApply(): void {
@@ -3007,7 +2842,6 @@ function updateBindApply(): void {
 
 /** 바인딩 미리보기/적용 상태를 초기화(선택 변경·적용 완료 시). */
 function clearBindPreview(): void {
-  remapOpen = null; // 선택이 바뀌면 열어 둔 교체 패널은 낡은 대상을 가리킨다
   $('bindTree').classList.remove('stale');
   bindResultMode = false;
   bindCandidates = [];
@@ -3494,6 +3328,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b)
 /* ---------- 탭 내비게이션 (UI 개편 + UX8 키보드) ---------- */
 const TABS = ['wizard', 'tokens', 'apply', 'settings'] as const;
 function showTab(name: (typeof TABS)[number]): void {
+  if (vmOpen) leaveManagerUi(); // 탭을 누르면 변수 관리(넓은 화면)에서 나온다
   for (const t of TABS) {
     $(`tab-${t}`).classList.toggle('active', t === name);
     const btn = $(`tabbtn-${t}`);
@@ -3529,6 +3364,10 @@ function renderExistingVars(tierVars: number, tierColor: number, other: number):
     const box = $(id);
     const text = box.querySelector('.ev-text') as HTMLElement;
     const go = box.querySelector('.ev-go') as HTMLButtonElement;
+    const manage = box.querySelector('.ev-manage') as HTMLButtonElement;
+    manage.textContent = t('vm.fromBanner');
+    manage.onclick = () => openVarManager({ onlyUsed: false });
+    manage.style.display = tierVars + other > 0 ? '' : 'none';
     if (tierVars > 0) {
       text.textContent = onMake
         ? t('existingVars.hasMake', { n: tierVars })
@@ -3685,3 +3524,607 @@ for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-ap
   b.addEventListener('click', () => showApplyStep(b.dataset.nextApply as ApplyStep));
 }
 
+
+
+/* =====================================================================
+   공용 — 우클릭 메뉴 · 팝업
+   ===================================================================== */
+interface MenuItem {
+  label: string;
+  onSelect: () => void;
+  disabled?: boolean;
+  separatorBefore?: boolean;
+}
+let menuEl: HTMLElement | null = null;
+function closeMenu(): void {
+  menuEl?.remove();
+  menuEl = null;
+}
+/** (x, y)에 메뉴. 창 밖으로 안 넘치게 당기고, ↑↓·Enter·Esc, 바깥 클릭·스크롤·크기 변경에 닫는다. */
+function openMenu(x: number, y: number, items: MenuItem[], returnFocus?: HTMLElement): void {
+  closeMenu();
+  const m = document.createElement('div');
+  m.className = 'ctx-menu';
+  m.setAttribute('role', 'menu');
+  const buttons: HTMLButtonElement[] = [];
+  for (const it of items) {
+    if (it.separatorBefore) m.appendChild(document.createElement('hr'));
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'menuitem');
+    b.textContent = it.label;
+    b.disabled = !!it.disabled;
+    b.addEventListener('click', () => {
+      closeMenu();
+      returnFocus?.focus();
+      it.onSelect();
+    });
+    m.appendChild(b);
+    buttons.push(b);
+  }
+  $('overlayRoot').appendChild(m);
+  const r = m.getBoundingClientRect();
+  m.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
+  m.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
+  const enabled = buttons.filter((b) => !b.disabled);
+  enabled[0]?.focus();
+  m.addEventListener('keydown', (e) => {
+    const i = enabled.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === 'ArrowDown') { e.preventDefault(); enabled[(i + 1) % enabled.length]?.focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); enabled[(i - 1 + enabled.length) % enabled.length]?.focus(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeMenu(); returnFocus?.focus(); }
+    else if (e.key === 'Tab') { e.preventDefault(); }
+  });
+  menuEl = m;
+}
+document.addEventListener('pointerdown', (e) => { if (menuEl && !menuEl.contains(e.target as Node)) closeMenu(); }, true);
+window.addEventListener('resize', closeMenu);
+document.addEventListener('scroll', closeMenu, true);
+
+let modalEl: HTMLElement | null = null;
+let modalReturnFocus: HTMLElement | null = null;
+function closeModal(): void {
+  if (!modalEl) return;
+  modalEl.remove();
+  modalEl = null;
+  modalReturnFocus?.focus();
+  modalReturnFocus = null;
+}
+/** 창 안 오버레이 팝업 — Esc·바깥 클릭으로 닫힘, Tab은 팝업 안에서만 돈다. */
+function openModal(title: HTMLElement | string, body: HTMLElement, foot: HTMLElement[]): HTMLElement {
+  closeModal();
+  closeMenu();
+  modalReturnFocus = document.activeElement as HTMLElement | null;
+  const back = document.createElement('div');
+  back.className = 'modal-backdrop';
+  const box = document.createElement('div');
+  box.className = 'modal';
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-modal', 'true');
+  const h = document.createElement('h3');
+  if (typeof title === 'string') h.textContent = title;
+  else h.appendChild(title);
+  const f = document.createElement('div');
+  f.className = 'm-foot';
+  f.append(...foot);
+  box.append(h, body, f);
+  back.appendChild(box);
+  back.addEventListener('pointerdown', (e) => { if (e.target === back) closeModal(); });
+  box.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); closeModal(); return; }
+    if (e.key !== 'Tab') return;
+    const focusables = Array.from(box.querySelectorAll<HTMLElement>('button:not(:disabled), select, input, [tabindex="0"]'));
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  $('overlayRoot').appendChild(back);
+  modalEl = back;
+  (box.querySelector<HTMLElement>('select, input, button.primary, button') ?? box).focus();
+  return box;
+}
+function modalButton(label: string, onClick: () => void, primary = false): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = label;
+  if (primary) b.className = 'primary';
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+/** 클립보드 복사 — 플러그인 창은 navigator.clipboard가 막힐 수 있어 execCommand로 한 번 더 시도한다. */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* 권한 없음 — 아래로 */ }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  ta.remove();
+  return ok;
+}
+
+/* =====================================================================
+   변수 관리(넓은 화면) — Figma Variables를 닮은 컬렉션·그룹 트리 + 표
+   ===================================================================== */
+let vmOpen = false;
+let vmCols: VarCollection[] = [];
+let vmVars: VarRow[] = [];
+let vmScope: { collectionId: string; path: string } | null = null;
+/** 사용자가 트리에서 직접 고른 범위인가 — 아니면(자동 선택) 사용 수가 도착할 때마다 결과가 있는 컬렉션으로 다시 고른다. */
+let vmScopeUser = false;
+let vmSelected: string | null = null;
+const vmCollapsed = new Set<string>(); // 접은 트리 노드·표 그룹 키
+/** 선택 안에서의 사용처(변수 id → 후보들) — 관리 전용 조회 결과. null = 아직 모름. */
+let vmUsage: Map<string, BindCandidate[]> | null = null;
+let vmUsageNodes = new Map<string, string>(); // 노드 id → 이름
+let vmUsageCapped = false;
+let vmUsageReq = 0;
+let vmReturn: { tab: (typeof TABS)[number]; scrollY: number } | null = null;
+
+function currentTab(): (typeof TABS)[number] {
+  return (TABS.find((t) => $(`tab-${t}`).classList.contains('active')) ?? 'wizard') as (typeof TABS)[number];
+}
+
+function openVarManager(opts: { onlyUsed?: boolean } = {}): void {
+  if (!vmOpen) { vmReturn = { tab: currentTab(), scrollY: window.scrollY }; vmScopeUser = false; }
+  vmOpen = true;
+  if (opts.onlyUsed !== undefined) ($('vmOnlyUsed') as HTMLInputElement).checked = opts.onlyUsed;
+  for (const t of TABS) $(`tab-${t}`).classList.remove('active');
+  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+  $('varManager').style.display = '';
+  $('btnVarManager').setAttribute('aria-pressed', 'true');
+  send({ type: 'SET_UI_WIDE', wide: true });
+  send({ type: 'GET_VAR_TABLE' });
+  requestManagerUsage();
+  renderVarManager();
+  window.scrollTo(0, 0);
+}
+/** 변수 관리 화면을 걷는다(탭 표시는 부르는 쪽이) — 창은 400으로. */
+function leaveManagerUi(): void {
+  vmOpen = false;
+  if (vmUsageTimer) { clearTimeout(vmUsageTimer); vmUsageTimer = null; }
+  closeMenu();
+  closeModal();
+  $('varManager').style.display = 'none';
+  $('btnVarManager').setAttribute('aria-pressed', 'false');
+  send({ type: 'SET_UI_WIDE', wide: false });
+}
+/** ‘돌아가기’ — 열기 전에 보던 탭·스크롤 위치로. */
+function closeVarManager(): void {
+  if (!vmOpen) return;
+  const back = vmReturn;
+  vmReturn = null;
+  showTab(back?.tab ?? 'wizard');
+  // 보던 자리로 — 창 폭이 바뀐 뒤 레이아웃이 자리 잡은 다음에.
+  if (back) requestAnimationFrame(() => window.scrollTo(0, back.scrollY));
+}
+/** 변수 관리를 보는 중 선택이 바뀌면 사용 수를 다시 읽는다(드래그 선택 중엔 멎은 뒤 한 번). */
+let vmUsageTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleManagerUsage(): void {
+  if (!vmOpen) return;
+  if (vmUsageTimer) clearTimeout(vmUsageTimer);
+  vmUsage = null; // 모름 — 이전 선택의 사용 수를 새 선택에 보여주지 않는다
+  vmUsageReq = 0;
+  renderVarManager();
+  vmUsageTimer = setTimeout(() => { vmUsageTimer = null; requestManagerUsage(); }, AUTO_SCAN_DELAY);
+}
+$('btnVarManager').addEventListener('click', () => (vmOpen ? closeVarManager() : openVarManager()));
+$('vmBack').addEventListener('click', () => closeVarManager());
+$('vmSearch').addEventListener('input', () => renderVarManager());
+$('vmOnlyUsed').addEventListener('change', () => { vmScopeUser = false; renderVarManager(); });
+
+/** 관리 전용 사용처 조회 — 연결 카드의 미리보기·결과는 건드리지 않는다(forManager). */
+function requestManagerUsage(): void {
+  if (lastSelCount === 0) {
+    setManagerUsage([], [], false);
+    return;
+  }
+  vmUsageReq = ++bindReqSeq;
+  send({ type: 'SCAN_BINDINGS', reqId: vmUsageReq, forManager: true });
+}
+function setManagerUsage(cands: BindCandidate[], nodes: BindNode[], capped: boolean): void {
+  const m = new Map<string, BindCandidate[]>();
+  for (const c of cands) {
+    const list = m.get(c.variableId) ?? [];
+    list.push(c);
+    m.set(c.variableId, list);
+  }
+  vmUsage = m;
+  vmUsageNodes = new Map(nodes.map((n) => [n.id, n.name]));
+  vmUsageCapped = capped;
+  if (vmOpen) renderVarManager();
+}
+function usageCount(id: string): number {
+  return vmUsage?.get(id)?.length ?? 0;
+}
+
+function renderVarManager(): void {
+  if (!vmOpen) return;
+  const onlyUsed = ($('vmOnlyUsed') as HTMLInputElement).checked;
+  const query = ($('vmSearch') as HTMLInputElement).value;
+  const usage = new Map([...(vmUsage ?? new Map<string, BindCandidate[]>()).entries()].map(([k, v]) => [k, v.length]));
+  const q = query.trim().toLowerCase();
+  const include = (v: VarRow): boolean => (!onlyUsed || (usage.get(v.id) ?? 0) > 0) && (!q || v.name.toLowerCase().includes(q));
+  const tree = buildVarTree(vmCols, vmVars, include);
+  if (!vmScopeUser || !vmScope || !vmCols.some((c) => c.id === vmScope!.collectionId)) {
+    vmScopeUser = false;
+    const first = pickInitialCollection(tree);
+    vmScope = first ? { collectionId: first, path: '' } : null;
+  }
+  const total = vmVars.length;
+  const shown = vmVars.filter(include).length;
+  $('vmCount').textContent = t('vm.count', { shown, total });
+  renderVmTree(tree);
+  renderVmTable(onlyUsed, query, usage);
+}
+
+function renderVmTree(tree: TreeNode[]): void {
+  const box = $('vmTree');
+  clearMount(box);
+  const walk = (n: TreeNode): void => {
+    const key = `${n.collectionId}|${n.path}`;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = n.count ? 'vm-node' : 'vm-node empty';
+    b.style.paddingLeft = `${6 + n.depth * 12}px`;
+    const current = vmScope && vmScope.collectionId === n.collectionId && vmScope.path === n.path;
+    b.setAttribute('aria-current', String(!!current));
+    const collapsed = vmCollapsed.has(`tree:${key}`);
+    const tw = document.createElement('span');
+    tw.className = 'tw';
+    tw.textContent = n.children.length ? (collapsed ? '▸' : '▾') : '';
+    tw.addEventListener('click', (e) => {
+      if (!n.children.length) return;
+      e.stopPropagation();
+      if (collapsed) vmCollapsed.delete(`tree:${key}`); else vmCollapsed.add(`tree:${key}`);
+      renderVarManager();
+    });
+    const lbl = document.createElement('span');
+    lbl.className = 'lbl';
+    lbl.textContent = n.label;
+    lbl.title = n.path || n.label;
+    b.append(tw, lbl);
+    if (n.depth === 0) {
+      const col = vmCols.find((c) => c.id === n.collectionId);
+      const tierName = col && col.tier ? ['', 'Global', 'Semantic', 'Component'][col.tier] : '';
+      if (tierName && tierName !== n.label) {
+        const tag = document.createElement('span');
+        tag.className = 'vm-tier';
+        tag.textContent = tierName;
+        b.appendChild(tag);
+      }
+    }
+    const cnt = document.createElement('span');
+    cnt.className = 'cnt';
+    cnt.textContent = String(n.count);
+    b.appendChild(cnt);
+    b.addEventListener('click', () => { vmScope = { collectionId: n.collectionId, path: n.path }; vmScopeUser = true; renderVarManager(); });
+    box.appendChild(b);
+    if (!collapsed) n.children.forEach(walk);
+  };
+  tree.forEach(walk);
+}
+
+/** 별칭을 따라가 실제 색(hex)을 찾는다 — 가리키는 변수의 첫 모드 기준, 순환·외부 변수는 포기(최대 8단). */
+function resolveColor(cell: VarCell | undefined): string | null {
+  let c = cell;
+  for (let i = 0; i < 8 && c; i++) {
+    if (c.kind === 'color') return c.hex;
+    if (c.kind !== 'alias') return null;
+    const target = vmVars.find((v) => v.id === (c as { aliasId: string }).aliasId);
+    if (!target) return null;
+    const col = vmCols.find((x) => x.id === target.collectionId);
+    c = col ? target.values[col.modes[0]?.modeId] : undefined;
+  }
+  return null;
+}
+const swatchHtml = (hex: string | null): string => (hex ? `<span class="bf-swatch" style="background:${escapeHtml(hex)}"></span>` : '');
+
+function vmCellEl(cell: VarCell | undefined): HTMLElement {
+  const span = document.createElement('span');
+  if (!cell) { span.textContent = '—'; span.className = 'muted'; return span; }
+  if (cell.kind === 'alias') {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'vm-alias';
+    b.innerHTML = `${swatchHtml(resolveColor(cell))}= ${escapeHtml(cell.aliasName)}`;
+    b.title = t('vm.jumpAlias');
+    b.addEventListener('click', (e) => { e.stopPropagation(); jumpToVar(cell.aliasId); });
+    return b;
+  }
+  span.className = 'vm-val';
+  if (cell.kind === 'color') span.innerHTML = `<span class="bf-swatch" style="background:${escapeHtml(cell.hex)}"></span>${escapeHtml(cell.hex.toUpperCase())}`;
+  else span.textContent = cell.text;
+  return span;
+}
+
+function jumpToVar(id: string): void {
+  const v = vmVars.find((x) => x.id === id);
+  if (!v) { setStatus('vmStatus', t('vm.aliasOutside'), 'warn'); return; }
+  ($('vmOnlyUsed') as HTMLInputElement).checked = false;
+  ($('vmSearch') as HTMLInputElement).value = '';
+  vmScope = { collectionId: v.collectionId, path: '' };
+  vmScopeUser = true;
+  vmSelected = id;
+  renderVarManager();
+  document.querySelector<HTMLElement>(`.vm-row[data-id="${CSS.escape(id)}"]`)?.focus();
+}
+
+function typeIcon(v: VarRow): string {
+  return v.type === 'COLOR' ? '' : v.type === 'FLOAT' ? '#' : v.type === 'STRING' ? 'T' : '◐';
+}
+
+function renderVmTable(onlyUsed: boolean, query: string, usage: Map<string, number>): void {
+  const wrap = $('vmTableWrap');
+  clearMount(wrap);
+  const empty = (text: string, action?: [string, () => void]): void => {
+    const d = document.createElement('div');
+    d.className = 'vm-empty';
+    d.textContent = text;
+    if (action) {
+      const b = document.createElement('button');
+      b.className = 'link';
+      b.textContent = action[0];
+      b.addEventListener('click', action[1]);
+      d.append(' ', b);
+    }
+    wrap.appendChild(d);
+  };
+  if (!vmVars.length && vmCols.length === 0) { empty(t('vm.noVars')); return; }
+  if (!vmScope) { empty(t('vm.noVars')); return; }
+  const col = vmCols.find((c) => c.id === vmScope!.collectionId);
+  if (!col) return;
+  const rows = filterVars(vmVars, { collectionId: col.id, path: vmScope.path, query, onlyUsed }, usage);
+  if (!rows.length) {
+    const showAll: [string, () => void] = [t('vm.showAll'), () => { ($('vmOnlyUsed') as HTMLInputElement).checked = false; vmScopeUser = false; renderVarManager(); }];
+    if (onlyUsed && lastSelCount === 0) empty(t('vm.selectFirst'), showAll);
+    else if (onlyUsed && vmUsage === null) empty(t('vm.usageLoading'));
+    else if (onlyUsed) empty(t('vm.noneUsed'), showAll);
+    else empty(t('vm.noMatch'));
+    return;
+  }
+  const table = document.createElement('table');
+  table.className = 'vm-table';
+  const head = document.createElement('tr');
+  const th = (text: string, cls = ''): void => { const c = document.createElement('th'); c.textContent = text; if (cls) c.className = cls; head.appendChild(c); };
+  th(t('vm.colName'), 'name');
+  for (const m of col.modes) th(m.name);
+  th(t('vm.colUsage'), 'vm-use');
+  th('');
+  const thead = document.createElement('thead');
+  thead.appendChild(head);
+  table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  const span = col.modes.length + 3;
+  for (const g of groupRows(rows)) {
+    const gkey = `grp:${col.id}|${g.path}`;
+    const collapsed = vmCollapsed.has(gkey);
+    if (g.path) {
+      const tr = document.createElement('tr');
+      tr.className = 'vm-group';
+      const td = document.createElement('td');
+      td.colSpan = span;
+      td.textContent = `${collapsed ? '▸' : '▾'} ${g.path.split('/').join(' / ')}`;
+      tr.appendChild(td);
+      tr.addEventListener('click', () => { if (collapsed) vmCollapsed.delete(gkey); else vmCollapsed.add(gkey); renderVarManager(); });
+      tbody.appendChild(tr);
+    }
+    if (collapsed) continue;
+    for (const v of g.rows) tbody.appendChild(vmRowEl(v, col, usage.get(v.id) ?? 0));
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  if (vmUsageCapped) setStatus('vmStatus', t('vm.usageCapped'), 'warn');
+}
+
+function vmRowEl(v: VarRow, col: VarCollection, uses: number): HTMLElement {
+  const tr = document.createElement('tr');
+  tr.className = 'vm-row';
+  tr.dataset.id = v.id;
+  tr.tabIndex = 0;
+  tr.setAttribute('aria-selected', String(vmSelected === v.id));
+  const name = document.createElement('td');
+  name.className = 'name';
+  name.title = v.description ? `${v.name}\n${v.description}` : v.name;
+  const ic = document.createElement('span');
+  ic.className = 'ic';
+  const firstCell = v.values[col.modes[0]?.modeId];
+  const hex = v.type === 'COLOR' ? resolveColor(firstCell) : null;
+  if (hex) ic.innerHTML = swatchHtml(hex);
+  else ic.textContent = typeIcon(v);
+  name.append(ic, leafName(v.name));
+  tr.appendChild(name);
+  for (const m of col.modes) {
+    const td = document.createElement('td');
+    td.appendChild(vmCellEl(v.values[m.modeId]));
+    tr.appendChild(td);
+  }
+  const use = document.createElement('td');
+  use.className = 'vm-use';
+  use.textContent = vmUsage === null || lastSelCount === 0 ? '—' : uses ? t('vm.uses', { n: uses }) : '—';
+  tr.appendChild(use);
+  const more = document.createElement('td');
+  const mb = document.createElement('button');
+  mb.type = 'button';
+  mb.className = 'more';
+  mb.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg>';
+  mb.title = t('vm.moreTip');
+  mb.setAttribute('aria-label', t('vm.moreTip'));
+  mb.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const r = mb.getBoundingClientRect();
+    selectVmRow(v.id);
+    openVarMenu(v, r.left, r.bottom, tr);
+  });
+  more.appendChild(mb);
+  tr.appendChild(more);
+  tr.addEventListener('click', () => selectVmRow(v.id));
+  tr.addEventListener('dblclick', () => openVarDetail(v));
+  tr.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    selectVmRow(v.id);
+    openVarMenu(v, e.clientX, e.clientY, tr);
+  });
+  tr.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); openVarDetail(v); }
+    else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
+      e.preventDefault();
+      const r = tr.getBoundingClientRect();
+      openVarMenu(v, r.left + 24, r.bottom, tr);
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const sib = (e.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling) as HTMLElement | null;
+      const target = sib && sib.classList.contains('vm-row') ? sib : null;
+      if (target) { target.focus(); selectVmRow(target.dataset.id ?? null); }
+    }
+  });
+  return tr;
+}
+
+function selectVmRow(id: string | null): void {
+  vmSelected = id;
+  document.querySelectorAll<HTMLElement>('.vm-row').forEach((r) => r.setAttribute('aria-selected', String(r.dataset.id === id)));
+}
+
+function currentModeCell(v: VarRow): VarCell | undefined {
+  const col = vmCols.find((c) => c.id === v.collectionId);
+  return col ? v.values[col.modes[0]?.modeId] : undefined;
+}
+
+async function copyAndReport(text: string, what: string): Promise<void> {
+  if (!text) { setStatus('vmStatus', t('vm.copyEmpty'), 'warn'); return; }
+  const ok = await copyText(text);
+  setStatus('vmStatus', ok ? t('vm.copied', { what, text }) : t('vm.copyFailed', { text }), ok ? 'ok' : 'warn');
+}
+
+function openVarMenu(v: VarRow, x: number, y: number, returnFocus: HTMLElement): void {
+  const uses = usageCount(v.id);
+  const nodeIds = [...new Set((vmUsage?.get(v.id) ?? []).map((c) => c.nodeId))];
+  openMenu(x, y, [
+    { label: t('vm.copyName'), onSelect: () => void copyAndReport(v.name, t('vm.whatName')) },
+    { label: t('vm.copyValue'), onSelect: () => void copyAndReport(cellCopyText(currentModeCell(v)), t('vm.whatValue')) },
+    { label: t('vm.copyCss'), onSelect: () => void copyAndReport(cssVarName(v.name), t('vm.whatCss')) },
+    { label: t('vm.selectLayers'), disabled: !nodeIds.length, separatorBefore: true, onSelect: () => selectNodes(nodeIds, 'vmStatus') },
+    { label: t('vm.detail'), onSelect: () => openVarDetail(v) },
+    { label: t('vm.remap'), disabled: !uses, onSelect: () => openRemapModal(v) },
+  ], returnFocus);
+}
+
+/** 상세 팝업 — 값(모드별)·용도·설명·쓰인 곳. */
+function openVarDetail(v: VarRow): void {
+  const col = vmCols.find((c) => c.id === v.collectionId);
+  const title = document.createElement('span');
+  const first = col ? v.values[col.modes[0]?.modeId] : undefined;
+  title.innerHTML = `${v.type === 'COLOR' ? swatchHtml(resolveColor(first)) : ''}<span class="vm-val">${escapeHtml(v.name)}</span>`;
+  const body = document.createElement('div');
+  const dl = document.createElement('dl');
+  const row = (k: string, val: HTMLElement | string): void => {
+    const dt = document.createElement('dt');
+    dt.textContent = k;
+    const dd = document.createElement('dd');
+    if (typeof val === 'string') dd.textContent = val; else dd.appendChild(val);
+    dl.append(dt, dd);
+  };
+  const tierName = col && col.tier ? ['', 'Global', 'Semantic', 'Component'][col.tier] : t('vm.noTier');
+  row(t('vm.dCollection'), col && col.name === tierName ? col.name : `${col?.name ?? ''} · ${tierName}`);
+  for (const m of col?.modes ?? []) row(m.name, vmCellEl(v.values[m.modeId]));
+  const scopes = document.createElement('span');
+  for (const sc of v.scopes) {
+    const c = document.createElement('span');
+    c.className = 'chip';
+    c.textContent = sc;
+    scopes.appendChild(c);
+  }
+  row(t('vm.dScopes'), v.scopes.length ? scopes : '—');
+  row(t('vm.dDesc'), v.description || '—');
+  // 쓰인 곳 — 선택 안(관리 전용 조회)
+  const usesBox = document.createElement('div');
+  const list = vmUsage?.get(v.id) ?? [];
+  if (!list.length) usesBox.textContent = lastSelCount ? t('vm.dNoUses') : t('vm.dSelectFirst');
+  else {
+    const byNode = new Map<string, BindCandidate[]>();
+    for (const c of list) byNode.set(c.nodeId, [...(byNode.get(c.nodeId) ?? []), c]);
+    for (const [nid, cs] of byNode) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'var-use';
+      b.title = t('bind.layerSelectTip');
+      const labels = groupBindLines(cs).map((l) => fieldLabel(l.label, l.fields[0])).join(', ');
+      b.innerHTML = `<span class="vu-layer">${escapeHtml(vmUsageNodes.get(nid) ?? nid)}</span> <span class="vu-props">${escapeHtml(labels)}</span>`;
+      b.addEventListener('click', () => selectNodes([nid], 'vmStatus'));
+      usesBox.appendChild(b);
+    }
+  }
+  usesBox.className = 'var-uses';
+  row(t('vm.dUses', { n: list.length }), usesBox);
+  body.appendChild(dl);
+  const foot = [modalButton(t('vm.remap'), () => openRemapModal(v)), modalButton(t('common.close'), closeModal, true)];
+  foot[0].disabled = !list.length;
+  openModal(title, body, foot);
+}
+
+/* 교체 팝업 — 선택 안에서 이 변수를 쓰던 자리를 다른 변수로(기존 REMAP_* 메시지). */
+let remapModal: { fromId: string; fields: string[]; sites: number; box: HTMLElement } | null = null;
+/** 교체 직후 따라오는 BINDINGS_RESULT가 '교체 결과' 상태 문구를 '연결 현황 n건'으로 덮지 않게 한 번 막는다. */
+let keepRemapStatus = false;
+function openRemapModal(v: VarRow): void {
+  const list = vmUsage?.get(v.id) ?? [];
+  const fields = [...new Set(list.map((c) => c.field))];
+  const body = document.createElement('div');
+  body.textContent = t('bind.remapLoading');
+  const box = openModal(t('vm.remapTitle', { name: v.name }), body, [modalButton(t('bind.remapCancel'), closeModal)]);
+  remapModal = { fromId: v.id, fields, sites: list.length, box };
+  send({ type: 'REMAP_TARGETS', fromId: v.id, fields });
+}
+function onRemapTargets(fromId: string, targets: { id: string; name: string; collection: string }[]): void {
+  if (!remapModal || remapModal.fromId !== fromId || !modalEl) return;
+  const { box, fields, sites } = remapModal;
+  const body = document.createElement('div');
+  const foot = box.querySelector('.m-foot') as HTMLElement;
+  clearMount(foot);
+  if (!targets.length) {
+    body.textContent = t('bind.remapNone');
+    foot.append(modalButton(t('common.close'), closeModal, true));
+  } else {
+    const label = document.createElement('label');
+    label.className = 'inline';
+    label.textContent = t('bind.remapLabel') + ' ';
+    const select = document.createElement('select');
+    select.id = 'remapTarget';
+    const byCol = new Map<string, HTMLOptGroupElement>();
+    for (const tv of targets) {
+      let g = byCol.get(tv.collection);
+      if (!g) {
+        g = document.createElement('optgroup');
+        g.label = tv.collection || '—';
+        byCol.set(tv.collection, g);
+        select.appendChild(g);
+      }
+      const opt = document.createElement('option');
+      opt.value = tv.id;
+      opt.textContent = tv.name;
+      g.appendChild(opt);
+    }
+    label.appendChild(select);
+    body.appendChild(label);
+    const apply = modalButton(t('bind.remapApply', { n: sites }), () => {
+      apply.disabled = true;
+      send({ type: 'REMAP_BINDINGS', fromId, toId: select.value, fields, reqId: nextBindReq() });
+    }, true);
+    foot.append(modalButton(t('bind.remapCancel'), closeModal), apply);
+    select.focus();
+  }
+  box.replaceChild(body, box.children[1]);
+}

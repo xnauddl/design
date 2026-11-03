@@ -80,16 +80,6 @@ export function groupBindLines(items: readonly BindItem[]): BindLine[] {
   return lines;
 }
 
-/** 변수별 보기의 묶음 — 색 / 여백·간격 / 모서리 / 크기·선 / 글자 / 기타. 값은 i18n 키 `fieldGroup.<값>`의 뒷부분. */
-export function fieldGroupKey(field: string): string {
-  if (field === 'fills' || field === 'strokes' || field === 'effects') return 'color';
-  if (familyOf(field) === 'padding' || /Spacing$|Gap$/.test(field)) return 'space';
-  if (familyOf(field) === 'radius') return 'radius';
-  if (field === 'width' || field === 'height' || /^stroke.*Weight$/.test(field) || /^(min|max)(Width|Height)$/.test(field)) return 'size';
-  if (/^font|^lineHeight$|^letterSpacing$|^paragraph/.test(field)) return 'text';
-  return 'other';
-}
-
 /** '#rrggbb' 같은 색 값인가(견본을 그릴지). */
 export function isHexColor(v: string): boolean {
   return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v.trim());

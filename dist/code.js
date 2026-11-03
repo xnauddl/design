@@ -4867,6 +4867,7 @@
 
   // src/lib/uiSize.ts
   var UI_WIDTH = 400;
+  var UI_WIDE_WIDTH = 760;
   var UI_HEIGHT = { default: 660, large: 860 };
   var UI_SIZE_KEY = "dsl.uiSize";
   function normalizeUiSize(v) {
@@ -4887,9 +4888,11 @@
   // src/code.ts
   figma.showUI(__html__, { width: UI_WIDTH, height: uiHeight("default"), themeColors: true });
   var uiSizeMode = "default";
+  var uiWide = false;
+  var uiWidth = () => uiWide ? UI_WIDE_WIDTH : UI_WIDTH;
   async function applyUiSize(mode, persist) {
     uiSizeMode = mode;
-    figma.ui.resize(UI_WIDTH, uiHeight(mode));
+    figma.ui.resize(uiWidth(), uiHeight(mode));
     if (persist) await figma.clientStorage.setAsync(UI_SIZE_KEY, mode).catch(() => {
     });
   }
@@ -5035,6 +5038,42 @@
       var _a2, _b;
       return { id: c.id, name: c.name, vars: (_a2 = count.get(c.id)) != null ? _a2 : 0, set: (_b = map[c.id]) != null ? _b : null, role: roleOfCollection(c, map), guess: guessRole(c.name) };
     });
+  }
+  async function collectVarTable() {
+    var _a, _b;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const tiers = collectionTiers(cols);
+    const all = await figma.variables.getLocalVariablesAsync();
+    const nameById = new Map(all.map((v) => [v.id, v.name]));
+    const colById = new Map(cols.map((c) => [c.id, c]));
+    const cell = (raw) => {
+      var _a2;
+      if (raw === void 0 || raw === null) return void 0;
+      if (typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
+        const id = raw.id;
+        return { kind: "alias", aliasId: id, aliasName: (_a2 = nameById.get(id)) != null ? _a2 : "(\uB2E4\uB978 \uD30C\uC77C \uBCC0\uC218)" };
+      }
+      if (typeof raw === "object" && "r" in raw) return { kind: "color", hex: rgbToHex(raw) };
+      if (typeof raw === "number") return { kind: "number", text: String(Math.round(raw * 1e3) / 1e3) };
+      if (typeof raw === "boolean") return { kind: "bool", text: raw ? "true" : "false" };
+      return { kind: "string", text: String(raw) };
+    };
+    const vars = [];
+    for (const v of all) {
+      const col = colById.get(v.variableCollectionId);
+      if (!col) continue;
+      const values = {};
+      for (const m of col.modes) {
+        const c = cell(v.valuesByMode[m.modeId]);
+        if (c) values[m.modeId] = c;
+      }
+      vars.push({ id: v.id, name: v.name, collectionId: col.id, type: v.resolvedType, values, scopes: [...(_a = v.scopes) != null ? _a : []], description: (_b = v.description) != null ? _b : "" });
+    }
+    const collections = cols.map((c) => {
+      var _a2;
+      return { id: c.id, name: c.name, tier: (_a2 = tiers.get(c.id)) != null ? _a2 : 0, modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })) };
+    });
+    return { collections, vars };
   }
   async function collectVars() {
     var _a;
@@ -5548,7 +5587,7 @@
         }
         case "SCAN_BINDINGS": {
           const r = await scanBindings(selection());
-          post({ type: "BINDINGS_RESULT", candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId });
+          post({ type: "BINDINGS_RESULT", candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId, forManager: msg.forManager });
           break;
         }
         case "REMAP_TARGETS": {
@@ -6307,6 +6346,15 @@
         case "GET_UI_SIZE": {
           await uiSizeReady;
           post({ type: "UI_SIZE", mode: uiSizeMode });
+          break;
+        }
+        case "SET_UI_WIDE": {
+          uiWide = msg.wide === true;
+          figma.ui.resize(uiWidth(), uiHeight(uiSizeMode));
+          break;
+        }
+        case "GET_VAR_TABLE": {
+          post(__spreadValues({ type: "VAR_TABLE" }, await collectVarTable()));
           break;
         }
         case "SET_UI_SIZE": {

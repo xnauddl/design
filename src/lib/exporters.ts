@@ -129,6 +129,10 @@ function cssLiteral(token: ExportToken, opts: ExportOptions): string {
 
 /* ---------- CSS 내보내기 ---------- */
 const cssVar = (name: string): string => `--${kebab(name)}`;
+/** 변수 이름 → CSS 변수명(내보내기와 같은 규칙). 변수 관리의 ‘CSS 변수명 복사’가 쓴다. */
+export function cssVarName(name: string): string {
+  return cssVar(name);
+}
 
 function toCss(tokens: ExportToken[], opts: ExportOptions): string {
   const lines: string[] = [':root {'];

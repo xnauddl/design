@@ -8,6 +8,8 @@
 export type UiSizeMode = 'default' | 'large';
 
 export const UI_WIDTH = 400;
+/** 변수 관리 화면을 볼 때만 쓰는 폭 — 왼쪽 트리 + 이름 + 모드 2열이 들어간다. 저장하지 않는다(다음 실행은 늘 400). */
+export const UI_WIDE_WIDTH = 760;
 export const UI_HEIGHT: Record<UiSizeMode, number> = { default: 660, large: 860 };
 /** clientStorage 키 — 철회 전 드래그 리사이즈가 `{ h }`로 쓰던 키와 같다(옛 값도 읽는다). */
 export const UI_SIZE_KEY = 'dsl.uiSize';
