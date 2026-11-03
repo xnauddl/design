@@ -46,13 +46,6 @@ export const STRINGS: Record<string, string> = {
   'apply.cancelRequested': '취소 요청됨 — 다음 지점에서 중단합니다.',
   'apply.cancelled': '취소됨 — {bound}건만 연결{detail}',
   'apply.preview': '미리보기 — 후보 {bound}건{detail} · 체크 후 ‘선택한 항목에 연결’',
-  'apply.done': '연결 {bound}{detail}',
-  'apply.resultCapped': ' · 목록은 {shown}건까지만 표시',
-  'bind.scanBtn': '연결 현황',
-  'bind.scanHelp': '선택 안에 이미 연결된 변수를 읽어 목록으로 보여줍니다. 파일은 안 바꿉니다.',
-  'bind.scanned': '연결 현황 — {total}건 · 레이어 {nodes}개',
-  'bind.scannedNone': '이 선택에는 연결된 변수가 없습니다 — 미리보기로 후보를 확인하세요.',
-  'bind.scanHintLarge': '선택이 커서 자동으로 읽지 않았어요 — ‘연결 현황’을 누르세요.',
   'bind.filterPlaceholder': '변수 이름 필터',
   // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
   'field.fills': '채움 색',
@@ -91,7 +84,6 @@ export const STRINGS: Record<string, string> = {
   'field.fontFamily': '글꼴',
   'field.fontWeight': '굵기',
   'bind.layerSelectTip': '누르면 캔버스에서 이 레이어를 선택합니다',
-  'bind.connectedTip': '{label}({fields})이(가) {variable}에 연결돼 있습니다',
   'bind.willConnectTip': '{label}({fields})을(를) {variable}에 연결합니다',
 
   // 리네임
@@ -222,7 +214,6 @@ export const STRINGS: Record<string, string> = {
   'common.cancel': '취소',
   'common.close': '닫기',
   // 변수 관리(넓은 화면)
-  'vm.fromBind': '변수 관리에서 보기 ↗',
   'vm.search': '변수 검색',
   'vm.uses': '{n}곳',
   'vm.moreTip': '메뉴 (우클릭과 같음)',
@@ -245,6 +236,25 @@ export const STRINGS: Record<string, string> = {
   'vm.dDesc': '설명',
   'vm.dNoUses': '선택 안에서는 쓰이지 않아요.',
   // 탭
+  // IA v3 레이어 › 연결(§4.6)
+  'bind.tsLabel': '텍스트 스타일',
+  'bind.repreview': '미리보기 다시',
+  'bind.toList': '변수 탭에서 보기 →',
+  'bind.doneLine': '✓ {n}개 연결',
+  'bind.doneSkipped': ' · 건너뜀 {m}',
+  'bind.candChanged': '후보가 바뀌었어요 · {a}개 추가 · {b}개 제외',
+  'bind.otherSel': '다른 선택에서 만든 결과예요',
+  'bind.maybeChanged': '피그마에서 바뀌었을 수 있어요',
+  'bind.selChanged': '선택이 바뀌었어요 · 미리보기를 다시 해 주세요',
+  'bind.noLocalLib': '이 파일엔 로컬 변수가 없어요 · 라이브러리 변수 연결은 피그마 오른쪽 패널에서 해요',
+  'bind.noTier': '변수는 있지만 계층이 지정되지 않았어요',
+  'bind.gotoTiers': '계층 지정하기 →',
+  'bind.noVarsPaid': '먼저 토큰을 생성해 연결할 변수를 만드세요.',
+  'bind.noVarsFree': '연결할 변수가 없어요 · 변수 만들기는 유료 기능이에요',
+  'bind.tsDone': '✓ 텍스트 {n}개에 스타일 연결',
+  'bind.tsNone': '등록된 텍스트 스타일이 없어요 · 타이포에서 등록 →(유료)',
+  'bind.tsNoneText': '등록된 텍스트 스타일이 없어요',
+  'bind.tsGotoType': '타이포에서 등록 →(유료)',
   // IA v3 변수 탭(§4.2~§4.4)
   'var.loading': '변수 정보를 불러오는 중…',
   'start.head': '아직 로컬 변수가 없어요',
@@ -372,11 +382,8 @@ export const STRINGS: Record<string, string> = {
   'rail.type': '타이포',
   'rail.typeSub': '텍스트 스타일',
   'rail.bind': '연결',
-  'rail.bindSub': '변수 붙이기',
   'rail.rename': '이름',
-  'rail.renameSub': '레이어 이름',
   'rail.structure': '컴포넌트',
-  'rail.structureSub': '닮은 프레임',
   'rail.next': '다음 →',
   // 플러그인 설정(#19) — 설정 탭에만
   'settings.title': '기본값',
@@ -465,14 +472,14 @@ export const STRINGS: Record<string, string> = {
   'semantic.scanBtn': '기존 색에서 추천',
   // 텍스트 스타일
   'textStyle.title': '텍스트 스타일',
-  'textStyle.hint': '스캔 후 이름을 다듬고 등록하세요. 화면 연결은 「기존만 연결」',
+  'textStyle.hint': '스캔 후 이름을 다듬고 등록하세요. 화면 연결은 레이어 › 연결에서',
   'textStyle.scanBtn': '스캔',
   'textStyle.addRow': '행 추가',
   // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
   // 지금 무슨 일이 일어나는지를 적는다.
   'textStyle.rowLabelBtn': '왼쪽 글자로 이름 채우기',
   'textStyle.rowLabelTip': '같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둡니다.',
-  'textStyle.applyExistingBtn': '기존만 연결',
+  'textStyle.applyExistingBtn': '기존 스타일 연결',
   'textStyle.applyExistingTip': '선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.',
   'textStyle.registerBtn': '등록',
   // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
@@ -486,7 +493,7 @@ export const STRINGS: Record<string, string> = {
   'bind.title': '변수 연결',
   'bind.hint': '먼저 미리보기로 확인하고, 연결할 항목만 고르세요',
   'bind.preview': '미리보기',
-  'bind.confirm': '선택한 항목에 연결',
+  'bind.confirm': '체크한 항목 연결',
   'bind.progress': '진행률',
   'bind.skipHint': '건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다',
   'bind.skipCapped': '건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다 — 레이어가 많아 목록은 {shown}개까지만 보여줍니다(사유 옆 숫자는 전체)',

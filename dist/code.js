@@ -1963,80 +1963,6 @@
       skip(res, "error", node, preview, field);
     }
   }
-  var TEXT_RANGE_FIELDS = ["fontSize", "lineHeight", "letterSpacing", "fontFamily"];
-  async function scanBindings(selection2) {
-    const vars = await figma.variables.getLocalVariablesAsync();
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const tierOf = collectionTiers(cols);
-    const byId = new Map(vars.map((v) => [v.id, v]));
-    const nameOf = (id) => {
-      var _a;
-      const v = byId.get(id);
-      return v ? { name: v.name, tier: (_a = tierOf.get(v.variableCollectionId)) != null ? _a : 0 } : { name: "(\uC0AD\uC81C\uB41C \uBCC0\uC218)", tier: 0 };
-    };
-    const candidates = [];
-    const nodeIndex = [];
-    let total = 0;
-    let boundNodes = 0;
-    const push = (c) => {
-      total++;
-      if (candidates.length < RESULT_CAP) candidates.push(c);
-    };
-    const aliasId = (raw) => {
-      if (!raw) return void 0;
-      const a = Array.isArray(raw) ? raw[0] : raw;
-      return a && typeof a === "object" && "id" in a ? a.id : void 0;
-    };
-    const walkNode = (node, depth, parentId) => {
-      var _a;
-      if (node.visible === false) return;
-      nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
-      let any = false;
-      for (const key of ["fills", "strokes"]) {
-        const ps = node[key];
-        if (!Array.isArray(ps)) continue;
-        ps.forEach((p, i) => {
-          var _a2, _b;
-          const id = (_b = (_a2 = p.boundVariables) == null ? void 0 : _a2.color) == null ? void 0 : _b.id;
-          if (!id) return;
-          const v = nameOf(id);
-          const hex = p.type === "SOLID" ? rgbToHex(p.color) : "";
-          push({ nodeId: node.id, field: key, index: i, currentValue: hex, variableId: id, variableName: v.name, tier: v.tier });
-          any = true;
-        });
-      }
-      const effects = node.effects;
-      if (Array.isArray(effects)) {
-        effects.forEach((e, i) => {
-          var _a2, _b;
-          const id = (_b = (_a2 = e.boundVariables) == null ? void 0 : _a2.color) == null ? void 0 : _b.id;
-          if (!id) return;
-          const v = nameOf(id);
-          push({ nodeId: node.id, field: "effects", index: i, currentValue: "color" in e ? rgbToHex(e.color) : "", variableId: id, variableName: v.name, tier: v.tier });
-          any = true;
-        });
-      }
-      const bv = (_a = node.boundVariables) != null ? _a : {};
-      for (const [field, raw] of Object.entries(bv)) {
-        if (field === "fills" || field === "strokes" || field === "effects" || field === "componentProperties" || field === "textRangeFills") continue;
-        const id = aliasId(raw);
-        if (!id) continue;
-        const v = nameOf(id);
-        const cur = node[field];
-        let currentValue = "";
-        if (typeof cur === "number") currentValue = String(Math.round(cur * 100) / 100);
-        else if (field === "fontFamily" && typeof node.fontName === "object" && node.fontName !== figma.mixed) currentValue = node.fontName.family;
-        else if (TEXT_RANGE_FIELDS.includes(field) && cur && typeof cur === "object" && "value" in cur) currentValue = String(cur.value);
-        push({ nodeId: node.id, field, currentValue, variableId: id, variableName: v.name, tier: v.tier });
-        any = true;
-      }
-      if (any) boundNodes++;
-      if (node.type === "INSTANCE") return;
-      if ("children" in node) for (const c of node.children) walkNode(c, depth + 1, node.id);
-    };
-    for (const n of selection2) if (isEffectivelyVisible2(n)) walkNode(n, 0, null);
-    return { candidates, nodes: pruneToAffected(nodeIndex, candidates, []), total, boundNodes };
-  }
   function boundVariableIds(node) {
     var _a, _b, _c, _d, _e;
     const out = [];
@@ -5618,11 +5544,6 @@
           post({ type: "SELECT_RESULT", found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
           break;
         }
-        case "SCAN_BINDINGS": {
-          const r = await scanBindings(selection());
-          post({ type: "BINDINGS_RESULT", candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId, forManager: msg.forManager });
-          break;
-        }
         case "CANCEL": {
           bindCancel = true;
           break;
@@ -5734,7 +5655,6 @@
           break;
         }
         case "APPLY_TEXT_STYLES": {
-          if (!requireTextStyles()) break;
           const r = await applyExistingTextStyles(selection());
           post({ type: "TEXT_STYLES_APPLIED", applied: r.applied, missing: r.missing });
           commitUndo(figma);

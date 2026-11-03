@@ -836,13 +836,12 @@
       <!-- 색 카드와 같은 이유로 제목 개수 없음 — 상태줄이 「신규 N · 등록됨 N · …」로 이미 말한다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted lock" id="tsLock"></span></h2>
-      <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 「기존만 연결」</div>
+      <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 레이어 › 연결에서</div>
       <div class="toolbar">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>
         <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
         <span class="grow"></span>
         <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">등록</button>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존만 연결</button>
       </div>
       <!-- 「가로 행의 왼쪽 텍스트를 이름으로」 체크박스 폐기(결정 2026-08-06) — 스캔 전에 켜고 끄는
            옵션이라, 결과를 보기도 전에 이름 규칙을 고르라는 요구였다. 스캔은 늘 크기 순으로 두고,
@@ -851,47 +850,48 @@
         <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둡니다.">왼쪽 글자로 이름 채우기</button>
       </div>
       <div id="tsList" class="results"></div>
-      <div class="prereq" id="tsApplyPrereq" style="display:none;"><span class="prereq-text"></span></div>
       <div class="status" id="tsStatus"></div>
     </div>
    </div>
   </section>
 
   <section class="tab-section" id="tab-layer" role="tabpanel" aria-labelledby="tabbtn-layer" tabindex="0">
-    <!-- 적용 단계 레일 — 바인딩 → 리네임 → 구조(컴포넌트·닮은 프레임). -->
-    <div class="steps steps-3" id="applyRail" role="tablist" aria-label="적용 단계">
-      <button class="step-chip" data-apply-step="bind"><span class="n" data-i18n="rail.bind">연결</span><span data-i18n="rail.bindSub">변수 붙이기</span></button>
-      <button class="step-chip" data-apply-step="rename"><span class="n" data-i18n="rail.rename">이름</span><span data-i18n="rail.renameSub">레이어 이름</span></button>
-      <button class="step-chip" data-apply-step="structure"><span class="n" data-i18n="rail.structure">컴포넌트</span><span data-i18n="rail.structureSub">닮은 프레임</span></button>
+    <!-- 레이어 하위 탭(밑줄, §4.1 탭 모양 2단계) — 연결 · 이름 · 컴포넌트. 세 작업은 순서가 없다(§4.7). -->
+    <div class="subtabs" id="applyRail" role="tablist" aria-label="레이어 작업">
+      <button class="subtab" role="tab" data-apply-step="bind" data-i18n="rail.bind">연결</button>
+      <button class="subtab" role="tab" data-apply-step="rename" data-i18n="rail.rename">이름</button>
+      <button class="subtab" role="tab" data-apply-step="structure" data-i18n="rail.structure">컴포넌트</button>
     </div>
 
     <div class="step" data-apply-step="bind">
       <h2><span data-i18n="bind.title">변수 연결</span> <span class="muted" id="bindCount"></span></h2>
       <div class="hint" data-i18n="bind.hint">먼저 미리보기로 확인하고, 연결할 항목만 고르세요</div>
-      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <!-- 연결할 변수가 없을 때의 안내(§4.6 표 4행) — 문구와 버튼은 ui.ts가 정한다. -->
+      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
       <div class="toolbar">
         <button id="btnApply" data-i18n="bind.preview">미리보기</button>
-        <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">선택한 항목에 연결</button>
-        <!-- 연결 현황 — 파일에 이미 붙어 있는 바인딩을 읽는다(읽기 전용). 작은 선택(≤300 노드)은 자동, 큰 선택은 이 버튼. -->
-        <button id="btnScanBindings" data-i18n="bind.scanBtn" data-tip="선택 안에 이미 연결된 변수를 읽어 목록으로 보여줍니다. 파일은 안 바꿉니다.">연결 현황</button>
-        <span class="grow"></span>
-        <button class="btn-next" data-next-apply="rename" data-i18n="rail.next">다음 →</button>
+        <button id="btnApplyConfirm" class="primary" style="display:none" data-i18n="bind.confirm">체크한 항목 연결</button>
       </div>
+      <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 있는 자산을 쓰는 일이라 연결 화면에 둔다(§4.6). -->
+      <div class="row ts-apply-row">
+        <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
+        <span class="grow"></span>
+        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 연결</button>
+      </div>
+      <div class="hint" id="tsApplyResult" hidden></div>
+      <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
+      <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">미리보기 다시</button></div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
-      </div>
-      <!-- 보기 축 토글 — 레이어별(캔버스 순서로 검증) / 변수별(Tokens Studio Inspect처럼 변수 행 + 레이어 수, 관리용). -->
-      <!-- 변수 쪽 일(교체·복사·이름·삭제)은 변수 관리 화면이 맡는다 — 연결 카드는 '무엇이 무엇에 연결됐나'(레이어별)만. -->
-      <div class="row tree-ctrls" id="bindViewRow" style="display:none">
-        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:140px" />
         <span class="grow"></span>
-        <button class="link" id="btnBindToManager" data-i18n="vm.fromBind">변수 관리에서 보기 ↗</button>
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:160px" />
       </div>
-      <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐).
-           목록 위에 둔다: 몇 개가 왜 빠졌는지는 후보를 훑기 전에 알아야 하는 정보다. -->
+      <!-- 건너뜀 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다. 목록 위: 몇 개가 왜 빠졌는지 먼저. -->
       <div class="skip-row" id="bindSkips" style="display:none"></div>
       <div class="hint" id="bindSkipHint" style="display:none" data-i18n="bind.skipHint">건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다</div>
       <div id="bindTree" class="results"></div>
+      <!-- 연결 후 — 요약 한 줄 + 사유 칩만(§4.6). -->
+      <div class="row" id="bindDone" hidden><span id="bindDoneText"></span> <button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
@@ -909,8 +909,6 @@
       <div class="toolbar">
         <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
         <button id="btnRename" class="primary" disabled data-i18n="rename.apply">이름 적용</button>
-        <span class="grow"></span>
-        <button class="btn-next" data-next-apply="structure" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row tree-ctrls">
         <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -1186,13 +1184,6 @@
     "apply.cancelRequested": "\uCDE8\uC18C \uC694\uCCAD\uB428 \u2014 \uB2E4\uC74C \uC9C0\uC810\uC5D0\uC11C \uC911\uB2E8\uD569\uB2C8\uB2E4.",
     "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC5F0\uACB0{detail}",
     "apply.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 \uD6C4\uBCF4 {bound}\uAC74{detail} \xB7 \uCCB4\uD06C \uD6C4 \u2018\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0\u2019",
-    "apply.done": "\uC5F0\uACB0 {bound}{detail}",
-    "apply.resultCapped": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC74\uAE4C\uC9C0\uB9CC \uD45C\uC2DC",
-    "bind.scanBtn": "\uC5F0\uACB0 \uD604\uD669",
-    "bind.scanHelp": "\uC120\uD0DD \uC548\uC5D0 \uC774\uBBF8 \uC5F0\uACB0\uB41C \uBCC0\uC218\uB97C \uC77D\uC5B4 \uBAA9\uB85D\uC73C\uB85C \uBCF4\uC5EC\uC90D\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
-    "bind.scanned": "\uC5F0\uACB0 \uD604\uD669 \u2014 {total}\uAC74 \xB7 \uB808\uC774\uC5B4 {nodes}\uAC1C",
-    "bind.scannedNone": "\uC774 \uC120\uD0DD\uC5D0\uB294 \uC5F0\uACB0\uB41C \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD6C4\uBCF4\uB97C \uD655\uC778\uD558\uC138\uC694.",
-    "bind.scanHintLarge": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC558\uC5B4\uC694 \u2014 \u2018\uC5F0\uACB0 \uD604\uD669\u2019\uC744 \uB204\uB974\uC138\uC694.",
     "bind.filterPlaceholder": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
     // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
     "field.fills": "\uCC44\uC6C0 \uC0C9",
@@ -1231,7 +1222,6 @@
     "field.fontFamily": "\uAE00\uAF34",
     "field.fontWeight": "\uAD75\uAE30",
     "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD569\uB2C8\uB2E4",
-    "bind.connectedTip": "{label}({fields})\uC774(\uAC00) {variable}\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC2B5\uB2C8\uB2E4",
     "bind.willConnectTip": "{label}({fields})\uC744(\uB97C) {variable}\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4",
     // 리네임
     "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
@@ -1349,7 +1339,6 @@
     "common.cancel": "\uCDE8\uC18C",
     "common.close": "\uB2EB\uAE30",
     // 변수 관리(넓은 화면)
-    "vm.fromBind": "\uBCC0\uC218 \uAD00\uB9AC\uC5D0\uC11C \uBCF4\uAE30 \u2197",
     "vm.search": "\uBCC0\uC218 \uAC80\uC0C9",
     "vm.uses": "{n}\uACF3",
     "vm.moreTip": "\uBA54\uB274 (\uC6B0\uD074\uB9AD\uACFC \uAC19\uC74C)",
@@ -1372,6 +1361,25 @@
     "vm.dDesc": "\uC124\uBA85",
     "vm.dNoUses": "\uC120\uD0DD \uC548\uC5D0\uC11C\uB294 \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
     // 탭
+    // IA v3 레이어 › 연결(§4.6)
+    "bind.tsLabel": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "bind.repreview": "\uBBF8\uB9AC\uBCF4\uAE30 \uB2E4\uC2DC",
+    "bind.toList": "\uBCC0\uC218 \uD0ED\uC5D0\uC11C \uBCF4\uAE30 \u2192",
+    "bind.doneLine": "\u2713 {n}\uAC1C \uC5F0\uACB0",
+    "bind.doneSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
+    "bind.candChanged": "\uD6C4\uBCF4\uAC00 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 {a}\uAC1C \uCD94\uAC00 \xB7 {b}\uAC1C \uC81C\uC678",
+    "bind.otherSel": "\uB2E4\uB978 \uC120\uD0DD\uC5D0\uC11C \uB9CC\uB4E0 \uACB0\uACFC\uC608\uC694",
+    "bind.maybeChanged": "\uD53C\uADF8\uB9C8\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC744 \uC218 \uC788\uC5B4\uC694",
+    "bind.selChanged": "\uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
+    "bind.noLocalLib": "\uC774 \uD30C\uC77C\uC5D4 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
+    "bind.noTier": "\uBCC0\uC218\uB294 \uC788\uC9C0\uB9CC \uACC4\uCE35\uC774 \uC9C0\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "bind.gotoTiers": "\uACC4\uCE35 \uC9C0\uC815\uD558\uAE30 \u2192",
+    "bind.noVarsPaid": "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
+    "bind.noVarsFree": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694",
+    "bind.tsDone": "\u2713 \uD14D\uC2A4\uD2B8 {n}\uAC1C\uC5D0 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
+    "bind.tsNone": "\uB4F1\uB85D\uB41C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694 \xB7 \uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
+    "bind.tsNoneText": "\uB4F1\uB85D\uB41C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694",
+    "bind.tsGotoType": "\uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
     // IA v3 변수 탭(§4.2~§4.4)
     "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
     "start.head": "\uC544\uC9C1 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
@@ -1500,11 +1508,8 @@
     "rail.type": "\uD0C0\uC774\uD3EC",
     "rail.typeSub": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "rail.bind": "\uC5F0\uACB0",
-    "rail.bindSub": "\uBCC0\uC218 \uBD99\uC774\uAE30",
     "rail.rename": "\uC774\uB984",
-    "rail.renameSub": "\uB808\uC774\uC5B4 \uC774\uB984",
     "rail.structure": "\uCEF4\uD3EC\uB10C\uD2B8",
-    "rail.structureSub": "\uB2EE\uC740 \uD504\uB808\uC784",
     "rail.next": "\uB2E4\uC74C \u2192",
     // 플러그인 설정(#19) — 설정 탭에만
     "settings.title": "\uAE30\uBCF8\uAC12",
@@ -1593,14 +1598,14 @@
     "semantic.scanBtn": "\uAE30\uC874 \uC0C9\uC5D0\uC11C \uCD94\uCC9C",
     // 텍스트 스타일
     "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uD654\uBA74 \uC5F0\uACB0\uC740 \u300C\uAE30\uC874\uB9CC \uC5F0\uACB0\u300D",
+    "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uD654\uBA74 \uC5F0\uACB0\uC740 \uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C",
     "textStyle.scanBtn": "\uC2A4\uCE94",
     "textStyle.addRow": "\uD589 \uCD94\uAC00",
     // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
     // 지금 무슨 일이 일어나는지를 적는다.
     "textStyle.rowLabelBtn": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984 \uCC44\uC6B0\uAE30",
     "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026) \uADF8\uB300\uB85C \uB461\uB2C8\uB2E4.",
-    "textStyle.applyExistingBtn": "\uAE30\uC874\uB9CC \uC5F0\uACB0",
+    "textStyle.applyExistingBtn": "\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
     "textStyle.applyExistingTip": "\uC120\uD0DD\uD55C \uAE00\uC790\uB97C \uC774\uBBF8 \uB9CC\uB4E0 \uAC19\uC740 \uC2A4\uD0C0\uC77C\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4. \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694.",
     "textStyle.registerBtn": "\uB4F1\uB85D",
     // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
@@ -1614,7 +1619,7 @@
     "bind.title": "\uBCC0\uC218 \uC5F0\uACB0",
     "bind.hint": "\uBA3C\uC800 \uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD655\uC778\uD558\uACE0, \uC5F0\uACB0\uD560 \uD56D\uBAA9\uB9CC \uACE0\uB974\uC138\uC694",
     "bind.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
-    "bind.confirm": "\uC120\uD0DD\uD55C \uD56D\uBAA9\uC5D0 \uC5F0\uACB0",
+    "bind.confirm": "\uCCB4\uD06C\uD55C \uD56D\uBAA9 \uC5F0\uACB0",
     "bind.progress": "\uC9C4\uD589\uB960",
     "bind.skipHint": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4",
     "bind.skipCapped": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4 \u2014 \uB808\uC774\uC5B4\uAC00 \uB9CE\uC544 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0\uB9CC \uBCF4\uC5EC\uC90D\uB2C8\uB2E4(\uC0AC\uC720 \uC606 \uC22B\uC790\uB294 \uC804\uCCB4)",
@@ -2769,6 +2774,7 @@
   var hasScaleVars = false;
   var hasGlobal = false;
   var hasBindable = false;
+  var prereqLocalVars = 0;
   var prereqKnown = false;
   var prereqInFlight = false;
   function requestPrereq() {
@@ -2791,6 +2797,7 @@
   var selectStatusTarget = "applyStatus";
   function selectNodes(ids, statusId) {
     selectStatusTarget = statusId;
+    if (statusId === "applyStatus" && activeTab === "layer") bindLayerSelectPending = true;
     send({ type: "SELECT_NODES", ids });
   }
   function resolveStatusId(id) {
@@ -3520,7 +3527,7 @@
     send({ type: "CREATE_TEXT_STYLES", styles });
   });
   $("btnApplyExistingText").addEventListener("click", () => {
-    setStatus("tsStatus", "\uC120\uD0DD \uD14D\uC2A4\uD2B8\uB97C \uAE30\uC874 \uC2A4\uD0C0\uC77C\uC5D0 \uC801\uC6A9 \uC911\u2026", "ok");
+    $("tsApplyResult").hidden = true;
     send({ type: "APPLY_TEXT_STYLES" });
   });
   var BIND_TOLERANCE_DEFAULT = 0.5;
@@ -3529,7 +3536,6 @@
     const v = Number(raw);
     return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
   }
-  var AUTO_SCAN_MAX = 300;
   var AUTO_SCAN_DELAY = 250;
   var bindReqSeq = 0;
   var bindLatest = 0;
@@ -3545,21 +3551,23 @@
   function isCurrentBindReply(reqId) {
     return reqId === void 0 || reqId === bindLatest;
   }
-  function requestBindingsScan() {
-    send({ type: "SCAN_BINDINGS", reqId: nextBindReq() });
+  $("btnApply").addEventListener("click", () => runBindPreview());
+  function runBindPreview(silent = false) {
+    $("bindNotice").hidden = true;
+    $("bindDone").hidden = true;
+    bindForeignSel = false;
+    bindHereSel = false;
+    bindLeftSince = false;
+    if (!silent) showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
+    const reqId = nextBindReq();
+    bindSilentReq = silent ? reqId : 0;
+    opSilent = silent;
+    send({ type: "APPLY", tolerance: bindTolerance(), preview: true, reqId });
+    opSilent = false;
+    bindPreviewSel = curSel.ids.slice();
   }
-  function markBindStale(on) {
-    $("bindTree").classList.toggle("stale", on);
-    if (on) $("btnApplyConfirm").style.display = "none";
-  }
-  $("btnScanBindings").addEventListener("click", () => {
-    setStatus("applyStatus", t("common.running"), "");
-    requestBindingsScan();
-  });
-  $("btnApply").addEventListener("click", () => {
-    showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
-    send({ type: "APPLY", tolerance: bindTolerance(), preview: true, reqId: nextBindReq() });
-  });
+  $("btnBindRepreview").addEventListener("click", () => runBindPreview());
+  $("btnBindToList").addEventListener("click", () => showManager());
   $("btnApplyConfirm").addEventListener("click", () => {
     const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
     if (!items.length) return;
@@ -3972,10 +3980,7 @@
     }
     setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
     if (!isPaid) setLock($("btnSemantics"), "paid");
-    setPrereq("btnApply", "bindPrereq", hasBindable, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
-    setLock($("btnApplyConfirm"), prereqKnown && !hasBindable ? "prereq" : null, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
-    setPrereq("btnApplyExistingText", "tsApplyPrereq", hasTextStyles, "\uBA3C\uC800 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC744 \uB4F1\uB85D\uD558\uC138\uC694.");
-    if (!isPaid) setLock($("btnApplyExistingText"), "paid");
+    renderBindPrereq();
   }
   function setLockTitle(el, locked) {
     var _a;
@@ -4241,7 +4246,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -4280,21 +4285,20 @@
         applySelectionDone();
         refreshVariantRow(msg.comps, msg.sets);
         if (!msg.selfSelect) {
-          scheduleManagerUsage();
           nextBindReq();
           hideApplyProgress();
-          const autoScan = !wizardRunning && msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX;
-          if (autoScan) {
-            markBindStale(true);
-            autoScanTimer = setTimeout(() => {
-              autoScanTimer = null;
-              requestBindingsScan();
-            }, AUTO_SCAN_DELAY);
-          } else {
-            clearBindPreview();
-            if (!wizardRunning && msg.bound > 0) setStatus("applyStatus", t("bind.scanHintLarge"), "");
-          }
+          clearBindPreview();
+          $("bindDone").hidden = true;
+          $("tsApplyResult").hidden = true;
+          layerLibUse = null;
+          if (activeTab === "layer") readLayerLibUse();
+        } else if (bindLayerSelectPending) {
+          bindHereSel = true;
+        } else if (hasBindPreview()) {
+          bindForeignSel = true;
         }
+        bindLayerSelectPending = false;
+        renderBindPrereq();
         if (!tokens.length) renderTokens();
         refreshTreeEmptyStates();
         break;
@@ -4335,7 +4339,9 @@
       case "APPLY_RESULT": {
         if (!isCurrentBindReply(msg.reqId)) break;
         hideApplyProgress();
-        markBindStale(false);
+        const silent = msg.preview && msg.reqId !== void 0 && msg.reqId === bindSilentReq;
+        bindSilentReq = 0;
+        if (isMini && msg.preview) bindPreviewMini = true;
         const confirmBtn = $("btnApplyConfirm");
         bindSkips = (_b = msg.skips) != null ? _b : [];
         bindSkipsCapped = ((_c = msg.skipTotal) != null ? _c : bindSkips.length) > bindSkips.length;
@@ -4349,25 +4355,32 @@
           setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail: cancelDetail }), "warn");
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
-          bindResultMode = false;
+          const prevKeys = new Set(bindCandidates.map(candKey));
+          const prevChecked = new Set(bindChecked);
           bindCandidates = (_d = msg.candidates) != null ? _d : [];
           bindNodes = (_e = msg.nodes) != null ? _e : [];
           bindChecked.clear();
-          for (const c of bindCandidates) bindChecked.add(candKey(c));
+          for (const c of bindCandidates) {
+            const k = candKey(c);
+            if (!silent || !prevKeys.has(k) || prevChecked.has(k)) bindChecked.add(k);
+          }
+          if (silent) {
+            const now = new Set(bindCandidates.map(candKey));
+            const added = [...now].filter((k) => !prevKeys.has(k)).length;
+            const removed = [...prevKeys].filter((k) => !now.has(k)).length;
+            if (added || removed) showStatusLine(t("bind.candChanged", { a: added, b: removed }));
+          }
+          setLock(confirmBtn, null);
           renderBindTree();
           setStatus("applyStatus", t("apply.preview", { bound: msg.bound, detail }), msg.skipped ? "warn" : "");
         } else {
           clearBindPreview();
-          bindResultMode = true;
-          bindCandidates = (_f = msg.candidates) != null ? _f : [];
-          bindNodes = (_g = msg.nodes) != null ? _g : [];
-          bindSkips = (_h = msg.skips) != null ? _h : [];
-          bindSkipsCapped = ((_i = msg.skipTotal) != null ? _i : bindSkips.length) > bindSkips.length;
+          bindSkips = (_f = msg.skips) != null ? _f : [];
+          bindSkipsCapped = ((_g = msg.skipTotal) != null ? _g : bindSkips.length) > bindSkips.length;
           renderSkipReasons(msg.reasons);
-          renderBindTree();
-          const capped = ((_j = msg.candidateTotal) != null ? _j : bindCandidates.length) > bindCandidates.length;
-          const capNote = capped ? t("apply.resultCapped", { shown: bindCandidates.length }) : "";
-          setStatus("applyStatus", t("apply.done", { bound: msg.bound, detail }) + capNote, msg.skipped ? "warn" : "ok");
+          setStatus("applyStatus", "", "");
+          $("bindDoneText").textContent = t("bind.doneLine", { n: msg.bound }) + (msg.skipped ? t("bind.doneSkipped", { m: msg.skipped }) : "") + " \xB7";
+          $("bindDone").hidden = false;
           confirmBtn.style.display = "none";
         }
         break;
@@ -4381,17 +4394,6 @@
       case "VAR_USERS":
         onVarUsers(msg);
         break;
-      case "BINDINGS_RESULT": {
-        if (!isCurrentBindReply(msg.reqId)) break;
-        clearBindPreview();
-        bindResultMode = true;
-        bindCandidates = msg.candidates;
-        bindNodes = msg.nodes;
-        renderBindTree();
-        const capNote = msg.total > msg.candidates.length ? t("apply.resultCapped", { shown: msg.candidates.length }) : "";
-        setStatus("applyStatus", msg.total ? t("bind.scanned", { total: msg.total, nodes: msg.boundNodes }) + capNote : t("bind.scannedNone"), msg.total ? "" : "warn");
-        break;
-      }
       case "SELECT_RESULT":
         if (selectStatusTarget === "list") {
           if (msg.capped) showStatusLine(t("list.selectCapped", { n: msg.requested }), { cls: "warn" });
@@ -4427,7 +4429,7 @@
           }) : [];
           tsSpecs = [...msg.styles.map((x) => __spreadValues({}, x)), ...manual];
           tsScanNote = {
-            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_k = msg.fallback) != null ? _k : 0}` : "",
+            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_h = msg.fallback) != null ? _h : 0}` : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -4447,13 +4449,13 @@
           msg.missing.length ? "warn" : "ok"
         );
         break;
-      case "TEXT_STYLES_APPLIED":
-        setStatus(
-          "tsStatus",
-          `\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC801\uC6A9 ${msg.applied}\uAC74` + (msg.missing.length ? ` \xB7 ${msg.missing.join(" \xB7 ")}` : ""),
-          msg.applied === 0 || msg.missing.length ? "warn" : "ok"
-        );
+      case "TEXT_STYLES_APPLIED": {
+        const line = $("tsApplyResult");
+        line.textContent = t("bind.tsDone", { n: msg.applied }) + (msg.missing.length ? t("bind.doneSkipped", { m: msg.missing.length }) : "");
+        line.title = msg.missing.join(" \xB7 ");
+        line.hidden = false;
         break;
+      }
       case "COLLECTIONS":
         break;
       case "COLLECTION_ROLES":
@@ -4477,6 +4479,8 @@
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
+        prereqLocalVars = ((_i = msg.tierVars) != null ? _i : 0) + ((_j = msg.otherVars) != null ? _j : 0);
+        if (activeTab === "layer") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
         hasSemanticRoles = msg.hasSemanticRoles;
@@ -4811,10 +4815,18 @@
     var _a;
     return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}`;
   }
-  var bindResultMode = false;
   function hasBindPreview() {
-    return bindCandidates.length > 0 && !bindResultMode;
+    return bindCandidates.length > 0;
   }
+  var bindPreviewSel = null;
+  var bindLeftSince = false;
+  var bindForeignSel = false;
+  var bindHereSel = false;
+  var bindLayerSelectPending = false;
+  var bindPreviewMini = false;
+  var bindSilentReq = 0;
+  var layerLibUse = null;
+  var layerLibReq = 0;
   function skipReasonText(s) {
     const why = t(`reason.${s.reason}`);
     return s.field ? `${s.field} \xB7 ${why}` : why;
@@ -4863,8 +4875,8 @@
               label,
               value: line.currentValue,
               variable,
-              connected: bindResultMode,
-              tip: t(bindResultMode ? "bind.connectedTip" : "bind.willConnectTip", tipArgs)
+              connected: false,
+              tip: t("bind.willConnectTip", tipArgs)
             }
           });
         }
@@ -4876,14 +4888,10 @@
     return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
   }
   function renderBindTree() {
-    const has = bindCandidates.length > 0;
-    $("bindViewRow").style.display = has ? "" : "none";
     $("bindTreeCtrls").style.display = hasBindPreview() ? "" : "none";
     renderSelectableTree($("bindTree"), bindRows(), bindChecked, {
       hideContext: bindHideContext,
-      onChange: updateBindApply,
-      readOnly: bindResultMode
-      // 적용 결과: 어느 레이어에 어느 변수가 붙었는지 보기만
+      onChange: updateBindApply
     });
     updateBindApply();
   }
@@ -4896,11 +4904,10 @@
     return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
   }
   $("bindFilter").addEventListener("input", () => renderBindTree());
-  $("btnBindToManager").addEventListener("click", () => showManager());
   function updateBindApply() {
     const total = bindCandidates.length;
     const sel = bindChecked.size;
-    $("bindCount").textContent = total ? bindResultMode ? `\uC5F0\uACB0 ${total}` : `\uD6C4\uBCF4 ${total}` : "";
+    $("bindCount").textContent = total ? `\uD6C4\uBCF4 ${total}` : "";
     const confirm = $("btnApplyConfirm");
     confirm.style.display = hasBindPreview() ? "" : "none";
     confirm.disabled = sel === 0;
@@ -4911,8 +4918,10 @@
     }
   }
   function clearBindPreview() {
-    $("bindTree").classList.remove("stale");
-    bindResultMode = false;
+    $("bindNotice").hidden = true;
+    bindPreviewSel = null;
+    bindForeignSel = false;
+    bindHereSel = false;
     bindCandidates = [];
     bindNodes = [];
     bindSkips = [];
@@ -4924,7 +4933,6 @@
     clearMount($("bindTree"));
     $("bindCount").textContent = "";
     $("bindTreeCtrls").style.display = "none";
-    $("bindViewRow").style.display = "none";
     $("btnApplyConfirm").style.display = "none";
   }
   var compCandidates = [];
@@ -5177,7 +5185,6 @@
   var STRUCTURE_TIPS = {
     btnScanComp: "component.scanHelp",
     btnScanSimilar: "similar.scanHelp",
-    btnScanBindings: "bind.scanHelp",
     btnClassifyVariants: "component.classifyHelp",
     btnGenMissing: "component.genMissingHelp",
     btnRegisterComp: "component.registerHelp",
@@ -5340,7 +5347,9 @@
     e.stopImmediatePropagation();
     if (e.type === "click" || e.type === "keydown") {
       if (el.dataset.lock === "paid") showPaidReason();
-      else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: "warn" });
+      else if (el.id === "btnApplyExistingText" && curSel.count && !hasTextStyles) {
+        showStatusLine(t("bind.tsNoneText"), { cls: "warn", action: { label: t("bind.tsGotoType"), run: () => showMake("type") } });
+      } else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: "warn" });
     }
   }
   document.addEventListener("click", onLockedActivate, true);
@@ -5444,8 +5453,9 @@
   var opProg = null;
   var opBusy = () => opWizard || opPending.size > 0;
   var opProgress = () => opProg;
+  var opSilent = false;
   function opSent(msg) {
-    if (wizardRunning) return;
+    if (wizardRunning || opSilent) return;
     const def = OPS[msg.type];
     if (!def) return;
     opPending.set(msg.type, def);
@@ -5515,9 +5525,13 @@
       send({ type: "GET_VARIABLES" });
     }
     if (why === "work" && !(activeTab === "variables" && varSub === "home")) send({ type: "GET_VAR_TABLE" });
+    if (activeTab === "layer") {
+      readLayerLibUse();
+      if (why !== "work") bindOnReturn();
+    }
   }
   var pointerDown = false;
-  var reentryHeld = () => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || vmUsageReq !== 0;
+  var reentryHeld = () => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || activeTab === "variables" && vmUsageInFlight || !$("readinessPop").hidden;
   var reentry = createReentryScheduler(() => readScreen("reentry"), reentryHeld, {
     now: () => Date.now(),
     set: (fn, ms) => setTimeout(fn, ms),
@@ -5577,6 +5591,7 @@
     var _a;
     const changed = name !== activeTab;
     if (changed) screenScroll.set(screenKey(), window.scrollY);
+    if (changed && activeTab === "layer" && hasBindPreview()) bindLeftSince = true;
     activeTab = name;
     for (const tb of TABS) {
       $(`tab-${tb}`).classList.toggle("active", tb === name);
@@ -5706,6 +5721,7 @@
     showVarSub("home");
     $("btnGoMake").focus();
   });
+  var APPLY_STEPS = ["bind", "rename", "structure"];
   function showStep(attr, step) {
     const key = attr === "make" ? "data-make-step" : "data-apply-step";
     const rail = $(attr === "make" ? "makeRail" : "applyRail");
@@ -5713,27 +5729,41 @@
       if (el.dataset.alwaysHidden !== void 0) continue;
       el.style.display = el.getAttribute(key) === step ? "" : "none";
     }
-    for (const b of Array.from(rail.querySelectorAll(".step-chip"))) {
+    for (const b of Array.from(rail.querySelectorAll(".step-chip, .subtab"))) {
       const on = b.getAttribute(key) === step;
-      if (on) b.setAttribute("aria-current", "step");
+      if (b.classList.contains("subtab")) {
+        b.setAttribute("aria-selected", String(on));
+        b.tabIndex = on ? 0 : -1;
+      } else if (on) b.setAttribute("aria-current", "step");
       else b.removeAttribute("aria-current");
     }
+    if (attr === "apply") {
+      const changed = currentApplyStep !== step;
+      currentApplyStep = step;
+      if (changed) syncStickyOffsets();
+    }
   }
+  var currentApplyStep = "bind";
   var showMakeStep = (s) => showStep("make", s);
   var showApplyStep = (s) => showStep("apply", s);
   for (const b of Array.from(document.querySelectorAll("#makeRail .step-chip"))) {
     b.addEventListener("click", () => showMakeStep(b.dataset.makeStep));
   }
-  for (const b of Array.from(document.querySelectorAll("#applyRail .step-chip"))) {
+  for (const b of Array.from(document.querySelectorAll("#applyRail .subtab"))) {
     b.addEventListener("click", () => showApplyStep(b.dataset.applyStep));
+    b.addEventListener("keydown", (e) => {
+      var _a;
+      const ni = nextTabIndex(e.key, APPLY_STEPS.indexOf(b.dataset.applyStep), APPLY_STEPS.length);
+      if (ni < 0) return;
+      e.preventDefault();
+      showApplyStep(APPLY_STEPS[ni]);
+      (_a = document.querySelector(`#applyRail [data-apply-step="${APPLY_STEPS[ni]}"]`)) == null ? void 0 : _a.focus();
+    });
   }
   showMakeStep("color");
   showApplyStep("bind");
   for (const b of Array.from(document.querySelectorAll("[data-next-make]"))) {
     b.addEventListener("click", () => showMakeStep(b.dataset.nextMake));
-  }
-  for (const b of Array.from(document.querySelectorAll("[data-next-apply]"))) {
-    b.addEventListener("click", () => showApplyStep(b.dataset.nextApply));
   }
   var menuOnClose = null;
   var menuEl = null;
@@ -5980,6 +6010,7 @@
   function onSelectionForList(m) {
     var _a, _b;
     curSel = { ids: (_a = m.ids) != null ? _a : [], count: m.count, scanned: m.scanned, name: (_b = m.firstName) != null ? _b : "" };
+    setLock($("btnFindUnbound"), curSel.count ? null : "prereq", t("status.noSelection"));
     if (m.selfSelect) {
       renderSelBase();
       return;
@@ -6021,8 +6052,6 @@
     }, AUTO_SCAN_DELAY);
   }
   var vmUsageTimer = null;
-  function scheduleManagerUsage() {
-  }
   function requestManagerUsage(why = "quiet") {
     if (!baseline) {
       usageMap = null;
@@ -6046,6 +6075,12 @@
     send({ type: "SCAN_USAGE", reqId: vmUsageReq, nodeIds: baseline.ids });
   }
   function onUsageResult(msg) {
+    if (msg.reqId === layerLibReq) {
+      layerLibReq = 0;
+      layerLibUse = msg.libraryVars.length > 0;
+      renderBindPrereq();
+      return;
+    }
     if (msg.reqId !== vmUsageReq) return;
     vmUsageInFlight = false;
     const wasVisible = vmUsageVisible;
@@ -6926,9 +6961,16 @@ ${v.description}` : v.name;
       showStatusLine(t("status.noSelection"), { cls: "warn" });
       return;
     }
+    const sameResult = hasBindPreview() && !!bindPreviewSel && sameIds(bindPreviewSel, curSel.ids) && !bindForeignSel;
+    bindLeftSince = false;
     showTab("layer");
     showApplyStep("bind");
-    $("btnApply").click();
+    if (sameResult || bindBusy()) return;
+    if (prereqKnown && !hasBindable) {
+      renderBindPrereq();
+      return;
+    }
+    runBindPreview();
   }
   $("btnVarRefresh").addEventListener("click", refreshList);
   $("btnAddVar").addEventListener("click", () => showMake("color"));
@@ -7101,6 +7143,90 @@ ${v.description}` : v.name;
     (_a = $("varTree").querySelector("[data-key]")) == null ? void 0 : _a.focus();
   });
   $("btnStartLicense").addEventListener("click", goToLicense);
+  function renderBindPrereq() {
+    if (!curSel) return;
+    const notice = $("bindPrereq");
+    const text = notice.querySelector(".prereq-text");
+    const act = $("bindPrereqAction");
+    let msg = "";
+    let action = null;
+    if (prereqKnown && !hasBindable) {
+      if (prereqLocalVars === 0) {
+        if (layerLibUse === true) msg = t("bind.noLocalLib");
+        else if (isPaid) {
+          msg = t("bind.noVarsPaid");
+          action = [t("prereq.gotoCreate"), goToCreate];
+        } else {
+          msg = t("bind.noVarsFree");
+          action = [t("status.paidAction"), goToLicense];
+        }
+      } else {
+        msg = t("bind.noTier");
+        action = [t("bind.gotoTiers"), goToTiers];
+      }
+    }
+    notice.style.display = msg ? "" : "none";
+    text.textContent = msg;
+    act.hidden = !action;
+    if (action) {
+      act.textContent = action[0];
+      act.onclick = action[1];
+    }
+    const noSel = !curSel.count;
+    setLock($("btnApply"), noSel ? "prereq" : msg ? "prereq" : null, noSel ? t("status.noSelection") : msg);
+    const confirm = $("btnApplyConfirm");
+    if (noSel) setLock(confirm, "prereq", t("status.noSelection"));
+    else if (bindForeignSel && !$("bindNotice").hidden) setLock(confirm, "prereq", t("bind.selChanged"));
+    else setLock(confirm, null);
+    const ts = $("btnApplyExistingText");
+    if (noSel) setLock(ts, "prereq", t("status.noSelection"));
+    else if (prereqKnown && !hasTextStyles) setLock(ts, "prereq", t("bind.tsNone"));
+    else setLock(ts, null);
+  }
+  function goToTiers() {
+    showTab("variables");
+    showVarSub("home");
+    requestAnimationFrame(() => openTierPopup($("btnVarMore")));
+  }
+  function readLayerLibUse() {
+    if (!prereqKnown || hasBindable || prereqLocalVars > 0 || !curSel.count || curSel.scanned > BIG_SELECTION || layerLibUse !== null || layerLibReq) return;
+    layerLibReq = ++bindReqSeq;
+    send({ type: "SCAN_USAGE", reqId: layerLibReq, nodeIds: curSel.ids });
+  }
+  function bindOnReturn() {
+    if (activeTab !== "layer" || currentApplyStep !== "bind" || !hasBindPreview()) return;
+    if (bindPreviewMini) {
+      bindPreviewMini = false;
+      return;
+    }
+    const notice = $("bindNotice");
+    if (bindForeignSel || bindPreviewSel && !sameIds(bindPreviewSel, curSel.ids)) {
+      bindForeignSel = true;
+      $("bindNoticeText").textContent = t("bind.otherSel");
+      notice.hidden = false;
+      renderBindPrereq();
+      return;
+    }
+    if (bindHereSel) {
+      bindHereSel = false;
+      return;
+    }
+    if (!bindLeftSince) return;
+    bindLeftSince = false;
+    if (curSel.scanned > BIG_SELECTION) {
+      $("bindNoticeText").textContent = t("bind.maybeChanged");
+      notice.hidden = false;
+      return;
+    }
+    runBindPreview(true);
+  }
+  document.documentElement.addEventListener("pointerleave", () => {
+    if (hasBindPreview()) bindLeftSince = true;
+  });
+  window.addEventListener("blur", () => {
+    if (hasBindPreview()) bindLeftSince = true;
+  });
+  var bindBusy = () => opPending.has("APPLY") || opPending.has("APPLY_SELECTED");
   activeTab = "settings";
   showTab("variables");
 })();

@@ -7,7 +7,7 @@ import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
-import { bindSelection, scanBindings, countUsage, findUsers } from './lib/bind';
+import { bindSelection, countUsage, findUsers } from './lib/bind';
 import { collectionTiers, findCollection, readRoleMap, writeRoleMap } from './lib/collectionRoles';
 import { assignRole, roleOfCollection, guessRole } from './lib/tiers';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
@@ -985,12 +985,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         post({ type: 'SELECT_RESULT', found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
         break;
       }
-      case 'SCAN_BINDINGS': {
-        // 읽기 전용 — 파일에 남은 바인딩을 결과 트리 모양으로. 플러그인을 닫았다 열어도 '뭐가 붙어 있나'가 보인다.
-        const r = await scanBindings(selection());
-        post({ type: 'BINDINGS_RESULT', candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId, forManager: msg.forManager });
-        break;
-      }
       case 'CANCEL': {
         bindCancel = true; // UX6: 다음 양보 지점에서 중단
         break;
@@ -1131,8 +1125,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'APPLY_TEXT_STYLES': {
-        // 적용만(생성 없음): 선택 텍스트를 시그니처가 같은 기존 스타일에 바인딩.
-        if (!requireTextStyles()) break;
+        // 적용만(생성 없음, 무료 — IA v3 §4.6): 선택 텍스트를 시그니처가 같은 기존 스타일에 연결.
         const r = await applyExistingTextStyles(selection());
         post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, missing: r.missing });
         commitUndo(figma);

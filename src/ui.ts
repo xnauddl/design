@@ -53,6 +53,8 @@ let hasColorVars = false;
 let hasScaleVars = false;
 let hasGlobal = false;
 let hasBindable = false;
+/** 로컬 변수 수(계층 있음 + 없음) — 연결할 변수가 없을 때 안내 4행(§4.6)을 가른다. */
+let prereqLocalVars = 0;
 /** 첫 PREREQ_STATE를 받았는가 — 받기 전엔 전제를 '모름'으로 보고 경고를 띄우지 않는다. */
 let prereqKnown = false;
 /** GET_PREREQ 응답 대기 중 — 시작 직후 같은 요청이 여러 번 겹쳐 나가지 않게. */
@@ -89,6 +91,7 @@ let selectStatusTarget = 'applyStatus';
 /** 레이어 선택 요청 — 결과 경고가 돌아올 자리를 함께 기억한다. */
 function selectNodes(ids: string[], statusId: string): void {
   selectStatusTarget = statusId;
+  if (statusId === 'applyStatus' && activeTab === 'layer') bindLayerSelectPending = true; // 사유 칩·레이어 머리
   send({ type: 'SELECT_NODES', ids });
 }
 /** #semStatus로 향하는 상태 쓰기를 화면에 있는 카드로 옮긴다(그 외 id는 그대로). */
@@ -1070,8 +1073,8 @@ $('btnTextStyles').addEventListener('click', () => {
   send({ type: 'CREATE_TEXT_STYLES', styles });
 });
 $('btnApplyExistingText').addEventListener('click', () => {
-  // 적용만: 표/스캔과 무관하게 현재 선택의 텍스트를 기존 스타일에 바인딩(생성 없음).
-  setStatus('tsStatus', '선택 텍스트를 기존 스타일에 적용 중…', 'ok');
+  // 적용만(무료): 현재 선택의 텍스트를 이미 등록된 같은 스타일에 연결(생성 없음).
+  $('tsApplyResult').hidden = true;
   send({ type: 'APPLY_TEXT_STYLES' });
 });
 
@@ -1088,8 +1091,6 @@ function bindTolerance(): number {
   return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
 }
 
-/** 연결 현황을 선택 변경 시 자동으로 읽는 상한(노드 수). 랜딩 한 장(≈250)은 자동, 페이지 통째는 버튼. */
-const AUTO_SCAN_MAX = 300;
 /** 선택이 멎은 뒤 이만큼 기다렸다 연결 현황을 읽는다 — 드래그 선택 중 매 이벤트마다 목록이 비었다 찼다 하지 않게. */
 const AUTO_SCAN_DELAY = 250;
 
@@ -1108,23 +1109,24 @@ function nextBindReq(): number {
 function isCurrentBindReply(reqId: number | undefined): boolean {
   return reqId === undefined || reqId === bindLatest;
 }
-function requestBindingsScan(): void {
-  send({ type: 'SCAN_BINDINGS', reqId: nextBindReq() });
+$('btnApply').addEventListener('click', () => runBindPreview());
+/** 미리보기 실행(UX1: dry-run 먼저). silent = 복귀 때 조용히 다시 계산(§4.6 ⑧) — 진행률·테두리 없이. */
+function runBindPreview(silent = false): void {
+  $('bindNotice').hidden = true;
+  $('bindDone').hidden = true;
+  bindForeignSel = false;
+  bindHereSel = false;
+  bindLeftSince = false;
+  if (!silent) showApplyProgress('미리보기 계산 중…'); // UX6
+  const reqId = nextBindReq();
+  bindSilentReq = silent ? reqId : 0;
+  opSilent = silent;
+  send({ type: 'APPLY', tolerance: bindTolerance(), preview: true, reqId });
+  opSilent = false;
+  bindPreviewSel = curSel.ids.slice();
 }
-/** 자동 연결 현황 대기 중 — 기존 목록은 지우지 않고 흐리게(깜빡임 대신), 낡은 후보로 연결하지 못하게 버튼은 숨김. */
-function markBindStale(on: boolean): void {
-  $('bindTree').classList.toggle('stale', on);
-  if (on) ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
-}
-
-$('btnScanBindings').addEventListener('click', () => {
-  setStatus('applyStatus', t('common.running'), '');
-  requestBindingsScan();
-});
-$('btnApply').addEventListener('click', () => {
-  showApplyProgress('미리보기 계산 중…'); // UX6
-  send({ type: 'APPLY', tolerance: bindTolerance(), preview: true, reqId: nextBindReq() }); // UX1: dry-run 미리보기 먼저
-});
+$('btnBindRepreview').addEventListener('click', () => runBindPreview());
+$('btnBindToList').addEventListener('click', () => showManager());
 
 $('btnApplyConfirm').addEventListener('click', () => {
   // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG).
@@ -1664,11 +1666,7 @@ function updateGates(): void {
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, '먼저 토큰을 생성해 Global 변수를 만드세요.');
   if (!isPaid) setLock($('btnSemantics'), 'paid'); // 유료 잠금이 전제보다 우선(§2.3)
-  setPrereq('btnApply', 'bindPrereq', hasBindable, '먼저 토큰을 생성해 연결할 변수를 만드세요.');
-  setLock($('btnApplyConfirm'), prereqKnown && !hasBindable ? 'prereq' : null, '먼저 토큰을 생성해 연결할 변수를 만드세요.');
-  // 「기존만 연결」은 등록된 텍스트 스타일이 없으면 할 일이 없으므로 비활성+안내(숨김 아님).
-  setPrereq('btnApplyExistingText', 'tsApplyPrereq', hasTextStyles, '먼저 텍스트 스타일을 등록하세요.');
-  if (!isPaid) setLock($('btnApplyExistingText'), 'paid'); // 유료 잠금이 전제보다 우선
+  renderBindPrereq();
 }
 
 /** 유료 잠금 사유를 툴팁으로. 원래 문구(기능 설명)는 dataset에 1회 백업해 보존·복원한다.
@@ -2066,20 +2064,21 @@ window.onmessage = (event: MessageEvent) => {
       // 스킵 칩이 만든 선택 변경(selfSelect)이면 미리보기를 유지한다 — 지우면 칩을 한 번 누르는 순간
       // 칩 줄과 체크해둔 후보가 통째로 사라져 두 번째 사유를 볼 수 없다.
       if (!msg.selfSelect) {
-        scheduleManagerUsage(); // 변수 관리를 보는 중이면 사용 수를 새 선택으로
         // 사용자의 선택 변경 → 진행 중이던 연결 카드 요청은 무효(이전 선택의 결과가 늦게 와도 버린다).
         nextBindReq();
         hideApplyProgress();
-        const autoScan = !wizardRunning && msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX;
-        if (autoScan) {
-          // 목록을 바로 비우지 않는다 — 선택이 멎으면 새 연결 현황으로 한 번에 바꾼다.
-          markBindStale(true);
-          autoScanTimer = setTimeout(() => { autoScanTimer = null; requestBindingsScan(); }, AUTO_SCAN_DELAY);
-        } else {
-          clearBindPreview();
-          if (!wizardRunning && msg.bound > 0) setStatus('applyStatus', t('bind.scanHintLarge'), '');
-        }
+        clearBindPreview();
+        $('bindDone').hidden = true;
+        $('tsApplyResult').hidden = true;
+        layerLibUse = null; // 라이브러리 사용 여부는 새 선택으로 다시 읽는다(§4.6 ②)
+        if (activeTab === 'layer') readLayerLibUse();
+      } else if (bindLayerSelectPending) {
+        bindHereSel = true; // 이 화면이 만든 선택(사유 칩·레이어 머리) — 복귀해도 아무것도 하지 않는다
+      } else if (hasBindPreview()) {
+        bindForeignSel = true; // 다른 화면에서 플러그인이 바꾼 선택 — 복귀하면 "다른 선택에서 만든 결과예요"
       }
+      bindLayerSelectPending = false;
+      renderBindPrereq();
       if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
       refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드 빈 상태 갱신
       break;
@@ -2124,7 +2123,9 @@ window.onmessage = (event: MessageEvent) => {
     case 'APPLY_RESULT': {
       if (!isCurrentBindReply(msg.reqId)) break; // 선택이 바뀐 뒤 도착한 이전 요청의 결과
       hideApplyProgress(); // UX6
-      markBindStale(false);
+      const silent = msg.preview && msg.reqId !== undefined && msg.reqId === bindSilentReq;
+      bindSilentReq = 0;
+      if (isMini && msg.preview) bindPreviewMini = true; // 최소화 중에 끝난 미리보기 — 펼쳐도 다시 계산하지 않는다
       const confirmBtn = $('btnApplyConfirm') as HTMLButtonElement;
       bindSkips = msg.skips ?? [];
       // 스킵 목록은 상한에서 잘린다(bind.ts SKIP_PREVIEW_CAP) — 잘렸으면 힌트 줄이 그렇다고 말한다.
@@ -2145,27 +2146,34 @@ window.onmessage = (event: MessageEvent) => {
         // #6: 후보를 선택형 미리보기 트리로. 기본 전체 체크.
         // 직전에 연결 현황(읽기 전용)이 떠 있었으면 그 모드를 끈다 — 안 끄면 후보가 읽기 전용으로
         // 그려져 체크박스·‘선택한 항목에 연결’이 사라진다(연결할 방법이 없어진다).
-        bindResultMode = false;
+        const prevKeys = new Set(bindCandidates.map(candKey));
+        const prevChecked = new Set(bindChecked);
         bindCandidates = msg.candidates ?? [];
         bindNodes = msg.nodes ?? [];
         bindChecked.clear();
-        for (const c of bindCandidates) bindChecked.add(candKey(c));
+        // 조용한 재계산: 체크 상태는 유지하고(새 후보는 체크), 후보가 달라졌을 때만 알린다(§4.6 ⑧).
+        for (const c of bindCandidates) {
+          const k = candKey(c);
+          if (!silent || !prevKeys.has(k) || prevChecked.has(k)) bindChecked.add(k);
+        }
+        if (silent) {
+          const now = new Set(bindCandidates.map(candKey));
+          const added = [...now].filter((k) => !prevKeys.has(k)).length;
+          const removed = [...prevKeys].filter((k) => !now.has(k)).length;
+          if (added || removed) showStatusLine(t('bind.candChanged', { a: added, b: removed }));
+        }
+        setLock(confirmBtn, null);
         renderBindTree();
         setStatus('applyStatus', t('apply.preview', { bound: msg.bound, detail }), msg.skipped ? 'warn' : '');
       } else {
-        // 적용 결과도 목록으로 — "어느 변수가 어디에 걸렸나"를 숫자 한 줄로 끝내지 않는다.
-        // 미리보기와 같은 트리를 읽기 전용으로 그린다(체크박스·적용 버튼 없음, 사유 칩은 유지).
+        // 연결 후 — 요약 한 줄 + 사유 칩만(§4.6). 결과 트리는 그리지 않는다(변수 탭 목록이 대신한다).
         clearBindPreview();
-        bindResultMode = true;
-        bindCandidates = msg.candidates ?? [];
-        bindNodes = msg.nodes ?? [];
         bindSkips = msg.skips ?? [];
         bindSkipsCapped = (msg.skipTotal ?? bindSkips.length) > bindSkips.length;
         renderSkipReasons(msg.reasons);
-        renderBindTree();
-        const capped = (msg.candidateTotal ?? bindCandidates.length) > bindCandidates.length;
-        const capNote = capped ? t('apply.resultCapped', { shown: bindCandidates.length }) : '';
-        setStatus('applyStatus', t('apply.done', { bound: msg.bound, detail }) + capNote, msg.skipped ? 'warn' : 'ok');
+        setStatus('applyStatus', '', '');
+        $('bindDoneText').textContent = t('bind.doneLine', { n: msg.bound }) + (msg.skipped ? t('bind.doneSkipped', { m: msg.skipped }) : '') + ' ·';
+        $('bindDone').hidden = false;
         confirmBtn.style.display = 'none';
       }
       break;
@@ -2179,18 +2187,6 @@ window.onmessage = (event: MessageEvent) => {
     case 'VAR_USERS':
       onVarUsers(msg);
       break;
-    case 'BINDINGS_RESULT': {
-      // 연결 현황(읽기 전용) — 결과 트리와 같은 모양. 사유 칩은 없다(실행이 아니라 조회).
-      if (!isCurrentBindReply(msg.reqId)) break; // 미리보기를 누른 뒤·선택을 바꾼 뒤 늦게 온 조회 결과
-      clearBindPreview();
-      bindResultMode = true;
-      bindCandidates = msg.candidates;
-      bindNodes = msg.nodes;
-      renderBindTree();
-      const capNote = msg.total > msg.candidates.length ? t('apply.resultCapped', { shown: msg.candidates.length }) : '';
-      setStatus('applyStatus', msg.total ? t('bind.scanned', { total: msg.total, nodes: msg.boundNodes }) + capNote : t('bind.scannedNone'), msg.total ? '' : 'warn');
-      break;
-    }
     case 'SELECT_RESULT':
       // 변수 탭에서 고른 레이어 선택 — 결과는 공통 상태 줄(§4.4: 한 번에 최대 200개).
       if (selectStatusTarget === 'list') {
@@ -2262,13 +2258,14 @@ window.onmessage = (event: MessageEvent) => {
         msg.missing.length ? 'warn' : 'ok',
       );
       break;
-    case 'TEXT_STYLES_APPLIED':
-      setStatus(
-        'tsStatus',
-        `기존 스타일 적용 ${msg.applied}건` + (msg.missing.length ? ` · ${msg.missing.join(' · ')}` : ''),
-        msg.applied === 0 || msg.missing.length ? 'warn' : 'ok',
-      );
+    case 'TEXT_STYLES_APPLIED': {
+      // 결과는 버튼 아래 한 줄(§4.6) — "✓ 텍스트 {n}개에 스타일 연결 · 건너뜀 {m}".
+      const line = $('tsApplyResult');
+      line.textContent = t('bind.tsDone', { n: msg.applied }) + (msg.missing.length ? t('bind.doneSkipped', { m: msg.missing.length }) : '');
+      line.title = msg.missing.join(' · ');
+      line.hidden = false;
       break;
+    }
     case 'COLLECTIONS':
       // 존재 확인용 프로브(별도 UI 없음).
       break;
@@ -2296,6 +2293,8 @@ window.onmessage = (event: MessageEvent) => {
       hasScaleVars = msg.hasScaleVars;
       hasGlobal = msg.hasGlobal;
       hasBindable = msg.hasBindable;
+      prereqLocalVars = (msg.tierVars ?? 0) + (msg.otherVars ?? 0);
+      if (activeTab === 'layer') queueMicrotask(readLayerLibUse); // 로컬 변수 0개가 확인되면 ② 판정용으로 읽는다
       hasDarkMode = msg.hasDarkMode;
       hasTextStyles = msg.hasTextStyles;
       hasSemanticRoles = msg.hasSemanticRoles;
@@ -2731,12 +2730,21 @@ function candKey(c: { nodeId: string; field: string; index?: number }): string {
   return `${c.nodeId}|${c.field}|${c.index ?? ''}`;
 }
 
-/** 미리보기 후보를 트리에 표시 가능 여부. */
-/** 트리가 '적용 결과'(읽기 전용)인지 — 미리보기(체크·적용 버튼)와 같은 행을 쓰되 체크박스를 숨긴다. */
-let bindResultMode = false;
+/** 미리보기 결과가 있는가(연결 후보 트리가 떠 있음). */
 function hasBindPreview(): boolean {
-  return bindCandidates.length > 0 && !bindResultMode;
+  return bindCandidates.length > 0;
 }
+/* 복귀 규칙(§4.6 ⑧) 상태 */
+let bindPreviewSel: string[] | null = null; // 미리보기를 만든 선택
+let bindLeftSince = false; // 미리보기 뒤 창·탭을 떠났었다
+let bindForeignSel = false; // 다른 화면에서 플러그인이 선택을 바꿨다
+let bindHereSel = false; // 이 화면이 만든 선택 직후
+let bindLayerSelectPending = false; // 이 화면이 레이어 선택을 요청했다(다음 selfSelect가 그것)
+let bindPreviewMini = false; // 최소화 중에 끝난 미리보기
+let bindSilentReq = 0;
+/** 레이어 › 연결에서 쓰는 라이브러리 사용 여부(§4.6 ②) — null = 아직 모름(선택 없음 · 300개 초과 · 읽는 중). */
+let layerLibUse: boolean | null = null;
+let layerLibReq = 0;
 
 /** 건너뛴 레이어의 사유 요약 — '너비 · HUG/FILL'처럼 속성이 있으면 앞에 붙인다. */
 function skipReasonText(s: BindSkip): string {
@@ -2789,8 +2797,8 @@ function bindRows(): TreeRow[] {
             label,
             value: line.currentValue,
             variable,
-            connected: bindResultMode,
-            tip: t(bindResultMode ? 'bind.connectedTip' : 'bind.willConnectTip', tipArgs),
+            connected: false,
+            tip: t('bind.willConnectTip', tipArgs),
           },
         });
       }
@@ -2805,13 +2813,11 @@ function fieldLabel(label: string, rawField: string): string {
 }
 
 function renderBindTree(): void {
-  const has = bindCandidates.length > 0;
-  ($('bindViewRow') as HTMLElement).style.display = has ? '' : 'none';
+  // 필터는 미리보기가 있을 때 트리 바로 위에(§4.6).
   ($('bindTreeCtrls') as HTMLElement).style.display = hasBindPreview() ? '' : 'none';
   renderSelectableTree($('bindTree'), bindRows(), bindChecked, {
     hideContext: bindHideContext,
     onChange: updateBindApply,
-    readOnly: bindResultMode, // 적용 결과: 어느 레이어에 어느 변수가 붙었는지 보기만
   });
   updateBindApply();
 }
@@ -2826,7 +2832,6 @@ function filteredCandidates(): BindCandidate[] {
 }
 
 $('bindFilter').addEventListener('input', () => renderBindTree());
-$('btnBindToManager').addEventListener('click', () => showManager());
 
 /** 선택에 바인딩 버튼 활성/라벨 + 전체선택 마스터 동기화. */
 function updateBindApply(): void {
@@ -2835,7 +2840,7 @@ function updateBindApply(): void {
   // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
   // 이 트리는 노드 헤더도 한 행이라 목록 아래 ‘총 n개’(행 수)와 수가 다르다 → 세는 단위를
   // ‘건’으로 구분해(상태 문구 ‘바인딩 n건 후보’와 같은 말) 같은 수의 오기로 읽히지 않게 한다.
-  $('bindCount').textContent = total ? (bindResultMode ? `연결 ${total}` : `후보 ${total}`) : '';
+  $('bindCount').textContent = total ? `후보 ${total}` : '';
   const confirm = $('btnApplyConfirm') as HTMLButtonElement;
   confirm.style.display = hasBindPreview() ? '' : 'none';
   confirm.disabled = sel === 0;
@@ -2848,8 +2853,10 @@ function updateBindApply(): void {
 
 /** 바인딩 미리보기/적용 상태를 초기화(선택 변경·적용 완료 시). */
 function clearBindPreview(): void {
-  $('bindTree').classList.remove('stale');
-  bindResultMode = false;
+  $('bindNotice').hidden = true;
+  bindPreviewSel = null;
+  bindForeignSel = false;
+  bindHereSel = false;
   bindCandidates = [];
   bindNodes = [];
   bindSkips = [];
@@ -2861,7 +2868,6 @@ function clearBindPreview(): void {
   clearMount($('bindTree'));
   $('bindCount').textContent = '';
   ($('bindTreeCtrls') as HTMLElement).style.display = 'none';
-  ($('bindViewRow') as HTMLElement).style.display = 'none';
   ($('btnApplyConfirm') as HTMLButtonElement).style.display = 'none';
 }
 
@@ -3211,7 +3217,6 @@ function applyCardChrome(): void {
 const STRUCTURE_TIPS: Record<string, string> = {
   btnScanComp: 'component.scanHelp',
   btnScanSimilar: 'similar.scanHelp',
-  btnScanBindings: 'bind.scanHelp',
   btnClassifyVariants: 'component.classifyHelp',
   btnGenMissing: 'component.genMissingHelp',
   btnRegisterComp: 'component.registerHelp',
@@ -3389,7 +3394,10 @@ function onLockedActivate(e: Event): void {
   e.stopImmediatePropagation();
   if (e.type === 'click' || e.type === 'keydown') {
     if (el.dataset.lock === 'paid') showPaidReason();
-    else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: 'warn' });
+    else if (el.id === 'btnApplyExistingText' && curSel.count && !hasTextStyles) {
+      // "등록된 텍스트 스타일이 없어요 · 타이포에서 등록 →(유료)"
+      showStatusLine(t('bind.tsNoneText'), { cls: 'warn', action: { label: t('bind.tsGotoType'), run: () => showMake('type') } });
+    } else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: 'warn' });
   }
 }
 document.addEventListener('click', onLockedActivate, true);
@@ -3494,8 +3502,10 @@ let opProg: number | null = null;
 const opBusy = (): boolean => opWizard || opPending.size > 0;
 const opProgress = (): number | null => opProg;
 
+/** 조용한 다시 계산(복귀 때 미리보기) — 진행 테두리 대상이 아니다(§4.9). */
+let opSilent = false;
 function opSent(msg: UiToCode): void {
-  if (wizardRunning) return; // 마법사 단계 요청은 마법사 한 작업으로 센다
+  if (wizardRunning || opSilent) return; // 마법사 단계 요청은 마법사 한 작업으로 센다
   const def = OPS[msg.type];
   if (!def) return;
   opPending.set(msg.type, def);
@@ -3570,11 +3580,16 @@ function readScreen(why: ReadWhy): void {
     send({ type: 'GET_VARIABLES' });
   }
   if (why === 'work' && !(activeTab === 'variables' && varSub === 'home')) send({ type: 'GET_VAR_TABLE' });
+  if (activeTab === 'layer') {
+    readLayerLibUse();
+    if (why !== 'work') bindOnReturn();
+  }
 }
 
 // 보류(④): 메뉴·팝업·팝오버 열림, 포인터 눌림, 진행 테두리 대상 작업 실행 중, 같은 종류 직전 요청 미완료.
 let pointerDown = false;
-const reentryHeld = (): boolean => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || vmUsageReq !== 0;
+// 같은 종류의 직전 요청 — 변수 목록의 사용 수는 변수 탭에 있을 때만 이 화면의 요청이다(응답이 오면 풀린다).
+const reentryHeld = (): boolean => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || (activeTab === 'variables' && vmUsageInFlight) || !$('readinessPop').hidden;
 const reentry = createReentryScheduler(() => readScreen('reentry'), reentryHeld, {
   now: () => Date.now(),
   set: (fn, ms) => setTimeout(fn, ms),
@@ -3638,6 +3653,7 @@ const screenKey = (): string => (activeTab === 'variables' ? `variables:${varSub
 function showTab(name: TabName): void {
   const changed = name !== activeTab;
   if (changed) screenScroll.set(screenKey(), window.scrollY);
+  if (changed && activeTab === 'layer' && hasBindPreview()) bindLeftSince = true; // 미리보기 뒤 탭을 떠남(⑧)
   activeTab = name;
   for (const tb of TABS) {
     $(`tab-${tb}`).classList.toggle('active', tb === name);
@@ -3801,12 +3817,22 @@ function showStep(attr: 'make' | 'apply', step: string): void {
     if (el.dataset.alwaysHidden !== undefined) continue;
     el.style.display = el.getAttribute(key) === step ? '' : 'none';
   }
-  for (const b of Array.from(rail.querySelectorAll<HTMLElement>('.step-chip'))) {
+  for (const b of Array.from(rail.querySelectorAll<HTMLElement>('.step-chip, .subtab'))) {
     const on = b.getAttribute(key) === step;
-    if (on) b.setAttribute('aria-current', 'step');
+    if (b.classList.contains('subtab')) {
+      // 레이어 하위 탭: tablist, 정지점 1개(§4.1)
+      b.setAttribute('aria-selected', String(on));
+      b.tabIndex = on ? 0 : -1;
+    } else if (on) b.setAttribute('aria-current', 'step');
     else b.removeAttribute('aria-current');
   }
+  if (attr === 'apply') {
+    const changed = currentApplyStep !== step;
+    currentApplyStep = step as ApplyStep;
+    if (changed) syncStickyOffsets();
+  }
 }
+let currentApplyStep: ApplyStep = 'bind';
 
 const showMakeStep = (s: MakeStep): void => showStep('make', s);
 const showApplyStep = (s: ApplyStep): void => showStep('apply', s);
@@ -3814,8 +3840,15 @@ const showApplyStep = (s: ApplyStep): void => showStep('apply', s);
 for (const b of Array.from(document.querySelectorAll<HTMLElement>('#makeRail .step-chip'))) {
   b.addEventListener('click', () => showMakeStep(b.dataset.makeStep as MakeStep));
 }
-for (const b of Array.from(document.querySelectorAll<HTMLElement>('#applyRail .step-chip'))) {
+for (const b of Array.from(document.querySelectorAll<HTMLElement>('#applyRail .subtab'))) {
   b.addEventListener('click', () => showApplyStep(b.dataset.applyStep as ApplyStep));
+  b.addEventListener('keydown', (e) => {
+    const ni = nextTabIndex(e.key, APPLY_STEPS.indexOf(b.dataset.applyStep as ApplyStep), APPLY_STEPS.length);
+    if (ni < 0) return;
+    e.preventDefault();
+    showApplyStep(APPLY_STEPS[ni]);
+    document.querySelector<HTMLElement>(`#applyRail [data-apply-step="${APPLY_STEPS[ni]}"]`)?.focus();
+  });
 }
 showMakeStep('color');
 showApplyStep('bind');
@@ -3824,9 +3857,7 @@ showApplyStep('bind');
 for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-make]'))) {
   b.addEventListener('click', () => showMakeStep(b.dataset.nextMake as MakeStep));
 }
-for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-apply]'))) {
-  b.addEventListener('click', () => showApplyStep(b.dataset.nextApply as ApplyStep));
-}
+
 
 
 
@@ -4084,6 +4115,8 @@ function showManager(): void {
 /* ---------- 선택과 목록 기준 ---------- */
 function onSelectionForList(m: { count: number; scanned: number; ids?: string[]; firstName?: string; selfSelect?: boolean }): void {
   curSel = { ids: m.ids ?? [], count: m.count, scanned: m.scanned, name: m.firstName ?? '' };
+  // "변수 없는 값 찾기 →"는 지금 선택에 대해 동작한다 — 사용 수를 기다리지 않고 잠금을 바로 갱신.
+  setLock($('btnFindUnbound'), curSel.count ? null : 'prereq', t('status.noSelection'));
   if (m.selfSelect) { renderSelBase(); return; } // 플러그인이 만든 선택 — 기준 유지
   setBaseline(curSel.count ? { ...curSel } : null);
 }
@@ -4117,7 +4150,6 @@ function setBaseline(b: SelInfo | null): void {
   vmUsageTimer = setTimeout(() => { vmUsageTimer = null; requestManagerUsage('selection'); }, AUTO_SCAN_DELAY);
 }
 let vmUsageTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleManagerUsage(): void { /* 선택 변경은 onSelectionForList가 맡는다(호환용 빈 함수) */ }
 
 /** 사용 수 요청 — why: quiet(진입·창 다시 들어옴) / work(작업 직후) / selection(선택 변경) / user(↻·[읽기]). */
 function requestManagerUsage(why: 'quiet' | 'work' | 'selection' | 'user' = 'quiet'): void {
@@ -4144,6 +4176,13 @@ function requestManagerUsage(why: 'quiet' | 'work' | 'selection' | 'user' = 'qui
 }
 
 function onUsageResult(msg: Extract<CodeToUi, { type: 'USAGE_RESULT' }>): void {
+  if (msg.reqId === layerLibReq) {
+    // 레이어 › 연결의 ② 판정 — 지금 선택이 라이브러리 변수를 쓰는가.
+    layerLibReq = 0;
+    layerLibUse = msg.libraryVars.length > 0;
+    renderBindPrereq();
+    return;
+  }
   if (msg.reqId !== vmUsageReq) return; // 늦게 온 이전 기준의 응답
   vmUsageInFlight = false;
   const wasVisible = vmUsageVisible;
@@ -4970,9 +5009,14 @@ function openMoreMenu(): void {
 /* ---------- 변수 없는 값 찾기 → 레이어 › 연결(§4.6 예외 규칙은 PR 3) ---------- */
 function findUnbound(): void {
   if (!curSel.count) { showStatusLine(t('status.noSelection'), { cls: 'warn' }); return; }
+  // 진입 규칙(§4.6): 같은 선택의 결과가 있으면 / 실행 중이면 화면만, 연결할 변수가 없으면 안내만, 그 밖은 미리보기.
+  const sameResult = hasBindPreview() && !!bindPreviewSel && sameIds(bindPreviewSel, curSel.ids) && !bindForeignSel;
+  bindLeftSince = false; // 지금 들어가는 것이라 복귀 재계산 대상이 아니다
   showTab('layer');
   showApplyStep('bind');
-  ($('btnApply') as HTMLButtonElement).click();
+  if (sameResult || bindBusy()) return;
+  if (prereqKnown && !hasBindable) { renderBindPrereq(); return; }
+  runBindPreview();
 }
 
 /* ---------- 리스너 ---------- */
@@ -5142,6 +5186,89 @@ $('btnWizListView').addEventListener('click', () => {
   $('varTree').querySelector<HTMLElement>('[data-key]')?.focus();
 });
 $('btnStartLicense').addEventListener('click', goToLicense);
+
+/* =====================================================================
+   레이어 › 연결(IA v3 §4.6)
+   ===================================================================== */
+/** 연결할 변수가 없을 때의 안내(4행)와 [미리보기]·[체크한 항목 연결]·[기존 스타일 연결] 잠금. */
+function renderBindPrereq(): void {
+  // 시작 직후 updateGates가 목록 상태보다 먼저 부를 수 있다 — 그때는 건너뛰고 첫 선택 상태에서 그린다.
+  if (!curSel) return;
+  const notice = $('bindPrereq');
+  const text = notice.querySelector('.prereq-text') as HTMLElement;
+  const act = $('bindPrereqAction') as HTMLButtonElement;
+  let msg = '';
+  let action: [string, () => void] | null = null;
+  // 첫 전제 상태 전에는 '모름' — 경고를 띄우지 않고 막지도 않는다.
+  if (prereqKnown && !hasBindable) {
+    if (prereqLocalVars === 0) {
+      // ②는 라이브러리 사용을 읽었을 때만. 모르면 유료/무료 행.
+      if (layerLibUse === true) msg = t('bind.noLocalLib');
+      else if (isPaid) { msg = t('bind.noVarsPaid'); action = [t('prereq.gotoCreate'), goToCreate]; }
+      else { msg = t('bind.noVarsFree'); action = [t('status.paidAction'), goToLicense]; }
+    } else {
+      msg = t('bind.noTier');
+      action = [t('bind.gotoTiers'), goToTiers];
+    }
+  }
+  notice.style.display = msg ? '' : 'none';
+  text.textContent = msg;
+  act.hidden = !action;
+  if (action) { act.textContent = action[0]; act.onclick = action[1]; }
+  // 선택이 없을 때 세 버튼은 aria-disabled(누르면 사유).
+  const noSel = !curSel.count;
+  setLock($('btnApply'), noSel ? 'prereq' : msg ? 'prereq' : null, noSel ? t('status.noSelection') : msg);
+  const confirm = $('btnApplyConfirm');
+  if (noSel) setLock(confirm, 'prereq', t('status.noSelection'));
+  else if (bindForeignSel && !$('bindNotice').hidden) setLock(confirm, 'prereq', t('bind.selChanged'));
+  else setLock(confirm, null);
+  // 기존 스타일 연결(무료) — 선택 없음 / 등록된 텍스트 스타일 없음.
+  const ts = $('btnApplyExistingText');
+  if (noSel) setLock(ts, 'prereq', t('status.noSelection'));
+  else if (prereqKnown && !hasTextStyles) setLock(ts, 'prereq', t('bind.tsNone'));
+  else setLock(ts, null);
+}
+/** 계층 지정하기 → 변수 › 목록 + 계층 팝업. */
+function goToTiers(): void {
+  showTab('variables');
+  showVarSub('home');
+  requestAnimationFrame(() => openTierPopup($('btnVarMore')));
+}
+/** ② 판정용 — 로컬 변수가 없고 선택이 300개 이하일 때만 라이브러리 사용을 읽는다. */
+function readLayerLibUse(): void {
+  // 연결할 변수가 없고 로컬 변수도 0개일 때만 필요하다(② 판정).
+  if (!prereqKnown || hasBindable || prereqLocalVars > 0 || !curSel.count || curSel.scanned > BIG_SELECTION || layerLibUse !== null || layerLibReq) return;
+  layerLibReq = ++bindReqSeq;
+  send({ type: 'SCAN_USAGE', reqId: layerLibReq, nodeIds: curSel.ids });
+}
+
+/** 다른 탭에서 돌아오거나 창에 다시 들어올 때(§4.6 ⑧). 순서: 최소화 중 결과 → 다른 선택 → 이 화면의 선택 → 조용한 재계산/안내. */
+function bindOnReturn(): void {
+  if (activeTab !== 'layer' || currentApplyStep !== 'bind' || !hasBindPreview()) return;
+  if (bindPreviewMini) { bindPreviewMini = false; return; }
+  const notice = $('bindNotice');
+  if (bindForeignSel || (bindPreviewSel && !sameIds(bindPreviewSel, curSel.ids))) {
+    bindForeignSel = true;
+    $('bindNoticeText').textContent = t('bind.otherSel');
+    notice.hidden = false;
+    renderBindPrereq();
+    return;
+  }
+  if (bindHereSel) { bindHereSel = false; return; }
+  if (!bindLeftSince) return;
+  bindLeftSince = false;
+  if (curSel.scanned > BIG_SELECTION) {
+    $('bindNoticeText').textContent = t('bind.maybeChanged');
+    notice.hidden = false;
+    return;
+  }
+  runBindPreview(true);
+}
+document.documentElement.addEventListener('pointerleave', () => { if (hasBindPreview()) bindLeftSince = true; });
+window.addEventListener('blur', () => { if (hasBindPreview()) bindLeftSince = true; });
+
+/** 연결 미리보기·연결이 실행 중인가. */
+const bindBusy = (): boolean => opPending.has('APPLY') || opPending.has('APPLY_SELECTED');
 
 /* ---------- 첫 화면 — 변수 탭(IA v3) ----------
    파일 맨 끝에서 부른다: 첫 화면이 변수 관리를 그리고 사용 수를 읽으므로, 그 상태 변수가 모두 선언된 뒤여야 한다.
