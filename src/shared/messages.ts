@@ -82,7 +82,7 @@ export interface RenameNode {
 
 /**
  * 바인딩 미리보기(#6)의 한 후보 — (노드, 필드[, 페인트 인덱스])가 매칭한 변수.
- * 체크된 후보만 `APPLY_SELECTED`로 재매칭 없이 그대로 적용한다.
+ * 체크된 후보만 `APPLY_SELECTED`로 연결한다(연결 직전 자리마다 다시 확인 — bindSelectedItems).
  */
 export interface BindCandidate {
   nodeId: string;
@@ -96,8 +96,6 @@ export interface BindCandidate {
   variableName: string;
   /** Component 3 > Semantic 2. */
   tier: number;
-  /** FLOAT 매칭 거리(0/undefined=정확). */
-  distance?: number;
   /** 변수 값(표시용 — 연결 목록의 변수 묶음 줄, §4.6). */
   variableValue?: string;
 }
@@ -144,13 +142,25 @@ export interface ComponentCandidate {
   propsOnly?: boolean;
 }
 
+/**
+ * [기존 스타일 연결]에서 건너뛴 텍스트의 사유(§4.6, §2.11).
+ * - hasStyle: 이미 텍스트 스타일이 붙음(원격·일부 구간 포함)
+ * - noStyle: 모든 글자 속성이 같은 스타일이 없음
+ * - ambiguous: 같은 모양의 스타일이 둘 이상
+ * - boundVars: 크기·줄 높이·자간·글꼴에 변수가 붙음
+ * - mixed: 구간마다 서식이 다름(크기·글꼴·대소문자·밑줄 등)
+ * - instance: 인스턴스 안쪽 글자
+ */
+export type TextStyleSkipReason = 'hasStyle' | 'noStyle' | 'ambiguous' | 'boundVars' | 'mixed' | 'instance';
+
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT' }
   | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
   // reqId: 연결 카드 요청 번호 — 결과에 그대로 돌려줘 UI가 낡은 응답(선택이 바뀐 뒤 도착한 것)을 버린다.
-  | { type: 'APPLY'; tolerance: number; preview?: boolean; reqId?: number } // preview: UX1 dry-run(바인딩 없음)
-  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[]; reqId?: number } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
+  // 매칭은 언제나 "같은 값"(IA v3 §2.11 — 숫자 소수 2자리, 색 #RRGGBB + 양쪽 불투명). 허용오차는 없앴다.
+  | { type: 'APPLY'; preview?: boolean; reqId?: number } // preview: UX1 dry-run(바인딩 없음)
+  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'GET_VAR_TABLE' } // 변수 관리: 로컬 변수 전부(모드별 값·별칭 이름·용도·설명)
   // IA v3 변수 목록(§4.4) — 보기 전용 사용 수. nodeIds = 목록 기준(없으면 지금 선택). 인스턴스 안쪽 포함, 상한 없음.
@@ -191,7 +201,7 @@ export type UiToCode =
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Paid): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Paid): 선택 세트의 빠진 조합 자동 생성
   | { type: 'GET_SETTINGS' } // #19: 설정 탭 설정(기준 크기·리네임 맥락 깊이) 불러오기
-  | { type: 'SET_SETTINGS'; base: number; maxDepth: number; grid: number; tolerance: number } // 바뀔 때마다 clientStorage에 보관
+  | { type: 'SET_SETTINGS'; base: number; maxDepth: number; grid: number } // 바뀔 때마다 clientStorage에 보관
   | { type: 'GET_VARIABLES' } // 3계층 변수 목록(다크 테마 생성의 컬렉션·모드 선택용)
   // 모드 id는 선택 — 생략하면 themeApply가 Light를 고르고 Dark가 없으면 addMode('Dark')로 만든다.
   | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId?: string; toModeId?: string } // 라이트→Dark(없으면 추가) 자동 채움
@@ -212,7 +222,7 @@ export type CodeToUi =
   | { type: 'VAR_USERS'; reqId: number; layers: { id: string; name: string }[]; totalLayers: number; places: number }
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; candidateTotal?: number; reqId?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; candidateTotal?: number; reqId?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수. APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
@@ -220,7 +230,8 @@ export type CodeToUi =
   // `왼쪽 글자 0`을 적어 봐야 실패처럼 읽힐 뿐이다. undefined면 상태줄에서 그 조각을 생략한다.
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number }
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[] } // Phase C (notes=경고 아닌 알림)
-  | { type: 'TEXT_STYLES_APPLIED'; applied: number; missing: string[] } // Phase C: 적용만(생성 없음) 결과
+  // 기존 스타일 연결(§4.6) — skipped = 건너뛴 텍스트 레이어 수(= skipReasons 합), skipReasons = 사유별 텍스트 수.
+  | { type: 'TEXT_STYLES_APPLIED'; applied: number; skipped: number; skipReasons: Record<TextStyleSkipReason, number>; missing: string[] }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   | { type: 'GLOBAL_COLORS'; colors: { name: string; hex: string }[] } // #10: 기존 Global 색(이름+hex)
   // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).
@@ -262,7 +273,7 @@ export type CodeToUi =
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
-  | { type: 'SETTINGS'; base: number; maxDepth: number; grid: number; tolerance: number } // #19: 보관된 설정(없으면 기본값). grid=여백·크기 격자, tolerance=바인딩 허용오차
+  | { type: 'SETTINGS'; base: number; maxDepth: number; grid: number } // #19: 보관된 설정(없으면 기본값). grid=만들기가 값을 맞추는 간격
   | { type: 'VARIABLES'; vars: VarInfo[] } // 3계층 변수 목록(다크 카드의 컬렉션·모드 선택지)
   // modeCreated: Dark 모드를 이번에 만들었는가(안내 문구가 달라진다). error: 채우기 전 단계 실패.
   | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number; modeCreated?: boolean; error?: string }

@@ -217,24 +217,9 @@
     .step-chip[aria-current="step"] { border-color: var(--accent-border); background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
     .step-chip .n { display: block; font-size: 11px; font-weight: 600; }
 
-    /* ── 선택 동기화 바 (탭 아래 sticky) ── */
-    #selBarWrap {
-      position: sticky; top: var(--tabs-h, 41px); z-index: 2; margin: 0 0 10px;
-      background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 7px 10px;
-    }
-    .selbar { color: var(--text); font-weight: 500; display: flex; align-items: center; gap: 0; min-width: 0; white-space: nowrap; }
-    .selbar .sel-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
-    .selbar .sel-name:only-child, .selbar .sel-name:has(+ .sel-sub:empty) { max-width: none; }
-    .selbar .sel-sub { flex: 0 0 auto; }
-    .selbar .sel-sub:empty { display: none; }
-    .selbar .sel-base { flex: 0 1 auto; min-width: 0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); font-weight: 400; }
-    .selbar .sel-base:empty { display: none; }
-    .selbar .sel-rebase { margin-left: auto; flex: 0 0 auto; font-weight: 600; }
     .ctx-menu .menu-note { display: block; font-size: 10px; color: var(--muted); font-weight: 400; }
     .ctx-menu button[aria-disabled="true"] { color: var(--muted); }
     .wiz-done { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    .selbar.muted { color: var(--muted); font-weight: 400; }
 
     /* ── 콜아웃(안내 노트) ── */
     .ux {
@@ -300,7 +285,6 @@
 
     /* ── 시스템화 마법사 스테퍼 ── */
     #wizardSteps { margin-top: 8px; }
-    #wizardBar { margin-top: 8px; }
 
     /* ── 첫 실행 배너 — 카드가 아니라 한 줄(온보딩 흡수) ── */
     .banner {
@@ -505,6 +489,8 @@
     .bg-head { font-weight: 600; color: var(--text); }
     .bg-place { padding-left: 42px; color: var(--text); }
     .bg-place.off { color: var(--text-2); }
+    .bg-head.off { color: var(--text-2); }
+    .skip-total { color: var(--text-2); font-size: 10.5px; margin-right: 2px; align-self: center; }
     .bg-tw { width: 24px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; }
     /* 색 견본은 원 — 네모 체크박스와 헷갈리지 않게(흰색 견본이 빈 체크박스로 보였다). */
     .bg-sw { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border-2); flex: 0 0 auto; }
@@ -514,7 +500,6 @@
     .bg-num { margin-left: auto; color: var(--text-2); font-weight: 500; font-size: 10.5px; }
     .bg-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .bg-layer { padding: 0; min-height: 0; }
-    .bg-approx { color: var(--warn, var(--text-2)); }
     .tier-chip {
       height: 24px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
       border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
@@ -649,10 +634,6 @@
     </button>
   </div>
 
-  <!-- 선택 동기화 (실시간) -->
-  <div id="selBarWrap">
-    <div class="selbar muted" id="selBar"><span class="sel-name" id="selName">● 선택 상태를 불러오는 중…</span><span class="sel-sub" id="selSub"></span><span class="sel-base" id="selBase"></span><button class="link link-btn sel-rebase" id="btnRebase" type="button" data-i18n="list.rebase" hidden>기준 바꾸기</button></div>
-  </div>
 
   <section class="tab-section" id="tab-variables" role="tabpanel" aria-labelledby="tabbtn-variables" tabindex="0">
    <!-- IA v3 변수 탭(§4.2~§4.4): 불러오는 중 / 시작 화면(로컬 변수 0개) / 변수 목록. 만들기는 아래 하위 화면. -->
@@ -707,7 +688,8 @@
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
-      <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
+      <div class="hint" data-i18n="wizardCard.hint">선택한 프레임의 색·간격을 변수로 만들고 레이어 이름을 정리해요</div>
+      <div class="hint" id="wizNoSel" hidden data-i18n="wizardCard.noSel">레이어를 선택하면 실행할 수 있어요</div>
       <div class="wiz-done" id="wizDone" hidden><b id="wizDoneText"></b> <button class="link link-btn" id="btnWizListView" type="button" data-i18n="start.viewList">변수 목록 보기</button></div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
@@ -726,9 +708,10 @@
       <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
            파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
            흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기 · 다크=라이트 모드에서 어두운 값 채우기</div>
-      <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 다크=라이트 모드에서 어두운 값 채우기</div>
       <div class="status" id="wizardSummary"></div>
+      <!-- 요약 끝 연결 안내(§4.3) — 마법사는 레이어에 변수를 붙이지 않는다. 누르면 레이어 › 연결 + 미리보기. -->
+      <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">레이어 › 연결에서 확인하고 연결하기 →</button>
     </div>
 
    <!-- 만들기 하위 화면 — "← 돌아가기"로 변수 탭 첫 화면. -->
@@ -911,14 +894,13 @@
       <div class="bind-desc" id="bindDesc" hidden></div>
       <!-- 건너뜀 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다. 목록 위: 몇 개가 왜 빠졌는지 먼저. -->
       <div class="skip-row" id="bindSkips" style="display:none"></div>
-      <div class="hint" id="bindSkipHint" style="display:none" data-i18n="bind.skipHint">건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다</div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:160px" />
       </div>
       <div class="bind-head" id="bindHead" hidden>
         <input type="checkbox" id="bindAll" />
         <span data-i18n="bind.headCol">연결</span>
-        <span data-i18n="bind.headVar">변수 · 연결할 자리</span>
+        <span data-i18n="bind.headVar">변수</span>
         <span class="grow"></span>
         <span class="outside" id="bindOutside"></span>
         <span data-i18n="bind.headCount">곳</span>
@@ -968,8 +950,8 @@
       <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
       <div class="toolbar toolbar-2">
         <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">묶기</button>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다. 원본의 연결과 값은 마스터를 따라요.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다. 원본의 연결과 값은 마스터를 따라요.">묶기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -1001,11 +983,9 @@
         <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
         <label class="inline"><span data-i18n="settings.depth">이름 정리 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
       </div>
-      <!-- 격자와 허용오차는 한 쌍이다 — 격자가 오차보다 크면 스냅한 토큰이 원래 레이어와
-           안 맞아 연결 단계에서 도로 떨어진다. 그래서 같은 줄에 나란히 두고 함께 고치게 한다. -->
+      <!-- 허용오차는 없앴다(§4.8) — 연결은 언제나 같은 값만. 격자는 만들기가 값을 맞추는 간격이다. -->
       <div class="row">
-        <label class="inline" data-i18n-title="settings.gridTip" title="여백·크기 토큰을 미리보기에서 이 격자로 모읍니다. 예: 8이면 13·15가 16으로."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
-        <label class="inline" data-i18n-title="settings.tolTip" title="바인딩은 레이어 값과 변수 값의 차이가 이 값 이하일 때 같은 값으로 봅니다. 격자로 옮긴 토큰까지 붙이려면 격자의 절반쯤이 필요합니다."><span data-i18n="settings.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" max="16" step="0.5" />px</label>
+        <label class="inline" data-i18n-title="settings.gridTip" title="여백·크기 토큰을 만들기에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
       </div>
     </div>
 
@@ -1301,7 +1281,6 @@
     "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizard.step.dark": "\uB2E4\uD06C",
     "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "wizard.step.bind": "\uBCC0\uC218\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
@@ -1310,7 +1289,7 @@
     "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
     "wizard.skip.paid": "Paid \uC804\uC6A9",
     "wizard.chip.paid": "Paid \uC804\uC6A9 \uB2E8\uACC4\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB701\uB2C8\uB2E4 \u2014 \uC124\uC815 \uD0ED\uC5D0\uC11C \uB77C\uC774\uC120\uC2A4\uB97C \uB4F1\uB85D\uD558\uBA74 \uD568\uAED8 \uB3D5\uB2C8\uB2E4",
-    "wizard.paidSkipped": " \xB7 Paid \uC804\uC6A9\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC73C\uB2C8 \uC774\uBBF8 \uC788\uB294 \uBCC0\uC218\uC5D0\uB9CC \uC5F0\uACB0\uD569\uB2C8\uB2E4",
+    "wizard.paidSkipped": " \xB7 \uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     // 진행 안내(파이프라인) 단계 상태
     "pipeline.stat.done": "\uC644\uB8CC",
     "pipeline.stat.ready": "\uC900\uBE44",
@@ -1318,7 +1297,10 @@
     "pipeline.stat.todo": "\uB9CC\uB4E4\uAE30",
     // 바인딩 스킵 사유(라벨 맵)
     "reason.no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
-    "reason.already-bound": "\uC774\uBBF8 \uBC14\uC778\uB529\uB428",
+    "reason.already-bound": "\uC774\uBBF8 \uC5F0\uACB0\uB428",
+    "reason.styled": "\uC2A4\uD0C0\uC77C \uC0AC\uC6A9 \uC911",
+    "reason.deleted-var": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB428",
+    "reason.changed": "\uADF8 \uC0AC\uC774 \uBC14\uB01C",
     "reason.empty-text": "\uBE48 \uD14D\uC2A4\uD2B8",
     "reason.error": "\uC5F0\uACB0 \uC2E4\uD328",
     "reason.hug-fill": "HUG/FILL",
@@ -1328,7 +1310,7 @@
     "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
     "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
-    "reason.translucent": "\uBC18\uD22C\uBA85(\uBCC0\uC218 alpha\uAC00 \uB36E\uC5B4\uC500)",
+    "reason.translucent": "\uBC18\uD22C\uBA85",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
@@ -1344,16 +1326,12 @@
     "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD569\uB2C8\uB2E4",
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
-    "wizard.seq.bindCancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uAC74\uB9CC \uC801\uC6A9",
-    "wizard.seq.bindDone": "\uC5F0\uACB0 {bound}",
-    "wizard.seq.bindSkip": " \xB7 \uC2A4\uD0B5 {n}",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
     "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
     "wizard.sum.tokens": "\uD1A0\uD070 {n}",
     "wizard.sum.dark": "\uB2E4\uD06C {n}",
     "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
-    "wizard.sum.bound": "\uC5F0\uACB0 {n}",
     "wizard.sum.renamed": "\uC774\uB984 {n}",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "wizard.sum.empty": "\uC644\uB8CC\uB41C \uC791\uC5C5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
@@ -1409,6 +1387,12 @@
     "bind.noVarsPaid": "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
     "bind.noVarsFree": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694",
     "bind.tsDone": "\u2713 \uD14D\uC2A4\uD2B8 {n}\uAC1C\uC5D0 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
+    "tsSkip.hasStyle": "\uC774\uBBF8 \uC2A4\uD0C0\uC77C \uC788\uC74C",
+    "tsSkip.noStyle": "\uAC19\uC740 \uC2A4\uD0C0\uC77C \uC5C6\uC74C",
+    "tsSkip.ambiguous": "\uAC19\uC740 \uBAA8\uC591 \uC2A4\uD0C0\uC77C\uC774 \uB458 \uC774\uC0C1",
+    "tsSkip.boundVars": "\uAE00\uC790 \uC18D\uC131\uC5D0 \uBCC0\uC218 \uC788\uC74C",
+    "tsSkip.mixed": "\uC11C\uC2DD\uC774 \uC11E\uC784",
+    "tsSkip.instance": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD",
     "bind.tsNone": "\uB4F1\uB85D\uB41C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694 \xB7 \uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
     "bind.tsNoneText": "\uB4F1\uB85D\uB41C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694",
     "bind.tsGotoType": "\uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
@@ -1422,14 +1406,13 @@
     "start.libNote": "\u24D8 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB294 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694. \uAC19\uC740 \uBCC0\uC218\uB97C \uC5EC\uAE30\uC11C \uB610 \uB9CC\uB4E4 \uD544\uC694\uB294 \uC5C6\uC5B4\uC694.",
     "start.made": "\uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
     "start.viewList": "\uBCC0\uC218 \uBAA9\uB85D \uBCF4\uAE30",
-    "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uACE0 \uC5F0\uACB0\uD574\uC694",
+    "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uB808\uC774\uC5B4 \uC5F0\uACB0\uC740 \uB05D\uB09C \uB4A4 \uD655\uC778\uD558\uACE0 \uD574\uC694",
+    "wizardCard.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC2E4\uD589\uD560 \uC218 \uC788\uC5B4\uC694",
+    "wizard.toBind": "\uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.seq.cancelSkipped": "\uCDE8\uC18C\uB85C \uAC74\uB108\uB700",
     "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uB9CC \uC815\uB9AC\uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
-    "wizardCard.hintFreeVars": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uACC4\uCE35\uC774 \uC788\uB294 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uACFC \uB808\uC774\uC5B4 \uC774\uB984 \uC815\uB9AC\uB9CC \uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
     "wizardCard.runFree": "\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
-    "wizardCard.runFreeVars": "\uC5F0\uACB0\xB7\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
-    "wizard.freeSumNoVars": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
-    "wizard.freeSumVars": "\uC5F0\uACB0 {m}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
-    "wizard.freeNoTier": " \xB7 \uACC4\uCE35\uC774 \uC9C0\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694 \u2014 \uBCC0\uC218 \uD0ED \u22EF \u203A \uCEEC\uB809\uC158 \uACC4\uCE35 \uC9C0\uC815",
+    "wizard.freeSum": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
     "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total} \u25BE",
     "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
@@ -1453,7 +1436,8 @@
     "list.wizardWait": "\uB9C8\uBC95\uC0AC\uAC00 \uB05D\uB098\uBA74 \uC77D\uC5B4\uC694",
     "list.noneUsed": "\uC774 \uC120\uD0DD\uC740 \uB85C\uCEEC \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694",
     "list.selectHint": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uB9CC \uD3BC\uCCD0\uC838\uC694",
-    "list.base": "\xB7 \uBAA9\uB85D \uAE30\uC900: {name}",
+    "list.baseDiff": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694 \xB7 ",
+    "list.baseDiffNoSel": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD \uC5C6\uC74C \xB7 ",
     "list.baseMany": "\uB808\uC774\uC5B4 {m}\uAC1C",
     "list.rebase": "\uAE30\uC900 \uBC14\uAFB8\uAE30",
     "list.unused": "\uC548 \uC500",
@@ -1501,11 +1485,9 @@
     "ui.expandBusy": "\uD3BC\uCE58\uAE30 \xB7 \uC791\uC5C5 \uC911",
     "ui.expandFail": "\uD3BC\uCE58\uAE30 \xB7 \uC2E4\uD328\uD55C \uC791\uC5C5 \uC788\uC74C",
     // 선택 표시줄(§4.1)
-    "sel.none": "\u25CF \uC120\uD0DD \uC5C6\uC74C \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
     "sel.unnamed": "(\uC774\uB984 \uC5C6\uC74C)",
-    "sel.many": "\u25CF \uB808\uC774\uC5B4 {k}\uAC1C",
-    "sel.sub": "\xA0\xB7 \uD558\uC704 {n}",
-    // 앞 공백은 줄바꿈 없는 공백 — 플렉스 항목 앞 공백은 사라진다
+    "sel.noneHere": "\uC120\uD0DD\uC774 \uC5C6\uC5B4\uC694 \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    "make.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC758 \uAC12\uC73C\uB85C \uB9CC\uB4E4\uC5B4\uC694",
     // 공통 상태 줄(§4.1·§2.3)
     "status.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4\uC5D0\uC11C \uD480 \uC218 \uC788\uC5B4\uC694",
     "status.paidAction": "\uB77C\uC774\uC120\uC2A4 \u2192",
@@ -1566,16 +1548,14 @@
     "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB429\uB2C8\uB2E4",
     "ts.weight": "\uAD75\uAE30 \u2014 Regular \xB7 Medium \xB7 SemiBold \xB7 Bold \uCC98\uB7FC Figma\uAC00 \uC4F0\uB294 \uC774\uB984",
     "settings.grid": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uACA9\uC790",
-    "settings.gridTip": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC744 \uBBF8\uB9AC\uBCF4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC74D\uB2C8\uB2E4. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C.",
-    "settings.tol": "\uD5C8\uC6A9\uC624\uCC28",
-    "settings.tolTip": "\uBC14\uC778\uB529\uC740 \uB808\uC774\uC5B4 \uAC12\uACFC \uBCC0\uC218 \uAC12\uC758 \uCC28\uC774\uAC00 \uC774 \uAC12 \uC774\uD558\uC77C \uB54C \uAC19\uC740 \uAC12\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uACA9\uC790\uB85C \uC62E\uAE34 \uD1A0\uD070\uAE4C\uC9C0 \uBD99\uC774\uB824\uBA74 \uACA9\uC790\uC758 \uC808\uBC18\uCBE4\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.",
+    "settings.gridTip": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC744 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
     // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
-    "create.snapTolGap": " \xB7 \uC62E\uAE34 \uAC12\uC740 \uD5C8\uC6A9\uC624\uCC28 {tol}px\uB85C\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC548 \uBD99\uC2B5\uB2C8\uB2E4(\uC124\uC815\uC5D0\uC11C {half}px\uB85C)",
+    "create.snapNoBind": " \xB7 \uACA9\uC790\uB85C \uC62E\uAE34 {k}\uAC1C \uAC12\uC740 \uC6D0\uB798 \uB808\uC774\uC5B4\uC640 \uB2EC\uB77C \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694",
     // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
     "create.tidyUndo": "\uB418\uB3CC\uB9AC\uAE30",
     // 마법사 카드
     "wizardCard.title": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
-    "wizardCard.hint": "\uC120\uD0DD \uD654\uBA74\uC744 \uD55C \uBC88\uC5D0 \uD1A0\uD070\xB7\uBCC0\uC218 \uC5F0\uACB0\uAE4C\uC9C0 \uC815\uB9AC\uD569\uB2C8\uB2E4",
+    "wizardCard.hint": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uACE0 \uB808\uC774\uC5B4 \uC774\uB984\uC744 \uC815\uB9AC\uD574\uC694",
     "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizardCard.optDark": "\uB2E4\uD06C",
     "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
@@ -1583,7 +1563,7 @@
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
     // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uBCC0\uC218\uC5F0\uACB0=\uD654\uBA74\uC5D0 \uBD99\uC774\uAE30 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8 \uBAA8\uB4DC\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
+    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8 \uBAA8\uB4DC\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4",
     "prereq.gotoCreate": "\uD1A0\uD070 \uC0DD\uC131\uC73C\uB85C \u2192",
@@ -1654,27 +1634,27 @@
     "bind.confirmN": "\uCCB4\uD06C\uD55C {n}\uACF3 \uC5F0\uACB0",
     "bind.needPreview": "\uBA3C\uC800 [\uBBF8\uB9AC\uBCF4\uAE30]\uB97C \uB204\uB974\uC138\uC694",
     "bind.nothing": "\uC5F0\uACB0\uD560 \uACF3\uC774 \uC5C6\uC5B4\uC694",
-    "bind.needCheck": "\uC5F0\uACB0\uD560 \uACF3\uC744 \uCCB4\uD06C\uD558\uC138\uC694",
     "bind.intro": "[\uBBF8\uB9AC\uBCF4\uAE30]\uB97C \uB204\uB974\uBA74 \uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C \uBCC0\uC218 \uAC12\uACFC \uAC19\uC740 \uC0C9\xB7\uD06C\uAE30\xB7\uAC04\uACA9 \uAC12\uC744 \uCC3E\uC544\uC694",
-    "bind.desc": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12 {n}\uACF3\uC744 \uCC3E\uC558\uC5B4\uC694. \uBAA8\uB450 \uCCB4\uD06C\uD574 \uB480\uC5B4\uC694. \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC744 \uACF3\uC740 \uCCB4\uD06C\uB97C \uD478\uC138\uC694. \uCCB4\uD06C\uB97C \uD47C \uACF3\uC740 \uADF8\uB300\uB85C \uB46C\uC694.",
-    "bind.descApprox": " \uAC12\uC774 \uC870\uAE08 \uB2E4\uB978 \uACF3(~)\uC740 \uC5F0\uACB0\uD558\uBA74 \uBCC0\uC218 \uAC12\uC73C\uB85C \uB9DE\uCDB0\uC838\uC694.",
+    "bind.desc": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12 {n}\uACF3\uC744 \uCC3E\uC558\uC5B4\uC694 \xB7 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC744 \uBCC0\uC218\uB294 \uCCB4\uD06C\uB97C \uD478\uC138\uC694",
+    "bind.introNoSel": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD55C \uB4A4 [\uBBF8\uB9AC\uBCF4\uAE30]\uB97C \uB204\uB974\uC138\uC694",
+    "bind.skipTotal": "\uAC74\uB108\uB700 {m}",
+    "bind.skipCappedTip": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0",
+    "bind.groupTipPartial": " \xB7 \uC77C\uBD80\uB9CC \uBE7C\uB824\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uBE80 \uB098\uBA38\uC9C0\uB97C \uC120\uD0DD\uD558\uACE0 \uBBF8\uB9AC\uBCF4\uAE30",
+    "bind.needCheckVar": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uCCB4\uD06C\uD558\uC138\uC694",
     "bind.descNone": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "bind.selMany": "\uB808\uC774\uC5B4 {k}\uAC1C",
     "bind.headCol": "\uC5F0\uACB0",
-    "bind.headVar": "\uBCC0\uC218 \xB7 \uC5F0\uACB0\uD560 \uC790\uB9AC",
+    "bind.headVar": "\uBCC0\uC218",
     "bind.headCount": "\uACF3",
     "bind.allAria": "\uBCF4\uC774\uB294 \uBB36\uC74C \uC804\uCCB4 \uCCB4\uD06C",
     "bind.outside": "\uD544\uD130 \uBC16 \uCCB4\uD06C {h}\uACF3 \uD3EC\uD568",
     "bind.groupTip": "{name}\uC744(\uB97C) \uC774 {k}\uACF3\uC5D0 \uC5F0\uACB0\uD574\uC694",
     "bind.placeCount": " \xB7 {k}\uACF3",
-    "bind.approxTip": "\uBCC0\uC218 \uAC12\uACFC {d} \uCC28\uC774 \xB7 \uC5F0\uACB0\uD558\uBA74 \uBCC0\uC218 \uAC12\uC73C\uB85C \uBC14\uB00C\uC5B4\uC694",
     "bind.layerTip": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uC120\uD0DD \xB7 \uC774 \uBAA9\uB85D\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
-    "bind.uncheckedTip": "\uCCB4\uD06C\uB97C \uD480\uBA74 \uC774 \uAC12\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
+    "bind.uncheckedTip": "\uCCB4\uD06C\uB97C \uD480\uBA74 \uC774 {k}\uACF3\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
     "bind.expand": "\uD3BC\uCE58\uAE30",
     "bind.collapse": "\uC811\uAE30",
     "bind.progress": "\uC9C4\uD589\uB960",
-    "bind.skipHint": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4",
-    "bind.skipCapped": "\uAC74\uB108\uB700 \uC0AC\uC720 \xB7 \uB204\uB974\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uCE94\uBC84\uC2A4\uC5D0\uC11C \uACE0\uB985\uB2C8\uB2E4 \u2014 \uB808\uC774\uC5B4\uAC00 \uB9CE\uC544 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0\uB9CC \uBCF4\uC5EC\uC90D\uB2C8\uB2E4(\uC0AC\uC720 \uC606 \uC22B\uC790\uB294 \uC804\uCCB4)",
     // 스킵 칩 툴팁 — 사유 건수(속성 단위)와 레이어 수가 다를 수 있어 레이어 쪽을 따로 밝힌다.
     "bind.skipChipTip": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names}",
     "bind.skipChipTipMore": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names} \uC678",
@@ -1734,11 +1714,11 @@
     "component.classifyBtn": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958",
     "component.genMissingBtn": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131",
     "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC2B5\uB2C8\uB2E4. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uC81C\uC678.",
-    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uAE41\uB2C8\uB2E4.",
+    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uAE41\uB2C8\uB2E4. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
     "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB9CC \uAC19\uC740 \uC774\uB984\uB07C\uB9AC \uC138\uD2B8\uB85C \uB2E4\uC2DC \uBB36\uC2B5\uB2C8\uB2E4.",
     "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6C1\uB2C8\uB2E4.",
     "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
-    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4.",
+    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
     "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC73C\uB85C \uBB36\uC744 \uD504\uB808\uC784\uACFC \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.",
     "similar.needScanAfterComp": "\u2018\uD6C4\uBCF4 \uC2A4\uCE94\u2019 \uACB0\uACFC\uB294 \u2018\uB4F1\uB85D\u2019\uC774 \uC501\uB2C8\uB2E4. \uBB36\uAE30\uB294 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC744 \uBA3C\uC800 \uC2E4\uD589\uD558\uC138\uC694.",
     // 내보내기
@@ -1848,21 +1828,16 @@
       for (const [nodeId, items] of byNode) {
         for (const l of groupBindLines(items)) {
           const its = l.items;
-          const d = Math.max(...its.map((x) => {
-            var _a2;
-            return (_a2 = x.distance) != null ? _a2 : 0;
-          }));
-          lines.push(__spreadValues({
+          lines.push({
             nodeId,
             label: l.label,
             fields: l.fields,
             keys: its.map((x) => placeKey(__spreadProps(__spreadValues({}, x), { nodeId }))),
             currentValue: l.currentValue
-          }, d > 0 ? { distance: d } : {}));
+          });
         }
       }
-      const exact = list.find((c) => !c.distance);
-      const variableValue = (_b = (_a = list.find((c) => c.variableValue != null)) == null ? void 0 : _a.variableValue) != null ? _b : (exact != null ? exact : list[0]).currentValue;
+      const variableValue = (_b = (_a = list.find((c) => c.variableValue != null)) == null ? void 0 : _a.variableValue) != null ? _b : list[0].currentValue;
       const keys = lines.flatMap((l) => l.keys);
       groups.push({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines });
     }
@@ -1870,25 +1845,18 @@
     return groups;
   }
   function carryChecks(prev, prevChecked, next) {
-    var _a;
+    var _a, _b;
     const prevKeys = new Set(prev.map(placeKey));
-    const anyChecked = /* @__PURE__ */ new Map();
-    for (const c of prev) {
-      const on = prevChecked.has(placeKey(c));
-      anyChecked.set(c.variableId, ((_a = anyChecked.get(c.variableId)) != null ? _a : false) || on);
-    }
+    const varOn = /* @__PURE__ */ new Map();
+    for (const c of prev) varOn.set(c.variableId, ((_a = varOn.get(c.variableId)) != null ? _a : false) || prevChecked.has(placeKey(c)));
     const checked = /* @__PURE__ */ new Set();
     const nextKeys = /* @__PURE__ */ new Set();
     let added = 0;
     for (const c of next) {
       const k = placeKey(c);
       nextKeys.add(k);
-      if (prevKeys.has(k)) {
-        if (prevChecked.has(k)) checked.add(k);
-        continue;
-      }
-      added++;
-      if (anyChecked.get(c.variableId) !== false) checked.add(k);
+      if (!prevKeys.has(k)) added++;
+      if ((_b = varOn.get(c.variableId)) != null ? _b : true) checked.add(k);
     }
     let removed = 0;
     for (const k of prevKeys) if (!nextKeys.has(k)) removed++;
@@ -2316,11 +2284,6 @@
         return held || debounce !== null || interval !== null;
       }
     };
-  }
-  function selectionSummary(count, scanned, capped) {
-    if (count <= 0) return { kind: "none", sub: "" };
-    const n = Math.max(0, scanned - count);
-    return { kind: count === 1 ? "one" : "many", sub: `${n}${capped ? "+" : ""}` };
   }
 
   // src/lib/color.ts
@@ -2834,7 +2797,6 @@
     // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
     { id: "dark", write: true, optional: true, paid: true },
     { id: "textStyles", write: true, optional: true, paid: true },
-    { id: "bind", write: true, optional: false },
     { id: "rename", write: true, optional: false },
     { id: "componentize", write: true, optional: true, paid: true }
   ];
@@ -2869,7 +2831,6 @@
     if (totals.created != null) parts.push(t("wizard.sum.tokens", { n: totals.created }));
     if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t("wizard.sum.dark", { n: totals.darkFilled }));
     if (totals.textStyles != null && totals.textStyles > 0) parts.push(t("wizard.sum.textStyles", { n: totals.textStyles }));
-    if (totals.bound != null) parts.push(t("wizard.sum.bound", { n: totals.bound }));
     if (totals.renamed != null) parts.push(t("wizard.sum.renamed", { n: totals.renamed }));
     if (totals.components != null && totals.components > 0) parts.push(t("wizard.sum.components", { n: totals.components }));
     return parts.length ? parts.join(" \xB7 ") : t("wizard.sum.empty");
@@ -3376,9 +3337,7 @@
     carryTokenChecked(snapshot, r.tokens);
     $("numTidySummary").style.display = "";
     const merged = r.merged ? ` \xB7 \uAC19\uC740 \uCE78 ${r.merged}\uAC1C \uBCD1\uD569` : "";
-    const half = grid / 2;
-    const tol = bindTolerance();
-    const gap = tol < half ? t("create.snapTolGap", { tol, half }) : "";
+    const gap = r.snapped ? t("create.snapNoBind", { k: r.snapped }) : "";
     $("numTidyText").textContent = `\uC5EC\uBC31\xB7\uD06C\uAE30 ${r.before} \u2192 ${r.after}\uAC1C (${grid}px \uACA9\uC790\uB85C ${r.snapped}\uAC1C \uC774\uB3D9${merged})${gap}`;
   }
   function undoNumTidy() {
@@ -3435,18 +3394,13 @@
         type: "SET_SETTINGS",
         base: Number($("base").value) || 16,
         maxDepth: readMaxDepth(),
-        grid: tidyGrid(),
-        tolerance: bindTolerance()
+        grid: tidyGrid()
       });
     }, 350);
   }
   $("base").addEventListener("input", saveSettings);
   $("depth").addEventListener("input", saveSettings);
   $("grid").addEventListener("input", saveSettings);
-  $("tol").addEventListener("input", () => {
-    saveSettings();
-    clearBindPreview();
-  });
   $("base").addEventListener("input", () => {
     const applyBtn = $("btnCreateApply");
     if (applyBtn.style.display === "none") return;
@@ -3653,12 +3607,6 @@
     $("tsApplyResult").hidden = true;
     send({ type: "APPLY_TEXT_STYLES" });
   });
-  var BIND_TOLERANCE_DEFAULT = 0.5;
-  function bindTolerance() {
-    const raw = $("tol").value.trim();
-    const v = Number(raw);
-    return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
-  }
   var AUTO_SCAN_DELAY = 250;
   var bindReqSeq = 0;
   var bindLatest = 0;
@@ -3685,10 +3633,10 @@
     const reqId = nextBindReq();
     bindSilentReq = silent ? reqId : 0;
     opSilent = silent;
-    send({ type: "APPLY", tolerance: bindTolerance(), preview: true, reqId });
+    send({ type: "APPLY", preview: true, reqId });
     opSilent = false;
     bindPreviewSel = curSel.ids.slice();
-    if (!silent) bindPreviewName = curSel.count === 1 ? curSel.name || t("sel.unnamed") : t("bind.selMany", { k: curSel.count });
+    if (!silent) bindPreviewName = curSel.count === 1 ? shortName(curSel.name || t("sel.unnamed")) : t("bind.selMany", { k: curSel.count });
   }
   $("btnBindRepreview").addEventListener("click", () => runBindPreview());
   $("btnBindToList").addEventListener("click", () => showManager());
@@ -3733,7 +3681,6 @@
   window.addEventListener("message", (event) => {
     const m = event.data.pluginMessage;
     if (!m) return;
-    if (wizardRunning && m.type === "PROGRESS" && m.op === "bind") updateWizardBar(m.done, m.total);
     if (!wizardWaiter) return;
     if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
       const w = wizardWaiter;
@@ -3756,18 +3703,6 @@
       };
       send(msg);
     });
-  }
-  function showWizardBar() {
-    $("wizardBar").style.display = "";
-    $("wizardBarFill").style.width = "0%";
-  }
-  function updateWizardBar(done, total) {
-    $("wizardBar").style.display = "";
-    const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
-    $("wizardBarFill").style.width = `${pct}%`;
-  }
-  function hideWizardBar() {
-    $("wizardBar").style.display = "none";
   }
   function paidSkippedSteps(plan) {
     return plan.filter((p) => !p.run && p.skipReason === "wizard.skip.paid");
@@ -3802,14 +3737,13 @@
     chip2.title = note;
   }
   async function runWizard() {
-    var _a, _b;
+    var _a;
     if (wizardRunning) return;
     if (lastSelCount <= 0) {
       setStatus("wizardSummary", t("wizard.needSelect"), "warn");
       return;
     }
     const base = Number($("base").value) || 16;
-    const tolerance = bindTolerance();
     const maxDepth = readMaxDepth();
     let semMap = textToSemanticMap($("semMap").value);
     const options = {
@@ -3834,10 +3768,14 @@
     const totals = {};
     let stopped = false;
     let failNote = "";
+    wizCancelReq = false;
+    wizEnded = false;
+    renderWizToBind();
     for (const p of plan) {
       if (!p.run) continue;
+      if (wizCancelReq && !stopped) stopped = true;
       if (stopped) {
-        setWizardStep(p.step.id, "fail", t("wizard.seq.stoppedPrev"));
+        setWizardStep(p.step.id, "fail", wizCancelReq ? t("wizard.seq.cancelSkipped") : t("wizard.seq.stoppedPrev"));
         continue;
       }
       setWizardStep(p.step.id, "active", t("wizard.seq.running"));
@@ -3916,19 +3854,6 @@
             setWizardStep("textStyles", "done", t("wizard.seq.textStyles", { created: r.created, updated: r.updated }));
             break;
           }
-          case "bind": {
-            showWizardBar();
-            const r = await wizardRequest({ type: "APPLY", tolerance }, ["APPLY_RESULT"]);
-            hideWizardBar();
-            totals.bound = r.bound;
-            if (r.cancelled) {
-              setWizardStep("bind", "done", t("wizard.seq.bindCancelled", { bound: r.bound }));
-              stopped = true;
-              break;
-            }
-            setWizardStep("bind", "done", t("wizard.seq.bindDone", { bound: r.bound }) + (r.skipped ? t("wizard.seq.bindSkip", { n: r.skipped }) : ""));
-            break;
-          }
           case "rename": {
             const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth }, ["RENAME_RESULT"]);
             totals.renamed = r.changes.length;
@@ -3943,7 +3868,6 @@
           }
         }
       } catch (e) {
-        hideWizardBar();
         const fe = explainError(e instanceof Error ? e.message : String(e));
         failNote = `${fe.message}${fe.action ? ` \u2014 ${fe.action}` : ""}`;
         setWizardStep(p.step.id, "fail", failNote);
@@ -3959,18 +3883,23 @@
     const paidSkipped = paidSkippedSteps(plan);
     const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
     if (!isPaid && !stopped && !wizardFailed) {
-      const renamed = (_a = totals.renamed) != null ? _a : 0;
-      const bound = (_b = totals.bound) != null ? _b : 0;
-      let text = wizBeforeCount === 0 ? t("wizard.freeSumNoVars", { n: renamed }) : t("wizard.freeSumVars", { m: bound, n: renamed });
-      if (wizBeforeCount > 0 && bound === 0 && !vmCols.some((c) => c.tier > 0)) text += t("wizard.freeNoTier");
-      setStatus("wizardSummary", text, "ok");
+      setStatus("wizardSummary", t("wizard.freeSum", { n: (_a = totals.renamed) != null ? _a : 0 }), "ok");
     } else setStatus(
       "wizardSummary",
       t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
       stopped || paidSkipped.length || wizardFailed ? "warn" : "ok"
     );
     wizCountPending = wizFrom === "make" && wizBeforeCount > 0;
+    wizEnded = true;
+    renderWizToBind();
     renderVarScreen();
+  }
+  var wizCancelReq = false;
+  var wizEnded = false;
+  function renderWizToBind() {
+    const b = $("btnWizToBind");
+    b.hidden = !wizEnded || wizardRunning || prereqKnown && !hasBindable;
+    if (curSel) setLock(b, curSel.count ? null : "prereq", t("status.noSelection"));
   }
   var wizCountPending = false;
   var lastSelBound = 0;
@@ -3989,7 +3918,11 @@
     renderWizardCopy();
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
-  $("btnWizardCancel").addEventListener("click", () => send({ type: "CANCEL" }));
+  $("btnWizardCancel").addEventListener("click", () => {
+    wizCancelReq = true;
+    send({ type: "CANCEL" });
+  });
+  $("btnWizToBind").addEventListener("click", () => findUnbound());
   if (false) {
     $("devTierRow").style.display = "";
     $("tier").addEventListener("change", () => {
@@ -4369,7 +4302,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -4402,7 +4335,6 @@
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         onSelectionForList(msg);
-        renderSelBar(msg.count, msg.scanned, msg.capped, (_a = msg.firstName) != null ? _a : "");
         lastSelBound = msg.bound;
         lastSelRenamed = msg.renamed;
         applySelectionDone();
@@ -4465,8 +4397,8 @@
         const silent = msg.preview && msg.reqId !== void 0 && msg.reqId === bindSilentReq;
         bindSilentReq = 0;
         if (isMini && msg.preview) bindPreviewMini = true;
-        bindSkips = (_b = msg.skips) != null ? _b : [];
-        bindSkipsCapped = ((_c = msg.skipTotal) != null ? _c : bindSkips.length) > bindSkips.length;
+        bindSkips = (_a = msg.skips) != null ? _a : [];
+        bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
         const rt = reasonsText(msg.reasons);
         renderSkipReasons(msg.reasons);
         if (msg.cancelled) {
@@ -4476,8 +4408,8 @@
         } else if (msg.preview) {
           const prev = bindCandidates;
           const prevChecked = new Set(bindChecked);
-          bindCandidates = (_d = msg.candidates) != null ? _d : [];
-          bindNodes = (_e = msg.nodes) != null ? _e : [];
+          bindCandidates = (_c = msg.candidates) != null ? _c : [];
+          bindNodes = (_d = msg.nodes) != null ? _d : [];
           bindPreviewed = true;
           bindChecked.clear();
           if (silent) {
@@ -4491,12 +4423,13 @@
           setStatus("applyStatus", "", "");
         } else {
           clearBindPreview();
-          bindSkips = (_f = msg.skips) != null ? _f : [];
-          bindSkipsCapped = ((_g = msg.skipTotal) != null ? _g : bindSkips.length) > bindSkips.length;
-          renderSkipReasons(msg.reasons);
+          bindSkips = (_e = msg.skips) != null ? _e : [];
+          bindSkipsCapped = ((_f = msg.skipTotal) != null ? _f : bindSkips.length) > bindSkips.length;
+          renderSkipReasons((_g = msg.reasons) != null ? _g : {}, false);
           setStatus("applyStatus", "", "");
           $("bindDoneText").textContent = t("bind.doneLine", { n: msg.bound }) + (msg.skipped ? t("bind.doneSkipped", { m: msg.skipped }) : "") + " \xB7";
           $("bindDone").hidden = false;
+          renderBindIntro();
         }
         break;
       }
@@ -4566,8 +4499,8 @@
         break;
       case "TEXT_STYLES_APPLIED": {
         const line = $("tsApplyResult");
-        line.textContent = t("bind.tsDone", { n: msg.applied }) + (msg.missing.length ? t("bind.doneSkipped", { m: msg.missing.length }) : "");
-        line.title = msg.missing.join(" \xB7 ");
+        line.textContent = t("bind.tsDone", { n: msg.applied }) + (msg.skipped ? t("bind.doneSkipped", { m: msg.skipped }) : "");
+        line.title = Object.entries((_i = msg.skipReasons) != null ? _i : {}).filter(([, n]) => n > 0).map(([k, n]) => `${t("tsSkip." + k)} ${n}`).join(" \xB7 ");
         line.hidden = false;
         break;
       }
@@ -4594,7 +4527,7 @@
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
-        prereqLocalVars = ((_i = msg.tierVars) != null ? _i : 0) + ((_j = msg.otherVars) != null ? _j : 0);
+        prereqLocalVars = ((_j = msg.tierVars) != null ? _j : 0) + ((_k = msg.otherVars) != null ? _k : 0);
         if (activeTab === "layer") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
@@ -4665,7 +4598,6 @@
         $("base").value = String(msg.base);
         $("depth").value = String(msg.maxDepth);
         $("grid").value = String(msg.grid);
-        $("tol").value = String(msg.tolerance);
         break;
       }
       case "VARIABLES": {
@@ -4747,7 +4679,7 @@
     CREATE_TEXT_STYLES: "tsStatus",
     // 옛 `tsApplyStatus`가 사라졌다고 매핑까지 빼면 폴백(colorStatus)으로 흘러가는데,
     // 그 줄은 다른 단계에 있어 숨겨져 있다 — 실패가 '적용 중…'인 채로 조용히 묻힌다.
-    APPLY_TEXT_STYLES: "tsStatus",
+    APPLY_TEXT_STYLES: "applyStatus",
     APPLY: "applyStatus",
     // 실제 자리는 부른 쪽이 정한다(selectStatusTarget) — 여기 값은 resolveStatusId가 못 받는
     // 경로를 위한 폴백일 뿐이다.
@@ -4944,7 +4876,6 @@
   function fieldLabel(label, rawField) {
     return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
   }
-  var round2 = (n) => Math.round(n * 100) / 100;
   function bindFilterText() {
     var _a;
     return ((_a = $("bindFilter").value) != null ? _a : "").trim().toLowerCase();
@@ -4954,34 +4885,24 @@
     const q = bindFilterText();
     return { all, shown: q ? all.filter((g) => g.variableName.toLowerCase().includes(q)) : all };
   }
-  function groupOpen(g, total) {
+  function groupOpen(g) {
     var _a;
-    return (_a = bindExpanded.get(g.variableId)) != null ? _a : total <= 10;
+    return (_a = bindExpanded.get(g.variableId)) != null ? _a : false;
   }
   function setTri(box, keys) {
     const on = keys.filter((k) => bindChecked.has(k)).length;
     box.checked = on > 0 && on === keys.length;
     box.indeterminate = on > 0 && on < keys.length;
   }
-  function placeEl(l) {
+  function placeEl(l, on) {
     var _a;
     const row = document.createElement("div");
     row.className = "bg-place";
     row.dataset.key = l.keys[0];
-    const box = document.createElement("input");
-    box.type = "checkbox";
-    setTri(box, l.keys);
+    row.classList.toggle("off", !on);
     const node = bindNodes.find((n) => n.id === l.nodeId);
     const layerName = (_a = node == null ? void 0 : node.name) != null ? _a : l.nodeId;
     const label = fieldLabel(l.label, l.fields[0]);
-    box.setAttribute("aria-label", `${layerName} \u203A ${label}`);
-    box.addEventListener("change", () => {
-      for (const k of l.keys) box.checked ? bindChecked.add(k) : bindChecked.delete(k);
-      renderBindTree();
-    });
-    const on = l.keys.some((k) => bindChecked.has(k));
-    row.classList.toggle("off", !on);
-    if (!on) row.title = t("bind.uncheckedTip");
     const layer = document.createElement("button");
     layer.type = "button";
     layer.className = "link link-btn bg-layer";
@@ -4991,35 +4912,29 @@
     const text = document.createElement("span");
     text.className = "bg-text";
     text.textContent = ` \u203A ${label} ${isHexColor(l.currentValue) ? l.currentValue.toUpperCase() : l.currentValue}`;
-    row.append(box, layer, text);
-    if (l.distance) {
-      const d = round2(l.distance);
-      const ap = document.createElement("span");
-      ap.className = "bg-approx";
-      ap.textContent = `~${d}`;
-      ap.title = t("bind.approxTip", { d });
-      row.appendChild(ap);
-    }
+    row.append(layer, text);
     if (l.keys.length > 1) row.append(t("bind.placeCount", { k: l.keys.length }));
     return row;
   }
-  function bindGroupEl(g, total) {
+  function bindGroupEl(g) {
     const wrap = document.createElement("div");
     wrap.className = "bg-group";
     wrap.setAttribute("role", "group");
     wrap.dataset.var = g.variableId;
     const head = document.createElement("div");
     head.className = "bg-head";
-    head.title = t("bind.groupTip", { name: g.variableName, k: g.count });
+    const groupOn = g.keys.every((k) => bindChecked.has(k));
+    head.classList.toggle("off", !groupOn);
+    head.title = groupOn ? t("bind.groupTip", { name: g.variableName, k: g.count }) + t("bind.groupTipPartial") : t("bind.uncheckedTip", { k: g.count });
     const box = document.createElement("input");
     box.type = "checkbox";
     box.setAttribute("aria-label", g.variableName);
-    setTri(box, g.keys);
+    box.checked = groupOn;
     box.addEventListener("change", () => {
       for (const k of g.keys) box.checked ? bindChecked.add(k) : bindChecked.delete(k);
       renderBindTree();
     });
-    const open = groupOpen(g, total);
+    const open = groupOpen(g);
     const tw = document.createElement("button");
     tw.type = "button";
     tw.className = "bg-tw";
@@ -5052,31 +4967,32 @@
     num.textContent = String(g.count);
     head.append(box, tw, mark, name, val, num);
     wrap.appendChild(head);
-    if (open) for (const l of g.lines) wrap.appendChild(placeEl(l));
+    if (open) for (const l of g.lines) wrap.appendChild(placeEl(l, groupOn));
     return wrap;
   }
   function renderBindIntro() {
+    const intro = $("bindIntro");
     const prereqShown = $("bindPrereq").style.display !== "none";
-    $("bindIntro").hidden = bindPreviewed || !curSel || !curSel.count || prereqShown;
+    intro.hidden = bindPreviewed || !curSel || prereqShown || !$("bindDone").hidden;
+    intro.textContent = curSel && curSel.count ? t("bind.intro") : t("bind.introNoSel");
+  }
+  function shortName(name) {
+    return name.length > 20 ? `${name.slice(0, 20)}\u2026` : name;
   }
   function renderBindTree() {
-    const { all, shown } = bindGroups();
+    const { shown } = bindGroups();
     const has = hasBindPreview();
     renderBindIntro();
     const desc = $("bindDesc");
     if (bindPreviewed) {
-      const approx = bindCandidates.some((c) => {
-        var _a;
-        return ((_a = c.distance) != null ? _a : 0) > 0;
-      });
-      desc.textContent = has ? t("bind.desc", { name: bindPreviewName, n: bindCandidates.length }) + (approx ? t("bind.descApprox") : "") : t("bind.descNone", { name: bindPreviewName });
+      desc.textContent = has ? t("bind.desc", { name: bindPreviewName, n: bindCandidates.length }) : t("bind.descNone", { name: bindPreviewName });
       desc.hidden = false;
     } else desc.hidden = true;
     $("bindTreeCtrls").style.display = has ? "" : "none";
     $("bindHead").hidden = !has;
     const tree = $("bindTree");
     clearMount(tree);
-    if (has) for (const g of shown) tree.appendChild(bindGroupEl(g, all.length));
+    if (has) for (const g of shown) tree.appendChild(bindGroupEl(g));
     updateBindApply();
   }
   $("bindFilter").addEventListener("input", () => renderBindTree());
@@ -5089,7 +5005,7 @@
     else if (bindForeignSel && !$("bindNotice").hidden) setLock(confirm, "prereq", t("bind.selChanged"));
     else if (!bindPreviewed) setLock(confirm, "prereq", t("bind.needPreview"));
     else if (!hasBindPreview()) setLock(confirm, "prereq", t("bind.nothing"));
-    else if (!n) setLock(confirm, "prereq", t("bind.needCheck"));
+    else if (!n) setLock(confirm, "prereq", t("bind.needCheckVar"));
     else setLock(confirm, null);
     if (!hasBindPreview()) return;
     const { shown } = bindGroups();
@@ -5113,7 +5029,6 @@
     bindSkipsCapped = false;
     clearMount($("bindSkips"));
     $("bindSkips").style.display = "none";
-    $("bindSkipHint").style.display = "none";
     bindChecked.clear();
     renderBindTree();
   }
@@ -5193,31 +5108,34 @@
     renderChunked($("variantReport"), lines, makeVariantReportRow);
   }
   function refreshTreeEmptyStates() {
-    const guide = "\uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.";
-    if (!hasBindPreview() && !$("bindTree").classList.contains("stale")) {
-      if (lastSelCount === 0) renderEmptyState($("bindTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", guide);
-      else clearMount($("bindTree"));
-    }
     if (compCandidates.length === 0) {
-      if (lastSelCount === 0) renderEmptyState($("compTree"), "\uC120\uD0DD\uD55C \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4", guide);
+      if (lastSelCount === 0) renderEmptyState($("compTree"), t("sel.noneHere"), "");
       else clearMount($("compTree"));
     }
+    if (renameNodes.length === 0) {
+      if (lastSelCount === 0) renderEmptyState($("diff"), t("sel.noneHere"), "");
+      else clearMount($("diff"));
+    }
+    renderMakeNoSel();
   }
   var bindSkips = [];
   var bindSkipsCapped = false;
-  function renderSkipReasons(reasons) {
+  function renderSkipReasons(reasons, withTotal = true) {
     const box = $("bindSkips");
-    const hint = $("bindSkipHint");
     box.innerHTML = "";
     const entries = Object.entries(reasons).filter(([, n]) => n > 0);
     if (!entries.length || !bindSkips.length) {
       box.style.display = "none";
-      hint.style.display = "none";
       return;
     }
     box.style.display = "";
-    hint.style.display = "";
-    hint.textContent = bindSkipsCapped ? t("bind.skipCapped", { shown: bindSkips.length }) : t("bind.skipHint");
+    if (withTotal) {
+      const total = document.createElement("span");
+      total.className = "skip-total";
+      total.textContent = t("bind.skipTotal", { m: entries.reduce((a, [, n]) => a + n, 0) });
+      box.appendChild(total);
+    }
+    const capNote = bindSkipsCapped ? t("bind.skipCappedTip", { shown: bindSkips.length }) : "";
     for (const [key, n] of entries) {
       const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
       const label = `${t("reason." + key)} ${n}`;
@@ -5232,7 +5150,7 @@
       btn.className = "skip-chip";
       btn.textContent = `${label} \u203A`;
       const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(", ");
-      btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names });
+      btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names }) + capNote;
       btn.addEventListener("click", () => {
         selectNodes(ids, "applyStatus");
         setStatus("applyStatus", `${t("reason." + key)} \uB808\uC774\uC5B4 ${ids.length}\uAC1C \uC120\uD0DD`, "");
@@ -5306,20 +5224,6 @@
   function hideApplyProgress() {
     $("applyProgress").style.display = "none";
   }
-  function renderSelBar(count, scanned, capped, firstName) {
-    const sum = selectionSummary(count, scanned, capped);
-    const name = $("selName");
-    const sub = $("selSub");
-    if (sum.kind === "none") {
-      name.textContent = t("sel.none");
-      sub.textContent = "";
-    } else {
-      name.textContent = sum.kind === "one" ? `\u25CF ${firstName || t("sel.unnamed")}` : t("sel.many", { k: count });
-      sub.textContent = t("sel.sub", { n: sum.sub });
-    }
-    name.title = sum.kind === "one" ? firstName : "";
-    $("selBar").className = count > 0 ? "selbar" : "selbar muted";
-  }
   function setStatus(id, text, cls) {
     const el = $(id);
     el.textContent = text;
@@ -5330,12 +5234,10 @@
   }
   function syncStickyOffsets() {
     const tabs = document.querySelector(".tabs");
-    const bar = $("selBarWrap");
     if (!tabs) return;
     const tabsH = Math.round(tabs.getBoundingClientRect().height);
-    const barH = Math.round(bar.getBoundingClientRect().height);
     const root = document.documentElement;
-    const headTop = tabsH + (bar.style.display === "none" ? 0 : barH);
+    const headTop = tabsH;
     root.style.setProperty("--tabs-h", `${tabsH}px`);
     root.style.setProperty("--head-top", `${headTop}px`);
     const head = document.querySelector(".tab-section.active .step:not(.collapsed) .step-head");
@@ -5618,7 +5520,10 @@
     GENERATE_DARK_MODE: { results: ["DARK_MODE_RESULT"], label: "op.dark", go: () => showMake("theme"), write: true },
     SCAN_TEXT_STYLES: { results: ["TEXT_STYLE_CANDIDATES"], label: "op.textScan", go: () => showMake("type"), write: false },
     CREATE_TEXT_STYLES: { results: ["TEXT_STYLES_RESULT"], label: "op.textStyles", go: () => showMake("type"), write: true },
-    APPLY_TEXT_STYLES: { results: ["TEXT_STYLES_APPLIED"], label: "op.textApply", go: () => showMake("type"), write: true },
+    APPLY_TEXT_STYLES: { results: ["TEXT_STYLES_APPLIED"], label: "op.textApply", go: () => {
+      showTab("layer");
+      showApplyStep("bind");
+    }, write: true },
     APPLY: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: false },
     APPLY_SELECTED: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: true },
     RENAME: { results: ["RENAME_RESULT"], label: "op.rename", go: goLayer("rename"), write: false },
@@ -5752,7 +5657,6 @@
     const ro = new ResizeObserver(() => syncStickyOffsets());
     const tabsEl = document.querySelector(".tabs");
     if (tabsEl) ro.observe(tabsEl);
-    ro.observe($("selBarWrap"));
   }
   window.addEventListener("resize", syncStickyOffsets);
   updateGates();
@@ -5785,7 +5689,6 @@
       btn.setAttribute("aria-selected", String(on));
       btn.tabIndex = on ? 0 : -1;
     }
-    $("selBarWrap").style.display = name === "settings" ? "none" : "";
     renderSelBase();
     if (changed && name !== "variables" && wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
     syncManagerVisibility(false);
@@ -5928,7 +5831,25 @@
     }
   }
   var currentApplyStep = "bind";
-  var showMakeStep = (s) => showStep("make", s);
+  var curMakeStep = "color";
+  var showMakeStep = (s) => {
+    curMakeStep = s;
+    showStep("make", s);
+    renderMakeNoSel();
+  };
+  function renderMakeNoSel() {
+    let hint = document.getElementById("makeNoSel");
+    if (!hint) {
+      hint = document.createElement("div");
+      hint.id = "makeNoSel";
+      hint.className = "hint";
+      hint.textContent = t("make.noSel");
+    }
+    const card = document.querySelector(`#varMake .step[data-make-step="${curMakeStep}"]:not([data-always-hidden])`);
+    const bar = card == null ? void 0 : card.querySelector(".toolbar");
+    if (bar && hint.previousElementSibling !== bar) bar.after(hint);
+    hint.hidden = lastSelCount > 0;
+  }
   var showApplyStep = (s) => showStep("apply", s);
   for (const b of Array.from(document.querySelectorAll("#makeRail .step-chip"))) {
     b.addEventListener("click", () => showMakeStep(b.dataset.makeStep));
@@ -6346,19 +6267,45 @@
       statusTimer = setTimeout(clearStatusLine, 2e3);
     }
   }
+  function baseDiffers() {
+    return !!baseline && !!curSel && !sameIds(baseline.ids, curSel.ids);
+  }
+  function baseNoticeText() {
+    const b = baseline;
+    const name = b.count === 1 ? b.name || t("sel.unnamed") : t("list.baseMany", { m: b.count });
+    return t(curSel.count ? "list.baseDiff" : "list.baseDiffNoSel", { name });
+  }
   function renderSelBase() {
-    const base = $("selBase");
-    const btn = $("btnRebase");
-    const show = activeTab === "variables" && !!baseline && !sameIds(baseline.ids, curSel.ids);
-    if (!show) {
-      base.textContent = "";
-      btn.hidden = true;
+    if (!vmCols) return;
+    renderSituation();
+    if (activeTab === "variables" && varScreen() === "start") renderStart();
+  }
+  function doRebase(fromStart) {
+    var _a;
+    rebaseToCurrent();
+    if (fromStart) {
+      ((_a = $("startLib").querySelector("[data-key]")) != null ? _a : $("btnWizardRun")).focus();
       return;
     }
-    const name = baseline.count === 1 ? baseline.name || t("sel.unnamed") : t("list.baseMany", { m: baseline.count });
-    base.textContent = t("list.base", { name });
-    base.title = name;
-    btn.hidden = false;
+    const tree = $("varTree");
+    const target = focusKey && tree.querySelector(`[data-key="${CSS.escape(focusKey)}"]`) || tree.querySelector("[data-key]");
+    target == null ? void 0 : target.focus();
+  }
+  function situationEl(text, action) {
+    const d = document.createElement("div");
+    d.className = "situation";
+    const sp = document.createElement("span");
+    sp.textContent = text;
+    d.appendChild(sp);
+    if (action) {
+      const b = document.createElement("button");
+      b.className = "link link-btn";
+      b.type = "button";
+      b.textContent = action[0];
+      b.addEventListener("click", action[1]);
+      d.appendChild(b);
+    }
+    return d;
   }
   function chipCounts(colId) {
     var _a, _b;
@@ -6482,7 +6429,8 @@
     };
     let shown = true;
     const groups = new Set(vmVars.filter((v) => chip === "all" || v.collectionId === chip).map((v) => groupKey(v.collectionId, v.name))).size;
-    if (baseline && bigSkipped && !usageMap) add(t("list.big"), [t("list.read"), () => requestManagerUsage("user")]);
+    if (baseDiffers()) add(baseNoticeText(), [t("list.rebase"), () => doRebase(false)]);
+    else if (baseline && bigSkipped && !usageMap) add(t("list.big"), [t("list.read"), () => requestManagerUsage("user")]);
     else if (baseline && wizardRunning && !usageMap) add(t("list.wizardWait"));
     else if (baseline && usageMap && chipCounts("all").direct === 0) add(t("list.noneUsed"), [t("list.findUnbound"), findUnbound]);
     else if (!baseline && groups > 10) add(t("list.selectHint"));
@@ -7187,12 +7135,6 @@ ${v.description}` : v.name;
     e.preventDefault();
     $("chipRow").scrollLeft += e.deltaY;
   }, { passive: false });
-  $("btnRebase").addEventListener("click", () => {
-    rebaseToCurrent();
-    const tree = $("varTree");
-    const target = focusKey && tree.querySelector(`[data-key="${CSS.escape(focusKey)}"]`) || tree.querySelector("[data-key]");
-    target == null ? void 0 : target.focus();
-  });
   var wizLatch = null;
   var wizBeforeCount = 0;
   var wizFrom = "start";
@@ -7216,11 +7158,12 @@ ${v.description}` : v.name;
   var wizHasSummary = () => !!$("wizardSummary").textContent;
   function renderWizardCopy() {
     const hint = $("wizardCard").querySelector('[data-i18n="wizardCard.hint"]');
-    const key = isPaid ? "wizardCard.hintPaid" : localVarCount() === 0 ? "wizardCard.hintFree" : "wizardCard.hintFreeVars";
-    if (hint) hint.textContent = t(key);
+    if (hint) hint.textContent = t(isPaid ? "wizardCard.hintPaid" : "wizardCard.hintFree");
     const btn = $("btnWizardRun");
-    if (!wizardRunning) btn.textContent = isPaid ? t(btn.dataset.rerun === "1" ? "wizard.rerun" : "wizardCard.run") : localVarCount() === 0 ? t("wizardCard.runFree") : t("wizardCard.runFreeVars");
+    if (!wizardRunning) btn.textContent = isPaid ? t(btn.dataset.rerun === "1" ? "wizard.rerun" : "wizardCard.run") : t("wizardCard.runFree");
     if (!wizardRunning) setLock(btn, curSel.count ? null : "prereq", t("status.noSelection"));
+    $("wizNoSel").hidden = wizardRunning || !!curSel.count;
+    renderWizToBind();
     const done = $("wizDone");
     const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
     if (made > 0) {
@@ -7236,6 +7179,7 @@ ${v.description}` : v.name;
     $("goMakeFree").style.display = isPaid ? "none" : "";
     const lib = $("startLib");
     clearMount(lib);
+    if (baseDiffers()) lib.appendChild(situationEl(baseNoticeText(), [t("list.rebase"), () => doRebase(true)]));
     if (baseline && bigSkipped && !usageMap) {
       const d = document.createElement("div");
       d.className = "situation";

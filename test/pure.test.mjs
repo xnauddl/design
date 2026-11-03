@@ -2613,12 +2613,12 @@ test('buildList — 판정 없음: 그룹 10개 이하 펼침 / 넘으면 접힘
   assert.equal(buildList({ ...base, collections: COLS, vars: few, chip: 's' }).filter((x) => x.kind === 'section').length, 1);
 });
 
-test('groupByVariable — 변수별 묶음 · 곳 수 많은 순 · 네 방향 여백 한 줄 · 허용오차', async () => {
+test('groupByVariable — 변수별 묶음 · 곳 수 많은 순 · 네 방향 여백 한 줄 · 변수 값', async () => {
   const { groupByVariable, placeKey } = await import('../dist/pure.mjs');
   const c = (nodeId, field, variableId, variableName, currentValue, extra = {}) => ({ nodeId, field, variableId, variableName, currentValue, ...extra });
   const groups = groupByVariable([
     c('card', 'fills', 'vC', 'color/bg/surface', '#ffffff', { index: 0 }),
-    c('card', 'topLeftRadius', 'vR', 'radius/4', '4.5', { distance: 0.5, variableValue: '4' }),
+    c('card', 'topLeftRadius', 'vR', 'radius/4', '4', { variableValue: '4' }),
     c('badge', 'paddingLeft', 'v16', 'spacing/16', '16'),
     c('badge', 'paddingRight', 'v16', 'spacing/16', '16'),
     c('title', 'fills', 'vC', 'color/bg/surface', '#ffffff', { index: 0 }),
@@ -2630,16 +2630,15 @@ test('groupByVariable — 변수별 묶음 · 곳 수 많은 순 · 네 방향 �
   assert.equal(groups[1].lines[0].label, 'paddingX');
   assert.equal(groups[1].lines[0].keys.length, 2, '한 줄이 2곳');
   assert.equal(groups[2].variableValue, '4', '변수 값은 variableValue');
-  assert.equal(groups[2].lines[0].distance, 0.5);
-  assert.equal(groups[0].lines[0].distance, undefined, '정확히 같으면 차이 없음');
-  assert.equal(groups[0].variableValue, '#ffffff', '변수 값이 없으면 정확한 후보의 값');
+  assert.equal('distance' in groups[2].lines[0], false, '허용오차 삭제 — 차이 표시 없음');
+  assert.equal(groups[0].variableValue, '#ffffff', '변수 값이 없으면 후보의 값');
   assert.equal(groups[0].keys[0], placeKey({ nodeId: 'card', field: 'fills', index: 0, variableId: 'vC' }));
   // 곳 수가 같으면 이름 순
   const tie = groupByVariable([c('a', 'width', 'v2', 'size/b', '8'), c('a', 'height', 'v1', 'size/a', '8')]);
   assert.deepEqual(tie.map((g) => g.variableName), ['size/a', 'size/b']);
 });
 
-test('carryChecks — 같은 곳(레이어·속성·변수)은 체크 유지, 새 곳은 묶음이 전부 풀렸으면 체크 안 함', async () => {
+test('carryChecks — 체크는 변수 단위로 이어받음: 푼 변수의 새 곳은 체크 안 함, 새 변수는 체크, 추가·제외는 곳 단위', async () => {
   const { carryChecks, placeKey } = await import('../dist/pure.mjs');
   const c = (nodeId, field, variableId) => ({ nodeId, field, variableId, variableName: variableId, currentValue: '1' });
   const prev = [c('a', 'width', 'v8'), c('b', 'width', 'v8'), c('a', 'height', 'v4'), c('x', 'width', 'v2')];

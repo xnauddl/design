@@ -13,7 +13,7 @@ import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { exportHasTokens, cssVarName, type ExportFormat } from './lib/exporters';
 import { leafName, cellCopyText, tierBadge, orderCollections, groupKey, matchesQuery, indirectUsage, aliasTargetsOf, buildList, type VarCell, type VarCollection, type VarRow, type LibraryVar, type ListEntry, type RowState } from './lib/varTable';
-import { createReentryScheduler, selectionSummary } from './lib/reread';
+import { createReentryScheduler } from './lib/reread';
 import type { FrameMeta } from './lib/similar';
 import type { VarInfo, CollectionRoleInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
@@ -720,11 +720,8 @@ function tidyNumbers(): void {
   $('numTidySummary').style.display = '';
   // 이동과 병합은 다른 일이라 따로 센다 — 옮겼지만 같은 칸이 아니어서 안 합쳐진 토큰도 있다.
   const merged = r.merged ? ` · 같은 칸 ${r.merged}개 병합` : '';
-  // 격자로 옮긴 값은 원래 레이어와 최대 grid/2만큼 어긋난다 — 허용오차가 그보다 좁으면
-  // 스냅은 성공하고 연결만 조용히 실패한다. 실제로 옮긴 게 있을 때만, 그 자리에서 알린다.
-  const half = grid / 2;
-  const tol = bindTolerance();
-  const gap = tol < half ? t('create.snapTolGap', { tol, half }) : '';
+  // 격자로 옮긴 값의 변수는 원래 레이어와 값이 달라 연결되지 않는다(§2.11 · §4.5). 실제로 옮긴 게 있을 때만 알린다.
+  const gap = r.snapped ? t('create.snapNoBind', { k: r.snapped }) : '';
   $('numTidyText').textContent = `여백·크기 ${r.before} → ${r.after}개 (${grid}px 격자로 ${r.snapped}개 이동${merged})${gap}`;
 }
 
@@ -794,7 +791,6 @@ function saveSettings(): void {
       base: Number(($('base') as HTMLInputElement).value) || 16,
       maxDepth: readMaxDepth(),
       grid: tidyGrid(),
-      tolerance: bindTolerance(),
     });
   }, 350);
 }
@@ -802,12 +798,6 @@ function saveSettings(): void {
 ($('base') as HTMLInputElement).addEventListener('input', saveSettings);
 ($('depth') as HTMLInputElement).addEventListener('input', saveSettings);
 ($('grid') as HTMLInputElement).addEventListener('input', saveSettings);
-($('tol') as HTMLInputElement).addEventListener('input', () => {
-  saveSettings();
-  // 허용오차가 바뀌면 이전 값으로 계산된 후보는 무효다. 남겨두면 설정에서 0(정확히 일치만)으로
-  // 바꾼 뒤 「선택한 항목에 연결」을 눌러도 옛 허용오차의 근사 매칭이 그대로 적용된다.
-  clearBindPreview();
-});
 
 ($('base') as HTMLInputElement).addEventListener('input', () => {
   const applyBtn = $('btnCreateApply') as HTMLButtonElement;
@@ -1079,19 +1069,6 @@ $('btnApplyExistingText').addEventListener('click', () => {
   send({ type: 'APPLY_TEXT_STYLES' });
 });
 
-/* #6: 허용오차는 만들기·적용 단계에서 칩·입력으로 노출하지 않는다 — 값은 설정 탭에서만 고친다.
-   기본 0.5px는 반올림 오차만 흡수하는 값이다(0은 소수점 때문에 실제로 안 붙고, 크게 잡으면
-   의도치 않은 값까지 끌어와 과매칭이 된다). 격자를 키운 사람은 여기도 같이 키워야 한다. */
-const BIND_TOLERANCE_DEFAULT = 0.5;
-/** 설정 탭의 허용오차(없거나 이상하면 기본 0.5). */
-function bindTolerance(): number {
-  // 빈 칸을 Number('')=0으로 받으면 0(정확히 일치만)이 파일에 저장돼, 소수점 때문에 연결이
-  // 영영 0건이 된다. '안 정함'과 '0으로 정함'을 가른다(격자 입력의 `v >= 1` 가드와 같은 취지).
-  const raw = ($('tol') as HTMLInputElement).value.trim();
-  const v = Number(raw);
-  return raw && isFinite(v) && v >= 0 ? v : BIND_TOLERANCE_DEFAULT;
-}
-
 /** 선택이 멎은 뒤 이만큼 기다렸다 연결 현황을 읽는다 — 드래그 선택 중 매 이벤트마다 목록이 비었다 찼다 하지 않게. */
 const AUTO_SCAN_DELAY = 250;
 
@@ -1122,10 +1099,10 @@ function runBindPreview(silent = false): void {
   const reqId = nextBindReq();
   bindSilentReq = silent ? reqId : 0;
   opSilent = silent;
-  send({ type: 'APPLY', tolerance: bindTolerance(), preview: true, reqId });
+  send({ type: 'APPLY', preview: true, reqId });
   opSilent = false;
   bindPreviewSel = curSel.ids.slice();
-  if (!silent) bindPreviewName = curSel.count === 1 ? curSel.name || t('sel.unnamed') : t('bind.selMany', { k: curSel.count });
+  if (!silent) bindPreviewName = curSel.count === 1 ? shortName(curSel.name || t('sel.unnamed')) : t('bind.selMany', { k: curSel.count });
 }
 $('btnBindRepreview').addEventListener('click', () => runBindPreview());
 $('btnBindToList').addEventListener('click', () => showManager());
@@ -1200,7 +1177,6 @@ window.addEventListener('message', (event: MessageEvent) => {
   const m = (event.data as { pluginMessage?: CodeToUi }).pluginMessage;
   if (!m) return;
   // 바인딩 진행률(UX6)은 마법사 자체 진행바로 표시(‘적용’ 탭 진행바는 안 보임).
-  if (wizardRunning && m.type === 'PROGRESS' && m.op === 'bind') updateWizardBar(m.done, m.total);
   if (!wizardWaiter) return;
   // 오류/유료요구는 대기 중이면 해당 단계 실패로 처리(무한 대기 방지).
   if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
@@ -1230,19 +1206,6 @@ function wizardRequest<T extends CodeToUi['type']>(msg: UiToCode, expect: T[]): 
     };
     send(msg);
   });
-}
-
-function showWizardBar(): void {
-  $('wizardBar').style.display = '';
-  ($('wizardBarFill') as HTMLElement).style.width = '0%';
-}
-function updateWizardBar(done: number, total: number): void {
-  $('wizardBar').style.display = '';
-  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
-  ($('wizardBarFill') as HTMLElement).style.width = `${pct}%`;
-}
-function hideWizardBar(): void {
-  $('wizardBar').style.display = 'none';
 }
 
 /** Paid라서 이번 실행에서 빠진 단계들. 칩과 요약 줄이 같은 목록을 쓴다. */
@@ -1295,7 +1258,6 @@ async function runWizard(): Promise<void> {
   }
   // 설정값은 설정 탭 '플러그인 설정'에서 읽는다(단일 출처) — 격자·허용오차도 거기 값을 그대로 쓴다.
   const base = Number(($('base') as HTMLInputElement).value) || 16;
-  const tolerance = bindTolerance();
   const maxDepth = readMaxDepth();
   let semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
 
@@ -1325,10 +1287,15 @@ async function runWizard(): Promise<void> {
   let stopped = false;
   let failNote = ''; // 실패 사유 — 칩 툴팁에만 두면 화면에서 사라진다(요약 줄에 함께 싣는다)
 
+  wizCancelReq = false;
+  wizEnded = false;
+  renderWizToBind();
   for (const p of plan) {
     if (!p.run) continue; // renderWizardSteps에서 이미 skip 표시
+    // 취소는 지금 단계가 끝난 뒤 남은 단계를 실행하지 않는다(§4.3).
+    if (wizCancelReq && !stopped) stopped = true;
     if (stopped) {
-      setWizardStep(p.step.id, 'fail', t('wizard.seq.stoppedPrev'));
+      setWizardStep(p.step.id, 'fail', wizCancelReq ? t('wizard.seq.cancelSkipped') : t('wizard.seq.stoppedPrev'));
       continue;
     }
     setWizardStep(p.step.id, 'active', t('wizard.seq.running'));
@@ -1422,19 +1389,6 @@ async function runWizard(): Promise<void> {
           setWizardStep('textStyles', 'done', t('wizard.seq.textStyles', { created: r.created, updated: r.updated }));
           break;
         }
-        case 'bind': {
-          showWizardBar();
-          const r = await wizardRequest({ type: 'APPLY', tolerance }, ['APPLY_RESULT']);
-          hideWizardBar();
-          totals.bound = r.bound;
-          if (r.cancelled) {
-            setWizardStep('bind', 'done', t('wizard.seq.bindCancelled', { bound: r.bound }));
-            stopped = true;
-            break;
-          }
-          setWizardStep('bind', 'done', t('wizard.seq.bindDone', { bound: r.bound }) + (r.skipped ? t('wizard.seq.bindSkip', { n: r.skipped }) : ''));
-          break;
-        }
         case 'rename': {
           const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth }, ['RENAME_RESULT']);
           totals.renamed = r.changes.length;
@@ -1450,7 +1404,6 @@ async function runWizard(): Promise<void> {
         }
       }
     } catch (e) {
-      hideWizardBar();
       const fe = explainError(e instanceof Error ? e.message : String(e));
       failNote = `${fe.message}${fe.action ? ` — ${fe.action}` : ''}`;
       setWizardStep(p.step.id, 'fail', failNote);
@@ -1471,12 +1424,8 @@ async function runWizard(): Promise<void> {
     ? t('wizard.paidSkipped', { steps: paidSkipped.map((p) => t('wizard.step.' + p.step.id)).join(' · ') })
     : '';
   if (!isPaid && !stopped && !wizardFailed) {
-    // 무료 완료 요약(§4.3) — 로컬 변수 0개면 이름만, 있으면 연결 + 이름. 계층이 없어 연결 0곳이면 안내.
-    const renamed = totals.renamed ?? 0;
-    const bound = totals.bound ?? 0;
-    let text = wizBeforeCount === 0 ? t('wizard.freeSumNoVars', { n: renamed }) : t('wizard.freeSumVars', { m: bound, n: renamed });
-    if (wizBeforeCount > 0 && bound === 0 && !vmCols.some((c) => c.tier > 0)) text += t('wizard.freeNoTier');
-    setStatus('wizardSummary', text, 'ok');
+    // 무료 완료 요약(§4.3) — 로컬 변수 수와 관계없이 이름 정리만.
+    setStatus('wizardSummary', t('wizard.freeSum', { n: totals.renamed ?? 0 }), 'ok');
   } else setStatus(
     'wizardSummary',
     t('wizard.result', { state: stopped ? t('wizard.stopped') : t('wizard.completed'), summary: summarize(totals) }) +
@@ -1487,7 +1436,19 @@ async function runWizard(): Promise<void> {
   // 만들기 맨 위에서 실행했고 로컬 변수가 이미 있었으면 머리는 그대로, "변수 {n}개 생성"은 상태 줄에(§4.3).
   // 변수 수는 작업 직후 다시 읽기로 오는 표에서 센다.
   wizCountPending = wizFrom === 'make' && wizBeforeCount > 0;
+  wizEnded = true;
+  renderWizToBind();
   renderVarScreen();
+}
+/** 마법사 취소 요청 — 지금 단계가 끝난 뒤 멈춘다. */
+let wizCancelReq = false;
+/** 마법사가 한 번 끝났다(취소·실패 포함) — 요약 끝 연결 안내를 보인다. */
+let wizEnded = false;
+/** 요약 끝 "레이어 › 연결에서 확인하고 연결하기 →"(§4.3). 연결할 변수가 없으면 숨기고, 선택이 없으면 잠근다. */
+function renderWizToBind(): void {
+  const b = $('btnWizToBind');
+  b.hidden = !wizEnded || wizardRunning || (prereqKnown && !hasBindable);
+  if (curSel) setLock(b, curSel.count ? null : 'prereq', t('status.noSelection'));
 }
 /** 만들기 맨 위(로컬 변수 있음) 마법사가 끝난 뒤 — 다음 변수 표에서 "변수 {n}개 생성"을 상태 줄에. */
 let wizCountPending = false;
@@ -1516,7 +1477,11 @@ function setWizardRunLabel(rerun: boolean): void {
   renderWizardCopy(); // 유료/무료·로컬 변수 유무에 따라 문구가 다르다(§4.3)
 }
 $('btnWizardRun').addEventListener('click', () => void runWizard());
-$('btnWizardCancel').addEventListener('click', () => send({ type: 'CANCEL' }));
+$('btnWizardCancel').addEventListener('click', () => {
+  wizCancelReq = true;
+  send({ type: 'CANCEL' });
+});
+$('btnWizToBind').addEventListener('click', () => findUnbound());
 
 // 개발용 강제 티어 토글 — 개발 빌드에서만 노출/동작(배포 빌드 백도어 차단).
 // HTML은 기본 display:none(배포 안전). dev 빌드에서만 여기서 노출한다.
@@ -2053,7 +2018,6 @@ window.onmessage = (event: MessageEvent) => {
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       onSelectionForList(msg); // 변수 목록 기준(③) — 플러그인이 만든 선택은 기준을 바꾸지 않는다
-      renderSelBar(msg.count, msg.scanned, msg.capped, msg.firstName ?? '');
       // 준비 현황의 '완료'는 현재 선택 기준 — 선택이 바뀌면 다시 판정한다.
       // Global/Semantic이 없으면(컬렉션을 지우고 처음부터 하는 QA 흐름, 또는 다른 파일에서 복사해 온
       // 프레임) 이전 이름 정리 기록이 남아 있어도 '처음'으로 본다 — 변수가 없으면 어차피 전부 다시 한다.
@@ -2166,10 +2130,12 @@ window.onmessage = (event: MessageEvent) => {
         clearBindPreview();
         bindSkips = msg.skips ?? [];
         bindSkipsCapped = (msg.skipTotal ?? bindSkips.length) > bindSkips.length;
-        renderSkipReasons(msg.reasons);
+        // 연결할 때 다시 확인해서 건너뛴 곳만 칩으로(미리보기 때 칩은 지웠다). m은 줄 가운데에 있으므로 칩 줄에는 합계를 붙이지 않는다.
+        renderSkipReasons(msg.reasons ?? {}, false);
         setStatus('applyStatus', '', '');
         $('bindDoneText').textContent = t('bind.doneLine', { n: msg.bound }) + (msg.skipped ? t('bind.doneSkipped', { m: msg.skipped }) : '') + ' ·';
         $('bindDone').hidden = false;
+        renderBindIntro();
       }
       break;
     }
@@ -2256,8 +2222,12 @@ window.onmessage = (event: MessageEvent) => {
     case 'TEXT_STYLES_APPLIED': {
       // 결과는 버튼 아래 한 줄(§4.6) — "✓ 텍스트 {n}개에 스타일 연결 · 건너뜀 {m}".
       const line = $('tsApplyResult');
-      line.textContent = t('bind.tsDone', { n: msg.applied }) + (msg.missing.length ? t('bind.doneSkipped', { m: msg.missing.length }) : '');
-      line.title = msg.missing.join(' · ');
+      // m = 건너뛴 텍스트 레이어 수, 사유별 수는 툴팁(§4.6).
+      line.textContent = t('bind.tsDone', { n: msg.applied }) + (msg.skipped ? t('bind.doneSkipped', { m: msg.skipped }) : '');
+      line.title = Object.entries(msg.skipReasons ?? {})
+        .filter(([, n]) => n > 0)
+        .map(([k, n]) => `${t('tsSkip.' + k)} ${n}`)
+        .join(' · ');
       line.hidden = false;
       break;
     }
@@ -2375,7 +2345,6 @@ window.onmessage = (event: MessageEvent) => {
       ($('base') as HTMLInputElement).value = String(msg.base);
       ($('depth') as HTMLInputElement).value = String(msg.maxDepth);
       ($('grid') as HTMLInputElement).value = String(msg.grid);
-      ($('tol') as HTMLInputElement).value = String(msg.tolerance);
       break;
     }
     case 'VARIABLES': {
@@ -2472,7 +2441,7 @@ const OP_STATUS: Record<string, string> = {
   CREATE_TEXT_STYLES: 'tsStatus',
   // 옛 `tsApplyStatus`가 사라졌다고 매핑까지 빼면 폴백(colorStatus)으로 흘러가는데,
   // 그 줄은 다른 단계에 있어 숨겨져 있다 — 실패가 '적용 중…'인 채로 조용히 묻힌다.
-  APPLY_TEXT_STYLES: 'tsStatus',
+  APPLY_TEXT_STYLES: 'applyStatus',
   APPLY: 'applyStatus',
   // 실제 자리는 부른 쪽이 정한다(selectStatusTarget) — 여기 값은 resolveStatusId가 못 받는
   // 경로를 위한 폴백일 뿐이다.
@@ -2750,7 +2719,6 @@ function fieldLabel(label: string, rawField: string): string {
 }
 
 /** 소수 둘째 자리까지(차이 표시). */
-const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 /** 변수 이름 필터(소문자 부분 일치). 비어 있으면 전부. */
 function bindFilterText(): string {
@@ -2762,9 +2730,9 @@ function bindGroups(): { all: VarGroup[]; shown: VarGroup[] } {
   const q = bindFilterText();
   return { all, shown: q ? all.filter((g) => g.variableName.toLowerCase().includes(q)) : all };
 }
-/** 묶음이 펼쳐져 있나 — 직접 바꾼 게 있으면 그것, 없으면 10개 이하면 펼침(§4.6). */
-function groupOpen(g: VarGroup, total: number): boolean {
-  return bindExpanded.get(g.variableId) ?? total <= 10;
+/** 묶음이 펼쳐져 있나 — 처음에는 모두 접힘, 직접 펼치거나 접은 것은 세션 동안 기억(§4.6). */
+function groupOpen(g: VarGroup): boolean {
+  return bindExpanded.get(g.variableId) ?? false;
 }
 /** 체크박스 상태(☑ / ▣ / ☐)를 키 목록에서. */
 function setTri(box: HTMLInputElement, keys: readonly string[]): void {
@@ -2773,24 +2741,15 @@ function setTri(box: HTMLInputElement, keys: readonly string[]): void {
   box.indeterminate = on > 0 && on < keys.length;
 }
 
-function placeEl(l: PlaceLine): HTMLElement {
+/** 자리 줄 — 보기만(체크는 변수 단위, §4.6). 레이어 이름 = 캔버스 선택. */
+function placeEl(l: PlaceLine, on: boolean): HTMLElement {
   const row = document.createElement('div');
   row.className = 'bg-place';
   row.dataset.key = l.keys[0];
-  const box = document.createElement('input');
-  box.type = 'checkbox';
-  setTri(box, l.keys);
+  row.classList.toggle('off', !on);
   const node = bindNodes.find((n) => n.id === l.nodeId);
   const layerName = node?.name ?? l.nodeId;
   const label = fieldLabel(l.label, l.fields[0]);
-  box.setAttribute('aria-label', `${layerName} › ${label}`);
-  box.addEventListener('change', () => {
-    for (const k of l.keys) box.checked ? bindChecked.add(k) : bindChecked.delete(k);
-    renderBindTree();
-  });
-  const on = l.keys.some((k) => bindChecked.has(k));
-  row.classList.toggle('off', !on);
-  if (!on) row.title = t('bind.uncheckedTip');
   const layer = document.createElement('button');
   layer.type = 'button';
   layer.className = 'link link-btn bg-layer';
@@ -2800,36 +2759,32 @@ function placeEl(l: PlaceLine): HTMLElement {
   const text = document.createElement('span');
   text.className = 'bg-text';
   text.textContent = ` › ${label} ${isHexColor(l.currentValue) ? l.currentValue.toUpperCase() : l.currentValue}`;
-  row.append(box, layer, text);
-  if (l.distance) {
-    const d = round2(l.distance);
-    const ap = document.createElement('span');
-    ap.className = 'bg-approx';
-    ap.textContent = `~${d}`;
-    ap.title = t('bind.approxTip', { d });
-    row.appendChild(ap);
-  }
+  row.append(layer, text);
   if (l.keys.length > 1) row.append(t('bind.placeCount', { k: l.keys.length }));
   return row;
 }
 
-function bindGroupEl(g: VarGroup, total: number): HTMLElement {
+function bindGroupEl(g: VarGroup): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'bg-group';
   wrap.setAttribute('role', 'group');
   wrap.dataset.var = g.variableId;
   const head = document.createElement('div');
   head.className = 'bg-head';
-  head.title = t('bind.groupTip', { name: g.variableName, k: g.count });
+  const groupOn = g.keys.every((k) => bindChecked.has(k));
+  head.classList.toggle('off', !groupOn);
+  head.title = groupOn
+    ? t('bind.groupTip', { name: g.variableName, k: g.count }) + t('bind.groupTipPartial')
+    : t('bind.uncheckedTip', { k: g.count });
   const box = document.createElement('input');
   box.type = 'checkbox';
   box.setAttribute('aria-label', g.variableName);
-  setTri(box, g.keys);
+  box.checked = groupOn;
   box.addEventListener('change', () => {
     for (const k of g.keys) box.checked ? bindChecked.add(k) : bindChecked.delete(k);
     renderBindTree();
   });
-  const open = groupOpen(g, total);
+  const open = groupOpen(g);
   const tw = document.createElement('button');
   tw.type = 'button';
   tw.className = 'bg-tw';
@@ -2861,27 +2816,32 @@ function bindGroupEl(g: VarGroup, total: number): HTMLElement {
   num.textContent = String(g.count);
   head.append(box, tw, mark, name, val, num);
   wrap.appendChild(head);
-  if (open) for (const l of g.lines) wrap.appendChild(placeEl(l));
+  if (open) for (const l of g.lines) wrap.appendChild(placeEl(l, groupOn));
   return wrap;
 }
 
-/** 미리보기 전 한 줄 — 선택이 있고, 연결할 변수가 없다는 안내가 없을 때만(§4.6). */
+/** 미리보기 전 한 줄 — 연결할 변수가 없다는 안내·연결 후 줄이 없을 때만(§4.6). 선택이 없으면 선택부터 권한다(§4.1). */
 function renderBindIntro(): void {
+  const intro = $('bindIntro');
   const prereqShown = $('bindPrereq').style.display !== 'none';
-  $('bindIntro').hidden = bindPreviewed || !curSel || !curSel.count || prereqShown;
+  intro.hidden = bindPreviewed || !curSel || prereqShown || !$('bindDone').hidden;
+  intro.textContent = curSel && curSel.count ? t('bind.intro') : t('bind.introNoSel');
+}
+/** 설명 문장에 넣을 선택 이름 — 20자를 넘으면 줄인다(§4.6). */
+function shortName(name: string): string {
+  return name.length > 20 ? `${name.slice(0, 20)}…` : name;
 }
 
 /** 연결 화면 그리기 — 미리보기 전 한 줄 / 설명 / 목록 머리 / 변수 묶음(§4.6). */
 function renderBindTree(): void {
-  const { all, shown } = bindGroups();
+  const { shown } = bindGroups();
   const has = hasBindPreview();
   renderBindIntro();
   // 목록 설명
   const desc = $('bindDesc');
   if (bindPreviewed) {
-    const approx = bindCandidates.some((c) => (c.distance ?? 0) > 0);
     desc.textContent = has
-      ? t('bind.desc', { name: bindPreviewName, n: bindCandidates.length }) + (approx ? t('bind.descApprox') : '')
+      ? t('bind.desc', { name: bindPreviewName, n: bindCandidates.length })
       : t('bind.descNone', { name: bindPreviewName });
     desc.hidden = false;
   } else desc.hidden = true;
@@ -2889,7 +2849,7 @@ function renderBindTree(): void {
   $('bindHead').hidden = !has;
   const tree = $('bindTree');
   clearMount(tree);
-  if (has) for (const g of shown) tree.appendChild(bindGroupEl(g, all.length));
+  if (has) for (const g of shown) tree.appendChild(bindGroupEl(g));
   updateBindApply();
 }
 
@@ -2906,7 +2866,7 @@ function updateBindApply(): void {
   else if (bindForeignSel && !$('bindNotice').hidden) setLock(confirm, 'prereq', t('bind.selChanged'));
   else if (!bindPreviewed) setLock(confirm, 'prereq', t('bind.needPreview'));
   else if (!hasBindPreview()) setLock(confirm, 'prereq', t('bind.nothing'));
-  else if (!n) setLock(confirm, 'prereq', t('bind.needCheck'));
+  else if (!n) setLock(confirm, 'prereq', t('bind.needCheckVar'));
   else setLock(confirm, null);
   if (!hasBindPreview()) return;
   const { shown } = bindGroups();
@@ -2932,7 +2892,6 @@ function clearBindPreview(): void {
   bindSkipsCapped = false;
   clearMount($('bindSkips')); // 숨기기만 하면 낡은 칩이 DOM에 남는다
   ($('bindSkips') as HTMLElement).style.display = 'none';
-  ($('bindSkipHint') as HTMLElement).style.display = 'none';
   bindChecked.clear();
   renderBindTree();
 }
@@ -3059,18 +3018,16 @@ function renderVariantReport(sections: VariantReportSection[]): void {
 /** 선택 의존 카드(바인딩·컴포넌트)의 빈 상태(캐논 108:2) — 미리보기/후보가 없을 때만,
     무선택이면 캐논 빈 상태를 표시하고, 선택이 있으면 비워 둔다(액션 버튼이 흐름을 주도). */
 function refreshTreeEmptyStates(): void {
-  const guide = '프레임이나 레이어를 선택하세요.';
-  // 어느 쪽이든 행은 0건이다 — 안내 문구는 스크롤 영역이 아니므로 테두리·개수 줄을 걷어야 한다.
-  // (예전 :empty 규칙은 안내 문구가 들어찬 순간 자식이 생겨 안 먹었다.)
-  // 자동 연결 현황을 기다리는 동안(stale)은 이전 목록을 흐리게 남겨 둔다 — 여기서 비우면 깜빡인다.
-  if (!hasBindPreview() && !$('bindTree').classList.contains('stale')) {
-    if (lastSelCount === 0) renderEmptyState($('bindTree'), '선택한 노드가 없습니다', guide);
-    else clearMount($('bindTree'));
-  }
+  // 선택 표시줄이 없으므로 선택이 없으면 목록 자리에서 알린다(§4.1). 연결 화면은 미리보기 전 한 줄이 맡는다.
   if (compCandidates.length === 0) {
-    if (lastSelCount === 0) renderEmptyState($('compTree'), '선택한 노드가 없습니다', guide);
+    if (lastSelCount === 0) renderEmptyState($('compTree'), t('sel.noneHere'), '');
     else clearMount($('compTree'));
   }
+  if (renameNodes.length === 0) {
+    if (lastSelCount === 0) renderEmptyState($('diff'), t('sel.noneHere'), '');
+    else clearMount($('diff'));
+  }
+  renderMakeNoSel();
 }
 
 /** UX3: 스킵 사유 키 → 한글 라벨. */
@@ -3083,19 +3040,23 @@ let bindSkips: BindSkip[] = [];
 let bindSkipsCapped = false;
 
 /** 사유 칩 렌더 — 레이어 목록이 있는 사유만 버튼, 나머지는 글자. */
-function renderSkipReasons(reasons: Record<string, number>): void {
+/** 건너뜀 사유 칩(§4.6). withTotal이면 칩 줄 앞에 "건너뜀 {m}"(m = 칩 숫자의 합, 속성 단위). */
+function renderSkipReasons(reasons: Record<string, number>, withTotal = true): void {
   const box = $('bindSkips');
-  const hint = $('bindSkipHint'); // 칩이 무엇이고 누르면 무슨 일이 나는지 — 칩과 생사를 같이 한다
   box.innerHTML = '';
   const entries = Object.entries(reasons).filter(([, n]) => n > 0);
   if (!entries.length || !bindSkips.length) {
     box.style.display = 'none';
-    hint.style.display = 'none';
     return;
   }
   box.style.display = '';
-  hint.style.display = '';
-  hint.textContent = bindSkipsCapped ? t('bind.skipCapped', { shown: bindSkips.length }) : t('bind.skipHint');
+  if (withTotal) {
+    const total = document.createElement('span');
+    total.className = 'skip-total';
+    total.textContent = t('bind.skipTotal', { m: entries.reduce((a, [, n]) => a + n, 0) });
+    box.appendChild(total);
+  }
+  const capNote = bindSkipsCapped ? t('bind.skipCappedTip', { shown: bindSkips.length }) : '';
   for (const [key, n] of entries) {
     const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
     const label = `${t('reason.' + key)} ${n}`;
@@ -3111,7 +3072,7 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     btn.textContent = `${label} ›`;
     // 사유 건수(n)는 속성 단위, 레이어 수는 노드 단위라 서로 다를 수 있다(padding 4건 → 레이어 1개).
     const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ');
-    btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names });
+    btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names }) + capNote;
     btn.addEventListener('click', () => {
       selectNodes(ids, 'applyStatus');
       setStatus('applyStatus', `${t('reason.' + key)} 레이어 ${ids.length}개 선택`, '');
@@ -3204,22 +3165,6 @@ function hideApplyProgress(): void {
   $('applyProgress').style.display = 'none';
 }
 
-/** 선택 표시줄(§4.1) — 알림 영역이 아니다(알림은 공통 상태 줄). 이름은 160px에서 말줄임. */
-function renderSelBar(count: number, scanned: number, capped: boolean, firstName: string): void {
-  const sum = selectionSummary(count, scanned, capped);
-  const name = $('selName');
-  const sub = $('selSub');
-  if (sum.kind === 'none') {
-    name.textContent = t('sel.none');
-    sub.textContent = '';
-  } else {
-    name.textContent = sum.kind === 'one' ? `● ${firstName || t('sel.unnamed')}` : t('sel.many', { k: count });
-    sub.textContent = t('sel.sub', { n: sum.sub });
-  }
-  name.title = sum.kind === 'one' ? firstName : '';
-  $('selBar').className = count > 0 ? 'selbar' : 'selbar muted';
-}
-
 function setStatus(id: string, text: string, cls: 'ok' | 'warn' | ''): void {
   const el = $(id);
   el.textContent = text;
@@ -3238,13 +3183,11 @@ function escapeHtml(s: string): string {
  */
 function syncStickyOffsets(): void {
   const tabs = document.querySelector<HTMLElement>('.tabs');
-  const bar = $('selBarWrap');
   if (!tabs) return;
   const tabsH = Math.round(tabs.getBoundingClientRect().height);
-  const barH = Math.round(bar.getBoundingClientRect().height);
   const root = document.documentElement;
-  // 설정 탭은 선택 표시줄을 숨긴다 — 그때 높이는 0으로 잰다.
-  const headTop = tabsH + (bar.style.display === 'none' ? 0 : barH);
+  // 선택 표시줄은 없앴다(§4.1) — 탭 바 바로 아래부터 탭 내용이다.
+  const headTop = tabsH;
   root.style.setProperty('--tabs-h', `${tabsH}px`);
   root.style.setProperty('--head-top', `${headTop}px`);
   // 버튼 줄은 카드 머리 바로 아래에 고정(§2.5). 카드 머리 높이는 카드마다 같다(제목 한 줄 + 아래 8px).
@@ -3550,7 +3493,7 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   GENERATE_DARK_MODE: { results: ['DARK_MODE_RESULT'], label: 'op.dark', go: () => showMake('theme'), write: true },
   SCAN_TEXT_STYLES: { results: ['TEXT_STYLE_CANDIDATES'], label: 'op.textScan', go: () => showMake('type'), write: false },
   CREATE_TEXT_STYLES: { results: ['TEXT_STYLES_RESULT'], label: 'op.textStyles', go: () => showMake('type'), write: true },
-  APPLY_TEXT_STYLES: { results: ['TEXT_STYLES_APPLIED'], label: 'op.textApply', go: () => showMake('type'), write: true },
+  APPLY_TEXT_STYLES: { results: ['TEXT_STYLES_APPLIED'], label: 'op.textApply', go: () => { showTab('layer'); showApplyStep('bind'); }, write: true },
   APPLY: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: false },
   APPLY_SELECTED: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: true },
   RENAME: { results: ['RENAME_RESULT'], label: 'op.rename', go: goLayer('rename'), write: false },
@@ -3687,7 +3630,6 @@ if (typeof ResizeObserver !== 'undefined') {
   const ro = new ResizeObserver(() => syncStickyOffsets());
   const tabsEl = document.querySelector('.tabs');
   if (tabsEl) ro.observe(tabsEl);
-  ro.observe($('selBarWrap'));
 }
 window.addEventListener('resize', syncStickyOffsets);
 
@@ -3732,8 +3674,7 @@ function showTab(name: TabName): void {
     btn.setAttribute('aria-selected', String(on));
     btn.tabIndex = on ? 0 : -1; // UX8: roving tabindex — 탭 묶음은 한 번의 Tab 정지점
   }
-  // 선택 표시줄은 설정에서만 숨긴다(§3). "목록 기준"은 변수 탭에서만.
-  $('selBarWrap').style.display = name === 'settings' ? 'none' : '';
+  // "목록 기준 다름"은 변수 탭의 상황 안내 줄에만(§4.1 · §4.4).
   renderSelBase();
   // 시작 화면 고정(①): 요약을 본 뒤 변수 탭을 떠나면 푼다.
   if (changed && name !== 'variables' && wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
@@ -3903,7 +3844,26 @@ function showStep(attr: 'make' | 'apply', step: string): void {
 }
 let currentApplyStep: ApplyStep = 'bind';
 
-const showMakeStep = (s: MakeStep): void => showStep('make', s);
+let curMakeStep: MakeStep = 'color';
+const showMakeStep = (s: MakeStep): void => {
+  curMakeStep = s;
+  showStep('make', s);
+  renderMakeNoSel();
+};
+/** 만들기 — 선택이 없으면 지금 단계 카드의 버튼 줄 아래에 안내(§4.1, 선택 표시줄이 없으므로). */
+function renderMakeNoSel(): void {
+  let hint = document.getElementById('makeNoSel');
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.id = 'makeNoSel';
+    hint.className = 'hint';
+    hint.textContent = t('make.noSel');
+  }
+  const card = document.querySelector<HTMLElement>(`#varMake .step[data-make-step="${curMakeStep}"]:not([data-always-hidden])`);
+  const bar = card?.querySelector<HTMLElement>('.toolbar');
+  if (bar && hint.previousElementSibling !== bar) bar.after(hint);
+  hint.hidden = lastSelCount > 0;
+}
 const showApplyStep = (s: ApplyStep): void => showStep('apply', s);
 
 for (const b of Array.from(document.querySelectorAll<HTMLElement>('#makeRail .step-chip'))) {
@@ -4325,16 +4285,50 @@ function finishRefresh(): void {
   if (statusTimer) { clearTimeout(statusTimer); statusTimer = setTimeout(clearStatusLine, 2000); }
 }
 
-/* ---------- 선택 표시줄의 목록 기준(§4.1) ---------- */
+/* ---------- 목록 기준 다름(§4.1 · §4.4) — 상황 안내 줄 맨 앞 ---------- */
+/** 목록 기준이 지금 선택과 다른가(지금 선택이 없을 때도 포함). */
+function baseDiffers(): boolean {
+  return !!baseline && !!curSel && !sameIds(baseline.ids, curSel.ids);
+}
+/** "목록 기준: {이름} · 지금 선택과 달라요 · " 문구. */
+function baseNoticeText(): string {
+  const b = baseline!;
+  const name = b.count === 1 ? b.name || t('sel.unnamed') : t('list.baseMany', { m: b.count });
+  return t(curSel.count ? 'list.baseDiff' : 'list.baseDiffNoSel', { name });
+}
+/** 목록 기준이 바뀌거나 선택이 바뀌면 상황 안내 줄(목록)과 시작 화면의 기준 줄을 다시 그린다. */
 function renderSelBase(): void {
-  const base = $('selBase');
-  const btn = $('btnRebase') as HTMLButtonElement;
-  const show = activeTab === 'variables' && !!baseline && !sameIds(baseline.ids, curSel.ids);
-  if (!show) { base.textContent = ''; btn.hidden = true; return; }
-  const name = baseline!.count === 1 ? baseline!.name || t('sel.unnamed') : t('list.baseMany', { m: baseline!.count });
-  base.textContent = t('list.base', { name });
-  base.title = name;
-  btn.hidden = false;
+  if (!vmCols) return; // 첫 화면 전(초기화 순서)
+  renderSituation();
+  if (activeTab === 'variables' && varScreen() === 'start') renderStart();
+}
+/** [기준 바꾸기] — 캔버스 선택 변경과 같게 처리하고, 포커스는 목록(시작 화면이면 LIB 첫 행 → 마법사 주 버튼). */
+function doRebase(fromStart: boolean): void {
+  rebaseToCurrent();
+  if (fromStart) {
+    ($('startLib').querySelector<HTMLElement>('[data-key]') ?? $('btnWizardRun')).focus();
+    return;
+  }
+  const tree = $('varTree');
+  const target = (focusKey && tree.querySelector<HTMLElement>(`[data-key="${CSS.escape(focusKey)}"]`)) || tree.querySelector<HTMLElement>('[data-key]');
+  target?.focus();
+}
+/** 상황 안내 줄 한 칸(글 + 링크 버튼). */
+function situationEl(text: string, action?: [string, () => void]): HTMLElement {
+  const d = document.createElement('div');
+  d.className = 'situation';
+  const sp = document.createElement('span');
+  sp.textContent = text;
+  d.appendChild(sp);
+  if (action) {
+    const b = document.createElement('button');
+    b.className = 'link link-btn';
+    b.type = 'button';
+    b.textContent = action[0];
+    b.addEventListener('click', action[1]);
+    d.appendChild(b);
+  }
+  return d;
 }
 
 /* ---------- 칩 줄 ---------- */
@@ -4454,7 +4448,9 @@ function renderSituation(): void {
   };
   let shown = true;
   const groups = new Set(vmVars.filter((v) => chip === 'all' || v.collectionId === chip).map((v) => groupKey(v.collectionId, v.name))).size;
-  if (baseline && bigSkipped && !usageMap) add(t('list.big'), [t('list.read'), () => requestManagerUsage('user')]);
+  // 겹치면 위쪽 하나만(§4.4). 목록 기준 다름이 맨 앞.
+  if (baseDiffers()) add(baseNoticeText(), [t('list.rebase'), () => doRebase(false)]);
+  else if (baseline && bigSkipped && !usageMap) add(t('list.big'), [t('list.read'), () => requestManagerUsage('user')]);
   else if (baseline && wizardRunning && !usageMap) add(t('list.wizardWait'));
   else if (baseline && usageMap && chipCounts('all').direct === 0) add(t('list.noneUsed'), [t('list.findUnbound'), findUnbound]);
   else if (!baseline && groups > 10) add(t('list.selectHint'));
@@ -5109,12 +5105,6 @@ $('chipRow').addEventListener('wheel', (e) => {
   e.preventDefault();
   $('chipRow').scrollLeft += e.deltaY;
 }, { passive: false });
-$('btnRebase').addEventListener('click', () => {
-  rebaseToCurrent();
-  const tree = $('varTree');
-  const target = (focusKey && tree.querySelector<HTMLElement>(`[data-key="${CSS.escape(focusKey)}"]`)) || tree.querySelector<HTMLElement>('[data-key]');
-  target?.focus();
-});
 
 /* =====================================================================
    시작 화면(§4.3) · 마법사 위치 · 준비 현황 팝오버
@@ -5150,12 +5140,14 @@ const wizHasSummary = (): boolean => !!$('wizardSummary').textContent;
 /** 마법사 카드 문구(§4.3 표) — 유료 / 무료(로컬 변수 0개) / 무료(로컬 변수 있음). */
 function renderWizardCopy(): void {
   const hint = $('wizardCard').querySelector<HTMLElement>('[data-i18n="wizardCard.hint"]');
-  const key = isPaid ? 'wizardCard.hintPaid' : localVarCount() === 0 ? 'wizardCard.hintFree' : 'wizardCard.hintFreeVars';
-  if (hint) hint.textContent = t(key);
+  // 마법사는 연결하지 않는다(§2.11) — 무료는 로컬 변수 수와 관계없이 이름 정리만.
+  if (hint) hint.textContent = t(isPaid ? 'wizardCard.hintPaid' : 'wizardCard.hintFree');
   const btn = $('btnWizardRun') as HTMLButtonElement;
-  if (!wizardRunning) btn.textContent = isPaid ? t(btn.dataset.rerun === '1' ? 'wizard.rerun' : 'wizardCard.run') : localVarCount() === 0 ? t('wizardCard.runFree') : t('wizardCard.runFreeVars');
-  // 선택이 없으면 주 버튼은 aria-disabled, 누르면 상태 줄에 사유.
+  if (!wizardRunning) btn.textContent = isPaid ? t(btn.dataset.rerun === '1' ? 'wizard.rerun' : 'wizardCard.run') : t('wizardCard.runFree');
+  // 선택이 없으면 주 버튼은 aria-disabled, 누르면 상태 줄에 사유. 카드 안에도 안내(§4.1 — 선택 표시줄이 없다).
   if (!wizardRunning) setLock(btn, curSel.count ? null : 'prereq', t('status.noSelection'));
+  $('wizNoSel').hidden = wizardRunning || !!curSel.count;
+  renderWizToBind();
   // 완료 머리 — 로컬 변수 0개에서 시작했고 변수가 늘었을 때.
   const done = $('wizDone');
   const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
@@ -5174,6 +5166,8 @@ function renderStart(): void {
   $('goMakeFree').style.display = isPaid ? 'none' : '';
   const lib = $('startLib');
   clearMount(lib);
+  // 시작 화면에는 상황 안내 표의 첫 행("목록 기준 다름")만 LIB 구역 위에(§4.4).
+  if (baseDiffers()) lib.appendChild(situationEl(baseNoticeText(), [t('list.rebase'), () => doRebase(true)]));
   if (baseline && bigSkipped && !usageMap) {
     const d = document.createElement('div');
     d.className = 'situation';

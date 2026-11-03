@@ -217,24 +217,9 @@
     .step-chip[aria-current="step"] { border-color: var(--accent-border); background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
     .step-chip .n { display: block; font-size: 11px; font-weight: 600; }
 
-    /* ── 선택 동기화 바 (탭 아래 sticky) ── */
-    #selBarWrap {
-      position: sticky; top: var(--tabs-h, 41px); z-index: 2; margin: 0 0 10px;
-      background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: var(--r); padding: 7px 10px;
-    }
-    .selbar { color: var(--text); font-weight: 500; display: flex; align-items: center; gap: 0; min-width: 0; white-space: nowrap; }
-    .selbar .sel-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
-    .selbar .sel-name:only-child, .selbar .sel-name:has(+ .sel-sub:empty) { max-width: none; }
-    .selbar .sel-sub { flex: 0 0 auto; }
-    .selbar .sel-sub:empty { display: none; }
-    .selbar .sel-base { flex: 0 1 auto; min-width: 0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; color: var(--text-2); font-weight: 400; }
-    .selbar .sel-base:empty { display: none; }
-    .selbar .sel-rebase { margin-left: auto; flex: 0 0 auto; font-weight: 600; }
     .ctx-menu .menu-note { display: block; font-size: 10px; color: var(--muted); font-weight: 400; }
     .ctx-menu button[aria-disabled="true"] { color: var(--muted); }
     .wiz-done { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    .selbar.muted { color: var(--muted); font-weight: 400; }
 
     /* ── 콜아웃(안내 노트) ── */
     .ux {
@@ -300,7 +285,6 @@
 
     /* ── 시스템화 마법사 스테퍼 ── */
     #wizardSteps { margin-top: 8px; }
-    #wizardBar { margin-top: 8px; }
 
     /* ── 첫 실행 배너 — 카드가 아니라 한 줄(온보딩 흡수) ── */
     .banner {
@@ -505,6 +489,8 @@
     .bg-head { font-weight: 600; color: var(--text); }
     .bg-place { padding-left: 42px; color: var(--text); }
     .bg-place.off { color: var(--text-2); }
+    .bg-head.off { color: var(--text-2); }
+    .skip-total { color: var(--text-2); font-size: 10.5px; margin-right: 2px; align-self: center; }
     .bg-tw { width: 24px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; }
     /* 색 견본은 원 — 네모 체크박스와 헷갈리지 않게(흰색 견본이 빈 체크박스로 보였다). */
     .bg-sw { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border-2); flex: 0 0 auto; }
@@ -514,7 +500,6 @@
     .bg-num { margin-left: auto; color: var(--text-2); font-weight: 500; font-size: 10.5px; }
     .bg-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .bg-layer { padding: 0; min-height: 0; }
-    .bg-approx { color: var(--warn, var(--text-2)); }
     .tier-chip {
       height: 24px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
       border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
@@ -649,10 +634,6 @@
     </button>
   </div>
 
-  <!-- 선택 동기화 (실시간) -->
-  <div id="selBarWrap">
-    <div class="selbar muted" id="selBar"><span class="sel-name" id="selName">● 선택 상태를 불러오는 중…</span><span class="sel-sub" id="selSub"></span><span class="sel-base" id="selBase"></span><button class="link link-btn sel-rebase" id="btnRebase" type="button" data-i18n="list.rebase" hidden>기준 바꾸기</button></div>
-  </div>
 
   <section class="tab-section" id="tab-variables" role="tabpanel" aria-labelledby="tabbtn-variables" tabindex="0">
    <!-- IA v3 변수 탭(§4.2~§4.4): 불러오는 중 / 시작 화면(로컬 변수 0개) / 변수 목록. 만들기는 아래 하위 화면. -->
@@ -707,7 +688,8 @@
     <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
     <div class="step" id="wizardCard">
       <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
-      <div class="hint" data-i18n="wizardCard.hint">선택 화면을 한 번에 토큰·변수 연결까지 정리합니다</div>
+      <div class="hint" data-i18n="wizardCard.hint">선택한 프레임의 색·간격을 변수로 만들고 레이어 이름을 정리해요</div>
+      <div class="hint" id="wizNoSel" hidden data-i18n="wizardCard.noSel">레이어를 선택하면 실행할 수 있어요</div>
       <div class="wiz-done" id="wizDone" hidden><b id="wizDoneText"></b> <button class="link link-btn" id="btnWizListView" type="button" data-i18n="start.viewList">변수 목록 보기</button></div>
       <div class="row">
         <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
@@ -726,9 +708,10 @@
       <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
            파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
            흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 변수연결=화면에 붙이기 · 다크=라이트 모드에서 어두운 값 채우기</div>
-      <div class="bar" id="wizardBar" style="display:none"><div class="bar-fill" id="wizardBarFill"></div></div>
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 다크=라이트 모드에서 어두운 값 채우기</div>
       <div class="status" id="wizardSummary"></div>
+      <!-- 요약 끝 연결 안내(§4.3) — 마법사는 레이어에 변수를 붙이지 않는다. 누르면 레이어 › 연결 + 미리보기. -->
+      <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">레이어 › 연결에서 확인하고 연결하기 →</button>
     </div>
 
    <!-- 만들기 하위 화면 — "← 돌아가기"로 변수 탭 첫 화면. -->
@@ -911,14 +894,13 @@
       <div class="bind-desc" id="bindDesc" hidden></div>
       <!-- 건너뜀 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다. 목록 위: 몇 개가 왜 빠졌는지 먼저. -->
       <div class="skip-row" id="bindSkips" style="display:none"></div>
-      <div class="hint" id="bindSkipHint" style="display:none" data-i18n="bind.skipHint">건너뜀 사유 · 누르면 그 레이어를 캔버스에서 고릅니다</div>
       <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
         <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:160px" />
       </div>
       <div class="bind-head" id="bindHead" hidden>
         <input type="checkbox" id="bindAll" />
         <span data-i18n="bind.headCol">연결</span>
-        <span data-i18n="bind.headVar">변수 · 연결할 자리</span>
+        <span data-i18n="bind.headVar">변수</span>
         <span class="grow"></span>
         <span class="outside" id="bindOutside"></span>
         <span data-i18n="bind.headCount">곳</span>
@@ -968,8 +950,8 @@
       <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
       <div class="toolbar toolbar-2">
         <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다.">묶기</button>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다. 원본의 연결과 값은 마스터를 따라요.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다. 원본의 연결과 값은 마스터를 따라요.">묶기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -1001,11 +983,9 @@
         <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
         <label class="inline"><span data-i18n="settings.depth">이름 정리 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
       </div>
-      <!-- 격자와 허용오차는 한 쌍이다 — 격자가 오차보다 크면 스냅한 토큰이 원래 레이어와
-           안 맞아 연결 단계에서 도로 떨어진다. 그래서 같은 줄에 나란히 두고 함께 고치게 한다. -->
+      <!-- 허용오차는 없앴다(§4.8) — 연결은 언제나 같은 값만. 격자는 만들기가 값을 맞추는 간격이다. -->
       <div class="row">
-        <label class="inline" data-i18n-title="settings.gridTip" title="여백·크기 토큰을 미리보기에서 이 격자로 모읍니다. 예: 8이면 13·15가 16으로."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
-        <label class="inline" data-i18n-title="settings.tolTip" title="바인딩은 레이어 값과 변수 값의 차이가 이 값 이하일 때 같은 값으로 봅니다. 격자로 옮긴 토큰까지 붙이려면 격자의 절반쯤이 필요합니다."><span data-i18n="settings.tol">허용오차</span> <input id="tol" type="number" value="0.5" min="0" max="16" step="0.5" />px</label>
+        <label class="inline" data-i18n-title="settings.gridTip" title="여백·크기 토큰을 만들기에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
       </div>
     </div>
 

@@ -9,7 +9,6 @@ import { groupBindLines, type BindItem } from './bindDisplay';
 /** 묶는 데 필요한 후보 필드(BindCandidate의 부분집합). */
 export interface GroupCand extends BindItem {
   nodeId: string;
-  distance?: number;
   /** 변수 값(표시용). 없으면 정확히 같은 후보의 현재 값으로 대신한다. */
   variableValue?: string;
 }
@@ -23,8 +22,6 @@ export interface PlaceLine {
   /** 이 줄이 묶은 후보 키. 길이 = 곳 수. */
   keys: string[];
   currentValue: string;
-  /** 허용오차 안에서만 같으면 차이(0보다 클 때만). */
-  distance?: number;
 }
 
 /** 변수 묶음. */
@@ -67,19 +64,16 @@ export function groupByVariable(cands: readonly GroupCand[]): VarGroup[] {
     for (const [nodeId, items] of byNode) {
       for (const l of groupBindLines(items)) {
         const its = l.items as GroupCand[];
-        const d = Math.max(...its.map((x) => x.distance ?? 0));
         lines.push({
           nodeId,
           label: l.label,
           fields: l.fields,
           keys: its.map((x) => placeKey({ ...x, nodeId })),
           currentValue: l.currentValue,
-          ...(d > 0 ? { distance: d } : {}),
         });
       }
     }
-    const exact = list.find((c) => !c.distance);
-    const variableValue = list.find((c) => c.variableValue != null)?.variableValue ?? (exact ?? list[0]).currentValue;
+    const variableValue = list.find((c) => c.variableValue != null)?.variableValue ?? list[0].currentValue;
     const keys = lines.flatMap((l) => l.keys);
     groups.push({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines });
   }
@@ -88,10 +82,10 @@ export function groupByVariable(cands: readonly GroupCand[]): VarGroup[] {
 }
 
 /**
- * 조용한 재계산(§4.6 ⑧)의 체크 이어받기.
- * - 같은 곳은 체크 상태를 그대로.
- * - 새로 생긴 곳: 그 변수의 기존 곳이 있었고 모두 체크 풀림이면 체크하지 않는다. 그 밖(새 묶음 포함)은 체크.
- * 반환: 새 체크 집합과 추가·제외 곳 수.
+ * 조용한 재계산(§4.6 ⑧)의 체크 이어받기 — 체크는 변수 단위다.
+ * - 전에 있던 변수는 체크 상태를 그대로(그 변수의 새 곳도 같은 상태).
+ * - 새로 생긴 변수는 체크.
+ * 추가·제외는 곳 단위(같은 곳 = 레이어 · 속성 · 변수)로 센다.
  */
 export function carryChecks(
   prev: readonly GroupCand[],
@@ -99,23 +93,16 @@ export function carryChecks(
   next: readonly GroupCand[],
 ): { checked: Set<string>; added: number; removed: number } {
   const prevKeys = new Set(prev.map(placeKey));
-  const anyChecked = new Map<string, boolean>(); // 변수 → 기존 곳 중 체크된 게 있나
-  for (const c of prev) {
-    const on = prevChecked.has(placeKey(c));
-    anyChecked.set(c.variableId, (anyChecked.get(c.variableId) ?? false) || on);
-  }
+  const varOn = new Map<string, boolean>(); // 변수 → 전에 체크돼 있었나
+  for (const c of prev) varOn.set(c.variableId, (varOn.get(c.variableId) ?? false) || prevChecked.has(placeKey(c)));
   const checked = new Set<string>();
   const nextKeys = new Set<string>();
   let added = 0;
   for (const c of next) {
     const k = placeKey(c);
     nextKeys.add(k);
-    if (prevKeys.has(k)) {
-      if (prevChecked.has(k)) checked.add(k);
-      continue;
-    }
-    added++;
-    if (anyChecked.get(c.variableId) !== false) checked.add(k);
+    if (!prevKeys.has(k)) added++;
+    if (varOn.get(c.variableId) ?? true) checked.add(k);
   }
   let removed = 0;
   for (const k of prevKeys) if (!nextKeys.has(k)) removed++;

@@ -21,6 +21,7 @@ import {
 import { paletteFamilyOf } from './palette';
 import { findCollection, ensureCollection, collectionTiers } from './collectionRoles'; // 이름이 아니라 지정된 역할로(Primitives→Global 등)
 import { TextSample, TextStyleSpec, ExistingTextStyle } from './textStyles';
+import type { TextStyleSkipReason } from '../shared/messages';
 
 export const GLOBAL = 'Global';
 export const SEMANTIC = 'Semantic';
@@ -226,10 +227,16 @@ export async function createSemanticAliases(map: Record<string, string>): Promis
    ============================================================ */
 const roundN = (n: number, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
 
-function walkText(node: SceneNode, out: TextNode[]): void {
+/**
+ * 보이는 텍스트를 모은다. `instanceOut`을 주면 인스턴스 안쪽으로는 내려가지 않고, 그 안의 보이는
+ * 텍스트는 `instanceOut`에 따로 모은다(연결은 인스턴스 안쪽을 건드리지 않는다 — §2.11, 건너뜀으로 센다).
+ * 주지 않으면(스캔) 예전처럼 인스턴스 안쪽까지 모은다.
+ */
+function walkText(node: SceneNode, out: TextNode[], instanceOut?: TextNode[]): void {
   if (node.visible === false) return; // 숨김 노드(및 그 하위)는 스캔/적용 대상에서 제외 — '보이는 텍스트만'
   if (node.type === 'TEXT') out.push(node);
-  else if ('children' in node) for (const c of node.children) walkText(c, out);
+  else if (instanceOut && node.type === 'INSTANCE') walkText(node, instanceOut);
+  else if ('children' in node) for (const c of node.children) walkText(c, out, instanceOut);
 }
 
 export interface TextScanResult {
@@ -447,15 +454,6 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
   }
   return { samples, warnings: [...warnings] };
 }
-
-/**
- * **시그니처 매칭용** 행간/자간 px — 스캔(`measureLineHeight`/`measureLetterSpacing`)과 **같은 함수**로
- * 재야 한다. 스캔이 PIXELS 150을 150%(=24px)로 읽어 스타일을 등록했는데 매칭 쪽에서 원값 150을
- * 그대로 쓰면 키가 어긋나, 「기존만 연결」이 방금 등록한 스타일을 '미등록 — 먼저 등록 필요'로 보고한다.
- * (값을 **쓰는** 경로는 아래 `lhPxOf`/`lsPxOf`로 스타일의 현재 값을 그대로 읽는다.)
- */
-const sigLhPx = (fontSize: number, lh: LineHeight | typeof figma.mixed): number => measureLineHeight(fontSize, lh).px;
-const sigLsPx = (fontSize: number, ls: LetterSpacing | typeof figma.mixed): number => measureLetterSpacing(fontSize, ls).px;
 
 /** 스타일/노드의 행간을 있는 그대로 px 환산(AUTO/혼합=0) — 값을 기록하는 경로용. */
 function lhPxOf(fontSize: number, lh: LineHeight | typeof figma.mixed): number {
@@ -791,25 +789,112 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
   return res;
 }
 
-/** 적용만(생성 없음): 선택 텍스트를 시그니처가 같은 **기존** 로컬 스타일에 바인딩.
-   라이브러리에 없는 시그니처는 건드리지 않고 "먼저 등록 필요"로 보고(스타일·변수 생성/수정 없음). */
-export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Promise<TextStyleResult> {
-  const res: TextStyleResult = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
-  // 기존 스타일 시그니처 인덱스(중복 시그니처는 모호 → 적용 제외).
-  //
-  // 스타일 쪽은 **원값 그대로**(lhPxOf) 재야 한다. 추측(sigLhPx)은 '캔버스에 아무렇게나
-  // 찍힌 PIXELS 150은 사실 150%더라'를 메우려고 있는 건데, 스타일은 누군가 정해 놓은
-  // 사실이라 메울 구멍이 없다. 여기에 추측을 걸면 16pt/200px처럼 일부러 넓게 잡은 스타일이
-  // 200%(=32px)로 읽혀, 평범한 16/32 문단이 그 스타일에 묶이고 캔버스 행간이 32→200으로 뛴다.
-  const styleBySig = new Map<string, TextStyle | null>(); // null = 같은 시그니처 2개 이상
+/** [기존 스타일 연결] 결과(IA v3 §4.6). skipped = 건너뛴 텍스트 레이어 수 = skipReasons 합. */
+export interface ApplyTextStylesResult {
+  applied: number;
+  skipped: number;
+  skipReasons: Record<TextStyleSkipReason, number>;
+  /** 예전 상태줄 문구(미등록 종류·모호·폰트 로드 실패·대상 없음) — 뒤호환용. */
+  missing: string[];
+}
+
+/** 텍스트 스타일 비교 키 — 스타일이 정하는 모든 글자 속성(§2.11). 숫자는 소수 2자리. */
+interface TypoFields {
+  fontSize: number;
+  fontName: FontName;
+  lineHeight: LineHeight | typeof figma.mixed;
+  letterSpacing: LetterSpacing | typeof figma.mixed;
+  textCase?: TextCase | typeof figma.mixed;
+  textDecoration?: TextDecoration | typeof figma.mixed;
+  paragraphSpacing?: number;
+  paragraphIndent?: number;
+}
+
+/**
+ * 스타일·글자 모두 같은 식으로 키를 만든다. 줄 높이·자간은 px로 환산해 비교한다 —
+ * 단위만 다르고 실제 높이가 같으면 같다(16px 글자의 24px ↔ 150%). 원값을 그대로 환산하고
+ * 추측(PIXELS 150 → 150%)은 하지 않는다: 숫자를 다른 단위로 읽어야만 맞는 경우는 모양이 달라진다.
+ * 없는 필드(오래된 목·환경)는 기본값(ORIGINAL · NONE · 0 · 0)으로 본다.
+ */
+function typoKey(t: TypoFields): string {
+  const fontSize = roundN(t.fontSize);
+  const lh = t.lineHeight !== figma.mixed && t.lineHeight && t.lineHeight.unit === 'AUTO' ? 'auto' : String(lhPxOf(fontSize, t.lineHeight));
+  return [
+    fontSize,
+    lh,
+    lsPxOf(fontSize, t.letterSpacing),
+    t.fontName.family,
+    t.fontName.style,
+    t.textCase ?? 'ORIGINAL',
+    t.textDecoration ?? 'NONE',
+    roundN(t.paragraphSpacing ?? 0),
+    roundN(t.paragraphIndent ?? 0),
+  ].join('|');
+}
+
+/** 이 텍스트가 섞인 서식인가(구간마다 크기·글꼴·줄 높이·자간·대소문자·밑줄이 다름). */
+function isMixedTypography(t: TextNode): boolean {
+  return (
+    t.fontSize === figma.mixed ||
+    t.fontName === figma.mixed ||
+    t.lineHeight === figma.mixed ||
+    t.letterSpacing === figma.mixed ||
+    (t as { textCase?: unknown }).textCase === figma.mixed ||
+    (t as { textDecoration?: unknown }).textDecoration === figma.mixed
+  );
+}
+
+const TEXT_VAR_FIELDS = ['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily'] as const;
+
+/** 글자 속성(크기·줄 높이·자간·글꼴)에 변수가 하나라도 붙었는가(일부 구간·지워진 변수 포함). */
+function hasTextVarBinding(t: TextNode): boolean {
+  const bv = (t as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
+  if (!bv) return false;
+  return TEXT_VAR_FIELDS.some((f) => {
+    const e = bv[f];
+    return Array.isArray(e) ? e.length > 0 : !!e;
+  });
+}
+
+/** 텍스트 스타일이 붙어 있는가(원격 스타일·일부 구간(mixed) 포함). */
+function hasTextStyle(t: TextNode): boolean {
+  const id = (t as { textStyleId?: unknown }).textStyleId;
+  return id === figma.mixed || (typeof id === 'string' && id !== '');
+}
+
+/** 조상 중에 인스턴스가 있는가(선택 루트가 인스턴스 안쪽인 경우). */
+function insideInstance(node: SceneNode): boolean {
+  for (let p: BaseNode | null = node.parent; p; p = p.parent) if (p.type === 'INSTANCE') return true;
+  return false;
+}
+
+/**
+ * 적용만(생성 없음, IA v3 §4.6): 선택 텍스트를 모든 글자 속성이 같은 **기존** 로컬 스타일에 연결한다.
+ * 건너뛰는 글자(§2.11): 이미 텍스트 스타일이 있음 · 글자 속성에 변수가 있음 · 인스턴스 안쪽 ·
+ * 서식이 섞임 · 같은 스타일이 없음 · 같은 모양 스타일이 둘 이상. 스타일·변수는 만들거나 고치지 않는다.
+ */
+export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Promise<ApplyTextStylesResult> {
+  const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+  const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons, missing: [] };
+  const skipText = (k: TextStyleSkipReason): void => {
+    skipReasons[k]++;
+    res.skipped++;
+  };
+  // 스타일 키 인덱스(같은 키 2개 이상 = 같은 모양 스타일이 여럿 → 모호, null).
+  const styleByKey = new Map<string, TextStyle | null>();
   for (const s of await figma.getLocalTextStylesAsync()) {
-    const fontSize = roundN(s.fontSize);
-    const k = `${fontSize}|${lhPxOf(fontSize, s.lineHeight)}|${lsPxOf(fontSize, s.letterSpacing)}|${s.fontName.family}|${s.fontName.style}`;
-    styleBySig.set(k, styleBySig.has(k) ? null : s);
+    const k = typoKey(s as unknown as TypoFields);
+    styleByKey.set(k, styleByKey.has(k) ? null : s);
   }
 
   const texts: TextNode[] = [];
-  for (const n of nodes) walkText(n, texts);
+  const inInstance: TextNode[] = [];
+  for (const n of nodes) {
+    if (insideInstance(n)) walkText(n, inInstance);
+    else walkText(n, texts, inInstance);
+  }
+  for (let i = 0; i < inInstance.length; i++) skipText('instance');
+
   const loaded = new Set<string>();
   const ensureFont = async (fn: FontName): Promise<void> => {
     const k = `${fn.family} ${fn.style}`;
@@ -818,27 +903,32 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
     loaded.add(k);
   };
 
-  const unregistered = new Set<string>(); // 라이브러리에 없는 시그니처(요약 보고용)
-  let ambiguous = 0;
+  const unregistered = new Set<string>(); // 같은 스타일이 없는 모양(요약 보고용)
   for (const t of texts) {
-    if (t.fontSize === figma.mixed || t.fontName === figma.mixed) continue;
-    const fontSize = roundN(t.fontSize);
-    const fn = t.fontName;
-    // 캔버스는 두 번 물어본다. 먼저 원값 그대로 — 진짜 200px 문단은 200px 스타일에 붙어야 한다.
-    // 없으면 추측값으로 한 번 더 — 스캔이 PIXELS 150을 150%로 읽어 PERCENT로 등록해 둔
-    // 스타일은 원값 150으로는 영영 안 잡힌다(등록해 놓고 '미등록'이라 답하던 그 경우).
-    const kLiteral = `${fontSize}|${lhPxOf(fontSize, t.lineHeight)}|${lsPxOf(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
-    const kGuess = `${fontSize}|${sigLhPx(fontSize, t.lineHeight)}|${sigLsPx(fontSize, t.letterSpacing)}|${fn.family}|${fn.style}`;
-    let hit = styleBySig.get(kLiteral);
-    if (hit === undefined && kGuess !== kLiteral) hit = styleBySig.get(kGuess);
+    if (hasTextStyle(t)) {
+      skipText('hasStyle');
+      continue;
+    }
+    if (hasTextVarBinding(t)) {
+      skipText('boundVars');
+      continue;
+    }
+    if (isMixedTypography(t)) {
+      skipText('mixed');
+      continue;
+    }
+    const fn = t.fontName as FontName;
+    const fontSize = t.fontSize as number;
+    const hit = styleByKey.get(typoKey(t as unknown as TypoFields));
     if (hit === undefined) {
-      unregistered.add(`${fn.family} ${fn.style} ${fontSize}`);
+      skipText('noStyle');
+      unregistered.add(`${fn.family} ${fn.style} ${roundN(fontSize)}`);
       continue;
     }
     if (hit === null) {
-      ambiguous++;
+      skipText('ambiguous'); // 같은 모양 스타일 2개 이상 → 어느 것에 붙일지 모호
       continue;
-    } // 같은 시그니처 스타일 2개 이상 → 어느 것에 붙일지 모호, 스킵
+    }
     try {
       await ensureFont(fn);
       await t.setTextStyleIdAsync(hit.id);
@@ -847,8 +937,8 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
       res.missing.push(`적용 실패 '${t.name}'(폰트 로드 불가)`);
     }
   }
-  if (texts.length === 0) res.missing.push('적용 대상 없음 — 선택에 텍스트 노드가 없습니다');
+  if (texts.length === 0 && inInstance.length === 0) res.missing.push('적용 대상 없음 — 선택에 텍스트 노드가 없습니다');
   if (unregistered.size) res.missing.push(`미등록 ${unregistered.size}종 — 먼저 등록 필요: ${[...unregistered].join(', ')}`);
-  if (ambiguous) res.missing.push(`모호 ${ambiguous}개 — 같은 타이포의 스타일이 여러 개라 자동 적용 보류`);
+  if (skipReasons.ambiguous) res.missing.push(`모호 ${skipReasons.ambiguous}개 — 같은 타이포의 스타일이 여러 개라 자동 적용 보류`);
   return res;
 }
