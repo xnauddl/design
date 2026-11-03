@@ -444,6 +444,60 @@
     .vusage.warn { color: var(--warn); }
 
     /* ── 창 높이 전환(QA #2 ①) — 탭 바 오른쪽 끝, 드래그 대신 버튼(#14) ── */
+    .tab-vars {
+      display: inline-flex; align-items: center; gap: 4px;
+      flex: 0 0 auto; padding: 6px 8px; border: none; background: transparent;
+      color: var(--text-2); font-weight: 600; border-radius: var(--r-sm); white-space: nowrap;
+    }
+    .tab-vars:hover { background: var(--surface-hover); color: var(--text); }
+    .tab-vars[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+    /* ── 변수 관리(넓은 화면) ── */
+    .var-manager { display: flex; flex-direction: column; gap: 8px; }
+    .vm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .vm-head h2 { margin: 0; font-size: 12px; }
+    .vm-head input[type=search] { width: 160px; }
+    .vm-body { display: grid; grid-template-columns: 170px 1fr; gap: 8px; min-height: 0; }
+    .vm-tree { border: 1px solid var(--border); border-radius: var(--r); padding: 4px; overflow: auto; max-height: calc(100vh - 150px); }
+    .vm-node { display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; border: none; background: transparent; padding: 4px 6px; border-radius: var(--r-sm); color: var(--text); font-size: 11px; }
+    .vm-node:hover { background: var(--surface-hover); }
+    .vm-node[aria-current="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+    .vm-node .tw { width: 10px; flex: 0 0 10px; color: var(--muted); }
+    .vm-node .lbl { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vm-node .cnt { color: var(--muted); font-size: 10px; }
+    .vm-node.empty .lbl { color: var(--muted); }
+    .vm-tier { font-size: 9px; padding: 0 4px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
+    .vm-table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow: auto; max-height: calc(100vh - 150px); }
+    .vm-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
+    .vm-table th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-2); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); z-index: 1; white-space: nowrap; }
+    .vm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .vm-table td.name, .vm-table th.name { position: sticky; left: 0; background: var(--surface); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+    .vm-table th.name { background: var(--surface-2); z-index: 2; }
+    .vm-group td { background: var(--surface-2); color: var(--text-2); font-weight: 600; cursor: pointer; }
+    .vm-row { cursor: default; outline: none; }
+    .vm-row:hover td { background: var(--surface-hover); }
+    .vm-row[aria-selected="true"] td { background: var(--accent-subtle); }
+    .vm-row .ic { display: inline-block; width: 12px; text-align: center; color: var(--muted); margin-right: 4px; font-family: var(--mono); }
+    .vm-row .more { visibility: hidden; border: none; background: transparent; padding: 0 4px; color: var(--text-2); }
+    .vm-row:hover .more, .vm-row:focus-within .more, .vm-row[aria-selected="true"] .more { visibility: visible; }
+    .vm-val { font-family: var(--mono); color: var(--text); }
+    .vm-alias { font-family: var(--mono); font-size: 10.5px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; background: var(--surface-2); color: var(--text-2); }
+    .vm-alias:hover { color: var(--accent-strong); border-color: var(--accent-border); }
+    .vm-use { color: var(--text-2); text-align: right; }
+    .vm-empty { padding: 16px; color: var(--muted); }
+    /* ── 우클릭 메뉴 · 팝업(공용) ── */
+    .ctx-menu { position: fixed; z-index: 50; min-width: 170px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 4px; }
+    .ctx-menu button { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: var(--r-sm); font-size: 11.5px; color: var(--text); }
+    .ctx-menu button:hover:not(:disabled), .ctx-menu button:focus-visible { background: var(--accent-subtle); color: var(--accent-strong); outline: none; }
+    .ctx-menu button:disabled { color: var(--muted); }
+    .ctx-menu hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.28); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; }
+    .modal { width: min(440px, 100%); max-height: calc(100vh - 80px); overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+    .modal h3 { margin: 0; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .modal .m-foot { display: flex; gap: 6px; justify-content: flex-end; }
+    .modal dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 0; font-size: 11.5px; }
+    .modal dt { color: var(--muted); }
+    .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
+    .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
     .tab-size {
       flex: 0 0 28px; padding: 6px 0; border: none; background: transparent;
       color: var(--text-2); border-radius: var(--r-sm); line-height: 1;
@@ -460,6 +514,8 @@
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
+    <!-- 변수 관리 — Figma Variables처럼 컬렉션·그룹 트리 + 표. 누르면 창이 넓어지고(760), 돌아가면 400. -->
+    <button class="tab-vars" id="btnVarManager" type="button" aria-pressed="false" data-i18n-title="vm.openTip" title="변수 관리 — 창이 넓어집니다"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1.5" width="10" height="9" rx="1.5"/><path d="M1 4.5h10M4.5 4.5v6"/></svg> <span data-i18n="vm.tab">변수</span></button>
     <button class="tab-size" id="btnUiSize" type="button" aria-pressed="false" data-i18n-title="ui.sizeGrow" title="창 높이 크게 (860)">
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
         <g class="ic-grow"><path d="M6 1v10M3 3.5 6 1l3 2.5M3 8.5 6 11l3-2.5"/></g>
@@ -475,7 +531,7 @@
 
   <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
     <!-- 이미 있는 변수 안내 — 변수가 있는 파일에서 '만들기'를 거쳐 확인하게 하지 않는다(바로 연결로). -->
-    <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button></div>
+    <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
     <div class="banner" id="onboardBanner" style="display:none">
       <span data-i18n="onboard.banner">처음이면 전체 실행으로 시작하세요.</span>
@@ -517,7 +573,7 @@
   </section>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
-    <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button></div>
+    <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
@@ -689,11 +745,11 @@
         <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
       </div>
       <!-- 보기 축 토글 — 레이어별(캔버스 순서로 검증) / 변수별(Tokens Studio Inspect처럼 변수 행 + 레이어 수, 관리용). -->
+      <!-- 변수 쪽 일(교체·복사·이름·삭제)은 변수 관리 화면이 맡는다 — 연결 카드는 '무엇이 무엇에 연결됐나'(레이어별)만. -->
       <div class="row tree-ctrls" id="bindViewRow" style="display:none">
-        <label class="inline"><input type="radio" name="bindView" value="layer" checked /> <span data-i18n="bind.viewLayer">레이어별</span></label>
-        <label class="inline"><input type="radio" name="bindView" value="variable" /> <span data-i18n="bind.viewVariable">변수별</span></label>
-        <span class="grow"></span>
         <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:140px" />
+        <span class="grow"></span>
+        <button class="link" id="btnBindToManager" data-i18n="vm.fromBind">변수 관리에서 보기 ↗</button>
       </div>
       <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐).
            목록 위에 둔다: 몇 개가 왜 빠졌는지는 후보를 훑기 전에 알아야 하는 정보다. -->
@@ -851,6 +907,26 @@
   <!-- 창 리사이즈 핸들(우하단) -->
   <div id="uiTip" role="tooltip" hidden></div>
 
+  <!-- 변수 관리(넓은 화면) — 탭 바의 [변수]로 연다. 탭 내용을 덮고, ‘돌아가기’로 보던 탭·스크롤로 복귀. -->
+  <section class="var-manager" id="varManager" style="display:none" aria-labelledby="vmTitle">
+    <div class="vm-head">
+      <button class="link" id="vmBack" data-i18n="vm.back">← 돌아가기</button>
+      <h2 id="vmTitle" data-i18n="vm.title">변수 관리</h2>
+      <span class="grow"></span>
+      <input id="vmSearch" type="search" data-i18n-placeholder="vm.search" placeholder="변수 검색" />
+      <label class="inline"><input type="checkbox" id="vmOnlyUsed" checked /> <span data-i18n="vm.onlyUsed">선택에서 쓰는 것만</span></label>
+      <span class="muted" id="vmCount"></span>
+    </div>
+    <div class="vm-body">
+      <nav class="vm-tree" id="vmTree" aria-label="컬렉션·그룹"></nav>
+      <div class="vm-table-wrap" id="vmTableWrap"></div>
+    </div>
+    <div class="status" id="vmStatus"></div>
+  </section>
+
+  <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->
+  <div id="overlayRoot"></div>
+
   <script>
 "use strict";
 (() => {
@@ -987,10 +1063,6 @@
     "bind.scannedNone": "\uC774 \uC120\uD0DD\uC5D0\uB294 \uC5F0\uACB0\uB41C \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBBF8\uB9AC\uBCF4\uAE30\uB85C \uD6C4\uBCF4\uB97C \uD655\uC778\uD558\uC138\uC694.",
     "bind.scanHintLarge": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC558\uC5B4\uC694 \u2014 \u2018\uC5F0\uACB0 \uD604\uD669\u2019\uC744 \uB204\uB974\uC138\uC694.",
     "bind.filterPlaceholder": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
-    "bind.viewLayer": "\uB808\uC774\uC5B4\uBCC4",
-    "bind.viewVariable": "\uBCC0\uC218\uBCC4",
-    "bind.varLayers": "\uB808\uC774\uC5B4 {n}",
-    "bind.varSelect": "\uC120\uD0DD",
     // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
     "field.fills": "\uCC44\uC6C0 \uC0C9",
     "field.strokes": "\uC120 \uC0C9",
@@ -1027,20 +1099,9 @@
     "field.letterSpacing": "\uC790\uAC04",
     "field.fontFamily": "\uAE00\uAF34",
     "field.fontWeight": "\uAD75\uAE30",
-    "fieldGroup.color": "\uC0C9",
-    "fieldGroup.space": "\uC5EC\uBC31\xB7\uAC04\uACA9",
-    "fieldGroup.radius": "\uBAA8\uC11C\uB9AC",
-    "fieldGroup.size": "\uD06C\uAE30\xB7\uC120",
-    "fieldGroup.text": "\uAE00\uC790",
-    "fieldGroup.other": "\uAE30\uD0C0",
-    "bind.varUses": "\uB808\uC774\uC5B4 {layers} \xB7 \uC18D\uC131 {props}",
-    "bind.varShowUses": "\uC5B4\uB514\uC5D0?",
-    "bind.varHideUses": "\uC811\uAE30",
     "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD569\uB2C8\uB2E4",
     "bind.connectedTip": "{label}({fields})\uC774(\uAC00) {variable}\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC2B5\uB2C8\uB2E4",
     "bind.willConnectTip": "{label}({fields})\uC744(\uB97C) {variable}\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4",
-    "bind.varRemap": "\uAD50\uCCB4",
-    "bind.varRemapTip": "\uC774 \uBCC0\uC218\uAC00 \uBD99\uC740 \uC790\uB9AC\uB97C \uB2E4\uB978 \uBCC0\uC218\uB85C \uBC14\uAFC9\uB2C8\uB2E4 \u2014 \uC120\uD0DD \uC548, \uC774 \uC18D\uC131\uB9CC",
     "bind.remapLabel": "\uBC14\uAFC0 \uBCC0\uC218",
     "bind.remapLoading": "\uBC14\uAFC0 \uC218 \uC788\uB294 \uBCC0\uC218\uB97C \uCC3E\uB294 \uC911\u2026",
     "bind.remapNone": "\uBC14\uAFC0 \uC218 \uC788\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uAC19\uC740 \uC885\uB958\xB7\uC6A9\uB3C4\uC758 \uBCC0\uC218\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.",
@@ -1164,6 +1225,50 @@
     "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
+    "common.close": "\uB2EB\uAE30",
+    // 변수 관리(넓은 화면)
+    "vm.tab": "\uBCC0\uC218",
+    "vm.openTip": "\uBCC0\uC218 \uAD00\uB9AC \u2014 \uCC3D\uC774 \uB113\uC5B4\uC9D1\uB2C8\uB2E4",
+    "vm.fromBind": "\uBCC0\uC218 \uAD00\uB9AC\uC5D0\uC11C \uBCF4\uAE30 \u2197",
+    "vm.fromBanner": "\uBCC0\uC218 \uAD00\uB9AC",
+    "vm.back": "\u2190 \uB3CC\uC544\uAC00\uAE30",
+    "vm.title": "\uBCC0\uC218 \uAD00\uB9AC",
+    "vm.search": "\uBCC0\uC218 \uAC80\uC0C9",
+    "vm.onlyUsed": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uAC83\uB9CC",
+    "vm.count": "{total}\uAC1C \uC911 {shown}\uAC1C",
+    "vm.colName": "\uC774\uB984",
+    "vm.colUsage": "\uC0AC\uC6A9",
+    "vm.uses": "{n}\uACF3",
+    "vm.moreTip": "\uBA54\uB274 (\uC6B0\uD074\uB9AD\uACFC \uAC19\uC74C)",
+    "vm.jumpAlias": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uB85C \uC774\uB3D9",
+    "vm.aliasOutside": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uAC00 \uC774 \uD30C\uC77C\uC5D0 \uC5C6\uC2B5\uB2C8\uB2E4(\uB2E4\uB978 \uD30C\uC77C\xB7\uB77C\uC774\uBE0C\uB7EC\uB9AC).",
+    "vm.noVars": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "vm.selectFirst": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uBA74 \uAC70\uAE30\uC11C \uC4F0\uB294 \uBCC0\uC218\uAC00 \uBCF4\uC5EC\uC694.",
+    "vm.usageLoading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218\uB97C \uC77D\uB294 \uC911\u2026",
+    "vm.noneUsed": "\uC774 \uCEEC\uB809\uC158\uC758 \uBCC0\uC218\uB294 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
+    "vm.showAll": "\uC804\uCCB4 \uBCF4\uAE30",
+    "vm.noMatch": "\uC870\uAC74\uC5D0 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "vm.usageCapped": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC0AC\uC6A9 \uC218\uB294 \uC77C\uBD80\uB9CC \uC14C\uC2B5\uB2C8\uB2E4.",
+    "vm.copyName": "\uC774\uB984 \uBCF5\uC0AC",
+    "vm.copyValue": "\uAC12 \uBCF5\uC0AC",
+    "vm.copyCss": "CSS \uBCC0\uC218\uBA85 \uBCF5\uC0AC",
+    "vm.whatName": "\uC774\uB984",
+    "vm.whatValue": "\uAC12",
+    "vm.whatCss": "CSS \uBCC0\uC218\uBA85",
+    "vm.copied": "{what}\uC744(\uB97C) \uBCF5\uC0AC\uD588\uC5B4\uC694: {text}",
+    "vm.copyFailed": "\uBCF5\uC0AC\uAC00 \uB9C9\uD614\uC5B4\uC694 \u2014 \uC9C1\uC811 \uBCF5\uC0AC\uD558\uC138\uC694: {text}",
+    "vm.copyEmpty": "\uBCF5\uC0AC\uD560 \uAC12\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "vm.selectLayers": "\uC0AC\uC6A9 \uB808\uC774\uC5B4 \uC120\uD0DD",
+    "vm.detail": "\uC0C1\uC138 \uBCF4\uAE30\u2026",
+    "vm.remap": "\uB2E4\uB978 \uBCC0\uC218\uB85C \uAD50\uCCB4\u2026",
+    "vm.remapTitle": "{name} \uAD50\uCCB4",
+    "vm.noTier": "\uACC4\uCE35 \uC544\uB2D8",
+    "vm.dCollection": "\uCEEC\uB809\uC158",
+    "vm.dScopes": "\uC6A9\uB3C4",
+    "vm.dDesc": "\uC124\uBA85",
+    "vm.dUses": "\uC4F0\uC778 \uACF3 {n}",
+    "vm.dNoUses": "\uC120\uD0DD \uC548\uC5D0\uC11C\uB294 \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
+    "vm.dSelectFirst": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uBA74 \uC4F0\uC778 \uACF3\uC774 \uBCF4\uC5EC\uC694.",
     // 탭
     "tab.wizard": "\uC2DC\uC791",
     "tab.tokens": "\uB9CC\uB4E4\uAE30",
@@ -1453,14 +1558,6 @@
     }
     return lines;
   }
-  function fieldGroupKey(field) {
-    if (field === "fills" || field === "strokes" || field === "effects") return "color";
-    if (familyOf(field) === "padding" || /Spacing$|Gap$/.test(field)) return "space";
-    if (familyOf(field) === "radius") return "radius";
-    if (field === "width" || field === "height" || /^stroke.*Weight$/.test(field) || /^(min|max)(Width|Height)$/.test(field)) return "size";
-    if (/^font|^lineHeight$|^letterSpacing$|^paragraph/.test(field)) return "text";
-    return "other";
-  }
   function isHexColor(v) {
     return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v.trim());
   }
@@ -1671,8 +1768,15 @@
   ];
   var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
   var ROLE_SET = new Set(ROLE_VOCAB);
+  function kebab(input) {
+    return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s/]+/g, "-").replace(/_/g, (_m, i, s) => /\d/.test(s[i - 1] || "") && /\d/.test(s[i + 1] || "") ? "_" : "-").replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+  }
 
   // src/lib/exporters.ts
+  var cssVar = (name) => `--${kebab(name)}`;
+  function cssVarName(name) {
+    return cssVar(name);
+  }
   function exportHasTokens(content, format) {
     if (format === "css") return /--[\w-]+\s*:/.test(content);
     try {
@@ -1681,6 +1785,87 @@
     } catch (e) {
       return false;
     }
+  }
+
+  // src/lib/varTable.ts
+  function groupPath(name) {
+    const i = name.lastIndexOf("/");
+    return i < 0 ? "" : name.slice(0, i);
+  }
+  function leafName(name) {
+    const i = name.lastIndexOf("/");
+    return i < 0 ? name : name.slice(i + 1);
+  }
+  function buildVarTree(cols, vars, include) {
+    const out = [];
+    for (const c of cols) {
+      const root = { collectionId: c.id, path: "", label: c.name, depth: 0, count: 0, children: [] };
+      const index = /* @__PURE__ */ new Map([["", root]]);
+      for (const v of vars) {
+        if (v.collectionId !== c.id || !include(v)) continue;
+        root.count++;
+        const parts = groupPath(v.name).split("/").filter(Boolean);
+        let parent2 = root;
+        let path = "";
+        parts.forEach((p, i) => {
+          path = path ? `${path}/${p}` : p;
+          let node = index.get(path);
+          if (!node) {
+            node = { collectionId: c.id, path, label: p, depth: i + 1, count: 0, children: [] };
+            index.set(path, node);
+            parent2.children.push(node);
+          }
+          node.count++;
+          parent2 = node;
+        });
+      }
+      out.push(root);
+    }
+    return out;
+  }
+  function inPath(name, path) {
+    if (!path) return true;
+    const g = groupPath(name);
+    return g === path || g.startsWith(path + "/");
+  }
+  function filterVars(vars, f, usage) {
+    const q = f.query.trim().toLowerCase();
+    return vars.filter(
+      (v) => {
+        var _a;
+        return v.collectionId === f.collectionId && inPath(v.name, f.path) && (!q || v.name.toLowerCase().includes(q)) && (!f.onlyUsed || ((_a = usage.get(v.id)) != null ? _a : 0) > 0);
+      }
+    );
+  }
+  function groupRows(rows) {
+    const out = [];
+    const idx = /* @__PURE__ */ new Map();
+    for (const r of rows) {
+      const p = groupPath(r.name);
+      let g = idx.get(p);
+      if (!g) {
+        g = { path: p, rows: [] };
+        idx.set(p, g);
+        out.push(g);
+      }
+      g.rows.push(r);
+    }
+    return out;
+  }
+  function cellCopyText(cell) {
+    if (!cell) return "";
+    switch (cell.kind) {
+      case "color":
+        return cell.hex.toUpperCase();
+      case "alias":
+        return cell.aliasName;
+      default:
+        return cell.text;
+    }
+  }
+  function pickInitialCollection(tree) {
+    var _a, _b, _c;
+    return (_c = (_b = (_a = tree.find((n) => n.count > 0)) != null ? _a : tree[0]) == null ? void 0 : _b.collectionId) != null ? _c : null;
   }
 
   // src/lib/color.ts
@@ -3746,6 +3931,7 @@
         applySelectionDone();
         refreshVariantRow(msg.comps, msg.sets);
         if (!msg.selfSelect) {
+          scheduleManagerUsage();
           nextBindReq();
           hideApplyProgress();
           const autoScan = !wizardRunning && msg.bound > 0 && msg.scanned <= AUTO_SCAN_MAX;
@@ -3815,7 +4001,6 @@
           confirmBtn.style.display = "none";
         } else if (msg.preview) {
           bindResultMode = false;
-          remapOpen = null;
           bindCandidates = (_c = msg.candidates) != null ? _c : [];
           bindNodes = (_d = msg.nodes) != null ? _d : [];
           bindChecked.clear();
@@ -3838,24 +4023,32 @@
         }
         break;
       }
-      case "REMAP_TARGETS_RESULT": {
-        if (!remapOpen || remapOpen.fromId !== msg.fromId) break;
-        remapOpen.targets = msg.targets;
-        renderBindTree();
+      case "REMAP_TARGETS_RESULT":
+        onRemapTargets(msg.fromId, msg.targets);
         break;
-      }
       case "REMAP_RESULT": {
-        remapOpen = null;
+        closeModal();
+        const statusId = vmOpen ? "vmStatus" : "applyStatus";
         if (!msg.replaced) {
-          setStatus("applyStatus", t("bind.remapNothing"), "warn");
+          setStatus(statusId, t("bind.remapNothing"), "warn");
           break;
         }
-        keepRemapStatus = true;
+        keepRemapStatus = !vmOpen;
         const skippedNote = msg.skipped ? t("bind.remapSkipped", { skipped: msg.skipped }) : "";
-        setStatus("applyStatus", t("bind.remapDone", { replaced: msg.replaced, to: msg.toName, nodes: msg.nodes }) + skippedNote, msg.skipped ? "warn" : "ok");
+        setStatus(statusId, t("bind.remapDone", { replaced: msg.replaced, to: msg.toName, nodes: msg.nodes }) + skippedNote, msg.skipped ? "warn" : "ok");
+        if (vmOpen) requestManagerUsage();
         break;
       }
+      case "VAR_TABLE":
+        vmCols = msg.collections;
+        vmVars = msg.vars;
+        renderVarManager();
+        break;
       case "BINDINGS_RESULT": {
+        if (msg.forManager) {
+          if (msg.reqId === vmUsageReq) setManagerUsage(msg.candidates, msg.nodes, msg.total > msg.candidates.length);
+          break;
+        }
         if (!isCurrentBindReply(msg.reqId)) break;
         clearBindPreview();
         bindResultMode = true;
@@ -4349,19 +4542,9 @@
   function fieldLabel(label, rawField) {
     return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
   }
-  function fieldGroupLabel(group) {
-    return t(`fieldGroup.${group}`);
-  }
-  var bindView = "layer";
   function renderBindTree() {
     const has = bindCandidates.length > 0;
     $("bindViewRow").style.display = has ? "" : "none";
-    if (has && bindView === "variable") {
-      $("bindTreeCtrls").style.display = "none";
-      renderBindByVariable();
-      updateBindApply();
-      return;
-    }
     $("bindTreeCtrls").style.display = hasBindPreview() ? "" : "none";
     renderSelectableTree($("bindTree"), bindRows(), bindChecked, {
       hideContext: bindHideContext,
@@ -4379,143 +4562,8 @@
     const q = bindFilterText();
     return q ? bindCandidates.filter((c) => c.variableName.toLowerCase().includes(q)) : bindCandidates;
   }
-  var varUsesOpen = /* @__PURE__ */ new Set();
-  var FIELD_GROUP_ORDER = ["color", "space", "radius", "size", "text", "other"];
-  function renderBindByVariable() {
-    var _a, _b, _c;
-    const mount = $("bindTree");
-    clearMount(mount);
-    const nodeName = new Map(bindNodes.map((n) => [n.id, n.name]));
-    const groups = /* @__PURE__ */ new Map();
-    for (const c of filteredCandidates()) {
-      const g = fieldGroupKey(c.field);
-      if (!groups.has(g)) groups.set(g, /* @__PURE__ */ new Map());
-      const byVar = groups.get(g);
-      const row = (_a = byVar.get(c.variableId)) != null ? _a : { id: c.variableId, name: c.variableName, value: c.currentValue, fields: /* @__PURE__ */ new Set(), byNode: /* @__PURE__ */ new Map() };
-      row.fields.add(c.field);
-      const list = (_b = row.byNode.get(c.nodeId)) != null ? _b : [];
-      list.push(c);
-      row.byNode.set(c.nodeId, list);
-      byVar.set(c.variableId, row);
-    }
-    const order = [...groups.keys()].sort((a, b) => FIELD_GROUP_ORDER.indexOf(a) - FIELD_GROUP_ORDER.indexOf(b));
-    for (const g of order) {
-      mount.appendChild(resultGroup(fieldGroupLabel(g)));
-      const rows = [...groups.get(g).values()].sort((a, b) => b.byNode.size - a.byNode.size || a.name.localeCompare(b.name));
-      for (const r of rows) {
-        const key = `${g}|${r.id}`;
-        const ids = [...r.byNode.keys()];
-        const uses = ids.map((nid) => ({ nid, labels: groupBindLines(r.byNode.get(nid)).map((l) => fieldLabel(l.label, l.fields[0])) }));
-        const props = uses.reduce((n, u) => n + u.labels.length, 0);
-        const meta = document.createElement("span");
-        const link = (text, tip, on) => {
-          const b = document.createElement("button");
-          b.className = "link";
-          b.textContent = text;
-          b.title = tip;
-          b.addEventListener("click", on);
-          return b;
-        };
-        const open = varUsesOpen.has(key);
-        meta.append(link(t(open ? "bind.varHideUses" : "bind.varShowUses"), "", () => {
-          if (open) varUsesOpen.delete(key);
-          else varUsesOpen.add(key);
-          renderBindTree();
-        }));
-        meta.append(" \xB7 ", link(t("bind.varSelect"), t("bind.varLayers", { n: ids.length }), () => selectNodes(ids, "applyStatus")));
-        if (bindResultMode) {
-          meta.append(" \xB7 ", link(t("bind.varRemap"), t("bind.varRemapTip"), () => openRemap({ key, fromId: r.id, fromName: r.name, fields: [...r.fields], sites: [...r.byNode.values()].reduce((n, l) => n + l.length, 0) })));
-        }
-        const title = document.createElement("span");
-        const swatch = isHexColor(r.value) ? `<span class="bf-swatch" style="background:${escapeHtml(r.value)}"></span>` : "";
-        const valueText = !isHexColor(r.value) && r.value ? ` <span class="bf-val">= ${escapeHtml(r.value)}</span>` : "";
-        title.innerHTML = `${swatch}${escapeHtml(r.name)}${valueText}`;
-        title.title = r.value ? `${r.name} = ${r.value}` : r.name;
-        mount.appendChild(resultCard({ title, titleMono: true, summary: t("bind.varUses", { layers: ids.length, props }), metaEl: meta }));
-        if (open) {
-          const box = document.createElement("div");
-          box.className = "var-uses";
-          for (const u of uses) {
-            const b = document.createElement("button");
-            b.className = "var-use";
-            b.title = t("bind.layerSelectTip");
-            b.innerHTML = `<span class="vu-layer">${escapeHtml((_c = nodeName.get(u.nid)) != null ? _c : u.nid)}</span> <span class="vu-props">${escapeHtml(u.labels.join(", "))}</span>`;
-            b.addEventListener("click", () => selectNodes([u.nid], "applyStatus"));
-            box.appendChild(b);
-          }
-          mount.appendChild(box);
-        }
-        if (remapOpen && remapOpen.key === key) mount.appendChild(renderRemapPanel(remapOpen));
-      }
-    }
-  }
-  var remapOpen = null;
-  var keepRemapStatus = false;
-  function openRemap(o) {
-    remapOpen = o;
-    send({ type: "REMAP_TARGETS", fromId: o.fromId, fields: o.fields });
-    renderBindTree();
-  }
-  function closeRemap() {
-    remapOpen = null;
-    renderBindTree();
-  }
-  function renderRemapPanel(o) {
-    const box = document.createElement("div");
-    box.className = "remap-panel";
-    if (!o.targets) {
-      box.textContent = t("bind.remapLoading");
-      return box;
-    }
-    const cancel = document.createElement("button");
-    cancel.className = "link";
-    cancel.textContent = t("bind.remapCancel");
-    cancel.addEventListener("click", closeRemap);
-    if (!o.targets.length) {
-      const note = document.createElement("span");
-      note.className = "muted";
-      note.textContent = t("bind.remapNone");
-      box.append(note, " ", cancel);
-      return box;
-    }
-    const label = document.createElement("label");
-    label.className = "inline";
-    label.textContent = t("bind.remapLabel");
-    const select = document.createElement("select");
-    select.id = "remapTarget";
-    const byCol = /* @__PURE__ */ new Map();
-    for (const v of o.targets) {
-      let g = byCol.get(v.collection);
-      if (!g) {
-        g = document.createElement("optgroup");
-        g.label = v.collection || "\u2014";
-        byCol.set(v.collection, g);
-        select.appendChild(g);
-      }
-      const opt = document.createElement("option");
-      opt.value = v.id;
-      opt.textContent = v.name;
-      g.appendChild(opt);
-    }
-    label.appendChild(select);
-    const apply = document.createElement("button");
-    apply.className = "primary";
-    apply.textContent = t("bind.remapApply", { n: o.sites });
-    apply.addEventListener("click", () => {
-      apply.disabled = true;
-      send({ type: "REMAP_BINDINGS", fromId: o.fromId, toId: select.value, fields: o.fields, reqId: nextBindReq() });
-    });
-    box.append(label, apply, cancel);
-    return box;
-  }
   $("bindFilter").addEventListener("input", () => renderBindTree());
-  document.querySelectorAll('input[name="bindView"]').forEach((radio) => {
-    radio.addEventListener("change", () => {
-      if (!radio.checked) return;
-      bindView = radio.value === "variable" ? "variable" : "layer";
-      renderBindTree();
-    });
-  });
+  $("btnBindToManager").addEventListener("click", () => openVarManager({ onlyUsed: true }));
   function updateBindApply() {
     const total = bindCandidates.length;
     const sel = bindChecked.size;
@@ -4530,7 +4578,6 @@
     }
   }
   function clearBindPreview() {
-    remapOpen = null;
     $("bindTree").classList.remove("stale");
     bindResultMode = false;
     bindCandidates = [];
@@ -4896,6 +4943,7 @@
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
   var TABS = ["wizard", "tokens", "apply", "settings"];
   function showTab(name) {
+    if (vmOpen) leaveManagerUi();
     for (const t2 of TABS) {
       $(`tab-${t2}`).classList.toggle("active", t2 === name);
       const btn = $(`tabbtn-${t2}`);
@@ -4926,6 +4974,10 @@
       const box = $(id);
       const text = box.querySelector(".ev-text");
       const go = box.querySelector(".ev-go");
+      const manage = box.querySelector(".ev-manage");
+      manage.textContent = t("vm.fromBanner");
+      manage.onclick = () => openVarManager({ onlyUsed: false });
+      manage.style.display = tierVars + other > 0 ? "" : "none";
       if (tierVars > 0) {
         text.textContent = onMake ? t("existingVars.hasMake", { n: tierVars }) : t("existingVars.has", { n: tierVars, color: tierColor, other: tierVars - tierColor });
         go.textContent = t("existingVars.gotoBind");
@@ -5053,8 +5105,667 @@
   for (const b of Array.from(document.querySelectorAll("[data-next-apply]"))) {
     b.addEventListener("click", () => showApplyStep(b.dataset.nextApply));
   }
+  var menuEl = null;
+  function closeMenu() {
+    menuEl == null ? void 0 : menuEl.remove();
+    menuEl = null;
+  }
+  function openMenu(x, y, items, returnFocus) {
+    var _a;
+    closeMenu();
+    const m = document.createElement("div");
+    m.className = "ctx-menu";
+    m.setAttribute("role", "menu");
+    const buttons = [];
+    for (const it of items) {
+      if (it.separatorBefore) m.appendChild(document.createElement("hr"));
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "menuitem");
+      b.textContent = it.label;
+      b.disabled = !!it.disabled;
+      b.addEventListener("click", () => {
+        closeMenu();
+        returnFocus == null ? void 0 : returnFocus.focus();
+        it.onSelect();
+      });
+      m.appendChild(b);
+      buttons.push(b);
+    }
+    $("overlayRoot").appendChild(m);
+    const r = m.getBoundingClientRect();
+    m.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
+    m.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
+    const enabled = buttons.filter((b) => !b.disabled);
+    (_a = enabled[0]) == null ? void 0 : _a.focus();
+    m.addEventListener("keydown", (e) => {
+      var _a2, _b;
+      const i = enabled.indexOf(document.activeElement);
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        (_a2 = enabled[(i + 1) % enabled.length]) == null ? void 0 : _a2.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        (_b = enabled[(i - 1 + enabled.length) % enabled.length]) == null ? void 0 : _b.focus();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeMenu();
+        returnFocus == null ? void 0 : returnFocus.focus();
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+      }
+    });
+    menuEl = m;
+  }
+  document.addEventListener("pointerdown", (e) => {
+    if (menuEl && !menuEl.contains(e.target)) closeMenu();
+  }, true);
+  window.addEventListener("resize", closeMenu);
+  document.addEventListener("scroll", closeMenu, true);
+  var modalEl = null;
+  var modalReturnFocus = null;
+  function closeModal() {
+    if (!modalEl) return;
+    modalEl.remove();
+    modalEl = null;
+    modalReturnFocus == null ? void 0 : modalReturnFocus.focus();
+    modalReturnFocus = null;
+  }
+  function openModal(title, body, foot) {
+    var _a;
+    closeModal();
+    closeMenu();
+    modalReturnFocus = document.activeElement;
+    const back = document.createElement("div");
+    back.className = "modal-backdrop";
+    const box = document.createElement("div");
+    box.className = "modal";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+    const h = document.createElement("h3");
+    if (typeof title === "string") h.textContent = title;
+    else h.appendChild(title);
+    const f = document.createElement("div");
+    f.className = "m-foot";
+    f.append(...foot);
+    box.append(h, body, f);
+    back.appendChild(box);
+    back.addEventListener("pointerdown", (e) => {
+      if (e.target === back) closeModal();
+    });
+    box.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeModal();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const focusables = Array.from(box.querySelectorAll('button:not(:disabled), select, input, [tabindex="0"]'));
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+    $("overlayRoot").appendChild(back);
+    modalEl = back;
+    ((_a = box.querySelector("select, input, button.primary, button")) != null ? _a : box).focus();
+    return box;
+  }
+  function modalButton(label, onClick, primary = false) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    if (primary) b.className = "primary";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+  async function copyText(text) {
+    var _a;
+    try {
+      if ((_a = navigator.clipboard) == null ? void 0 : _a.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (e) {
+      ok = false;
+    }
+    ta.remove();
+    return ok;
+  }
+  var vmOpen = false;
+  var vmCols = [];
+  var vmVars = [];
+  var vmScope = null;
+  var vmScopeUser = false;
+  var vmSelected = null;
+  var vmCollapsed = /* @__PURE__ */ new Set();
+  var vmUsage = null;
+  var vmUsageNodes = /* @__PURE__ */ new Map();
+  var vmUsageCapped = false;
+  var vmUsageReq = 0;
+  var vmReturn = null;
+  function currentTab() {
+    var _a;
+    return (_a = TABS.find((t2) => $(`tab-${t2}`).classList.contains("active"))) != null ? _a : "wizard";
+  }
+  function openVarManager(opts = {}) {
+    if (!vmOpen) {
+      vmReturn = { tab: currentTab(), scrollY: window.scrollY };
+      vmScopeUser = false;
+    }
+    vmOpen = true;
+    if (opts.onlyUsed !== void 0) $("vmOnlyUsed").checked = opts.onlyUsed;
+    for (const t2 of TABS) $(`tab-${t2}`).classList.remove("active");
+    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    $("varManager").style.display = "";
+    $("btnVarManager").setAttribute("aria-pressed", "true");
+    send({ type: "SET_UI_WIDE", wide: true });
+    send({ type: "GET_VAR_TABLE" });
+    requestManagerUsage();
+    renderVarManager();
+    window.scrollTo(0, 0);
+  }
+  function leaveManagerUi() {
+    vmOpen = false;
+    if (vmUsageTimer) {
+      clearTimeout(vmUsageTimer);
+      vmUsageTimer = null;
+    }
+    closeMenu();
+    closeModal();
+    $("varManager").style.display = "none";
+    $("btnVarManager").setAttribute("aria-pressed", "false");
+    send({ type: "SET_UI_WIDE", wide: false });
+  }
+  function closeVarManager() {
+    var _a;
+    if (!vmOpen) return;
+    const back = vmReturn;
+    vmReturn = null;
+    showTab((_a = back == null ? void 0 : back.tab) != null ? _a : "wizard");
+    if (back) requestAnimationFrame(() => window.scrollTo(0, back.scrollY));
+  }
+  var vmUsageTimer = null;
+  function scheduleManagerUsage() {
+    if (!vmOpen) return;
+    if (vmUsageTimer) clearTimeout(vmUsageTimer);
+    vmUsage = null;
+    vmUsageReq = 0;
+    renderVarManager();
+    vmUsageTimer = setTimeout(() => {
+      vmUsageTimer = null;
+      requestManagerUsage();
+    }, AUTO_SCAN_DELAY);
+  }
+  $("btnVarManager").addEventListener("click", () => vmOpen ? closeVarManager() : openVarManager());
+  $("vmBack").addEventListener("click", () => closeVarManager());
+  $("vmSearch").addEventListener("input", () => renderVarManager());
+  $("vmOnlyUsed").addEventListener("change", () => {
+    vmScopeUser = false;
+    renderVarManager();
+  });
+  function requestManagerUsage() {
+    if (lastSelCount === 0) {
+      setManagerUsage([], [], false);
+      return;
+    }
+    vmUsageReq = ++bindReqSeq;
+    send({ type: "SCAN_BINDINGS", reqId: vmUsageReq, forManager: true });
+  }
+  function setManagerUsage(cands, nodes, capped) {
+    var _a;
+    const m = /* @__PURE__ */ new Map();
+    for (const c of cands) {
+      const list = (_a = m.get(c.variableId)) != null ? _a : [];
+      list.push(c);
+      m.set(c.variableId, list);
+    }
+    vmUsage = m;
+    vmUsageNodes = new Map(nodes.map((n) => [n.id, n.name]));
+    vmUsageCapped = capped;
+    if (vmOpen) renderVarManager();
+  }
+  function usageCount(id) {
+    var _a, _b;
+    return (_b = (_a = vmUsage == null ? void 0 : vmUsage.get(id)) == null ? void 0 : _a.length) != null ? _b : 0;
+  }
+  function renderVarManager() {
+    if (!vmOpen) return;
+    const onlyUsed = $("vmOnlyUsed").checked;
+    const query = $("vmSearch").value;
+    const usage = new Map([...(vmUsage != null ? vmUsage : /* @__PURE__ */ new Map()).entries()].map(([k, v]) => [k, v.length]));
+    const q = query.trim().toLowerCase();
+    const include = (v) => {
+      var _a;
+      return (!onlyUsed || ((_a = usage.get(v.id)) != null ? _a : 0) > 0) && (!q || v.name.toLowerCase().includes(q));
+    };
+    const tree = buildVarTree(vmCols, vmVars, include);
+    if (!vmScopeUser || !vmScope || !vmCols.some((c) => c.id === vmScope.collectionId)) {
+      vmScopeUser = false;
+      const first = pickInitialCollection(tree);
+      vmScope = first ? { collectionId: first, path: "" } : null;
+    }
+    const total = vmVars.length;
+    const shown = vmVars.filter(include).length;
+    $("vmCount").textContent = t("vm.count", { shown, total });
+    renderVmTree(tree);
+    renderVmTable(onlyUsed, query, usage);
+  }
+  function renderVmTree(tree) {
+    const box = $("vmTree");
+    clearMount(box);
+    const walk = (n) => {
+      const key = `${n.collectionId}|${n.path}`;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = n.count ? "vm-node" : "vm-node empty";
+      b.style.paddingLeft = `${6 + n.depth * 12}px`;
+      const current = vmScope && vmScope.collectionId === n.collectionId && vmScope.path === n.path;
+      b.setAttribute("aria-current", String(!!current));
+      const collapsed = vmCollapsed.has(`tree:${key}`);
+      const tw = document.createElement("span");
+      tw.className = "tw";
+      tw.textContent = n.children.length ? collapsed ? "\u25B8" : "\u25BE" : "";
+      tw.addEventListener("click", (e) => {
+        if (!n.children.length) return;
+        e.stopPropagation();
+        if (collapsed) vmCollapsed.delete(`tree:${key}`);
+        else vmCollapsed.add(`tree:${key}`);
+        renderVarManager();
+      });
+      const lbl = document.createElement("span");
+      lbl.className = "lbl";
+      lbl.textContent = n.label;
+      lbl.title = n.path || n.label;
+      b.append(tw, lbl);
+      if (n.depth === 0) {
+        const col = vmCols.find((c) => c.id === n.collectionId);
+        const tierName = col && col.tier ? ["", "Global", "Semantic", "Component"][col.tier] : "";
+        if (tierName && tierName !== n.label) {
+          const tag = document.createElement("span");
+          tag.className = "vm-tier";
+          tag.textContent = tierName;
+          b.appendChild(tag);
+        }
+      }
+      const cnt = document.createElement("span");
+      cnt.className = "cnt";
+      cnt.textContent = String(n.count);
+      b.appendChild(cnt);
+      b.addEventListener("click", () => {
+        vmScope = { collectionId: n.collectionId, path: n.path };
+        vmScopeUser = true;
+        renderVarManager();
+      });
+      box.appendChild(b);
+      if (!collapsed) n.children.forEach(walk);
+    };
+    tree.forEach(walk);
+  }
+  function resolveColor(cell) {
+    var _a;
+    let c = cell;
+    for (let i = 0; i < 8 && c; i++) {
+      if (c.kind === "color") return c.hex;
+      if (c.kind !== "alias") return null;
+      const target = vmVars.find((v) => v.id === c.aliasId);
+      if (!target) return null;
+      const col = vmCols.find((x) => x.id === target.collectionId);
+      c = col ? target.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId] : void 0;
+    }
+    return null;
+  }
+  var swatchHtml = (hex) => hex ? `<span class="bf-swatch" style="background:${escapeHtml(hex)}"></span>` : "";
+  function vmCellEl(cell) {
+    const span = document.createElement("span");
+    if (!cell) {
+      span.textContent = "\u2014";
+      span.className = "muted";
+      return span;
+    }
+    if (cell.kind === "alias") {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "vm-alias";
+      b.innerHTML = `${swatchHtml(resolveColor(cell))}= ${escapeHtml(cell.aliasName)}`;
+      b.title = t("vm.jumpAlias");
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        jumpToVar(cell.aliasId);
+      });
+      return b;
+    }
+    span.className = "vm-val";
+    if (cell.kind === "color") span.innerHTML = `<span class="bf-swatch" style="background:${escapeHtml(cell.hex)}"></span>${escapeHtml(cell.hex.toUpperCase())}`;
+    else span.textContent = cell.text;
+    return span;
+  }
+  function jumpToVar(id) {
+    var _a;
+    const v = vmVars.find((x) => x.id === id);
+    if (!v) {
+      setStatus("vmStatus", t("vm.aliasOutside"), "warn");
+      return;
+    }
+    $("vmOnlyUsed").checked = false;
+    $("vmSearch").value = "";
+    vmScope = { collectionId: v.collectionId, path: "" };
+    vmScopeUser = true;
+    vmSelected = id;
+    renderVarManager();
+    (_a = document.querySelector(`.vm-row[data-id="${CSS.escape(id)}"]`)) == null ? void 0 : _a.focus();
+  }
+  function typeIcon(v) {
+    return v.type === "COLOR" ? "" : v.type === "FLOAT" ? "#" : v.type === "STRING" ? "T" : "\u25D0";
+  }
+  function renderVmTable(onlyUsed, query, usage) {
+    var _a;
+    const wrap = $("vmTableWrap");
+    clearMount(wrap);
+    const empty = (text, action) => {
+      const d = document.createElement("div");
+      d.className = "vm-empty";
+      d.textContent = text;
+      if (action) {
+        const b = document.createElement("button");
+        b.className = "link";
+        b.textContent = action[0];
+        b.addEventListener("click", action[1]);
+        d.append(" ", b);
+      }
+      wrap.appendChild(d);
+    };
+    if (!vmVars.length && vmCols.length === 0) {
+      empty(t("vm.noVars"));
+      return;
+    }
+    if (!vmScope) {
+      empty(t("vm.noVars"));
+      return;
+    }
+    const col = vmCols.find((c) => c.id === vmScope.collectionId);
+    if (!col) return;
+    const rows = filterVars(vmVars, { collectionId: col.id, path: vmScope.path, query, onlyUsed }, usage);
+    if (!rows.length) {
+      const showAll = [t("vm.showAll"), () => {
+        $("vmOnlyUsed").checked = false;
+        vmScopeUser = false;
+        renderVarManager();
+      }];
+      if (onlyUsed && lastSelCount === 0) empty(t("vm.selectFirst"), showAll);
+      else if (onlyUsed && vmUsage === null) empty(t("vm.usageLoading"));
+      else if (onlyUsed) empty(t("vm.noneUsed"), showAll);
+      else empty(t("vm.noMatch"));
+      return;
+    }
+    const table = document.createElement("table");
+    table.className = "vm-table";
+    const head = document.createElement("tr");
+    const th = (text, cls = "") => {
+      const c = document.createElement("th");
+      c.textContent = text;
+      if (cls) c.className = cls;
+      head.appendChild(c);
+    };
+    th(t("vm.colName"), "name");
+    for (const m of col.modes) th(m.name);
+    th(t("vm.colUsage"), "vm-use");
+    th("");
+    const thead = document.createElement("thead");
+    thead.appendChild(head);
+    table.appendChild(thead);
+    const tbody = document.createElement("tbody");
+    const span = col.modes.length + 3;
+    for (const g of groupRows(rows)) {
+      const gkey = `grp:${col.id}|${g.path}`;
+      const collapsed = vmCollapsed.has(gkey);
+      if (g.path) {
+        const tr = document.createElement("tr");
+        tr.className = "vm-group";
+        const td = document.createElement("td");
+        td.colSpan = span;
+        td.textContent = `${collapsed ? "\u25B8" : "\u25BE"} ${g.path.split("/").join(" / ")}`;
+        tr.appendChild(td);
+        tr.addEventListener("click", () => {
+          if (collapsed) vmCollapsed.delete(gkey);
+          else vmCollapsed.add(gkey);
+          renderVarManager();
+        });
+        tbody.appendChild(tr);
+      }
+      if (collapsed) continue;
+      for (const v of g.rows) tbody.appendChild(vmRowEl(v, col, (_a = usage.get(v.id)) != null ? _a : 0));
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    if (vmUsageCapped) setStatus("vmStatus", t("vm.usageCapped"), "warn");
+  }
+  function vmRowEl(v, col, uses) {
+    var _a;
+    const tr = document.createElement("tr");
+    tr.className = "vm-row";
+    tr.dataset.id = v.id;
+    tr.tabIndex = 0;
+    tr.setAttribute("aria-selected", String(vmSelected === v.id));
+    const name = document.createElement("td");
+    name.className = "name";
+    name.title = v.description ? `${v.name}
+${v.description}` : v.name;
+    const ic = document.createElement("span");
+    ic.className = "ic";
+    const firstCell = v.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId];
+    const hex = v.type === "COLOR" ? resolveColor(firstCell) : null;
+    if (hex) ic.innerHTML = swatchHtml(hex);
+    else ic.textContent = typeIcon(v);
+    name.append(ic, leafName(v.name));
+    tr.appendChild(name);
+    for (const m of col.modes) {
+      const td = document.createElement("td");
+      td.appendChild(vmCellEl(v.values[m.modeId]));
+      tr.appendChild(td);
+    }
+    const use = document.createElement("td");
+    use.className = "vm-use";
+    use.textContent = vmUsage === null || lastSelCount === 0 ? "\u2014" : uses ? t("vm.uses", { n: uses }) : "\u2014";
+    tr.appendChild(use);
+    const more = document.createElement("td");
+    const mb = document.createElement("button");
+    mb.type = "button";
+    mb.className = "more";
+    mb.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg>';
+    mb.title = t("vm.moreTip");
+    mb.setAttribute("aria-label", t("vm.moreTip"));
+    mb.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const r = mb.getBoundingClientRect();
+      selectVmRow(v.id);
+      openVarMenu(v, r.left, r.bottom, tr);
+    });
+    more.appendChild(mb);
+    tr.appendChild(more);
+    tr.addEventListener("click", () => selectVmRow(v.id));
+    tr.addEventListener("dblclick", () => openVarDetail(v));
+    tr.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      selectVmRow(v.id);
+      openVarMenu(v, e.clientX, e.clientY, tr);
+    });
+    tr.addEventListener("keydown", (e) => {
+      var _a2;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        openVarDetail(v);
+      } else if (e.key === "ContextMenu" || e.key === "F10" && e.shiftKey) {
+        e.preventDefault();
+        const r = tr.getBoundingClientRect();
+        openVarMenu(v, r.left + 24, r.bottom, tr);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const sib = e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
+        const target = sib && sib.classList.contains("vm-row") ? sib : null;
+        if (target) {
+          target.focus();
+          selectVmRow((_a2 = target.dataset.id) != null ? _a2 : null);
+        }
+      }
+    });
+    return tr;
+  }
+  function selectVmRow(id) {
+    vmSelected = id;
+    document.querySelectorAll(".vm-row").forEach((r) => r.setAttribute("aria-selected", String(r.dataset.id === id)));
+  }
+  function currentModeCell(v) {
+    var _a;
+    const col = vmCols.find((c) => c.id === v.collectionId);
+    return col ? v.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId] : void 0;
+  }
+  async function copyAndReport(text, what) {
+    if (!text) {
+      setStatus("vmStatus", t("vm.copyEmpty"), "warn");
+      return;
+    }
+    const ok = await copyText(text);
+    setStatus("vmStatus", ok ? t("vm.copied", { what, text }) : t("vm.copyFailed", { text }), ok ? "ok" : "warn");
+  }
+  function openVarMenu(v, x, y, returnFocus) {
+    var _a;
+    const uses = usageCount(v.id);
+    const nodeIds = [...new Set(((_a = vmUsage == null ? void 0 : vmUsage.get(v.id)) != null ? _a : []).map((c) => c.nodeId))];
+    openMenu(x, y, [
+      { label: t("vm.copyName"), onSelect: () => void copyAndReport(v.name, t("vm.whatName")) },
+      { label: t("vm.copyValue"), onSelect: () => void copyAndReport(cellCopyText(currentModeCell(v)), t("vm.whatValue")) },
+      { label: t("vm.copyCss"), onSelect: () => void copyAndReport(cssVarName(v.name), t("vm.whatCss")) },
+      { label: t("vm.selectLayers"), disabled: !nodeIds.length, separatorBefore: true, onSelect: () => selectNodes(nodeIds, "vmStatus") },
+      { label: t("vm.detail"), onSelect: () => openVarDetail(v) },
+      { label: t("vm.remap"), disabled: !uses, onSelect: () => openRemapModal(v) }
+    ], returnFocus);
+  }
+  function openVarDetail(v) {
+    var _a, _b, _c, _d, _e, _f;
+    const col = vmCols.find((c) => c.id === v.collectionId);
+    const title = document.createElement("span");
+    const first = col ? v.values[(_a = col.modes[0]) == null ? void 0 : _a.modeId] : void 0;
+    title.innerHTML = `${v.type === "COLOR" ? swatchHtml(resolveColor(first)) : ""}<span class="vm-val">${escapeHtml(v.name)}</span>`;
+    const body = document.createElement("div");
+    const dl = document.createElement("dl");
+    const row = (k, val) => {
+      const dt = document.createElement("dt");
+      dt.textContent = k;
+      const dd = document.createElement("dd");
+      if (typeof val === "string") dd.textContent = val;
+      else dd.appendChild(val);
+      dl.append(dt, dd);
+    };
+    const tierName = col && col.tier ? ["", "Global", "Semantic", "Component"][col.tier] : t("vm.noTier");
+    row(t("vm.dCollection"), col && col.name === tierName ? col.name : `${(_b = col == null ? void 0 : col.name) != null ? _b : ""} \xB7 ${tierName}`);
+    for (const m of (_c = col == null ? void 0 : col.modes) != null ? _c : []) row(m.name, vmCellEl(v.values[m.modeId]));
+    const scopes = document.createElement("span");
+    for (const sc of v.scopes) {
+      const c = document.createElement("span");
+      c.className = "chip";
+      c.textContent = sc;
+      scopes.appendChild(c);
+    }
+    row(t("vm.dScopes"), v.scopes.length ? scopes : "\u2014");
+    row(t("vm.dDesc"), v.description || "\u2014");
+    const usesBox = document.createElement("div");
+    const list = (_d = vmUsage == null ? void 0 : vmUsage.get(v.id)) != null ? _d : [];
+    if (!list.length) usesBox.textContent = lastSelCount ? t("vm.dNoUses") : t("vm.dSelectFirst");
+    else {
+      const byNode = /* @__PURE__ */ new Map();
+      for (const c of list) byNode.set(c.nodeId, [...(_e = byNode.get(c.nodeId)) != null ? _e : [], c]);
+      for (const [nid, cs] of byNode) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "var-use";
+        b.title = t("bind.layerSelectTip");
+        const labels = groupBindLines(cs).map((l) => fieldLabel(l.label, l.fields[0])).join(", ");
+        b.innerHTML = `<span class="vu-layer">${escapeHtml((_f = vmUsageNodes.get(nid)) != null ? _f : nid)}</span> <span class="vu-props">${escapeHtml(labels)}</span>`;
+        b.addEventListener("click", () => selectNodes([nid], "vmStatus"));
+        usesBox.appendChild(b);
+      }
+    }
+    usesBox.className = "var-uses";
+    row(t("vm.dUses", { n: list.length }), usesBox);
+    body.appendChild(dl);
+    const foot = [modalButton(t("vm.remap"), () => openRemapModal(v)), modalButton(t("common.close"), closeModal, true)];
+    foot[0].disabled = !list.length;
+    openModal(title, body, foot);
+  }
+  var remapModal = null;
+  var keepRemapStatus = false;
+  function openRemapModal(v) {
+    var _a;
+    const list = (_a = vmUsage == null ? void 0 : vmUsage.get(v.id)) != null ? _a : [];
+    const fields = [...new Set(list.map((c) => c.field))];
+    const body = document.createElement("div");
+    body.textContent = t("bind.remapLoading");
+    const box = openModal(t("vm.remapTitle", { name: v.name }), body, [modalButton(t("bind.remapCancel"), closeModal)]);
+    remapModal = { fromId: v.id, fields, sites: list.length, box };
+    send({ type: "REMAP_TARGETS", fromId: v.id, fields });
+  }
+  function onRemapTargets(fromId, targets) {
+    if (!remapModal || remapModal.fromId !== fromId || !modalEl) return;
+    const { box, fields, sites } = remapModal;
+    const body = document.createElement("div");
+    const foot = box.querySelector(".m-foot");
+    clearMount(foot);
+    if (!targets.length) {
+      body.textContent = t("bind.remapNone");
+      foot.append(modalButton(t("common.close"), closeModal, true));
+    } else {
+      const label = document.createElement("label");
+      label.className = "inline";
+      label.textContent = t("bind.remapLabel") + " ";
+      const select = document.createElement("select");
+      select.id = "remapTarget";
+      const byCol = /* @__PURE__ */ new Map();
+      for (const tv of targets) {
+        let g = byCol.get(tv.collection);
+        if (!g) {
+          g = document.createElement("optgroup");
+          g.label = tv.collection || "\u2014";
+          byCol.set(tv.collection, g);
+          select.appendChild(g);
+        }
+        const opt = document.createElement("option");
+        opt.value = tv.id;
+        opt.textContent = tv.name;
+        g.appendChild(opt);
+      }
+      label.appendChild(select);
+      body.appendChild(label);
+      const apply = modalButton(t("bind.remapApply", { n: sites }), () => {
+        apply.disabled = true;
+        send({ type: "REMAP_BINDINGS", fromId, toId: select.value, fields, reqId: nextBindReq() });
+      }, true);
+      foot.append(modalButton(t("bind.remapCancel"), closeModal), apply);
+      select.focus();
+    }
+    box.replaceChild(body, box.children[1]);
+  }
 })();
 
 </script>
+  <!-- 스크립트는 반드시 마지막 — 위 마크업이 모두 있어야 리스너가 붙는다. -->
 </body>
 </html>

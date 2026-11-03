@@ -1,6 +1,7 @@
 /* ============================================================
    messages.ts — code(샌드박스) ↔ ui(iframe) 메시지 타입 단일 소스
    ============================================================ */
+import type { VarCollection, VarRow } from '../lib/varTable';
 import type { DraftToken } from '../lib/tokens';
 import type { TextStyleSpec } from '../lib/textStyles';
 import type { Tier, Feature } from '../lib/entitlements';
@@ -149,7 +150,9 @@ export type UiToCode =
   | { type: 'APPLY'; tolerance: number; preview?: boolean; reqId?: number } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string }[]; reqId?: number } // #6: 미리보기 트리에서 체크한 후보만 직접 바인딩(WYSIWYG)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
-  | { type: 'SCAN_BINDINGS'; reqId?: number } // 선택 안에 이미 붙은 변수 바인딩 읽기(연결 현황 · 읽기 전용)
+  | { type: 'GET_VAR_TABLE' } // 변수 관리: 로컬 변수 전부(모드별 값·별칭 이름·용도·설명)
+  | { type: 'SET_UI_WIDE'; wide: boolean } // 변수 관리를 볼 때만 넓게(760), 나가면 400
+  | { type: 'SCAN_BINDINGS'; reqId?: number; forManager?: boolean } // 선택 안에 이미 붙은 변수 바인딩 읽기(연결 현황 · 읽기 전용)
   | { type: 'REMAP_TARGETS'; fromId: string; fields: string[] } // 일괄 교체: A 자리에 붙일 수 있는 변수 후보(읽기 전용)
   | { type: 'REMAP_BINDINGS'; fromId: string; toId: string; fields: string[]; reqId?: number } // 일괄 교체: 선택 안의 A(그 필드들) → B
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
@@ -203,7 +206,8 @@ export type CodeToUi =
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
   | { type: 'REMAP_TARGETS_RESULT'; fromId: string; targets: { id: string; name: string; collection: string }[] }
   | { type: 'REMAP_RESULT'; replaced: number; nodes: number; skipped: number; toName: string }
-  | { type: 'BINDINGS_RESULT'; candidates: BindCandidate[]; nodes: BindNode[]; total: number; boundNodes: number; reqId?: number } // 연결 현황(읽기 전용)
+  | { type: 'VAR_TABLE'; collections: VarCollection[]; vars: VarRow[] }
+  | { type: 'BINDINGS_RESULT'; candidates: BindCandidate[]; nodes: BindNode[]; total: number; boundNodes: number; reqId?: number; forManager?: boolean } // 연결 현황(읽기 전용)
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }
   | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; candidateTotal?: number; reqId?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수

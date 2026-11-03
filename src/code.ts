@@ -26,7 +26,8 @@ import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
-import { UI_SIZE_KEY, UI_WIDTH, UiSizeMode, normalizeUiSize, uiHeight } from './lib/uiSize';
+import { UI_SIZE_KEY, UI_WIDTH, UI_WIDE_WIDTH, UiSizeMode, normalizeUiSize, uiHeight } from './lib/uiSize';
+import type { VarCell, VarCollection, VarRow, VarType } from './lib/varTable';
 
 /* #14: 드래그 리사이즈는 없다 — 플러그인 iframe에서 포인터 캡처가 iframe 경계를 넘지 못해
    아래로 끌면 이벤트가 끊기고, 창을 포인터보다 크게 따라가게 하는 우회까지 실기에서 멎었다.
@@ -36,9 +37,12 @@ import { UI_SIZE_KEY, UI_WIDTH, UiSizeMode, normalizeUiSize, uiHeight } from './
 figma.showUI(__html__, { width: UI_WIDTH, height: uiHeight('default'), themeColors: true });
 
 let uiSizeMode: UiSizeMode = 'default';
+/** 변수 관리 화면을 보는 동안만 넓다 — 저장하지 않는다(다음 실행은 늘 400). */
+let uiWide = false;
+const uiWidth = (): number => (uiWide ? UI_WIDE_WIDTH : UI_WIDTH);
 async function applyUiSize(mode: UiSizeMode, persist: boolean): Promise<void> {
   uiSizeMode = mode;
-  figma.ui.resize(UI_WIDTH, uiHeight(mode));
+  figma.ui.resize(uiWidth(), uiHeight(mode));
   if (persist) await figma.clientStorage.setAsync(UI_SIZE_KEY, mode).catch(() => {});
 }
 // 시작 시 복원 — 저장값이 없거나 깨졌으면 기본(660) 그대로.
@@ -231,6 +235,39 @@ async function collectionRoleInfos(): Promise<CollectionRoleInfo[]> {
   const count = new Map<string, number>();
   for (const v of await figma.variables.getLocalVariablesAsync()) count.set(v.variableCollectionId, (count.get(v.variableCollectionId) ?? 0) + 1);
   return cols.map((c) => ({ id: c.id, name: c.name, vars: count.get(c.id) ?? 0, set: map[c.id] ?? null, role: roleOfCollection(c, map), guess: guessRole(c.name) }));
+}
+
+/** 변수 관리 표 — 로컬 컬렉션·변수 전부(계층 아닌 것도 — 관리 대상은 파일의 변수 전체다). */
+async function collectVarTable(): Promise<{ collections: VarCollection[]; vars: VarRow[] }> {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const tiers = collectionTiers(cols);
+  const all = await figma.variables.getLocalVariablesAsync();
+  const nameById = new Map(all.map((v) => [v.id, v.name]));
+  const colById = new Map(cols.map((c) => [c.id, c]));
+  const cell = (raw: VariableValue | undefined): VarCell | undefined => {
+    if (raw === undefined || raw === null) return undefined;
+    if (typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
+      const id = (raw as VariableAlias).id;
+      return { kind: 'alias', aliasId: id, aliasName: nameById.get(id) ?? '(다른 파일 변수)' };
+    }
+    if (typeof raw === 'object' && 'r' in raw) return { kind: 'color', hex: rgbToHex(raw as RGB) };
+    if (typeof raw === 'number') return { kind: 'number', text: String(Math.round(raw * 1000) / 1000) };
+    if (typeof raw === 'boolean') return { kind: 'bool', text: raw ? 'true' : 'false' };
+    return { kind: 'string', text: String(raw) };
+  };
+  const vars: VarRow[] = [];
+  for (const v of all) {
+    const col = colById.get(v.variableCollectionId);
+    if (!col) continue;
+    const values: Record<string, VarCell> = {};
+    for (const m of col.modes) {
+      const c = cell(v.valuesByMode[m.modeId]);
+      if (c) values[m.modeId] = c;
+    }
+    vars.push({ id: v.id, name: v.name, collectionId: col.id, type: v.resolvedType as VarType, values, scopes: [...(v.scopes ?? [])], description: v.description ?? '' });
+  }
+  const collections: VarCollection[] = cols.map((c) => ({ id: c.id, name: c.name, tier: tiers.get(c.id) ?? 0, modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })) }));
+  return { collections, vars };
 }
 
 async function collectVars(): Promise<VarInfo[]> {
@@ -850,7 +887,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_BINDINGS': {
         // 읽기 전용 — 파일에 남은 바인딩을 결과 트리 모양으로. 플러그인을 닫았다 열어도 '뭐가 붙어 있나'가 보인다.
         const r = await scanBindings(selection());
-        post({ type: 'BINDINGS_RESULT', candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId });
+        post({ type: 'BINDINGS_RESULT', candidates: r.candidates, nodes: r.nodes, total: r.total, boundNodes: r.boundNodes, reqId: msg.reqId, forManager: msg.forManager });
         break;
       }
       case 'REMAP_TARGETS': {
@@ -1687,6 +1724,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'GET_UI_SIZE': {
         await uiSizeReady; // 복원이 끝난 뒤의 상태를 알려야 버튼 표시가 맞다
         post({ type: 'UI_SIZE', mode: uiSizeMode });
+        break;
+      }
+      case 'SET_UI_WIDE': {
+        uiWide = msg.wide === true;
+        figma.ui.resize(uiWidth(), uiHeight(uiSizeMode));
+        break;
+      }
+      case 'GET_VAR_TABLE': {
+        post({ type: 'VAR_TABLE', ...(await collectVarTable()) });
         break;
       }
       case 'SET_UI_SIZE': {

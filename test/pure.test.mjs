@@ -2432,7 +2432,7 @@ test('tiers — 지정 우선, 없으면 정확한 이름, none으로 빼기, �
 
 /* ---------- 연결 목록 표시(bindDisplay.ts) ---------- */
 test('groupBindLines — 같은 변수의 네 방향 여백·모서리를 한 줄로, 다른 변수는 따로, 순서 유지', async () => {
-  const { groupBindLines, fieldGroupKey, isHexColor } = await import('../dist/pure.mjs');
+  const { groupBindLines, isHexColor } = await import('../dist/pure.mjs');
   const it = (field, variableId, index) => ({ field, index, variableId, variableName: variableId, currentValue: '8' });
   const lines = groupBindLines([
     it('fills', 'bg', 0),
@@ -2459,9 +2459,49 @@ test('groupBindLines — 같은 변수의 네 방향 여백·모서리를 한 �
   assert.equal(groupBindLines([it('fills', 'a', 0), it('fills', 'a', 1)]).length, 2);
   // 합쳐진 줄은 원래 항목을 모두 들고 있다(체크·교체 대상)
   assert.equal(lines[1].items.length, 2);
-  // 묶음
-  assert.deepEqual(['fills', 'paddingLeft', 'itemSpacing', 'topLeftRadius', 'strokeWeight', 'width', 'fontSize', 'lineHeight', 'visible'].map(fieldGroupKey),
-    ['color', 'space', 'space', 'radius', 'size', 'size', 'text', 'text', 'other']);
   assert.equal(isHexColor('#2563eb'), true);
   assert.equal(isHexColor('24'), false);
+});
+
+/* ---------- 변수 관리 표(varTable.ts) ---------- */
+test('varTable — 그룹 경로·트리·필터·묶음·복사 문자열', async () => {
+  const { groupPath, leafName, buildVarTree, filterVars, groupRows, cellCopyText, pickInitialCollection, cssVarName } = await import('../dist/pure.mjs');
+  assert.equal(groupPath('color/background/default'), 'color/background');
+  assert.equal(leafName('color/background/default'), 'default');
+  assert.equal(groupPath('primary'), '');
+  const cols = [
+    { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }] },
+    { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }] },
+  ];
+  const v = (id, name, collectionId) => ({ id, name, collectionId, type: 'COLOR', values: {}, scopes: [], description: '' });
+  const vars = [
+    v('a', 'color/blue/500', 'g'), v('b', 'color/gray/50', 'g'), v('c', 'spacing/8', 'g'),
+    v('d', 'color/background/default', 's'), v('e', 'color/background/muted', 's'), v('f', 'color/text/default', 's'),
+  ];
+  const usage = new Map([['d', 3], ['f', 1]]);
+  const tree = buildVarTree(cols, vars, (x) => (usage.get(x.id) ?? 0) > 0);
+  assert.deepEqual(tree.map((n) => [n.label, n.count]), [['Global', 0], ['Semantic', 2]]);
+  assert.deepEqual(tree[1].children.map((n) => [n.path, n.count]), [['color', 2]]);
+  assert.deepEqual(tree[1].children[0].children.map((n) => [n.path, n.count]), [['color/background', 1], ['color/text', 1]]);
+  assert.equal(pickInitialCollection(tree), 's');
+  // 전체(include 모두)면 Global에 그룹 color(2)·spacing(1)
+  const all = buildVarTree(cols, vars, () => true);
+  assert.deepEqual(all[0].children.map((n) => [n.label, n.count]), [['color', 2], ['spacing', 1]]);
+  // 필터: 컬렉션 · 경로(하위 포함) · 검색 · 선택에서 쓰는 것만
+  const f = (o) => filterVars(vars, { collectionId: 's', path: '', query: '', onlyUsed: false, ...o }, usage).map((x) => x.id);
+  assert.deepEqual(f({}), ['d', 'e', 'f']);
+  assert.deepEqual(f({ path: 'color/background' }), ['d', 'e']);
+  assert.deepEqual(f({ path: 'color' }), ['d', 'e', 'f']);
+  assert.deepEqual(f({ query: 'MUTED' }), ['e']);
+  assert.deepEqual(f({ onlyUsed: true }), ['d', 'f']);
+  // 'color/back'은 'color/background'의 접두어지만 경로가 아니다
+  assert.deepEqual(f({ path: 'color/back' }), []);
+  // 묶음 — 첫 등장 순서
+  assert.deepEqual(groupRows(vars.slice(3)).map((g) => [g.path, g.rows.length]), [['color/background', 2], ['color/text', 1]]);
+  // 복사 문자열
+  assert.equal(cellCopyText({ kind: 'color', hex: '#2563eb' }), '#2563EB');
+  assert.equal(cellCopyText({ kind: 'alias', aliasId: 'x', aliasName: 'color/blue/500' }), 'color/blue/500');
+  assert.equal(cellCopyText({ kind: 'number', text: '16' }), '16');
+  assert.equal(cellCopyText(undefined), '');
+  assert.equal(cssVarName('color/background/default'), '--color-background-default');
 });

@@ -11,6 +11,7 @@
      6 시작 직후 GET_PREREQ는 한 번
      7 좁은 폭에서도 ‘다음 →’은 툴바 오른쪽 끝
      8 연결 현황 줄은 디자인 말 + ‘=’(취소선 없음), 미리보기는 ‘→’, 네 방향 여백은 한 줄, 레이어 머리는 캔버스 선택
+     9 변수 관리(탭 바 [변수]): 넓게 열기·연결 카드 무간섭·트리/표·우클릭 메뉴·복사·상세·교체·돌아가기, 시작 시 스크립트 오류 0
    사용: npm run verify:bind  (Chromium 경로가 다르면 CHROMIUM_PATH로 지정)
    ============================================================ */
 import { chromium } from 'playwright';
@@ -26,8 +27,10 @@ const check = (name, cond, detail = '') => {
   if (!cond) fails.push(name);
 };
 
+const pageErrors = [];
 async function open(width = 400) {
   const p = await browser.newPage({ viewport: { width, height: 660 } });
+  p.on('pageerror', (e) => pageErrors.push(e.message));
   await p.addInitScript(() => {
     window.__sent = [];
     window.parent.postMessage = (m) => window.__sent.push(m.pluginMessage);
@@ -121,6 +124,42 @@ const preview = (reqId) => ({ type: 'APPLY_RESULT', preview: true, bound: 2, ski
   await p.close();
 }
 
+/* 9 — 변수 관리 */
+{
+  const p = await open();
+  await recv(p, PREREQ);
+  await recv(p, { ...sel(1, 2), selfSelect: true });
+  await p.click('#tabbtn-apply');
+  await p.click('#btnVarManager');
+  check('9 [변수] → 넓은 창 요청', (await sent(p, 'SET_UI_WIDE')).at(-1)?.wide === true);
+  const usageReq = (await sent(p, 'SCAN_BINDINGS')).at(-1);
+  check('9 사용 수 조회는 관리 전용(forManager)', usageReq?.forManager === true);
+  await p.setViewportSize({ width: 760, height: 660 });
+  const cols = [{ id: 's', name: 'Tokens', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }] }];
+  const vars = [
+    { id: 'vA', name: 'spacing/8', collectionId: 's', type: 'FLOAT', values: { l: { kind: 'number', text: '8' }, d: { kind: 'number', text: '8' } }, scopes: ['GAP'], description: '' },
+    { id: 'vB', name: 'color/bg', collectionId: 's', type: 'COLOR', values: { l: { kind: 'color', hex: '#ffffff' }, d: { kind: 'color', hex: '#000000' } }, scopes: [], description: '' },
+  ];
+  await recv(p, { type: 'VAR_TABLE', collections: cols, vars });
+  await recv(p, { ...scanResult(usageReq.reqId), forManager: true });
+  check('9 관리 조회가 연결 카드를 건드리지 않음', !(await visible(p, '#bindViewRow')));
+  const rows = await p.$$eval('#vmTableWrap .vm-row', (e) => e.map((x) => x.dataset.id));
+  check('9 선택에서 쓰는 것만(기본) — 쓰인 변수만', rows.length === 1 && rows[0] === 'vA', rows.join(','));
+  check('9 표 머리에 모드 열', (await p.textContent('#vmTableWrap thead')).includes('Dark'));
+  await p.click('.vm-row[data-id="vA"]', { button: 'right' });
+  const items = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
+  check('9 우클릭 메뉴(복사 3 · 선택 · 상세 · 교체)', ['이름 복사', '값 복사', 'CSS 변수명 복사', '사용 레이어 선택', '상세 보기…', '다른 변수로 교체…'].every((x) => items.includes(x)), items.join('|'));
+  await p.keyboard.press('Escape');
+  check('9 Esc로 메뉴 닫힘', (await p.$('.ctx-menu')) === null);
+  await p.dblclick('.vm-row[data-id="vA"]');
+  check('9 더블클릭 → 상세 팝업', (await p.textContent('.modal')).includes('spacing/8'));
+  await p.keyboard.press('Escape');
+  check('9 Esc로 팝업 닫힘', (await p.$('.modal')) === null);
+  await p.click('#vmBack');
+  check('9 돌아가기 → 400 · 보던 탭', (await sent(p, 'SET_UI_WIDE')).at(-1)?.wide === false && (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-apply');
+  await p.close();
+}
+
 /* 7 — 좁은 폭 */
 {
   const p = await open(360);
@@ -136,6 +175,15 @@ const preview = (reqId) => ({ type: 'APPLY_RESULT', preview: true, bound: 2, ski
   check('7 가로 스크롤 없음', !(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)));
   await p.close();
 }
+
+// 탭 바(+[변수] 버튼)가 좁은 폭에서도 한 줄
+for (const w of [400, 360]) {
+  const p = await open(w);
+  const r = await p.evaluate(() => ({ h: Math.round(document.querySelector('.tabs').getBoundingClientRect().height), hs: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
+  check(`9 ${w}px 탭 바 한 줄·가로 스크롤 없음`, r.h <= 40 && !r.hs, `높이 ${r.h}px`);
+  await p.close();
+}
+check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.join(' / '));
 
 await browser.close();
 if (fails.length) {

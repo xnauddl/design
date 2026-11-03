@@ -444,6 +444,60 @@
     .vusage.warn { color: var(--warn); }
 
     /* ── 창 높이 전환(QA #2 ①) — 탭 바 오른쪽 끝, 드래그 대신 버튼(#14) ── */
+    .tab-vars {
+      display: inline-flex; align-items: center; gap: 4px;
+      flex: 0 0 auto; padding: 6px 8px; border: none; background: transparent;
+      color: var(--text-2); font-weight: 600; border-radius: var(--r-sm); white-space: nowrap;
+    }
+    .tab-vars:hover { background: var(--surface-hover); color: var(--text); }
+    .tab-vars[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+    /* ── 변수 관리(넓은 화면) ── */
+    .var-manager { display: flex; flex-direction: column; gap: 8px; }
+    .vm-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .vm-head h2 { margin: 0; font-size: 12px; }
+    .vm-head input[type=search] { width: 160px; }
+    .vm-body { display: grid; grid-template-columns: 170px 1fr; gap: 8px; min-height: 0; }
+    .vm-tree { border: 1px solid var(--border); border-radius: var(--r); padding: 4px; overflow: auto; max-height: calc(100vh - 150px); }
+    .vm-node { display: flex; align-items: center; gap: 4px; width: 100%; text-align: left; border: none; background: transparent; padding: 4px 6px; border-radius: var(--r-sm); color: var(--text); font-size: 11px; }
+    .vm-node:hover { background: var(--surface-hover); }
+    .vm-node[aria-current="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+    .vm-node .tw { width: 10px; flex: 0 0 10px; color: var(--muted); }
+    .vm-node .lbl { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vm-node .cnt { color: var(--muted); font-size: 10px; }
+    .vm-node.empty .lbl { color: var(--muted); }
+    .vm-tier { font-size: 9px; padding: 0 4px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
+    .vm-table-wrap { border: 1px solid var(--border); border-radius: var(--r); overflow: auto; max-height: calc(100vh - 150px); }
+    .vm-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
+    .vm-table th { position: sticky; top: 0; background: var(--surface-2); color: var(--text-2); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); z-index: 1; white-space: nowrap; }
+    .vm-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .vm-table td.name, .vm-table th.name { position: sticky; left: 0; background: var(--surface); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+    .vm-table th.name { background: var(--surface-2); z-index: 2; }
+    .vm-group td { background: var(--surface-2); color: var(--text-2); font-weight: 600; cursor: pointer; }
+    .vm-row { cursor: default; outline: none; }
+    .vm-row:hover td { background: var(--surface-hover); }
+    .vm-row[aria-selected="true"] td { background: var(--accent-subtle); }
+    .vm-row .ic { display: inline-block; width: 12px; text-align: center; color: var(--muted); margin-right: 4px; font-family: var(--mono); }
+    .vm-row .more { visibility: hidden; border: none; background: transparent; padding: 0 4px; color: var(--text-2); }
+    .vm-row:hover .more, .vm-row:focus-within .more, .vm-row[aria-selected="true"] .more { visibility: visible; }
+    .vm-val { font-family: var(--mono); color: var(--text); }
+    .vm-alias { font-family: var(--mono); font-size: 10.5px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; background: var(--surface-2); color: var(--text-2); }
+    .vm-alias:hover { color: var(--accent-strong); border-color: var(--accent-border); }
+    .vm-use { color: var(--text-2); text-align: right; }
+    .vm-empty { padding: 16px; color: var(--muted); }
+    /* ── 우클릭 메뉴 · 팝업(공용) ── */
+    .ctx-menu { position: fixed; z-index: 50; min-width: 170px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 4px; }
+    .ctx-menu button { display: block; width: 100%; text-align: left; border: none; background: transparent; padding: 6px 10px; border-radius: var(--r-sm); font-size: 11.5px; color: var(--text); }
+    .ctx-menu button:hover:not(:disabled), .ctx-menu button:focus-visible { background: var(--accent-subtle); color: var(--accent-strong); outline: none; }
+    .ctx-menu button:disabled { color: var(--muted); }
+    .ctx-menu hr { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.28); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; }
+    .modal { width: min(440px, 100%); max-height: calc(100vh - 80px); overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+    .modal h3 { margin: 0; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .modal .m-foot { display: flex; gap: 6px; justify-content: flex-end; }
+    .modal dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 0; font-size: 11.5px; }
+    .modal dt { color: var(--muted); }
+    .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
+    .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
     .tab-size {
       flex: 0 0 28px; padding: 6px 0; border: none; background: transparent;
       color: var(--text-2); border-radius: var(--r-sm); line-height: 1;
@@ -460,6 +514,8 @@
     <button class="tab-btn" id="tabbtn-tokens" role="tab" aria-controls="tab-tokens" data-i18n="tab.tokens">만들기</button>
     <button class="tab-btn" id="tabbtn-apply" role="tab" aria-controls="tab-apply" data-i18n="tab.apply">적용</button>
     <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
+    <!-- 변수 관리 — Figma Variables처럼 컬렉션·그룹 트리 + 표. 누르면 창이 넓어지고(760), 돌아가면 400. -->
+    <button class="tab-vars" id="btnVarManager" type="button" aria-pressed="false" data-i18n-title="vm.openTip" title="변수 관리 — 창이 넓어집니다"><svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1.5" width="10" height="9" rx="1.5"/><path d="M1 4.5h10M4.5 4.5v6"/></svg> <span data-i18n="vm.tab">변수</span></button>
     <button class="tab-size" id="btnUiSize" type="button" aria-pressed="false" data-i18n-title="ui.sizeGrow" title="창 높이 크게 (860)">
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
         <g class="ic-grow"><path d="M6 1v10M3 3.5 6 1l3 2.5M3 8.5 6 11l3-2.5"/></g>
@@ -475,7 +531,7 @@
 
   <section class="tab-section" id="tab-wizard" role="tabpanel" aria-labelledby="tabbtn-wizard" tabindex="0">
     <!-- 이미 있는 변수 안내 — 변수가 있는 파일에서 '만들기'를 거쳐 확인하게 하지 않는다(바로 연결로). -->
-    <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button></div>
+    <div class="banner existing-vars" id="existingVarsStart" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 첫 실행 배너 — 옛 '온보딩/가이드' 카드를 한 줄로 흡수. '다시 보지 않기'는 파일에 기억한다. -->
     <div class="banner" id="onboardBanner" style="display:none">
       <span data-i18n="onboard.banner">처음이면 전체 실행으로 시작하세요.</span>
@@ -517,7 +573,7 @@
   </section>
 
   <section class="tab-section" id="tab-tokens" role="tabpanel" aria-labelledby="tabbtn-tokens" tabindex="0">
-    <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button></div>
+    <div class="banner existing-vars" id="existingVarsMake" style="display:none"><span class="ev-text"></span> <button class="link ev-go"></button> <button class="link ev-manage"></button></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
@@ -689,11 +745,11 @@
         <label class="inline"><input type="checkbox" id="bindAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
       </div>
       <!-- 보기 축 토글 — 레이어별(캔버스 순서로 검증) / 변수별(Tokens Studio Inspect처럼 변수 행 + 레이어 수, 관리용). -->
+      <!-- 변수 쪽 일(교체·복사·이름·삭제)은 변수 관리 화면이 맡는다 — 연결 카드는 '무엇이 무엇에 연결됐나'(레이어별)만. -->
       <div class="row tree-ctrls" id="bindViewRow" style="display:none">
-        <label class="inline"><input type="radio" name="bindView" value="layer" checked /> <span data-i18n="bind.viewLayer">레이어별</span></label>
-        <label class="inline"><input type="radio" name="bindView" value="variable" /> <span data-i18n="bind.viewVariable">변수별</span></label>
-        <span class="grow"></span>
         <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:140px" />
+        <span class="grow"></span>
+        <button class="link" id="btnBindToManager" data-i18n="vm.fromBind">변수 관리에서 보기 ↗</button>
       </div>
       <!-- 스킵 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다(미리보기에서만 채워짐).
            목록 위에 둔다: 몇 개가 왜 빠졌는지는 후보를 훑기 전에 알아야 하는 정보다. -->
@@ -851,6 +907,27 @@
   <!-- 창 리사이즈 핸들(우하단) -->
   <div id="uiTip" role="tooltip" hidden></div>
 
+  <!-- 변수 관리(넓은 화면) — 탭 바의 [변수]로 연다. 탭 내용을 덮고, ‘돌아가기’로 보던 탭·스크롤로 복귀. -->
+  <section class="var-manager" id="varManager" style="display:none" aria-labelledby="vmTitle">
+    <div class="vm-head">
+      <button class="link" id="vmBack" data-i18n="vm.back">← 돌아가기</button>
+      <h2 id="vmTitle" data-i18n="vm.title">변수 관리</h2>
+      <span class="grow"></span>
+      <input id="vmSearch" type="search" data-i18n-placeholder="vm.search" placeholder="변수 검색" />
+      <label class="inline"><input type="checkbox" id="vmOnlyUsed" checked /> <span data-i18n="vm.onlyUsed">선택에서 쓰는 것만</span></label>
+      <span class="muted" id="vmCount"></span>
+    </div>
+    <div class="vm-body">
+      <nav class="vm-tree" id="vmTree" aria-label="컬렉션·그룹"></nav>
+      <div class="vm-table-wrap" id="vmTableWrap"></div>
+    </div>
+    <div class="status" id="vmStatus"></div>
+  </section>
+
+  <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->
+  <div id="overlayRoot"></div>
+
   <!-- UI_SCRIPT -->
+  <!-- 스크립트는 반드시 마지막 — 위 마크업이 모두 있어야 리스너가 붙는다. -->
 </body>
 </html>
