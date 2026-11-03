@@ -2119,7 +2119,8 @@ window.onmessage = (event: MessageEvent) => {
           for (const k of r.checked) bindChecked.add(k);
           if (r.added || r.removed) showStatusLine(t('bind.candChanged', { a: r.added, b: r.removed }));
         } else {
-          // 미리보기 직후에는 모든 곳을 체크한다.
+          // 미리보기 직후에는 모든 곳을 체크한다. 칩은 설명 아래 자리로(연결 후에 옮겼을 수 있다).
+          $('bindDesc').after($('bindSkips'));
           for (const c of bindCandidates) bindChecked.add(candKey(c));
         }
         renderBindTree();
@@ -2135,6 +2136,7 @@ window.onmessage = (event: MessageEvent) => {
         setStatus('applyStatus', '', '');
         $('bindDoneText').textContent = t('bind.doneLine', { n: msg.bound }) + (msg.skipped ? t('bind.doneSkipped', { m: msg.skipped }) : '') + ' ·';
         $('bindDone').hidden = false;
+        $('bindDone').after($('bindSkips')); // 연결 후 칩은 요약 줄 아래(§4.6)
         renderBindIntro();
       }
       break;

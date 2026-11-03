@@ -4417,6 +4417,7 @@
             for (const k of r.checked) bindChecked.add(k);
             if (r.added || r.removed) showStatusLine(t("bind.candChanged", { a: r.added, b: r.removed }));
           } else {
+            $("bindDesc").after($("bindSkips"));
             for (const c of bindCandidates) bindChecked.add(candKey(c));
           }
           renderBindTree();
@@ -4429,6 +4430,7 @@
           setStatus("applyStatus", "", "");
           $("bindDoneText").textContent = t("bind.doneLine", { n: msg.bound }) + (msg.skipped ? t("bind.doneSkipped", { m: msg.skipped }) : "") + " \xB7";
           $("bindDone").hidden = false;
+          $("bindDone").after($("bindSkips"));
           renderBindIntro();
         }
         break;
