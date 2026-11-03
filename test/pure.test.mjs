@@ -2699,3 +2699,37 @@ test('사이드바 B — sidebarCollections · rightEntries · initialSideSel ·
   assert.deepEqual(validSideSel({ kind: 'lib' }, cols, vars, false, false, init), { kind: 'col', id: 'S' });
   assert.deepEqual(validSideSel({ kind: 'deleted' }, cols, vars, false, true, init), { kind: 'deleted' });
 });
+
+test('fieldIcon — 자리 줄 속성 아이콘(§4.6 표), 표에 없는 필드는 "·"', async () => {
+  const { fieldIcon } = await import('../dist/pure.mjs');
+  const cases = {
+    fills: '▣', strokes: '▢', strokeWeight: '┃', strokeLeftWeight: '┃', cornerRadius: '◰', topLeftRadius: '◰',
+    paddingTop: '⇔', itemSpacing: '⇔', counterAxisSpacing: '⇔', gridRowGap: '⇔', gridColumnGap: '⇔',
+    width: '↔', height: '↔', minWidth: '↔', maxHeight: '↔', opacity: '◑',
+    fontSize: 'T', lineHeight: 'T', letterSpacing: 'T', fontFamily: 'T', paragraphSpacing: 'T', effects: '◐', somethingNew: '·',
+  };
+  for (const [f, ic] of Object.entries(cases)) assert.equal(fieldIcon(f), ic, f);
+});
+
+test('bindExamples — 계층 컬렉션을 사이드바 순서로 훑어 첫 색·첫 숫자, 기본 모드 값(별칭은 대상), 없으면 뺀다', async () => {
+  const { bindExamples } = await import('../dist/pure.mjs');
+  const cols = [
+    { id: 'g', tier: 1, modes: [{ modeId: 'm' }], defaultModeId: 'm' },
+    { id: 'x', tier: 0, modes: [{ modeId: 'x1' }] },
+    { id: 's', tier: 2, modes: [{ modeId: 'l' }, { modeId: 'd' }], defaultModeId: 'd' },
+    { id: 'c', tier: 3, modes: [{ modeId: 'c1' }] },
+  ];
+  const v = (id, collectionId, type, values) => ({ id, name: id, collectionId, type, values });
+  const vars = [
+    v('misc', 'x', 'COLOR', { x1: { kind: 'color', hex: '#ff0000' } }),
+    v('gray0', 'g', 'COLOR', { m: { kind: 'color', hex: '#ffffff' } }),
+    v('gray9', 'g', 'COLOR', { m: { kind: 'color', hex: '#111111ff' } }),
+    v('sp8', 'g', 'FLOAT', { m: { kind: 'number', text: '8' } }),
+    v('lib', 'c', 'COLOR', { c1: { kind: 'alias', aliasId: 'remote', aliasName: 'x', remote: true } }),
+    v('text', 's', 'COLOR', { l: { kind: 'alias', aliasId: 'gray0' }, d: { kind: 'alias', aliasId: 'gray9' } }),
+    v('gap', 's', 'FLOAT', { d: { kind: 'alias', aliasId: 'sp8' } }),
+  ];
+  assert.deepEqual(bindExamples(cols, vars), { color: { value: '#111111', name: 'text' }, number: { value: '8', name: 'gap' } }, 'Component(못 읽는 별칭) 건너뜀 → Semantic, 기본 모드 Dark');
+  assert.deepEqual(bindExamples(cols, vars.filter((x) => x.type === 'COLOR')), { color: { value: '#111111', name: 'text' } });
+  assert.deepEqual(bindExamples(cols, [vars[0]]), {}, '계층 없는 컬렉션은 보지 않는다');
+});

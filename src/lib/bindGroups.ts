@@ -108,3 +108,69 @@ export function carryChecks(
   for (const k of prevKeys) if (!nextKeys.has(k)) removed++;
   return { checked, added, removed };
 }
+
+/**
+ * 자리 줄의 속성 아이콘(§4.6 표) — 연결 코드가 다루는 필드 전부. 표에 없는 새 필드는 "·".
+ */
+export function fieldIcon(field: string): string {
+  if (field === 'fills') return '▣';
+  if (field === 'strokes') return '▢';
+  if (field === 'effects') return '◐';
+  if (field === 'opacity') return '◑';
+  if (field === 'strokeWeight' || /^stroke(Top|Right|Bottom|Left)Weight$/.test(field)) return '┃';
+  if (field === 'cornerRadius' || /^(topLeft|topRight|bottomRight|bottomLeft)Radius$/.test(field)) return '◰';
+  if (/^padding(Top|Right|Bottom|Left)$/.test(field) || ['itemSpacing', 'counterAxisSpacing', 'gridRowGap', 'gridColumnGap'].includes(field)) return '⇔';
+  if (/^(width|height|minWidth|maxWidth|minHeight|maxHeight)$/.test(field)) return '↔';
+  if (['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily', 'fontWeight', 'fontStyle', 'paragraphSpacing', 'paragraphIndent'].includes(field)) return 'T';
+  return '·';
+}
+
+/** 찾기 전 빈 상태의 예시 한 줄(§4.6) — 값(기본 모드)과 변수 전체 경로. */
+export interface BindExample {
+  value: string;
+  name: string;
+}
+interface ExCol { id: string; tier: number; modes: { modeId: string }[]; defaultModeId?: string }
+type ExCell = { kind: string; hex?: string; text?: string; aliasId?: string };
+interface ExVar { id: string; name: string; collectionId: string; type: string; values: Record<string, ExCell> }
+
+/**
+ * 찾기 전 예시 — 계층이 지정된 로컬 컬렉션을 사이드바 순서(Component → Semantic → Global, 같으면 피그마 순서)로
+ * 훑어 첫 색 변수와 첫 숫자 변수. 값은 그 컬렉션 기본 모드(별칭이면 로컬 대상을 따라 최대 5단계).
+ * 값을 못 읽는 변수(라이브러리 별칭 등)는 건너뛴다. 없으면 그 종류는 빠진다.
+ */
+export function bindExamples(cols: readonly ExCol[], vars: readonly ExVar[]): { color?: BindExample; number?: BindExample } {
+  const rank = (t: number): number => (t === 3 ? 0 : t === 2 ? 1 : 2);
+  const tiered = cols.map((c, i) => ({ c, i })).filter((x) => x.c.tier > 0)
+    .sort((a, b) => rank(a.c.tier) - rank(b.c.tier) || a.i - b.i).map((x) => x.c);
+  const colById = new Map(cols.map((c) => [c.id, c]));
+  const varById = new Map(vars.map((v) => [v.id, v]));
+  const defaultCell = (v: ExVar): ExCell | undefined => {
+    const col = colById.get(v.collectionId);
+    const mode = col?.defaultModeId ?? col?.modes[0]?.modeId ?? '';
+    return v.values[mode];
+  };
+  const resolve = (v: ExVar): ExCell | undefined => {
+    let cell = defaultCell(v);
+    for (let depth = 0; cell && cell.kind === 'alias' && depth < 5; depth++) {
+      const next = cell.aliasId ? varById.get(cell.aliasId) : undefined;
+      cell = next ? defaultCell(next) : undefined;
+    }
+    return cell && cell.kind !== 'alias' ? cell : undefined;
+  };
+  const out: { color?: BindExample; number?: BindExample } = {};
+  for (const col of tiered) {
+    for (const v of vars) {
+      if (v.collectionId !== col.id) continue;
+      if (!out.color && v.type === 'COLOR') {
+        const cell = resolve(v);
+        if (cell?.kind === 'color' && cell.hex) out.color = { value: cell.hex.slice(0, 7).toUpperCase(), name: v.name };
+      } else if (!out.number && v.type === 'FLOAT') {
+        const cell = resolve(v);
+        if (cell?.kind === 'number' && cell.text != null) out.number = { value: cell.text, name: v.name };
+      }
+      if (out.color && out.number) return out;
+    }
+  }
+  return out;
+}

@@ -474,32 +474,86 @@
     }
     .subtab:hover:not([aria-selected="true"]) { background: none; color: var(--text); }
     .subtab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
-    /* 연결 후보 — 변수별 묶음(§4.6). 목록 머리는 버튼 줄 아래에 고정(두 겹, §2.5), 묶음 줄은 고정하지 않는다. */
-    .bind-desc { margin: 8px 0 6px; color: var(--text-2); font-size: 11px; line-height: 1.5; }
-    .bind-head {
-      position: sticky; top: calc(var(--toolbar-top, 95px) + var(--toolbar-h, 36px)); z-index: 1;
-      display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 6px; margin-top: 6px;
-      background: var(--surface); border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 10.5px; font-weight: 600;
+    /* ── 레이어 › 연결(§4.6 그림 개편) ── */
+    /* 카드 제목이 없다 — 버튼 줄(단계 표시 포함)이 카드 맨 위. */
+    .bind-card > .prereq:first-child { margin-top: 0; }
+    /* 단계 표시 — 버튼 줄 안 첫 줄(함께 고정). 누를 수 없는 표시. */
+    .bind-steps { flex: 1 0 100%; display: flex; align-items: center; gap: 6px; list-style: none; margin: 0 0 2px; padding: 0; font-size: var(--fs); }
+    .bind-steps .bs { display: flex; align-items: center; gap: 5px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+    .bind-steps .bs + .bs::before { content: ''; width: 18px; height: 1px; background: var(--border-2); margin-right: 1px; }
+    .bs-dot {
+      width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+      font: 600 9.5px/1 var(--font); border: 1px solid var(--border-2); color: var(--muted); background: var(--surface); box-sizing: border-box;
     }
-    .bind-head .grow { flex: 1 1 auto; }
-    .bind-head .outside { font-weight: 500; color: var(--muted); }
-    .bind-list { display: flex; flex-direction: column; font-size: var(--fs); }
-    .bg-val, .bg-text { font-variant-numeric: tabular-nums; }
-    .bg-head, .bg-place { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; border-bottom: 1px solid var(--border); }
-    .bg-head { font-weight: 600; color: var(--text); }
-    .bg-place { padding-left: 42px; color: var(--text); }
-    .bg-place.off { color: var(--text-2); }
-    .bg-head.off { color: var(--text-2); }
-    .skip-total { color: var(--text-2); font-size: 10.5px; margin-right: 2px; align-self: center; }
-    .bg-tw { width: 24px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; }
-    /* 색 견본은 원 — 네모 체크박스와 헷갈리지 않게(흰색 견본이 빈 체크박스로 보였다). */
-    .bg-sw { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border-2); flex: 0 0 auto; }
-    .bg-type { width: 12px; text-align: center; color: var(--muted); font-family: var(--mono); flex: 0 0 auto; }
-    .bg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-    .bg-val { color: var(--text-2); font-weight: 500; white-space: nowrap; }
-    .bg-num { margin-left: auto; color: var(--text-2); font-weight: 500; font-size: 10.5px; }
-    .bg-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-    .bg-layer { padding: 0; min-height: 0; }
+    .bs.now { color: var(--text); font-weight: 600; }
+    .bs.now .bs-dot { background: var(--text); border-color: var(--text); color: var(--on-accent); }
+    .bs.done { color: var(--ok); }
+    .bs.done .bs-dot { border-color: var(--ok); color: var(--ok); }
+    /* 찾는 중 — 지금 단계 동그라미에 도는 테두리 */
+    .bs.busy .bs-dot { background: var(--surface); color: var(--text); border: 2px solid var(--border-2); border-top-color: var(--text); animation: mini-spin .9s linear infinite; }
+    @media (prefers-reduced-motion: reduce) { .bs.busy .bs-dot { animation: none; } }
+    /* 버튼 — 아이콘은 글자 앞 14px(접근성 이름은 글자만) */
+    .bind-btn { display: inline-flex; align-items: center; gap: 5px; }
+    .bind-btn .bi { flex: 0 0 auto; }
+    /* 배지 줄 */
+    .bind-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 24px; }
+    .bind-badges .grow { flex: 1 1 auto; }
+    .bd { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font: 600 10.5px/1 var(--font); white-space: nowrap; }
+    .bd-found { background: var(--ok-subtle); color: var(--ok); cursor: default; }
+    button.bd-skip { min-height: 24px; height: 24px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); }
+    button.bd-skip:hover:not([aria-disabled="true"]) { background: var(--surface-hover); }
+    .bind-badges .skip-row { order: 10; flex: 1 0 100%; margin-top: 0; }
+    button.bd-all { min-height: 24px; height: 24px; padding: 0 6px; border: none; background: none; color: var(--accent-strong); font-size: 10.5px; }
+    button.bd-all:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
+    .bind-filter-row input { width: 170px; }
+    /* 빈 상태 — 목록 자리 점선 상자 */
+    .bind-empty {
+      border: 1px dashed var(--border-2); border-radius: 8px; padding: 14px 10px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+      color: var(--text-2); text-align: center;
+    }
+    .be-art { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+    .be-art.icon { font-size: 18px; line-height: 1; color: var(--muted); align-items: center; flex-direction: row; gap: 2px; }
+    .be-row { display: flex; align-items: center; gap: 6px; }
+    .be-text { font-size: var(--fs); }
+    /* 변수 카드 "값 → 변수" — 카드 사이 6, 모서리 8, 머리 32 */
+    .bind-list { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs); }
+    .bind-list:empty { display: none; }
+    .bv-card { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+    .bv-head { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 2px 0 8px; }
+    .bv-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 4px; font: 500 10.5px/1 var(--mono); white-space: nowrap; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+    .bv-val { background: var(--surface); border: 1px solid var(--border-2); color: var(--text); }
+    .bv-sw { width: 10px; height: 10px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); flex: 0 0 auto; }
+    .bv-arrow { color: var(--accent-strong); font-weight: 600; flex: 0 0 auto; }
+    .bv-var { background: var(--accent-subtle); color: var(--accent-strong); border: 1px solid transparent; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+    .bv-var .bv-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .bv-mark { flex: 0 0 auto; font-family: var(--font); font-weight: 700; }
+    .bind-empty .bv-var { max-width: 140px; }
+    .bv-head .grow { flex: 1 1 auto; min-width: 4px; }
+    button.bv-tw { height: 24px; min-height: 24px; padding: 0 4px; border: none; background: none; color: var(--text-2); font-weight: 500; font-size: 10.5px; flex: 0 0 auto; }
+    button.bv-tw:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
+    /* 스위치 — 보이는 트랙 28×16, 누를 수 있는 영역 32×24 */
+    button.bv-switch { width: 32px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    button.bv-switch:hover:not([aria-disabled="true"]) { background: none; }
+    .bv-track { position: relative; width: 28px; height: 16px; border-radius: 999px; background: var(--accent); transition: background .12s; }
+    .bv-track::after { content: ''; position: absolute; top: 2px; left: 14px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 1px rgba(0,0,0,.2); transition: left .12s; }
+    button.bv-switch[aria-checked="false"] .bv-track { background: var(--border-2); }
+    button.bv-switch[aria-checked="false"] .bv-track::after { left: 2px; }
+    button.bv-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+    /* 끈 카드 — 글자·칩을 회색으로(opacity 쓰지 않음) */
+    .bv-card.off .bv-val, .bv-card.off .bv-var { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
+    .bv-card.off .bv-arrow, .bv-card.off .bv-tw, .bv-card.off .bv-place { color: var(--text-2); }
+    .bv-card.off .bv-sw { filter: grayscale(1); }
+    /* 자리 줄(보기만) — [속성 아이콘] 레이어 · 속성 */
+    .bv-places { border-top: 1px solid var(--border); padding: 3px 8px 5px; display: flex; flex-direction: column; }
+    .bv-place { display: flex; align-items: center; gap: 6px; min-height: 24px; color: var(--text); }
+    .bv-ic { width: 14px; height: 14px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); font: 600 9px/14px var(--font); text-align: center; flex: 0 0 auto; }
+    .bv-place .bv-layer { padding: 0 2px; min-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
+    .bv-card.off .bv-place .bv-layer { color: var(--text-2); }
+    .bv-prop { color: var(--text-2); white-space: nowrap; flex: 0 0 auto; }
+    /* 연결 후 결과 카드 */
+    .bind-done { display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 6px 4px 10px; border-radius: 8px; background: var(--ok-subtle); color: var(--ok); font-weight: 600; }
+    .bind-done .grow { flex: 1 1 auto; }
+    .ts-aa { font: 700 11px/1 var(--font); color: var(--text-2); width: 16px; }
     .tier-chip {
       height: 24px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
       border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
@@ -907,42 +961,20 @@
       <button class="subtab" role="tab" data-apply-step="structure" data-i18n="rail.structure">컴포넌트</button>
     </div>
 
-    <div class="step" data-apply-step="bind">
-      <h2><span data-i18n="bind.title">변수 연결</span></h2>
+    <!-- 레이어 › 연결(§4.6 그림 개편) — 카드 제목 없음. 단계 표시 + 버튼 줄(함께 고정) → 배지 줄 → 빈 상태/변수 카드 → 텍스트 스타일. -->
+    <div class="step bind-card" data-apply-step="bind">
       <!-- 연결할 변수가 없을 때의 안내(§4.6 표 4행) — 문구와 버튼은 ui.ts가 정한다. -->
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
-      <div class="toolbar">
-        <button id="btnApply" data-i18n="bind.preview">미리보기</button>
-        <button id="btnApplyConfirm" class="primary" data-i18n="bind.confirm">체크한 곳 연결</button>
+      <div class="toolbar bind-toolbar">
+        <!-- 단계 표시 — 누를 수 없는 표시(정지점 아님). 상태는 ui.ts renderBindSteps가 정한다. -->
+        <ol class="bind-steps" id="bindSteps" role="list" aria-label="연결 단계">
+          <li class="bs" data-s="find"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.find">찾기</span></li>
+          <li class="bs" data-s="pick"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.stepPick">고르기</span></li>
+          <li class="bs" data-s="link"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.link">연결</span></li>
+        </ol>
+        <button id="btnApply" class="primary bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg><span class="bl" id="btnApplyLabel">찾기</span></button>
+        <button id="btnApplyConfirm" class="bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span class="bl" id="btnApplyConfirmLabel">연결</span></button>
       </div>
-      <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 있는 자산을 쓰는 일이라 연결 화면에 둔다(§4.6). -->
-      <div class="row ts-apply-row">
-        <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
-        <span class="grow"></span>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 연결</button>
-      </div>
-      <div class="hint" id="tsApplyResult" hidden></div>
-      <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
-      <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">미리보기 다시</button></div>
-      <!-- 미리보기 전 한 줄 / 미리보기 뒤 목록 설명(§4.6) — 문구는 ui.ts가 정한다. -->
-      <div class="bind-desc" id="bindIntro" hidden data-i18n="bind.intro">[미리보기]를 누르면 선택한 레이어에서 변수 값과 같은 색·크기·간격 값을 찾아요</div>
-      <div class="bind-desc" id="bindDesc" hidden></div>
-      <!-- 건너뜀 사유 칩 — 누르면 그 사유로 건너뛴 레이어를 캔버스에서 선택한다. 목록 위: 몇 개가 왜 빠졌는지 먼저. -->
-      <div class="skip-row" id="bindSkips" style="display:none"></div>
-      <div class="row tree-ctrls" id="bindTreeCtrls" style="display:none">
-        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" style="width:160px" />
-      </div>
-      <div class="bind-head" id="bindHead" hidden>
-        <input type="checkbox" id="bindAll" />
-        <span data-i18n="bind.headCol">연결</span>
-        <span data-i18n="bind.headVar">변수</span>
-        <span class="grow"></span>
-        <span class="outside" id="bindOutside"></span>
-        <span data-i18n="bind.headCount">곳</span>
-      </div>
-      <div id="bindTree" class="bind-list"></div>
-      <!-- 연결 후 — 요약 한 줄 + 사유 칩만(§4.6). -->
-      <div class="row" id="bindDone" hidden><span id="bindDoneText"></span> <button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
@@ -951,6 +983,35 @@
           <button id="btnApplyCancel" data-i18n="common.cancel">취소</button>
         </div>
       </div>
+      <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
+      <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">다시 찾기</button></div>
+      <!-- 연결 후 결과 카드(§4.6) -->
+      <div class="bind-done" id="bindDone" hidden><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span id="bindDoneText"></span><span class="grow"></span><button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
+      <!-- 배지 줄(찾은 뒤) — (찾음 n) (건너뜀 m ▸) … [모두 켜기/끄기] [필터]. 사유 칩 줄은 DOM에서 건너뜀 바로 뒤(포커스 순서), 화면에서는 아랫줄. -->
+      <div class="bind-badges" id="bindBadges" hidden>
+        <span class="bd bd-found" id="bindFound"></span>
+        <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
+        <div class="skip-row" id="bindSkips" hidden></div>
+        <span class="grow"></span>
+        <button class="bd-all" id="bindAll" type="button"></button>
+        <button class="icon-btn" id="bindFilterBtn" type="button" aria-expanded="false" aria-controls="bindFilterRow" data-i18n-title="bind.filterBtn" title="변수 이름 필터" aria-label="변수 이름 필터"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+      </div>
+      <div class="row bind-filter-row" id="bindFilterRow" hidden>
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" />
+        <span class="muted" id="bindOutside"></span>
+      </div>
+      <!-- 빈 상태(목록 자리, 점선 상자) — 찾기 전(예시 두 줄) · 선택 없음 · 찾은 곳 0. -->
+      <div class="bind-empty" id="bindEmpty" hidden></div>
+      <!-- 변수 카드 "값 → 변수"(§4.6) -->
+      <div id="bindTree" class="bind-list"></div>
+      <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 카드 목록 아래 한 줄(§4.6). -->
+      <div class="row ts-apply-row">
+        <span class="ts-aa" aria-hidden="true">Aa</span>
+        <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
+        <span class="grow"></span>
+        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 연결</button>
+      </div>
+      <div class="hint" id="tsApplyResult" hidden></div>
       <div class="status" id="applyStatus"></div>
     </div>
 
@@ -1408,14 +1469,41 @@
     // 탭
     // IA v3 레이어 › 연결(§4.6)
     "bind.tsLabel": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "bind.repreview": "\uBBF8\uB9AC\uBCF4\uAE30 \uB2E4\uC2DC",
+    // 단계 표시 · 버튼(§4.6 그림 개편 — "찾기"는 이전의 "미리보기")
+    "bind.stepsAria": "\uC5F0\uACB0 \uB2E8\uACC4",
+    "bind.find": "\uCC3E\uAE30",
+    "bind.refind": "\uB2E4\uC2DC \uCC3E\uAE30",
+    "bind.stepPick": "\uACE0\uB974\uAE30",
+    "bind.link": "\uC5F0\uACB0",
+    "bind.linkN": "{n}\uACF3 \uC5F0\uACB0",
+    "bind.finding": "\uCC3E\uB294 \uC911\u2026",
+    "bind.needFind": "\uBA3C\uC800 [\uCC3E\uAE30]\uB97C \uB204\uB974\uC138\uC694",
+    "bind.needOn": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uCF1C\uC138\uC694",
+    // 빈 상태(목록 자리)
+    "bind.emptyIntro": "\uAC12\uC774 \uBCC0\uC218\uC640 \uAC19\uC740 \uACF3\uC744 \uCC3E\uC544 \uC5F0\uACB0\uD574\uC694",
+    "bind.emptyNoSel": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    // 배지 줄
+    "bind.found": "\uCC3E\uC74C {n}",
+    "bind.foundTip": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12 {n}\uACF3\uC744 \uCC3E\uC558\uC5B4\uC694 \xB7 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC744 \uBCC0\uC218\uB294 \uB044\uC138\uC694",
+    "bind.skipAria": "\uAC74\uB108\uB700 {m}\uACF3 \uC0AC\uC720 \uBCF4\uAE30",
+    "bind.allOn": "\uBAA8\uB450 \uCF1C\uAE30",
+    "bind.allOff": "\uBAA8\uB450 \uB044\uAE30",
+    "bind.filterBtn": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
+    // 변수 카드 "값 → 변수"
+    "bind.cardTip": "{name}\uC744(\uB97C) \uC774 {k}\uACF3\uC5D0 \uC5F0\uACB0\uD574\uC694 \xB7 \uC77C\uBD80\uB9CC \uBE7C\uB824\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uBE80 \uB098\uBA38\uC9C0\uB97C \uC120\uD0DD\uD558\uACE0 \uB2E4\uC2DC \uCC3E\uAE30",
+    "bind.offTip": "\uB044\uBA74 \uC774 {k}\uACF3\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
+    "bind.count": "{k}\uACF3",
+    "bind.placesAria": "{name} {k}\uACF3",
+    "bind.switchAria": "{name} \uC5F0\uACB0",
+    // 연결 후 결과 카드
+    "bind.doneCard": "{n}\uACF3 \uC5F0\uACB0\uB428",
+    "bind.repreview": "\uB2E4\uC2DC \uCC3E\uAE30",
     "bind.toList": "\uBCC0\uC218 \uD0ED\uC5D0\uC11C \uBCF4\uAE30 \u2192",
-    "bind.doneLine": "\u2713 {n}\uACF3 \uC5F0\uACB0",
     "bind.doneSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
     "bind.candChanged": "\uD6C4\uBCF4\uAC00 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 {a}\uACF3 \uCD94\uAC00 \xB7 {b}\uACF3 \uC81C\uC678",
     "bind.otherSel": "\uB2E4\uB978 \uC120\uD0DD\uC5D0\uC11C \uB9CC\uB4E0 \uACB0\uACFC\uC608\uC694",
     "bind.maybeChanged": "\uD53C\uADF8\uB9C8\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC744 \uC218 \uC788\uC5B4\uC694",
-    "bind.selChanged": "\uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
+    "bind.selChanged": "\uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uB2E4\uC2DC \uCC3E\uC544 \uC8FC\uC138\uC694",
     "bind.noLocalLib": "\uC774 \uD30C\uC77C\uC5D4 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
     "bind.noTier": "\uBCC0\uC218\uB294 \uC788\uC9C0\uB9CC \uACC4\uCE35\uC774 \uC9C0\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "bind.gotoTiers": "\uACC4\uCE35 \uC9C0\uC815\uD558\uAE30 \u2192",
@@ -1672,32 +1760,14 @@
     "textStyle.badgeGoTip": "\uC774 \uAE00\uC790\uB85C \uC774\uB3D9",
     "textStyle.badgeSelectTip": "\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 {count}\uAC1C \uC804\uCCB4 \uC120\uD0DD",
     // 적용(바인딩)
-    "bind.title": "\uBCC0\uC218 \uC5F0\uACB0",
-    "bind.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
-    "bind.confirm": "\uCCB4\uD06C\uD55C \uACF3 \uC5F0\uACB0",
-    "bind.confirmN": "\uCCB4\uD06C\uD55C {n}\uACF3 \uC5F0\uACB0",
-    "bind.needPreview": "\uBA3C\uC800 [\uBBF8\uB9AC\uBCF4\uAE30]\uB97C \uB204\uB974\uC138\uC694",
     "bind.nothing": "\uC5F0\uACB0\uD560 \uACF3\uC774 \uC5C6\uC5B4\uC694",
-    "bind.intro": "[\uBBF8\uB9AC\uBCF4\uAE30]\uB97C \uB204\uB974\uBA74 \uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C \uBCC0\uC218 \uAC12\uACFC \uAC19\uC740 \uC0C9\xB7\uD06C\uAE30\xB7\uAC04\uACA9 \uAC12\uC744 \uCC3E\uC544\uC694",
-    "bind.desc": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12 {n}\uACF3\uC744 \uCC3E\uC558\uC5B4\uC694 \xB7 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC744 \uBCC0\uC218\uB294 \uCCB4\uD06C\uB97C \uD478\uC138\uC694",
-    "bind.introNoSel": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD55C \uB4A4 [\uBBF8\uB9AC\uBCF4\uAE30]\uB97C \uB204\uB974\uC138\uC694",
     "bind.skipTotal": "\uAC74\uB108\uB700 {m}",
     "bind.skipCappedTip": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0",
-    "bind.groupTipPartial": " \xB7 \uC77C\uBD80\uB9CC \uBE7C\uB824\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uBE80 \uB098\uBA38\uC9C0\uB97C \uC120\uD0DD\uD558\uACE0 \uBBF8\uB9AC\uBCF4\uAE30",
-    "bind.needCheckVar": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uCCB4\uD06C\uD558\uC138\uC694",
     "bind.descNone": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "bind.selMany": "\uB808\uC774\uC5B4 {k}\uAC1C",
-    "bind.headCol": "\uC5F0\uACB0",
-    "bind.headVar": "\uBCC0\uC218",
-    "bind.headCount": "\uACF3",
-    "bind.allAria": "\uBCF4\uC774\uB294 \uBB36\uC74C \uC804\uCCB4 \uCCB4\uD06C",
-    "bind.outside": "\uD544\uD130 \uBC16 \uCCB4\uD06C {h}\uACF3 \uD3EC\uD568",
-    "bind.groupTip": "{name}\uC744(\uB97C) \uC774 {k}\uACF3\uC5D0 \uC5F0\uACB0\uD574\uC694",
+    "bind.outside": "\uD544\uD130 \uBC16 {h}\uACF3 \uD3EC\uD568",
     "bind.placeCount": " \xB7 {k}\uACF3",
     "bind.layerTip": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uC120\uD0DD \xB7 \uC774 \uBAA9\uB85D\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
-    "bind.uncheckedTip": "\uCCB4\uD06C\uB97C \uD480\uBA74 \uC774 {k}\uACF3\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
-    "bind.expand": "\uD3BC\uCE58\uAE30",
-    "bind.collapse": "\uC811\uAE30",
     "bind.progress": "\uC9C4\uD589\uB960",
     // 스킵 칩 툴팁 — 사유 건수(속성 단위)와 레이어 수가 다를 수 있어 레이어 쪽을 따로 밝힌다.
     "bind.skipChipTip": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names}",
@@ -1905,6 +1975,53 @@
     let removed = 0;
     for (const k of prevKeys) if (!nextKeys.has(k)) removed++;
     return { checked, added, removed };
+  }
+  function fieldIcon(field) {
+    if (field === "fills") return "\u25A3";
+    if (field === "strokes") return "\u25A2";
+    if (field === "effects") return "\u25D0";
+    if (field === "opacity") return "\u25D1";
+    if (field === "strokeWeight" || /^stroke(Top|Right|Bottom|Left)Weight$/.test(field)) return "\u2503";
+    if (field === "cornerRadius" || /^(topLeft|topRight|bottomRight|bottomLeft)Radius$/.test(field)) return "\u25F0";
+    if (/^padding(Top|Right|Bottom|Left)$/.test(field) || ["itemSpacing", "counterAxisSpacing", "gridRowGap", "gridColumnGap"].includes(field)) return "\u21D4";
+    if (/^(width|height|minWidth|maxWidth|minHeight|maxHeight)$/.test(field)) return "\u2194";
+    if (["fontSize", "lineHeight", "letterSpacing", "fontFamily", "fontWeight", "fontStyle", "paragraphSpacing", "paragraphIndent"].includes(field)) return "T";
+    return "\xB7";
+  }
+  function bindExamples(cols, vars) {
+    const rank = (t2) => t2 === 3 ? 0 : t2 === 2 ? 1 : 2;
+    const tiered = cols.map((c, i) => ({ c, i })).filter((x) => x.c.tier > 0).sort((a, b) => rank(a.c.tier) - rank(b.c.tier) || a.i - b.i).map((x) => x.c);
+    const colById = new Map(cols.map((c) => [c.id, c]));
+    const varById = new Map(vars.map((v) => [v.id, v]));
+    const defaultCell = (v) => {
+      var _a, _b, _c;
+      const col = colById.get(v.collectionId);
+      const mode = (_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a.modeId) != null ? _c : "";
+      return v.values[mode];
+    };
+    const resolve = (v) => {
+      let cell = defaultCell(v);
+      for (let depth = 0; cell && cell.kind === "alias" && depth < 5; depth++) {
+        const next = cell.aliasId ? varById.get(cell.aliasId) : void 0;
+        cell = next ? defaultCell(next) : void 0;
+      }
+      return cell && cell.kind !== "alias" ? cell : void 0;
+    };
+    const out = {};
+    for (const col of tiered) {
+      for (const v of vars) {
+        if (v.collectionId !== col.id) continue;
+        if (!out.color && v.type === "COLOR") {
+          const cell = resolve(v);
+          if ((cell == null ? void 0 : cell.kind) === "color" && cell.hex) out.color = { value: cell.hex.slice(0, 7).toUpperCase(), name: v.name };
+        } else if (!out.number && v.type === "FLOAT") {
+          const cell = resolve(v);
+          if ((cell == null ? void 0 : cell.kind) === "number" && cell.text != null) out.number = { value: cell.text, name: v.name };
+        }
+        if (out.color && out.number) return out;
+      }
+    }
+    return out;
   }
 
   // src/lib/textStyles.ts
@@ -3685,11 +3802,19 @@
   $("btnApply").addEventListener("click", () => runBindPreview());
   function runBindPreview(silent = false) {
     $("bindNotice").hidden = true;
+    const wasDone = bindIsDone();
     $("bindDone").hidden = true;
+    if (wasDone) {
+      bindSkipReasons = {};
+      bindSkipsOpen = false;
+    }
     bindForeignSel = false;
     bindHereSel = false;
     bindLeftSince = false;
-    if (!silent) showApplyProgress("\uBBF8\uB9AC\uBCF4\uAE30 \uACC4\uC0B0 \uC911\u2026");
+    if (!silent) {
+      bindFinding = true;
+      showApplyProgress(t("bind.finding"));
+    }
     const reqId = nextBindReq();
     bindSilentReq = silent ? reqId : 0;
     opSilent = silent;
@@ -3697,19 +3822,16 @@
     opSilent = false;
     bindPreviewSel = curSel.ids.slice();
     if (!silent) bindPreviewName = curSel.count === 1 ? shortName(curSel.name || t("sel.unnamed")) : t("bind.selMany", { k: curSel.count });
+    renderBindChrome();
   }
   $("btnBindRepreview").addEventListener("click", () => runBindPreview());
   $("btnBindToList").addEventListener("click", () => showManager());
   $("btnApplyConfirm").addEventListener("click", () => {
     const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
     if (!items.length) return;
+    bindFinding = false;
     showApplyProgress("\uC5F0\uACB0 \uC911\u2026");
     send({ type: "APPLY_SELECTED", items, reqId: nextBindReq() });
-  });
-  $("bindAll").addEventListener("change", (e) => {
-    const on = e.target.checked;
-    for (const g of bindGroups().shown) for (const k of g.keys) on ? bindChecked.add(k) : bindChecked.delete(k);
-    renderBindTree();
   });
   $("btnApplyCancel").addEventListener("click", () => {
     send({ type: "CANCEL" });
@@ -4362,7 +4484,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -4460,7 +4582,6 @@
         bindSkips = (_a = msg.skips) != null ? _a : [];
         bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
         const rt = reasonsText(msg.reasons);
-        renderSkipReasons(msg.reasons);
         if (msg.cancelled) {
           clearBindPreview();
           const cancelDetail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}`;
@@ -4472,31 +4593,32 @@
           bindNodes = (_d = msg.nodes) != null ? _d : [];
           bindPreviewed = true;
           bindChecked.clear();
+          renderSkipReasons((_e = msg.reasons) != null ? _e : {});
           if (silent) {
             const r = carryChecks(prev, prevChecked, bindCandidates);
             for (const k of r.checked) bindChecked.add(k);
             if (r.added || r.removed) showStatusLine(t("bind.candChanged", { a: r.added, b: r.removed }));
           } else {
-            $("bindDesc").after($("bindSkips"));
+            bindSkipsOpen = false;
             for (const c of bindCandidates) bindChecked.add(candKey(c));
           }
           renderBindTree();
           setStatus("applyStatus", "", "");
         } else {
           clearBindPreview();
-          bindSkips = (_e = msg.skips) != null ? _e : [];
-          bindSkipsCapped = ((_f = msg.skipTotal) != null ? _f : bindSkips.length) > bindSkips.length;
-          renderSkipReasons((_g = msg.reasons) != null ? _g : {}, false);
+          bindSkips = (_f = msg.skips) != null ? _f : [];
+          bindSkipsCapped = ((_g = msg.skipTotal) != null ? _g : bindSkips.length) > bindSkips.length;
+          renderSkipReasons((_h = msg.reasons) != null ? _h : {});
           setStatus("applyStatus", "", "");
-          $("bindDoneText").textContent = t("bind.doneLine", { n: msg.bound }) + (msg.skipped ? t("bind.doneSkipped", { m: msg.skipped }) : "") + " \xB7";
+          $("bindDoneText").textContent = t("bind.doneCard", { n: msg.bound });
           $("bindDone").hidden = false;
-          $("bindDone").after($("bindSkips"));
-          renderBindIntro();
+          renderBindTree();
         }
         break;
       }
       case "VAR_TABLE":
         onVarTable(msg);
+        renderBindEmpty();
         break;
       case "USAGE_RESULT":
         onUsageResult(msg);
@@ -4539,7 +4661,7 @@
           }) : [];
           tsSpecs = [...msg.styles.map((x) => __spreadValues({}, x)), ...manual];
           tsScanNote = {
-            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_h = msg.fallback) != null ? _h : 0}` : "",
+            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_i = msg.fallback) != null ? _i : 0}` : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -4562,7 +4684,7 @@
       case "TEXT_STYLES_APPLIED": {
         const line = $("tsApplyResult");
         line.textContent = t("bind.tsDone", { n: msg.applied }) + (msg.skipped ? t("bind.doneSkipped", { m: msg.skipped }) : "");
-        line.title = Object.entries((_i = msg.skipReasons) != null ? _i : {}).filter(([, n]) => n > 0).map(([k, n]) => `${t("tsSkip." + k)} ${n}`).join(" \xB7 ");
+        line.title = Object.entries((_j = msg.skipReasons) != null ? _j : {}).filter(([, n]) => n > 0).map(([k, n]) => `${t("tsSkip." + k)} ${n}`).join(" \xB7 ");
         line.hidden = false;
         break;
       }
@@ -4589,7 +4711,7 @@
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
-        prereqLocalVars = ((_j = msg.tierVars) != null ? _j : 0) + ((_k = msg.otherVars) != null ? _k : 0);
+        prereqLocalVars = ((_k = msg.tierVars) != null ? _k : 0) + ((_l = msg.otherVars) != null ? _l : 0);
         if (activeTab === "layer") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
@@ -4926,6 +5048,9 @@
   var bindPreviewed = false;
   var bindPreviewName = "";
   var bindExpanded = /* @__PURE__ */ new Map();
+  var bindFinding = false;
+  var bindSkipsOpen = false;
+  var bindSkipReasons = {};
   var bindPreviewSel = null;
   var bindLeftSince = false;
   var bindForeignSel = false;
@@ -4951,133 +5076,292 @@
     var _a;
     return (_a = bindExpanded.get(g.variableId)) != null ? _a : false;
   }
-  function setTri(box, keys) {
-    const on = keys.filter((k) => bindChecked.has(k)).length;
-    box.checked = on > 0 && on === keys.length;
-    box.indeterminate = on > 0 && on < keys.length;
+  var groupOn = (g) => g.keys.every((k) => bindChecked.has(k));
+  var bindOnCount = () => bindChecked.size;
+  var bindIsDone = () => !$("bindDone").hidden;
+  var bindPrereqShown = () => $("bindPrereq").style.display !== "none";
+  var bindOtherSel = () => bindForeignSel && !$("bindNotice").hidden;
+  function typeMark(value) {
+    return isHexColor(value) ? "\u25CF" : /^-?\d/.test(value) ? "#" : "T";
   }
-  function placeEl(l, on) {
+  function valueChip(value) {
+    const chip = document.createElement("span");
+    chip.className = "bv-chip bv-val";
+    if (isHexColor(value)) {
+      const sw = document.createElement("span");
+      sw.className = "bv-sw";
+      sw.style.background = value;
+      chip.append(sw, value.toUpperCase());
+    } else chip.textContent = value;
+    return chip;
+  }
+  function varChip(name, value) {
+    const chip = document.createElement("span");
+    chip.className = "bv-chip bv-var";
+    const mark = document.createElement("span");
+    mark.className = "bv-mark";
+    mark.setAttribute("aria-hidden", "true");
+    mark.textContent = typeMark(value);
+    const nm = document.createElement("span");
+    nm.className = "bv-name";
+    nm.textContent = name;
+    chip.append(mark, nm);
+    return chip;
+  }
+  var arrowEl = () => {
+    const a = document.createElement("span");
+    a.className = "bv-arrow";
+    a.setAttribute("aria-hidden", "true");
+    a.textContent = "\u2192";
+    return a;
+  };
+  function tipTruncatedNames(root) {
+    requestAnimationFrame(() => {
+      var _a;
+      for (const nm of Array.from(root.querySelectorAll(".bv-name"))) {
+        const chip = nm.parentElement;
+        if (nm.scrollWidth > nm.clientWidth + 1) chip.title = (_a = nm.textContent) != null ? _a : "";
+        else chip.removeAttribute("title");
+      }
+    });
+  }
+  function placeEl(l) {
     var _a;
     const row = document.createElement("div");
-    row.className = "bg-place";
+    row.className = "bv-place";
     row.dataset.key = l.keys[0];
-    row.classList.toggle("off", !on);
+    const ic = document.createElement("span");
+    ic.className = "bv-ic";
+    ic.setAttribute("aria-hidden", "true");
+    ic.textContent = fieldIcon(l.fields[0]);
     const node = bindNodes.find((n) => n.id === l.nodeId);
-    const layerName = (_a = node == null ? void 0 : node.name) != null ? _a : l.nodeId;
-    const label = fieldLabel(l.label, l.fields[0]);
     const layer = document.createElement("button");
     layer.type = "button";
-    layer.className = "link link-btn bg-layer";
-    layer.textContent = layerName;
+    layer.className = "link link-btn bv-layer";
+    layer.textContent = (_a = node == null ? void 0 : node.name) != null ? _a : l.nodeId;
     layer.title = t("bind.layerTip");
     layer.addEventListener("click", () => selectNodes([l.nodeId], "applyStatus"));
-    const text = document.createElement("span");
-    text.className = "bg-text";
-    text.textContent = ` \u203A ${label} ${isHexColor(l.currentValue) ? l.currentValue.toUpperCase() : l.currentValue}`;
-    row.append(layer, text);
-    if (l.keys.length > 1) row.append(t("bind.placeCount", { k: l.keys.length }));
+    const prop = document.createElement("span");
+    prop.className = "bv-prop";
+    prop.textContent = fieldLabel(l.label, l.fields[0]) + (l.keys.length > 1 ? t("bind.placeCount", { k: l.keys.length }) : "");
+    row.append(ic, layer, prop);
     return row;
   }
   function bindGroupEl(g) {
-    const wrap = document.createElement("div");
-    wrap.className = "bg-group";
-    wrap.setAttribute("role", "group");
-    wrap.dataset.var = g.variableId;
-    const head = document.createElement("div");
-    head.className = "bg-head";
-    const groupOn = g.keys.every((k) => bindChecked.has(k));
-    head.classList.toggle("off", !groupOn);
-    head.title = groupOn ? t("bind.groupTip", { name: g.variableName, k: g.count }) + t("bind.groupTipPartial") : t("bind.uncheckedTip", { k: g.count });
-    const box = document.createElement("input");
-    box.type = "checkbox";
-    box.setAttribute("aria-label", g.variableName);
-    box.checked = groupOn;
-    box.addEventListener("change", () => {
-      for (const k of g.keys) box.checked ? bindChecked.add(k) : bindChecked.delete(k);
-      renderBindTree();
-    });
+    const on = groupOn(g);
     const open = groupOpen(g);
+    const card = document.createElement("div");
+    card.className = "bv-card";
+    card.classList.toggle("off", !on);
+    card.dataset.var = g.variableId;
+    const head = document.createElement("div");
+    head.className = "bv-head";
+    head.title = on ? t("bind.cardTip", { name: g.variableName, k: g.count }) : t("bind.offTip", { k: g.count });
+    const grow = document.createElement("span");
+    grow.className = "grow";
     const tw = document.createElement("button");
     tw.type = "button";
-    tw.className = "bg-tw";
-    tw.textContent = open ? "\u25BE" : "\u25B8";
+    tw.className = "bv-tw";
+    tw.textContent = `${t("bind.count", { k: g.count })} ${open ? "\u25BE" : "\u25B8"}`;
     tw.setAttribute("aria-expanded", String(open));
-    tw.setAttribute("aria-label", t(open ? "bind.collapse" : "bind.expand"));
+    tw.setAttribute("aria-label", t("bind.placesAria", { name: g.variableName, k: g.count }));
     tw.addEventListener("click", () => {
-      var _a;
       bindExpanded.set(g.variableId, !open);
       renderBindTree();
-      (_a = $("bindTree").querySelector(`.bg-group[data-var="${CSS.escape(g.variableId)}"] .bg-tw`)) == null ? void 0 : _a.focus();
+      focusCardControl(g.variableId, ".bv-tw");
     });
-    const color = isHexColor(g.variableValue);
-    const mark = document.createElement("span");
-    if (color) {
-      mark.className = "bg-sw";
-      mark.style.background = g.variableValue;
-    } else {
-      mark.className = "bg-type";
-      mark.textContent = /^-?\d/.test(g.variableValue) ? "#" : "T";
+    const sw = document.createElement("button");
+    sw.type = "button";
+    sw.className = "bv-switch";
+    sw.setAttribute("role", "switch");
+    sw.setAttribute("aria-checked", String(on));
+    sw.setAttribute("aria-label", t("bind.switchAria", { name: g.variableName }));
+    const track = document.createElement("span");
+    track.className = "bv-track";
+    track.setAttribute("aria-hidden", "true");
+    sw.appendChild(track);
+    sw.addEventListener("click", () => {
+      for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k);
+      renderBindTree();
+      focusCardControl(g.variableId, ".bv-switch");
+    });
+    head.append(valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue), grow, tw, sw);
+    card.appendChild(head);
+    if (open) {
+      const places = document.createElement("div");
+      places.className = "bv-places";
+      for (const l of g.lines) places.appendChild(placeEl(l));
+      card.appendChild(places);
     }
-    const name = document.createElement("span");
-    name.className = "bg-name";
-    name.textContent = g.variableName;
-    const val = document.createElement("span");
-    val.className = "bg-val";
-    val.textContent = color ? g.variableValue.toUpperCase() : `= ${g.variableValue}`;
-    const num = document.createElement("span");
-    num.className = "bg-num";
-    num.textContent = String(g.count);
-    head.append(box, tw, mark, name, val, num);
-    wrap.appendChild(head);
-    if (open) for (const l of g.lines) wrap.appendChild(placeEl(l, groupOn));
-    return wrap;
+    return card;
   }
-  function renderBindIntro() {
-    const intro = $("bindIntro");
-    const prereqShown = $("bindPrereq").style.display !== "none";
-    intro.hidden = bindPreviewed || !curSel || prereqShown || !$("bindDone").hidden;
-    intro.textContent = curSel && curSel.count ? t("bind.intro") : t("bind.introNoSel");
+  function focusCardControl(variableId, sel) {
+    var _a;
+    (_a = $("bindTree").querySelector(`.bv-card[data-var="${CSS.escape(variableId)}"] ${sel}`)) == null ? void 0 : _a.focus();
   }
   function shortName(name) {
     return name.length > 20 ? `${name.slice(0, 20)}\u2026` : name;
   }
-  function renderBindTree() {
-    const { shown } = bindGroups();
-    const has = hasBindPreview();
-    renderBindIntro();
-    const desc = $("bindDesc");
-    if (bindPreviewed) {
-      desc.textContent = has ? t("bind.desc", { name: bindPreviewName, n: bindCandidates.length }) : t("bind.descNone", { name: bindPreviewName });
-      desc.hidden = false;
-    } else desc.hidden = true;
-    $("bindTreeCtrls").style.display = has ? "" : "none";
-    $("bindHead").hidden = !has;
-    const tree = $("bindTree");
-    clearMount(tree);
-    if (has) for (const g of shown) tree.appendChild(bindGroupEl(g));
-    updateBindApply();
+  function bindStepStates() {
+    if (!curSel.count || bindPrereqShown()) return ["todo", "todo", "todo"];
+    if (bindIsDone()) return ["done", "done", "done"];
+    if (bindFinding && $("applyProgress").style.display !== "none") return ["now", "todo", "todo"];
+    if (bindOtherSel()) return ["now", "todo", "todo"];
+    if (bindPreviewed) return hasBindPreview() ? ["done", "now", "todo"] : ["done", "todo", "todo"];
+    return ["now", "todo", "todo"];
   }
-  $("bindFilter").addEventListener("input", () => renderBindTree());
-  function updateBindApply() {
-    if (!curSel) return;
-    const confirm = $("btnApplyConfirm");
-    const n = bindChecked.size;
-    confirm.textContent = bindPreviewed && hasBindPreview() ? t("bind.confirmN", { n }) : t("bind.confirm");
-    if (!curSel.count) setLock(confirm, "prereq", t("status.noSelection"));
-    else if (bindForeignSel && !$("bindNotice").hidden) setLock(confirm, "prereq", t("bind.selChanged"));
-    else if (!bindPreviewed) setLock(confirm, "prereq", t("bind.needPreview"));
-    else if (!hasBindPreview()) setLock(confirm, "prereq", t("bind.nothing"));
-    else if (!n) setLock(confirm, "prereq", t("bind.needCheckVar"));
-    else setLock(confirm, null);
-    if (!hasBindPreview()) return;
-    const { shown } = bindGroups();
-    const shownKeys = shown.flatMap((g) => g.keys);
-    const all = $("bindAll");
-    all.setAttribute("aria-label", t("bind.allAria"));
-    setTri(all, shownKeys);
-    const shownSet = new Set(shownKeys);
+  function renderBindSteps() {
+    const states = bindStepStates();
+    const busy = bindFinding && $("applyProgress").style.display !== "none";
+    $("bindSteps").querySelectorAll(".bs").forEach((li, i) => {
+      const st = states[i];
+      li.classList.toggle("now", st === "now");
+      li.classList.toggle("done", st === "done");
+      const spin = i === 0 && busy && st === "now";
+      li.classList.toggle("busy", spin);
+      if (st === "now") li.setAttribute("aria-current", "step");
+      else li.removeAttribute("aria-current");
+      li.querySelector(".bs-dot").textContent = spin ? "" : st === "done" ? "\u2713" : String(i + 1);
+    });
+  }
+  function renderBindEmpty() {
+    const box = $("bindEmpty");
+    clearMount(box);
+    let kind = null;
+    if (bindPrereqShown() || bindIsDone()) kind = null;
+    else if (!curSel.count) kind = "nosel";
+    else if (!bindPreviewed) kind = "intro";
+    else if (!hasBindPreview()) kind = "none";
+    box.hidden = !kind;
+    if (!kind) return;
+    const text = document.createElement("div");
+    text.className = "be-text";
+    if (kind === "intro") {
+      const ex = bindExamples(vmCols, vmVars);
+      const rows = [ex.color, ex.number].filter((x) => !!x);
+      if (rows.length) {
+        const art = document.createElement("div");
+        art.className = "be-art";
+        art.setAttribute("aria-hidden", "true");
+        for (const r of rows) {
+          const row = document.createElement("div");
+          row.className = "be-row";
+          const vc = varChip(r.name, r.value);
+          vc.title = r.name;
+          row.append(valueChip(r.value), arrowEl(), vc);
+          art.appendChild(row);
+        }
+        box.appendChild(art);
+      }
+      text.textContent = t("bind.emptyIntro");
+    } else {
+      const art = document.createElement("div");
+      art.className = "be-art icon";
+      art.setAttribute("aria-hidden", "true");
+      art.textContent = kind === "nosel" ? "\u2B1A \u2196" : "\u2205";
+      box.appendChild(art);
+      text.textContent = kind === "nosel" ? t("bind.emptyNoSel") : t("bind.descNone", { name: bindPreviewName });
+    }
+    box.appendChild(text);
+  }
+  function renderBindBadges() {
+    const done = bindIsDone();
+    const has = hasBindPreview() && !done;
+    const m = Object.values(bindSkipReasons).reduce((a, n) => a + (n > 0 ? n : 0), 0);
+    const showSkip = m > 0 && (bindPreviewed || done);
+    $("bindBadges").hidden = !has && !showSkip;
+    const found = $("bindFound");
+    found.hidden = !has;
+    if (has) {
+      found.textContent = t("bind.found", { n: bindCandidates.length });
+      found.title = t("bind.foundTip", { name: bindPreviewName, n: bindCandidates.length });
+    }
+    const skip = $("bindSkipToggle");
+    skip.hidden = !showSkip;
+    skip.textContent = `${t("bind.skipTotal", { m })} ${bindSkipsOpen ? "\u25BE" : "\u25B8"}`;
+    skip.setAttribute("aria-expanded", String(showSkip && bindSkipsOpen));
+    skip.setAttribute("aria-label", t("bind.skipAria", { m }));
+    $("bindSkips").hidden = !(showSkip && bindSkipsOpen);
+    const { all, shown } = bindGroups();
+    const allBtn = $("bindAll");
+    allBtn.hidden = !has;
+    allBtn.textContent = shown.some((g) => !groupOn(g)) ? t("bind.allOn") : t("bind.allOff");
+    const filterOn = has && (all.length > 6 || !!bindFilterText());
+    const fbtn = $("bindFilterBtn");
+    fbtn.hidden = !filterOn;
+    const row = $("bindFilterRow");
+    if (!filterOn) row.hidden = true;
+    fbtn.setAttribute("aria-expanded", String(!row.hidden));
+    const shownSet = new Set(shown.flatMap((g) => g.keys));
     const outside = [...bindChecked].filter((k) => !shownSet.has(k)).length;
     $("bindOutside").textContent = bindFilterText() && outside ? t("bind.outside", { h: outside }) : "";
+  }
+  function renderBindTree() {
+    const tree = $("bindTree");
+    clearMount(tree);
+    if (hasBindPreview() && !bindIsDone()) for (const g of bindGroups().shown) tree.appendChild(bindGroupEl(g));
+    tipTruncatedNames(tree);
+    renderBindChrome();
+  }
+  function renderBindChrome() {
+    if (!curSel) return;
+    renderBindEmpty();
+    renderBindBadges();
+    updateBindApply();
+  }
+  $("bindSteps").setAttribute("aria-label", t("bind.stepsAria"));
+  $("bindFilterBtn").setAttribute("aria-label", t("bind.filterBtn"));
+  $("btnApplyLabel").textContent = t("bind.find");
+  $("btnApplyConfirmLabel").textContent = t("bind.link");
+  $("bindFilter").addEventListener("input", () => renderBindTree());
+  $("bindFilter").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeBindFilter();
+    }
+  });
+  function closeBindFilter() {
+    $("bindFilter").value = "";
+    $("bindFilterRow").hidden = true;
+    renderBindTree();
+    if (!$("bindFilterBtn").hidden) $("bindFilterBtn").focus();
+  }
+  $("bindFilterBtn").addEventListener("click", () => {
+    const row = $("bindFilterRow");
+    if (row.hidden) {
+      row.hidden = false;
+      renderBindBadges();
+      $("bindFilter").focus();
+    } else closeBindFilter();
+  });
+  $("bindSkipToggle").addEventListener("click", () => {
+    bindSkipsOpen = !bindSkipsOpen;
+    renderBindBadges();
+  });
+  $("bindAll").addEventListener("click", () => {
+    const { shown } = bindGroups();
+    const turnOn = shown.some((g) => !groupOn(g));
+    for (const g of shown) for (const k of g.keys) turnOn ? bindChecked.add(k) : bindChecked.delete(k);
+    renderBindTree();
+  });
+  function updateBindApply() {
+    if (!curSel) return;
+    renderBindSteps();
+    const done = bindIsDone();
+    const has = bindPreviewed && hasBindPreview() && !done;
+    const find = $("btnApply");
+    $("btnApplyLabel").textContent = bindPreviewed || done ? t("bind.refind") : t("bind.find");
+    find.classList.toggle("primary", !bindPreviewed || done);
+    const confirm = $("btnApplyConfirm");
+    const n = bindOnCount();
+    $("btnApplyConfirmLabel").textContent = has ? t("bind.linkN", { n }) : t("bind.link");
+    confirm.classList.toggle("primary", has);
+    if (!curSel.count) setLock(confirm, "prereq", t("status.noSelection"));
+    else if (bindOtherSel()) setLock(confirm, "prereq", t("bind.selChanged"));
+    else if (!bindPreviewed || done) setLock(confirm, "prereq", t("bind.needFind"));
+    else if (!hasBindPreview()) setLock(confirm, "prereq", t("bind.nothing"));
+    else if (!n) setLock(confirm, "prereq", t("bind.needOn"));
+    else setLock(confirm, null);
   }
   function clearBindPreview() {
     $("bindNotice").hidden = true;
@@ -5089,8 +5373,11 @@
     bindNodes = [];
     bindSkips = [];
     bindSkipsCapped = false;
+    bindSkipReasons = {};
+    bindSkipsOpen = false;
     clearMount($("bindSkips"));
-    $("bindSkips").style.display = "none";
+    $("bindFilter").value = "";
+    $("bindFilterRow").hidden = true;
     bindChecked.clear();
     renderBindTree();
   }
@@ -5182,21 +5469,11 @@
   }
   var bindSkips = [];
   var bindSkipsCapped = false;
-  function renderSkipReasons(reasons, withTotal = true) {
+  function renderSkipReasons(reasons) {
+    bindSkipReasons = __spreadValues({}, reasons);
     const box = $("bindSkips");
-    box.innerHTML = "";
+    clearMount(box);
     const entries = Object.entries(reasons).filter(([, n]) => n > 0);
-    if (!entries.length || !bindSkips.length) {
-      box.style.display = "none";
-      return;
-    }
-    box.style.display = "";
-    if (withTotal) {
-      const total = document.createElement("span");
-      total.className = "skip-total";
-      total.textContent = t("bind.skipTotal", { m: entries.reduce((a, [, n]) => a + n, 0) });
-      box.appendChild(total);
-    }
     const capNote = bindSkipsCapped ? t("bind.skipCappedTip", { shown: bindSkips.length }) : "";
     for (const [key, n] of entries) {
       const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
@@ -5209,6 +5486,7 @@
         continue;
       }
       const btn = document.createElement("button");
+      btn.type = "button";
       btn.className = "skip-chip";
       btn.textContent = `${label} \u203A`;
       const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(", ");
@@ -5285,6 +5563,8 @@
   }
   function hideApplyProgress() {
     $("applyProgress").style.display = "none";
+    bindFinding = false;
+    if (curSel) renderBindSteps();
   }
   function setStatus(id, text, cls) {
     const el = $(id);
@@ -5302,8 +5582,9 @@
     const headTop = tabsH;
     root.style.setProperty("--tabs-h", `${tabsH}px`);
     root.style.setProperty("--head-top", `${headTop}px`);
+    const shownCard = Array.from(document.querySelectorAll(".tab-section.active .step:not(.collapsed)")).find((c) => c.offsetParent);
     const head = document.querySelector(".tab-section.active .step:not(.collapsed) .step-head");
-    const headH = head && head.offsetParent ? Math.round(head.getBoundingClientRect().height) : 26;
+    const headH = shownCard && !shownCard.querySelector(".step-head") ? 0 : head && head.offsetParent ? Math.round(head.getBoundingClientRect().height) : 26;
     root.style.setProperty("--toolbar-top", `${headTop + headH}px`);
     const lh = document.getElementById("listHead");
     if (lh && lh.offsetParent) root.style.setProperty("--side-top", `${headTop + Math.round(lh.getBoundingClientRect().height)}px`);
@@ -7352,7 +7633,6 @@ ${v.description}` : v.name;
     }
     notice.style.display = msg ? "" : "none";
     text.textContent = msg;
-    renderBindIntro();
     act.hidden = !action;
     if (action) {
       act.textContent = action[0];
@@ -7360,7 +7640,7 @@ ${v.description}` : v.name;
     }
     const noSel = !curSel.count;
     setLock($("btnApply"), noSel ? "prereq" : msg ? "prereq" : null, noSel ? t("status.noSelection") : msg);
-    updateBindApply();
+    renderBindChrome();
     const ts = $("btnApplyExistingText");
     if (noSel) setLock(ts, "prereq", t("status.noSelection"));
     else if (prereqKnown && !hasTextStyles) setLock(ts, "prereq", t("bind.tsNone"));
