@@ -4493,3 +4493,15 @@ test('bindSelection — 소수 선 두께는 이미 있는 1.5 변수에도, 가
   assert.equal(res.bound, 0);
   assert.ok(findVar(figma, 'Global', 'stroke-width/1_5'), '이미 있는 변수는 지우지 않는다');
 });
+
+test('bindSelection — 이미 1.5 변수에 붙은 선 두께는 "소수 선 두께"가 아니라 "이미 연결됨"', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'stroke-width/1_5', category: 'strokeWidth', sources: ['strokeWidth'], value: 1.5 }], 16);
+  const v15 = findVar(figma, 'Global', 'stroke-width/1_5');
+  const node = strokedFrame('bound15', 1.5);
+  node.boundVariables = { strokeWeight: { type: 'VARIABLE_ALIAS', id: v15.id } };
+  const dry = await bindSelection([node], false);
+  assert.equal(dry.reasons['already-bound'], 1);
+  assert.equal(dry.reasons.fraction ?? 0, 0);
+  assert.ok(dry.skips.some((s) => s.nodeId === 'bound15' && s.reason === 'already-bound' && s.field === 'strokeWeight'));
+});

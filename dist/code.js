@@ -1902,6 +1902,11 @@
     const w = node.strokeWeight;
     const one = (field, v) => {
       if (!(v > 0)) return;
+      const st = stateReason(nodeFieldState(node, field));
+      if (st) {
+        note(res, st, node, preview, field);
+        return;
+      }
       if (Math.abs(v - Math.round(v)) >= 5e-3) {
         note(res, "fraction", node, preview, field);
         return;

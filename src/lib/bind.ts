@@ -668,6 +668,9 @@ function bindStroke(node: SceneNode, entries: VarEntry[], res: BindResult, apply
   // 이미 있는 소수 변수(stroke-width/1_5 등)에도 붙이지 않는다.
   const one = (field: 'strokeWeight' | 'strokeTopWeight' | 'strokeRightWeight' | 'strokeBottomWeight' | 'strokeLeftWeight', v: number): void => {
     if (!(v > 0)) return;
+    // 이미 붙은 것(소수 변수 stroke-width/1_5 포함)은 소수 판정보다 먼저 — "이미 연결됨" · "삭제된 변수"(§4.6).
+    const st = stateReason(nodeFieldState(node, field));
+    if (st) { note(res, st, node, preview, field); return; }
     if (Math.abs(v - Math.round(v)) >= 0.005) { note(res, 'fraction', node, preview, field); return; }
     tryBind(node, field, v, entries, res, apply, preview);
   };
