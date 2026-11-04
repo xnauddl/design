@@ -7,7 +7,7 @@
    실제 피그마가 아니라 목이다 — 실기 확인은 부록 A.5의 마지막 항목. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues } from '../dist/figma-lib.mjs';
+import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill } from '../dist/figma-lib.mjs';
 
 let seq = 0;
 const SELF_DELETING = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -527,4 +527,42 @@ test('속성 값 넣기 — 한 번에 실패하면 속성마다, 거절된 이�
   assert.deepEqual(applied, { 'title#1': 'B', 'show#3': false }, '나머지는 넣는다');
   // 모두 받으면 빈 목록
   assert.deepEqual(applyInstancePropValues({ setProperties() {} }, ids, { Title: 'C' }), []);
+});
+
+/* ---------- 검토 3회차 (2026-11-04) ---------- */
+
+/** 피그마 실제 모양: 키는 "이름#id"(베리언트는 이름만), 값에는 name이 없다. */
+const REAL_DEFS = {
+  'Title#12:3': { type: 'TEXT', defaultValue: 'A' },
+  'Icon#12:4': { type: 'INSTANCE_SWAP', defaultValue: '1:2' },
+  'Show badge#12:5': { type: 'BOOLEAN', defaultValue: true },
+  Size: { type: 'VARIANT', defaultValue: 'md', variantOptions: ['sm', 'md'] },
+};
+
+test('속성 이름 → id — 정의 키 "이름#id"에서 이름을 뽑는다(값에 name 없음), 베리언트 키는 그대로', () => {
+  const ids = propIdsByName({ componentPropertyDefinitions: REAL_DEFS });
+  assert.deepEqual([...ids.entries()], [
+    ['Title', 'Title#12:3'], ['Icon', 'Icon#12:4'], ['Show badge', 'Show badge#12:5'], ['Size', 'Size'],
+  ]);
+  assert.equal(propIdsByName({ componentPropertyDefinitions: null }).size, 0);
+  assert.equal(propIdsByName({ get componentPropertyDefinitions() { throw new Error('읽기 실패'); } }).size, 0);
+});
+
+test('속성 접힘 값 넣기 — 실제 모양 정의에서 모든 값이 이어지고 실패 0', () => {
+  const ids = propIdsByName({ componentPropertyDefinitions: REAL_DEFS });
+  const applied = {};
+  const inst = { setProperties(p) { for (const k of Object.keys(p)) if (!(k in REAL_DEFS)) throw new Error(`없는 속성 ${k}`); Object.assign(applied, p); } };
+  const failed = applyInstancePropValues(inst, ids, { Title: 'B', Icon: '9:9', 'Show badge': false });
+  assert.deepEqual(failed, [], '예전 코드(def.name)는 Map이 비어 모든 속성이 실패로 잡혔다');
+  assert.deepEqual(applied, { 'Title#12:3': 'B', 'Icon#12:4': '9:9', 'Show badge#12:5': false });
+});
+
+test('자리 결과 세기 — 빈 자리로 끝난 멤버는 propFailed에서 빼고 placeFailed만', () => {
+  const t = { placeCloned: [], placeFailed: [], propFailed: ['Card', 'Card', 'Row'] };
+  tallyFill(t, 'instance', 'Row');
+  tallyFill(t, 'copy', 'Card');
+  tallyFill(t, 'failed', 'Card');
+  assert.deepEqual(t.placeCloned, ['Card']);
+  assert.deepEqual(t.placeFailed, ['Card']);
+  assert.deepEqual(t.propFailed, ['Card', 'Row'], '빈 자리 한 멤버만 빠진다(복사본·인스턴스 멤버는 남음)');
 });

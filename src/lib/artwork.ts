@@ -119,6 +119,23 @@ export function swapVectorSlots(master: SceneNode, slots: readonly VectorSlot[])
 }
 
 /**
+ * 컴포넌트 속성 정의에서 속성 이름 → 속성 id(정의 키). 피그마는 TEXT·INSTANCE_SWAP·BOOLEAN 속성의
+ * 키를 "이름#id"(예: `Title#12:3`)로 주고, **정의 값에는 이름이 없다**(plugin-api ComponentPropertyDefinitions).
+ * 그래서 이름은 키 끝의 "#…"를 떼어 얻는다. VARIANT 속성은 키에 "#"가 없으므로 키가 곧 이름이다(§4.7 6번).
+ */
+export function propIdsByName(container: { componentPropertyDefinitions?: Record<string, unknown> | null }): Map<string, string> {
+  const map = new Map<string, string>();
+  let defs: Record<string, unknown> | null | undefined;
+  try { defs = container.componentPropertyDefinitions; } catch { return map; } // 세트 안 변형 등에서 읽기가 던질 수 있다
+  if (!defs) return map;
+  for (const key of Object.keys(defs)) {
+    const name = key.replace(/#[^#]*$/, '');
+    if (name && !map.has(name)) map.set(name, key);
+  }
+  return map;
+}
+
+/**
  * 속성 접힘 멤버 인스턴스에 속성 값을 넣는다(§4.7 6번). 못 넣은 속성의 **이름** 목록을 돌려준다
  * — 그 속성은 마스터 값 그대로다. 인스턴스는 지우지 않는다(2026-11-04 결정).
  * 한 번에 넣어 보고, 피그마가 거절하면 속성마다 따로 넣어 거절된 것만 골라낸다.

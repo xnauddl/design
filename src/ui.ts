@@ -3767,7 +3767,9 @@ function opReceived(m: CodeToUi): void {
     else opFinished(!failed, def);
     // 작업 직후 다시 읽기(§4.1) — 파일을 바꾼 작업만. 준비 상태 + 변수 표 + 지금 화면의 표.
     // 실패(⚠)로 끝나도 파일을 바꿨으면 읽는다(컴포넌트 등록·묶기·분류 — §4.1 표).
-    if (def.write && (!failed || changedFile(m))) readScreen('work');
+    // [묶기]는 마스터가 있을 때만 — 실패 여부와 무관(이른 반환 = 마스터 없음 = 아무것도 안 바꿈).
+    const reread = m.type === 'COMPONENTIZE_RESULT' ? changedFile(m) : !failed || changedFile(m);
+    if (def.write && reread) readScreen('work');
     return;
   }
 }

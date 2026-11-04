@@ -20,11 +20,11 @@ export { bindSelection, bindSelectedItems, scanBindings, countUsage, findUsers, 
 export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName } from './rename';
 export type { RenameOutcome } from './rename';
-export { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, nodeAtPath } from './artwork';
+export { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath } from './artwork';
 export type { IconRegistry, VectorSlot } from './artwork';
 export { scanSimilar, componentizeSimilar, componentizeResultMessage } from './similarApply';
-export { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin } from './placement';
-export type { Origin, FillResult, Sizing } from './placement';
+export { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, tallyFill } from './placement';
+export type { Origin, FillResult, FillTally, Sizing } from './placement';
 export type { ComponentizeResult } from './similarApply';
 export { generateDarkMode, ensureDarkMode, findModeByName, DARK_MODE_NAME } from './themeApply';
 export type { DarkModeResult } from './themeApply';

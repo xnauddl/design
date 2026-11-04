@@ -6152,7 +6152,8 @@
       if (cancelled) {
         if (isMini) renderMiniMark();
       } else opFinished(!failed, def);
-      if (def.write && (!failed || changedFile(m))) readScreen("work");
+      const reread = m.type === "COMPONENTIZE_RESULT" ? changedFile(m) : !failed || changedFile(m);
+      if (def.write && reread) readScreen("work");
       return;
     }
   }

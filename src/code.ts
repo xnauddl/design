@@ -16,8 +16,8 @@ import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
-import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, nodeAtPath } from './lib/artwork';
-import { captureOrigin as captureOriginAt, fillOrigin, releaseOrigin, type Origin } from './lib/placement';
+import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath } from './lib/artwork';
+import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { scanSimilar, componentizeSimilar, componentizeResultMessage } from './lib/similarApply';
@@ -768,18 +768,6 @@ function propValuesFromNode(root: SceneNode, plan: readonly CompPropPlan[]): Rec
   return propValuesFromStruct(toStructNode(root), plan);
 }
 
-/** 컴포넌트 속성 정의에서 propName → property id. */
-function propIdsByName(container: ComponentNode | ComponentSetNode): Map<string, string> {
-  const map = new Map<string, string>();
-  const defs = container.componentPropertyDefinitions;
-  if (!defs) return map;
-  for (const [id, def] of Object.entries(defs)) {
-    if (def && typeof def === 'object' && 'name' in def && typeof (def as { name: string }).name === 'string') {
-      map.set((def as { name: string }).name, id);
-    }
-  }
-  return map;
-}
 
 /**
  * 컴포넌트/세트의 레이어를 컴포넌트 속성으로 노출(등록에 자동 통합).
@@ -1449,15 +1437,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           for (const { o, make, label } of places) {
             const why: string[] = [];
             const r = fillOrigin(make, o, (w) => why.push(w));
+            // 복사본 · 빈 자리 목록에 넣는다. 빈 자리면 속성 값 꼬리에서는 뺀다(§4.7 6번).
+            tallyFill({ placeCloned, placeFailed, propFailed }, r, o.name);
             if (r === 'instance') continue;
             const cause = why.length ? ` — ${why.join(' · ')}` : '';
-            if (r === 'copy') {
-              placeCloned.push(o.name);
-              failures.push(`인스턴스 대신 복사본을 뒀어요(${label} → ${o.name})${cause}`);
-            } else {
-              placeFailed.push(o.name);
-              failures.push(`제자리에 아무것도 두지 못했어요(${label} → ${o.name})${cause}`);
-            }
+            if (r === 'copy') failures.push(`인스턴스 대신 복사본을 뒀어요(${label} → ${o.name})${cause}`);
+            else failures.push(`제자리에 아무것도 두지 못했어요(${label} → ${o.name})${cause}`);
           }
         };
         // 단독 컴포넌트 1개를 페이지 이동 + 원위치 인스턴스 + 속성 노출 대상 등록(단독·결합불가·결합실패 3곳 공용).

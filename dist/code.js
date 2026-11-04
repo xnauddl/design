@@ -3376,6 +3376,13 @@
       releaseOrigin(o);
     }
   }
+  function tallyFill(t, r, name) {
+    if (r === "copy") t.placeCloned.push(name);
+    if (r !== "failed") return;
+    t.placeFailed.push(name);
+    const i = t.propFailed.indexOf(name);
+    if (i >= 0) t.propFailed.splice(i, 1);
+  }
 
   // src/lib/artwork.ts
   function nodeAtPath(root, path) {
@@ -3454,6 +3461,21 @@
       }
     }
     return failures;
+  }
+  function propIdsByName(container) {
+    const map = /* @__PURE__ */ new Map();
+    let defs;
+    try {
+      defs = container.componentPropertyDefinitions;
+    } catch (e) {
+      return map;
+    }
+    if (!defs) return map;
+    for (const key of Object.keys(defs)) {
+      const name = key.replace(/#[^#]*$/, "");
+      if (name && !map.has(name)) map.set(name, key);
+    }
+    return map;
   }
   function applyInstancePropValues(inst, ids, values) {
     var _a;
@@ -5878,17 +5900,6 @@
   function propValuesFromNode(root, plan) {
     return propValuesFromStruct(toStructNode(root), plan);
   }
-  function propIdsByName(container) {
-    const map = /* @__PURE__ */ new Map();
-    const defs = container.componentPropertyDefinitions;
-    if (!defs) return map;
-    for (const [id, def] of Object.entries(defs)) {
-      if (def && typeof def === "object" && "name" in def && typeof def.name === "string") {
-        map.set(def.name, id);
-      }
-    }
-    return map;
-  }
   function exposeProperties(container, scopes) {
     const rep = scopes[0];
     if (!rep) return [];
@@ -6439,15 +6450,11 @@
             for (const { o, make, label } of places) {
               const why = [];
               const r = fillOrigin(make, o, (w) => why.push(w));
+              tallyFill({ placeCloned, placeFailed, propFailed }, r, o.name);
               if (r === "instance") continue;
               const cause = why.length ? ` \u2014 ${why.join(" \xB7 ")}` : "";
-              if (r === "copy") {
-                placeCloned.push(o.name);
-                failures.push(`\uC778\uC2A4\uD134\uC2A4 \uB300\uC2E0 \uBCF5\uC0AC\uBCF8\uC744 \uB480\uC5B4\uC694(${label} \u2192 ${o.name})${cause}`);
-              } else {
-                placeFailed.push(o.name);
-                failures.push(`\uC81C\uC790\uB9AC\uC5D0 \uC544\uBB34\uAC83\uB3C4 \uB450\uC9C0 \uBABB\uD588\uC5B4\uC694(${label} \u2192 ${o.name})${cause}`);
-              }
+              if (r === "copy") failures.push(`\uC778\uC2A4\uD134\uC2A4 \uB300\uC2E0 \uBCF5\uC0AC\uBCF8\uC744 \uB480\uC5B4\uC694(${label} \u2192 ${o.name})${cause}`);
+              else failures.push(`\uC81C\uC790\uB9AC\uC5D0 \uC544\uBB34\uAC83\uB3C4 \uB450\uC9C0 \uBABB\uD588\uC5B4\uC694(${label} \u2192 ${o.name})${cause}`);
             }
           };
           const placeSingle = (comp, o, name) => {
