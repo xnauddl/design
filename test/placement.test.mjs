@@ -557,12 +557,28 @@ test('속성 접힘 값 넣기 — 실제 모양 정의에서 모든 값이 이�
   assert.deepEqual(applied, { 'Title#12:3': 'B', 'Icon#12:4': '9:9', 'Show badge#12:5': false });
 });
 
-test('자리 결과 세기 — 빈 자리로 끝난 멤버는 propFailed에서 빼고 placeFailed만', () => {
-  const t = { placeCloned: [], placeFailed: [], propFailed: ['Card', 'Card', 'Row'] };
-  tallyFill(t, 'instance', 'Row');
-  tallyFill(t, 'copy', 'Card');
-  tallyFill(t, 'failed', 'Card');
+test('자리 결과 세기 — 빈 자리로 끝난 멤버는 그 자리가 넣은 propFailed 항목만 빼고 placeFailed만', () => {
+  const t = { placeCloned: [], placeFailed: [], propFailed: ['Row'] };
+  let before = t.propFailed.length;
+  tallyFill(t, 'copy', 'Card', before);
+  // 빈 자리로 끝난 자리가 속성 실패도 기록했다면 그 항목만 빠진다
+  before = t.propFailed.length;
+  t.propFailed.push('Card');
+  tallyFill(t, 'failed', 'Card', before);
   assert.deepEqual(t.placeCloned, ['Card']);
   assert.deepEqual(t.placeFailed, ['Card']);
-  assert.deepEqual(t.propFailed, ['Card', 'Row'], '빈 자리 한 멤버만 빠진다(복사본·인스턴스 멤버는 남음)');
+  assert.deepEqual(t.propFailed, ['Row']);
+});
+
+test('자리 결과 세기 — 같은 이름 두 멤버: 한쪽만 속성 실패, 다른 쪽은 빈 자리면 속성 실패 항목이 남는다', () => {
+  const t = { placeCloned: [], placeFailed: [], propFailed: [] };
+  // 멤버 1 "Card": 인스턴스는 들어갔지만 속성 값을 못 넣음
+  let before = t.propFailed.length;
+  t.propFailed.push('Card'); // make()가 기록
+  tallyFill(t, 'instance', 'Card', before);
+  // 멤버 2 "Card": 속성은 다 넣었지만 빈 자리로 끝남(propFailed에 넣은 것 없음)
+  before = t.propFailed.length;
+  tallyFill(t, 'failed', 'Card', before);
+  assert.deepEqual(t.propFailed, ['Card'], '이름으로 빼면 멤버 1의 항목이 사라진다');
+  assert.deepEqual(t.placeFailed, ['Card']);
 });

@@ -3376,12 +3376,11 @@
       releaseOrigin(o);
     }
   }
-  function tallyFill(t, r, name) {
+  function tallyFill(t, r, name, propStart) {
     if (r === "copy") t.placeCloned.push(name);
     if (r !== "failed") return;
     t.placeFailed.push(name);
-    const i = t.propFailed.indexOf(name);
-    if (i >= 0) t.propFailed.splice(i, 1);
+    if (t.propFailed.length > propStart) t.propFailed.splice(propStart);
   }
 
   // src/lib/artwork.ts
@@ -6449,8 +6448,9 @@
             });
             for (const { o, make, label } of places) {
               const why = [];
+              const before = propFailed.length;
               const r = fillOrigin(make, o, (w) => why.push(w));
-              tallyFill({ placeCloned, placeFailed, propFailed }, r, o.name);
+              tallyFill({ placeCloned, placeFailed, propFailed }, r, o.name, before);
               if (r === "instance") continue;
               const cause = why.length ? ` \u2014 ${why.join(" \xB7 ")}` : "";
               if (r === "copy") failures.push(`\uC778\uC2A4\uD134\uC2A4 \uB300\uC2E0 \uBCF5\uC0AC\uBCF8\uC744 \uB480\uC5B4\uC694(${label} \u2192 ${o.name})${cause}`);

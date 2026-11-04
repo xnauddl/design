@@ -1436,9 +1436,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           });
           for (const { o, make, label } of places) {
             const why: string[] = [];
+            // 이 자리를 채우며 make()가 propFailed에 넣은 항목은 before 뒤에 붙는다(§4.7 6번).
+            const before = propFailed.length;
             const r = fillOrigin(make, o, (w) => why.push(w));
             // 복사본 · 빈 자리 목록에 넣는다. 빈 자리면 속성 값 꼬리에서는 뺀다(§4.7 6번).
-            tallyFill({ placeCloned, placeFailed, propFailed }, r, o.name);
+            tallyFill({ placeCloned, placeFailed, propFailed }, r, o.name, before);
             if (r === 'instance') continue;
             const cause = why.length ? ` — ${why.join(' · ')}` : '';
             if (r === 'copy') failures.push(`인스턴스 대신 복사본을 뒀어요(${label} → ${o.name})${cause}`);
