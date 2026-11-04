@@ -664,14 +664,21 @@ function bindStroke(node: SceneNode, entries: VarEntry[], res: BindResult, apply
   const strokes = (node as { strokes: readonly Paint[] | typeof figma.mixed }).strokes;
   if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
   const w = (node as { strokeWeight: number | typeof figma.mixed }).strokeWeight;
+  // 선 두께는 정수만(§2.11, 2026-11-04) — 소수 두께는 정수 변수에 당겨 붙이지 않고 "소수 선 두께"로 건너뛴다.
+  // 이미 있는 소수 변수(stroke-width/1_5 등)에도 붙이지 않는다.
+  const one = (field: 'strokeWeight' | 'strokeTopWeight' | 'strokeRightWeight' | 'strokeBottomWeight' | 'strokeLeftWeight', v: number): void => {
+    if (!(v > 0)) return;
+    if (Math.abs(v - Math.round(v)) >= 0.005) { note(res, 'fraction', node, preview, field); return; }
+    tryBind(node, field, v, entries, res, apply, preview);
+  };
   if (w !== figma.mixed && typeof w === 'number') {
-    if (w > 0) tryBind(node, 'strokeWeight', w, entries, res, apply, preview);
+    one('strokeWeight', w);
     return;
   }
   // 변별 두께(상/우/하/좌)
   for (const side of ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const) {
     const sv = (node as unknown as Record<string, number>)[side];
-    if (typeof sv === 'number' && sv > 0) tryBind(node, side, sv, entries, res, apply, preview);
+    if (typeof sv === 'number') one(side, sv);
   }
 }
 

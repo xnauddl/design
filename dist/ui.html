@@ -1399,6 +1399,7 @@
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
     "component.placeFailedMore": " \uC678",
     "component.propFailed": " \xB7 \uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC740 {n}\uAC1C: {names}",
+    "component.fillKept": " \xB7 \uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uAC74\uB108\uB6F4 {n}\uAC1C: {names}",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
     "wizard.needSelect": "\uBA3C\uC800 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C \uD1A0\uD070\uC744 \uCD94\uCD9C\uD569\uB2C8\uB2E4.",
@@ -1461,6 +1462,7 @@
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
     "reason.translucent": "\uBC18\uD22C\uBA85",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
+    "reason.fraction": "\uC18C\uC218 \uC120 \uB450\uAED8",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
@@ -2999,7 +3001,7 @@
     [24, "2xl"]
   ]);
   var STROKE_LADDER = /* @__PURE__ */ new Map([
-    [0.5, "hairline"],
+    // 변수는 정수만 — 0.5(hairline)는 없다(2026-11-04 사용자 결정, §2.11).
     [1, "thin"],
     [2, "thick"]
   ]);
@@ -4688,7 +4690,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -4968,8 +4970,9 @@
         const misplaced = (_m = msg.placeFailed) != null ? _m : [];
         const cloned = (_n = msg.placeCloned) != null ? _n : [];
         const propFailed = (_o = msg.propFailed) != null ? _o : [];
-        const extra = `${msg.skipped ? ` \xB7 \uAC74\uB108\uB700 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.exposed ? ` \xB7 \uC18D\uC131 ${msg.exposed}` : ""}${msg.icons ? ` \xB7 \uC544\uC774\uCF58 ${msg.icons}` : ""}${placeTailText("component.propFailed", propFailed)}${placeTailText("component.placeCloned", cloned)}${placeFailedText(misplaced)}`;
-        setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extra }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length && !propFailed.length ? "ok" : "warn");
+        const fillKept = (_p = msg.fillKept) != null ? _p : [];
+        const extra = `${msg.skipped ? ` \xB7 \uAC74\uB108\uB700 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.exposed ? ` \xB7 \uC18D\uC131 ${msg.exposed}` : ""}${msg.icons ? ` \xB7 \uC544\uC774\uCF58 ${msg.icons}` : ""}${placeTailText("component.propFailed", propFailed)}${placeTailText("component.fillKept", fillKept)}${placeTailText("component.placeCloned", cloned)}${placeFailedText(misplaced)}`;
+        setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extra }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
         break;
       }
@@ -5031,7 +5034,7 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_p = msg.placeFailed) != null ? _p : [];
+          const misplaced0 = (_q = msg.placeFailed) != null ? _q : [];
           const first = msg.warnings.find((w) => !misplaced0.some((n) => w.startsWith(`${n}: \uC81C\uC790\uB9AC`)));
           setStatus("structureStatus", `\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694${first ? ` \u2014 ${first}` : ""}${placeFailedText(misplaced0)}`, "warn");
           break;
@@ -5039,7 +5042,7 @@
         const parts = [`\uB9C8\uC2A4\uD130 ${msg.master}`, `\uC778\uC2A4\uD134\uC2A4 ${msg.instances}\uAC1C`];
         if (msg.properties) parts.push(`\uC18D\uC131 ${msg.properties}\uAC1C`);
         if (msg.images) parts.push(`\uC774\uBBF8\uC9C0 ${msg.images}\uAC1C`);
-        const misplaced = (_q = msg.placeFailed) != null ? _q : [];
+        const misplaced = (_r = msg.placeFailed) != null ? _r : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !misplaced.some((n) => w.startsWith(`${n}: \uC81C\uC790\uB9AC`)));
         const warn = others > 0 && firstOther ? ` \xB7 \uB0A8\uACA8\uB454 \uAC83 ${others}\uAC74: ${firstOther}` : "";
@@ -6123,7 +6126,7 @@
     if (isMini) renderMiniMark();
   }
   function opReceived(m) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     if (m.type === "PROGRESS") {
       opProg = m.total > 0 ? Math.min(1, m.done / m.total) : null;
       if (isMini) renderMiniMark();
@@ -6146,8 +6149,8 @@
       let cancelled = false;
       if (m.type === "DARK_MODE_RESULT" && m.error) failed = true;
       if ((m.type === "COMPONENTS_RESULT" || m.type === "VARIANTS_RESULT") && ((_b = (_a = m.failures) == null ? void 0 : _a.length) != null ? _b : 0) > 0) failed = true;
-      if (m.type === "COMPONENTS_RESULT" && ((_d = (_c = m.propFailed) == null ? void 0 : _c.length) != null ? _d : 0) + ((_f = (_e = m.placeCloned) == null ? void 0 : _e.length) != null ? _f : 0) + ((_h = (_g = m.placeFailed) == null ? void 0 : _g.length) != null ? _h : 0) > 0) failed = true;
-      if (m.type === "COMPONENTIZE_RESULT" && ((_j = (_i = m.placeFailed) == null ? void 0 : _i.length) != null ? _j : 0) > 0) failed = true;
+      if (m.type === "COMPONENTS_RESULT" && ((_d = (_c = m.propFailed) == null ? void 0 : _c.length) != null ? _d : 0) + ((_f = (_e = m.fillKept) == null ? void 0 : _e.length) != null ? _f : 0) + ((_h = (_g = m.placeCloned) == null ? void 0 : _g.length) != null ? _h : 0) + ((_j = (_i = m.placeFailed) == null ? void 0 : _i.length) != null ? _j : 0) > 0) failed = true;
+      if (m.type === "COMPONENTIZE_RESULT" && ((_l = (_k = m.placeFailed) == null ? void 0 : _k.length) != null ? _l : 0) > 0) failed = true;
       if (m.type === "APPLY_RESULT" && m.cancelled) cancelled = true;
       if (cancelled) {
         if (isMini) renderMiniMark();

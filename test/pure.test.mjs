@@ -1684,7 +1684,7 @@ test('radiusRoles — 고정 사다리(2 xs·4 sm·8 md·12 lg·16 xl·24 2xl) �
 test('spacingRoles/strokeRoles — Lightning·Atlassian 고정 사다리, 척도 밖 값은 역할 없음', () => {
   assert.deepEqual(spacingRoles([4, 8, 16, 24, 32]), ['2xs', 'xs', 'md', 'lg', 'xl']);
   assert.deepEqual(spacingRoles([13, 16, 51]), ['', 'md', '']);
-  assert.deepEqual(strokeRoles([0.5, 1, 2, 4]), ['hairline', 'thin', 'thick', '']);
+  assert.deepEqual(strokeRoles([0.5, 1, 2, 4]), ['', 'thin', 'thick', '']); // 정수만 — hairline 없음(2026-11-04)
 });
 
 test('suggestTokenRoles — 사다리 밖 간격은 역할 맵에서 빠진다', () => {
@@ -2847,4 +2847,12 @@ test('aliasCandidates — 같은 타입 · 계층 규칙 · 자기/순환 제외
   assert.ok(ids(aliasCandidates(byId('xa'), edCols, cyc)).includes('xb') && ids(aliasCandidates(byId('xa'), edCols, cyc)).includes('xc'), '지금 대상(xb)을 다시 고르는 것은 순환이 아니다');
   assert.ok(!ids(aliasCandidates({ ...byId('tx'), collectionId: 'x' }, edCols, cyc)).includes('xc'), 'xc → bt → tx: 순환');
   assert.deepEqual(ids(aliasCandidates(byId('bt'), edCols, edVars, 'GRAY/9')), ['g9'], '검색은 전체 경로 · 대소문자 무시');
+});
+
+test('inferVaryingImageSlots — 레이어 자신이 사진인 멤버(사각형·원)도 슬롯(루트 경로 "") · QA #3 실기 ② 불합격 6', () => {
+  const rect = (id, hash, h = 280) => ({ id, name: 'flight', type: 'RECTANGLE', width: 1000, height: h, imageHash: hash, fills: [{ type: 'IMAGE', visible: true }] });
+  assert.deepEqual(inferVaryingImageSlots([rect('a', 'sky'), rect('b', 'plane')]), [{ layerName: 'flight', layerPath: '' }]);
+  assert.deepEqual(inferVaryingImageSlots([rect('a', 'sky'), rect('b', 'sky')]), [], '같은 사진이면 슬롯 없음');
+  const av = (id, hash) => ({ id, name: 'Ellipse 10', type: 'ELLIPSE', width: 32, height: 32, imageHash: hash, fills: [{ type: 'IMAGE', visible: true }] });
+  assert.deepEqual(inferVaryingImageSlots([av('a', 'f1'), av('b', 'f2'), av('c', 'f3')]), [{ layerName: 'Ellipse 10', layerPath: '' }]);
 });

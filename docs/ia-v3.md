@@ -1559,6 +1559,6 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
 **QA #3 실기 ② (dev @504c528, 원본 163:1523 → 결과 163:1779)**
 - 불합격 3(인스턴스 자리): 합격 — 그룹 6개 유지, (0,0)에 남은 것 0
 - 불합격 1: 연결을 돌리지 않아 부분 확인 — 다음 실기에서 다시
-- [ ] 불합격 6 — 사진·크기(§4.7 8번): 원인 `components.ts` `inferVaryingImageSlots`가 루트를 뺌 + 속성 접힘 `make`가 크기를 맞추지 않음(`code.ts`). 사진 슬롯에 루트 포함, 감싼 도형 경로 맞추기, 멤버 크기로 resize, 넣기 전 검사(해시 · 크기) → 다르면 원본 그대로, 멤버를 컴포넌트로 바꾸지 않고 넣고 나서 지움(`artwork.ts` `replaceMember`), 꼬리 `component.fillKept` · `COMPONENTS_RESULT.fillKept` + 단위 테스트(해시 다른 사각형 2개 · 333 vs 280 · 원 아바타)
-- [ ] 항목 5 — 선 두께 정수만(§2.11): `extract.ts` 선 두께 `onScale` step 1, `roles.ts` `STROKE_LADDER`에서 0.5(hairline) 삭제, 연결은 소수 선 두께를 사유 `fraction`("소수 선 두께")으로 건너뜀, 이미 있는 변수는 지우지 않음 + 단위 테스트(1.5 → 토큰 없음 · 연결 없음). 저장소 안 `dsl-token-conventions`는 없음(grep)
+- [x] 불합격 6 — 사진·크기(§4.7 8번): 원인 `components.ts` `inferVaryingImageSlots`가 루트를 뺌 + 속성 접힘 `make`가 크기를 맞추지 않음(`code.ts`). 사진 슬롯에 루트 포함, 감싼 도형 경로 맞추기, 멤버 크기로 resize, 넣기 전 검사(해시 · 크기) → 다르면 원본 그대로, 멤버를 컴포넌트로 바꾸지 않고 넣고 나서 지움(`artwork.ts` `replaceMember`), 꼬리 `component.fillKept` · `COMPONENTS_RESULT.fillKept` + 단위 테스트(해시 다른 사각형 2개 · 333 vs 280 · 원 아바타)
+- [x] 항목 5 — 선 두께 정수만(§2.11): `extract.ts` 선 두께 `onScale` step 1, `roles.ts` `STROKE_LADDER`에서 0.5(hairline) 삭제, 연결은 소수 선 두께를 사유 `fraction`("소수 선 두께")으로 건너뜀, 이미 있는 변수는 지우지 않음 + 단위 테스트(1.5 → 토큰 없음 · 연결 없음). 저장소 안 `dsl-token-conventions`는 없음(grep)
 - [ ] 실기 확인 ③(사용자, 피그마): 같은 원본 재실행 → 이미지 채움 해시 15 = 15, `flight` 1000×333 유지(인스턴스가 못 지키면 원본 그대로 + "채움·크기가 달라 건너뛴" 꼬리), 여행자 카드 사진 4장이 서로 다름, 아바타 3개가 저마다 얼굴, `stroke-width/1_5` 새로 생기지 않음, 연결을 돌려 불합격 1 재확인

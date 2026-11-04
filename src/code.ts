@@ -16,7 +16,7 @@ import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
-import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath } from './lib/artwork';
+import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
@@ -1413,6 +1413,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const placeFailed: string[] = []; // 복사본도 못 둬 비운 자리의 원본 이름(결과 줄 · §4.7 5번)
         const placeCloned: string[] = []; // 인스턴스를 못 넣어 복사본으로 채운 자리의 원본 이름(§4.7 5번)
         const propFailed: string[] = []; // 속성 값·사진을 못 넣어 마스터 값으로 남은 멤버 이름(§4.7 6번)
+        const fillKept: string[] = []; // 사진·크기 검사에 걸려 묶지 않고 원본을 둔 멤버 이름(§4.7 8번)
         const captureOrigin = (n: SceneNode): Origin => {
           const o = captureOriginAt(n);
           origins.push(o);
@@ -1550,8 +1551,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 }
                 return out;
               };
-              // 아이콘 컴포넌트는 멤버가 컴포넌트로 바뀌기 **전에** 만든다 — 마스터가 아닌 멤버는
-              // 곧 제거되고, 그때 그 안의 그림도 함께 사라진다.
+              // 아이콘 컴포넌트는 멤버를 바꾸기 **전에** 만든다 — 마스터가 아닌 멤버는 인스턴스로 바뀌면
+              // 지워지고, 그때 그 안의 그림도 함께 사라진다.
               // 하나라도 못 만들면 접지 않는다 — 멤버를 지운 뒤엔 그 그림을 되살릴 수 없다.
               let iconsReady = true;
               for (let i = 0; i < live.length; i++) {
@@ -1566,48 +1567,40 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 // 세트로 남긴다(아래 경로) — 멤버가 그대로라 그림도 그대로다.
                 failures.push(`아이콘을 만들지 못해 세트로 등록해요(${setName})`);
               } else {
-                type Snap = { o: Origin; vals: Record<string, string | boolean>; images: Record<string, readonly Paint[]> };
-                const snapshots: Snap[] = [];
-                const made: ComponentNode[] = [];
-                const madeFromLive: number[] = [];
-                for (let i = 0; i < live.length; i++) {
-                  const n = live[i];
-                  const snap: Snap = { o: captureOrigin(n), vals: propValuesFromNode(n, plan), images: imagesOf(n) };
-                  try {
-                    made.push(figma.createComponentFromNode(n));
-                    snapshots.push(snap);
-                    madeFromLive.push(i);
-                  } catch (e) {
-                    releaseOrigin(snap.o);
-                    skipped++;
-                    failures.push(`속성접힘 컴포넌트화 실패(${n.name}): ${errText(e)}`);
-                  }
-                }
-                if (!made.length) continue;
+                // 마스터 하나만 컴포넌트로 바꾼다. 나머지 멤버는 바꾸지 않고, 인스턴스를 만들어 사진·크기를
+                // 검사한 뒤 넣고 나서 지운다 — 검사에 걸리면 원본을 손대지 않고 그대로 둔다(§4.7 3·8번).
+                // (예전: 멤버를 모두 컴포넌트로 바꾼 뒤 마스터 아닌 것을 지워, 사진·크기를 못 지키면 되돌릴 수 없었다.)
+                type Snap = { n: SceneNode; vals: Record<string, string | boolean>; images: Record<string, readonly Paint[]> };
+                const snaps: Snap[] = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                 // 액션 슬롯이 있는 쪽을 마스터로 — optional 결손 멤버의 트리를 대표로 쓰면 BOOLEAN 경로가 사라짐.
                 const preferLive = pickCollapseMasterIndex(structs);
-                let masterMade = madeFromLive.indexOf(preferLive);
-                if (masterMade < 0) masterMade = 0;
-                const master = made[masterMade];
-                for (let i = 0; i < made.length; i++) {
-                  if (i === masterMade) continue;
-                  try { made[i].remove(); } catch { /* 이미 제거됨 */ }
+                const masterSnap = snaps[preferLive] ?? snaps[0];
+                const masterOrigin = captureOrigin(masterSnap.n);
+                let master: ComponentNode;
+                try {
+                  master = figma.createComponentFromNode(masterSnap.n);
+                } catch (e) {
+                  releaseOrigin(masterOrigin);
+                  skipped++;
+                  failures.push(`속성접힘 컴포넌트화 실패(${masterSnap.n.name}): ${errText(e)}`);
+                  continue;
                 }
-                try { master.name = setName || pascalCase(live[preferLive]?.name ?? live[0].name); } catch { /* 이름 실패 무시 */ }
+                try { master.name = setName || pascalCase(masterSnap.n.name); } catch { /* 이름 실패 무시 */ }
+                // 도형 멤버는 컴포넌트가 감싼다 — 원본 경로 앞에 붙일 것(§4.7 8번 "경로 맞추기").
+                const prefix = shapePrefix(master, structs[preferLive]?.type ?? '');
                 placeOnPage(master);
                 singles.push(master.name);
-                registered++; // 남긴 단품 1개만 집계(중간 변환분은 제거)
+                registered++; // 남긴 단품 1개만 집계
                 // 마스터의 날 벡터 자리를 아이콘 인스턴스로 교체 — INSTANCE_SWAP은 대상이
                 // 인스턴스일 때만 붙으므로 **속성 노출보다 먼저** 한다. 먼저 끼우고 뒤에 지워
                 // 인덱스 경로가 흔들리지 않게 한다(자식 수가 잠깐도 줄지 않는다).
-                const masterSnap = snapshots[masterMade];
                 failures.push(
                   ...swapVectorSlots(
                     master,
                     vectorPlans.map((p) => ({
                       layerName: p.layerName,
-                      layerPath: p.layerPath!,
-                      icon: iconRegistry.get(String(masterSnap?.vals[p.propName] ?? '')),
+                      layerPath: joinPath(prefix, p.layerPath!),
+                      icon: iconRegistry.get(String(masterSnap.vals[p.propName] ?? '')),
                     })),
                   ),
                 );
@@ -1620,8 +1613,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 }
                 exposedEarly += collapsedExposed;
                 const ids = propIdsByName(master);
-                const places: Place[] = [];
-                for (const snap of snapshots) {
+                /** 이 멤버의 인스턴스 — 속성 값·사진까지. 못 넣은 속성·사진은 마스터 값으로 두고 알린다(§4.7 6번). */
+                const makerFor = (snap: Snap, name: string): (() => InstanceNode) => {
                   // 벡터 슬롯의 값은 그림 지문이다 — 방금 만든 아이콘 컴포넌트 key로 옮겨 적는다.
                   const vals = { ...snap.vals };
                   for (const p of vectorPlans) {
@@ -1629,32 +1622,50 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                     if (icon) vals[p.propName] = icon.key || icon.id;
                     else delete vals[p.propName]; // 못 만든 그림은 마스터 것 그대로(빈 값으로 덮지 않는다)
                   }
+                  // 사진 경로를 마스터 경로로(감싼 도형이면 앞붙이)
+                  const images: Record<string, readonly Paint[]> = {};
+                  for (const [path, paints] of Object.entries(snap.images)) images[joinPath(prefix, path)] = paints;
                   let noted = false; // 속성 값·사진 실패는 멤버마다 한 번만(복사본을 다시 만들 때 겹치지 않게)
-                  // 인스턴스를 만들고 속성 값·사진까지 넣는다. 못 넣은 속성·사진은 마스터 값 그대로 두고
-                  // 알린다(인스턴스는 지우지 않는다 — §4.7 6번, 2026-11-04 결정). 복사본도 같은 함수로 만든다.
-                  // 예상 밖 예외면 만든 인스턴스를 지우고 던진다(어디에도 남기지 않는다).
-                  const make = (): InstanceNode => {
+                  return (): InstanceNode => {
                     let inst: InstanceNode | null = null;
                     try {
                       inst = master.createInstance();
                       const badProps = applyInstancePropValues(inst, ids, vals);
-                      // 사진은 속성이 아니라 fill 오버라이드 — 멤버 원본을 같은 경로에 이식한다.
-                      const img = transplantImageFills(inst, snap.images).failures;
+                      // 사진은 속성이 아니라 fill 오버라이드 — 멤버 원본 채움 전체(해시·scaleMode·imageTransform)를 이식한다.
+                      const img = transplantImageFills(inst, images).failures;
                       if (!noted) {
                         noted = true;
-                        for (const p of badProps) failures.push(`속성 값을 못 넣어 마스터 값으로 뒀어요(${snap.o.name} · ${p})`);
-                        failures.push(...img.map((f) => `${snap.o.name}: ${f}`));
-                        if (badProps.length || img.length) propFailed.push(snap.o.name);
+                        for (const p of badProps) failures.push(`속성 값을 못 넣어 마스터 값으로 뒀어요(${name} · ${p})`);
+                        failures.push(...img.map((f) => `${name}: ${f}`));
+                        if (badProps.length || img.length) propFailed.push(name);
                       }
                       return inst;
                     } catch (e) {
+                      // 예상 밖 예외면 만든 인스턴스를 지우고 던진다(어디에도 남기지 않는다).
                       if (inst) { try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ } }
                       throw e;
                     }
                   };
-                  places.push({ o: snap.o, make, label: master.name });
+                };
+                // 마스터 자리 — 원본이 Components 페이지로 옮겨졌으므로 인스턴스 → 복사본 → 빈 자리(5번).
+                restore([{ o: masterOrigin, make: makerFor(masterSnap, masterOrigin.name), label: master.name }]);
+                // 나머지 멤버 — 검사 뒤 넣고 나서 지운다. 걸리면 원본 그대로(8번), 못 넣으면 원본 그대로(5번).
+                for (const snap of snaps) {
+                  if (snap === masterSnap) continue;
+                  const name = snap.n.name;
+                  const before = propFailed.length;
+                  const r = replaceMember(snap.n, makerFor(snap, name), prefix);
+                  if (r.result === 'replaced') continue;
+                  // 묶지 않은 멤버는 속성 값 꼬리에서 뺀다 — 원본이 그대로라 따질 속성 값이 없다.
+                  if (propFailed.length > before) propFailed.splice(before);
+                  if (r.result === 'mismatch') {
+                    fillKept.push(name);
+                    failures.push(`채움·크기가 달라 묶지 않고 원본을 뒀어요(${name}) — ${r.why ?? ''}`);
+                  } else {
+                    placeFailed.push(name);
+                    failures.push(`제자리에 넣지 못해 원본을 뒀어요(${name})${r.why ? ` — ${r.why}` : ''}`);
+                  }
                 }
-                restore(places);
                 // 루프 끝 일괄 expose는 중복 방지 — 이미 노출했으므로 containers에 넣지 않음.
                 continue;
               }
@@ -1716,7 +1727,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(`속성 노출 실패: ${errText(e)}`); }
         }
 
-        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed });
+        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept });
         if (registered || sets) commitUndo(figma); // UX2
         break;
       }

@@ -7,7 +7,7 @@
    실제 피그마가 아니라 목이다 — 실기 확인은 부록 A.5의 마지막 항목. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill } from '../dist/figma-lib.mjs';
+import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill, replaceMember, shapePrefix, memberFitIssue, transplantImageFills, joinPath } from '../dist/figma-lib.mjs';
 
 let seq = 0;
 const SELF_DELETING = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -89,7 +89,7 @@ function installFigma(page) {
       node.addComponentProperty = function (pname, ptype, def) { const id = `${pname}#${seq++}`; this.props.push({ id, pname, ptype, def }); return id; };
       node.createInstance = function () {
         const clone = (c) => {
-          const o = mk(c.type, { name: c.name, x: c.x, y: c.y, width: c.width, height: c.height, characters: c.characters, componentPropertyReferences: {} });
+          const o = mk(c.type, { name: c.name, x: c.x, y: c.y, width: c.width, height: c.height, characters: c.characters, componentPropertyReferences: {}, ...(c.fills ? { fills: c.fills } : {}) });
           if (c.children) { o.children = c.children.map(clone); for (const k of o.children) k.parent = o; }
           return o;
         };
@@ -581,4 +581,107 @@ test('자리 결과 세기 — 같은 이름 두 멤버: 한쪽만 속성 실패
   tallyFill(t, 'failed', 'Card', before);
   assert.deepEqual(t.propFailed, ['Card'], '이름으로 빼면 멤버 1의 항목이 사라진다');
   assert.deepEqual(t.placeFailed, ['Card']);
+});
+
+/* ---------- QA #3 실기 ② 불합격 6 — 속성 접힘 사진·크기 (§4.7 8번) ---------- */
+
+const img = (hash) => [{ type: 'IMAGE', visible: true, imageHash: hash, scaleMode: 'FILL', imageTransform: [[1, 0, 0], [0, 1, 0]] }];
+
+/**
+ * 도형 멤버를 [등록] 속성 접힘처럼 바꾼다: 마스터만 컴포넌트(피그마처럼 도형을 감싼다) → 나머지는
+ * 인스턴스(사진 이식) → replaceMember. 마스터 자리는 이 테스트의 관심 밖이라 그대로 둔다.
+ */
+function collapseShapes(members, masterIdx = 0) {
+  const m = members[masterIdx];
+  const shape = mk(m.type, { name: m.name, width: m.width, height: m.height, fills: m.fills });
+  const comp = figma.createComponentFromNode(mk('FRAME', { name: 'WebsiteImage', width: m.width, height: m.height }, [shape]));
+  const prefix = shapePrefix(comp, m.type);
+  return members.map((n, i) => {
+    if (i === masterIdx) return { n, r: { result: 'master' } };
+    const make = () => {
+      const inst = comp.createInstance();
+      transplantImageFills(inst, { [joinPath(prefix, '')]: n.fills });
+      return inst;
+    };
+    return { n, r: replaceMember(n, make, prefix) };
+  });
+}
+
+test('불합격 6 — 이미지가 다른 사각형 2개: 인스턴스가 저마다 자기 사진(해시·scaleMode·imageTransform)', () => {
+  const page = mk('PAGE', {}, []);
+  const a = mk('RECTANGLE', { name: 'photo', x: 0, y: 0, width: 300, height: 200, fills: img('h-a') });
+  const b = mk('RECTANGLE', { name: 'photo', x: 320, y: 0, width: 300, height: 200, fills: img('h-b') });
+  const row = mk('FRAME', { name: 'Row' }, [a, b]);
+  page.appendChild(row);
+  installFigma(page);
+  const [, rb] = collapseShapes([a, b]);
+  assert.equal(rb.r.result, 'replaced');
+  const inst = row.children[1];
+  assert.equal(inst.type, 'INSTANCE');
+  assert.deepEqual(inst.children[0].fills, img('h-b'), '마스터 사진(h-a)으로 바뀌면 안 된다');
+  assert.deepEqual([inst.x, inst.y], [320, 0]);
+  assert.equal(b.removed, true);
+  assert.deepEqual(page.children, [row]);
+});
+
+test('불합격 6 — 원 아바타 3개: 저마다 얼굴', () => {
+  const page = mk('PAGE', {}, []);
+  const av = ['f1', 'f2', 'f3'].map((h, i) => mk('ELLIPSE', { name: 'Ellipse 10', x: i * 40, width: 32, height: 32, fills: img(h) }));
+  const list = mk('FRAME', { name: 'Travelers' }, av);
+  page.appendChild(list);
+  installFigma(page);
+  const out = collapseShapes(av);
+  assert.deepEqual(out.slice(1).map((o) => o.r.result), ['replaced', 'replaced']);
+  assert.deepEqual(list.children.slice(1).map((n) => n.children[0].fills[0].imageHash), ['f2', 'f3']);
+});
+
+test('불합격 6 — 크기가 다른 멤버(1000×333 vs 280): 감싼 사진이 따라오지 않으면 묶지 않고 원본 그대로', () => {
+  const page = mk('PAGE', {}, []);
+  const sky = mk('RECTANGLE', { name: 'flight', width: 1000, height: 280, fills: img('09164b5e') });
+  const flight = mk('RECTANGLE', { name: 'flight', y: 400, width: 1000, height: 333, fills: img('4a76bedd') });
+  const hero = mk('FRAME', { name: 'Hero' }, [sky, flight]);
+  page.appendChild(hero);
+  installFigma(page);
+  const [, rf] = collapseShapes([sky, flight]);
+  assert.equal(rf.r.result, 'mismatch');
+  assert.match(rf.r.why, /사진 크기/);
+  assert.equal(flight.removed, false, '원본을 지킨다');
+  assert.deepEqual([flight.width, flight.height], [1000, 333]);
+  assert.deepEqual(flight.fills, img('4a76bedd'));
+  assert.deepEqual(hero.children, [sky, flight]);
+  assert.deepEqual(page.children, [hero], '지운 인스턴스가 페이지 맨 위에 남지 않는다');
+});
+
+test('불합격 6 — 사진을 못 옮기면(이식 실패) 검사가 걸러 원본 그대로', () => {
+  const page = mk('PAGE', {}, []);
+  const a = mk('RECTANGLE', { name: 'photo', width: 100, height: 100, fills: img('a') });
+  const b = mk('RECTANGLE', { name: 'photo', width: 100, height: 100, fills: img('b') });
+  const row = mk('FRAME', { name: 'Row' }, [a, b]);
+  page.appendChild(row);
+  installFigma(page);
+  const comp = figma.createComponentFromNode(mk('FRAME', { width: 100, height: 100 }, [mk('RECTANGLE', { width: 100, height: 100, fills: img('a') })]));
+  const r = replaceMember(b, () => comp.createInstance(), shapePrefix(comp, 'RECTANGLE')); // 이식 없이
+  assert.equal(r.result, 'mismatch');
+  assert.match(r.why, /사진 다름/);
+  assert.deepEqual(row.children, [a, b]);
+});
+
+test('불합격 6 — 프레임 안 사진(카드): 경로 앞붙이 없음, 같은 크기면 묶고 사진은 멤버 것', () => {
+  const page = mk('PAGE', {}, []);
+  const card = (h, x) => mk('FRAME', { name: 'Card', x, width: 200, height: 260 }, [mk('RECTANGLE', { name: 'ArticleImage', width: 200, height: 160, fills: img(h) })]);
+  const A = card('nP9t', 0);
+  const B = card('j7vJ', 220);
+  const box = mk('FRAME', { name: 'Box' }, [A, B]);
+  page.appendChild(box);
+  installFigma(page);
+  const comp = figma.createComponentFromNode(A);
+  assert.equal(shapePrefix(comp, 'FRAME'), '');
+  const r = replaceMember(B, () => {
+    const i = comp.createInstance();
+    transplantImageFills(i, { 0: B.children[0].fills });
+    return i;
+  }, '');
+  assert.equal(r.result, 'replaced');
+  assert.equal(box.children[1].children[0].fills[0].imageHash, 'j7vJ');
+  assert.equal(memberFitIssue(box.children[1], { width: 200, height: 260, children: [], type: 'FRAME', name: 'x' }, ''), null);
 });

@@ -4453,3 +4453,43 @@ test('bindSelectedItems — 찾은 뒤 줄바꿈이 꺼진 줄 사이 간격은 
   assert.deepEqual(r.reasons, { changed: 1 });
   assert.equal(row.boundVariables.counterAxisSpacing, undefined);
 });
+
+/* ---------- 선 두께는 정수만 (§2.11, 2026-11-04 사용자 결정 · QA #3 실기 ② 항목 5) ---------- */
+
+function strokedFrame(id, w) {
+  return {
+    type: 'FRAME', id, name: id, fills: [],
+    strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, visible: true }],
+    strokeWeight: w, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', layoutMode: 'NONE', children: [],
+    setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; },
+  };
+}
+
+test('extractFromSelection — 소수 선 두께(1.5)는 토큰이 없다, 정수(1·2)는 그대로', () => {
+  installFigma();
+  const names = new Set(extractFromSelection([strokedFrame('a', 1.5), strokedFrame('b', 1), strokedFrame('c', 2)]).tokens.map((t) => t.name));
+  assert.equal(names.has('stroke-width/1_5'), false, 'stroke-width/1_5가 생겼다');
+  assert.equal(names.has('stroke-width/1'), true);
+  assert.equal(names.has('stroke-width/2'), true);
+  assert.equal(names.has('stroke-width/0_5'), false);
+});
+
+test('bindSelection — 소수 선 두께는 이미 있는 1.5 변수에도, 가까운 정수에도 붙이지 않고 "소수 선 두께"로 건너뜀', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'stroke-width/1_5', category: 'strokeWidth', sources: ['strokeWidth'], value: 1.5 }, // 예전에 만든 변수(지우지 않음)
+      { name: 'stroke-width/2', category: 'strokeWidth', sources: ['strokeWidth'], value: 2 },
+    ],
+    16,
+  );
+  const node = strokedFrame('thin', 1.5);
+  const dry = await bindSelection([node], false);
+  assert.equal(dry.reasons.fraction, 1);
+  assert.ok(dry.skips.some((s) => s.nodeId === 'thin' && s.reason === 'fraction' && s.field === 'strokeWeight'));
+  const res = await bindSelection([node]);
+  assert.equal(node._bound?.strokeWeight, undefined, '소수 두께에 변수가 붙었다');
+  assert.equal(node.strokeWeight, 1.5, '값을 바꾸지 않는다');
+  assert.equal(res.bound, 0);
+  assert.ok(findVar(figma, 'Global', 'stroke-width/1_5'), '이미 있는 변수는 지우지 않는다');
+});

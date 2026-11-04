@@ -104,6 +104,7 @@ export const STRINGS: Record<string, string> = {
   'component.placeFailed': ' · 제자리에 못 둔 {n}개: {names}',
   'component.placeFailedMore': ' 외',
   'component.propFailed': ' · 속성 값을 못 넣은 {n}개: {names}',
+  'component.fillKept': ' · 채움·크기가 달라 건너뛴 {n}개: {names}',
   'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
 
   // 마법사
@@ -173,6 +174,7 @@ export const STRINGS: Record<string, string> = {
   'reason.font': '폰트 미로드',
   'reason.translucent': '반투명',
   'reason.space-between': '사이 간격 자동',
+  'reason.fraction': '소수 선 두께',
 
   // 마법사 시퀀서 단계 결과
   'wizard.seq.stoppedPrev': '이전 단계 중단으로 건너뜀',
