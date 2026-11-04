@@ -78,9 +78,9 @@ const currentTier = (): Tier => effective().tier;
 const isPaid = (): boolean => currentTier() === 'paid';
 
 /** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용) */
-function requirePaid(feature: Feature, message: string): boolean {
+function requirePaid(feature: Feature): boolean {
   if (isPaid()) return true;
-  post({ type: 'PREMIUM_REQUIRED', feature, message });
+  post({ type: 'PREMIUM_REQUIRED', feature });
   return false;
 }
 
@@ -432,12 +432,12 @@ function pageOf(node: BaseNode): PageNode | null {
 
 /** Paid 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireComponents(): boolean {
-  return requirePaid('components', '컴포넌트 등록·베리언트 분류는 Paid 기능입니다.');
+  return requirePaid('components');
 }
 
 /** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireTextStyles(): boolean {
-  return requirePaid('textStyles', '텍스트 스타일 등록은 Paid 기능입니다.');
+  return requirePaid('textStyles');
 }
 
 /** 변수 → 내보내기 kind 분류(scope 우선, 이름 폴백 — STRING line-height 등 scope 비어있음 대비). */
@@ -916,7 +916,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'CREATE_TOKENS': {
         // 실제 변수 생성만 Paid(미리보기는 비파괴 읽기라 백엔드는 허용 — UI가 무료 티어에서 버튼을 잠근다).
-        if (!msg.preview && !requirePaid('tokens', '토큰(변수) 생성은 Paid 기능입니다. 미리보기는 무료로 제공됩니다.')) break;
+        if (!msg.preview && !requirePaid('tokens')) break;
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
@@ -952,7 +952,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           type: 'APPLY_RESULT',
           bound: r.bound,
           skipped: r.skipped,
-          flags: r.flags,
           reasons: r.reasons,
           preview: msg.preview,
           cancelled: r.cancelled,
@@ -1028,7 +1027,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 스타일이 생겼거나 값이 달라진 곳은 건너뛰고 사유로 돌려준다(IA v3 §4.6 "찾는 범위" · "연결 후").
         const r = await bindSelectedItems(msg.items);
         const bound = r.bound;
-        post({ type: 'APPLY_RESULT', bound, skipped: r.skipped, flags: [], reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
+        post({ type: 'APPLY_RESULT', bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
         if (bound) {
           commitUndo(figma); // UX2: 선택 바인딩 전체를 단일 Undo로
           selfSelect = true;
@@ -1088,7 +1087,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_SEMANTICS': {
-        if (!requirePaid('semantics', '시맨틱 매핑은 Paid 기능입니다.')) break;
+        if (!requirePaid('semantics')) break;
         const s = await createSemanticAliases(msg.map);
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
@@ -1098,7 +1097,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 스캔(미리보기)도 Paid — 등록이 Paid라 스캔만 열어두면 막다른 길(ROADMAP §5).
         // 마법사의 텍스트 스타일 단계도 Paid 전용이라 Free 마법사는 여기 오지 않는다.
-        if (!requirePaid('textStyles', '텍스트 스타일은 Paid 기능입니다.')) break;
+        if (!requirePaid('textStyles')) break;
         // 이름은 언제나 크기 순(display/h1…) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
         const { samples, warnings } = await scanTextStyles(selection());
         lastTextSamples = samples;
@@ -1108,7 +1107,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'NAME_TEXT_STYLES_BY_ROW': {
-        if (!requirePaid('textStyles', '텍스트 스타일은 Paid 기능입니다.')) break; // 스캔 후속 — 스캔과 같은 등급
+        if (!requirePaid('textStyles')) break; // 스캔 후속 — 스캔과 같은 등급
         // 방금 스캔한 표본을 그대로 다시 이름 짓는다(캔버스 재탐색 없음) — 사용자가 보고 있는 표와
         // 같은 입력이어야 결과가 예측 가능하다. 등록된 스타일은 그 사이 바뀔 수 있어 새로 읽는다.
         // 빈 후보를 돌려보내면 UI가 '텍스트를 못 찾음'으로 읽고 기본 램프로 표를 덮는다 — 오류로 알린다.
@@ -1132,7 +1131,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'APPLY_TEXT_STYLES': {
         // 적용만(생성 없음, 무료 — IA v3 §4.6): 선택 텍스트를 시그니처가 같은 기존 스타일에 연결.
         const r = await applyExistingTextStyles(selection());
-        post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, missing: r.missing });
+        post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons });
         commitUndo(figma);
         break;
       }
@@ -1863,7 +1862,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'GENERATE_DARK_MODE': {
         // 다크 Global을 새로 만드는 작업이라 토큰 생성과 같은 등급으로 잠근다.
-        if (!requirePaid('tokens', '다크 테마 생성은 Paid 기능입니다.')) break;
+        if (!requirePaid('tokens')) break;
         // toModeId 생략 시 themeApply가 Dark 모드를 ensure(없으면 addMode('Dark')).
         const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
         post({ type: 'DARK_MODE_RESULT', ...r });
@@ -1889,7 +1888,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'COMPONENTIZE_SIMILAR': {
-        if (!requirePaid('components', '닮은 프레임 컴포넌트화는 Paid 기능입니다. 스캔·미리보기는 무료입니다.')) break;
+        if (!requirePaid('components')) break;
         const master = await figma.getNodeByIdAsync(msg.masterId);
         if (!master || (master.type !== 'FRAME' && master.type !== 'GROUP')) {
           post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['마스터 프레임을 찾을 수 없습니다.'] });

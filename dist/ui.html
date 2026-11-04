@@ -4062,6 +4062,8 @@
     renderRenameTree();
   });
   var wizardRunning = false;
+  var PaidRequiredError = class extends Error {
+  };
   var wizardWaiter = null;
   window.addEventListener("message", (event) => {
     const m = event.data.pluginMessage;
@@ -4070,7 +4072,7 @@
     if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
       const w = wizardWaiter;
       wizardWaiter = null;
-      w.reject(new Error(m.message));
+      w.reject(m.type === "PREMIUM_REQUIRED" ? new PaidRequiredError() : new Error(m.message));
       return;
     }
     if (wizardWaiter.types.includes(m.type)) {
@@ -4253,8 +4255,11 @@
           }
         }
       } catch (e) {
-        const fe = explainError(e instanceof Error ? e.message : String(e));
-        failNote = `${fe.message}${fe.action ? ` \u2014 ${fe.action}` : ""}`;
+        if (e instanceof PaidRequiredError) failNote = t("status.paid");
+        else {
+          const fe = explainError(e instanceof Error ? e.message : String(e));
+          failNote = `${fe.message}${fe.action ? ` \u2014 ${fe.action}` : ""}`;
+        }
         setWizardStep(p.step.id, "fail", failNote);
         stopped = true;
       }

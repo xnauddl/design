@@ -59,7 +59,7 @@ const PREREQ = { type: 'PREREQ_STATE', hasColorVars: true, hasScaleVars: true, h
 const sel = (count, bound) => ({ type: 'SELECTION_STATE', count, scanned: count * 40, bindable: 12, capped: false, comps: 0, sets: 0, selfSelect: false, bound, renamed: 0, firstName: 'Card', ids: Array.from({ length: count }, (_, i) => `s${i}`) });
 const nodes = [{ id: 'n1', name: 'card', type: 'FRAME', depth: 0, parentId: null }];
 const c = (field, v = 'vA') => ({ nodeId: 'n1', field, currentValue: '8', variableId: v, variableName: 'spacing/8', tier: 1 });
-const preview = (reqId) => ({ type: 'APPLY_RESULT', preview: true, bound: 2, skipped: 0, flags: [], reasons: {}, candidates: [c('itemSpacing'), c('paddingLeft')], nodes, skips: [], reqId });
+const preview = (reqId) => ({ type: 'APPLY_RESULT', preview: true, bound: 2, skipped: 0, reasons: {}, candidates: [c('itemSpacing'), c('paddingLeft')], nodes, skips: [], reqId });
 
 /* 4·6 — 시작 직후 */
 {
@@ -131,7 +131,7 @@ const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return 
   check('1 0곳 + 건너뜀 → (건너뜀 m ▸)만', (await visible(p, '#bindSkipToggle')) && !(await visible(p, '#bindFound')) && !(await visible(p, '#bindAll')) && !(await visible(p, '#bindFilterBtn')));
   // 찾기 취소 → 찾기 전과 같음
   await p.click('#btnApply');
-  await recv(p, { type: 'APPLY_RESULT', preview: true, cancelled: true, bound: 0, skipped: 0, flags: [], reasons: {}, reqId: await lastReq(p, 'APPLY') });
+  await recv(p, { type: 'APPLY_RESULT', preview: true, cancelled: true, bound: 0, skipped: 0, reasons: {}, reqId: await lastReq(p, 'APPLY') });
   check('1 찾기 취소 → 찾기 전과 같음', JSON.stringify(await steps(p)) === JSON.stringify(['now', 'todo', 'todo']) && (await named(p, '#btnApply', '찾기')) && (await emptyText(p)) === '값이 변수와 같은 곳을 찾아 연결해요');
   // 5 + 2: 찾는 중 선택 변경 → 진행률 숨김, 이전 선택의 결과는 버린다
   await recv(p, sel(1, 0));
@@ -250,7 +250,7 @@ const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return 
   await p.click('#btnApplyConfirm');
   const applyId = await lastReq(p, 'APPLY_SELECTED');
   check('8 연결 요청은 켠 곳만', (await sent(p, 'APPLY_SELECTED')).at(-1).items.length === 3);
-  await recv(p, { type: 'APPLY_RESULT', bound: 3, skipped: 1, flags: [], reasons: { changed: 1 }, skips: [{ nodeId: 'n1', name: 'card', reason: 'changed' }], reqId: applyId });
+  await recv(p, { type: 'APPLY_RESULT', bound: 3, skipped: 1, reasons: { changed: 1 }, skips: [{ nodeId: 'n1', name: 'card', reason: 'changed' }], reqId: applyId });
   check('8 연결 후 결과 카드 "3곳 연결됨" + "변수 탭에서 보기 →"', (await visible(p, '#bindDone')) && (await p.textContent('#bindDoneText')) === '3곳 연결됨' && (await p.textContent('#btnBindToList')) === '변수 탭에서 보기 →');
   check('8 연결 후 카드·(찾음)·모두 켜기·필터 없음', (await p.$$('#bindTree .bv-card')).length === 0 && !(await visible(p, '#bindFound')) && !(await visible(p, '#bindAll')) && !(await visible(p, '#bindFilterBtn')) && (await emptyText(p)) === null);
   check('8 연결 후 다시 확인 건너뜀 (건너뜀 1 ▸) — 결과 카드 아래', (await p.textContent('#bindSkipToggle')) === '건너뜀 1 ▸' && (await p.$eval('#bindDone', (d) => d.getBoundingClientRect().bottom <= document.getElementById('bindSkipToggle').getBoundingClientRect().top)));
@@ -680,7 +680,7 @@ const reenter = (p) => p.evaluate(() => {
   await recv(p, { ...PREREQ, hasTextStyles: true });
   await p.click('#btnApplyExistingText');
   check('11 기존 스타일 연결은 무료(요청 보냄)', (await sent(p, 'APPLY_TEXT_STYLES')).length === 1);
-  await recv(p, { type: 'TEXT_STYLES_APPLIED', applied: 4, skipped: 1, skipReasons: { hasStyle: 1 }, missing: [] });
+  await recv(p, { type: 'TEXT_STYLES_APPLIED', applied: 4, skipped: 1, skipReasons: { hasStyle: 1 } });
   check('11 결과 한 줄 "✓ 텍스트 4개에 스타일 연결 · 건너뜀 1" + 사유 툴팁', (await p.textContent('#tsApplyResult')) === '✓ 텍스트 4개에 스타일 연결 · 건너뜀 1' && (await p.getAttribute('#tsApplyResult', 'title')) === '이미 스타일 있음 1');
   await p.close();
 }

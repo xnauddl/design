@@ -1172,6 +1172,9 @@ $('btnRenameKeep').addEventListener('click', () => {
    ============================================================ */
 let wizardRunning = false;
 // 한 번에 하나의 단계만 await(순차 실행)하므로 단일 대기자로 충분.
+/** 마법사 단계가 유료 잠금에 걸림 — 실패 줄은 공통 잠금 문구(status.paid)를 쓴다(§2.3). */
+class PaidRequiredError extends Error {}
+
 let wizardWaiter: { types: string[]; resolve: (m: CodeToUi) => void; reject: (e: Error) => void } | null = null;
 
 window.addEventListener('message', (event: MessageEvent) => {
@@ -1183,7 +1186,7 @@ window.addEventListener('message', (event: MessageEvent) => {
   if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
     const w = wizardWaiter;
     wizardWaiter = null;
-    w.reject(new Error(m.message));
+    w.reject(m.type === 'PREMIUM_REQUIRED' ? new PaidRequiredError() : new Error(m.message));
     return;
   }
   if (wizardWaiter.types.includes(m.type)) {
@@ -1405,8 +1408,11 @@ async function runWizard(): Promise<void> {
         }
       }
     } catch (e) {
-      const fe = explainError(e instanceof Error ? e.message : String(e));
-      failNote = `${fe.message}${fe.action ? ` — ${fe.action}` : ''}`;
+      if (e instanceof PaidRequiredError) failNote = t('status.paid');
+      else {
+        const fe = explainError(e instanceof Error ? e.message : String(e));
+        failNote = `${fe.message}${fe.action ? ` — ${fe.action}` : ''}`;
+      }
       setWizardStep(p.step.id, 'fail', failNote);
       stopped = true;
     }

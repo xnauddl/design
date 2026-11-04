@@ -794,8 +794,6 @@ export interface ApplyTextStylesResult {
   applied: number;
   skipped: number;
   skipReasons: Record<TextStyleSkipReason, number>;
-  /** 예전 상태줄 문구(미등록 종류·모호·폰트 로드 실패·대상 없음) — 뒤호환용. */
-  missing: string[];
 }
 
 /** 텍스트 스타일 비교 키 — 스타일이 정하는 모든 글자 속성(§2.11). 숫자는 소수 2자리. */
@@ -875,7 +873,7 @@ function insideInstance(node: SceneNode): boolean {
  */
 export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Promise<ApplyTextStylesResult> {
   const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
-  const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons, missing: [] };
+  const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons };
   const skipText = (k: TextStyleSkipReason): void => {
     skipReasons[k]++;
     res.skipped++;
@@ -903,7 +901,6 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
     loaded.add(k);
   };
 
-  const unregistered = new Set<string>(); // 같은 스타일이 없는 모양(요약 보고용)
   for (const t of texts) {
     if (hasTextStyle(t)) {
       skipText('hasStyle');
@@ -918,11 +915,9 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
       continue;
     }
     const fn = t.fontName as FontName;
-    const fontSize = t.fontSize as number;
     const hit = styleByKey.get(typoKey(t as unknown as TypoFields));
     if (hit === undefined) {
       skipText('noStyle');
-      unregistered.add(`${fn.family} ${fn.style} ${roundN(fontSize)}`);
       continue;
     }
     if (hit === null) {
@@ -934,11 +929,8 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
       await t.setTextStyleIdAsync(hit.id);
       res.applied++;
     } catch {
-      res.missing.push(`적용 실패 '${t.name}'(폰트 로드 불가)`);
+      /* 폰트를 못 불러옴 — 적용 수에 넣지 않는다(결과 줄은 적용 수 + 건너뜀 사유만 보인다) */
     }
   }
-  if (texts.length === 0 && inInstance.length === 0) res.missing.push('적용 대상 없음 — 선택에 텍스트 노드가 없습니다');
-  if (unregistered.size) res.missing.push(`미등록 ${unregistered.size}종 — 먼저 등록 필요: ${[...unregistered].join(', ')}`);
-  if (skipReasons.ambiguous) res.missing.push(`모호 ${skipReasons.ambiguous}개 — 같은 타이포의 스타일이 여러 개라 자동 적용 보류`);
   return res;
 }

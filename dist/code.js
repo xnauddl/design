@@ -1177,7 +1177,7 @@
   }
   async function applyExistingTextStyles(nodes) {
     const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
-    const res = { applied: 0, skipped: 0, skipReasons, missing: [] };
+    const res = { applied: 0, skipped: 0, skipReasons };
     const skipText = (k) => {
       skipReasons[k]++;
       res.skipped++;
@@ -1201,7 +1201,6 @@
       await figma.loadFontAsync(fn);
       loaded.add(k);
     };
-    const unregistered = /* @__PURE__ */ new Set();
     for (const t of texts) {
       if (hasTextStyle(t)) {
         skipText("hasStyle");
@@ -1216,11 +1215,9 @@
         continue;
       }
       const fn = t.fontName;
-      const fontSize = t.fontSize;
       const hit = styleByKey.get(typoKey(t));
       if (hit === void 0) {
         skipText("noStyle");
-        unregistered.add(`${fn.family} ${fn.style} ${roundN(fontSize)}`);
         continue;
       }
       if (hit === null) {
@@ -1232,12 +1229,8 @@
         await t.setTextStyleIdAsync(hit.id);
         res.applied++;
       } catch (e) {
-        res.missing.push(`\uC801\uC6A9 \uC2E4\uD328 '${t.name}'(\uD3F0\uD2B8 \uB85C\uB4DC \uBD88\uAC00)`);
       }
     }
-    if (texts.length === 0 && inInstance.length === 0) res.missing.push("\uC801\uC6A9 \uB300\uC0C1 \uC5C6\uC74C \u2014 \uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8 \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4");
-    if (unregistered.size) res.missing.push(`\uBBF8\uB4F1\uB85D ${unregistered.size}\uC885 \u2014 \uBA3C\uC800 \uB4F1\uB85D \uD544\uC694: ${[...unregistered].join(", ")}`);
-    if (skipReasons.ambiguous) res.missing.push(`\uBAA8\uD638 ${skipReasons.ambiguous}\uAC1C \u2014 \uAC19\uC740 \uD0C0\uC774\uD3EC\uC758 \uC2A4\uD0C0\uC77C\uC774 \uC5EC\uB7EC \uAC1C\uB77C \uC790\uB3D9 \uC801\uC6A9 \uBCF4\uB958`);
     return res;
   }
 
@@ -1645,20 +1638,17 @@
     var _a;
     const entries = await buildIndex();
     liveVarIds = await collectLiveVarIds(selection2, new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
-    const res = { bound: 0, skipped: 0, flags: [], reasons: {} };
-    const flagSet = /* @__PURE__ */ new Set();
+    const res = { bound: 0, skipped: 0, reasons: {} };
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     for (const node of selection2) {
       if (!isEffectivelyVisible2(node)) {
-        flagSet.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
         note(res, "hidden", node, preview);
         continue;
       }
-      await walk2(node, entries, res, flagSet, apply, hooks, prog, preview, 0, null);
+      await walk2(node, entries, res, apply, hooks, prog, preview, 0, null);
       if (res.cancelled) break;
     }
-    res.flags = [...flagSet];
     {
       res.candidateTotal = preview.candidates.length;
       res.candidates = preview.candidates.slice(0, RESULT_CAP);
@@ -1756,17 +1746,16 @@
     }
     return null;
   }
-  async function walk2(node, entries, res, flags, apply, hooks, prog, preview, depth, parentId) {
+  async function walk2(node, entries, res, apply, hooks, prog, preview, depth, parentId) {
     var _a;
     if (res.cancelled) return;
     if (node.visible === false) {
-      flags.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
       note(res, "hidden", node, preview);
       return;
     }
     preview == null ? void 0 : preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
     bindPaints(node, entries, res, apply, preview);
-    bindFrame(node, entries, res, flags, apply, preview);
+    bindFrame(node, entries, res, apply, preview);
     bindRadius(node, entries, res, apply, preview);
     bindStroke(node, entries, res, apply, preview);
     bindOpacity(node, entries, res, apply, preview);
@@ -1783,14 +1772,13 @@
     }
     if (node.type === "INSTANCE") {
       if (node.children.length) {
-        flags.add("\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uC624\uBC84\uB77C\uC774\uB4DC\uAC00 \uB418\uBBC0\uB85C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uCEF4\uD3EC\uB10C\uD2B8 \uC6D0\uBCF8\uC5D0\uC11C \uBC14\uC778\uB529\uD558\uC138\uC694.");
         note(res, "instance-children", node, preview);
       }
       return;
     }
     if ("children" in node)
       for (const c of node.children) {
-        await walk2(c, entries, res, flags, apply, hooks, prog, preview, depth + 1, node.id);
+        await walk2(c, entries, res, apply, hooks, prog, preview, depth + 1, node.id);
         if (res.cancelled) return;
       }
   }
@@ -1832,7 +1820,7 @@
       if (changed && apply) node[key] = next;
     }
   }
-  function bindFrame(node, entries, res, flags, apply, preview) {
+  function bindFrame(node, entries, res, apply, preview) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
     const parent = node.parent;
     const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
@@ -1840,7 +1828,6 @@
     if (inAutoLayout) {
       const bindAxis = (sizing, field, v) => {
         if (sizing !== "FIXED") {
-          flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
           note(res, "hug-fill", node, preview, field);
           return;
         }
@@ -1850,11 +1837,9 @@
       bindAxis(node.layoutSizingHorizontal, "width", node.width);
       bindAxis(node.layoutSizingVertical, "height", node.height);
     } else {
-      flags.add("\uC790\uC720 \uBC30\uCE58(\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uBC16) \uD504\uB808\uC784\uC740 \uD06C\uAE30 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
       note(res, "size-free-layout", node, preview);
     }
     if (node.layoutMode === "NONE") {
-      flags.add("\uC624\uD1A0\uB808\uC774\uC544\uC6C3\uC774 \uC544\uB2CC \uD504\uB808\uC784\uC740 padding/gap \uBC14\uC778\uB529 \uBD88\uAC00.");
       note(res, "no-autolayout", node, preview);
       return;
     }
@@ -2041,7 +2026,7 @@
   }
   async function bindSelectedItems(items) {
     var _a, _b, _c;
-    const res = { bound: 0, skipped: 0, flags: [], reasons: {} };
+    const res = { bound: 0, skipped: 0, reasons: {} };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
@@ -5244,9 +5229,9 @@
   }
   var currentTier = () => effective().tier;
   var isPaid = () => currentTier() === "paid";
-  function requirePaid(feature, message) {
+  function requirePaid(feature) {
     if (isPaid()) return true;
-    post({ type: "PREMIUM_REQUIRED", feature, message });
+    post({ type: "PREMIUM_REQUIRED", feature });
     return false;
   }
   function postLicense(note2) {
@@ -5561,10 +5546,10 @@
     return n && n.type === "PAGE" ? n : null;
   }
   function requireComponents() {
-    return requirePaid("components", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
+    return requirePaid("components");
   }
   function requireTextStyles() {
-    return requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
+    return requirePaid("textStyles");
   }
   function kindOf(v) {
     if (v.resolvedType === "COLOR") return "color";
@@ -5949,7 +5934,7 @@
           break;
         }
         case "CREATE_TOKENS": {
-          if (!msg.preview && !requirePaid("tokens", "\uD1A0\uD070(\uBCC0\uC218) \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4. \uBBF8\uB9AC\uBCF4\uAE30\uB294 \uBB34\uB8CC\uB85C \uC81C\uACF5\uB429\uB2C8\uB2E4.")) break;
+          if (!msg.preview && !requirePaid("tokens")) break;
           const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
           let summary = `Global ${s.globals}\uAC1C (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated})`;
@@ -5981,7 +5966,6 @@
             type: "APPLY_RESULT",
             bound: r.bound,
             skipped: r.skipped,
-            flags: r.flags,
             reasons: r.reasons,
             preview: msg.preview,
             cancelled: r.cancelled,
@@ -6053,7 +6037,7 @@
         case "APPLY_SELECTED": {
           const r = await bindSelectedItems(msg.items);
           const bound = r.bound;
-          post({ type: "APPLY_RESULT", bound, skipped: r.skipped, flags: [], reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
+          post({ type: "APPLY_RESULT", bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
           if (bound) {
             commitUndo(figma);
             selfSelect = true;
@@ -6097,7 +6081,7 @@
           break;
         }
         case "CREATE_SEMANTICS": {
-          if (!requirePaid("semantics", "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("semantics")) break;
           const s = await createSemanticAliases(msg.map);
           post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
           commitUndo(figma);
@@ -6105,7 +6089,7 @@
           break;
         }
         case "SCAN_TEXT_STYLES": {
-          if (!requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("textStyles")) break;
           const { samples, warnings } = await scanTextStyles(selection());
           lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
@@ -6114,7 +6098,7 @@
           break;
         }
         case "NAME_TEXT_STYLES_BY_ROW": {
-          if (!requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("textStyles")) break;
           if (!lastTextSamples.length) {
             post({ type: "ERROR", message: "\uBA3C\uC800 \uC2A4\uCE94\uD558\uC138\uC694 \u2014 \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE38 \uD45C\uBCF8\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.", op: "NAME_TEXT_STYLES_BY_ROW" });
             break;
@@ -6134,7 +6118,7 @@
         }
         case "APPLY_TEXT_STYLES": {
           const r = await applyExistingTextStyles(selection());
-          post({ type: "TEXT_STYLES_APPLIED", applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, missing: r.missing });
+          post({ type: "TEXT_STYLES_APPLIED", applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons });
           commitUndo(figma);
           break;
         }
@@ -6793,7 +6777,7 @@
           break;
         }
         case "GENERATE_DARK_MODE": {
-          if (!requirePaid("tokens", "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("tokens")) break;
           const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
           post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
           if (r.created || r.realiased || r.modeCreated) {
@@ -6817,7 +6801,7 @@
           break;
         }
         case "COMPONENTIZE_SIMILAR": {
-          if (!requirePaid("components", "\uB2EE\uC740 \uD504\uB808\uC784 \uCEF4\uD3EC\uB10C\uD2B8\uD654\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4. \uC2A4\uCE94\xB7\uBBF8\uB9AC\uBCF4\uAE30\uB294 \uBB34\uB8CC\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("components")) break;
           const master = await figma.getNodeByIdAsync(msg.masterId);
           if (!master || master.type !== "FRAME" && master.type !== "GROUP") {
             post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: ["\uB9C8\uC2A4\uD130 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."] });
