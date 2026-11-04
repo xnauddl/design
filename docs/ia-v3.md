@@ -1491,11 +1491,11 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
 
 **삭제**
 - [x] `vm.title`, `vm.fromBanner`, `vm.fromBind`, `vm.onlyUsed`, `vm.openTip`, `ui.sizeGrow`, `existingVars.*`, 일괄 교체 키(`bind.remap*`·`vm.remap`) — STRINGS·`ui.ts`·`ui.html`·`code.ts` 어디에도 없다(PR 1~3에서 지움).
-- [ ] 화면에 안 나오는 문구: `APPLY_RESULT.flags`(`bind.ts` 343·486·513·596·606·612, "…바인딩…" 안내 6종)는 UI가 읽지 않는다. `flags` 필드와 문구를 지운다(`messages.ts` 239, `code.ts` 954, `figma.test.mjs` 733의 단언, `verify-bind-flow.mjs`의 모의 응답).
+- [x] 화면에 안 나오는 문구: `APPLY_RESULT.flags`(`bind.ts` 343·486·513·596·606·612, "…바인딩…" 안내 6종)는 UI가 읽지 않는다. `flags` 필드와 문구를 지운다(`messages.ts` 239, `code.ts` 954, `figma.test.mjs` 733의 단언, `verify-bind-flow.mjs`의 모의 응답).
 
 **새 키** — 이전 목록은 모두 들어갔다
 - [x] 시작 화면(`start.*`) · 공통 상태 줄(`status.*`) · 상황 안내(`list.baseDiff*`·`list.selectHint` 등) · 최소화(`ui.minimize`·`ui.expand*`) · 잠금 사유(`status.paid`·`status.paidAction`·`lock.tipSuffix`·`status.noSelection`) · 레이어 › 연결 안내 4종(`bind.noLocalLib`·계층 미지정·`bind.noVarsPaid`·`bind.noVarsFree`)과 `bind.otherSel` · 텍스트 스타일 결과 줄(`bind.tsDone`·`tsSkip.*`) · 무료 마법사(`wizardCard.hintFree`·`wizardCard.runFree`) · 요약 끝 연결 안내(`wizard.toBind`) · 상세 "쓰인 곳"(`list.selectFirstNote`·`list.detailBig`). 칩·구역 키는 PR 3.6 사이드바로 바뀌어 필요 없다.
-- [ ] 아래 "코드에 직접 쓴 문구"를 옮길 키. 키 이름과 문구는 행마다 [`pr4-copy-table.md`](pr4-copy-table.md)에 있다(확정 2026-11-04). 같은 글자의 키가 이미 있으면 새로 만들지 않는다: `code.ts` 232 → `edit.deletedTarget`, `ui.html` aria-label → title과 같은 키(`ui.minimize` · `list.addTip` · `list.moreTip` · `list.refreshTip` · `list.searchTip`), 레이어 선택 결과(`ui.ts` 2163·2166·2167) → 변수 탭의 `list.selectCapped`·`list.selectPartial`·`list.selectNone`과 합쳐 `select.*`로(결정 ④). 레이어 선택 결과는 기존 키 3개(i18n.ts 404 `list.selectCapped` "레이어 200개만 선택했어요(전체 {n}개)" · 405 `list.selectNone` · 406 `list.selectPartial`)를 `select.capped` · `select.none` · `select.partial`로 이름을 바꿔 함께 쓴다. `select.capped`의 자리표시자는 `{n}` → `{found}` · `{requested}`이고 호출부는 `ui.ts` 2156~2158(변수 탭)과 2163~2167(연결 · 텍스트 스타일)이다. `list.searchClear`(393) · `list.noGroup`(381)도 이미 있는 키다(지금 `ui.html` · `varTable.ts`가 안 쓸 뿐). **같은 글자의 키는 문맥이 다르면 따로 둬도 된다**(`rename.count` · `component.count`). 유료 사유 8곳은 키를 만들지 않는다(결정 5-(c)). 라이선스 → `license.verifyFailed` · `license.err.*`(툴팁) · `license.err.server.*`(화면 줄) · `license.status.*`(결정 5-(b)). **자리표시자는 ASCII 이름만**(`t()`의 `/\{(\w+)\}/`), 붙었다 떨어지는 조각은 따로 키(`similar.failedWarn` · `create.sumBaseMore` · `license.srcKeyStatus`)로 두고, 조각을 받는 자리표시자는 이름 끝에 `Part`를 붙인다: `license.srcKey` "라이선스 키{statusPart}", `similar.failed` "컴포넌트화하지 못했어요{warnPart}", `create.sumBase`의 `{morePart}`, `create.tidySummary`의 `{mergedPart}` · `{gapPart}`(호출부 `ui.ts` 723~726), `dark.done`의 `{modePart}` · `{skipPart}`(2380~2382), `dark.fillFailed`의 `{modePart}`(2376~2377), `similar.scanned`의 `{openPart}` · `{skipPart}`(3332~3334), `license.current`의 `{expPart}`(2279~2280), 기존 키 `component.registered` · `component.variants`의 `{extra}` → `{extraPart}`(2324~2333). 값(숫자 · 이름 · 사유 문장)을 받는 자리는 `Part`를 붙이지 않는다.
+- [x] 아래 "코드에 직접 쓴 문구"를 옮길 키. 키 이름과 문구는 행마다 [`pr4-copy-table.md`](pr4-copy-table.md)에 있다(확정 2026-11-04). 같은 글자의 키가 이미 있으면 새로 만들지 않는다: `code.ts` 232 → `edit.deletedTarget`, `ui.html` aria-label → title과 같은 키(`ui.minimize` · `list.addTip` · `list.moreTip` · `list.refreshTip` · `list.searchTip`), 레이어 선택 결과(`ui.ts` 2163·2166·2167) → 변수 탭의 `list.selectCapped`·`list.selectPartial`·`list.selectNone`과 합쳐 `select.*`로(결정 ④). 레이어 선택 결과는 기존 키 3개(i18n.ts 404 `list.selectCapped` "레이어 200개만 선택했어요(전체 {n}개)" · 405 `list.selectNone` · 406 `list.selectPartial`)를 `select.capped` · `select.none` · `select.partial`로 이름을 바꿔 함께 쓴다. `select.capped`의 자리표시자는 `{n}` → `{found}` · `{requested}`이고 호출부는 `ui.ts` 2156~2158(변수 탭)과 2163~2167(연결 · 텍스트 스타일)이다. `list.searchClear`(393) · `list.noGroup`(381)도 이미 있는 키다(지금 `ui.html` · `varTable.ts`가 안 쓸 뿐). **같은 글자의 키는 문맥이 다르면 따로 둬도 된다**(`rename.count` · `component.count`). 유료 사유 8곳은 키를 만들지 않는다(결정 5-(c)). 라이선스 → `license.verifyFailed` · `license.err.*`(툴팁) · `license.err.server.*`(화면 줄) · `license.status.*`(결정 5-(b)). **자리표시자는 ASCII 이름만**(`t()`의 `/\{(\w+)\}/`), 붙었다 떨어지는 조각은 따로 키(`similar.failedWarn` · `create.sumBaseMore` · `license.srcKeyStatus`)로 두고, 조각을 받는 자리표시자는 이름 끝에 `Part`를 붙인다: `license.srcKey` "라이선스 키{statusPart}", `similar.failed` "컴포넌트화하지 못했어요{warnPart}", `create.sumBase`의 `{morePart}`, `create.tidySummary`의 `{mergedPart}` · `{gapPart}`(호출부 `ui.ts` 723~726), `dark.done`의 `{modePart}` · `{skipPart}`(2380~2382), `dark.fillFailed`의 `{modePart}`(2376~2377), `similar.scanned`의 `{openPart}` · `{skipPart}`(3332~3334), `license.current`의 `{expPart}`(2279~2280), 기존 키 `component.registered` · `component.variants`의 `{extra}` → `{extraPart}`(2324~2333). 값(숫자 · 이름 · 사유 문장)을 받는 자리는 `Part`를 붙이지 않는다.
 
 **코드에 직접 쓴 문구** — 금지 용어가 든 것(PR 4에서 고친다). 오른쪽 열은 **확정(2026-11-04)**.
 
@@ -1510,9 +1510,9 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
 | `code.ts` 434·439·918·1090·1100·1110·1838·1864 | `requirePaid(…, '… Paid 기능입니다.')` 8곳. UI는 `PREMIUM_REQUIRED`에 `status.paid`를 띄우고, 마법사 단계 실패 줄(`ui.ts` 1183~1187 → 1408)만 이 `message`를 그대로 보인다 | **삭제(화면 밖, 결정 5-(c))**: 마법사도 `PREMIUM_REQUIRED`면 `status.paid`를 쓰게 하고, `requirePaid`의 `message` 인자와 `PREMIUM_REQUIRED.message` 필드를 지운다(`feature`만 보냄). 문구 키는 만들지 않는다 |
 | `lib/variables.ts` 388 · 759 · 775 | "부분 서식(혼합) 텍스트는 스킵했습니다." · "… — 변수 바인딩 생략"(텍스트 스타일 스캔 경고·등록 알림으로 화면에 나옴) | "…건너뛰었어요" · "… — 변수 연결 안 함" |
 
-- [ ] 위 표 8행을 고친다(`ui.ts` 2280은 옮기기만).
-- [ ] **연결 중 [취소] — 숨긴다(2026-11-04 사용자 결정):** 지금은 [🔗 n곳 연결]을 누르면 진행 줄(`showApplyProgress('연결 중…')`, `ui.ts` 1124)에 [취소]가 보이지만 `APPLY_SELECTED`는 취소를 보지 않는다(`code.ts` 1025~1036, `bindSelectedItems`에 취소 훅 없음). 누르면 "취소 요청됨…"만 뜨고 연결은 끝까지 간다. → 연결 중에는 진행 줄만 두고 [취소]를 숨긴다. 찾기 중 [취소](`APPLY` `preview: true`, `ui.ts` 1108)는 그대로다(§4.6).
-- [ ] **나머지 직접 쓴 문구를 모두 i18n으로 옮긴다(2026-11-04 사용자 결정).** 줄마다 키 · 지금 문구 · 바꿀 문구는 [`pr4-copy-table.md`](pr4-copy-table.md)에 있다(확정 2026-11-04 — 해요체 통일 포함). 화면에 보이는 것 기준 묶음(줄 번호 `5c61c6f`):
+- [x] 위 표 8행을 고친다(`ui.ts` 2280은 옮기기만).
+- [x] **연결 중 [취소] — 숨긴다(2026-11-04 사용자 결정):** 지금은 [🔗 n곳 연결]을 누르면 진행 줄(`showApplyProgress('연결 중…')`, `ui.ts` 1124)에 [취소]가 보이지만 `APPLY_SELECTED`는 취소를 보지 않는다(`code.ts` 1025~1036, `bindSelectedItems`에 취소 훅 없음). 누르면 "취소 요청됨…"만 뜨고 연결은 끝까지 간다. → 연결 중에는 진행 줄만 두고 [취소]를 숨긴다. 찾기 중 [취소](`APPLY` `preview: true`, `ui.ts` 1108)는 그대로다(§4.6).
+- [x] **나머지 직접 쓴 문구를 모두 i18n으로 옮긴다(2026-11-04 사용자 결정).** 줄마다 키 · 지금 문구 · 바꿀 문구는 [`pr4-copy-table.md`](pr4-copy-table.md)에 있다(확정 2026-11-04 — 해요체 통일 포함). 화면에 보이는 것 기준 묶음(줄 번호 `5c61c6f`):
   - **`ui.ts` 79줄(리터럴 90개)**
     - 만들기 › 색·토큰: 378 · 382 · 391 · 406 · 591 · 723 · 726 · 738 · 753 · 2002
     - 만들기 › 테마(역할 매핑 · 다크): 1635 · 1807 · 1810 · 1813 · 1816 · 1854 · 1857 · 2375~2382
@@ -1551,7 +1551,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
 
     - 마법사 단계 실패 줄(`ui.ts` 1183~1187 → 1408)도 `PREMIUM_REQUIRED`면 `status.paid`를 쓴다. `requirePaid`의 `message`는 지운다(위 표).
   - 끝나면 `i18n.ts` 머리 주석이 참이다. 아래 "새 검사" 5번이 이를 CI에서 지킨다.
-- [ ] **문구 · 필드가 바뀌어 고칠 테스트**
+- [x] **문구 · 필드가 바뀌어 고칠 테스트**
   - `test/figma.test.mjs`: 3245 · 3301(`TEXT_STYLES_APPLIED.missing`의 "미등록 …" — 필드를 지우므로 단언도 지움) · 3632("바인딩 생략" 없음 단언 → "연결 안 함" 기준으로) · 3738("자간 변수 연결을 지켰습니다" → "지켰어요") · 733(`flags` 단언 지움) · 18 · 1425 · 4059(`scanBindings` 지움).
   - `scripts/verify-bind-flow.mjs` 353: 행 메뉴 목록의 "상세 보기…" → "상세"(`vm.detail`). `flags` 모의 응답도 지운다.
   - `flags` 제거 대상: `code.ts` 954 · 1030, `bind.ts` 38(타입) · 334 · 350 · 475 · 486 · 513 · 571 · 596 · 606 · 612 · 860, `messages.ts` 239.
@@ -1562,7 +1562,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
   - 옛 플러그인(지금 배포본)으로 같은 키를 검증해도 `error` 원문이 그대로 보이는지 본다(호환).
 
 **문서·자료** — v3와 어긋나는 곳
-- [ ] **README.md**
+- [x] **README.md**
   - 1~9행 소개: 흐름이 "추출 → 토큰 생성 → 적용(바인딩) → 리네임", "v2 재설계 진행 중"(REDESIGN 안내) → v3(변수 · 레이어 · 설정, `docs/ia-v3.md`) 기준으로.
   - "컬렉션 계층 지정"(31~34): "설정 › 컬렉션 계층" → 변수 탭 [⋯] › "컬렉션 계층 지정…" 팝업.
   - "변수 관리"(36~39): [변수] 버튼 · 760 넓은 창 · 트리 + 표 · "← 돌아가기" · "다른 변수로 교체" → 변수 탭(사이드바 112px + 오른쪽 목록, ★ Inspect, LIB, 상세 · 고치기…).
@@ -1574,30 +1574,31 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
   - "UX 개선"(217~222): "미리보기 → 적용", "스킵", 선택 상태 바("선택 n·요소 m·바인딩 후보 b" — 선택 표시줄은 PR 3에서 삭제).
   - 요금제 표(238~253): "변수 일괄 교체" 행 삭제, "텍스트 스타일 등록 · 적용" → 등록만 유료(기존 스타일 연결은 무료).
   - M3(292): "base·허용오차·맥락단계" → 허용오차 없음.
-- [ ] **REDESIGN.md**
+- [x] **REDESIGN.md**
   - 1~3행 상태 "v2 구현 완료" → 맨 위에 "v3로 대체(`docs/ia-v3.md`), 이 문서는 v2 기록" 한 줄.
   - "탭 / IA"(35): "560 고정" → 400×510 고정 + 최소화 140×104(틀린 숫자).
   - #4 마법사 별도 탭(196~200) · #5 4탭(202~211, 「기본값」의 허용오차) · #14 400×660 · 660↔860(213~220) · #19 허용오차 0.5 수정 가능(280~286) · #6 "거리 0.3" 후보(295~302) → 각 절 머리에 "v3에서 바뀜: …" 한 줄(시작 탭 없음 · 마법사 연결 단계 없음 · 400×510 · 허용오차 삭제 · 같은 값만 · 변수 단위 켜기).
   - #8b 변수 편집기 제거(325~341) → PR 3.5에서 상세 팝업 고치기로 일부 번복(이름 · 모드별 값 · 별칭, 삭제는 하지 않음).
-- [ ] **ROADMAP.md**
+- [x] **ROADMAP.md**
   - §1(15·20): "자동 바인딩 — 가장 가까운 변수에 연결(허용오차)" → 같은 값에만 연결. 마법사 "추출→생성→바인딩→정돈" → 연결 단계 없음.
   - §3(29·33): "탭 3개 재편 — 만들기 / 적용 / 관리", "시작 탭 진행 안내" → v3로 대체 표시.
   - §8.4(116~118): 시작 탭 · 4탭 · "크기 확대 + 리사이즈" → v3로 대체 표시.
   - §8.5: 126 "Free 마법사 = 추출 → 바인딩 → 리네임" → 이름 정리만. 130~131 400×660 · 660↔860("교체 예정") → 교체됨(400×510 + 최소화). 132 · 142 · 147 허용오차 → 삭제됨. 143 변수 편집기 제거 → PR 3.5에서 일부 번복.
   - §9: 157 Remap "IA v3에서 삭제 예정" → 삭제됨(PR 2). 158 "설정 › 컬렉션 계층" → 변수 [⋯] 팝업. 160 "바인딩·교체 후보" → 연결 후보. 161 변수 관리 넓은 화면(760 · 교체 · "변수 관리에서 보기 ↗") → v3 변수 탭으로 대체. 162 "변수 수정 PR" `[ ]` → `[x]` PR 3.5(이름 · 값 · 별칭, 단일 ⌘Z; "저장 전 영향 범위 표시"는 하지 않기로 함 — §4.4 고치기).
   - §10: 167 "최소화(400×48, "DSL" 글자 마크)" → 140×104 + 펼치기 버튼(↙↗), "계층 탭([모두]·컬렉션별)" → 사이드바(결정 B). 168 "선택 표시줄(설정만 숨김)" → PR 3에서 삭제. 169 "계층 탭 · 쓰는 행만 펼치는 그룹 목록", "안 붙은 값 찾기 →" → 사이드바 + "변수 없는 값 찾기 →". PR 3.6 · PR 3.5 줄이 없다 → 추가. 171 PR 4의 "새 QA 지시서(v3 기준)" → 별도 PR(아래).
-- [ ] **와이어 문서**: `docs/wireframe-plugin-ia.html`(rev 2026-08-06l)은 v2 4탭 · 허용오차 "0.5px 고정" · 첫 실행 배너 · 적용 탭 단계 레일 그대로다. `docs/CLAUDE-IMPLEMENT-FROM-WIREFRAME.md`도 v2 구현 프롬프트다. 둘 다 맨 위에 "v2 기록 — 현재 명세는 `docs/ia-v3.md`" 안내를 단다. 지우지 않는다(2026-11-04 사용자 결정).
-- [ ] **`store/figma-listing.md`**
+- [x] **와이어 문서**: `docs/wireframe-plugin-ia.html`(rev 2026-08-06l)은 v2 4탭 · 허용오차 "0.5px 고정" · 첫 실행 배너 · 적용 탭 단계 레일 그대로다. `docs/CLAUDE-IMPLEMENT-FROM-WIREFRAME.md`도 v2 구현 프롬프트다. 둘 다 맨 위에 "v2 기록 — 현재 명세는 `docs/ia-v3.md`" 안내를 단다. 지우지 않는다(2026-11-04 사용자 결정).
+- [x] **`store/figma-listing.md`**
   - 9·73행 캐러셀 "만들기 / 적용 / 관리" → "변수 / 레이어 / 최소화"로 다시 찍는다(에셋 Figma 파일의 `carousel-1~3` 포함).
   - 18~19 태그라인 "추출·바인딩·정리·내보내기" / "extract, bind, …" → "연결"/"link".
   - 26 · 42 설명 "바인딩", "모든 동작은 미리보기 → 적용 2단계" → 연결, 찾기 → 켠 변수 연결.
   - 32 · 48 "자동 바인딩 — 가장 가까운 변수에 연결(허용오차) … 사유별 스킵" / "nearest variable (tolerance)" → 같은 값에만 연결 · 이미 붙은 것은 건너뜀(§2.11).
   - 34 · 50 "(Paid)" → "(유료)".
   - 빠진 v3 기능: 변수 목록(★ Inspect · 사이드바 · LIB), 상세에서 변수 고치기(PR 3.5), 기존 텍스트 스타일 연결(무료), 최소화.
+  - [ ] 에셋 Figma 파일의 `carousel-1~3`을 v3 화면(변수 · 레이어 · 최소화)으로 다시 찍어 내보내기 — 피그마에서 하는 일(문구는 PR 4에서 고침)
 - QA 지시서(v3 기준)는 PR 4에서 뺀다. 사용자가 QA를 더 진행한 뒤 별도 PR로 쓴다. 그때까지 QA 항목은 `docs/qa/backlog.md`에 모은다(A.3c의 실기 확인 2건 — 피그마가 거절하는 이름 글자, 대소문자만 다른 이름 — 도 거기서 다룬다).
 
 **새 검사**
-- [ ] **금지 용어 검사** — 새 파일 `test/terms.test.mjs`(`npm test`라서 CI에서 돈다). 금지 정규식 `/바인딩|스킵|\bPaid\b|\bFree\b|적용 탭|붙이기/`.
+- [x] **금지 용어 검사** — 새 파일 `test/terms.test.mjs`(`npm test`라서 CI에서 돈다). 금지 정규식 `/바인딩|스킵|\bPaid\b|\bFree\b|적용 탭|붙이기/`.
   1. `dist/pure.mjs`의 `STRINGS` 모든 값에 없다.
   2. `STRINGS`의 `bind.*` · `apply.*` · `list.findUnboundTip` 값에 "미리보기"가 없다(연결은 "찾기").
   3. `src/ui.html`에서 `<!-- -->` 주석, `<style>` 블록, `#devTierRow`(개발용, 숨김)를 뺀 글자 · `title` · `placeholder` · `aria-label` · `data-tip`에 없다.
@@ -1605,7 +1606,14 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
   5. **한글 문구는 i18n에만(2026-11-04 결정 1을 지키는 검사):** 4번과 같은 파일의 문자열 리터럴에 한글(`[가-힣]`)이 없다. `src/ui.html`에서는 3번과 같은 범위 중 `data-i18n` · `data-i18n-html` 요소 안의 글자와 `data-i18n-title` · `data-i18n-placeholder` · `data-i18n-aria-label` · `data-i18n-tip`이 붙은 속성값(폴백)만 한글을 허용한다. 범위는 4번과 같은 `src/**/*.ts`(`i18n.ts` 제외)다.
   - 실패 메시지에 파일:줄과 문구를 낸다.
 - [x] 설정 탭에 계층·내보내기가 없다 — `verify:bind` "9 설정 탭에 계층·내보내기 없음"(PR 2)
-- [ ] `verify:bind` "1 찾기 취소 → 찾기 전과 같음"에 상태 줄 문구(`apply.cancelled` "찾기를 취소했어요", 확정 2026-11-04) 단언을 더한다. 연결(`APPLY_SELECTED`) 중에는 [취소]가 보이지 않는다(2026-11-04 결정 2).
+- [x] `verify:bind` "1 찾기 취소 → 찾기 전과 같음"에 상태 줄 문구(`apply.cancelled` "찾기를 취소했어요", 확정 2026-11-04) 단언을 더한다. 연결(`APPLY_SELECTED`) 중에는 [취소]가 보이지 않는다(2026-11-04 결정 2).
+
+**구현 메모 (2026-11-04, PR 4 구현)** — 표(`pr4-copy-table.md`)와 다르게 한 곳
+- 9-19 `component.fail.placeInstance` · 9-20 `component.fail.instance`: QA #3(부록 A.5)가 그 진단 줄을 "자리 채우기" 진단으로 바꿔서 코드에 없다. 대신 같은 규칙(해요체 · 내부 말 그대로 · `{…Part}`)으로 `component.fail.copyPlaced` · `nothingPlaced` · `cause`(조각 `{causePart}`) · `instanceMake` · `instancePlace` · `iconSwapPlace`, 묶기 경고 `similar.placeFail`을 두었다. UI는 묶기 경고를 같은 키로 알아본다(`isPlaceFailWarning` — 문구 앞머리 비교를 대신함).
+- `placement.ts`의 `tryPlace`가 던지던 한글 오류 2개는 바로 아래 `catch`가 삼켜 화면에 안 나온다 → 키를 만들지 않고 ASCII 사유로 바꿨다.
+- 라이선스 `noteTip` 툴팁 비우기는 `#licenseStatus`에만 건다(`setStatus` · `showError`) — 다른 상태 줄의 `title`은 건드리지 않는다.
+- `dist/code.js`는 약 70KB 늘었다(265KB → 335KB). esbuild가 한글을 `\uXXXX`로 내보내 `i18n.ts`(약 52KB)보다 커진다. 피그마 플러그인 크기 한도에는 여유가 있다.
+- `verify:bind` "10 [라이선스 →] → 키 입력칸 포커스"가 늘 실패하던 원인: `goToLicense`가 포커스를 `requestAnimationFrame` 안에서 줘서, 누른 직후에는 포커스가 body였다(누른 버튼이 상태 줄과 함께 사라짐). 포커스는 바로 주고(`preventScroll`), 스크롤만 rAF로 미룬다(`showTab`의 스크롤 복원 뒤).
 
 ## A.5 QA #3 수정 (2026-11-04)
 
