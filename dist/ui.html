@@ -1398,6 +1398,7 @@
     "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
     "component.placeFailedMore": " \uC678",
+    "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
     "wizard.needSelect": "\uBA3C\uC800 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C \uD1A0\uD070\uC744 \uCD94\uCD9C\uD569\uB2C8\uB2E4.",
     "wizard.result": "{state} \u2014 {summary}",
@@ -4686,7 +4687,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -4964,8 +4965,9 @@
       case "COMPONENTS_RESULT": {
         clearCompPreview();
         const misplaced = (_m = msg.placeFailed) != null ? _m : [];
-        const extra = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.exposed ? ` \xB7 \uC18D\uC131 ${msg.exposed}` : ""}${msg.icons ? ` \xB7 \uC544\uC774\uCF58 ${msg.icons}` : ""}${placeFailedText(misplaced)}`;
-        setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extra }), (msg.registered || msg.sets) && !misplaced.length ? "ok" : "warn");
+        const cloned = (_n = msg.placeCloned) != null ? _n : [];
+        const extra = `${msg.skipped ? ` \xB7 \uAC74\uB108\uB700 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.exposed ? ` \xB7 \uC18D\uC131 ${msg.exposed}` : ""}${msg.icons ? ` \xB7 \uC544\uC774\uCF58 ${msg.icons}` : ""}${placeTailText("component.placeCloned", cloned)}${placeFailedText(misplaced)}`;
+        setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extra }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
         break;
       }
@@ -5027,13 +5029,15 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          setStatus("structureStatus", `\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4${msg.warnings.length ? ` \u2014 ${msg.warnings[0]}` : ""}`, "warn");
+          const misplaced0 = (_o = msg.placeFailed) != null ? _o : [];
+          const first = msg.warnings.find((w) => !misplaced0.some((n) => w.startsWith(`${n}: \uC81C\uC790\uB9AC`)));
+          setStatus("structureStatus", `\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694${first ? ` \u2014 ${first}` : ""}${placeFailedText(misplaced0)}`, "warn");
           break;
         }
         const parts = [`\uB9C8\uC2A4\uD130 ${msg.master}`, `\uC778\uC2A4\uD134\uC2A4 ${msg.instances}\uAC1C`];
         if (msg.properties) parts.push(`\uC18D\uC131 ${msg.properties}\uAC1C`);
         if (msg.images) parts.push(`\uC774\uBBF8\uC9C0 ${msg.images}\uAC1C`);
-        const misplaced = (_n = msg.placeFailed) != null ? _n : [];
+        const misplaced = (_p = msg.placeFailed) != null ? _p : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !misplaced.some((n) => w.startsWith(`${n}: \uC81C\uC790\uB9AC`)));
         const warn = others > 0 && firstOther ? ` \xB7 \uB0A8\uACA8\uB454 \uAC83 ${others}\uAC74: ${firstOther}` : "";
@@ -5709,10 +5713,13 @@
       box.appendChild(btn);
     }
   }
-  function placeFailedText(names) {
+  function placeTailText(key, names) {
     if (!names.length) return "";
     const shown = names.slice(0, 3).join(", ") + (names.length > 3 ? t("component.placeFailedMore") : "");
-    return t("component.placeFailed", { n: names.length, names: shown });
+    return t(key, { n: names.length, names: shown });
+  }
+  function placeFailedText(names) {
+    return placeTailText("component.placeFailed", names);
   }
   function reasonsText(reasons) {
     return Object.entries(reasons).filter(([, n]) => n > 0).map(([k, n]) => `${t("reason." + k)} ${n}`).join(" \xB7 ");
@@ -6142,9 +6149,15 @@
       if (cancelled) {
         if (isMini) renderMiniMark();
       } else opFinished(!failed, def);
-      if (def.write && !failed) readScreen("work");
+      if (def.write && (!failed || changedFile(m))) readScreen("work");
       return;
     }
+  }
+  function changedFile(m) {
+    if (m.type === "COMPONENTS_RESULT") return m.registered > 0 || m.sets > 0;
+    if (m.type === "COMPONENTIZE_RESULT") return true;
+    if (m.type === "VARIANTS_RESULT") return m.sets > 0;
+    return false;
   }
   function opFinished(ok, def) {
     if (!isMini) return;

@@ -17,7 +17,7 @@ import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { createIconRegistry, swapVectorSlots, transplantImageFills, nodeAtPath } from './lib/artwork';
-import { captureOrigin as captureOriginAt, placeAtOrigin, releaseOrigin, type Origin } from './lib/placement';
+import { captureOrigin as captureOriginAt, fillOrigin, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
@@ -1437,7 +1437,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 옮겨지는 순간 빈 그룹을 피그마가 지우면 인스턴스를 둘 곳이 없어진다(QA #3 불합격 3).
         // 만든 기록은 모두 모아 두고 끝에서 표지를 정리한다(실패 경로에서 표지가 남지 않게).
         const origins: Origin[] = [];
-        const placeFailed: string[] = []; // 제자리에 못 둔 원본 이름(결과 줄 · §4.7 5번)
+        const placeFailed: string[] = []; // 복사본도 못 둬 비운 자리의 원본 이름(결과 줄 · §4.7 5번)
+        const placeCloned: string[] = []; // 인스턴스를 못 넣어 복사본으로 채운 자리의 원본 이름(§4.7 5번)
         const captureOrigin = (n: SceneNode): Origin => {
           const o = captureOriginAt(n);
           origins.push(o);
@@ -1449,19 +1450,27 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           n.y = 0;
           cursorX += n.width + 48;
         };
-        // 한 그룹의 인스턴스를 원위치 복원(부모별 인덱스 오름차순 + 클램프). 깊은 그룹부터 즉시 복원해야
+        // 한 그룹의 원본 자리를 채운다(부모별 인덱스 오름차순 + 클램프). 깊은 그룹부터 즉시 채워야
         // 바깥 그룹 컴포넌트화 시 내부 인스턴스가 이미 자리잡고 있다.
-        const restore = (places: { inst: InstanceNode; o: Origin }[]): void => {
+        // 자리마다 인스턴스 → 복사본 → 빈 자리(§4.7 5번). 인스턴스 만들기 실패와 넣기 실패를 같은 길로 센다.
+        // 자리 결과는 건너뜀(skipped)에 넣지 않는다 — 원본은 이미 컴포넌트로 등록됐다(§4.7 6번).
+        type Place = { o: Origin; make: () => InstanceNode; label: string };
+        const restore = (places: Place[]): void => {
           places.sort((a, b) => {
             const pa = a.o.parent?.id ?? ''; const pb = b.o.parent?.id ?? '';
             return pa === pb ? a.o.index - b.o.index : pa < pb ? -1 : 1;
           });
-          for (const { inst, o } of places) {
-            // 못 넣으면 인스턴스를 지운다 — createInstance()가 놓은 페이지 맨 위(0,0)에 남기지 않는다.
-            if (!placeAtOrigin(inst, o)) {
-              skipped++;
+          for (const { o, make, label } of places) {
+            const why: string[] = [];
+            const r = fillOrigin(make, o, (w) => why.push(w));
+            if (r === 'instance') continue;
+            const cause = why.length ? ` — ${why.join(' · ')}` : '';
+            if (r === 'copy') {
+              placeCloned.push(o.name);
+              failures.push(`인스턴스 대신 복사본을 뒀어요(${label} → ${o.name})${cause}`);
+            } else {
               placeFailed.push(o.name);
-              failures.push(`인스턴스 배치 실패(${o.name}) — 제자리에 둘 수 없어 두지 않았습니다`);
+              failures.push(`제자리에 아무것도 두지 못했어요(${label} → ${o.name})${cause}`);
             }
           }
         };
@@ -1471,11 +1480,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           placeOnPage(comp);
           singles.push(comp.name);
           containers.push({ container: comp, scopes: [comp] });
-          try { restore([{ inst: comp.createInstance(), o }]); } catch (e) {
-            releaseOrigin(o);
-            placeFailed.push(o.name);
-            failures.push(`인스턴스 실패(${comp.name}): ${errText(e)}`);
-          }
+          restore([{ o, make: () => comp.createInstance(), label: comp.name }]);
         };
 
         // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
@@ -1642,26 +1647,33 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 }
                 exposedEarly += collapsedExposed;
                 const ids = propIdsByName(master);
-                const places: { inst: InstanceNode; o: Origin }[] = [];
+                const places: Place[] = [];
                 for (const snap of snapshots) {
-                  try {
-                    const inst = master.createInstance();
-                    // 벡터 슬롯의 값은 그림 지문이다 — 방금 만든 아이콘 컴포넌트 key로 옮겨 적는다.
-                    const vals = { ...snap.vals };
-                    for (const p of vectorPlans) {
-                      const icon = iconRegistry.get(String(vals[p.propName] ?? ''));
-                      if (icon) vals[p.propName] = icon.key || icon.id;
-                      else delete vals[p.propName]; // 못 만든 그림은 마스터 것 그대로(빈 값으로 덮지 않는다)
-                    }
-                    applyInstancePropValues(inst, ids, vals);
-                    // 사진은 속성이 아니라 fill 오버라이드 — 멤버 원본을 같은 경로에 이식한다.
-                    failures.push(...transplantImageFills(inst, snap.images).failures);
-                    places.push({ inst, o: snap.o });
-                  } catch (e) {
-                    releaseOrigin(snap.o);
-                    placeFailed.push(snap.o.name);
-                    failures.push(`인스턴스 실패(${master.name}): ${errText(e)}`);
+                  // 벡터 슬롯의 값은 그림 지문이다 — 방금 만든 아이콘 컴포넌트 key로 옮겨 적는다.
+                  const vals = { ...snap.vals };
+                  for (const p of vectorPlans) {
+                    const icon = iconRegistry.get(String(vals[p.propName] ?? ''));
+                    if (icon) vals[p.propName] = icon.key || icon.id;
+                    else delete vals[p.propName]; // 못 만든 그림은 마스터 것 그대로(빈 값으로 덮지 않는다)
                   }
+                  let imageNoted = false; // 사진 이식 실패는 자리마다 한 번만(복사본을 다시 만들 때 겹치지 않게)
+                  // 인스턴스를 만들고 속성 값·사진까지 넣는다. 도중에 실패하면 만든 인스턴스를 지우고 던진다
+                  // (어디에도 남기지 않는다 — §4.7 6번). 복사본도 같은 함수로 만든다.
+                  const make = (): InstanceNode => {
+                    let inst: InstanceNode | null = null;
+                    try {
+                      inst = master.createInstance();
+                      applyInstancePropValues(inst, ids, vals);
+                      // 사진은 속성이 아니라 fill 오버라이드 — 멤버 원본을 같은 경로에 이식한다.
+                      const img = transplantImageFills(inst, snap.images).failures;
+                      if (!imageNoted) { failures.push(...img); imageNoted = true; }
+                      return inst;
+                    } catch (e) {
+                      if (inst) { try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ } }
+                      throw e;
+                    }
+                  };
+                  places.push({ o: snap.o, make, label: master.name });
                 }
                 restore(places);
                 // 루프 끝 일괄 expose는 중복 방지 — 이미 노출했으므로 containers에 넣지 않음.
@@ -1711,15 +1723,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             cursorX += set.width + 48;
             sets++;
             containers.push({ container: set, scopes: made.map((x) => x.comp) });
-            const places: { inst: InstanceNode; o: Origin }[] = [];
-            for (const x of made) {
-              try { places.push({ inst: x.comp.createInstance(), o: x.o }); } catch (e) {
-                releaseOrigin(x.o);
-                placeFailed.push(x.o.name);
-                failures.push(`인스턴스 실패(${x.variant}): ${errText(e)}`);
-              }
-            }
-            restore(places); // 이 그룹 인스턴스 즉시 복원(중첩 보존)
+            restore(made.map((x) => ({ o: x.o, make: () => x.comp.createInstance(), label: x.variant || set.name })));
+            // ↑ 이 그룹 자리를 즉시 채운다(중첩 보존)
           }
         } finally {
           // 어느 경로에서든 남은 표지를 치운다(원본이 제자리에 남은 경우·예상 밖 중단). 이미 치운 것은 지나간다.
@@ -1732,7 +1737,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(`속성 노출 실패: ${errText(e)}`); }
         }
 
-        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed });
+        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned });
         if (registered || sets) commitUndo(figma); // UX2
         break;
       }

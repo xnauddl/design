@@ -2322,9 +2322,11 @@ window.onmessage = (event: MessageEvent) => {
     case 'COMPONENTS_RESULT': {
       clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
       const misplaced = msg.placeFailed ?? [];
-      const extra = `${msg.skipped ? ` · 스킵 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.exposed ? ` · 속성 ${msg.exposed}` : ''}${msg.icons ? ` · 아이콘 ${msg.icons}` : ''}${placeFailedText(misplaced)}`;
-      // 제자리에 못 둔 원본이 있으면 성공이어도 경고 — 그 자리가 비었다(§4.7 "인스턴스 자리" 5번).
-      setStatus('structureStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), (msg.registered || msg.sets) && !misplaced.length ? 'ok' : 'warn');
+      const cloned = msg.placeCloned ?? [];
+      // 건너뜀 = 컴포넌트로 만들지 못한 대상 수(§4.7 6번 · 용어 §2.9). 자리 결과는 꼬리 두 개로 따로 센다.
+      const extra = `${msg.skipped ? ` · 건너뜀 ${msg.skipped}` : ''}${msg.singles.length ? ` · 단일 ${msg.singles.length}` : ''}${msg.exposed ? ` · 속성 ${msg.exposed}` : ''}${msg.icons ? ` · 아이콘 ${msg.icons}` : ''}${placeTailText('component.placeCloned', cloned)}${placeFailedText(misplaced)}`;
+      // 복사본으로 채웠거나 비운 자리가 있으면 성공이어도 경고(§4.7 "인스턴스 자리" 5번).
+      setStatus('structureStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extra }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length ? 'ok' : 'warn');
       // 빈 조합(미생성) + 실패(진단) 리포트
       renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       break;
@@ -2389,8 +2391,10 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'COMPONENTIZE_RESULT': {
       if (!msg.instances) {
-        // 교체가 하나도 없으면 실패다 — 경고를 그대로 보여줘야 원인을 안다.
-        setStatus('structureStatus', `컴포넌트화하지 못했습니다${msg.warnings.length ? ` — ${msg.warnings[0]}` : ''}`, 'warn');
+        // 교체가 하나도 없으면 실패다 — 경고를 그대로 보여줘야 원인을 안다. 제자리에 못 둔 것도 같은 꼬리로(§4.7 5번).
+        const misplaced0 = msg.placeFailed ?? [];
+        const first = msg.warnings.find((w) => !misplaced0.some((n) => w.startsWith(`${n}: 제자리`)));
+        setStatus('structureStatus', `컴포넌트화하지 못했어요${first ? ` — ${first}` : ''}${placeFailedText(misplaced0)}`, 'warn');
         break;
       }
       const parts = [`마스터 ${msg.master}`, `인스턴스 ${msg.instances}개`];
@@ -3266,11 +3270,15 @@ function renderSkipReasons(reasons: Record<string, number>): void {
   }
 }
 
-/** 결과 줄 꼬리 " · 제자리에 못 둔 {n}개: {이름들}" — 이름은 3개까지 + " 외"(§4.7 "인스턴스 자리" 5번). 없으면 빈 문자열. */
-function placeFailedText(names: readonly string[]): string {
+/** 결과 줄 꼬리 — 이름은 3개까지 + " 외"(§4.7 "인스턴스 자리" 5번). 없으면 빈 문자열. */
+function placeTailText(key: 'component.placeFailed' | 'component.placeCloned', names: readonly string[]): string {
   if (!names.length) return '';
   const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? t('component.placeFailedMore') : '');
-  return t('component.placeFailed', { n: names.length, names: shown });
+  return t(key, { n: names.length, names: shown });
+}
+/** " · 제자리에 못 둔 {n}개: {이름들}" */
+function placeFailedText(names: readonly string[]): string {
+  return placeTailText('component.placeFailed', names);
 }
 
 function reasonsText(reasons: Record<string, number>): string {
@@ -3755,9 +3763,17 @@ function opReceived(m: CodeToUi): void {
     if (cancelled) { if (isMini) renderMiniMark(); }
     else opFinished(!failed, def);
     // 작업 직후 다시 읽기(§4.1) — 파일을 바꾼 작업만. 준비 상태 + 변수 표 + 지금 화면의 표.
-    if (def.write && !failed) readScreen('work');
+    // 실패(⚠)로 끝나도 파일을 바꿨으면 읽는다(컴포넌트 등록·묶기·분류 — §4.1 표).
+    if (def.write && (!failed || changedFile(m))) readScreen('work');
     return;
   }
+}
+/** 실패로 끝난 결과라도 파일을 바꿨나(§4.1 "플러그인 작업이 끝난 직후"). 그 밖의 실패는 바꾸지 않았다고 본다. */
+function changedFile(m: CodeToUi): boolean {
+  if (m.type === 'COMPONENTS_RESULT') return m.registered > 0 || m.sets > 0;
+  if (m.type === 'COMPONENTIZE_RESULT') return true; // 마스터는 이미 컴포넌트가 됐다
+  if (m.type === 'VARIANTS_RESULT') return m.sets > 0;
+  return false;
 }
 function opFinished(ok: boolean, def: OpDef): void {
   if (!isMini) return;

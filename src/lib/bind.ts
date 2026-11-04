@@ -8,7 +8,7 @@ import { rgbToHex } from './tokens';
 import { collectionTiers } from './collectionRoles'; // 계층은 컬렉션 이름이 아니라 지정된 역할로
 import { FIELD_SCOPE, FILL_SCOPES, STROKE_SCOPES, EFFECT_SCOPES } from './scopes'; // 용도 규칙
 import type { BindCandidate, BindNode, BindSkip } from '../shared/messages';
-import { spaceBetweenGap } from './extract'; // 사이 간격 자동 판정 — 만들기와 같은 기준
+import { gapSkip } from './extract'; // 쓰지 않는 간격 판정(사이 간격 자동 · 줄바꿈 아님) — 만들기와 같은 기준
 
 interface VarEntry {
   variable: Variable;
@@ -621,11 +621,14 @@ function bindFrame(
   } else {
     // 사이 간격 자동(Space between)이면 간격 값은 피그마가 쓰지 않는다 — 붙이면 정렬이 MIN으로 바뀌어
     // 레이어 모양이 바뀐다(§2.11 "사이 간격 자동", QA #3 불합격 1). 사유만 남기고 건너뛴다.
-    if (spaceBetweenGap(node, 'itemSpacing')) note(res, 'space-between', node, preview, 'itemSpacing');
-    else tryBind(node, 'itemSpacing', node.itemSpacing, entries, res, apply, preview);
-    if (typeof node.counterAxisSpacing === 'number') {
-      if (spaceBetweenGap(node, 'counterAxisSpacing')) note(res, 'space-between', node, preview, 'counterAxisSpacing');
-      else tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, res, apply, preview);
+    // 줄바꿈이 아니면 줄 사이 간격은 이 레이어에 없는 값이다 — 찾지도 세지도 않는다(§2.11 "줄바꿈이 아님").
+    for (const f of ['itemSpacing', 'counterAxisSpacing'] as const) {
+      const v = node[f];
+      if (typeof v !== 'number') continue;
+      const skip = gapSkip(node, f);
+      if (skip === 'no-wrap') continue;
+      if (skip === 'space-between') note(res, 'space-between', node, preview, f);
+      else tryBind(node, f, v, entries, res, apply, preview);
     }
   }
   tryBind(node, 'paddingLeft', node.paddingLeft, entries, res, apply, preview);
@@ -971,8 +974,10 @@ export async function bindSelectedItems(items: readonly SelectedBindItem[]): Pro
       }
       // 스칼라 노드 필드(width/height/padding…/cornerRadius…/opacity)
       // 찾은 뒤 정렬이 Space between으로 바뀐 간격 — 붙이면 정렬이 바뀌므로 건너뛴다(§4.6 다시 확인).
-      if (spaceBetweenGap(node, it.field)) {
-        fail('space-between', node, it.field);
+      // 찾은 뒤 줄바꿈이 꺼진 줄 사이 간격은 "그 사이 바뀜"(§2.11 "줄바꿈이 아님").
+      const gap = gapSkip(node, it.field);
+      if (gap) {
+        fail(gap === 'no-wrap' ? 'changed' : 'space-between', node, it.field);
         continue;
       }
       const st = stateReason(nodeFieldState(node, it.field));

@@ -4415,3 +4415,41 @@ test('bindSelectedItems — 찾은 뒤 Space between이 된 간격은 다시 확
   assert.equal(row.primaryAxisAlignItems, 'SPACE_BETWEEN');
   assert.equal(row.boundVariables.itemSpacing, undefined);
 });
+
+/* ---------- 줄바꿈 아님 — counterAxisSpacing은 WRAP일 때만 (§2.11, 2026-11-04 사용자 결정) ---------- */
+
+test('extractFromSelection — 줄바꿈이 아니면 counterAxisSpacing을 뽑지 않는다', () => {
+  installFigma();
+  const row = spaceBetweenRow({ primaryAxisAlignItems: 'MIN', itemSpacing: 12, layoutWrap: 'NO_WRAP', counterAxisSpacing: 51, counterAxisAlignContent: 'AUTO' });
+  const names = new Set(extractFromSelection([row]).tokens.map((t) => t.name));
+  assert.equal(names.has('spacing/51'), false, '피그마가 쓰지 않는 줄 사이 간격이 토큰이 됐다');
+  assert.equal(names.has('spacing/12'), true);
+  // layoutWrap이 아예 없어도(옛 목·세로 오토레이아웃) 줄바꿈 아님
+  const noProp = spaceBetweenRow({ primaryAxisAlignItems: 'MIN', itemSpacing: 12, counterAxisSpacing: 51 });
+  assert.equal(new Set(extractFromSelection([noProp]).tokens.map((t) => t.name)).has('spacing/51'), false);
+});
+
+test('bindSelection — 줄바꿈이 아니면 counterAxisSpacing은 후보도 건너뜀도 아니다', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/51', category: 'gap', sources: ['gap'], value: 51 }], 16);
+  const row = spaceBetweenRow({ primaryAxisAlignItems: 'MIN', itemSpacing: 0, layoutWrap: 'NO_WRAP', counterAxisSpacing: 51, counterAxisAlignContent: 'SPACE_BETWEEN' });
+  const dry = await bindSelection([row], false);
+  assert.ok(!dry.candidates.some((c) => c.field === 'counterAxisSpacing'), '줄바꿈 아닌 줄 사이 간격이 후보로 나왔다');
+  assert.ok(!dry.skips.some((s) => s.field === 'counterAxisSpacing'), '건너뜀으로 세지 않는다');
+  assert.equal(dry.reasons['space-between'] ?? 0, 0, '줄바꿈 아님이 Space between보다 먼저');
+  await bindSelection([row]);
+  assert.equal(row.boundVariables.counterAxisSpacing, undefined);
+  void figma;
+});
+
+test('bindSelectedItems — 찾은 뒤 줄바꿈이 꺼진 줄 사이 간격은 다시 확인에서 "그 사이 바뀜"', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/51', category: 'gap', sources: ['gap'], value: 51 }], 16);
+  const sp = findVar(figma, 'Global', 'spacing/51');
+  const row = spaceBetweenRow({ primaryAxisAlignItems: 'MIN', itemSpacing: 0, layoutWrap: 'NO_WRAP', counterAxisSpacing: 51, counterAxisAlignContent: 'AUTO' });
+  registerNodes(figma, [row]);
+  const r = await bindSelectedItems([{ nodeId: 'row', field: 'counterAxisSpacing', variableId: sp.id }]);
+  assert.equal(r.bound, 0);
+  assert.deepEqual(r.reasons, { changed: 1 });
+  assert.equal(row.boundVariables.counterAxisSpacing, undefined);
+});

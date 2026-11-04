@@ -7,7 +7,7 @@
    실제 피그마가 아니라 목이다 — 실기 확인은 부록 A.5의 마지막 항목. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureOrigin, placeAtOrigin, releaseOrigin, componentizeSimilar } from '../dist/figma-lib.mjs';
+import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots } from '../dist/figma-lib.mjs';
 
 let seq = 0;
 const SELF_DELETING = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -95,8 +95,11 @@ function installFigma(page) {
         };
         const i = mk('INSTANCE', {
           name: this.name, width: this.width, height: this.height, applied: {}, mainId: this.id,
+          constraints: { horizontal: 'MIN', vertical: 'MIN' },
           resize(w, h) { this.width = w; this.height = h; },
           setProperties(p) { Object.assign(this.applied, p); },
+          // 피그마: 떼어 내면 같은 자리의 보통 프레임이 된다(목은 그 자리에서 종류만 바꾼다).
+          detachInstance() { this.type = 'FRAME'; return this; },
         });
         if (this.children) { i.children = this.children.map(clone); for (const k of i.children) k.parent = i; }
         page.appendChild(i); // 피그마: 새 인스턴스는 현재 페이지 맨 위(0,0)
@@ -290,4 +293,203 @@ test('묶기 — 넣기 실패면 인스턴스를 지우고 원본을 그대로 
   assert.equal(B.removed, false, '원본을 지키기');
   assert.deepEqual(box.children, [A, B]);
   assert.deepEqual(page.children, [box], '페이지 맨 위에 인스턴스가 남지 않는다');
+});
+
+/* ---------- 코드 대조 검토 뒤 (2026-11-04) — 실패 경로 · 크기 규칙 · 복사본 ---------- */
+
+const anchors = (root) => all(root).filter((n) => n.name === '__dsl_anchor');
+
+/** 넣기를 거절하는 부모 — types에 든 종류의 자식을 받지 않는다(불리언 연산이 인스턴스를 거절하는 경우 등). */
+function rejecting(parent, types) {
+  const orig = parent.insertChild;
+  parent.insertChild = function (i, c) {
+    if (types.includes(c.type)) throw new Error(`${c.type}는 받지 않음`);
+    return orig.call(this, i, c);
+  };
+}
+
+test('표지 — 만든 뒤 그룹에 넣다 실패하면 표지를 지운다(페이지 맨 위에 남기지 않음)', () => {
+  const { page, card, group, v } = iconFixture();
+  installFigma(page);
+  rejecting(group, ['RECTANGLE']);
+  const o = captureOrigin(v[0]);
+  assert.equal(o.anchor, null);
+  assert.deepEqual(page.children, [card], '표지가 페이지 맨 위에 남았다');
+  assert.equal(anchors(page).length, 0);
+  assert.deepEqual(group.children, v, '그룹은 그대로');
+});
+
+test('표지 — 크기·위치를 그룹에 넣기 전에 정한다', () => {
+  const { page, group, v } = iconFixture();
+  installFigma(page);
+  const seen = [];
+  const orig = group.insertChild;
+  group.insertChild = function (i, c) {
+    if (c.type === 'RECTANGLE') seen.push({ x: c.x, y: c.y, w: c.width, h: c.height, fills: c.fills });
+    return orig.call(this, i, c);
+  };
+  const o = captureOrigin(v[2]);
+  assert.deepEqual(seen, [{ x: 18, y: 12, w: 2, h: 9, fills: [] }]);
+  releaseOrigin(o);
+});
+
+test('표지 — [묶기]·아이콘 자리 교체(anchor: false)와 불리언 연산 부모에는 넣지 않는다', () => {
+  const { page, group, v } = iconFixture();
+  installFigma(page);
+  const o = captureOrigin(v[0], { anchor: false });
+  assert.equal(o.anchor, null);
+  assert.deepEqual(group.children, v);
+  const a = mk('VECTOR', { name: 'A', x: 1, y: 1 });
+  const b = mk('VECTOR', { name: 'B', x: 3, y: 3 });
+  const bool = mk('BOOLEAN_OPERATION', { name: 'Union' }, [a, b]);
+  const frame = mk('FRAME', { name: 'F', x: 10, y: 10 }, [bool]);
+  page.appendChild(frame);
+  const ob = captureOrigin(a);
+  assert.equal(ob.anchor, null, '표지 사각형이 불리언 모양에 더해진다');
+  assert.deepEqual(bool.children, [a, b]);
+});
+
+test('크기 규칙 — FILL·늘이기·맞춤·최소·최대를 이어받고, 거절된 하나만 건너뛴다(D1)', () => {
+  const page = mk('PAGE', {}, []);
+  const a = mk('FRAME', {
+    name: 'A', layoutSizingHorizontal: 'FILL', layoutSizingVertical: 'HUG', layoutGrow: 1, layoutAlign: 'STRETCH',
+    minWidth: 40, maxWidth: 400, minHeight: null, maxHeight: 200,
+  });
+  const list = mk('FRAME', { name: 'List', layoutMode: 'VERTICAL' }, [a]);
+  page.appendChild(list);
+  installFigma(page);
+  const o = captureOrigin(a);
+  a.remove();
+  const inst = figma.createComponentFromNode(mk('FRAME')).createInstance();
+  Object.assign(inst, { layoutSizingHorizontal: 'FIXED', layoutGrow: 0, layoutAlign: 'INHERIT', minWidth: null, maxWidth: null, minHeight: null, maxHeight: null });
+  // 오토레이아웃이 아닌 마스터의 인스턴스는 HUG를 받지 않는다(피그마가 던짐)
+  let vertical = 'FIXED';
+  Object.defineProperty(inst, 'layoutSizingVertical', {
+    get: () => vertical,
+    set: (val) => { if (val === 'HUG') throw new Error('HUG 불가'); vertical = val; },
+    enumerable: true, configurable: true,
+  });
+  assert.equal(placeAtOrigin(inst, o), true);
+  assert.deepEqual(list.children, [inst]);
+  assert.equal(inst.layoutSizingHorizontal, 'FILL');
+  assert.equal(inst.layoutSizingVertical, 'FIXED', '거절된 HUG는 건너뛴다');
+  assert.equal(inst.layoutGrow, 1);
+  assert.equal(inst.layoutAlign, 'STRETCH');
+  assert.deepEqual([inst.minWidth, inst.maxWidth, inst.minHeight, inst.maxHeight], [40, 400, null, 200], '나머지는 계속 이어받는다');
+});
+
+test('제약 — 오토레이아웃 안 절대 배치 자식은 제약도 이어받는다', () => {
+  const page = mk('PAGE', {}, []);
+  const c = { horizontal: 'MAX', vertical: 'CENTER' };
+  const b = mk('FRAME', { name: 'Badge', x: 5, y: 7, layoutPositioning: 'ABSOLUTE', constraints: c });
+  const list = mk('FRAME', { name: 'List', layoutMode: 'HORIZONTAL' }, [b]);
+  page.appendChild(list);
+  installFigma(page);
+  const o = captureOrigin(b);
+  b.remove();
+  const inst = figma.createComponentFromNode(mk('FRAME')).createInstance();
+  inst.constraints = { horizontal: 'MIN', vertical: 'MIN' };
+  inst.layoutPositioning = 'AUTO';
+  assert.equal(placeAtOrigin(inst, o), true);
+  assert.equal(inst.layoutPositioning, 'ABSOLUTE');
+  assert.deepEqual(inst.constraints, c);
+});
+
+test('복사본(D2) — 부모가 인스턴스를 받지 않으면 떼어 낸 보통 프레임으로 같은 자리를 채운다', () => {
+  const { page, card, group, v } = iconFixture();
+  installFigma(page);
+  const componentsPage = mk('PAGE', { name: 'Components' }, []);
+  rejecting(group, ['INSTANCE']);
+  const before = v.map(absXY);
+  const origins = v.map((n) => captureOrigin(n));
+  const comps = v.map((n) => figma.createComponentFromNode(n));
+  for (const c of comps) componentsPage.appendChild(c);
+  const results = comps.map((c, i) => fillOrigin(() => c.createInstance(), origins[i]));
+  assert.deepEqual(results, ['copy', 'copy', 'copy']);
+  assert.equal(group.removed, false, '복사본을 넣을 때까지 표지가 그룹을 지킨다');
+  assert.deepEqual(group.children.map((n) => n.type), ['FRAME', 'FRAME', 'FRAME']);
+  assert.deepEqual(group.children.map((n) => n.name), ['Vector', 'Vector', 'Vector'], '이름은 원본 레이어 이름');
+  assert.deepEqual(group.children.map(absXY), before, '같은 절대 위치');
+  assert.deepEqual(page.children, [card], '페이지 맨 위에 인스턴스·복사본·표지가 없다');
+  assert.equal(anchors(page).length, 0);
+});
+
+test('복사본(D2) — 프레임도 받지 않으면 하나뿐인 자식(벡터)만 넣는다', () => {
+  const page = mk('PAGE', {}, []);
+  const a = mk('VECTOR', { name: 'Star', x: 2, y: 3, width: 6, height: 6 });
+  const b = mk('VECTOR', { name: 'B', x: 0, y: 0 });
+  const bool = mk('BOOLEAN_OPERATION', { name: 'Union' }, [a, b]);
+  const frame = mk('FRAME', { name: 'F', x: 10, y: 10 }, [bool]);
+  page.appendChild(frame);
+  installFigma(page);
+  rejecting(bool, ['INSTANCE', 'FRAME']);
+  const o = captureOrigin(a);
+  // createComponentFromNode(벡터)는 벡터를 감싼 컴포넌트를 만든다 — 목: 벡터 하나를 자식으로 가진 컴포넌트
+  const comp = figma.createComponentFromNode(mk('FRAME', { name: 'Star', width: 6, height: 6 }, [mk('VECTOR', { name: 'Vector', width: 6, height: 6 })]));
+  a.remove();
+  const why = [];
+  assert.equal(fillOrigin(() => comp.createInstance(), o, (w) => why.push(w)), 'copy');
+  assert.deepEqual(bool.children.map((n) => [n.type, n.name]), [['VECTOR', 'Star'], ['VECTOR', 'B']]);
+  assert.deepEqual(absXY(bool.children[0]), [12, 13]);
+  assert.deepEqual(page.children, [frame], '꺼내고 남은 프레임도 지운다');
+  assert.ok(why.some((w) => w.includes('넣지 못했어요')));
+});
+
+test('빈 자리 — 부모가 없어졌으면 인스턴스·복사본 모두 지우고 failed', () => {
+  const { page, card, icon, v } = iconFixture();
+  installFigma(page);
+  const o = captureOrigin(v[0]);
+  icon.remove();
+  const comp = figma.createComponentFromNode(v[0]);
+  assert.equal(fillOrigin(() => comp.createInstance(), o), 'failed');
+  assert.deepEqual(page.children, [card], '페이지 맨 위에 아무것도 남지 않는다');
+  assert.equal(o.anchor, null);
+});
+
+test('빈 자리 — 인스턴스를 만들 수 없으면(make가 던짐) failed, 표지 정리', () => {
+  const { page, card, group, v } = iconFixture();
+  installFigma(page);
+  const o = captureOrigin(v[1]);
+  const why = [];
+  const r = fillOrigin(() => { throw new Error('잠김'); }, o, (w) => why.push(w));
+  assert.equal(r, 'failed');
+  assert.ok(why[0].includes('인스턴스를 만들지 못했어요'));
+  assert.equal(anchors(page).length, 0);
+  assert.deepEqual(group.children, v);
+  assert.deepEqual(page.children, [card]);
+});
+
+test('아이콘 자리 교체 — 넣기 실패면 인스턴스를 지우고 벡터를 그대로 둔다(페이지 맨 위에 남기지 않음)', () => {
+  const page = mk('PAGE', {}, []);
+  const vec = mk('VECTOR', { name: 'icon', x: 4, y: 4, width: 16, height: 16 });
+  const master = mk('FRAME', { name: 'Button' }, [mk('TEXT', { name: 'Label' }), vec]);
+  page.appendChild(master);
+  installFigma(page);
+  const icon = figma.createComponentFromNode(mk('VECTOR', { name: 'Star' }));
+  rejecting(master, ['INSTANCE']);
+  const failures = swapVectorSlots(master, [{ layerName: 'icon', layerPath: '1', icon }]);
+  assert.equal(failures.length, 1);
+  assert.ok(failures[0].startsWith('아이콘 자리 교체 실패(icon)'));
+  assert.deepEqual(master.children.map((n) => n.type), ['TEXT', 'VECTOR'], '벡터 그대로');
+  assert.deepEqual(page.children, [master], '페이지 맨 위에 인스턴스가 남지 않는다');
+});
+
+test('아이콘 자리 교체 — 같은 순서·위치·제약을 이어받고 벡터를 지운다', () => {
+  const page = mk('PAGE', {}, []);
+  const c = { horizontal: 'CENTER', vertical: 'MAX' };
+  const vec = mk('VECTOR', { name: 'icon', x: 4, y: 6, width: 16, height: 16, constraints: c });
+  const master = mk('FRAME', { name: 'Button' }, [mk('TEXT', { name: 'Label' }), vec]);
+  page.appendChild(master);
+  installFigma(page);
+  const icon = figma.createComponentFromNode(mk('VECTOR', { name: 'Star' }));
+  const failures = swapVectorSlots(master, [{ layerName: 'icon', layerPath: '1', icon }]);
+  assert.deepEqual(failures, []);
+  const inst = master.children[1];
+  assert.equal(inst.type, 'INSTANCE');
+  assert.equal(inst.name, 'icon');
+  assert.deepEqual([inst.x, inst.y, inst.width, inst.height], [4, 6, 16, 16]);
+  assert.deepEqual(inst.constraints, c);
+  assert.equal(vec.removed, true);
+  assert.equal(anchors(page).length, 0);
+  assert.deepEqual(page.children, [master]);
 });

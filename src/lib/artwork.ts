@@ -7,6 +7,7 @@
    조용히 마스터 것으로 통일된다(되돌리기 전엔 알아채기 어렵다). 지우기 전에 옮겨지는지
    목 테스트로 지킨다(figma-lib 배럴로 내보낸다).
    ============================================================ */
+import { captureOrigin, placeAtOrigin } from './placement';
 
 /** 루트 기준 **자식 인덱스 경로**(`0/1`)의 노드. 이름이 갈린 트리에서도 같은 슬롯을 가리킨다. */
 export function nodeAtPath(root: SceneNode, path: string): SceneNode | null {
@@ -82,6 +83,9 @@ export interface VectorSlot {
  * 마스터의 날 벡터 자리를 아이콘 **인스턴스**로 교체한다(INSTANCE_SWAP은 대상이 인스턴스여야
  * 붙으므로 속성 노출보다 먼저). 먼저 끼우고 뒤에 지워 자식 수가 잠깐도 줄지 않게 한다 —
  * 줄면 뒤따르는 슬롯의 인덱스 경로가 어긋난다.
+ * 자리 잡기는 공용 모듈(§4.7 "인스턴스 자리")로 — 같은 순서·x·y·제약·절대 배치·크기 규칙을 이어받고,
+ * 못 넣으면 인스턴스를 지운다(createInstance()가 놓은 페이지 맨 위에 남기지 않는다). 벡터는 그대로 둔다.
+ * 원본이 넣은 뒤에야 빠지므로 표지는 쓰지 않는다(§4.7 3번).
  */
 export function swapVectorSlots(master: SceneNode, slots: readonly VectorSlot[]): string[] {
   const failures: string[] = [];
@@ -92,19 +96,22 @@ export function swapVectorSlots(master: SceneNode, slots: readonly VectorSlot[])
       failures.push(`아이콘 자리 교체 실패(${s.layerName})`);
       continue;
     }
+    let inst: InstanceNode | null = null;
     try {
-      const kids = parent as BaseNode & ChildrenMixin;
-      const idx = kids.children.indexOf(target);
-      const inst = s.icon.createInstance();
+      const o = captureOrigin(target, { anchor: false });
+      inst = s.icon.createInstance();
       inst.name = target.name;
       try { inst.resize(target.width, target.height); } catch { /* 제약상 불가 시 아이콘 크기 그대로 */ }
-      kids.insertChild(Math.max(0, idx), inst);
-      if (!('layoutMode' in parent) || (parent as FrameNode).layoutMode === 'NONE') {
-        inst.x = target.x;
-        inst.y = target.y;
+      const placed = inst;
+      inst = null; // 여기부터는 placeAtOrigin이 실패 시 지운다
+      if (!placeAtOrigin(placed, o)) {
+        failures.push(`아이콘 자리 교체 실패(${s.layerName}): 제자리에 넣지 못했어요`);
+        continue;
       }
       target.remove();
     } catch (e) {
+      // 만든 인스턴스가 아직 자리 잡기 전이면 지운다 — 페이지 맨 위(0,0)에 남기지 않는다.
+      if (inst) { try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ } }
       failures.push(`아이콘 자리 교체 실패(${s.layerName}): ${e instanceof Error ? e.message : String(e)}`);
     }
   }

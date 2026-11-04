@@ -135,8 +135,9 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
       // 원본이 있던 **자리**에 먼저 끼우고 원본은 맨 끝에 지운다(§4.7 "인스턴스 자리" — 등록과 같은 모듈).
       // appendChild로 부모 끝에 붙이면 오토레이아웃 리스트에서 순서가 뒤섞이고, 부모가 없을 때 그냥 두면
       // 인스턴스가 페이지 맨 위(0,0)에 남는다(QA #3 불합격 3). 못 넣으면 인스턴스를 지우고 원본을 지킨다.
-      // 원본이 아직 자리에 있으니 그룹이 빌 일은 없지만, 같은 모듈이 표지·절대 위치 보정까지 맡는다.
-      const origin = captureOrigin(n);
+      // 원본이 아직 자리에 있으니 그룹이 빌 일이 없다 — 표지는 넣지 않는다(§4.7 3번). 위치·제약·크기 규칙·
+      // 절대 위치 보정은 같은 모듈이 맡는다.
+      const origin = captureOrigin(n, { anchor: false });
       if (!placeAtOrigin(inst, origin)) {
         inst = null; // placeAtOrigin이 이미 지웠다
         placeFailed.push(n.name);
@@ -185,6 +186,6 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
 
   const warnings = aligned.excluded.map((e) => `${e.name}: ${e.reason}`);
   for (const name of kept) warnings.push(`${name}: 속성 오버라이드 실패 — 원본을 그대로 두었습니다.`);
-  for (const name of placeFailed) warnings.push(`${name}: 제자리에 둘 수 없어 원본을 그대로 두었습니다.`);
+  for (const name of placeFailed) warnings.push(`${name}: 제자리에 둘 수 없어 원본을 그대로 두었어요.`);
   return { master: comp.name, properties, instances, images, warnings, placeFailed };
 }

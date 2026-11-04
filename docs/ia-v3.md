@@ -1488,7 +1488,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
 
 **불합격 1 — 사이 간격 자동 (§2.11)**
 - [x] 만들기 추출(`extract.ts` `collectSpacing`): `primaryAxisAlignItems === 'SPACE_BETWEEN'`이면 `itemSpacing`을 뽑지 않음, `counterAxisAlignContent === 'SPACE_BETWEEN'`이면 `counterAxisSpacing`을 뽑지 않음. padding은 그대로
-- [ ] 줄바꿈 아님(§2.11): 판정 함수 하나(`extract.ts` `gapSkip` — `'no-wrap'` · `'space-between'` · 없음)를 추출 · `bindFrame` · `bindSelectedItems` 다시 확인이 함께 씀. `layoutWrap !== 'WRAP'`이면 `counterAxisSpacing`을 뽑지 않고 찾지 않음(건너뜀으로 세지 않음), 다시 확인에서는 "그 사이 바뀜"(`changed`) + 단위 테스트
+- [x] 줄바꿈 아님(§2.11): 판정 함수 하나(`extract.ts` `gapSkip` — `'no-wrap'` · `'space-between'` · 없음)를 추출 · `bindFrame` · `bindSelectedItems` 다시 확인이 함께 씀. `layoutWrap !== 'WRAP'`이면 `counterAxisSpacing`을 뽑지 않고 찾지 않음(건너뜀으로 세지 않음), 다시 확인에서는 "그 사이 바뀜"(`changed`) + 단위 테스트
 - [x] 연결 찾기(`bind.ts` `bindFrame`): 같은 조건에서 두 필드를 건너뛰고 사유 `space-between`(건너뜀 칩 · 사유별 수 · 자리 목록)
 - [x] 연결 다시 확인(`bindSelectedItems`): 그 사이 Space between이 된 간격은 `space-between`으로 건너뜀
 - [x] i18n `reason.space-between` = "사이 간격 자동"
@@ -1504,13 +1504,13 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
 - [ ] 실기 확인(사용자, 피그마): QA #3 파일 다시 실행 → Page 1 맨 위에는 프레임만, 아이콘 위치가 원본과 같음, 노드 수 256
 
 **인스턴스 자리 — 코드 대조 검토 뒤 (2026-11-04)**
-- [ ] 표지는 GROUP 부모 + 원본이 먼저 빠지는 경우([등록])만. 표지 크기·위치를 넣기 전에 정하고, 만든 뒤 넣기·칠하기에서 실패하면 지움(`placement.ts`) + 단위 테스트
-- [ ] 크기 규칙 이어받기(2번 D1): `layoutSizingHorizontal/Vertical` · `layoutGrow` · `layoutAlign` · 최소·최대 크기, 하나씩 따로 시도 + 단위 테스트
-- [ ] 아이콘 자리 교체(`artwork.ts` `swapVectorSlots`)도 공용 모듈로 — 넣기 실패 시 인스턴스 지움, 제약·절대 배치·크기 규칙 이어받음 + 실패 경로 단위 테스트
-- [ ] [등록] 복사본(5번 D2): 인스턴스를 만들어 바로 떼어 낸 보통 레이어로 같은 자리 채움, 안 되면 하나뿐인 자식만, 그래도 안 되면 비움. 결과 줄 `component.placeCloned` · `COMPONENTS_RESULT.placeCloned` + 단위 테스트(복사본 · 빈 자리)
-- [ ] 등록 수 규칙(7번): `skipped`에 자리 실패를 넣지 않음. 속성 접힘의 인스턴스 만들기 실패 시 만든 인스턴스를 지움(`code.ts`)
-- [ ] 결과 줄: 인스턴스 0개인 [묶기]에도 " · 제자리에 못 둔 {n}개", "스킵" → "건너뜀"(§2.9). 실패여도 파일을 바꿨으면 다시 읽기(§4.1)
-- [ ] 문구 해요체: 실패 진단(`code.ts`) · [묶기] 경고(`similarApply.ts`)
+- [x] 표지는 GROUP 부모 + 원본이 먼저 빠지는 경우([등록])만. 표지 크기·위치를 넣기 전에 정하고, 만든 뒤 넣기·칠하기에서 실패하면 지움(`placement.ts`) + 단위 테스트
+- [x] 크기 규칙 이어받기(2번 D1): `layoutSizingHorizontal/Vertical` · `layoutGrow` · `layoutAlign` · 최소·최대 크기, 하나씩 따로 시도 + 단위 테스트
+- [x] 아이콘 자리 교체(`artwork.ts` `swapVectorSlots`)도 공용 모듈로 — 넣기 실패 시 인스턴스 지움, 제약·절대 배치·크기 규칙 이어받음 + 실패 경로 단위 테스트
+- [x] [등록] 복사본(5번 D2): 인스턴스를 만들어 바로 떼어 낸 보통 레이어로 같은 자리 채움, 안 되면 하나뿐인 자식만, 그래도 안 되면 비움. 결과 줄 `component.placeCloned` · `COMPONENTS_RESULT.placeCloned` + 단위 테스트(복사본 · 빈 자리)
+- [x] 등록 수 규칙(6번): `skipped`에 자리 실패를 넣지 않음. 속성 접힘의 인스턴스 만들기 실패 시 만든 인스턴스를 지움(`code.ts`)
+- [x] 결과 줄: 인스턴스 0개인 [묶기]에도 " · 제자리에 못 둔 {n}개", "스킵" → "건너뜀"(§2.9). 실패여도 파일을 바꿨으면 다시 읽기(§4.1)
+- [x] 문구 해요체: 실패 진단(`code.ts`) · [묶기] 경고(`similarApply.ts`)
 - [ ] 실기 확인(사용자, 피그마) — 목 테스트로는 확인할 수 없는 것:
   - 속성 접힘: 마스터가 아닌 멤버가 지워지고(옮겨지지 않음) 그 자리에 인스턴스가 들어감, 그룹 안 멤버도 그룹이 남음
   - 베리언트 세트: `combineAsVariants` 뒤 세트가 Components 페이지로 가고 각 원본 자리에 변형 인스턴스

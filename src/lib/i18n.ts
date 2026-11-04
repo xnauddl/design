@@ -103,6 +103,7 @@ export const STRINGS: Record<string, string> = {
   'component.generated': '누락 조합 {generated}개 생성(세트 {sets})',
   'component.placeFailed': ' · 제자리에 못 둔 {n}개: {names}',
   'component.placeFailedMore': ' 외',
+  'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
 
   // 마법사
   'wizard.needSelect': '먼저 프레임을 선택하세요 — 선택한 레이어에서 토큰을 추출합니다.',
