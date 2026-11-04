@@ -1,5 +1,7 @@
 # Claude Code — 와이어프레임 기준 구현 프롬프트
 
+> **v2 기록 — 현재 명세는 [`docs/ia-v3.md`](ia-v3.md)** 이다. 이 프롬프트는 v2 와이어(4탭 · 허용오차 · 적용 탭)를 구현하던 때의 것으로, 지우지 않고 기록으로 남긴다(2026-11-04 결정). 새 작업에 쓰지 않는다.
+
 아래 블록을 Claude Code에 그대로 붙여 넣으세요.  
 스펙 원본: [`REDESIGN.md`](../REDESIGN.md) · [`wireframe-plugin-ia.html`](wireframe-plugin-ia.html)
 
