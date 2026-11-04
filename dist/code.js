@@ -112,6 +112,7 @@
     "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
     "component.placeFailedMore": " \uC678",
+    "component.propFailed": " \xB7 \uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC740 {n}\uAC1C: {names}",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
     "wizard.needSelect": "\uBA3C\uC800 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uC5D0\uC11C \uAC12\uC744 \uBF51\uC544\uC694",
@@ -706,6 +707,7 @@
     "component.fail.cause": " \u2014 {why}",
     "component.fail.instanceMake": "\uC778\uC2A4\uD134\uC2A4\uB97C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694: {error}",
     "component.fail.instancePlace": "\uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "component.fail.propValue": "\uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC5B4 \uB9C8\uC2A4\uD130 \uAC12\uC73C\uB85C \uB480\uC5B4\uC694({name} \xB7 {prop})",
     "component.fail.single": "\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328({name}): {error}",
     "component.fail.propsRegister": "\uC18D\uC131\uC811\uD798 \uB4F1\uB85D \uC2E4\uD328({set}): {error}",
     "component.fail.iconFallback": "\uC544\uC774\uCF58\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD574 \uC138\uD2B8\uB85C \uB4F1\uB85D\uD574\uC694({set})",
@@ -4214,6 +4216,12 @@
       releaseOrigin(o);
     }
   }
+  function tallyFill(t2, r, name, propStart) {
+    if (r === "copy") t2.placeCloned.push(name);
+    if (r !== "failed") return;
+    t2.placeFailed.push(name);
+    if (t2.propFailed.length > propStart) t2.propFailed.splice(propStart);
+  }
 
   // src/lib/artwork.ts
   function nodeAtPath(root, path) {
@@ -4292,6 +4300,50 @@
       }
     }
     return failures;
+  }
+  function propIdsByName(container) {
+    const map = /* @__PURE__ */ new Map();
+    let defs;
+    try {
+      defs = container.componentPropertyDefinitions;
+    } catch (e) {
+      return map;
+    }
+    if (!defs) return map;
+    for (const key of Object.keys(defs)) {
+      const name = key.replace(/#[^#]*$/, "");
+      if (name && !map.has(name)) map.set(name, key);
+    }
+    return map;
+  }
+  function applyInstancePropValues(inst, ids, values) {
+    var _a;
+    const failed = [];
+    const payload = {};
+    const nameOf = /* @__PURE__ */ new Map();
+    for (const [name, val] of Object.entries(values)) {
+      const id = ids.get(name);
+      if (id == null) {
+        failed.push(name);
+        continue;
+      }
+      payload[id] = val;
+      nameOf.set(id, name);
+    }
+    if (!Object.keys(payload).length) return failed;
+    try {
+      inst.setProperties(payload);
+      return failed;
+    } catch (e) {
+    }
+    for (const [id, val] of Object.entries(payload)) {
+      try {
+        inst.setProperties({ [id]: val });
+      } catch (e) {
+        failed.push((_a = nameOf.get(id)) != null ? _a : id);
+      }
+    }
+    return failed;
   }
   function transplantImageFills(inst, images) {
     let applied = 0;
@@ -5863,6 +5915,17 @@
     for (const name of placeFailed) warnings.push(t("similar.placeFail", { name }));
     return { master: comp.name, properties, instances, images, warnings, placeFailed };
   }
+  function componentizeResultMessage(r) {
+    return {
+      type: "COMPONENTIZE_RESULT",
+      master: r.master,
+      properties: r.properties,
+      instances: r.instances,
+      images: r.images,
+      warnings: r.warnings,
+      placeFailed: r.placeFailed
+    };
+  }
 
   // src/lib/themeGen.ts
   var DARK_L_MIN = 0.18;
@@ -6683,30 +6746,6 @@
   function propValuesFromNode(root, plan) {
     return propValuesFromStruct(toStructNode(root), plan);
   }
-  function propIdsByName(container) {
-    const map = /* @__PURE__ */ new Map();
-    const defs = container.componentPropertyDefinitions;
-    if (!defs) return map;
-    for (const [id, def] of Object.entries(defs)) {
-      if (def && typeof def === "object" && "name" in def && typeof def.name === "string") {
-        map.set(def.name, id);
-      }
-    }
-    return map;
-  }
-  function applyInstancePropValues(inst, ids, values) {
-    const payload = {};
-    for (const [name, val] of Object.entries(values)) {
-      const id = ids.get(name);
-      if (id != null) payload[id] = val;
-    }
-    if (Object.keys(payload).length) {
-      try {
-        inst.setProperties(payload);
-      } catch (e) {
-      }
-    }
-  }
   function exposeProperties(container, scopes) {
     const rep = scopes[0];
     if (!rep) return [];
@@ -7238,6 +7277,7 @@
           const origins = [];
           const placeFailed = [];
           const placeCloned = [];
+          const propFailed = [];
           const captureOrigin2 = (n) => {
             const o = captureOrigin(n);
             origins.push(o);
@@ -7258,16 +7298,13 @@
             });
             for (const { o, make, label } of places) {
               const why = [];
+              const before = propFailed.length;
               const r = fillOrigin(make, o, (w) => why.push(w));
+              tallyFill({ placeCloned, placeFailed, propFailed }, r, o.name, before);
               if (r === "instance") continue;
               const causePart = why.length ? t("component.fail.cause", { why: why.join(" \xB7 ") }) : "";
-              if (r === "copy") {
-                placeCloned.push(o.name);
-                failures.push(t("component.fail.copyPlaced", { label, name: o.name, causePart }));
-              } else {
-                placeFailed.push(o.name);
-                failures.push(t("component.fail.nothingPlaced", { label, name: o.name, causePart }));
-              }
+              if (r === "copy") failures.push(t("component.fail.copyPlaced", { label, name: o.name, causePart }));
+              else failures.push(t("component.fail.nothingPlaced", { label, name: o.name, causePart }));
             }
           };
           const placeSingle = (comp, o, name) => {
@@ -7434,16 +7471,18 @@
                       if (icon) vals[p.propName] = icon.key || icon.id;
                       else delete vals[p.propName];
                     }
-                    let imageNoted = false;
+                    let noted = false;
                     const make = () => {
                       let inst = null;
                       try {
                         inst = master.createInstance();
-                        applyInstancePropValues(inst, ids, vals);
+                        const badProps = applyInstancePropValues(inst, ids, vals);
                         const img = transplantImageFills(inst, snap.images).failures;
-                        if (!imageNoted) {
-                          failures.push(...img);
-                          imageNoted = true;
+                        if (!noted) {
+                          noted = true;
+                          for (const p of badProps) failures.push(t("component.fail.propValue", { name: snap.o.name, prop: p }));
+                          failures.push(...img.map((f) => `${snap.o.name}: ${f}`));
+                          if (badProps.length || img.length) propFailed.push(snap.o.name);
                         }
                         return inst;
                       } catch (e) {
@@ -7516,7 +7555,7 @@
               failures.push(t("component.fail.exposeAll", { error: errText(e) }));
             }
           }
-          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned });
+          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed });
           if (registered || sets) commitUndo(figma);
           break;
         }
@@ -7668,7 +7707,7 @@
           if (!requirePaid("components")) break;
           const master = await figma.getNodeByIdAsync(msg.masterId);
           if (!master || master.type !== "FRAME" && master.type !== "GROUP") {
-            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: [t("similar.noMaster")] });
+            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: [t("similar.noMaster")], placeFailed: [] });
             break;
           }
           const memberNodes = [];
@@ -7677,11 +7716,11 @@
             if (n && "type" in n) memberNodes.push(n);
           }
           if (memberNodes.length < 2) {
-            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: [t("similar.tooFew")] });
+            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: [t("similar.tooFew")], placeFailed: [] });
             break;
           }
           const r = await componentizeSimilar(master, memberNodes);
-          post({ type: "COMPONENTIZE_RESULT", master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
+          post(componentizeResultMessage(r));
           if (r.instances) commitUndo(figma);
           break;
         }

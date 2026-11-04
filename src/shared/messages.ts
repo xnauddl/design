@@ -288,7 +288,7 @@ export type CodeToUi =
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
   // icons: 날 벡터가 그림마다 달라 새로 만든 아이콘 컴포넌트 수(스왑 속성의 재료 — 등록 수와 별개로 센다).
-  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[]; placeFailed?: string[]; placeCloned?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단. placeFailed: 비운 자리 · placeCloned: 복사본으로 채운 자리의 원본 이름(§4.7 5번)
+  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[]; placeFailed?: string[]; placeCloned?: string[]; propFailed?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단. placeFailed: 비운 자리 · placeCloned: 복사본으로 채운 자리의 원본 이름(§4.7 5번). propFailed: 속성 값·사진을 못 넣은 멤버(§4.7 6번)
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'SETTINGS'; base: number; maxDepth: number; grid: number } // #19: 보관된 설정(없으면 기본값). grid=만들기가 값을 맞추는 간격

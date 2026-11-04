@@ -105,6 +105,7 @@ export const STRINGS: Record<string, string> = {
   'component.generated': '누락 조합 {generated}개 생성(세트 {sets})',
   'component.placeFailed': ' · 제자리에 못 둔 {n}개: {names}',
   'component.placeFailedMore': ' 외',
+  'component.propFailed': ' · 속성 값을 못 넣은 {n}개: {names}',
   'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
 
   // 마법사
@@ -710,6 +711,7 @@ export const STRINGS: Record<string, string> = {
   'component.fail.cause': ' — {why}',
   'component.fail.instanceMake': '인스턴스를 만들지 못했어요: {error}',
   'component.fail.instancePlace': '제자리에 인스턴스를 넣지 못했어요',
+  'component.fail.propValue': '속성 값을 못 넣어 마스터 값으로 뒀어요({name} · {prop})',
   'component.fail.single': '단독 등록 실패({name}): {error}',
   'component.fail.propsRegister': '속성접힘 등록 실패({set}): {error}',
   'component.fail.iconFallback': '아이콘을 만들지 못해 세트로 등록해요({set})',

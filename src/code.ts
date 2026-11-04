@@ -17,11 +17,11 @@ import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
-import { createIconRegistry, swapVectorSlots, transplantImageFills, nodeAtPath } from './lib/artwork';
-import { captureOrigin as captureOriginAt, fillOrigin, releaseOrigin, type Origin } from './lib/placement';
+import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath } from './lib/artwork';
+import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
-import { scanSimilar, componentizeSimilar } from './lib/similarApply';
+import { scanSimilar, componentizeSimilar, componentizeResultMessage } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache, isVerifyErrCode } from './lib/license';
@@ -773,33 +773,6 @@ function propValuesFromNode(root: SceneNode, plan: readonly CompPropPlan[]): Rec
   return propValuesFromStruct(toStructNode(root), plan);
 }
 
-/** 컴포넌트 속성 정의에서 propName → property id. */
-function propIdsByName(container: ComponentNode | ComponentSetNode): Map<string, string> {
-  const map = new Map<string, string>();
-  const defs = container.componentPropertyDefinitions;
-  if (!defs) return map;
-  for (const [id, def] of Object.entries(defs)) {
-    if (def && typeof def === 'object' && 'name' in def && typeof (def as { name: string }).name === 'string') {
-      map.set((def as { name: string }).name, id);
-    }
-  }
-  return map;
-}
-
-function applyInstancePropValues(
-  inst: InstanceNode,
-  ids: Map<string, string>,
-  values: Record<string, string | boolean>,
-): void {
-  const payload: { [key: string]: string | boolean } = {};
-  for (const [name, val] of Object.entries(values)) {
-    const id = ids.get(name);
-    if (id != null) payload[id] = val;
-  }
-  if (Object.keys(payload).length) {
-    try { inst.setProperties(payload); } catch { /* 일부 속성 적용 실패 무시 */ }
-  }
-}
 
 /**
  * 컴포넌트/세트의 레이어를 컴포넌트 속성으로 노출(등록에 자동 통합).
@@ -1446,6 +1419,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const origins: Origin[] = [];
         const placeFailed: string[] = []; // 복사본도 못 둬 비운 자리의 원본 이름(결과 줄 · §4.7 5번)
         const placeCloned: string[] = []; // 인스턴스를 못 넣어 복사본으로 채운 자리의 원본 이름(§4.7 5번)
+        const propFailed: string[] = []; // 속성 값·사진을 못 넣어 마스터 값으로 남은 멤버 이름(§4.7 6번)
         const captureOrigin = (n: SceneNode): Origin => {
           const o = captureOriginAt(n);
           origins.push(o);
@@ -1469,16 +1443,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           });
           for (const { o, make, label } of places) {
             const why: string[] = [];
+            // 이 자리를 채우며 make()가 propFailed에 넣은 항목은 before 뒤에 붙는다(§4.7 6번).
+            const before = propFailed.length;
             const r = fillOrigin(make, o, (w) => why.push(w));
+            // 복사본 · 빈 자리 목록에 넣는다. 빈 자리면 속성 값 꼬리에서는 뺀다(§4.7 6번).
+            tallyFill({ placeCloned, placeFailed, propFailed }, r, o.name, before);
             if (r === 'instance') continue;
             const causePart = why.length ? t('component.fail.cause', { why: why.join(' · ') }) : '';
-            if (r === 'copy') {
-              placeCloned.push(o.name);
-              failures.push(t('component.fail.copyPlaced', { label, name: o.name, causePart }));
-            } else {
-              placeFailed.push(o.name);
-              failures.push(t('component.fail.nothingPlaced', { label, name: o.name, causePart }));
-            }
+            if (r === 'copy') failures.push(t('component.fail.copyPlaced', { label, name: o.name, causePart }));
+            else failures.push(t('component.fail.nothingPlaced', { label, name: o.name, causePart }));
           }
         };
         // 단독 컴포넌트 1개를 페이지 이동 + 원위치 인스턴스 + 속성 노출 대상 등록(단독·결합불가·결합실패 3곳 공용).
@@ -1663,17 +1636,23 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                     if (icon) vals[p.propName] = icon.key || icon.id;
                     else delete vals[p.propName]; // 못 만든 그림은 마스터 것 그대로(빈 값으로 덮지 않는다)
                   }
-                  let imageNoted = false; // 사진 이식 실패는 자리마다 한 번만(복사본을 다시 만들 때 겹치지 않게)
-                  // 인스턴스를 만들고 속성 값·사진까지 넣는다. 도중에 실패하면 만든 인스턴스를 지우고 던진다
-                  // (어디에도 남기지 않는다 — §4.7 6번). 복사본도 같은 함수로 만든다.
+                  let noted = false; // 속성 값·사진 실패는 멤버마다 한 번만(복사본을 다시 만들 때 겹치지 않게)
+                  // 인스턴스를 만들고 속성 값·사진까지 넣는다. 못 넣은 속성·사진은 마스터 값 그대로 두고
+                  // 알린다(인스턴스는 지우지 않는다 — §4.7 6번, 2026-11-04 결정). 복사본도 같은 함수로 만든다.
+                  // 예상 밖 예외면 만든 인스턴스를 지우고 던진다(어디에도 남기지 않는다).
                   const make = (): InstanceNode => {
                     let inst: InstanceNode | null = null;
                     try {
                       inst = master.createInstance();
-                      applyInstancePropValues(inst, ids, vals);
+                      const badProps = applyInstancePropValues(inst, ids, vals);
                       // 사진은 속성이 아니라 fill 오버라이드 — 멤버 원본을 같은 경로에 이식한다.
                       const img = transplantImageFills(inst, snap.images).failures;
-                      if (!imageNoted) { failures.push(...img); imageNoted = true; }
+                      if (!noted) {
+                        noted = true;
+                        for (const p of badProps) failures.push(t('component.fail.propValue', { name: snap.o.name, prop: p }));
+                        failures.push(...img.map((f) => `${snap.o.name}: ${f}`));
+                        if (badProps.length || img.length) propFailed.push(snap.o.name);
+                      }
                       return inst;
                     } catch (e) {
                       if (inst) { try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ } }
@@ -1744,7 +1723,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(t('component.fail.exposeAll', { error: errText(e) })); }
         }
 
-        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned });
+        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed });
         if (registered || sets) commitUndo(figma); // UX2
         break;
       }
@@ -1899,7 +1878,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!requirePaid('components')) break;
         const master = await figma.getNodeByIdAsync(msg.masterId);
         if (!master || (master.type !== 'FRAME' && master.type !== 'GROUP')) {
-          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: [t('similar.noMaster')] });
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: [t('similar.noMaster')], placeFailed: [] });
           break;
         }
         // 멤버 노드 수집(마스터 포함) → 정렬·컴포넌트화·인스턴스 교체는 similarApply에 위임.
@@ -1909,11 +1888,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (n && 'type' in n) memberNodes.push(n as SceneNode);
         }
         if (memberNodes.length < 2) {
-          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: [t('similar.tooFew')] });
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: [t('similar.tooFew')], placeFailed: [] });
           break;
         }
         const r = await componentizeSimilar(master as SceneNode, memberNodes);
-        post({ type: 'COMPONENTIZE_RESULT', master: r.master, properties: r.properties, instances: r.instances, images: r.images, warnings: r.warnings });
+        // 결과의 모든 필드를 싣는다(placeFailed가 빠지면 결과 줄 꼬리·⚠가 동작하지 않는다 — §4.7 5번).
+        post(componentizeResultMessage(r));
         if (r.instances) commitUndo(figma); // UX2: 컴포넌트화 전체를 단일 Undo로
         break;
       }

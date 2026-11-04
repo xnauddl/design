@@ -7,7 +7,7 @@
    실제 피그마가 아니라 목이다 — 실기 확인은 부록 A.5의 마지막 항목. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots } from '../dist/figma-lib.mjs';
+import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill } from '../dist/figma-lib.mjs';
 
 let seq = 0;
 const SELF_DELETING = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -492,4 +492,93 @@ test('아이콘 자리 교체 — 같은 순서·위치·제약을 이어받고 
   assert.equal(vec.removed, true);
   assert.equal(anchors(page).length, 0);
   assert.deepEqual(page.children, [master]);
+});
+
+/* ---------- 검토 2회차 (2026-11-04) ---------- */
+
+test('[묶기] 결과 메시지 — 결과의 필드를 빠짐없이 싣는다(placeFailed 포함)', async () => {
+  const page = mk('PAGE', {}, []);
+  const txt = (name, characters) => mk('TEXT', { name, characters, componentPropertyReferences: {} });
+  const A = mk('FRAME', { name: 'Card', x: 0, y: 0 }, [txt('Title', 'A')]);
+  const B = mk('FRAME', { name: 'Other', x: 50, y: 0 }, [txt('Title', 'B')]);
+  const box = mk('FRAME', { name: 'Box' }, [A, B]);
+  page.appendChild(box);
+  installFigma(page);
+  box.insertChild = () => { throw new Error('잠긴 부모'); };
+  const r = await componentizeSimilar(A, [A, B]);
+  const m = componentizeResultMessage(r);
+  assert.equal(m.type, 'COMPONENTIZE_RESULT');
+  assert.deepEqual(m.placeFailed, ['Other'], 'placeFailed가 실려야 꼬리·⚠가 동작한다');
+  for (const k of Object.keys(r)) assert.ok(k in m, `결과 필드 ${k}가 메시지에 없다`);
+  assert.ok(r.warnings.every((w) => !/습니다|합니다/.test(w)), '해요체');
+});
+
+test('속성 값 넣기 — 한 번에 실패하면 속성마다, 거절된 이름만 돌려주고 나머지는 넣는다', () => {
+  const applied = {};
+  const inst = {
+    setProperties(p) {
+      if ('bad#2' in p) throw new Error('거절');
+      Object.assign(applied, p);
+    },
+  };
+  const ids = new Map([['Title', 'title#1'], ['Icon', 'bad#2'], ['Show', 'show#3']]);
+  const failed = applyInstancePropValues(inst, ids, { Title: 'B', Icon: 'k', Show: false, Gone: 'x' });
+  assert.deepEqual(failed.sort(), ['Gone', 'Icon'], 'id 없는 속성 · 거절된 속성');
+  assert.deepEqual(applied, { 'title#1': 'B', 'show#3': false }, '나머지는 넣는다');
+  // 모두 받으면 빈 목록
+  assert.deepEqual(applyInstancePropValues({ setProperties() {} }, ids, { Title: 'C' }), []);
+});
+
+/* ---------- 검토 3회차 (2026-11-04) ---------- */
+
+/** 피그마 실제 모양: 키는 "이름#id"(베리언트는 이름만), 값에는 name이 없다. */
+const REAL_DEFS = {
+  'Title#12:3': { type: 'TEXT', defaultValue: 'A' },
+  'Icon#12:4': { type: 'INSTANCE_SWAP', defaultValue: '1:2' },
+  'Show badge#12:5': { type: 'BOOLEAN', defaultValue: true },
+  Size: { type: 'VARIANT', defaultValue: 'md', variantOptions: ['sm', 'md'] },
+};
+
+test('속성 이름 → id — 정의 키 "이름#id"에서 이름을 뽑는다(값에 name 없음), 베리언트 키는 그대로', () => {
+  const ids = propIdsByName({ componentPropertyDefinitions: REAL_DEFS });
+  assert.deepEqual([...ids.entries()], [
+    ['Title', 'Title#12:3'], ['Icon', 'Icon#12:4'], ['Show badge', 'Show badge#12:5'], ['Size', 'Size'],
+  ]);
+  assert.equal(propIdsByName({ componentPropertyDefinitions: null }).size, 0);
+  assert.equal(propIdsByName({ get componentPropertyDefinitions() { throw new Error('읽기 실패'); } }).size, 0);
+});
+
+test('속성 접힘 값 넣기 — 실제 모양 정의에서 모든 값이 이어지고 실패 0', () => {
+  const ids = propIdsByName({ componentPropertyDefinitions: REAL_DEFS });
+  const applied = {};
+  const inst = { setProperties(p) { for (const k of Object.keys(p)) if (!(k in REAL_DEFS)) throw new Error(`없는 속성 ${k}`); Object.assign(applied, p); } };
+  const failed = applyInstancePropValues(inst, ids, { Title: 'B', Icon: '9:9', 'Show badge': false });
+  assert.deepEqual(failed, [], '예전 코드(def.name)는 Map이 비어 모든 속성이 실패로 잡혔다');
+  assert.deepEqual(applied, { 'Title#12:3': 'B', 'Icon#12:4': '9:9', 'Show badge#12:5': false });
+});
+
+test('자리 결과 세기 — 빈 자리로 끝난 멤버는 그 자리가 넣은 propFailed 항목만 빼고 placeFailed만', () => {
+  const t = { placeCloned: [], placeFailed: [], propFailed: ['Row'] };
+  let before = t.propFailed.length;
+  tallyFill(t, 'copy', 'Card', before);
+  // 빈 자리로 끝난 자리가 속성 실패도 기록했다면 그 항목만 빠진다
+  before = t.propFailed.length;
+  t.propFailed.push('Card');
+  tallyFill(t, 'failed', 'Card', before);
+  assert.deepEqual(t.placeCloned, ['Card']);
+  assert.deepEqual(t.placeFailed, ['Card']);
+  assert.deepEqual(t.propFailed, ['Row']);
+});
+
+test('자리 결과 세기 — 같은 이름 두 멤버: 한쪽만 속성 실패, 다른 쪽은 빈 자리면 속성 실패 항목이 남는다', () => {
+  const t = { placeCloned: [], placeFailed: [], propFailed: [] };
+  // 멤버 1 "Card": 인스턴스는 들어갔지만 속성 값을 못 넣음
+  let before = t.propFailed.length;
+  t.propFailed.push('Card'); // make()가 기록
+  tallyFill(t, 'instance', 'Card', before);
+  // 멤버 2 "Card": 속성은 다 넣었지만 빈 자리로 끝남(propFailed에 넣은 것 없음)
+  before = t.propFailed.length;
+  tallyFill(t, 'failed', 'Card', before);
+  assert.deepEqual(t.propFailed, ['Card'], '이름으로 빼면 멤버 1의 항목이 사라진다');
+  assert.deepEqual(t.placeFailed, ['Card']);
 });

@@ -287,3 +287,23 @@ export function fillOrigin(make: () => InstanceNode, o: Origin, onError?: (why: 
     releaseOrigin(o);
   }
 }
+
+/** [등록] 결과 줄의 세 목록(§4.7 5·6번). 이름은 원본 레이어 이름. */
+export interface FillTally {
+  placeCloned: string[];
+  placeFailed: string[];
+  propFailed: string[];
+}
+
+/**
+ * 자리 채우기 결과를 목록에 센다. 복사본 → placeCloned, 빈 자리 → placeFailed.
+ * 빈 자리로 끝난 멤버는 남은 레이어가 없으므로 속성 값 꼬리(propFailed)에서 뺀다 — placeFailed만 센다(§4.7 6번).
+ * 빼는 것은 **이 자리를 채우며 넣은 항목**(`propStart` — fillOrigin 부르기 전 propFailed 길이 — 뒤)뿐이다.
+ * 이름으로 찾지 않는다: 원본 레이어 이름은 멤버끼리 같을 수 있어("Card"), 다른 멤버의 항목이 빠질 수 있다.
+ */
+export function tallyFill(t: FillTally, r: FillResult, name: string, propStart: number): void {
+  if (r === 'copy') t.placeCloned.push(name);
+  if (r !== 'failed') return;
+  t.placeFailed.push(name);
+  if (t.propFailed.length > propStart) t.propFailed.splice(propStart);
+}

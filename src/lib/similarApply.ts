@@ -13,6 +13,7 @@ import {
   type FrameNode as SimNode,
 } from './similar';
 import { captureOrigin, placeAtOrigin, releaseOrigin } from './placement';
+import type { CodeToUi } from '../shared/messages';
 
 /** figma 노드 → similar 입력 트리(콘텐츠 신호 포함). INSTANCE key는 async 조회. */
 async function buildSimTree(node: SceneNode): Promise<SimNode> {
@@ -189,4 +190,20 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
   for (const name of kept) warnings.push(t('similar.overrideFail', { name }));
   for (const name of placeFailed) warnings.push(t('similar.placeFail', { name })); // UI가 같은 키로 알아본다(isPlaceFailWarning)
   return { master: comp.name, properties, instances, images, warnings, placeFailed };
+}
+
+/**
+ * [묶기] 결과 → UI 메시지. 결과의 필드를 빠짐없이 싣는다 — 예전에 code.ts가 필드를 하나씩 옮기다
+ * `placeFailed`를 빠뜨려 결과 줄 꼬리·최소화 ⚠가 동작하지 않았다(QA #3 검토 2회차). 테스트가 지킨다.
+ */
+export function componentizeResultMessage(r: ComponentizeResult): Extract<CodeToUi, { type: 'COMPONENTIZE_RESULT' }> {
+  return {
+    type: 'COMPONENTIZE_RESULT',
+    master: r.master,
+    properties: r.properties,
+    instances: r.instances,
+    images: r.images,
+    warnings: r.warnings,
+    placeFailed: r.placeFailed,
+  };
 }
