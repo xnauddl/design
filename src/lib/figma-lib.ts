@@ -23,6 +23,8 @@ export type { RenameOutcome } from './rename';
 export { createIconRegistry, swapVectorSlots, transplantImageFills, nodeAtPath } from './artwork';
 export type { IconRegistry, VectorSlot } from './artwork';
 export { scanSimilar, componentizeSimilar } from './similarApply';
+export { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin } from './placement';
+export type { Origin, FillResult, Sizing } from './placement';
 export type { ComponentizeResult } from './similarApply';
 export { generateDarkMode, ensureDarkMode, findModeByName, DARK_MODE_NAME } from './themeApply';
 export type { DarkModeResult } from './themeApply';

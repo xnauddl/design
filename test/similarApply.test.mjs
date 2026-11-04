@@ -17,8 +17,29 @@ function card(id, { title, imgKey }, parent) {
   return {
     id, name: 'Card', type: 'FRAME', x: 1, y: 2, width: 100, height: 80, parent, removed: false,
     children: [inst(`${id}:img`, 'Image', imgKey), txt(`${id}:title`, 'Title', title), txt(`${id}:desc`, 'Desc', 'same')],
-    remove() { this.removed = true; },
+    remove() { this.removed = true; detach(this); },
   };
+}
+
+/** 부모 children에서 뺀다(실물 remove와 같게). */
+function detach(n) {
+  const c = n.parent?.children;
+  if (!c) return;
+  const j = c.indexOf(n);
+  if (j >= 0) c.splice(j, 1);
+}
+
+/** 실물처럼 children·insertChild가 있는 페이지. 넣은 노드는 inserted에도 남긴다. */
+function mkPage() {
+  return {
+    id: 'page', type: 'PAGE', children: [], inserted: [],
+    appendChild(n) { this.insertChild(this.children.length, n); },
+    insertChild(i, n) { detach(n); n.parent = this; this.children.splice(i, 0, n); this.inserted.push(n); },
+  };
+}
+/** 노드들을 부모의 자식으로 붙인다. */
+function attach(parent, ...nodes) {
+  for (const n of nodes) { n.parent = parent; parent.children.push(n); }
 }
 
 /** 전역 figma 목 — createComponentFromNode가 자식을 보존한 컴포넌트(속성/인스턴스 메서드)를 반환. */
@@ -41,7 +62,7 @@ function installFigma() {
             return o;
           };
           const i = { id: `inst:${seq++}`, type: 'INSTANCE', x: 0, y: 0, parent: null, applied: {}, children: this.children.map(clone),
-            resize() {}, setProperties(p) { Object.assign(this.applied, p); }, remove() {} };
+            resize() {}, setProperties(p) { Object.assign(this.applied, p); }, remove() { this.removed = true; detach(this); } };
           created.push(i);
           return i;
         },
@@ -72,10 +93,11 @@ test('scanSimilar — 동일 구조 묶고 가변 위치·마스터 추천(목)'
 
 test('componentizeSimilar — 컴포넌트 생성·속성 노출·인스턴스 오버라이드 교체(목)', async () => {
   const figma = installFigma();
-  const page = { appended: [], appendChild(n) { n.parent = this; this.appended.push(n); } };
+  const page = mkPage();
   const a = card('A', { title: 'A', imgKey: 'k1' }, page); // 마스터
   const b = card('B', { title: 'B', imgKey: 'k2' }, page);
   const c = card('C', { title: 'C', imgKey: 'k3' }, page);
+  attach(page, a, b, c);
 
   const r = await componentizeSimilar(a, [a, b, c]);
 
@@ -84,6 +106,7 @@ test('componentizeSimilar — 컴포넌트 생성·속성 노출·인스턴스 �
   assert.equal(r.instances, 2); // 마스터 제외 2개
   assert.equal(r.images, 0); // 이미지 fill 없음(INSTANCE 카드)
   assert.deepEqual(r.warnings, []);
+  assert.deepEqual(r.placeFailed, []);
 
   // 마스터 → 컴포넌트(소비), 자식에 속성 참조 연결
   assert.equal(a.consumed, true);
@@ -106,21 +129,23 @@ test('componentizeSimilar — 컴포넌트 생성·속성 노출·인스턴스 �
   assert.equal(figma._created.length, 2);
   const appliedValues = figma._created.map((i) => Object.values(i.applied).sort());
   assert.deepEqual(appliedValues, [['B', 'k2'].sort(), ['C', 'k3'].sort()]);
-  // 인스턴스가 원래 위치로 배치되고 부모에 삽입됨
+  // 인스턴스가 원래 위치로 배치되고 부모의 원래 자리(B·C 자리)에 삽입됨
   assert.equal(figma._created[0].x, 1);
-  assert.equal(page.appended.length, 2);
+  assert.equal(page.inserted.length, 2);
+  assert.deepEqual(page.children.map((n) => n.id.split(':')[0]), ['A', 'inst', 'inst']);
 });
 
 test('componentizeSimilar — 가변 이미지 fill은 인스턴스 fill 오버라이드(v2, 목)', async () => {
   const figma = installFigma();
-  const page = { appendChild(n) { n.parent = this; } };
+  const page = mkPage();
   const imgCard = (id, title, hash) => ({
     id, name: 'Card', type: 'FRAME', x: 0, y: 0, width: 50, height: 50, parent: page, removed: false,
     children: [{ id: `${id}:pic`, name: 'Photo', type: 'RECTANGLE', fills: [{ type: 'IMAGE', visible: true, imageHash: hash }] }, txt(`${id}:t`, 'Title', title)],
-    remove() { this.removed = true; },
+    remove() { this.removed = true; detach(this); },
   });
   const m = imgCard('1', 'A', 'hA'); // 마스터
   const b = imgCard('2', 'A', 'hB'); // 텍스트 동일, 이미지만 다름
+  attach(page, m, b);
   const r = await componentizeSimilar(m, [m, b]);
 
   assert.equal(r.properties, 0); // 텍스트 동일 → 컴포넌트 속성 없음
@@ -134,9 +159,10 @@ test('componentizeSimilar — 가변 이미지 fill은 인스턴스 fill 오버�
 
 test('componentizeSimilar — 정렬에서 제외된 프레임은 교체하지 않고 원본 보존', async () => {
   const f = installFigma();
-  const page = { appendChild() {} };
+  const page = mkPage();
   const a = card('A', { title: 'A', imgKey: 'k1' }, page);
   const b = card('B', { title: 'B', imgKey: 'k2' }, page);
+  attach(page, a, b);
   // 구조가 다른 프레임 — alignFrames가 '구조 불일치'로 뺀다. 그런데도 members로 넘어오면
   // (스캔과 실행 사이 문서 변경 등) 인스턴스로 갈아끼우고 원본을 지워선 안 된다.
   const odd = { id: 'odd', name: 'Other', type: 'FRAME', x: 0, y: 0, width: 10, height: 10, parent: page, removed: false,
@@ -167,13 +193,16 @@ test('componentizeSimilar — 오버라이드 실패 시 인스턴스를 버리�
     return comp;
   };
 
-  const page = { appendChild() {} };
+  const page = mkPage();
   const a = card('A', { title: 'A', imgKey: 'k1' }, page);
   const b = card('B', { title: 'B', imgKey: 'k2' }, page);
+  attach(page, a, b);
 
   const r = await componentizeSimilar(a, [a, b]);
 
   assert.equal(b.removed, false, '오버라이드가 실패했는데 원본을 지웠다 — 콘텐츠 소실');
+  assert.deepEqual(r.placeFailed, [], '자리 잡기는 성공 — 실패 사유는 오버라이드');
+  assert.deepEqual(page.children.map((n) => n.id), ['A', 'B'], '버린 인스턴스가 부모에 남으면 안 된다');
   assert.equal(r.instances, 0, '실패한 교체는 집계하지 않는다');
   assert.ok(r.warnings.some((w) => w.includes('Card')), '남겨둔 이유가 경고에 있어야 한다');
 });

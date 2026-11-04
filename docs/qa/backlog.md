@@ -19,3 +19,8 @@
 5. 이미 등록된 width 출신 Global 변수는 그대로 둘지(플러그인은 변수를 삭제하지 않음 — §2.4).
 
 **관련 코드(확인 필요)**: 마법사 값 추출 `src/lib/wizard.ts`, 숫자 스케일 정리 `tidyNumberTokens`.
+
+**재현 (QA #3, 2026-11-03 — `docs/qa/2026-11-03-qa3.md` "결정 대기")**
+- Size Global `size/20` … `size/1440` **26개**가 생겼고, `width`/`height`에 변수가 붙은 노드가 **44개**다.
+- 원인 위치: `src/lib/extract.ts:163`(`collectSize`의 `addSize`) — 오토레이아웃 맥락에서 Fixed인 **정수 크기는 모두** `size/` 토큰이 된다.
+- 검수자 권고(결정 전): padding은 gap과 함께 간격(spacing)으로 취급(질문 1 = 예), `width`/`height`/`min`/`max`는 토큰에서 제외(질문 2 = 예), `size/`는 아이콘 크기 16 · 24 · 32 · 40 · 48만 허용(질문 3).
