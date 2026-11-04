@@ -7,6 +7,7 @@
    조용히 마스터 것으로 통일된다(되돌리기 전엔 알아채기 어렵다). 지우기 전에 옮겨지는지
    목 테스트로 지킨다(figma-lib 배럴로 내보낸다).
    ============================================================ */
+import { t } from './i18n';
 import { captureOrigin, placeAtOrigin } from './placement';
 
 /** 루트 기준 **자식 인덱스 경로**(`0/1`)의 노드. 이름이 갈린 트리에서도 같은 슬롯을 가리킨다. */
@@ -64,7 +65,7 @@ export function createIconRegistry(opts: {
         made++;
         return comp;
       } catch (e) {
-        opts.onFailure(`아이콘 컴포넌트 실패(${baseName}): ${e instanceof Error ? e.message : String(e)}`);
+        opts.onFailure(t('component.fail.iconComponent', { name: baseName, error: e instanceof Error ? e.message : String(e) }));
         return null;
       }
     },
@@ -93,7 +94,7 @@ export function swapVectorSlots(master: SceneNode, slots: readonly VectorSlot[])
     const target = nodeAtPath(master, s.layerPath);
     const parent = target?.parent;
     if (!target || !s.icon || !parent || !('children' in parent)) {
-      failures.push(`아이콘 자리 교체 실패(${s.layerName})`);
+      failures.push(t('component.fail.iconSwap', { layer: s.layerName }));
       continue;
     }
     let inst: InstanceNode | null = null;
@@ -105,14 +106,14 @@ export function swapVectorSlots(master: SceneNode, slots: readonly VectorSlot[])
       const placed = inst;
       inst = null; // 여기부터는 placeAtOrigin이 실패 시 지운다
       if (!placeAtOrigin(placed, o)) {
-        failures.push(`아이콘 자리 교체 실패(${s.layerName}): 제자리에 넣지 못했어요`);
+        failures.push(t('component.fail.iconSwapPlace', { layer: s.layerName }));
         continue;
       }
       target.remove();
     } catch (e) {
       // 만든 인스턴스가 아직 자리 잡기 전이면 지운다 — 페이지 맨 위(0,0)에 남기지 않는다.
       if (inst) { try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ } }
-      failures.push(`아이콘 자리 교체 실패(${s.layerName}): ${e instanceof Error ? e.message : String(e)}`);
+      failures.push(t('component.fail.iconSwapErr', { layer: s.layerName, error: e instanceof Error ? e.message : String(e) }));
     }
   }
   return failures;
@@ -132,14 +133,14 @@ export function transplantImageFills(
   for (const [path, paints] of Object.entries(images)) {
     const dst = nodeAtPath(inst, path);
     if (!dst || !('fills' in dst)) {
-      failures.push(`사진 이식 실패(${path}) — 자리를 찾지 못했습니다`);
+      failures.push(t('component.fail.photoNoSlot', { path }));
       continue;
     }
     try {
       (dst as GeometryMixin).fills = paints;
       applied++;
     } catch (e) {
-      failures.push(`사진 이식 실패(${path}): ${e instanceof Error ? e.message : String(e)}`);
+      failures.push(t('component.fail.photo', { path, error: e instanceof Error ? e.message : String(e) }));
     }
   }
   return { applied, failures };

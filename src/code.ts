@@ -3,6 +3,7 @@
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, CollectionRoleInfo, VarUpdateError } from './shared/messages';
 import { post } from './shared/messages';
+import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
@@ -23,7 +24,7 @@ import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } fr
 import { scanSimilar, componentizeSimilar } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
 import { Tier, Feature, isTier } from './lib/entitlements';
-import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
+import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache, isVerifyErrCode } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
 import { UI_SIZE_KEY, UI_WIDTH, normalizeUiSize, uiHeight, uiWidth } from './lib/uiSize';
@@ -84,7 +85,9 @@ function requirePaid(feature: Feature): boolean {
   return false;
 }
 
-function postLicense(note?: string): void {
+interface LicenseNote { text: string; kind: 'ok' | 'warn'; tip?: string }
+
+function postLicense(note?: LicenseNote): void {
   const e = effective();
   post({
     type: 'LICENSE_STATUS',
@@ -93,7 +96,9 @@ function postLicense(note?: string): void {
     source: e.source,
     status: e.status,
     expiresAt: e.expiresAt,
-    note,
+    note: note?.text,
+    noteKind: note?.kind,
+    noteTip: note?.tip,
   });
 }
 
@@ -230,7 +235,7 @@ function tableCell(raw: VariableValue | undefined, aliasInfo: (id: string) => { 
     const id = (raw as VariableAlias).id;
     const info = aliasInfo(id);
     if (info.name !== null && !info.remote) return { kind: 'alias', aliasId: id, aliasName: info.name };
-    return { kind: 'alias', aliasId: id, aliasName: info.name ?? '(삭제된 변수)', remote: info.name ? true : undefined };
+    return { kind: 'alias', aliasId: id, aliasName: info.name ?? t('edit.deletedTarget'), remote: info.name ? true : undefined };
   }
   if (typeof raw === 'object' && 'r' in raw) {
     const a = 'a' in raw && typeof (raw as RGBA).a === 'number' ? Math.round((raw as RGBA).a * 255) / 255 : 1;
@@ -921,13 +926,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
-        let summary = `Global ${s.globals}개 (생성 ${s.created} / 갱신 ${s.updated})`;
-        if (pruned) summary += ` · 이전 색 ${pruned}개 정리`;
+        let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });
+        if (pruned) summary += t('create.sumPruned', { n: pruned });
         // base 반영 — 비-px 값이 실제로 얼마가 되는지 요약에 노출. base를 바꾸면 이 줄이 바뀐다.
         if (s.conversions.length) {
           const px = (n: number): string => String(Math.round(n * 100) / 100);
           const ex = s.conversions.slice(0, 2).map((c) => `${c.from}→${px(c.to)}px`).join(', ');
-          summary += ` · base ${msg.base}px 환산 ${s.conversions.length}개(${ex}${s.conversions.length > 2 ? ' 외' : ''})`;
+          const morePart = s.conversions.length > 2 ? t('create.sumBaseMore') : '';
+          summary += t('create.sumBase', { base: msg.base, n: s.conversions.length, examples: ex, morePart });
         }
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview });
         if (!msg.preview) {
@@ -1112,7 +1118,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 같은 입력이어야 결과가 예측 가능하다. 등록된 스타일은 그 사이 바뀔 수 있어 새로 읽는다.
         // 빈 후보를 돌려보내면 UI가 '텍스트를 못 찾음'으로 읽고 기본 램프로 표를 덮는다 — 오류로 알린다.
         if (!lastTextSamples.length) {
-          post({ type: 'ERROR', message: '먼저 스캔하세요 — 이름을 다시 매길 표본이 없습니다.', op: 'NAME_TEXT_STYLES_BY_ROW' });
+          post({ type: 'ERROR', message: t('textStyle.needScan'), op: 'NAME_TEXT_STYLES_BY_ROW' });
           break;
         }
         const existing = await scanExistingTextStyles();
@@ -1206,16 +1212,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           } catch {
             /* 저장 실패해도 세션 동안은 적용 */
           }
-          postLicense('라이선스 적용됨');
+          postLicense({ text: t('license.noteApplied'), kind: 'ok' });
         } else if (msg.result.offline) {
           // 오프라인 — 기존 캐시(grace) 유지, 변경 없음.
-          postLicense(
-            cache
-              ? '오프라인 — 캐시된 라이선스로 동작(grace).'
-              : '오프라인 — 키를 확인할 수 없습니다.',
-          );
+          postLicense({ text: t(cache ? 'license.noteGrace' : 'license.noteOffline'), kind: 'warn' });
         } else {
-          postLicense(`검증 실패: ${msg.result.error}`);
+          // 알려진 서버 사유면 해요체 문구, 아니면 한 줄 + 원문 툴팁(결정 5-(b)). 머리말은 붙이지 않는다.
+          const { code, error } = msg.result;
+          postLicense({
+            text: isVerifyErrCode(code) ? t(`license.err.server.${code}`) : t('license.verifyFailed'),
+            kind: 'warn',
+            tip: error || undefined,
+          });
         }
         break;
       }
@@ -1230,7 +1238,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         } catch {
           /* 무시 */
         }
-        postLicense('라이선스 키 제거됨');
+        postLicense({ text: t('license.noteCleared'), kind: 'ok' });
         break;
       }
       case 'OPEN_LICENSE_LINK': {
@@ -1463,13 +1471,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             const why: string[] = [];
             const r = fillOrigin(make, o, (w) => why.push(w));
             if (r === 'instance') continue;
-            const cause = why.length ? ` — ${why.join(' · ')}` : '';
+            const causePart = why.length ? t('component.fail.cause', { why: why.join(' · ') }) : '';
             if (r === 'copy') {
               placeCloned.push(o.name);
-              failures.push(`인스턴스 대신 복사본을 뒀어요(${label} → ${o.name})${cause}`);
+              failures.push(t('component.fail.copyPlaced', { label, name: o.name, causePart }));
             } else {
               placeFailed.push(o.name);
-              failures.push(`제자리에 아무것도 두지 못했어요(${label} → ${o.name})${cause}`);
+              failures.push(t('component.fail.nothingPlaced', { label, name: o.name, causePart }));
             }
           }
         };
@@ -1532,7 +1540,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               } catch (e) {
                 releaseOrigin(o); // 원본이 그 자리에 그대로 — 표지만 치운다
                 skipped++;
-                failures.push(`단독 등록 실패(${g.members[0].name}): ${errText(e)}`);
+                failures.push(t('component.fail.single', { name: g.members[0].name, error: errText(e) }));
               }
               continue;
             }
@@ -1555,7 +1563,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   } catch (e) {
                     releaseOrigin(o);
                     skipped++;
-                    failures.push(`속성접힘 등록 실패(${setName}): ${errText(e)}`);
+                    failures.push(t('component.fail.propsRegister', { set: setName, error: errText(e) }));
                   }
                 }
                 continue;
@@ -1590,7 +1598,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               }
               if (!iconsReady) {
                 // 세트로 남긴다(아래 경로) — 멤버가 그대로라 그림도 그대로다.
-                failures.push(`아이콘을 만들지 못해 세트로 등록합니다(${setName})`);
+                failures.push(t('component.fail.iconFallback', { set: setName }));
               } else {
                 type Snap = { o: Origin; vals: Record<string, string | boolean>; images: Record<string, readonly Paint[]> };
                 const snapshots: Snap[] = [];
@@ -1606,7 +1614,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   } catch (e) {
                     releaseOrigin(snap.o);
                     skipped++;
-                    failures.push(`속성접힘 컴포넌트화 실패(${n.name}): ${errText(e)}`);
+                    failures.push(t('component.fail.propsComponentize', { name: n.name, error: errText(e) }));
                   }
                 }
                 if (!made.length) continue;
@@ -1642,7 +1650,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 try {
                   collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
                 } catch (e) {
-                  failures.push(`속성 노출 실패(${master.name}): ${errText(e)}`);
+                  failures.push(t('component.fail.expose', { name: master.name, error: errText(e) }));
                 }
                 exposedEarly += collapsedExposed;
                 const ids = propIdsByName(master);
@@ -1693,7 +1701,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               } catch (e) {
                 releaseOrigin(o);
                 skipped++;
-                failures.push(`컴포넌트화 실패(${m.name}): ${errText(e)}`);
+                failures.push(t('component.fail.componentize', { name: m.name, error: errText(e) }));
               }
             }
             if (made.length < 2) {
@@ -1708,7 +1716,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               const home = pageOf(made[0].comp) ?? figma.currentPage;
               set = figma.combineAsVariants(made.map((x) => x.comp), home);
             } catch (e) {
-              failures.push(`결합 실패(${setName}): ${errText(e)}`);
+              failures.push(t('component.fail.combine', { set: setName, error: errText(e) }));
               for (const x of made) placeSingle(x.comp, x.o, setName);
               continue;
             }
@@ -1716,7 +1724,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             set.name = setName;
             for (const x of made) if (x.variant) x.comp.name = x.variant; // 'Prop=value, ...'
             page.appendChild(set); // Components 페이지로 이동
-            try { arrangeSet(set); } catch (e) { failures.push(`정렬 실패(${set.name}): ${errText(e)}`); } // 장식: 비치명
+            try { arrangeSet(set); } catch (e) { failures.push(t('component.fail.arrange', { set: set.name, error: errText(e) })); } // 장식: 비치명
             set.x = cursorX;
             set.y = 0;
             cursorX += set.width + 48;
@@ -1733,7 +1741,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 속성 자동 노출 — 등록한 각 컴포넌트/세트의 직속 레이어를 Text/Instance-swap/Boolean 속성으로.
         let exposed = exposedEarly;
         for (const c of containers) {
-          try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(`속성 노출 실패: ${errText(e)}`); }
+          try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(t('component.fail.exposeAll', { error: errText(e) })); }
         }
 
         post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned });
@@ -1775,13 +1783,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               const v = variantById.get(m.id);
               if (node && v) node.name = v; // 'Prop=value, ...'
             }
-            try { arrangeSet(set); } catch (e) { failures.push(`정렬 실패(${set.name}): ${errText(e)}`); }
+            try { arrangeSet(set); } catch (e) { failures.push(t('component.fail.arrange', { set: set.name, error: errText(e) })); }
             const childNames = set.children.filter((c): c is ComponentNode => c.type === 'COMPONENT').map((c) => c.name);
             const miss = missingVariants(childNames);
             if (miss.length) missing.push(`${set.name}: ${miss.join(' / ')}`);
             sets++;
           } catch (e) {
-            failures.push(`결합 실패(${groupNames[gi]}): ${errText(e)}`);
+            failures.push(t('component.fail.combine', { set: groupNames[gi], error: errText(e) }));
           }
         }
         post({ type: 'VARIANTS_RESULT', sets, missing, singles, failures });
@@ -1891,7 +1899,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!requirePaid('components')) break;
         const master = await figma.getNodeByIdAsync(msg.masterId);
         if (!master || (master.type !== 'FRAME' && master.type !== 'GROUP')) {
-          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['마스터 프레임을 찾을 수 없습니다.'] });
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: [t('similar.noMaster')] });
           break;
         }
         // 멤버 노드 수집(마스터 포함) → 정렬·컴포넌트화·인스턴스 교체는 similarApply에 위임.
@@ -1901,7 +1909,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (n && 'type' in n) memberNodes.push(n as SceneNode);
         }
         if (memberNodes.length < 2) {
-          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['대상 프레임이 2개 미만입니다. 다시 스캔하세요.'] });
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: [t('similar.tooFew')] });
           break;
         }
         const r = await componentizeSimilar(master as SceneNode, memberNodes);

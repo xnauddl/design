@@ -93,7 +93,7 @@ test('summarize — 집계가 있는 항목만 표시', () => {
 
 test('summarize — 컴포넌트 0은 생략, 빈 집계는 안내 문구', () => {
   assert.equal(summarize({ created: 4, components: 0 }), '토큰 4');
-  assert.equal(summarize({}), '완료된 작업이 없습니다');
+  assert.equal(summarize({}), '끝낸 작업이 없어요');
 });
 
 test('summarize — 다크·텍스트 스타일은 0이면 생략(안 돈 단계와 구분)', () => {

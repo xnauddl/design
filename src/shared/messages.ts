@@ -275,8 +275,12 @@ export type CodeToUi =
       status?: LicenseStatus;
       /** 구독 만료(ms epoch). */
       expiresAt?: number;
-      /** 마지막 작업 관련 메시지(검증 실패·오프라인 안내 등). */
+      /** 마지막 작업 관련 메시지(검증 실패·오프라인 안내 등) — 이미 t()로 만든 화면 문구. */
       note?: string;
+      /** note의 색: ok(적용·제거) / warn(오프라인·검증 실패). 문구를 보고 정하지 않는다. */
+      noteKind?: 'ok' | 'warn';
+      /** 원문 사유(서버 error · 기술 사유) — #licenseStatus의 title(툴팁). 없으면 title을 비운다. */
+      noteTip?: string;
     }
   | { type: 'PREMIUM_REQUIRED'; feature: Feature } // 사유 문구는 보내지 않는다 — UI가 status.paid를 띄운다(PR 4)
   | { type: 'REQUEST_VERIFY'; key: string; instanceId?: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서). instanceId: 같은 기기로 validate

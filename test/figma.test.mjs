@@ -575,7 +575,7 @@ test('extractFromSelection — 인스턴스 내부만 있으면 그 이유를 �
   };
   const { tokens, warnings } = extractFromSelection([node]);
   assert.equal(tokens.length, 0);
-  assert.match(warnings.join(' '), /인스턴스 내부/);
+  assert.match(warnings.join(' '), /인스턴스 안쪽/);
 });
 
 /* ================= variables.ts ================= */
@@ -3595,7 +3595,7 @@ test('createSemanticTextStyles — px 행간으로 스캔한 스타일은 행간
   assert.equal(style.lineHeight.unit, 'PIXELS'); // %로 뒤집히지 않는다
   assert.equal(style.lineHeight.value, 24);
   assert.ok(style.boundVariables?.lineHeight, 'line-height 변수가 연결돼야 한다');
-  assert.ok(!r.notes.some((n) => n.includes('바인딩 생략')));
+  assert.ok(!r.notes.some((n) => n.includes('연결 안 함'))); // %를 지키느라 변수를 안 붙인 알림이 없어야
 });
 
 test('scanTextStyles — 흔하지 않은 px 행간(23px)은 %로 오인하지 않는다', async () => {
@@ -3701,7 +3701,7 @@ test('createSemanticTextStyles — 이미 변수가 묶인 스타일은 스캔 %
   );
   assert.deepEqual(style.letterSpacing, { value: 1, unit: 'PIXELS' }); // 그대로
   assert.ok(style.boundVariables.letterSpacing, '연결 유지');
-  assert.ok(r.notes.some((n) => n.includes('자간 변수 연결을 지켰습니다')));
+  assert.ok(r.notes.some((n) => n.includes('자간 변수 연결을 지켰어요')));
 });
 
 test('createSemanticTextStyles — 묶인 변수가 없으면 스캔 %로 단위를 교정한다', async () => {

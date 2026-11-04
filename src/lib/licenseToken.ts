@@ -6,6 +6,7 @@
    - 페이로드는 ASCII JSON 가정(라이선스 클레임: tier·날짜·식별자).
    ============================================================ */
 import { isTier, Tier } from './entitlements';
+import { t } from './i18n';
 import type { VerifyOk, VerifyErr } from './license';
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -16,7 +17,7 @@ for (let i = 0; i < B64.length; i++) LOOKUP[B64[i]] = i;
 export function base64UrlToString(input: string): string {
   let b64 = input.replace(/-/g, '+').replace(/_/g, '/');
   const rem = b64.length % 4;
-  if (rem === 1) throw new Error('잘못된 base64url 길이');
+  if (rem === 1) throw new Error(t('license.err.b64Len'));
   if (rem === 2) b64 += '==';
   else if (rem === 3) b64 += '=';
   let out = '';
@@ -28,7 +29,7 @@ export function base64UrlToString(input: string): string {
     const c2 = e2 === '=' ? -1 : LOOKUP[e2];
     const c3 = e3 === '=' ? -1 : LOOKUP[e3];
     if (c0 === undefined || c1 === undefined || (e2 !== '=' && c2 === undefined) || (e3 !== '=' && c3 === undefined)) {
-      throw new Error('잘못된 base64url 문자');
+      throw new Error(t('license.err.b64Char'));
     }
     out += String.fromCharCode((c0 << 2) | (c1 >> 4));
     if (c2 !== -1) out += String.fromCharCode(((c1 & 15) << 4) | (c2 >> 2));
@@ -49,7 +50,7 @@ export interface Jwt {
 /** JWT 문자열 → 구조 분해(서명 검증 전). 형식·디코드 오류는 throw. */
 export function decodeJwt(token: string): Jwt {
   const parts = token.split('.');
-  if (parts.length !== 3) throw new Error('JWT 형식 아님(점 3분할 필요)');
+  if (parts.length !== 3) throw new Error(t('license.err.notJwt'));
   const [h, p, s] = parts;
   const header = JSON.parse(base64UrlToString(h)) as Record<string, unknown>;
   const payload = JSON.parse(base64UrlToString(p)) as Record<string, unknown>;
@@ -67,15 +68,15 @@ export function validateLicenseClaims(
   now: number,
   opts: ClaimOpts = {},
 ): VerifyOk | VerifyErr {
-  if (typeof payload.exp !== 'number') return { ok: false, error: 'exp 클레임 없음' };
+  if (typeof payload.exp !== 'number') return { ok: false, error: t('license.err.noExp') };
   const expiresAt = payload.exp * 1000;
-  if (now >= expiresAt) return { ok: false, error: '토큰 만료됨' };
+  if (now >= expiresAt) return { ok: false, error: t('license.err.expired') };
   if (typeof payload.nbf === 'number' && now < payload.nbf * 1000) {
-    return { ok: false, error: '아직 유효하지 않은 토큰(nbf)' };
+    return { ok: false, error: t('license.err.notYet') };
   }
-  if (opts.issuer && payload.iss !== opts.issuer) return { ok: false, error: '발급자(iss) 불일치' };
-  if (opts.audience && payload.aud !== opts.audience) return { ok: false, error: '대상(aud) 불일치' };
-  if (!isTier(payload.tier)) return { ok: false, error: '알 수 없는 티어' };
+  if (opts.issuer && payload.iss !== opts.issuer) return { ok: false, error: t('license.err.iss') };
+  if (opts.audience && payload.aud !== opts.audience) return { ok: false, error: t('license.err.aud') };
+  if (!isTier(payload.tier)) return { ok: false, error: t('license.err.tier') };
   return { ok: true, tier: payload.tier as Tier, expiresAt };
 }
 
@@ -96,10 +97,10 @@ export async function verifyLicenseToken(
   try {
     jwt = decodeJwt(token);
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : '토큰 디코드 실패' };
+    return { ok: false, error: e instanceof Error ? e.message : t('license.err.decode') };
   }
   const alg = typeof jwt.header.alg === 'string' ? jwt.header.alg : '';
-  if (!alg || alg.toLowerCase() === 'none') return { ok: false, error: '서명 알고리즘 없음(alg=none 거부)' };
+  if (!alg || alg.toLowerCase() === 'none') return { ok: false, error: t('license.err.alg') };
 
   let sigOk = false;
   try {
@@ -107,7 +108,7 @@ export async function verifyLicenseToken(
   } catch {
     sigOk = false;
   }
-  if (!sigOk) return { ok: false, error: '서명 검증 실패' };
+  if (!sigOk) return { ok: false, error: t('license.err.sig') };
 
   return validateLicenseClaims(jwt.payload, now, opts);
 }

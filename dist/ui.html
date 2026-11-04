@@ -756,12 +756,12 @@
 <body>
   <!-- 탭 바 — 다루는 대상별 3탭(IA v3) + 오른쪽 끝 최소화. [—]는 탭이 아니라 창 조작이라 tablist 밖에 둔다. -->
   <div class="tabs" id="tabBar">
-    <div class="tab-list" role="tablist" aria-label="작업 탭">
+    <div class="tab-list" role="tablist" data-i18n-aria-label="tab.listAria" aria-label="작업 탭">
       <button class="tab-btn" id="tabbtn-variables" role="tab" aria-controls="tab-variables" data-i18n="tab.variables">변수</button>
       <button class="tab-btn" id="tabbtn-layer" role="tab" aria-controls="tab-layer" data-i18n="tab.layer">레이어</button>
       <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
     </div>
-    <button class="tab-min" id="btnMinimize" type="button" data-i18n-title="ui.minimize" title="최소화" aria-label="최소화">
+    <button class="tab-min" id="btnMinimize" type="button" data-i18n-title="ui.minimize" title="최소화" data-i18n-aria-label="ui.minimize" aria-label="최소화">
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 6h7"/></svg>
     </button>
   </div>
@@ -793,25 +793,25 @@
    <div id="varList" style="display:none">
     <div class="list-head" id="listHead">
       <button class="link link-btn" id="btnReadiness" aria-haspopup="menu"></button>
-      <button class="link link-btn" id="btnFindUnbound" data-i18n="list.findUnbound" data-i18n-title="list.findUnboundTip" title="선택에서 변수로 바꿀 수 있는 색·간격을 찾아 연결 미리보기를 엽니다">변수 없는 값 찾기 →</button>
+      <button class="link link-btn" id="btnFindUnbound" data-i18n="list.findUnbound" data-i18n-title="list.findUnboundTip" title="선택에서 변수로 바꿀 수 있는 색·간격을 레이어 › 연결에서 찾아요">변수 없는 값 찾기 →</button>
       <span class="grow"></span>
-      <button class="icon-btn" id="btnAddVar" type="button" data-i18n-title="list.addTip" title="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)" aria-label="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
-      <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
-      <button class="icon-btn" id="btnVarRefresh" type="button" data-i18n-title="list.refreshTip" title="다시 읽기" aria-label="다시 읽기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg></button>
+      <button class="icon-btn" id="btnAddVar" type="button" data-i18n-title="list.addTip" title="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)" data-i18n-aria-label="list.addTip" aria-label="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
+      <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
+      <button class="icon-btn" id="btnVarRefresh" type="button" data-i18n-title="list.refreshTip" title="다시 읽기" data-i18n-aria-label="list.refreshTip" aria-label="다시 읽기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg></button>
     </div>
     <div class="situation" id="situationLine" hidden></div>
     <!-- 결정 B(§4.4): 왼쪽 사이드바(★ Inspect · 컬렉션 › 그룹 · LIB · 삭제된 변수) + 오른쪽 목록 -->
     <div class="vl-split">
-      <div class="vl-side" id="varSide" role="tree" aria-label="변수 컬렉션"></div>
+      <div class="vl-side" id="varSide" role="tree" data-i18n-aria-label="list.sideAria" aria-label="변수 컬렉션"></div>
       <div class="vl-main">
         <div class="vl-head" id="chipBar">
           <b class="vl-title" id="varMainTitle" tabindex="-1"></b>
           <span class="grow"></span>
           <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
-          <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
-          <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" aria-label="검색 지우기">✕</button></span>
+          <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" data-i18n-aria-label="list.searchTip" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+          <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" data-i18n-aria-label="list.searchClear" aria-label="검색 지우기">✕</button></span>
         </div>
-        <div class="var-tree" id="varTree" role="grid" aria-label="변수 목록"></div>
+        <div class="var-tree" id="varTree" role="grid" data-i18n-aria-label="list.gridAria" aria-label="변수 목록"></div>
       </div>
     </div>
    </div>
@@ -846,7 +846,7 @@
       <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
            파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
            흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 다크=라이트 모드에서 어두운 값 채우기</div>
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 다크=라이트에서 어두운 값 채우기</div>
       <div class="status" id="wizardSummary"></div>
       <!-- 요약 끝 연결 안내(§4.3) — 마법사는 레이어에 변수를 붙이지 않는다. 누르면 레이어 › 연결 + 미리보기. -->
       <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">레이어 › 연결에서 확인하고 연결하기 →</button>
@@ -857,7 +857,7 @@
     <button class="link back-link" id="btnMakeBack" data-i18n="make.back">← 돌아가기</button>
     <div id="wizardSlotMake"></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
-    <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
+    <div class="steps steps-4" id="makeRail" role="tablist" data-i18n-aria-label="rail.makeAria" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
       <button class="step-chip" data-make-step="token"><span class="n" data-i18n="rail.token">토큰</span><span data-i18n="rail.tokenSub">간격·크기</span></button>
       <button class="step-chip" data-make-step="theme"><span class="n" data-i18n="rail.theme">테마</span><span data-i18n="rail.themeSub">다크 모드</span></button>
@@ -871,7 +871,7 @@
            이미 말한다. 게다가 잠금 배지와 범위 라벨 사이에 끼어 「🔒 색 12개 변수화」로 읽혔다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 됩니다. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
+      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 돼요. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 역할은 Semantic으로 붙어요.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만들어요. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
@@ -917,7 +917,7 @@
       <h2><span data-i18n="create.title">간격·크기 토큰</span> <span class="muted lock" id="createLock"></span> <span class="muted" id="createCount"></span></h2>
       <!-- 설명 줄은 툴바 **위** — 나머지 여덟 카드가 다 그렇다. 여기만 아래에 있으면
            「무엇을 하는 카드인가」를 버튼을 지나친 뒤에야 읽게 된다. -->
-      <div class="hint" data-i18n="create.scopeHint">여백·크기·폰트·효과만 다룹니다. 색은 이전 단계에서 이미 만들었어요</div>
+      <div class="hint" data-i18n="create.scopeHint">여백·크기·폰트·효과만 다뤄요. 색은 이전 단계에서 이미 만들었어요</div>
       <div class="toolbar">
         <button id="btnCreate" data-i18n="create.previewBtn">미리보기</button>
         <button id="btnCreateApply" class="primary" style="display:none" data-i18n="create.apply">적용</button>
@@ -927,7 +927,7 @@
       <div class="banner" id="tokenColorNote" style="display:none"></div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체</span></label>
-        <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" data-i18n-title="create.dropOnceTip" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
+        <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" data-i18n-title="create.dropOnceTip" title="한 레이어에서만 쓰인 값(1×)의 체크를 풀어요 — 대개 일회성이라 토큰으로 남길 필요가 적어요">1× 해제</button>
       </div>
       <div id="tokenList" class="results"></div>
       <!-- 격자 값이 설정 입력으로 돌아온 뒤로는 스냅이 '정책'이 아니라 사용자의 선택이다.
@@ -945,7 +945,7 @@
     <div class="step" data-make-step="token" data-always-hidden style="display:none">
       <h2><span data-i18n="semantic.title">시맨틱 매핑 (역할 → 토큰)</span> <span class="muted lock" id="semLock"></span></h2>
       <div class="hint" data-i18n-html="semantic.formatLabel">형식: <code>역할 = Global변수이름</code></div>
-      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
       <div class="row">
         <button id="btnSemantics" data-i18n="semantic.aliasBtn">시맨틱 별칭 생성</button>
@@ -956,7 +956,7 @@
 
     <div class="step" id="darkCard" data-make-step="theme">
       <h2><span data-i18n="dark.title">다크 모드</span> <span class="muted lock" id="darkLock"></span></h2>
-      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="색상·채도는 그대로 두고 명도만 뒤집습니다. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 dark/…로 따로 만들어집니다.">밝은 모드 색을 뒤집어 다크 모드에 채웁니다. 목록 이름은 Figma 변수 컬렉션·모드예요</div>
+      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="색상·채도는 그대로 두고 명도만 뒤집어요. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뛰어요. 다크용 원시색은 dark/…로 따로 만들어요.">라이트 색을 뒤집어 다크에 채워요. 목록 이름은 Figma 변수 컬렉션·모드예요</div>
       <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바에, 입력은 그 아래 한 줄(와이어 uxTheme). -->
       <div class="toolbar">
         <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 만들기</button>
@@ -967,15 +967,15 @@
         <label class="inline"><span data-i18n="dark.collection">역할 컬렉션</span>
           <select id="darkCollection"></select>
         </label>
-        <label class="inline"><span data-i18n="dark.fromMode">밝은 모드</span>
+        <label class="inline"><span data-i18n="dark.fromMode">라이트</span>
           <select id="darkFromMode"></select>
         </label>
-        <label class="inline"><span data-i18n="dark.toMode">어두운 모드</span>
+        <label class="inline"><span data-i18n="dark.toMode">다크</span>
           <select id="darkToMode"></select>
         </label>
       </div>
       <!-- 바로가기는 '토큰이 없다'일 때만 뜬다 — 컬렉션·모드를 고르라는 안내에는 갈 곳이 없다. -->
-      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
       <div class="status" id="darkStatus"></div>
     </div>
 
@@ -994,7 +994,7 @@
            옵션이라, 결과를 보기도 전에 이름 규칙을 고르라는 요구였다. 스캔은 늘 크기 순으로 두고,
            이름이 마음에 안 들 때 눌러 덧입히는 뒤따르는 동작으로 바꾼다. 스캔해야 누를 것이 생긴다. -->
       <div class="row">
-        <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둡니다.">왼쪽 글자로 이름 채우기</button>
+        <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봐요. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둬요.">왼쪽 글자로 이름 채우기</button>
       </div>
       <div id="tsList" class="results"></div>
       <div class="status" id="tsStatus"></div>
@@ -1004,7 +1004,7 @@
 
   <section class="tab-section" id="tab-layer" role="tabpanel" aria-labelledby="tabbtn-layer" tabindex="0">
     <!-- 레이어 하위 탭(밑줄, §4.1 탭 모양 2단계) — 연결 · 이름 · 컴포넌트. 세 작업은 순서가 없다(§4.7). -->
-    <div class="subtabs" id="applyRail" role="tablist" aria-label="레이어 작업">
+    <div class="subtabs" id="applyRail" role="tablist" data-i18n-aria-label="rail.layerAria" aria-label="레이어 작업">
       <button class="subtab" role="tab" data-apply-step="bind" data-i18n="rail.bind">연결</button>
       <button class="subtab" role="tab" data-apply-step="rename" data-i18n="rail.rename">이름</button>
       <button class="subtab" role="tab" data-apply-step="structure" data-i18n="rail.structure">컴포넌트</button>
@@ -1016,13 +1016,13 @@
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
       <div class="toolbar bind-toolbar">
         <!-- 단계 표시 — 누를 수 없는 표시(정지점 아님). 상태는 ui.ts renderBindSteps가 정한다. -->
-        <ol class="bind-steps" id="bindSteps" role="list" aria-label="연결 단계">
+        <ol class="bind-steps" id="bindSteps" role="list" data-i18n-aria-label="bind.stepsAria" aria-label="연결 단계">
           <li class="bs" data-s="find"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.find">찾기</span></li>
           <li class="bs" data-s="pick"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.stepPick">고르기</span></li>
           <li class="bs" data-s="link"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.link">연결</span></li>
         </ol>
-        <button id="btnApply" class="primary bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg><span class="bl" id="btnApplyLabel">찾기</span></button>
-        <button id="btnApplyConfirm" class="bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span class="bl" id="btnApplyConfirmLabel">연결</span></button>
+        <button id="btnApply" class="primary bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg><span class="bl" id="btnApplyLabel" data-i18n="bind.find">찾기</span></button>
+        <button id="btnApplyConfirm" class="bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span class="bl" id="btnApplyConfirmLabel" data-i18n="bind.link">연결</span></button>
       </div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
@@ -1043,7 +1043,7 @@
         <div class="skip-row" id="bindSkips" hidden></div>
         <span class="grow"></span>
         <button class="bd-all" id="bindAll" type="button"></button>
-        <button class="icon-btn" id="bindFilterBtn" type="button" aria-expanded="false" aria-controls="bindFilterRow" data-i18n-title="bind.filterBtn" title="변수 이름 필터" aria-label="변수 이름 필터"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+        <button class="icon-btn" id="bindFilterBtn" type="button" aria-expanded="false" aria-controls="bindFilterRow" data-i18n-title="bind.filterBtn" title="변수 이름 필터" data-i18n-aria-label="bind.filterBtn" aria-label="변수 이름 필터"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
       </div>
       <div class="row bind-filter-row" id="bindFilterRow" hidden>
         <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" />
@@ -1058,7 +1058,7 @@
         <span class="ts-aa" aria-hidden="true">Aa</span>
         <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
         <span class="grow"></span>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 연결</button>
+        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결해요. 새로 만들지 않아요.">기존 스타일 연결</button>
       </div>
       <div class="hint" id="tsApplyResult" hidden></div>
       <div class="status" id="applyStatus"></div>
@@ -1066,7 +1066,7 @@
 
     <div class="step" data-apply-step="rename">
       <h2><span data-i18n="rename.title">이름 정리</span> <span class="muted" id="renameCount"></span></h2>
-      <div class="hint" data-i18n="rename.hint">역할에 맞는 레이어 이름으로 바꿉니다. 최상위·인스턴스 이름은 그대로 둡니다</div>
+      <div class="hint" data-i18n="rename.hint">역할에 맞는 레이어 이름으로 바꿔요. 최상위·인스턴스 이름은 그대로 둬요</div>
       <div class="toolbar">
         <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
         <button id="btnRename" class="primary" disabled data-i18n="rename.apply">이름 적용</button>
@@ -1089,14 +1089,14 @@
       <h2><span data-i18n="structure.title">컴포넌트</span> <span class="muted lock" id="componentLock"></span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
       <div class="hint" data-i18n="component.hint">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</div>
       <div class="toolbar">
-        <button id="btnScanComp" data-i18n="component.scanBtn" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.">후보 스캔</button>
-        <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.">닮은 스캔</button>
+        <button id="btnScanComp" data-i18n="component.scanBtn" data-i18n-tip="component.scanHelp" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.">후보 스캔</button>
+        <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-i18n-tip="similar.scanHelp" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶어요. 파일은 안 바꿔요.">닮은 스캔</button>
       </div>
       <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
       <div class="toolbar toolbar-2">
         <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다. 원본의 연결과 값은 마스터를 따라요.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다. 원본의 연결과 값은 마스터를 따라요.">묶기</button>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿔요. 원본의 연결과 값은 마스터를 따라요.">묶기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -1110,8 +1110,8 @@
       <div id="variantRow" hidden>
         <div class="r-group" data-i18n="structure.groupVariant">선택한 컴포넌트 정리</div>
         <div class="row">
-          <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶습니다.">베리언트 분류</button>
-          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채웁니다.">누락 조합 생성</button>
+          <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-i18n-tip="component.classifyHelp" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶어요.">베리언트 분류</button>
+          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-i18n-tip="component.genMissingHelp" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채워요.">누락 조합 생성</button>
         </div>
       </div>
       <div id="variantReport" class="results"></div>
@@ -1123,7 +1123,7 @@
     <!-- #19: 기준 크기·맥락 깊이·허용오차는 여기서만. 만들기/적용 단계에는 노출하지 않는다. -->
     <div class="step" id="pluginSettingsCard">
       <h2 data-i18n="settings.title">기본값</h2>
-      <div class="hint" data-i18n="settings.hint">자주 안 바꾸는 값이에요. 만들기·적용 화면에는 안 보여요</div>
+      <div class="hint" data-i18n="settings.hint">만들기 · 연결 · 이름 정리에 쓰는 값이에요</div>
       <div class="row">
         <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
         <label class="inline"><span data-i18n="settings.depth">이름 정리 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
@@ -1136,12 +1136,12 @@
 
     <div class="step">
       <h2 data-i18n="license.title">라이선스</h2>
-      <div class="hint" data-i18n="license.hint">유료를 쓰면 🔒 잠긴 기능이 풀립니다</div>
+      <div class="hint" data-i18n="license.hint">유료를 쓰면 🔒 잠긴 기능이 풀려요</div>
       <div class="row">
         <input id="licenseKey" type="text" data-i18n-placeholder="license.keyPlaceholder" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
         <button id="btnVerify" data-i18n="license.verify">검증</button>
         <!-- 와이어엔 없지만 남긴다: 기기 1대 한도라 이 버튼 없이는 기기를 옮길 방법이 없다. -->
-        <button id="btnClearLicense" data-i18n-title="license.clearTip" title="이 기기의 활성화를 반납합니다. 새 기기에서 같은 키를 다시 검증하면 됩니다." data-i18n="license.clear">해제</button>
+        <button id="btnClearLicense" data-i18n-title="license.clearTip" title="이 기기의 활성화를 반납해요. 새 기기에서 같은 키를 다시 검증하면 돼요." data-i18n="license.clear">해제</button>
       </div>
       <div class="muted" id="licenseInfo"></div>
       <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유.
@@ -1149,10 +1149,10 @@
       <!-- 「구독」+「관리」 이원화 폐기(결정 2026-08-06) — 한 버튼이 티어에 따라 갈린다:
            Free면 결제 페이지, Paid면 고객 포털. 사용자가 자기 상태를 알고 버튼을 고를 일이 아니다. -->
       <div class="row" id="licenseLinkRow">
-        <button id="btnLicenseLink" class="primary" data-i18n-title="license.manageTip" title="Free면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 엽니다" data-i18n="license.manage">결제 · 구독 관리</button>
+        <button id="btnLicenseLink" class="primary" data-i18n-title="license.manageTip" title="무료면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 열어요" data-i18n="license.manage">결제 · 구독 관리 ↗</button>
       </div>
-      <div class="hint" id="licenseLinkHint">Free · Paid 연 $39 · 기기 1대</div>
-      <div class="hint" id="licenseSetupHint" style="display:none">배포 전 — 키 검증·구독 링크는 아직 동작하지 않습니다.</div>
+      <div class="hint" id="licenseLinkHint" data-i18n="license.priceHint">무료 · 유료 연 $39 · 기기 1대</div>
+      <div class="hint" id="licenseSetupHint" style="display:none" data-i18n="license.setupHint">배포 전이라 키 검증·구독 링크는 아직 동작하지 않아요</div>
       <!-- 개발용 강제 티어: 사용자 화면 비노출(개발 시 display 해제). #tier id는 ui.ts가 참조하므로 DOM 유지. -->
       <div class="row" id="devTierRow" style="display:none;">
         <label class="inline"><span data-i18n="license.devTier">개발용 강제 티어</span>
@@ -1179,7 +1179,7 @@
 
   <!-- 최소화 상태(§4.9) — 창 140×104, 가운데 펼치기 버튼(↙↗)만. 누르면 펼친다. -->
   <div class="mini" id="miniView" hidden>
-    <button class="mini-mark" id="btnExpand" type="button" aria-label="펼치기">
+    <button class="mini-mark" id="btnExpand" type="button" data-i18n-aria-label="ui.expand" aria-label="펼치기">
       <svg width="16" height="16" viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3h6v6M19 3l-7 7M9 19H3v-6M3 19l7-7"/></svg>
       <span class="mini-badge" id="miniBadge" hidden></span>
     </button>
@@ -1189,19 +1189,19 @@
   <!-- 팝업 보관함(§4.4 ⋯) — 계층 팝업·내보내기 팝업이 열릴 때 내용을 빌려 가고 닫히면 돌려준다. -->
   <div id="popupStore" hidden>
     <div id="tierPopBody" hidden>
-      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
+      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정해요. 파일에 저장돼 이 파일을 여는 모두에게 적용돼요</div>
       <div id="collectionRoles"></div>
       <div class="status" id="colRolesStatus"></div>
     </div>
     <div id="exportPopBody" hidden>
-      <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
+      <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장돼요</div>
       <div class="row">
         <select id="exportFormat" data-i18n-title="export.formatTip" title="내보낼 코드 형식">
           <option value="w3c" data-i18n="export.fmtW3c">W3C 토큰 JSON</option>
           <option value="css" data-i18n="export.fmtCss">CSS 변수</option>
         </select>
         <!-- px·rem은 단위 기호 그대로라 번역 대상이 아니다(Free·Paid 티어 이름도 같다). -->
-        <select id="exportFontUnit" data-i18n-title="export.fontUnitTip" title="폰트 크기 단위 — rem은 기준 크기로 나눕니다">
+        <select id="exportFontUnit" data-i18n-title="export.fontUnitTip" title="폰트 크기 단위 — rem은 기준 크기로 나눠요">
           <option value="px">px</option>
           <option value="rem">rem</option>
         </select>
@@ -1238,79 +1238,6 @@
   };
   var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 
-  // src/lib/tokens.ts
-  var clamp01 = (n) => Math.min(1, Math.max(0, n));
-  var to255 = (c) => Math.round(clamp01(c) * 255);
-  function rgbToHex(rgb) {
-    const h = (c) => to255(c).toString(16).padStart(2, "0");
-    return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`.toLowerCase();
-  }
-  function hexToRgb(hex) {
-    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-    if (!m) throw new Error(`\uC798\uBABB\uB41C hex: ${hex}`);
-    const n = parseInt(m[1], 16);
-    return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
-  }
-  var SNAP_CATEGORIES = /* @__PURE__ */ new Set(["gap", "size"]);
-  var TOKEN_GROUP = { gap: "spacing", size: "size" };
-  var cloneToken = (t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] });
-  function scaleLadder(base, max) {
-    if (base <= 0) return [];
-    const rungs = [];
-    for (let v = base / 2; v >= 1; v /= 2) rungs.push(v);
-    for (let k = 1; base * k <= max + base; k++) rungs.push(base * k);
-    return rungs.sort((a, b) => a - b);
-  }
-  function tidyNumberTokens(tokens2, opts) {
-    var _a, _b, _c, _d, _e;
-    const { base, ratio } = opts;
-    const out = tokens2.map(cloneToken);
-    const targets = out.filter(
-      (t2) => SNAP_CATEGORIES.has(t2.category) && typeof t2.value === "number" && (!t2.unit || t2.unit === "px")
-    );
-    const before = targets.length;
-    if (base <= 0 || ratio <= 0 || before === 0) return { tokens: out, before, after: before, merged: 0, snapped: 0 };
-    const rungs = scaleLadder(base, Math.max(...targets.map((t2) => t2.value)));
-    const nearest = (v) => rungs.reduce((p, c) => Math.abs(c - v) < Math.abs(p - v) ? c : p);
-    let snapped = 0;
-    for (const t2 of targets) {
-      const v = t2.value;
-      if (v <= 0) continue;
-      const target = nearest(v);
-      if (target === v || Math.abs(target - v) / v > ratio) continue;
-      const group = TOKEN_GROUP[t2.category];
-      if (group && t2.name === numberTokenName(group, v)) t2.name = numberTokenName(group, target);
-      t2.value = target;
-      snapped++;
-    }
-    const seen = /* @__PURE__ */ new Map();
-    const dropped = /* @__PURE__ */ new Set();
-    for (const t2 of targets) {
-      const k = `${t2.category}|${t2.value}|${(_a = t2.unit) != null ? _a : ""}`;
-      const cur = seen.get(k);
-      if (!cur) {
-        seen.set(k, t2);
-        continue;
-      }
-      const [rep, gone] = ((_b = t2.count) != null ? _b : 0) > ((_c = cur.count) != null ? _c : 0) ? [t2, cur] : [cur, t2];
-      seen.set(k, rep);
-      for (const s of gone.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
-      rep.count = Math.max((_d = rep.count) != null ? _d : 0, (_e = gone.count) != null ? _e : 0);
-      dropped.add(gone);
-    }
-    return {
-      tokens: out.filter((t2) => !dropped.has(t2)),
-      before,
-      after: before - dropped.size,
-      merged: dropped.size,
-      snapped
-    };
-  }
-  function numberTokenName(group, value) {
-    const v = Number.isInteger(value) ? String(value) : String(value).replace(".", "_");
-    return `${group}/${v}`;
-  }
-
   // src/lib/i18n.ts
   var STRINGS = {
     // 공통 진행/상태
@@ -1327,21 +1254,21 @@
     "create.colorsDone": "\uC0C9 \uBCC0\uC218 {count}\uAC1C \uC774\uBBF8 \uC0DD\uC131\uB428 \xB7 \uC5EC\uAE30\uC120 \uC0C9 \uC678\uB9CC",
     "color.summary": "\uC0C9 {count}\uAC1C \xB7 \uC5ED\uD560 \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
     "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019 \uB610\uB294 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC73C\uC138\uC694.",
-    "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 \uC5ED\uD560 {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC2B5\uB2C8\uB2E4",
-    "create.fileVars": "\uD30C\uC77C\uC5D0 \uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8 \uBCC0\uC218 {n}\uAC1C \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uAC12\uC744 \uC77D\uC2B5\uB2C8\uB2E4",
+    "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 \uC5ED\uD560 {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC5B4\uC694",
+    "create.fileVars": "\uD30C\uC77C\uC5D0 \uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8 \uBCC0\uC218 {n}\uAC1C \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uAC12\uC744 \uC77D\uC5B4\uC694",
     // 지나친 이유조차 없는 빈손 — 버튼이 고장 난 것처럼 보이지 않게 최소한의 말은 한다.
-    "color.extractEmpty": "\uACE0\uB97C \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 \u2014 \uC0C9\xB7\uC5EC\uBC31\xB7\uD06C\uAE30\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.",
+    "color.extractEmpty": "\uACE0\uB97C \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0C9\xB7\uC5EC\uBC31\xB7\uD06C\uAE30\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.",
     "create.baseChanged": "base {base}px\uB85C \uB2E4\uC2DC \uACC4\uC0B0 \uC911\u2026",
     // 시맨틱 매핑
     "semantic.scanningGlobals": "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026",
     "semantic.formatHint": "\uB9E4\uD551\uC744 \uD55C \uC904\uC5D0 \u201C\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984\u201D \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
-    "semantic.noGlobals": "\uAE30\uC874 Global \uC0C9 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.",
+    "semantic.noGlobals": "\uAE30\uC874 Global \uC0C9 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
     "semantic.suggested": "\uAE30\uC874 \uC0C9 {count}\uAC1C\uC5D0\uC11C \uC5ED\uD560 \uCD94\uCC9C \u2014 \uD655\uC778 \uD6C4 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019.",
     "semantic.result": "\uC2DC\uB9E8\uD2F1 {aliased}\uAC1C \uBCC4\uCE6D (\uC0DD\uC131 {created} / \uAC31\uC2E0 {updated})",
     "semantic.missing": " \xB7 \uB204\uB77D: {names}",
     // 바인딩(적용)
-    "apply.cancelRequested": "\uCDE8\uC18C \uC694\uCCAD\uB428 \u2014 \uB2E4\uC74C \uC9C0\uC810\uC5D0\uC11C \uC911\uB2E8\uD569\uB2C8\uB2E4.",
-    "apply.cancelled": "\uCDE8\uC18C\uB428 \u2014 {bound}\uACF3\uB9CC \uC5F0\uACB0{detail}",
+    "apply.cancelRequested": "\uCDE8\uC18C\uD558\uB294 \uC911\u2026",
+    "apply.cancelled": "\uCC3E\uAE30\uB97C \uCDE8\uC18C\uD588\uC5B4\uC694",
     "bind.filterPlaceholder": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
     // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
     "field.fills": "\uCC44\uC6C0 \uC0C9",
@@ -1379,47 +1306,47 @@
     "field.letterSpacing": "\uC790\uAC04",
     "field.fontFamily": "\uAE00\uAF34",
     "field.fontWeight": "\uAD75\uAE30",
-    "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD569\uB2C8\uB2E4",
+    "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD574\uC694",
     // 리네임
-    "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uC120\uD0DD \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019.",
-    "rename.none": "\uBCC0\uACBD\uD560 \uC774\uB984\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uCCB4\uD06C \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019",
+    "rename.none": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694.",
     "rename.applied": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.",
     // 컴포넌트 / 베리언트
     "component.scanning": "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026",
     "component.registering": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026",
     "component.classifying": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958 \uC911\u2026",
     "component.generating": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131 \uC911\u2026",
-    "component.noEligible": "\uC120\uD0DD \uD558\uC704\uC5D0 \uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
-    "component.noEligibleShort": "\uB4F1\uB85D \uAC00\uB2A5\uD55C \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
-    "component.noChecked": "\uCCB4\uD06C\uB41C \uD6C4\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uD2B8\uB9AC\uC5D0\uC11C \uBB36\uC744 \uD56D\uBAA9\uC744 \uC120\uD0DD\uD558\uC138\uC694.",
-    "component.candidates": "\uB4F1\uB85D \uD6C4\uBCF4 {total}\uAC1C \xB7 {sel}\uAC1C \uC120\uD0DD",
-    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {registered} \xB7 \uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}{extra}",
-    "component.variants": "\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}\uAC1C \uC0DD\uC131{extra}",
+    "component.noEligible": "\uC120\uD0DD \uC544\uB798\uC5D0 \uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694.",
+    "component.noEligibleShort": "\uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694.",
+    "component.noChecked": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBB36\uC744 \uD56D\uBAA9\uC744 \uCCB4\uD06C\uD558\uC138\uC694",
+    "component.candidates": "\uB4F1\uB85D \uD6C4\uBCF4 {total}\uAC1C \xB7 {sel}\uAC1C \uCCB4\uD06C",
+    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {registered} \xB7 \uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}{extraPart}",
+    "component.variants": "\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}\uAC1C \uC0DD\uC131{extraPart}",
     "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
     "component.placeFailedMore": " \uC678",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
-    "wizard.needSelect": "\uBA3C\uC800 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C \uD1A0\uD070\uC744 \uCD94\uCD9C\uD569\uB2C8\uB2E4.",
+    "wizard.needSelect": "\uBA3C\uC800 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uC5D0\uC11C \uAC12\uC744 \uBF51\uC544\uC694",
     "wizard.result": "{state} \u2014 {summary}",
     "wizard.stopped": "\uC911\uB2E8",
     "wizard.completed": "\uC644\uB8CC",
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
-    "dark.hint": "\uBC1D\uC740 \uBAA8\uB4DC \uC0C9\uC744 \uB4A4\uC9D1\uC5B4 \uB2E4\uD06C \uBAA8\uB4DC\uC5D0 \uCC44\uC6C1\uB2C8\uB2E4. \uBAA9\uB85D \uC774\uB984\uC740 Figma \uBCC0\uC218 \uCEEC\uB809\uC158\xB7\uBAA8\uB4DC\uC608\uC694",
-    "dark.hintTip": "\uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC2B5\uB2C8\uB2E4. Semantic\uC774 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uAC83\uB9CC \uB300\uC0C1\uC774\uACE0 \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB701\uB2C8\uB2E4. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 dark/\u2026\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC9D1\uB2C8\uB2E4.",
+    "dark.hint": "\uB77C\uC774\uD2B8 \uC0C9\uC744 \uB4A4\uC9D1\uC5B4 \uB2E4\uD06C\uC5D0 \uCC44\uC6CC\uC694. \uBAA9\uB85D \uC774\uB984\uC740 Figma \uBCC0\uC218 \uCEEC\uB809\uC158\xB7\uBAA8\uB4DC\uC608\uC694",
+    "dark.hintTip": "\uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4\uC694. Semantic\uC774 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uAC83\uB9CC \uB300\uC0C1\uC774\uACE0 \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB6F0\uC5B4\uC694. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 dark/\u2026\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC694.",
     "dark.collection": "\uC5ED\uD560 \uCEEC\uB809\uC158",
-    "dark.fromMode": "\uBC1D\uC740 \uBAA8\uB4DC",
-    "dark.toMode": "\uC5B4\uB450\uC6B4 \uBAA8\uB4DC",
+    "dark.fromMode": "\uB77C\uC774\uD2B8",
+    "dark.toMode": "\uB2E4\uD06C",
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
     // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
-    "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uC0DD\uC131)",
+    "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
     // 닮은 프레임 컴포넌트화
     "similar.scanBtn": "\uB2EE\uC740 \uC2A4\uCE94",
     "similar.componentizeBtn": "\uBB36\uAE30",
     // 내보내기
-    "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4.",
-    "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694.",
+    "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
+    "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
     // 라이선스
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
@@ -1432,11 +1359,11 @@
     "wizard.step.rename": "\uC774\uB984",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
-    "wizard.rerunHint": "\uC774\uBBF8 \uC815\uB9AC\uD55C \uC120\uD0DD\uC785\uB2C8\uB2E4 \u2014 \uB2E4\uC2DC \uC2E4\uD589\uD558\uBA74 \uBCC0\uC218\uB294 \uAC31\uC2E0\uB418\uACE0 \uC774\uB984\uC740 \uADF8\uB300\uB85C\uC608\uC694.",
+    "wizard.rerunHint": "\uC774\uBBF8 \uC815\uB9AC\uD55C \uC120\uD0DD\uC774\uC5D0\uC694 \u2014 \uB2E4\uC2DC \uC2E4\uD589\uD558\uBA74 \uBCC0\uC218\uB294 \uAC31\uC2E0\uB418\uACE0 \uC774\uB984\uC740 \uADF8\uB300\uB85C\uC608\uC694.",
     "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
     "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
-    "wizard.skip.paid": "Paid \uC804\uC6A9",
-    "wizard.chip.paid": "Paid \uC804\uC6A9 \uB2E8\uACC4\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB701\uB2C8\uB2E4 \u2014 \uC124\uC815 \uD0ED\uC5D0\uC11C \uB77C\uC774\uC120\uC2A4\uB97C \uB4F1\uB85D\uD558\uBA74 \uD568\uAED8 \uB3D5\uB2C8\uB2E4",
+    "wizard.skip.paid": "\uC720\uB8CC \uAE30\uB2A5",
+    "wizard.chip.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB6F0\uC5B4\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4",
     "wizard.paidSkipped": " \xB7 \uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     // 진행 안내(파이프라인) 단계 상태
     "pipeline.stat.done": "\uC644\uB8CC",
@@ -1463,16 +1390,16 @@
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
-    "wizard.seq.noExtract": "\uCD94\uCD9C\uB41C \uD1A0\uD070 \uC5C6\uC74C \u2014 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uC788\uB294 \uD504\uB808\uC784\uC744 \uC120\uD0DD\uD558\uC138\uC694.",
+    "wizard.seq.noExtract": "\uBF51\uC740 \uAC12\uC774 \uC5C6\uC5B4\uC694 \u2014 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uC788\uB294 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
     "wizard.seq.extractDone": "{count}\uAC1C \uD6C4\uBCF4",
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.semantics": "\uBCC4\uCE6D {aliased}",
     "wizard.seq.semanticsMissing": " \xB7 \uB204\uB77D {n}",
     "wizard.seq.dark": "\uB2E4\uD06C {realiased}\uAC1C \uC5F0\uACB0",
-    "wizard.seq.darkModeCreated": " \xB7 Dark \uBAA8\uB4DC \uCD94\uAC00",
+    "wizard.seq.darkModeCreated": " \xB7 \uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00",
     "wizard.seq.darkSkip": " \xB7 \uAC74\uB108\uB700 {n}(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
-    "wizard.seq.darkNoTarget": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD558\uC138\uC694",
-    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD569\uB2C8\uB2E4",
+    "wizard.seq.darkNoTarget": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
+    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD574\uC694",
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
@@ -1483,7 +1410,7 @@
     "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
     "wizard.sum.renamed": "\uC774\uB984 {n}",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
-    "wizard.sum.empty": "\uC644\uB8CC\uB41C \uC791\uC5C5\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
+    "wizard.sum.empty": "\uB05D\uB0B8 \uC791\uC5C5\uC774 \uC5C6\uC5B4\uC694",
     // 진행 안내 단계 라벨·안내
     "pipeline.step.colors": "\uC0C9 \uBCC0\uC218",
     "pipeline.step.tokens": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
@@ -1492,8 +1419,8 @@
     "pipeline.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
     "pipeline.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "pipeline.step.rename": "\uC774\uB984 \uC815\uB9AC",
-    "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
-    "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uC0DD\uC131\uD558\uC138\uC694",
+    "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
+    "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
     "common.close": "\uB2EB\uAE30",
@@ -1502,7 +1429,7 @@
     "vm.uses": "{n}\uACF3",
     "vm.moreTip": "\uBA54\uB274 (\uC6B0\uD074\uB9AD\uACFC \uAC19\uC74C)",
     "vm.jumpAlias": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uB85C \uC774\uB3D9",
-    "vm.noVars": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "vm.noVars": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694.",
     "vm.copyName": "\uC774\uB984 \uBCF5\uC0AC",
     "vm.copyValue": "\uAC12 \uBCF5\uC0AC",
     "vm.copyCss": "CSS \uBCC0\uC218\uBA85 \uBCF5\uC0AC",
@@ -1511,9 +1438,9 @@
     "vm.whatCss": "CSS \uBCC0\uC218\uBA85",
     "vm.copied": "{what}\uC744(\uB97C) \uBCF5\uC0AC\uD588\uC5B4\uC694: {text}",
     "vm.copyFailed": "\uBCF5\uC0AC\uAC00 \uB9C9\uD614\uC5B4\uC694 \u2014 \uC9C1\uC811 \uBCF5\uC0AC\uD558\uC138\uC694: {text}",
-    "vm.copyEmpty": "\uBCF5\uC0AC\uD560 \uAC12\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "vm.copyEmpty": "\uBCF5\uC0AC\uD560 \uAC12\uC774 \uC5C6\uC5B4\uC694.",
     "vm.selectLayers": "\uC0AC\uC6A9 \uB808\uC774\uC5B4 \uC120\uD0DD",
-    "vm.detail": "\uC0C1\uC138 \uBCF4\uAE30\u2026",
+    "vm.detail": "\uC0C1\uC138",
     "vm.edit": "\uACE0\uCE58\uAE30\u2026",
     // 변수 고치기(§4.4 고치기, PR 3.5)
     "edit.name": "\uC774\uB984",
@@ -1603,7 +1530,7 @@
     "bind.noLocalLib": "\uC774 \uD30C\uC77C\uC5D4 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
     "bind.noTier": "\uBCC0\uC218\uB294 \uC788\uC9C0\uB9CC \uACC4\uCE35\uC774 \uC9C0\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "bind.gotoTiers": "\uACC4\uCE35 \uC9C0\uC815\uD558\uAE30 \u2192",
-    "bind.noVarsPaid": "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
+    "bind.noVarsPaid": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
     "bind.noVarsFree": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694",
     "bind.tsDone": "\u2713 \uD14D\uC2A4\uD2B8 {n}\uAC1C\uC5D0 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
     "tsSkip.hasStyle": "\uC774\uBBF8 \uC2A4\uD0C0\uC77C \uC788\uC74C",
@@ -1635,7 +1562,7 @@
     "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
     "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total} \u25BE",
     "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
-    "list.findUnboundTip": "\uC120\uD0DD\uC5D0\uC11C \uBCC0\uC218\uB85C \uBC14\uAFC0 \uC218 \uC788\uB294 \uC0C9\xB7\uAC04\uACA9\uC744 \uCC3E\uC544 \uC5F0\uACB0 \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uC5FD\uB2C8\uB2E4",
+    "list.findUnboundTip": "\uC120\uD0DD\uC5D0\uC11C \uBCC0\uC218\uB85C \uBC14\uAFC0 \uC218 \uC788\uB294 \uC0C9\xB7\uAC04\uACA9\uC744 \uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uCC3E\uC544\uC694",
     "list.addTip": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30(\uC0C9\xB7\uD1A0\uD070\xB7\uD14C\uB9C8\xB7\uD0C0\uC774\uD3EC)",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
     "list.refreshTip": "\uB2E4\uC2DC \uC77D\uAE30",
@@ -1689,9 +1616,9 @@
     "list.undo": "\u2190 \uB418\uB3CC\uB9AC\uAE30",
     "list.selectFirstNote": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC5D0\uC11C \uCC3E\uC544\uC694",
     "list.selectViaAlias": "\uBCC4\uCE6D\uC73C\uB85C \uC4F0\uB294 \uB808\uC774\uC5B4 \uC120\uD0DD",
-    "list.selectCapped": "\uB808\uC774\uC5B4 200\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694(\uC804\uCCB4 {n}\uAC1C)",
-    "list.selectNone": "\uC120\uD0DD\uD560 \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
-    "list.selectPartial": "\uB808\uC774\uC5B4 {found}\uAC1C \uC120\uD0DD \u2014 {missing}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
+    "select.capped": "\uB808\uC774\uC5B4 {found}\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694(\uC804\uCCB4 {requested}\uAC1C)",
+    "select.none": "\uC120\uD0DD\uD560 \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
+    "select.partial": "\uB808\uC774\uC5B4 {found}\uAC1C \uC120\uD0DD \u2014 {missing}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
     "list.dValue": "\uAC12",
     "list.dUses": "\uC4F0\uC778 \uACF3",
     "list.detailBig": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uCC3E\uC9C0 \uC54A\uC544\uC694",
@@ -1756,24 +1683,24 @@
     // 플러그인 설정(#19) — 설정 탭에만
     "settings.title": "\uAE30\uBCF8\uAC12",
     "colRoles.title": "\uCEEC\uB809\uC158 \uACC4\uCE35",
-    "colRoles.hint": "\uC774\uB984\uC774 Global\xB7Semantic\xB7Component\uAC00 \uC544\uB2CC \uCEEC\uB809\uC158\uB3C4 \uACC4\uCE35\uC73C\uB85C \uC4F0\uAC8C \uC9C0\uC815\uD569\uB2C8\uB2E4. \uD30C\uC77C\uC5D0 \uC800\uC7A5\uB3FC \uC774 \uD30C\uC77C\uC744 \uC5EC\uB294 \uBAA8\uB450\uC5D0\uAC8C \uC801\uC6A9\uB429\uB2C8\uB2E4",
-    "colRoles.empty": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218 \uCEEC\uB809\uC158\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    "colRoles.hint": "\uC774\uB984\uC774 Global\xB7Semantic\xB7Component\uAC00 \uC544\uB2CC \uCEEC\uB809\uC158\uB3C4 \uACC4\uCE35\uC73C\uB85C \uC4F0\uAC8C \uC9C0\uC815\uD574\uC694. \uD30C\uC77C\uC5D0 \uC800\uC7A5\uB3FC \uC774 \uD30C\uC77C\uC744 \uC5EC\uB294 \uBAA8\uB450\uC5D0\uAC8C \uC801\uC6A9\uB3FC\uC694",
+    "colRoles.empty": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4\uC694.",
     "colRoles.vars": "\uBCC0\uC218 {n}",
     "colRoles.auto": "\uC790\uB3D9 \u2014 {role}",
     "colRoles.autoNone": "\uC790\uB3D9 \u2014 \uACC4\uCE35 \uC544\uB2D8",
     "colRoles.none": "\uACC4\uCE35 \uC544\uB2D8",
     "colRoles.guess": "\uCD94\uCC9C: {role}",
     "colRoles.useGuess": "\uCD94\uCC9C\uB300\uB85C",
-    "colRoles.saved": "{name} \u2192 {role}. \uBC14\uC778\uB529\xB7\uC5ED\uD560 \uCD94\uCC9C\xB7\uB0B4\uBCF4\uB0B4\uAE30\uAC00 \uC774 \uC9C0\uC815\uC744 \uB530\uB985\uB2C8\uB2E4.",
-    "colRoles.dup": "{role}\uC740(\uB294) \uD55C \uCEEC\uB809\uC158\uB9CC \uB9E1\uC2B5\uB2C8\uB2E4 \u2014 {prev}\uC758 \uC9C0\uC815\uC740 \uD480\uB838\uC2B5\uB2C8\uB2E4.",
-    "settings.hint": "\uC790\uC8FC \uC548 \uBC14\uAFB8\uB294 \uAC12\uC774\uC5D0\uC694. \uB9CC\uB4E4\uAE30\xB7\uC801\uC6A9 \uD654\uBA74\uC5D0\uB294 \uC548 \uBCF4\uC5EC\uC694",
+    "colRoles.saved": "{name} \u2192 {role}. \uC5F0\uACB0\xB7\uC5ED\uD560 \uCD94\uCC9C\xB7\uB0B4\uBCF4\uB0B4\uAE30\uAC00 \uC774 \uC9C0\uC815\uC744 \uB530\uB77C\uC694",
+    "colRoles.dup": "{role}\uC740(\uB294) \uD55C \uCEEC\uB809\uC158\uB9CC \uB9E1\uC544\uC694 \u2014 {prev}\uC758 \uC9C0\uC815\uC740 \uD480\uC5C8\uC5B4\uC694.",
+    "settings.hint": "\uB9CC\uB4E4\uAE30 \xB7 \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uC5D0 \uC4F0\uB294 \uAC12\uC774\uC5D0\uC694",
     "settings.base": "\uAE30\uC900 \uD06C\uAE30",
     "settings.depth": "\uC774\uB984 \uC815\uB9AC \uAE4A\uC774",
     // 수동·폴백 행의 값 입력 칸 툴팁(칸이 좁아 라벨 대신 툴팁으로 설명한다).
-    "ts.family": "\uD3F0\uD2B8 \uC774\uB984 \u2014 \uC774 \uC774\uB984 \uADF8\uB300\uB85C \uC2A4\uD0C0\uC77C\uC5D0 \uC501\uB2C8\uB2E4",
+    "ts.family": "\uD3F0\uD2B8 \uC774\uB984 \u2014 \uC774 \uC774\uB984 \uADF8\uB300\uB85C \uC2A4\uD0C0\uC77C\uC5D0 \uC368\uC694",
     "ts.size": "\uAE00\uC790 \uD06C\uAE30(px)",
     "ts.lineHeight": "\uD589\uAC04(px) \xB7 0\uC774\uBA74 AUTO",
-    "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB429\uB2C8\uB2E4",
+    "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB3FC\uC694",
     "ts.weight": "\uAD75\uAE30 \u2014 Regular \xB7 Medium \xB7 SemiBold \xB7 Bold \uCC98\uB7FC Figma\uAC00 \uC4F0\uB294 \uC774\uB984",
     "settings.grid": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uACA9\uC790",
     "settings.gridTip": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC744 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
@@ -1791,10 +1718,10 @@
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
     // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8 \uBAA8\uB4DC\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
+    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4",
-    "prereq.gotoCreate": "\uD1A0\uD070 \uC0DD\uC131\uC73C\uB85C \u2192",
+    "prereq.gotoCreate": "\uD1A0\uD070 \uB9CC\uB4E4\uAE30\uB85C \u2192",
     // 온보딩 / 가이드
     // 첫 실행 배너(온보딩 흡수)
     // 진행(파이프라인 카드)
@@ -1818,14 +1745,14 @@
     // 추출
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
-    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4ED\uB2C8\uB2E4. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
-    "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB429\uB2C8\uB2E4. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC5ED\uD560\uC740 Semantic\uC73C\uB85C \uBD99\uC2B5\uB2C8\uB2E4.",
+    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
+    "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB3FC\uC694. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC5ED\uD560\uC740 Semantic\uC73C\uB85C \uBD99\uC5B4\uC694.",
     // 토큰 생성
     "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
-    "create.scopeHint": "\uC5EC\uBC31\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC \uB2E4\uB8F9\uB2C8\uB2E4. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uC774\uBBF8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
+    "create.scopeHint": "\uC5EC\uBC31\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC \uB2E4\uB904\uC694. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uC774\uBBF8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
     "create.selectAll": "\uC804\uCCB4",
     "create.dropOnce": "1\xD7 \uD574\uC81C",
-    "create.dropOnceTip": "\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C\uB9CC \uC4F0\uC778 \uAC12(1\xD7)\uC758 \uCCB4\uD06C\uB97C \uD574\uC81C\uD569\uB2C8\uB2E4 \u2014 \uB300\uAC1C \uC77C\uD68C\uC131\uC774\uB77C \uD1A0\uD070\uC73C\uB85C \uB0A8\uAE38 \uD544\uC694\uAC00 \uC801\uC2B5\uB2C8\uB2E4",
+    "create.dropOnceTip": "\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C\uB9CC \uC4F0\uC778 \uAC12(1\xD7)\uC758 \uCCB4\uD06C\uB97C \uD480\uC5B4\uC694 \u2014 \uB300\uAC1C \uC77C\uD68C\uC131\uC774\uB77C \uD1A0\uD070\uC73C\uB85C \uB0A8\uAE38 \uD544\uC694\uAC00 \uC801\uC5B4\uC694",
     "create.previewBtn": "\uBBF8\uB9AC\uBCF4\uAE30",
     "create.apply": "\uC801\uC6A9",
     // 토큰 행 — 체크박스·등장 횟수(N×)는 라벨을 놓을 자리가 없어 툴팁으로만 뜻을 밝힌다.
@@ -1844,14 +1771,14 @@
     // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
     // 지금 무슨 일이 일어나는지를 적는다.
     "textStyle.rowLabelBtn": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984 \uCC44\uC6B0\uAE30",
-    "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD05\uB2C8\uB2E4. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026) \uADF8\uB300\uB85C \uB461\uB2C8\uB2E4.",
+    "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD10\uC694. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026) \uADF8\uB300\uB85C \uB46C\uC694.",
     "textStyle.applyExistingBtn": "\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
-    "textStyle.applyExistingTip": "\uC120\uD0DD\uD55C \uAE00\uC790\uB97C \uC774\uBBF8 \uB9CC\uB4E0 \uAC19\uC740 \uC2A4\uD0C0\uC77C\uC5D0 \uC5F0\uACB0\uD569\uB2C8\uB2E4. \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694.",
+    "textStyle.applyExistingTip": "\uC120\uD0DD\uD55C \uAE00\uC790\uB97C \uC774\uBBF8 \uB9CC\uB4E0 \uAC19\uC740 \uC2A4\uD0C0\uC77C\uC5D0 \uC5F0\uACB0\uD574\uC694. \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694.",
     "textStyle.registerBtn": "\uB4F1\uB85D",
     // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
     "textStyle.namePlaceholder": "\uC2A4\uD0C0\uC77C \uC774\uB984",
-    "textStyle.nameBoundTip": "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C\uC785\uB2C8\uB2E4. \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC774 \uC2A4\uD0C0\uC77C\uC758 \uC774\uB984\uB9CC \uBC14\uB01D\uB2C8\uB2E4(\uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC74C).",
-    "textStyle.nameNewTip": "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB429\uB2C8\uB2E4(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).",
+    "textStyle.nameBoundTip": "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C\uC774\uC5D0\uC694. \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC774 \uC2A4\uD0C0\uC77C\uC758 \uC774\uB984\uB9CC \uBC14\uB00C\uC5B4\uC694(\uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC74C).",
+    "textStyle.nameNewTip": "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB3FC\uC694(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).",
     // ×N 배지 — 1개면 그 글자로 이동, 여럿이면 전부 선택.
     "textStyle.badgeGoTip": "\uC774 \uAE00\uC790\uB85C \uC774\uB3D9",
     "textStyle.badgeSelectTip": "\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 {count}\uAC1C \uC804\uCCB4 \uC120\uD0DD",
@@ -1900,7 +1827,7 @@
     "role.icon-brand": "\uC8FC\uC0C9 \uC544\uC774\uCF58",
     // 리네임
     "rename.title": "\uC774\uB984 \uC815\uB9AC",
-    "rename.hint": "\uC5ED\uD560\uC5D0 \uB9DE\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uC73C\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uCD5C\uC0C1\uC704\xB7\uC778\uC2A4\uD134\uC2A4 \uC774\uB984\uC740 \uADF8\uB300\uB85C \uB461\uB2C8\uB2E4",
+    "rename.hint": "\uC5ED\uD560\uC5D0 \uB9DE\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uC73C\uB85C \uBC14\uAFD4\uC694. \uCD5C\uC0C1\uC704\xB7\uC778\uC2A4\uD134\uC2A4 \uC774\uB984\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
     "rename.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
     "rename.apply": "\uC774\uB984 \uC801\uC6A9",
     // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
@@ -1923,35 +1850,238 @@
     "component.registerBtn": "\uB4F1\uB85D",
     "component.classifyBtn": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958",
     "component.genMissingBtn": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131",
-    "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC2B5\uB2C8\uB2E4. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uC81C\uC678.",
-    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uAE41\uB2C8\uB2E4. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
-    "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB9CC \uAC19\uC740 \uC774\uB984\uB07C\uB9AC \uC138\uD2B8\uB85C \uB2E4\uC2DC \uBB36\uC2B5\uB2C8\uB2E4.",
-    "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6C1\uB2C8\uB2E4.",
-    "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFC9\uB2C8\uB2E4.",
-    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFC9\uB2C8\uB2E4. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
+    "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uC694. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uBE7C\uC694.",
+    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
+    "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB9CC \uAC19\uC740 \uC774\uB984\uB07C\uB9AC \uC138\uD2B8\uB85C \uB2E4\uC2DC \uBB36\uC5B4\uC694.",
+    "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6CC\uC694.",
+    "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC5B4\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
+    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
     "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC73C\uB85C \uBB36\uC744 \uD504\uB808\uC784\uACFC \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.",
-    "similar.needScanAfterComp": "\u2018\uD6C4\uBCF4 \uC2A4\uCE94\u2019 \uACB0\uACFC\uB294 \u2018\uB4F1\uB85D\u2019\uC774 \uC501\uB2C8\uB2E4. \uBB36\uAE30\uB294 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC744 \uBA3C\uC800 \uC2E4\uD589\uD558\uC138\uC694.",
+    "similar.needScanAfterComp": "\u2018\uD6C4\uBCF4 \uC2A4\uCE94\u2019 \uACB0\uACFC\uB294 \u2018\uB4F1\uB85D\u2019\uC774 \uC368\uC694. \uBB36\uAE30\uB294 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC744 \uBA3C\uC800 \uC2E4\uD589\uD558\uC138\uC694.",
     // 내보내기
     "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
-    "export.hint": "\uB204\uB974\uBA74 \uBC14\uB85C \uCF54\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uB429\uB2C8\uB2E4",
+    "export.hint": "\uB204\uB974\uBA74 \uBC14\uB85C \uCF54\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uB3FC\uC694",
     "export.runBtn": "\uB0B4\uBCF4\uB0B4\uAE30",
     // 셀렉트는 값이 곧 라벨이라 머리말이 없다 — 무엇을 고르는 칸인지는 툴팁이 맡는다.
     "export.formatTip": "\uB0B4\uBCF4\uB0BC \uCF54\uB4DC \uD615\uC2DD",
     "export.fmtW3c": "W3C \uD1A0\uD070 JSON",
     "export.fmtCss": "CSS \uBCC0\uC218",
-    "export.fontUnitTip": "\uD3F0\uD2B8 \uD06C\uAE30 \uB2E8\uC704 \u2014 rem\uC740 \uAE30\uC900 \uD06C\uAE30\uB85C \uB098\uB215\uB2C8\uB2E4",
+    "export.fontUnitTip": "\uD3F0\uD2B8 \uD06C\uAE30 \uB2E8\uC704 \u2014 rem\uC740 \uAE30\uC900 \uD06C\uAE30\uB85C \uB098\uB220\uC694",
     // 요금제 / 라이선스
     "license.title": "\uB77C\uC774\uC120\uC2A4",
     "license.keyPlaceholder": "\uB77C\uC774\uC120\uC2A4 \uD0A4 \uC785\uB825",
     "license.verify": "\uAC80\uC99D",
     "license.clear": "\uD574\uC81C",
-    "license.clearTip": "\uC774 \uAE30\uAE30\uC758 \uD65C\uC131\uD654\uB97C \uBC18\uB0A9\uD569\uB2C8\uB2E4. \uC0C8 \uAE30\uAE30\uC5D0\uC11C \uAC19\uC740 \uD0A4\uB97C \uB2E4\uC2DC \uAC80\uC99D\uD558\uBA74 \uB429\uB2C8\uB2E4.",
-    "license.hint": "\uC720\uB8CC\uB97C \uC4F0\uBA74 \u{1F512} \uC7A0\uAE34 \uAE30\uB2A5\uC774 \uD480\uB9BD\uB2C8\uB2E4",
+    "license.clearTip": "\uC774 \uAE30\uAE30\uC758 \uD65C\uC131\uD654\uB97C \uBC18\uB0A9\uD574\uC694. \uC0C8 \uAE30\uAE30\uC5D0\uC11C \uAC19\uC740 \uD0A4\uB97C \uB2E4\uC2DC \uAC80\uC99D\uD558\uBA74 \uB3FC\uC694.",
+    "license.hint": "\uC720\uB8CC\uB97C \uC4F0\uBA74 \u{1F512} \uC7A0\uAE34 \uAE30\uB2A5\uC774 \uD480\uB824\uC694",
     // 한 버튼이 티어에 따라 갈린다(결정 2026-08-06) — 라벨은 두 목적지를 함께 적는다.
-    "license.manage": "\uACB0\uC81C \xB7 \uAD6C\uB3C5 \uAD00\uB9AC",
-    "license.manageTip": "Free\uBA74 \uACB0\uC81C \uD398\uC774\uC9C0\uB85C, \uAD6C\uB3C5 \uC911\uC774\uBA74 \uACB0\uC81C\uC218\uB2E8\xB7\uAE30\uAE30 \uD65C\uC131\uD654\uB97C \uAD00\uB9AC\uD558\uB294 \uD398\uC774\uC9C0\uB85C \uC5FD\uB2C8\uB2E4",
+    "license.manage": "\uACB0\uC81C \xB7 \uAD6C\uB3C5 \uAD00\uB9AC \u2197",
+    "license.manageTip": "\uBB34\uB8CC\uBA74 \uACB0\uC81C \uD398\uC774\uC9C0\uB85C, \uAD6C\uB3C5 \uC911\uC774\uBA74 \uACB0\uC81C\uC218\uB2E8\xB7\uAE30\uAE30 \uD65C\uC131\uD654\uB97C \uAD00\uB9AC\uD558\uB294 \uD398\uC774\uC9C0\uB85C \uC5F4\uC5B4\uC694",
     "license.devTier": "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C \uD2F0\uC5B4",
-    "license.devTierNote": "(\uAC80\uC99D\uB41C \uD0A4\uAC00 \uC5C6\uC744 \uB54C\uB9CC \uC801\uC6A9)"
+    "license.devTierNote": "(\uAC80\uC99D\uB41C \uD0A4\uAC00 \uC5C6\uC744 \uB54C\uB9CC \uC801\uC6A9)",
+    // PR 4 — 코드에 직접 쓰던 문구를 옮김(docs/pr4-copy-table.md). 조각을 받는 자리는 {…Part}
+    // 공통 · 접근성 이름
+    "tab.listAria": "\uC791\uC5C5 \uD0ED",
+    "rail.layerAria": "\uB808\uC774\uC5B4 \uC791\uC5C5",
+    "rail.makeAria": "\uB9CC\uB4E4\uAE30 \uB2E8\uACC4",
+    "list.sideAria": "\uBCC0\uC218 \uCEEC\uB809\uC158",
+    "list.gridAria": "\uBCC0\uC218 \uBAA9\uB85D",
+    "common.retry": "\uB2E4\uC2DC \uC2DC\uB3C4",
+    // 레이어 › 연결
+    "bind.linking": "\uC5F0\uACB0 \uC911\u2026",
+    "bind.progressOf": "{done} / {total} \uCC98\uB9AC \uC911\u2026 ({pct}%)",
+    "bind.progressCount": "{done}\uAC1C \uCC98\uB9AC \uC911\u2026",
+    "bind.skipSelected": "{reason} \uB808\uC774\uC5B4 {n}\uAC1C \uC120\uD0DD",
+    // 레이어 › 이름
+    "rename.count": "\uD6C4\uBCF4 {total}",
+    // 레이어 › 컴포넌트 — 등록 결과 꼬리 · 트리 배지 · 리포트
+    "component.extraSkipped": " \xB7 \uAC74\uB108\uB700 {n}",
+    "component.extraSingles": " \xB7 \uB2E8\uC77C {n}",
+    "component.extraProps": " \xB7 \uC18D\uC131 {n}",
+    "component.extraIcons": " \xB7 \uC544\uC774\uCF58 {n}",
+    "component.extraMissing": " \xB7 \uBE48 \uC870\uD569 \uC788\uC74C",
+    "component.tagAdded": "\uC0DD\uC131",
+    "component.variantFallback": "\uBCA0\uB9AC\uC5B8\uD2B8",
+    "component.badgeSet": "\uC138\uD2B8",
+    "component.changeProps": "{name} \xB7 \uC18D\uC131",
+    "component.badgeProps": "\uC18D\uC131",
+    "component.nameFallback": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "component.badgeSingle": "\uB2E8\uB3C5",
+    "component.count": "\uD6C4\uBCF4 {total}",
+    "component.tagMissing": "\uBE48 \uC870\uD569",
+    "component.headMissing": "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):",
+    "component.tagIssue": "\uBB38\uC81C",
+    "component.headIssue": "\uCC98\uB9AC \uC911 \uBB38\uC81C {n}\uAC74:",
+    "component.tagCount": "{tag} {n}\uAC1C",
+    // 컴포넌트 “처리 중 문제” 진단 — 내부 말(속성접힘 · 결합 · 정렬)은 그대로(결정 ⑨)
+    "component.fail.copyPlaced": "\uC778\uC2A4\uD134\uC2A4 \uB300\uC2E0 \uBCF5\uC0AC\uBCF8\uC744 \uB480\uC5B4\uC694({label} \u2192 {name}){causePart}",
+    "component.fail.nothingPlaced": "\uC81C\uC790\uB9AC\uC5D0 \uC544\uBB34\uAC83\uB3C4 \uB450\uC9C0 \uBABB\uD588\uC5B4\uC694({label} \u2192 {name}){causePart}",
+    "component.fail.cause": " \u2014 {why}",
+    "component.fail.instanceMake": "\uC778\uC2A4\uD134\uC2A4\uB97C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694: {error}",
+    "component.fail.instancePlace": "\uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "component.fail.single": "\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328({name}): {error}",
+    "component.fail.propsRegister": "\uC18D\uC131\uC811\uD798 \uB4F1\uB85D \uC2E4\uD328({set}): {error}",
+    "component.fail.iconFallback": "\uC544\uC774\uCF58\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD574 \uC138\uD2B8\uB85C \uB4F1\uB85D\uD574\uC694({set})",
+    "component.fail.propsComponentize": "\uC18D\uC131\uC811\uD798 \uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328({name}): {error}",
+    "component.fail.expose": "\uC18D\uC131 \uB178\uCD9C \uC2E4\uD328({name}): {error}",
+    "component.fail.exposeAll": "\uC18D\uC131 \uB178\uCD9C \uC2E4\uD328: {error}",
+    "component.fail.componentize": "\uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328({name}): {error}",
+    "component.fail.combine": "\uACB0\uD569 \uC2E4\uD328({set}): {error}",
+    "component.fail.arrange": "\uC815\uB82C \uC2E4\uD328({set}): {error}",
+    "component.fail.iconComponent": "\uC544\uC774\uCF58 \uCEF4\uD3EC\uB10C\uD2B8 \uC2E4\uD328({name}): {error}",
+    "component.fail.iconSwap": "\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328({layer})",
+    "component.fail.iconSwapPlace": "\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328({layer}): \uC81C\uC790\uB9AC\uC5D0 \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "component.fail.iconSwapErr": "\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328({layer}): {error}",
+    "component.fail.photoNoSlot": "\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328({path}) \u2014 \uC790\uB9AC\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "component.fail.photo": "\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328({path}): {error}",
+    // 레이어 › 컴포넌트 — 닮은 프레임 묶기
+    "similar.scanning": "\uB2EE\uC740 \uD504\uB808\uC784\uC744 \uCC3E\uB294 \uC911\u2026",
+    "similar.componentizing": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uB294 \uC911\u2026",
+    "similar.failed": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694{warnPart}",
+    "similar.failedWarn": " \u2014 {warning}",
+    "similar.resMaster": "\uB9C8\uC2A4\uD130 {name}",
+    "similar.resInstances": "\uC778\uC2A4\uD134\uC2A4 {n}\uAC1C",
+    "similar.resProps": "\uC18D\uC131 {n}\uAC1C",
+    "similar.resImages": "\uC774\uBBF8\uC9C0 {n}\uAC1C",
+    "similar.resKept": " \xB7 \uB0A8\uACA8\uB454 \uAC83 {n}\uAC74: {warning}",
+    "similar.metaText": "\uD14D\uC2A4\uD2B8 {filled}/{total}",
+    "similar.metaImages": "\uC774\uBBF8\uC9C0 {n}",
+    "similar.metaEmpty": "\uBE48 \uCE78 {n}",
+    "similar.recommended": "\uCD94\uCC9C",
+    "similar.count": "\uB2EE\uC740 {n}\uAC1C",
+    "similar.needTwo": "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC744 2\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD558\uC138\uC694.",
+    "similar.none": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD560 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 {why}",
+    "similar.openText": "\uD14D\uC2A4\uD2B8 {n}",
+    "similar.openSwap": "\uC544\uC774\uCF58 \uAD50\uCCB4 {n}",
+    "similar.openImage": "\uC774\uBBF8\uC9C0 {n}",
+    "similar.opened": "\uC18D\uC131\uC73C\uB85C \uC5F4\uB9BC: {list}",
+    "similar.noVarying": "\uAC00\uBCC0 \uC704\uCE58\uAC00 \uC5C6\uC5B4 \uC18D\uC131\uC740 \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694",
+    "similar.excluded": " \xB7 \uC81C\uC678 {n}\uAC1C({why})",
+    "similar.scanned": "\uB300\uC0C1 {n}\uAC1C \xB7 {openPart}{skipPart}",
+    "similar.noMaster": "\uB9C8\uC2A4\uD130 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
+    "similar.tooFew": "\uB300\uC0C1 \uD504\uB808\uC784\uC774 2\uAC1C\uBCF4\uB2E4 \uC801\uC5B4\uC694. \uB2E4\uC2DC \uC2A4\uCE94\uD558\uC138\uC694.",
+    "similar.overrideFail": "{name}: \uC18D\uC131 \uC624\uBC84\uB77C\uC774\uB4DC \uC2E4\uD328 \u2014 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
+    "similar.placeFail": "{name}: \uC81C\uC790\uB9AC\uC5D0 \uB458 \uC218 \uC5C6\uC5B4 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
+    "similar.why.needTwo": "\uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uD544\uC694",
+    "similar.why.mismatch": "\uAD6C\uC870 \uBD88\uC77C\uCE58",
+    "similar.why.fewSame": "\uB3D9\uC77C \uAD6C\uC870 \uD504\uB808\uC784 2\uAC1C \uBBF8\uB9CC",
+    // 만들기 › 색 · 토큰
+    "create.hintPreview": "\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uC138\uC694.",
+    "create.hintNoSel": "\uB808\uC774\uC5B4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.",
+    "create.hintReveal": "\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uB9CC\uB4E4 \uD1A0\uD070\uC774 \uBCF4\uC5EC\uC694",
+    "create.onlyColors": "\uC0C9 \uC678 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694(\uC0C9\uB9CC \uBF51\uC558\uC5B4\uC694)",
+    "create.count": "\uD6C4\uBCF4 {sel}/{total}",
+    "color.usedCount": " \xB7 {n}\xD7 \uC0AC\uC6A9",
+    "create.tidyMerged": " \xB7 \uAC19\uC740 \uCE78 {n}\uAC1C \uBCD1\uD569",
+    "create.tidySummary": "\uC5EC\uBC31\xB7\uD06C\uAE30 {before} \u2192 {after}\uAC1C ({grid}px \uACA9\uC790\uB85C {n}\uAC1C \uC774\uB3D9{mergedPart}){gapPart}",
+    "create.tidyUndone": "\uACA9\uC790 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694 \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB2E4\uC2DC \uB204\uB974\uBA74 \uB610 \uC815\uB9AC\uD574\uC694",
+    "create.onceOff": "1\xD7 \uD1A0\uD070 {n}\uAC1C \uD574\uC81C",
+    "create.onceNone": "1\xD7 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694",
+    "color.selInfo": "\uC120\uD0DD {n}\uAC1C \xB7 \uC0C9 {c} \xB7 \uADF8 \uC678 {o}",
+    "palette.lowChroma": "\uBE0C\uB79C\uB4DC\uC0C9\uC758 \uCC44\uB3C4\uAC00 \uB108\uBB34 \uB0AE\uC544 hue\uAC00 \uD754\uB4E4\uB824\uC694 \u2014 \uC911\uB9BD(neutral) \uC2A4\uCF00\uC77C\uC744 \uAD8C\uD574\uC694",
+    "create.sumGlobals": "Global {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u})",
+    "create.sumPruned": " \xB7 \uC774\uC804 \uC0C9 {n}\uAC1C \uC815\uB9AC",
+    "create.sumBase": " \xB7 base {base}px \uD658\uC0B0 {n}\uAC1C({examples}{morePart})",
+    "create.sumBaseMore": " \uC678",
+    "extract.skipHidden": "\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD654\uBA74\uC5D0 \uC5C6\uB294 \uAC12\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694 \u2014 \uBCF4\uC774\uAC8C \uD55C \uB4A4 \uB2E4\uC2DC \uCD94\uCD9C\uD558\uC138\uC694.",
+    "extract.skipInstance": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD\uC740 \uB9C8\uC2A4\uD130 \uBCF5\uC0AC\uBCF8\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694 \u2014 \uAC12\uC774 \uD544\uC694\uD558\uBA74 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC120\uD0DD\uD574 \uCD94\uCD9C\uD558\uC138\uC694.",
+    "extract.skipGradient": "\uADF8\uB77C\uB514\uC5B8\uD2B8\xB7\uC774\uBBF8\uC9C0 \uCC44\uC6C0\uC740 \uBCC0\uC218\uB85C \uBB36\uC744 \uC218 \uC5C6\uC5B4 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694.",
+    "extract.skipFraction": "\uC18C\uC218 \uAC12(26.67px \uB4F1)\uC740 \uCC99\uB3C4\uAC00 \uC544\uB2C8\uB77C \uC2A4\uCF00\uC77C \uC794\uAC12\uC774\uB77C \uD1A0\uD070\uC5D0\uC11C \uBE90\uC5B4\uC694.",
+    // 만들기 › 테마(역할 매핑 · 다크)
+    "semantic.needGlobal": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
+    "dark.prereqLoading": "\uBCC0\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
+    "dark.prereqNoVars": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
+    "dark.prereqNoModes": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158(\uBCF4\uD1B5 Semantic)\uC744 \uACE0\uB974\uC138\uC694.",
+    "dark.prereqPick": "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
+    "dark.running": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026",
+    "dark.whyNoGlobal": "Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 {n}\uAC1C)",
+    "dark.whyNone": "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694",
+    "dark.modeAdded": "\uB2E4\uD06C \uBAA8\uB4DC\uB294 \uCD94\uAC00\uD588\uC5B4\uC694. ",
+    "dark.fillFailed": "{modePart}\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
+    "dark.modeAddedShort": "\uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00 \xB7 ",
+    "dark.skippedDirect": " \xB7 \uAC74\uB108\uB700 {n}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
+    "dark.done": "{modePart}\uB2E4\uD06C {n}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 {c}\uAC1C{skipPart}",
+    "dark.errNoCol": "\uCEEC\uB809\uC158\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
+    "dark.errAddMode": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
+    "dark.errAddModePlan": "\uD50C\uB79C\uC5D0\uC11C \uBAA8\uB4DC\uB97C \uB354 \uB9CC\uB4E4 \uC218 \uC5C6\uC744 \uC218 \uC788\uC5B4\uC694.",
+    "dark.errSameMode": "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694 \u2014 \uB77C\uC774\uD2B8\uC5D0 \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
+    // 만들기 › 타이포(텍스트 스타일)
+    "textStyle.rowDelete": "\uC0AD\uC81C",
+    "textStyle.scanSummary": "\uC2E0\uADDC {a} \xB7 \uB4F1\uB85D\uB428 {b}",
+    "textStyle.scanLhPct": " \xB7 \uD589\uAC04% {n}",
+    "textStyle.scanLsPct": " \xB7 \uC790\uAC04% {n}",
+    "textStyle.renaming": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE30\uB294 \uC911\u2026",
+    "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uD558\uAC70\uB098 \u2018\uD589 \uCD94\uAC00\u2019\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC815\uC758\uD558\uC138\uC694.",
+    "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 \uD06C\uAE30 \uC21C {b}",
+    "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
+    "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
+    "textStyle.unlinked": " \xB7 \uBBF8\uC5F0\uACB0: {names}",
+    "textStyle.needScan": "\uBA3C\uC800 \uC2A4\uCE94\uD558\uC138\uC694 \u2014 \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE38 \uD45C\uBCF8\uC774 \uC5C6\uC5B4\uC694.",
+    "textStyle.warnMixed": "\uBD80\uBD84 \uC11C\uC2DD(\uD63C\uD569) \uD14D\uC2A4\uD2B8\uB294 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694.",
+    "textStyle.missRename": "\uC774\uB984 \uCDA9\uB3CC '{from}'\u2192'{to}' \u2014 \uAC19\uC740 \uC774\uB984 \uC2A4\uD0C0\uC77C\uC774 \uC788\uC5B4 \uC774\uB984\uC744 \uBC14\uAFB8\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "textStyle.noteLhPx": "{name}: \uC5ED\uD560\uB9C8\uB2E4 \uD589\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)",
+    "textStyle.noteLsPx": "{name}: \uC5ED\uD560\uB9C8\uB2E4 \uC790\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)",
+    "textStyle.missStyle": "{name}: \uD3F0\uD2B8 {style}\u2192Regular",
+    "textStyle.missFamily": "{name}: \uD3F0\uD2B8 '{family}' \uC5C6\uC74C",
+    "textStyle.noteKeepLh": "{name}: \uD589\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
+    "textStyle.noteKeepLs": "{name}: \uC790\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
+    "textStyle.noteLhPct": "{role}: \uD589\uAC04 {n}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uC5F0\uACB0 \uC548 \uD568",
+    "textStyle.noteLsPct": "{role}: \uC790\uAC04 {n}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uC5F0\uACB0 \uC548 \uD568",
+    // 설정 › 라이선스
+    "license.priceHint": "\uBB34\uB8CC \xB7 \uC720\uB8CC \uC5F0 $39 \xB7 \uAE30\uAE30 1\uB300",
+    "license.setupHint": "\uBC30\uD3EC \uC804\uC774\uB77C \uD0A4 \uAC80\uC99D\xB7\uAD6C\uB3C5 \uB9C1\uD06C\uB294 \uC544\uC9C1 \uB3D9\uC791\uD558\uC9C0 \uC54A\uC544\uC694",
+    // “현재” 줄 — FREE / PAID는 그대로(§2.9 예외)
+    "license.current": "\uD604\uC7AC: {tier} ({source}){expPart}",
+    "license.srcKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4{statusPart}",
+    "license.srcKeyStatus": " \xB7 {status}",
+    "license.status.active": "\uC0AC\uC6A9 \uC911",
+    "license.status.grace": "\uC720\uC608 \uAE30\uAC04",
+    "license.status.expired": "\uB9CC\uB8CC",
+    "license.srcDev": "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C",
+    "license.srcNone": "\uC5C6\uC74C",
+    "license.expires": " \xB7 \uB9CC\uB8CC {date}",
+    // 알림(code.ts postLicense) — 상태 줄
+    "license.noteApplied": "\uB77C\uC774\uC120\uC2A4\uB97C \uC801\uC6A9\uD588\uC5B4\uC694",
+    "license.noteGrace": "\uC624\uD504\uB77C\uC778\uC774\uC5D0\uC694 \u2014 \uC774 \uAE30\uAE30\uC5D0 \uC800\uC7A5\uB41C \uB77C\uC774\uC120\uC2A4\uB85C \uACC4\uC18D \uC368\uC694",
+    "license.noteOffline": "\uC624\uD504\uB77C\uC778\uC774\uC5D0\uC694 \u2014 \uD0A4\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC5B4\uC694",
+    "license.verifyFailed": "\uD0A4\uB97C \uD655\uC778\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uD0A4\uB97C \uB2E4\uC2DC \uD655\uC778\uD574 \uC8FC\uC138\uC694",
+    "license.noteCleared": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC9C0\uC6E0\uC5B4\uC694",
+    // 서버가 code로 알려 준 사유 — 상태 줄(결정 5-(b))
+    "license.err.server.expired": "\uAD6C\uB3C5\uC774 \uB05D\uB0AC\uC5B4\uC694 \u2014 \uACB0\uC81C \xB7 \uAD6C\uB3C5 \uAD00\uB9AC\uC5D0\uC11C \uAC31\uC2E0\uD558\uC138\uC694",
+    "license.err.server.invalid": "\uD0A4\uAC00 \uB9DE\uC9C0 \uC54A\uC544\uC694 \u2014 \uD0A4\uB97C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694",
+    "license.err.server.limit": "\uAE30\uAE30 \uD65C\uC131\uD654 \uD55C\uB3C4\uB97C \uB118\uC5C8\uC5B4\uC694 \u2014 \uB2E4\uB978 \uAE30\uAE30\uC5D0\uC11C [\uD574\uC81C]\uD55C \uB4A4 \uB2E4\uC2DC \uAC80\uC99D\uD558\uC138\uC694",
+    "license.err.server.server": "\uAC80\uC99D \uC11C\uBC84\uC5D0 \uBB38\uC81C\uAC00 \uC788\uC5B4\uC694 \u2014 \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694",
+    // 플러그인 쪽 기술 사유 — 툴팁(noteTip)에만
+    "license.err.badBody": "\uC751\uB2F5 \uBCF8\uBB38\uC744 \uD574\uC11D\uD560 \uC218 \uC5C6\uC5B4\uC694",
+    "license.err.noToken": "\uC11C\uBA85 \uD1A0\uD070\uC774 \uC5C6\uB294 \uC751\uB2F5",
+    "license.err.b64Len": "\uC798\uBABB\uB41C base64url \uAE38\uC774",
+    "license.err.b64Char": "\uC798\uBABB\uB41C base64url \uBB38\uC790",
+    "license.err.notJwt": "JWT \uD615\uC2DD \uC544\uB2D8(\uC810 3\uBD84\uD560 \uD544\uC694)",
+    "license.err.noExp": "exp \uD074\uB808\uC784 \uC5C6\uC74C",
+    "license.err.expired": "\uD1A0\uD070 \uB9CC\uB8CC\uB428",
+    "license.err.notYet": "\uC544\uC9C1 \uC720\uD6A8\uD558\uC9C0 \uC54A\uC740 \uD1A0\uD070(nbf)",
+    "license.err.iss": "\uBC1C\uAE09\uC790(iss) \uBD88\uC77C\uCE58",
+    "license.err.aud": "\uB300\uC0C1(aud) \uBD88\uC77C\uCE58",
+    "license.err.tier": "\uC54C \uC218 \uC5C6\uB294 \uD2F0\uC5B4",
+    "license.err.decode": "\uD1A0\uD070 \uB514\uCF54\uB4DC \uC2E4\uD328",
+    "license.err.alg": "\uC11C\uBA85 \uC54C\uACE0\uB9AC\uC998 \uC5C6\uC74C(alg=none \uAC70\uBD80)",
+    "license.err.sig": "\uC11C\uBA85 \uAC80\uC99D \uC2E4\uD328",
+    // 오류 설명(errors.ts explainError) — 설명 · 할 일
+    "err.font": "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694.",
+    "err.fontAction": "\uADF8 \uD3F0\uD2B8\uB97C \uC124\uCE58\xB7\uD65C\uC131\uD654\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.",
+    "err.scope": "\uBCC0\uC218 \uC2A4\uCF54\uD504\uAC00 \uB9DE\uC9C0 \uC54A\uC544\uC694.",
+    "err.scopeAction": "\u2018\uD1A0\uD070 \uB9CC\uB4E4\uAE30\u2019\uB97C \uB2E4\uC2DC \uC2E4\uD589\uD574 \uC2A4\uCF54\uD504\uB97C \uAC31\uC2E0\uD558\uC138\uC694.",
+    "err.prop": "\uC18D\uC131 \uAC12\uC774 \uB9DE\uC9C0 \uC54A\uC544\uC694(\uC608: \uBC1C\uD589 \uC548 \uD55C \uCEF4\uD3EC\uB10C\uD2B8).",
+    "err.propAction": "\uCEF4\uD3EC\uB10C\uD2B8\uB97C \uBC1C\uD589\uD558\uAC70\uB098 \uB300\uC0C1 \uB808\uC774\uC5B4\uB97C \uD655\uC778\uD558\uC138\uC694.",
+    "err.readonly": "\uD3B8\uC9D1 \uAD8C\uD55C\uC774 \uC5C6\uAC70\uB098 \uC77D\uAE30 \uC804\uC6A9 \uD30C\uC77C\uC774\uC5D0\uC694.",
+    "err.readonlyAction": "\uD3B8\uC9D1 \uAC00\uB2A5\uD55C \uD30C\uC77C\uC5D0\uC11C \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.",
+    "err.network": "\uB124\uD2B8\uC6CC\uD06C \uC624\uB958\uAC00 \uB0AC\uC5B4\uC694.",
+    "err.networkAction": "\uC5F0\uACB0\uC744 \uD655\uC778\uD558\uACE0 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.",
+    "err.storage": "\uB85C\uCEEC \uC800\uC7A5\uC18C\uC5D0 \uC811\uADFC\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694.",
+    "err.storageAction": "\uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.",
+    "err.unknown": "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958",
+    "err.unknownAction": "\uC120\uD0DD\uC744 \uD655\uC778\uD558\uACE0 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.",
+    "err.badHex": "\uC798\uBABB\uB41C hex: {value}"
     // 접근성 · 국제화
   };
   function hasString(key) {
@@ -1962,6 +2092,79 @@
     const tpl = (_a = STRINGS[key]) != null ? _a : key;
     if (!vars) return tpl;
     return tpl.replace(/\{(\w+)\}/g, (_, k) => k in vars ? String(vars[k]) : `{${k}}`);
+  }
+
+  // src/lib/tokens.ts
+  var clamp01 = (n) => Math.min(1, Math.max(0, n));
+  var to255 = (c) => Math.round(clamp01(c) * 255);
+  function rgbToHex(rgb) {
+    const h = (c) => to255(c).toString(16).padStart(2, "0");
+    return `#${h(rgb.r)}${h(rgb.g)}${h(rgb.b)}`.toLowerCase();
+  }
+  function hexToRgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+    if (!m) throw new Error(t("err.badHex", { value: hex }));
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
+  }
+  var SNAP_CATEGORIES = /* @__PURE__ */ new Set(["gap", "size"]);
+  var TOKEN_GROUP = { gap: "spacing", size: "size" };
+  var cloneToken = (t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] });
+  function scaleLadder(base, max) {
+    if (base <= 0) return [];
+    const rungs = [];
+    for (let v = base / 2; v >= 1; v /= 2) rungs.push(v);
+    for (let k = 1; base * k <= max + base; k++) rungs.push(base * k);
+    return rungs.sort((a, b) => a - b);
+  }
+  function tidyNumberTokens(tokens2, opts) {
+    var _a, _b, _c, _d, _e;
+    const { base, ratio } = opts;
+    const out = tokens2.map(cloneToken);
+    const targets = out.filter(
+      (t2) => SNAP_CATEGORIES.has(t2.category) && typeof t2.value === "number" && (!t2.unit || t2.unit === "px")
+    );
+    const before = targets.length;
+    if (base <= 0 || ratio <= 0 || before === 0) return { tokens: out, before, after: before, merged: 0, snapped: 0 };
+    const rungs = scaleLadder(base, Math.max(...targets.map((t2) => t2.value)));
+    const nearest = (v) => rungs.reduce((p, c) => Math.abs(c - v) < Math.abs(p - v) ? c : p);
+    let snapped = 0;
+    for (const t2 of targets) {
+      const v = t2.value;
+      if (v <= 0) continue;
+      const target = nearest(v);
+      if (target === v || Math.abs(target - v) / v > ratio) continue;
+      const group = TOKEN_GROUP[t2.category];
+      if (group && t2.name === numberTokenName(group, v)) t2.name = numberTokenName(group, target);
+      t2.value = target;
+      snapped++;
+    }
+    const seen = /* @__PURE__ */ new Map();
+    const dropped = /* @__PURE__ */ new Set();
+    for (const t2 of targets) {
+      const k = `${t2.category}|${t2.value}|${(_a = t2.unit) != null ? _a : ""}`;
+      const cur = seen.get(k);
+      if (!cur) {
+        seen.set(k, t2);
+        continue;
+      }
+      const [rep, gone] = ((_b = t2.count) != null ? _b : 0) > ((_c = cur.count) != null ? _c : 0) ? [t2, cur] : [cur, t2];
+      seen.set(k, rep);
+      for (const s of gone.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+      rep.count = Math.max((_d = rep.count) != null ? _d : 0, (_e = gone.count) != null ? _e : 0);
+      dropped.add(gone);
+    }
+    return {
+      tokens: out.filter((t2) => !dropped.has(t2)),
+      before,
+      after: before - dropped.size,
+      merged: dropped.size,
+      snapped
+    };
+  }
+  function numberTokenName(group, value) {
+    const v = Number.isInteger(value) ? String(value) : String(value).replace(".", "_");
+    return `${group}/${v}`;
   }
 
   // src/lib/bindDisplay.ts
@@ -2168,12 +2371,18 @@
   // src/lib/license.ts
   var REVERIFY_MS = 24 * 60 * 60 * 1e3;
   var GRACE_MS = 14 * 24 * 60 * 60 * 1e3;
+  var VERIFY_ERR_CODES = ["expired", "limit", "invalid", "server"];
+  function isVerifyErrCode(v) {
+    return typeof v === "string" && VERIFY_ERR_CODES.includes(v);
+  }
   function extractSignedToken(json) {
-    if (!json || typeof json !== "object") return { ok: false, error: "\uC751\uB2F5 \uBCF8\uBB38\uC744 \uD574\uC11D\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4" };
+    if (!json || typeof json !== "object") return { ok: false, error: t("license.err.badBody") };
     const o = json;
     if (typeof o.token === "string" && o.token) return { ok: true, token: o.token };
-    if (o.valid === false && typeof o.error === "string" && o.error) return { ok: false, error: o.error };
-    return { ok: false, error: "\uC11C\uBA85 \uD1A0\uD070\uC774 \uC5C6\uB294 \uC751\uB2F5" };
+    if (o.valid === false && typeof o.error === "string" && o.error) {
+      return isVerifyErrCode(o.code) ? { ok: false, error: o.error, code: o.code } : { ok: false, error: o.error };
+    }
+    return { ok: false, error: t("license.err.noToken") };
   }
   function pickInstanceId(json, prev) {
     if (json && typeof json === "object") {
@@ -2190,7 +2399,7 @@
   function base64UrlToString(input) {
     let b64 = input.replace(/-/g, "+").replace(/_/g, "/");
     const rem = b64.length % 4;
-    if (rem === 1) throw new Error("\uC798\uBABB\uB41C base64url \uAE38\uC774");
+    if (rem === 1) throw new Error(t("license.err.b64Len"));
     if (rem === 2) b64 += "==";
     else if (rem === 3) b64 += "=";
     let out = "";
@@ -2202,7 +2411,7 @@
       const c2 = e2 === "=" ? -1 : LOOKUP[e2];
       const c3 = e3 === "=" ? -1 : LOOKUP[e3];
       if (c0 === void 0 || c1 === void 0 || e2 !== "=" && c2 === void 0 || e3 !== "=" && c3 === void 0) {
-        throw new Error("\uC798\uBABB\uB41C base64url \uBB38\uC790");
+        throw new Error(t("license.err.b64Char"));
       }
       out += String.fromCharCode(c0 << 2 | c1 >> 4);
       if (c2 !== -1) out += String.fromCharCode((c1 & 15) << 4 | c2 >> 2);
@@ -2212,22 +2421,22 @@
   }
   function decodeJwt(token) {
     const parts = token.split(".");
-    if (parts.length !== 3) throw new Error("JWT \uD615\uC2DD \uC544\uB2D8(\uC810 3\uBD84\uD560 \uD544\uC694)");
+    if (parts.length !== 3) throw new Error(t("license.err.notJwt"));
     const [h, p, s] = parts;
     const header = JSON.parse(base64UrlToString(h));
     const payload = JSON.parse(base64UrlToString(p));
     return { header, payload, signingInput: `${h}.${p}`, signatureB64: s };
   }
   function validateLicenseClaims(payload, now, opts = {}) {
-    if (typeof payload.exp !== "number") return { ok: false, error: "exp \uD074\uB808\uC784 \uC5C6\uC74C" };
+    if (typeof payload.exp !== "number") return { ok: false, error: t("license.err.noExp") };
     const expiresAt = payload.exp * 1e3;
-    if (now >= expiresAt) return { ok: false, error: "\uD1A0\uD070 \uB9CC\uB8CC\uB428" };
+    if (now >= expiresAt) return { ok: false, error: t("license.err.expired") };
     if (typeof payload.nbf === "number" && now < payload.nbf * 1e3) {
-      return { ok: false, error: "\uC544\uC9C1 \uC720\uD6A8\uD558\uC9C0 \uC54A\uC740 \uD1A0\uD070(nbf)" };
+      return { ok: false, error: t("license.err.notYet") };
     }
-    if (opts.issuer && payload.iss !== opts.issuer) return { ok: false, error: "\uBC1C\uAE09\uC790(iss) \uBD88\uC77C\uCE58" };
-    if (opts.audience && payload.aud !== opts.audience) return { ok: false, error: "\uB300\uC0C1(aud) \uBD88\uC77C\uCE58" };
-    if (!isTier(payload.tier)) return { ok: false, error: "\uC54C \uC218 \uC5C6\uB294 \uD2F0\uC5B4" };
+    if (opts.issuer && payload.iss !== opts.issuer) return { ok: false, error: t("license.err.iss") };
+    if (opts.audience && payload.aud !== opts.audience) return { ok: false, error: t("license.err.aud") };
+    if (!isTier(payload.tier)) return { ok: false, error: t("license.err.tier") };
     return { ok: true, tier: payload.tier, expiresAt };
   }
   async function verifyLicenseToken(token, now, opts, verifySig) {
@@ -2235,17 +2444,17 @@
     try {
       jwt = decodeJwt(token);
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : "\uD1A0\uD070 \uB514\uCF54\uB4DC \uC2E4\uD328" };
+      return { ok: false, error: e instanceof Error ? e.message : t("license.err.decode") };
     }
     const alg = typeof jwt.header.alg === "string" ? jwt.header.alg : "";
-    if (!alg || alg.toLowerCase() === "none") return { ok: false, error: "\uC11C\uBA85 \uC54C\uACE0\uB9AC\uC998 \uC5C6\uC74C(alg=none \uAC70\uBD80)" };
+    if (!alg || alg.toLowerCase() === "none") return { ok: false, error: t("license.err.alg") };
     let sigOk = false;
     try {
       sigOk = await verifySig(jwt.signingInput, jwt.signatureB64, alg);
     } catch (e) {
       sigOk = false;
     }
-    if (!sigOk) return { ok: false, error: "\uC11C\uBA85 \uAC80\uC99D \uC2E4\uD328" };
+    if (!sigOk) return { ok: false, error: t("license.err.sig") };
     return validateLicenseClaims(jwt.payload, now, opts);
   }
 
@@ -2376,7 +2585,7 @@
     const rank = (t2) => t2 === 3 ? 0 : t2 === 2 ? 1 : t2 === 1 ? 2 : 3;
     return cols.map((c, i) => ({ c, i })).sort((a, b) => rank(a.c.tier) - rank(b.c.tier) || a.i - b.i).map((x) => x.c);
   }
-  var NO_GROUP = "(\uADF8\uB8F9 \uC5C6\uC74C)";
+  var NO_GROUP = t("list.noGroup");
   function groupKey(collectionId, name) {
     return `${collectionId}|${groupPath(name)}`;
   }
@@ -2874,7 +3083,7 @@
     const warnings = [];
     const base = hexToOklch(input.brand.primary);
     if (base.c < LOW_CHROMA) {
-      warnings.push("\uBE0C\uB79C\uB4DC\uC0C9\uC758 \uCC44\uB3C4\uAC00 \uB9E4\uC6B0 \uB0AE\uC544 hue\uAC00 \uBD88\uC548\uC815\uD569\uB2C8\uB2E4 \u2014 \uC911\uB9BD(neutral) \uC2A4\uCF00\uC77C\uB85C \uB2E4\uB8E8\uB294 \uAC83\uC744 \uAD8C\uC7A5\uD569\uB2C8\uB2E4.");
+      warnings.push(t("palette.lowChroma"));
     }
     const built = [];
     built.push({ role: "primary", scale: buildScale("primary", input.brand.primary, { anchor: true }) });
@@ -3136,18 +3345,18 @@
   function explainError(raw) {
     const s = (raw || "").toLowerCase();
     if (/font|loadfontasync|has not been loaded/.test(s))
-      return { message: "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.", action: "\uD574\uB2F9 \uD3F0\uD2B8\uB97C \uC124\uCE58/\uD65C\uC131\uD654\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.", retryable: true };
+      return { message: t("err.font"), action: t("err.fontAction"), retryable: true };
     if (/invalid scope|scope/.test(s))
-      return { message: "\uBCC0\uC218 \uC2A4\uCF54\uD504\uAC00 \uD638\uD658\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.", action: "\u2018\uD1A0\uD070 \uC0DD\uC131/\uAC31\uC2E0\u2019\uC744 \uB2E4\uC2DC \uC2E4\uD589\uD574 \uC2A4\uCF54\uD504\uB97C \uAC31\uC2E0\uD558\uC138\uC694.", retryable: true };
+      return { message: t("err.scope"), action: t("err.scopeAction"), retryable: true };
     if (/incompatible|property value/.test(s))
-      return { message: "\uC18D\uC131 \uAC12\uC774 \uD638\uD658\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4(\uC608: \uBBF8\uBC1C\uD589 \uCEF4\uD3EC\uB10C\uD2B8).", action: "\uCEF4\uD3EC\uB10C\uD2B8\uB97C \uBC1C\uD589\uD558\uAC70\uB098 \uB300\uC0C1 \uB808\uC774\uC5B4\uB97C \uD655\uC778\uD558\uC138\uC694.", retryable: false };
+      return { message: t("err.prop"), action: t("err.propAction"), retryable: false };
     if (/read[- ]?only|permission|not allowed|cannot edit/.test(s))
-      return { message: "\uD3B8\uC9D1 \uAD8C\uD55C\uC774 \uC5C6\uAC70\uB098 \uC77D\uAE30 \uC804\uC6A9 \uD30C\uC77C\uC785\uB2C8\uB2E4.", action: "\uD3B8\uC9D1 \uAC00\uB2A5\uD55C \uD30C\uC77C\uC5D0\uC11C \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.", retryable: false };
+      return { message: t("err.readonly"), action: t("err.readonlyAction"), retryable: false };
     if (/network|fetch|timeout|offline/.test(s))
-      return { message: "\uB124\uD2B8\uC6CC\uD06C \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4.", action: "\uC5F0\uACB0\uC744 \uD655\uC778\uD558\uACE0 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.", retryable: true };
+      return { message: t("err.network"), action: t("err.networkAction"), retryable: true };
     if (/storage|quota|exceeded/.test(s))
-      return { message: "\uB85C\uCEEC \uC800\uC7A5\uC18C \uC811\uADFC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.", action: "\uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.", retryable: true };
-    return { message: raw || "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958", action: "\uC120\uD0DD\uC744 \uD655\uC778\uD558\uACE0 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.", retryable: true };
+      return { message: t("err.storage"), action: t("err.storageAction"), retryable: true };
+    return { message: raw || t("err.unknown"), action: t("err.unknownAction"), retryable: true };
   }
 
   // src/lib/a11y.ts
@@ -3450,11 +3659,11 @@
       updateTokenCreate();
     };
     if (!tokens.length) {
-      showHint(lastSelCount > 0 ? "\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uC138\uC694." : "\uD504\uB808\uC784\uC744 \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.");
+      showHint(t(lastSelCount > 0 ? "create.hintPreview" : "create.hintNoSel"));
       return;
     }
     if (!previewRevealed) {
-      showHint("\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uB9CC\uB4E4 \uD1A0\uD070\uC774 \uD45C\uC2DC\uB429\uB2C8\uB2E4.");
+      showHint(t("create.hintReveal"));
       return;
     }
     const colorN = tokens.length - others.length;
@@ -3462,7 +3671,7 @@
     banner.style.display = colorsCreated && colorN ? "" : "none";
     if (colorsCreated && colorN) banner.textContent = t("create.colorsDone", { count: colorN });
     if (!others.length) {
-      showHint("\uC0C9 \uC678 \uD1A0\uD070\uC774 \uC5C6\uC2B5\uB2C8\uB2E4(\uC0C9\uB9CC \uCD94\uCD9C\uB428).");
+      showHint(t("create.onlyColors"));
       return;
     }
     $("tokenCtrls").style.display = "";
@@ -3472,7 +3681,7 @@
   function updateTokenCreate() {
     const others = creatableTokens();
     const sel = others.filter((t2) => tokenChecked.has(tokenKey(t2))).length;
-    $("createCount").textContent = others.length ? `\uD6C4\uBCF4 ${sel}/${others.length}` : "";
+    $("createCount").textContent = others.length ? t("create.count", { sel, total: others.length }) : "";
     const all = $("tokenAll");
     all.checked = sel === others.length && others.length > 0;
     all.indeterminate = sel > 0 && sel < others.length;
@@ -3626,20 +3835,20 @@
       if (!roleByName.has(name)) roleByName.set(name, role);
     }
     renderPaletteRow(colors);
-    renderChunked($("colorTable"), colors, (t2) => {
+    renderChunked($("colorTable"), colors, (tok) => {
       var _a;
-      const role = roleSelect((_a = roleByName.get(t2.name)) != null ? _a : "");
-      role.dataset.name = t2.name;
-      const used = t2.count ? ` \xB7 ${t2.count}\xD7 \uC0AC\uC6A9` : "";
+      const role = roleSelect((_a = roleByName.get(tok.name)) != null ? _a : "");
+      role.dataset.name = tok.name;
+      const used = tok.count ? t("color.usedCount", { n: tok.count }) : "";
       const card2 = resultCard({
-        title: t2.name,
+        title: tok.name,
         titleMono: true,
-        summary: `${t2.value}${used}`,
+        summary: `${tok.value}${used}`,
         summaryMono: true,
         metaEl: role
       });
       role.addEventListener("change", updateColorSummary);
-      addSwatch(card2, t2.value);
+      addSwatch(card2, tok.value);
       return card2;
     });
     updateColorSummary();
@@ -3716,9 +3925,9 @@
     preNumTidyTokens = snapshot;
     carryTokenChecked(snapshot, r.tokens);
     $("numTidySummary").style.display = "";
-    const merged = r.merged ? ` \xB7 \uAC19\uC740 \uCE78 ${r.merged}\uAC1C \uBCD1\uD569` : "";
-    const gap = r.snapped ? t("create.snapNoBind", { k: r.snapped }) : "";
-    $("numTidyText").textContent = `\uC5EC\uBC31\xB7\uD06C\uAE30 ${r.before} \u2192 ${r.after}\uAC1C (${grid}px \uACA9\uC790\uB85C ${r.snapped}\uAC1C \uC774\uB3D9${merged})${gap}`;
+    const mergedPart = r.merged ? t("create.tidyMerged", { n: r.merged }) : "";
+    const gapPart = r.snapped ? t("create.snapNoBind", { k: r.snapped }) : "";
+    $("numTidyText").textContent = t("create.tidySummary", { before: r.before, after: r.after, grid, n: r.snapped, mergedPart, gapPart });
   }
   function undoNumTidy() {
     if (!preNumTidyTokens) return;
@@ -3728,7 +3937,7 @@
     clearNumTidy();
     renderTokens();
     $("btnCreateApply").style.display = "none";
-    setStatus("createStatus", "\uACA9\uC790 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC2B5\uB2C8\uB2E4 \u2014 \u300C\uBBF8\uB9AC\uBCF4\uAE30\u300D\uB97C \uB2E4\uC2DC \uB204\uB974\uBA74 \uB610 \uC815\uB9AC\uB429\uB2C8\uB2E4.", "");
+    setStatus("createStatus", t("create.tidyUndone"), "");
   }
   $("btnNumTidyUndo").addEventListener("click", undoNumTidy);
   $("tokenAll").addEventListener("change", () => {
@@ -3744,7 +3953,7 @@
     });
     for (const t2 of once) tokenChecked.delete(tokenKey(t2));
     renderTokens();
-    setStatus("createStatus", once.length ? `1\xD7 \uD1A0\uD070 ${once.length}\uAC1C \uD574\uC81C` : "1\xD7 \uD1A0\uD070\uC774 \uC5C6\uC2B5\uB2C8\uB2E4", "");
+    setStatus("createStatus", once.length ? t("create.onceOff", { n: once.length }) : t("create.onceNone"), "");
   });
   $("btnCreate").addEventListener("click", () => {
     previewRevealed = true;
@@ -3926,7 +4135,7 @@
     } else {
       const del = document.createElement("button");
       del.className = "link";
-      del.textContent = "\uC0AD\uC81C";
+      del.textContent = t("textStyle.rowDelete");
       del.addEventListener("click", () => {
         tsSpecs = tsSpecs.filter((x) => x !== s);
         renderTextStyles();
@@ -3945,10 +4154,10 @@
     const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
     setStatus(
       "tsStatus",
-      `\uC2E0\uADDC ${fresh} \xB7 \uB4F1\uB85D\uB428 ${tsSpecs.length - fresh}` + tsScanNote.namePart + ` \xB7 \uD589\uAC04% ${tsSpecs.filter((s) => s.lineHeightPercent).length} \xB7 \uC790\uAC04% ${tsSpecs.filter((s) => {
+      t("textStyle.scanSummary", { a: fresh, b: tsSpecs.length - fresh }) + tsScanNote.namePart + t("textStyle.scanLhPct", { n: tsSpecs.filter((s) => s.lineHeightPercent).length }) + t("textStyle.scanLsPct", { n: tsSpecs.filter((s) => {
         var _a;
         return ((_a = s.letterSpacingPercent) != null ? _a : 0) !== 0;
-      }).length}` + (tsScanNote.warnings.length ? " \xB7 " + tsScanNote.warnings.join(" ") : ""),
+      }).length }) + (tsScanNote.warnings.length ? " \xB7 " + tsScanNote.warnings.join(" ") : ""),
       tsScanNote.warnings.length ? "warn" : "ok"
     );
   }
@@ -3964,7 +4173,7 @@
   }
   $("btnScanText").addEventListener("click", () => send({ type: "SCAN_TEXT_STYLES" }));
   $("btnTsRowLabels").addEventListener("click", () => {
-    setStatus("tsStatus", "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE30\uB294 \uC911\u2026", "ok");
+    setStatus("tsStatus", t("textStyle.renaming"), "ok");
     send({ type: "NAME_TEXT_STYLES_BY_ROW" });
   });
   $("btnTsAddRow").addEventListener("click", () => {
@@ -3978,7 +4187,7 @@
   $("btnTextStyles").addEventListener("click", () => {
     const styles = readTextStyleRows();
     if (!styles.length) {
-      setStatus("tsStatus", "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uC2A4\uCE94\u2019 \uD558\uAC70\uB098 \u2018\uD589 \uCD94\uAC00\u2019\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC815\uC758\uD558\uC138\uC694.", "warn");
+      setStatus("tsStatus", t("textStyle.needSpecs"), "warn");
       return;
     }
     send({ type: "CREATE_TEXT_STYLES", styles });
@@ -4033,7 +4242,7 @@
     const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
     if (!items.length) return;
     bindFinding = false;
-    showApplyProgress("\uC5F0\uACB0 \uC911\u2026");
+    showApplyProgress(t("bind.linking"), false);
     send({ type: "APPLY_SELECTED", items, reqId: nextBindReq() });
   });
   $("btnApplyCancel").addEventListener("click", () => {
@@ -4358,17 +4567,20 @@
       });
       json = await resp.json().catch(() => null);
     } catch (e) {
-      send({ type: "LICENSE_VERIFIED", key, result: { ok: false, error: "\uAC80\uC99D \uC11C\uBC84 \uC5F0\uACB0 \uC2E4\uD328(\uC624\uD504\uB77C\uC778)", offline: true } });
+      send({ type: "LICENSE_VERIFIED", key, result: { ok: false, offline: true } });
       return;
     }
     let result;
     try {
       const ext = extractSignedToken(json);
-      if (!ext.ok) throw new Error(ext.error);
+      if (!ext.ok) {
+        send({ type: "LICENSE_VERIFIED", key, result: ext.code ? { ok: false, error: ext.error, code: ext.code } : { ok: false, error: ext.error } });
+        return;
+      }
       const parsed = await verifyLicenseToken(ext.token, Date.now(), { issuer: LICENSE_ISS, audience: LICENSE_AUD }, subtleVerify);
       result = parsed.ok ? { ok: true, tier: parsed.tier, expiresAt: parsed.expiresAt, instanceId: pickInstanceId(json, instanceId) } : { ok: false, error: parsed.error };
     } catch (e) {
-      result = { ok: false, error: `\uAC80\uC99D \uC2E4\uD328: ${e instanceof Error ? e.message : String(e)}` };
+      result = { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
     send({ type: "LICENSE_VERIFIED", key, result });
   }
@@ -4424,7 +4636,7 @@
       }
       setLock(input, isPaid ? null : "paid");
     }
-    setPrereq("btnSemantics", "semPrereq", hasGlobal, "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.");
+    setPrereq("btnSemantics", "semPrereq", hasGlobal, t("semantic.needGlobal"));
     if (!isPaid) setLock($("btnSemantics"), "paid");
     renderBindPrereq();
   }
@@ -4563,16 +4775,16 @@
     const text = notice.querySelector(".prereq-text");
     if (!ok && text) {
       if (!varsLoaded) {
-        text.textContent = "\uBCC0\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026";
+        text.textContent = t("dark.prereqLoading");
         gotoCreate.style.display = "none";
       } else if (allVars.length === 0) {
-        text.textContent = "\uBA3C\uC800 \uD1A0\uD070\uC744 \uC0DD\uC131\uD574 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.";
+        text.textContent = t("dark.prereqNoVars");
         gotoCreate.style.display = "";
       } else if (!colId || modes.length === 0) {
-        text.textContent = "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158(\uBCF4\uD1B5 Semantic)\uC744 \uACE0\uB974\uC138\uC694.";
+        text.textContent = t("dark.prereqNoModes");
         gotoCreate.style.display = "none";
       } else {
-        text.textContent = "\uCEEC\uB809\uC158\uACFC \uBC1D\uC740 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.";
+        text.textContent = t("dark.prereqPick");
         gotoCreate.style.display = "none";
       }
     }
@@ -4602,17 +4814,17 @@
     const collectionId = $("darkCollection").value;
     const fromModeId = $("darkFromMode").value;
     if (!collectionId || !fromModeId) {
-      setStatus("darkStatus", "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.", "warn");
+      setStatus("darkStatus", t("dark.prereqPick"), "warn");
       return;
     }
-    setStatus("darkStatus", "Dark \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026", "");
+    setStatus("darkStatus", t("dark.running"), "");
     const toModeId = $("darkToMode").value;
     send(__spreadValues({ type: "GENERATE_DARK_MODE", collectionId, fromModeId }, toModeId ? { toModeId } : {}));
   });
   var similarMemberIds = [];
   var similarMasterId = null;
   $("btnScanSimilar").addEventListener("click", () => {
-    setStatus("structureStatus", "\uB2EE\uC740 \uD504\uB808\uC784\uC744 \uCC3E\uB294 \uC911\u2026", "");
+    setStatus("structureStatus", t("similar.scanning"), "");
     send({ type: "SCAN_SIMILAR" });
   });
   $("btnComponentize").addEventListener("click", () => {
@@ -4620,7 +4832,7 @@
       setStatus("structureStatus", t(compCandidates.length ? "similar.needScanAfterComp" : "similar.needScan"), "warn");
       return;
     }
-    setStatus("structureStatus", "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uB294 \uC911\u2026", "");
+    setStatus("structureStatus", t("similar.componentizing"), "");
     send({ type: "COMPONENTIZE_SIMILAR", masterId: similarMasterId, frameIds: similarMemberIds });
   });
   $("btnRegisterComp").addEventListener("click", () => {
@@ -4692,7 +4904,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -4709,7 +4921,7 @@
         renderColorTable();
         renderTokens();
         const colorN = tokens.filter((tk) => tk.category === "color").length;
-        $("selInfo").textContent = `\uC120\uD0DD ${msg.selection}\uAC1C \xB7 \uC0C9 ${colorN} \xB7 \uADF8 \uC678 ${tokens.length - colorN}`;
+        $("selInfo").textContent = t("color.selInfo", { n: msg.selection, c: colorN, o: tokens.length - colorN });
         if (msg.warnings.length) setStatus("colorStatus", msg.warnings.join(" "), "warn");
         else if (!tokens.length) setStatus("colorStatus", t("color.extractEmpty"), "warn");
         if (pendingCreatePreview) {
@@ -4789,11 +5001,9 @@
         if (isMini && msg.preview) bindPreviewMini = true;
         bindSkips = (_a = msg.skips) != null ? _a : [];
         bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
-        const rt = reasonsText(msg.reasons);
         if (msg.cancelled) {
           clearBindPreview();
-          const cancelDetail = `${msg.skipped ? ` \xB7 \uC2A4\uD0B5 ${msg.skipped}` : ""}${rt ? ` \u2014 ${rt}` : ""}`;
-          setStatus("applyStatus", t("apply.cancelled", { bound: msg.bound, detail: cancelDetail }), "warn");
+          setStatus("applyStatus", t("apply.cancelled"), "warn");
         } else if (msg.preview) {
           const prev = bindCandidates;
           const prevChecked = new Set(bindChecked);
@@ -4839,15 +5049,15 @@
         break;
       case "SELECT_RESULT":
         if (selectStatusTarget === "list") {
-          if (msg.capped) showStatusLine(t("list.selectCapped", { n: msg.requested }), { cls: "warn" });
-          else if (!msg.found) showStatusLine(t("list.selectNone"), { cls: "warn" });
-          else if (msg.found < msg.requested) showStatusLine(t("list.selectPartial", { found: msg.found, missing: msg.requested - msg.found }), { cls: "warn" });
+          if (msg.capped) showStatusLine(t("select.capped", { found: msg.found, requested: msg.requested }), { cls: "warn" });
+          else if (!msg.found) showStatusLine(t("select.none"), { cls: "warn" });
+          else if (msg.found < msg.requested) showStatusLine(t("select.partial", { found: msg.found, missing: msg.requested - msg.found }), { cls: "warn" });
           break;
         }
         if (msg.capped) {
-          setStatus(selectStatusTarget, `\uB808\uC774\uC5B4 ${msg.found}\uAC1C\uB9CC \uC120\uD0DD \u2014 \uD55C \uBC88\uC5D0 \uBCF4\uC5EC\uC904 \uC218 \uC788\uB294 \uC0C1\uD55C(${msg.requested}\uAC1C \uC911)\uC785\uB2C8\uB2E4.`, "warn");
+          setStatus(selectStatusTarget, t("select.capped", { found: msg.found, requested: msg.requested }), "warn");
         } else if (msg.found < msg.requested) {
-          setStatus(selectStatusTarget, msg.found ? `\uB808\uC774\uC5B4 ${msg.found}\uAC1C \uC120\uD0DD \u2014 ${msg.requested - msg.found}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC785\uB2C8\uB2E4.` : "\uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC785\uB2C8\uB2E4. \uBBF8\uB9AC\uBCF4\uAE30\uB97C \uB2E4\uC2DC \uC2E4\uD589\uD558\uC138\uC694.", "warn");
+          setStatus(selectStatusTarget, msg.found ? t("select.partial", { found: msg.found, missing: msg.requested - msg.found }) : t("select.none"), "warn");
         }
         break;
       case "RENAME_RESULT":
@@ -4872,7 +5082,7 @@
           }) : [];
           tsSpecs = [...msg.styles.map((x) => __spreadValues({}, x)), ...manual];
           tsScanNote = {
-            namePart: msg.labeled != null ? ` \xB7 \uC67C\uCABD \uAE00\uC790 ${msg.labeled} \xB7 \uD06C\uAE30 \uC21C ${(_i = msg.fallback) != null ? _i : 0}` : "",
+            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_i = msg.fallback) != null ? _i : 0 }) : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -4880,15 +5090,15 @@
           tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY);
           tsScanNote = { namePart: "", warnings: [] };
           renderTextStyles();
-          setStatus("tsStatus", "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC2B5\uB2C8\uB2E4. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694.", "warn");
+          setStatus("tsStatus", t("textStyle.fallbackRamp"), "warn");
         }
         break;
       }
       case "TEXT_STYLES_RESULT":
         setStatus(
           "tsStatus",
-          `\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C ${msg.created + msg.updated}\uAC1C (\uC0DD\uC131 ${msg.created} / \uAC31\uC2E0 ${msg.updated}) \xB7 \uBC14\uC778\uB529 ${msg.bound}` + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
-          (msg.notes.length ? ` \xB7 ${msg.notes.join(" \xB7 ")}` : "") + (msg.missing.length ? ` \xB7 \uBBF8\uC5F0\uACB0: ${msg.missing.join(", ")}` : ""),
+          t("textStyle.registered", { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
+          (msg.notes.length ? ` \xB7 ${msg.notes.join(" \xB7 ")}` : "") + (msg.missing.length ? t("textStyle.unlinked", { names: msg.missing.join(", ") }) : ""),
           msg.missing.length ? "warn" : "ok"
         );
         break;
@@ -4932,13 +5142,14 @@
         requestGlobalRoles();
         break;
       case "LICENSE_STATUS": {
-        const srcLabel = msg.source === "key" ? `\uB77C\uC774\uC120\uC2A4 \uD0A4${msg.status ? ` \xB7 ${msg.status}` : ""}` : msg.source === "dev" ? "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C" : "\uC5C6\uC74C";
-        const exp = msg.expiresAt ? ` \xB7 \uB9CC\uB8CC ${new Date(msg.expiresAt).toISOString().slice(0, 10)}` : "";
-        $("licenseInfo").textContent = `\uD604\uC7AC: ${msg.tier.toUpperCase()} (${srcLabel})${exp}`;
+        const statusPart = msg.status ? t("license.srcKeyStatus", { status: t(`license.status.${msg.status}`) }) : "";
+        const source = msg.source === "key" ? t("license.srcKey", { statusPart }) : msg.source === "dev" ? t("license.srcDev") : t("license.srcNone");
+        const expPart = msg.expiresAt ? t("license.expires", { date: new Date(msg.expiresAt).toISOString().slice(0, 10) }) : "";
+        $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          const cls = /실패|오프라인/.test(msg.note) ? "warn" : "ok";
-          setStatus("licenseStatus", msg.note, cls);
+          setStatus("licenseStatus", msg.note, (_m = msg.noteKind) != null ? _m : "ok");
+          if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
         updateGates();
@@ -4969,21 +5180,21 @@
       }
       case "COMPONENTS_RESULT": {
         clearCompPreview();
-        const misplaced = (_m = msg.placeFailed) != null ? _m : [];
-        const cloned = (_n = msg.placeCloned) != null ? _n : [];
-        const extra = `${msg.skipped ? ` \xB7 \uAC74\uB108\uB700 ${msg.skipped}` : ""}${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.exposed ? ` \xB7 \uC18D\uC131 ${msg.exposed}` : ""}${msg.icons ? ` \xB7 \uC544\uC774\uCF58 ${msg.icons}` : ""}${placeTailText("component.placeCloned", cloned)}${placeFailedText(misplaced)}`;
-        setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extra }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length ? "ok" : "warn");
+        const misplaced = (_n = msg.placeFailed) != null ? _n : [];
+        const cloned = (_o = msg.placeCloned) != null ? _o : [];
+        const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + (msg.singles.length ? t("component.extraSingles", { n: msg.singles.length }) : "") + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
+        setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extraPart }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
         break;
       }
       case "VARIANTS_RESULT": {
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
-        const extra = `${msg.singles.length ? ` \xB7 \uB2E8\uC77C ${msg.singles.length}` : ""}${msg.missing.length ? " \xB7 \uBE48 \uC870\uD569 \uC788\uC74C" : ""}`;
-        setStatus("structureStatus", t("component.variants", { sets: msg.sets, extra }), msg.sets ? "ok" : "warn");
+        const extraPart = (msg.singles.length ? t("component.extraSingles", { n: msg.singles.length }) : "") + (msg.missing.length ? t("component.extraMissing") : "");
+        setStatus("structureStatus", t("component.variants", { sets: msg.sets, extraPart }), msg.sets ? "ok" : "warn");
         break;
       }
       case "GENERATE_RESULT": {
-        renderVariantReport([{ tag: "\uC0DD\uC131", items: msg.combos, marker: "added" }]);
+        renderVariantReport([{ tag: t("component.tagAdded"), items: msg.combos, marker: "added" }]);
         setStatus("structureStatus", t("component.generated", { generated: msg.generated, sets: msg.sets }), msg.generated ? "ok" : "warn");
         break;
       }
@@ -5019,14 +5230,14 @@
           break;
         }
         if (!msg.realiased) {
-          const why = msg.skipped ? `Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 ${msg.skipped}\uAC1C)` : "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694";
-          const mode2 = msg.modeCreated ? "Dark \uBAA8\uB4DC\uB294 \uCD94\uAC00\uB410\uC5B4\uC694. " : "";
-          setStatus("darkStatus", `${mode2}\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${why}`, "warn");
+          const why = msg.skipped ? t("dark.whyNoGlobal", { n: msg.skipped }) : t("dark.whyNone");
+          const modePart2 = msg.modeCreated ? t("dark.modeAdded") : "";
+          setStatus("darkStatus", t("dark.fillFailed", { modePart: modePart2, why }), "warn");
           break;
         }
-        const mode = msg.modeCreated ? "Dark \uBAA8\uB4DC \uCD94\uAC00 \xB7 " : "";
-        const skip = msg.skipped ? ` \xB7 \uAC74\uB108\uB700 ${msg.skipped}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)` : "";
-        setStatus("darkStatus", `${mode}\uB2E4\uD06C ${msg.realiased}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 ${msg.created}\uAC1C${skip}`, "ok");
+        const modePart = msg.modeCreated ? t("dark.modeAddedShort") : "";
+        const skipPart = msg.skipped ? t("dark.skippedDirect", { n: msg.skipped }) : "";
+        setStatus("darkStatus", t("dark.done", { modePart, n: msg.realiased, c: msg.created, skipPart }), "ok");
         break;
       }
       case "SIMILAR_CANDIDATES":
@@ -5034,18 +5245,19 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_o = msg.placeFailed) != null ? _o : [];
-          const first = msg.warnings.find((w) => !misplaced0.some((n) => w.startsWith(`${n}: \uC81C\uC790\uB9AC`)));
-          setStatus("structureStatus", `\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694${first ? ` \u2014 ${first}` : ""}${placeFailedText(misplaced0)}`, "warn");
+          const misplaced0 = (_p = msg.placeFailed) != null ? _p : [];
+          const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
+          const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
+          setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
           break;
         }
-        const parts = [`\uB9C8\uC2A4\uD130 ${msg.master}`, `\uC778\uC2A4\uD134\uC2A4 ${msg.instances}\uAC1C`];
-        if (msg.properties) parts.push(`\uC18D\uC131 ${msg.properties}\uAC1C`);
-        if (msg.images) parts.push(`\uC774\uBBF8\uC9C0 ${msg.images}\uAC1C`);
-        const misplaced = (_p = msg.placeFailed) != null ? _p : [];
+        const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
+        if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
+        if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
+        const misplaced = (_q = msg.placeFailed) != null ? _q : [];
         const others = msg.warnings.length - misplaced.length;
-        const firstOther = msg.warnings.find((w) => !misplaced.some((n) => w.startsWith(`${n}: \uC81C\uC790\uB9AC`)));
-        const warn = others > 0 && firstOther ? ` \xB7 \uB0A8\uACA8\uB454 \uAC83 ${others}\uAC74: ${firstOther}` : "";
+        const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
+        const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
         setStatus("structureStatus", `${parts.join(" \xB7 ")}${warn}${placeFailedText(misplaced)}`, msg.warnings.length ? "warn" : "ok");
         similarMemberIds = [];
         similarMasterId = null;
@@ -5103,6 +5315,7 @@
     const el = $(id);
     el.className = "status";
     el.innerHTML = "";
+    if (id === "licenseStatus") el.removeAttribute("title");
     const box = document.createElement("div");
     box.className = "ux danger";
     const h = document.createElement("div");
@@ -5122,7 +5335,7 @@
       const retry = lastSentMsg;
       const btn = document.createElement("button");
       btn.className = "primary";
-      btn.textContent = "\uB2E4\uC2DC \uC2DC\uB3C4";
+      btn.textContent = t("common.retry");
       btn.addEventListener("click", () => send(retry));
       box.appendChild(btn);
     }
@@ -5232,7 +5445,7 @@
   function updateRenameApply() {
     const total = affectedRenameCount();
     const sel = renameChecked.size;
-    $("renameCount").textContent = total ? `\uD6C4\uBCF4 ${total}` : "";
+    $("renameCount").textContent = total ? t("rename.count", { total }) : "";
     $("btnRename").disabled = sel === 0;
     const all = $("renameAll");
     all.checked = total > 0 && sel === total;
@@ -5612,12 +5825,12 @@
       if (!n.eligible) return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId };
       const base = { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, replace: false };
       if (n.group) {
-        return __spreadProps(__spreadValues({}, base), { change: `${n.group} \xB7 ${n.variant || "\uBCA0\uB9AC\uC5B8\uD2B8"}`, badge: { text: "\uC138\uD2B8", kind: "set" } });
+        return __spreadProps(__spreadValues({}, base), { change: `${n.group} \xB7 ${n.variant || t("component.variantFallback")}`, badge: { text: t("component.badgeSet"), kind: "set" } });
       }
       if (n.propsOnly) {
-        return __spreadProps(__spreadValues({}, base), { change: `${n.single || "\uCEF4\uD3EC\uB10C\uD2B8"} \xB7 \uC18D\uC131`, badge: { text: "\uC18D\uC131", kind: "single" } });
+        return __spreadProps(__spreadValues({}, base), { change: t("component.changeProps", { name: n.single || t("component.nameFallback") }), badge: { text: t("component.badgeProps"), kind: "single" } });
       }
-      return __spreadProps(__spreadValues({}, base), { change: n.single || "\uCEF4\uD3EC\uB10C\uD2B8", badge: { text: "\uB2E8\uB3C5", kind: "single" } });
+      return __spreadProps(__spreadValues({}, base), { change: n.single || t("component.nameFallback"), badge: { text: t("component.badgeSingle"), kind: "single" } });
     });
   }
   function renderCompTree() {
@@ -5632,7 +5845,7 @@
   function updateCompRegister() {
     const total = compEligibleCount();
     const sel = compChecked.size;
-    $("compCount").textContent = total ? `\uD6C4\uBCF4 ${total}` : "";
+    $("compCount").textContent = total ? t("component.count", { total }) : "";
     $("compTreeGroup").style.display = total ? "" : "none";
     if (compCandidates.length) {
       const all = $("compAll");
@@ -5662,13 +5875,13 @@
   function variantIssueSections(missing, failures) {
     const f = failures || [];
     return [
-      { tag: "\uBE48 \uC870\uD569", head: "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):", items: missing },
-      { tag: "\uBB38\uC81C", head: `\uCC98\uB9AC \uC911 \uBB38\uC81C ${f.length}\uAC74:`, items: f, warn: true, marker: "bullet" }
+      { tag: t("component.tagMissing"), head: t("component.headMissing"), items: missing },
+      { tag: t("component.tagIssue"), head: t("component.headIssue", { n: f.length }), items: f, warn: true, marker: "bullet" }
     ];
   }
   function renderVariantReport(sections) {
     const filled = sections.filter((s) => s.items.length);
-    $("componentCount").textContent = filled.map((s) => `${s.tag} ${s.items.length}\uAC1C`).join(" \xB7 ");
+    $("componentCount").textContent = filled.map((s) => t("component.tagCount", { tag: s.tag, n: s.items.length })).join(" \xB7 ");
     const lines = [];
     for (const s of filled) {
       if (s.head) lines.push({ text: s.head, head: true, warn: s.warn });
@@ -5713,7 +5926,7 @@
       btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names }) + capNote;
       btn.addEventListener("click", () => {
         selectNodes(ids, "applyStatus");
-        setStatus("applyStatus", `${t("reason." + key)} \uB808\uC774\uC5B4 ${ids.length}\uAC1C \uC120\uD0DD`, "");
+        setStatus("applyStatus", t("bind.skipSelected", { reason: t("reason." + key), n: ids.length }), "");
       });
       box.appendChild(btn);
     }
@@ -5726,13 +5939,14 @@
   function placeFailedText(names) {
     return placeTailText("component.placeFailed", names);
   }
-  function reasonsText(reasons) {
-    return Object.entries(reasons).filter(([, n]) => n > 0).map(([k, n]) => `${t("reason." + k)} ${n}`).join(" \xB7 ");
+  function isPlaceFailWarning(w, names) {
+    return names.some((name) => w === t("similar.placeFail", { name }));
   }
-  function showApplyProgress(label) {
+  function showApplyProgress(label, cancellable = true) {
     $("applyProgress").style.display = "";
     $("applyBarFill").style.width = "0%";
     $("applyProgressText").textContent = label;
+    $("btnApplyCancel").hidden = !cancellable;
   }
   function makeSimilarRow(m, recommendedId) {
     const radio = document.createElement("input");
@@ -5743,15 +5957,15 @@
     radio.addEventListener("change", () => {
       if (radio.checked) similarMasterId = m.id;
     });
-    const parts = [`\uD14D\uC2A4\uD2B8 ${m.textFilled}/${m.textTotal}`];
-    if (m.images) parts.push(`\uC774\uBBF8\uC9C0 ${m.images}`);
-    if (m.emptyLayers) parts.push(`\uBE48 \uCE78 ${m.emptyLayers}`);
+    const parts = [t("similar.metaText", { filled: m.textFilled, total: m.textTotal })];
+    if (m.images) parts.push(t("similar.metaImages", { n: m.images }));
+    if (m.emptyLayers) parts.push(t("similar.metaEmpty", { n: m.emptyLayers }));
     const card = resultCard({
       check: radio,
       title: m.name,
       summary: parts.join(" \xB7 "),
       summaryMono: true,
-      meta: m.id === recommendedId ? "\uCD94\uCC9C" : ""
+      meta: m.id === recommendedId ? t("similar.recommended") : ""
     });
     if (m.id === recommendedId) card.querySelector(".r-meta").className = "tag tag-set";
     card.addEventListener("click", (e) => {
@@ -5764,30 +5978,30 @@
   function renderSimilar(msg) {
     similarMemberIds = msg.metas.map((m) => m.id);
     similarMasterId = msg.recommendedMasterId;
-    $("similarCount").textContent = msg.metas.length ? `\uB2EE\uC740 ${msg.metas.length}\uAC1C` : "";
+    $("similarCount").textContent = msg.metas.length ? t("similar.count", { n: msg.metas.length }) : "";
     $("similarGroup").style.display = msg.metas.length ? "" : "none";
     const box = $("similarList");
     renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId));
     if (!msg.metas.length) {
-      const why = msg.excluded.length ? msg.excluded[0].reason : "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC744 2\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD558\uC138\uC694.";
-      setStatus("structureStatus", `\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD560 \uD504\uB808\uC784\uC774 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 ${why}`, "warn");
+      const why = msg.excluded.length ? msg.excluded[0].reason : t("similar.needTwo");
+      setStatus("structureStatus", t("similar.none", { why }), "warn");
       return;
     }
     const texts = msg.varying.filter((v) => v.type === "TEXT").length;
     const swaps = msg.varying.length - texts;
     const opened = [];
-    if (texts) opened.push(`\uD14D\uC2A4\uD2B8 ${texts}`);
-    if (swaps) opened.push(`\uC544\uC774\uCF58 \uAD50\uCCB4 ${swaps}`);
-    if (msg.imageVarying.length) opened.push(`\uC774\uBBF8\uC9C0 ${msg.imageVarying.length}`);
-    const openText = opened.length ? `\uC18D\uC131\uC73C\uB85C \uC5F4\uB9BC: ${opened.join(" \xB7 ")}` : "\uAC00\uBCC0 \uC704\uCE58\uAC00 \uC5C6\uC5B4 \uC18D\uC131\uC740 \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694";
-    const skipText = msg.excluded.length ? ` \xB7 \uC81C\uC678 ${msg.excluded.length}\uAC1C(${msg.excluded[0].reason})` : "";
-    setStatus("structureStatus", `\uB300\uC0C1 ${msg.metas.length}\uAC1C \xB7 ${openText}${skipText}`, "ok");
+    if (texts) opened.push(t("similar.openText", { n: texts }));
+    if (swaps) opened.push(t("similar.openSwap", { n: swaps }));
+    if (msg.imageVarying.length) opened.push(t("similar.openImage", { n: msg.imageVarying.length }));
+    const openPart = opened.length ? t("similar.opened", { list: opened.join(" \xB7 ") }) : t("similar.noVarying");
+    const skipPart = msg.excluded.length ? t("similar.excluded", { n: msg.excluded.length, why: msg.excluded[0].reason }) : "";
+    setStatus("structureStatus", t("similar.scanned", { n: msg.metas.length, openPart, skipPart }), "ok");
   }
   function updateApplyProgress(done, total) {
     $("applyProgress").style.display = "";
     const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
     $("applyBarFill").style.width = `${pct}%`;
-    $("applyProgressText").textContent = total > 0 ? `${done} / ${total} \uCC98\uB9AC \uC911\u2026 (${pct}%)` : `${done}\uAC1C \uCC98\uB9AC \uC911\u2026`;
+    $("applyProgressText").textContent = total > 0 ? t("bind.progressOf", { done, total, pct }) : t("bind.progressCount", { done });
   }
   function hideApplyProgress() {
     $("applyProgress").style.display = "none";
@@ -5798,6 +6012,7 @@
     const el = $(id);
     el.textContent = text;
     el.className = `status ${cls}`;
+    if (id === "licenseStatus") el.removeAttribute("title");
   }
   function escapeHtml(s) {
     return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
@@ -5841,14 +6056,6 @@
       });
     });
   }
-  var STRUCTURE_TIPS = {
-    btnScanComp: "component.scanHelp",
-    btnScanSimilar: "similar.scanHelp",
-    btnClassifyVariants: "component.classifyHelp",
-    btnGenMissing: "component.genMissingHelp",
-    btnRegisterComp: "component.registerHelp",
-    btnComponentize: "similar.componentizeHelp"
-  };
   var TIP_PAD = 8;
   function hideUiTip() {
     const tip = $("uiTip");
@@ -5878,10 +6085,6 @@
     tip.classList.add("show");
   }
   function applyButtonTips() {
-    for (const [id, key] of Object.entries(STRUCTURE_TIPS)) {
-      const el = document.getElementById(id);
-      if (el && hasString(key)) el.setAttribute("data-tip", t(key));
-    }
     document.querySelectorAll("[data-tip]").forEach((el) => {
       const show = () => {
         const text = el.getAttribute("data-tip");
@@ -5903,12 +6106,15 @@
       const key = el.dataset.i18nHtml;
       if (hasString(key)) el.innerHTML = t(key);
     });
-    for (const [attr, prop] of [
-      ["title", "i18nTitle"],
-      ["placeholder", "i18nPlaceholder"]
+    for (const [form, attr] of [
+      ["title", "title"],
+      ["placeholder", "placeholder"],
+      ["aria-label", "aria-label"],
+      ["tip", "data-tip"]
+      // 커스텀 툴팁(applyButtonTips가 호버 때 읽는다)
     ]) {
-      root.querySelectorAll(`[data-i18n-${attr}]`).forEach((el) => {
-        const key = el.dataset[prop];
+      root.querySelectorAll(`[data-i18n-${form}]`).forEach((el) => {
+        const key = el.getAttribute(`data-i18n-${form}`);
         if (hasString(key)) el.setAttribute(attr, t(key));
       });
     }
@@ -5974,10 +6180,8 @@
   }
   function goToLicense() {
     showTab("settings");
-    requestAnimationFrame(() => {
-      $("licenseKey").scrollIntoView({ block: "center" });
-      $("licenseKey").focus();
-    });
+    $("licenseKey").focus({ preventScroll: true });
+    requestAnimationFrame(() => $("licenseKey").scrollIntoView({ block: "center" }));
   }
   function setLock(el, reason, prereqMsg = "") {
     if (reason) {

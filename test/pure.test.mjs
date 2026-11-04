@@ -408,6 +408,14 @@ test('extractSignedToken — 서명 토큰만 수용(평문 응답은 페이월 
     ok: false,
     error: '구독이 만료되었습니다.',
   });
+  // 서버가 붙인 code도 함께 넘긴다(화면 줄은 license.err.server.{code}, 원문은 툴팁 — 결정 5-(b)).
+  assert.deepEqual(extractSignedToken({ valid: false, error: 'activation limit reached', code: 'limit' }), {
+    ok: false,
+    error: 'activation limit reached',
+    code: 'limit',
+  });
+  // 모르는 code는 넘기지 않는다 — 키 이름이 화면에 그대로 나오지 않게(license.verifyFailed로 간다).
+  assert.deepEqual(extractSignedToken({ valid: false, error: '새 사유', code: 'weird' }), { ok: false, error: '새 사유' });
   // 사유가 있어도 절대 성공으로 승격되지 않는다.
   assert.equal(extractSignedToken({ valid: false, error: '한도 초과', tier: 'paid' }).ok, false);
   // valid:true인데 토큰이 없으면 여전히 거부(페일오픈 방지) — error가 있어도 마찬가지.
@@ -1801,9 +1809,9 @@ test('pipelineSteps — 전제에 따른 단계 상태', () => {
 
 /* ================= i18n.ts (런타임 문자열 외부화) ================= */
 test('t — 키 조회·보간·폴백', () => {
-  assert.equal(t('rename.none'), '변경할 이름이 없습니다.');
+  assert.equal(t('rename.none'), '바꿀 이름이 없어요.');
   assert.equal(t('rename.applied', { count: 3 }), '3개 이름 적용 완료.');
-  assert.equal(t('export.saved', { format: 'CSS', file: 'tokens.css' }), 'CSS — tokens.css로 저장했습니다.');
+  assert.equal(t('export.saved', { format: 'CSS', file: 'tokens.css' }), 'CSS — tokens.css로 저장했어요.');
   // 누락 변수는 자리표시자 유지
   assert.equal(t('rename.applied', {}), '{count}개 이름 적용 완료.');
   // 누락 키는 key 그대로 폴백

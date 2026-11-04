@@ -2,6 +2,7 @@
    palette.ts — 브랜드 색 → 톤 스케일·하모니·중립·상태색 생성 (순수, figma 의존 없음)
    출력은 기존 DraftToken[] 형식 → variables.ts(createTokens)로 그대로 커밋.
    ============================================================ */
+import { t } from './i18n';
 import { Oklch, hexToOklch, oklchToHex, clampToGamut, mod360 } from './color';
 import { classifyColor, HUE_FAMILIES } from './colorName';
 import type { DraftToken } from './tokens';
@@ -145,7 +146,7 @@ export function generatePalette(input: PaletteInput): PaletteResult {
   const warnings: string[] = [];
   const base = hexToOklch(input.brand.primary);
   if (base.c < LOW_CHROMA) {
-    warnings.push('브랜드색의 채도가 매우 낮아 hue가 불안정합니다 — 중립(neutral) 스케일로 다루는 것을 권장합니다.');
+    warnings.push(t('palette.lowChroma'));
   }
 
   // 1) 역할별 스케일 생성(스케일 형태는 그대로, family는 임시로 역할명).

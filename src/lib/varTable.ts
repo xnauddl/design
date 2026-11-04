@@ -3,6 +3,7 @@
    - 이름의 `/`로 그룹을 나눈다(Figma Variables 사이드바와 같은 규칙: 마지막 토막이 변수 이름).
    - 왼쪽 트리(컬렉션 → 그룹)와 오른쪽 표(그룹 머리 + 행)를 만들 데이터, 필터, 복사 문자열.
    ============================================================ */
+import { t } from './i18n';
 
 export type VarType = 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
 
@@ -94,7 +95,7 @@ export function orderCollections<T extends Pick<VarCollection, 'tier'>>(cols: re
 }
 
 /** 그룹 이름 — 이름에 "/"가 없으면 "(그룹 없음)". 그룹 키는 컬렉션 + 경로. */
-export const NO_GROUP = '(그룹 없음)';
+export const NO_GROUP = t('list.noGroup');
 export function groupKey(collectionId: string, name: string): string {
   return `${collectionId}|${groupPath(name)}`;
 }

@@ -3,6 +3,7 @@
    값 변환 자체는 순수 themeGen.ts가 맡고, 여기서는 변수 그래프를 읽고 쓴다.
    (similar.ts ↔ similarApply.ts와 같은 분리)
    ============================================================ */
+import { t } from './i18n';
 import { rgbToHex, hexToRgb } from './tokens';
 import { GLOBAL } from './variables';
 import { ensureCollection } from './collectionRoles';
@@ -65,7 +66,7 @@ export async function generateDarkMode(
   let skipped = 0;
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const semanticCol = cols.find((c) => c.id === collectionId);
-  if (!semanticCol) return { created, realiased, skipped, error: '컬렉션을 찾을 수 없어요.' };
+  if (!semanticCol) return { created, realiased, skipped, error: t('dark.errNoCol') };
 
   let modeCreated = false;
   let to = toModeId;
@@ -80,7 +81,7 @@ export async function generateDarkMode(
         created: 0,
         realiased: 0,
         skipped: 0,
-        error: `Dark 모드를 추가하지 못했어요 — ${why || '플랜에서 모드를 더 만들 수 없을 수 있어요.'}`,
+        error: t('dark.errAddMode', { why: why || t('dark.errAddModePlan') }),
       };
     }
   }
@@ -99,7 +100,7 @@ export async function generateDarkMode(
       realiased: 0,
       skipped: 0,
       ...(modeCreated ? { modeCreated: true } : {}),
-      error: '라이트와 다크가 같은 모드예요. 다른 라이트 모드를 고르세요.',
+      error: t('dark.errSameMode'),
     };
   }
 

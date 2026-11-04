@@ -5,6 +5,7 @@
    ③ 완전성 점수로 마스터 추천 ④ 속성 계획·프레임별 오버라이드 값 매핑.
    실제 createComponentFromNode·addComponentProperty·createInstance 적용은 code.ts.
    ============================================================ */
+import { t } from './i18n';
 import { kebab } from './naming';
 
 /** 스캔 입력 — figma SceneNode 트리의 최소 형태(콘텐츠 신호 포함). */
@@ -130,7 +131,7 @@ function metaOf(frame: FrameNode): FrameMeta {
 export function alignFrames(frames: readonly FrameNode[]): AlignResult {
   const empty: AlignResult = { memberIds: [], recommendedMasterId: null, metas: [], varying: [], imageVarying: [], excluded: [] };
   if (frames.length < 2) {
-    return { ...empty, excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: '프레임이 2개 이상 필요' })) };
+    return { ...empty, excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: t('similar.why.needTwo') })) };
   }
 
   // 1) 구조 시그니처로 그룹화 → 최대 그룹 선택.
@@ -144,10 +145,10 @@ export function alignFrames(frames: readonly FrameNode[]): AlignResult {
 
   const excluded = frames
     .filter((f) => !best.includes(f))
-    .map((f) => ({ id: f.id, name: f.name, reason: '구조 불일치' }));
+    .map((f) => ({ id: f.id, name: f.name, reason: t('similar.why.mismatch') }));
 
   if (best.length < 2) {
-    return { ...empty, excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: '동일 구조 프레임 2개 미만' })) };
+    return { ...empty, excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: t('similar.why.fewSame') })) };
   }
 
   // 2) 위치별 콘텐츠 수집 → 가변 판정.
