@@ -284,7 +284,7 @@ export type CodeToUi =
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
   // icons: 날 벡터가 그림마다 달라 새로 만든 아이콘 컴포넌트 수(스왑 속성의 재료 — 등록 수와 별개로 센다).
-  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단
+  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[]; placeFailed?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단. placeFailed: 제자리에 못 둔 원본 이름(§4.7)
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'SETTINGS'; base: number; maxDepth: number; grid: number } // #19: 보관된 설정(없으면 기본값). grid=만들기가 값을 맞추는 간격
@@ -294,7 +294,7 @@ export type CodeToUi =
   // 닮은 프레임 스캔 결과 — metas는 완전성 점수 내림차순(맨 앞이 추천 마스터).
   // varying/imageVarying는 "무엇이 속성으로 열리는지" 미리 보여주는 용도.
   | { type: 'SIMILAR_CANDIDATES'; metas: FrameMeta[]; recommendedMasterId: string | null; varying: VaryingPosition[]; imageVarying: string[]; excluded: { id: string; name: string; reason: string }[] }
-  | { type: 'COMPONENTIZE_RESULT'; master: string; properties: number; instances: number; images: number; warnings: string[] }
+  | { type: 'COMPONENTIZE_RESULT'; master: string; properties: number; instances: number; images: number; warnings: string[]; placeFailed?: string[] } // placeFailed: 제자리에 못 둔 원본 이름(원본은 그대로, §4.7)
   | { type: 'ERROR'; message: string; op?: string }; // op: 실패한 UiToCode 종류(상태 라우팅용)
 
 /** code → UI 안전 전송. */

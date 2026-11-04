@@ -121,6 +121,19 @@ function collectText(acc: Accumulator, node: TextNode): void {
 }
 
 /* ---------- auto-layout spacing/padding ---------- */
+/**
+ * 이 간격 필드가 "사이 간격 자동"(Space between)이라 피그마가 쓰지 않는 값인가.
+ * - `itemSpacing`: 주 축 정렬 `primaryAxisAlignItems === 'SPACE_BETWEEN'`
+ * - `counterAxisSpacing`: 줄바꿈의 줄 정렬 `counterAxisAlignContent === 'SPACE_BETWEEN'`
+ * 연결(bind.ts)도 같은 판정으로 건너뛴다 — 붙이면 피그마가 정렬을 MIN으로 바꿔 레이어가 바뀐다.
+ */
+export function spaceBetweenGap(node: unknown, field: string): boolean {
+  const n = node as { primaryAxisAlignItems?: string; counterAxisAlignContent?: string };
+  if (field === 'itemSpacing') return n.primaryAxisAlignItems === 'SPACE_BETWEEN';
+  if (field === 'counterAxisSpacing') return n.counterAxisAlignContent === 'SPACE_BETWEEN';
+  return false;
+}
+
 function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | InstanceNode): void {
   if (node.layoutMode === 'NONE') return;
   const gaps: number[] = [node.paddingLeft, node.paddingRight, node.paddingTop, node.paddingBottom];
@@ -129,8 +142,11 @@ function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | Inst
     // HORIZONTAL/VERTICAL 전용이라 그리드에서는 의미 있는 값을 주지 않는다.
     gaps.push(node.gridRowGap, node.gridColumnGap);
   } else {
-    gaps.push(node.itemSpacing);
-    if (typeof node.counterAxisSpacing === 'number') gaps.push(node.counterAxisSpacing); // 줄바꿈(wrap) 오토레이아웃의 교차축 간격
+    // 사이 간격 자동(Space between)이면 피그마가 간격을 계산한다 — 저장된 숫자는 화면 값이 아니라
+    // 토큰으로 뽑으면 쓰레기(spacing/33·109…)가 된다(IA v3 §2.11, QA #3 불합격 1). padding은 그대로.
+    if (!spaceBetweenGap(node, 'itemSpacing')) gaps.push(node.itemSpacing);
+    // 줄바꿈(wrap) 오토레이아웃의 교차축 간격 — 줄 정렬이 Space between이면 같은 이유로 뺀다.
+    if (typeof node.counterAxisSpacing === 'number' && !spaceBetweenGap(node, 'counterAxisSpacing')) gaps.push(node.counterAxisSpacing);
   }
   for (const g of gaps) {
     if (typeof g === 'number' && g > 0) {

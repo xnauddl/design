@@ -1450,18 +1450,19 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
 > 기록: `docs/qa/2026-11-03-qa3.md`. ①③은 이 PR, ④는 화면 시안 확인 뒤 다음 PR.
 
 **불합격 1 — 사이 간격 자동 (§2.11)**
-- [ ] 만들기 추출(`extract.ts` `collectSpacing`): `primaryAxisAlignItems === 'SPACE_BETWEEN'`이면 `itemSpacing`을 뽑지 않음, `counterAxisAlignContent === 'SPACE_BETWEEN'`이면 `counterAxisSpacing`을 뽑지 않음. padding은 그대로
-- [ ] 연결 찾기(`bind.ts` `bindFrame`): 같은 조건에서 두 필드를 건너뛰고 사유 `space-between`(건너뜀 칩 · 사유별 수 · 자리 목록)
-- [ ] 연결 다시 확인(`bindSelectedItems`): 그 사이 Space between이 된 간격은 `space-between`으로 건너뜀
-- [ ] i18n `reason.space-between` = "사이 간격 자동"
-- [ ] 단위 테스트(`test/figma.test.mjs`): Space between 프레임 → 간격 토큰 없음 · padding 토큰 있음, 연결 뒤 `primaryAxisAlignItems` 그대로 · 사유 기록 · wrap 줄 사이 간격
+- [x] 만들기 추출(`extract.ts` `collectSpacing`): `primaryAxisAlignItems === 'SPACE_BETWEEN'`이면 `itemSpacing`을 뽑지 않음, `counterAxisAlignContent === 'SPACE_BETWEEN'`이면 `counterAxisSpacing`을 뽑지 않음. padding은 그대로
+- [x] 연결 찾기(`bind.ts` `bindFrame`): 같은 조건에서 두 필드를 건너뛰고 사유 `space-between`(건너뜀 칩 · 사유별 수 · 자리 목록)
+- [x] 연결 다시 확인(`bindSelectedItems`): 그 사이 Space between이 된 간격은 `space-between`으로 건너뜀
+- [x] i18n `reason.space-between` = "사이 간격 자동"
+- [x] 단위 테스트(`test/figma.test.mjs`): Space between 프레임 → 간격 토큰 없음 · padding 토큰 있음, 연결 뒤 `primaryAxisAlignItems` 그대로 · 사유 기록 · wrap 줄 사이 간격
+- [ ] 실기 확인(사용자, 피그마): QA #3 파일 다시 실행 → `spacing/33 · 51 · 109 · 198 · 257` 없음, 연결 뒤 Space between 카드의 정렬·간격(40) 그대로, 건너뜀 칩 "사이 간격 자동"
 
 **불합격 3 — 인스턴스 자리 (§4.7)**
-- [ ] 자리 잡기 공용 모듈(`src/lib/placement.ts`): 원본 자리 기록(그룹이면 표지) · 같은 자리에 넣기(x·y · 제약 · 절대 배치 · 그룹 절대 위치 보정) · 실패 시 인스턴스 지움 · 표지 정리
-- [ ] [등록](`code.ts` `REGISTER_COMPONENTS`): 단독 · 세트 · 속성 접힘 세 경로 모두 공용 모듈로. 페이지 맨 위에 남는 인스턴스 0. 실패 이름을 `COMPONENTS_RESULT.placeFailed`로
-- [ ] [묶기](`similarApply.ts`): 부모 끝에 붙이는 대체 경로(`appendChild`) 삭제, 넣기 실패 시 인스턴스 지우고 원본 유지, `COMPONENTIZE_RESULT.placeFailed`
-- [ ] 결과 줄 " · 제자리에 못 둔 {n}개: {이름들}"(i18n `component.placeFailed`), 상태 경고
-- [ ] 단위 테스트: 프레임 › 그룹 › 벡터 ×3을 [등록] 순서로 바꿔도 그룹·위치·순서 유지, 페이지 맨 위 자식 수 그대로, 노드 수 그대로, 표지 0 · 프레임 › 벡터도 그대로 · 넣기 실패 시 페이지 맨 위로 가지 않음 · [묶기] 그룹 안 프레임
+- [x] 자리 잡기 공용 모듈(`src/lib/placement.ts`): 원본 자리 기록(그룹이면 표지) · 같은 자리에 넣기(x·y · 제약 · 절대 배치 · 그룹 절대 위치 보정) · 실패 시 인스턴스 지움 · 표지 정리
+- [x] [등록](`code.ts` `REGISTER_COMPONENTS`): 단독 · 세트 · 속성 접힘 세 경로 모두 공용 모듈로. 페이지 맨 위에 남는 인스턴스 0. 실패 이름을 `COMPONENTS_RESULT.placeFailed`로
+- [x] [묶기](`similarApply.ts`): 부모 끝에 붙이는 대체 경로(`appendChild`) 삭제, 넣기 실패 시 인스턴스 지우고 원본 유지, `COMPONENTIZE_RESULT.placeFailed`
+- [x] 결과 줄 " · 제자리에 못 둔 {n}개: {이름들}"(i18n `component.placeFailed` · `component.placeFailedMore`), 상태 경고, 최소화 ⚠([묶기]도)
+- [x] 단위 테스트(`test/placement.test.mjs` · `test/similarApply.test.mjs`): 프레임 › 그룹 › 벡터 ×3을 [등록] 순서로 바꿔도 그룹·위치·순서 유지, 페이지 맨 위 자식 수 그대로, 노드 수 그대로, 표지 0 · 프레임 › 벡터도 그대로 · 넣기 실패 시 페이지 맨 위로 가지 않음 · [묶기] 그룹 안 프레임
 - [ ] 실기 확인(사용자, 피그마): QA #3 파일 다시 실행 → Page 1 맨 위에는 프레임만, 아이콘 위치가 원본과 같음, 노드 수 256
 
 **불합격 4 — 컴포넌트 베타 (§4.7 "베타", 화면 시안 확인 뒤)**
