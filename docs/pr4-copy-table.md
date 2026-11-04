@@ -7,17 +7,17 @@
 
 | | 개수 |
 |---|---|
-| 전체 행 | **275** |
-| 문구를 바꾸는 행 | **144** (그중 기존 STRINGS 10번 묶음 50) |
+| 전체 행 | **277** |
+| 문구를 바꾸는 행 | **146** (그중 기존 STRINGS 10번 묶음 50) |
 | i18n으로 옮기기만(문구 그대로) | **123** |
 | 삭제(화면 밖이거나 지우는 조각) | **8** |
 
-묶음별: 공통 5(바꿈 1) · 변수 탭 11(바꿈 3) · 레이어 › 연결 14(바꿈 5 · 삭제 1) · 레이어 › 이름 2(바꿈 1) · 레이어 › 컴포넌트 43(바꿈 5) · 만들기 · 마법사 43(바꿈 20) · 설정 · 라이선스 33(바꿈 28) · 오류 · 상태 줄 15(바꿈 8) · 플러그인 쪽(code.ts · lib) 메시지 59(바꿈 23 · 삭제 7) · 기존 STRINGS 50(바꿈 50)
+묶음별: 공통 5(바꿈 1) · 변수 탭 11(바꿈 3) · 레이어 › 연결 14(바꿈 5 · 삭제 1) · 레이어 › 이름 2(바꿈 1) · 레이어 › 컴포넌트 45(바꿈 7) · 만들기 · 마법사 43(바꿈 20) · 설정 · 라이선스 33(바꿈 28) · 오류 · 상태 줄 15(바꿈 8) · 플러그인 쪽(code.ts · lib) 메시지 59(바꿈 23 · 삭제 7) · 기존 STRINGS 50(바꿈 50)
 
 - 한 행 = i18n 키 하나. 같은 문구를 여러 줄이 쓰면 위치에 줄을 함께 적었다(예: `code.ts` 1471 · 1649 · 1701).
 - 기존 키 17개(A.4 “i18n 변경” 표)도 문구가 바뀌므로 함께 넣었다. 10번 묶음은 표에 없던 기존 STRINGS(합니다체 · “토큰을 생성” · 라이트/다크)다(결정 (a) · (d)).
 - **자리표시자는 ASCII 이름만** 쓴다(`{reason}`, `{name}` …). `t()`의 정규식 `/\{(\w+)\}/`는 ASCII만 잡는다. 앞뒤가 붙었다 떨어지는 조건부 조각(“ — 첫 경고”, “ 외”, “ · 상태”)은 따로 키를 둔다(`similar.failedWarn` · `create.sumBaseMore` · `license.srcKeyStatus`).
-- **조각을 받는 자리표시자는 이름 끝에 `Part`를 붙여** 값 자리표시자와 나눈다: `license.srcKey`의 `{statusPart}`(← `license.srcKeyStatus` “ · {status}”), `similar.failed`의 `{warnPart}`(← `similar.failedWarn` “ — {warning}”), `create.sumBase`의 `{morePart}`(← `create.sumBaseMore`).
+- **조각을 받는 자리표시자는 이름 끝에 `Part`를 붙여** 값 자리표시자와 나눈다: `license.srcKey`의 `{statusPart}`(← `license.srcKeyStatus` “ · {status}”), `similar.failed`의 `{warnPart}`(← `similar.failedWarn` “ — {warning}”), `create.sumBase`의 `{morePart}`(← `create.sumBaseMore`), `create.tidySummary`의 `{mergedPart}` · `{gapPart}`, `dark.done`의 `{modePart}` · `{skipPart}`, `dark.fillFailed`의 `{modePart}`, `similar.scanned`의 `{openPart}` · `{skipPart}`, `license.current`의 `{expPart}`, `component.registered` · `component.variants`의 `{extraPart}`. 값(숫자 · 이름 · 사유 문장)을 받는 자리는 `Part`를 붙이지 않는다(`{why}` · `{source}` 등).
 - **같은 글자의 키:** 문맥이 다르면 따로 둬도 된다(예: `rename.count`와 `component.count`의 “후보 {total}”). 같은 자리 · 같은 뜻이면 기존 키를 쓴다(`list.searchClear` · `list.noGroup` · `edit.deletedTarget`).
 - `ui.html`의 aria-label은 지금 i18n이 덮지 않는다(정적 i18n은 글자 · title · placeholder만). 새 속성 `data-i18n-aria-label`로 옮긴다. title과 글자가 같은 것은 같은 키를 쓴다.
 - 말투(결정 ①): 모든 문장을 해요체로 쓴다. 합니다체(“…했습니다”, “…없습니다”)와 “…됨”으로 끝나는 알림 문장은 해요체로 바꿨다. 안내의 “…하세요”는 해요체이므로 그대로 둔다(§2.9 “레이어를 선택하세요”). 숫자 · 라벨 · 진단 조각(“구조 불일치”, “… 실패({이름}): {오류}”, “(원본 표기 생략)”)은 문장이 아니라서 “(그대로)”다.
@@ -155,7 +155,9 @@ i18n.ts 머리 주석(“화면에 보이는 한국어는 전부 여기에 있�
 | 5-40 | `ui.ts 3332` | 새 `similar.opened` | 속성으로 열림: {list} | (그대로) | i18n 이동만 |
 | 5-41 | `ui.ts 3332` | 새 `similar.noVarying` | 가변 위치가 없어 속성은 만들지 않아요 | (그대로) | i18n 이동만 |
 | 5-42 | `ui.ts 3333` | 새 `similar.excluded` |  · 제외 {n}개({why}) | (그대로) | i18n 이동만 |
-| 5-43 | `ui.ts 3334` | 새 `similar.scanned` | 대상 {n}개 · {open}{skip} | (그대로) | i18n 이동만 |
+| 5-43 | `ui.ts 3334` | 새 `similar.scanned` | 대상 {n}개 · {openPart}{skipPart} | (그대로) | i18n 이동만 · 조각을 받는 자리는 `{…Part}`(호출부 ui.ts 3332~3334도 바꿈) |
+| 5-44 | `i18n.ts 101` | 기존 `component.registered` | 컴포넌트 {registered} · 베리언트 세트 {sets}{extra} | **컴포넌트 {registered} · 베리언트 세트 {sets}{extraPart}** | 조각을 받는 자리는 `{…Part}` — `{extra}` → `{extraPart}`(← `component.extra*` 조각, 호출부 ui.ts 2324~2325도 바꿈) |
+| 5-45 | `i18n.ts 102` | 기존 `component.variants` | 베리언트 세트 {sets}개 생성{extra} | **베리언트 세트 {sets}개 생성{extraPart}** | 조각을 받는 자리는 `{…Part}` — `{extra}` → `{extraPart}`(← `component.extra*` 조각, 호출부 ui.ts 2332~2333도 바꿈) |
 
 ## 6. 만들기 · 마법사
 
@@ -174,7 +176,7 @@ i18n.ts 머리 주석(“화면에 보이는 한국어는 전부 여기에 있�
 | 6-11 | `ui.ts 406` | 새 `create.count` | 후보 {sel}/{total} | (그대로) | i18n 이동만 |
 | 6-12 | `ui.ts 591` | 새 `color.usedCount` |  · {n}× 사용 | (그대로) | i18n 이동만 |
 | 6-13 | `ui.ts 723` | 새 `create.tidyMerged` |  · 같은 칸 {n}개 병합 | (그대로) | i18n 이동만 |
-| 6-14 | `ui.ts 726` | 새 `create.tidySummary` | 여백·크기 {before} → {after}개 ({grid}px 격자로 {n}개 이동{merged}){gap} | (그대로) | i18n 이동만 |
+| 6-14 | `ui.ts 726` | 새 `create.tidySummary` | 여백·크기 {before} → {after}개 ({grid}px 격자로 {n}개 이동{mergedPart}){gapPart} | (그대로) | i18n 이동만 · 조각을 받는 자리는 `{…Part}`(호출부 ui.ts 723~726도 바꿈) |
 | 6-15 | `ui.ts 738` | 새 `create.tidyUndone` | 격자 정리를 되돌렸습니다 — 「미리보기」를 다시 누르면 또 정리됩니다. | **격자 정리를 되돌렸어요 — ‘미리보기’를 다시 누르면 또 정리해요** | §9 해요체 통일 |
 | 6-16 | `ui.ts 753` | 새 `create.onceOff` | 1× 토큰 {n}개 해제 | (그대로) | i18n 이동만 |
 | 6-17 | `ui.ts 753` | 새 `create.onceNone` | 1× 토큰이 없습니다 | **1× 토큰이 없어요** | §9 해요체 통일 |
@@ -190,10 +192,10 @@ i18n.ts 머리 주석(“화면에 보이는 한국어는 전부 여기에 있�
 | 6-27 | `ui.ts 2375` | 새 `dark.whyNoGlobal` | Global을 가리키는 색이 없어요(건너뜀 {n}개) | (그대로) | i18n 이동만 |
 | 6-28 | `ui.ts 2375` | 새 `dark.whyNone` | 대상 색이 없어요 | (그대로) | i18n 이동만 |
 | 6-29 | `ui.ts 2376` | 새 `dark.modeAdded` | Dark 모드는 추가됐어요.  | **다크 모드는 추가했어요. ** | 결정 (d) 라이트 · 다크 · 해요체 |
-| 6-30 | `ui.ts 2377` | 새 `dark.fillFailed` | {mode}다크 값을 채우지 못했어요 — {why} | (그대로) | i18n 이동만 |
+| 6-30 | `ui.ts 2377` | 새 `dark.fillFailed` | {modePart}다크 값을 채우지 못했어요 — {why} | (그대로) | i18n 이동만 · 조각을 받는 자리는 `{…Part}`(호출부 ui.ts 2376~2377도 바꿈) |
 | 6-31 | `ui.ts 2380` | 새 `dark.modeAddedShort` | Dark 모드 추가 ·  | **다크 모드 추가 · ** | 결정 (d) 라이트 · 다크 |
 | 6-32 | `ui.ts 2381` | 새 `dark.skippedDirect` |  · 건너뜀 {n}개(값을 직접 넣은 색) | (그대로) | i18n 이동만 |
-| 6-33 | `ui.ts 2382` | 새 `dark.done` | {mode}다크 {n}개 연결 · 새 dark/ 원시색 {c}개{skip} | (그대로) | i18n 이동만 |
+| 6-33 | `ui.ts 2382` | 새 `dark.done` | {modePart}다크 {n}개 연결 · 새 dark/ 원시색 {c}개{skipPart} | (그대로) | i18n 이동만 · 조각을 받는 자리는 `{…Part}`(호출부 ui.ts 2380~2382도 바꿈) |
 | 6-34 | `ui.ts 996` | 새 `textStyle.rowDelete` | 삭제 | (그대로) | i18n 이동만 |
 | 6-35 | `ui.ts 1020` | 새 `textStyle.scanSummary` | 신규 {a} · 등록됨 {b} | (그대로) | i18n 이동만 |
 | 6-36 | `ui.ts 1022` | 새 `textStyle.scanLhPct` |  · 행간% {n} | (그대로) | i18n 이동만 |
@@ -214,7 +216,7 @@ i18n.ts 머리 주석(“화면에 보이는 한국어는 전부 여기에 있�
 | 7-3 | `i18n.ts 664` | 기존 `license.manageTip` | Free면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 엽니다 | **무료면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 열어요** | 금지 용어(Free) |
 | 7-4 | `ui.html 1154` | 새 `license.priceHint` | Free · Paid 연 $39 · 기기 1대 | **무료 · 유료 연 $39 · 기기 1대** | 금지 용어(Free·Paid) |
 | 7-5 | `ui.html 1155` | 새 `license.setupHint` | 배포 전 — 키 검증·구독 링크는 아직 동작하지 않습니다. | **배포 전이라 키 검증·구독 링크는 아직 동작하지 않아요** | §9 해요체 통일 |
-| 7-6 | `ui.ts 2280` | 새 `license.current` | 현재: {tier} ({source}){exp} | (그대로) | i18n 이동만(FREE/PAID는 그대로 — §2.9 예외) |
+| 7-6 | `ui.ts 2280` | 새 `license.current` | 현재: {tier} ({source}){expPart} | (그대로) | i18n 이동만(FREE/PAID는 그대로 — §2.9 예외) · 조각을 받는 자리는 `{…Part}`(호출부 ui.ts 2279~2280도 바꿈) |
 | 7-7 | `ui.ts 2275` | 새 `license.srcKey` | 라이선스 키 · {status}(상태가 있을 때만) | **라이선스 키{statusPart}** | ② 조건부 조각을 키로 나눔(`license.srcKeyStatus`, 조각을 받는 자리 `{statusPart}`) |
 | 7-8 | `ui.ts 2275` | 새 `license.srcKeyStatus` |  · {status} | (그대로) | i18n 이동만(② 조건부 조각을 나눈 키) |
 | 7-9 | `ui.ts 2275` (code.ts 93 `status`) | 새 `license.status.active` | active | **사용 중** | 결정 (b) — 상태값을 한국어로 |
