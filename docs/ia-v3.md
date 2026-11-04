@@ -1118,7 +1118,7 @@
 
 - §2.9 용어 규칙을 모든 문구에 적용한다.
 - 키별 변경 목록은 부록 A.4에 있다. PR 4에서 바꾸거나 옮기거나 지우는 문구 전부의 전후 표는 [`pr4-copy-table.md`](pr4-copy-table.md)다. 표의 문구는 **확정(2026-11-04)**이다. 문장은 해요체, 모드는 "라이트 · 다크", 라이선스 "현재" 줄은 FREE / PAID(§2.9 예외).
-- i18n 자리표시자는 ASCII 이름만 쓴다(`{reason}` 등 — `t()`가 `/\{(\w+)\}/`로 바꾼다). 붙었다 떨어지는 조각(" — {warning}" 같은)은 따로 키를 둔다.
+- i18n 자리표시자는 ASCII 이름만 쓴다(`{reason}` 등 — `t()`가 `/\{(\w+)\}/`로 바꾼다). 붙었다 떨어지는 조각(" — {warning}" 같은)은 따로 키를 두고, 그 조각을 받는 자리는 `{…Part}`로 이름을 나눈다(`{statusPart}` · `{warnPart}`).
 - 와이어에 쓴 문구가 본문 문구다. 와이어 안의 숫자와 사유 칩만 예시다.
 
 ## 10. 구현 순서
@@ -1399,7 +1399,7 @@
 
 **새 키** — 이전 목록은 모두 들어갔다
 - [x] 시작 화면(`start.*`) · 공통 상태 줄(`status.*`) · 상황 안내(`list.baseDiff*`·`list.selectHint` 등) · 최소화(`ui.minimize`·`ui.expand*`) · 잠금 사유(`status.paid`·`status.paidAction`·`lock.tipSuffix`·`status.noSelection`) · 레이어 › 연결 안내 4종(`bind.noLocalLib`·계층 미지정·`bind.noVarsPaid`·`bind.noVarsFree`)과 `bind.otherSel` · 텍스트 스타일 결과 줄(`bind.tsDone`·`tsSkip.*`) · 무료 마법사(`wizardCard.hintFree`·`wizardCard.runFree`) · 요약 끝 연결 안내(`wizard.toBind`) · 상세 "쓰인 곳"(`list.selectFirstNote`·`list.detailBig`). 칩·구역 키는 PR 3.6 사이드바로 바뀌어 필요 없다.
-- [ ] 아래 "코드에 직접 쓴 문구"를 옮길 키. 키 이름과 문구는 행마다 [`pr4-copy-table.md`](pr4-copy-table.md)에 있다(확정 2026-11-04). 같은 글자의 키가 이미 있으면 새로 만들지 않는다: `code.ts` 232 → `edit.deletedTarget`, `ui.html` aria-label → title과 같은 키(`ui.minimize` · `list.addTip` · `list.moreTip` · `list.refreshTip` · `list.searchTip`), 레이어 선택 결과(`ui.ts` 2163·2166·2167) → 변수 탭의 `list.selectCapped`·`list.selectPartial`·`list.selectNone`과 합쳐 `select.*`로(결정 ④). 레이어 선택 결과는 기존 키 3개(i18n.ts 404 `list.selectCapped` "레이어 200개만 선택했어요(전체 {n}개)" · 405 `list.selectNone` · 406 `list.selectPartial`)를 `select.capped` · `select.none` · `select.partial`로 이름을 바꿔 함께 쓴다. `select.capped`의 자리표시자는 `{n}` → `{found}` · `{requested}`이고 호출부는 `ui.ts` 2156~2158(변수 탭)과 2163~2167(연결 · 텍스트 스타일)이다. `list.searchClear`(393) · `list.noGroup`(381)도 이미 있는 키다(지금 `ui.html` · `varTable.ts`가 안 쓸 뿐). **같은 글자의 키는 문맥이 다르면 따로 둬도 된다**(`rename.count` · `component.count`). 유료 사유 8곳은 키를 만들지 않는다(결정 5-(c)). 라이선스 → `license.verifyFailed` · `license.err.*`(툴팁) · `license.err.server.*`(화면 줄) · `license.status.*`(결정 5-(b)). **자리표시자는 ASCII 이름만**(`t()`의 `/\{(\w+)\}/`), 붙었다 떨어지는 조각은 따로 키(`similar.failedWarn` · `create.sumBaseMore` · `license.srcKeyStatus`).
+- [ ] 아래 "코드에 직접 쓴 문구"를 옮길 키. 키 이름과 문구는 행마다 [`pr4-copy-table.md`](pr4-copy-table.md)에 있다(확정 2026-11-04). 같은 글자의 키가 이미 있으면 새로 만들지 않는다: `code.ts` 232 → `edit.deletedTarget`, `ui.html` aria-label → title과 같은 키(`ui.minimize` · `list.addTip` · `list.moreTip` · `list.refreshTip` · `list.searchTip`), 레이어 선택 결과(`ui.ts` 2163·2166·2167) → 변수 탭의 `list.selectCapped`·`list.selectPartial`·`list.selectNone`과 합쳐 `select.*`로(결정 ④). 레이어 선택 결과는 기존 키 3개(i18n.ts 404 `list.selectCapped` "레이어 200개만 선택했어요(전체 {n}개)" · 405 `list.selectNone` · 406 `list.selectPartial`)를 `select.capped` · `select.none` · `select.partial`로 이름을 바꿔 함께 쓴다. `select.capped`의 자리표시자는 `{n}` → `{found}` · `{requested}`이고 호출부는 `ui.ts` 2156~2158(변수 탭)과 2163~2167(연결 · 텍스트 스타일)이다. `list.searchClear`(393) · `list.noGroup`(381)도 이미 있는 키다(지금 `ui.html` · `varTable.ts`가 안 쓸 뿐). **같은 글자의 키는 문맥이 다르면 따로 둬도 된다**(`rename.count` · `component.count`). 유료 사유 8곳은 키를 만들지 않는다(결정 5-(c)). 라이선스 → `license.verifyFailed` · `license.err.*`(툴팁) · `license.err.server.*`(화면 줄) · `license.status.*`(결정 5-(b)). **자리표시자는 ASCII 이름만**(`t()`의 `/\{(\w+)\}/`), 붙었다 떨어지는 조각은 따로 키(`similar.failedWarn` · `create.sumBaseMore` · `license.srcKeyStatus`)로 두고, 조각을 받는 자리표시자는 이름 끝에 `Part`를 붙인다: `license.srcKey` "라이선스 키{statusPart}", `similar.failed` "컴포넌트화하지 못했어요{warnPart}", `create.sumBase`의 `{morePart}`.
 
 **코드에 직접 쓴 문구** — 금지 용어가 든 것(PR 4에서 고친다). 오른쪽 열은 **확정(2026-11-04)**.
 
@@ -1426,7 +1426,7 @@
     - 레이어 › 컴포넌트(등록 · 닮은 프레임 묶기): 1872 · 1882 · 2324 · 2332 · 2337 · 2391~2398 · 3102~3107 · 3126 · 3186~3195 · 3288~3297 · 3313 · 3321~3334
     - 설정 › 라이선스: 1559 · 2275~2280 (1544는 화면에 안 나옴 — 아래)
     - 오류 줄: 2490 [다시 시도]
-  - **`ui.html` 18곳 + `data-tip` 6곳:** 정적 aria-label 11개(759 · 764 · 798 · 799 · 800 · 805 · 811 · 812 · 814 · 860 · 1007), 라이선스 안내 2개(1154 `#licenseLinkHint` · 1155 `#licenseSetupHint`), 그리고 `ui.ts`가 덮어 지금은 폴백일 뿐인 5곳 — 1019 aria-label(`bind.stepsAria`) · 1024 `#btnApplyLabel`(`bind.find`) · 1025 `#btnApplyConfirmLabel`(`bind.link`) · 1046 aria-label(`bind.filterBtn`) · 1182 aria-label(`ui.expand`)에도 `data-i18n` 계열 속성을 붙여 폴백도 검사가 보게 한다. aria-label은 지금 정적 i18n이 덮지 않는다 → `data-i18n-aria-label` 속성을 새로 둔다. 구조 버튼의 커스텀 툴팁 폴백 `data-tip` 6곳(1092 · 1093 · 1098 · 1099 · 1113 · 1114 — `ui.ts` 3458이 `component.scanHelp` 등으로 덮음)은 `data-i18n-tip`으로 바꾼다. `applyStaticI18n` · `verify-i18n.mjs`(누락 · 드리프트) · 아래 새 검사 3 · 5가 `data-i18n-aria-label` · `data-i18n-tip`을 함께 본다. 10번 묶음(기존 STRINGS)을 바꾸면 같은 키의 `ui.html` 인라인 폴백도 같이 고친다(드리프트).
+  - **`ui.html` 18곳 + `data-tip` 6곳:** 정적 aria-label 11개(759 · 764 · 798 · 799 · 800 · 805 · 811 · 812 · 814 · 860 · 1007), 라이선스 안내 2개(1154 `#licenseLinkHint` · 1155 `#licenseSetupHint`), 그리고 `ui.ts`가 덮어 지금은 폴백일 뿐인 5곳 — 1019 aria-label(`bind.stepsAria`) · 1024 `#btnApplyLabel`(`bind.find`) · 1025 `#btnApplyConfirmLabel`(`bind.link`) · 1046 aria-label(`bind.filterBtn`) · 1182 aria-label(`ui.expand`)에도 `data-i18n` 계열 속성을 붙여 폴백도 검사가 보게 한다. aria-label은 지금 정적 i18n이 덮지 않는다 → `data-i18n-aria-label` 속성을 새로 둔다. 구조 버튼의 커스텀 툴팁 폴백 `data-tip` 6곳(1092 · 1093 · 1098 · 1099 · 1113 · 1114 — `ui.ts` 3458이 `component.scanHelp` 등으로 덮음)은 `data-i18n-tip`으로 바꾼다. 두 속성의 매핑(`data-i18n-aria-label` → `aria-label`, `data-i18n-tip` → `data-tip`)을 **두 곳 모두**에 더한다: `applyStaticI18n`(`ui.ts` 3478~3496)과 `scripts/verify-i18n.mjs`의 `ATTR_FORMS`(107, 지금 `title` · `placeholder`). 그러면 `data-tip`을 id → 키 표로 덮던 `STRUCTURE_TIPS`(`ui.ts` 3415~3458)는 필요 없으므로 지운다. 아래 새 검사 3 · 5도 두 속성을 본다. 10번 묶음(기존 STRINGS)을 바꾸면 같은 키의 `ui.html` 인라인 폴백도 같이 고친다(드리프트).
   - **`code.ts` 35줄:** 별칭 칸 `(삭제된 변수)` 232 · 유료 사유 8곳(위 표 — 지움) · 토큰 만들기 요약 923 · 924 · 929 · 이름 다시 매기기 1115 · 라이선스 알림 1209 · 1214 · 1215 · 1218 · 1233 · 컴포넌트 처리 중 문제 1462~1757(15줄) · 닮은 프레임 묶기 1867 · 1877.
   - **`lib/` (플러그인 쪽과 UI 쪽):** `errors.ts` 19~37(오류 설명 7종 × 설명·할 일 = 14) · `license.ts` 84 · 88 · `licenseToken.ts` 19~110(12, "검증 실패: …" 뒤에 보임) · `variables.ts` 388 · 542 · 598 · 618 · 708 · 710 · 736 · 740 · 759 · 775(텍스트 스타일 스캔 경고 · 등록 알림) · `extract.ts` 31~38(추출 경고 4) · `artwork.ts` 66~135(5) · `similar.ts` 133 · 147 · 150 · `similarApply.ts` 184 · `themeApply.ts` 68 · 83 · 102 · `palette.ts` 148 · `tokens.ts` 101 · `varTable.ts` 97 `(그룹 없음)`.
   - **화면에 안 나오는 것 — 옮기지 않고 지운다:** `bind.ts` 343~612 `flags` 6종(위 "삭제"), `bind.ts` 1026~ `scanBindings` 함수째(`code.ts`가 부르지 않음 — `figma-lib.ts` 19 export, `figma.test.mjs` 18 import · 1425 테스트 · 4059 사용도 지움, 결정 5-(c)), `ui.ts` 1544(`offline`이면 `code.ts`가 자기 문구를 씀), `variables.ts` 937 · 940 · 941 · 942(`TEXT_STYLES_APPLIED.missing` — UI가 읽지 않음, 필드째 지움).
@@ -1434,12 +1434,16 @@
     - `code.ts`와 플러그인 쪽 `lib`도 `t()`를 직접 부른다. `i18n.ts`는 피그마 의존이 없는 순수 모듈이라 플러그인 쪽에서도 import할 수 있다(지금은 UI 쪽만 쓴다 — `lib/wizard.ts`도 UI 번들). 대가: `STRINGS` 전체가 `dist/code.js`에도 들어가 약 38KB 늘어난다(지금 약 260KB, `i18n.ts` 38,100바이트).
     - **지역 변수 `t`가 함수를 가리는 곳**은 이름을 바꾼다: `variables.ts` 385 `for (const t of texts)` 안의 388(→ `node`), `ui.ts` 586 `renderChunked(…, (t) => …)` 안의 591(→ `tok`). 다른 곳도 `t(` 호출을 넣을 때 같은 범위에 `t`가 있는지 본다(호출할 수 없는 값이면 `tsc`가 잡지만, 미리 바꾼다).
     - **라이선스 사유(결정 5-(b)):**
-      - 서버(`workers/verify/src/index.js`)가 거부 응답에 `code`를 붙인다: 138 → `expired`(`lk.status === 'expired'`) · `limit`(LS 기기 한도 — `lk.activation_usage >= lk.activation_limit`) · `invalid`(그 밖), 148 → `server`. `error` 원문은 그대로 둔다(옛 플러그인 호환).
-      - `VerifyErr`(`license.ts` 61~72)에 `code?: 'expired' | 'limit' | 'invalid' | 'server'`를 더하고, `extractSignedToken`(84 · 87 · 88)이 `o.code`를 함께 넘긴다.
-      - 화면 줄: `code`가 있으면 `license.err.server.{code}`, 없으면 `license.verifyFailed`("키를 확인하지 못했어요 — 키를 다시 확인해 주세요"). 원문(서버 `error`, 플러그인 쪽 기술 사유 `license.err.*`, 키에 없는 사유 — `JSON.parse`의 `SyntaxError` 같은 예외 메시지 포함)은 툴팁.
+      - 서버(`workers/verify/src/index.js`)가 거부 응답에 `code`를 붙인다: 138 → `expired`(`lk.status === 'expired'`) · `limit` · `invalid`(그 밖), 148 → `server`. `error` 원문은 그대로 둔다(옛 플러그인 호환).
+        - `limit` 판정은 **둘 다 숫자일 때만** 비교한다: `typeof lk.activation_limit === 'number' && typeof lk.activation_usage === 'number' && lk.activation_usage >= lk.activation_limit`. 아니면 `invalid`.
+        - `test/verify.test.mjs` 128의 모의 응답 `license_key`에 `activation_limit` · `activation_usage`(예: 1 · 1)를 넣고 `code: 'limit'`을 단언한다. 숫자가 없는 응답은 `invalid`인지도 단언한다.
+        - LS 실제 응답에 `activation_limit` · `activation_usage`가 오는지는 **실기 · 배포 확인 항목**이다(아래 "배포").
+      - `VerifyErr`(`license.ts` 61~64)를 `{ ok: false; error?: string; code?: 'expired' | 'limit' | 'invalid' | 'server' }`로 바꾼다. **`error`는 선택 필드가 된다** — 오프라인일 때 `ui.ts` 1544가 문구 없이 `{ ok: false, offline: true }`만 넘기려면 필요하다(지금은 필수라 컴파일되지 않는다, `VerifyResult` 72). `extractSignedToken`(84 · 87 · 88)이 `o.code`를 함께 넘긴다.
+      - 화면 줄: `code`가 `expired` · `limit` · `invalid` · `server` **중 하나일 때만** `license.err.server.{code}`. `code`가 없거나 그 밖의 값이면(옛 서버, 새로 생긴 사유) `license.verifyFailed` — 키 이름이 화면에 그대로 나오지 않게 한다. 나머지 경우("키를 확인하지 못했어요 — 키를 다시 확인해 주세요"). 원문(서버 `error`, 플러그인 쪽 기술 사유 `license.err.*`, 키에 없는 사유 — `JSON.parse`의 `SyntaxError` 같은 예외 메시지 포함)은 툴팁.
       - **"검증 실패:" 중복 버그:** `extractSignedToken` 실패(`license.ts` 84 · 87 · 88)는 `ui.ts` 1552에서 던져져 1559가 "검증 실패: "를 붙이고, `code.ts` 1218이 또 붙인다. → `ui.ts`는 사유(와 `code`)만 넘기고 머리말은 쓰지 않는다.
-      - `LICENSE_STATUS`에 `noteKind`('ok' | 'warn')와 `noteTip`(원문 사유)을 더한다. `noteTip`은 `#licenseStatus`의 `title`이 된다. 지금 `ui.ts` 2284는 문구를 정규식(`/실패|오프라인/`)으로 보고 색을 정한다 → `noteKind`로 바꾼다.
+      - `LICENSE_STATUS`에 `noteKind`('ok' | 'warn')와 `noteTip`(원문 사유)을 더한다. `noteTip`은 `#licenseStatus`의 `title`이 된다. **툴팁이 남지 않게:** `noteTip`이 없는 알림이 오거나 UI가 `#licenseStatus`를 직접 쓸 때(`ui.ts` 1501 키 없음 · 1504 검증 중 · 2285 알림 표시 등 `setStatus('licenseStatus', …)` 전부)는 `title`을 비운다. 지금 `ui.ts` 2284는 문구를 정규식(`/실패|오프라인/`)으로 보고 색을 정한다 → `noteKind`로 바꾼다.
       - 상태값: `ui.ts` 2275의 `msg.status`(active / grace / expired)를 `license.status.*`("사용 중 / 유예 기간 / 만료")로 보인다.
+      - **배포 순서:** 서버(`workers/verify`)를 먼저 배포한다. 플러그인은 `code`가 없는 응답(옛 서버)에서도 동작해야 한다 — `license.verifyFailed` + 원문 툴팁. 그래서 서버와 플러그인 중 어느 쪽이 먼저 나가도 화면이 깨지지 않는다.
 
       | 알림(`code.ts` `postLicense`) | 키 | `noteKind` | `noteTip` |
       |---|---|---|---|
@@ -1456,6 +1460,10 @@
   - `scripts/verify-bind-flow.mjs` 353: 행 메뉴 목록의 "상세 보기…" → "상세"(`vm.detail`). `flags` 모의 응답도 지운다.
   - `flags` 제거 대상: `code.ts` 954 · 1030, `bind.ts` 38(타입) · 334 · 350 · 475 · 486 · 513 · 571 · 596 · 606 · 612 · 860, `messages.ts` 239.
   - 라이선스(결정 5-(b)): `test/pure.test.mjs` 407~410(`extractSignedToken`이 서버 사유를 넘김 — `code`도 넘기는지 단언 추가), `test/verify.test.mjs` 128(기기 한도 → `code: 'limit'`), 만료 · 잘못된 키 · 서버 오류의 `code` 테스트 추가. `pure.test.mjs` 1638~1655 `explainError`는 /글꼴/ · /스코프/가 새 문구에도 들어 있어 그대로 통과한다(확인만).
+- [ ] **라이선스 서버 배포(플러그인보다 먼저)**
+  - 저장소 루트에서 `node --test test/verify.test.mjs` 통과(루트 `npm test`에도 들어 있음) → `workers/verify`에서 `wrangler deploy`.
+  - 배포 뒤 실제 키로 확인: 정상 키 → 토큰, 만료 키 → `code: 'expired'`, 없는 키 → `code: 'invalid'`, 기기 한도를 넘긴 키 → `code: 'limit'`. 이때 LS 응답의 `license_key.activation_limit` · `activation_usage`가 숫자로 오는지 본다(안 오면 한도 초과도 `invalid`로 나온다 — 그대로 두거나 판정을 다시 정한다).
+  - 옛 플러그인(지금 배포본)으로 같은 키를 검증해도 `error` 원문이 그대로 보이는지 본다(호환).
 
 **문서·자료** — v3와 어긋나는 곳
 - [ ] **README.md**

@@ -17,6 +17,7 @@
 - 한 행 = i18n 키 하나. 같은 문구를 여러 줄이 쓰면 위치에 줄을 함께 적었다(예: `code.ts` 1471 · 1649 · 1701).
 - 기존 키 17개(A.4 “i18n 변경” 표)도 문구가 바뀌므로 함께 넣었다. 10번 묶음은 표에 없던 기존 STRINGS(합니다체 · “토큰을 생성” · 라이트/다크)다(결정 (a) · (d)).
 - **자리표시자는 ASCII 이름만** 쓴다(`{reason}`, `{name}` …). `t()`의 정규식 `/\{(\w+)\}/`는 ASCII만 잡는다. 앞뒤가 붙었다 떨어지는 조건부 조각(“ — 첫 경고”, “ 외”, “ · 상태”)은 따로 키를 둔다(`similar.failedWarn` · `create.sumBaseMore` · `license.srcKeyStatus`).
+- **조각을 받는 자리표시자는 이름 끝에 `Part`를 붙여** 값 자리표시자와 나눈다: `license.srcKey`의 `{statusPart}`(← `license.srcKeyStatus` “ · {status}”), `similar.failed`의 `{warnPart}`(← `similar.failedWarn` “ — {warning}”), `create.sumBase`의 `{morePart}`(← `create.sumBaseMore`).
 - **같은 글자의 키:** 문맥이 다르면 따로 둬도 된다(예: `rename.count`와 `component.count`의 “후보 {total}”). 같은 자리 · 같은 뜻이면 기존 키를 쓴다(`list.searchClear` · `list.noGroup` · `edit.deletedTarget`).
 - `ui.html`의 aria-label은 지금 i18n이 덮지 않는다(정적 i18n은 글자 · title · placeholder만). 새 속성 `data-i18n-aria-label`로 옮긴다. title과 글자가 같은 것은 같은 키를 쓴다.
 - 말투(결정 ①): 모든 문장을 해요체로 쓴다. 합니다체(“…했습니다”, “…없습니다”)와 “…됨”으로 끝나는 알림 문장은 해요체로 바꿨다. 안내의 “…하세요”는 해요체이므로 그대로 둔다(§2.9 “레이어를 선택하세요”). 숫자 · 라벨 · 진단 조각(“구조 불일치”, “… 실패({이름}): {오류}”, “(원본 표기 생략)”)은 문장이 아니라서 “(그대로)”다.
@@ -134,7 +135,7 @@ i18n.ts 머리 주석(“화면에 보이는 한국어는 전부 여기에 있�
 | 5-20 | `ui.ts 3195` | 새 `component.tagCount` | {tag} {n}개 | (그대로) | i18n 이동만 |
 | 5-21 | `ui.ts 1872` | 새 `similar.scanning` | 닮은 프레임을 찾는 중… | (그대로) | i18n 이동만 |
 | 5-22 | `ui.ts 1882` | 새 `similar.componentizing` | 컴포넌트화하는 중… | (그대로) | i18n 이동만 |
-| 5-23 | `ui.ts 2391` | 새 `similar.failed` | 컴포넌트화하지 못했습니다 + 경고가 있으면 “ — {warning}” | **컴포넌트화하지 못했어요{warn}** | §9 해요체 통일 · ② 조건부 조각은 `similar.failedWarn` |
+| 5-23 | `ui.ts 2391` | 새 `similar.failed` | 컴포넌트화하지 못했습니다 + 경고가 있으면 “ — {warning}” | **컴포넌트화하지 못했어요{warnPart}** | §9 해요체 통일 · ② 조건부 조각은 `similar.failedWarn`(조각을 받는 자리 `{warnPart}`) |
 | 5-24 | `ui.ts 2391` | 새 `similar.failedWarn` |  — {warning} | (그대로) | i18n 이동만(② 조건부 조각을 나눈 키) |
 | 5-25 | `ui.ts 2394` | 새 `similar.resMaster` | 마스터 {name} | (그대로) | i18n 이동만 |
 | 5-26 | `ui.ts 2394` | 새 `similar.resInstances` | 인스턴스 {n}개 | (그대로) | i18n 이동만 |
@@ -214,7 +215,7 @@ i18n.ts 머리 주석(“화면에 보이는 한국어는 전부 여기에 있�
 | 7-4 | `ui.html 1154` | 새 `license.priceHint` | Free · Paid 연 $39 · 기기 1대 | **무료 · 유료 연 $39 · 기기 1대** | 금지 용어(Free·Paid) |
 | 7-5 | `ui.html 1155` | 새 `license.setupHint` | 배포 전 — 키 검증·구독 링크는 아직 동작하지 않습니다. | **배포 전이라 키 검증·구독 링크는 아직 동작하지 않아요** | §9 해요체 통일 |
 | 7-6 | `ui.ts 2280` | 새 `license.current` | 현재: {tier} ({source}){exp} | (그대로) | i18n 이동만(FREE/PAID는 그대로 — §2.9 예외) |
-| 7-7 | `ui.ts 2275` | 새 `license.srcKey` | 라이선스 키 · {status}(상태가 있을 때만) | **라이선스 키{status}** | ② 조건부 조각을 키로 나눔(`license.srcKeyStatus`) |
+| 7-7 | `ui.ts 2275` | 새 `license.srcKey` | 라이선스 키 · {status}(상태가 있을 때만) | **라이선스 키{statusPart}** | ② 조건부 조각을 키로 나눔(`license.srcKeyStatus`, 조각을 받는 자리 `{statusPart}`) |
 | 7-8 | `ui.ts 2275` | 새 `license.srcKeyStatus` |  · {status} | (그대로) | i18n 이동만(② 조건부 조각을 나눈 키) |
 | 7-9 | `ui.ts 2275` (code.ts 93 `status`) | 새 `license.status.active` | active | **사용 중** | 결정 (b) — 상태값을 한국어로 |
 | 7-10 | `ui.ts 2275` (code.ts 93 `status`) | 새 `license.status.grace` | grace | **유예 기간** | 결정 (b) — 상태값을 한국어로 |
@@ -276,7 +277,7 @@ i18n.ts 머리 주석(“화면에 보이는 한국어는 전부 여기에 있�
 | 9-8 | `code.ts 1864` (PREMIUM_REQUIRED) | (키 없음 — 지움) | 닮은 프레임 컴포넌트화는 Paid 기능입니다. 스캔·미리보기는 무료입니다. | **(삭제 — 화면 밖)** | 결정 (c) — 화면에 안 나옴. `requirePaid`는 `feature`만 보내고 UI는 `status.paid` |
 | 9-9 | `code.ts 923` (만들기 › 토큰 결과) | 새 `create.sumGlobals` | Global {n}개 (생성 {c} / 갱신 {u}) | (그대로) | i18n 이동만 |
 | 9-10 | `code.ts 924` | 새 `create.sumPruned` |  · 이전 색 {n}개 정리 | (그대로) | i18n 이동만 |
-| 9-11 | `code.ts 929` | 새 `create.sumBase` |  · base {base}px 환산 {n}개({examples}{more}) | (그대로) | i18n 이동만 · ② 조건부 조각은 `create.sumBaseMore` |
+| 9-11 | `code.ts 929` | 새 `create.sumBase` |  · base {base}px 환산 {n}개({examples}{morePart}) | (그대로) | i18n 이동만 · ② 조건부 조각은 `create.sumBaseMore` |
 | 9-12 | `code.ts 929` | 새 `create.sumBaseMore` |  외 | (그대로) | i18n 이동만(② 조건부 조각을 나눈 키) |
 | 9-13 | `code.ts 1115` (만들기 › 타이포) | 새 `textStyle.needScan` | 먼저 스캔하세요 — 이름을 다시 매길 표본이 없습니다. | **먼저 스캔하세요 — 이름을 다시 매길 표본이 없어요.** | §9 해요체 통일 |
 | 9-14 | `code.ts 1209` (설정 › 라이선스) | 새 `license.noteApplied` | 라이선스 적용됨 | **라이선스를 적용했어요** | §9 해요체 통일 |
