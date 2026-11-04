@@ -20,9 +20,9 @@ export { bindSelection, bindSelectedItems, scanBindings, countUsage, findUsers, 
 export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName } from './rename';
 export type { RenameOutcome } from './rename';
-export { createIconRegistry, swapVectorSlots, transplantImageFills, nodeAtPath } from './artwork';
+export { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, nodeAtPath } from './artwork';
 export type { IconRegistry, VectorSlot } from './artwork';
-export { scanSimilar, componentizeSimilar } from './similarApply';
+export { scanSimilar, componentizeSimilar, componentizeResultMessage } from './similarApply';
 export { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin } from './placement';
 export type { Origin, FillResult, Sizing } from './placement';
 export type { ComponentizeResult } from './similarApply';

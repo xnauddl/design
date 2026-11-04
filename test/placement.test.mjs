@@ -7,7 +7,7 @@
    실제 피그마가 아니라 목이다 — 실기 확인은 부록 A.5의 마지막 항목. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots } from '../dist/figma-lib.mjs';
+import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues } from '../dist/figma-lib.mjs';
 
 let seq = 0;
 const SELF_DELETING = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -492,4 +492,39 @@ test('아이콘 자리 교체 — 같은 순서·위치·제약을 이어받고 
   assert.equal(vec.removed, true);
   assert.equal(anchors(page).length, 0);
   assert.deepEqual(page.children, [master]);
+});
+
+/* ---------- 검토 2회차 (2026-11-04) ---------- */
+
+test('[묶기] 결과 메시지 — 결과의 필드를 빠짐없이 싣는다(placeFailed 포함)', async () => {
+  const page = mk('PAGE', {}, []);
+  const txt = (name, characters) => mk('TEXT', { name, characters, componentPropertyReferences: {} });
+  const A = mk('FRAME', { name: 'Card', x: 0, y: 0 }, [txt('Title', 'A')]);
+  const B = mk('FRAME', { name: 'Other', x: 50, y: 0 }, [txt('Title', 'B')]);
+  const box = mk('FRAME', { name: 'Box' }, [A, B]);
+  page.appendChild(box);
+  installFigma(page);
+  box.insertChild = () => { throw new Error('잠긴 부모'); };
+  const r = await componentizeSimilar(A, [A, B]);
+  const m = componentizeResultMessage(r);
+  assert.equal(m.type, 'COMPONENTIZE_RESULT');
+  assert.deepEqual(m.placeFailed, ['Other'], 'placeFailed가 실려야 꼬리·⚠가 동작한다');
+  for (const k of Object.keys(r)) assert.ok(k in m, `결과 필드 ${k}가 메시지에 없다`);
+  assert.ok(r.warnings.every((w) => !/습니다|합니다/.test(w)), '해요체');
+});
+
+test('속성 값 넣기 — 한 번에 실패하면 속성마다, 거절된 이름만 돌려주고 나머지는 넣는다', () => {
+  const applied = {};
+  const inst = {
+    setProperties(p) {
+      if ('bad#2' in p) throw new Error('거절');
+      Object.assign(applied, p);
+    },
+  };
+  const ids = new Map([['Title', 'title#1'], ['Icon', 'bad#2'], ['Show', 'show#3']]);
+  const failed = applyInstancePropValues(inst, ids, { Title: 'B', Icon: 'k', Show: false, Gone: 'x' });
+  assert.deepEqual(failed.sort(), ['Gone', 'Icon'], 'id 없는 속성 · 거절된 속성');
+  assert.deepEqual(applied, { 'title#1': 'B', 'show#3': false }, '나머지는 넣는다');
+  // 모두 받으면 빈 목록
+  assert.deepEqual(applyInstancePropValues({ setProperties() {} }, ids, { Title: 'C' }), []);
 });

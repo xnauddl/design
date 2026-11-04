@@ -119,6 +119,39 @@ export function swapVectorSlots(master: SceneNode, slots: readonly VectorSlot[])
 }
 
 /**
+ * 속성 접힘 멤버 인스턴스에 속성 값을 넣는다(§4.7 6번). 못 넣은 속성의 **이름** 목록을 돌려준다
+ * — 그 속성은 마스터 값 그대로다. 인스턴스는 지우지 않는다(2026-11-04 결정).
+ * 한 번에 넣어 보고, 피그마가 거절하면 속성마다 따로 넣어 거절된 것만 골라낸다.
+ * 이름이 `ids`에 없는 속성(노출 실패)도 못 넣은 것으로 센다.
+ */
+export function applyInstancePropValues(
+  inst: InstanceNode,
+  ids: Map<string, string>,
+  values: Record<string, string | boolean>,
+): string[] {
+  const failed: string[] = [];
+  const payload: { [key: string]: string | boolean } = {};
+  const nameOf = new Map<string, string>();
+  for (const [name, val] of Object.entries(values)) {
+    const id = ids.get(name);
+    if (id == null) { failed.push(name); continue; }
+    payload[id] = val;
+    nameOf.set(id, name);
+  }
+  if (!Object.keys(payload).length) return failed;
+  try {
+    inst.setProperties(payload);
+    return failed;
+  } catch {
+    // 하나가 거절되면 전체가 거절된다 — 속성마다 따로
+  }
+  for (const [id, val] of Object.entries(payload)) {
+    try { inst.setProperties({ [id]: val }); } catch { failed.push(nameOf.get(id) ?? id); }
+  }
+  return failed;
+}
+
+/**
  * 사진은 컴포넌트 속성이 될 수 없지만 인스턴스의 `fills`는 오버라이드된다 —
  * 멤버 원본의 fill을 같은 경로에 이식해 접힌 뒤에도 각자 사진을 지킨다.
  * (닮은 프레임 컴포넌트화가 쓰는 방식과 같다.)

@@ -961,6 +961,34 @@ async function saveAndGet(p) {
   await p.close();
 }
 
+/* ---------- 13 컴포넌트 결과 줄 꼬리 (§4.7 "인스턴스 자리" 5·6번, QA #3 검토 2회차) ---------- */
+{
+  const p = await open(400, 'layer');
+  await p.evaluate(() => document.querySelector('[data-apply-step="structure"]')?.click());
+  const st = () => p.$eval('#structureStatus', (e) => ({ text: e.textContent, cls: e.className }));
+  await recv(p, {
+    type: 'COMPONENTS_RESULT', registered: 3, skipped: 1, sets: 0, singles: ['Card'], missing: [], failures: ['x'],
+    propFailed: ['Card A', 'Card B'], placeCloned: ['Vector'], placeFailed: ['Gone'],
+  });
+  let s1 = await st();
+  check('13 [등록] 꼬리 순서: 건너뜀 → 속성 값 → 복사본 → 빈 자리, 경고',
+    s1.text.includes(' · 건너뜀 1') && !s1.text.includes('스킵')
+      && s1.text.indexOf('속성 값을 못 넣은 2개: Card A, Card B') > 0
+      && s1.text.indexOf('속성 값을 못 넣은') < s1.text.indexOf('복사본을 둔 1개: Vector')
+      && s1.text.indexOf('복사본을 둔') < s1.text.indexOf('제자리에 못 둔 1개: Gone')
+      && s1.cls.includes('warn'), JSON.stringify(s1));
+  await recv(p, { type: 'COMPONENTS_RESULT', registered: 2, skipped: 0, sets: 0, singles: [], missing: [], failures: [], propFailed: ['M'] });
+  s1 = await st();
+  check('13 속성 값만 못 넣어도 경고', s1.text.includes('속성 값을 못 넣은 1개: M') && s1.cls.includes('warn'), JSON.stringify(s1));
+  await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card', properties: 1, instances: 1, images: 0, warnings: ['Other: 제자리에 둘 수 없어 원본을 그대로 두었어요.'], placeFailed: ['Other'] });
+  s1 = await st();
+  check('13 [묶기] placeFailed 꼬리 · 경고', s1.text.includes('제자리에 못 둔 1개: Other') && !s1.text.includes('남겨둔 것') && s1.cls.includes('warn'), JSON.stringify(s1));
+  await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card', properties: 0, instances: 0, images: 0, warnings: ['Other: 제자리에 둘 수 없어 원본을 그대로 두었어요.'], placeFailed: ['Other'] });
+  s1 = await st();
+  check('13 [묶기] 인스턴스 0개에도 꼬리', s1.text.startsWith('컴포넌트화하지 못했어요') && s1.text.includes('제자리에 못 둔 1개: Other'), JSON.stringify(s1));
+  await p.close();
+}
+
 check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.join(' / '));
 
 await browser.close();

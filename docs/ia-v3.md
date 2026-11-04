@@ -1515,10 +1515,10 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
 - [x] 아이콘 자리 교체(`artwork.ts` `swapVectorSlots`)도 공용 모듈로 — 넣기 실패 시 인스턴스 지움, 제약·절대 배치·크기 규칙 이어받음 + 실패 경로 단위 테스트
 - [x] [등록] 복사본(5번 D2): 인스턴스를 만들어 바로 떼어 낸 보통 레이어로 같은 자리 채움, 안 되면 하나뿐인 자식만, 그래도 안 되면 비움. 결과 줄 `component.placeCloned` · `COMPONENTS_RESULT.placeCloned` + 단위 테스트(복사본 · 빈 자리)
 - [x] 등록 수 규칙(6번): `skipped`에 자리 실패를 넣지 않음. 속성 접힘의 인스턴스를 만든 뒤 예상 밖 예외가 나면 그 인스턴스를 지움(`code.ts` `make`)
-- [ ] 속성 값을 못 넣을 때(6번, 2026-11-04 결정): 인스턴스는 남기고 마스터 값, `applyInstancePropValues`(→ `artwork.ts`)가 실패한 속성을 돌려줌(한 번에 → 속성마다), 사진 이식 실패도 같이. `COMPONENTS_RESULT.propFailed` · 꼬리 `component.propFailed` · 경고 · ⚠ + 단위 테스트
-- [ ] [묶기] 결과 메시지에 `placeFailed`(`code.ts` `COMPONENTIZE_SIMILAR` — 메시지는 `similarApply.ts` `componentizeResultMessage`로 만들어 빠지는 필드가 없게) + 단위 테스트 · `verify-bind-flow` 결과 줄 꼬리
+- [x] 속성 값을 못 넣을 때(6번, 2026-11-04 결정): 인스턴스는 남기고 마스터 값, `applyInstancePropValues`(→ `artwork.ts`)가 실패한 속성을 돌려줌(한 번에 → 속성마다), 사진 이식 실패도 같이. `COMPONENTS_RESULT.propFailed` · 꼬리 `component.propFailed` · 경고 · ⚠ + 단위 테스트
+- [x] [묶기] 결과 메시지에 `placeFailed`(`code.ts` `COMPONENTIZE_SIMILAR` — 메시지는 `similarApply.ts` `componentizeResultMessage`로 만들어 빠지는 필드가 없게) + 단위 테스트 · `verify-bind-flow` 결과 줄 꼬리
 - [x] 결과 줄: 인스턴스 0개인 [묶기]에도 " · 제자리에 못 둔 {n}개", "스킵" → "건너뜀"(§2.9). 실패여도 파일을 바꿨으면 다시 읽기(§4.1)
-- [ ] 문구 해요체: 실패 진단(`code.ts` — 자리·아이콘·"세트로 등록해요"), [묶기] 경고(`similarApply.ts` — 제자리·속성 오버라이드), [묶기] 결과("마스터 프레임을 찾을 수 없어요" · "대상 프레임이 2개 미만이에요")
+- [x] 문구 해요체: 실패 진단(`code.ts` — 자리·아이콘·"세트로 등록해요"), [묶기] 경고(`similarApply.ts` — 제자리·속성 오버라이드), [묶기] 결과("마스터 프레임을 찾을 수 없어요" · "대상 프레임이 2개 미만이에요")
 - [ ] 실기 확인(사용자, 피그마) — 목 테스트로는 확인할 수 없는 것:
   - 속성 접힘: 마스터가 아닌 멤버가 지워지고(옮겨지지 않음) 그 자리에 인스턴스가 들어감, 그룹 안 멤버도 그룹이 남음
   - 베리언트 세트: `combineAsVariants` 뒤 세트가 Components 페이지로 가고 각 원본 자리에 변형 인스턴스

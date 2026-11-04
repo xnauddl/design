@@ -103,6 +103,7 @@ export const STRINGS: Record<string, string> = {
   'component.generated': '누락 조합 {generated}개 생성(세트 {sets})',
   'component.placeFailed': ' · 제자리에 못 둔 {n}개: {names}',
   'component.placeFailedMore': ' 외',
+  'component.propFailed': ' · 속성 값을 못 넣은 {n}개: {names}',
   'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
 
   // 마법사

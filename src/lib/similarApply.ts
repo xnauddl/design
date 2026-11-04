@@ -12,6 +12,7 @@ import {
   type FrameNode as SimNode,
 } from './similar';
 import { captureOrigin, placeAtOrigin, releaseOrigin } from './placement';
+import type { CodeToUi } from '../shared/messages';
 
 /** figma 노드 → similar 입력 트리(콘텐츠 신호 포함). INSTANCE key는 async 조회. */
 async function buildSimTree(node: SceneNode): Promise<SimNode> {
@@ -185,7 +186,23 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
   }
 
   const warnings = aligned.excluded.map((e) => `${e.name}: ${e.reason}`);
-  for (const name of kept) warnings.push(`${name}: 속성 오버라이드 실패 — 원본을 그대로 두었습니다.`);
+  for (const name of kept) warnings.push(`${name}: 속성 오버라이드 실패 — 원본을 그대로 두었어요.`);
   for (const name of placeFailed) warnings.push(`${name}: 제자리에 둘 수 없어 원본을 그대로 두었어요.`);
   return { master: comp.name, properties, instances, images, warnings, placeFailed };
+}
+
+/**
+ * [묶기] 결과 → UI 메시지. 결과의 필드를 빠짐없이 싣는다 — 예전에 code.ts가 필드를 하나씩 옮기다
+ * `placeFailed`를 빠뜨려 결과 줄 꼬리·최소화 ⚠가 동작하지 않았다(QA #3 검토 2회차). 테스트가 지킨다.
+ */
+export function componentizeResultMessage(r: ComponentizeResult): Extract<CodeToUi, { type: 'COMPONENTIZE_RESULT' }> {
+  return {
+    type: 'COMPONENTIZE_RESULT',
+    master: r.master,
+    properties: r.properties,
+    instances: r.instances,
+    images: r.images,
+    warnings: r.warnings,
+    placeFailed: r.placeFailed,
+  };
 }
