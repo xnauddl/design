@@ -125,12 +125,54 @@ test('무효 instanceId → validate 실패 → activate로 재등록(새 instan
 
 /* ---------------- 기기 한도 우회 차단(회귀 방어) ---------------- */
 test('한도 초과 2번째 기기(instanceId 없음) → instance 없는 validate 폴백 없이 거부', async () => {
-  handlers.activate = { activated: false, error: 'activation limit reached', license_key: { status: 'active' } };
+  handlers.activate = { activated: false, error: 'activation limit reached', license_key: { status: 'active', activation_limit: 1, activation_usage: 1 } };
   const res = await worker.fetch(req({ key: 'K' }), env);
   const json = await res.json();
   assert.equal(json.valid, false);
+  assert.equal(json.code, 'limit', '기기 한도 → code limit(플러그인이 해요체 문구를 고른다)');
+  assert.equal(json.error, 'activation limit reached', 'error 원문은 그대로(옛 플러그인 호환)');
   assert.ok(!json.token, '한도 초과인데 토큰을 발급하면 안 됨');
   assert.ok(!calls.includes('validate'), 'instance 없는 validate로 폴백하면 우회가 열림');
+});
+
+/* ---------------- 거부 사유 code(PR 4 결정 5-(b)) ---------------- */
+test('거부 code — 한도 수치가 숫자가 아니면 limit이 아니라 invalid', async () => {
+  handlers.activate = { activated: false, error: 'activation limit reached', license_key: { status: 'active' } };
+  const json = await (await worker.fetch(req({ key: 'K' }), env)).json();
+  assert.equal(json.valid, false);
+  assert.equal(json.code, 'invalid');
+  handlers.activate = { activated: false, license_key: { status: 'active', activation_limit: '1', activation_usage: 1 } };
+  assert.equal((await (await worker.fetch(req({ key: 'K' }), env)).json()).code, 'invalid', '문자열 한도는 비교하지 않는다');
+});
+
+test('거부 code — 한도 아래면 invalid', async () => {
+  handlers.activate = { activated: false, error: 'license_key not found', license_key: { status: 'active', activation_limit: 3, activation_usage: 1 } };
+  const json = await (await worker.fetch(req({ key: 'K' }), env)).json();
+  assert.equal(json.code, 'invalid');
+});
+
+test('거부 code — 만료 키 → expired(원문 사유 유지)', async () => {
+  handlers.activate = { activated: false, license_key: { status: 'expired', activation_limit: 1, activation_usage: 1 } };
+  const json = await (await worker.fetch(req({ key: 'K' }), env)).json();
+  assert.equal(json.valid, false);
+  assert.equal(json.code, 'expired', '만료가 한도보다 앞선다');
+  assert.equal(json.error, '구독이 만료되었습니다.');
+});
+
+test('거부 code — 없는 키(license_key 없음) → invalid', async () => {
+  handlers.activate = { activated: false, error: 'license_key not found' };
+  const json = await (await worker.fetch(req({ key: 'K' }), env)).json();
+  assert.equal(json.code, 'invalid');
+  assert.equal(json.error, 'license_key not found');
+});
+
+test('거부 code — LS 호출이 던지면 502 + code server', async () => {
+  handlers.activate = () => { throw new Error('LS down'); };
+  const res = await worker.fetch(req({ key: 'K' }), env);
+  assert.equal(res.status, 502);
+  const json = await res.json();
+  assert.equal(json.code, 'server');
+  assert.match(json.error, /LS down/);
 });
 
 /* ---------------- 해제(deactivate) ---------------- */

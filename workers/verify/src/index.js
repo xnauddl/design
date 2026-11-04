@@ -136,7 +136,14 @@ export default {
       const active = data.valid === true || data.activated === true;
       if (!active) {
         const msg = data.error || (lk.status === 'expired' ? '구독이 만료되었습니다.' : '유효하지 않은 라이선스 키이거나 기기 활성화 한도를 초과했습니다.');
-        return json({ valid: false, error: msg }, 200);
+        // code: 플러그인이 해요체 문구(license.err.server.*)를 고르는 기계용 사유. error 원문은 옛 플러그인 호환으로 둔다.
+        // 한도 판정은 두 값이 모두 숫자일 때만 — 아니면 '잘못된 키'로 본다(LS 응답 형태가 다를 때 오판 방지).
+        const atLimit =
+          typeof lk.activation_limit === 'number' &&
+          typeof lk.activation_usage === 'number' &&
+          lk.activation_usage >= lk.activation_limit;
+        const code = lk.status === 'expired' ? 'expired' : atLimit ? 'limit' : 'invalid';
+        return json({ valid: false, error: msg, code }, 200);
       }
       // 라이선스 만료(구독 종료일). 형식 불량(NaN)은 0(만료 없음)으로 처리해 토큰 시각이 오염되지 않게 한다.
       const parsedExpiry = lk.expires_at ? Date.parse(lk.expires_at) : 0;
@@ -145,7 +152,7 @@ export default {
       // 플러그인은 instanceId를 캐시에 보관 → 다음 재검증 때 되돌려보내 같은 기기로 validate.
       return json(newInstanceId ? { token, instanceId: newInstanceId } : { token });
     } catch (e) {
-      return json({ valid: false, error: `검증 서버 오류: ${e && e.message ? e.message : e}` }, 502);
+      return json({ valid: false, error: `검증 서버 오류: ${e && e.message ? e.message : e}`, code: 'server' }, 502);
     }
   },
 };
