@@ -1326,6 +1326,7 @@
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
     "component.placeFailedMore": " \uC678",
     "component.propFailed": " \xB7 \uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC740 {n}\uAC1C: {names}",
+    "component.fillKept": " \xB7 \uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uAC74\uB108\uB6F4 {n}\uAC1C: {names}",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
     "wizard.needSelect": "\uBA3C\uC800 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uC5D0\uC11C \uAC12\uC744 \uBF51\uC544\uC694",
@@ -1388,6 +1389,7 @@
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
     "reason.translucent": "\uBC18\uD22C\uBA85",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
+    "reason.fraction": "\uC18C\uC218 \uC120 \uB450\uAED8",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
@@ -1921,6 +1923,14 @@
     "component.fail.instanceMake": "\uC778\uC2A4\uD134\uC2A4\uB97C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694: {error}",
     "component.fail.instancePlace": "\uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "component.fail.propValue": "\uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC5B4 \uB9C8\uC2A4\uD130 \uAC12\uC73C\uB85C \uB480\uC5B4\uC694({name} \xB7 {prop})",
+    "component.fail.fillKept": "\uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uBB36\uC9C0 \uC54A\uACE0 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name}){causePart}",
+    "component.fail.memberKept": "\uC81C\uC790\uB9AC\uC5D0 \uB123\uC9C0 \uBABB\uD574 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name}){causePart}",
+    // 속성 접힘 멤버 검사(§4.7 8번) 사유 — 위 두 줄의 {causePart}에 들어간다
+    "component.fit.size": "\uD06C\uAE30 {w}\xD7{h} \u2260 {mw}\xD7{mh}",
+    "component.fit.noPhoto": "\uC0AC\uC9C4 \uC790\uB9AC \uC5C6\uC74C({path})",
+    "component.fit.self": "\uC790\uC2E0",
+    "component.fit.photoDiff": "\uC0AC\uC9C4 \uB2E4\uB984({name})",
+    "component.fit.photoSize": "\uC0AC\uC9C4 \uD06C\uAE30 {w}\xD7{h} \u2260 {mw}\xD7{mh}({name})",
     "component.fail.single": "\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328({name}): {error}",
     "component.fail.propsRegister": "\uC18D\uC131\uC811\uD798 \uB4F1\uB85D \uC2E4\uD328({set}): {error}",
     "component.fail.iconFallback": "\uC544\uC774\uCF58\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD574 \uC138\uD2B8\uB85C \uB4F1\uB85D\uD574\uC694({set})",
@@ -3209,7 +3219,7 @@
     [24, "2xl"]
   ]);
   var STROKE_LADDER = /* @__PURE__ */ new Map([
-    [0.5, "hairline"],
+    // 변수는 정수만 — 0.5(hairline)는 없다(2026-11-04 사용자 결정, §2.11).
     [1, "thin"],
     [2, "thick"]
   ]);
@@ -4906,7 +4916,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -5185,8 +5195,9 @@
         const misplaced = (_n = msg.placeFailed) != null ? _n : [];
         const cloned = (_o = msg.placeCloned) != null ? _o : [];
         const propFailed = (_p = msg.propFailed) != null ? _p : [];
-        const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + (msg.singles.length ? t("component.extraSingles", { n: msg.singles.length }) : "") + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
-        setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extraPart }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length && !propFailed.length ? "ok" : "warn");
+        const fillKept = (_q = msg.fillKept) != null ? _q : [];
+        const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + (msg.singles.length ? t("component.extraSingles", { n: msg.singles.length }) : "") + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
+        setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extraPart }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
         break;
       }
@@ -5248,7 +5259,7 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_q = msg.placeFailed) != null ? _q : [];
+          const misplaced0 = (_r = msg.placeFailed) != null ? _r : [];
           const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
           const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
           setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
@@ -5257,7 +5268,7 @@
         const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
         if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
         if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_r = msg.placeFailed) != null ? _r : [];
+        const misplaced = (_s = msg.placeFailed) != null ? _s : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
         const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
@@ -6333,7 +6344,7 @@
     if (isMini) renderMiniMark();
   }
   function opReceived(m) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     if (m.type === "PROGRESS") {
       opProg = m.total > 0 ? Math.min(1, m.done / m.total) : null;
       if (isMini) renderMiniMark();
@@ -6356,8 +6367,8 @@
       let cancelled = false;
       if (m.type === "DARK_MODE_RESULT" && m.error) failed = true;
       if ((m.type === "COMPONENTS_RESULT" || m.type === "VARIANTS_RESULT") && ((_b = (_a = m.failures) == null ? void 0 : _a.length) != null ? _b : 0) > 0) failed = true;
-      if (m.type === "COMPONENTS_RESULT" && ((_d = (_c = m.propFailed) == null ? void 0 : _c.length) != null ? _d : 0) + ((_f = (_e = m.placeCloned) == null ? void 0 : _e.length) != null ? _f : 0) + ((_h = (_g = m.placeFailed) == null ? void 0 : _g.length) != null ? _h : 0) > 0) failed = true;
-      if (m.type === "COMPONENTIZE_RESULT" && ((_j = (_i = m.placeFailed) == null ? void 0 : _i.length) != null ? _j : 0) > 0) failed = true;
+      if (m.type === "COMPONENTS_RESULT" && ((_d = (_c = m.propFailed) == null ? void 0 : _c.length) != null ? _d : 0) + ((_f = (_e = m.fillKept) == null ? void 0 : _e.length) != null ? _f : 0) + ((_h = (_g = m.placeCloned) == null ? void 0 : _g.length) != null ? _h : 0) + ((_j = (_i = m.placeFailed) == null ? void 0 : _i.length) != null ? _j : 0) > 0) failed = true;
+      if (m.type === "COMPONENTIZE_RESULT" && ((_l = (_k = m.placeFailed) == null ? void 0 : _k.length) != null ? _l : 0) > 0) failed = true;
       if (m.type === "APPLY_RESULT" && m.cancelled) cancelled = true;
       if (cancelled) {
         if (isMini) renderMiniMark();

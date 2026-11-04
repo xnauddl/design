@@ -8,7 +8,7 @@
    목 테스트로 지킨다(figma-lib 배럴로 내보낸다).
    ============================================================ */
 import { t } from './i18n';
-import { captureOrigin, placeAtOrigin } from './placement';
+import { captureOrigin, placeAtOrigin, releaseOrigin } from './placement';
 
 /** 루트 기준 **자식 인덱스 경로**(`0/1`)의 노드. 이름이 갈린 트리에서도 같은 슬롯을 가리킨다. */
 export function nodeAtPath(root: SceneNode, path: string): SceneNode | null {
@@ -117,6 +117,105 @@ export function swapVectorSlots(master: SceneNode, slots: readonly VectorSlot[])
     }
   }
   return failures;
+}
+
+/** 경로 잇기 — `joinPath('0', '')` = '0', `joinPath('', '1/2')` = '1/2'. */
+export function joinPath(prefix: string, path: string): string {
+  if (!prefix) return path;
+  return path ? `${prefix}/${path}` : prefix;
+}
+
+const FRAME_LIKE = new Set(['FRAME', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE', 'SECTION']);
+
+/**
+ * 원본 경로 → 마스터(컴포넌트) 경로 앞붙이(§4.7 "인스턴스 자리" 8번).
+ * 피그마는 도형(사각형·원 등)을 컴포넌트로 만들 때 컴포넌트 프레임으로 **감싼다** — 그러면 원본의
+ * 루트('')는 마스터의 첫 자식('0')이다. 마스터의 자식이 하나이고 그 종류가 원본 루트와 같으면 감싼 것으로 본다.
+ * 프레임류는 그 자리에서 컴포넌트가 되므로 앞붙이가 없다.
+ */
+export function shapePrefix(master: SceneNode, rootType: string): string {
+  if (FRAME_LIKE.has(rootType)) return '';
+  const kids = 'children' in master ? (master.children as readonly SceneNode[]) : [];
+  return kids.length === 1 && kids[0].type === rootType ? '0' : '';
+}
+
+/** 첫 보이는 IMAGE 채움의 해시. 사진이 아니면 undefined. */
+function imageHashOf(n: SceneNode): string | undefined {
+  const f = 'fills' in n ? (n as GeometryMixin).fills : null;
+  if (!Array.isArray(f)) return undefined;
+  const img = (f as readonly Paint[]).find((p) => p.type === 'IMAGE' && p.visible !== false) as ImagePaint | undefined;
+  return img ? img.imageHash ?? '' : undefined;
+}
+
+const sameSize = (a: number, b: number) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
+
+/**
+ * 인스턴스가 멤버의 사진·크기를 지키는가(§4.7 8번 검사). 다르면 그 까닭(진단용), 같으면 null.
+ * - 인스턴스 자신의 크기 = 멤버 크기
+ * - 멤버 안 사진 채움이 있는 모든 레이어(자신 포함)마다, 인스턴스의 같은 경로(`prefix` 앞붙이) 레이어의
+ *   이미지 해시와 크기가 같다
+ */
+export function memberFitIssue(inst: SceneNode, member: SceneNode, prefix: string): string | null {
+  if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
+    return t('component.fit.size', { w: inst.width, h: inst.height, mw: member.width, mh: member.height });
+  }
+  let issue: string | null = null;
+  const visit = (n: SceneNode, path: string): void => {
+    if (issue) return;
+    const h = imageHashOf(n);
+    if (h !== undefined) {
+      const at = joinPath(prefix, path);
+      const hit = nodeAtPath(inst, at);
+      if (!hit) { issue = t('component.fit.noPhoto', { path: at || t('component.fit.self') }); return; }
+      if (imageHashOf(hit) !== h) { issue = t('component.fit.photoDiff', { name: n.name }); return; }
+      if (!sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
+        issue = t('component.fit.photoSize', { w: hit.width, h: hit.height, mw: n.width, mh: n.height, name: n.name });
+        return;
+      }
+    }
+    if (n.type === 'INSTANCE' || !('children' in n)) return; // 인스턴스 안은 그 컴포넌트 소관
+    (n.children as readonly SceneNode[]).forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i)));
+  };
+  visit(member, '');
+  return issue;
+}
+
+export type MemberResult = { result: 'replaced' | 'mismatch' | 'placeFailed'; why?: string };
+
+/**
+ * [등록] 속성 접힘의 마스터가 아닌 멤버를 인스턴스로 바꾼다(§4.7 3·8번). 멤버는 컴포넌트로 바꾸지 않는다.
+ * 1. `make()`로 인스턴스(속성 값·사진까지)를 만들고 멤버 크기로 resize
+ * 2. 검사(`memberFitIssue`) — 다르면 인스턴스를 지우고 멤버를 그대로 둔다('mismatch')
+ * 3. 멤버 자리에 넣고(표지 없이 — 멤버가 아직 자리에 있다) 멤버를 지운다. 못 넣으면 멤버 그대로('placeFailed')
+ * 어느 실패든 페이지 맨 위에 인스턴스를 남기지 않는다.
+ */
+export function replaceMember(member: SceneNode, make: () => InstanceNode, prefix: string): MemberResult {
+  let inst: InstanceNode | null = null;
+  try {
+    inst = make();
+  } catch (e) {
+    return { result: 'placeFailed', why: t('component.fail.instanceMake', { error: e instanceof Error ? e.message : String(e) }) };
+  }
+  try {
+    if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
+      try { inst.resize(member.width, member.height); } catch { /* 검사가 가른다 */ }
+    }
+    const why = memberFitIssue(inst, member, prefix);
+    if (why) {
+      try { inst.remove(); } catch { /* 이미 사라짐 */ }
+      return { result: 'mismatch', why };
+    }
+  } catch (e) {
+    try { inst.remove(); } catch { /* 이미 사라짐 */ }
+    return { result: 'mismatch', why: e instanceof Error ? e.message : String(e) };
+  }
+  const o = captureOrigin(member, { anchor: false });
+  if (!placeAtOrigin(inst, o)) {
+    releaseOrigin(o);
+    return { result: 'placeFailed', why: t('component.fail.instancePlace') };
+  }
+  try { member.remove(); } catch { /* 이미 사라짐 */ }
+  return { result: 'replaced' };
 }
 
 /**

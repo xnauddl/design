@@ -624,7 +624,8 @@ export function inferVaryingImageSlots(members: readonly StructNode[]): ImageSlo
     const rep = nodes[0];
     if (!rep) return;
     if (rep.type === 'INSTANCE') return; // 인스턴스 안은 자식 컴포넌트 소관
-    if (path !== '' && nodes.every((n) => n.imageHash !== undefined)) {
+    // 레이어 자신(루트 '')도 사진 슬롯이다 — 사각형 히어로 · 카드 사진 · 원 아바타(QA #3 실기 ② 불합격 6).
+    if (nodes.every((n) => n.imageHash !== undefined)) {
       if (new Set(nodes.map((n) => n.imageHash)).size > 1) out.push({ layerName: rep.name, layerPath: path });
     }
     const lens = nodes.map((n) => (n.children ?? []).length);

@@ -2332,6 +2332,7 @@ window.onmessage = (event: MessageEvent) => {
       const misplaced = msg.placeFailed ?? [];
       const cloned = msg.placeCloned ?? [];
       const propFailed = msg.propFailed ?? [];
+      const fillKept = msg.fillKept ?? [];
       // 건너뜀 = 컴포넌트로 만들지 못한 대상 수(§4.7 6번 · 용어 §2.9). 자리 결과는 꼬리 두 개로 따로 센다.
       const extraPart =
         (msg.skipped ? t('component.extraSkipped', { n: msg.skipped }) : '') +
@@ -2339,10 +2340,11 @@ window.onmessage = (event: MessageEvent) => {
         (msg.exposed ? t('component.extraProps', { n: msg.exposed }) : '') +
         (msg.icons ? t('component.extraIcons', { n: msg.icons }) : '') +
         placeTailText('component.propFailed', propFailed) +
+        placeTailText('component.fillKept', fillKept) +
         placeTailText('component.placeCloned', cloned) +
         placeFailedText(misplaced);
-      // 속성 값을 못 넣었거나(6번) 복사본으로 채웠거나 비운 자리(5번)가 있으면 성공이어도 경고(§4.7 "인스턴스 자리").
-      setStatus('structureStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extraPart }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length && !propFailed.length ? 'ok' : 'warn');
+      // 속성 값을 못 넣었거나(6번) 원본을 그대로 뒀거나 복사본으로 채웠거나 비운 자리(5번)가 있으면 성공이어도 경고(§4.7 "인스턴스 자리").
+      setStatus('structureStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extraPart }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length ? 'ok' : 'warn');
       // 빈 조합(미생성) + 실패(진단) 리포트
       renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       break;
@@ -3289,7 +3291,7 @@ function renderSkipReasons(reasons: Record<string, number>): void {
 }
 
 /** 결과 줄 꼬리 — 이름은 3개까지 + " 외"(§4.7 "인스턴스 자리" 5번). 없으면 빈 문자열. */
-function placeTailText(key: 'component.placeFailed' | 'component.placeCloned' | 'component.propFailed', names: readonly string[]): string {
+function placeTailText(key: 'component.placeFailed' | 'component.placeCloned' | 'component.propFailed' | 'component.fillKept', names: readonly string[]): string {
   if (!names.length) return '';
   const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? t('component.placeFailedMore') : '');
   return t(key, { n: names.length, names: shown });
@@ -3771,7 +3773,7 @@ function opReceived(m: CodeToUi): void {
     if (m.type === 'DARK_MODE_RESULT' && m.error) failed = true;
     if ((m.type === 'COMPONENTS_RESULT' || m.type === 'VARIANTS_RESULT') && (m.failures?.length ?? 0) > 0) failed = true;
     // 속성 값 실패 · 복사본 · 빈 자리도 실패로(§4.7 5·6번) — failures에도 실리지만 꼬리와 같은 기준으로 한 번 더 본다.
-    if (m.type === 'COMPONENTS_RESULT' && ((m.propFailed?.length ?? 0) + (m.placeCloned?.length ?? 0) + (m.placeFailed?.length ?? 0)) > 0) failed = true;
+    if (m.type === 'COMPONENTS_RESULT' && ((m.propFailed?.length ?? 0) + (m.fillKept?.length ?? 0) + (m.placeCloned?.length ?? 0) + (m.placeFailed?.length ?? 0)) > 0) failed = true;
     // [묶기]에서 제자리에 못 둔 것도 실패로(§4.7 "인스턴스 자리" 5번 — 최소화 중이면 ⚠).
     if (m.type === 'COMPONENTIZE_RESULT' && (m.placeFailed?.length ?? 0) > 0) failed = true;
     if (m.type === 'APPLY_RESULT' && m.cancelled) cancelled = true;

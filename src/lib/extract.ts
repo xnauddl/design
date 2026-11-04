@@ -38,7 +38,7 @@ const round = (n: number, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
 const SKIP_FRACTION = t('extract.skipFraction');
 /**
  * 척도 값인가 — 변수는 소수점을 갖지 않는다: 폰트 크기·간격·반경·행간·자간·그림자 수치는 정수,
- * 선 두께만 0.5 단위(hairline·아이콘 선). 불투명도(0~1)는 본질이 소수라 이 규칙 밖(collectOpacity).
+ * 선 두께도 예외 없이 정수(2026-11-04 사용자 결정 — 예전 0.5 단위 허용을 없앰, §2.11). 불투명도(0~1)는 본질이 소수라 이 규칙 밖(collectOpacity).
  * 26.67·13.33·58.29 같은 값은 그룹 스케일(×1.333)이 남긴 잔값이지 디자이너가 정한 척도가 아니다.
  * (크기 size는 이미 같은 규칙 — addSize의 Number.isInteger.) 토큰으로 만들면 변수 목록이
  * `font-size/26_67`로 지저분해지고, 바인딩은 허용오차로 근처 정수에 붙여 디자인을 바꾼다.
@@ -229,7 +229,7 @@ function collectStroke(acc: Accumulator, node: SceneNode): void {
   for (const wv of widths) {
     if (wv > 0) {
       const v = round(wv);
-      if (onScale(acc, v, 0.5)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id);
     }
   }
 }

@@ -982,6 +982,13 @@ async function saveAndGet(p) {
       && s1.cls.includes('warn'), JSON.stringify(s1));
   await recv(p, { type: 'COMPONENTS_RESULT', registered: 2, skipped: 0, sets: 0, singles: [], missing: [], failures: [], propFailed: ['M'] });
   s1 = await st();
+  await recv(p, { type: 'COMPONENTS_RESULT', registered: 1, skipped: 0, sets: 0, singles: ['WebsiteImage'], missing: [], failures: ['x'], propFailed: ['P'], fillKept: ['flight'], placeCloned: ['C'] });
+  const s2 = await st();
+  check('13 채움·크기 꼬리 — 속성 값 뒤 · 복사본 앞, 경고',
+    s2.text.includes('채움·크기가 달라 건너뛴 1개: flight')
+      && s2.text.indexOf('속성 값을 못 넣은') < s2.text.indexOf('채움·크기가 달라')
+      && s2.text.indexOf('채움·크기가 달라') < s2.text.indexOf('복사본을 둔')
+      && s2.cls.includes('warn'), JSON.stringify(s2));
   check('13 속성 값만 못 넣어도 경고', s1.text.includes('속성 값을 못 넣은 1개: M') && s1.cls.includes('warn'), JSON.stringify(s1));
   await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card', properties: 1, instances: 1, images: 0, warnings: ['Other: 제자리에 둘 수 없어 원본을 그대로 두었어요.'], placeFailed: ['Other'] });
   s1 = await st();

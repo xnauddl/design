@@ -113,6 +113,7 @@
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
     "component.placeFailedMore": " \uC678",
     "component.propFailed": " \xB7 \uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC740 {n}\uAC1C: {names}",
+    "component.fillKept": " \xB7 \uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uAC74\uB108\uB6F4 {n}\uAC1C: {names}",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
     "wizard.needSelect": "\uBA3C\uC800 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uC5D0\uC11C \uAC12\uC744 \uBF51\uC544\uC694",
@@ -175,6 +176,7 @@
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
     "reason.translucent": "\uBC18\uD22C\uBA85",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
+    "reason.fraction": "\uC18C\uC218 \uC120 \uB450\uAED8",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
@@ -708,6 +710,14 @@
     "component.fail.instanceMake": "\uC778\uC2A4\uD134\uC2A4\uB97C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694: {error}",
     "component.fail.instancePlace": "\uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "component.fail.propValue": "\uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC5B4 \uB9C8\uC2A4\uD130 \uAC12\uC73C\uB85C \uB480\uC5B4\uC694({name} \xB7 {prop})",
+    "component.fail.fillKept": "\uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uBB36\uC9C0 \uC54A\uACE0 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name}){causePart}",
+    "component.fail.memberKept": "\uC81C\uC790\uB9AC\uC5D0 \uB123\uC9C0 \uBABB\uD574 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name}){causePart}",
+    // 속성 접힘 멤버 검사(§4.7 8번) 사유 — 위 두 줄의 {causePart}에 들어간다
+    "component.fit.size": "\uD06C\uAE30 {w}\xD7{h} \u2260 {mw}\xD7{mh}",
+    "component.fit.noPhoto": "\uC0AC\uC9C4 \uC790\uB9AC \uC5C6\uC74C({path})",
+    "component.fit.self": "\uC790\uC2E0",
+    "component.fit.photoDiff": "\uC0AC\uC9C4 \uB2E4\uB984({name})",
+    "component.fit.photoSize": "\uC0AC\uC9C4 \uD06C\uAE30 {w}\xD7{h} \u2260 {mw}\xD7{mh}({name})",
     "component.fail.single": "\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328({name}): {error}",
     "component.fail.propsRegister": "\uC18D\uC131\uC811\uD798 \uB4F1\uB85D \uC2E4\uD328({set}): {error}",
     "component.fail.iconFallback": "\uC544\uC774\uCF58\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD574 \uC138\uD2B8\uB85C \uB4F1\uB85D\uD574\uC694({set})",
@@ -1163,7 +1173,7 @@
     for (const wv of widths) {
       if (wv > 0) {
         const v = round(wv);
-        if (onScale(acc, v, 0.5)) add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth", node.id);
+        if (onScale(acc, v)) add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth", node.id);
       }
     }
   }
@@ -2740,13 +2750,26 @@
     const strokes = node.strokes;
     if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
     const w = node.strokeWeight;
+    const one = (field, v) => {
+      if (!(v > 0)) return;
+      const st = stateReason(nodeFieldState(node, field));
+      if (st) {
+        note(res, st, node, preview, field);
+        return;
+      }
+      if (Math.abs(v - Math.round(v)) >= 5e-3) {
+        note(res, "fraction", node, preview, field);
+        return;
+      }
+      tryBind(node, field, v, entries, res, apply, preview);
+    };
     if (w !== figma.mixed && typeof w === "number") {
-      if (w > 0) tryBind(node, "strokeWeight", w, entries, res, apply, preview);
+      one("strokeWeight", w);
       return;
     }
     for (const side of ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"]) {
       const sv = node[side];
-      if (typeof sv === "number" && sv > 0) tryBind(node, side, sv, entries, res, apply, preview);
+      if (typeof sv === "number") one(side, sv);
     }
   }
   function bindEffects(node, entries, res, apply, preview) {
@@ -4301,6 +4324,94 @@
     }
     return failures;
   }
+  function joinPath(prefix, path) {
+    if (!prefix) return path;
+    return path ? `${prefix}/${path}` : prefix;
+  }
+  var FRAME_LIKE = /* @__PURE__ */ new Set(["FRAME", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"]);
+  function shapePrefix(master, rootType) {
+    if (FRAME_LIKE.has(rootType)) return "";
+    const kids = "children" in master ? master.children : [];
+    return kids.length === 1 && kids[0].type === rootType ? "0" : "";
+  }
+  function imageHashOf(n) {
+    var _a;
+    const f = "fills" in n ? n.fills : null;
+    if (!Array.isArray(f)) return void 0;
+    const img = f.find((p) => p.type === "IMAGE" && p.visible !== false);
+    return img ? (_a = img.imageHash) != null ? _a : "" : void 0;
+  }
+  var sameSize = (a, b) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
+  function memberFitIssue(inst, member, prefix) {
+    if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
+      return t("component.fit.size", { w: inst.width, h: inst.height, mw: member.width, mh: member.height });
+    }
+    let issue = null;
+    const visit = (n, path) => {
+      if (issue) return;
+      const h = imageHashOf(n);
+      if (h !== void 0) {
+        const at = joinPath(prefix, path);
+        const hit = nodeAtPath(inst, at);
+        if (!hit) {
+          issue = t("component.fit.noPhoto", { path: at || t("component.fit.self") });
+          return;
+        }
+        if (imageHashOf(hit) !== h) {
+          issue = t("component.fit.photoDiff", { name: n.name });
+          return;
+        }
+        if (!sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
+          issue = t("component.fit.photoSize", { w: hit.width, h: hit.height, mw: n.width, mh: n.height, name: n.name });
+          return;
+        }
+      }
+      if (n.type === "INSTANCE" || !("children" in n)) return;
+      n.children.forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i)));
+    };
+    visit(member, "");
+    return issue;
+  }
+  function replaceMember(member, make, prefix) {
+    let inst = null;
+    try {
+      inst = make();
+    } catch (e) {
+      return { result: "placeFailed", why: t("component.fail.instanceMake", { error: e instanceof Error ? e.message : String(e) }) };
+    }
+    try {
+      if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
+        try {
+          inst.resize(member.width, member.height);
+        } catch (e) {
+        }
+      }
+      const why = memberFitIssue(inst, member, prefix);
+      if (why) {
+        try {
+          inst.remove();
+        } catch (e) {
+        }
+        return { result: "mismatch", why };
+      }
+    } catch (e) {
+      try {
+        inst.remove();
+      } catch (e2) {
+      }
+      return { result: "mismatch", why: e instanceof Error ? e.message : String(e) };
+    }
+    const o = captureOrigin(member, { anchor: false });
+    if (!placeAtOrigin(inst, o)) {
+      releaseOrigin(o);
+      return { result: "placeFailed", why: t("component.fail.instancePlace") };
+    }
+    try {
+      member.remove();
+    } catch (e) {
+    }
+    return { result: "replaced" };
+  }
   function propIdsByName(container) {
     const map = /* @__PURE__ */ new Map();
     let defs;
@@ -5190,7 +5301,7 @@
       const rep = nodes[0];
       if (!rep) return;
       if (rep.type === "INSTANCE") return;
-      if (path !== "" && nodes.every((n) => n.imageHash !== void 0)) {
+      if (nodes.every((n) => n.imageHash !== void 0)) {
         if (new Set(nodes.map((n) => n.imageHash)).size > 1) out.push({ layerName: rep.name, layerPath: path });
       }
       const lens = nodes.map((n) => {
@@ -6604,7 +6715,7 @@
       opacity: p.opacity
     }));
   }
-  function imageHashOf(node) {
+  function imageHashOf2(node) {
     var _a;
     const fills = node.fills;
     if (!Array.isArray(fills)) return void 0;
@@ -6659,7 +6770,7 @@
       id: node.id,
       name: node.name,
       type: node.type,
-      imageHash: imageHashOf(node),
+      imageHash: imageHashOf2(node),
       vectorKey: vectorKeyOf(node),
       locked: node.locked,
       visible: node.visible,
@@ -6823,7 +6934,7 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -7278,6 +7389,7 @@
           const placeFailed = [];
           const placeCloned = [];
           const propFailed = [];
+          const fillKept = [];
           const captureOrigin2 = (n) => {
             const o = captureOrigin(n);
             origins.push(o);
@@ -7406,42 +7518,27 @@
                 if (!iconsReady) {
                   failures.push(t("component.fail.iconFallback", { set: setName }));
                 } else {
-                  const snapshots = [];
-                  const made2 = [];
-                  const madeFromLive = [];
-                  for (let i = 0; i < live.length; i++) {
-                    const n = live[i];
-                    const snap = { o: captureOrigin2(n), vals: propValuesFromNode(n, plan), images: imagesOf(n) };
-                    try {
-                      made2.push(figma.createComponentFromNode(n));
-                      snapshots.push(snap);
-                      madeFromLive.push(i);
-                    } catch (e) {
-                      releaseOrigin(snap.o);
-                      skipped++;
-                      failures.push(t("component.fail.propsComponentize", { name: n.name, error: errText(e) }));
-                    }
-                  }
-                  if (!made2.length) continue;
+                  const snaps = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                   const preferLive = pickCollapseMasterIndex(structs);
-                  let masterMade = madeFromLive.indexOf(preferLive);
-                  if (masterMade < 0) masterMade = 0;
-                  const master = made2[masterMade];
-                  for (let i = 0; i < made2.length; i++) {
-                    if (i === masterMade) continue;
-                    try {
-                      made2[i].remove();
-                    } catch (e) {
-                    }
+                  const masterSnap = (_d = snaps[preferLive]) != null ? _d : snaps[0];
+                  const masterOrigin = captureOrigin2(masterSnap.n);
+                  let master;
+                  try {
+                    master = figma.createComponentFromNode(masterSnap.n);
+                  } catch (e) {
+                    releaseOrigin(masterOrigin);
+                    skipped++;
+                    failures.push(t("component.fail.propsComponentize", { name: masterSnap.n.name, error: errText(e) }));
+                    continue;
                   }
                   try {
-                    master.name = setName || pascalCase((_e = (_d = live[preferLive]) == null ? void 0 : _d.name) != null ? _e : live[0].name);
+                    master.name = setName || pascalCase(masterSnap.n.name);
                   } catch (e) {
                   }
+                  const prefix = shapePrefix(master, (_f = (_e = structs[preferLive]) == null ? void 0 : _e.type) != null ? _f : "");
                   placeOnPage(master);
                   singles.push(master.name);
                   registered++;
-                  const masterSnap = snapshots[masterMade];
                   failures.push(
                     ...swapVectorSlots(
                       master,
@@ -7449,8 +7546,8 @@
                         var _a2;
                         return {
                           layerName: p.layerName,
-                          layerPath: p.layerPath,
-                          icon: iconRegistry.get(String((_a2 = masterSnap == null ? void 0 : masterSnap.vals[p.propName]) != null ? _a2 : ""))
+                          layerPath: joinPath(prefix, p.layerPath),
+                          icon: iconRegistry.get(String((_a2 = masterSnap.vals[p.propName]) != null ? _a2 : ""))
                         };
                       })
                     )
@@ -7463,26 +7560,28 @@
                   }
                   exposedEarly += collapsedExposed;
                   const ids = propIdsByName(master);
-                  const places = [];
-                  for (const snap of snapshots) {
+                  const makerFor = (snap, name) => {
+                    var _a2;
                     const vals = __spreadValues({}, snap.vals);
                     for (const p of vectorPlans) {
-                      const icon = iconRegistry.get(String((_f = vals[p.propName]) != null ? _f : ""));
+                      const icon = iconRegistry.get(String((_a2 = vals[p.propName]) != null ? _a2 : ""));
                       if (icon) vals[p.propName] = icon.key || icon.id;
                       else delete vals[p.propName];
                     }
+                    const images = {};
+                    for (const [path, paints3] of Object.entries(snap.images)) images[joinPath(prefix, path)] = paints3;
                     let noted = false;
-                    const make = () => {
+                    return () => {
                       let inst = null;
                       try {
                         inst = master.createInstance();
                         const badProps = applyInstancePropValues(inst, ids, vals);
-                        const img = transplantImageFills(inst, snap.images).failures;
+                        const img = transplantImageFills(inst, images).failures;
                         if (!noted) {
                           noted = true;
-                          for (const p of badProps) failures.push(t("component.fail.propValue", { name: snap.o.name, prop: p }));
-                          failures.push(...img.map((f) => `${snap.o.name}: ${f}`));
-                          if (badProps.length || img.length) propFailed.push(snap.o.name);
+                          for (const p of badProps) failures.push(t("component.fail.propValue", { name, prop: p }));
+                          failures.push(...img.map((f) => `${name}: ${f}`));
+                          if (badProps.length || img.length) propFailed.push(name);
                         }
                         return inst;
                       } catch (e) {
@@ -7495,9 +7594,23 @@
                         throw e;
                       }
                     };
-                    places.push({ o: snap.o, make, label: master.name });
+                  };
+                  restore([{ o: masterOrigin, make: makerFor(masterSnap, masterOrigin.name), label: master.name }]);
+                  for (const snap of snaps) {
+                    if (snap === masterSnap) continue;
+                    const name = snap.n.name;
+                    const before = propFailed.length;
+                    const r = replaceMember(snap.n, makerFor(snap, name), prefix);
+                    if (r.result === "replaced") continue;
+                    if (propFailed.length > before) propFailed.splice(before);
+                    if (r.result === "mismatch") {
+                      fillKept.push(name);
+                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_g = r.why) != null ? _g : "" }) }));
+                    } else {
+                      placeFailed.push(name);
+                      failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
+                    }
                   }
-                  restore(places);
                   continue;
                 }
               }
@@ -7508,7 +7621,7 @@
                 if (!node) continue;
                 const o = captureOrigin2(node);
                 try {
-                  made.push({ comp: figma.createComponentFromNode(node), variant: (_g = variantById.get(m.id)) != null ? _g : "", o });
+                  made.push({ comp: figma.createComponentFromNode(node), variant: (_h = variantById.get(m.id)) != null ? _h : "", o });
                   registered++;
                 } catch (e) {
                   releaseOrigin(o);
@@ -7522,7 +7635,7 @@
               }
               let set;
               try {
-                const home = (_h = pageOf(made[0].comp)) != null ? _h : figma.currentPage;
+                const home = (_i = pageOf(made[0].comp)) != null ? _i : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
                 failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
@@ -7555,7 +7668,7 @@
               failures.push(t("component.fail.exposeAll", { error: errText(e) }));
             }
           }
-          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed });
+          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept });
           if (registered || sets) commitUndo(figma);
           break;
         }
@@ -7586,7 +7699,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_i = nodes[0].parent) != null ? _i : figma.currentPage;
+              const parent = (_j = nodes[0].parent) != null ? _j : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {

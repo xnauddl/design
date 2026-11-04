@@ -106,6 +106,7 @@ export const STRINGS: Record<string, string> = {
   'component.placeFailed': ' · 제자리에 못 둔 {n}개: {names}',
   'component.placeFailedMore': ' 외',
   'component.propFailed': ' · 속성 값을 못 넣은 {n}개: {names}',
+  'component.fillKept': ' · 채움·크기가 달라 건너뛴 {n}개: {names}',
   'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
 
   // 마법사
@@ -175,6 +176,7 @@ export const STRINGS: Record<string, string> = {
   'reason.font': '폰트 미로드',
   'reason.translucent': '반투명',
   'reason.space-between': '사이 간격 자동',
+  'reason.fraction': '소수 선 두께',
 
   // 마법사 시퀀서 단계 결과
   'wizard.seq.stoppedPrev': '이전 단계 중단으로 건너뜀',
@@ -712,6 +714,14 @@ export const STRINGS: Record<string, string> = {
   'component.fail.instanceMake': '인스턴스를 만들지 못했어요: {error}',
   'component.fail.instancePlace': '제자리에 인스턴스를 넣지 못했어요',
   'component.fail.propValue': '속성 값을 못 넣어 마스터 값으로 뒀어요({name} · {prop})',
+  'component.fail.fillKept': '채움·크기가 달라 묶지 않고 원본을 뒀어요({name}){causePart}',
+  'component.fail.memberKept': '제자리에 넣지 못해 원본을 뒀어요({name}){causePart}',
+  // 속성 접힘 멤버 검사(§4.7 8번) 사유 — 위 두 줄의 {causePart}에 들어간다
+  'component.fit.size': '크기 {w}×{h} ≠ {mw}×{mh}',
+  'component.fit.noPhoto': '사진 자리 없음({path})',
+  'component.fit.self': '자신',
+  'component.fit.photoDiff': '사진 다름({name})',
+  'component.fit.photoSize': '사진 크기 {w}×{h} ≠ {mw}×{mh}({name})',
   'component.fail.single': '단독 등록 실패({name}): {error}',
   'component.fail.propsRegister': '속성접힘 등록 실패({set}): {error}',
   'component.fail.iconFallback': '아이콘을 만들지 못해 세트로 등록해요({set})',
