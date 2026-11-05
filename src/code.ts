@@ -17,10 +17,11 @@ import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
+import { tabInfo } from './lib/componentLike';
 import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
-import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan, ReuseCandidate } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
+import type { CompPropType, StructNode, StructGroup, CompPropPlan, ReuseCandidate } from './lib/components';
 import { scanSimilar, componentizeSimilar, componentizeResultMessage } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
 import { Tier, Feature, isTier } from './lib/entitlements';
@@ -645,8 +646,52 @@ function vectorKeyOf(node: SceneNode): string | undefined {
 
 const VECTOR_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);
 
-/** figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑·역할을 읽어 순수 그룹화에 넘김. */
-function toStructNode(node: SceneNode): StructNode {
+/**
+ * 아이콘 프레임의 아이콘 지문(§4.7 "묶기" 3번). 아이콘 프레임이 아니면 undefined.
+ * 아이콘 프레임 = FRAME · GROUP, 가로 · 세로 96 이하, 자손에 벡터 1개 이상, 자손이 벡터 · ELLIPSE · RECTANGLE과
+ * 그것을 담은 GROUP · FRAME뿐(TEXT · 이미지 채움 · 인스턴스 없음).
+ * 지문 = 프레임 자신의 (가로 · 세로 · 채움) + 자손마다 순서대로 (타입 · 벡터면 그림 지문, 아니면 가로 · 세로) · 채움.
+ */
+function iconFrameKeyOf(node: SceneNode): string | undefined {
+  if (node.type !== 'FRAME' && node.type !== 'GROUP') return undefined;
+  const size = (n: SceneNode): string => `${Math.round((n as LayoutMixin).width * 100) / 100}x${Math.round((n as LayoutMixin).height * 100) / 100}`;
+  if ((node as LayoutMixin).width > 96 || (node as LayoutMixin).height > 96) return undefined;
+  if (imageHashOf(node) !== undefined) return undefined;
+  const parts: string[] = [`${size(node)}:${solidFillHex(node) ?? ''}`];
+  let vectors = 0;
+  const walk = (n: SceneNode): boolean => {
+    const kids = 'children' in n ? (n.children as readonly SceneNode[]) : [];
+    for (const c of kids) {
+      if (imageHashOf(c) !== undefined) return false;
+      if (VECTOR_TYPES.has(c.type)) {
+        vectors++;
+        parts.push(`${c.type}:${vectorKeyOf(c) ?? ''}:${solidFillHex(c) ?? ''}`);
+      } else if (c.type === 'ELLIPSE' || c.type === 'RECTANGLE') {
+        parts.push(`${c.type}:${size(c)}:${solidFillHex(c) ?? ''}`);
+      } else if (c.type === 'GROUP' || c.type === 'FRAME') {
+        parts.push(`${c.type}:${size(c)}:${solidFillHex(c) ?? ''}[`);
+        if (!walk(c)) return false;
+        parts.push(']');
+      } else {
+        return false; // TEXT · INSTANCE · 그 밖
+      }
+    }
+    return true;
+  };
+  if (!walk(node) || vectors === 0) return undefined;
+  return `f:${fnv1a(parts.join('|'))}`;
+}
+
+/** 그림 지문 — 날 벡터는 경로 지문, 아이콘 프레임은 아이콘 지문(아이콘 등록부 · 값 옮기기가 쓴다). */
+function artKeyOf(node: SceneNode): string | undefined {
+  return vectorKeyOf(node) ?? iconFrameKeyOf(node);
+}
+
+/**
+ * figma 노드 → 구조 비교용 StructNode(재귀). 여백·크기·대표 색·텍스트/스왑·역할을 읽어 순수 그룹화에 넘김.
+ * 루트가 아닌 아이콘 프레임은 자식을 비우고 `vectorKey`에 아이콘 지문을 실어 그림 하나로 넘긴다(§4.7 "묶기" 3번).
+ */
+function toStructNode(node: SceneNode, isRoot = true): StructNode {
   const a = node as unknown as Record<string, unknown>;
   const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined);
   const kids = 'children' in node ? (node.children as readonly SceneNode[]) : [];
@@ -655,6 +700,7 @@ function toStructNode(node: SceneNode): StructNode {
   if (node.type === 'TEXT') {
     try { characters = node.characters; } catch { characters = ''; }
   }
+  const iconKey = isRoot ? undefined : iconFrameKeyOf(node);
   if (node.type === 'INSTANCE') {
     try {
       const main = node.mainComponent;
@@ -697,9 +743,18 @@ function toStructNode(node: SceneNode): StructNode {
     characters,
     mainComponentKey,
     role: readRole(node),
-    // INSTANCE 안은 자식 컴포넌트 소관 — 접힘 비교·속성 노출과 동일하게 펼치지 않음.
-    children: node.type === 'INSTANCE' ? [] : kids.map(toStructNode),
+    ...(iconKey ? { iconFrame: true, vectorKey: iconKey } : {}),
+    // INSTANCE 안은 자식 컴포넌트 소관 — 접힘 비교·속성 노출과 동일하게 펼치지 않음. 아이콘 프레임도 그림 하나.
+    children: node.type === 'INSTANCE' || iconKey ? [] : kids.map((k) => toStructNode(k, false)),
   };
+}
+
+/** 선택 루트마다 StructNode를 한 번 만들고 노드 id로 찾는다(§4.7 "묶기" — 하위마다 새로 만들지 않는다). */
+function structIndex(roots: readonly SceneNode[]): Map<string, StructNode> {
+  const out = new Map<string, StructNode>();
+  const add = (n: StructNode): void => { out.set(n.id, n); for (const c of n.children ?? []) add(c); };
+  for (const r of roots) add(toStructNode(r));
+  return out;
 }
 
 /** 컴포넌트 루트 기준 레이어 + 경로(인스턴스 안 미진입). */
@@ -750,13 +805,13 @@ function isEffectivelyVisible(node: SceneNode): boolean {
   return true;
 }
 
-/** 등록/스캔 공통: 실효 보임 + componentEligible. */
-function sceneComponentEligible(n: SceneNode): boolean {
+/**
+ * 등록/스캔 공통: 실효 보임 + componentEligible. 판정은 StructNode로 한다(§4.7 "묶기" — 탭 판정이 글자 · 색을 읽는다).
+ * `index`(선택 루트마다 한 번 만든 StructNode)에 있으면 그것을, 없으면 그 노드만 새로 만든다.
+ */
+function sceneComponentEligible(n: SceneNode, index?: ReadonlyMap<string, StructNode>): boolean {
   if (!isEffectivelyVisible(n)) return false;
-  // FRAME/GROUP은 구조만으로 판정하므로 노드를 그대로 넘긴다.
-  if (n.type === 'FRAME' || n.type === 'GROUP') return componentEligible(n as ScanNode);
-  // 말단은 리네임이 남긴 dsRole로만 열린다 — SceneNode엔 그 필드가 없어 읽어 채운다.
-  return componentEligible({ id: n.id, name: n.name, type: n.type, locked: n.locked, visible: n.visible, role: readRole(n) });
+  return componentEligible(index?.get(n.id) ?? toStructNode(n));
 }
 
 /** 계획의 layerPath(우선) 또는 layerName으로 대상 레이어 찾기. */
@@ -837,22 +892,25 @@ function isAncestorOf(a: BaseNode, b: BaseNode): boolean {
 }
 
 /**
- * 등록용 그룹화 — 정확한 이름 그룹(`groupByExactName`) + **같은 이름의 조상 제외**.
- * 같은 이름의 조상·자손이 함께 선택되면 한 세트에 둘 다 넣을 수 없어(결합이 깨짐) 잎 쪽만 남긴다.
- * SCAN 미리보기와 REGISTER가 **동일 규칙**을 쓰도록 한 곳에 둔다.
+ * 등록용 묶기 계획(§4.7 "묶기") — 이름 그룹 · 탭 그룹 → 구조 가족 → 소가족. 같은 그룹 안의 조상 · 자손은 자손만 남긴다.
+ * SCAN 미리보기와 REGISTER가 **동일 규칙**을 쓰도록 한 곳에 둔다. 멤버 StructNode는 멤버마다 루트로 만든다
+ * (루트 자신은 아이콘 프레임으로 접지 않는다 — 아이콘 멤버의 그림 차를 속성으로 담기 위해).
  */
-function groupForRegister(nodes: readonly SceneNode[]): StructGroup[] {
-  const liveById = new Map(nodes.map((n) => [n.id, n]));
-  return groupByExactName(nodes.map(toStructNode))
-    .map((g) => {
-      const live = g.members.map((m) => liveById.get(m.id)).filter((n): n is SceneNode => !!n);
-      const members = g.members.filter((m) => {
-        const node = liveById.get(m.id);
-        return node ? !live.some((o) => o.id !== node.id && isAncestorOf(node, o)) : false;
-      });
-      return { key: g.key, members };
-    })
-    .filter((g) => g.members.length > 0);
+function groupForRegister(nodes: readonly SceneNode[], index?: ReadonlyMap<string, StructNode>): PlanGroup[] {
+  // 후보는 아이콘 프레임이 아니므로(3번) 선택 루트로 만든 StructNode를 그대로 써도 루트로 만든 것과 같다.
+  const structs = nodes.map((n) => index?.get(n.id) ?? toStructNode(n));
+  const desc = new Map<string, Set<string>>();
+  const descOf = (a: StructNode): Set<string> => {
+    let d = desc.get(a.id);
+    if (!d) {
+      d = new Set<string>();
+      const walk = (n: StructNode): void => { for (const c of n.children ?? []) { d!.add(c.id); walk(c); } };
+      walk(a);
+      desc.set(a.id, d);
+    }
+    return d;
+  };
+  return planRegisterGroups(structs, (a, b) => descOf(a).has(b.id));
 }
 
 /**
@@ -861,20 +919,20 @@ function groupForRegister(nodes: readonly SceneNode[]): StructGroup[] {
  * 깊이만으로 정렬하면 한 그룹의 멤버가 여러 깊이에 걸칠 때 어긋날 수 있어, 실제 포함관계로 정렬한다.
  * 사이클(이론상)·동순위는 문서 깊이 내림차순으로 폴백.
  */
-function orderInnerFirst(groups: readonly StructGroup[], byId: Map<string, SceneNode>): StructGroup[] {
-  const liveOf = (g: StructGroup): SceneNode[] => g.members.map((m) => byId.get(m.id)).filter((n): n is SceneNode => !!n);
+function orderInnerFirst<G extends StructGroup>(groups: readonly G[], byId: Map<string, SceneNode>): G[] {
+  const liveOf = (g: G): SceneNode[] => g.members.map((m) => byId.get(m.id)).filter((n): n is SceneNode => !!n);
   const docDepth = (n: SceneNode): number => {
     let d = 0;
     let p: BaseNode | null = n.parent;
     while (p && p.type !== 'PAGE' && p.type !== 'DOCUMENT') { d++; p = p.parent; }
     return d;
   };
-  const groupDepth = (g: StructGroup): number => Math.max(0, ...liveOf(g).map(docDepth));
+  const groupDepth = (g: G): number => Math.max(0, ...liveOf(g).map(docDepth));
   // x가 남은 다른 그룹 y를 자기 안에 포함하면(=y가 x보다 안쪽) x는 아직 출력 불가.
-  const containsRemaining = (x: StructGroup, rest: readonly StructGroup[]): boolean =>
+  const containsRemaining = (x: G, rest: readonly G[]): boolean =>
     rest.some((y) => y !== x && liveOf(y).some((b) => liveOf(x).some((a) => a.id !== b.id && isAncestorOf(a, b))));
   const remaining = [...groups].sort((a, b) => groupDepth(b) - groupDepth(a)); // 깊이 폴백(사이클/동순위)
-  const out: StructGroup[] = [];
+  const out: G[] = [];
   while (remaining.length) {
     let idx = remaining.findIndex((x) => !containsRemaining(x, remaining));
     if (idx < 0) idx = 0; // 사이클 폴백: 가장 깊은 것
@@ -939,15 +997,17 @@ type ReuseDecision = { hit: ReuseHit | null; keepKey: boolean };
  * `asInstance`는 A 쪽 "이번 실행 뒤의 모습" — 이번 [등록]의 그룹 멤버(인스턴스가 된다). [등록]은 체크한 그룹 전체,
  * 미리보기는 기본 체크 상태(세트 · 접힘 그룹 — 멤버 2개+)의 멤버(7번).
  */
-async function decideReuse(groups: readonly StructGroup[], exclude: ReadonlySet<string>, asInstance: ReadonlySet<string>): Promise<ReuseDecision[]> {
+async function decideReuse(groups: readonly PlanGroup[], exclude: ReadonlySet<string>, asInstance: ReadonlySet<string>): Promise<ReuseDecision[]> {
   const { list, byId } = await reuseCandidates(exclude);
   if (!list.length) return groups.map(() => ({ hit: null, keepKey: true }));
   const out: ReuseDecision[] = [];
+  // 같은 기존 컴포넌트를 멤버마다 다시 읽지 않는다(소가족 멤버는 같은 변형 키를 나눠 쓴다).
+  const rootCache = new Map<string, { struct: StructNode; icons: Set<string> }>();
   for (const g of groups) {
     let hit: ReuseHit | null = null;
     let keepKey = true;
     try {
-      const plan = reusePlanFor(g.members);
+      const plan = reusePlanFor(g);
       if (plan) {
         // 키가 같은 후보마다 멤버별 짝 맞추기(비동기 — 아이콘 메인을 구한다)를 먼저 해 둔다.
         const pass = new Map<string, 'strict' | 'loose' | 'fail'>(); // `${k}|${compId}` — 엄격 · 예외 통과 · 걸림
@@ -959,9 +1019,11 @@ async function decideReuse(groups: readonly StructGroup[], exclude: ReadonlySet<
             const comp = byId.get(c.id);
             if (!comp) { pass.set(`${k}|${c.id}`, 'fail'); continue; }
             const { root } = reuseRootOf(comp, g.members[k].type);
-            const ids = await iconInstanceIds(root);
-            icons.set(`${k}|${c.id}`, ids);
-            pass.set(`${k}|${c.id}`, reusePairGrade(g.members[k], toStructNode(root), asInstance, ids));
+            const ck = `${c.id}|${root.id}`;
+            let cached = rootCache.get(ck);
+            if (!cached) { cached = { struct: toStructNode(root), icons: await iconInstanceIds(root) }; rootCache.set(ck, cached); }
+            icons.set(`${k}|${c.id}`, cached.icons);
+            pass.set(`${k}|${c.id}`, reusePairGrade(g.members[k], cached.struct, asInstance, cached.icons));
           }
         }
         const m = matchReuse(plan, list, g.members.length, (k, id) => pass.get(`${k}|${id}`) ?? 'fail');
@@ -1392,7 +1454,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const roots = selection().filter(isEffectivelyVisible);
         // StructNode로 매핑해 넘긴다 — 말단 등록 자격이 `dsRole`에 달려 있다.
         // toStructNode가 인스턴스 내부를 펼치지 않으므로 스캔 범위는 그대로다.
-        const candidates = scanComponentCandidates(roots.map(toStructNode));
+        const rootStructs = roots.map((n) => toStructNode(n));
+        const candidates = scanComponentCandidates(rootStructs);
+        // 선택 루트마다 한 번 만든 StructNode를 id로 찾는다(§4.7 "묶기").
+        const scanIndex = new Map<string, StructNode>();
+        const addIdx = (n: StructNode): void => { scanIndex.set(n.id, n); for (const c of n.children ?? []) addIdx(c); };
+        for (const r of rootStructs) addIdx(r);
         // 라이브 노드 인덱스 — 스캔과 동일하게 인스턴스·메인·세트 안은 펼치지 않는다.
         // (전체 재귀는 대용량 파일에서 UI가 ‘스캔 중’에 멈춘 것처럼 보이게 함.)
         const liveById = new Map<string, SceneNode>();
@@ -1430,34 +1497,28 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             .filter((c) => c.eligible)
             .map((c) => liveById.get(c.id))
             .filter((n): n is SceneNode => !!n);
-          const groups = groupForRegister(eligibleNodes);
-          // 등록과 **같은 함수**로 이름을 정한다. 예전엔 미리보기만 `commonBaseName`/`pascalCase(첫 멤버명)`을
-          // 써서, 트리에 `CardThumbnail`이라 보여 주고 실제로는 `Thumbnail`로 등록됐다.
+          const groups = groupForRegister(eligibleNodes, scanIndex);
+          // 등록과 **같은 함수**로 이름을 정한다 — 문서 순서의 계획 그룹으로 한 번(§4.7 "묶기" 4번).
           // 문서에 이미 있는 컴포넌트 이름도 함께 넘겨 충돌 해소 결과까지 등록과 일치시킨다.
           // (후보 자신은 제외 — 이미 COMPONENT인 말단이 후보면 자기 이름과 충돌해 숫자가 붙는다.)
-          // origin/main은 같은 자리를 for 루프로 바꿨는데 동작은 같아서, 인자가 하나 더 붙는
-          // 이쪽을 남긴다.
-          const groupNames = resolveGroupNames(
-            groups.map((g) => g.members),
-            await existingComponentNames(new Set(eligibleNodes.map((n) => n.id))),
-          );
-          // 재사용 판정을 미리 해 본다(§4.7 "재사용" 7번) — 이번 [등록] 대상은 **기본 체크 상태**(세트 · 접힘 그룹은 체크, 단독은 체크 안 함)로 보고, 판정은 안쪽 그룹까지 저마다.
-          // 짝 맞추기의 "이번 [등록]의 다른 그룹 멤버"는 기본 체크 상태 기준 — 세트 · 접힘 그룹(멤버 2개+)만.
+          const groupNames = resolvePlanNames(groups, await existingComponentNames(new Set(eligibleNodes.map((n) => n.id))));
+          // 기본 체크(§4.7 "묶기" 6번) — 재사용 미리보기의 "기본 체크 상태"도 같은 값(§4.7 "재사용" 7번).
           const defaultChecked = new Set<string>();
-          for (const g of groups) if (g.members.length >= 2) for (const m of g.members) defaultChecked.add(m.id);
+          for (const g of groups) for (const m of g.members) if (defaultOnFor(g, m)) defaultChecked.add(m.id);
           const reuseHits = (await decideReuse(groups, new Set(eligibleNodes.map((n) => n.id)), defaultChecked)).map((d) => d.hit);
-          const preview = new Map<string, { group?: string; variant?: string; single?: string; propsOnly?: boolean; reuse?: { name: string } }>();
+          const preview = new Map<string, { group?: string; variant?: string; single?: string; propsOnly?: boolean; reuse?: { name: string }; defaultOn?: boolean }>();
           groups.forEach((g, gi) => {
             const name = groupNames[gi];
-            if (g.members.length < 2) {
-              if (g.members[0]) preview.set(g.members[0].id, { single: name });
+            const on = (id: string) => defaultChecked.has(id);
+            if (g.subfamilies.length === 1) {
+              if (g.members.length === 1) preview.set(g.members[0].id, { single: name, defaultOn: on(g.members[0].id) });
+              else for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true, defaultOn: on(m.id) });
               return;
             }
-            if (shouldCollapseToProperties(g.members)) {
-              for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true });
-              return;
+            for (const sf of g.subfamilies) {
+              const variant = formatVariant(sf.props);
+              for (const m of sf.members) preview.set(m.id, { group: name, variant, defaultOn: on(m.id) });
             }
-            for (const d of deriveVariants(g.members)) preview.set(d.id, { group: name, variant: d.variant });
           });
           // [재사용] 배지 + 기존 컴포넌트 이름(세트면 "{세트} · {변형}") — 종류 라벨 위에 얹는다(기본 체크는 종류대로).
           // 트리는 reuse가 있으면 종류 배지 대신 [재사용]을 보이고, 숫자 접미사 이름은 보이지도 보내지도 않는다.
@@ -1484,7 +1545,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         let skipped = 0;
         // 후보 필터: 스캔(`componentEligible`)과 같은 규칙 — 실효 보임 + FRAME/GROUP은 고신뢰
         // 시맨틱 역할, 말단은 리네임이 재사용 원자로 판정한 것(아바타·아이콘·썸네일…).
-        const eligible = (n: SceneNode): boolean => sceneComponentEligible(n);
+        // 판정은 StructNode로 — 선택 루트마다 한 번 만들어 노드 id로 찾는다(§4.7 "묶기").
+        const sIndex = structIndex(selection());
+        const eligible = (n: SceneNode): boolean => sceneComponentEligible(n, sIndex);
         // 대상 결정: 트리에서 체크한 nodeIds, 없으면(스캔 없이 등록) 선택 서브트리를 **재귀**로 모아
         // **반복 이름(2회+)만** 묶는다(단독 잡음 제외).
         let targets: SceneNode[];
@@ -1506,6 +1569,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             if (!isContainerRoot && eligible(n)) collected.push(n);
             // 인스턴스·메인·세트 안은 이미 컴포넌트 체계 — 안쪽 FRAME을 다시 등록하지 않음.
             if (n.type === 'INSTANCE' || n.type === 'COMPONENT' || n.type === 'COMPONENT_SET') return;
+            // 탭의 칸은 후보가 아니다(§4.7 "묶기" 1번).
+            const st = sIndex.get(n.id);
+            if (st && tabInfo(st) != null) return;
+            // 아이콘 프레임과 그 안은 후보가 아니다(§4.7 "묶기" 3번) — 스캔과 같은 범위.
+            if (st?.iconFrame) return;
             if ('children' in n) for (const c of n.children as readonly SceneNode[]) walk(c, depth + 1);
           };
           for (const r of roots) walk(r, 0);
@@ -1519,9 +1587,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         const byId = new Map(valid.map((n) => [n.id, n]));
 
-        // 정확한 이름 그룹화 + 같은 이름 조상 제외(SCAN과 공유). 폴백(스캔 없이 등록)은 반복만.
-        let groups = groupForRegister(valid);
+        // 묶기 계획(SCAN과 공유). 폴백(스캔 없이 등록)은 반복만 — 가족 단위(탭 그룹은 그룹 전체, §4.7 "묶기").
+        let groups = groupForRegister(valid, sIndex);
         if (setsOnly) groups = groups.filter((g) => g.members.length >= 2);
+        // 이름은 **문서 순서**로 루프 전에 한 번 정한다(§4.7 "묶기" 4번) — 안쪽 먼저 정렬 뒤에도 이 이름을 쓴다.
+        // 등록 대상 자신은 '기존 이름'에서 제외(스캔 미리보기와 같은 규칙).
+        const existingNames = await existingComponentNames(new Set(valid.map((n) => n.id)));
+        const nameByGroup = new Map<PlanGroup, string>();
+        resolvePlanNames(groups, existingNames).forEach((nm, i) => nameByGroup.set(groups[i], nm));
         if (!groups.length) {
           post({ type: 'COMPONENTS_RESULT', registered: 0, skipped, sets: 0, singles: [], missing: [], failures: [] });
           break;
@@ -1542,9 +1615,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 짝이 맞는 기존 후보가 둘 이상이던 그룹은 새로 만들되 키를 남기지 않는다(3번) — 그 그룹 멤버 id.
         const noKeyMembers = new Set<string>();
         groups.forEach((g, gi) => { if (!reuseDecisions[gi].keepKey) for (const m of g.members) noKeyMembers.add(m.id); });
+        const groupKeyOf = new Map<string, string>();
+        for (const g of groups) for (const m of g.members) groupKeyOf.set(m.id, g.key);
         const markReuse = (comp: ComponentNode, kind: 'single' | 'collapse' | 'variant', memberId: string): void => {
           const m = structById.get(memberId);
-          const key = m && !noKeyMembers.has(memberId) ? reuseKey(kind, m) : '';
+          // 이름 키는 그룹 키(탭은 `role:tab`, §4.7 "묶기" 7번).
+          const key = m && !noKeyMembers.has(memberId) ? reuseKey(kind, m, groupKeyOf.get(memberId)) : '';
           try { comp.setPluginData(REUSE_KEY, key); } catch { /* 무시 */ }
         };
         // 문서에 이미 있는 아이콘 컴포넌트(그림 지문 `dsl.icon`) — 등록부가 먼저 찾아 쓴다(2번).
@@ -1627,13 +1703,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           restore([{ o, make: instanceOf(comp, o.name), label: comp.name }]);
         };
 
-        // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
-        // 등록 대상 자신은 '기존 이름'에서 제외(스캔 미리보기와 같은 규칙).
-        const existingNames = await existingComponentNames(new Set(valid.map((n) => n.id)));
-        const resolved = resolveGroupNames(
-          groups.map((g) => g.members),
-          existingNames,
-        );
+        // 이름은 정렬 전에 정했다(위) — 순서와 1:1로 옮긴다.
+        const resolved = groups.map((g) => nameByGroup.get(g) ?? '');
 
         /* 아이콘(날 벡터) 컴포넌트 — 그림이 다른 슬롯은 인스턴스 안에서 경로를 못 고치므로,
            그림마다 컴포넌트를 만들고 그 자리를 인스턴스로 바꿔 INSTANCE_SWAP으로 담는다.
@@ -1693,8 +1764,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                     const bad = await copyOverridesAsync(node, inst, prefix, {
                       mainOf: (n) => n.getMainComponentAsync(),
                       loadFont: (f) => figma.loadFontAsync(f),
+                      isIcon: (n) => iconFrameKeyOf(n) !== undefined,
                       iconFor: (v) => {
-                        const key = vectorKeyOf(v);
+                        const key = artKeyOf(v);
                         if (!key) return null;
                         const had = iconRegistry.get(key); // 이미 있던 것(이번에 만든 것 · 문서에 있던 것)
                         const icon = iconRegistry.ensure(key, v, v.name);
@@ -1750,8 +1822,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               continue;
             }
 
-            // 텍스트/스왑/불리언만 다른 반복 → 단품 1개 + 속성 오버라이드 인스턴스(세트 금지).
-            if (shouldCollapseToProperties(g.members)) {
+            // 소가족 하나(텍스트/스왑/불리언 · 그림만 다른 반복) → 단품 1개 + 속성 오버라이드 인스턴스(세트 금지, §4.7 "묶기" 5번).
+            // 아이콘을 못 만들어 접지 못하면 아래 세트 경로로 — 그때는 멤버마다 변형(지금 규칙).
+            let subfamilies = g.subfamilies;
+            if (subfamilies.length === 1) {
               const live: SceneNode[] = [];
               for (const m of g.members) {
                 const n = byId.get(m.id);
@@ -1774,7 +1848,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 }
                 continue;
               }
-              const structs = live.map(toStructNode);
+              const structs = live.map((n) => toStructNode(n));
               const plan = inferVaryingComponentProperties(structs);
               // 사진이 다른 슬롯 — 컴포넌트 속성이 아니라 인스턴스 fill 오버라이드로 이식한다.
               const imageSlots = inferVaryingImageSlots(structs);
@@ -1803,8 +1877,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 }
               }
               if (!iconsReady) {
-                // 세트로 남긴다(아래 경로) — 멤버가 그대로라 그림도 그대로다.
+                // 세트로 남긴다(아래 경로) — 멤버가 그대로라 그림도 그대로다. 멤버마다 변형(지금 규칙).
                 failures.push(t('component.fail.iconFallback', { set: setName }));
+                const dv = new Map(deriveVariants(g.members).map((d) => [d.id, d.props]));
+                subfamilies = g.members.map((m) => ({ members: [m], master: 0, props: { ...(dv.get(m.id) ?? {}) } }));
               } else {
                 // 마스터 하나만 컴포넌트로 바꾼다. 나머지 멤버는 바꾸지 않고, 인스턴스를 만들어 사진·크기를
                 // 검사한 뒤 넣고 나서 지운다 — 검사에 걸리면 원본을 손대지 않고 그대로 둔다(§4.7 3·8번).
@@ -1915,25 +1991,95 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               }
             }
 
-            // 2개+ → 각 멤버 컴포넌트화(원위치 기록) 후 세트 결합 → 원위치에 변형 인스턴스 복원.
-            const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
-            const made: { comp: ComponentNode; variant: string; o: Origin; id: string }[] = [];
-            for (const m of g.members) {
-              const node = byId.get(m.id);
+            // 세트(§4.7 "묶기" 5번 5단계) — 소가족마다 마스터 하나를 변형으로 만든다. 순서: ① 마스터 고르기
+            // ② 마스터의 그림 자리(날 벡터 · 아이콘 프레임)를 아이콘 인스턴스로 ③ 세트로 합치기(접힘 속성 노출은 따로 없음)
+            // ④ 마스터 자리 · 나머지 멤버 자리에 그 소가족 변형의 인스턴스 ⑤ 멤버 값을 레이어에 직접 적기 → 9번 기록 → 노출 → 되돌리기.
+            // 지금 트리로 계획한다 — 안쪽 그룹이 이미 인스턴스가 됐을 수 있다(루프 전 스냅샷은 그 안을 펼쳐 둔다).
+            const liveStruct = new Map<string, StructNode>();
+            for (const m of g.members) { const n = byId.get(m.id); if (n && !n.removed) liveStruct.set(m.id, toStructNode(n)); }
+            const vectorPlans = inferVaryingComponentProperties([...liveStruct.values()])
+              .filter((p) => p.fromVector && p.layerPath != null);
+            type Made = { comp: ComponentNode; variant: string; o: Origin; id: string; sf: (typeof subfamilies)[number]; type: string };
+            const made: Made[] = [];
+            for (const sf of subfamilies) {
+              const head = sf.members[sf.master] ?? sf.members[0];
+              const node = byId.get(head.id);
               if (!node) continue;
+              // 아이콘 컴포넌트는 마스터를 컴포넌트로 바꾸기 **전에** 만든다(원본 그림을 복제한다).
+              const icons = vectorPlans.map((p) => {
+                const at = nodeAtPath(node, p.layerPath!);
+                const live = liveStruct.get(head.id);
+                const key = live ? structAtPathVectorKey(live, p.layerPath!) : null;
+                return at && key ? iconRegistry.ensure(key, at, p.layerName) : null;
+              });
               const o = captureOrigin(node);
               try {
-                made.push({ comp: figma.createComponentFromNode(node), variant: variantById.get(m.id) ?? '', o, id: m.id });
+                const comp = figma.createComponentFromNode(node);
                 registered++;
+                if (vectorPlans.length) {
+                  const prefix = shapePrefix(comp, head.type);
+                  failures.push(...swapVectorSlots(comp, vectorPlans
+                    .map((p, k) => ({ layerName: p.layerName, layerPath: joinPath(prefix, p.layerPath!), icon: icons[k] }))
+                    .filter((x) => !!x.icon)));
+                }
+                made.push({ comp, variant: formatVariant(sf.props), o, id: head.id, sf, type: head.type });
               } catch (e) {
                 releaseOrigin(o);
                 skipped++;
-                failures.push(t('component.fail.componentize', { name: m.name, error: errText(e) }));
+                failures.push(t('component.fail.componentize', { name: head.name, error: errText(e) }));
+                // 마스터가 없으니 소가족의 나머지 멤버도 원본 그대로 — 조용히 두지 않고 알린다(§4.7 "인스턴스 자리" 5번 꼬리).
+                sf.members.forEach((m, k) => {
+                  if (k === sf.master) return;
+                  placeFailed.push(m.name);
+                  failures.push(t('component.fail.memberKept', { name: m.name, causePart: '' }));
+                });
               }
             }
+            /** 소가족의 나머지 멤버 → 그 변형의 인스턴스(넣고 나서 지운다 — "인스턴스 자리" 3번), 값은 레이어에 직접(⑤). */
+            const placeExtras = async (x: Made): Promise<void> => {
+              for (let k = 0; k < x.sf.members.length; k++) {
+                if (k === x.sf.master) continue;
+                const node = byId.get(x.sf.members[k].id);
+                if (!node || node.removed) { skipped++; continue; }
+                const name = node.name;
+                const prefix = shapePrefix(x.comp, x.type);
+                const make = async (): Promise<InstanceNode> => {
+                  const inst = x.comp.createInstance();
+                  try {
+                    keepRoots.push({ node: inst, name }); // 9번 값 지키기의 기록 대상
+                    const bad = await copyOverridesAsync(node, inst, prefix, {
+                      mainOf: (n) => n.getMainComponentAsync(),
+                      loadFont: (f) => figma.loadFontAsync(f),
+                      isIcon: (n) => iconFrameKeyOf(n) !== undefined,
+                      iconFor: (v) => {
+                        const key = artKeyOf(v);
+                        return key ? iconRegistry.ensure(key, v, v.name) : null;
+                      },
+                    });
+                    for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
+                    if (bad.length) propFailed.push(name);
+                    return inst;
+                  } catch (e) {
+                    try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
+                    throw e;
+                  }
+                };
+                const before = propFailed.length;
+                const r = await replaceMemberAsync(node, make, prefix);
+                if (r.result === 'replaced') continue;
+                if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
+                if (r.result === 'mismatch') {
+                  fillKept.push(name);
+                  failures.push(t('component.fail.fillKept', { name, causePart: t('component.fail.cause', { why: r.why ?? '' }) }));
+                } else {
+                  placeFailed.push(name);
+                  failures.push(t('component.fail.memberKept', { name, causePart: r.why ? t('component.fail.cause', { why: r.why }) : '' }));
+                }
+              }
+            };
             if (made.length < 2) {
-              // 결합 불가 → 단독으로 등록 + 원위치 인스턴스.
-              for (const x of made) { markReuse(x.comp, 'single', x.id); placeSingle(x.comp, x.o, setName); }
+              // 결합 불가 → 단독으로 등록 + 원위치 인스턴스. 소가족 나머지 멤버도 그 단독의 인스턴스로.
+              for (const x of made) { markReuse(x.comp, 'single', x.id); placeSingle(x.comp, x.o, setName); await placeExtras(x); }
               continue;
             }
             // 결합(핵심). 실패해도 컴포넌트가 소실되지 않게 **단독으로라도 등록**(반쪽 상태 방지).
@@ -1944,7 +2090,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               set = figma.combineAsVariants(made.map((x) => x.comp), home);
             } catch (e) {
               failures.push(t('component.fail.combine', { set: setName, error: errText(e) }));
-              for (const x of made) { markReuse(x.comp, 'single', x.id); placeSingle(x.comp, x.o, setName); }
+              for (const x of made) { markReuse(x.comp, 'single', x.id); placeSingle(x.comp, x.o, setName); await placeExtras(x); }
               continue;
             }
             // 결합 성공 — 이름/이동/인스턴스는 **무조건** 수행(장식 단계 실패로 세트를 버리지 않음).
@@ -1959,7 +2105,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             sets++;
             containers.push({ container: set, scopes: made.map((x) => x.comp) });
             restore(made.map((x) => ({ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.variant || set.name })));
-            // ↑ 이 그룹 자리를 즉시 채운다(중첩 보존)
+            // ↑ 이 그룹 자리를 즉시 채운다(중첩 보존). 소가족의 나머지 멤버도 지금(노출 전에).
+            for (const x of made) await placeExtras(x);
           }
         } finally {
           // 어느 경로에서든 남은 표지를 치운다(원본이 제자리에 남은 경우·예상 밖 중단). 이미 치운 것은 지나간다.
@@ -2004,7 +2151,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           (n): n is ComponentNode => n.type === 'COMPONENT' && n.parent?.type !== 'COMPONENT_SET',
         );
         const byId = new Map(comps.map((c) => [c.id, c]));
-        const groups = groupByExactName(comps.map(toStructNode));
+        const groups = groupByExactName(comps.map((n) => toStructNode(n)));
         let sets = 0;
         const missing: string[] = [];
         const singles: string[] = [];
