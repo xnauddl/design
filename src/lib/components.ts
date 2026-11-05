@@ -1490,7 +1490,11 @@ const r2 = (v: number | undefined): string => (v == null ? '' : String(Math.roun
  */
 export function structFingerprint(root: StructNode, exact: boolean): string {
   const enc = (n: StructNode): string => {
-    if (n.type === 'TEXT' || n.type === 'INSTANCE') return n.type;
+    // 아이콘 프레임은 그림 하나 — 접힘 지문엔 "아이콘 있음"만, 정확 지문엔 아이콘 지문(§4.7 "묶기" 7번).
+    if (n.iconFrame) return exact ? `ICON:${n.vectorKey ?? ''}` : 'ICON';
+    // 정확 지문엔 글자 색을 넣는다 — 글자 색만 다른 변형(Color · 탭 Selected)이 같은 키를 받지 않게(§4.7 "재사용" 1번).
+    if (n.type === 'TEXT') return exact ? `TEXT:${n.fillHex ?? ''}` : 'TEXT';
+    if (n.type === 'INSTANCE') return n.type;
     const parts = [
       n.type,
       n.layoutMode ?? 'NONE',
@@ -1738,14 +1742,20 @@ const padOf = (n: StructNode): string =>
  */
 function pairDiff(a: StructNode, b: StructNode): PairDiff {
   const d: PairDiff = { split: false, content: false, colorPaths: [], rootFill: false, rootSize: false, innerSize: false, rootPad: false, innerPad: false };
+  const isArt = (n: StructNode) => !!n.iconFrame || VECTOR_TYPES.has(n.type);
   const walk = (x: StructNode, y: StructNode, path: string): void => {
     if (d.split) return;
-    if (x.type !== y.type) { d.split = true; return; }
-    if (x.iconFrame || y.iconFrame) {
-      if (!(x.iconFrame && y.iconFrame)) { d.split = true; return; }
+    // 그림 슬롯(날 벡터 · 아이콘 프레임)끼리는 타입이 달라도(벡터 ↔ 아이콘 프레임, FRAME ↔ GROUP 아이콘) 아이콘 차다(4번).
+    if ((x.iconFrame || y.iconFrame) && isArt(x) && isArt(y)) {
       if ((x.vectorKey ?? '') !== (y.vectorKey ?? '')) d.content = true; // 아이콘 차(프레임 채움 · 크기 포함)
+      if ((x.visible !== false) !== (y.visible !== false)) {
+        if (x.name.trim().endsWith('?') || y.name.trim().endsWith('?')) d.content = true;
+        else d.split = true;
+      }
       return;
     }
+    if (x.type !== y.type) { d.split = true; return; }
+    if (x.iconFrame || y.iconFrame) { d.split = true; return; }
     if (x.type === 'TEXT') {
       if ((x.characters ?? '') !== (y.characters ?? '')) d.content = true;
       if (path !== '' && (x.fillHex ?? null) !== (y.fillHex ?? null)) d.colorPaths.push(path);
@@ -1813,11 +1823,11 @@ function comparePath(a: string, b: string): number {
   return as.length - bs.length;
 }
 
-/** 루트가 아닌 레이어(TEXT · INSTANCE · 아이콘 프레임 제외)의 값 서명 — 안쪽 여백 · 간격 / 크기. */
+/** 루트가 아닌 레이어(TEXT · INSTANCE · 그림 슬롯(날 벡터 · 아이콘 프레임) 제외)의 값 서명 — 안쪽 여백 · 간격 / 크기. */
 function innerSig(root: StructNode, pick: (n: StructNode) => string): string {
   const out: string[] = [];
   const walk = (n: StructNode, isRoot: boolean): void => {
-    if (!isRoot && (n.type === 'TEXT' || n.type === 'INSTANCE' || n.iconFrame)) return;
+    if (!isRoot && (n.type === 'TEXT' || n.type === 'INSTANCE' || n.iconFrame || VECTOR_TYPES.has(n.type))) return; // 그림 슬롯은 아이콘 차로 본다
     if (!isRoot) out.push(pick(n));
     for (const c of n.children ?? []) walk(c, false);
   };
@@ -1954,7 +1964,7 @@ export function planOfMembers(members: readonly StructNode[]): PlanGroup {
   return { key: reuseNameKey(ms[0]?.name ?? ''), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
 }
 
-/** 탭 그룹의 소가족 · 축(§4.7 "묶기" 2번). */
+/** 탭 그룹의 소가족 · 축(§4.7 "묶기" 2번). 칸 색은 Color 기준에 넣지 않고 탭 규칙(선택 위치 · 선택 칸 색)으로 본다. */
 function tabSubfamilies(members: StructNode[]): Subfamily[] {
   const fams = splitFamilies(members);
   const famOf = new Map<string, number>();
@@ -1962,24 +1972,46 @@ function tabSubfamilies(members: StructNode[]): Subfamily[] {
   const info = new Map(members.map((m) => [m.id, tabInfo(m as LikeNode)!]));
   const rootVaries = new Set(members.map((m) => m.fillHex ?? '')).size > 1;
   const colorOf = (m: StructNode): string => (rootVaries ? m.fillHex ?? '' : info.get(m.id)!.selectedColor);
+  // 가족마다 내용(글자 · 그림) 차가 있으면 크기는 축이 아니다(5번 3단계와 같은 규칙).
+  const famContent = fams.map((f) => f.some((m, i) => i > 0 && pairDiff(f[0], m).content));
   const key = (m: StructNode): string => {
     const t = info.get(m.id)!;
-    return [famOf.get(m.id), t.style, t.selected, colorOf(m), padOf(m), innerSig(m, padOf)].join('#');
+    const fi = famOf.get(m.id)!;
+    const content = famContent[fi];
+    return [fi, t.style, t.selected, colorOf(m), content ? '' : `${m.width ?? 0}x${m.height ?? 0}`, padOf(m), innerSig(m, padOf),
+      content ? '' : innerSig(m, (n) => `${n.width ?? 0}x${n.height ?? 0}`)].join('#');
   };
   const subs = subfamiliesBy(members, key);
   if (subs.length >= 2) {
     const head = (s: Subfamily) => s.members[s.master];
+    const famStyle = (s: Subfamily) => `${famOf.get(head(s).id)}#${info.get(head(s).id)!.style}`;
     assignAxis(subs, 'Style', (s) => info.get(head(s).id)!.style);
-    assignAxis(subs, 'Selected', (s) => String(info.get(head(s).id)!.selected + 1));
-    // Color: 같은 Style · 선택 위치인데 색이 다른 소가족이 있을 때만(테마만 다른 탭).
+    // Selected: 같은 가족 · 같은 Style 안에서 선택 위치가 갈릴 때만 — 그 묶음의 소가족에만 붙인다(나머지는 default).
+    const posBy = new Map<string, Set<number>>();
+    for (const s of subs) {
+      const k = famStyle(s);
+      if (!posBy.has(k)) posBy.set(k, new Set());
+      posBy.get(k)!.add(info.get(head(s).id)!.selected);
+    }
+    for (const s of subs) if ((posBy.get(famStyle(s))?.size ?? 0) > 1) s.props.Selected = String(info.get(head(s).id)!.selected + 1);
+    // Color: 같은 가족 · Style · 선택 위치인데 색이 다른 소가족이 있을 때만(테마만 다른 탭).
     const byPos = new Map<string, Set<string>>();
     for (const s of subs) {
-      const t = info.get(head(s).id)!;
-      const k = `${t.style}#${t.selected}`;
+      const k = `${famStyle(s)}#${info.get(head(s).id)!.selected}`;
       if (!byPos.has(k)) byPos.set(k, new Set());
       byPos.get(k)!.add(colorOf(head(s)));
     }
     if ([...byPos.values()].some((v) => v.size > 1)) assignAxis(subs, 'Color', (s) => colorOf(head(s)) || null, (d) => colorAxisLabels(d));
+    // Size: 내용 차 없는 가족 안에서 크기만 다를 때.
+    const sizeBy = new Map<string, Set<string>>();
+    for (const s of subs) {
+      const fi = famOf.get(head(s).id)!;
+      if (famContent[fi]) continue;
+      const k = famStyle(s);
+      if (!sizeBy.has(k)) sizeBy.set(k, new Set());
+      sizeBy.get(k)!.add(String((head(s).width ?? 0) * (head(s).height ?? 0)));
+    }
+    if ([...sizeBy.values()].some((v) => v.size > 1)) assignAxis(subs, 'Size', (s) => String((head(s).width ?? 0) * (head(s).height ?? 0)), sizeLabel);
   }
   finishProps(subs);
   return subs;

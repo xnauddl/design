@@ -25,6 +25,8 @@ export interface LikeNode {
   fillHex?: string | null;
   /** TEXT 글자. 탭 판정이 읽는다. */
   characters?: string;
+  /** 아이콘 프레임(§4.7 "묶기" 3번 — `toStructNode`가 그림 하나로 접은 노드). */
+  iconFrame?: boolean;
   children?: readonly LikeNode[];
 }
 
@@ -439,14 +441,22 @@ function cellText(cell: LikeNode): LikeNode | null {
   return texts[0];
 }
 
-/** 아이콘처럼 보이는 자식 — 벡터류 · 그것만 담은 작은 틀(96 이하). 탭 칸 안에서만 쓴다. */
+const ICON_VECTORS = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);
+
+/** 탭 칸 안에 허용하는 그림 — 날 벡터, 또는 아이콘 프레임(§4.7 "묶기" 3번: 96 이하 · 벡터 1개 이상 · 벡터 · 원 · 사각형과 그 묶음뿐). */
 function isIconLike(n: LikeNode): boolean {
-  const VEC = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE', 'ELLIPSE', 'RECTANGLE']);
-  if (VEC.has(n.type)) return true;
+  if (ICON_VECTORS.has(n.type) || n.iconFrame) return true;
   if (n.type !== 'FRAME' && n.type !== 'GROUP') return false;
   const d = dims(n);
   if (!d || d.w > 96 || d.h > 96) return false;
-  return (n.children ?? []).every(isIconLike);
+  let vectors = 0;
+  const ok = (x: LikeNode): boolean => (x.children ?? []).every((c) => {
+    if (ICON_VECTORS.has(c.type)) { vectors++; return true; }
+    if (c.type === 'ELLIPSE' || c.type === 'RECTANGLE') return !hasImageFill(c);
+    if (c.type === 'FRAME' || c.type === 'GROUP') return !hasImageFill(c) && ok(c);
+    return false;
+  });
+  return ok(n) && vectors > 0;
 }
 
 function shortOneLine(t: LikeNode): boolean {
@@ -476,9 +486,9 @@ export function tabInfo(node: LikeNode): TabInfo | null {
     textCells = false;
     const texts = cells.map(cellText);
     if (texts.some((t) => !t || !shortOneLine(t) || !t.fillHex)) return null;
-    // 칸 채움이 섞인 색(symbol)이면 탭이 아니다.
-    if (cells.some((c) => typeof c.fills === 'symbol')) return null;
-    looks = cells.map((c, i) => `${hasVisibleFill(c) ? (c.fillHex ?? 'x') : ''}|${hasVisibleStroke(c) ? 's' : ''}|${texts[i]!.fillHex}`);
+    // 칸 채움이 섞인 색(symbol)이거나 단색이 아니면(그라데이션 · 사진) 탭이 아니다 — 칸 모양을 비교할 수 없다.
+    if (cells.some((c) => typeof c.fills === 'symbol' || (hasVisibleFill(c) && !c.fillHex))) return null;
+    looks = cells.map((c, i) => `${hasVisibleFill(c) ? c.fillHex : ''}|${hasVisibleStroke(c) ? 's' : ''}|${texts[i]!.fillHex}`);
     colors = cells.map((c, i) => (hasVisibleFill(c) && c.fillHex ? c.fillHex : (texts[i]!.fillHex as string)));
   } else {
     return null;

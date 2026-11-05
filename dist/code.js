@@ -4322,14 +4322,26 @@
     if (others.some((k) => !isIconLike(k))) return null;
     return texts[0];
   }
+  var ICON_VECTORS = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
   function isIconLike(n) {
-    var _a;
-    const VEC = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE", "ELLIPSE", "RECTANGLE"]);
-    if (VEC.has(n.type)) return true;
+    if (ICON_VECTORS.has(n.type) || n.iconFrame) return true;
     if (n.type !== "FRAME" && n.type !== "GROUP") return false;
     const d = dims2(n);
     if (!d || d.w > 96 || d.h > 96) return false;
-    return ((_a = n.children) != null ? _a : []).every(isIconLike);
+    let vectors = 0;
+    const ok = (x) => {
+      var _a;
+      return ((_a = x.children) != null ? _a : []).every((c) => {
+        if (ICON_VECTORS.has(c.type)) {
+          vectors++;
+          return true;
+        }
+        if (c.type === "ELLIPSE" || c.type === "RECTANGLE") return !hasImageFill2(c);
+        if (c.type === "FRAME" || c.type === "GROUP") return !hasImageFill2(c) && ok(c);
+        return false;
+      });
+    };
+    return ok(n) && vectors > 0;
   }
   function shortOneLine(t2) {
     const c = t2.characters;
@@ -4357,11 +4369,8 @@
       textCells = false;
       const texts = cells.map(cellText);
       if (texts.some((t2) => !t2 || !shortOneLine(t2) || !t2.fillHex)) return null;
-      if (cells.some((c) => typeof c.fills === "symbol")) return null;
-      looks = cells.map((c, i) => {
-        var _a2;
-        return `${hasVisibleFill2(c) ? (_a2 = c.fillHex) != null ? _a2 : "x" : ""}|${hasVisibleStroke2(c) ? "s" : ""}|${texts[i].fillHex}`;
-      });
+      if (cells.some((c) => typeof c.fills === "symbol" || hasVisibleFill2(c) && !c.fillHex)) return null;
+      looks = cells.map((c, i) => `${hasVisibleFill2(c) ? c.fillHex : ""}|${hasVisibleStroke2(c) ? "s" : ""}|${texts[i].fillHex}`);
       colors = cells.map((c, i) => hasVisibleFill2(c) && c.fillHex ? c.fillHex : texts[i].fillHex);
     } else {
       return null;
@@ -5619,26 +5628,28 @@
   var r2 = (v) => v == null ? "" : String(Math.round(v * 100) / 100);
   function structFingerprint(root, exact) {
     const enc = (n) => {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
-      if (n.type === "TEXT" || n.type === "INSTANCE") return n.type;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+      if (n.iconFrame) return exact ? `ICON:${(_a = n.vectorKey) != null ? _a : ""}` : "ICON";
+      if (n.type === "TEXT") return exact ? `TEXT:${(_b = n.fillHex) != null ? _b : ""}` : "TEXT";
+      if (n.type === "INSTANCE") return n.type;
       const parts = [
         n.type,
-        (_a = n.layoutMode) != null ? _a : "NONE",
-        (_b = n.paddingTop) != null ? _b : 0,
-        (_c = n.paddingRight) != null ? _c : 0,
-        (_d = n.paddingBottom) != null ? _d : 0,
-        (_e = n.paddingLeft) != null ? _e : 0,
-        (_f = n.itemSpacing) != null ? _f : 0,
-        (_g = n.counterAxisSpacing) != null ? _g : 0,
-        (_h = n.fillHex) != null ? _h : "",
+        (_c = n.layoutMode) != null ? _c : "NONE",
+        (_d = n.paddingTop) != null ? _d : 0,
+        (_e = n.paddingRight) != null ? _e : 0,
+        (_f = n.paddingBottom) != null ? _f : 0,
+        (_g = n.paddingLeft) != null ? _g : 0,
+        (_h = n.itemSpacing) != null ? _h : 0,
+        (_i = n.counterAxisSpacing) != null ? _i : 0,
+        (_j = n.fillHex) != null ? _j : "",
         artKind(n),
         n.name.trim().endsWith("?") ? "" : n.visible === false ? "h" : "s"
       ];
       if (exact) {
         parts.push(r2(n.width), r2(n.height));
-        if (VECTOR_TYPES.has(n.type) || n.iconFrame) parts.push((_i = n.vectorKey) != null ? _i : "");
+        if (VECTOR_TYPES.has(n.type) || n.iconFrame) parts.push((_k = n.vectorKey) != null ? _k : "");
       }
-      const kids = ((_j = n.children) != null ? _j : []).map(enc);
+      const kids = ((_l = n.children) != null ? _l : []).map(enc);
       return `${parts.join(",")}[${kids.join(";")}]`;
     };
     return hash2(enc(root));
@@ -5763,19 +5774,24 @@
   };
   function pairDiff(a, b) {
     const d = { split: false, content: false, colorPaths: [], rootFill: false, rootSize: false, innerSize: false, rootPad: false, innerPad: false };
+    const isArt = (n) => !!n.iconFrame || VECTOR_TYPES.has(n.type);
     const walk3 = (x, y, path) => {
       var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
       if (d.split) return;
+      if ((x.iconFrame || y.iconFrame) && isArt(x) && isArt(y)) {
+        if (((_a = x.vectorKey) != null ? _a : "") !== ((_b = y.vectorKey) != null ? _b : "")) d.content = true;
+        if (x.visible !== false !== (y.visible !== false)) {
+          if (x.name.trim().endsWith("?") || y.name.trim().endsWith("?")) d.content = true;
+          else d.split = true;
+        }
+        return;
+      }
       if (x.type !== y.type) {
         d.split = true;
         return;
       }
       if (x.iconFrame || y.iconFrame) {
-        if (!(x.iconFrame && y.iconFrame)) {
-          d.split = true;
-          return;
-        }
-        if (((_a = x.vectorKey) != null ? _a : "") !== ((_b = y.vectorKey) != null ? _b : "")) d.content = true;
+        d.split = true;
         return;
       }
       if (x.type === "TEXT") {
@@ -5859,7 +5875,7 @@
     const out = [];
     const walk3 = (n, isRoot) => {
       var _a;
-      if (!isRoot && (n.type === "TEXT" || n.type === "INSTANCE" || n.iconFrame)) return;
+      if (!isRoot && (n.type === "TEXT" || n.type === "INSTANCE" || n.iconFrame || VECTOR_TYPES.has(n.type))) return;
       if (!isRoot) out.push(pick(n));
       for (const c of (_a = n.children) != null ? _a : []) walk3(c, false);
     };
@@ -6003,35 +6019,70 @@
     return { key: reuseNameKey((_b = (_a = ms[0]) == null ? void 0 : _a.name) != null ? _b : ""), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
   }
   function tabSubfamilies(members) {
+    var _a, _b, _c, _d;
     const fams = splitFamilies(members);
     const famOf = /* @__PURE__ */ new Map();
     fams.forEach((f, i) => f.forEach((m) => famOf.set(m.id, i)));
     const info = new Map(members.map((m) => [m.id, tabInfo(m)]));
     const rootVaries = new Set(members.map((m) => {
-      var _a;
-      return (_a = m.fillHex) != null ? _a : "";
+      var _a2;
+      return (_a2 = m.fillHex) != null ? _a2 : "";
     })).size > 1;
     const colorOf = (m) => {
-      var _a;
-      return rootVaries ? (_a = m.fillHex) != null ? _a : "" : info.get(m.id).selectedColor;
+      var _a2;
+      return rootVaries ? (_a2 = m.fillHex) != null ? _a2 : "" : info.get(m.id).selectedColor;
     };
+    const famContent = fams.map((f) => f.some((m, i) => i > 0 && pairDiff(f[0], m).content));
     const key = (m) => {
+      var _a2, _b2;
       const t2 = info.get(m.id);
-      return [famOf.get(m.id), t2.style, t2.selected, colorOf(m), padOf(m), innerSig(m, padOf)].join("#");
+      const fi = famOf.get(m.id);
+      const content = famContent[fi];
+      return [
+        fi,
+        t2.style,
+        t2.selected,
+        colorOf(m),
+        content ? "" : `${(_a2 = m.width) != null ? _a2 : 0}x${(_b2 = m.height) != null ? _b2 : 0}`,
+        padOf(m),
+        innerSig(m, padOf),
+        content ? "" : innerSig(m, (n) => {
+          var _a3, _b3;
+          return `${(_a3 = n.width) != null ? _a3 : 0}x${(_b3 = n.height) != null ? _b3 : 0}`;
+        })
+      ].join("#");
     };
     const subs = subfamiliesBy(members, key);
     if (subs.length >= 2) {
       const head = (s) => s.members[s.master];
+      const famStyle = (s) => `${famOf.get(head(s).id)}#${info.get(head(s).id).style}`;
       assignAxis(subs, "Style", (s) => info.get(head(s).id).style);
-      assignAxis(subs, "Selected", (s) => String(info.get(head(s).id).selected + 1));
+      const posBy = /* @__PURE__ */ new Map();
+      for (const s of subs) {
+        const k = famStyle(s);
+        if (!posBy.has(k)) posBy.set(k, /* @__PURE__ */ new Set());
+        posBy.get(k).add(info.get(head(s).id).selected);
+      }
+      for (const s of subs) if (((_b = (_a = posBy.get(famStyle(s))) == null ? void 0 : _a.size) != null ? _b : 0) > 1) s.props.Selected = String(info.get(head(s).id).selected + 1);
       const byPos = /* @__PURE__ */ new Map();
       for (const s of subs) {
-        const t2 = info.get(head(s).id);
-        const k = `${t2.style}#${t2.selected}`;
+        const k = `${famStyle(s)}#${info.get(head(s).id).selected}`;
         if (!byPos.has(k)) byPos.set(k, /* @__PURE__ */ new Set());
         byPos.get(k).add(colorOf(head(s)));
       }
       if ([...byPos.values()].some((v) => v.size > 1)) assignAxis(subs, "Color", (s) => colorOf(head(s)) || null, (d) => colorAxisLabels(d));
+      const sizeBy = /* @__PURE__ */ new Map();
+      for (const s of subs) {
+        const fi = famOf.get(head(s).id);
+        if (famContent[fi]) continue;
+        const k = famStyle(s);
+        if (!sizeBy.has(k)) sizeBy.set(k, /* @__PURE__ */ new Set());
+        sizeBy.get(k).add(String(((_c = head(s).width) != null ? _c : 0) * ((_d = head(s).height) != null ? _d : 0)));
+      }
+      if ([...sizeBy.values()].some((v) => v.size > 1)) assignAxis(subs, "Size", (s) => {
+        var _a2, _b2;
+        return String(((_a2 = head(s).width) != null ? _a2 : 0) * ((_b2 = head(s).height) != null ? _b2 : 0));
+      }, sizeLabel);
     }
     finishProps(subs);
     return subs;
@@ -7795,8 +7846,11 @@
     }
     return false;
   }
-  function groupForRegister(nodes) {
-    const structs = nodes.map((n) => toStructNode(n));
+  function groupForRegister(nodes, index) {
+    const structs = nodes.map((n) => {
+      var _a;
+      return (_a = index == null ? void 0 : index.get(n.id)) != null ? _a : toStructNode(n);
+    });
     const desc = /* @__PURE__ */ new Map();
     const descOf = (a) => {
       let d = desc.get(a.id);
@@ -7882,6 +7936,7 @@
     const { list, byId } = await reuseCandidates(exclude);
     if (!list.length) return groups.map(() => ({ hit: null, keepKey: true }));
     const out = [];
+    const rootCache = /* @__PURE__ */ new Map();
     for (const g of groups) {
       let hit = null;
       let keepKey = true;
@@ -7900,9 +7955,14 @@
                 continue;
               }
               const { root } = reuseRootOf(comp, g.members[k].type);
-              const ids = await iconInstanceIds(root);
-              icons.set(`${k}|${c.id}`, ids);
-              pass.set(`${k}|${c.id}`, reusePairGrade(g.members[k], toStructNode(root), asInstance, ids));
+              const ck = `${c.id}|${root.id}`;
+              let cached = rootCache.get(ck);
+              if (!cached) {
+                cached = { struct: toStructNode(root), icons: await iconInstanceIds(root) };
+                rootCache.set(ck, cached);
+              }
+              icons.set(`${k}|${c.id}`, cached.icons);
+              pass.set(`${k}|${c.id}`, reusePairGrade(g.members[k], cached.struct, asInstance, cached.icons));
             }
           }
           const m = matchReuse(plan, list, g.members.length, (k, id) => {
@@ -8278,7 +8338,15 @@
         case "SCAN_COMPONENT_CANDIDATES": {
           if (!requireComponents()) break;
           const roots = selection().filter(isEffectivelyVisible3);
-          const candidates = scanComponentCandidates(roots.map((n) => toStructNode(n)));
+          const rootStructs = roots.map((n) => toStructNode(n));
+          const candidates = scanComponentCandidates(rootStructs);
+          const scanIndex = /* @__PURE__ */ new Map();
+          const addIdx = (n) => {
+            var _a2;
+            scanIndex.set(n.id, n);
+            for (const c of (_a2 = n.children) != null ? _a2 : []) addIdx(c);
+          };
+          for (const r of rootStructs) addIdx(r);
           const liveById = /* @__PURE__ */ new Map();
           const index = (n) => {
             if (n.visible === false) return;
@@ -8306,7 +8374,7 @@
           let nodes = pruned;
           try {
             const eligibleNodes = pruned.filter((c) => c.eligible).map((c) => liveById.get(c.id)).filter((n) => !!n);
-            const groups = groupForRegister(eligibleNodes);
+            const groups = groupForRegister(eligibleNodes, scanIndex);
             const groupNames = resolvePlanNames(groups, await existingComponentNames(new Set(eligibleNodes.map((n) => n.id))));
             const defaultChecked = /* @__PURE__ */ new Set();
             for (const g of groups) for (const m of g.members) if (defaultOnFor(g, m)) defaultChecked.add(m.id);
@@ -8370,6 +8438,7 @@
               if (n.type === "INSTANCE" || n.type === "COMPONENT" || n.type === "COMPONENT_SET") return;
               const st = sIndex.get(n.id);
               if (st && tabInfo(st) != null) return;
+              if (st == null ? void 0 : st.iconFrame) return;
               if ("children" in n) for (const c of n.children) walk3(c, depth + 1);
             };
             for (const r of roots) walk3(r, 0);
@@ -8382,7 +8451,7 @@
             else skipped++;
           }
           const byId = new Map(valid.map((n) => [n.id, n]));
-          let groups = groupForRegister(valid);
+          let groups = groupForRegister(valid, sIndex);
           if (setsOnly) groups = groups.filter((g) => g.members.length >= 2);
           const existingNames = await existingComponentNames(new Set(valid.map((n) => n.id)));
           const nameByGroup = /* @__PURE__ */ new Map();
@@ -8752,19 +8821,21 @@
                   continue;
                 }
               }
-              const vectorPlans = inferVaryingComponentProperties(g.members.map((m) => {
-                var _a2;
-                return (_a2 = structById.get(m.id)) != null ? _a2 : m;
-              })).filter((p) => p.fromVector && p.layerPath != null);
+              const liveStruct = /* @__PURE__ */ new Map();
+              for (const m of g.members) {
+                const n = byId.get(m.id);
+                if (n && !n.removed) liveStruct.set(m.id, toStructNode(n));
+              }
+              const vectorPlans = inferVaryingComponentProperties([...liveStruct.values()]).filter((p) => p.fromVector && p.layerPath != null);
               const made = [];
               for (const sf of subfamilies) {
                 const head = (_i = sf.members[sf.master]) != null ? _i : sf.members[0];
                 const node = byId.get(head.id);
                 if (!node) continue;
                 const icons = vectorPlans.map((p) => {
-                  var _a2;
                   const at = nodeAtPath(node, p.layerPath);
-                  const key = structAtPathVectorKey((_a2 = structById.get(head.id)) != null ? _a2 : head, p.layerPath);
+                  const live = liveStruct.get(head.id);
+                  const key = live ? structAtPathVectorKey(live, p.layerPath) : null;
                   return at && key ? iconRegistry.ensure(key, at, p.layerName) : null;
                 });
                 const o = captureOrigin2(node);
@@ -8780,6 +8851,11 @@
                   releaseOrigin(o);
                   skipped++;
                   failures.push(t("component.fail.componentize", { name: head.name, error: errText(e) }));
+                  sf.members.forEach((m, k) => {
+                    if (k === sf.master) return;
+                    placeFailed.push(m.name);
+                    failures.push(t("component.fail.memberKept", { name: m.name, causePart: "" }));
+                  });
                 }
               }
               const placeExtras = async (x) => {

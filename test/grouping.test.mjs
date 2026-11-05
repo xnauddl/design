@@ -77,7 +77,7 @@ test('탭 그룹 — 이름과 상관없이 한 세트, Style=Text · Pill, 이�
   assert.equal(groups.length, 1);
   assert.equal(groups[0].key, 'role:tab');
   assert.equal(groups[0].subfamilies.length, 2);
-  assert.deepEqual(groups[0].subfamilies.map((s) => s.props.Style), ['Text', 'Pill']);
+  assert.deepEqual(groups[0].subfamilies.map((s) => s.props), [{ Style: 'Text' }, { Style: 'Pill' }]); // Style이 다르면 Selected 없음
   assert.deepEqual(resolvePlanNames(groups), ['Tab']);
   assert.deepEqual(resolvePlanNames(groups, ['Tab']), ['Tab2']);
 });
@@ -211,4 +211,34 @@ test('재사용 계획 — 탭 그룹은 이름 키 role:tab, 세트는 소가�
   assert.ok(plan.keys.every((k) => k.startsWith('variant:role:tab:')));
   assert.equal(plan.keys[0], plan.keys[1]); // 같은 소가족 → 같은 변형
   assert.notEqual(plan.keys[0], plan.keys[2]);
+});
+
+test('재사용 정확 지문 — 글자 색만 다른 변형 · 선택 위치만 다른 글자 탭은 키가 다르다', () => {
+  const b = (id, color) => ({ id, name: 'btn', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 80, height: 32, cornerRadius: 4, fillHex: '#ffffff', fills: visible,
+    children: [text(`${id}t`, 'Go', color)] });
+  const g = planRegisterGroups([b('a', '#ff0000'), b('c', '#0000ff')], noAncestors)[0];
+  assert.equal(g.subfamilies.length, 2);
+  const keys = reusePlanFor(g).keys;
+  assert.notEqual(keys[0], keys[1]);
+  const t = planRegisterGroups([menu('m1', 0), menu('m2', 1)], noAncestors)[0];
+  const tk = reusePlanFor(t).keys;
+  assert.notEqual(tk[0], tk[1]);
+});
+
+test('날 벡터 ↔ 아이콘 프레임은 아이콘 차 — 한 가족으로 접힌다', () => {
+  const b = (id, icon) => ({ id, name: 'chip-btn', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 100, height: 40, cornerRadius: 8, fillHex: '#111111', fills: visible,
+    children: [icon, text(`${id}t`, 'Go', '#ffffff')] });
+  const g = planRegisterGroups([
+    b('a', { id: 'ai', name: 'v', type: 'VECTOR', vectorKey: 'v1', width: 24, height: 24 }),
+    b('b', { id: 'bi', name: 'ic', type: 'FRAME', width: 24, height: 24, iconFrame: true, vectorKey: 'f:9', children: [] }),
+  ], noAncestors);
+  assert.equal(g.length, 1);
+  assert.equal(g[0].subfamilies.length, 1);
+});
+
+test('탭 칸 — 그라데이션 칸 · 원 하나뿐인 자식은 탭 아님', () => {
+  const grad = { ...pill(), children: pill().children.map((c, i) => (i === 1 ? { ...c, fillHex: null } : c)) };
+  assert.equal(tabInfo(grad), null);
+  const dot = { ...pill(), children: pill().children.map((c) => ({ ...c, children: [...c.children, { id: `${c.id}d`, name: 'dot', type: 'ELLIPSE', width: 6, height: 6 }] })) };
+  assert.equal(tabInfo(dot), null);
 });
