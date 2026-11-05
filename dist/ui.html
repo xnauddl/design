@@ -439,6 +439,8 @@
     .tag { display: inline-block; padding: 0 5px; border-radius: 999px; font-size: 10px; font-weight: 600; line-height: 15px; border: 1px solid transparent; }
     .tag-set { background: var(--accent-subtle); color: var(--accent-strong); border-color: var(--accent-border); }
     .tag-single { background: var(--ok-subtle); color: var(--ok); border-color: var(--ok); }
+    /* 재사용(§4.7 "재사용" 7번) — 새로 만들지 않고 기존 컴포넌트를 쓰는 줄 */
+    .tag-reuse { background: transparent; color: var(--muted); border-color: var(--border); }
 
     /* 리포트(#variantReport) — 빈 조합 이름이 길어 가로만 넘긴다. 행은 r-card. */
     #variantReport { font-family: var(--mono); font-size: 11px; overflow-x: auto; }
@@ -1327,6 +1329,10 @@
     "component.placeFailedMore": " \uC678",
     "component.propFailed": " \xB7 \uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC740 {n}\uAC1C: {names}",
     "component.fillKept": " \xB7 \uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uAC74\uB108\uB6F4 {n}\uAC1C: {names}",
+    // [등록] 재사용(§4.7 "재사용" 8번) — 꼬리 형식은 placeFailed와 같다(이름 3개까지 + " 외").
+    "component.reused": " \xB7 \uAE30\uC874 \uCEF4\uD3EC\uB10C\uD2B8 \uC7AC\uC0AC\uC6A9 {n}: {names}",
+    "component.reusedMore": " \uC678",
+    "component.reuseKept": " \xB7 \uAD6C\uC870\uAC00 \uB2EC\uB77C \uC6D0\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
     "wizard.needSelect": "\uBA3C\uC800 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uC5D0\uC11C \uAC12\uC744 \uBF51\uC544\uC694",
@@ -1910,6 +1916,7 @@
     "component.badgeProps": "\uC18D\uC131",
     "component.nameFallback": "\uCEF4\uD3EC\uB10C\uD2B8",
     "component.badgeSingle": "\uB2E8\uB3C5",
+    "component.badgeReuse": "\uC7AC\uC0AC\uC6A9",
     "component.count": "\uD6C4\uBCF4 {total}",
     "component.tagMissing": "\uBE48 \uC870\uD569",
     "component.headMissing": "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):",
@@ -1923,6 +1930,7 @@
     "component.fail.instanceMake": "\uC778\uC2A4\uD134\uC2A4\uB97C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694: {error}",
     "component.fail.instancePlace": "\uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "component.fail.propValue": "\uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC5B4 \uB9C8\uC2A4\uD130 \uAC12\uC73C\uB85C \uB480\uC5B4\uC694({name} \xB7 {prop})",
+    "component.fail.reuseShape": "\uAD6C\uC870\uAC00 \uB2EC\uB77C \uC7AC\uC0AC\uC6A9\uD558\uC9C0 \uC54A\uACE0 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name})",
     "component.fail.fillKept": "\uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uBB36\uC9C0 \uC54A\uACE0 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name}){causePart}",
     "component.fail.memberKept": "\uC81C\uC790\uB9AC\uC5D0 \uB123\uC9C0 \uBABB\uD574 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name}){causePart}",
     // 속성 접힘 멤버 검사(§4.7 8번) 사유 — 위 두 줄의 {causePart}에 들어간다
@@ -4858,6 +4866,7 @@
       setStatus("structureStatus", t("component.registering"), "");
       const names = {};
       for (const c of compCandidates) {
+        if (c.reuse) continue;
         const shown = (_a = c.group) != null ? _a : c.single;
         if (shown && compChecked.has(c.id)) names[c.id] = shown;
       }
@@ -4916,7 +4925,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -5196,8 +5205,10 @@
         const cloned = (_o = msg.placeCloned) != null ? _o : [];
         const propFailed = (_p = msg.propFailed) != null ? _p : [];
         const fillKept = (_q = msg.fillKept) != null ? _q : [];
-        const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + (msg.singles.length ? t("component.extraSingles", { n: msg.singles.length }) : "") + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
-        setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extraPart }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length ? "ok" : "warn");
+        const reused = (_r = msg.reused) != null ? _r : [];
+        const reuseKept = (_s = msg.reuseKept) != null ? _s : [];
+        const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + (msg.singles.length ? t("component.extraSingles", { n: msg.singles.length }) : "") + reusedText(reused) + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
+        setStatus("structureStatus", t("component.registered", { registered: msg.registered, sets: msg.sets, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
         break;
       }
@@ -5259,7 +5270,7 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_r = msg.placeFailed) != null ? _r : [];
+          const misplaced0 = (_t = msg.placeFailed) != null ? _t : [];
           const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
           const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
           setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
@@ -5268,7 +5279,7 @@
         const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
         if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
         if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_s = msg.placeFailed) != null ? _s : [];
+        const misplaced = (_u = msg.placeFailed) != null ? _u : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
         const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
@@ -5838,6 +5849,9 @@
     return compCandidates.map((n) => {
       if (!n.eligible) return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId };
       const base = { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, replace: false };
+      if (n.reuse) {
+        return __spreadProps(__spreadValues({}, base), { change: n.reuse.name, badge: { text: t("component.badgeReuse"), kind: "reuse" } });
+      }
       if (n.group) {
         return __spreadProps(__spreadValues({}, base), { change: `${n.group} \xB7 ${n.variant || t("component.variantFallback")}`, badge: { text: t("component.badgeSet"), kind: "set" } });
       }
@@ -5949,6 +5963,11 @@
     if (!names.length) return "";
     const shown = names.slice(0, 3).join(", ") + (names.length > 3 ? t("component.placeFailedMore") : "");
     return t(key, { n: names.length, names: shown });
+  }
+  function reusedText(names) {
+    if (!names.length) return "";
+    const shown = names.slice(0, 3).join(", ") + (names.length > 3 ? t("component.reusedMore") : "");
+    return t("component.reused", { n: names.length, names: shown });
   }
   function placeFailedText(names) {
     return placeTailText("component.placeFailed", names);
@@ -6344,7 +6363,7 @@
     if (isMini) renderMiniMark();
   }
   function opReceived(m) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if (m.type === "PROGRESS") {
       opProg = m.total > 0 ? Math.min(1, m.done / m.total) : null;
       if (isMini) renderMiniMark();
@@ -6367,8 +6386,8 @@
       let cancelled = false;
       if (m.type === "DARK_MODE_RESULT" && m.error) failed = true;
       if ((m.type === "COMPONENTS_RESULT" || m.type === "VARIANTS_RESULT") && ((_b = (_a = m.failures) == null ? void 0 : _a.length) != null ? _b : 0) > 0) failed = true;
-      if (m.type === "COMPONENTS_RESULT" && ((_d = (_c = m.propFailed) == null ? void 0 : _c.length) != null ? _d : 0) + ((_f = (_e = m.fillKept) == null ? void 0 : _e.length) != null ? _f : 0) + ((_h = (_g = m.placeCloned) == null ? void 0 : _g.length) != null ? _h : 0) + ((_j = (_i = m.placeFailed) == null ? void 0 : _i.length) != null ? _j : 0) > 0) failed = true;
-      if (m.type === "COMPONENTIZE_RESULT" && ((_l = (_k = m.placeFailed) == null ? void 0 : _k.length) != null ? _l : 0) > 0) failed = true;
+      if (m.type === "COMPONENTS_RESULT" && ((_d = (_c = m.propFailed) == null ? void 0 : _c.length) != null ? _d : 0) + ((_f = (_e = m.fillKept) == null ? void 0 : _e.length) != null ? _f : 0) + ((_h = (_g = m.reuseKept) == null ? void 0 : _g.length) != null ? _h : 0) + ((_j = (_i = m.placeCloned) == null ? void 0 : _i.length) != null ? _j : 0) + ((_l = (_k = m.placeFailed) == null ? void 0 : _k.length) != null ? _l : 0) > 0) failed = true;
+      if (m.type === "COMPONENTIZE_RESULT" && ((_n = (_m = m.placeFailed) == null ? void 0 : _m.length) != null ? _n : 0) > 0) failed = true;
       if (m.type === "APPLY_RESULT" && m.cancelled) cancelled = true;
       if (cancelled) {
         if (isMini) renderMiniMark();
@@ -6379,7 +6398,8 @@
     }
   }
   function changedFile(m) {
-    if (m.type === "COMPONENTS_RESULT") return m.registered > 0 || m.sets > 0;
+    var _a, _b;
+    if (m.type === "COMPONENTS_RESULT") return m.registered > 0 || m.sets > 0 || ((_b = (_a = m.reused) == null ? void 0 : _a.length) != null ? _b : 0) > 0;
     if (m.type === "COMPONENTIZE_RESULT") return !!m.master;
     if (m.type === "VARIANTS_RESULT") return m.sets > 0;
     return false;

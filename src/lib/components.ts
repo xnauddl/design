@@ -822,6 +822,8 @@ export interface ComponentCandidateNode {
    * UI는 기본 체크하고 [속성] 배지로 표시.
    */
   propsOnly?: boolean;
+  /** 전에 만든 컴포넌트를 재사용할 줄(§4.7 "재사용" 7번). name = 보여 줄 이름 전체(세트면 "{세트} · {변형}"). */
+  reuse?: { name: string };
 }
 
 /**
@@ -1426,4 +1428,175 @@ export function resolveGroupNames(
     taken.add(name);
     return name;
   });
+}
+
+/* ---------- [등록] 재사용 — 다시 등록할 때 전에 만든 컴포넌트를 쓴다 (§4.7 "재사용", 2026-11-05 결정 A) ----------
+   판정은 컴포넌트 이름이 아니라 **재사용 키**(원본 레이어 이름 키 + 원본 구조 지문)로 한다. 지문은 [등록] 루프
+   **전** 스냅샷(StructNode)으로만 계산한다 — 루프 안에서는 안쪽 그룹이 이미 인스턴스로 바뀌어 달라 보인다. */
+
+/** 재사용 키의 종류 — 실제로 만든 종류대로 남긴다(단독 · 속성 접힘 마스터 · 세트 변형). */
+export type ReuseKind = 'single' | 'collapse' | 'variant';
+
+/** 컴포넌트에 남기는 플러그인 데이터 키 — 재사용 키 · 아이콘 그림 지문. */
+export const REUSE_KEY = 'dsl.reuse';
+export const ICON_KEY = 'dsl.icon';
+
+/** 재사용 키의 이름 부분 — `groupByExactName`이 묶는 값과 같다(`exactNameKey`). */
+export function reuseNameKey(name: string): string {
+  return exactNameKey(name);
+}
+
+/** FNV-1a 32bit 두 갈래(시드 다름) — 지문 문자열을 짧은 키로 줄인다. */
+function hash2(s: string): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193 ^ 0x5bd1e995;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 ^= c;
+    h1 = Math.imul(h1, 0x01000193) >>> 0;
+    h2 ^= c;
+    h2 = Math.imul(h2, 0x5bd1e995) >>> 0;
+    h2 ^= h2 >>> 13;
+  }
+  return h1.toString(36) + h2.toString(36);
+}
+
+/** 그림 종류 — 사진(p) · 날 벡터(v) · 없음(''). */
+function artKind(n: StructNode): string {
+  if (VECTOR_TYPES.has(n.type)) return 'v';
+  if (n.imageHash !== undefined) return 'p';
+  if (Array.isArray(n.fills) && n.fills.some((p) => p.visible !== false && p.type === 'IMAGE')) return 'p';
+  return '';
+}
+
+const r2 = (v: number | undefined): string => (v == null ? '' : String(Math.round(v * 100) / 100));
+
+/**
+ * 구조 지문(§4.7 "재사용" 1번). `toStructNode`가 주는 필드만 쓴다.
+ * - 레이어마다 타입 · 자식 순서. TEXT · INSTANCE는 타입만(그 안은 보지 않는다 — `diffForCollapse`와 같다).
+ * - 그 밖: 오토레이아웃 방향 · 여백 4개 · 간격 2개 · 첫 보이는 단색 채움 · 그림 종류 · 보이기(이름이 `?`로 끝나면 뺀다).
+ * - 빼는 것: 레이어 이름 · 글자 · 안쪽 인스턴스의 메인 · 사진 해시.
+ * - `exact`(단독 · 세트 변형): 크기(루트와 TEXT · INSTANCE가 아닌 모든 자손, 소수 둘째 자리) · 날 벡터의 그림 지문을 더한다.
+ */
+export function structFingerprint(root: StructNode, exact: boolean): string {
+  const enc = (n: StructNode): string => {
+    if (n.type === 'TEXT' || n.type === 'INSTANCE') return n.type;
+    const parts = [
+      n.type,
+      n.layoutMode ?? 'NONE',
+      n.paddingTop ?? 0, n.paddingRight ?? 0, n.paddingBottom ?? 0, n.paddingLeft ?? 0,
+      n.itemSpacing ?? 0, n.counterAxisSpacing ?? 0,
+      n.fillHex ?? '',
+      artKind(n),
+      n.name.trim().endsWith('?') ? '' : n.visible === false ? 'h' : 's',
+    ];
+    if (exact) {
+      parts.push(r2(n.width), r2(n.height));
+      if (VECTOR_TYPES.has(n.type)) parts.push(n.vectorKey ?? '');
+    }
+    const kids = (n.children ?? []).map(enc);
+    return `${parts.join(',')}[${kids.join(';')}]`;
+  };
+  return hash2(enc(root));
+}
+
+/** 재사용 키 `{종류}:{이름 키}:{구조 지문}` — 접힘은 접힘 지문, 단독 · 변형은 정확 지문. */
+export function reuseKey(kind: ReuseKind, member: StructNode): string {
+  return `${kind}:${reuseNameKey(member.name)}:${structFingerprint(member, kind !== 'collapse')}`;
+}
+
+/** heading 접힘 그룹인가 — 재사용하지 않는다(멤버마다 자식 수가 달라질 수 있다). */
+export function isHeadingCollapseGroup(members: readonly StructNode[]): boolean {
+  if (members.length < 2) return false;
+  if (!members.every((m) => highConfidenceComponentRole(m as LikeNode) === 'heading')) return false;
+  return shouldCollapseHeadingMembers(members);
+}
+
+/** 그룹을 지금 고른 멤버로 등록하면 어떤 종류가 되고, 어떤 키를 찾아야 하나. heading 접힘이면 null. */
+export interface ReusePlan {
+  kind: ReuseKind;
+  /** single · collapse: 키 하나. variant: 멤버마다(멤버 순서). */
+  keys: string[];
+}
+
+export function reusePlanFor(members: readonly StructNode[]): ReusePlan | null {
+  if (!members.length) return null;
+  if (members.length === 1) return { kind: 'single', keys: [reuseKey('single', members[0])] };
+  if (shouldCollapseToProperties(members)) {
+    if (isHeadingCollapseGroup(members)) return null;
+    const master = members[pickCollapseMasterIndex(members)] ?? members[0];
+    return { kind: 'collapse', keys: [reuseKey('collapse', master)] };
+  }
+  return { kind: 'variant', keys: members.map((m) => reuseKey('variant', m)) };
+}
+
+/** 문서의 기존 컴포넌트(재사용 키가 있는 로컬 COMPONENT). setId = 든 세트(없으면 null). */
+export interface ReuseCandidate {
+  id: string;
+  key: string;
+  setId: string | null;
+}
+
+/**
+ * 키 맞추기(§4.7 "재사용" 3번). 돌려주는 값: 멤버마다 쓸 컴포넌트 id(멤버 순서), 재사용하지 않으면 null.
+ * - single · collapse: 같은 키가 **정확히 하나**면 모든 멤버가 그 컴포넌트.
+ * - variant: 멤버마다 같은 키가 정확히 하나이고, 그 변형들이 모두 **같은 세트**에 있으면.
+ * - 후보가 없거나 둘 이상(복제하면 플러그인 데이터도 복제된다)이면 null.
+ */
+export function matchReuse(plan: ReusePlan, comps: readonly ReuseCandidate[], memberCount: number): string[] | null {
+  const only = (key: string): ReuseCandidate | null => {
+    const hits = comps.filter((c) => c.key === key);
+    return hits.length === 1 ? hits[0] : null;
+  };
+  if (plan.kind !== 'variant') {
+    const hit = only(plan.keys[0]);
+    return hit ? Array.from({ length: memberCount }, () => hit.id) : null;
+  }
+  const hits = plan.keys.map(only);
+  if (hits.some((h) => !h)) return null;
+  const setId = hits[0]!.setId;
+  if (!setId || hits.some((h) => h!.setId !== setId)) return null;
+  return hits.map((h) => h!.id);
+}
+
+/**
+ * 짝 맞추기 검사(§4.7 "재사용" 3번). 멤버(A)와 기존 컴포넌트(B — 감싼 도형이면 부르는 쪽이 앞붙이 자식을 넘긴다)를
+ * 경로끼리 맞춰 본다. 걸리면 그 경로(진단용 문자열), 맞으면 null.
+ * - 자식 구성: 경로마다 자식 수와 각 자식의 타입이 순서대로 같다. A 쪽 `asInstance`(이번 [등록]의 다른 그룹 멤버)는 INSTANCE로 본다.
+ * - 한쪽만 인스턴스면 걸린다. 예외: A가 날 벡터이고 B가 아이콘 컴포넌트의 인스턴스(`iconInstances`)면 맞는 짝이다.
+ * - 둘 다 날 벡터인데 그림 지문이 다르면 걸린다.
+ * 인스턴스끼리는 안으로 내려가지 않는다(B의 트리는 인스턴스 안을 펼치지 않는다).
+ */
+export function reusePairIssue(
+  a: StructNode,
+  b: StructNode,
+  asInstance: ReadonlySet<string> = new Set(),
+  iconInstances: ReadonlySet<string> = new Set(),
+): string | null {
+  const isVec = (n: StructNode) => VECTOR_TYPES.has(n.type);
+  const vecDiff = (x: StructNode, y: StructNode) => isVec(x) && isVec(y) && (x.vectorKey ?? '') !== (y.vectorKey ?? '');
+  if (vecDiff(a, b)) return '/';
+  const walk = (x: StructNode, y: StructNode, path: string): string | null => {
+    const xs = x.children ?? [];
+    const ys = y.children ?? [];
+    if (xs.length !== ys.length) return path || '/';
+    for (let i = 0; i < xs.length; i++) {
+      const p = path ? `${path}/${i}` : String(i);
+      const xa = xs[i];
+      const yb = ys[i];
+      const xInst = xa.type === 'INSTANCE' || asInstance.has(xa.id);
+      const yInst = yb.type === 'INSTANCE';
+      if (xInst !== yInst) {
+        if (!xInst && isVec(xa) && iconInstances.has(yb.id)) continue; // 1회차 접힘의 아이콘 자리 교체
+        return p;
+      }
+      if (xInst) continue; // 인스턴스끼리 — 안은 그 컴포넌트 소관
+      if (xa.type !== yb.type) return p;
+      if (vecDiff(xa, yb)) return p;
+      const deeper = walk(xa, yb, p);
+      if (deeper) return deeper;
+    }
+    return null;
+  };
+  return walk(a, b, '');
 }

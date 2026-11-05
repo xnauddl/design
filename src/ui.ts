@@ -1907,6 +1907,9 @@ $('btnRegisterComp').addEventListener('click', () => {
     // 일부만 체크해 보내면 code 쪽에서 충돌이 사라져 `ProfileAvatar`가 `Avatar`로 등록됐다.
     const names: Record<string, string> = {};
     for (const c of compCandidates) {
+      // [재사용] 줄의 이름은 기존 컴포넌트 것이다 — 보내지 않는다. [등록] 판정이 재사용이 아니면 code 쪽이
+      // 숫자 접미사 규칙으로 새 이름을 정한다(§4.7 "재사용" 7번 — 같은 이름이 둘 생기지 않게).
+      if (c.reuse) continue;
       const shown = c.group ?? c.single;
       if (shown && compChecked.has(c.id)) names[c.id] = shown;
     }
@@ -2333,18 +2336,23 @@ window.onmessage = (event: MessageEvent) => {
       const cloned = msg.placeCloned ?? [];
       const propFailed = msg.propFailed ?? [];
       const fillKept = msg.fillKept ?? [];
+      const reused = msg.reused ?? [];
+      const reuseKept = msg.reuseKept ?? [];
       // 건너뜀 = 컴포넌트로 만들지 못한 대상 수(§4.7 6번 · 용어 §2.9). 자리 결과는 꼬리 두 개로 따로 센다.
       const extraPart =
         (msg.skipped ? t('component.extraSkipped', { n: msg.skipped }) : '') +
         (msg.singles.length ? t('component.extraSingles', { n: msg.singles.length }) : '') +
+        reusedText(reused) +
         (msg.exposed ? t('component.extraProps', { n: msg.exposed }) : '') +
         (msg.icons ? t('component.extraIcons', { n: msg.icons }) : '') +
         placeTailText('component.propFailed', propFailed) +
         placeTailText('component.fillKept', fillKept) +
+        placeTailText('component.reuseKept', reuseKept) +
         placeTailText('component.placeCloned', cloned) +
         placeFailedText(misplaced);
       // 속성 값을 못 넣었거나(6번) 원본을 그대로 뒀거나 복사본으로 채웠거나 비운 자리(5번)가 있으면 성공이어도 경고(§4.7 "인스턴스 자리").
-      setStatus('structureStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extraPart }), (msg.registered || msg.sets) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length ? 'ok' : 'warn');
+      // 등록 · 세트 · 재사용 중 하나라도 있으면 성공(꼬리가 있으면 경고 — §4.7 "재사용" 6번).
+      setStatus('structureStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? 'ok' : 'warn');
       // 빈 조합(미생성) + 실패(진단) 리포트
       renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       break;
@@ -2543,7 +2551,7 @@ interface TreeRow {
   /** false면 name을 교체(취소선)가 아니라 그대로 유지(예: 컴포넌트 등록은 이름 보존). 기본 true. */
   replace?: boolean;
   /** 행 앞 종류 배지(예: 세트/단독). text=라벨, kind=색 클래스(set|single). */
-  badge?: { text: string; kind: 'set' | 'single' };
+  badge?: { text: string; kind: 'set' | 'single' | 'reuse' };
   /** 대상이 아닌 이유. 있으면 흐린 행 + 사유(reason) + 꼬리표(meta), 체크 불가.
    *  리네임=보존(잠금) · 바인딩=건너뜀(스킵). */
   keep?: { reason: string; meta: string };
@@ -3126,8 +3134,11 @@ function compEligibleCount(): number {
 function compRows(): TreeRow[] {
   return compCandidates.map((n) => {
     if (!n.eligible) return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId };
-    // 세트: [세트] · 속성접힘: [속성] · 단독: [단독]
+    // 세트: [세트] · 속성접힘: [속성] · 단독: [단독] · 재사용: [재사용] + 기존 컴포넌트 이름(§4.7 "재사용" 7번)
     const base = { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, replace: false };
+    if (n.reuse) {
+      return { ...base, change: n.reuse.name, badge: { text: t('component.badgeReuse'), kind: 'reuse' as const } };
+    }
     if (n.group) {
       return { ...base, change: `${n.group} · ${n.variant || t('component.variantFallback')}`, badge: { text: t('component.badgeSet'), kind: 'set' as const } };
     }
@@ -3291,10 +3302,16 @@ function renderSkipReasons(reasons: Record<string, number>): void {
 }
 
 /** 결과 줄 꼬리 — 이름은 3개까지 + " 외"(§4.7 "인스턴스 자리" 5번). 없으면 빈 문자열. */
-function placeTailText(key: 'component.placeFailed' | 'component.placeCloned' | 'component.propFailed' | 'component.fillKept', names: readonly string[]): string {
+function placeTailText(key: 'component.placeFailed' | 'component.placeCloned' | 'component.propFailed' | 'component.fillKept' | 'component.reuseKept', names: readonly string[]): string {
   if (!names.length) return '';
   const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? t('component.placeFailedMore') : '');
   return t(key, { n: names.length, names: shown });
+}
+/** " · 기존 컴포넌트 재사용 {n}: {이름들}" — 이름 3개까지 + " 외"(§4.7 "재사용" 8번). 없으면 빈 문자열. */
+function reusedText(names: readonly string[]): string {
+  if (!names.length) return '';
+  const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? t('component.reusedMore') : '');
+  return t('component.reused', { n: names.length, names: shown });
 }
 /** " · 제자리에 못 둔 {n}개: {이름들}" */
 function placeFailedText(names: readonly string[]): string {
@@ -3773,7 +3790,7 @@ function opReceived(m: CodeToUi): void {
     if (m.type === 'DARK_MODE_RESULT' && m.error) failed = true;
     if ((m.type === 'COMPONENTS_RESULT' || m.type === 'VARIANTS_RESULT') && (m.failures?.length ?? 0) > 0) failed = true;
     // 속성 값 실패 · 복사본 · 빈 자리도 실패로(§4.7 5·6번) — failures에도 실리지만 꼬리와 같은 기준으로 한 번 더 본다.
-    if (m.type === 'COMPONENTS_RESULT' && ((m.propFailed?.length ?? 0) + (m.fillKept?.length ?? 0) + (m.placeCloned?.length ?? 0) + (m.placeFailed?.length ?? 0)) > 0) failed = true;
+    if (m.type === 'COMPONENTS_RESULT' && ((m.propFailed?.length ?? 0) + (m.fillKept?.length ?? 0) + (m.reuseKept?.length ?? 0) + (m.placeCloned?.length ?? 0) + (m.placeFailed?.length ?? 0)) > 0) failed = true;
     // [묶기]에서 제자리에 못 둔 것도 실패로(§4.7 "인스턴스 자리" 5번 — 최소화 중이면 ⚠).
     if (m.type === 'COMPONENTIZE_RESULT' && (m.placeFailed?.length ?? 0) > 0) failed = true;
     if (m.type === 'APPLY_RESULT' && m.cancelled) cancelled = true;
@@ -3789,7 +3806,7 @@ function opReceived(m: CodeToUi): void {
 }
 /** 실패로 끝난 결과라도 파일을 바꿨나(§4.1 "플러그인 작업이 끝난 직후"). 그 밖의 실패는 바꾸지 않았다고 본다. */
 function changedFile(m: CodeToUi): boolean {
-  if (m.type === 'COMPONENTS_RESULT') return m.registered > 0 || m.sets > 0;
+  if (m.type === 'COMPONENTS_RESULT') return m.registered > 0 || m.sets > 0 || (m.reused?.length ?? 0) > 0; // 재사용만이어도 파일을 바꿨다(§4.7 "재사용" 6번)
   if (m.type === 'COMPONENTIZE_RESULT') return !!m.master; // 마스터를 컴포넌트로 만든 결과(빈 이름 = 아무것도 안 바꿈)
   if (m.type === 'VARIANTS_RESULT') return m.sets > 0;
   return false;

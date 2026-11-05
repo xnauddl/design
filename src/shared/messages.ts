@@ -140,6 +140,8 @@ export interface ComponentCandidate {
   single?: string;
   /** 텍스트/스왑/불리언만 다른 반복 → 단품+속성으로 접힘(기본 체크). */
   propsOnly?: boolean;
+  /** 전에 만든 컴포넌트를 재사용할 줄 — [재사용] 배지 + 기존 이름(세트면 "{세트} · {변형}")(§4.7 "재사용" 7번). */
+  reuse?: { name: string };
 }
 
 /**
@@ -288,7 +290,7 @@ export type CodeToUi =
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
   | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
   // icons: 날 벡터가 그림마다 달라 새로 만든 아이콘 컴포넌트 수(스왑 속성의 재료 — 등록 수와 별개로 센다).
-  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[]; placeFailed?: string[]; placeCloned?: string[]; propFailed?: string[]; fillKept?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단. placeFailed: 비운 자리 · placeCloned: 복사본으로 채운 자리의 원본 이름(§4.7 5번). propFailed: 속성 값·사진을 못 넣은 멤버(§4.7 6번). fillKept: 사진·크기 검사로 묶지 않은 멤버(§4.7 8번)
+  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[]; placeFailed?: string[]; placeCloned?: string[]; propFailed?: string[]; fillKept?: string[]; reused?: string[]; reuseKept?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단. placeFailed: 비운 자리 · placeCloned: 복사본으로 채운 자리의 원본 이름(§4.7 5번). propFailed: 속성 값·사진을 못 넣은 멤버(§4.7 6번). fillKept: 사진·크기 검사로 묶지 않은 멤버(§4.7 8번). reused: 재사용한 기존 컴포넌트 이름(그룹마다 하나, 세트는 세트 이름) · reuseKept: 바꾸기 직전 다시 맞추기에 걸려 원본을 둔 멤버(§4.7 "재사용")
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'SETTINGS'; base: number; maxDepth: number; grid: number } // #19: 보관된 설정(없으면 기본값). grid=만들기가 값을 맞추는 간격
