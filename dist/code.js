@@ -5591,30 +5591,53 @@
     }
     return { kind: "variant", keys: members.map((m) => reuseKey("variant", m)) };
   }
-  function matchReuse(plan, comps, memberCount, passes = () => true) {
-    const byKey = (key) => comps.filter((c) => c.key === key);
-    if (plan.kind !== "variant") {
-      const ok = byKey(plan.keys[0]).filter((c) => {
-        for (let k = 0; k < memberCount; k++) if (!passes(k, c.id)) return false;
-        return true;
-      });
-      if (ok.length === 1) return { ids: Array.from({ length: memberCount }, () => ok[0].id), keepKey: true };
-      return { ids: null, keepKey: ok.length === 0 };
-    }
-    const hits = plan.keys.map((key, k) => byKey(key).filter((c) => passes(k, c.id)));
-    if (hits.some((h) => h.length > 1)) return { ids: null, keepKey: false };
-    if (hits.some((h) => h.length === 0)) return { ids: null, keepKey: true };
-    const setId = hits[0][0].setId;
-    if (!setId || hits.some((h) => h[0].setId !== setId)) return { ids: null, keepKey: true };
-    return { ids: hits.map((h) => h[0].id), keepKey: true };
+  function countable(items) {
+    const strict = items.filter((x) => x.grade === "strict");
+    return (strict.length ? strict : items.filter((x) => x.grade === "loose")).map((x) => x.item);
   }
-  function reusePairIssue(a, b, asInstance = /* @__PURE__ */ new Set(), iconInstances = /* @__PURE__ */ new Set()) {
+  function matchReuse(plan, comps, memberCount, grade = () => "strict") {
+    const result = (n, ids) => n === 1 ? { ids: ids(), keepKey: true } : { ids: null, keepKey: n === 0 };
+    if (plan.kind !== "variant") {
+      const graded = comps.filter((c) => c.key === plan.keys[0]).map((c) => {
+        let g = "strict";
+        for (let k = 0; k < memberCount && g !== "fail"; k++) {
+          const gk = grade(k, c.id);
+          if (gk === "fail") g = "fail";
+          else if (gk === "loose") g = "loose";
+        }
+        return { item: c, grade: g };
+      });
+      const hit = countable(graded);
+      return result(hit.length, () => Array.from({ length: memberCount }, () => hit[0].id));
+    }
+    const setIds = [...new Set(comps.map((c) => c.setId).filter((id) => !!id))];
+    const covering = [];
+    for (const setId of setIds) {
+      const picked = [];
+      let setGrade = "strict";
+      for (let k = 0; k < memberCount; k++) {
+        const graded = comps.filter((c) => c.setId === setId && c.key === plan.keys[k]).map((c) => ({ item: c, grade: grade(k, c.id) }));
+        const hit = countable(graded);
+        if (hit.length !== 1) {
+          setGrade = "fail";
+          break;
+        }
+        if (graded.find((x) => x.item === hit[0]).grade === "loose") setGrade = "loose";
+        picked.push(hit[0].id);
+      }
+      if (setGrade !== "fail") covering.push({ item: picked, grade: setGrade });
+    }
+    const sets = countable(covering);
+    return result(sets.length, () => sets[0]);
+  }
+  function reusePairCheck(a, b, asInstance = /* @__PURE__ */ new Set(), iconInstances = /* @__PURE__ */ new Set()) {
+    let viaIcon = false;
     const isVec = (n) => VECTOR_TYPES.has(n.type);
     const vecDiff = (x, y) => {
       var _a, _b;
       return isVec(x) && isVec(y) && ((_a = x.vectorKey) != null ? _a : "") !== ((_b = y.vectorKey) != null ? _b : "");
     };
-    if (vecDiff(a, b)) return "/";
+    if (vecDiff(a, b)) return { issue: "/", viaIcon };
     const walk3 = (x, y, path) => {
       var _a, _b;
       const xs = (_a = x.children) != null ? _a : [];
@@ -5627,7 +5650,10 @@
         const xInst = xa.type === "INSTANCE" || asInstance.has(xa.id);
         const yInst = yb.type === "INSTANCE";
         if (xInst !== yInst) {
-          if (!xInst && isVec(xa) && iconInstances.has(yb.id)) continue;
+          if (!xInst && isVec(xa) && iconInstances.has(yb.id)) {
+            viaIcon = true;
+            continue;
+          }
           return p;
         }
         if (xInst) continue;
@@ -5638,7 +5664,15 @@
       }
       return null;
     };
-    return walk3(a, b, "");
+    const issue = walk3(a, b, "");
+    return { issue, viaIcon: issue ? false : viaIcon };
+  }
+  function reusePairGrade(a, b, asInstance, iconInstances) {
+    const r = reusePairCheck(a, b, asInstance, iconInstances);
+    return r.issue ? "fail" : r.viaIcon ? "loose" : "strict";
+  }
+  function reusePairIssue(a, b, asInstance, iconInstances) {
+    return reusePairCheck(a, b, asInstance, iconInstances).issue;
   }
 
   // src/lib/artwork.ts
@@ -7369,16 +7403,19 @@
               if (c.key !== key) continue;
               const comp = byId.get(c.id);
               if (!comp) {
-                pass.set(`${k}|${c.id}`, false);
+                pass.set(`${k}|${c.id}`, "fail");
                 continue;
               }
               const { root } = reuseRootOf(comp, g.members[k].type);
               const ids = await iconInstanceIds(root);
               icons.set(`${k}|${c.id}`, ids);
-              pass.set(`${k}|${c.id}`, !reusePairIssue(g.members[k], toStructNode(root), asInstance, ids));
+              pass.set(`${k}|${c.id}`, reusePairGrade(g.members[k], toStructNode(root), asInstance, ids));
             }
           }
-          const m = matchReuse(plan, list, g.members.length, (k, id) => pass.get(`${k}|${id}`) === true);
+          const m = matchReuse(plan, list, g.members.length, (k, id) => {
+            var _a2;
+            return (_a2 = pass.get(`${k}|${id}`)) != null ? _a2 : "fail";
+          });
           keepKey = m.keepKey;
           const comps = m.ids ? m.ids.map((id) => byId.get(id)).filter((c) => !!c) : [];
           if (m.ids && comps.length === g.members.length) {

@@ -1543,54 +1543,86 @@ export interface ReuseMatch {
   keepKey: boolean;
 }
 
+/** 짝 맞추기 결과 — strict: 그대로 맞음 · loose: 아이콘 예외로만 맞음 · fail: 걸림. */
+export type PairGrade = 'strict' | 'loose' | 'fail';
+
+/** 후보 무리에서 "센다" — 엄격 통과가 있으면 그것만, 없으면 예외 통과까지(§4.7 "재사용" 3번). */
+function countable<T>(items: readonly { item: T; grade: PairGrade }[]): T[] {
+  const strict = items.filter((x) => x.grade === 'strict');
+  return (strict.length ? strict : items.filter((x) => x.grade === 'loose')).map((x) => x.item);
+}
+
 /**
- * 키 맞추기(§4.7 "재사용" 3번). **"정확히 하나"는 짝 맞추기 검사(`passes`)를 통과한 후보 중에서 센다.**
- * - single · collapse: 같은 키이고 모든 멤버와 짝이 맞는 후보가 정확히 하나면 모든 멤버가 그 컴포넌트.
- * - variant: 멤버마다 같은 키이고 그 멤버와 짝이 맞는 후보가 정확히 하나이고, 그 변형들이 모두 **같은 세트**에 있으면.
- * - 통과한 후보가 없으면 새로 만들고 키를 남긴다(keepKey). 둘 이상이면(복제하면 플러그인 데이터도 복제된다)
+ * 키 맞추기(§4.7 "재사용" 3번). **"정확히 하나"는 짝 맞추기 검사(`grade`)를 통과한 후보 중에서 센다** —
+ * 통과 후보 중 엄격 통과(아이콘 예외 없이 그대로 맞음)가 있으면 그것만 센다.
+ * - single · collapse: 같은 키이고 모든 멤버와 짝이 맞는 후보(한 멤버라도 예외 통과면 예외 통과)가 정확히 하나면 재사용.
+ * - variant: **세트 단위로** 맞춘다 — 모든 멤버에 대해 키가 같고 짝이 맞는 변형이 그 세트 안에 정확히 하나씩
+ *   있는 세트를 모아, 그런 세트가 정확히 하나면 그 세트(멤버 → 그 변형)를 재사용한다.
+ * - 센 것이 없으면 새로 만들고 키를 남긴다(keepKey). 둘 이상이면(복제하면 플러그인 데이터도 복제된다)
  *   새로 만들되 키를 남기지 않는다 — 같은 키가 끝없이 쌓여 재사용이 영영 꺼지지 않게.
- * `passes(memberIndex, compId)`를 주지 않으면 모두 통과로 본다.
+ * `grade(memberIndex, compId)`를 주지 않으면 모두 엄격 통과로 본다.
  */
 export function matchReuse(
   plan: ReusePlan,
   comps: readonly ReuseCandidate[],
   memberCount: number,
-  passes: (memberIndex: number, compId: string) => boolean = () => true,
+  grade: (memberIndex: number, compId: string) => PairGrade = () => 'strict',
 ): ReuseMatch {
-  const byKey = (key: string) => comps.filter((c) => c.key === key);
+  const result = (n: number, ids: () => string[]): ReuseMatch =>
+    n === 1 ? { ids: ids(), keepKey: true } : { ids: null, keepKey: n === 0 };
   if (plan.kind !== 'variant') {
-    const ok = byKey(plan.keys[0]).filter((c) => {
-      for (let k = 0; k < memberCount; k++) if (!passes(k, c.id)) return false;
-      return true;
+    const graded = comps.filter((c) => c.key === plan.keys[0]).map((c) => {
+      let g: PairGrade = 'strict';
+      for (let k = 0; k < memberCount && g !== 'fail'; k++) {
+        const gk = grade(k, c.id);
+        if (gk === 'fail') g = 'fail';
+        else if (gk === 'loose') g = 'loose';
+      }
+      return { item: c, grade: g };
     });
-    if (ok.length === 1) return { ids: Array.from({ length: memberCount }, () => ok[0].id), keepKey: true };
-    return { ids: null, keepKey: ok.length === 0 };
+    const hit = countable(graded);
+    return result(hit.length, () => Array.from({ length: memberCount }, () => hit[0].id));
   }
-  const hits = plan.keys.map((key, k) => byKey(key).filter((c) => passes(k, c.id)));
-  if (hits.some((h) => h.length > 1)) return { ids: null, keepKey: false };
-  if (hits.some((h) => h.length === 0)) return { ids: null, keepKey: true };
-  const setId = hits[0][0].setId;
-  if (!setId || hits.some((h) => h[0].setId !== setId)) return { ids: null, keepKey: true };
-  return { ids: hits.map((h) => h[0].id), keepKey: true };
+  // 세트마다: 멤버별로 그 세트 안에서 센 변형이 정확히 하나씩이면 그 세트는 모든 멤버를 덮는다.
+  const setIds = [...new Set(comps.map((c) => c.setId).filter((id): id is string => !!id))];
+  const covering: { item: string[]; grade: PairGrade }[] = [];
+  for (const setId of setIds) {
+    const picked: string[] = [];
+    let setGrade: PairGrade = 'strict';
+    for (let k = 0; k < memberCount; k++) {
+      const graded = comps
+        .filter((c) => c.setId === setId && c.key === plan.keys[k])
+        .map((c) => ({ item: c, grade: grade(k, c.id) }));
+      const hit = countable(graded);
+      if (hit.length !== 1) { setGrade = 'fail'; break; }
+      if (graded.find((x) => x.item === hit[0])!.grade === 'loose') setGrade = 'loose';
+      picked.push(hit[0].id);
+    }
+    if (setGrade !== 'fail') covering.push({ item: picked, grade: setGrade });
+  }
+  const sets = countable(covering);
+  return result(sets.length, () => sets[0]);
 }
 
 /**
  * 짝 맞추기 검사(§4.7 "재사용" 3번). 멤버(A)와 기존 컴포넌트(B — 감싼 도형이면 부르는 쪽이 앞붙이 자식을 넘긴다)를
- * 경로끼리 맞춰 본다. 걸리면 그 경로(진단용 문자열), 맞으면 null.
+ * 경로끼리 맞춰 본다. 엄격 통과(그대로 맞음)와 예외 통과(아이콘 예외로만 맞음)를 구분해 돌려준다.
  * - 자식 구성: 경로마다 자식 수와 각 자식의 타입이 순서대로 같다. A 쪽 `asInstance`(이번 [등록]의 다른 그룹 멤버)는 INSTANCE로 본다.
- * - 한쪽만 인스턴스면 걸린다. 예외: A가 날 벡터이고 B가 아이콘 컴포넌트의 인스턴스(`iconInstances`)면 맞는 짝이다.
+ * - 한쪽만 인스턴스면 걸린다. 예외: A가 날 벡터이고 B가 아이콘 컴포넌트의 인스턴스(`iconInstances`)면 맞는 짝이다(예외 통과).
  * - 둘 다 날 벡터인데 그림 지문이 다르면 걸린다.
  * 인스턴스끼리는 안으로 내려가지 않는다(B의 트리는 인스턴스 안을 펼치지 않는다).
+ * issue: 걸린 경로(진단용), 맞으면 null. viaIcon: 아이콘 예외를 하나라도 썼나.
  */
-export function reusePairIssue(
+export function reusePairCheck(
   a: StructNode,
   b: StructNode,
   asInstance: ReadonlySet<string> = new Set(),
   iconInstances: ReadonlySet<string> = new Set(),
-): string | null {
+): { issue: string | null; viaIcon: boolean } {
+  let viaIcon = false;
   const isVec = (n: StructNode) => VECTOR_TYPES.has(n.type);
   const vecDiff = (x: StructNode, y: StructNode) => isVec(x) && isVec(y) && (x.vectorKey ?? '') !== (y.vectorKey ?? '');
-  if (vecDiff(a, b)) return '/';
+  if (vecDiff(a, b)) return { issue: '/', viaIcon };
   const walk = (x: StructNode, y: StructNode, path: string): string | null => {
     const xs = x.children ?? [];
     const ys = y.children ?? [];
@@ -1602,7 +1634,7 @@ export function reusePairIssue(
       const xInst = xa.type === 'INSTANCE' || asInstance.has(xa.id);
       const yInst = yb.type === 'INSTANCE';
       if (xInst !== yInst) {
-        if (!xInst && isVec(xa) && iconInstances.has(yb.id)) continue; // 1회차 접힘의 아이콘 자리 교체
+        if (!xInst && isVec(xa) && iconInstances.has(yb.id)) { viaIcon = true; continue; } // 1회차 접힘의 아이콘 자리 교체
         return p;
       }
       if (xInst) continue; // 인스턴스끼리 — 안은 그 컴포넌트 소관
@@ -1613,5 +1645,27 @@ export function reusePairIssue(
     }
     return null;
   };
-  return walk(a, b, '');
+  const issue = walk(a, b, '');
+  return { issue, viaIcon: issue ? false : viaIcon };
+}
+
+/** 짝 맞추기 등급 — strict(그대로 맞음) · loose(아이콘 예외로만 맞음) · fail. */
+export function reusePairGrade(
+  a: StructNode,
+  b: StructNode,
+  asInstance?: ReadonlySet<string>,
+  iconInstances?: ReadonlySet<string>,
+): PairGrade {
+  const r = reusePairCheck(a, b, asInstance, iconInstances);
+  return r.issue ? 'fail' : r.viaIcon ? 'loose' : 'strict';
+}
+
+/** 짝 맞추기 검사 — 걸린 경로(진단용), 맞으면(엄격 · 예외 통과 모두) null. */
+export function reusePairIssue(
+  a: StructNode,
+  b: StructNode,
+  asInstance?: ReadonlySet<string>,
+  iconInstances?: ReadonlySet<string>,
+): string | null {
+  return reusePairCheck(a, b, asInstance, iconInstances).issue;
 }

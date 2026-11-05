@@ -19,7 +19,7 @@ import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, reusePairIssue, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan, ReuseCandidate } from './lib/components';
 import { scanSimilar, componentizeSimilar, componentizeResultMessage } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
@@ -950,21 +950,21 @@ async function decideReuse(groups: readonly StructGroup[], exclude: ReadonlySet<
       const plan = reusePlanFor(g.members);
       if (plan) {
         // 키가 같은 후보마다 멤버별 짝 맞추기(비동기 — 아이콘 메인을 구한다)를 먼저 해 둔다.
-        const pass = new Map<string, boolean>(); // `${k}|${compId}`
+        const pass = new Map<string, 'strict' | 'loose' | 'fail'>(); // `${k}|${compId}` — 엄격 · 예외 통과 · 걸림
         const icons = new Map<string, Set<string>>(); // 같은 키
         for (let k = 0; k < g.members.length; k++) {
           const key = plan.kind === 'variant' ? plan.keys[k] : plan.keys[0];
           for (const c of list) {
             if (c.key !== key) continue;
             const comp = byId.get(c.id);
-            if (!comp) { pass.set(`${k}|${c.id}`, false); continue; }
+            if (!comp) { pass.set(`${k}|${c.id}`, 'fail'); continue; }
             const { root } = reuseRootOf(comp, g.members[k].type);
             const ids = await iconInstanceIds(root);
             icons.set(`${k}|${c.id}`, ids);
-            pass.set(`${k}|${c.id}`, !reusePairIssue(g.members[k], toStructNode(root), asInstance, ids));
+            pass.set(`${k}|${c.id}`, reusePairGrade(g.members[k], toStructNode(root), asInstance, ids));
           }
         }
-        const m = matchReuse(plan, list, g.members.length, (k, id) => pass.get(`${k}|${id}`) === true);
+        const m = matchReuse(plan, list, g.members.length, (k, id) => pass.get(`${k}|${id}`) ?? 'fail');
         keepKey = m.keepKey;
         const comps = m.ids ? m.ids.map((id) => byId.get(id)).filter((c): c is ComponentNode => !!c) : [];
         if (m.ids && comps.length === g.members.length) {
@@ -1430,7 +1430,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             groups.map((g) => g.members),
             await existingComponentNames(new Set(eligibleNodes.map((n) => n.id))),
           );
-          // 재사용 판정을 **후보 전체**로 미리 해 본다(§4.7 "재사용" 7번) — 안쪽 그룹도 저마다.
+          // 재사용 판정을 미리 해 본다(§4.7 "재사용" 7번) — 이번 [등록] 대상은 **기본 체크 상태**(세트 · 접힘 그룹은 체크, 단독은 체크 안 함)로 보고, 판정은 안쪽 그룹까지 저마다.
           // 짝 맞추기의 "이번 [등록]의 다른 그룹 멤버"는 기본 체크 상태 기준 — 세트 · 접힘 그룹(멤버 2개+)만.
           const defaultChecked = new Set<string>();
           for (const g of groups) if (g.members.length >= 2) for (const m of g.members) defaultChecked.add(m.id);

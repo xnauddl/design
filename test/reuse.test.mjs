@@ -10,6 +10,7 @@ import {
   reusePlanFor,
   matchReuse,
   reusePairIssue,
+  reusePairGrade,
   isHeadingCollapseGroup,
 } from '../dist/pure.mjs';
 import { copyOverridesAsync, replaceMemberAsync, createIconRegistry } from '../dist/figma-lib.mjs';
@@ -124,22 +125,67 @@ test('matchReuse — "정확히 하나"는 짝 맞추기를 통과한 후보 중
   const plan = { kind: 'single', keys: ['single:card:1'] };
   // 옛 Card(사용자가 고쳐 구조가 바뀜 — 통과 못 함) + Card2(지난번 새로 만든 것 — 통과)
   const comps = [{ id: 'Card', key: 'single:card:1', setId: null }, { id: 'Card2', key: 'single:card:1', setId: null }];
-  assert.deepEqual(matchReuse(plan, comps, 1, (k, id) => id === 'Card2'), { ids: ['Card2'], keepKey: true });
+  assert.deepEqual(matchReuse(plan, comps, 1, (k, id) => g(id === 'Card2')), { ids: ['Card2'], keepKey: true });
   // 통과 0 → 새로 만들고 키를 남긴다(다음엔 통과하는 새 것 하나)
-  assert.deepEqual(matchReuse(plan, comps, 1, () => false), { ids: null, keepKey: true });
+  assert.deepEqual(matchReuse(plan, comps, 1, () => 'fail'), { ids: null, keepKey: true });
   // 통과 2개 → 재사용하지 않고 키도 남기지 않는다
-  assert.deepEqual(matchReuse(plan, comps, 1, () => true), { ids: null, keepKey: false });
+  assert.deepEqual(matchReuse(plan, comps, 1, () => 'strict'), { ids: null, keepKey: false });
   // 접힘: 모든 멤버와 짝이 맞아야 그 후보를 센다
   const coll = { kind: 'collapse', keys: ['collapse:x:1'] };
-  assert.deepEqual(matchReuse(coll, [{ id: 'm', key: 'collapse:x:1', setId: null }], 2, (k) => k === 0), { ids: null, keepKey: true });
-  // 세트: 멤버마다 통과 후보를 센다 — 한 멤버라도 둘 이상이면 키를 남기지 않는다
+  assert.deepEqual(matchReuse(coll, [{ id: 'm', key: 'collapse:x:1', setId: null }], 2, (k) => g(k === 0)), { ids: null, keepKey: true });
+  // 세트: 통과한 변형으로 모든 멤버를 덮는 세트만 센다
   const v = { kind: 'variant', keys: ['variant:x:1', 'variant:x:2'] };
   const vs = [
     { id: 'old1', key: 'variant:x:1', setId: 'S' }, { id: 'old2', key: 'variant:x:2', setId: 'S' },
     { id: 'new1', key: 'variant:x:1', setId: 'T' }, { id: 'new2', key: 'variant:x:2', setId: 'T' },
   ];
-  assert.deepEqual(matchReuse(v, vs, 2, (k, id) => id.startsWith('new')), { ids: ['new1', 'new2'], keepKey: true });
-  assert.deepEqual(matchReuse(v, vs, 2, (k, id) => k === 0 || id === 'new2'), { ids: null, keepKey: false });
+  assert.deepEqual(matchReuse(v, vs, 2, (k, id) => g(id.startsWith('new'))), { ids: ['new1', 'new2'], keepKey: true });
+  assert.deepEqual(matchReuse(v, vs, 2, (k, id) => g(k === 0 || id === 'new2')), { ids: ['new1', 'new2'], keepKey: true }, 'S는 멤버 2를 덮지 못한다');
+});
+const g = (ok) => (ok ? 'strict' : 'fail');
+
+test('matchReuse — 세트는 세트 단위로: 변형을 다른 세트로 옮김 · 세트 복제', () => {
+  const v = { kind: 'variant', keys: ['variant:tab:1', 'variant:tab:2'] };
+  // 1회차 세트 S(변형 a1 · a2). 사용자가 a2를 다른 세트 X로 옮겼다 → 2회차: 어느 세트도 모든 멤버를 덮지 못함
+  const run2 = [
+    { id: 'a1', key: 'variant:tab:1', setId: 'S' },
+    { id: 'a2', key: 'variant:tab:2', setId: 'X' },
+    { id: 'x9', key: 'variant:other:1', setId: 'X' },
+  ];
+  assert.deepEqual(matchReuse(v, run2, 2), { ids: null, keepKey: true }, '2회차: 새 세트를 만들고 키를 남긴다');
+  // 3회차: 2회차가 만든 새 세트 N(n1 · n2)만 모든 멤버를 덮는다
+  const run3 = [...run2, { id: 'n1', key: 'variant:tab:1', setId: 'N' }, { id: 'n2', key: 'variant:tab:2', setId: 'N' }];
+  assert.deepEqual(matchReuse(v, run3, 2), { ids: ['n1', 'n2'], keepKey: true }, '3회차: 새 세트 재사용');
+  // 세트를 복제 — 모든 멤버를 덮는 세트가 둘 → 재사용 안 함 + 키 없음
+  const dup = [
+    { id: 's1', key: 'variant:tab:1', setId: 'S' }, { id: 's2', key: 'variant:tab:2', setId: 'S' },
+    { id: 'c1', key: 'variant:tab:1', setId: 'S copy' }, { id: 'c2', key: 'variant:tab:2', setId: 'S copy' },
+  ];
+  assert.deepEqual(matchReuse(v, dup, 2), { ids: null, keepKey: false });
+  // 한 세트 안에서 한 멤버에 같은 키 변형이 둘이면(세트 안 복제) 그 세트는 덮지 못한다
+  assert.deepEqual(matchReuse(v, [...dup.slice(0, 2), { id: 's1b', key: 'variant:tab:1', setId: 'S' }], 2), { ids: null, keepKey: true });
+});
+
+test('matchReuse — 엄격 통과 먼저: 1회차 날 벡터 마스터 + 2회차 아이콘 마스터 → 날 벡터 쪽', () => {
+  // 멤버: 날 벡터가 든 칩. 1회차 마스터는 날 벡터 그대로(엄격), 2회차 마스터는 아이콘 자리 교체(예외 통과)
+  const member = { id: 'A', name: 'Chip', type: 'FRAME', children: [vec('av', 'heart'), text('at', 'l', 'x')] };
+  const raw = { id: 'M1', name: 'Chip', type: 'COMPONENT', children: [vec('m1v', 'heart'), text('m1t', 'l', 'y')] };
+  const iconed = { id: 'M2', name: 'Chip', type: 'COMPONENT', children: [{ id: 'm2i', name: 'icon', type: 'INSTANCE' }, text('m2t', 'l', 'y')] };
+  assert.equal(reusePairGrade(member, raw), 'strict');
+  assert.equal(reusePairGrade(member, iconed, new Set(), new Set(['m2i'])), 'loose');
+  assert.equal(reusePairGrade(member, iconed), 'fail', '아이콘이 아닌 인스턴스');
+  const grades = { M1: reusePairGrade(member, raw), M2: reusePairGrade(member, iconed, new Set(), new Set(['m2i'])) };
+  const coll = { kind: 'collapse', keys: ['collapse:chip:1'] };
+  const comps = [{ id: 'M1', key: 'collapse:chip:1', setId: null }, { id: 'M2', key: 'collapse:chip:1', setId: null }];
+  assert.deepEqual(matchReuse(coll, comps, 1, (k, id) => grades[id]), { ids: ['M1'], keepKey: true });
+  // 엄격 통과가 없으면 예외 통과를 센다
+  assert.deepEqual(matchReuse(coll, comps, 1, (k, id) => (id === 'M2' ? 'loose' : 'fail')), { ids: ['M2'], keepKey: true });
+  // 예외 통과만 둘이면 둘 이상 → 키 없음
+  assert.deepEqual(matchReuse(coll, comps, 1, () => 'loose'), { ids: null, keepKey: false });
+  // 세트 변형도 같다 — 한 세트 안에서 엄격 통과 변형만 센다
+  const v = { kind: 'variant', keys: ['variant:chip:1'] };
+  const vs = [{ id: 'r', key: 'variant:chip:1', setId: 'S' }, { id: 'i', key: 'variant:chip:1', setId: 'S' }];
+  assert.deepEqual(matchReuse(v, vs, 1, (k, id) => (id === 'r' ? 'strict' : 'loose')), { ids: ['r'], keepKey: true });
 });
 
 /* ---------- 짝 맞추기 검사 (3번) ---------- */
