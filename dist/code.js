@@ -107,7 +107,7 @@
     "component.noEligibleShort": "\uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694.",
     "component.noChecked": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBB36\uC744 \uD56D\uBAA9\uC744 \uCCB4\uD06C\uD558\uC138\uC694",
     "component.candidates": "\uB4F1\uB85D \uD6C4\uBCF4 {total}\uAC1C \xB7 {sel}\uAC1C \uCCB4\uD06C",
-    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {registered} \xB7 \uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}{extraPart}",
+    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {total} (\uC138\uD2B8 {sets} \xB7 \uB2E8\uC77C {singles}){extraPart}",
     "component.variants": "\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}\uAC1C \uC0DD\uC131{extraPart}",
     "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",

@@ -100,7 +100,7 @@ export const STRINGS: Record<string, string> = {
   'component.noEligibleShort': '등록할 수 있는 프레임이 없어요.',
   'component.noChecked': '체크한 후보가 없어요 — 묶을 항목을 체크하세요',
   'component.candidates': '등록 후보 {total}개 · {sel}개 체크',
-  'component.registered': '컴포넌트 {registered} · 베리언트 세트 {sets}{extraPart}',
+  'component.registered': '컴포넌트 {total} (세트 {sets} · 단일 {singles}){extraPart}',
   'component.variants': '베리언트 세트 {sets}개 생성{extraPart}',
   'component.generated': '누락 조합 {generated}개 생성(세트 {sets})',
   'component.placeFailed': ' · 제자리에 못 둔 {n}개: {names}',

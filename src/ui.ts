@@ -2338,10 +2338,10 @@ window.onmessage = (event: MessageEvent) => {
       const fillKept = msg.fillKept ?? [];
       const reused = msg.reused ?? [];
       const reuseKept = msg.reuseKept ?? [];
+      // 컴포넌트 수 = 새로 만든 맨 위 단위(세트 + 단일, §4.7 6번 "세는 단위"). 단일은 괄호 안에만 쓴다.
       // 건너뜀 = 컴포넌트로 만들지 못한 대상 수(§4.7 6번 · 용어 §2.9). 자리 결과는 꼬리 두 개로 따로 센다.
       const extraPart =
         (msg.skipped ? t('component.extraSkipped', { n: msg.skipped }) : '') +
-        (msg.singles.length ? t('component.extraSingles', { n: msg.singles.length }) : '') +
         reusedText(reused) +
         (msg.exposed ? t('component.extraProps', { n: msg.exposed }) : '') +
         (msg.icons ? t('component.extraIcons', { n: msg.icons }) : '') +
@@ -2352,7 +2352,7 @@ window.onmessage = (event: MessageEvent) => {
         placeFailedText(misplaced);
       // 속성 값을 못 넣었거나(6번) 원본을 그대로 뒀거나 복사본으로 채웠거나 비운 자리(5번)가 있으면 성공이어도 경고(§4.7 "인스턴스 자리").
       // 등록 · 세트 · 재사용 중 하나라도 있으면 성공(꼬리가 있으면 경고 — §4.7 "재사용" 6번).
-      setStatus('structureStatus', t('component.registered', { registered: msg.registered, sets: msg.sets, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? 'ok' : 'warn');
+      setStatus('structureStatus', t('component.registered', { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? 'ok' : 'warn');
       // 빈 조합(미생성) + 실패(진단) 리포트
       renderVariantReport(variantIssueSections(msg.missing, msg.failures));
       break;
