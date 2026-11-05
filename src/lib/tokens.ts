@@ -1,6 +1,7 @@
 /* ============================================================
    tokens.ts — 토큰 모델 + 순수 헬퍼 (figma.* 의존 없음 → node --test 가능)
    ============================================================ */
+import { t } from './i18n';
 
 /** Figma VariableScope 문자열의 부분집합(정확히 동일 리터럴이라 VariableScope[]에 할당 가능). */
 export type ScopeName =
@@ -98,7 +99,7 @@ export function rgbToHex(rgb: { r: number; g: number; b: number }): string {
 /** 소문자 6자리 hex → {r,g,b} (0~1). */
 export function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) throw new Error(`잘못된 hex: ${hex}`);
+  if (!m) throw new Error(t('err.badHex', { value: hex }));
   const n = parseInt(m[1], 16);
   return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 };
 }

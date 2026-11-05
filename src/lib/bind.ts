@@ -36,7 +36,6 @@ export interface BindResult {
   candidateTotal?: number;
   bound: number;
   skipped: number;
-  flags: string[];
   /** UX3: 스킵/건너뜀 사유별 집계(키→건수). 예: { 'no-match': 2, 'hug-fill': 3 }. */
   reasons: Record<string, number>;
   /** UX6: 사용자가 취소해 중단되었는가(이미 처리한 만큼은 유지). */
@@ -332,8 +331,7 @@ export async function bindSelection(
 ): Promise<BindResult> {
   const entries = await buildIndex();
   liveVarIds = await collectLiveVarIds(selection, new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
-  const res: BindResult = { bound: 0, skipped: 0, flags: [], reasons: {} };
-  const flagSet = new Set<string>();
+  const res: BindResult = { bound: 0, skipped: 0, reasons: {} };
   const prog: Progress = { done: 0, total: hooks.onProgress ? countNodes(selection) : 0, every: 50 };
   // 적용 모드에서도 "어느 레이어에 어느 변수가 붙었나" 목록을 모은다(결과 트리). dry-run과 같은 수집기 —
   // 차이는 실제로 setBoundVariable을 부르느냐뿐. 목록은 RESULT_CAP에서 멈춘다(대형 파일 보호).
@@ -341,14 +339,12 @@ export async function bindSelection(
   for (const node of selection) {
     // 선택 루트가 숨긴 그룹 안이면 walk의 자체 visible 검사로는 못 거른다(루트 자신은 보임).
     if (!isEffectivelyVisible(node)) {
-      flagSet.add('숨긴 레이어는 바인딩에서 제외했습니다.');
       note(res, 'hidden', node, preview);
       continue;
     }
-    await walk(node, entries, res, flagSet, apply, hooks, prog, preview, 0, null);
+    await walk(node, entries, res, apply, hooks, prog, preview, 0, null);
     if (res.cancelled) break;
   }
-  res.flags = [...flagSet];
   {
     res.candidateTotal = preview.candidates.length;
     res.candidates = preview.candidates.slice(0, RESULT_CAP);
@@ -473,7 +469,6 @@ async function walk(
   node: SceneNode,
   entries: VarEntry[],
   res: BindResult,
-  flags: Set<string>,
   apply: boolean,
   hooks: BindHooks,
   prog: Progress,
@@ -484,14 +479,13 @@ async function walk(
   if (res.cancelled) return;
   // 숨긴 레이어는 화면에 없는 값이라 하위까지 통째로 제외 — extract.ts와 동일 기준.
   if (node.visible === false) {
-    flags.add('숨긴 레이어는 바인딩에서 제외했습니다.');
     note(res, 'hidden', node, preview);
     return;
   }
   // 미리보기 트리(#13)용: 방문한 모든 노드를 기록(나중에 영향+조상으로 가지치기).
   preview?.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
   bindPaints(node, entries, res, apply, preview);
-  bindFrame(node, entries, res, flags, apply, preview);
+  bindFrame(node, entries, res, apply, preview);
   bindRadius(node, entries, res, apply, preview);
   bindStroke(node, entries, res, apply, preview);
   bindOpacity(node, entries, res, apply, preview);
@@ -511,14 +505,13 @@ async function walk(
   // 인스턴스 자체 속성까지만 처리하고 하위로는 내려가지 않는다(extract.ts와 동일 기준).
   if (node.type === 'INSTANCE') {
     if (node.children.length) {
-      flags.add('인스턴스 내부는 오버라이드가 되므로 건너뛰었습니다 — 컴포넌트 원본에서 바인딩하세요.');
       note(res, 'instance-children', node, preview);
     }
     return;
   }
   if ('children' in node)
     for (const c of node.children) {
-      await walk(c, entries, res, flags, apply, hooks, prog, preview, depth + 1, node.id);
+      await walk(c, entries, res, apply, hooks, prog, preview, depth + 1, node.id);
       if (res.cancelled) return;
     }
 }
@@ -569,7 +562,6 @@ function bindFrame(
   node: SceneNode,
   entries: VarEntry[],
   res: BindResult,
-  flags: Set<string>,
   apply: boolean,
   preview: Preview | null,
 ): void {
@@ -594,7 +586,6 @@ function bindFrame(
      */
     const bindAxis = (sizing: 'FIXED' | 'HUG' | 'FILL', field: 'width' | 'height', v: number): void => {
       if (sizing !== 'FIXED') {
-        flags.add('일부 크기는 HUG/FILL이라 width/height 바인딩을 건너뜀(Fixed 필요).');
         note(res, 'hug-fill', node, preview, field);
         return;
       }
@@ -604,13 +595,11 @@ function bindFrame(
     bindAxis(node.layoutSizingHorizontal, 'width', node.width);
     bindAxis(node.layoutSizingVertical, 'height', node.height);
   } else {
-    flags.add('자유 배치(오토레이아웃 밖) 프레임은 크기 바인딩에서 제외했습니다.');
     note(res, 'size-free-layout', node, preview);
   }
 
   // 여백/간격: 오토레이아웃에만
   if (node.layoutMode === 'NONE') {
-    flags.add('오토레이아웃이 아닌 프레임은 padding/gap 바인딩 불가.');
     note(res, 'no-autolayout', node, preview);
     return;
   }
@@ -878,7 +867,7 @@ export interface SelectedBindResult {
  * - 'error': 연결 호출이 실패함
  */
 export async function bindSelectedItems(items: readonly SelectedBindItem[]): Promise<SelectedBindResult> {
-  const res: BindResult = { bound: 0, skipped: 0, flags: [], reasons: {} };
+  const res: BindResult = { bound: 0, skipped: 0, reasons: {} };
   const preview: Preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
@@ -1035,93 +1024,6 @@ function textValueEqual(node: TextNode, field: VariableBindableTextField, value:
   return false;
 }
 
-
-/* ---------- 연결 현황 스캔(읽기 전용) ---------- */
-/**
- * 선택 안에서 **이미 붙어 있는** 변수 바인딩을 읽어 결과 트리와 같은 모양으로 돌려준다.
- * 플러그인을 닫았다 열어도 파일에 남은 상태를 그대로 보여 주기 위한 것(Tokens Studio Inspect와
- * 같은 "상태 조회" — 실행 기록이 아니다). 변수 해석은 하지 않고 이름만 붙인다. 상한 RESULT_CAP.
- */
-export interface BindingsScan {
-  candidates: BindCandidate[];
-  nodes: BindNode[];
-  /** 상한 전 실제 건수. */
-  total: number;
-  /** 바인딩이 하나라도 있는 레이어 수. */
-  boundNodes: number;
-}
-
-export async function scanBindings(selection: readonly SceneNode[]): Promise<BindingsScan> {
-  const vars = await figma.variables.getLocalVariablesAsync();
-  const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const tierOf = collectionTiers(cols);
-  const byId = new Map(vars.map((v) => [v.id, v]));
-  const nameOf = (id: string): { name: string; tier: number } => {
-    const v = byId.get(id);
-    return v ? { name: v.name, tier: tierOf.get(v.variableCollectionId) ?? 0 } : { name: '(삭제된 변수)', tier: 0 };
-  };
-  const candidates: BindCandidate[] = [];
-  const nodeIndex: BindNode[] = [];
-  let total = 0;
-  let boundNodes = 0;
-  const push = (c: BindCandidate): void => {
-    total++;
-    if (candidates.length < RESULT_CAP) candidates.push(c);
-  };
-  const aliasId = (raw: unknown): string | undefined => {
-    if (!raw) return undefined;
-    const a = Array.isArray(raw) ? raw[0] : raw;
-    return a && typeof a === 'object' && 'id' in a ? (a as VariableAlias).id : undefined;
-  };
-  const walkNode = (node: SceneNode, depth: number, parentId: string | null): void => {
-    if (node.visible === false) return;
-    nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
-    let any = false;
-    // 페인트·효과 색
-    for (const key of ['fills', 'strokes'] as const) {
-      const ps = (node as unknown as Record<string, unknown>)[key];
-      if (!Array.isArray(ps)) continue;
-      ps.forEach((p, i) => {
-        const id = (p as { boundVariables?: { color?: VariableAlias } }).boundVariables?.color?.id;
-        if (!id) return;
-        const v = nameOf(id);
-        const hex = (p as SolidPaint).type === 'SOLID' ? rgbToHex((p as SolidPaint).color) : '';
-        push({ nodeId: node.id, field: key, index: i, currentValue: hex, variableId: id, variableName: v.name, tier: v.tier });
-        any = true;
-      });
-    }
-    const effects = (node as { effects?: readonly Effect[] }).effects;
-    if (Array.isArray(effects)) {
-      effects.forEach((e, i) => {
-        const id = (e as { boundVariables?: { color?: VariableAlias } }).boundVariables?.color?.id;
-        if (!id) return;
-        const v = nameOf(id);
-        push({ nodeId: node.id, field: 'effects', index: i, currentValue: 'color' in e ? rgbToHex((e as DropShadowEffect).color) : '', variableId: id, variableName: v.name, tier: v.tier });
-        any = true;
-      });
-    }
-    // 노드 스칼라 필드 + 텍스트 구간 필드
-    const bv = (node as { boundVariables?: Record<string, unknown> }).boundVariables ?? {};
-    for (const [field, raw] of Object.entries(bv)) {
-      if (field === 'fills' || field === 'strokes' || field === 'effects' || field === 'componentProperties' || field === 'textRangeFills') continue;
-      const id = aliasId(raw);
-      if (!id) continue;
-      const v = nameOf(id);
-      const cur = (node as unknown as Record<string, unknown>)[field];
-      let currentValue = '';
-      if (typeof cur === 'number') currentValue = String(Math.round(cur * 100) / 100);
-      else if (field === 'fontFamily' && typeof (node as TextNode).fontName === 'object' && (node as TextNode).fontName !== figma.mixed) currentValue = ((node as TextNode).fontName as FontName).family;
-      else if ((TEXT_RANGE_FIELDS as readonly string[]).includes(field) && cur && typeof cur === 'object' && 'value' in (cur as object)) currentValue = String((cur as { value: number }).value);
-      push({ nodeId: node.id, field, currentValue, variableId: id, variableName: v.name, tier: v.tier });
-      any = true;
-    }
-    if (any) boundNodes++;
-    if (node.type === 'INSTANCE') return; // 인스턴스 내부는 메인 컴포넌트의 몫
-    if ('children' in node) for (const c of node.children) walkNode(c, depth + 1, node.id);
-  };
-  for (const n of selection) if (isEffectivelyVisible(n)) walkNode(n, 0, null);
-  return { candidates, nodes: pruneToAffected(nodeIndex, candidates, []), total, boundNodes };
-}
 
 /* ---------- 변수 사용 조회(IA v3 §4.4 — 보기 전용) ----------
    연결 작업과 범위가 다르다: 인스턴스 안쪽 레이어도 센다(보기 전용, 재검토 ⑥). 숨긴 레이어는 세지 않는다.

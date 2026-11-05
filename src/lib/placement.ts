@@ -11,6 +11,7 @@
    - 넣기는 표지 자리(없으면 기록한 index)에 하고, x·y·제약·크기 규칙을 원본과 같게 한 뒤 절대 위치로 보정한다.
    - 못 넣으면 인스턴스를 지운다 — 페이지 맨 위로 대체하지 않는다. [등록]은 복사본으로 채워 본다(5번).
    ============================================================ */
+import { t } from './i18n';
 
 type Parent = BaseNode & ChildrenMixin;
 
@@ -176,12 +177,12 @@ export function releaseOrigin(o: Origin): void {
 function tryPlace(node: SceneNode, o: Origin): boolean {
   try {
     const parent = o.parent;
-    if (!parent || (parent as { removed?: boolean }).removed) throw new Error('부모가 없어졌어요');
+    if (!parent || (parent as { removed?: boolean }).removed) throw new Error('parent gone'); // 화면에 안 나옴 — 아래 catch가 삼킨다
     const kids = parent.children;
     const at = o.anchor && !o.anchor.removed ? kids.indexOf(o.anchor) : -1;
     const idx = at >= 0 ? at : Math.min(Math.max(0, o.index), kids.length);
     parent.insertChild(idx, node);
-    if (node.parent !== parent) throw new Error('자리에 들어가지 않았어요');
+    if (node.parent !== parent) throw new Error('not inserted'); // 화면에 안 나옴 — 아래 catch가 삼킨다
     if (o.autolayout && o.absolute && 'layoutPositioning' in node) {
       try { (node as FrameNode).layoutPositioning = 'ABSOLUTE'; } catch { /* 절대 배치 실패 — 레이아웃 흐름에 둔다 */ }
     }
@@ -241,11 +242,11 @@ export function fillOrigin(make: () => InstanceNode, o: Origin, onError?: (why: 
     try {
       inst = make();
     } catch (e) {
-      onError?.(`인스턴스를 만들지 못했어요: ${errText(e)}`);
+      onError?.(t('component.fail.instanceMake', { error: errText(e) }));
     }
     if (inst) {
       if (tryPlace(inst, o)) return 'instance';
-      onError?.('제자리에 인스턴스를 넣지 못했어요');
+      onError?.(t('component.fail.instancePlace'));
     }
     // 복사본 — 보통 프레임(컴포넌트와 이어지지 않음)
     const detached = (): FrameNode | null => {

@@ -16,7 +16,7 @@ export {
   COMPONENT,
 } from './variables';
 export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult, ApplyTextStylesResult } from './variables';
-export { bindSelection, bindSelectedItems, scanBindings, countUsage, findUsers, boundVariableIds } from './bind';
+export { bindSelection, bindSelectedItems, countUsage, findUsers, boundVariableIds } from './bind';
 export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName } from './rename';
 export type { RenameOutcome } from './rename';

@@ -25,6 +25,871 @@
     figma.ui.postMessage(msg);
   }
 
+  // src/lib/i18n.ts
+  var STRINGS = {
+    // 공통 진행/상태
+    "common.applyingVars": "\uBCC0\uC218\uC5D0 \uC801\uC6A9 \uC911\u2026",
+    "common.exporting": "\uB0B4\uBCF4\uB0B4\uB294 \uC911\u2026",
+    "common.verifying": "\uAC80\uC99D \uC911\u2026",
+    "common.running": "\uC2E4\uD589 \uC911\u2026",
+    // 팔레트
+    "palette.invalidHex": "\uBE0C\uB79C\uB4DC\uC0C9\uC744 #RRGGBB \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
+    "palette.invalidHex2": "\uBCF4\uC870\uC0C9\uC744 #RRGGBB \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
+    "palette.summary": "{count}\uACC4\uC5F4 \xB7 {tokens}\uC0C9 \uC0DD\uC131",
+    // 추출 / 토큰 생성
+    "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
+    "create.colorsDone": "\uC0C9 \uBCC0\uC218 {count}\uAC1C \uC774\uBBF8 \uC0DD\uC131\uB428 \xB7 \uC5EC\uAE30\uC120 \uC0C9 \uC678\uB9CC",
+    "color.summary": "\uC0C9 {count}\uAC1C \xB7 \uC5ED\uD560 \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
+    "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019 \uB610\uB294 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC73C\uC138\uC694.",
+    "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 \uC5ED\uD560 {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC5B4\uC694",
+    "create.fileVars": "\uD30C\uC77C\uC5D0 \uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8 \uBCC0\uC218 {n}\uAC1C \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uAC12\uC744 \uC77D\uC5B4\uC694",
+    // 지나친 이유조차 없는 빈손 — 버튼이 고장 난 것처럼 보이지 않게 최소한의 말은 한다.
+    "color.extractEmpty": "\uACE0\uB97C \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0C9\xB7\uC5EC\uBC31\xB7\uD06C\uAE30\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.",
+    "create.baseChanged": "base {base}px\uB85C \uB2E4\uC2DC \uACC4\uC0B0 \uC911\u2026",
+    // 시맨틱 매핑
+    "semantic.scanningGlobals": "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026",
+    "semantic.formatHint": "\uB9E4\uD551\uC744 \uD55C \uC904\uC5D0 \u201C\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984\u201D \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
+    "semantic.noGlobals": "\uAE30\uC874 Global \uC0C9 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
+    "semantic.suggested": "\uAE30\uC874 \uC0C9 {count}\uAC1C\uC5D0\uC11C \uC5ED\uD560 \uCD94\uCC9C \u2014 \uD655\uC778 \uD6C4 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019.",
+    "semantic.result": "\uC2DC\uB9E8\uD2F1 {aliased}\uAC1C \uBCC4\uCE6D (\uC0DD\uC131 {created} / \uAC31\uC2E0 {updated})",
+    "semantic.missing": " \xB7 \uB204\uB77D: {names}",
+    // 바인딩(적용)
+    "apply.cancelRequested": "\uCDE8\uC18C\uD558\uB294 \uC911\u2026",
+    "apply.cancelled": "\uCC3E\uAE30\uB97C \uCDE8\uC18C\uD588\uC5B4\uC694",
+    "bind.filterPlaceholder": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
+    // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
+    "field.fills": "\uCC44\uC6C0 \uC0C9",
+    "field.strokes": "\uC120 \uC0C9",
+    "field.effects": "\uADF8\uB9BC\uC790 \uC0C9",
+    "field.itemSpacing": "\uAC04\uACA9",
+    "field.counterAxisSpacing": "\uC904 \uAC04\uACA9",
+    "field.gridRowGap": "\uD589 \uAC04\uACA9",
+    "field.gridColumnGap": "\uC5F4 \uAC04\uACA9",
+    "field.padding": "\uC5EC\uBC31",
+    "field.paddingX": "\uC88C\uC6B0 \uC5EC\uBC31",
+    "field.paddingY": "\uC704\uC544\uB798 \uC5EC\uBC31",
+    "field.paddingSome": "\uC5EC\uBC31 \uC77C\uBD80",
+    "field.paddingTop": "\uC704 \uC5EC\uBC31",
+    "field.paddingRight": "\uC624\uB978\uCABD \uC5EC\uBC31",
+    "field.paddingBottom": "\uC544\uB798 \uC5EC\uBC31",
+    "field.paddingLeft": "\uC67C\uCABD \uC5EC\uBC31",
+    "field.radius": "\uBAA8\uC11C\uB9AC",
+    "field.radiusSome": "\uBAA8\uC11C\uB9AC \uC77C\uBD80",
+    "field.topLeftRadius": "\uC67C\uCABD \uC704 \uBAA8\uC11C\uB9AC",
+    "field.topRightRadius": "\uC624\uB978\uCABD \uC704 \uBAA8\uC11C\uB9AC",
+    "field.bottomRightRadius": "\uC624\uB978\uCABD \uC544\uB798 \uBAA8\uC11C\uB9AC",
+    "field.bottomLeftRadius": "\uC67C\uCABD \uC544\uB798 \uBAA8\uC11C\uB9AC",
+    "field.strokeWeight": "\uC120 \uB450\uAED8",
+    "field.strokeSome": "\uC120 \uB450\uAED8 \uC77C\uBD80",
+    "field.strokeTopWeight": "\uC704 \uC120 \uB450\uAED8",
+    "field.strokeRightWeight": "\uC624\uB978\uCABD \uC120 \uB450\uAED8",
+    "field.strokeBottomWeight": "\uC544\uB798 \uC120 \uB450\uAED8",
+    "field.strokeLeftWeight": "\uC67C\uCABD \uC120 \uB450\uAED8",
+    "field.width": "\uB108\uBE44",
+    "field.height": "\uB192\uC774",
+    "field.opacity": "\uBD88\uD22C\uBA85\uB3C4",
+    "field.fontSize": "\uAE00\uC790 \uD06C\uAE30",
+    "field.lineHeight": "\uD589\uAC04",
+    "field.letterSpacing": "\uC790\uAC04",
+    "field.fontFamily": "\uAE00\uAF34",
+    "field.fontWeight": "\uAD75\uAE30",
+    "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD574\uC694",
+    // 리네임
+    "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uCCB4\uD06C \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019",
+    "rename.none": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694.",
+    "rename.applied": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.",
+    // 컴포넌트 / 베리언트
+    "component.scanning": "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026",
+    "component.registering": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026",
+    "component.classifying": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958 \uC911\u2026",
+    "component.generating": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131 \uC911\u2026",
+    "component.noEligible": "\uC120\uD0DD \uC544\uB798\uC5D0 \uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694.",
+    "component.noEligibleShort": "\uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694.",
+    "component.noChecked": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBB36\uC744 \uD56D\uBAA9\uC744 \uCCB4\uD06C\uD558\uC138\uC694",
+    "component.candidates": "\uB4F1\uB85D \uD6C4\uBCF4 {total}\uAC1C \xB7 {sel}\uAC1C \uCCB4\uD06C",
+    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {registered} \xB7 \uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}{extraPart}",
+    "component.variants": "\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}\uAC1C \uC0DD\uC131{extraPart}",
+    "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
+    "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
+    "component.placeFailedMore": " \uC678",
+    "component.propFailed": " \xB7 \uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC740 {n}\uAC1C: {names}",
+    "component.fillKept": " \xB7 \uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uAC74\uB108\uB6F4 {n}\uAC1C: {names}",
+    "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
+    // 마법사
+    "wizard.needSelect": "\uBA3C\uC800 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uC5D0\uC11C \uAC12\uC744 \uBF51\uC544\uC694",
+    "wizard.result": "{state} \u2014 {summary}",
+    "wizard.stopped": "\uC911\uB2E8",
+    "wizard.completed": "\uC644\uB8CC",
+    // 다크 테마 생성
+    "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
+    "dark.hint": "\uB77C\uC774\uD2B8 \uC0C9\uC744 \uB4A4\uC9D1\uC5B4 \uB2E4\uD06C\uC5D0 \uCC44\uC6CC\uC694. \uBAA9\uB85D \uC774\uB984\uC740 Figma \uBCC0\uC218 \uCEEC\uB809\uC158\xB7\uBAA8\uB4DC\uC608\uC694",
+    "dark.hintTip": "\uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4\uC694. Semantic\uC774 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uAC83\uB9CC \uB300\uC0C1\uC774\uACE0 \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB6F0\uC5B4\uC694. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 dark/\u2026\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC694.",
+    "dark.collection": "\uC5ED\uD560 \uCEEC\uB809\uC158",
+    "dark.fromMode": "\uB77C\uC774\uD2B8",
+    "dark.toMode": "\uB2E4\uD06C",
+    "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
+    // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
+    "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
+    // 닮은 프레임 컴포넌트화
+    "similar.scanBtn": "\uB2EE\uC740 \uC2A4\uCE94",
+    "similar.componentizeBtn": "\uBB36\uAE30",
+    // 내보내기
+    "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
+    "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
+    // 라이선스
+    "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
+    // 유료 게이팅
+    // 마법사 단계 라벨(WIZARD_STEPS id 기준) + 건너뜀 사유
+    "wizard.step.extract": "\uCD94\uCD9C",
+    "wizard.step.create": "\uD1A0\uD070",
+    "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "wizard.step.dark": "\uB2E4\uD06C",
+    "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "wizard.step.rename": "\uC774\uB984",
+    "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
+    "wizard.rerunHint": "\uC774\uBBF8 \uC815\uB9AC\uD55C \uC120\uD0DD\uC774\uC5D0\uC694 \u2014 \uB2E4\uC2DC \uC2E4\uD589\uD558\uBA74 \uBCC0\uC218\uB294 \uAC31\uC2E0\uB418\uACE0 \uC774\uB984\uC740 \uADF8\uB300\uB85C\uC608\uC694.",
+    "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
+    "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
+    "wizard.skip.paid": "\uC720\uB8CC \uAE30\uB2A5",
+    "wizard.chip.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB6F0\uC5B4\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4",
+    "wizard.paidSkipped": " \xB7 \uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    // 진행 안내(파이프라인) 단계 상태
+    "pipeline.stat.done": "\uC644\uB8CC",
+    "pipeline.stat.ready": "\uC900\uBE44",
+    "pipeline.stat.blocked": "\uC804\uC81C \uBBF8\uCDA9\uC871",
+    "pipeline.stat.todo": "\uB9CC\uB4E4\uAE30",
+    // 바인딩 스킵 사유(라벨 맵)
+    "reason.no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
+    "reason.already-bound": "\uC774\uBBF8 \uC5F0\uACB0\uB428",
+    "reason.styled": "\uC2A4\uD0C0\uC77C \uC0AC\uC6A9 \uC911",
+    "reason.deleted-var": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB428",
+    "reason.changed": "\uADF8 \uC0AC\uC774 \uBC14\uB01C",
+    "reason.empty-text": "\uBE48 \uD14D\uC2A4\uD2B8",
+    "reason.error": "\uC5F0\uACB0 \uC2E4\uD328",
+    "reason.hug-fill": "HUG/FILL",
+    "reason.no-autolayout": "\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uC544\uB2D8",
+    "reason.size-free-layout": "\uC790\uC720 \uBC30\uCE58(\uD06C\uAE30 \uC81C\uC678)",
+    "reason.size-fraction": "\uC18C\uC218 \uD06C\uAE30(\uC815\uD655 \uC77C\uCE58\uB9CC)",
+    "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
+    "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
+    "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
+    "reason.translucent": "\uBC18\uD22C\uBA85",
+    "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
+    "reason.fraction": "\uC18C\uC218 \uC120 \uB450\uAED8",
+    // 마법사 시퀀서 단계 결과
+    "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
+    "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
+    "wizard.seq.noExtract": "\uBF51\uC740 \uAC12\uC774 \uC5C6\uC5B4\uC694 \u2014 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uC788\uB294 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    "wizard.seq.extractDone": "{count}\uAC1C \uD6C4\uBCF4",
+    "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
+    "wizard.seq.semantics": "\uBCC4\uCE6D {aliased}",
+    "wizard.seq.semanticsMissing": " \xB7 \uB204\uB77D {n}",
+    "wizard.seq.dark": "\uB2E4\uD06C {realiased}\uAC1C \uC5F0\uACB0",
+    "wizard.seq.darkModeCreated": " \xB7 \uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00",
+    "wizard.seq.darkSkip": " \xB7 \uAC74\uB108\uB700 {n}(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
+    "wizard.seq.darkNoTarget": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
+    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD574\uC694",
+    "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
+    "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
+    "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
+    "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
+    // 마법사 완료 요약(summarize, wizard.ts)
+    "wizard.sum.tokens": "\uD1A0\uD070 {n}",
+    "wizard.sum.dark": "\uB2E4\uD06C {n}",
+    "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
+    "wizard.sum.renamed": "\uC774\uB984 {n}",
+    "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
+    "wizard.sum.empty": "\uB05D\uB0B8 \uC791\uC5C5\uC774 \uC5C6\uC5B4\uC694",
+    // 진행 안내 단계 라벨·안내
+    "pipeline.step.colors": "\uC0C9 \uBCC0\uC218",
+    "pipeline.step.tokens": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
+    "pipeline.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "pipeline.step.bind": "\uBCC0\uC218 \uC5F0\uACB0",
+    "pipeline.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
+    "pipeline.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "pipeline.step.rename": "\uC774\uB984 \uC815\uB9AC",
+    "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
+    "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
+    /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
+    "common.cancel": "\uCDE8\uC18C",
+    "common.close": "\uB2EB\uAE30",
+    // 변수 관리(넓은 화면)
+    "vm.search": "\uBCC0\uC218 \uAC80\uC0C9",
+    "vm.uses": "{n}\uACF3",
+    "vm.moreTip": "\uBA54\uB274 (\uC6B0\uD074\uB9AD\uACFC \uAC19\uC74C)",
+    "vm.jumpAlias": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uB85C \uC774\uB3D9",
+    "vm.noVars": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694.",
+    "vm.copyName": "\uC774\uB984 \uBCF5\uC0AC",
+    "vm.copyValue": "\uAC12 \uBCF5\uC0AC",
+    "vm.copyCss": "CSS \uBCC0\uC218\uBA85 \uBCF5\uC0AC",
+    "vm.whatName": "\uC774\uB984",
+    "vm.whatValue": "\uAC12",
+    "vm.whatCss": "CSS \uBCC0\uC218\uBA85",
+    "vm.copied": "{what}\uC744(\uB97C) \uBCF5\uC0AC\uD588\uC5B4\uC694: {text}",
+    "vm.copyFailed": "\uBCF5\uC0AC\uAC00 \uB9C9\uD614\uC5B4\uC694 \u2014 \uC9C1\uC811 \uBCF5\uC0AC\uD558\uC138\uC694: {text}",
+    "vm.copyEmpty": "\uBCF5\uC0AC\uD560 \uAC12\uC774 \uC5C6\uC5B4\uC694.",
+    "vm.selectLayers": "\uC0AC\uC6A9 \uB808\uC774\uC5B4 \uC120\uD0DD",
+    "vm.detail": "\uC0C1\uC138",
+    "vm.edit": "\uACE0\uCE58\uAE30\u2026",
+    // 변수 고치기(§4.4 고치기, PR 3.5)
+    "edit.name": "\uC774\uB984",
+    "edit.nameAria": "\uC774\uB984(\uC804\uCCB4 \uACBD\uB85C)",
+    "edit.valueAria": "{mode} \uAC12",
+    "edit.save": "\uC800\uC7A5",
+    "edit.savingBtn": "\uC800\uC7A5 \uC911\u2026",
+    "edit.saving": "\uC800\uC7A5 \uC911\uC774\uC5D0\uC694",
+    "edit.noChange": "\uACE0\uCE5C \uAC83\uC774 \uC5C6\uC5B4\uC694",
+    "edit.checkInput": "\uC785\uB825\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694",
+    "edit.deleted": "\uBCC0\uC218\uAC00 \uC0AD\uC81C\uB410\uC5B4\uC694",
+    "edit.conflict": "\uB2E4\uB978 \uACF3\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uB2EB\uACE0 \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694",
+    "edit.maybeSaved": "\uC800\uC7A5\uB410\uC744 \uC218 \uC788\uC5B4\uC694 \xB7 \uB2EB\uACE0 \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694",
+    "edit.partial": "\uC77C\uBD80\uB9CC \uC800\uC7A5\uB410\uC5B4\uC694",
+    "edit.closedMissing": "{name} \uD589\uC740 \uC9C0\uAE08 \uACE0\uB978 \uBAA9\uB85D\uC5D0 \uC5C6\uC5B4\uC694",
+    "edit.closedPartialMissing": "\uC77C\uBD80\uB9CC \uC800\uC7A5\uB410\uC5B4\uC694 \xB7 {name} \uD589\uC740 \uC9C0\uAE08 \uACE0\uB978 \uBAA9\uB85D\uC5D0 \uC5C6\uC5B4\uC694",
+    "edit.nameEmptySeg": "\uC774\uB984\uC758 '/' \uC0AC\uC774\uAC00 \uBE44\uC5B4 \uC788\uC5B4\uC694",
+    "edit.nameDup": "\uC774 \uCEEC\uB809\uC158\uC5D0 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4\uC694",
+    "edit.nameRejected": "\uD53C\uADF8\uB9C8\uAC00 \uC774 \uC774\uB984\uC744 \uBC1B\uC9C0 \uC54A\uC544\uC694",
+    "edit.valueRejected": "\uD53C\uADF8\uB9C8\uAC00 \uC774 \uAC12\uC744 \uBC1B\uC9C0 \uC54A\uC544\uC694",
+    "edit.saveFailed": "\uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "edit.errColor": "#RRGGBB \uD615\uC2DD\uC73C\uB85C \uC801\uC5B4 \uC8FC\uC138\uC694",
+    "edit.errNumber": "\uC22B\uC790\uB97C \uC801\uC5B4 \uC8FC\uC138\uC694",
+    "edit.errNeedValue": "\uAC12\uC744 \uC801\uC5B4 \uC8FC\uC138\uC694",
+    "edit.targetDeleted": "\uAC00\uB9AC\uD0A4\uB358 \uBCC0\uC218\uAC00 \uC0AD\uC81C\uB410\uC5B4\uC694",
+    "edit.deletedTarget": "(\uC0AD\uC81C\uB41C \uBCC0\uC218)",
+    "edit.changesHead": "\uC800\uC7A5\uD558\uBA74 \uBC14\uB00C\uB294 \uAC83",
+    "edit.groupMove": "\uADF8\uB8F9 \uC774\uB3D9: {from} \u2192 {to}",
+    "edit.newGroup": "(\uC0C8 \uADF8\uB8F9)",
+    "edit.groupEmptied": "\xB7 {group} \uADF8\uB8F9\uC740 \uBE44\uC5B4\uC11C \uC0AC\uB77C\uC838\uC694",
+    "edit.cssLabel": "CSS:",
+    "edit.cssClash": "\xB7 {name}\uACFC CSS \uC774\uB984\uC774 \uAC19\uC544\uC838\uC694",
+    "edit.pickAria": "{mode} \uBCC4\uCE6D \uACE0\uB974\uAE30",
+    "edit.pickSearch": "\uBCC0\uC218 \uC774\uB984\uC73C\uB85C \uCC3E\uAE30",
+    "edit.writeValue": "\uAC12\uC73C\uB85C \uC801\uAE30",
+    "edit.pickGlobal": "Global\uC740 \uB2E4\uB978 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uC9C0 \uC54A\uC544\uC694",
+    "edit.pickAllTiers": "\uACC4\uCE35\uC774 \uC5C6\uB294 \uCEEC\uB809\uC158\uC774\uB77C \uBAA8\uB4E0 \uBCC0\uC218\uB97C \uBCF4\uC5EC\uC694",
+    "edit.pickNoLib": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB294 \uB300\uC0C1\uC73C\uB85C \uACE0\uB97C \uC218 \uC5C6\uC5B4\uC694",
+    "edit.pickOutOfRules": "\uC9C0\uAE08 \uB300\uC0C1\uC740 \uADDC\uCE59 \uBC16\uC774\uB77C \uB2E4\uC2DC \uACE0\uB97C \uC218 \uC5C6\uC5B4\uC694 \xB7 \uADF8\uB300\uB85C \uB450\uBA74 \uBC14\uB00C\uC9C0 \uC54A\uC544\uC694",
+    "edit.pickNoMatch": "\uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "edit.confirm": "\uACE0\uCE5C \uB0B4\uC6A9\uC744 \uBC84\uB9B4\uAE4C\uC694?",
+    "edit.discard": "\uBC84\uB9AC\uAE30",
+    "edit.keep": "\uACC4\uC18D \uACE0\uCE58\uAE30",
+    "vm.noTier": "\uACC4\uCE35 \uC544\uB2D8",
+    "vm.dCollection": "\uCEEC\uB809\uC158",
+    "vm.dScopes": "\uC6A9\uB3C4",
+    "vm.dDesc": "\uC124\uBA85",
+    "vm.dNoUses": "\uC120\uD0DD \uC548\uC5D0\uC11C\uB294 \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
+    // 탭
+    // IA v3 레이어 › 연결(§4.6)
+    "bind.tsLabel": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    // 단계 표시 · 버튼(§4.6 그림 개편 — "찾기"는 이전의 "미리보기")
+    "bind.stepsAria": "\uC5F0\uACB0 \uB2E8\uACC4",
+    "bind.find": "\uCC3E\uAE30",
+    "bind.refind": "\uB2E4\uC2DC \uCC3E\uAE30",
+    "bind.stepPick": "\uACE0\uB974\uAE30",
+    "bind.link": "\uC5F0\uACB0",
+    "bind.linkN": "{n}\uACF3 \uC5F0\uACB0",
+    "bind.finding": "\uCC3E\uB294 \uC911\u2026",
+    "bind.needFind": "\uBA3C\uC800 [\uCC3E\uAE30]\uB97C \uB204\uB974\uC138\uC694",
+    "bind.needOn": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uCF1C\uC138\uC694",
+    // 빈 상태(목록 자리)
+    "bind.emptyIntro": "\uAC12\uC774 \uBCC0\uC218\uC640 \uAC19\uC740 \uACF3\uC744 \uCC3E\uC544 \uC5F0\uACB0\uD574\uC694",
+    "bind.emptyNoSel": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    // 배지 줄
+    "bind.found": "\uCC3E\uC74C {n}",
+    "bind.foundTip": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12 {n}\uACF3\uC744 \uCC3E\uC558\uC5B4\uC694 \xB7 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC744 \uBCC0\uC218\uB294 \uB044\uC138\uC694",
+    "bind.skipAria": "\uAC74\uB108\uB700 {m}\uACF3 \uC0AC\uC720 \uBCF4\uAE30",
+    "bind.allOn": "\uBAA8\uB450 \uCF1C\uAE30",
+    "bind.allOff": "\uBAA8\uB450 \uB044\uAE30",
+    "bind.filterBtn": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
+    // 변수 카드 "값 → 변수"
+    "bind.cardTip": "{name}\uC744(\uB97C) \uC774 {k}\uACF3\uC5D0 \uC5F0\uACB0\uD574\uC694 \xB7 \uC77C\uBD80\uB9CC \uBE7C\uB824\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uBE80 \uB098\uBA38\uC9C0\uB97C \uC120\uD0DD\uD558\uACE0 \uB2E4\uC2DC \uCC3E\uAE30",
+    "bind.offTip": "\uB044\uBA74 \uC774 {k}\uACF3\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
+    "bind.count": "{k}\uACF3",
+    "bind.placesAria": "{name} {k}\uACF3",
+    "bind.switchAria": "{name} \uC5F0\uACB0",
+    // 연결 후 결과 카드
+    "bind.doneCard": "{n}\uACF3 \uC5F0\uACB0\uB428",
+    "bind.repreview": "\uB2E4\uC2DC \uCC3E\uAE30",
+    "bind.toList": "\uBCC0\uC218 \uD0ED\uC5D0\uC11C \uBCF4\uAE30 \u2192",
+    "bind.doneSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
+    "bind.candChanged": "\uD6C4\uBCF4\uAC00 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 {a}\uACF3 \uCD94\uAC00 \xB7 {b}\uACF3 \uC81C\uC678",
+    "bind.otherSel": "\uB2E4\uB978 \uC120\uD0DD\uC5D0\uC11C \uB9CC\uB4E0 \uACB0\uACFC\uC608\uC694",
+    "bind.maybeChanged": "\uD53C\uADF8\uB9C8\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC744 \uC218 \uC788\uC5B4\uC694",
+    "bind.selChanged": "\uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uB2E4\uC2DC \uCC3E\uC544 \uC8FC\uC138\uC694",
+    "bind.noLocalLib": "\uC774 \uD30C\uC77C\uC5D4 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
+    "bind.noTier": "\uBCC0\uC218\uB294 \uC788\uC9C0\uB9CC \uACC4\uCE35\uC774 \uC9C0\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "bind.gotoTiers": "\uACC4\uCE35 \uC9C0\uC815\uD558\uAE30 \u2192",
+    "bind.noVarsPaid": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
+    "bind.noVarsFree": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694",
+    "bind.tsDone": "\u2713 \uD14D\uC2A4\uD2B8 {n}\uAC1C\uC5D0 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
+    "tsSkip.hasStyle": "\uC774\uBBF8 \uC2A4\uD0C0\uC77C \uC788\uC74C",
+    "tsSkip.noStyle": "\uAC19\uC740 \uC2A4\uD0C0\uC77C \uC5C6\uC74C",
+    "tsSkip.ambiguous": "\uAC19\uC740 \uBAA8\uC591 \uC2A4\uD0C0\uC77C\uC774 \uB458 \uC774\uC0C1",
+    "tsSkip.boundVars": "\uAE00\uC790 \uC18D\uC131\uC5D0 \uBCC0\uC218 \uC788\uC74C",
+    "tsSkip.mixed": "\uC11C\uC2DD\uC774 \uC11E\uC784",
+    "tsSkip.instance": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD",
+    "bind.tsNone": "\uB4F1\uB85D\uB41C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694 \xB7 \uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
+    "bind.tsNoneText": "\uB4F1\uB85D\uB41C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694",
+    "bind.tsGotoType": "\uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
+    // IA v3 변수 탭(§4.2~§4.4)
+    "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
+    "start.head": "\uC544\uC9C1 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "start.sub": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uB9CC\uB4E4\uC5B4 \uBCF4\uC138\uC694",
+    "start.freeNote": "\u24D8 \uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uBCC0\uC218\uB97C \uC0C8\uB85C \uB9CC\uB4E4 \uC218 \uC5C6\uC5B4\uC694",
+    "start.freeNote2": "\uC774\uB984 \uC815\uB9AC\uC640 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uC740 \uBB34\uB8CC",
+    "start.freeExtract": "(\uCD94\uCD9C\uAE4C\uC9C0 \uBB34\uB8CC)",
+    "start.libNote": "\u24D8 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB294 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694. \uAC19\uC740 \uBCC0\uC218\uB97C \uC5EC\uAE30\uC11C \uB610 \uB9CC\uB4E4 \uD544\uC694\uB294 \uC5C6\uC5B4\uC694.",
+    "start.made": "\uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
+    "start.viewList": "\uBCC0\uC218 \uBAA9\uB85D \uBCF4\uAE30",
+    "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uB808\uC774\uC5B4 \uC5F0\uACB0\uC740 \uB05D\uB09C \uB4A4 \uD655\uC778\uD558\uACE0 \uD574\uC694",
+    "wizardCard.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC2E4\uD589\uD560 \uC218 \uC788\uC5B4\uC694",
+    "wizard.toBind": "\uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.seq.cancelSkipped": "\uCDE8\uC18C\uB85C \uAC74\uB108\uB700",
+    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uB9CC \uC815\uB9AC\uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
+    "wizardCard.runFree": "\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
+    "wizard.freeSum": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
+    "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total} \u25BE",
+    "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
+    "list.findUnboundTip": "\uC120\uD0DD\uC5D0\uC11C \uBCC0\uC218\uB85C \uBC14\uAFC0 \uC218 \uC788\uB294 \uC0C9\xB7\uAC04\uACA9\uC744 \uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uCC3E\uC544\uC694",
+    "list.addTip": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30(\uC0C9\xB7\uD1A0\uD070\xB7\uD14C\uB9C8\xB7\uD0C0\uC774\uD3EC)",
+    "list.moreTip": "\uB354 \uBCF4\uAE30",
+    "list.refreshTip": "\uB2E4\uC2DC \uC77D\uAE30",
+    "list.modeTip": "\uBAA8\uB4DC",
+    "list.modeDefault": "\uAE30\uBCF8 \uBAA8\uB4DC",
+    "list.searchTip": "\uAC80\uC0C9",
+    "list.chipTip": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 {used}\uAC1C(\uC9C1\uC811 {direct} \xB7 \uAC04\uC811 {indirect}) / \uC804\uCCB4 {total}\uAC1C",
+    "list.reading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 \uC77D\uB294 \uC911\u2026",
+    "list.refreshSame": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uBCC0\uACBD \uC5C6\uC74C",
+    "list.refreshUsage": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uC0AC\uC6A9 \uC218\uAC00 \uBC14\uB010 \uBCC0\uC218 {n}\uAC1C",
+    "list.refreshTable": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uBCC0\uC218 \uBAA9\uB85D\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694",
+    "list.refreshCountSuffix": " \xB7 \uC0AC\uC6A9 \uC218\uAC00 \uBC14\uB010 \uBCC0\uC218 {n}\uAC1C",
+    "list.big": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC544\uC694",
+    "list.read": "\uC77D\uAE30",
+    "list.wizardWait": "\uB9C8\uBC95\uC0AC\uAC00 \uB05D\uB098\uBA74 \uC77D\uC5B4\uC694",
+    "list.noneUsed": "\uC774 \uC120\uD0DD\uC740 \uB85C\uCEEC \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694",
+    "list.selectHint": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \u2605 Inspect\uC5D0 \uBAA8\uC5EC\uC694",
+    "list.inspect": "\u2605 Inspect",
+    "list.inspectTip": "Inspect \u2014 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218",
+    "list.inspectAria": "Inspect \u2014 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218, {n}\uAC1C",
+    "list.inspectNoSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5EC\uAE30\uC5D0 \uBAA8\uC5EC\uC694",
+    "list.libItem": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
+    "list.libItemAria": "\uB77C\uC774\uBE0C\uB7EC\uB9AC, \uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
+    "list.deletedItem": "\uC0AD\uC81C\uB41C \uBCC0\uC218",
+    "list.deletedItemAria": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB41C \uACF3 {n}\uAC1C",
+    "list.sideColAria": "{name}, \uACC4\uCE35 {badge}, {num}",
+    "list.sideGrpAria": "{name}, {num}",
+    "list.sideExpand": "\uD3BC\uCE58\uAE30",
+    "list.sideCollapse": "\uC811\uAE30",
+    "list.searchTitle": "'{q}' \uAC80\uC0C9 \uACB0\uACFC",
+    "list.noGroup": "(\uADF8\uB8F9 \uC5C6\uC74C)",
+    "list.totalTip": "\uC804\uCCB4 {total}\uAC1C",
+    "list.baseDiff": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694 \xB7 ",
+    "list.baseDiffNoSel": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD \uC5C6\uC74C \xB7 ",
+    "list.baseMany": "\uB808\uC774\uC5B4 {m}\uAC1C",
+    "list.rebase": "\uAE30\uC900 \uBC14\uAFB8\uAE30",
+    "list.unused": "\uC548 \uC500",
+    "list.indirect": "\u21B3",
+    "list.indirectTip": "\uC9C1\uC811 \uBD99\uC5B4 \uC788\uC9C4 \uC54A\uACE0, {alias} \uAC19\uC740 \uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC5EC\uC694",
+    "list.usesTip": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3",
+    "list.hiddenRow": "\uC120\uD0DD\uC5D0\uC11C \uC548 \uC4F0\uC5EC \uBAA9\uB85D\uC5D0\uC11C \uBE60\uC84C\uC5B4\uC694",
+    "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
+    "list.libSection": "LIB \xB7 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uAC83",
+    "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
+    "list.libCollection": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \xB7 {name}",
+    "list.libManaged": "\uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
+    "list.deleted": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB41C \uACF3 {n}\uAC1C",
+    "list.select": "\uC120\uD0DD",
+    "list.jumped": "{name} \uD589\uC73C\uB85C \uC62E\uACBC\uC5B4\uC694",
+    "list.undo": "\u2190 \uB418\uB3CC\uB9AC\uAE30",
+    "list.selectFirstNote": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC5D0\uC11C \uCC3E\uC544\uC694",
+    "list.selectViaAlias": "\uBCC4\uCE6D\uC73C\uB85C \uC4F0\uB294 \uB808\uC774\uC5B4 \uC120\uD0DD",
+    "select.capped": "\uB808\uC774\uC5B4 {found}\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694(\uC804\uCCB4 {requested}\uAC1C)",
+    "select.none": "\uC120\uD0DD\uD560 \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
+    "select.partial": "\uB808\uC774\uC5B4 {found}\uAC1C \uC120\uD0DD \u2014 {missing}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
+    "list.dValue": "\uAC12",
+    "list.dUses": "\uC4F0\uC778 \uACF3",
+    "list.detailBig": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uCC3E\uC9C0 \uC54A\uC544\uC694",
+    "list.find": "\uCC3E\uAE30",
+    "list.usesHead": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3 \xB7 \uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
+    "list.usesMore": "\uC678 {n}\uAC1C",
+    "list.viaAlias": "\uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC784: {names}",
+    "list.menuTiers": "\uCEEC\uB809\uC158 \uACC4\uCE35 \uC9C0\uC815\u2026",
+    "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
+    "list.menuExpandAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uD3BC\uCE58\uAE30",
+    "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
+    "list.semanticsNote": "\uC5ED\uD560 \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uC801\uC6A9\uD560 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
+    "tab.variables": "\uBCC0\uC218",
+    "tab.layer": "\uB808\uC774\uC5B4",
+    "tab.settings": "\uC124\uC815",
+    // 최소화(IA v3 §4.9)
+    "ui.minimize": "\uCD5C\uC18C\uD654",
+    "ui.expand": "\uD3BC\uCE58\uAE30",
+    "ui.expandBusy": "\uD3BC\uCE58\uAE30 \xB7 \uC791\uC5C5 \uC911",
+    "ui.expandFail": "\uD3BC\uCE58\uAE30 \xB7 \uC2E4\uD328\uD55C \uC791\uC5C5 \uC788\uC74C",
+    // 선택 표시줄(§4.1)
+    "sel.unnamed": "(\uC774\uB984 \uC5C6\uC74C)",
+    "sel.noneHere": "\uC120\uD0DD\uC774 \uC5C6\uC5B4\uC694 \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    "make.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC758 \uAC12\uC73C\uB85C \uB9CC\uB4E4\uC5B4\uC694",
+    // 공통 상태 줄(§4.1·§2.3)
+    "status.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4\uC5D0\uC11C \uD480 \uC218 \uC788\uC5B4\uC694",
+    "status.paidAction": "\uB77C\uC774\uC120\uC2A4 \u2192",
+    "lock.tipSuffix": "\uC720\uB8CC \uAE30\uB2A5 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4",
+    "status.noSelection": "\uC120\uD0DD\uC774 \uC5C6\uC5B4\uC694 \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    "status.failed": "{op} \uC2E4\uD328",
+    "status.view": "\uBCF4\uAE30",
+    // 작업 이름 — 최소화 중 실패 안내("{op} 실패 · [보기]")
+    "op.extract": "\uCD94\uCD9C",
+    "op.create": "\uD1A0\uD070 \uB9CC\uB4E4\uAE30",
+    "op.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "op.dark": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
+    "op.textScan": "\uD14D\uC2A4\uD2B8 \uC2A4\uCE94",
+    "op.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D",
+    "op.textApply": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
+    "op.bind": "\uC5F0\uACB0",
+    "op.rename": "\uC774\uB984 \uC815\uB9AC",
+    "op.components": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "op.export": "\uB0B4\uBCF4\uB0B4\uAE30",
+    "op.roles": "\uACC4\uCE35 \uC9C0\uC815",
+    "op.wizard": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
+    // 변수 탭 하위 화면(PR 1 중간 상태)
+    "var.goMake": "\uC0C9\uBD80\uD130 \uD558\uB098\uC529 \uB9CC\uB4E4\uAE30 \u2192",
+    "make.back": "\u2190 \uB3CC\uC544\uAC00\uAE30",
+    // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
+    "rail.color": "\uC0C9",
+    "rail.colorSub": "\uCD94\uCD9C\xB7\uBCC0\uC218",
+    "rail.token": "\uD1A0\uD070",
+    "rail.tokenSub": "\uAC04\uACA9\xB7\uD06C\uAE30",
+    "rail.theme": "\uD14C\uB9C8",
+    "rail.themeSub": "\uB2E4\uD06C \uBAA8\uB4DC",
+    "rail.type": "\uD0C0\uC774\uD3EC",
+    "rail.typeSub": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "rail.bind": "\uC5F0\uACB0",
+    "rail.rename": "\uC774\uB984",
+    "rail.structure": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "rail.next": "\uB2E4\uC74C \u2192",
+    // 플러그인 설정(#19) — 설정 탭에만
+    "settings.title": "\uAE30\uBCF8\uAC12",
+    "colRoles.title": "\uCEEC\uB809\uC158 \uACC4\uCE35",
+    "colRoles.hint": "\uC774\uB984\uC774 Global\xB7Semantic\xB7Component\uAC00 \uC544\uB2CC \uCEEC\uB809\uC158\uB3C4 \uACC4\uCE35\uC73C\uB85C \uC4F0\uAC8C \uC9C0\uC815\uD574\uC694. \uD30C\uC77C\uC5D0 \uC800\uC7A5\uB3FC \uC774 \uD30C\uC77C\uC744 \uC5EC\uB294 \uBAA8\uB450\uC5D0\uAC8C \uC801\uC6A9\uB3FC\uC694",
+    "colRoles.empty": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4\uC694.",
+    "colRoles.vars": "\uBCC0\uC218 {n}",
+    "colRoles.auto": "\uC790\uB3D9 \u2014 {role}",
+    "colRoles.autoNone": "\uC790\uB3D9 \u2014 \uACC4\uCE35 \uC544\uB2D8",
+    "colRoles.none": "\uACC4\uCE35 \uC544\uB2D8",
+    "colRoles.guess": "\uCD94\uCC9C: {role}",
+    "colRoles.useGuess": "\uCD94\uCC9C\uB300\uB85C",
+    "colRoles.saved": "{name} \u2192 {role}. \uC5F0\uACB0\xB7\uC5ED\uD560 \uCD94\uCC9C\xB7\uB0B4\uBCF4\uB0B4\uAE30\uAC00 \uC774 \uC9C0\uC815\uC744 \uB530\uB77C\uC694",
+    "colRoles.dup": "{role}\uC740(\uB294) \uD55C \uCEEC\uB809\uC158\uB9CC \uB9E1\uC544\uC694 \u2014 {prev}\uC758 \uC9C0\uC815\uC740 \uD480\uC5C8\uC5B4\uC694.",
+    "settings.hint": "\uB9CC\uB4E4\uAE30 \xB7 \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uC5D0 \uC4F0\uB294 \uAC12\uC774\uC5D0\uC694",
+    "settings.base": "\uAE30\uC900 \uD06C\uAE30",
+    "settings.depth": "\uC774\uB984 \uC815\uB9AC \uAE4A\uC774",
+    // 수동·폴백 행의 값 입력 칸 툴팁(칸이 좁아 라벨 대신 툴팁으로 설명한다).
+    "ts.family": "\uD3F0\uD2B8 \uC774\uB984 \u2014 \uC774 \uC774\uB984 \uADF8\uB300\uB85C \uC2A4\uD0C0\uC77C\uC5D0 \uC368\uC694",
+    "ts.size": "\uAE00\uC790 \uD06C\uAE30(px)",
+    "ts.lineHeight": "\uD589\uAC04(px) \xB7 0\uC774\uBA74 AUTO",
+    "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB3FC\uC694",
+    "ts.weight": "\uAD75\uAE30 \u2014 Regular \xB7 Medium \xB7 SemiBold \xB7 Bold \uCC98\uB7FC Figma\uAC00 \uC4F0\uB294 \uC774\uB984",
+    "settings.grid": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uACA9\uC790",
+    "settings.gridTip": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC744 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
+    // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
+    "create.snapNoBind": " \xB7 \uACA9\uC790\uB85C \uC62E\uAE34 {k}\uAC1C \uAC12\uC740 \uC6D0\uB798 \uB808\uC774\uC5B4\uC640 \uB2EC\uB77C \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694",
+    // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
+    "create.tidyUndo": "\uB418\uB3CC\uB9AC\uAE30",
+    // 마법사 카드
+    "wizardCard.title": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
+    "wizardCard.hint": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uACE0 \uB808\uC774\uC5B4 \uC774\uB984\uC744 \uC815\uB9AC\uD574\uC694",
+    "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "wizardCard.optDark": "\uB2E4\uD06C",
+    "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
+    // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
+    // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
+    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
+    // 공통(정적 라벨)
+    "common.selectAll": "\uC804\uCCB4",
+    "prereq.gotoCreate": "\uD1A0\uD070 \uB9CC\uB4E4\uAE30\uB85C \u2192",
+    // 온보딩 / 가이드
+    // 첫 실행 배너(온보딩 흡수)
+    // 진행(파이프라인 카드)
+    "pipeline.indep": "\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uB808\uC774\uC5B4 \u203A \uCEF4\uD3EC\uB10C\uD2B8\uC5D0\uC11C",
+    // 브랜드 팔레트
+    "color.title": "\uC0C9",
+    "color.scope": "\uBCC0\uC218\uD654",
+    "color.listHint": "\uCD94\uCD9C\xB7\uC815\uB9AC\uB41C \uC0C9 \xB7 Global = hue \xB7 Semantic = \uC5ED\uD560",
+    "color.makeVars": "\uC0C9 \uBCC0\uC218 \uB9CC\uB4E4\uAE30",
+    "palette.brand2": "\uBCF4\uC870\uC0C9",
+    "palette.harmony": "\uD558\uBAA8\uB2C8",
+    "palette.neutral": "\uC911\uB9BD",
+    "palette.status": "\uC0C1\uD0DC",
+    "palette.gen": "\uD314\uB808\uD2B8 \uC0DD\uC131",
+    // 하모니 선택지 — 보조색을 브랜드색에서 몇 도 돌려 뽑을지.
+    "harmony.complementary": "\uBCF4\uC0C9",
+    "harmony.analogous": "\uC720\uC0AC",
+    "harmony.triadic": "\uC0BC\uAC01",
+    "harmony.split": "\uBD84\uD560\uBCF4\uC0C9",
+    "harmony.tetradic": "\uC0AC\uAC01",
+    // 추출
+    "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
+    // 색 정리(추출 카드에 흡수)
+    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
+    "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB3FC\uC694. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC5ED\uD560\uC740 Semantic\uC73C\uB85C \uBD99\uC5B4\uC694.",
+    // 토큰 생성
+    "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
+    "create.scopeHint": "\uC5EC\uBC31\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC \uB2E4\uB904\uC694. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uC774\uBBF8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
+    "create.selectAll": "\uC804\uCCB4",
+    "create.dropOnce": "1\xD7 \uD574\uC81C",
+    "create.dropOnceTip": "\uD55C \uB808\uC774\uC5B4\uC5D0\uC11C\uB9CC \uC4F0\uC778 \uAC12(1\xD7)\uC758 \uCCB4\uD06C\uB97C \uD480\uC5B4\uC694 \u2014 \uB300\uAC1C \uC77C\uD68C\uC131\uC774\uB77C \uD1A0\uD070\uC73C\uB85C \uB0A8\uAE38 \uD544\uC694\uAC00 \uC801\uC5B4\uC694",
+    "create.previewBtn": "\uBBF8\uB9AC\uBCF4\uAE30",
+    "create.apply": "\uC801\uC6A9",
+    // 토큰 행 — 체크박스·등장 횟수(N×)는 라벨을 놓을 자리가 없어 툴팁으로만 뜻을 밝힌다.
+    "create.rowCheckTip": "\uC0DD\uC131 \uB300\uC0C1",
+    "create.rowCountTip": "\uC774 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4 {count}\uAC1C",
+    // 시맨틱 매핑 카드
+    "semantic.title": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551 (\uC5ED\uD560 \u2192 \uD1A0\uD070)",
+    "semantic.formatLabel": "\uD615\uC2DD: <code>\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984</code>",
+    "semantic.aliasBtn": "\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131",
+    "semantic.scanBtn": "\uAE30\uC874 \uC0C9\uC5D0\uC11C \uCD94\uCC9C",
+    // 텍스트 스타일
+    "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uD654\uBA74 \uC5F0\uACB0\uC740 \uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C",
+    "textStyle.scanBtn": "\uC2A4\uCE94",
+    "textStyle.addRow": "\uD589 \uCD94\uAC00",
+    // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
+    // 지금 무슨 일이 일어나는지를 적는다.
+    "textStyle.rowLabelBtn": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984 \uCC44\uC6B0\uAE30",
+    "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD10\uC694. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026) \uADF8\uB300\uB85C \uB46C\uC694.",
+    "textStyle.applyExistingBtn": "\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
+    "textStyle.applyExistingTip": "\uC120\uD0DD\uD55C \uAE00\uC790\uB97C \uC774\uBBF8 \uB9CC\uB4E0 \uAC19\uC740 \uC2A4\uD0C0\uC77C\uC5D0 \uC5F0\uACB0\uD574\uC694. \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694.",
+    "textStyle.registerBtn": "\uB4F1\uB85D",
+    // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
+    "textStyle.namePlaceholder": "\uC2A4\uD0C0\uC77C \uC774\uB984",
+    "textStyle.nameBoundTip": "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C\uC774\uC5D0\uC694. \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC774 \uC2A4\uD0C0\uC77C\uC758 \uC774\uB984\uB9CC \uBC14\uB00C\uC5B4\uC694(\uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC74C).",
+    "textStyle.nameNewTip": "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB3FC\uC694(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).",
+    // ×N 배지 — 1개면 그 글자로 이동, 여럿이면 전부 선택.
+    "textStyle.badgeGoTip": "\uC774 \uAE00\uC790\uB85C \uC774\uB3D9",
+    "textStyle.badgeSelectTip": "\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 {count}\uAC1C \uC804\uCCB4 \uC120\uD0DD",
+    // 적용(바인딩)
+    "bind.nothing": "\uC5F0\uACB0\uD560 \uACF3\uC774 \uC5C6\uC5B4\uC694",
+    "bind.skipTotal": "\uAC74\uB108\uB700 {m}",
+    "bind.skipCappedTip": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0",
+    "bind.descNone": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "bind.selMany": "\uB808\uC774\uC5B4 {k}\uAC1C",
+    "bind.outside": "\uD544\uD130 \uBC16 {h}\uACF3 \uD3EC\uD568",
+    "bind.placeCount": " \xB7 {k}\uACF3",
+    "bind.layerTip": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uC120\uD0DD \xB7 \uC774 \uBAA9\uB85D\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
+    "bind.progress": "\uC9C4\uD589\uB960",
+    // 스킵 칩 툴팁 — 사유 건수(속성 단위)와 레이어 수가 다를 수 있어 레이어 쪽을 따로 밝힌다.
+    "bind.skipChipTip": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names}",
+    "bind.skipChipTipMore": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names} \uC678",
+    // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
+    // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.
+    // 키 = `color/` 접두사를 뗀 역할 경로의 `/`→`-` (color/background/brand-bold → background-brand-bold).
+    "role.none": "\uC5ED\uD560 \uC5C6\uC74C",
+    "role.background-default": "\uBA74",
+    "role.background-subtle": "\uC605\uC740 \uBA74",
+    "role.background-inverse": "\uBC18\uC804 \uBA74",
+    "role.background-brand": "\uC8FC\uC0C9 \uBA74",
+    "role.background-brand-bold": "\uC9C4\uD55C \uC8FC\uC0C9 \uBA74",
+    "role.background-brand-subtle": "\uC605\uC740 \uC8FC\uC0C9 \uBA74",
+    "role.background-accent": "\uAC15\uC870 \uBA74",
+    "role.background-success": "\uC131\uACF5 \uBA74",
+    "role.background-warning": "\uC8FC\uC758 \uBA74",
+    "role.background-danger": "\uC624\uB958 \uBA74",
+    "role.background-info": "\uC548\uB0B4 \uBA74",
+    "role.text-default": "\uAE00\uC790",
+    "role.text-subtle": "\uC605\uC740 \uAE00\uC790",
+    "role.text-inverse": "\uBC18\uC804 \uAE00\uC790",
+    "role.text-brand": "\uC8FC\uC0C9 \uAE00\uC790",
+    "role.text-success": "\uC131\uACF5 \uAE00\uC790",
+    "role.text-warning": "\uC8FC\uC758 \uAE00\uC790",
+    "role.text-danger": "\uC624\uB958 \uAE00\uC790",
+    "role.text-info": "\uC548\uB0B4 \uAE00\uC790",
+    "role.border-default": "\uD14C\uB450\uB9AC",
+    "role.border-bold": "\uC9C4\uD55C \uD14C\uB450\uB9AC",
+    "role.border-brand": "\uC8FC\uC0C9 \uD14C\uB450\uB9AC",
+    "role.border-danger": "\uC624\uB958 \uD14C\uB450\uB9AC",
+    "role.icon-default": "\uC544\uC774\uCF58",
+    "role.icon-subtle": "\uC605\uC740 \uC544\uC774\uCF58",
+    "role.icon-brand": "\uC8FC\uC0C9 \uC544\uC774\uCF58",
+    // 리네임
+    "rename.title": "\uC774\uB984 \uC815\uB9AC",
+    "rename.hint": "\uC5ED\uD560\uC5D0 \uB9DE\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uC73C\uB85C \uBC14\uAFD4\uC694. \uCD5C\uC0C1\uC704\xB7\uC778\uC2A4\uD134\uC2A4 \uC774\uB984\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
+    "rename.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
+    "rename.apply": "\uC774\uB984 \uC801\uC6A9",
+    // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
+    "rename.keep.root": "\uB8E8\uD2B8 \uBCF4\uC874",
+    "rename.keep.instance": "\uC778\uC2A4\uD134\uC2A4 \uBCF4\uC874",
+    "rename.keep.component": "\uCEF4\uD3EC\uB10C\uD2B8 \uBCF4\uC874",
+    "rename.keep.text": "\uD14D\uC2A4\uD2B8 \uBCF4\uC874",
+    "rename.keep.locked": "\uC7A0\uAE34 \uB808\uC774\uC5B4",
+    "rename.keep.meta": "\uC7A0\uAE08",
+    "rename.hideKeep": "\uC7A0\uAE08 \uC81C\uC678",
+    "rename.showKeep": "\uC7A0\uAE08 \uD45C\uC2DC",
+    // 컴포넌트 / 베리언트
+    "structure.title": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "structure.scope": "\uB2EE\uC740 \uD504\uB808\uC784",
+    "structure.groupComp": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4",
+    "structure.groupSimilar": "\uB2EE\uC740 \uD504\uB808\uC784",
+    "structure.groupVariant": "\uC120\uD0DD\uD55C \uCEF4\uD3EC\uB10C\uD2B8 \uC815\uB9AC",
+    "component.hint": "\uC704\uB294 \uD6C4\uBCF4 \uB4F1\uB85D, \uC544\uB798\uB294 \uB2EE\uC740 \uD504\uB808\uC784 \uBB36\uAE30. \uB2EE\uC740 \uC2A4\uCE94\uC740 \uBB34\uB8CC",
+    "component.scanBtn": "\uD6C4\uBCF4 \uC2A4\uCE94",
+    "component.registerBtn": "\uB4F1\uB85D",
+    "component.classifyBtn": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958",
+    "component.genMissingBtn": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131",
+    "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uC694. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uBE7C\uC694.",
+    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
+    "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB9CC \uAC19\uC740 \uC774\uB984\uB07C\uB9AC \uC138\uD2B8\uB85C \uB2E4\uC2DC \uBB36\uC5B4\uC694.",
+    "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6CC\uC694.",
+    "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC5B4\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
+    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
+    "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC73C\uB85C \uBB36\uC744 \uD504\uB808\uC784\uACFC \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.",
+    "similar.needScanAfterComp": "\u2018\uD6C4\uBCF4 \uC2A4\uCE94\u2019 \uACB0\uACFC\uB294 \u2018\uB4F1\uB85D\u2019\uC774 \uC368\uC694. \uBB36\uAE30\uB294 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC744 \uBA3C\uC800 \uC2E4\uD589\uD558\uC138\uC694.",
+    // 내보내기
+    "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
+    "export.hint": "\uB204\uB974\uBA74 \uBC14\uB85C \uCF54\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uB3FC\uC694",
+    "export.runBtn": "\uB0B4\uBCF4\uB0B4\uAE30",
+    // 셀렉트는 값이 곧 라벨이라 머리말이 없다 — 무엇을 고르는 칸인지는 툴팁이 맡는다.
+    "export.formatTip": "\uB0B4\uBCF4\uB0BC \uCF54\uB4DC \uD615\uC2DD",
+    "export.fmtW3c": "W3C \uD1A0\uD070 JSON",
+    "export.fmtCss": "CSS \uBCC0\uC218",
+    "export.fontUnitTip": "\uD3F0\uD2B8 \uD06C\uAE30 \uB2E8\uC704 \u2014 rem\uC740 \uAE30\uC900 \uD06C\uAE30\uB85C \uB098\uB220\uC694",
+    // 요금제 / 라이선스
+    "license.title": "\uB77C\uC774\uC120\uC2A4",
+    "license.keyPlaceholder": "\uB77C\uC774\uC120\uC2A4 \uD0A4 \uC785\uB825",
+    "license.verify": "\uAC80\uC99D",
+    "license.clear": "\uD574\uC81C",
+    "license.clearTip": "\uC774 \uAE30\uAE30\uC758 \uD65C\uC131\uD654\uB97C \uBC18\uB0A9\uD574\uC694. \uC0C8 \uAE30\uAE30\uC5D0\uC11C \uAC19\uC740 \uD0A4\uB97C \uB2E4\uC2DC \uAC80\uC99D\uD558\uBA74 \uB3FC\uC694.",
+    "license.hint": "\uC720\uB8CC\uB97C \uC4F0\uBA74 \u{1F512} \uC7A0\uAE34 \uAE30\uB2A5\uC774 \uD480\uB824\uC694",
+    // 한 버튼이 티어에 따라 갈린다(결정 2026-08-06) — 라벨은 두 목적지를 함께 적는다.
+    "license.manage": "\uACB0\uC81C \xB7 \uAD6C\uB3C5 \uAD00\uB9AC \u2197",
+    "license.manageTip": "\uBB34\uB8CC\uBA74 \uACB0\uC81C \uD398\uC774\uC9C0\uB85C, \uAD6C\uB3C5 \uC911\uC774\uBA74 \uACB0\uC81C\uC218\uB2E8\xB7\uAE30\uAE30 \uD65C\uC131\uD654\uB97C \uAD00\uB9AC\uD558\uB294 \uD398\uC774\uC9C0\uB85C \uC5F4\uC5B4\uC694",
+    "license.devTier": "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C \uD2F0\uC5B4",
+    "license.devTierNote": "(\uAC80\uC99D\uB41C \uD0A4\uAC00 \uC5C6\uC744 \uB54C\uB9CC \uC801\uC6A9)",
+    // PR 4 — 코드에 직접 쓰던 문구를 옮김(docs/pr4-copy-table.md). 조각을 받는 자리는 {…Part}
+    // 공통 · 접근성 이름
+    "tab.listAria": "\uC791\uC5C5 \uD0ED",
+    "rail.layerAria": "\uB808\uC774\uC5B4 \uC791\uC5C5",
+    "rail.makeAria": "\uB9CC\uB4E4\uAE30 \uB2E8\uACC4",
+    "list.sideAria": "\uBCC0\uC218 \uCEEC\uB809\uC158",
+    "list.gridAria": "\uBCC0\uC218 \uBAA9\uB85D",
+    "common.retry": "\uB2E4\uC2DC \uC2DC\uB3C4",
+    // 레이어 › 연결
+    "bind.linking": "\uC5F0\uACB0 \uC911\u2026",
+    "bind.progressOf": "{done} / {total} \uCC98\uB9AC \uC911\u2026 ({pct}%)",
+    "bind.progressCount": "{done}\uAC1C \uCC98\uB9AC \uC911\u2026",
+    "bind.skipSelected": "{reason} \uB808\uC774\uC5B4 {n}\uAC1C \uC120\uD0DD",
+    // 레이어 › 이름
+    "rename.count": "\uD6C4\uBCF4 {total}",
+    // 레이어 › 컴포넌트 — 등록 결과 꼬리 · 트리 배지 · 리포트
+    "component.extraSkipped": " \xB7 \uAC74\uB108\uB700 {n}",
+    "component.extraSingles": " \xB7 \uB2E8\uC77C {n}",
+    "component.extraProps": " \xB7 \uC18D\uC131 {n}",
+    "component.extraIcons": " \xB7 \uC544\uC774\uCF58 {n}",
+    "component.extraMissing": " \xB7 \uBE48 \uC870\uD569 \uC788\uC74C",
+    "component.tagAdded": "\uC0DD\uC131",
+    "component.variantFallback": "\uBCA0\uB9AC\uC5B8\uD2B8",
+    "component.badgeSet": "\uC138\uD2B8",
+    "component.changeProps": "{name} \xB7 \uC18D\uC131",
+    "component.badgeProps": "\uC18D\uC131",
+    "component.nameFallback": "\uCEF4\uD3EC\uB10C\uD2B8",
+    "component.badgeSingle": "\uB2E8\uB3C5",
+    "component.count": "\uD6C4\uBCF4 {total}",
+    "component.tagMissing": "\uBE48 \uC870\uD569",
+    "component.headMissing": "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):",
+    "component.tagIssue": "\uBB38\uC81C",
+    "component.headIssue": "\uCC98\uB9AC \uC911 \uBB38\uC81C {n}\uAC74:",
+    "component.tagCount": "{tag} {n}\uAC1C",
+    // 컴포넌트 “처리 중 문제” 진단 — 내부 말(속성접힘 · 결합 · 정렬)은 그대로(결정 ⑨)
+    "component.fail.copyPlaced": "\uC778\uC2A4\uD134\uC2A4 \uB300\uC2E0 \uBCF5\uC0AC\uBCF8\uC744 \uB480\uC5B4\uC694({label} \u2192 {name}){causePart}",
+    "component.fail.nothingPlaced": "\uC81C\uC790\uB9AC\uC5D0 \uC544\uBB34\uAC83\uB3C4 \uB450\uC9C0 \uBABB\uD588\uC5B4\uC694({label} \u2192 {name}){causePart}",
+    "component.fail.cause": " \u2014 {why}",
+    "component.fail.instanceMake": "\uC778\uC2A4\uD134\uC2A4\uB97C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694: {error}",
+    "component.fail.instancePlace": "\uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "component.fail.propValue": "\uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC5B4 \uB9C8\uC2A4\uD130 \uAC12\uC73C\uB85C \uB480\uC5B4\uC694({name} \xB7 {prop})",
+    "component.fail.fillKept": "\uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uBB36\uC9C0 \uC54A\uACE0 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name}){causePart}",
+    "component.fail.memberKept": "\uC81C\uC790\uB9AC\uC5D0 \uB123\uC9C0 \uBABB\uD574 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name}){causePart}",
+    // 속성 접힘 멤버 검사(§4.7 8번) 사유 — 위 두 줄의 {causePart}에 들어간다
+    "component.fit.size": "\uD06C\uAE30 {w}\xD7{h} \u2260 {mw}\xD7{mh}",
+    "component.fit.noPhoto": "\uC0AC\uC9C4 \uC790\uB9AC \uC5C6\uC74C({path})",
+    "component.fit.self": "\uC790\uC2E0",
+    "component.fit.photoDiff": "\uC0AC\uC9C4 \uB2E4\uB984({name})",
+    "component.fit.photoSize": "\uC0AC\uC9C4 \uD06C\uAE30 {w}\xD7{h} \u2260 {mw}\xD7{mh}({name})",
+    "component.fail.single": "\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328({name}): {error}",
+    "component.fail.propsRegister": "\uC18D\uC131\uC811\uD798 \uB4F1\uB85D \uC2E4\uD328({set}): {error}",
+    "component.fail.iconFallback": "\uC544\uC774\uCF58\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD574 \uC138\uD2B8\uB85C \uB4F1\uB85D\uD574\uC694({set})",
+    "component.fail.propsComponentize": "\uC18D\uC131\uC811\uD798 \uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328({name}): {error}",
+    "component.fail.expose": "\uC18D\uC131 \uB178\uCD9C \uC2E4\uD328({name}): {error}",
+    "component.fail.exposeAll": "\uC18D\uC131 \uB178\uCD9C \uC2E4\uD328: {error}",
+    "component.fail.componentize": "\uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328({name}): {error}",
+    "component.fail.combine": "\uACB0\uD569 \uC2E4\uD328({set}): {error}",
+    "component.fail.arrange": "\uC815\uB82C \uC2E4\uD328({set}): {error}",
+    "component.fail.iconComponent": "\uC544\uC774\uCF58 \uCEF4\uD3EC\uB10C\uD2B8 \uC2E4\uD328({name}): {error}",
+    "component.fail.iconSwap": "\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328({layer})",
+    "component.fail.iconSwapPlace": "\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328({layer}): \uC81C\uC790\uB9AC\uC5D0 \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "component.fail.iconSwapErr": "\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328({layer}): {error}",
+    "component.fail.photoNoSlot": "\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328({path}) \u2014 \uC790\uB9AC\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "component.fail.photo": "\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328({path}): {error}",
+    // 레이어 › 컴포넌트 — 닮은 프레임 묶기
+    "similar.scanning": "\uB2EE\uC740 \uD504\uB808\uC784\uC744 \uCC3E\uB294 \uC911\u2026",
+    "similar.componentizing": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uB294 \uC911\u2026",
+    "similar.failed": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694{warnPart}",
+    "similar.failedWarn": " \u2014 {warning}",
+    "similar.resMaster": "\uB9C8\uC2A4\uD130 {name}",
+    "similar.resInstances": "\uC778\uC2A4\uD134\uC2A4 {n}\uAC1C",
+    "similar.resProps": "\uC18D\uC131 {n}\uAC1C",
+    "similar.resImages": "\uC774\uBBF8\uC9C0 {n}\uAC1C",
+    "similar.resKept": " \xB7 \uB0A8\uACA8\uB454 \uAC83 {n}\uAC74: {warning}",
+    "similar.metaText": "\uD14D\uC2A4\uD2B8 {filled}/{total}",
+    "similar.metaImages": "\uC774\uBBF8\uC9C0 {n}",
+    "similar.metaEmpty": "\uBE48 \uCE78 {n}",
+    "similar.recommended": "\uCD94\uCC9C",
+    "similar.count": "\uB2EE\uC740 {n}\uAC1C",
+    "similar.needTwo": "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC744 2\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD558\uC138\uC694.",
+    "similar.none": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD560 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 {why}",
+    "similar.openText": "\uD14D\uC2A4\uD2B8 {n}",
+    "similar.openSwap": "\uC544\uC774\uCF58 \uAD50\uCCB4 {n}",
+    "similar.openImage": "\uC774\uBBF8\uC9C0 {n}",
+    "similar.opened": "\uC18D\uC131\uC73C\uB85C \uC5F4\uB9BC: {list}",
+    "similar.noVarying": "\uAC00\uBCC0 \uC704\uCE58\uAC00 \uC5C6\uC5B4 \uC18D\uC131\uC740 \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694",
+    "similar.excluded": " \xB7 \uC81C\uC678 {n}\uAC1C({why})",
+    "similar.scanned": "\uB300\uC0C1 {n}\uAC1C \xB7 {openPart}{skipPart}",
+    "similar.noMaster": "\uB9C8\uC2A4\uD130 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
+    "similar.tooFew": "\uB300\uC0C1 \uD504\uB808\uC784\uC774 2\uAC1C\uBCF4\uB2E4 \uC801\uC5B4\uC694. \uB2E4\uC2DC \uC2A4\uCE94\uD558\uC138\uC694.",
+    "similar.overrideFail": "{name}: \uC18D\uC131 \uC624\uBC84\uB77C\uC774\uB4DC \uC2E4\uD328 \u2014 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
+    "similar.placeFail": "{name}: \uC81C\uC790\uB9AC\uC5D0 \uB458 \uC218 \uC5C6\uC5B4 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
+    "similar.why.needTwo": "\uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uD544\uC694",
+    "similar.why.mismatch": "\uAD6C\uC870 \uBD88\uC77C\uCE58",
+    "similar.why.fewSame": "\uB3D9\uC77C \uAD6C\uC870 \uD504\uB808\uC784 2\uAC1C \uBBF8\uB9CC",
+    // 만들기 › 색 · 토큰
+    "create.hintPreview": "\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uC138\uC694.",
+    "create.hintNoSel": "\uB808\uC774\uC5B4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.",
+    "create.hintReveal": "\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uB9CC\uB4E4 \uD1A0\uD070\uC774 \uBCF4\uC5EC\uC694",
+    "create.onlyColors": "\uC0C9 \uC678 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694(\uC0C9\uB9CC \uBF51\uC558\uC5B4\uC694)",
+    "create.count": "\uD6C4\uBCF4 {sel}/{total}",
+    "color.usedCount": " \xB7 {n}\xD7 \uC0AC\uC6A9",
+    "create.tidyMerged": " \xB7 \uAC19\uC740 \uCE78 {n}\uAC1C \uBCD1\uD569",
+    "create.tidySummary": "\uC5EC\uBC31\xB7\uD06C\uAE30 {before} \u2192 {after}\uAC1C ({grid}px \uACA9\uC790\uB85C {n}\uAC1C \uC774\uB3D9{mergedPart}){gapPart}",
+    "create.tidyUndone": "\uACA9\uC790 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694 \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB2E4\uC2DC \uB204\uB974\uBA74 \uB610 \uC815\uB9AC\uD574\uC694",
+    "create.onceOff": "1\xD7 \uD1A0\uD070 {n}\uAC1C \uD574\uC81C",
+    "create.onceNone": "1\xD7 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694",
+    "color.selInfo": "\uC120\uD0DD {n}\uAC1C \xB7 \uC0C9 {c} \xB7 \uADF8 \uC678 {o}",
+    "palette.lowChroma": "\uBE0C\uB79C\uB4DC\uC0C9\uC758 \uCC44\uB3C4\uAC00 \uB108\uBB34 \uB0AE\uC544 hue\uAC00 \uD754\uB4E4\uB824\uC694 \u2014 \uC911\uB9BD(neutral) \uC2A4\uCF00\uC77C\uC744 \uAD8C\uD574\uC694",
+    "create.sumGlobals": "Global {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u})",
+    "create.sumPruned": " \xB7 \uC774\uC804 \uC0C9 {n}\uAC1C \uC815\uB9AC",
+    "create.sumBase": " \xB7 base {base}px \uD658\uC0B0 {n}\uAC1C({examples}{morePart})",
+    "create.sumBaseMore": " \uC678",
+    "extract.skipHidden": "\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD654\uBA74\uC5D0 \uC5C6\uB294 \uAC12\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694 \u2014 \uBCF4\uC774\uAC8C \uD55C \uB4A4 \uB2E4\uC2DC \uCD94\uCD9C\uD558\uC138\uC694.",
+    "extract.skipInstance": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD\uC740 \uB9C8\uC2A4\uD130 \uBCF5\uC0AC\uBCF8\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694 \u2014 \uAC12\uC774 \uD544\uC694\uD558\uBA74 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC120\uD0DD\uD574 \uCD94\uCD9C\uD558\uC138\uC694.",
+    "extract.skipGradient": "\uADF8\uB77C\uB514\uC5B8\uD2B8\xB7\uC774\uBBF8\uC9C0 \uCC44\uC6C0\uC740 \uBCC0\uC218\uB85C \uBB36\uC744 \uC218 \uC5C6\uC5B4 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694.",
+    "extract.skipFraction": "\uC18C\uC218 \uAC12(26.67px \uB4F1)\uC740 \uCC99\uB3C4\uAC00 \uC544\uB2C8\uB77C \uC2A4\uCF00\uC77C \uC794\uAC12\uC774\uB77C \uD1A0\uD070\uC5D0\uC11C \uBE90\uC5B4\uC694.",
+    // 만들기 › 테마(역할 매핑 · 다크)
+    "semantic.needGlobal": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
+    "dark.prereqLoading": "\uBCC0\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
+    "dark.prereqNoVars": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
+    "dark.prereqNoModes": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158(\uBCF4\uD1B5 Semantic)\uC744 \uACE0\uB974\uC138\uC694.",
+    "dark.prereqPick": "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
+    "dark.running": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026",
+    "dark.whyNoGlobal": "Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 {n}\uAC1C)",
+    "dark.whyNone": "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694",
+    "dark.modeAdded": "\uB2E4\uD06C \uBAA8\uB4DC\uB294 \uCD94\uAC00\uD588\uC5B4\uC694. ",
+    "dark.fillFailed": "{modePart}\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
+    "dark.modeAddedShort": "\uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00 \xB7 ",
+    "dark.skippedDirect": " \xB7 \uAC74\uB108\uB700 {n}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
+    "dark.done": "{modePart}\uB2E4\uD06C {n}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 {c}\uAC1C{skipPart}",
+    "dark.errNoCol": "\uCEEC\uB809\uC158\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
+    "dark.errAddMode": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
+    "dark.errAddModePlan": "\uD50C\uB79C\uC5D0\uC11C \uBAA8\uB4DC\uB97C \uB354 \uB9CC\uB4E4 \uC218 \uC5C6\uC744 \uC218 \uC788\uC5B4\uC694.",
+    "dark.errSameMode": "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694 \u2014 \uB77C\uC774\uD2B8\uC5D0 \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
+    // 만들기 › 타이포(텍스트 스타일)
+    "textStyle.rowDelete": "\uC0AD\uC81C",
+    "textStyle.scanSummary": "\uC2E0\uADDC {a} \xB7 \uB4F1\uB85D\uB428 {b}",
+    "textStyle.scanLhPct": " \xB7 \uD589\uAC04% {n}",
+    "textStyle.scanLsPct": " \xB7 \uC790\uAC04% {n}",
+    "textStyle.renaming": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE30\uB294 \uC911\u2026",
+    "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uD558\uAC70\uB098 \u2018\uD589 \uCD94\uAC00\u2019\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC815\uC758\uD558\uC138\uC694.",
+    "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 \uD06C\uAE30 \uC21C {b}",
+    "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
+    "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
+    "textStyle.unlinked": " \xB7 \uBBF8\uC5F0\uACB0: {names}",
+    "textStyle.needScan": "\uBA3C\uC800 \uC2A4\uCE94\uD558\uC138\uC694 \u2014 \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE38 \uD45C\uBCF8\uC774 \uC5C6\uC5B4\uC694.",
+    "textStyle.warnMixed": "\uBD80\uBD84 \uC11C\uC2DD(\uD63C\uD569) \uD14D\uC2A4\uD2B8\uB294 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694.",
+    "textStyle.missRename": "\uC774\uB984 \uCDA9\uB3CC '{from}'\u2192'{to}' \u2014 \uAC19\uC740 \uC774\uB984 \uC2A4\uD0C0\uC77C\uC774 \uC788\uC5B4 \uC774\uB984\uC744 \uBC14\uAFB8\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "textStyle.noteLhPx": "{name}: \uC5ED\uD560\uB9C8\uB2E4 \uD589\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)",
+    "textStyle.noteLsPx": "{name}: \uC5ED\uD560\uB9C8\uB2E4 \uC790\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)",
+    "textStyle.missStyle": "{name}: \uD3F0\uD2B8 {style}\u2192Regular",
+    "textStyle.missFamily": "{name}: \uD3F0\uD2B8 '{family}' \uC5C6\uC74C",
+    "textStyle.noteKeepLh": "{name}: \uD589\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
+    "textStyle.noteKeepLs": "{name}: \uC790\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
+    "textStyle.noteLhPct": "{role}: \uD589\uAC04 {n}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uC5F0\uACB0 \uC548 \uD568",
+    "textStyle.noteLsPct": "{role}: \uC790\uAC04 {n}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uC5F0\uACB0 \uC548 \uD568",
+    // 설정 › 라이선스
+    "license.priceHint": "\uBB34\uB8CC \xB7 \uC720\uB8CC \uC5F0 $39 \xB7 \uAE30\uAE30 1\uB300",
+    "license.setupHint": "\uBC30\uD3EC \uC804\uC774\uB77C \uD0A4 \uAC80\uC99D\xB7\uAD6C\uB3C5 \uB9C1\uD06C\uB294 \uC544\uC9C1 \uB3D9\uC791\uD558\uC9C0 \uC54A\uC544\uC694",
+    // “현재” 줄 — FREE / PAID는 그대로(§2.9 예외)
+    "license.current": "\uD604\uC7AC: {tier} ({source}){expPart}",
+    "license.srcKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4{statusPart}",
+    "license.srcKeyStatus": " \xB7 {status}",
+    "license.status.active": "\uC0AC\uC6A9 \uC911",
+    "license.status.grace": "\uC720\uC608 \uAE30\uAC04",
+    "license.status.expired": "\uB9CC\uB8CC",
+    "license.srcDev": "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C",
+    "license.srcNone": "\uC5C6\uC74C",
+    "license.expires": " \xB7 \uB9CC\uB8CC {date}",
+    // 알림(code.ts postLicense) — 상태 줄
+    "license.noteApplied": "\uB77C\uC774\uC120\uC2A4\uB97C \uC801\uC6A9\uD588\uC5B4\uC694",
+    "license.noteGrace": "\uC624\uD504\uB77C\uC778\uC774\uC5D0\uC694 \u2014 \uC774 \uAE30\uAE30\uC5D0 \uC800\uC7A5\uB41C \uB77C\uC774\uC120\uC2A4\uB85C \uACC4\uC18D \uC368\uC694",
+    "license.noteOffline": "\uC624\uD504\uB77C\uC778\uC774\uC5D0\uC694 \u2014 \uD0A4\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC5B4\uC694",
+    "license.verifyFailed": "\uD0A4\uB97C \uD655\uC778\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uD0A4\uB97C \uB2E4\uC2DC \uD655\uC778\uD574 \uC8FC\uC138\uC694",
+    "license.noteCleared": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC9C0\uC6E0\uC5B4\uC694",
+    // 서버가 code로 알려 준 사유 — 상태 줄(결정 5-(b))
+    "license.err.server.expired": "\uAD6C\uB3C5\uC774 \uB05D\uB0AC\uC5B4\uC694 \u2014 \uACB0\uC81C \xB7 \uAD6C\uB3C5 \uAD00\uB9AC\uC5D0\uC11C \uAC31\uC2E0\uD558\uC138\uC694",
+    "license.err.server.invalid": "\uD0A4\uAC00 \uB9DE\uC9C0 \uC54A\uC544\uC694 \u2014 \uD0A4\uB97C \uB2E4\uC2DC \uD655\uC778\uD558\uC138\uC694",
+    "license.err.server.limit": "\uAE30\uAE30 \uD65C\uC131\uD654 \uD55C\uB3C4\uB97C \uB118\uC5C8\uC5B4\uC694 \u2014 \uB2E4\uB978 \uAE30\uAE30\uC5D0\uC11C [\uD574\uC81C]\uD55C \uB4A4 \uB2E4\uC2DC \uAC80\uC99D\uD558\uC138\uC694",
+    "license.err.server.server": "\uAC80\uC99D \uC11C\uBC84\uC5D0 \uBB38\uC81C\uAC00 \uC788\uC5B4\uC694 \u2014 \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694",
+    // 플러그인 쪽 기술 사유 — 툴팁(noteTip)에만
+    "license.err.badBody": "\uC751\uB2F5 \uBCF8\uBB38\uC744 \uD574\uC11D\uD560 \uC218 \uC5C6\uC5B4\uC694",
+    "license.err.noToken": "\uC11C\uBA85 \uD1A0\uD070\uC774 \uC5C6\uB294 \uC751\uB2F5",
+    "license.err.b64Len": "\uC798\uBABB\uB41C base64url \uAE38\uC774",
+    "license.err.b64Char": "\uC798\uBABB\uB41C base64url \uBB38\uC790",
+    "license.err.notJwt": "JWT \uD615\uC2DD \uC544\uB2D8(\uC810 3\uBD84\uD560 \uD544\uC694)",
+    "license.err.noExp": "exp \uD074\uB808\uC784 \uC5C6\uC74C",
+    "license.err.expired": "\uD1A0\uD070 \uB9CC\uB8CC\uB428",
+    "license.err.notYet": "\uC544\uC9C1 \uC720\uD6A8\uD558\uC9C0 \uC54A\uC740 \uD1A0\uD070(nbf)",
+    "license.err.iss": "\uBC1C\uAE09\uC790(iss) \uBD88\uC77C\uCE58",
+    "license.err.aud": "\uB300\uC0C1(aud) \uBD88\uC77C\uCE58",
+    "license.err.tier": "\uC54C \uC218 \uC5C6\uB294 \uD2F0\uC5B4",
+    "license.err.decode": "\uD1A0\uD070 \uB514\uCF54\uB4DC \uC2E4\uD328",
+    "license.err.alg": "\uC11C\uBA85 \uC54C\uACE0\uB9AC\uC998 \uC5C6\uC74C(alg=none \uAC70\uBD80)",
+    "license.err.sig": "\uC11C\uBA85 \uAC80\uC99D \uC2E4\uD328",
+    // 오류 설명(errors.ts explainError) — 설명 · 할 일
+    "err.font": "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC5B4\uC694.",
+    "err.fontAction": "\uADF8 \uD3F0\uD2B8\uB97C \uC124\uCE58\xB7\uD65C\uC131\uD654\uD55C \uB4A4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.",
+    "err.scope": "\uBCC0\uC218 \uC2A4\uCF54\uD504\uAC00 \uB9DE\uC9C0 \uC54A\uC544\uC694.",
+    "err.scopeAction": "\u2018\uD1A0\uD070 \uB9CC\uB4E4\uAE30\u2019\uB97C \uB2E4\uC2DC \uC2E4\uD589\uD574 \uC2A4\uCF54\uD504\uB97C \uAC31\uC2E0\uD558\uC138\uC694.",
+    "err.prop": "\uC18D\uC131 \uAC12\uC774 \uB9DE\uC9C0 \uC54A\uC544\uC694(\uC608: \uBC1C\uD589 \uC548 \uD55C \uCEF4\uD3EC\uB10C\uD2B8).",
+    "err.propAction": "\uCEF4\uD3EC\uB10C\uD2B8\uB97C \uBC1C\uD589\uD558\uAC70\uB098 \uB300\uC0C1 \uB808\uC774\uC5B4\uB97C \uD655\uC778\uD558\uC138\uC694.",
+    "err.readonly": "\uD3B8\uC9D1 \uAD8C\uD55C\uC774 \uC5C6\uAC70\uB098 \uC77D\uAE30 \uC804\uC6A9 \uD30C\uC77C\uC774\uC5D0\uC694.",
+    "err.readonlyAction": "\uD3B8\uC9D1 \uAC00\uB2A5\uD55C \uD30C\uC77C\uC5D0\uC11C \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.",
+    "err.network": "\uB124\uD2B8\uC6CC\uD06C \uC624\uB958\uAC00 \uB0AC\uC5B4\uC694.",
+    "err.networkAction": "\uC5F0\uACB0\uC744 \uD655\uC778\uD558\uACE0 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.",
+    "err.storage": "\uB85C\uCEEC \uC800\uC7A5\uC18C\uC5D0 \uC811\uADFC\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694.",
+    "err.storageAction": "\uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.",
+    "err.unknown": "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958",
+    "err.unknownAction": "\uC120\uD0DD\uC744 \uD655\uC778\uD558\uACE0 \uB2E4\uC2DC \uC2DC\uB3C4\uD558\uC138\uC694.",
+    "err.badHex": "\uC798\uBABB\uB41C hex: {value}"
+    // 접근성 · 국제화
+  };
+  function t(key, vars) {
+    var _a;
+    const tpl = (_a = STRINGS[key]) != null ? _a : key;
+    if (!vars) return tpl;
+    return tpl.replace(/\{(\w+)\}/g, (_, k) => k in vars ? String(vars[k]) : `{${k}}`);
+  }
+
   // src/lib/tokens.ts
   var clamp01 = (n) => Math.min(1, Math.max(0, n));
   var to255 = (c) => Math.round(clamp01(c) * 255);
@@ -34,7 +899,7 @@
   }
   function hexToRgb(hex) {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-    if (!m) throw new Error(`\uC798\uBABB\uB41C hex: ${hex}`);
+    if (!m) throw new Error(t("err.badHex", { value: hex }));
     const n = parseInt(m[1], 16);
     return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
   }
@@ -49,25 +914,25 @@
         return "FLOAT";
     }
   }
-  function resolvedTypeForToken(t) {
-    return resolvedTypeFor(t.category);
+  function resolvedTypeForToken(t2) {
+    return resolvedTypeFor(t2.category);
   }
-  function unitDescription(t) {
-    if ((t.category === "lineHeight" || t.category === "letterSpacing") && t.unit && t.unit !== "px" && typeof t.value === "number") {
-      return stringValueForUnit(t.value, t.unit);
+  function unitDescription(t2) {
+    if ((t2.category === "lineHeight" || t2.category === "letterSpacing") && t2.unit && t2.unit !== "px" && typeof t2.value === "number") {
+      return stringValueForUnit(t2.value, t2.unit);
     }
     return void 0;
   }
   function pxConversions(tokens, base) {
     var _a;
     const out = [];
-    for (const t of tokens) {
-      if (!t.unit || t.unit === "px" || typeof t.value !== "number") continue;
+    for (const t2 of tokens) {
+      if (!t2.unit || t2.unit === "px" || typeof t2.value !== "number") continue;
       out.push({
-        name: t.name,
-        from: stringValueForUnit(t.value, t.unit),
+        name: t2.name,
+        from: stringValueForUnit(t2.value, t2.unit),
         // 토큰이 자기 폰트 크기를 알고 있으면 그것으로 환산(없으면 base) — setGlobalLiteral과 같은 규칙.
-        to: toPx(t.value, t.unit, { base, fontSize: (_a = t.fontSize) != null ? _a : base })
+        to: toPx(t2.value, t2.unit, { base, fontSize: (_a = t2.fontSize) != null ? _a : base })
       });
     }
     return out;
@@ -176,11 +1041,11 @@
   }
 
   // src/lib/extract.ts
-  var SKIP_HIDDEN = "\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uD654\uBA74\uC5D0 \uC5C6\uB294 \uAC12\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uBCF4\uC774\uAC8C \uD55C \uB4A4 \uB2E4\uC2DC \uCD94\uCD9C\uD558\uC138\uC694.";
-  var SKIP_INSTANCE = "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uB9C8\uC2A4\uD130 \uBCF5\uC0AC\uBCF8\uC774\uB77C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uAC12\uC774 \uD544\uC694\uD558\uBA74 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC120\uD0DD\uD574 \uCD94\uCD9C\uD558\uC138\uC694.";
-  var SKIP_GRADIENT = "\uADF8\uB77C\uB514\uC5B8\uD2B8\xB7\uC774\uBBF8\uC9C0 \uCC44\uC6C0\uC740 \uBCC0\uC218\uB85C \uBB36\uC744 \uC218 \uC5C6\uC5B4 \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4.";
+  var SKIP_HIDDEN = t("extract.skipHidden");
+  var SKIP_INSTANCE = t("extract.skipInstance");
+  var SKIP_GRADIENT = t("extract.skipGradient");
   var round = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
-  var SKIP_FRACTION = "\uC18C\uC218 \uAC12(26.67px \uB4F1)\uC740 \uCC99\uB3C4\uAC00 \uC544\uB2C8\uB77C \uC2A4\uCF00\uC77C \uC794\uAC12\uC774\uB77C \uD1A0\uD070\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.";
+  var SKIP_FRACTION = t("extract.skipFraction");
   function onScale(acc, v, step = 1) {
     const ok = Math.abs(v / step - Math.round(v / step)) < 1e-6;
     if (!ok) acc.skipped.add(SKIP_FRACTION);
@@ -630,19 +1495,19 @@
     const idx = await buildVarIndex();
     const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base) };
     const touched = /* @__PURE__ */ new Set();
-    for (const t of tokens) {
-      const type = resolvedTypeForToken(t);
-      const g = upsertVariable(t.name, globalCol, type, idx);
+    for (const t2 of tokens) {
+      const type = resolvedTypeForToken(t2);
+      const g = upsertVariable(t2.name, globalCol, type, idx);
       summary[g.created ? "created" : "updated"]++;
       summary.globals++;
-      setGlobalLiteral(g.variable, gMode, t, type, base);
-      const scopes = scopesForType(scopesForSources(t.sources), type);
-      const key = vkey(globalCol.id, t.name);
+      setGlobalLiteral(g.variable, gMode, t2, type, base);
+      const scopes = scopesForType(scopesForSources(t2.sources), type);
+      const key = vkey(globalCol.id, t2.name);
       const merged = touched.has(key) ? scopesForType([.../* @__PURE__ */ new Set([...g.variable.scopes, ...scopes])], type) : scopes;
       touched.add(key);
       g.variable.scopes = merged;
       g.variable.hiddenFromPublishing = true;
-      const desc = unitDescription(t);
+      const desc = unitDescription(t2);
       if (desc) g.variable.description = desc;
     }
     return summary;
@@ -665,18 +1530,18 @@
       seen.add(k);
       summary[existing.has(k) ? "updated" : "created"]++;
     };
-    for (const t of tokens) tally(gId, t.name, "globals");
+    for (const t2 of tokens) tally(gId, t2.name, "globals");
     return summary;
   }
-  function setGlobalLiteral(v, modeId, t, type, base) {
+  function setGlobalLiteral(v, modeId, t2, type, base) {
     var _a;
     if (type === "COLOR") {
-      const { r, g, b } = hexToRgb(String(t.value));
+      const { r, g, b } = hexToRgb(String(t2.value));
       v.setValueForMode(modeId, { r, g, b, a: 1 });
     } else if (type === "STRING") {
-      v.setValueForMode(modeId, String(t.value));
+      v.setValueForMode(modeId, String(t2.value));
     } else {
-      const num = t.unit && t.unit !== "px" && typeof t.value === "number" ? toPx(t.value, t.unit, { base, fontSize: (_a = t.fontSize) != null ? _a : base }) : Number(t.value);
+      const num = t2.unit && t2.unit !== "px" && typeof t2.value === "number" ? toPx(t2.value, t2.unit, { base, fontSize: (_a = t2.fontSize) != null ? _a : base }) : Number(t2.value);
       v.setValueForMode(modeId, num);
     }
   }
@@ -761,14 +1626,14 @@
     }
     return { px, pct: 0 };
   }
-  function readNodeTypography(t) {
-    if (t.fontSize === figma.mixed || t.fontName === figma.mixed) return null;
+  function readNodeTypography(t2) {
+    if (t2.fontSize === figma.mixed || t2.fontName === figma.mixed) return null;
     return {
-      fontSize: t.fontSize,
-      family: t.fontName.family,
-      style: t.fontName.style,
-      lineHeight: t.lineHeight,
-      letterSpacing: t.letterSpacing
+      fontSize: t2.fontSize,
+      family: t2.fontName.family,
+      style: t2.fontName.style,
+      lineHeight: t2.lineHeight,
+      letterSpacing: t2.letterSpacing
     };
   }
   async function percentFromVariableDescription(varId, cache2) {
@@ -796,9 +1661,9 @@
     }
     return void 0;
   }
-  async function percentFromNodeBinding(t, field, cache2) {
+  async function percentFromNodeBinding(t2, field, cache2) {
     var _a;
-    const entry = (_a = t.boundVariables) == null ? void 0 : _a[field];
+    const entry = (_a = t2.boundVariables) == null ? void 0 : _a[field];
     if (!entry) return void 0;
     const alias = Array.isArray(entry) ? entry[0] : entry;
     if (!(alias == null ? void 0 : alias.id)) return void 0;
@@ -819,10 +1684,10 @@
       styleCache.set(id, st);
       return st;
     };
-    for (const t of texts) {
-      const typo = readNodeTypography(t);
+    for (const node of texts) {
+      const typo = readNodeTypography(node);
       if (!typo) {
-        warnings.add("\uBD80\uBD84 \uC11C\uC2DD(\uD63C\uD569) \uD14D\uC2A4\uD2B8\uB294 \uC2A4\uD0B5\uD588\uC2B5\uB2C8\uB2E4.");
+        warnings.add(t("textStyle.warnMixed"));
         continue;
       }
       const fontSize = roundN(typo.fontSize);
@@ -834,20 +1699,20 @@
       let letterSpacing = lsMeas.px;
       let letterSpacingPercent = lsMeas.pct;
       if (lineHeightPercent === 0) {
-        const fromVar = await percentFromNodeBinding(t, "lineHeight", varCache);
+        const fromVar = await percentFromNodeBinding(node, "lineHeight", varCache);
         if (fromVar !== void 0 && fromVar > 0) {
           lineHeightPercent = fromVar;
           lineHeight = roundN(fontSize * fromVar / 100);
         }
       }
       if (letterSpacingPercent === 0) {
-        const fromVar = await percentFromNodeBinding(t, "letterSpacing", varCache);
+        const fromVar = await percentFromNodeBinding(node, "letterSpacing", varCache);
         if (fromVar !== void 0 && fromVar !== 0) {
           letterSpacingPercent = fromVar;
           letterSpacing = roundN(fontSize * fromVar / 100);
         }
       }
-      const sid = t.textStyleId;
+      const sid = node.textStyleId;
       const styleId = sid === figma.mixed ? "" : sid;
       if (styleId) {
         const st = await styleOf(styleId);
@@ -866,16 +1731,16 @@
       }
       let characters = "";
       try {
-        characters = t.characters;
+        characters = node.characters;
       } catch (e) {
         characters = "";
       }
       let rowId;
       let indexInParent;
-      const parent = t.parent;
+      const parent = node.parent;
       if (parent && "layoutMode" in parent && parent.layoutMode === "HORIZONTAL" && "children" in parent) {
         rowId = parent.id;
-        indexInParent = parent.children.indexOf(t);
+        indexInParent = parent.children.indexOf(node);
         if (indexInParent < 0) indexInParent = void 0;
       }
       samples.push({
@@ -886,10 +1751,10 @@
         letterSpacingPercent,
         family,
         style,
-        layerName: t.name,
+        layerName: node.name,
         styleId,
         characters,
-        id: t.id,
+        id: node.id,
         rowId,
         indexInParent
       });
@@ -948,7 +1813,7 @@
       const occupant = styleByName.get(spec.name);
       if (occupant && occupant.id !== st.id) {
         renameBlocked.add(spec.boundStyleId);
-        res.missing.push(`\uC774\uB984 \uCDA9\uB3CC '${st.name}'\u2192'${spec.name}' \u2014 \uC774\uBBF8 \uAC19\uC740 \uC774\uB984 \uC2A4\uD0C0\uC77C\uC774 \uC788\uC5B4 rename \uBCF4\uB958`);
+        res.missing.push(t("textStyle.missRename", { from: st.name, to: spec.name }));
         continue;
       }
       roleRenames.push({ from: st.name, to: spec.name });
@@ -973,10 +1838,10 @@
     }
     const tokens = [];
     const seen = /* @__PURE__ */ new Set();
-    const pushTok = (t) => {
-      if (!seen.has(t.name)) {
-        seen.add(t.name);
-        tokens.push(t);
+    const pushTok = (t2) => {
+      if (!seen.has(t2.name)) {
+        seen.add(t2.name);
+        tokens.push(t2);
       }
     };
     const aliasMap = {};
@@ -984,9 +1849,9 @@
     const pushLineHeightTok = (name, px, pct2, fontSize) => {
       const prev = lhTokens.get(name);
       if (!prev) {
-        const t = pct2 > 0 ? { name, category: "lineHeight", value: pct2, unit: "percent", fontSize, sources: ["lineHeight"] } : { name, category: "lineHeight", value: px, unit: "px", sources: ["lineHeight"] };
-        lhTokens.set(name, t);
-        pushTok(t);
+        const t2 = pct2 > 0 ? { name, category: "lineHeight", value: pct2, unit: "percent", fontSize, sources: ["lineHeight"] } : { name, category: "lineHeight", value: px, unit: "px", sources: ["lineHeight"] };
+        lhTokens.set(name, t2);
+        pushTok(t2);
         return;
       }
       const prevPct = prev.unit === "percent" ? Number(prev.value) : 0;
@@ -994,15 +1859,15 @@
       prev.value = px;
       prev.unit = "px";
       prev.fontSize = void 0;
-      res.notes.push(`${name}: \uC5ED\uD560\uB9C8\uB2E4 \uD589\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)`);
+      res.notes.push(t("textStyle.noteLhPx", { name }));
     };
     const lsTokens = /* @__PURE__ */ new Map();
     const pushLetterSpacingTok = (name, px, pct2, fontSize) => {
       const prev = lsTokens.get(name);
       if (!prev) {
-        const t = pct2 !== 0 ? { name, category: "letterSpacing", value: pct2, unit: "percent", fontSize, sources: ["letterSpacing"] } : { name, category: "letterSpacing", value: px, unit: "px", sources: ["letterSpacing"] };
-        lsTokens.set(name, t);
-        pushTok(t);
+        const t2 = pct2 !== 0 ? { name, category: "letterSpacing", value: pct2, unit: "percent", fontSize, sources: ["letterSpacing"] } : { name, category: "letterSpacing", value: px, unit: "px", sources: ["letterSpacing"] };
+        lsTokens.set(name, t2);
+        pushTok(t2);
         return;
       }
       const prevPct = prev.unit === "percent" ? Number(prev.value) : 0;
@@ -1010,7 +1875,7 @@
       prev.value = px;
       prev.unit = "px";
       prev.fontSize = void 0;
-      res.notes.push(`${name}: \uC5ED\uD560\uB9C8\uB2E4 \uC790\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)`);
+      res.notes.push(t("textStyle.noteLsPx", { name }));
     };
     const pushAlias = (role, fontSize, lineHeight, letterSpacing, lineHeightPercent = 0, letterSpacingPercent = 0) => {
       pushTok({ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] });
@@ -1082,9 +1947,9 @@
             const fb = { family: spec.family, style: "Regular" };
             await figma.loadFontAsync(fb);
             loaded = fb;
-            res.missing.push(`${spec.name}: \uD3F0\uD2B8 ${spec.style}\u2192Regular`);
+            res.missing.push(t("textStyle.missStyle", { name: spec.name, style: spec.style }));
           } catch (e2) {
-            res.missing.push(`${spec.name}: \uD3F0\uD2B8 '${spec.family}' \uC5C6\uC74C`);
+            res.missing.push(t("textStyle.missFamily", { name: spec.name, family: spec.family }));
             continue;
           }
         }
@@ -1094,11 +1959,11 @@
         style.letterSpacing = lsPct !== 0 ? { value: lsPct, unit: "PERCENT" } : { value: spec.letterSpacing, unit: "PIXELS" };
       } else if (lhPct > 0 || lsPct !== 0) {
         if (lhPct > 0) {
-          if ((_h = style.boundVariables) == null ? void 0 : _h.lineHeight) res.notes.push(`${spec.name}: \uD589\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC2B5\uB2C8\uB2E4 \u2014 ${lhPct}% \uAD50\uC815 \uBCF4\uB958`);
+          if ((_h = style.boundVariables) == null ? void 0 : _h.lineHeight) res.notes.push(t("textStyle.noteKeepLh", { name: spec.name, n: lhPct }));
           else style.lineHeight = { value: lhPct, unit: "PERCENT" };
         }
         if (lsPct !== 0) {
-          if ((_i = style.boundVariables) == null ? void 0 : _i.letterSpacing) res.notes.push(`${spec.name}: \uC790\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC2B5\uB2C8\uB2E4 \u2014 ${lsPct}% \uAD50\uC815 \uBCF4\uB958`);
+          if ((_i = style.boundVariables) == null ? void 0 : _i.letterSpacing) res.notes.push(t("textStyle.noteKeepLs", { name: spec.name, n: lsPct }));
           else style.letterSpacing = { value: lsPct, unit: "PERCENT" };
         }
       }
@@ -1112,7 +1977,7 @@
         const pctNow = lhPctOf(style.lineHeight);
         if (pctNow > 0) {
           if ((_j = style.boundVariables) == null ? void 0 : _j.lineHeight) style.setBoundVariable("lineHeight", null);
-          res.notes.push(`${bindRole}: \uD589\uAC04 ${pctNow}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uBC14\uC778\uB529 \uC0DD\uB7B5`);
+          res.notes.push(t("textStyle.noteLhPct", { role: bindRole, n: pctNow }));
         } else {
           const lhVar = semByName.get(`line-height/${bindRole}`);
           if (lhVar) {
@@ -1125,7 +1990,7 @@
         const lsPctNow = lsPctOf(style.letterSpacing);
         if (lsPctNow !== 0) {
           if ((_k = style.boundVariables) == null ? void 0 : _k.letterSpacing) style.setBoundVariable("letterSpacing", null);
-          res.notes.push(`${bindRole}: \uC790\uAC04 ${lsPctNow}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uBC14\uC778\uB529 \uC0DD\uB7B5`);
+          res.notes.push(t("textStyle.noteLsPct", { role: bindRole, n: lsPctNow }));
         } else {
           const lsVar = semByName.get(`letter-spacing/${bindRole}`);
           if (lsVar) {
@@ -1139,36 +2004,36 @@
     }
     return res;
   }
-  function typoKey(t) {
+  function typoKey(t2) {
     var _a, _b, _c, _d;
-    const fontSize = roundN(t.fontSize);
-    const lh = t.lineHeight !== figma.mixed && t.lineHeight && t.lineHeight.unit === "AUTO" ? "auto" : String(lhPxOf(fontSize, t.lineHeight));
+    const fontSize = roundN(t2.fontSize);
+    const lh = t2.lineHeight !== figma.mixed && t2.lineHeight && t2.lineHeight.unit === "AUTO" ? "auto" : String(lhPxOf(fontSize, t2.lineHeight));
     return [
       fontSize,
       lh,
-      lsPxOf(fontSize, t.letterSpacing),
-      t.fontName.family,
-      t.fontName.style,
-      (_a = t.textCase) != null ? _a : "ORIGINAL",
-      (_b = t.textDecoration) != null ? _b : "NONE",
-      roundN((_c = t.paragraphSpacing) != null ? _c : 0),
-      roundN((_d = t.paragraphIndent) != null ? _d : 0)
+      lsPxOf(fontSize, t2.letterSpacing),
+      t2.fontName.family,
+      t2.fontName.style,
+      (_a = t2.textCase) != null ? _a : "ORIGINAL",
+      (_b = t2.textDecoration) != null ? _b : "NONE",
+      roundN((_c = t2.paragraphSpacing) != null ? _c : 0),
+      roundN((_d = t2.paragraphIndent) != null ? _d : 0)
     ].join("|");
   }
-  function isMixedTypography(t) {
-    return t.fontSize === figma.mixed || t.fontName === figma.mixed || t.lineHeight === figma.mixed || t.letterSpacing === figma.mixed || t.textCase === figma.mixed || t.textDecoration === figma.mixed;
+  function isMixedTypography(t2) {
+    return t2.fontSize === figma.mixed || t2.fontName === figma.mixed || t2.lineHeight === figma.mixed || t2.letterSpacing === figma.mixed || t2.textCase === figma.mixed || t2.textDecoration === figma.mixed;
   }
   var TEXT_VAR_FIELDS = ["fontSize", "lineHeight", "letterSpacing", "fontFamily"];
-  function hasTextVarBinding(t) {
-    const bv = t.boundVariables;
+  function hasTextVarBinding(t2) {
+    const bv = t2.boundVariables;
     if (!bv) return false;
     return TEXT_VAR_FIELDS.some((f) => {
       const e = bv[f];
       return Array.isArray(e) ? e.length > 0 : !!e;
     });
   }
-  function hasTextStyle(t) {
-    const id = t.textStyleId;
+  function hasTextStyle(t2) {
+    const id = t2.textStyleId;
     return id === figma.mixed || typeof id === "string" && id !== "";
   }
   function insideInstance(node) {
@@ -1177,7 +2042,7 @@
   }
   async function applyExistingTextStyles(nodes) {
     const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
-    const res = { applied: 0, skipped: 0, skipReasons, missing: [] };
+    const res = { applied: 0, skipped: 0, skipReasons };
     const skipText = (k) => {
       skipReasons[k]++;
       res.skipped++;
@@ -1201,26 +2066,23 @@
       await figma.loadFontAsync(fn);
       loaded.add(k);
     };
-    const unregistered = /* @__PURE__ */ new Set();
-    for (const t of texts) {
-      if (hasTextStyle(t)) {
+    for (const t2 of texts) {
+      if (hasTextStyle(t2)) {
         skipText("hasStyle");
         continue;
       }
-      if (hasTextVarBinding(t)) {
+      if (hasTextVarBinding(t2)) {
         skipText("boundVars");
         continue;
       }
-      if (isMixedTypography(t)) {
+      if (isMixedTypography(t2)) {
         skipText("mixed");
         continue;
       }
-      const fn = t.fontName;
-      const fontSize = t.fontSize;
-      const hit = styleByKey.get(typoKey(t));
+      const fn = t2.fontName;
+      const hit = styleByKey.get(typoKey(t2));
       if (hit === void 0) {
         skipText("noStyle");
-        unregistered.add(`${fn.family} ${fn.style} ${roundN(fontSize)}`);
         continue;
       }
       if (hit === null) {
@@ -1229,15 +2091,11 @@
       }
       try {
         await ensureFont(fn);
-        await t.setTextStyleIdAsync(hit.id);
+        await t2.setTextStyleIdAsync(hit.id);
         res.applied++;
       } catch (e) {
-        res.missing.push(`\uC801\uC6A9 \uC2E4\uD328 '${t.name}'(\uD3F0\uD2B8 \uB85C\uB4DC \uBD88\uAC00)`);
       }
     }
-    if (texts.length === 0 && inInstance.length === 0) res.missing.push("\uC801\uC6A9 \uB300\uC0C1 \uC5C6\uC74C \u2014 \uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8 \uB178\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4");
-    if (unregistered.size) res.missing.push(`\uBBF8\uB4F1\uB85D ${unregistered.size}\uC885 \u2014 \uBA3C\uC800 \uB4F1\uB85D \uD544\uC694: ${[...unregistered].join(", ")}`);
-    if (skipReasons.ambiguous) res.missing.push(`\uBAA8\uD638 ${skipReasons.ambiguous}\uAC1C \u2014 \uAC19\uC740 \uD0C0\uC774\uD3EC\uC758 \uC2A4\uD0C0\uC77C\uC774 \uC5EC\uB7EC \uAC1C\uB77C \uC790\uB3D9 \uC801\uC6A9 \uBCF4\uB958`);
     return res;
   }
 
@@ -1345,10 +2203,10 @@
   }
   var LABEL_RAMP_RE = /^(display|h[1-6]|title|body|caption|overline)(\/\S+)?$/i;
   function isRowLabelNameLike(characters) {
-    const t = characters.trim();
-    if (!t || t.includes("\n")) return false;
-    if (t.length <= 24) return true;
-    return LABEL_RAMP_RE.test(t);
+    const t2 = characters.trim();
+    if (!t2 || t2.includes("\n")) return false;
+    if (t2.length <= 24) return true;
+    return LABEL_RAMP_RE.test(t2);
   }
   function pairHorizontalRowLabel(row) {
     var _a, _b, _c, _d, _e, _f, _g;
@@ -1645,20 +2503,17 @@
     var _a;
     const entries = await buildIndex();
     liveVarIds = await collectLiveVarIds(selection2, new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
-    const res = { bound: 0, skipped: 0, flags: [], reasons: {} };
-    const flagSet = /* @__PURE__ */ new Set();
+    const res = { bound: 0, skipped: 0, reasons: {} };
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     for (const node of selection2) {
       if (!isEffectivelyVisible2(node)) {
-        flagSet.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
         note(res, "hidden", node, preview);
         continue;
       }
-      await walk2(node, entries, res, flagSet, apply, hooks, prog, preview, 0, null);
+      await walk2(node, entries, res, apply, hooks, prog, preview, 0, null);
       if (res.cancelled) break;
     }
-    res.flags = [...flagSet];
     {
       res.candidateTotal = preview.candidates.length;
       res.candidates = preview.candidates.slice(0, RESULT_CAP);
@@ -1756,17 +2611,16 @@
     }
     return null;
   }
-  async function walk2(node, entries, res, flags, apply, hooks, prog, preview, depth, parentId) {
+  async function walk2(node, entries, res, apply, hooks, prog, preview, depth, parentId) {
     var _a;
     if (res.cancelled) return;
     if (node.visible === false) {
-      flags.add("\uC228\uAE34 \uB808\uC774\uC5B4\uB294 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
       note(res, "hidden", node, preview);
       return;
     }
     preview == null ? void 0 : preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
     bindPaints(node, entries, res, apply, preview);
-    bindFrame(node, entries, res, flags, apply, preview);
+    bindFrame(node, entries, res, apply, preview);
     bindRadius(node, entries, res, apply, preview);
     bindStroke(node, entries, res, apply, preview);
     bindOpacity(node, entries, res, apply, preview);
@@ -1783,14 +2637,13 @@
     }
     if (node.type === "INSTANCE") {
       if (node.children.length) {
-        flags.add("\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80\uB294 \uC624\uBC84\uB77C\uC774\uB4DC\uAC00 \uB418\uBBC0\uB85C \uAC74\uB108\uB6F0\uC5C8\uC2B5\uB2C8\uB2E4 \u2014 \uCEF4\uD3EC\uB10C\uD2B8 \uC6D0\uBCF8\uC5D0\uC11C \uBC14\uC778\uB529\uD558\uC138\uC694.");
         note(res, "instance-children", node, preview);
       }
       return;
     }
     if ("children" in node)
       for (const c of node.children) {
-        await walk2(c, entries, res, flags, apply, hooks, prog, preview, depth + 1, node.id);
+        await walk2(c, entries, res, apply, hooks, prog, preview, depth + 1, node.id);
         if (res.cancelled) return;
       }
   }
@@ -1832,7 +2685,7 @@
       if (changed && apply) node[key] = next;
     }
   }
-  function bindFrame(node, entries, res, flags, apply, preview) {
+  function bindFrame(node, entries, res, apply, preview) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
     const parent = node.parent;
     const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
@@ -1840,7 +2693,6 @@
     if (inAutoLayout) {
       const bindAxis = (sizing, field, v) => {
         if (sizing !== "FIXED") {
-          flags.add("\uC77C\uBD80 \uD06C\uAE30\uB294 HUG/FILL\uC774\uB77C width/height \uBC14\uC778\uB529\uC744 \uAC74\uB108\uB700(Fixed \uD544\uC694).");
           note(res, "hug-fill", node, preview, field);
           return;
         }
@@ -1850,11 +2702,9 @@
       bindAxis(node.layoutSizingHorizontal, "width", node.width);
       bindAxis(node.layoutSizingVertical, "height", node.height);
     } else {
-      flags.add("\uC790\uC720 \uBC30\uCE58(\uC624\uD1A0\uB808\uC774\uC544\uC6C3 \uBC16) \uD504\uB808\uC784\uC740 \uD06C\uAE30 \uBC14\uC778\uB529\uC5D0\uC11C \uC81C\uC678\uD588\uC2B5\uB2C8\uB2E4.");
       note(res, "size-free-layout", node, preview);
     }
     if (node.layoutMode === "NONE") {
-      flags.add("\uC624\uD1A0\uB808\uC774\uC544\uC6C3\uC774 \uC544\uB2CC \uD504\uB808\uC784\uC740 padding/gap \uBC14\uC778\uB529 \uBD88\uAC00.");
       note(res, "no-autolayout", node, preview);
       return;
     }
@@ -2054,7 +2904,7 @@
   }
   async function bindSelectedItems(items) {
     var _a, _b, _c;
-    const res = { bound: 0, skipped: 0, flags: [], reasons: {} };
+    const res = { bound: 0, skipped: 0, reasons: {} };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
@@ -2358,9 +3208,9 @@
   };
   function pascalCase(input) {
     const tokens = kebab(input).split("-").filter(Boolean);
-    const out = tokens.map((t) => {
+    const out = tokens.map((t2) => {
       var _a;
-      const w = (_a = ABBR[t]) != null ? _a : t;
+      const w = (_a = ABBR[t2]) != null ? _a : t2;
       return w.charAt(0).toUpperCase() + w.slice(1);
     }).join("");
     return out || input;
@@ -2785,9 +3635,9 @@
     for (const k of kids) counts.set(k.type, ((_a = counts.get(k.type)) != null ? _a : 0) + 1);
     let domType = null;
     let domCount = 0;
-    for (const [t, c] of counts) if (c > domCount) {
+    for (const [t2, c] of counts) if (c > domCount) {
       domCount = c;
-      domType = t;
+      domType = t2;
     }
     if (!domType || domCount / kids.length < 0.8) return false;
     if (!LIST_ITEM_TYPES.has(domType)) return false;
@@ -3022,13 +3872,13 @@
   var cssVar = (name) => `--${kebab(name)}`;
   function toCss(tokens, opts) {
     const lines = [":root {"];
-    for (const t of tokens) {
-      if (t.aliasOf) {
-        lines.push(`  ${cssVar(t.name)}: var(${cssVar(t.aliasOf)});`);
+    for (const t2 of tokens) {
+      if (t2.aliasOf) {
+        lines.push(`  ${cssVar(t2.name)}: var(${cssVar(t2.aliasOf)});`);
       } else {
-        lines.push(`  ${cssVar(t.name)}: ${cssLiteral(t, opts)};`);
-        if (t.kind === "fontWeight" && splitWeightStyle(t.value).italic) {
-          lines.push(`  ${cssVar(t.name)}-style: italic;`);
+        lines.push(`  ${cssVar(t2.name)}: ${cssLiteral(t2, opts)};`);
+        if (t2.kind === "fontWeight" && splitWeightStyle(t2.value).italic) {
+          lines.push(`  ${cssVar(t2.name)}-style: italic;`);
         }
       }
     }
@@ -3080,19 +3930,19 @@
   function toW3C(tokens, opts) {
     var _a;
     const root = {};
-    for (const t of tokens) {
-      const segs = t.name.split("/").filter(Boolean);
+    for (const t2 of tokens) {
+      const segs = t2.name.split("/").filter(Boolean);
       let node = root;
       for (let i = 0; i < segs.length - 1; i++) {
         const key = segs[i];
         if (!node[key] || "$value" in node[key]) node[key] = (_a = node[key]) != null ? _a : {};
         node = node[key];
       }
-      const leaf = { $value: w3cValue(t, opts) };
-      const ty = W3C_TYPE[t.kind];
+      const leaf = { $value: w3cValue(t2, opts) };
+      const ty = W3C_TYPE[t2.kind];
       if (ty) leaf.$type = ty;
       node[segs[segs.length - 1]] = leaf;
-      if (!t.aliasOf && t.kind === "fontWeight" && splitWeightStyle(t.value).italic) {
+      if (!t2.aliasOf && t2.kind === "fontWeight" && splitWeightStyle(t2.value).italic) {
         node[`${segs[segs.length - 1]}-style`] = { $type: "fontStyle", $value: "italic" };
       }
     }
@@ -3100,9 +3950,9 @@
   }
   function dedupeByName(tokens) {
     const seen = /* @__PURE__ */ new Map();
-    for (const t of tokens) {
-      const prev = seen.get(t.name);
-      if (!prev || prev.collection === "Semantic" && t.collection === "Global") seen.set(t.name, t);
+    for (const t2 of tokens) {
+      const prev = seen.get(t2.name);
+      if (!prev || prev.collection === "Semantic" && t2.collection === "Global") seen.set(t2.name, t2);
     }
     return [...seen.values()];
   }
@@ -3180,17 +4030,17 @@
     return !!parent && parent.type === "GROUP";
   }
   function absOf(n) {
-    const t = n.absoluteTransform;
-    if (!t || !Array.isArray(t) || !Array.isArray(t[0]) || !Array.isArray(t[1])) return null;
-    const x = t[0][2];
-    const y = t[1][2];
+    const t2 = n.absoluteTransform;
+    if (!t2 || !Array.isArray(t2) || !Array.isArray(t2[0]) || !Array.isArray(t2[1])) return null;
+    const x = t2[0][2];
+    const y = t2[1][2];
     return typeof x === "number" && typeof y === "number" ? { x, y } : null;
   }
   function isPlainTransform(n) {
-    const t = n ? n.absoluteTransform : null;
-    if (!t || !Array.isArray(t)) return false;
+    const t2 = n ? n.absoluteTransform : null;
+    if (!t2 || !Array.isArray(t2)) return false;
     const eq = (a, b) => Math.abs(a - b) < 1e-6;
-    return eq(t[0][0], 1) && eq(t[0][1], 0) && eq(t[1][0], 0) && eq(t[1][1], 1);
+    return eq(t2[0][0], 1) && eq(t2[0][1], 0) && eq(t2[1][0], 0) && eq(t2[1][1], 1);
   }
   function sizingOf(n) {
     const out = {};
@@ -3277,12 +4127,12 @@
   function tryPlace(node, o) {
     try {
       const parent = o.parent;
-      if (!parent || parent.removed) throw new Error("\uBD80\uBAA8\uAC00 \uC5C6\uC5B4\uC84C\uC5B4\uC694");
+      if (!parent || parent.removed) throw new Error("parent gone");
       const kids = parent.children;
       const at = o.anchor && !o.anchor.removed ? kids.indexOf(o.anchor) : -1;
       const idx = at >= 0 ? at : Math.min(Math.max(0, o.index), kids.length);
       parent.insertChild(idx, node);
-      if (node.parent !== parent) throw new Error("\uC790\uB9AC\uC5D0 \uB4E4\uC5B4\uAC00\uC9C0 \uC54A\uC558\uC5B4\uC694");
+      if (node.parent !== parent) throw new Error("not inserted");
       if (o.autolayout && o.absolute && "layoutPositioning" in node) {
         try {
           node.layoutPositioning = "ABSOLUTE";
@@ -3330,11 +4180,11 @@
       try {
         inst = make();
       } catch (e) {
-        onError == null ? void 0 : onError(`\uC778\uC2A4\uD134\uC2A4\uB97C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694: ${errText2(e)}`);
+        onError == null ? void 0 : onError(t("component.fail.instanceMake", { error: errText2(e) }));
       }
       if (inst) {
         if (tryPlace(inst, o)) return "instance";
-        onError == null ? void 0 : onError("\uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694");
+        onError == null ? void 0 : onError(t("component.fail.instancePlace"));
       }
       const detached = () => {
         let i = null;
@@ -3389,11 +4239,11 @@
       releaseOrigin(o);
     }
   }
-  function tallyFill(t, r, name, propStart) {
-    if (r === "copy") t.placeCloned.push(name);
+  function tallyFill(t2, r, name, propStart) {
+    if (r === "copy") t2.placeCloned.push(name);
     if (r !== "failed") return;
-    t.placeFailed.push(name);
-    if (t.propFailed.length > propStart) t.propFailed.splice(propStart);
+    t2.placeFailed.push(name);
+    if (t2.propFailed.length > propStart) t2.propFailed.splice(propStart);
   }
 
   // src/lib/artwork.ts
@@ -3431,7 +4281,7 @@
           made++;
           return comp;
         } catch (e) {
-          opts.onFailure(`\uC544\uC774\uCF58 \uCEF4\uD3EC\uB10C\uD2B8 \uC2E4\uD328(${baseName}): ${e instanceof Error ? e.message : String(e)}`);
+          opts.onFailure(t("component.fail.iconComponent", { name: baseName, error: e instanceof Error ? e.message : String(e) }));
           return null;
         }
       }
@@ -3443,7 +4293,7 @@
       const target = nodeAtPath(master, s.layerPath);
       const parent = target == null ? void 0 : target.parent;
       if (!target || !s.icon || !parent || !("children" in parent)) {
-        failures.push(`\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328(${s.layerName})`);
+        failures.push(t("component.fail.iconSwap", { layer: s.layerName }));
         continue;
       }
       let inst = null;
@@ -3458,7 +4308,7 @@
         const placed = inst;
         inst = null;
         if (!placeAtOrigin(placed, o)) {
-          failures.push(`\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328(${s.layerName}): \uC81C\uC790\uB9AC\uC5D0 \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694`);
+          failures.push(t("component.fail.iconSwapPlace", { layer: s.layerName }));
           continue;
         }
         target.remove();
@@ -3469,7 +4319,7 @@
           } catch (e2) {
           }
         }
-        failures.push(`\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328(${s.layerName}): ${e instanceof Error ? e.message : String(e)}`);
+        failures.push(t("component.fail.iconSwapErr", { layer: s.layerName, error: e instanceof Error ? e.message : String(e) }));
       }
     }
     return failures;
@@ -3494,7 +4344,7 @@
   var sameSize = (a, b) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
   function memberFitIssue(inst, member, prefix) {
     if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
-      return `\uD06C\uAE30 ${inst.width}\xD7${inst.height} \u2260 ${member.width}\xD7${member.height}`;
+      return t("component.fit.size", { w: inst.width, h: inst.height, mw: member.width, mh: member.height });
     }
     let issue = null;
     const visit = (n, path) => {
@@ -3502,17 +4352,17 @@
       const h = imageHashOf(n);
       if (h !== void 0) {
         const at = joinPath(prefix, path);
-        const t = nodeAtPath(inst, at);
-        if (!t) {
-          issue = `\uC0AC\uC9C4 \uC790\uB9AC \uC5C6\uC74C(${at || "\uC790\uC2E0"})`;
+        const hit = nodeAtPath(inst, at);
+        if (!hit) {
+          issue = t("component.fit.noPhoto", { path: at || t("component.fit.self") });
           return;
         }
-        if (imageHashOf(t) !== h) {
-          issue = `\uC0AC\uC9C4 \uB2E4\uB984(${n.name})`;
+        if (imageHashOf(hit) !== h) {
+          issue = t("component.fit.photoDiff", { name: n.name });
           return;
         }
-        if (!sameSize(t.width, n.width) || !sameSize(t.height, n.height)) {
-          issue = `\uC0AC\uC9C4 \uD06C\uAE30 ${t.width}\xD7${t.height} \u2260 ${n.width}\xD7${n.height}(${n.name})`;
+        if (!sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
+          issue = t("component.fit.photoSize", { w: hit.width, h: hit.height, mw: n.width, mh: n.height, name: n.name });
           return;
         }
       }
@@ -3527,7 +4377,7 @@
     try {
       inst = make();
     } catch (e) {
-      return { result: "placeFailed", why: `\uC778\uC2A4\uD134\uC2A4\uB97C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694: ${e instanceof Error ? e.message : String(e)}` };
+      return { result: "placeFailed", why: t("component.fail.instanceMake", { error: e instanceof Error ? e.message : String(e) }) };
     }
     try {
       if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
@@ -3554,7 +4404,7 @@
     const o = captureOrigin(member, { anchor: false });
     if (!placeAtOrigin(inst, o)) {
       releaseOrigin(o);
-      return { result: "placeFailed", why: "\uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694" };
+      return { result: "placeFailed", why: t("component.fail.instancePlace") };
     }
     try {
       member.remove();
@@ -3612,14 +4462,14 @@
     for (const [path, paints3] of Object.entries(images)) {
       const dst = nodeAtPath(inst, path);
       if (!dst || !("fills" in dst)) {
-        failures.push(`\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328(${path}) \u2014 \uC790\uB9AC\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4`);
+        failures.push(t("component.fail.photoNoSlot", { path }));
         continue;
       }
       try {
         dst.fills = paints3;
         applied++;
       } catch (e) {
-        failures.push(`\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328(${path}): ${e instanceof Error ? e.message : String(e)}`);
+        failures.push(t("component.fail.photo", { path, error: e instanceof Error ? e.message : String(e) }));
       }
     }
     return { applied, failures };
@@ -3785,9 +4635,9 @@
     for (const k of kids) counts.set(k.type, ((_a = counts.get(k.type)) != null ? _a : 0) + 1);
     let domType = null;
     let domCount = 0;
-    for (const [t, c] of counts) if (c > domCount) {
+    for (const [t2, c] of counts) if (c > domCount) {
       domCount = c;
-      domType = t;
+      domType = t2;
     }
     if (!domType || domCount / kids.length < 0.8) return false;
     if (!LIST_ITEM_TYPES2.has(domType)) return false;
@@ -4031,31 +4881,31 @@
   }
   function recognizeComponentName(name) {
     let found = null;
-    for (const t of kebab(name).split("-").filter(Boolean)) {
-      const w = nounWord(t);
+    for (const t2 of kebab(name).split("-").filter(Boolean)) {
+      const w = nounWord(t2);
       if (COMPONENT_NOUNS.has(w)) found = pascalCase(w);
     }
     return found;
   }
   function extractNameProps(name) {
     const props = {};
-    for (const t of kebab(name).split("-").filter(Boolean)) {
-      if (COMPONENT_NOUNS.has(nounWord(t))) continue;
-      if (BOOLEANS.has(t)) {
-        const bk = capitalize(t);
+    for (const t2 of kebab(name).split("-").filter(Boolean)) {
+      if (COMPONENT_NOUNS.has(nounWord(t2))) continue;
+      if (BOOLEANS.has(t2)) {
+        const bk = capitalize(t2);
         if (!(bk in props)) props[bk] = "true";
         continue;
       }
-      const p = inferProp(t);
-      if (p && !(p in props)) props[p] = t;
+      const p = inferProp(t2);
+      if (p && !(p in props)) props[p] = t2;
     }
     return props;
   }
   function distinguishingTokens(name) {
-    return kebab(name).split("-").filter(Boolean).filter((t) => {
-      if (COMPONENT_NOUNS.has(nounWord(t))) return false;
-      if (BOOLEANS.has(t)) return false;
-      if (inferProp(t)) return false;
+    return kebab(name).split("-").filter(Boolean).filter((t2) => {
+      if (COMPONENT_NOUNS.has(nounWord(t2))) return false;
+      if (BOOLEANS.has(t2)) return false;
+      if (inferProp(t2)) return false;
       return true;
     }).join("-");
   }
@@ -4300,14 +5150,14 @@
     const actions = bundles.map((b) => ofKind(b, "action"));
     const titleCount = titles[repIdx].length;
     const metaCount = metas[repIdx].length;
-    if (titles.some((t) => t.length !== titleCount) || metas.some((m) => m.length !== metaCount)) return [];
+    if (titles.some((t2) => t2.length !== titleCount) || metas.some((m) => m.length !== metaCount)) return [];
     const aroundRep = (arr) => {
       if (repIdx === 0) return arr;
       return [arr[repIdx], ...arr.filter((_, i) => i !== repIdx)];
     };
     for (let ti = 0; ti < titleCount; ti++) {
       const repTitle = titles[repIdx][ti];
-      const nodes = aroundRep(titles.map((t) => t[ti].node));
+      const nodes = aroundRep(titles.map((t2) => t2[ti].node));
       collectVaryingUnder(nodes, String(repTitle.childIndex), {
         kind: "title",
         slotIndex: ti
@@ -4824,7 +5674,7 @@
     }
     if (new Set(props.map(formatVariant)).size !== members.length) {
       const tokens = members.map((m) => distinguishingTokens(m.name));
-      const usable = tokens.every((t) => t.length > 0) && new Set(tokens).size === members.length;
+      const usable = tokens.every((t2) => t2.length > 0) && new Set(tokens).size === members.length;
       members.forEach((_, i) => {
         props[i].Variant = usable ? tokens[i] : String(i + 1);
       });
@@ -4943,7 +5793,7 @@
     var _a;
     const empty = { memberIds: [], recommendedMasterId: null, metas: [], varying: [], imageVarying: [], excluded: [] };
     if (frames.length < 2) {
-      return __spreadProps(__spreadValues({}, empty), { excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: "\uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uD544\uC694" })) });
+      return __spreadProps(__spreadValues({}, empty), { excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: t("similar.why.needTwo") })) });
     }
     const bySig = /* @__PURE__ */ new Map();
     for (const f of frames) {
@@ -4952,9 +5802,9 @@
     }
     let best = [];
     for (const group of bySig.values()) if (group.length > best.length) best = group;
-    const excluded = frames.filter((f) => !best.includes(f)).map((f) => ({ id: f.id, name: f.name, reason: "\uAD6C\uC870 \uBD88\uC77C\uCE58" }));
+    const excluded = frames.filter((f) => !best.includes(f)).map((f) => ({ id: f.id, name: f.name, reason: t("similar.why.mismatch") }));
     if (best.length < 2) {
-      return __spreadProps(__spreadValues({}, empty), { excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: "\uB3D9\uC77C \uAD6C\uC870 \uD504\uB808\uC784 2\uAC1C \uBBF8\uB9CC" })) });
+      return __spreadProps(__spreadValues({}, empty), { excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: t("similar.why.fewSame") })) });
     }
     const flats = best.map((f) => flattenFrame(f));
     const paths = flats[0];
@@ -5172,8 +6022,8 @@
       }
     }
     const warnings = aligned.excluded.map((e) => `${e.name}: ${e.reason}`);
-    for (const name of kept) warnings.push(`${name}: \uC18D\uC131 \uC624\uBC84\uB77C\uC774\uB4DC \uC2E4\uD328 \u2014 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB450\uC5C8\uC5B4\uC694.`);
-    for (const name of placeFailed) warnings.push(`${name}: \uC81C\uC790\uB9AC\uC5D0 \uB458 \uC218 \uC5C6\uC5B4 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB450\uC5C8\uC5B4\uC694.`);
+    for (const name of kept) warnings.push(t("similar.overrideFail", { name }));
+    for (const name of placeFailed) warnings.push(t("similar.placeFail", { name }));
     return { master: comp.name, properties, instances, images, warnings, placeFailed };
   }
   function componentizeResultMessage(r) {
@@ -5226,7 +6076,7 @@
     let skipped = 0;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const semanticCol = cols.find((c) => c.id === collectionId);
-    if (!semanticCol) return { created, realiased, skipped, error: "\uCEEC\uB809\uC158\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694." };
+    if (!semanticCol) return { created, realiased, skipped, error: t("dark.errNoCol") };
     let modeCreated = false;
     let to = toModeId;
     if (!to) {
@@ -5240,7 +6090,7 @@
           created: 0,
           realiased: 0,
           skipped: 0,
-          error: `Dark \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 ${why || "\uD50C\uB79C\uC5D0\uC11C \uBAA8\uB4DC\uB97C \uB354 \uB9CC\uB4E4 \uC218 \uC5C6\uC744 \uC218 \uC788\uC5B4\uC694."}`
+          error: t("dark.errAddMode", { why: why || t("dark.errAddModePlan") })
         };
       }
     }
@@ -5255,7 +6105,7 @@
         realiased: 0,
         skipped: 0
       }, modeCreated ? { modeCreated: true } : {}), {
-        error: "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694. \uB2E4\uB978 \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694."
+        error: t("dark.errSameMode")
       });
     }
     const globalCol = ensureCollection(cols, "global", GLOBAL);
@@ -5322,6 +6172,10 @@
     if (age <= GRACE_MS) return { tier: cache2.tier, status: "grace", stale: true };
     return { tier: "free", status: "expired", stale: true };
   }
+  var VERIFY_ERR_CODES = ["expired", "limit", "invalid", "server"];
+  function isVerifyErrCode(v) {
+    return typeof v === "string" && VERIFY_ERR_CODES.includes(v);
+  }
   function cacheFromVerify(key, v, now) {
     const cache2 = { key, tier: v.tier, expiresAt: v.expiresAt, lastVerified: now };
     if (v.instanceId) cache2.instanceId = v.instanceId;
@@ -5364,6 +6218,7 @@
   }
 
   // src/lib/varTable.ts
+  var NO_GROUP = t("list.noGroup");
   function cellKey(c) {
     var _a;
     if (!c) return "";
@@ -5406,9 +6261,9 @@
   }
   var currentTier = () => effective().tier;
   var isPaid = () => currentTier() === "paid";
-  function requirePaid(feature, message) {
+  function requirePaid(feature) {
     if (isPaid()) return true;
-    post({ type: "PREMIUM_REQUIRED", feature, message });
+    post({ type: "PREMIUM_REQUIRED", feature });
     return false;
   }
   function postLicense(note2) {
@@ -5421,7 +6276,9 @@
       source: e.source,
       status: e.status,
       expiresAt: e.expiresAt,
-      note: note2
+      note: note2 == null ? void 0 : note2.text,
+      noteKind: note2 == null ? void 0 : note2.kind,
+      noteTip: note2 == null ? void 0 : note2.tip
     });
   }
   async function loadLicense() {
@@ -5531,7 +6388,7 @@
       const id = raw.id;
       const info = aliasInfo(id);
       if (info.name !== null && !info.remote) return { kind: "alias", aliasId: id, aliasName: info.name };
-      return { kind: "alias", aliasId: id, aliasName: (_a = info.name) != null ? _a : "(\uC0AD\uC81C\uB41C \uBCC0\uC218)", remote: info.name ? true : void 0 };
+      return { kind: "alias", aliasId: id, aliasName: (_a = info.name) != null ? _a : t("edit.deletedTarget"), remote: info.name ? true : void 0 };
     }
     if (typeof raw === "object" && "r" in raw) {
       const a = "a" in raw && typeof raw.a === "number" ? Math.round(raw.a * 255) / 255 : 1;
@@ -5602,8 +6459,8 @@
   async function libCell(raw) {
     let info = { name: null, remote: false };
     if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
-      const t = await figma.variables.getVariableByIdAsync(raw.id).catch(() => null);
-      info = { name: t ? t.name : null, remote: !!(t == null ? void 0 : t.remote) };
+      const t2 = await figma.variables.getVariableByIdAsync(raw.id).catch(() => null);
+      info = { name: t2 ? t2.name : null, remote: !!(t2 == null ? void 0 : t2.remote) };
     }
     return tableCell(raw, () => info);
   }
@@ -5673,7 +6530,7 @@
       }
       libraryVars.push({ id: v.id, name: v.name, collection: (_b = col == null ? void 0 : col.name) != null ? _b : "", type: v.resolvedType, value: await libCell(modeId ? v.valuesByMode[modeId] : void 0), aliasTargets });
       if (depth < 5) {
-        for (const t of aliasTargets) if (!local.has(t)) await addLibrary(t, depth + 1);
+        for (const t2 of aliasTargets) if (!local.has(t2)) await addLibrary(t2, depth + 1);
       }
       return true;
     };
@@ -5694,8 +6551,8 @@
       if (!out[v.id]) continue;
       for (const raw of Object.values(v.valuesByMode)) {
         if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
-          const t = raw.id;
-          if (!local.has(t)) await addLibrary(t, 2);
+          const t2 = raw.id;
+          if (!local.has(t2)) await addLibrary(t2, 2);
         }
       }
     }
@@ -5723,10 +6580,10 @@
     return n && n.type === "PAGE" ? n : null;
   }
   function requireComponents() {
-    return requirePaid("components", "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D\xB7\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
+    return requirePaid("components");
   }
   function requireTextStyles() {
-    return requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.");
+    return requirePaid("textStyles");
   }
   function kindOf(v) {
     if (v.resolvedType === "COLOR") return "color";
@@ -6087,15 +6944,16 @@
           break;
         }
         case "CREATE_TOKENS": {
-          if (!msg.preview && !requirePaid("tokens", "\uD1A0\uD070(\uBCC0\uC218) \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4. \uBBF8\uB9AC\uBCF4\uAE30\uB294 \uBB34\uB8CC\uB85C \uC81C\uACF5\uB429\uB2C8\uB2E4.")) break;
+          if (!msg.preview && !requirePaid("tokens")) break;
           const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
-          const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
-          let summary = `Global ${s.globals}\uAC1C (\uC0DD\uC131 ${s.created} / \uAC31\uC2E0 ${s.updated})`;
-          if (pruned) summary += ` \xB7 \uC774\uC804 \uC0C9 ${pruned}\uAC1C \uC815\uB9AC`;
+          const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name)) : 0;
+          let summary = t("create.sumGlobals", { n: s.globals, c: s.created, u: s.updated });
+          if (pruned) summary += t("create.sumPruned", { n: pruned });
           if (s.conversions.length) {
             const px = (n) => String(Math.round(n * 100) / 100);
             const ex = s.conversions.slice(0, 2).map((c) => `${c.from}\u2192${px(c.to)}px`).join(", ");
-            summary += ` \xB7 base ${msg.base}px \uD658\uC0B0 ${s.conversions.length}\uAC1C(${ex}${s.conversions.length > 2 ? " \uC678" : ""})`;
+            const morePart = s.conversions.length > 2 ? t("create.sumBaseMore") : "";
+            summary += t("create.sumBase", { base: msg.base, n: s.conversions.length, examples: ex, morePart });
           }
           post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, preview: msg.preview });
           if (!msg.preview) {
@@ -6119,7 +6977,6 @@
             type: "APPLY_RESULT",
             bound: r.bound,
             skipped: r.skipped,
-            flags: r.flags,
             reasons: r.reasons,
             preview: msg.preview,
             cancelled: r.cancelled,
@@ -6191,7 +7048,7 @@
         case "APPLY_SELECTED": {
           const r = await bindSelectedItems(msg.items);
           const bound = r.bound;
-          post({ type: "APPLY_RESULT", bound, skipped: r.skipped, flags: [], reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
+          post({ type: "APPLY_RESULT", bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
           if (bound) {
             commitUndo(figma);
             selfSelect = true;
@@ -6235,7 +7092,7 @@
           break;
         }
         case "CREATE_SEMANTICS": {
-          if (!requirePaid("semantics", "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("semantics")) break;
           const s = await createSemanticAliases(msg.map);
           post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
           commitUndo(figma);
@@ -6243,7 +7100,7 @@
           break;
         }
         case "SCAN_TEXT_STYLES": {
-          if (!requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("textStyles")) break;
           const { samples, warnings } = await scanTextStyles(selection());
           lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
@@ -6252,9 +7109,9 @@
           break;
         }
         case "NAME_TEXT_STYLES_BY_ROW": {
-          if (!requirePaid("textStyles", "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("textStyles")) break;
           if (!lastTextSamples.length) {
-            post({ type: "ERROR", message: "\uBA3C\uC800 \uC2A4\uCE94\uD558\uC138\uC694 \u2014 \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE38 \uD45C\uBCF8\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.", op: "NAME_TEXT_STYLES_BY_ROW" });
+            post({ type: "ERROR", message: t("textStyle.needScan"), op: "NAME_TEXT_STYLES_BY_ROW" });
             break;
           }
           const existing = await scanExistingTextStyles();
@@ -6272,7 +7129,7 @@
         }
         case "APPLY_TEXT_STYLES": {
           const r = await applyExistingTextStyles(selection());
-          post({ type: "TEXT_STYLES_APPLIED", applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, missing: r.missing });
+          post({ type: "TEXT_STYLES_APPLIED", applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons });
           commitUndo(figma);
           break;
         }
@@ -6341,13 +7198,16 @@
               await figma.clientStorage.setAsync(CACHE_KEY, cache);
             } catch (e) {
             }
-            postLicense("\uB77C\uC774\uC120\uC2A4 \uC801\uC6A9\uB428");
+            postLicense({ text: t("license.noteApplied"), kind: "ok" });
           } else if (msg.result.offline) {
-            postLicense(
-              cache ? "\uC624\uD504\uB77C\uC778 \u2014 \uCE90\uC2DC\uB41C \uB77C\uC774\uC120\uC2A4\uB85C \uB3D9\uC791(grace)." : "\uC624\uD504\uB77C\uC778 \u2014 \uD0A4\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."
-            );
+            postLicense({ text: t(cache ? "license.noteGrace" : "license.noteOffline"), kind: "warn" });
           } else {
-            postLicense(`\uAC80\uC99D \uC2E4\uD328: ${msg.result.error}`);
+            const { code, error } = msg.result;
+            postLicense({
+              text: isVerifyErrCode(code) ? t(`license.err.server.${code}`) : t("license.verifyFailed"),
+              kind: "warn",
+              tip: error || void 0
+            });
           }
           break;
         }
@@ -6360,7 +7220,7 @@
             await figma.clientStorage.deleteAsync(CACHE_KEY);
           } catch (e) {
           }
-          postLicense("\uB77C\uC774\uC120\uC2A4 \uD0A4 \uC81C\uAC70\uB428");
+          postLicense({ text: t("license.noteCleared"), kind: "ok" });
           break;
         }
         case "OPEN_LICENSE_LINK": {
@@ -6379,24 +7239,24 @@
             const tier = col ? tiers.get(col.id) : 0;
             if (!col || tier !== 1 && tier !== 2) continue;
             const raw = v.valuesByMode[col.defaultModeId];
-            const t = {
+            const t2 = {
               name: v.name,
               collection: tier === 1 ? "Global" : "Semantic",
               // 출력 그룹은 계층 이름(컬렉션 실제 이름과 무관)
               type: v.resolvedType,
               kind: kindOf(v)
             };
-            if (v.description) t.description = v.description;
+            if (v.description) t2.description = v.description;
             if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
               const target = nameById.get(raw.id);
               if (!target) continue;
-              t.aliasOf = target;
+              t2.aliasOf = target;
             } else if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) {
-              t.value = rgbToHex(raw);
+              t2.value = rgbToHex(raw);
             } else {
-              t.value = raw;
+              t2.value = raw;
             }
-            tokens.push(t);
+            tokens.push(t2);
           }
           tokens.sort((a, b) => a.name.localeCompare(b.name));
           const styles = (await figma.getLocalTextStylesAsync()).map((st) => ({
@@ -6554,9 +7414,9 @@
               const r = fillOrigin(make, o, (w) => why.push(w));
               tallyFill({ placeCloned, placeFailed, propFailed }, r, o.name, before);
               if (r === "instance") continue;
-              const cause = why.length ? ` \u2014 ${why.join(" \xB7 ")}` : "";
-              if (r === "copy") failures.push(`\uC778\uC2A4\uD134\uC2A4 \uB300\uC2E0 \uBCF5\uC0AC\uBCF8\uC744 \uB480\uC5B4\uC694(${label} \u2192 ${o.name})${cause}`);
-              else failures.push(`\uC81C\uC790\uB9AC\uC5D0 \uC544\uBB34\uAC83\uB3C4 \uB450\uC9C0 \uBABB\uD588\uC5B4\uC694(${label} \u2192 ${o.name})${cause}`);
+              const causePart = why.length ? t("component.fail.cause", { why: why.join(" \xB7 ") }) : "";
+              if (r === "copy") failures.push(t("component.fail.copyPlaced", { label, name: o.name, causePart }));
+              else failures.push(t("component.fail.nothingPlaced", { label, name: o.name, causePart }));
             }
           };
           const placeSingle = (comp, o, name) => {
@@ -6608,7 +7468,7 @@
                 } catch (e) {
                   releaseOrigin(o);
                   skipped++;
-                  failures.push(`\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328(${g.members[0].name}): ${errText(e)}`);
+                  failures.push(t("component.fail.single", { name: g.members[0].name, error: errText(e) }));
                 }
                 continue;
               }
@@ -6628,7 +7488,7 @@
                     } catch (e) {
                       releaseOrigin(o);
                       skipped++;
-                      failures.push(`\uC18D\uC131\uC811\uD798 \uB4F1\uB85D \uC2E4\uD328(${setName}): ${errText(e)}`);
+                      failures.push(t("component.fail.propsRegister", { set: setName, error: errText(e) }));
                     }
                   }
                   continue;
@@ -6656,7 +7516,7 @@
                   }
                 }
                 if (!iconsReady) {
-                  failures.push(`\uC544\uC774\uCF58\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD574 \uC138\uD2B8\uB85C \uB4F1\uB85D\uD574\uC694(${setName})`);
+                  failures.push(t("component.fail.iconFallback", { set: setName }));
                 } else {
                   const snaps = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                   const preferLive = pickCollapseMasterIndex(structs);
@@ -6668,7 +7528,7 @@
                   } catch (e) {
                     releaseOrigin(masterOrigin);
                     skipped++;
-                    failures.push(`\uC18D\uC131\uC811\uD798 \uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328(${masterSnap.n.name}): ${errText(e)}`);
+                    failures.push(t("component.fail.propsComponentize", { name: masterSnap.n.name, error: errText(e) }));
                     continue;
                   }
                   try {
@@ -6696,7 +7556,7 @@
                   try {
                     collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
                   } catch (e) {
-                    failures.push(`\uC18D\uC131 \uB178\uCD9C \uC2E4\uD328(${master.name}): ${errText(e)}`);
+                    failures.push(t("component.fail.expose", { name: master.name, error: errText(e) }));
                   }
                   exposedEarly += collapsedExposed;
                   const ids = propIdsByName(master);
@@ -6719,7 +7579,7 @@
                         const img = transplantImageFills(inst, images).failures;
                         if (!noted) {
                           noted = true;
-                          for (const p of badProps) failures.push(`\uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC5B4 \uB9C8\uC2A4\uD130 \uAC12\uC73C\uB85C \uB480\uC5B4\uC694(${name} \xB7 ${p})`);
+                          for (const p of badProps) failures.push(t("component.fail.propValue", { name, prop: p }));
                           failures.push(...img.map((f) => `${name}: ${f}`));
                           if (badProps.length || img.length) propFailed.push(name);
                         }
@@ -6745,10 +7605,10 @@
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
                       fillKept.push(name);
-                      failures.push(`\uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uBB36\uC9C0 \uC54A\uACE0 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694(${name}) \u2014 ${(_g = r.why) != null ? _g : ""}`);
+                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_g = r.why) != null ? _g : "" }) }));
                     } else {
                       placeFailed.push(name);
-                      failures.push(`\uC81C\uC790\uB9AC\uC5D0 \uB123\uC9C0 \uBABB\uD574 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694(${name})${r.why ? ` \u2014 ${r.why}` : ""}`);
+                      failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
                     }
                   }
                   continue;
@@ -6766,7 +7626,7 @@
                 } catch (e) {
                   releaseOrigin(o);
                   skipped++;
-                  failures.push(`\uCEF4\uD3EC\uB10C\uD2B8\uD654 \uC2E4\uD328(${m.name}): ${errText(e)}`);
+                  failures.push(t("component.fail.componentize", { name: m.name, error: errText(e) }));
                 }
               }
               if (made.length < 2) {
@@ -6778,7 +7638,7 @@
                 const home = (_i = pageOf(made[0].comp)) != null ? _i : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
-                failures.push(`\uACB0\uD569 \uC2E4\uD328(${setName}): ${errText(e)}`);
+                failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
                 for (const x of made) placeSingle(x.comp, x.o, setName);
                 continue;
               }
@@ -6788,7 +7648,7 @@
               try {
                 arrangeSet(set);
               } catch (e) {
-                failures.push(`\uC815\uB82C \uC2E4\uD328(${set.name}): ${errText(e)}`);
+                failures.push(t("component.fail.arrange", { set: set.name, error: errText(e) }));
               }
               set.x = cursorX;
               set.y = 0;
@@ -6805,7 +7665,7 @@
             try {
               exposed += exposeProperties(c.container, c.scopes).length;
             } catch (e) {
-              failures.push(`\uC18D\uC131 \uB178\uCD9C \uC2E4\uD328: ${errText(e)}`);
+              failures.push(t("component.fail.exposeAll", { error: errText(e) }));
             }
           }
           post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept });
@@ -6850,14 +7710,14 @@
               try {
                 arrangeSet(set);
               } catch (e) {
-                failures.push(`\uC815\uB82C \uC2E4\uD328(${set.name}): ${errText(e)}`);
+                failures.push(t("component.fail.arrange", { set: set.name, error: errText(e) }));
               }
               const childNames = set.children.filter((c) => c.type === "COMPONENT").map((c) => c.name);
               const miss = missingVariants(childNames);
               if (miss.length) missing.push(`${set.name}: ${miss.join(" / ")}`);
               sets++;
             } catch (e) {
-              failures.push(`\uACB0\uD569 \uC2E4\uD328(${groupNames[gi]}): ${errText(e)}`);
+              failures.push(t("component.fail.combine", { set: groupNames[gi], error: errText(e) }));
             }
           }
           post({ type: "VARIANTS_RESULT", sets, missing, singles, failures });
@@ -6933,7 +7793,7 @@
           break;
         }
         case "GENERATE_DARK_MODE": {
-          if (!requirePaid("tokens", "\uB2E4\uD06C \uD14C\uB9C8 \uC0DD\uC131\uC740 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("tokens")) break;
           const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
           post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
           if (r.created || r.realiased || r.modeCreated) {
@@ -6957,10 +7817,10 @@
           break;
         }
         case "COMPONENTIZE_SIMILAR": {
-          if (!requirePaid("components", "\uB2EE\uC740 \uD504\uB808\uC784 \uCEF4\uD3EC\uB10C\uD2B8\uD654\uB294 Paid \uAE30\uB2A5\uC785\uB2C8\uB2E4. \uC2A4\uCE94\xB7\uBBF8\uB9AC\uBCF4\uAE30\uB294 \uBB34\uB8CC\uC785\uB2C8\uB2E4.")) break;
+          if (!requirePaid("components")) break;
           const master = await figma.getNodeByIdAsync(msg.masterId);
           if (!master || master.type !== "FRAME" && master.type !== "GROUP") {
-            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: ["\uB9C8\uC2A4\uD130 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694."], placeFailed: [] });
+            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: [t("similar.noMaster")], placeFailed: [] });
             break;
           }
           const memberNodes = [];
@@ -6969,7 +7829,7 @@
             if (n && "type" in n) memberNodes.push(n);
           }
           if (memberNodes.length < 2) {
-            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: ["\uB300\uC0C1 \uD504\uB808\uC784\uC774 2\uAC1C \uBBF8\uB9CC\uC774\uC5D0\uC694. \uB2E4\uC2DC \uC2A4\uCE94\uD574 \uC8FC\uC138\uC694."], placeFailed: [] });
+            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: [t("similar.tooFew")], placeFailed: [] });
             break;
           }
           const r = await componentizeSimilar(master, memberNodes);

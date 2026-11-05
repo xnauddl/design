@@ -756,12 +756,12 @@
 <body>
   <!-- 탭 바 — 다루는 대상별 3탭(IA v3) + 오른쪽 끝 최소화. [—]는 탭이 아니라 창 조작이라 tablist 밖에 둔다. -->
   <div class="tabs" id="tabBar">
-    <div class="tab-list" role="tablist" aria-label="작업 탭">
+    <div class="tab-list" role="tablist" data-i18n-aria-label="tab.listAria" aria-label="작업 탭">
       <button class="tab-btn" id="tabbtn-variables" role="tab" aria-controls="tab-variables" data-i18n="tab.variables">변수</button>
       <button class="tab-btn" id="tabbtn-layer" role="tab" aria-controls="tab-layer" data-i18n="tab.layer">레이어</button>
       <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
     </div>
-    <button class="tab-min" id="btnMinimize" type="button" data-i18n-title="ui.minimize" title="최소화" aria-label="최소화">
+    <button class="tab-min" id="btnMinimize" type="button" data-i18n-title="ui.minimize" title="최소화" data-i18n-aria-label="ui.minimize" aria-label="최소화">
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 6h7"/></svg>
     </button>
   </div>
@@ -793,25 +793,25 @@
    <div id="varList" style="display:none">
     <div class="list-head" id="listHead">
       <button class="link link-btn" id="btnReadiness" aria-haspopup="menu"></button>
-      <button class="link link-btn" id="btnFindUnbound" data-i18n="list.findUnbound" data-i18n-title="list.findUnboundTip" title="선택에서 변수로 바꿀 수 있는 색·간격을 찾아 연결 미리보기를 엽니다">변수 없는 값 찾기 →</button>
+      <button class="link link-btn" id="btnFindUnbound" data-i18n="list.findUnbound" data-i18n-title="list.findUnboundTip" title="선택에서 변수로 바꿀 수 있는 색·간격을 레이어 › 연결에서 찾아요">변수 없는 값 찾기 →</button>
       <span class="grow"></span>
-      <button class="icon-btn" id="btnAddVar" type="button" data-i18n-title="list.addTip" title="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)" aria-label="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
-      <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
-      <button class="icon-btn" id="btnVarRefresh" type="button" data-i18n-title="list.refreshTip" title="다시 읽기" aria-label="다시 읽기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg></button>
+      <button class="icon-btn" id="btnAddVar" type="button" data-i18n-title="list.addTip" title="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)" data-i18n-aria-label="list.addTip" aria-label="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
+      <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
+      <button class="icon-btn" id="btnVarRefresh" type="button" data-i18n-title="list.refreshTip" title="다시 읽기" data-i18n-aria-label="list.refreshTip" aria-label="다시 읽기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg></button>
     </div>
     <div class="situation" id="situationLine" hidden></div>
     <!-- 결정 B(§4.4): 왼쪽 사이드바(★ Inspect · 컬렉션 › 그룹 · LIB · 삭제된 변수) + 오른쪽 목록 -->
     <div class="vl-split">
-      <div class="vl-side" id="varSide" role="tree" aria-label="변수 컬렉션"></div>
+      <div class="vl-side" id="varSide" role="tree" data-i18n-aria-label="list.sideAria" aria-label="변수 컬렉션"></div>
       <div class="vl-main">
         <div class="vl-head" id="chipBar">
           <b class="vl-title" id="varMainTitle" tabindex="-1"></b>
           <span class="grow"></span>
           <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
-          <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
-          <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" aria-label="검색 지우기">✕</button></span>
+          <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" data-i18n-aria-label="list.searchTip" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+          <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" data-i18n-aria-label="list.searchClear" aria-label="검색 지우기">✕</button></span>
         </div>
-        <div class="var-tree" id="varTree" role="grid" aria-label="변수 목록"></div>
+        <div class="var-tree" id="varTree" role="grid" data-i18n-aria-label="list.gridAria" aria-label="변수 목록"></div>
       </div>
     </div>
    </div>
@@ -846,7 +846,7 @@
       <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
            파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
            흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 다크=라이트 모드에서 어두운 값 채우기</div>
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 다크=라이트에서 어두운 값 채우기</div>
       <div class="status" id="wizardSummary"></div>
       <!-- 요약 끝 연결 안내(§4.3) — 마법사는 레이어에 변수를 붙이지 않는다. 누르면 레이어 › 연결 + 미리보기. -->
       <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">레이어 › 연결에서 확인하고 연결하기 →</button>
@@ -857,7 +857,7 @@
     <button class="link back-link" id="btnMakeBack" data-i18n="make.back">← 돌아가기</button>
     <div id="wizardSlotMake"></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
-    <div class="steps steps-4" id="makeRail" role="tablist" aria-label="만들기 단계">
+    <div class="steps steps-4" id="makeRail" role="tablist" data-i18n-aria-label="rail.makeAria" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
       <button class="step-chip" data-make-step="token"><span class="n" data-i18n="rail.token">토큰</span><span data-i18n="rail.tokenSub">간격·크기</span></button>
       <button class="step-chip" data-make-step="theme"><span class="n" data-i18n="rail.theme">테마</span><span data-i18n="rail.themeSub">다크 모드</span></button>
@@ -871,7 +871,7 @@
            이미 말한다. 게다가 잠금 배지와 범위 라벨 사이에 끼어 「🔒 색 12개 변수화」로 읽혔다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 됩니다. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 역할은 Semantic으로 붙습니다.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만듭니다. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
+      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 돼요. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 역할은 Semantic으로 붙어요.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만들어요. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
@@ -917,7 +917,7 @@
       <h2><span data-i18n="create.title">간격·크기 토큰</span> <span class="muted lock" id="createLock"></span> <span class="muted" id="createCount"></span></h2>
       <!-- 설명 줄은 툴바 **위** — 나머지 여덟 카드가 다 그렇다. 여기만 아래에 있으면
            「무엇을 하는 카드인가」를 버튼을 지나친 뒤에야 읽게 된다. -->
-      <div class="hint" data-i18n="create.scopeHint">여백·크기·폰트·효과만 다룹니다. 색은 이전 단계에서 이미 만들었어요</div>
+      <div class="hint" data-i18n="create.scopeHint">여백·크기·폰트·효과만 다뤄요. 색은 이전 단계에서 이미 만들었어요</div>
       <div class="toolbar">
         <button id="btnCreate" data-i18n="create.previewBtn">미리보기</button>
         <button id="btnCreateApply" class="primary" style="display:none" data-i18n="create.apply">적용</button>
@@ -927,7 +927,7 @@
       <div class="banner" id="tokenColorNote" style="display:none"></div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체</span></label>
-        <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" data-i18n-title="create.dropOnceTip" title="한 레이어에서만 쓰인 값(1×)의 체크를 해제합니다 — 대개 일회성이라 토큰으로 남길 필요가 적습니다">1× 해제</button>
+        <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" data-i18n-title="create.dropOnceTip" title="한 레이어에서만 쓰인 값(1×)의 체크를 풀어요 — 대개 일회성이라 토큰으로 남길 필요가 적어요">1× 해제</button>
       </div>
       <div id="tokenList" class="results"></div>
       <!-- 격자 값이 설정 입력으로 돌아온 뒤로는 스냅이 '정책'이 아니라 사용자의 선택이다.
@@ -945,7 +945,7 @@
     <div class="step" data-make-step="token" data-always-hidden style="display:none">
       <h2><span data-i18n="semantic.title">시맨틱 매핑 (역할 → 토큰)</span> <span class="muted lock" id="semLock"></span></h2>
       <div class="hint" data-i18n-html="semantic.formatLabel">형식: <code>역할 = Global변수이름</code></div>
-      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
       <div class="row">
         <button id="btnSemantics" data-i18n="semantic.aliasBtn">시맨틱 별칭 생성</button>
@@ -956,7 +956,7 @@
 
     <div class="step" id="darkCard" data-make-step="theme">
       <h2><span data-i18n="dark.title">다크 모드</span> <span class="muted lock" id="darkLock"></span></h2>
-      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="색상·채도는 그대로 두고 명도만 뒤집습니다. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뜁니다. 다크용 원시색은 dark/…로 따로 만들어집니다.">밝은 모드 색을 뒤집어 다크 모드에 채웁니다. 목록 이름은 Figma 변수 컬렉션·모드예요</div>
+      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="색상·채도는 그대로 두고 명도만 뒤집어요. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뛰어요. 다크용 원시색은 dark/…로 따로 만들어요.">라이트 색을 뒤집어 다크에 채워요. 목록 이름은 Figma 변수 컬렉션·모드예요</div>
       <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바에, 입력은 그 아래 한 줄(와이어 uxTheme). -->
       <div class="toolbar">
         <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 만들기</button>
@@ -967,15 +967,15 @@
         <label class="inline"><span data-i18n="dark.collection">역할 컬렉션</span>
           <select id="darkCollection"></select>
         </label>
-        <label class="inline"><span data-i18n="dark.fromMode">밝은 모드</span>
+        <label class="inline"><span data-i18n="dark.fromMode">라이트</span>
           <select id="darkFromMode"></select>
         </label>
-        <label class="inline"><span data-i18n="dark.toMode">어두운 모드</span>
+        <label class="inline"><span data-i18n="dark.toMode">다크</span>
           <select id="darkToMode"></select>
         </label>
       </div>
       <!-- 바로가기는 '토큰이 없다'일 때만 뜬다 — 컬렉션·모드를 고르라는 안내에는 갈 곳이 없다. -->
-      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate">토큰 생성으로 →</button></div>
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
       <div class="status" id="darkStatus"></div>
     </div>
 
@@ -994,7 +994,7 @@
            옵션이라, 결과를 보기도 전에 이름 규칙을 고르라는 요구였다. 스캔은 늘 크기 순으로 두고,
            이름이 마음에 안 들 때 눌러 덧입히는 뒤따르는 동작으로 바꾼다. 스캔해야 누를 것이 생긴다. -->
       <div class="row">
-        <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봅니다. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둡니다.">왼쪽 글자로 이름 채우기</button>
+        <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봐요. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둬요.">왼쪽 글자로 이름 채우기</button>
       </div>
       <div id="tsList" class="results"></div>
       <div class="status" id="tsStatus"></div>
@@ -1004,7 +1004,7 @@
 
   <section class="tab-section" id="tab-layer" role="tabpanel" aria-labelledby="tabbtn-layer" tabindex="0">
     <!-- 레이어 하위 탭(밑줄, §4.1 탭 모양 2단계) — 연결 · 이름 · 컴포넌트. 세 작업은 순서가 없다(§4.7). -->
-    <div class="subtabs" id="applyRail" role="tablist" aria-label="레이어 작업">
+    <div class="subtabs" id="applyRail" role="tablist" data-i18n-aria-label="rail.layerAria" aria-label="레이어 작업">
       <button class="subtab" role="tab" data-apply-step="bind" data-i18n="rail.bind">연결</button>
       <button class="subtab" role="tab" data-apply-step="rename" data-i18n="rail.rename">이름</button>
       <button class="subtab" role="tab" data-apply-step="structure" data-i18n="rail.structure">컴포넌트</button>
@@ -1016,13 +1016,13 @@
       <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
       <div class="toolbar bind-toolbar">
         <!-- 단계 표시 — 누를 수 없는 표시(정지점 아님). 상태는 ui.ts renderBindSteps가 정한다. -->
-        <ol class="bind-steps" id="bindSteps" role="list" aria-label="연결 단계">
+        <ol class="bind-steps" id="bindSteps" role="list" data-i18n-aria-label="bind.stepsAria" aria-label="연결 단계">
           <li class="bs" data-s="find"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.find">찾기</span></li>
           <li class="bs" data-s="pick"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.stepPick">고르기</span></li>
           <li class="bs" data-s="link"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.link">연결</span></li>
         </ol>
-        <button id="btnApply" class="primary bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg><span class="bl" id="btnApplyLabel">찾기</span></button>
-        <button id="btnApplyConfirm" class="bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span class="bl" id="btnApplyConfirmLabel">연결</span></button>
+        <button id="btnApply" class="primary bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg><span class="bl" id="btnApplyLabel" data-i18n="bind.find">찾기</span></button>
+        <button id="btnApplyConfirm" class="bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span class="bl" id="btnApplyConfirmLabel" data-i18n="bind.link">연결</span></button>
       </div>
       <div class="ux" id="applyProgress" style="display:none">
         <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
@@ -1043,7 +1043,7 @@
         <div class="skip-row" id="bindSkips" hidden></div>
         <span class="grow"></span>
         <button class="bd-all" id="bindAll" type="button"></button>
-        <button class="icon-btn" id="bindFilterBtn" type="button" aria-expanded="false" aria-controls="bindFilterRow" data-i18n-title="bind.filterBtn" title="변수 이름 필터" aria-label="변수 이름 필터"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+        <button class="icon-btn" id="bindFilterBtn" type="button" aria-expanded="false" aria-controls="bindFilterRow" data-i18n-title="bind.filterBtn" title="변수 이름 필터" data-i18n-aria-label="bind.filterBtn" aria-label="변수 이름 필터"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
       </div>
       <div class="row bind-filter-row" id="bindFilterRow" hidden>
         <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" />
@@ -1058,7 +1058,7 @@
         <span class="ts-aa" aria-hidden="true">Aa</span>
         <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
         <span class="grow"></span>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결합니다. 새로 만들지 않아요.">기존 스타일 연결</button>
+        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결해요. 새로 만들지 않아요.">기존 스타일 연결</button>
       </div>
       <div class="hint" id="tsApplyResult" hidden></div>
       <div class="status" id="applyStatus"></div>
@@ -1066,7 +1066,7 @@
 
     <div class="step" data-apply-step="rename">
       <h2><span data-i18n="rename.title">이름 정리</span> <span class="muted" id="renameCount"></span></h2>
-      <div class="hint" data-i18n="rename.hint">역할에 맞는 레이어 이름으로 바꿉니다. 최상위·인스턴스 이름은 그대로 둡니다</div>
+      <div class="hint" data-i18n="rename.hint">역할에 맞는 레이어 이름으로 바꿔요. 최상위·인스턴스 이름은 그대로 둬요</div>
       <div class="toolbar">
         <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
         <button id="btnRename" class="primary" disabled data-i18n="rename.apply">이름 적용</button>
@@ -1089,14 +1089,14 @@
       <h2><span data-i18n="structure.title">컴포넌트</span> <span class="muted lock" id="componentLock"></span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
       <div class="hint" data-i18n="component.hint">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</div>
       <div class="toolbar">
-        <button id="btnScanComp" data-i18n="component.scanBtn" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾습니다. 숨김·부모 컨테이너는 제외.">후보 스캔</button>
-        <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶습니다. 파일은 안 바꿉니다.">닮은 스캔</button>
+        <button id="btnScanComp" data-i18n="component.scanBtn" data-i18n-tip="component.scanHelp" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.">후보 스캔</button>
+        <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-i18n-tip="similar.scanHelp" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶어요. 파일은 안 바꿔요.">닮은 스캔</button>
       </div>
       <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
       <div class="toolbar toolbar-2">
         <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남깁니다. 원본의 연결과 값은 마스터를 따라요.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿉니다. 원본의 연결과 값은 마스터를 따라요.">묶기</button>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿔요. 원본의 연결과 값은 마스터를 따라요.">묶기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -1110,8 +1110,8 @@
       <div id="variantRow" hidden>
         <div class="r-group" data-i18n="structure.groupVariant">선택한 컴포넌트 정리</div>
         <div class="row">
-          <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶습니다.">베리언트 분류</button>
-          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채웁니다.">누락 조합 생성</button>
+          <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-i18n-tip="component.classifyHelp" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶어요.">베리언트 분류</button>
+          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-i18n-tip="component.genMissingHelp" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채워요.">누락 조합 생성</button>
         </div>
       </div>
       <div id="variantReport" class="results"></div>
@@ -1123,7 +1123,7 @@
     <!-- #19: 기준 크기·맥락 깊이·허용오차는 여기서만. 만들기/적용 단계에는 노출하지 않는다. -->
     <div class="step" id="pluginSettingsCard">
       <h2 data-i18n="settings.title">기본값</h2>
-      <div class="hint" data-i18n="settings.hint">자주 안 바꾸는 값이에요. 만들기·적용 화면에는 안 보여요</div>
+      <div class="hint" data-i18n="settings.hint">만들기 · 연결 · 이름 정리에 쓰는 값이에요</div>
       <div class="row">
         <label class="inline"><span data-i18n="settings.base">기준 크기</span> <input id="base" type="number" value="16" min="1" />px</label>
         <label class="inline"><span data-i18n="settings.depth">이름 정리 깊이</span> <input id="depth" type="number" value="8" min="1" /></label>
@@ -1136,12 +1136,12 @@
 
     <div class="step">
       <h2 data-i18n="license.title">라이선스</h2>
-      <div class="hint" data-i18n="license.hint">유료를 쓰면 🔒 잠긴 기능이 풀립니다</div>
+      <div class="hint" data-i18n="license.hint">유료를 쓰면 🔒 잠긴 기능이 풀려요</div>
       <div class="row">
         <input id="licenseKey" type="text" data-i18n-placeholder="license.keyPlaceholder" placeholder="라이선스 키 입력" spellcheck="false" style="flex:1; min-width:140px;" />
         <button id="btnVerify" data-i18n="license.verify">검증</button>
         <!-- 와이어엔 없지만 남긴다: 기기 1대 한도라 이 버튼 없이는 기기를 옮길 방법이 없다. -->
-        <button id="btnClearLicense" data-i18n-title="license.clearTip" title="이 기기의 활성화를 반납합니다. 새 기기에서 같은 키를 다시 검증하면 됩니다." data-i18n="license.clear">해제</button>
+        <button id="btnClearLicense" data-i18n-title="license.clearTip" title="이 기기의 활성화를 반납해요. 새 기기에서 같은 키를 다시 검증하면 돼요." data-i18n="license.clear">해제</button>
       </div>
       <div class="muted" id="licenseInfo"></div>
       <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유.
@@ -1149,10 +1149,10 @@
       <!-- 「구독」+「관리」 이원화 폐기(결정 2026-08-06) — 한 버튼이 티어에 따라 갈린다:
            Free면 결제 페이지, Paid면 고객 포털. 사용자가 자기 상태를 알고 버튼을 고를 일이 아니다. -->
       <div class="row" id="licenseLinkRow">
-        <button id="btnLicenseLink" class="primary" data-i18n-title="license.manageTip" title="Free면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 엽니다" data-i18n="license.manage">결제 · 구독 관리</button>
+        <button id="btnLicenseLink" class="primary" data-i18n-title="license.manageTip" title="무료면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 열어요" data-i18n="license.manage">결제 · 구독 관리 ↗</button>
       </div>
-      <div class="hint" id="licenseLinkHint">Free · Paid 연 $39 · 기기 1대</div>
-      <div class="hint" id="licenseSetupHint" style="display:none">배포 전 — 키 검증·구독 링크는 아직 동작하지 않습니다.</div>
+      <div class="hint" id="licenseLinkHint" data-i18n="license.priceHint">무료 · 유료 연 $39 · 기기 1대</div>
+      <div class="hint" id="licenseSetupHint" style="display:none" data-i18n="license.setupHint">배포 전이라 키 검증·구독 링크는 아직 동작하지 않아요</div>
       <!-- 개발용 강제 티어: 사용자 화면 비노출(개발 시 display 해제). #tier id는 ui.ts가 참조하므로 DOM 유지. -->
       <div class="row" id="devTierRow" style="display:none;">
         <label class="inline"><span data-i18n="license.devTier">개발용 강제 티어</span>
@@ -1179,7 +1179,7 @@
 
   <!-- 최소화 상태(§4.9) — 창 140×104, 가운데 펼치기 버튼(↙↗)만. 누르면 펼친다. -->
   <div class="mini" id="miniView" hidden>
-    <button class="mini-mark" id="btnExpand" type="button" aria-label="펼치기">
+    <button class="mini-mark" id="btnExpand" type="button" data-i18n-aria-label="ui.expand" aria-label="펼치기">
       <svg width="16" height="16" viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3h6v6M19 3l-7 7M9 19H3v-6M3 19l7-7"/></svg>
       <span class="mini-badge" id="miniBadge" hidden></span>
     </button>
@@ -1189,19 +1189,19 @@
   <!-- 팝업 보관함(§4.4 ⋯) — 계층 팝업·내보내기 팝업이 열릴 때 내용을 빌려 가고 닫히면 돌려준다. -->
   <div id="popupStore" hidden>
     <div id="tierPopBody" hidden>
-      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정합니다. 파일에 저장돼 이 파일을 여는 모두에게 적용됩니다</div>
+      <div class="hint" data-i18n="colRoles.hint">이름이 Global·Semantic·Component가 아닌 컬렉션도 계층으로 쓰게 지정해요. 파일에 저장돼 이 파일을 여는 모두에게 적용돼요</div>
       <div id="collectionRoles"></div>
       <div class="status" id="colRolesStatus"></div>
     </div>
     <div id="exportPopBody" hidden>
-      <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장됩니다</div>
+      <div class="hint" data-i18n="export.hint">누르면 바로 코드 파일로 저장돼요</div>
       <div class="row">
         <select id="exportFormat" data-i18n-title="export.formatTip" title="내보낼 코드 형식">
           <option value="w3c" data-i18n="export.fmtW3c">W3C 토큰 JSON</option>
           <option value="css" data-i18n="export.fmtCss">CSS 변수</option>
         </select>
         <!-- px·rem은 단위 기호 그대로라 번역 대상이 아니다(Free·Paid 티어 이름도 같다). -->
-        <select id="exportFontUnit" data-i18n-title="export.fontUnitTip" title="폰트 크기 단위 — rem은 기준 크기로 나눕니다">
+        <select id="exportFontUnit" data-i18n-title="export.fontUnitTip" title="폰트 크기 단위 — rem은 기준 크기로 나눠요">
           <option value="px">px</option>
           <option value="rem">rem</option>
         </select>

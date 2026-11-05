@@ -3,6 +3,7 @@
    불변식: Global만 리터럴, Semantic/Component는 별칭만. upsert로 재실행 안전.
    성능: 로컬 변수를 1회만 페치해 인덱스(Map)로 O(1) upsert.
    ============================================================ */
+import { t } from './i18n';
 import {
   DraftToken,
   PxConversion,
@@ -382,10 +383,10 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
     styleCache.set(id, st);
     return st;
   };
-  for (const t of texts) {
-    const typo = readNodeTypography(t);
+  for (const node of texts) {
+    const typo = readNodeTypography(node);
     if (!typo) {
-      warnings.add('부분 서식(혼합) 텍스트는 스킵했습니다.');
+      warnings.add(t('textStyle.warnMixed'));
       continue;
     }
     const fontSize = roundN(typo.fontSize);
@@ -399,14 +400,14 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
 
     // 변수 바인딩 → 해석 px만 남는 경우 description("%")으로 복구(스타일 없는 텍스트 포함).
     if (lineHeightPercent === 0) {
-      const fromVar = await percentFromNodeBinding(t, 'lineHeight', varCache);
+      const fromVar = await percentFromNodeBinding(node, 'lineHeight', varCache);
       if (fromVar !== undefined && fromVar > 0) {
         lineHeightPercent = fromVar;
         lineHeight = roundN((fontSize * fromVar) / 100);
       }
     }
     if (letterSpacingPercent === 0) {
-      const fromVar = await percentFromNodeBinding(t, 'letterSpacing', varCache);
+      const fromVar = await percentFromNodeBinding(node, 'letterSpacing', varCache);
       if (fromVar !== undefined && fromVar !== 0) {
         letterSpacingPercent = fromVar;
         letterSpacing = roundN((fontSize * fromVar) / 100);
@@ -414,7 +415,7 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
     }
 
     // 이미 바인딩된 로컬 텍스트 스타일 id(혼합/없음=''). 재스캔 rename 앵커로 군집에 전달.
-    const sid = t.textStyleId;
+    const sid = node.textStyleId;
     const styleId = sid === figma.mixed ? '' : sid;
     if (styleId) {
       const st = await styleOf(styleId);
@@ -432,11 +433,11 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
       }
     }
     let characters = '';
-    try { characters = t.characters; } catch { characters = ''; }
+    try { characters = node.characters; } catch { characters = ''; }
     // HORIZONTAL 부모 = 행. 안쪽 H 행 단위 라벨 짝짓기용.
     let rowId: string | undefined;
     let indexInParent: number | undefined;
-    const parent = t.parent;
+    const parent = node.parent;
     if (
       parent &&
       'layoutMode' in parent &&
@@ -444,12 +445,12 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
       'children' in parent
     ) {
       rowId = parent.id;
-      indexInParent = parent.children.indexOf(t);
+      indexInParent = parent.children.indexOf(node);
       if (indexInParent < 0) indexInParent = undefined;
     }
     samples.push({
       fontSize, lineHeight, lineHeightPercent, letterSpacing, letterSpacingPercent, family, style,
-      layerName: t.name, styleId, characters, id: t.id, rowId, indexInParent,
+      layerName: node.name, styleId, characters, id: node.id, rowId, indexInParent,
     });
   }
   return { samples, warnings: [...warnings] };
@@ -539,7 +540,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
     const occupant = styleByName.get(spec.name);
     if (occupant && occupant.id !== st.id) {
       renameBlocked.add(spec.boundStyleId as string);
-      res.missing.push(`이름 충돌 '${st.name}'→'${spec.name}' — 이미 같은 이름 스타일이 있어 rename 보류`);
+      res.missing.push(t('textStyle.missRename', { from: st.name, to: spec.name }));
       continue;
     }
     roleRenames.push({ from: st.name, to: spec.name });
@@ -595,7 +596,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
     prev.value = px;
     prev.unit = 'px';
     prev.fontSize = undefined;
-    res.notes.push(`${name}: 역할마다 행간 원본이 달라 px로 기록(원본 표기 생략)`);
+    res.notes.push(t('textStyle.noteLhPx', { name }));
   };
   // 자간도 행간과 같이 이름(=px)이 같아도 원본이 갈릴 수 있다(0.32px 역할 + 16px의 2% 역할).
   const lsTokens = new Map<string, DraftToken>();
@@ -615,7 +616,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
     prev.value = px;
     prev.unit = 'px';
     prev.fontSize = undefined;
-    res.notes.push(`${name}: 역할마다 자간 원본이 달라 px로 기록(원본 표기 생략)`);
+    res.notes.push(t('textStyle.noteLsPx', { name }));
   };
   const pushAlias = (
     role: string,
@@ -705,9 +706,9 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
           const fb: FontName = { family: spec.family, style: 'Regular' };
           await figma.loadFontAsync(fb);
           loaded = fb;
-          res.missing.push(`${spec.name}: 폰트 ${spec.style}→Regular`);
+          res.missing.push(t('textStyle.missStyle', { name: spec.name, style: spec.style }));
         } catch {
-          res.missing.push(`${spec.name}: 폰트 '${spec.family}' 없음`);
+          res.missing.push(t('textStyle.missFamily', { name: spec.name, family: spec.family }));
           continue;
         }
       }
@@ -733,11 +734,11 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
       // 지우면 되돌릴 방법이 없다 — 값을 안 바꾼 재스캔·재등록만으로 디자인 시스템 연결이
       // 끊기던 자리다. 바인딩이 없을 때만 단위를 교정한다.
       if (lhPct > 0) {
-        if (style.boundVariables?.lineHeight) res.notes.push(`${spec.name}: 행간 변수 연결을 지켰습니다 — ${lhPct}% 교정 보류`);
+        if (style.boundVariables?.lineHeight) res.notes.push(t('textStyle.noteKeepLh', { name: spec.name, n: lhPct }));
         else style.lineHeight = { value: lhPct, unit: 'PERCENT' };
       }
       if (lsPct !== 0) {
-        if (style.boundVariables?.letterSpacing) res.notes.push(`${spec.name}: 자간 변수 연결을 지켰습니다 — ${lsPct}% 교정 보류`);
+        if (style.boundVariables?.letterSpacing) res.notes.push(t('textStyle.noteKeepLs', { name: spec.name, n: lsPct }));
         else style.letterSpacing = { value: lsPct, unit: 'PERCENT' };
       }
     }
@@ -756,7 +757,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
       if (pctNow > 0) {
         // 예전에 묶여 있던 px 변수가 남아 있으면 다시 풀린다(rename 교정 경로와 동일).
         if (style.boundVariables?.lineHeight) style.setBoundVariable('lineHeight', null);
-        res.notes.push(`${bindRole}: 행간 ${pctNow}% 유지 — 변수 바인딩 생략`);
+        res.notes.push(t('textStyle.noteLhPct', { role: bindRole, n: pctNow }));
       } else {
         // rename은 스펙 lineHeight가 스캔값일 수 있어, 스타일에 바인딩할 시맨틱은 역할명 기준.
         // lineHeight>0인 신규만 필수; rename은 역할에 lh 별칭이 있으면 연결.
@@ -772,7 +773,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
       const lsPctNow = lsPctOf(style.letterSpacing);
       if (lsPctNow !== 0) {
         if (style.boundVariables?.letterSpacing) style.setBoundVariable('letterSpacing', null);
-        res.notes.push(`${bindRole}: 자간 ${lsPctNow}% 유지 — 변수 바인딩 생략`);
+        res.notes.push(t('textStyle.noteLsPct', { role: bindRole, n: lsPctNow }));
       } else {
         const lsVar = semByName.get(`letter-spacing/${bindRole}`);
         if (lsVar) {
@@ -794,8 +795,6 @@ export interface ApplyTextStylesResult {
   applied: number;
   skipped: number;
   skipReasons: Record<TextStyleSkipReason, number>;
-  /** 예전 상태줄 문구(미등록 종류·모호·폰트 로드 실패·대상 없음) — 뒤호환용. */
-  missing: string[];
 }
 
 /** 텍스트 스타일 비교 키 — 스타일이 정하는 모든 글자 속성(§2.11). 숫자는 소수 2자리. */
@@ -875,7 +874,7 @@ function insideInstance(node: SceneNode): boolean {
  */
 export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Promise<ApplyTextStylesResult> {
   const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
-  const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons, missing: [] };
+  const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons };
   const skipText = (k: TextStyleSkipReason): void => {
     skipReasons[k]++;
     res.skipped++;
@@ -903,7 +902,6 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
     loaded.add(k);
   };
 
-  const unregistered = new Set<string>(); // 같은 스타일이 없는 모양(요약 보고용)
   for (const t of texts) {
     if (hasTextStyle(t)) {
       skipText('hasStyle');
@@ -918,11 +916,9 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
       continue;
     }
     const fn = t.fontName as FontName;
-    const fontSize = t.fontSize as number;
     const hit = styleByKey.get(typoKey(t as unknown as TypoFields));
     if (hit === undefined) {
       skipText('noStyle');
-      unregistered.add(`${fn.family} ${fn.style} ${roundN(fontSize)}`);
       continue;
     }
     if (hit === null) {
@@ -934,11 +930,8 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
       await t.setTextStyleIdAsync(hit.id);
       res.applied++;
     } catch {
-      res.missing.push(`적용 실패 '${t.name}'(폰트 로드 불가)`);
+      /* 폰트를 못 불러옴 — 적용 수에 넣지 않는다(결과 줄은 적용 수 + 건너뜀 사유만 보인다) */
     }
   }
-  if (texts.length === 0 && inInstance.length === 0) res.missing.push('적용 대상 없음 — 선택에 텍스트 노드가 없습니다');
-  if (unregistered.size) res.missing.push(`미등록 ${unregistered.size}종 — 먼저 등록 필요: ${[...unregistered].join(', ')}`);
-  if (skipReasons.ambiguous) res.missing.push(`모호 ${skipReasons.ambiguous}개 — 같은 타이포의 스타일이 여러 개라 자동 적용 보류`);
   return res;
 }

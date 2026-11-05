@@ -1,6 +1,7 @@
 /* ============================================================
    extract.ts — 선택 노드에서 원시 토큰 수집·중복 제거 (bottom-up)
    ============================================================ */
+import { t } from './i18n';
 import {
   DraftToken,
   SourceField,
@@ -28,14 +29,13 @@ interface Accumulator {
 }
 
 /* 결과가 비었을 때만 쓰는 스킵 사유 — 왜 아무것도 안 나왔는지, 무엇을 바꾸면 되는지까지 말한다. */
-const SKIP_HIDDEN = '숨긴 레이어는 화면에 없는 값이라 건너뛰었습니다 — 보이게 한 뒤 다시 추출하세요.';
-const SKIP_INSTANCE =
-  '인스턴스 내부는 마스터 복사본이라 건너뛰었습니다 — 값이 필요하면 컴포넌트를 선택해 추출하세요.';
-const SKIP_GRADIENT = '그라디언트·이미지 채움은 변수로 묶을 수 없어 건너뛰었습니다.';
+const SKIP_HIDDEN = t('extract.skipHidden');
+const SKIP_INSTANCE = t('extract.skipInstance');
+const SKIP_GRADIENT = t('extract.skipGradient');
 
 const round = (n: number, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
 
-const SKIP_FRACTION = '소수 값(26.67px 등)은 척도가 아니라 스케일 잔값이라 토큰에서 제외했습니다.';
+const SKIP_FRACTION = t('extract.skipFraction');
 /**
  * 척도 값인가 — 변수는 소수점을 갖지 않는다: 폰트 크기·간격·반경·행간·자간·그림자 수치는 정수,
  * 선 두께도 예외 없이 정수(2026-11-04 사용자 결정 — 예전 0.5 단위 허용을 없앰, §2.11). 불투명도(0~1)는 본질이 소수라 이 규칙 밖(collectOpacity).

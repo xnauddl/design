@@ -3,6 +3,7 @@
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, CollectionRoleInfo, VarUpdateError } from './shared/messages';
 import { post } from './shared/messages';
+import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
@@ -23,7 +24,7 @@ import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } fr
 import { scanSimilar, componentizeSimilar, componentizeResultMessage } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
 import { Tier, Feature, isTier } from './lib/entitlements';
-import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache } from './lib/license';
+import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache, isVerifyErrCode } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
 import { commitUndo } from './lib/undo';
 import { UI_SIZE_KEY, UI_WIDTH, normalizeUiSize, uiHeight, uiWidth } from './lib/uiSize';
@@ -78,13 +79,15 @@ const currentTier = (): Tier => effective().tier;
 const isPaid = (): boolean => currentTier() === 'paid';
 
 /** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용) */
-function requirePaid(feature: Feature, message: string): boolean {
+function requirePaid(feature: Feature): boolean {
   if (isPaid()) return true;
-  post({ type: 'PREMIUM_REQUIRED', feature, message });
+  post({ type: 'PREMIUM_REQUIRED', feature });
   return false;
 }
 
-function postLicense(note?: string): void {
+interface LicenseNote { text: string; kind: 'ok' | 'warn'; tip?: string }
+
+function postLicense(note?: LicenseNote): void {
   const e = effective();
   post({
     type: 'LICENSE_STATUS',
@@ -93,7 +96,9 @@ function postLicense(note?: string): void {
     source: e.source,
     status: e.status,
     expiresAt: e.expiresAt,
-    note,
+    note: note?.text,
+    noteKind: note?.kind,
+    noteTip: note?.tip,
   });
 }
 
@@ -230,7 +235,7 @@ function tableCell(raw: VariableValue | undefined, aliasInfo: (id: string) => { 
     const id = (raw as VariableAlias).id;
     const info = aliasInfo(id);
     if (info.name !== null && !info.remote) return { kind: 'alias', aliasId: id, aliasName: info.name };
-    return { kind: 'alias', aliasId: id, aliasName: info.name ?? '(삭제된 변수)', remote: info.name ? true : undefined };
+    return { kind: 'alias', aliasId: id, aliasName: info.name ?? t('edit.deletedTarget'), remote: info.name ? true : undefined };
   }
   if (typeof raw === 'object' && 'r' in raw) {
     const a = 'a' in raw && typeof (raw as RGBA).a === 'number' ? Math.round((raw as RGBA).a * 255) / 255 : 1;
@@ -432,12 +437,12 @@ function pageOf(node: BaseNode): PageNode | null {
 
 /** Paid 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireComponents(): boolean {
-  return requirePaid('components', '컴포넌트 등록·베리언트 분류는 Paid 기능입니다.');
+  return requirePaid('components');
 }
 
 /** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
 function requireTextStyles(): boolean {
-  return requirePaid('textStyles', '텍스트 스타일 등록은 Paid 기능입니다.');
+  return requirePaid('textStyles');
 }
 
 /** 변수 → 내보내기 kind 분류(scope 우선, 이름 폴백 — STRING line-height 등 scope 비어있음 대비). */
@@ -889,18 +894,19 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'CREATE_TOKENS': {
         // 실제 변수 생성만 Paid(미리보기는 비파괴 읽기라 백엔드는 허용 — UI가 무료 티어에서 버튼을 잠근다).
-        if (!msg.preview && !requirePaid('tokens', '토큰(변수) 생성은 Paid 기능입니다. 미리보기는 무료로 제공됩니다.')) break;
+        if (!msg.preview && !requirePaid('tokens')) break;
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
-        let summary = `Global ${s.globals}개 (생성 ${s.created} / 갱신 ${s.updated})`;
-        if (pruned) summary += ` · 이전 색 ${pruned}개 정리`;
+        let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });
+        if (pruned) summary += t('create.sumPruned', { n: pruned });
         // base 반영 — 비-px 값이 실제로 얼마가 되는지 요약에 노출. base를 바꾸면 이 줄이 바뀐다.
         if (s.conversions.length) {
           const px = (n: number): string => String(Math.round(n * 100) / 100);
           const ex = s.conversions.slice(0, 2).map((c) => `${c.from}→${px(c.to)}px`).join(', ');
-          summary += ` · base ${msg.base}px 환산 ${s.conversions.length}개(${ex}${s.conversions.length > 2 ? ' 외' : ''})`;
+          const morePart = s.conversions.length > 2 ? t('create.sumBaseMore') : '';
+          summary += t('create.sumBase', { base: msg.base, n: s.conversions.length, examples: ex, morePart });
         }
         post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview });
         if (!msg.preview) {
@@ -925,7 +931,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           type: 'APPLY_RESULT',
           bound: r.bound,
           skipped: r.skipped,
-          flags: r.flags,
           reasons: r.reasons,
           preview: msg.preview,
           cancelled: r.cancelled,
@@ -1001,7 +1006,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 스타일이 생겼거나 값이 달라진 곳은 건너뛰고 사유로 돌려준다(IA v3 §4.6 "찾는 범위" · "연결 후").
         const r = await bindSelectedItems(msg.items);
         const bound = r.bound;
-        post({ type: 'APPLY_RESULT', bound, skipped: r.skipped, flags: [], reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
+        post({ type: 'APPLY_RESULT', bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
         if (bound) {
           commitUndo(figma); // UX2: 선택 바인딩 전체를 단일 Undo로
           selfSelect = true;
@@ -1061,7 +1066,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_SEMANTICS': {
-        if (!requirePaid('semantics', '시맨틱 매핑은 Paid 기능입니다.')) break;
+        if (!requirePaid('semantics')) break;
         const s = await createSemanticAliases(msg.map);
         post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
@@ -1071,7 +1076,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 스캔(미리보기)도 Paid — 등록이 Paid라 스캔만 열어두면 막다른 길(ROADMAP §5).
         // 마법사의 텍스트 스타일 단계도 Paid 전용이라 Free 마법사는 여기 오지 않는다.
-        if (!requirePaid('textStyles', '텍스트 스타일은 Paid 기능입니다.')) break;
+        if (!requirePaid('textStyles')) break;
         // 이름은 언제나 크기 순(display/h1…) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
         const { samples, warnings } = await scanTextStyles(selection());
         lastTextSamples = samples;
@@ -1081,12 +1086,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'NAME_TEXT_STYLES_BY_ROW': {
-        if (!requirePaid('textStyles', '텍스트 스타일은 Paid 기능입니다.')) break; // 스캔 후속 — 스캔과 같은 등급
+        if (!requirePaid('textStyles')) break; // 스캔 후속 — 스캔과 같은 등급
         // 방금 스캔한 표본을 그대로 다시 이름 짓는다(캔버스 재탐색 없음) — 사용자가 보고 있는 표와
         // 같은 입력이어야 결과가 예측 가능하다. 등록된 스타일은 그 사이 바뀔 수 있어 새로 읽는다.
         // 빈 후보를 돌려보내면 UI가 '텍스트를 못 찾음'으로 읽고 기본 램프로 표를 덮는다 — 오류로 알린다.
         if (!lastTextSamples.length) {
-          post({ type: 'ERROR', message: '먼저 스캔하세요 — 이름을 다시 매길 표본이 없습니다.', op: 'NAME_TEXT_STYLES_BY_ROW' });
+          post({ type: 'ERROR', message: t('textStyle.needScan'), op: 'NAME_TEXT_STYLES_BY_ROW' });
           break;
         }
         const existing = await scanExistingTextStyles();
@@ -1105,7 +1110,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'APPLY_TEXT_STYLES': {
         // 적용만(생성 없음, 무료 — IA v3 §4.6): 선택 텍스트를 시그니처가 같은 기존 스타일에 연결.
         const r = await applyExistingTextStyles(selection());
-        post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, missing: r.missing });
+        post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons });
         commitUndo(figma);
         break;
       }
@@ -1180,16 +1185,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           } catch {
             /* 저장 실패해도 세션 동안은 적용 */
           }
-          postLicense('라이선스 적용됨');
+          postLicense({ text: t('license.noteApplied'), kind: 'ok' });
         } else if (msg.result.offline) {
           // 오프라인 — 기존 캐시(grace) 유지, 변경 없음.
-          postLicense(
-            cache
-              ? '오프라인 — 캐시된 라이선스로 동작(grace).'
-              : '오프라인 — 키를 확인할 수 없습니다.',
-          );
+          postLicense({ text: t(cache ? 'license.noteGrace' : 'license.noteOffline'), kind: 'warn' });
         } else {
-          postLicense(`검증 실패: ${msg.result.error}`);
+          // 알려진 서버 사유면 해요체 문구, 아니면 한 줄 + 원문 툴팁(결정 5-(b)). 머리말은 붙이지 않는다.
+          const { code, error } = msg.result;
+          postLicense({
+            text: isVerifyErrCode(code) ? t(`license.err.server.${code}`) : t('license.verifyFailed'),
+            kind: 'warn',
+            tip: error || undefined,
+          });
         }
         break;
       }
@@ -1204,7 +1211,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         } catch {
           /* 무시 */
         }
-        postLicense('라이선스 키 제거됨');
+        postLicense({ text: t('license.noteCleared'), kind: 'ok' });
         break;
       }
       case 'OPEN_LICENSE_LINK': {
@@ -1443,9 +1450,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             // 복사본 · 빈 자리 목록에 넣는다. 빈 자리면 속성 값 꼬리에서는 뺀다(§4.7 6번).
             tallyFill({ placeCloned, placeFailed, propFailed }, r, o.name, before);
             if (r === 'instance') continue;
-            const cause = why.length ? ` — ${why.join(' · ')}` : '';
-            if (r === 'copy') failures.push(`인스턴스 대신 복사본을 뒀어요(${label} → ${o.name})${cause}`);
-            else failures.push(`제자리에 아무것도 두지 못했어요(${label} → ${o.name})${cause}`);
+            const causePart = why.length ? t('component.fail.cause', { why: why.join(' · ') }) : '';
+            if (r === 'copy') failures.push(t('component.fail.copyPlaced', { label, name: o.name, causePart }));
+            else failures.push(t('component.fail.nothingPlaced', { label, name: o.name, causePart }));
           }
         };
         // 단독 컴포넌트 1개를 페이지 이동 + 원위치 인스턴스 + 속성 노출 대상 등록(단독·결합불가·결합실패 3곳 공용).
@@ -1507,7 +1514,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               } catch (e) {
                 releaseOrigin(o); // 원본이 그 자리에 그대로 — 표지만 치운다
                 skipped++;
-                failures.push(`단독 등록 실패(${g.members[0].name}): ${errText(e)}`);
+                failures.push(t('component.fail.single', { name: g.members[0].name, error: errText(e) }));
               }
               continue;
             }
@@ -1530,7 +1537,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   } catch (e) {
                     releaseOrigin(o);
                     skipped++;
-                    failures.push(`속성접힘 등록 실패(${setName}): ${errText(e)}`);
+                    failures.push(t('component.fail.propsRegister', { set: setName, error: errText(e) }));
                   }
                 }
                 continue;
@@ -1565,7 +1572,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               }
               if (!iconsReady) {
                 // 세트로 남긴다(아래 경로) — 멤버가 그대로라 그림도 그대로다.
-                failures.push(`아이콘을 만들지 못해 세트로 등록해요(${setName})`);
+                failures.push(t('component.fail.iconFallback', { set: setName }));
               } else {
                 // 마스터 하나만 컴포넌트로 바꾼다. 나머지 멤버는 바꾸지 않고, 인스턴스를 만들어 사진·크기를
                 // 검사한 뒤 넣고 나서 지운다 — 검사에 걸리면 원본을 손대지 않고 그대로 둔다(§4.7 3·8번).
@@ -1582,7 +1589,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 } catch (e) {
                   releaseOrigin(masterOrigin);
                   skipped++;
-                  failures.push(`속성접힘 컴포넌트화 실패(${masterSnap.n.name}): ${errText(e)}`);
+                  failures.push(t('component.fail.propsComponentize', { name: masterSnap.n.name, error: errText(e) }));
                   continue;
                 }
                 try { master.name = setName || pascalCase(masterSnap.n.name); } catch { /* 이름 실패 무시 */ }
@@ -1609,7 +1616,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 try {
                   collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
                 } catch (e) {
-                  failures.push(`속성 노출 실패(${master.name}): ${errText(e)}`);
+                  failures.push(t('component.fail.expose', { name: master.name, error: errText(e) }));
                 }
                 exposedEarly += collapsedExposed;
                 const ids = propIdsByName(master);
@@ -1635,7 +1642,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                       const img = transplantImageFills(inst, images).failures;
                       if (!noted) {
                         noted = true;
-                        for (const p of badProps) failures.push(`속성 값을 못 넣어 마스터 값으로 뒀어요(${name} · ${p})`);
+                        for (const p of badProps) failures.push(t('component.fail.propValue', { name, prop: p }));
                         failures.push(...img.map((f) => `${name}: ${f}`));
                         if (badProps.length || img.length) propFailed.push(name);
                       }
@@ -1660,10 +1667,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   if (propFailed.length > before) propFailed.splice(before);
                   if (r.result === 'mismatch') {
                     fillKept.push(name);
-                    failures.push(`채움·크기가 달라 묶지 않고 원본을 뒀어요(${name}) — ${r.why ?? ''}`);
+                    failures.push(t('component.fail.fillKept', { name, causePart: t('component.fail.cause', { why: r.why ?? '' }) }));
                   } else {
                     placeFailed.push(name);
-                    failures.push(`제자리에 넣지 못해 원본을 뒀어요(${name})${r.why ? ` — ${r.why}` : ''}`);
+                    failures.push(t('component.fail.memberKept', { name, causePart: r.why ? t('component.fail.cause', { why: r.why }) : '' }));
                   }
                 }
                 // 루프 끝 일괄 expose는 중복 방지 — 이미 노출했으므로 containers에 넣지 않음.
@@ -1684,7 +1691,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               } catch (e) {
                 releaseOrigin(o);
                 skipped++;
-                failures.push(`컴포넌트화 실패(${m.name}): ${errText(e)}`);
+                failures.push(t('component.fail.componentize', { name: m.name, error: errText(e) }));
               }
             }
             if (made.length < 2) {
@@ -1699,7 +1706,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               const home = pageOf(made[0].comp) ?? figma.currentPage;
               set = figma.combineAsVariants(made.map((x) => x.comp), home);
             } catch (e) {
-              failures.push(`결합 실패(${setName}): ${errText(e)}`);
+              failures.push(t('component.fail.combine', { set: setName, error: errText(e) }));
               for (const x of made) placeSingle(x.comp, x.o, setName);
               continue;
             }
@@ -1707,7 +1714,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             set.name = setName;
             for (const x of made) if (x.variant) x.comp.name = x.variant; // 'Prop=value, ...'
             page.appendChild(set); // Components 페이지로 이동
-            try { arrangeSet(set); } catch (e) { failures.push(`정렬 실패(${set.name}): ${errText(e)}`); } // 장식: 비치명
+            try { arrangeSet(set); } catch (e) { failures.push(t('component.fail.arrange', { set: set.name, error: errText(e) })); } // 장식: 비치명
             set.x = cursorX;
             set.y = 0;
             cursorX += set.width + 48;
@@ -1724,7 +1731,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 속성 자동 노출 — 등록한 각 컴포넌트/세트의 직속 레이어를 Text/Instance-swap/Boolean 속성으로.
         let exposed = exposedEarly;
         for (const c of containers) {
-          try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(`속성 노출 실패: ${errText(e)}`); }
+          try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(t('component.fail.exposeAll', { error: errText(e) })); }
         }
 
         post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept });
@@ -1766,13 +1773,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               const v = variantById.get(m.id);
               if (node && v) node.name = v; // 'Prop=value, ...'
             }
-            try { arrangeSet(set); } catch (e) { failures.push(`정렬 실패(${set.name}): ${errText(e)}`); }
+            try { arrangeSet(set); } catch (e) { failures.push(t('component.fail.arrange', { set: set.name, error: errText(e) })); }
             const childNames = set.children.filter((c): c is ComponentNode => c.type === 'COMPONENT').map((c) => c.name);
             const miss = missingVariants(childNames);
             if (miss.length) missing.push(`${set.name}: ${miss.join(' / ')}`);
             sets++;
           } catch (e) {
-            failures.push(`결합 실패(${groupNames[gi]}): ${errText(e)}`);
+            failures.push(t('component.fail.combine', { set: groupNames[gi], error: errText(e) }));
           }
         }
         post({ type: 'VARIANTS_RESULT', sets, missing, singles, failures });
@@ -1853,7 +1860,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'GENERATE_DARK_MODE': {
         // 다크 Global을 새로 만드는 작업이라 토큰 생성과 같은 등급으로 잠근다.
-        if (!requirePaid('tokens', '다크 테마 생성은 Paid 기능입니다.')) break;
+        if (!requirePaid('tokens')) break;
         // toModeId 생략 시 themeApply가 Dark 모드를 ensure(없으면 addMode('Dark')).
         const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
         post({ type: 'DARK_MODE_RESULT', ...r });
@@ -1879,10 +1886,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'COMPONENTIZE_SIMILAR': {
-        if (!requirePaid('components', '닮은 프레임 컴포넌트화는 Paid 기능입니다. 스캔·미리보기는 무료입니다.')) break;
+        if (!requirePaid('components')) break;
         const master = await figma.getNodeByIdAsync(msg.masterId);
         if (!master || (master.type !== 'FRAME' && master.type !== 'GROUP')) {
-          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['마스터 프레임을 찾을 수 없어요.'], placeFailed: [] });
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: [t('similar.noMaster')], placeFailed: [] });
           break;
         }
         // 멤버 노드 수집(마스터 포함) → 정렬·컴포넌트화·인스턴스 교체는 similarApply에 위임.
@@ -1892,7 +1899,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (n && 'type' in n) memberNodes.push(n as SceneNode);
         }
         if (memberNodes.length < 2) {
-          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['대상 프레임이 2개 미만이에요. 다시 스캔해 주세요.'], placeFailed: [] });
+          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: [t('similar.tooFew')], placeFailed: [] });
           break;
         }
         const r = await componentizeSimilar(master as SceneNode, memberNodes);

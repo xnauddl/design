@@ -236,7 +236,7 @@ export type CodeToUi =
   | { type: 'VAR_USERS'; reqId: number; layers: { id: string; name: string }[]; totalLayers: number; places: number }
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; flags: string[]; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; candidateTotal?: number; reqId?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수. APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; candidateTotal?: number; reqId?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수. APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
   | { type: 'PROGRESS'; op: 'bind'; done: number; total: number } // UX6: 진행률
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
@@ -245,7 +245,7 @@ export type CodeToUi =
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number }
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[] } // Phase C (notes=경고 아닌 알림)
   // 기존 스타일 연결(§4.6) — skipped = 건너뛴 텍스트 레이어 수(= skipReasons 합), skipReasons = 사유별 텍스트 수.
-  | { type: 'TEXT_STYLES_APPLIED'; applied: number; skipped: number; skipReasons: Record<TextStyleSkipReason, number>; missing: string[] }
+  | { type: 'TEXT_STYLES_APPLIED'; applied: number; skipped: number; skipReasons: Record<TextStyleSkipReason, number> }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   | { type: 'GLOBAL_COLORS'; colors: { name: string; hex: string }[] } // #10: 기존 Global 색(이름+hex)
   // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).
@@ -275,10 +275,14 @@ export type CodeToUi =
       status?: LicenseStatus;
       /** 구독 만료(ms epoch). */
       expiresAt?: number;
-      /** 마지막 작업 관련 메시지(검증 실패·오프라인 안내 등). */
+      /** 마지막 작업 관련 메시지(검증 실패·오프라인 안내 등) — 이미 t()로 만든 화면 문구. */
       note?: string;
+      /** note의 색: ok(적용·제거) / warn(오프라인·검증 실패). 문구를 보고 정하지 않는다. */
+      noteKind?: 'ok' | 'warn';
+      /** 원문 사유(서버 error · 기술 사유) — #licenseStatus의 title(툴팁). 없으면 title을 비운다. */
+      noteTip?: string;
     }
-  | { type: 'PREMIUM_REQUIRED'; feature: Feature; message: string }
+  | { type: 'PREMIUM_REQUIRED'; feature: Feature } // 사유 문구는 보내지 않는다 — UI가 status.paid를 띄운다(PR 4)
   | { type: 'REQUEST_VERIFY'; key: string; instanceId?: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서). instanceId: 같은 기기로 validate
   | { type: 'REQUEST_DEACTIVATE'; key: string; instanceId: string } // 해제 시 code → UI: 이 기기의 LS 활성화 슬롯 반납(best-effort)
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과

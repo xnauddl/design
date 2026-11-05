@@ -3,6 +3,7 @@
    순수 정렬·계획(similar.ts) 위에서 노드 트리 구성·컴포넌트 생성·속성 노출·인스턴스 교체.
    code.ts 핸들러는 이 함수를 호출만 한다(createTokens·bindSelection과 같은 패턴).
    ============================================================ */
+import { t } from './i18n';
 import {
   alignFrames,
   planContentProperties,
@@ -186,8 +187,8 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
   }
 
   const warnings = aligned.excluded.map((e) => `${e.name}: ${e.reason}`);
-  for (const name of kept) warnings.push(`${name}: 속성 오버라이드 실패 — 원본을 그대로 두었어요.`);
-  for (const name of placeFailed) warnings.push(`${name}: 제자리에 둘 수 없어 원본을 그대로 두었어요.`);
+  for (const name of kept) warnings.push(t('similar.overrideFail', { name }));
+  for (const name of placeFailed) warnings.push(t('similar.placeFail', { name })); // UI가 같은 키로 알아본다(isPlaceFailWarning)
   return { master: comp.name, properties, instances, images, warnings, placeFailed };
 }
 

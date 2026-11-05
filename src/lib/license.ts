@@ -3,6 +3,7 @@
    M2: 외부 키 검증의 "두뇌". 실제 fetch·clientStorage는 code.ts(부수효과)에서.
    원칙: 만료 전이면 적용, 오프라인이면 grace 동안 유지, grace 초과 시 강등(free).
    ============================================================ */
+import { t } from './i18n';
 import { Tier, normalizeLegacyTier } from './entitlements';
 
 export interface LicenseCache {
@@ -58,9 +59,18 @@ export interface VerifyOk {
   /** 검증 서버가 돌려준 기기 인스턴스 식별자(있으면 캐시에 보관해 재검증 때 되돌려보냄). */
   instanceId?: string;
 }
+/** 서버가 붙여 보내는 거부 사유(workers/verify) — 화면 줄 문구 license.err.server.{code}를 고른다. */
+export type VerifyErrCode = 'expired' | 'limit' | 'invalid' | 'server';
+export const VERIFY_ERR_CODES: readonly VerifyErrCode[] = ['expired', 'limit', 'invalid', 'server'];
+export function isVerifyErrCode(v: unknown): v is VerifyErrCode {
+  return typeof v === 'string' && (VERIFY_ERR_CODES as readonly string[]).includes(v);
+}
 export interface VerifyErr {
   ok: false;
-  error: string;
+  /** 원문 사유(서버 error · 플러그인 쪽 기술 사유 · 예외 메시지) — 화면에서는 툴팁으로만. 오프라인이면 없다. */
+  error?: string;
+  /** 서버가 알려 준 거부 사유. 없거나 모르는 값이면 화면 줄은 license.verifyFailed. */
+  code?: VerifyErrCode;
 }
 
 /**
@@ -80,12 +90,17 @@ export type VerifyResult = VerifyOk | (VerifyErr & { offline?: boolean });
  * "서명 토큰이 없는 응답"이라고만 하면 사용자가 무엇을 해야 할지 알 수 없다.
  * 실패 문구만 바꿀 뿐 `ok:true`로 승격시키지 않으므로 서명 없는 응답을 수용하는 것과 무관하다.
  */
-export function extractSignedToken(json: unknown): { ok: true; token: string } | { ok: false; error: string } {
-  if (!json || typeof json !== 'object') return { ok: false, error: '응답 본문을 해석할 수 없습니다' };
-  const o = json as { token?: unknown; valid?: unknown; error?: unknown };
+export function extractSignedToken(
+  json: unknown,
+): { ok: true; token: string } | { ok: false; error: string; code?: VerifyErrCode } {
+  if (!json || typeof json !== 'object') return { ok: false, error: t('license.err.badBody') };
+  const o = json as { token?: unknown; valid?: unknown; error?: unknown; code?: unknown };
   if (typeof o.token === 'string' && o.token) return { ok: true, token: o.token };
-  if (o.valid === false && typeof o.error === 'string' && o.error) return { ok: false, error: o.error };
-  return { ok: false, error: '서명 토큰이 없는 응답' };
+  if (o.valid === false && typeof o.error === 'string' && o.error) {
+    // 서버가 code를 붙였으면 함께 넘긴다(옛 서버는 없다 — 그때는 원문만).
+    return isVerifyErrCode(o.code) ? { ok: false, error: o.error, code: o.code } : { ok: false, error: o.error };
+  }
+  return { ok: false, error: t('license.err.noToken') };
 }
 
 /** 응답의 기기 instanceId(문자열일 때만) — 없으면 기존 캐시 값을 유지. */

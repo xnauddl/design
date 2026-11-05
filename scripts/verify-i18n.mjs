@@ -8,7 +8,7 @@
  * typecheck·테스트로는 안 잡힌다. 여기서 잡는다.
  *
  * 속성으로 보이는 문자열(`data-i18n-title` → `title`, `data-i18n-placeholder` →
- * `placeholder`)도 같은 관계다 — 인라인 속성값이 폴백, STRINGS가 화면값. 툴팁은
+ * `placeholder`, `data-i18n-aria-label` → `aria-label`, `data-i18n-tip` → `data-tip`)도 같은 관계다 — 인라인 속성값이 폴백, STRINGS가 화면값. 툴팁은
  * 호버해야 보여 드리프트가 더 오래 안 들킨다. 그래서 같은 잣대로 함께 본다.
  *
  * 1. 누락  — `data-i18n*` 키가 STRINGS에 없음(하이드레이션이 건너뛰어 조용히 폴백)
@@ -104,7 +104,13 @@ if (unparsed.length) {
 /* ---------- 속성 폴백 추출(data-i18n-title / -placeholder) ----------
    짝이 되는 속성(title/placeholder)이 같은 여는 태그 안에 있어야 폴백이 성립한다.
    없으면 하이드레이션 전 첫 프레임에 툴팁이 통째로 빈다 — 누락으로 잡는다. */
-const ATTR_FORMS = ['title', 'placeholder'];
+// [data-i18n-{form}] → 짝 속성 {attr}. applyStaticI18n(ui.ts)과 같은 표다.
+const ATTR_FORMS = [
+  { form: 'title', attr: 'title' },
+  { form: 'placeholder', attr: 'placeholder' },
+  { form: 'aria-label', attr: 'aria-label' },
+  { form: 'tip', attr: 'data-tip' }, // 구조 버튼의 커스텀 툴팁
+];
 const unescape = (s) =>
   s.replace(/&(amp|lt|gt|quot|#39);/g, (_, e) =>
     ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e],
@@ -112,20 +118,20 @@ const unescape = (s) =>
 
 const attrFound = []; // { key, inner, form }
 const noFallback = [];
-for (const form of ATTR_FORMS) {
+for (const { form, attr } of ATTR_FORMS) {
   const re = new RegExp(`data-i18n-${form}="([^"]+)"`, 'g');
   let m;
   while ((m = re.exec(html))) {
     const start = html.lastIndexOf('<', m.index);
     const end = endOfOpenTag(html, start);
     const tag = html.slice(start, end < 0 ? undefined : end);
-    const pair = new RegExp(`\\s${form}="([^"]*)"`).exec(tag);
+    const pair = new RegExp(`\\s${attr}="([^"]*)"`).exec(tag);
     if (!pair) noFallback.push(m[1]);
-    else attrFound.push({ key: m[1], inner: unescape(pair[1]), form });
+    else attrFound.push({ key: m[1], inner: unescape(pair[1]), form: attr });
   }
 }
 if (noFallback.length) {
-  console.error(`✗ 폴백 속성이 없는 키: ${noFallback.join(', ')} — 같은 태그에 title/placeholder를 함께 두세요`);
+  console.error(`✗ 폴백 속성이 없는 키: ${noFallback.join(', ')} — 같은 태그에 짝 속성(title/placeholder/aria-label/data-tip)을 함께 두세요`);
   process.exit(2);
 }
 found.push(...attrFound);

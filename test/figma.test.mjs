@@ -15,7 +15,6 @@ import {
   applyExistingTextStyles,
   bindSelection,
   bindSelectedItems,
-  scanBindings,
   countUsage,
   findUsers,
   renameSelection,
@@ -576,7 +575,7 @@ test('extractFromSelection — 인스턴스 내부만 있으면 그 이유를 �
   };
   const { tokens, warnings } = extractFromSelection([node]);
   assert.equal(tokens.length, 0);
-  assert.match(warnings.join(' '), /인스턴스 내부/);
+  assert.match(warnings.join(' '), /인스턴스 안쪽/);
 });
 
 /* ================= variables.ts ================= */
@@ -730,7 +729,7 @@ test('bindSelection — 색/크기 바인딩, 미매칭 skip, 오토레이아웃
 
   assert.equal(res.bound, 2); // 색 1 + width 1
   assert.equal(res.skipped, 1); // 미매칭 색 1
-  assert.ok(res.flags.some((f) => /오토레이아웃/.test(f)));
+  assert.ok(res.reasons['no-autolayout'] >= 1); // 오토레이아웃 밖 여백·간격은 사유로만 남는다(flags 안내는 PR 4에서 지움)
   // 첫 채움에 변수 바인딩됨
   assert.equal(node.fills[0].boundVariables.color.type, 'VARIABLE_ALIAS');
   // width가 Semantic size 변수로 바인딩됨
@@ -1420,38 +1419,6 @@ test('bindSelection — 역할 별칭(text)이 같은 값의 Semantic 거울(col
   await bindSelection([node]);
   assert.equal(node.fills[0].boundVariables.color.id, findVar(figma, 'Semantic', 'text').id);
   assert.equal(node.boundVariables.itemSpacing.id, findVar(figma, 'Semantic', 'spacing/sm').id);
-});
-
-test('scanBindings — 파일에 붙어 있는 바인딩을 결과 트리 모양으로 읽는다(읽기 전용)', async () => {
-  const figma = installFigma();
-  await createTokens(
-    [
-      { name: 'color/aa0000', category: 'color', sources: ['fill'], value: '#aa0000' },
-      { name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 },
-    ],
-    16,
-  );
-  await createSemanticAliases({ 'color/text/default': 'color/aa0000' });
-  const node = {
-    type: 'FRAME', id: 'sb', name: 'sb',
-    fills: [{ type: 'SOLID', color: { r: 0.6667, g: 0, b: 0 } }],
-    layoutMode: 'VERTICAL', itemSpacing: 8, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
-    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
-    boundVariables: {},
-    setBoundVariable(field, v) { this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id }; },
-    children: [],
-  };
-  await bindSelection([node]);
-  const before = JSON.stringify(node);
-  const r = await scanBindings([node]);
-  assert.equal(JSON.stringify(node), before); // 읽기 전용
-  assert.equal(r.boundNodes, 1);
-  assert.equal(r.total, 2);
-  const byField = Object.fromEntries(r.candidates.map((c) => [c.field, c.variableName]));
-  assert.equal(byField.fills, 'color/text/default'); // 역할 별칭에 붙은 것이 그대로 읽힌다
-  assert.equal(byField.itemSpacing, 'spacing/8');
-  assert.equal(r.candidates.find((c) => c.field === 'fills').currentValue, '#aa0000');
-  assert.ok(r.nodes.some((n) => n.id === 'sb'));
 });
 
 test('bindSelection — 지워진 변수를 가리키는 자리는 덮어쓰지 않고 "삭제된 변수에 연결됨"으로 건너뜀', async () => {
@@ -3242,7 +3209,6 @@ test('applyExistingTextStyles — 시그니처가 같은 기존 스타일에만 
   assert.equal(figma._state.textStyles.length, 1); // 연결만 — 스타일을 새로 만들지 않는다
   assert.equal(r.skipped, 1);
   assert.equal(r.skipReasons.noStyle, 1);
-  assert.ok(r.missing.some((m) => m.includes('미등록')));
 });
 
 test('applyExistingTextStyles — 추측 일치 없음: PIXELS 150을 150% 스타일에 붙이지 않는다(모양이 달라짐)', async () => {
@@ -3298,7 +3264,7 @@ test('applyExistingTextStyles — 일부러 넓게 잡은 px 행간 스타일이
   const r = await applyExistingTextStyles([para]);
   assert.equal(para._styleId, null); // 캔버스를 건드리지 않는다
   assert.equal(r.applied, 0);
-  assert.equal(r.missing.length, 1); // 대신 '미등록 — 먼저 등록 필요'로 보고
+  assert.equal(r.skipReasons.noStyle, 1); // 대신 '같은 스타일 없음'으로 건너뜀
 
   // 같은 200px 문단은 제 스타일에 제대로 붙는다(원값끼리 만난다).
   const wide = { ...para, id: 'p2', lineHeight: { unit: 'PIXELS', value: 200 }, _styleId: null,
@@ -3629,7 +3595,7 @@ test('createSemanticTextStyles — px 행간으로 스캔한 스타일은 행간
   assert.equal(style.lineHeight.unit, 'PIXELS'); // %로 뒤집히지 않는다
   assert.equal(style.lineHeight.value, 24);
   assert.ok(style.boundVariables?.lineHeight, 'line-height 변수가 연결돼야 한다');
-  assert.ok(!r.notes.some((n) => n.includes('바인딩 생략')));
+  assert.ok(!r.notes.some((n) => n.includes('연결 안 함'))); // %를 지키느라 변수를 안 붙인 알림이 없어야
 });
 
 test('scanTextStyles — 흔하지 않은 px 행간(23px)은 %로 오인하지 않는다', async () => {
@@ -3735,7 +3701,7 @@ test('createSemanticTextStyles — 이미 변수가 묶인 스타일은 스캔 %
   );
   assert.deepEqual(style.letterSpacing, { value: 1, unit: 'PIXELS' }); // 그대로
   assert.ok(style.boundVariables.letterSpacing, '연결 유지');
-  assert.ok(r.notes.some((n) => n.includes('자간 변수 연결을 지켰습니다')));
+  assert.ok(r.notes.some((n) => n.includes('자간 변수 연결을 지켰어요')));
 });
 
 test('createSemanticTextStyles — 묶인 변수가 없으면 스캔 %로 단위를 교정한다', async () => {
@@ -4056,8 +4022,7 @@ test('컬렉션 계층 지정 — Primitives를 Global로 지정하면 토큰은
   };
   const r = await bindSelection([node]);
   assert.equal(r.bound, 1);
-  const scan = await scanBindings([node]);
-  assert.equal(scan.candidates[0].tier, 2); // 역할 별칭(Semantic)이 이긴다 — 계층 판정이 살아 있다
+  assert.equal(r.candidates[0].tier, 2); // 역할 별칭(Semantic)이 이긴다 — 계층 판정이 살아 있다
 });
 
 test('컬렉션 계층 지정 — 지정이 없으면 예전처럼 이름이 Global인 컬렉션만 계층(Primitives는 무시)', async () => {
