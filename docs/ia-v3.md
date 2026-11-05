@@ -87,7 +87,7 @@
 | 묶음 | 결정 |
 |---|---|
 | 컴포넌트 하위 탭 (QA #3 불합격 4 = **A**) | v1.0에서 레이어 › 컴포넌트는 **베타**다. 기본으로 숨기고, 설정 › 기본값의 "컴포넌트(베타) 보이기"를 켠 사람에게만 하위 탭이 보인다(§4.7 "베타", §4.8). 시안 확인(2026-11-05) 뒤 구현 |
-| 컴포넌트 안내 각주 (2026-11-05 사용자 결정) | 준비 현황 팝오버의 "컴포넌트는 필요할 때 레이어 › 컴포넌트에서" 각주를 켬/끔 모두 지운다. 베타는 필요한 사람이 설정에서 찾아 켠다(§4.4 · §4.7 "베타") |
+| 컴포넌트 안내 각주 (2026-11-05 사용자 결정) | 준비 현황 팝오버의 "컴포넌트는 필요할 때 레이어 › 컴포넌트에서" 각주를 켬/끔 모두 지운다. 베타는 필요한 사람이 설정에서 찾아 켠다(§3.1 준비 현황 · §4.7 "베타") |
 | 사이 간격 자동 (QA #3 불합격 1) | 오토레이아웃 정렬이 Space between이면 그 간격 값은 피그마가 쓰지 않는다. 만들기는 토큰으로 뽑지 않고, 연결은 붙이지 않는다. 건너뜀 사유 "사이 간격 자동"(§2.11) |
 | 컴포넌트 인스턴스 자리 (QA #3 불합격 3) | 인스턴스는 원본 부모의 같은 자리(순서·위치)에만 둔다. 둘 수 없으면 페이지 맨 위로 옮기지 않고 결과 줄에 "제자리에 못 둔 {n}개"를 알린다(§4.7 "인스턴스 자리") |
 | 인스턴스 크기 규칙 (코드 대조 검토 뒤) | 인스턴스는 원본의 오토레이아웃 크기 규칙(가로·세로 FILL/HUG/FIXED, 늘이기, 맞춤, 최소·최대 크기)도 이어받는다(§4.7 "인스턴스 자리" 2번) |
@@ -1520,7 +1520,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 기본으로 
 | `component.candidates` · `rename.previewCount` (새로 찾음) | "등록 후보 {total}개 · {sel}개 선택" · "{total}개 변경 예정 · {sel}개 선택 — ‘이름 적용’." | "… · {sel}개 체크"(§2.9) |
 | `apply.cancelRequested` · `apply.cancelled` (새로 찾음) | "취소 요청됨 — 다음 지점에서 중단합니다." · "취소됨 — {bound}곳만 연결{detail}". 취소는 찾기에서만 일어나는데(아래 "연결 중 [취소]") 찾기를 취소하면 "취소됨 — 0곳만 연결 · 스킵 n"이 뜬다 | "취소하는 중…" · "찾기를 취소했어요"({bound}·{detail} 없음 — §4.6 "찾기 취소됨 = 찾기 전") |
 
-- **끝난 것(표에서 뺌, 11행):** `pipeline.indep`(2026-11-05 삭제 — §4.4 준비 현황) · `textStyle.hint` · `textStyle.applyExistingBtn` · `reason.deleted-var` · `reason.already-bound` · `reason.styled` · `wizard.paidSkipped`는 v3 문구와 같다. `settings.tolTip`·`settings.tol`(PR 3 허용오차 삭제), `bind.skipMeta`·`wizard.seq.bindSkip`(PR 3)은 지워졌다. `vm.selectFirst`는 `list.selectHint`("레이어를 선택하면 쓰는 변수가 ★ Inspect에 모여요", PR 3.6)로, `bind.confirm`은 `bind.linkN`("{n}곳 연결" + 🔗, PR 3.6)으로 바뀌었다.
+- **끝난 것(표에서 뺌, 11행):** `pipeline.indep`(2026-11-05 삭제 — §3.1 준비 현황) · `textStyle.hint` · `textStyle.applyExistingBtn` · `reason.deleted-var` · `reason.already-bound` · `reason.styled` · `wizard.paidSkipped`는 v3 문구와 같다. `settings.tolTip`·`settings.tol`(PR 3 허용오차 삭제), `bind.skipMeta`·`wizard.seq.bindSkip`(PR 3)은 지워졌다. `vm.selectFirst`는 `list.selectHint`("레이어를 선택하면 쓰는 변수가 ★ Inspect에 모여요", PR 3.6)로, `bind.confirm`은 `bind.linkN`("{n}곳 연결" + 🔗, PR 3.6)으로 바뀌었다.
 
 **삭제**
 - [x] `vm.title`, `vm.fromBanner`, `vm.fromBind`, `vm.onlyUsed`, `vm.openTip`, `ui.sizeGrow`, `existingVars.*`, 일괄 교체 키(`bind.remap*`·`vm.remap`) — STRINGS·`ui.ts`·`ui.html`·`code.ts` 어디에도 없다(PR 1~3에서 지움).
