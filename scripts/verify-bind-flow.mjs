@@ -310,6 +310,13 @@ const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return 
     return [id, b.getAttribute('aria-disabled'), tip.endsWith('연결이 끝나면 다시 해 주세요')];
   }), writeIds);
   check('15 연결 중 쓰기 버튼 aria-disabled · 툴팁 꼬리', (await waitState()).every(([, a, tip]) => a === 'true' && tip), JSON.stringify(await waitState()));
+  // 유료 잠금 툴팁을 다시 쓰는 PREREQ_STATE(updateGates → setLockTitle) 뒤에도 대기 꼬리는 남는다
+  await recv(p, { ...PREREQ, hasTextStyles: true });
+  const paidTails = await p.evaluate(() => ['btnCreate', 'btnTextStyles', 'btnGenDark'].map((id) => {
+    const b = document.getElementById(id);
+    return (b.getAttribute(b.hasAttribute('data-tip') ? 'data-tip' : 'title') ?? '').endsWith('연결이 끝나면 다시 해 주세요') && b.getAttribute('aria-disabled') === 'true';
+  }));
+  check('15 연결 중 PREREQ_STATE 뒤에도 꼬리 유지', paidTails.every(Boolean) && (await waitState()).every(([, a, tip]) => a === 'true' && tip), JSON.stringify(paidTails) + JSON.stringify(await waitState()));
   const renamesBefore = (await sent(p, 'RENAME_APPLY')).length;
   await p.$eval('#btnRename', (b) => { b.disabled = false; b.click(); }); // 고른 이름이 있을 때처럼(체크 0이면 원래 disabled)
   check('15 연결 중 [이름 정리 적용] → 공통 상태 줄 "연결이 끝나면 다시 해 주세요" · 요청 없음', (await p.textContent('#statusText')) === '연결이 끝나면 다시 해 주세요' && (await sent(p, 'RENAME_APPLY')).length === renamesBefore, await p.textContent('#statusText'));
@@ -330,6 +337,13 @@ const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return 
   check('15 다른 쓰기 작업 중 [연결] → "텍스트 스타일 연결 작업이 끝나면 다시 해 주세요" · 요청 없음', (await p.textContent('#applyStatus')) === '텍스트 스타일 연결 작업이 끝나면 다시 해 주세요' && (await sent(p, 'APPLY_SELECTED')).length === 1, await p.textContent('#applyStatus'));
   await recv(p, { type: 'TEXT_STYLES_APPLIED', applied: 1, skipped: 0, skipReasons: {} });
   check('15 그 작업의 결과가 오면 [연결] 풀림', !(await locked(p, '#btnApplyConfirm')));
+  // 연결 중 선택 변경 → 연결 오류 → 미뤄 둔 결과 지우기(결과 카드가 없으므로)
+  await p.click('#btnApplyConfirm');
+  check('15 다시 연결 요청', (await sent(p, 'APPLY_SELECTED')).length === 2);
+  await recv(p, sel(2, 0));
+  check('15 연결 중 선택 변경 → 카드 남음', (await p.$$('#bindTree .bv-card')).length === 2);
+  await recv(p, { type: 'ERROR', op: 'APPLY_SELECTED', message: 'boom' });
+  check('15 연결 중 선택 변경 → ERROR → 결과 지워짐(찾기 전)', (await p.$$('#bindTree .bv-card')).length === 0 && !(await visible(p, '#bindFound')) && (await named(p, '#btnApplyConfirm', '연결')) && (await locked(p, '#btnApplyConfirm')) && !(await visible(p, '#applyProgress')));
   await p.close();
 }
 

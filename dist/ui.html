@@ -3496,6 +3496,8 @@
   var semStatusTarget = "colorStatus";
   var semStatusPrefix = "";
   var bindLinking = 0;
+  var bindSelChangedDuringLink = false;
+  var lastLinkItems = null;
   var selectStatusTarget = "applyStatus";
   function selectNodes(ids, statusId) {
     selectStatusTarget = statusId;
@@ -4273,13 +4275,34 @@
     startLink(items);
   });
   function startLink(items) {
+    var _a;
     if (bindLinking) return;
+    const other = otherWriteOp();
+    if (other) {
+      setStatus("applyStatus", t("bind.waitOp", { op: other }), "warn");
+      return;
+    }
+    updateBindApply();
+    const confirm = $("btnApplyConfirm");
+    if (isLocked(confirm)) {
+      setStatus("applyStatus", (_a = confirm.dataset.lockMsg) != null ? _a : "", "warn");
+      return;
+    }
+    lastLinkItems = items;
     bindFinding = false;
     showApplyProgress(t("bind.linking"), false);
     const reqId = nextBindReq();
     bindLinking = reqId;
     send({ type: "APPLY_SELECTED", items, reqId });
     onBindLinkingChanged();
+  }
+  function flushLinkSelClear() {
+    if (!bindSelChangedDuringLink) return;
+    bindSelChangedDuringLink = false;
+    nextBindReq();
+    hideApplyProgress();
+    clearBindPreview();
+    $("bindDone").hidden = true;
   }
   $("btnApplyCancel").addEventListener("click", () => {
     send({ type: "CANCEL" });
@@ -4550,6 +4573,7 @@
     const b = $("btnWizardRun");
     b.dataset.rerun = rerun ? "1" : "";
     b.title = rerun && isPaid ? t("wizard.rerunHint") : "";
+    reapplyWaitTip(b);
     renderWizardCopy();
   }
   $("btnWizardRun").addEventListener("click", () => void runWizard());
@@ -4683,6 +4707,13 @@
     const base = el.dataset.baseTip;
     const note = t("lock.tipSuffix");
     el.setAttribute(attr, locked ? base ? `${base} \xB7 ${note}` : note : base);
+    reapplyWaitTip(el);
+  }
+  function reapplyWaitTip(el) {
+    var _a;
+    if (!el.dataset.wait) return;
+    delete el.dataset.waitTail;
+    setWait(el, el.dataset.wait, (_a = el.dataset.waitTarget) != null ? _a : "");
   }
   function setPrereq(btnId, noticeId, okRaw, msg) {
     const ok = okRaw || !prereqKnown;
@@ -4984,7 +5015,7 @@
             hideApplyProgress();
             clearBindPreview();
             $("bindDone").hidden = true;
-          }
+          } else bindSelChangedDuringLink = true;
           $("tsApplyResult").hidden = true;
           layerLibUse = null;
           if (activeTab === "layer") readLayerLibUse();
@@ -5037,9 +5068,13 @@
         const linkEnded = bindLinking !== 0 && msg.reqId === bindLinking;
         if (linkEnded) bindLinking = 0;
         if (!isCurrentBindReply(msg.reqId)) {
-          if (linkEnded) onBindLinkingChanged();
+          if (linkEnded) {
+            flushLinkSelClear();
+            onBindLinkingChanged();
+          }
           break;
         }
+        if (linkEnded) bindSelChangedDuringLink = false;
         hideApplyProgress();
         const silent = msg.preview && msg.reqId !== void 0 && msg.reqId === bindSilentReq;
         bindSilentReq = 0;
@@ -5334,9 +5369,10 @@
         if (msg.op === "APPLY_SELECTED" && bindLinking) {
           bindLinking = 0;
           hideApplyProgress();
+          flushLinkSelClear();
           onBindLinkingChanged();
         }
-        showError(statusId, explainError(msg.message));
+        showError(statusId, explainError(msg.message), msg.op);
         break;
       }
     }
@@ -5368,7 +5404,7 @@
     CLEAR_LICENSE: "licenseStatus",
     GET_LICENSE: "licenseStatus"
   };
-  function showError(id, f) {
+  function showError(id, f, op) {
     const el = $(id);
     el.className = "status";
     el.innerHTML = "";
@@ -5388,19 +5424,21 @@
       g.textContent = f.action;
       box.appendChild(g);
     }
-    if (f.retryable && lastSentMsg) {
-      const retry = lastSentMsg;
+    const linkRetry = op === "APPLY_SELECTED" ? lastLinkItems : null;
+    const retry = linkRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
+    if (f.retryable && (linkRetry || retry)) {
       const btn = document.createElement("button");
       btn.className = "primary";
       btn.textContent = t("common.retry");
       btn.addEventListener("click", () => {
         var _a;
-        if (bindLinking && ((_a = OPS[retry.type]) == null ? void 0 : _a.write)) {
-          setStatus(id, t("bind.waitLink"), "warn");
+        if (linkRetry) {
+          startLink(linkRetry);
           return;
         }
-        if (retry.type === "APPLY_SELECTED") {
-          startLink(retry.items);
+        if (!retry) return;
+        if (bindLinking && ((_a = OPS[retry.type]) == null ? void 0 : _a.write)) {
+          setStatus(id, t("bind.waitLink"), "warn");
           return;
         }
         send(retry);
@@ -5568,8 +5606,23 @@
     var _a;
     return ((_a = $("bindFilter").value) != null ? _a : "").trim().toLowerCase();
   }
+  var bindGroupsSrc = null;
+  var bindGroupsAll = [];
+  var bindNodesSrc = null;
+  var bindNodeMap = /* @__PURE__ */ new Map();
+  function bindNodeById(id) {
+    if (bindNodesSrc !== bindNodes) {
+      bindNodeMap = new Map(bindNodes.map((n) => [n.id, n]));
+      bindNodesSrc = bindNodes;
+    }
+    return bindNodeMap.get(id);
+  }
   function bindGroups() {
-    const all = groupByVariable(bindCandidates);
+    if (bindGroupsSrc !== bindCandidates) {
+      bindGroupsAll = groupByVariable(bindCandidates);
+      bindGroupsSrc = bindCandidates;
+    }
+    const all = bindGroupsAll;
     const q = bindFilterText();
     return { all, shown: q ? all.filter((g) => g.variableName.toLowerCase().includes(q)) : all };
   }
@@ -5635,7 +5688,7 @@
     ic.className = "bv-ic";
     ic.setAttribute("aria-hidden", "true");
     ic.textContent = fieldIcon(l.fields[0]);
-    const node = bindNodes.find((n) => n.id === l.nodeId);
+    const node = bindNodeById(l.nodeId);
     const layer = document.createElement("button");
     layer.type = "button";
     layer.className = "link link-btn bv-layer";
@@ -5722,8 +5775,8 @@
     return name.length > 20 ? `${name.slice(0, 20)}\u2026` : name;
   }
   function bindStepStates() {
-    if (!curSel.count || bindPrereqShown()) return ["todo", "todo", "todo"];
     if (bindLinking) return ["done", "done", "now"];
+    if (!curSel.count || bindPrereqShown()) return ["todo", "todo", "todo"];
     if (bindIsDone()) return ["done", "done", "done"];
     if (bindFinding && $("applyProgress").style.display !== "none") return ["now", "todo", "todo"];
     if (bindOtherSel()) return ["now", "todo", "todo"];
@@ -6526,12 +6579,20 @@
     }
     if (wizardRunning) return;
     if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
-      const defs = [...opPending.values()];
-      if (!defs.length) return;
-      opPending.clear();
+      const op = m.type === "ERROR" ? m.op : void 0;
+      let def;
+      if (op) {
+        def = opPending.get(op);
+        if (!def) return;
+        opPending.delete(op);
+      } else {
+        def = [...opPending.values()][0];
+        if (!def) return;
+        opPending.clear();
+      }
       opProg = null;
       renderWaitLocks();
-      opFinished(false, defs[0]);
+      opFinished(false, def);
       return;
     }
     for (const [type, def] of opPending) {

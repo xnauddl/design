@@ -2914,7 +2914,7 @@
   }
   var LINK_CHUNK = 300;
   async function bindSelectedItems(items, hooks = {}) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const res = { bound: 0, skipped: 0, reasons: {} };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     const fail = (key, node, field) => {
@@ -3016,6 +3016,7 @@
             await figma.loadFontAsync(node.fontName);
             node.setRangeBoundVariable(0, node.characters.length, field, variable);
             res.bound++;
+            (_e = hooks.onBound) == null ? void 0 : _e.call(hooks, res.bound);
             continue;
           }
           const gap = gapSkip(node, it.field);
@@ -3035,6 +3036,7 @@
           }
           node.setBoundVariable(it.field, variable);
           res.bound++;
+          (_f = hooks.onBound) == null ? void 0 : _f.call(hooks, res.bound);
         } catch (e) {
           fail("error", node, it.field);
         }
@@ -3044,6 +3046,7 @@
           try {
             node[key] = w.arr;
             res.bound += w.fields;
+            (_g = hooks.onBound) == null ? void 0 : _g.call(hooks, res.bound);
           } catch (e) {
             for (let k = 0; k < w.fields; k++) fail("error", node, key);
           }
@@ -3051,7 +3054,7 @@
       }
       changedPaints.clear();
       const done = Math.min(start + LINK_CHUNK, items.length);
-      (_e = hooks.onProgress) == null ? void 0 : _e.call(hooks, done, items.length);
+      (_h = hooks.onProgress) == null ? void 0 : _h.call(hooks, done, items.length);
       if (hooks.yieldToEvents) await hooks.yieldToEvents();
     }
     const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
@@ -7567,16 +7570,25 @@
           break;
         }
         case "APPLY_SELECTED": {
-          const r = await bindSelectedItems(msg.items, {
-            onProgress: (done, total) => post({ type: "PROGRESS", op: "link", done, total }),
-            yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
-          });
-          const bound = r.bound;
-          post({ type: "APPLY_RESULT", bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
-          if (bound) {
-            commitUndo(figma);
-            selfSelect = true;
-            postSelection();
+          let written = 0;
+          let committed = false;
+          try {
+            const r = await bindSelectedItems(msg.items, {
+              onProgress: (done, total) => post({ type: "PROGRESS", op: "link", done, total }),
+              yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0)),
+              onBound: (n) => {
+                written = n;
+              }
+            });
+            post({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
+            if (r.bound) {
+              commitUndo(figma);
+              committed = true;
+              selfSelect = true;
+              postSelection();
+            }
+          } finally {
+            if (written > 0 && !committed) commitUndo(figma);
           }
           break;
         }

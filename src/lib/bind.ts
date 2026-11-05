@@ -844,6 +844,8 @@ export interface SelectedBindHooks {
   onProgress?: (done: number, total: number) => void;
   /** 진행 메시지가 UI에 닿도록 한 번 양보한다(code.ts: setTimeout 0). */
   yieldToEvents?: () => Promise<void>;
+  /** 실제로 쓴 자리 수(누적)가 늘 때마다 — 중간에 예외가 나도 code.ts가 ⌘Z 묶음을 닫을지 안다. */
+  onBound?: (bound: number) => void;
 }
 
 /** 연결 묶음 크기 — 한 번에 setBoundVariable을 이만큼 부르고 양보한다(제안값, 실기 뒤 바꿀 수 있음). */
@@ -985,6 +987,7 @@ export async function bindSelectedItems(items: readonly SelectedBindItem[], hook
           await figma.loadFontAsync(node.fontName);
           node.setRangeBoundVariable(0, node.characters.length, field, variable);
           res.bound++;
+          hooks.onBound?.(res.bound);
           continue;
         }
         // 스칼라 노드 필드(width/height/padding…/cornerRadius…/opacity)
@@ -1007,6 +1010,7 @@ export async function bindSelectedItems(items: readonly SelectedBindItem[], hook
         }
         (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(it.field as VariableBindableNodeField, variable);
         res.bound++;
+        hooks.onBound?.(res.bound);
       } catch {
         fail('error', node, it.field);
       }
@@ -1016,6 +1020,7 @@ export async function bindSelectedItems(items: readonly SelectedBindItem[], hook
         try {
           (node as unknown as Record<string, unknown>)[key] = w.arr;
           res.bound += w.fields;
+          hooks.onBound?.(res.bound);
         } catch {
           // 배열 쓰기 실패 — 그 배열에 연결한 자리는 연결되지 않았다.
           for (let k = 0; k < w.fields; k++) fail('error', node, key);

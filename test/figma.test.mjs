@@ -4261,10 +4261,12 @@ test('bindSelectedItems — 1,000곳을 300곳씩 연결하고 묶음마다 진�
   registerNodes(figma, nodes);
   const progress = [];
   let yields = 0;
+  let written = 0;
   const r = await bindSelectedItems(
     nodes.map((n) => ({ nodeId: n.id, field: 'itemSpacing', variableId: sp8.id })),
-    { onProgress: (done, total) => progress.push([done, total]), yieldToEvents: async () => { yields++; } },
+    { onProgress: (done, total) => progress.push([done, total]), yieldToEvents: async () => { yields++; }, onBound: (n) => { written = n; } },
   );
+  assert.equal(written, 1000); // 실제로 쓴 자리 수(code.ts가 예외 때 ⌘Z 묶음을 닫는 기준)
   assert.equal(r.bound, 1000);
   assert.equal(r.skipped, 0);
   assert.deepEqual(progress, [[300, 1000], [600, 1000], [900, 1000], [1000, 1000]]);
@@ -4330,13 +4332,15 @@ test('bindSelectedItems — 칠하기 배열 쓰기가 실패하면 bound에 세
     enumerable: true,
   });
   registerNodes(figma, [ok, bad]);
+  let written = 0;
   const r = await bindSelectedItems([
     { nodeId: 'ok', field: 'fills', index: 0, variableId: blue.id },
     { nodeId: 'bad', field: 'fills', index: 0, variableId: blue.id },
     { nodeId: 'bad', field: 'fills', index: 1, variableId: blue.id },
     { nodeId: 'bad', field: 'itemSpacing', variableId: sp8.id },
-  ]);
+  ], { onBound: (n) => { written = n; } });
   assert.equal(r.bound, 2); // ok.fills · bad.itemSpacing
+  assert.equal(written, 2); // 쓰기에 실패한 배열은 쓴 자리로 세지 않는다
   assert.deepEqual(r.reasons, { error: 2 });
   assert.equal(r.skipped, 2);
   assert.deepEqual(r.skips.map((s) => `${s.nodeId}:${s.reason}`), ['bad:error']);

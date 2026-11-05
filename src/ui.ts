@@ -91,6 +91,10 @@ let semStatusPrefix = '';
  * 초기화 중 setLock이 읽으므로 맨 위에 둔다.
  */
 let bindLinking = 0;
+/** 연결 중에 사용자가 선택을 바꿨다 — 결과 지우기를 미뤄 뒀다(연결이 성공하면 결과 카드, 아니면 그때 지운다). */
+let bindSelChangedDuringLink = false;
+/** 마지막으로 보낸 연결 자리 — 연결 오류의 [다시 시도]가 쓴다(lastSentMsg는 그 뒤 다른 요청으로 바뀔 수 있다). */
+let lastLinkItems: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items'] | null = null;
 /**
  * SELECT_NODES를 부른 자리의 상태 줄. 레이어 선택은 적용 탭의 스킵 칩만 쓰던 기능이라
  * 결과를 #applyStatus에 고정으로 썼는데, 타이포 단계의 ×N 배지도 같은 메시지를 쓰면서
@@ -1132,6 +1136,13 @@ $('btnApplyConfirm').addEventListener('click', () => {
 /** 연결 보내기 — 진행 줄을 열고 "연결 중" 플래그를 세운다(§4.6 "찾기 · 연결의 수"). [다시 시도]도 이 길로. */
 function startLink(items: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items']): void {
   if (bindLinking) return;
+  // [다시 시도]는 버튼 잠금을 거치지 않는다 — 같은 사유로 여기서 막는다(다른 쓰기 작업 중 → [🔗 연결] 전제).
+  const other = otherWriteOp();
+  if (other) { setStatus('applyStatus', t('bind.waitOp', { op: other }), 'warn'); return; }
+  updateBindApply();
+  const confirm = $('btnApplyConfirm');
+  if (isLocked(confirm)) { setStatus('applyStatus', confirm.dataset.lockMsg ?? '', 'warn'); return; }
+  lastLinkItems = items;
   bindFinding = false;
   // 첫 진행 메시지 전에는 "연결 중…", 그 뒤로 "연결 중… {done} / {total}".
   // 연결은 중간에 멈추지 않으므로 [취소]를 숨긴다.
@@ -1140,6 +1151,15 @@ function startLink(items: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items']
   bindLinking = reqId;
   send({ type: 'APPLY_SELECTED', items, reqId });
   onBindLinkingChanged();
+}
+/** 연결이 결과 카드 없이 끝났다(오류 · 버린 응답) — 연결 중에 미뤄 둔 선택 변경의 지우기를 이제 한다. */
+function flushLinkSelClear(): void {
+  if (!bindSelChangedDuringLink) return;
+  bindSelChangedDuringLink = false;
+  nextBindReq();
+  hideApplyProgress();
+  clearBindPreview();
+  $('bindDone').hidden = true;
 }
 
 
@@ -1498,6 +1518,7 @@ function setWizardRunLabel(rerun: boolean): void {
   const b = $('btnWizardRun') as HTMLButtonElement;
   b.dataset.rerun = rerun ? '1' : '';
   b.title = rerun && isPaid ? t('wizard.rerunHint') : '';
+  reapplyWaitTip(b);
   renderWizardCopy(); // 유료/무료·로컬 변수 유무에 따라 문구가 다르다(§4.3)
 }
 $('btnWizardRun').addEventListener('click', () => void runWizard());
@@ -1675,6 +1696,13 @@ function setLockTitle(el: HTMLElement, locked: boolean): void {
   // 툴팁은 기존 설명 뒤에 " · 유료 기능 · 설정 › 라이선스"를 붙인다(IA v3 §2.3).
   const note = t('lock.tipSuffix');
   el.setAttribute(attr, locked ? (base ? `${base} · ${note}` : note) : base);
+  reapplyWaitTip(el);
+}
+/** 툴팁을 새로 쓴 뒤 — 연결 중 대기 꼬리가 있었으면 다시 붙인다(§4.6 "연결 중의 다른 일"). */
+function reapplyWaitTip(el: HTMLElement): void {
+  if (!el.dataset.wait) return;
+  delete el.dataset.waitTail;
+  setWait(el, el.dataset.wait, el.dataset.waitTarget ?? '');
 }
 
 /** 전제 충족 여부로 버튼 활성/안내(+바로가기) 토글. */
@@ -2069,7 +2097,7 @@ window.onmessage = (event: MessageEvent) => {
           hideApplyProgress();
           clearBindPreview();
           $('bindDone').hidden = true;
-        }
+        } else bindSelChangedDuringLink = true; // 연결이 결과 카드 없이 끝나면 그때 지운다
         $('tsApplyResult').hidden = true;
         layerLibUse = null; // 라이브러리 사용 여부는 새 선택으로 다시 읽는다(§4.6 ②)
         if (activeTab === 'layer') readLayerLibUse();
@@ -2126,7 +2154,12 @@ window.onmessage = (event: MessageEvent) => {
       // 연결이 끝났다 — 잠금을 푼다(화면을 그리는지와 무관하게).
       const linkEnded = bindLinking !== 0 && msg.reqId === bindLinking;
       if (linkEnded) bindLinking = 0;
-      if (!isCurrentBindReply(msg.reqId)) { if (linkEnded) onBindLinkingChanged(); break; } // 선택이 바뀐 뒤 도착한 이전 요청의 결과
+      if (!isCurrentBindReply(msg.reqId)) {
+        // 선택이 바뀐 뒤 도착한 이전 요청의 결과
+        if (linkEnded) { flushLinkSelClear(); onBindLinkingChanged(); }
+        break;
+      }
+      if (linkEnded) bindSelChangedDuringLink = false; // 결과 카드를 그린다 — 미뤄 둔 지우기는 하지 않는다
       hideApplyProgress(); // UX6
       const silent = msg.preview && msg.reqId !== undefined && msg.reqId === bindSilentReq;
       bindSilentReq = 0;
@@ -2496,9 +2529,10 @@ window.onmessage = (event: MessageEvent) => {
         // 연결 실패 — 진행 줄을 닫고 잠금을 푼다(ERROR에는 reqId가 없지만 연결은 한 번에 하나뿐).
         bindLinking = 0;
         hideApplyProgress();
+        flushLinkSelClear();
         onBindLinkingChanged();
       }
-      showError(statusId, explainError(msg.message));
+      showError(statusId, explainError(msg.message), msg.op);
       break;
     }
   }
@@ -2532,7 +2566,7 @@ const OP_STATUS: Record<string, string> = {
   GET_LICENSE: 'licenseStatus',
 };
 
-function showError(id: string, f: FriendlyError): void {
+function showError(id: string, f: FriendlyError, op?: string): void {
   const el = $(id);
   el.className = 'status';
   el.innerHTML = '';
@@ -2553,15 +2587,19 @@ function showError(id: string, f: FriendlyError): void {
     g.textContent = f.action;
     box.appendChild(g);
   }
-  if (f.retryable && lastSentMsg) {
-    const retry = lastSentMsg;
+  // [다시 시도] — 연결 오류는 마지막 연결 자리(lastLinkItems)로 연결 길을 다시 탄다(§4.6 "연결 중의 다른 일").
+  // 오류의 종류가 마지막 요청과 다르면 무엇을 다시 할지 모르므로 숨긴다.
+  const linkRetry = op === 'APPLY_SELECTED' ? lastLinkItems : null;
+  const retry = linkRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
+  if (f.retryable && (linkRetry || retry)) {
     const btn = document.createElement('button');
     btn.className = 'primary';
     btn.textContent = t('common.retry');
     btn.addEventListener('click', () => {
-      // 연결 중에는 쓰기 작업을 다시 보내지 않는다 · 연결 다시 시도는 연결 길로(§4.6 "연결 중의 다른 일").
+      if (linkRetry) { startLink(linkRetry); return; }
+      if (!retry) return;
+      // 연결 중에는 쓰기 작업을 다시 보내지 않는다.
       if (bindLinking && OPS[retry.type]?.write) { setStatus(id, t('bind.waitLink'), 'warn'); return; }
-      if (retry.type === 'APPLY_SELECTED') { startLink(retry.items); return; }
       send(retry);
     });
     box.appendChild(btn);
@@ -2810,8 +2848,25 @@ function bindFilterText(): string {
   return (($('bindFilter') as HTMLInputElement).value ?? '').trim().toLowerCase();
 }
 /** 변수 카드 — 전체와 필터에 걸린 것. */
+let bindGroupsSrc: BindCandidate[] | null = null;
+let bindGroupsAll: VarGroup[] = [];
+let bindNodesSrc: BindNode[] | null = null;
+let bindNodeMap = new Map<string, BindNode>();
+/** 자리 줄의 레이어 — id → BindNode 맵은 찾기 결과가 바뀔 때 한 번만 만든다(1만 곳에서 줄마다 find하지 않게). */
+function bindNodeById(id: string): BindNode | undefined {
+  if (bindNodesSrc !== bindNodes) {
+    bindNodeMap = new Map(bindNodes.map((n) => [n.id, n]));
+    bindNodesSrc = bindNodes;
+  }
+  return bindNodeMap.get(id);
+}
 function bindGroups(): { all: VarGroup[]; shown: VarGroup[] } {
-  const all = groupByVariable(bindCandidates);
+  // 변수 묶음은 후보가 바뀔 때만 다시 만든다(스위치 · 펼침 · 필터마다 다시 그린다).
+  if (bindGroupsSrc !== bindCandidates) {
+    bindGroupsAll = groupByVariable(bindCandidates);
+    bindGroupsSrc = bindCandidates;
+  }
+  const all = bindGroupsAll;
   const q = bindFilterText();
   return { all, shown: q ? all.filter((g) => g.variableName.toLowerCase().includes(q)) : all };
 }
@@ -2887,7 +2942,7 @@ function placeEl(l: PlaceLine): HTMLElement {
   ic.className = 'bv-ic';
   ic.setAttribute('aria-hidden', 'true');
   ic.textContent = fieldIcon(l.fields[0]);
-  const node = bindNodes.find((n) => n.id === l.nodeId);
+  const node = bindNodeById(l.nodeId);
   const layer = document.createElement('button');
   layer.type = 'button';
   layer.className = 'link link-btn bv-layer';
@@ -2986,8 +3041,8 @@ function shortName(name: string): string {
 type BindStepState = 'now' | 'done' | 'todo';
 /** 단계 표시 상태(§4.6 표). */
 function bindStepStates(): [BindStepState, BindStepState, BindStepState] {
+  if (bindLinking) return ['done', 'done', 'now']; // 연결 중(돌아가는 표시) — 선택이 바뀌어도 연결은 계속된다
   if (!curSel.count || bindPrereqShown()) return ['todo', 'todo', 'todo'];
-  if (bindLinking) return ['done', 'done', 'now']; // 연결 중(돌아가는 표시)
   if (bindIsDone()) return ['done', 'done', 'done'];
   if (bindFinding && $('applyProgress').style.display !== 'none') return ['now', 'todo', 'todo'];
   if (bindOtherSel()) return ['now', 'todo', 'todo'];
@@ -3932,12 +3987,21 @@ function opReceived(m: CodeToUi): void {
   }
   if (wizardRunning) return;
   if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
-    const defs = [...opPending.values()];
-    if (!defs.length) return;
-    opPending.clear();
+    // 오류의 op가 있으면 그 작업만 끝낸다 — 다른 작업(예: 연결)이 기다리는 결과는 그대로 기다린다.
+    const op = m.type === 'ERROR' ? (m.op as UiToCode['type'] | undefined) : undefined;
+    let def: OpDef | undefined;
+    if (op) {
+      def = opPending.get(op);
+      if (!def) return;
+      opPending.delete(op);
+    } else {
+      def = [...opPending.values()][0];
+      if (!def) return;
+      opPending.clear();
+    }
     opProg = null;
     renderWaitLocks();
-    opFinished(false, defs[0]);
+    opFinished(false, def);
     return;
   }
   for (const [type, def] of opPending) {
