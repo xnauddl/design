@@ -2313,11 +2313,11 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'COMPONENT_CANDIDATES': {
-      // #1: 하위 등록 후보를 트리로. **반복 이름(group) + 속성접힘(propsOnly)만 기본 체크** —
-      // 잡음(컨테이너/래퍼 단발성)은 체크 해제 상태로 두고, 사용자가 필요시 추가 체크.
+      // #1: 하위 등록 후보를 트리로. 기본 체크는 code.ts가 정한 `defaultOn`만 본다(§4.7 "묶기" 6번 —
+      // 반복 이름 · 속성 접힘 · 버튼 · 칩 · 탭). 잡음(컨테이너/래퍼 단발성)은 체크 해제 상태로 둔다.
       compCandidates = msg.nodes;
       compChecked.clear();
-      for (const c of msg.nodes) if (c.eligible && (c.group || c.propsOnly)) compChecked.add(c.id);
+      for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
       renderCompTree();
       // 다시 스캔했으면 이전 등록/분류 리포트는 남의 얘기다. 개수를 카드 제목에 올린 뒤로는
       // 카드를 접어 둬도 옛 수치가 계속 보여, 새 후보와 짝이 안 맞는다.
