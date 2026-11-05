@@ -295,17 +295,56 @@ export function transplantImageFills(
   return { applied, failures };
 }
 
-/** 자리를 채운 인스턴스 안 텍스트의 글자 기록(§4.7 9번). */
-export type TextSnap = { node: TextNode; chars: string };
+/* ---------- 값 지키기 — [등록] 맨 끝 속성 노출 (§4.7 9번, QA #3 실기 ③ 불합격 7) ----------
+   세트의 레이어를 한 속성에 묶으면 피그마는 모든 변형을 그 속성의 기본값(대표 변형 값)으로 바꾼다.
+   노출 전에 만들어 둔 인스턴스는 덮어쓴 값이 없어 기본값을 따라간다. 노출 전에 인스턴스마다
+   **자기 레이어**(안쪽 인스턴스 속은 그 인스턴스 몫)의 값을 적어 두고, 노출 뒤 묶인 속성에 다시 넣는다. */
 
-/** 인스턴스 안 텍스트 레이어마다 지금 글자를 적는다 — 속성 노출 **전에** 부른다(§4.7 9번). */
-export function snapshotTexts(inst: SceneNode): TextSnap[] {
-  if (!('findAll' in inst)) return [];
-  const out: TextSnap[] = [];
-  for (const n of (inst as InstanceNode).findAll((x) => x.type === 'TEXT')) {
-    const node = n as TextNode;
-    try { out.push({ node, chars: node.characters }); } catch { /* 읽기 실패 — 지킬 것이 없다 */ }
-  }
+/** 인스턴스 자기 레이어 하나의 값 — 글자 · 안쪽 인스턴스의 메인 컴포넌트 id · 보이기. */
+export type SlotSnap = { id: string; name: string; text?: string; swap?: string; visible: boolean };
+/** 인스턴스 하나의 기록. depth = 안쪽 인스턴스 깊이(바깥부터 되돌린다). place = 결과 줄에 셀 자리 번호(부르는 쪽이 정함). */
+export type OverrideSnap = { instId: string; depth: number; place: number; items: SlotSnap[] };
+
+type MainOf = (inst: InstanceNode) => Promise<{ id: string } | null>;
+
+/** 자기 레이어 — 자식을 따라 내려가되 INSTANCE 안으로는 들어가지 않는다(그 인스턴스 자신은 넣는다). */
+function ownLayers(root: SceneNode): SceneNode[] {
+  const out: SceneNode[] = [];
+  const walk = (n: SceneNode): void => {
+    if (!('children' in n)) return;
+    for (const c of (n as ChildrenMixin).children as readonly SceneNode[]) {
+      out.push(c);
+      if (c.type !== 'INSTANCE') walk(c);
+    }
+  };
+  walk(root);
+  return out;
+}
+
+/**
+ * `root` 아래(자신 포함)의 모든 인스턴스마다 자기 레이어 값을 적는다 — 속성 노출 **전에** 부른다.
+ * 안쪽 인스턴스는 바깥 인스턴스와 따로, 깊이를 붙여 적는다.
+ */
+export async function snapshotOverrides(root: SceneNode, place: number, mainOf: MainOf): Promise<OverrideSnap[]> {
+  const out: OverrideSnap[] = [];
+  const visit = async (n: SceneNode, depth: number): Promise<void> => {
+    if (n.removed) return;
+    if (n.type === 'INSTANCE') {
+      const items: SlotSnap[] = [];
+      for (const l of ownLayers(n)) {
+        try {
+          const item: SlotSnap = { id: l.id, name: l.name, visible: l.visible };
+          if (l.type === 'TEXT') item.text = l.characters;
+          if (l.type === 'INSTANCE') item.swap = (await mainOf(l))?.id;
+          items.push(item);
+        } catch { /* 읽기 실패 — 지킬 것이 없다 */ }
+      }
+      out.push({ instId: n.id, depth, place, items });
+      depth++;
+    }
+    if ('children' in n) for (const c of (n as ChildrenMixin).children as readonly SceneNode[]) await visit(c, depth);
+  };
+  await visit(root, 0);
   return out;
 }
 
@@ -313,48 +352,67 @@ export function snapshotTexts(inst: SceneNode): TextSnap[] {
 const propNameOf = (key: string): string => key.replace(/#[^#]*$/, '') || key;
 
 /**
- * 속성 노출 뒤 글자가 기본값으로 바뀐 텍스트를 기록한 글자로 되돌린다(§4.7 9번).
- * 묶인 텍스트는 그 속성에 값을 넣고(한 번에 → 속성마다), 안 묶인 텍스트는 글자를 직접 넣는다.
- * 넣기 전에 그 텍스트의 글꼴을 모두 불러온다. 못 넣은 속성(또는 레이어) 이름 목록을 돌려준다.
+ * 속성 노출 뒤 기록과 달라진 값을 되돌린다(§4.7 9번). 바깥 인스턴스부터(depth 오름차순) — 바깥의
+ * 인스턴스 바꾸기를 먼저 되돌려야 안쪽 인스턴스가 제 메인 컴포넌트로 돌아온다. 노드는 id로 다시 찾는다.
+ * 묶인 값은 그 인스턴스의 속성에(한 번에 → 속성마다), 묶이지 않았는데 달라진 글자는 직접 넣는다.
+ * 글자를 넣기 전 그 텍스트의 글꼴을 모두 불러오고, 못 불러오면 실패로 센다.
+ * 돌려주는 값: 자리(place)마다 못 넣은 속성 이름(안 묶인 글자는 레이어 이름) 목록 — 실패가 있는 자리만.
  */
-export async function restoreTexts(
-  inst: InstanceNode,
-  snaps: readonly TextSnap[],
+export async function restoreOverrides(
+  snaps: readonly OverrideSnap[],
+  getNode: (id: string) => Promise<BaseNode | null>,
+  mainOf: MainOf,
   loadFont: (f: FontName) => Promise<void>,
-): Promise<string[]> {
-  if (inst.removed) return [];
-  const failed: string[] = [];
-  const payload: { [key: string]: string } = {};
-  const direct: TextSnap[] = [];
+): Promise<Map<number, string[]>> {
+  const failedBy = new Map<number, string[]>();
+  const fail = (place: number, what: string): void => {
+    const list = failedBy.get(place) ?? [];
+    if (!list.includes(what)) list.push(what);
+    failedBy.set(place, list);
+  };
   const loadAll = async (node: TextNode): Promise<void> => {
     const len = node.characters.length;
-    const fonts = len ? node.getRangeAllFontNames(0, len) : (typeof node.fontName === 'symbol' ? [] : [node.fontName as FontName]);
+    const fonts = len ? node.getRangeAllFontNames(0, len) : typeof node.fontName === 'symbol' ? [] : [node.fontName as FontName];
     for (const f of fonts) await loadFont(f);
   };
-  for (const s of snaps) {
-    const { node } = s;
-    try {
-      if (node.removed || node.characters === s.chars) continue;
-      await loadAll(node);
-      const key = node.componentPropertyReferences?.characters;
-      if (key) payload[key] = s.chars;
-      else direct.push(s);
-    } catch {
-      failed.push(node.name);
-    }
-  }
-  const keys = Object.keys(payload);
-  if (keys.length) {
-    let ok = false;
-    try { inst.setProperties(payload); ok = true; } catch { /* 하나가 거절되면 전체가 거절된다 — 속성마다 */ }
-    if (!ok) {
-      for (const k of keys) {
-        try { inst.setProperties({ [k]: payload[k] }); } catch { failed.push(propNameOf(k)); }
+  const ordered = [...snaps].sort((a, b) => a.depth - b.depth);
+  for (const snap of ordered) {
+    const inst = (await getNode(snap.instId)) as InstanceNode | null;
+    if (!inst || inst.removed || inst.type !== 'INSTANCE') continue; // 복사본으로 떼어졌거나 지워짐
+    const payload: { [key: string]: string | boolean } = {};
+    const direct: { node: TextNode; text: string }[] = [];
+    for (const it of snap.items) {
+      const node = (await getNode(it.id)) as SceneNode | null;
+      if (!node || node.removed) continue;
+      const refs = node.componentPropertyReferences ?? {};
+      try {
+        if (refs.visible && node.visible !== it.visible) payload[refs.visible] = it.visible;
+        if (node.type === 'INSTANCE' && it.swap && refs.mainComponent) {
+          const cur = (await mainOf(node))?.id;
+          if (cur !== it.swap) payload[refs.mainComponent] = it.swap;
+        }
+        if (node.type === 'TEXT' && it.text !== undefined && node.characters !== it.text) {
+          try { await loadAll(node); } catch { fail(snap.place, refs.characters ? propNameOf(refs.characters) : node.name); continue; }
+          if (refs.characters) payload[refs.characters] = it.text;
+          else direct.push({ node, text: it.text });
+        }
+      } catch {
+        fail(snap.place, it.name);
       }
     }
+    const keys = Object.keys(payload);
+    if (keys.length) {
+      let ok = false;
+      try { inst.setProperties(payload); ok = true; } catch { /* 하나가 거절되면 전체가 거절된다 — 속성마다 */ }
+      if (!ok) {
+        for (const k of keys) {
+          try { inst.setProperties({ [k]: payload[k] }); } catch { fail(snap.place, propNameOf(k)); }
+        }
+      }
+    }
+    for (const d of direct) {
+      try { d.node.characters = d.text; } catch { fail(snap.place, d.node.name); }
+    }
   }
-  for (const s of direct) {
-    try { s.node.characters = s.chars; } catch { failed.push(s.node.name); }
-  }
-  return failed;
+  return failedBy;
 }
