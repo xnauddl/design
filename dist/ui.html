@@ -39,6 +39,8 @@
       --ok-subtle:     #e8f5ec;
       --warn:          #9a6300;
       --warn-subtle:   #fbf1df;
+      --beta:          #c2410c;   /* [베타] 배지 글자 — 다듬는 중(§4.7) */
+      --beta-subtle:   #fff1e6;   /* [베타] 배지 바탕 */
       --danger:        #c8252f;
       --danger-subtle: #fdecec;
       --danger-border: #f4c9cc;
@@ -707,7 +709,7 @@
     .vt-empty { padding: 14px 6px; color: var(--text-2); }
     .popover { position: fixed; z-index: 45; width: 240px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 6px; }
     .popover[hidden] { display: none; }
-    .popover .pop-note { font-size: 10px; padding: 4px 6px 2px; }
+    .beta-badge { display: inline-block; font-size: 10px; font-weight: 600; line-height: 14px; background: var(--beta-subtle); color: var(--beta); border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
     #wizardSlotMake .step { margin-bottom: 10px; }
 
     /* ── 하위 화면 돌아가기 링크 ── */
@@ -821,7 +823,6 @@
    <!-- 준비 현황 팝오버(§4.4 머리줄) — 메뉴 모양, 목록을 밀지 않는다. -->
    <div class="popover" id="readinessPop" role="menu" hidden>
     <div id="pipelineSteps"></div>
-    <div class="muted pop-note" data-i18n="pipeline.indep">컴포넌트는 필요할 때 레이어 › 컴포넌트에서</div>
    </div>
 
    <!-- 마법사 카드(요소 1개) — 시작 화면 또는 만들기 맨 위 중 보이는 곳에 붙는다(§4.3). -->
@@ -1009,7 +1010,8 @@
     <div class="subtabs" id="applyRail" role="tablist" data-i18n-aria-label="rail.layerAria" aria-label="레이어 작업">
       <button class="subtab" role="tab" data-apply-step="bind" data-i18n="rail.bind">연결</button>
       <button class="subtab" role="tab" data-apply-step="rename" data-i18n="rail.rename">이름</button>
-      <button class="subtab" role="tab" data-apply-step="structure" data-i18n="rail.structure">컴포넌트</button>
+      <!-- 컴포넌트는 베타 — 언제나 보이고 [베타] 배지로 알린다(§4.7 "베타"). 배지는 접근성 트리에서 숨기고 이름은 aria-label로. -->
+      <button class="subtab" role="tab" data-apply-step="structure" id="subtabComponents" data-i18n-aria-label="layer.componentsBetaAria" aria-label="컴포넌트 (베타)"><span data-i18n="rail.structure">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span></button>
     </div>
 
     <!-- 레이어 › 연결(§4.6 그림 개편) — 카드 제목 없음. 단계 표시 + 버튼 줄(함께 고정) → 배지 줄 → 빈 상태/변수 카드 → 텍스트 스타일. -->
@@ -1088,7 +1090,7 @@
     <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
          목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
     <div class="step" id="structureCard" data-apply-step="structure">
-      <h2><span data-i18n="structure.title">컴포넌트</span> <span class="muted lock" id="componentLock"></span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
+      <h2><span data-i18n="structure.title">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span> <span class="muted lock" id="componentLock"></span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
       <div class="hint" data-i18n="component.hint">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</div>
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-i18n-tip="component.scanHelp" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.">후보 스캔</button>
@@ -1327,6 +1329,8 @@
     "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
     "component.placeFailedMore": " \uC678",
+    "common.beta": "\uBCA0\uD0C0",
+    "layer.componentsBetaAria": "\uCEF4\uD3EC\uB10C\uD2B8 (\uBCA0\uD0C0)",
     "component.propFailed": " \xB7 \uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC740 {n}\uAC1C: {names}",
     "component.fillKept": " \xB7 \uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uAC74\uB108\uB6F4 {n}\uAC1C: {names}",
     // [등록] 재사용(§4.7 "재사용" 8번) — 꼬리 형식은 placeFailed와 같다(이름 3개까지 + " 외").
@@ -1734,7 +1738,6 @@
     // 온보딩 / 가이드
     // 첫 실행 배너(온보딩 흡수)
     // 진행(파이프라인 카드)
-    "pipeline.indep": "\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uB808\uC774\uC5B4 \u203A \uCEF4\uD3EC\uB10C\uD2B8\uC5D0\uC11C",
     // 브랜드 팔레트
     "color.title": "\uC0C9",
     "color.scope": "\uBCC0\uC218\uD654",

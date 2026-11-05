@@ -17,6 +17,7 @@
        최소화, 잠금 사유, 버튼 줄 고정, 24×24, §8 목록 높이 실측
     12 변수 고치기(PR 3.5): 열 때 포커스, 이름 오류·바뀌는 것 줄, 별칭 고르개(계층·Global·순환·검색), 값 ↔ 별칭,
        저장(고친 것만 + base), 저장 중 잠금, 성공·일부 실패·다른 곳에서 바뀜·삭제됨·이름 거절, ERROR·10초, 버리기 확인, 닫은 뒤 포커스
+    14 컴포넌트(베타): 언제나 하위 탭 셋 · [베타] 배지 · 접근성 이름 · 준비 현황 각주 없음 · 켜기 체크박스 없음 · End
    사용: npm run verify:bind  (Chromium 경로가 다르면 CHROMIUM_PATH로 지정)
    ============================================================ */
 import { chromium } from 'playwright';
@@ -652,7 +653,7 @@ const reenter = (p) => p.evaluate(() => {
 {
   // 하위 탭(밑줄) · "다음 →" 없음
   const p = await open();
-  check('11 하위 탭 3개(밑줄)', JSON.stringify(await p.$$eval('#applyRail .subtab', (e) => e.map((x) => x.textContent))) === JSON.stringify(['연결', '이름', '컴포넌트']));
+  check('11 하위 탭 3개(밑줄) — 컴포넌트 [베타]', JSON.stringify(await p.$$eval('#applyRail .subtab', (e) => e.map((x) => x.textContent))) === JSON.stringify(['연결', '이름', '컴포넌트베타']));
   check('11 연결·이름 카드에 "다음 →" 없음', (await p.$$('#tab-layer .btn-next')).length === 0);
   await p.focus('#applyRail [data-apply-step="bind"]');
   await p.keyboard.press('ArrowRight');
@@ -1032,6 +1033,22 @@ async function saveAndGet(p) {
 }
 
 check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.join(' / '));
+
+/* ---------- 14 컴포넌트(베타) — 언제나 보임 · [베타] 배지 · 각주 없음 (§4.7 "베타", QA #3 불합격 4, 2026-11-05 결정) ---------- */
+{
+  const p = await open(400, 'layer');
+  const tabs = () => p.$$eval('#applyRail .subtab', (e) => e.filter((x) => !x.hidden && x.offsetParent !== null).map((x) => x.dataset.applyStep));
+  check('14 처음부터 하위 탭 셋', JSON.stringify(await tabs()) === JSON.stringify(['bind', 'rename', 'structure']), JSON.stringify(await tabs()));
+  check('14 배지 — 하위 탭 · 카드 제목, aria-hidden', (await p.$$eval('#subtabComponents .beta-badge[aria-hidden="true"], #structureCard h2 .beta-badge[aria-hidden="true"]', (e) => e.length)) === 2);
+  check('14 배지 주황(#C2410C 글자 · #FFF1E6 바탕)', JSON.stringify(await p.$eval('#subtabComponents .beta-badge', (e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor])) === JSON.stringify(['rgb(194, 65, 12)', 'rgb(255, 241, 230)']));
+  check('14 하위 탭 접근성 이름 "컴포넌트 (베타)"', (await p.$eval('#subtabComponents', (e) => e.getAttribute('aria-label'))) === '컴포넌트 (베타)');
+  check('14 준비 현황 각주 없음', (await p.$('#readinessPop .pop-note')) === null);
+  check('14 설정에 켜기 체크박스 없음', (await p.$('#componentsBeta')) === null);
+  await p.click('#applyRail [data-apply-step="bind"]');
+  await p.keyboard.press('End');
+  check('14 End는 컴포넌트', (await p.evaluate(() => document.activeElement?.dataset.applyStep)) === 'structure');
+  await p.close();
+}
 
 await browser.close();
 if (fails.length) {
