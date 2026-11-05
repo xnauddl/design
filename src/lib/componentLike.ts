@@ -21,6 +21,10 @@ export interface LikeNode {
   fills?: readonly PaintLike[] | symbol;
   strokes?: readonly PaintLike[] | symbol;
   effects?: readonly EffectLike[];
+  /** 첫 보이는 단색 채움(hex) — TEXT면 글자 색. 섞인 색 · 없음은 null/undefined. 탭 판정(§4.7 "묶기" 1번)이 읽는다. */
+  fillHex?: string | null;
+  /** TEXT 글자. 탭 판정이 읽는다. */
+  characters?: string;
   children?: readonly LikeNode[];
 }
 
@@ -37,6 +41,7 @@ export interface EffectLike {
 
 /** 고신뢰 컴포넌트 역할 — button/chip/nav/progress/table/card/figure/field/list/heading. */
 export type HighConfidenceRole =
+  | 'tab'
   | 'button'
   | 'chip'
   | 'nav'
@@ -54,6 +59,8 @@ export type HighConfidenceRole =
  * heading은 card/nav/list 등보다 낮은 우선순위(오탐 방지).
  */
 export function highConfidenceComponentRole(node: LikeNode): HighConfidenceRole | null {
+  // 탭은 맨 먼저 — 메뉴는 nav, 알약 탭은 card · list · heading 조건도 함께 만족한다(§4.7 "묶기" 1번).
+  if (isTabLike(node)) return 'tab';
   if (isButtonLike(node)) return isChipLike(node) ? 'chip' : 'button';
   // highConfidenceRole은 depth=0으로 nav를 본다(노드 자체 판정).
   if (isNavLike(node, 0)) return 'nav';
@@ -409,4 +416,87 @@ function isHeadingMetaSlot(node: LikeNode): boolean {
   return kids.every(
     (k) => k.type === 'TEXT' || isHeadingTitleWrapper(k),
   );
+}
+
+/* ---------- 탭(§4.7 "묶기" 1번, 2026-11-05) ---------- */
+export type TabStyle = 'Text' | 'Pill' | 'Box';
+
+/** 탭 판정 결과 — 칸 종류 · 선택 칸 위치(0부터) · 선택 칸 색 · Style. 탭이 아니면 null. */
+export interface TabInfo {
+  style: TabStyle;
+  selected: number;
+  /** 선택 칸 색 — 글자 칸은 글자 색, 틀 칸은 칸 채움(없으면 안쪽 글자 색). */
+  selectedColor: string;
+}
+
+/** 칸 안의 보이는 직접 TEXT 하나(틀 칸 조건). 아니면 null. 그 밖의 자식은 아이콘(그림)만 허용. */
+function cellText(cell: LikeNode): LikeNode | null {
+  const kids = (cell.children ?? []).filter(isVisible);
+  const texts = kids.filter((k) => k.type === 'TEXT');
+  if (texts.length !== 1) return null;
+  const others = kids.filter((k) => k.type !== 'TEXT');
+  if (others.some((k) => !isIconLike(k))) return null;
+  return texts[0];
+}
+
+/** 아이콘처럼 보이는 자식 — 벡터류 · 그것만 담은 작은 틀(96 이하). 탭 칸 안에서만 쓴다. */
+function isIconLike(n: LikeNode): boolean {
+  const VEC = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE', 'ELLIPSE', 'RECTANGLE']);
+  if (VEC.has(n.type)) return true;
+  if (n.type !== 'FRAME' && n.type !== 'GROUP') return false;
+  const d = dims(n);
+  if (!d || d.w > 96 || d.h > 96) return false;
+  return (n.children ?? []).every(isIconLike);
+}
+
+function shortOneLine(t: LikeNode): boolean {
+  const c = t.characters;
+  if (typeof c !== 'string') return false;
+  return !/[\n\r\u2028]/.test(c) && c.trim().length > 0 && c.trim().length <= 24;
+}
+
+/** 탭이면 정보, 아니면 null(§4.7 "묶기" 1번). */
+export function tabInfo(node: LikeNode): TabInfo | null {
+  if (node.type !== 'FRAME') return null;
+  if (layoutOf(node) !== 'horizontal') return null;
+  const d = dims(node);
+  if (!d || d.h > 80) return null;
+  const cells = (node.children ?? []).filter(isVisible);
+  if (cells.length < 3) return null;
+  let looks: string[];
+  let colors: string[];
+  let textCells: boolean;
+  if (cells.every((c) => c.type === 'TEXT')) {
+    textCells = true;
+    if (!cells.every(shortOneLine)) return null;
+    if (cells.some((c) => !c.fillHex)) return null; // 섞인 색 · 없음
+    looks = cells.map((c) => c.fillHex as string);
+    colors = looks;
+  } else if (cells.every((c) => c.type === 'FRAME')) {
+    textCells = false;
+    const texts = cells.map(cellText);
+    if (texts.some((t) => !t || !shortOneLine(t) || !t.fillHex)) return null;
+    // 칸 채움이 섞인 색(symbol)이면 탭이 아니다.
+    if (cells.some((c) => typeof c.fills === 'symbol')) return null;
+    looks = cells.map((c, i) => `${hasVisibleFill(c) ? (c.fillHex ?? 'x') : ''}|${hasVisibleStroke(c) ? 's' : ''}|${texts[i]!.fillHex}`);
+    colors = cells.map((c, i) => (hasVisibleFill(c) && c.fillHex ? c.fillHex : (texts[i]!.fillHex as string)));
+  } else {
+    return null;
+  }
+  // 선택 칸이 정확히 하나 — 나머지 칸끼리는 모양이 모두 같다.
+  const counts = new Map<string, number>();
+  for (const l of looks) counts.set(l, (counts.get(l) ?? 0) + 1);
+  if (counts.size !== 2) return null;
+  const odd = [...counts.entries()].find(([, n]) => n === 1);
+  if (!odd) return null;
+  // 칸이 3개 이상이므로 나머지 모양은 2번 이상 — 한 번 나온 쪽이 선택 칸.
+  const selected = looks.indexOf(odd[0]);
+  const sel = cells[selected];
+  let style: TabStyle = 'Text';
+  if (!textCells) style = hasVisibleFill(sel) && cornerRadiusOf(sel) > 0 ? 'Pill' : 'Box';
+  return { style, selected, selectedColor: colors[selected] };
+}
+
+function isTabLike(node: LikeNode): boolean {
+  return tabInfo(node) != null;
 }

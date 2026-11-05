@@ -5192,7 +5192,7 @@
       case "COMPONENT_CANDIDATES": {
         compCandidates = msg.nodes;
         compChecked.clear();
-        for (const c of msg.nodes) if (c.eligible && (c.group || c.propsOnly)) compChecked.add(c.id);
+        for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
         renderCompTree();
         renderVariantReport([]);
         if (!compCandidates.length || !compEligibleCount()) {

@@ -284,6 +284,8 @@ export interface CopyDeps {
   loadFont: (f: FontName) => Promise<void>;
   /** A의 날 벡터 그림에 맞는 아이콘 컴포넌트(등록부 — 없으면 만든다). 못 구하면 null. */
   iconFor: (vector: SceneNode) => ComponentNode | null;
+  /** 아이콘 프레임인가(§4.7 "묶기" 3번) — 날 벡터처럼 아이콘 인스턴스와 짝짓는다. */
+  isIcon?: (node: SceneNode) => boolean;
 }
 
 /**
@@ -323,7 +325,7 @@ export async function copyOverridesAsync(member: SceneNode, inst: InstanceNode, 
   const visit = async (a: SceneNode, b: SceneNode, root: boolean): Promise<void> => {
     if (a.removed || b.removed) return;
     // 날 벡터 ↔ 아이콘 인스턴스(1회차 접힘의 아이콘 자리 교체)
-    if (!root && VECTOR_TYPES.has(a.type) && b.type === 'INSTANCE') {
+    if (!root && (VECTOR_TYPES.has(a.type) || deps.isIcon?.(a)) && b.type === 'INSTANCE') {
       try {
         if (a.visible !== b.visible) put(b, 'visible', a.visible, () => { b.visible = a.visible; });
         const icon = deps.iconFor(a);

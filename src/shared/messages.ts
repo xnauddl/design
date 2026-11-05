@@ -142,6 +142,8 @@ export interface ComponentCandidate {
   propsOnly?: boolean;
   /** 전에 만든 컴포넌트를 재사용할 줄 — [재사용] 배지 + 기존 이름(세트면 "{세트} · {변형}")(§4.7 "재사용" 7번). */
   reuse?: { name: string };
+  /** 처음 열 때 체크(§4.7 "묶기" 6번) — code.ts가 정한다(반복 이름 · 속성 접힘 · 버튼 · 칩 · 탭). */
+  defaultOn?: boolean;
 }
 
 /**
