@@ -1041,7 +1041,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           nodes: r.nodes, // #13: 미리보기 트리 맥락
           skips: r.skips, // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
           skipTotal: r.skipTotal, // 상한 전 실제 수 — 잘렸으면 UI가 알린다
-          candidateTotal: r.candidateTotal, // 결과/미리보기 목록 상한 전 실제 수
           reqId: msg.reqId, // UI가 낡은 응답을 가려낸다
         });
         if (!msg.preview) {
@@ -1062,7 +1061,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'SELECT_VAR_USERS': {
-        // 그때 새로 찾아서 고른다 — 600개 결과 상한과 무관, 선택은 최대 200개(SELECT_CAP).
+        // 그때 새로 찾아서 고른다 — 선택은 최대 200개(SELECT_CAP).
         const r = findUsers(await resolveRoots(msg.nodeIds), new Set(msg.varIds));
         const pick = r.nodes.slice(0, SELECT_CAP);
         if (pick.length) {
@@ -1107,11 +1106,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'APPLY_SELECTED': {
         // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해, 그 사이 붙었거나(일부 구간 포함)
         // 스타일이 생겼거나 값이 달라진 곳은 건너뛰고 사유로 돌려준다(IA v3 §4.6 "찾는 범위" · "연결 후").
-        const r = await bindSelectedItems(msg.items);
+        // 300곳씩 묶어 연결하고 묶음마다 진행률을 보낸다(§4.6 "찾기 · 연결의 수"). [취소]는 없다.
+        const r = await bindSelectedItems(msg.items, {
+          onProgress: (done, total) => post({ type: 'PROGRESS', op: 'link', done, total }),
+          yieldToEvents: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
+        });
         const bound = r.bound;
         post({ type: 'APPLY_RESULT', bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
         if (bound) {
-          commitUndo(figma); // UX2: 선택 바인딩 전체를 단일 Undo로
+          commitUndo(figma); // UX2: 선택 바인딩 전체(마지막 묶음 뒤 한 번)를 단일 Undo로
           selfSelect = true;
           postSelection();
         }

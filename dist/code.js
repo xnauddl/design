@@ -686,6 +686,11 @@
     "bind.linking": "\uC5F0\uACB0 \uC911\u2026",
     "bind.progressOf": "{done} / {total} \uCC98\uB9AC \uC911\u2026 ({pct}%)",
     "bind.progressCount": "{done}\uAC1C \uCC98\uB9AC \uC911\u2026",
+    // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
+    "bind.placesMore": "\uC678 {n}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC120\uD0DD\uC73C\uB85C \uBCF4\uAE30",
+    "bind.linkingOf": "\uC5F0\uACB0 \uC911\u2026 {done} / {total}",
+    "bind.waitLink": "\uC5F0\uACB0\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
+    "bind.waitOp": "{op} \uC791\uC5C5\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
     "bind.skipSelected": "{reason} \uB808\uC774\uC5B4 {n}\uAC1C \uC120\uD0DD",
     // 레이어 › 이름
     "rename.count": "\uD6C4\uBCF4 {total}",
@@ -2352,7 +2357,6 @@
     return round2(a) === round2(b);
   }
   var SKIP_PREVIEW_CAP = 200;
-  var RESULT_CAP = 600;
   function capSkipsByReason(skips, cap) {
     if (skips.length <= cap) return skips;
     const byReason = /* @__PURE__ */ new Map();
@@ -2522,8 +2526,7 @@
       if (res.cancelled) break;
     }
     {
-      res.candidateTotal = preview.candidates.length;
-      res.candidates = preview.candidates.slice(0, RESULT_CAP);
+      res.candidates = preview.candidates;
       const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
       res.nodes = pruneToAffected(preview.nodeIndex, res.candidates, skips);
       res.skips = skips;
@@ -2909,31 +2912,11 @@
       skip(res, "error", node, preview, field);
     }
   }
-  async function bindSelectedItems(items) {
-    var _a, _b, _c;
+  var LINK_CHUNK = 300;
+  async function bindSelectedItems(items, hooks = {}) {
+    var _a, _b, _c, _d, _e;
     const res = { bound: 0, skipped: 0, reasons: {} };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const localIds = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
-    const nodes = /* @__PURE__ */ new Map();
-    for (const it of items) {
-      if (nodes.has(it.nodeId)) continue;
-      const n = await figma.getNodeByIdAsync(it.nodeId);
-      nodes.set(it.nodeId, n && "type" in n && n.type !== "PAGE" && n.type !== "DOCUMENT" ? n : null);
-    }
-    const roots = [...nodes.values()].filter((n) => !!n);
-    liveVarIds = await collectLiveVarIds(roots, localIds, false);
-    const valueCache = /* @__PURE__ */ new Map();
-    const variableOf = async (id) => {
-      var _a2;
-      if (valueCache.has(id)) return (_a2 = valueCache.get(id)) != null ? _a2 : null;
-      const v = await figma.variables.getVariableByIdAsync(id);
-      const entry = v ? { variable: v, value: await resolveValue(v, modeOf) } : null;
-      valueCache.set(id, entry);
-      return entry;
-    };
-    const changedPaints = /* @__PURE__ */ new Map();
     const fail = (key, node, field) => {
       var _a2;
       if (node) skip(res, key, node, preview, field);
@@ -2942,101 +2925,134 @@
         res.reasons[key] = ((_a2 = res.reasons[key]) != null ? _a2 : 0) + 1;
       }
     };
-    for (const it of items) {
-      const node = (_a = nodes.get(it.nodeId)) != null ? _a : null;
-      const vv = await variableOf(it.variableId);
-      if (!node || !vv) {
-        fail("changed", node, it.field);
-        continue;
+    for (let start = 0; start < items.length; start += LINK_CHUNK) {
+      const chunk = items.slice(start, start + LINK_CHUNK);
+      const cols = await figma.variables.getLocalVariableCollectionsAsync();
+      const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+      const localIds = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
+      const nodes = /* @__PURE__ */ new Map();
+      for (const it of chunk) {
+        if (nodes.has(it.nodeId)) continue;
+        const n = await figma.getNodeByIdAsync(it.nodeId);
+        nodes.set(it.nodeId, n && "type" in n && n.type !== "PAGE" && n.type !== "DOCUMENT" ? n : null);
       }
-      const { variable, value } = vv;
-      try {
-        if (it.field === "fills" || it.field === "strokes" || it.field === "effects") {
-          const key = it.field;
-          if (hasStyleId(node, STYLE_KEY_OF[key])) {
-            fail("styled", node, key);
-            continue;
-          }
-          const pending = (_b = changedPaints.get(node)) == null ? void 0 : _b.get(key);
-          const list = pending != null ? pending : node[key];
-          const i = (_c = it.index) != null ? _c : 0;
-          const x = Array.isArray(list) ? list[i] : void 0;
-          const isColorItem = !!x && (key === "effects" ? x.type === "DROP_SHADOW" || x.type === "INNER_SHADOW" : x.type === "SOLID");
-          if (!Array.isArray(list) || !x || !isColorItem) {
-            fail("changed", node, key);
-            continue;
-          }
-          const st2 = stateReason(colorState(x, node, key, i));
-          if (st2) {
-            fail(st2, node, key);
-            continue;
-          }
-          const translucent = key === "effects" ? isTranslucentEffectColor(x) : isTranslucentPaint(x);
-          const hex = rgbToHex(x.color);
-          if (translucent || variable.resolvedType !== "COLOR" || !value || !isRGB(value) || !isOpaqueColorValue(value) || rgbToHex(value) !== hex) {
-            fail("changed", node, key);
-            continue;
-          }
-          const arr = list.slice();
-          arr[i] = key === "effects" ? figma.variables.setBoundVariableForEffect(x, "color", variable) : figma.variables.setBoundVariableForPaint(x, "color", variable);
-          let m = changedPaints.get(node);
-          if (!m) changedPaints.set(node, m = /* @__PURE__ */ new Map());
-          m.set(key, arr);
-          res.bound++;
-          continue;
-        }
-        if (TEXT_RANGE_FIELDS.includes(it.field)) {
-          const field = it.field;
-          if (node.type !== "TEXT") {
-            fail("changed", node, field);
-            continue;
-          }
-          if (hasStyleId(node, "textStyleId")) {
-            fail("styled", node, field);
-            continue;
-          }
-          const st2 = stateReason(textFieldState(node, field));
-          if (st2) {
-            fail(st2, node, field);
-            continue;
-          }
-          if (node.characters.length === 0 || node.fontName === figma.mixed || !textValueEqual(node, field, value)) {
-            fail("changed", node, field);
-            continue;
-          }
-          await figma.loadFontAsync(node.fontName);
-          node.setRangeBoundVariable(0, node.characters.length, field, variable);
-          res.bound++;
-          continue;
-        }
-        const gap = gapSkip(node, it.field);
-        if (gap) {
-          fail(gap === "no-wrap" ? "changed" : "space-between", node, it.field);
-          continue;
-        }
-        const st = stateReason(nodeFieldState(node, it.field));
-        if (st) {
-          fail(st, node, it.field);
-          continue;
-        }
-        const cur = node[it.field];
-        if (typeof cur !== "number" || typeof value !== "number" || !sameNumber(cur, value)) {
+      const roots = [...nodes.values()].filter((n) => !!n);
+      liveVarIds = await collectLiveVarIds(roots, localIds, false);
+      const valueCache = /* @__PURE__ */ new Map();
+      const variableOf = async (id) => {
+        var _a2;
+        if (valueCache.has(id)) return (_a2 = valueCache.get(id)) != null ? _a2 : null;
+        const v = await figma.variables.getVariableByIdAsync(id);
+        const entry = v ? { variable: v, value: await resolveValue(v, modeOf) } : null;
+        valueCache.set(id, entry);
+        return entry;
+      };
+      const changedPaints = /* @__PURE__ */ new Map();
+      for (const it of chunk) {
+        const node = (_a = nodes.get(it.nodeId)) != null ? _a : null;
+        const vv = await variableOf(it.variableId);
+        if (!node || !vv) {
           fail("changed", node, it.field);
           continue;
         }
-        node.setBoundVariable(it.field, variable);
-        res.bound++;
-      } catch (e) {
-        fail("error", node, it.field);
-      }
-    }
-    for (const [node, m] of changedPaints) {
-      for (const [key, arr] of m) {
+        const { variable, value } = vv;
         try {
-          node[key] = arr;
+          if (it.field === "fills" || it.field === "strokes" || it.field === "effects") {
+            const key = it.field;
+            if (hasStyleId(node, STYLE_KEY_OF[key])) {
+              fail("styled", node, key);
+              continue;
+            }
+            const pending = (_c = (_b = changedPaints.get(node)) == null ? void 0 : _b.get(key)) == null ? void 0 : _c.arr;
+            const list = pending != null ? pending : node[key];
+            const i = (_d = it.index) != null ? _d : 0;
+            const x = Array.isArray(list) ? list[i] : void 0;
+            const isColorItem = !!x && (key === "effects" ? x.type === "DROP_SHADOW" || x.type === "INNER_SHADOW" : x.type === "SOLID");
+            if (!Array.isArray(list) || !x || !isColorItem) {
+              fail("changed", node, key);
+              continue;
+            }
+            const st2 = stateReason(colorState(x, node, key, i));
+            if (st2) {
+              fail(st2, node, key);
+              continue;
+            }
+            const translucent = key === "effects" ? isTranslucentEffectColor(x) : isTranslucentPaint(x);
+            const hex = rgbToHex(x.color);
+            if (translucent || variable.resolvedType !== "COLOR" || !value || !isRGB(value) || !isOpaqueColorValue(value) || rgbToHex(value) !== hex) {
+              fail("changed", node, key);
+              continue;
+            }
+            const arr = list.slice();
+            arr[i] = key === "effects" ? figma.variables.setBoundVariableForEffect(x, "color", variable) : figma.variables.setBoundVariableForPaint(x, "color", variable);
+            let m = changedPaints.get(node);
+            if (!m) changedPaints.set(node, m = /* @__PURE__ */ new Map());
+            const w = m.get(key);
+            if (w) {
+              w.arr = arr;
+              w.fields++;
+            } else m.set(key, { arr, fields: 1 });
+            continue;
+          }
+          if (TEXT_RANGE_FIELDS.includes(it.field)) {
+            const field = it.field;
+            if (node.type !== "TEXT") {
+              fail("changed", node, field);
+              continue;
+            }
+            if (hasStyleId(node, "textStyleId")) {
+              fail("styled", node, field);
+              continue;
+            }
+            const st2 = stateReason(textFieldState(node, field));
+            if (st2) {
+              fail(st2, node, field);
+              continue;
+            }
+            if (node.characters.length === 0 || node.fontName === figma.mixed || !textValueEqual(node, field, value)) {
+              fail("changed", node, field);
+              continue;
+            }
+            await figma.loadFontAsync(node.fontName);
+            node.setRangeBoundVariable(0, node.characters.length, field, variable);
+            res.bound++;
+            continue;
+          }
+          const gap = gapSkip(node, it.field);
+          if (gap) {
+            fail(gap === "no-wrap" ? "changed" : "space-between", node, it.field);
+            continue;
+          }
+          const st = stateReason(nodeFieldState(node, it.field));
+          if (st) {
+            fail(st, node, it.field);
+            continue;
+          }
+          const cur = node[it.field];
+          if (typeof cur !== "number" || typeof value !== "number" || !sameNumber(cur, value)) {
+            fail("changed", node, it.field);
+            continue;
+          }
+          node.setBoundVariable(it.field, variable);
+          res.bound++;
         } catch (e) {
+          fail("error", node, it.field);
         }
       }
+      for (const [node, m] of changedPaints) {
+        for (const [key, w] of m) {
+          try {
+            node[key] = w.arr;
+            res.bound += w.fields;
+          } catch (e) {
+            for (let k = 0; k < w.fields; k++) fail("error", node, key);
+          }
+        }
+      }
+      changedPaints.clear();
+      const done = Math.min(start + LINK_CHUNK, items.length);
+      (_e = hooks.onProgress) == null ? void 0 : _e.call(hooks, done, items.length);
+      if (hooks.yieldToEvents) await hooks.yieldToEvents();
     }
     const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
     return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, skipTotal: preview.skips.length };
@@ -7495,8 +7511,6 @@
             // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
             skipTotal: r.skipTotal,
             // 상한 전 실제 수 — 잘렸으면 UI가 알린다
-            candidateTotal: r.candidateTotal,
-            // 결과/미리보기 목록 상한 전 실제 수
             reqId: msg.reqId
             // UI가 낡은 응답을 가려낸다
           });
@@ -7553,7 +7567,10 @@
           break;
         }
         case "APPLY_SELECTED": {
-          const r = await bindSelectedItems(msg.items);
+          const r = await bindSelectedItems(msg.items, {
+            onProgress: (done, total) => post({ type: "PROGRESS", op: "link", done, total }),
+            yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
+          });
           const bound = r.bound;
           post({ type: "APPLY_RESULT", bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
           if (bound) {

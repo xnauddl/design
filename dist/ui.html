@@ -1903,6 +1903,11 @@
     "bind.linking": "\uC5F0\uACB0 \uC911\u2026",
     "bind.progressOf": "{done} / {total} \uCC98\uB9AC \uC911\u2026 ({pct}%)",
     "bind.progressCount": "{done}\uAC1C \uCC98\uB9AC \uC911\u2026",
+    // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
+    "bind.placesMore": "\uC678 {n}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC120\uD0DD\uC73C\uB85C \uBCF4\uAE30",
+    "bind.linkingOf": "\uC5F0\uACB0 \uC911\u2026 {done} / {total}",
+    "bind.waitLink": "\uC5F0\uACB0\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
+    "bind.waitOp": "{op} \uC791\uC5C5\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
     "bind.skipSelected": "{reason} \uB808\uC774\uC5B4 {n}\uAC1C \uC120\uD0DD",
     // 레이어 › 이름
     "rename.count": "\uD6C4\uBCF4 {total}",
@@ -3490,6 +3495,7 @@
   var createFrom = "tokens";
   var semStatusTarget = "colorStatus";
   var semStatusPrefix = "";
+  var bindLinking = 0;
   var selectStatusTarget = "applyStatus";
   function selectNodes(ids, statusId) {
     selectStatusTarget = statusId;
@@ -4264,10 +4270,17 @@
   $("btnApplyConfirm").addEventListener("click", () => {
     const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
     if (!items.length) return;
+    startLink(items);
+  });
+  function startLink(items) {
+    if (bindLinking) return;
     bindFinding = false;
     showApplyProgress(t("bind.linking"), false);
-    send({ type: "APPLY_SELECTED", items, reqId: nextBindReq() });
-  });
+    const reqId = nextBindReq();
+    bindLinking = reqId;
+    send({ type: "APPLY_SELECTED", items, reqId });
+    onBindLinkingChanged();
+  }
   $("btnApplyCancel").addEventListener("click", () => {
     send({ type: "CANCEL" });
     setStatus("applyStatus", t("apply.cancelRequested"), "warn");
@@ -4966,10 +4979,12 @@
         applySelectionDone();
         refreshVariantRow(msg.comps, msg.sets);
         if (!msg.selfSelect) {
-          nextBindReq();
-          hideApplyProgress();
-          clearBindPreview();
-          $("bindDone").hidden = true;
+          if (!bindLinking) {
+            nextBindReq();
+            hideApplyProgress();
+            clearBindPreview();
+            $("bindDone").hidden = true;
+          }
           $("tsApplyResult").hidden = true;
           layerLibUse = null;
           if (activeTab === "layer") readLayerLibUse();
@@ -5016,9 +5031,15 @@
       }
       case "PROGRESS":
         if (msg.op === "bind") updateApplyProgress(msg.done, msg.total);
+        else if (msg.op === "link" && bindLinking) updateLinkProgress(msg.done, msg.total);
         break;
       case "APPLY_RESULT": {
-        if (!isCurrentBindReply(msg.reqId)) break;
+        const linkEnded = bindLinking !== 0 && msg.reqId === bindLinking;
+        if (linkEnded) bindLinking = 0;
+        if (!isCurrentBindReply(msg.reqId)) {
+          if (linkEnded) onBindLinkingChanged();
+          break;
+        }
         hideApplyProgress();
         const silent = msg.preview && msg.reqId !== void 0 && msg.reqId === bindSilentReq;
         bindSilentReq = 0;
@@ -5056,6 +5077,7 @@
           $("bindDone").hidden = false;
           renderBindTree();
         }
+        if (linkEnded) onBindLinkingChanged();
         break;
       }
       case "VAR_TABLE":
@@ -5309,6 +5331,11 @@
         if (msg.op === "UPDATE_VARIABLE") break;
         const statusId = msg.op === "SELECT_NODES" ? selectStatusTarget : resolveStatusId(msg.op && OP_STATUS[msg.op] || "colorStatus");
         if (msg.op === "APPLY") hideApplyProgress();
+        if (msg.op === "APPLY_SELECTED" && bindLinking) {
+          bindLinking = 0;
+          hideApplyProgress();
+          onBindLinkingChanged();
+        }
         showError(statusId, explainError(msg.message));
         break;
       }
@@ -5325,6 +5352,8 @@
     // 그 줄은 다른 단계에 있어 숨겨져 있다 — 실패가 '적용 중…'인 채로 조용히 묻힌다.
     APPLY_TEXT_STYLES: "applyStatus",
     APPLY: "applyStatus",
+    APPLY_SELECTED: "applyStatus",
+    // 연결 오류도 연결 카드에(§4.6 "연결 중의 다른 일")
     // 실제 자리는 부른 쪽이 정한다(selectStatusTarget) — 여기 값은 resolveStatusId가 못 받는
     // 경로를 위한 폴백일 뿐이다.
     SELECT_NODES: "applyStatus",
@@ -5364,7 +5393,18 @@
       const btn = document.createElement("button");
       btn.className = "primary";
       btn.textContent = t("common.retry");
-      btn.addEventListener("click", () => send(retry));
+      btn.addEventListener("click", () => {
+        var _a;
+        if (bindLinking && ((_a = OPS[retry.type]) == null ? void 0 : _a.write)) {
+          setStatus(id, t("bind.waitLink"), "warn");
+          return;
+        }
+        if (retry.type === "APPLY_SELECTED") {
+          startLink(retry.items);
+          return;
+        }
+        send(retry);
+      });
       box.appendChild(btn);
     }
     el.appendChild(box);
@@ -5651,10 +5691,28 @@
     if (open) {
       const places = document.createElement("div");
       places.className = "bv-places";
-      for (const l of g.lines) places.appendChild(placeEl(l));
+      const drawn = g.lines.slice(0, PLACE_ROW_CAP);
+      for (const l of drawn) places.appendChild(placeEl(l));
+      if (g.lines.length > PLACE_ROW_CAP) places.appendChild(placesMoreEl(g, drawn));
       card.appendChild(places);
     }
     return card;
+  }
+  var PLACE_ROW_CAP = 200;
+  function placesMoreEl(g, drawn) {
+    const n = g.count - drawn.reduce((sum, l) => sum + l.keys.length, 0);
+    const row = document.createElement("div");
+    row.className = "bv-place bv-more";
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "link link-btn";
+    b.textContent = t("bind.placesMore", { n });
+    b.addEventListener("click", () => {
+      const ids = [...new Set(g.lines.slice(drawn.length).map((l) => l.nodeId))];
+      selectNodes(ids, "applyStatus");
+    });
+    row.appendChild(b);
+    return row;
   }
   function focusCardControl(variableId, sel) {
     var _a;
@@ -5665,6 +5723,7 @@
   }
   function bindStepStates() {
     if (!curSel.count || bindPrereqShown()) return ["todo", "todo", "todo"];
+    if (bindLinking) return ["done", "done", "now"];
     if (bindIsDone()) return ["done", "done", "done"];
     if (bindFinding && $("applyProgress").style.display !== "none") return ["now", "todo", "todo"];
     if (bindOtherSel()) return ["now", "todo", "todo"];
@@ -5678,7 +5737,7 @@
       const st = states[i];
       li.classList.toggle("now", st === "now");
       li.classList.toggle("done", st === "done");
-      const spin = i === 0 && busy && st === "now";
+      const spin = st === "now" && (i === 0 && busy || i === 2 && bindLinking !== 0);
       li.classList.toggle("busy", spin);
       if (st === "now") li.setAttribute("aria-current", "step");
       else li.removeAttribute("aria-current");
@@ -6039,6 +6098,12 @@
     $("applyBarFill").style.width = `${pct}%`;
     $("applyProgressText").textContent = total > 0 ? t("bind.progressOf", { done, total, pct }) : t("bind.progressCount", { done });
   }
+  function updateLinkProgress(done, total) {
+    $("applyProgress").style.display = "";
+    const pct = total > 0 ? Math.min(100, Math.round(done / total * 100)) : 0;
+    $("applyBarFill").style.width = `${pct}%`;
+    $("applyProgressText").textContent = t("bind.linkingOf", { done, total });
+  }
   function hideApplyProgress() {
     $("applyProgress").style.display = "none";
     bindFinding = false;
@@ -6221,15 +6286,53 @@
   }
   function setLock(el, reason, prereqMsg = "") {
     if (reason) {
+      el.dataset.baseLock = reason;
+      if (reason === "prereq") el.dataset.baseLockMsg = prereqMsg;
+      else delete el.dataset.baseLockMsg;
+    } else {
+      delete el.dataset.baseLock;
+      delete el.dataset.baseLockMsg;
+    }
+    applyLock(el);
+  }
+  function applyLock(el) {
+    const base = el.dataset.baseLock;
+    const wait = el.dataset.wait;
+    const reason = base === "paid" ? "paid" : wait ? "prereq" : base;
+    if (reason) {
       el.setAttribute("aria-disabled", "true");
       el.dataset.lock = reason;
-      if (reason === "prereq") el.dataset.lockMsg = prereqMsg;
+      if (reason === "prereq") el.dataset.lockMsg = wait || el.dataset.baseLockMsg || "";
       else delete el.dataset.lockMsg;
     } else {
       el.removeAttribute("aria-disabled");
       delete el.dataset.lock;
       delete el.dataset.lockMsg;
     }
+  }
+  function setWait(el, msg, target = "") {
+    var _a, _b;
+    const attr = el.hasAttribute("data-tip") ? "data-tip" : "title";
+    let tip = (_a = el.getAttribute(attr)) != null ? _a : "";
+    const prevTail = (_b = el.dataset.waitTail) != null ? _b : "";
+    if (prevTail && tip.endsWith(prevTail)) tip = tip.slice(0, tip.length - prevTail.length);
+    if (msg) {
+      const tail = tip ? ` \xB7 ${msg}` : msg;
+      el.setAttribute(attr, tip + tail);
+      el.dataset.waitTail = tail;
+      el.dataset.wait = msg;
+      if (target) el.dataset.waitTarget = target;
+      else delete el.dataset.waitTarget;
+    } else {
+      if (prevTail) {
+        if (tip) el.setAttribute(attr, tip);
+        else el.removeAttribute(attr);
+      }
+      delete el.dataset.waitTail;
+      delete el.dataset.wait;
+      delete el.dataset.waitTarget;
+    }
+    applyLock(el);
   }
   function isLocked(el) {
     return el.getAttribute("aria-disabled") === "true";
@@ -6247,7 +6350,8 @@
     if (e.type === "click" || e.type === "keydown") {
       if (el.dataset.lock === "paid") showPaidReason();
       else if (el.dataset.lock === "edit") edLockedSave();
-      else if (el.id === "btnApplyExistingText" && curSel.count && !hasTextStyles) {
+      else if (el.dataset.wait && el.dataset.waitTarget) setStatus(el.dataset.waitTarget, el.dataset.wait, "warn");
+      else if (el.id === "btnApplyExistingText" && !el.dataset.wait && curSel.count && !hasTextStyles) {
         showStatusLine(t("bind.tsNoneText"), { cls: "warn", action: { label: t("bind.tsGotoType"), run: () => showMake("type") } });
       } else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: "warn" });
     }
@@ -6353,6 +6457,53 @@
   };
   var opPending = /* @__PURE__ */ new Map();
   var opWizard = false;
+  var WAIT_LINK_IDS = [
+    "btnCreate",
+    "btnCreateApply",
+    "btnColorVars",
+    // CREATE_TOKENS
+    "btnSemantics",
+    // CREATE_SEMANTICS
+    "btnGenDark",
+    // GENERATE_DARK_MODE
+    "btnTextStyles",
+    // CREATE_TEXT_STYLES
+    "btnApplyExistingText",
+    // APPLY_TEXT_STYLES
+    "btnRename",
+    // RENAME_APPLY
+    "btnRegisterComp",
+    // REGISTER_COMPONENTS
+    "btnClassifyVariants",
+    // CLASSIFY_VARIANTS
+    "btnGenMissing",
+    // GENERATE_MISSING_VARIANTS
+    "btnComponentize",
+    // COMPONENTIZE_SIMILAR
+    "btnWizardRun"
+    // 마법사 [전체 실행]
+  ];
+  var WAIT_CARD_IDS = ["btnApply", "btnBindRepreview", "btnApplyConfirm"];
+  function otherWriteOp() {
+    if (opWizard || wizardRunning) return t("op.wizard");
+    for (const [type, def] of opPending) if (type !== "APPLY_SELECTED" && def.write) return t(def.label);
+    return null;
+  }
+  function renderWaitLocks() {
+    const link = bindLinking ? t("bind.waitLink") : null;
+    for (const id of WAIT_LINK_IDS) setWait($(id), link);
+    const other = link ? null : otherWriteOp();
+    for (const id of WAIT_CARD_IDS) {
+      const msg = link != null ? link : id === "btnApplyConfirm" && other ? t("bind.waitOp", { op: other }) : null;
+      setWait($(id), msg, "applyStatus");
+    }
+    document.querySelectorAll("[data-role-write]").forEach((el) => setWait(el, link));
+  }
+  function onBindLinkingChanged() {
+    renderWaitLocks();
+    renderBindChrome();
+    if (ed) edChrome();
+  }
   var opProg = null;
   var opBusy = () => opWizard || opPending.size > 0;
   var opProgress = () => opProg;
@@ -6364,6 +6515,7 @@
     opPending.set(msg.type, def);
     if (msg.type === "APPLY_SELECTED" || msg.type === "APPLY") opProg = null;
     if (isMini) renderMiniMark();
+    if (def.write) renderWaitLocks();
   }
   function opReceived(m) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
@@ -6378,6 +6530,7 @@
       if (!defs.length) return;
       opPending.clear();
       opProg = null;
+      renderWaitLocks();
       opFinished(false, defs[0]);
       return;
     }
@@ -6385,6 +6538,7 @@
       if (!def.results.includes(m.type)) continue;
       opPending.delete(type);
       opProg = null;
+      if (def.write) renderWaitLocks();
       let failed = false;
       let cancelled = false;
       if (m.type === "DARK_MODE_RESULT" && m.error) failed = true;
@@ -6416,10 +6570,12 @@
   function opWizardStart() {
     opWizard = true;
     if (isMini) renderMiniMark();
+    renderWaitLocks();
   }
   function opWizardEnd(result) {
     opWizard = false;
     opProg = null;
+    renderWaitLocks();
     if (result !== "cancel") opFinished(result === "ok", { results: [], label: "op.wizard", go: () => {
       showTab("variables");
       showVarSub("home");
@@ -6582,7 +6738,15 @@
         sel.appendChild(o);
       }
       sel.value = (_a = r.set) != null ? _a : "";
+      sel.dataset.roleWrite = "";
+      if (bindLinking) setWait(sel, t("bind.waitLink"));
       sel.addEventListener("change", () => {
+        var _a2;
+        if (bindLinking) {
+          sel.value = (_a2 = r.set) != null ? _a2 : "";
+          showStatusLine(t("bind.waitLink"), { cls: "warn" });
+          return;
+        }
         const role = sel.value || null;
         const holder = role && role !== "none" ? colRoleRows.find((x) => x.id !== r.id && x.set === role) : void 0;
         pendingRoleNote = { id: r.id, name: r.name, role, prev: holder == null ? void 0 : holder.name };
@@ -6596,6 +6760,8 @@
         const use = document.createElement("button");
         use.className = "link";
         use.textContent = t("colRoles.useGuess");
+        use.dataset.roleWrite = "";
+        if (bindLinking) setWait(use, t("bind.waitLink"));
         use.addEventListener("click", () => {
           const holder = colRoleRows.find((x) => x.id !== r.id && x.set === r.guess);
           pendingRoleNote = { id: r.id, name: r.name, role: r.guess, prev: holder == null ? void 0 : holder.name };
@@ -8062,7 +8228,7 @@ ${v.description}` : v.name;
     e.confirmRow.hidden = !e.confirm;
     e.btnClose.textContent = st.changed ? t("common.cancel") : t("common.close");
     e.btnSave.textContent = saving ? t("edit.savingBtn") : t("edit.save");
-    const locked = saving || !!e.sticky || !st.changed || st.hasErr;
+    const locked = saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0;
     if (locked) {
       e.btnSave.setAttribute("aria-disabled", "true");
       e.btnSave.dataset.lock = "edit";
@@ -8070,6 +8236,7 @@ ${v.description}` : v.name;
       e.btnSave.removeAttribute("aria-disabled");
       delete e.btnSave.dataset.lock;
     }
+    e.btnSave.title = bindLinking ? t("bind.waitLink") : "";
   }
   function edEdited() {
     if (!ed) return;
@@ -8081,7 +8248,8 @@ ${v.description}` : v.name;
     const e = ed;
     if (!e || e.saving || e.sticky) return;
     const st = edState(e);
-    if (!st.changed) e.event = { text: t("edit.noChange"), err: false };
+    if (bindLinking) e.event = { text: t("bind.waitLink"), err: false };
+    else if (!st.changed) e.event = { text: t("edit.noChange"), err: false };
     else if (st.hasErr) {
       e.event = { text: t("edit.checkInput"), err: true };
       (_a = st.firstErr) == null ? void 0 : _a.focus();
@@ -8544,7 +8712,7 @@ ${v.description}` : v.name;
     const e = ed;
     if (!e || e.saving || e.sticky) return;
     const st = edState(e);
-    if (!st.changed || st.hasErr) {
+    if (bindLinking || !st.changed || st.hasErr) {
       edLockedSave();
       return;
     }
@@ -8931,6 +9099,7 @@ ${v.description}` : v.name;
     send({ type: "SCAN_USAGE", reqId: layerLibReq, nodeIds: curSel.ids });
   }
   function bindOnReturn() {
+    if (bindLinking) return;
     if (activeTab !== "layer" || currentApplyStep !== "bind" || !hasBindPreview()) return;
     if (bindPreviewMini) {
       bindPreviewMini = false;
@@ -8963,7 +9132,7 @@ ${v.description}` : v.name;
   window.addEventListener("blur", () => {
     if (hasBindPreview()) bindLeftSince = true;
   });
-  var bindBusy = () => opPending.has("APPLY") || opPending.has("APPLY_SELECTED");
+  var bindBusy = () => bindFinding || bindLinking !== 0;
   activeTab = "settings";
   showTab("variables");
 })();

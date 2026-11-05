@@ -1034,7 +1034,7 @@
 - **선택이 다른 경우 (조용한 재계산보다 먼저 판정, 재계산하지 않음):** 다른 화면에서 플러그인이 선택을 바꾼 뒤(변수 탭의 사용 레이어 선택, 삭제된 변수 [선택], 상세 항목 클릭) 돌아오면, 결과와 스위치는 그대로 두고 결과 위에 "다른 선택에서 만든 결과예요 · [다시 찾기]"를 둔다. [🔗 n곳 연결]은 `aria-disabled`이고, 사유는 "선택이 바뀌었어요 · 다시 찾아 주세요"다.
 
 **텍스트 스타일 "기존 스타일 연결"** (무료, 카드 목록 아래 한 줄 "Aa 텍스트 스타일 [기존 스타일 연결]")
-- 잠금 사유(`aria-disabled`, 누르면 카드 상태 줄): 연결 중 "연결이 끝나면 다시 해 주세요"(`bind.waitLink` — "찾기 · 연결의 수") → 등록된 텍스트 스타일이 없음 "등록된 텍스트 스타일이 없어요 · 타이포에서 등록 →(유료)".
+- 잠금 사유(`aria-disabled`, 누르면 공통 상태 줄): 연결 중 "연결이 끝나면 다시 해 주세요"(`bind.waitLink` — "찾기 · 연결의 수") → 등록된 텍스트 스타일이 없음 "등록된 텍스트 스타일이 없어요 · 타이포에서 등록 →(유료)".
 - 결과는 버튼 아래 한 줄 "✓ 텍스트 {n}개에 스타일 연결 · 건너뜀 {m}"이다. m = 건너뛴 텍스트 레이어 수. 줄의 툴팁에 사유별 수를 적는다(예: "이미 스타일 있음 3 · 같은 스타일 없음 2 · 같은 모양 스타일이 둘 이상 1 · 글자 속성에 변수 있음 1 · 서식이 섞임 1").
 - 건너뛰는 글자: §2.11의 이미 붙은 것(텍스트 스타일 · 글자 속성의 변수), 인스턴스 안쪽, 서식이 섞인 글자(구간마다 크기·글꼴이 다름).
 - §2.11의 모든 글자 속성이 같은 스타일에만 붙인다. 줄 높이 단위만 다르고 실제 높이가 같으면 같다(예: 16px 글자의 줄 높이 24px ↔ 150%로 등록된 스타일). 숫자를 다른 단위로 읽어야만 맞는 경우(줄 높이 150px ↔ 150%)는 모양이 달라지므로 건너뛴다.
@@ -1842,17 +1842,18 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 > §4.6 "찾기 · 연결의 수". 코드 대조 검토 1회차 뒤 고침: 메시지 모양은 그대로(상한만 없앰), 크기 안내는 뺌.
 
-- [ ] 화면 시안 확인(사용자): 카드 끝 "외 {n}곳" 줄, 진행 줄 "연결 중…" → "연결 중… {done} / {total}", 연결 중 잠금 사유
-- [ ] 찾기: `bind.ts` `RESULT_CAP` · 잘라내기(`preview.candidates.slice`) · `BindResult.candidateTotal` 삭제, `APPLY_RESULT.candidateTotal` 삭제(`shared/messages.ts` · `code.ts` `case 'APPLY'`). `APPLY_RESULT`의 나머지 모양은 그대로
-- [ ] 연결(`bindSelectedItems`): `items` 300개씩 · 묶음마다 레이어 찾기 · `collectLiveVarIds` · 변수 값 읽기 · 다시 확인 · 연결 · `changedPaints` 쓰고 비우기, `bound`는 쓴 뒤에 셈(배열 쓰기 실패 → `error`), 묶음 끝 `PROGRESS{op: 'link'}` + 양보, `commitUndo`는 `code.ts`에서 마지막 묶음 뒤 한 번
-- [ ] `shared/messages.ts` `PROGRESS.op`에 `'link'` 추가, `ui.ts` `case 'PROGRESS'`에서 `'link'` → `bind.linkingOf` · 막대 done/total(첫 메시지 전은 `bind.linking`), 최소화 진행 테두리는 `opReceived` 그대로
-- [ ] 카드 자리 줄 200줄 + "외 {n}곳 · 레이어 선택으로 보기"(n = 곳 수 − 그린 줄의 곳 수 합), 누르면 그리지 않은 줄의 레이어(겹침 없이 줄 순서)를 `selectNodes(ids, 'applyStatus')` → `SELECT_NODES`, 200개 넘으면 `select.capped`. ⑧ "이 화면에서 만든 선택"(`bindLayerSelectPending` → `bindHereSel`) — 결과 유지 · 복귀 때 아무것도 안 함
-- [ ] 연결 중의 다른 일: 선택 변경 때 `SELECTION_STATE`의 연결 카드 처리(`nextBindReq` · `hideApplyProgress` · `clearBindPreview` · `#bindDone` 숨김)를 건너뜀 → 마지막 `APPLY_RESULT`가 `isCurrentBindReply`를 통과, ⑧ 복귀 규칙 멈춤, 쓰기 버튼 잠금(아래 항목)
-- [ ] "연결 중" 플래그 `bindLinking`(reqId): `APPLY_SELECTED` 보낼 때 세움, 그 reqId의 `APPLY_RESULT` 또는 `op: 'APPLY_SELECTED'`인 `ERROR`에서 내림(이때 진행 줄도 닫음). `bindBusy` = `bindFinding || bindLinking !== 0`. `code.ts`는 그대로(맨 끝 `catch`가 `op: msg.type`)
-- [ ] 연결 중 잠금 버튼 전부 §2 원칙 3(`aria-disabled` · 툴팁 꼬리 · 누르면 그 화면 상태 줄 `bind.waitLink`): `OPS` `write: true` 버튼 · [기존 스타일 연결] · 마법사 [전체 실행] · [🔍 다시 찾기] · [🔗 연결] · 상세 팝업 [저장](`UPDATE_VARIABLE`). 반대로 다른 쓰기 작업 중 [🔗 연결] 잠금 + `bind.waitOp`
-- [ ] i18n 4키 추가(`bind.placesMore` · `bind.linkingOf` · `bind.waitLink` · `bind.waitOp`) · `pr4-copy-table.md` "11. 추가 문구"
-- [ ] 600을 말하는 주석 · 테스트 이름 정리: `bind.ts` `RESULT_CAP` 주석(62)과 `bindSelection` 안 주석(337 "목록은 RESULT_CAP에서 멈춘다"), 사용 조회 머리 주석(1030 "600개 결과 상한(RESULT_CAP)과 무관"), `code.ts` `case 'APPLY'`의 `candidateTotal` 줄(1044) · `case 'SELECT_VAR_USERS'` 주석(1065 "600개 결과 상한과 무관"), `test/figma.test.mjs` "countUsage · findUsers — 600개를 넘어도…"(4052)
-- [ ] `test/figma.test.mjs`(`bindSelection` dry-run · `bindSelectedItems`): 후보 1,000곳 → (찾음 1000) · `candidates` 1000개 · `candidateTotal` 없음, `bindSelectedItems` 1,000개 → 연결 1000 · 건너뜀 0 · `PROGRESS` 300 · 600 · 900 · 1000, 묶음 경계(300 · 600 · 900)를 넘는 같은 레이어의 칠하기 두 자리(index 0 · 1)가 둘 다 연결, 묶음 2에서 값이 바뀐 자리만 `changed`, 배열 쓰기 실패 → `bound`에 안 셈 · `error`
-- [ ] `groupByVariable` · `carryChecks`를 고치면 `test/pure.test.mjs` 단위 테스트도 고친다(이번 결정으로는 고칠 일이 없다 — 메시지 모양 그대로)
-- [ ] `verify-bind-flow`: 찾기 응답 fixture에 한 변수 201줄(각 1곳) 카드 추가 → 펼치면 200줄 + "외 1곳", 누르면 `SELECT_NODES` ids 1개(201번째 줄의 레이어). 연결: 지금 8번 검사("연결 중…")에 `PROGRESS{op: 'link', done: 300, total: 618}` 주입 → "연결 중… 300 / 618", 연결 중 캔버스 선택 변경(`selfSelect: false`) 주입 → 진행 줄 남음 · 뒤이은 `APPLY_RESULT`로 결과 카드, 연결 중 [🔍 다시 찾기] → `aria-disabled` · 요청 안 보냄 · `bind.waitLink`, 연결 중 `ERROR{op: 'APPLY_SELECTED'}` 주입 → 진행 줄 닫힘 · 잠금 풀림, 다른 쓰기 작업 중 [🔗 연결] → `bind.waitOp`
+- [x] 화면 시안 확인(사용자): 카드 끝 "외 {n}곳" 줄, 진행 줄 "연결 중…" → "연결 중… {done} / {total}", 연결 중 잠금 사유
+- [x] 찾기: `bind.ts` `RESULT_CAP` · 잘라내기(`preview.candidates.slice`) · `BindResult.candidateTotal` 삭제, `APPLY_RESULT.candidateTotal` 삭제(`shared/messages.ts` · `code.ts` `case 'APPLY'`). `APPLY_RESULT`의 나머지 모양은 그대로
+- [x] 연결(`bindSelectedItems`): `items` 300개씩 · 묶음마다 레이어 찾기 · `collectLiveVarIds` · 변수 값 읽기 · 다시 확인 · 연결 · `changedPaints` 쓰고 비우기, `bound`는 쓴 뒤에 셈(배열 쓰기 실패 → `error`), 묶음 끝 `PROGRESS{op: 'link'}` + 양보, `commitUndo`는 `code.ts`에서 마지막 묶음 뒤 한 번
+- [x] `shared/messages.ts` `PROGRESS.op`에 `'link'` 추가, `ui.ts` `case 'PROGRESS'`에서 `'link'` → `bind.linkingOf` · 막대 done/total(첫 메시지 전은 `bind.linking`), 최소화 진행 테두리는 `opReceived` 그대로
+- [x] 카드 자리 줄 200줄 + "외 {n}곳 · 레이어 선택으로 보기"(n = 곳 수 − 그린 줄의 곳 수 합), 누르면 그리지 않은 줄의 레이어(겹침 없이 줄 순서)를 `selectNodes(ids, 'applyStatus')` → `SELECT_NODES`, 200개 넘으면 `select.capped`. ⑧ "이 화면에서 만든 선택"(`bindLayerSelectPending` → `bindHereSel`) — 결과 유지 · 복귀 때 아무것도 안 함
+- [x] 연결 중의 다른 일: 선택 변경 때 `SELECTION_STATE`의 연결 카드 처리(`nextBindReq` · `hideApplyProgress` · `clearBindPreview` · `#bindDone` 숨김)를 건너뜀 → 마지막 `APPLY_RESULT`가 `isCurrentBindReply`를 통과, ⑧ 복귀 규칙 멈춤, 쓰기 버튼 잠금(아래 항목)
+- [x] "연결 중" 플래그 `bindLinking`(reqId): `APPLY_SELECTED` 보낼 때 세움, 그 reqId의 `APPLY_RESULT` 또는 `op: 'APPLY_SELECTED'`인 `ERROR`에서 내림(이때 진행 줄도 닫음). `bindBusy` = `bindFinding || bindLinking !== 0`. `code.ts`는 그대로(맨 끝 `catch`가 `op: msg.type`)
+- [x] 연결 중 잠금 버튼 전부 §2 원칙 3(`aria-disabled` · 툴팁 꼬리 · 누르면 그 화면 상태 줄 `bind.waitLink`): `OPS` `write: true` 버튼 · [기존 스타일 연결] · 마법사 [전체 실행] · [🔍 다시 찾기] · [🔗 연결] · 상세 팝업 [저장](`UPDATE_VARIABLE`). 반대로 다른 쓰기 작업 중 [🔗 연결] 잠금 + `bind.waitOp`
+- [x] i18n 4키 추가(`bind.placesMore` · `bind.linkingOf` · `bind.waitLink` · `bind.waitOp`) · `pr4-copy-table.md` "11. 추가 문구"
+- [x] 600을 말하는 주석 · 테스트 이름 정리: `bind.ts` `RESULT_CAP` 주석(62)과 `bindSelection` 안 주석(337 "목록은 RESULT_CAP에서 멈춘다"), 사용 조회 머리 주석(1030 "600개 결과 상한(RESULT_CAP)과 무관"), `code.ts` `case 'APPLY'`의 `candidateTotal` 줄(1044) · `case 'SELECT_VAR_USERS'` 주석(1065 "600개 결과 상한과 무관"), `test/figma.test.mjs` "countUsage · findUsers — 600개를 넘어도…"(4052)
+- [x] `test/figma.test.mjs`(`bindSelection` dry-run · `bindSelectedItems`): 후보 1,000곳 → (찾음 1000) · `candidates` 1000개 · `candidateTotal` 없음, `bindSelectedItems` 1,000개 → 연결 1000 · 건너뜀 0 · `PROGRESS` 300 · 600 · 900 · 1000, 묶음 경계(300 · 600 · 900)를 넘는 같은 레이어의 칠하기 두 자리(index 0 · 1)가 둘 다 연결, 묶음 2에서 값이 바뀐 자리만 `changed`, 배열 쓰기 실패 → `bound`에 안 셈 · `error`
+- [x] `groupByVariable` · `carryChecks`를 고치면 `test/pure.test.mjs` 단위 테스트도 고친다(이번 결정으로는 고칠 일이 없다 — 메시지 모양 그대로)
+- [x] `verify-bind-flow`: 찾기 응답 fixture에 한 변수 201줄(각 1곳) 카드 추가 → 펼치면 200줄 + "외 1곳", 누르면 `SELECT_NODES` ids 1개(201번째 줄의 레이어). 연결: 지금 8번 검사("연결 중…")에 `PROGRESS{op: 'link', done: 300, total: 618}` 주입 → "연결 중… 300 / 618", 연결 중 캔버스 선택 변경(`selfSelect: false`) 주입 → 진행 줄 남음 · 뒤이은 `APPLY_RESULT`로 결과 카드, 연결 중 [🔍 다시 찾기] → `aria-disabled` · 요청 안 보냄 · `bind.waitLink`, 연결 중 `ERROR{op: 'APPLY_SELECTED'}` 주입 → 진행 줄 닫힘 · 잠금 풀림, 다른 쓰기 작업 중 [🔗 연결] → `bind.waitOp`
 - [ ] 실기 확인(사용자, 피그마): QA #4 파일 복제본 (찾음 618) → 연결 618, 푸터 글자 6개 연결, 진행 줄 "연결 중…" → "연결 중… 300 / 618" → "600 / 618" → "618 / 618", ⌘Z 한 번에 전부 풀림
+- 구현 중 더한 것(명세 범위 안): `OP_STATUS`에 `APPLY_SELECTED: 'applyStatus'`(연결 오류가 숨은 색 카드로 가던 것), 오류 상자 [다시 시도]가 연결이면 `startLink`로(플래그 · 진행 줄), 연결 중에는 쓰기 작업 [다시 시도]도 `bind.waitLink`. 단계 표 "연결 중 — 끝 · 끝 · 지금(돌아가는 표시)"을 코드에 맞춤(전에는 "찾은 뒤"로 보였다). 텍스트 스타일 절의 잠금 사유 자리를 "공통 상태 줄"로 고침(지금 코드 · 위 목록과 같게).
