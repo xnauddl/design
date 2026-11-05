@@ -1051,7 +1051,7 @@
      | `component.placeCloned` | " · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}" |
      | `component.propFailed` | " · 속성 값을 못 넣은 {n}개: {names}" |
      | `component.fillKept` | " · 채움·크기가 달라 건너뛴 {n}개: {names}" |
-     | `component.placeFailedMore` | " 외" (네 꼬리가 함께 씀) |
+     | `component.placeFailedMore` | " 외" (꼬리들이 함께 씀) |
 
 6. **[등록] 결과 줄의 수.** "컴포넌트 {registered} · 베리언트 세트 {sets}" 뒤에 " · 건너뜀 {m}"(§2.9 — "스킵"이라 쓰지 않는다) · 단일 · 기존 컴포넌트 재사용(§4.7 "재사용") · 속성 · 아이콘 · 5번 꼬리 순이다.
    - 건너뜀 m = 컴포넌트로 만들지 못한 대상 수(사라진 레이어 · 대상이 아닌 레이어 · 컴포넌트화 실패).
