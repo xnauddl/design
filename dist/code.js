@@ -112,6 +112,12 @@
     "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
     "component.placeFailedMore": " \uC678",
+    "settings.componentsBeta": "\uCEF4\uD3EC\uB10C\uD2B8(\uBCA0\uD0C0) \uBCF4\uC774\uAE30",
+    "settings.componentsBetaTip": "\uB808\uC774\uC5B4 \u203A \uCEF4\uD3EC\uB10C\uD2B8 \uD558\uC704 \uD0ED\uC744 \uBCF4\uC5EC \uC918\uC694 \xB7 \uC544\uC9C1 \uB2E4\uB4EC\uB294 \uC911\uC778 \uAE30\uB2A5\uC774\uC5D0\uC694",
+    "common.beta": "\uBCA0\uD0C0",
+    "settings.componentsBetaOn": "\uB808\uC774\uC5B4 \u203A \uCEF4\uD3EC\uB10C\uD2B8(\uBCA0\uD0C0)\uB97C \uCF30\uC5B4\uC694",
+    "settings.componentsBetaOff": "\uB808\uC774\uC5B4 \u203A \uCEF4\uD3EC\uB10C\uD2B8(\uBCA0\uD0C0)\uB97C \uC228\uACBC\uC5B4\uC694",
+    "layer.componentsBetaAria": "\uCEF4\uD3EC\uB10C\uD2B8 (\uBCA0\uD0C0)",
     "component.propFailed": " \xB7 \uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC740 {n}\uAC1C: {names}",
     "component.fillKept": " \xB7 \uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uAC74\uB108\uB6F4 {n}\uAC1C: {names}",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
@@ -515,7 +521,6 @@
     // 온보딩 / 가이드
     // 첫 실행 배너(온보딩 흡수)
     // 진행(파이프라인 카드)
-    "pipeline.indep": "\uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD544\uC694\uD560 \uB54C \uB808\uC774\uC5B4 \u203A \uCEF4\uD3EC\uB10C\uD2B8\uC5D0\uC11C",
     // 브랜드 팔레트
     "color.title": "\uC0C9",
     "color.scope": "\uBCC0\uC218\uD654",
@@ -6354,7 +6359,7 @@
   var DEV_TIER_KEY = "dsl.devTier";
   var CACHE_KEY = "dsl.licenseCache";
   var SETTINGS_KEY = "dsl.settings";
-  var SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8 };
+  var SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8, componentsBeta: false };
   var devTier = "free";
   var cache = null;
   var bindCancel = false;
@@ -7911,17 +7916,19 @@
               s = {
                 base: typeof o.base === "number" && isFinite(o.base) && o.base > 0 ? o.base : SETTINGS_DEFAULT.base,
                 maxDepth: typeof o.maxDepth === "number" && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth,
-                grid: typeof o.grid === "number" && isFinite(o.grid) && o.grid >= 1 ? Math.round(o.grid) : SETTINGS_DEFAULT.grid
+                grid: typeof o.grid === "number" && isFinite(o.grid) && o.grid >= 1 ? Math.round(o.grid) : SETTINGS_DEFAULT.grid,
+                componentsBeta: o.componentsBeta === true
+                // 이전 저장값엔 없다 → 끔
               };
             }
           } catch (e) {
           }
-          post({ type: "SETTINGS", base: s.base, maxDepth: s.maxDepth, grid: s.grid });
+          post({ type: "SETTINGS", base: s.base, maxDepth: s.maxDepth, grid: s.grid, componentsBeta: s.componentsBeta });
           break;
         }
         case "SET_SETTINGS": {
           try {
-            await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, grid: msg.grid });
+            await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, grid: msg.grid, componentsBeta: msg.componentsBeta === true });
           } catch (e) {
           }
           break;

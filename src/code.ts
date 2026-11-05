@@ -49,7 +49,7 @@ const CACHE_KEY = 'dsl.licenseCache';
 const SETTINGS_KEY = 'dsl.settings';
 // grid=만들기가 값을 맞추는 간격. 허용오차는 없앴다(IA v3 §4.8, 2026-11-03) — 연결은 언제나
 // "같은 값"만 찾는다. 예전 버전이 저장한 `tolerance` 필드는 읽지도 쓰지도 않는다.
-const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8 };
+const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8, componentsBeta: false }; // componentsBeta: 레이어 › 컴포넌트(베타) 보이기(§4.7)
 
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
@@ -1869,17 +1869,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               base: typeof o.base === 'number' && isFinite(o.base) && o.base > 0 ? o.base : SETTINGS_DEFAULT.base,
               maxDepth: typeof o.maxDepth === 'number' && isFinite(o.maxDepth) && o.maxDepth >= 1 ? Math.round(o.maxDepth) : SETTINGS_DEFAULT.maxDepth,
               grid: typeof o.grid === 'number' && isFinite(o.grid) && o.grid >= 1 ? Math.round(o.grid) : SETTINGS_DEFAULT.grid,
+              componentsBeta: o.componentsBeta === true, // 이전 저장값엔 없다 → 끔
             };
           }
         } catch {
           /* 저장소 접근 실패 → 기본값 */
         }
-        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth, grid: s.grid });
+        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth, grid: s.grid, componentsBeta: s.componentsBeta });
         break;
       }
       case 'SET_SETTINGS': {
         try {
-          await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, grid: msg.grid });
+          await figma.clientStorage.setAsync(SETTINGS_KEY, { base: msg.base, maxDepth: msg.maxDepth, grid: msg.grid, componentsBeta: msg.componentsBeta === true });
         } catch {
           /* 보관 실패해도 이번 세션 동작에는 영향 없음 */
         }

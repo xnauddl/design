@@ -17,6 +17,7 @@
        최소화, 잠금 사유, 버튼 줄 고정, 24×24, §8 목록 높이 실측
     12 변수 고치기(PR 3.5): 열 때 포커스, 이름 오류·바뀌는 것 줄, 별칭 고르개(계층·Global·순환·검색), 값 ↔ 별칭,
        저장(고친 것만 + base), 저장 중 잠금, 성공·일부 실패·다른 곳에서 바뀜·삭제됨·이름 거절, ERROR·10초, 버리기 확인, 닫은 뒤 포커스
+    14 컴포넌트(베타): 기본 숨김(하위 탭 둘 · 각주 없음) · 화살표 · 켜기/끄기 상태 줄 · 저장 · 배지 · 접근성 이름 · 끈 뒤 연결로 · 다시 열어도 유지
    사용: npm run verify:bind  (Chromium 경로가 다르면 CHROMIUM_PATH로 지정)
    ============================================================ */
 import { chromium } from 'playwright';
@@ -498,6 +499,7 @@ const reenter = (p) => p.evaluate(() => {
   check('10 선택 없음 — 연결 화면 빈 상태 "캔버스에서 레이어를 선택하세요"', (await emptyText(p)) === '캔버스에서 레이어를 선택하세요');
   await p.click('#applyRail [data-apply-step="rename"]');
   check('10 선택 없음 — 이름 목록 자리', (await p.textContent('#diff')).includes('선택이 없어요 — 캔버스에서 레이어를 선택하세요'));
+  await recv(p, { type: 'SETTINGS', base: 16, maxDepth: 8, grid: 8, componentsBeta: true }); // 컴포넌트는 베타 — 켜야 보인다(§4.7)
   await p.click('#applyRail [data-apply-step="structure"]');
   check('10 선택 없음 — 컴포넌트 목록 자리', (await p.textContent('#compTree')).includes('선택이 없어요 — 캔버스에서 레이어를 선택하세요'));
   await p.click('#applyRail [data-apply-step="bind"]');
@@ -652,7 +654,9 @@ const reenter = (p) => p.evaluate(() => {
 {
   // 하위 탭(밑줄) · "다음 →" 없음
   const p = await open();
-  check('11 하위 탭 3개(밑줄)', JSON.stringify(await p.$$eval('#applyRail .subtab', (e) => e.map((x) => x.textContent))) === JSON.stringify(['연결', '이름', '컴포넌트']));
+  check('11 하위 탭 2개(밑줄) — 컴포넌트는 베타라 기본 숨김', JSON.stringify(await p.$$eval('#applyRail .subtab:not([hidden])', (e) => e.map((x) => x.textContent))) === JSON.stringify(['연결', '이름']));
+  await recv(p, { type: 'SETTINGS', base: 16, maxDepth: 8, grid: 8, componentsBeta: true });
+  check('11 베타 켜면 하위 탭 3개 — 컴포넌트 [베타]', JSON.stringify(await p.$$eval('#applyRail .subtab:not([hidden])', (e) => e.map((x) => x.textContent))) === JSON.stringify(['연결', '이름', '컴포넌트베타']));
   check('11 연결·이름 카드에 "다음 →" 없음', (await p.$$('#tab-layer .btn-next')).length === 0);
   await p.focus('#applyRail [data-apply-step="bind"]');
   await p.keyboard.press('ArrowRight');
@@ -967,6 +971,7 @@ async function saveAndGet(p) {
 /* ---------- 13 컴포넌트 결과 줄 꼬리 (§4.7 "인스턴스 자리" 5·6번, QA #3 검토 2회차) ---------- */
 {
   const p = await open(400, 'layer');
+  await recv(p, { type: 'SETTINGS', base: 16, maxDepth: 8, grid: 8, componentsBeta: true });
   await p.evaluate(() => document.querySelector('[data-apply-step="structure"]')?.click());
   const st = () => p.$eval('#structureStatus', (e) => ({ text: e.textContent, cls: e.className }));
   await recv(p, {
@@ -1000,6 +1005,46 @@ async function saveAndGet(p) {
 }
 
 check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.join(' / '));
+
+/* ---------- 14 컴포넌트(베타) — 기본 숨김 · 켜기 · 배지 · 키보드 · [보기] 대체 (§4.7 "베타", QA #3 불합격 4) ---------- */
+{
+  const p = await open(400, 'layer');
+  const tabs = () => p.$$eval('#applyRail .subtab', (e) => e.filter((x) => !x.hidden && x.offsetParent !== null).map((x) => x.dataset.applyStep));
+  check('14 기본(끔) — 하위 탭 연결 · 이름 둘', JSON.stringify(await tabs()) === JSON.stringify(['bind', 'rename']), JSON.stringify(await tabs()));
+  check('14 준비 현황 각주 없음', (await p.$('#readinessPop .pop-note')) === null);
+  // 키보드: 이름에서 → 는 연결로 돈다(숨은 컴포넌트로 가지 않음)
+  await p.click('#applyRail [data-apply-step="rename"]');
+  await p.keyboard.press('ArrowRight');
+  check('14 끔 — 화살표는 보이는 두 탭만', (await p.evaluate(() => document.activeElement?.dataset.applyStep)) === 'bind');
+  await p.keyboard.press('End');
+  check('14 끔 — End는 이름', (await p.evaluate(() => document.activeElement?.dataset.applyStep)) === 'rename');
+  // 설정에서 켜기
+  await p.click('#tabbtn-settings');
+  check('14 설정 체크박스 처음엔 끔', !(await p.$eval('#componentsBeta', (e) => e.checked)));
+  await p.click('#componentsBeta');
+  check('14 켬 — 상태 줄 "켰어요"', (await p.textContent('#statusText')) === '레이어 › 컴포넌트(베타)를 켰어요');
+  check('14 켬 — 화면은 그대로(설정 탭)', (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-settings');
+  await p.waitForTimeout(450);
+  const saved = (await sent(p, 'SET_SETTINGS')).at(-1);
+  check('14 켬 — 저장(SET_SETTINGS componentsBeta true)', saved?.componentsBeta === true, JSON.stringify(saved));
+  await p.click('#tabbtn-layer');
+  check('14 켬 — 하위 탭 셋', JSON.stringify(await tabs()) === JSON.stringify(['bind', 'rename', 'structure']));
+  check('14 배지 — 하위 탭 · 카드 제목, aria-hidden', (await p.$$eval('#subtabComponents .beta-badge[aria-hidden="true"], #structureCard .beta-badge[aria-hidden="true"], [data-apply-step="structure"] h2 .beta-badge[aria-hidden="true"]', (e) => e.length)) >= 2);
+  check('14 하위 탭 접근성 이름 "컴포넌트 (베타)"', (await p.$eval('#subtabComponents', (e) => e.getAttribute('aria-label'))) === '컴포넌트 (베타)');
+  await p.click('#applyRail [data-apply-step="structure"]');
+  // 컴포넌트 화면에서 끄면 → 레이어는 연결로
+  await p.click('#tabbtn-settings');
+  await p.click('#componentsBeta');
+  check('14 끔 — 상태 줄 "숨겼어요"', (await p.textContent('#statusText')) === '레이어 › 컴포넌트(베타)를 숨겼어요');
+  await p.click('#tabbtn-layer');
+  check('14 끈 뒤 레이어 탭은 연결로', (await p.$eval('#applyRail [aria-selected="true"]', (e) => e.dataset.applyStep)) === 'bind' && JSON.stringify(await tabs()) === JSON.stringify(['bind', 'rename']));
+  await p.close();
+  // 다시 열어도 유지: 저장된 값이 SETTINGS로 오면 켬
+  const q = await open(400, 'layer');
+  await recv(q, { type: 'SETTINGS', base: 16, maxDepth: 8, grid: 8, componentsBeta: true });
+  check('14 다시 열어도 유지(SETTINGS → 켬)', (await q.$eval('#componentsBeta', (e) => e.checked)) && !(await q.$eval('#subtabComponents', (e) => e.hidden)));
+  await q.close();
+}
 
 await browser.close();
 if (fails.length) {

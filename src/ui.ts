@@ -792,6 +792,7 @@ function saveSettings(): void {
       base: Number(($('base') as HTMLInputElement).value) || 16,
       maxDepth: readMaxDepth(),
       grid: tidyGrid(),
+      componentsBeta,
     });
   }, 350);
 }
@@ -2369,6 +2370,7 @@ window.onmessage = (event: MessageEvent) => {
       ($('base') as HTMLInputElement).value = String(msg.base);
       ($('depth') as HTMLInputElement).value = String(msg.maxDepth);
       ($('grid') as HTMLInputElement).value = String(msg.grid);
+      setComponentsBeta(msg.componentsBeta === true, false);
       break;
     }
     case 'VARIABLES': {
@@ -3708,7 +3710,12 @@ $('btnExpand').addEventListener('click', () => setMini(false));
    사용자가 일으킨 작업 요청을 보내고 결과가 올 때까지. 조용한 다시 읽기는 대상이 아니다. */
 type OpGo = () => void;
 interface OpDef { results: CodeToUi['type'][]; label: string; go: OpGo; write: boolean }
-const goLayer = (step: ApplyStep): OpGo => () => { showTab('layer'); showApplyStep(step); };
+const goLayer = (step: ApplyStep): OpGo => () => {
+  // 컴포넌트(베타)를 그 사이 껐으면 숨은 카드 대신 설정의 체크박스로(§4.7 "베타" · §4.9)
+  if (step === 'structure' && !componentsBeta) { showTab('settings'); const cb = $('componentsBeta'); cb.scrollIntoView({ block: 'center' }); cb.focus(); return; }
+  showTab('layer');
+  showApplyStep(step);
+};
 const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   EXTRACT: { results: ['EXTRACT_RESULT'], label: 'op.extract', go: () => showMake('color'), write: false },
   CREATE_TOKENS: { results: ['CREATE_RESULT'], label: 'op.create', go: () => showMake('token'), write: true },
@@ -4107,14 +4114,31 @@ const showApplyStep = (s: ApplyStep): void => showStep('apply', s);
 for (const b of Array.from(document.querySelectorAll<HTMLElement>('#makeRail .step-chip'))) {
   b.addEventListener('click', () => showMakeStep(b.dataset.makeStep as MakeStep));
 }
+/* 컴포넌트(베타) — 기본 끔. 켜야 레이어 › 컴포넌트 하위 탭이 보인다(§4.7 "베타"). */
+let componentsBeta = false;
+/** 화살표·Home·End가 도는 하위 탭 — 보이는 것만(끔이면 연결 · 이름). */
+const visibleApplySteps = (): ApplyStep[] => APPLY_STEPS.filter((s) => s !== 'structure' || componentsBeta);
+function setComponentsBeta(on: boolean, announce: boolean): void {
+  componentsBeta = on;
+  ($('componentsBeta') as HTMLInputElement).checked = on;
+  $('subtabComponents').hidden = !on;
+  // 기억해 둔 하위 화면이 컴포넌트면 연결로(켠 순간에는 화면을 옮기지 않는다)
+  if (!on && currentApplyStep === 'structure') showApplyStep('bind');
+  if (announce) showStatusLine(t(on ? 'settings.componentsBetaOn' : 'settings.componentsBetaOff'));
+}
+($('componentsBeta') as HTMLInputElement).addEventListener('change', (e) => {
+  setComponentsBeta((e.target as HTMLInputElement).checked, true);
+  saveSettings();
+});
 for (const b of Array.from(document.querySelectorAll<HTMLElement>('#applyRail .subtab'))) {
   b.addEventListener('click', () => showApplyStep(b.dataset.applyStep as ApplyStep));
   b.addEventListener('keydown', (e) => {
-    const ni = nextTabIndex(e.key, APPLY_STEPS.indexOf(b.dataset.applyStep as ApplyStep), APPLY_STEPS.length);
+    const steps = visibleApplySteps();
+    const ni = nextTabIndex(e.key, steps.indexOf(b.dataset.applyStep as ApplyStep), steps.length);
     if (ni < 0) return;
     e.preventDefault();
-    showApplyStep(APPLY_STEPS[ni]);
-    document.querySelector<HTMLElement>(`#applyRail [data-apply-step="${APPLY_STEPS[ni]}"]`)?.focus();
+    showApplyStep(steps[ni]);
+    document.querySelector<HTMLElement>(`#applyRail [data-apply-step="${steps[ni]}"]`)?.focus();
   });
 }
 showMakeStep('color');
