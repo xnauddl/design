@@ -3997,7 +3997,7 @@
   });
   var basePreviewTimer = 0;
   var settingsSaveTimer = 0;
-  function saveSettings() {
+  function saveSettings(now = false) {
     clearTimeout(settingsSaveTimer);
     settingsSaveTimer = window.setTimeout(() => {
       send({
@@ -4007,11 +4007,11 @@
         grid: tidyGrid(),
         componentsBeta
       });
-    }, 350);
+    }, now ? 0 : 350);
   }
-  $("base").addEventListener("input", saveSettings);
-  $("depth").addEventListener("input", saveSettings);
-  $("grid").addEventListener("input", saveSettings);
+  $("base").addEventListener("input", () => saveSettings());
+  $("depth").addEventListener("input", () => saveSettings());
+  $("grid").addEventListener("input", () => saveSettings());
   $("base").addEventListener("input", () => {
     const applyBtn = $("btnCreateApply");
     if (applyBtn.style.display === "none") return;
@@ -6203,6 +6203,12 @@
   function showPaidReason() {
     showStatusLine(t("status.paid"), { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
   }
+  function goToBetaSetting() {
+    showTab("settings");
+    $("pluginSettingsCard").classList.remove("collapsed");
+    $("componentsBeta").focus({ preventScroll: true });
+    requestAnimationFrame(() => $("componentsBeta").scrollIntoView({ block: "center" }));
+  }
   function goToLicense() {
     showTab("settings");
     $("licenseKey").focus({ preventScroll: true });
@@ -6314,10 +6320,7 @@
   $("btnExpand").addEventListener("click", () => setMini(false));
   var goLayer = (step) => () => {
     if (step === "structure" && !componentsBeta) {
-      showTab("settings");
-      const cb = $("componentsBeta");
-      cb.scrollIntoView({ block: "center" });
-      cb.focus();
+      goToBetaSetting();
       return;
     }
     showTab("layer");
@@ -6685,7 +6688,7 @@
   }
   $("componentsBeta").addEventListener("change", (e) => {
     setComponentsBeta(e.target.checked, true);
-    saveSettings();
+    saveSettings(true);
   });
   for (const b of Array.from(document.querySelectorAll("#applyRail .subtab"))) {
     b.addEventListener("click", () => showApplyStep(b.dataset.applyStep));

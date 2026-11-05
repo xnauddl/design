@@ -784,7 +784,8 @@ let basePreviewTimer = 0;
 /* #19: 설정은 설정 탭에만 있고, 바뀌면 곧바로 파일에 기억한다(저장 버튼 없음).
    타이핑 중 매 키마다 보내지 않도록 한 박자 늦춘다. */
 let settingsSaveTimer = 0;
-function saveSettings(): void {
+/** now: 체크박스처럼 한 번 누르면 끝나는 조작은 바로 저장한다(닫기 전에 놓치지 않게). */
+function saveSettings(now = false): void {
   clearTimeout(settingsSaveTimer);
   settingsSaveTimer = window.setTimeout(() => {
     send({
@@ -794,12 +795,12 @@ function saveSettings(): void {
       grid: tidyGrid(),
       componentsBeta,
     });
-  }, 350);
+  }, now ? 0 : 350);
 }
 
-($('base') as HTMLInputElement).addEventListener('input', saveSettings);
-($('depth') as HTMLInputElement).addEventListener('input', saveSettings);
-($('grid') as HTMLInputElement).addEventListener('input', saveSettings);
+($('base') as HTMLInputElement).addEventListener('input', () => saveSettings());
+($('depth') as HTMLInputElement).addEventListener('input', () => saveSettings());
+($('grid') as HTMLInputElement).addEventListener('input', () => saveSettings());
 
 ($('base') as HTMLInputElement).addEventListener('input', () => {
   const applyBtn = $('btnCreateApply') as HTMLButtonElement;
@@ -3591,6 +3592,14 @@ document.addEventListener('keydown', dismissStickyOnAction, true);
 function showPaidReason(): void {
   showStatusLine(t('status.paid'), { cls: 'warn', action: { label: t('status.paidAction'), run: goToLicense } });
 }
+/** 설정 › 기본값의 "컴포넌트(베타) 보이기"로(§4.7 "베타" · §4.9). 카드가 접혀 있으면 펼친다. 순서는 goToLicense와 같다. */
+function goToBetaSetting(): void {
+  showTab('settings');
+  $('pluginSettingsCard').classList.remove('collapsed');
+  ($('componentsBeta') as HTMLInputElement).focus({ preventScroll: true });
+  requestAnimationFrame(() => $('componentsBeta').scrollIntoView({ block: 'center' }));
+}
+
 function goToLicense(): void {
   showTab('settings');
   // 포커스는 바로 준다 — 누른 [라이선스 →]가 상태 줄과 함께 사라져 포커스가 body로 떨어진 채
@@ -3712,7 +3721,7 @@ type OpGo = () => void;
 interface OpDef { results: CodeToUi['type'][]; label: string; go: OpGo; write: boolean }
 const goLayer = (step: ApplyStep): OpGo => () => {
   // 컴포넌트(베타)를 그 사이 껐으면 숨은 카드 대신 설정의 체크박스로(§4.7 "베타" · §4.9)
-  if (step === 'structure' && !componentsBeta) { showTab('settings'); const cb = $('componentsBeta'); cb.scrollIntoView({ block: 'center' }); cb.focus(); return; }
+  if (step === 'structure' && !componentsBeta) { goToBetaSetting(); return; }
   showTab('layer');
   showApplyStep(step);
 };
@@ -4128,7 +4137,7 @@ function setComponentsBeta(on: boolean, announce: boolean): void {
 }
 ($('componentsBeta') as HTMLInputElement).addEventListener('change', (e) => {
   setComponentsBeta((e.target as HTMLInputElement).checked, true);
-  saveSettings();
+  saveSettings(true);
 });
 for (const b of Array.from(document.querySelectorAll<HTMLElement>('#applyRail .subtab'))) {
   b.addEventListener('click', () => showApplyStep(b.dataset.applyStep as ApplyStep));

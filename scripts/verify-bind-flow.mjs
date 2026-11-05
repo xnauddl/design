@@ -1014,6 +1014,9 @@ check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.
   check('14 준비 현황 각주 없음', (await p.$('#readinessPop .pop-note')) === null);
   // 키보드: 이름에서 → 는 연결로 돈다(숨은 컴포넌트로 가지 않음)
   await p.click('#applyRail [data-apply-step="rename"]');
+  await p.keyboard.press('Home');
+  check('14 끔 — Home은 연결', (await p.evaluate(() => document.activeElement?.dataset.applyStep)) === 'bind');
+  await p.click('#applyRail [data-apply-step="rename"]');
   await p.keyboard.press('ArrowRight');
   check('14 끔 — 화살표는 보이는 두 탭만', (await p.evaluate(() => document.activeElement?.dataset.applyStep)) === 'bind');
   await p.keyboard.press('End');
@@ -1024,9 +1027,9 @@ check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.
   await p.click('#componentsBeta');
   check('14 켬 — 상태 줄 "켰어요"', (await p.textContent('#statusText')) === '레이어 › 컴포넌트(베타)를 켰어요');
   check('14 켬 — 화면은 그대로(설정 탭)', (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-settings');
-  await p.waitForTimeout(450);
+  await p.waitForTimeout(50);
   const saved = (await sent(p, 'SET_SETTINGS')).at(-1);
-  check('14 켬 — 저장(SET_SETTINGS componentsBeta true)', saved?.componentsBeta === true, JSON.stringify(saved));
+  check('14 켬 — 바로 저장(SET_SETTINGS componentsBeta true, 350ms 기다리지 않음)', saved?.componentsBeta === true, JSON.stringify(saved));
   await p.click('#tabbtn-layer');
   check('14 켬 — 하위 탭 셋', JSON.stringify(await tabs()) === JSON.stringify(['bind', 'rename', 'structure']));
   check('14 배지 — 하위 탭 · 카드 제목, aria-hidden', (await p.$$eval('#subtabComponents .beta-badge[aria-hidden="true"], #structureCard .beta-badge[aria-hidden="true"], [data-apply-step="structure"] h2 .beta-badge[aria-hidden="true"]', (e) => e.length)) >= 2);
@@ -1039,6 +1042,27 @@ check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.
   await p.click('#tabbtn-layer');
   check('14 끈 뒤 레이어 탭은 연결로', (await p.$eval('#applyRail [aria-selected="true"]', (e) => e.dataset.applyStep)) === 'bind' && JSON.stringify(await tabs()) === JSON.stringify(['bind', 'rename']));
   await p.close();
+  // [보기] 대체(§4.9): 최소화 중 컴포넌트 작업 실패 → 그 사이 끔 → 펼침 → [보기] → 접힌 기본값 카드를 펼치고 체크박스에 포커스
+  const v = await open(400, 'layer');
+  await recv(v, PREREQ);
+  await recv(v, { type: 'SETTINGS', base: 16, maxDepth: 8, grid: 8, componentsBeta: true });
+  await v.click('#tabbtn-settings');
+  await v.click('#pluginSettingsCard .step-head');
+  const folded = await v.$eval('#pluginSettingsCard', (e) => e.classList.contains('collapsed'));
+  await v.click('#tabbtn-layer');
+  await recv(v, sel(1, 0));
+  await v.click('#applyRail [data-apply-step="structure"]');
+  await v.click('#btnScanSimilar'); // 컴포넌트 작업 시작(닮은 스캔 — 무료)
+  await v.click('#btnMinimize');
+  await recv(v, { type: 'ERROR', message: '테스트 실패', op: 'SCAN_SIMILAR' });
+  await recv(v, { type: 'SETTINGS', base: 16, maxDepth: 8, grid: 8, componentsBeta: false });
+  await v.click('#btnExpand');
+  await v.click('#statusAction');
+  await v.waitForTimeout(100);
+  check('14 [보기] — 끈 뒤엔 설정 체크박스(접힌 카드 펼침 · 포커스)', folded && (await v.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-settings'
+    && !(await v.$eval('#pluginSettingsCard', (e) => e.classList.contains('collapsed'))) && (await v.evaluate(() => document.activeElement?.id)) === 'componentsBeta');
+  check('14 [보기] — 숨은 컴포넌트 카드는 드러나지 않음', !(await v.$eval('#subtabComponents', (e) => !e.hidden)));
+  await v.close();
   // 다시 열어도 유지: 저장된 값이 SETTINGS로 오면 켬
   const q = await open(400, 'layer');
   await recv(q, { type: 'SETTINGS', base: 16, maxDepth: 8, grid: 8, componentsBeta: true });
