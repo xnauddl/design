@@ -1744,10 +1744,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         for (const c of containers) keepRoots.push({ node: c.container, name: c.container.name });
         const mainOf = (n: InstanceNode) => n.getMainComponentAsync();
         const keepSnaps: OverrideSnap[] = [];
+        const seen = new Set<string>();
         for (let k = 0; k < keepRoots.length; k++) {
           const { node } = keepRoots[k];
           if (node.removed) continue;
-          try { keepSnaps.push(...(await snapshotOverrides(node, k, mainOf))); } catch { /* 읽기 실패 — 지킬 것이 없다 */ }
+          // 같은 인스턴스가 두 뿌리에 걸리면(자리 인스턴스가 다른 컴포넌트 안에 든 경우) 먼저 들어온 자리만 남긴다 — 한 번만 센다.
+          try { for (const sn of await snapshotOverrides(node, k, mainOf)) if (!seen.has(sn.instId)) { seen.add(sn.instId); keepSnaps.push(sn); } } catch { /* 읽기 실패 — 지킬 것이 없다 */ }
         }
 
         // 속성 자동 노출 — 등록한 각 컴포넌트/세트의 직속 레이어를 Text/Instance-swap/Boolean 속성으로.

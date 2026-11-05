@@ -7780,11 +7780,15 @@
           for (const c of containers) keepRoots.push({ node: c.container, name: c.container.name });
           const mainOf = (n) => n.getMainComponentAsync();
           const keepSnaps = [];
+          const seen = /* @__PURE__ */ new Set();
           for (let k = 0; k < keepRoots.length; k++) {
             const { node } = keepRoots[k];
             if (node.removed) continue;
             try {
-              keepSnaps.push(...await snapshotOverrides(node, k, mainOf));
+              for (const sn of await snapshotOverrides(node, k, mainOf)) if (!seen.has(sn.instId)) {
+                seen.add(sn.instId);
+                keepSnaps.push(sn);
+              }
             } catch (e) {
             }
           }
