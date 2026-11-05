@@ -294,3 +294,67 @@ export function transplantImageFills(
   }
   return { applied, failures };
 }
+
+/** 자리를 채운 인스턴스 안 텍스트의 글자 기록(§4.7 9번). */
+export type TextSnap = { node: TextNode; chars: string };
+
+/** 인스턴스 안 텍스트 레이어마다 지금 글자를 적는다 — 속성 노출 **전에** 부른다(§4.7 9번). */
+export function snapshotTexts(inst: SceneNode): TextSnap[] {
+  if (!('findAll' in inst)) return [];
+  const out: TextSnap[] = [];
+  for (const n of (inst as InstanceNode).findAll((x) => x.type === 'TEXT')) {
+    const node = n as TextNode;
+    try { out.push({ node, chars: node.characters }); } catch { /* 읽기 실패 — 지킬 것이 없다 */ }
+  }
+  return out;
+}
+
+/** 속성 키("이름#id")에서 화면에 보일 속성 이름. */
+const propNameOf = (key: string): string => key.replace(/#[^#]*$/, '') || key;
+
+/**
+ * 속성 노출 뒤 글자가 기본값으로 바뀐 텍스트를 기록한 글자로 되돌린다(§4.7 9번).
+ * 묶인 텍스트는 그 속성에 값을 넣고(한 번에 → 속성마다), 안 묶인 텍스트는 글자를 직접 넣는다.
+ * 넣기 전에 그 텍스트의 글꼴을 모두 불러온다. 못 넣은 속성(또는 레이어) 이름 목록을 돌려준다.
+ */
+export async function restoreTexts(
+  inst: InstanceNode,
+  snaps: readonly TextSnap[],
+  loadFont: (f: FontName) => Promise<void>,
+): Promise<string[]> {
+  if (inst.removed) return [];
+  const failed: string[] = [];
+  const payload: { [key: string]: string } = {};
+  const direct: TextSnap[] = [];
+  const loadAll = async (node: TextNode): Promise<void> => {
+    const len = node.characters.length;
+    const fonts = len ? node.getRangeAllFontNames(0, len) : (typeof node.fontName === 'symbol' ? [] : [node.fontName as FontName]);
+    for (const f of fonts) await loadFont(f);
+  };
+  for (const s of snaps) {
+    const { node } = s;
+    try {
+      if (node.removed || node.characters === s.chars) continue;
+      await loadAll(node);
+      const key = node.componentPropertyReferences?.characters;
+      if (key) payload[key] = s.chars;
+      else direct.push(s);
+    } catch {
+      failed.push(node.name);
+    }
+  }
+  const keys = Object.keys(payload);
+  if (keys.length) {
+    let ok = false;
+    try { inst.setProperties(payload); ok = true; } catch { /* 하나가 거절되면 전체가 거절된다 — 속성마다 */ }
+    if (!ok) {
+      for (const k of keys) {
+        try { inst.setProperties({ [k]: payload[k] }); } catch { failed.push(propNameOf(k)); }
+      }
+    }
+  }
+  for (const s of direct) {
+    try { s.node.characters = s.chars; } catch { failed.push(s.node.name); }
+  }
+  return failed;
+}

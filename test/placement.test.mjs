@@ -7,7 +7,7 @@
    실제 피그마가 아니라 목이다 — 실기 확인은 부록 A.5의 마지막 항목. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill, replaceMember, shapePrefix, memberFitIssue, transplantImageFills, joinPath } from '../dist/figma-lib.mjs';
+import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill, replaceMember, shapePrefix, memberFitIssue, transplantImageFills, joinPath, snapshotTexts, restoreTexts } from '../dist/figma-lib.mjs';
 
 let seq = 0;
 const SELF_DELETING = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -684,4 +684,72 @@ test('불합격 6 — 프레임 안 사진(카드): 경로 앞붙이 없음, 같
   assert.equal(r.result, 'replaced');
   assert.equal(box.children[1].children[0].fills[0].imageHash, 'j7vJ');
   assert.equal(memberFitIssue(box.children[1], { width: 200, height: 260, children: [], type: 'FRAME', name: 'x' }, ''), null);
+});
+
+/* ---------- QA #3 실기 ③ 불합격 7 — 글자 지키기 (§4.7 9번) ---------- */
+
+/** 세트 변형의 인스턴스 목: 텍스트가 속성에 묶이면 기본값을 보여 주고, setProperties로 값이 들어간다. */
+function textInstance(texts, defaults, { reject = new Set() } = {}) {
+  const props = {};
+  const nodes = texts.map(([name, chars, key]) => {
+    const node = {
+      type: 'TEXT', name, removed: false, _chars: chars, componentPropertyReferences: key ? { characters: key } : null,
+      fontName: { family: 'Inter', style: 'Medium' },
+      get characters() { return key && key in props ? props[key] : key && key in defaults ? defaults[key] : this._chars; },
+      set characters(v) { this._chars = v; },
+      getRangeAllFontNames() { return [this.fontName]; },
+    };
+    return node;
+  });
+  const inst = {
+    type: 'INSTANCE', removed: false, set: [],
+    findAll(fn) { return nodes.filter(fn); },
+    setProperties(p) {
+      for (const k of Object.keys(p)) if (reject.has(k)) throw new Error('rejected');
+      Object.assign(props, p); this.set.push(p);
+    },
+  };
+  return { inst, nodes, bind: (d) => Object.assign(defaults, d) };
+}
+
+test('글자 지키기 — 배지 01·02·03을 세트로 묶은 뒤 노출이 기본값(01)으로 바꿔도 자리마다 제 글자로 돌아온다', async () => {
+  const loaded = [];
+  const defaults = {};
+  const made = ['01', '02', '03'].map((c) => textInstance([['Label', c, '01#168:3']], defaults));
+  const snaps = made.map(({ inst }) => snapshotTexts(inst)); // 노출 전 기록
+  // 노출: 세트의 텍스트를 한 속성에 묶음 → 모든 변형이 기본값을 보인다
+  defaults['01#168:3'] = '01';
+  assert.deepEqual(made.map(({ nodes }) => nodes[0].characters), ['01', '01', '01'], '노출 뒤 모두 01 (재현)');
+  for (let i = 0; i < made.length; i++) {
+    const bad = await restoreTexts(made[i].inst, snaps[i], async (f) => { loaded.push(f.style); });
+    assert.deepEqual(bad, []);
+  }
+  assert.deepEqual(made.map(({ nodes }) => nodes[0].characters), ['01', '02', '03'], '자리마다 제 글자');
+  assert.equal(made[0].inst.set.length, 0, '이미 같은 글자(대표 변형)는 건드리지 않는다');
+  assert.ok(loaded.length >= 2, '넣기 전에 글꼴을 불러온다');
+});
+
+test('글자 지키기 — 거절된 속성만 이름으로 돌려주고 나머지는 넣는다, 안 묶인 텍스트는 글자 직접', async () => {
+  const defaults = {};
+  const { inst, nodes } = textInstance(
+    [['Title', 'Smart checklist', 'Title#1:1'], ['Body', 'Plan ahead', 'Body#1:2'], ['Free', 'keep', null]],
+    defaults, { reject: new Set(['Body#1:2']) },
+  );
+  const snaps = snapshotTexts(inst);
+  defaults['Title#1:1'] = 'Book & relax';
+  defaults['Body#1:2'] = 'We realize…';
+  nodes[2]._chars = 'changed'; // 안 묶였는데 바뀐 텍스트
+  const bad = await restoreTexts(inst, snaps, async () => {});
+  assert.deepEqual(bad, ['Body'], '속성 이름(키의 #id 뗀 것)');
+  assert.equal(nodes[0].characters, 'Smart checklist');
+  assert.equal(nodes[1].characters, 'We realize…', '거절된 속성은 기본값 그대로');
+  assert.equal(nodes[2].characters, 'keep', '안 묶인 텍스트는 글자 직접');
+});
+
+test('글자 지키기 — 지워진 인스턴스·바뀌지 않은 글자는 건드리지 않는다', async () => {
+  const { inst } = textInstance([['Label', 'A', 'L#1']], { 'L#1': 'A' });
+  const snaps = snapshotTexts(inst);
+  assert.deepEqual(await restoreTexts(inst, snaps, async () => { throw new Error('부르면 안 됨'); }), []);
+  inst.removed = true;
+  assert.deepEqual(await restoreTexts(inst, snaps, async () => {}), []);
 });

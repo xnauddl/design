@@ -17,7 +17,7 @@ import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
-import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember } from './lib/artwork';
+import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, snapshotTexts, restoreTexts, type TextSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
@@ -1455,13 +1455,21 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             else failures.push(t('component.fail.nothingPlaced', { label, name: o.name, causePart }));
           }
         };
+        // 단독 · 세트 자리 인스턴스의 글자 기록 — 맨 끝 속성 노출이 세트 변형의 글자를 기본값으로 바꾸므로
+        // 노출 뒤 되돌린다(§4.7 9번). 속성 접힘은 노출 뒤에 값을 넣으므로 쓰지 않는다.
+        const textSnaps: { inst: InstanceNode; name: string; snaps: TextSnap[] }[] = [];
+        const instanceOf = (comp: ComponentNode, name: string) => (): InstanceNode => {
+          const inst = comp.createInstance();
+          textSnaps.push({ inst, name, snaps: snapshotTexts(inst) });
+          return inst;
+        };
         // 단독 컴포넌트 1개를 페이지 이동 + 원위치 인스턴스 + 속성 노출 대상 등록(단독·결합불가·결합실패 3곳 공용).
         const placeSingle = (comp: ComponentNode, o: Origin, name: string): void => {
           try { comp.name = name; } catch { /* 이름 실패 무시 */ }
           placeOnPage(comp);
           singles.push(comp.name);
           containers.push({ container: comp, scopes: [comp] });
-          restore([{ o, make: () => comp.createInstance(), label: comp.name }]);
+          restore([{ o, make: instanceOf(comp, o.name), label: comp.name }]);
         };
 
         // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
@@ -1720,7 +1728,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             cursorX += set.width + 48;
             sets++;
             containers.push({ container: set, scopes: made.map((x) => x.comp) });
-            restore(made.map((x) => ({ o: x.o, make: () => x.comp.createInstance(), label: x.variant || set.name })));
+            restore(made.map((x) => ({ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.variant || set.name })));
             // ↑ 이 그룹 자리를 즉시 채운다(중첩 보존)
           }
         } finally {
@@ -1732,6 +1740,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         let exposed = exposedEarly;
         for (const c of containers) {
           try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(t('component.fail.exposeAll', { error: errText(e) })); }
+        }
+        // 노출로 기본값이 된 글자를 자리 인스턴스마다 되돌린다(§4.7 9번). 복사본·지운 인스턴스는 지나간다.
+        for (const { inst, name, snaps } of textSnaps) {
+          if (inst.removed || inst.type !== 'INSTANCE') continue;
+          const bad = await restoreTexts(inst, snaps, (f) => figma.loadFontAsync(f));
+          for (const prop of bad) failures.push(t('component.fail.propValue', { name, prop }));
+          if (bad.length) propFailed.push(name); // 자리마다 한 번(같은 이름의 다른 자리는 따로 센다)
         }
 
         post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept });

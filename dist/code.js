@@ -4474,6 +4474,69 @@
     }
     return { applied, failures };
   }
+  function snapshotTexts(inst) {
+    if (!("findAll" in inst)) return [];
+    const out = [];
+    for (const n of inst.findAll((x) => x.type === "TEXT")) {
+      const node = n;
+      try {
+        out.push({ node, chars: node.characters });
+      } catch (e) {
+      }
+    }
+    return out;
+  }
+  var propNameOf = (key) => key.replace(/#[^#]*$/, "") || key;
+  async function restoreTexts(inst, snaps, loadFont) {
+    var _a;
+    if (inst.removed) return [];
+    const failed = [];
+    const payload = {};
+    const direct = [];
+    const loadAll = async (node) => {
+      const len = node.characters.length;
+      const fonts = len ? node.getRangeAllFontNames(0, len) : typeof node.fontName === "symbol" ? [] : [node.fontName];
+      for (const f of fonts) await loadFont(f);
+    };
+    for (const s of snaps) {
+      const { node } = s;
+      try {
+        if (node.removed || node.characters === s.chars) continue;
+        await loadAll(node);
+        const key = (_a = node.componentPropertyReferences) == null ? void 0 : _a.characters;
+        if (key) payload[key] = s.chars;
+        else direct.push(s);
+      } catch (e) {
+        failed.push(node.name);
+      }
+    }
+    const keys = Object.keys(payload);
+    if (keys.length) {
+      let ok = false;
+      try {
+        inst.setProperties(payload);
+        ok = true;
+      } catch (e) {
+      }
+      if (!ok) {
+        for (const k of keys) {
+          try {
+            inst.setProperties({ [k]: payload[k] });
+          } catch (e) {
+            failed.push(propNameOf(k));
+          }
+        }
+      }
+    }
+    for (const s of direct) {
+      try {
+        s.node.characters = s.chars;
+      } catch (e) {
+        failed.push(s.node.name);
+      }
+    }
+    return failed;
+  }
 
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
@@ -7419,6 +7482,12 @@
               else failures.push(t("component.fail.nothingPlaced", { label, name: o.name, causePart }));
             }
           };
+          const textSnaps = [];
+          const instanceOf = (comp, name) => () => {
+            const inst = comp.createInstance();
+            textSnaps.push({ inst, name, snaps: snapshotTexts(inst) });
+            return inst;
+          };
           const placeSingle = (comp, o, name) => {
             try {
               comp.name = name;
@@ -7427,7 +7496,7 @@
             placeOnPage(comp);
             singles.push(comp.name);
             containers.push({ container: comp, scopes: [comp] });
-            restore([{ o, make: () => comp.createInstance(), label: comp.name }]);
+            restore([{ o, make: instanceOf(comp, o.name), label: comp.name }]);
           };
           const existingNames = await existingComponentNames(new Set(valid.map((n) => n.id)));
           const resolved = resolveGroupNames(
@@ -7655,7 +7724,7 @@
               cursorX += set.width + 48;
               sets++;
               containers.push({ container: set, scopes: made.map((x) => x.comp) });
-              restore(made.map((x) => ({ o: x.o, make: () => x.comp.createInstance(), label: x.variant || set.name })));
+              restore(made.map((x) => ({ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.variant || set.name })));
             }
           } finally {
             for (const o of origins) releaseOrigin(o);
@@ -7667,6 +7736,12 @@
             } catch (e) {
               failures.push(t("component.fail.exposeAll", { error: errText(e) }));
             }
+          }
+          for (const { inst, name, snaps } of textSnaps) {
+            if (inst.removed || inst.type !== "INSTANCE") continue;
+            const bad = await restoreTexts(inst, snaps, (f) => figma.loadFontAsync(f));
+            for (const prop of bad) failures.push(t("component.fail.propValue", { name, prop }));
+            if (bad.length) propFailed.push(name);
           }
           post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept });
           if (registered || sets) commitUndo(figma);
