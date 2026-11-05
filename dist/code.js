@@ -4474,6 +4474,115 @@
     }
     return { applied, failures };
   }
+  function ownLayers(root) {
+    const out = [];
+    const walk3 = (n) => {
+      if (!("children" in n)) return;
+      for (const c of n.children) {
+        out.push(c);
+        if (c.type !== "INSTANCE") walk3(c);
+      }
+    };
+    walk3(root);
+    return out;
+  }
+  async function snapshotOverrides(root, place, mainOf) {
+    const out = [];
+    const visit = async (n, depth) => {
+      var _a;
+      if (n.removed) return;
+      if (n.type === "INSTANCE") {
+        const items = [];
+        for (const l of ownLayers(n)) {
+          try {
+            const item = { id: l.id, name: l.name, visible: l.visible };
+            if (l.type === "TEXT") item.text = l.characters;
+            if (l.type === "INSTANCE") item.swap = (_a = await mainOf(l)) == null ? void 0 : _a.id;
+            items.push(item);
+          } catch (e) {
+          }
+        }
+        out.push({ instId: n.id, depth, place, items });
+        depth++;
+      }
+      if ("children" in n) for (const c of n.children) await visit(c, depth);
+    };
+    await visit(root, 0);
+    return out;
+  }
+  var propNameOf = (key) => key.replace(/#[^#]*$/, "") || key;
+  async function restoreOverrides(snaps, getNode, mainOf, loadFont) {
+    var _a, _b;
+    const failedBy = /* @__PURE__ */ new Map();
+    const fail = (place, what) => {
+      var _a2;
+      const list = (_a2 = failedBy.get(place)) != null ? _a2 : [];
+      if (!list.includes(what)) list.push(what);
+      failedBy.set(place, list);
+    };
+    const loadAll = async (node) => {
+      const len = node.characters.length;
+      const fonts = len ? node.getRangeAllFontNames(0, len) : typeof node.fontName === "symbol" ? [] : [node.fontName];
+      for (const f of fonts) await loadFont(f);
+    };
+    const ordered = [...snaps].sort((a, b) => a.depth - b.depth);
+    for (const snap of ordered) {
+      const inst = await getNode(snap.instId);
+      if (!inst || inst.removed || inst.type !== "INSTANCE") continue;
+      const payload = {};
+      const direct = [];
+      for (const it of snap.items) {
+        const node = await getNode(it.id);
+        if (!node || node.removed) continue;
+        const refs = (_a = node.componentPropertyReferences) != null ? _a : {};
+        try {
+          if (refs.visible && node.visible !== it.visible) payload[refs.visible] = it.visible;
+          if (node.type === "INSTANCE" && it.swap && refs.mainComponent) {
+            const cur = (_b = await mainOf(node)) == null ? void 0 : _b.id;
+            if (cur !== it.swap) payload[refs.mainComponent] = it.swap;
+          }
+          if (node.type === "TEXT" && it.text !== void 0 && node.characters !== it.text) {
+            try {
+              await loadAll(node);
+            } catch (e) {
+              fail(snap.place, refs.characters ? propNameOf(refs.characters) : node.name);
+              continue;
+            }
+            if (refs.characters) payload[refs.characters] = it.text;
+            else direct.push({ node, text: it.text });
+          }
+        } catch (e) {
+          fail(snap.place, it.name);
+        }
+      }
+      const keys = Object.keys(payload);
+      if (keys.length) {
+        let ok = false;
+        try {
+          inst.setProperties(payload);
+          ok = true;
+        } catch (e) {
+        }
+        if (!ok) {
+          for (const k of keys) {
+            try {
+              inst.setProperties({ [k]: payload[k] });
+            } catch (e) {
+              fail(snap.place, propNameOf(k));
+            }
+          }
+        }
+      }
+      for (const d of direct) {
+        try {
+          d.node.characters = d.text;
+        } catch (e) {
+          fail(snap.place, d.node.name);
+        }
+      }
+    }
+    return failedBy;
+  }
 
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
@@ -7419,6 +7528,12 @@
               else failures.push(t("component.fail.nothingPlaced", { label, name: o.name, causePart }));
             }
           };
+          const keepRoots = [];
+          const instanceOf = (comp, name) => () => {
+            const inst = comp.createInstance();
+            keepRoots.push({ node: inst, name });
+            return inst;
+          };
           const placeSingle = (comp, o, name) => {
             try {
               comp.name = name;
@@ -7427,7 +7542,7 @@
             placeOnPage(comp);
             singles.push(comp.name);
             containers.push({ container: comp, scopes: [comp] });
-            restore([{ o, make: () => comp.createInstance(), label: comp.name }]);
+            restore([{ o, make: instanceOf(comp, o.name), label: comp.name }]);
           };
           const existingNames = await existingComponentNames(new Set(valid.map((n) => n.id)));
           const resolved = resolveGroupNames(
@@ -7537,6 +7652,7 @@
                   }
                   const prefix = shapePrefix(master, (_f = (_e = structs[preferLive]) == null ? void 0 : _e.type) != null ? _f : "");
                   placeOnPage(master);
+                  keepRoots.push({ node: master, name: master.name });
                   singles.push(master.name);
                   registered++;
                   failures.push(
@@ -7575,6 +7691,7 @@
                       let inst = null;
                       try {
                         inst = master.createInstance();
+                        keepRoots.push({ node: inst, name });
                         const badProps = applyInstancePropValues(inst, ids, vals);
                         const img = transplantImageFills(inst, images).failures;
                         if (!noted) {
@@ -7655,10 +7772,25 @@
               cursorX += set.width + 48;
               sets++;
               containers.push({ container: set, scopes: made.map((x) => x.comp) });
-              restore(made.map((x) => ({ o: x.o, make: () => x.comp.createInstance(), label: x.variant || set.name })));
+              restore(made.map((x) => ({ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.variant || set.name })));
             }
           } finally {
             for (const o of origins) releaseOrigin(o);
+          }
+          for (const c of containers) keepRoots.push({ node: c.container, name: c.container.name });
+          const mainOf = (n) => n.getMainComponentAsync();
+          const keepSnaps = [];
+          const seen = /* @__PURE__ */ new Set();
+          for (let k = 0; k < keepRoots.length; k++) {
+            const { node } = keepRoots[k];
+            if (node.removed) continue;
+            try {
+              for (const sn of await snapshotOverrides(node, k, mainOf)) if (!seen.has(sn.instId)) {
+                seen.add(sn.instId);
+                keepSnaps.push(sn);
+              }
+            } catch (e) {
+            }
           }
           let exposed = exposedEarly;
           for (const c of containers) {
@@ -7667,6 +7799,12 @@
             } catch (e) {
               failures.push(t("component.fail.exposeAll", { error: errText(e) }));
             }
+          }
+          const keepFailed = await restoreOverrides(keepSnaps, (id) => figma.getNodeByIdAsync(id), mainOf, (f) => figma.loadFontAsync(f));
+          for (const [k, props] of keepFailed) {
+            const name = keepRoots[k].name;
+            for (const prop of props) failures.push(t("component.fail.propValue", { name, prop }));
+            propFailed.push(name);
           }
           post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept });
           if (registered || sets) commitUndo(figma);

@@ -20,7 +20,7 @@ export { bindSelection, bindSelectedItems, countUsage, findUsers, boundVariableI
 export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName } from './rename';
 export type { RenameOutcome } from './rename';
-export { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, memberFitIssue, replaceMember } from './artwork';
+export { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, memberFitIssue, replaceMember, snapshotOverrides, restoreOverrides } from './artwork';
 export type { IconRegistry, VectorSlot, MemberResult } from './artwork';
 export { scanSimilar, componentizeSimilar, componentizeResultMessage } from './similarApply';
 export { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, tallyFill } from './placement';

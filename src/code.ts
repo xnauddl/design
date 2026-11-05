@@ -17,7 +17,7 @@ import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
-import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember } from './lib/artwork';
+import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
@@ -1455,13 +1455,22 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             else failures.push(t('component.fail.nothingPlaced', { label, name: o.name, causePart }));
           }
         };
+        // 맨 끝 속성 노출은 세트 변형의 값(글자 · 안쪽 인스턴스 · 보이기)을 기본값으로 바꾼다. 노출 전에 만든
+        // 인스턴스가 따라가지 않게, 이번 [등록]이 만든 자리 인스턴스와 컴포넌트를 모아 두고 노출 직전에
+        // 그 안 모든 인스턴스의 값을 적어, 노출 뒤 되돌린다(§4.7 9번).
+        const keepRoots: { node: SceneNode; name: string }[] = [];
+        const instanceOf = (comp: ComponentNode, name: string) => (): InstanceNode => {
+          const inst = comp.createInstance();
+          keepRoots.push({ node: inst, name });
+          return inst;
+        };
         // 단독 컴포넌트 1개를 페이지 이동 + 원위치 인스턴스 + 속성 노출 대상 등록(단독·결합불가·결합실패 3곳 공용).
         const placeSingle = (comp: ComponentNode, o: Origin, name: string): void => {
           try { comp.name = name; } catch { /* 이름 실패 무시 */ }
           placeOnPage(comp);
           singles.push(comp.name);
           containers.push({ container: comp, scopes: [comp] });
-          restore([{ o, make: () => comp.createInstance(), label: comp.name }]);
+          restore([{ o, make: instanceOf(comp, o.name), label: comp.name }]);
         };
 
         // 역할 기반 이름 + 그룹 간 충돌 해소를 **루프 전에** 한 번에 정한다(순서와 1:1).
@@ -1596,6 +1605,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 // 도형 멤버는 컴포넌트가 감싼다 — 원본 경로 앞에 붙일 것(§4.7 8번 "경로 맞추기").
                 const prefix = shapePrefix(master, structs[preferLive]?.type ?? '');
                 placeOnPage(master);
+                keepRoots.push({ node: master, name: master.name });
                 singles.push(master.name);
                 registered++; // 남긴 단품 1개만 집계
                 // 마스터의 날 벡터 자리를 아이콘 인스턴스로 교체 — INSTANCE_SWAP은 대상이
@@ -1637,6 +1647,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                     let inst: InstanceNode | null = null;
                     try {
                       inst = master.createInstance();
+                      keepRoots.push({ node: inst, name });
                       const badProps = applyInstancePropValues(inst, ids, vals);
                       // 사진은 속성이 아니라 fill 오버라이드 — 멤버 원본 채움 전체(해시·scaleMode·imageTransform)를 이식한다.
                       const img = transplantImageFills(inst, images).failures;
@@ -1720,7 +1731,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             cursorX += set.width + 48;
             sets++;
             containers.push({ container: set, scopes: made.map((x) => x.comp) });
-            restore(made.map((x) => ({ o: x.o, make: () => x.comp.createInstance(), label: x.variant || set.name })));
+            restore(made.map((x) => ({ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.variant || set.name })));
             // ↑ 이 그룹 자리를 즉시 채운다(중첩 보존)
           }
         } finally {
@@ -1728,10 +1739,30 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           for (const o of origins) releaseOrigin(o);
         }
 
+        // 노출 직전 기록(§4.7 9번) — 등록한 컴포넌트·세트 안과 자리 인스턴스(자신 포함)의 모든 인스턴스.
+        // 복사본으로 떼어졌거나 지워진 자리는 지나간다(떼어 낸 인스턴스는 removed다).
+        for (const c of containers) keepRoots.push({ node: c.container, name: c.container.name });
+        const mainOf = (n: InstanceNode) => n.getMainComponentAsync();
+        const keepSnaps: OverrideSnap[] = [];
+        const seen = new Set<string>();
+        for (let k = 0; k < keepRoots.length; k++) {
+          const { node } = keepRoots[k];
+          if (node.removed) continue;
+          // 같은 인스턴스가 두 뿌리에 걸리면(자리 인스턴스가 다른 컴포넌트 안에 든 경우) 먼저 들어온 자리만 남긴다 — 한 번만 센다.
+          try { for (const sn of await snapshotOverrides(node, k, mainOf)) if (!seen.has(sn.instId)) { seen.add(sn.instId); keepSnaps.push(sn); } } catch { /* 읽기 실패 — 지킬 것이 없다 */ }
+        }
+
         // 속성 자동 노출 — 등록한 각 컴포넌트/세트의 직속 레이어를 Text/Instance-swap/Boolean 속성으로.
         let exposed = exposedEarly;
         for (const c of containers) {
           try { exposed += exposeProperties(c.container, c.scopes).length; } catch (e) { failures.push(t('component.fail.exposeAll', { error: errText(e) })); }
+        }
+        // 노출로 기본값이 된 값을 되돌린다. 못 넣은 것은 자리마다 한 번 "속성 값을 못 넣은" 꼬리에(6번과 같다).
+        const keepFailed = await restoreOverrides(keepSnaps, (id) => figma.getNodeByIdAsync(id), mainOf, (f) => figma.loadFontAsync(f));
+        for (const [k, props] of keepFailed) {
+          const name = keepRoots[k].name;
+          for (const prop of props) failures.push(t('component.fail.propValue', { name, prop }));
+          propFailed.push(name);
         }
 
         post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept });

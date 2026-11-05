@@ -7,7 +7,7 @@
    실제 피그마가 아니라 목이다 — 실기 확인은 부록 A.5의 마지막 항목. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill, replaceMember, shapePrefix, memberFitIssue, transplantImageFills, joinPath } from '../dist/figma-lib.mjs';
+import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill, replaceMember, shapePrefix, memberFitIssue, transplantImageFills, joinPath, snapshotOverrides, restoreOverrides } from '../dist/figma-lib.mjs';
 
 let seq = 0;
 const SELF_DELETING = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -684,4 +684,96 @@ test('불합격 6 — 프레임 안 사진(카드): 경로 앞붙이 없음, 같
   assert.equal(r.result, 'replaced');
   assert.equal(box.children[1].children[0].fills[0].imageHash, 'j7vJ');
   assert.equal(memberFitIssue(box.children[1], { width: 200, height: 260, children: [], type: 'FRAME', name: 'x' }, ''), null);
+});
+
+/* ---------- QA #3 실기 ③ 불합격 7 — 값 지키기 (§4.7 9번) ---------- */
+
+/** 목 트리: 노드는 id로 찾는다. 묶인 레이어는 기본값(defaults)을 보이고, 인스턴스 setProperties가 값을 덮는다. */
+function keepWorld() {
+  const byId = new Map();
+  const defaults = {};
+  let seqK = 0;
+  const reg = (n) => { byId.set(n.id, n); for (const c of n.children ?? []) { c.parent = n; reg(c); } return n; };
+  const owner = (n) => { let p = n.parent; while (p && p.type !== 'INSTANCE') p = p.parent; return p; };
+  const view = (n, key, own) => {
+    const o = owner(n);
+    if (key && o && key in o.props) return o.props[key];
+    if (key && key in defaults) return defaults[key];
+    return own;
+  };
+  const text = (name, chars, key) => ({
+    id: `t${seqK++}`, type: 'TEXT', name, removed: false, visible: true, _c: chars, fontName: { family: 'Inter', style: 'Medium' },
+    componentPropertyReferences: key ? { characters: key } : null,
+    get characters() { return view(this, key, this._c); }, set characters(v) { this._c = v; },
+    getRangeAllFontNames() { return [this.fontName]; },
+  });
+  const inst = (name, main, children = [], refs = null, { reject = new Set() } = {}) => ({
+    id: `i${seqK++}`, type: 'INSTANCE', name, removed: false, visible: true, children, props: {}, calls: [], _main: main,
+    componentPropertyReferences: refs,
+    get main() { return refs?.mainComponent ? view(this, refs.mainComponent, this._main) : this._main; },
+    setProperties(p) { for (const k of Object.keys(p)) if (reject.has(k)) throw new Error('rejected'); Object.assign(this.props, p); this.calls.push(p); },
+  });
+  const mainOf = async (n) => ({ id: n.main });
+  const getNode = async (id) => byId.get(id) ?? null;
+  return { reg, text, inst, defaults, mainOf, getNode };
+}
+
+test('값 지키기 — 배지 01·02·03 세트: 노출이 모두 01로 바꿔도 자리 인스턴스마다 제 글자로', async () => {
+  const w = keepWorld();
+  const places = ['01', '02', '03'].map((c, k) => w.reg(w.inst(`Badge ${k}`, `v${k}`, [w.text('Label', c, '01#168:3')])));
+  const snaps = [];
+  for (let k = 0; k < places.length; k++) snaps.push(...(await snapshotOverrides(places[k], k, w.mainOf)));
+  w.defaults['01#168:3'] = '01'; // 노출
+  assert.deepEqual(places.map((p) => p.children[0].characters), ['01', '01', '01'], '재현');
+  const loaded = [];
+  const failed = await restoreOverrides(snaps, w.getNode, w.mainOf, async (f) => { loaded.push(f.style); });
+  assert.equal(failed.size, 0);
+  assert.deepEqual(places.map((p) => p.children[0].characters), ['01', '02', '03']);
+  assert.equal(places[0].calls.length, 0, '이미 같은 값은 건드리지 않는다');
+  assert.equal(loaded.length, 2, '글자를 넣기 전에 글꼴을 불러온다');
+});
+
+test('값 지키기 — 안쪽 인스턴스: 바깥의 인스턴스 바꾸기 먼저, 안쪽 글자는 안쪽 인스턴스에(바깥 키로 넣지 않음)', async () => {
+  const w = keepWorld();
+  const badge = w.inst('Badge', 'badge-02', [w.text('Label', '02', '01#168:3')], { mainComponent: 'Badge#1:9' });
+  const card = w.reg(w.inst('Card 2', 'card', [w.text('Title', 'Save more', 'Title#1:1'), badge]));
+  const snaps = await snapshotOverrides(card, 0, w.mainOf);
+  assert.deepEqual(snaps.map((s) => s.depth), [0, 1], '바깥 · 안쪽 따로');
+  assert.deepEqual(snaps[0].items.map((i) => i.name), ['Title', 'Badge'], '자기 레이어만 — 안쪽 Label은 안쪽 기록');
+  w.defaults['Title#1:1'] = 'Book & relax';
+  w.defaults['Badge#1:9'] = 'badge-01';
+  w.defaults['01#168:3'] = '01';
+  const failed = await restoreOverrides([...snaps].reverse(), w.getNode, w.mainOf, async () => {});
+  assert.equal(failed.size, 0);
+  assert.deepEqual(card.calls, [{ 'Title#1:1': 'Save more', 'Badge#1:9': 'badge-02' }], '바깥: 글자 + 인스턴스 바꾸기');
+  assert.deepEqual(badge.calls, [{ '01#168:3': '02' }], '안쪽 키는 안쪽 인스턴스에');
+  assert.equal(badge.children[0].characters, '02');
+});
+
+test('값 지키기 — 보이기 · 거절된 속성 · 글꼴 실패 · 안 묶인 글자 · 지워진 인스턴스', async () => {
+  const w = keepWorld();
+  const dot = w.text('Dot?', '•', null);
+  dot.componentPropertyReferences = { visible: 'Dot#2:1' };
+  Object.defineProperty(dot, 'visible', { get() { return 'Dot#2:1' in w.defaults ? w.defaults['Dot#2:1'] : true; }, configurable: true });
+  const free = w.text('Free', 'keep', null);
+  const p0 = w.reg(w.inst('Row', 'r', [w.text('Body', 'Plan', 'Body#2:2'), dot, free], null, { reject: new Set(['Body#2:2']) }));
+  const p1 = w.reg(w.inst('Gone', 'g', [w.text('X', 'a', 'X#2:3')]));
+  const snaps = [...(await snapshotOverrides(p0, 0, w.mainOf)), ...(await snapshotOverrides(p1, 1, w.mainOf))];
+  w.defaults['Body#2:2'] = 'We realize…';
+  w.defaults['Dot#2:1'] = false;
+  w.defaults['X#2:3'] = 'b';
+  free._c = 'changed';
+  p1.removed = true;
+  const failed = await restoreOverrides(snaps, w.getNode, w.mainOf, async () => {});
+  assert.deepEqual([...failed.entries()], [[0, ['Body']]], '거절된 속성 이름만, 지워진 자리는 지나감');
+  assert.deepEqual(p0.props, { 'Dot#2:1': true }, '보이기는 넣음(속성마다 다시)');
+  assert.equal(free.characters, 'keep', '안 묶인 글자는 직접');
+  // 글꼴을 못 불러오면 그 속성을 실패로 센다
+  const w2 = keepWorld();
+  const p2 = w2.reg(w2.inst('B', 'b', [w2.text('L', '02', 'L#3:1')]));
+  const s2 = await snapshotOverrides(p2, 7, w2.mainOf);
+  w2.defaults['L#3:1'] = '01';
+  const f2 = await restoreOverrides(s2, w2.getNode, w2.mainOf, async () => { throw new Error('no font'); });
+  assert.deepEqual([...f2.entries()], [[7, ['L']]]);
+  assert.equal(p2.calls.length, 0);
 });
