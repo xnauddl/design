@@ -101,6 +101,11 @@ export const STRINGS: Record<string, string> = {
   'component.registered': '컴포넌트 {registered} · 베리언트 세트 {sets}{extra}',
   'component.variants': '베리언트 세트 {sets}개 생성{extra}',
   'component.generated': '누락 조합 {generated}개 생성(세트 {sets})',
+  'component.placeFailed': ' · 제자리에 못 둔 {n}개: {names}',
+  'component.placeFailedMore': ' 외',
+  'component.propFailed': ' · 속성 값을 못 넣은 {n}개: {names}',
+  'component.fillKept': ' · 채움·크기가 달라 건너뛴 {n}개: {names}',
+  'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
 
   // 마법사
   'wizard.needSelect': '먼저 프레임을 선택하세요 — 선택한 레이어에서 토큰을 추출합니다.',
@@ -168,6 +173,8 @@ export const STRINGS: Record<string, string> = {
   'reason.instance-children': '인스턴스 내부',
   'reason.font': '폰트 미로드',
   'reason.translucent': '반투명',
+  'reason.space-between': '사이 간격 자동',
+  'reason.fraction': '소수 선 두께',
 
   // 마법사 시퀀서 단계 결과
   'wizard.seq.stoppedPrev': '이전 단계 중단으로 건너뜀',

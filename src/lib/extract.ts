@@ -38,7 +38,7 @@ const round = (n: number, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
 const SKIP_FRACTION = '소수 값(26.67px 등)은 척도가 아니라 스케일 잔값이라 토큰에서 제외했습니다.';
 /**
  * 척도 값인가 — 변수는 소수점을 갖지 않는다: 폰트 크기·간격·반경·행간·자간·그림자 수치는 정수,
- * 선 두께만 0.5 단위(hairline·아이콘 선). 불투명도(0~1)는 본질이 소수라 이 규칙 밖(collectOpacity).
+ * 선 두께도 예외 없이 정수(2026-11-04 사용자 결정 — 예전 0.5 단위 허용을 없앰, §2.11). 불투명도(0~1)는 본질이 소수라 이 규칙 밖(collectOpacity).
  * 26.67·13.33·58.29 같은 값은 그룹 스케일(×1.333)이 남긴 잔값이지 디자이너가 정한 척도가 아니다.
  * (크기 size는 이미 같은 규칙 — addSize의 Number.isInteger.) 토큰으로 만들면 변수 목록이
  * `font-size/26_67`로 지저분해지고, 바인딩은 허용오차로 근처 정수에 붙여 디자인을 바꾼다.
@@ -121,6 +121,26 @@ function collectText(acc: Accumulator, node: TextNode): void {
 }
 
 /* ---------- auto-layout spacing/padding ---------- */
+/**
+ * 이 간격 필드를 피그마가 쓰지 않는가 — 만들기 추출 · 연결 찾기 · 연결 직전 다시 확인이 함께 쓰는 판정(§2.11).
+ * - `'no-wrap'`: `counterAxisSpacing`인데 줄바꿈이 아니다(`layoutWrap !== 'WRAP'`). 피그마는 줄바꿈일 때만
+ *   줄 사이 간격을 쓴다. 이 레이어에 없는 값이므로 건너뜀으로도 세지 않는다(그리드의 itemSpacing과 같다).
+ * - `'space-between'`: 사이 간격 자동(Space between) — `itemSpacing`은 주 축 정렬
+ *   `primaryAxisAlignItems === 'SPACE_BETWEEN'`, `counterAxisSpacing`은 줄 정렬 `counterAxisAlignContent === 'SPACE_BETWEEN'`.
+ *   붙이면 피그마가 정렬을 MIN으로 바꿔 레이어가 바뀐다. 사유 "사이 간격 자동".
+ * - `null`: 쓰는 값(뽑고 붙인다).
+ * 줄바꿈 아님이 먼저다 — 줄바꿈이 아니면 줄 정렬도 쓰이지 않는다.
+ */
+export function gapSkip(node: unknown, field: string): 'no-wrap' | 'space-between' | null {
+  const n = node as { primaryAxisAlignItems?: string; counterAxisAlignContent?: string; layoutWrap?: string };
+  if (field === 'itemSpacing') return n.primaryAxisAlignItems === 'SPACE_BETWEEN' ? 'space-between' : null;
+  if (field === 'counterAxisSpacing') {
+    if (n.layoutWrap !== 'WRAP') return 'no-wrap';
+    return n.counterAxisAlignContent === 'SPACE_BETWEEN' ? 'space-between' : null;
+  }
+  return null;
+}
+
 function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | InstanceNode): void {
   if (node.layoutMode === 'NONE') return;
   const gaps: number[] = [node.paddingLeft, node.paddingRight, node.paddingTop, node.paddingBottom];
@@ -129,8 +149,11 @@ function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | Inst
     // HORIZONTAL/VERTICAL 전용이라 그리드에서는 의미 있는 값을 주지 않는다.
     gaps.push(node.gridRowGap, node.gridColumnGap);
   } else {
-    gaps.push(node.itemSpacing);
-    if (typeof node.counterAxisSpacing === 'number') gaps.push(node.counterAxisSpacing); // 줄바꿈(wrap) 오토레이아웃의 교차축 간격
+    // 사이 간격 자동(Space between)이면 피그마가 간격을 계산한다 — 저장된 숫자는 화면 값이 아니라
+    // 토큰으로 뽑으면 쓰레기(spacing/33·109…)가 된다(IA v3 §2.11, QA #3 불합격 1). padding은 그대로.
+    if (!gapSkip(node, 'itemSpacing')) gaps.push(node.itemSpacing);
+    // 줄 사이 간격 — 줄바꿈일 때만 쓰이고, 줄 정렬이 Space between이면 같은 이유로 뺀다.
+    if (typeof node.counterAxisSpacing === 'number' && !gapSkip(node, 'counterAxisSpacing')) gaps.push(node.counterAxisSpacing);
   }
   for (const g of gaps) {
     if (typeof g === 'number' && g > 0) {
@@ -206,7 +229,7 @@ function collectStroke(acc: Accumulator, node: SceneNode): void {
   for (const wv of widths) {
     if (wv > 0) {
       const v = round(wv);
-      if (onScale(acc, v, 0.5)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id);
     }
   }
 }

@@ -47,7 +47,8 @@ export const RADIUS_LADDER: ReadonlyMap<number, string> = new Map([
 ]);
 /** 선 두께 — Lightning borderWidthThin 1 / Thick 2, Atlassian border.width 1 / selected 2. */
 export const STROKE_LADDER: ReadonlyMap<number, string> = new Map([
-  [0.5, 'hairline'], [1, 'thin'], [2, 'thick'],
+  // 변수는 정수만 — 0.5(hairline)는 없다(2026-11-04 사용자 결정, §2.11).
+  [1, 'thin'], [2, 'thick'],
 ]);
 
 export function spacingRoles(values: number[]): string[] {

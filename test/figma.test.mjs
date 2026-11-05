@@ -4327,3 +4327,181 @@ test('applyExistingTextStyles — 스타일의 모든 글자 속성(대소문자
   assert.equal(r2.skipReasons.ambiguous, 1);
   assert.equal(again._styleId, null);
 });
+
+/* ---------- QA #3 불합격 1 — 사이 간격 자동(Space between) (§2.11) ---------- */
+
+/** Space between 카드 줄: 피그마는 itemSpacing(33)을 쓰지 않는다. 변수를 붙이면 정렬이 MIN으로 바뀐다(목이 흉내). */
+function spaceBetweenRow(extra = {}) {
+  return {
+    type: 'FRAME', id: 'row', name: 'Row', fills: [],
+    layoutMode: 'HORIZONTAL', primaryAxisAlignItems: 'SPACE_BETWEEN', itemSpacing: 33,
+    paddingLeft: 16, paddingRight: 16, paddingTop: 8, paddingBottom: 8,
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
+    children: [], boundVariables: {},
+    setBoundVariable(field, v) {
+      this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id };
+      if (field === 'itemSpacing' && this.primaryAxisAlignItems === 'SPACE_BETWEEN') this.primaryAxisAlignItems = 'MIN';
+    },
+    ...extra,
+  };
+}
+
+test('extractFromSelection — Space between의 itemSpacing은 토큰으로 뽑지 않는다(padding은 그대로)', () => {
+  installFigma();
+  const names = new Set(extractFromSelection([spaceBetweenRow()]).tokens.map((t) => t.name));
+  assert.equal(names.has('spacing/33'), false, '피그마가 쓰지 않는 간격이 토큰이 됐다');
+  assert.equal(names.has('spacing/16'), true);
+  assert.equal(names.has('spacing/8'), true);
+  // 같은 값이라도 Space between이 아니면 뽑는다(가드가 넓지 않은지)
+  const plain = new Set(extractFromSelection([spaceBetweenRow({ primaryAxisAlignItems: 'MIN' })]).tokens.map((t) => t.name));
+  assert.equal(plain.has('spacing/33'), true);
+});
+
+test('extractFromSelection — wrap의 줄 정렬이 Space between이면 counterAxisSpacing을 뽑지 않는다', () => {
+  installFigma();
+  const wrap = spaceBetweenRow({ primaryAxisAlignItems: 'MIN', itemSpacing: 12, layoutWrap: 'WRAP', counterAxisSpacing: 51, counterAxisAlignContent: 'SPACE_BETWEEN' });
+  const names = new Set(extractFromSelection([wrap]).tokens.map((t) => t.name));
+  assert.equal(names.has('spacing/51'), false);
+  assert.equal(names.has('spacing/12'), true, '주 축 간격은 Space between이 아니라 그대로');
+  const auto = new Set(extractFromSelection([{ ...wrap, counterAxisAlignContent: 'AUTO' }]).tokens.map((t) => t.name));
+  assert.equal(auto.has('spacing/51'), true);
+});
+
+test('bindSelection — Space between 간격은 붙이지 않고 정렬도 그대로, 사유 space-between', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'spacing/33', category: 'gap', sources: ['gap'], value: 33 }, // 예전 추출이 만든 쓰레기 토큰이 있어도
+      { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+    ],
+    16,
+  );
+  const row = spaceBetweenRow();
+  const dry = await bindSelection([row], false);
+  assert.equal(dry.reasons['space-between'], 1);
+  assert.ok(!dry.candidates.some((c) => c.field === 'itemSpacing'), '간격이 후보로 나오면 안 된다');
+  assert.ok(dry.skips.some((s) => s.nodeId === 'row' && s.reason === 'space-between' && s.field === 'itemSpacing'), '칩에서 레이어로 이어져야 한다');
+
+  const res = await bindSelection([row]);
+  assert.equal(row.primaryAxisAlignItems, 'SPACE_BETWEEN', '정렬이 바뀌었다 — 레이어 값 변경(§2.11 위반)');
+  assert.equal(row.boundVariables.itemSpacing, undefined);
+  assert.equal(row.boundVariables.paddingLeft.id, findVar(figma, 'Global', 'spacing/16').id, 'padding은 그대로 붙는다');
+  assert.equal(res.reasons['space-between'], 1);
+});
+
+test('bindSelection — wrap 줄 정렬 Space between이면 counterAxisSpacing을 건너뛴다', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/51', category: 'gap', sources: ['gap'], value: 51 }], 16);
+  const wrap = spaceBetweenRow({ primaryAxisAlignItems: 'MIN', itemSpacing: 0, layoutWrap: 'WRAP', counterAxisSpacing: 51, counterAxisAlignContent: 'SPACE_BETWEEN' });
+  const res = await bindSelection([wrap]);
+  assert.equal(wrap.boundVariables.counterAxisSpacing, undefined);
+  assert.equal(res.reasons['space-between'], 1);
+  // 줄 정렬이 AUTO면 붙는다(가드가 넓지 않은지)
+  const auto = spaceBetweenRow({ id: 'auto', primaryAxisAlignItems: 'MIN', itemSpacing: 0, layoutWrap: 'WRAP', counterAxisSpacing: 51, counterAxisAlignContent: 'AUTO' });
+  await bindSelection([auto]);
+  assert.equal(auto.boundVariables.counterAxisSpacing.id, findVar(figma, 'Global', 'spacing/51').id);
+});
+
+test('bindSelectedItems — 찾은 뒤 Space between이 된 간격은 다시 확인에서 space-between으로 건너뜀', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/33', category: 'gap', sources: ['gap'], value: 33 }], 16);
+  const sp = findVar(figma, 'Global', 'spacing/33');
+  const row = spaceBetweenRow();
+  registerNodes(figma, [row]);
+  const r = await bindSelectedItems([{ nodeId: 'row', field: 'itemSpacing', variableId: sp.id }]);
+  assert.equal(r.bound, 0);
+  assert.deepEqual(r.reasons, { 'space-between': 1 });
+  assert.equal(r.skipped, 1);
+  assert.equal(row.primaryAxisAlignItems, 'SPACE_BETWEEN');
+  assert.equal(row.boundVariables.itemSpacing, undefined);
+});
+
+/* ---------- 줄바꿈 아님 — counterAxisSpacing은 WRAP일 때만 (§2.11, 2026-11-04 사용자 결정) ---------- */
+
+test('extractFromSelection — 줄바꿈이 아니면 counterAxisSpacing을 뽑지 않는다', () => {
+  installFigma();
+  const row = spaceBetweenRow({ primaryAxisAlignItems: 'MIN', itemSpacing: 12, layoutWrap: 'NO_WRAP', counterAxisSpacing: 51, counterAxisAlignContent: 'AUTO' });
+  const names = new Set(extractFromSelection([row]).tokens.map((t) => t.name));
+  assert.equal(names.has('spacing/51'), false, '피그마가 쓰지 않는 줄 사이 간격이 토큰이 됐다');
+  assert.equal(names.has('spacing/12'), true);
+  // layoutWrap이 아예 없어도(옛 목·세로 오토레이아웃) 줄바꿈 아님
+  const noProp = spaceBetweenRow({ primaryAxisAlignItems: 'MIN', itemSpacing: 12, counterAxisSpacing: 51 });
+  assert.equal(new Set(extractFromSelection([noProp]).tokens.map((t) => t.name)).has('spacing/51'), false);
+});
+
+test('bindSelection — 줄바꿈이 아니면 counterAxisSpacing은 후보도 건너뜀도 아니다', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/51', category: 'gap', sources: ['gap'], value: 51 }], 16);
+  const row = spaceBetweenRow({ primaryAxisAlignItems: 'MIN', itemSpacing: 0, layoutWrap: 'NO_WRAP', counterAxisSpacing: 51, counterAxisAlignContent: 'SPACE_BETWEEN' });
+  const dry = await bindSelection([row], false);
+  assert.ok(!dry.candidates.some((c) => c.field === 'counterAxisSpacing'), '줄바꿈 아닌 줄 사이 간격이 후보로 나왔다');
+  assert.ok(!dry.skips.some((s) => s.field === 'counterAxisSpacing'), '건너뜀으로 세지 않는다');
+  assert.equal(dry.reasons['space-between'] ?? 0, 0, '줄바꿈 아님이 Space between보다 먼저');
+  await bindSelection([row]);
+  assert.equal(row.boundVariables.counterAxisSpacing, undefined);
+  void figma;
+});
+
+test('bindSelectedItems — 찾은 뒤 줄바꿈이 꺼진 줄 사이 간격은 다시 확인에서 "그 사이 바뀜"', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/51', category: 'gap', sources: ['gap'], value: 51 }], 16);
+  const sp = findVar(figma, 'Global', 'spacing/51');
+  const row = spaceBetweenRow({ primaryAxisAlignItems: 'MIN', itemSpacing: 0, layoutWrap: 'NO_WRAP', counterAxisSpacing: 51, counterAxisAlignContent: 'AUTO' });
+  registerNodes(figma, [row]);
+  const r = await bindSelectedItems([{ nodeId: 'row', field: 'counterAxisSpacing', variableId: sp.id }]);
+  assert.equal(r.bound, 0);
+  assert.deepEqual(r.reasons, { changed: 1 });
+  assert.equal(row.boundVariables.counterAxisSpacing, undefined);
+});
+
+/* ---------- 선 두께는 정수만 (§2.11, 2026-11-04 사용자 결정 · QA #3 실기 ② 항목 5) ---------- */
+
+function strokedFrame(id, w) {
+  return {
+    type: 'FRAME', id, name: id, fills: [],
+    strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, visible: true }],
+    strokeWeight: w, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', layoutMode: 'NONE', children: [],
+    setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; },
+  };
+}
+
+test('extractFromSelection — 소수 선 두께(1.5)는 토큰이 없다, 정수(1·2)는 그대로', () => {
+  installFigma();
+  const names = new Set(extractFromSelection([strokedFrame('a', 1.5), strokedFrame('b', 1), strokedFrame('c', 2)]).tokens.map((t) => t.name));
+  assert.equal(names.has('stroke-width/1_5'), false, 'stroke-width/1_5가 생겼다');
+  assert.equal(names.has('stroke-width/1'), true);
+  assert.equal(names.has('stroke-width/2'), true);
+  assert.equal(names.has('stroke-width/0_5'), false);
+});
+
+test('bindSelection — 소수 선 두께는 이미 있는 1.5 변수에도, 가까운 정수에도 붙이지 않고 "소수 선 두께"로 건너뜀', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'stroke-width/1_5', category: 'strokeWidth', sources: ['strokeWidth'], value: 1.5 }, // 예전에 만든 변수(지우지 않음)
+      { name: 'stroke-width/2', category: 'strokeWidth', sources: ['strokeWidth'], value: 2 },
+    ],
+    16,
+  );
+  const node = strokedFrame('thin', 1.5);
+  const dry = await bindSelection([node], false);
+  assert.equal(dry.reasons.fraction, 1);
+  assert.ok(dry.skips.some((s) => s.nodeId === 'thin' && s.reason === 'fraction' && s.field === 'strokeWeight'));
+  const res = await bindSelection([node]);
+  assert.equal(node._bound?.strokeWeight, undefined, '소수 두께에 변수가 붙었다');
+  assert.equal(node.strokeWeight, 1.5, '값을 바꾸지 않는다');
+  assert.equal(res.bound, 0);
+  assert.ok(findVar(figma, 'Global', 'stroke-width/1_5'), '이미 있는 변수는 지우지 않는다');
+});
+
+test('bindSelection — 이미 1.5 변수에 붙은 선 두께는 "소수 선 두께"가 아니라 "이미 연결됨"', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'stroke-width/1_5', category: 'strokeWidth', sources: ['strokeWidth'], value: 1.5 }], 16);
+  const v15 = findVar(figma, 'Global', 'stroke-width/1_5');
+  const node = strokedFrame('bound15', 1.5);
+  node.boundVariables = { strokeWeight: { type: 'VARIABLE_ALIAS', id: v15.id } };
+  const dry = await bindSelection([node], false);
+  assert.equal(dry.reasons['already-bound'], 1);
+  assert.equal(dry.reasons.fraction ?? 0, 0);
+  assert.ok(dry.skips.some((s) => s.nodeId === 'bound15' && s.reason === 'already-bound' && s.field === 'strokeWeight'));
+});

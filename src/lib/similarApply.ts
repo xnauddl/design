@@ -11,6 +11,8 @@ import {
   type AlignResult,
   type FrameNode as SimNode,
 } from './similar';
+import { captureOrigin, placeAtOrigin, releaseOrigin } from './placement';
+import type { CodeToUi } from '../shared/messages';
 
 /** figma 노드 → similar 입력 트리(콘텐츠 신호 포함). INSTANCE key는 async 조회. */
 async function buildSimTree(node: SceneNode): Promise<SimNode> {
@@ -69,6 +71,8 @@ export interface ComponentizeResult {
   /** v2: 인스턴스 fill 오버라이드로 교체한 이미지 수. */
   images: number;
   warnings: string[];
+  /** 제자리에 넣지 못해 원본을 그대로 둔 멤버 이름(§4.7 "인스턴스 자리" 5번). 인스턴스는 지웠다. */
+  placeFailed: string[];
 }
 
 /**
@@ -116,6 +120,7 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
   let instances = 0;
   let images = 0;
   const kept: string[] = [];
+  const placeFailed: string[] = [];
   // 정렬에서 제외된(구조 불일치) 프레임은 절대 교체 대상이 아니다 — 스캔과 실행 사이에
   // 문서가 바뀌어 구조가 달라졌다면 원본을 그대로 두고 경고만 남긴다.
   const memberSet = new Set(aligned.memberIds);
@@ -124,23 +129,22 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
     if (!memberSet.has(n.id)) continue; // 제외된 프레임 → 원본 보존
     const leaves = treeById.get(n.id);
     if (!leaves) continue;
+    let inst: InstanceNode | null = null;
     try {
-      const inst = comp.createInstance();
+      inst = comp.createInstance();
       try { inst.resize(n.width, n.height); } catch { /* 제약상 불가 시 기본 크기 */ }
-      // 원본이 있던 **자리**에 끼운다. appendChild는 부모 맨 끝에 붙여, 오토레이아웃 리스트·그리드에서
-      // 교체된 카드가 전부 마지막으로 밀려 순서가 뒤섞였다(등록 경로의 restore와 같은 규칙).
-      // 오토레이아웃 부모면 위치는 레이아웃이 정하므로 x/y를 쓰지 않는다.
-      const parent = n.parent as (BaseNode & ChildrenMixin) | null;
-      if (parent) {
-        const idx = 'children' in parent ? parent.children.indexOf(n) : -1;
-        if (idx >= 0 && typeof parent.insertChild === 'function') parent.insertChild(idx, inst);
-        else parent.appendChild(inst);
+      // 원본이 있던 **자리**에 먼저 끼우고 원본은 맨 끝에 지운다(§4.7 "인스턴스 자리" — 등록과 같은 모듈).
+      // appendChild로 부모 끝에 붙이면 오토레이아웃 리스트에서 순서가 뒤섞이고, 부모가 없을 때 그냥 두면
+      // 인스턴스가 페이지 맨 위(0,0)에 남는다(QA #3 불합격 3). 못 넣으면 인스턴스를 지우고 원본을 지킨다.
+      // 원본이 아직 자리에 있으니 그룹이 빌 일이 없다 — 표지는 넣지 않는다(§4.7 3번). 위치·제약·크기 규칙·
+      // 절대 위치 보정은 같은 모듈이 맡는다.
+      const origin = captureOrigin(n, { anchor: false });
+      if (!placeAtOrigin(inst, origin)) {
+        inst = null; // placeAtOrigin이 이미 지웠다
+        placeFailed.push(n.name);
+        continue;
       }
-      const autolayout = !!parent && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE';
-      if (!autolayout) {
-        inst.x = n.x;
-        inst.y = n.y;
-      }
+      releaseOrigin(origin);
       // 컴포넌트 속성 오버라이드(TEXT/INSTANCE_SWAP).
       const ov = overridesForFrame(flattenFrame(leaves), plan);
       const props: Record<string, string> = {};
@@ -176,11 +180,29 @@ export async function componentizeSimilar(master: SceneNode, members: readonly S
       n.remove();
       instances++;
     } catch {
-      /* 인스턴스 생성 실패 시 원본 보존 */
+      // 인스턴스 생성·오버라이드 중 실패 — 원본은 보존. 만든 인스턴스가 있으면 치운다(어디에도 남기지 않음).
+      if (inst) { try { inst.remove(); } catch { /* 이미 사라짐 */ } }
     }
   }
 
   const warnings = aligned.excluded.map((e) => `${e.name}: ${e.reason}`);
-  for (const name of kept) warnings.push(`${name}: 속성 오버라이드 실패 — 원본을 그대로 두었습니다.`);
-  return { master: comp.name, properties, instances, images, warnings };
+  for (const name of kept) warnings.push(`${name}: 속성 오버라이드 실패 — 원본을 그대로 두었어요.`);
+  for (const name of placeFailed) warnings.push(`${name}: 제자리에 둘 수 없어 원본을 그대로 두었어요.`);
+  return { master: comp.name, properties, instances, images, warnings, placeFailed };
+}
+
+/**
+ * [묶기] 결과 → UI 메시지. 결과의 필드를 빠짐없이 싣는다 — 예전에 code.ts가 필드를 하나씩 옮기다
+ * `placeFailed`를 빠뜨려 결과 줄 꼬리·최소화 ⚠가 동작하지 않았다(QA #3 검토 2회차). 테스트가 지킨다.
+ */
+export function componentizeResultMessage(r: ComponentizeResult): Extract<CodeToUi, { type: 'COMPONENTIZE_RESULT' }> {
+  return {
+    type: 'COMPONENTIZE_RESULT',
+    master: r.master,
+    properties: r.properties,
+    instances: r.instances,
+    images: r.images,
+    warnings: r.warnings,
+    placeFailed: r.placeFailed,
+  };
 }

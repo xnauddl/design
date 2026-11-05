@@ -8,6 +8,7 @@ import { rgbToHex } from './tokens';
 import { collectionTiers } from './collectionRoles'; // 계층은 컬렉션 이름이 아니라 지정된 역할로
 import { FIELD_SCOPE, FILL_SCOPES, STROKE_SCOPES, EFFECT_SCOPES } from './scopes'; // 용도 규칙
 import type { BindCandidate, BindNode, BindSkip } from '../shared/messages';
+import { gapSkip } from './extract'; // 쓰지 않는 간격 판정(사이 간격 자동 · 줄바꿈 아님) — 만들기와 같은 기준
 
 interface VarEntry {
   variable: Variable;
@@ -618,8 +619,17 @@ function bindFrame(
     tryBind(node, 'gridRowGap', node.gridRowGap, entries, res, apply, preview);
     tryBind(node, 'gridColumnGap', node.gridColumnGap, entries, res, apply, preview);
   } else {
-    tryBind(node, 'itemSpacing', node.itemSpacing, entries, res, apply, preview);
-    if (typeof node.counterAxisSpacing === 'number') tryBind(node, 'counterAxisSpacing', node.counterAxisSpacing, entries, res, apply, preview);
+    // 사이 간격 자동(Space between)이면 간격 값은 피그마가 쓰지 않는다 — 붙이면 정렬이 MIN으로 바뀌어
+    // 레이어 모양이 바뀐다(§2.11 "사이 간격 자동", QA #3 불합격 1). 사유만 남기고 건너뛴다.
+    // 줄바꿈이 아니면 줄 사이 간격은 이 레이어에 없는 값이다 — 찾지도 세지도 않는다(§2.11 "줄바꿈이 아님").
+    for (const f of ['itemSpacing', 'counterAxisSpacing'] as const) {
+      const v = node[f];
+      if (typeof v !== 'number') continue;
+      const skip = gapSkip(node, f);
+      if (skip === 'no-wrap') continue;
+      if (skip === 'space-between') note(res, 'space-between', node, preview, f);
+      else tryBind(node, f, v, entries, res, apply, preview);
+    }
   }
   tryBind(node, 'paddingLeft', node.paddingLeft, entries, res, apply, preview);
   tryBind(node, 'paddingRight', node.paddingRight, entries, res, apply, preview);
@@ -654,14 +664,24 @@ function bindStroke(node: SceneNode, entries: VarEntry[], res: BindResult, apply
   const strokes = (node as { strokes: readonly Paint[] | typeof figma.mixed }).strokes;
   if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
   const w = (node as { strokeWeight: number | typeof figma.mixed }).strokeWeight;
+  // 선 두께는 정수만(§2.11, 2026-11-04) — 소수 두께는 정수 변수에 당겨 붙이지 않고 "소수 선 두께"로 건너뛴다.
+  // 이미 있는 소수 변수(stroke-width/1_5 등)에도 붙이지 않는다.
+  const one = (field: 'strokeWeight' | 'strokeTopWeight' | 'strokeRightWeight' | 'strokeBottomWeight' | 'strokeLeftWeight', v: number): void => {
+    if (!(v > 0)) return;
+    // 이미 붙은 것(소수 변수 stroke-width/1_5 포함)은 소수 판정보다 먼저 — "이미 연결됨" · "삭제된 변수"(§4.6).
+    const st = stateReason(nodeFieldState(node, field));
+    if (st) { note(res, st, node, preview, field); return; }
+    if (Math.abs(v - Math.round(v)) >= 0.005) { note(res, 'fraction', node, preview, field); return; }
+    tryBind(node, field, v, entries, res, apply, preview);
+  };
   if (w !== figma.mixed && typeof w === 'number') {
-    if (w > 0) tryBind(node, 'strokeWeight', w, entries, res, apply, preview);
+    one('strokeWeight', w);
     return;
   }
   // 변별 두께(상/우/하/좌)
   for (const side of ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const) {
     const sv = (node as unknown as Record<string, number>)[side];
-    if (typeof sv === 'number' && sv > 0) tryBind(node, side, sv, entries, res, apply, preview);
+    if (typeof sv === 'number') one(side, sv);
   }
 }
 
@@ -838,7 +858,7 @@ export interface SelectedBindResult {
   bound: number;
   /** 다시 확인에서 건너뛴 자리 수(속성 단위) — reasons 합과 같다. */
   skipped: number;
-  /** 사유별 자리 수: 'already-bound' · 'deleted-var' · 'styled' · 'changed' · 'error'. */
+  /** 사유별 자리 수: 'already-bound' · 'deleted-var' · 'styled' · 'space-between' · 'changed' · 'error'. */
   reasons: Record<string, number>;
   /** 사유별 건너뛴 레이어(노드×사유 중복 제거, SKIP_PREVIEW_CAP까지). */
   skips: BindSkip[];
@@ -853,6 +873,7 @@ export interface SelectedBindResult {
  * - 'already-bound': 살아 있는 변수가 붙음(글자는 어느 구간이든)
  * - 'deleted-var': 지워진 변수를 가리킴
  * - 'styled': 해당 칠하기·선·효과·글자에 스타일이 붙음
+ * - 'space-between': 간격 필드인데 그 사이 정렬이 Space between(사이 간격 자동)이 됨
  * - 'changed': 값이 변수 값과 더는 같지 않음, 칠하기 자리가 없어짐·반투명이 됨, 레이어·변수가 없어짐
  * - 'error': 연결 호출이 실패함
  */
@@ -962,6 +983,13 @@ export async function bindSelectedItems(items: readonly SelectedBindItem[]): Pro
         continue;
       }
       // 스칼라 노드 필드(width/height/padding…/cornerRadius…/opacity)
+      // 찾은 뒤 정렬이 Space between으로 바뀐 간격 — 붙이면 정렬이 바뀌므로 건너뛴다(§4.6 다시 확인).
+      // 찾은 뒤 줄바꿈이 꺼진 줄 사이 간격은 "그 사이 바뀜"(§2.11 "줄바꿈이 아님").
+      const gap = gapSkip(node, it.field);
+      if (gap) {
+        fail(gap === 'no-wrap' ? 'changed' : 'space-between', node, it.field);
+        continue;
+      }
       const st = stateReason(nodeFieldState(node, it.field));
       if (st) {
         fail(st, node, it.field);
