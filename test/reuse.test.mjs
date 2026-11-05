@@ -102,22 +102,44 @@ test('reusePlanFor — 단독 · 접힘(마스터 키) · 세트(멤버마다) �
 
 test('matchReuse — 정확히 하나일 때만, 세트는 모두 같은 세트', () => {
   const plan = { kind: 'single', keys: ['single:x:1'] };
-  assert.deepEqual(matchReuse(plan, [{ id: 'c1', key: 'single:x:1', setId: null }], 1), ['c1']);
-  assert.equal(matchReuse(plan, [], 1), null, '후보 없음');
-  assert.equal(matchReuse(plan, [{ id: 'c1', key: 'single:x:1', setId: null }, { id: 'c2', key: 'single:x:1', setId: null }], 1), null, '둘 이상(복제)');
+  assert.deepEqual(matchReuse(plan, [{ id: 'c1', key: 'single:x:1', setId: null }], 1), { ids: ['c1'], keepKey: true });
+  assert.deepEqual(matchReuse(plan, [], 1), { ids: null, keepKey: true }, '후보 없음 — 새로 만들고 키를 남긴다');
+  assert.deepEqual(matchReuse(plan, [{ id: 'c1', key: 'single:x:1', setId: null }, { id: 'c2', key: 'single:x:1', setId: null }], 1), { ids: null, keepKey: false }, '둘 이상(복제) — 키를 남기지 않는다');
   const coll = { kind: 'collapse', keys: ['collapse:x:1'] };
-  assert.deepEqual(matchReuse(coll, [{ id: 'm', key: 'collapse:x:1', setId: null }], 3), ['m', 'm', 'm']);
-  assert.equal(matchReuse(coll, [{ id: 'm', key: 'single:x:1', setId: null }], 3), null, '종류가 다르면 새로 만든다');
+  assert.deepEqual(matchReuse(coll, [{ id: 'm', key: 'collapse:x:1', setId: null }], 3).ids, ['m', 'm', 'm']);
+  assert.equal(matchReuse(coll, [{ id: 'm', key: 'single:x:1', setId: null }], 3).ids, null, '종류가 다르면 새로 만든다');
   const v = { kind: 'variant', keys: ['variant:x:1', 'variant:x:2'] };
   const vs = [
     { id: 'v1', key: 'variant:x:1', setId: 'S' },
     { id: 'v2', key: 'variant:x:2', setId: 'S' },
     { id: 'v3', key: 'variant:x:3', setId: 'S' }, // 사용자가 더한 변형 — 멤버가 일부여도 된다
   ];
-  assert.deepEqual(matchReuse(v, vs, 2), ['v1', 'v2']);
-  assert.equal(matchReuse(v, [vs[0], { ...vs[1], setId: 'T' }], 2), null, '다른 세트');
-  assert.equal(matchReuse(v, [vs[0]], 2), null, '한 멤버라도 없으면');
-  assert.equal(matchReuse(v, [{ ...vs[0], setId: null }, { ...vs[1], setId: null }], 2), null, '세트 밖 변형');
+  assert.deepEqual(matchReuse(v, vs, 2).ids, ['v1', 'v2']);
+  assert.equal(matchReuse(v, [vs[0], { ...vs[1], setId: 'T' }], 2).ids, null, '다른 세트');
+  assert.equal(matchReuse(v, [vs[0]], 2).ids, null, '한 멤버라도 없으면');
+  assert.equal(matchReuse(v, [{ ...vs[0], setId: null }, { ...vs[1], setId: null }], 2).ids, null, '세트 밖 변형');
+});
+
+test('matchReuse — "정확히 하나"는 짝 맞추기를 통과한 후보 중에서 센다', () => {
+  const plan = { kind: 'single', keys: ['single:card:1'] };
+  // 옛 Card(사용자가 고쳐 구조가 바뀜 — 통과 못 함) + Card2(지난번 새로 만든 것 — 통과)
+  const comps = [{ id: 'Card', key: 'single:card:1', setId: null }, { id: 'Card2', key: 'single:card:1', setId: null }];
+  assert.deepEqual(matchReuse(plan, comps, 1, (k, id) => id === 'Card2'), { ids: ['Card2'], keepKey: true });
+  // 통과 0 → 새로 만들고 키를 남긴다(다음엔 통과하는 새 것 하나)
+  assert.deepEqual(matchReuse(plan, comps, 1, () => false), { ids: null, keepKey: true });
+  // 통과 2개 → 재사용하지 않고 키도 남기지 않는다
+  assert.deepEqual(matchReuse(plan, comps, 1, () => true), { ids: null, keepKey: false });
+  // 접힘: 모든 멤버와 짝이 맞아야 그 후보를 센다
+  const coll = { kind: 'collapse', keys: ['collapse:x:1'] };
+  assert.deepEqual(matchReuse(coll, [{ id: 'm', key: 'collapse:x:1', setId: null }], 2, (k) => k === 0), { ids: null, keepKey: true });
+  // 세트: 멤버마다 통과 후보를 센다 — 한 멤버라도 둘 이상이면 키를 남기지 않는다
+  const v = { kind: 'variant', keys: ['variant:x:1', 'variant:x:2'] };
+  const vs = [
+    { id: 'old1', key: 'variant:x:1', setId: 'S' }, { id: 'old2', key: 'variant:x:2', setId: 'S' },
+    { id: 'new1', key: 'variant:x:1', setId: 'T' }, { id: 'new2', key: 'variant:x:2', setId: 'T' },
+  ];
+  assert.deepEqual(matchReuse(v, vs, 2, (k, id) => id.startsWith('new')), { ids: ['new1', 'new2'], keepKey: true });
+  assert.deepEqual(matchReuse(v, vs, 2, (k, id) => k === 0 || id === 'new2'), { ids: null, keepKey: false });
 });
 
 /* ---------- 짝 맞추기 검사 (3번) ---------- */
@@ -292,5 +314,37 @@ test('createIconRegistry — 문서의 같은 dsl.icon 아이콘을 먼저 쓰�
   assert.equal(reg.created(), 1, '새로 만든 아이콘만 센다');
   assert.equal(data.get('v2-c:dsl.icon'), 'star');
   assert.deepEqual(placed, [made]);
+  delete globalThis.figma;
+});
+
+test('createIconRegistry.discard — 이번에 만든 아이콘만 지우고 등록부 · 만든 수에서 뺀다(재사용 멤버가 원본으로 남을 때)', () => {
+  const page = { children: [], appendChild(c) { this.children.push(c); c.parent = this; } };
+  globalThis.figma = {
+    createComponentFromNode(n) {
+      n.type = 'COMPONENT';
+      n.removed = false;
+      n.setPluginData = () => {};
+      n.remove = function () { this.removed = true; page.children.splice(page.children.indexOf(this), 1); };
+      return n;
+    },
+  };
+  const old = { id: 'old', type: 'COMPONENT', name: 'IconHeart', removed: false, remove() { this.removed = true; } };
+  const reg = createIconRegistry({ page, place: () => {}, uniqueName: (b) => b, onFailure: () => {}, existing: (k) => (k === 'heart' ? old : null) });
+  const vector = (id) => ({ id, type: 'VECTOR', name: 'icon', clone() { return { id: `${id}-c`, type: 'VECTOR', name: 'icon' }; } });
+  const star = reg.ensure('star', vector('v1'), 'Icon'); // 실패할 멤버를 위해 새로 만든 아이콘
+  const bolt = reg.ensure('bolt', vector('v2'), 'Icon'); // 다른 멤버가 쓰는 아이콘
+  reg.ensure('heart', vector('v3'), 'Icon'); // 문서에 있던 아이콘
+  assert.equal(reg.created(), 2);
+  assert.equal(reg.discard('star'), true);
+  assert.equal(star.removed, true);
+  assert.equal(reg.get('star'), null, '등록부에서 빠진다');
+  assert.equal(reg.created(), 1, '결과 줄 "아이콘 n"에서도 빠진다');
+  assert.equal(reg.discard('heart'), false, '문서에 있던 아이콘은 지우지 않는다');
+  assert.equal(old.removed, false);
+  assert.equal(bolt.removed, false);
+  assert.deepEqual(page.children, [bolt]);
+  // 다시 필요하면 새로 만든다
+  assert.notEqual(reg.ensure('star', vector('v4'), 'Icon'), star);
+  assert.equal(reg.created(), 2);
   delete globalThis.figma;
 });

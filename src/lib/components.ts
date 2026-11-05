@@ -1537,26 +1537,41 @@ export interface ReuseCandidate {
   setId: string | null;
 }
 
+/** 키 맞추기 결과 — ids: 멤버마다 쓸 컴포넌트 id(재사용하지 않으면 null). keepKey: 새로 만들 때 키를 남기나. */
+export interface ReuseMatch {
+  ids: string[] | null;
+  keepKey: boolean;
+}
+
 /**
- * 키 맞추기(§4.7 "재사용" 3번). 돌려주는 값: 멤버마다 쓸 컴포넌트 id(멤버 순서), 재사용하지 않으면 null.
- * - single · collapse: 같은 키가 **정확히 하나**면 모든 멤버가 그 컴포넌트.
- * - variant: 멤버마다 같은 키가 정확히 하나이고, 그 변형들이 모두 **같은 세트**에 있으면.
- * - 후보가 없거나 둘 이상(복제하면 플러그인 데이터도 복제된다)이면 null.
+ * 키 맞추기(§4.7 "재사용" 3번). **"정확히 하나"는 짝 맞추기 검사(`passes`)를 통과한 후보 중에서 센다.**
+ * - single · collapse: 같은 키이고 모든 멤버와 짝이 맞는 후보가 정확히 하나면 모든 멤버가 그 컴포넌트.
+ * - variant: 멤버마다 같은 키이고 그 멤버와 짝이 맞는 후보가 정확히 하나이고, 그 변형들이 모두 **같은 세트**에 있으면.
+ * - 통과한 후보가 없으면 새로 만들고 키를 남긴다(keepKey). 둘 이상이면(복제하면 플러그인 데이터도 복제된다)
+ *   새로 만들되 키를 남기지 않는다 — 같은 키가 끝없이 쌓여 재사용이 영영 꺼지지 않게.
+ * `passes(memberIndex, compId)`를 주지 않으면 모두 통과로 본다.
  */
-export function matchReuse(plan: ReusePlan, comps: readonly ReuseCandidate[], memberCount: number): string[] | null {
-  const only = (key: string): ReuseCandidate | null => {
-    const hits = comps.filter((c) => c.key === key);
-    return hits.length === 1 ? hits[0] : null;
-  };
+export function matchReuse(
+  plan: ReusePlan,
+  comps: readonly ReuseCandidate[],
+  memberCount: number,
+  passes: (memberIndex: number, compId: string) => boolean = () => true,
+): ReuseMatch {
+  const byKey = (key: string) => comps.filter((c) => c.key === key);
   if (plan.kind !== 'variant') {
-    const hit = only(plan.keys[0]);
-    return hit ? Array.from({ length: memberCount }, () => hit.id) : null;
+    const ok = byKey(plan.keys[0]).filter((c) => {
+      for (let k = 0; k < memberCount; k++) if (!passes(k, c.id)) return false;
+      return true;
+    });
+    if (ok.length === 1) return { ids: Array.from({ length: memberCount }, () => ok[0].id), keepKey: true };
+    return { ids: null, keepKey: ok.length === 0 };
   }
-  const hits = plan.keys.map(only);
-  if (hits.some((h) => !h)) return null;
-  const setId = hits[0]!.setId;
-  if (!setId || hits.some((h) => h!.setId !== setId)) return null;
-  return hits.map((h) => h!.id);
+  const hits = plan.keys.map((key, k) => byKey(key).filter((c) => passes(k, c.id)));
+  if (hits.some((h) => h.length > 1)) return { ids: null, keepKey: false };
+  if (hits.some((h) => h.length === 0)) return { ids: null, keepKey: true };
+  const setId = hits[0][0].setId;
+  if (!setId || hits.some((h) => h[0].setId !== setId)) return { ids: null, keepKey: true };
+  return { ids: hits.map((h) => h[0].id), keepKey: true };
 }
 
 /**

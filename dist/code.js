@@ -5591,20 +5591,22 @@
     }
     return { kind: "variant", keys: members.map((m) => reuseKey("variant", m)) };
   }
-  function matchReuse(plan, comps, memberCount) {
-    const only = (key) => {
-      const hits2 = comps.filter((c) => c.key === key);
-      return hits2.length === 1 ? hits2[0] : null;
-    };
+  function matchReuse(plan, comps, memberCount, passes = () => true) {
+    const byKey = (key) => comps.filter((c) => c.key === key);
     if (plan.kind !== "variant") {
-      const hit = only(plan.keys[0]);
-      return hit ? Array.from({ length: memberCount }, () => hit.id) : null;
+      const ok = byKey(plan.keys[0]).filter((c) => {
+        for (let k = 0; k < memberCount; k++) if (!passes(k, c.id)) return false;
+        return true;
+      });
+      if (ok.length === 1) return { ids: Array.from({ length: memberCount }, () => ok[0].id), keepKey: true };
+      return { ids: null, keepKey: ok.length === 0 };
     }
-    const hits = plan.keys.map(only);
-    if (hits.some((h) => !h)) return null;
-    const setId = hits[0].setId;
-    if (!setId || hits.some((h) => h.setId !== setId)) return null;
-    return hits.map((h) => h.id);
+    const hits = plan.keys.map((key, k) => byKey(key).filter((c) => passes(k, c.id)));
+    if (hits.some((h) => h.length > 1)) return { ids: null, keepKey: false };
+    if (hits.some((h) => h.length === 0)) return { ids: null, keepKey: true };
+    const setId = hits[0][0].setId;
+    if (!setId || hits.some((h) => h[0].setId !== setId)) return { ids: null, keepKey: true };
+    return { ids: hits.map((h) => h[0].id), keepKey: true };
   }
   function reusePairIssue(a, b, asInstance = /* @__PURE__ */ new Set(), iconInstances = /* @__PURE__ */ new Set()) {
     const isVec = (n) => VECTOR_TYPES.has(n.type);
@@ -5654,6 +5656,7 @@
   }
   function createIconRegistry(opts) {
     const byKey = /* @__PURE__ */ new Map();
+    const madeKeys = /* @__PURE__ */ new Set();
     let made = 0;
     const lookup = (vectorKey) => {
       var _a, _b;
@@ -5674,6 +5677,18 @@
     return {
       get: (vectorKey) => lookup(vectorKey),
       created: () => made,
+      discard(vectorKey) {
+        if (!madeKeys.has(vectorKey)) return false;
+        const comp = byKey.get(vectorKey);
+        madeKeys.delete(vectorKey);
+        byKey.delete(vectorKey);
+        made--;
+        try {
+          if (comp && !comp.removed) comp.remove();
+        } catch (e) {
+        }
+        return true;
+      },
       ensure(vectorKey, node, baseName) {
         const hit = lookup(vectorKey);
         if (hit) return hit;
@@ -5688,6 +5703,7 @@
           }
           opts.place(comp);
           byKey.set(vectorKey, comp);
+          madeKeys.add(vectorKey);
           made++;
           return comp;
         } catch (e) {
@@ -7334,33 +7350,45 @@
     }
     return { list, byId };
   }
-  async function decideReuse(groups, exclude) {
+  async function decideReuse(groups, exclude, asInstance) {
     var _a;
     const { list, byId } = await reuseCandidates(exclude);
-    if (!list.length) return groups.map(() => null);
-    const asInstance = /* @__PURE__ */ new Set();
-    for (const g of groups) for (const m of g.members) asInstance.add(m.id);
+    if (!list.length) return groups.map(() => ({ hit: null, keepKey: true }));
     const out = [];
     for (const g of groups) {
       let hit = null;
+      let keepKey = true;
       try {
         const plan = reusePlanFor(g.members);
-        const ids = plan ? matchReuse(plan, list, g.members.length) : null;
-        const comps = ids ? ids.map((id) => byId.get(id)).filter((c) => !!c) : [];
-        if (plan && ids && comps.length === g.members.length) {
-          const iconIds = [];
-          let ok = true;
-          for (let k = 0; k < g.members.length && ok; k++) {
-            const { root } = reuseRootOf(comps[k], g.members[k].type);
-            const icons = await iconInstanceIds(root);
-            iconIds.push(icons);
-            if (reusePairIssue(g.members[k], toStructNode(root), asInstance, icons)) ok = false;
+        if (plan) {
+          const pass = /* @__PURE__ */ new Map();
+          const icons = /* @__PURE__ */ new Map();
+          for (let k = 0; k < g.members.length; k++) {
+            const key = plan.kind === "variant" ? plan.keys[k] : plan.keys[0];
+            for (const c of list) {
+              if (c.key !== key) continue;
+              const comp = byId.get(c.id);
+              if (!comp) {
+                pass.set(`${k}|${c.id}`, false);
+                continue;
+              }
+              const { root } = reuseRootOf(comp, g.members[k].type);
+              const ids = await iconInstanceIds(root);
+              icons.set(`${k}|${c.id}`, ids);
+              pass.set(`${k}|${c.id}`, !reusePairIssue(g.members[k], toStructNode(root), asInstance, ids));
+            }
           }
-          if (ok) {
+          const m = matchReuse(plan, list, g.members.length, (k, id) => pass.get(`${k}|${id}`) === true);
+          keepKey = m.keepKey;
+          const comps = m.ids ? m.ids.map((id) => byId.get(id)).filter((c) => !!c) : [];
+          if (m.ids && comps.length === g.members.length) {
             const set = plan.kind === "variant" && ((_a = comps[0].parent) == null ? void 0 : _a.type) === "COMPONENT_SET" ? comps[0].parent : null;
             hit = {
               comps,
-              iconIds,
+              iconIds: m.ids.map((id, k) => {
+                var _a2;
+                return (_a2 = icons.get(`${k}|${id}`)) != null ? _a2 : /* @__PURE__ */ new Set();
+              }),
               name: set ? set.name : comps[0].name,
               shown: comps.map((c) => set ? `${set.name} \xB7 ${c.name}` : c.name)
             };
@@ -7368,8 +7396,9 @@
         }
       } catch (e) {
         hit = null;
+        keepKey = true;
       }
-      out.push(hit);
+      out.push({ hit, keepKey });
     }
     return out;
   }
@@ -7752,7 +7781,9 @@
               groups.map((g) => g.members),
               await existingComponentNames(new Set(eligibleNodes.map((n) => n.id)))
             );
-            const reuseHits = await decideReuse(groups, new Set(eligibleNodes.map((n) => n.id)));
+            const defaultChecked = /* @__PURE__ */ new Set();
+            for (const g of groups) if (g.members.length >= 2) for (const m of g.members) defaultChecked.add(m.id);
+            const reuseHits = (await decideReuse(groups, new Set(eligibleNodes.map((n) => n.id)), defaultChecked)).map((d) => d.hit);
             const preview = /* @__PURE__ */ new Map();
             groups.forEach((g, gi) => {
               const name = groupNames[gi];
@@ -7827,13 +7858,21 @@
             break;
           }
           groups = orderInnerFirst(groups, byId);
-          const reuseHits = await decideReuse(groups, new Set(valid.map((n) => n.id)));
+          const checkedMembers = /* @__PURE__ */ new Set();
+          for (const g of groups) for (const m of g.members) checkedMembers.add(m.id);
+          const reuseDecisions = await decideReuse(groups, new Set(valid.map((n) => n.id)), checkedMembers);
+          const reuseHits = reuseDecisions.map((d) => d.hit);
           const structById = /* @__PURE__ */ new Map();
           for (const g of groups) for (const m of g.members) structById.set(m.id, m);
+          const noKeyMembers = /* @__PURE__ */ new Set();
+          groups.forEach((g, gi) => {
+            if (!reuseDecisions[gi].keepKey) for (const m of g.members) noKeyMembers.add(m.id);
+          });
           const markReuse = (comp, kind, memberId) => {
             const m = structById.get(memberId);
+            const key = m && !noKeyMembers.has(memberId) ? reuseKey(kind, m) : "";
             try {
-              comp.setPluginData(REUSE_KEY, m ? reuseKey(kind, m) : "");
+              comp.setPluginData(REUSE_KEY, key);
             } catch (e) {
             }
           };
@@ -7954,6 +7993,7 @@
                     continue;
                   }
                   let noted = false;
+                  const newIcons = [];
                   const make = async () => {
                     const inst = comp.createInstance();
                     try {
@@ -7963,7 +8003,11 @@
                         loadFont: (f) => figma.loadFontAsync(f),
                         iconFor: (v) => {
                           const key = vectorKeyOf(v);
-                          return key ? iconRegistry.ensure(key, v, v.name) : null;
+                          if (!key) return null;
+                          const had = iconRegistry.get(key);
+                          const icon = iconRegistry.ensure(key, v, v.name);
+                          if (icon && !had && !newIcons.includes(key)) newIcons.push(key);
+                          return icon;
                         }
                       });
                       if (!noted) {
@@ -7987,6 +8031,7 @@
                     continue;
                   }
                   if (propFailed.length > before) propFailed.splice(before);
+                  for (const key of newIcons) iconRegistry.discard(key);
                   if (r.result === "mismatch") {
                     fillKept.push(name);
                     failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_d = r.why) != null ? _d : "" }) }));

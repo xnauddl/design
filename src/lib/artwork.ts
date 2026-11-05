@@ -31,6 +31,11 @@ export interface IconRegistry {
   get(vectorKey: string): ComponentNode | null;
   /** 이번 실행에서 새로 만든 아이콘 수. */
   created(): number;
+  /**
+   * 이번 실행에 새로 만든 아이콘을 지우고 등록부 · 만든 수에서 뺀다(§4.7 "재사용" 5번 "아이콘 정리" — 그 멤버가
+   * 원본으로 남았을 때). 문서에 있던 아이콘이나 이번에 만들지 않은 지문이면 아무것도 하지 않고 false.
+   */
+  discard(vectorKey: string): boolean;
 }
 
 /**
@@ -52,6 +57,7 @@ export function createIconRegistry(opts: {
   existing?: (vectorKey: string) => ComponentNode | null;
 }): IconRegistry {
   const byKey = new Map<string, ComponentNode>();
+  const madeKeys = new Set<string>(); // 이번 실행에 새로 만든 지문
   let made = 0;
   const lookup = (vectorKey: string): ComponentNode | null => {
     const hit = byKey.get(vectorKey);
@@ -67,6 +73,15 @@ export function createIconRegistry(opts: {
   return {
     get: (vectorKey) => lookup(vectorKey),
     created: () => made,
+    discard(vectorKey) {
+      if (!madeKeys.has(vectorKey)) return false;
+      const comp = byKey.get(vectorKey);
+      madeKeys.delete(vectorKey);
+      byKey.delete(vectorKey);
+      made--;
+      try { if (comp && !comp.removed) comp.remove(); } catch { /* 이미 사라짐 */ }
+      return true;
+    },
     ensure(vectorKey, node, baseName) {
       const hit = lookup(vectorKey);
       if (hit) return hit;
@@ -81,6 +96,7 @@ export function createIconRegistry(opts: {
         try { comp.setPluginData(ICON_KEY, vectorKey); } catch { /* 남기지 못하면 다음에 새로 만들 뿐 */ }
         opts.place(comp);
         byKey.set(vectorKey, comp);
+        madeKeys.add(vectorKey);
         made++;
         return comp;
       } catch (e) {

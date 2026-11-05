@@ -929,37 +929,49 @@ async function reuseCandidates(exclude: ReadonlySet<string>): Promise<{ list: Re
   return { list, byId };
 }
 
+/** 그룹 하나의 판정 — hit: 재사용할 때만. keepKey: 새로 만들 때 키를 남기나(짝이 맞는 후보가 둘 이상이면 false). */
+type ReuseDecision = { hit: ReuseHit | null; keepKey: boolean };
+
 /**
- * 그룹마다 재사용 판정(§4.7 "재사용" 3번) — 키 맞추기 + 짝 맞추기 검사. 미리보기 · [등록]이 같은 함수를 쓴다.
- * `groups`는 루프 전 스냅샷(그 멤버 StructNode로 키를 계산한다). 재사용하지 않는 그룹은 null.
+ * 그룹마다 재사용 판정(§4.7 "재사용" 3번) — 키가 같은 후보마다 짝 맞추기 검사를 하고, 통과한 후보 중
+ * "정확히 하나"를 센다(`matchReuse`). 미리보기 · [등록]이 같은 함수를 쓴다.
+ * `groups`는 루프 전 스냅샷(그 멤버 StructNode로 키를 계산한다).
+ * `asInstance`는 A 쪽 "이번 실행 뒤의 모습" — 이번 [등록]의 그룹 멤버(인스턴스가 된다). [등록]은 체크한 그룹 전체,
+ * 미리보기는 기본 체크 상태(세트 · 접힘 그룹 — 멤버 2개+)의 멤버(7번).
  */
-async function decideReuse(groups: readonly StructGroup[], exclude: ReadonlySet<string>): Promise<(ReuseHit | null)[]> {
+async function decideReuse(groups: readonly StructGroup[], exclude: ReadonlySet<string>, asInstance: ReadonlySet<string>): Promise<ReuseDecision[]> {
   const { list, byId } = await reuseCandidates(exclude);
-  if (!list.length) return groups.map(() => null);
-  // A 쪽 "이번 실행 뒤의 모습" — 이번 [등록]의 그룹 멤버는 인스턴스가 된다.
-  const asInstance = new Set<string>();
-  for (const g of groups) for (const m of g.members) asInstance.add(m.id);
-  const out: (ReuseHit | null)[] = [];
+  if (!list.length) return groups.map(() => ({ hit: null, keepKey: true }));
+  const out: ReuseDecision[] = [];
   for (const g of groups) {
     let hit: ReuseHit | null = null;
+    let keepKey = true;
     try {
       const plan = reusePlanFor(g.members);
-      const ids = plan ? matchReuse(plan, list, g.members.length) : null;
-      const comps = ids ? ids.map((id) => byId.get(id)).filter((c): c is ComponentNode => !!c) : [];
-      if (plan && ids && comps.length === g.members.length) {
-        const iconIds: Set<string>[] = [];
-        let ok = true;
-        for (let k = 0; k < g.members.length && ok; k++) {
-          const { root } = reuseRootOf(comps[k], g.members[k].type);
-          const icons = await iconInstanceIds(root);
-          iconIds.push(icons);
-          if (reusePairIssue(g.members[k], toStructNode(root), asInstance, icons)) ok = false;
+      if (plan) {
+        // 키가 같은 후보마다 멤버별 짝 맞추기(비동기 — 아이콘 메인을 구한다)를 먼저 해 둔다.
+        const pass = new Map<string, boolean>(); // `${k}|${compId}`
+        const icons = new Map<string, Set<string>>(); // 같은 키
+        for (let k = 0; k < g.members.length; k++) {
+          const key = plan.kind === 'variant' ? plan.keys[k] : plan.keys[0];
+          for (const c of list) {
+            if (c.key !== key) continue;
+            const comp = byId.get(c.id);
+            if (!comp) { pass.set(`${k}|${c.id}`, false); continue; }
+            const { root } = reuseRootOf(comp, g.members[k].type);
+            const ids = await iconInstanceIds(root);
+            icons.set(`${k}|${c.id}`, ids);
+            pass.set(`${k}|${c.id}`, !reusePairIssue(g.members[k], toStructNode(root), asInstance, ids));
+          }
         }
-        if (ok) {
+        const m = matchReuse(plan, list, g.members.length, (k, id) => pass.get(`${k}|${id}`) === true);
+        keepKey = m.keepKey;
+        const comps = m.ids ? m.ids.map((id) => byId.get(id)).filter((c): c is ComponentNode => !!c) : [];
+        if (m.ids && comps.length === g.members.length) {
           const set = plan.kind === 'variant' && comps[0].parent?.type === 'COMPONENT_SET' ? comps[0].parent : null;
           hit = {
             comps,
-            iconIds,
+            iconIds: m.ids.map((id, k) => icons.get(`${k}|${id}`) ?? new Set<string>()),
             name: set ? set.name : comps[0].name,
             shown: comps.map((c) => (set ? `${set.name} · ${c.name}` : c.name)),
           };
@@ -967,8 +979,9 @@ async function decideReuse(groups: readonly StructGroup[], exclude: ReadonlySet<
       }
     } catch {
       hit = null; // 판정 실패 — 새로 만든다
+      keepKey = true;
     }
-    out.push(hit);
+    out.push({ hit, keepKey });
   }
   return out;
 }
@@ -1418,7 +1431,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             await existingComponentNames(new Set(eligibleNodes.map((n) => n.id))),
           );
           // 재사용 판정을 **후보 전체**로 미리 해 본다(§4.7 "재사용" 7번) — 안쪽 그룹도 저마다.
-          const reuseHits = await decideReuse(groups, new Set(eligibleNodes.map((n) => n.id)));
+          // 짝 맞추기의 "이번 [등록]의 다른 그룹 멤버"는 기본 체크 상태 기준 — 세트 · 접힘 그룹(멤버 2개+)만.
+          const defaultChecked = new Set<string>();
+          for (const g of groups) if (g.members.length >= 2) for (const m of g.members) defaultChecked.add(m.id);
+          const reuseHits = (await decideReuse(groups, new Set(eligibleNodes.map((n) => n.id)), defaultChecked)).map((d) => d.hit);
           const preview = new Map<string, { group?: string; variant?: string; single?: string; propsOnly?: boolean; reuse?: { name: string } }>();
           groups.forEach((g, gi) => {
             const name = groupNames[gi];
@@ -1504,14 +1520,21 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         groups = orderInnerFirst(groups, byId);
         // 재사용 판정 — 루프 **전** 스냅샷(그룹 멤버의 StructNode)으로 한 번(§4.7 "재사용" 1·3번).
         // 체크한 그룹만 받아 다시 판정한다(7번) — 미리보기와 답이 다를 수 있다.
-        const reuseHits = await decideReuse(groups, new Set(valid.map((n) => n.id)));
+        const checkedMembers = new Set<string>();
+        for (const g of groups) for (const m of g.members) checkedMembers.add(m.id);
+        const reuseDecisions = await decideReuse(groups, new Set(valid.map((n) => n.id)), checkedMembers);
+        const reuseHits = reuseDecisions.map((d) => d.hit);
         /** 루프 전 스냅샷 — 키를 남길 때도 이것으로 계산한다(루프 안에서는 안쪽이 이미 인스턴스다). */
         const structById = new Map<string, StructNode>();
         for (const g of groups) for (const m of g.members) structById.set(m.id, m);
         /** 만든 컴포넌트에 재사용 키를 남긴다 — 실제로 만든 종류대로(2번). 못 남기면 다음에 새로 만들 뿐. */
+        // 짝이 맞는 기존 후보가 둘 이상이던 그룹은 새로 만들되 키를 남기지 않는다(3번) — 그 그룹 멤버 id.
+        const noKeyMembers = new Set<string>();
+        groups.forEach((g, gi) => { if (!reuseDecisions[gi].keepKey) for (const m of g.members) noKeyMembers.add(m.id); });
         const markReuse = (comp: ComponentNode, kind: 'single' | 'collapse' | 'variant', memberId: string): void => {
           const m = structById.get(memberId);
-          try { comp.setPluginData(REUSE_KEY, m ? reuseKey(kind, m) : ''); } catch { /* 무시 */ }
+          const key = m && !noKeyMembers.has(memberId) ? reuseKey(kind, m) : '';
+          try { comp.setPluginData(REUSE_KEY, key); } catch { /* 무시 */ }
         };
         // 문서에 이미 있는 아이콘 컴포넌트(그림 지문 `dsl.icon`) — 등록부가 먼저 찾아 쓴다(2번).
         const existingIcons = new Map<string, ComponentNode>();
@@ -1650,6 +1673,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   continue;
                 }
                 let noted = false;
+                // 이 멤버를 위해 이번 실행에 새로 만든 아이콘 — 멤버가 원본으로 남으면 지운다(5번 "아이콘 정리").
+                const newIcons: string[] = [];
                 const make = async (): Promise<InstanceNode> => {
                   const inst = comp.createInstance();
                   try {
@@ -1659,7 +1684,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                       loadFont: (f) => figma.loadFontAsync(f),
                       iconFor: (v) => {
                         const key = vectorKeyOf(v);
-                        return key ? iconRegistry.ensure(key, v, v.name) : null;
+                        if (!key) return null;
+                        const had = iconRegistry.get(key); // 이미 있던 것(이번에 만든 것 · 문서에 있던 것)
+                        const icon = iconRegistry.ensure(key, v, v.name);
+                        if (icon && !had && !newIcons.includes(key)) newIcons.push(key);
+                        return icon;
                       },
                     });
                     if (!noted) {
@@ -1677,6 +1706,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 const r = await replaceMemberAsync(node, make, prefix);
                 if (r.result === 'replaced') { any = true; continue; }
                 if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
+                // 이 멤버만 쓰려고 새로 만든 아이콘은 지운다 — 만든 순간 다른 멤버는 아직 쓰지 않았다(쓰던 것은 had로 빠진다).
+                // 결과 줄 "아이콘 n"에서도 빠진다(등록부의 만든 수).
+                for (const key of newIcons) iconRegistry.discard(key);
                 if (r.result === 'mismatch') {
                   fillKept.push(name);
                   failures.push(t('component.fail.fillKept', { name, causePart: t('component.fail.cause', { why: r.why ?? '' }) }));
