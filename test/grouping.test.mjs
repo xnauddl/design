@@ -242,3 +242,17 @@ test('탭 칸 — 그라데이션 칸 · 원 하나뿐인 자식은 탭 아님',
   const dot = { ...pill(), children: pill().children.map((c) => ({ ...c, children: [...c.children, { id: `${c.id}d`, name: 'dot', type: 'ELLIPSE', width: 6, height: 6 }] })) };
   assert.equal(tabInfo(dot), null);
 });
+
+test('아이콘 프레임 보이기 차 → 가족과 함께 재사용 키도 갈린다 · 탭 Size는 그 묶음에만', () => {
+  const c = (id, hidden) => ({ id, name: 'card', type: 'FRAME', width: 200, height: 100, cornerRadius: 8, fillHex: '#ffffff', fills: visible,
+    children: [{ id: `${id}-i`, name: 'ic', type: 'FRAME', width: 24, height: 24, iconFrame: true, vectorKey: 'f:1', visible: !hidden, children: [] }, text(`${id}t`, id)] });
+  const g = planRegisterGroups([c('a', false), c('b', false), c('d', true), c('e', true)], noAncestors);
+  assert.equal(g.length, 2);
+  assert.notEqual(reusePlanFor(g[0]).keys[0], reusePlanFor(g[1]).keys[0]);
+  const small = { ...pill('p1'), width: 400, height: 60 };
+  const big = { ...pill('p2'), width: 500, height: 71 };
+  const t = planRegisterGroups([menu(), small, big], noAncestors)[0];
+  const props = t.subfamilies.map((s) => s.props);
+  assert.equal(props[0].Size, 'default'); // 메뉴(다른 Style)에는 붙지 않는다
+  assert.notEqual(props[1].Size, props[2].Size);
+});

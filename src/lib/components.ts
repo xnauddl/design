@@ -1488,12 +1488,17 @@ const r2 = (v: number | undefined): string => (v == null ? '' : String(Math.roun
  * - 빼는 것: 레이어 이름 · 글자 · 안쪽 인스턴스의 메인 · 사진 해시.
  * - `exact`(단독 · 세트 변형): 크기(루트와 TEXT · INSTANCE가 아닌 모든 자손, 소수 둘째 자리) · 날 벡터의 그림 지문을 더한다.
  */
-export function structFingerprint(root: StructNode, exact: boolean): string {
+export function structFingerprint(root: StructNode, exact: boolean, textColor = false): string {
   const enc = (n: StructNode): string => {
     // 아이콘 프레임은 그림 하나 — 접힘 지문엔 "아이콘 있음"만, 정확 지문엔 아이콘 지문(§4.7 "묶기" 7번).
-    if (n.iconFrame) return exact ? `ICON:${n.vectorKey ?? ''}` : 'ICON';
-    // 정확 지문엔 글자 색을 넣는다 — 글자 색만 다른 변형(Color · 탭 Selected)이 같은 키를 받지 않게(§4.7 "재사용" 1번).
-    if (n.type === 'TEXT') return exact ? `TEXT:${n.fillHex ?? ''}` : 'TEXT';
+    // 보이기는 다른 레이어처럼 넣는다(`?` 이름이면 뺀다) — 가족을 가르는 차라 키도 갈려야 한다.
+    if (n.iconFrame) {
+      const vis = n.name.trim().endsWith('?') ? '' : n.visible === false ? ':h' : ':s';
+      return (exact ? `ICON:${n.vectorKey ?? ''}` : 'ICON') + vis;
+    }
+    // 변형 키(`textColor`)에만 글자 색을 넣는다 — 글자 색만 다른 변형(Color · 탭 Selected)이 같은 키를 받지 않게.
+    // 단독 · 접힘 키는 그대로 둔다(이 변경 전에 만든 컴포넌트를 계속 재사용 — §4.7 "재사용" 1번).
+    if (n.type === 'TEXT') return textColor ? `TEXT:${n.fillHex ?? ''}` : 'TEXT';
     if (n.type === 'INSTANCE') return n.type;
     const parts = [
       n.type,
@@ -1516,7 +1521,7 @@ export function structFingerprint(root: StructNode, exact: boolean): string {
 
 /** 재사용 키 `{종류}:{이름 키}:{구조 지문}` — 접힘은 접힘 지문, 단독 · 변형은 정확 지문. */
 export function reuseKey(kind: ReuseKind, member: StructNode, nameKey: string = reuseNameKey(member.name)): string {
-  return `${kind}:${nameKey}:${structFingerprint(member, kind !== 'collapse')}`;
+  return `${kind}:${nameKey}:${structFingerprint(member, kind !== 'collapse', kind === 'variant')}`;
 }
 
 /** heading 접힘 그룹인가 — 재사용하지 않는다(멤버마다 자식 수가 달라질 수 있다). */
@@ -2011,7 +2016,15 @@ function tabSubfamilies(members: StructNode[]): Subfamily[] {
       if (!sizeBy.has(k)) sizeBy.set(k, new Set());
       sizeBy.get(k)!.add(String((head(s).width ?? 0) * (head(s).height ?? 0)));
     }
-    if ([...sizeBy.values()].some((v) => v.size > 1)) assignAxis(subs, 'Size', (s) => String((head(s).width ?? 0) * (head(s).height ?? 0)), sizeLabel);
+    // 그 묶음 변형에만 붙인다(Selected와 같다 — 나머지는 default).
+    const area = (s: Subfamily) => (head(s).width ?? 0) * (head(s).height ?? 0);
+    for (const [k, v] of sizeBy) {
+      if (v.size < 2) continue;
+      const inGroup = subs.filter((s) => !famContent[famOf.get(head(s).id)!] && famStyle(s) === k);
+      const labels = sizeLabel([...new Set(inGroup.map((s) => String(area(s))))]);
+      const byArea = new Map([...new Set(inGroup.map((s) => String(area(s))))].map((a, i) => [a, labels[i]]));
+      for (const s of inGroup) s.props.Size = byArea.get(String(area(s)))!;
+    }
   }
   finishProps(subs);
   return subs;

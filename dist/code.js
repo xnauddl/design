@@ -5626,11 +5626,14 @@
     return "";
   }
   var r2 = (v) => v == null ? "" : String(Math.round(v * 100) / 100);
-  function structFingerprint(root, exact) {
+  function structFingerprint(root, exact, textColor = false) {
     const enc = (n) => {
       var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
-      if (n.iconFrame) return exact ? `ICON:${(_a = n.vectorKey) != null ? _a : ""}` : "ICON";
-      if (n.type === "TEXT") return exact ? `TEXT:${(_b = n.fillHex) != null ? _b : ""}` : "TEXT";
+      if (n.iconFrame) {
+        const vis = n.name.trim().endsWith("?") ? "" : n.visible === false ? ":h" : ":s";
+        return (exact ? `ICON:${(_a = n.vectorKey) != null ? _a : ""}` : "ICON") + vis;
+      }
+      if (n.type === "TEXT") return textColor ? `TEXT:${(_b = n.fillHex) != null ? _b : ""}` : "TEXT";
       if (n.type === "INSTANCE") return n.type;
       const parts = [
         n.type,
@@ -5655,7 +5658,7 @@
     return hash2(enc(root));
   }
   function reuseKey(kind, member, nameKey = reuseNameKey(member.name)) {
-    return `${kind}:${nameKey}:${structFingerprint(member, kind !== "collapse")}`;
+    return `${kind}:${nameKey}:${structFingerprint(member, kind !== "collapse", kind === "variant")}`;
   }
   function isHeadingCollapseGroup(members) {
     if (members.length < 2) return false;
@@ -6079,10 +6082,17 @@
         if (!sizeBy.has(k)) sizeBy.set(k, /* @__PURE__ */ new Set());
         sizeBy.get(k).add(String(((_c = head(s).width) != null ? _c : 0) * ((_d = head(s).height) != null ? _d : 0)));
       }
-      if ([...sizeBy.values()].some((v) => v.size > 1)) assignAxis(subs, "Size", (s) => {
+      const area = (s) => {
         var _a2, _b2;
-        return String(((_a2 = head(s).width) != null ? _a2 : 0) * ((_b2 = head(s).height) != null ? _b2 : 0));
-      }, sizeLabel);
+        return ((_a2 = head(s).width) != null ? _a2 : 0) * ((_b2 = head(s).height) != null ? _b2 : 0);
+      };
+      for (const [k, v] of sizeBy) {
+        if (v.size < 2) continue;
+        const inGroup = subs.filter((s) => !famContent[famOf.get(head(s).id)] && famStyle(s) === k);
+        const labels = sizeLabel([...new Set(inGroup.map((s) => String(area(s))))]);
+        const byArea = new Map([...new Set(inGroup.map((s) => String(area(s))))].map((a, i) => [a, labels[i]]));
+        for (const s of inGroup) s.props.Size = byArea.get(String(area(s)));
+      }
     }
     finishProps(subs);
     return subs;
