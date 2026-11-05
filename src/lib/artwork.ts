@@ -9,6 +9,7 @@
    ============================================================ */
 import { t } from './i18n';
 import { captureOrigin, placeAtOrigin, releaseOrigin } from './placement';
+import { ICON_KEY } from './components';
 
 /** 루트 기준 **자식 인덱스 경로**(`0/1`)의 노드. 이름이 갈린 트리에서도 같은 슬롯을 가리킨다. */
 export function nodeAtPath(root: SceneNode, path: string): SceneNode | null {
@@ -30,6 +31,11 @@ export interface IconRegistry {
   get(vectorKey: string): ComponentNode | null;
   /** 이번 실행에서 새로 만든 아이콘 수. */
   created(): number;
+  /**
+   * 이번 실행에 새로 만든 아이콘을 지우고 등록부 · 만든 수에서 뺀다(§4.7 "재사용" 5번 "아이콘 정리" — 그 멤버가
+   * 원본으로 남았을 때). 문서에 있던 아이콘이나 이번에 만들지 않은 지문이면 아무것도 하지 않고 false.
+   */
+  discard(vectorKey: string): boolean;
 }
 
 /**
@@ -44,14 +50,40 @@ export function createIconRegistry(opts: {
   /** 문서 안에서 겹치지 않는 이름으로. */
   uniqueName: (base: string) => string;
   onFailure: (message: string) => void;
+  /**
+   * 문서에 이미 있는, 같은 그림 지문(`dsl.icon`)의 로컬 아이콘 컴포넌트(§4.7 "재사용" 2번).
+   * 있으면 새로 만들지 않고 그것을 쓴다 — 다시 [등록]해도 `Icon2`가 생기지 않는다. 새로 만든 수에는 넣지 않는다.
+   */
+  existing?: (vectorKey: string) => ComponentNode | null;
 }): IconRegistry {
   const byKey = new Map<string, ComponentNode>();
+  const madeKeys = new Set<string>(); // 이번 실행에 새로 만든 지문
   let made = 0;
+  const lookup = (vectorKey: string): ComponentNode | null => {
+    const hit = byKey.get(vectorKey);
+    if (hit) return hit;
+    let found: ComponentNode | null = null;
+    try { found = opts.existing?.(vectorKey) ?? null; } catch { found = null; }
+    if (found && !found.removed) {
+      byKey.set(vectorKey, found);
+      return found;
+    }
+    return null;
+  };
   return {
-    get: (vectorKey) => byKey.get(vectorKey) ?? null,
+    get: (vectorKey) => lookup(vectorKey),
     created: () => made,
+    discard(vectorKey) {
+      if (!madeKeys.has(vectorKey)) return false;
+      const comp = byKey.get(vectorKey);
+      madeKeys.delete(vectorKey);
+      byKey.delete(vectorKey);
+      made--;
+      try { if (comp && !comp.removed) comp.remove(); } catch { /* 이미 사라짐 */ }
+      return true;
+    },
     ensure(vectorKey, node, baseName) {
-      const hit = byKey.get(vectorKey);
+      const hit = lookup(vectorKey);
       if (hit) return hit;
       try {
         // 복제본을 **즉시** 페이지로 옮긴다 — 멤버 트리 안에 잠깐이라도 형제로 남으면
@@ -60,8 +92,11 @@ export function createIconRegistry(opts: {
         opts.page.appendChild(clone);
         const comp = figma.createComponentFromNode(clone);
         comp.name = opts.uniqueName(baseName);
+        // 그림 지문을 남긴다 — 다음 [등록]이 이 아이콘을 찾아 쓴다(§4.7 "재사용" 2번).
+        try { comp.setPluginData(ICON_KEY, vectorKey); } catch { /* 남기지 못하면 다음에 새로 만들 뿐 */ }
         opts.place(comp);
         byKey.set(vectorKey, comp);
+        madeKeys.add(vectorKey);
         made++;
         return comp;
       } catch (e) {
@@ -216,6 +251,122 @@ export function replaceMember(member: SceneNode, make: () => InstanceNode, prefi
   }
   try { member.remove(); } catch { /* 이미 사라짐 */ }
   return { result: 'replaced' };
+}
+
+/**
+ * `replaceMember`의 비동기판(§4.7 "재사용" 5번) — 값 넣기 안에서 글꼴 불러오기 · `getMainComponentAsync`를
+ * 기다려야 하므로 `make`가 Promise를 돌려준다. 순서와 실패 처리는 같다(resize → 사진·크기 검사 → 넣기 → 지움).
+ */
+export async function replaceMemberAsync(member: SceneNode, make: () => Promise<InstanceNode>, prefix: string): Promise<MemberResult> {
+  let inst: InstanceNode;
+  try {
+    inst = await make();
+  } catch (e) {
+    return { result: 'placeFailed', why: t('component.fail.instanceMake', { error: e instanceof Error ? e.message : String(e) }) };
+  }
+  return replaceMember(member, () => inst, prefix);
+}
+
+/** 그 레이어를 품은 가장 가까운 **조상** 인스턴스(자기 자신은 뺀다). */
+function ancestorInstance(n: SceneNode): InstanceNode | null {
+  let p: BaseNode | null = n.parent;
+  while (p) {
+    if ((p as SceneNode).type === 'INSTANCE') return p as InstanceNode;
+    p = p.parent;
+  }
+  return null;
+}
+
+const VECTOR_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);
+
+export interface CopyDeps {
+  mainOf: (inst: InstanceNode) => Promise<ComponentNode | null>;
+  loadFont: (f: FontName) => Promise<void>;
+  /** A의 날 벡터 그림에 맞는 아이콘 컴포넌트(등록부 — 없으면 만든다). 못 구하면 null. */
+  iconFor: (vector: SceneNode) => ComponentNode | null;
+}
+
+/**
+ * 재사용 인스턴스에 멤버의 덮어쓴 값을 옮긴다(§4.7 "재사용" 5번, 재귀). 멤버(A)와 인스턴스(B)를 같은 경로끼리
+ * 맞춘다(루트 포함, 감싼 도형이면 `prefix` 앞붙이). 짝마다:
+ * - 보이기가 다르면 넣는다.
+ * - TEXT: 글자가 다르면 넣는다 — 넣기 전에 B 쪽 텍스트의 지금 글꼴을 모두 불러온다.
+ * - INSTANCE: B의 메인이 A의 메인과 다르면 바꾸고, **언제나** 그 안으로 내려간다.
+ * - 날 벡터 ↔ 아이콘 인스턴스: A 그림의 아이콘으로 B를 바꾼다.
+ * - 사진: A의 이미지 해시가 B와 다르면 채움 전체를 옮긴다.
+ * 넣는 곳: 레이어가 속성에 묶여 있으면(`componentPropertyReferences`) 가장 가까운 조상 인스턴스의 속성에,
+ * 아니면 직접. 돌려주는 값: 못 넣은 것(레이어 이름) 목록.
+ */
+export async function copyOverridesAsync(member: SceneNode, inst: InstanceNode, prefix: string, deps: CopyDeps): Promise<string[]> {
+  const failed: string[] = [];
+  const fail = (what: string): void => { if (!failed.includes(what)) failed.push(what); };
+  const refsOf = (n: SceneNode): { [k: string]: string } => {
+    try { return (n.componentPropertyReferences ?? {}) as { [k: string]: string }; } catch { return {}; }
+  };
+  /** 묶였으면 조상 인스턴스의 속성에, 아니면 직접. */
+  const put = (b: SceneNode, field: 'visible' | 'characters' | 'mainComponent', value: string | boolean, direct: () => void): void => {
+    const ref = refsOf(b)[field];
+    const owner = ref ? ancestorInstance(b) : null;
+    if (ref && owner) owner.setProperties({ [ref]: value });
+    else direct();
+  };
+  const loadFonts = async (n: TextNode): Promise<void> => {
+    const len = n.characters.length;
+    const fonts = len ? n.getRangeAllFontNames(0, len) : typeof n.fontName === 'symbol' ? [] : [n.fontName as FontName];
+    for (const f of fonts) await deps.loadFont(f);
+  };
+  const swapTo = async (b: InstanceNode, comp: ComponentNode): Promise<void> => {
+    const cur = await deps.mainOf(b);
+    if (cur && cur.id === comp.id) return;
+    put(b, 'mainComponent', comp.id, () => b.swapComponent(comp));
+  };
+  const visit = async (a: SceneNode, b: SceneNode, root: boolean): Promise<void> => {
+    if (a.removed || b.removed) return;
+    // 날 벡터 ↔ 아이콘 인스턴스(1회차 접힘의 아이콘 자리 교체)
+    if (!root && VECTOR_TYPES.has(a.type) && b.type === 'INSTANCE') {
+      try {
+        if (a.visible !== b.visible) put(b, 'visible', a.visible, () => { b.visible = a.visible; });
+        const icon = deps.iconFor(a);
+        if (!icon) { fail(b.name); return; }
+        await swapTo(b, icon);
+      } catch { fail(b.name); }
+      return;
+    }
+    // 루트(멤버 ↔ 재사용 인스턴스 자신)는 타입이 다르다(FRAME ↔ INSTANCE). 그 밖의 다른 짝은 짝 맞추기 검사가 막는다.
+    if (!root && a.type !== b.type) return;
+    try {
+      if (a.visible !== b.visible) put(b, 'visible', a.visible, () => { b.visible = a.visible; });
+    } catch { fail(b.name); }
+    if (a.type === 'TEXT' && b.type === 'TEXT') {
+      try {
+        if (a.characters !== b.characters) {
+          await loadFonts(b);
+          const text = a.characters;
+          put(b, 'characters', text, () => { b.characters = text; });
+        }
+      } catch { fail(b.name); }
+      return;
+    }
+    if (!root && a.type === 'INSTANCE' && b.type === 'INSTANCE') {
+      try {
+        const main = await deps.mainOf(a);
+        if (main) await swapTo(b, main);
+      } catch { fail(b.name); }
+    }
+    // 사진 — §4.7 "인스턴스 자리" 8번처럼 채움 전체를 옮긴다
+    const ha = imageHashOf(a);
+    if (ha !== undefined && imageHashOf(b) !== ha) {
+      try { (b as GeometryMixin).fills = (a as GeometryMixin).fills; } catch { fail(b.name); }
+    }
+    if (!('children' in a) || !('children' in b)) return;
+    const ak = (a as ChildrenMixin).children as readonly SceneNode[];
+    const bk = (b as ChildrenMixin).children as readonly SceneNode[]; // 바꾼 뒤의 자식을 다시 읽는다
+    const n = Math.min(ak.length, bk.length);
+    for (let i = 0; i < n; i++) await visit(ak[i], bk[i], false);
+  };
+  const bRoot = prefix ? nodeAtPath(inst, prefix) : inst;
+  if (bRoot) await visit(member, bRoot, bRoot === inst);
+  return failed;
 }
 
 /**

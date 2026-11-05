@@ -100,7 +100,7 @@ export const STRINGS: Record<string, string> = {
   'component.noEligibleShort': '등록할 수 있는 프레임이 없어요.',
   'component.noChecked': '체크한 후보가 없어요 — 묶을 항목을 체크하세요',
   'component.candidates': '등록 후보 {total}개 · {sel}개 체크',
-  'component.registered': '컴포넌트 {registered} · 베리언트 세트 {sets}{extraPart}',
+  'component.registered': '컴포넌트 {total} (세트 {sets} · 단일 {singles}){extraPart}',
   'component.variants': '베리언트 세트 {sets}개 생성{extraPart}',
   'component.generated': '누락 조합 {generated}개 생성(세트 {sets})',
   'component.placeFailed': ' · 제자리에 못 둔 {n}개: {names}',
@@ -109,6 +109,10 @@ export const STRINGS: Record<string, string> = {
   'layer.componentsBetaAria': '컴포넌트 (베타)',
   'component.propFailed': ' · 속성 값을 못 넣은 {n}개: {names}',
   'component.fillKept': ' · 채움·크기가 달라 건너뛴 {n}개: {names}',
+  // [등록] 재사용(§4.7 "재사용" 8번) — 꼬리 형식은 placeFailed와 같다(이름 3개까지 + " 외").
+  'component.reused': ' · 기존 컴포넌트 재사용 {n}: {names}',
+  'component.reusedMore': ' 외',
+  'component.reuseKept': ' · 구조가 달라 원본을 둔 {n}개: {names}',
   'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
 
   // 마법사
@@ -702,6 +706,7 @@ export const STRINGS: Record<string, string> = {
   'component.badgeProps': '속성',
   'component.nameFallback': '컴포넌트',
   'component.badgeSingle': '단독',
+  'component.badgeReuse': '재사용',
   'component.count': '후보 {total}',
   'component.tagMissing': '빈 조합',
   'component.headMissing': '빈 조합(미생성):',
@@ -715,6 +720,7 @@ export const STRINGS: Record<string, string> = {
   'component.fail.instanceMake': '인스턴스를 만들지 못했어요: {error}',
   'component.fail.instancePlace': '제자리에 인스턴스를 넣지 못했어요',
   'component.fail.propValue': '속성 값을 못 넣어 마스터 값으로 뒀어요({name} · {prop})',
+  'component.fail.reuseShape': '구조가 달라 재사용하지 않고 원본을 뒀어요({name})',
   'component.fail.fillKept': '채움·크기가 달라 묶지 않고 원본을 뒀어요({name}){causePart}',
   'component.fail.memberKept': '제자리에 넣지 못해 원본을 뒀어요({name}){causePart}',
   // 속성 접힘 멤버 검사(§4.7 8번) 사유 — 위 두 줄의 {causePart}에 들어간다

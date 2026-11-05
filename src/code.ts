@@ -17,10 +17,10 @@ import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 import { rgbToHex, hexToRgb } from './lib/tokens';
 import { pascalCase, ROLE_KEY } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
-import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
+import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots } from './lib/components';
-import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, shouldCollapseToProperties, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
+import type { CompPropType, StructNode, StructGroup, ScanNode, CompPropPlan, ReuseCandidate } from './lib/components';
 import { scanSimilar, componentizeSimilar, componentizeResultMessage } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
 import { Tier, Feature, isTier } from './lib/entitlements';
@@ -883,6 +883,109 @@ function orderInnerFirst(groups: readonly StructGroup[], byId: Map<string, Scene
   return out;
 }
 
+/* ---------- [등록] 재사용 (§4.7 "재사용", 2026-11-05 결정 A) ---------- */
+
+/** 재사용할 그룹 — 멤버마다 쓸 기존 컴포넌트(멤버 순서), 결과 줄 이름(세트면 세트 이름), 트리에 보일 이름(멤버마다). */
+type ReuseHit = { comps: ComponentNode[]; name: string; shown: string[]; iconIds: Set<string>[] };
+
+/** 기존 컴포넌트를 찾을 앞붙이 — 감싼 도형이면 그 자식부터(§4.7 "인스턴스 자리" 8번 "경로 맞추기"). */
+function reuseRootOf(comp: ComponentNode, memberType: string): { root: SceneNode; prefix: string } {
+  const prefix = shapePrefix(comp, memberType);
+  return { root: (prefix ? nodeAtPath(comp, prefix) : null) ?? comp, prefix };
+}
+
+/** B 안 인스턴스(인스턴스 안은 내려가지 않는다) 중 메인이 아이콘 컴포넌트(`dsl.icon`)인 것의 id — 동기 메인 읽기는 dynamic-page에서 비어 있을 수 있다. */
+async function iconInstanceIds(root: SceneNode): Promise<Set<string>> {
+  const out = new Set<string>();
+  const walk = async (n: SceneNode): Promise<void> => {
+    if (n !== root && n.type === 'INSTANCE') {
+      try {
+        const main = await n.getMainComponentAsync();
+        if (main && main.getPluginData(ICON_KEY)) out.add(n.id);
+      } catch { /* 메인을 못 구하면 아이콘이 아니라고 본다 */ }
+      return;
+    }
+    if ('children' in n) for (const c of n.children as readonly SceneNode[]) await walk(c);
+  };
+  await walk(root);
+  return out;
+}
+
+/** 실효 숨김이 아닌, 재사용 키가 있는 로컬 COMPONENT(모든 페이지). `exclude`는 이번 대상 자신. */
+async function reuseCandidates(exclude: ReadonlySet<string>): Promise<{ list: ReuseCandidate[]; byId: Map<string, ComponentNode> }> {
+  const byId = new Map<string, ComponentNode>();
+  const list: ReuseCandidate[] = [];
+  try {
+    await figma.loadAllPagesAsync();
+    const comps = figma.root.findAllWithCriteria({ types: ['COMPONENT'], pluginData: { keys: [REUSE_KEY] } });
+    for (const c of comps) {
+      if (exclude.has(c.id) || !isEffectivelyVisible(c)) continue;
+      const key = c.getPluginData(REUSE_KEY);
+      if (!key) continue;
+      byId.set(c.id, c);
+      list.push({ id: c.id, key, setId: c.parent?.type === 'COMPONENT_SET' ? c.parent.id : null });
+    }
+  } catch { /* 못 찾으면 재사용하지 않는다(지금처럼 새로 만든다) */ }
+  return { list, byId };
+}
+
+/** 그룹 하나의 판정 — hit: 재사용할 때만. keepKey: 새로 만들 때 키를 남기나(짝이 맞는 후보가 둘 이상이면 false). */
+type ReuseDecision = { hit: ReuseHit | null; keepKey: boolean };
+
+/**
+ * 그룹마다 재사용 판정(§4.7 "재사용" 3번) — 키가 같은 후보마다 짝 맞추기 검사를 하고, 통과한 후보 중
+ * "정확히 하나"를 센다(`matchReuse`). 미리보기 · [등록]이 같은 함수를 쓴다.
+ * `groups`는 루프 전 스냅샷(그 멤버 StructNode로 키를 계산한다).
+ * `asInstance`는 A 쪽 "이번 실행 뒤의 모습" — 이번 [등록]의 그룹 멤버(인스턴스가 된다). [등록]은 체크한 그룹 전체,
+ * 미리보기는 기본 체크 상태(세트 · 접힘 그룹 — 멤버 2개+)의 멤버(7번).
+ */
+async function decideReuse(groups: readonly StructGroup[], exclude: ReadonlySet<string>, asInstance: ReadonlySet<string>): Promise<ReuseDecision[]> {
+  const { list, byId } = await reuseCandidates(exclude);
+  if (!list.length) return groups.map(() => ({ hit: null, keepKey: true }));
+  const out: ReuseDecision[] = [];
+  for (const g of groups) {
+    let hit: ReuseHit | null = null;
+    let keepKey = true;
+    try {
+      const plan = reusePlanFor(g.members);
+      if (plan) {
+        // 키가 같은 후보마다 멤버별 짝 맞추기(비동기 — 아이콘 메인을 구한다)를 먼저 해 둔다.
+        const pass = new Map<string, 'strict' | 'loose' | 'fail'>(); // `${k}|${compId}` — 엄격 · 예외 통과 · 걸림
+        const icons = new Map<string, Set<string>>(); // 같은 키
+        for (let k = 0; k < g.members.length; k++) {
+          const key = plan.kind === 'variant' ? plan.keys[k] : plan.keys[0];
+          for (const c of list) {
+            if (c.key !== key) continue;
+            const comp = byId.get(c.id);
+            if (!comp) { pass.set(`${k}|${c.id}`, 'fail'); continue; }
+            const { root } = reuseRootOf(comp, g.members[k].type);
+            const ids = await iconInstanceIds(root);
+            icons.set(`${k}|${c.id}`, ids);
+            pass.set(`${k}|${c.id}`, reusePairGrade(g.members[k], toStructNode(root), asInstance, ids));
+          }
+        }
+        const m = matchReuse(plan, list, g.members.length, (k, id) => pass.get(`${k}|${id}`) ?? 'fail');
+        keepKey = m.keepKey;
+        const comps = m.ids ? m.ids.map((id) => byId.get(id)).filter((c): c is ComponentNode => !!c) : [];
+        if (m.ids && comps.length === g.members.length) {
+          const set = plan.kind === 'variant' && comps[0].parent?.type === 'COMPONENT_SET' ? comps[0].parent : null;
+          hit = {
+            comps,
+            iconIds: m.ids.map((id, k) => icons.get(`${k}|${id}`) ?? new Set<string>()),
+            name: set ? set.name : comps[0].name,
+            shown: comps.map((c) => (set ? `${set.name} · ${c.name}` : c.name)),
+          };
+        }
+      }
+    } catch {
+      hit = null; // 판정 실패 — 새로 만든다
+      keepKey = true;
+    }
+    out.push({ hit, keepKey });
+  }
+  return out;
+}
+
 figma.ui.onmessage = async (msg: UiToCode) => {
   try {
     switch (msg.type) {
@@ -1327,7 +1430,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             groups.map((g) => g.members),
             await existingComponentNames(new Set(eligibleNodes.map((n) => n.id))),
           );
-          const preview = new Map<string, { group?: string; variant?: string; single?: string; propsOnly?: boolean }>();
+          // 재사용 판정을 미리 해 본다(§4.7 "재사용" 7번) — 이번 [등록] 대상은 **기본 체크 상태**(세트 · 접힘 그룹은 체크, 단독은 체크 안 함)로 보고, 판정은 안쪽 그룹까지 저마다.
+          // 짝 맞추기의 "이번 [등록]의 다른 그룹 멤버"는 기본 체크 상태 기준 — 세트 · 접힘 그룹(멤버 2개+)만.
+          const defaultChecked = new Set<string>();
+          for (const g of groups) if (g.members.length >= 2) for (const m of g.members) defaultChecked.add(m.id);
+          const reuseHits = (await decideReuse(groups, new Set(eligibleNodes.map((n) => n.id)), defaultChecked)).map((d) => d.hit);
+          const preview = new Map<string, { group?: string; variant?: string; single?: string; propsOnly?: boolean; reuse?: { name: string } }>();
           groups.forEach((g, gi) => {
             const name = groupNames[gi];
             if (g.members.length < 2) {
@@ -1339,6 +1447,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               return;
             }
             for (const d of deriveVariants(g.members)) preview.set(d.id, { group: name, variant: d.variant });
+          });
+          // [재사용] 배지 + 기존 컴포넌트 이름(세트면 "{세트} · {변형}") — 종류 라벨 위에 얹는다(기본 체크는 종류대로).
+          // 트리는 reuse가 있으면 종류 배지 대신 [재사용]을 보이고, 숫자 접미사 이름은 보이지도 보내지도 않는다.
+          groups.forEach((g, gi) => {
+            const hit = reuseHits[gi];
+            if (!hit) return;
+            g.members.forEach((m, k) => preview.set(m.id, { ...(preview.get(m.id) ?? {}), reuse: { name: hit.shown[k] } }));
           });
           nodes = pruned.map((c) => {
             const p = preview.get(c.id);
@@ -1403,6 +1518,34 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // **내부(자손) 그룹 먼저** — 내부 반복이 먼저 세트/인스턴스가 된 뒤 바깥을 컴포넌트화해야
         // 그 안에 내부 인스턴스가 들어가 중첩이 보존된다(각 단계 모두). 실제 포함관계로 위상 정렬.
         groups = orderInnerFirst(groups, byId);
+        // 재사용 판정 — 루프 **전** 스냅샷(그룹 멤버의 StructNode)으로 한 번(§4.7 "재사용" 1·3번).
+        // 체크한 그룹만 받아 다시 판정한다(7번) — 미리보기와 답이 다를 수 있다.
+        const checkedMembers = new Set<string>();
+        for (const g of groups) for (const m of g.members) checkedMembers.add(m.id);
+        const reuseDecisions = await decideReuse(groups, new Set(valid.map((n) => n.id)), checkedMembers);
+        const reuseHits = reuseDecisions.map((d) => d.hit);
+        /** 루프 전 스냅샷 — 키를 남길 때도 이것으로 계산한다(루프 안에서는 안쪽이 이미 인스턴스다). */
+        const structById = new Map<string, StructNode>();
+        for (const g of groups) for (const m of g.members) structById.set(m.id, m);
+        /** 만든 컴포넌트에 재사용 키를 남긴다 — 실제로 만든 종류대로(2번). 못 남기면 다음에 새로 만들 뿐. */
+        // 짝이 맞는 기존 후보가 둘 이상이던 그룹은 새로 만들되 키를 남기지 않는다(3번) — 그 그룹 멤버 id.
+        const noKeyMembers = new Set<string>();
+        groups.forEach((g, gi) => { if (!reuseDecisions[gi].keepKey) for (const m of g.members) noKeyMembers.add(m.id); });
+        const markReuse = (comp: ComponentNode, kind: 'single' | 'collapse' | 'variant', memberId: string): void => {
+          const m = structById.get(memberId);
+          const key = m && !noKeyMembers.has(memberId) ? reuseKey(kind, m) : '';
+          try { comp.setPluginData(REUSE_KEY, key); } catch { /* 무시 */ }
+        };
+        // 문서에 이미 있는 아이콘 컴포넌트(그림 지문 `dsl.icon`) — 등록부가 먼저 찾아 쓴다(2번).
+        const existingIcons = new Map<string, ComponentNode>();
+        try {
+          for (const c of figma.root.findAllWithCriteria({ types: ['COMPONENT'], pluginData: { keys: [ICON_KEY] } })) {
+            const k = c.getPluginData(ICON_KEY);
+            if (k && !existingIcons.has(k)) existingIcons.set(k, c);
+          }
+        } catch { /* 못 찾으면 새로 만든다 */ }
+        const reused: string[] = []; // 재사용한 기존 컴포넌트 이름(그룹마다 하나, 세트는 세트 이름)
+        const reuseKept: string[] = []; // 바꾸기 직전 다시 맞추기에 걸려 원본을 둔 멤버 이름
 
         const page = await ensureComponentsPage();
         let cursorX = pageStartX(page);
@@ -1497,6 +1640,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             return n;
           },
           onFailure: (m) => failures.push(m),
+          existing: (key) => existingIcons.get(key) ?? null,
         });
         // 트리가 보여 준 이름이 있으면 그것이 최종이다 — 충돌 해소는 **후보 전체**를 봐야
         // 같은 답이 나오는데 여기는 체크한 것만 받는다. 다시 풀면 `ProfileAvatar`로 보여 주고
@@ -1511,6 +1655,72 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           for (let gi = 0; gi < groups.length; gi++) {
             const g = groups[gi];
             const setName = groupNames[gi];
+            // 재사용(§4.7 "재사용" 5번) — 새로 만들지 않고 멤버마다 기존 컴포넌트의 인스턴스로 바꾼다.
+            // 멤버는 컴포넌트로 바꾸지 않는다 — 넣고 나서 지운다. 기존 컴포넌트 자체는 바꾸지 않는다.
+            const hit = reuseHits[gi];
+            if (hit) {
+              let any = false;
+              for (let k = 0; k < g.members.length; k++) {
+                const node = byId.get(g.members[k].id);
+                if (!node || node.removed) { skipped++; continue; }
+                const comp = hit.comps[k];
+                const name = node.name;
+                const { root, prefix } = reuseRootOf(comp, g.members[k].type);
+                // 바꾸기 직전 다시 맞추기 — 안쪽 그룹이 실제로 인스턴스가 되지 못했을 수 있다(3번). 지금 멤버 트리로.
+                if (reusePairIssue(toStructNode(node), toStructNode(root), new Set(), hit.iconIds[k])) {
+                  reuseKept.push(name);
+                  failures.push(t('component.fail.reuseShape', { name }));
+                  continue;
+                }
+                let noted = false;
+                // 이 멤버를 위해 이번 실행에 새로 만든 아이콘 — 멤버가 원본으로 남으면 지운다(5번 "아이콘 정리").
+                const newIcons: string[] = [];
+                const make = async (): Promise<InstanceNode> => {
+                  const inst = comp.createInstance();
+                  try {
+                    keepRoots.push({ node: inst, name }); // 9번 값 지키기의 기록 대상
+                    const bad = await copyOverridesAsync(node, inst, prefix, {
+                      mainOf: (n) => n.getMainComponentAsync(),
+                      loadFont: (f) => figma.loadFontAsync(f),
+                      iconFor: (v) => {
+                        const key = vectorKeyOf(v);
+                        if (!key) return null;
+                        const had = iconRegistry.get(key); // 이미 있던 것(이번에 만든 것 · 문서에 있던 것)
+                        const icon = iconRegistry.ensure(key, v, v.name);
+                        if (icon && !had && !newIcons.includes(key)) newIcons.push(key);
+                        return icon;
+                      },
+                    });
+                    if (!noted) {
+                      noted = true;
+                      for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
+                      if (bad.length) propFailed.push(name);
+                    }
+                    return inst;
+                  } catch (e) {
+                    try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
+                    throw e;
+                  }
+                };
+                const before = propFailed.length;
+                const r = await replaceMemberAsync(node, make, prefix);
+                if (r.result === 'replaced') { any = true; continue; }
+                if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
+                // 이 멤버만 쓰려고 새로 만든 아이콘은 지운다 — 만든 순간 다른 멤버는 아직 쓰지 않았다(쓰던 것은 had로 빠진다).
+                // 결과 줄 "아이콘 n"에서도 빠진다(등록부의 만든 수).
+                for (const key of newIcons) iconRegistry.discard(key);
+                if (r.result === 'mismatch') {
+                  fillKept.push(name);
+                  failures.push(t('component.fail.fillKept', { name, causePart: t('component.fail.cause', { why: r.why ?? '' }) }));
+                } else {
+                  placeFailed.push(name);
+                  failures.push(t('component.fail.memberKept', { name, causePart: r.why ? t('component.fail.cause', { why: r.why }) : '' }));
+                }
+              }
+              // 재사용한 그룹 = 멤버가 하나라도 인스턴스로 바뀐 그룹(6번). registered · sets · 단일에 세지 않는다.
+              if (any) reused.push(hit.name);
+              continue;
+            }
             // 단독(1개) — 컴포넌트화 + 원위치 인스턴스.
             if (g.members.length === 1) {
               const node = byId.get(g.members[0].id);
@@ -1519,6 +1729,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               try {
                 const comp = figma.createComponentFromNode(node);
                 registered++;
+                markReuse(comp, 'single', g.members[0].id);
                 placeSingle(comp, o, setName); // 단독·세트 동일 규칙
               } catch (e) {
                 releaseOrigin(o); // 원본이 그 자리에 그대로 — 표지만 치운다
@@ -1542,6 +1753,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   try {
                     const comp = figma.createComponentFromNode(live[0]);
                     registered++;
+                    markReuse(comp, 'single', live[0].id);
                     placeSingle(comp, o, setName || pascalCase(live[0].name));
                   } catch (e) {
                     releaseOrigin(o);
@@ -1602,6 +1814,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   continue;
                 }
                 try { master.name = setName || pascalCase(masterSnap.n.name); } catch { /* 이름 실패 무시 */ }
+                // heading 접힘 그룹은 재사용하지 않는다 — 키를 남기지 않는다(1번).
+                if (isHeadingCollapseGroup(g.members)) { try { master.setPluginData(REUSE_KEY, ''); } catch { /* 무시 */ } }
+                else markReuse(master, 'collapse', masterSnap.n.id);
                 // 도형 멤버는 컴포넌트가 감싼다 — 원본 경로 앞에 붙일 것(§4.7 8번 "경로 맞추기").
                 const prefix = shapePrefix(master, structs[preferLive]?.type ?? '');
                 placeOnPage(master);
@@ -1691,13 +1906,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
 
             // 2개+ → 각 멤버 컴포넌트화(원위치 기록) 후 세트 결합 → 원위치에 변형 인스턴스 복원.
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
-            const made: { comp: ComponentNode; variant: string; o: Origin }[] = [];
+            const made: { comp: ComponentNode; variant: string; o: Origin; id: string }[] = [];
             for (const m of g.members) {
               const node = byId.get(m.id);
               if (!node) continue;
               const o = captureOrigin(node);
               try {
-                made.push({ comp: figma.createComponentFromNode(node), variant: variantById.get(m.id) ?? '', o });
+                made.push({ comp: figma.createComponentFromNode(node), variant: variantById.get(m.id) ?? '', o, id: m.id });
                 registered++;
               } catch (e) {
                 releaseOrigin(o);
@@ -1707,7 +1922,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             }
             if (made.length < 2) {
               // 결합 불가 → 단독으로 등록 + 원위치 인스턴스.
-              for (const x of made) placeSingle(x.comp, x.o, setName);
+              for (const x of made) { markReuse(x.comp, 'single', x.id); placeSingle(x.comp, x.o, setName); }
               continue;
             }
             // 결합(핵심). 실패해도 컴포넌트가 소실되지 않게 **단독으로라도 등록**(반쪽 상태 방지).
@@ -1718,12 +1933,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               set = figma.combineAsVariants(made.map((x) => x.comp), home);
             } catch (e) {
               failures.push(t('component.fail.combine', { set: setName, error: errText(e) }));
-              for (const x of made) placeSingle(x.comp, x.o, setName);
+              for (const x of made) { markReuse(x.comp, 'single', x.id); placeSingle(x.comp, x.o, setName); }
               continue;
             }
             // 결합 성공 — 이름/이동/인스턴스는 **무조건** 수행(장식 단계 실패로 세트를 버리지 않음).
             set.name = setName;
             for (const x of made) if (x.variant) x.comp.name = x.variant; // 'Prop=value, ...'
+            for (const x of made) markReuse(x.comp, 'variant', x.id); // 세트 자신에는 남기지 않는다
             page.appendChild(set); // Components 페이지로 이동
             try { arrangeSet(set); } catch (e) { failures.push(t('component.fail.arrange', { set: set.name, error: errText(e) })); } // 장식: 비치명
             set.x = cursorX;
@@ -1765,8 +1981,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           propFailed.push(name);
         }
 
-        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept });
-        if (registered || sets) commitUndo(figma); // UX2
+        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
+        if (registered || sets || reused.length) commitUndo(figma); // UX2 — 재사용만이어도 ⌘Z 한 번(§4.7 "재사용" 6번)
         break;
       }
       case 'CLASSIFY_VARIANTS': {

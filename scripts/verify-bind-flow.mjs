@@ -997,6 +997,43 @@ async function saveAndGet(p) {
   await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card', properties: 0, instances: 0, images: 0, warnings: ['Other: 제자리에 둘 수 없어 원본을 그대로 두었어요.'], placeFailed: ['Other'] });
   s1 = await st();
   check('13 [묶기] 인스턴스 0개에도 꼬리', s1.text.startsWith('컴포넌트화하지 못했어요') && s1.text.includes('제자리에 못 둔 1개: Other'), JSON.stringify(s1));
+  // [등록] 결과 줄(§4.7 6번 "세는 단위") — "컴포넌트 {total} (세트 · 단일)", 단일 꼬리 없음.
+  // 재사용(§4.7 "재사용" 6·8번) — 재사용만 있어도 성공, 꼬리는 건너뜀 뒤 · 속성 앞, 이름 3개 + " 외"
+  await recv(p, { type: 'COMPONENTS_RESULT', registered: 1, skipped: 0, sets: 0, singles: ['Solo'], exposed: 2, missing: [], failures: [], reused: ['Card', 'Badge', 'Chip', 'Pill'] });
+  s1 = await st();
+  check('13 결과 줄 — 컴포넌트 1 (세트 0 · 단일 1), 단일 꼬리 없음',
+    s1.text.startsWith('컴포넌트 1 (세트 0 · 단일 1) · ') && s1.text.split('단일').length === 2, JSON.stringify(s1));
+  check('13 재사용 꼬리 — 속성 앞, 3개 + " 외"',
+    s1.text.includes(' · 기존 컴포넌트 재사용 4: Card, Badge, Chip 외')
+      && s1.text.indexOf('기존 컴포넌트 재사용') < s1.text.indexOf(' · 속성 2'), JSON.stringify(s1));
+  await recv(p, { type: 'COMPONENTS_RESULT', registered: 39, skipped: 0, sets: 7, singles: ['A', 'B', 'C', 'D'], exposed: 3, missing: [], failures: [] });
+  s1 = await st();
+  check('13 결과 줄 — 변형 수 대신 맨 위 단위', s1.text === '컴포넌트 11 (세트 7 · 단일 4) · 속성 3', JSON.stringify(s1));
+  await recv(p, { type: 'COMPONENTS_RESULT', registered: 0, skipped: 0, sets: 0, singles: [], missing: [], failures: [], reused: ['ItemButton'] });
+  s1 = await st();
+  check('13 재사용만 있어도 성공 상태', s1.text.startsWith('컴포넌트 0 (세트 0 · 단일 0) · 기존 컴포넌트 재사용 1: ItemButton') && s1.cls.includes('ok') && !s1.cls.includes('warn'), JSON.stringify(s1));
+  await recv(p, { type: 'COMPONENTS_RESULT', registered: 0, skipped: 0, sets: 0, singles: [], missing: [], failures: ['x'], reused: ['Card'], fillKept: ['flight'], reuseKept: ['Row A', 'Row B'], placeCloned: ['C'] });
+  s1 = await st();
+  check('13 구조가 달라 원본을 둔 꼬리 — 채움·크기 뒤 · 복사본 앞, 경고',
+    s1.text.includes(' · 구조가 달라 원본을 둔 2개: Row A, Row B')
+      && s1.text.indexOf('채움·크기가 달라') < s1.text.indexOf('구조가 달라 원본을 둔')
+      && s1.text.indexOf('구조가 달라 원본을 둔') < s1.text.indexOf('복사본을 둔')
+      && s1.cls.includes('warn'), JSON.stringify(s1));
+  // 후보 트리 — 재사용할 줄은 종류 배지 대신 [재사용] + 기존 컴포넌트 이름(세트면 "{세트} · {변형}")
+  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes: [
+    { id: 'r', name: 'Frame', type: 'FRAME', depth: 0, parentId: null, eligible: false },
+    { id: 'a', name: 'Item Button', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, group: 'ItemButton2', variant: 'Variant=1', reuse: { name: 'ItemButton · Variant=1' } },
+    { id: 'b', name: 'Like', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Like' },
+  ] });
+  const rows = await p.$$eval('#compTree .tag', (els) => els.map((e) => ({ text: e.textContent, cls: e.className, row: e.closest('.r-card')?.textContent ?? '' })));
+  const reuseRow = rows.find((r) => r.text === '재사용');
+  check('13 후보 트리 배지 [재사용] + 기존 이름(접미사 이름 안 보임)',
+    !!reuseRow && reuseRow.cls.includes('tag-reuse') && reuseRow.row.includes('ItemButton · Variant=1') && !reuseRow.row.includes('ItemButton2')
+      && rows.some((r) => r.text === '단독'), JSON.stringify(rows));
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' }); // [등록]은 유료 — 잠금을 푼다
+  await p.click('#btnRegisterComp');
+  const reg = (await sent(p, 'REGISTER_COMPONENTS')).pop();
+  check('13 [등록] — 재사용 줄의 이름은 보내지 않는다(판정이 바뀌면 접미사 규칙)', !!reg && reg.nodeIds.includes('a') && !(reg.names && 'a' in reg.names), JSON.stringify(reg));
   await p.close();
 }
 

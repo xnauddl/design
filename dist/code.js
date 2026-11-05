@@ -107,7 +107,7 @@
     "component.noEligibleShort": "\uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694.",
     "component.noChecked": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBB36\uC744 \uD56D\uBAA9\uC744 \uCCB4\uD06C\uD558\uC138\uC694",
     "component.candidates": "\uB4F1\uB85D \uD6C4\uBCF4 {total}\uAC1C \xB7 {sel}\uAC1C \uCCB4\uD06C",
-    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {registered} \xB7 \uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}{extraPart}",
+    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {total} (\uC138\uD2B8 {sets} \xB7 \uB2E8\uC77C {singles}){extraPart}",
     "component.variants": "\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}\uAC1C \uC0DD\uC131{extraPart}",
     "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
@@ -116,6 +116,10 @@
     "layer.componentsBetaAria": "\uCEF4\uD3EC\uB10C\uD2B8 (\uBCA0\uD0C0)",
     "component.propFailed": " \xB7 \uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC740 {n}\uAC1C: {names}",
     "component.fillKept": " \xB7 \uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uAC74\uB108\uB6F4 {n}\uAC1C: {names}",
+    // [등록] 재사용(§4.7 "재사용" 8번) — 꼬리 형식은 placeFailed와 같다(이름 3개까지 + " 외").
+    "component.reused": " \xB7 \uAE30\uC874 \uCEF4\uD3EC\uB10C\uD2B8 \uC7AC\uC0AC\uC6A9 {n}: {names}",
+    "component.reusedMore": " \uC678",
+    "component.reuseKept": " \xB7 \uAD6C\uC870\uAC00 \uB2EC\uB77C \uC6D0\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
     "wizard.needSelect": "\uBA3C\uC800 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uC5D0\uC11C \uAC12\uC744 \uBF51\uC544\uC694",
@@ -698,6 +702,7 @@
     "component.badgeProps": "\uC18D\uC131",
     "component.nameFallback": "\uCEF4\uD3EC\uB10C\uD2B8",
     "component.badgeSingle": "\uB2E8\uB3C5",
+    "component.badgeReuse": "\uC7AC\uC0AC\uC6A9",
     "component.count": "\uD6C4\uBCF4 {total}",
     "component.tagMissing": "\uBE48 \uC870\uD569",
     "component.headMissing": "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):",
@@ -711,6 +716,7 @@
     "component.fail.instanceMake": "\uC778\uC2A4\uD134\uC2A4\uB97C \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694: {error}",
     "component.fail.instancePlace": "\uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uB123\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "component.fail.propValue": "\uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC5B4 \uB9C8\uC2A4\uD130 \uAC12\uC73C\uB85C \uB480\uC5B4\uC694({name} \xB7 {prop})",
+    "component.fail.reuseShape": "\uAD6C\uC870\uAC00 \uB2EC\uB77C \uC7AC\uC0AC\uC6A9\uD558\uC9C0 \uC54A\uACE0 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name})",
     "component.fail.fillKept": "\uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uBB36\uC9C0 \uC54A\uACE0 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name}){causePart}",
     "component.fail.memberKept": "\uC81C\uC790\uB9AC\uC5D0 \uB123\uC9C0 \uBABB\uD574 \uC6D0\uBCF8\uC744 \uB480\uC5B4\uC694({name}){causePart}",
     // 속성 접힘 멤버 검사(§4.7 8번) 사유 — 위 두 줄의 {causePart}에 들어간다
@@ -4247,344 +4253,6 @@
     if (t2.propFailed.length > propStart) t2.propFailed.splice(propStart);
   }
 
-  // src/lib/artwork.ts
-  function nodeAtPath(root, path) {
-    let cur = root;
-    for (const seg of path.split("/").filter(Boolean)) {
-      if (!("children" in cur)) return null;
-      const i = Number(seg);
-      if (!Number.isFinite(i)) return null;
-      const kids = cur.children;
-      if (!kids[i]) return null;
-      cur = kids[i];
-    }
-    return cur;
-  }
-  function createIconRegistry(opts) {
-    const byKey = /* @__PURE__ */ new Map();
-    let made = 0;
-    return {
-      get: (vectorKey) => {
-        var _a;
-        return (_a = byKey.get(vectorKey)) != null ? _a : null;
-      },
-      created: () => made,
-      ensure(vectorKey, node, baseName) {
-        const hit = byKey.get(vectorKey);
-        if (hit) return hit;
-        try {
-          const clone = node.clone();
-          opts.page.appendChild(clone);
-          const comp = figma.createComponentFromNode(clone);
-          comp.name = opts.uniqueName(baseName);
-          opts.place(comp);
-          byKey.set(vectorKey, comp);
-          made++;
-          return comp;
-        } catch (e) {
-          opts.onFailure(t("component.fail.iconComponent", { name: baseName, error: e instanceof Error ? e.message : String(e) }));
-          return null;
-        }
-      }
-    };
-  }
-  function swapVectorSlots(master, slots) {
-    const failures = [];
-    for (const s of slots) {
-      const target = nodeAtPath(master, s.layerPath);
-      const parent = target == null ? void 0 : target.parent;
-      if (!target || !s.icon || !parent || !("children" in parent)) {
-        failures.push(t("component.fail.iconSwap", { layer: s.layerName }));
-        continue;
-      }
-      let inst = null;
-      try {
-        const o = captureOrigin(target, { anchor: false });
-        inst = s.icon.createInstance();
-        inst.name = target.name;
-        try {
-          inst.resize(target.width, target.height);
-        } catch (e) {
-        }
-        const placed = inst;
-        inst = null;
-        if (!placeAtOrigin(placed, o)) {
-          failures.push(t("component.fail.iconSwapPlace", { layer: s.layerName }));
-          continue;
-        }
-        target.remove();
-      } catch (e) {
-        if (inst) {
-          try {
-            if (!inst.removed) inst.remove();
-          } catch (e2) {
-          }
-        }
-        failures.push(t("component.fail.iconSwapErr", { layer: s.layerName, error: e instanceof Error ? e.message : String(e) }));
-      }
-    }
-    return failures;
-  }
-  function joinPath(prefix, path) {
-    if (!prefix) return path;
-    return path ? `${prefix}/${path}` : prefix;
-  }
-  var FRAME_LIKE = /* @__PURE__ */ new Set(["FRAME", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"]);
-  function shapePrefix(master, rootType) {
-    if (FRAME_LIKE.has(rootType)) return "";
-    const kids = "children" in master ? master.children : [];
-    return kids.length === 1 && kids[0].type === rootType ? "0" : "";
-  }
-  function imageHashOf(n) {
-    var _a;
-    const f = "fills" in n ? n.fills : null;
-    if (!Array.isArray(f)) return void 0;
-    const img = f.find((p) => p.type === "IMAGE" && p.visible !== false);
-    return img ? (_a = img.imageHash) != null ? _a : "" : void 0;
-  }
-  var sameSize = (a, b) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
-  function memberFitIssue(inst, member, prefix) {
-    if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
-      return t("component.fit.size", { w: inst.width, h: inst.height, mw: member.width, mh: member.height });
-    }
-    let issue = null;
-    const visit = (n, path) => {
-      if (issue) return;
-      const h = imageHashOf(n);
-      if (h !== void 0) {
-        const at = joinPath(prefix, path);
-        const hit = nodeAtPath(inst, at);
-        if (!hit) {
-          issue = t("component.fit.noPhoto", { path: at || t("component.fit.self") });
-          return;
-        }
-        if (imageHashOf(hit) !== h) {
-          issue = t("component.fit.photoDiff", { name: n.name });
-          return;
-        }
-        if (!sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
-          issue = t("component.fit.photoSize", { w: hit.width, h: hit.height, mw: n.width, mh: n.height, name: n.name });
-          return;
-        }
-      }
-      if (n.type === "INSTANCE" || !("children" in n)) return;
-      n.children.forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i)));
-    };
-    visit(member, "");
-    return issue;
-  }
-  function replaceMember(member, make, prefix) {
-    let inst = null;
-    try {
-      inst = make();
-    } catch (e) {
-      return { result: "placeFailed", why: t("component.fail.instanceMake", { error: e instanceof Error ? e.message : String(e) }) };
-    }
-    try {
-      if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
-        try {
-          inst.resize(member.width, member.height);
-        } catch (e) {
-        }
-      }
-      const why = memberFitIssue(inst, member, prefix);
-      if (why) {
-        try {
-          inst.remove();
-        } catch (e) {
-        }
-        return { result: "mismatch", why };
-      }
-    } catch (e) {
-      try {
-        inst.remove();
-      } catch (e2) {
-      }
-      return { result: "mismatch", why: e instanceof Error ? e.message : String(e) };
-    }
-    const o = captureOrigin(member, { anchor: false });
-    if (!placeAtOrigin(inst, o)) {
-      releaseOrigin(o);
-      return { result: "placeFailed", why: t("component.fail.instancePlace") };
-    }
-    try {
-      member.remove();
-    } catch (e) {
-    }
-    return { result: "replaced" };
-  }
-  function propIdsByName(container) {
-    const map = /* @__PURE__ */ new Map();
-    let defs;
-    try {
-      defs = container.componentPropertyDefinitions;
-    } catch (e) {
-      return map;
-    }
-    if (!defs) return map;
-    for (const key of Object.keys(defs)) {
-      const name = key.replace(/#[^#]*$/, "");
-      if (name && !map.has(name)) map.set(name, key);
-    }
-    return map;
-  }
-  function applyInstancePropValues(inst, ids, values) {
-    var _a;
-    const failed = [];
-    const payload = {};
-    const nameOf = /* @__PURE__ */ new Map();
-    for (const [name, val] of Object.entries(values)) {
-      const id = ids.get(name);
-      if (id == null) {
-        failed.push(name);
-        continue;
-      }
-      payload[id] = val;
-      nameOf.set(id, name);
-    }
-    if (!Object.keys(payload).length) return failed;
-    try {
-      inst.setProperties(payload);
-      return failed;
-    } catch (e) {
-    }
-    for (const [id, val] of Object.entries(payload)) {
-      try {
-        inst.setProperties({ [id]: val });
-      } catch (e) {
-        failed.push((_a = nameOf.get(id)) != null ? _a : id);
-      }
-    }
-    return failed;
-  }
-  function transplantImageFills(inst, images) {
-    let applied = 0;
-    const failures = [];
-    for (const [path, paints3] of Object.entries(images)) {
-      const dst = nodeAtPath(inst, path);
-      if (!dst || !("fills" in dst)) {
-        failures.push(t("component.fail.photoNoSlot", { path }));
-        continue;
-      }
-      try {
-        dst.fills = paints3;
-        applied++;
-      } catch (e) {
-        failures.push(t("component.fail.photo", { path, error: e instanceof Error ? e.message : String(e) }));
-      }
-    }
-    return { applied, failures };
-  }
-  function ownLayers(root) {
-    const out = [];
-    const walk3 = (n) => {
-      if (!("children" in n)) return;
-      for (const c of n.children) {
-        out.push(c);
-        if (c.type !== "INSTANCE") walk3(c);
-      }
-    };
-    walk3(root);
-    return out;
-  }
-  async function snapshotOverrides(root, place, mainOf) {
-    const out = [];
-    const visit = async (n, depth) => {
-      var _a;
-      if (n.removed) return;
-      if (n.type === "INSTANCE") {
-        const items = [];
-        for (const l of ownLayers(n)) {
-          try {
-            const item = { id: l.id, name: l.name, visible: l.visible };
-            if (l.type === "TEXT") item.text = l.characters;
-            if (l.type === "INSTANCE") item.swap = (_a = await mainOf(l)) == null ? void 0 : _a.id;
-            items.push(item);
-          } catch (e) {
-          }
-        }
-        out.push({ instId: n.id, depth, place, items });
-        depth++;
-      }
-      if ("children" in n) for (const c of n.children) await visit(c, depth);
-    };
-    await visit(root, 0);
-    return out;
-  }
-  var propNameOf = (key) => key.replace(/#[^#]*$/, "") || key;
-  async function restoreOverrides(snaps, getNode, mainOf, loadFont) {
-    var _a, _b;
-    const failedBy = /* @__PURE__ */ new Map();
-    const fail = (place, what) => {
-      var _a2;
-      const list = (_a2 = failedBy.get(place)) != null ? _a2 : [];
-      if (!list.includes(what)) list.push(what);
-      failedBy.set(place, list);
-    };
-    const loadAll = async (node) => {
-      const len = node.characters.length;
-      const fonts = len ? node.getRangeAllFontNames(0, len) : typeof node.fontName === "symbol" ? [] : [node.fontName];
-      for (const f of fonts) await loadFont(f);
-    };
-    const ordered = [...snaps].sort((a, b) => a.depth - b.depth);
-    for (const snap of ordered) {
-      const inst = await getNode(snap.instId);
-      if (!inst || inst.removed || inst.type !== "INSTANCE") continue;
-      const payload = {};
-      const direct = [];
-      for (const it of snap.items) {
-        const node = await getNode(it.id);
-        if (!node || node.removed) continue;
-        const refs = (_a = node.componentPropertyReferences) != null ? _a : {};
-        try {
-          if (refs.visible && node.visible !== it.visible) payload[refs.visible] = it.visible;
-          if (node.type === "INSTANCE" && it.swap && refs.mainComponent) {
-            const cur = (_b = await mainOf(node)) == null ? void 0 : _b.id;
-            if (cur !== it.swap) payload[refs.mainComponent] = it.swap;
-          }
-          if (node.type === "TEXT" && it.text !== void 0 && node.characters !== it.text) {
-            try {
-              await loadAll(node);
-            } catch (e) {
-              fail(snap.place, refs.characters ? propNameOf(refs.characters) : node.name);
-              continue;
-            }
-            if (refs.characters) payload[refs.characters] = it.text;
-            else direct.push({ node, text: it.text });
-          }
-        } catch (e) {
-          fail(snap.place, it.name);
-        }
-      }
-      const keys = Object.keys(payload);
-      if (keys.length) {
-        let ok = false;
-        try {
-          inst.setProperties(payload);
-          ok = true;
-        } catch (e) {
-        }
-        if (!ok) {
-          for (const k of keys) {
-            try {
-              inst.setProperties({ [k]: payload[k] });
-            } catch (e) {
-              fail(snap.place, propNameOf(k));
-            }
-          }
-        }
-      }
-      for (const d of direct) {
-        try {
-          d.node.characters = d.text;
-        } catch (e) {
-          fail(snap.place, d.node.name);
-        }
-      }
-    }
-    return failedBy;
-  }
-
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
   var TSHIRT_MID = TSHIRT.indexOf("md");
@@ -5854,6 +5522,641 @@
       return name;
     });
   }
+  var REUSE_KEY = "dsl.reuse";
+  var ICON_KEY = "dsl.icon";
+  function reuseNameKey(name) {
+    return exactNameKey(name);
+  }
+  function hash2(s) {
+    let h1 = 2166136261;
+    let h2 = 16777619 ^ 1540483477;
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      h1 ^= c;
+      h1 = Math.imul(h1, 16777619) >>> 0;
+      h2 ^= c;
+      h2 = Math.imul(h2, 1540483477) >>> 0;
+      h2 ^= h2 >>> 13;
+    }
+    return h1.toString(36) + h2.toString(36);
+  }
+  function artKind(n) {
+    if (VECTOR_TYPES.has(n.type)) return "v";
+    if (n.imageHash !== void 0) return "p";
+    if (Array.isArray(n.fills) && n.fills.some((p) => p.visible !== false && p.type === "IMAGE")) return "p";
+    return "";
+  }
+  var r2 = (v) => v == null ? "" : String(Math.round(v * 100) / 100);
+  function structFingerprint(root, exact) {
+    const enc = (n) => {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+      if (n.type === "TEXT" || n.type === "INSTANCE") return n.type;
+      const parts = [
+        n.type,
+        (_a = n.layoutMode) != null ? _a : "NONE",
+        (_b = n.paddingTop) != null ? _b : 0,
+        (_c = n.paddingRight) != null ? _c : 0,
+        (_d = n.paddingBottom) != null ? _d : 0,
+        (_e = n.paddingLeft) != null ? _e : 0,
+        (_f = n.itemSpacing) != null ? _f : 0,
+        (_g = n.counterAxisSpacing) != null ? _g : 0,
+        (_h = n.fillHex) != null ? _h : "",
+        artKind(n),
+        n.name.trim().endsWith("?") ? "" : n.visible === false ? "h" : "s"
+      ];
+      if (exact) {
+        parts.push(r2(n.width), r2(n.height));
+        if (VECTOR_TYPES.has(n.type)) parts.push((_i = n.vectorKey) != null ? _i : "");
+      }
+      const kids = ((_j = n.children) != null ? _j : []).map(enc);
+      return `${parts.join(",")}[${kids.join(";")}]`;
+    };
+    return hash2(enc(root));
+  }
+  function reuseKey(kind, member) {
+    return `${kind}:${reuseNameKey(member.name)}:${structFingerprint(member, kind !== "collapse")}`;
+  }
+  function isHeadingCollapseGroup(members) {
+    if (members.length < 2) return false;
+    if (!members.every((m) => highConfidenceComponentRole(m) === "heading")) return false;
+    return shouldCollapseHeadingMembers(members);
+  }
+  function reusePlanFor(members) {
+    var _a;
+    if (!members.length) return null;
+    if (members.length === 1) return { kind: "single", keys: [reuseKey("single", members[0])] };
+    if (shouldCollapseToProperties(members)) {
+      if (isHeadingCollapseGroup(members)) return null;
+      const master = (_a = members[pickCollapseMasterIndex(members)]) != null ? _a : members[0];
+      return { kind: "collapse", keys: [reuseKey("collapse", master)] };
+    }
+    return { kind: "variant", keys: members.map((m) => reuseKey("variant", m)) };
+  }
+  function countable(items) {
+    const strict = items.filter((x) => x.grade === "strict");
+    return (strict.length ? strict : items.filter((x) => x.grade === "loose")).map((x) => x.item);
+  }
+  function matchReuse(plan, comps, memberCount, grade = () => "strict") {
+    const result = (n, ids) => n === 1 ? { ids: ids(), keepKey: true } : { ids: null, keepKey: n === 0 };
+    if (plan.kind !== "variant") {
+      const graded = comps.filter((c) => c.key === plan.keys[0]).map((c) => {
+        let g = "strict";
+        for (let k = 0; k < memberCount && g !== "fail"; k++) {
+          const gk = grade(k, c.id);
+          if (gk === "fail") g = "fail";
+          else if (gk === "loose") g = "loose";
+        }
+        return { item: c, grade: g };
+      });
+      const hit = countable(graded);
+      return result(hit.length, () => Array.from({ length: memberCount }, () => hit[0].id));
+    }
+    const setIds = [...new Set(comps.map((c) => c.setId).filter((id) => !!id))];
+    const covering = [];
+    for (const setId of setIds) {
+      const picked = [];
+      let setGrade = "strict";
+      for (let k = 0; k < memberCount; k++) {
+        const graded = comps.filter((c) => c.setId === setId && c.key === plan.keys[k]).map((c) => ({ item: c, grade: grade(k, c.id) }));
+        const hit = countable(graded);
+        if (hit.length !== 1) {
+          setGrade = "fail";
+          break;
+        }
+        if (graded.find((x) => x.item === hit[0]).grade === "loose") setGrade = "loose";
+        picked.push(hit[0].id);
+      }
+      if (setGrade !== "fail") covering.push({ item: picked, grade: setGrade });
+    }
+    const sets = countable(covering);
+    return result(sets.length, () => sets[0]);
+  }
+  function reusePairCheck(a, b, asInstance = /* @__PURE__ */ new Set(), iconInstances = /* @__PURE__ */ new Set()) {
+    let viaIcon = false;
+    const isVec = (n) => VECTOR_TYPES.has(n.type);
+    const vecDiff = (x, y) => {
+      var _a, _b;
+      return isVec(x) && isVec(y) && ((_a = x.vectorKey) != null ? _a : "") !== ((_b = y.vectorKey) != null ? _b : "");
+    };
+    if (vecDiff(a, b)) return { issue: "/", viaIcon };
+    const walk3 = (x, y, path) => {
+      var _a, _b;
+      const xs = (_a = x.children) != null ? _a : [];
+      const ys = (_b = y.children) != null ? _b : [];
+      if (xs.length !== ys.length) return path || "/";
+      for (let i = 0; i < xs.length; i++) {
+        const p = path ? `${path}/${i}` : String(i);
+        const xa = xs[i];
+        const yb = ys[i];
+        const xInst = xa.type === "INSTANCE" || asInstance.has(xa.id);
+        const yInst = yb.type === "INSTANCE";
+        if (xInst !== yInst) {
+          if (!xInst && isVec(xa) && iconInstances.has(yb.id)) {
+            viaIcon = true;
+            continue;
+          }
+          return p;
+        }
+        if (xInst) continue;
+        if (xa.type !== yb.type) return p;
+        if (vecDiff(xa, yb)) return p;
+        const deeper = walk3(xa, yb, p);
+        if (deeper) return deeper;
+      }
+      return null;
+    };
+    const issue = walk3(a, b, "");
+    return { issue, viaIcon: issue ? false : viaIcon };
+  }
+  function reusePairGrade(a, b, asInstance, iconInstances) {
+    const r = reusePairCheck(a, b, asInstance, iconInstances);
+    return r.issue ? "fail" : r.viaIcon ? "loose" : "strict";
+  }
+  function reusePairIssue(a, b, asInstance, iconInstances) {
+    return reusePairCheck(a, b, asInstance, iconInstances).issue;
+  }
+
+  // src/lib/artwork.ts
+  function nodeAtPath(root, path) {
+    let cur = root;
+    for (const seg of path.split("/").filter(Boolean)) {
+      if (!("children" in cur)) return null;
+      const i = Number(seg);
+      if (!Number.isFinite(i)) return null;
+      const kids = cur.children;
+      if (!kids[i]) return null;
+      cur = kids[i];
+    }
+    return cur;
+  }
+  function createIconRegistry(opts) {
+    const byKey = /* @__PURE__ */ new Map();
+    const madeKeys = /* @__PURE__ */ new Set();
+    let made = 0;
+    const lookup = (vectorKey) => {
+      var _a, _b;
+      const hit = byKey.get(vectorKey);
+      if (hit) return hit;
+      let found = null;
+      try {
+        found = (_b = (_a = opts.existing) == null ? void 0 : _a.call(opts, vectorKey)) != null ? _b : null;
+      } catch (e) {
+        found = null;
+      }
+      if (found && !found.removed) {
+        byKey.set(vectorKey, found);
+        return found;
+      }
+      return null;
+    };
+    return {
+      get: (vectorKey) => lookup(vectorKey),
+      created: () => made,
+      discard(vectorKey) {
+        if (!madeKeys.has(vectorKey)) return false;
+        const comp = byKey.get(vectorKey);
+        madeKeys.delete(vectorKey);
+        byKey.delete(vectorKey);
+        made--;
+        try {
+          if (comp && !comp.removed) comp.remove();
+        } catch (e) {
+        }
+        return true;
+      },
+      ensure(vectorKey, node, baseName) {
+        const hit = lookup(vectorKey);
+        if (hit) return hit;
+        try {
+          const clone = node.clone();
+          opts.page.appendChild(clone);
+          const comp = figma.createComponentFromNode(clone);
+          comp.name = opts.uniqueName(baseName);
+          try {
+            comp.setPluginData(ICON_KEY, vectorKey);
+          } catch (e) {
+          }
+          opts.place(comp);
+          byKey.set(vectorKey, comp);
+          madeKeys.add(vectorKey);
+          made++;
+          return comp;
+        } catch (e) {
+          opts.onFailure(t("component.fail.iconComponent", { name: baseName, error: e instanceof Error ? e.message : String(e) }));
+          return null;
+        }
+      }
+    };
+  }
+  function swapVectorSlots(master, slots) {
+    const failures = [];
+    for (const s of slots) {
+      const target = nodeAtPath(master, s.layerPath);
+      const parent = target == null ? void 0 : target.parent;
+      if (!target || !s.icon || !parent || !("children" in parent)) {
+        failures.push(t("component.fail.iconSwap", { layer: s.layerName }));
+        continue;
+      }
+      let inst = null;
+      try {
+        const o = captureOrigin(target, { anchor: false });
+        inst = s.icon.createInstance();
+        inst.name = target.name;
+        try {
+          inst.resize(target.width, target.height);
+        } catch (e) {
+        }
+        const placed = inst;
+        inst = null;
+        if (!placeAtOrigin(placed, o)) {
+          failures.push(t("component.fail.iconSwapPlace", { layer: s.layerName }));
+          continue;
+        }
+        target.remove();
+      } catch (e) {
+        if (inst) {
+          try {
+            if (!inst.removed) inst.remove();
+          } catch (e2) {
+          }
+        }
+        failures.push(t("component.fail.iconSwapErr", { layer: s.layerName, error: e instanceof Error ? e.message : String(e) }));
+      }
+    }
+    return failures;
+  }
+  function joinPath(prefix, path) {
+    if (!prefix) return path;
+    return path ? `${prefix}/${path}` : prefix;
+  }
+  var FRAME_LIKE = /* @__PURE__ */ new Set(["FRAME", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"]);
+  function shapePrefix(master, rootType) {
+    if (FRAME_LIKE.has(rootType)) return "";
+    const kids = "children" in master ? master.children : [];
+    return kids.length === 1 && kids[0].type === rootType ? "0" : "";
+  }
+  function imageHashOf(n) {
+    var _a;
+    const f = "fills" in n ? n.fills : null;
+    if (!Array.isArray(f)) return void 0;
+    const img = f.find((p) => p.type === "IMAGE" && p.visible !== false);
+    return img ? (_a = img.imageHash) != null ? _a : "" : void 0;
+  }
+  var sameSize = (a, b) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
+  function memberFitIssue(inst, member, prefix) {
+    if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
+      return t("component.fit.size", { w: inst.width, h: inst.height, mw: member.width, mh: member.height });
+    }
+    let issue = null;
+    const visit = (n, path) => {
+      if (issue) return;
+      const h = imageHashOf(n);
+      if (h !== void 0) {
+        const at = joinPath(prefix, path);
+        const hit = nodeAtPath(inst, at);
+        if (!hit) {
+          issue = t("component.fit.noPhoto", { path: at || t("component.fit.self") });
+          return;
+        }
+        if (imageHashOf(hit) !== h) {
+          issue = t("component.fit.photoDiff", { name: n.name });
+          return;
+        }
+        if (!sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
+          issue = t("component.fit.photoSize", { w: hit.width, h: hit.height, mw: n.width, mh: n.height, name: n.name });
+          return;
+        }
+      }
+      if (n.type === "INSTANCE" || !("children" in n)) return;
+      n.children.forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i)));
+    };
+    visit(member, "");
+    return issue;
+  }
+  function replaceMember(member, make, prefix) {
+    let inst = null;
+    try {
+      inst = make();
+    } catch (e) {
+      return { result: "placeFailed", why: t("component.fail.instanceMake", { error: e instanceof Error ? e.message : String(e) }) };
+    }
+    try {
+      if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
+        try {
+          inst.resize(member.width, member.height);
+        } catch (e) {
+        }
+      }
+      const why = memberFitIssue(inst, member, prefix);
+      if (why) {
+        try {
+          inst.remove();
+        } catch (e) {
+        }
+        return { result: "mismatch", why };
+      }
+    } catch (e) {
+      try {
+        inst.remove();
+      } catch (e2) {
+      }
+      return { result: "mismatch", why: e instanceof Error ? e.message : String(e) };
+    }
+    const o = captureOrigin(member, { anchor: false });
+    if (!placeAtOrigin(inst, o)) {
+      releaseOrigin(o);
+      return { result: "placeFailed", why: t("component.fail.instancePlace") };
+    }
+    try {
+      member.remove();
+    } catch (e) {
+    }
+    return { result: "replaced" };
+  }
+  async function replaceMemberAsync(member, make, prefix) {
+    let inst;
+    try {
+      inst = await make();
+    } catch (e) {
+      return { result: "placeFailed", why: t("component.fail.instanceMake", { error: e instanceof Error ? e.message : String(e) }) };
+    }
+    return replaceMember(member, () => inst, prefix);
+  }
+  function ancestorInstance(n) {
+    let p = n.parent;
+    while (p) {
+      if (p.type === "INSTANCE") return p;
+      p = p.parent;
+    }
+    return null;
+  }
+  var VECTOR_TYPES2 = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
+  async function copyOverridesAsync(member, inst, prefix, deps) {
+    const failed = [];
+    const fail = (what) => {
+      if (!failed.includes(what)) failed.push(what);
+    };
+    const refsOf = (n) => {
+      var _a;
+      try {
+        return (_a = n.componentPropertyReferences) != null ? _a : {};
+      } catch (e) {
+        return {};
+      }
+    };
+    const put = (b, field, value, direct) => {
+      const ref = refsOf(b)[field];
+      const owner = ref ? ancestorInstance(b) : null;
+      if (ref && owner) owner.setProperties({ [ref]: value });
+      else direct();
+    };
+    const loadFonts = async (n) => {
+      const len = n.characters.length;
+      const fonts = len ? n.getRangeAllFontNames(0, len) : typeof n.fontName === "symbol" ? [] : [n.fontName];
+      for (const f of fonts) await deps.loadFont(f);
+    };
+    const swapTo = async (b, comp) => {
+      const cur = await deps.mainOf(b);
+      if (cur && cur.id === comp.id) return;
+      put(b, "mainComponent", comp.id, () => b.swapComponent(comp));
+    };
+    const visit = async (a, b, root) => {
+      if (a.removed || b.removed) return;
+      if (!root && VECTOR_TYPES2.has(a.type) && b.type === "INSTANCE") {
+        try {
+          if (a.visible !== b.visible) put(b, "visible", a.visible, () => {
+            b.visible = a.visible;
+          });
+          const icon = deps.iconFor(a);
+          if (!icon) {
+            fail(b.name);
+            return;
+          }
+          await swapTo(b, icon);
+        } catch (e) {
+          fail(b.name);
+        }
+        return;
+      }
+      if (!root && a.type !== b.type) return;
+      try {
+        if (a.visible !== b.visible) put(b, "visible", a.visible, () => {
+          b.visible = a.visible;
+        });
+      } catch (e) {
+        fail(b.name);
+      }
+      if (a.type === "TEXT" && b.type === "TEXT") {
+        try {
+          if (a.characters !== b.characters) {
+            await loadFonts(b);
+            const text = a.characters;
+            put(b, "characters", text, () => {
+              b.characters = text;
+            });
+          }
+        } catch (e) {
+          fail(b.name);
+        }
+        return;
+      }
+      if (!root && a.type === "INSTANCE" && b.type === "INSTANCE") {
+        try {
+          const main = await deps.mainOf(a);
+          if (main) await swapTo(b, main);
+        } catch (e) {
+          fail(b.name);
+        }
+      }
+      const ha = imageHashOf(a);
+      if (ha !== void 0 && imageHashOf(b) !== ha) {
+        try {
+          b.fills = a.fills;
+        } catch (e) {
+          fail(b.name);
+        }
+      }
+      if (!("children" in a) || !("children" in b)) return;
+      const ak = a.children;
+      const bk = b.children;
+      const n = Math.min(ak.length, bk.length);
+      for (let i = 0; i < n; i++) await visit(ak[i], bk[i], false);
+    };
+    const bRoot = prefix ? nodeAtPath(inst, prefix) : inst;
+    if (bRoot) await visit(member, bRoot, bRoot === inst);
+    return failed;
+  }
+  function propIdsByName(container) {
+    const map = /* @__PURE__ */ new Map();
+    let defs;
+    try {
+      defs = container.componentPropertyDefinitions;
+    } catch (e) {
+      return map;
+    }
+    if (!defs) return map;
+    for (const key of Object.keys(defs)) {
+      const name = key.replace(/#[^#]*$/, "");
+      if (name && !map.has(name)) map.set(name, key);
+    }
+    return map;
+  }
+  function applyInstancePropValues(inst, ids, values) {
+    var _a;
+    const failed = [];
+    const payload = {};
+    const nameOf = /* @__PURE__ */ new Map();
+    for (const [name, val] of Object.entries(values)) {
+      const id = ids.get(name);
+      if (id == null) {
+        failed.push(name);
+        continue;
+      }
+      payload[id] = val;
+      nameOf.set(id, name);
+    }
+    if (!Object.keys(payload).length) return failed;
+    try {
+      inst.setProperties(payload);
+      return failed;
+    } catch (e) {
+    }
+    for (const [id, val] of Object.entries(payload)) {
+      try {
+        inst.setProperties({ [id]: val });
+      } catch (e) {
+        failed.push((_a = nameOf.get(id)) != null ? _a : id);
+      }
+    }
+    return failed;
+  }
+  function transplantImageFills(inst, images) {
+    let applied = 0;
+    const failures = [];
+    for (const [path, paints3] of Object.entries(images)) {
+      const dst = nodeAtPath(inst, path);
+      if (!dst || !("fills" in dst)) {
+        failures.push(t("component.fail.photoNoSlot", { path }));
+        continue;
+      }
+      try {
+        dst.fills = paints3;
+        applied++;
+      } catch (e) {
+        failures.push(t("component.fail.photo", { path, error: e instanceof Error ? e.message : String(e) }));
+      }
+    }
+    return { applied, failures };
+  }
+  function ownLayers(root) {
+    const out = [];
+    const walk3 = (n) => {
+      if (!("children" in n)) return;
+      for (const c of n.children) {
+        out.push(c);
+        if (c.type !== "INSTANCE") walk3(c);
+      }
+    };
+    walk3(root);
+    return out;
+  }
+  async function snapshotOverrides(root, place, mainOf) {
+    const out = [];
+    const visit = async (n, depth) => {
+      var _a;
+      if (n.removed) return;
+      if (n.type === "INSTANCE") {
+        const items = [];
+        for (const l of ownLayers(n)) {
+          try {
+            const item = { id: l.id, name: l.name, visible: l.visible };
+            if (l.type === "TEXT") item.text = l.characters;
+            if (l.type === "INSTANCE") item.swap = (_a = await mainOf(l)) == null ? void 0 : _a.id;
+            items.push(item);
+          } catch (e) {
+          }
+        }
+        out.push({ instId: n.id, depth, place, items });
+        depth++;
+      }
+      if ("children" in n) for (const c of n.children) await visit(c, depth);
+    };
+    await visit(root, 0);
+    return out;
+  }
+  var propNameOf = (key) => key.replace(/#[^#]*$/, "") || key;
+  async function restoreOverrides(snaps, getNode, mainOf, loadFont) {
+    var _a, _b;
+    const failedBy = /* @__PURE__ */ new Map();
+    const fail = (place, what) => {
+      var _a2;
+      const list = (_a2 = failedBy.get(place)) != null ? _a2 : [];
+      if (!list.includes(what)) list.push(what);
+      failedBy.set(place, list);
+    };
+    const loadAll = async (node) => {
+      const len = node.characters.length;
+      const fonts = len ? node.getRangeAllFontNames(0, len) : typeof node.fontName === "symbol" ? [] : [node.fontName];
+      for (const f of fonts) await loadFont(f);
+    };
+    const ordered = [...snaps].sort((a, b) => a.depth - b.depth);
+    for (const snap of ordered) {
+      const inst = await getNode(snap.instId);
+      if (!inst || inst.removed || inst.type !== "INSTANCE") continue;
+      const payload = {};
+      const direct = [];
+      for (const it of snap.items) {
+        const node = await getNode(it.id);
+        if (!node || node.removed) continue;
+        const refs = (_a = node.componentPropertyReferences) != null ? _a : {};
+        try {
+          if (refs.visible && node.visible !== it.visible) payload[refs.visible] = it.visible;
+          if (node.type === "INSTANCE" && it.swap && refs.mainComponent) {
+            const cur = (_b = await mainOf(node)) == null ? void 0 : _b.id;
+            if (cur !== it.swap) payload[refs.mainComponent] = it.swap;
+          }
+          if (node.type === "TEXT" && it.text !== void 0 && node.characters !== it.text) {
+            try {
+              await loadAll(node);
+            } catch (e) {
+              fail(snap.place, refs.characters ? propNameOf(refs.characters) : node.name);
+              continue;
+            }
+            if (refs.characters) payload[refs.characters] = it.text;
+            else direct.push({ node, text: it.text });
+          }
+        } catch (e) {
+          fail(snap.place, it.name);
+        }
+      }
+      const keys = Object.keys(payload);
+      if (keys.length) {
+        let ok = false;
+        try {
+          inst.setProperties(payload);
+          ok = true;
+        } catch (e) {
+        }
+        if (!ok) {
+          for (const k of keys) {
+            try {
+              inst.setProperties({ [k]: payload[k] });
+            } catch (e) {
+              fail(snap.place, propNameOf(k));
+            }
+          }
+        }
+      }
+      for (const d of direct) {
+        try {
+          d.node.characters = d.text;
+        } catch (e) {
+          fail(snap.place, d.node.name);
+        }
+      }
+    }
+    return failedBy;
+  }
 
   // src/lib/similar.ts
   function flattenFrame(root) {
@@ -6843,7 +7146,7 @@
   }
   function vectorKeyOf(node) {
     var _a, _b, _c, _d;
-    if (!VECTOR_TYPES2.has(node.type)) return void 0;
+    if (!VECTOR_TYPES3.has(node.type)) return void 0;
     try {
       const g = node;
       const parts = [];
@@ -6854,7 +7157,7 @@
       return void 0;
     }
   }
-  var VECTOR_TYPES2 = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
+  var VECTOR_TYPES3 = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
   function toStructNode(node) {
     const a = node;
     const num = (v) => typeof v === "number" ? v : void 0;
@@ -7043,8 +7346,102 @@
     }
     return out;
   }
+  function reuseRootOf(comp, memberType) {
+    var _a;
+    const prefix = shapePrefix(comp, memberType);
+    return { root: (_a = prefix ? nodeAtPath(comp, prefix) : null) != null ? _a : comp, prefix };
+  }
+  async function iconInstanceIds(root) {
+    const out = /* @__PURE__ */ new Set();
+    const walk3 = async (n) => {
+      if (n !== root && n.type === "INSTANCE") {
+        try {
+          const main = await n.getMainComponentAsync();
+          if (main && main.getPluginData(ICON_KEY)) out.add(n.id);
+        } catch (e) {
+        }
+        return;
+      }
+      if ("children" in n) for (const c of n.children) await walk3(c);
+    };
+    await walk3(root);
+    return out;
+  }
+  async function reuseCandidates(exclude) {
+    var _a;
+    const byId = /* @__PURE__ */ new Map();
+    const list = [];
+    try {
+      await figma.loadAllPagesAsync();
+      const comps = figma.root.findAllWithCriteria({ types: ["COMPONENT"], pluginData: { keys: [REUSE_KEY] } });
+      for (const c of comps) {
+        if (exclude.has(c.id) || !isEffectivelyVisible3(c)) continue;
+        const key = c.getPluginData(REUSE_KEY);
+        if (!key) continue;
+        byId.set(c.id, c);
+        list.push({ id: c.id, key, setId: ((_a = c.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" ? c.parent.id : null });
+      }
+    } catch (e) {
+    }
+    return { list, byId };
+  }
+  async function decideReuse(groups, exclude, asInstance) {
+    var _a;
+    const { list, byId } = await reuseCandidates(exclude);
+    if (!list.length) return groups.map(() => ({ hit: null, keepKey: true }));
+    const out = [];
+    for (const g of groups) {
+      let hit = null;
+      let keepKey = true;
+      try {
+        const plan = reusePlanFor(g.members);
+        if (plan) {
+          const pass = /* @__PURE__ */ new Map();
+          const icons = /* @__PURE__ */ new Map();
+          for (let k = 0; k < g.members.length; k++) {
+            const key = plan.kind === "variant" ? plan.keys[k] : plan.keys[0];
+            for (const c of list) {
+              if (c.key !== key) continue;
+              const comp = byId.get(c.id);
+              if (!comp) {
+                pass.set(`${k}|${c.id}`, "fail");
+                continue;
+              }
+              const { root } = reuseRootOf(comp, g.members[k].type);
+              const ids = await iconInstanceIds(root);
+              icons.set(`${k}|${c.id}`, ids);
+              pass.set(`${k}|${c.id}`, reusePairGrade(g.members[k], toStructNode(root), asInstance, ids));
+            }
+          }
+          const m = matchReuse(plan, list, g.members.length, (k, id) => {
+            var _a2;
+            return (_a2 = pass.get(`${k}|${id}`)) != null ? _a2 : "fail";
+          });
+          keepKey = m.keepKey;
+          const comps = m.ids ? m.ids.map((id) => byId.get(id)).filter((c) => !!c) : [];
+          if (m.ids && comps.length === g.members.length) {
+            const set = plan.kind === "variant" && ((_a = comps[0].parent) == null ? void 0 : _a.type) === "COMPONENT_SET" ? comps[0].parent : null;
+            hit = {
+              comps,
+              iconIds: m.ids.map((id, k) => {
+                var _a2;
+                return (_a2 = icons.get(`${k}|${id}`)) != null ? _a2 : /* @__PURE__ */ new Set();
+              }),
+              name: set ? set.name : comps[0].name,
+              shown: comps.map((c) => set ? `${set.name} \xB7 ${c.name}` : c.name)
+            };
+          }
+        }
+      } catch (e) {
+        hit = null;
+        keepKey = true;
+      }
+      out.push({ hit, keepKey });
+    }
+    return out;
+  }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -7422,6 +7819,9 @@
               groups.map((g) => g.members),
               await existingComponentNames(new Set(eligibleNodes.map((n) => n.id)))
             );
+            const defaultChecked = /* @__PURE__ */ new Set();
+            for (const g of groups) if (g.members.length >= 2) for (const m of g.members) defaultChecked.add(m.id);
+            const reuseHits = (await decideReuse(groups, new Set(eligibleNodes.map((n) => n.id)), defaultChecked)).map((d) => d.hit);
             const preview = /* @__PURE__ */ new Map();
             groups.forEach((g, gi) => {
               const name = groupNames[gi];
@@ -7434,6 +7834,14 @@
                 return;
               }
               for (const d of deriveVariants(g.members)) preview.set(d.id, { group: name, variant: d.variant });
+            });
+            groups.forEach((g, gi) => {
+              const hit = reuseHits[gi];
+              if (!hit) return;
+              g.members.forEach((m, k) => {
+                var _a2;
+                return preview.set(m.id, __spreadProps(__spreadValues({}, (_a2 = preview.get(m.id)) != null ? _a2 : {}), { reuse: { name: hit.shown[k] } }));
+              });
             });
             nodes = pruned.map((c) => {
               const p = preview.get(c.id);
@@ -7488,6 +7896,34 @@
             break;
           }
           groups = orderInnerFirst(groups, byId);
+          const checkedMembers = /* @__PURE__ */ new Set();
+          for (const g of groups) for (const m of g.members) checkedMembers.add(m.id);
+          const reuseDecisions = await decideReuse(groups, new Set(valid.map((n) => n.id)), checkedMembers);
+          const reuseHits = reuseDecisions.map((d) => d.hit);
+          const structById = /* @__PURE__ */ new Map();
+          for (const g of groups) for (const m of g.members) structById.set(m.id, m);
+          const noKeyMembers = /* @__PURE__ */ new Set();
+          groups.forEach((g, gi) => {
+            if (!reuseDecisions[gi].keepKey) for (const m of g.members) noKeyMembers.add(m.id);
+          });
+          const markReuse = (comp, kind, memberId) => {
+            const m = structById.get(memberId);
+            const key = m && !noKeyMembers.has(memberId) ? reuseKey(kind, m) : "";
+            try {
+              comp.setPluginData(REUSE_KEY, key);
+            } catch (e) {
+            }
+          };
+          const existingIcons = /* @__PURE__ */ new Map();
+          try {
+            for (const c of figma.root.findAllWithCriteria({ types: ["COMPONENT"], pluginData: { keys: [ICON_KEY] } })) {
+              const k = c.getPluginData(ICON_KEY);
+              if (k && !existingIcons.has(k)) existingIcons.set(k, c);
+            }
+          } catch (e) {
+          }
+          const reused = [];
+          const reuseKept = [];
           const page = await ensureComponentsPage();
           let cursorX = pageStartX(page);
           let sets = 0;
@@ -7562,7 +7998,11 @@
               takenNames.add(n);
               return n;
             },
-            onFailure: (m) => failures.push(m)
+            onFailure: (m) => failures.push(m),
+            existing: (key) => {
+              var _a2;
+              return (_a2 = existingIcons.get(key)) != null ? _a2 : null;
+            }
           });
           const shownNames = (_c = msg.names) != null ? _c : {};
           const groupNames = groups.map((g, gi) => {
@@ -7573,6 +8013,74 @@
             for (let gi = 0; gi < groups.length; gi++) {
               const g = groups[gi];
               const setName = groupNames[gi];
+              const hit = reuseHits[gi];
+              if (hit) {
+                let any = false;
+                for (let k = 0; k < g.members.length; k++) {
+                  const node = byId.get(g.members[k].id);
+                  if (!node || node.removed) {
+                    skipped++;
+                    continue;
+                  }
+                  const comp = hit.comps[k];
+                  const name = node.name;
+                  const { root, prefix } = reuseRootOf(comp, g.members[k].type);
+                  if (reusePairIssue(toStructNode(node), toStructNode(root), /* @__PURE__ */ new Set(), hit.iconIds[k])) {
+                    reuseKept.push(name);
+                    failures.push(t("component.fail.reuseShape", { name }));
+                    continue;
+                  }
+                  let noted = false;
+                  const newIcons = [];
+                  const make = async () => {
+                    const inst = comp.createInstance();
+                    try {
+                      keepRoots.push({ node: inst, name });
+                      const bad = await copyOverridesAsync(node, inst, prefix, {
+                        mainOf: (n) => n.getMainComponentAsync(),
+                        loadFont: (f) => figma.loadFontAsync(f),
+                        iconFor: (v) => {
+                          const key = vectorKeyOf(v);
+                          if (!key) return null;
+                          const had = iconRegistry.get(key);
+                          const icon = iconRegistry.ensure(key, v, v.name);
+                          if (icon && !had && !newIcons.includes(key)) newIcons.push(key);
+                          return icon;
+                        }
+                      });
+                      if (!noted) {
+                        noted = true;
+                        for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
+                        if (bad.length) propFailed.push(name);
+                      }
+                      return inst;
+                    } catch (e) {
+                      try {
+                        if (!inst.removed) inst.remove();
+                      } catch (e2) {
+                      }
+                      throw e;
+                    }
+                  };
+                  const before = propFailed.length;
+                  const r = await replaceMemberAsync(node, make, prefix);
+                  if (r.result === "replaced") {
+                    any = true;
+                    continue;
+                  }
+                  if (propFailed.length > before) propFailed.splice(before);
+                  for (const key of newIcons) iconRegistry.discard(key);
+                  if (r.result === "mismatch") {
+                    fillKept.push(name);
+                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_d = r.why) != null ? _d : "" }) }));
+                  } else {
+                    placeFailed.push(name);
+                    failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
+                  }
+                }
+                if (any) reused.push(hit.name);
+                continue;
+              }
               if (g.members.length === 1) {
                 const node = byId.get(g.members[0].id);
                 if (!node) continue;
@@ -7580,6 +8088,7 @@
                 try {
                   const comp = figma.createComponentFromNode(node);
                   registered++;
+                  markReuse(comp, "single", g.members[0].id);
                   placeSingle(comp, o, setName);
                 } catch (e) {
                   releaseOrigin(o);
@@ -7600,6 +8109,7 @@
                     try {
                       const comp = figma.createComponentFromNode(live[0]);
                       registered++;
+                      markReuse(comp, "single", live[0].id);
                       placeSingle(comp, o, setName || pascalCase(live[0].name));
                     } catch (e) {
                       releaseOrigin(o);
@@ -7636,7 +8146,7 @@
                 } else {
                   const snaps = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                   const preferLive = pickCollapseMasterIndex(structs);
-                  const masterSnap = (_d = snaps[preferLive]) != null ? _d : snaps[0];
+                  const masterSnap = (_e = snaps[preferLive]) != null ? _e : snaps[0];
                   const masterOrigin = captureOrigin2(masterSnap.n);
                   let master;
                   try {
@@ -7651,7 +8161,13 @@
                     master.name = setName || pascalCase(masterSnap.n.name);
                   } catch (e) {
                   }
-                  const prefix = shapePrefix(master, (_f = (_e = structs[preferLive]) == null ? void 0 : _e.type) != null ? _f : "");
+                  if (isHeadingCollapseGroup(g.members)) {
+                    try {
+                      master.setPluginData(REUSE_KEY, "");
+                    } catch (e) {
+                    }
+                  } else markReuse(master, "collapse", masterSnap.n.id);
+                  const prefix = shapePrefix(master, (_g = (_f = structs[preferLive]) == null ? void 0 : _f.type) != null ? _g : "");
                   placeOnPage(master);
                   keepRoots.push({ node: master, name: master.name });
                   singles.push(master.name);
@@ -7723,7 +8239,7 @@
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
                       fillKept.push(name);
-                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_g = r.why) != null ? _g : "" }) }));
+                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_h = r.why) != null ? _h : "" }) }));
                     } else {
                       placeFailed.push(name);
                       failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -7739,7 +8255,7 @@
                 if (!node) continue;
                 const o = captureOrigin2(node);
                 try {
-                  made.push({ comp: figma.createComponentFromNode(node), variant: (_h = variantById.get(m.id)) != null ? _h : "", o });
+                  made.push({ comp: figma.createComponentFromNode(node), variant: (_i = variantById.get(m.id)) != null ? _i : "", o, id: m.id });
                   registered++;
                 } catch (e) {
                   releaseOrigin(o);
@@ -7748,20 +8264,27 @@
                 }
               }
               if (made.length < 2) {
-                for (const x of made) placeSingle(x.comp, x.o, setName);
+                for (const x of made) {
+                  markReuse(x.comp, "single", x.id);
+                  placeSingle(x.comp, x.o, setName);
+                }
                 continue;
               }
               let set;
               try {
-                const home = (_i = pageOf(made[0].comp)) != null ? _i : figma.currentPage;
+                const home = (_j = pageOf(made[0].comp)) != null ? _j : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
                 failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
-                for (const x of made) placeSingle(x.comp, x.o, setName);
+                for (const x of made) {
+                  markReuse(x.comp, "single", x.id);
+                  placeSingle(x.comp, x.o, setName);
+                }
                 continue;
               }
               set.name = setName;
               for (const x of made) if (x.variant) x.comp.name = x.variant;
+              for (const x of made) markReuse(x.comp, "variant", x.id);
               page.appendChild(set);
               try {
                 arrangeSet(set);
@@ -7807,8 +8330,8 @@
             for (const prop of props) failures.push(t("component.fail.propValue", { name, prop }));
             propFailed.push(name);
           }
-          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept });
-          if (registered || sets) commitUndo(figma);
+          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
+          if (registered || sets || reused.length) commitUndo(figma);
           break;
         }
         case "CLASSIFY_VARIANTS": {
@@ -7838,7 +8361,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_j = nodes[0].parent) != null ? _j : figma.currentPage;
+              const parent = (_k = nodes[0].parent) != null ? _k : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {
