@@ -213,7 +213,7 @@ export type UiToCode =
   | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Paid): 같은 베이스 컴포넌트 → 베리언트 세트
   | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Paid): 선택 세트의 빠진 조합 자동 생성
   | { type: 'GET_SETTINGS' } // #19: 설정 탭 설정(기준 크기·리네임 맥락 깊이) 불러오기
-  | { type: 'SET_SETTINGS'; base: number; maxDepth: number; grid: number; componentsBeta: boolean } // 바뀔 때마다 clientStorage에 보관
+  | { type: 'SET_SETTINGS'; base: number; maxDepth: number; grid: number } // 바뀔 때마다 clientStorage에 보관
   | { type: 'GET_VARIABLES' } // 3계층 변수 목록(다크 테마 생성의 컬렉션·모드 선택용)
   // 모드 id는 선택 — 생략하면 themeApply가 Light를 고르고 Dark가 없으면 addMode('Dark')로 만든다.
   | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId?: string; toModeId?: string } // 라이트→Dark(없으면 추가) 자동 채움
@@ -291,7 +291,7 @@ export type CodeToUi =
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[]; placeFailed?: string[]; placeCloned?: string[]; propFailed?: string[]; fillKept?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단. placeFailed: 비운 자리 · placeCloned: 복사본으로 채운 자리의 원본 이름(§4.7 5번). propFailed: 속성 값·사진을 못 넣은 멤버(§4.7 6번). fillKept: 사진·크기 검사로 묶지 않은 멤버(§4.7 8번)
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
   | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
-  | { type: 'SETTINGS'; base: number; maxDepth: number; grid: number; componentsBeta: boolean } // #19: 보관된 설정(없으면 기본값). grid=만들기가 값을 맞추는 간격
+  | { type: 'SETTINGS'; base: number; maxDepth: number; grid: number } // #19: 보관된 설정(없으면 기본값). grid=만들기가 값을 맞추는 간격
   | { type: 'VARIABLES'; vars: VarInfo[] } // 3계층 변수 목록(다크 카드의 컬렉션·모드 선택지)
   // modeCreated: Dark 모드를 이번에 만들었는가(안내 문구가 달라진다). error: 채우기 전 단계 실패.
   | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number; modeCreated?: boolean; error?: string }

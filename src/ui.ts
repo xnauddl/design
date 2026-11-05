@@ -784,8 +784,7 @@ let basePreviewTimer = 0;
 /* #19: 설정은 설정 탭에만 있고, 바뀌면 곧바로 파일에 기억한다(저장 버튼 없음).
    타이핑 중 매 키마다 보내지 않도록 한 박자 늦춘다. */
 let settingsSaveTimer = 0;
-/** now: 체크박스처럼 한 번 누르면 끝나는 조작은 바로 저장한다(닫기 전에 놓치지 않게). */
-function saveSettings(now = false): void {
+function saveSettings(): void {
   clearTimeout(settingsSaveTimer);
   settingsSaveTimer = window.setTimeout(() => {
     send({
@@ -793,14 +792,13 @@ function saveSettings(now = false): void {
       base: Number(($('base') as HTMLInputElement).value) || 16,
       maxDepth: readMaxDepth(),
       grid: tidyGrid(),
-      componentsBeta,
     });
-  }, now ? 0 : 350);
+  }, 350);
 }
 
-($('base') as HTMLInputElement).addEventListener('input', () => saveSettings());
-($('depth') as HTMLInputElement).addEventListener('input', () => saveSettings());
-($('grid') as HTMLInputElement).addEventListener('input', () => saveSettings());
+($('base') as HTMLInputElement).addEventListener('input', saveSettings);
+($('depth') as HTMLInputElement).addEventListener('input', saveSettings);
+($('grid') as HTMLInputElement).addEventListener('input', saveSettings);
 
 ($('base') as HTMLInputElement).addEventListener('input', () => {
   const applyBtn = $('btnCreateApply') as HTMLButtonElement;
@@ -2371,7 +2369,6 @@ window.onmessage = (event: MessageEvent) => {
       ($('base') as HTMLInputElement).value = String(msg.base);
       ($('depth') as HTMLInputElement).value = String(msg.maxDepth);
       ($('grid') as HTMLInputElement).value = String(msg.grid);
-      setComponentsBeta(msg.componentsBeta === true, false);
       break;
     }
     case 'VARIABLES': {
@@ -3592,14 +3589,6 @@ document.addEventListener('keydown', dismissStickyOnAction, true);
 function showPaidReason(): void {
   showStatusLine(t('status.paid'), { cls: 'warn', action: { label: t('status.paidAction'), run: goToLicense } });
 }
-/** 설정 › 기본값의 "컴포넌트(베타) 보이기"로(§4.7 "베타" · §4.9). 카드가 접혀 있으면 펼친다. 순서는 goToLicense와 같다. */
-function goToBetaSetting(): void {
-  showTab('settings');
-  $('pluginSettingsCard').classList.remove('collapsed');
-  ($('componentsBeta') as HTMLInputElement).focus({ preventScroll: true });
-  requestAnimationFrame(() => $('componentsBeta').scrollIntoView({ block: 'center' }));
-}
-
 function goToLicense(): void {
   showTab('settings');
   // 포커스는 바로 준다 — 누른 [라이선스 →]가 상태 줄과 함께 사라져 포커스가 body로 떨어진 채
@@ -3719,12 +3708,7 @@ $('btnExpand').addEventListener('click', () => setMini(false));
    사용자가 일으킨 작업 요청을 보내고 결과가 올 때까지. 조용한 다시 읽기는 대상이 아니다. */
 type OpGo = () => void;
 interface OpDef { results: CodeToUi['type'][]; label: string; go: OpGo; write: boolean }
-const goLayer = (step: ApplyStep): OpGo => () => {
-  // 컴포넌트(베타)를 그 사이 껐으면 숨은 카드 대신 설정의 체크박스로(§4.7 "베타" · §4.9)
-  if (step === 'structure' && !componentsBeta) { goToBetaSetting(); return; }
-  showTab('layer');
-  showApplyStep(step);
-};
+const goLayer = (step: ApplyStep): OpGo => () => { showTab('layer'); showApplyStep(step); };
 const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   EXTRACT: { results: ['EXTRACT_RESULT'], label: 'op.extract', go: () => showMake('color'), write: false },
   CREATE_TOKENS: { results: ['CREATE_RESULT'], label: 'op.create', go: () => showMake('token'), write: true },
@@ -4123,31 +4107,14 @@ const showApplyStep = (s: ApplyStep): void => showStep('apply', s);
 for (const b of Array.from(document.querySelectorAll<HTMLElement>('#makeRail .step-chip'))) {
   b.addEventListener('click', () => showMakeStep(b.dataset.makeStep as MakeStep));
 }
-/* 컴포넌트(베타) — 기본 끔. 켜야 레이어 › 컴포넌트 하위 탭이 보인다(§4.7 "베타"). */
-let componentsBeta = false;
-/** 화살표·Home·End가 도는 하위 탭 — 보이는 것만(끔이면 연결 · 이름). */
-const visibleApplySteps = (): ApplyStep[] => APPLY_STEPS.filter((s) => s !== 'structure' || componentsBeta);
-function setComponentsBeta(on: boolean, announce: boolean): void {
-  componentsBeta = on;
-  ($('componentsBeta') as HTMLInputElement).checked = on;
-  $('subtabComponents').hidden = !on;
-  // 기억해 둔 하위 화면이 컴포넌트면 연결로(켠 순간에는 화면을 옮기지 않는다)
-  if (!on && currentApplyStep === 'structure') showApplyStep('bind');
-  if (announce) showStatusLine(t(on ? 'settings.componentsBetaOn' : 'settings.componentsBetaOff'));
-}
-($('componentsBeta') as HTMLInputElement).addEventListener('change', (e) => {
-  setComponentsBeta((e.target as HTMLInputElement).checked, true);
-  saveSettings(true);
-});
 for (const b of Array.from(document.querySelectorAll<HTMLElement>('#applyRail .subtab'))) {
   b.addEventListener('click', () => showApplyStep(b.dataset.applyStep as ApplyStep));
   b.addEventListener('keydown', (e) => {
-    const steps = visibleApplySteps();
-    const ni = nextTabIndex(e.key, steps.indexOf(b.dataset.applyStep as ApplyStep), steps.length);
+    const ni = nextTabIndex(e.key, APPLY_STEPS.indexOf(b.dataset.applyStep as ApplyStep), APPLY_STEPS.length);
     if (ni < 0) return;
     e.preventDefault();
-    showApplyStep(steps[ni]);
-    document.querySelector<HTMLElement>(`#applyRail [data-apply-step="${steps[ni]}"]`)?.focus();
+    showApplyStep(APPLY_STEPS[ni]);
+    document.querySelector<HTMLElement>(`#applyRail [data-apply-step="${APPLY_STEPS[ni]}"]`)?.focus();
   });
 }
 showMakeStep('color');
