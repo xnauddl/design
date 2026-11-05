@@ -105,6 +105,8 @@ export const STRINGS: Record<string, string> = {
   'component.generated': '누락 조합 {generated}개 생성(세트 {sets})',
   'component.placeFailed': ' · 제자리에 못 둔 {n}개: {names}',
   'component.placeFailedMore': ' 외',
+  'common.beta': '베타',
+  'layer.componentsBetaAria': '컴포넌트 (베타)',
   'component.propFailed': ' · 속성 값을 못 넣은 {n}개: {names}',
   'component.fillKept': ' · 채움·크기가 달라 건너뛴 {n}개: {names}',
   'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
@@ -519,7 +521,6 @@ export const STRINGS: Record<string, string> = {
   // 온보딩 / 가이드
   // 첫 실행 배너(온보딩 흡수)
   // 진행(파이프라인 카드)
-  'pipeline.indep': '컴포넌트는 필요할 때 레이어 › 컴포넌트에서',
   // 브랜드 팔레트
   'color.title': '색',
   'color.scope': '변수화',
