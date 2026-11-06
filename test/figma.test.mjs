@@ -4753,12 +4753,13 @@ test('extractFromSelection — 크기 토큰은 아이콘 · 아바타에서만(
   assert.deepEqual([...names].sort(), ['size/20', 'size/24', 'size/32', 'size/40']);
 });
 
-test('extractFromSelection — 가로 FIXED 24 · 세로 24(HUG) 아이콘은 가로만', () => {
+test('extractFromSelection — 아이콘이어도 HUG 축은 토큰으로 뽑지 않는다(FIXED 축만)', () => {
   installFigma();
   const { root, ok } = sizeFixtures();
+  // 24 아이콘은 이 픽스처에 하나뿐이다 — 두 축이 모두 HUG면 size/24가 없어야 한다(축 하나라도 잘못 뽑으면 생긴다).
+  ok.icon.layoutSizingHorizontal = 'HUG';
   ok.icon.layoutSizingVertical = 'HUG';
-  const t = extractFromSelection([root]).tokens.find((x) => x.name === 'size/24');
-  assert.equal(t.count, 1);
+  assert.equal(extractFromSelection([root]).tokens.find((x) => x.name === 'size/24'), undefined);
 });
 
 test('bindSelection — 크기는 아이콘 · 아바타에만 붙고, 그 밖의 레이어는 찾지도 세지도 않음', async () => {
