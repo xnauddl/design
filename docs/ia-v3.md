@@ -1957,14 +1957,15 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 ## A.7 크기는 아이콘 · 아바타만 (2026-11-06, QA 대기 목록 1번)
 
-- [ ] `isIconOrAvatar`(`extract.ts` export) — 정사각형 · 64 이하 · 아이콘(자손 조건, INSTANCE 루트는 안쪽 자식, 중첩 INSTANCE는 안쪽이 같은 자손 조건이면 허용 · 크기 조건 없음, 벡터 수는 중첩 안까지 합침) 또는 아바타(둥근 모서리 ≥ 절반 + 두 단계 안 이미지 · 같은 크기 이미지 ELLIPSE 자식)
-- [ ] `extract.ts` `collectSize`: 판정을 통과한 노드의 FIXED 축만 `size/` 토큰
-- [ ] `tokens.ts` `SNAP_CATEGORIES`에서 `size` 제외(격자 정리는 크기를 옮기지 않음) + i18n `settings.grid` · `settings.gridTip` · `create.tidySummary` 문구, `ui.html` 기본 글자, 주석(`ui.ts` 710 · `tokens.ts` 309–310 · 327 · 351)
-- [ ] `test/pure.test.mjs` `tidyNumberTokens`: `size/36` → 32 비율 예시를 `gap`으로, "여백·크기만 대상" 제목 · 단언에 `size` 제외
-- [ ] `bind.ts` 크기: 판정을 먼저 — 아니면 찾지도 세지도 않음, 맞으면 지금 순서(자유 배치 → HUG/FILL → 소수). `bindSelectedItems` 크기 자리 다시 확인에 판정 추가(아니면 `changed`)
-- [ ] 주석 정리: `bind.ts` 565–568 · 579, `extract.ts` 43 · 168. i18n `reason.hug-fill` · `reason.size-free-layout` · `reason.size-fraction`은 남긴다(아이콘 · 아바타에서 계속 씀)
-- [ ] 단위 테스트(`test/figma.test.mjs` 목에 children · IMAGE fills · cornerRadius): 24×24 아이콘 프레임 · 벡터 컴포넌트를 든 아이콘 인스턴스 · 40×40 원형(cornerRadius 20) 사진 FRAME 아바타 · 정사각 틀 + 같은 크기 사진 ELLIPSE → 크기 토큰 · 연결 / 1440 화면 · 356×467 카드 · 48×48 글자 버튼 · 64×64 사각 사진(원 아님) · 72×72 아이콘 · 가로 FIXED 24 · 세로 24(HUG)의 HUG 축 → 각 규칙대로. 격자 정리가 14 · 28 크기를 옮기지 않음
-- [ ] 기존 단언 고치기: extract 크기 토큰(`size/200` · `size/100` · `size/280` · `size/48` · `size/64` · `size/120` · `size/40`), bind 일반 프레임 크기 연결(`size/200` · `size/8` · `size/12` · `size/344` · `size/343_5`), 사유(`hug-fill` · `size-fraction` · `size-free-layout` 노드 목록, 상한 검사에 쓰던 `size-free-layout` ≥ 500은 다른 사유로) — 의도를 살려 아이콘 · 아바타 픽스처로 바꾼다
-- [ ] `verify-bind-flow`: UI 픽스처만 주입해 `bind.ts`를 거치지 않으므로 영향 없음(확인만)
-- [ ] `docs/qa/backlog.md` 1번을 QA 기록으로 옮기고 대기 목록에서 지운다
+- [x] `isIconOrAvatar`(`extract.ts` export) — 정사각형 · 64 이하 · 아이콘(자손 조건, INSTANCE 루트는 안쪽 자식, 중첩 INSTANCE는 안쪽이 같은 자손 조건이면 허용 · 크기 조건 없음, 벡터 수는 중첩 안까지 합침) 또는 아바타(둥근 모서리 ≥ 절반 + 두 단계 안 이미지 · 같은 크기 이미지 ELLIPSE 자식)
+- [x] `extract.ts` `collectSize`: 판정을 통과한 노드의 FIXED 축만 `size/` 토큰
+- [x] `tokens.ts` `SNAP_CATEGORIES`에서 `size` 제외(격자 정리는 크기를 옮기지 않음) + i18n `settings.grid` · `settings.gridTip` · `create.tidySummary` 문구, `ui.html` 기본 글자, 주석(`ui.ts` 710 · `tokens.ts` 309–310 · 327 · 351)
+- [x] `test/pure.test.mjs` `tidyNumberTokens`: `size/36` → 32 비율 예시를 `gap`으로, "여백·크기만 대상" 제목 · 단언에 `size` 제외
+- [x] `bind.ts` 크기: 판정을 먼저 — 아니면 찾지도 세지도 않음, 맞으면 지금 순서(자유 배치 → HUG/FILL → 소수). `bindSelectedItems` 크기 자리 다시 확인에 판정 추가(아니면 `changed`)
+- [x] 주석 정리: `bind.ts` 565–568 · 579, `extract.ts` 43 · 168. i18n `reason.hug-fill` · `reason.size-free-layout` · `reason.size-fraction`은 남긴다(아이콘 · 아바타에서 계속 씀)
+- [x] 단위 테스트(`test/figma.test.mjs` 목에 children · IMAGE fills · cornerRadius): 24×24 아이콘 프레임 · 벡터 컴포넌트를 든 아이콘 인스턴스 · 40×40 원형(cornerRadius 20) 사진 FRAME 아바타 · 정사각 틀 + 같은 크기 사진 ELLIPSE → 크기 토큰 · 연결 / 1440 화면 · 356×467 카드 · 48×48 글자 버튼 · 64×64 사각 사진(원 아님) · 72×72 아이콘 · 가로 FIXED 24 · 세로 24(HUG)의 HUG 축 → 각 규칙대로. 격자 정리가 14 · 28 크기를 옮기지 않음
+- [x] 기존 단언 고치기: extract 크기 토큰(`size/200` · `size/100` · `size/280` · `size/48` · `size/64` · `size/120` · `size/40`), bind 일반 프레임 크기 연결(`size/200` · `size/8` · `size/12` · `size/344` · `size/343_5`), 사유(`hug-fill` · `size-fraction` · `size-free-layout` 노드 목록, 상한 검사에 쓰던 `size-free-layout` ≥ 500은 다른 사유로) — 의도를 살려 아이콘 · 아바타 픽스처로 바꾼다
+- [x] `verify-bind-flow`: UI 픽스처만 주입해 `bind.ts`를 거치지 않으므로 영향 없음(확인만)
+- [x] `docs/qa/backlog.md` 1번을 QA 기록으로 옮기고 대기 목록에서 지운다
 - [ ] 실기 확인(사용자, 피그마): QA #3 파일 복제본 → 변수 만들기 → `size/` 변수가 아이콘 · 아바타 크기 몇 개뿐(지금 26개), 레이어 › 연결 → 카드 · 화면 폭에 크기 변수가 붙지 않고 크기 사유 칩도 그 레이어들 몫은 없음
+- 구현 중 더한 것(명세 범위 안): `isIconOrAvatar`를 테스트용 배럴(`src/lib/figma-lib.ts`)에도 내보냈다. `tokens.ts` `TOKEN_GROUP`에서 `size`를 뺐다(격자 정리 대상이 아니라 쓰이지 않음). `bindSelectedItems`의 크기 판정은 간격 판정(`gapSkip`) 다음, 붙은 상태 판정 앞에 둔다. 아이콘 판정에서 벡터(VECTOR · BOOLEAN_OPERATION …)는 잎으로 보고 그 안으로는 내려가지 않는다. 이미지 채움은 보이는 IMAGE 칠하기만 센다.

@@ -498,8 +498,8 @@
     "ts.lineHeight": "\uD589\uAC04(px) \xB7 0\uC774\uBA74 AUTO",
     "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB3FC\uC694",
     "ts.weight": "\uAD75\uAE30 \u2014 Regular \xB7 Medium \xB7 SemiBold \xB7 Bold \uCC98\uB7FC Figma\uAC00 \uC4F0\uB294 \uC774\uB984",
-    "settings.grid": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uACA9\uC790",
-    "settings.gridTip": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC744 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
+    "settings.grid": "\uC5EC\uBC31 \uACA9\uC790",
+    "settings.gridTip": "\uC5EC\uBC31 \uD1A0\uD070\uC744 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
     // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
     "create.snapNoBind": " \xB7 \uACA9\uC790\uB85C \uC62E\uAE34 {k}\uAC1C \uAC12\uC740 \uC6D0\uB798 \uB808\uC774\uC5B4\uC640 \uB2EC\uB77C \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694",
     // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
@@ -784,7 +784,7 @@
     "create.count": "\uD6C4\uBCF4 {sel}/{total}",
     "color.usedCount": " \xB7 {n}\xD7 \uC0AC\uC6A9",
     "create.tidyMerged": " \xB7 \uAC19\uC740 \uCE78 {n}\uAC1C \uBCD1\uD569",
-    "create.tidySummary": "\uC5EC\uBC31\xB7\uD06C\uAE30 {before} \u2192 {after}\uAC1C ({grid}px \uACA9\uC790\uB85C {n}\uAC1C \uC774\uB3D9{mergedPart}){gapPart}",
+    "create.tidySummary": "\uC5EC\uBC31 {before} \u2192 {after}\uAC1C ({grid}px \uACA9\uC790\uB85C {n}\uAC1C \uC774\uB3D9{mergedPart}){gapPart}",
     "create.tidyUndone": "\uACA9\uC790 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694 \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB2E4\uC2DC \uB204\uB974\uBA74 \uB610 \uC815\uB9AC\uD574\uC694",
     "create.onceOff": "1\xD7 \uD1A0\uD070 {n}\uAC1C \uD574\uC81C",
     "create.onceNone": "1\xD7 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694",
@@ -1136,7 +1136,60 @@
       }
     }
   }
+  function hasImageFill(node) {
+    const fills = node.fills;
+    return Array.isArray(fills) && fills.some((p) => p.type === "IMAGE" && p.visible !== false);
+  }
+  var ICON_VECTOR_TYPES = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
+  function iconVectorCount(children) {
+    let vectors = 0;
+    for (const c of children) {
+      if (hasImageFill(c)) return -1;
+      if (ICON_VECTOR_TYPES.has(c.type)) {
+        vectors++;
+        continue;
+      }
+      if (c.type === "ELLIPSE" || c.type === "RECTANGLE") continue;
+      if (c.type === "GROUP" || c.type === "FRAME" || c.type === "INSTANCE") {
+        const n = iconVectorCount("children" in c ? c.children : []);
+        if (n < 0) return -1;
+        vectors += n;
+        continue;
+      }
+      return -1;
+    }
+    return vectors;
+  }
+  function isIconOrAvatar(node) {
+    if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return false;
+    const w = round(node.width);
+    const h = round(node.height);
+    if (!(w > 0) || w !== h || w > 64) return false;
+    const children = "children" in node ? node.children : [];
+    if (!hasImageFill(node) && iconVectorCount(children) > 0) return true;
+    const r = node.cornerRadius;
+    let radii = [];
+    if (r === figma.mixed) {
+      for (const corner of ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"]) {
+        const cv = node[corner];
+        radii.push(typeof cv === "number" ? cv : 0);
+      }
+    } else if (typeof r === "number") radii = [r];
+    const allRound = radii.length > 0 && radii.every((cv) => round(cv) >= w / 2);
+    if (allRound) {
+      const imageWithin = (n, depth) => {
+        if (hasImageFill(n)) return true;
+        if (depth >= 2 || !("children" in n)) return false;
+        return n.children.some((c) => imageWithin(c, depth + 1));
+      };
+      if (imageWithin(node, 0)) return true;
+    }
+    return children.some(
+      (c) => c.visible !== false && c.type === "ELLIPSE" && hasImageFill(c) && Math.abs(c.width - node.width) <= 0.5 && Math.abs(c.height - node.height) <= 0.5
+    );
+  }
   function collectSize(acc, node) {
+    if (!isIconOrAvatar(node)) return;
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
     const parent = node.parent;
     const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
@@ -2697,22 +2750,24 @@
   }
   function bindFrame(node, entries, res, apply, preview) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
-    const parent = node.parent;
-    const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
-    const inAutoLayout = !absolute && (node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE");
-    if (inAutoLayout) {
-      const bindAxis = (sizing, field, v) => {
-        if (sizing !== "FIXED") {
-          note(res, "hug-fill", node, preview, field);
-          return;
-        }
-        const fraction = Math.abs(v - Math.round(v)) >= 5e-3;
-        tryBind(node, field, v, entries, res, apply, preview, fraction ? "size-fraction" : void 0);
-      };
-      bindAxis(node.layoutSizingHorizontal, "width", node.width);
-      bindAxis(node.layoutSizingVertical, "height", node.height);
-    } else {
-      note(res, "size-free-layout", node, preview);
+    if (isIconOrAvatar(node)) {
+      const parent = node.parent;
+      const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
+      const inAutoLayout = !absolute && (node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE");
+      if (inAutoLayout) {
+        const bindAxis = (sizing, field, v) => {
+          if (sizing !== "FIXED") {
+            note(res, "hug-fill", node, preview, field);
+            return;
+          }
+          const fraction = Math.abs(v - Math.round(v)) >= 5e-3;
+          tryBind(node, field, v, entries, res, apply, preview, fraction ? "size-fraction" : void 0);
+        };
+        bindAxis(node.layoutSizingHorizontal, "width", node.width);
+        bindAxis(node.layoutSizingVertical, "height", node.height);
+      } else {
+        note(res, "size-free-layout", node, preview);
+      }
     }
     if (node.layoutMode === "NONE") {
       note(res, "no-autolayout", node, preview);
@@ -3022,6 +3077,10 @@
           const gap = gapSkip(node, it.field);
           if (gap) {
             fail(gap === "no-wrap" ? "changed" : "space-between", node, it.field);
+            continue;
+          }
+          if ((it.field === "width" || it.field === "height") && !isIconOrAvatar(node)) {
+            fail("changed", node, it.field);
             continue;
           }
           const st = stateReason(nodeFieldState(node, it.field));
@@ -3345,7 +3404,7 @@
     let slots = 0;
     for (let i = 0; i < total; i++) if (isLandmarkCandidate(nodes[i])) slotOf.set(i, slots++);
     const overlayAt = findOverlayIndex(nodes, parentDims);
-    const hasAvatarSibling = nodes.some((n) => n.type === "ELLIPSE" && hasImageFill(n));
+    const hasAvatarSibling = nodes.some((n) => n.type === "ELLIPSE" && hasImageFill2(n));
     for (let i = 0; i < total; i++) {
       const node = nodes[i];
       const before = node.name;
@@ -3451,7 +3510,7 @@
       case "RECTANGLE":
       case "ELLIPSE": {
         if (isThin(node)) return "divider";
-        if (hasImageFill(node)) return node.type === "ELLIPSE" ? "avatar" : "image";
+        if (hasImageFill2(node)) return node.type === "ELLIPSE" ? "avatar" : "image";
         if (hasVisibleFill(node)) return "background";
         if (hasVisibleStroke(node)) return "border";
         return "shape";
@@ -3461,7 +3520,7 @@
       case "SECTION": {
         const kids = "children" in node ? node.children : [];
         if (kids.length === 0) {
-          if (hasImageFill(node)) return "image";
+          if (hasImageFill2(node)) return "image";
           if (hasColorFill(node)) return "swatch";
           const emptyRegion = regionRole(node, pos, ctxScope, parentRole);
           if (emptyRegion) return emptyRegion;
@@ -3553,7 +3612,7 @@
     const f = paints(node, "fills");
     return !!f && f.some((p) => p.visible !== false);
   }
-  function hasImageFill(node) {
+  function hasImageFill2(node) {
     const f = paints(node, "fills");
     return !!f && f.some((p) => p.visible !== false && p.type === "IMAGE");
   }
@@ -3707,7 +3766,7 @@
   }
   function isInputBox(node) {
     if (node.type !== "FRAME" && node.type !== "RECTANGLE") return false;
-    if (hasImageFill(node)) return false;
+    if (hasImageFill2(node)) return false;
     if (!hasVisibleStroke(node) && !hasColorFill(node)) return false;
     const d = dims(node);
     if (!d || d.h <= 0 || d.h > 72) return false;
@@ -3745,7 +3804,7 @@
   function isFigureLike(node, kids) {
     if (node.type !== "FRAME") return false;
     if (kids.length < 2 || kids.length > 3) return false;
-    const hasImg = kids.some((k) => hasImageFill(k));
+    const hasImg = kids.some((k) => hasImageFill2(k));
     const hasCaption = kids.some((k) => k.type === "TEXT");
     return hasImg && hasCaption;
   }
@@ -3810,7 +3869,7 @@
   function isBarFill(node) {
     if (node.type !== "RECTANGLE" && node.type !== "FRAME") return false;
     if ("children" in node && node.children.length > 0) return false;
-    if (hasImageFill(node) || !hasColorFill(node)) return false;
+    if (hasImageFill2(node) || !hasColorFill(node)) return false;
     const d = dims(node);
     return !!d && d.h > 0 && d.h <= 24 && d.w >= d.h * 2;
   }
@@ -3818,7 +3877,7 @@
   function isThumbnail(node, pos, ctxScope) {
     if (!ctxScope || !THUMB_CONTEXTS.has(ctxScope)) return false;
     if (node.type === "ELLIPSE") return false;
-    if (!hasImageFill(node)) return false;
+    if (!hasImageFill2(node)) return false;
     const d = dims(node);
     if (!d) return false;
     if (Math.max(d.w, d.h) <= 96) return true;
@@ -3828,7 +3887,7 @@
   function isStatusDot(node, pos) {
     if (!pos.hasAvatarSibling) return false;
     if (node.type !== "ELLIPSE" && node.type !== "RECTANGLE" && node.type !== "FRAME") return false;
-    if (hasImageFill(node) || !hasColorFill(node)) return false;
+    if (hasImageFill2(node) || !hasColorFill(node)) return false;
     const d = dims(node);
     if (!d || d.w <= 0 || d.h <= 0) return false;
     if (Math.max(d.w, d.h) > 16) return false;
@@ -4075,7 +4134,7 @@
     const f = paints2(node, "fills");
     return !!f && f.some((p) => p.visible !== false);
   }
-  function hasImageFill2(node) {
+  function hasImageFill3(node) {
     const f = paints2(node, "fills");
     return !!f && f.some((p) => p.visible !== false && p.type === "IMAGE");
   }
@@ -4219,7 +4278,7 @@
   }
   function isInputBox2(node) {
     if (node.type !== "FRAME" && node.type !== "RECTANGLE") return false;
-    if (hasImageFill2(node)) return false;
+    if (hasImageFill3(node)) return false;
     if (!hasVisibleStroke2(node) && !hasColorFill2(node)) return false;
     const d = dims2(node);
     if (!d || d.h <= 0 || d.h > 72) return false;
@@ -4249,7 +4308,7 @@
   function isFigureLike2(node, kids) {
     if (node.type !== "FRAME") return false;
     if (kids.length < 2 || kids.length > 3) return false;
-    const hasImg = kids.some((k) => hasImageFill2(k));
+    const hasImg = kids.some((k) => hasImageFill3(k));
     const hasCaption = kids.some((k) => k.type === "TEXT");
     return hasImg && hasCaption;
   }
@@ -4355,8 +4414,8 @@
           vectors++;
           return true;
         }
-        if (c.type === "ELLIPSE" || c.type === "RECTANGLE") return !hasImageFill2(c);
-        if (c.type === "FRAME" || c.type === "GROUP") return !hasImageFill2(c) && ok(c);
+        if (c.type === "ELLIPSE" || c.type === "RECTANGLE") return !hasImageFill3(c);
+        if (c.type === "FRAME" || c.type === "GROUP") return !hasImageFill3(c) && ok(c);
         return false;
       });
     };

@@ -8,7 +8,7 @@ import { rgbToHex } from './tokens';
 import { collectionTiers } from './collectionRoles'; // 계층은 컬렉션 이름이 아니라 지정된 역할로
 import { FIELD_SCOPE, FILL_SCOPES, STROKE_SCOPES, EFFECT_SCOPES } from './scopes'; // 용도 규칙
 import type { BindCandidate, BindNode, BindSkip } from '../shared/messages';
-import { gapSkip } from './extract'; // 쓰지 않는 간격 판정(사이 간격 자동 · 줄바꿈 아님) — 만들기와 같은 기준
+import { gapSkip, isIconOrAvatar } from './extract'; // 쓰지 않는 간격 판정(사이 간격 자동 · 줄바꿈 아님) · 크기 대상 판정(아이콘 · 아바타) — 만들기와 같은 기준
 
 interface VarEntry {
   variable: Variable;
@@ -562,35 +562,38 @@ function bindFrame(
 ): void {
   if (node.type !== 'FRAME' && node.type !== 'COMPONENT' && node.type !== 'INSTANCE') return;
 
-  // 크기: 오토레이아웃 맥락(자신 또는 부모)에서 Fixed인 축만 — extract.ts의 수집 기준과 동일.
-  // 자유 배치 프레임은 Hug/Fill이 될 수 없어 layoutSizing*가 항상 'FIXED'라, 이 게이트가 없으면
-  // 화면 프레임·장식 박스의 width/height까지 크기 변수에 붙는다.
-  const parent = node.parent;
-  // 절대 배치 자식은 오토레이아웃 흐름 밖이라 Hug/Fill을 고를 수 없고 항상 FIXED다 —
-  // 부모가 오토레이아웃이어도 '디자이너가 Fixed를 선택했다'가 성립하지 않는다.
-  const absolute = 'layoutPositioning' in node && (node as FrameNode).layoutPositioning === 'ABSOLUTE';
-  const inAutoLayout =
-    !absolute &&
-    (node.layoutMode !== 'NONE' ||
-      (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE'));
-  if (inAutoLayout) {
-    /**
-     * 축 하나를 처리 — 두 축이 같은 규칙을 쓰도록 한 곳에 모은다.
-     * 소수 크기에 같은 값의 토큰이 없으면 사유를 'size-fraction'으로 따로 남긴다
-     * (extract가 소수 size를 토큰으로 만들지 않으므로 '매칭 없음'과 원인이 다르다).
-     */
-    const bindAxis = (sizing: 'FIXED' | 'HUG' | 'FILL', field: 'width' | 'height', v: number): void => {
-      if (sizing !== 'FIXED') {
-        note(res, 'hug-fill', node, preview, field);
-        return;
-      }
-      const fraction = Math.abs(v - Math.round(v)) >= 0.005; // extract의 소수 2자리 반올림과 같은 판정
-      tryBind(node, field, v, entries, res, apply, preview, fraction ? 'size-fraction' : undefined);
-    };
-    bindAxis(node.layoutSizingHorizontal, 'width', node.width);
-    bindAxis(node.layoutSizingVertical, 'height', node.height);
-  } else {
-    note(res, 'size-free-layout', node, preview);
+  // 크기: 아이콘 · 아바타 레이어만(§2.11 "크기는 아이콘 · 아바타만", extract.ts의 수집 기준과 같은 함수).
+  // 아니면 찾지도 않고 건너뜀으로도 세지 않는다 — 카드 · 화면 프레임마다 크기 칩이 생기지 않게.
+  if (isIconOrAvatar(node)) {
+    // 오토레이아웃 맥락(자신 또는 부모)에서 Fixed인 축만. 자유 배치 프레임은 Hug/Fill이 될 수 없어
+    // layoutSizing*가 항상 'FIXED'라 디자이너가 고른 값이 아니다.
+    const parent = node.parent;
+    // 절대 배치 자식은 오토레이아웃 흐름 밖이라 Hug/Fill을 고를 수 없고 항상 FIXED다 —
+    // 부모가 오토레이아웃이어도 '디자이너가 Fixed를 선택했다'가 성립하지 않는다.
+    const absolute = 'layoutPositioning' in node && (node as FrameNode).layoutPositioning === 'ABSOLUTE';
+    const inAutoLayout =
+      !absolute &&
+      (node.layoutMode !== 'NONE' ||
+        (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE'));
+    if (inAutoLayout) {
+      /**
+       * 축 하나를 처리 — 두 축이 같은 규칙을 쓰도록 한 곳에 모은다.
+       * 소수 크기에 같은 값의 토큰이 없으면 사유를 'size-fraction'으로 따로 남긴다
+       * (extract가 아이콘 · 아바타의 소수 size도 토큰으로 만들지 않으므로 '매칭 없음'과 원인이 다르다).
+       */
+      const bindAxis = (sizing: 'FIXED' | 'HUG' | 'FILL', field: 'width' | 'height', v: number): void => {
+        if (sizing !== 'FIXED') {
+          note(res, 'hug-fill', node, preview, field);
+          return;
+        }
+        const fraction = Math.abs(v - Math.round(v)) >= 0.005; // extract의 소수 2자리 반올림과 같은 판정
+        tryBind(node, field, v, entries, res, apply, preview, fraction ? 'size-fraction' : undefined);
+      };
+      bindAxis(node.layoutSizingHorizontal, 'width', node.width);
+      bindAxis(node.layoutSizingVertical, 'height', node.height);
+    } else {
+      note(res, 'size-free-layout', node, preview);
+    }
   }
 
   // 여백/간격: 오토레이아웃에만
@@ -996,6 +999,11 @@ export async function bindSelectedItems(items: readonly SelectedBindItem[], hook
         const gap = gapSkip(node, it.field);
         if (gap) {
           fail(gap === 'no-wrap' ? 'changed' : 'space-between', node, it.field);
+          continue;
+        }
+        // 찾은 뒤 아이콘 · 아바타가 아니게 된 레이어(글자를 넣는 등)의 크기는 "그 사이 바뀜"(§2.11).
+        if ((it.field === 'width' || it.field === 'height') && !isIconOrAvatar(node)) {
+          fail('changed', node, it.field);
           continue;
         }
         const st = stateReason(nodeFieldState(node, it.field));

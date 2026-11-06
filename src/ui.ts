@@ -707,7 +707,7 @@ function clearNumTidy(): void {
   preNumTidyTokens = null; // 요약이 없으면 되돌릴 대상도 없다
 }
 
-/** 여백·크기 토큰을 격자 8 사다리로 스냅(#19). 미리보기 직전에 호출. */
+/** 여백 토큰을 격자 8 사다리로 스냅(#19). 미리보기 직전에 호출. 크기는 옮기지 않는다(§2.11). */
 function tidyNumbers(): void {
   if (!creatableTokens().length) {
     clearNumTidy();

@@ -502,8 +502,8 @@ export const STRINGS: Record<string, string> = {
   'ts.lineHeight': '행간(px) · 0이면 AUTO',
   'ts.letterSpacing': '자간(px) · 음수도 돼요',
   'ts.weight': '굵기 — Regular · Medium · SemiBold · Bold 처럼 Figma가 쓰는 이름',
-  'settings.grid': '여백·크기 격자',
-  'settings.gridTip': '여백·크기 토큰을 만들기에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요.',
+  'settings.grid': '여백 격자',
+  'settings.gridTip': '여백 토큰을 만들기에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요.',
   // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
   'create.snapNoBind': ' · 격자로 옮긴 {k}개 값은 원래 레이어와 달라 연결되지 않아요',
   // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
@@ -788,7 +788,7 @@ export const STRINGS: Record<string, string> = {
   'create.count': '후보 {sel}/{total}',
   'color.usedCount': ' · {n}× 사용',
   'create.tidyMerged': ' · 같은 칸 {n}개 병합',
-  'create.tidySummary': '여백·크기 {before} → {after}개 ({grid}px 격자로 {n}개 이동{mergedPart}){gapPart}',
+  'create.tidySummary': '여백 {before} → {after}개 ({grid}px 격자로 {n}개 이동{mergedPart}){gapPart}',
   'create.tidyUndone': '격자 정리를 되돌렸어요 — ‘미리보기’를 다시 누르면 또 정리해요',
   'create.onceOff': '1× 토큰 {n}개 해제',
   'create.onceNone': '1× 토큰이 없어요',
