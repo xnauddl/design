@@ -130,39 +130,72 @@ export function colorUse(nodeType: string, field: 'fills' | 'strokes' | 'effects
 
 /* ---------- 색 밝기 이름 (12.4) ---------- */
 
+/** 배경 종류(12.4) — 유채색 · 어두움(L < 0.5) · 밝음. 모르면 없음. */
+export type BgKind = 'chroma' | 'dark' | 'light';
+
 export interface ColorCount {
   hex: string;
   count: number;
+  /** 그 자리의 배경 종류(`backgroundOf`). 모르면 없음. */
+  bg?: BgKind;
 }
 
-const byCountThenHex = (a: ColorCount, b: ColorCount): number => b.count - a.count || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0);
+/** 색 하나의 배경 종류(유채색이면 chroma, 아니면 L 0.5 기준). */
+export function bgKindOf(hex: string): BgKind {
+  const o = hexToOklch(hex);
+  if (o.c >= LOW_CHROMA) return 'chroma';
+  return o.l < 0.5 ? 'dark' : 'light';
+}
+
+/** colorRoleBases 결과의 찾기 키 — (hex, 배경 종류). 배경을 모르면 hex만. */
+export function colorSlotKey(hex: string, bg?: BgKind): string {
+  return bg ? `${hex.toLowerCase()}|${bg}` : hex.toLowerCase();
+}
+
+/** inverse가 있는 쓰임(배경 위에 놓이는 색). */
+const INVERSE_USES = new Set(['text', 'icon', 'border']);
+
+const byCountThenHex = (a: { hex: string; count: number }, b: { hex: string; count: number }): number =>
+  b.count - a.count || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0);
 
 /**
- * 한 쓰임의 색들 → 번호 없는 밝기 이름(default · subtle · strong · inverse · brand).
- * `existingDefaultHex`: `color/{쓰임}/default`가 이미 있으면 그 색 — 기준색이 된다.
- * 없으면 곳 수가 가장 많은 색(같으면 hex 순)이 default이자 기준색.
- * 같은 이름 후보가 여럿이면 번호는 assignNames가 곳 수 순으로 붙인다.
+ * 한 쓰임의 색들 → 번호 없는 밝기 이름(default · subtle · strong · inverse · brand), 키는 `colorSlotKey(hex, bg)`.
+ * 기준색: `existingDefaultHex`(`color/{쓰임}/default`가 이미 있으면 그 색), 없으면 hex별 곳 수 합이 가장 많은 색
+ * (같으면 hex 순). 판정 순서: default → inverse(합친 판정) → brand(유채) → subtle · strong.
+ * inverse(12.4 합친 판정, `use`가 text · icon · border일 때만 — 없으면 판정한다):
+ *   1. 기준색이 극단(L < 0.35 또는 ≥ 0.85) 2. 그 색이 반대쪽 극단 3. 배경 종류가 있고 chroma이거나 기준과 같은 쪽.
+ * 같은 이름 후보가 여럿이면 번호는 assignNames가 붙인다.
  */
-export function colorRoleBases(colors: readonly ColorCount[], existingDefaultHex?: string): Map<string, string> {
+export function colorRoleBases(colors: readonly ColorCount[], existingDefaultHex?: string, use?: string): Map<string, string> {
   const out = new Map<string, string>();
-  const sorted = [...colors].sort(byCountThenHex);
-  const refHex = (existingDefaultHex ?? sorted[0]?.hex)?.toLowerCase();
+  const totals = new Map<string, number>();
+  for (const c of colors) totals.set(c.hex.toLowerCase(), (totals.get(c.hex.toLowerCase()) ?? 0) + c.count);
+  const top = [...totals].map(([hex, count]) => ({ hex, count })).sort(byCountThenHex)[0];
+  const refHex = (existingDefaultHex ?? top?.hex)?.toLowerCase();
   if (!refHex) return out;
   const ref = hexToOklch(refHex);
-  for (const c of sorted) {
+  const refDark = ref.l < 0.35;
+  const refExtreme = refDark || ref.l >= 0.85;
+  const sameSide: BgKind = ref.l < 0.5 ? 'dark' : 'light';
+  const inverseUse = use == null || INVERSE_USES.has(use);
+  for (const c of colors) {
     const hex = c.hex.toLowerCase();
+    const key = colorSlotKey(hex, c.bg);
     if (hex === refHex) {
-      out.set(hex, 'default');
+      out.set(key, 'default');
       continue;
     }
     const o = hexToOklch(hex);
-    if (o.c >= LOW_CHROMA) {
-      out.set(hex, 'brand');
+    const opposite = refDark ? o.l >= 0.85 : o.l < 0.35;
+    if (inverseUse && refExtreme && opposite && c.bg && (c.bg === 'chroma' || c.bg === sameSide)) {
+      out.set(key, 'inverse');
       continue;
     }
-    // 아주 반대쪽 밝기만 inverse — 흰 바탕 회색 보조 글자(L 0.55~0.7)가 inverse가 되지 않게 띠를 둔다.
-    const inverse = ref.l < 0.5 ? o.l >= 0.85 : o.l <= 0.35;
-    out.set(hex, inverse ? 'inverse' : o.l > ref.l ? 'subtle' : 'strong');
+    if (o.c >= LOW_CHROMA) {
+      out.set(key, 'brand');
+      continue;
+    }
+    out.set(key, o.l > ref.l ? 'subtle' : 'strong');
   }
   return out;
 }
@@ -228,17 +261,13 @@ function cmpValue(a: string, b: string): number {
 }
 
 /* ---------- 옛 이름 (12.7) ---------- */
-const OLD_LADDER = new Set([
-  ...['none', '3xs', '2xs', 'xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl'].map((s) => `spacing/${s}`),
-  ...['none', 'xs', 'sm', 'md', 'lg', 'xl', '2xl', 'full'].map((s) => `radius/${s}`),
-  'stroke-width/thin',
-  'stroke-width/thick',
-]);
+/** 단계 이름(12.7) — 사다리 · 상대 순위(tshirtRoles)가 만든 이름과 그 `-N` 변형. */
+const OLD_LADDER = /^(spacing|radius|size|stroke-width)\/(none|3xs|2xs|xs|sm|md|lg|xl|2xl|3xl|4xl|full|thin|thick)(-\d+)?$/;
 const OLD_COLOR = new Set(['color/background/default', 'color/text/default', 'color/border/default', 'color/background/brand']);
 
 /** 옛 플러그인 이름인가(순서 3 "디자이너가 만든 것"에서 뺀다). 옛 색 4개는 순서 2에서는 쓴다. */
 export function isOldPluginName(name: string): boolean {
-  return OLD_LADDER.has(name) || OLD_COLOR.has(name);
+  return OLD_LADDER.test(name) || OLD_COLOR.has(name);
 }
 
 /** 값 키 — 숫자는 소수 둘째 자리, 색은 소문자 hex. */

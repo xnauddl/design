@@ -11,6 +11,9 @@ import {
   createUsageRoles,
   assignNames,
   colorRoleBases,
+  colorSlotKey,
+  bgKindOf,
+  backgroundOf,
   colorUse,
   paddingProp,
   radiusName,
@@ -5052,23 +5055,50 @@ test('usageRoles — 쓰임 이름 · 색 쓰임 · 번호 · 옛 이름(순수)
   assert.equal(isOldPluginName('spacing/card/gap'), false);
 });
 
-test('colorRoleBases — default · subtle · strong · brand · inverse 띠', () => {
-  const b = colorRoleBases([
-    { hex: '#111111', count: 9 }, // 가장 많이 씀 → default(어두운 기준)
-    { hex: '#6b7280', count: 3 }, // L 0.55 — 흰 바탕 회색 보조 글자 → subtle(inverse 아님)
-    { hex: '#ffffff', count: 6 }, // L 1.0 ≥ 0.85 → inverse
-    { hex: '#000000', count: 1 }, // 기준보다 어두움 → strong
-    { hex: '#0066ff', count: 2 }, // 유채 → brand
-  ]);
-  assert.equal(b.get('#111111'), 'default');
-  assert.equal(b.get('#6b7280'), 'subtle');
-  assert.equal(b.get('#ffffff'), 'inverse');
-  assert.equal(b.get('#000000'), 'strong');
-  assert.equal(b.get('#0066ff'), 'brand');
-  // 흰 기준: #555(L 0.45)는 strong, #111은 inverse
-  const w = colorRoleBases([{ hex: '#555555', count: 1 }, { hex: '#111111', count: 1 }], '#ffffff');
-  assert.equal(w.get('#555555'), 'strong');
-  assert.equal(w.get('#111111'), 'inverse');
+test('colorRoleBases — default · subtle · strong · brand · inverse 합친 판정(기준 극단 · 반대 극단 · 배경 유채 또는 같은 쪽)', () => {
+  const k = colorSlotKey;
+  const b = colorRoleBases(
+    [
+      { hex: '#111111', count: 9 }, // 가장 많이 씀 → default(어두운 극단 기준)
+      { hex: '#6b7280', count: 3 }, // L 0.55 — 회색 보조 글자 → subtle(반대쪽 극단 아님)
+      { hex: '#ffffff', count: 3, bg: 'chroma' }, // 파란 버튼 위 흰 글자 → inverse
+      { hex: '#ffffff', count: 2, bg: 'dark' }, // 어두운 바 위 흰 글자 → inverse
+      { hex: '#ffffff', count: 1, bg: 'light' }, // 밝은 회색 카드 위 흰 글자 → subtle(배경이 기준과 반대쪽)
+      { hex: '#ffffff', count: 1 }, // 배경 모름(이미지 · 채움 없음) → subtle
+      { hex: '#000000', count: 1 }, // 기준보다 어두움 → strong
+      { hex: '#0066ff', count: 2 }, // 유채 → brand
+    ],
+    undefined,
+    'text',
+  );
+  assert.equal(b.get(k('#111111')), 'default');
+  assert.equal(b.get(k('#6b7280')), 'subtle');
+  assert.equal(b.get(k('#ffffff', 'chroma')), 'inverse');
+  assert.equal(b.get(k('#ffffff', 'dark')), 'inverse');
+  assert.equal(b.get(k('#ffffff', 'light')), 'subtle');
+  assert.equal(b.get(k('#ffffff')), 'subtle');
+  assert.equal(b.get(k('#000000')), 'strong');
+  assert.equal(b.get(k('#0066ff')), 'brand');
+  // 기준색은 hex별 곳 수 합 — 흰색이 7곳으로 가장 많아도 파일에 color/text/default(#000)가 있으면 그것이 기준
+  const f = colorRoleBases([{ hex: '#ffffff', count: 7, bg: 'dark' }, { hex: '#ffffff', count: 2, bg: 'light' }, { hex: '#000000', count: 1 }], '#000000', 'text');
+  assert.equal(f.get(k('#ffffff', 'dark')), 'inverse');
+  assert.equal(f.get(k('#ffffff', 'light')), 'subtle');
+  assert.equal(f.get(k('#000000')), 'default');
+  // 회색 기준(#7A7A7A, L 0.58 — 극단 아님): 연회색 바 위 검정 아이콘 → strong(inverse 없음)
+  const g = colorRoleBases([{ hex: '#7a7a7a', count: 5 }, { hex: '#000000', count: 2, bg: 'light' }], undefined, 'icon');
+  assert.equal(g.get(k('#000000', 'light')), 'strong');
+  // 흰 기준: #555(L 0.45)는 strong, 밝은 배경 위 #111은 inverse
+  const w = colorRoleBases([{ hex: '#555555', count: 1 }, { hex: '#111111', count: 1, bg: 'light' }], '#ffffff', 'text');
+  assert.equal(w.get(k('#555555')), 'strong');
+  assert.equal(w.get(k('#111111', 'light')), 'inverse');
+  // background · shadow에는 inverse가 없다
+  const bg = colorRoleBases([{ hex: '#111111', count: 3 }, { hex: '#ffffff', count: 1, bg: 'dark' }], undefined, 'background');
+  assert.equal(bg.get(k('#ffffff', 'dark')), 'subtle');
+  // 배경 종류
+  assert.equal(bgKindOf('#3d5fdb'), 'chroma');
+  assert.equal(bgKindOf('#2edcf3'), 'chroma');
+  assert.equal(bgKindOf('#f3f3f3'), 'light');
+  assert.equal(bgKindOf('#222222'), 'dark');
 });
 
 /** 실기 파일과 같은 모양 — 옛 Semantic 색 4개(background/default = 흰색 FRAME_FILL · SHAPE_FILL, text/default = 검정). */
@@ -5094,8 +5124,11 @@ test('칠하기 용도는 레이어 종류(QA #4 불합격 1) — 흰 글자는 
   await legacyColorFile(figma);
   const white = textNode('contact', '#ffffff');
   const body = textNode('body', '#000000');
-  const panel = { type: 'FRAME', id: 'panel', name: 'panel', layoutMode: 'NONE', fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }], children: [white, body], setBoundVariable() {} };
-  white.parent = panel;
+  // 흰 글자는 파란 버튼(프레임 자신의 채움) 위 — 배경이 유채색이라 inverse(12.4 합친 판정)
+  const button = { type: 'FRAME', id: 'button', name: 'button', layoutMode: 'NONE', fills: [{ type: 'SOLID', color: hexToRgb('#3d5fdb') }], children: [white], setBoundVariable() {} };
+  const panel = { type: 'FRAME', id: 'panel', name: 'panel', layoutMode: 'NONE', fills: [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }], children: [button, body], setBoundVariable() {} };
+  white.parent = button;
+  button.parent = panel;
   body.parent = panel;
   const dry = await bindSelection([panel], false);
   const fillOf = (id) => dry.candidates.find((c) => c.nodeId === id && c.field === 'fills');
@@ -5197,7 +5230,7 @@ test('createUsageRoles — 만들기는 쓰임마다 역할, 같은 값이면 �
     { name: 'spacing/24', category: 'gap', sources: ['gap'], value: 24, uses: [{ name: 'spacing/card/gap', count: 3 }] },
     { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16, uses: [{ name: 'spacing/card/gap', count: 1 }, { name: 'spacing/padding', count: 2 }] },
     { name: 'color/111111', category: 'color', sources: ['fill'], value: '#111111', uses: [{ name: 'color/text', count: 5 }] },
-    { name: 'color/ffffff', category: 'color', sources: ['fill'], value: '#ffffff', uses: [{ name: 'color/text', count: 1 }] },
+    { name: 'color/ffffff', category: 'color', sources: ['fill'], value: '#ffffff', uses: [{ name: 'color/text', count: 1, bg: 'dark' }] },
   ];
   await createTokens(tokens, 16);
   assert.equal(await createUsageRoles(tokens, true), 5); // 미리보기는 세기만
@@ -5231,5 +5264,171 @@ test('extractFromSelection — 쓰임 목록(uses)을 모은다, 격자 정리�
   assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/card/gap', count: 1 }]);
   assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/card/padding', count: 4 }]);
   assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1 }]);
-  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1 }]);
+  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light' }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
+});
+
+/* ---------- A.10 (2026-11-06 실기 뒤): 용도가 틀린 연결 바꾸기 · 크기 연결 풀기 · inverse 합친 판정 · 옛 단계 이름 ---------- */
+
+test('용도가 틀린 연결 바꾸기(12.8) — 흰 글자에 붙은 background/default → color/text/inverse(그 역할이 가리키던 Global 별칭), 맞는 용도는 그대로', async () => {
+  const figma = installFigma();
+  await legacyColorFile(figma);
+  const bgDefault = findVar(figma, 'Semantic', 'color/background/default'); // FRAME_FILL · SHAPE_FILL
+  const textDefault = findVar(figma, 'Semantic', 'color/text/default');
+  const alias = (v) => ({ type: 'VARIABLE_ALIAS', id: v.id });
+  const white = textNode('contact', '#ffffff', { fills: [{ type: 'SOLID', color: hexToRgb('#ffffff'), boundVariables: { color: alias(bgDefault) } }] });
+  const body = textNode('body', '#000000', { fills: [{ type: 'SOLID', color: hexToRgb('#000000'), boundVariables: { color: alias(textDefault) } }] });
+  const button = { type: 'FRAME', id: 'button', name: 'button', layoutMode: 'NONE', fills: [{ type: 'SOLID', color: hexToRgb('#e68e6c') }], children: [white], setBoundVariable() {} };
+  const panel = { type: 'FRAME', id: 'panel', name: 'panel', layoutMode: 'NONE', fills: [], children: [button, body], setBoundVariable() {} };
+  white.parent = button;
+  button.parent = panel;
+  body.parent = panel;
+  const dry = await bindSelection([panel], false);
+  const c = dry.candidates.find((x) => x.nodeId === 'contact');
+  assert.equal(c.variableName, 'color/text/inverse'); // 주황 버튼(유채) 위 흰 글자
+  assert.equal(c.fromVariableId, bgDefault.id);
+  assert.equal(c.fromVariableName, 'color/background/default');
+  assert.equal(c.newRoleGlobalName, 'color/gray/0'); // 붙어 있던 역할이 가리키던 Global
+  assert.equal(dry.candidates.find((x) => x.nodeId === 'body'), undefined); // 용도가 맞는 Semantic은 그대로(이미 연결됨)
+  assert.ok(dry.reasons['already-bound'] >= 1);
+  const r = await bindSelection([panel]);
+  assert.equal(r.swapped, 1);
+  const inv = findVar(figma, 'Semantic', 'color/text/inverse');
+  assert.equal(white.fills[0].boundVariables.color.id, inv.id);
+  assert.equal(roleTarget(figma, inv.id), findVar(figma, 'Global', 'color/gray/0').id);
+});
+
+test('크기 연결 풀기(12.8a) — 카드 width에 붙은 Global은 풀기 후보, 연결하면 풀리고 값은 그대로, 그 사이 바뀌면 건너뜀', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/1440', category: 'size', sources: ['size'], value: 1440 }], 16);
+  const g = findVar(figma, 'Global', 'size/1440');
+  const label = textNode('label', '#000000');
+  const mkCard = (id) => ({
+    type: 'FRAME', id, name: id, fills: [], layoutMode: 'VERTICAL', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+    width: 1440, height: 300, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG', children: [label],
+    boundVariables: { width: { type: 'VARIABLE_ALIAS', id: g.id } },
+    setBoundVariable(field, v) {
+      if (v) this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id };
+      else delete this.boundVariables[field];
+    },
+  });
+  const card = mkCard('card');
+  label.parent = card;
+  const dry = await bindSelection([card], false);
+  const c = dry.candidates.find((x) => x.field === 'width');
+  assert.equal(c.unbind, true);
+  assert.equal(c.variableId, `unbind:${g.id}`);
+  assert.equal(c.variableName, 'size/1440');
+  assert.equal(c.fromVariableId, g.id);
+  registerNodes(figma, [card]);
+  const r = await bindSelectedItems([{ nodeId: 'card', field: 'width', variableId: c.variableId, fromVariableId: g.id, unbind: true }]);
+  assert.equal(r.unbound, 1);
+  assert.equal(r.bound, 0);
+  assert.equal(card.boundVariables.width, undefined);
+  assert.equal(card.width, 1440); // 값은 그대로
+  // 다시 찾으면 풀기 후보가 없다
+  const again = await bindSelection([card], false);
+  assert.equal(again.candidates.find((x) => x.field === 'width'), undefined);
+  // 그 사이 다른 변수로 바뀌었으면 "그 사이 바뀜"
+  const card2 = mkCard('card2');
+  const other = figma.variables.createVariable('size/other', g.variableCollectionId, 'FLOAT');
+  card2.boundVariables.width = { type: 'VARIABLE_ALIAS', id: other.id };
+  registerNodes(figma, [card2]);
+  const r2 = await bindSelectedItems([{ nodeId: 'card2', field: 'width', variableId: `unbind:${g.id}`, fromVariableId: g.id, unbind: true }]);
+  assert.deepEqual(r2.reasons, { changed: 1 });
+  assert.equal(r2.unbound, 0);
+});
+
+test('크기 연결 풀기 — Semantic이 붙은 카드 크기는 건드리지 않는다(찾지도 세지도 않음)', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/1440', category: 'size', sources: ['size'], value: 1440 }], 16);
+  const role = designerRole(figma, 'size/page', findVar(figma, 'Global', 'size/1440'));
+  const label = textNode('label', '#000000');
+  const card = {
+    type: 'FRAME', id: 'card', name: 'card', fills: [], layoutMode: 'NONE', width: 1440, height: 300, children: [label],
+    boundVariables: { width: { type: 'VARIABLE_ALIAS', id: role.id } }, setBoundVariable() {},
+  };
+  label.parent = card;
+  const dry = await bindSelection([card], false);
+  assert.equal(dry.candidates.find((x) => x.field === 'width'), undefined);
+});
+
+test('backgroundOf — 조상 첫 보이는 채움(불투명 SOLID만), 이미지 · 반투명 · 없음은 모름, 자기 채움은 보지 않음', () => {
+  installFigma();
+  const leaf = textNode('t', '#ffffff');
+  const mid = { type: 'FRAME', id: 'mid', fills: [{ type: 'SOLID', color: hexToRgb('#000000'), visible: false }], children: [leaf] };
+  const top = { type: 'FRAME', id: 'top', fills: [{ type: 'SOLID', color: hexToRgb('#ffffff') }, { type: 'SOLID', color: hexToRgb('#3d5fdb') }], children: [mid] };
+  leaf.parent = mid;
+  mid.parent = top;
+  top.parent = { type: 'PAGE' };
+  assert.equal(backgroundOf(leaf), '#3d5fdb'); // 숨긴 칠하기는 건너뛰고, 맨 위(배열 끝) 칠하기
+  top.fills = [{ type: 'IMAGE', scaleMode: 'FILL' }];
+  assert.equal(backgroundOf(leaf), undefined);
+  top.fills = [{ type: 'SOLID', color: hexToRgb('#3d5fdb'), opacity: 0.5 }];
+  assert.equal(backgroundOf(leaf), undefined);
+  top.fills = [];
+  assert.equal(backgroundOf(leaf), undefined); // 페이지까지 채움 없음
+});
+
+test('extractFromSelection — 같은 흰 글자가 버튼 위 · 카드 위에 있으면 배경 종류별로 따로 세고, 만들기는 inverse · subtle 두 역할', async () => {
+  const figma = installFigma();
+  const onButton = textNode('a', '#ffffff');
+  const onCard = textNode('b', '#ffffff');
+  const dark = textNode('c', '#111111');
+  const dark2 = textNode('d', '#111111');
+  const button = { type: 'FRAME', id: 'btn', name: 'btn', layoutMode: 'NONE', fills: [{ type: 'SOLID', color: hexToRgb('#3d5fdb') }], children: [onButton] };
+  const card = { type: 'FRAME', id: 'card', name: 'card', layoutMode: 'NONE', fills: [{ type: 'SOLID', color: hexToRgb('#e9e9e9') }], children: [onCard, dark, dark2] };
+  const root = { type: 'FRAME', id: 'root', name: 'root', layoutMode: 'NONE', fills: [], children: [button, card] };
+  onButton.parent = button;
+  onCard.parent = card;
+  dark.parent = card;
+  dark2.parent = card;
+  button.parent = root;
+  card.parent = root;
+  const { tokens } = extractFromSelection([root]);
+  const white = tokens.find((x) => x.name === 'color/ffffff');
+  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma' }, { name: 'color/text', count: 1, bg: 'light' }]);
+  await createTokens(tokens, 16);
+  await createUsageRoles(tokens);
+  const inv = findVar(figma, 'Semantic', 'color/text/inverse');
+  const sub = findVar(figma, 'Semantic', 'color/text/subtle');
+  assert.ok(inv && sub);
+  assert.equal(roleTarget(figma, inv.id), roleTarget(figma, sub.id)); // 같은 Global 별칭
+  assert.ok(findVar(figma, 'Semantic', 'color/text/default')); // #111(2곳)이 기준
+});
+
+test('옛 단계 이름(12.7) — size · 칸 밖 · -N 변형도 순서 3에서 빼고 쓰임 역할을 만든다', async () => {
+  for (const n of ['size/md', 'spacing/4xl-2', 'size/4xl-20', 'radius/full', 'radius/3xl', 'stroke-width/thin', 'spacing/none']) assert.equal(isOldPluginName(n), true, n);
+  for (const n of ['size/icon', 'size/avatar', 'spacing/gap-2', 'radius/default', 'stroke-width/default', 'spacing/card/gap', 'radius/button']) assert.equal(isOldPluginName(n), false, n);
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 }], 16);
+  const g = findVar(figma, 'Global', 'spacing/16');
+  designerRole(figma, 'spacing/4xl-2', g);
+  const frame = {
+    type: 'FRAME', id: 'f', name: 'f', fills: [], layoutMode: 'VERTICAL', itemSpacing: 16, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', setBoundVariable() {},
+  };
+  const dry = await bindSelection([frame], false);
+  assert.equal(dry.candidates[0].variableName, 'spacing/gap');
+  assert.ok(dry.candidates[0].newRole);
+});
+
+test('크기 연결 풀기 — 아이콘의 HUG 축 · 자유 배치에 붙은 Global도 푼다, FIXED 축은 지금처럼 바꾸기', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/24', category: 'size', sources: ['size'], value: 24 }], 16);
+  const g = findVar(figma, 'Global', 'size/24');
+  const vec = { type: 'VECTOR', id: 'v', name: 'v', visible: true, fills: [], strokes: [{ type: 'SOLID', color: hexToRgb('#000000') }], strokeWeight: 1.5 };
+  const icon = {
+    type: 'FRAME', id: 'icon', name: 'icon', fills: [], layoutMode: 'NONE', width: 24, height: 24, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG',
+    children: [vec], boundVariables: { width: { type: 'VARIABLE_ALIAS', id: g.id }, height: { type: 'VARIABLE_ALIAS', id: g.id } }, setBoundVariable() {},
+  };
+  vec.parent = icon;
+  const row = { type: 'FRAME', id: 'row', name: 'row', fills: [], layoutMode: 'HORIZONTAL', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, children: [icon], setBoundVariable() {} };
+  icon.parent = row;
+  const dry = await bindSelection([row], false);
+  const w = dry.candidates.find((c) => c.nodeId === 'icon' && c.field === 'width');
+  const h = dry.candidates.find((c) => c.nodeId === 'icon' && c.field === 'height');
+  assert.equal(h.unbind, true); // HUG 축 → 풀기
+  assert.ok(!w.unbind); // FIXED 축 → 같은 값 역할로 바꾸기
+  assert.equal(w.variableName, 'size/icon');
+  assert.equal(w.fromVariableId, g.id);
 });

@@ -692,9 +692,14 @@
     "bind.fromGlobal": "\xB7 {global}\uC5D0\uC11C",
     "bind.roleNew": "\uC0C8 \uC5ED\uD560 {k}",
     "bind.roleSwap": "\uBC14\uAFC8 {m}",
-    "bind.roleSummaryTip": "\uC0C8 \uC5ED\uD560\uC740 \uC5F0\uACB0\uD560 \uB54C Semantic\uC5D0 \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uBC14\uAFC8\uC740 Global\uC774 \uBD99\uC740 \uACF3\uC744 \uAC19\uC740 \uAC12\uC758 \uC5ED\uD560\uB85C \uBC14\uAFD4\uC694",
+    "bind.roleSummaryTip": "\uC0C8 \uC5ED\uD560\uC740 \uC5F0\uACB0\uD560 \uB54C Semantic\uC5D0 \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uBC14\uAFC8\uC740 Global\uC774\uB098 \uC6A9\uB3C4\uAC00 \uB9DE\uC9C0 \uC54A\uB294 \uBCC0\uC218\uAC00 \uBD99\uC740 \uACF3\uC744 \uAC19\uC740 \uAC12\uC758 \uC5ED\uD560\uB85C \uBC14\uAFD4\uC694 \xB7 \uD480\uAE30\uB294 \uCE74\uB4DC \xB7 \uD654\uBA74 \uD06C\uAE30\uC758 \uBCC0\uC218 \uC5F0\uACB0\uB9CC \uD480\uC5B4\uC694",
     "bind.doneNewRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
-    "bind.doneSwapped": " \xB7 Global\uC5D0\uC11C \uBC14\uAFC8 {m}\uACF3",
+    "bind.doneSwapped": " \xB7 \uBC14\uAFC8 {m}\uACF3",
+    // 크기 연결 풀기(§2.12 12.8a, §4.6)
+    "bind.unbind": "\uD480\uAE30",
+    "bind.unbindTip": "\uCE74\uB4DC \xB7 \uD654\uBA74 \uD06C\uAE30\uB294 \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694 \xB7 \uC5F0\uACB0\uB9CC \uD480\uACE0 \uD06C\uAE30\uB294 \uADF8\uB300\uB85C\uC608\uC694",
+    "bind.roleUnbind": "\uD480\uAE30 {u}",
+    "bind.doneUnbound": " \xB7 \uD06C\uAE30 \uC5F0\uACB0 \uD480\uAE30 {u}\uACF3",
     "bind.placesMore": "\uC678 {n}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC120\uD0DD\uC73C\uB85C \uBCF4\uAE30",
     "bind.linkingOf": "\uC5F0\uACB0 \uC911\u2026 {done} / {total}",
     "bind.waitLink": "\uC5F0\uACB0\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
@@ -1322,27 +1327,47 @@
     if (insideIconFrame && (nodeType === "RECTANGLE" || nodeType === "ELLIPSE")) return "icon";
     return field === "fills" ? "background" : "border";
   }
+  function bgKindOf(hex) {
+    const o = hexToOklch(hex);
+    if (o.c >= LOW_CHROMA) return "chroma";
+    return o.l < 0.5 ? "dark" : "light";
+  }
+  function colorSlotKey(hex, bg) {
+    return bg ? `${hex.toLowerCase()}|${bg}` : hex.toLowerCase();
+  }
+  var INVERSE_USES = /* @__PURE__ */ new Set(["text", "icon", "border"]);
   var byCountThenHex = (a, b) => b.count - a.count || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0);
-  function colorRoleBases(colors, existingDefaultHex) {
+  function colorRoleBases(colors, existingDefaultHex, use) {
     var _a, _b;
     const out = /* @__PURE__ */ new Map();
-    const sorted = [...colors].sort(byCountThenHex);
-    const refHex = (_b = existingDefaultHex != null ? existingDefaultHex : (_a = sorted[0]) == null ? void 0 : _a.hex) == null ? void 0 : _b.toLowerCase();
+    const totals = /* @__PURE__ */ new Map();
+    for (const c of colors) totals.set(c.hex.toLowerCase(), ((_a = totals.get(c.hex.toLowerCase())) != null ? _a : 0) + c.count);
+    const top = [...totals].map(([hex, count]) => ({ hex, count })).sort(byCountThenHex)[0];
+    const refHex = (_b = existingDefaultHex != null ? existingDefaultHex : top == null ? void 0 : top.hex) == null ? void 0 : _b.toLowerCase();
     if (!refHex) return out;
     const ref = hexToOklch(refHex);
-    for (const c of sorted) {
+    const refDark = ref.l < 0.35;
+    const refExtreme = refDark || ref.l >= 0.85;
+    const sameSide = ref.l < 0.5 ? "dark" : "light";
+    const inverseUse = use == null || INVERSE_USES.has(use);
+    for (const c of colors) {
       const hex = c.hex.toLowerCase();
+      const key = colorSlotKey(hex, c.bg);
       if (hex === refHex) {
-        out.set(hex, "default");
+        out.set(key, "default");
         continue;
       }
       const o = hexToOklch(hex);
-      if (o.c >= LOW_CHROMA) {
-        out.set(hex, "brand");
+      const opposite = refDark ? o.l >= 0.85 : o.l < 0.35;
+      if (inverseUse && refExtreme && opposite && c.bg && (c.bg === "chroma" || c.bg === sameSide)) {
+        out.set(key, "inverse");
         continue;
       }
-      const inverse = ref.l < 0.5 ? o.l >= 0.85 : o.l <= 0.35;
-      out.set(hex, inverse ? "inverse" : o.l > ref.l ? "subtle" : "strong");
+      if (o.c >= LOW_CHROMA) {
+        out.set(key, "brand");
+        continue;
+      }
+      out.set(key, o.l > ref.l ? "subtle" : "strong");
     }
     return out;
   }
@@ -1389,15 +1414,10 @@
     if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
     return a < b ? -1 : a > b ? 1 : 0;
   }
-  var OLD_LADDER = /* @__PURE__ */ new Set([
-    ...["none", "3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"].map((s) => `spacing/${s}`),
-    ...["none", "xs", "sm", "md", "lg", "xl", "2xl", "full"].map((s) => `radius/${s}`),
-    "stroke-width/thin",
-    "stroke-width/thick"
-  ]);
+  var OLD_LADDER = /^(spacing|radius|size|stroke-width)\/(none|3xs|2xs|xs|sm|md|lg|xl|2xl|3xl|4xl|full|thin|thick)(-\d+)?$/;
   var OLD_COLOR = /* @__PURE__ */ new Set(["color/background/default", "color/text/default", "color/border/default", "color/background/brand"]);
   function isOldPluginName(name) {
-    return OLD_LADDER.has(name) || OLD_COLOR.has(name);
+    return OLD_LADDER.test(name) || OLD_COLOR.has(name);
   }
   function valueKey(v) {
     return typeof v === "number" ? String(Math.round(v * 100) / 100) : v.toLowerCase();
@@ -1418,7 +1438,7 @@
   function keyOf(category, value, unit) {
     return `${category}|${value}|${unit != null ? unit : ""}`;
   }
-  function add(acc, token, source, nodeId, use) {
+  function add(acc, token, source, nodeId, use, bg) {
     var _a, _b;
     const k = keyOf(token.category, token.value, token.unit);
     let existing = acc.map.get(k);
@@ -1432,10 +1452,27 @@
     acc.lastNode.set(k, nodeId);
     if (use) {
       const uses = (_b = existing.uses) != null ? _b : existing.uses = [];
-      const u = uses.find((x) => x.name === use);
+      const u = uses.find((x) => x.name === use && x.bg === bg);
       if (u) u.count++;
-      else uses.push({ name: use, count: 1 });
+      else uses.push(bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
     }
+  }
+  function backgroundOf(node) {
+    var _a;
+    let p = node.parent;
+    while (p && p.type !== "PAGE" && p.type !== "DOCUMENT") {
+      const fills = p.fills;
+      if (Array.isArray(fills)) {
+        const vis = fills.filter((f) => f.visible !== false && f.opacity !== 0);
+        if (vis.length) {
+          const top = vis[vis.length - 1];
+          if (top.type === "SOLID" && ((_a = top.opacity) != null ? _a : 1) >= 1) return rgbToHex(top.color);
+          return void 0;
+        }
+      }
+      p = p.parent;
+    }
+    return void 0;
   }
   function collectPaints(acc, node, paints2, source) {
     const nodeId = node.id;
@@ -1447,8 +1484,9 @@
         continue;
       }
       const hex = rgbToHex(p.color);
-      const use = `color/${colorUse(node.type, source === "fill" ? "fills" : "strokes", isInsideIconFrame(node))}`;
-      add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source, nodeId, use);
+      const cu = colorUse(node.type, source === "fill" ? "fills" : "strokes", isInsideIconFrame(node));
+      const bgHex = cu === "text" || cu === "icon" || cu === "border" ? backgroundOf(node) : void 0;
+      add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : void 0);
     }
   }
   function collectText(acc, node) {
@@ -1840,7 +1878,7 @@
     return summary;
   }
   async function createUsageRoles(tokens, preview = false) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f;
     const withUses = tokens.filter((t2) => {
       var _a2;
       return (_a2 = t2.uses) == null ? void 0 : _a2.length;
@@ -1879,25 +1917,27 @@
       for (const u of (_a = t2.uses) != null ? _a : []) {
         if (u.name.startsWith("color/")) {
           const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
-          arr.push({ token: t2, count: u.count });
+          arr.push({ token: t2, count: u.count, bg: u.bg });
           colorUses.set(u.name, arr);
         } else reqs.push({ base: u.name, value: valueKey(t2.value), count: u.count, token: t2 });
       }
     }
     for (const [use, list] of colorUses) {
-      const counts = /* @__PURE__ */ new Map();
-      for (const x of list) counts.set(String(x.token.value).toLowerCase(), ((_c = counts.get(String(x.token.value).toLowerCase())) != null ? _c : 0) + x.count);
       const defKey = existing.get(`${use}/default`);
-      const bases = colorRoleBases([...counts].map(([hex, count]) => ({ hex, count })), defKey || void 0);
+      const bases = colorRoleBases(
+        list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg })),
+        defKey || void 0,
+        use.slice("color/".length)
+      );
       for (const x of list) {
         const hex = String(x.token.value).toLowerCase();
-        reqs.push({ base: `${use}/${(_d = bases.get(hex)) != null ? _d : "default"}`, value: valueKey(hex), count: x.count, token: x.token });
+        reqs.push({ base: `${use}/${(_c = bases.get(colorSlotKey(hex, x.bg))) != null ? _c : "default"}`, value: valueKey(hex), count: x.count, token: x.token });
       }
     }
     const names = assignNames(reqs, existing);
     const toMake = /* @__PURE__ */ new Map();
     for (const r of reqs) {
-      const name = (_e = names.get(`${r.base}\0${r.value}`)) != null ? _e : r.base;
+      const name = (_d = names.get(`${r.base}\0${r.value}`)) != null ? _d : r.base;
       if (existing.has(name) || toMake.has(name)) continue;
       toMake.set(name, r.token);
     }
@@ -1909,9 +1949,9 @@
       if (!g) continue;
       const v = figma.variables.createVariable(name, col, g.resolvedType);
       for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
-      v.scopes = scopesForType((_f = scopeForSemanticRole(name)) != null ? _f : g.scopes, g.resolvedType);
+      v.scopes = scopesForType((_e = scopeForSemanticRole(name)) != null ? _e : g.scopes, g.resolvedType);
       try {
-        (_g = v.setPluginData) == null ? void 0 : _g.call(v, AUTO_ROLE_KEY, "1");
+        (_f = v.setPluginData) == null ? void 0 : _f.call(v, AUTO_ROLE_KEY, "1");
       } catch (e) {
       }
       made++;
@@ -3099,7 +3139,7 @@
       const known = /* @__PURE__ */ new Map();
       for (const s of ctx.slots) known.set(s.node.id, s.node);
       const r = await bindSelectedItems(
-        preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, fromVariableId: c.fromVariableId })),
+        preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, fromVariableId: c.fromVariableId, unbind: c.unbind })),
         {},
         known
         // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
@@ -3109,6 +3149,7 @@
       for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_b = res.reasons[k]) != null ? _b : 0) + v;
       res.newRoles = r.newRoles;
       res.swapped = r.swapped;
+      res.unbound = r.unbound;
       for (const c of preview.candidates) {
         const id = c.newRole ? r.createdIds[c.newRole.name] : void 0;
         if (id) c.variableId = id;
@@ -3149,10 +3190,22 @@
       } else if (v.resolvedType === "FLOAT" && typeof val === "number") e.num = val;
       else if (v.resolvedType === "STRING" && typeof val === "string") e.str = val;
       if (tier === 2) semNames.set(v.name, entryKey(e));
+      if (tier >= 2) e.aliasGlobalId = await aliasGlobalOf(v, modeOf, tierOf);
       entries.push(e);
     }
     entries.sort((a, b) => b.tier - a.tier);
     return { entries, semNames, globalIds, byId: new Map(entries.map((e) => [e.variable.id, e])) };
+  }
+  async function aliasGlobalOf(v, modeOf, tierOf) {
+    let cur = v;
+    for (let i = 0; i < 12 && cur; i++) {
+      const mode = modeOf.get(cur.variableCollectionId);
+      const val = mode ? cur.valuesByMode[mode] : void 0;
+      if (!(val && typeof val === "object" && "type" in val && val.type === "VARIABLE_ALIAS")) return void 0;
+      cur = await figma.variables.getVariableByIdAsync(val.id);
+      if (cur && tierOf.get(cur.variableCollectionId) === 1) return cur.id;
+    }
+    return void 0;
   }
   function readAutoRole(v) {
     const fn = v.getPluginData;
@@ -3216,7 +3269,7 @@
     return (_a = cands.filter((e) => e.tier === 2 && !e.auto && !e.mirror && !isOldPluginName(e.variable.name)).sort(byName)[0]) != null ? _a : null;
   }
   function resolveSlots(ctx) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d;
     const { res, preview } = ctx;
     const pending = [];
     const colorLeft = [];
@@ -3225,9 +3278,15 @@
       preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s)));
     };
     const globalFor = (s, cands) => {
-      var _a2, _b2;
-      if (s.fromId) return (_a2 = ctx.index.byId.get(s.fromId)) != null ? _a2 : null;
-      return (_b2 = cands.filter((e) => e.tier === 1).sort(byName)[0]) != null ? _b2 : null;
+      var _a2;
+      if (s.fromId) {
+        const from = ctx.index.byId.get(s.fromId);
+        if (!from) return null;
+        if (from.tier === 1) return from;
+        const g = from.aliasGlobalId ? ctx.index.byId.get(from.aliasGlobalId) : void 0;
+        if (g) return g;
+      }
+      return (_a2 = cands.filter((e) => e.tier === 1).sort(byName)[0]) != null ? _a2 : null;
     };
     for (const s of ctx.slots) {
       const cands = sameValueEntries(ctx, s);
@@ -3257,11 +3316,16 @@
     }
     for (const [use, list] of byUse) {
       const counts = /* @__PURE__ */ new Map();
-      for (const x of list) counts.set(x.slot.value, ((_a = counts.get(x.slot.value)) != null ? _a : 0) + 1);
-      const def = ctx.index.entries.find((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex);
-      const bases = colorRoleBases([...counts].map(([hex, count]) => ({ hex, count })), def == null ? void 0 : def.colorHex);
       for (const x of list) {
-        const base = `color/${use}/${(_b = bases.get(x.slot.value)) != null ? _b : "default"}`;
+        const k = colorSlotKey(x.slot.value, x.slot.bg);
+        const c = counts.get(k);
+        if (c) c.count++;
+        else counts.set(k, { hex: x.slot.value, count: 1, bg: x.slot.bg });
+      }
+      const def = ctx.index.entries.find((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex);
+      const bases = colorRoleBases([...counts.values()], def == null ? void 0 : def.colorHex, use);
+      for (const x of list) {
+        const base = `color/${use}/${(_a = bases.get(colorSlotKey(x.slot.value, x.slot.bg))) != null ? _a : "default"}`;
         const re = nameRe(base);
         const two = x.cands.filter((e) => e.tier === 2 && re.test(e.variable.name)).sort(byName)[0];
         if (two) {
@@ -3283,11 +3347,11 @@
     );
     const roleOf = /* @__PURE__ */ new Map();
     for (const p of live) {
-      const name = (_c = names.get(`${p.base}\0${valueKey(p.slot.value)}`)) != null ? _c : p.base;
+      const name = (_b = names.get(`${p.base}\0${valueKey(p.slot.value)}`)) != null ? _b : p.base;
       let spec = roleOf.get(name);
       if (!spec) {
         const g2 = p.global;
-        const scopes = (_d = scopeForSemanticRole(name)) != null ? _d : g2.scopes;
+        const scopes = (_c = scopeForSemanticRole(name)) != null ? _c : g2.scopes;
         spec = { name, globalId: g2.variable.id, scopes, globalName: g2.variable.name };
         roleOf.set(name, spec);
       }
@@ -3299,7 +3363,7 @@
       }));
     }
     for (const c of preview.candidates) {
-      if (c.fromVariableId) c.fromVariableName = (_e = ctx.index.byId.get(c.fromVariableId)) == null ? void 0 : _e.variable.name;
+      if (c.fromVariableId) c.fromVariableName = (_d = ctx.index.byId.get(c.fromVariableId)) == null ? void 0 : _d.variable.name;
     }
   }
   function candOf(s, variableId, variableName, tier, variableValue) {
@@ -3320,34 +3384,41 @@
     if (e.num != null) return String(round2(e.num));
     return (_a = e.str) != null ? _a : s.display;
   }
-  function globalAliasId(ctx, list) {
+  function swapSourceId(ctx, list, allowed) {
     const ids = new Set(list.filter(isLiveAlias).map((a) => a.id));
     if (ids.size !== 1) return void 0;
     const id = [...ids][0];
-    return ctx.index.globalIds.has(id) ? id : void 0;
+    if (ctx.index.globalIds.has(id)) return id;
+    if (!allowed) return void 0;
+    const e = ctx.index.byId.get(id);
+    return e && e.tier >= 2 && entryKey(e) !== "" && !scopeOk(e.scopes, allowed) ? id : void 0;
   }
-  function nodeFieldGlobal(ctx, node, field) {
+  function nodeFieldGlobal(ctx, node, field, allowed) {
     const bv = node.boundVariables;
     const entry = bv == null ? void 0 : bv[field];
     if (!entry) return void 0;
-    return globalAliasId(ctx, Array.isArray(entry) ? entry : [entry]);
+    return swapSourceId(ctx, Array.isArray(entry) ? entry : [entry], allowed);
   }
-  function colorGlobal(ctx, x, node, field, index) {
+  var numAllowed = (field) => {
+    const scope = FIELD_SCOPE[field];
+    return scope ? [scope] : ["ALL_SCOPES"];
+  };
+  function colorGlobal(ctx, x, node, field, index, allowed) {
     var _a;
     const own = (_a = x.boundVariables) == null ? void 0 : _a.color;
     const bv = node.boundVariables;
     const arr = bv == null ? void 0 : bv[field];
-    return globalAliasId(ctx, [own, Array.isArray(arr) ? arr[index] : void 0].filter(Boolean));
+    return swapSourceId(ctx, [own, Array.isArray(arr) ? arr[index] : void 0].filter(Boolean), allowed);
   }
-  function textFieldGlobal(ctx, node, field) {
+  function textFieldGlobal(ctx, node, field, allowed) {
     const len = node.characters.length;
     const getRange = node.getRangeBoundVariable;
     if (len > 0 && typeof getRange === "function") {
       const full = getRange.call(node, 0, len, field);
       if (full === figma.mixed || !full) return void 0;
-      return globalAliasId(ctx, [full]);
+      return swapSourceId(ctx, [full], allowed);
     }
-    return nodeFieldGlobal(ctx, node, field);
+    return nodeFieldGlobal(ctx, node, field, allowed);
   }
   async function walk2(node, ctx, hooks, prog, depth, parentId) {
     var _a;
@@ -3399,9 +3470,10 @@
       }
       const allowed = key === "fills" ? fillScopesFor(node.type) : STROKE_SCOPES;
       let use;
+      let bg = null;
       paints2.forEach((p, i) => {
         if (p.type !== "SOLID") return;
-        const fromId = colorGlobal(ctx, p, node, key, i);
+        const fromId = colorGlobal(ctx, p, node, key, i, allowed);
         const st = fromId ? null : stateReason(colorState(p, node, key, i));
         if (st) {
           note(res, st, node, preview, key);
@@ -3413,7 +3485,11 @@
         }
         const hex = rgbToHex(p.color);
         use != null ? use : use = colorUse(node.type, key, isInsideIconFrame(node));
-        ctx.slots.push({ node, field: key, index: i, kind: "color", value: hex, display: hex, allowed, usage: use, fromId, noMatchReason: "no-match" });
+        if (bg === null) {
+          const bgHex = use === "text" || use === "icon" || use === "border" ? backgroundOf(node) : void 0;
+          bg = bgHex ? bgKindOf(bgHex) : void 0;
+        }
+        ctx.slots.push(__spreadProps(__spreadValues({ node, field: key, index: i, kind: "color", value: hex, display: hex, allowed, usage: use, fromId }, bg ? { bg } : {}), { noMatchReason: "no-match" }));
       });
     }
   }
@@ -3421,20 +3497,32 @@
     const { res, preview } = ctx;
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
     const kind = iconOrAvatarKind(node);
-    if (kind) {
+    const unbindGlobal = (field) => {
+      const gid = nodeFieldGlobal(ctx, node, field);
+      if (!gid) return false;
+      pushUnbind(ctx, node, field, gid);
+      return true;
+    };
+    if (!kind) {
+      unbindGlobal("width");
+      unbindGlobal("height");
+    } else {
       if (inAutoLayoutFlow(node)) {
         const bindAxis = (sizing, field, v) => {
           if (sizing !== "FIXED") {
-            note(res, "hug-fill", node, preview, field);
+            if (!unbindGlobal(field)) note(res, "hug-fill", node, preview, field);
             return;
           }
           const fraction = Math.abs(v - Math.round(v)) >= 5e-3;
+          if (fraction && unbindGlobal(field)) return;
           tryBind(ctx, node, field, v, `size/${kind}`, fraction ? "size-fraction" : void 0);
         };
         bindAxis(node.layoutSizingHorizontal, "width", node.width);
         bindAxis(node.layoutSizingVertical, "height", node.height);
       } else {
-        note(res, "size-free-layout", node, preview);
+        const w = unbindGlobal("width");
+        const h = unbindGlobal("height");
+        if (!w || !h) note(res, "size-free-layout", node, preview);
       }
     }
     if (node.layoutMode === "NONE") {
@@ -3488,7 +3576,7 @@
     const owner = ctx.owner(node);
     const one = (field, v) => {
       if (!(v > 0)) return;
-      if (!nodeFieldGlobal(ctx, node, field)) {
+      if (!nodeFieldGlobal(ctx, node, field, numAllowed(field))) {
         const st = stateReason(nodeFieldState(node, field));
         if (st) {
           note(res, st, node, preview, field);
@@ -3518,7 +3606,7 @@
     }
     effects.forEach((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return;
-      const fromId = colorGlobal(ctx, e, node, "effects", i);
+      const fromId = colorGlobal(ctx, e, node, "effects", i, EFFECT_SCOPES);
       const st = fromId ? null : stateReason(colorState(e, node, "effects", i));
       if (st) {
         note(res, st, node, preview, "effects");
@@ -3555,7 +3643,7 @@
     if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") tryBindText(ctx, node, "letterSpacing", node.letterSpacing.value);
     if (node.characters.length === 0) return;
     const fam = node.fontName.family;
-    const fromId = textFieldGlobal(ctx, node, "fontFamily");
+    const fromId = textFieldGlobal(ctx, node, "fontFamily", ["FONT_FAMILY"]);
     const st = fromId ? null : stateReason(textFieldState(node, "fontFamily"));
     if (st) {
       note(res, st, node, preview, "fontFamily");
@@ -3570,7 +3658,7 @@
       skip(res, "empty-text", node, preview, field);
       return;
     }
-    const fromId = textFieldGlobal(ctx, node, field);
+    const fromId = textFieldGlobal(ctx, node, field, [FIELD_SCOPE[field]]);
     const st = fromId ? null : stateReason(textFieldState(node, field));
     if (st) {
       note(res, st, node, preview, field);
@@ -3579,18 +3667,36 @@
     ctx.slots.push({ node, field, kind: "text", value, display: String(value), allowed: [FIELD_SCOPE[field]], usage: textUsageName(field), fromId, noMatchReason: "no-match" });
   }
   function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match") {
-    const fromId = nodeFieldGlobal(ctx, node, field);
+    const allowed = numAllowed(field);
+    const fromId = nodeFieldGlobal(ctx, node, field, allowed);
     const st = fromId ? null : stateReason(nodeFieldState(node, field));
     if (st) {
       note(ctx.res, st, node, ctx.preview, field);
       return;
     }
-    const scope = FIELD_SCOPE[field];
-    ctx.slots.push({ node, field, kind: "num", value, display: String(value), allowed: scope ? [scope] : ["ALL_SCOPES"], usage, fromId, noMatchReason });
+    ctx.slots.push({ node, field, kind: "num", value, display: String(value), allowed, usage, fromId, noMatchReason });
+  }
+  function pushUnbind(ctx, node, field, globalId) {
+    var _a, _b;
+    const v = node[field];
+    const display = String(round2(v));
+    const name = (_b = (_a = ctx.index.byId.get(globalId)) == null ? void 0 : _a.variable.name) != null ? _b : "";
+    ctx.res.bound++;
+    ctx.preview.candidates.push({
+      nodeId: node.id,
+      field,
+      currentValue: display,
+      variableId: `unbind:${globalId}`,
+      variableName: name,
+      tier: 1,
+      variableValue: display,
+      unbind: true,
+      fromVariableId: globalId
+    });
   }
   var LINK_CHUNK = 300;
   async function bindSelectedItems(items, hooks = {}, known) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const res = { bound: 0, skipped: 0, reasons: {} };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     const fail = (key, node, field) => {
@@ -3604,6 +3710,7 @@
     const created = /* @__PURE__ */ new Map();
     const createdIds = {};
     let swapped = 0;
+    let unbound = 0;
     const ensureRole = async (spec, global) => {
       var _a2;
       const have = created.get(spec.name);
@@ -3650,6 +3757,20 @@
       const changedPaints = /* @__PURE__ */ new Map();
       for (const it of chunk) {
         const node = (_a = nodes.get(it.nodeId)) != null ? _a : null;
+        if (it.unbind) {
+          if (!node || it.field !== "width" && it.field !== "height" || !it.fromVariableId || boundFieldId(node, it.field) !== it.fromVariableId) {
+            fail("changed", node, it.field);
+            continue;
+          }
+          try {
+            node.setBoundVariable(it.field, null);
+            unbound++;
+            (_b = hooks.onUnbound) == null ? void 0 : _b.call(hooks, unbound);
+          } catch (e) {
+            fail("error", node, it.field);
+          }
+          continue;
+        }
         const vv = await variableOf(it.newRole ? it.newRole.globalId : it.variableId);
         if (!node || !vv) {
           fail("changed", node, it.field);
@@ -3668,9 +3789,9 @@
               fail("styled", node, key);
               continue;
             }
-            const pending = (_c = (_b = changedPaints.get(node)) == null ? void 0 : _b.get(key)) == null ? void 0 : _c.arr;
+            const pending = (_d = (_c = changedPaints.get(node)) == null ? void 0 : _c.get(key)) == null ? void 0 : _d.arr;
             const list = pending != null ? pending : node[key];
-            const i = (_d = it.index) != null ? _d : 0;
+            const i = (_e = it.index) != null ? _e : 0;
             const x = Array.isArray(list) ? list[i] : void 0;
             const isColorItem = !!x && (key === "effects" ? x.type === "DROP_SHADOW" || x.type === "INNER_SHADOW" : x.type === "SOLID");
             if (!Array.isArray(list) || !x || !isColorItem) {
@@ -3739,7 +3860,7 @@
             node.setRangeBoundVariable(0, node.characters.length, field, await target());
             res.bound++;
             if (it.fromVariableId) swapped++;
-            (_e = hooks.onBound) == null ? void 0 : _e.call(hooks, res.bound);
+            (_f = hooks.onBound) == null ? void 0 : _f.call(hooks, res.bound);
             continue;
           }
           const gap = gapSkip(node, it.field);
@@ -3771,7 +3892,7 @@
           node.setBoundVariable(it.field, await target());
           res.bound++;
           if (it.fromVariableId) swapped++;
-          (_f = hooks.onBound) == null ? void 0 : _f.call(hooks, res.bound);
+          (_g = hooks.onBound) == null ? void 0 : _g.call(hooks, res.bound);
         } catch (e) {
           fail("error", node, it.field);
         }
@@ -3782,7 +3903,7 @@
             node[key] = w.arr;
             res.bound += w.fields;
             swapped += w.swaps;
-            (_g = hooks.onBound) == null ? void 0 : _g.call(hooks, res.bound);
+            (_h = hooks.onBound) == null ? void 0 : _h.call(hooks, res.bound);
           } catch (e) {
             for (let k = 0; k < w.fields; k++) fail("error", node, key);
           }
@@ -3790,11 +3911,11 @@
       }
       changedPaints.clear();
       const done = Math.min(start + LINK_CHUNK, items.length);
-      (_h = hooks.onProgress) == null ? void 0 : _h.call(hooks, done, items.length);
+      (_i = hooks.onProgress) == null ? void 0 : _i.call(hooks, done, items.length);
       if (hooks.yieldToEvents) await hooks.yieldToEvents();
     }
     const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
-    return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, skipTotal: preview.skips.length, newRoles: created.size, swapped, createdIds };
+    return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, skipTotal: preview.skips.length, newRoles: created.size, swapped, unbound, createdIds };
   }
   function singleAliasId(list) {
     const ids = new Set(list.filter(isAlias).map((a) => a.id));
@@ -8664,7 +8785,8 @@
             reqId: msg.reqId,
             // UI가 낡은 응답을 가려낸다
             newRoles: r.newRoles,
-            swapped: r.swapped
+            swapped: r.swapped,
+            unbound: r.unbound
           });
           if (!msg.preview) {
             commitUndo(figma);
@@ -8721,6 +8843,7 @@
         case "APPLY_SELECTED": {
           let written = 0;
           let made = 0;
+          let unbound = 0;
           let committed = false;
           try {
             const r = await bindSelectedItems(msg.items, {
@@ -8731,17 +8854,20 @@
               },
               onCreated: (n) => {
                 made = n;
+              },
+              onUnbound: (n) => {
+                unbound = n;
               }
             });
-            post({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles, swapped: r.swapped });
-            if (r.bound || r.newRoles) {
+            post({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles, swapped: r.swapped, unbound: r.unbound });
+            if (r.bound || r.newRoles || r.unbound) {
               commitUndo(figma);
               committed = true;
               selfSelect = true;
               postSelection();
             }
           } finally {
-            if ((written > 0 || made > 0) && !committed) commitUndo(figma);
+            if ((written > 0 || made > 0 || unbound > 0) && !committed) commitUndo(figma);
           }
           break;
         }

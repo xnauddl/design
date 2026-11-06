@@ -2863,3 +2863,21 @@ test('inferVaryingImageSlots — 레이어 자신이 사진인 멤버(사각형�
   const av = (id, hash) => ({ id, name: 'Ellipse 10', type: 'ELLIPSE', width: 32, height: 32, imageHash: hash, fills: [{ type: 'IMAGE', visible: true }] });
   assert.deepEqual(inferVaryingImageSlots([av('a', 'f1'), av('b', 'f2'), av('c', 'f3')]), [{ layerName: 'Ellipse 10', layerPath: '' }]);
 });
+
+test('groupByVariable — 크기 연결 풀기 카드(§4.6): unbind 표시, 바꿈 수 · "…에서" 꼬리에서 빠짐', async () => {
+  const { groupByVariable } = await import('../dist/pure.mjs');
+  const groups = groupByVariable([
+    { nodeId: 'a', field: 'width', currentValue: '1440', variableId: 'unbind:g1', variableName: 'size/1440', variableValue: '1440', unbind: true, fromVariableId: 'g1', fromVariableName: 'size/1440' },
+    { nodeId: 'b', field: 'width', currentValue: '1440', variableId: 'unbind:g1', variableName: 'size/1440', variableValue: '1440', unbind: true, fromVariableId: 'g1', fromVariableName: 'size/1440' },
+    { nodeId: 'c', field: 'fills', index: 0, currentValue: '#ffffff', variableId: 'new:color/text/inverse', variableName: 'color/text/inverse', variableValue: '#ffffff', newRole: {}, newRoleGlobalName: 'color/gray/0', fromVariableId: 's1', fromVariableName: 'color/background/default' },
+  ]);
+  const unb = groups.find((g) => g.variableId === 'unbind:g1');
+  assert.equal(unb.unbind, true);
+  assert.equal(unb.count, 2);
+  assert.equal(unb.swaps, 0);
+  assert.equal(unb.lines[0].from, undefined);
+  const inv = groups.find((g) => g.variableId === 'new:color/text/inverse');
+  assert.equal(inv.unbind, undefined);
+  assert.equal(inv.swaps, 1);
+  assert.equal(inv.lines[0].from, 'color/background/default');
+});

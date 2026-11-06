@@ -12,7 +12,7 @@ import {
   colorTokenName,
   numberTokenName,
 } from './tokens';
-import { colorUse, composeName, paddingProp, radiusName, simpleNumericName, strokeName, type Padding } from './usageRoles'; // 쓰임 이름(§2.12)
+import { bgKindOf, colorUse, composeName, paddingProp, radiusName, simpleNumericName, strokeName, type BgKind, type Padding } from './usageRoles'; // 쓰임 이름(§2.12)
 
 interface Accumulator {
   map: Map<string, DraftToken>;
@@ -64,6 +64,8 @@ function add(
   nodeId: string,
   /** 쓰임 이름(§2.12 12.10) — 숫자는 `spacing/card/gap` 같은 이름, 색은 `color/{쓰임}`. 글자는 없음. */
   use?: string,
+  /** 색 쓰임의 배경 종류(12.4) — 같은 쓰임이라도 배경 종류가 다르면 따로 센다. */
+  bg?: BgKind,
 ): void {
   const k = keyOf(token.category, token.value, token.unit);
   let existing = acc.map.get(k);
@@ -77,13 +79,35 @@ function add(
   acc.lastNode.set(k, nodeId);
   if (use) {
     const uses = (existing.uses ??= []);
-    const u = uses.find((x) => x.name === use);
+    const u = uses.find((x) => x.name === use && x.bg === bg);
     if (u) u.count++;
-    else uses.push({ name: use, count: 1 });
+    else uses.push(bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
   }
 }
 
 /* ---------- paint ---------- */
+/**
+ * 레이어 뒤의 배경색(§2.12 12.4) — 조상을 위로 올라가며 처음 만나는 보이는 채움. 그 맨 위 보이는 칠하기가
+ * 불투명 SOLID면 그 색(소문자 hex), 이미지 · 그라데이션 · 반투명이면 모름. 페이지까지 채움이 없어도 모름.
+ * 레이어 자신의 채움은 보지 않는다(글자 · 아이콘 · 테두리는 뒤의 배경 위에 있다). 형제 레이어도 보지 않는다(한계).
+ */
+export function backgroundOf(node: SceneNode): string | undefined {
+  let p: BaseNode | null = node.parent;
+  while (p && p.type !== 'PAGE' && p.type !== 'DOCUMENT') {
+    const fills = (p as { fills?: readonly Paint[] | typeof figma.mixed }).fills;
+    if (Array.isArray(fills)) {
+      const vis = fills.filter((f) => f.visible !== false && f.opacity !== 0);
+      if (vis.length) {
+        const top = vis[vis.length - 1]; // 칠하기 배열은 아래 → 위 순
+        if (top.type === 'SOLID' && (top.opacity ?? 1) >= 1) return rgbToHex(top.color);
+        return undefined;
+      }
+    }
+    p = p.parent;
+  }
+  return undefined;
+}
+
 function collectPaints(
   acc: Accumulator,
   node: SceneNode,
@@ -99,8 +123,9 @@ function collectPaints(
       continue;
     }
     const hex = rgbToHex(p.color);
-    const use = `color/${colorUse(node.type, source === 'fill' ? 'fills' : 'strokes', isInsideIconFrame(node))}`;
-    add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source, nodeId, use);
+    const cu = colorUse(node.type, source === 'fill' ? 'fills' : 'strokes', isInsideIconFrame(node));
+    const bgHex = cu === 'text' || cu === 'icon' || cu === 'border' ? backgroundOf(node) : undefined;
+    add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : undefined);
     // 페인트 불투명도(p.opacity)는 토큰화하지 않는다 — Figma에는 페인트 opacity에 붙는 변수가 없다
     // (OPACITY 스코프는 **레이어** 불투명도 전용, collectOpacity가 따로 모은다). 만들어 봐야
     // 어디에도 연결되지 않는 `opacity/0.08` 변수만 남았다. 반투명 색 자체는 bind가 건너뛴다(bind.ts).

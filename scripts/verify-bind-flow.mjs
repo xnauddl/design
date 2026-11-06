@@ -1147,8 +1147,42 @@ async function saveAndGet(p) {
   const items = (await sent(p, 'APPLY_SELECTED')).at(-1).items;
   check('16 연결 요청 — 새 역할 · 바꾸기 정보', items.some((i) => i.newRole?.name === 'color/text/inverse') && items.some((i) => i.fromVariableId === 'g52' && i.newRole?.name === 'spacing/gap'), JSON.stringify(items));
   await recv(p, { type: 'APPLY_RESULT', bound: 3, skipped: 0, reasons: {}, skips: [], newRoles: 2, swapped: 1, reqId: await lastReq(p, 'APPLY_SELECTED') });
-  check('16 연결 뒤 "3곳 연결됨 · 새 역할 2개 · Global에서 바꿈 1곳"', (await p.textContent('#bindDoneText')) === '3곳 연결됨 · 새 역할 2개 · Global에서 바꿈 1곳', await p.textContent('#bindDoneText'));
+  check('16 연결 뒤 "3곳 연결됨 · 새 역할 2개 · 바꿈 1곳"', (await p.textContent('#bindDoneText')) === '3곳 연결됨 · 새 역할 2개 · 바꿈 1곳', await p.textContent('#bindDoneText'));
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/role-done.png` : '/dev/null' }).catch(() => {});
+  await p.close();
+}
+
+/* ---------- 17 크기 연결 풀기 · 용도가 틀린 연결 바꾸기 표시(§4.6 · §2.12 12.8 · 12.8a, 2026-11-06 실기 뒤) ---------- */
+{
+  const p = await open(400, 'layer');
+  await recv(p, PREREQ);
+  await recv(p, sel(1, 0));
+  await p.click('#btnApply');
+  const unb = (id, v, n) => ({ nodeId: id, field: 'width', currentValue: String(v), variableId: `unbind:g${v}`, variableName: `size/${v}`, tier: 1, variableValue: String(v), unbind: true, fromVariableId: `g${v}`, fromVariableName: `size/${v}` });
+  const wrong = (id) => ({ nodeId: id, field: 'fills', index: 0, currentValue: '#ffffff', variableId: 'new:color/text/inverse', variableName: 'color/text/inverse', tier: 2, variableValue: '#ffffff', newRole: { name: 'color/text/inverse', globalId: 'g0', scopes: ['TEXT_FILL'] }, newRoleGlobalName: 'color/gray/0', fromVariableId: 's1', fromVariableName: 'color/background/default' });
+  const cands = [unb('n1', 1440), unb('n2', 1440), unb('n3', 1440), unb('n4', 380), unb('n5', 380), wrong('n6'), wrong('n7')];
+  await recv(p, { ...preview(await lastReq(p, 'APPLY')), candidates: cands, bound: cands.length });
+  const card = '#bindTree .bv-card[data-var="unbind:g1440"]';
+  check('17 풀기 카드 — 칩 "풀기 size/1440"', (await p.textContent(`${card} .bv-unb`)) === '풀기size/1440', await p.textContent(`${card} .bv-unb`));
+  check('17 풀기 칩 툴팁', (await p.getAttribute(`${card} .bv-unb`, 'title')) === '카드 · 화면 크기는 변수를 쓰지 않아요 · 연결만 풀고 크기는 그대로예요');
+  check('17 풀기 칩에는 "새" 없음', (await p.$(`${card} .bv-new`)) === null);
+  check('17 배지 줄 "새 역할 1 · 바꿈 2 · 풀기 5"', (await p.textContent('#bindRoleSum')) === '새 역할 1 · 바꿈 2 · 풀기 5', await p.textContent('#bindRoleSum'));
+  check('17 요약 툴팁에 풀기 설명', ((await p.getAttribute('#bindRoleSum', 'title')) ?? '').endsWith('풀기는 카드 · 화면 크기의 변수 연결만 풀어요'));
+  await p.click(`${card} .bv-tw`);
+  check('17 풀기 자리 줄에는 "…에서" 꼬리 없음', (await p.$(`${card} .bv-from`)) === null);
+  await p.click('#bindTree .bv-card[data-var="new:color/text/inverse"] .bv-tw');
+  check('17 용도가 틀린 연결 바꾸기 자리 줄 "· color/background/default에서"', (await p.textContent('#bindTree .bv-card[data-var="new:color/text/inverse"] .bv-from')) === '· color/background/default에서');
+  // 풀기 카드를 끄면 요약에서 빠진다
+  await p.click('#bindTree .bv-card[data-var="unbind:g380"] .bv-switch');
+  check('17 끈 풀기 카드는 "풀기"에서 빠짐', (await p.textContent('#bindRoleSum')) === '새 역할 1 · 바꿈 2 · 풀기 3', await p.textContent('#bindRoleSum'));
+  await p.click('#bindTree .bv-card[data-var="unbind:g380"] .bv-switch');
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/unbind-found.png` : '/dev/null' }).catch(() => {});
+  await p.click('#btnApplyConfirm');
+  const items = (await sent(p, 'APPLY_SELECTED')).at(-1).items;
+  check('17 연결 요청 — 풀기 자리는 unbind · fromVariableId', items.filter((i) => i.unbind && i.fromVariableId === 'g1440').length === 3 && items.filter((i) => i.unbind).length === 5, JSON.stringify(items));
+  await recv(p, { type: 'APPLY_RESULT', bound: 2, skipped: 0, reasons: {}, skips: [], newRoles: 1, swapped: 2, unbound: 5, reqId: await lastReq(p, 'APPLY_SELECTED') });
+  check('17 연결 뒤 "2곳 연결됨 · 크기 연결 풀기 5곳 · 새 역할 1개 · 바꿈 2곳"', (await p.textContent('#bindDoneText')) === '2곳 연결됨 · 크기 연결 풀기 5곳 · 새 역할 1개 · 바꿈 2곳', await p.textContent('#bindDoneText'));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/unbind-done.png` : '/dev/null' }).catch(() => {});
   await p.close();
 }
 

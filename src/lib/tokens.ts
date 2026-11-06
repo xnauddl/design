@@ -71,7 +71,7 @@ export interface DraftToken {
    * 쓰임 목록(§2.12 12.10) — 숫자는 쓰임 이름(`spacing/card/gap`), 색은 `color/{쓰임}`. 곳 수와 함께.
    * 토큰을 적용할 때 코드가 이 쓰임마다 Semantic 역할을 만든다(createUsageRoles).
    */
-  uses?: { name: string; count: number }[];
+  uses?: { name: string; count: number; bg?: 'chroma' | 'dark' | 'light' }[];
   /** 색상: 6자리 hex(#rrggbb). 그 외: 숫자 또는 fontFamily 문자열. */
   value: string | number;
   /** 수치 토큰의 의도 단위(px 외에는 STRING 보존 + 선택적 px 환산). */
@@ -426,7 +426,7 @@ export function tidyNumberTokens(tokens: readonly DraftToken[], opts: TidyNumber
     for (const s of gone.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
     // 쓰임도 합친다(옮긴 쪽은 이미 비어 있다).
     for (const u of gone.uses ?? []) {
-      const have = (rep.uses ??= []).find((x) => x.name === u.name);
+      const have = (rep.uses ??= []).find((x) => x.name === u.name && x.bg === u.bg);
       if (have) have.count += u.count;
       else rep.uses.push({ ...u });
     }

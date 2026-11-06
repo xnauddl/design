@@ -21,7 +21,7 @@ import {
   unitDescription,
 } from './tokens';
 import { paletteFamilyOf } from './palette';
-import { AUTO_ROLE_KEY, assignNames, colorRoleBases, valueKey } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
+import { AUTO_ROLE_KEY, assignNames, colorRoleBases, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
 import { findCollection, ensureCollection, collectionTiers } from './collectionRoles'; // 이름이 아니라 지정된 역할로(Primitives→Global 등)
 import { TextSample, TextStyleSpec, ExistingTextStyle } from './textStyles';
 import type { TextStyleSkipReason } from '../shared/messages';
@@ -177,24 +177,27 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
 
   // 요청 — 숫자는 쓰임 이름, 색은 쓰임별 밝기 이름.
   const reqs: { base: string; value: string; count: number; token: DraftToken }[] = [];
-  const colorUses = new Map<string, { token: DraftToken; count: number }[]>();
+  const colorUses = new Map<string, { token: DraftToken; count: number; bg?: BgKind }[]>();
   for (const t of withUses) {
     for (const u of t.uses ?? []) {
       if (u.name.startsWith('color/')) {
         const arr = colorUses.get(u.name) ?? [];
-        arr.push({ token: t, count: u.count });
+        arr.push({ token: t, count: u.count, bg: u.bg });
         colorUses.set(u.name, arr);
       } else reqs.push({ base: u.name, value: valueKey(t.value), count: u.count, token: t });
     }
   }
   for (const [use, list] of colorUses) {
-    const counts = new Map<string, number>();
-    for (const x of list) counts.set(String(x.token.value).toLowerCase(), (counts.get(String(x.token.value).toLowerCase()) ?? 0) + x.count);
+    // 입력 = (hex · 배경 종류 · 곳 수) — inverse 여부는 함수 안에서 기준색을 정한 뒤 판정한다(12.4).
     const defKey = existing.get(`${use}/default`);
-    const bases = colorRoleBases([...counts].map(([hex, count]) => ({ hex, count })), defKey || undefined);
+    const bases = colorRoleBases(
+      list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg })),
+      defKey || undefined,
+      use.slice('color/'.length),
+    );
     for (const x of list) {
       const hex = String(x.token.value).toLowerCase();
-      reqs.push({ base: `${use}/${bases.get(hex) ?? 'default'}`, value: valueKey(hex), count: x.count, token: x.token });
+      reqs.push({ base: `${use}/${bases.get(colorSlotKey(hex, x.bg)) ?? 'default'}`, value: valueKey(hex), count: x.count, token: x.token });
     }
   }
   const names = assignNames(reqs, existing);
