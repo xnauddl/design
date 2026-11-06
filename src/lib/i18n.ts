@@ -690,6 +690,11 @@ export const STRINGS: Record<string, string> = {
   'bind.linking': '연결 중…',
   'bind.progressOf': '{done} / {total} 처리 중… ({pct}%)',
   'bind.progressCount': '{done}개 처리 중…',
+  // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
+  'bind.placesMore': '외 {n}곳 · 레이어 선택으로 보기',
+  'bind.linkingOf': '연결 중… {done} / {total}',
+  'bind.waitLink': '연결이 끝나면 다시 해 주세요',
+  'bind.waitOp': '{op} 작업이 끝나면 다시 해 주세요',
   'bind.skipSelected': '{reason} 레이어 {n}개 선택',
   // 레이어 › 이름
   'rename.count': '후보 {total}',

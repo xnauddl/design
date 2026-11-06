@@ -85,6 +85,17 @@ let semStatusTarget = 'colorStatus';
 /** 그 카드가 이미 띄운 요약 — 시맨틱 결과가 덮어쓰지 않고 뒤에 이어 붙게 한다. */
 let semStatusPrefix = '';
 /**
+ * 연결 중(§4.6 "찾기 · 연결의 수") — 그 연결(APPLY_SELECTED)의 reqId, 아니면 0.
+ * 보낼 때 세우고, 그 reqId의 APPLY_RESULT나 op: 'APPLY_SELECTED'인 ERROR에서 내린다.
+ * opPending은 쓰지 않는다 — 다른 작업의 ERROR가 오면 opReceived가 통째로 비운다.
+ * 초기화 중 setLock이 읽으므로 맨 위에 둔다.
+ */
+let bindLinking = 0;
+/** 연결 중에 사용자가 선택을 바꿨다 — 결과 지우기를 미뤄 뒀다(연결이 성공하면 결과 카드, 아니면 그때 지운다). */
+let bindSelChangedDuringLink = false;
+/** 마지막으로 보낸 연결 자리 — 연결 오류의 [다시 시도]가 쓴다(lastSentMsg는 그 뒤 다른 요청으로 바뀔 수 있다). */
+let lastLinkItems: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items'] | null = null;
+/**
  * SELECT_NODES를 부른 자리의 상태 줄. 레이어 선택은 적용 탭의 스킵 칩만 쓰던 기능이라
  * 결과를 #applyStatus에 고정으로 썼는데, 타이포 단계의 ×N 배지도 같은 메시지를 쓰면서
  * ‘상한 200개에 잘렸다’는 경고가 다른 탭에 적혀 사용자에게 닿지 않는다 — 부른 쪽이 지정한다.
@@ -1120,10 +1131,36 @@ $('btnApplyConfirm').addEventListener('click', () => {
     .filter((c) => bindChecked.has(candKey(c)))
     .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
   if (!items.length) return;
-  bindFinding = false;
-  showApplyProgress(t('bind.linking'), false); // UX6 — 연결은 중간에 멈추지 않으므로 [취소]를 숨긴다(§4.6)
-  send({ type: 'APPLY_SELECTED', items, reqId: nextBindReq() });
+  startLink(items);
 });
+/** 연결 보내기 — 진행 줄을 열고 "연결 중" 플래그를 세운다(§4.6 "찾기 · 연결의 수"). [다시 시도]도 이 길로. */
+function startLink(items: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items']): void {
+  if (bindLinking) return;
+  // [다시 시도]는 버튼 잠금을 거치지 않는다 — 같은 사유로 여기서 막는다(다른 쓰기 작업 중 → [🔗 연결] 전제).
+  const other = otherWriteOp();
+  if (other) { setStatus('applyStatus', t('bind.waitOp', { op: other }), 'warn'); return; }
+  updateBindApply();
+  const confirm = $('btnApplyConfirm');
+  if (isLocked(confirm)) { setStatus('applyStatus', confirm.dataset.lockMsg ?? '', 'warn'); return; }
+  lastLinkItems = items;
+  bindFinding = false;
+  // 첫 진행 메시지 전에는 "연결 중…", 그 뒤로 "연결 중… {done} / {total}".
+  // 연결은 중간에 멈추지 않으므로 [취소]를 숨긴다.
+  showApplyProgress(t('bind.linking'), false);
+  const reqId = nextBindReq();
+  bindLinking = reqId;
+  send({ type: 'APPLY_SELECTED', items, reqId });
+  onBindLinkingChanged();
+}
+/** 연결이 결과 카드 없이 끝났다(오류 · 버린 응답) — 연결 중에 미뤄 둔 선택 변경의 지우기를 이제 한다. */
+function flushLinkSelClear(): void {
+  if (!bindSelChangedDuringLink) return;
+  bindSelChangedDuringLink = false;
+  nextBindReq();
+  hideApplyProgress();
+  clearBindPreview();
+  $('bindDone').hidden = true;
+}
 
 
 $('btnApplyCancel').addEventListener('click', () => {
@@ -1481,6 +1518,7 @@ function setWizardRunLabel(rerun: boolean): void {
   const b = $('btnWizardRun') as HTMLButtonElement;
   b.dataset.rerun = rerun ? '1' : '';
   b.title = rerun && isPaid ? t('wizard.rerunHint') : '';
+  reapplyWaitTip(b);
   renderWizardCopy(); // 유료/무료·로컬 변수 유무에 따라 문구가 다르다(§4.3)
 }
 $('btnWizardRun').addEventListener('click', () => void runWizard());
@@ -1658,6 +1696,13 @@ function setLockTitle(el: HTMLElement, locked: boolean): void {
   // 툴팁은 기존 설명 뒤에 " · 유료 기능 · 설정 › 라이선스"를 붙인다(IA v3 §2.3).
   const note = t('lock.tipSuffix');
   el.setAttribute(attr, locked ? (base ? `${base} · ${note}` : note) : base);
+  reapplyWaitTip(el);
+}
+/** 툴팁을 새로 쓴 뒤 — 연결 중 대기 꼬리가 있었으면 다시 붙인다(§4.6 "연결 중의 다른 일"). */
+function reapplyWaitTip(el: HTMLElement): void {
+  if (!el.dataset.wait) return;
+  delete el.dataset.waitTail;
+  setWait(el, el.dataset.wait, el.dataset.waitTarget ?? '');
 }
 
 /** 전제 충족 여부로 버튼 활성/안내(+바로가기) 토글. */
@@ -2046,10 +2091,13 @@ window.onmessage = (event: MessageEvent) => {
       // 칩 줄과 체크해둔 후보가 통째로 사라져 두 번째 사유를 볼 수 없다.
       if (!msg.selfSelect) {
         // 사용자의 선택 변경 → 진행 중이던 연결 카드 요청은 무효(이전 선택의 결과가 늦게 와도 버린다).
-        nextBindReq();
-        hideApplyProgress();
-        clearBindPreview();
-        $('bindDone').hidden = true;
+        // 단 연결 중에는 진행 줄과 결과를 그대로 둔다 — 마지막 APPLY_RESULT가 결과 카드를 그린다(§4.6 "연결 중의 다른 일").
+        if (!bindLinking) {
+          nextBindReq();
+          hideApplyProgress();
+          clearBindPreview();
+          $('bindDone').hidden = true;
+        } else bindSelChangedDuringLink = true; // 연결이 결과 카드 없이 끝나면 그때 지운다
         $('tsApplyResult').hidden = true;
         layerLibUse = null; // 라이브러리 사용 여부는 새 선택으로 다시 읽는다(§4.6 ②)
         if (activeTab === 'layer') readLayerLibUse();
@@ -2100,9 +2148,18 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'PROGRESS':
       if (msg.op === 'bind') updateApplyProgress(msg.done, msg.total); // UX6
+      else if (msg.op === 'link' && bindLinking) updateLinkProgress(msg.done, msg.total);
       break;
     case 'APPLY_RESULT': {
-      if (!isCurrentBindReply(msg.reqId)) break; // 선택이 바뀐 뒤 도착한 이전 요청의 결과
+      // 연결이 끝났다 — 잠금을 푼다(화면을 그리는지와 무관하게).
+      const linkEnded = bindLinking !== 0 && msg.reqId === bindLinking;
+      if (linkEnded) bindLinking = 0;
+      if (!isCurrentBindReply(msg.reqId)) {
+        // 선택이 바뀐 뒤 도착한 이전 요청의 결과
+        if (linkEnded) { flushLinkSelClear(); onBindLinkingChanged(); }
+        break;
+      }
+      if (linkEnded) bindSelChangedDuringLink = false; // 결과 카드를 그린다 — 미뤄 둔 지우기는 하지 않는다
       hideApplyProgress(); // UX6
       const silent = msg.preview && msg.reqId !== undefined && msg.reqId === bindSilentReq;
       bindSilentReq = 0;
@@ -2147,6 +2204,7 @@ window.onmessage = (event: MessageEvent) => {
         $('bindDone').hidden = false;
         renderBindTree();
       }
+      if (linkEnded) onBindLinkingChanged();
       break;
     }
     case 'VAR_TABLE':
@@ -2467,7 +2525,14 @@ window.onmessage = (event: MessageEvent) => {
         ? selectStatusTarget
         : resolveStatusId((msg.op && OP_STATUS[msg.op]) || 'colorStatus');
       if (msg.op === 'APPLY') hideApplyProgress();
-      showError(statusId, explainError(msg.message));
+      if (msg.op === 'APPLY_SELECTED' && bindLinking) {
+        // 연결 실패 — 진행 줄을 닫고 잠금을 푼다(ERROR에는 reqId가 없지만 연결은 한 번에 하나뿐).
+        bindLinking = 0;
+        hideApplyProgress();
+        flushLinkSelClear();
+        onBindLinkingChanged();
+      }
+      showError(statusId, explainError(msg.message), msg.op);
       break;
     }
   }
@@ -2485,6 +2550,7 @@ const OP_STATUS: Record<string, string> = {
   // 그 줄은 다른 단계에 있어 숨겨져 있다 — 실패가 '적용 중…'인 채로 조용히 묻힌다.
   APPLY_TEXT_STYLES: 'applyStatus',
   APPLY: 'applyStatus',
+  APPLY_SELECTED: 'applyStatus', // 연결 오류도 연결 카드에(§4.6 "연결 중의 다른 일")
   // 실제 자리는 부른 쪽이 정한다(selectStatusTarget) — 여기 값은 resolveStatusId가 못 받는
   // 경로를 위한 폴백일 뿐이다.
   SELECT_NODES: 'applyStatus',
@@ -2500,7 +2566,7 @@ const OP_STATUS: Record<string, string> = {
   GET_LICENSE: 'licenseStatus',
 };
 
-function showError(id: string, f: FriendlyError): void {
+function showError(id: string, f: FriendlyError, op?: string): void {
   const el = $(id);
   el.className = 'status';
   el.innerHTML = '';
@@ -2521,12 +2587,21 @@ function showError(id: string, f: FriendlyError): void {
     g.textContent = f.action;
     box.appendChild(g);
   }
-  if (f.retryable && lastSentMsg) {
-    const retry = lastSentMsg;
+  // [다시 시도] — 연결 오류는 마지막 연결 자리(lastLinkItems)로 연결 길을 다시 탄다(§4.6 "연결 중의 다른 일").
+  // 오류의 종류가 마지막 요청과 다르면 무엇을 다시 할지 모르므로 숨긴다.
+  const linkRetry = op === 'APPLY_SELECTED' ? lastLinkItems : null;
+  const retry = linkRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
+  if (f.retryable && (linkRetry || retry)) {
     const btn = document.createElement('button');
     btn.className = 'primary';
     btn.textContent = t('common.retry');
-    btn.addEventListener('click', () => send(retry));
+    btn.addEventListener('click', () => {
+      if (linkRetry) { startLink(linkRetry); return; }
+      if (!retry) return;
+      // 연결 중에는 쓰기 작업을 다시 보내지 않는다.
+      if (bindLinking && OPS[retry.type]?.write) { setStatus(id, t('bind.waitLink'), 'warn'); return; }
+      send(retry);
+    });
     box.appendChild(btn);
   }
   el.appendChild(box);
@@ -2773,8 +2848,25 @@ function bindFilterText(): string {
   return (($('bindFilter') as HTMLInputElement).value ?? '').trim().toLowerCase();
 }
 /** 변수 카드 — 전체와 필터에 걸린 것. */
+let bindGroupsSrc: BindCandidate[] | null = null;
+let bindGroupsAll: VarGroup[] = [];
+let bindNodesSrc: BindNode[] | null = null;
+let bindNodeMap = new Map<string, BindNode>();
+/** 자리 줄의 레이어 — id → BindNode 맵은 찾기 결과가 바뀔 때 한 번만 만든다(1만 곳에서 줄마다 find하지 않게). */
+function bindNodeById(id: string): BindNode | undefined {
+  if (bindNodesSrc !== bindNodes) {
+    bindNodeMap = new Map(bindNodes.map((n) => [n.id, n]));
+    bindNodesSrc = bindNodes;
+  }
+  return bindNodeMap.get(id);
+}
 function bindGroups(): { all: VarGroup[]; shown: VarGroup[] } {
-  const all = groupByVariable(bindCandidates);
+  // 변수 묶음은 후보가 바뀔 때만 다시 만든다(스위치 · 펼침 · 필터마다 다시 그린다).
+  if (bindGroupsSrc !== bindCandidates) {
+    bindGroupsAll = groupByVariable(bindCandidates);
+    bindGroupsSrc = bindCandidates;
+  }
+  const all = bindGroupsAll;
   const q = bindFilterText();
   return { all, shown: q ? all.filter((g) => g.variableName.toLowerCase().includes(q)) : all };
 }
@@ -2850,7 +2942,7 @@ function placeEl(l: PlaceLine): HTMLElement {
   ic.className = 'bv-ic';
   ic.setAttribute('aria-hidden', 'true');
   ic.textContent = fieldIcon(l.fields[0]);
-  const node = bindNodes.find((n) => n.id === l.nodeId);
+  const node = bindNodeById(l.nodeId);
   const layer = document.createElement('button');
   layer.type = 'button';
   layer.className = 'link link-btn bv-layer';
@@ -2908,10 +3000,33 @@ function bindGroupEl(g: VarGroup): HTMLElement {
   if (open) {
     const places = document.createElement('div');
     places.className = 'bv-places';
-    for (const l of g.lines) places.appendChild(placeEl(l));
+    const drawn = g.lines.slice(0, PLACE_ROW_CAP);
+    for (const l of drawn) places.appendChild(placeEl(l));
+    if (g.lines.length > PLACE_ROW_CAP) places.appendChild(placesMoreEl(g, drawn));
     card.appendChild(places);
   }
   return card;
+}
+/** 카드 안 자리 줄 상한(§4.6 "찾기 · 연결의 수" — 보여주기에만 상한, 제안값). */
+const PLACE_ROW_CAP = 200;
+/**
+ * 200줄 뒤 마지막 줄 "외 {n}곳 · 레이어 선택으로 보기". n = 카드의 곳 수 − 그린 줄의 곳 수 합.
+ * 누르면 그리지 않은 줄의 레이어를 겹침 없이 줄 순서로 캔버스에서 선택한다(이 화면에서 만든 선택 — ⑧).
+ */
+function placesMoreEl(g: VarGroup, drawn: readonly PlaceLine[]): HTMLElement {
+  const n = g.count - drawn.reduce((sum, l) => sum + l.keys.length, 0);
+  const row = document.createElement('div');
+  row.className = 'bv-place bv-more';
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'link link-btn';
+  b.textContent = t('bind.placesMore', { n });
+  b.addEventListener('click', () => {
+    const ids = [...new Set(g.lines.slice(drawn.length).map((l) => l.nodeId))];
+    selectNodes(ids, 'applyStatus');
+  });
+  row.appendChild(b);
+  return row;
 }
 /** 다시 그린 뒤 같은 카드의 같은 컨트롤로 포커스를 돌려준다. */
 function focusCardControl(variableId: string, sel: string): void {
@@ -2926,6 +3041,7 @@ function shortName(name: string): string {
 type BindStepState = 'now' | 'done' | 'todo';
 /** 단계 표시 상태(§4.6 표). */
 function bindStepStates(): [BindStepState, BindStepState, BindStepState] {
+  if (bindLinking) return ['done', 'done', 'now']; // 연결 중(돌아가는 표시) — 선택이 바뀌어도 연결은 계속된다
   if (!curSel.count || bindPrereqShown()) return ['todo', 'todo', 'todo'];
   if (bindIsDone()) return ['done', 'done', 'done'];
   if (bindFinding && $('applyProgress').style.display !== 'none') return ['now', 'todo', 'todo'];
@@ -2940,7 +3056,7 @@ function renderBindSteps(): void {
     const st = states[i];
     li.classList.toggle('now', st === 'now');
     li.classList.toggle('done', st === 'done');
-    const spin = i === 0 && busy && st === 'now';
+    const spin = st === 'now' && ((i === 0 && busy) || (i === 2 && bindLinking !== 0));
     li.classList.toggle('busy', spin);
     if (st === 'now') li.setAttribute('aria-current', 'step');
     else li.removeAttribute('aria-current');
@@ -3398,6 +3514,13 @@ function updateApplyProgress(done: number, total: number): void {
   ($('applyBarFill') as HTMLElement).style.width = `${pct}%`;
   $('applyProgressText').textContent = total > 0 ? t('bind.progressOf', { done, total, pct }) : t('bind.progressCount', { done });
 }
+/** 연결 진행(PROGRESS op: 'link') — "연결 중… {done} / {total}", 막대는 done/total. */
+function updateLinkProgress(done: number, total: number): void {
+  $('applyProgress').style.display = '';
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  ($('applyBarFill') as HTMLElement).style.width = `${pct}%`;
+  $('applyProgressText').textContent = t('bind.linkingOf', { done, total });
+}
 function hideApplyProgress(): void {
   $('applyProgress').style.display = 'none';
   bindFinding = false;
@@ -3617,18 +3740,63 @@ function goToLicense(): void {
 
 /* ---------- 잠금(§2.3) — aria-disabled: 포커스는 받고, 누르면 동작 대신 사유 ---------- */
 type LockReason = 'paid' | 'prereq';
-/** 버튼·체크박스 잠금. reason이 null이면 푼다. prereqMsg는 전제 미충족 사유(공통 상태 줄 문구). */
+/**
+ * 버튼·체크박스 잠금. reason이 null이면 푼다. prereqMsg는 전제 미충족 사유(공통 상태 줄 문구).
+ * 그 화면의 사유(base)는 따로 기억하고, 대기 사유(setWait — 연결 중 · 다른 쓰기 작업 중)와 합쳐 건다.
+ * 순서: 유료 → 대기 → 전제(§2 원칙 3 · §4.6 버튼 절).
+ */
 function setLock(el: HTMLElement, reason: LockReason | null, prereqMsg = ''): void {
+  if (reason) {
+    el.dataset.baseLock = reason;
+    if (reason === 'prereq') el.dataset.baseLockMsg = prereqMsg;
+    else delete el.dataset.baseLockMsg;
+  } else {
+    delete el.dataset.baseLock;
+    delete el.dataset.baseLockMsg;
+  }
+  applyLock(el);
+}
+function applyLock(el: HTMLElement): void {
+  const base = el.dataset.baseLock as LockReason | undefined;
+  const wait = el.dataset.wait;
+  const reason: LockReason | undefined = base === 'paid' ? 'paid' : wait ? 'prereq' : base;
   if (reason) {
     el.setAttribute('aria-disabled', 'true');
     el.dataset.lock = reason;
-    if (reason === 'prereq') el.dataset.lockMsg = prereqMsg;
+    if (reason === 'prereq') el.dataset.lockMsg = wait || el.dataset.baseLockMsg || '';
     else delete el.dataset.lockMsg;
   } else {
     el.removeAttribute('aria-disabled');
     delete el.dataset.lock;
     delete el.dataset.lockMsg;
   }
+}
+/**
+ * 대기 잠금(§4.6 "연결 중의 다른 일") — msg가 있으면 걸고 툴팁 뒤에 " · {msg}"를 붙인다. null이면 푼다.
+ * target이 있으면 누를 때 사유를 그 카드 상태 줄에, 없으면 공통 상태 줄에 띄운다.
+ */
+function setWait(el: HTMLElement, msg: string | null, target = ''): void {
+  const attr = el.hasAttribute('data-tip') ? 'data-tip' : 'title';
+  let tip = el.getAttribute(attr) ?? '';
+  const prevTail = el.dataset.waitTail ?? '';
+  if (prevTail && tip.endsWith(prevTail)) tip = tip.slice(0, tip.length - prevTail.length);
+  if (msg) {
+    const tail = tip ? ` · ${msg}` : msg;
+    el.setAttribute(attr, tip + tail);
+    el.dataset.waitTail = tail;
+    el.dataset.wait = msg;
+    if (target) el.dataset.waitTarget = target;
+    else delete el.dataset.waitTarget;
+  } else {
+    if (prevTail) {
+      if (tip) el.setAttribute(attr, tip);
+      else el.removeAttribute(attr);
+    }
+    delete el.dataset.waitTail;
+    delete el.dataset.wait;
+    delete el.dataset.waitTarget;
+  }
+  applyLock(el);
 }
 function isLocked(el: HTMLElement): boolean {
   return el.getAttribute('aria-disabled') === 'true';
@@ -3646,7 +3814,8 @@ function onLockedActivate(e: Event): void {
   if (e.type === 'click' || e.type === 'keydown') {
     if (el.dataset.lock === 'paid') showPaidReason();
     else if (el.dataset.lock === 'edit') edLockedSave(); // 고치기 [저장] — 사유는 팝업 안 알림 줄에
-    else if (el.id === 'btnApplyExistingText' && curSel.count && !hasTextStyles) {
+    else if (el.dataset.wait && el.dataset.waitTarget) setStatus(el.dataset.waitTarget, el.dataset.wait, 'warn'); // 연결 카드 버튼 — 카드 상태 줄
+    else if (el.id === 'btnApplyExistingText' && !el.dataset.wait && curSel.count && !hasTextStyles) {
       // "등록된 텍스트 스타일이 없어요 · 타이포에서 등록 →(유료)"
       showStatusLine(t('bind.tsNoneText'), { cls: 'warn', action: { label: t('bind.tsGotoType'), run: () => showMake('type') } });
     } else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: 'warn' });
@@ -3750,6 +3919,49 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
 /** 결과를 기다리는 작업(요청 종류별). 마법사는 단계 요청을 따로 세지 않고 한 작업으로 본다. */
 const opPending = new Map<UiToCode['type'], OpDef>();
 let opWizard = false;
+
+/* ---------- 연결 중 잠금(§4.6 "연결 중의 다른 일") ----------
+   연결 중에는 쓰기 작업 버튼을 aria-disabled로 두고 사유 bind.waitLink를 띄운다.
+   반대로 다른 쓰기 작업 중에는 [🔗 연결]을 bind.waitOp로 잠근다. 읽기 요청(write: false)은 막지 않는다. */
+/** OPS write: true 요청의 버튼 + 마법사 [전체 실행] — 사유는 공통 상태 줄. */
+const WAIT_LINK_IDS = [
+  'btnCreate', 'btnCreateApply', 'btnColorVars', // CREATE_TOKENS
+  'btnSemantics', // CREATE_SEMANTICS
+  'btnGenDark', // GENERATE_DARK_MODE
+  'btnTextStyles', // CREATE_TEXT_STYLES
+  'btnApplyExistingText', // APPLY_TEXT_STYLES
+  'btnRename', // RENAME_APPLY
+  'btnRegisterComp', // REGISTER_COMPONENTS
+  'btnClassifyVariants', // CLASSIFY_VARIANTS
+  'btnGenMissing', // GENERATE_MISSING_VARIANTS
+  'btnComponentize', // COMPONENTIZE_SIMILAR
+  'btnWizardRun', // 마법사 [전체 실행]
+];
+/** 연결 카드의 [🔍 다시 찾기] · [🔗 연결] — 사유는 카드 상태 줄(#applyStatus). */
+const WAIT_CARD_IDS = ['btnApply', 'btnBindRepreview', 'btnApplyConfirm'];
+/** 지금 진행 중인 다른 쓰기 작업의 이름(op.* 라벨) — 없으면 null. 연결 자신은 빼고 본다. */
+function otherWriteOp(): string | null {
+  if (opWizard || wizardRunning) return t('op.wizard');
+  for (const [type, def] of opPending) if (type !== 'APPLY_SELECTED' && def.write) return t(def.label);
+  return null;
+}
+function renderWaitLocks(): void {
+  const link = bindLinking ? t('bind.waitLink') : null;
+  for (const id of WAIT_LINK_IDS) setWait($(id), link);
+  const other = link ? null : otherWriteOp();
+  for (const id of WAIT_CARD_IDS) {
+    const msg = link ?? (id === 'btnApplyConfirm' && other ? t('bind.waitOp', { op: other }) : null);
+    setWait($(id), msg, 'applyStatus');
+  }
+  // 계층 지정(SET_COLLECTION_ROLE) — 팝업 안 고르개
+  document.querySelectorAll<HTMLElement>('[data-role-write]').forEach((el) => setWait(el, link));
+}
+/** 연결 중 플래그가 바뀐 뒤 — 잠금 · 단계 표시 · 상세 팝업 [저장]을 다시 맞춘다. */
+function onBindLinkingChanged(): void {
+  renderWaitLocks();
+  renderBindChrome();
+  if (ed) edChrome();
+}
 let opProg: number | null = null;
 const opBusy = (): boolean => opWizard || opPending.size > 0;
 const opProgress = (): number | null => opProg;
@@ -3763,6 +3975,7 @@ function opSent(msg: UiToCode): void {
   opPending.set(msg.type, def);
   if (msg.type === 'APPLY_SELECTED' || msg.type === 'APPLY') opProg = null;
   if (isMini) renderMiniMark();
+  if (def.write) renderWaitLocks(); // 다른 쓰기 작업 중 [🔗 연결] 잠금(§4.6 "반대 방향")
 }
 /** 결과 메시지 → 끝난 작업 판정. 실패 조건(§4.9): 오류 응답, 유료 잠금 응답, 다크 생성 오류,
  *  컴포넌트 실패 1건 이상. 취소는 표시 없음. */
@@ -3774,17 +3987,28 @@ function opReceived(m: CodeToUi): void {
   }
   if (wizardRunning) return;
   if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
-    const defs = [...opPending.values()];
-    if (!defs.length) return;
-    opPending.clear();
+    // 오류의 op가 있으면 그 작업만 끝낸다 — 다른 작업(예: 연결)이 기다리는 결과는 그대로 기다린다.
+    const op = m.type === 'ERROR' ? (m.op as UiToCode['type'] | undefined) : undefined;
+    let def: OpDef | undefined;
+    if (op) {
+      def = opPending.get(op);
+      if (!def) return;
+      opPending.delete(op);
+    } else {
+      def = [...opPending.values()][0];
+      if (!def) return;
+      opPending.clear();
+    }
     opProg = null;
-    opFinished(false, defs[0]);
+    renderWaitLocks();
+    opFinished(false, def);
     return;
   }
   for (const [type, def] of opPending) {
     if (!def.results.includes(m.type)) continue;
     opPending.delete(type);
     opProg = null;
+    if (def.write) renderWaitLocks();
     let failed = false;
     let cancelled = false;
     if (m.type === 'DARK_MODE_RESULT' && m.error) failed = true;
@@ -3821,10 +4045,12 @@ function opFinished(ok: boolean, def: OpDef): void {
 function opWizardStart(): void {
   opWizard = true;
   if (isMini) renderMiniMark();
+  renderWaitLocks();
 }
 function opWizardEnd(result: 'ok' | 'fail' | 'cancel'): void {
   opWizard = false;
   opProg = null;
+  renderWaitLocks();
   if (result !== 'cancel') opFinished(result === 'ok', { results: [], label: 'op.wizard', go: () => { showTab('variables'); showVarSub('home'); }, write: true });
   else if (isMini) renderMiniMark();
   readScreen('work');
@@ -4007,7 +4233,15 @@ function renderCollectionRoles(rows: CollectionRoleInfo[]): void {
       sel.appendChild(o);
     }
     sel.value = r.set ?? '';
+    sel.dataset.roleWrite = '';
+    if (bindLinking) setWait(sel, t('bind.waitLink'));
     sel.addEventListener('change', () => {
+      if (bindLinking) {
+        // 연결 중에는 계층을 바꾸지 않는다(§4.6 "연결 중의 다른 일") — 고른 값을 되돌리고 사유.
+        sel.value = r.set ?? '';
+        showStatusLine(t('bind.waitLink'), { cls: 'warn' });
+        return;
+      }
       const role = (sel.value || null) as RoleKey | 'none' | null;
       // 같은 역할을 맡던 다른 컬렉션은 풀린다(한 역할 = 한 컬렉션) — 미리 알려 준다.
       const holder = role && role !== 'none' ? colRoleRows.find((x) => x.id !== r.id && x.set === role) : undefined;
@@ -4023,6 +4257,8 @@ function renderCollectionRoles(rows: CollectionRoleInfo[]): void {
       const use = document.createElement('button');
       use.className = 'link';
       use.textContent = t('colRoles.useGuess');
+      use.dataset.roleWrite = '';
+      if (bindLinking) setWait(use, t('bind.waitLink'));
       use.addEventListener('click', () => {
         const holder = colRoleRows.find((x) => x.id !== r.id && x.set === r.guess);
         pendingRoleNote = { id: r.id, name: r.name, role: r.guess, prev: holder?.name };
@@ -5549,9 +5785,11 @@ function edChrome(): void {
   // 단추 — 고친 것이 없으면 [닫기] + [저장](잠김), 있으면 [취소] + [저장].
   e.btnClose.textContent = st.changed ? t('common.cancel') : t('common.close');
   e.btnSave.textContent = saving ? t('edit.savingBtn') : t('edit.save');
-  const locked = saving || !!e.sticky || !st.changed || st.hasErr;
+  // 연결 중에도 잠근다(§4.6 "연결 중의 다른 일") — 툴팁 꼬리 · 누르면 팝업 안 알림 줄에 bind.waitLink.
+  const locked = saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0;
   if (locked) { e.btnSave.setAttribute('aria-disabled', 'true'); e.btnSave.dataset.lock = 'edit'; }
   else { e.btnSave.removeAttribute('aria-disabled'); delete e.btnSave.dataset.lock; }
+  e.btnSave.title = bindLinking ? t('bind.waitLink') : '';
 }
 /** 칸을 고쳤다 — 사건 문구를 지우고 다시 판정. */
 function edEdited(): void {
@@ -5564,7 +5802,8 @@ function edLockedSave(): void {
   const e = ed;
   if (!e || e.saving || e.sticky) return; // 저장 중 · 남는 상태 문구는 그대로
   const st = edState(e);
-  if (!st.changed) e.event = { text: t('edit.noChange'), err: false };
+  if (bindLinking) e.event = { text: t('bind.waitLink'), err: false }; // 연결 중(§4.6 "연결 중의 다른 일")
+  else if (!st.changed) e.event = { text: t('edit.noChange'), err: false };
   else if (st.hasErr) { e.event = { text: t('edit.checkInput'), err: true }; st.firstErr?.focus(); }
   edChrome();
 }
@@ -5996,7 +6235,7 @@ function edSave(): void {
   const e = ed;
   if (!e || e.saving || e.sticky) return;
   const st = edState(e);
-  if (!st.changed || st.hasErr) { edLockedSave(); return; }
+  if (bindLinking || !st.changed || st.hasErr) { edLockedSave(); return; }
   const n = edNameState(e);
   const values: Record<string, EditValue> = {};
   const baseValues: Record<string, VarCell | null> = {};
@@ -6374,6 +6613,7 @@ function readLayerLibUse(): void {
 
 /** 다른 탭에서 돌아오거나 창에 다시 들어올 때(§4.6 ⑧). 순서: 최소화 중 결과 → 다른 선택 → 이 화면의 선택 → 조용한 재계산/안내. */
 function bindOnReturn(): void {
+  if (bindLinking) return; // 연결 중의 복귀는 아무것도 하지 않는다(§4.6 ⑧)
   if (activeTab !== 'layer' || currentApplyStep !== 'bind' || !hasBindPreview()) return;
   if (bindPreviewMini) { bindPreviewMini = false; return; }
   const notice = $('bindNotice');
@@ -6397,8 +6637,8 @@ function bindOnReturn(): void {
 document.documentElement.addEventListener('pointerleave', () => { if (hasBindPreview()) bindLeftSince = true; });
 window.addEventListener('blur', () => { if (hasBindPreview()) bindLeftSince = true; });
 
-/** 연결 미리보기·연결이 실행 중인가. */
-const bindBusy = (): boolean => opPending.has('APPLY') || opPending.has('APPLY_SELECTED');
+/** 찾기·연결이 실행 중인가. 연결 쪽은 bindLinking(§4.6 "연결 중의 다른 일"). */
+const bindBusy = (): boolean => bindFinding || bindLinking !== 0;
 
 /* ---------- 첫 화면 — 변수 탭(IA v3) ----------
    파일 맨 끝에서 부른다: 첫 화면이 변수 관리를 그리고 사용 수를 읽으므로, 그 상태 변수가 모두 선언된 뒤여야 한다.

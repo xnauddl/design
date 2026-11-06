@@ -254,7 +254,20 @@ const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return 
   const applyId = await lastReq(p, 'APPLY_SELECTED');
   check('8 연결 요청은 켠 곳만', (await sent(p, 'APPLY_SELECTED')).at(-1).items.length === 3);
   check('8 연결 중 → 진행 줄 "연결 중…" · [취소] 숨김(연결은 멈추지 않는다)', (await visible(p, '#applyProgress')) && (await p.textContent('#applyProgressText')) === '연결 중…' && !(await visible(p, '#btnApplyCancel')));
+  // 300곳씩 연결 — 묶음마다 PROGRESS{op: 'link'}(§4.6 "찾기 · 연결의 수")
+  await recv(p, { type: 'PROGRESS', op: 'link', done: 300, total: 618 });
+  check('8 연결 진행 → "연결 중… 300 / 618" · 막대 49%', (await p.textContent('#applyProgressText')) === '연결 중… 300 / 618' && (await p.$eval('#applyBarFill', (e) => e.style.width)) === '49%', await p.textContent('#applyProgressText'));
+  check('8 연결 중 단계: 끝 · 끝 · 지금(돌아가는 표시)', JSON.stringify(await steps(p)) === JSON.stringify(['done', 'done', 'now']) && (await p.$eval('#bindSteps .bs:nth-child(3)', (e) => e.classList.contains('busy'))), JSON.stringify(await steps(p)));
+  // 연결 중 캔버스 선택 변경(사용자) → 진행 줄 · 결과를 지우지 않는다
+  await recv(p, sel(2, 0));
+  check('8 연결 중 선택 변경 → 진행 줄 남음', (await visible(p, '#applyProgress')) && (await p.textContent('#applyProgressText')) === '연결 중… 300 / 618');
+  // 연결 중 [🔍 다시 찾기] → 잠금 · 요청 안 보냄 · 카드 상태 줄 "연결이 끝나면 다시 해 주세요"
+  const findsBefore = (await sent(p, 'APPLY')).length;
+  check('8 연결 중 [다시 찾기] aria-disabled', await locked(p, '#btnApply'));
+  await p.click('#btnApply', { force: true });
+  check('8 연결 중 [다시 찾기] → 요청 안 보냄 · "연결이 끝나면 다시 해 주세요"', (await sent(p, 'APPLY')).length === findsBefore && (await p.textContent('#applyStatus')) === '연결이 끝나면 다시 해 주세요', await p.textContent('#applyStatus'));
   await recv(p, { type: 'APPLY_RESULT', bound: 3, skipped: 1, reasons: { changed: 1 }, skips: [{ nodeId: 'n1', name: 'card', reason: 'changed' }], reqId: applyId });
+  check('8 연결 중 선택이 바뀌어도 뒤이은 결과로 결과 카드 · 잠금 풀림', (await visible(p, '#bindDone')) && !(await visible(p, '#applyProgress')) && !(await locked(p, '#btnApply')));
   check('8 연결 후 결과 카드 "3곳 연결됨" + "변수 탭에서 보기 →"', (await visible(p, '#bindDone')) && (await p.textContent('#bindDoneText')) === '3곳 연결됨' && (await p.textContent('#btnBindToList')) === '변수 탭에서 보기 →');
   check('8 연결 후 카드·(찾음)·모두 켜기·필터 없음', (await p.$$('#bindTree .bv-card')).length === 0 && !(await visible(p, '#bindFound')) && !(await visible(p, '#bindAll')) && !(await visible(p, '#bindFilterBtn')) && (await emptyText(p)) === null);
   check('8 연결 후 다시 확인 건너뜀 (건너뜀 1 ▸) — 결과 카드 아래', (await p.textContent('#bindSkipToggle')) === '건너뜀 1 ▸' && (await p.$eval('#bindDone', (d) => d.getBoundingClientRect().bottom <= document.getElementById('bindSkipToggle').getBoundingClientRect().top)));
@@ -265,6 +278,72 @@ const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return 
   check('8 연결 후 [연결] 사유 "먼저 [찾기]를 누르세요"', (await lockMsg(p, '#btnApplyConfirm')).includes('먼저 [찾기]를 누르세요'));
   await p.click('#btnBindToList');
   check('8 변수 탭에서 보기 → 변수 탭', (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-variables');
+  await p.close();
+}
+
+/* 15 — 찾기 · 연결의 수(§4.6, 2026-11-05): 자리 줄 200줄 + "외 n곳", 연결 중 잠금 · 오류로 풀림, 다른 작업 중 [연결] 잠금 */
+{
+  const p = await open();
+  await recv(p, { ...PREREQ, hasTextStyles: true });
+  await recv(p, sel(1, 0));
+  const many = Array.from({ length: 201 }, (_, i) => ({ nodeId: `m${i}`, field: 'width', currentValue: '8', variableId: 'vM', variableName: 'size/8', tier: 1 }));
+  const manyNodes = many.map((x) => ({ id: x.nodeId, name: `L-${x.nodeId}`, type: 'FRAME', depth: 0, parentId: null }));
+  await p.click('#btnApply');
+  await recv(p, { ...preview(await lastReq(p, 'APPLY')), candidates: [...many, c('itemSpacing')], nodes: [...nodes, ...manyNodes] });
+  check('15 (찾음 202) · 카드 머리 "201곳"(상한 없음)', (await p.textContent('#bindFound')) === '찾음 202' && (await cards(p))[0]?.[3] === '201곳', JSON.stringify(await cards(p)));
+  await p.click('#bindTree .bv-card >> nth=0 >> .bv-tw');
+  const rows = await p.$$eval('#bindTree .bv-card:first-child .bv-place', (e) => e.map((x) => (x.classList.contains('bv-more') ? `more:${x.textContent}` : x.querySelector('.bv-layer').textContent)));
+  check('15 201줄 카드 펼침 → 200줄 + "외 1곳 · 레이어 선택으로 보기"', rows.length === 201 && rows[199] === 'L-m199' && rows[200] === 'more:외 1곳 · 레이어 선택으로 보기', `${rows.length}줄 · ${rows.at(-1)}`);
+  await p.click('#bindTree .bv-more button');
+  check('15 "외 1곳" → SELECT_NODES ids 1개(201번째 줄의 레이어)', JSON.stringify((await sent(p, 'SELECT_NODES')).at(-1)?.ids) === JSON.stringify(['m200']));
+  await recv(p, { ...sel(1, 0), selfSelect: true, ids: ['m200'] });
+  check('15 이 화면에서 만든 선택 → 결과 남음', (await p.$$('#bindTree .bv-card')).length === 2 && (await p.textContent('#bindFound')) === '찾음 202');
+  await recv(p, { type: 'SELECT_RESULT', found: 200, requested: 340, capped: true });
+  check('15 200개 넘으면 카드 상태 줄 select.capped', (await p.textContent('#applyStatus')).includes('레이어 200개만 선택했어요(전체 340개)'), await p.textContent('#applyStatus'));
+  // 연결 중 잠금 — 쓰기 버튼 전부(§2 원칙 3: aria-disabled · 툴팁 꼬리 · 누르면 사유)
+  await p.click('#btnApplyConfirm');
+  check('15 연결 요청 202곳', (await sent(p, 'APPLY_SELECTED')).at(-1)?.items?.length === 202);
+  const writeIds = ['btnRename', 'btnRegisterComp', 'btnApplyExistingText', 'btnWizardRun'];
+  const waitState = () => p.evaluate((ids) => ids.map((id) => {
+    const b = document.getElementById(id);
+    const tip = b.getAttribute(b.hasAttribute('data-tip') ? 'data-tip' : 'title') ?? '';
+    return [id, b.getAttribute('aria-disabled'), tip.endsWith('연결이 끝나면 다시 해 주세요')];
+  }), writeIds);
+  check('15 연결 중 쓰기 버튼 aria-disabled · 툴팁 꼬리', (await waitState()).every(([, a, tip]) => a === 'true' && tip), JSON.stringify(await waitState()));
+  // 유료 잠금 툴팁을 다시 쓰는 PREREQ_STATE(updateGates → setLockTitle) 뒤에도 대기 꼬리는 남는다
+  await recv(p, { ...PREREQ, hasTextStyles: true });
+  const paidTails = await p.evaluate(() => ['btnCreate', 'btnTextStyles', 'btnGenDark'].map((id) => {
+    const b = document.getElementById(id);
+    return (b.getAttribute(b.hasAttribute('data-tip') ? 'data-tip' : 'title') ?? '').endsWith('연결이 끝나면 다시 해 주세요') && b.getAttribute('aria-disabled') === 'true';
+  }));
+  check('15 연결 중 PREREQ_STATE 뒤에도 꼬리 유지', paidTails.every(Boolean) && (await waitState()).every(([, a, tip]) => a === 'true' && tip), JSON.stringify(paidTails) + JSON.stringify(await waitState()));
+  const renamesBefore = (await sent(p, 'RENAME_APPLY')).length;
+  await p.$eval('#btnRename', (b) => { b.disabled = false; b.click(); }); // 고른 이름이 있을 때처럼(체크 0이면 원래 disabled)
+  check('15 연결 중 [이름 정리 적용] → 공통 상태 줄 "연결이 끝나면 다시 해 주세요" · 요청 없음', (await p.textContent('#statusText')) === '연결이 끝나면 다시 해 주세요' && (await sent(p, 'RENAME_APPLY')).length === renamesBefore, await p.textContent('#statusText'));
+  const tsBefore = (await sent(p, 'APPLY_TEXT_STYLES')).length;
+  await p.click('#btnApplyExistingText', { force: true });
+  check('15 연결 중 [기존 스타일 연결] → 사유 · 요청 없음', (await p.textContent('#statusText')) === '연결이 끝나면 다시 해 주세요' && (await sent(p, 'APPLY_TEXT_STYLES')).length === tsBefore);
+  await p.click('#btnApplyConfirm', { force: true });
+  check('15 연결 중 [연결] → 카드 상태 줄 사유 · 두 번 보내지 않음', (await p.textContent('#applyStatus')) === '연결이 끝나면 다시 해 주세요' && (await sent(p, 'APPLY_SELECTED')).length === 1);
+  // 연결 중 ERROR{op: 'APPLY_SELECTED'} → 진행 줄 닫힘 · 잠금 풀림
+  await recv(p, { type: 'ERROR', op: 'APPLY_SELECTED', message: 'boom' });
+  check('15 연결 오류 → 진행 줄 닫힘 · 카드 상태 줄에 오류', !(await visible(p, '#applyProgress')) && !!(await p.textContent('#applyStatus')) && (await p.textContent('#applyStatus')) !== '연결이 끝나면 다시 해 주세요', await p.textContent('#applyStatus'));
+  check('15 연결 오류 → 잠금 풀림(쓰기 버튼 · 다시 찾기)', !(await locked(p, '#btnApply')) && (await waitState()).every(([id, a, tip]) => (id === 'btnRegisterComp' || a !== 'true') && !tip), JSON.stringify(await waitState()));
+  check('15 연결 오류 → 단계 표시 돌아가는 표시 없음', !(await p.$eval('#bindSteps .bs:nth-child(3)', (e) => e.classList.contains('busy'))));
+  // 반대 방향: 다른 쓰기 작업 중 [🔗 연결] → bind.waitOp
+  await p.click('#btnApplyExistingText');
+  check('15 다른 쓰기 작업 중 [연결] aria-disabled', (await sent(p, 'APPLY_TEXT_STYLES')).length === tsBefore + 1 && (await locked(p, '#btnApplyConfirm')));
+  await p.click('#btnApplyConfirm', { force: true });
+  check('15 다른 쓰기 작업 중 [연결] → "텍스트 스타일 연결 작업이 끝나면 다시 해 주세요" · 요청 없음', (await p.textContent('#applyStatus')) === '텍스트 스타일 연결 작업이 끝나면 다시 해 주세요' && (await sent(p, 'APPLY_SELECTED')).length === 1, await p.textContent('#applyStatus'));
+  await recv(p, { type: 'TEXT_STYLES_APPLIED', applied: 1, skipped: 0, skipReasons: {} });
+  check('15 그 작업의 결과가 오면 [연결] 풀림', !(await locked(p, '#btnApplyConfirm')));
+  // 연결 중 선택 변경 → 연결 오류 → 미뤄 둔 결과 지우기(결과 카드가 없으므로)
+  await p.click('#btnApplyConfirm');
+  check('15 다시 연결 요청', (await sent(p, 'APPLY_SELECTED')).length === 2);
+  await recv(p, sel(2, 0));
+  check('15 연결 중 선택 변경 → 카드 남음', (await p.$$('#bindTree .bv-card')).length === 2);
+  await recv(p, { type: 'ERROR', op: 'APPLY_SELECTED', message: 'boom' });
+  check('15 연결 중 선택 변경 → ERROR → 결과 지워짐(찾기 전)', (await p.$$('#bindTree .bv-card')).length === 0 && !(await visible(p, '#bindFound')) && (await named(p, '#btnApplyConfirm', '연결')) && (await locked(p, '#btnApplyConfirm')) && !(await visible(p, '#applyProgress')));
   await p.close();
 }
 

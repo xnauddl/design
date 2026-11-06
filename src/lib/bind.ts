@@ -32,8 +32,6 @@ export function sameNumber(a: number, b: number): boolean {
 }
 
 export interface BindResult {
-  /** 상한(RESULT_CAP) 전 실제 후보 수 — 잘렸으면 UI가 알린다. */
-  candidateTotal?: number;
   bound: number;
   skipped: number;
   /** UX3: 스킵/건너뜀 사유별 집계(키→건수). 예: { 'no-match': 2, 'hug-fill': 3 }. */
@@ -58,8 +56,6 @@ export interface BindResult {
  * 칩의 '레이어 선택'도 code 쪽 SELECT_CAP과 같은 200에서 잘리니 수를 맞춘다.
  */
 const SKIP_PREVIEW_CAP = 200;
-/** 결과/미리보기 트리에 실을 바인딩 후보 상한 — 수천 레이어 파일에서 UI 메시지가 터지지 않게. */
-const RESULT_CAP = 600;
 
 /**
  * 상한을 사유별로 고르게 나눈다.
@@ -334,7 +330,7 @@ export async function bindSelection(
   const res: BindResult = { bound: 0, skipped: 0, reasons: {} };
   const prog: Progress = { done: 0, total: hooks.onProgress ? countNodes(selection) : 0, every: 50 };
   // 적용 모드에서도 "어느 레이어에 어느 변수가 붙었나" 목록을 모은다(결과 트리). dry-run과 같은 수집기 —
-  // 차이는 실제로 setBoundVariable을 부르느냐뿐. 목록은 RESULT_CAP에서 멈춘다(대형 파일 보호).
+  // 차이는 실제로 setBoundVariable을 부르느냐뿐. 후보는 상한 없이 전부 싣는다(§4.6 "찾기 · 연결의 수").
   const preview: Preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
   for (const node of selection) {
     // 선택 루트가 숨긴 그룹 안이면 walk의 자체 visible 검사로는 못 거른다(루트 자신은 보임).
@@ -346,9 +342,8 @@ export async function bindSelection(
     if (res.cancelled) break;
   }
   {
-    res.candidateTotal = preview.candidates.length;
-    res.candidates = preview.candidates.slice(0, RESULT_CAP);
-    // 트리 씨앗도 잘린 목록으로 — 트리 크기가 '고른 레이어 수'가 아니라 '보낼 스킵 수'에 묶인다.
+    res.candidates = preview.candidates;
+    // 트리 씨앗의 스킵은 잘린 목록으로 — 트리 크기가 '고른 레이어 수'가 아니라 '보낼 스킵 수'에 묶인다.
     const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
     res.nodes = pruneToAffected(preview.nodeIndex, res.candidates, skips);
     res.skips = skips;
@@ -843,6 +838,19 @@ export interface SelectedBindItem {
   variableId: string;
 }
 
+/** 연결 진행률 · 양보 훅(§4.6 "찾기 · 연결의 수"). 묶음이 끝날 때마다 부른다. */
+export interface SelectedBindHooks {
+  /** done = 처리한 자리 수(건너뛴 자리 포함), total = 받은 items 수. */
+  onProgress?: (done: number, total: number) => void;
+  /** 진행 메시지가 UI에 닿도록 한 번 양보한다(code.ts: setTimeout 0). */
+  yieldToEvents?: () => Promise<void>;
+  /** 실제로 쓴 자리 수(누적)가 늘 때마다 — 중간에 예외가 나도 code.ts가 ⌘Z 묶음을 닫을지 안다. */
+  onBound?: (bound: number) => void;
+}
+
+/** 연결 묶음 크기 — 한 번에 setBoundVariable을 이만큼 부르고 양보한다(제안값, 실기 뒤 바꿀 수 있음). */
+export const LINK_CHUNK = 300;
+
 export interface SelectedBindResult {
   bound: number;
   /** 다시 확인에서 건너뛴 자리 수(속성 단위) — reasons 합과 같다. */
@@ -864,35 +872,11 @@ export interface SelectedBindResult {
  * - 'styled': 해당 칠하기·선·효과·글자에 스타일이 붙음
  * - 'space-between': 간격 필드인데 그 사이 정렬이 Space between(사이 간격 자동)이 됨
  * - 'changed': 값이 변수 값과 더는 같지 않음, 칠하기 자리가 없어짐·반투명이 됨, 레이어·변수가 없어짐
- * - 'error': 연결 호출이 실패함
+ * - 'error': 연결 호출이 실패함, 묶음 끝 칠하기·선·효과 배열 쓰기가 실패함
  */
-export async function bindSelectedItems(items: readonly SelectedBindItem[]): Promise<SelectedBindResult> {
+export async function bindSelectedItems(items: readonly SelectedBindItem[], hooks: SelectedBindHooks = {}): Promise<SelectedBindResult> {
   const res: BindResult = { bound: 0, skipped: 0, reasons: {} };
   const preview: Preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
-  const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-  const localIds = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
-
-  // 노드를 한 번씩만 찾고, 살아 있는 변수 집합은 그 노드들(하위 제외)로 만든다.
-  const nodes = new Map<string, SceneNode | null>();
-  for (const it of items) {
-    if (nodes.has(it.nodeId)) continue;
-    const n = await figma.getNodeByIdAsync(it.nodeId);
-    nodes.set(it.nodeId, n && 'type' in n && n.type !== 'PAGE' && n.type !== 'DOCUMENT' ? (n as SceneNode) : null);
-  }
-  const roots = [...nodes.values()].filter((n): n is SceneNode => !!n);
-  liveVarIds = await collectLiveVarIds(roots, localIds, false);
-
-  const valueCache = new Map<string, { variable: Variable; value: VariableValue | undefined } | null>();
-  const variableOf = async (id: string) => {
-    if (valueCache.has(id)) return valueCache.get(id) ?? null;
-    const v = await figma.variables.getVariableByIdAsync(id);
-    const entry = v ? { variable: v, value: await resolveValue(v, modeOf) } : null;
-    valueCache.set(id, entry);
-    return entry;
-  };
-
-  const changedPaints = new Map<SceneNode, Map<'fills' | 'strokes' | 'effects', (Paint | Effect)[]>>();
   const fail = (key: string, node: SceneNode | null, field: string): void => {
     if (node) skip(res, key, node, preview, field);
     else {
@@ -901,108 +885,153 @@ export async function bindSelectedItems(items: readonly SelectedBindItem[]): Pro
     }
   };
 
-  for (const it of items) {
-    const node = nodes.get(it.nodeId) ?? null;
-    const vv = await variableOf(it.variableId);
-    if (!node || !vv) {
-      fail('changed', node, it.field);
-      continue;
+  // 300곳씩 묶어 처리한다(§4.6 "찾기 · 연결의 수"). 묶음마다 레이어·변수 값을 새로 읽고, 배열 쓰기도
+  // 그 묶음 끝에 마친다 — 창을 닫아도 마지막으로 끝난 묶음까지는 온전히 연결된 채로 남는다.
+  for (let start = 0; start < items.length; start += LINK_CHUNK) {
+    const chunk = items.slice(start, start + LINK_CHUNK);
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const localIds = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
+
+    // 노드를 한 번씩만 찾고, 살아 있는 변수 집합은 그 노드들(하위 제외)로 만든다.
+    const nodes = new Map<string, SceneNode | null>();
+    for (const it of chunk) {
+      if (nodes.has(it.nodeId)) continue;
+      const n = await figma.getNodeByIdAsync(it.nodeId);
+      nodes.set(it.nodeId, n && 'type' in n && n.type !== 'PAGE' && n.type !== 'DOCUMENT' ? (n as SceneNode) : null);
     }
-    const { variable, value } = vv;
-    try {
-      if (it.field === 'fills' || it.field === 'strokes' || it.field === 'effects') {
-        const key = it.field;
-        if (hasStyleId(node, STYLE_KEY_OF[key])) {
-          fail('styled', node, key);
-          continue;
-        }
-        const pending = changedPaints.get(node)?.get(key);
-        const list = pending ?? ((node as unknown as Record<string, unknown>)[key] as (Paint | Effect)[] | typeof figma.mixed | undefined);
-        const i = it.index ?? 0;
-        const x = Array.isArray(list) ? list[i] : undefined;
-        const isColorItem = !!x && (key === 'effects' ? x.type === 'DROP_SHADOW' || x.type === 'INNER_SHADOW' : x.type === 'SOLID');
-        if (!Array.isArray(list) || !x || !isColorItem) {
-          fail('changed', node, key);
-          continue;
-        }
-        const st = stateReason(colorState(x, node, key, i));
-        if (st) {
-          fail(st, node, key);
-          continue;
-        }
-        const translucent = key === 'effects' ? isTranslucentEffectColor(x as DropShadowEffect) : isTranslucentPaint(x as SolidPaint);
-        const hex = rgbToHex((x as SolidPaint | DropShadowEffect).color);
-        if (translucent || variable.resolvedType !== 'COLOR' || !value || !isRGB(value) || !isOpaqueColorValue(value) || rgbToHex(value) !== hex) {
-          fail('changed', node, key);
-          continue;
-        }
-        const arr = list.slice();
-        arr[i] =
-          key === 'effects'
-            ? figma.variables.setBoundVariableForEffect(x as Effect, 'color', variable)
-            : figma.variables.setBoundVariableForPaint(x as SolidPaint, 'color', variable);
-        let m = changedPaints.get(node);
-        if (!m) changedPaints.set(node, (m = new Map()));
-        m.set(key, arr);
-        res.bound++;
-        continue;
-      }
-      if ((TEXT_RANGE_FIELDS as readonly string[]).includes(it.field)) {
-        const field = it.field as VariableBindableTextField;
-        if (node.type !== 'TEXT') {
-          fail('changed', node, field);
-          continue;
-        }
-        if (hasStyleId(node, 'textStyleId')) {
-          fail('styled', node, field);
-          continue;
-        }
-        const st = stateReason(textFieldState(node, field));
-        if (st) {
-          fail(st, node, field);
-          continue;
-        }
-        if (node.characters.length === 0 || node.fontName === figma.mixed || !textValueEqual(node, field, value)) {
-          fail('changed', node, field);
-          continue;
-        }
-        await figma.loadFontAsync(node.fontName);
-        node.setRangeBoundVariable(0, node.characters.length, field, variable);
-        res.bound++;
-        continue;
-      }
-      // 스칼라 노드 필드(width/height/padding…/cornerRadius…/opacity)
-      // 찾은 뒤 정렬이 Space between으로 바뀐 간격 — 붙이면 정렬이 바뀌므로 건너뛴다(§4.6 다시 확인).
-      // 찾은 뒤 줄바꿈이 꺼진 줄 사이 간격은 "그 사이 바뀜"(§2.11 "줄바꿈이 아님").
-      const gap = gapSkip(node, it.field);
-      if (gap) {
-        fail(gap === 'no-wrap' ? 'changed' : 'space-between', node, it.field);
-        continue;
-      }
-      const st = stateReason(nodeFieldState(node, it.field));
-      if (st) {
-        fail(st, node, it.field);
-        continue;
-      }
-      const cur = (node as unknown as Record<string, unknown>)[it.field];
-      if (typeof cur !== 'number' || typeof value !== 'number' || !sameNumber(cur, value)) {
+    const roots = [...nodes.values()].filter((n): n is SceneNode => !!n);
+    liveVarIds = await collectLiveVarIds(roots, localIds, false);
+
+    // 변수 값은 묶음마다 새로 읽는다 — 그 사이 피그마에서 바뀐 값으로 다시 확인하려고.
+    const valueCache = new Map<string, { variable: Variable; value: VariableValue | undefined } | null>();
+    const variableOf = async (id: string) => {
+      if (valueCache.has(id)) return valueCache.get(id) ?? null;
+      const v = await figma.variables.getVariableByIdAsync(id);
+      const entry = v ? { variable: v, value: await resolveValue(v, modeOf) } : null;
+      valueCache.set(id, entry);
+      return entry;
+    };
+
+    // 칠하기·선·효과는 레이어×속성마다 새 배열을 모았다가 묶음 끝에 한 번 쓴다. fields = 그 배열에 연결한 자리 수.
+    const changedPaints = new Map<SceneNode, Map<'fills' | 'strokes' | 'effects', { arr: (Paint | Effect)[]; fields: number }>>();
+
+    for (const it of chunk) {
+      const node = nodes.get(it.nodeId) ?? null;
+      const vv = await variableOf(it.variableId);
+      if (!node || !vv) {
         fail('changed', node, it.field);
         continue;
       }
-      (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(it.field as VariableBindableNodeField, variable);
-      res.bound++;
-    } catch {
-      fail('error', node, it.field);
-    }
-  }
-  for (const [node, m] of changedPaints) {
-    for (const [key, arr] of m) {
+      const { variable, value } = vv;
       try {
-        (node as unknown as Record<string, unknown>)[key] = arr;
+        if (it.field === 'fills' || it.field === 'strokes' || it.field === 'effects') {
+          const key = it.field;
+          if (hasStyleId(node, STYLE_KEY_OF[key])) {
+            fail('styled', node, key);
+            continue;
+          }
+          const pending = changedPaints.get(node)?.get(key)?.arr;
+          const list = pending ?? ((node as unknown as Record<string, unknown>)[key] as (Paint | Effect)[] | typeof figma.mixed | undefined);
+          const i = it.index ?? 0;
+          const x = Array.isArray(list) ? list[i] : undefined;
+          const isColorItem = !!x && (key === 'effects' ? x.type === 'DROP_SHADOW' || x.type === 'INNER_SHADOW' : x.type === 'SOLID');
+          if (!Array.isArray(list) || !x || !isColorItem) {
+            fail('changed', node, key);
+            continue;
+          }
+          const st = stateReason(colorState(x, node, key, i));
+          if (st) {
+            fail(st, node, key);
+            continue;
+          }
+          const translucent = key === 'effects' ? isTranslucentEffectColor(x as DropShadowEffect) : isTranslucentPaint(x as SolidPaint);
+          const hex = rgbToHex((x as SolidPaint | DropShadowEffect).color);
+          if (translucent || variable.resolvedType !== 'COLOR' || !value || !isRGB(value) || !isOpaqueColorValue(value) || rgbToHex(value) !== hex) {
+            fail('changed', node, key);
+            continue;
+          }
+          const arr = list.slice();
+          arr[i] =
+            key === 'effects'
+              ? figma.variables.setBoundVariableForEffect(x as Effect, 'color', variable)
+              : figma.variables.setBoundVariableForPaint(x as SolidPaint, 'color', variable);
+          let m = changedPaints.get(node);
+          if (!m) changedPaints.set(node, (m = new Map()));
+          const w = m.get(key);
+          if (w) {
+            w.arr = arr;
+            w.fields++;
+          } else m.set(key, { arr, fields: 1 });
+          continue; // bound는 묶음 끝 배열 쓰기가 성공해야 센다
+        }
+        if ((TEXT_RANGE_FIELDS as readonly string[]).includes(it.field)) {
+          const field = it.field as VariableBindableTextField;
+          if (node.type !== 'TEXT') {
+            fail('changed', node, field);
+            continue;
+          }
+          if (hasStyleId(node, 'textStyleId')) {
+            fail('styled', node, field);
+            continue;
+          }
+          const st = stateReason(textFieldState(node, field));
+          if (st) {
+            fail(st, node, field);
+            continue;
+          }
+          if (node.characters.length === 0 || node.fontName === figma.mixed || !textValueEqual(node, field, value)) {
+            fail('changed', node, field);
+            continue;
+          }
+          await figma.loadFontAsync(node.fontName);
+          node.setRangeBoundVariable(0, node.characters.length, field, variable);
+          res.bound++;
+          hooks.onBound?.(res.bound);
+          continue;
+        }
+        // 스칼라 노드 필드(width/height/padding…/cornerRadius…/opacity)
+        // 찾은 뒤 정렬이 Space between으로 바뀐 간격 — 붙이면 정렬이 바뀌므로 건너뛴다(§4.6 다시 확인).
+        // 찾은 뒤 줄바꿈이 꺼진 줄 사이 간격은 "그 사이 바뀜"(§2.11 "줄바꿈이 아님").
+        const gap = gapSkip(node, it.field);
+        if (gap) {
+          fail(gap === 'no-wrap' ? 'changed' : 'space-between', node, it.field);
+          continue;
+        }
+        const st = stateReason(nodeFieldState(node, it.field));
+        if (st) {
+          fail(st, node, it.field);
+          continue;
+        }
+        const cur = (node as unknown as Record<string, unknown>)[it.field];
+        if (typeof cur !== 'number' || typeof value !== 'number' || !sameNumber(cur, value)) {
+          fail('changed', node, it.field);
+          continue;
+        }
+        (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(it.field as VariableBindableNodeField, variable);
+        res.bound++;
+        hooks.onBound?.(res.bound);
       } catch {
-        /* 배열 쓰기 실패 — 이미 센 bound는 되돌릴 수 없어 그대로 둔다(드묾) */
+        fail('error', node, it.field);
       }
     }
+    for (const [node, m] of changedPaints) {
+      for (const [key, w] of m) {
+        try {
+          (node as unknown as Record<string, unknown>)[key] = w.arr;
+          res.bound += w.fields;
+          hooks.onBound?.(res.bound);
+        } catch {
+          // 배열 쓰기 실패 — 그 배열에 연결한 자리는 연결되지 않았다.
+          for (let k = 0; k < w.fields; k++) fail('error', node, key);
+        }
+      }
+    }
+    changedPaints.clear();
+
+    const done = Math.min(start + LINK_CHUNK, items.length);
+    hooks.onProgress?.(done, items.length);
+    if (hooks.yieldToEvents) await hooks.yieldToEvents();
   }
   const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
   return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, skipTotal: preview.skips.length };
@@ -1027,7 +1056,7 @@ function textValueEqual(node: TextNode, field: VariableBindableTextField, value:
 
 /* ---------- 변수 사용 조회(IA v3 §4.4 — 보기 전용) ----------
    연결 작업과 범위가 다르다: 인스턴스 안쪽 레이어도 센다(보기 전용, 재검토 ⑥). 숨긴 레이어는 세지 않는다.
-   상한이 없다 — 숫자만 모으고 후보 목록을 만들지 않으므로 600개 결과 상한(RESULT_CAP)과 무관하다. */
+   상한이 없다 — 숫자만 모으고 후보 목록을 만들지 않는다. */
 
 /** 한 레이어에 연결된 변수 id들(속성 자리마다 하나 — 같은 변수가 두 자리면 두 번). */
 export function boundVariableIds(node: SceneNode): string[] {

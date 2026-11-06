@@ -4049,7 +4049,7 @@ test('countUsage — 인스턴스 안쪽까지 세고 숨긴 레이어는 뺀다
   assert.deepEqual(r.nodesById.get('vA').sort(), ['in1', 'two']);
   assert.equal(r.scanned, 4); // r, i, in1, two
 });
-test('countUsage · findUsers — 600개를 넘어도 상한 없이 센다', async () => {
+test('countUsage · findUsers — 700곳도 상한 없이 센다', async () => {
   const kids = Array.from({ length: 700 }, (_, i) => ({ type: 'RECTANGLE', id: `n${i}`, name: `n${i}`, visible: true, fills: [], boundVariables: { width: { type: 'VARIABLE_ALIAS', id: 'vW' } } }));
   const root = { type: 'FRAME', id: 'r', name: 'r', visible: true, boundVariables: {}, children: kids, parent: null };
   assert.deepEqual(countUsage([root]).usage.get('vW'), { places: 700, layers: 700 });
@@ -4221,6 +4221,131 @@ test('bindSelectedItems — 숫자는 소수 둘째 자리까지 같으면 연�
   assert.equal(n.boundVariables.itemSpacing.id, sp.id);
   assert.equal(n.boundVariables.paddingLeft, undefined);
   assert.equal(r.reasons.changed, 2);
+});
+
+/* ---- 찾기 · 연결의 수(§4.6, 2026-11-05) — 찾기는 상한 없이, 연결은 300곳씩 ---- */
+async function linkFixture() {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 },
+      { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+    ],
+    16,
+  );
+  return { figma, blue: findVar(figma, 'Global', 'color/0066ff'), sp8: findVar(figma, 'Global', 'spacing/8'), sp16: findVar(figma, 'Global', 'spacing/16') };
+}
+const blueFill = () => ({ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } });
+function gapFrame(id, extra = {}) {
+  return {
+    type: 'FRAME', id, name: id, layoutMode: 'VERTICAL', itemSpacing: 8, fills: [], boundVariables: {},
+    setBoundVariable(field, v) { this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id }; },
+    ...extra,
+  };
+}
+
+test('bindSelection dry-run — 후보 1,000곳을 상한 없이 전부 싣는다(candidateTotal 없음)', async () => {
+  await linkFixture();
+  const nodes = Array.from({ length: 1000 }, (_, i) => gapFrame(`g${i}`));
+  const r = await bindSelection(nodes, false);
+  assert.equal(r.candidates.length, 1000);
+  assert.equal(r.candidates.filter((c) => c.field === 'itemSpacing').length, 1000);
+  assert.equal('candidateTotal' in r, false);
+  assert.equal(r.nodes.length, 1000); // 영향 레이어 전부
+});
+
+test('bindSelectedItems — 1,000곳을 300곳씩 연결하고 묶음마다 진행률(300 · 600 · 900 · 1000)', async () => {
+  const { figma, sp8 } = await linkFixture();
+  const nodes = Array.from({ length: 1000 }, (_, i) => gapFrame(`g${i}`));
+  registerNodes(figma, nodes);
+  const progress = [];
+  let yields = 0;
+  let written = 0;
+  const r = await bindSelectedItems(
+    nodes.map((n) => ({ nodeId: n.id, field: 'itemSpacing', variableId: sp8.id })),
+    { onProgress: (done, total) => progress.push([done, total]), yieldToEvents: async () => { yields++; }, onBound: (n) => { written = n; } },
+  );
+  assert.equal(written, 1000); // 실제로 쓴 자리 수(code.ts가 예외 때 ⌘Z 묶음을 닫는 기준)
+  assert.equal(r.bound, 1000);
+  assert.equal(r.skipped, 0);
+  assert.deepEqual(progress, [[300, 1000], [600, 1000], [900, 1000], [1000, 1000]]);
+  assert.equal(yields, 4);
+  assert.ok(nodes.every((n) => n.boundVariables.itemSpacing?.id === sp8.id));
+});
+
+test('bindSelectedItems — 묶음 경계(300 · 600 · 900)를 넘는 같은 레이어의 칠하기 두 자리가 둘 다 연결', async () => {
+  const { figma, blue, sp8 } = await linkFixture();
+  const fillers = Array.from({ length: 994 }, (_, i) => gapFrame(`g${i}`));
+  const pairs = ['p1', 'p2', 'p3'].map((id) => gapFrame(id, { fills: [blueFill(), blueFill()] }));
+  registerNodes(figma, [...fillers, ...pairs]);
+  const items = fillers.map((n) => ({ nodeId: n.id, field: 'itemSpacing', variableId: sp8.id }));
+  // index 0은 앞 묶음의 끝(299 · 599 · 899), index 1은 다음 묶음의 처음(300 · 600 · 900)
+  pairs.forEach((p, k) => {
+    const at = 300 * (k + 1) - 1;
+    items.splice(at, 0, { nodeId: p.id, field: 'fills', index: 0, variableId: blue.id }, { nodeId: p.id, field: 'fills', index: 1, variableId: blue.id });
+  });
+  assert.equal(items.length, 1000);
+  pairs.forEach((p, k) => {
+    assert.equal(items[300 * (k + 1) - 1].nodeId, p.id);
+    assert.equal(items[300 * (k + 1)].nodeId, p.id);
+  });
+  const r = await bindSelectedItems(items);
+  assert.equal(r.bound, 1000);
+  assert.equal(r.skipped, 0);
+  for (const p of pairs) {
+    assert.equal(p.fills[0].boundVariables?.color?.id, blue.id, `${p.id} index 0`);
+    assert.equal(p.fills[1].boundVariables?.color?.id, blue.id, `${p.id} index 1`);
+  }
+});
+
+test('bindSelectedItems — 묶음마다 다시 확인: 묶음 2에서 값이 바뀐 자리만 changed', async () => {
+  const { figma, sp8, sp16 } = await linkFixture();
+  const nodes = Array.from({ length: 600 }, (_, i) => gapFrame(`g${i}`, i % 2 ? { itemSpacing: 16 } : {}));
+  registerNodes(figma, nodes);
+  const items = nodes.map((n, i) => ({ nodeId: n.id, field: 'itemSpacing', variableId: i % 2 ? sp16.id : sp8.id }));
+  const g = figma._state.collections.find((c) => c.name === 'Global');
+  const r = await bindSelectedItems(items, {
+    onProgress: (done) => {
+      if (done !== 300) return;
+      nodes[400].itemSpacing = 9; // 묶음 2의 레이어 값이 바뀜(spacing/8 자리)
+      sp16.setValueForMode(g.defaultModeId, 20); // 묶음 2부터 spacing/16 값이 바뀜 — 묶음마다 새로 읽는다
+    },
+  });
+  // 묶음 1: 300곳 전부 연결. 묶음 2: spacing/8 자리 150곳 중 1곳(g400) changed, spacing/16 자리 150곳 changed.
+  assert.equal(r.bound, 300 + 149);
+  assert.deepEqual(r.reasons, { changed: 151 });
+  assert.equal(nodes[299].boundVariables.itemSpacing.id, sp16.id); // 묶음 1의 spacing/16은 연결됨
+  assert.equal(nodes[301].boundVariables.itemSpacing, undefined);
+  assert.equal(nodes[400].boundVariables.itemSpacing, undefined);
+  assert.equal(nodes[402].boundVariables.itemSpacing.id, sp8.id);
+});
+
+test('bindSelectedItems — 칠하기 배열 쓰기가 실패하면 bound에 세지 않고 error로 건너뜀', async () => {
+  const { figma, blue, sp8 } = await linkFixture();
+  const ok = gapFrame('ok', { fills: [blueFill()] });
+  const bad = gapFrame('bad');
+  let fills = [blueFill(), blueFill()];
+  Object.defineProperty(bad, 'fills', {
+    get: () => fills,
+    set: () => { throw new Error('쓰기 실패'); },
+    enumerable: true,
+  });
+  registerNodes(figma, [ok, bad]);
+  let written = 0;
+  const r = await bindSelectedItems([
+    { nodeId: 'ok', field: 'fills', index: 0, variableId: blue.id },
+    { nodeId: 'bad', field: 'fills', index: 0, variableId: blue.id },
+    { nodeId: 'bad', field: 'fills', index: 1, variableId: blue.id },
+    { nodeId: 'bad', field: 'itemSpacing', variableId: sp8.id },
+  ], { onBound: (n) => { written = n; } });
+  assert.equal(r.bound, 2); // ok.fills · bad.itemSpacing
+  assert.equal(written, 2); // 쓰기에 실패한 배열은 쓴 자리로 세지 않는다
+  assert.deepEqual(r.reasons, { error: 2 });
+  assert.equal(r.skipped, 2);
+  assert.deepEqual(r.skips.map((s) => `${s.nodeId}:${s.reason}`), ['bad:error']);
+  assert.equal(fills[0].boundVariables, undefined);
+  assert.equal(ok.fills[0].boundVariables.color.id, blue.id);
 });
 
 test('applyExistingTextStyles — 이미 스타일 · 글자 변수 · 인스턴스 안쪽 · 섞인 서식은 건너뛰고 사유별로 센다', async () => {
