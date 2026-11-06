@@ -107,7 +107,7 @@
 | 레이어에는 Semantic 역할만 (§2.12) | 레이어에 붙는 변수는 Semantic(또는 Component) 역할이다. Global은 원시값을 담고 플러그인은 레이어에 Global을 붙이지 않는다(이미 붙은 연결은 아래 '이미 붙은 연결'). 같은 값의 역할이 없으면 플러그인이 **쓰임 이름**으로 역할을 만들어 붙인다 — 역할을 자동으로 만드는 것이 이 플러그인 변수 기능의 핵심이다 |
 | 역할 이름 = 쓰임 (A안) | 숫자 역할은 전부 `{그룹}/{레이어 역할}/{속성}`(예: `spacing/card/gap`, `radius/button`). 고정 칸 이름(`spacing/xl`)은 새로 만들지 않는다. 파일에 이미 있는 단계 이름(`spacing/xs` · `radius/md` · `radius/xl` 등)은 같은 값이어도 붙이지 않는다(12.7 옛 이름) — 같은 Global을 가리키는 단계 · 쓰임 역할이 함께 있을 수 있다(2026-11-06 사용자 재확인: 단계 재사용 B안 · 단계↔쓰임 두 층 C안은 택하지 않음). 같은 이름에 값이 둘 이상일 때만 `-2` · `-3`. 글자 크기 · 굵기 · 글꼴은 지금 이름 그대로 |
 | 색 역할 = 쓰임 + 밝기 | `color/{text · background · border · icon · shadow}/{default · subtle · strong · inverse · brand}` + 겹치면 `-2`. inverse는 합친 판정(2026-11-06 실기 뒤): 기준색이 극단 · 그 색이 반대쪽 극단 · 배경(조상 첫 불투명 채움)이 유채색이거나 기준과 같은 쪽 밝기일 때만 — 글자 · 아이콘 · 테두리 |
-| 이미 붙은 연결 (2026-11-06 사용자 결정 B — 같은 날 정한 바꾸기 · 풀기를 철회) | §2.11 "이미 붙은 것은 바꾸지 않는다" 그대로 — Global · Semantic · Component · 라이브러리 어떤 변수가 붙어 있어도 바꾸지도 풀지도 않는다("이미 연결됨"). 사용자가 지정했을 수 있는 연결을 플러그인이 되돌리지 않는다. 옛 플러그인이 붙인 크기 Global(`size/1440` 등) · 용도가 틀린 연결(흰 글자에 붙은 `color/background/default` 등)도 사용자가 피그마에서 고친다. 플러그인은 앞으로 그런 연결을 만들지 않는다(크기는 아이콘 · 아바타만, 칠하기 용도는 레이어 종류) |
+| 이미 붙은 연결 (2026-11-06 사용자 결정 B — 같은 날 정한 바꾸기 · 풀기를 철회) | §2.11 "이미 붙은 것은 바꾸지 않는다" 그대로 — Global · Semantic · Component · 계층 없음 · 라이브러리 어떤 변수가 붙어 있어도 바꾸지도 풀지도 않는다("이미 연결됨"). 사용자가 지정했을 수 있는 연결을 플러그인이 되돌리지 않는다. 옛 플러그인이 붙인 크기 Global(`size/1440` 등) · 용도가 틀린 연결(흰 글자에 붙은 `color/background/default` 등)도 사용자가 피그마에서 고친다. 플러그인은 앞으로 그런 연결을 만들지 않는다(크기는 아이콘 · 아바타만, 칠하기 용도는 레이어 종류) |
 | 역할을 만드는 때 | 토큰 만들기와 연결 두 곳 |
 
 ### 결정 기록 (2026-11-05, QA #4 뒤 사용자 확정)
@@ -261,7 +261,7 @@
             1. 기준색이 극단 — OKLCH L < 0.35(어두움) 또는 ≥ 0.85(밝음).
             2. 그 색이 반대쪽 극단 — 기준이 어두우면 L ≥ 0.85, 밝으면 L < 0.35.
             3. 배경 종류가 있고, `chroma`이거나 기준색과 같은 쪽(기준 L < 0.5면 `dark`, 아니면 `light`).
-            - 실기 파일: 흰 글자 6개(배경 #3D5FDB · #5576EE · #E68E6C · #2EDCF3 — 모두 버튼 프레임 자신의 채움, 기준 글자색 #000) → 셋 다 맞아 `color/text/inverse`. 연회색 #F3F3F3 바 위 검정 선 아이콘(기준 아이콘색 #7A7A7A, L 0.58) → 1이 아니라 inverse 아님 → `color/icon/strong`. 밝은 회색 카드 위 흰 글자(기준 #000) → 3이 아니라 `subtle`.
+            - 실기 파일(연결 전 원본 `163:1523` 기준 — 이미 붙은 결과 파일 `190:615`에서는 그대로 남는다, 12.8): 흰 글자 6개(배경 #3D5FDB · #5576EE · #E68E6C · #2EDCF3 — 모두 버튼 프레임 자신의 채움, 기준 글자색 #000) → 셋 다 맞아 `color/text/inverse`. 연회색 #F3F3F3 바 위 검정 선 아이콘(기준 아이콘색 #7A7A7A, L 0.58) → 1이 아니라 inverse 아님 → `color/icon/strong`. 밝은 회색 카드 위 흰 글자(기준 #000) → 3이 아니라 `subtle`.
             - 판정 순서: default(기준색 자신) → inverse → brand(유채) → subtle · strong.
           - 같은 색이 어떤 자리에서는 inverse, 다른 자리에서는 아닐 수 있다(흰 글자: 어두운 버튼 위 → `inverse`, 밝은 카드 위 → `subtle`). 이름은 자리마다 정한다 — 밝기 함수의 입력은 (hex · 배경 종류 · 곳 수), 출력 키는 (hex, inverse 여부)이고 inverse 여부는 함수 안에서 정해진다. 기준색(default)은 지금처럼 쓰임 안 전체 곳 수(배경 종류와 무관하게 hex별 합)로 정한다.
           - 만들기도 같다 — 추출이 색 쓰임마다 배경 종류를 함께 모은다(`uses` 항목 `{ name, count, bg? }`, 같은 쓰임이라도 배경 종류가 다르면 따로 센다).
@@ -280,13 +280,13 @@
       - 용도(scope): spacing → GAP, radius → CORNER_RADIUS, stroke-width → STROKE_FLOAT, size → WIDTH_HEIGHT, opacity → OPACITY, `color/text` → TEXT_FILL, `color/background` → FRAME_FILL · SHAPE_FILL, `color/icon` → SHAPE_FILL · STROKE_COLOR, `color/border` → STROKE_COLOR, `color/shadow` → EFFECT_COLOR. 글자 묶음은 Global의 용도를 물려받는다(지금 동작 — `scopeForSemanticRole`이 모르는 이름). `scopeForSemanticRole`을 이 표로 넓힌다.
       - **플러그인 표시:** 만들기의 자동 역할과 연결이 만든 역할에 변수 플러그인 데이터 `dsl.autoRole = "1"`을 남긴다. 색 목록 표에서 사용자가 고른 역할 · 텍스트 스타일 등록 · 손으로 고친 매핑(`semMap`)은 남기지 않는다.
       - **칠하기 용도:** §2.11 "칠하기 용도는 레이어 종류를 따른다"(QA #4 불합격 1 — 이 작업과 한 PR, 부록 A.9)를 그대로 쓴다.
-    - **12.7 옛 이름.** 아래는 순서 3에서 쓰지 않는다(이름이 같은 손 변수도 옛 이름으로 친다). 지우지 않고, 이미 붙은 곳도 그대로 둔다(Semantic이므로 건너뜀).
+    - **12.7 옛 이름.** 아래는 순서 3에서 쓰지 않는다(이름이 같은 손 변수도 옛 이름으로 친다). 지우지 않고, 이미 붙은 곳도 그대로 둔다(이미 연결됨 — §0 "이미 붙은 연결").
       - 단계 이름(2026-11-06 넓힘 — 사다리 이전 상대 순위 `tshirtRoles`가 만든 이름도 오래된 파일에 남아 있다): 그룹 `spacing` · `radius` · `size` · `stroke-width` 아래 단계 `none · 3xs · 2xs · xs · sm · md · lg · xl · 2xl · 3xl · 4xl · full · thin · thick`, 그리고 그 뒤에 `-{숫자}`가 붙은 변형(`size/4xl-20` · `spacing/4xl-2`). 패턴: `^(spacing|radius|size|stroke-width)/(none|3xs|2xs|xs|sm|md|lg|xl|2xl|3xl|4xl|full|thin|thick)(-\d+)?$`. §0 "단계 이름 … 등"은 이 범위다.
       - 옛 색 역할 4개: `color/background/default` · `color/text/default` · `color/border/default` · `color/background/brand`. 단 이 이름은 새 규칙의 쓰임 이름과 같으므로 **순서 2에서는 쓴다**(같은 값일 때).
       - 거울: Global에 같은 이름이 있는 Semantic 변수(`bind.ts` `mirror`).
     - **12.8 이미 붙은 연결 — 바꾸지도 풀지도 않는다 (2026-11-06 사용자 결정 B).** 같은 날 정했던 "Global에서 바꾸기"(로컬 Global이 붙은 자리를 같은 값의 역할로 바꿈), "용도가 틀린 연결 바꾸기"(용도가 맞지 않는 Semantic · Component를 맞는 역할로 바꿈), "12.8a 크기 연결 풀기"(바꿀 수 없는 크기 자리의 Global 연결을 풂)를 모두 철회한다.
       - 왜: 플러그인은 그 연결을 누가 붙였는지 구별하지 못한다(Global에는 플러그인 표시가 없다). 사용자가 일부러 붙인 연결까지 되돌리게 된다. 플러그인이 앞으로 그런 연결을 만들지 않으면 충분하다.
-      - 찾기는 변수가 붙은 자리를 모두 "이미 연결됨"(지워진 변수면 "삭제된 변수에 연결됨")으로 센다 — §2.11 그대로. 바꾸기 후보 · 풀기 후보는 없다.
+      - 찾는 자리(§2.11 "찾는 범위") 중 변수가 붙은 곳은 "이미 연결됨"(지워진 변수면 "삭제된 변수에 연결됨")으로 센다 — §2.11 그대로. 찾지 않는 자리(아이콘 · 아바타가 아닌 레이어의 크기, 줄바꿈이 아닌 줄 사이 간격)는 붙어 있어도 세지 않고, 사이 간격 자동 · HUG/FILL · 자유 배치는 그 사유가 먼저다. 바꾸기 후보 · 풀기 후보는 없다.
       - 결과: 이미 Global이 붙은 레이어(옛 플러그인 결과 등)에는 Global이 남는다. 정리는 사용자가 피그마에서 한다. 플러그인 전용 컬렉션으로 사용자 변수와 나누는 일은 다음 PR에서 따로 명세한다.
     - **12.9 연결 메시지 · 되돌리기.**
       - 적용 모드 `bindSelection(apply=true)`(`code.ts` `APPLY`의 `preview: false` — UI는 쓰지 않음)도 같은 규칙이다: 찾기와 같은 후보를 만든 뒤 `bindSelectedItems`와 같은 함수로 새 역할을 만들고 붙인다. ⌘Z는 지금 `APPLY` 처리 + 아래 규칙.
@@ -1050,9 +1050,9 @@
 
 **새 역할 표시 (2026-11-06 결정, §2.12)**
 - 카드는 지금처럼 변수(역할)마다 하나다. 새로 만들 역할의 카드는 아직 변수가 없으므로 역할 이름으로 묶는다(같은 이름 · 같은 값이면 한 카드).
-- **새 역할 카드:** 변수 칩의 이름 앞에 작은 "새" 표시(`bind.newRole`, `--accent-subtle` 테두리 글자 11px). 칩 툴팁 "연결할 때 Semantic에 만들어요 · {Global 이름}을 가리켜요"(`bind.newRoleTip`).
-- **배지 줄:** (찾음 {n}) 뒤에 회색 글자 "새 역할 {k}"(`bind.roleNew`, 0이면 숨김). 툴팁 "새 역할은 연결할 때 Semantic에 만들어요"(`bind.roleSummaryTip`). 2026-11-06 결정 B로 "바꿈 {m}"(`bind.roleSwap`) · "풀기 {u}" 조각은 없앤다.
-- **연결 뒤 상태 줄:** 지금 문구 뒤에 " · 새 역할 {k}개"(`bind.doneNewRoles`)를 0이 아닐 때만 붙인다. " · 바꿈 {m}곳"(`bind.doneSwapped`)은 없앤다.
+- **새 역할 카드:** 변수 칩의 이름 앞에 작은 "새" 표시(`bind.newRole`, `--accent` 테두리 · `--accent-strong` 글자 10px). 칩 툴팁 "연결할 때 Semantic에 만들어요 · {Global 이름}을 가리켜요"(`bind.newRoleTip`).
+- **배지 줄:** (찾음 {n}) 뒤에 회색 글자 "새 역할 {k}"(`bind.roleNew`, 0이면 숨김). 툴팁 "새 역할은 연결할 때 Semantic에 만들어요"(`bind.roleSummaryTip`). 카드의 칩은 변수 칩(새 역할이면 "새" 표시)뿐이고, 자리 줄은 아이콘 · 레이어 이름 · 속성뿐이다(꼬리 없음). 없애는 표시 목록은 부록 A.10.
+- **연결 뒤 상태 줄:** 지금 문구 뒤에 " · 새 역할 {k}개"(`bind.doneNewRoles`)를 0이 아닐 때만 붙인다.
 - 스위치를 끈 카드의 새 역할은 만들지 않는다. "새 역할 k"는 켠 카드 수다. 끈 카드의 이름은 비워 두지 않는다(§2.12 12.5).
 
 **찾기 · 연결의 수 (2026-11-05 결정, QA #4 불합격 2 · 코드 대조 검토 1회차 뒤 고침)**
@@ -1564,10 +1564,12 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 2. 레이어 변경 자동 감지(`nodechange`) — 실제 플러그인에서 검증되면
 3. 다크 테마
 4. 변수의 설명 · 용도(scopes) 고치기, 라이브러리 변수를 별칭 대상으로 고르기, 색 고르개
+5. 플러그인 전용 컬렉션(2026-11-06 결정) — 새 변수는 플러그인 컬렉션에만 만들고, 사용자 변수는 고치지 않되 활용(같은 값 역할 붙이기 · 같은 값 Global 가리키기). #123 다음 PR에서 명세(ROADMAP)
 
 **하지 않음**
 - 텍스트 스타일 목록 보기·관리(피그마 오른쪽 패널)
 - 레이어 연결 일괄 교체
+- 이미 붙은 연결 바꾸기 · 풀기(2026-11-06 결정 B, §2.12 12.8)
 - 변수 삭제
 
 ## 12. 검증과 시뮬레이션 기록 (2026-11-03)
@@ -2090,7 +2092,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [x] 단위 테스트: 보는 순서 1 → 3 → 2 → 4 · 이름 순(같은 값의 디자이너 변수와 쓰임 이름 역할이 함께 있으면 디자이너 변수), 색 inverse 띠(검정 기준 + #6B7280 → subtle, #FFFFFF → inverse · 흰 기준 + #555 → strong, #111 → inverse), 디자이너 Semantic 우선 · 옛 이름 · 거울 제외, 이름 표 전부(여백 네 방향 · 모서리 · 방향별 선), 글자 그룹 아무 이름, 색 쓰임 · 밝기 · 아이콘 선, 번호(찾기 안 · 이미 있는 이름 · 덮어쓰지 않음), Global에서 바꾸기(다시 확인 · 글자 구간 · 건너뜀 먼저), 모든 모드 별칭, ⌘Z 한 번(전부 건너뛰어도), 만들기 쓰임 맵
 - [x] `verify-bind-flow`: 새 역할 카드 · 바꿈 표시 픽스처
 - [x] 기대값이 바뀌는 기존 테스트(의도대로 고친다): `test/figma.test.mjs` 811(Global이 붙은 칠하기 → 같은 값 Component로 바뀜) · 1452(옛 이름 `spacing/sm` 대신 쓰임 역할) · 1627(역할 없는 색이 Global 대신 새 쓰임 역할) · 4645(Global `stroke-width/1_5`가 붙은 선 → `fraction`) · Global에 붙는 것을 확인하는 적용 모드 테스트(729 · 1379 · 1412 · 1551 · 4120 등 — 새 쓰임 역할 + Global 별칭으로), `test/palette.test.mjs` 123(`color/icon` 용도), `test/pure.test.mjs` 1698 · 1725 · 1756(미리 채우기에서 고정 칸 · 색 4개 빠짐)
-- [x] ~~실기 확인~~ → **A.10 ① · ②로 대체**(아래 기대값은 12.8a 이전 것 — 크기 자리(59 · 60곳)는 12.8a로 풀린다 — 실기 파일은 Global이 그것뿐이라 연결 뒤 Global 0곳): 실기 파일 → [찾기] → 바꿈 최대 156곳(Global 215곳 − 아이콘 · 아바타가 아닌 크기 59곳; 그보다 적으면 차이는 소수 선 두께 · 사이 간격 자동 · 줄바꿈 아님 · 글자 일부 구간 · 아이콘의 HUG/자유 배치 크기 사유의 합) → 연결 뒤 Global이 붙은 자리는 그 59곳과 위 사유 자리뿐
+- [x] ~~실기 확인~~ → (결정 B로 철회 — 아래 기대값 무효, A.10 마지막 실기 확인 항목으로 대체) **A.10 ① · ②로 대체**(아래 기대값은 12.8a 이전 것 — 크기 자리(59 · 60곳)는 12.8a로 풀린다 — 실기 파일은 Global이 그것뿐이라 연결 뒤 Global 0곳): 실기 파일 → [찾기] → 바꿈 최대 156곳(Global 215곳 − 아이콘 · 아바타가 아닌 크기 59곳; 그보다 적으면 차이는 소수 선 두께 · 사이 간격 자동 · 줄바꿈 아님 · 글자 일부 구간 · 아이콘의 HUG/자유 배치 크기 사유의 합) → 연결 뒤 Global이 붙은 자리는 그 59곳과 위 사유 자리뿐
 - 구현 중 바꾼 것(명세 범위 안): 주인 판정의 구조 색인(`toStructNode`)은 `src/lib`로 옮기지 않고, `code.ts`가 `bindOwnerOf(roots)`(이름 정리 역할 → `highConfidenceComponentRole`, 색인은 처음 물을 때 선택 루트마다 한 번)를 만들어 연결(`bindSelection` 4번째 인자 `{ ownerOf }`)과 추출(`extractFromSelection` 2번째 인자)에 넘긴다 — `toStructNode`가 `code.ts` 안의 지문 도우미 여럿에 묶여 있어 옮기는 위험이 크다. 넘기지 않으면(테스트) 이름 정리 역할만 본다. 배지 줄 문구는 한 키(`bind.roleSummary`) 대신 두 조각 `bind.roleNew` "새 역할 {k}" · `bind.roleSwap` "바꿈 {m}"을 " · "로 잇는다(0인 쪽을 빼기 쉽게). 새 역할 후보의 `variableId`는 `new:{이름}`(카드 묶음 · 스위치 키), 칩 툴팁용으로 `BindCandidate.newRoleGlobalName`을 더 싣는다. 적용 모드는 찾기에서 본 레이어를 그대로 `bindSelectedItems`에 넘긴다(id로 다시 찾지 않음). 판정 함수 `isInsideIconFrame` · `iconOrAvatarKind`는 `extract.ts`, 역할 만들기는 연결 `createRole`(`bind.ts`) · 만들기 `createUsageRoles`(`variables.ts`), 순수 이름 규칙은 `src/lib/usageRoles.ts`.
 
 ## A.9 QA #4 불합격 1 — 칠하기 용도는 레이어 종류를 따른다 (2026-11-06)
@@ -2104,11 +2106,11 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [x] 단위 테스트: 흰 TEXT + 흰 FRAME, 변수 `color/background/default`(FRAME_FILL · SHAPE_FILL, Semantic) · `color/gray/0`(ALL_FILLS, Global) → TEXT는 `gray/0`, FRAME은 `background/default`. TEXT_FILL 전용 변수는 FRAME에 안 붙음. 연결 직전에 변수 용도가 TEXT_FILL 없이 바뀌면 `changed`
 - [x] 기대값이 바뀌는 기존 테스트(의도를 살려 고친다): `test/figma.test.mjs` 1452(한 FRAME으로 채움 → TEXT_FILL 전용 `text` 역할과 `itemSpacing` → `spacing/sm`을 함께 확인 — "FRAME(간격) 안에 TEXT 자식(채움)"으로 나눠, 채움 확인은 TEXT 자식에서, 간격 확인은 FRAME에서 한다. §2.12 때 A.8 목록대로 한 번 더 바뀐다) · 4072 부근 컬렉션 계층 지정(Primitives) 테스트(FRAME 채움 #aa0000 → `color/text/default` TEXT_FILL · `tier === 2` 기대 — 노드를 TEXT로 바꿔 계층 판정 확인을 지킨다)
 - [x] QA 회신 `docs/qa/2026-11-05-qa4-reply.md`(커밋 · 바뀐 동작 한 줄 · `npm test` 요약 · 미검증)
-- [ ] 실기 확인(사용자, 피그마): **연결 전 원본**(`163:1523`)의 복제본에서 변수 탭 전체 실행 → 레이어 › 연결 [찾기] → [연결]. 이미 연결된 결과 파일은 "이미 연결됨"으로 건너뛰어 아무것도 바뀌지 않는다(그 파일로 보려면 6개 글자의 칠하기 연결을 피그마에서 먼저 푼다). 기대: 흰 글자 6개(`Contact` · `Business Class` · `01` · `02` · `03` · `Subscribe Now`)가 Semantic `color/text/inverse`(TEXT_FILL, `color/gray/0` 별칭)에 붙음 — QA 문서의 "`color/gray/0`(Global)"은 §2.12 전 기대값이라 바뀐다. 글자가 아닌 칠하기(예: 검정 벡터 아이콘 채움)에 `color/text/default`가 붙던 곳도 용도에 맞는 쓰임 역할(`color/icon/...` 등)로 바뀐다 — "나머지 608건 변화 없음"이 아니라 이 수는 실기에서 센다. QA 회신의 "바뀐 동작"에도 이 줄을 넣는다
+- [ ] 실기 확인(사용자, 피그마): **연결 전 원본**(`163:1523`)의 복제본에서 변수 탭 전체 실행 → 레이어 › 연결 [찾기] → [연결]. 이미 연결된 결과 파일은 "이미 연결됨"으로 건너뛰어 아무것도 바뀌지 않는다(그 파일로 보려면 6개 글자의 칠하기 연결을 피그마에서 먼저 푼다). 기대: 흰 글자 6개(`Contact` · `Business Class` · `01` · `02` · `03` · `Subscribe Now`)가 Semantic `color/text/inverse`(TEXT_FILL, `color/gray/0` 별칭)에 붙음 — QA 문서의 "`color/gray/0`(Global)"은 §2.12 전 기대값이라 바뀐다. 새 복제본에서는 글자가 아닌 칠하기(예: 검정 벡터 아이콘 채움)도 처음부터 용도에 맞는 쓰임 역할(`color/icon/...` 등)에 붙는다(이미 붙은 결과 파일에서는 바뀌지 않음, 12.8). A.10 마지막 실기 확인과 한 번에 한다. QA 회신의 "바뀐 동작"에도 이 줄을 넣는다
 
 ## A.10 실기 뒤 고침 — inverse 합친 판정(기준 극단 · 반대 극단 · 배경 유채 또는 같은 쪽) · 옛 단계 이름 (크기 연결 풀기 · 용도가 틀린 연결 바꾸기는 철회) (2026-11-06)
 
-> 실기(`190:615`, #123 빌드)에서 검정 선 아이콘(채움 없는 그룹 안)이 `color/icon/inverse`가 돼 inverse 판정을 바꾼다. 경과: A(극단만, 회색 기준 아이콘에서 틀림 — 배경을 안 봄) → B(배경만, 주황 · 하늘색 버튼 위 흰 글자 · 연회색 바 위 검정 아이콘에서 틀림) → 합친 안. 또 Global 215 → 60곳(전부 아이콘 · 아바타가 아닌 크기), 흰 글자 6개가 여전히 `color/background/default`(이미 Semantic에 붙어 건너뜀). 사용자 결정 셋(§2.12 12.4 합친 판정 · 12.8 · 12.8a).
+> 실기(`190:615`, #123 빌드)에서 검정 선 아이콘(채움 없는 그룹 안)이 `color/icon/inverse`가 돼 inverse 판정을 바꾼다. 경과: A(극단만, 회색 기준 아이콘에서 틀림 — 배경을 안 봄) → B(배경만, 주황 · 하늘색 버튼 위 흰 글자 · 연회색 바 위 검정 아이콘에서 틀림) → 합친 안. 또 Global 215 → 60곳(전부 아이콘 · 아바타가 아닌 크기), 흰 글자 6개가 여전히 `color/background/default`(이미 Semantic에 붙어 건너뜀). 사용자 결정 셋(§2.12 12.4 합친 판정 · 12.8 · 12.8a) — 이 중 12.8 바꾸기 · 12.8a 풀기는 아래 결정 B로 철회.
 
 - [x] inverse 합친 판정(12.4): `backgroundOf(node)`(조상 첫 보이는 채움 — 불투명 SOLID만, 그 밖 · 없음은 모름, `extract.ts`에 두고 bind와 같이 씀) · 색 자리마다 **배경 종류**(`chroma` · `dark` · `light` · 없음)를 싣는다(판정 결과가 아님 — 기준색은 나중에 정해짐) → 밝기 함수 입력 (hex · 배경 종류 · 곳 수), 조건 3은 함수 안에서 기준색을 정한 뒤 판단, **출력 키 = (hex, inverse 여부)**(`bind.resolveSlots` · `createUsageRoles` 둘 다), 대상 쓰임 text · icon · border. 추출: `uses` 항목 `{ name, count, bg?: 'chroma' | 'dark' | 'light' }`(`DraftToken.uses` 타입 · `extract.add`의 쓰임 비교를 (name, bg 종류)로). 단위 테스트: 검정 기준 + 짙은 파랑 · 주황 · 하늘색 버튼 위 흰 글자 → inverse, 회색 기준(#7A7A7A) + 연회색 바 안 채움 없는 그룹의 검정 아이콘 → strong, 밝은 회색 카드 위 흰 글자 → subtle, 이미지 배경 위 흰 글자 → inverse 아님, 같은 흰색이 버튼 위 · 카드 위 함께 → `color/text/inverse`와 `color/text/subtle` 두 역할(같은 Global 별칭), 파일에 이미 있는 `color/text/default`(#000)가 기준색일 때 목록 최다색이 흰색이어도 그 기준(#000)으로 판정 — `dark` · `chroma` 배경 위 흰 글자 → inverse, `light` 배경 위 → subtle
 - [x] `bind.ts` 찾기: 용도가 틀린 Semantic · Component 연결을 바꾸기 후보로(붙어 있던 변수 제외, 별칭 대상 Global 따라가기), 아이콘 · 아바타가 아닌 레이어의 Global 크기를 풀기 후보로(`unbind:{id}`)
@@ -2123,8 +2125,8 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - 구현 중 바꾼 것(명세 범위 안): 밝기 함수(`colorRoleBases(색 목록, default hex, 쓰임)`)의 결과 찾기 키는 `colorSlotKey(hex, 배경 종류)`다 — 같은 (hex, 배경 종류)는 늘 같은 inverse 여부라 (hex, inverse 여부)와 같은 이름이 나오고, 부르는 쪽이 판정을 다시 하지 않아도 된다(배경을 모르면 키는 hex만). 쓰임 인자로 text · icon · border에만 inverse를 준다. 풀기 다시 확인은 본문 12.8a대로 같은 Global만 본다(레이어 판정은 다시 보지 않음 — 위 체크 항목의 "여전히 아이콘 · 아바타 아님"보다 본문이 우선). 바꾸기 대상 판정은 `swapSourceId`(Global, 또는 값을 읽을 수 있고 용도가 그 자리에 맞지 않는 Semantic · Component), 크기 풀기는 Global만. 별칭 대상은 찾기 색인을 만들 때 변수마다 `aliasGlobalId`로 구해 둔다. 푼 자리는 `bindSelectedItems`의 `onUnbound` 훅으로 알려 `code.ts`가 ⌘Z 묶음을 닫는다. 아이콘 · 아바타의 HUG · 자유 배치 · 소수 크기 축에 붙은 Global도 풀기다(FIXED 축은 지금처럼 바꾸기).
 > **2026-11-06 사용자 결정 B(구현 뒤):** 위 항목 중 "크기 연결 풀기"와 "용도가 틀린 연결 바꾸기", 그리고 A.8의 "Global에서 바꾸기"를 철회한다(§0 "이미 붙은 연결", §2.12 12.8). 남기는 것: inverse 합친 판정 · 옛 단계 이름 넓히기 · 새 역할 자동 생성.
 
-- [ ] 걷어내기 — `bind.ts`: 바꾸기 대상 판정(`swapSourceId` · `nodeFieldGlobal` · `colorGlobal` · `textFieldGlobal`), `Slot.fromId`, `globalFor`의 바꾸기 갈래, `aliasGlobalOf` · `VarEntry.aliasGlobalId`, 크기 풀기(`pushUnbind` · `bindFrame`의 `unbindGlobal`), `bindSelectedItems`의 `unbind` · `fromVariableId` 다시 확인 · `swapped` · `unbound` · `onUnbound`. 변수가 붙은 자리는 모두 §2.11대로 "이미 연결됨"(선 두께는 소수 판정보다 먼저)
-- [ ] 걷어내기 — 메시지: `BindCandidate.fromVariableId` · `fromVariableName` · `unbind`, `APPLY_SELECTED` items `fromVariableId` · `unbind`, `APPLY_RESULT` `swapped` · `unbound`, `BindResult.swapped` · `unbound`. `code.ts` 처리(⌘Z 조건은 `bound || newRoles`로)
-- [ ] 걷어내기 — UI: 풀기 칩 · 자리 줄 "…에서" 꼬리 · 배지 "바꿈" · "풀기" 조각 · 연결 뒤 " · 바꿈" · " · 크기 연결 풀기" 꼬리, `bindGroups`의 `from` · `swaps` · `unbind`. i18n 지움: `bind.fromGlobal` · `bind.roleSwap` · `bind.doneSwapped` · `bind.unbind` · `bind.unbindTip` · `bind.roleUnbind` · `bind.doneUnbound`. `bind.roleSummaryTip` → "새 역할은 연결할 때 Semantic에 만들어요"
-- [ ] 테스트: 바꾸기 · 풀기 테스트를 "Global · 용도 틀린 Semantic이 붙은 자리는 이미 연결됨(바꾸지 않음)" · "카드 크기에 붙은 Global도 그대로(후보 없음 · 건너뜀으로도 안 셈 — 아이콘 · 아바타가 아니므로)"로 바꾼다. verify-bind-flow 16 · 17에서 바꿈 · 풀기 표시를 걷는다
+- [ ] 걷어내기 — `bind.ts`: 바꾸기 대상 판정(`swapSourceId` · `nodeFieldGlobal` · `colorGlobal` · `textFieldGlobal`), `Slot.fromId`, `globalFor`의 바꾸기 갈래, `aliasGlobalOf` · `VarEntry.aliasGlobalId`, 크기 풀기(`pushUnbind` · `bindFrame`의 `unbindGlobal`), `bindSelectedItems`의 `unbind` · `fromVariableId` 다시 확인 · `swapped` · `unbound` · `onUnbound`. 함께: 다시 확인 도우미 `singleAliasId` · `boundFieldId` · `boundColorId` · `boundTextId`, `VarIndexAll.globalIds`, `changedPaints`의 `swaps`, 적용 모드 `bindSelection`의 items `fromVariableId` · `unbind`와 `res.swapped` · `res.unbound`, `resolveSlots`의 `fromId` → `already-bound` 갈래와 원래 변수 이름을 싣는 반복. `bindFrame` 자유 배치는 언제나 `size-free-layout`, HUG/FILL은 언제나 `hug-fill`. 관련 주석(`bind.ts` 소수 선 두께 · 바꾸기 주석). 남긴다: `isAlias` · `isLiveAlias` · `numAllowed` · `globalFor`의 Global 고르기(순서 4) · `isSizeTarget` · `backgroundOf` · `bg` · `colorSlotKey` · `OLD_LADDER` · `createRole` · `newRole` · `newRoleGlobalName` 찾는 자리 중 변수가 붙은 곳은 §2.11대로 "이미 연결됨"(선 두께는 소수 판정보다 먼저, 찾지 않는 자리는 세지 않음 · 사이 간격 자동 · HUG/FILL · 자유 배치는 그 사유가 먼저 — 12.8)
+- [ ] 걷어내기 — 메시지: `BindCandidate.fromVariableId` · `fromVariableName` · `unbind`, `APPLY_SELECTED` items `fromVariableId` · `unbind`, `APPLY_RESULT` `swapped` · `unbound`, `BindResult.swapped` · `unbound`. `code.ts` 처리(⌘Z 조건은 `bound || newRoles`로, `finally`의 `unbound` 지역 변수 · `onUnbound`도 걷음). `messages.ts` 주석
+- [ ] 걷어내기 — UI: 풀기 칩 · 자리 줄 "…에서" 꼬리 · 배지 "바꿈" · "풀기" 조각 · 연결 뒤 " · 바꿈" · " · 크기 연결 풀기" 꼬리, `bindGroups`의 `GroupCand.fromVariableName` · `unbind`, `PlaceLine.from`, `VarGroup.swaps` · `unbind`. `ui.html` CSS `.bv-chip.bv-unb` · `.bv-unb-label` · `.bv-from`. `i18n.ts` 구역 주석. i18n 지움: `bind.fromGlobal` · `bind.roleSwap` · `bind.doneSwapped` · `bind.unbind` · `bind.unbindTip` · `bind.roleUnbind` · `bind.doneUnbound`. `bind.roleSummaryTip` → "새 역할은 연결할 때 Semantic에 만들어요"
+- [ ] 테스트: 바꾸기 · 풀기 테스트를 "Global · 용도 틀린 Semantic이 붙은 자리는 이미 연결됨(바꾸지 않음)" · "카드 크기에 붙은 Global도 그대로(후보 없음 · 건너뜀으로도 안 셈 — 아이콘 · 아바타가 아니므로)"로 바꾼다. verify-bind-flow 16 · 17에서 바꿈 · 풀기 표시를 걷는다. 고칠 테스트: `test/figma.test.mjs` "Global이 붙은 칠하기는 같은 값의 Component로 바뀐다" · "Global 1.5는 소수 선 두께" · "Global에서 바꾸기 …" · "용도가 틀린 연결 바꾸기 …" · "크기 연결 풀기 …"(셋) → 이미 연결됨 / 후보 없음으로, 바꾸기를 말하는 주석. `test/pure.test.mjs` "groupByVariable — 크기 연결 풀기 카드"는 지운다
 - [ ] 실기 확인(사용자, 피그마) 연결 전 원본 `163:1523`의 새 복제본 → 변수 탭 전체 실행 → 레이어 › 연결 [찾기] → [연결]. 기대: 흰 글자 6개 `color/text/inverse`, 아이콘 색 이름에 inverse 없음(`color/icon/strong` · `subtle`), 카드 · 화면 크기 연결 없음. 결과 파일 `190:615`에서는 [찾기]가 이미 붙은 곳을 모두 "이미 연결됨"으로 세고 아무것도 바꾸지 않는다
