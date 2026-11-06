@@ -1141,17 +1141,18 @@
     return Array.isArray(fills) && fills.some((p) => p.type === "IMAGE" && p.visible !== false);
   }
   var ICON_VECTOR_TYPES = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
-  function iconVectorCount(children) {
+  function iconVectorCount(children, visible = true) {
     let vectors = 0;
     for (const c of children) {
       if (hasImageFill(c)) return -1;
+      const shown = visible && c.visible !== false;
       if (ICON_VECTOR_TYPES.has(c.type)) {
-        vectors++;
+        if (shown) vectors++;
         continue;
       }
       if (c.type === "ELLIPSE" || c.type === "RECTANGLE") continue;
       if (c.type === "GROUP" || c.type === "FRAME" || c.type === "INSTANCE") {
-        const n = iconVectorCount("children" in c ? c.children : []);
+        const n = iconVectorCount("children" in c ? c.children : [], shown);
         if (n < 0) return -1;
         vectors += n;
         continue;
@@ -1160,13 +1161,16 @@
     }
     return vectors;
   }
-  function isIconOrAvatar(node) {
+  function isSmallSquare(node) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return false;
     const w = round(node.width);
-    const h = round(node.height);
-    if (!(w > 0) || w !== h || w > 64) return false;
-    const children = "children" in node ? node.children : [];
-    if (!hasImageFill(node) && iconVectorCount(children) > 0) return true;
+    return w > 0 && w === round(node.height) && w <= 64;
+  }
+  function isIconSelf(node) {
+    return !hasImageFill(node) && iconVectorCount("children" in node ? node.children : []) > 0;
+  }
+  function isAvatarSelf(node) {
+    const w = round(node.width);
     const r = node.cornerRadius;
     let radii = [];
     if (r === figma.mixed) {
@@ -1175,22 +1179,32 @@
         radii.push(typeof cv === "number" ? cv : 0);
       }
     } else if (typeof r === "number") radii = [r];
-    const allRound = radii.length > 0 && radii.every((cv) => round(cv) >= w / 2);
-    if (allRound) {
+    if (radii.length > 0 && radii.every((cv) => round(cv) >= w / 2)) {
       const imageWithin = (n, depth) => {
         if (hasImageFill(n)) return true;
         if (depth >= 2 || !("children" in n)) return false;
-        return n.children.some((c) => imageWithin(c, depth + 1));
+        return n.children.some((c) => c.visible !== false && imageWithin(c, depth + 1));
       };
       if (imageWithin(node, 0)) return true;
     }
+    const children = "children" in node ? node.children : [];
     return children.some(
       (c) => c.visible !== false && c.type === "ELLIPSE" && hasImageFill(c) && Math.abs(c.width - node.width) <= 0.5 && Math.abs(c.height - node.height) <= 0.5
     );
   }
+  function hasIconAncestor(node) {
+    for (let p = node.parent; p && p.type !== "PAGE" && p.type !== "DOCUMENT"; p = p.parent) {
+      if (isSmallSquare(p) && isIconSelf(p)) return true;
+    }
+    return false;
+  }
+  function isIconOrAvatar(node) {
+    if (!isSmallSquare(node)) return false;
+    if (!isIconSelf(node) && !isAvatarSelf(node)) return false;
+    return !hasIconAncestor(node);
+  }
   function collectSize(acc, node) {
     if (!isIconOrAvatar(node)) return;
-    if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
     const parent = node.parent;
     const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
     const inAutoLayout = !absolute && (node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE");

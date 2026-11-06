@@ -317,7 +317,7 @@ test('extractFromSelection — 자유 배치(오토레이아웃 밖) 프레임�
     layoutMode: 'HORIZONTAL',
     layoutSizingHorizontal: 'HUG',
     layoutSizingVertical: 'HUG',
-    width: 48,
+    width: 60, // 정사각형이 아니라 아이콘 틀이 아님(가장 바깥 틀 규칙에 걸리지 않게)
     height: 48,
     itemSpacing: 0,
     paddingLeft: 0,
@@ -4812,4 +4812,122 @@ test('bindSelectedItems — 찾은 뒤 아이콘 · 아바타가 아니게 된 �
   assert.deepEqual(r.reasons, { changed: 2 });
   assert.equal(broken._bound, undefined);
   assert.equal(keep._bound.width, s24.id);
+});
+
+/* ---- 크기 대상: 가장 바깥 틀만 · 보이는 벡터 · 아바타 ① 보이는 이미지 (코드 리뷰 2026-11-06, §2.11) ---- */
+function linkParents(n) {
+  for (const c of n.children ?? []) {
+    c.parent = n;
+    linkParents(c);
+  }
+  return n;
+}
+
+test('isIconOrAvatar — 가장 바깥 틀만: 아이콘 안쪽 틀은 대상이 아니다(GROUP 조상은 건너뜀 · 아바타 조상은 제외 안 함)', () => {
+  installFigma();
+  // 24 › 20 틀 › 벡터
+  const inner = sizedFrame('inner20', 20, 20, { children: [vec('iv')] });
+  const outer = linkParents(sizedFrame('outer24', 24, 24, { children: [inner] }));
+  assert.equal(isIconOrAvatar(outer), true);
+  assert.equal(isIconOrAvatar(inner), false);
+  // 24 › 20 › 16 세 겹 — 가운데가 바깥 규칙으로 빠져도 16은 여전히 대상 아님
+  const deep16 = sizedFrame('deep16', 16, 16, { children: [vec('d16')] });
+  const mid20 = sizedFrame('mid20', 20, 20, { children: [deep16] });
+  linkParents(sizedFrame('top24', 24, 24, { children: [mid20] }));
+  assert.equal(isIconOrAvatar(mid20), false);
+  assert.equal(isIconOrAvatar(deep16), false);
+  // 24 › GROUP › 16 틀 › 벡터 — 바깥 24가 아이콘이라 16은 아님
+  const g16 = sizedFrame('g16', 16, 16, { children: [vec('g16v')] });
+  linkParents(sizedFrame('gOuter', 24, 24, { children: [{ type: 'GROUP', id: 'grp', width: 20, height: 18, children: [g16] }] }));
+  assert.equal(isIconOrAvatar(g16), false);
+  // 24 GROUP › 20 틀 › 벡터 — GROUP은 조상 아이콘으로 치지 않는다
+  const inGroup = sizedFrame('inGroup20', 20, 20, { children: [vec('ig')] });
+  linkParents({ type: 'GROUP', id: 'g24', width: 24, height: 24, children: [inGroup] });
+  assert.equal(isIconOrAvatar(inGroup), true);
+  // 48 아이콘 버튼(배경 사각형 + 24 아이콘) — 바깥 48만
+  const btnIcon = sizedFrame('btnIcon', 24, 24, { children: [vec('bi')] });
+  const btn = linkParents(sizedFrame('btn48', 48, 48, { children: [{ type: 'RECTANGLE', id: 'bg', fills: [] }, btnIcon] }));
+  assert.equal(isIconOrAvatar(btn), true);
+  assert.equal(isIconOrAvatar(btnIcon), false);
+  // 아바타 안 16 상태 아이콘 — 아바타 조상은 이 규칙에 들지 않음
+  const badge = sizedFrame('badge16', 16, 16, { children: [vec('bv')] });
+  const av = linkParents(sizedFrame('av48', 48, 48, { cornerRadius: 24, fills: [IMG], children: [badge] }));
+  assert.equal(isIconOrAvatar(av), true);
+  assert.equal(isIconOrAvatar(badge), true);
+  // 조상은 페이지 바로 아래에서 멈춘다
+  const top = sizedFrame('onPage', 24, 24, { children: [vec('op')] });
+  top.parent = { type: 'PAGE', id: 'page', width: 24, height: 24, children: [top] };
+  assert.equal(isIconOrAvatar(top), true);
+});
+
+test('isIconOrAvatar — 벡터 수는 보이는 것만, 숨긴 TEXT · 이미지는 계속 탈락', () => {
+  installFigma();
+  assert.equal(isIconOrAvatar(sizedFrame('hidVec', 40, 40, { children: [{ ...vec('hv'), visible: false }] })), false);
+  // 숨긴 GROUP 아래 벡터도 세지 않는다
+  assert.equal(
+    isIconOrAvatar(sizedFrame('hidGrp', 24, 24, { children: [{ type: 'GROUP', id: 'hg', visible: false, children: [vec('hgv')] }] })),
+    false,
+  );
+  // 보이는 벡터가 하나라도 있으면 아이콘
+  assert.equal(isIconOrAvatar(sizedFrame('mixVec', 24, 24, { children: [vec('mv'), { ...vec('mh'), visible: false }] })), true);
+  // 숨긴 TEXT · 숨긴 사진은 여전히 탈락
+  assert.equal(isIconOrAvatar(sizedFrame('hidTxt', 24, 24, { children: [vec('ht'), { type: 'TEXT', id: 'tt', fills: [], visible: false }] })), false);
+  assert.equal(
+    isIconOrAvatar(sizedFrame('hidImg', 24, 24, { children: [vec('hi'), { type: 'RECTANGLE', id: 'ri', fills: [IMG], visible: false }] })),
+    false,
+  );
+  // 루트 자신이 숨었어도 판정은 아래 레이어로(숨김의 기준점)
+  assert.equal(isIconOrAvatar(sizedFrame('hidRoot', 24, 24, { visible: false, children: [vec('hr')] })), true);
+});
+
+test('isIconOrAvatar — 아바타 ①은 루트 채움 또는 보이는 레이어의 이미지만', () => {
+  installFigma();
+  const round48 = (extra) => sizedFrame('r48', 48, 48, { cornerRadius: 24, ...extra });
+  assert.equal(isIconOrAvatar(round48({ children: [{ type: 'RECTANGLE', id: 'p', fills: [IMG], visible: false }] })), false);
+  assert.equal(
+    isIconOrAvatar(round48({ children: [{ type: 'FRAME', id: 'w', fills: [], visible: false, children: [{ type: 'RECTANGLE', id: 'p2', fills: [IMG] }] }] })),
+    false,
+  );
+  assert.equal(isIconOrAvatar(round48({ children: [{ type: 'RECTANGLE', id: 'p3', fills: [IMG] }] })), true);
+  assert.equal(isIconOrAvatar(round48({ fills: [IMG], visible: false })), true); // 루트 채움은 숨김과 무관
+});
+
+test('extract · bind — 24 › 20 틀에서 크기는 바깥 24만(안쪽은 토큰 · 후보 · 크기 사유 없음), 안쪽만 골라도 없음', async () => {
+  const figma = installFigma();
+  const inner = sizedFrame('inner20', 20, 20, { children: [vec('iv')] });
+  const outer = sizedFrame('outer24', 24, 24, { layoutMode: 'VERTICAL', itemSpacing: 0, paddingLeft: 2, paddingRight: 2, paddingTop: 2, paddingBottom: 2, children: [inner] });
+  const root = linkParents({
+    type: 'FRAME', id: 'root', name: 'root', fills: [], layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
+    itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+    children: [outer], setBoundVariable() {},
+  });
+  const sizes = (sel) => extractFromSelection(sel).tokens.filter((t) => t.category === 'size').map((t) => t.name).sort();
+  assert.deepEqual(sizes([root]), ['size/24']);
+  assert.deepEqual(sizes([inner]), []);
+
+  await createTokens([20, 24].map((v) => ({ name: `size/${v}`, category: 'size', sources: ['size'], value: v })), 16);
+  const dry = await bindSelection([root], false);
+  const sizeIds = dry.candidates.filter((c) => c.field === 'width' || c.field === 'height').map((c) => c.nodeId);
+  assert.deepEqual([...new Set(sizeIds)], ['outer24']);
+  assert.ok(!dry.skips.some((s) => s.nodeId === 'inner20' && ['hug-fill', 'size-free-layout', 'size-fraction'].includes(s.reason)));
+  const dryInner = await bindSelection([inner], false);
+  assert.ok(!dryInner.candidates.some((c) => c.field === 'width' || c.field === 'height'));
+  void figma;
+});
+
+test('bindSelectedItems — 찾은 뒤 아이콘 틀로 감싸진 아이콘의 크기는 "그 사이 바뀜"', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/24', category: 'size', sources: ['size'], value: 24 }], 16);
+  const s24 = findVar(figma, 'Global', 'size/24');
+  const { ok } = sizeFixtures();
+  const icon = ok.icon;
+  icon.boundVariables = {};
+  registerNodes(figma, [icon]);
+  // 찾은 뒤 28 아이콘 틀로 감쌌다
+  const wrap = sizedFrame('wrap28', 28, 28, { children: [icon] });
+  icon.parent = wrap;
+  const r = await bindSelectedItems([{ nodeId: 'icon', field: 'width', variableId: s24.id }]);
+  assert.equal(r.bound, 0);
+  assert.deepEqual(r.reasons, { changed: 1 });
 });
