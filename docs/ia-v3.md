@@ -2068,30 +2068,31 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 ## A.8 Semantic 역할 자동 생성 (2026-11-06, 실기 결과 뒤 사용자 결정)
 
-- [ ] 쓰임 이름(순수 새 모듈 `src/lib/usageRoles.ts`): 12.3 이름 표 · 12.4 `colorRoleNames` · 12.5 번호 고르기
-- [ ] 주인 판정: `dsRole`(역할 어휘, 구조 폴백 제외) → `highConfidenceComponentRole`(구조 색인 — `toStructNode`를 `code.ts`에서 `src/lib`로 옮김) → 없음. `extract.ts` `iconOrAvatarKind` 내보내기
-- [ ] `bind.ts` 변수 인덱스: Global은 붙일 후보에서 빼고 별칭 대상 색인(값 · 용도 → 이름 순 Global)으로. 보는 순서 1 → 3 → 2 → 4(글자 1 → 2 → 4, 12.2), 이름 순, 옛 이름(12.7), 플러그인 표시 읽기
-- [ ] 찾기 결과: `BindCandidate.fromVariableId` · `newRole{name, globalId, scopes}`, 한 번의 찾기 안 색 밝기 · 번호 확정(12.4 · 12.5) — `shared/messages.ts`
-- [ ] Global에서 바꾸기(12.8): 다른 건너뜀 먼저, 글자는 전 구간 한 Global일 때만, 별칭 대상은 붙어 있던 Global
-- [ ] `bindSelectedItems`: items의 `fromVariableId`(같은 Global id인지 다시 확인) · `newRole`(첫 자리가 통과한 뒤 만들기 · 재사용 · 그 사이 다른 값이면 다음 번호), 모든 모드 별칭, 플러그인 표시, 역할을 만들었으면 `commitUndo`(`code.ts` `APPLY_SELECTED`)
-- [ ] 역할 용도 표 — `scopeForSemanticRole` 넓히기
-- [ ] 만들기(12.10): `DraftToken.uses` 모으기(추출) · 격자 정리에서 합치기/버리기 · 적용 때 쓰임 역할(번호 규칙, 덮어쓰기 없음) · 색 표 선택 우선 · 글자 역할 그대로 · 팔레트 경로 그대로
-- [ ] UI(§4.6 · §4.5): 새 역할 "새" 표시 · 툴팁, 자리 줄 "· {Global}에서", 배지 줄 "새 역할 k · 바꿈 m"(켠 카드 기준), 연결 뒤 상태 줄 꼬리, 만들기 결과 · 미리보기 꼬리 `create.sumRoles` " · 역할 {n}개", 기존 색 추천 경로 걷기(12.10), 마법사 역할 매핑 단계 `wizard.rolesFromTokens` · 범례. i18n `create.sumRoles` · `wizard.rolesFromTokens` · `wizard.rolesFromTokensTail` · `bind.newRole` · `bind.newRoleTip` · `bind.fromGlobal` · `bind.roleSummary` · `bind.roleSummaryTip` · `bind.doneNewRoles` · `bind.doneSwapped`
-- [ ] 주석 갱신: `bind.ts` · `variables.ts` · `roles.ts` 머리의 "역할 없는 값은 Global에 붙는다"
-- [ ] 단위 테스트: 보는 순서 1 → 3 → 2 → 4 · 이름 순(같은 값의 디자이너 변수와 쓰임 이름 역할이 함께 있으면 디자이너 변수), 색 inverse 띠(검정 기준 + #6B7280 → subtle, #FFFFFF → inverse · 흰 기준 + #555 → strong, #111 → inverse), 디자이너 Semantic 우선 · 옛 이름 · 거울 제외, 이름 표 전부(여백 네 방향 · 모서리 · 방향별 선), 글자 그룹 아무 이름, 색 쓰임 · 밝기 · 아이콘 선, 번호(찾기 안 · 이미 있는 이름 · 덮어쓰지 않음), Global에서 바꾸기(다시 확인 · 글자 구간 · 건너뜀 먼저), 모든 모드 별칭, ⌘Z 한 번(전부 건너뛰어도), 만들기 쓰임 맵
-- [ ] `verify-bind-flow`: 새 역할 카드 · 바꿈 표시 픽스처
-- [ ] 기대값이 바뀌는 기존 테스트(의도대로 고친다): `test/figma.test.mjs` 811(Global이 붙은 칠하기 → 같은 값 Component로 바뀜) · 1452(옛 이름 `spacing/sm` 대신 쓰임 역할) · 1627(역할 없는 색이 Global 대신 새 쓰임 역할) · 4645(Global `stroke-width/1_5`가 붙은 선 → `fraction`) · Global에 붙는 것을 확인하는 적용 모드 테스트(729 · 1379 · 1412 · 1551 · 4120 등 — 새 쓰임 역할 + Global 별칭으로), `test/palette.test.mjs` 123(`color/icon` 용도), `test/pure.test.mjs` 1698 · 1725 · 1756(미리 채우기에서 고정 칸 · 색 4개 빠짐)
+- [x] 쓰임 이름(순수 새 모듈 `src/lib/usageRoles.ts`): 12.3 이름 표 · 12.4 `colorRoleNames` · 12.5 번호 고르기
+- [x] 주인 판정: `dsRole`(역할 어휘, 구조 폴백 제외) → `highConfidenceComponentRole`(구조 색인 — `toStructNode`를 `code.ts`에서 `src/lib`로 옮김) → 없음. `extract.ts` `iconOrAvatarKind` 내보내기
+- [x] `bind.ts` 변수 인덱스: Global은 붙일 후보에서 빼고 별칭 대상 색인(값 · 용도 → 이름 순 Global)으로. 보는 순서 1 → 3 → 2 → 4(글자 1 → 2 → 4, 12.2), 이름 순, 옛 이름(12.7), 플러그인 표시 읽기
+- [x] 찾기 결과: `BindCandidate.fromVariableId` · `newRole{name, globalId, scopes}`, 한 번의 찾기 안 색 밝기 · 번호 확정(12.4 · 12.5) — `shared/messages.ts`
+- [x] Global에서 바꾸기(12.8): 다른 건너뜀 먼저, 글자는 전 구간 한 Global일 때만, 별칭 대상은 붙어 있던 Global
+- [x] `bindSelectedItems`: items의 `fromVariableId`(같은 Global id인지 다시 확인) · `newRole`(첫 자리가 통과한 뒤 만들기 · 재사용 · 그 사이 다른 값이면 다음 번호), 모든 모드 별칭, 플러그인 표시, 역할을 만들었으면 `commitUndo`(`code.ts` `APPLY_SELECTED`)
+- [x] 역할 용도 표 — `scopeForSemanticRole` 넓히기
+- [x] 만들기(12.10): `DraftToken.uses` 모으기(추출) · 격자 정리에서 합치기/버리기 · 적용 때 쓰임 역할(번호 규칙, 덮어쓰기 없음) · 색 표 선택 우선 · 글자 역할 그대로 · 팔레트 경로 그대로
+- [x] UI(§4.6 · §4.5): 새 역할 "새" 표시 · 툴팁, 자리 줄 "· {Global}에서", 배지 줄 "새 역할 k · 바꿈 m"(켠 카드 기준), 연결 뒤 상태 줄 꼬리, 만들기 결과 · 미리보기 꼬리 `create.sumRoles` " · 역할 {n}개", 기존 색 추천 경로 걷기(12.10), 마법사 역할 매핑 단계 `wizard.rolesFromTokens` · 범례. i18n `create.sumRoles` · `wizard.rolesFromTokens` · `wizard.rolesFromTokensTail` · `bind.newRole` · `bind.newRoleTip` · `bind.fromGlobal` · `bind.roleSummary` · `bind.roleSummaryTip` · `bind.doneNewRoles` · `bind.doneSwapped`
+- [x] 주석 갱신: `bind.ts` · `variables.ts` · `roles.ts` 머리의 "역할 없는 값은 Global에 붙는다"
+- [x] 단위 테스트: 보는 순서 1 → 3 → 2 → 4 · 이름 순(같은 값의 디자이너 변수와 쓰임 이름 역할이 함께 있으면 디자이너 변수), 색 inverse 띠(검정 기준 + #6B7280 → subtle, #FFFFFF → inverse · 흰 기준 + #555 → strong, #111 → inverse), 디자이너 Semantic 우선 · 옛 이름 · 거울 제외, 이름 표 전부(여백 네 방향 · 모서리 · 방향별 선), 글자 그룹 아무 이름, 색 쓰임 · 밝기 · 아이콘 선, 번호(찾기 안 · 이미 있는 이름 · 덮어쓰지 않음), Global에서 바꾸기(다시 확인 · 글자 구간 · 건너뜀 먼저), 모든 모드 별칭, ⌘Z 한 번(전부 건너뛰어도), 만들기 쓰임 맵
+- [x] `verify-bind-flow`: 새 역할 카드 · 바꿈 표시 픽스처
+- [x] 기대값이 바뀌는 기존 테스트(의도대로 고친다): `test/figma.test.mjs` 811(Global이 붙은 칠하기 → 같은 값 Component로 바뀜) · 1452(옛 이름 `spacing/sm` 대신 쓰임 역할) · 1627(역할 없는 색이 Global 대신 새 쓰임 역할) · 4645(Global `stroke-width/1_5`가 붙은 선 → `fraction`) · Global에 붙는 것을 확인하는 적용 모드 테스트(729 · 1379 · 1412 · 1551 · 4120 등 — 새 쓰임 역할 + Global 별칭으로), `test/palette.test.mjs` 123(`color/icon` 용도), `test/pure.test.mjs` 1698 · 1725 · 1756(미리 채우기에서 고정 칸 · 색 4개 빠짐)
 - [ ] 실기 확인(사용자, 피그마): 실기 파일 → [찾기] → 바꿈 최대 156곳(Global 215곳 − 아이콘 · 아바타가 아닌 크기 59곳; 그보다 적으면 차이는 소수 선 두께 · 사이 간격 자동 · 줄바꿈 아님 · 글자 일부 구간 · 아이콘의 HUG/자유 배치 크기 사유의 합) → 연결 뒤 Global이 붙은 자리는 그 59곳과 위 사유 자리뿐
+- 구현 중 바꾼 것(명세 범위 안): 주인 판정의 구조 색인(`toStructNode`)은 `src/lib`로 옮기지 않고, `code.ts`가 `bindOwnerOf(roots)`(이름 정리 역할 → `highConfidenceComponentRole`, 색인은 처음 물을 때 선택 루트마다 한 번)를 만들어 연결(`bindSelection` 4번째 인자 `{ ownerOf }`)과 추출(`extractFromSelection` 2번째 인자)에 넘긴다 — `toStructNode`가 `code.ts` 안의 지문 도우미 여럿에 묶여 있어 옮기는 위험이 크다. 넘기지 않으면(테스트) 이름 정리 역할만 본다. 배지 줄 문구는 한 키(`bind.roleSummary`) 대신 두 조각 `bind.roleNew` "새 역할 {k}" · `bind.roleSwap` "바꿈 {m}"을 " · "로 잇는다(0인 쪽을 빼기 쉽게). 새 역할 후보의 `variableId`는 `new:{이름}`(카드 묶음 · 스위치 키), 칩 툴팁용으로 `BindCandidate.newRoleGlobalName`을 더 싣는다. 적용 모드는 찾기에서 본 레이어를 그대로 `bindSelectedItems`에 넘긴다(id로 다시 찾지 않음). 판정 함수 `isInsideIconFrame` · `iconOrAvatarKind`는 `extract.ts`, 역할 만들기는 연결 `createRole`(`bind.ts`) · 만들기 `createUsageRoles`(`variables.ts`), 순수 이름 규칙은 `src/lib/usageRoles.ts`.
 
 ## A.9 QA #4 불합격 1 — 칠하기 용도는 레이어 종류를 따른다 (2026-11-06)
 
 > `docs/qa/2026-11-05-qa4.md` §1. §2.11 "칠하기 용도는 레이어 종류를 따른다". **§2.12(A.8)와 한 PR로 낸다**(2026-11-06 사용자 결정 — 따로 먼저 내면 흰 글자가 잠시 Global에 붙어 "레이어에는 Semantic만"을 어긴다).
 
-- [ ] `scopes.ts` `fillScopesFor(nodeType)` — TEXT → `ALL_FILLS` · `TEXT_FILL`, 프레임류 → `ALL_FILLS` · `FRAME_FILL`, 그 밖 → `ALL_FILLS` · `SHAPE_FILL`(`ALL_SCOPES`는 `colorScopeOk`가 지금처럼 통과). `fieldScopes('fills')` · `scopeFitsField`는 노드 종류를 받지 않으므로 지금 그대로 두고, 바인딩 경로만 바꾼다
-- [ ] `bind.ts` `bindPaints`: `allowed = key === 'fills' ? fillScopesFor(node.type) : STROKE_SCOPES`
-- [ ] `bind.ts` `bindSelectedItems`: 칠하기 자리에 변수 용도 다시 확인(`fillScopesFor`) — 맞지 않으면 "그 사이 바뀜"(`changed`). 선 · 효과도 같은 자리에서 `STROKE_SCOPES` · `EFFECT_SCOPES`로 확인
-- [ ] 다른 곳에서 `FILL_SCOPES`를 직접 쓰는지 확인 — 지금은 `bindPaints`와 `fieldScopes`뿐(변수 탭 사용 표시는 용도를 보지 않음)
-- [ ] 단위 테스트: 흰 TEXT + 흰 FRAME, 변수 `color/background/default`(FRAME_FILL · SHAPE_FILL, Semantic) · `color/gray/0`(ALL_FILLS, Global) → TEXT는 `gray/0`, FRAME은 `background/default`. TEXT_FILL 전용 변수는 FRAME에 안 붙음. 연결 직전에 변수 용도가 TEXT_FILL 없이 바뀌면 `changed`
-- [ ] 기대값이 바뀌는 기존 테스트(의도를 살려 고친다): `test/figma.test.mjs` 1452(한 FRAME으로 채움 → TEXT_FILL 전용 `text` 역할과 `itemSpacing` → `spacing/sm`을 함께 확인 — "FRAME(간격) 안에 TEXT 자식(채움)"으로 나눠, 채움 확인은 TEXT 자식에서, 간격 확인은 FRAME에서 한다. §2.12 때 A.8 목록대로 한 번 더 바뀐다) · 4072 부근 컬렉션 계층 지정(Primitives) 테스트(FRAME 채움 #aa0000 → `color/text/default` TEXT_FILL · `tier === 2` 기대 — 노드를 TEXT로 바꿔 계층 판정 확인을 지킨다)
-- [ ] QA 회신 `docs/qa/2026-11-05-qa4-reply.md`(커밋 · 바뀐 동작 한 줄 · `npm test` 요약 · 미검증)
+- [x] `scopes.ts` `fillScopesFor(nodeType)` — TEXT → `ALL_FILLS` · `TEXT_FILL`, 프레임류 → `ALL_FILLS` · `FRAME_FILL`, 그 밖 → `ALL_FILLS` · `SHAPE_FILL`(`ALL_SCOPES`는 `colorScopeOk`가 지금처럼 통과). `fieldScopes('fills')` · `scopeFitsField`는 노드 종류를 받지 않으므로 지금 그대로 두고, 바인딩 경로만 바꾼다
+- [x] `bind.ts` `bindPaints`: `allowed = key === 'fills' ? fillScopesFor(node.type) : STROKE_SCOPES`
+- [x] `bind.ts` `bindSelectedItems`: 칠하기 자리에 변수 용도 다시 확인(`fillScopesFor`) — 맞지 않으면 "그 사이 바뀜"(`changed`). 선 · 효과도 같은 자리에서 `STROKE_SCOPES` · `EFFECT_SCOPES`로 확인
+- [x] 다른 곳에서 `FILL_SCOPES`를 직접 쓰는지 확인 — 지금은 `bindPaints`와 `fieldScopes`뿐(변수 탭 사용 표시는 용도를 보지 않음)
+- [x] 단위 테스트: 흰 TEXT + 흰 FRAME, 변수 `color/background/default`(FRAME_FILL · SHAPE_FILL, Semantic) · `color/gray/0`(ALL_FILLS, Global) → TEXT는 `gray/0`, FRAME은 `background/default`. TEXT_FILL 전용 변수는 FRAME에 안 붙음. 연결 직전에 변수 용도가 TEXT_FILL 없이 바뀌면 `changed`
+- [x] 기대값이 바뀌는 기존 테스트(의도를 살려 고친다): `test/figma.test.mjs` 1452(한 FRAME으로 채움 → TEXT_FILL 전용 `text` 역할과 `itemSpacing` → `spacing/sm`을 함께 확인 — "FRAME(간격) 안에 TEXT 자식(채움)"으로 나눠, 채움 확인은 TEXT 자식에서, 간격 확인은 FRAME에서 한다. §2.12 때 A.8 목록대로 한 번 더 바뀐다) · 4072 부근 컬렉션 계층 지정(Primitives) 테스트(FRAME 채움 #aa0000 → `color/text/default` TEXT_FILL · `tier === 2` 기대 — 노드를 TEXT로 바꿔 계층 판정 확인을 지킨다)
+- [x] QA 회신 `docs/qa/2026-11-05-qa4-reply.md`(커밋 · 바뀐 동작 한 줄 · `npm test` 요약 · 미검증)
 - [ ] 실기 확인(사용자, 피그마): **연결 전 원본**(`163:1523`)의 복제본에서 변수 탭 전체 실행 → 레이어 › 연결 [찾기] → [연결]. 이미 연결된 결과 파일은 "이미 연결됨"으로 건너뛰어 아무것도 바뀌지 않는다(그 파일로 보려면 6개 글자의 칠하기 연결을 피그마에서 먼저 푼다). 기대: 흰 글자 6개(`Contact` · `Business Class` · `01` · `02` · `03` · `Subscribe Now`)가 Semantic `color/text/inverse`(TEXT_FILL, `color/gray/0` 별칭)에 붙음 — QA 문서의 "`color/gray/0`(Global)"은 §2.12 전 기대값이라 바뀐다. 글자가 아닌 칠하기(예: 검정 벡터 아이콘 채움)에 `color/text/default`가 붙던 곳도 용도에 맞는 쓰임 역할(`color/icon/...` 등)로 바뀐다 — "나머지 608건 변화 없음"이 아니라 이 수는 실기에서 센다. QA 회신의 "바뀐 동작"에도 이 줄을 넣는다

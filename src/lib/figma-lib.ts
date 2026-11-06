@@ -5,6 +5,7 @@ export type { ExtractResult } from './extract';
 export {
   createTokens,
   previewCreateTokens,
+  createUsageRoles,
   createSemanticAliases,
   scanTextStyles,
   scanExistingTextStyles,
@@ -17,6 +18,7 @@ export {
 } from './variables';
 export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult, ApplyTextStylesResult } from './variables';
 export { bindSelection, bindSelectedItems, countUsage, findUsers, boundVariableIds } from './bind';
+export { assignNames, colorRoleBases, colorUse, paddingProp, radiusName, strokeName, isOldPluginName } from './usageRoles';
 export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName } from './rename';
 export type { RenameOutcome } from './rename';

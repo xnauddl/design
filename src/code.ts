@@ -5,11 +5,11 @@ import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, CollectionRole
 import { post } from './shared/messages';
 import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
+import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countUsage, findUsers } from './lib/bind';
-import { collectionTiers, findCollection, readRoleMap, writeRoleMap } from './lib/collectionRoles';
+import { collectionTiers, readRoleMap, writeRoleMap } from './lib/collectionRoles';
 import { assignRole, roleOfCollection, guessRole } from './lib/tiers';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
@@ -1068,7 +1068,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
     switch (msg.type) {
       case 'EXTRACT': {
         const sel = selection();
-        const { tokens, warnings } = extractFromSelection(sel);
+        const { tokens, warnings } = extractFromSelection(sel, bindOwnerOf(sel)); // 쓰임 이름의 주인(§2.12 12.3)
         post({ type: 'EXTRACT_RESULT', tokens, warnings, selection: sel.length });
         break;
       }
@@ -1077,9 +1077,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!msg.preview && !requirePaid('tokens')) break;
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
+        // 쓰임 역할 — Global을 만든 직후 같은 처리 · 같은 ⌘Z 안에서(§2.12 12.10). 미리보기는 만들 수만 센다.
+        const roles = await createUsageRoles(msg.tokens, !!msg.preview);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });
+        if (roles) summary += t('create.sumRoles', { n: roles });
         if (pruned) summary += t('create.sumPruned', { n: pruned });
         // base 반영 — 비-px 값이 실제로 얼마가 되는지 요약에 노출. base를 바꾸면 이 줄이 바뀐다.
         if (s.conversions.length) {
@@ -1088,7 +1091,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           const morePart = s.conversions.length > 2 ? t('create.sumBaseMore') : '';
           summary += t('create.sumBase', { base: msg.base, n: s.conversions.length, examples: ex, morePart });
         }
-        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview });
+        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview, roles });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
           await postPrereq(); // #11: 토큰 생성 → 시맨틱/바인딩 전제 충족 갱신
@@ -1332,22 +1335,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'GET_PREREQ': {
         await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
-        break;
-      }
-      case 'GET_GLOBAL_COLORS': {
-        // #10: 기존 Global 색 변수(리터럴 COLOR)를 이름+hex로 수집 → 재방문 시맨틱 매핑 추천.
-        const cols = await figma.variables.getLocalVariableCollectionsAsync();
-        const globalCol = findCollection(cols, 'global');
-        const colors: { name: string; hex: string }[] = [];
-        if (globalCol) {
-          const mode = globalCol.defaultModeId;
-          for (const v of await figma.variables.getLocalVariablesAsync()) {
-            if (v.variableCollectionId !== globalCol.id || v.resolvedType !== 'COLOR') continue;
-            const raw = v.valuesByMode[mode];
-            if (raw && typeof raw === 'object' && 'r' in raw) colors.push({ name: v.name, hex: rgbToHex(raw as RGB) });
-          }
-        }
-        post({ type: 'GLOBAL_COLORS', colors });
         break;
       }
       case 'GET_LICENSE': {

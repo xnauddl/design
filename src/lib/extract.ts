@@ -12,9 +12,12 @@ import {
   colorTokenName,
   numberTokenName,
 } from './tokens';
+import { colorUse, composeName, paddingProp, radiusName, simpleNumericName, strokeName, type Padding } from './usageRoles'; // 쓰임 이름(§2.12)
 
 interface Accumulator {
   map: Map<string, DraftToken>;
+  /** 쓰임 이름의 주인(§2.12 12.3) — 부르는 쪽이 넘긴다. 없으면 주인 없음. */
+  owner: (node: SceneNode) => string | undefined;
   warnings: Set<string>;
   /**
    * 지나친 이유. 성공한 추출에서는 말하지 않는다 — 매번 뜨는 경고가 성가셔서 걷어냈다(114393d).
@@ -59,16 +62,25 @@ function add(
   token: Omit<DraftToken, 'sources'>,
   source: SourceField,
   nodeId: string,
+  /** 쓰임 이름(§2.12 12.10) — 숫자는 `spacing/card/gap` 같은 이름, 색은 `color/{쓰임}`. 글자는 없음. */
+  use?: string,
 ): void {
   const k = keyOf(token.category, token.value, token.unit);
-  const existing = acc.map.get(k);
+  let existing = acc.map.get(k);
   if (existing) {
     if (!existing.sources.includes(source)) existing.sources.push(source);
     if (acc.lastNode.get(k) !== nodeId) existing.count = (existing.count ?? 1) + 1;
   } else {
-    acc.map.set(k, { ...token, sources: [source], count: 1 });
+    existing = { ...token, sources: [source], count: 1 };
+    acc.map.set(k, existing);
   }
   acc.lastNode.set(k, nodeId);
+  if (use) {
+    const uses = (existing.uses ??= []);
+    const u = uses.find((x) => x.name === use);
+    if (u) u.count++;
+    else uses.push({ name: use, count: 1 });
+  }
 }
 
 /* ---------- paint ---------- */
@@ -87,7 +99,8 @@ function collectPaints(
       continue;
     }
     const hex = rgbToHex(p.color);
-    add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source, nodeId);
+    const use = `color/${colorUse(node.type, source === 'fill' ? 'fills' : 'strokes', isInsideIconFrame(node))}`;
+    add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source, nodeId, use);
     // 페인트 불투명도(p.opacity)는 토큰화하지 않는다 — Figma에는 페인트 opacity에 붙는 변수가 없다
     // (OPACITY 스코프는 **레이어** 불투명도 전용, collectOpacity가 따로 모은다). 만들어 봐야
     // 어디에도 연결되지 않는 `opacity/0.08` 변수만 남았다. 반투명 색 자체는 bind가 건너뛴다(bind.ts).
@@ -144,22 +157,27 @@ export function gapSkip(node: unknown, field: string): 'no-wrap' | 'space-betwee
 
 function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | InstanceNode): void {
   if (node.layoutMode === 'NONE') return;
-  const gaps: number[] = [node.paddingLeft, node.paddingRight, node.paddingTop, node.paddingBottom];
+  const owner = acc.owner(node);
+  const pad: Padding = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
+  const gaps: [number, string][] = (['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'] as const).map((f) => [
+    node[f],
+    composeName('spacing', owner, paddingProp(f, pad)),
+  ]);
   if (node.layoutMode === 'GRID') {
     // 그리드 오토레이아웃의 간격은 gridRowGap/gridColumnGap — itemSpacing/counterAxisSpacing은
     // HORIZONTAL/VERTICAL 전용이라 그리드에서는 의미 있는 값을 주지 않는다.
-    gaps.push(node.gridRowGap, node.gridColumnGap);
+    gaps.push([node.gridRowGap, simpleNumericName('gridRowGap', owner) as string], [node.gridColumnGap, simpleNumericName('gridColumnGap', owner) as string]);
   } else {
     // 사이 간격 자동(Space between)이면 피그마가 간격을 계산한다 — 저장된 숫자는 화면 값이 아니라
     // 토큰으로 뽑으면 쓰레기(spacing/33·109…)가 된다(IA v3 §2.11, QA #3 불합격 1). padding은 그대로.
-    if (!gapSkip(node, 'itemSpacing')) gaps.push(node.itemSpacing);
+    if (!gapSkip(node, 'itemSpacing')) gaps.push([node.itemSpacing, simpleNumericName('itemSpacing', owner) as string]);
     // 줄 사이 간격 — 줄바꿈일 때만 쓰이고, 줄 정렬이 Space between이면 같은 이유로 뺀다.
-    if (typeof node.counterAxisSpacing === 'number' && !gapSkip(node, 'counterAxisSpacing')) gaps.push(node.counterAxisSpacing);
+    if (typeof node.counterAxisSpacing === 'number' && !gapSkip(node, 'counterAxisSpacing')) gaps.push([node.counterAxisSpacing, simpleNumericName('counterAxisSpacing', owner) as string]);
   }
-  for (const g of gaps) {
+  for (const [g, use] of gaps) {
     if (typeof g === 'number' && g > 0) {
       const v = round(g);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('spacing', v), category: 'gap', value: v }, 'gap', node.id);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('spacing', v), category: 'gap', value: v }, 'gap', node.id, use);
     }
   }
 }
@@ -295,7 +313,7 @@ function collectSize(acc: Accumulator, node: SceneNode): void {
   // 정수만 — 343.5처럼 자유 리사이즈로 남은 소수 값은 의도된 척도가 아님.
   const addSize = (v: number) => {
     const rv = round(v);
-    if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName('size', rv), category: 'size', value: rv }, 'size', node.id);
+    if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName('size', rv), category: 'size', value: rv }, 'size', node.id, `size/${isIconSelf(node) ? 'icon' : 'avatar'}`);
   };
   if (node.layoutSizingHorizontal === 'FIXED') addSize(node.width);
   if (node.layoutSizingVertical === 'FIXED') addSize(node.height);
@@ -305,19 +323,16 @@ function collectSize(acc: Accumulator, node: SceneNode): void {
 function collectRadius(acc: Accumulator, node: SceneNode): void {
   if (!('cornerRadius' in node)) return;
   const r = (node as { cornerRadius: number | typeof figma.mixed }).cornerRadius;
-  const values: number[] = [];
-  if (r === figma.mixed) {
-    for (const corner of ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'] as const) {
-      const cv = (node as unknown as Record<string, unknown>)[corner];
-      if (typeof cv === 'number') values.push(cv);
-    }
-  } else if (typeof r === 'number') {
-    values.push(r);
-  }
-  for (const rv of values) {
+  const corners = ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'] as const;
+  if (r !== figma.mixed && typeof r !== 'number') return;
+  const values = corners.map((c) => (r !== figma.mixed ? (r as number) : Number((node as unknown as Record<string, unknown>)[c]) || 0));
+  const owner = acc.owner(node);
+  // 연결이 모서리마다 붙이므로 쓰임도 모서리마다 센다(같으면 한 이름 — radiusName).
+  const list = r === figma.mixed ? corners.map((c, i) => [c, values[i]] as const) : [[corners[0], r as number] as const];
+  for (const [c, rv] of list) {
     if (rv > 0) {
       const v = round(rv);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id, radiusName(c, owner, values));
     }
   }
 }
@@ -329,19 +344,16 @@ function collectStroke(acc: Accumulator, node: SceneNode): void {
   // 보이는 선이 있을 때만 두께를 토큰 후보로(선 없는 노드의 strokeWeight는 무의미).
   if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
   const w = (node as { strokeWeight: number | typeof figma.mixed }).strokeWeight;
-  const widths: number[] = [];
-  if (w === figma.mixed) {
-    for (const side of ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const) {
-      const sv = (node as unknown as Record<string, unknown>)[side];
-      if (typeof sv === 'number') widths.push(sv);
-    }
-  } else if (typeof w === 'number') {
-    widths.push(w);
-  }
-  for (const wv of widths) {
+  const sides = ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const;
+  const sideValues = sides.map((sd) => Number((node as unknown as Record<string, unknown>)[sd]) || 0);
+  const widths: [string, number][] = [];
+  if (w === figma.mixed) sides.forEach((sd, i) => widths.push([sd, sideValues[i]]));
+  else if (typeof w === 'number') widths.push(['strokeWeight', w]);
+  const owner = acc.owner(node);
+  for (const [field, wv] of widths) {
     if (wv > 0) {
       const v = round(wv);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id, strokeName(field, owner, sideValues));
     }
   }
 }
@@ -352,7 +364,7 @@ function collectOpacity(acc: Accumulator, node: SceneNode): void {
   const o = (node as { opacity: number }).opacity;
   if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1(불투명)·0(숨김 동등)은 토큰화 안 함
   const v = round(o);
-  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity', node.id);
+  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity', node.id, simpleNumericName('opacity', acc.owner(node)) as string);
 }
 
 /* ---------- effects ---------- */
@@ -362,7 +374,7 @@ function collectEffects(acc: Accumulator, node: SceneNode): void {
     if (e.visible === false) continue;
     if (e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW') {
       const hex = rgbToHex(e.color);
-      add(acc, { name: colorTokenName(hex), category: 'effectColor', value: hex }, 'effectColor', node.id);
+      add(acc, { name: colorTokenName(hex), category: 'effectColor', value: hex }, 'effectColor', node.id, 'color/shadow');
       for (const [g, val] of [
         ['shadow-blur', e.radius],
         ['shadow-spread', e.spread ?? 0],
@@ -424,8 +436,12 @@ function isEffectivelyVisible(node: SceneNode): boolean {
 }
 
 /** 현재 선택(자식 포함)에서 토큰 후보를 추출. */
-export function extractFromSelection(selection: readonly SceneNode[]): ExtractResult {
-  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map(), skipped: new Set() };
+export function extractFromSelection(
+  selection: readonly SceneNode[],
+  /** 쓰임 이름의 주인(§2.12 12.3) — code.ts가 이름 정리 역할 → 고신뢰 판정으로 넘긴다. */
+  ownerOf: (node: SceneNode) => string | undefined = () => undefined,
+): ExtractResult {
+  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map(), skipped: new Set(), owner: ownerOf };
   for (const node of selection) {
     if (!isEffectivelyVisible(node)) {
       acc.skipped.add(SKIP_HIDDEN); // 숨긴 그룹 안의 자식을 직접 고른 경우 — walk가 못 거른다

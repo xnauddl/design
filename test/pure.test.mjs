@@ -1695,14 +1695,14 @@ test('spacingRoles/strokeRoles — Lightning·Atlassian 고정 사다리, 척도
   assert.deepEqual(strokeRoles([0.5, 1, 2, 4]), ['', 'thin', 'thick', '']); // 정수만 — hairline 없음(2026-11-04)
 });
 
-test('suggestTokenRoles — 사다리 밖 간격은 역할 맵에서 빠진다', () => {
+test('suggestTokenRoles — 간격 · 반경 · 선 두께는 고정 칸 이름을 채우지 않는다(쓰임 역할은 만들기가 만든다, §2.12 12.10)', () => {
   const map = suggestTokenRoles([
     { name: 'spacing/16', category: 'gap', value: 16, sources: ['gap'] },
     { name: 'spacing/13', category: 'gap', value: 13, sources: ['gap'] },
     { name: 'radius/8', category: 'radius', value: 8, sources: ['radius'] },
     { name: 'stroke-width/1', category: 'strokeWidth', value: 1, sources: ['strokeWidth'] },
   ]);
-  assert.deepEqual(map, { 'spacing/md': 'spacing/16', 'radius/md': 'radius/8', 'stroke-width/thin': 'stroke-width/1' });
+  assert.deepEqual(map, {});
 });
 
 
@@ -1739,30 +1739,25 @@ test('suggestTokenRoles — 전 카테고리 역할→Global 이름', () => {
     { name: 'stroke-width/4', category: 'strokeWidth', sources: ['strokeWidth'], value: 4 },
   ];
   const map = suggestTokenRoles(tokens, 16);
-  assert.equal(map['color/background/brand'], 'color/0066ff'); // 색(유일 유채) → brand 면
-  assert.equal(map['spacing/md'], 'spacing/16'); // 고정 사다리: 16=md
-  assert.equal(map['spacing/xs'], 'spacing/8'); // 8=xs (Lightning x-small 8px)
-  assert.equal(map['spacing/lg'], 'spacing/24');
-  assert.equal(map['radius/none'], 'radius/0');
-  assert.equal(map['font-size/body'], 'font-size/16');
-  assert.equal(map['font-size/title'], 'font-size/24');
-  assert.equal(map['font-weight/bold'], 'font-weight/700');
-  assert.equal(map['font-family/sans'], 'font-family/Inter');
-  assert.equal(map['stroke-width/thin'], 'stroke-width/1'); // Lightning borderWidthThin
-  assert.equal(map['stroke-width/thick'], 'stroke-width/2');
-  assert.equal(Object.values(map).includes('stroke-width/4'), false); // 척도 밖 → 역할 없음
+  // 글자 역할만(§2.12 12.10) — 색 4개 · 고정 칸 이름은 채우지 않는다(채우면 옛 이름이 계속 생긴다).
+  assert.deepEqual(map, {
+    'font-size/body': 'font-size/16',
+    'font-size/title': 'font-size/24',
+    'font-weight/bold': 'font-weight/700',
+    'font-family/sans': 'font-family/Inter',
+  });
 });
 
 test('mergeTokenRoles — 부분 맵을 덮어쓰되 빠진 카테고리는 자동 추천을 남긴다', () => {
   const tokens = [
     { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
-    { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+    { name: 'font-size/16', category: 'fontSize', sources: ['fontSize'], value: 16 },
   ];
-  // 색 목록 화면이 주는 건 색 역할뿐 — 이걸로 통째 교체하면 spacing 역할이 사라진다.
+  // 색 목록 화면이 주는 건 색 역할뿐 — 이걸로 통째 교체하면 글자 역할이 사라진다.
   const merged = mergeTokenRoles(tokens, 16, { primary: 'color/0066ff', accent: 'color/0066ff' });
   assert.equal(merged['primary'], 'color/0066ff'); // 사용자가 정한 것 우선
   assert.equal(merged['accent'], 'color/0066ff'); // 자동 추천에 없던 역할도 그대로
-  assert.equal(merged['spacing/md'], 'spacing/16'); // 색만 왔어도 간격 역할은 유지
+  assert.equal(merged['font-size/body'], 'font-size/16'); // 색만 왔어도 글자 역할은 유지
   // 덮어쓸 게 없으면 자동 추천 그대로.
   assert.deepEqual(mergeTokenRoles(tokens, 16, {}), suggestTokenRoles(tokens, 16));
   assert.deepEqual(mergeTokenRoles(tokens, 16), suggestTokenRoles(tokens, 16));

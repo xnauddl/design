@@ -661,7 +661,11 @@ function resolveSlots(ctx: Ctx): void {
     }
     res.bound++;
     const g = p.global as VarEntry;
-    preview.candidates.push({ ...candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot)), newRole: { name: spec.name, globalId: spec.globalId, scopes: spec.scopes } });
+    preview.candidates.push({
+      ...candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot)),
+      newRole: { name: spec.name, globalId: spec.globalId, scopes: spec.scopes },
+      newRoleGlobalName: spec.globalName,
+    });
   }
   // 바꾸는 자리에는 원래 Global 이름을 싣는다(자리 줄 "· {Global}에서").
   for (const c of preview.candidates) {

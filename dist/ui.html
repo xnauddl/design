@@ -579,6 +579,10 @@
     .bv-arrow { color: var(--accent-strong); font-weight: 600; flex: 0 0 auto; }
     .bv-var { background: var(--accent-subtle); color: var(--accent-strong); border: 1px solid transparent; flex: 0 1 auto; min-width: 0; max-width: 100%; }
     .bv-var .bv-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    /* 새 역할(§2.12) — 연결할 때 Semantic에 만든다 */
+    .bv-new { font: 500 10px/14px var(--font); border: 1px solid var(--accent); color: var(--accent-strong); border-radius: 3px; padding: 0 3px; flex: 0 0 auto; }
+    .bv-from { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .bd-roles { font-size: 11px; color: var(--text-2); white-space: nowrap; }
     .bv-mark { flex: 0 0 auto; font-family: var(--font); font-weight: 700; }
     .bind-empty .bv-var { max-width: 140px; }
     .bv-head .grow { flex: 1 1 auto; min-width: 4px; }
@@ -849,7 +853,7 @@
       <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
            파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
            흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=색 역할 · 다크=라이트에서 어두운 값 채우기</div>
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=쓰임 역할 · 다크=라이트에서 어두운 값 채우기</div>
       <div class="status" id="wizardSummary"></div>
       <!-- 요약 끝 연결 안내(§4.3) — 마법사는 레이어에 변수를 붙이지 않는다. 누르면 레이어 › 연결 + 미리보기. -->
       <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">레이어 › 연결에서 확인하고 연결하기 →</button>
@@ -952,7 +956,6 @@
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
       <div class="row">
         <button id="btnSemantics" data-i18n="semantic.aliasBtn">시맨틱 별칭 생성</button>
-        <button id="btnScanGlobals" data-i18n="semantic.scanBtn">기존 색에서 추천</button>
       </div>
       <div class="status" id="semStatus"></div>
     </div>
@@ -1043,6 +1046,7 @@
       <!-- 배지 줄(찾은 뒤) — (찾음 n) (건너뜀 m ▸) … [모두 켜기/끄기] [필터]. 사유 칩 줄은 DOM에서 건너뜀 바로 뒤(포커스 순서), 화면에서는 아랫줄. -->
       <div class="bind-badges" id="bindBadges" hidden>
         <span class="bd bd-found" id="bindFound"></span>
+        <span class="bd-roles" id="bindRoleSum" hidden></span>
         <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
         <div class="skip-row" id="bindSkips" hidden></div>
         <span class="grow"></span>
@@ -1264,10 +1268,7 @@
     "color.extractEmpty": "\uACE0\uB97C \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0C9\xB7\uC5EC\uBC31\xB7\uD06C\uAE30\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.",
     "create.baseChanged": "base {base}px\uB85C \uB2E4\uC2DC \uACC4\uC0B0 \uC911\u2026",
     // 시맨틱 매핑
-    "semantic.scanningGlobals": "\uAE30\uC874 \uC0C9 \uC2A4\uCE94 \uC911\u2026",
     "semantic.formatHint": "\uB9E4\uD551\uC744 \uD55C \uC904\uC5D0 \u201C\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984\u201D \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
-    "semantic.noGlobals": "\uAE30\uC874 Global \uC0C9 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
-    "semantic.suggested": "\uAE30\uC874 \uC0C9 {count}\uAC1C\uC5D0\uC11C \uC5ED\uD560 \uCD94\uCC9C \u2014 \uD655\uC778 \uD6C4 \u2018\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131\u2019.",
     "semantic.result": "\uC2DC\uB9E8\uD2F1 {aliased}\uAC1C \uBCC4\uCE6D (\uC0DD\uC131 {created} / \uAC31\uC2E0 {updated})",
     "semantic.missing": " \xB7 \uB204\uB77D: {names}",
     // 바인딩(적용)
@@ -1374,6 +1375,9 @@
     "wizard.rerunHint": "\uC774\uBBF8 \uC815\uB9AC\uD55C \uC120\uD0DD\uC774\uC5D0\uC694 \u2014 \uB2E4\uC2DC \uC2E4\uD589\uD558\uBA74 \uBCC0\uC218\uB294 \uAC31\uC2E0\uB418\uACE0 \uC774\uB984\uC740 \uADF8\uB300\uB85C\uC608\uC694.",
     "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
     "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
+    // 역할 매핑 단계 — 쓰임 역할은 만들기 단계가 이미 만들었을 때(§2.12 12.10).
+    "wizard.rolesFromTokens": "\uB9CC\uB4E4\uAE30\uC5D0\uC11C \uD568\uAED8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694 \xB7 \uC5ED\uD560 {n}\uAC1C",
+    "wizard.rolesFromTokensTail": " \xB7 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC5ED\uD560 {n}\uAC1C",
     "wizard.skip.paid": "\uC720\uB8CC \uAE30\uB2A5",
     "wizard.chip.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB6F0\uC5B4\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4",
     "wizard.paidSkipped": " \xB7 \uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
@@ -1731,7 +1735,7 @@
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
     // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC0C9 \uC5ED\uD560 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
+    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC4F0\uC784 \uC5ED\uD560 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4",
     "prereq.gotoCreate": "\uD1A0\uD070 \uB9CC\uB4E4\uAE30\uB85C \u2192",
@@ -1774,7 +1778,6 @@
     "semantic.title": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551 (\uC5ED\uD560 \u2192 \uD1A0\uD070)",
     "semantic.formatLabel": "\uD615\uC2DD: <code>\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984</code>",
     "semantic.aliasBtn": "\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131",
-    "semantic.scanBtn": "\uAE30\uC874 \uC0C9\uC5D0\uC11C \uCD94\uCC9C",
     // 텍스트 스타일
     "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uD654\uBA74 \uC5F0\uACB0\uC740 \uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C",
@@ -1904,6 +1907,15 @@
     "bind.progressOf": "{done} / {total} \uCC98\uB9AC \uC911\u2026 ({pct}%)",
     "bind.progressCount": "{done}\uAC1C \uCC98\uB9AC \uC911\u2026",
     // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
+    // 새 역할 · Global에서 바꾸기(§2.12, §4.6)
+    "bind.newRole": "\uC0C8",
+    "bind.newRoleTip": "\uC5F0\uACB0\uD560 \uB54C Semantic\uC5D0 \uB9CC\uB4E4\uC5B4\uC694 \xB7 {global}\uC744 \uAC00\uB9AC\uCF1C\uC694",
+    "bind.fromGlobal": "\xB7 {global}\uC5D0\uC11C",
+    "bind.roleNew": "\uC0C8 \uC5ED\uD560 {k}",
+    "bind.roleSwap": "\uBC14\uAFC8 {m}",
+    "bind.roleSummaryTip": "\uC0C8 \uC5ED\uD560\uC740 \uC5F0\uACB0\uD560 \uB54C Semantic\uC5D0 \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uBC14\uAFC8\uC740 Global\uC774 \uBD99\uC740 \uACF3\uC744 \uAC19\uC740 \uAC12\uC758 \uC5ED\uD560\uB85C \uBC14\uAFD4\uC694",
+    "bind.doneNewRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
+    "bind.doneSwapped": " \xB7 Global\uC5D0\uC11C \uBC14\uAFC8 {m}\uACF3",
     "bind.placesMore": "\uC678 {n}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC120\uD0DD\uC73C\uB85C \uBCF4\uAE30",
     "bind.linkingOf": "\uC5F0\uACB0 \uC911\u2026 {done} / {total}",
     "bind.waitLink": "\uC5F0\uACB0\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
@@ -2001,6 +2013,8 @@
     "create.count": "\uD6C4\uBCF4 {sel}/{total}",
     "color.usedCount": " \xB7 {n}\xD7 \uC0AC\uC6A9",
     "create.tidyMerged": " \xB7 \uAC19\uC740 \uCE78 {n}\uAC1C \uBCD1\uD569",
+    // 만들기 결과 · 미리보기 꼬리 — 새로 만든(만들) 쓰임 역할 수(§2.12 12.10).
+    "create.sumRoles": " \xB7 \uC5ED\uD560 {n}\uAC1C",
     "create.tidySummary": "\uC5EC\uBC31 {before} \u2192 {after}\uAC1C ({grid}px \uACA9\uC790\uB85C {n}\uAC1C \uC774\uB3D9{mergedPart}){gapPart}",
     "create.tidyUndone": "\uACA9\uC790 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694 \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB2E4\uC2DC \uB204\uB974\uBA74 \uB610 \uC815\uB9AC\uD574\uC694",
     "create.onceOff": "1\xD7 \uD1A0\uD070 {n}\uAC1C \uD574\uC81C",
@@ -2137,7 +2151,7 @@
   }
   var SNAP_CATEGORIES = /* @__PURE__ */ new Set(["gap"]);
   var TOKEN_GROUP = { gap: "spacing" };
-  var cloneToken = (t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] });
+  var cloneToken = (t2) => __spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues({}, u)) } : {});
   function scaleLadder(base, max) {
     if (base <= 0) return [];
     const rungs = [];
@@ -2146,7 +2160,7 @@
     return rungs.sort((a, b) => a - b);
   }
   function tidyNumberTokens(tokens2, opts) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g;
     const { base, ratio } = opts;
     const out = tokens2.map(cloneToken);
     const targets = out.filter(
@@ -2165,6 +2179,7 @@
       const group = TOKEN_GROUP[t2.category];
       if (group && t2.name === numberTokenName(group, v)) t2.name = numberTokenName(group, target);
       t2.value = target;
+      delete t2.uses;
       snapped++;
     }
     const seen = /* @__PURE__ */ new Map();
@@ -2179,7 +2194,12 @@
       const [rep, gone] = ((_b = t2.count) != null ? _b : 0) > ((_c = cur.count) != null ? _c : 0) ? [t2, cur] : [cur, t2];
       seen.set(k, rep);
       for (const s of gone.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
-      rep.count = Math.max((_d = rep.count) != null ? _d : 0, (_e = gone.count) != null ? _e : 0);
+      for (const u of (_d = gone.uses) != null ? _d : []) {
+        const have = ((_e = rep.uses) != null ? _e : rep.uses = []).find((x) => x.name === u.name);
+        if (have) have.count += u.count;
+        else rep.uses.push(__spreadValues({}, u));
+      }
+      rep.count = Math.max((_f = rep.count) != null ? _f : 0, (_g = gone.count) != null ? _g : 0);
       dropped.add(gone);
     }
     return {
@@ -2250,7 +2270,7 @@
     return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}|${c.variableId}`;
   }
   function groupByVariable(cands) {
-    var _a, _b;
+    var _a, _b, _c, _d, _e;
     const byVar = /* @__PURE__ */ new Map();
     for (const c of cands) {
       const arr = byVar.get(c.variableId);
@@ -2269,18 +2289,20 @@
       for (const [nodeId, items] of byNode) {
         for (const l of groupBindLines(items)) {
           const its = l.items;
-          lines.push({
+          lines.push(__spreadValues({
             nodeId,
             label: l.label,
             fields: l.fields,
             keys: its.map((x) => placeKey(__spreadProps(__spreadValues({}, x), { nodeId }))),
             currentValue: l.currentValue
-          });
+          }, ((_a = its.find((x) => x.fromVariableName)) == null ? void 0 : _a.fromVariableName) ? { from: (_b = its.find((x) => x.fromVariableName)) == null ? void 0 : _b.fromVariableName } : {}));
         }
       }
-      const variableValue = (_b = (_a = list.find((c) => c.variableValue != null)) == null ? void 0 : _a.variableValue) != null ? _b : list[0].currentValue;
+      const variableValue = (_d = (_c = list.find((c) => c.variableValue != null)) == null ? void 0 : _c.variableValue) != null ? _d : list[0].currentValue;
       const keys = lines.flatMap((l) => l.keys);
-      groups.push({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines });
+      const nr = list.find((c) => c.newRole);
+      const swaps = list.filter((c) => c.fromVariableName).length;
+      groups.push(__spreadValues({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines, swaps }, nr ? { newRoleOf: (_e = nr.newRoleGlobalName) != null ? _e : "" } : {}));
     }
     groups.sort((a, b) => b.count - a.count || a.variableName.localeCompare(b.variableName));
     return groups;
@@ -3175,19 +3197,6 @@
     }
     return map;
   }
-  function suggestSemanticMap(colors) {
-    const classed = colors.map((c) => ({ name: c.name, o: hexToOklch(c.hex), achromatic: hexToOklch(c.hex).c < LOW_CHROMA }));
-    const map = {};
-    const neutrals = classed.filter((c) => c.achromatic).sort((a, b) => b.o.l - a.o.l);
-    if (neutrals.length) {
-      map["color/background/default"] = neutrals[0].name;
-      map["color/text/default"] = neutrals[neutrals.length - 1].name;
-      if (neutrals.length >= 3) map["color/border/default"] = neutrals[Math.floor(neutrals.length / 2)].name;
-    }
-    const chroma = classed.filter((c) => !c.achromatic).sort((a, b) => b.o.c - a.o.c);
-    if (chroma.length) map["color/background/brand"] = chroma[0].name;
-    return map;
-  }
   function paletteToDraftTokens(p) {
     const tokens2 = [];
     for (const scale of p.scales) {
@@ -3206,51 +3215,6 @@
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
   var TSHIRT_MID = TSHIRT.indexOf("md");
-  function ladderRoles(values, ladder) {
-    return values.map((v) => {
-      var _a;
-      return (_a = ladder.get(v)) != null ? _a : "";
-    });
-  }
-  var SPACING_LADDER = /* @__PURE__ */ new Map([
-    [0, "none"],
-    [2, "3xs"],
-    [4, "2xs"],
-    [8, "xs"],
-    [12, "sm"],
-    [16, "md"],
-    [24, "lg"],
-    [32, "xl"],
-    [48, "2xl"],
-    [64, "3xl"],
-    [80, "4xl"]
-  ]);
-  var RADIUS_LADDER = /* @__PURE__ */ new Map([
-    [0, "none"],
-    [2, "xs"],
-    [4, "sm"],
-    [8, "md"],
-    [12, "lg"],
-    [16, "xl"],
-    [24, "2xl"]
-  ]);
-  var STROKE_LADDER = /* @__PURE__ */ new Map([
-    // 변수는 정수만 — 0.5(hairline)는 없다(2026-11-04 사용자 결정, §2.11).
-    [1, "thin"],
-    [2, "thick"]
-  ]);
-  function spacingRoles(values) {
-    return ladderRoles(values, SPACING_LADDER);
-  }
-  function strokeRoles(values) {
-    return ladderRoles(values, STROKE_LADDER);
-  }
-  function radiusRoles(values) {
-    return values.map((v) => {
-      var _a;
-      return v >= 999 ? "full" : (_a = RADIUS_LADDER.get(v)) != null ? _a : "";
-    });
-  }
   var FS_UP = ["title", "h3", "h2", "h1", "display"];
   var FS_DOWN = ["caption", "overline"];
   function fontSizeRoles(values, base = 16) {
@@ -3311,19 +3275,11 @@
   }
   function suggestTokenRoles(tokens2, base = 16) {
     const map = {};
-    const colors = tokens2.filter((t2) => t2.category === "color" && typeof t2.value === "string").map((t2) => ({ name: t2.name, hex: t2.value }));
-    Object.assign(map, suggestSemanticMap(colors));
-    const scale = (category, prefix, roleFn) => {
-      const entries = numericEntries(tokens2, category);
-      const roles = roleFn(entries.map((e) => e.value));
-      entries.forEach((e, i) => {
-        if (roles[i]) map[`${prefix}/${roles[i]}`] = e.name;
-      });
-    };
-    scale("gap", "spacing", spacingRoles);
-    scale("radius", "radius", radiusRoles);
-    scale("strokeWidth", "stroke-width", strokeRoles);
-    scale("fontSize", "font-size", (vals) => fontSizeRoles(vals, base));
+    const fs = numericEntries(tokens2, "fontSize");
+    const fsRoles = fontSizeRoles(fs.map((e) => e.value), base);
+    fs.forEach((e, i) => {
+      if (fsRoles[i]) map[`font-size/${fsRoles[i]}`] = e.name;
+    });
     for (const e of numericEntries(tokens2, "fontWeight")) map[`font-weight/${weightRole(e.value)}`] = e.name;
     const families = tokens2.filter((t2) => t2.category === "fontFamily" && typeof t2.value === "string");
     families.forEach((t2, i) => {
@@ -4049,20 +4005,6 @@
     }, colorsFromPalette ? { replacePalette: true } : {}));
     setStatus("colorStatus", t("common.applyingVars"), "");
   });
-  $("btnScanGlobals").addEventListener("click", () => {
-    autoGlobalScan = false;
-    setStatus(semStatusTarget, t("semantic.scanningGlobals"), "");
-    send({ type: "GET_GLOBAL_COLORS" });
-  });
-  var autoGlobalScan = false;
-  var globalRolesAsked = false;
-  function requestGlobalRoles() {
-    if (globalRolesAsked || !hasColorVars) return;
-    if ($("semMap").value.trim()) return;
-    globalRolesAsked = true;
-    autoGlobalScan = true;
-    send({ type: "GET_GLOBAL_COLORS" });
-  }
   $("btnSemantics").addEventListener("click", () => {
     const map = {};
     for (const line of $("semMap").value.split("\n")) {
@@ -4270,7 +4212,7 @@
   $("btnBindRepreview").addEventListener("click", () => runBindPreview());
   $("btnBindToList").addEventListener("click", () => showManager());
   $("btnApplyConfirm").addEventListener("click", () => {
-    const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
+    const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}), c.fromVariableId ? { fromVariableId: c.fromVariableId } : {}));
     if (!items.length) return;
     startLink(items);
   });
@@ -4392,7 +4334,7 @@
     chip.title = note;
   }
   async function runWizard() {
-    var _a;
+    var _a, _b;
     if (wizardRunning) return;
     if (lastSelCount <= 0) {
       setStatus("wizardSummary", t("wizard.needSelect"), "warn");
@@ -4421,6 +4363,7 @@
     setStatus("wizardSummary", t("common.running"), "");
     renderWizardSteps(plan);
     const totals = {};
+    let rolesFromTokens = 0;
     let stopped = false;
     let failNote = "";
     wizCancelReq = false;
@@ -4462,13 +4405,22 @@
           case "create": {
             const r = await wizardRequest({ type: "CREATE_TOKENS", tokens, base }, ["CREATE_RESULT"]);
             totals.created = r.created + r.updated;
+            rolesFromTokens = (_a = r.roles) != null ? _a : 0;
             setWizardStep("create", "done", t("wizard.seq.createDone", { created: r.created, updated: r.updated }));
+            const sem = plan.find((x) => x.step.id === "semantics");
+            if (sem && !sem.run && sem.skipReason === "wizard.skip.noMapping" && rolesFromTokens > 0) {
+              setWizardStep("semantics", "done", t("wizard.rolesFromTokens", { n: rolesFromTokens }));
+            }
             break;
           }
           case "semantics": {
             const r = await wizardRequest({ type: "CREATE_SEMANTICS", map: semMap }, ["SEMANTICS_RESULT"]);
             totals.semanticsAliased = r.aliased;
-            setWizardStep("semantics", "done", t("wizard.seq.semantics", { aliased: r.aliased }) + (r.missing.length ? t("wizard.seq.semanticsMissing", { n: r.missing.length }) : ""));
+            setWizardStep(
+              "semantics",
+              "done",
+              t("wizard.seq.semantics", { aliased: r.aliased }) + (r.missing.length ? t("wizard.seq.semanticsMissing", { n: r.missing.length }) : "") + (rolesFromTokens > 0 ? t("wizard.rolesFromTokensTail", { n: rolesFromTokens }) : "")
+            );
             break;
           }
           case "dark": {
@@ -4541,7 +4493,7 @@
     const paidSkipped = paidSkippedSteps(plan);
     const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
     if (!isPaid && !stopped && !wizardFailed) {
-      setStatus("wizardSummary", t("wizard.freeSum", { n: (_a = totals.renamed) != null ? _a : 0 }), "ok");
+      setStatus("wizardSummary", t("wizard.freeSum", { n: (_b = totals.renamed) != null ? _b : 0 }), "ok");
     } else setStatus(
       "wizardSummary",
       t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
@@ -5108,7 +5060,7 @@
           bindSkipsCapped = ((_g = msg.skipTotal) != null ? _g : bindSkips.length) > bindSkips.length;
           renderSkipReasons((_h = msg.reasons) != null ? _h : {});
           setStatus("applyStatus", "", "");
-          $("bindDoneText").textContent = t("bind.doneCard", { n: msg.bound });
+          $("bindDoneText").textContent = t("bind.doneCard", { n: msg.bound }) + (msg.newRoles ? t("bind.doneNewRoles", { k: msg.newRoles }) : "") + (msg.swapped ? t("bind.doneSwapped", { m: msg.swapped }) : "");
           $("bindDone").hidden = false;
           renderBindTree();
         }
@@ -5195,16 +5147,6 @@
       case "COLLECTION_ROLES":
         renderCollectionRoles(msg.collections);
         break;
-      case "GLOBAL_COLORS":
-        if (!msg.colors.length) {
-          if (!autoGlobalScan) setStatus(semStatusTarget, t("semantic.noGlobals"), "warn");
-        } else if (!autoGlobalScan || !$("semMap").value.trim()) {
-          setSemMapText(suggestSemanticMap(msg.colors));
-          renderColorTable();
-          if (!autoGlobalScan) setStatus(semStatusTarget, t("semantic.suggested", { count: msg.colors.length }), "ok");
-        }
-        autoGlobalScan = false;
-        break;
       case "PREREQ_STATE":
         prereqKnown = true;
         prereqInFlight = false;
@@ -5220,7 +5162,6 @@
         hasSemanticRoles = msg.hasSemanticRoles;
         updateGates();
         applySelectionDone();
-        requestGlobalRoles();
         break;
       case "LICENSE_STATUS": {
         const statusPart = msg.status ? t("license.srcKeyStatus", { status: t(`license.status.${msg.status}`) }) : "";
@@ -5649,7 +5590,7 @@
     } else chip.textContent = value;
     return chip;
   }
-  function varChip(name, value) {
+  function varChip(name, value, newRoleOf) {
     const chip = document.createElement("span");
     chip.className = "bv-chip bv-var";
     const mark = document.createElement("span");
@@ -5659,7 +5600,14 @@
     const nm = document.createElement("span");
     nm.className = "bv-name";
     nm.textContent = name;
-    chip.append(mark, nm);
+    if (newRoleOf != null) {
+      const badge = document.createElement("span");
+      badge.className = "bv-new";
+      badge.textContent = t("bind.newRole");
+      chip.append(badge, mark, nm);
+      chip.dataset.tip = t("bind.newRoleTip", { global: newRoleOf });
+      chip.title = chip.dataset.tip;
+    } else chip.append(mark, nm);
     return chip;
   }
   var arrowEl = () => {
@@ -5674,6 +5622,7 @@
       var _a;
       for (const nm of Array.from(root.querySelectorAll(".bv-name"))) {
         const chip = nm.parentElement;
+        if (chip.dataset.tip) continue;
         if (nm.scrollWidth > nm.clientWidth + 1) chip.title = (_a = nm.textContent) != null ? _a : "";
         else chip.removeAttribute("title");
       }
@@ -5699,6 +5648,12 @@
     prop.className = "bv-prop";
     prop.textContent = fieldLabel(l.label, l.fields[0]) + (l.keys.length > 1 ? t("bind.placeCount", { k: l.keys.length }) : "");
     row.append(ic, layer, prop);
+    if (l.from) {
+      const from = document.createElement("span");
+      from.className = "bv-from";
+      from.textContent = t("bind.fromGlobal", { global: l.from });
+      row.appendChild(from);
+    }
     return row;
   }
   function bindGroupEl(g) {
@@ -5739,7 +5694,7 @@
       renderBindTree();
       focusCardControl(g.variableId, ".bv-switch");
     });
-    head.append(valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue), grow, tw, sw);
+    head.append(valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf), grow, tw, sw);
     card.appendChild(head);
     if (open) {
       const places = document.createElement("div");
@@ -5849,6 +5804,14 @@
       found.textContent = t("bind.found", { n: bindCandidates.length });
       found.title = t("bind.foundTip", { name: bindPreviewName, n: bindCandidates.length });
     }
+    const roleSum = $("bindRoleSum");
+    const onGroups = has ? bindGroups().all.filter(groupOn) : [];
+    const k = onGroups.filter((g) => g.newRoleOf != null).length;
+    const sw = onGroups.reduce((a, g) => a + g.swaps, 0);
+    const parts = [k ? t("bind.roleNew", { k }) : "", sw ? t("bind.roleSwap", { m: sw }) : ""].filter(Boolean);
+    roleSum.hidden = !parts.length;
+    roleSum.textContent = parts.join(" \xB7 ");
+    roleSum.title = parts.length ? t("bind.roleSummaryTip") : "";
     const skip = $("bindSkipToggle");
     skip.hidden = !showSkip;
     skip.textContent = `${t("bind.skipTotal", { m })} ${bindSkipsOpen ? "\u25BE" : "\u25B8"}`;
@@ -5866,7 +5829,7 @@
     if (!filterOn) row.hidden = true;
     fbtn.setAttribute("aria-expanded", String(!row.hidden));
     const shownSet = new Set(shown.flatMap((g) => g.keys));
-    const outside = [...bindChecked].filter((k) => !shownSet.has(k)).length;
+    const outside = [...bindChecked].filter((k2) => !shownSet.has(k2)).length;
     $("bindOutside").textContent = bindFilterText() && outside ? t("bind.outside", { h: outside }) : "";
   }
   function renderBindTree() {

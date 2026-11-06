@@ -10,6 +10,7 @@ import {
   ResolvedType,
   ScopeName,
   hexToRgb,
+  rgbToHex,
   numberTokenName,
   pxConversions,
   resolvedTypeForToken,
@@ -20,6 +21,7 @@ import {
   unitDescription,
 } from './tokens';
 import { paletteFamilyOf } from './palette';
+import { AUTO_ROLE_KEY, assignNames, colorRoleBases, valueKey } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
 import { findCollection, ensureCollection, collectionTiers } from './collectionRoles'; // 이름이 아니라 지정된 역할로(Primitives→Global 등)
 import { TextSample, TextStyleSpec, ExistingTextStyle } from './textStyles';
 import type { TextStyleSkipReason } from '../shared/messages';
@@ -137,6 +139,88 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
   // 토큰당 Global 1개(거울 없음 — createTokens와 동일).
   for (const t of tokens) tally(gId, t.name, 'globals');
   return summary;
+}
+
+/**
+ * 쓰임 역할 만들기(§2.12 12.10) — 토큰의 쓰임(`uses`)마다 Semantic 역할을 만든다(같은 처리 · 같은 ⌘Z).
+ * 숫자는 쓰임 이름 그대로, 색은 쓰임별 밝기 이름(colorRoleBases). 번호(12.5): 같은 값이 이미 있으면 그 이름을
+ * 쓰고(만들지 않음), 다른 값이 차지했으면 다음 번호. 이미 있는 역할의 값은 바꾸지 않는다.
+ * preview면 만들지 않고 만들 수만 센다. 반환 = 새로 만든(만들) 역할 수.
+ */
+export async function createUsageRoles(tokens: readonly DraftToken[], preview = false): Promise<number> {
+  const withUses = tokens.filter((t) => t.uses?.length);
+  if (!withUses.length) return 0;
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const globalCol = findCollection(cols, 'global');
+  if (!globalCol) return 0;
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const byId = new Map(vars.map((v) => [v.id, v]));
+  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+  const resolve = (v: Variable): VariableValue | undefined => {
+    let cur: Variable | undefined = v;
+    for (let i = 0; i < 12 && cur; i++) {
+      const val: VariableValue | undefined = cur.valuesByMode[modeOf.get(cur.variableCollectionId) ?? ''];
+      if (val && typeof val === 'object' && (val as VariableAlias).type === 'VARIABLE_ALIAS') cur = byId.get((val as VariableAlias).id);
+      else return val;
+    }
+    return undefined;
+  };
+  const keyOfValue = (val: VariableValue | undefined): string => {
+    if (val == null) return '';
+    if (typeof val === 'object' && 'r' in val) return valueKey(rgbToHex(val as RGB));
+    return typeof val === 'number' || typeof val === 'string' ? valueKey(val) : '';
+  };
+  const semCol = findCollection(cols, 'semantic');
+  const existing = new Map<string, string>();
+  if (semCol) for (const v of vars) if (v.variableCollectionId === semCol.id) existing.set(v.name, keyOfValue(resolve(v)));
+  const globalByName = new Map(vars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
+
+  // 요청 — 숫자는 쓰임 이름, 색은 쓰임별 밝기 이름.
+  const reqs: { base: string; value: string; count: number; token: DraftToken }[] = [];
+  const colorUses = new Map<string, { token: DraftToken; count: number }[]>();
+  for (const t of withUses) {
+    for (const u of t.uses ?? []) {
+      if (u.name.startsWith('color/')) {
+        const arr = colorUses.get(u.name) ?? [];
+        arr.push({ token: t, count: u.count });
+        colorUses.set(u.name, arr);
+      } else reqs.push({ base: u.name, value: valueKey(t.value), count: u.count, token: t });
+    }
+  }
+  for (const [use, list] of colorUses) {
+    const counts = new Map<string, number>();
+    for (const x of list) counts.set(String(x.token.value).toLowerCase(), (counts.get(String(x.token.value).toLowerCase()) ?? 0) + x.count);
+    const defKey = existing.get(`${use}/default`);
+    const bases = colorRoleBases([...counts].map(([hex, count]) => ({ hex, count })), defKey || undefined);
+    for (const x of list) {
+      const hex = String(x.token.value).toLowerCase();
+      reqs.push({ base: `${use}/${bases.get(hex) ?? 'default'}`, value: valueKey(hex), count: x.count, token: x.token });
+    }
+  }
+  const names = assignNames(reqs, existing);
+  const toMake = new Map<string, DraftToken>();
+  for (const r of reqs) {
+    const name = names.get(`${r.base}\u0000${r.value}`) ?? r.base;
+    if (existing.has(name) || toMake.has(name)) continue; // 같은 값이 이미 있음(재사용)
+    toMake.set(name, r.token);
+  }
+  if (preview) return toMake.size;
+  const col = semCol ?? ensureCollection(cols, 'semantic', SEMANTIC);
+  let made = 0;
+  for (const [name, t] of toMake) {
+    const g = globalByName.get(t.name);
+    if (!g) continue;
+    const v = figma.variables.createVariable(name, col, g.resolvedType);
+    for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
+    v.scopes = scopesForType(scopeForSemanticRole(name) ?? (g.scopes as ScopeName[]), g.resolvedType as ResolvedType);
+    try {
+      (v as unknown as { setPluginData?: (k: string, val: string) => void }).setPluginData?.(AUTO_ROLE_KEY, '1');
+    } catch {
+      /* 표시를 못 남겨도 역할은 쓴다 */
+    }
+    made++;
+  }
+  return made;
 }
 
 function setGlobalLiteral(v: Variable, modeId: string, t: DraftToken, type: ResolvedType, base: number): void {

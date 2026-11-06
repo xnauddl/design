@@ -16,7 +16,7 @@ import { leafName, cellCopyText, tierBadge, groupKey, matchesQuery, indirectUsag
 import { createReentryScheduler } from './lib/reread';
 import type { FrameMeta } from './lib/similar';
 import type { VarInfo, CollectionRoleInfo } from './shared/messages';
-import { generatePalette, paletteToDraftTokens, paletteSemanticMap, suggestSemanticMap, type Harmony } from './lib/palette';
+import { generatePalette, paletteToDraftTokens, paletteSemanticMap, type Harmony } from './lib/palette';
 import { nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles, mergeTokenRoles, semanticMapToText, textToSemanticMap } from './lib/roles';
 import { pipelineSteps, type PipelineStep } from './lib/pipeline';
@@ -848,32 +848,6 @@ $('btnColorVars').addEventListener('click', () => {
   setStatus('colorStatus', t('common.applyingVars'), '');
 });
 
-$('btnScanGlobals').addEventListener('click', () => {
-  // #10: 기존 Global 색에서 시맨틱 역할 추천(재방문 매핑).
-  autoGlobalScan = false;
-  setStatus(semStatusTarget, t('semantic.scanningGlobals'), '');
-  send({ type: 'GET_GLOBAL_COLORS' });
-});
-
-/** 방금 보낸 Global 색 요청이 자동(전제 상태 감지)인가 — 사용자가 누른 것과 응답 처리가 다르다. */
-let autoGlobalScan = false;
-/** 자동 요청은 세션당 한 번 — 탭을 오갈 때마다 사용자가 고친 맵을 흔들지 않는다. */
-let globalRolesAsked = false;
-
-/**
- * #10 재방문 매핑 — 색 변수가 이미 있는 파일이면 그때 정한 역할을 불러와 채운다.
- * 수동 트리거(「기존 색에서 추천」)는 흡수된 시맨틱 카드 안에 있어 손이 닿지 않으므로,
- * 전제 상태(hasColorVars)를 신호로 삼는다. 채우기는 맵이 비어 있을 때만 —
- * 추측 휴리스틱(suggestSemMapFrom)보다 '지난번에 실제로 만든 것'이 언제나 낫다.
- */
-function requestGlobalRoles(): void {
-  if (globalRolesAsked || !hasColorVars) return;
-  if (($('semMap') as HTMLTextAreaElement).value.trim()) return;
-  globalRolesAsked = true;
-  autoGlobalScan = true;
-  send({ type: 'GET_GLOBAL_COLORS' });
-}
-
 $('btnSemantics').addEventListener('click', () => {
   const map: Record<string, string> = {};
   for (const line of ($('semMap') as HTMLTextAreaElement).value.split('\n')) {
@@ -1129,7 +1103,7 @@ $('btnApplyConfirm').addEventListener('click', () => {
   // #6: 켠 변수의 곳만 직접 연결(WYSIWYG). 플러그인이 각 자리를 다시 확인한다.
   const items = bindCandidates
     .filter((c) => bindChecked.has(candKey(c)))
-    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }));
+    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}), ...(c.fromVariableId ? { fromVariableId: c.fromVariableId } : {}) }));
   if (!items.length) return;
   startLink(items);
 });
@@ -1325,6 +1299,7 @@ async function runWizard(): Promise<void> {
   renderWizardSteps(plan);
 
   const totals: WizardTotals = {};
+  let rolesFromTokens = 0; // 만들기 단계가 만든 쓰임 역할 수(§2.12 12.10)
   let stopped = false;
   let failNote = ''; // 실패 사유 — 칩 툴팁에만 두면 화면에서 사라진다(요약 줄에 함께 싣는다)
 
@@ -1377,13 +1352,26 @@ async function runWizard(): Promise<void> {
         case 'create': {
           const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens, base }, ['CREATE_RESULT']);
           totals.created = r.created + r.updated;
+          rolesFromTokens = r.roles ?? 0;
           setWizardStep('create', 'done', t('wizard.seq.createDone', { created: r.created, updated: r.updated }));
+          // 쓰임 역할은 만들기가 이미 만들었다(§2.12 12.10) — 맵이 비어 '매핑 없음'으로 빠진 역할 매핑 단계를
+          // 건너뜀 대신 끝난 단계로 보인다(빈 맵이라 CREATE_SEMANTICS는 보내지 않는다).
+          const sem = plan.find((x) => x.step.id === 'semantics');
+          if (sem && !sem.run && sem.skipReason === 'wizard.skip.noMapping' && rolesFromTokens > 0) {
+            setWizardStep('semantics', 'done', t('wizard.rolesFromTokens', { n: rolesFromTokens }));
+          }
           break;
         }
         case 'semantics': {
           const r = await wizardRequest({ type: 'CREATE_SEMANTICS', map: semMap }, ['SEMANTICS_RESULT']);
           totals.semanticsAliased = r.aliased;
-          setWizardStep('semantics', 'done', t('wizard.seq.semantics', { aliased: r.aliased }) + (r.missing.length ? t('wizard.seq.semanticsMissing', { n: r.missing.length }) : ''));
+          setWizardStep(
+            'semantics',
+            'done',
+            t('wizard.seq.semantics', { aliased: r.aliased }) +
+              (r.missing.length ? t('wizard.seq.semanticsMissing', { n: r.missing.length }) : '') +
+              (rolesFromTokens > 0 ? t('wizard.rolesFromTokensTail', { n: rolesFromTokens }) : ''),
+          );
           break;
         }
         case 'dark': {
@@ -2200,7 +2188,10 @@ window.onmessage = (event: MessageEvent) => {
         bindSkipsCapped = (msg.skipTotal ?? bindSkips.length) > bindSkips.length;
         renderSkipReasons(msg.reasons ?? {});
         setStatus('applyStatus', '', '');
-        $('bindDoneText').textContent = t('bind.doneCard', { n: msg.bound });
+        $('bindDoneText').textContent =
+          t('bind.doneCard', { n: msg.bound }) +
+          (msg.newRoles ? t('bind.doneNewRoles', { k: msg.newRoles }) : '') +
+          (msg.swapped ? t('bind.doneSwapped', { m: msg.swapped }) : '');
         $('bindDone').hidden = false;
         renderBindTree();
       }
@@ -2309,18 +2300,6 @@ window.onmessage = (event: MessageEvent) => {
     case 'COLLECTION_ROLES':
       renderCollectionRoles(msg.collections);
       break;
-    case 'GLOBAL_COLORS':
-      // #10: 기존 Global 색에서 역할 추천 → 시맨틱 매핑 textarea 채움(재방문 매핑).
-      // 자동 요청은 비어 있을 때만 채운다 — 사용자가 이미 고른 역할을 덮으면 안 된다.
-      if (!msg.colors.length) {
-        if (!autoGlobalScan) setStatus(semStatusTarget, t('semantic.noGlobals'), 'warn');
-      } else if (!autoGlobalScan || !($('semMap') as HTMLTextAreaElement).value.trim()) {
-        setSemMapText(suggestSemanticMap(msg.colors));
-        renderColorTable(); // 이미 색이 떠 있으면 역할 드롭다운을 새 맵으로 다시 채운다
-        if (!autoGlobalScan) setStatus(semStatusTarget, t('semantic.suggested', { count: msg.colors.length }), 'ok');
-      }
-      autoGlobalScan = false;
-      break;
     case 'PREREQ_STATE':
       // #11: 단계 전제 갱신 → 통합 게이트 재평가 + 진행 안내(§3).
       prereqKnown = true;
@@ -2337,7 +2316,6 @@ window.onmessage = (event: MessageEvent) => {
       hasSemanticRoles = msg.hasSemanticRoles;
       updateGates();
       applySelectionDone(); // renderPipeline 포함 — 변수 유무가 '처음/다시' 판정을 바꾼다
-      requestGlobalRoles(); // #10: 이미 색 변수가 있는 파일이면 지난번 역할을 불러온다
       break;
     case 'LICENSE_STATUS': {
       // 상태값(active/grace/expired)은 한국어로(결정 5-(b)). FREE/PAID는 그대로(§2.9 예외).
@@ -2902,7 +2880,7 @@ function valueChip(value: string): HTMLElement {
   return chip;
 }
 /** 변수 칩 — 타입 표시 + 이름(길면 말줄임 + 툴팁). */
-function varChip(name: string, value: string): HTMLElement {
+function varChip(name: string, value: string, newRoleOf?: string): HTMLElement {
   const chip = document.createElement('span');
   chip.className = 'bv-chip bv-var';
   const mark = document.createElement('span');
@@ -2912,7 +2890,15 @@ function varChip(name: string, value: string): HTMLElement {
   const nm = document.createElement('span');
   nm.className = 'bv-name';
   nm.textContent = name;
-  chip.append(mark, nm);
+  if (newRoleOf != null) {
+    // 새 역할(§2.12) — 연결할 때 Semantic에 만든다.
+    const badge = document.createElement('span');
+    badge.className = 'bv-new';
+    badge.textContent = t('bind.newRole');
+    chip.append(badge, mark, nm);
+    chip.dataset.tip = t('bind.newRoleTip', { global: newRoleOf });
+    chip.title = chip.dataset.tip;
+  } else chip.append(mark, nm);
   return chip;
 }
 const arrowEl = (): HTMLElement => {
@@ -2927,6 +2913,8 @@ function tipTruncatedNames(root: HTMLElement): void {
   requestAnimationFrame(() => {
     for (const nm of Array.from(root.querySelectorAll<HTMLElement>('.bv-name'))) {
       const chip = nm.parentElement as HTMLElement;
+      // 새 역할 칩은 툴팁이 정해져 있다(§2.12) — 말줄임 툴팁으로 덮지 않는다.
+      if (chip.dataset.tip) continue;
       if (nm.scrollWidth > nm.clientWidth + 1) chip.title = nm.textContent ?? '';
       else chip.removeAttribute('title');
     }
@@ -2953,6 +2941,13 @@ function placeEl(l: PlaceLine): HTMLElement {
   prop.className = 'bv-prop';
   prop.textContent = fieldLabel(l.label, l.fields[0]) + (l.keys.length > 1 ? t('bind.placeCount', { k: l.keys.length }) : '');
   row.append(ic, layer, prop);
+  if (l.from) {
+    // Global에서 바꾸는 자리(§2.12 12.8)
+    const from = document.createElement('span');
+    from.className = 'bv-from';
+    from.textContent = t('bind.fromGlobal', { global: l.from });
+    row.appendChild(from);
+  }
   return row;
 }
 
@@ -2995,7 +2990,7 @@ function bindGroupEl(g: VarGroup): HTMLElement {
     renderBindTree();
     focusCardControl(g.variableId, '.bv-switch');
   });
-  head.append(valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue), grow, tw, sw);
+  head.append(valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf), grow, tw, sw);
   card.appendChild(head);
   if (open) {
     const places = document.createElement('div');
@@ -3119,6 +3114,15 @@ function renderBindBadges(): void {
     found.textContent = t('bind.found', { n: bindCandidates.length });
     found.title = t('bind.foundTip', { name: bindPreviewName, n: bindCandidates.length });
   }
+  // 새 역할 k(켠 카드) · 바꿈 m(켠 카드의 바꾸는 자리) — 0인 쪽은 빼고, 둘 다 0이면 숨김(§4.6 · §2.12).
+  const roleSum = $('bindRoleSum');
+  const onGroups = has ? bindGroups().all.filter(groupOn) : [];
+  const k = onGroups.filter((g) => g.newRoleOf != null).length;
+  const sw = onGroups.reduce((a, g) => a + g.swaps, 0);
+  const parts = [k ? t('bind.roleNew', { k }) : '', sw ? t('bind.roleSwap', { m: sw }) : ''].filter(Boolean);
+  roleSum.hidden = !parts.length;
+  roleSum.textContent = parts.join(' · ');
+  roleSum.title = parts.length ? t('bind.roleSummaryTip') : '';
   const skip = $('bindSkipToggle');
   skip.hidden = !showSkip;
   skip.textContent = `${t('bind.skipTotal', { m })} ${bindSkipsOpen ? '▾' : '▸'}`;

@@ -100,6 +100,8 @@ export interface BindCandidate {
   variableValue?: string;
   /** 새 역할(§2.12 12.9) — 연결할 때 만든다. 이때 variableId는 `new:{이름}`(카드 묶음 키). */
   newRole?: NewRoleRef;
+  /** 새 역할이 가리킬 Global 이름(칩 툴팁 "…{Global}을 가리켜요"). */
+  newRoleGlobalName?: string;
   /** Global에서 바꾸는 자리 — 붙어 있던 Global id · 이름(§2.12 12.8). */
   fromVariableId?: string;
   fromVariableName?: string;
@@ -212,7 +214,6 @@ export type UiToCode =
   | { type: 'GET_COLLECTION_ROLES' } // 컬렉션 → 계층 지정 현황(설정 탭)
   | { type: 'SET_COLLECTION_ROLE'; collectionId: string; role: 'global' | 'semantic' | 'component' | 'none' | null } // null=지정 해제(이름으로 판정)
   | { type: 'SET_UI_SIZE'; mode: 'default' | 'mini' } // IA v3: 최소화(400×48) / 펼치기(400×510), 저장 안 함
-  | { type: 'GET_GLOBAL_COLORS' } // #10: 기존 Global 색 변수 스캔(재방문 시맨틱 매핑 추천용)
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
   | { type: 'GET_LICENSE' }
   | { type: 'SET_LICENSE'; tier: Tier } // M1: 개발용 강제 티어(검증 키 없을 때만 적용)
@@ -251,7 +252,7 @@ export type CodeToUi =
   | { type: 'USAGE_RESULT'; reqId: number; usage: Record<string, { places: number; layers: number }>; libraryVars: LibraryVar[]; deleted: { count: number; nodeIds: string[] }; scanned: number }
   | { type: 'VAR_USERS'; reqId: number; layers: { id: string; name: string }[]; totalLayers: number; places: number }
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
-  | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean }
+  | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean; roles?: number } // roles: 새로 만든(미리보기는 만들) 쓰임 역할 수(§2.12 12.10)
   | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; swapped?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; reqId?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수. APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
   | { type: 'PROGRESS'; op: 'bind' | 'link'; done: number; total: number } // UX6: 진행률. 'bind' = 찾기(APPLY), 'link' = 연결(APPLY_SELECTED, 300곳씩)
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
@@ -263,7 +264,6 @@ export type CodeToUi =
   // 기존 스타일 연결(§4.6) — skipped = 건너뛴 텍스트 레이어 수(= skipReasons 합), skipReasons = 사유별 텍스트 수.
   | { type: 'TEXT_STYLES_APPLIED'; applied: number; skipped: number; skipReasons: Record<TextStyleSkipReason, number> }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
-  | { type: 'GLOBAL_COLORS'; colors: { name: string; hex: string }[] } // #10: 기존 Global 색(이름+hex)
   // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).
   | {
       type: 'PREREQ_STATE';
