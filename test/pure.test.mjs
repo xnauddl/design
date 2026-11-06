@@ -2354,10 +2354,10 @@ test('normalizeUiSize — mini만 최소화, 예전 large·{h}·깨진 값은 �
   }
   assert.equal(uiHeight('default'), 510);
   assert.equal(uiHeight('mini'), 104);
-  assert.equal(uiWidth('default'), 400);
+  assert.equal(uiWidth('default'), 480);
   assert.equal(uiWidth('mini'), 140); // 최소화는 폭도 줄인다(Tokens Studio처럼 작은 사각형)
   assert.ok(uiWidth('mini') >= 70); // 피그마 창 최소 폭
-  assert.equal(UI_WIDTH, 400); // #17: 가로 고정
+  assert.equal(UI_WIDTH, 480); // #17: 가로 고정
   assert.deepEqual(Object.keys(UI_HEIGHT).sort(), ['default', 'mini']); // 크게(860)는 없다
 });
 
