@@ -230,7 +230,7 @@
       1. Component(계층 3) 변수 — 지금과 같다(여럿이면 지금 순서).
       2. **쓰임이 맞는 Semantic 변수.** 숫자 · 색 묶음은 이름이 그 자리의 쓰임 이름(12.3 · 12.4)이거나 그 이름 + `-n`인 것. 글자 묶음은 같은 그룹(`font-size/` · `line-height/` · `letter-spacing/` · `font-family/`) 안의 아무 이름이나(글자 역할은 만들기 · 텍스트 스타일이 값 순위로 짓기 때문 — 이름으로 쓰임을 알 수 없다). 단 거울(12.7)은 빼고, 플러그인 표시 여부는 보지 않는다. 여럿이면 이름 순 첫 번째.
       3. **디자이너가 만든 Semantic 변수**(숫자 · 색 묶음만): 플러그인 표시(12.6)가 없고 옛 이름(12.7)도 아닌 것. 디자이너가 정한 역할을 먼저 존중한다. 여럿이면 이름 순 첫 번째.
-      4. 없으면 **새 역할**을 쓰임 이름으로 만든다(12.5). 값은 같은 값 · 맞는 용도의 로컬 Global(계층 1) 변수의 별칭이다. 그런 Global이 여럿이면 이름 순 첫 번째. 없으면 지금처럼 "매칭 없음"(`no-match`)으로 건너뛴다 — 연결은 Global을 만들지 않는다(Global은 만들기에서).
+      4. 없으면 **새 역할**을 쓰임 이름으로 만든다(12.5). 값은 같은 값 · 맞는 용도의 로컬 Global(계층 1) 변수의 별칭이다. 그런 Global이 여럿이면 사용자 컬렉션 것을 먼저, 그 안에서 이름 순 첫 번째(§2.13 13.5). 없으면 지금처럼 "매칭 없음"(`no-match`)으로 건너뛴다 — 연결은 Global을 만들지 않는다(Global은 만들기에서).
       - **보는 순서는 1 → 3 → 2 → 4다**(숫자 · 색 묶음). 디자이너가 만든 변수가 플러그인의 쓰임 이름보다 먼저다 — 색은 쓰임 이름(밝기)이 순서 3의 결과에 달려 있기도 하다(12.4 처리 순서). 글자 묶음은 순서 3이 없어 1 → 2 → 4다.
       - 계층 없음(0) · 라이브러리 변수는 지금처럼 후보가 아니다. **Global은 더 이상 붙일 후보가 아니다**(별칭 대상으로만 찾는다). 순서 2 · 3의 "이름 순"은 새로 정하는 결정적 순서다(지금 코드의 "변수 목록 순 첫 일치" · 숫자 거리 순을 대신한다 — 값은 언제나 같으므로 거리는 0).
     - **12.3 쓰임 이름 — 숫자 · 글자.** `{그룹}/{주인}/{속성}`. 주인이 없으면 `{그룹}/{속성}`, 속성이 없는 그룹이면 `{그룹}/{주인}`, 둘 다 없으면 `{그룹}/default`.
@@ -278,7 +278,7 @@
       - **이미 있는 역할의 값(별칭 대상)은 절대 바꾸지 않는다.** 만들기도 연결과 같은 규칙으로 번호를 고른다 — 지금 `createSemanticAliases`의 같은 이름 덮어쓰기(`upsertVariable`)는 이 경로에서 쓰지 않는다(덮어쓰면 이미 붙은 레이어의 화면 값이 바뀐다, 2.11).
       - 연결은 찾기에서 정한 이름을 그대로 쓴다. 그 사이 같은 이름에 다른 값이 생겼을 때만 다음 번호를 쓴다. 스위치를 끈 카드의 이름은 비워 두지 않는다(켠 카드의 이름이 바뀌지 않게).
     - **12.6 역할 변수의 모양.**
-      - Semantic 컬렉션에 만든다. 없으면 만든다(지금 `ensureCollection`). 컬렉션의 **모든 모드**에 같은 Global 별칭을 건다(다크 모드가 있으면 Dark 값도 같은 Global — 다크 짝은 다크 단계가 따로 정한다).
+      - 플러그인 Semantic(§2.13 13.2)에 만든다. 없으면 만든다(사용자 Semantic이 있어도). 컬렉션의 **모든 모드**에 같은 Global 별칭을 건다(다크 모드가 있으면 Dark 값도 같은 Global — 다크 짝은 다크 단계가 따로 정한다).
       - 용도(scope): spacing → GAP, radius → CORNER_RADIUS, stroke-width → STROKE_FLOAT, size → WIDTH_HEIGHT, opacity → OPACITY, `color/text` → TEXT_FILL, `color/background` → FRAME_FILL · SHAPE_FILL, `color/icon` → SHAPE_FILL · STROKE_COLOR, `color/border` → STROKE_COLOR, `color/shadow` → EFFECT_COLOR. 글자 묶음은 Global의 용도를 물려받는다(지금 동작 — `scopeForSemanticRole`이 모르는 이름). `scopeForSemanticRole`을 이 표로 넓힌다.
       - **플러그인 표시:** 만들기의 자동 역할과 연결이 만든 역할에 변수 플러그인 데이터 `dsl.autoRole = "1"`을 남긴다. 색 목록 표에서 사용자가 고른 역할 · 텍스트 스타일 등록 · 손으로 고친 매핑(`semMap`)은 남기지 않는다.
       - **칠하기 용도:** §2.11 "칠하기 용도는 레이어 종류를 따른다"(QA #4 불합격 1 — 이 작업과 한 PR, 부록 A.9)를 그대로 쓴다.
@@ -289,7 +289,7 @@
     - **12.8 이미 붙은 연결 — 바꾸지도 풀지도 않는다 (2026-11-06 사용자 결정 B).** 같은 날 정했던 "Global에서 바꾸기"(로컬 Global이 붙은 자리를 같은 값의 역할로 바꿈), "용도가 틀린 연결 바꾸기"(용도가 맞지 않는 Semantic · Component를 맞는 역할로 바꿈), "12.8a 크기 연결 풀기"(바꿀 수 없는 크기 자리의 Global 연결을 풂)를 모두 철회한다.
       - 왜: 플러그인은 그 연결을 누가 붙였는지 구별하지 못한다(Global에는 플러그인 표시가 없다). 사용자가 일부러 붙인 연결까지 되돌리게 된다. 플러그인이 앞으로 그런 연결을 만들지 않으면 충분하다.
       - 찾는 자리(§2.11 "찾는 범위") 중 변수가 붙은 곳은 "이미 연결됨"(지워진 변수면 "삭제된 변수에 연결됨")으로 센다 — §2.11 그대로. 찾지 않는 자리(아이콘 · 아바타가 아닌 레이어의 크기, 줄바꿈이 아닌 줄 사이 간격)는 붙어 있어도 세지 않고, 사이 간격 자동 · HUG/FILL · 자유 배치는 그 사유가 먼저다. 바꾸기 후보 · 풀기 후보는 없다.
-      - 결과: 이미 Global이 붙은 레이어(옛 플러그인 결과 등)에는 Global이 남는다. 정리는 사용자가 피그마에서 한다. 플러그인 전용 컬렉션으로 사용자 변수와 나누는 일은 다음 PR에서 따로 명세한다.
+      - 결과: 이미 Global이 붙은 레이어(옛 플러그인 결과 등)에는 Global이 남는다. 정리는 사용자가 피그마에서 한다. 플러그인 전용 컬렉션으로 사용자 변수와 나누는 일은 §2.13이다.
     - **12.9 연결 메시지 · 되돌리기.**
       - 적용 모드 `bindSelection(apply=true)`(`code.ts` `APPLY`의 `preview: false` — UI는 쓰지 않음)도 같은 규칙이다: 찾기와 같은 후보를 만든 뒤 `bindSelectedItems`와 같은 함수로 새 역할을 만들고 붙인다. ⌘Z는 지금 `APPLY` 처리 + 아래 규칙.
       - 찾기 결과 `BindCandidate`와 연결 요청 `APPLY_SELECTED`의 items에 `newRole {name, globalId, scopes}`(새 역할일 때 — 아직 `variableId`가 없으므로 이것으로 묶는다)를 더한다.
@@ -305,30 +305,36 @@
 13. **플러그인 컬렉션과 사용자 컬렉션 (2026-11-06 사용자 결정, #124 다음 PR).** 플러그인이 자동으로 만드는 변수는 플러그인 컬렉션에만 넣고, 사용자 컬렉션의 변수는 고치지 않되 찾아 쓴다.
     - **13.1 두 종류.**
       - **플러그인 컬렉션:** 플러그인이 변수를 만들고 · 값을 바꾸고 · 지우고 · 모드를 더하는 곳. Global 역할 하나, Semantic 역할 하나. Component 역할의 플러그인 컬렉션은 없다.
-      - **사용자 컬렉션:** 그 밖의 로컬 컬렉션 전부. 플러그인의 자동 기능(만들기 · 쓰임 역할 · 연결 · 역할 매핑 · 다크 · 텍스트 스타일 역할 · 팔레트 이전 색 지우기)은 여기에 변수 · 모드를 만들거나 바꾸거나 지우지 않는다. 사용자가 변수 탭에서 직접 하는 일(§4.4 고치기 · 삭제)은 별개로 지금 그대로다.
+      - **사용자 컬렉션:** 그 밖의 로컬 컬렉션 전부. 플러그인의 자동 기능(만들기 · 쓰임 역할 · 연결 · 역할 매핑 · 다크 · 텍스트 스타일 역할 · 팔레트 이전 색 지우기)은 여기에 변수 · 모드를 만들거나 바꾸거나 지우지 않는다. 사용자가 변수 탭에서 직접 하는 일(§4.4 고치기)은 별개로 지금 그대로다.
       - 라이브러리 컬렉션은 지금처럼 찾기에도 쓰지 않는다.
     - **13.2 어느 것이 플러그인 컬렉션인가 (위에서부터 먼저).**
       1. 플러그인 표시가 있는 컬렉션 — 컬렉션 pluginData `dsl.owned` = `global` · `semantic`. 이름을 바꿔도 플러그인 컬렉션이다.
       2. 표시가 없고, 이름이 정확히 `Global` · `Semantic`이며, 계층 지정(13.3)이 없거나 **같은 역할**(`Global` → global, `Semantic` → semantic — 예전 "추천대로"로 저장된 지정)이면 **플러그인 것으로 이어받는다**(2026-11-06 사용자 결정). 다른 역할이나 "계층 아님"으로 지정한 것만 사용자 컬렉션이다. 같은 이름이 여럿이면 목록 순서 첫 번째만 이어받는다(사용자 결정 — 예전 플러그인이 만든 파일). 처음 쓸 때 표시를 단다(읽기만 할 때는 달지 않는다).
-      3. 없으면 처음 쓸 때 만들고 표시를 단다. 이름: 같은 이름의 컬렉션이 없으면 `Global` · `Semantic`, 있으면(13.3으로 지정된 사용자 컬렉션) `DSL Global` · `DSL Semantic`(그것도 있으면 뒤에 ` 2` · ` 3`).
+      3. 없으면 **변수를 실제로 만들 때** 만들고 표시를 단다(빈 컬렉션을 미리 만들지 않는다 — 모든 토큰이 사용자 Global을 재사용하면 플러그인 Global은 생기지 않는다). 이름: 같은 이름의 컬렉션이 없으면 `Global` · `Semantic`, 있으면(13.3으로 지정된 사용자 컬렉션) `DSL Global` · `DSL Semantic`(그것도 있으면 뒤에 ` 2` · ` 3`).
       - 같은 역할의 표시가 둘 이상이면(복제한 파일 등) 목록 순서 첫 번째만 플러그인 컬렉션이고, 나머지는 사용자 컬렉션으로 본다(계층은 13.3대로).
     - **13.3 계층 지정 = 찾을 곳.** 설정의 "컬렉션 계층 지정"(변수 탭 ⋯ › 계층 팝업)은 사용자 컬렉션에만 쓴다. 지정한 계층(Global · Semantic · Component · 계층 아님)은 플러그인이 **찾아 쓰는** 계층이다 — 그 컬렉션에 쓰지는 않는다.
       - 역할 하나에 컬렉션 여러 개를 지정할 수 있다(지금의 "한 역할 = 한 컬렉션" 규칙과 `colRoles.dup` 안내를 없앤다).
-      - 플러그인 컬렉션은 목록에 그대로 보이되 계층을 고를 수 없고, 고르개 대신 "플러그인 · Global"(`colRoles.owned`)을 보인다.
+      - 플러그인 컬렉션은 목록에 그대로 보이되 계층을 고를 수 없고, 고르개 대신 "플러그인 · {role}"(`colRoles.owned`, {role} = Global · Semantic)을 보이고, 추천(`colRoles.guess` · [추천대로])도 보이지 않는다. 각 줄의 판정(`CollectionRoleInfo.role` · "자동 — …")은 13.2 · 13.3 규칙으로 계산한다(이어받지 않은 정확한 이름은 "자동 — 계층 아님").
       - 지정이 없고 이름이 정확히 `Component`인 사용자 컬렉션은 지금처럼 Component로 읽는다. 이름이 정확히 `Global` · `Semantic`인데 13.2-2에서 이어받지 않은 것(같은 역할의 표시가 이미 있음)은 지정이 없으면 계층 아님이다.
       - 이름 추측(`guessRole`)은 지금처럼 추천 표시만 한다.
       - 바뀌는 점(기존 파일): 전에 사용자 컬렉션(`Primitives` 등)을 Global로 지정해 두었으면, 지금까지는 만들기가 그 안에 썼지만 이제는 찾기만 하고 새 변수는 플러그인 Global에 만든다.
     - **13.4 계층 번호.** 플러그인 컬렉션은 그 역할(Global 1 · Semantic 2), 사용자 컬렉션은 지정(없으면 이름 규칙 13.3, 그것도 아니면 0). 연결 · 변수 표 · 내보내기 · 준비 현황이 이 번호를 쓴다(`collectionTiers`).
     - **13.5 연결(12.2)에서.** 보는 순서 1 → 3 → 2 → 4는 그대로다. 사용자 컬렉션의 변수도 계층에 따라 후보가 된다(①): 순서 1은 Component 계층, 순서 3 "디자이너가 만든 Semantic"은 Semantic 계층(플러그인 · 사용자 컬렉션 모두)에서 플러그인 표시 · 옛 이름 · 거울이 아닌 것, 순서 2는 Semantic 계층 전부.
       - 순서 4의 새 역할은 **플러그인 Semantic**에 만든다. 별칭 대상(②): 같은 값 · 맞는 용도의 Global 계층 변수 중 **사용자 컬렉션 것을 먼저**, 그 안에서 이름 순. 없으면 플러그인 Global 중 이름 순. 둘 다 없으면 지금처럼 "매칭 없음"(연결은 Global을 만들지 않는다).
-      - 번호(12.5)의 "이미 있는 이름"은 Semantic 계층 전부(플러그인 · 사용자)의 이름이다 — 지금 그대로.
+      - 번호(12.5)의 "이미 있는 이름"은 Semantic 계층 전부(플러그인 · 사용자)의 이름이다. 같은 이름이 여러 컬렉션에 있으면 이름별 값 묶음으로 본다 — 어느 컬렉션이든 같은 값이면 재사용, 이름이 있으면 차지된 것.
+      - **같은 이름이 여러 컬렉션에 있을 때의 순서:** 사용자 컬렉션 먼저, 그 안에서 컬렉션 목록 순(순서 2 · 3의 "이름 순 첫 번째"가 같을 때, 기준색 `color/{쓰임}/default`를 고를 때 모두). 내보내기의 같은 이름도 이 순서로 앞의 것 하나를 남긴다(`dedupeByName`).
     - **13.6 만들기 · 쓰임 역할(12.10)에서.**
-      - Global 토큰: 같은 종류 · 같은 값(기본 모드, 2.11 "같은 값") · 그 토큰의 용도를 받는(`scopeOk`) Global 계층 사용자 변수가 있으면 **만들지 않고 그것을 쓴다**(②, 이름 순 첫 번째). 없으면 플러그인 Global에 만든다(이름 · 덮어쓰기 규칙은 지금 그대로, 플러그인 Global 안에서만).
+      - **재사용 범위(2026-11-06 사용자 결정 A):** 선택에서 뽑은 토큰 중 **쓰임 목록(`uses`)이 있는 토큰**(간격 · 반경 · 선 두께 · 크기 · 투명도 · 색)만 재사용한다. 쓰임 목록이 없는 토큰 — 글자 토큰(글자 크기 · 줄 높이 · 자간 · 글꼴), 팔레트 「색 변수 만들기」, 텍스트 스타일 만들기가 넣는 토큰 — 은 지금처럼 플러그인 Global에 만든다(팔레트는 50~900 단계가 한 벌이라 일부만 사용자 변수로 바뀌면 단계가 섞이고, 텍스트 스타일 경로는 Global을 이름으로 찾기 때문).
+      - 재사용: 같은 종류 · 같은 값(그 Global이 속한 컬렉션의 기본 모드, 2.11 "같은 값") · 그 토큰의 용도를 받는(`scopeOk`) Global 계층 **사용자** 변수가 있으면 **만들지 않고 그것을 쓴다**(②, 사용자 컬렉션 목록 순 · 이름 순 첫 번째). 없으면 플러그인 Global에 만든다(이름 · 덮어쓰기 규칙은 지금 그대로, 플러그인 Global 안에서만).
+      - `createTokens`는 **토큰 이름 → 고른 Global id** 맵을 돌려주고, 같은 처리 안의 `createUsageRoles`가 그 맵으로 별칭 대상을 찾는다(지금의 "플러그인 Global이 있어야 한다" · 이름으로 찾기를 없앤다). 같은 맵을 파일(figma.root pluginData `dsl.reuseMap`, 토큰 이름 → Global id)에 남겨, 뒤이은 역할 매핑 표(`CREATE_SEMANTICS`)가 재사용된 토큰 이름을 찾을 수 있게 한다(13.7).
       - 쓰임 역할은 플러그인 Semantic에 만들고, 별칭 대상은 위에서 고른 Global(사용자 것일 수 있다). 같은 쓰임 이름 · 같은 값의 역할이 Semantic 계층 어디에든 있으면 만들지 않는다(재사용, ①).
-      - 결과 수(`create.sumGlobals`의 {n})는 새로 만든 Global 수다. 재사용한 사용자 Global은 세지 않는다(문구를 더하지 않는다).
+      - 결과 수: `create.sumGlobals` "Global {n}개 (생성 {c} / 갱신 {u})"의 {n} · {c} · {u}는 플러그인 Global에 만들거나 갱신한 수다. 재사용한 사용자 Global은 어디에도 세지 않고 문구도 더하지 않는다. [미리보기](`previewCreateTokens`)도 같은 판단으로 센다.
     - **13.7 다른 쓰기 기능 (사용자 결정 — 전부 플러그인 컬렉션 안에서만).**
-      - 역할 매핑 표(`createSemanticAliases`): 플러그인 Semantic에 만든다. Global 이름은 Global 계층 전부에서 찾는다(플러그인 Global 먼저, 같은 이름이면 그것).
+      - 역할 매핑 표(`createSemanticAliases`): 플러그인 Semantic에 만든다. Global 이름은 Global 계층 전부에서 찾는다(플러그인 Global 먼저, 같은 이름이면 그것). 이름으로 못 찾으면 `dsl.reuseMap`에서 그 이름이 재사용한 Global을 쓴다(13.6). 그래도 없으면 지금처럼 `missing`.
       - 다크(`themeApply`): Dark 모드는 플러그인 Semantic에만 더하고, 다시 거는 별칭과 새 어두운 Global은 플러그인 컬렉션에만 만든다. 사용자 Semantic의 모드 · 별칭은 건드리지 않는다.
+        - 라이트 값은 역할이 가리키는 Global이 **속한 컬렉션의 기본 모드**로 읽는다(사용자 Global일 수 있다 — 지금은 플러그인 Global의 기본 모드로 읽어 사용자 Global이면 값이 비어 건너뛴다). 어두운 짝 `dark/{원래 이름}`은 플러그인 Global에 만들고, 같은 이름이 이미 있으면 지금처럼 그것을 쓴다.
+        - 대상 컬렉션: 다크 카드의 대상 목록(`refreshDarkOptions`) · 마법사의 대상(`pickDarkTarget`)은 플러그인 Semantic 하나뿐이다. 플러그인 Semantic이 없으면 다크 카드는 "토큰 만들기로 →"(§4.5)를 보인다. `GENERATE_DARK`에 플러그인 Semantic이 아닌 컬렉션 id가 오면 바꾸지 않고 오류로 답한다.
+        - 준비 현황의 다크 완료(`hasDarkMode`)는 플러그인 Semantic의 모드가 둘 이상일 때다.
       - 텍스트 스타일 역할(`font-size/…` 등 Semantic 이동 · 생성): 플러그인 Semantic에서만.
       - 팔레트 다시 적용의 이전 색 지우기(`prunePaletteColors`): 플러그인 Global · Semantic 안에서만 지운다. 사용자 컬렉션의 색은 지우지 않는다.
       - 내보내기: Global · Semantic 계층 전부(플러그인 + 사용자 지정) — 지금 그대로.
@@ -1164,7 +1170,7 @@
 | 로컬 변수 0개 (유료) | 지금 경고 + "토큰 만들기로 →" |
 | 로컬 변수 0개 (무료) | "연결할 변수가 없어요 · 변수 만들기는 유료 기능이에요 [라이선스 →]" |
 
-- (2026-11-06, §2.12) Global이 없고 Semantic · Component만 있는 파일은 지금처럼 찾기를 보낸다 — 이미 있는 역할에만 붙고, 새 역할은 만들 수 없어 나머지는 "매칭 없음"이다. Global만 있는 파일도 찾기를 보낸다 — Semantic 컬렉션이 없으면 연결이 만든다(§2.12 12.6).
+- (2026-11-06, §2.12) Global이 없고 Semantic · Component만 있는 파일은 지금처럼 찾기를 보낸다 — 이미 있는 역할에만 붙고, 새 역할은 만들 수 없어 나머지는 "매칭 없음"이다. Global만 있는 파일도 찾기를 보낸다 — 플러그인 Semantic이 없으면 연결이 만든다(사용자 Semantic이 있어도, §2.13 13.2).
 
 - ②는 라이브러리 사용 여부를 읽었을 때만 판정한다. 선택이 없거나, 300개를 넘거나, 아직 읽는 중이면 ② 행을 건너뛰고 "로컬 변수 0개 (유료)" / "로컬 변수 0개 (무료)" 행을 보여 준다.
 - "계층이 지정된"은 직접 지정했거나 이름(Global · Semantic · Component)으로 정해진 계층을 모두 포함한다(§4.4 사이드바 계층 배지와 같다).
@@ -2179,13 +2185,13 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 - [ ] `collectionRoles.ts` · `tiers.ts`: 플러그인 컬렉션 판정(표시 `dsl.owned` → 이름 `Global` · `Semantic` 이어받기(지정 없을 때) → 없음), `ownedCollection(role)`(읽기) · `ensureOwnedCollection(role)`(쓰기 — 이어받기 표시 달기 · 만들기 · 이름 고르기 `Global`/`DSL Global`/` 2`), 같은 역할 표시 둘 이상이면 첫 번째만. `collectionTiers`는 13.4대로. `pickCollection` · `ensureCollection`의 쓰기 쓰임은 모두 `ensureOwnedCollection`으로
 - [ ] 계층 지정: `assignRole`의 "같은 역할은 하나만" 제거, 플러그인 컬렉션에는 지정 불가(`SET_COLLECTION_ROLE`이 무시), `CollectionRoleInfo.owned`(`'global' | 'semantic'`)
-- [ ] 연결(`bind.ts`): 새 역할은 `ensureOwnedCollection('semantic')`, 별칭 대상 Global은 사용자 컬렉션 먼저 → 플러그인 Global(`globalFor`), `createRole`도 플러그인 Semantic 안에서 이름 · 재사용 판단
-- [ ] 만들기(`variables.ts`): `createTokens` — 같은 값 · 용도를 받는 사용자 Global이 있으면 재사용(만들지 않음, 쓰임 역할의 별칭 대상으로 씀), 없으면 플러그인 Global. `previewCreateTokens`도 같은 판단으로 센다. `createUsageRoles` — 플러그인 Semantic, 같은 쓰임 이름 · 같은 값 역할이 Semantic 계층 어디든 있으면 재사용
-- [ ] `createSemanticAliases`: 플러그인 Semantic에 만들고 Global 이름은 Global 계층 전부(플러그인 먼저)
-- [ ] 다크(`themeApply.ts`): 플러그인 Semantic에만 모드 · 별칭, 새 Global은 플러그인 Global
+- [ ] 연결(`bind.ts`): 새 역할은 `ensureOwnedCollection('semantic')`, 별칭 대상 Global은 사용자 컬렉션 먼저 → 플러그인 Global(`globalFor`), 같은 이름 여러 컬렉션은 사용자 먼저 · 목록 순(`byName` 동점 · 기준색 `default`). `createRole`: 이름 차지 여부는 Semantic 계층 전부, 만드는 곳은 플러그인 Semantic
+- [ ] 만들기(`variables.ts`): `createTokens` — `uses`가 있는 토큰만, 같은 값 · 용도를 받는 사용자 Global이 있으면 재사용(만들지 않음), 없으면 플러그인 Global. 토큰 이름 → Global id 맵을 돌려주고 `dsl.reuseMap`에 남김. 컬렉션은 실제로 만들 때만 생성(`resolveCollections`의 미리 만들기 제거). `previewCreateTokens`도 같은 판단으로 센다(생성 · 갱신 수에 재사용 제외). `createUsageRoles` — 플러그인 Global 필수 조건 · `globalByName` 제거, 맵으로 별칭 대상, 플러그인 Semantic, 같은 쓰임 이름 · 같은 값 역할이 Semantic 계층 어디든 있으면 재사용(기존 이름 맵은 이름별 값 묶음)
+- [ ] `createSemanticAliases`: 플러그인 Semantic에 만들고 Global 이름은 Global 계층 전부(플러그인 먼저), 없으면 `dsl.reuseMap`
+- [ ] 다크(`themeApply.ts`): 플러그인 Semantic에만 모드 · 별칭, 라이트 값은 그 Global 컬렉션의 기본 모드, 새 `dark/…` Global은 플러그인 Global. 대상: `ui.ts` `refreshDarkOptions` · `wizard.ts` `pickDarkTarget`은 플러그인 Semantic만(`VarInfo`/`VarCollection`에 owned), 없으면 "토큰 만들기로 →", `code.ts` `GENERATE_DARK`는 다른 id면 오류, `postPrereq` `hasDarkMode`는 플러그인 Semantic 기준
 - [ ] 텍스트 스타일 역할(`variables.ts` 텍스트 스타일 경로의 `findCollection(…,'semantic')` 세 곳): 플러그인 Semantic
 - [ ] `prunePaletteColors`: 플러그인 Global · Semantic 안에서만
-- [ ] UI(§4.4 계층 팝업): 플러그인 줄 "플러그인 · {역할}"(`colRoles.owned`), `colRoles.hint` · `colRoles.saved` 문구, `colRoles.dup` 지움, `ui.ts` `renderCollectionRoles`의 "다른 컬렉션 지정이 풀린다" 처리(`holder` · `pendingRoleNote.prev`) 지움
+- [ ] UI(§4.4 계층 팝업): 플러그인 줄 "플러그인 · {role}"(새 키 `colRoles.owned`, 고르개 · 추천 숨김), 각 줄 판정 `CollectionRoleInfo.role`을 13.2 · 13.3으로, `colRoles.hint` · `colRoles.saved` 문구, `colRoles.dup` 지움, `ui.ts` `renderCollectionRoles`의 "다른 컬렉션 지정이 풀린다" 처리(`holder` · `pendingRoleNote.prev`) 지움
 - [ ] 단위 테스트: 이어받기(이름 `Global` · 지정 없음 → 표시 달고 그 안에 만듦) · 지정된 `Global`은 사용자 것(`DSL Global` 생성) · 표시 둘이면 첫 번째만 · 사용자 Semantic의 같은 값 역할 붙이기 · 새 역할이 사용자 Global을 가리킴 · 만들기가 사용자 Global 재사용 · 사용자 컬렉션에 변수 · 모드가 생기지 않음(만들기 · 연결 · 역할 매핑 · 다크 · 팔레트 정리) · 역할 하나에 컬렉션 둘 지정
 - [ ] verify-bind-flow: 계층 팝업의 플러그인 줄(고르개 없음 · 문구)
 - [ ] 실기 확인(사용자, 피그마): ① 사용자 컬렉션(`Primitives` · `Tokens`)이 있는 파일에서 계층 지정 → 만들기 · 연결 → `Primitives` · `Tokens`에 변수 · 모드가 늘지 않음, 같은 값은 사용자 변수 재사용 ② 예전 플러그인 파일(`Global` · `Semantic`) → 그 컬렉션을 이어서 씀
