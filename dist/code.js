@@ -7654,7 +7654,7 @@
   }
 
   // src/lib/uiSize.ts
-  var UI_WIDTH = 400;
+  var UI_WIDTH = 480;
   var UI_WIDTHS = { default: UI_WIDTH, mini: 140 };
   var UI_HEIGHT = { default: 510, mini: 104 };
   var UI_SIZE_KEY = "dsl.uiSize";

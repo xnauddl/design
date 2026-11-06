@@ -9,7 +9,7 @@
      4 첫 전제 상태 전에는 ‘먼저 토큰을 생성…’ 경고를 띄우지 않는다
      5 찾는 중 선택이 바뀌면 진행률을 숨긴다
      6 시작 직후 GET_PREREQ는 한 번
-     7 좁은 폭에서도 ‘다음 →’은 툴바 오른쪽 끝
+     7 480 폭에서도 ‘다음 →’은 툴바 오른쪽 끝
      8 변수 카드 "값 → 변수" · 스위치 · 속성 아이콘 · 모두 켜기/끄기 · 필터(7개 이상) · 연결 후 결과 카드 · 포커스 순서
      9 변수 탭(IA v3 PR 2): 불러오는 중·시작 화면·목록, 칩·펼침·간접·LIB·삭제된 변수, 목록 기준, 큰 선택·[읽기], ↻,
        검색, 행 메뉴(교체 없음)·사용 레이어 선택 200개, 상세, 알약 이동·되돌리기, 키보드, ⋯ 팝업, 시작 시 스크립트 오류 0
@@ -34,7 +34,7 @@ const check = (name, cond, detail = '') => {
 };
 
 const pageErrors = [];
-async function open(width = 400, tab = 'layer') {
+async function open(width = 480, tab = 'layer') {
   const p = await browser.newPage({ viewport: { width, height: 510 } });
   p.on('pageerror', (e) => pageErrors.push(e.message));
   await p.addInitScript(() => {
@@ -395,7 +395,7 @@ const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset
 const sideItems = (p) => p.$$eval('#varSide .vs-item', (e) => e.map((x) => [x.querySelector('.vs-name').textContent, x.querySelector('.vs-num').textContent]));
 const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.dataset.key).catch(() => null);
 {
-  const p = await open(400, null);
+  const p = await open(480, null);
   await recv(p, PREREQ);
   check('9 첫 표 전에는 불러오는 중', await visible(p, '#varLoading'));
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -426,6 +426,18 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 사이드바 사용/전체', JSON.stringify((await sideItems(p)).slice(0, 2)) === JSON.stringify([['★ Inspect', '4'], ['Semantic', '1/1']]), JSON.stringify(await sideItems(p)));
   await p.click('#varSide [data-key="side:col:g"]');
   check('9 컬렉션 고름 → 모든 행(쓰는 것 먼저, 안 쓰는 행 "안 씀")', JSON.stringify(await rowIds(p)) === JSON.stringify(['g0', 'g9', 'sp8', 'r4']) && (await p.textContent('.vt-row[data-id="r4"] .use')) === '안 씀');
+  // §8 폭(2026-11-06 창 가로 480 · 사이드바 128 · 값 칸 130)
+  const widths = await p.evaluate(() => {
+    const w = (sel) => Math.round(document.querySelector(sel)?.getBoundingClientRect().width ?? -1);
+    return { win: window.innerWidth, side: w('.vl-side'), main: w('#varTree'), name: w('#varTree .vt-row .nm'), val: w('#varTree .vt-row .val'), hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  });
+  const head = await p.evaluate(() => {
+    const lh = document.getElementById('listHead');
+    const kids = [...lh.children].filter((e) => !e.classList.contains('grow') && e.offsetParent);
+    return { used: Math.round(kids.reduce((a, e) => a + e.getBoundingClientRect().width, 0)), width: Math.round(lh.clientWidth), h: Math.round(lh.getBoundingClientRect().height) };
+  });
+  console.log(`  · §8 실측: 머리줄 ${head.used}/${head.width}px · 높이 ${head.h}px`);
+  check('9 §8 폭 — 창 480 · 사이드바 128 · 목록 328 · 이름 칸 130 · 값 칸 130 · 가로 스크롤 0', JSON.stringify(widths) === JSON.stringify({ win: 480, side: 128, main: 328, name: 130, val: 130, hscroll: 0 }), JSON.stringify(widths));
   check('9 컬렉션 고르면 그룹이 사이드바에 펼쳐짐', (await sideItems(p)).some(([n]) => n === 'radius'));
   await p.click('#varSide [data-key="side:grp:g|radius"]');
   check('9 그룹 고름 → 그 그룹만', JSON.stringify(await rowIds(p)) === JSON.stringify(['r4']) && (await p.textContent('#varMainTitle')) === 'radius');
@@ -509,7 +521,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
 }
 {
   // §4.2 — 선택이 있는 채로 처음 목록에 들어오면 사용 수가 올 때까지 "읽는 중" 한 줄만
-  const p = await open(400, null);
+  const p = await open(480, null);
   await recv(p, PREREQ);
   await recv(p, { ...sel(1, 2), scanned: 40, ids: ['1:2'] });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -521,7 +533,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
 }
 {
   // LIB 구역 · 삭제된 변수 줄
-  const p = await open(400, null);
+  const p = await open(480, null);
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, { ...sel(1, 2), scanned: 40, ids: ['1:2'] });
@@ -537,7 +549,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
 
 /* 7 — '다음 →'은 툴바 오른쪽 끝(만들기 › 색) */
 {
-  const p = await open(400, 'variables');
+  const p = await open(480, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
   await p.click('#btnGoMake');
@@ -553,7 +565,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
 }
 
 // 탭 바(+[—])가 한 줄
-for (const w of [400]) {
+for (const w of [480]) {
   const p = await open(w);
   const r = await p.evaluate(() => ({ h: Math.round(document.querySelector('.tabs').getBoundingClientRect().height), hs: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
   check(`9 ${w}px 탭 바 한 줄·가로 스크롤 없음`, r.h <= 40 && !r.hs, `높이 ${r.h}px`);
@@ -568,7 +580,7 @@ const reenter = (p) => p.evaluate(() => {
   window.dispatchEvent(new FocusEvent('focus'));
 });
 {
-  const p = await open(400, null);
+  const p = await open(480, null);
   check('10 처음 열면 변수 탭', (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-variables');
   check('10 선택 표시줄 없음(탭 바 바로 아래가 탭 내용)', (await p.$('#selBarWrap')) === null);
   await recv(p, PREREQ);
@@ -599,7 +611,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 창 다시 들어옴(④): 합쳐서 1번, 2초 안 재진입은 간격 끝에 1번, 창 안 이동 0회, 메뉴 열림 중 보류
-  const p = await open(400, null);
+  const p = await open(480, null);
   await recv(p, PREREQ);
   await recv(p, sel(0, 0));
   await p.waitForTimeout(50);
@@ -633,7 +645,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 최소화(§4.9)
-  const p = await open(400, 'layer');
+  const p = await open(480, 'layer');
   await recv(p, PREREQ);
   await recv(p, sel(1, 0));
   await p.click('#btnApply'); // 미리보기 요청 — 결과 전까지 진행 테두리
@@ -671,7 +683,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 잠금(§2.3): 포커스 가능, 누르면 공통 상태 줄에 사유 + [라이선스 →]
-  const p = await open(400, 'variables');
+  const p = await open(480, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
   await p.click('#btnGoMake');
@@ -698,7 +710,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 510에서 버튼 줄이 스크롤해도 보임(§2.5) + §8 목록 높이 실측
-  const p = await open(400, 'layer');
+  const p = await open(480, 'layer');
   await recv(p, PREREQ);
   await recv(p, sel(1, 0));
   const many = Array.from({ length: 40 }, (_, i) => ({ ...c('itemSpacing'), nodeId: `n${i}` }));
@@ -769,7 +781,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // "변수 없는 값 찾기" 진입 규칙 · 복귀 규칙
-  const p = await open(400, null);
+  const p = await open(480, null);
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, sel(1, 0));
@@ -841,7 +853,7 @@ async function openEditList(opts = {}) {
   let p;
   if (opts.clock) {
     // 10초 시간 초과는 가짜 시계로 — 설치는 페이지를 열기 전에.
-    p = await browser.newPage({ viewport: { width: 400, height: 510 } });
+    p = await browser.newPage({ viewport: { width: 480, height: 510 } });
     p.on('pageerror', (e) => pageErrors.push(e.message));
     await p.clock.install();
     await p.addInitScript(() => {
@@ -849,7 +861,7 @@ async function openEditList(opts = {}) {
       window.parent.postMessage = (m) => window.__sent.push(m.pluginMessage);
     });
     await p.goto(url);
-  } else p = await open(400, null);
+  } else p = await open(480, null);
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS });
   await recv(p, { ...sel(1, 2), scanned: 40, firstName: 'Card', ids: ['1:2'] });
@@ -1046,7 +1058,7 @@ async function saveAndGet(p) {
 
 /* ---------- 13 컴포넌트 결과 줄 꼬리 (§4.7 "인스턴스 자리" 5·6번, QA #3 검토 2회차) ---------- */
 {
-  const p = await open(400, 'layer');
+  const p = await open(480, 'layer');
   await p.evaluate(() => document.querySelector('[data-apply-step="structure"]')?.click());
   const st = () => p.$eval('#structureStatus', (e) => ({ text: e.textContent, cls: e.className }));
   await recv(p, {
@@ -1121,7 +1133,7 @@ async function saveAndGet(p) {
 
 /* ---------- 16 새 역할 표시 — "N" 배지 · 이미 붙은 연결은 그대로(§4.6 · §2.12, 2026-11-06 결정 B) ---------- */
 {
-  const p = await open(400, 'layer');
+  const p = await open(480, 'layer');
   await recv(p, PREREQ);
   await recv(p, sel(1, 0));
   await p.click('#btnApply');
@@ -1161,7 +1173,7 @@ check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.
 
 /* ---------- 14 컴포넌트(베타) — 언제나 보임 · [베타] 배지 · 각주 없음 (§4.7 "베타", QA #3 불합격 4, 2026-11-05 결정) ---------- */
 {
-  const p = await open(400, 'layer');
+  const p = await open(480, 'layer');
   const tabs = () => p.$$eval('#applyRail .subtab', (e) => e.filter((x) => !x.hidden && x.offsetParent !== null).map((x) => x.dataset.applyStep));
   check('14 처음부터 하위 탭 셋', JSON.stringify(await tabs()) === JSON.stringify(['bind', 'rename', 'structure']), JSON.stringify(await tabs()));
   check('14 배지 — 하위 탭 · 카드 제목, aria-hidden', (await p.$$eval('#subtabComponents .beta-badge[aria-hidden="true"], #structureCard h2 .beta-badge[aria-hidden="true"]', (e) => e.length)) === 2);
