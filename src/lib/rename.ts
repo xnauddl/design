@@ -26,6 +26,7 @@
 import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole, ROLE_KEY } from './naming';
 import type { ParsedToken } from './naming';
 import type { KeepReason, RenameChange, RenameNode } from '../shared/messages';
+import { hasVisibleFill, hasImageFill, hasColorFill, hasVisibleStroke } from './nodePaint'; // 스와치 판정의 색 채움 = 보이는 단색 · 그라데이션
 
 /** 자식에게 내려보내는 위치 정보(영역 추론용). depth 0 = 선택 루트. */
 interface Pos {
@@ -392,27 +393,6 @@ function paints(node: SceneNode, field: 'fills' | 'strokes'): Paint[] | null {
   if (!(field in node)) return null;
   const p = (node as unknown as Record<string, unknown>)[field];
   return Array.isArray(p) ? (p as Paint[]) : null; // figma.mixed → 배열 아님 → null
-}
-
-function hasVisibleFill(node: SceneNode): boolean {
-  const f = paints(node, 'fills');
-  return !!f && f.some((p) => p.visible !== false);
-}
-
-function hasImageFill(node: SceneNode): boolean {
-  const f = paints(node, 'fills');
-  return !!f && f.some((p) => p.visible !== false && p.type === 'IMAGE');
-}
-
-/** 보이는 색(단색·그라데이션, 이미지 제외) 채움이 있는지 — 스와치 판정용. */
-function hasColorFill(node: SceneNode): boolean {
-  const f = paints(node, 'fills');
-  return !!f && f.some((p) => p.visible !== false && p.type !== 'IMAGE');
-}
-
-function hasVisibleStroke(node: SceneNode): boolean {
-  const s = paints(node, 'strokes');
-  return !!s && s.some((p) => p.visible !== false);
 }
 
 /* ---------- 시맨틱(영역/버튼) 추론 ---------- */

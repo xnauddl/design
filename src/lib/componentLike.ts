@@ -4,6 +4,8 @@
    컴포넌트 후보 eligible 게이트에 쓰며, 리네임 실행 여부와 무관하게 구조만으로 판정.
    ============================================================ */
 
+import { VECTOR_TYPES, hasVisibleFill, hasImageFill, hasColorFill, hasVisibleStroke } from './nodePaint';
+
 /** 검출에 필요한 최소 노드 형태(SceneNode / 테스트 fixture와 호환). */
 export interface LikeNode {
   type: string;
@@ -94,31 +96,6 @@ function dims(node: LikeNode): { w: number; h: number } | null {
   const h = node.height;
   if (typeof w !== 'number' || typeof h !== 'number') return null;
   return { w, h };
-}
-
-function paints(node: LikeNode, field: 'fills' | 'strokes'): PaintLike[] | null {
-  const p = node[field];
-  return Array.isArray(p) ? (p as PaintLike[]) : null;
-}
-
-function hasVisibleFill(node: LikeNode): boolean {
-  const f = paints(node, 'fills');
-  return !!f && f.some((p) => p.visible !== false);
-}
-
-function hasImageFill(node: LikeNode): boolean {
-  const f = paints(node, 'fills');
-  return !!f && f.some((p) => p.visible !== false && p.type === 'IMAGE');
-}
-
-function hasColorFill(node: LikeNode): boolean {
-  const f = paints(node, 'fills');
-  return !!f && f.some((p) => p.visible !== false && p.type !== 'IMAGE');
-}
-
-function hasVisibleStroke(node: LikeNode): boolean {
-  const s = paints(node, 'strokes');
-  return !!s && s.some((p) => p.visible !== false);
 }
 
 function layoutOf(node: LikeNode): 'vertical' | 'horizontal' | null {
@@ -441,17 +418,15 @@ function cellText(cell: LikeNode): LikeNode | null {
   return texts[0];
 }
 
-const ICON_VECTORS = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);
-
 /** 탭 칸 안에 허용하는 그림 — 날 벡터, 또는 아이콘 프레임(§4.7 "묶기" 3번: 96 이하 · 벡터 1개 이상 · 벡터 · 원 · 사각형과 그 묶음뿐). */
 function isIconLike(n: LikeNode): boolean {
-  if (ICON_VECTORS.has(n.type) || n.iconFrame) return true;
+  if (VECTOR_TYPES.has(n.type) || n.iconFrame) return true;
   if (n.type !== 'FRAME' && n.type !== 'GROUP') return false;
   const d = dims(n);
   if (!d || d.w > 96 || d.h > 96) return false;
   let vectors = 0;
   const ok = (x: LikeNode): boolean => (x.children ?? []).every((c) => {
-    if (ICON_VECTORS.has(c.type)) { vectors++; return true; }
+    if (VECTOR_TYPES.has(c.type)) { vectors++; return true; }
     if (c.type === 'ELLIPSE' || c.type === 'RECTANGLE') return !hasImageFill(c);
     if (c.type === 'FRAME' || c.type === 'GROUP') return !hasImageFill(c) && ok(c);
     return false;
