@@ -5,19 +5,20 @@ import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, CollectionRole
 import { post } from './shared/messages';
 import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
+import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countUsage, findUsers } from './lib/bind';
-import { collectionTiers, findCollection, readRoleMap, writeRoleMap } from './lib/collectionRoles';
+import { collectionTiers, readRoleMap, writeRoleMap } from './lib/collectionRoles';
 import { assignRole, roleOfCollection, guessRole } from './lib/tiers';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex, hexToRgb } from './lib/tokens';
-import { pascalCase, ROLE_KEY } from './lib/naming';
+import { pascalCase, ROLE_KEY, isKnownRole } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
-import { tabInfo } from './lib/componentLike';
+import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
+import { pickOwner } from './lib/usageRoles';
 import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
@@ -749,6 +750,20 @@ function toStructNode(node: SceneNode, isRoot = true): StructNode {
   };
 }
 
+/**
+ * 쓰임 이름의 주인(§2.12 12.3) — ① 이름 정리 역할(`dsRole`, 어휘 안 · 구조 폴백 아님) ② 고신뢰 판정 ③ 없음.
+ * 고신뢰 판정 입력(StructNode)은 처음 물을 때 선택 루트마다 한 번 만든다.
+ */
+function bindOwnerOf(roots: readonly SceneNode[]): (node: SceneNode) => string | undefined {
+  let idx: Map<string, StructNode> | null = null;
+  return (node) => {
+    const role = readRole(node);
+    idx ??= structIndex(roots);
+    const s = idx.get(node.id);
+    return pickOwner(role, s ? highConfidenceComponentRole(s) : null, isKnownRole);
+  };
+}
+
 /** 선택 루트마다 StructNode를 한 번 만들고 노드 id로 찾는다(§4.7 "묶기" — 하위마다 새로 만들지 않는다). */
 function structIndex(roots: readonly SceneNode[]): Map<string, StructNode> {
   const out = new Map<string, StructNode>();
@@ -1053,7 +1068,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
     switch (msg.type) {
       case 'EXTRACT': {
         const sel = selection();
-        const { tokens, warnings } = extractFromSelection(sel);
+        const { tokens, warnings } = extractFromSelection(sel, bindOwnerOf(sel)); // 쓰임 이름의 주인(§2.12 12.3)
         post({ type: 'EXTRACT_RESULT', tokens, warnings, selection: sel.length });
         break;
       }
@@ -1062,9 +1077,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!msg.preview && !requirePaid('tokens')) break;
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
+        // 쓰임 역할 — Global을 만든 직후 같은 처리 · 같은 ⌘Z 안에서(§2.12 12.10). 미리보기는 만들 수만 센다.
+        const roles = await createUsageRoles(msg.tokens, !!msg.preview);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });
+        if (roles) summary += t('create.sumRoles', { n: roles });
         if (pruned) summary += t('create.sumPruned', { n: pruned });
         // base 반영 — 비-px 값이 실제로 얼마가 되는지 요약에 노출. base를 바꾸면 이 줄이 바뀐다.
         if (s.conversions.length) {
@@ -1073,7 +1091,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           const morePart = s.conversions.length > 2 ? t('create.sumBaseMore') : '';
           summary += t('create.sumBase', { base: msg.base, n: s.conversions.length, examples: ex, morePart });
         }
-        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview });
+        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview, roles });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
           await postPrereq(); // #11: 토큰 생성 → 시맨틱/바인딩 전제 충족 갱신
@@ -1083,14 +1101,16 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'APPLY': {
         bindCancel = false; // UX6: 새 작업 시작 시 취소 플래그 초기화
         // UX1: preview면 dry-run(바인딩 없이 집계). UX3: 사유별 스킵(reasons). UX6: 진행률·취소.
+        const sel = selection();
         const r = await bindSelection(
-          selection(),
+          sel,
           !msg.preview,
           {
             onProgress: (done, total) => post({ type: 'PROGRESS', op: 'bind', done, total }),
             shouldCancel: () => bindCancel,
             yieldToEvents: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
           },
+          { ownerOf: bindOwnerOf(sel) }, // 쓰임 이름의 주인 — 이름 정리 역할 → 고신뢰 판정(§2.12 12.3)
         );
         post({
           type: 'APPLY_RESULT',
@@ -1104,6 +1124,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           skips: r.skips, // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
           skipTotal: r.skipTotal, // 상한 전 실제 수 — 잘렸으면 UI가 알린다
           reqId: msg.reqId, // UI가 낡은 응답을 가려낸다
+          newRoles: r.newRoles,
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
@@ -1171,22 +1192,25 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 300곳씩 묶어 연결하고 묶음마다 진행률을 보낸다(§4.6 "찾기 · 연결의 수"). [취소]는 없다.
         // 중간에 예외가 나도 이미 쓴 자리가 있으면 ⌘Z 한 번으로 풀리게 finally에서 묶음을 닫는다(오류는 맨 끝 catch가 보낸다).
         let written = 0;
+        let made = 0;
         let committed = false;
         try {
           const r = await bindSelectedItems(msg.items, {
             onProgress: (done, total) => post({ type: 'PROGRESS', op: 'link', done, total }),
             yieldToEvents: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
             onBound: (n) => { written = n; },
+            onCreated: (n) => { made = n; },
           });
-          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId });
-          if (r.bound) {
+          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles });
+          // 역할을 하나라도 만들었으면 아무것도 붙이지 못했어도 묶음을 닫는다 — 연결 한 번 = ⌘Z 한 번(§2.12 12.9).
+          if (r.bound || r.newRoles) {
             commitUndo(figma); // UX2: 선택 바인딩 전체(마지막 묶음 뒤 한 번)를 단일 Undo로
             committed = true;
             selfSelect = true;
             postSelection();
           }
         } finally {
-          if (written > 0 && !committed) commitUndo(figma);
+          if ((written > 0 || made > 0) && !committed) commitUndo(figma);
         }
         break;
       }
@@ -1310,22 +1334,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'GET_PREREQ': {
         await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
-        break;
-      }
-      case 'GET_GLOBAL_COLORS': {
-        // #10: 기존 Global 색 변수(리터럴 COLOR)를 이름+hex로 수집 → 재방문 시맨틱 매핑 추천.
-        const cols = await figma.variables.getLocalVariableCollectionsAsync();
-        const globalCol = findCollection(cols, 'global');
-        const colors: { name: string; hex: string }[] = [];
-        if (globalCol) {
-          const mode = globalCol.defaultModeId;
-          for (const v of await figma.variables.getLocalVariablesAsync()) {
-            if (v.variableCollectionId !== globalCol.id || v.resolvedType !== 'COLOR') continue;
-            const raw = v.valuesByMode[mode];
-            if (raw && typeof raw === 'object' && 'r' in raw) colors.push({ name: v.name, hex: rgbToHex(raw as RGB) });
-          }
-        }
-        post({ type: 'GLOBAL_COLORS', colors });
         break;
       }
       case 'GET_LICENSE': {

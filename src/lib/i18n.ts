@@ -37,10 +37,7 @@ export const STRINGS: Record<string, string> = {
   'create.baseChanged': 'base {base}px로 다시 계산 중…',
 
   // 시맨틱 매핑
-  'semantic.scanningGlobals': '기존 색 스캔 중…',
   'semantic.formatHint': '매핑을 한 줄에 “역할 = Global변수이름” 형식으로 입력하세요.',
-  'semantic.noGlobals': '기존 Global 색 변수가 없어요 — 먼저 토큰을 만드세요.',
-  'semantic.suggested': '기존 색 {count}개에서 역할 추천 — 확인 후 ‘시맨틱 별칭 생성’.',
   'semantic.result': '시맨틱 {aliased}개 별칭 (생성 {created} / 갱신 {updated})',
   'semantic.missing': ' · 누락: {names}',
 
@@ -155,6 +152,9 @@ export const STRINGS: Record<string, string> = {
   'wizard.rerunHint': '이미 정리한 선택이에요 — 다시 실행하면 변수는 갱신되고 이름은 그대로예요.',
   'wizard.skip.optionOff': '옵션 꺼짐',
   'wizard.skip.noMapping': '매핑 없음',
+  // 역할 매핑 단계 — 쓰임 역할은 만들기 단계가 이미 만들었을 때(§2.12 12.10).
+  'wizard.rolesFromTokens': '만들기에서 함께 만들었어요 · 역할 {n}개',
+  'wizard.rolesFromTokensTail': ' · 만들기에서 역할 {n}개',
   'wizard.skip.paid': '유료 기능',
   'wizard.chip.paid': '유료 기능이라 이번 실행에서는 건너뛰어요 · 설정 › 라이선스',
   'wizard.paidSkipped': ' · 유료 기능이라 건너뜀: {steps} — 새 변수는 만들지 않았어요',
@@ -518,7 +518,7 @@ export const STRINGS: Record<string, string> = {
   'wizardCard.run': '전체 실행',
   // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
   // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-  'wizardCard.legend': '역할 매핑=색 역할 · 다크=라이트에서 어두운 값 채우기',
+  'wizardCard.legend': '역할 매핑=쓰임 역할 · 다크=라이트에서 어두운 값 채우기',
   // 공통(정적 라벨)
   'common.selectAll': '전체',
   'prereq.gotoCreate': '토큰 만들기로 →',
@@ -561,7 +561,6 @@ export const STRINGS: Record<string, string> = {
   'semantic.title': '시맨틱 매핑 (역할 → 토큰)',
   'semantic.formatLabel': '형식: <code>역할 = Global변수이름</code>',
   'semantic.aliasBtn': '시맨틱 별칭 생성',
-  'semantic.scanBtn': '기존 색에서 추천',
   // 텍스트 스타일
   'textStyle.title': '텍스트 스타일',
   'textStyle.hint': '스캔 후 이름을 다듬고 등록하세요. 화면 연결은 레이어 › 연결에서',
@@ -691,6 +690,12 @@ export const STRINGS: Record<string, string> = {
   'bind.progressOf': '{done} / {total} 처리 중… ({pct}%)',
   'bind.progressCount': '{done}개 처리 중…',
   // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
+  // 새 역할(§2.12, §4.6)
+  'bind.newRole': 'N',
+  'bind.newRoleAria': '새 역할',
+  'bind.newRoleTip': '{global}을 가리켜요',
+  'bind.roleNew': '새 역할 {k}',
+  'bind.doneNewRoles': ' · 새 역할 {k}개',
   'bind.placesMore': '외 {n}곳 · 레이어 선택으로 보기',
   'bind.linkingOf': '연결 중… {done} / {total}',
   'bind.waitLink': '연결이 끝나면 다시 해 주세요',
@@ -788,6 +793,8 @@ export const STRINGS: Record<string, string> = {
   'create.count': '후보 {sel}/{total}',
   'color.usedCount': ' · {n}× 사용',
   'create.tidyMerged': ' · 같은 칸 {n}개 병합',
+  // 만들기 결과 · 미리보기 꼬리 — 새로 만든(만들) 쓰임 역할 수(§2.12 12.10).
+  'create.sumRoles': ' · 역할 {n}개',
   'create.tidySummary': '여백 {before} → {after}개 ({grid}px 격자로 {n}개 이동{mergedPart}){gapPart}',
   'create.tidyUndone': '격자 정리를 되돌렸어요 — ‘미리보기’를 다시 누르면 또 정리해요',
   'create.onceOff': '1× 토큰 {n}개 해제',

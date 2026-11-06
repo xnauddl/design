@@ -11,6 +11,9 @@ export interface GroupCand extends BindItem {
   nodeId: string;
   /** 변수 값(표시용). 없으면 정확히 같은 후보의 현재 값으로 대신한다. */
   variableValue?: string;
+  /** 새 역할(§2.12) — 연결할 때 만든다. 가리킬 Global 이름. */
+  newRole?: unknown;
+  newRoleGlobalName?: string;
 }
 
 /** 자리 줄 — 레이어 하나에서 같은 변수에 묶인 속성(들). */
@@ -33,6 +36,8 @@ export interface VarGroup {
   count: number;
   keys: string[];
   lines: PlaceLine[];
+  /** 새 역할이면 가리킬 Global 이름(§2.12 — 카드 칩 "새" 표시 · 툴팁). */
+  newRoleOf?: string;
 }
 
 /** 후보 키 — 같은 곳 = 같은 레이어 · 같은 속성 · 같은 변수(§4.6 ⑧). */
@@ -75,7 +80,8 @@ export function groupByVariable(cands: readonly GroupCand[]): VarGroup[] {
     }
     const variableValue = list.find((c) => c.variableValue != null)?.variableValue ?? list[0].currentValue;
     const keys = lines.flatMap((l) => l.keys);
-    groups.push({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines });
+    const nr = list.find((c) => c.newRole);
+    groups.push({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines, ...(nr ? { newRoleOf: nr.newRoleGlobalName ?? '' } : {}) });
   }
   groups.sort((a, b) => b.count - a.count || a.variableName.localeCompare(b.variableName));
   return groups;

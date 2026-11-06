@@ -67,6 +67,11 @@ export interface DraftToken {
   category: TokenCategory;
   /** 이 값이 등장한 출처 속성들(스코프 union 산출용). */
   sources: SourceField[];
+  /**
+   * 쓰임 목록(§2.12 12.10) — 숫자는 쓰임 이름(`spacing/card/gap`), 색은 `color/{쓰임}`. 곳 수와 함께.
+   * 토큰을 적용할 때 코드가 이 쓰임마다 Semantic 역할을 만든다(createUsageRoles).
+   */
+  uses?: { name: string; count: number; bg?: 'chroma' | 'dark' | 'light' }[];
   /** 색상: 6자리 hex(#rrggbb). 그 외: 숫자 또는 fontFamily 문자열. */
   value: string | number;
   /** 수치 토큰의 의도 단위(px 외에는 STRING 보존 + 선택적 px 환산). */
@@ -252,13 +257,30 @@ export function scopeForSemanticRole(role: string): ScopeName[] | undefined {
   const segs = role.toLowerCase().split('/');
   // property-first(`color/background/default`)면 둘째 세그먼트가 property, 구식(`text/muted`)은 첫째.
   const prop = segs[0] === 'color' && segs.length >= 2 ? segs[1] : segs[0];
+  // 쓰임 역할(§2.12 12.6) — 숫자 그룹은 첫째 세그먼트로.
+  if (segs[0] !== 'color') {
+    switch (segs[0]) {
+      case 'spacing':
+        return ['GAP'];
+      case 'radius':
+        return ['CORNER_RADIUS'];
+      case 'stroke-width':
+        return ['STROKE_FLOAT'];
+      case 'size':
+        return ['WIDTH_HEIGHT'];
+      case 'opacity':
+        return ['OPACITY'];
+    }
+  }
   switch (prop) {
     case 'text':
       return ['TEXT_FILL'];
     case 'border':
       return ['STROKE_COLOR'];
     case 'icon':
-      return ['SHAPE_FILL'];
+      return ['SHAPE_FILL', 'STROKE_COLOR'];
+    case 'shadow':
+      return segs[0] === 'color' ? ['EFFECT_COLOR'] : undefined;
     case 'surface':
     case 'background':
       return ['FRAME_FILL', 'SHAPE_FILL'];
@@ -334,7 +356,7 @@ export interface TidyNumbersResult {
   snapped: number;
 }
 
-const cloneToken = (t: DraftToken): DraftToken => ({ ...t, sources: [...t.sources] });
+const cloneToken = (t: DraftToken): DraftToken => ({ ...t, sources: [...t.sources], ...(t.uses ? { uses: t.uses.map((u) => ({ ...u })) } : {}) });
 
 /**
  * 스케일 사다리 — 기준 미만은 **반분할**, 기준 이상은 **배수**.
@@ -383,6 +405,7 @@ export function tidyNumberTokens(tokens: readonly DraftToken[], opts: TidyNumber
     // 사용자가 개명했으면 그 이름을 존중한다 — 자동 이름 그대로일 때만 값에 맞춰 갱신.
     if (group && t.name === numberTokenName(group, v)) t.name = numberTokenName(group, target);
     t.value = target;
+    delete t.uses; // 옮긴 값은 원래 레이어와 달라 연결되지 않는다 — 그 쓰임의 역할도 만들지 않는다(§2.12 12.10)
     snapped++;
   }
 
@@ -401,6 +424,12 @@ export function tidyNumberTokens(tokens: readonly DraftToken[], opts: TidyNumber
     seen.set(k, rep);
     // 흡수된 값의 출처도 대표가 물려받아야 스코프가 좁아지지 않는다.
     for (const s of gone.sources) if (!rep.sources.includes(s)) rep.sources.push(s);
+    // 쓰임도 합친다(옮긴 쪽은 이미 비어 있다).
+    for (const u of gone.uses ?? []) {
+      const have = (rep.uses ??= []).find((x) => x.name === u.name && x.bg === u.bg);
+      if (have) have.count += u.count;
+      else rep.uses.push({ ...u });
+    }
     // count는 '값을 쓰는 서로 다른 레이어 수'다. 두 값을 같은 레이어가 함께 썼을 수 있어
     // 단순 합산은 과대계상이 된다(한 카드의 padding 15 + gap 17 → 2× 표시). 겹침을 알 수 없으므로
     // 하한인 최댓값을 쓴다 — '1× 해제'가 실제로 한 레이어짜리 값을 계속 걸러내도록.

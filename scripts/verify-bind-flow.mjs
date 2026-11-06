@@ -1119,6 +1119,44 @@ async function saveAndGet(p) {
   await p.close();
 }
 
+/* ---------- 16 새 역할 표시 — "N" 배지 · 이미 붙은 연결은 그대로(§4.6 · §2.12, 2026-11-06 결정 B) ---------- */
+{
+  const p = await open(400, 'layer');
+  await recv(p, PREREQ);
+  await recv(p, sel(1, 0));
+  await p.click('#btnApply');
+  const nr = { name: 'color/text/inverse', globalId: 'g0', scopes: ['TEXT_FILL'] };
+  const newCand = (id) => ({ nodeId: id, field: 'fills', index: 0, currentValue: '#ffffff', variableId: 'new:color/text/inverse', variableName: 'color/text/inverse', tier: 2, variableValue: '#ffffff', newRole: nr, newRoleGlobalName: 'color/gray/0' });
+  const gapCand = { nodeId: 'n1', field: 'itemSpacing', currentValue: '52', variableId: 'new:spacing/gap', variableName: 'spacing/gap', tier: 2, variableValue: '52', newRole: { name: 'spacing/gap', globalId: 'g52', scopes: ['GAP'] }, newRoleGlobalName: 'spacing/52' };
+  const keep = { nodeId: 'n1', field: 'paddingLeft', currentValue: '8', variableId: 'vA', variableName: 'spacing/8', tier: 2 };
+  await recv(p, { ...preview(await lastReq(p, 'APPLY')), candidates: [newCand('n1'), newCand('n2'), gapCand, keep], bound: 4 });
+  const chips = await p.$$eval('#bindTree .bv-card', (cards) => cards.map((c) => {
+    const b = c.querySelector('.bv-new');
+    return { name: c.querySelector('.bv-name')?.textContent, badge: b?.textContent, role: b?.getAttribute('role'), aria: b?.getAttribute('aria-label'), tip: c.querySelector('.bv-var')?.getAttribute('title') };
+  }));
+  const inv = chips.find((x) => x.name === 'color/text/inverse');
+  check('16 새 역할 카드 — "N" 배지 · role=img · 읽기 이름 "새 역할"', !!inv && inv.badge === 'N' && inv.role === 'img' && inv.aria === '새 역할', JSON.stringify(inv));
+  check('16 칩 툴팁 "color/gray/0을 가리켜요"', inv?.tip === 'color/gray/0을 가리켜요', JSON.stringify(inv));
+  check('16 이미 있는 역할 카드는 "N" 없음', chips.find((x) => x.name === 'spacing/8')?.badge === undefined);
+  const badgeStyle = await p.$eval('#bindTree .bv-new', (e) => { const cs = getComputedStyle(e); return [cs.backgroundColor, cs.color, cs.borderTopWidth, cs.fontWeight]; });
+  check('16 "N" 배지 — 채운 바탕(#0a6dbf) · 흰 글자 · 테두리 없음 · 600', JSON.stringify(badgeStyle) === JSON.stringify(['rgb(10, 109, 191)', 'rgb(255, 255, 255)', '0px', '600']), JSON.stringify(badgeStyle));
+  check('16 배지 줄 "새 역할 2" · 툴팁 없음', (await visible(p, '#bindRoleSum')) && (await p.textContent('#bindRoleSum')) === '새 역할 2' && !(await p.getAttribute('#bindRoleSum', 'title')), await p.textContent('#bindRoleSum'));
+  await p.click('#bindTree .bv-card[data-var="new:color/text/inverse"] .bv-tw');
+  check('16 자리 줄에 "…에서" 꼬리 없음', (await p.$('#bindTree .bv-from')) === null);
+  // 카드를 끄면 요약에서 빠진다(켠 카드만)
+  await p.click('#bindTree .bv-card[data-var="new:color/text/inverse"] .bv-switch');
+  check('16 끈 카드는 "새 역할"에서 빠짐', (await p.textContent('#bindRoleSum')) === '새 역할 1', await p.textContent('#bindRoleSum'));
+  await p.click('#bindTree .bv-card[data-var="new:color/text/inverse"] .bv-switch');
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/role-found.png` : '/dev/null' }).catch(() => {});
+  await p.click('#btnApplyConfirm');
+  const items = (await sent(p, 'APPLY_SELECTED')).at(-1).items;
+  check('16 연결 요청 — 새 역할 정보만(바꾸기 · 풀기 없음)', items.some((i) => i.newRole?.name === 'color/text/inverse') && items.every((i) => !('fromVariableId' in i) && !('unbind' in i)), JSON.stringify(items));
+  await recv(p, { type: 'APPLY_RESULT', bound: 4, skipped: 0, reasons: {}, skips: [], newRoles: 2, reqId: await lastReq(p, 'APPLY_SELECTED') });
+  check('16 연결 뒤 "4곳 연결됨 · 새 역할 2개"', (await p.textContent('#bindDoneText')) === '4곳 연결됨 · 새 역할 2개', await p.textContent('#bindDoneText'));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/role-done.png` : '/dev/null' }).catch(() => {});
+  await p.close();
+}
+
 check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.join(' / '));
 
 /* ---------- 14 컴포넌트(베타) — 언제나 보임 · [베타] 배지 · 각주 없음 (§4.7 "베타", QA #3 불합격 4, 2026-11-05 결정) ---------- */

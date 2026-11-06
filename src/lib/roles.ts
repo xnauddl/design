@@ -9,7 +9,6 @@
    결정에 따라 opacity·letterSpacing·effects는 추천 대상 제외(약함/후순위).
    ============================================================ */
 import type { DraftToken, TokenCategory } from './tokens';
-import { suggestSemanticMap } from './palette';
 
 /** 센터(md)에 맞춘 티셔츠 사다리. */
 const TSHIRT = ['3xs', '2xs', 'xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl'];
@@ -124,32 +123,18 @@ function numericEntries(tokens: DraftToken[], category: TokenCategory): Array<{ 
 }
 
 /**
- * 전 토큰 역할 추천 — `역할이름 → Global변수이름` 맵.
- * 색은 palette.suggestSemanticMap(휴리스틱) 재사용, 수치/타이포는 위 스케일/어휘.
+ * 글자 역할 추천 — `역할이름 → Global변수이름` 맵(글자 크기 · 굵기 · 글꼴만).
+ * 색 · 간격 · 반경 · 선 두께는 더 이상 값 순위로 짓지 않는다 — 토큰을 적용할 때 코드가 쓰임 이름으로
+ * 만든다(§2.12 12.10 `createUsageRoles`). 여기서 고정 칸 이름(`spacing/md`)과 색 4개를 채우면
+ * `CREATE_SEMANTICS`가 옛 이름을 계속 만든다.
  */
 export function suggestTokenRoles(tokens: DraftToken[], base = 16): Record<string, string> {
   const map: Record<string, string> = {};
-
-  // 색 — 기존 휴리스틱(무채→surface/text/border, 채도최고→primary).
-  const colors = tokens
-    .filter((t) => t.category === 'color' && typeof t.value === 'string')
-    .map((t) => ({ name: t.name, hex: t.value as string }));
-  Object.assign(map, suggestSemanticMap(colors));
-
-  // 수치 — 티셔츠/타입 스케일. prefix는 Semantic 폴더 그룹.
-  const scale = (category: TokenCategory, prefix: string, roleFn: (vals: number[]) => string[]): void => {
-    const entries = numericEntries(tokens, category);
-    const roles = roleFn(entries.map((e) => e.value));
-    entries.forEach((e, i) => {
-      if (roles[i]) map[`${prefix}/${roles[i]}`] = e.name; // 사다리 밖 값은 역할 없음(Global만)
-    });
-  };
-  scale('gap', 'spacing', spacingRoles);
-  scale('radius', 'radius', radiusRoles);
-  // 크기(width/height)는 역할을 주지 않는다 — 화면에 20~1440px 임의 값이 30개쯤 나오면 상대 순위가
-  // `size/4xl-20`까지 번호만 늘어났다. 세 시스템 모두 임의 치수에 의미 토큰을 두지 않는다(Global만).
-  scale('strokeWidth', 'stroke-width', strokeRoles);
-  scale('fontSize', 'font-size', (vals) => fontSizeRoles(vals, base));
+  const fs = numericEntries(tokens, 'fontSize');
+  const fsRoles = fontSizeRoles(fs.map((e) => e.value), base);
+  fs.forEach((e, i) => {
+    if (fsRoles[i]) map[`font-size/${fsRoles[i]}`] = e.name;
+  });
 
   // fontWeight — 값→이름.
   for (const e of numericEntries(tokens, 'fontWeight')) map[`font-weight/${weightRole(e.value)}`] = e.name;

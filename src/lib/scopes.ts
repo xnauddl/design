@@ -38,6 +38,22 @@ export const FIELD_SCOPE: Record<string, VariableScope> = {
 /** 색상 필드별 허용 스코프 — 변수 scopes가 이 중 하나(또는 ALL_SCOPES)를 포함해야 매칭. */
 export const FILL_SCOPES: readonly VariableScope[] = ['ALL_FILLS', 'FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL'];
 export const STROKE_SCOPES: readonly VariableScope[] = ['STROKE_COLOR'];
+
+const FRAME_LIKE = new Set(['FRAME', 'COMPONENT', 'COMPONENT_SET', 'INSTANCE', 'SECTION']);
+const TEXT_FILLS: readonly VariableScope[] = ['ALL_FILLS', 'TEXT_FILL'];
+const FRAME_FILLS: readonly VariableScope[] = ['ALL_FILLS', 'FRAME_FILL'];
+const SHAPE_FILLS: readonly VariableScope[] = ['ALL_FILLS', 'SHAPE_FILL'];
+
+/**
+ * 칠하기 용도는 레이어 종류를 따른다(§2.11, QA #4 불합격 1) — 글자 TEXT_FILL · 프레임류 FRAME_FILL ·
+ * 그 밖 SHAPE_FILL(ALL_FILLS는 전부). ALL_SCOPES는 부르는 쪽(colorScopeOk)이 통과시킨다.
+ * 예전 FILL_SCOPES는 종류와 무관하게 넷 중 하나면 통과해 흰 글자가 배경 역할에 붙었다.
+ */
+export function fillScopesFor(nodeType: string): readonly VariableScope[] {
+  if (nodeType === 'TEXT') return TEXT_FILLS;
+  if (FRAME_LIKE.has(nodeType)) return FRAME_FILLS;
+  return SHAPE_FILLS;
+}
 export const EFFECT_SCOPES: readonly VariableScope[] = ['EFFECT_COLOR'];
 
 /** 필드가 받아들이는 스코프 목록. 규칙이 없는 필드(visible·characters 등)는 null. */

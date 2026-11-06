@@ -120,7 +120,15 @@ test('scopeForSemanticRole — 역할별 스코프(미지정은 undefined)', () 
   assert.deepEqual(scopeForSemanticRole('color/text/danger'), ['TEXT_FILL']);
   assert.deepEqual(scopeForSemanticRole('color/background/brand-bold'), ['FRAME_FILL', 'SHAPE_FILL']);
   assert.deepEqual(scopeForSemanticRole('color/border/default'), ['STROKE_COLOR']);
-  assert.deepEqual(scopeForSemanticRole('color/icon/brand'), ['SHAPE_FILL']);
+  // 아이콘은 채움과 선 모두(§2.12 12.6) · 쓰임 숫자 역할
+  assert.deepEqual(scopeForSemanticRole('color/icon/brand'), ['SHAPE_FILL', 'STROKE_COLOR']);
+  assert.deepEqual(scopeForSemanticRole('color/shadow/default'), ['EFFECT_COLOR']);
+  assert.deepEqual(scopeForSemanticRole('spacing/card/gap'), ['GAP']);
+  assert.deepEqual(scopeForSemanticRole('radius/button'), ['CORNER_RADIUS']);
+  assert.deepEqual(scopeForSemanticRole('stroke-width/input'), ['STROKE_FLOAT']);
+  assert.deepEqual(scopeForSemanticRole('size/icon'), ['WIDTH_HEIGHT']);
+  assert.deepEqual(scopeForSemanticRole('opacity/default'), ['OPACITY']);
+  assert.equal(scopeForSemanticRole('font-size/body'), undefined); // 글자 묶음은 Global 용도 상속
 });
 
 test('harmonyHexes — complementary는 hue ≈ +180', () => {
