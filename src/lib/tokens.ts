@@ -307,13 +307,14 @@ export function colorTokenName(hex: string): string {
 /* ---------- 수치 토큰 정리 (스케일 사다리 스냅) ---------- */
 
 /**
- * 스냅 대상 — 8pt 사다리가 실제 관례인 여백·크기만.
+ * 스냅 대상 — 8pt 사다리가 실제 관례인 여백만.
  * fontSize(14·18·20)·strokeWidth(1·1.5·2)·radius(2·4·6)는 각자의 척도가 있어 끌어당기면 망가진다.
+ * 크기(size)도 옮기지 않는다 — 아이콘 · 아바타 크기(14·18·28…)는 의도된 값이고, 옮긴 변수는 원래 레이어에 연결되지 않는다(§2.11).
  */
-const SNAP_CATEGORIES: ReadonlySet<TokenCategory> = new Set<TokenCategory>(['gap', 'size']);
+const SNAP_CATEGORIES: ReadonlySet<TokenCategory> = new Set<TokenCategory>(['gap']);
 
 /** 카테고리별 자동 이름의 그룹 접두사 — 스냅으로 값이 바뀌면 이름도 따라가야 한다. */
-const TOKEN_GROUP: Partial<Record<TokenCategory, string>> = { gap: 'spacing', size: 'size' };
+const TOKEN_GROUP: Partial<Record<TokenCategory, string>> = { gap: 'spacing' };
 
 export interface TidyNumbersOptions {
   /** 사다리 기준(px). 8이면 …4·2·1 / 8·16·24·32… 0 이하면 정리하지 않는다. */
@@ -324,7 +325,7 @@ export interface TidyNumbersOptions {
 
 export interface TidyNumbersResult {
   tokens: DraftToken[];
-  /** 정리 대상(여백·크기, px)이었던 토큰 수. */
+  /** 정리 대상(여백, px)이었던 토큰 수. */
   before: number;
   after: number;
   /** 같은 칸에 놓여 하나로 합쳐진 토큰 수. */
@@ -348,7 +349,7 @@ export function scaleLadder(base: number, max: number): number[] {
 }
 
 /**
- * 여백·크기 토큰을 스케일 사다리로 정리한다.
+ * 여백 토큰을 스케일 사다리로 정리한다.
  *
  * 이동 거리를 px이 아니라 **값 대비 비율**로 재는 것이 핵심이다. 2px 이동은 값 4에서는 50%,
  * 64에서는 3%로 의미가 전혀 다르다. 절대 px으로 통제하면 `4 → 8`(2배) 같은 사고가 나므로,

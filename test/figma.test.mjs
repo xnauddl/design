@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { rgbToHex, hexToRgb, isKnownRole, nameTextStyles, clusterTextStyles } from '../dist/pure.mjs';
 import {
   extractFromSelection,
+  isIconOrAvatar,
   createTokens,
   previewCreateTokens,
   createSemanticAliases,
@@ -132,6 +133,10 @@ const findVar = (figma, colName, varName) => {
   return figma._state.variables.find((v) => v.name === varName && v.variableCollectionId === col?.id);
 };
 
+/* 크기 테스트용 — 크기 변수는 아이콘 · 아바타 레이어만(§2.11 "크기는 아이콘 · 아바타만"). */
+const vec = (id = 'vec') => ({ type: 'VECTOR', id, name: 'Vector', fills: [] });
+const IMG = { type: 'IMAGE', imageHash: 'h', scaleMode: 'FILL', visible: true };
+
 /* ================= extract.ts ================= */
 test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup', () => {
   installFigma();
@@ -174,6 +179,20 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
     cornerRadius: 8,
     children: [text, rect],
   };
+  // 크기는 아이콘 · 아바타만 — 오토레이아웃 안의 24×24 아이콘
+  const icon = {
+    type: 'FRAME',
+    id: 'ic1',
+    name: 'Icon',
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 24,
+    height: 24,
+    children: [vec('ic1-v')],
+    parent: frame,
+  };
+  frame.children.push(icon);
 
   const { tokens, warnings } = extractFromSelection([frame]);
   const byName = new Map(tokens.map((t) => [t.name, t]));
@@ -193,8 +212,9 @@ test('extractFromSelection — 색/타이포/간격/크기/반경 수집 + dedup
   // 간격/크기/반경
   assert.equal(byName.get('spacing/16')?.category, 'gap');
   assert.equal(byName.get('spacing/8')?.category, 'gap');
-  assert.equal(byName.get('size/200')?.category, 'size');
-  assert.equal(byName.get('size/100')?.category, 'size');
+  assert.equal(byName.get('size/24')?.category, 'size'); // 아이콘
+  assert.equal(byName.get('size/200'), undefined); // 일반 프레임의 크기는 뽑지 않는다
+  assert.equal(byName.get('size/100'), undefined);
   assert.equal(byName.get('radius/8')?.category, 'radius');
   assert.equal(byName.get('radius/4')?.category, 'radius');
   // 선 두께(border) — 보이는 선이 있을 때만
@@ -215,8 +235,8 @@ test('extractFromSelection — HUG/FILL 축의 크기는 토큰화하지 않음(
     layoutMode: 'VERTICAL',
     layoutSizingHorizontal: 'FILL',
     layoutSizingVertical: 'HUG',
-    width: 320,
-    height: 44,
+    width: 32,
+    height: 32,
     itemSpacing: 0,
     paddingLeft: 0,
     paddingRight: 0,
@@ -224,7 +244,7 @@ test('extractFromSelection — HUG/FILL 축의 크기는 토큰화하지 않음(
     paddingBottom: 0,
     children: [],
   };
-  // 가로만 Fixed → 그 축의 크기(width)만 토큰화.
+  // 가로만 Fixed(24) · 세로 HUG(24) 아이콘 → 그 축의 크기(width)만 토큰화.
   const fixedW = {
     type: 'FRAME',
     id: 'f-fw',
@@ -232,24 +252,23 @@ test('extractFromSelection — HUG/FILL 축의 크기는 토큰화하지 않음(
     layoutMode: 'VERTICAL',
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'HUG',
-    width: 280,
-    height: 99,
+    width: 24,
+    height: 24,
     itemSpacing: 0,
     paddingLeft: 0,
     paddingRight: 0,
     paddingTop: 0,
     paddingBottom: 0,
-    children: [],
+    children: [vec('fw-v')],
   };
+  fillHug.children = [vec('fh-v')];
 
   const { tokens } = extractFromSelection([fillHug, fixedW]);
   const names = new Set(tokens.map((t) => t.name));
   // FILL/HUG 축의 값은 모두 제외
-  assert.equal(names.has('size/320'), false); // 가로 FILL
-  assert.equal(names.has('size/44'), false); // 세로 HUG
-  assert.equal(names.has('size/99'), false); // 세로 HUG
+  assert.equal(names.has('size/32'), false); // 가로 FILL · 세로 HUG
   // Fixed 축만 수집
-  assert.equal(names.has('size/280'), true); // 가로 FIXED
+  assert.equal(names.has('size/24'), true); // 가로 FIXED
 });
 
 test('extractFromSelection — 자유 배치(오토레이아웃 밖) 프레임의 크기는 제외', () => {
@@ -267,6 +286,18 @@ test('extractFromSelection — 자유 배치(오토레이아웃 밖) 프레임�
     height: 812,
     children: [],
   };
+  // 자유 배치 아이콘도 마찬가지
+  const freeIcon = {
+    type: 'FRAME',
+    id: 'f-free-icon',
+    name: 'FreeIcon',
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 20,
+    height: 20,
+    children: [vec('free-v')],
+  };
   // 부모가 오토레이아웃이면 Fixed는 디자이너의 선택이므로 수집한다.
   const child = {
     type: 'FRAME',
@@ -277,7 +308,7 @@ test('extractFromSelection — 자유 배치(오토레이아웃 밖) 프레임�
     layoutSizingVertical: 'FIXED',
     width: 48,
     height: 48,
-    children: [],
+    children: [vec('child-v')], // 아이콘
   };
   const auto = {
     type: 'FRAME',
@@ -286,7 +317,7 @@ test('extractFromSelection — 자유 배치(오토레이아웃 밖) 프레임�
     layoutMode: 'HORIZONTAL',
     layoutSizingHorizontal: 'HUG',
     layoutSizingVertical: 'HUG',
-    width: 48,
+    width: 60, // 정사각형이 아니라 아이콘 틀이 아님(가장 바깥 틀 규칙에 걸리지 않게)
     height: 48,
     itemSpacing: 0,
     paddingLeft: 0,
@@ -297,9 +328,10 @@ test('extractFromSelection — 자유 배치(오토레이아웃 밖) 프레임�
   };
   child.parent = auto;
 
-  const names = new Set(extractFromSelection([decor, auto]).tokens.map((t) => t.name));
+  const names = new Set(extractFromSelection([decor, freeIcon, auto]).tokens.map((t) => t.name));
   assert.equal(names.has('size/1440'), false); // 자유 배치 — 화면 크기
   assert.equal(names.has('size/812'), false);
+  assert.equal(names.has('size/20'), false); // 자유 배치 아이콘
   assert.equal(names.has('size/48'), true); // 오토레이아웃 자식의 Fixed
 });
 
@@ -312,18 +344,19 @@ test('extractFromSelection — 소수 크기는 토큰화하지 않음', () => {
     layoutMode: 'VERTICAL',
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'FIXED',
-    width: 343.5,
-    height: 64,
+    width: 23.5,
+    height: 23.5,
     itemSpacing: 0,
     paddingLeft: 0,
     paddingRight: 0,
     paddingTop: 0,
     paddingBottom: 0,
-    children: [],
+    children: [vec('frac-v')], // 아이콘
   };
+  const whole = { ...node, id: 'f-whole', name: 'Whole', width: 64, height: 64, children: [vec('whole-v')] };
 
-  const names = new Set(extractFromSelection([node]).tokens.map((t) => t.name));
-  assert.equal(names.has('size/343_5'), false); // 자유 리사이즈 잔값
+  const names = new Set(extractFromSelection([node, whole]).tokens.map((t) => t.name));
+  assert.equal(names.has('size/23_5'), false); // 자유 리사이즈 잔값
   assert.equal(names.has('size/64'), true);
 });
 
@@ -338,14 +371,14 @@ test('extractFromSelection — 숨긴 레이어와 인스턴스 내부는 순회
     layoutMode: 'VERTICAL',
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'FIXED',
-    width: 77,
-    height: 77,
+    width: 32,
+    height: 32,
     itemSpacing: 0,
     paddingLeft: 0,
     paddingRight: 0,
     paddingTop: 0,
     paddingBottom: 0,
-    children: [],
+    children: [vec('hidden-v')], // 아이콘이어도 숨기면 제외
   };
   const inner = {
     type: 'FRAME',
@@ -354,7 +387,7 @@ test('extractFromSelection — 숨긴 레이어와 인스턴스 내부는 순회
     fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 1 }, visible: true }], // #0000ff — 인스턴스 내부라 제외
     cornerRadius: 13,
     layoutMode: 'NONE',
-    children: [],
+    children: [vec('inner-v')],
   };
   const instance = {
     type: 'INSTANCE',
@@ -364,25 +397,24 @@ test('extractFromSelection — 숨긴 레이어와 인스턴스 내부는 순회
     layoutMode: 'VERTICAL',
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'FIXED',
-    width: 120,
+    width: 40,
     height: 40,
     itemSpacing: 0,
     paddingLeft: 0,
     paddingRight: 0,
     paddingTop: 0,
     paddingBottom: 0,
-    children: [inner],
+    children: [inner], // 안쪽이 벡터뿐 — 아이콘 인스턴스
   };
 
   const { tokens, warnings } = extractFromSelection([hidden, instance]);
   const names = new Set(tokens.map((t) => t.name));
   assert.equal(names.has('color/00ff00'), false); // 숨긴 레이어
-  assert.equal(names.has('size/77'), false);
+  assert.equal(names.has('size/32'), false);
   assert.equal(names.has('color/0000ff'), false); // 인스턴스 내부
   assert.equal(names.has('radius/13'), false);
   assert.equal(names.has('color/ff0000'), true); // 인스턴스 자체 속성은 수집
-  assert.equal(names.has('size/120'), true);
-  assert.equal(names.has('size/40'), true);
+  assert.equal(names.has('size/40'), true); // 인스턴스 자체 크기(아이콘)
   assert.equal(warnings.length, 0); // 스킵은 조용히 — 안내 문구 없음
 });
 
@@ -424,9 +456,9 @@ test('extractFromSelection — 절대 배치 자식의 크기는 제외(오토�
     layoutPositioning: 'ABSOLUTE',
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'FIXED',
-    width: 187,
-    height: 43,
-    children: [],
+    width: 16,
+    height: 16,
+    children: [vec('badge-v')], // 아이콘
   };
   const flow = {
     type: 'FRAME',
@@ -437,7 +469,7 @@ test('extractFromSelection — 절대 배치 자식의 크기는 제외(오토�
     layoutSizingVertical: 'FIXED',
     width: 48,
     height: 48,
-    children: [],
+    children: [vec('flow-v')], // 아이콘
   };
   const card = {
     type: 'FRAME',
@@ -457,8 +489,7 @@ test('extractFromSelection — 절대 배치 자식의 크기는 제외(오토�
   flow.parent = card;
 
   const names = new Set(extractFromSelection([card]).tokens.map((t) => t.name));
-  assert.equal(names.has('size/187'), false); // 절대 배치 — 자유 리사이즈 잔값
-  assert.equal(names.has('size/43'), false);
+  assert.equal(names.has('size/16'), false); // 절대 배치 — 오토레이아웃 흐름 밖
   assert.equal(names.has('size/48'), true); // 흐름 안의 Fixed는 그대로
 });
 
@@ -697,11 +728,11 @@ test('createSemanticAliases — Global 컬렉션 없으면 전부 누락', async
 /* ================= bind.ts ================= */
 test('bindSelection — 색/크기 바인딩, 미매칭 skip, 오토레이아웃 아님 플래그', async () => {
   const figma = installFigma();
-  // Semantic 토큰 시드(별칭→Global 리터럴): 색 #0066ff, 크기 200
+  // Semantic 토큰 시드(별칭→Global 리터럴): 색 #0066ff, 크기 24(아이콘)
   await createTokens(
     [
       { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
-      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+      { name: 'size/24', category: 'size', sources: ['size'], value: 24 },
     ],
     16,
   );
@@ -716,8 +747,9 @@ test('bindSelection — 색/크기 바인딩, 미매칭 skip, 오토레이아웃
     ],
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'HUG',
-    width: 200,
-    height: 50,
+    width: 24,
+    height: 24,
+    children: [vec()], // 아이콘 — 크기는 아이콘 · 아바타만
     layoutMode: 'NONE',
     parent: { type: 'FRAME', layoutMode: 'VERTICAL' }, // 부모가 오토레이아웃 → Fixed는 디자이너의 선택
     setBoundVariable(field, v) {
@@ -733,7 +765,7 @@ test('bindSelection — 색/크기 바인딩, 미매칭 skip, 오토레이아웃
   // 첫 채움에 변수 바인딩됨
   assert.equal(node.fills[0].boundVariables.color.type, 'VARIABLE_ALIAS');
   // width가 Semantic size 변수로 바인딩됨
-  const sSize = findVar(figma, 'Global', 'size/200');
+  const sSize = findVar(figma, 'Global', 'size/24');
   assert.equal(node._bound.width, sSize.id);
 });
 
@@ -742,7 +774,7 @@ test('bindSelection — 이미 바인딩된 자리는 2회차 미리보기에 �
   await createTokens(
     [
       { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
-      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+      { name: 'size/24', category: 'size', sources: ['size'], value: 24 },
     ],
     16,
   );
@@ -753,8 +785,9 @@ test('bindSelection — 이미 바인딩된 자리는 2회차 미리보기에 �
     fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 } }],
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'HUG',
-    width: 200,
-    height: 50,
+    width: 24,
+    height: 24,
+    children: [vec()], // 아이콘
     layoutMode: 'NONE',
     parent: { type: 'FRAME', layoutMode: 'VERTICAL' },
     boundVariables: {},
@@ -904,7 +937,8 @@ test('bindSelection — "같은 값"만: 소수 둘째 자리까지 같으면 �
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'HUG',
     width: 11, // 12와 1 차이 — 허용오차가 없으므로 붙이지 않는다(레이어 값을 바꾸지 않는다)
-    height: 50,
+    height: 11,
+    children: [vec()], // 아이콘 — 크기는 아이콘 · 아바타만
     layoutMode: 'NONE',
     parent: { type: 'FRAME', layoutMode: 'VERTICAL' },
     setBoundVariable(field, v) {
@@ -917,19 +951,20 @@ test('bindSelection — "같은 값"만: 소수 둘째 자리까지 같으면 �
 
   // 11.996 → 소수 2자리 반올림 12.00 = 12 → 같은 값
   node.width = 11.996;
+  node.height = 11.996; // 정사각형 유지
   await bindSelection([node]);
   const s12 = findVar(figma, 'Global', 'size/12');
   assert.equal(node._bound.width, s12.id);
 
   // 12.01은 화면에 보이는 값이 달라 같은 값이 아니다
-  const n2 = { ...node, id: 'n2', width: 12.01, _bound: undefined };
+  const n2 = { ...node, id: 'n2', width: 12.01, height: 12.01, _bound: undefined };
   await bindSelection([n2]);
   assert.equal(n2._bound, undefined);
 });
 
 test('bindSelection — HUG/FILL 사유는 두 축 모두 집계', async () => {
   installFigma();
-  await createTokens([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
+  await createTokens([{ name: 'size/32', category: 'size', sources: ['size'], value: 32 }], 16);
   // 가로 FILL · 세로 HUG — 두 축 모두 건너뛰었으니 사유도 2건이어야 한다.
   const node = {
     type: 'FRAME',
@@ -939,8 +974,9 @@ test('bindSelection — HUG/FILL 사유는 두 축 모두 집계', async () => {
     layoutMode: 'VERTICAL',
     layoutSizingHorizontal: 'FILL',
     layoutSizingVertical: 'HUG',
-    width: 200,
-    height: 200,
+    width: 32,
+    height: 32,
+    children: [vec()], // 아이콘
     itemSpacing: 0,
     paddingLeft: 0,
     paddingRight: 0,
@@ -958,7 +994,7 @@ test('bindSelection — 소수 크기는 근처 정수 토큰에 스냅하지 �
   const figma = installFigma();
   await createTokens(
     [
-      { name: 'size/344', category: 'size', sources: ['size'], value: 344 },
+      { name: 'size/24', category: 'size', sources: ['size'], value: 24 },
       { name: 'size/40', category: 'size', sources: ['size'], value: 40 },
     ],
     16,
@@ -972,7 +1008,8 @@ test('bindSelection — 소수 크기는 근처 정수 토큰에 스냅하지 �
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'HUG',
     width: w,
-    height: 10,
+    height: w,
+    children: [vec(`${id}-v`)], // 아이콘
     itemSpacing: 0,
     paddingLeft: 0,
     paddingRight: 0,
@@ -983,9 +1020,9 @@ test('bindSelection — 소수 크기는 근처 정수 토큰에 스냅하지 �
     },
   });
 
-  // 343.5는 허용오차(1) 안에 size/344가 있지만, extract가 소수 size를 토큰으로 만들지 않으므로
+  // 23.5는 허용오차(1) 안에 size/24가 있지만, extract가 소수 size를 토큰으로 만들지 않으므로
   // 바인딩도 스냅하지 않는다 — 그러지 않으면 추출이 거부한 값을 바인딩이 되살리며 폭까지 바꾼다.
-  const frac = mk('frac', 343.5);
+  const frac = mk('frac', 23.5);
   const res = await bindSelection([frac]);
   assert.equal(frac._bound, undefined);
   assert.equal(res.reasons['size-fraction'], 1); // 사유가 '매칭 없음'에 섞이지 않고 따로 집계된다
@@ -994,14 +1031,14 @@ test('bindSelection — 소수 크기는 근처 정수 토큰에 스냅하지 �
   const near = mk('near', 39.5);
   await bindSelection([near]);
   assert.equal(near._bound, undefined); // 39.5도 소수 → 스냅 안 함
-  const exact = mk('exact', 344);
+  const exact = mk('exact', 24);
   await bindSelection([exact]);
-  assert.equal(exact._bound.width, findVar(figma, 'Global', 'size/344').id);
+  assert.equal(exact._bound.width, findVar(figma, 'Global', 'size/24').id);
 });
 
 test('bindSelection — 소수 크기라도 같은 값의 토큰이 있으면 바인딩', async () => {
   const figma = installFigma();
-  await createTokens([{ name: 'size/343_5', category: 'size', sources: ['size'], value: 343.5 }], 16);
+  await createTokens([{ name: 'size/23_5', category: 'size', sources: ['size'], value: 23.5 }], 16);
   const node = {
     type: 'FRAME',
     id: 'n',
@@ -1010,8 +1047,9 @@ test('bindSelection — 소수 크기라도 같은 값의 토큰이 있으면 �
     layoutMode: 'VERTICAL',
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'HUG',
-    width: 343.5,
-    height: 10,
+    width: 23.5,
+    height: 23.5,
+    children: [vec()], // 아이콘
     itemSpacing: 0,
     paddingLeft: 0,
     paddingRight: 0,
@@ -1023,12 +1061,12 @@ test('bindSelection — 소수 크기라도 같은 값의 토큰이 있으면 �
   };
 
   await bindSelection([node]);
-  assert.equal(node._bound.width, findVar(figma, 'Global', 'size/343_5').id);
+  assert.equal(node._bound.width, findVar(figma, 'Global', 'size/23_5').id);
 });
 
 test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사유로 수집', async () => {
   installFigma();
-  await createTokens([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
+  await createTokens([{ name: 'size/24', category: 'size', sources: ['size'], value: 24 }], 16);
   // 오토레이아웃 프레임 — padding 4방향이 모두 매칭 실패(GAP 변수 없음)지만 레이어는 1개다.
   const pad = {
     type: 'FRAME',
@@ -1038,6 +1076,9 @@ test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사�
     layoutMode: 'VERTICAL',
     layoutSizingHorizontal: 'HUG',
     layoutSizingVertical: 'HUG',
+    width: 24,
+    height: 24,
+    children: [vec('pad-v')], // 아이콘 — 크기 사유는 아이콘 · 아바타에서만
     itemSpacing: 7,
     paddingLeft: 7,
     paddingRight: 7,
@@ -1053,12 +1094,26 @@ test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사�
     layoutMode: 'NONE',
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'FIXED',
-    width: 200,
-    height: 200,
+    width: 24,
+    height: 24,
+    children: [vec('free-v')], // 아이콘
+    setBoundVariable() {},
+  };
+  // 아이콘 · 아바타가 아닌 카드 — 크기 사유를 내지 않는다
+  const card = {
+    type: 'FRAME',
+    id: 'card',
+    name: 'Card',
+    fills: [],
+    layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED',
+    layoutSizingVertical: 'FIXED',
+    width: 356,
+    height: 467,
     setBoundVariable() {},
   };
 
-  const dry = await bindSelection([pad, free], false);
+  const dry = await bindSelection([pad, free, card], false);
 
   const byReason = (r) => dry.skips.filter((s) => s.reason === r);
   // padding 5건이 모두 no-match지만 레이어는 1개 — 노드×사유로 중복 제거된다.
@@ -1066,7 +1121,7 @@ test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사�
   assert.equal(byReason('no-match')[0].nodeId, 'pad');
   assert.equal(byReason('no-match')[0].name, 'Padded');
   assert.ok(dry.reasons['no-match'] >= 5); // 건수는 속성 단위 그대로
-  // 자유 배치·HUG/FILL도 각각 레이어와 함께 잡힌다.
+  // 자유 배치·HUG/FILL도 각각 레이어와 함께 잡힌다(카드는 크기를 찾지 않으니 없다).
   assert.deepEqual(byReason('size-free-layout').map((s) => s.nodeId), ['free']);
   assert.deepEqual(byReason('hug-fill').map((s) => s.nodeId), ['pad']);
   assert.equal(byReason('hug-fill')[0].field, 'width'); // 첫 축의 필드가 남는다
@@ -1078,16 +1133,16 @@ test('bindSelection — dry-run은 사유별 건너뛴 레이어를 노드×사�
 
 test('bindSelection — 스킵 목록·미리보기 트리는 고른 레이어 수가 아니라 상한에 묶인다', async () => {
   installFigma();
-  await createTokens([{ name: 'size/200', category: 'size', sources: ['size'], value: 200 }], 16);
-  // 매칭되는 레이어 1개 + 매칭 안 되는 자유배치 레이어 500개.
+  await createTokens([{ name: 'size/24', category: 'size', sources: ['size'], value: 24 }], 16);
+  // 매칭되는 레이어 1개 + 매칭 안 되는 자유배치 아이콘 500개(크기 사유는 아이콘 · 아바타에서만 난다).
   const hit = {
     type: 'FRAME', id: 'hit', name: 'Hit', fills: [], layoutMode: 'NONE',
-    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 200, height: 200,
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 24, height: 24, children: [vec('hit-v')],
     setBoundVariable() {},
   };
   const misses = Array.from({ length: 500 }, (_, i) => ({
     type: 'FRAME', id: `m${i}`, name: `Miss ${i}`, fills: [], layoutMode: 'NONE',
-    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 137, height: 137,
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 20, height: 20, children: [vec(`m${i}-v`)],
     setBoundVariable() {},
   }));
 
@@ -1104,7 +1159,7 @@ test('bindSelection — 스킵 목록·미리보기 트리는 고른 레이어 �
 test('bindSelection — 스킵 상한을 사유별로 나눠 드문 사유도 레이어 목록을 지킨다', async () => {
   installFigma();
   await createTokens([
-    { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+    { name: 'size/24', category: 'size', sources: ['size'], value: 24 },
     { name: 'spacing/12', category: 'gap', sources: ['gap'], value: 12 },
   ], 16);
   // 사유가 노드별로 갈려야 이 테스트가 뜻이 있다 — 한 노드가 두 사유를 다 내면 순회만으로
@@ -1112,13 +1167,13 @@ test('bindSelection — 스킵 상한을 사유별로 나눠 드문 사유도 �
   // 흔한 사유(매칭 없음) 400개가 먼저 순회되고, 드문 사유(HUG/FILL) 10개가 뒤에 온다.
   const common = Array.from({ length: 400 }, (_, i) => ({
     type: 'FRAME', id: `c${i}`, name: `NoMatch ${i}`, fills: [], layoutMode: 'VERTICAL',
-    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 200, height: 200,
-    itemSpacing: 13, // 토큰 없는 간격 → no-match (크기 200은 붙으므로 크기 사유는 안 난다)
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 24, height: 24, children: [vec(`c${i}-v`)],
+    itemSpacing: 13, // 토큰 없는 간격 → no-match (아이콘 크기 24는 붙으므로 크기 사유는 안 난다)
     setBoundVariable() {},
   }));
   const rare = Array.from({ length: 10 }, (_, i) => ({
     type: 'FRAME', id: `r${i}`, name: `Hug ${i}`, fills: [], layoutMode: 'VERTICAL',
-    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', width: 200, height: 200,
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', width: 24, height: 24, children: [vec(`r${i}-v`)],
     itemSpacing: 12, // 토큰 있는 간격 → 붙는다. 남는 사유는 HUG/FILL뿐.
     setBoundVariable() {},
   }));
@@ -1176,7 +1231,7 @@ test('bindSelection — 자유 배치 크기 제외 · 숨김/인스턴스 내�
   await createTokens(
     [
       { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
-      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+      { name: 'size/24', category: 'size', sources: ['size'], value: 24 },
     ],
     16,
   );
@@ -1191,8 +1246,9 @@ test('bindSelection — 자유 배치 크기 제외 · 숨김/인스턴스 내�
     layoutMode: 'NONE',
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'FIXED',
-    width: 200,
-    height: 200,
+    width: 24,
+    height: 24,
+    children: [vec('free-v')], // 아이콘이어도 자유 배치면 크기 제외
     setBoundVariable(field, v) {
       (this._bound ??= {})[field] = v.id;
     },
@@ -1222,7 +1278,7 @@ test('bindSelection — 자유 배치 크기 제외 · 숨김/인스턴스 내�
   assert.equal(hiddenChild.fills[0].boundVariables, undefined);
 
   // 3) 인스턴스 — 자체 속성만 바인딩하고 내부는 건드리지 않음(오버라이드 방지)
-  const inner = { type: 'FRAME', id: 'in', name: 'in', fills: [blue()], layoutMode: 'NONE', setBoundVariable() {} };
+  const inner = { type: 'FRAME', id: 'in', name: 'in', fills: [blue()], layoutMode: 'NONE', children: [vec('in-v')], setBoundVariable() {} };
   const inst = {
     type: 'INSTANCE',
     id: 'i',
@@ -1231,8 +1287,8 @@ test('bindSelection — 자유 배치 크기 제외 · 숨김/인스턴스 내�
     layoutMode: 'VERTICAL',
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'HUG',
-    width: 200,
-    height: 40,
+    width: 24,
+    height: 24, // 안쪽이 벡터뿐 — 아이콘 인스턴스
     itemSpacing: 0,
     paddingLeft: 0,
     paddingRight: 0,
@@ -1244,8 +1300,8 @@ test('bindSelection — 자유 배치 크기 제외 · 숨김/인스턴스 내�
     },
   };
   const r3 = await bindSelection([inst]);
-  const s200 = findVar(figma, 'Global', 'size/200');
-  assert.equal(inst._bound.width, s200.id); // 인스턴스 자체 크기는 바인딩
+  const s24 = findVar(figma, 'Global', 'size/24');
+  assert.equal(inst._bound.width, s24.id); // 인스턴스 자체 크기는 바인딩
   assert.equal(inner.fills[0].boundVariables, undefined); // 내부는 미순회
   assert.ok(r3.reasons['instance-children'] >= 1);
 });
@@ -1523,7 +1579,7 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
   await createTokens(
     [
       { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
-      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+      { name: 'size/24', category: 'size', sources: ['size'], value: 24 },
     ],
     16,
   );
@@ -1537,8 +1593,9 @@ test('bindSelection — dry-run(apply=false)은 변경 없이 동일 집계 + �
     ],
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'HUG',
-    width: 200,
-    height: 50,
+    width: 24,
+    height: 24,
+    children: [vec()], // 아이콘 — 크기는 아이콘 · 아바타만
     layoutMode: 'NONE', // → 사유 no-autolayout
     parent: { type: 'FRAME', layoutMode: 'VERTICAL' }, // 크기 바인딩은 오토레이아웃 맥락에서만
     setBoundVariable(field, v) {
@@ -1572,7 +1629,7 @@ test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 
   await createTokens(
     [
       { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
-      { name: 'size/200', category: 'size', sources: ['size'], value: 200 },
+      { name: 'size/24', category: 'size', sources: ['size'], value: 24 },
     ],
     16,
   );
@@ -1587,8 +1644,9 @@ test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 
     ],
     layoutSizingHorizontal: 'FIXED',
     layoutSizingVertical: 'HUG',
-    width: 200, // → 후보(width)
-    height: 50,
+    width: 24, // → 후보(width)
+    height: 24,
+    children: [vec()], // 아이콘 — 크기는 아이콘 · 아바타만
     layoutMode: 'NONE',
     setBoundVariable() {},
   };
@@ -1609,7 +1667,7 @@ test('bindSelection — dry-run 후보(#6) + 트리 노드(#13): 영향+조상, 
   const widthC = dry.candidates.find((c) => c.field === 'width');
   assert.equal(widthC.nodeId, 'child');
   assert.equal('distance' in widthC, false); // 허용오차가 없으므로 거리도 없다
-  assert.equal(widthC.variableValue, '200');
+  assert.equal(widthC.variableValue, '24');
 
   // 트리: 영향(child) + 조상(root)만, pre-order. 계층 복원.
   assert.deepEqual(dry.nodes.map((n) => n.id), ['root', 'child']);
@@ -4594,4 +4652,282 @@ test('bindSelection — 이미 1.5 변수에 붙은 선 두께는 "소수 선 �
   assert.equal(dry.reasons['already-bound'], 1);
   assert.equal(dry.reasons.fraction ?? 0, 0);
   assert.ok(dry.skips.some((s) => s.nodeId === 'bound15' && s.reason === 'already-bound' && s.field === 'strokeWeight'));
+});
+
+/* ---------- 크기는 아이콘 · 아바타만 (§2.11, 2026-11-06 사용자 결정 · QA 대기 목록 1번) ---------- */
+
+/** 오토레이아웃 부모 안의 FIXED 프레임 — 크기 판정 픽스처. */
+function sizedFrame(id, w, h, extra = {}) {
+  return {
+    type: 'FRAME', id, name: id, fills: [], layoutMode: 'NONE',
+    layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: w, height: h,
+    children: [],
+    setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; },
+    ...extra,
+  };
+}
+
+/** 크기 판정 픽스처 한 벌 — 맞는 것(아이콘 · 아바타)과 아닌 것. */
+function sizeFixtures() {
+  const ok = {
+    icon: sizedFrame('icon', 24, 24, { children: [vec('icon-v')] }),
+    // 아이콘 래퍼 인스턴스 안에 벡터 컴포넌트 인스턴스(크기 조건은 보지 않음)
+    iconInst: sizedFrame('iconInst', 20, 20, {
+      type: 'INSTANCE',
+      children: [{ type: 'INSTANCE', id: 'glyph', name: 'Glyph', width: 18, height: 16, fills: [], children: [vec('glyph-v')] }],
+    }),
+    // 40×40 원형(cornerRadius 20) 사진 FRAME
+    avatar: sizedFrame('avatar', 40, 40, { cornerRadius: 20, fills: [IMG] }),
+    // 정사각 틀 + 같은 크기 사진 ELLIPSE
+    avatarEllipse: sizedFrame('avatarEllipse', 32, 32, {
+      children: [{ type: 'ELLIPSE', id: 'photo', name: 'Photo', width: 32, height: 32, fills: [IMG] }],
+    }),
+  };
+  const no = {
+    screen: sizedFrame('screen', 1440, 1440),
+    card: sizedFrame('card', 356, 467, { children: [vec('card-v')] }),
+    textButton: sizedFrame('textButton', 48, 48, {
+      children: [{ type: 'TEXT', id: 'label', name: 'Label', fills: [], characters: 'OK', fontSize: 14, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'AUTO' }, letterSpacing: { unit: 'PIXELS', value: 0 } }],
+    }),
+    squarePhoto: sizedFrame('squarePhoto', 64, 64, { cornerRadius: 8, fills: [IMG] }), // 원이 아님
+    icon72: sizedFrame('icon72', 72, 72, { children: [vec('icon72-v')] }), // 64 초과
+  };
+  const root = {
+    type: 'FRAME', id: 'root', name: 'root', fills: [], layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
+    itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+    children: [...Object.values(ok), ...Object.values(no)],
+    setBoundVariable() {},
+  };
+  for (const c of root.children) c.parent = root;
+  return { ok, no, root };
+}
+
+test('isIconOrAvatar — 아이콘 · 아바타만 참', () => {
+  const figma = installFigma();
+  const { ok, no } = sizeFixtures();
+  for (const [k, n] of Object.entries(ok)) assert.equal(isIconOrAvatar(n), true, `${k}가 아이콘 · 아바타로 판정되지 않았다`);
+  for (const [k, n] of Object.entries(no)) assert.equal(isIconOrAvatar(n), false, `${k}가 아이콘 · 아바타로 판정됐다`);
+
+  // 정사각형은 소수 둘째 자리로 반올림해 본다
+  assert.equal(isIconOrAvatar(sizedFrame('r', 24.001, 23.999, { children: [vec()] })), true);
+  assert.equal(isIconOrAvatar(sizedFrame('r2', 24, 23.9, { children: [vec()] })), false);
+  assert.equal(isIconOrAvatar(sizedFrame('r64', 64, 64, { children: [vec()] })), true);
+  // 대상 타입은 FRAME · COMPONENT · INSTANCE만
+  assert.equal(isIconOrAvatar({ type: 'GROUP', id: 'g', width: 24, height: 24, children: [vec()] }), false);
+  assert.equal(isIconOrAvatar({ type: 'ELLIPSE', id: 'e', width: 40, height: 40, fills: [IMG] }), false);
+  // 아이콘: 벡터가 하나는 있어야 하고, GROUP · FRAME 안의 벡터도 센다
+  assert.equal(isIconOrAvatar(sizedFrame('empty', 24, 24)), false);
+  assert.equal(isIconOrAvatar(sizedFrame('rects', 24, 24, { children: [{ type: 'RECTANGLE', id: 'rc', fills: [] }] })), false);
+  assert.equal(isIconOrAvatar(sizedFrame('grp', 24, 24, { children: [{ type: 'GROUP', id: 'gg', children: [{ type: 'RECTANGLE', id: 'bg', fills: [] }, vec()] }] })), true);
+  // TEXT · 이미지 채움은 어디에도 없어야 한다(중첩 INSTANCE 안까지)
+  assert.equal(isIconOrAvatar(sizedFrame('imgIn', 24, 24, { children: [vec(), { type: 'RECTANGLE', id: 'pic', fills: [IMG] }] })), false);
+  assert.equal(
+    isIconOrAvatar(sizedFrame('nestedText', 24, 24, { type: 'INSTANCE', children: [{ type: 'INSTANCE', id: 'in', fills: [], children: [vec(), { type: 'TEXT', id: 'tx', fills: [] }] }] })),
+    false,
+  );
+  // 아바타 ①: 모서리가 서로 다르면 네 모서리 모두 절반 이상
+  const mixedCorners = (bl) => sizedFrame('mx', 40, 40, { cornerRadius: figma.mixed, topLeftRadius: 20, topRightRadius: 20, bottomRightRadius: 20, bottomLeftRadius: bl, fills: [IMG] });
+  assert.equal(isIconOrAvatar(mixedCorners(20)), true);
+  assert.equal(isIconOrAvatar(mixedCorners(0)), false);
+  // 아바타 ①: 이미지는 루트나 그 아래 두 단계 안
+  const deep = (levels) => {
+    let n = { type: 'RECTANGLE', id: 'img', fills: [IMG] };
+    for (let i = 1; i < levels; i++) n = { type: 'FRAME', id: `w${i}`, fills: [], children: [n] };
+    return sizedFrame('deep', 40, 40, { cornerRadius: 20, children: [n] });
+  };
+  assert.equal(isIconOrAvatar(deep(2)), true);
+  assert.equal(isIconOrAvatar(deep(3)), false);
+  // 아바타 ②: 같은 크기(±0.5) · 보이는 이미지 ELLIPSE
+  const ell = (extra) => sizedFrame('el', 32, 32, { children: [{ type: 'ELLIPSE', id: 'p', width: 32, height: 32, fills: [IMG], ...extra }] });
+  assert.equal(isIconOrAvatar(ell({ width: 31.5, height: 32.5 })), true);
+  assert.equal(isIconOrAvatar(ell({ width: 28, height: 28 })), false);
+  assert.equal(isIconOrAvatar(ell({ visible: false })), false);
+  assert.equal(isIconOrAvatar(ell({ fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }] })), false);
+});
+
+test('extractFromSelection — 크기 토큰은 아이콘 · 아바타에서만(화면 · 카드 · 글자 버튼 · 사각 사진 · 72 아이콘 제외)', () => {
+  installFigma();
+  const { root } = sizeFixtures();
+  const names = new Set(extractFromSelection([root]).tokens.filter((t) => t.category === 'size').map((t) => t.name));
+  assert.deepEqual([...names].sort(), ['size/20', 'size/24', 'size/32', 'size/40']);
+});
+
+test('extractFromSelection — 아이콘이어도 HUG 축은 토큰으로 뽑지 않는다(FIXED 축만)', () => {
+  installFigma();
+  const { root, ok } = sizeFixtures();
+  // 24 아이콘은 이 픽스처에 하나뿐이다 — 두 축이 모두 HUG면 size/24가 없어야 한다(축 하나라도 잘못 뽑으면 생긴다).
+  ok.icon.layoutSizingHorizontal = 'HUG';
+  ok.icon.layoutSizingVertical = 'HUG';
+  assert.equal(extractFromSelection([root]).tokens.find((x) => x.name === 'size/24'), undefined);
+});
+
+test('bindSelection — 크기는 아이콘 · 아바타에만 붙고, 그 밖의 레이어는 찾지도 세지도 않음', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [20, 24, 32, 40, 48, 64, 72, 356, 467, 1440].map((v) => ({ name: `size/${v}`, category: 'size', sources: ['size'], value: v })),
+    16,
+  );
+  const { ok, no, root } = sizeFixtures();
+  ok.icon.layoutSizingVertical = 'HUG'; // 세로 HUG 축 → 사유 "HUG/FILL"
+  const dry = await bindSelection([root], false);
+  const sizeCands = dry.candidates.filter((c) => c.field === 'width' || c.field === 'height');
+  const ids = (f) => sizeCands.filter((c) => c.field === f).map((c) => c.nodeId).sort();
+  assert.deepEqual(ids('width'), ['avatar', 'avatarEllipse', 'icon', 'iconInst']);
+  assert.deepEqual(ids('height'), ['avatar', 'avatarEllipse', 'iconInst']);
+  const sizeReasons = ['hug-fill', 'size-free-layout', 'size-fraction'];
+  const sizeSkips = dry.skips.filter((s) => sizeReasons.includes(s.reason));
+  assert.deepEqual(sizeSkips.map((s) => [s.nodeId, s.reason, s.field]), [['icon', 'hug-fill', 'height']]);
+  assert.equal(dry.reasons['hug-fill'], 1);
+  // 매칭 없음에도 크기는 섞이지 않는다(그 밖의 레이어는 크기를 찾지 않음)
+  for (const n of Object.values(no)) assert.ok(!dry.skips.some((s) => s.nodeId === n.id && (s.field === 'width' || s.field === 'height')));
+
+  await bindSelection([root]);
+  assert.equal(ok.avatar._bound.width, findVar(figma, 'Global', 'size/40').id);
+  assert.equal(ok.avatarEllipse._bound.height, findVar(figma, 'Global', 'size/32').id);
+  assert.equal(ok.iconInst._bound.width, findVar(figma, 'Global', 'size/20').id);
+  assert.equal(ok.icon._bound.width, findVar(figma, 'Global', 'size/24').id);
+  assert.equal(ok.icon._bound.height, undefined);
+  for (const n of Object.values(no)) assert.equal(n._bound, undefined, `${n.id}에 크기 변수가 붙었다`);
+});
+
+test('bindSelectedItems — 찾은 뒤 아이콘 · 아바타가 아니게 된 레이어의 크기는 "그 사이 바뀜"', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/24', category: 'size', sources: ['size'], value: 24 }], 16);
+  const s24 = findVar(figma, 'Global', 'size/24');
+  const { ok, root } = sizeFixtures();
+  const keep = ok.icon;
+  const broken = sizedFrame('broken', 24, 24, { children: [vec('b-v')], parent: root });
+  for (const n of [keep, broken]) n.boundVariables = {};
+  registerNodes(figma, [keep, broken]);
+  // 찾은 뒤 글자를 넣었다
+  broken.children.push({ type: 'TEXT', id: 'bt', name: 'T', fills: [] });
+  const r = await bindSelectedItems([
+    { nodeId: 'icon', field: 'width', variableId: s24.id },
+    { nodeId: 'icon', field: 'height', variableId: s24.id },
+    { nodeId: 'broken', field: 'width', variableId: s24.id },
+    { nodeId: 'broken', field: 'height', variableId: s24.id },
+  ]);
+  assert.equal(r.bound, 2);
+  assert.deepEqual(r.reasons, { changed: 2 });
+  assert.equal(broken._bound, undefined);
+  assert.equal(keep._bound.width, s24.id);
+});
+
+/* ---- 크기 대상: 가장 바깥 틀만 · 보이는 벡터 · 아바타 ① 보이는 이미지 (코드 리뷰 2026-11-06, §2.11) ---- */
+function linkParents(n) {
+  for (const c of n.children ?? []) {
+    c.parent = n;
+    linkParents(c);
+  }
+  return n;
+}
+
+test('isIconOrAvatar — 가장 바깥 틀만: 아이콘 안쪽 틀은 대상이 아니다(GROUP 조상은 건너뜀 · 아바타 조상은 제외 안 함)', () => {
+  installFigma();
+  // 24 › 20 틀 › 벡터
+  const inner = sizedFrame('inner20', 20, 20, { children: [vec('iv')] });
+  const outer = linkParents(sizedFrame('outer24', 24, 24, { children: [inner] }));
+  assert.equal(isIconOrAvatar(outer), true);
+  assert.equal(isIconOrAvatar(inner), false);
+  // 24 › 20 › 16 세 겹 — 가운데가 바깥 규칙으로 빠져도 16은 여전히 대상 아님
+  const deep16 = sizedFrame('deep16', 16, 16, { children: [vec('d16')] });
+  const mid20 = sizedFrame('mid20', 20, 20, { children: [deep16] });
+  linkParents(sizedFrame('top24', 24, 24, { children: [mid20] }));
+  assert.equal(isIconOrAvatar(mid20), false);
+  assert.equal(isIconOrAvatar(deep16), false);
+  // 24 › GROUP › 16 틀 › 벡터 — 바깥 24가 아이콘이라 16은 아님
+  const g16 = sizedFrame('g16', 16, 16, { children: [vec('g16v')] });
+  linkParents(sizedFrame('gOuter', 24, 24, { children: [{ type: 'GROUP', id: 'grp', width: 20, height: 18, children: [g16] }] }));
+  assert.equal(isIconOrAvatar(g16), false);
+  // 24 GROUP › 20 틀 › 벡터 — GROUP은 조상 아이콘으로 치지 않는다
+  const inGroup = sizedFrame('inGroup20', 20, 20, { children: [vec('ig')] });
+  linkParents({ type: 'GROUP', id: 'g24', width: 24, height: 24, children: [inGroup] });
+  assert.equal(isIconOrAvatar(inGroup), true);
+  // 48 아이콘 버튼(배경 사각형 + 24 아이콘) — 바깥 48만
+  const btnIcon = sizedFrame('btnIcon', 24, 24, { children: [vec('bi')] });
+  const btn = linkParents(sizedFrame('btn48', 48, 48, { children: [{ type: 'RECTANGLE', id: 'bg', fills: [] }, btnIcon] }));
+  assert.equal(isIconOrAvatar(btn), true);
+  assert.equal(isIconOrAvatar(btnIcon), false);
+  // 아바타 안 16 상태 아이콘 — 아바타 조상은 이 규칙에 들지 않음
+  const badge = sizedFrame('badge16', 16, 16, { children: [vec('bv')] });
+  const av = linkParents(sizedFrame('av48', 48, 48, { cornerRadius: 24, fills: [IMG], children: [badge] }));
+  assert.equal(isIconOrAvatar(av), true);
+  assert.equal(isIconOrAvatar(badge), true);
+  // 조상은 페이지 바로 아래에서 멈춘다
+  const top = sizedFrame('onPage', 24, 24, { children: [vec('op')] });
+  top.parent = { type: 'PAGE', id: 'page', width: 24, height: 24, children: [top] };
+  assert.equal(isIconOrAvatar(top), true);
+});
+
+test('isIconOrAvatar — 벡터 수는 보이는 것만, 숨긴 TEXT · 이미지는 계속 탈락', () => {
+  installFigma();
+  assert.equal(isIconOrAvatar(sizedFrame('hidVec', 40, 40, { children: [{ ...vec('hv'), visible: false }] })), false);
+  // 숨긴 GROUP 아래 벡터도 세지 않는다
+  assert.equal(
+    isIconOrAvatar(sizedFrame('hidGrp', 24, 24, { children: [{ type: 'GROUP', id: 'hg', visible: false, children: [vec('hgv')] }] })),
+    false,
+  );
+  // 보이는 벡터가 하나라도 있으면 아이콘
+  assert.equal(isIconOrAvatar(sizedFrame('mixVec', 24, 24, { children: [vec('mv'), { ...vec('mh'), visible: false }] })), true);
+  // 숨긴 TEXT · 숨긴 사진은 여전히 탈락
+  assert.equal(isIconOrAvatar(sizedFrame('hidTxt', 24, 24, { children: [vec('ht'), { type: 'TEXT', id: 'tt', fills: [], visible: false }] })), false);
+  assert.equal(
+    isIconOrAvatar(sizedFrame('hidImg', 24, 24, { children: [vec('hi'), { type: 'RECTANGLE', id: 'ri', fills: [IMG], visible: false }] })),
+    false,
+  );
+  // 루트 자신이 숨었어도 판정은 아래 레이어로(숨김의 기준점)
+  assert.equal(isIconOrAvatar(sizedFrame('hidRoot', 24, 24, { visible: false, children: [vec('hr')] })), true);
+});
+
+test('isIconOrAvatar — 아바타 ①은 루트 채움 또는 보이는 레이어의 이미지만', () => {
+  installFigma();
+  const round48 = (extra) => sizedFrame('r48', 48, 48, { cornerRadius: 24, ...extra });
+  assert.equal(isIconOrAvatar(round48({ children: [{ type: 'RECTANGLE', id: 'p', fills: [IMG], visible: false }] })), false);
+  assert.equal(
+    isIconOrAvatar(round48({ children: [{ type: 'FRAME', id: 'w', fills: [], visible: false, children: [{ type: 'RECTANGLE', id: 'p2', fills: [IMG] }] }] })),
+    false,
+  );
+  assert.equal(isIconOrAvatar(round48({ children: [{ type: 'RECTANGLE', id: 'p3', fills: [IMG] }] })), true);
+  assert.equal(isIconOrAvatar(round48({ fills: [IMG], visible: false })), true); // 루트 채움은 숨김과 무관
+});
+
+test('extract · bind — 24 › 20 틀에서 크기는 바깥 24만(안쪽은 토큰 · 후보 · 크기 사유 없음), 안쪽만 골라도 없음', async () => {
+  const figma = installFigma();
+  const inner = sizedFrame('inner20', 20, 20, { children: [vec('iv')] });
+  const outer = sizedFrame('outer24', 24, 24, { layoutMode: 'VERTICAL', itemSpacing: 0, paddingLeft: 2, paddingRight: 2, paddingTop: 2, paddingBottom: 2, children: [inner] });
+  const root = linkParents({
+    type: 'FRAME', id: 'root', name: 'root', fills: [], layoutMode: 'VERTICAL',
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
+    itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+    children: [outer], setBoundVariable() {},
+  });
+  const sizes = (sel) => extractFromSelection(sel).tokens.filter((t) => t.category === 'size').map((t) => t.name).sort();
+  assert.deepEqual(sizes([root]), ['size/24']);
+  assert.deepEqual(sizes([inner]), []);
+
+  await createTokens([20, 24].map((v) => ({ name: `size/${v}`, category: 'size', sources: ['size'], value: v })), 16);
+  const dry = await bindSelection([root], false);
+  const sizeIds = dry.candidates.filter((c) => c.field === 'width' || c.field === 'height').map((c) => c.nodeId);
+  assert.deepEqual([...new Set(sizeIds)], ['outer24']);
+  assert.ok(!dry.skips.some((s) => s.nodeId === 'inner20' && ['hug-fill', 'size-free-layout', 'size-fraction'].includes(s.reason)));
+  const dryInner = await bindSelection([inner], false);
+  assert.ok(!dryInner.candidates.some((c) => c.field === 'width' || c.field === 'height'));
+  void figma;
+});
+
+test('bindSelectedItems — 찾은 뒤 아이콘 틀로 감싸진 아이콘의 크기는 "그 사이 바뀜"', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/24', category: 'size', sources: ['size'], value: 24 }], 16);
+  const s24 = findVar(figma, 'Global', 'size/24');
+  const { ok } = sizeFixtures();
+  const icon = ok.icon;
+  icon.boundVariables = {};
+  registerNodes(figma, [icon]);
+  // 찾은 뒤 28 아이콘 틀로 감쌌다
+  const wrap = sizedFrame('wrap28', 28, 28, { children: [icon] });
+  icon.parent = wrap;
+  const r = await bindSelectedItems([{ nodeId: 'icon', field: 'width', variableId: s24.id }]);
+  assert.equal(r.bound, 0);
+  assert.deepEqual(r.reasons, { changed: 1 });
 });

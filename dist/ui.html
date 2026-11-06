@@ -1134,7 +1134,7 @@
       </div>
       <!-- 허용오차는 없앴다(§4.8) — 연결은 언제나 같은 값만. 격자는 만들기가 값을 맞추는 간격이다. -->
       <div class="row">
-        <label class="inline" data-i18n-title="settings.gridTip" title="여백·크기 토큰을 만들기에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요."><span data-i18n="settings.grid">여백·크기 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
+        <label class="inline" data-i18n-title="settings.gridTip" title="여백 토큰을 만들기에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요."><span data-i18n="settings.grid">여백 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
       </div>
     </div>
 
@@ -1715,8 +1715,8 @@
     "ts.lineHeight": "\uD589\uAC04(px) \xB7 0\uC774\uBA74 AUTO",
     "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB3FC\uC694",
     "ts.weight": "\uAD75\uAE30 \u2014 Regular \xB7 Medium \xB7 SemiBold \xB7 Bold \uCC98\uB7FC Figma\uAC00 \uC4F0\uB294 \uC774\uB984",
-    "settings.grid": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uACA9\uC790",
-    "settings.gridTip": "\uC5EC\uBC31\xB7\uD06C\uAE30 \uD1A0\uD070\uC744 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
+    "settings.grid": "\uC5EC\uBC31 \uACA9\uC790",
+    "settings.gridTip": "\uC5EC\uBC31 \uD1A0\uD070\uC744 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
     // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
     "create.snapNoBind": " \xB7 \uACA9\uC790\uB85C \uC62E\uAE34 {k}\uAC1C \uAC12\uC740 \uC6D0\uB798 \uB808\uC774\uC5B4\uC640 \uB2EC\uB77C \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694",
     // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
@@ -2001,7 +2001,7 @@
     "create.count": "\uD6C4\uBCF4 {sel}/{total}",
     "color.usedCount": " \xB7 {n}\xD7 \uC0AC\uC6A9",
     "create.tidyMerged": " \xB7 \uAC19\uC740 \uCE78 {n}\uAC1C \uBCD1\uD569",
-    "create.tidySummary": "\uC5EC\uBC31\xB7\uD06C\uAE30 {before} \u2192 {after}\uAC1C ({grid}px \uACA9\uC790\uB85C {n}\uAC1C \uC774\uB3D9{mergedPart}){gapPart}",
+    "create.tidySummary": "\uC5EC\uBC31 {before} \u2192 {after}\uAC1C ({grid}px \uACA9\uC790\uB85C {n}\uAC1C \uC774\uB3D9{mergedPart}){gapPart}",
     "create.tidyUndone": "\uACA9\uC790 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694 \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB2E4\uC2DC \uB204\uB974\uBA74 \uB610 \uC815\uB9AC\uD574\uC694",
     "create.onceOff": "1\xD7 \uD1A0\uD070 {n}\uAC1C \uD574\uC81C",
     "create.onceNone": "1\xD7 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694",
@@ -2135,8 +2135,8 @@
     const n = parseInt(m[1], 16);
     return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
   }
-  var SNAP_CATEGORIES = /* @__PURE__ */ new Set(["gap", "size"]);
-  var TOKEN_GROUP = { gap: "spacing", size: "size" };
+  var SNAP_CATEGORIES = /* @__PURE__ */ new Set(["gap"]);
+  var TOKEN_GROUP = { gap: "spacing" };
   var cloneToken = (t2) => __spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] });
   function scaleLadder(base, max) {
     if (base <= 0) return [];

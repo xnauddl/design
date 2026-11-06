@@ -2122,11 +2122,11 @@ test('tidyNumberTokens — 8px 사다리·15%: 근사값만 옮기고 2·4는 �
 });
 
 test('tidyNumberTokens — 이동 한계가 비율이라 작은 값일수록 보수적', () => {
-  // 4와 40 모두 사다리 칸에서 4px 떨어져 있지만, 비율은 100% vs 10%로 다르다.
-  const r = tidyNumberTokens([numTok('spacing/4', 'gap', 4, 3), numTok('size/36', 'size', 36, 3)], { base: 8, ratio: 0.15 });
+  // 4와 36 모두 사다리 칸에서 4px 떨어져 있지만, 비율은 100% vs 11%로 다르다.
+  const r = tidyNumberTokens([numTok('spacing/4', 'gap', 4, 3), numTok('spacing/36', 'gap', 36, 3)], { base: 8, ratio: 0.15 });
   const byName = new Map(r.tokens.map((t) => [t.name, t]));
   assert.equal(byName.get('spacing/4').value, 4); // 유지 — 8까지 100%
-  assert.equal(byName.get('size/32').value, 32); // 36 → 32 (11%)
+  assert.equal(byName.get('spacing/32').value, 32); // 36 → 32 (11%)
 });
 
 test('tidyNumberTokens — 같은 칸에 놓이면 사용 수와 무관하게 병합', () => {
@@ -2177,8 +2177,10 @@ test('tidyNumberTokens — 사다리에서 먼 값은 서로 가까워도 합치
   assert.equal(r.tokens.length, 2);
 });
 
-test('tidyNumberTokens — 여백·크기만 대상(폰트 크기·선 두께·반경·색 제외)', () => {
+test('tidyNumberTokens — 여백만 대상(크기·폰트 크기·선 두께·반경·색 제외)', () => {
   const tokens = [
+    numTok('size/14', 'size', 14, 6), // 아이콘 · 아바타 크기는 의도된 값 — 옮기지 않는다(§2.11)
+    numTok('size/28', 'size', 28, 6),
     numTok('font-size/15', 'fontSize', 15, 30),
     numTok('stroke-width/1_5', 'strokeWidth', 1.5, 12),
     numTok('radius/6', 'radius', 6, 8),
@@ -2190,6 +2192,8 @@ test('tidyNumberTokens — 여백·크기만 대상(폰트 크기·선 두께·�
   assert.equal(r.before, 1); // 대상은 spacing 하나뿐
   assert.equal(r.snapped, 1);
   const byName = new Map(r.tokens.map((t) => [t.name, t]));
+  assert.equal(byName.get('size/14').value, 14);
+  assert.equal(byName.get('size/28').value, 28);
   assert.equal(byName.get('font-size/15').value, 15);
   assert.equal(byName.get('stroke-width/1_5').value, 1.5);
   assert.equal(byName.get('radius/6').value, 6);
