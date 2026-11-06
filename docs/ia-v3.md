@@ -283,7 +283,7 @@
       - **플러그인 표시:** 만들기의 자동 역할과 연결이 만든 역할에 변수 플러그인 데이터 `dsl.autoRole = "1"`을 남긴다. 색 목록 표에서 사용자가 고른 역할 · 텍스트 스타일 등록 · 손으로 고친 매핑(`semMap`)은 남기지 않는다.
       - **칠하기 용도:** §2.11 "칠하기 용도는 레이어 종류를 따른다"(QA #4 불합격 1 — 이 작업과 한 PR, 부록 A.9)를 그대로 쓴다.
     - **12.7 옛 이름.** 아래는 순서 3에서 쓰지 않는다(이름이 같은 손 변수도 옛 이름으로 친다). 지우지 않고, 이미 붙은 곳도 그대로 둔다(Semantic이므로 건너뜀).
-      - 고정 칸 이름: `spacing/{none · 3xs · 2xs · xs · sm · md · lg · xl · 2xl · 3xl · 4xl}`, `radius/{none · xs · sm · md · lg · xl · 2xl · full}`, `stroke-width/{thin · thick}`.
+      - 단계 이름(2026-11-06 넓힘 — 사다리 이전 상대 순위 `tshirtRoles`가 만든 이름도 오래된 파일에 남아 있다): 그룹 `spacing` · `radius` · `size` · `stroke-width` 아래 단계 `none · 3xs · 2xs · xs · sm · md · lg · xl · 2xl · 3xl · 4xl · full · thin · thick`, 그리고 그 뒤에 `-{숫자}`가 붙은 변형(`size/4xl-20` · `spacing/4xl-2`). 패턴: `^(spacing|radius|size|stroke-width)/(none|3xs|2xs|xs|sm|md|lg|xl|2xl|3xl|4xl|full|thin|thick)(-\d+)?$`. §0 "단계 이름 … 등"은 이 범위다.
       - 옛 색 역할 4개: `color/background/default` · `color/text/default` · `color/border/default` · `color/background/brand`. 단 이 이름은 새 규칙의 쓰임 이름과 같으므로 **순서 2에서는 쓴다**(같은 값일 때).
       - 거울: Global에 같은 이름이 있는 Semantic 변수(`bind.ts` `mirror`).
     - **12.8 Global에서 바꾸기 · 용도가 틀린 연결 바꾸기.** 찾기에서 다음 자리를 바꾸기 후보로 센다.
@@ -2140,6 +2140,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [ ] UI(§4.6): 풀기 칩 · 툴팁, 배지 요약 "풀기 u", 연결 뒤 꼬리. i18n `bind.unbind` · `bind.unbindTip` · `bind.roleUnbind` · `bind.doneUnbound`
 - [ ] 문구: `bind.doneSwapped` " · Global에서 바꿈 {m}곳" → " · 바꿈 {m}곳"(용도가 틀린 Semantic에서 바꾼 자리도 셈)
 - [ ] 문구: `bind.roleSummaryTip`을 §4.6 문구로(용도 틀림 · 풀기 포함, 늘 한 문장)
+- [ ] 옛 단계 이름 넓히기(12.7): `usageRoles.ts` `OLD_LADDER`(정확 일치 목록)를 12.7 패턴으로(`size` 그룹 · 칸 밖 단계 · `-N` 변형 포함). 단위 테스트: `size/md`(24) · `spacing/4xl-2`가 같은 값이어도 순서 3으로 붙지 않고 쓰임 역할이 생김
 - [ ] 단위 테스트: inverse 띠(회색 기준이면 inverse 없음), 용도가 틀린 연결 바꾸기(흰 TEXT에 붙은 background/default → color/text/inverse), 크기 풀기(카드 width Global → 풀림 · 값 그대로 · 다시 확인), verify-bind-flow 풀기 카드
 - [ ] 실기 확인(사용자, 피그마) ① `190:615`(이 파일 기준 — Global이 크기 60곳뿐)에서 다시 [찾기] → 풀기 60 · 흰 글자 6개 바꿈 → [연결] 뒤 Global 0곳, 흰 글자 `color/text/inverse`. 이미 생긴 `color/icon/inverse`(검정 선 아이콘 2곳)는 플러그인 표시가 있고 용도도 맞아 그대로 남는다 — 이미 있는 역할은 바꾸지 않는다(12.5), 이름은 사용자가 고치거나 지운다
 - [ ] 실기 확인 ② 연결 전 원본 `163:1523`의 새 복제본 → 아이콘 색 이름에 inverse 없음(`color/icon/strong` · `subtle`)
