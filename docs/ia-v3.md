@@ -1959,7 +1959,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 - [ ] `isIconOrAvatar`(`extract.ts` export) — 정사각형 · 64 이하 · 아이콘(자손 조건, INSTANCE 루트는 안쪽 자식, 중첩 INSTANCE는 안쪽이 같은 자손 조건이면 허용 · 크기 조건 없음, 벡터 수는 중첩 안까지 합침) 또는 아바타(둥근 모서리 ≥ 절반 + 두 단계 안 이미지 · 같은 크기 이미지 ELLIPSE 자식)
 - [ ] `extract.ts` `collectSize`: 판정을 통과한 노드의 FIXED 축만 `size/` 토큰
-- [ ] `tokens.ts` `SNAP_CATEGORIES`에서 `size` 제외(격자 정리는 크기를 옮기지 않음) + i18n `settings.grid` · `settings.gridTip` · `create.tidySummary` 문구, `ui.html` 기본 글자, 주석(`ui.ts` 711 · `tokens.ts` 309–310)
+- [ ] `tokens.ts` `SNAP_CATEGORIES`에서 `size` 제외(격자 정리는 크기를 옮기지 않음) + i18n `settings.grid` · `settings.gridTip` · `create.tidySummary` 문구, `ui.html` 기본 글자, 주석(`ui.ts` 710 · `tokens.ts` 309–310 · 327 · 351)
 - [ ] `test/pure.test.mjs` `tidyNumberTokens`: `size/36` → 32 비율 예시를 `gap`으로, "여백·크기만 대상" 제목 · 단언에 `size` 제외
 - [ ] `bind.ts` 크기: 판정을 먼저 — 아니면 찾지도 세지도 않음, 맞으면 지금 순서(자유 배치 → HUG/FILL → 소수). `bindSelectedItems` 크기 자리 다시 확인에 판정 추가(아니면 `changed`)
 - [ ] 주석 정리: `bind.ts` 565–568 · 579, `extract.ts` 43 · 168. i18n `reason.hug-fill` · `reason.size-free-layout` · `reason.size-fraction`은 남긴다(아이콘 · 아바타에서 계속 씀)
