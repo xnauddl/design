@@ -106,7 +106,7 @@
 |---|---|
 | 레이어에는 Semantic 역할만 (§2.12) | 레이어에 붙는 변수는 Semantic(또는 Component) 역할이다. Global은 원시값을 담고 레이어에 직접 붙지 않는다. 같은 값의 역할이 없으면 플러그인이 **쓰임 이름**으로 역할을 만들어 붙인다 — 역할을 자동으로 만드는 것이 이 플러그인 변수 기능의 핵심이다 |
 | 역할 이름 = 쓰임 (A안) | 숫자 역할은 전부 `{그룹}/{레이어 역할}/{속성}`(예: `spacing/card/gap`, `radius/button`). 고정 칸 이름(`spacing/xl`)은 새로 만들지 않는다. 같은 이름에 값이 둘 이상일 때만 `-2` · `-3`. 글자 크기 · 굵기 · 글꼴은 지금 이름 그대로 |
-| 색 역할 = 쓰임 + 밝기 | `color/{text · background · border · icon · shadow}/{default · subtle · strong · brand}` + 겹치면 `-2` |
+| 색 역할 = 쓰임 + 밝기 | `color/{text · background · border · icon · shadow}/{default · subtle · strong · inverse · brand}` + 겹치면 `-2` |
 | 이미 Global이 붙은 자리 | §2.11 "이미 붙은 것은 바꾸지 않는다"의 예외. 같은 값의 역할(Component 또는 Semantic)로 바꾼다(화면 값 그대로). 예외: 옛 규칙으로 아이콘 · 아바타가 아닌 레이어 크기에 붙은 Global은 남는다(§2.12 12.8) |
 | 역할을 만드는 때 | 토큰 만들기와 연결 두 곳 |
 
@@ -253,7 +253,7 @@
       - **쓰임:** TEXT의 채움 → `text`(구간마다 색이 다른 글자는 지금처럼 연결하지 않는다 — `fills`가 `figma.mixed`). 벡터(VECTOR · BOOLEAN_OPERATION · STAR · POLYGON · LINE)의 채움 · 선, 그리고 아이콘 틀(`isIconOrAvatar`의 아이콘 판정을 통과한 레이어) 안의 도형(RECTANGLE · ELLIPSE)의 채움 · 선 → `icon`. 프레임류(아이콘 틀 자신 포함)의 채움은 언제나 `background`, 선은 `border`. 그 밖의 채움 → `background`, 그 밖의 선 → `border`. 효과 색 → `shadow`.
       - **밝기 함수 하나**(`colorRoleNames(쓰임, 색 목록(hex · 곳 수), 이미 있는 이름 → hex)`)를 만들기와 연결이 같이 쓴다.
         - 기준색: `color/{쓰임}/default`가 이미 있으면 그 색. 없으면 목록에서 곳 수가 가장 많은 색(같으면 hex 순)이 `default`가 되고 기준색이 된다.
-        - 나머지: 유채색(OKLCH 채도 ≥ `palette.ts` `LOW_CHROMA`)은 `brand`. 무채색은 기준색보다 OKLCH L이 크면 `subtle`, 작으면 `strong`. 같은 이름 후보가 여럿이면 곳 수가 많은 순(같으면 hex 순)으로 번호 없는 이름 · `-2` · `-3`(12.5).
+        - 나머지: 유채색(OKLCH 채도 ≥ `palette.ts` `LOW_CHROMA`)은 `brand`. 무채색은 기준색과 OKLCH L 0.5를 사이에 두고 반대쪽이면 `inverse`(예: 검정 기본 글자 + 어두운 버튼 위 흰 글자 → `color/text/inverse`, 2026-11-06 사용자 결정), 같은 쪽이면 기준색보다 L이 크면 `subtle`, 작으면 `strong`. 같은 이름 후보가 여럿이면 곳 수가 많은 순(같으면 hex 순)으로 번호 없는 이름 · `-2` · `-3`(12.5).
         - 유채색은 뜻(오류 · 성공)을 모르므로 모두 `brand` 계열이다(빨간 오류 글자도 `color/text/brand-2`가 될 수 있다 — 디자이너가 이름을 고치면 다음부터 순서 3으로 그 변수를 쓴다).
         - "역할이 있다"는 `color/{쓰임}/default` 변수가 있다는 뜻이다. 디자이너가 만든 `color/text/primary`만 있으면 기준색은 목록에서 정한다(그 변수는 같은 값이면 순서 3으로 붙는다).
       - **처리 순서(연결 · 자리 순서와 무관):** ① 순서 1(Component) · 순서 3(디자이너 변수)에 붙는 색 자리를 먼저 정한다. ② 남은 색 자리를 쓰임별로 모아(hex · 곳 수) 이 함수를 한 번 불러 이름을 정한다. ③ 그 이름(또는 `-n`)에 같은 값의 Semantic이 있으면 그것을 쓴다(순서 2). ④ 나머지는 순서 4로 그 이름의 새 역할. 만들기는 ①이 없고(레이어에 붙이지 않음) 선택의 색 쓰임 전체로 ②~④를 한다.
@@ -267,7 +267,7 @@
       - Semantic 컬렉션에 만든다. 없으면 만든다(지금 `ensureCollection`). 컬렉션의 **모든 모드**에 같은 Global 별칭을 건다(다크 모드가 있으면 Dark 값도 같은 Global — 다크 짝은 다크 단계가 따로 정한다).
       - 용도(scope): spacing → GAP, radius → CORNER_RADIUS, stroke-width → STROKE_FLOAT, size → WIDTH_HEIGHT, opacity → OPACITY, `color/text` → TEXT_FILL, `color/background` → FRAME_FILL · SHAPE_FILL, `color/icon` → SHAPE_FILL · STROKE_COLOR, `color/border` → STROKE_COLOR, `color/shadow` → EFFECT_COLOR. 글자 묶음은 Global의 용도를 물려받는다(지금 동작 — `scopeForSemanticRole`이 모르는 이름). `scopeForSemanticRole`을 이 표로 넓힌다.
       - **플러그인 표시:** 만들기의 자동 역할과 연결이 만든 역할에 변수 플러그인 데이터 `dsl.autoRole = "1"`을 남긴다. 색 목록 표에서 사용자가 고른 역할 · 텍스트 스타일 등록 · 손으로 고친 매핑(`semMap`)은 남기지 않는다.
-      - **칠하기 용도:** §2.11 "칠하기 용도는 레이어 종류를 따른다"(QA #4 불합격 1 — 이 작업보다 먼저 고친다)를 그대로 쓴다.
+      - **칠하기 용도:** §2.11 "칠하기 용도는 레이어 종류를 따른다"(QA #4 불합격 1 — 이 작업과 한 PR, 부록 A.9)를 그대로 쓴다.
     - **12.7 옛 이름.** 아래는 순서 3에서 쓰지 않는다(이름이 같은 손 변수도 옛 이름으로 친다). 지우지 않고, 이미 붙은 곳도 그대로 둔다(Semantic이므로 건너뜀).
       - 고정 칸 이름: `spacing/{none · 3xs · 2xs · xs · sm · md · lg · xl · 2xl · 3xl · 4xl}`, `radius/{none · xs · sm · md · lg · xl · 2xl · full}`, `stroke-width/{thin · thick}`.
       - 옛 색 역할 4개: `color/background/default` · `color/text/default` · `color/border/default` · `color/background/brand`. 단 이 이름은 새 규칙의 쓰임 이름과 같으므로 **순서 2에서는 쓴다**(같은 값일 때).
@@ -2085,7 +2085,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 ## A.9 QA #4 불합격 1 — 칠하기 용도는 레이어 종류를 따른다 (2026-11-06)
 
-> `docs/qa/2026-11-05-qa4.md` §1. §2.11 "칠하기 용도는 레이어 종류를 따른다". §2.12보다 먼저 따로 고친다(작고 독립적).
+> `docs/qa/2026-11-05-qa4.md` §1. §2.11 "칠하기 용도는 레이어 종류를 따른다". **§2.12(A.8)와 한 PR로 낸다**(2026-11-06 사용자 결정 — 따로 먼저 내면 흰 글자가 잠시 Global에 붙어 "레이어에는 Semantic만"을 어긴다).
 
 - [ ] `scopes.ts` `fillScopesFor(nodeType)` — TEXT → `ALL_FILLS` · `TEXT_FILL`, 프레임류 → `ALL_FILLS` · `FRAME_FILL`, 그 밖 → `ALL_FILLS` · `SHAPE_FILL`(`ALL_SCOPES`는 `colorScopeOk`가 지금처럼 통과). `fieldScopes('fills')` · `scopeFitsField`는 노드 종류를 받지 않으므로 지금 그대로 두고, 바인딩 경로만 바꾼다
 - [ ] `bind.ts` `bindPaints`: `allowed = key === 'fills' ? fillScopesFor(node.type) : STROKE_SCOPES`
@@ -2094,4 +2094,4 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [ ] 단위 테스트: 흰 TEXT + 흰 FRAME, 변수 `color/background/default`(FRAME_FILL · SHAPE_FILL, Semantic) · `color/gray/0`(ALL_FILLS, Global) → TEXT는 `gray/0`, FRAME은 `background/default`. TEXT_FILL 전용 변수는 FRAME에 안 붙음. 연결 직전에 변수 용도가 TEXT_FILL 없이 바뀌면 `changed`
 - [ ] 기대값이 바뀌는 기존 테스트(의도를 살려 고친다): `test/figma.test.mjs` 1452(FRAME 채움 #000 → TEXT_FILL 전용 `text` 역할을 기대 — 노드를 TEXT로 바꿔 "역할 별칭이 거울 · Global보다 먼저"를 지킨다. §2.12 때 A.8 목록대로 한 번 더 바뀐다) · 4072 부근 컬렉션 계층 지정(Primitives) 테스트(FRAME 채움 #aa0000 → `color/text/default` TEXT_FILL · `tier === 2` 기대 — 노드를 TEXT로 바꿔 계층 판정 확인을 지킨다)
 - [ ] QA 회신 `docs/qa/2026-11-05-qa4-reply.md`(커밋 · 바뀐 동작 한 줄 · `npm test` 요약 · 미검증)
-- [ ] 실기 확인(사용자, 피그마): **연결 전 원본**(`163:1523`)의 복제본에서 변수 탭 전체 실행 → 레이어 › 연결 [찾기] → [연결]. 이미 연결된 결과 파일은 "이미 연결됨"으로 건너뛰어 아무것도 바뀌지 않는다(그 파일로 보려면 6개 글자의 칠하기 연결을 피그마에서 먼저 푼다). 기대: 흰 글자 6개(`Contact` · `Business Class` · `01` · `02` · `03` · `Subscribe Now`)가 `color/gray/0`(Global)에 붙음. 글자가 아닌 칠하기(예: 검정 벡터 아이콘 채움)에 `color/text/default`가 붙던 곳도 Global로 바뀐다 — "나머지 608건 변화 없음"이 아니라 이 수는 실기에서 센다. QA 회신의 "바뀐 동작"에도 이 줄을 넣는다
+- [ ] 실기 확인(사용자, 피그마): **연결 전 원본**(`163:1523`)의 복제본에서 변수 탭 전체 실행 → 레이어 › 연결 [찾기] → [연결]. 이미 연결된 결과 파일은 "이미 연결됨"으로 건너뛰어 아무것도 바뀌지 않는다(그 파일로 보려면 6개 글자의 칠하기 연결을 피그마에서 먼저 푼다). 기대: 흰 글자 6개(`Contact` · `Business Class` · `01` · `02` · `03` · `Subscribe Now`)가 Semantic `color/text/inverse`(TEXT_FILL, `color/gray/0` 별칭)에 붙음 — QA 문서의 "`color/gray/0`(Global)"은 §2.12 전 기대값이라 바뀐다. 글자가 아닌 칠하기(예: 검정 벡터 아이콘 채움)에 `color/text/default`가 붙던 곳도 용도에 맞는 쓰임 역할(`color/icon/...` 등)로 바뀐다 — "나머지 608건 변화 없음"이 아니라 이 수는 실기에서 센다. QA 회신의 "바뀐 동작"에도 이 줄을 넣는다
