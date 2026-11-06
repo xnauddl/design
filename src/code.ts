@@ -1125,8 +1125,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           skipTotal: r.skipTotal, // 상한 전 실제 수 — 잘렸으면 UI가 알린다
           reqId: msg.reqId, // UI가 낡은 응답을 가려낸다
           newRoles: r.newRoles,
-          swapped: r.swapped,
-          unbound: r.unbound,
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
@@ -1195,7 +1193,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 중간에 예외가 나도 이미 쓴 자리가 있으면 ⌘Z 한 번으로 풀리게 finally에서 묶음을 닫는다(오류는 맨 끝 catch가 보낸다).
         let written = 0;
         let made = 0;
-        let unbound = 0;
         let committed = false;
         try {
           const r = await bindSelectedItems(msg.items, {
@@ -1203,18 +1200,17 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             yieldToEvents: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
             onBound: (n) => { written = n; },
             onCreated: (n) => { made = n; },
-            onUnbound: (n) => { unbound = n; },
           });
-          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles, swapped: r.swapped, unbound: r.unbound });
-          // 역할을 만들었거나 크기 연결을 풀었으면 아무것도 붙이지 못했어도 묶음을 닫는다 — 연결 한 번 = ⌘Z 한 번(§2.12 12.9 · 12.8a).
-          if (r.bound || r.newRoles || r.unbound) {
+          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles });
+          // 역할을 하나라도 만들었으면 아무것도 붙이지 못했어도 묶음을 닫는다 — 연결 한 번 = ⌘Z 한 번(§2.12 12.9).
+          if (r.bound || r.newRoles) {
             commitUndo(figma); // UX2: 선택 바인딩 전체(마지막 묶음 뒤 한 번)를 단일 Undo로
             committed = true;
             selfSelect = true;
             postSelection();
           }
         } finally {
-          if ((written > 0 || made > 0 || unbound > 0) && !committed) commitUndo(figma);
+          if ((written > 0 || made > 0) && !committed) commitUndo(figma);
         }
         break;
       }

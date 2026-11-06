@@ -690,20 +690,12 @@ export const STRINGS: Record<string, string> = {
   'bind.progressOf': '{done} / {total} 처리 중… ({pct}%)',
   'bind.progressCount': '{done}개 처리 중…',
   // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
-  // 새 역할 · Global에서 바꾸기(§2.12, §4.6)
-  'bind.newRole': '새',
-  'bind.newRoleTip': '연결할 때 Semantic에 만들어요 · {global}을 가리켜요',
-  'bind.fromGlobal': '· {global}에서',
+  // 새 역할(§2.12, §4.6)
+  'bind.newRole': 'N',
+  'bind.newRoleAria': '새 역할',
+  'bind.newRoleTip': '{global}을 가리켜요',
   'bind.roleNew': '새 역할 {k}',
-  'bind.roleSwap': '바꿈 {m}',
-  'bind.roleSummaryTip': '새 역할은 연결할 때 Semantic에 만들어요 · 바꿈은 Global이나 용도가 맞지 않는 변수가 붙은 곳을 같은 값의 역할로 바꿔요 · 풀기는 카드 · 화면 크기의 변수 연결만 풀어요',
   'bind.doneNewRoles': ' · 새 역할 {k}개',
-  'bind.doneSwapped': ' · 바꿈 {m}곳',
-  // 크기 연결 풀기(§2.12 12.8a, §4.6)
-  'bind.unbind': '풀기',
-  'bind.unbindTip': '카드 · 화면 크기는 변수를 쓰지 않아요 · 연결만 풀고 크기는 그대로예요',
-  'bind.roleUnbind': '풀기 {u}',
-  'bind.doneUnbound': ' · 크기 연결 풀기 {u}곳',
   'bind.placesMore': '외 {n}곳 · 레이어 선택으로 보기',
   'bind.linkingOf': '연결 중… {done} / {total}',
   'bind.waitLink': '연결이 끝나면 다시 해 주세요',

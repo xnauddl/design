@@ -1,7 +1,7 @@
 /* ============================================================
    bind.ts — 토큰(변수)을 레이어 속성에 바인딩 (top-down)
    - 레이어에는 역할(Component · Semantic)만 붙인다(§2.12). 같은 값의 역할이 없으면 쓰임 이름으로
-     새 Semantic 역할을 만들어(같은 값 Global의 별칭) 붙이고, Global이 붙은 자리는 역할로 바꾼다.
+     새 Semantic 역할을 만들어(같은 값 Global의 별칭) 붙인다. 이미 붙은 연결은 바꾸지도 풀지도 않는다(§2.12 12.8).
    - 프레임 크기(Fixed)·여백(오토레이아웃)·반경·효과·텍스트 지원.
    ============================================================ */
 import { rgbToHex, scopeForSemanticRole, scopesForType, type ScopeName, type ResolvedType } from './tokens';
@@ -43,8 +43,6 @@ interface VarEntry {
   colorHex?: string;
   num?: number;
   str?: string;
-  /** Semantic · Component가 별칭으로 가리키는 로컬 Global(여러 단계면 끝까지) — 용도가 틀린 연결 바꾸기의 별칭 대상(12.8). */
-  aliasGlobalId?: string;
 }
 
 /**
@@ -71,11 +69,8 @@ export interface BindResult {
   skips?: BindSkip[];
   /** dry-run일 때만 — 상한 적용 전 실제 스킵 레이어 수(잘렸는지 알리려고). */
   skipTotal?: number;
-  /** 적용 모드 — 새로 만든 역할 수 · Global에서 바꾼 자리 수(§2.12). */
+  /** 적용 모드 — 새로 만든 역할 수(§2.12). */
   newRoles?: number;
-  swapped?: number;
-  /** 적용 모드 — 크기 연결을 푼 자리 수(§2.12 12.8a). */
-  unbound?: number;
 }
 
 /**
@@ -398,7 +393,7 @@ export async function bindSelection(
     const known = new Map<string, SceneNode>();
     for (const s of ctx.slots) known.set(s.node.id, s.node);
     const r = await bindSelectedItems(
-      preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, fromVariableId: c.fromVariableId, unbind: c.unbind })),
+      preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole })),
       {},
       known, // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
     );
@@ -406,8 +401,6 @@ export async function bindSelection(
     res.skipped += r.skipped;
     for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = (res.reasons[k] ?? 0) + v;
     res.newRoles = r.newRoles;
-    res.swapped = r.swapped;
-    res.unbound = r.unbound;
     // 결과 트리에는 실제로 만든 역할의 id를 싣는다.
     for (const c of preview.candidates) {
       const id = c.newRole ? r.createdIds[c.newRole.name] : undefined;
@@ -431,8 +424,6 @@ interface VarIndexAll {
   entries: VarEntry[];
   /** Semantic(계층 2) 이름 → 값 키(값을 못 읽으면 '') — 새 역할 번호가 이미 있는 이름을 피하게. */
   semNames: Map<string, string>;
-  /** 로컬 Global(계층 1) 변수 id — 여기 붙은 자리는 바꾸기 대상(§2.12 12.8). */
-  globalIds: Set<string>;
   byId: Map<string, VarEntry>;
 }
 
@@ -445,11 +436,9 @@ async function buildIndex(): Promise<VarIndexAll> {
   const globalNames = new Set(vars.filter((v) => tierOf.get(v.variableCollectionId) === 1).map((v) => v.name));
   const entries: VarEntry[] = [];
   const semNames = new Map<string, string>();
-  const globalIds = new Set<string>();
   for (const v of vars) {
     const tier = tierOf.get(v.variableCollectionId) ?? 0;
     if (tier < 1) continue; // Global/Semantic/Component 3계층만(다른 컬렉션 제외)
-    if (tier === 1) globalIds.add(v.id);
     const val = await resolveValue(v, modeOf);
     if (tier === 2) semNames.set(v.name, '');
     if (val == null) continue;
@@ -462,25 +451,11 @@ async function buildIndex(): Promise<VarIndexAll> {
     } else if (v.resolvedType === 'FLOAT' && typeof val === 'number') e.num = val;
     else if (v.resolvedType === 'STRING' && typeof val === 'string') e.str = val;
     if (tier === 2) semNames.set(v.name, entryKey(e));
-    if (tier >= 2) e.aliasGlobalId = await aliasGlobalOf(v, modeOf, tierOf);
     entries.push(e);
   }
   // 높은 tier 우선(Component의 "지금 순서"는 이 정렬 안의 피그마 순서).
   entries.sort((a, b) => b.tier - a.tier);
-  return { entries, semNames, globalIds, byId: new Map(entries.map((e) => [e.variable.id, e])) };
-}
-
-/** 별칭을 끝까지 따라가 닿는 로컬 Global id(별칭이 아니거나 Global에 닿지 않으면 없음, §2.12 12.8 `aliasGlobalId`). */
-async function aliasGlobalOf(v: Variable, modeOf: Map<string, string>, tierOf: Map<string, number>): Promise<string | undefined> {
-  let cur: Variable | null = v;
-  for (let i = 0; i < 12 && cur; i++) {
-    const mode = modeOf.get(cur.variableCollectionId);
-    const val = mode ? cur.valuesByMode[mode] : undefined;
-    if (!(val && typeof val === 'object' && 'type' in val && (val as VariableAlias).type === 'VARIABLE_ALIAS')) return undefined;
-    cur = await figma.variables.getVariableByIdAsync((val as VariableAlias).id);
-    if (cur && tierOf.get(cur.variableCollectionId) === 1) return cur.id;
-  }
-  return undefined;
+  return { entries, semNames, byId: new Map(entries.map((e) => [e.variable.id, e])) };
 }
 
 /** 변수에 플러그인 표시(`dsl.autoRole`)가 있나 — 목 변수는 API가 없을 수 있다. */
@@ -557,8 +532,6 @@ interface Slot {
   allowed: readonly VariableScope[];
   /** 숫자 · 글자: 쓰임 이름(12.3). 색: 쓰임(12.4). */
   usage: string;
-  /** 바꾸는 자리 — 붙어 있던 Global 또는 용도가 틀린 역할의 id(12.8). */
-  fromId?: string;
   /** 색: 배경 종류(12.4 inverse 판정 — text · icon · border만). */
   bg?: BgKind;
   noMatchReason: string;
@@ -611,15 +584,7 @@ function resolveSlots(ctx: Ctx): void {
     res.bound++;
     preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s)));
   };
-  const globalFor = (s: Slot, cands: VarEntry[]): VarEntry | null => {
-    if (s.fromId) {
-      // 바꾸기는 붙어 있던 Global 그 자체. 용도가 틀린 역할이면 그 역할이 가리키는 Global, 없으면 같은 값 Global(12.8).
-      const from = ctx.index.byId.get(s.fromId);
-      if (!from) return null;
-      if (from.tier === 1) return from;
-      const g = from.aliasGlobalId ? ctx.index.byId.get(from.aliasGlobalId) : undefined;
-      if (g) return g;
-    }
+  const globalFor = (cands: VarEntry[]): VarEntry | null => {
     return cands.filter((e) => e.tier === 1).sort(byName)[0] ?? null;
   };
   for (const s of ctx.slots) {
@@ -643,7 +608,7 @@ function resolveSlots(ctx: Ctx): void {
       emit(s, two);
       continue;
     }
-    pending.push({ slot: s, base: s.usage, global: globalFor(s, cands) });
+    pending.push({ slot: s, base: s.usage, global: globalFor(cands) });
   }
 
   // 색: 남은 자리를 쓰임별로 모아 밝기 이름을 한 번에 정한다(12.4 처리 순서 ②~④).
@@ -672,15 +637,14 @@ function resolveSlots(ctx: Ctx): void {
         emit(x.slot, two);
         continue;
       }
-      pending.push({ slot: x.slot, base, global: globalFor(x.slot, x.cands) });
+      pending.push({ slot: x.slot, base, global: globalFor(x.cands) });
     }
   }
 
   // 순서 4 — 새 역할. 이름 번호는 한꺼번에(곳 수 순).
   const live = pending.filter((p) => {
     if (p.global) return true;
-    if (p.slot.fromId) note(res, 'already-bound', p.slot.node, preview, p.slot.field);
-    else skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
+    skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
     return false;
   });
   const names = assignNames(
@@ -705,10 +669,6 @@ function resolveSlots(ctx: Ctx): void {
       newRoleGlobalName: spec.globalName,
     });
   }
-  // 바꾸는 자리에는 원래 Global 이름을 싣는다(자리 줄 "· {Global}에서").
-  for (const c of preview.candidates) {
-    if (c.fromVariableId) c.fromVariableName = ctx.index.byId.get(c.fromVariableId)?.variable.name;
-  }
 }
 
 interface NewRoleSpec {
@@ -728,7 +688,6 @@ function candOf(s: Slot, variableId: string, variableName: string, tier: number,
     variableName,
     tier,
     variableValue,
-    ...(s.fromId ? { fromVariableId: s.fromId } : {}),
   };
 }
 
@@ -738,57 +697,11 @@ function entryDisplay(e: VarEntry, s: Slot): string {
   return e.str ?? s.display;
 }
 
-/**
- * 바꾸기 대상인가(§2.12 12.8) — 붙어 있는 별칭이 하나이고, 로컬 Global이거나 값을 읽을 수 있는 로컬
- * Semantic · Component인데 용도가 이 자리(`allowed`)에 맞지 않으면 그 id. `allowed`가 없으면 Global만.
- */
-function swapSourceId(ctx: Ctx, list: readonly unknown[], allowed?: readonly VariableScope[]): string | undefined {
-  const ids = new Set(list.filter(isLiveAlias).map((a) => (a as VariableAlias).id));
-  if (ids.size !== 1) return undefined;
-  const id = [...ids][0];
-  if (ctx.index.globalIds.has(id)) return id;
-  if (!allowed) return undefined;
-  const e = ctx.index.byId.get(id);
-  return e && e.tier >= 2 && entryKey(e) !== '' && !scopeOk(e.scopes, allowed) ? id : undefined;
-}
-
-/** 노드 필드의 바꾸기 대상 id(하나일 때). `allowed`가 없으면 Global만(12.8a 크기 풀기). */
-function nodeFieldGlobal(ctx: Ctx, node: SceneNode, field: string, allowed?: readonly VariableScope[]): string | undefined {
-  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
-  const entry = bv?.[field];
-  if (!entry) return undefined;
-  return swapSourceId(ctx, Array.isArray(entry) ? entry : [entry], allowed);
-}
-
 /** 숫자 필드의 허용 용도. */
 const numAllowed = (field: string): readonly VariableScope[] => {
   const scope = FIELD_SCOPE[field];
   return scope ? [scope] : ['ALL_SCOPES'];
 };
-
-/** 칠하기 · 효과 자리의 바꾸기 대상 id. */
-function colorGlobal(ctx: Ctx, x: Paint | Effect, node: SceneNode, field: 'fills' | 'strokes' | 'effects', index: number, allowed: readonly VariableScope[]): string | undefined {
-  const own = (x as { boundVariables?: { color?: unknown } }).boundVariables?.color;
-  const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
-  const arr = bv?.[field];
-  return swapSourceId(ctx, [own, Array.isArray(arr) ? arr[index] : undefined].filter(Boolean), allowed);
-}
-
-/** 글자 속성 전체가 한 바꾸기 대상에 붙어 있으면 그 id(일부 구간 · 구간마다 다르면 undefined). */
-function textFieldGlobal(ctx: Ctx, node: TextNode, field: VariableBindableTextField, allowed: readonly VariableScope[]): string | undefined {
-  const len = node.characters.length;
-  const getRange = (
-    node as TextNode & {
-      getRangeBoundVariable?: (start: number, end: number, f: VariableBindableTextField) => VariableAlias | null | typeof figma.mixed;
-    }
-  ).getRangeBoundVariable;
-  if (len > 0 && typeof getRange === 'function') {
-    const full = getRange.call(node, 0, len, field);
-    if (full === figma.mixed || !full) return undefined;
-    return swapSourceId(ctx, [full], allowed);
-  }
-  return nodeFieldGlobal(ctx, node, field, allowed);
-}
 
 /* ---------- 노드 순회 ---------- */
 async function walk(
@@ -858,8 +771,7 @@ function bindPaints(node: SceneNode, ctx: Ctx): void {
     let bg: BgKind | undefined | null = null; // null = 아직 안 봄
     paints.forEach((p, i) => {
       if (p.type !== 'SOLID') return;
-      const fromId = colorGlobal(ctx, p, node, key, i, allowed);
-      const st = fromId ? null : stateReason(colorState(p, node, key, i));
+      const st = stateReason(colorState(p, node, key, i));
       if (st) {
         note(res, st, node, preview, key);
         return;
@@ -877,7 +789,7 @@ function bindPaints(node: SceneNode, ctx: Ctx): void {
         const bgHex = use === 'text' || use === 'icon' || use === 'border' ? backgroundOf(node) : undefined;
         bg = bgHex ? bgKindOf(bgHex) : undefined;
       }
-      ctx.slots.push({ node, field: key, index: i, kind: 'color', value: hex, display: hex, allowed, usage: use, fromId, ...(bg ? { bg } : {}), noMatchReason: 'no-match' });
+      ctx.slots.push({ node, field: key, index: i, kind: 'color', value: hex, display: hex, allowed, usage: use, ...(bg ? { bg } : {}), noMatchReason: 'no-match' });
     });
   }
 }
@@ -889,17 +801,7 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
   // 크기: 아이콘 · 아바타 레이어만(§2.11 "크기는 아이콘 · 아바타만", extract.ts의 수집 기준과 같은 함수).
   // 아니면 찾지도 않고 건너뜀으로도 세지 않는다 — 카드 · 화면 프레임마다 크기 칩이 생기지 않게.
   const kind = iconOrAvatarKind(node);
-  // 옛 규칙으로 크기에 붙은 로컬 Global — 역할로 바꿀 수 없는 자리면 연결을 푼다(§2.12 12.8a). 값은 그대로.
-  const unbindGlobal = (field: 'width' | 'height'): boolean => {
-    const gid = nodeFieldGlobal(ctx, node, field);
-    if (!gid) return false;
-    pushUnbind(ctx, node, field, gid);
-    return true;
-  };
-  if (!kind) {
-    unbindGlobal('width');
-    unbindGlobal('height');
-  } else {
+  if (kind) {
     // 오토레이아웃 맥락에서 Fixed인 축만 — 만들기(collectSize)와 같은 판정(inAutoLayoutFlow).
     if (inAutoLayoutFlow(node)) {
       /**
@@ -909,19 +811,16 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
        */
       const bindAxis = (sizing: 'FIXED' | 'HUG' | 'FILL', field: 'width' | 'height', v: number): void => {
         if (sizing !== 'FIXED') {
-          if (!unbindGlobal(field)) note(res, 'hug-fill', node, preview, field);
+          note(res, 'hug-fill', node, preview, field);
           return;
         }
         const fraction = Math.abs(v - Math.round(v)) >= 0.005; // extract의 소수 2자리 반올림과 같은 판정
-        if (fraction && unbindGlobal(field)) return;
         tryBind(ctx, node, field, v, `size/${kind}`, fraction ? 'size-fraction' : undefined);
       };
       bindAxis(node.layoutSizingHorizontal, 'width', node.width);
       bindAxis(node.layoutSizingVertical, 'height', node.height);
     } else {
-      const w = unbindGlobal('width');
-      const h = unbindGlobal('height');
-      if (!w || !h) note(res, 'size-free-layout', node, preview);
+      note(res, 'size-free-layout', node, preview);
     }
   }
 
@@ -986,11 +885,9 @@ function bindStroke(node: SceneNode, ctx: Ctx): void {
   // 선 두께는 정수만(§2.11, 2026-11-04) — 소수 두께는 정수 변수에 당겨 붙이지 않고 "소수 선 두께"로 건너뛴다.
   const one = (field: 'strokeWeight' | (typeof sides)[number], v: number): void => {
     if (!(v > 0)) return;
-    // 이미 붙은 것은 소수 판정보다 먼저 — 단 Global에 붙은 것은 바꾸기 대상이라 소수 판정을 받는다(§2.12 12.8).
-    if (!nodeFieldGlobal(ctx, node, field, numAllowed(field))) {
-      const st = stateReason(nodeFieldState(node, field));
-      if (st) { note(res, st, node, preview, field); return; }
-    }
+    // 이미 붙은 것은 소수 판정보다 먼저(§2.11 — 이미 붙은 연결은 바꾸지 않는다, §2.12 12.8).
+    const st = stateReason(nodeFieldState(node, field));
+    if (st) { note(res, st, node, preview, field); return; }
     if (Math.abs(v - Math.round(v)) >= 0.005) { note(res, 'fraction', node, preview, field); return; }
     tryBind(ctx, node, field, v, strokeName(field, owner, sideValues));
   };
@@ -1014,8 +911,7 @@ function bindEffects(node: SceneNode, ctx: Ctx): void {
   }
   effects.forEach((e, i) => {
     if (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW') return;
-    const fromId = colorGlobal(ctx, e, node, 'effects', i, EFFECT_SCOPES);
-    const st = fromId ? null : stateReason(colorState(e, node, 'effects', i));
+    const st = stateReason(colorState(e, node, 'effects', i));
     if (st) {
       note(res, st, node, preview, 'effects');
       return;
@@ -1026,7 +922,7 @@ function bindEffects(node: SceneNode, ctx: Ctx): void {
       return;
     }
     const hex = rgbToHex(e.color);
-    ctx.slots.push({ node, field: 'effects', index: i, kind: 'color', value: hex, display: hex, allowed: EFFECT_SCOPES, usage: 'shadow', fromId, noMatchReason: 'no-match' });
+    ctx.slots.push({ node, field: 'effects', index: i, kind: 'color', value: hex, display: hex, allowed: EFFECT_SCOPES, usage: 'shadow', noMatchReason: 'no-match' });
   });
 }
 
@@ -1057,14 +953,13 @@ async function bindText(node: SceneNode, ctx: Ctx): Promise<void> {
   // fontFamily — STRING 변수(FONT_FAMILY)에 정확 일치. 같은 글꼴의 변수가 아예 없으면 지금처럼 세지 않는다.
   if (node.characters.length === 0) return;
   const fam = node.fontName.family;
-  const fromId = textFieldGlobal(ctx, node, 'fontFamily', ['FONT_FAMILY']);
-  const st = fromId ? null : stateReason(textFieldState(node, 'fontFamily'));
+  const st = stateReason(textFieldState(node, 'fontFamily'));
   if (st) {
     note(res, st, node, preview, 'fontFamily');
     return;
   }
   if (!ctx.index.entries.some((e) => e.str === fam && scopeOk(e.scopes, ['FONT_FAMILY']))) return;
-  ctx.slots.push({ node, field: 'fontFamily', kind: 'text', value: fam, display: fam, allowed: ['FONT_FAMILY'], usage: textUsageName('fontFamily') as string, fromId, noMatchReason: 'no-match' });
+  ctx.slots.push({ node, field: 'fontFamily', kind: 'text', value: fam, display: fam, allowed: ['FONT_FAMILY'], usage: textUsageName('fontFamily') as string, noMatchReason: 'no-match' });
 }
 
 function tryBindText(ctx: Ctx, node: TextNode, field: VariableBindableTextField, value: number): void {
@@ -1074,14 +969,12 @@ function tryBindText(ctx: Ctx, node: TextNode, field: VariableBindableTextField,
     return;
   }
   // 일부 구간에만 붙어 있어도 속성 전체를 건너뛴다 — 빈 구간을 채우지 않는다(§2.11).
-  // 단 속성 전체가 한 Global에 붙어 있으면 바꾸기 대상(§2.12 12.8).
-  const fromId = textFieldGlobal(ctx, node, field, [FIELD_SCOPE[field] as VariableScope]);
-  const st = fromId ? null : stateReason(textFieldState(node, field));
+  const st = stateReason(textFieldState(node, field));
   if (st) {
     note(res, st, node, preview, field);
     return;
   }
-  ctx.slots.push({ node, field, kind: 'text', value, display: String(value), allowed: [FIELD_SCOPE[field] as VariableScope], usage: textUsageName(field) as string, fromId, noMatchReason: 'no-match' });
+  ctx.slots.push({ node, field, kind: 'text', value, display: String(value), allowed: [FIELD_SCOPE[field] as VariableScope], usage: textUsageName(field) as string, noMatchReason: 'no-match' });
 }
 
 function tryBind(
@@ -1094,32 +987,12 @@ function tryBind(
   noMatchReason = 'no-match',
 ): void {
   const allowed = numAllowed(field);
-  const fromId = nodeFieldGlobal(ctx, node, field, allowed);
-  const st = fromId ? null : stateReason(nodeFieldState(node, field));
+  const st = stateReason(nodeFieldState(node, field));
   if (st) {
     note(ctx.res, st, node, ctx.preview, field);
     return;
   }
-  ctx.slots.push({ node, field, kind: 'num', value, display: String(value), allowed, usage, fromId, noMatchReason });
-}
-
-/** 크기 연결 풀기 후보(§2.12 12.8a) — 카드는 붙어 있던 Global마다 하나(`unbind:{id}`). */
-function pushUnbind(ctx: Ctx, node: SceneNode, field: 'width' | 'height', globalId: string): void {
-  const v = (node as unknown as Record<string, number>)[field];
-  const display = String(round2(v));
-  const name = ctx.index.byId.get(globalId)?.variable.name ?? '';
-  ctx.res.bound++;
-  ctx.preview.candidates.push({
-    nodeId: node.id,
-    field,
-    currentValue: display,
-    variableId: `unbind:${globalId}`,
-    variableName: name,
-    tier: 1,
-    variableValue: display,
-    unbind: true,
-    fromVariableId: globalId,
-  });
+  ctx.slots.push({ node, field, kind: 'num', value, display: String(value), allowed, usage, noMatchReason });
 }
 
 /* ---------- 체크한 자리 연결(APPLY_SELECTED) — 연결 직전 다시 확인(§4.6 "찾는 범위") ---------- */
@@ -1132,10 +1005,6 @@ export interface SelectedBindItem {
   variableId: string;
   /** 새 역할(§2.12 12.9) — 이 자리가 다시 확인을 통과하면 만든다(같은 이름은 한 번). */
   newRole?: NewRoleRef;
-  /** 바꾸는 자리 — 아직 이 변수가 붙어 있어야 한다(§2.12 12.8). 풀기도 같다(12.8a). */
-  fromVariableId?: string;
-  /** 크기 연결 풀기(§2.12 12.8a) — `fromVariableId`의 연결을 푼다(값은 그대로). */
-  unbind?: boolean;
 }
 
 /** 연결 진행률 · 양보 훅(§4.6 "찾기 · 연결의 수"). 묶음이 끝날 때마다 부른다. */
@@ -1148,8 +1017,6 @@ export interface SelectedBindHooks {
   onBound?: (bound: number) => void;
   /** 새 역할을 만들 때마다(누적 수) — 아무것도 못 붙여도 역할을 만들었으면 ⌘Z 묶음을 닫는다(§2.12 12.9). */
   onCreated?: (created: number) => void;
-  /** 크기 연결을 풀 때마다(누적 수) — 푼 자리만 있어도 ⌘Z 묶음을 닫는다(§2.12 12.8a). */
-  onUnbound?: (unbound: number) => void;
 }
 
 /** 연결 묶음 크기 — 한 번에 setBoundVariable을 이만큼 부르고 양보한다(제안값, 실기 뒤 바꿀 수 있음). */
@@ -1165,11 +1032,8 @@ export interface SelectedBindResult {
   skips: BindSkip[];
   /** 상한 전 실제 스킵 레이어 수. */
   skipTotal: number;
-  /** 새로 만든 역할 수 · Global에서 바꾼 자리 수(§2.12). */
+  /** 새로 만든 역할 수(§2.12). */
   newRoles: number;
-  swapped: number;
-  /** 크기 연결을 푼 자리 수(§2.12 12.8a). */
-  unbound: number;
   /** 만든 역할 이름 → 변수 id. */
   createdIds: Record<string, string>;
 }
@@ -1203,8 +1067,6 @@ export async function bindSelectedItems(
   // 새 역할은 이 연결 안에서 이름마다 한 번 만든다(§2.12 12.9).
   const created = new Map<string, Variable>();
   const createdIds: Record<string, string> = {};
-  let swapped = 0;
-  let unbound = 0;
   const ensureRole = async (spec: NewRoleRef, global: Variable): Promise<Variable> => {
     const have = created.get(spec.name);
     if (have) return have;
@@ -1257,25 +1119,10 @@ export async function bindSelectedItems(
     };
 
     // 칠하기·선·효과는 레이어×속성마다 새 배열을 모았다가 묶음 끝에 한 번 쓴다. fields = 그 배열에 연결한 자리 수.
-    const changedPaints = new Map<SceneNode, Map<'fills' | 'strokes' | 'effects', { arr: (Paint | Effect)[]; fields: number; swaps: number }>>();
+    const changedPaints = new Map<SceneNode, Map<'fills' | 'strokes' | 'effects', { arr: (Paint | Effect)[]; fields: number }>>();
 
     for (const it of chunk) {
       const node = nodes.get(it.nodeId) ?? null;
-      // 크기 연결 풀기(12.8a) — 변수 값을 읽지 않는다. 아직 같은 Global이 붙어 있어야 한다(레이어 판정은 다시 보지 않음).
-      if (it.unbind) {
-        if (!node || (it.field !== 'width' && it.field !== 'height') || !it.fromVariableId || boundFieldId(node, it.field) !== it.fromVariableId) {
-          fail('changed', node, it.field);
-          continue;
-        }
-        try {
-          (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable | null) => void }).setBoundVariable(it.field, null);
-          unbound++;
-          hooks.onUnbound?.(unbound);
-        } catch {
-          fail('error', node, it.field);
-        }
-        continue;
-      }
       // 새 역할은 아직 없으므로 가리킬 Global의 값으로 다시 확인한다.
       const vv = await variableOf(it.newRole ? it.newRole.globalId : it.variableId);
       if (!node || !vv) {
@@ -1301,17 +1148,10 @@ export async function bindSelectedItems(
             fail('changed', node, key);
             continue;
           }
-          if (it.fromVariableId) {
-            if (boundColorId(x, node, key, i) !== it.fromVariableId) {
-              fail('changed', node, key); // 그 사이 다른 변수로 바뀌었거나 풀림
-              continue;
-            }
-          } else {
-            const st = stateReason(colorState(x, node, key, i));
-            if (st) {
-              fail(st, node, key);
-              continue;
-            }
+          const st = stateReason(colorState(x, node, key, i));
+          if (st) {
+            fail(st, node, key);
+            continue;
           }
           const translucent = key === 'effects' ? isTranslucentEffectColor(x as DropShadowEffect) : isTranslucentPaint(x as SolidPaint);
           const hex = rgbToHex((x as SolidPaint | DropShadowEffect).color);
@@ -1332,8 +1172,7 @@ export async function bindSelectedItems(
           if (w) {
             w.arr = arr;
             w.fields++;
-          } else m.set(key, { arr, fields: 1, swaps: 0 });
-          if (it.fromVariableId) (m.get(key) as { swaps: number }).swaps++;
+          } else m.set(key, { arr, fields: 1 });
           continue; // bound는 묶음 끝 배열 쓰기가 성공해야 센다
         }
         if ((TEXT_RANGE_FIELDS as readonly string[]).includes(it.field)) {
@@ -1346,17 +1185,10 @@ export async function bindSelectedItems(
             fail('styled', node, field);
             continue;
           }
-          if (it.fromVariableId) {
-            if (boundTextId(node, field) !== it.fromVariableId) {
-              fail('changed', node, field);
-              continue;
-            }
-          } else {
-            const st = stateReason(textFieldState(node, field));
-            if (st) {
-              fail(st, node, field);
-              continue;
-            }
+          const st = stateReason(textFieldState(node, field));
+          if (st) {
+            fail(st, node, field);
+            continue;
           }
           if (node.characters.length === 0 || node.fontName === figma.mixed || !textValueEqual(node, field, value)) {
             fail('changed', node, field);
@@ -1365,7 +1197,6 @@ export async function bindSelectedItems(
           await figma.loadFontAsync(node.fontName);
           node.setRangeBoundVariable(0, node.characters.length, field, await target());
           res.bound++;
-          if (it.fromVariableId) swapped++;
           hooks.onBound?.(res.bound);
           continue;
         }
@@ -1382,17 +1213,10 @@ export async function bindSelectedItems(
           fail('changed', node, it.field);
           continue;
         }
-        if (it.fromVariableId) {
-          if (boundFieldId(node, it.field) !== it.fromVariableId) {
-            fail('changed', node, it.field);
-            continue;
-          }
-        } else {
-          const st = stateReason(nodeFieldState(node, it.field));
-          if (st) {
-            fail(st, node, it.field);
-            continue;
-          }
+        const st = stateReason(nodeFieldState(node, it.field));
+        if (st) {
+          fail(st, node, it.field);
+          continue;
         }
         const cur = (node as unknown as Record<string, unknown>)[it.field];
         if (typeof cur !== 'number' || typeof value !== 'number' || !sameNumber(cur, value)) {
@@ -1401,7 +1225,6 @@ export async function bindSelectedItems(
         }
         (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(it.field as VariableBindableNodeField, await target());
         res.bound++;
-        if (it.fromVariableId) swapped++;
         hooks.onBound?.(res.bound);
       } catch {
         fail('error', node, it.field);
@@ -1412,7 +1235,6 @@ export async function bindSelectedItems(
         try {
           (node as unknown as Record<string, unknown>)[key] = w.arr;
           res.bound += w.fields;
-          swapped += w.swaps;
           hooks.onBound?.(res.bound);
         } catch {
           // 배열 쓰기 실패 — 그 배열에 연결한 자리는 연결되지 않았다.
@@ -1427,35 +1249,7 @@ export async function bindSelectedItems(
     if (hooks.yieldToEvents) await hooks.yieldToEvents();
   }
   const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
-  return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, skipTotal: preview.skips.length, newRoles: created.size, swapped, unbound, createdIds };
-}
-
-/** 지금 붙어 있는 별칭 id(하나일 때) — 바꾸기 다시 확인용. */
-function singleAliasId(list: readonly unknown[]): string | undefined {
-  const ids = new Set(list.filter(isAlias).map((a) => (a as VariableAlias).id));
-  return ids.size === 1 ? [...ids][0] : undefined;
-}
-function boundFieldId(node: SceneNode, field: string): string | undefined {
-  const entry = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables?.[field];
-  return entry ? singleAliasId(Array.isArray(entry) ? entry : [entry]) : undefined;
-}
-function boundColorId(x: Paint | Effect, node: SceneNode, field: 'fills' | 'strokes' | 'effects', index: number): string | undefined {
-  const own = (x as { boundVariables?: { color?: unknown } }).boundVariables?.color;
-  const arr = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables?.[field];
-  return singleAliasId([own, Array.isArray(arr) ? arr[index] : undefined].filter(Boolean));
-}
-function boundTextId(node: TextNode, field: VariableBindableTextField): string | undefined {
-  const len = node.characters.length;
-  const getRange = (
-    node as TextNode & {
-      getRangeBoundVariable?: (start: number, end: number, f: VariableBindableTextField) => VariableAlias | null | typeof figma.mixed;
-    }
-  ).getRangeBoundVariable;
-  if (len > 0 && typeof getRange === 'function') {
-    const full = getRange.call(node, 0, len, field);
-    return full && full !== figma.mixed ? singleAliasId([full]) : undefined;
-  }
-  return boundFieldId(node, field);
+  return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, skipTotal: preview.skips.length, newRoles: created.size, createdIds };
 }
 
 /**

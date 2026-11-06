@@ -840,7 +840,7 @@ test('bindSelection — 이미 바인딩된 자리는 2회차 미리보기에 �
   assert.ok(second.skips.some((s) => s.reason === 'already-bound')); // 칩에서 레이어로 이동 가능
 });
 
-/** 디자이너가 만든 Semantic 역할(Global 별칭) — 이미 붙은 역할은 바꾸지 않는다(§2.11 · §2.12 12.8은 Global만). */
+/** 디자이너가 만든 Semantic 역할(Global 별칭) — 이미 붙은 역할은 바꾸지 않는다(§2.11 · §2.12 12.8). */
 function designerRole(figma, name, global) {
   const col = figma._state.collections.find((c) => c.name === 'Semantic') ?? figma.variables.createVariableCollection('Semantic');
   const v = figma.variables.createVariable(name, col, global.resolvedType);
@@ -881,7 +881,7 @@ test('bindSelection — 이미 붙은 Semantic 역할은 같은 값의 상위 ti
   assert.equal(res.reasons['already-bound'], 1);
 });
 
-test('bindSelection — Global이 붙은 칠하기는 같은 값의 Component로 바뀐다(§2.12 12.8)', async () => {
+test('bindSelection — Global이 붙은 칠하기도 이미 연결됨 — 같은 값의 Component가 있어도 바꾸지 않는다(§2.12 12.8 결정 B)', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
   const g = findVar(figma, 'Global', 'color/0066ff');
@@ -894,12 +894,11 @@ test('bindSelection — Global이 붙은 칠하기는 같은 값의 Component로
     fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: g.id } } }],
   };
   const dry = await bindSelection([node], false);
-  assert.equal(dry.candidates[0].fromVariableId, g.id);
-  assert.equal(dry.candidates[0].fromVariableName, 'color/0066ff');
+  assert.equal(dry.candidates.length, 0);
+  assert.equal(dry.reasons['already-bound'], 1);
   const res = await bindSelection([node]);
-  assert.equal(res.bound, 1);
-  assert.equal(res.swapped, 1);
-  assert.equal(node.fills[0].boundVariables.color.id, cv.id);
+  assert.equal(res.bound, 0);
+  assert.equal(node.fills[0].boundVariables.color.id, g.id);
 });
 
 test('bindSelection — 노드 레벨 fills 바인딩만 있어도 이미 바인딩으로 보호', async () => {
@@ -1554,7 +1553,7 @@ test('bindSelection — 역할 별칭(text)이 같은 값의 Semantic 거울(col
 test('bindSelection — 지워진 변수를 가리키는 자리는 덮어쓰지 않고 "삭제된 변수에 연결됨"으로 건너뜀', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'color/aa0000', category: 'color', sources: ['fill'], value: '#aa0000' }], 16);
-  // 살아 있는 Semantic 역할 — Global이면 바꾸기 대상이라(§2.12 12.8) 마지막 '이미 연결됨' 확인은 역할로 한다.
+  // 살아 있는 Semantic 역할에 붙인 자리 — 마지막 '이미 연결됨' 확인(§2.11 · §2.12 12.8).
   const live = designerRole(figma, 'color/danger', findVar(figma, 'Global', 'color/aa0000'));
   const node = {
     type: 'FRAME', id: 'dg', name: 'dg',
@@ -4721,7 +4720,7 @@ test('bindSelection — 소수 선 두께는 이미 있는 1.5 변수에도, 가
   assert.ok(findVar(figma, 'Global', 'stroke-width/1_5'), '이미 있는 변수는 지우지 않는다');
 });
 
-test('bindSelection — 이미 1.5 역할에 붙은 선 두께는 "소수 선 두께"가 아니라 "이미 연결됨", Global 1.5는 "소수 선 두께"(§2.12 12.8)', async () => {
+test('bindSelection — 이미 1.5 변수에 붙은 선 두께는 Semantic · Global 모두 "소수 선 두께"가 아니라 "이미 연결됨"(§2.12 12.8)', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'stroke-width/1_5', category: 'strokeWidth', sources: ['strokeWidth'], value: 1.5 }], 16);
   const v15 = findVar(figma, 'Global', 'stroke-width/1_5');
@@ -4732,11 +4731,12 @@ test('bindSelection — 이미 1.5 역할에 붙은 선 두께는 "소수 선 �
   assert.equal(dry.reasons['already-bound'], 1);
   assert.equal(dry.reasons.fraction ?? 0, 0);
   assert.ok(dry.skips.some((s) => s.nodeId === 'bound15' && s.reason === 'already-bound' && s.field === 'strokeWeight'));
-  // Global에 붙은 소수 선 두께는 바꾸기 대상이 아니라 소수 판정을 받는다 — 1.5짜리 역할을 새로 만들지 않는다.
+  // Global에 붙은 소수 선 두께도 이미 연결됨(바꾸지 않는다 — 결정 B).
   const g = strokedFrame('global15', 1.5);
   g.boundVariables = { strokeWeight: { type: 'VARIABLE_ALIAS', id: v15.id } };
   const dry2 = await bindSelection([g], false);
-  assert.equal(dry2.reasons.fraction, 1);
+  assert.equal(dry2.reasons['already-bound'], 1);
+  assert.equal(dry2.reasons.fraction ?? 0, 0);
   assert.equal(dry2.candidates.length, 0);
 });
 
@@ -5199,31 +5199,6 @@ test('새 역할 — 한 번의 찾기에서 번호는 곳 수 순, 모든 모�
   assert.equal(dry3.candidates[0].variableId, v.id);
 });
 
-test('Global에서 바꾸기 — 연결 직전에 다른 변수로 바뀌었으면 "그 사이 바뀜", 글자는 전 구간이 한 Global일 때만', async () => {
-  const figma = installFigma();
-  await createTokens([{ name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 }], 16);
-  const g = findVar(figma, 'Global', 'spacing/16');
-  const other = designerRole(figma, 'spacing/other', g);
-  const frame = {
-    type: 'FRAME', id: 'f', name: 'f', fills: [], layoutMode: 'VERTICAL', itemSpacing: 16, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
-    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', boundVariables: { itemSpacing: { type: 'VARIABLE_ALIAS', id: g.id } },
-    setBoundVariable(field, v) { this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id }; },
-  };
-  other.remove(); // 디자이너 변수 없음 → 새 역할 spacing/gap으로 바꾼다
-  const dry = await bindSelection([frame], false);
-  const c = dry.candidates[0];
-  assert.equal(c.variableName, 'spacing/gap');
-  assert.equal(c.fromVariableId, g.id);
-  // 찾은 뒤 피그마에서 다른 변수로 바꿨다
-  const moved = designerRole(figma, 'spacing/moved', g);
-  frame.boundVariables.itemSpacing = { type: 'VARIABLE_ALIAS', id: moved.id };
-  registerNodes(figma, [frame]);
-  const r = await bindSelectedItems([{ nodeId: 'f', field: 'itemSpacing', variableId: c.variableId, newRole: c.newRole, fromVariableId: c.fromVariableId }]);
-  assert.deepEqual(r.reasons, { changed: 1 });
-  assert.equal(r.newRoles, 0); // 통과한 자리가 없으면 역할을 만들지 않는다
-  assert.equal(findVar(figma, 'Semantic', 'spacing/gap'), undefined);
-});
-
 test('createUsageRoles — 만들기는 쓰임마다 역할, 같은 값이면 재사용, 다른 값이면 다음 번호(덮어쓰지 않음)', async () => {
   const figma = installFigma();
   const tokens = [
@@ -5269,76 +5244,39 @@ test('extractFromSelection — 쓰임 목록(uses)을 모은다, 격자 정리�
 
 /* ---------- A.10 (2026-11-06 실기 뒤): 용도가 틀린 연결 바꾸기 · 크기 연결 풀기 · inverse 합친 판정 · 옛 단계 이름 ---------- */
 
-test('용도가 틀린 연결 바꾸기(12.8) — 흰 글자에 붙은 background/default → color/text/inverse(그 역할이 가리키던 Global 별칭), 맞는 용도는 그대로', async () => {
+test('이미 붙은 연결(12.8 결정 B) — 흰 글자에 붙은 background/default(용도 틀림)도 바꾸지 않는다', async () => {
   const figma = installFigma();
   await legacyColorFile(figma);
-  const bgDefault = findVar(figma, 'Semantic', 'color/background/default'); // FRAME_FILL · SHAPE_FILL
-  const textDefault = findVar(figma, 'Semantic', 'color/text/default');
-  const alias = (v) => ({ type: 'VARIABLE_ALIAS', id: v.id });
-  const white = textNode('contact', '#ffffff', { fills: [{ type: 'SOLID', color: hexToRgb('#ffffff'), boundVariables: { color: alias(bgDefault) } }] });
-  const body = textNode('body', '#000000', { fills: [{ type: 'SOLID', color: hexToRgb('#000000'), boundVariables: { color: alias(textDefault) } }] });
+  const bgDefault = findVar(figma, 'Semantic', 'color/background/default');
+  const white = textNode('contact', '#ffffff', { fills: [{ type: 'SOLID', color: hexToRgb('#ffffff'), boundVariables: { color: { type: 'VARIABLE_ALIAS', id: bgDefault.id } } }] });
   const button = { type: 'FRAME', id: 'button', name: 'button', layoutMode: 'NONE', fills: [{ type: 'SOLID', color: hexToRgb('#e68e6c') }], children: [white], setBoundVariable() {} };
-  const panel = { type: 'FRAME', id: 'panel', name: 'panel', layoutMode: 'NONE', fills: [], children: [button, body], setBoundVariable() {} };
   white.parent = button;
-  button.parent = panel;
-  body.parent = panel;
-  const dry = await bindSelection([panel], false);
-  const c = dry.candidates.find((x) => x.nodeId === 'contact');
-  assert.equal(c.variableName, 'color/text/inverse'); // 주황 버튼(유채) 위 흰 글자
-  assert.equal(c.fromVariableId, bgDefault.id);
-  assert.equal(c.fromVariableName, 'color/background/default');
-  assert.equal(c.newRoleGlobalName, 'color/gray/0'); // 붙어 있던 역할이 가리키던 Global
-  assert.equal(dry.candidates.find((x) => x.nodeId === 'body'), undefined); // 용도가 맞는 Semantic은 그대로(이미 연결됨)
+  const dry = await bindSelection([button], false);
+  assert.equal(dry.candidates.find((x) => x.nodeId === 'contact'), undefined);
   assert.ok(dry.reasons['already-bound'] >= 1);
-  const r = await bindSelection([panel]);
-  assert.equal(r.swapped, 1);
-  const inv = findVar(figma, 'Semantic', 'color/text/inverse');
-  assert.equal(white.fills[0].boundVariables.color.id, inv.id);
-  assert.equal(roleTarget(figma, inv.id), findVar(figma, 'Global', 'color/gray/0').id);
+  await bindSelection([button]);
+  assert.equal(white.fills[0].boundVariables.color.id, bgDefault.id);
+  assert.equal(findVar(figma, 'Semantic', 'color/text/inverse'), undefined);
 });
 
-test('크기 연결 풀기(12.8a) — 카드 width에 붙은 Global은 풀기 후보, 연결하면 풀리고 값은 그대로, 그 사이 바뀌면 건너뜀', async () => {
+test('이미 붙은 연결(12.8 결정 B) — 카드 width에 붙은 Global은 그대로(후보 없음 · 건너뜀으로도 안 셈)', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'size/1440', category: 'size', sources: ['size'], value: 1440 }], 16);
   const g = findVar(figma, 'Global', 'size/1440');
   const label = textNode('label', '#000000');
-  const mkCard = (id) => ({
-    type: 'FRAME', id, name: id, fills: [], layoutMode: 'VERTICAL', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+  const card = {
+    type: 'FRAME', id: 'card', name: 'card', fills: [], layoutMode: 'VERTICAL', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
     width: 1440, height: 300, layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG', children: [label],
-    boundVariables: { width: { type: 'VARIABLE_ALIAS', id: g.id } },
-    setBoundVariable(field, v) {
-      if (v) this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id };
-      else delete this.boundVariables[field];
-    },
-  });
-  const card = mkCard('card');
+    boundVariables: { width: { type: 'VARIABLE_ALIAS', id: g.id } }, setBoundVariable() {},
+  };
   label.parent = card;
   const dry = await bindSelection([card], false);
-  const c = dry.candidates.find((x) => x.field === 'width');
-  assert.equal(c.unbind, true);
-  assert.equal(c.variableId, `unbind:${g.id}`);
-  assert.equal(c.variableName, 'size/1440');
-  assert.equal(c.fromVariableId, g.id);
-  registerNodes(figma, [card]);
-  const r = await bindSelectedItems([{ nodeId: 'card', field: 'width', variableId: c.variableId, fromVariableId: g.id, unbind: true }]);
-  assert.equal(r.unbound, 1);
-  assert.equal(r.bound, 0);
-  assert.equal(card.boundVariables.width, undefined);
-  assert.equal(card.width, 1440); // 값은 그대로
-  // 다시 찾으면 풀기 후보가 없다
-  const again = await bindSelection([card], false);
-  assert.equal(again.candidates.find((x) => x.field === 'width'), undefined);
-  // 그 사이 다른 변수로 바뀌었으면 "그 사이 바뀜"
-  const card2 = mkCard('card2');
-  const other = figma.variables.createVariable('size/other', g.variableCollectionId, 'FLOAT');
-  card2.boundVariables.width = { type: 'VARIABLE_ALIAS', id: other.id };
-  registerNodes(figma, [card2]);
-  const r2 = await bindSelectedItems([{ nodeId: 'card2', field: 'width', variableId: `unbind:${g.id}`, fromVariableId: g.id, unbind: true }]);
-  assert.deepEqual(r2.reasons, { changed: 1 });
-  assert.equal(r2.unbound, 0);
+  assert.equal(dry.candidates.find((x) => x.field === 'width'), undefined);
+  assert.ok(!dry.skips.some((x) => x.nodeId === 'card' && x.field === 'width'));
+  assert.equal(card.boundVariables.width.id, g.id);
 });
 
-test('크기 연결 풀기 — Semantic이 붙은 카드 크기는 건드리지 않는다(찾지도 세지도 않음)', async () => {
+test('카드 크기 — Semantic이 붙어 있어도 건드리지 않는다(찾지도 세지도 않음)', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'size/1440', category: 'size', sources: ['size'], value: 1440 }], 16);
   const role = designerRole(figma, 'size/page', findVar(figma, 'Global', 'size/1440'));
@@ -5412,7 +5350,7 @@ test('옛 단계 이름(12.7) — size · 칸 밖 · -N 변형도 순서 3에서
   assert.ok(dry.candidates[0].newRole);
 });
 
-test('크기 연결 풀기 — 아이콘의 HUG 축 · 자유 배치에 붙은 Global도 푼다, FIXED 축은 지금처럼 바꾸기', async () => {
+test('이미 붙은 연결(12.8 결정 B) — 아이콘의 HUG 축에 붙은 Global은 hug-fill, FIXED 축에 붙은 Global은 이미 연결됨', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'size/24', category: 'size', sources: ['size'], value: 24 }], 16);
   const g = findVar(figma, 'Global', 'size/24');
@@ -5425,10 +5363,7 @@ test('크기 연결 풀기 — 아이콘의 HUG 축 · 자유 배치에 붙은 G
   const row = { type: 'FRAME', id: 'row', name: 'row', fills: [], layoutMode: 'HORIZONTAL', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, children: [icon], setBoundVariable() {} };
   icon.parent = row;
   const dry = await bindSelection([row], false);
-  const w = dry.candidates.find((c) => c.nodeId === 'icon' && c.field === 'width');
-  const h = dry.candidates.find((c) => c.nodeId === 'icon' && c.field === 'height');
-  assert.equal(h.unbind, true); // HUG 축 → 풀기
-  assert.ok(!w.unbind); // FIXED 축 → 같은 값 역할로 바꾸기
-  assert.equal(w.variableName, 'size/icon');
-  assert.equal(w.fromVariableId, g.id);
+  assert.equal(dry.candidates.filter((c) => c.nodeId === 'icon').length, 0);
+  assert.ok(dry.skips.some((x) => x.nodeId === 'icon' && x.reason === 'hug-fill'));
+  assert.ok(dry.skips.some((x) => x.nodeId === 'icon' && x.reason === 'already-bound'));
 });

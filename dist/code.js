@@ -686,20 +686,12 @@
     "bind.progressOf": "{done} / {total} \uCC98\uB9AC \uC911\u2026 ({pct}%)",
     "bind.progressCount": "{done}\uAC1C \uCC98\uB9AC \uC911\u2026",
     // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
-    // 새 역할 · Global에서 바꾸기(§2.12, §4.6)
-    "bind.newRole": "\uC0C8",
-    "bind.newRoleTip": "\uC5F0\uACB0\uD560 \uB54C Semantic\uC5D0 \uB9CC\uB4E4\uC5B4\uC694 \xB7 {global}\uC744 \uAC00\uB9AC\uCF1C\uC694",
-    "bind.fromGlobal": "\xB7 {global}\uC5D0\uC11C",
+    // 새 역할(§2.12, §4.6)
+    "bind.newRole": "N",
+    "bind.newRoleAria": "\uC0C8 \uC5ED\uD560",
+    "bind.newRoleTip": "{global}\uC744 \uAC00\uB9AC\uCF1C\uC694",
     "bind.roleNew": "\uC0C8 \uC5ED\uD560 {k}",
-    "bind.roleSwap": "\uBC14\uAFC8 {m}",
-    "bind.roleSummaryTip": "\uC0C8 \uC5ED\uD560\uC740 \uC5F0\uACB0\uD560 \uB54C Semantic\uC5D0 \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uBC14\uAFC8\uC740 Global\uC774\uB098 \uC6A9\uB3C4\uAC00 \uB9DE\uC9C0 \uC54A\uB294 \uBCC0\uC218\uAC00 \uBD99\uC740 \uACF3\uC744 \uAC19\uC740 \uAC12\uC758 \uC5ED\uD560\uB85C \uBC14\uAFD4\uC694 \xB7 \uD480\uAE30\uB294 \uCE74\uB4DC \xB7 \uD654\uBA74 \uD06C\uAE30\uC758 \uBCC0\uC218 \uC5F0\uACB0\uB9CC \uD480\uC5B4\uC694",
     "bind.doneNewRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
-    "bind.doneSwapped": " \xB7 \uBC14\uAFC8 {m}\uACF3",
-    // 크기 연결 풀기(§2.12 12.8a, §4.6)
-    "bind.unbind": "\uD480\uAE30",
-    "bind.unbindTip": "\uCE74\uB4DC \xB7 \uD654\uBA74 \uD06C\uAE30\uB294 \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694 \xB7 \uC5F0\uACB0\uB9CC \uD480\uACE0 \uD06C\uAE30\uB294 \uADF8\uB300\uB85C\uC608\uC694",
-    "bind.roleUnbind": "\uD480\uAE30 {u}",
-    "bind.doneUnbound": " \xB7 \uD06C\uAE30 \uC5F0\uACB0 \uD480\uAE30 {u}\uACF3",
     "bind.placesMore": "\uC678 {n}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC120\uD0DD\uC73C\uB85C \uBCF4\uAE30",
     "bind.linkingOf": "\uC5F0\uACB0 \uC911\u2026 {done} / {total}",
     "bind.waitLink": "\uC5F0\uACB0\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
@@ -3139,7 +3131,7 @@
       const known = /* @__PURE__ */ new Map();
       for (const s of ctx.slots) known.set(s.node.id, s.node);
       const r = await bindSelectedItems(
-        preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, fromVariableId: c.fromVariableId, unbind: c.unbind })),
+        preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole })),
         {},
         known
         // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
@@ -3148,8 +3140,6 @@
       res.skipped += r.skipped;
       for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_b = res.reasons[k]) != null ? _b : 0) + v;
       res.newRoles = r.newRoles;
-      res.swapped = r.swapped;
-      res.unbound = r.unbound;
       for (const c of preview.candidates) {
         const id = c.newRole ? r.createdIds[c.newRole.name] : void 0;
         if (id) c.variableId = id;
@@ -3174,11 +3164,9 @@
     const globalNames = new Set(vars.filter((v) => tierOf.get(v.variableCollectionId) === 1).map((v) => v.name));
     const entries = [];
     const semNames = /* @__PURE__ */ new Map();
-    const globalIds = /* @__PURE__ */ new Set();
     for (const v of vars) {
       const tier = (_a = tierOf.get(v.variableCollectionId)) != null ? _a : 0;
       if (tier < 1) continue;
-      if (tier === 1) globalIds.add(v.id);
       const val = await resolveValue(v, modeOf);
       if (tier === 2) semNames.set(v.name, "");
       if (val == null) continue;
@@ -3190,22 +3178,10 @@
       } else if (v.resolvedType === "FLOAT" && typeof val === "number") e.num = val;
       else if (v.resolvedType === "STRING" && typeof val === "string") e.str = val;
       if (tier === 2) semNames.set(v.name, entryKey(e));
-      if (tier >= 2) e.aliasGlobalId = await aliasGlobalOf(v, modeOf, tierOf);
       entries.push(e);
     }
     entries.sort((a, b) => b.tier - a.tier);
-    return { entries, semNames, globalIds, byId: new Map(entries.map((e) => [e.variable.id, e])) };
-  }
-  async function aliasGlobalOf(v, modeOf, tierOf) {
-    let cur = v;
-    for (let i = 0; i < 12 && cur; i++) {
-      const mode = modeOf.get(cur.variableCollectionId);
-      const val = mode ? cur.valuesByMode[mode] : void 0;
-      if (!(val && typeof val === "object" && "type" in val && val.type === "VARIABLE_ALIAS")) return void 0;
-      cur = await figma.variables.getVariableByIdAsync(val.id);
-      if (cur && tierOf.get(cur.variableCollectionId) === 1) return cur.id;
-    }
-    return void 0;
+    return { entries, semNames, byId: new Map(entries.map((e) => [e.variable.id, e])) };
   }
   function readAutoRole(v) {
     const fn = v.getPluginData;
@@ -3269,7 +3245,7 @@
     return (_a = cands.filter((e) => e.tier === 2 && !e.auto && !e.mirror && !isOldPluginName(e.variable.name)).sort(byName)[0]) != null ? _a : null;
   }
   function resolveSlots(ctx) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c;
     const { res, preview } = ctx;
     const pending = [];
     const colorLeft = [];
@@ -3277,15 +3253,8 @@
       res.bound++;
       preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s)));
     };
-    const globalFor = (s, cands) => {
+    const globalFor = (cands) => {
       var _a2;
-      if (s.fromId) {
-        const from = ctx.index.byId.get(s.fromId);
-        if (!from) return null;
-        if (from.tier === 1) return from;
-        const g = from.aliasGlobalId ? ctx.index.byId.get(from.aliasGlobalId) : void 0;
-        if (g) return g;
-      }
       return (_a2 = cands.filter((e) => e.tier === 1).sort(byName)[0]) != null ? _a2 : null;
     };
     for (const s of ctx.slots) {
@@ -3306,7 +3275,7 @@
         emit(s, two);
         continue;
       }
-      pending.push({ slot: s, base: s.usage, global: globalFor(s, cands) });
+      pending.push({ slot: s, base: s.usage, global: globalFor(cands) });
     }
     const byUse = /* @__PURE__ */ new Map();
     for (const x of colorLeft) {
@@ -3332,13 +3301,12 @@
           emit(x.slot, two);
           continue;
         }
-        pending.push({ slot: x.slot, base, global: globalFor(x.slot, x.cands) });
+        pending.push({ slot: x.slot, base, global: globalFor(x.cands) });
       }
     }
     const live = pending.filter((p) => {
       if (p.global) return true;
-      if (p.slot.fromId) note(res, "already-bound", p.slot.node, preview, p.slot.field);
-      else skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
+      skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
       return false;
     });
     const names = assignNames(
@@ -3362,12 +3330,9 @@
         newRoleGlobalName: spec.globalName
       }));
     }
-    for (const c of preview.candidates) {
-      if (c.fromVariableId) c.fromVariableName = (_d = ctx.index.byId.get(c.fromVariableId)) == null ? void 0 : _d.variable.name;
-    }
   }
   function candOf(s, variableId, variableName, tier, variableValue) {
-    return __spreadValues(__spreadProps(__spreadValues({
+    return __spreadProps(__spreadValues({
       nodeId: s.node.id,
       field: s.field
     }, s.index != null ? { index: s.index } : {}), {
@@ -3376,7 +3341,7 @@
       variableName,
       tier,
       variableValue
-    }), s.fromId ? { fromVariableId: s.fromId } : {});
+    });
   }
   function entryDisplay(e, s) {
     var _a;
@@ -3384,42 +3349,10 @@
     if (e.num != null) return String(round2(e.num));
     return (_a = e.str) != null ? _a : s.display;
   }
-  function swapSourceId(ctx, list, allowed) {
-    const ids = new Set(list.filter(isLiveAlias).map((a) => a.id));
-    if (ids.size !== 1) return void 0;
-    const id = [...ids][0];
-    if (ctx.index.globalIds.has(id)) return id;
-    if (!allowed) return void 0;
-    const e = ctx.index.byId.get(id);
-    return e && e.tier >= 2 && entryKey(e) !== "" && !scopeOk(e.scopes, allowed) ? id : void 0;
-  }
-  function nodeFieldGlobal(ctx, node, field, allowed) {
-    const bv = node.boundVariables;
-    const entry = bv == null ? void 0 : bv[field];
-    if (!entry) return void 0;
-    return swapSourceId(ctx, Array.isArray(entry) ? entry : [entry], allowed);
-  }
   var numAllowed = (field) => {
     const scope = FIELD_SCOPE[field];
     return scope ? [scope] : ["ALL_SCOPES"];
   };
-  function colorGlobal(ctx, x, node, field, index, allowed) {
-    var _a;
-    const own = (_a = x.boundVariables) == null ? void 0 : _a.color;
-    const bv = node.boundVariables;
-    const arr = bv == null ? void 0 : bv[field];
-    return swapSourceId(ctx, [own, Array.isArray(arr) ? arr[index] : void 0].filter(Boolean), allowed);
-  }
-  function textFieldGlobal(ctx, node, field, allowed) {
-    const len = node.characters.length;
-    const getRange = node.getRangeBoundVariable;
-    if (len > 0 && typeof getRange === "function") {
-      const full = getRange.call(node, 0, len, field);
-      if (full === figma.mixed || !full) return void 0;
-      return swapSourceId(ctx, [full], allowed);
-    }
-    return nodeFieldGlobal(ctx, node, field, allowed);
-  }
   async function walk2(node, ctx, hooks, prog, depth, parentId) {
     var _a;
     const { res, preview } = ctx;
@@ -3473,8 +3406,7 @@
       let bg = null;
       paints2.forEach((p, i) => {
         if (p.type !== "SOLID") return;
-        const fromId = colorGlobal(ctx, p, node, key, i, allowed);
-        const st = fromId ? null : stateReason(colorState(p, node, key, i));
+        const st = stateReason(colorState(p, node, key, i));
         if (st) {
           note(res, st, node, preview, key);
           return;
@@ -3489,7 +3421,7 @@
           const bgHex = use === "text" || use === "icon" || use === "border" ? backgroundOf(node) : void 0;
           bg = bgHex ? bgKindOf(bgHex) : void 0;
         }
-        ctx.slots.push(__spreadProps(__spreadValues({ node, field: key, index: i, kind: "color", value: hex, display: hex, allowed, usage: use, fromId }, bg ? { bg } : {}), { noMatchReason: "no-match" }));
+        ctx.slots.push(__spreadProps(__spreadValues({ node, field: key, index: i, kind: "color", value: hex, display: hex, allowed, usage: use }, bg ? { bg } : {}), { noMatchReason: "no-match" }));
       });
     }
   }
@@ -3497,32 +3429,20 @@
     const { res, preview } = ctx;
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
     const kind = iconOrAvatarKind(node);
-    const unbindGlobal = (field) => {
-      const gid = nodeFieldGlobal(ctx, node, field);
-      if (!gid) return false;
-      pushUnbind(ctx, node, field, gid);
-      return true;
-    };
-    if (!kind) {
-      unbindGlobal("width");
-      unbindGlobal("height");
-    } else {
+    if (kind) {
       if (inAutoLayoutFlow(node)) {
         const bindAxis = (sizing, field, v) => {
           if (sizing !== "FIXED") {
-            if (!unbindGlobal(field)) note(res, "hug-fill", node, preview, field);
+            note(res, "hug-fill", node, preview, field);
             return;
           }
           const fraction = Math.abs(v - Math.round(v)) >= 5e-3;
-          if (fraction && unbindGlobal(field)) return;
           tryBind(ctx, node, field, v, `size/${kind}`, fraction ? "size-fraction" : void 0);
         };
         bindAxis(node.layoutSizingHorizontal, "width", node.width);
         bindAxis(node.layoutSizingVertical, "height", node.height);
       } else {
-        const w = unbindGlobal("width");
-        const h = unbindGlobal("height");
-        if (!w || !h) note(res, "size-free-layout", node, preview);
+        note(res, "size-free-layout", node, preview);
       }
     }
     if (node.layoutMode === "NONE") {
@@ -3576,12 +3496,10 @@
     const owner = ctx.owner(node);
     const one = (field, v) => {
       if (!(v > 0)) return;
-      if (!nodeFieldGlobal(ctx, node, field, numAllowed(field))) {
-        const st = stateReason(nodeFieldState(node, field));
-        if (st) {
-          note(res, st, node, preview, field);
-          return;
-        }
+      const st = stateReason(nodeFieldState(node, field));
+      if (st) {
+        note(res, st, node, preview, field);
+        return;
       }
       if (Math.abs(v - Math.round(v)) >= 5e-3) {
         note(res, "fraction", node, preview, field);
@@ -3606,8 +3524,7 @@
     }
     effects.forEach((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return;
-      const fromId = colorGlobal(ctx, e, node, "effects", i, EFFECT_SCOPES);
-      const st = fromId ? null : stateReason(colorState(e, node, "effects", i));
+      const st = stateReason(colorState(e, node, "effects", i));
       if (st) {
         note(res, st, node, preview, "effects");
         return;
@@ -3617,7 +3534,7 @@
         return;
       }
       const hex = rgbToHex(e.color);
-      ctx.slots.push({ node, field: "effects", index: i, kind: "color", value: hex, display: hex, allowed: EFFECT_SCOPES, usage: "shadow", fromId, noMatchReason: "no-match" });
+      ctx.slots.push({ node, field: "effects", index: i, kind: "color", value: hex, display: hex, allowed: EFFECT_SCOPES, usage: "shadow", noMatchReason: "no-match" });
     });
   }
   async function bindText(node, ctx) {
@@ -3643,14 +3560,13 @@
     if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") tryBindText(ctx, node, "letterSpacing", node.letterSpacing.value);
     if (node.characters.length === 0) return;
     const fam = node.fontName.family;
-    const fromId = textFieldGlobal(ctx, node, "fontFamily", ["FONT_FAMILY"]);
-    const st = fromId ? null : stateReason(textFieldState(node, "fontFamily"));
+    const st = stateReason(textFieldState(node, "fontFamily"));
     if (st) {
       note(res, st, node, preview, "fontFamily");
       return;
     }
     if (!ctx.index.entries.some((e) => e.str === fam && scopeOk(e.scopes, ["FONT_FAMILY"]))) return;
-    ctx.slots.push({ node, field: "fontFamily", kind: "text", value: fam, display: fam, allowed: ["FONT_FAMILY"], usage: textUsageName("fontFamily"), fromId, noMatchReason: "no-match" });
+    ctx.slots.push({ node, field: "fontFamily", kind: "text", value: fam, display: fam, allowed: ["FONT_FAMILY"], usage: textUsageName("fontFamily"), noMatchReason: "no-match" });
   }
   function tryBindText(ctx, node, field, value) {
     const { res, preview } = ctx;
@@ -3658,45 +3574,25 @@
       skip(res, "empty-text", node, preview, field);
       return;
     }
-    const fromId = textFieldGlobal(ctx, node, field, [FIELD_SCOPE[field]]);
-    const st = fromId ? null : stateReason(textFieldState(node, field));
+    const st = stateReason(textFieldState(node, field));
     if (st) {
       note(res, st, node, preview, field);
       return;
     }
-    ctx.slots.push({ node, field, kind: "text", value, display: String(value), allowed: [FIELD_SCOPE[field]], usage: textUsageName(field), fromId, noMatchReason: "no-match" });
+    ctx.slots.push({ node, field, kind: "text", value, display: String(value), allowed: [FIELD_SCOPE[field]], usage: textUsageName(field), noMatchReason: "no-match" });
   }
   function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match") {
     const allowed = numAllowed(field);
-    const fromId = nodeFieldGlobal(ctx, node, field, allowed);
-    const st = fromId ? null : stateReason(nodeFieldState(node, field));
+    const st = stateReason(nodeFieldState(node, field));
     if (st) {
       note(ctx.res, st, node, ctx.preview, field);
       return;
     }
-    ctx.slots.push({ node, field, kind: "num", value, display: String(value), allowed, usage, fromId, noMatchReason });
-  }
-  function pushUnbind(ctx, node, field, globalId) {
-    var _a, _b;
-    const v = node[field];
-    const display = String(round2(v));
-    const name = (_b = (_a = ctx.index.byId.get(globalId)) == null ? void 0 : _a.variable.name) != null ? _b : "";
-    ctx.res.bound++;
-    ctx.preview.candidates.push({
-      nodeId: node.id,
-      field,
-      currentValue: display,
-      variableId: `unbind:${globalId}`,
-      variableName: name,
-      tier: 1,
-      variableValue: display,
-      unbind: true,
-      fromVariableId: globalId
-    });
+    ctx.slots.push({ node, field, kind: "num", value, display: String(value), allowed, usage, noMatchReason });
   }
   var LINK_CHUNK = 300;
   async function bindSelectedItems(items, hooks = {}, known) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const res = { bound: 0, skipped: 0, reasons: {} };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     const fail = (key, node, field) => {
@@ -3709,8 +3605,6 @@
     };
     const created = /* @__PURE__ */ new Map();
     const createdIds = {};
-    let swapped = 0;
-    let unbound = 0;
     const ensureRole = async (spec, global) => {
       var _a2;
       const have = created.get(spec.name);
@@ -3757,20 +3651,6 @@
       const changedPaints = /* @__PURE__ */ new Map();
       for (const it of chunk) {
         const node = (_a = nodes.get(it.nodeId)) != null ? _a : null;
-        if (it.unbind) {
-          if (!node || it.field !== "width" && it.field !== "height" || !it.fromVariableId || boundFieldId(node, it.field) !== it.fromVariableId) {
-            fail("changed", node, it.field);
-            continue;
-          }
-          try {
-            node.setBoundVariable(it.field, null);
-            unbound++;
-            (_b = hooks.onUnbound) == null ? void 0 : _b.call(hooks, unbound);
-          } catch (e) {
-            fail("error", node, it.field);
-          }
-          continue;
-        }
         const vv = await variableOf(it.newRole ? it.newRole.globalId : it.variableId);
         if (!node || !vv) {
           fail("changed", node, it.field);
@@ -3789,26 +3669,19 @@
               fail("styled", node, key);
               continue;
             }
-            const pending = (_d = (_c = changedPaints.get(node)) == null ? void 0 : _c.get(key)) == null ? void 0 : _d.arr;
+            const pending = (_c = (_b = changedPaints.get(node)) == null ? void 0 : _b.get(key)) == null ? void 0 : _c.arr;
             const list = pending != null ? pending : node[key];
-            const i = (_e = it.index) != null ? _e : 0;
+            const i = (_d = it.index) != null ? _d : 0;
             const x = Array.isArray(list) ? list[i] : void 0;
             const isColorItem = !!x && (key === "effects" ? x.type === "DROP_SHADOW" || x.type === "INNER_SHADOW" : x.type === "SOLID");
             if (!Array.isArray(list) || !x || !isColorItem) {
               fail("changed", node, key);
               continue;
             }
-            if (it.fromVariableId) {
-              if (boundColorId(x, node, key, i) !== it.fromVariableId) {
-                fail("changed", node, key);
-                continue;
-              }
-            } else {
-              const st = stateReason(colorState(x, node, key, i));
-              if (st) {
-                fail(st, node, key);
-                continue;
-              }
+            const st2 = stateReason(colorState(x, node, key, i));
+            if (st2) {
+              fail(st2, node, key);
+              continue;
             }
             const translucent = key === "effects" ? isTranslucentEffectColor(x) : isTranslucentPaint(x);
             const hex = rgbToHex(x.color);
@@ -3826,8 +3699,7 @@
             if (w) {
               w.arr = arr;
               w.fields++;
-            } else m.set(key, { arr, fields: 1, swaps: 0 });
-            if (it.fromVariableId) m.get(key).swaps++;
+            } else m.set(key, { arr, fields: 1 });
             continue;
           }
           if (TEXT_RANGE_FIELDS.includes(it.field)) {
@@ -3840,17 +3712,10 @@
               fail("styled", node, field);
               continue;
             }
-            if (it.fromVariableId) {
-              if (boundTextId(node, field) !== it.fromVariableId) {
-                fail("changed", node, field);
-                continue;
-              }
-            } else {
-              const st = stateReason(textFieldState(node, field));
-              if (st) {
-                fail(st, node, field);
-                continue;
-              }
+            const st2 = stateReason(textFieldState(node, field));
+            if (st2) {
+              fail(st2, node, field);
+              continue;
             }
             if (node.characters.length === 0 || node.fontName === figma.mixed || !textValueEqual(node, field, value)) {
               fail("changed", node, field);
@@ -3859,8 +3724,7 @@
             await figma.loadFontAsync(node.fontName);
             node.setRangeBoundVariable(0, node.characters.length, field, await target());
             res.bound++;
-            if (it.fromVariableId) swapped++;
-            (_f = hooks.onBound) == null ? void 0 : _f.call(hooks, res.bound);
+            (_e = hooks.onBound) == null ? void 0 : _e.call(hooks, res.bound);
             continue;
           }
           const gap = gapSkip(node, it.field);
@@ -3872,17 +3736,10 @@
             fail("changed", node, it.field);
             continue;
           }
-          if (it.fromVariableId) {
-            if (boundFieldId(node, it.field) !== it.fromVariableId) {
-              fail("changed", node, it.field);
-              continue;
-            }
-          } else {
-            const st = stateReason(nodeFieldState(node, it.field));
-            if (st) {
-              fail(st, node, it.field);
-              continue;
-            }
+          const st = stateReason(nodeFieldState(node, it.field));
+          if (st) {
+            fail(st, node, it.field);
+            continue;
           }
           const cur = node[it.field];
           if (typeof cur !== "number" || typeof value !== "number" || !sameNumber(cur, value)) {
@@ -3891,8 +3748,7 @@
           }
           node.setBoundVariable(it.field, await target());
           res.bound++;
-          if (it.fromVariableId) swapped++;
-          (_g = hooks.onBound) == null ? void 0 : _g.call(hooks, res.bound);
+          (_f = hooks.onBound) == null ? void 0 : _f.call(hooks, res.bound);
         } catch (e) {
           fail("error", node, it.field);
         }
@@ -3902,8 +3758,7 @@
           try {
             node[key] = w.arr;
             res.bound += w.fields;
-            swapped += w.swaps;
-            (_h = hooks.onBound) == null ? void 0 : _h.call(hooks, res.bound);
+            (_g = hooks.onBound) == null ? void 0 : _g.call(hooks, res.bound);
           } catch (e) {
             for (let k = 0; k < w.fields; k++) fail("error", node, key);
           }
@@ -3911,35 +3766,11 @@
       }
       changedPaints.clear();
       const done = Math.min(start + LINK_CHUNK, items.length);
-      (_i = hooks.onProgress) == null ? void 0 : _i.call(hooks, done, items.length);
+      (_h = hooks.onProgress) == null ? void 0 : _h.call(hooks, done, items.length);
       if (hooks.yieldToEvents) await hooks.yieldToEvents();
     }
     const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
-    return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, skipTotal: preview.skips.length, newRoles: created.size, swapped, unbound, createdIds };
-  }
-  function singleAliasId(list) {
-    const ids = new Set(list.filter(isAlias).map((a) => a.id));
-    return ids.size === 1 ? [...ids][0] : void 0;
-  }
-  function boundFieldId(node, field) {
-    var _a;
-    const entry = (_a = node.boundVariables) == null ? void 0 : _a[field];
-    return entry ? singleAliasId(Array.isArray(entry) ? entry : [entry]) : void 0;
-  }
-  function boundColorId(x, node, field, index) {
-    var _a, _b;
-    const own = (_a = x.boundVariables) == null ? void 0 : _a.color;
-    const arr = (_b = node.boundVariables) == null ? void 0 : _b[field];
-    return singleAliasId([own, Array.isArray(arr) ? arr[index] : void 0].filter(Boolean));
-  }
-  function boundTextId(node, field) {
-    const len = node.characters.length;
-    const getRange = node.getRangeBoundVariable;
-    if (len > 0 && typeof getRange === "function") {
-      const full = getRange.call(node, 0, len, field);
-      return full && full !== figma.mixed ? singleAliasId([full]) : void 0;
-    }
-    return boundFieldId(node, field);
+    return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, skipTotal: preview.skips.length, newRoles: created.size, createdIds };
   }
   async function createRole(spec, global) {
     var _a;
@@ -8784,9 +8615,7 @@
             // 상한 전 실제 수 — 잘렸으면 UI가 알린다
             reqId: msg.reqId,
             // UI가 낡은 응답을 가려낸다
-            newRoles: r.newRoles,
-            swapped: r.swapped,
-            unbound: r.unbound
+            newRoles: r.newRoles
           });
           if (!msg.preview) {
             commitUndo(figma);
@@ -8843,7 +8672,6 @@
         case "APPLY_SELECTED": {
           let written = 0;
           let made = 0;
-          let unbound = 0;
           let committed = false;
           try {
             const r = await bindSelectedItems(msg.items, {
@@ -8854,20 +8682,17 @@
               },
               onCreated: (n) => {
                 made = n;
-              },
-              onUnbound: (n) => {
-                unbound = n;
               }
             });
-            post({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles, swapped: r.swapped, unbound: r.unbound });
-            if (r.bound || r.newRoles || r.unbound) {
+            post({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles });
+            if (r.bound || r.newRoles) {
               commitUndo(figma);
               committed = true;
               selfSelect = true;
               postSelection();
             }
           } finally {
-            if ((written > 0 || made > 0 || unbound > 0) && !committed) commitUndo(figma);
+            if ((written > 0 || made > 0) && !committed) commitUndo(figma);
           }
           break;
         }

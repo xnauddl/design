@@ -14,10 +14,6 @@ export interface GroupCand extends BindItem {
   /** 새 역할(§2.12) — 연결할 때 만든다. 가리킬 Global 이름. */
   newRole?: unknown;
   newRoleGlobalName?: string;
-  /** 바꾸는 자리의 원래 변수 이름(Global 또는 용도가 틀린 역할). */
-  fromVariableName?: string;
-  /** 크기 연결 풀기(§2.12 12.8a). */
-  unbind?: boolean;
 }
 
 /** 자리 줄 — 레이어 하나에서 같은 변수에 묶인 속성(들). */
@@ -29,8 +25,6 @@ export interface PlaceLine {
   /** 이 줄이 묶은 후보 키. 길이 = 곳 수. */
   keys: string[];
   currentValue: string;
-  /** Global에서 바꾸는 자리면 그 Global 이름(자리 줄 "· {Global}에서", §4.6). */
-  from?: string;
 }
 
 /** 변수 묶음. */
@@ -44,10 +38,6 @@ export interface VarGroup {
   lines: PlaceLine[];
   /** 새 역할이면 가리킬 Global 이름(§2.12 — 카드 칩 "새" 표시 · 툴팁). */
   newRoleOf?: string;
-  /** 바꾸는 자리 수(풀기 제외). */
-  swaps: number;
-  /** 크기 연결 풀기 카드(§4.6 "크기 연결 풀기 표시") — 변수 이름은 풀 Global. */
-  unbind?: boolean;
 }
 
 /** 후보 키 — 같은 곳 = 같은 레이어 · 같은 속성 · 같은 변수(§4.6 ⑧). */
@@ -85,17 +75,13 @@ export function groupByVariable(cands: readonly GroupCand[]): VarGroup[] {
           fields: l.fields,
           keys: its.map((x) => placeKey({ ...x, nodeId })),
           currentValue: l.currentValue,
-          // 풀기 카드의 자리 줄에는 "…에서" 꼬리를 붙이지 않는다(칩이 이미 말한다).
-          ...(its.find((x) => x.fromVariableName && !x.unbind)?.fromVariableName ? { from: its.find((x) => x.fromVariableName && !x.unbind)?.fromVariableName } : {}),
         });
       }
     }
     const variableValue = list.find((c) => c.variableValue != null)?.variableValue ?? list[0].currentValue;
     const keys = lines.flatMap((l) => l.keys);
     const nr = list.find((c) => c.newRole);
-    const swaps = list.filter((c) => c.fromVariableName && !c.unbind).length;
-    const unbind = list.some((c) => c.unbind);
-    groups.push({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines, swaps, ...(nr ? { newRoleOf: nr.newRoleGlobalName ?? '' } : {}), ...(unbind ? { unbind: true } : {}) });
+    groups.push({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines, ...(nr ? { newRoleOf: nr.newRoleGlobalName ?? '' } : {}) });
   }
   groups.sort((a, b) => b.count - a.count || a.variableName.localeCompare(b.variableName));
   return groups;

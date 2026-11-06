@@ -1103,7 +1103,7 @@ $('btnApplyConfirm').addEventListener('click', () => {
   // #6: 켠 변수의 곳만 직접 연결(WYSIWYG). 플러그인이 각 자리를 다시 확인한다.
   const items = bindCandidates
     .filter((c) => bindChecked.has(candKey(c)))
-    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}), ...(c.fromVariableId ? { fromVariableId: c.fromVariableId } : {}), ...(c.unbind ? { unbind: true } : {}) }));
+    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}) }));
   if (!items.length) return;
   startLink(items);
 });
@@ -2190,9 +2190,7 @@ window.onmessage = (event: MessageEvent) => {
         setStatus('applyStatus', '', '');
         $('bindDoneText').textContent =
           t('bind.doneCard', { n: msg.bound }) +
-          (msg.unbound ? t('bind.doneUnbound', { u: msg.unbound }) : '') +
-          (msg.newRoles ? t('bind.doneNewRoles', { k: msg.newRoles }) : '') +
-          (msg.swapped ? t('bind.doneSwapped', { m: msg.swapped }) : '');
+          (msg.newRoles ? t('bind.doneNewRoles', { k: msg.newRoles }) : '');
         $('bindDone').hidden = false;
         renderBindTree();
       }
@@ -2880,21 +2878,6 @@ function valueChip(value: string): HTMLElement {
   } else chip.textContent = value;
   return chip;
 }
-/** 크기 연결 풀기 칩(§4.6) — 회색 테두리에 "풀기" + 풀 Global 이름. */
-function unbindChip(name: string): HTMLElement {
-  const chip = document.createElement('span');
-  chip.className = 'bv-chip bv-unb';
-  const lab = document.createElement('span');
-  lab.className = 'bv-unb-label';
-  lab.textContent = t('bind.unbind');
-  const nm = document.createElement('span');
-  nm.className = 'bv-name';
-  nm.textContent = name;
-  chip.append(lab, nm);
-  chip.dataset.tip = t('bind.unbindTip');
-  chip.title = chip.dataset.tip;
-  return chip;
-}
 /** 변수 칩 — 타입 표시 + 이름(길면 말줄임 + 툴팁). */
 function varChip(name: string, value: string, newRoleOf?: string): HTMLElement {
   const chip = document.createElement('span');
@@ -2911,6 +2894,8 @@ function varChip(name: string, value: string, newRoleOf?: string): HTMLElement {
     const badge = document.createElement('span');
     badge.className = 'bv-new';
     badge.textContent = t('bind.newRole');
+    badge.setAttribute('role', 'img');
+    badge.setAttribute('aria-label', t('bind.newRoleAria'));
     chip.append(badge, mark, nm);
     chip.dataset.tip = t('bind.newRoleTip', { global: newRoleOf });
     chip.title = chip.dataset.tip;
@@ -2957,13 +2942,6 @@ function placeEl(l: PlaceLine): HTMLElement {
   prop.className = 'bv-prop';
   prop.textContent = fieldLabel(l.label, l.fields[0]) + (l.keys.length > 1 ? t('bind.placeCount', { k: l.keys.length }) : '');
   row.append(ic, layer, prop);
-  if (l.from) {
-    // Global에서 바꾸는 자리(§2.12 12.8)
-    const from = document.createElement('span');
-    from.className = 'bv-from';
-    from.textContent = t('bind.fromGlobal', { global: l.from });
-    row.appendChild(from);
-  }
   return row;
 }
 
@@ -3006,7 +2984,7 @@ function bindGroupEl(g: VarGroup): HTMLElement {
     renderBindTree();
     focusCardControl(g.variableId, '.bv-switch');
   });
-  head.append(valueChip(g.variableValue), arrowEl(), g.unbind ? unbindChip(g.variableName) : varChip(g.variableName, g.variableValue, g.newRoleOf), grow, tw, sw);
+  head.append(valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf), grow, tw, sw);
   card.appendChild(head);
   if (open) {
     const places = document.createElement('div');
@@ -3130,16 +3108,12 @@ function renderBindBadges(): void {
     found.textContent = t('bind.found', { n: bindCandidates.length });
     found.title = t('bind.foundTip', { name: bindPreviewName, n: bindCandidates.length });
   }
-  // 새 역할 k(켠 카드) · 바꿈 m(켠 카드의 바꾸는 자리) — 0인 쪽은 빼고, 둘 다 0이면 숨김(§4.6 · §2.12).
+  // 새 역할 k(켠 카드) — 0이면 숨김, 툴팁 없음(§4.6 · §2.12).
   const roleSum = $('bindRoleSum');
-  const onGroups = has ? bindGroups().all.filter(groupOn) : [];
-  const k = onGroups.filter((g) => g.newRoleOf != null).length;
-  const sw = onGroups.reduce((a, g) => a + g.swaps, 0);
-  const u = onGroups.reduce((a, g) => a + (g.unbind ? g.count : 0), 0);
-  const parts = [k ? t('bind.roleNew', { k }) : '', sw ? t('bind.roleSwap', { m: sw }) : '', u ? t('bind.roleUnbind', { u }) : ''].filter(Boolean);
-  roleSum.hidden = !parts.length;
-  roleSum.textContent = parts.join(' · ');
-  roleSum.title = parts.length ? t('bind.roleSummaryTip') : '';
+  const k = has ? bindGroups().all.filter(groupOn).filter((g) => g.newRoleOf != null).length : 0;
+  roleSum.hidden = !k;
+  roleSum.textContent = k ? t('bind.roleNew', { k }) : '';
+  roleSum.removeAttribute('title');
   const skip = $('bindSkipToggle');
   skip.hidden = !showSkip;
   skip.textContent = `${t('bind.skipTotal', { m })} ${bindSkipsOpen ? '▾' : '▸'}`;

@@ -580,10 +580,7 @@
     .bv-var { background: var(--accent-subtle); color: var(--accent-strong); border: 1px solid transparent; flex: 0 1 auto; min-width: 0; max-width: 100%; }
     .bv-var .bv-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     /* 새 역할(§2.12) — 연결할 때 Semantic에 만든다 */
-    .bv-new { font: 500 10px/14px var(--font); border: 1px solid var(--accent); color: var(--accent-strong); border-radius: 3px; padding: 0 3px; flex: 0 0 auto; }
-    .bv-chip.bv-unb { background: transparent; border: 1px solid var(--text-2); color: var(--text-2); }
-    .bv-unb-label { font: 500 11px/16px var(--font); color: var(--text); flex: 0 0 auto; margin-right: 4px; }
-    .bv-from { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .bv-new { font: 600 10px/14px var(--font); background: var(--accent-strong); color: #fff; border-radius: 3px; padding: 0 4px; flex: 0 0 auto; }
     .bd-roles { font-size: 11px; color: var(--text-2); white-space: nowrap; }
     .bv-mark { flex: 0 0 auto; font-family: var(--font); font-weight: 700; }
     .bind-empty .bv-var { max-width: 140px; }
@@ -1909,20 +1906,12 @@
     "bind.progressOf": "{done} / {total} \uCC98\uB9AC \uC911\u2026 ({pct}%)",
     "bind.progressCount": "{done}\uAC1C \uCC98\uB9AC \uC911\u2026",
     // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
-    // 새 역할 · Global에서 바꾸기(§2.12, §4.6)
-    "bind.newRole": "\uC0C8",
-    "bind.newRoleTip": "\uC5F0\uACB0\uD560 \uB54C Semantic\uC5D0 \uB9CC\uB4E4\uC5B4\uC694 \xB7 {global}\uC744 \uAC00\uB9AC\uCF1C\uC694",
-    "bind.fromGlobal": "\xB7 {global}\uC5D0\uC11C",
+    // 새 역할(§2.12, §4.6)
+    "bind.newRole": "N",
+    "bind.newRoleAria": "\uC0C8 \uC5ED\uD560",
+    "bind.newRoleTip": "{global}\uC744 \uAC00\uB9AC\uCF1C\uC694",
     "bind.roleNew": "\uC0C8 \uC5ED\uD560 {k}",
-    "bind.roleSwap": "\uBC14\uAFC8 {m}",
-    "bind.roleSummaryTip": "\uC0C8 \uC5ED\uD560\uC740 \uC5F0\uACB0\uD560 \uB54C Semantic\uC5D0 \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uBC14\uAFC8\uC740 Global\uC774\uB098 \uC6A9\uB3C4\uAC00 \uB9DE\uC9C0 \uC54A\uB294 \uBCC0\uC218\uAC00 \uBD99\uC740 \uACF3\uC744 \uAC19\uC740 \uAC12\uC758 \uC5ED\uD560\uB85C \uBC14\uAFD4\uC694 \xB7 \uD480\uAE30\uB294 \uCE74\uB4DC \xB7 \uD654\uBA74 \uD06C\uAE30\uC758 \uBCC0\uC218 \uC5F0\uACB0\uB9CC \uD480\uC5B4\uC694",
     "bind.doneNewRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
-    "bind.doneSwapped": " \xB7 \uBC14\uAFC8 {m}\uACF3",
-    // 크기 연결 풀기(§2.12 12.8a, §4.6)
-    "bind.unbind": "\uD480\uAE30",
-    "bind.unbindTip": "\uCE74\uB4DC \xB7 \uD654\uBA74 \uD06C\uAE30\uB294 \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694 \xB7 \uC5F0\uACB0\uB9CC \uD480\uACE0 \uD06C\uAE30\uB294 \uADF8\uB300\uB85C\uC608\uC694",
-    "bind.roleUnbind": "\uD480\uAE30 {u}",
-    "bind.doneUnbound": " \xB7 \uD06C\uAE30 \uC5F0\uACB0 \uD480\uAE30 {u}\uACF3",
     "bind.placesMore": "\uC678 {n}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC120\uD0DD\uC73C\uB85C \uBCF4\uAE30",
     "bind.linkingOf": "\uC5F0\uACB0 \uC911\u2026 {done} / {total}",
     "bind.waitLink": "\uC5F0\uACB0\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
@@ -2277,7 +2266,7 @@
     return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}|${c.variableId}`;
   }
   function groupByVariable(cands) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c;
     const byVar = /* @__PURE__ */ new Map();
     for (const c of cands) {
       const arr = byVar.get(c.variableId);
@@ -2296,21 +2285,19 @@
       for (const [nodeId, items] of byNode) {
         for (const l of groupBindLines(items)) {
           const its = l.items;
-          lines.push(__spreadValues({
+          lines.push({
             nodeId,
             label: l.label,
             fields: l.fields,
             keys: its.map((x) => placeKey(__spreadProps(__spreadValues({}, x), { nodeId }))),
             currentValue: l.currentValue
-          }, ((_a = its.find((x) => x.fromVariableName && !x.unbind)) == null ? void 0 : _a.fromVariableName) ? { from: (_b = its.find((x) => x.fromVariableName && !x.unbind)) == null ? void 0 : _b.fromVariableName } : {}));
+          });
         }
       }
-      const variableValue = (_d = (_c = list.find((c) => c.variableValue != null)) == null ? void 0 : _c.variableValue) != null ? _d : list[0].currentValue;
+      const variableValue = (_b = (_a = list.find((c) => c.variableValue != null)) == null ? void 0 : _a.variableValue) != null ? _b : list[0].currentValue;
       const keys = lines.flatMap((l) => l.keys);
       const nr = list.find((c) => c.newRole);
-      const swaps = list.filter((c) => c.fromVariableName && !c.unbind).length;
-      const unbind = list.some((c) => c.unbind);
-      groups.push(__spreadValues(__spreadValues({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines, swaps }, nr ? { newRoleOf: (_e = nr.newRoleGlobalName) != null ? _e : "" } : {}), unbind ? { unbind: true } : {}));
+      groups.push(__spreadValues({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines }, nr ? { newRoleOf: (_c = nr.newRoleGlobalName) != null ? _c : "" } : {}));
     }
     groups.sort((a, b) => b.count - a.count || a.variableName.localeCompare(b.variableName));
     return groups;
@@ -4220,7 +4207,7 @@
   $("btnBindRepreview").addEventListener("click", () => runBindPreview());
   $("btnBindToList").addEventListener("click", () => showManager());
   $("btnApplyConfirm").addEventListener("click", () => {
-    const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues(__spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}), c.fromVariableId ? { fromVariableId: c.fromVariableId } : {}), c.unbind ? { unbind: true } : {}));
+    const items = bindCandidates.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}));
     if (!items.length) return;
     startLink(items);
   });
@@ -5068,7 +5055,7 @@
           bindSkipsCapped = ((_g = msg.skipTotal) != null ? _g : bindSkips.length) > bindSkips.length;
           renderSkipReasons((_h = msg.reasons) != null ? _h : {});
           setStatus("applyStatus", "", "");
-          $("bindDoneText").textContent = t("bind.doneCard", { n: msg.bound }) + (msg.unbound ? t("bind.doneUnbound", { u: msg.unbound }) : "") + (msg.newRoles ? t("bind.doneNewRoles", { k: msg.newRoles }) : "") + (msg.swapped ? t("bind.doneSwapped", { m: msg.swapped }) : "");
+          $("bindDoneText").textContent = t("bind.doneCard", { n: msg.bound }) + (msg.newRoles ? t("bind.doneNewRoles", { k: msg.newRoles }) : "");
           $("bindDone").hidden = false;
           renderBindTree();
         }
@@ -5598,20 +5585,6 @@
     } else chip.textContent = value;
     return chip;
   }
-  function unbindChip(name) {
-    const chip = document.createElement("span");
-    chip.className = "bv-chip bv-unb";
-    const lab = document.createElement("span");
-    lab.className = "bv-unb-label";
-    lab.textContent = t("bind.unbind");
-    const nm = document.createElement("span");
-    nm.className = "bv-name";
-    nm.textContent = name;
-    chip.append(lab, nm);
-    chip.dataset.tip = t("bind.unbindTip");
-    chip.title = chip.dataset.tip;
-    return chip;
-  }
   function varChip(name, value, newRoleOf) {
     const chip = document.createElement("span");
     chip.className = "bv-chip bv-var";
@@ -5626,6 +5599,8 @@
       const badge = document.createElement("span");
       badge.className = "bv-new";
       badge.textContent = t("bind.newRole");
+      badge.setAttribute("role", "img");
+      badge.setAttribute("aria-label", t("bind.newRoleAria"));
       chip.append(badge, mark, nm);
       chip.dataset.tip = t("bind.newRoleTip", { global: newRoleOf });
       chip.title = chip.dataset.tip;
@@ -5670,12 +5645,6 @@
     prop.className = "bv-prop";
     prop.textContent = fieldLabel(l.label, l.fields[0]) + (l.keys.length > 1 ? t("bind.placeCount", { k: l.keys.length }) : "");
     row.append(ic, layer, prop);
-    if (l.from) {
-      const from = document.createElement("span");
-      from.className = "bv-from";
-      from.textContent = t("bind.fromGlobal", { global: l.from });
-      row.appendChild(from);
-    }
     return row;
   }
   function bindGroupEl(g) {
@@ -5716,7 +5685,7 @@
       renderBindTree();
       focusCardControl(g.variableId, ".bv-switch");
     });
-    head.append(valueChip(g.variableValue), arrowEl(), g.unbind ? unbindChip(g.variableName) : varChip(g.variableName, g.variableValue, g.newRoleOf), grow, tw, sw);
+    head.append(valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf), grow, tw, sw);
     card.appendChild(head);
     if (open) {
       const places = document.createElement("div");
@@ -5827,14 +5796,10 @@
       found.title = t("bind.foundTip", { name: bindPreviewName, n: bindCandidates.length });
     }
     const roleSum = $("bindRoleSum");
-    const onGroups = has ? bindGroups().all.filter(groupOn) : [];
-    const k = onGroups.filter((g) => g.newRoleOf != null).length;
-    const sw = onGroups.reduce((a, g) => a + g.swaps, 0);
-    const u = onGroups.reduce((a, g) => a + (g.unbind ? g.count : 0), 0);
-    const parts = [k ? t("bind.roleNew", { k }) : "", sw ? t("bind.roleSwap", { m: sw }) : "", u ? t("bind.roleUnbind", { u }) : ""].filter(Boolean);
-    roleSum.hidden = !parts.length;
-    roleSum.textContent = parts.join(" \xB7 ");
-    roleSum.title = parts.length ? t("bind.roleSummaryTip") : "";
+    const k = has ? bindGroups().all.filter(groupOn).filter((g) => g.newRoleOf != null).length : 0;
+    roleSum.hidden = !k;
+    roleSum.textContent = k ? t("bind.roleNew", { k }) : "";
+    roleSum.removeAttribute("title");
     const skip = $("bindSkipToggle");
     skip.hidden = !showSkip;
     skip.textContent = `${t("bind.skipTotal", { m })} ${bindSkipsOpen ? "\u25BE" : "\u25B8"}`;
