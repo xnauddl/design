@@ -1072,9 +1072,9 @@
 **새 역할 · Global에서 바꾸기 표시 (2026-11-06 결정, §2.12)**
 - 카드는 지금처럼 변수(역할)마다 하나다. 새로 만들 역할의 카드는 아직 변수가 없으므로 역할 이름으로 묶는다(같은 이름 · 같은 값이면 한 카드).
 - **새 역할 카드:** 변수 칩의 이름 앞에 작은 "새" 표시(`bind.newRole`, `--accent-subtle` 테두리 글자 11px). 칩 툴팁 "연결할 때 Semantic에 만들어요 · {Global 이름}을 가리켜요"(`bind.newRoleTip`).
-- **Global에서 바꾸는 자리:** 자리 줄 끝에 회색 글자 "· {Global 이름}에서"(`bind.fromGlobal`). 한 카드에 새로 붙는 자리와 바꾸는 자리가 섞일 수 있다.
+- **Global에서 바꾸는 자리:** 자리 줄 끝에 회색 글자 "· {Global 이름}에서"(`bind.fromGlobal`). 용도가 틀린 Semantic · Component에서 바꾸는 자리(12.8)도 같은 꼬리에 그 변수 이름이 들어간다("· color/background/default에서"). 한 카드에 새로 붙는 자리와 바꾸는 자리가 섞일 수 있다.
 - **배지 줄:** (찾음 {n})의 n은 새로 붙는 자리 + 바꾸는 자리 + 크기 연결 풀기 자리 합이다. 그 뒤에 회색 글자 "새 역할 {k} · 바꿈 {m}"(`bind.roleSummary` — 0인 쪽은 빼고, 둘 다 0이면 숨김). 툴팁 "새 역할은 연결할 때 Semantic에 만들어요 · 바꿈은 Global이나 용도가 맞지 않는 변수가 붙은 곳을 같은 값의 역할로 바꿔요 · 풀기는 카드 · 화면 크기의 변수 연결만 풀어요"(`bind.roleSummaryTip`).
-- **연결 뒤 상태 줄:** 지금 문구 뒤에 " · 새 역할 {k}개"(`bind.doneNewRoles`) · " · Global에서 바꿈 {m}곳"(`bind.doneSwapped`)을 0이 아닐 때만 붙인다.
+- **연결 뒤 상태 줄:** 지금 문구 뒤에 " · 새 역할 {k}개"(`bind.doneNewRoles`) · " · 바꿈 {m}곳"(`bind.doneSwapped` — 2026-11-06 A.10에서 "Global에서"를 뺌: 용도가 틀린 Semantic에서 바꾼 자리도 든다)을 0이 아닐 때만 붙인다.
 - 스위치를 끈 카드의 새 역할은 만들지 않는다. "새 역할 k"는 켠 카드 수다. 끈 카드의 이름은 비워 두지 않는다(§2.12 12.5).
 
 **찾기 · 연결의 수 (2026-11-05 결정, QA #4 불합격 2 · 코드 대조 검토 1회차 뒤 고침)**
@@ -2138,6 +2138,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [ ] 메시지: `BindCandidate.unbind` · `APPLY_SELECTED` items `unbind`(`ui.ts` 체크한 후보 → items, `bindSelection` 적용 모드의 items 둘 다) · `APPLY_RESULT.unbound`
 - [ ] `aliasGlobalId`(별칭 끝 로컬 Global id) — 용도 틀림 바꾸기의 새 역할 별칭 대상
 - [ ] UI(§4.6): 풀기 칩 · 툴팁, 배지 요약 "풀기 u", 연결 뒤 꼬리. i18n `bind.unbind` · `bind.unbindTip` · `bind.roleUnbind` · `bind.doneUnbound`
+- [ ] 문구: `bind.doneSwapped` " · Global에서 바꿈 {m}곳" → " · 바꿈 {m}곳"(용도가 틀린 Semantic에서 바꾼 자리도 셈)
 - [ ] 단위 테스트: inverse 띠(회색 기준이면 inverse 없음), 용도가 틀린 연결 바꾸기(흰 TEXT에 붙은 background/default → color/text/inverse), 크기 풀기(카드 width Global → 풀림 · 값 그대로 · 다시 확인), verify-bind-flow 풀기 카드
 - [ ] 실기 확인(사용자, 피그마) ① `190:615`에서 다시 [찾기] → 풀기 60 · 흰 글자 6개 바꿈 → [연결] 뒤 Global 0곳, 흰 글자 `color/text/inverse`. 이미 생긴 `color/icon/inverse`(검정 선 아이콘 2곳)는 플러그인 표시가 있고 용도도 맞아 그대로 남는다 — 이미 있는 역할은 바꾸지 않는다(12.5), 이름은 사용자가 고치거나 지운다
 - [ ] 실기 확인 ② 연결 전 원본 `163:1523`의 새 복제본 → 아이콘 색 이름에 inverse 없음(`color/icon/strong` · `subtle`)
