@@ -11,10 +11,11 @@
      2. dist/ 만 바뀌어 있으면 되돌린다(로컬 빌드 잔여물 — 원격 dist/가 정본).
         dist/ 밖에 고친 파일이 있으면 멈춘다(사용자 작업을 지우지 않는다).
      3. 브랜치를 바꾸고(인자가 있을 때) 원격 최신으로 앞으로만 옮긴다(--ff-only).
+        원격이 새로 들이는 파일과 이름이 같은 '추적 안 하는' 로컬 파일은 같은 내용이면 지우고, 다르면 .local로 옮긴다.
      4. 받아 온 커밋 · 창 크기(dist/code.js의 UI_WIDTH)를 보여 준다.
    ============================================================ */
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,6 +57,22 @@ if (branch !== current) {
     git('checkout', '-b', branch, '--track', `origin/${branch}`);
   }
   console.log(`· 브랜치 바꿈: ${current || '(없음)'} → ${branch}`);
+}
+// 원격이 새로 들이는 파일과 같은 이름의 '추적 안 하는' 로컬 파일 — 내용이 같으면 지우고, 다르면 .local로 옮긴다
+// (그대로 두면 merge가 덮어쓰지 않으려고 멈춘다).
+const incoming = git('diff', '--name-only', '--diff-filter=A', 'HEAD', `origin/${branch}`).split('\n').filter(Boolean);
+for (const f of incoming) {
+  const p = join(root, f);
+  if (!existsSync(p)) continue;
+  const theirs = execFileSync('git', ['show', `origin/${branch}:${f}`], { cwd: root });
+  if (Buffer.compare(readFileSync(p), theirs) === 0) {
+    rmSync(p);
+    console.log(`· 같은 내용의 로컬 파일 정리: ${f}`);
+  } else {
+    const keep = p.replace(/(\.[^./]+)?$/, '.local$1');
+    renameSync(p, keep);
+    console.log(`· 내용이 다른 로컬 파일을 옮겨 둠: ${f} → ${keep.slice(root.length + 1)}`);
+  }
 }
 try {
   git('merge', '--ff-only', `origin/${branch}`);
