@@ -902,6 +902,30 @@
     return tpl.replace(/\{(\w+)\}/g, (_, k) => k in vars ? String(vars[k]) : `{${k}}`);
   }
 
+  // src/lib/nodePaint.ts
+  var VECTOR_TYPES = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
+  function paintsOf(node, field) {
+    if (node == null || typeof node !== "object" || !(field in node)) return null;
+    const p = node[field];
+    return Array.isArray(p) ? p : null;
+  }
+  function hasVisibleFill(node) {
+    const f = paintsOf(node, "fills");
+    return !!f && f.some((p) => p.visible !== false);
+  }
+  function hasImageFill(node) {
+    const f = paintsOf(node, "fills");
+    return !!f && f.some((p) => p.visible !== false && p.type === "IMAGE");
+  }
+  function hasColorFill(node) {
+    const f = paintsOf(node, "fills");
+    return !!f && f.some((p) => p.visible !== false && p.type !== "IMAGE");
+  }
+  function hasVisibleStroke(node) {
+    const s = paintsOf(node, "strokes");
+    return !!s && s.some((p) => p.visible !== false);
+  }
+
   // src/lib/tokens.ts
   var clamp01 = (n) => Math.min(1, Math.max(0, n));
   var to255 = (c) => Math.round(clamp01(c) * 255);
@@ -1078,10 +1102,10 @@
     }
     acc.lastNode.set(k, nodeId);
   }
-  function collectPaints(acc, node, paints3, source) {
+  function collectPaints(acc, node, paints2, source) {
     const nodeId = node.id;
-    if (paints3 === figma.mixed || !Array.isArray(paints3)) return;
-    for (const p of paints3) {
+    if (paints2 === figma.mixed || !Array.isArray(paints2)) return;
+    for (const p of paints2) {
       if (p.visible === false) continue;
       if (p.type !== "SOLID") {
         acc.skipped.add(SKIP_GRADIENT);
@@ -1136,17 +1160,12 @@
       }
     }
   }
-  function hasImageFill(node) {
-    const fills = node.fills;
-    return Array.isArray(fills) && fills.some((p) => p.type === "IMAGE" && p.visible !== false);
-  }
-  var ICON_VECTOR_TYPES = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
   function iconVectorCount(children, visible = true) {
     let vectors = 0;
     for (const c of children) {
       if (hasImageFill(c)) return -1;
       const shown = visible && c.visible !== false;
-      if (ICON_VECTOR_TYPES.has(c.type)) {
+      if (VECTOR_TYPES.has(c.type)) {
         if (shown) vectors++;
         continue;
       }
@@ -1203,12 +1222,14 @@
     if (!isIconSelf(node) && !isAvatarSelf(node)) return false;
     return !hasIconAncestor(node);
   }
+  function inAutoLayoutFlow(node) {
+    if ("layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE") return false;
+    const parent = node.parent;
+    return node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE";
+  }
   function collectSize(acc, node) {
     if (!isIconOrAvatar(node)) return;
-    const parent = node.parent;
-    const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
-    const inAutoLayout = !absolute && (node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE");
-    if (!inAutoLayout) return;
+    if (!inAutoLayoutFlow(node)) return;
     const addSize = (v) => {
       const rv = round(v);
       if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size", node.id);
@@ -2727,16 +2748,16 @@
   function bindPaints(node, entries, res, apply, preview) {
     for (const key of ["fills", "strokes"]) {
       if (!(key in node)) continue;
-      const paints3 = node[key];
-      if (paints3 === figma.mixed || !Array.isArray(paints3)) continue;
-      if (!paints3.some((p) => p.type === "SOLID")) continue;
+      const paints2 = node[key];
+      if (paints2 === figma.mixed || !Array.isArray(paints2)) continue;
+      if (!paints2.some((p) => p.type === "SOLID")) continue;
       if (hasStyleId(node, STYLE_KEY_OF[key])) {
         note(res, "styled", node, preview, key);
         continue;
       }
       const allowed = key === "fills" ? FILL_SCOPES : STROKE_SCOPES;
       let changed = false;
-      const next = paints3.map((p, i) => {
+      const next = paints2.map((p, i) => {
         if (p.type !== "SOLID") return p;
         const st = stateReason(colorState(p, node, key, i));
         if (st) {
@@ -2765,10 +2786,7 @@
   function bindFrame(node, entries, res, apply, preview) {
     if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return;
     if (isIconOrAvatar(node)) {
-      const parent = node.parent;
-      const absolute = "layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE";
-      const inAutoLayout = !absolute && (node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE");
-      if (inAutoLayout) {
+      if (inAutoLayoutFlow(node)) {
         const bindAxis = (sizing, field, v) => {
           if (sizing !== "FIXED") {
             note(res, "hug-fill", node, preview, field);
@@ -3016,6 +3034,12 @@
         valueCache.set(id, entry);
         return entry;
       };
+      const sizeTargetCache = /* @__PURE__ */ new Map();
+      const isSizeTarget = (n) => {
+        let v = sizeTargetCache.get(n);
+        if (v === void 0) sizeTargetCache.set(n, v = isIconOrAvatar(n));
+        return v;
+      };
       const changedPaints = /* @__PURE__ */ new Map();
       for (const it of chunk) {
         const node = (_a = nodes.get(it.nodeId)) != null ? _a : null;
@@ -3093,7 +3117,7 @@
             fail(gap === "no-wrap" ? "changed" : "space-between", node, it.field);
             continue;
           }
-          if ((it.field === "width" || it.field === "height") && !isIconOrAvatar(node)) {
+          if ((it.field === "width" || it.field === "height") && !isSizeTarget(node)) {
             fail("changed", node, it.field);
             continue;
           }
@@ -3418,7 +3442,7 @@
     let slots = 0;
     for (let i = 0; i < total; i++) if (isLandmarkCandidate(nodes[i])) slotOf.set(i, slots++);
     const overlayAt = findOverlayIndex(nodes, parentDims);
-    const hasAvatarSibling = nodes.some((n) => n.type === "ELLIPSE" && hasImageFill2(n));
+    const hasAvatarSibling = nodes.some((n) => n.type === "ELLIPSE" && hasImageFill(n));
     for (let i = 0; i < total; i++) {
       const node = nodes[i];
       const before = node.name;
@@ -3524,7 +3548,7 @@
       case "RECTANGLE":
       case "ELLIPSE": {
         if (isThin(node)) return "divider";
-        if (hasImageFill2(node)) return node.type === "ELLIPSE" ? "avatar" : "image";
+        if (hasImageFill(node)) return node.type === "ELLIPSE" ? "avatar" : "image";
         if (hasVisibleFill(node)) return "background";
         if (hasVisibleStroke(node)) return "border";
         return "shape";
@@ -3534,7 +3558,7 @@
       case "SECTION": {
         const kids = "children" in node ? node.children : [];
         if (kids.length === 0) {
-          if (hasImageFill2(node)) return "image";
+          if (hasImageFill(node)) return "image";
           if (hasColorFill(node)) return "swatch";
           const emptyRegion = regionRole(node, pos, ctxScope, parentRole);
           if (emptyRegion) return emptyRegion;
@@ -3621,22 +3645,6 @@
     if (!(field in node)) return null;
     const p = node[field];
     return Array.isArray(p) ? p : null;
-  }
-  function hasVisibleFill(node) {
-    const f = paints(node, "fills");
-    return !!f && f.some((p) => p.visible !== false);
-  }
-  function hasImageFill2(node) {
-    const f = paints(node, "fills");
-    return !!f && f.some((p) => p.visible !== false && p.type === "IMAGE");
-  }
-  function hasColorFill(node) {
-    const f = paints(node, "fills");
-    return !!f && f.some((p) => p.visible !== false && p.type !== "IMAGE");
-  }
-  function hasVisibleStroke(node) {
-    const s = paints(node, "strokes");
-    return !!s && s.some((p) => p.visible !== false);
   }
   function layoutOf(node) {
     if (!("layoutMode" in node)) return null;
@@ -3780,7 +3788,7 @@
   }
   function isInputBox(node) {
     if (node.type !== "FRAME" && node.type !== "RECTANGLE") return false;
-    if (hasImageFill2(node)) return false;
+    if (hasImageFill(node)) return false;
     if (!hasVisibleStroke(node) && !hasColorFill(node)) return false;
     const d = dims(node);
     if (!d || d.h <= 0 || d.h > 72) return false;
@@ -3818,7 +3826,7 @@
   function isFigureLike(node, kids) {
     if (node.type !== "FRAME") return false;
     if (kids.length < 2 || kids.length > 3) return false;
-    const hasImg = kids.some((k) => hasImageFill2(k));
+    const hasImg = kids.some((k) => hasImageFill(k));
     const hasCaption = kids.some((k) => k.type === "TEXT");
     return hasImg && hasCaption;
   }
@@ -3883,7 +3891,7 @@
   function isBarFill(node) {
     if (node.type !== "RECTANGLE" && node.type !== "FRAME") return false;
     if ("children" in node && node.children.length > 0) return false;
-    if (hasImageFill2(node) || !hasColorFill(node)) return false;
+    if (hasImageFill(node) || !hasColorFill(node)) return false;
     const d = dims(node);
     return !!d && d.h > 0 && d.h <= 24 && d.w >= d.h * 2;
   }
@@ -3891,7 +3899,7 @@
   function isThumbnail(node, pos, ctxScope) {
     if (!ctxScope || !THUMB_CONTEXTS.has(ctxScope)) return false;
     if (node.type === "ELLIPSE") return false;
-    if (!hasImageFill2(node)) return false;
+    if (!hasImageFill(node)) return false;
     const d = dims(node);
     if (!d) return false;
     if (Math.max(d.w, d.h) <= 96) return true;
@@ -3901,7 +3909,7 @@
   function isStatusDot(node, pos) {
     if (!pos.hasAvatarSibling) return false;
     if (node.type !== "ELLIPSE" && node.type !== "RECTANGLE" && node.type !== "FRAME") return false;
-    if (hasImageFill2(node) || !hasColorFill(node)) return false;
+    if (hasImageFill(node) || !hasColorFill(node)) return false;
     const d = dims(node);
     if (!d || d.w <= 0 || d.h <= 0) return false;
     if (Math.max(d.w, d.h) > 16) return false;
@@ -4140,26 +4148,6 @@
     if (typeof w !== "number" || typeof h !== "number") return null;
     return { w, h };
   }
-  function paints2(node, field) {
-    const p = node[field];
-    return Array.isArray(p) ? p : null;
-  }
-  function hasVisibleFill2(node) {
-    const f = paints2(node, "fills");
-    return !!f && f.some((p) => p.visible !== false);
-  }
-  function hasImageFill3(node) {
-    const f = paints2(node, "fills");
-    return !!f && f.some((p) => p.visible !== false && p.type === "IMAGE");
-  }
-  function hasColorFill2(node) {
-    const f = paints2(node, "fills");
-    return !!f && f.some((p) => p.visible !== false && p.type !== "IMAGE");
-  }
-  function hasVisibleStroke2(node) {
-    const s = paints2(node, "strokes");
-    return !!s && s.some((p) => p.visible !== false);
-  }
   function layoutOf2(node) {
     const m = node.layoutMode;
     return m === "VERTICAL" ? "vertical" : m === "HORIZONTAL" ? "horizontal" : null;
@@ -4184,7 +4172,7 @@
     if (node.type !== "FRAME") return false;
     if (layoutOf2(node) === null) return false;
     if (!(cornerRadiusOf2(node) > 0)) return false;
-    if (!hasVisibleFill2(node) && !hasVisibleStroke2(node)) return false;
+    if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
     if (!hasDirectText2(node)) return false;
     const d = dims2(node);
     if (d && d.h > 80) return false;
@@ -4202,7 +4190,7 @@
   function isCardLike2(node, kids) {
     if (node.type !== "FRAME") return false;
     if (kids.length < 2) return false;
-    if (!hasVisibleFill2(node) && !hasVisibleStroke2(node)) return false;
+    if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
     return cornerRadiusOf2(node) > 0 || hasDropShadow2(node);
   }
   function rowCells(node) {
@@ -4292,8 +4280,8 @@
   }
   function isInputBox2(node) {
     if (node.type !== "FRAME" && node.type !== "RECTANGLE") return false;
-    if (hasImageFill3(node)) return false;
-    if (!hasVisibleStroke2(node) && !hasColorFill2(node)) return false;
+    if (hasImageFill(node)) return false;
+    if (!hasVisibleStroke(node) && !hasColorFill(node)) return false;
     const d = dims2(node);
     if (!d || d.h <= 0 || d.h > 72) return false;
     return d.w >= d.h * 2;
@@ -4312,7 +4300,7 @@
     if (node.type !== "FRAME") return false;
     if (layoutOf2(node) !== "horizontal") return false;
     if (depth > 1) return false;
-    if (cornerRadiusOf2(node) > 0 && (hasVisibleFill2(node) || hasVisibleStroke2(node))) return false;
+    if (cornerRadiusOf2(node) > 0 && (hasVisibleFill(node) || hasVisibleStroke(node))) return false;
     const kids = (_a = node.children) != null ? _a : [];
     if (kids.length < 3) return false;
     const d = dims2(node);
@@ -4322,7 +4310,7 @@
   function isFigureLike2(node, kids) {
     if (node.type !== "FRAME") return false;
     if (kids.length < 2 || kids.length > 3) return false;
-    const hasImg = kids.some((k) => hasImageFill3(k));
+    const hasImg = kids.some((k) => hasImageFill(k));
     const hasCaption = kids.some((k) => k.type === "TEXT");
     return hasImg && hasCaption;
   }
@@ -4334,10 +4322,10 @@
     if (!d || d.h < 4 || d.h > 24) return false;
     if (d.w < d.h * 4) return false;
     if (cornerRadiusOf2(node) * 2 < d.h) return false;
-    if (!hasVisibleFill2(node) && !hasVisibleStroke2(node)) return false;
+    if (!hasVisibleFill(node) && !hasVisibleStroke(node)) return false;
     return kids.some((k) => {
       const kd = dims2(k);
-      return !!kd && kd.w > 0 && kd.w < d.w && kd.h <= d.h + 1 && hasColorFill2(k);
+      return !!kd && kd.w > 0 && kd.w < d.w && kd.h <= d.h + 1 && hasColorFill(k);
     });
   }
   function parseHeadingSlots(node) {
@@ -4346,8 +4334,8 @@
     if (layoutOf2(node) !== "horizontal") return null;
     const d = dims2(node);
     if (d && d.h > 96) return null;
-    if (hasVisibleFill2(node) && cornerRadiusOf2(node) > 0) return null;
-    if (hasVisibleFill2(node) && hasDropShadow2(node)) return null;
+    if (hasVisibleFill(node) && cornerRadiusOf2(node) > 0) return null;
+    if (hasVisibleFill(node) && hasDropShadow2(node)) return null;
     const allKids = (_a = node.children) != null ? _a : [];
     const visible = allKids.map((k, childIndex) => ({ k, childIndex })).filter(({ k }) => isVisible2(k));
     if (visible.length < 1 || visible.length > 5) return null;
@@ -4414,9 +4402,8 @@
     if (others.some((k) => !isIconLike(k))) return null;
     return texts[0];
   }
-  var ICON_VECTORS = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
   function isIconLike(n) {
-    if (ICON_VECTORS.has(n.type) || n.iconFrame) return true;
+    if (VECTOR_TYPES.has(n.type) || n.iconFrame) return true;
     if (n.type !== "FRAME" && n.type !== "GROUP") return false;
     const d = dims2(n);
     if (!d || d.w > 96 || d.h > 96) return false;
@@ -4424,12 +4411,12 @@
     const ok = (x) => {
       var _a;
       return ((_a = x.children) != null ? _a : []).every((c) => {
-        if (ICON_VECTORS.has(c.type)) {
+        if (VECTOR_TYPES.has(c.type)) {
           vectors++;
           return true;
         }
-        if (c.type === "ELLIPSE" || c.type === "RECTANGLE") return !hasImageFill3(c);
-        if (c.type === "FRAME" || c.type === "GROUP") return !hasImageFill3(c) && ok(c);
+        if (c.type === "ELLIPSE" || c.type === "RECTANGLE") return !hasImageFill(c);
+        if (c.type === "FRAME" || c.type === "GROUP") return !hasImageFill(c) && ok(c);
         return false;
       });
     };
@@ -4461,9 +4448,9 @@
       textCells = false;
       const texts = cells.map(cellText);
       if (texts.some((t2) => !t2 || !shortOneLine(t2) || !t2.fillHex)) return null;
-      if (cells.some((c) => typeof c.fills === "symbol" || hasVisibleFill2(c) && !c.fillHex)) return null;
-      looks = cells.map((c, i) => `${hasVisibleFill2(c) ? c.fillHex : ""}|${hasVisibleStroke2(c) ? "s" : ""}|${texts[i].fillHex}`);
-      colors = cells.map((c, i) => hasVisibleFill2(c) && c.fillHex ? c.fillHex : texts[i].fillHex);
+      if (cells.some((c) => typeof c.fills === "symbol" || hasVisibleFill(c) && !c.fillHex)) return null;
+      looks = cells.map((c, i) => `${hasVisibleFill(c) ? c.fillHex : ""}|${hasVisibleStroke(c) ? "s" : ""}|${texts[i].fillHex}`);
+      colors = cells.map((c, i) => hasVisibleFill(c) && c.fillHex ? c.fillHex : texts[i].fillHex);
     } else {
       return null;
     }
@@ -4475,7 +4462,7 @@
     const selected = looks.indexOf(odd[0]);
     const sel = cells[selected];
     let style = "Text";
-    if (!textCells) style = hasVisibleFill2(sel) && cornerRadiusOf2(sel) > 0 ? "Pill" : "Box";
+    if (!textCells) style = hasVisibleFill(sel) && cornerRadiusOf2(sel) > 0 ? "Pill" : "Box";
     return { style, selected, selectedColor: colors[selected] };
   }
   function isTabLike(node) {
@@ -5377,7 +5364,6 @@
     }
     return all.filter((c) => keep.has(c.id));
   }
-  var VECTOR_TYPES = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
   function artworkKey(n) {
     var _a;
     if (VECTOR_TYPES.has(n.type) || n.iconFrame) return `v:${(_a = n.vectorKey) != null ? _a : n.name}`;
@@ -6477,7 +6463,6 @@
     }
     return null;
   }
-  var VECTOR_TYPES2 = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
   async function copyOverridesAsync(member, inst, prefix, deps) {
     const failed = [];
     const fail = (what) => {
@@ -6510,7 +6495,7 @@
     const visit = async (a, b, root) => {
       var _a;
       if (a.removed || b.removed) return;
-      if (!root && (VECTOR_TYPES2.has(a.type) || ((_a = deps.isIcon) == null ? void 0 : _a.call(deps, a))) && b.type === "INSTANCE") {
+      if (!root && (VECTOR_TYPES.has(a.type) || ((_a = deps.isIcon) == null ? void 0 : _a.call(deps, a))) && b.type === "INSTANCE") {
         try {
           if (a.visible !== b.visible) put(b, "visible", a.visible, () => {
             b.visible = a.visible;
@@ -6621,14 +6606,14 @@
   function transplantImageFills(inst, images) {
     let applied = 0;
     const failures = [];
-    for (const [path, paints3] of Object.entries(images)) {
+    for (const [path, paints2] of Object.entries(images)) {
       const dst = nodeAtPath(inst, path);
       if (!dst || !("fills" in dst)) {
         failures.push(t("component.fail.photoNoSlot", { path }));
         continue;
       }
       try {
-        dst.fills = paints3;
+        dst.fills = paints2;
         applied++;
       } catch (e) {
         failures.push(t("component.fail.photo", { path, error: e instanceof Error ? e.message : String(e) }));
@@ -7707,7 +7692,7 @@
       return [];
     }
   }
-  function paintsOf(v) {
+  function paintsOf2(v) {
     if (typeof v === "symbol") return v;
     if (!Array.isArray(v)) return void 0;
     return v.map((p) => ({
@@ -7734,7 +7719,7 @@
   }
   function vectorKeyOf(node) {
     var _a, _b, _c, _d;
-    if (!VECTOR_TYPES3.has(node.type)) return void 0;
+    if (!VECTOR_TYPES2.has(node.type)) return void 0;
     try {
       const g = node;
       const parts = [];
@@ -7745,7 +7730,7 @@
       return void 0;
     }
   }
-  var VECTOR_TYPES3 = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
+  var VECTOR_TYPES2 = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
   function iconFrameKeyOf(node) {
     var _a;
     if (node.type !== "FRAME" && node.type !== "GROUP") return void 0;
@@ -7759,7 +7744,7 @@
       const kids = "children" in n ? n.children : [];
       for (const c of kids) {
         if (imageHashOf2(c) !== void 0) return false;
-        if (VECTOR_TYPES3.has(c.type)) {
+        if (VECTOR_TYPES2.has(c.type)) {
           vectors++;
           parts.push(`${c.type}:${(_a2 = vectorKeyOf(c)) != null ? _a2 : ""}:${(_b = solidFillHex(c)) != null ? _b : ""}`);
         } else if (c.type === "ELLIPSE" || c.type === "RECTANGLE") {
@@ -7829,8 +7814,8 @@
       opacity: num(a.opacity),
       gridRowCount: num(a.gridRowCount),
       gridColumnCount: num(a.gridColumnCount),
-      fills: paintsOf(a.fills),
-      strokes: paintsOf(a.strokes),
+      fills: paintsOf2(a.fills),
+      strokes: paintsOf2(a.strokes),
       effects: Array.isArray(a.effects) ? a.effects.map((e) => ({ visible: e.visible, type: e.type })) : void 0,
       characters,
       mainComponentKey,
@@ -8887,7 +8872,7 @@
                       else delete vals[p.propName];
                     }
                     const images = {};
-                    for (const [path, paints3] of Object.entries(snap.images)) images[joinPath(prefix, path)] = paints3;
+                    for (const [path, paints2] of Object.entries(snap.images)) images[joinPath(prefix, path)] = paints2;
                     let noted = false;
                     return () => {
                       let inst = null;

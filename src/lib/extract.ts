@@ -2,6 +2,7 @@
    extract.ts — 선택 노드에서 원시 토큰 수집·중복 제거 (bottom-up)
    ============================================================ */
 import { t } from './i18n';
+import { VECTOR_TYPES, hasImageFill } from './nodePaint';
 import {
   DraftToken,
   SourceField,
@@ -165,13 +166,6 @@ function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | Inst
 
 /* ---------- size ---------- */
 
-/** 이미지 채움이 있는가(보이는 IMAGE 칠하기). */
-function hasImageFill(node: unknown): boolean {
-  const fills = (node as { fills?: unknown }).fills;
-  return Array.isArray(fills) && fills.some((p: Paint) => p.type === 'IMAGE' && p.visible !== false);
-}
-
-const ICON_VECTOR_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);
 
 /**
  * 아이콘 자손 조건 — 자식들이 벡터 · ELLIPSE · RECTANGLE, 그것을 담은 GROUP · FRAME,
@@ -183,7 +177,7 @@ function iconVectorCount(children: readonly SceneNode[], visible = true): number
   for (const c of children) {
     if (hasImageFill(c)) return -1;
     const shown = visible && c.visible !== false;
-    if (ICON_VECTOR_TYPES.has(c.type)) {
+    if (VECTOR_TYPES.has(c.type)) {
       if (shown) vectors++;
       continue;
     }
@@ -267,20 +261,22 @@ export function isIconOrAvatar(node: SceneNode): node is SizeTarget {
   return !hasIconAncestor(node);
 }
 
+/**
+ * 디자이너가 크기 방식(Fixed · Hug · Fill)을 고를 수 있었던 노드인가 — 오토레이아웃 맥락(자신 또는 부모)이고 절대 배치가 아님.
+ * Figma에서 HUG는 오토레이아웃 프레임/텍스트에만, FILL은 오토레이아웃 자식에만 유효하므로, 자유 배치 프레임의
+ * layoutSizing*는 **언제나 'FIXED'** 다. 절대 배치 자식도 흐름 밖이라 항상 FIXED다 — 둘 다 'Fixed를 선택했다'가 성립하지 않는다.
+ * 만들기(collectSize)와 연결 찾기(bind.ts bindFrame)가 같이 쓴다.
+ */
+export function inAutoLayoutFlow(node: SizeTarget): boolean {
+  if ('layoutPositioning' in node && node.layoutPositioning === 'ABSOLUTE') return false;
+  const parent = node.parent;
+  return node.layoutMode !== 'NONE' || (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE');
+}
+
 function collectSize(acc: Accumulator, node: SceneNode): void {
   // 아이콘 · 아바타 레이어의 크기만 토큰 후보로(§2.11). 카드 · 화면 폭 같은 크기는 뽑지 않는다.
   if (!isIconOrAvatar(node)) return;
-  // 오토레이아웃 맥락에서만. Figma에서 HUG는 오토레이아웃 프레임/텍스트에만, FILL은 오토레이아웃 자식에만
-  // 유효하므로, 자유 배치 프레임의 layoutSizing*는 **언제나 'FIXED'** 다. 디자이너가 Fixed를 '선택'할 수 있었던 노드로 좁힌다.
-  const parent = node.parent;
-  // 절대 배치 자식은 오토레이아웃 흐름 밖이라 Hug/Fill을 고를 수 없고 항상 FIXED다 —
-  // 부모가 오토레이아웃이어도 '디자이너가 Fixed를 선택했다'가 성립하지 않는다.
-  const absolute = 'layoutPositioning' in node && (node as FrameNode).layoutPositioning === 'ABSOLUTE';
-  const inAutoLayout =
-    !absolute &&
-    (node.layoutMode !== 'NONE' ||
-      (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE'));
-  if (!inAutoLayout) return;
+  if (!inAutoLayoutFlow(node)) return;
   // Fixed인 축만 토큰화 — HUG/FILL은 계산된 동적 크기라 디자인 토큰이 아님.
   // 정수만 — 343.5처럼 자유 리사이즈로 남은 소수 값은 의도된 척도가 아님.
   const addSize = (v: number) => {

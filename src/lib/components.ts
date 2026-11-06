@@ -9,6 +9,7 @@ import { tshirtRoles } from './roles';
 import { classifyColor } from './colorName';
 import { highConfidenceComponentRole, isHighConfidenceComponent, parseHeadingSlots, tabInfo } from './componentLike';
 import type { LikeNode, PaintLike, EffectLike } from './componentLike';
+import { VECTOR_TYPES } from './nodePaint'; // 경로 데이터를 비교할 수 없는 도형 타입 — 지문(`vectorKey`)으로 본다
 
 /** 알려진 속성 어휘 — 값 → 속성명 추론. */
 const STATES = new Set(['default', 'hover', 'pressed', 'focus', 'active', 'disabled', 'loading']);
@@ -954,8 +955,6 @@ export interface StructNode extends ScanNode {
   children?: readonly StructNode[];
 }
 
-/** 경로 데이터를 비교할 수 없는 도형 타입 — 지문(`vectorKey`)으로 본다. */
-const VECTOR_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);
 
 /**
  * 그림 슬롯의 **내용 지문**. 그림이 아니면 null.

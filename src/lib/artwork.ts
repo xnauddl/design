@@ -10,6 +10,7 @@
 import { t } from './i18n';
 import { captureOrigin, placeAtOrigin, releaseOrigin } from './placement';
 import { ICON_KEY } from './components';
+import { VECTOR_TYPES } from './nodePaint'; // 벡터로 치는 타입
 
 /** 루트 기준 **자식 인덱스 경로**(`0/1`)의 노드. 이름이 갈린 트리에서도 같은 슬롯을 가리킨다. */
 export function nodeAtPath(root: SceneNode, path: string): SceneNode | null {
@@ -277,7 +278,6 @@ function ancestorInstance(n: SceneNode): InstanceNode | null {
   return null;
 }
 
-const VECTOR_TYPES = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);
 
 export interface CopyDeps {
   mainOf: (inst: InstanceNode) => Promise<ComponentNode | null>;
