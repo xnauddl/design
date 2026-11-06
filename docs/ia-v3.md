@@ -1073,7 +1073,7 @@
 - 카드는 지금처럼 변수(역할)마다 하나다. 새로 만들 역할의 카드는 아직 변수가 없으므로 역할 이름으로 묶는다(같은 이름 · 같은 값이면 한 카드).
 - **새 역할 카드:** 변수 칩의 이름 앞에 작은 "새" 표시(`bind.newRole`, `--accent-subtle` 테두리 글자 11px). 칩 툴팁 "연결할 때 Semantic에 만들어요 · {Global 이름}을 가리켜요"(`bind.newRoleTip`).
 - **Global에서 바꾸는 자리:** 자리 줄 끝에 회색 글자 "· {Global 이름}에서"(`bind.fromGlobal`). 용도가 틀린 Semantic · Component에서 바꾸는 자리(12.8)도 같은 꼬리에 그 변수 이름이 들어간다("· color/background/default에서"). 한 카드에 새로 붙는 자리와 바꾸는 자리가 섞일 수 있다.
-- **배지 줄:** (찾음 {n})의 n은 새로 붙는 자리 + 바꾸는 자리 + 크기 연결 풀기 자리 합이다. 그 뒤에 회색 글자 "새 역할 {k} · 바꿈 {m}"(`bind.roleSummary` — 0인 쪽은 빼고, 둘 다 0이면 숨김). 툴팁 "새 역할은 연결할 때 Semantic에 만들어요 · 바꿈은 Global이나 용도가 맞지 않는 변수가 붙은 곳을 같은 값의 역할로 바꿔요 · 풀기는 카드 · 화면 크기의 변수 연결만 풀어요"(`bind.roleSummaryTip`).
+- **배지 줄:** (찾음 {n})의 n은 새로 붙는 자리 + 바꾸는 자리 + 크기 연결 풀기 자리 합이다. 그 뒤에 회색 글자 "새 역할 {k} · 바꿈 {m} · 풀기 {u}" — 조각 키 `bind.roleNew` "새 역할 {k}" · `bind.roleSwap` "바꿈 {m}" · `bind.roleUnbind` "풀기 {u}"(A.10) 중 0이 아닌 조각만 " · "로 잇고, 모두 0이면 숨김. 툴팁 "새 역할은 연결할 때 Semantic에 만들어요 · 바꿈은 Global이나 용도가 맞지 않는 변수가 붙은 곳을 같은 값의 역할로 바꿔요 · 풀기는 카드 · 화면 크기의 변수 연결만 풀어요"(`bind.roleSummaryTip` — 조각과 상관없이 늘 같은 한 문장, A.10에서 지금 코드 문구 "… 바꿈은 Global이 붙은 곳을 같은 값의 역할로 바꿔요"를 이 문구로 바꾼다).
 - **연결 뒤 상태 줄:** 지금 문구 뒤에 " · 새 역할 {k}개"(`bind.doneNewRoles`) · " · 바꿈 {m}곳"(`bind.doneSwapped` — 2026-11-06 A.10에서 "Global에서"를 뺌: 용도가 틀린 Semantic에서 바꾼 자리도 든다)을 0이 아닐 때만 붙인다.
 - 스위치를 끈 카드의 새 역할은 만들지 않는다. "새 역할 k"는 켠 카드 수다. 끈 카드의 이름은 비워 두지 않는다(§2.12 12.5).
 
@@ -2099,7 +2099,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 ## A.8 Semantic 역할 자동 생성 (2026-11-06, 실기 결과 뒤 사용자 결정)
 
-- [x] 쓰임 이름(순수 새 모듈 `src/lib/usageRoles.ts`): 12.3 이름 표 · 12.4 `colorRoleNames` · 12.5 번호 고르기
+- [x] 쓰임 이름(순수 새 모듈 `src/lib/usageRoles.ts`): 12.3 이름 표 · 12.4 `colorRoleBases` · 12.5 번호 고르기
 - [x] 주인 판정: `dsRole`(역할 어휘, 구조 폴백 제외) → `highConfidenceComponentRole`(구조 색인 — `toStructNode`를 `code.ts`에서 `src/lib`로 옮김) → 없음. `extract.ts` `iconOrAvatarKind` 내보내기
 - [x] `bind.ts` 변수 인덱스: Global은 붙일 후보에서 빼고 별칭 대상 색인(값 · 용도 → 이름 순 Global)으로. 보는 순서 1 → 3 → 2 → 4(글자 1 → 2 → 4, 12.2), 이름 순, 옛 이름(12.7), 플러그인 표시 읽기
 - [x] 찾기 결과: `BindCandidate.fromVariableId` · `newRole{name, globalId, scopes}`, 한 번의 찾기 안 색 밝기 · 번호 확정(12.4 · 12.5) — `shared/messages.ts`
@@ -2107,12 +2107,12 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [x] `bindSelectedItems`: items의 `fromVariableId`(같은 Global id인지 다시 확인) · `newRole`(첫 자리가 통과한 뒤 만들기 · 재사용 · 그 사이 다른 값이면 다음 번호), 모든 모드 별칭, 플러그인 표시, 역할을 만들었으면 `commitUndo`(`code.ts` `APPLY_SELECTED`)
 - [x] 역할 용도 표 — `scopeForSemanticRole` 넓히기
 - [x] 만들기(12.10): `DraftToken.uses` 모으기(추출) · 격자 정리에서 합치기/버리기 · 적용 때 쓰임 역할(번호 규칙, 덮어쓰기 없음) · 색 표 선택 우선 · 글자 역할 그대로 · 팔레트 경로 그대로
-- [x] UI(§4.6 · §4.5): 새 역할 "새" 표시 · 툴팁, 자리 줄 "· {Global}에서", 배지 줄 "새 역할 k · 바꿈 m"(켠 카드 기준), 연결 뒤 상태 줄 꼬리, 만들기 결과 · 미리보기 꼬리 `create.sumRoles` " · 역할 {n}개", 기존 색 추천 경로 걷기(12.10), 마법사 역할 매핑 단계 `wizard.rolesFromTokens` · 범례. i18n `create.sumRoles` · `wizard.rolesFromTokens` · `wizard.rolesFromTokensTail` · `bind.newRole` · `bind.newRoleTip` · `bind.fromGlobal` · `bind.roleSummary` · `bind.roleSummaryTip` · `bind.doneNewRoles` · `bind.doneSwapped`
+- [x] UI(§4.6 · §4.5): 새 역할 "새" 표시 · 툴팁, 자리 줄 "· {Global}에서", 배지 줄 "새 역할 k · 바꿈 m"(켠 카드 기준, 조각 키 `bind.roleNew` · `bind.roleSwap`), 연결 뒤 상태 줄 꼬리, 만들기 결과 · 미리보기 꼬리 `create.sumRoles` " · 역할 {n}개", 기존 색 추천 경로 걷기(12.10), 마법사 역할 매핑 단계 `wizard.rolesFromTokens` · 범례. i18n `create.sumRoles` · `wizard.rolesFromTokens` · `wizard.rolesFromTokensTail` · `bind.newRole` · `bind.newRoleTip` · `bind.fromGlobal` · `bind.roleNew` · `bind.roleSwap` · `bind.roleSummaryTip` · `bind.doneNewRoles` · `bind.doneSwapped`
 - [x] 주석 갱신: `bind.ts` · `variables.ts` · `roles.ts` 머리의 "역할 없는 값은 Global에 붙는다"
 - [x] 단위 테스트: 보는 순서 1 → 3 → 2 → 4 · 이름 순(같은 값의 디자이너 변수와 쓰임 이름 역할이 함께 있으면 디자이너 변수), 색 inverse 띠(검정 기준 + #6B7280 → subtle, #FFFFFF → inverse · 흰 기준 + #555 → strong, #111 → inverse), 디자이너 Semantic 우선 · 옛 이름 · 거울 제외, 이름 표 전부(여백 네 방향 · 모서리 · 방향별 선), 글자 그룹 아무 이름, 색 쓰임 · 밝기 · 아이콘 선, 번호(찾기 안 · 이미 있는 이름 · 덮어쓰지 않음), Global에서 바꾸기(다시 확인 · 글자 구간 · 건너뜀 먼저), 모든 모드 별칭, ⌘Z 한 번(전부 건너뛰어도), 만들기 쓰임 맵
 - [x] `verify-bind-flow`: 새 역할 카드 · 바꿈 표시 픽스처
 - [x] 기대값이 바뀌는 기존 테스트(의도대로 고친다): `test/figma.test.mjs` 811(Global이 붙은 칠하기 → 같은 값 Component로 바뀜) · 1452(옛 이름 `spacing/sm` 대신 쓰임 역할) · 1627(역할 없는 색이 Global 대신 새 쓰임 역할) · 4645(Global `stroke-width/1_5`가 붙은 선 → `fraction`) · Global에 붙는 것을 확인하는 적용 모드 테스트(729 · 1379 · 1412 · 1551 · 4120 등 — 새 쓰임 역할 + Global 별칭으로), `test/palette.test.mjs` 123(`color/icon` 용도), `test/pure.test.mjs` 1698 · 1725 · 1756(미리 채우기에서 고정 칸 · 색 4개 빠짐)
-- [ ] 실기 확인(사용자, 피그마): 실기 파일 → [찾기] → 바꿈 최대 156곳(Global 215곳 − 아이콘 · 아바타가 아닌 크기 59곳; 그보다 적으면 차이는 소수 선 두께 · 사이 간격 자동 · 줄바꿈 아님 · 글자 일부 구간 · 아이콘의 HUG/자유 배치 크기 사유의 합) → 연결 뒤 Global이 붙은 자리는 그 59곳과 위 사유 자리뿐
+- [x] ~~실기 확인~~ → **A.10 ① · ②로 대체**(아래 기대값은 12.8a 이전 것 — 크기 59곳 · Global 사유 자리는 이제 풀기 대상이라 연결 뒤 Global 0곳): 실기 파일 → [찾기] → 바꿈 최대 156곳(Global 215곳 − 아이콘 · 아바타가 아닌 크기 59곳; 그보다 적으면 차이는 소수 선 두께 · 사이 간격 자동 · 줄바꿈 아님 · 글자 일부 구간 · 아이콘의 HUG/자유 배치 크기 사유의 합) → 연결 뒤 Global이 붙은 자리는 그 59곳과 위 사유 자리뿐
 - 구현 중 바꾼 것(명세 범위 안): 주인 판정의 구조 색인(`toStructNode`)은 `src/lib`로 옮기지 않고, `code.ts`가 `bindOwnerOf(roots)`(이름 정리 역할 → `highConfidenceComponentRole`, 색인은 처음 물을 때 선택 루트마다 한 번)를 만들어 연결(`bindSelection` 4번째 인자 `{ ownerOf }`)과 추출(`extractFromSelection` 2번째 인자)에 넘긴다 — `toStructNode`가 `code.ts` 안의 지문 도우미 여럿에 묶여 있어 옮기는 위험이 크다. 넘기지 않으면(테스트) 이름 정리 역할만 본다. 배지 줄 문구는 한 키(`bind.roleSummary`) 대신 두 조각 `bind.roleNew` "새 역할 {k}" · `bind.roleSwap` "바꿈 {m}"을 " · "로 잇는다(0인 쪽을 빼기 쉽게). 새 역할 후보의 `variableId`는 `new:{이름}`(카드 묶음 · 스위치 키), 칩 툴팁용으로 `BindCandidate.newRoleGlobalName`을 더 싣는다. 적용 모드는 찾기에서 본 레이어를 그대로 `bindSelectedItems`에 넘긴다(id로 다시 찾지 않음). 판정 함수 `isInsideIconFrame` · `iconOrAvatarKind`는 `extract.ts`, 역할 만들기는 연결 `createRole`(`bind.ts`) · 만들기 `createUsageRoles`(`variables.ts`), 순수 이름 규칙은 `src/lib/usageRoles.ts`.
 
 ## A.9 QA #4 불합격 1 — 칠하기 용도는 레이어 종류를 따른다 (2026-11-06)
@@ -2139,6 +2139,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [ ] `aliasGlobalId`(별칭 끝 로컬 Global id) — 용도 틀림 바꾸기의 새 역할 별칭 대상
 - [ ] UI(§4.6): 풀기 칩 · 툴팁, 배지 요약 "풀기 u", 연결 뒤 꼬리. i18n `bind.unbind` · `bind.unbindTip` · `bind.roleUnbind` · `bind.doneUnbound`
 - [ ] 문구: `bind.doneSwapped` " · Global에서 바꿈 {m}곳" → " · 바꿈 {m}곳"(용도가 틀린 Semantic에서 바꾼 자리도 셈)
+- [ ] 문구: `bind.roleSummaryTip`을 §4.6 문구로(용도 틀림 · 풀기 포함, 늘 한 문장)
 - [ ] 단위 테스트: inverse 띠(회색 기준이면 inverse 없음), 용도가 틀린 연결 바꾸기(흰 TEXT에 붙은 background/default → color/text/inverse), 크기 풀기(카드 width Global → 풀림 · 값 그대로 · 다시 확인), verify-bind-flow 풀기 카드
 - [ ] 실기 확인(사용자, 피그마) ① `190:615`에서 다시 [찾기] → 풀기 60 · 흰 글자 6개 바꿈 → [연결] 뒤 Global 0곳, 흰 글자 `color/text/inverse`. 이미 생긴 `color/icon/inverse`(검정 선 아이콘 2곳)는 플러그인 표시가 있고 용도도 맞아 그대로 남는다 — 이미 있는 역할은 바꾸지 않는다(12.5), 이름은 사용자가 고치거나 지운다
 - [ ] 실기 확인 ② 연결 전 원본 `163:1523`의 새 복제본 → 아이콘 색 이름에 inverse 없음(`color/icon/strong` · `subtle`)
