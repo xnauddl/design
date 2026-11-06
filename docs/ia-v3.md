@@ -106,7 +106,7 @@
 |---|---|
 | 레이어에는 Semantic 역할만 (§2.12) | 레이어에 붙는 변수는 Semantic(또는 Component) 역할이다. Global은 원시값을 담고 레이어에 직접 붙지 않는다. 같은 값의 역할이 없으면 플러그인이 **쓰임 이름**으로 역할을 만들어 붙인다 — 역할을 자동으로 만드는 것이 이 플러그인 변수 기능의 핵심이다 |
 | 역할 이름 = 쓰임 (A안) | 숫자 역할은 전부 `{그룹}/{레이어 역할}/{속성}`(예: `spacing/card/gap`, `radius/button`). 고정 칸 이름(`spacing/xl`)은 새로 만들지 않는다. 같은 이름에 값이 둘 이상일 때만 `-2` · `-3`. 글자 크기 · 굵기 · 글꼴은 지금 이름 그대로 |
-| 색 역할 = 쓰임 + 밝기 | `color/{text · background · border · icon · shadow}/{default · subtle · strong · inverse · brand}` + 겹치면 `-2`. inverse는 배경 기준(2026-11-06 실기 뒤 B): 글자 · 아이콘 · 테두리가 기준색과 같은 쪽 밝기의 배경 위에서 대비될 때만 |
+| 색 역할 = 쓰임 + 밝기 | `color/{text · background · border · icon · shadow}/{default · subtle · strong · inverse · brand}` + 겹치면 `-2`. inverse는 합친 판정(2026-11-06 실기 뒤): 기준색이 극단 · 그 색이 반대쪽 극단 · 배경(조상 첫 불투명 채움)이 유채색이거나 기준과 같은 쪽 밝기일 때만 — 글자 · 아이콘 · 테두리 |
 | 이미 Global이 붙은 자리 | §2.11 "이미 붙은 것은 바꾸지 않는다"의 예외. 같은 값의 역할(Component 또는 Semantic)로 바꾼다(화면 값 그대로). 옛 규칙으로 크기에 붙은 Global 중 역할로 바꿀 수 없는 것(아이콘 · 아바타가 아닌 레이어, 아이콘 · 아바타의 자유 배치 · HUG/FILL · 소수 크기)은 연결을 푼다(§2.12 12.8a, 2026-11-06 실기 뒤) |
 | 용도가 틀린 역할 연결 (2026-11-06 실기 뒤) | 이미 붙은 Semantic · Component라도 용도가 그 자리에 맞지 않으면(흰 글자에 붙은 배경 역할 등) 같은 값의 맞는 역할로 바꾼다(§2.12 12.8) |
 | 역할을 만드는 때 | 토큰 만들기와 연결 두 곳 |
@@ -255,10 +255,15 @@
       - **쓰임:** TEXT의 채움 → `text`(구간마다 색이 다른 글자는 지금처럼 연결하지 않는다 — `fills`가 `figma.mixed`). 벡터(VECTOR · BOOLEAN_OPERATION · STAR · POLYGON · LINE)의 채움 · 선, 그리고 아이콘 틀(`isIconOrAvatar`의 아이콘 판정을 통과한 레이어) 안의 도형(RECTANGLE · ELLIPSE)의 채움 · 선 → `icon`. 프레임류(아이콘 틀 자신 포함)의 채움은 언제나 `background`, 선은 `border`. 그 밖의 채움 → `background`, 그 밖의 선 → `border`. 효과 색 → `shadow`.
       - **밝기 함수 하나**(`colorRoleBases(색 목록(hex · inverse 자리 여부 · 곳 수), 이미 있는 default hex)`)를 만들기와 연결이 같이 쓴다.
         - 기준색: `color/{쓰임}/default`가 이미 있으면 그 색. 없으면 목록에서 곳 수가 가장 많은 색(같으면 hex 순)이 `default`가 되고 기준색이 된다.
-        - 나머지: 유채색(OKLCH 채도 ≥ `palette.ts` `LOW_CHROMA`)은 `brand`. 무채색 · 유채색과 상관없이 **기준색이 배경에 묻히는 자리에서 대비되는 색일 때만** `inverse`다(아래 판정이 brand보다 먼저)(2026-11-06 실기 뒤 사용자 결정 B — 같은 쓰임 색끼리의 밝기 비교로 짓던 A안은 배경을 보지 않아, 채움 없는 그룹 안 검정 선 아이콘이 `color/icon/inverse`가 됐다).
+        - 나머지: 유채색(OKLCH 채도 ≥ `palette.ts` `LOW_CHROMA`)은 `brand`. 무채색 · 유채색과 상관없이 아래 **합친 판정**이 맞을 때만 `inverse`다(brand보다 먼저)(2026-11-06 실기 뒤 사용자 결정 B — 같은 쓰임 색끼리의 밝기 비교로 짓던 A안은 배경을 보지 않아, 채움 없는 그룹 안 검정 선 아이콘이 `color/icon/inverse`가 됐다).
           - 대상 쓰임: `text` · `icon` · `border`(배경 위에 놓이는 색). `background` · `shadow`에는 inverse가 없다.
-          - 배경(`backgroundL(node)`): 그 레이어의 **조상**을 위로 올라가며 처음 만나는 보이는 채움. 그 채움의 맨 위 보이는 칠하기가 불투명 SOLID면 그 색의 OKLCH L, 이미지 · 그라데이션 · 반투명이면 "모름". 페이지까지 채움이 없으면 "모름". 레이어 자신의 채움은 보지 않는다(글자 · 아이콘 · 테두리는 자기 채움 위가 아니라 뒤의 배경 위에 있다).
-          - 판정: 배경을 알고, **배경이 기준색과 같은 쪽 밝기**(OKLCH L 0.5 기준 — 기본색으로 쓰면 배경에 묻히는 자리)이고, 그 색이 배경과 반대쪽 밝기(배경과 대비)이면 `inverse`. 예: 기준 글자색 #000(L 0) · 짙은 남색 버튼(L < 0.5) 위 흰 글자(L 1) → 배경과 기준이 둘 다 어두운 쪽, 흰 글자는 밝은 쪽 → `color/text/inverse`. 흰 카드(L 1) 위 흰 글자는 배경과 기준이 반대쪽이라 inverse가 아니다(→ subtle). 배경을 모르면 inverse가 아니다. 판정 순서: default(기준색 자신) → inverse → brand(유채) → subtle · strong.
+          - 배경(`backgroundOf(node)` → 색 또는 모름): 그 레이어의 **조상**을 위로 올라가며 처음 만나는 보이는 채움. 형제 레이어(버튼 배경을 형제 사각형으로 그린 구조)는 보지 않는다 — 그런 글자는 inverse가 아니라 subtle · strong이 된다(한계, 실기 파일의 흰 글자 6개는 모두 프레임 자신의 채움 위라 해당 없음). 그 채움의 맨 위 보이는 칠하기가 불투명 SOLID면 그 색의 OKLCH L, 이미지 · 그라데이션 · 반투명이면 "모름". 페이지까지 채움이 없으면 "모름". 레이어 자신의 채움은 보지 않는다(글자 · 아이콘 · 테두리는 자기 채움 위가 아니라 뒤의 배경 위에 있다).
+          - 판정(**합친 안**, 2026-11-06 사용자 결정 — 배경만 보는 B안은 실기 파일에서 주황 · 하늘색 버튼 위 흰 글자를 놓치고 연회색 바 위 검정 아이콘을 inverse로 잡았다): 세 조건이 모두 맞을 때만 `inverse`.
+            1. 기준색이 극단 — OKLCH L < 0.35(어두움) 또는 ≥ 0.85(밝음).
+            2. 그 색이 반대쪽 극단 — 기준이 어두우면 L ≥ 0.85, 밝으면 L < 0.35.
+            3. 배경(`backgroundL`)을 알고, 배경이 유채색(채도 ≥ `LOW_CHROMA`)이거나 기준색과 같은 쪽 밝기(L 0.5 기준).
+            - 실기 파일: 흰 글자 6개(배경 #3D5FDB · #5576EE · #E68E6C · #2EDCF3 — 모두 버튼 프레임 자신의 채움, 기준 글자색 #000) → 셋 다 맞아 `color/text/inverse`. 연회색 #F3F3F3 바 위 검정 선 아이콘(기준 아이콘색 #7A7A7A, L 0.58) → 1이 아니라 inverse 아님 → `color/icon/strong`. 밝은 회색 카드 위 흰 글자(기준 #000) → 3이 아니라 `subtle`.
+            - 판정 순서: default(기준색 자신) → inverse → brand(유채) → subtle · strong.
           - 같은 색이 어떤 자리에서는 inverse, 다른 자리에서는 아닐 수 있다(흰 글자: 어두운 버튼 위 → `inverse`, 밝은 카드 위 → `subtle`). 이름은 자리마다 정한다 — 밝기 함수의 입력은 (hex · 배경 판정 · 곳 수)이고, 기준색(default)은 지금처럼 쓰임 안 전체 곳 수로 정한다.
           - 만들기도 같다 — 추출이 색 쓰임마다 배경 판정을 함께 모은다(`uses` 항목에 `bg: 'inverse'`가 붙은 쓰임은 따로 센다).
           - inverse가 아닌 무채색은 기준색보다 L이 크면 `subtle`, 작으면 `strong`. 같은 이름 후보가 여럿이면 곳 수가 많은 순(같으면 hex 순)으로 번호 없는 이름 · `-2` · `-3`(12.5).
@@ -2124,9 +2129,9 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 ## A.10 실기 뒤 고침 — 크기 연결 풀기 · 용도가 틀린 연결 바꾸기 · inverse는 배경 기준 (2026-11-06)
 
-> 실기(`190:615`, #123 빌드)에서 검정 선 아이콘(채움 없는 그룹 안)이 `color/icon/inverse`가 돼 inverse를 배경 기준으로 바꾼다(결정 B — 처음 정한 "기준이 극단일 때만"(A)을 대신한다). 또 Global 215 → 60곳(전부 아이콘 · 아바타가 아닌 크기), 흰 글자 6개가 여전히 `color/background/default`(이미 Semantic에 붙어 건너뜀), 아이콘 기준색이 회색이라 검정 아이콘이 `color/icon/inverse`. 사용자 결정 셋(§2.12 12.4 · 12.8 · 12.8a).
+> 실기(`190:615`, #123 빌드)에서 검정 선 아이콘(채움 없는 그룹 안)이 `color/icon/inverse`가 돼 inverse를 배경 기준으로 바꾼다(결정 B — 처음 정한 "기준이 극단일 때만"(A)을 대신한다). 또 Global 215 → 60곳(전부 아이콘 · 아바타가 아닌 크기), 흰 글자 6개가 여전히 `color/background/default`(이미 Semantic에 붙어 건너뜀). 사용자 결정 셋(§2.12 12.4 합친 판정 · 12.8 · 12.8a).
 
-- [ ] inverse 배경 기준(12.4, 결정 B): `backgroundL(node)`(조상 첫 보이는 채움 — 불투명 SOLID만, 그 밖 · 없음은 모름) · 색 자리마다 배경 판정 → 밝기 함수 입력 (hex · inverse 자리 여부 · 곳 수), 대상 쓰임 text · icon · border. 추출 `uses` 항목에 `bg: 'inverse'`. 단위 테스트: 어두운 버튼 위 흰 글자 → inverse, 흰 카드 위 흰 글자 → subtle, 채움 없는 그룹 안 검정 선 아이콘 → inverse 아님, 이미지 배경 → inverse 아님
+- [ ] inverse 합친 판정(12.4): `backgroundOf(node)`(조상 첫 보이는 채움 — 불투명 SOLID만, 그 밖 · 없음은 모름, `extract.ts`에 두고 bind와 같이 씀) · 색 자리마다 "inverse 후보 자리"(배경 조건 3) 여부를 싣는다 → 밝기 함수 입력 (hex · 후보 여부 · 곳 수), **출력 키 = (hex, inverse 여부)**(`bind.resolveSlots` · `createUsageRoles` 둘 다), 대상 쓰임 text · icon · border. 추출: `uses` 항목 `{ name, count, bg?: 'inverse' }`(`DraftToken.uses` 타입 · `extract.add`의 쓰임 비교를 (name, bg)로). 단위 테스트: 검정 기준 + 짙은 파랑 · 주황 · 하늘색 버튼 위 흰 글자 → inverse, 회색 기준(#7A7A7A) + 연회색 바 안 채움 없는 그룹의 검정 아이콘 → strong, 밝은 회색 카드 위 흰 글자 → subtle, 이미지 배경 위 흰 글자 → inverse 아님, 같은 흰색이 버튼 위 · 카드 위 함께 → `color/text/inverse`와 `color/text/subtle` 두 역할(같은 Global 별칭)
 - [ ] `bind.ts` 찾기: 용도가 틀린 Semantic · Component 연결을 바꾸기 후보로(붙어 있던 변수 제외, 별칭 대상 Global 따라가기), 아이콘 · 아바타가 아닌 레이어의 Global 크기를 풀기 후보로(`unbind:{id}`)
 - [ ] `bindSelectedItems`: `unbind` 자리 다시 확인(같은 Global · 여전히 아이콘 · 아바타 아님) → `setBoundVariable(field, null)`, 결과 `unbound`, 푼 자리가 있으면 ⌘Z 묶음(`code.ts`)
 - [ ] 메시지: `BindCandidate.unbind` · `APPLY_SELECTED` items `unbind`(`ui.ts` 체크한 후보 → items, `bindSelection` 적용 모드의 items 둘 다) · `APPLY_RESULT.unbound`
