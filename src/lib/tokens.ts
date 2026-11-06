@@ -252,13 +252,30 @@ export function scopeForSemanticRole(role: string): ScopeName[] | undefined {
   const segs = role.toLowerCase().split('/');
   // property-first(`color/background/default`)면 둘째 세그먼트가 property, 구식(`text/muted`)은 첫째.
   const prop = segs[0] === 'color' && segs.length >= 2 ? segs[1] : segs[0];
+  // 쓰임 역할(§2.12 12.6) — 숫자 그룹은 첫째 세그먼트로.
+  if (segs[0] !== 'color') {
+    switch (segs[0]) {
+      case 'spacing':
+        return ['GAP'];
+      case 'radius':
+        return ['CORNER_RADIUS'];
+      case 'stroke-width':
+        return ['STROKE_FLOAT'];
+      case 'size':
+        return ['WIDTH_HEIGHT'];
+      case 'opacity':
+        return ['OPACITY'];
+    }
+  }
   switch (prop) {
     case 'text':
       return ['TEXT_FILL'];
     case 'border':
       return ['STROKE_COLOR'];
     case 'icon':
-      return ['SHAPE_FILL'];
+      return ['SHAPE_FILL', 'STROKE_COLOR'];
+    case 'shadow':
+      return segs[0] === 'color' ? ['EFFECT_COLOR'] : undefined;
     case 'surface':
     case 'background':
       return ['FRAME_FILL', 'SHAPE_FILL'];

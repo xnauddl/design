@@ -273,6 +273,20 @@ export function inAutoLayoutFlow(node: SizeTarget): boolean {
   return node.layoutMode !== 'NONE' || (parent != null && 'layoutMode' in parent && (parent as FrameNode).layoutMode !== 'NONE');
 }
 
+/** 크기 역할 이름에 쓰는 구분(§2.12 12.3) — 아이콘 판정을 통과하면 icon, 아바타면 avatar, 아니면 null. */
+export function iconOrAvatarKind(node: SceneNode): 'icon' | 'avatar' | null {
+  if (!isIconOrAvatar(node)) return null;
+  return isIconSelf(node) ? 'icon' : 'avatar';
+}
+
+/** 아이콘 틀(정사각형 · 64 이하 · 아이콘 조건) 안의 레이어인가 — 그 안 도형의 색 쓰임은 icon(§2.12 12.4). */
+export function isInsideIconFrame(node: SceneNode): boolean {
+  for (let p = node.parent; p && p.type !== 'PAGE' && p.type !== 'DOCUMENT'; p = p.parent) {
+    if (isSmallSquare(p) && isIconSelf(p)) return true;
+  }
+  return false;
+}
+
 function collectSize(acc: Accumulator, node: SceneNode): void {
   // 아이콘 · 아바타 레이어의 크기만 토큰 후보로(§2.11). 카드 · 화면 폭 같은 크기는 뽑지 않는다.
   if (!isIconOrAvatar(node)) return;
