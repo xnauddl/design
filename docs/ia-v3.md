@@ -191,6 +191,7 @@
     - **레이어 값을 바꾸지 않는다.** "같은 값"에만 붙인다.
       - 숫자: 소수 둘째 자리까지 같으면 같다(화면에 보이는 값). 그보다 작은 차이(예: 15.9999 ↔ 16)는 연결하면 변수 값으로 맞춰진다.
       - 색: 화면의 #RRGGBB(채널마다 0~255 반올림)가 같고, 칠하기와 변수가 모두 불투명(투명도 1)일 때 같다. 반투명 칠하기·그림자 색은 언제나 건너뛴다("반투명" — 색 변수를 붙이면 칠하기 불투명도가 변수 값으로 바뀌므로). 투명도가 1이 아닌 색 변수는 연결 대상에서 뺀다(그 색의 칠하기는 다른 같은 색 변수에 붙거나 "매칭 없음").
+      - **칠하기 용도는 레이어 종류를 따른다 (2026-11-06, QA #4 불합격 1):** 칠하기(`fills`)에 붙일 색 변수의 용도는 레이어 종류로 정한다 — TEXT는 `TEXT_FILL`, 프레임류(FRAME · COMPONENT · COMPONENT_SET · INSTANCE · SECTION)는 `FRAME_FILL`, 그 밖(RECTANGLE · ELLIPSE · VECTOR · POLYGON · STAR · LINE · BOOLEAN_OPERATION …)은 `SHAPE_FILL`. `ALL_FILLS` · `ALL_SCOPES`는 어느 종류에나 맞는다. 예전에는 넷 중 하나만 맞으면 통과해 흰 글자가 `color/background/default`(FRAME_FILL · SHAPE_FILL)에 붙었다 — 배경 역할 값을 바꾸면 글자색도 바뀐다. 찾기(`bindPaints`)와 연결 직전 다시 확인(`bindSelectedItems` — 그 사이 변수 용도가 바뀌었으면 "그 사이 바뀜")이 같은 함수(`scopes.ts` `fillScopesFor(nodeType)`)를 쓴다. 선(`STROKE_COLOR`) · 효과(`EFFECT_COLOR`)는 지금 그대로다.
       - 텍스트 스타일: 스타일이 정하는 모든 글자 속성(크기·줄 높이·자간·글꼴·대소문자·밑줄/취소선·문단 간격·들여쓰기)이 글자와 같을 때만 붙인다.
       - 사이 간격 자동 (2026-11-04, QA #3 불합격 1): 오토레이아웃 주 축 정렬이 Space between(`primaryAxisAlignItems = 'SPACE_BETWEEN'`)이면 사이 간격은 피그마가 계산한다. 저장된 숫자(`itemSpacing`)는 화면 값이 아니다. 그래서 만들기는 이 값을 토큰으로 뽑지 않고, 연결은 붙이지 않는다(사유 "사이 간격 자동"). 붙이면 피그마가 정렬을 왼쪽(`MIN`)으로 바꿔 레이어 모양이 바뀐다. 줄바꿈(wrap)의 줄 사이 간격(`counterAxisSpacing`)도 줄 정렬이 Space between(`counterAxisAlignContent = 'SPACE_BETWEEN'`)이면 같다. 여백(padding 네 방향)과 그리드 간격은 그대로 뽑고 붙인다.
       - 선 두께는 정수만 (2026-11-04 사용자 결정): 변수는 정수만 만든다 — 선 두께도 예외가 없다(이전의 0.5 단위 허용을 없앤다). 소수 선 두께(예: 1.5)는 만들기가 토큰으로 뽑지 않고, 연결은 찾을 때 사유 "소수 선 두께"(`fraction`)로 건너뛴다. 이미 변수가 붙은 선 두께는 소수 판정보다 먼저 "이미 연결됨" · "삭제된 변수에 연결됨"으로 센다(§4.6). 가까운 정수 변수에 당겨 붙이지 않는다(레이어 값을 바꾸지 않는다). 이미 있는 소수 선 두께 변수(예: `stroke-width/1_5`)는 지우지 않는다(§2.4) — 연결 대상도 아니다. 예전 역할 사다리(1 → thin, 2 → thick)는 옛 이름으로 남는다 — 새 역할은 쓰임 이름이다(§2.12).
@@ -266,7 +267,7 @@
       - Semantic 컬렉션에 만든다. 없으면 만든다(지금 `ensureCollection`). 컬렉션의 **모든 모드**에 같은 Global 별칭을 건다(다크 모드가 있으면 Dark 값도 같은 Global — 다크 짝은 다크 단계가 따로 정한다).
       - 용도(scope): spacing → GAP, radius → CORNER_RADIUS, stroke-width → STROKE_FLOAT, size → WIDTH_HEIGHT, opacity → OPACITY, `color/text` → TEXT_FILL, `color/background` → FRAME_FILL · SHAPE_FILL, `color/icon` → SHAPE_FILL · STROKE_COLOR, `color/border` → STROKE_COLOR, `color/shadow` → EFFECT_COLOR. 글자 묶음은 Global의 용도를 물려받는다(지금 동작 — `scopeForSemanticRole`이 모르는 이름). `scopeForSemanticRole`을 이 표로 넓힌다.
       - **플러그인 표시:** 만들기의 자동 역할과 연결이 만든 역할에 변수 플러그인 데이터 `dsl.autoRole = "1"`을 남긴다. 색 목록 표에서 사용자가 고른 역할 · 텍스트 스타일 등록 · 손으로 고친 매핑(`semMap`)은 남기지 않는다.
-      - **칠하기 용도(새로 정함):** 칠하기에 붙일 변수의 용도는 레이어 타입으로 나눈다 — TEXT는 TEXT_FILL · ALL_FILLS, 벡터 · 도형(RECTANGLE · ELLIPSE …)은 SHAPE_FILL · ALL_FILLS, 프레임류(FRAME · COMPONENT · INSTANCE)는 FRAME_FILL · ALL_FILLS(지금 `FILL_SCOPES`는 타입과 무관하게 넷 중 하나면 통과).
+      - **칠하기 용도:** §2.11 "칠하기 용도는 레이어 종류를 따른다"(QA #4 불합격 1 — 이 작업보다 먼저 고친다)를 그대로 쓴다.
     - **12.7 옛 이름.** 아래는 순서 3에서 쓰지 않는다(이름이 같은 손 변수도 옛 이름으로 친다). 지우지 않고, 이미 붙은 곳도 그대로 둔다(Semantic이므로 건너뜀).
       - 고정 칸 이름: `spacing/{none · 3xs · 2xs · xs · sm · md · lg · xl · 2xl · 3xl · 4xl}`, `radius/{none · xs · sm · md · lg · xl · 2xl · full}`, `stroke-width/{thin · thick}`.
       - 옛 색 역할 4개: `color/background/default` · `color/text/default` · `color/border/default` · `color/background/brand`. 단 이 이름은 새 규칙의 쓰임 이름과 같으므로 **순서 2에서는 쓴다**(같은 값일 때).
@@ -2070,7 +2071,6 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [ ] 쓰임 이름(순수 새 모듈 `src/lib/usageRoles.ts`): 12.3 이름 표 · 12.4 `colorRoleNames` · 12.5 번호 고르기
 - [ ] 주인 판정: `dsRole`(역할 어휘, 구조 폴백 제외) → `highConfidenceComponentRole`(구조 색인 — `toStructNode`를 `code.ts`에서 `src/lib`로 옮김) → 없음. `extract.ts` `iconOrAvatarKind` 내보내기
 - [ ] `bind.ts` 변수 인덱스: Global은 붙일 후보에서 빼고 별칭 대상 색인(값 · 용도 → 이름 순 Global)으로. 보는 순서 1 → 3 → 2 → 4(글자 1 → 2 → 4, 12.2), 이름 순, 옛 이름(12.7), 플러그인 표시 읽기
-- [ ] 칠하기 용도를 레이어 타입별로(12.6 "칠하기 용도")
 - [ ] 찾기 결과: `BindCandidate.fromVariableId` · `newRole{name, globalId, scopes}`, 한 번의 찾기 안 색 밝기 · 번호 확정(12.4 · 12.5) — `shared/messages.ts`
 - [ ] Global에서 바꾸기(12.8): 다른 건너뜀 먼저, 글자는 전 구간 한 Global일 때만, 별칭 대상은 붙어 있던 Global
 - [ ] `bindSelectedItems`: items의 `fromVariableId`(같은 Global id인지 다시 확인) · `newRole`(첫 자리가 통과한 뒤 만들기 · 재사용 · 그 사이 다른 값이면 다음 번호), 모든 모드 별칭, 플러그인 표시, 역할을 만들었으면 `commitUndo`(`code.ts` `APPLY_SELECTED`)
@@ -2082,3 +2082,15 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [ ] `verify-bind-flow`: 새 역할 카드 · 바꿈 표시 픽스처
 - [ ] 기대값이 바뀌는 기존 테스트(의도대로 고친다): `test/figma.test.mjs` 811(Global이 붙은 칠하기 → 같은 값 Component로 바뀜) · 1452(옛 이름 `spacing/sm` 대신 쓰임 역할) · 1627(역할 없는 색이 Global 대신 새 쓰임 역할) · 4645(Global `stroke-width/1_5`가 붙은 선 → `fraction`) · Global에 붙는 것을 확인하는 적용 모드 테스트(729 · 1379 · 1412 · 1551 · 4120 등 — 새 쓰임 역할 + Global 별칭으로), `test/palette.test.mjs` 123(`color/icon` 용도), `test/pure.test.mjs` 1698 · 1725 · 1756(미리 채우기에서 고정 칸 · 색 4개 빠짐)
 - [ ] 실기 확인(사용자, 피그마): 실기 파일 → [찾기] → 바꿈 최대 156곳(Global 215곳 − 아이콘 · 아바타가 아닌 크기 59곳; 그보다 적으면 차이는 소수 선 두께 · 사이 간격 자동 · 줄바꿈 아님 · 글자 일부 구간 · 아이콘의 HUG/자유 배치 크기 사유의 합) → 연결 뒤 Global이 붙은 자리는 그 59곳과 위 사유 자리뿐
+
+## A.9 QA #4 불합격 1 — 칠하기 용도는 레이어 종류를 따른다 (2026-11-06)
+
+> `docs/qa/2026-11-05-qa4.md` §1. §2.11 "칠하기 용도는 레이어 종류를 따른다". §2.12보다 먼저 따로 고친다(작고 독립적).
+
+- [ ] `scopes.ts` `fillScopesFor(nodeType)` — TEXT → `ALL_FILLS` · `TEXT_FILL`, 프레임류 → `ALL_FILLS` · `FRAME_FILL`, 그 밖 → `ALL_FILLS` · `SHAPE_FILL`(`ALL_SCOPES`는 `colorScopeOk`가 지금처럼 통과). `fieldScopes('fills')` · `scopeFitsField`는 노드 종류를 받지 않으므로 지금 그대로 두고, 바인딩 경로만 바꾼다
+- [ ] `bind.ts` `bindPaints`: `allowed = key === 'fills' ? fillScopesFor(node.type) : STROKE_SCOPES`
+- [ ] `bind.ts` `bindSelectedItems`: 칠하기 자리에 변수 용도 다시 확인(`fillScopesFor`) — 맞지 않으면 "그 사이 바뀜"(`changed`). 선 · 효과도 같은 자리에서 `STROKE_SCOPES` · `EFFECT_SCOPES`로 확인
+- [ ] 다른 곳에서 `FILL_SCOPES`를 직접 쓰는지 확인 — 지금은 `bindPaints`와 `fieldScopes`뿐(변수 탭 사용 표시는 용도를 보지 않음)
+- [ ] 단위 테스트: 흰 TEXT + 흰 FRAME, 변수 `color/background/default`(FRAME_FILL · SHAPE_FILL, Semantic) · `color/gray/0`(ALL_FILLS, Global) → TEXT는 `gray/0`, FRAME은 `background/default`. TEXT_FILL 전용 변수는 FRAME에 안 붙음. 연결 직전에 변수 용도가 TEXT_FILL 없이 바뀌면 `changed`
+- [ ] QA 회신 `docs/qa/2026-11-05-qa4-reply.md`(커밋 · 바뀐 동작 한 줄 · `npm test` 요약 · 미검증)
+- [ ] 실기 확인(사용자, 피그마): 실기 파일 복제본 → 레이어 › 연결 → 흰 글자 6개(`Contact` · `Business Class` · `01` · `02` · `03` · `Subscribe Now`)가 `color/background/default`가 아닌 곳에 붙음(§2.12 전에는 `color/gray/0` Global)
