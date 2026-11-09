@@ -26,23 +26,11 @@ export interface VarInfo {
   collectionId: string;
   /** 소속 컬렉션 이름(표시용 — 'Primitives' 등 무엇이든 될 수 있다). */
   collection: string;
-  /** 계층(Global 1 · Semantic 2 · Component 3) — 이름이 아니라 지정된 역할로 판정(tiers.ts). */
+  /** 계층(Global 1 · Semantic 2 · Component 3) — 플러그인 컬렉션은 그 역할, 사용자 컬렉션은 내용으로 판단(§2.13). */
   tier: number;
+  /** 플러그인 컬렉션이면 그 역할(§2.13 — 다크 대상은 플러그인 Semantic뿐). */
+  owned?: 'global' | 'semantic';
   modes: VarMode[];
-}
-
-/** 설정 탭 '컬렉션 계층' 한 행. */
-export interface CollectionRoleInfo {
-  id: string;
-  name: string;
-  /** 컬렉션 안 변수 수. */
-  vars: number;
-  /** 파일에 저장된 명시적 지정(없으면 null = 이름으로 판정). */
-  set: 'global' | 'semantic' | 'component' | 'none' | null;
-  /** 실제로 쓰이는 역할(지정 또는 정확한 이름). 계층 아님이면 null. */
-  role: 'global' | 'semantic' | 'component' | null;
-  /** 이름으로 추측한 역할 — 추천 표시용(자동 적용 안 함). */
-  guess: 'global' | 'semantic' | 'component' | null;
 }
 
 export interface CollectionInfo {
@@ -208,8 +196,6 @@ export type UiToCode =
   | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[] } // Phase C: 변수 보장+스타일 등록(화면 연결 없음)
   | { type: 'APPLY_TEXT_STYLES' } // Phase C: 적용만(생성 없음) — 선택 텍스트를 기존 스타일에 바인딩
   | { type: 'GET_COLLECTIONS' }
-  | { type: 'GET_COLLECTION_ROLES' } // 컬렉션 → 계층 지정 현황(설정 탭)
-  | { type: 'SET_COLLECTION_ROLE'; collectionId: string; role: 'global' | 'semantic' | 'component' | 'none' | null } // null=지정 해제(이름으로 판정)
   | { type: 'SET_UI_SIZE'; mode: 'default' | 'mini' } // IA v3: 최소화(400×48) / 펼치기(400×510), 저장 안 함
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
   | { type: 'GET_LICENSE' }
@@ -236,7 +222,6 @@ export type UiToCode =
 
 /** code → UI 응답. */
 export type CodeToUi =
-  | { type: 'COLLECTION_ROLES'; collections: CollectionRoleInfo[] }
   | { type: 'UI_SIZE'; mode: 'default' | 'mini' } // 지금 창 크기(최소화 여부)
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).

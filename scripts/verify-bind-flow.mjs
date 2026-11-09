@@ -379,8 +379,8 @@ const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return 
 
 /* 9 — 변수 탭(IA v3 §4.2~§4.4) */
 const COLS = [
-  { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }], defaultModeId: 'm', tierSet: null },
-  { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }], defaultModeId: 'l', tierSet: null },
+  { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }], defaultModeId: 'm', tierWhy: { kind: 'ratio', alias: 0, counted: 4 } },
+  { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }], defaultModeId: 'l', tierWhy: { kind: 'owned' } },
 ];
 const VARS = [
   { id: 'g0', name: 'color/gray/0', collectionId: 'g', type: 'COLOR', values: { m: { kind: 'color', hex: '#FFFFFF' } }, scopes: [], description: '' },
@@ -507,12 +507,16 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await p.keyboard.press('Enter');
   check('9 사이드바 Enter → 고르기', (await sideSelected(p)) === 'side:col:s');
   await p.click('#varSide [data-key="side:inspect"]');
-  // ⋯ → 계층 팝업 · 내보내기 팝업, 설정 탭에는 없다
+  // 계층 배지 툴팁(§4.4 결정 B) — 사이드바 배지에만, 접근성 이름 꼬리에도
+  const tips = await p.$$eval('#varSide .vs-item', (e) => e.filter((x) => x.dataset.key?.startsWith('side:col:')).map((x) => [x.querySelector('.vs-badge')?.title, x.getAttribute('aria-label')]));
+  check('9 계층 배지 툴팁 · 접근성 이름', tips.length === 2 && tips[0][0] === '플러그인 컬렉션' && tips[0][1].endsWith(', 플러그인 컬렉션') && tips[1][0] === '직접 값 4/4 · Global', JSON.stringify(tips));
+  check('9 목록 제목 배지에는 툴팁 없음', !(await p.$('.vl-head [title*="플러그인 컬렉션"]')));
+  // ⋯ → 내보내기 팝업(계층 지정은 없앰 — §2.13 13.3), 설정 탭에는 없다
   await p.click('#btnVarMore');
   const more = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
-  check('9 ⋯ 메뉴', JSON.stringify(more) === JSON.stringify(['컬렉션 계층 지정…', '코드로 내보내기…', '사이드바 모두 펼치기', '사이드바 모두 접기']), more.join('|'));
-  await p.click('.ctx-menu button >> text=컬렉션 계층 지정…');
-  check('9 계층 팝업 열 때 계층 정보 읽기', (await sent(p, 'GET_COLLECTION_ROLES')).length > 0 && (await p.textContent('.modal')).includes('컬렉션 계층'));
+  check('9 ⋯ 메뉴(계층 지정 없음)', JSON.stringify(more) === JSON.stringify(['코드로 내보내기…', '사이드바 모두 펼치기', '사이드바 모두 접기']), more.join('|'));
+  await p.click('.ctx-menu button >> text=코드로 내보내기…');
+  check('9 내보내기 팝업 열림', (await p.textContent('.modal')).includes('누르면 바로 코드 파일로 저장돼요'));
   await p.keyboard.press('Escape');
   check('9 팝업 닫으면 [⋯]로 포커스', (await p.evaluate(() => document.activeElement?.id)) === 'btnVarMore');
   await p.click('#tabbtn-settings');
@@ -761,7 +765,11 @@ const reenter = (p) => p.evaluate(() => {
   // 연결할 변수가 없을 때 4행
   await recv(p, sel(1, 0));
   await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 3 });
-  check('11 계층 없음 → "계층 지정하기 →"', (await p.textContent('#bindPrereq')).includes('변수는 있지만 계층이 지정되지 않았어요') && (await p.textContent('#bindPrereqAction')) === '계층 지정하기 →');
+  check('11 계층 컬렉션에 변수 없음(무료) → 새 문구 · 라이선스 →', (await p.textContent('#bindPrereq')).includes('변수는 있지만 계층으로 쓸 컬렉션이 없어요') && (await p.textContent('#bindPrereqAction')) === '라이선스 →');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 3 });
+  check('11 계층 컬렉션에 변수 없음(유료) → 토큰 만들기로 →', (await p.textContent('#bindPrereqAction')) === '토큰 만들기로 →', await p.textContent('#bindPrereqAction'));
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
   check('11 로컬 변수 0개(무료) → 라이선스 →', (await p.textContent('#bindPrereq')).includes('연결할 변수가 없어요') && (await p.textContent('#bindPrereqAction')) === '라이선스 →');
   const libReq = (await sent(p, 'SCAN_USAGE')).at(-1);
@@ -832,7 +840,7 @@ const reenter = (p) => p.evaluate(() => {
 /* 12 — 변수 고치기(§4.4 고치기 · PR 3.5) */
 const ECOLS = [
   ...COLS,
-  { id: 'x', name: 'Misc', tier: 0, modes: [{ modeId: 'x1', name: 'Mode 1' }], defaultModeId: 'x1', tierSet: null },
+  { id: 'x', name: 'Misc', tier: 0, modes: [{ modeId: 'x1', name: 'Mode 1' }], defaultModeId: 'x1' },
 ];
 const EVARS = [
   ...VARS,

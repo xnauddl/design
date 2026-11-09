@@ -99,15 +99,12 @@ export interface DarkTarget {
  * 마법사가 같은 응답으로 깨어나 읽으면 아직 비어 있을 수 있다.
  *
  * 규칙은 테마 카드(`refreshDarkOptions`/`refreshDarkModes`)와 같다:
- * 모드가 1개 이상인 컬렉션 중 `Semantic` 우선 → 출처는 Dark가 아닌 첫 모드 →
+ * 플러그인 Semantic(§2.13 13.7) → 출처는 Dark가 아닌 첫 모드 →
  * 대상은 이미 있는 `Dark`(없으면 생략). 고를 게 없으면 null(단계는 건너뛴다).
  */
-export function pickDarkTarget(vars: readonly { collectionId: string; collection: string; tier?: number; modes: readonly { modeId: string; name: string }[] }[]): DarkTarget | null {
-  const cols = new Map<string, (typeof vars)[number]>();
-  for (const v of vars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
-  const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-  // Semantic 역할(지정 또는 이름) 우선 — tier가 없으면 예전처럼 이름으로.
-  const target = withModes.find((v) => (v.tier ?? (v.collection === 'Semantic' ? 2 : 0)) === 2) ?? withModes[0];
+export function pickDarkTarget(vars: readonly { collectionId: string; collection: string; tier?: number; owned?: string; modes: readonly { modeId: string; name: string }[] }[]): DarkTarget | null {
+  // 대상은 플러그인 Semantic 하나뿐(§2.13 13.7). 없으면 단계를 건너뛴다.
+  const target = vars.find((v) => v.owned === 'semantic' && v.modes.length >= 1);
   if (!target) return null;
   const dark = target.modes.find((m) => m.name.toLowerCase() === 'dark');
   const from = target.modes.find((m) => m.modeId !== dark?.modeId);

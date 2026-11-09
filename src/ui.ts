@@ -12,10 +12,10 @@ import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/lic
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { exportHasTokens, cssVarName, type ExportFormat } from './lib/exporters';
-import { leafName, cellCopyText, tierBadge, groupKey, matchesQuery, indirectUsage, aliasTargetsOf, sidebarCollections, rightEntries, initialSideSel, validSideSel, inspectCount, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type SideCollection, type VarCell, type VarCollection, type VarRow, type LibraryVar, type RowState, type EditValue } from './lib/varTable';
+import { leafName, cellCopyText, tierBadge, tierWhyText, groupKey, matchesQuery, indirectUsage, aliasTargetsOf, sidebarCollections, rightEntries, initialSideSel, validSideSel, inspectCount, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type SideCollection, type VarCell, type VarCollection, type VarRow, type LibraryVar, type RowState, type EditValue } from './lib/varTable';
 import { createReentryScheduler } from './lib/reread';
 import type { FrameMeta } from './lib/similar';
-import type { VarInfo, CollectionRoleInfo } from './shared/messages';
+import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, type Harmony } from './lib/palette';
 import { nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles, mergeTokenRoles, semanticMapToText, textToSemanticMap } from './lib/roles';
@@ -1791,8 +1791,9 @@ let varsLoaded = false;
 // 목록은 시작할 때 한 번 받아 둔다 — 안 받으면 토큰이 있어도 modes=[]로 보여
 // ‘토큰 생성으로’라는 엉뚱한 안내가 뜬다.
 function refreshDarkOptions(): void {
+  // 대상은 플러그인 Semantic 하나뿐(§2.13 13.7) — 사용자 Semantic의 모드는 건드리지 않는다.
   const cols = new Map<string, VarInfo>();
-  for (const v of allVars) if (!cols.has(v.collectionId)) cols.set(v.collectionId, v);
+  for (const v of allVars) if (v.owned === 'semantic' && !cols.has(v.collectionId)) cols.set(v.collectionId, v);
   const sel = $('darkCollection') as HTMLSelectElement;
   const prev = sel.value;
   sel.innerHTML = '';
@@ -1850,7 +1851,8 @@ function refreshDarkModes(): void {
     if (!varsLoaded) {
       text.textContent = t('dark.prereqLoading');
       gotoCreate.style.display = 'none';
-    } else if (allVars.length === 0) {
+    } else if (allVars.length === 0 || !allVars.some((v) => v.owned === 'semantic')) {
+      // 플러그인 Semantic이 없으면 만들기부터(§4.5 "토큰 만들기로 →").
       text.textContent = t('dark.prereqNoVars');
       gotoCreate.style.display = '';
     } else if (!colId || modes.length === 0) {
@@ -2295,9 +2297,6 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'COLLECTIONS':
       // 존재 확인용 프로브(별도 UI 없음).
-      break;
-    case 'COLLECTION_ROLES':
-      renderCollectionRoles(msg.collections);
       break;
     case 'PREREQ_STATE':
       // #11: 단계 전제 갱신 → 통합 게이트 재평가 + 진행 안내(§3).
@@ -3909,7 +3908,6 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   SCAN_SIMILAR: { results: ['SIMILAR_CANDIDATES'], label: 'op.components', go: goLayer('structure'), write: false },
   COMPONENTIZE_SIMILAR: { results: ['COMPONENTIZE_RESULT'], label: 'op.components', go: goLayer('structure'), write: true },
   EXPORT: { results: ['EXPORT_RESULT'], label: 'op.export', go: () => showTab('settings'), write: false },
-  SET_COLLECTION_ROLE: { results: ['COLLECTION_ROLES'], label: 'op.roles', go: () => showTab('settings'), write: true },
 };
 /** 결과를 기다리는 작업(요청 종류별). 마법사는 단계 요청을 따로 세지 않고 한 작업으로 본다. */
 const opPending = new Map<UiToCode['type'], OpDef>();
@@ -3948,8 +3946,6 @@ function renderWaitLocks(): void {
     const msg = link ?? (id === 'btnApplyConfirm' && other ? t('bind.waitOp', { op: other }) : null);
     setWait($(id), msg, 'applyStatus');
   }
-  // 계층 지정(SET_COLLECTION_ROLE) — 팝업 안 고르개
-  document.querySelectorAll<HTMLElement>('[data-role-write]').forEach((el) => setWait(el, link));
 }
 /** 연결 중 플래그가 바뀐 뒤 — 잠금 · 단계 표시 · 상세 팝업 [저장]을 다시 맞춘다. */
 function onBindLinkingChanged(): void {
@@ -4187,97 +4183,6 @@ function showMake(step?: MakeStep): void {
 }
 
 
-/* ---------- 컬렉션 계층(§9) — 이름이 아니라 지정으로 Global/Semantic/Component ---------- */
-type RoleKey = 'global' | 'semantic' | 'component';
-const ROLE_LABEL: Record<RoleKey, string> = { global: 'Global', semantic: 'Semantic', component: 'Component' };
-let colRoleRows: CollectionRoleInfo[] = [];
-
-function renderCollectionRoles(rows: CollectionRoleInfo[]): void {
-  const prev = colRoleRows;
-  colRoleRows = rows;
-  const box = $('collectionRoles');
-  clearMount(box);
-  if (!rows.length) {
-    const p = document.createElement('div');
-    p.className = 'hint';
-    p.textContent = t('colRoles.empty');
-    box.appendChild(p);
-    return;
-  }
-  for (const r of rows) {
-    const row = document.createElement('div');
-    row.className = 'col-role';
-    const name = document.createElement('div');
-    name.className = 'name';
-    name.textContent = r.name;
-    name.title = r.name;
-    const sel = document.createElement('select');
-    sel.setAttribute('aria-label', r.name);
-    // 자동 = 지정 없음(이름으로 판정). 지금 이름 판정 결과를 함께 보여 준다.
-    const opts: [string, string][] = [
-      ['', !r.set && r.role ? t('colRoles.auto', { role: ROLE_LABEL[r.role] }) : t('colRoles.autoNone')],
-      ['global', 'Global'],
-      ['semantic', 'Semantic'],
-      ['component', 'Component'],
-      ['none', t('colRoles.none')],
-    ];
-    for (const [v, label] of opts) {
-      const o = document.createElement('option');
-      o.value = v;
-      o.textContent = label;
-      sel.appendChild(o);
-    }
-    sel.value = r.set ?? '';
-    sel.dataset.roleWrite = '';
-    if (bindLinking) setWait(sel, t('bind.waitLink'));
-    sel.addEventListener('change', () => {
-      if (bindLinking) {
-        // 연결 중에는 계층을 바꾸지 않는다(§4.6 "연결 중의 다른 일") — 고른 값을 되돌리고 사유.
-        sel.value = r.set ?? '';
-        showStatusLine(t('bind.waitLink'), { cls: 'warn' });
-        return;
-      }
-      const role = (sel.value || null) as RoleKey | 'none' | null;
-      // 같은 역할을 맡던 다른 컬렉션은 풀린다(한 역할 = 한 컬렉션) — 미리 알려 준다.
-      const holder = role && role !== 'none' ? colRoleRows.find((x) => x.id !== r.id && x.set === role) : undefined;
-      pendingRoleNote = { id: r.id, name: r.name, role, prev: holder?.name };
-      send({ type: 'SET_COLLECTION_ROLE', collectionId: r.id, role });
-    });
-    const sub = document.createElement('div');
-    sub.className = 'sub';
-    sub.append(t('colRoles.vars', { n: r.vars }));
-    // 추천은 지정이 없고, 추측이 지금 판정과 다를 때만 — 이미 맞으면 소음이다.
-    if (!r.set && r.guess && r.guess !== r.role) {
-      sub.append(' · ', t('colRoles.guess', { role: ROLE_LABEL[r.guess] }), ' ');
-      const use = document.createElement('button');
-      use.className = 'link';
-      use.textContent = t('colRoles.useGuess');
-      use.dataset.roleWrite = '';
-      if (bindLinking) setWait(use, t('bind.waitLink'));
-      use.addEventListener('click', () => {
-        const holder = colRoleRows.find((x) => x.id !== r.id && x.set === r.guess);
-        pendingRoleNote = { id: r.id, name: r.name, role: r.guess, prev: holder?.name };
-        send({ type: 'SET_COLLECTION_ROLE', collectionId: r.id, role: r.guess });
-      });
-      sub.appendChild(use);
-    }
-    row.append(name, sel, sub);
-    box.appendChild(row);
-  }
-  // 방금 바꾼 지정의 결과 문구(지정 응답일 때만).
-  if (pendingRoleNote && prev.length) {
-    const n = pendingRoleNote;
-    pendingRoleNote = null;
-    // 해제(null)는 이름 판정으로 돌아간다 — 실제 결과는 방금 받은 행의 role이 말해 준다.
-    const now = rows.find((x) => x.id === n.id);
-    const label = n.role === null
-      ? now?.role ? t('colRoles.auto', { role: ROLE_LABEL[now.role] }) : t('colRoles.autoNone')
-      : n.role === 'none' ? t('colRoles.none') : ROLE_LABEL[n.role];
-    const dup = n.prev && n.role && n.role !== 'none' ? ' ' + t('colRoles.dup', { role: ROLE_LABEL[n.role], prev: n.prev }) : '';
-    setStatus('colRolesStatus', t('colRoles.saved', { name: n.name, role: label }) + dup, dup ? 'warn' : 'ok');
-  }
-}
-let pendingRoleNote: { id: string; name: string; role: RoleKey | 'none' | null; prev?: string } | null = null;
 TABS.forEach((t, i) => {
   const btn = $(`tabbtn-${t}`);
   btn.addEventListener('click', () => showTab(t));
@@ -4908,7 +4813,7 @@ function renderSidebar(sel: SideSel): void {
   const ind = indirectSet();
   const sides = sidebarCollections(vmCols, vmVars, dm, ind);
   const selKey = searchOpen && query.trim() ? '' : sideSelKey(sel);
-  const item = (key: string, level: number, label: string, num: { text: string; tip: string }, aria: string, opts: { badge?: string; open?: boolean; onToggle?: () => void; muted?: boolean; danger?: boolean; onPick: () => void; title?: string }): HTMLElement => {
+  const item = (key: string, level: number, label: string, num: { text: string; tip: string }, aria: string, opts: { badge?: string; badgeTip?: string; open?: boolean; onToggle?: () => void; muted?: boolean; danger?: boolean; onPick: () => void; title?: string }): HTMLElement => {
     const d = document.createElement('div');
     d.className = `vs-item lv${level}${opts.muted ? ' muted' : ''}${opts.danger ? ' danger' : ''}`;
     d.dataset.key = `side:${key}`;
@@ -4933,6 +4838,7 @@ function renderSidebar(sel: SideSel): void {
       b.className = 'vs-badge';
       b.setAttribute('aria-hidden', 'true');
       b.textContent = opts.badge;
+      if (opts.badgeTip) b.title = opts.badgeTip; // 계층 판단 근거(§4.4 — 사이드바 배지에만)
       d.appendChild(b);
     }
     const nm = document.createElement('span');
@@ -4958,8 +4864,9 @@ function renderSidebar(sel: SideSel): void {
     const open = sideIsOpen(side, sides, sel);
     const badge = tierBadge(c);
     const num = sideNum(side);
-    item(`col:${c.id}`, 1, c.name, num, t('list.sideColAria', { name: c.name, badge, num: num.text }), {
-      badge, open, muted: !!usageMap && side.used === 0,
+    const why = tierWhyText(c);
+    item(`col:${c.id}`, 1, c.name, num, t('list.sideColAria', { name: c.name, badge, num: num.text }) + (why ? `, ${why}` : ''), {
+      badge, badgeTip: why, open, muted: !!usageMap && side.used === 0,
       onToggle: () => { sideOpen.set(c.id, !open); focusSideKey = `side:col:${c.id}`; renderVarList(); },
       onPick: () => pickSide({ kind: 'col', id: c.id }),
     });
@@ -6369,10 +6276,6 @@ function openPopupFrom(storeId: string, title: string, returnFocus: HTMLElement)
     $('popupStore').appendChild(content); // 팝업이 지워지기 전에 원래 자리로
   });
 }
-function openTierPopup(returnFocus: HTMLElement): void {
-  send({ type: 'GET_COLLECTION_ROLES' });
-  openPopupFrom('tierPopBody', t('colRoles.title'), returnFocus);
-}
 function openExportPopup(returnFocus: HTMLElement): void {
   openPopupFrom('exportPopBody', t('export.title'), returnFocus);
 }
@@ -6380,7 +6283,6 @@ function openMoreMenu(): void {
   const btn = $('btnVarMore');
   const r = btn.getBoundingClientRect();
   openMenu(r.left, r.bottom + 2, [
-    { label: t('list.menuTiers'), onSelect: () => openTierPopup(btn), focusElsewhere: true },
     { label: t('list.menuExport'), onSelect: () => openExportPopup(btn), focusElsewhere: true },
     { label: t('list.menuExpandAll'), separatorBefore: true, onSelect: () => setAllExpanded(true) },
     { label: t('list.menuCollapseAll'), onSelect: () => setAllExpanded(false) },
@@ -6574,8 +6476,9 @@ function renderBindPrereq(): void {
       else if (isPaid) { msg = t('bind.noVarsPaid'); action = [t('prereq.gotoCreate'), goToCreate]; }
       else { msg = t('bind.noVarsFree'); action = [t('status.paidAction'), goToLicense]; }
     } else {
+      // 계층 컬렉션에 변수가 없음(§4.6) — 버튼은 로컬 변수 0개 행과 같다.
       msg = t('bind.noTier');
-      action = [t('bind.gotoTiers'), goToTiers];
+      action = isPaid ? [t('prereq.gotoCreate'), goToCreate] : [t('status.paidAction'), goToLicense];
     }
   }
   notice.style.display = msg ? '' : 'none';
@@ -6591,12 +6494,6 @@ function renderBindPrereq(): void {
   if (noSel) setLock(ts, 'prereq', t('status.noSelection'));
   else if (prereqKnown && !hasTextStyles) setLock(ts, 'prereq', t('bind.tsNone'));
   else setLock(ts, null);
-}
-/** 계층 지정하기 → 변수 › 목록 + 계층 팝업. */
-function goToTiers(): void {
-  showTab('variables');
-  showVarSub('home');
-  requestAnimationFrame(() => openTierPopup($('btnVarMore')));
 }
 /** ② 판정용 — 로컬 변수가 없고 선택이 300개 이하일 때만 라이브러리 사용을 읽는다. */
 function readLayerLibUse(): void {
