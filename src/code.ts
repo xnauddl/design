@@ -8,7 +8,7 @@ import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
-import { bindSelection, bindSelectedItems, countUsage, findUsers } from './lib/bind';
+import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
 import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
@@ -55,6 +55,8 @@ const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8 };
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
+let bindTurn = 0; // 찾기 요청 차례(IA v4 §7 — 한 번에 하나)
+let bindRunning: Promise<void> = Promise.resolve();
 // 마지막 스캔의 원본 표본 — 「왼쪽 글자로 이름 채우기」가 다시 훑지 않고 이름만 다시 매기게 한다.
 // 다시 훑으면 그 사이 선택이 바뀐 경우 표에 보이는 것과 다른 결과가 조용히 나온다.
 let lastTextSamples: TextSample[] = [];
@@ -353,52 +355,41 @@ async function updateVariable(msg: Extract<UiToCode, { type: 'UPDATE_VARIABLE' }
   done(applied);
 }
 
+/** 이 범위에서 쓰는 변수 중 삭제된 것(로컬도 라이브러리도 아닌 id). */
+async function deletedVarIds(roots: readonly SceneNode[]): Promise<Set<string>> {
+  const { usage } = countUsage(roots);
+  const local = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
+  const out = new Set<string>();
+  for (const id of usage.keys()) {
+    if (local.has(id)) continue;
+    const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+    if (!v) out.add(id);
+  }
+  return out;
+}
+
 /**
- * 변수 사용 조회(IA v3 §4.4) — 로컬이 아닌 id를 라이브러리 / 삭제됨으로 가른다.
- * 라이브러리 변수는 별칭 사슬을 5단계까지 따라가 함께 돌려준다(간접 사용 판정용).
+ * 변수 사용 조회(IA v4 §4.1 카드 2 · 3) — 직접 연결만. 로컬이 아닌 id를 라이브러리 / 삭제됨으로 가른다.
+ * 간접(별칭이 가리키는 변수)은 세지 않는다 — 별칭 사슬을 따라가지 않는다.
+ * 삭제된 변수 자리 수는 연결 풀기와 같은 자리(deletedBindings)로 센다.
  */
 async function collectUsage(nodeIds: readonly string[] | undefined): Promise<Omit<Extract<CodeToUi, { type: 'USAGE_RESULT' }>, 'type' | 'reqId'>> {
   const roots = await resolveRoots(nodeIds);
-  const { usage, nodesById, scanned } = countUsage(roots);
+  const { usage, scanned } = countUsage(roots);
   const local = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
   const out: Record<string, { places: number; layers: number }> = {};
   const libraryVars: LibraryVar[] = [];
-  const libSeen = new Set<string>();
-  let deletedCount = 0;
-  const deletedNodes = new Set<string>();
-  const addLibrary = async (id: string, depth: number): Promise<boolean> => {
-    if (libSeen.has(id)) return true;
-    const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
-    if (!v) return false;
-    libSeen.add(id);
-    const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId).catch(() => null);
-    const modeId = col?.defaultModeId ?? Object.keys(v.valuesByMode)[0];
-    const aliasTargets: string[] = [];
-    for (const raw of Object.values(v.valuesByMode)) {
-      if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') aliasTargets.push((raw as VariableAlias).id);
-    }
-    libraryVars.push({ id: v.id, name: v.name, collection: col?.name ?? '', type: v.resolvedType as VarType, value: await libCell(modeId ? v.valuesByMode[modeId] : undefined), aliasTargets });
-    if (depth < 5) for (const t of aliasTargets) if (!local.has(t)) await addLibrary(t, depth + 1);
-    return true;
-  };
+  const deletedIds = new Set<string>();
   for (const [id, u] of usage) {
     if (local.has(id)) { out[id] = u; continue; }
-    if (await addLibrary(id, 1)) { out[id] = u; continue; }
-    deletedCount += u.places;
-    for (const n of nodesById.get(id) ?? []) deletedNodes.add(n);
+    const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+    if (!v) { deletedIds.add(id); continue; }
+    out[id] = u;
+    const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId).catch(() => null);
+    const modeId = col?.defaultModeId ?? Object.keys(v.valuesByMode)[0];
+    libraryVars.push({ id: v.id, name: v.name, collection: col?.name ?? '', type: v.resolvedType as VarType, value: await libCell(modeId ? v.valuesByMode[modeId] : undefined), aliasTargets: [] });
   }
-  // 로컬 변수가 가리키는 라이브러리 변수도 간접 사용 판정에 필요하다 — 직접 쓰는 로컬 변수의 별칭 사슬.
-  const localVars = await figma.variables.getLocalVariablesAsync();
-  for (const v of localVars) {
-    if (!out[v.id]) continue;
-    for (const raw of Object.values(v.valuesByMode)) {
-      if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
-        const t = (raw as VariableAlias).id;
-        if (!local.has(t)) await addLibrary(t, 2);
-      }
-    }
-  }
-  return { usage: out, libraryVars, deleted: { count: deletedCount, nodeIds: [...deletedNodes] }, scanned };
+  return { usage: out, libraryVars, deleted: countDeleted(roots, deletedIds), scanned };
 }
 
 async function collectVars(): Promise<VarInfo[]> {
@@ -1055,7 +1046,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
   try {
     switch (msg.type) {
       case 'EXTRACT': {
-        const sel = selection();
+        const sel = await resolveRoots(msg.nodeIds);
         const { tokens, warnings } = extractFromSelection(sel, bindOwnerOf(sel)); // 쓰임 이름의 주인(§2.12 12.3)
         post({ type: 'EXTRACT_RESULT', tokens, warnings, selection: sel.length });
         break;
@@ -1087,9 +1078,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'APPLY': {
+        // 찾기는 한 번에 하나(IA v4 §7) — 앞 찾기를 멈추고 끝날 때까지 기다린다.
+        // liveVarIds · bindCancel이 모듈 전역이라 겹쳐 돌면 판정과 취소가 틀어진다.
+        const myTurn = ++bindTurn;
+        bindCancel = true;
+        await bindRunning;
+        if (myTurn !== bindTurn) break; // 기다리는 사이 더 새 요청이 왔다 — 이 요청은 버린다(UI도 reqId로 버림)
+        let release: () => void = () => {};
+        bindRunning = new Promise<void>((res) => (release = res));
         bindCancel = false; // UX6: 새 작업 시작 시 취소 플래그 초기화
+        try {
         // UX1: preview면 dry-run(바인딩 없이 집계). UX3: 사유별 스킵(reasons). UX6: 진행률·취소.
-        const sel = selection();
+        const sel = await resolveRoots(msg.nodeIds);
         const r = await bindSelection(
           sel,
           !msg.preview,
@@ -1113,12 +1113,26 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           skipTotal: r.skipTotal, // 상한 전 실제 수 — 잘렸으면 UI가 알린다
           reqId: msg.reqId, // UI가 낡은 응답을 가려낸다
           newRoles: r.newRoles,
+          counts: r.counts as Record<string, Record<string, number>> | undefined, // 사유 × 종류(카드 숫자, IA v4 §4.1)
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
           selfSelect = true; // 선택이 바뀐 게 아니다 — UI가 방금 그린 결과 트리를 지우지 않게
           postSelection(); // 준비 현황 '변수 연결 완료' 판정 갱신(선택은 그대로라 selectionchange가 안 온다)
         }
+        } finally {
+          release();
+        }
+        break;
+      }
+      case 'UNBIND_DELETED': {
+        // 삭제된 변수 연결 풀기(IA v4 §4.1 카드 3) — 세기와 같은 자리(deletedBindings)만.
+        const roots = await resolveRoots(msg.nodeIds);
+        const deletedIds = await deletedVarIds(roots);
+        const r = await unbindDeleted(roots, deletedIds);
+        if (r.unbound) commitUndo(figma);
+        post({ type: 'DELETED_UNBOUND', reqId: msg.reqId, ...r });
+        if (r.unbound) await postPrereq();
         break;
       }
       case 'SCAN_USAGE': {
@@ -1182,6 +1196,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         let written = 0;
         let made = 0;
         let committed = false;
+        // 찾기와 겹쳐 돌지 않게(IA v4 §7) — 돌던 찾기를 멈추고 끝나길 기다린 뒤 연결한다.
+        bindTurn++;
+        bindCancel = true;
+        await bindRunning;
+        let releaseLink: () => void = () => {};
+        bindRunning = new Promise<void>((res) => (releaseLink = res));
+        bindCancel = false;
         try {
           const r = await bindSelectedItems(msg.items, {
             onProgress: (done, total) => post({ type: 'PROGRESS', op: 'link', done, total }),
@@ -1199,11 +1220,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           }
         } finally {
           if ((written > 0 || made > 0) && !committed) commitUndo(figma);
+          releaseLink();
         }
         break;
       }
       case 'RENAME': {
-        const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
+        const r = await renameSelection(await resolveRoots(msg.nodeIds), { apply: msg.apply, maxDepth: msg.maxDepth });
         post({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied });
         if (r.applied && r.changes.length) {
           commitUndo(figma); // UX2: 리네임 전체를 단일 Undo로
@@ -2304,6 +2326,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
     }
   } catch (err) {
     // UX7: 실패한 작업 종류(op)도 함께 보내 UI가 해당 영역에 친절한 메시지를 띄운다.
-    post({ type: 'ERROR', message: err instanceof Error ? err.message : String(err), op: msg?.type });
+    post({ type: 'ERROR', message: err instanceof Error ? err.message : String(err), op: msg?.type, reqId: (msg as { reqId?: number } | undefined)?.reqId });
   }
 };
