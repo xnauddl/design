@@ -249,7 +249,7 @@
   - **Semantic 묶음**(Global 묶음 뒤): 머리 "Semantic" · "{r}개"만 — **스위치 없음**(보기만, 2026-11-09 사용자 결정 A). Semantic은 Global을 따라간다: 켠 Global의 Semantic만 만들고, Global을 끄면 그 Semantic도 빠진다(다음 미리보기에서 `roleRows`가 줄어듦). 따로 끄는 스위치를 두지 않는 이유 — "바로 연결"의 연결 단계는 레이어에 붙일 Semantic이 없으면 그 자리에서 새 Semantic을 만들기 때문에(§2.12 새 역할) 꺼 둔 Semantic이 실행 뒤 생겨 있게 된다.
     - 펼치면 첫 줄에 회색 안내 "켠 Global을 가리키는 Semantic을 함께 만들어요 · 레이어에는 Semantic이 붙어요 · Global을 끄면 그 Semantic도 빠져요".
     - 그 아래 종류 머리(이름 · "{n}개", 스위치 없음) — 종류는 그 Semantic이 가리키는 Global 토큰의 종류(`roleRows.token`의 분류 → 위 종류 표). 종류 머리 아래 줄: Semantic 이름 칩 · "= {Global 이름}"(회색), 스위치 없음 — 미리보기 응답의 `roleRows` 순서.
-    - r = 0이면 Semantic 묶음을 숨긴다. 미리보기 응답 전에는 묶음 머리 "Semantic" · "세는 중…".
+    - r = 0이면 Semantic 묶음을 숨긴다. 켠 줄이 0개(잠긴 줄은 세지 않음)일 때도 r = 0으로 보고 숨긴다(잠긴 줄만으로 보낸 미리보기 응답의 `roleRows`는 쓰지 않는다). 미리보기 응답 전에는 묶음 머리 "Semantic" · "세는 중…".
   - 트리 맨 끝 한 줄: "격자 정리 · 테마 · 타이포까지 고르려면 [값을 직접 고르기 →]".
 
 | 종류 머리 | 추출 분류(TokenCategory) |
@@ -620,7 +620,7 @@
 - [ ] 연결 화면 트리로(§4.2): 종류 · 텍스트 스타일 머리, 목록 위 줄, 포커스
 - [ ] 텍스트 스타일 A+C(§2.3-6 · §4.3 "타이포 등록"): `boundVars` 사유 · `tsSkip.boundVars` 키 삭제, `applyTextStyleRows`가 글자 변수 연결(전체 · 구간)을 떼고 붙임, `createSemanticTextStyles`가 글꼴 Global 변수를 스타일에 붙임, `CREATE_TEXT_STYLES.applyTo` · `TEXT_STYLES_RESULT.applied/applySkipped/applyReasons`, 바로 연결 체크 · `textStyle.hint` 문구, 테스트(변수 붙은 글자에 스타일 · 값 다르면 건너뜀 · 등록+적용 ⌘Z 한 번)
 - [ ] 만들기 트리 Global · Semantic 두 묶음 › 종류 › 줄(Semantic 보기만 · `roleRows.token`으로 종류), 여러 단 머리
-- [ ] 용어 통일(§2.4): Semantic 변수를 뜻하는 "역할" 화면 문구를 모두 "Semantic"으로 — i18n(`color.summary` · `color.fileVars` · `semantic.formatHint` · `semantic.title` · `semantic.formatLabel` · `dark.collection` · `pipeline.step.semantics` · `list.semanticsNote` · `op.semantics` · `color.listHint` · `colorTidy.hint` · `colorTidy.hintTip` · `role.none` · `bind.newRole*` · `create.sumRoles` · `wizard.seq.bindRoles` 등)과 `ui.html` 기본 문구. 레이어 역할(`rename.hint` 등) · 텍스트 스타일 역할(`textStyle.noteLhPx` · `noteLsPx`)은 그대로. 테스트: 화면 문구(i18n 값)에 Semantic 변수 뜻의 "역할"이 남지 않음(허용 키 목록으로 검사)
+- [ ] 용어 통일(§2.4): Semantic 변수를 뜻하는 "역할" 화면 문구를 모두 "Semantic"으로 — i18n(`color.summary` · `color.fileVars` · `semantic.formatHint` · `semantic.title` · `semantic.formatLabel` · `dark.collection` · `pipeline.step.semantics` · `list.semanticsNote` · `op.semantics` · `color.listHint` · `colorTidy.hint` · `colorTidy.hintTip` · `role.none` · `bind.newRole*` · `create.sumRoles` · `wizard.seq.bindRoles` 등)과 `ui.html` 기본 문구. 단어만 바꾸면 말이 안 되는 세 키는 **다시 쓴다**: `color.listHint` "추출·정리된 색 · Global = hue 이름 · Semantic = 쓰임 이름", `colorTidy.hintTip` "추출한 색은 전부 변수가 돼요. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 쓰임 이름은 Semantic으로 붙어요.", `semantic.title` "Semantic 매핑 (쓰임 이름 → Global)" (`ui.html` 같은 자리 기본 문구도). 레이어 역할(`rename.hint` 등) · 텍스트 스타일 역할(`textStyle.noteLhPx` · `noteLsPx`)은 그대로. 테스트: 화면 문구(i18n 값)에 Semantic 변수 뜻의 "역할"이 남지 않음(허용 키 목록으로 검사)
 - [ ] 만들기 미리보기 `CREATE_RESULT.tokenStates` · `roleRows`(preview만) · 같은 이름 토큰 합치기 · 상태 태그 4종 · 역할 묶음, 테스트
 - [ ] `SCAN_TEXT_STYLES{nodeIds?}`(값을 직접 고르기 › 타이포 스캔이 기준 nodeIds를 보냄 · 마지막 스캔 nodeIds 기억), `RENAME` · `RENAME_APPLY` · `RENAME_RESULT`에 reqId(이름 정리 화면 · 만들기 실행이 각자 받음)
 - [ ] 만들기: 추출(화면 자체 상태, `tokens` 안 덮어씀 — `EXTRACT` · `CREATE_TOKENS` preview 응답을 reqId로 나눠 받아 공용 처리기(`#createStatus` · `btnCreateApply` · `createFrom`)를 건드리지 않음, 추출 뒤 정리는 공용 함수로 재사용) · 트리(값 → 이름 · 레이어 수 · 스위치) · 종류 머리 표 · 격자 정리 안 함 · 아래 고정 만든 뒤 옵션 3 · [변수 {g}개 만들기] · 만들 수 다시 계산 · 실행 순서(만들기 → 다크 → 연결 → 이름, 무료: 연결 → 이름) · 실행 상태표 · 무료 잠금 · 포커스 · [값을 직접 고르기 →](v3 만들기 4단계 이동 · 링크 표), 시작 화면 · 마법사 카드 삭제
