@@ -158,9 +158,21 @@
 - [선택]: 그 레이어들을 캔버스에서 선택한다(기준은 유지 — §2.5).
 - [연결 풀기](§2.3-5): 목록 기준 안에서 삭제된 변수에 붙은 자리(n과 같은 범위 — 인스턴스 안쪽 포함, 숨긴 레이어 제외)의 연결을 뗀다.
   - 레이어 모습은 바뀌지 않는다 — 피그마는 변수가 지워져도 마지막 값을 갖고 있고, 연결을 떼면 그 값이 그대로 남는다.
-  - 칠 · 선 색은 `setBoundVariableForPaint(paint, 'color', null)`, 그림자 색은 `setBoundVariableForEffect(effect, 'color', null)`, 그 밖의 속성은 `setBoundVariable(field, null)`(글자 속성은 글꼴을 불러온 뒤). 살아 있는 변수(로컬 · 라이브러리)의 연결은 건드리지 않는다.
+  - **푸는 자리 = 세는 자리.** 카드 3의 n과 풀기는 같은 함수(`deletedBindings(node)` — 자리마다 필드 · 배열 번호 · 글자 구간)로 정한다. 살아 있는 변수(로컬 · 라이브러리)의 연결은 건드리지 않는다.
+
+  | 자리 | 푸는 법 |
+  |---|---|
+  | 칠 · 선의 색(`fills` · `strokes`의 단색 페인트) | `setBoundVariableForPaint(paint, 'color', null)`이 돌려준 복사본으로 배열을 새로 만들어 다시 넣는다 |
+  | 그림자 색(`effects`) | `setBoundVariableForEffect(effect, 'color', null)` 복사본으로 배열을 새로 넣는다 |
+  | 글자 구간 속성(fontSize · lineHeight · letterSpacing · fontFamily · fontWeight 등 — 값이 구간 배열) | 글꼴을 모두 불러온 뒤 `getStyledTextSegments([field, 'boundVariables'])`로 구간을 읽고, **삭제된 변수가 붙은 구간에만** `setRangeBoundVariable(start, end, field, null)` |
+  | 글자 내용(`characters`) | 글꼴을 불러온 뒤 `setBoundVariable('characters', null)` |
+  | 그 밖의 한 값 속성(간격 · 여백 · 반경 · 크기 · 선 두께 · 투명도 · `visible` 등) | `setBoundVariable(field, null)` |
+
+  - **범위 밖**(세지도 풀지도 않는다): 구간별 글자 색(`textRangeFills`), 레이아웃 그리드(`layoutGrids`), 그라디언트 색 단계, 그림자의 흐림 · 퍼짐 · 위치, 컴포넌트 속성. 이 자리의 삭제된 연결은 피그마에서 고친다.
+  - 실패 사유: "글꼴을 불러올 수 없음" · "오류".
+  - 연결을 푼 자리는 다음 찾기에서 카드 1의 후보가 된다(같은 값의 변수가 있으면 다시 연결할 수 있다).
   - 인스턴스 안쪽 자리는 오버라이드가 된다(받아들임 — 사용자가 누른 일).
-  - 확인 창은 없다. ⌘Z 한 번으로 되돌린다. 결과(상태 줄): "삭제된 변수 연결 {k}곳을 풀었어요 · ⌘Z로 되돌리기" + 못 뗀 자리가 있으면 " · {m}곳은 풀지 못했어요"(툴팁에 사유: 잠긴 글꼴 · 오류).
+  - 확인 창은 없다. ⌘Z 한 번으로 되돌린다. 결과(상태 줄): "삭제된 변수 연결 {k}곳을 풀었어요 · ⌘Z로 되돌리기" + 못 뗀 자리가 있으면 " · {m}곳은 풀지 못했어요"(툴팁에 사유별 수).
   - 쓰기 작업이다(v3 OPS write · 공통 잠금). 끝나면 §7 "플러그인 작업 직후" 다시 읽기 → 카드 3이 사라진다.
   - 메시지 `UNBIND_DELETED{reqId, nodeIds}`(기준) → `DELETED_UNBOUND{reqId, unbound, failed, failReasons}` / `ERROR{op:'UNBIND_DELETED', reqId}`. 삭제 판정은 지금 `collectUsage`와 같다(로컬도 라이브러리도 아닌 id).
 - 포커스: [연결 풀기]를 누른 뒤 카드가 사라지면 레이어 정리의 [이름 정리]로.
@@ -468,7 +480,7 @@
 
 ### B.1 PR 1 — 탭 구조 + 선택 탭 첫 화면
 - [ ] 머리 [선택 | 변수] ⚙ —, 기본 탭 = 선택, 하위 화면 틀(← 머리 · 아래 고정 버튼 줄 · 기억 · 포커스 규칙 §2.1), ⚙ 설정 화면(탭 밖, v3 설정 내용 이동)
-- [ ] 선택 탭 첫 화면: 머리 줄(이름 · count · 기준 다름 · [기준 바꾸기]), 상태표 1~7, 카드 1(자동 찾기 250ms · 300개 규칙 · m · k · s · n · 종류별 수 · ✓ · noTier), 카드 2(직접만 · 펼침 목록 · 상세), 카드 3([선택] · [연결 풀기] — `UNBIND_DELETED` · OPS write · 테스트), 레이어 정리, 포커스 순서
+- [ ] 선택 탭 첫 화면: 머리 줄(이름 · count · 기준 다름 · [기준 바꾸기]), 상태표 1~7, 카드 1(자동 찾기 250ms · 300개 규칙 · m · k · s · n · 종류별 수 · ✓ · noTier), 카드 2(직접만 · 펼침 목록 · 상세), 카드 3([선택] · [연결 풀기] — `deletedBindings`(구간 배열까지 읽음 · 범위 밖 필드 뺌)로 세기와 풀기를 같게, `UNBIND_DELETED` · OPS write · 테스트. 실기 확인: 뗀 뒤 값이 그대로인지(칠 · 숫자 · 글자 구간 · 인스턴스 안쪽), ⌘Z 한 번, `setBoundVariableForPaint/Effect`의 null, 라이브러리를 뺀 파일에서 살아 있는 라이브러리 연결이 삭제로 판정되지 않는지), 레이어 정리, 포커스 순서
 - [ ] 이 PR에서 하위 화면 연결 · 만들기 · 이름 정리는 v3 화면을 그 틀 안에 옮겨 둔다(B.2 · B.4에서 바꿈). 컴포넌트 화면은 v3 내용 그대로
 - [ ] 메시지: `APPLY` · `EXTRACT` · `RENAME`에 `nodeIds`(`resolveRoots`). `APPLY_RESULT`에 상한 없는 `counts`(사유 × 종류별 자리 수 — 지금 `reasons`는 합계뿐이고 `skips`는 200에서 잘림)를 더함, 로컬 변수 0개여도 찾기가 변수가 없는 값 자리를 돌려줌(④ · 카드 1 종류별 수). 카드 1의 텍스트 스타일 수는 B.2의 `PREVIEW_TEXT_STYLES`가 올 때까지 이 PR에서는 빼고 센다(B.2에서 더함)
 - [ ] 찾기 한 번에 하나(UI 취소 · 합치기 + 코드의 `liveVarIds` · `bindCancel` 겹침 막기), 쓰기 중 자동 요청 미룸, reread의 run 콜백 · `isHeld` 바꿈
