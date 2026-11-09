@@ -67,7 +67,7 @@
 
 ### 2.6 최소화 (v3 §4.9에서 바뀌는 점)
 - 공통 상태 줄 "{작업 이름} 실패 · [보기]"의 도착: 연결 · 찾기 → 선택 탭 연결 화면, 만들기 → 만들기 화면, 이름 → 이름 정리 화면, 컴포넌트 → 컴포넌트 화면, 클릭 연결 · 새 변수 · 복제 · 삭제 · 고치기 → 변수 탭, 내보내기 → 변수 탭(내보내기 팝업은 다시 열지 않음).
-- 자동 읽기(§4.1 카드 1의 찾기 · 텍스트 스타일 미리보기, §4.3 자동 추출, §4.4 자동 이름 미리보기)는 **조용한 읽기**다 — 진행 테두리 · ✓ / ⚠ · 진행률 · [취소]가 없고, 300개 규칙을 따른다(넘으면 그 화면에 "선택이 커서 자동으로 읽지 않아요 · [읽기]"). 사용자가 누른 [읽기] · [다시 읽기]는 진행 테두리 대상이고 "{p}%" + [취소]가 있다.
+- 자동 읽기(§4.1 카드 1의 찾기 · 텍스트 스타일 미리보기, §4.3 자동 추출, §4.4 자동 이름 미리보기)는 **조용한 읽기**다 — 진행 테두리 · ✓ / ⚠ · 진행률 · [취소]가 없고, 300개 규칙을 따른다(넘으면 그 화면에 "선택이 커서 자동으로 읽지 않아요 · [읽기]"). 사용자가 누른 [읽기] · [다시 읽기]는 진행 테두리 대상이다. 진행률 "{p}%" + [취소]는 찾기(`PROGRESS{op:'bind'}` · `CANCEL`)에만 있다 — 추출 · 이름 미리보기 · 텍스트 스타일 미리보기는 진행률 · 취소가 없는 "읽는 중…"(지금 코드와 같음).
 - [취소]한 뒤에는 그 자리에 "읽기를 취소했어요 · [다시 읽기]".
 - 최소화 중에는 다시 읽지 않는다(v3). 펼칠 때 기준이 바뀌었으면 §7 "목록 기준이 바뀜"을 1번 한다.
 
@@ -118,7 +118,8 @@
 - **숫자** (찾기 결과의 자리 단위, 사유 키는 `reason.*`):
   - m = 연결할 수 있는 곳 = preview 후보 자리 수 − 스타일 후보 레이어의 글자 종류 자리 + 스타일 후보 레이어 수.
   - k = 변수가 없는 값 = 건너뜀 사유가 `no-match` · `size-fraction`인 자리 수.
-  - s = 그 밖의 건너뜀 중 **자리 단위** 사유만(`styled` · `hug-fill` · `translucent` · `space-between` · `fraction` · `font` · `empty-text` · `deleted-var`). 이미 연결 `already-bound`과, 코드가 레이어 단위로 세는 범위 밖 사유(`instance-children` · `hidden` · `no-autolayout` · `size-free-layout`)는 세지 않는다 — 연결 화면의 건너뜀 칩에만 레이어 수로 나온다.
+  - s = 그 밖의 건너뜀 중 **자리 단위** 사유만(`styled` · `hug-fill` · `translucent` · `space-between` · `fraction` · `empty-text` · `deleted-var`). 이미 연결 `already-bound`과, 코드가 레이어 단위로 세는 사유(`instance-children` · `hidden` · `no-autolayout` · `size-free-layout` · `font`)는 세지 않는다 — 연결 화면의 건너뜀 칩에만 레이어 수로 나온다.
+  - 스타일 후보 레이어의 글자 종류 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 m에서만이 아니라 k · s에서도 뺀다 — 그 레이어는 스타일 줄 1곳으로만 센다(④ · 종류별 수도 같다).
   - n = m + k. 제목 "변수 없는 값 {n}곳"(n 툴팁 "인스턴스 안쪽 · 숨긴 레이어 제외").
 - 둘째 줄 종류별 수(아래 속성 → 종류 표의 순서, 0은 뺌). 버튼 **[{m}곳 연결]**(주 버튼) → 연결 화면(§4.2).
 - m = 0이고 k > 0이면 버튼 대신 [변수 만들기 →](→ §4.3).
@@ -324,7 +325,7 @@
 | 색 | 글자 레이어: 글자 색 → 선 색 → 그림자 색. 그 밖: 채움 → 선 색 → 그림자 색 |
 | 간격 | 이름 끝 마디(v3 §2.12 12.3 이름 표의 역): `gap` → 간격(`itemSpacing`), `row-gap` → 줄바꿈이면 `counterAxisSpacing`, 아니면 `itemSpacing`, `column-gap` → `itemSpacing`, `padding` → 안쪽 여백 4방향, `padding-x` → 좌 · 우, `padding-y` → 위 · 아래, `padding-top · -right · -bottom · -left` → 그 방향. 그 밖(예 `spacing/16`) → 간격 |
 | 반경 | 끝 마디가 `-top-left` 등이면 그 모서리, 그 밖은 모서리 4곳(`topLeftRadius` … 필드가 있는 레이어만) |
-| 크기 | 가로 · 세로 |
+| 크기 | 끝 마디가 `width`면 가로만, `height`면 세로만, 그 밖은 가로 · 세로 |
 | 선 두께 | 끝 마디가 `-top` 등이면 그 방향, 그 밖은 `strokeWeight` |
 | 투명도 | 레이어 투명도(`opacity`) |
 | 글자 | 그 글자 속성(fontSize · lineHeight · letterSpacing · fontFamily) |
@@ -364,7 +365,10 @@
 - 팝업(상세와 같은 틀): 컬렉션(읽기, 지금 고른 컬렉션) · 이름 · 타입(색 · 숫자 · 글자 · 참거짓) · 모드별 값(값 ↔ 별칭, 고치기의 칸 · [▾] 그대로) · [취소] [만들기].
 - 타입 기본값: 지금 보이는 첫 그룹의 첫 변수 타입. 그룹이 없으면 숫자.
 - 로컬 컬렉션이 0개면 사용자 컬렉션 `Variables`를 새로 만들어 넣는다(플러그인 표시 없음 — 플러그인 자동 쓰기가 건드리지 않는 곳). 컬렉션 칸에 "Variables (새로 만듦)".
-- **직접 만든 변수 지키기:** 새 변수 · 복제로 만든 변수에는 플러그인 데이터 `dsl.manual = 1`을 단다. 플러그인 컬렉션 안에 있어도 자동 쓰기가 덮어쓰거나 지우지 않는다 — `createTokens`는 같은 이름의 `dsl.manual` 변수를 고치지 않고 건너뜀으로 세고, `prunePaletteColors`는 지우지 않는다. 사용자가 상세에서 고치는 것은 그대로 된다.
+- **직접 만든 변수 지키기:** 새 변수 · 복제로 만든 변수에는 플러그인 데이터 `dsl.manual = 1`을 단다. 플러그인 컬렉션 안에 있어도 자동 쓰기가 덮어쓰거나 지우지 않는다 — 빼는 곳: `createTokens` · `prunePaletteColors` · 다크(`themeApply` — Dark 값을 다시 걸지 않음) · 역할 매핑(`createSemanticAliases` · `createUsageRoles`의 `upsertVariable` — 덮어쓰지 않음).
+  - `createTokens`가 같은 이름의 manual 변수를 만나면: 값이 같으면 그 변수를 그 토큰의 Global로 쓴다(`globalOf`가 가리킴 — 지금의 재사용과 같음). 값이 다르면 그 토큰과 그 토큰을 가리킬 역할을 만들지 않는다. 응답 `CREATE_RESULT`에 `skippedManual`(수)을 더하고 결과 문구 끝에 " · 직접 만든 변수라 건너뜀 {n}".
+  - 역할 매핑 · 다크가 manual 변수를 건너뛰면 결과의 건너뜀 수에 더한다.
+  - 사용자가 상세에서 고치는 것은 그대로 된다.
 - 이름은 비워 둔다. 이름 검사 · 값 검사는 고치기와 같다(새 변수용 가상 self로 `nameError` · `aliasCandidates`를 부른다). 기본 모드 값은 필수, 다른 모드는 비우면 기본 모드 값.
 - 용도(scopes)는 **최종 이름**의 종류(§4.6 판정 1~3)로: 간격 GAP, 반경 CORNER_RADIUS, 크기 WIDTH_HEIGHT, 선 두께 STROKE_FLOAT, 투명도 OPACITY, 색 ALL_FILLS · STROKE_COLOR · EFFECT_COLOR, 글자는 그 속성(FONT_SIZE · LINE_HEIGHT · LETTER_SPACING · FONT_FAMILY). 기타 · 참거짓은 용도를 설정하지 않는다(피그마 기본값).
 - 만든 뒤 팝업을 닫고 변수 표를 다시 읽어, 그 그룹을 펼치고 새 변수로 포커스 · 스크롤. ⌘Z 한 번. 사용자 컬렉션에도 된다(v3 §2.13 13.1 — 사용자가 직접 하는 일).
@@ -473,7 +477,7 @@
 - [ ] 클릭 · 더블클릭(한 번) · Space · Enter · 우클릭, 쓰기 잠금(양쪽), 키보드
 - [ ] `APPLY_VARIABLE`(§4.7 속성 목록 · 용도 · 채움 용도 · 색 · 숫자 · 글자 세부 · target · 사유 · 되돌리기 한 묶음) — `scopes.ts` · `bind.ts`에 필요한 필드 · 함수
 - [ ] 상세 합침(복사 · → · 되돌리기 두 곳 · 모두 선택 · 직접만 · 포커스 순서), "고치기…" · 행 메뉴 복사 3종 삭제, 간접 코드(`indirectUsage` · `aliasTargetsOf` · `recomputeIndirect` · `indirectMap`)와 키(`list.indirect*` · `list.chipTip`) 삭제
-- [ ] 새 변수(타입 기본값 · 컬렉션 0개면 사용자 `Variables`) · `dsl.manual` 표시와 `createTokens` · `prunePaletteColors`에서 빼기 · 복제(무료 개수 제한 상수, 자동 생성은 세지 않음) · 삭제 확인(⌘Z 실기 확인), 메시지 4종 · reqId · ERROR.op · OPS write 표에 넣기
+- [ ] 새 변수(타입 기본값 · 컬렉션 0개면 사용자 `Variables`) · `dsl.manual` 표시와 `createTokens`(값 같음 = 재사용, 다름 = 건너뜀 · `skippedManual`) · `prunePaletteColors` · `themeApply` · `createSemanticAliases` · `createUsageRoles`에서 빼기, 테스트 · 복제(무료 개수 제한 상수, 자동 생성은 세지 않음) · 삭제 확인(⌘Z 실기 확인), 메시지 4종 · reqId · ERROR.op · OPS write 표에 넣기
 - [ ] i18n: 새 키 · 지울 키(`vm.copyValue` · `vm.whatValue` · `vm.edit` · `vm.moreTip` · `vm.selectLayers` · `list.usesTip` 등), `cellCopyText` 등 쓰이지 않는 함수와 테스트 정리, `initialSideSel` 테스트, verify-bind-flow 블록 9 · 12
 - [ ] 테스트(`figma.test.mjs`): 속성 표 각 줄 · 용도 막힘 · 다음 속성 · 채움 용도 · 단색 없음 · 글자 구간 · 크기 FIXED · 반경 필드 없음 · 기존 연결 바꿈 · Global 연결 · 기타 · 종류 판정 3 · 4(사용자 Component 이름), 복제 · 삭제 · 새 변수
 - [ ] ia-v3 A.13 체크리스트 닫음(이 PR로 대체)
@@ -481,5 +485,6 @@
 ### B.4 PR 4 — 만들기 화면 · 이름 정리 화면
 - [ ] 만들기: 추출(화면 자체 상태, `tokens` 안 덮어씀 — `EXTRACT` · `CREATE_TOKENS` preview 응답을 reqId로 나눠 받아 공용 처리기(`#createStatus` · `btnCreateApply` · `createFrom`)를 건드리지 않음, 추출 뒤 정리는 공용 함수로 재사용) · 종류 줄 표 · 격자 정리 안 함 · 만든 뒤 옵션 3 · 만들 수 다시 계산 · 실행 순서(추출 → 만들기 → 다크 → 연결 → 이름) · 실행 상태표 · 무료 잠금 · 포커스 · [값을 직접 고르기 →](v3 만들기 4단계 이동 · 링크 표), 시작 화면 · 마법사 카드 삭제
 - [ ] `wizard.ts` 새 단계 목록(연결 단계 더함, 역할 매핑 · 텍스트 스타일 · 컴포넌트 단계 뺌) · `runWizard`의 DOM 의존(`#wizOpt*` · `#semMap` · `#base`) 걷어냄 · 연결 결과 처리 경로, `test/wizard.test.mjs` 고침, 키 `wizard.*` 시작 화면 · 요약 · 연결 안내 · `create.*` "레이어에 연결하기 →" 지움
+- [ ] 설정 문구: `settings.gridTip` · 기본값 안내의 "만들기에서 격자로 모아요"를 "값을 직접 고르기 › 토큰에서"로(만들기 화면은 격자 정리를 하지 않음)
 - [ ] 이름 정리: 바꿀 줄만 · 체크 · 미리보기 다시 하기 · 빈 상태 · [k개 이름 바꾸기] · 포커스, `rename.hideKeep` · `rename.showKeep` 삭제
 - [ ] 컴포넌트 하위 화면(v3 내용 그대로)
