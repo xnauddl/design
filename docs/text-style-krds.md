@@ -87,7 +87,7 @@
 위 꼬리를 다 붙여도 이름이 같은 스타일들:
 1. 자간이 다르면 정렬(① 자간 0 ② 쓰인 곳 많은 순 ③ 절댓값 작은 순 ④ 작은 값) 1등이 그대로, 나머지는 `-ls{자간 px}`(소수 첫째 자리, `_` · `m` 표기 — 예 `-ls0_5` · `-lsm0_3`). 표기가 같아지는 자간은 같은 것으로 보고 다음 단계로.
 2. 그래도 같고 글꼴이 다르면 쓰인 곳이 많은 글꼴(같으면 글꼴 이름 순 앞)이 그대로, 나머지는 `-{글꼴 slug}`(예 `-noto-sans-kr`).
-3. 그래도 같으면 정렬(쓰인 곳 많은 순 → 시그니처 문자열 순) 1등이 그대로, 나머지 `-2` · `-3`.
+3. 그래도 같으면 정렬(쓰인 곳 많은 순 → 시그니처 문자열 순 → 지금 이름 순 → 스타일 id 순) 1등이 그대로, 나머지 `-2` · `-3`(값이 완전히 같은 기존 스타일 둘도 이 순서로 갈린다).
 
 ### 3.9 그 밖
 - **"왼쪽 글자로 이름 채우기"**(행 라벨)는 사용자가 누르는 기능이라 그대로 — 라벨 글자 이름이 KRDS 이름을 덮는다. 라벨이 이름처럼 보이는지 판정하는 `LABEL_RAMP_RE`에 KRDS 분류(`display|heading|body|label`)와 단계 · 꼬리 모양을 더한다.
@@ -117,13 +117,14 @@
 ### 5.2b 카드 안 배치
 - 타이포 카드: 툴바 [스캔] [행 추가] … [이름 다시 짓기] [등록]. [이름 다시 짓기]를 누르면 스캔 표(`tsList`) **자리를 미리보기 목록이 대신**한다(스캔 표는 숨김, 상태는 그대로 보관). 미리보기 아래 [k개 이름 바꾸기] · [닫기].
 - [닫기] 또는 바꾸기가 끝나면 미리보기를 닫고 스캔 표를 다시 보인다. 미리보기 중 [스캔]을 누르면 미리보기를 닫고 스캔한다.
-- 바꾸기가 끝나면(`TEXT_STYLE_RENAMED`) 스캔 표에서 `boundStyleId`가 바뀐 스타일인 줄의 이름을 `to`로 고친다 — 옛 이름으로 [등록]해 스타일 · 역할 변수 이름이 되돌아가지 않게.
+- 바꾸기가 끝나면(`TEXT_STYLE_RENAMED`) 스캔 표에서 `boundStyleId`가 `status: 'renamed'`인 스타일인 줄만 이름을 그 결과의 `name`으로 고친다 — 옛 이름으로 [등록]해 스타일 · 역할 변수 이름이 되돌아가지 않게.
 
 ### 5.3 바꾸기
-- `APPLY_TEXT_STYLE_RENAME{reqId, items:[{id, from, to, sig}]}` → `TEXT_STYLE_RENAMED{reqId, renamed, skipped, skipReasons, roleVarsRenamed, roleVarsSkipped}`. `sig` = 미리보기 때의 시그니처(크기 · 줄 높이 · 자간 · 글꼴 · 스타일).
+- `APPLY_TEXT_STYLE_RENAME{reqId, items:[{id, from, to, sig}]}` → `TEXT_STYLE_RENAMED{reqId, results:[{id, status, name}], renamed, skipped, skipReasons, roleVarsRenamed, roleVarsSkipped}` — `status` = `'renamed'` 또는 건너뜀 사유 코드, `name` = 끝난 뒤 그 스타일의 지금 이름. `sig` = 미리보기 때의 시그니처(크기 · 줄 높이 · 자간 · 글꼴 · 스타일).
 - 다시 확인(스타일마다): 지금 이름이 `from`이 아니면 건너뜀 `'renamed-meanwhile'`, 시그니처가 `sig`와 다르면 `'value-changed'`.
 - 겹침 판정은 **최종 이름 집합**으로, 이름을 하나라도 바꾸기 전에 끝낸다: 통과 후보 = 다시 확인을 통과한 항목. (후보가 아닌 모든 스타일의 지금 이름) ∪ (후보들의 `to`)에서 `to`가 겹치는 후보를 건너뜀 `'name-taken'`으로 빼고, 빠진 항목의 지금 이름이 남으므로 **더 빠지는 항목이 없을 때까지 반복**한다(고정점). 그래서 A→B · B→C 연쇄나 A↔B 맞바꿈도 되고, 한 항목이 빠지면 그 이름을 원하던 항목도 함께 빠진다.
-- 바꾸는 순서: 남은 후보를 모두 임시 이름(`__dsl_tmp_{id}`)으로 바꾼 뒤(1단계) `to`로 바꾼다(2단계). 2단계에서 오류가 난 항목은 `from`으로 되돌리고 `'error'`, 되돌리기도 실패하면 `'error-stuck'`(결과 툴팁에 그 스타일의 지금 이름을 적는다).
+- 바꾸는 순서: 남은 후보를 모두 임시 이름(`__dsl_tmp_{id}`)으로 바꾼 뒤(1단계) `to`로 바꾼다(2단계). 1단계나 2단계에서 오류가 난 항목은 `from`으로 되돌리고 `'error'`, 되돌리기도 실패하면 `'error-stuck'`(결과 툴팁에 그 스타일의 지금 이름 `name`을 적는다). 오류가 나도 고정점 판정은 다시 하지 않는다(그 항목의 `to`를 원하던 다른 항목은 이미 통과했으므로 겹칠 수 없다 — 오류 항목은 `from`으로 돌아가고, `from`은 최종 집합에 없던 이름이다).
+- **역할 변수는 스타일 바꾸기가 끝난 뒤:** `status: 'renamed'`인 항목의 `{from, to}`만 넘긴다(되돌려진 스타일의 변수는 건드리지 않는다). 변수 쪽 실패는 스타일 이름을 되돌리지 않고 `roleVarsSkipped`에 센다.
 - **역할 변수도 함께:** 텍스트 스타일 등록이 스타일 이름으로 만드는 역할 변수 `font-size/{이름}` · `line-height/{이름}` · `letter-spacing/{이름}`(3종 — `variables.ts createSemanticTextStyles`)를 플러그인 Semantic 컬렉션(`ownedCollection('semantic')`) 안에서 `{from}` → `{to}`로 바꾼다. 사용자 컬렉션 · 직접 만든 변수(IA v4 B.3의 `dsl.manual` 표시가 생긴 뒤에는 그 변수)는 건드리지 않는다. 역할 변수도 스타일과 **같은 방식**(최종 이름 집합 · 고정점 · 임시 이름 2단계 · 실패 시 되돌림)으로 바꾼다 — 최종 집합 밖의 다른 변수와 이름이 겹치는 변수만 건너뛰고 `roleVarsSkipped`에 센다(그 스타일은 옛 이름의 변수에 묶인 채로 남는다). 지금 `createSemanticTextStyles` 안의 `roleRenames` 처리를 이 방식의 공용 함수 `renameTextRoleVars(pairs)`로 바꿔 두 경로가 함께 쓴다.
 - ⌘Z 한 번(스타일 · 변수 이름을 한 묶음 — `commitUndo`).
 - 결과(상태 줄): "텍스트 스타일 {renamed}개 이름을 바꿨어요 · ⌘Z로 되돌리기" + 건너뛴 것이 있으면 " · 건너뜀 {skipped}"(툴팁에 사유별 수) + 역할 변수를 건너뛴 것이 있으면 " · 역할 변수 {roleVarsSkipped}개는 같은 이름이 있어 그대로 뒀어요".
@@ -132,7 +133,7 @@
 
 - 새 `src/lib/krdsType.ts`(순수): `KRDS_SIZES`, `KRDS_STEPS`, `weightOf(style)`, `krdsCategory(input, path)`, `krdsStep(category, size)`, `offScale(size) → { kind: 'decimal' | 'off' | null, nearest }`, `nameKrdsStyles(inputs, { reserved, anchored })`.
 - `textStyles.ts`: `nameTextStyles`가 RAMP_NAMES 순위 대신 `nameKrdsStyles`를 쓴다(앵커 조건 · 행 라벨은 유지). `StyleCluster`에 `uiCount`, `TextSample`에 `uiRole?: boolean`. `LABEL_RAMP_RE` 넓힘(§3.9). `RAMP_NAMES` · 옛 램프는 지운다.
-- `rampToSpecs`(스캔 결과가 없을 때의 기본 램프): display/large 60 · heading/large 32 · heading/medium 24 · heading/small 19 = Bold, body/medium 17 · body/small 15 = Regular, 줄 높이 `lineHeightPercent: 150` · `lineHeight = 크기 × 1.5`, 자간 0. 글꼴은 지금처럼 `DEFAULT_TS_FAMILY`(Inter — Pretendard GOV는 설치되지 않았을 수 있다). label 줄은 넣지 않는다(body/medium과 값이 같아 앵커 · 기존 스타일 연결이 모호해지므로). 램프 이름도 §3.4 예약을 따른다 — 같은 이름의 로컬 스타일이 있으면 그 줄은 강제 꼬리를 붙인다(등록이 이름으로 찾아 남의 스타일 값을 덮어쓰지 않게).
+- `rampToSpecs`(스캔 결과가 없을 때의 기본 램프): display/large 60 · heading/large 32 · heading/medium 24 · heading/small 19 = Bold, body/medium 17 · body/small 15 = Regular, 줄 높이 `lineHeightPercent: 150` · `lineHeight = 크기 × 1.5`, 자간 0. 글꼴은 지금처럼 `DEFAULT_TS_FAMILY`(Inter — Pretendard GOV는 설치되지 않았을 수 있다). label 줄은 넣지 않는다(body/medium과 값이 같아 앵커 · 기존 스타일 연결이 모호해지므로). 램프 이름도 §3.4 예약을 따른다 — 같은 이름의 로컬 스타일이 있으면 그 줄은 강제 꼬리를 붙인다(등록이 이름으로 찾아 남의 스타일 값을 덮어쓰지 않게). 이를 위해 `TEXT_STYLE_CANDIDATES`에 `reservedNames`(이 파일의 로컬 텍스트 스타일 이름 전부)를 더하고, UI의 `rampToSpecs(family, reservedNames)`가 예약을 적용한다(램프 폴백 판정 · 문구는 지금 그대로).
 - `variables.ts scanTextStyles`: 표본에 `uiRole`(§3.2-1 조상 탐색). `scanExistingTextStyles`는 그대로.
 - `variables.ts`: `renameTextRoleVars(pairs)` 공용 함수 + 이름 다시 짓기 적용 함수. `code.ts` · `messages.ts`: 메시지 2쌍.
 - `ui.ts` · `ui.html`: 타이포 카드 [이름 다시 짓기] · 미리보기 목록 · §4 표시.
@@ -151,7 +152,7 @@
 | `textStyle.renamed` (새) | — | "텍스트 스타일 {n}개 이름을 바꿨어요 · ⌘Z로 되돌리기" |
 | `textStyle.renameSkipped` (새) | — | " · 건너뜀 {m}" |
 | `textStyle.renameRoleSkipped` (새) | — | " · 역할 변수 {n}개는 같은 이름이 있어 그대로 뒀어요" |
-| `textStyle.renameSkip.renamed-meanwhile` · `value-changed` · `name-taken` · `error` (새) | — | "그 사이 이름이 바뀜" · "그 사이 값이 바뀜" · "같은 이름이 있음" · "오류" |
+| `textStyle.renameSkip.renamed-meanwhile` · `value-changed` · `name-taken` · `error` · `error-stuck` (새) | — | "그 사이 이름이 바뀜" · "그 사이 값이 바뀜" · "같은 이름이 있음" · "오류" · "되돌리지 못함 · 지금 이름 {name}" |
 | `textStyle.offDecimal` · `offScale` · `offTip` · `offSum` (새) | — | "소수 크기" · "KRDS 밖" · "KRDS 크기가 아니에요 · 가까운 KRDS 크기 {n}px" · " · KRDS 밖 크기 {k}개(소수 {m})" |
 
 - 테스트: `krdsType` 단위(분류 · 단계 경계 · 꼬리 순서 · 정렬 동점 · 강제 꼬리 · 마지막 수단 · 소수 · 음수 표기 · 규칙 밖 · weightOf), `nameTextStyles` · `rampToSpecs` 바뀐 기대값, 이름 다시 짓기(figma 목: 연쇄 · 맞바꿈 · 임시 이름 · 역할 변수 · 사용자 컬렉션 제외 · 겹침 건너뜀 · 값 바뀜), verify-bind-flow(타이포 카드 표시 · 이름 다시 짓기 흐름).
@@ -169,8 +170,8 @@
 | title/semi-bold | 20/120 SemiBold | heading/small-120 (20 · 18이 기준 19와 같은 거리 → 큰 크기 20이 꼬리 없음) | ○ |
 | body/inter-semi-bold · -2 | 18/125 · 18/120 SemiBold | heading/small-18-125 · heading/small-18-120 | ○ |
 | title/regular | 20/150 Regular | body/large (20이 꼬리 없음) | ○ |
-| body/inter-regular · -2 · -3 · -4 | 18/180 · 18/150 · 18/120 · 18/120 Regular | body/large-18-180 · body/large-18 · body/large-18-120 · (넷째는 셋째와 같은 값 → §3.8) | ○ |
-| body/inter-medium · -2 · -3 | 18/120 · 18/120 · 18/125 Medium | body/large-18-w500-120 · (같은 값 → §3.8) · body/large-18-w500-125 | ○ |
+| body/inter-regular · -2 · -3 · -4 | 18/180 · 18/150 · 18/120 · 18/120 Regular | body/large-18-180 · body/large-18 · body/large-18-120 · body/large-18-120-2 (셋째 · 넷째가 값이 같으면 지금 이름 순 — §3.8-3) | ○ |
+| body/inter-medium · -2 · -3 | 18/120 · 18/120 · 18/125 Medium | body/large-18-w500-120 · body/large-18-w500-120-2 (값이 같으면 §3.8-3) · body/large-18-w500-125 | ○ |
 | caption/inter-regular | 16/125 Regular | body/medium-125 (Regular가 기본값 400에 가까움) | ○ |
 | caption/inter-medium · -2 | 16/125 · 16/120 Medium | body/medium-w500-125 · body/medium-w500-120 | ○ |
 | caption/inter-semi-bold · -2 | 16/120 · 16/125 SemiBold | heading/xsmall-120 · heading/xsmall-125 | ○ |
