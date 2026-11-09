@@ -54,6 +54,13 @@ function installFigma() {
       name,
       defaultModeId: `mode:${name}`,
       modes: [{ modeId: `mode:${name}`, name: 'Mode 1' }],
+      _pd: {},
+      getPluginData(k) {
+        return this._pd[k] ?? '';
+      },
+      setPluginData(k, val) {
+        this._pd[k] = val;
+      },
       addMode(modeName) {
         const modeId = `mode:${name}:${modeName}:${seq++}`;
         this.modes.push({ modeId, name: modeName });
@@ -655,13 +662,15 @@ test('createTokens — Global 리터럴 + scopes/hidden + px 환산 (Semantic �
 
   // 토큰당 Global 1개(거울 없음). 색1 + 라인하이트1 + 간격1 = created 3
   // conversions: base(16px) 환산 대상은 비-px인 lineHeight(150%)뿐
-  assert.deepEqual(summary, {
+  const { globalOf, ...counts } = summary;
+  assert.deepEqual(counts, {
     created: 3,
     updated: 0,
     globals: 3,
     semantics: 0,
     conversions: [{ name: 'line-height/150', from: '150%', to: 24 }],
   });
+  assert.equal(globalOf.size, 3); // 토큰 이름 → 만든 Global id(§2.13 13.6)
 
   // Global 색: 리터럴 + scope + hidden
   const gColor = findVar(figma, 'Global', 'color/0066ff');
@@ -4135,42 +4144,166 @@ test('transplantImageFills — 인스턴스의 같은 경로에 원본 사진 fi
   assert.match(bad.failures[0], /사진 이식 실패/);
 });
 
-/* ================= 컬렉션 계층 지정(collectionRoles) ================= */
-test('컬렉션 계층 지정 — Primitives를 Global로 지정하면 토큰은 Primitives에, 바인딩도 그 변수를 쓴다', async () => {
-  const figma = installFigma();
+/* ================= 플러그인 컬렉션 · 사용자 컬렉션(§2.13, A.12) ================= */
+const withRoot = (figma) => {
   const data = {};
   figma.root = { getPluginData: (k) => data[k] ?? '', setPluginData: (k, v) => { data[k] = v; } };
+  return data;
+};
+const rgbOf = (hex) => ({ r: parseInt(hex.slice(1, 3), 16) / 255, g: parseInt(hex.slice(3, 5), 16) / 255, b: parseInt(hex.slice(5, 7), 16) / 255 });
+const colorTok = (hex, use = 'color/background') => ({ name: `color/${hex.slice(1)}`, category: 'color', sources: ['fill'], value: hex, uses: [{ name: use, count: 1 }] });
+
+test('플러그인 컬렉션 — 이름 Global(표시 없음)은 이어받아 표시를 달고 그 안에 만든다, 같은 이름 둘이면 첫 번째', async () => {
+  const figma = installFigma();
+  withRoot(figma);
+  const g1 = figma.variables.createVariableCollection('Global');
+  const g2 = figma.variables.createVariableCollection('Global');
+  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const v = figma._state.variables.find((x) => x.name === 'spacing/8');
+  assert.equal(v.variableCollectionId, g1.id);
+  assert.equal(g1._pd['dsl.owned'], 'global');
+  assert.equal(g2._pd['dsl.owned'], undefined);
+  assert.equal(figma._state.collections.length, 2); // 새로 만들지 않음
+});
+
+test('플러그인 컬렉션 — 이름을 Global로 바꾼 플러그인 Semantic은 이어받지 않고 새 Global을 만든다 · 예전 계층 지정은 무시', async () => {
+  const figma = installFigma();
+  const data = withRoot(figma);
+  const ps = figma.variables.createVariableCollection('Global');
+  ps.setPluginData('dsl.owned', 'semantic');
   const prim = figma.variables.createVariableCollection('Primitives');
-  data['dsl.collectionRoles'] = JSON.stringify({ [prim.id]: 'global' });
-  await createTokens([{ name: 'color/aa0000', category: 'color', sources: ['fill'], value: '#aa0000' }], 16);
-  assert.equal(figma._state.collections.some((c) => c.name === 'Global'), false); // 새 Global을 만들지 않는다
-  const v = figma._state.variables.find((x) => x.name === 'color/aa0000');
-  assert.equal(v.variableCollectionId, prim.id);
-  // 역할 별칭의 원본(Global)도 Primitives에서 찾는다
-  const sem = await createSemanticAliases({ 'color/text/default': 'color/aa0000' });
-  assert.deepEqual(sem.missing, []);
-  // 바인딩: Primitives(=Global 계층) 변수가 후보가 된다
+  data['dsl.collectionRoles'] = JSON.stringify({ [prim.id]: 'global' }); // 예전 지정 — 읽지 않는다
+  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const v = figma._state.variables.find((x) => x.name === 'spacing/8');
+  const col = figma._state.collections.find((c) => c.id === v.variableCollectionId);
+  assert.notEqual(col.id, ps.id);
+  assert.notEqual(col.id, prim.id);
+  assert.equal(col.name, 'Global');
+  assert.equal(col._pd['dsl.owned'], 'global');
+});
+
+test('만들기 — 쓰임이 있는 토큰은 같은 값 사용자 Global을 재사용(플러그인 Global 안 생김) · 역할은 플러그인 Semantic에서 사용자 Global을 가리킴 · reuseMap', async () => {
+  const figma = installFigma();
+  const data = withRoot(figma);
+  const prim = figma.variables.createVariableCollection('Primitives');
+  const blue = figma.variables.createVariable('blue/500', prim, 'COLOR');
+  blue.scopes = ['ALL_SCOPES'];
+  blue.setValueForMode(prim.defaultModeId, rgbOf('#0066ff'));
+  const before = figma._state.variables.filter((v) => v.variableCollectionId === prim.id).length;
+  const toks = [colorTok('#0066ff')];
+  const s = await createTokens(toks, 16);
+  assert.equal(s.created, 0);
+  assert.equal(s.globals, 0); // 재사용은 세지 않는다
+  assert.equal(s.globalOf.get('color/0066ff'), blue.id);
+  assert.equal(figma._state.collections.some((c) => c.name === 'Global'), false);
+  assert.equal(JSON.parse(data['dsl.reuseMap'])['color/0066ff'], blue.id);
+  const roles = await createUsageRoles(toks, false, s.globalOf);
+  assert.equal(roles, 1);
+  const sem = figma._state.collections.find((c) => c._pd['dsl.owned'] === 'semantic');
+  assert.ok(sem);
+  const role = figma._state.variables.find((v) => v.variableCollectionId === sem.id);
+  assert.deepEqual(role.valuesByMode[sem.defaultModeId], { type: 'VARIABLE_ALIAS', id: blue.id });
+  // 사용자 컬렉션에 변수 · 모드가 늘지 않는다
+  assert.equal(figma._state.variables.filter((v) => v.variableCollectionId === prim.id).length, before);
+  assert.equal(prim.modes.length, 1);
+  // 미리보기도 같은 판단 — 재사용은 생성 수에 넣지 않는다
+  const pv = await previewCreateTokens(toks, 16);
+  assert.equal(pv.created + pv.updated, 0);
+});
+
+test('만들기 — 쓰임이 없는 토큰(글자 등)은 같은 값 사용자 Global이 있어도 플러그인 Global에 만든다', async () => {
+  const figma = installFigma();
+  withRoot(figma);
+  const prim = figma.variables.createVariableCollection('Primitives');
+  const n = figma.variables.createVariable('size/16', prim, 'FLOAT');
+  n.scopes = ['ALL_SCOPES'];
+  n.setValueForMode(prim.defaultModeId, 16);
+  const s = await createTokens([{ name: 'font-size/16', category: 'fontSize', sources: ['fontSize'], value: 16 }], 16);
+  assert.equal(s.created, 1);
+  assert.equal(findVar(figma, 'Global', 'font-size/16').variableCollectionId !== prim.id, true);
+});
+
+test('역할 매핑 표 — 이름은 직접 값 Global에서, 없으면 reuseMap(별칭으로 바뀐 항목은 버림) · 플러그인 Semantic에 만든다', async () => {
+  const figma = installFigma();
+  const data = withRoot(figma);
+  const prim = figma.variables.createVariableCollection('Primitives');
+  const blue = figma.variables.createVariable('blue/500', prim, 'COLOR');
+  blue.scopes = ['ALL_SCOPES'];
+  blue.setValueForMode(prim.defaultModeId, rgbOf('#0066ff'));
+  const red = figma.variables.createVariable('red/500', prim, 'COLOR');
+  red.setValueForMode(prim.defaultModeId, rgbOf('#ff0000'));
+  for (let i = 0; i < 6; i++) figma.variables.createVariable(`x/${i}`, prim, 'FLOAT').setValueForMode(prim.defaultModeId, i);
+  data['dsl.reuseMap'] = JSON.stringify({ 'color/0066ff': blue.id, 'color/ff0000': red.id });
+  // red를 별칭으로 바꾸면 그 항목은 낡은 것 — 쓰지 않는다
+  red.setValueForMode(prim.defaultModeId, { type: 'VARIABLE_ALIAS', id: blue.id });
+  const r = await createSemanticAliases({ 'color/background/default': 'color/0066ff', 'color/text/default': 'color/ff0000', 'color/border/default': 'red/500' });
+  assert.deepEqual(r.missing.sort(), ['color/ff0000', 'red/500']); // 별칭 변수는 이름이 같아도 쓰지 않는다
+  const sem = figma._state.collections.find((c) => c._pd['dsl.owned'] === 'semantic');
+  const made = figma._state.variables.find((v) => v.variableCollectionId === sem.id && v.name === 'color/background/default');
+  assert.deepEqual(made.valuesByMode[sem.defaultModeId], { type: 'VARIABLE_ALIAS', id: blue.id });
+});
+
+test('연결 — 새 역할은 플러그인 Semantic에, 별칭 대상은 사용자 Global 먼저 · 플러그인 Global의 별칭 변수는 대상 아님', async () => {
+  const figma = installFigma();
+  withRoot(figma);
+  const g = figma.variables.createVariableCollection('Global'); // 이어받을 플러그인 Global
+  const shortcut = figma.variables.createVariable('a/shortcut', g, 'COLOR'); // 별칭 변수(이름 순 첫 번째)
+  const pg = figma.variables.createVariable('b/blue', g, 'COLOR');
+  pg.setValueForMode(g.defaultModeId, rgbOf('#aa0000'));
+  shortcut.setValueForMode(g.defaultModeId, { type: 'VARIABLE_ALIAS', id: pg.id });
+  const prim = figma.variables.createVariableCollection('Primitives');
+  const up = figma.variables.createVariable('z/red', prim, 'COLOR');
+  up.setValueForMode(prim.defaultModeId, rgbOf('#aa0000'));
+  for (const v of [shortcut, pg, up]) v.scopes = ['ALL_SCOPES'];
   const node = {
-    type: 'FRAME', id: 'cr', name: 'cr',
+    type: 'FRAME', id: 'n', name: 'n',
     fills: [{ type: 'SOLID', color: { r: 0.6667, g: 0, b: 0 } }],
     layoutMode: 'NONE', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG',
     boundVariables: {}, setBoundVariable() {}, children: [],
   };
-  const r = await bindSelection([node]);
-  assert.equal(r.bound, 1);
-  assert.equal(r.candidates[0].tier, 2); // 역할 별칭(Semantic)이 이긴다 — 계층 판정이 살아 있다
+  const dry = await bindSelection([node], false);
+  assert.equal(dry.candidates.length, 1);
+  assert.equal(dry.candidates[0].newRole.globalId, up.id); // 사용자 Global 먼저
+  // 사용자 Global이 없으면 플러그인 Global의 직접 값 변수(별칭 shortcut 아님)
+  up.remove();
+  const dry2 = await bindSelection([node], false);
+  assert.equal(dry2.candidates[0].newRole.globalId, pg.id);
 });
 
-test('컬렉션 계층 지정 — 지정이 없으면 예전처럼 이름이 Global인 컬렉션만 계층(Primitives는 무시)', async () => {
+test('다크 — 플러그인 Semantic이 아니면 오류(바꾸지 않음) · 라이트 값은 사용자 Global의 기본 모드에서 읽고 dark/는 플러그인 Global에', async () => {
   const figma = installFigma();
-  figma.root = { getPluginData: () => '', setPluginData() {} };
-  figma.variables.createVariableCollection('Primitives');
-  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
-  const v = figma._state.variables.find((x) => x.name === 'spacing/8');
-  const col = figma._state.collections.find((c) => c.id === v.variableCollectionId);
-  assert.equal(col.name, 'Global');
+  withRoot(figma);
+  const prim = figma.variables.createVariableCollection('Primitives');
+  const white = figma.variables.createVariable('gray/0', prim, 'COLOR');
+  white.setValueForMode(prim.defaultModeId, rgbOf('#ffffff'));
+  const tokens = figma.variables.createVariableCollection('Tokens'); // 사용자 Semantic
+  const ut = figma.variables.createVariable('bg', tokens, 'COLOR');
+  ut.setValueForMode(tokens.defaultModeId, { type: 'VARIABLE_ALIAS', id: white.id });
+  const bad = await generateDarkMode(tokens.id);
+  assert.ok(bad.error);
+  assert.equal(tokens.modes.length, 1);
+  const sem = figma.variables.createVariableCollection('Semantic'); // 이어받을 플러그인 Semantic
+  const s1 = figma.variables.createVariable('color/background/default', sem, 'COLOR');
+  s1.setValueForMode(sem.defaultModeId, { type: 'VARIABLE_ALIAS', id: white.id });
+  const r = await generateDarkMode(sem.id);
+  assert.equal(r.realiased, 1);
+  const dark = figma._state.variables.find((v) => v.name === 'dark/gray/0');
+  const dcol = figma._state.collections.find((c) => c.id === dark.variableCollectionId);
+  assert.equal(dcol._pd['dsl.owned'], 'global');
+  assert.notEqual(dcol.id, prim.id);
 });
 
+test('팔레트 정리 — 플러그인 컬렉션 안에서만 지운다(사용자 컬렉션의 같은 패밀리 색은 보존)', async () => {
+  const figma = installFigma();
+  withRoot(figma);
+  const g = figma.variables.createVariableCollection('Global');
+  const prim = figma.variables.createVariableCollection('Primitives');
+  figma.variables.createVariable('color/blue/100', g, 'COLOR').setValueForMode(g.defaultModeId, rgbOf('#ddeeff'));
+  figma.variables.createVariable('color/blue/100', prim, 'COLOR').setValueForMode(prim.defaultModeId, rgbOf('#ddeeff'));
+  const removed = await prunePaletteColors(['color/blue/500']);
+  assert.equal(removed, 1);
+  assert.equal(figma._state.variables.filter((v) => v.variableCollectionId === prim.id).length, 1);
+});
 
 /* ---------- IA v3 §4.4: 변수 사용 수(보기 전용) — 인스턴스 안쪽 포함, 숨김 제외, 상한 없음 ---------- */
 test('countUsage — 인스턴스 안쪽까지 세고 숨긴 레이어는 뺀다, 곳·레이어 수', async () => {

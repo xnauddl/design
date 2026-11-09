@@ -1,80 +1,66 @@
 /* ============================================================
    tiers.ts — 변수 컬렉션 ↔ 3계층(Global/Semantic/Component) 판정 (순수, figma 의존 없음)
-   예전엔 컬렉션 **이름이 정확히** Global/Semantic/Component여야 계층으로 읽었다. 그래서
-   남이 만든 'Primitives'·'Tokens' 컬렉션은 바인딩 우선순위·역할 추천·내보내기에서 빠졌다.
-   이제 파일에 저장한 지정(역할 맵)을 먼저 보고, 지정이 없으면 예전처럼 정확한 이름으로 읽는다
-   — 지정을 안 하면 동작이 그대로라 기존 파일에 영향이 없다.
+   §2.13(2026-11-06 사용자 결정 B): 계층은 사용자가 지정하지 않는다.
+   - 플러그인 컬렉션(표시 `dsl.owned` 또는 이름 `Global`·`Semantic` 이어받기)은 그 역할 — collectionRoles.ts가 정한다.
+   - 사용자 컬렉션은 내용으로 판단한다(13.3): 판단할 변수 0개 → 계층 아님, 이름에 component → Component,
+     별칭 80% 이상 → Semantic, 직접 값 80% 이상 → Global, 그 사이 → 계층 아님.
    ============================================================ */
 
 export type TierRole = 'global' | 'semantic' | 'component';
-/** 역할 맵 값 — 'none'은 정확한 이름(예: 'Global')이어도 계층에서 빼라는 명시적 지정. */
-export type RoleValue = TierRole | 'none';
-/** 컬렉션 id → 지정. 파일(figma.root pluginData)에 JSON으로 저장된다. */
-export type RoleMap = Record<string, RoleValue>;
+/** 플러그인 컬렉션 역할 — Component 역할의 플러그인 컬렉션은 없다(13.1). */
+export type OwnedRole = 'global' | 'semantic';
 
 export const TIER_ROLES: readonly TierRole[] = ['global', 'semantic', 'component'];
 export const TIER_NUM: Record<TierRole, number> = { global: 1, semantic: 2, component: 3 };
-/** 지정이 없을 때 계층으로 읽는 정확한 이름(그리고 새로 만들 때 쓰는 이름). */
-export const CANONICAL_NAME: Record<TierRole, string> = { global: 'Global', semantic: 'Semantic', component: 'Component' };
+/** 플러그인 컬렉션 이름(이어받기 · 새로 만들 때). */
+export const CANONICAL_NAME: Record<OwnedRole, string> = { global: 'Global', semantic: 'Semantic' };
 
-const isRoleValue = (v: unknown): v is RoleValue => v === 'none' || TIER_ROLES.includes(v as TierRole);
-
-/** 저장된 문자열 → 역할 맵. 깨졌거나 비었으면 빈 맵(= 예전 동작). 알 수 없는 값은 버린다. */
-export function parseRoleMap(raw: string | null | undefined): RoleMap {
-  if (!raw) return {};
-  try {
-    const o = JSON.parse(raw) as unknown;
-    if (!o || typeof o !== 'object' || Array.isArray(o)) return {};
-    const out: RoleMap = {};
-    for (const [k, v] of Object.entries(o as Record<string, unknown>)) if (isRoleValue(v)) out[k] = v;
-    return out;
-  } catch {
-    return {};
-  }
+/** 계층 판단 근거 — 사이드바 배지 툴팁(§4.4)이 문구를 만든다. */
+export type TierWhy = { kind: 'owned' } | { kind: 'empty' | 'name' | 'ratio'; alias: number; counted: number };
+export interface TierInfo {
+  tier: number;
+  why: TierWhy;
 }
 
-/** 컬렉션의 역할 — 지정 우선, 없으면 정확한 이름. 'none' 지정이나 해당 없음은 null. */
-export function roleOfCollection(col: { id: string; name: string }, map: RoleMap): TierRole | null {
-  const set = map[col.id];
-  if (set) return set === 'none' ? null : set;
-  return TIER_ROLES.find((r) => CANONICAL_NAME[r] === col.name) ?? null;
+/** 판단할 변수 한 개의 기본 모드 값 요약 — 별칭이면 대상 컬렉션 id(로컬이 아니면 null = 라이브러리 · 삭제된 대상). */
+export interface TierSample {
+  alias: boolean;
+  targetCollection?: string | null;
 }
 
-/** 컬렉션의 계층 번호(Global 1 · Semantic 2 · Component 3 · 해당 없음 0). */
-export function tierOfCollection(col: { id: string; name: string }, map: RoleMap): number {
-  const r = roleOfCollection(col, map);
-  return r ? TIER_NUM[r] : 0;
+/** 이름에 단어 component · components가 있나(대소문자 무시, 13.3-2). */
+export function hasComponentWord(name: string): boolean {
+  return /\bcomponents?\b/i.test(name);
 }
 
 /**
- * 역할을 맡을 컬렉션 하나 — 쓰기(토큰 생성·별칭)의 대상.
- * 명시적으로 지정된 컬렉션이 정확한 이름의 컬렉션보다 먼저다('Primitives'를 Global로 지정했으면
- * 예전에 만든 'Global'이 남아 있어도 'Primitives'에 쓴다). 같은 순위 안에서는 목록 순서.
+ * 사용자 컬렉션의 계층(13.3). samples = 그 컬렉션 변수들의 기본 모드 값.
+ * 같은 컬렉션 안을 가리키는 별칭은 세지 않는다(원시값 컬렉션 안의 바로가기 때문에 흔들리지 않게).
+ * 경계는 정수로: 5a ≥ 4n → Semantic, 5a ≤ n → Global.
  */
-export function pickCollection<T extends { id: string; name: string }>(cols: readonly T[], map: RoleMap, role: TierRole): T | undefined {
-  return cols.find((c) => map[c.id] === role) ?? cols.find((c) => !map[c.id] && c.name === CANONICAL_NAME[role]);
+export function judgeUserTier(name: string, collectionId: string, samples: readonly TierSample[]): TierInfo {
+  let counted = 0;
+  let alias = 0;
+  for (const s of samples) {
+    if (s.alias && s.targetCollection === collectionId) continue;
+    counted++;
+    if (s.alias) alias++;
+  }
+  if (counted === 0) return { tier: 0, why: { kind: 'empty', alias, counted } };
+  if (hasComponentWord(name)) return { tier: 3, why: { kind: 'name', alias, counted } };
+  const tier = 5 * alias >= 4 * counted ? 2 : 5 * alias <= counted ? 1 : 0;
+  return { tier, why: { kind: 'ratio', alias, counted } };
 }
 
 /**
- * 지정 바꾸기 — 한 역할은 한 컬렉션만 맡는다(다른 컬렉션의 같은 역할 지정은 지운다).
- * role=null은 '지정 해제'(정확한 이름이면 다시 이름으로 읽힘), 'none'은 '계층 아님'으로 못 박기.
+ * 플러그인 컬렉션 고르기(13.2) — 순수 판정. marker = 컬렉션의 `dsl.owned` 값('' = 없음).
+ * 1. 그 역할 표시가 있는 첫 컬렉션. 2. 없으면 어떤 표시도 없고 이름이 정확히 Global · Semantic인 첫 컬렉션(이어받기).
+ * 한 컬렉션이 두 역할을 맡지 않는다(표시가 있으면 그 표시의 역할만).
  */
-export function assignRole(map: RoleMap, colId: string, role: RoleValue | null): RoleMap {
-  const out: RoleMap = {};
-  for (const [k, v] of Object.entries(map)) {
-    if (k === colId) continue;
-    if (role && role !== 'none' && v === role) continue; // 같은 역할은 하나만
-    out[k] = v;
+export function pickOwned<T extends { id: string; name: string }>(cols: readonly T[], marker: (c: T) => string): Record<OwnedRole, T | undefined> {
+  const out: Record<OwnedRole, T | undefined> = { global: undefined, semantic: undefined };
+  for (const role of ['global', 'semantic'] as const) {
+    out[role] = cols.find((c) => marker(c) === role) ?? cols.find((c) => !marker(c) && c.name === CANONICAL_NAME[role]);
   }
-  if (role) out[colId] = role;
   return out;
-}
-
-/** 이름으로 역할 추측 — 설정 화면의 '추천' 표시용일 뿐, 자동으로 적용하지 않는다. */
-export function guessRole(name: string): TierRole | null {
-  const n = name.toLowerCase();
-  if (/\bcomponents?\b/.test(n)) return 'component';
-  if (/semantic|alias|theme|role|system|^tokens?$/.test(n)) return 'semantic';
-  if (/global|primitive|core|base|palette|foundation|raw|ref(erence)?s?\b/.test(n)) return 'global';
-  return null;
 }

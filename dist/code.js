@@ -281,6 +281,11 @@
     "edit.discard": "\uBC84\uB9AC\uAE30",
     "edit.keep": "\uACC4\uC18D \uACE0\uCE58\uAE30",
     "vm.noTier": "\uACC4\uCE35 \uC544\uB2D8",
+    "vm.tierWhyOwned": "\uD50C\uB7EC\uADF8\uC778 \uCEEC\uB809\uC158",
+    "vm.tierWhyEmpty": "\uD310\uB2E8\uD560 \uBCC0\uC218 \uC5C6\uC74C \xB7 \uACC4\uCE35 \uC544\uB2D8",
+    "vm.tierWhyName": "\uC774\uB984 \xB7 Component",
+    "vm.tierWhyAlias": "\uBCC4\uCE6D {a}/{n} \xB7 {tier}",
+    "vm.tierWhyDirect": "\uC9C1\uC811 \uAC12 {d}/{n} \xB7 Global",
     "vm.dCollection": "\uCEEC\uB809\uC158",
     "vm.dScopes": "\uC6A9\uB3C4",
     "vm.dDesc": "\uC124\uBA85",
@@ -324,8 +329,7 @@
     "bind.maybeChanged": "\uD53C\uADF8\uB9C8\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC744 \uC218 \uC788\uC5B4\uC694",
     "bind.selChanged": "\uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uB2E4\uC2DC \uCC3E\uC544 \uC8FC\uC138\uC694",
     "bind.noLocalLib": "\uC774 \uD30C\uC77C\uC5D4 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
-    "bind.noTier": "\uBCC0\uC218\uB294 \uC788\uC9C0\uB9CC \uACC4\uCE35\uC774 \uC9C0\uC815\uB418\uC9C0 \uC54A\uC558\uC5B4\uC694",
-    "bind.gotoTiers": "\uACC4\uCE35 \uC9C0\uC815\uD558\uAE30 \u2192",
+    "bind.noTier": "\uBCC0\uC218\uB294 \uC788\uC9C0\uB9CC \uACC4\uCE35\uC73C\uB85C \uC4F8 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4\uC694",
     "bind.noVarsPaid": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
     "bind.noVarsFree": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694",
     "bind.tsDone": "\u2713 \uD14D\uC2A4\uD2B8 {n}\uAC1C\uC5D0 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
@@ -422,7 +426,6 @@
     "list.usesHead": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3 \xB7 \uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
     "list.usesMore": "\uC678 {n}\uAC1C",
     "list.viaAlias": "\uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC784: {names}",
-    "list.menuTiers": "\uCEEC\uB809\uC158 \uACC4\uCE35 \uC9C0\uC815\u2026",
     "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
     "list.menuExpandAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uD3BC\uCE58\uAE30",
     "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
@@ -458,7 +461,6 @@
     "op.rename": "\uC774\uB984 \uC815\uB9AC",
     "op.components": "\uCEF4\uD3EC\uB10C\uD2B8",
     "op.export": "\uB0B4\uBCF4\uB0B4\uAE30",
-    "op.roles": "\uACC4\uCE35 \uC9C0\uC815",
     "op.wizard": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
     // 변수 탭 하위 화면(PR 1 중간 상태)
     "var.goMake": "\uC0C9\uBD80\uD130 \uD558\uB098\uC529 \uB9CC\uB4E4\uAE30 \u2192",
@@ -478,17 +480,6 @@
     "rail.next": "\uB2E4\uC74C \u2192",
     // 플러그인 설정(#19) — 설정 탭에만
     "settings.title": "\uAE30\uBCF8\uAC12",
-    "colRoles.title": "\uCEEC\uB809\uC158 \uACC4\uCE35",
-    "colRoles.hint": "\uC774\uB984\uC774 Global\xB7Semantic\xB7Component\uAC00 \uC544\uB2CC \uCEEC\uB809\uC158\uB3C4 \uACC4\uCE35\uC73C\uB85C \uC4F0\uAC8C \uC9C0\uC815\uD574\uC694. \uD30C\uC77C\uC5D0 \uC800\uC7A5\uB3FC \uC774 \uD30C\uC77C\uC744 \uC5EC\uB294 \uBAA8\uB450\uC5D0\uAC8C \uC801\uC6A9\uB3FC\uC694",
-    "colRoles.empty": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4\uC694.",
-    "colRoles.vars": "\uBCC0\uC218 {n}",
-    "colRoles.auto": "\uC790\uB3D9 \u2014 {role}",
-    "colRoles.autoNone": "\uC790\uB3D9 \u2014 \uACC4\uCE35 \uC544\uB2D8",
-    "colRoles.none": "\uACC4\uCE35 \uC544\uB2D8",
-    "colRoles.guess": "\uCD94\uCC9C: {role}",
-    "colRoles.useGuess": "\uCD94\uCC9C\uB300\uB85C",
-    "colRoles.saved": "{name} \u2192 {role}. \uC5F0\uACB0\xB7\uC5ED\uD560 \uCD94\uCC9C\xB7\uB0B4\uBCF4\uB0B4\uAE30\uAC00 \uC774 \uC9C0\uC815\uC744 \uB530\uB77C\uC694",
-    "colRoles.dup": "{role}\uC740(\uB294) \uD55C \uCEEC\uB809\uC158\uB9CC \uB9E1\uC544\uC694 \u2014 {prev}\uC758 \uC9C0\uC815\uC740 \uD480\uC5C8\uC5B4\uC694.",
     "settings.hint": "\uB9CC\uB4E4\uAE30 \xB7 \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uC5D0 \uC4F0\uB294 \uAC12\uC774\uC5D0\uC694",
     "settings.base": "\uAE30\uC900 \uD06C\uAE30",
     "settings.depth": "\uC774\uB984 \uC815\uB9AC \uAE4A\uC774",
@@ -820,6 +811,7 @@
     "dark.skippedDirect": " \xB7 \uAC74\uB108\uB700 {n}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
     "dark.done": "{modePart}\uB2E4\uD06C {n}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 {c}\uAC1C{skipPart}",
     "dark.errNoCol": "\uCEEC\uB809\uC158\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
+    "dark.errNotOwned": "\uB2E4\uD06C\uB294 \uD50C\uB7EC\uADF8\uC778 Semantic\uC5D0\uB9CC \uB9CC\uB4E4\uC5B4\uC694",
     "dark.errAddMode": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
     "dark.errAddModePlan": "\uD50C\uB79C\uC5D0\uC11C \uBAA8\uB4DC\uB97C \uB354 \uB9CC\uB4E4 \uC218 \uC5C6\uC744 \uC218 \uC788\uC5B4\uC694.",
     "dark.errSameMode": "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694 \u2014 \uB77C\uC774\uD2B8\uC5D0 \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
@@ -1373,13 +1365,13 @@
       if (!m) byBase.set(r.base, m = /* @__PURE__ */ new Map());
       m.set(r.value, ((_a = m.get(r.value)) != null ? _a : 0) + r.count);
     }
-    const taken = new Map(existing);
+    const taken = new Map([...existing].map(([n, v]) => [n, typeof v === "string" ? v ? [v] : [] : v]));
     for (const [base, values] of byBase) {
       const re = suffixRe(base);
       const order = [...values.entries()].sort((a, b) => b[1] - a[1] || cmpValue(a[0], b[0]));
       for (const [value] of order) {
         let name;
-        for (const [n, v] of taken) if (v === value && re.test(n)) {
+        for (const [n, v] of taken) if (v.includes(value) && re.test(n)) {
           name = pick(name, n, base);
         }
         if (!name) {
@@ -1388,7 +1380,7 @@
             name = `${base}-${i}`;
             break;
           }
-          taken.set(name, value);
+          taken.set(name, [value]);
         }
         out.set(`${base}\0${value}`, name);
       }
@@ -1726,83 +1718,97 @@
   }
 
   // src/lib/tiers.ts
-  var TIER_ROLES = ["global", "semantic", "component"];
   var TIER_NUM = { global: 1, semantic: 2, component: 3 };
-  var CANONICAL_NAME = { global: "Global", semantic: "Semantic", component: "Component" };
-  var isRoleValue = (v) => v === "none" || TIER_ROLES.includes(v);
-  function parseRoleMap(raw) {
-    if (!raw) return {};
-    try {
-      const o = JSON.parse(raw);
-      if (!o || typeof o !== "object" || Array.isArray(o)) return {};
-      const out = {};
-      for (const [k, v] of Object.entries(o)) if (isRoleValue(v)) out[k] = v;
-      return out;
-    } catch (e) {
-      return {};
+  var CANONICAL_NAME = { global: "Global", semantic: "Semantic" };
+  function hasComponentWord(name) {
+    return /\bcomponents?\b/i.test(name);
+  }
+  function judgeUserTier(name, collectionId, samples) {
+    let counted = 0;
+    let alias = 0;
+    for (const s of samples) {
+      if (s.alias && s.targetCollection === collectionId) continue;
+      counted++;
+      if (s.alias) alias++;
     }
+    if (counted === 0) return { tier: 0, why: { kind: "empty", alias, counted } };
+    if (hasComponentWord(name)) return { tier: 3, why: { kind: "name", alias, counted } };
+    const tier = 5 * alias >= 4 * counted ? 2 : 5 * alias <= counted ? 1 : 0;
+    return { tier, why: { kind: "ratio", alias, counted } };
   }
-  function roleOfCollection(col, map) {
+  function pickOwned(cols, marker) {
     var _a;
-    const set = map[col.id];
-    if (set) return set === "none" ? null : set;
-    return (_a = TIER_ROLES.find((r) => CANONICAL_NAME[r] === col.name)) != null ? _a : null;
-  }
-  function tierOfCollection(col, map) {
-    const r = roleOfCollection(col, map);
-    return r ? TIER_NUM[r] : 0;
-  }
-  function pickCollection(cols, map, role) {
-    var _a;
-    return (_a = cols.find((c) => map[c.id] === role)) != null ? _a : cols.find((c) => !map[c.id] && c.name === CANONICAL_NAME[role]);
-  }
-  function assignRole(map, colId, role) {
-    const out = {};
-    for (const [k, v] of Object.entries(map)) {
-      if (k === colId) continue;
-      if (role && role !== "none" && v === role) continue;
-      out[k] = v;
+    const out = { global: void 0, semantic: void 0 };
+    for (const role of ["global", "semantic"]) {
+      out[role] = (_a = cols.find((c) => marker(c) === role)) != null ? _a : cols.find((c) => !marker(c) && c.name === CANONICAL_NAME[role]);
     }
-    if (role) out[colId] = role;
     return out;
-  }
-  function guessRole(name) {
-    const n = name.toLowerCase();
-    if (/\bcomponents?\b/.test(n)) return "component";
-    if (/semantic|alias|theme|role|system|^tokens?$/.test(n)) return "semantic";
-    if (/global|primitive|core|base|palette|foundation|raw|ref(erence)?s?\b/.test(n)) return "global";
-    return null;
   }
 
   // src/lib/collectionRoles.ts
-  var ROLE_MAP_KEY = "dsl.collectionRoles";
-  function readRoleMap() {
-    var _a;
+  var OWNED_KEY = "dsl.owned";
+  function ownedMarker(c) {
     try {
-      const root = figma.root;
-      return parseRoleMap((_a = root == null ? void 0 : root.getPluginData) == null ? void 0 : _a.call(root, ROLE_MAP_KEY));
+      const fn = c.getPluginData;
+      return typeof fn === "function" ? fn.call(c, OWNED_KEY) || "" : "";
     } catch (e) {
-      return {};
+      return "";
     }
   }
-  function writeRoleMap(map) {
-    figma.root.setPluginData(ROLE_MAP_KEY, JSON.stringify(map));
+  function ownedCollections(cols) {
+    return pickOwned(cols, ownedMarker);
   }
-  function findCollection(cols, role) {
-    return pickCollection(cols, readRoleMap(), role);
+  function ownedCollection(cols, role) {
+    return ownedCollections(cols)[role];
   }
-  function ensureCollection(cols, role, name) {
+  function ensureOwnedCollection(cols, role) {
     var _a;
-    return (_a = findCollection(cols, role)) != null ? _a : figma.variables.createVariableCollection(name);
+    const found = ownedCollection(cols, role);
+    const col = found != null ? found : figma.variables.createVariableCollection(CANONICAL_NAME[role]);
+    if (ownedMarker(col) !== role) {
+      try {
+        (_a = col.setPluginData) == null ? void 0 : _a.call(col, OWNED_KEY, role);
+      } catch (e) {
+      }
+    }
+    return col;
   }
-  function collectionTiers(cols) {
-    const map = readRoleMap();
-    return new Map(cols.map((c) => [c.id, tierOfCollection(c, map)]));
+  function samplesByCollection(cols, vars) {
+    var _a, _b, _c;
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const colOfVar = new Map(vars.map((v) => [v.id, v.variableCollectionId]));
+    const out = /* @__PURE__ */ new Map();
+    for (const v of vars) {
+      const raw = (_b = v.valuesByMode) == null ? void 0 : _b[(_a = modeOf.get(v.variableCollectionId)) != null ? _a : ""];
+      const isAlias2 = !!raw && typeof raw === "object" && raw.type === "VARIABLE_ALIAS";
+      const s = isAlias2 ? { alias: true, targetCollection: (_c = colOfVar.get(raw.id)) != null ? _c : null } : { alias: false };
+      const arr = out.get(v.variableCollectionId);
+      if (arr) arr.push(s);
+      else out.set(v.variableCollectionId, [s]);
+    }
+    return out;
+  }
+  function collectionTierInfo(cols, vars) {
+    var _a;
+    const owned = ownedCollections(cols);
+    const samples = samplesByCollection(cols, vars);
+    const out = /* @__PURE__ */ new Map();
+    for (const c of cols) {
+      const role = owned.global === c ? "global" : owned.semantic === c ? "semantic" : null;
+      out.set(c.id, role ? { tier: TIER_NUM[role], why: { kind: "owned" } } : judgeUserTier(c.name, c.id, (_a = samples.get(c.id)) != null ? _a : []));
+    }
+    return out;
+  }
+  function collectionTiers(cols, vars) {
+    return new Map([...collectionTierInfo(cols, vars)].map(([id, i]) => [id, i.tier]));
+  }
+  function ownedIds(cols) {
+    var _a, _b;
+    const o = ownedCollections(cols);
+    return new Set([(_a = o.global) == null ? void 0 : _a.id, (_b = o.semantic) == null ? void 0 : _b.id].filter((x) => !!x));
   }
 
   // src/lib/variables.ts
-  var GLOBAL = "Global";
-  var SEMANTIC = "Semantic";
   var vkey = (collectionId, name) => `${collectionId}\0${name}`;
   async function buildVarIndex() {
     const idx = /* @__PURE__ */ new Map();
@@ -1819,42 +1825,121 @@
     idx.set(k, variable);
     return { variable, created: true };
   }
-  async function resolveCollections() {
+  var REUSE_MAP_KEY = "dsl.reuseMap";
+  function literalOf(t2, type, base) {
+    var _a;
+    if (type === "COLOR") return String(t2.value).toLowerCase();
+    if (type === "STRING") return String(t2.value);
+    return t2.unit && t2.unit !== "px" && typeof t2.value === "number" ? toPx(t2.value, t2.unit, { base, fontSize: (_a = t2.fontSize) != null ? _a : base }) : Number(t2.value);
+  }
+  function directValue(v, modeOf) {
+    var _a;
+    const raw = v.valuesByMode[(_a = modeOf.get(v.variableCollectionId)) != null ? _a : ""];
+    if (raw == null || typeof raw === "object" && raw.type === "VARIABLE_ALIAS") return void 0;
+    return raw;
+  }
+  function sameLiteral(raw, lit, type) {
+    if (raw == null) return false;
+    if (type === "COLOR") {
+      if (typeof raw !== "object" || !("r" in raw)) return false;
+      const a = raw.a;
+      return (typeof a !== "number" || a === 1) && rgbToHex(raw).toLowerCase() === lit;
+    }
+    if (type === "STRING") return typeof raw === "string" && raw === lit;
+    return typeof raw === "number" && Math.round(raw * 100) === Math.round(Number(lit) * 100);
+  }
+  async function pickReusable(tokens, base) {
+    const out = /* @__PURE__ */ new Map();
+    const withUses = tokens.filter((t2) => {
+      var _a;
+      return (_a = t2.uses) == null ? void 0 : _a.length;
+    });
+    if (!withUses.length) return out;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const globalCol = ensureCollection(cols, "global", GLOBAL);
-    const semanticCol = ensureCollection(cols, "semantic", SEMANTIC);
-    return { globalCol, semanticCol };
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const owned = ownedIds(cols);
+    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const userGlobals = vars.filter((v) => tiers.get(v.variableCollectionId) === 1 && !owned.has(v.variableCollectionId)).sort((a, b) => {
+      var _a, _b;
+      return ((_a = colIdx.get(a.variableCollectionId)) != null ? _a : 0) - ((_b = colIdx.get(b.variableCollectionId)) != null ? _b : 0) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    });
+    for (const t2 of withUses) {
+      const type = resolvedTypeForToken(t2);
+      const lit = literalOf(t2, type, base);
+      const allowed = scopesForType(scopesForSources(t2.sources), type);
+      const hit = userGlobals.find((v) => {
+        var _a;
+        if (v.resolvedType !== type) return false;
+        const sc = (_a = v.scopes) != null ? _a : [];
+        if (!sc.includes("ALL_SCOPES") && !allowed.some((x) => sc.includes(x))) return false;
+        return sameLiteral(directValue(v, modeOf), lit, type);
+      });
+      if (hit) out.set(t2.name, hit);
+    }
+    return out;
+  }
+  function readReuseMap() {
+    var _a, _b;
+    try {
+      const raw = (_b = (_a = figma.root) == null ? void 0 : _a.getPluginData) == null ? void 0 : _b.call(_a, REUSE_MAP_KEY);
+      const o = raw ? JSON.parse(raw) : {};
+      return o && typeof o === "object" && !Array.isArray(o) ? o : {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function writeReuseMap(map) {
+    var _a, _b;
+    try {
+      (_b = (_a = figma.root) == null ? void 0 : _a.setPluginData) == null ? void 0 : _b.call(_a, REUSE_MAP_KEY, JSON.stringify(map));
+    } catch (e) {
+    }
   }
   async function createTokens(tokens, base) {
-    const { globalCol } = await resolveCollections();
-    const gMode = globalCol.defaultModeId;
-    const idx = await buildVarIndex();
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base) };
-    const touched = /* @__PURE__ */ new Set();
-    for (const t2 of tokens) {
-      const type = resolvedTypeForToken(t2);
-      const g = upsertVariable(t2.name, globalCol, type, idx);
-      summary[g.created ? "created" : "updated"]++;
-      summary.globals++;
-      setGlobalLiteral(g.variable, gMode, t2, type, base);
-      const scopes = scopesForType(scopesForSources(t2.sources), type);
-      const key = vkey(globalCol.id, t2.name);
-      const merged = touched.has(key) ? scopesForType([.../* @__PURE__ */ new Set([...g.variable.scopes, ...scopes])], type) : scopes;
-      touched.add(key);
-      g.variable.scopes = merged;
-      g.variable.hiddenFromPublishing = true;
-      const desc = unitDescription(t2);
-      if (desc) g.variable.description = desc;
+    const reuse = await pickReusable(tokens, base);
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map() };
+    const reuseMap = readReuseMap();
+    const toCreate = tokens.filter((t2) => !reuse.has(t2.name));
+    for (const [name, v] of reuse) {
+      summary.globalOf.set(name, v.id);
+      reuseMap[name] = v.id;
     }
+    if (toCreate.length) {
+      const globalCol = ensureOwnedCollection(await figma.variables.getLocalVariableCollectionsAsync(), "global");
+      const gMode = globalCol.defaultModeId;
+      const idx = await buildVarIndex();
+      const touched = /* @__PURE__ */ new Set();
+      for (const t2 of toCreate) {
+        const type = resolvedTypeForToken(t2);
+        const g = upsertVariable(t2.name, globalCol, type, idx);
+        summary[g.created ? "created" : "updated"]++;
+        summary.globals++;
+        summary.globalOf.set(t2.name, g.variable.id);
+        delete reuseMap[t2.name];
+        setGlobalLiteral(g.variable, gMode, t2, type, base);
+        const scopes = scopesForType(scopesForSources(t2.sources), type);
+        const key = vkey(globalCol.id, t2.name);
+        const merged = touched.has(key) ? scopesForType([.../* @__PURE__ */ new Set([...g.variable.scopes, ...scopes])], type) : scopes;
+        touched.add(key);
+        g.variable.scopes = merged;
+        g.variable.hiddenFromPublishing = true;
+        const desc = unitDescription(t2);
+        if (desc) g.variable.description = desc;
+      }
+    }
+    writeReuseMap(reuseMap);
     return summary;
   }
   async function previewCreateTokens(tokens, base) {
     var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const gId = (_b = (_a = findCollection(cols, "global")) == null ? void 0 : _a.id) != null ? _b : "#G";
+    const gId = (_b = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id) != null ? _b : "#G";
+    const reuse = await pickReusable(tokens, base);
     const existing = /* @__PURE__ */ new Set();
     for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base) };
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map() };
     const seen = /* @__PURE__ */ new Set();
     const tally = (colId, name, kind) => {
       const k = vkey(colId, name);
@@ -1866,20 +1951,24 @@
       seen.add(k);
       summary[existing.has(k) ? "updated" : "created"]++;
     };
-    for (const t2 of tokens) tally(gId, t2.name, "globals");
+    for (const t2 of tokens) {
+      const r = reuse.get(t2.name);
+      if (r) summary.globalOf.set(t2.name, r.id);
+      else tally(gId, t2.name, "globals");
+    }
     return summary;
   }
-  async function createUsageRoles(tokens, preview = false) {
-    var _a, _b, _c, _d, _e, _f;
+  async function createUsageRoles(tokens, preview = false, globalOf) {
+    var _a, _b, _c, _d, _e, _f, _g;
     const withUses = tokens.filter((t2) => {
       var _a2;
       return (_a2 = t2.uses) == null ? void 0 : _a2.length;
     });
     if (!withUses.length) return 0;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const globalCol = findCollection(cols, "global");
-    if (!globalCol) return 0;
     const vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const owned = ownedIds(cols);
     const byId = new Map(vars.map((v) => [v.id, v]));
     const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
     const resolve = (v) => {
@@ -1897,12 +1986,24 @@
       if (typeof val === "object" && "r" in val) return valueKey(rgbToHex(val));
       return typeof val === "number" || typeof val === "string" ? valueKey(val) : "";
     };
-    const semCol = findCollection(cols, "semantic");
+    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+    const rank = (id) => {
+      var _a2;
+      return (owned.has(id) ? 1e6 : 0) + ((_a2 = colIdx.get(id)) != null ? _a2 : 0);
+    };
     const existing = /* @__PURE__ */ new Map();
-    if (semCol) {
-      for (const v of vars) if (v.variableCollectionId === semCol.id) existing.set(v.name, keyOfValue(resolve(v)));
+    for (const v of vars.filter((x) => tiers.get(x.variableCollectionId) === 2).sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
+      const k = keyOfValue(resolve(v));
+      const arr = existing.get(v.name);
+      if (!arr) existing.set(v.name, k ? [k] : []);
+      else if (k && !arr.includes(k)) arr.push(k);
     }
-    const globalByName = new Map(vars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
+    const pluginGlobal = ownedCollection(cols, "global");
+    const globalFor = (t2) => {
+      const id = globalOf == null ? void 0 : globalOf.get(t2.name);
+      if (id) return byId.get(id);
+      return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === t2.name) : void 0;
+    };
     const reqs = [];
     const colorUses = /* @__PURE__ */ new Map();
     for (const t2 of withUses) {
@@ -1915,7 +2016,7 @@
       }
     }
     for (const [use, list] of colorUses) {
-      const defKey = existing.get(`${use}/default`);
+      const defKey = (_c = existing.get(`${use}/default`)) == null ? void 0 : _c[0];
       const bases = colorRoleBases(
         list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg })),
         defKey || void 0,
@@ -1923,27 +2024,28 @@
       );
       for (const x of list) {
         const hex = String(x.token.value).toLowerCase();
-        reqs.push({ base: `${use}/${(_c = bases.get(colorSlotKey(hex, x.bg))) != null ? _c : "default"}`, value: valueKey(hex), count: x.count, token: x.token });
+        reqs.push({ base: `${use}/${(_d = bases.get(colorSlotKey(hex, x.bg))) != null ? _d : "default"}`, value: valueKey(hex), count: x.count, token: x.token });
       }
     }
     const names = assignNames(reqs, existing);
     const toMake = /* @__PURE__ */ new Map();
     for (const r of reqs) {
-      const name = (_d = names.get(`${r.base}\0${r.value}`)) != null ? _d : r.base;
+      const name = (_e = names.get(`${r.base}\0${r.value}`)) != null ? _e : r.base;
       if (existing.has(name) || toMake.has(name)) continue;
       toMake.set(name, r.token);
     }
     if (preview) return toMake.size;
-    const col = semCol != null ? semCol : ensureCollection(cols, "semantic", SEMANTIC);
+    if (!toMake.size) return 0;
+    const col = ensureOwnedCollection(cols, "semantic");
     let made = 0;
     for (const [name, t2] of toMake) {
-      const g = globalByName.get(t2.name);
+      const g = globalFor(t2);
       if (!g) continue;
       const v = figma.variables.createVariable(name, col, g.resolvedType);
       for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
-      v.scopes = scopesForType((_e = scopeForSemanticRole(name)) != null ? _e : g.scopes, g.resolvedType);
+      v.scopes = scopesForType((_f = scopeForSemanticRole(name)) != null ? _f : g.scopes, g.resolvedType);
       try {
-        (_f = v.setPluginData) == null ? void 0 : _f.call(v, AUTO_ROLE_KEY, "1");
+        (_g = v.setPluginData) == null ? void 0 : _g.call(v, AUTO_ROLE_KEY, "1");
       } catch (e) {
       }
       made++;
@@ -1966,8 +2068,7 @@
     const keepSet = new Set(keep);
     const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f) => f !== null));
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const tiers = collectionTiers(cols);
-    const palIds = new Set(cols.filter((c) => tiers.get(c.id) === 1 || tiers.get(c.id) === 2).map((c) => c.id));
+    const palIds = ownedIds(cols);
     let removed = 0;
     for (const v of await figma.variables.getLocalVariablesAsync()) {
       if (!palIds.has(v.variableCollectionId)) continue;
@@ -1980,26 +2081,38 @@
     return removed;
   }
   async function createSemanticAliases(map) {
-    var _a;
+    var _a, _b, _c, _d;
     const summary = { created: 0, updated: 0, aliased: 0, missing: [] };
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const globalCol = findCollection(cols, "global");
-    if (!globalCol) {
-      summary.missing = Object.values(map);
-      return summary;
-    }
-    const semanticCol = ensureCollection(cols, "semantic", SEMANTIC);
-    const sMode = semanticCol.defaultModeId;
-    const idx = await buildVarIndex();
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const pluginGlobalId = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id;
+    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+    const globals = vars.filter((v) => tiers.get(v.variableCollectionId) === 1 && directValue(v, modeOf) !== void 0).sort((a, b) => {
+      var _a2, _b2;
+      return Number(b.variableCollectionId === pluginGlobalId) - Number(a.variableCollectionId === pluginGlobalId) || ((_a2 = colIdx.get(a.variableCollectionId)) != null ? _a2 : 0) - ((_b2 = colIdx.get(b.variableCollectionId)) != null ? _b2 : 0);
+    });
+    const byName2 = /* @__PURE__ */ new Map();
+    for (const v of globals) if (!byName2.has(v.name)) byName2.set(v.name, v);
+    const okIds = new Map(globals.map((v) => [v.id, v]));
+    const reuseMap = readReuseMap();
+    let semanticCol;
+    let idx;
     for (const [semName, globalName] of Object.entries(map)) {
-      const g = idx.get(vkey(globalCol.id, globalName));
+      const g = (_c = byName2.get(globalName)) != null ? _c : okIds.get((_b = reuseMap[globalName]) != null ? _b : "");
       if (!g) {
         summary.missing.push(globalName);
         continue;
       }
+      if (!semanticCol || !idx) {
+        semanticCol = ensureOwnedCollection(cols, "semantic");
+        idx = await buildVarIndex();
+      }
+      const sMode = semanticCol.defaultModeId;
       const u = upsertVariable(semName, semanticCol, g.resolvedType, idx);
       u.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g));
-      u.variable.scopes = scopesForType((_a = scopeForSemanticRole(semName)) != null ? _a : g.scopes, g.resolvedType);
+      u.variable.scopes = scopesForType((_d = scopeForSemanticRole(semName)) != null ? _d : g.scopes, g.resolvedType);
       summary[u.created ? "created" : "updated"]++;
       summary.aliased++;
     }
@@ -2237,7 +2350,7 @@
     }
     if (roleRenames.length) {
       const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-      const semId0 = (_a = findCollection(cols0, "semantic")) == null ? void 0 : _a.id;
+      const semId0 = (_a = ownedCollection(cols0, "semantic")) == null ? void 0 : _a.id;
       if (semId0) {
         const byName2 = /* @__PURE__ */ new Map();
         for (const v of await figma.variables.getLocalVariablesAsync())
@@ -2314,7 +2427,7 @@
     }
     {
       const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-      const semId0 = (_d = findCollection(cols0, "semantic")) == null ? void 0 : _d.id;
+      const semId0 = (_d = ownedCollection(cols0, "semantic")) == null ? void 0 : _d.id;
       const semNames = /* @__PURE__ */ new Set();
       if (semId0) {
         for (const v of await figma.variables.getLocalVariablesAsync())
@@ -2331,7 +2444,7 @@
     if (tokens.length) await createTokens(tokens, 16);
     if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_e = findCollection(cols, "semantic")) == null ? void 0 : _e.id;
+    const semId = (_e = ownedCollection(cols, "semantic")) == null ? void 0 : _e.id;
     const semByName = /* @__PURE__ */ new Map();
     if (semId) {
       for (const v of await figma.variables.getLocalVariablesAsync())
@@ -3156,28 +3269,45 @@
     return res;
   }
   async function buildIndex() {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const tierOf = collectionTiers(cols);
     const vars = await figma.variables.getLocalVariablesAsync();
+    const tierOf = collectionTiers(cols, vars);
+    const owned = ownedIds(cols);
+    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
     const globalNames = new Set(vars.filter((v) => tierOf.get(v.variableCollectionId) === 1).map((v) => v.name));
     const entries = [];
     const semNames = /* @__PURE__ */ new Map();
+    const addSem = (name, key) => {
+      const arr = semNames.get(name);
+      if (!arr) semNames.set(name, key ? [key] : []);
+      else if (key && !arr.includes(key)) arr.push(key);
+    };
     for (const v of vars) {
       const tier = (_a = tierOf.get(v.variableCollectionId)) != null ? _a : 0;
       if (tier < 1) continue;
       const val = await resolveValue(v, modeOf);
-      if (tier === 2) semNames.set(v.name, "");
+      if (tier === 2) addSem(v.name, "");
       if (val == null) continue;
-      const e = { variable: v, tier, type: v.resolvedType, scopes: (_b = v.scopes) != null ? _b : ["ALL_SCOPES"] };
+      const raw = v.valuesByMode[(_b = modeOf.get(v.variableCollectionId)) != null ? _b : ""];
+      const direct = !(raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS");
+      const e = {
+        variable: v,
+        tier,
+        type: v.resolvedType,
+        scopes: (_c = v.scopes) != null ? _c : ["ALL_SCOPES"],
+        user: !owned.has(v.variableCollectionId),
+        colIdx: (_d = colIdx.get(v.variableCollectionId)) != null ? _d : 0,
+        direct
+      };
       if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
       if (tier === 2 && readAutoRole(v)) e.auto = true;
       if (v.resolvedType === "COLOR" && isRGB(val)) {
         if (isOpaqueColorValue(val)) e.colorHex = rgbToHex(val);
       } else if (v.resolvedType === "FLOAT" && typeof val === "number") e.num = val;
       else if (v.resolvedType === "STRING" && typeof val === "string") e.str = val;
-      if (tier === 2) semNames.set(v.name, entryKey(e));
+      if (tier === 2) addSem(v.name, entryKey(e));
       entries.push(e);
     }
     entries.sort((a, b) => b.tier - a.tier);
@@ -3235,7 +3365,8 @@
       return e.str != null && e.str === s.value;
     });
   }
-  var byName = (a, b) => a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : 0;
+  var byName = (a, b) => a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : Number(b.user) - Number(a.user) || a.colIdx - b.colIdx;
+  var byUserThenName = (a, b) => Number(b.user) - Number(a.user) || byName(a, b);
   var nameRe = (base) => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:-\\d+)?$`);
   function pickDesigned(cands, kind) {
     var _a;
@@ -3255,7 +3386,7 @@
     };
     const globalFor = (cands) => {
       var _a2;
-      return (_a2 = cands.filter((e) => e.tier === 1).sort(byName)[0]) != null ? _a2 : null;
+      return (_a2 = cands.filter((e) => e.tier === 1 && e.direct).sort(byUserThenName)[0]) != null ? _a2 : null;
     };
     for (const s of ctx.slots) {
       const cands = sameValueEntries(ctx, s);
@@ -3291,7 +3422,7 @@
         if (c) c.count++;
         else counts.set(k, { hex: x.slot.value, count: 1, bg: x.slot.bg });
       }
-      const def = ctx.index.entries.find((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex);
+      const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
       const bases = colorRoleBases([...counts.values()], def == null ? void 0 : def.colorHex, use);
       for (const x of list) {
         const base = `color/${use}/${(_a = bases.get(colorSlotKey(x.slot.value, x.slot.bg))) != null ? _a : "default"}`;
@@ -3775,12 +3906,19 @@
   async function createRole(spec, global) {
     var _a;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const col = ensureCollection(cols, "semantic", "Semantic");
-    const inCol = (await figma.variables.getLocalVariablesAsync()).filter((v2) => v2.variableCollectionId === col.id);
-    const pointsAtGlobal = (v2) => v2.resolvedType === global.resolvedType && col.modes.every((m) => {
-      const val = v2.valuesByMode[m.modeId];
-      return !!val && typeof val === "object" && val.type === "VARIABLE_ALIAS" && val.id === global.id;
-    });
+    const all = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, all);
+    const col = ensureOwnedCollection(cols, "semantic");
+    const semCols = new Map(cols.filter((c) => tiers.get(c.id) === 2).map((c) => [c.id, c]));
+    semCols.set(col.id, col);
+    const inCol = all.filter((v2) => semCols.has(v2.variableCollectionId));
+    const pointsAtGlobal = (v2) => {
+      var _a2;
+      return v2.resolvedType === global.resolvedType && ((_a2 = semCols.get(v2.variableCollectionId)) != null ? _a2 : col).modes.every((m) => {
+        const val = v2.valuesByMode[m.modeId];
+        return !!val && typeof val === "object" && val.type === "VARIABLE_ALIAS" && val.id === global.id;
+      });
+    };
     const re = new RegExp(`^${spec.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:-\\d+)?$`);
     const same = inCol.filter((v2) => re.test(v2.name) && pointsAtGlobal(v2)).sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : 1))[0];
     if (same) return same;
@@ -7521,13 +7659,14 @@
     return { modeId, created: true };
   }
   async function generateDarkMode(collectionId, fromModeId, toModeId) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     let created = 0;
     let realiased = 0;
     let skipped = 0;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const semanticCol = cols.find((c) => c.id === collectionId);
     if (!semanticCol) return { created, realiased, skipped, error: t("dark.errNoCol") };
+    if (((_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.id) !== semanticCol.id) return { created, realiased, skipped, error: t("dark.errNotOwned") };
     let modeCreated = false;
     let to = toModeId;
     if (!to) {
@@ -7548,7 +7687,7 @@
     let from = fromModeId;
     if (!from) {
       const def = semanticCol.defaultModeId;
-      from = def === to ? (_b = (_a = semanticCol.modes.find((m) => m.modeId !== to)) == null ? void 0 : _a.modeId) != null ? _b : def : def;
+      from = def === to ? (_c = (_b = semanticCol.modes.find((m) => m.modeId !== to)) == null ? void 0 : _b.modeId) != null ? _c : def : def;
     }
     if (from === to) {
       return __spreadProps(__spreadValues({
@@ -7559,11 +7698,11 @@
         error: t("dark.errSameMode")
       });
     }
-    const globalCol = ensureCollection(cols, "global", GLOBAL);
-    const gMode = globalCol.defaultModeId;
+    let globalCol = ownedCollection(cols, "global");
     const allVars = await figma.variables.getLocalVariablesAsync();
     const byId = new Map(allVars.map((v) => [v.id, v]));
-    const globalByName = new Map(allVars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const globalByName = new Map(globalCol ? allVars.filter((v) => v.variableCollectionId === (globalCol == null ? void 0 : globalCol.id)).map((v) => [v.name, v]) : []);
     for (const v of allVars) {
       if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
       const fromRaw = v.valuesByMode[from];
@@ -7572,7 +7711,7 @@
         continue;
       }
       const lightGlobal = byId.get(fromRaw.id);
-      const lightRaw = lightGlobal == null ? void 0 : lightGlobal.valuesByMode[gMode];
+      const lightRaw = lightGlobal == null ? void 0 : lightGlobal.valuesByMode[(_d = modeOf.get(lightGlobal.variableCollectionId)) != null ? _d : ""];
       if (!lightGlobal || !(lightRaw && typeof lightRaw === "object" && "r" in lightRaw)) {
         skipped++;
         continue;
@@ -7584,6 +7723,8 @@
       const darkHex = darkValueForLight(rgbToHex(lightRaw));
       const dname = darkGlobalName(lightGlobal.name);
       let dark = globalByName.get(dname);
+      if (!dark || !globalCol) globalCol = ensureOwnedCollection(cols, "global");
+      const gMode = globalCol.defaultModeId;
       if (!dark) {
         dark = figma.variables.createVariable(dname, globalCol, "COLOR");
         dark.scopes = lightGlobal.scopes;
@@ -7752,25 +7893,26 @@
     }
   }
   async function postPrereq() {
+    var _a, _b;
     try {
       const cols = await figma.variables.getLocalVariableCollectionsAsync();
-      const tiers = collectionTiers(cols);
+      const vars = await figma.variables.getLocalVariablesAsync();
+      const tiers = collectionTiers(cols, vars);
       const globalIds = new Set(cols.filter((c) => tiers.get(c.id) === 1).map((c) => c.id));
       const bindableIds = new Set(cols.filter((c) => {
-        var _a;
-        return ((_a = tiers.get(c.id)) != null ? _a : 0) > 0;
+        var _a2;
+        return ((_a2 = tiers.get(c.id)) != null ? _a2 : 0) > 0;
       }).map((c) => c.id));
-      const vars = await figma.variables.getLocalVariablesAsync();
       const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
       const hasColorVars = globals.some((v) => v.resolvedType === "COLOR");
       const hasScaleVars = globals.some((v) => v.resolvedType !== "COLOR");
       const hasGlobal = globals.length > 0;
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
       const semanticIds = new Set(cols.filter((c) => {
-        var _a;
-        return ((_a = tiers.get(c.id)) != null ? _a : 0) >= 2;
+        var _a2;
+        return ((_a2 = tiers.get(c.id)) != null ? _a2 : 0) >= 2;
       }).map((c) => c.id));
-      const hasDarkMode = cols.some((c) => semanticIds.has(c.id) && c.modes.length > 1);
+      const hasDarkMode = ((_b = (_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.modes.length) != null ? _b : 0) > 1;
       const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
       const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId));
       const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
@@ -7817,20 +7959,9 @@
   function errText(e) {
     return e instanceof Error ? e.message : String(e);
   }
-  function toVarInfo(v, col, tier) {
+  function toVarInfo(v, col, tier, owned) {
     const modes = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
-    return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, tier, modes };
-  }
-  async function collectionRoleInfos() {
-    var _a;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const map = readRoleMap();
-    const count = /* @__PURE__ */ new Map();
-    for (const v of await figma.variables.getLocalVariablesAsync()) count.set(v.variableCollectionId, ((_a = count.get(v.variableCollectionId)) != null ? _a : 0) + 1);
-    return cols.map((c) => {
-      var _a2, _b;
-      return { id: c.id, name: c.name, vars: (_a2 = count.get(c.id)) != null ? _a2 : 0, set: (_b = map[c.id]) != null ? _b : null, role: roleOfCollection(c, map), guess: guessRole(c.name) };
-    });
+    return __spreadProps(__spreadValues({ id: v.id, name: v.name, collectionId: col.id, collection: col.name, tier }, owned ? { owned } : {}), { modes });
   }
   function tableCell(raw, aliasInfo) {
     var _a;
@@ -7852,8 +7983,8 @@
   async function collectVarTable() {
     var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const tiers = collectionTiers(cols);
     const all = await figma.variables.getLocalVariablesAsync();
+    const tierInfo = collectionTierInfo(cols, all);
     const nameById = new Map(all.map((v) => [v.id, v.name]));
     const colById = new Map(cols.map((c) => [c.id, c]));
     const remoteName = /* @__PURE__ */ new Map();
@@ -7884,16 +8015,15 @@
       }
       vars.push({ id: v.id, name: v.name, collectionId: col.id, type: v.resolvedType, values, scopes: [...(_a = v.scopes) != null ? _a : []], description: (_b = v.description) != null ? _b : "" });
     }
-    const roleMap = readRoleMap();
     const collections = cols.map((c) => {
-      var _a2, _b2;
+      var _a2, _b2, _c;
       return {
         id: c.id,
         name: c.name,
-        tier: (_a2 = tiers.get(c.id)) != null ? _a2 : 0,
+        tier: (_b2 = (_a2 = tierInfo.get(c.id)) == null ? void 0 : _a2.tier) != null ? _b2 : 0,
         modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })),
         defaultModeId: c.defaultModeId,
-        tierSet: (_b2 = roleMap[c.id]) != null ? _b2 : null
+        tierWhy: (_c = tierInfo.get(c.id)) == null ? void 0 : _c.why
       };
     });
     return { collections, vars };
@@ -8013,14 +8143,15 @@
     var _a;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const colById = new Map(cols.map((c) => [c.id, c]));
-    const tiers = collectionTiers(cols);
     const vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const owned = ownedCollections(cols);
     const out = [];
     for (const v of vars) {
       const col = colById.get(v.variableCollectionId);
       const tier = col ? (_a = tiers.get(col.id)) != null ? _a : 0 : 0;
       if (!col || !tier) continue;
-      out.push(toVarInfo(v, col, tier));
+      out.push(toVarInfo(v, col, tier, owned.global === col ? "global" : owned.semantic === col ? "semantic" : void 0));
     }
     out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
     return out;
@@ -8566,7 +8697,7 @@
         case "CREATE_TOKENS": {
           if (!msg.preview && !requirePaid("tokens")) break;
           const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
-          const roles = await createUsageRoles(msg.tokens, !!msg.preview);
+          const roles = await createUsageRoles(msg.tokens, !!msg.preview, s.globalOf);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name)) : 0;
           let summary = t("create.sumGlobals", { n: s.globals, c: s.created, u: s.updated });
           if (roles) summary += t("create.sumRoles", { n: roles });
@@ -8779,17 +8910,6 @@
           postSelection();
           break;
         }
-        case "GET_COLLECTION_ROLES": {
-          post({ type: "COLLECTION_ROLES", collections: await collectionRoleInfos() });
-          break;
-        }
-        case "SET_COLLECTION_ROLE": {
-          writeRoleMap(assignRole(readRoleMap(), msg.collectionId, msg.role));
-          post({ type: "COLLECTION_ROLES", collections: await collectionRoleInfos() });
-          await postPrereq();
-          post({ type: "VARIABLES", vars: await collectVars() });
-          break;
-        }
         case "GET_PREREQ": {
           await postPrereq();
           break;
@@ -8855,11 +8975,17 @@
         case "EXPORT": {
           const cols = await figma.variables.getLocalVariableCollectionsAsync();
           const colById = new Map(cols.map((c) => [c.id, c]));
-          const tiers = collectionTiers(cols);
           const vars = await figma.variables.getLocalVariablesAsync();
+          const tiers = collectionTiers(cols, vars);
           const nameById = new Map(vars.map((v) => [v.id, v.name]));
           const tokens = [];
-          for (const v of vars) {
+          const owned = ownedIds(cols);
+          const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+          const rank = (id) => {
+            var _a2;
+            return (owned.has(id) ? 1e6 : 0) + ((_a2 = colIdx.get(id)) != null ? _a2 : 0);
+          };
+          for (const v of [...vars].sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
             const col = colById.get(v.variableCollectionId);
             const tier = col ? tiers.get(col.id) : 0;
             if (!col || tier !== 1 && tier !== 2) continue;

@@ -5,8 +5,7 @@
    ============================================================ */
 import { t } from './i18n';
 import { rgbToHex, hexToRgb } from './tokens';
-import { GLOBAL } from './variables';
-import { ensureCollection } from './collectionRoles';
+import { ensureOwnedCollection, ownedCollection } from './collectionRoles';
 import { darkValueForLight, darkGlobalName, isDarkGlobalName } from './themeGen';
 
 /** Semantic(대상) 컬렉션에 만들/재사용할 다크 모드 표시 이름. */
@@ -67,6 +66,8 @@ export async function generateDarkMode(
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const semanticCol = cols.find((c) => c.id === collectionId);
   if (!semanticCol) return { created, realiased, skipped, error: t('dark.errNoCol') };
+  // 다크는 플러그인 Semantic에만(§2.13 13.7) — 사용자 Semantic의 모드 · 별칭은 건드리지 않는다.
+  if (ownedCollection(cols, 'semantic')?.id !== semanticCol.id) return { created, realiased, skipped, error: t('dark.errNotOwned') };
 
   let modeCreated = false;
   let to = toModeId;
@@ -104,11 +105,12 @@ export async function generateDarkMode(
     };
   }
 
-  const globalCol = ensureCollection(cols, 'global', GLOBAL);
-  const gMode = globalCol.defaultModeId;
+  // 새 `dark/…` Global은 플러그인 Global에만 — 실제로 만들 때 컬렉션을 정한다.
+  let globalCol = ownedCollection(cols, 'global');
   const allVars = await figma.variables.getLocalVariablesAsync();
   const byId = new Map(allVars.map((v) => [v.id, v]));
-  const globalByName = new Map(allVars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
+  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+  const globalByName = new Map(globalCol ? allVars.filter((v) => v.variableCollectionId === globalCol?.id).map((v) => [v.name, v]) : []);
 
   for (const v of allVars) {
     if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== 'COLOR') continue;
@@ -118,7 +120,8 @@ export async function generateDarkMode(
       continue;
     }
     const lightGlobal = byId.get(fromRaw.id);
-    const lightRaw = lightGlobal?.valuesByMode[gMode];
+    // 라이트 값은 그 Global이 속한 컬렉션의 기본 모드(사용자 Global일 수 있다). 별칭이면 건너뛴다.
+    const lightRaw = lightGlobal?.valuesByMode[modeOf.get(lightGlobal.variableCollectionId) ?? ''];
     if (!lightGlobal || !(lightRaw && typeof lightRaw === 'object' && 'r' in lightRaw)) {
       skipped++;
       continue;
@@ -132,6 +135,8 @@ export async function generateDarkMode(
     const darkHex = darkValueForLight(rgbToHex(lightRaw as RGB));
     const dname = darkGlobalName(lightGlobal.name);
     let dark = globalByName.get(dname);
+    if (!dark || !globalCol) globalCol = ensureOwnedCollection(cols, 'global'); // 없으면 만들고, 이어받은 것이면 표시를 단다
+    const gMode = globalCol.defaultModeId;
     if (!dark) {
       dark = figma.variables.createVariable(dname, globalCol, 'COLOR');
       dark.scopes = lightGlobal.scopes;

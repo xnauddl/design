@@ -35,8 +35,8 @@ export interface VarCollection {
   modes: { modeId: string; name: string }[];
   /** 피그마 기본 모드 — 고른 모드가 없는 컬렉션은 이 값을 보여 준다(§4.4 모드 ▾). */
   defaultModeId?: string;
-  /** 계층 지정 상태: 직접 지정('global'…·'none') / 지정 없음(null — 이름으로 판정하거나 "?"). */
-  tierSet?: 'global' | 'semantic' | 'component' | 'none' | null;
+  /** 계층 판단 근거(§4.4 배지 툴팁). 없으면 툴팁을 달지 않는다. */
+  tierWhy?: { kind: 'owned' } | { kind: 'empty' | 'name' | 'ratio'; alias: number; counted: number };
 }
 
 /** 라이브러리(다른 파일) 변수 — 이 파일이 쓰는 것만. 읽기 전용(§4.4 LIB 구역). */
@@ -80,12 +80,23 @@ export function cellCopyText(cell: VarCell | undefined): string {
    IA v3 변수 목록(§4.4) — 구역(컬렉션) · 그룹 · 행과 펼침 규칙. 순수 함수라 단위 테스트한다.
    ===================================================================== */
 
-/** 계층 배지 — 계층이면 G/S/C, "계층 아님"으로 지정했으면 "–", 정해지지 않았으면 "?". */
-export function tierBadge(c: Pick<VarCollection, 'tier' | 'tierSet'>): 'G' | 'S' | 'C' | '–' | '?' {
+/** 계층 배지 — 계층이면 G/S/C, 계층 아님은 "–"(§2.13 — 지정이 없어져 "?"는 없다). */
+export function tierBadge(c: Pick<VarCollection, 'tier'>): 'G' | 'S' | 'C' | '–' {
   if (c.tier === 1) return 'G';
   if (c.tier === 2) return 'S';
   if (c.tier === 3) return 'C';
-  return c.tierSet === 'none' ? '–' : '?';
+  return '–';
+}
+
+/** 계층 판단 근거 한 줄(§4.4 사이드바 배지 툴팁). 근거가 없으면 undefined(툴팁을 달지 않는다). */
+export function tierWhyText(c: Pick<VarCollection, 'tier' | 'tierWhy'>): string | undefined {
+  const w = c.tierWhy;
+  if (!w) return undefined;
+  if (w.kind === 'owned') return t('vm.tierWhyOwned');
+  if (w.kind === 'empty') return t('vm.tierWhyEmpty');
+  if (w.kind === 'name') return t('vm.tierWhyName');
+  if (c.tier === 1) return t('vm.tierWhyDirect', { d: w.counted - w.alias, n: w.counted });
+  return t('vm.tierWhyAlias', { a: w.alias, n: w.counted, tier: c.tier === 2 ? 'Semantic' : t('vm.noTier') });
 }
 
 /** 칩·구역 순서 — Component → Semantic → Global → 계층 없음. 같은 계층 안은 피그마 순서(안정 정렬). */

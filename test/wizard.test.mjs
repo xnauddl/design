@@ -101,21 +101,24 @@ test('summarize — 다크·텍스트 스타일은 0이면 생략(안 돈 단계
   assert.equal(summarize({ created: 4, darkFilled: 0, textStyles: 0 }), '토큰 4');
 });
 
-test('pickDarkTarget — Semantic 우선 · 출처는 Dark가 아닌 모드 · Dark 있으면 대상으로', () => {
+test('pickDarkTarget — 플러그인 Semantic만(§2.13 13.7) · 출처는 Dark가 아닌 모드 · Dark 있으면 대상으로', () => {
   const light = { modeId: 'm1', name: 'Light' };
   const dark = { modeId: 'm2', name: 'Dark' };
   const vars = [
-    { collectionId: 'g', collection: 'Global', modes: [{ modeId: 'g1', name: 'Mode 1' }] },
-    { collectionId: 's', collection: 'Semantic', modes: [light, dark] },
+    { collectionId: 'g', collection: 'Global', owned: 'global', modes: [{ modeId: 'g1', name: 'Mode 1' }] },
+    { collectionId: 'u', collection: 'Tokens', tier: 2, modes: [light, dark] }, // 사용자 Semantic — 대상 아님
+    { collectionId: 's', collection: 'Semantic', owned: 'semantic', modes: [light, dark] },
   ];
   assert.deepEqual(pickDarkTarget(vars), { collectionId: 's', fromModeId: 'm1', toModeId: 'm2' });
+  // 플러그인 Semantic이 없으면 건너뛴다(사용자 Semantic이 있어도)
+  assert.equal(pickDarkTarget([vars[1]]), null);
 
   // Dark가 없으면 대상 모드를 생략한다 — 플러그인이 addMode('Dark')로 만든다.
-  const noDark = [{ collectionId: 's', collection: 'Semantic', modes: [light] }];
+  const noDark = [{ collectionId: 's', collection: 'Semantic', owned: 'semantic', modes: [light] }];
   assert.deepEqual(pickDarkTarget(noDark), { collectionId: 's', fromModeId: 'm1' });
 
   // 모드가 Dark 하나뿐이면 채울 출처가 없다.
-  assert.equal(pickDarkTarget([{ collectionId: 's', collection: 'Semantic', modes: [dark] }]), null);
+  assert.equal(pickDarkTarget([{ collectionId: 's', collection: 'Semantic', owned: 'semantic', modes: [dark] }]), null);
   // 모드가 있는 컬렉션이 아예 없으면 null.
   assert.equal(pickDarkTarget([{ collectionId: 'g', collection: 'Global', modes: [] }]), null);
   assert.equal(pickDarkTarget([]), null);

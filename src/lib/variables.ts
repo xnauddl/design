@@ -22,7 +22,7 @@ import {
 } from './tokens';
 import { paletteFamilyOf } from './palette';
 import { AUTO_ROLE_KEY, assignNames, colorRoleBases, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
-import { findCollection, ensureCollection, collectionTiers } from './collectionRoles'; // 이름이 아니라 지정된 역할로(Primitives→Global 등)
+import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { TextSample, TextStyleSpec, ExistingTextStyle } from './textStyles';
 import type { TextStyleSkipReason } from '../shared/messages';
 
@@ -60,11 +60,82 @@ function upsertVariable(name: string, collection: VariableCollection, type: Reso
   return { variable, created: true };
 }
 
-async function resolveCollections(): Promise<{ globalCol: VariableCollection; semanticCol: VariableCollection }> {
+/* ---------- 사용자 Global 재사용(§2.13 13.6) ---------- */
+export const REUSE_MAP_KEY = 'dsl.reuseMap';
+
+/** 토큰의 Global 리터럴 — 비교 · 쓰기가 같은 값을 쓴다(setGlobalLiteral과 같은 환산). */
+function literalOf(t: DraftToken, type: ResolvedType, base: number): string | number {
+  if (type === 'COLOR') return String(t.value).toLowerCase();
+  if (type === 'STRING') return String(t.value);
+  return t.unit && t.unit !== 'px' && typeof t.value === 'number' ? toPx(t.value, t.unit, { base, fontSize: t.fontSize ?? base }) : Number(t.value);
+}
+
+/** 변수의 기본 모드 직접 값(별칭이면 undefined). */
+function directValue(v: Variable, modeOf: Map<string, string>): VariableValue | undefined {
+  const raw = v.valuesByMode[modeOf.get(v.variableCollectionId) ?? ''];
+  if (raw == null || (typeof raw === 'object' && (raw as VariableAlias).type === 'VARIABLE_ALIAS')) return undefined;
+  return raw;
+}
+
+function sameLiteral(raw: VariableValue | undefined, lit: string | number, type: ResolvedType): boolean {
+  if (raw == null) return false;
+  if (type === 'COLOR') {
+    if (typeof raw !== 'object' || !('r' in raw)) return false;
+    const a = (raw as RGBA).a;
+    return (typeof a !== 'number' || a === 1) && rgbToHex(raw as RGB).toLowerCase() === lit;
+  }
+  if (type === 'STRING') return typeof raw === 'string' && raw === lit;
+  return typeof raw === 'number' && Math.round(raw * 100) === Math.round(Number(lit) * 100);
+}
+
+/**
+ * 쓰임 목록이 있는 토큰마다 재사용할 사용자 Global(같은 종류 · 같은 값 · 용도를 받는 직접 값 변수)을 고른다.
+ * 사용자 컬렉션 목록 순 · 이름 순 첫 번째. 쓰임이 없는 토큰(글자 · 팔레트 · 텍스트 스타일)은 고르지 않는다.
+ */
+async function pickReusable(tokens: readonly DraftToken[], base: number): Promise<Map<string, Variable>> {
+  const out = new Map<string, Variable>();
+  const withUses = tokens.filter((t) => t.uses?.length);
+  if (!withUses.length) return out;
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const globalCol = ensureCollection(cols, 'global', GLOBAL);
-  const semanticCol = ensureCollection(cols, 'semantic', SEMANTIC);
-  return { globalCol, semanticCol };
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const tiers = collectionTiers(cols, vars);
+  const owned = ownedIds(cols);
+  const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+  const userGlobals = vars
+    .filter((v) => tiers.get(v.variableCollectionId) === 1 && !owned.has(v.variableCollectionId))
+    .sort((a, b) => (colIdx.get(a.variableCollectionId) ?? 0) - (colIdx.get(b.variableCollectionId) ?? 0) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const t of withUses) {
+    const type = resolvedTypeForToken(t);
+    const lit = literalOf(t, type, base);
+    const allowed = scopesForType(scopesForSources(t.sources), type);
+    const hit = userGlobals.find((v) => {
+      if (v.resolvedType !== type) return false;
+      const sc = (v.scopes ?? []) as ScopeName[];
+      if (!sc.includes('ALL_SCOPES' as ScopeName) && !allowed.some((x) => sc.includes(x))) return false;
+      return sameLiteral(directValue(v, modeOf), lit, type);
+    });
+    if (hit) out.set(t.name, hit);
+  }
+  return out;
+}
+
+function readReuseMap(): Record<string, string> {
+  try {
+    const raw = (figma as unknown as { root?: { getPluginData?: (k: string) => string } }).root?.getPluginData?.(REUSE_MAP_KEY);
+    const o = raw ? (JSON.parse(raw) as unknown) : {};
+    return o && typeof o === 'object' && !Array.isArray(o) ? (o as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeReuseMap(map: Record<string, string>): void {
+  try {
+    (figma as unknown as { root?: { setPluginData?: (k: string, v: string) => void } }).root?.setPluginData?.(REUSE_MAP_KEY, JSON.stringify(map));
+  } catch {
+    /* 못 남겨도 이번 만들기는 끝난다 — 역할 매핑 표가 그 이름을 못 찾을 뿐 */
+  }
 }
 
 export interface CreateSummary {
@@ -74,6 +145,8 @@ export interface CreateSummary {
   semantics: number;
   /** base(px)로 px 환산되는 토큰들 — 미리보기가 base 반영 결과를 보여주는 데 쓴다. */
   conversions: PxConversion[];
+  /** 토큰 이름 → 고른 Global id(재사용한 사용자 Global 또는 플러그인 Global) — 쓰임 역할이 별칭 대상으로 쓴다(13.6). */
+  globalOf: Map<string, string>;
 }
 
 /**
@@ -84,32 +157,41 @@ export interface CreateSummary {
  * Semantic 컬렉션은 역할 단계가 쓸 수 있게 미리 만들어 둔다(빈 컬렉션).
  */
 export async function createTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
-  const { globalCol } = await resolveCollections();
-  const gMode = globalCol.defaultModeId;
-  const idx = await buildVarIndex();
-
-  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base) };
-  // 같은 실행에서 같은 이름이 두 번 오면(채움색 #000 + 그림자색 #000) 스코프를 덮지 않고 합친다.
-  const touched = new Set<string>();
-
-  for (const t of tokens) {
-    const type = resolvedTypeForToken(t);
-    const g = upsertVariable(t.name, globalCol, type, idx);
-    summary[g.created ? 'created' : 'updated']++;
-    summary.globals++;
-
-    // Global 값 = 리터럴(#16: 비-px lineHeight/letterSpacing은 px FLOAT + 원본 단위는 description)
-    setGlobalLiteral(g.variable, gMode, t, type, base);
-    const scopes = scopesForType(scopesForSources(t.sources), type);
-    const key = vkey(globalCol.id, t.name);
-    const merged = touched.has(key) ? scopesForType([...new Set([...(g.variable.scopes as ScopeName[]), ...scopes])], type) : scopes;
-    touched.add(key);
-    g.variable.scopes = merged;
-    g.variable.hiddenFromPublishing = true; // 직접 사용 방지(3계층 규칙 보강)
-    const desc = unitDescription(t);
-    if (desc) g.variable.description = desc; // 예: "160%" — 내보내기·Figma 패널 표시
+  const reuse = await pickReusable(tokens, base);
+  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map() };
+  const reuseMap = readReuseMap();
+  const toCreate = tokens.filter((t) => !reuse.has(t.name));
+  for (const [name, v] of reuse) {
+    summary.globalOf.set(name, v.id);
+    reuseMap[name] = v.id;
   }
-
+  if (toCreate.length) {
+    // 플러그인 Global은 실제로 만들 때만 만든다(13.2-3 — 모두 재사용이면 생기지 않는다).
+    const globalCol = ensureOwnedCollection(await figma.variables.getLocalVariableCollectionsAsync(), 'global');
+    const gMode = globalCol.defaultModeId;
+    const idx = await buildVarIndex();
+    // 같은 실행에서 같은 이름이 두 번 오면(채움색 #000 + 그림자색 #000) 스코프를 덮지 않고 합친다.
+    const touched = new Set<string>();
+    for (const t of toCreate) {
+      const type = resolvedTypeForToken(t);
+      const g = upsertVariable(t.name, globalCol, type, idx);
+      summary[g.created ? 'created' : 'updated']++;
+      summary.globals++;
+      summary.globalOf.set(t.name, g.variable.id);
+      delete reuseMap[t.name];
+      // Global 값 = 리터럴(#16: 비-px lineHeight/letterSpacing은 px FLOAT + 원본 단위는 description)
+      setGlobalLiteral(g.variable, gMode, t, type, base);
+      const scopes = scopesForType(scopesForSources(t.sources), type);
+      const key = vkey(globalCol.id, t.name);
+      const merged = touched.has(key) ? scopesForType([...new Set([...(g.variable.scopes as ScopeName[]), ...scopes])], type) : scopes;
+      touched.add(key);
+      g.variable.scopes = merged;
+      g.variable.hiddenFromPublishing = true; // 직접 사용 방지(3계층 규칙 보강)
+      const desc = unitDescription(t);
+      if (desc) g.variable.description = desc; // 예: "160%" — 내보내기·Figma 패널 표시
+    }
+  }
+  writeReuseMap(reuseMap);
   return summary;
 }
 
@@ -119,11 +201,12 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
    conversions로 돌려줘 미리보기가 base 변경을 보여줄 수 있게 한다. */
 export async function previewCreateTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const gId = findCollection(cols, 'global')?.id ?? '#G';
+  const gId = ownedCollection(cols, 'global')?.id ?? '#G';
+  const reuse = await pickReusable(tokens, base);
   const existing = new Set<string>();
   for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
 
-  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base) };
+  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map() };
   const seen = new Set<string>();
   const tally = (colId: string, name: string, kind: 'globals' | 'semantics'): void => {
     const k = vkey(colId, name);
@@ -136,8 +219,12 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
     summary[existing.has(k) ? 'updated' : 'created']++;
   };
 
-  // 토큰당 Global 1개(거울 없음 — createTokens와 동일).
-  for (const t of tokens) tally(gId, t.name, 'globals');
+  // 토큰당 Global 1개(거울 없음 — createTokens와 동일). 재사용하는 사용자 Global은 세지 않는다(13.6).
+  for (const t of tokens) {
+    const r = reuse.get(t.name);
+    if (r) summary.globalOf.set(t.name, r.id);
+    else tally(gId, t.name, 'globals');
+  }
   return summary;
 }
 
@@ -147,13 +234,13 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
  * 쓰고(만들지 않음), 다른 값이 차지했으면 다음 번호. 이미 있는 역할의 값은 바꾸지 않는다.
  * preview면 만들지 않고 만들 수만 센다. 반환 = 새로 만든(만들) 역할 수.
  */
-export async function createUsageRoles(tokens: readonly DraftToken[], preview = false): Promise<number> {
+export async function createUsageRoles(tokens: readonly DraftToken[], preview = false, globalOf?: ReadonlyMap<string, string>): Promise<number> {
   const withUses = tokens.filter((t) => t.uses?.length);
   if (!withUses.length) return 0;
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const globalCol = findCollection(cols, 'global');
-  if (!globalCol) return 0;
   const vars = await figma.variables.getLocalVariablesAsync();
+  const tiers = collectionTiers(cols, vars);
+  const owned = ownedIds(cols);
   const byId = new Map(vars.map((v) => [v.id, v]));
   const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
   const resolve = (v: Variable): VariableValue | undefined => {
@@ -170,10 +257,23 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     if (typeof val === 'object' && 'r' in val) return valueKey(rgbToHex(val as RGB));
     return typeof val === 'number' || typeof val === 'string' ? valueKey(val) : '';
   };
-  const semCol = findCollection(cols, 'semantic');
-  const existing = new Map<string, string>();
-  if (semCol) for (const v of vars) if (v.variableCollectionId === semCol.id) existing.set(v.name, keyOfValue(resolve(v)));
-  const globalByName = new Map(vars.filter((v) => v.variableCollectionId === globalCol.id).map((v) => [v.name, v]));
+  // 이미 있는 이름 = Semantic 계층 전부(플러그인 · 사용자)의 이름 → 값 묶음. 같은 이름이면 사용자 컬렉션 먼저 · 목록 순(13.5).
+  const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+  const rank = (id: string): number => (owned.has(id) ? 1e6 : 0) + (colIdx.get(id) ?? 0);
+  const existing = new Map<string, string[]>();
+  for (const v of vars.filter((x) => tiers.get(x.variableCollectionId) === 2).sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
+    const k = keyOfValue(resolve(v));
+    const arr = existing.get(v.name);
+    if (!arr) existing.set(v.name, k ? [k] : []);
+    else if (k && !arr.includes(k)) arr.push(k);
+  }
+  // 별칭 대상 — createTokens가 고른 Global(사용자 것일 수 있다). 없으면 플러그인 Global에서 이름으로.
+  const pluginGlobal = ownedCollection(cols, 'global');
+  const globalFor = (t: DraftToken): Variable | undefined => {
+    const id = globalOf?.get(t.name);
+    if (id) return byId.get(id);
+    return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === t.name) : undefined;
+  };
 
   // 요청 — 숫자는 쓰임 이름, 색은 쓰임별 밝기 이름.
   const reqs: { base: string; value: string; count: number; token: DraftToken }[] = [];
@@ -189,7 +289,7 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
   }
   for (const [use, list] of colorUses) {
     // 입력 = (hex · 배경 종류 · 곳 수) — inverse 여부는 함수 안에서 기준색을 정한 뒤 판정한다(12.4).
-    const defKey = existing.get(`${use}/default`);
+    const defKey = existing.get(`${use}/default`)?.[0];
     const bases = colorRoleBases(
       list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg })),
       defKey || undefined,
@@ -208,10 +308,11 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     toMake.set(name, r.token);
   }
   if (preview) return toMake.size;
-  const col = semCol ?? ensureCollection(cols, 'semantic', SEMANTIC);
+  if (!toMake.size) return 0;
+  const col = ensureOwnedCollection(cols, 'semantic'); // 쓰임 역할은 플러그인 Semantic에만(13.6)
   let made = 0;
   for (const [name, t] of toMake) {
-    const g = globalByName.get(t.name);
+    const g = globalFor(t);
     if (!g) continue;
     const v = figma.variables.createVariable(name, col, g.resolvedType);
     for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
@@ -265,8 +366,7 @@ export async function prunePaletteColors(keep: string[]): Promise<number> {
   // 이번 팔레트가 쓰는 hue 패밀리(이 안에서만 정리 — 무관 색 보존).
   const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f): f is string => f !== null));
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const tiers = collectionTiers(cols);
-  const palIds = new Set(cols.filter((c) => tiers.get(c.id) === 1 || tiers.get(c.id) === 2).map((c) => c.id));
+  const palIds = ownedIds(cols); // 플러그인 Global · Semantic 안에서만 — 사용자 컬렉션의 색은 지우지 않는다(13.7)
   let removed = 0;
   for (const v of await figma.variables.getLocalVariablesAsync()) {
     if (!palIds.has(v.variableCollectionId)) continue;
@@ -283,21 +383,33 @@ export async function prunePaletteColors(keep: string[]): Promise<number> {
 export async function createSemanticAliases(map: Record<string, string>): Promise<SemanticSummary> {
   const summary: SemanticSummary = { created: 0, updated: 0, aliased: 0, missing: [] };
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const globalCol = findCollection(cols, 'global');
-  if (!globalCol) {
-    summary.missing = Object.values(map);
-    return summary; // Global이 없으면 먼저 토큰을 생성해야 함
-  }
-  const semanticCol = ensureCollection(cols, 'semantic', SEMANTIC);
-  const sMode = semanticCol.defaultModeId;
-  const idx = await buildVarIndex();
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const tiers = collectionTiers(cols, vars);
+  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+  const pluginGlobalId = ownedCollection(cols, 'global')?.id;
+  const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+  // Global 이름은 Global 계층 전부의 직접 값 변수에서 — 플러그인 Global 먼저, 그다음 목록 순(13.7). 별칭 변수는 쓰지 않는다.
+  const globals = vars
+    .filter((v) => tiers.get(v.variableCollectionId) === 1 && directValue(v, modeOf) !== undefined)
+    .sort((a, b) => Number(b.variableCollectionId === pluginGlobalId) - Number(a.variableCollectionId === pluginGlobalId) || (colIdx.get(a.variableCollectionId) ?? 0) - (colIdx.get(b.variableCollectionId) ?? 0));
+  const byName = new Map<string, Variable>();
+  for (const v of globals) if (!byName.has(v.name)) byName.set(v.name, v);
+  const okIds = new Map(globals.map((v) => [v.id, v]));
+  const reuseMap = readReuseMap(); // 재사용된 토큰 이름(13.6) — 낡은 항목(없음 · Global 아님 · 별칭)은 okIds에 없어 버려진다
+  let semanticCol: VariableCollection | undefined;
+  let idx: VarIndex | undefined;
 
   for (const [semName, globalName] of Object.entries(map)) {
-    const g = idx.get(vkey(globalCol.id, globalName));
+    const g = byName.get(globalName) ?? okIds.get(reuseMap[globalName] ?? '');
     if (!g) {
       summary.missing.push(globalName);
       continue;
     }
+    if (!semanticCol || !idx) {
+      semanticCol = ensureOwnedCollection(cols, 'semantic'); // 역할은 플러그인 Semantic에만
+      idx = await buildVarIndex();
+    }
+    const sMode = semanticCol.defaultModeId;
     const u = upsertVariable(semName, semanticCol, g.resolvedType, idx);
     u.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g)); // 별칭만
     // 역할 기반, 없으면 원시 상속 — 단 변수 타입에 유효한 스코프만(STRING에 LINE_HEIGHT 등 금지)
@@ -634,7 +746,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
   }
   if (roleRenames.length) {
     const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId0 = findCollection(cols0, 'semantic')?.id;
+    const semId0 = ownedCollection(cols0, 'semantic')?.id;
     if (semId0) {
       const byName = new Map<string, Variable>();
       for (const v of await figma.variables.getLocalVariablesAsync())
@@ -736,7 +848,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
   // rename인데 이동/기존 모두 없어 시맨틱이 비면, 스타일 **현재 값**으로만 생성(스캔 오버라이드 아님).
   {
     const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId0 = findCollection(cols0, 'semantic')?.id;
+    const semId0 = ownedCollection(cols0, 'semantic')?.id;
     const semNames = new Set<string>();
     if (semId0)
       for (const v of await figma.variables.getLocalVariablesAsync())
@@ -755,7 +867,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
 
   // 2) 시맨틱 변수 인덱스(이름→변수). 기존 텍스트 스타일 맵은 step 0에서 준비됨.
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const semId = findCollection(cols, 'semantic')?.id;
+  const semId = ownedCollection(cols, 'semantic')?.id;
   const semByName = new Map<string, Variable>();
   if (semId)
     for (const v of await figma.variables.getLocalVariablesAsync())

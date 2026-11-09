@@ -5,7 +5,7 @@
    - 프레임 크기(Fixed)·여백(오토레이아웃)·반경·효과·텍스트 지원.
    ============================================================ */
 import { rgbToHex, scopeForSemanticRole, scopesForType, type ScopeName, type ResolvedType } from './tokens';
-import { collectionTiers, ensureCollection } from './collectionRoles'; // 계층은 컬렉션 이름이 아니라 지정된 역할로
+import { collectionTiers, ensureOwnedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { FIELD_SCOPE, STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scopes'; // 용도 규칙
 import type { BindCandidate, BindNode, BindSkip, NewRoleRef } from '../shared/messages';
 import { backgroundOf, gapSkip, isIconOrAvatar, inAutoLayoutFlow, iconOrAvatarKind, isInsideIconFrame } from './extract'; // 쓰지 않는 간격 판정(사이 간격 자동 · 줄바꿈 아님) · 크기 대상 판정(아이콘 · 아바타 · 오토레이아웃 흐름) — 만들기와 같은 기준
@@ -40,6 +40,12 @@ interface VarEntry {
   auto?: boolean;
   type: VariableResolvedDataType;
   scopes: readonly VariableScope[]; // 용도 스코프 — 필드와 안 맞는 변수 오매칭 차단
+  /** 사용자 컬렉션의 변수인가(§2.13 — 같은 이름이면 사용자 것 먼저). */
+  user: boolean;
+  /** 컬렉션 목록 순서(같은 이름 · 같은 사용자 여부일 때). */
+  colIdx: number;
+  /** 기본 모드 값이 직접 값인가 — Global 계층의 별칭 변수는 새 역할의 별칭 대상이 아니다(13.3 · 13.5). */
+  direct: boolean;
   colorHex?: string;
   num?: number;
   str?: string;
@@ -423,26 +429,44 @@ export async function bindSelection(
 interface VarIndexAll {
   entries: VarEntry[];
   /** Semantic(계층 2) 이름 → 값 키(값을 못 읽으면 '') — 새 역할 번호가 이미 있는 이름을 피하게. */
-  semNames: Map<string, string>;
+  semNames: Map<string, string[]>;
   byId: Map<string, VarEntry>;
 }
 
 async function buildIndex(): Promise<VarIndexAll> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-  const tierOf = collectionTiers(cols);
   const vars = await figma.variables.getLocalVariablesAsync();
+  const tierOf = collectionTiers(cols, vars);
+  const owned = ownedIds(cols);
+  const colIdx = new Map(cols.map((c, i) => [c.id, i]));
   // 예전 파일에 남은 Semantic 거울(Global과 같은 이름) — 역할로 치지 않는다(§2.12 12.7).
   const globalNames = new Set(vars.filter((v) => tierOf.get(v.variableCollectionId) === 1).map((v) => v.name));
   const entries: VarEntry[] = [];
-  const semNames = new Map<string, string>();
+  // Semantic 계층 전부(플러그인 · 사용자)의 이름 → 값 묶음 — 같은 이름이 여러 컬렉션에 있으면 값을 모은다(13.5).
+  const semNames = new Map<string, string[]>();
+  const addSem = (name: string, key: string): void => {
+    const arr = semNames.get(name);
+    if (!arr) semNames.set(name, key ? [key] : []);
+    else if (key && !arr.includes(key)) arr.push(key);
+  };
   for (const v of vars) {
     const tier = tierOf.get(v.variableCollectionId) ?? 0;
     if (tier < 1) continue; // Global/Semantic/Component 3계층만(다른 컬렉션 제외)
     const val = await resolveValue(v, modeOf);
-    if (tier === 2) semNames.set(v.name, '');
+    if (tier === 2) addSem(v.name, '');
     if (val == null) continue;
-    const e: VarEntry = { variable: v, tier, type: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'] };
+    const raw = v.valuesByMode[modeOf.get(v.variableCollectionId) ?? ''];
+    const direct = !(raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS');
+    const e: VarEntry = {
+      variable: v,
+      tier,
+      type: v.resolvedType,
+      scopes: v.scopes ?? ['ALL_SCOPES'],
+      user: !owned.has(v.variableCollectionId),
+      colIdx: colIdx.get(v.variableCollectionId) ?? 0,
+      direct,
+    };
     if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
     if (tier === 2 && readAutoRole(v)) e.auto = true;
     // 투명도가 1이 아닌 색 변수는 연결 대상에서 뺀다(§2.11) — 붙이면 칠하기 불투명도가 변수 값으로 바뀐다.
@@ -450,7 +474,7 @@ async function buildIndex(): Promise<VarIndexAll> {
       if (isOpaqueColorValue(val)) e.colorHex = rgbToHex(val);
     } else if (v.resolvedType === 'FLOAT' && typeof val === 'number') e.num = val;
     else if (v.resolvedType === 'STRING' && typeof val === 'string') e.str = val;
-    if (tier === 2) semNames.set(v.name, entryKey(e));
+    if (tier === 2) addSem(v.name, entryKey(e));
     entries.push(e);
   }
   // 높은 tier 우선(Component의 "지금 순서"는 이 정렬 안의 피그마 순서).
@@ -555,7 +579,11 @@ function sameValueEntries(ctx: Ctx, s: Slot): VarEntry[] {
   });
 }
 
-const byName = (a: VarEntry, b: VarEntry): number => (a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : 0);
+/** 이름 순 — 같은 이름이면 사용자 컬렉션 먼저, 그다음 컬렉션 목록 순(§2.13 13.5). */
+const byName = (a: VarEntry, b: VarEntry): number =>
+  a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : Number(b.user) - Number(a.user) || a.colIdx - b.colIdx;
+/** 별칭 대상 Global 순서 — 사용자 컬렉션 먼저, 그 안에서 이름 순(13.5 ②). */
+const byUserThenName = (a: VarEntry, b: VarEntry): number => Number(b.user) - Number(a.user) || byName(a, b);
 const nameRe = (base: string): RegExp => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:-\\d+)?$`);
 
 /** 순서 1 → 3(디자이너 변수) — 숫자 · 색. 글자는 1만. */
@@ -585,7 +613,8 @@ function resolveSlots(ctx: Ctx): void {
     preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s)));
   };
   const globalFor = (cands: VarEntry[]): VarEntry | null => {
-    return cands.filter((e) => e.tier === 1).sort(byName)[0] ?? null;
+    // 직접 값 Global만(별칭 변수는 사슬을 만든다 — 13.3), 사용자 컬렉션 먼저.
+    return cands.filter((e) => e.tier === 1 && e.direct).sort(byUserThenName)[0] ?? null;
   };
   for (const s of ctx.slots) {
     const cands = sameValueEntries(ctx, s);
@@ -627,7 +656,7 @@ function resolveSlots(ctx: Ctx): void {
       if (c) c.count++;
       else counts.set(k, { hex: x.slot.value as string, count: 1, bg: x.slot.bg });
     }
-    const def = ctx.index.entries.find((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex);
+    const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
     const bases = colorRoleBases([...counts.values()], def?.colorHex, use);
     for (const x of list) {
       const base = `color/${use}/${bases.get(colorSlotKey(x.slot.value as string, x.slot.bg)) ?? 'default'}`;
@@ -1259,11 +1288,16 @@ export async function bindSelectedItems(
  */
 export async function createRole(spec: NewRoleRef, global: Variable): Promise<Variable> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const col = ensureCollection(cols, 'semantic', 'Semantic');
-  const inCol = (await figma.variables.getLocalVariablesAsync()).filter((v) => v.variableCollectionId === col.id);
+  const all = await figma.variables.getLocalVariablesAsync();
+  const tiers = collectionTiers(cols, all);
+  // 만드는 곳은 플러그인 Semantic, 이름 차지 · 같은 역할 찾기는 Semantic 계층 전부(§2.13 13.5).
+  const col = ensureOwnedCollection(cols, 'semantic');
+  const semCols = new Map(cols.filter((c) => tiers.get(c.id) === 2).map((c) => [c.id, c]));
+  semCols.set(col.id, col);
+  const inCol = all.filter((v) => semCols.has(v.variableCollectionId));
   const pointsAtGlobal = (v: Variable): boolean =>
     v.resolvedType === global.resolvedType &&
-    col.modes.every((m) => {
+    (semCols.get(v.variableCollectionId) ?? col).modes.every((m) => {
       const val = v.valuesByMode[m.modeId];
       return !!val && typeof val === 'object' && (val as VariableAlias).type === 'VARIABLE_ALIAS' && (val as VariableAlias).id === global.id;
     });

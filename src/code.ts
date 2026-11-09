@@ -1,7 +1,7 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, CollectionRoleInfo, VarUpdateError } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, VarUpdateError } from './shared/messages';
 import { post } from './shared/messages';
 import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
@@ -9,8 +9,7 @@ import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAlia
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countUsage, findUsers } from './lib/bind';
-import { collectionTiers, readRoleMap, writeRoleMap } from './lib/collectionRoles';
-import { assignRole, roleOfCollection, guessRole } from './lib/tiers';
+import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
@@ -136,22 +135,20 @@ async function loadLicense(): Promise<void> {
 async function postPrereq(): Promise<void> {
   try {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    // 계층은 컬렉션 이름이 아니라 지정된 역할로(Primitives→Global 등, tiers.ts).
-    const tiers = collectionTiers(cols);
+    const vars = await figma.variables.getLocalVariablesAsync();
+    // 계층: 플러그인 컬렉션은 그 역할, 사용자 컬렉션은 내용으로 판단(§2.13 13.3 · 13.4).
+    const tiers = collectionTiers(cols, vars);
     const globalIds = new Set(cols.filter((c) => tiers.get(c.id) === 1).map((c) => c.id));
     // 거울 폐지 후 바인딩 대상은 3계층 전부 — 역할 없는 값은 Global에 붙는다(bind.ts).
     const bindableIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) > 0).map((c) => c.id));
-    const vars = await figma.variables.getLocalVariablesAsync();
     const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
     const hasColorVars = globals.some((v) => v.resolvedType === 'COLOR');
     const hasScaleVars = globals.some((v) => v.resolvedType !== 'COLOR'); // 간격·크기·폰트
     const hasGlobal = globals.length > 0;
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-    // 다크는 '모드가 둘 이상인 **바인딩 대상** 컬렉션'이 있으면 이미 만든 것으로 본다.
-    // 문서 전체로 보면 Breakpoint(Desktop/Mobile) 같은 무관한 컬렉션 하나가 다크 단계를
-    // 「완료」로 만들어, 다크 테마가 없는 파일에서 사용자가 그 단계를 건너뛴다.
+    // 다크는 플러그인 Semantic의 모드가 둘 이상일 때 완료(§2.13 13.7 — 다크는 플러그인 Semantic에만 만든다).
     const semanticIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) >= 2).map((c) => c.id));
-    const hasDarkMode = cols.some((c) => semanticIds.has(c.id) && c.modes.length > 1);
+    const hasDarkMode = (ownedCollection(cols, 'semantic')?.modes.length ?? 0) > 1;
     const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 타이포 단계 「기존만 연결」 전제
     const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId)); // 역할 별칭 존재 = 역할 매핑 완료
     // '이미 변수가 있다'를 먼저 알리는 안내용 개수 — 계층 안/밖을 나눠 센다(밖이면 연결에 못 쓴다).
@@ -212,18 +209,9 @@ function errText(e: unknown): string {
 /* ---------- 변수 목록(다크 테마 생성의 컬렉션·모드 선택용) ---------- */
 
 // 3계층(이름 또는 지정된 역할)만 목록 대상 — 계층이 아닌 컬렉션은 다루지 않는다.
-function toVarInfo(v: Variable, col: VariableCollection, tier: number): VarInfo {
+function toVarInfo(v: Variable, col: VariableCollection, tier: number, owned?: 'global' | 'semantic'): VarInfo {
   const modes: VarMode[] = col.modes.map((m) => ({ modeId: m.modeId, name: m.name }));
-  return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, tier, modes };
-}
-
-/** 설정 탭 '컬렉션 계층' 목록 — 로컬 컬렉션 전부(계층 아닌 것도 지정할 수 있게). */
-async function collectionRoleInfos(): Promise<CollectionRoleInfo[]> {
-  const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const map = readRoleMap();
-  const count = new Map<string, number>();
-  for (const v of await figma.variables.getLocalVariablesAsync()) count.set(v.variableCollectionId, (count.get(v.variableCollectionId) ?? 0) + 1);
-  return cols.map((c) => ({ id: c.id, name: c.name, vars: count.get(c.id) ?? 0, set: map[c.id] ?? null, role: roleOfCollection(c, map), guess: guessRole(c.name) }));
+  return { id: v.id, name: v.name, collectionId: col.id, collection: col.name, tier, ...(owned ? { owned } : {}), modes };
 }
 
 /**
@@ -251,8 +239,8 @@ function tableCell(raw: VariableValue | undefined, aliasInfo: (id: string) => { 
 /** 변수 관리 표 — 로컬 컬렉션·변수 전부(계층 아닌 것도 — 관리 대상은 파일의 변수 전체다). */
 async function collectVarTable(): Promise<{ collections: VarCollection[]; vars: VarRow[] }> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const tiers = collectionTiers(cols);
   const all = await figma.variables.getLocalVariablesAsync();
+  const tierInfo = collectionTierInfo(cols, all);
   const nameById = new Map(all.map((v) => [v.id, v.name]));
   const colById = new Map(cols.map((c) => [c.id, c]));
   // 로컬에 없는 별칭 대상은 라이브러리 변수일 수 있다 — 이름을 실제로 읽는다(§12.1, 91/91 검증).
@@ -285,14 +273,13 @@ async function collectVarTable(): Promise<{ collections: VarCollection[]; vars: 
     }
     vars.push({ id: v.id, name: v.name, collectionId: col.id, type: v.resolvedType as VarType, values, scopes: [...(v.scopes ?? [])], description: v.description ?? '' });
   }
-  const roleMap = readRoleMap();
   const collections: VarCollection[] = cols.map((c) => ({
     id: c.id,
     name: c.name,
-    tier: tiers.get(c.id) ?? 0,
+    tier: tierInfo.get(c.id)?.tier ?? 0,
     modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })),
     defaultModeId: c.defaultModeId,
-    tierSet: roleMap[c.id] ?? null,
+    tierWhy: tierInfo.get(c.id)?.why,
   }));
   return { collections, vars };
 }
@@ -417,14 +404,15 @@ async function collectUsage(nodeIds: readonly string[] | undefined): Promise<Omi
 async function collectVars(): Promise<VarInfo[]> {
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const colById = new Map(cols.map((c) => [c.id, c]));
-  const tiers = collectionTiers(cols);
   const vars = await figma.variables.getLocalVariablesAsync();
+  const tiers = collectionTiers(cols, vars);
+  const owned = ownedCollections(cols);
   const out: VarInfo[] = [];
   for (const v of vars) {
     const col = colById.get(v.variableCollectionId);
     const tier = col ? tiers.get(col.id) ?? 0 : 0;
     if (!col || !tier) continue;
-    out.push(toVarInfo(v, col, tier));
+    out.push(toVarInfo(v, col, tier, owned.global === col ? 'global' : owned.semantic === col ? 'semantic' : undefined));
   }
   out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
   return out;
@@ -1078,7 +1066,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 쓰임 역할 — Global을 만든 직후 같은 처리 · 같은 ⌘Z 안에서(§2.12 12.10). 미리보기는 만들 수만 센다.
-        const roles = await createUsageRoles(msg.tokens, !!msg.preview);
+        const roles = await createUsageRoles(msg.tokens, !!msg.preview, s.globalOf);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });
@@ -1320,18 +1308,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         postSelection(); // UI 초기화 시점 — 현재 선택 상태도 함께 전송(UX5).
         break;
       }
-      case 'GET_COLLECTION_ROLES': {
-        post({ type: 'COLLECTION_ROLES', collections: await collectionRoleInfos() });
-        break;
-      }
-      case 'SET_COLLECTION_ROLE': {
-        // 컬렉션 계층 지정(Free — 기존 변수를 다루는 일). 파일 pluginData라 같은 파일을 여는 모두에게 적용.
-        writeRoleMap(assignRole(readRoleMap(), msg.collectionId, msg.role));
-        post({ type: 'COLLECTION_ROLES', collections: await collectionRoleInfos() });
-        await postPrereq(); // 계층이 바뀌면 '토큰 있음/바인딩 대상 있음' 판정도 바뀐다
-        post({ type: 'VARIABLES', vars: await collectVars() });
-        break;
-      }
       case 'GET_PREREQ': {
         await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
         break;
@@ -1407,11 +1383,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 모든 디자인 시스템 변수(Global+Semantic)를 코드로 내보내기. (현재 Free; 추후 게이팅 가능)
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
         const colById = new Map(cols.map((c) => [c.id, c]));
-        const tiers = collectionTiers(cols);
         const vars = await figma.variables.getLocalVariablesAsync();
+        const tiers = collectionTiers(cols, vars);
         const nameById = new Map(vars.map((v) => [v.id, v.name]));
         const tokens: ExportToken[] = [];
-        for (const v of vars) {
+        // 같은 이름은 내보내기에서 앞의 것 하나만 남는다(dedupeByName) — 같은 계층 안에서는 사용자 컬렉션 먼저 · 목록 순(§2.13 13.5).
+        const owned = ownedIds(cols);
+        const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+        const rank = (id: string): number => (owned.has(id) ? 1e6 : 0) + (colIdx.get(id) ?? 0);
+        for (const v of [...vars].sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
           const col = colById.get(v.variableCollectionId);
           const tier = col ? tiers.get(col.id) : 0;
           if (!col || (tier !== 1 && tier !== 2)) continue; // 내보내기는 Global·Semantic 계층(이름 무관)

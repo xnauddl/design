@@ -220,7 +220,7 @@ const suffixRe = (base: string): RegExp => new RegExp(`^${base.replace(/[.*+?^${
  * - 같은 이름에 새 값이 둘 이상이면 곳 수가 많은 값부터(같으면 값 오름차순).
  * 반환 키는 `${base}\u0000${value}`.
  */
-export function assignNames(requests: readonly NameRequest[], existing: ReadonlyMap<string, string>): Map<string, string> {
+export function assignNames(requests: readonly NameRequest[], existing: ReadonlyMap<string, string | readonly string[]>): Map<string, string> {
   const out = new Map<string, string>();
   const byBase = new Map<string, Map<string, number>>();
   for (const r of requests) {
@@ -228,17 +228,18 @@ export function assignNames(requests: readonly NameRequest[], existing: Readonly
     if (!m) byBase.set(r.base, (m = new Map()));
     m.set(r.value, (m.get(r.value) ?? 0) + r.count);
   }
-  const taken = new Map(existing); // 이름 → 값(이번에 정한 이름도 더한다)
+  // 이름 → 값 묶음(같은 이름이 여러 컬렉션에 있으면 값이 여럿 — §2.13 13.5). 이번에 정한 이름도 더한다.
+  const taken = new Map<string, readonly string[]>([...existing].map(([n, v]) => [n, typeof v === 'string' ? (v ? [v] : []) : v]));
   for (const [base, values] of byBase) {
     const re = suffixRe(base);
     const order = [...values.entries()].sort((a, b) => b[1] - a[1] || cmpValue(a[0], b[0]));
     for (const [value] of order) {
       let name: string | undefined;
-      for (const [n, v] of taken) if (v === value && re.test(n)) { name = pick(name, n, base); }
+      for (const [n, v] of taken) if (v.includes(value) && re.test(n)) { name = pick(name, n, base); }
       if (!name) {
         if (!taken.has(base)) name = base;
         else for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) { name = `${base}-${i}`; break; }
-        taken.set(name, value);
+        taken.set(name, [value]);
       }
       out.set(`${base}\u0000${value}`, name);
     }

@@ -2457,44 +2457,47 @@ test('scopeFitsField — 스코프 판정 단위', async () => {
 });
 
 /* ---------- 컬렉션 계층 판정(tiers.ts) ---------- */
-test('tiers — 지정 우선, 없으면 정확한 이름, none으로 빼기, 한 역할 한 컬렉션', async () => {
-  const { parseRoleMap, roleOfCollection, tierOfCollection, pickCollection, assignRole, guessRole } = await import('../dist/pure.mjs');
-  const cols = [
-    { id: 'g', name: 'Global' },
-    { id: 'p', name: 'Primitives' },
-    { id: 's', name: 'Semantic' },
-    { id: 'x', name: 'Breakpoints' },
-  ];
-  // 지정 없음 = 예전 동작(정확한 이름만)
-  assert.deepEqual(cols.map((c) => tierOfCollection(c, {})), [1, 0, 2, 0]);
-  assert.equal(pickCollection(cols, {}, 'global').id, 'g');
-  // Primitives를 Global로 지정 → 쓰기 대상은 Primitives, 기존 'Global'도 여전히 계층(읽기)
-  let map = assignRole({}, 'p', 'global');
-  assert.equal(pickCollection(cols, map, 'global').id, 'p');
-  assert.deepEqual(cols.map((c) => tierOfCollection(c, map)), [1, 1, 2, 0]);
-  // 'Global'을 계층 아님으로 못 박기
-  map = assignRole(map, 'g', 'none');
-  assert.equal(roleOfCollection(cols[0], map), null);
-  assert.equal(pickCollection(cols, map, 'global').id, 'p');
-  // 한 역할 한 컬렉션 — 다른 컬렉션에 global을 주면 p의 지정은 풀린다
-  map = assignRole(map, 'x', 'global');
-  assert.equal(map.p, undefined);
-  assert.equal(map.x, 'global');
-  // 해제(null)는 이름 판정으로 복귀
-  map = assignRole(map, 'g', null);
-  assert.equal(map.g, undefined);
-  // 저장 문자열 파싱 — 깨졌거나 모르는 값은 버린다
-  assert.deepEqual(parseRoleMap('{"a":"global","b":"weird","c":"none"}'), { a: 'global', c: 'none' });
-  assert.deepEqual(parseRoleMap('not json'), {});
-  assert.deepEqual(parseRoleMap('[1]'), {});
-  assert.deepEqual(parseRoleMap(''), {});
-  // 이름 추천(자동 적용 안 함)
-  assert.equal(guessRole('Primitives'), 'global');
-  assert.equal(guessRole('Core colors'), 'global');
-  assert.equal(guessRole('Tokens'), 'semantic');
-  assert.equal(guessRole('Theme'), 'semantic');
-  assert.equal(guessRole('Components'), 'component');
-  assert.equal(guessRole('Breakpoints'), null);
+test('tiers — 사용자 컬렉션은 내용으로 판단(§2.13 13.3): 판단할 변수 0개 → 이름 component → 별칭 비율(정수 경계)', async () => {
+  const { judgeUserTier, hasComponentWord } = await import('../dist/pure.mjs');
+  const S = (n, alias, target = 'other') => Array.from({ length: n }, (_, i) => (i < alias ? { alias: true, targetCollection: target } : { alias: false }));
+  // 경계: 5a ≥ 4n → Semantic, 5a ≤ n → Global, 그 사이 계층 아님
+  assert.deepEqual(judgeUserTier('Tokens', 'c', S(250, 200)), { tier: 2, why: { kind: 'ratio', alias: 200, counted: 250 } });
+  assert.equal(judgeUserTier('Tokens', 'c', S(250, 199)).tier, 0);
+  assert.equal(judgeUserTier('Prim', 'c', S(250, 50)).tier, 1);
+  assert.equal(judgeUserTier('Prim', 'c', S(250, 51)).tier, 0);
+  assert.equal(judgeUserTier('Primitives', 'c', S(40, 0)).tier, 1);
+  assert.equal(judgeUserTier('Brand', 'c', S(10, 5)).tier, 0);
+  // 라이브러리 · 삭제된 대상(null)도 별칭으로 센다
+  assert.equal(judgeUserTier('Lib', 'c', S(10, 10, null)).tier, 2);
+  // 같은 컬렉션 안을 가리키는 별칭은 세지 않는다 — Primitives 안 바로가기 때문에 흔들리지 않게
+  const prim = [...S(8, 0), { alias: true, targetCollection: 'c' }, { alias: true, targetCollection: 'c' }, { alias: true, targetCollection: 'c' }];
+  assert.deepEqual(judgeUserTier('Primitives', 'c', prim), { tier: 1, why: { kind: 'ratio', alias: 0, counted: 8 } });
+  // 판단할 변수 0개가 이름보다 먼저 — 빈 Components는 계층 아님
+  assert.deepEqual(judgeUserTier('Components', 'c', []), { tier: 0, why: { kind: 'empty', alias: 0, counted: 0 } });
+  assert.equal(judgeUserTier('Components', 'c', [{ alias: true, targetCollection: 'c' }]).why.kind, 'empty');
+  assert.deepEqual(judgeUserTier('Components', 'c', S(4, 0)), { tier: 3, why: { kind: 'name', alias: 0, counted: 4 } });
+  assert.equal(judgeUserTier('Component', 'c', S(4, 4)).tier, 3);
+  assert.equal(hasComponentWord('Button components'), true);
+  assert.equal(hasComponentWord('Componentry'), false);
+});
+
+test('pickOwned — 표시 먼저, 없으면 표시 없는 정확한 이름(첫 번째), 한 컬렉션은 두 역할을 맡지 않음(§2.13 13.2)', async () => {
+  const { pickOwned } = await import('../dist/pure.mjs');
+  const m = (pairs) => (c) => pairs[c.id] ?? '';
+  const cols = [{ id: 'g1', name: 'Global' }, { id: 'g2', name: 'Global' }, { id: 's', name: 'Semantic' }];
+  let r = pickOwned(cols, m({}));
+  assert.equal(r.global.id, 'g1'); // 같은 이름이면 첫 번째
+  assert.equal(r.semantic.id, 's');
+  // 표시가 있으면 이름과 관계없이 그것
+  r = pickOwned([...cols, { id: 'x', name: 'Foundation' }], m({ x: 'global' }));
+  assert.equal(r.global.id, 'x');
+  // 이름을 Global로 바꾼 플러그인 Semantic은 global로 이어받지 않는다
+  r = pickOwned([{ id: 'ps', name: 'Global' }], m({ ps: 'semantic' }));
+  assert.equal(r.global, undefined);
+  assert.equal(r.semantic.id, 'ps');
+  // 같은 역할 표시가 둘이면 첫 번째만
+  r = pickOwned([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], m({ a: 'semantic', b: 'semantic' }));
+  assert.equal(r.semantic.id, 'a');
 });
 
 /* ---------- 연결 목록 표시(bindDisplay.ts) ---------- */
@@ -2547,16 +2550,26 @@ test('varTable — 그룹 경로·복사 문자열', async () => {
 /* ---------- IA v3 §4.4 변수 목록(varTable.ts) ---------- */
 const V = (id, name, collectionId, values = {}) => ({ id, name, collectionId, type: 'FLOAT', values, scopes: [], description: '' });
 const COLS = [
-  { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }], tierSet: null },
-  { id: 'x', name: 'Misc', tier: 0, modes: [{ modeId: 'm', name: 'Mode 1' }], tierSet: 'none' },
-  { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'm', name: 'Mode 1' }], tierSet: null },
-  { id: 'c', name: 'Comp', tier: 3, modes: [{ modeId: 'm', name: 'Mode 1' }], tierSet: 'component' },
-  { id: 'q', name: 'Other', tier: 0, modes: [{ modeId: 'm', name: 'Mode 1' }], tierSet: null },
+  { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }] },
+  { id: 'x', name: 'Misc', tier: 0, modes: [{ modeId: 'm', name: 'Mode 1' }] },
+  { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'm', name: 'Mode 1' }] },
+  { id: 'c', name: 'Comp', tier: 3, modes: [{ modeId: 'm', name: 'Mode 1' }] },
+  { id: 'q', name: 'Other', tier: 0, modes: [{ modeId: 'm', name: 'Mode 1' }] },
 ];
-test('orderCollections · tierBadge — C → S → G → 계층 없음(피그마 순서), 배지 G/S/C/–/?', async () => {
+test('orderCollections · tierBadge — C → S → G → 계층 없음(피그마 순서), 배지 G/S/C/–("?" 없음)', async () => {
   const { orderCollections, tierBadge } = await import('../dist/pure.mjs');
   assert.deepEqual(orderCollections(COLS).map((c) => c.id), ['c', 's', 'g', 'x', 'q']);
-  assert.deepEqual(COLS.map(tierBadge), ['G', '–', 'S', 'C', '?']);
+  assert.deepEqual(COLS.map(tierBadge), ['G', '–', 'S', 'C', '–']);
+});
+test('tierWhyText — 배지 툴팁 다섯 문구(§4.4), 근거 없으면 undefined', async () => {
+  const { tierWhyText } = await import('../dist/pure.mjs');
+  assert.equal(tierWhyText({ tier: 1, tierWhy: { kind: 'owned' } }), '플러그인 컬렉션');
+  assert.equal(tierWhyText({ tier: 0, tierWhy: { kind: 'empty', alias: 0, counted: 0 } }), '판단할 변수 없음 · 계층 아님');
+  assert.equal(tierWhyText({ tier: 3, tierWhy: { kind: 'name', alias: 0, counted: 4 } }), '이름 · Component');
+  assert.equal(tierWhyText({ tier: 2, tierWhy: { kind: 'ratio', alias: 45, counted: 48 } }), '별칭 45/48 · Semantic');
+  assert.equal(tierWhyText({ tier: 0, tierWhy: { kind: 'ratio', alias: 5, counted: 10 } }), '별칭 5/10 · 계층 아님');
+  assert.equal(tierWhyText({ tier: 1, tierWhy: { kind: 'ratio', alias: 0, counted: 40 } }), '직접 값 40/40 · Global');
+  assert.equal(tierWhyText({ tier: 1 }), undefined);
 });
 test('groupKey · matchesQuery — 키는 컬렉션+경로, 검색은 전체 경로 부분 일치·대소문자 무시', async () => {
   const { groupKey, matchesQuery } = await import('../dist/pure.mjs');
@@ -2667,8 +2680,8 @@ test('carryChecks — 체크는 변수 단위로 이어받음: 푼 변수의 새
 test('사이드바 B — sidebarCollections · rightEntries · initialSideSel · validSideSel', async () => {
   const { sidebarCollections, rightEntries, initialSideSel, validSideSel, inspectCount } = await import('../dist/pure.mjs');
   const cols = [
-    { id: 'G', name: 'Global', tier: 1, tierSet: true, modes: [{ modeId: 'm', name: 'Light' }], defaultModeId: 'm' },
-    { id: 'S', name: 'Semantic', tier: 2, tierSet: true, modes: [{ modeId: 'm', name: 'Light' }], defaultModeId: 'm' },
+    { id: 'G', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Light' }], defaultModeId: 'm' },
+    { id: 'S', name: 'Semantic', tier: 2, modes: [{ modeId: 'm', name: 'Light' }], defaultModeId: 'm' },
   ];
   const v = (id, collectionId, name) => ({ id, collectionId, name, type: 'COLOR', values: {}, scopes: [], description: '' });
   const vars = [v('g1', 'G', 'gray/0'), v('g2', 'G', 'gray/100'), v('t1', 'S', 'color/text/default'), v('t2', 'S', 'color/text/muted'), v('t3', 'S', 'color/text/subtle'), v('b1', 'S', 'color/bg/surface'), v('x', 'S', 'flat')];
