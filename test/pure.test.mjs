@@ -2908,3 +2908,27 @@ test('cardCounts — m · k · s · n, 레이어 단위 사유와 already-bound�
   assert.deepEqual(c.noVarByKind, [{ kind: 'gap', n: 1 }, { kind: 'size', n: 1 }, { kind: 'color', n: 2 }]);
   assert.deepEqual(cardCounts([], undefined), { m: 0, k: 0, s: 0, n: 0, byKind: [], noVarByKind: [] });
 });
+
+test('groupByVarKind · carryRowChecks — (변수, 종류) 줄 · 종류 순서 · 줄 단위 스위치 이어받기(IA v4 §4.2)', async () => {
+  const { groupByVarKind, carryRowChecks, placeKey } = await import('../dist/pure.mjs');
+  const c = (nodeId, field, variableId, extra = {}) => ({ nodeId, field, variableId, variableName: variableId, currentValue: '8', ...extra });
+  const cands = [
+    c('a', 'fills', 'vC', { index: 0, currentValue: '#ffffff' }),
+    c('a', 'itemSpacing', 'v8'),
+    c('b', 'itemSpacing', 'v8'),
+    c('a', 'topLeftRadius', 'v8'), // 같은 변수가 다른 종류 → 줄이 따로
+  ];
+  const rows = groupByVarKind(cands);
+  assert.deepEqual(rows.map((r) => [r.kind, r.variableId, r.count]), [['gap', 'v8', 2], ['radius', 'v8', 1], ['color', 'vC', 1]]);
+  assert.notEqual(rows[0].rowKey, rows[1].rowKey);
+  // radius 줄만 끔 → 다시 찾아도 radius 줄은 꺼진 채, gap 줄의 새 곳은 켬, 새 변수는 켬
+  const prevChecked = new Set([...rows[0].keys, ...rows[2].keys]);
+  const next = [...cands, c('c', 'itemSpacing', 'v8'), c('b', 'topLeftRadius', 'v8'), c('a', 'strokeWeight', 'v1')];
+  const r = carryRowChecks(cands, prevChecked, next);
+  assert.ok(r.checked.has(placeKey(c('c', 'itemSpacing', 'v8'))));
+  assert.ok(!r.checked.has(placeKey(c('b', 'topLeftRadius', 'v8'))));
+  assert.ok(!r.checked.has(placeKey(c('a', 'topLeftRadius', 'v8'))));
+  assert.ok(r.checked.has(placeKey(c('a', 'strokeWeight', 'v1'))));
+  assert.equal(r.added, 3);
+  assert.equal(r.removed, 0);
+});

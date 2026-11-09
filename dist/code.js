@@ -52,44 +52,7 @@
     "semantic.missing": " \xB7 \uB204\uB77D: {names}",
     // 바인딩(적용)
     "apply.cancelRequested": "\uCDE8\uC18C\uD558\uB294 \uC911\u2026",
-    "apply.cancelled": "\uCC3E\uAE30\uB97C \uCDE8\uC18C\uD588\uC5B4\uC694",
-    "bind.filterPlaceholder": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
     // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
-    "field.fills": "\uCC44\uC6C0 \uC0C9",
-    "field.strokes": "\uC120 \uC0C9",
-    "field.effects": "\uADF8\uB9BC\uC790 \uC0C9",
-    "field.itemSpacing": "\uAC04\uACA9",
-    "field.counterAxisSpacing": "\uC904 \uAC04\uACA9",
-    "field.gridRowGap": "\uD589 \uAC04\uACA9",
-    "field.gridColumnGap": "\uC5F4 \uAC04\uACA9",
-    "field.padding": "\uC5EC\uBC31",
-    "field.paddingX": "\uC88C\uC6B0 \uC5EC\uBC31",
-    "field.paddingY": "\uC704\uC544\uB798 \uC5EC\uBC31",
-    "field.paddingSome": "\uC5EC\uBC31 \uC77C\uBD80",
-    "field.paddingTop": "\uC704 \uC5EC\uBC31",
-    "field.paddingRight": "\uC624\uB978\uCABD \uC5EC\uBC31",
-    "field.paddingBottom": "\uC544\uB798 \uC5EC\uBC31",
-    "field.paddingLeft": "\uC67C\uCABD \uC5EC\uBC31",
-    "field.radius": "\uBAA8\uC11C\uB9AC",
-    "field.radiusSome": "\uBAA8\uC11C\uB9AC \uC77C\uBD80",
-    "field.topLeftRadius": "\uC67C\uCABD \uC704 \uBAA8\uC11C\uB9AC",
-    "field.topRightRadius": "\uC624\uB978\uCABD \uC704 \uBAA8\uC11C\uB9AC",
-    "field.bottomRightRadius": "\uC624\uB978\uCABD \uC544\uB798 \uBAA8\uC11C\uB9AC",
-    "field.bottomLeftRadius": "\uC67C\uCABD \uC544\uB798 \uBAA8\uC11C\uB9AC",
-    "field.strokeWeight": "\uC120 \uB450\uAED8",
-    "field.strokeSome": "\uC120 \uB450\uAED8 \uC77C\uBD80",
-    "field.strokeTopWeight": "\uC704 \uC120 \uB450\uAED8",
-    "field.strokeRightWeight": "\uC624\uB978\uCABD \uC120 \uB450\uAED8",
-    "field.strokeBottomWeight": "\uC544\uB798 \uC120 \uB450\uAED8",
-    "field.strokeLeftWeight": "\uC67C\uCABD \uC120 \uB450\uAED8",
-    "field.width": "\uB108\uBE44",
-    "field.height": "\uB192\uC774",
-    "field.opacity": "\uBD88\uD22C\uBA85\uB3C4",
-    "field.fontSize": "\uAE00\uC790 \uD06C\uAE30",
-    "field.lineHeight": "\uD589\uAC04",
-    "field.letterSpacing": "\uC790\uAC04",
-    "field.fontFamily": "\uAE00\uAF34",
-    "field.fontWeight": "\uAD75\uAE30",
     "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD574\uC694",
     // 리네임
     "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uCCB4\uD06C \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019",
@@ -299,56 +262,27 @@
     "vm.dNoUses": "\uC120\uD0DD \uC548\uC5D0\uC11C\uB294 \uC4F0\uC774\uC9C0 \uC54A\uC544\uC694.",
     // 탭
     // IA v3 레이어 › 연결(§4.6)
-    "bind.tsLabel": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     // 단계 표시 · 버튼(§4.6 그림 개편 — "찾기"는 이전의 "미리보기")
-    "bind.stepsAria": "\uC5F0\uACB0 \uB2E8\uACC4",
-    "bind.find": "\uCC3E\uAE30",
-    "bind.refind": "\uB2E4\uC2DC \uCC3E\uAE30",
-    "bind.stepPick": "\uACE0\uB974\uAE30",
     "bind.link": "\uC5F0\uACB0",
     "bind.linkN": "{n}\uACF3 \uC5F0\uACB0",
     "bind.finding": "\uCC3E\uB294 \uC911\u2026",
-    "bind.needFind": "\uBA3C\uC800 [\uCC3E\uAE30]\uB97C \uB204\uB974\uC138\uC694",
     "bind.needOn": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uCF1C\uC138\uC694",
     // 빈 상태(목록 자리)
-    "bind.emptyIntro": "\uAC12\uC774 \uBCC0\uC218\uC640 \uAC19\uC740 \uACF3\uC744 \uCC3E\uC544 \uC5F0\uACB0\uD574\uC694",
-    "bind.emptyNoSel": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
     // 배지 줄
-    "bind.found": "\uCC3E\uC74C {n}",
-    "bind.foundTip": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12 {n}\uACF3\uC744 \uCC3E\uC558\uC5B4\uC694 \xB7 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC744 \uBCC0\uC218\uB294 \uB044\uC138\uC694",
-    "bind.skipAria": "\uAC74\uB108\uB700 {m}\uACF3 \uC0AC\uC720 \uBCF4\uAE30",
     "bind.allOn": "\uBAA8\uB450 \uCF1C\uAE30",
     "bind.allOff": "\uBAA8\uB450 \uB044\uAE30",
-    "bind.filterBtn": "\uBCC0\uC218 \uC774\uB984 \uD544\uD130",
     // 변수 카드 "값 → 변수"
-    "bind.cardTip": "{name}\uC744(\uB97C) \uC774 {k}\uACF3\uC5D0 \uC5F0\uACB0\uD574\uC694 \xB7 \uC77C\uBD80\uB9CC \uBE7C\uB824\uBA74 \uADF8 \uB808\uC774\uC5B4\uB97C \uBE80 \uB098\uBA38\uC9C0\uB97C \uC120\uD0DD\uD558\uACE0 \uB2E4\uC2DC \uCC3E\uAE30",
-    "bind.offTip": "\uB044\uBA74 \uC774 {k}\uACF3\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
     "bind.count": "{k}\uACF3",
-    "bind.placesAria": "{name} {k}\uACF3",
     "bind.switchAria": "{name} \uC5F0\uACB0",
     // 연결 후 결과 카드
-    "bind.doneCard": "{n}\uACF3 \uC5F0\uACB0\uB428",
-    "bind.repreview": "\uB2E4\uC2DC \uCC3E\uAE30",
-    "bind.toList": "\uBCC0\uC218 \uD0ED\uC5D0\uC11C \uBCF4\uAE30 \u2192",
-    "bind.doneSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
     "bind.candChanged": "\uD6C4\uBCF4\uAC00 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 {a}\uACF3 \uCD94\uAC00 \xB7 {b}\uACF3 \uC81C\uC678",
-    "bind.otherSel": "\uB2E4\uB978 \uC120\uD0DD\uC5D0\uC11C \uB9CC\uB4E0 \uACB0\uACFC\uC608\uC694",
-    "bind.maybeChanged": "\uD53C\uADF8\uB9C8\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC744 \uC218 \uC788\uC5B4\uC694",
-    "bind.selChanged": "\uC120\uD0DD\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uB2E4\uC2DC \uCC3E\uC544 \uC8FC\uC138\uC694",
-    "bind.noLocalLib": "\uC774 \uD30C\uC77C\uC5D4 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
     "bind.noTier": "\uBCC0\uC218\uB294 \uC788\uC9C0\uB9CC \uACC4\uCE35\uC73C\uB85C \uC4F8 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4\uC694",
-    "bind.noVarsPaid": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
-    "bind.noVarsFree": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \xB7 \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694",
-    "bind.tsDone": "\u2713 \uD14D\uC2A4\uD2B8 {n}\uAC1C\uC5D0 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
     "tsSkip.hasStyle": "\uC774\uBBF8 \uC2A4\uD0C0\uC77C \uC788\uC74C",
     "tsSkip.noStyle": "\uAC19\uC740 \uC2A4\uD0C0\uC77C \uC5C6\uC74C",
     "tsSkip.ambiguous": "\uAC19\uC740 \uBAA8\uC591 \uC2A4\uD0C0\uC77C\uC774 \uB458 \uC774\uC0C1",
     "tsSkip.boundVars": "\uAE00\uC790 \uC18D\uC131\uC5D0 \uBCC0\uC218 \uC788\uC74C",
     "tsSkip.mixed": "\uC11C\uC2DD\uC774 \uC11E\uC784",
     "tsSkip.instance": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD",
-    "bind.tsNone": "\uB4F1\uB85D\uB41C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694 \xB7 \uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
-    "bind.tsNoneText": "\uB4F1\uB85D\uB41C \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694",
-    "bind.tsGotoType": "\uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
     // IA v3 변수 탭(§4.2~§4.4)
     "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
     "start.made": "\uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
@@ -441,6 +375,17 @@
     "v4.noVarPlaces": "\uBCC0\uC218\uAC00 \uC5C6\uB294 \uAC12 {k}\uACF3",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
+    "v4.kind.textStyle": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "v4.skipPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
+    "v4.skipLayers": "\uAC74\uB108\uB6F4 \uB808\uC774\uC5B4",
+    "v4.bindListAria": "\uC5F0\uACB0\uD560 \uBCC0\uC218",
+    "v4.linked": "\u{1F517} {n}\uACF3 \uC5F0\uACB0 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "v4.linkedSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
+    "v4.tsPlaces": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {t}\uACF3",
+    "v4.reasonPlaces": "{reason} {n}\uACF3",
+    "v4.reasonLayers": "{reason} \uB808\uC774\uC5B4 {n}\uAC1C",
+    "v4.readCancelled": "\uC77D\uAE30\uB97C \uCDE8\uC18C\uD588\uC5B4\uC694",
+    "v4.reread": "\uB2E4\uC2DC \uC77D\uAE30",
     "v4.skippedPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
     "v4.view": "\uBCF4\uAE30",
     "v4.usesTitle0": "\uC4F0\uB294 \uBCC0\uC218",
@@ -491,7 +436,6 @@
     "op.dark": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
     "op.textScan": "\uD14D\uC2A4\uD2B8 \uC2A4\uCE94",
     "op.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D",
-    "op.textApply": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
     "op.bind": "\uC5F0\uACB0",
     "op.rename": "\uC774\uB984 \uC815\uB9AC",
     "op.components": "\uCEF4\uD3EC\uB10C\uD2B8",
@@ -590,8 +534,6 @@
     // 지금 무슨 일이 일어나는지를 적는다.
     "textStyle.rowLabelBtn": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984 \uCC44\uC6B0\uAE30",
     "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD10\uC694. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026) \uADF8\uB300\uB85C \uB46C\uC694.",
-    "textStyle.applyExistingBtn": "\uAE30\uC874 \uC2A4\uD0C0\uC77C \uC5F0\uACB0",
-    "textStyle.applyExistingTip": "\uC120\uD0DD\uD55C \uAE00\uC790\uB97C \uC774\uBBF8 \uB9CC\uB4E0 \uAC19\uC740 \uC2A4\uD0C0\uC77C\uC5D0 \uC5F0\uACB0\uD574\uC694. \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694.",
     "textStyle.registerBtn": "\uB4F1\uB85D",
     // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
     "textStyle.namePlaceholder": "\uC2A4\uD0C0\uC77C \uC774\uB984",
@@ -602,14 +544,7 @@
     "textStyle.badgeSelectTip": "\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 {count}\uAC1C \uC804\uCCB4 \uC120\uD0DD",
     // 적용(바인딩)
     "bind.nothing": "\uC5F0\uACB0\uD560 \uACF3\uC774 \uC5C6\uC5B4\uC694",
-    "bind.skipTotal": "\uAC74\uB108\uB700 {m}",
     "bind.skipCappedTip": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0",
-    "bind.descNone": "{name}\uC5D0\uC11C \uBCC0\uC218\uC640 \uAC19\uC740 \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694",
-    "bind.selMany": "\uB808\uC774\uC5B4 {k}\uAC1C",
-    "bind.outside": "\uD544\uD130 \uBC16 {h}\uACF3 \uD3EC\uD568",
-    "bind.placeCount": " \xB7 {k}\uACF3",
-    "bind.layerTip": "\uCE94\uBC84\uC2A4\uC5D0\uC11C \uC120\uD0DD \xB7 \uC774 \uBAA9\uB85D\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
-    "bind.progress": "\uC9C4\uD589\uB960",
     // 스킵 칩 툴팁 — 사유 건수(속성 단위)와 레이어 수가 다를 수 있어 레이어 쪽을 따로 밝힌다.
     "bind.skipChipTip": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names}",
     "bind.skipChipTipMore": "\uB808\uC774\uC5B4 {count}\uAC1C \uC120\uD0DD \u2014 {names} \uC678",
@@ -713,9 +648,6 @@
     "bind.newRole": "N",
     "bind.newRoleAria": "\uC0C8 \uC5ED\uD560",
     "bind.newRoleTip": "{global}\uC744 \uAC00\uB9AC\uCF1C\uC694",
-    "bind.roleNew": "\uC0C8 \uC5ED\uD560 {k}",
-    "bind.doneNewRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
-    "bind.placesMore": "\uC678 {n}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC120\uD0DD\uC73C\uB85C \uBCF4\uAE30",
     "bind.linkingOf": "\uC5F0\uACB0 \uC911\u2026 {done} / {total}",
     "bind.waitLink": "\uC5F0\uACB0\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
     "bind.waitOp": "{op} \uC791\uC5C5\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
@@ -2602,60 +2534,77 @@
     for (let p = node.parent; p; p = p.parent) if (p.type === "INSTANCE") return true;
     return false;
   }
-  async function applyExistingTextStyles(nodes) {
-    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
-    const res = { applied: 0, skipped: 0, skipReasons };
-    const skipText = (k) => {
-      skipReasons[k]++;
-      res.skipped++;
-    };
+  async function textStyleIndex() {
     const styleByKey = /* @__PURE__ */ new Map();
     for (const s of await figma.getLocalTextStylesAsync()) {
       const k = typoKey(s);
       styleByKey.set(k, styleByKey.has(k) ? null : s);
     }
+    return styleByKey;
+  }
+  function textStyleFor(t2, styleByKey) {
+    if (hasTextStyle(t2)) return "hasStyle";
+    if (hasTextVarBinding(t2)) return "boundVars";
+    if (isMixedTypography(t2)) return "mixed";
+    const hit = styleByKey.get(typoKey(t2));
+    if (hit === void 0) return "noStyle";
+    if (hit === null) return "ambiguous";
+    return hit;
+  }
+  async function planExistingTextStyles(nodes) {
+    var _a;
+    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+    const styleByKey = await textStyleIndex();
     const texts = [];
     const inInstance = [];
     for (const n of nodes) {
       if (insideInstance(n)) walkText(n, inInstance);
       else walkText(n, texts, inInstance);
     }
-    for (let i = 0; i < inInstance.length; i++) skipText("instance");
-    const loaded = /* @__PURE__ */ new Set();
-    const ensureFont = async (fn) => {
-      const k = `${fn.family} ${fn.style}`;
-      if (loaded.has(k)) return;
-      await figma.loadFontAsync(fn);
-      loaded.add(k);
-    };
+    skipReasons.instance += inInstance.length;
+    const rows = /* @__PURE__ */ new Map();
     for (const t2 of texts) {
-      if (hasTextStyle(t2)) {
-        skipText("hasStyle");
+      const r = textStyleFor(t2, styleByKey);
+      if (typeof r === "string") {
+        skipReasons[r]++;
         continue;
       }
-      if (hasTextVarBinding(t2)) {
-        skipText("boundVars");
-        continue;
-      }
-      if (isMixedTypography(t2)) {
-        skipText("mixed");
-        continue;
-      }
-      const fn = t2.fontName;
-      const hit = styleByKey.get(typoKey(t2));
-      if (hit === void 0) {
-        skipText("noStyle");
-        continue;
-      }
-      if (hit === null) {
-        skipText("ambiguous");
-        continue;
-      }
-      try {
-        await ensureFont(fn);
-        await t2.setTextStyleIdAsync(hit.id);
-        res.applied++;
-      } catch (e) {
+      const row = (_a = rows.get(r.id)) != null ? _a : { styleId: r.id, name: r.name, nodeIds: [] };
+      row.nodeIds.push(t2.id);
+      rows.set(r.id, row);
+    }
+    return { rows: [...rows.values()], skipReasons };
+  }
+  async function applyTextStyleRows(rows) {
+    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+    const res = { applied: 0, skipped: 0, skipReasons };
+    const styleByKey = await textStyleIndex();
+    const loaded = /* @__PURE__ */ new Set();
+    for (const row of rows) {
+      for (const id of row.nodeIds) {
+        const t2 = await figma.getNodeByIdAsync(id).catch(() => null);
+        if (!t2 || t2.type !== "TEXT") {
+          skipReasons.noStyle++;
+          res.skipped++;
+          continue;
+        }
+        const r = textStyleFor(t2, styleByKey);
+        if (typeof r === "string" || r.id !== row.styleId) {
+          skipReasons[typeof r === "string" ? r : "noStyle"]++;
+          res.skipped++;
+          continue;
+        }
+        try {
+          const fn = t2.fontName;
+          const k = `${fn.family} ${fn.style}`;
+          if (!loaded.has(k)) {
+            await figma.loadFontAsync(fn);
+            loaded.add(k);
+          }
+          await t2.setTextStyleIdAsync(r.id);
+          res.applied++;
+        } catch (e) {
+        }
       }
     }
     return res;
@@ -8855,7 +8804,7 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -9004,18 +8953,21 @@
           bindCancel = false;
           bindLinkRunning = true;
           try {
+            const ts = ((_a = msg.textStyles) == null ? void 0 : _a.length) ? await applyTextStyleRows(msg.textStyles) : null;
+            if (ts == null ? void 0 : ts.applied) written += ts.applied;
             const r = await bindSelectedItems(msg.items, {
               onProgress: (done, total) => post({ type: "PROGRESS", op: "link", done, total }),
               yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0)),
               onBound: (n) => {
-                written = n;
+                var _a2;
+                written = ((_a2 = ts == null ? void 0 : ts.applied) != null ? _a2 : 0) + n;
               },
               onCreated: (n) => {
                 made = n;
               }
             });
-            post({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles });
-            if (r.bound || r.newRoles) {
+            post(__spreadValues({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles }, ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}));
+            if (r.bound || r.newRoles || (ts == null ? void 0 : ts.applied)) {
               commitUndo(figma);
               committed = true;
               selfSelect = true;
@@ -9099,10 +9051,9 @@
           await postPrereq();
           break;
         }
-        case "APPLY_TEXT_STYLES": {
-          const r = await applyExistingTextStyles(selection());
-          post({ type: "TEXT_STYLES_APPLIED", applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons });
-          commitUndo(figma);
+        case "PREVIEW_TEXT_STYLES": {
+          const r = await planExistingTextStyles(await resolveRoots(msg.nodeIds));
+          post({ type: "TEXT_STYLES_PREVIEW", reqId: msg.reqId, rows: r.rows, skipReasons: r.skipReasons });
           break;
         }
         case "GET_COLLECTIONS": {
@@ -9260,7 +9211,7 @@
             let p = c.parentId;
             while (p && !keepIds.has(p)) {
               keepIds.add(p);
-              p = (_b = (_a = byCand.get(p)) == null ? void 0 : _a.parentId) != null ? _b : null;
+              p = (_c = (_b = byCand.get(p)) == null ? void 0 : _b.parentId) != null ? _c : null;
             }
           }
           const pruned = gated.filter((c) => keepIds.has(c.id));
@@ -9463,7 +9414,7 @@
               return (_a2 = existingIcons.get(key)) != null ? _a2 : null;
             }
           });
-          const shownNames = (_c = msg.names) != null ? _c : {};
+          const shownNames = (_d = msg.names) != null ? _d : {};
           const groupNames = groups.map((g, gi) => {
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
             return shown != null ? shown : resolved[gi];
@@ -9532,7 +9483,7 @@
                   for (const key of newIcons) iconRegistry.discard(key);
                   if (r.result === "mismatch") {
                     fillKept.push(name);
-                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_d = r.why) != null ? _d : "" }) }));
+                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_e = r.why) != null ? _e : "" }) }));
                   } else {
                     placeFailed.push(name);
                     failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -9612,7 +9563,7 @@
                 } else {
                   const snaps = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                   const preferLive = pickCollapseMasterIndex(structs);
-                  const masterSnap = (_e = snaps[preferLive]) != null ? _e : snaps[0];
+                  const masterSnap = (_f = snaps[preferLive]) != null ? _f : snaps[0];
                   const masterOrigin = captureOrigin2(masterSnap.n);
                   let master;
                   try {
@@ -9633,7 +9584,7 @@
                     } catch (e) {
                     }
                   } else markReuse(master, "collapse", masterSnap.n.id);
-                  const prefix = shapePrefix(master, (_g = (_f = structs[preferLive]) == null ? void 0 : _f.type) != null ? _g : "");
+                  const prefix = shapePrefix(master, (_h = (_g = structs[preferLive]) == null ? void 0 : _g.type) != null ? _h : "");
                   placeOnPage(master);
                   keepRoots.push({ node: master, name: master.name });
                   singles.push(master.name);
@@ -9705,7 +9656,7 @@
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
                       fillKept.push(name);
-                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_h = r.why) != null ? _h : "" }) }));
+                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_i = r.why) != null ? _i : "" }) }));
                     } else {
                       placeFailed.push(name);
                       failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -9722,7 +9673,7 @@
               const vectorPlans = inferVaryingComponentProperties([...liveStruct.values()]).filter((p) => p.fromVector && p.layerPath != null);
               const made = [];
               for (const sf of subfamilies) {
-                const head = (_i = sf.members[sf.master]) != null ? _i : sf.members[0];
+                const head = (_j = sf.members[sf.master]) != null ? _j : sf.members[0];
                 const node = byId.get(head.id);
                 if (!node) continue;
                 const icons = vectorPlans.map((p) => {
@@ -9809,7 +9760,7 @@
               }
               let set;
               try {
-                const home = (_j = pageOf(made[0].comp)) != null ? _j : figma.currentPage;
+                const home = (_k = pageOf(made[0].comp)) != null ? _k : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
                 failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
@@ -9900,7 +9851,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_k = nodes[0].parent) != null ? _k : figma.currentPage;
+              const parent = (_l = nodes[0].parent) != null ? _l : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {

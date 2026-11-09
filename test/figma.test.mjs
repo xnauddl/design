@@ -25,6 +25,8 @@ import {
   scanTextStyles,
   createSemanticTextStyles,
   applyExistingTextStyles,
+  planExistingTextStyles,
+  applyTextStyleRows,
   bindSelection,
   bindSelectedItems,
   countUsage,
@@ -5549,4 +5551,35 @@ test('이미 붙은 연결(12.8 결정 B) — 아이콘의 HUG 축에 붙은 Glo
   assert.equal(dry.candidates.filter((c) => c.nodeId === 'icon').length, 0);
   assert.ok(dry.skips.some((x) => x.nodeId === 'icon' && x.reason === 'hug-fill'));
   assert.ok(dry.skips.some((x) => x.nodeId === 'icon' && x.reason === 'already-bound'));
+});
+
+test('planExistingTextStyles · applyTextStyleRows — 스타일 줄 미리보기(쓰지 않음) · 켠 줄만 연결 · 그 사이 스타일이 붙으면 건너뜀', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([
+    { name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+    { name: 'title', fontSize: 24, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+  ]);
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
+  const title = figma._state.textStyles.find((s) => s.name === 'title');
+  const mkText = (id, fontSize) => ({
+    type: 'TEXT', id, name: id, fontSize, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: fontSize * 1.5 }, letterSpacing: { unit: 'PIXELS', value: 0 },
+    characters: 'hi', visible: true, textStyleId: '',
+    _styleId: null, async setTextStyleIdAsync(sid) { this._styleId = sid; this.textStyleId = sid; },
+  });
+  const a = mkText('a', 16), b = mkText('b', 16), c = mkText('c', 24), d = mkText('d', 40);
+  const plan = await planExistingTextStyles([a, b, c, d]);
+  assert.deepEqual(plan.rows.map((r) => [r.name, r.nodeIds]).sort(), [['body', ['a', 'b']], ['title', ['c']]]);
+  assert.equal(plan.skipReasons.noStyle, 1);
+  assert.equal(a._styleId, null, '미리보기는 쓰지 않는다');
+  registerNodes(figma, [a, b, c, d]);
+  // 그 사이 b에 스타일이 붙었다 → 건너뜀. title 줄은 끔(보내지 않음).
+  b.textStyleId = title.id;
+  const r = await applyTextStyleRows([{ styleId: body.id, nodeIds: ['a', 'b'] }]);
+  assert.equal(r.applied, 1);
+  assert.equal(a._styleId, body.id);
+  assert.equal(b._styleId, null);
+  assert.equal(c._styleId, null, '끈 줄은 붙이지 않는다');
+  assert.equal(r.skipped, 1);
+  assert.equal(r.skipReasons.hasStyle, 1);
 });

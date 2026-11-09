@@ -11,6 +11,8 @@ export {
   scanExistingTextStyles,
   createSemanticTextStyles,
   applyExistingTextStyles,
+  planExistingTextStyles,
+  applyTextStyleRows,
   prunePaletteColors,
   GLOBAL,
   SEMANTIC,

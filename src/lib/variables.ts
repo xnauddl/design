@@ -1071,6 +1071,84 @@ function insideInstance(node: SceneNode): boolean {
  * 건너뛰는 글자(§2.11): 이미 텍스트 스타일이 있음 · 글자 속성에 변수가 있음 · 인스턴스 안쪽 ·
  * 서식이 섞임 · 같은 스타일이 없음 · 같은 모양 스타일이 둘 이상. 스타일·변수는 만들거나 고치지 않는다.
  */
+/** 텍스트 스타일 미리보기의 줄 — 스타일 하나와 붙을 글자 레이어들(IA v4 §4.2). */
+export interface TextStylePlanRow {
+  styleId: string;
+  name: string;
+  nodeIds: string[];
+}
+/** 스타일 키 인덱스(같은 키 2개 이상 = 같은 모양 스타일이 여럿 → 모호, null). */
+async function textStyleIndex(): Promise<Map<string, TextStyle | null>> {
+  const styleByKey = new Map<string, TextStyle | null>();
+  for (const s of await figma.getLocalTextStylesAsync()) {
+    const k = typoKey(s as unknown as TypoFields);
+    styleByKey.set(k, styleByKey.has(k) ? null : s);
+  }
+  return styleByKey;
+}
+/** 이 글자에 붙일 수 있는 스타일(없으면 건너뜀 사유). */
+function textStyleFor(t: TextNode, styleByKey: Map<string, TextStyle | null>): TextStyle | TextStyleSkipReason {
+  if (hasTextStyle(t)) return 'hasStyle';
+  if (hasTextVarBinding(t)) return 'boundVars';
+  if (isMixedTypography(t)) return 'mixed';
+  const hit = styleByKey.get(typoKey(t as unknown as TypoFields));
+  if (hit === undefined) return 'noStyle';
+  if (hit === null) return 'ambiguous'; // 같은 모양 스타일 2개 이상 → 어느 것에 붙일지 모호
+  return hit;
+}
+/**
+ * 기존 스타일 연결 미리보기(IA v4 §4.2) — 쓰지 않고 스타일별로 붙을 글자를 모은다.
+ * 사유는 레이어 단위로 센다(연결 화면 건너뜀 칩 "레이어 n개").
+ */
+export async function planExistingTextStyles(nodes: readonly SceneNode[]): Promise<{ rows: TextStylePlanRow[]; skipReasons: Record<TextStyleSkipReason, number> }> {
+  const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+  const styleByKey = await textStyleIndex();
+  const texts: TextNode[] = [];
+  const inInstance: TextNode[] = [];
+  for (const n of nodes) {
+    if (insideInstance(n)) walkText(n, inInstance);
+    else walkText(n, texts, inInstance);
+  }
+  skipReasons.instance += inInstance.length;
+  const rows = new Map<string, TextStylePlanRow>();
+  for (const t of texts) {
+    const r = textStyleFor(t, styleByKey);
+    if (typeof r === 'string') { skipReasons[r]++; continue; }
+    const row = rows.get(r.id) ?? { styleId: r.id, name: r.name, nodeIds: [] };
+    row.nodeIds.push(t.id);
+    rows.set(r.id, row);
+  }
+  return { rows: [...rows.values()], skipReasons };
+}
+/**
+ * 켠 스타일 줄만 붙인다(IA v4 §4.2 — 연결 직전 다시 확인). 그 사이 스타일이 붙었거나 값이 달라진 글자는 건너뛴다.
+ * 반환: 붙인 레이어 수 · 건너뛴 사유.
+ */
+export async function applyTextStyleRows(rows: readonly { styleId: string; nodeIds: readonly string[] }[]): Promise<ApplyTextStylesResult> {
+  const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+  const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons };
+  const styleByKey = await textStyleIndex();
+  const loaded = new Set<string>();
+  for (const row of rows) {
+    for (const id of row.nodeIds) {
+      const t = await figma.getNodeByIdAsync(id).catch(() => null);
+      if (!t || t.type !== 'TEXT') { skipReasons.noStyle++; res.skipped++; continue; }
+      const r = textStyleFor(t as TextNode, styleByKey);
+      if (typeof r === 'string' || r.id !== row.styleId) { skipReasons[typeof r === 'string' ? r : 'noStyle']++; res.skipped++; continue; }
+      try {
+        const fn = (t as TextNode).fontName as FontName;
+        const k = `${fn.family} ${fn.style}`;
+        if (!loaded.has(k)) { await figma.loadFontAsync(fn); loaded.add(k); }
+        await (t as TextNode).setTextStyleIdAsync(r.id);
+        res.applied++;
+      } catch {
+        /* 폰트를 못 불러옴 */
+      }
+    }
+  }
+  return res;
+}
+
 export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Promise<ApplyTextStylesResult> {
   const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
   const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons };
@@ -1078,12 +1156,7 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
     skipReasons[k]++;
     res.skipped++;
   };
-  // 스타일 키 인덱스(같은 키 2개 이상 = 같은 모양 스타일이 여럿 → 모호, null).
-  const styleByKey = new Map<string, TextStyle | null>();
-  for (const s of await figma.getLocalTextStylesAsync()) {
-    const k = typoKey(s as unknown as TypoFields);
-    styleByKey.set(k, styleByKey.has(k) ? null : s);
-  }
+  const styleByKey = await textStyleIndex();
 
   const texts: TextNode[] = [];
   const inInstance: TextNode[] = [];

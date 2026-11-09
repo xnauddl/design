@@ -236,6 +236,11 @@
     .sub-back:hover { background: var(--surface-hover); }
     .sub-title { font-size: 13px; }
     .var-empty { padding: 40px 8px; text-align: center; }
+    /* IA v4 §4.2 연결 화면 */
+    .bind-v4 .bv-kind { padding: 10px 2px 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
+    .bind-v4 .bv-card { border-width: 0 0 1px; border-radius: 0; margin: 0; }
+    .bind-v4 .bv-allrow { text-align: right; font-size: 11px; margin: 0 0 2px; }
+    .sub-foot { position: sticky; bottom: 24px; display: flex; align-items: center; gap: 8px; min-height: 52px; background: var(--bg, #fff); border-top: 1px solid var(--border); margin-top: 8px; }
 
     /* ── 단계 레일 — 만들기 4단계 · 적용 3단계. 한 화면에 한 단계만 보인다. ── */
     .steps { display: grid; gap: 3px; margin: 0 0 10px; }
@@ -862,58 +867,27 @@
       <span class="sub-right muted" id="subRight"></span>
     </div>
     <!-- 레이어 › 연결(§4.6 그림 개편) — 카드 제목 없음. 단계 표시 + 버튼 줄(함께 고정) → 배지 줄 → 빈 상태/변수 카드 → 텍스트 스타일. -->
-    <div class="step bind-card" data-apply-step="bind">
-      <!-- 연결할 변수가 없을 때의 안내(§4.6 표 4행) — 문구와 버튼은 ui.ts가 정한다. -->
-      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
-      <div class="toolbar bind-toolbar">
-        <!-- 단계 표시 — 누를 수 없는 표시(정지점 아님). 상태는 ui.ts renderBindSteps가 정한다. -->
-        <ol class="bind-steps" id="bindSteps" role="list" data-i18n-aria-label="bind.stepsAria" aria-label="연결 단계">
-          <li class="bs" data-s="find"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.find">찾기</span></li>
-          <li class="bs" data-s="pick"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.stepPick">고르기</span></li>
-          <li class="bs" data-s="link"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.link">연결</span></li>
-        </ol>
-        <button id="btnApply" class="primary bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg><span class="bl" id="btnApplyLabel" data-i18n="bind.find">찾기</span></button>
-        <button id="btnApplyConfirm" class="bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span class="bl" id="btnApplyConfirmLabel" data-i18n="bind.link">연결</span></button>
-      </div>
+    <div class="step bind-card bind-v4" data-apply-step="bind">
+      <!-- IA v4 §4.2 연결 화면(⑦) — 종류 머리 · (변수, 종류) 줄 · 스위치 · 텍스트 스타일 줄 · 건너뜀 칩 · 아래 고정 [n곳 연결] -->
       <div class="ux" id="applyProgress" style="display:none">
-        <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
         <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
         <div class="row">
           <span class="muted" id="applyProgressText"></span>
           <button id="btnApplyCancel" data-i18n="common.cancel">취소</button>
         </div>
       </div>
-      <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
-      <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">다시 찾기</button></div>
-      <!-- 연결 후 결과 카드(§4.6) -->
-      <div class="bind-done" id="bindDone" hidden><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span id="bindDoneText"></span><span class="grow"></span><button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
-      <!-- 배지 줄(찾은 뒤) — (찾음 n) (건너뜀 m ▸) … [모두 켜기/끄기] [필터]. 사유 칩 줄은 DOM에서 건너뜀 바로 뒤(포커스 순서), 화면에서는 아랫줄. -->
+      <div class="bind-empty" id="bindEmpty" hidden></div>
+      <div class="bv-allrow" id="bindAllRow" hidden><button class="link link-btn" id="bindAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button> · <button class="link link-btn" id="bindAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></div>
+      <div id="bindTree" class="bind-list" role="grid" data-i18n-aria-label="v4.bindListAria" aria-label="연결할 변수"></div>
       <div class="bind-badges" id="bindBadges" hidden>
-        <span class="bd bd-found" id="bindFound"></span>
-        <span class="bd-roles" id="bindRoleSum" hidden></span>
         <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
         <div class="skip-row" id="bindSkips" hidden></div>
-        <span class="grow"></span>
-        <button class="bd-all" id="bindAll" type="button"></button>
-        <button class="icon-btn" id="bindFilterBtn" type="button" aria-expanded="false" aria-controls="bindFilterRow" data-i18n-title="bind.filterBtn" title="변수 이름 필터" data-i18n-aria-label="bind.filterBtn" aria-label="변수 이름 필터"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
       </div>
-      <div class="row bind-filter-row" id="bindFilterRow" hidden>
-        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" />
-        <span class="muted" id="bindOutside"></span>
-      </div>
-      <!-- 빈 상태(목록 자리, 점선 상자) — 찾기 전(예시 두 줄) · 선택 없음 · 찾은 곳 0. -->
-      <div class="bind-empty" id="bindEmpty" hidden></div>
-      <!-- 변수 카드 "값 → 변수"(§4.6) -->
-      <div id="bindTree" class="bind-list"></div>
-      <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 카드 목록 아래 한 줄(§4.6). -->
-      <div class="row ts-apply-row">
-        <span class="ts-aa" aria-hidden="true">Aa</span>
-        <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
-        <span class="grow"></span>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결해요. 새로 만들지 않아요.">기존 스타일 연결</button>
-      </div>
-      <div class="hint" id="tsApplyResult" hidden></div>
       <div class="status" id="applyStatus"></div>
+      <div class="sub-foot" id="bindFoot">
+        <span class="grow"></span>
+        <button id="btnApplyConfirm" class="primary bind-btn" type="button"><span class="bl" id="btnApplyConfirmLabel" data-i18n="bind.link">연결</span></button>
+      </div>
     </div>
 
     <div class="step" data-apply-step="rename">

@@ -504,10 +504,10 @@
 - [x] 테스트: pure.test "사이드바 B"(`sidebarCollections` · `rightEntries` · `inspectCount`) 고침, reread 테스트, verify-bind-flow 블록 1~11 · 15(연결 수 · 잠금 · `#applyStatus`) 고침, 스크린샷
 
 ### B.2 PR 2 — 연결 화면
-- [ ] 변수별 줄((변수, 종류) 한 쌍) · 종류 머리 · 줄 순서 · 모두 켜기/끄기 · 스위치 · N 배지 · 텍스트 스타일 줄(스타일 먼저, 한 자리 한 번) · 건너뜀 칩 · [n곳 연결] · 상태표 · 기준 바뀜 이어받기 · 끝난 뒤 첫 화면 + 상태 줄 · 포커스
-- [ ] 메시지 `PREVIEW_TEXT_STYLES`(기준 nodeIds) → `TEXT_STYLES_PREVIEW`, `APPLY_SELECTED`의 `textStyles` · 한 번에 연결(⌘Z 한 번), 카드 1 · 자동 읽기에 스타일 미리보기와 m 규칙 더함, 테스트
-- [ ] `APPLY_TEXT_STYLES` / `TEXT_STYLES_APPLIED` 정리: OPS 항목, `WAIT_LINK_IDS`의 `btnApplyExistingText`, verify-bind-flow 블록 11("기존 스타일 연결은 무료" → 연결 화면 스타일 줄로)
-- [ ] v3 연결 카드 UI · 단계 · 필터 · 결과 카드 · 링크 삭제, 키 `bind.*` 단계 · 필터 · 배지 · 빈 상태 · 결과 카드 지움, terms.test 2(새 `bind.*` 키) 고침
+- [x] 변수별 줄((변수, 종류) 한 쌍) · 종류 머리 · 줄 순서 · 모두 켜기/끄기 · 스위치 · N 배지 · 텍스트 스타일 줄(스타일 먼저, 한 자리 한 번) · 건너뜀 칩 · [n곳 연결] · 상태표 · 기준 바뀜 이어받기 · 끝난 뒤 첫 화면 + 상태 줄 · 포커스
+- [x] 메시지 `PREVIEW_TEXT_STYLES`(기준 nodeIds) → `TEXT_STYLES_PREVIEW`, `APPLY_SELECTED`의 `textStyles` · 한 번에 연결(⌘Z 한 번), 카드 1 · 자동 읽기에 스타일 미리보기와 m 규칙 더함, 테스트
+- [x] `APPLY_TEXT_STYLES` / `TEXT_STYLES_APPLIED` 정리: OPS 항목, `WAIT_LINK_IDS`의 `btnApplyExistingText`, verify-bind-flow 블록 11("기존 스타일 연결은 무료" → 연결 화면 스타일 줄로)
+- [x] v3 연결 카드 UI · 단계 · 필터 · 결과 카드 · 링크 삭제, 키 `bind.*` 단계 · 필터 · 배지 · 빈 상태 · 결과 카드 지움, terms.test 2(새 `bind.*` 키) 고침
 
 ### B.3 PR 3 — 변수 탭 팔레트 · 클릭 연결 · 상세 · 새 변수 · 복제 · 삭제 (§9 결정 전 병합 안 함)
 - [ ] 머리 줄(검색 · 모드 · ＋ · ⋯ · 준비 현황 도착 표), 그룹 머리(종류 판정 1~5 · 종류 순서), Global 알약 · 동그라미(목록 · 격자 · 참거짓), 줄(이름 · 값 180), 사용 표시 삭제, 빈 상태
