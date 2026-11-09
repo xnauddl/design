@@ -365,7 +365,7 @@
 - 팝업(상세와 같은 틀): 컬렉션(읽기, 지금 고른 컬렉션) · 이름 · 타입(색 · 숫자 · 글자 · 참거짓) · 모드별 값(값 ↔ 별칭, 고치기의 칸 · [▾] 그대로) · [취소] [만들기].
 - 타입 기본값: 지금 보이는 첫 그룹의 첫 변수 타입. 그룹이 없으면 숫자.
 - 로컬 컬렉션이 0개면 사용자 컬렉션 `Variables`를 새로 만들어 넣는다(플러그인 표시 없음 — 플러그인 자동 쓰기가 건드리지 않는 곳). 컬렉션 칸에 "Variables (새로 만듦)".
-- **직접 만든 변수 지키기:** 새 변수 · 복제로 만든 변수에는 플러그인 데이터 `dsl.manual = 1`을 단다. 플러그인 컬렉션 안에 있어도 자동 쓰기가 덮어쓰거나 지우지 않는다 — 빼는 곳: `createTokens` · `prunePaletteColors` · 다크(`themeApply` — Dark 값을 다시 걸지 않음) · 역할 매핑(`createSemanticAliases` · `createUsageRoles`의 `upsertVariable` — 덮어쓰지 않음).
+- **직접 만든 변수 지키기:** 새 변수 · 복제로 만든 변수에는 플러그인 데이터 `dsl.manual = 1`을 단다. 플러그인 컬렉션 안에 있어도 자동 쓰기가 덮어쓰거나 지우지 않는다 — 빼는 곳(이름이 같으면 덮어쓰거나 지우는 경로): `createTokens` · `prunePaletteColors` · 역할 매핑 `createSemanticAliases`의 `upsertVariable` · 다크 `themeApply`(manual Semantic 변수의 Dark 값을 다시 걸지 않고, 쓸 `dark/{이름}` Global이 manual 변수면 값을 덮어쓰지 않고 `-n` 번호를 붙여 새로 만든다). `createUsageRoles`는 지금도 같은 이름이면 `-n`으로 새로 만들어 덮어쓰지 않는다(같은 이름 · 같은 값 재사용 판정에는 manual 변수도 들어간다).
   - `createTokens`가 같은 이름의 manual 변수를 만나면: 값이 같으면 그 변수를 그 토큰의 Global로 쓴다(`globalOf`가 가리킴 — 지금의 재사용과 같음). 값이 다르면 그 토큰과 그 토큰을 가리킬 역할을 만들지 않는다. 응답 `CREATE_RESULT`에 `skippedManual`(수)을 더하고 결과 문구 끝에 " · 직접 만든 변수라 건너뜀 {n}".
   - 역할 매핑 · 다크가 manual 변수를 건너뛰면 결과의 건너뜀 수에 더한다.
   - 사용자가 상세에서 고치는 것은 그대로 된다.
@@ -477,7 +477,7 @@
 - [ ] 클릭 · 더블클릭(한 번) · Space · Enter · 우클릭, 쓰기 잠금(양쪽), 키보드
 - [ ] `APPLY_VARIABLE`(§4.7 속성 목록 · 용도 · 채움 용도 · 색 · 숫자 · 글자 세부 · target · 사유 · 되돌리기 한 묶음) — `scopes.ts` · `bind.ts`에 필요한 필드 · 함수
 - [ ] 상세 합침(복사 · → · 되돌리기 두 곳 · 모두 선택 · 직접만 · 포커스 순서), "고치기…" · 행 메뉴 복사 3종 삭제, 간접 코드(`indirectUsage` · `aliasTargetsOf` · `recomputeIndirect` · `indirectMap`)와 키(`list.indirect*` · `list.chipTip`) 삭제
-- [ ] 새 변수(타입 기본값 · 컬렉션 0개면 사용자 `Variables`) · `dsl.manual` 표시와 `createTokens`(값 같음 = 재사용, 다름 = 건너뜀 · `skippedManual`) · `prunePaletteColors` · `themeApply` · `createSemanticAliases` · `createUsageRoles`에서 빼기, 테스트 · 복제(무료 개수 제한 상수, 자동 생성은 세지 않음) · 삭제 확인(⌘Z 실기 확인), 메시지 4종 · reqId · ERROR.op · OPS write 표에 넣기
+- [ ] 새 변수(타입 기본값 · 컬렉션 0개면 사용자 `Variables`) · `dsl.manual` 표시와 `createTokens`(값 같음 = 재사용, 다름 = 건너뜀 · `skippedManual`) · `prunePaletteColors` · `createSemanticAliases` · `themeApply`(Dark 값 · `dark/` Global `-n`)에서 빼기, 테스트 · 복제(무료 개수 제한 상수, 자동 생성은 세지 않음) · 삭제 확인(⌘Z 실기 확인), 메시지 4종 · reqId · ERROR.op · OPS write 표에 넣기
 - [ ] i18n: 새 키 · 지울 키(`vm.copyValue` · `vm.whatValue` · `vm.edit` · `vm.moreTip` · `vm.selectLayers` · `list.usesTip` 등), `cellCopyText` 등 쓰이지 않는 함수와 테스트 정리, `initialSideSel` 테스트, verify-bind-flow 블록 9 · 12
 - [ ] 테스트(`figma.test.mjs`): 속성 표 각 줄 · 용도 막힘 · 다음 속성 · 채움 용도 · 단색 없음 · 글자 구간 · 크기 FIXED · 반경 필드 없음 · 기존 연결 바꿈 · Global 연결 · 기타 · 종류 판정 3 · 4(사용자 Component 이름), 복제 · 삭제 · 새 변수
 - [ ] ia-v3 A.13 체크리스트 닫음(이 PR로 대체)
@@ -485,6 +485,6 @@
 ### B.4 PR 4 — 만들기 화면 · 이름 정리 화면
 - [ ] 만들기: 추출(화면 자체 상태, `tokens` 안 덮어씀 — `EXTRACT` · `CREATE_TOKENS` preview 응답을 reqId로 나눠 받아 공용 처리기(`#createStatus` · `btnCreateApply` · `createFrom`)를 건드리지 않음, 추출 뒤 정리는 공용 함수로 재사용) · 종류 줄 표 · 격자 정리 안 함 · 만든 뒤 옵션 3 · 만들 수 다시 계산 · 실행 순서(추출 → 만들기 → 다크 → 연결 → 이름) · 실행 상태표 · 무료 잠금 · 포커스 · [값을 직접 고르기 →](v3 만들기 4단계 이동 · 링크 표), 시작 화면 · 마법사 카드 삭제
 - [ ] `wizard.ts` 새 단계 목록(연결 단계 더함, 역할 매핑 · 텍스트 스타일 · 컴포넌트 단계 뺌) · `runWizard`의 DOM 의존(`#wizOpt*` · `#semMap` · `#base`) 걷어냄 · 연결 결과 처리 경로, `test/wizard.test.mjs` 고침, 키 `wizard.*` 시작 화면 · 요약 · 연결 안내 · `create.*` "레이어에 연결하기 →" 지움
-- [ ] 설정 문구: `settings.gridTip` · 기본값 안내의 "만들기에서 격자로 모아요"를 "값을 직접 고르기 › 토큰에서"로(만들기 화면은 격자 정리를 하지 않음)
+- [ ] 설정 문구: `settings.gridTip`의 "만들기에서 이 격자로 모아요"를 "값을 직접 고르기 › 토큰에서 이 격자로 모아요"로(만들기 화면은 격자 정리를 하지 않음). `settings.hint`는 그대로
 - [ ] 이름 정리: 바꿀 줄만 · 체크 · 미리보기 다시 하기 · 빈 상태 · [k개 이름 바꾸기] · 포커스, `rename.hideKeep` · `rename.showKeep` 삭제
 - [ ] 컴포넌트 하위 화면(v3 내용 그대로)
