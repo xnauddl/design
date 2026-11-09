@@ -4353,6 +4353,7 @@
   };
   var wizardWaiter = null;
   var wizBindReq = 0;
+  var wizBindPending = false;
   window.addEventListener("message", (event) => {
     const m = event.data.pluginMessage;
     if (!m) return;
@@ -4545,7 +4546,10 @@
           }
           case "bind": {
             wizBindReq = ++bindReqSeq;
-            const r = await wizardRequest({ type: "APPLY", preview: false, nodeIds: wizIds, reqId: wizBindReq }, ["APPLY_RESULT"], wizBindReq);
+            wizBindPending = true;
+            const r = await wizardRequest({ type: "APPLY", preview: false, nodeIds: wizIds, reqId: wizBindReq }, ["APPLY_RESULT"], wizBindReq).finally(() => {
+              wizBindPending = false;
+            });
             totals.bound = r.bound;
             wizBindRan = true;
             const reasons = (_b = r.reasons) != null ? _b : {};
@@ -4585,7 +4589,7 @@
     const paidSkipped = paidSkippedSteps(plan);
     const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
     if (!isPaid && !stopped && !wizardFailed) {
-      setStatus("wizardSummary", wizBindRan ? t("wizard.freeSumBound", { b: (_e = totals.bound) != null ? _e : 0, n: (_f = totals.renamed) != null ? _f : 0 }) : t("wizard.freeSum", { n: (_g = totals.renamed) != null ? _g : 0 }), "ok");
+      setStatus("wizardSummary", wizBindRan ? t("wizard.freeSumBound", { b: (_e = totals.bound) != null ? _e : 0, n: (_f = totals.renamed) != null ? _f : 0 }) : t("wizard.freeSum", { n: (_g = totals.renamed) != null ? _g : 0 }) + t("wizard.notLinked"), "ok");
     } else setStatus(
       "wizardSummary",
       t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + // 연결 단계를 껐으면 다 끝난 것처럼 읽히지 않게 적는다(v4 §4.3 링크 표).
@@ -5109,7 +5113,7 @@
         break;
       }
       case "PROGRESS":
-        if (msg.op === "bind") updateApplyProgress(msg.done, msg.total);
+        if (msg.op === "bind" && !wizBindPending) updateApplyProgress(msg.done, msg.total);
         else if (msg.op === "link" && bindLinking) updateLinkProgress(msg.done, msg.total);
         break;
       case "APPLY_RESULT": {

@@ -1193,6 +1193,8 @@ class PaidRequiredError extends Error {}
 let wizardWaiter: { types: string[]; reqId?: number; resolve: (m: CodeToUi) => void; reject: (e: Error) => void } | null = null;
 /** 마법사 연결 요청의 reqId — 메인 처리기는 이 결과로 연결 화면을 다시 그리지 않는다(§4.3). */
 let wizBindReq = 0;
+/** 마법사 연결이 응답을 기다리는 중. */
+let wizBindPending = false;
 
 window.addEventListener('message', (event: MessageEvent) => {
   const m = (event.data as { pluginMessage?: CodeToUi }).pluginMessage;
@@ -1432,7 +1434,8 @@ async function runWizard(): Promise<void> {
         case 'bind': {
           // 기준 nodeIds로 실제 연결 — 연결 화면 [연결]과 같은 규칙(IA v4 §4.3). 텍스트 스타일은 붙이지 않는다.
           wizBindReq = ++bindReqSeq;
-          const r = await wizardRequest({ type: 'APPLY', preview: false, nodeIds: wizIds, reqId: wizBindReq }, ['APPLY_RESULT'], wizBindReq);
+          wizBindPending = true;
+          const r = await wizardRequest({ type: 'APPLY', preview: false, nodeIds: wizIds, reqId: wizBindReq }, ['APPLY_RESULT'], wizBindReq).finally(() => { wizBindPending = false; });
           totals.bound = r.bound;
           wizBindRan = true;
           // 0곳 사유(§4.3): 계층으로 쓸 변수 없음 / 이미 모두 연결됨 / 값이 같은 곳 없음.
@@ -1480,7 +1483,7 @@ async function runWizard(): Promise<void> {
     : '';
   if (!isPaid && !stopped && !wizardFailed) {
     // 무료 완료 요약(§4.3) — 로컬 변수 수와 관계없이 이름 정리만.
-    setStatus('wizardSummary', wizBindRan ? t('wizard.freeSumBound', { b: totals.bound ?? 0, n: totals.renamed ?? 0 }) : t('wizard.freeSum', { n: totals.renamed ?? 0 }), 'ok');
+    setStatus('wizardSummary', wizBindRan ? t('wizard.freeSumBound', { b: totals.bound ?? 0, n: totals.renamed ?? 0 }) : t('wizard.freeSum', { n: totals.renamed ?? 0 }) + t('wizard.notLinked'), 'ok');
   } else setStatus(
     'wizardSummary',
     t('wizard.result', { state: stopped ? t('wizard.stopped') : t('wizard.completed'), summary: summarize(totals) }) +
@@ -2166,7 +2169,7 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'PROGRESS':
-      if (msg.op === 'bind') updateApplyProgress(msg.done, msg.total); // UX6
+      if (msg.op === 'bind' && !wizBindPending) updateApplyProgress(msg.done, msg.total); // UX6 — 마법사 연결의 진행은 연결 화면에 띄우지 않는다(§4.3)
       else if (msg.op === 'link' && bindLinking) updateLinkProgress(msg.done, msg.total);
       break;
     case 'APPLY_RESULT': {

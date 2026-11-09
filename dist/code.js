@@ -8018,7 +8018,14 @@
   var cache = null;
   var bindCancel = false;
   var bindTurn = 0;
-  var bindRunning = Promise.resolve();
+  var bindChain = Promise.resolve();
+  function acquireBind() {
+    const prev = bindChain;
+    let release = () => {
+    };
+    bindChain = new Promise((res) => release = res);
+    return prev.then(() => release);
+  }
   var bindLinkRunning = false;
   var lastTextSamples = [];
   function effective() {
@@ -8881,11 +8888,11 @@
         case "APPLY": {
           const myTurn = ++bindTurn;
           if (!bindLinkRunning) bindCancel = true;
-          await bindRunning;
-          if (msg.preview && myTurn !== bindTurn) break;
-          let release = () => {
-          };
-          bindRunning = new Promise((res) => release = res);
+          const release = await acquireBind();
+          if (msg.preview && myTurn !== bindTurn) {
+            release();
+            break;
+          }
           bindCancel = false;
           bindLinkRunning = !msg.preview;
           try {
@@ -8964,6 +8971,7 @@
           break;
         }
         case "CANCEL": {
+          if (bindLinkRunning) break;
           bindCancel = true;
           break;
         }
@@ -8993,10 +9001,7 @@
           let committed = false;
           bindTurn++;
           if (!bindLinkRunning) bindCancel = true;
-          await bindRunning;
-          let releaseLink = () => {
-          };
-          bindRunning = new Promise((res) => releaseLink = res);
+          const releaseLink = await acquireBind();
           bindCancel = false;
           bindLinkRunning = true;
           try {

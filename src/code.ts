@@ -56,7 +56,14 @@ let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때�
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
 let bindTurn = 0; // 찾기 요청 차례(IA v4 §7 — 한 번에 하나)
-let bindRunning: Promise<void> = Promise.resolve();
+/** 찾기 · 연결 요청 줄(IA v4 §7) — 앞 요청이 끝나야 다음이 돈다. 겹쳐 깨어나지 않는다. */
+let bindChain: Promise<void> = Promise.resolve();
+function acquireBind(): Promise<() => void> {
+  const prev = bindChain;
+  let release: () => void = () => {};
+  bindChain = new Promise<void>((res) => (release = res));
+  return prev.then(() => release);
+}
 /** 실제 연결(APPLY preview 아님 · APPLY_SELECTED)이 도는 중 — 찾기가 이것을 취소하지 않는다. */
 let bindLinkRunning = false;
 // 마지막 스캔의 원본 표본 — 「왼쪽 글자로 이름 채우기」가 다시 훑지 않고 이름만 다시 매기게 한다.
@@ -1084,11 +1091,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // liveVarIds · bindCancel이 모듈 전역이라 겹쳐 돌면 판정과 취소가 틀어진다.
         // 실제 연결(preview 아님 · APPLY_SELECTED)은 취소하지 않고 끝나길 기다린다(마법사 연결 — §4.3).
         const myTurn = ++bindTurn;
-        if (!bindLinkRunning) bindCancel = true;
-        await bindRunning;
-        if (msg.preview && myTurn !== bindTurn) break; // 기다리는 사이 더 새 요청이 왔다 — 이 찾기는 버린다(UI도 reqId로 버림). 실제 연결은 버리지 않는다
-        let release: () => void = () => {};
-        bindRunning = new Promise<void>((res) => (release = res));
+        if (!bindLinkRunning) bindCancel = true; // 돌던 찾기를 멈춘다(실제 연결은 멈추지 않는다)
+        const release = await acquireBind();
+        if (msg.preview && myTurn !== bindTurn) { release(); break; } // 기다리는 사이 더 새 요청이 왔다 — 이 찾기는 버린다(UI도 reqId로 버림). 실제 연결은 버리지 않는다
         bindCancel = false; // UX6: 새 작업 시작 시 취소 플래그 초기화
         bindLinkRunning = !msg.preview;
         try {
@@ -1164,6 +1169,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CANCEL': {
+        if (bindLinkRunning) break; // 실제 연결은 취소하지 않는다(IA v4 §4.3 — 마법사 연결)
         bindCancel = true; // UX6: 다음 양보 지점에서 중단
         break;
       }
@@ -1204,9 +1210,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 찾기와 겹쳐 돌지 않게(IA v4 §7) — 돌던 찾기를 멈추고 끝나길 기다린 뒤 연결한다.
         bindTurn++;
         if (!bindLinkRunning) bindCancel = true;
-        await bindRunning;
-        let releaseLink: () => void = () => {};
-        bindRunning = new Promise<void>((res) => (releaseLink = res));
+        const releaseLink = await acquireBind();
         bindCancel = false;
         bindLinkRunning = true;
         try {
