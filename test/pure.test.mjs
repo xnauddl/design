@@ -3,6 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  fieldKind,
+  cardCounts,
   rgbToHex,
   hexToRgb,
   scopesFor,
@@ -2875,4 +2877,34 @@ test('inferVaryingImageSlots — 레이어 자신이 사진인 멤버(사각형�
   assert.deepEqual(inferVaryingImageSlots([rect('a', 'sky'), rect('b', 'sky')]), [], '같은 사진이면 슬롯 없음');
   const av = (id, hash) => ({ id, name: 'Ellipse 10', type: 'ELLIPSE', width: 32, height: 32, imageHash: hash, fills: [{ type: 'IMAGE', visible: true }] });
   assert.deepEqual(inferVaryingImageSlots([av('a', 'f1'), av('b', 'f2'), av('c', 'f3')]), [{ layerName: 'Ellipse 10', layerPath: '' }]);
+});
+
+/* ---------- IA v4 §4.1 — 선택 탭 카드 숫자 ---------- */
+test('fieldKind — 찾기 속성 → 종류', () => {
+  assert.equal(fieldKind('itemSpacing'), 'gap');
+  assert.equal(fieldKind('paddingLeft'), 'gap');
+  assert.equal(fieldKind('topLeftRadius'), 'radius');
+  assert.equal(fieldKind('width'), 'size');
+  assert.equal(fieldKind('strokeTopWeight'), 'stroke');
+  assert.equal(fieldKind('opacity'), 'opacity');
+  assert.equal(fieldKind('effects'), 'color');
+  assert.equal(fieldKind('fontFamily'), 'text');
+  assert.equal(fieldKind(undefined), 'other');
+});
+test('cardCounts — m · k · s · n, 레이어 단위 사유와 already-bound는 s에서 뺀다', () => {
+  const c = cardCounts(['fills', 'fills', 'itemSpacing'], {
+    'no-match': { color: 2, gap: 1 },
+    'size-fraction': { size: 1 },
+    styled: { color: 1 },
+    'already-bound': { color: 5 },
+    'instance-children': { other: 9 },
+    font: { other: 2 },
+  });
+  assert.equal(c.m, 3);
+  assert.equal(c.k, 4);
+  assert.equal(c.s, 1);
+  assert.equal(c.n, 7);
+  assert.deepEqual(c.byKind, [{ kind: 'gap', n: 2 }, { kind: 'size', n: 1 }, { kind: 'color', n: 4 }]);
+  assert.deepEqual(c.noVarByKind, [{ kind: 'gap', n: 1 }, { kind: 'size', n: 1 }, { kind: 'color', n: 2 }]);
+  assert.deepEqual(cardCounts([], undefined), { m: 0, k: 0, s: 0, n: 0, byKind: [], noVarByKind: [] });
 });

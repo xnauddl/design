@@ -479,17 +479,17 @@
 각 PR 공통: `verify:i18n` 미참조 키 0(지운 화면의 키를 그 PR에서 지운다), 4검사 · 스크린샷 · 실기 확인(사용자, 피그마).
 
 ### B.1 PR 1 — 탭 구조 + 선택 탭 첫 화면
-- [ ] 머리 [선택 | 변수] ⚙ —, 기본 탭 = 선택, 하위 화면 틀(← 머리 · 아래 고정 버튼 줄 · 기억 · 포커스 규칙 §2.1), ⚙ 설정 화면(탭 밖, v3 설정 내용 이동)
-- [ ] 선택 탭 첫 화면: 머리 줄(이름 · count · 기준 다름 · [기준 바꾸기]), 상태표 1~7, 카드 1(자동 찾기 250ms · 300개 규칙 · m · k · s · n · 종류별 수 · ✓ · noTier), 카드 2(직접만 · 펼침 목록 · 상세), 카드 3([선택] · [연결 풀기] — `deletedBindings`(구간 배열까지 읽음 · 범위 밖 필드 뺌)로 세기와 풀기를 같게, `UNBIND_DELETED` · OPS write · 테스트. 실기 확인: 뗀 뒤 값이 그대로인지(칠 · 숫자 · 글자 구간 · 인스턴스 안쪽), ⌘Z 한 번, `setBoundVariableForPaint/Effect`의 null, 라이브러리를 뺀 파일에서 살아 있는 라이브러리 연결이 삭제로 판정되지 않는지), 레이어 정리, 포커스 순서
-- [ ] 이 PR에서 하위 화면 연결 · 만들기 · 이름 정리는 v3 화면을 그 틀 안에 옮겨 둔다(B.2 · B.4에서 바꿈). 컴포넌트 화면은 v3 내용 그대로
-- [ ] 메시지: `APPLY` · `EXTRACT` · `RENAME`에 `nodeIds`(`resolveRoots`). `APPLY_RESULT`에 상한 없는 `counts`(사유 × 종류별 자리 수 — 지금 `reasons`는 합계뿐이고 `skips`는 200에서 잘림)를 더함, 로컬 변수 0개여도 찾기가 변수가 없는 값 자리를 돌려줌(④ · 카드 1 종류별 수). 카드 1의 텍스트 스타일 수는 B.2의 `PREVIEW_TEXT_STYLES`가 올 때까지 이 PR에서는 빼고 센다(B.2에서 더함)
-- [ ] 찾기 한 번에 하나(UI 취소 · 합치기 + 코드의 `liveVarIds` · `bindCancel` 겹침 막기), 쓰기 중 자동 요청 미룸, reread의 run 콜백 · `isHeld` 바꿈
-- [ ] `boundVariableIds`가 글자 구간 배열의 모든 원소를 읽게 고침(카드 2 곳 수와 카드 3이 같은 방식으로 셈)
-- [ ] 쓰는 변수 직접만: `collectUsage`의 별칭 따라가기(`addLibrary` 재귀 · 로컬 별칭 사슬, code.ts 381 · 391–399) 지움
-- [ ] OPS 표(ui.ts): `go` 도착지 바꿈(`goLayer` · `showMake` · EXPORT의 `showTab('settings')` → v4 화면), `WAIT_LINK_IDS` · `WAIT_CARD_IDS` · `OP_STATUS` id 정리, 최소화 [보기] 도착(§2.6)
-- [ ] 지울 것: 레이어 탭 · 설정 탭 · 레이어 하위 탭, 변수 › 목록 사이드바의 ★ Inspect · LIB · 삭제된 변수 · 그룹 항목 · 상황 안내 줄 · 머리줄 링크 · [↻](이 PR에서 변수 탭 오른쪽은 아직 v3 목록 — 사이드바만 컬렉션 `listbox`로), 키 `tab.layer` · `tab.settings` · 레이어 하위 탭 · `list.*` Inspect · 상황 안내 · findUnbound · noneUsed · `pipeline.*` 링크
-- [ ] 다시 읽기 §7(창 다시 들어옴 → 선택 탭 데이터, 작업 뒤 `GET_PREREQ`)
-- [ ] 테스트: pure.test "사이드바 B"(`sidebarCollections` · `rightEntries` · `inspectCount`) 고침, reread 테스트, verify-bind-flow 블록 1~11 · 15(연결 수 · 잠금 · `#applyStatus`) 고침, 스크린샷
+- [x] 머리 [선택 | 변수] ⚙ —, 기본 탭 = 선택, 하위 화면 틀(← 머리 · 아래 고정 버튼 줄 · 기억 · 포커스 규칙 §2.1), ⚙ 설정 화면(탭 밖, v3 설정 내용 이동)
+- [x] 선택 탭 첫 화면: 머리 줄(이름 · count · 기준 다름 · [기준 바꾸기]), 상태표 1~7, 카드 1(자동 찾기 250ms · 300개 규칙 · m · k · s · n · 종류별 수 · ✓ · noTier), 카드 2(직접만 · 펼침 목록 · 상세), 카드 3([선택] · [연결 풀기] — `deletedBindings`(구간 배열까지 읽음 · 범위 밖 필드 뺌)로 세기와 풀기를 같게, `UNBIND_DELETED` · OPS write · 테스트. 실기 확인: 뗀 뒤 값이 그대로인지(칠 · 숫자 · 글자 구간 · 인스턴스 안쪽), ⌘Z 한 번, `setBoundVariableForPaint/Effect`의 null, 라이브러리를 뺀 파일에서 살아 있는 라이브러리 연결이 삭제로 판정되지 않는지), 레이어 정리, 포커스 순서
+- [x] 이 PR에서 하위 화면 연결 · 만들기 · 이름 정리는 v3 화면을 그 틀 안에 옮겨 둔다(B.2 · B.4에서 바꿈). 컴포넌트 화면은 v3 내용 그대로
+- [x] 메시지: `APPLY` · `EXTRACT` · `RENAME`에 `nodeIds`(`resolveRoots`). `APPLY_RESULT`에 상한 없는 `counts`(사유 × 종류별 자리 수 — 지금 `reasons`는 합계뿐이고 `skips`는 200에서 잘림)를 더함, 로컬 변수 0개여도 찾기가 변수가 없는 값 자리를 돌려줌(④ · 카드 1 종류별 수). 카드 1의 텍스트 스타일 수는 B.2의 `PREVIEW_TEXT_STYLES`가 올 때까지 이 PR에서는 빼고 센다(B.2에서 더함)
+- [x] 찾기 한 번에 하나(UI 취소 · 합치기 + 코드의 `liveVarIds` · `bindCancel` 겹침 막기), 쓰기 중 자동 요청 미룸, reread의 run 콜백 · `isHeld` 바꿈
+- [x] `boundVariableIds`가 글자 구간 배열의 모든 원소를 읽게 고침(카드 2 곳 수와 카드 3이 같은 방식으로 셈)
+- [x] 쓰는 변수 직접만: `collectUsage`의 별칭 따라가기(`addLibrary` 재귀 · 로컬 별칭 사슬, code.ts 381 · 391–399) 지움
+- [x] OPS 표(ui.ts): `go` 도착지 바꿈(`goLayer` · `showMake` · EXPORT의 `showTab('settings')` → v4 화면), `WAIT_LINK_IDS` · `WAIT_CARD_IDS` · `OP_STATUS` id 정리, 최소화 [보기] 도착(§2.6)
+- [x] 지울 것: 레이어 탭 · 설정 탭 · 레이어 하위 탭, 변수 › 목록 사이드바의 ★ Inspect · LIB · 삭제된 변수 · 그룹 항목 · 상황 안내 줄 · 머리줄 링크 · [↻](이 PR에서 변수 탭 오른쪽은 아직 v3 목록 — 사이드바만 컬렉션 `listbox`로), 키 `tab.layer` · `tab.settings` · 레이어 하위 탭 · `list.*` Inspect · 상황 안내 · findUnbound · noneUsed · `pipeline.*` 링크
+- [x] 다시 읽기 §7(창 다시 들어옴 → 선택 탭 데이터, 작업 뒤 `GET_PREREQ`)
+- [x] 테스트: pure.test "사이드바 B"(`sidebarCollections` · `rightEntries` · `inspectCount`) 고침, reread 테스트, verify-bind-flow 블록 1~11 · 15(연결 수 · 잠금 · `#applyStatus`) 고침, 스크린샷
 
 ### B.2 PR 2 — 연결 화면
 - [ ] 변수별 줄((변수, 종류) 한 쌍) · 종류 머리 · 줄 순서 · 모두 켜기/끄기 · 스위치 · N 배지 · 텍스트 스타일 줄(스타일 먼저, 한 자리 한 번) · 건너뜀 칩 · [n곳 연결] · 상태표 · 기준 바뀜 이어받기 · 끝난 뒤 첫 화면 + 상태 줄 · 포커스

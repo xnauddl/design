@@ -42,8 +42,18 @@ async function open(width = 480, tab = 'layer') {
     window.parent.postMessage = (m) => window.__sent.push(m.pluginMessage);
   });
   await p.goto(url);
-  if (tab) await p.click(`#tabbtn-${tab}`);
+  if (tab) await goTab(p, tab);
   return p;
+}
+/** v4 탭 이동 — layer → 선택 탭 › 연결 하위 화면, settings → ⚙, 그 밖은 세그먼트(IA v4 §2.1). */
+async function goTab(p, tab) {
+  if (tab === 'settings') return p.click('#btnSettings');
+  if (tab === 'layer' || ['bind', 'rename', 'structure', 'make'].includes(tab)) return goSub(p, tab === 'layer' ? 'bind' : tab);
+  return p.click(`#tabbtn-${tab}`);
+}
+/** 선택 탭 하위 화면으로 — [data-go-sub] 위임 링크를 잠깐 붙여 누른다. */
+async function goSub(p, sub) {
+  await p.evaluate((sub) => { const b = document.createElement('button'); b.dataset.goSub = sub; b.id = '__goSub'; document.body.appendChild(b); b.click(); b.remove(); }, sub);
 }
 const recv = (p, m) => p.evaluate((m) => window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: m } })), m);
 const sent = (p, type) => p.evaluate((t) => window.__sent.filter((m) => m && m.type === t), type);
@@ -119,7 +129,6 @@ const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return 
   check('1 스위치 role=switch · 이름 "{변수} 연결"', (await p.getAttribute('#bindTree .bv-switch', 'role')) === 'switch' && (await p.getByRole('switch', { name: 'spacing/8 연결', exact: true }).count()) === 1);
   check('1 자리 줄에는 체크박스·값 없음(펼쳐도)', await (async () => { await p.click('#bindTree .bv-tw'); return (await p.$$('#bindTree .bv-place')).length > 0 && (await p.$$('#bindTree .bv-place input')).length === 0 && !(await p.textContent('#bindTree .bv-place')).includes('8'); })());
   check('1 카드 6개 이하 → 필터 숨김', !(await visible(p, '#bindFilterBtn')) && !(await visible(p, '#bindFilterRow')));
-  check('1 하위 탭 13px · 높이 32', JSON.stringify(await p.$eval('#applyRail .subtab', (e) => [getComputedStyle(e).fontSize, Math.round(e.getBoundingClientRect().height)])) === JSON.stringify(['13px', 32]));
   // 찾은 곳 0
   await p.click('#btnApply');
   await recv(p, { ...preview(await lastReq(p, 'APPLY')), candidates: [], bound: 0 });
@@ -358,7 +367,7 @@ const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return 
   await p.click('#bindSkipToggle');
   await p.click('#bindFilterBtn');
   await p.click('#bindTree .bv-card >> nth=0 >> .bv-tw');
-  await p.focus('#applyRail [data-apply-step="bind"]');
+  await p.focus('#btnSubBack'); // v4: 하위 화면 머리의 ← 다음부터
   const order = [];
   for (let i = 0; i < 25; i++) {
     await p.keyboard.press('Tab');
@@ -373,7 +382,7 @@ const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return 
     if (id === '#btnApplyExistingText') break;
   }
   const expect = ['#btnApply', '#btnApplyConfirm', '#bindSkipToggle', 'chip', '#bindAll', '#bindFilterBtn', '#bindFilter', 'v0:bv-tw', 'v0:bv-switch', 'v0:bv-layer'];
-  check('8 포커스 순서 — 하위 탭 → 버튼 줄 → 배지 줄 → 필터 칸 → 카드(▾ · 스위치 · 레이어) → 기존 스타일 연결', JSON.stringify(order.slice(0, expect.length)) === JSON.stringify(expect) && order.at(-1) === '#btnApplyExistingText' && !order.some((x) => x === 'LI' || x === '#bindSteps'), JSON.stringify(order));
+  check('8 포커스 순서 — ← → 버튼 줄 → 배지 줄 → 필터 칸 → 카드(▾ · 스위치 · 레이어) → 기존 스타일 연결', JSON.stringify(order.slice(0, expect.length)) === JSON.stringify(expect) && order.at(-1) === '#btnApplyExistingText' && !order.some((x) => x === 'LI' || x === '#bindSteps'), JSON.stringify(order));
   await p.close();
 }
 
@@ -395,99 +404,68 @@ const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset
 const sideItems = (p) => p.$$eval('#varSide .vs-item', (e) => e.map((x) => [x.querySelector('.vs-name').textContent, x.querySelector('.vs-num').textContent]));
 const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.dataset.key).catch(() => null);
 {
-  const p = await open(480, null);
+  const p = await open(480, 'variables');
   await recv(p, PREREQ);
   check('9 첫 표 전에는 불러오는 중', await visible(p, '#varLoading'));
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
-  check('9 로컬 변수 0개 → 시작 화면', (await visible(p, '#varStart')) && !(await visible(p, '#varList')));
-  check('9 무료 시작 화면: 무료 안내 + [이름 정리 실행]', (await visible(p, '#startFree')) && (await p.textContent('#btnWizardRun')) === '이름 정리 실행');
+  check('9 로컬 변수 0개 → "아직 변수가 없어요" 빈 상태(v4 §4.6)', (await visible(p, '#varEmpty')) && !(await visible(p, '#varList')));
+  check('9 빈 상태 [선택에서 변수 만들기] — 선택 없으면 잠금', await locked(p, '#btnVarEmptyMake'));
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   check('9 로컬 변수 있음 → 목록', await visible(p, '#varList'));
-  // 사이드바(결정 B): ★ Inspect · 계층 순서(S → G), 선택 없으면 전체 수, 첫 컬렉션만 펼침
-  check('9 사이드바 항목·숫자(선택 없음)', JSON.stringify(await sideItems(p)) === JSON.stringify([['★ Inspect', '—'], ['Semantic', '1'], ['color/text', '1'], ['Global', '4']]), JSON.stringify(await sideItems(p)));
-  check('9 칩 줄 없음', (await p.$('#chipRow')) === null);
-  check('9 선택 없음 → 첫 컬렉션 고름 + 상황 안내 줄', (await sideSelected(p)) === 'side:col:s' && (await p.textContent('#situationLine')) === '레이어를 선택하면 쓰는 변수가 ★ Inspect에 모여요');
+  // 사이드바(v4 §4.6): 컬렉션만 · 계층 순서(S → G) · 전체 수 · listbox
+  check('9 사이드바 = 컬렉션만(★ · 그룹 · LIB · 삭제된 변수 없음)', JSON.stringify(await sideItems(p)) === JSON.stringify([['Semantic', '1'], ['Global', '4']]), JSON.stringify(await sideItems(p)));
+  check('9 사이드바 listbox · option', (await p.getAttribute('#varSide', 'role')) === 'listbox' && (await p.$$eval('#varSide .vs-item', (e) => e.every((x) => x.getAttribute('role') === 'option'))));
+  check('9 머리줄 링크 · ↻ · 상황 안내 줄 없음', (await p.$('#btnFindUnbound')) === null && (await p.$('#btnVarRefresh')) === null && (await p.$('#btnReadiness')) === null && (await p.$('#situationLine')) === null);
+  check('9 처음에는 첫 컬렉션', (await sideSelected(p)) === 'side:col:s');
   check('9 모드 ▾(보이는 모드 2개 이상)', await visible(p, '#modeSelect'));
   check('9 선택 없음: 사용 "—"', JSON.stringify(await rowIds(p)) === JSON.stringify(['tx']) && (await p.textContent('.vt-row[data-id="tx"] .use')) === '—');
-  // 선택 → 400ms 뒤 SCAN_USAGE(목록 기준 = 지금 선택), 응답 동안 칩 "…"
   await recv(p, { ...sel(1, 2), scanned: 40, firstName: 'Card', ids: ['1:2'] });
   await p.waitForTimeout(450);
   const req = (await sent(p, 'SCAN_USAGE')).at(-1);
   check('9 선택 변경 → SCAN_USAGE(기준 = 지금 선택)', req?.nodeIds?.[0] === '1:2');
-  check('9 읽는 중 사이드바 숫자 "…"', (await p.textContent('#varSide')).includes('…'));
   await recv(p, usageResult(req.reqId, { tx: { places: 8, layers: 5 }, sp8: { places: 3, layers: 2 } }));
-  const ids = await rowIds(p);
-  // tx는 Light에서 g9, Dark에서 g0을 가리킨다 — 간접은 모든 모드를 본다.
-  check('9 쓰는 변수 있음 → ★ Inspect 고름', (await sideSelected(p)) === 'side:inspect');
-  check('9 ★ Inspect: 쓰는 행만(직접 + 간접, 모든 모드)', JSON.stringify(ids) === JSON.stringify(['tx', 'g0', 'g9', 'sp8']), ids.join(','));
-  check('9 ★ Inspect: 경로 머리', JSON.stringify(await p.$$eval('#varTree .vt-path', (e) => e.map((x) => x.textContent))) === JSON.stringify(['S Semantic › color/text', 'G Global › color/gray', 'G Global › spacing']));
-  check('9 간접 사용 "↳"', (await p.textContent('.vt-row[data-id="g9"] .use')) === '↳');
   check('9 사용 수 "곳"', (await p.textContent('.vt-row[data-id="tx"] .use')) === '8곳');
-  check('9 사이드바 사용/전체', JSON.stringify((await sideItems(p)).slice(0, 2)) === JSON.stringify([['★ Inspect', '4'], ['Semantic', '1/1']]), JSON.stringify(await sideItems(p)));
   await p.click('#varSide [data-key="side:col:g"]');
-  check('9 컬렉션 고름 → 모든 행(쓰는 것 먼저, 안 쓰는 행 "안 씀")', JSON.stringify(await rowIds(p)) === JSON.stringify(['g0', 'g9', 'sp8', 'r4']) && (await p.textContent('.vt-row[data-id="r4"] .use')) === '안 씀');
-  // §8 폭(2026-11-06 창 가로 480 · 사이드바 128 · 값 칸 130)
+  check('9 컬렉션 고름 → 그 컬렉션 행', JSON.stringify(await rowIds(p)) === JSON.stringify(['g0', 'g9', 'sp8', 'r4']), JSON.stringify(await rowIds(p)));
   const widths = await p.evaluate(() => {
     const w = (sel) => Math.round(document.querySelector(sel)?.getBoundingClientRect().width ?? -1);
-    return { win: window.innerWidth, side: w('.vl-side'), main: w('#varTree'), name: w('#varTree .vt-row .nm'), val: w('#varTree .vt-row .val'), hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+    return { win: window.innerWidth, side: w('.vl-side'), main: w('#varTree'), hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
   });
-  const head = await p.evaluate(() => {
-    const lh = document.getElementById('listHead');
-    const kids = [...lh.children].filter((e) => !e.classList.contains('grow') && e.offsetParent);
-    return { used: Math.round(kids.reduce((a, e) => a + e.getBoundingClientRect().width, 0)), width: Math.round(lh.clientWidth), h: Math.round(lh.getBoundingClientRect().height) };
-  });
-  console.log(`  · §8 실측: 머리줄 ${head.used}/${head.width}px · 높이 ${head.h}px`);
-  check('9 §8 폭 — 창 480 · 사이드바 128 · 목록 328 · 이름 칸 130 · 값 칸 130 · 가로 스크롤 0', JSON.stringify(widths) === JSON.stringify({ win: 480, side: 128, main: 328, name: 130, val: 130, hscroll: 0 }), JSON.stringify(widths));
-  check('9 컬렉션 고르면 그룹이 사이드바에 펼쳐짐', (await sideItems(p)).some(([n]) => n === 'radius'));
-  await p.click('#varSide [data-key="side:grp:g|radius"]');
-  check('9 그룹 고름 → 그 그룹만', JSON.stringify(await rowIds(p)) === JSON.stringify(['r4']) && (await p.textContent('#varMainTitle')) === 'radius');
-  await p.click('#varSide [data-key="side:inspect"]');
-  // 우클릭 메뉴 — 교체 없음
+  check('9 §8 폭 — 창 480 · 사이드바 128 · 목록 328 · 가로 스크롤 0', JSON.stringify(widths) === JSON.stringify({ win: 480, side: 128, main: 328, hscroll: 0 }), JSON.stringify(widths));
+  await p.click('#varSide [data-key="side:col:s"]');
+  // 우클릭 메뉴 — 교체 없음(B.3 전까지 v3 행 메뉴)
   await rightClick(p, '.vt-row[data-id="tx"]');
-  const items = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
-  check('9 행 메뉴(복사 3 · 사용 레이어 선택 · 이동 · 상세 · 고치기, 교체 없음)', JSON.stringify(items) === JSON.stringify(['이름 복사', '값 복사', 'CSS 변수명 복사', '사용 레이어 선택', '가리키는 변수로 이동', '상세', '고치기…']), items.join('|'));
   await p.click('.ctx-menu button >> text=사용 레이어 선택');
   const selReq = (await sent(p, 'SELECT_VAR_USERS')).at(-1);
   check('9 사용 레이어 선택 → 기준 안에서 새로 찾기', selReq?.varIds?.[0] === 'tx' && selReq?.nodeIds?.[0] === '1:2');
   await recv(p, { type: 'SELECT_RESULT', found: 200, requested: 340, capped: true });
   check('9 200개 상한 문구', (await p.textContent('#statusText')).includes('레이어 200개만 선택했어요(전체 340개)'));
-  // 플러그인이 만든 선택 → 기준 유지 + [기준 바꾸기]
+  // 플러그인이 만든 선택 → 기준 유지, 선택 탭 머리 줄에 [기준 바꾸기](§2.5)
   await recv(p, { ...sel(3, 2), scanned: 60, selfSelect: true, ids: ['a', 'b', 'c'] });
-  check('9 플러그인이 만든 선택은 기준 유지 → 상황 안내 줄 맨 앞', (await p.textContent('#situationLine')).startsWith('목록 기준: Card · 지금 선택과 달라요') && (await visible(p, '#situationLine button')), await p.textContent('#situationLine'));
-  check('9 선택 표시줄 없음', (await p.$('#selBarWrap')) === null);
+  await goTab(p, 'select');
+  check('9 플러그인이 만든 선택은 기준 유지 → 선택 탭 머리 줄 "지금 선택과 달라요"', (await p.textContent('#selHead')).includes('지금 선택과 달라요') && (await p.textContent('#selHead')).startsWith('Card'), await p.textContent('#selHead'));
   const scansBefore = (await sent(p, 'SCAN_USAGE')).length;
-  await p.click('#situationLine button');
+  await p.click('#selHead [data-k="rebase"]');
   await p.waitForTimeout(450);
-  check('9 [기준 바꾸기] → 새 기준으로 읽기', (await sent(p, 'SCAN_USAGE')).length === scansBefore + 1 && !(await p.textContent('#situationLine')).includes('목록 기준'));
-  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 8, layers: 5 }, sp8: { places: 3, layers: 2 } }));
+  check('9 [기준 바꾸기] → 새 기준으로 읽기 · 안내 사라짐', (await sent(p, 'SCAN_USAGE')).length > scansBefore && !(await p.textContent('#selHead')).includes('지금 선택과 달라요'));
   // 큰 선택(⑤): 자동으로 읽지 않고 [읽기]
   const s0 = (await sent(p, 'SCAN_USAGE')).length;
+  const a0 = (await sent(p, 'APPLY')).length;
   await recv(p, { ...sel(1, 2), scanned: 1200, ids: ['big'] });
   await p.waitForTimeout(450);
-  check('9 큰 선택은 자동으로 읽지 않음 — ★ 빈 상태에만(상황 안내 줄엔 없음)', (await sent(p, 'SCAN_USAGE')).length === s0 && (await p.textContent('#varTree')).includes('선택이 커서 자동으로 읽지 않아요') && !(await visible(p, '#situationLine')));
-  await p.click('#varTree .vt-empty button');
-  check('9 [읽기] → 300개 무시하고 읽기', (await sent(p, 'SCAN_USAGE')).length === s0 + 1);
-  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
-  check('9 안 쓰는 선택 안내(★ 빈 상태)', (await p.textContent('#varTree')).includes('이 선택은 로컬 변수를 쓰지 않아요'));
-  // ↻ — 결과 문구
-  await p.click('#btnVarRefresh');
-  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
-  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 1, layers: 1 } }));
-  check('9 ↻ 결과 "사용 수가 바뀐 변수 n개"', (await p.textContent('#statusText')) === '다시 읽음 · 사용 수가 바뀐 변수 1개', await p.textContent('#statusText'));
+  check('9 큰 선택은 자동으로 읽지 않음 — 선택 탭 "선택이 커서…" + [읽기]', (await sent(p, 'SCAN_USAGE')).length === s0 && (await sent(p, 'APPLY')).length === a0 && (await p.textContent('#selCards')).includes('선택이 커서 자동으로 읽지 않아요'));
+  await p.click('#selCards button');
+  check('9 [읽기] → 300개 무시하고 사용 수 · 찾기', (await sent(p, 'SCAN_USAGE')).length === s0 + 1 && (await sent(p, 'APPLY')).length === a0 + 1 && (await sent(p, 'APPLY')).at(-1).nodeIds?.[0] === 'big');
+  await goTab(p, 'variables');
   // 검색 — 결과 없음
   await p.click('#btnSearch');
   await p.fill('#varSearch', 'zzz');
   check('9 검색 결과 없음 문구', (await p.textContent('#varTree')).includes("'zzz'와 맞는 변수가 없어요"));
   await p.keyboard.press('Escape');
   check('9 Esc로 검색 닫힘', !(await visible(p, '#searchBox')));
-  // 상세 팝업 — 큰 기준이면 자동으로 찾지 않고 [찾기]
-  await p.dblclick('.vt-row[data-id="tx"] .nm');
-  check('9 큰 기준의 상세 → [찾기]', (await p.textContent('.modal')).includes('선택이 커서 자동으로 찾지 않아요') && (await sent(p, 'FIND_VAR_USERS')).length === 0);
-  await p.keyboard.press('Escape');
   await recv(p, { ...sel(1, 2), scanned: 40, firstName: 'Card', ids: ['1:2'] });
   await p.waitForTimeout(450);
   await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 8, layers: 5 }, sp8: { places: 3, layers: 2 } }));
-  // 상세 팝업 — 기준 안에서 쓰인 곳(최대 50)
   await p.dblclick('.vt-row[data-id="tx"] .nm');
   const fq = (await sent(p, 'FIND_VAR_USERS')).at(-1);
   check('9 상세 → 쓰인 곳 새로 찾기(50)', fq?.limit === 50 && fq?.varIds?.[0] === 'tx');
@@ -495,59 +473,57 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 상세 "인스턴스 안쪽 포함" · 외 n개', (await p.textContent('.modal')).includes('레이어 60개 · 80곳 · 인스턴스 안쪽 포함') && (await p.textContent('.modal')).includes('외 59개'));
   await p.keyboard.press('Escape');
   check('9 Esc로 팝업 닫힘 · 원래 행으로 포커스', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx');
-  // 알약 이동 + 되돌리기
-  await p.click('.vt-row[data-id="tx"] .alias-pill');
-  check('9 알약 → 가리키는 행으로 포커스', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g9');
-  await p.click('#statusAction');
-  check('9 되돌리기 → 원래 행', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx');
-  // 키보드 — 사이드바(tree): ↑↓ 이동, Enter 고르기
-  await p.focus('#varSide [data-key="side:inspect"]');
+  // 키보드 — 사이드바(listbox): ↑↓ 이동, Enter 고르기
+  await p.focus('#varSide [data-key="side:col:s"]');
   await p.keyboard.press('ArrowDown');
-  check('9 사이드바 ↓ → 다음 항목(고르지 않음)', (await p.evaluate(() => document.activeElement?.dataset?.key)) === 'side:col:s' && (await sideSelected(p)) === 'side:inspect');
+  check('9 사이드바 ↓ → 다음 항목(고르지 않음)', (await p.evaluate(() => document.activeElement?.dataset?.key)) === 'side:col:g' && (await sideSelected(p)) === 'side:col:s');
   await p.keyboard.press('Enter');
-  check('9 사이드바 Enter → 고르기', (await sideSelected(p)) === 'side:col:s');
-  await p.click('#varSide [data-key="side:inspect"]');
-  // 계층 배지 툴팁(§4.4 결정 B) — 사이드바 배지에만, 접근성 이름 꼬리에도
-  const tips = await p.$$eval('#varSide .vs-item', (e) => e.filter((x) => x.dataset.key?.startsWith('side:col:')).map((x) => [x.querySelector('.vs-badge')?.title, x.getAttribute('aria-label')]));
+  check('9 사이드바 Enter → 고르기', (await sideSelected(p)) === 'side:col:g');
+  const tips = await p.$$eval('#varSide .vs-item', (e) => e.map((x) => [x.querySelector('.vs-badge')?.title, x.getAttribute('aria-label')]));
   check('9 계층 배지 툴팁 · 접근성 이름', tips.length === 2 && tips[0][0] === '플러그인 컬렉션' && tips[0][1].endsWith(', 플러그인 컬렉션') && tips[1][0] === '직접 값 4/4 · Global', JSON.stringify(tips));
-  check('9 목록 제목 배지에는 툴팁 없음', !(await p.$('.vl-head [title*="플러그인 컬렉션"]')));
-  // ⋯ → 내보내기 팝업(계층 지정은 없앰 — §2.13 13.3), 설정 탭에는 없다
+  // ⋯ → 준비 현황 · 내보내기(v4 §4.6)
   await p.click('#btnVarMore');
   const more = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
-  check('9 ⋯ 메뉴(계층 지정 없음)', JSON.stringify(more) === JSON.stringify(['코드로 내보내기…', '사이드바 모두 펼치기', '사이드바 모두 접기']), more.join('|'));
+  check('9 ⋯ 메뉴 — 준비 현황 · 내보내기 · 펼치기/접기', more.length === 4 && /^준비 현황 \d\/7…$/.test(more[0]) && more[1] === '코드로 내보내기…', more.join('|'));
   await p.click('.ctx-menu button >> text=코드로 내보내기…');
   check('9 내보내기 팝업 열림', (await p.textContent('.modal')).includes('누르면 바로 코드 파일로 저장돼요'));
   await p.keyboard.press('Escape');
   check('9 팝업 닫으면 [⋯]로 포커스', (await p.evaluate(() => document.activeElement?.id)) === 'btnVarMore');
-  await p.click('#tabbtn-settings');
-  check('9 설정 탭에 계층·내보내기 없음', !(await p.textContent('#tab-settings')).includes('컬렉션 계층') && !(await p.textContent('#tab-settings')).includes('코드로 내보내기'));
+  await goTab(p, 'settings');
+  check('9 설정 화면에 계층·내보내기 없음', !(await p.textContent('#tab-settings')).includes('컬렉션 계층') && !(await p.textContent('#tab-settings')).includes('코드로 내보내기'));
   await p.close();
 }
 {
-  // §4.2 — 선택이 있는 채로 처음 목록에 들어오면 사용 수가 올 때까지 "읽는 중" 한 줄만
-  const p = await open(480, null);
-  await recv(p, PREREQ);
-  await recv(p, { ...sel(1, 2), scanned: 40, ids: ['1:2'] });
+  // 선택 탭 카드(v4 §4.1) — 카드 1 숫자 · 카드 2 직접만 · 카드 3 [선택] · [연결 풀기]
+  const p = await open(480, 'select');
+  await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
-  check('9 처음 목록 + 선택 → "읽는 중" 한 줄만', (await p.textContent('#varTree')).trim() === '선택에서 쓰는 변수 읽는 중…' && (await rowIds(p)).length === 0);
-  await p.waitForTimeout(450);
-  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 2, layers: 1 } }));
-  check('9 사용 수가 오면 한 번에 목록', (await rowIds(p)).includes('tx'));
-  await p.close();
-}
-{
-  // LIB 구역 · 삭제된 변수 줄
-  const p = await open(480, null);
-  await recv(p, PREREQ);
-  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  check('9 선택 없음 → "디자인에서 레이어를 선택하세요" · 레이어 정리 잠금', (await p.textContent('#selCards')).includes('디자인에서 레이어를 선택하세요') && (await locked(p, '#btnGoRename')));
   await recv(p, { ...sel(1, 2), scanned: 40, ids: ['1:2'] });
+  check('9 읽는 중 카드', (await p.textContent('#selCards')).includes('선택을 읽는 중…'));
   await p.waitForTimeout(450);
-  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { L1: { places: 2, layers: 1 } }, { libraryVars: [{ id: 'L1', name: 'core/blue/500', collection: 'Core', type: 'COLOR', value: { kind: 'color', hex: '#3366FF' }, aliasTargets: [] }], deleted: { count: 3, nodeIds: ['x'] } }));
-  check('9 쓰는 로컬 변수 0 → 첫 컬렉션', (await sideSelected(p)) === 'side:col:s');
-  await p.click('#varSide [data-key="side:lib"]');
-  check('9 사이드바 라이브러리: 실제 이름 + LIB', (await p.textContent('.vt-row[data-id="L1"]')).includes('core/blue/500LIB'));
-  await p.click('#varSide [data-key="side:deleted"]');
-  check('9 사이드바 삭제된 변수 → 삭제된 변수에 연결된 곳 n개', (await p.textContent('#varTree')).includes('삭제된 변수에 연결된 곳 3개'));
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  check('9 자동 찾기 — 기준 nodeIds · preview', ap?.preview === true && ap?.nodeIds?.[0] === '1:2');
+  await recv(p, { ...preview(ap.reqId), counts: { 'no-match': { color: 2 }, styled: { color: 1 }, 'instance-children': { other: 4 } } });
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 2, layers: 1 }, L1: { places: 1, layers: 1 } }, { libraryVars: [{ id: 'L1', name: 'core/blue/500', collection: 'Core', type: 'COLOR', value: { kind: 'color', hex: '#3366FF' }, aliasTargets: [] }], deleted: { count: 3, nodeIds: ['x'] } }));
+  const txt = await p.textContent('#selCards');
+  check('9 카드 1 — n = m + k(4곳), [2곳 연결], 변수가 없는 값 2곳', txt.includes('변수 없는 값 4곳') && txt.includes('2곳 연결') && txt.includes('변수가 없는 값 2곳'), txt);
+  check('9 카드 2 — 직접만 2개(Semantic 1 · 라이브러리 1)', txt.includes('쓰는 변수 2개') && txt.includes('Semantic 1 · 라이브러리 1'), txt);
+  check('9 카드 3 — 삭제된 변수 3곳 · [선택] · [연결 풀기]', txt.includes('삭제된 변수 3곳') && (await p.$('[data-k="delsel"]')) !== null && (await p.$('[data-k="unbind"]')) !== null);
+  await p.click('[data-k="uses"]');
+  check('9 카드 2 펼침 — 경로 머리 · 줄', JSON.stringify(await p.$$eval('.sel-list .sl-path', (e) => e.map((x) => x.textContent))) === JSON.stringify(['S Semantic › color/text', '라이브러리 › Core']));
+  await p.click('[data-k="unbind"]');
+  const ub = (await sent(p, 'UNBIND_DELETED')).at(-1);
+  check('9 [연결 풀기] → UNBIND_DELETED(기준)', ub?.nodeIds?.[0] === '1:2');
+  await recv(p, { type: 'DELETED_UNBOUND', reqId: ub.reqId, unbound: 3, failed: 0, failReasons: {} });
+  check('9 연결 풀기 결과 문구', (await p.textContent('#statusText')).startsWith('삭제된 변수 연결 3곳을 풀었어요'));
+  const ap2 = (await sent(p, 'APPLY')).at(-1);
+  check('9 연결 풀기 뒤 다시 읽기(찾기 · 사용 수)', ap2.reqId !== ap.reqId);
+  await recv(p, preview(ap2.reqId));
+  await p.click('[data-k="link"]');
+  check('9 [2곳 연결] → 연결 하위 화면(← 머리)', (await visible(p, '#subHead')) && !(await visible(p, '#selHome')));
+  await p.keyboard.press('Escape');
+  check('9 Esc → 첫 화면 · 포커스는 연 버튼', (await visible(p, '#selHome')) && (await p.evaluate(() => document.activeElement?.dataset?.k)) === 'link');
   await p.close();
 }
 
@@ -556,7 +532,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   const p = await open(480, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
-  await p.click('#btnGoMake');
+  await goSub(p, 'make');
   const r = await p.evaluate(() => {
     const card = document.getElementById('colorCard');
     const bar = card.querySelector('.toolbar').getBoundingClientRect();
@@ -585,37 +561,40 @@ const reenter = (p) => p.evaluate(() => {
 });
 {
   const p = await open(480, null);
-  check('10 처음 열면 변수 탭', (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-variables');
+  check('10 처음 열면 선택 탭(v4 §2.1)', (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-select');
+  check('10 머리 = [선택 | 변수] + ⚙ + —', JSON.stringify(await p.$$eval('#tabBar .tab-btn', (e) => e.map((x) => x.textContent))) === JSON.stringify(['선택', '변수']) && (await visible(p, '#btnSettings')) && (await visible(p, '#btnMinimize')));
   check('10 선택 표시줄 없음(탭 바 바로 아래가 탭 내용)', (await p.$('#selBarWrap')) === null);
   await recv(p, PREREQ);
   await recv(p, sel(0, 0));
   // 선택이 없을 때 화면별 안내(§4.1)
-  await p.click('#tabbtn-layer');
+  await goTab(p, 'layer');
   check('10 선택 없음 — 연결 화면 빈 상태 "캔버스에서 레이어를 선택하세요"', (await emptyText(p)) === '캔버스에서 레이어를 선택하세요');
-  await p.click('#applyRail [data-apply-step="rename"]');
+  await goSub(p, 'rename');
   check('10 선택 없음 — 이름 목록 자리', (await p.textContent('#diff')).includes('선택이 없어요 — 캔버스에서 레이어를 선택하세요'));
-  await p.click('#applyRail [data-apply-step="structure"]');
+  await goSub(p, 'structure');
   check('10 선택 없음 — 컴포넌트 목록 자리', (await p.textContent('#compTree')).includes('선택이 없어요 — 캔버스에서 레이어를 선택하세요'));
-  await p.click('#applyRail [data-apply-step="bind"]');
+  await goSub(p, 'bind');
   await recv(p, { ...sel(1, 0), scanned: 43, firstName: 'Card', ids: ['1:2'] });
   check('10 선택하면 연결 화면 빈 상태가 찾기 전으로', (await emptyText(p)) === '값이 변수와 같은 곳을 찾아 연결해요');
-  for (const tb of ['layer', 'settings', 'variables', 'layer', 'variables']) await p.click(`#tabbtn-${tb}`);
+  for (const tb of ['layer', 'settings', 'variables', 'layer', 'variables']) await goTab(p, tb);
   check('10 탭 전환 시 크기 요청 0회', (await count(p, 'SET_UI_SIZE')) === 0);
   // 하위 화면·단계 기억(§2.6)
-  await p.click('#tabbtn-variables');
-  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] }); // 시작 화면 → [색부터 하나씩 만들기 →]
-  await p.click('#btnGoMake');
+  await goSub(p, 'make');
   await p.click('#makeRail [data-make-step="theme"]');
-  await p.click('#tabbtn-layer');
   await p.click('#tabbtn-variables');
-  check('10 탭 상태 유지(만들기 › 테마)', (await visible(p, '#varMake')) && (await visible(p, '#darkCard')));
-  await p.click('#btnMakeBack');
-  check('10 ← 돌아가기 → 변수 첫 화면', (await visible(p, '#varStart')) && !(await visible(p, '#varMake')));
+  await p.click('#tabbtn-select');
+  check('10 하위 화면 기억(선택 탭 › 값을 직접 고르기 › 테마)', (await visible(p, '#varMake')) && (await visible(p, '#darkCard')));
+  await p.click('#btnSubBack');
+  check('10 ← → 선택 탭 첫 화면', (await visible(p, '#selHome')) && !(await visible(p, '#varMake')));
+  await p.click('#btnSettings');
+  check('10 ⚙ → 설정 화면 · 세그먼트 둘 다 고르지 않음', (await visible(p, '#tab-settings')) && (await p.$$eval('#tabBar .tab-btn', (e) => e.every((x) => x.getAttribute('aria-selected') === 'false'))));
+  await p.keyboard.press('Escape');
+  check('10 Esc → 설정을 연 탭으로', (await visible(p, '#selHome')) && (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-select');
   await p.close();
 }
 {
   // 창 다시 들어옴(④): 합쳐서 1번, 2초 안 재진입은 간격 끝에 1번, 창 안 이동 0회, 메뉴 열림 중 보류
-  const p = await open(480, null);
+  const p = await open(480, "variables");
   await recv(p, PREREQ);
   await recv(p, sel(0, 0));
   await p.waitForTimeout(50);
@@ -690,7 +669,7 @@ const reenter = (p) => p.evaluate(() => {
   const p = await open(480, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
-  await p.click('#btnGoMake');
+  await goSub(p, 'make');
   await p.focus('#btnColorVars');
   check('10 잠긴 버튼은 포커스 가능', (await p.evaluate(() => document.activeElement?.id)) === 'btnColorVars');
   check('10 잠긴 버튼은 aria-disabled', (await p.getAttribute('#btnColorVars', 'aria-disabled')) === 'true');
@@ -700,11 +679,11 @@ const reenter = (p) => p.evaluate(() => {
   await p.keyboard.press('Tab'); // 포커스 이동은 메시지를 지우지 않는다
   check('10 포커스 이동은 상태 줄 메시지를 지우지 않음', await visible(p, '#statusAction'));
   await p.click('#statusAction');
-  check('10 [라이선스 →] → 설정 › 키 입력칸 포커스', (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-settings' && (await p.evaluate(() => document.activeElement?.id)) === 'licenseKey');
+  check('10 [라이선스 →] → 설정 › 키 입력칸 포커스', (await visible(p, '#tab-settings')) && (await p.evaluate(() => document.activeElement?.id)) === 'licenseKey');
   // 24×24
   await p.click('#tabbtn-variables');
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
-  const small = await p.evaluate(() => ['btnMinimize', 'btnReadiness', 'btnFindUnbound', 'btnAddVar', 'btnVarMore', 'btnVarRefresh', 'btnSearch'].map((id) => {
+  const small = await p.evaluate(() => ['btnMinimize', 'btnSettings', 'btnAddVar', 'btnVarMore', 'btnSearch'].map((id) => {
     const el = document.getElementById(id);
     const r = el.getBoundingClientRect();
     return { id, w: Math.round(r.width), h: Math.round(r.height), shown: el.offsetParent !== null };
@@ -748,12 +727,9 @@ const reenter = (p) => p.evaluate(() => {
 {
   // 하위 탭(밑줄) · "다음 →" 없음
   const p = await open();
-  check('11 하위 탭 3개(밑줄) — 컴포넌트 [베타]', JSON.stringify(await p.$$eval('#applyRail .subtab', (e) => e.map((x) => x.textContent))) === JSON.stringify(['연결', '이름', '컴포넌트베타']));
-  check('11 연결·이름 카드에 "다음 →" 없음', (await p.$$('#tab-layer .btn-next')).length === 0);
-  await p.focus('#applyRail [data-apply-step="bind"]');
-  await p.keyboard.press('ArrowRight');
-  check('11 하위 탭 → 키로 이동', (await p.getAttribute('#applyRail [data-apply-step="rename"]', 'aria-selected')) === 'true');
-  await p.click('#applyRail [data-apply-step="bind"]');
+  check('11 하위 탭 없음(v4 — 레이어 정리 버튼 · 카드에서 들어감)', (await p.$('#applyRail')) === null);
+  check('11 연결·이름 카드에 "다음 →" 없음', (await p.$$('#tab-select .step[data-apply-step] .btn-next')).length === 0);
+  await goSub(p, 'bind');
   // 선택 없음: 세 버튼 aria-disabled + 사유
   await recv(p, PREREQ);
   await recv(p, sel(0, 0));
@@ -788,19 +764,17 @@ const reenter = (p) => p.evaluate(() => {
   await p.close();
 }
 {
-  // "변수 없는 값 찾기" 진입 규칙 · 복귀 규칙
-  const p = await open(480, null);
+  // 카드 [n곳 연결] 진입 규칙 · 복귀 규칙(v4 §4.1 · §4.2)
+  const p = await open(480, 'select');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, sel(1, 0));
   await p.waitForTimeout(450);
   await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
-  await p.click('#btnFindUnbound');
-  check('11 변수 없는 값 찾기 → 레이어 › 연결 + 찾기', (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-layer' && (await sent(p, 'APPLY')).length === 1);
+  check('11 선택 → 자동 찾기 1번(기준 nodeIds)', (await sent(p, 'APPLY')).length === 1 && (await sent(p, 'APPLY'))[0].nodeIds?.[0] === 's0');
   await recv(p, preview(await lastReq(p, 'APPLY')));
-  await p.click('#tabbtn-variables');
-  await p.click('#btnFindUnbound');
-  check('11 같은 선택의 결과가 있으면 다시 실행하지 않음', (await sent(p, 'APPLY')).length === 1);
+  await p.click('[data-k="link"]');
+  check('11 [2곳 연결] → 연결 화면, 같은 기준의 결과라 다시 찾지 않음', (await visible(p, '#subHead')) && (await sent(p, 'APPLY')).length === 1);
   // 조용한 재계산: 창을 떠났다 돌아오면(≤300) 스위치 유지 + 차이 알림
   await p.click('#bindTree .bv-switch >> nth=0'); // 변수 단위 스위치(vA)
   await p.click('#bindTree .bv-tw >> nth=0'); // 펼침도 유지되는지
@@ -808,19 +782,17 @@ const reenter = (p) => p.evaluate(() => {
   await recv(p, PREREQ);
   await p.waitForTimeout(500);
   const silent = (await sent(p, 'APPLY')).at(-1);
-  check('11 창 다시 들어옴 → 조용히 다시 계산', (await sent(p, 'APPLY')).length === 2 && !(await visible(p, '#applyProgress')));
+  check('11 창 다시 들어옴 → 조용히 다시 계산(1번)', (await sent(p, 'APPLY')).length === 2 && !(await visible(p, '#applyProgress')));
   await recv(p, { ...preview(silent.reqId), candidates: [c('itemSpacing'), c('paddingLeft'), c('paddingTop'), { ...c('width', 'vB'), variableName: 'size/8' }] });
   const checked = await p.$$eval('#bindTree .bv-card', (e) => e.map((x) => [x.querySelector('.bv-name').textContent, x.querySelector('.bv-switch').getAttribute('aria-checked') === 'true']));
   check('11 스위치는 변수 단위로 이어받음 — 끈 변수의 새 곳은 끔, 새 변수는 켬', JSON.stringify(checked) === JSON.stringify([['spacing/8', false], ['size/8', true]]) && (await named(p, '#btnApplyConfirm', '1곳 연결')), JSON.stringify(checked));
   check('11 조용한 재계산은 펼침을 바꾸지 않음', (await p.getAttribute('#bindTree .bv-tw >> nth=0', 'aria-expanded')) === 'true');
   check('11 후보가 바뀌면 알림', (await p.textContent('#statusText')) === '후보가 바뀌었어요 · 2곳 추가 · 0곳 제외');
-  // 다른 화면에서 플러그인이 선택을 바꾼 뒤 복귀 → "다른 선택에서 만든 결과예요" + 연결 잠금
+  // 플러그인이 만든 선택은 기준을 바꾸지 않는다(v4 §2.5) — 복귀해도 결과는 그대로 · 연결 가능
   await p.click('#tabbtn-variables');
   await recv(p, { ...sel(2, 0), selfSelect: true });
-  await p.click('#tabbtn-layer');
-  check('11 다른 선택의 결과 → 안내 + [다시 찾기]', (await p.textContent('#bindNotice')).includes('다른 선택에서 만든 결과예요') && (await p.textContent('#btnBindRepreview')) === '다시 찾기');
-  check('11 다른 선택의 결과 → 단계 지금 · 아직 · 아직', JSON.stringify(await steps(p)) === JSON.stringify(['now', 'todo', 'todo']));
-  check('11 다른 선택의 결과 → [n곳 연결] 잠금 · 사유 "선택이 바뀌었어요 · 다시 찾아 주세요"', (await locked(p, '#btnApplyConfirm')) && (await named(p, '#btnApplyConfirm', '1곳 연결')) && (await lockMsg(p, '#btnApplyConfirm')).includes('선택이 바뀌었어요 · 다시 찾아 주세요'));
+  await p.click('#tabbtn-select');
+  check('11 플러그인이 만든 선택 뒤 복귀 → 안내 없음 · [n곳 연결] 가능', !(await visible(p, '#bindNotice')) && !(await locked(p, '#btnApplyConfirm')));
   await p.close();
 }
 {
@@ -869,7 +841,8 @@ async function openEditList(opts = {}) {
       window.parent.postMessage = (m) => window.__sent.push(m.pluginMessage);
     });
     await p.goto(url);
-  } else p = await open(480, null);
+    await goTab(p, 'variables');
+  } else p = await open(480, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS });
   await recv(p, { ...sel(1, 2), scanned: 40, firstName: 'Card', ids: ['1:2'] });
@@ -948,7 +921,8 @@ async function saveAndGet(p) {
   // 행이 지금 목록에 없게 됨(그룹 이동) → 오른쪽 목록 머리 + 상태 줄
   const p = await openEditList();
   await p.click('#varSide [data-key="side:col:s"]');
-  await p.click('#varSide [data-key="side:grp:s|color/text"]');
+  await p.click('#btnSearch');
+  await p.fill('#varSearch', 'color/text'); // v4: 그룹 항목이 없어 검색으로 좁힌다
   await menuEdit(p, 'tx');
   await p.fill(NAME, 'color/fg/default');
   const u = await saveAndGet(p);
@@ -1067,7 +1041,7 @@ async function saveAndGet(p) {
 /* ---------- 13 컴포넌트 결과 줄 꼬리 (§4.7 "인스턴스 자리" 5·6번, QA #3 검토 2회차) ---------- */
 {
   const p = await open(480, 'layer');
-  await p.evaluate(() => document.querySelector('[data-apply-step="structure"]')?.click());
+  await goSub(p, 'structure');
   const st = () => p.$eval('#structureStatus', (e) => ({ text: e.textContent, cls: e.className }));
   await recv(p, {
     type: 'COMPONENTS_RESULT', registered: 3, skipped: 1, sets: 0, singles: ['Card'], missing: [], failures: ['x'],
@@ -1181,17 +1155,20 @@ check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.
 
 /* ---------- 14 컴포넌트(베타) — 언제나 보임 · [베타] 배지 · 각주 없음 (§4.7 "베타", QA #3 불합격 4, 2026-11-05 결정) ---------- */
 {
-  const p = await open(480, 'layer');
-  const tabs = () => p.$$eval('#applyRail .subtab', (e) => e.filter((x) => !x.hidden && x.offsetParent !== null).map((x) => x.dataset.applyStep));
-  check('14 처음부터 하위 탭 셋', JSON.stringify(await tabs()) === JSON.stringify(['bind', 'rename', 'structure']), JSON.stringify(await tabs()));
-  check('14 배지 — 하위 탭 · 카드 제목, aria-hidden', (await p.$$eval('#subtabComponents .beta-badge[aria-hidden="true"], #structureCard h2 .beta-badge[aria-hidden="true"]', (e) => e.length)) === 2);
-  check('14 배지 주황(#C2410C 글자 · #FFF1E6 바탕)', JSON.stringify(await p.$eval('#subtabComponents .beta-badge', (e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor])) === JSON.stringify(['rgb(194, 65, 12)', 'rgb(255, 241, 230)']));
-  check('14 하위 탭 접근성 이름 "컴포넌트 (베타)"', (await p.$eval('#subtabComponents', (e) => e.getAttribute('aria-label'))) === '컴포넌트 (베타)');
+  // v4 §4.1 레이어 정리 — [이름 정리] · [컴포넌트 베타](언제나 보임, 선택이 없으면 잠금)
+  const p = await open(480, 'select');
+  check('14 레이어 정리 버튼 둘', (await visible(p, '#btnGoRename')) && (await visible(p, '#btnGoComponents')));
+  check('14 배지 — 레이어 정리 버튼 · 카드 제목, aria-hidden', (await p.$$eval('#btnGoComponents .beta-badge[aria-hidden="true"], #structureCard h2 .beta-badge[aria-hidden="true"]', (e) => e.length)) === 2);
+  check('14 배지 주황(#C2410C 글자 · #FFF1E6 바탕)', JSON.stringify(await p.$eval('#btnGoComponents .beta-badge', (e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor])) === JSON.stringify(['rgb(194, 65, 12)', 'rgb(255, 241, 230)']));
+  check('14 접근성 이름 "컴포넌트 (베타)"', (await p.$eval('#btnGoComponents', (e) => e.getAttribute('aria-label'))) === '컴포넌트 (베타)');
   check('14 준비 현황 각주 없음', (await p.$('#readinessPop .pop-note')) === null);
   check('14 설정에 켜기 체크박스 없음', (await p.$('#componentsBeta')) === null);
-  await p.click('#applyRail [data-apply-step="bind"]');
-  await p.keyboard.press('End');
-  check('14 End는 컴포넌트', (await p.evaluate(() => document.activeElement?.dataset.applyStep)) === 'structure');
+  await recv(p, PREREQ);
+  await recv(p, sel(1, 0));
+  await p.click('#btnGoComponents');
+  check('14 [컴포넌트 베타] → 컴포넌트 하위 화면(머리 "컴포넌트 베타")', (await visible(p, '#structureCard')) && (await p.textContent('#subTitle')) === '컴포넌트 베타');
+  await p.click('#btnSubBack');
+  check('14 ← → 첫 화면 · 포커스는 [컴포넌트 베타]', (await visible(p, '#selHome')) && (await p.evaluate(() => document.activeElement?.id)) === 'btnGoComponents');
   await p.close();
 }
 

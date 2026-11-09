@@ -12,7 +12,7 @@ import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/lic
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { exportHasTokens, cssVarName, type ExportFormat } from './lib/exporters';
-import { leafName, cellCopyText, tierBadge, tierWhyText, groupKey, matchesQuery, indirectUsage, aliasTargetsOf, sidebarCollections, rightEntries, initialSideSel, validSideSel, inspectCount, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type SideCollection, type VarCell, type VarCollection, type VarRow, type LibraryVar, type RowState, type EditValue } from './lib/varTable';
+import { leafName, cellCopyText, tierBadge, tierWhyText, groupKey, matchesQuery, indirectUsage, aliasTargetsOf, sidebarCollections, rightEntries, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type VarCell, type VarCollection, type VarRow, type LibraryVar, type RowState, type EditValue } from './lib/varTable';
 import { createReentryScheduler } from './lib/reread';
 import type { FrameMeta } from './lib/similar';
 import type { VarInfo } from './shared/messages';
@@ -23,6 +23,7 @@ import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planWizard, summarize, pickDarkTarget, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
+import { cardCounts, type CardCounts, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -104,7 +105,7 @@ let selectStatusTarget = 'applyStatus';
 /** 레이어 선택 요청 — 결과 경고가 돌아올 자리를 함께 기억한다. */
 function selectNodes(ids: string[], statusId: string): void {
   selectStatusTarget = statusId;
-  if (statusId === 'applyStatus' && activeTab === 'layer') bindLayerSelectPending = true; // 사유 칩·레이어 머리
+  if (statusId === 'applyStatus' && activeTab === 'select') bindLayerSelectPending = true; // 사유 칩·레이어 머리
   send({ type: 'SELECT_NODES', ids });
 }
 /** #semStatus로 향하는 상태 쓰기를 화면에 있는 카드로 옮긴다(그 외 id는 그대로). */
@@ -1089,11 +1090,14 @@ function runBindPreview(silent = false): void {
   }
   const reqId = nextBindReq();
   bindSilentReq = silent ? reqId : 0;
+  // 찾기 대상 = 목록 기준(IA v4 §2.5) — 플러그인이 만든 선택이어도 기준으로 센다.
+  const base = baseline ?? curSel;
+  bindSilentCarry = silent && !!bindPreviewSel && sameIds(bindPreviewSel, base.ids);
   opSilent = silent;
-  send({ type: 'APPLY', preview: true, reqId });
+  send({ type: 'APPLY', preview: true, reqId, nodeIds: base.ids });
   opSilent = false;
-  bindPreviewSel = curSel.ids.slice();
-  if (!silent) bindPreviewName = curSel.count === 1 ? shortName(curSel.name || t('sel.unnamed')) : t('bind.selMany', { k: curSel.count });
+  bindPreviewSel = base.ids.slice();
+  if (!silent) bindPreviewName = base.count === 1 ? shortName(base.name || t('sel.unnamed')) : t('bind.selMany', { k: base.count });
   renderBindChrome();
 }
 $('btnBindRepreview').addEventListener('click', () => runBindPreview());
@@ -1290,7 +1294,7 @@ async function runWizard(): Promise<void> {
   wizardFailed = false;
   // 시작 화면 고정(①) — 로컬 변수 0개일 때 시작했으면 실행 중·요약 동안 시작 화면 유지.
   wizBeforeCount = localVarCount();
-  wizFrom = activeTab === 'variables' && varSub === 'make' ? 'make' : 'start';
+  wizFrom = activeTab === 'select' && selSub === 'make' ? 'make' : 'start';
   wizLatch = wizBeforeCount === 0 ? { from: wizFrom, before: 0, summarySeen: false, done: false } : null;
   opWizardStart();
   ($('btnWizardRun') as HTMLButtonElement).disabled = true;
@@ -1730,8 +1734,10 @@ function gotoStep(id: PipelineStep['id']): void {
   const target = PIPELINE_TARGET[id];
   if (id === 'semantics') showStatusLine(t('list.semanticsNote'));
   if (target.make === null) {
-    showTab('layer');
-    showApplyStep(target.apply ?? 'bind');
+    // v4 §4.6 준비 현황 표: 연결 → 선택 탭 첫 화면, 이름 → 이름 정리(선택이 없으면 첫 화면).
+    showTab('select');
+    showSelSub(target.apply === 'rename' && curSel.count ? 'rename' : 'home');
+    if (selSub === 'home') { $('selCards').querySelector<HTMLElement>('button')?.focus(); return; }
   } else {
     showMake(target.make);
   }
@@ -2090,12 +2096,11 @@ window.onmessage = (event: MessageEvent) => {
         } else bindSelChangedDuringLink = true; // 연결이 결과 카드 없이 끝나면 그때 지운다
         $('tsApplyResult').hidden = true;
         layerLibUse = null; // 라이브러리 사용 여부는 새 선택으로 다시 읽는다(§4.6 ②)
-        if (activeTab === 'layer') readLayerLibUse();
+        if (activeTab === 'select') readLayerLibUse();
       } else if (bindLayerSelectPending) {
         bindHereSel = true; // 이 화면이 만든 선택(사유 칩·레이어 머리) — 복귀해도 아무것도 하지 않는다
-      } else if (hasBindPreview()) {
-        bindForeignSel = true; // 다른 화면에서 플러그인이 바꾼 선택 — 복귀하면 "다른 선택에서 만든 결과예요"
       }
+      // v4 §2.5: 플러그인이 만든 선택은 기준을 바꾸지 않는다 — 기준으로 센 찾기 결과는 그대로 유효하다.
       bindLayerSelectPending = false;
       renderBindPrereq();
       if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
@@ -2168,6 +2173,8 @@ window.onmessage = (event: MessageEvent) => {
         const prevChecked = new Set(bindChecked);
         bindCandidates = msg.candidates ?? [];
         bindNodes = msg.nodes ?? [];
+        bindCounts = msg.counts as ReasonCounts | undefined;
+        selFindFor = bindPreviewSel ? bindPreviewSel.join(',') : null;
         bindPreviewed = true;
         bindChecked.clear();
         renderSkipReasons(msg.reasons ?? {});
@@ -2175,7 +2182,7 @@ window.onmessage = (event: MessageEvent) => {
           // 조용한 재계산: 스위치는 변수 단위로 이어받고, 달라졌을 때만 알린다(§4.6 ⑧). 건너뜀 펼침은 그대로.
           const r = carryChecks(prev, prevChecked, bindCandidates);
           for (const k of r.checked) bindChecked.add(k);
-          if (r.added || r.removed) showStatusLine(t('bind.candChanged', { a: r.added, b: r.removed }));
+          if (bindSilentCarry && (r.added || r.removed)) showStatusLine(t('bind.candChanged', { a: r.added, b: r.removed }));
         } else {
           bindSkipsOpen = false;
           for (const c of bindCandidates) bindChecked.add(candKey(c));
@@ -2197,8 +2204,13 @@ window.onmessage = (event: MessageEvent) => {
         renderBindTree();
       }
       if (linkEnded) onBindLinkingChanged();
+      selFindInFlight = false;
+      renderSelHome();
       break;
     }
+    case 'DELETED_UNBOUND':
+      onDeletedUnbound(msg);
+      break;
     case 'VAR_TABLE':
       onVarTable(msg);
       renderBindEmpty(); // 찾기 전 예시는 이 파일의 변수에서(§4.6)
@@ -2308,7 +2320,7 @@ window.onmessage = (event: MessageEvent) => {
       hasGlobal = msg.hasGlobal;
       hasBindable = msg.hasBindable;
       prereqLocalVars = (msg.tierVars ?? 0) + (msg.otherVars ?? 0);
-      if (activeTab === 'layer') queueMicrotask(readLayerLibUse); // 로컬 변수 0개가 확인되면 ② 판정용으로 읽는다
+      if (activeTab === 'select') queueMicrotask(readLayerLibUse); // 로컬 변수 0개가 확인되면 ② 판정용으로 읽는다
       hasDarkMode = msg.hasDarkMode;
       hasTextStyles = msg.hasTextStyles;
       hasSemanticRoles = msg.hasSemanticRoles;
@@ -2810,6 +2822,10 @@ let bindHereSel = false; // 이 화면이 만든 선택 직후
 let bindLayerSelectPending = false; // 이 화면이 레이어 선택을 요청했다(다음 selfSelect가 그것)
 let bindPreviewMini = false; // 최소화 중에 끝난 찾기
 let bindSilentReq = 0;
+/** 조용한 찾기가 같은 기준의 다시 계산인가 — 다르면 스위치 이어받기 알림을 띄우지 않는다. */
+let bindSilentCarry = false;
+/** 찾기 결과의 사유 × 종류(카드 1 숫자, IA v4 §4.1). */
+let bindCounts: ReasonCounts | undefined;
 /** 레이어 › 연결에서 쓰는 라이브러리 사용 여부(§4.6 ②) — null = 아직 모름(선택 없음 · 300개 초과 · 읽는 중). */
 let layerLibUse: boolean | null = null;
 let layerLibReq = 0;
@@ -3888,7 +3904,7 @@ $('btnExpand').addEventListener('click', () => setMini(false));
    사용자가 일으킨 작업 요청을 보내고 결과가 올 때까지. 조용한 다시 읽기는 대상이 아니다. */
 type OpGo = () => void;
 interface OpDef { results: CodeToUi['type'][]; label: string; go: OpGo; write: boolean }
-const goLayer = (step: ApplyStep): OpGo => () => { showTab('layer'); showApplyStep(step); };
+const goLayer = (step: ApplyStep): OpGo => () => { showTab('select'); showApplyStep(step); };
 const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   EXTRACT: { results: ['EXTRACT_RESULT'], label: 'op.extract', go: () => showMake('color'), write: false },
   CREATE_TOKENS: { results: ['CREATE_RESULT'], label: 'op.create', go: () => showMake('token'), write: true },
@@ -3896,7 +3912,7 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   GENERATE_DARK_MODE: { results: ['DARK_MODE_RESULT'], label: 'op.dark', go: () => showMake('theme'), write: true },
   SCAN_TEXT_STYLES: { results: ['TEXT_STYLE_CANDIDATES'], label: 'op.textScan', go: () => showMake('type'), write: false },
   CREATE_TEXT_STYLES: { results: ['TEXT_STYLES_RESULT'], label: 'op.textStyles', go: () => showMake('type'), write: true },
-  APPLY_TEXT_STYLES: { results: ['TEXT_STYLES_APPLIED'], label: 'op.textApply', go: () => { showTab('layer'); showApplyStep('bind'); }, write: true },
+  APPLY_TEXT_STYLES: { results: ['TEXT_STYLES_APPLIED'], label: 'op.textApply', go: () => { showTab('select'); showApplyStep('bind'); }, write: true },
   APPLY: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: false },
   APPLY_SELECTED: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: true },
   RENAME: { results: ['RENAME_RESULT'], label: 'op.rename', go: goLayer('rename'), write: false },
@@ -3907,7 +3923,8 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   GENERATE_MISSING_VARIANTS: { results: ['GENERATE_RESULT'], label: 'op.components', go: goLayer('structure'), write: true },
   SCAN_SIMILAR: { results: ['SIMILAR_CANDIDATES'], label: 'op.components', go: goLayer('structure'), write: false },
   COMPONENTIZE_SIMILAR: { results: ['COMPONENTIZE_RESULT'], label: 'op.components', go: goLayer('structure'), write: true },
-  EXPORT: { results: ['EXPORT_RESULT'], label: 'op.export', go: () => showTab('settings'), write: false },
+  EXPORT: { results: ['EXPORT_RESULT'], label: 'op.export', go: () => showTab('variables'), write: false },
+  UNBIND_DELETED: { results: ['DELETED_UNBOUND'], label: 'op.unbind', go: () => { showTab('select'); showSelSub('home'); }, write: true },
 };
 /** 결과를 기다리는 작업(요청 종류별). 마법사는 단계 요청을 따로 세지 않고 한 작업으로 본다. */
 const opPending = new Map<UiToCode['type'], OpDef>();
@@ -4042,7 +4059,7 @@ function opWizardEnd(result: 'ok' | 'fail' | 'cancel'): void {
   opWizard = false;
   opProg = null;
   renderWaitLocks();
-  if (result !== 'cancel') opFinished(result === 'ok', { results: [], label: 'op.wizard', go: () => { showTab('variables'); showVarSub('home'); }, write: true });
+  if (result !== 'cancel') opFinished(result === 'ok', { results: [], label: 'op.wizard', go: () => showMake(), write: true });
   else if (isMini) renderMiniMark();
   readScreen('work');
   reentry.release();
@@ -4056,16 +4073,19 @@ type ReadWhy = 'enter' | 'work' | 'reentry' | 'expand';
 function readScreen(why: ReadWhy): void {
   if (isMini) return; // 최소화 상태에서는 다시 읽지 않는다
   if (activeTab !== 'settings' || why === 'work') requestPrereq();
-  if (activeTab === 'variables' && varSub === 'home') {
+  if (activeTab === 'variables') {
     send({ type: 'GET_VAR_TABLE' });
     requestManagerUsage(why === 'work' ? 'work' : 'quiet');
-  } else if (activeTab === 'variables' && varSub === 'make') {
-    send({ type: 'GET_VARIABLES' });
   }
-  if (why === 'work' && !(activeTab === 'variables' && varSub === 'home')) send({ type: 'GET_VAR_TABLE' });
-  if (activeTab === 'layer') {
+  if (why === 'work' && activeTab !== 'variables') send({ type: 'GET_VAR_TABLE' });
+  if (activeTab === 'select') {
+    if (selSub === 'make') send({ type: 'GET_VARIABLES' });
+    // 선택 탭 데이터(IA v4 §7): 찾기 + 쓰는 변수 + 삭제된 변수(300개 규칙, 조용히).
+    // 연결 하위 화면의 복귀는 bindOnReturn이 조용히 다시 찾는다(§4.2) — 찾기를 두 번 보내지 않는다.
+    const bindReturn = why !== 'work' && selSub === 'bind';
+    readSelData(why, !bindReturn);
     readLayerLibUse();
-    if (why !== 'work') bindOnReturn();
+    if (bindReturn) bindOnReturn();
   }
 }
 
@@ -4122,21 +4142,28 @@ refreshDarkModes(); // 응답 전 ‘불러오는 중…’ 안내(오안내 ‘
 // #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
 document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
 
-/* ---------- 탭 내비게이션 (IA v3: 변수 · 레이어 · 설정) ---------- */
-const TABS = ['variables', 'layer', 'settings'] as const;
-type TabName = (typeof TABS)[number];
-/** 변수 탭의 하위 화면 — PR 1 중간 상태: 첫 화면(마법사·준비 현황·변수 관리) / 만들기. */
-type VarSub = 'home' | 'make';
-let activeTab: TabName = 'variables';
-let varSub: VarSub = 'home';
+/* ---------- 탭 내비게이션 (IA v4 §2.1: [선택 | 변수] + ⚙) ---------- */
+const TABS = ['select', 'variables'] as const;
+type SegTab = (typeof TABS)[number];
+/** settings = ⚙ 설정 화면(탭 밖). */
+type TabName = SegTab | 'settings';
+/** 선택 탭의 하위 화면(§2.1). */
+type SelSub = 'home' | 'bind' | 'rename' | 'structure' | 'make';
+let activeTab: TabName = 'select';
+let selSub: SelSub = 'home';
+/** ⚙ 설정을 연 탭 — ←로 돌아간다. */
+let settingsReturn: SegTab = 'select';
+/** 하위 화면을 연 버튼 — ←로 돌아오면 포커스(§2.1). */
+let subOpener: HTMLElement | null = null;
 /** 플러그인이 열려 있는 동안 기억(§2.6) — 탭·하위 화면별 스크롤. 다시 열면 처음 상태. */
 const screenScroll = new Map<string, number>();
-const screenKey = (): string => (activeTab === 'variables' ? `variables:${varSub}` : activeTab);
+const screenKey = (): string => (activeTab === 'select' ? `select:${selSub}` : activeTab);
 
 function showTab(name: TabName): void {
   const changed = name !== activeTab;
   if (changed) screenScroll.set(screenKey(), window.scrollY);
-  if (changed && activeTab === 'layer' && hasBindPreview()) bindLeftSince = true; // 미리보기 뒤 탭을 떠남(⑧)
+  if (changed && activeTab === 'select' && selSub === 'bind' && hasBindPreview()) bindLeftSince = true; // 미리보기 뒤 탭을 떠남(⑧)
+  if (name === 'settings' && activeTab !== 'settings') settingsReturn = activeTab as SegTab;
   activeTab = name;
   for (const tb of TABS) {
     $(`tab-${tb}`).classList.toggle('active', tb === name);
@@ -4144,12 +4171,10 @@ function showTab(name: TabName): void {
     const on = tb === name;
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-selected', String(on));
-    btn.tabIndex = on ? 0 : -1; // UX8: roving tabindex — 탭 묶음은 한 번의 Tab 정지점
+    // 정지점 1개 — 설정 화면 중에는 둘 다 고르지 않은 모양이라 [선택]이 정지점(§2.1).
+    btn.tabIndex = on || (name === 'settings' && tb === 'select') ? 0 : -1;
   }
-  // "목록 기준 다름"은 변수 탭의 상황 안내 줄에만(§4.1 · §4.4).
-  renderSelBase();
-  // 시작 화면 고정(①): 요약을 본 뒤 변수 탭을 떠나면 푼다.
-  if (changed && name !== 'variables' && wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
+  $('tab-settings').classList.toggle('active', name === 'settings');
   syncManagerVisibility(false);
   syncStickyOffsets();
   if (changed) {
@@ -4157,35 +4182,76 @@ function showTab(name: TabName): void {
     requestAnimationFrame(() => window.scrollTo(0, y));
     readScreen('enter');
   }
+  renderSelHome();
 }
 
-/** 변수 탭 하위 화면 전환. 탭은 바꾸지 않는다(부르는 쪽이 showTab). */
-function showVarSub(sub: VarSub): void {
-  if (sub === varSub) return;
-  if (activeTab === 'variables') screenScroll.set(screenKey(), window.scrollY);
-  varSub = sub;
+/** 선택 탭 하위 화면 전환(§2.1). 탭은 바꾸지 않는다(부르는 쪽이 showTab). */
+function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
+  const changed = sub !== selSub;
+  if (changed && activeTab === 'select') screenScroll.set(screenKey(), window.scrollY);
+  if (changed && selSub === 'bind' && hasBindPreview()) bindLeftSince = true;
+  if (sub !== 'home' && opener !== undefined) subOpener = opener;
+  selSub = sub;
+  $('selHome').style.display = sub === 'home' ? '' : 'none';
+  $('subHead').hidden = sub === 'home';
   $('varMake').style.display = sub === 'make' ? '' : 'none';
-  renderVarScreen(); // 첫 화면(불러오는 중·시작 화면·목록)은 만들기 동안 숨긴다
-  syncManagerVisibility(false);
+  if (sub === 'bind' || sub === 'rename' || sub === 'structure') showStep('apply', sub);
+  else for (const el of Array.from(document.querySelectorAll<HTMLElement>('.step[data-apply-step]'))) el.style.display = 'none';
+  if (sub === 'make') showMakeStep(curMakeStep);
+  renderSubHead();
+  placeWizard();
   syncStickyOffsets();
-  if (activeTab === 'variables') {
+  if (changed && activeTab === 'select') {
     const y = screenScroll.get(screenKey()) ?? 0;
     requestAnimationFrame(() => window.scrollTo(0, y));
     readScreen('enter');
   }
+  renderSelHome();
 }
+/** 하위 화면 머리 — 제목 · 오른쪽 보조 글(§4.2~§4.5). */
+function renderSubHead(): void {
+  const titles: Record<Exclude<SelSub, 'home'>, string> = { bind: 'v4.subBind', rename: 'v4.rename', structure: 'v4.subComponents', make: 'v4.subMake' };
+  if (selSub === 'home') return;
+  $('subTitle').textContent = selSub === 'bind' ? baseLabel() : t(titles[selSub]);
+  $('subRight').textContent = selSub === 'make' || selSub === 'rename' ? baseLabel() : '';
+}
+/** ← · Esc — 첫 화면으로, 포커스는 연 버튼(없으면 첫 카드 버튼, §2.1). */
+function subBack(): void {
+  showSelSub('home');
+  const target = subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : $('selCards').querySelector<HTMLElement>('button');
+  (target ?? $('btnGoRename')).focus();
+}
+$('btnSubBack').addEventListener('click', subBack);
+// [data-go-sub] — 선택 탭 하위 화면으로 가는 링크(위임). 카드 버튼과 같은 이동.
+document.addEventListener('click', (e) => {
+  const el = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-go-sub]');
+  if (!el) return;
+  const sub = el.dataset.goSub as SelSub;
+  if (!['home', 'bind', 'rename', 'structure', 'make'].includes(sub)) return;
+  showTab('select');
+  showSelSub(sub, el);
+});
+$('btnSettings').addEventListener('click', () => { showTab('settings'); $('btnSettingsBack').focus(); });
+$('btnSettingsBack').addEventListener('click', () => { showTab(settingsReturn); $('btnSettings').focus(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || menuEl || modalEl || e.defaultPrevented) return;
+  const tg = e.target as HTMLElement;
+  if (tg.closest('input, textarea, select, [contenteditable]')) return;
+  if (activeTab === 'settings') { e.preventDefault(); showTab(settingsReturn); $('btnSettings').focus(); }
+  else if (activeTab === 'select' && selSub !== 'home') { e.preventDefault(); subBack(); }
+});
 
-/** 변수 › 만들기로(필요하면 단계까지). 옛 '만들기' 탭으로 가던 모든 바로가기가 여기로 온다. */
+/** 만들기 하위 화면으로(필요하면 단계까지). 옛 '만들기' 바로가기가 모두 여기로 온다. v4: 선택 탭 › 값을 직접 고르기. */
 function showMake(step?: MakeStep): void {
-  showTab('variables');
-  showVarSub('make');
+  const opener = document.activeElement as HTMLElement | null;
+  showTab('select');
+  showSelSub('make', opener);
   if (step) showMakeStep(step);
 }
 
-
-TABS.forEach((t, i) => {
-  const btn = $(`tabbtn-${t}`);
-  btn.addEventListener('click', () => showTab(t));
+TABS.forEach((tb, i) => {
+  const btn = $(`tabbtn-${tb}`);
+  btn.addEventListener('click', () => showTab(tb));
   // UX8: 화살표/Home/End로 탭 이동(포커스 따라가며 활성화).
   btn.addEventListener('keydown', (e) => {
     const ni = nextTabIndex(e.key, i, TABS.length);
@@ -4196,11 +4262,9 @@ TABS.forEach((t, i) => {
     $(`tabbtn-${target}`).focus();
   });
 });
-$('btnGoMake').addEventListener('click', () => showMake('color'));
-$('btnMakeBack').addEventListener('click', () => {
-  showVarSub('home');
-  ($('btnGoMake') as HTMLButtonElement).focus();
-});
+$('btnGoRename').addEventListener('click', (e) => { if (!curSel.count) return; showSelSub('rename', e.currentTarget as HTMLElement); });
+$('btnGoComponents').addEventListener('click', (e) => { if (!curSel.count) return; showSelSub('structure', e.currentTarget as HTMLElement); });
+$('btnVarEmptyMake').addEventListener('click', () => { if (!curSel.count) return; showMake('color'); });
 
 /* ---------- #5: 단계 레일 — 한 화면에 한 단계 ---------- */
 // 만들기 4단계·적용 3단계. 카드는 마크업의 data-make-step / data-apply-step으로 묶여 있고,
@@ -4212,13 +4276,13 @@ type ApplyStep = (typeof APPLY_STEPS)[number];
 
 function showStep(attr: 'make' | 'apply', step: string): void {
   const key = attr === 'make' ? 'data-make-step' : 'data-apply-step';
-  const rail = $(attr === 'make' ? 'makeRail' : 'applyRail');
+  const rail = attr === 'make' ? $('makeRail') : null;
   for (const el of Array.from(document.querySelectorAll<HTMLElement>(`.step[${key}]`))) {
     // 시맨틱 매핑처럼 원래부터 숨은 카드(자동 흡수)는 단계가 맞아도 계속 숨긴다.
     if (el.dataset.alwaysHidden !== undefined) continue;
     el.style.display = el.getAttribute(key) === step ? '' : 'none';
   }
-  for (const b of Array.from(rail.querySelectorAll<HTMLElement>('.step-chip, .subtab'))) {
+  for (const b of Array.from(rail?.querySelectorAll<HTMLElement>('.step-chip') ?? [])) {
     const on = b.getAttribute(key) === step;
     if (b.classList.contains('subtab')) {
       // 레이어 하위 탭: tablist, 정지점 1개(§4.1)
@@ -4255,23 +4319,15 @@ function renderMakeNoSel(): void {
   if (bar && hint.previousElementSibling !== bar) bar.after(hint);
   hint.hidden = lastSelCount > 0;
 }
-const showApplyStep = (s: ApplyStep): void => showStep('apply', s);
+const showApplyStep = (s: ApplyStep): void => showSelSub(s);
 
 for (const b of Array.from(document.querySelectorAll<HTMLElement>('#makeRail .step-chip'))) {
   b.addEventListener('click', () => showMakeStep(b.dataset.makeStep as MakeStep));
 }
-for (const b of Array.from(document.querySelectorAll<HTMLElement>('#applyRail .subtab'))) {
-  b.addEventListener('click', () => showApplyStep(b.dataset.applyStep as ApplyStep));
-  b.addEventListener('keydown', (e) => {
-    const ni = nextTabIndex(e.key, APPLY_STEPS.indexOf(b.dataset.applyStep as ApplyStep), APPLY_STEPS.length);
-    if (ni < 0) return;
-    e.preventDefault();
-    showApplyStep(APPLY_STEPS[ni]);
-    document.querySelector<HTMLElement>(`#applyRail [data-apply-step="${APPLY_STEPS[ni]}"]`)?.focus();
-  });
-}
 showMakeStep('color');
-showApplyStep('bind');
+showStep('apply', 'bind');
+// 첫 화면에서는 하위 화면 카드를 숨긴다(§2.1) — 들어갈 때 showSelSub가 보인다.
+for (const el of Array.from(document.querySelectorAll<HTMLElement>('.step[data-apply-step]'))) el.style.display = 'none';
 
 // 카드 툴바의 '다음 →' — 레일 칩과 같은 이동을 카드 안에서(일이 끝난 자리에서 바로 다음으로).
 for (const b of Array.from(document.querySelectorAll<HTMLElement>('[data-next-make]'))) {
@@ -4486,8 +4542,6 @@ let vmUsageInFlight = false;
 /** 사용자가 일으킨 읽기(↻·[읽기]·선택 변경)인가 — 칩 숫자 "…"·상태 줄 문구는 이때만(조용한 반영 아님). */
 let vmUsageVisible = false;
 let vmUsageSig = '';
-/** ↻ 결과 비교용 — 누르기 전 표·사용 수. */
-let refreshBefore: { table: string; usage: Map<string, number> } | null = null;
 
 interface SelInfo { ids: string[]; count: number; scanned: number; name: string }
 let curSel: SelInfo = { ids: [], count: 0, scanned: 0, name: '' };
@@ -4513,26 +4567,25 @@ const sameIds = (a: readonly string[], b: readonly string[]): boolean => a.lengt
 const localVarCount = (): number => vmVars.length;
 
 /* ---------- 화면 고르기(§4.2·§4.3) ---------- */
-type VarScreen = 'loading' | 'start' | 'list';
+type VarScreen = 'loading' | 'empty' | 'list';
 function varScreen(): VarScreen {
   if (!vmTableKnown) return 'loading';
-  if (startLatched() || localVarCount() === 0) return 'start';
+  if (localVarCount() === 0) return 'empty'; // 로컬 변수 0개(컬렉션이 있어도) — §4.6 빈 상태
   return 'list';
 }
 function renderVarScreen(): void {
-  const scr = varSub === 'home' ? varScreen() : null;
+  const scr = varScreen();
   $('varLoading').style.display = scr === 'loading' ? '' : 'none';
-  $('varStart').style.display = scr === 'start' ? '' : 'none';
+  $('varEmpty').style.display = scr === 'empty' ? '' : 'none';
   $('varList').style.display = scr === 'list' ? '' : 'none';
-  placeWizard();
-  if (scr === 'start') renderStart();
+  setLock($('btnVarEmptyMake'), curSel.count ? null : 'prereq', t('status.noSelection'));
   if (scr === 'list') renderVarList();
-  renderReadinessButtons();
+  renderSelHome();
 }
 
 /** 변수 첫 화면이 보이는가 = 변수 탭 + 첫 화면. 보이게 될 때 표와 사용 수를 읽는다(부르는 쪽이 read). */
 function syncManagerVisibility(read: boolean): void {
-  const want = activeTab === 'variables' && varSub === 'home';
+  const want = activeTab === 'variables';
   if (want && !vmOpen) {
     vmOpen = true;
     renderVarScreen();
@@ -4540,7 +4593,6 @@ function syncManagerVisibility(read: boolean): void {
   } else if (!want && vmOpen) {
     leaveManagerUi();
   }
-  placeWizard();
 }
 function leaveManagerUi(): void {
   vmOpen = false;
@@ -4554,15 +4606,12 @@ function leaveManagerUi(): void {
 /** 다른 화면에서 "변수 탭에서 보기 →" — 목록, 기준은 지금 선택으로(§3.1). */
 function showManager(): void {
   showTab('variables');
-  showVarSub('home');
   rebaseToCurrent();
 }
 
 /* ---------- 선택과 목록 기준 ---------- */
 function onSelectionForList(m: { count: number; scanned: number; ids?: string[]; firstName?: string; selfSelect?: boolean }): void {
   curSel = { ids: m.ids ?? [], count: m.count, scanned: m.scanned, name: m.firstName ?? '' };
-  // "변수 없는 값 찾기 →"는 지금 선택에 대해 동작한다 — 사용 수를 기다리지 않고 잠금을 바로 갱신.
-  setLock($('btnFindUnbound'), curSel.count ? null : 'prereq', t('status.noSelection'));
   if (m.selfSelect) { renderSelBase(); return; } // 플러그인이 만든 선택 — 기준 유지
   setBaseline(curSel.count ? { ...curSel } : null);
 }
@@ -4571,6 +4620,7 @@ function rebaseToCurrent(): void {
 }
 function setBaseline(b: SelInfo | null): void {
   baseline = b;
+  selFindInFlight = false; // 앞 기준의 찾기는 버린다(응답은 reqId로 걸러진다)
   renderSelBase();
   if (vmUsageTimer) { clearTimeout(vmUsageTimer); vmUsageTimer = null; }
   vmUsageReq = 0;
@@ -4583,17 +4633,22 @@ function setBaseline(b: SelInfo | null): void {
     deletedUse = { count: 0, nodeIds: [] };
     vmUsageSig = '';
     if (vmOpen) renderVarScreen();
+    renderSelHome();
     return;
   }
   // 목록은 비우지 않는다 — 응답이 오면 한 번에 바꾼다. 큰 선택·마법사 중이면 자동으로 읽지 않는다.
   if (b.scanned > BIG_SELECTION || wizardRunning) {
     bigSkipped = b.scanned > BIG_SELECTION;
     usageMap = null;
+    selFindFor = null;
     if (vmOpen) renderVarScreen();
+    renderSelHome();
     return;
   }
-  if (!vmOpen || isMini) return; // 보이지 않으면 들어올 때 읽는다
-  vmUsageTimer = setTimeout(() => { vmUsageTimer = null; requestManagerUsage('selection'); }, AUTO_SCAN_DELAY);
+  usageMap = null; // 새 기준 — 카드는 "읽는 중"(§4.1 상태 4)
+  renderSelHome();
+  if (!usageVisible() || isMini) return; // 보이지 않으면 들어올 때 읽는다
+  vmUsageTimer = setTimeout(() => { vmUsageTimer = null; requestManagerUsage('selection'); readSelFind(); }, AUTO_SCAN_DELAY);
 }
 let vmUsageTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -4602,22 +4657,21 @@ function requestManagerUsage(why: 'quiet' | 'work' | 'selection' | 'user' = 'qui
   if (!baseline) {
     usageMap = null;
     if (vmOpen) renderVarScreen();
+    renderSelHome();
     return;
   }
   const auto = why !== 'user';
   if (auto && (baseline.scanned > BIG_SELECTION || wizardRunning)) {
     bigSkipped = baseline.scanned > BIG_SELECTION;
     if (vmOpen) renderVarScreen();
+    renderSelHome();
     return;
   }
   if (vmUsageInFlight && why !== 'user') return; // 같은 종류의 직전 요청이 아직 끝나지 않았다(보류)
   vmUsageReq = ++bindReqSeq;
   vmUsageInFlight = true;
   vmUsageVisible = why === 'selection' || why === 'user';
-  if (vmUsageVisible && vmOpen) {
-    showStatusLine(t('list.reading'), { background: true });
-    if (varScreen() === 'list') renderVarList();
-  }
+  if (vmUsageVisible && vmOpen && varScreen() === 'list') renderVarList();
   send({ type: 'SCAN_USAGE', reqId: vmUsageReq, nodeIds: baseline.ids });
 }
 
@@ -4644,9 +4698,8 @@ function onUsageResult(msg: Extract<CodeToUi, { type: 'USAGE_RESULT' }>): void {
     deletedUse = msg.deleted;
     recomputeIndirect();
   }
-  if (wasVisible && $('statusText').textContent === t('list.reading')) clearStatusLine();
-  if (refreshBefore) finishRefresh();
   if (changed || wasVisible) renderVarScreen();
+  renderSelHome();
   reentry.release();
 }
 function recomputeIndirect(): void {
@@ -4663,7 +4716,6 @@ function onVarTable(msg: Extract<CodeToUi, { type: 'VAR_TABLE' }>): void {
   vmTableKnown = true;
   if (sig === vmTableSig && !first) {
     if (edRebase) edOnVarTable(msg); // 고치기 저장 뒤 첫 표는 직전과 같아도 팝업 base를 새로 잡는다(§4.4 고치기)
-    if (refreshBefore) finishRefresh();
     return;
   }
   vmTableSig = sig;
@@ -4675,36 +4727,8 @@ function onVarTable(msg: Extract<CodeToUi, { type: 'VAR_TABLE' }>): void {
     if (n > 0) showStatusLine(t('wizard.madeStatus', { n }), { cls: 'ok' });
   }
   recomputeIndirect();
-  if (refreshBefore) finishRefresh();
   if (vmOpen || first) renderVarScreen();
   if (edRebase) edOnVarTable(msg); // 목록을 새 표로 그린 뒤(이름 검사 · 후보도 새 표로)
-}
-
-/* ---------- ↻ 다시 읽기 ---------- */
-function refreshList(): void {
-  const btn = $('btnVarRefresh');
-  btn.classList.add('spinning');
-  refreshBefore = { table: vmTableSig, usage: new Map([...(usageMap ?? new Map()).entries()].map(([k, v]) => [k, v.places])) };
-  refreshPending = baseline ? 2 : 1;
-  requestPrereq();
-  send({ type: 'GET_VAR_TABLE' });
-  if (baseline) requestManagerUsage('user'); // 300개 제한 무시, 기준 유지
-}
-let refreshPending = 0;
-function finishRefresh(): void {
-  if (!refreshBefore) return;
-  refreshPending--;
-  if (refreshPending > 0) return;
-  const before = refreshBefore;
-  refreshBefore = null;
-  $('btnVarRefresh').classList.remove('spinning');
-  const tableChanged = before.table !== vmTableSig;
-  let n = 0;
-  const now = new Map([...(usageMap ?? new Map()).entries()].map(([k, v]) => [k, v.places]));
-  for (const k of new Set([...before.usage.keys(), ...now.keys()])) if ((before.usage.get(k) ?? 0) !== (now.get(k) ?? 0)) n++;
-  const text = tableChanged ? t('list.refreshTable') + (n ? t('list.refreshCountSuffix', { n }) : '') : n ? t('list.refreshUsage', { n }) : t('list.refreshSame');
-  showStatusLine(text);
-  if (statusTimer) { clearTimeout(statusTimer); statusTimer = setTimeout(clearStatusLine, 2000); }
 }
 
 /* ---------- 목록 기준 다름(§4.1 · §4.4) — 상황 안내 줄 맨 앞 ---------- */
@@ -4712,45 +4736,15 @@ function finishRefresh(): void {
 function baseDiffers(): boolean {
   return !!baseline && !!curSel && !sameIds(baseline.ids, curSel.ids);
 }
-/** "목록 기준: {이름} · 지금 선택과 달라요 · " 문구. */
-function baseNoticeText(): string {
-  const b = baseline!;
-  const name = b.count === 1 ? b.name || t('sel.unnamed') : t('list.baseMany', { m: b.count });
-  return t(curSel.count ? 'list.baseDiff' : 'list.baseDiffNoSel', { name });
-}
 /** 목록 기준이 바뀌거나 선택이 바뀌면 상황 안내 줄(목록)과 시작 화면의 기준 줄을 다시 그린다. */
 function renderSelBase(): void {
   if (!vmCols) return; // 첫 화면 전(초기화 순서)
-  renderSituation();
-  if (activeTab === 'variables' && varScreen() === 'start') renderStart();
+  renderSelHome();
 }
-/** [기준 바꾸기] — 캔버스 선택 변경과 같게 처리하고, 포커스는 목록(시작 화면이면 LIB 첫 행 → 마법사 주 버튼). */
-function doRebase(fromStart: boolean): void {
+/** [기준 바꾸기](§2.5) — 지금 선택을 기준으로 삼고 읽는다. 버튼이 사라지면 첫 카드 버튼(없으면 [이름 정리])으로. */
+function doRebase(): void {
   rebaseToCurrent();
-  if (fromStart) {
-    ($('startLib').querySelector<HTMLElement>('[data-key]') ?? $('btnWizardRun')).focus();
-    return;
-  }
-  const tree = $('varTree');
-  const target = (focusKey && tree.querySelector<HTMLElement>(`[data-key="${CSS.escape(focusKey)}"]`)) || tree.querySelector<HTMLElement>('[data-key]');
-  target?.focus();
-}
-/** 상황 안내 줄 한 칸(글 + 링크 버튼). */
-function situationEl(text: string, action?: [string, () => void]): HTMLElement {
-  const d = document.createElement('div');
-  d.className = 'situation';
-  const sp = document.createElement('span');
-  sp.textContent = text;
-  d.appendChild(sp);
-  if (action) {
-    const b = document.createElement('button');
-    b.className = 'link link-btn';
-    b.type = 'button';
-    b.textContent = action[0];
-    b.addEventListener('click', action[1]);
-    d.appendChild(b);
-  }
-  return d;
+  ($('selCards').querySelector<HTMLElement>('button') ?? $('btnGoRename')).focus();
 }
 
 /* ---------- 칩 줄 ---------- */
@@ -4758,137 +4752,63 @@ function situationEl(text: string, action?: [string, () => void]): HTMLElement {
 const directMap = (): Map<string, number> | null =>
   usageMap ? new Map([...usageMap.entries()].map(([k, v]) => [k, v.places])) : null;
 const indirectSet = (): Set<string> => new Set(indirectMap.keys());
-/** 사용 수를 읽는 중이고 사용자가 기다리는 중인가("…"). */
-const usageReadingVisible = (): boolean => vmUsageInFlight && vmUsageVisible;
-/** 숫자 칸 — 사용/전체, 아니면 전체, 읽는 중이면 "…". */
-function sideNum(c: { used: number; total: number; direct: number; indirect: number }): { text: string; tip: string } {
-  if (usageReadingVisible()) return { text: '…', tip: '' };
-  if (!usageMap) return { text: String(c.total), tip: t('list.totalTip', { total: c.total }) };
-  return { text: `${c.used}/${c.total}`, tip: t('list.chipTip', { used: c.used, direct: c.direct, indirect: c.indirect, total: c.total }) };
-}
-/** 처음 고르는 항목(사용자가 직접 고르지 않았을 때) — 선택이 바뀌면 사용 수가 온 뒤 다시 정한다. */
-function initialSel(): SideSel {
-  return initialSideSel(vmCols, vmVars, !!baseline, bigSkipped || (wizardRunning && !usageMap), directMap(), indirectSet());
-}
-/** 지금 고른 항목 — 직접 고른 게 없으면 처음 규칙, 있으면 사라졌는지 확인(§4.4). */
+/** 지금 고른 컬렉션(IA v4 §4.6) — 처음에는 첫 컬렉션, 사라지면 첫 컬렉션. */
 function currentSel(): SideSel {
-  const hasLib = libRowsAll().length > 0;
-  const hasDeleted = deletedUse.count > 0 && !!baseline;
-  if (!sidePicked || !sideSel) {
-    // 마법사 실행 중(선택 있음, 아직 안 읽음)은 ★(마법사 빈 상태)로 둔다.
-    sideSel = baseline && wizardRunning && !usageMap && !bigSkipped ? { kind: 'inspect' } : initialSel();
-    return sideSel;
+  const sides = sidebarCollections(vmCols, vmVars, null, new Set());
+  const cur = sideSel;
+  if (!cur || cur.kind !== 'col' || !sides.some((x) => x.collection.id === cur.id)) {
+    const first = sides[0];
+    if (cur && document.activeElement?.closest('#varSide') && first) focusSideKey = `side:col:${first.collection.id}`;
+    sideSel = first ? { kind: 'col', id: first.collection.id } : { kind: 'inspect' };
   }
-  const next = validSideSel(sideSel, vmCols, vmVars, hasLib, hasDeleted, initialSel);
-  if (sideSelKey(next) !== sideSelKey(sideSel)) {
-    // 사라진 항목에 포커스가 있었으면 새 항목으로(§4.4).
-    if (document.activeElement?.closest('#varSide')) focusSideKey = `side:${sideSelKey(next)}`;
-    sideSel = next;
-  }
-  return sideSel;
+  return sideSel!;
 }
 let focusSideKey: string | null = null;
-/** 컬렉션이 사이드바에서 펼쳐져 있나 — 직접 바꾼 게 있으면 그것, 없으면 쓰는 변수가 있는 컬렉션(없으면 첫 컬렉션만). */
-function sideIsOpen(side: SideCollection, all: SideCollection[], sel: SideSel): boolean {
-  const user = sideOpen.get(side.collection.id);
-  if (user !== undefined) return user;
-  if (sel.kind === 'grp' && sel.key.startsWith(`${side.collection.id}|`)) return true;
-  if (usageMap && all.some((x) => x.used > 0)) return side.used > 0;
-  return all[0] === side;
-}
 function pickSide(sel: SideSel, focus = true): void {
   if (searchOpen || query) clearSearch(false); // 검색 중에 사이드바를 누르면 검색을 지우고 그 항목(§4.4)
   sideSel = sel;
-  sidePicked = true;
-  if (sel.kind === 'col') sideOpen.set(sel.id, true);
   focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
   focusKey = null;
   renderVarList();
 }
 function renderSidebar(sel: SideSel): void {
+  // IA v4 §4.6 — 로컬 컬렉션만(listbox, 정지점 1개). 그룹 · ★ Inspect · LIB · 삭제된 변수 항목은 없다.
   const nav = $('varSide');
+  nav.setAttribute('role', 'listbox');
   const hadFocus = nav.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.key ?? null : null;
   clearMount(nav);
-  const dm = directMap();
-  const ind = indirectSet();
-  const sides = sidebarCollections(vmCols, vmVars, dm, ind);
+  const sides = sidebarCollections(vmCols, vmVars, null, new Set());
   const selKey = searchOpen && query.trim() ? '' : sideSelKey(sel);
-  const item = (key: string, level: number, label: string, num: { text: string; tip: string }, aria: string, opts: { badge?: string; badgeTip?: string; open?: boolean; onToggle?: () => void; muted?: boolean; danger?: boolean; onPick: () => void; title?: string }): HTMLElement => {
-    const d = document.createElement('div');
-    d.className = `vs-item lv${level}${opts.muted ? ' muted' : ''}${opts.danger ? ' danger' : ''}`;
-    d.dataset.key = `side:${key}`;
-    d.setAttribute('role', 'treeitem');
-    d.setAttribute('aria-level', String(level));
-    d.setAttribute('aria-selected', String(selKey === key));
-    d.setAttribute('aria-label', aria);
-    if (opts.open !== undefined) d.setAttribute('aria-expanded', String(opts.open));
-    d.tabIndex = -1;
-    if (opts.onToggle) {
-      const tw = document.createElement('button');
-      tw.type = 'button';
-      tw.className = 'vs-tw';
-      tw.tabIndex = -1;
-      tw.textContent = opts.open ? '▾' : '▸';
-      tw.setAttribute('aria-label', t(opts.open ? 'list.sideCollapse' : 'list.sideExpand'));
-      tw.addEventListener('click', (e) => { e.stopPropagation(); opts.onToggle!(); });
-      d.appendChild(tw);
-    }
-    if (opts.badge) {
-      const b = document.createElement('span');
-      b.className = 'vs-badge';
-      b.setAttribute('aria-hidden', 'true');
-      b.textContent = opts.badge;
-      if (opts.badgeTip) b.title = opts.badgeTip; // 계층 판단 근거(§4.4 — 사이드바 배지에만)
-      d.appendChild(b);
-    }
-    const nm = document.createElement('span');
-    nm.className = 'vs-name';
-    nm.textContent = label;
-    d.title = opts.title ?? label;
-    const n = document.createElement('span');
-    n.className = 'vs-num';
-    n.textContent = num.text;
-    if (num.tip) n.title = num.tip;
-    d.append(nm, n);
-    d.addEventListener('click', opts.onPick);
-    d.addEventListener('keydown', (ev) => sideKey(ev, d, opts));
-    nav.appendChild(d);
-    return d;
-  };
-  // ★ Inspect
-  const insN = inspectCount(vmVars, dm, ind);
-  const insNum = usageReadingVisible() ? '…' : !baseline || !usageMap ? '—' : String(insN);
-  item('inspect', 1, t('list.inspect'), { text: insNum, tip: t('list.inspectTip') }, t('list.inspectAria', { n: insNum }), { onPick: () => pickSide({ kind: 'inspect' }), title: t('list.inspectTip') });
   for (const side of sides) {
     const c = side.collection;
-    const open = sideIsOpen(side, sides, sel);
+    const key = `col:${c.id}`;
+    const d = document.createElement('div');
+    d.className = 'vs-item lv1';
+    d.dataset.key = `side:${key}`;
+    d.setAttribute('role', 'option');
+    d.setAttribute('aria-selected', String(selKey === key));
     const badge = tierBadge(c);
-    const num = sideNum(side);
     const why = tierWhyText(c);
-    item(`col:${c.id}`, 1, c.name, num, t('list.sideColAria', { name: c.name, badge, num: num.text }) + (why ? `, ${why}` : ''), {
-      badge, badgeTip: why, open, muted: !!usageMap && side.used === 0,
-      onToggle: () => { sideOpen.set(c.id, !open); focusSideKey = `side:col:${c.id}`; renderVarList(); },
-      onPick: () => pickSide({ kind: 'col', id: c.id }),
-    });
-    if (open) for (const g of side.groups) {
-      const gn = sideNum(g);
-      item(`grp:${g.key}`, 2, g.label, gn, t('list.sideGrpAria', { name: g.label, num: gn.text }), {
-        muted: !!usageMap && g.used === 0,
-        onPick: () => pickSide({ kind: 'grp', key: g.key }),
-      });
-    }
+    d.setAttribute('aria-label', t('list.sideColAria', { name: c.name, badge, num: String(side.total) }) + (why ? `, ${why}` : ''));
+    d.tabIndex = -1;
+    const b = document.createElement('span');
+    b.className = 'vs-badge';
+    b.setAttribute('aria-hidden', 'true');
+    b.textContent = badge;
+    if (why) b.title = why; // 계층 판단 근거(§4.4 — 사이드바 배지에만)
+    const nm = document.createElement('span');
+    nm.className = 'vs-name';
+    nm.textContent = c.name;
+    d.title = c.name;
+    const n = document.createElement('span');
+    n.className = 'vs-num';
+    n.textContent = String(side.total);
+    d.append(b, nm, n);
+    const pick = (): void => pickSide({ kind: 'col', id: c.id });
+    d.addEventListener('click', pick);
+    d.addEventListener('keydown', (ev) => sideKey(ev, d, pick));
+    nav.appendChild(d);
   }
-  const libN = libRowsAll().length;
-  const hasDeleted = deletedUse.count > 0 && !!baseline;
-  if (libN || hasDeleted) {
-    const sep = document.createElement('div');
-    sep.className = 'vs-sep';
-    sep.setAttribute('role', 'separator');
-    nav.appendChild(sep);
-  }
-  if (libN) item('lib', 1, t('list.libItem'), { text: String(libN), tip: '' }, t('list.libItemAria', { n: libN }), { onPick: () => pickSide({ kind: 'lib' }) });
-  if (hasDeleted) item('deleted', 1, t('list.deletedItem'), { text: String(deletedUse.count), tip: '' }, t('list.deletedItemAria', { n: deletedUse.count }), { danger: true, onPick: () => pickSide({ kind: 'deleted' }) });
-  // 정지점 1개 — 고른 항목(없으면 첫 항목).
   const items = Array.from(nav.querySelectorAll<HTMLElement>('.vs-item'));
   const want = focusSideKey ?? hadFocus;
   const target = (want && items.find((x) => x.dataset.key === want)) || items.find((x) => x.getAttribute('aria-selected') === 'true') || items[0];
@@ -4896,8 +4816,8 @@ function renderSidebar(sel: SideSel): void {
   if (want && target && (focusSideKey || hadFocus)) target.focus({ preventScroll: true });
   focusSideKey = null;
 }
-/** 사이드바 키(§4.4 키보드 · tree). */
-function sideKey(ev: KeyboardEvent, el: HTMLElement, opts: { open?: boolean; onToggle?: () => void; onPick: () => void }): void {
+/** 사이드바 키(listbox — ↑↓ · Home/End · Enter/Space). */
+function sideKey(ev: KeyboardEvent, el: HTMLElement, pick: () => void): void {
   const items = Array.from($('varSide').querySelectorAll<HTMLElement>('.vs-item'));
   const i = items.indexOf(el);
   const go = (j: number): void => {
@@ -4912,14 +4832,7 @@ function sideKey(ev: KeyboardEvent, el: HTMLElement, opts: { open?: boolean; onT
   else if (k === 'ArrowUp') go(i - 1);
   else if (k === 'Home') go(0);
   else if (k === 'End') go(items.length - 1);
-  else if (k === 'ArrowRight' && opts.onToggle) {
-    if (!opts.open) opts.onToggle();
-    else go(i + 1);
-  } else if (k === 'ArrowLeft') {
-    if (el.classList.contains('lv2')) {
-      for (let j = i - 1; j >= 0; j--) if (items[j].classList.contains('lv1')) { go(j); break; }
-    } else if (opts.onToggle && opts.open) opts.onToggle();
-  } else if (k === 'Enter' || k === ' ') opts.onPick();
+  else if (k === 'Enter' || k === ' ') pick();
   else return;
   ev.preventDefault();
 }
@@ -4957,37 +4870,6 @@ function modeIdFor(col: VarCollection | undefined): string | undefined {
 }
 function currentModeCell(v: VarRow): VarCell | undefined {
   return v.values[modeIdFor(vmCols.find((c) => c.id === v.collectionId)) ?? ''];
-}
-
-/* ---------- 상황 안내 줄(위 행 하나만) ---------- */
-function renderSituation(): void {
-  const line = $('situationLine');
-  clearMount(line);
-  const add = (text: string, action?: [string, () => void]): void => {
-    const s = document.createElement('span');
-    s.textContent = text;
-    line.appendChild(s);
-    if (action) {
-      const b = document.createElement('button');
-      b.className = 'link link-btn';
-      b.type = 'button';
-      b.textContent = action[0];
-      b.addEventListener('click', action[1]);
-      line.appendChild(b);
-    }
-  };
-  let shown = true;
-  // ★가 골라져 있으면 그 빈 상태가 같은 안내를 보인다 — 한 안내는 한 곳에만(§4.4).
-  const insShown = !!sideSel && sideSel.kind === 'inspect' && !(searchOpen && query.trim());
-  // 겹치면 위쪽 하나만(§4.4). 목록 기준 다름이 맨 앞.
-  if (baseDiffers()) add(baseNoticeText(), [t('list.rebase'), () => doRebase(false)]);
-  else if (insShown && (!baseline || !usageMap || inspectCount(vmVars, directMap(), indirectSet()) === 0)) shown = false;
-  else if (baseline && bigSkipped && !usageMap) add(t('list.big'), [t('list.read'), () => requestManagerUsage('user')]);
-  else if (baseline && wizardRunning && !usageMap) add(t('list.wizardWait'));
-  else if (baseline && usageMap && inspectCount(vmVars, directMap(), indirectSet()) === 0) add(t('list.noneUsed'), [t('list.findUnbound'), findUnbound]);
-  else if (!baseline) add(t('list.selectHint'));
-  else shown = false;
-  line.hidden = !shown;
 }
 
 /* ---------- 목록 ---------- */
@@ -5038,9 +4920,6 @@ function renderVarList(): void {
   if (!vmOpen || varScreen() !== 'list') return;
   const sel = currentSel();
   renderSidebar(sel);
-  renderSituation();
-  renderReadinessButtons();
-  setLock($('btnFindUnbound'), curSel.count ? null : 'prereq', t('status.noSelection'));
   const tree = $('varTree');
   const prevScroll = window.scrollY;
   const hadFocus = tree.contains(document.activeElement);
@@ -6283,6 +6162,7 @@ function openMoreMenu(): void {
   const btn = $('btnVarMore');
   const r = btn.getBoundingClientRect();
   openMenu(r.left, r.bottom + 2, [
+    { label: t('list.readiness', { n: readinessDone(), total: 7 }) + '…', onSelect: () => openReadiness(btn), focusElsewhere: true },
     { label: t('list.menuExport'), onSelect: () => openExportPopup(btn), focusElsewhere: true },
     { label: t('list.menuExpandAll'), separatorBefore: true, onSelect: () => setAllExpanded(true) },
     { label: t('list.menuCollapseAll'), onSelect: () => setAllExpanded(false) },
@@ -6293,9 +6173,9 @@ function openMoreMenu(): void {
 function findUnbound(): void {
   if (!curSel.count) { showStatusLine(t('status.noSelection'), { cls: 'warn' }); return; }
   // 진입 규칙(§4.6): 같은 선택의 결과가 있으면 / 실행 중이면 화면만, 연결할 변수가 없으면 안내만, 그 밖은 미리보기.
-  const sameResult = hasBindPreview() && !!bindPreviewSel && sameIds(bindPreviewSel, curSel.ids) && !bindForeignSel;
+  const sameResult = hasBindPreview() && !!bindPreviewSel && sameIds(bindPreviewSel, (baseline ?? curSel).ids) && !bindForeignSel;
   bindLeftSince = false; // 지금 들어가는 것이라 복귀 재계산 대상이 아니다
-  showTab('layer');
+  showTab('select');
   showApplyStep('bind');
   if (sameResult || bindBusy()) return;
   if (prereqKnown && !hasBindable) { renderBindPrereq(); return; }
@@ -6303,10 +6183,8 @@ function findUnbound(): void {
 }
 
 /* ---------- 리스너 ---------- */
-$('btnVarRefresh').addEventListener('click', refreshList);
 $('btnAddVar').addEventListener('click', () => showMake('color'));
 $('btnVarMore').addEventListener('click', openMoreMenu);
-$('btnFindUnbound').addEventListener('click', findUnbound);
 $('btnSearch').addEventListener('click', () => (searchOpen ? ($('varSearch') as HTMLInputElement).focus() : openSearch()));
 $('varSearch').addEventListener('input', () => { query = ($('varSearch') as HTMLInputElement).value; renderVarList(); });
 $('varSearch').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); clearSearch(); } });
@@ -6320,14 +6198,11 @@ let wizLatch: { from: 'start' | 'make'; before: number; summarySeen: boolean; do
 /** 이번 실행 시작 때 로컬 변수 수 — 완료 n = 전후 차이(만들기 맨 위, 로컬 변수 있음). */
 let wizBeforeCount = 0;
 let wizFrom: 'start' | 'make' = 'start';
-function startLatched(): boolean {
-  return !!wizLatch;
-}
 /** 마법사 카드(요소 1개)를 보이는 곳에 붙인다 — 만들기 하위 화면이면 맨 위, 아니면 시작 화면. */
 function placeWizard(): void {
   const card = $('wizardCard');
-  const inMake = activeTab === 'variables' && varSub === 'make';
-  const slot = $(inMake ? 'wizardSlotMake' : 'wizardSlotStart');
+  const inMake = true; // v4: 마법사 카드는 만들기 하위 화면에만(시작 화면은 없앴다)
+  const slot = $('wizardSlotMake');
   // 자리를 옮길 때만 기본 펼침을 정한다 — 다시 그릴 때마다 접으면 사용자가 펼친 것이 풀린다.
   // 만들기 쪽에서는 접힌 채, 실행 중이거나 요약이 있으면 펼친다.
   if (card.parentElement !== slot) {
@@ -6337,7 +6212,7 @@ function placeWizard(): void {
   }
   if (wizardRunning) card.classList.remove('collapsed');
   // 요약을 화면에서 봤다(①) — 끝난 뒤 카드가 실제로 보이면.
-  const visible = activeTab === 'variables' && !isMini && (inMake || varScreen() === 'start');
+  const visible = activeTab === 'select' && selSub === 'make' && !isMini;
   if (wizLatch && wizLatch.done && visible) wizLatch.summarySeen = true;
   renderWizardCopy();
 }
@@ -6363,49 +6238,9 @@ function renderWizardCopy(): void {
   } else done.hidden = true;
 }
 
-/** 시작 화면 내용 — 머리, 무료 안내, LIB 구역, 무료 표시. */
-function renderStart(): void {
-  const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
-  $('startHead').textContent = made > 0 ? t('start.made', { n: made }) : t('start.head');
-  $('startSub').hidden = made > 0;
-  $('startFree').style.display = isPaid ? 'none' : '';
-  $('goMakeFree').style.display = isPaid ? 'none' : '';
-  const lib = $('startLib');
-  clearMount(lib);
-  // 시작 화면에는 상황 안내 표의 첫 행("목록 기준 다름")만 LIB 구역 위에(§4.4).
-  if (baseDiffers()) lib.appendChild(situationEl(baseNoticeText(), [t('list.rebase'), () => doRebase(true)]));
-  if (baseline && bigSkipped && !usageMap) {
-    const d = document.createElement('div');
-    d.className = 'situation';
-    d.append(t('list.big'), ' ');
-    const b = document.createElement('button');
-    b.className = 'link link-btn';
-    b.textContent = t('list.read');
-    b.addEventListener('click', () => requestManagerUsage('user'));
-    d.appendChild(b);
-    lib.appendChild(d);
-  } else {
-    const rows = libRowsMatching();
-    if (rows.length) {
-      const h = document.createElement('div');
-      h.className = 'vt-section vt-lib';
-      h.textContent = t('list.libSection');
-      const note = document.createElement('div');
-      note.className = 'hint';
-      note.textContent = t('start.libNote');
-      lib.append(h, note, ...rows.map(libRowEl));
-    }
-  }
-  renderWizardCopy();
-}
-
 /* ---------- 준비 현황 팝오버 ---------- */
 function readinessDone(): number {
   return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === 'done').length;
-}
-function renderReadinessButtons(): void {
-  const label = t('list.readiness', { n: readinessDone(), total: 7 });
-  for (const id of ['btnReadiness', 'btnReadinessStart']) $(id).textContent = label;
 }
 let readinessReturn: HTMLElement | null = null;
 function openReadiness(btn: HTMLElement): void {
@@ -6431,8 +6266,6 @@ function closeReadiness(returnFocus = false): void {
   readinessReturn = null;
   reentry.release();
 }
-$('btnReadiness').addEventListener('click', () => openReadiness($('btnReadiness')));
-$('btnReadinessStart').addEventListener('click', () => openReadiness($('btnReadinessStart')));
 $('readinessPop').addEventListener('keydown', (e) => {
   const rows = Array.from($('readinessPop').querySelectorAll<HTMLElement>('.pstep'));
   const i = rows.indexOf(document.activeElement as HTMLElement);
@@ -6450,11 +6283,9 @@ document.addEventListener('pointerdown', (e) => {
 }, true);
 $('btnWizListView').addEventListener('click', () => {
   wizLatch = null;
-  showVarSub('home');
-  renderVarScreen();
+  showTab('variables');
   $('varTree').querySelector<HTMLElement>('[data-key]')?.focus();
 });
-$('btnStartLicense').addEventListener('click', goToLicense);
 
 /* =====================================================================
    레이어 › 연결(IA v3 §4.6)
@@ -6506,10 +6337,10 @@ function readLayerLibUse(): void {
 /** 다른 탭에서 돌아오거나 창에 다시 들어올 때(§4.6 ⑧). 순서: 최소화 중 결과 → 다른 선택 → 이 화면의 선택 → 조용한 재계산/안내. */
 function bindOnReturn(): void {
   if (bindLinking) return; // 연결 중의 복귀는 아무것도 하지 않는다(§4.6 ⑧)
-  if (activeTab !== 'layer' || currentApplyStep !== 'bind' || !hasBindPreview()) return;
+  if (activeTab !== 'select' || selSub !== 'bind' || !hasBindPreview()) return;
   if (bindPreviewMini) { bindPreviewMini = false; return; }
   const notice = $('bindNotice');
-  if (bindForeignSel || (bindPreviewSel && !sameIds(bindPreviewSel, curSel.ids))) {
+  if (bindForeignSel || (bindPreviewSel && !sameIds(bindPreviewSel, (baseline ?? curSel).ids))) {
     bindForeignSel = true;
     $('bindNoticeText').textContent = t('bind.otherSel');
     notice.hidden = false;
@@ -6532,8 +6363,332 @@ window.addEventListener('blur', () => { if (hasBindPreview()) bindLeftSince = tr
 /** 찾기·연결이 실행 중인가. 연결 쪽은 bindLinking(§4.6 "연결 중의 다른 일"). */
 const bindBusy = (): boolean => bindFinding || bindLinking !== 0;
 
+/* =====================================================================
+   선택 탭 첫 화면(IA v4 §4.1) — 머리 줄 · 상태표 · 카드 1(변수 없는 값) · 카드 2(쓰는 변수) · 카드 3(삭제된 변수)
+   ===================================================================== */
+/** 카드 1 숫자가 가리키는 기준(id를 이은 글) — 다르면 "읽는 중". */
+let selFindFor: string | null = null;
+/** 자동 찾기를 보냈고 응답을 기다린다. */
+let selFindInFlight = false;
+/** 쓰기 작업 중이라 미룬 자동 찾기(§7). */
+let selFindDeferred = false;
+/** 카드 2 펼침(세션 동안 기억). */
+let selUsesOpen = false;
+let unbindReq = 0;
+
+const baseKey = (): string => (baseline ? baseline.ids.join(',') : '');
+/** 기준 이름 — "{첫 이름}" / "{첫 이름} 외 {k}개". */
+function baseLabel(): string {
+  const b = baseline ?? curSel;
+  if (!b.count) return '';
+  const first = b.name || t('sel.unnamed');
+  return b.count === 1 ? first : t('v4.selMany', { name: first, k: b.count - 1 });
+}
+/** 사용 수를 읽어야 하는 화면이 보이는가(변수 탭 · 선택 탭). */
+function usageVisible(): boolean {
+  return vmOpen || activeTab === 'select';
+}
+/** 선택 탭 데이터 읽기(§7) — 찾기 + 쓰는 변수 · 삭제된 변수. */
+function readSelData(why: ReadWhy, find = true): void {
+  if (!baseline) return;
+  requestManagerUsage(why === 'work' ? 'work' : 'quiet');
+  if (find) readSelFind(why === 'work' || why === 'reentry' || selFindDeferred || selFindFor !== baseKey());
+}
+/** 카드 1 자동 찾기 — 조용한 읽기, 300개 규칙, 쓰기 중이면 미룬다, 한 번에 하나(§2.6 · §7). */
+function readSelFind(force = true, user = false): void {
+  if (!baseline || isMini || activeTab !== 'select') return;
+  if (!force && selFindFor === baseKey()) return;
+  if (!user && baseline.scanned > BIG_SELECTION) { renderSelHome(); return; }
+  if (bindLinking || opBusy() || wizardRunning) { selFindDeferred = true; return; }
+  if (prereqKnown && !hasBindable && prereqLocalVars > 0) { selFindFor = baseKey(); renderSelHome(); return; } // noTier — 찾지 않는다
+  selFindDeferred = false;
+  selFindInFlight = true;
+  if (user) runBindPreview(); else runBindPreview(true);
+  renderSelHome();
+}
+
+/** 카드 한 장. */
+function selCard(opts: { title: string; subs?: (string | Node)[]; cls?: string; actions?: HTMLElement[] }): HTMLElement {
+  const d = document.createElement('div');
+  d.className = `sel-card${opts.cls ? ' ' + opts.cls : ''}`;
+  const g = document.createElement('div');
+  g.className = 'grow';
+  const tt = document.createElement('div');
+  tt.className = 't';
+  tt.textContent = opts.title;
+  g.appendChild(tt);
+  for (const sub of opts.subs ?? []) {
+    const sd = document.createElement('div');
+    sd.className = 's';
+    sd.append(sub);
+    g.appendChild(sd);
+  }
+  d.appendChild(g);
+  if (opts.actions?.length) {
+    const a = document.createElement('div');
+    a.className = 'acts';
+    a.append(...opts.actions);
+    d.appendChild(a);
+  }
+  return d;
+}
+function selBtn(label: string, onClick: (b: HTMLButtonElement) => void, primary = false): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = label;
+  if (primary) b.className = 'primary';
+  b.addEventListener('click', () => { if (!isLocked(b)) onClick(b); });
+  return b;
+}
+function selLink(label: string, onClick: (b: HTMLButtonElement) => void): HTMLButtonElement {
+  const b = selBtn(label, onClick);
+  b.className = 'link link-btn';
+  return b;
+}
+const kindLabel = (k: SelKind): string => t(`v4.kind.${k}`);
+
+function renderSelHome(): void {
+  if (activeTab !== 'select' || selSub !== 'home' || !curSel) return;
+  const head = $('selHead');
+  const cards = $('selCards');
+  const hadFocus = cards.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.k ?? null : null;
+  clearMount(head);
+  clearMount(cards);
+  const noSel = !baseline;
+  // 레이어 정리(§4.1) — 선택이 없으면 잠금.
+  for (const id of ['btnGoRename', 'btnGoComponents']) setLock($(id), curSel.count ? null : 'prereq', t('status.noSelection'));
+  // 머리 줄
+  if (baseline) {
+    const b = document.createElement('b');
+    b.textContent = baseLabel();
+    b.title = baseLabel();
+    const n = document.createElement('span');
+    n.className = 'sel-n';
+    n.textContent = t('v4.layers', { n: baseline.count });
+    head.append(b, n);
+    if (baseDiffers()) {
+      const diff = document.createElement('span');
+      diff.className = 'sel-diff';
+      diff.append(t('v4.baseDiff') + ' · ');
+      const rb = selLink(t('list.rebase'), () => doRebase());
+      rb.dataset.k = 'rebase';
+      diff.appendChild(rb);
+      head.appendChild(diff);
+    }
+  }
+  const put = (el: HTMLElement): void => { cards.appendChild(el); };
+  const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
+  // 1 첫 정보 전
+  if (!vmTableKnown && !prereqKnown) { put(selCard({ title: t('v4.loading') })); return finishSelFocus(hadFocus); }
+  // 2 선택 없음
+  if (noSel) {
+    const d = document.createElement('div');
+    d.className = 'sel-empty';
+    d.textContent = t('v4.noSel');
+    if (localZero) { const sd = document.createElement('div'); sd.className = 'sub'; sd.textContent = t('v4.noVarsFile'); d.appendChild(sd); }
+    put(d);
+    return finishSelFocus(hadFocus);
+  }
+  // 3 큰 선택, 아직 안 읽음
+  const findReady = selFindFor === baseKey() && !selFindInFlight;
+  const usageReady = !!usageMap;
+  if (baseline!.scanned > BIG_SELECTION && !findReady && !usageReady && !selFindInFlight) {
+    const c = selCard({ title: t('list.big'), actions: [selBtn(t('list.read'), () => { requestManagerUsage('user'); readSelFind(true, true); })] });
+    put(c);
+    return finishSelFocus(hadFocus);
+  }
+  const counts = findReady ? cardCounts(bindCandidates.map((c) => c.field), bindCounts) : null;
+  const reading = (): HTMLElement => selCard({ title: t('v4.reading') });
+  // 5 · 6 로컬 변수 0개 — 쓰는 변수 결과가 온 뒤 가린다(오기 전에는 4 읽는 중).
+  if (localZero) {
+    if (!usageReady) { put(reading()); return finishSelFocus(hadFocus); }
+    const libDirect = libVars.filter((l) => (usageMap?.get(l.id)?.places ?? 0) > 0);
+    if (libDirect.length) {
+      put(selCard({ title: t('v4.libOnly') }));
+      renderUsesCard(put);
+    } else {
+      const subs: string[] = [];
+      if (counts && counts.noVarByKind.length) subs.push(counts.noVarByKind.filter((x) => x.kind !== 'other').map((x) => t('v4.kindPlaces', { kind: kindLabel(x.kind), n: x.n })).join(' · '));
+      else if (!findReady) subs.push(t('v4.reading'));
+      put(selCard({ title: t('v4.noVarsFile'), subs, actions: [selBtn(t('v4.makeArrow'), (b) => { showMake('color'); subOpener = b; }, true)] }));
+    }
+    renderDeletedCard(put);
+    return finishSelFocus(hadFocus);
+  }
+  // 7 카드들
+  renderFindCard(put, counts);
+  renderUsesCard(put);
+  renderDeletedCard(put);
+  finishSelFocus(hadFocus);
+}
+function finishSelFocus(key: string | null): void {
+  if (!key) return;
+  $('selCards').querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+}
+/** 카드 1 — 변수 없는 값(§4.1). */
+function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | null): void {
+  if (prereqKnown && !hasBindable) {
+    // noTier — 계층 컬렉션에 변수가 없음
+    const b = selBtn(t('v4.makeArrow'), (el) => { showMake('color'); subOpener = el; });
+    b.dataset.k = 'make';
+    put(selCard({ title: t('v4.find0'), subs: [t('bind.noTier')], actions: [b] }));
+    return;
+  }
+  if (!counts) {
+    put(selCard({ title: t('v4.find0'), subs: [t('v4.reading')] }));
+    return;
+  }
+  const { m, k, s, n } = counts;
+  if (n === 0 && s === 0) { put(selCard({ title: t('v4.allBound'), cls: 'ok' })); return; }
+  if (n === 0) {
+    const v = selLink(t('v4.view'), (el) => { bindSkipsOpen = true; showSelSub('bind', el); renderBindTree(); });
+    v.dataset.k = 'skips';
+    put(selCard({ title: t('v4.nothingToLink'), subs: [t('v4.skippedPlaces', { s })], actions: [v] }));
+    return;
+  }
+  const kinds = counts.byKind.filter((x) => x.kind !== 'other').map((x) => `${kindLabel(x.kind)} ${x.n}`).join(' · ');
+  const sub = document.createElement('span');
+  sub.textContent = kinds;
+  const actions: HTMLElement[] = [];
+  if (m > 0) {
+    const go = selBtn(t('v4.linkN', { n: m }), (el) => { showSelSub('bind', el); }, true);
+    go.dataset.k = 'link';
+    actions.push(go);
+    if (k > 0) {
+      sub.append(' · ' + t('v4.noVarPlaces', { k }) + ' ');
+      const mk = selLink(t('v4.makeArrow'), (el) => { showMake('color'); subOpener = el; });
+      mk.dataset.k = 'make';
+      sub.appendChild(mk);
+    }
+  } else {
+    const mk = selBtn(t('v4.makeArrow'), (el) => { showMake('color'); subOpener = el; }, true);
+    mk.dataset.k = 'make';
+    actions.push(mk);
+  }
+  const card = selCard({ title: t('v4.findN', { n }), subs: [sub], actions });
+  (card.querySelector('.t') as HTMLElement).title = t('v4.findTip');
+  put(card);
+}
+/** 카드 2 — 쓰는 변수(직접만, §4.1). */
+function renderUsesCard(put: (el: HTMLElement) => void): void {
+  if (!usageMap) { put(selCard({ title: t('v4.usesTitle0'), subs: [t('v4.reading')] })); return; }
+  const local = vmVars.filter((v) => (usageMap!.get(v.id)?.places ?? 0) > 0);
+  const lib = libVars.filter((l) => (usageMap!.get(l.id)?.places ?? 0) > 0);
+  const n = local.length + lib.length;
+  if (!n) return;
+  const tierN = new Map<string, number>();
+  for (const v of local) {
+    const c = vmCols.find((x) => x.id === v.collectionId);
+    const key = c?.tier === 3 ? 'Component' : c?.tier === 2 ? 'Semantic' : c?.tier === 1 ? 'Global' : t('v4.noTierName');
+    tierN.set(key, (tierN.get(key) ?? 0) + 1);
+  }
+  if (lib.length) tierN.set(t('v4.libName'), lib.length);
+  const order = ['Component', 'Semantic', 'Global', t('v4.noTierName'), t('v4.libName')];
+  const sub = order.filter((k) => tierN.get(k)).map((k) => `${k} ${tierN.get(k)}`).join(' · ');
+  const tog = selLink(selUsesOpen ? t('v4.collapse') : t('v4.expand'), () => { selUsesOpen = !selUsesOpen; renderSelHome(); });
+  tog.dataset.k = 'uses';
+  tog.setAttribute('aria-expanded', String(selUsesOpen));
+  const card = selCard({ title: t('v4.usesN', { n }), subs: [sub], actions: [tog] });
+  (card.querySelector('.t') as HTMLElement).title = t('v4.usesTip');
+  put(card);
+  if (!selUsesOpen) return;
+  // 펼친 목록 — 계층(C → S → G → 없음 → 라이브러리) → 그룹 → 피그마 순서. grid, 정지점 1개.
+  const list = document.createElement('div');
+  list.className = 'sel-list';
+  list.setAttribute('role', 'grid');
+  list.setAttribute('aria-label', t('v4.usesN', { n }));
+  const tierRank = (tier: number | undefined): number => (tier === 3 ? 0 : tier === 2 ? 1 : tier === 1 ? 2 : 3);
+  const rows: { path: string; name: string; ref: RowRef; cell: VarCell | undefined; places: number; rank: number; order: number }[] = [];
+  local.forEach((v) => {
+    const c = vmCols.find((x) => x.id === v.collectionId);
+    const cut = v.name.lastIndexOf('/');
+    rows.push({ path: `${tierBadge(c ?? { tier: 0 })} ${c?.name ?? ''}${cut > 0 ? ' › ' + v.name.slice(0, cut) : ''}`, name: cut >= 0 ? v.name.slice(cut + 1) : v.name, ref: { local: v }, cell: currentModeCell(v), places: usageMap!.get(v.id)?.places ?? 0, rank: tierRank(c?.tier), order: vmVars.indexOf(v) });
+  });
+  lib.forEach((l, i) => {
+    const cut = l.name.lastIndexOf('/');
+    rows.push({ path: `${t('v4.libName')} › ${l.collection}`, name: cut >= 0 ? l.name.slice(cut + 1) : l.name, ref: { lib: l }, cell: l.value, places: usageMap!.get(l.id)?.places ?? 0, rank: 4, order: i });
+  });
+  rows.sort((a, b) => a.rank - b.rank || a.path.localeCompare(b.path) || a.order - b.order);
+  let lastPath = '';
+  const focusables: HTMLElement[] = [];
+  for (const r of rows) {
+    if (r.path !== lastPath) {
+      const ph = document.createElement('div');
+      ph.className = 'sl-path';
+      ph.textContent = r.path;
+      list.appendChild(ph);
+      lastPath = r.path;
+    }
+    const row = document.createElement('div');
+    row.className = 'sl-row';
+    row.setAttribute('role', 'row');
+    row.tabIndex = -1;
+    row.dataset.k = `use:${r.ref.local ? r.ref.local.id : r.ref.lib.id}`;
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = r.name;
+    const num = document.createElement('span');
+    num.className = 'num';
+    num.textContent = t('v4.places', { n: r.places });
+    row.append(nm, valueEl(r.cell), num);
+    const open = (): void => openDetail(r.ref, row);
+    row.addEventListener('click', open);
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openMenu(e.clientX, e.clientY, [{ label: t('v4.detail'), onSelect: open, focusElsewhere: true }], row);
+    });
+    row.addEventListener('keydown', (e) => {
+      const i = focusables.indexOf(row);
+      const go = (j: number): void => { const tg = focusables[Math.max(0, Math.min(focusables.length - 1, j))]; focusables.forEach((x) => (x.tabIndex = -1)); tg.tabIndex = 0; tg.focus(); };
+      if (e.key === 'ArrowDown') go(i + 1);
+      else if (e.key === 'ArrowUp') go(i - 1);
+      else if (e.key === 'Home') go(0);
+      else if (e.key === 'End') go(focusables.length - 1);
+      else if (e.key === 'Enter') open();
+      else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) { const rc = row.getBoundingClientRect(); openMenu(rc.left + 16, rc.bottom, [{ label: t('v4.detail'), onSelect: open, focusElsewhere: true }], row); }
+      else return;
+      e.preventDefault();
+    });
+    focusables.push(row);
+    list.appendChild(row);
+  }
+  if (focusables[0]) focusables[0].tabIndex = 0;
+  put(list);
+}
+/** 카드 3 — 삭제된 변수(§4.1) · [선택] · [연결 풀기]. */
+function renderDeletedCard(put: (el: HTMLElement) => void): void {
+  if (!usageMap || !deletedUse.count) return;
+  const sel = selBtn(t('v4.select'), () => { selectStatusTarget = 'list'; send({ type: 'SELECT_NODES', ids: deletedUse.nodeIds }); });
+  sel.dataset.k = 'delsel';
+  const un = selBtn(t('v4.unbind'), () => unbindDeleted());
+  un.id = 'btnUnbindDeleted';
+  un.dataset.k = 'unbind';
+  const other = otherWriteOp() ?? (bindLinking ? t('op.bind') : null);
+  if (other) setWait(un, t('bind.waitOp', { op: other }));
+  put(selCard({ title: t('v4.deletedN', { n: deletedUse.count }), cls: 'warn', actions: [sel, un] }));
+}
+/** [연결 풀기] — 기준 안 삭제된 변수 연결만 뗀다(§2.3-5). */
+function unbindDeleted(): void {
+  if (!baseline) return;
+  unbindReq = ++bindReqSeq;
+  send({ type: 'UNBIND_DELETED', reqId: unbindReq, nodeIds: baseline.ids });
+}
+function onDeletedUnbound(msg: Extract<CodeToUi, { type: 'DELETED_UNBOUND' }>): void {
+  if (msg.reqId !== unbindReq) return;
+  unbindReq = 0;
+  let text = t('v4.unbound', { k: msg.unbound });
+  if (msg.failed) text += t('v4.unboundFailed', { m: msg.failed });
+  showStatusLine(text, { cls: msg.failed ? 'warn' : 'ok' });
+  const tip = Object.entries(msg.failReasons).map(([k, n]) => `${t('v4.unbindFail.' + k)} ${n}`).join(' · ');
+  if (tip) $('statusText').title = tip;
+  // 카드가 사라지면 포커스는 [이름 정리](§4.1).
+  if (document.activeElement === document.body || !document.activeElement?.isConnected) $('btnGoRename').focus();
+  queueMicrotask(() => { if (!$('selCards').contains(document.activeElement)) $('btnGoRename').focus(); });
+}
+
 /* ---------- 첫 화면 — 변수 탭(IA v3) ----------
    파일 맨 끝에서 부른다: 첫 화면이 변수 관리를 그리고 사용 수를 읽으므로, 그 상태 변수가 모두 선언된 뒤여야 한다.
    처음 한 번은 탭이 '바뀌지' 않으므로 activeTab을 비켜 두어 들어올 때 읽기가 돌게 한다. */
-activeTab = 'settings';
-showTab('variables');
+activeTab = 'variables';
+showTab('select'); // v4 §2.1 — 창을 열면 선택 탭
+placeWizard(); // 마법사 카드는 만들기 하위 화면 안에만

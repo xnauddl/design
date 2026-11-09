@@ -28,6 +28,10 @@ import {
   bindSelection,
   bindSelectedItems,
   countUsage,
+  deletedBindings,
+  unbindDeleted,
+  countDeleted,
+  boundVariableIds,
   findUsers,
   renameSelection,
   writeRole,
@@ -114,14 +118,17 @@ function installFigma() {
       createVariable,
       createVariableAlias: (v) => ({ type: 'VARIABLE_ALIAS', id: v.id }),
       getVariableByIdAsync: async (id) => variables.find((v) => v.id === id) ?? null,
-      setBoundVariableForPaint: (paint, field, v) => ({
-        ...paint,
-        boundVariables: { ...(paint.boundVariables ?? {}), [field]: { type: 'VARIABLE_ALIAS', id: v.id } },
-      }),
-      setBoundVariableForEffect: (effect, field, v) => ({
-        ...effect,
-        boundVariables: { ...(effect.boundVariables ?? {}), [field]: { type: 'VARIABLE_ALIAS', id: v.id } },
-      }),
+      // v = null이면 연결을 뗀다(IA v4 연결 풀기).
+      setBoundVariableForPaint: (paint, field, v) => {
+        const bv = { ...(paint.boundVariables ?? {}) };
+        if (v) bv[field] = { type: 'VARIABLE_ALIAS', id: v.id }; else delete bv[field];
+        return { ...paint, boundVariables: bv };
+      },
+      setBoundVariableForEffect: (effect, field, v) => {
+        const bv = { ...(effect.boundVariables ?? {}) };
+        if (v) bv[field] = { type: 'VARIABLE_ALIAS', id: v.id }; else delete bv[field];
+        return { ...effect, boundVariables: bv };
+      },
     },
     loadFontAsync: async () => {},
     createTextStyle: () => {
@@ -4325,6 +4332,49 @@ test('countUsage · findUsers — 700곳도 상한 없이 센다', async () => {
   const f = findUsers([root], new Set(['vW', 'other']));
   assert.equal(f.nodes.length, 700);
   assert.equal(f.places, 700);
+});
+
+/* ---------- IA v4 §4.1 카드 3 — 삭제된 변수 연결 풀기 ---------- */
+test('boundVariableIds — 글자 구간 배열은 모든 원소를 읽는다(IA v4 B.1)', () => {
+  const t = { type: 'TEXT', id: 't', name: 't', visible: true, fills: [], boundVariables: { fontSize: [{ type: 'VARIABLE_ALIAS', id: 'vA' }, { type: 'VARIABLE_ALIAS', id: 'vDel' }] } };
+  assert.deepEqual(boundVariableIds(t).sort(), ['vA', 'vDel']);
+});
+test('deletedBindings · countDeleted · unbindDeleted — 삭제된 자리만, 살아 있는 연결은 그대로', async () => {
+  installFigma();
+  const alias = (id) => ({ type: 'VARIABLE_ALIAS', id });
+  const unboundFields = [];
+  const ranges = [];
+  const rect = {
+    type: 'RECTANGLE', id: 'r1', name: 'r1', visible: true,
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: alias('vDel') } }, { type: 'SOLID', color: { r: 1, g: 1, b: 1 }, boundVariables: { color: alias('vLive') } }],
+    strokes: [],
+    effects: [{ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 1 }, boundVariables: { color: alias('vDel') } }],
+    boundVariables: { width: alias('vDel'), height: alias('vLive'), layoutGrids: [alias('vDel')] },
+    setBoundVariable(f, v) { if (v === null) { unboundFields.push(f); delete this.boundVariables[f]; } },
+  };
+  const text = {
+    type: 'TEXT', id: 't1', name: 't1', visible: true, characters: 'abcd', fontName: { family: 'Inter', style: 'Regular' },
+    fills: [], boundVariables: { fontSize: [alias('vLive'), alias('vDel')], textRangeFills: [alias('vDel')] },
+    getRangeAllFontNames: () => [{ family: 'Inter', style: 'Regular' }],
+    getStyledTextSegments: () => [{ start: 0, end: 2, boundVariables: { fontSize: alias('vLive') } }, { start: 2, end: 4, boundVariables: { fontSize: alias('vDel') } }],
+    setRangeBoundVariable(s, e, f, v) { ranges.push([s, e, f, v]); },
+    setBoundVariable() { throw new Error('구간 속성에 레이어 전체를 부르면 안 됨'); },
+  };
+  const hidden = { ...rect, id: 'h', visible: false };
+  const root = { type: 'FRAME', id: 'root', name: 'root', visible: true, fills: [], boundVariables: {}, children: [rect, text, hidden], parent: null };
+  const del = new Set(['vDel']);
+  const places = deletedBindings(rect, del);
+  assert.deepEqual(places.map((p) => p.kind).sort(), ['effect', 'field', 'paint']); // layoutGrids는 범위 밖
+  assert.deepEqual(deletedBindings(text, del), [{ kind: 'range', field: 'fontSize', start: 2, end: 4 }]); // textRangeFills는 범위 밖
+  assert.deepEqual(countDeleted([root], del), { count: 4, nodeIds: ['t1', 'r1'] }); // 숨긴 레이어 제외
+  const r = await unbindDeleted([root], del);
+  assert.deepEqual(r, { unbound: 4, failed: 0, failReasons: {} });
+  assert.equal(rect.fills[0].boundVariables.color, undefined);
+  assert.equal(rect.fills[1].boundVariables.color.id, 'vLive'); // 살아 있는 연결은 그대로
+  assert.equal(rect.effects[0].boundVariables.color, undefined);
+  assert.deepEqual(unboundFields, ['width']);
+  assert.equal(rect.boundVariables.height.id, 'vLive');
+  assert.deepEqual(ranges, [[2, 4, 'fontSize', null]]);
 });
 
 /* ================= IA v3 §2.11 — 레이어에 하는 일 ================= */
