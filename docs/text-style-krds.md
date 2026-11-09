@@ -92,6 +92,9 @@
 ### 3.9 그 밖
 - **"왼쪽 글자로 이름 채우기"**(행 라벨)는 사용자가 누르는 기능이라 그대로 — 라벨 글자 이름이 KRDS 이름을 덮는다. 라벨이 이름처럼 보이는지 판정하는 `LABEL_RAMP_RE`에 KRDS 분류(`display|heading|body|label`)와 단계 · 꼬리 모양을 더한다.
 
+### 3.10 문자열 비교
+- "이름 순" · "시그니처 문자열 순" · "글꼴 이름 순" · "id 순"은 모두 **문자 코드 순**(JS `a < b`, 대소문자 구분, `localeCompare` 쓰지 않음)이다.
+
 ## 4. 규칙 밖 크기 표시
 
 - 판정(크기는 §3.1 표기 기준): 소수 → `'decimal'`, §1 KRDS 크기 모음에 없는 정수 → `'off'`, 있으면 `null`. **가까운 KRDS 크기** `nearest` = §1 모음에서 가장 가까운 값, 같은 거리면 큰 값.
@@ -117,17 +120,17 @@
 ### 5.2b 카드 안 배치
 - 타이포 카드: 툴바 [스캔] [행 추가] … [이름 다시 짓기] [등록]. [이름 다시 짓기]를 누르면 스캔 표(`tsList`) **자리를 미리보기 목록이 대신**한다(스캔 표는 숨김, 상태는 그대로 보관). 미리보기 아래 [k개 이름 바꾸기] · [닫기].
 - [닫기] 또는 바꾸기가 끝나면 미리보기를 닫고 스캔 표를 다시 보인다. 미리보기 중 [스캔]을 누르면 미리보기를 닫고 스캔한다.
-- 바꾸기가 끝나면(`TEXT_STYLE_RENAMED`) 스캔 표에서 `boundStyleId`가 `status: 'renamed'`인 스타일인 줄만 이름을 그 결과의 `name`으로 고친다 — 옛 이름으로 [등록]해 스타일 · 역할 변수 이름이 되돌아가지 않게.
+- 바꾸기가 끝나면(`TEXT_STYLE_RENAMED`) 스캔 표가 있었으면 **다시 스캔한다**(`SCAN_TEXT_STYLES` — 새 이름과 예약 이름으로 표를 새로 짓는다). 그래서 옛 이름으로 [등록]해 이름이 되돌아가거나, 앵커 없는 새 줄 · 행 추가 줄이 바뀐 이름과 겹쳐 남의 스타일 값을 덮어쓰는 일이 없다. 손으로 고친 이름 · 행 추가 줄은 지금 스캔 규칙대로 남는다(`TEXT_STYLE_CANDIDATES` 처리 — 캔버스에서 온 줄만 다시 짓는다).
 
 ### 5.3 바꾸기
-- `APPLY_TEXT_STYLE_RENAME{reqId, items:[{id, from, to, sig}]}` → `TEXT_STYLE_RENAMED{reqId, results:[{id, status, name}], renamed, skipped, skipReasons, roleVarsRenamed, roleVarsSkipped}` — `status` = `'renamed'` 또는 건너뜀 사유 코드, `name` = 끝난 뒤 그 스타일의 지금 이름. `sig` = 미리보기 때의 시그니처(크기 · 줄 높이 · 자간 · 글꼴 · 스타일).
+- `APPLY_TEXT_STYLE_RENAME{reqId, items:[{id, from, to, sig}]}` → `TEXT_STYLE_RENAMED{reqId, results:[{id, status, name}], renamed, skipped, skipReasons, roleVarsRenamed, roleVarsTaken, roleVarsError, roleVarsStuck}` — `status` = `'renamed'` 또는 건너뜀 사유 코드, `name` = 끝난 뒤 그 스타일의 지금 이름. `sig` = 미리보기 때의 시그니처(크기 · 줄 높이 · 자간 · 글꼴 · 스타일).
 - 다시 확인(스타일마다): 지금 이름이 `from`이 아니면 건너뜀 `'renamed-meanwhile'`, 시그니처가 `sig`와 다르면 `'value-changed'`.
 - 겹침 판정은 **최종 이름 집합**으로, 이름을 하나라도 바꾸기 전에 끝낸다: 통과 후보 = 다시 확인을 통과한 항목. (후보가 아닌 모든 스타일의 지금 이름) ∪ (후보들의 `to`)에서 `to`가 겹치는 후보를 건너뜀 `'name-taken'`으로 빼고, 빠진 항목의 지금 이름이 남으므로 **더 빠지는 항목이 없을 때까지 반복**한다(고정점). 그래서 A→B · B→C 연쇄나 A↔B 맞바꿈도 되고, 한 항목이 빠지면 그 이름을 원하던 항목도 함께 빠진다.
-- 바꾸는 순서: 남은 후보를 모두 임시 이름(`__dsl_tmp_{id}`)으로 바꾼 뒤(1단계) `to`로 바꾼다(2단계). 1단계나 2단계에서 오류가 난 항목은 `from`으로 되돌리고 `'error'`, 되돌리기도 실패하면 `'error-stuck'`(결과 툴팁에 그 스타일의 지금 이름 `name`을 적는다). 오류가 나도 고정점 판정은 다시 하지 않는다(그 항목의 `to`를 원하던 다른 항목은 이미 통과했으므로 겹칠 수 없다 — 오류 항목은 `from`으로 돌아가고, `from`은 최종 집합에 없던 이름이다).
-- **역할 변수는 스타일 바꾸기가 끝난 뒤:** `status: 'renamed'`인 항목의 `{from, to}`만 넘긴다(되돌려진 스타일의 변수는 건드리지 않는다). 변수 쪽 실패는 스타일 이름을 되돌리지 않고 `roleVarsSkipped`에 센다.
-- **역할 변수도 함께:** 텍스트 스타일 등록이 스타일 이름으로 만드는 역할 변수 `font-size/{이름}` · `line-height/{이름}` · `letter-spacing/{이름}`(3종 — `variables.ts createSemanticTextStyles`)를 플러그인 Semantic 컬렉션(`ownedCollection('semantic')`) 안에서 `{from}` → `{to}`로 바꾼다. 사용자 컬렉션 · 직접 만든 변수(IA v4 B.3의 `dsl.manual` 표시가 생긴 뒤에는 그 변수)는 건드리지 않는다. 역할 변수도 스타일과 **같은 방식**(최종 이름 집합 · 고정점 · 임시 이름 2단계 · 실패 시 되돌림)으로 바꾼다 — 최종 집합 밖의 다른 변수와 이름이 겹치는 변수만 건너뛰고 `roleVarsSkipped`에 센다(그 스타일은 옛 이름의 변수에 묶인 채로 남는다). 지금 `createSemanticTextStyles` 안의 `roleRenames` 처리를 이 방식의 공용 함수 `renameTextRoleVars(pairs)`로 바꿔 두 경로가 함께 쓴다.
+- 바꾸는 순서: 남은 후보를 모두 임시 이름(`__dsl_tmp_{id}`)으로 바꾼 뒤(1단계) `to`로 바꾼다(2단계). 1단계나 2단계에서 오류가 난 항목은 `from`으로 되돌리고 `'error'`, 되돌리기도 실패하면 `'error-stuck'`(결과 툴팁에 그 스타일의 지금 이름 `name`을 적는다). **연쇄 되돌림:** 1단계를 모든 후보에 끝낸 뒤 2단계로 간다. 어느 단계든 오류로 `from`에 돌아간 항목이 생기면, 그 `from`을 `to`로 원하던 항목(연쇄 · 맞바꿈)도 `from`으로 되돌리고 `'error'`로 센다 — 더 되돌릴 항목이 없을 때까지 반복한다(같은 이름이 둘 생기지 않게).
+- **역할 변수는 스타일 바꾸기가 끝난 뒤:** `status: 'renamed'`인 항목의 `{from, to}`만 넘긴다(되돌려진 스타일의 변수는 건드리지 않는다). 변수 쪽 실패는 스타일 이름을 되돌리지 않는다. 결과는 `roleVarsTaken`(같은 이름이 있어 건너뜀) · `roleVarsError`(바꾸기 오류 — 되돌림, 되돌리지 못한 변수는 `roleVarsStuck:[지금 이름]`)으로 나눠 센다.
+- **역할 변수도 함께:** 텍스트 스타일 등록이 스타일 이름으로 만드는 역할 변수 `font-size/{이름}` · `line-height/{이름}` · `letter-spacing/{이름}`(3종 — `variables.ts createSemanticTextStyles`)를 플러그인 Semantic 컬렉션(`ownedCollection('semantic')`) 안에서 `{from}` → `{to}`로 바꾼다. 사용자 컬렉션 · 직접 만든 변수(IA v4 B.3의 `dsl.manual` 표시가 생긴 뒤에는 그 변수)는 건드리지 않는다. 역할 변수도 스타일과 **같은 방식**(최종 이름 집합 · 고정점 · 임시 이름 2단계 · 실패 시 되돌림)으로 바꾼다 — 최종 집합 밖의 다른 변수와 이름이 겹치는 변수만 건너뛰고 `roleVarsTaken`에 센다(그 스타일은 옛 이름의 변수에 묶인 채로 남는다). 지금 `createSemanticTextStyles` 안의 `roleRenames` 처리를 이 방식의 공용 함수 `renameTextRoleVars(pairs)`로 바꿔 두 경로가 함께 쓴다.
 - ⌘Z 한 번(스타일 · 변수 이름을 한 묶음 — `commitUndo`).
-- 결과(상태 줄): "텍스트 스타일 {renamed}개 이름을 바꿨어요 · ⌘Z로 되돌리기" + 건너뛴 것이 있으면 " · 건너뜀 {skipped}"(툴팁에 사유별 수) + 역할 변수를 건너뛴 것이 있으면 " · 역할 변수 {roleVarsSkipped}개는 같은 이름이 있어 그대로 뒀어요".
+- 결과(상태 줄): "텍스트 스타일 {renamed}개 이름을 바꿨어요 · ⌘Z로 되돌리기" + 건너뛴 것이 있으면 " · 건너뜀 {skipped}"(툴팁에 사유별 수) + " · 역할 변수 {roleVarsTaken}개는 같은 이름이 있어 그대로 뒀어요"(있을 때) + " · 역할 변수 {roleVarsError}개는 바꾸지 못했어요"(있을 때, 툴팁에 되돌리지 못한 변수의 지금 이름).
 
 ## 6. 코드에서 바뀌는 곳
 
@@ -152,6 +155,7 @@
 | `textStyle.renamed` (새) | — | "텍스트 스타일 {n}개 이름을 바꿨어요 · ⌘Z로 되돌리기" |
 | `textStyle.renameSkipped` (새) | — | " · 건너뜀 {m}" |
 | `textStyle.renameRoleSkipped` (새) | — | " · 역할 변수 {n}개는 같은 이름이 있어 그대로 뒀어요" |
+| `textStyle.renameRoleError` · `renameRoleStuck` (새) | — | " · 역할 변수 {n}개는 바꾸지 못했어요" · "되돌리지 못한 변수: {names}" |
 | `textStyle.renameSkip.renamed-meanwhile` · `value-changed` · `name-taken` · `error` · `error-stuck` (새) | — | "그 사이 이름이 바뀜" · "그 사이 값이 바뀜" · "같은 이름이 있음" · "오류" · "되돌리지 못함 · 지금 이름 {name}" |
 | `textStyle.offDecimal` · `offScale` · `offTip` · `offSum` (새) | — | "소수 크기" · "KRDS 밖" · "KRDS 크기가 아니에요 · 가까운 KRDS 크기 {n}px" · " · KRDS 밖 크기 {k}개(소수 {m})" |
 
