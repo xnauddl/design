@@ -649,7 +649,12 @@
 
    - 위 빈 상태가 오른쪽에 보이는 동안에는 같은 내용을 상황 안내 줄에 띄우지 않는다(한 안내는 한 곳에만).
 2. **컬렉션** — 계층 순서(Component → Semantic → Global → 계층 없음), 같은 계층 안에서는 피그마 순서. 표기는 [▾/▸] + 계층 배지 + 이름 + 숫자.
-   - **계층 배지**(누를 수 없는 표시): G / S / C — 플러그인 컬렉션은 그 역할, 사용자 컬렉션은 §2.13 13.3의 판단. 계층 아님은 "–"(지정이 없어졌으므로 "?"는 없앤다).
+   - **계층 배지**(누를 수 없는 표시): G / S / C — 플러그인 컬렉션은 그 역할, 사용자 컬렉션은 §2.13 13.3의 판단. 계층 아님은 "–"(지정이 없어졌으므로 "?"는 없앤다). 배지에 마우스를 올리면 판단 근거를 한 줄로 보인다(2026-11-09 사용자 결정 B — 툴팁만, 화면에 줄을 더하지 않음, `VarCollection.tierWhy`):
+     - 플러그인 컬렉션: "플러그인 컬렉션"(`vm.tierWhyOwned`)
+     - 이름에 component: "이름 · Component"(`vm.tierWhyName`)
+     - 셀 변수 0개: "셀 변수 없음 · 계층 아님"(`vm.tierWhyEmpty`)
+     - 그 밖: "별칭 {a}/{n} ({p}%) · {계층}"(`vm.tierWhyRatio`, {a} = 별칭 수, {n} = 셀 변수 수(13.3-1), {p} = 반올림한 정수 %, {계층} = Global · Semantic · 계층 아님). 예: "별칭 45/48 (94%) · Semantic", "별칭 0/40 (0%) · Global", "별칭 5/10 (50%) · 계층 아님".
+     - 목록 제목(오른쪽 머리의 "G Global")의 배지에는 툴팁을 달지 않는다(사이드바 한 곳).
    - 로컬 컬렉션이 0개면 변수 탭은 목록이 아니라 시작 화면이다(§4.3).
    - **그룹** — 펼친 컬렉션 아래에 들여 쓴다. 그룹 키는 컬렉션 + 경로(이름의 마지막 "/" 앞). "/"가 없는 변수는 "(그룹 없음)". 표기는 경로 + 숫자.
 3. 구분선
@@ -2191,6 +2196,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 ## A.12 플러그인 컬렉션 (§2.13, 2026-11-06 사용자 결정 — #124 다음 PR)
 
 - [ ] `collectionRoles.ts` · `tiers.ts`: 플러그인 컬렉션 판정(표시 `dsl.owned` → 이름 `Global` · `Semantic` 이어받기(같은 역할 표시가 없을 때, 같은 이름 여럿이면 첫 번째) → 없음), `ownedCollection(role)`(읽기) · `ensureOwnedCollection(role)`(쓰기 — 이어받기 표시 달기 · 없으면 `Global` · `Semantic`으로 만들기), 같은 역할 표시 둘 이상이면 첫 번째만. 사용자 컬렉션 판단(13.3)은 순수 함수(`tiers.ts`, 이름 · 변수 수 · 별칭 수 → 계층)로, `collectionTiers(cols, vars)`는 13.4대로(변수를 받는다 — 부르는 곳 `code.ts` 4곳 · `bind.ts` · `variables.ts`). 역할 맵(`readRoleMap` · `writeRoleMap` · `parseRoleMap` · `assignRole` · `pickCollection`의 지정 경로 · `ROLE_MAP_KEY`)은 지운다. `pickCollection` · `ensureCollection`의 쓰기 쓰임은 모두 `ensureOwnedCollection`으로
+- [ ] 계층 배지 툴팁(§4.4, 결정 B): 판단 함수가 근거(종류 · 별칭 수 · 셀 변수 수)를 함께 돌려주고 `VAR_TABLE` 컬렉션에 `tierWhy`로 싣는다, 사이드바 배지 `title`, i18n `vm.tierWhyOwned` · `vm.tierWhyName` · `vm.tierWhyEmpty` · `vm.tierWhyRatio`. 테스트: 네 문구(순수) · verify-bind-flow 사이드바 배지 title
 - [ ] 계층 지정 없애기: 계층 팝업(`ui.html` `tierPopBody` · `ui.ts` `openTierPopup` · `renderCollectionRoles` · `colRoleRows` · `pendingRoleNote`), ⋯ 메뉴 "컬렉션 계층 지정…", `goToTiers` · `bind.gotoTiers`, 메시지 `GET_COLLECTION_ROLES` · `SET_COLLECTION_ROLE` · `COLLECTION_ROLES` · `CollectionRoleInfo`와 `code.ts` 처리 · `collectionRoleInfos`, `OPS`의 `SET_COLLECTION_ROLE`, i18n `colRoles.*` · `op.roles` · `list.menuTiers`, `ui.ts`의 `[data-role-write]` 대기 처리 · `ROLE_LABEL` · `RoleKey` · `case 'COLLECTION_ROLES'`, `ui.html` `colRolesStatus`, `VarCollection.tierSet`(그 값을 채우는 `code.ts` 처리 포함), `tierBadge`의 "?"(계층 아님은 "–"). `tiers.ts` · `collectionRoles.ts`의 `roleOfCollection` · `tierOfCollection` · `RoleValue` · `RoleMap` · `collectionRole` · `guessRole`(semantic · global 정규식은 지우고 Component 규칙은 13.3 판단 함수로 옮김)과 `code.ts` import 정리. `findCollection`의 읽기 쓰임(`variables.ts` 122 · 154 · 173 · 286 부근)은 플러그인 컬렉션을 뜻하면 `ownedCollection`으로, 계층 전체를 뜻하면 13.4 계층 번호로 바꾼다(각 자리의 13.5~13.7 규칙대로). `bind.noTier` 문구 → "변수는 있지만 계층으로 쓸 컬렉션이 없어요", 버튼은 유료 "토큰 만들기로 →" · 무료 [라이선스 →](§4.6)
 - [ ] 연결(`bind.ts`): 새 역할은 `ensureOwnedCollection('semantic')`, 별칭 대상 Global은 사용자 컬렉션 먼저 → 플러그인 Global(`globalFor`), 같은 이름 여러 컬렉션은 사용자 먼저 · 목록 순(`byName` 동점 · 기준색 `default`). `createRole`: 이름 차지 여부는 Semantic 계층 전부, 만드는 곳은 플러그인 Semantic
 - [ ] 만들기(`variables.ts`): `createTokens` — `uses`가 있는 토큰만, 같은 값 · 용도를 받는 사용자 Global이 있으면 재사용(만들지 않음), 없으면 플러그인 Global. 토큰 이름 → Global id 맵을 돌려주고 `dsl.reuseMap`에 남김. 컬렉션은 실제로 만들 때만 생성(`resolveCollections`의 미리 만들기 제거). `previewCreateTokens`도 같은 판단으로 센다(생성 · 갱신 수에 재사용 제외). `createUsageRoles` — 플러그인 Global 필수 조건 · `globalByName` 제거, 맵으로 별칭 대상, 플러그인 Semantic, 같은 쓰임 이름 · 같은 값 역할이 Semantic 계층 어디든 있으면 재사용(기존 이름 맵은 이름별 값 묶음)
