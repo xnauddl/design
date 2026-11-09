@@ -29,3 +29,4 @@ export * from './bindDisplay';
 export * from './bindGroups';
 export * from './varTable';
 export * from './selCards';
+export * from './varKind';
