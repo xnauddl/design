@@ -14,6 +14,14 @@ export {
   planExistingTextStyles,
   applyTextStyleRows,
   prunePaletteColors,
+  isManualVar,
+  createManualVariable,
+  duplicateVariable,
+  deleteVariable,
+  editValueToFigma,
+  VarNameError,
+  VarGoneError,
+  USER_COLLECTION_NAME,
   GLOBAL,
   SEMANTIC,
   COMPONENT,
@@ -32,3 +40,5 @@ export type { Origin, FillResult, FillTally, Sizing } from './placement';
 export type { ComponentizeResult } from './similarApply';
 export { generateDarkMode, ensureDarkMode, findModeByName, DARK_MODE_NAME } from './themeApply';
 export type { DarkModeResult } from './themeApply';
+export { applyVariableToNodes, SKIP_REASONS } from './applyVar';
+export type { ApplyVarResult, SkipReason } from './applyVar';

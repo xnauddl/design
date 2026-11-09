@@ -24,11 +24,23 @@ import { paletteFamilyOf } from './palette';
 import { AUTO_ROLE_KEY, assignNames, colorRoleBases, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
 import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { TextSample, TextStyleSpec, ExistingTextStyle } from './textStyles';
+import { MANUAL_KEY, duplicateName } from './varKind'; // 직접 만든 변수(IA v4 §4.9)
+import type { EditValue } from './varTable';
 import type { TextStyleSkipReason } from '../shared/messages';
 
 export const GLOBAL = 'Global';
 export const SEMANTIC = 'Semantic';
 export const COMPONENT = 'Component';
+
+/** 직접 만든 변수(새 변수 · 복제, IA v4 §4.9)인가 — 자동 쓰기가 덮어쓰거나 지우지 않는다. */
+export function isManualVar(v: Variable): boolean {
+  try {
+    const fn = (v as unknown as { getPluginData?: (k: string) => string }).getPluginData;
+    return typeof fn === 'function' && fn.call(v, MANUAL_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /* ---------- 변수 인덱스(이름+컬렉션 → 변수) ---------- */
 type VarIndex = Map<string, Variable>;
@@ -147,6 +159,10 @@ export interface CreateSummary {
   conversions: PxConversion[];
   /** 토큰 이름 → 고른 Global id(재사용한 사용자 Global 또는 플러그인 Global) — 쓰임 역할이 별칭 대상으로 쓴다(13.6). */
   globalOf: Map<string, string>;
+  /** 같은 이름의 직접 만든 변수가 값이 달라 만들지 않은 토큰 수(§4.9). 그 토큰을 가리킬 역할도 만들지 않는다. */
+  skippedManual: number;
+  /** 그 토큰 이름들 — 부르는 쪽이 쓰임 역할에서 뺀다. */
+  skippedManualNames: Set<string>;
 }
 
 /**
@@ -158,7 +174,7 @@ export interface CreateSummary {
  */
 export async function createTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
   const reuse = await pickReusable(tokens, base);
-  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map() };
+  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set() };
   const reuseMap = readReuseMap();
   const toCreate = tokens.filter((t) => !reuse.has(t.name));
   for (const [name, v] of reuse) {
@@ -174,6 +190,19 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
     const touched = new Set<string>();
     for (const t of toCreate) {
       const type = resolvedTypeForToken(t);
+      // 같은 이름의 직접 만든 변수(§4.9): 값이 같으면 그 변수를 이 토큰의 Global로 쓰고(재사용), 다르면 건너뛴다.
+      const mine = idx.get(vkey(globalCol.id, t.name));
+      if (mine && isManualVar(mine)) {
+        if (!summary.skippedManualNames.has(t.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gMode], literalOf(t, type, base), type)) {
+          summary.globalOf.set(t.name, mine.id);
+          delete reuseMap[t.name];
+        } else if (!summary.skippedManualNames.has(t.name)) {
+          summary.globalOf.delete(t.name);
+          summary.skippedManualNames.add(t.name);
+          summary.skippedManual++;
+        }
+        continue;
+      }
       const g = upsertVariable(t.name, globalCol, type, idx);
       summary[g.created ? 'created' : 'updated']++;
       summary.globals++;
@@ -206,7 +235,7 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
   const existing = new Set<string>();
   for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
 
-  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map() };
+  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set() };
   const seen = new Set<string>();
   const tally = (colId: string, name: string, kind: 'globals' | 'semantics'): void => {
     const k = vkey(colId, name);
@@ -219,11 +248,30 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
     summary[existing.has(k) ? 'updated' : 'created']++;
   };
 
+  // 같은 이름의 직접 만든 변수(§4.9) — createTokens와 같은 판정(값이 같으면 재사용, 다르면 건너뜀).
+  const gCol = cols.find((c) => c.id === gId);
+  const manualByName = new Map<string, Variable>();
+  if (gCol) for (const v of await figma.variables.getLocalVariablesAsync()) if (v.variableCollectionId === gId && isManualVar(v)) manualByName.set(v.name, v);
   // 토큰당 Global 1개(거울 없음 — createTokens와 동일). 재사용하는 사용자 Global은 세지 않는다(13.6).
   for (const t of tokens) {
     const r = reuse.get(t.name);
-    if (r) summary.globalOf.set(t.name, r.id);
-    else tally(gId, t.name, 'globals');
+    if (r) {
+      summary.globalOf.set(t.name, r.id);
+      continue;
+    }
+    const mine = manualByName.get(t.name);
+    if (mine && gCol) {
+      const type = resolvedTypeForToken(t);
+      if (!summary.skippedManualNames.has(t.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gCol.defaultModeId], literalOf(t, type, base), type)) {
+        summary.globalOf.set(t.name, mine.id);
+      } else if (!summary.skippedManualNames.has(t.name)) {
+        summary.globalOf.delete(t.name);
+        summary.skippedManualNames.add(t.name);
+        summary.skippedManual++;
+      }
+      continue;
+    }
+    tally(gId, t.name, 'globals');
   }
   return summary;
 }
@@ -357,6 +405,8 @@ export interface SemanticSummary {
   aliased: number;
   /** 참조 대상 Global 변수가 없어 건너뛴 이름들. */
   missing: string[];
+  /** 같은 이름의 직접 만든 변수라 덮어쓰지 않고 건너뛴 역할 수(§4.9). */
+  skippedManual: number;
 }
 
 /** 팔레트 재적용 시 이전 색 정리: 이번에 (재)생성하는 **hue 패밀리** 안에서 keep에 없는
@@ -370,6 +420,7 @@ export async function prunePaletteColors(keep: string[]): Promise<number> {
   let removed = 0;
   for (const v of await figma.variables.getLocalVariablesAsync()) {
     if (!palIds.has(v.variableCollectionId)) continue;
+    if (isManualVar(v)) continue; // 직접 만든 변수는 지우지 않는다(§4.9)
     const fam = paletteFamilyOf(v.name);
     if (fam && keepFamilies.has(fam) && !keepSet.has(v.name)) {
       v.remove();
@@ -381,7 +432,7 @@ export async function prunePaletteColors(keep: string[]): Promise<number> {
 
 /** map: 시맨틱 이름 → Global 변수 이름(예: {'surface':'color/neutral/50'}). */
 export async function createSemanticAliases(map: Record<string, string>): Promise<SemanticSummary> {
-  const summary: SemanticSummary = { created: 0, updated: 0, aliased: 0, missing: [] };
+  const summary: SemanticSummary = { created: 0, updated: 0, aliased: 0, missing: [], skippedManual: 0 };
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
   const vars = await figma.variables.getLocalVariablesAsync();
   const tiers = collectionTiers(cols, vars);
@@ -410,6 +461,11 @@ export async function createSemanticAliases(map: Record<string, string>): Promis
       idx = await buildVarIndex();
     }
     const sMode = semanticCol.defaultModeId;
+    const mine = idx.get(vkey(semanticCol.id, semName));
+    if (mine && isManualVar(mine)) {
+      summary.skippedManual++; // 직접 만든 변수는 덮어쓰지 않는다(§4.9)
+      continue;
+    }
     const u = upsertVariable(semName, semanticCol, g.resolvedType, idx);
     u.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g)); // 별칭만
     // 역할 기반, 없으면 원시 상속 — 단 변수 타입에 유효한 스코프만(STRING에 LINE_HEIGHT 등 금지)
@@ -1206,4 +1262,133 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
     }
   }
   return res;
+}
+
+/* ============================================================
+   새 변수 · 복제 · 삭제(IA v4 §4.9) — 사용자가 직접 하는 일. 직접 만든 변수에는 MANUAL_KEY를 단다.
+   무료 개수 제한(세기 · 막기)은 부르는 쪽(code.ts)이 한다.
+   ============================================================ */
+
+/** 피그마가 이름을 거절함 — ERROR code 'name'. */
+export class VarNameError extends Error {}
+/** 대상 변수 · 컬렉션이 없음(지워짐 · 라이브러리) — ERROR code 'deleted'. */
+export class VarGoneError extends Error {}
+
+/** 사용자 컬렉션 이름(로컬 컬렉션이 없을 때 새로 만든다 — 플러그인 표시 없음). */
+export const USER_COLLECTION_NAME = 'Variables';
+
+/** 고치기 · 새 변수 칸의 값 → 피그마 값. 별칭 대상이 없으면 던진다. */
+export async function editValueToFigma(ev: EditValue): Promise<VariableValue> {
+  if (ev.kind === 'color') return { ...hexToRgb(ev.hex), a: Math.max(0, Math.min(1, ev.alpha)) };
+  if (ev.kind === 'number') return ev.value;
+  if (ev.kind === 'string') return ev.text;
+  if (ev.kind === 'bool') return ev.value;
+  const target = await figma.variables.getVariableByIdAsync(ev.targetId).catch(() => null);
+  if (!target) throw new Error('alias target not found');
+  return figma.variables.createVariableAlias(target);
+}
+
+function markManual(v: Variable): void {
+  try {
+    (v as unknown as { setPluginData?: (k: string, val: string) => void }).setPluginData?.(MANUAL_KEY, '1');
+  } catch {
+    /* 표시를 못 달아도 변수는 만들었다 */
+  }
+}
+
+function dropQuietly(x: { remove?: () => void } | null | undefined): void {
+  try {
+    x?.remove?.();
+  } catch {
+    /* 못 지우면 그대로 둔다 */
+  }
+}
+
+export interface NewVariableInput {
+  collectionId?: string;
+  name: string;
+  varType: 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
+  /** 모드 id → 값. '*' = 기본 모드(새 컬렉션처럼 모드 id를 모를 때). 비운 모드는 기본 모드 값. */
+  values: Record<string, EditValue>;
+  scopes?: string[];
+}
+
+/**
+ * 새 변수(§4.9). collectionId가 없으면 사용자 컬렉션 `Variables`를 새로 만든다(플러그인 표시 없음).
+ * 실패하면 이번에 만든 변수 · 컬렉션을 걷고 던진다(이름 거절은 VarNameError).
+ */
+export async function createManualVariable(input: NewVariableInput): Promise<{ variable: Variable; newCollection: boolean }> {
+  let col: VariableCollection | undefined;
+  let newCollection = false;
+  if (input.collectionId) {
+    col = (await figma.variables.getLocalVariableCollectionsAsync()).find((c) => c.id === input.collectionId);
+    if (!col) throw new VarGoneError('collection not found');
+  } else {
+    col = figma.variables.createVariableCollection(USER_COLLECTION_NAME);
+    newCollection = true;
+  }
+  let v: Variable;
+  try {
+    v = figma.variables.createVariable(input.name, col, input.varType);
+  } catch (e) {
+    if (newCollection) dropQuietly(col as unknown as { remove?: () => void });
+    throw new VarNameError(e instanceof Error ? e.message : String(e));
+  }
+  try {
+    const def = col.defaultModeId;
+    const defVal = input.values[def] ?? input.values['*'];
+    if (!defVal) throw new Error('default mode value required');
+    for (const m of col.modes) {
+      const ev = m.modeId === def ? defVal : input.values[m.modeId] ?? defVal;
+      v.setValueForMode(m.modeId, await editValueToFigma(ev));
+    }
+    if (input.scopes) v.scopes = input.scopes as VariableScope[];
+    markManual(v);
+  } catch (e) {
+    dropQuietly(v as unknown as { remove?: () => void });
+    if (newCollection) dropQuietly(col as unknown as { remove?: () => void });
+    throw e;
+  }
+  return { variable: v, newCollection };
+}
+
+/**
+ * 복제(§4.9) — 같은 컬렉션에 모든 모드 값(별칭 포함) · 용도 · 설명 · 게시 숨김 · 코드 문법을 복사.
+ * `dsl.autoRole` 같은 플러그인 데이터는 복사하지 않고 MANUAL_KEY를 단다. 이름은 duplicateName(대소문자까지 같을 때 겹침).
+ */
+export async function duplicateVariable(id: string): Promise<Variable> {
+  const src = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+  if (!src || src.remote) throw new VarGoneError('variable not found');
+  const col = (await figma.variables.getLocalVariableCollectionsAsync()).find((c) => c.id === src.variableCollectionId);
+  if (!col) throw new VarGoneError('collection not found');
+  const taken = new Set((await figma.variables.getLocalVariablesAsync()).filter((v) => v.variableCollectionId === col.id).map((v) => v.name));
+  const nv = figma.variables.createVariable(duplicateName(src.name, taken), col, src.resolvedType);
+  try {
+    for (const [modeId, raw] of Object.entries(src.valuesByMode)) {
+      if (raw === undefined || raw === null) continue;
+      const val = typeof raw === 'object' && (raw as VariableAlias).type === 'VARIABLE_ALIAS' ? { type: 'VARIABLE_ALIAS' as const, id: (raw as VariableAlias).id } : raw;
+      nv.setValueForMode(modeId, val as VariableValue);
+    }
+    nv.scopes = [...(src.scopes ?? [])];
+    nv.description = src.description ?? '';
+    nv.hiddenFromPublishing = !!src.hiddenFromPublishing;
+    const cs = (src as unknown as { codeSyntax?: Record<string, string> }).codeSyntax ?? {};
+    for (const [platform, value] of Object.entries(cs)) {
+      if (value) nv.setVariableCodeSyntax(platform as CodeSyntaxPlatform, value);
+    }
+    markManual(nv);
+  } catch (e) {
+    dropQuietly(nv as unknown as { remove?: () => void });
+    throw e;
+  }
+  return nv;
+}
+
+/** 삭제(§4.9) — 지운 변수의 이름을 돌려준다. 없으면 VarGoneError. */
+export async function deleteVariable(id: string): Promise<string> {
+  const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+  if (!v || v.remote) throw new VarGoneError('variable not found');
+  const name = v.name;
+  v.remove();
+  return name;
 }

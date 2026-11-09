@@ -5,7 +5,9 @@ import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, VarUpdateError
 import { post } from './shared/messages';
 import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyTextStyleRows, planExistingTextStyles, prunePaletteColors } from './lib/variables';
+import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyTextStyleRows, planExistingTextStyles, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
+import { applyVariableToNodes } from './lib/applyVar';
+import { FREE_MANUAL_CREATE_LIMIT } from './lib/varKind';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
@@ -13,7 +15,7 @@ import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections,
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
-import { rgbToHex, hexToRgb } from './lib/tokens';
+import { rgbToHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY, isKnownRole } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
@@ -89,6 +91,32 @@ function effective(): {
 const currentTier = (): Tier => effective().tier;
 /** Free/Paid 2티어 — 유료면 모든 유료 기능 해금. */
 const isPaid = (): boolean => currentTier() === 'paid';
+
+/* ---------- 새 변수 · 복제 개수(IA v4 §4.9 · §9) ----------
+   무료는 사용자가 직접 만든 수(새 변수 + 복제)만 센다. 기준(파일당 / 기간당 / 누적)은 미정 —
+   지금은 clientStorage 누적 숫자 하나. 기준이 정해지면 이 두 함수만 바꾼다. 유료도 세기는 한다. */
+const MANUAL_USED_KEY = 'dsl.manualUsed';
+async function readManualUsed(): Promise<number> {
+  try {
+    const n = await figma.clientStorage.getAsync(MANUAL_USED_KEY);
+    return typeof n === 'number' && isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  } catch {
+    return 0;
+  }
+}
+async function bumpManualUsed(): Promise<number> {
+  const n = (await readManualUsed()) + 1;
+  try {
+    await figma.clientStorage.setAsync(MANUAL_USED_KEY, n);
+  } catch {
+    /* 못 남겨도 이번에 만든 것은 그대로 */
+  }
+  return n;
+}
+/** 무료 한도에 닿았나(유료는 늘 false). */
+async function manualLimitReached(): Promise<boolean> {
+  return !isPaid() && (await readManualUsed()) >= FREE_MANUAL_CREATE_LIMIT;
+}
 
 /** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용) */
 function requirePaid(feature: Feature): boolean {
@@ -167,7 +195,8 @@ async function postPrereq(): Promise<void> {
     const tierVars = tierVarList.length;
     const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
     const otherVars = vars.length - tierVars;
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
+    const manualUsed = await readManualUsed(); // 새 변수 · 복제 무료 개수(§4.9)
+    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, manualUsed });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -345,23 +374,47 @@ async function updateVariable(msg: Extract<UiToCode, { type: 'UPDATE_VARIABLE' }
   }
   for (const [modeId, ev] of Object.entries(msg.values ?? {})) {
     try {
-      let value: VariableValue;
-      if (ev.kind === 'color') value = { ...hexToRgb(ev.hex), a: Math.max(0, Math.min(1, ev.alpha)) };
-      else if (ev.kind === 'number') value = ev.value;
-      else if (ev.kind === 'string') value = ev.text;
-      else if (ev.kind === 'bool') value = ev.value;
-      else {
-        const target = await figma.variables.getVariableByIdAsync(ev.targetId).catch(() => null);
-        if (!target) throw new Error('alias target not found');
-        value = figma.variables.createVariableAlias(target);
-      }
-      v.setValueForMode(modeId, value);
+      v.setValueForMode(modeId, await editValueToFigma(ev));
       applied.push(modeId);
     } catch (e) {
       return done(applied, { code: 'value', modeId, message: errText(e) });
     }
   }
   done(applied);
+}
+
+/**
+ * 새 변수 · 복제 · 삭제(IA v4 §4.9). 실패는 ERROR{op, reqId, code?} — 이름 거절 'name' · 무료 한도 'freeLimit' · 지워짐 'deleted'.
+ * 성공하면 ⌘Z 한 번(commitUndo) 뒤 준비 상태를 다시 보낸다(manualUsed 포함).
+ */
+async function manualVariableOp(msg: Extract<UiToCode, { type: 'CREATE_VARIABLE' | 'DUPLICATE_VARIABLE' | 'DELETE_VARIABLE' }>): Promise<void> {
+  const fail = (message: string, code?: 'name' | 'freeLimit' | 'deleted'): void =>
+    post({ type: 'ERROR', message, op: msg.type, reqId: msg.reqId, ...(code ? { code } : {}) });
+  try {
+    if (msg.type === 'DELETE_VARIABLE') {
+      await deleteVariable(msg.id);
+      commitUndo(figma);
+      post({ type: 'VARIABLE_DELETED', reqId: msg.reqId, id: msg.id });
+    } else {
+      if (await manualLimitReached()) return fail(`free limit ${FREE_MANUAL_CREATE_LIMIT}`, 'freeLimit');
+      if (msg.type === 'CREATE_VARIABLE') {
+        const { variable } = await createManualVariable({ collectionId: msg.collectionId, name: msg.name, varType: msg.varType, values: msg.values, scopes: msg.scopes });
+        const manualUsed = await bumpManualUsed();
+        commitUndo(figma);
+        post({ type: 'VARIABLE_CREATED', reqId: msg.reqId, id: variable.id, manualUsed });
+      } else {
+        const nv = await duplicateVariable(msg.id);
+        const manualUsed = await bumpManualUsed();
+        commitUndo(figma);
+        post({ type: 'VARIABLE_DUPLICATED', reqId: msg.reqId, newId: nv.id, manualUsed });
+      }
+    }
+  } catch (e) {
+    if (e instanceof VarNameError) return fail(e.message, 'name');
+    if (e instanceof VarGoneError) return fail(e.message, 'deleted');
+    return fail(errText(e));
+  }
+  await postPrereq();
 }
 
 /** 이 범위에서 쓰는 변수 중 삭제된 것(로컬도 라이브러리도 아닌 id). */
@@ -1066,7 +1119,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 쓰임 역할 — Global을 만든 직후 같은 처리 · 같은 ⌘Z 안에서(§2.12 12.10). 미리보기는 만들 수만 센다.
-        const roles = await createUsageRoles(msg.tokens, !!msg.preview, s.globalOf);
+        // 같은 이름의 직접 만든 변수라 건너뛴 토큰은 그 토큰을 가리킬 역할도 만들지 않는다(§4.9).
+        const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
+        const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });
@@ -1079,7 +1134,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           const morePart = s.conversions.length > 2 ? t('create.sumBaseMore') : '';
           summary += t('create.sumBase', { base: msg.base, n: s.conversions.length, examples: ex, morePart });
         }
-        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview, roles });
+        if (s.skippedManual) summary += t('create.sumManual', { n: s.skippedManual });
+        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview, roles, ...(s.skippedManual ? { skippedManual: s.skippedManual } : {}) });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
           await postPrereq(); // #11: 토큰 생성 → 시맨틱/바인딩 전제 충족 갱신
@@ -1292,7 +1348,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'CREATE_SEMANTICS': {
         if (!requirePaid('semantics')) break;
         const s = await createSemanticAliases(msg.map);
-        post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
+        post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing, ...(s.skippedManual ? { skippedManual: s.skippedManual } : {}) });
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
         await postPrereq(); // #11: 시맨틱 별칭(바인딩 가능 변수) 생성 → 전제 갱신
         break;
@@ -2247,6 +2303,24 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'UPDATE_VARIABLE': {
         await updateVariable(msg);
+        break;
+      }
+      case 'APPLY_VARIABLE': {
+        // 클릭 연결(IA v4 §4.7) — 지금 선택의 레이어만, ⌘Z 한 번.
+        const v = await figma.variables.getVariableByIdAsync(msg.id).catch(() => null);
+        if (!v) {
+          post({ type: 'ERROR', message: 'variable not found', op: msg.type, reqId: msg.reqId, code: 'deleted' });
+          break;
+        }
+        const r = await applyVariableToNodes(selection().slice(), v, msg.target);
+        if (r.applied) commitUndo(figma);
+        post({ type: 'VARIABLE_APPLIED', reqId: msg.reqId, applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, name: v.name });
+        break;
+      }
+      case 'CREATE_VARIABLE':
+      case 'DUPLICATE_VARIABLE':
+      case 'DELETE_VARIABLE': {
+        await manualVariableOp(msg);
         break;
       }
       case 'SET_UI_SIZE': {

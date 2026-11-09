@@ -193,6 +193,7 @@ export const STRINGS: Record<string, string> = {
 
   /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
   'common.cancel': '취소',
+  'create.sumManual': ' · 직접 만든 변수라 건너뜀 {n}',
   'common.close': '닫기',
   // 변수 관리(넓은 화면)
   'vm.search': '변수 검색',

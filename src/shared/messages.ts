@@ -250,7 +250,7 @@ export type CodeToUi =
   | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; reqId?: number; counts?: Record<string, Record<string, number>>; textStylesApplied?: number; textStylesSkipped?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수. APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
   | { type: 'PROGRESS'; op: 'bind' | 'link'; done: number; total: number } // UX6: 진행률. 'bind' = 찾기(APPLY), 'link' = 연결(APPLY_SELECTED, 300곳씩)
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
-  | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
+  | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[]; skippedManual?: number } // skippedManual: 직접 만든 변수라 건너뛴 역할 수(§4.9)
   // labeled/fallback은 「왼쪽 글자로 이름 채우기」를 눌렀을 때만 온다 — 맨 스캔은 전부 크기 순이라
   // `왼쪽 글자 0`을 적어 봐야 실패처럼 읽힐 뿐이다. undefined면 상태줄에서 그 조각을 생략한다.
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number }
