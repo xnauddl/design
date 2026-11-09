@@ -55,7 +55,7 @@ const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8 };
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
-let bindTurn = 0; // 찾기 요청 차례(IA v4 §7 — 한 번에 하나)
+let bindFindTurn = 0; // 찾기(preview) 요청 차례(IA v4 §7) — 더 새 찾기가 있을 때만 앞 찾기를 버린다
 /** 찾기 · 연결 요청 줄(IA v4 §7) — 앞 요청이 끝나야 다음이 돈다. 겹쳐 깨어나지 않는다. */
 let bindChain: Promise<void> = Promise.resolve();
 function acquireBind(): Promise<() => void> {
@@ -1090,10 +1090,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 찾기는 한 번에 하나(IA v4 §7) — 앞 찾기를 멈추고 끝날 때까지 기다린다.
         // liveVarIds · bindCancel이 모듈 전역이라 겹쳐 돌면 판정과 취소가 틀어진다.
         // 실제 연결(preview 아님 · APPLY_SELECTED)은 취소하지 않고 끝나길 기다린다(마법사 연결 — §4.3).
-        const myTurn = ++bindTurn;
+        // 차례는 찾기(preview)끼리만 비교한다 — 연결이 끼어들어도 마지막 찾기는 버리지 않는다(응답이 늘 온다).
+        const myTurn = msg.preview ? ++bindFindTurn : bindFindTurn;
         if (!bindLinkRunning) bindCancel = true; // 돌던 찾기를 멈춘다(실제 연결은 멈추지 않는다)
         const release = await acquireBind();
-        if (msg.preview && myTurn !== bindTurn) { release(); break; } // 기다리는 사이 더 새 요청이 왔다 — 이 찾기는 버린다(UI도 reqId로 버림). 실제 연결은 버리지 않는다
+        if (msg.preview && myTurn !== bindFindTurn) { release(); break; } // 기다리는 사이 더 새 요청이 왔다 — 이 찾기는 버린다(UI도 reqId로 버림). 실제 연결은 버리지 않는다
         bindCancel = false; // UX6: 새 작업 시작 시 취소 플래그 초기화
         bindLinkRunning = !msg.preview;
         try {
@@ -1208,7 +1209,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         let made = 0;
         let committed = false;
         // 찾기와 겹쳐 돌지 않게(IA v4 §7) — 돌던 찾기를 멈추고 끝나길 기다린 뒤 연결한다.
-        bindTurn++;
         if (!bindLinkRunning) bindCancel = true;
         const releaseLink = await acquireBind();
         bindCancel = false;

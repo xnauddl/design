@@ -8017,7 +8017,7 @@
   var devTier = "free";
   var cache = null;
   var bindCancel = false;
-  var bindTurn = 0;
+  var bindFindTurn = 0;
   var bindChain = Promise.resolve();
   function acquireBind() {
     const prev = bindChain;
@@ -8886,10 +8886,10 @@
           break;
         }
         case "APPLY": {
-          const myTurn = ++bindTurn;
+          const myTurn = msg.preview ? ++bindFindTurn : bindFindTurn;
           if (!bindLinkRunning) bindCancel = true;
           const release = await acquireBind();
-          if (msg.preview && myTurn !== bindTurn) {
+          if (msg.preview && myTurn !== bindFindTurn) {
             release();
             break;
           }
@@ -8999,7 +8999,6 @@
           let written = 0;
           let made = 0;
           let committed = false;
-          bindTurn++;
           if (!bindLinkRunning) bindCancel = true;
           const releaseLink = await acquireBind();
           bindCancel = false;
