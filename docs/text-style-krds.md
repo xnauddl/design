@@ -120,13 +120,13 @@
 ### 5.2b 카드 안 배치
 - 타이포 카드: 툴바 [스캔] [행 추가] … [이름 다시 짓기] [등록]. [이름 다시 짓기]를 누르면 스캔 표(`tsList`) **자리를 미리보기 목록이 대신**한다(스캔 표는 숨김, 상태는 그대로 보관). 미리보기 아래 [k개 이름 바꾸기] · [닫기].
 - [닫기] 또는 바꾸기가 끝나면 미리보기를 닫고 스캔 표를 다시 보인다. 미리보기 중 [스캔]을 누르면 미리보기를 닫고 스캔한다.
-- 바꾸기가 끝나면(`TEXT_STYLE_RENAMED`) 스캔 표가 있었으면 **다시 스캔한다**(`SCAN_TEXT_STYLES` — 새 이름과 예약 이름으로 표를 새로 짓는다). 그래서 옛 이름으로 [등록]해 이름이 되돌아가거나, 앵커 없는 새 줄 · 행 추가 줄이 바뀐 이름과 겹쳐 남의 스타일 값을 덮어쓰는 일이 없다. 손으로 고친 이름 · 행 추가 줄은 지금 스캔 규칙대로 남는다(`TEXT_STYLE_CANDIDATES` 처리 — 캔버스에서 온 줄만 다시 짓는다).
+- 바꾸기가 끝나면(`TEXT_STYLE_RENAMED`) 스캔 표가 있었으면 **표를 비운다**(`tsSpecs` = 빈 표, 상태 줄 끝 " · 스캔 표를 비웠어요 — 다시 [스캔]해 주세요"). 옛 이름으로 [등록]해 이름이 되돌아가거나, 앵커 없는 줄 · 행 추가 줄이 바뀐 이름과 겹쳐 남의 스타일 값을 덮어쓰는 일을 막는다. 손으로 고친 이름 · 행 추가 줄 · 행 라벨 이름도 함께 없어진다(사용자가 [이름 다시 짓기]를 누르기 전에 표를 등록하지 않았다면 다시 만들어야 한다 — 받아들임). 자동으로 다시 스캔하지 않는 이유: 스캔은 지금 선택을 읽어 그 사이 바뀐 선택이나 빈 선택(기본 램프)으로 표를 엉뚱하게 덮을 수 있다.
 
 ### 5.3 바꾸기
 - `APPLY_TEXT_STYLE_RENAME{reqId, items:[{id, from, to, sig}]}` → `TEXT_STYLE_RENAMED{reqId, results:[{id, status, name}], renamed, skipped, skipReasons, roleVarsRenamed, roleVarsTaken, roleVarsError, roleVarsStuck}` — `status` = `'renamed'` 또는 건너뜀 사유 코드, `name` = 끝난 뒤 그 스타일의 지금 이름. `sig` = 미리보기 때의 시그니처(크기 · 줄 높이 · 자간 · 글꼴 · 스타일).
 - 다시 확인(스타일마다): 지금 이름이 `from`이 아니면 건너뜀 `'renamed-meanwhile'`, 시그니처가 `sig`와 다르면 `'value-changed'`.
 - 겹침 판정은 **최종 이름 집합**으로, 이름을 하나라도 바꾸기 전에 끝낸다: 통과 후보 = 다시 확인을 통과한 항목. (후보가 아닌 모든 스타일의 지금 이름) ∪ (후보들의 `to`)에서 `to`가 겹치는 후보를 건너뜀 `'name-taken'`으로 빼고, 빠진 항목의 지금 이름이 남으므로 **더 빠지는 항목이 없을 때까지 반복**한다(고정점). 그래서 A→B · B→C 연쇄나 A↔B 맞바꿈도 되고, 한 항목이 빠지면 그 이름을 원하던 항목도 함께 빠진다.
-- 바꾸는 순서: 남은 후보를 모두 임시 이름(`__dsl_tmp_{id}`)으로 바꾼 뒤(1단계) `to`로 바꾼다(2단계). 1단계나 2단계에서 오류가 난 항목은 `from`으로 되돌리고 `'error'`, 되돌리기도 실패하면 `'error-stuck'`(결과 툴팁에 그 스타일의 지금 이름 `name`을 적는다). **연쇄 되돌림:** 1단계를 모든 후보에 끝낸 뒤 2단계로 간다. 어느 단계든 오류로 `from`에 돌아간 항목이 생기면, 그 `from`을 `to`로 원하던 항목(연쇄 · 맞바꿈)도 `from`으로 되돌리고 `'error'`로 센다 — 더 되돌릴 항목이 없을 때까지 반복한다(같은 이름이 둘 생기지 않게).
+- 바꾸는 순서: 남은 후보를 모두 임시 이름(`__dsl_tmp_{id}`)으로 바꾼 뒤(1단계) `to`로 바꾼다(2단계). 1단계나 2단계에서 오류가 난 항목은 `from`으로 되돌리고 `'error'`, 되돌리기도 실패하면 `'error-stuck'`(결과 툴팁에 그 스타일의 지금 이름 `name`을 적는다). **연쇄 되돌림:** 1단계를 모든 후보에 끝낸 뒤 2단계로 간다. 어느 단계든 오류가 난 항목이 생기면, 먼저 **되돌릴 집합 전체**를 계산한다 — 오류 항목 + 그 `from`을 `to`로 원하던 항목, 그 항목의 `from`을 원하던 항목 … 더 늘지 않을 때까지(닫힘). 그 집합을 모두 임시 이름(`__dsl_tmp_{id}`)으로 옮긴 뒤 `from`으로 바꾼다(되돌림도 2단계 — 같은 이름이 잠깐이라도 둘 생기지 않게). 직접 오류가 난 항목은 `'error'`, 함께 되돌려진 항목은 `'error-chain'`으로 센다. 되돌림 2단계에서도 실패하면 `'error-stuck'`.
 - **역할 변수는 스타일 바꾸기가 끝난 뒤:** `status: 'renamed'`인 항목의 `{from, to}`만 넘긴다(되돌려진 스타일의 변수는 건드리지 않는다). 변수 쪽 실패는 스타일 이름을 되돌리지 않는다. 결과는 `roleVarsTaken`(같은 이름이 있어 건너뜀) · `roleVarsError`(바꾸기 오류 — 되돌림, 되돌리지 못한 변수는 `roleVarsStuck:[지금 이름]`)으로 나눠 센다.
 - **역할 변수도 함께:** 텍스트 스타일 등록이 스타일 이름으로 만드는 역할 변수 `font-size/{이름}` · `line-height/{이름}` · `letter-spacing/{이름}`(3종 — `variables.ts createSemanticTextStyles`)를 플러그인 Semantic 컬렉션(`ownedCollection('semantic')`) 안에서 `{from}` → `{to}`로 바꾼다. 사용자 컬렉션 · 직접 만든 변수(IA v4 B.3의 `dsl.manual` 표시가 생긴 뒤에는 그 변수)는 건드리지 않는다. 역할 변수도 스타일과 **같은 방식**(최종 이름 집합 · 고정점 · 임시 이름 2단계 · 실패 시 되돌림)으로 바꾼다 — 최종 집합 밖의 다른 변수와 이름이 겹치는 변수만 건너뛰고 `roleVarsTaken`에 센다(그 스타일은 옛 이름의 변수에 묶인 채로 남는다). 지금 `createSemanticTextStyles` 안의 `roleRenames` 처리를 이 방식의 공용 함수 `renameTextRoleVars(pairs)`로 바꿔 두 경로가 함께 쓴다.
 - ⌘Z 한 번(스타일 · 변수 이름을 한 묶음 — `commitUndo`).
@@ -156,7 +156,8 @@
 | `textStyle.renameSkipped` (새) | — | " · 건너뜀 {m}" |
 | `textStyle.renameRoleSkipped` (새) | — | " · 역할 변수 {n}개는 같은 이름이 있어 그대로 뒀어요" |
 | `textStyle.renameRoleError` · `renameRoleStuck` (새) | — | " · 역할 변수 {n}개는 바꾸지 못했어요" · "되돌리지 못한 변수: {names}" |
-| `textStyle.renameSkip.renamed-meanwhile` · `value-changed` · `name-taken` · `error` · `error-stuck` (새) | — | "그 사이 이름이 바뀜" · "그 사이 값이 바뀜" · "같은 이름이 있음" · "오류" · "되돌리지 못함 · 지금 이름 {name}" |
+| `textStyle.renameSkip.renamed-meanwhile` · `value-changed` · `name-taken` · `error` · `error-chain` · `error-stuck` (새) | — | "그 사이 이름이 바뀜" · "그 사이 값이 바뀜" · "같은 이름이 있음" · "오류" · "연결된 항목 오류로 되돌림" · "되돌리지 못함 · 지금 이름 {name}" |
+| `textStyle.renameClearedTable` (새) | — | " · 스캔 표를 비웠어요 — 다시 [스캔]해 주세요" |
 | `textStyle.offDecimal` · `offScale` · `offTip` · `offSum` (새) | — | "소수 크기" · "KRDS 밖" · "KRDS 크기가 아니에요 · 가까운 KRDS 크기 {n}px" · " · KRDS 밖 크기 {k}개(소수 {m})" |
 
 - 테스트: `krdsType` 단위(분류 · 단계 경계 · 꼬리 순서 · 정렬 동점 · 강제 꼬리 · 마지막 수단 · 소수 · 음수 표기 · 규칙 밖 · weightOf), `nameTextStyles` · `rampToSpecs` 바뀐 기대값, 이름 다시 짓기(figma 목: 연쇄 · 맞바꿈 · 임시 이름 · 역할 변수 · 사용자 컬렉션 제외 · 겹침 건너뜀 · 값 바뀜), verify-bind-flow(타이포 카드 표시 · 이름 다시 짓기 흐름).
@@ -188,5 +189,5 @@
 - [ ] `nameTextStyles` · `rampToSpecs` · `LABEL_RAMP_RE` · 기존 테스트 기대값
 - [ ] 스캔 표본 `uiRole` · 군집 `uiCount`
 - [ ] 규칙 밖 표시(목록 · 상태 줄)
-- [ ] [이름 다시 짓기] — 메시지(`sig`) · 미리보기(카드 안 배치) · 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 되돌림 · 역할 변수(`renameTextRoleVars`, 같은 방식) · 스캔 표 이름 고침 · ⌘Z · 잠금 · 다시 읽기
+- [ ] [이름 다시 짓기] — 메시지(`sig`) · 미리보기(카드 안 배치) · 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 되돌림 · 역할 변수(`renameTextRoleVars`, 같은 방식) · 바꾼 뒤 스캔 표 비움 · ⌘Z · 잠금 · 다시 읽기
 - [ ] i18n(§6 표) · verify:i18n 0 · verify-bind-flow · 4검사 · 스크린샷 · 실기 확인
