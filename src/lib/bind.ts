@@ -10,6 +10,7 @@ import { FIELD_SCOPE, STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scop
 import type { BindCandidate, BindNode, BindSkip, NewRoleRef } from '../shared/messages';
 import { backgroundOf, gapSkip, isIconOrAvatar, inAutoLayoutFlow, iconOrAvatarKind, isInsideIconFrame } from './extract'; // 쓰지 않는 간격 판정(사이 간격 자동 · 줄바꿈 아님) · 크기 대상 판정(아이콘 · 아바타 · 오토레이아웃 흐름) — 만들기와 같은 기준
 import { ROLE_KEY, isKnownRole } from './naming';
+import { fieldKind, type ReasonCounts } from './selCards'; // 카드 숫자 — 속성 → 종류(IA v4 §4.1)
 import {
   AUTO_ROLE_KEY,
   assignNames,
@@ -77,6 +78,8 @@ export interface BindResult {
   skipTotal?: number;
   /** 적용 모드 — 새로 만든 역할 수(§2.12). */
   newRoles?: number;
+  /** 사유 × 종류별 자리 수(상한 없음, IA v4 §4.1 카드 숫자). */
+  counts?: ReasonCounts;
 }
 
 /**
@@ -329,6 +332,9 @@ function countNodes(sel: readonly SceneNode[]): number {
  */
 function note(res: BindResult, key: string, node?: SceneNode, preview?: Preview | null, field?: string): void {
   res.reasons[key] = (res.reasons[key] ?? 0) + 1;
+  const kind = fieldKind(field);
+  const byKind = ((res.counts ??= {})[key] ??= {});
+  byKind[kind] = (byKind[kind] ?? 0) + 1;
   if (!node || !preview) return;
   const k = `${node.id}|${key}`;
   if (preview.skipSeen.has(k)) return;
@@ -1343,10 +1349,11 @@ function textValueEqual(node: TextNode, field: VariableBindableTextField, value:
 /** 한 레이어에 연결된 변수 id들(속성 자리마다 하나 — 같은 변수가 두 자리면 두 번). */
 export function boundVariableIds(node: SceneNode): string[] {
   const out: string[] = [];
-  const aliasId = (raw: unknown): string | undefined => {
-    if (!raw) return undefined;
-    const a = Array.isArray(raw) ? raw[0] : raw;
-    return a && typeof a === 'object' && 'id' in a ? (a as VariableAlias).id : undefined;
+  // 글자 구간 속성은 구간마다 연결이 붙는 배열 — 모든 원소를 읽는다(IA v4 B.1).
+  const aliasIds = (raw: unknown): string[] => {
+    if (!raw) return [];
+    const arr = Array.isArray(raw) ? raw : [raw];
+    return arr.map((a) => (a && typeof a === 'object' && 'id' in a ? (a as VariableAlias).id : undefined)).filter((x): x is string => !!x);
   };
   for (const key of ['fills', 'strokes'] as const) {
     const ps = (node as unknown as Record<string, unknown>)[key];
@@ -1366,8 +1373,7 @@ export function boundVariableIds(node: SceneNode): string[] {
   const bv = (node as { boundVariables?: Record<string, unknown> }).boundVariables ?? {};
   for (const [field, raw] of Object.entries(bv)) {
     if (field === 'fills' || field === 'strokes' || field === 'effects' || field === 'componentProperties' || field === 'textRangeFills') continue;
-    const id = aliasId(raw);
-    if (id) out.push(id);
+    out.push(...aliasIds(raw));
   }
   return out;
 }
@@ -1431,3 +1437,129 @@ export function findUsers(roots: readonly SceneNode[], varIds: ReadonlySet<strin
   return { nodes, places };
 }
 
+
+/* ---------- 삭제된 변수 연결 풀기(IA v4 §4.1 카드 3 · §2.3-5) ----------
+   세기와 풀기는 같은 자리 목록(deletedBindings)을 쓴다. 범위 밖: textRangeFills · layoutGrids ·
+   그라디언트 색 단계 · 그림자 숫자 · 컴포넌트 속성. */
+export type DeletedPlace =
+  | { kind: 'paint'; field: 'fills' | 'strokes'; index: number }
+  | { kind: 'effect'; index: number }
+  | { kind: 'range'; field: string; start: number; end: number }
+  | { kind: 'field'; field: string };
+
+/** 글자 구간 배열로 연결되는 속성(setRangeBoundVariable 대상). */
+const RANGE_FIELDS = new Set(['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily', 'fontWeight', 'fontStyle', 'paragraphSpacing', 'paragraphIndent']);
+/** 연결 풀기 범위 밖 — 세지도 풀지도 않는다. */
+const UNBIND_SKIP_FIELDS = new Set(['fills', 'strokes', 'effects', 'componentProperties', 'textRangeFills', 'layoutGrids']);
+
+const aliasOf = (raw: unknown): string | undefined => (raw && typeof raw === 'object' && 'id' in raw ? (raw as VariableAlias).id : undefined);
+
+/** 이 레이어에서 삭제된 변수가 붙은 자리. 글자 구간은 getStyledTextSegments로 구간을 나눈다. */
+export function deletedBindings(node: SceneNode, deletedIds: ReadonlySet<string>): DeletedPlace[] {
+  const out: DeletedPlace[] = [];
+  if (!deletedIds.size) return out;
+  for (const field of ['fills', 'strokes'] as const) {
+    const ps = (node as unknown as Record<string, unknown>)[field];
+    if (!Array.isArray(ps)) continue;
+    ps.forEach((p, index) => {
+      const id = (p as { boundVariables?: { color?: VariableAlias } }).boundVariables?.color?.id;
+      if (id && deletedIds.has(id)) out.push({ kind: 'paint', field, index });
+    });
+  }
+  const effects = (node as { effects?: readonly Effect[] }).effects;
+  if (Array.isArray(effects)) {
+    effects.forEach((e, index) => {
+      const id = (e as { boundVariables?: { color?: VariableAlias } }).boundVariables?.color?.id;
+      if (id && deletedIds.has(id)) out.push({ kind: 'effect', index });
+    });
+  }
+  const bv = (node as { boundVariables?: Record<string, unknown> }).boundVariables ?? {};
+  for (const [field, raw] of Object.entries(bv)) {
+    if (UNBIND_SKIP_FIELDS.has(field)) continue;
+    if (Array.isArray(raw)) {
+      if (!raw.some((a) => { const id = aliasOf(a); return !!id && deletedIds.has(id); })) continue;
+      if (node.type === 'TEXT' && RANGE_FIELDS.has(field)) {
+        const segs = (node as TextNode).getStyledTextSegments([field as 'fontSize', 'boundVariables']);
+        for (const seg of segs) {
+          const id = aliasOf((seg.boundVariables as Record<string, unknown> | undefined)?.[field]);
+          if (id && deletedIds.has(id)) out.push({ kind: 'range', field, start: seg.start, end: seg.end });
+        }
+      }
+      continue; // 그 밖의 배열 필드는 범위 밖
+    }
+    const id = aliasOf(raw);
+    if (id && deletedIds.has(id)) out.push({ kind: 'field', field });
+  }
+  return out;
+}
+
+/** 삭제된 변수 연결 풀기 — 자리 수를 센다. 글꼴이 필요한 자리는 글꼴을 먼저 불러온다. */
+export async function unbindDeleted(roots: readonly SceneNode[], deletedIds: ReadonlySet<string>): Promise<{ unbound: number; failed: number; failReasons: Record<string, number> }> {
+  let unbound = 0;
+  let failed = 0;
+  const failReasons: Record<string, number> = {};
+  const fail = (key: string, n: number): void => { failed += n; failReasons[key] = (failReasons[key] ?? 0) + n; };
+  const targets: { node: SceneNode; places: DeletedPlace[] }[] = [];
+  walkVisibleDeep(roots, (n) => {
+    const places = deletedBindings(n, deletedIds);
+    if (places.length) targets.push({ node: n, places });
+  });
+  for (const { node, places } of targets) {
+    const needsFont = node.type === 'TEXT' && places.some((p) => p.kind === 'range' || (p.kind === 'field' && p.field === 'characters'));
+    if (needsFont) {
+      try {
+        const t = node as TextNode;
+        const fonts = t.characters.length ? t.getRangeAllFontNames(0, t.characters.length) : [t.fontName as FontName];
+        for (const f of fonts) await figma.loadFontAsync(f);
+      } catch {
+        const n = places.filter((p) => p.kind === 'range' || (p.kind === 'field' && p.field === 'characters')).length;
+        fail('font', n);
+        places.splice(0, places.length, ...places.filter((p) => !(p.kind === 'range' || (p.kind === 'field' && p.field === 'characters'))));
+      }
+    }
+    for (const field of ['fills', 'strokes'] as const) {
+      const idx = places.filter((p): p is Extract<DeletedPlace, { kind: 'paint' }> => p.kind === 'paint' && p.field === field).map((p) => p.index);
+      if (!idx.length) continue;
+      try {
+        const paints = ((node as unknown as Record<string, readonly Paint[]>)[field] ?? []).slice();
+        for (const i of idx) paints[i] = figma.variables.setBoundVariableForPaint(paints[i] as SolidPaint, 'color', null);
+        (node as unknown as Record<string, Paint[]>)[field] = paints;
+        unbound += idx.length;
+      } catch { fail('error', idx.length); }
+    }
+    const effIdx = places.filter((p): p is Extract<DeletedPlace, { kind: 'effect' }> => p.kind === 'effect').map((p) => p.index);
+    if (effIdx.length) {
+      try {
+        const effs = ((node as { effects?: readonly Effect[] }).effects ?? []).slice();
+        for (const i of effIdx) effs[i] = figma.variables.setBoundVariableForEffect(effs[i], 'color', null);
+        (node as unknown as { effects: Effect[] }).effects = effs;
+        unbound += effIdx.length;
+      } catch { fail('error', effIdx.length); }
+    }
+    for (const p of places) {
+      try {
+        if (p.kind === 'range') {
+          (node as TextNode).setRangeBoundVariable(p.start, p.end, p.field as VariableBindableTextField, null);
+          unbound++;
+        } else if (p.kind === 'field') {
+          (node as SceneNode & { setBoundVariable: (f: string, v: null) => void }).setBoundVariable(p.field, null);
+          unbound++;
+        }
+      } catch { fail('error', 1); }
+    }
+  }
+  return { unbound, failed, failReasons };
+}
+
+/** 삭제된 변수가 붙은 자리 수 · 레이어(카드 3의 n — 풀기와 같은 자리). */
+export function countDeleted(roots: readonly SceneNode[], deletedIds: ReadonlySet<string>): { count: number; nodeIds: string[] } {
+  let count = 0;
+  const nodeIds: string[] = [];
+  walkVisibleDeep(roots, (n) => {
+    const k = deletedBindings(n, deletedIds).length;
+    if (!k) return;
+    count += k;
+    nodeIds.push(n.id);
+  });
+  return { count, nodeIds };
+}

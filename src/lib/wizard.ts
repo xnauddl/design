@@ -11,8 +11,9 @@ export type WizardStepId =
   | 'semantics' // CREATE_SEMANTICS (쓰기, 선택)
   | 'dark' // GENERATE_DARK_MODE (쓰기, 선택) — 시맨틱 별칭이 있어야 채울 게 많다
   | 'textStyles' // SCAN_TEXT_STYLES → CREATE_TEXT_STYLES (쓰기, 선택)
-  // 연결(APPLY) 단계는 없다(IA v3 §2.11 — 레이어에 변수를 붙이는 일은 사용자가 레이어 › 연결에서 버튼을 눌러서만).
-  | 'rename' // RENAME (쓰기) — 연결 전이라 붙은 변수 이름(역할 신호) 없이 정리한다
+  // 연결 — 기준 nodeIds로 APPLY(preview 아님). 연결 화면 [연결]과 같은 규칙(IA v4 §2.3-2 · §4.3 "B.1 ~ B.3 동안의 v3 마법사").
+  | 'bind' // APPLY (쓰기, 선택, 무료)
+  | 'rename' // RENAME (쓰기)
   // 등록이 같은 이름 묶음의 세트 결합까지 함께 수행하므로 별도 CLASSIFY_VARIANTS를 보내지 않는다.
   | 'componentize'; // REGISTER_COMPONENTS (쓰기, 선택, Paid)
 
@@ -26,7 +27,7 @@ export interface WizardStepDef {
   paid?: boolean;
 }
 
-/** 단계 순서 = 실제 데이터 의존 순서. 마법사는 레이어에 변수를 붙이지 않는다(§2.11) — 요약 끝에서 레이어 › 연결로 안내.
+/** 단계 순서 = 실제 데이터 의존 순서. 연결은 만들기 · 다크 · 텍스트 스타일 뒤, 이름 정리 앞(IA v4 §4.3 — "한 번에 정리는 연결까지").
  *  표시 라벨은 i18n `wizard.step.<id>` 키로 UI가 해석(외부화). */
 export const WIZARD_STEPS: readonly WizardStepDef[] = [
   { id: 'extract', write: false, optional: false },
@@ -35,6 +36,7 @@ export const WIZARD_STEPS: readonly WizardStepDef[] = [
   // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
   { id: 'dark', write: true, optional: true, paid: true },
   { id: 'textStyles', write: true, optional: true, paid: true },
+  { id: 'bind', write: true, optional: true }, // 무료 — 연결은 무료 기능이다
   { id: 'rename', write: true, optional: false },
   { id: 'componentize', write: true, optional: true, paid: true },
 ];
@@ -42,6 +44,7 @@ export const WIZARD_STEPS: readonly WizardStepDef[] = [
 /** 사용자가 켠 선택 단계(필수 단계는 포함하지 않는다). */
 export interface WizardOptions {
   semantics: boolean;
+  bind: boolean;
   dark: boolean;
   textStyles: boolean;
   componentize: boolean;
@@ -118,6 +121,7 @@ export interface WizardTotals {
   semanticsAliased?: number;
   darkFilled?: number; // 다크 모드로 다시 별칭된 색 수
   textStyles?: number; // 생성/갱신된 텍스트 스타일 수
+  bound?: number; // 연결한 곳 수
   renamed?: number;
   components?: number;
 }
@@ -128,6 +132,7 @@ export function summarize(totals: WizardTotals): string {
   if (totals.created != null) parts.push(t('wizard.sum.tokens', { n: totals.created }));
   if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t('wizard.sum.dark', { n: totals.darkFilled }));
   if (totals.textStyles != null && totals.textStyles > 0) parts.push(t('wizard.sum.textStyles', { n: totals.textStyles }));
+  if (totals.bound != null) parts.push(t('wizard.sum.bound', { n: totals.bound }));
   if (totals.renamed != null) parts.push(t('wizard.sum.renamed', { n: totals.renamed }));
   if (totals.components != null && totals.components > 0) parts.push(t('wizard.sum.components', { n: totals.components }));
   return parts.length ? parts.join(' · ') : t('wizard.sum.empty');

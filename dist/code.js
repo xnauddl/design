@@ -148,6 +148,7 @@
     "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizard.step.dark": "\uB2E4\uD06C",
     "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "wizard.step.bind": "\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
@@ -199,11 +200,17 @@
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
+    "wizard.seq.bindDone": "{n}\uACF3 \uC5F0\uACB0",
+    "wizard.seq.bindRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
+    "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
+    "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
     "wizard.sum.tokens": "\uD1A0\uD070 {n}",
     "wizard.sum.dark": "\uB2E4\uD06C {n}",
     "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
+    "wizard.sum.bound": "\uC5F0\uACB0 {n}\uACF3",
     "wizard.sum.renamed": "\uC774\uB984 {n}",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "wizard.sum.empty": "\uB05D\uB0B8 \uC791\uC5C5\uC774 \uC5C6\uC5B4\uC694",
@@ -344,60 +351,37 @@
     "bind.tsGotoType": "\uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
     // IA v3 변수 탭(§4.2~§4.4)
     "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
-    "start.head": "\uC544\uC9C1 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
-    "start.sub": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uB9CC\uB4E4\uC5B4 \uBCF4\uC138\uC694",
-    "start.freeNote": "\u24D8 \uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uBCC0\uC218\uB97C \uC0C8\uB85C \uB9CC\uB4E4 \uC218 \uC5C6\uC5B4\uC694",
-    "start.freeNote2": "\uC774\uB984 \uC815\uB9AC\uC640 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uC740 \uBB34\uB8CC",
-    "start.freeExtract": "(\uCD94\uCD9C\uAE4C\uC9C0 \uBB34\uB8CC)",
-    "start.libNote": "\u24D8 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB294 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694. \uAC19\uC740 \uBCC0\uC218\uB97C \uC5EC\uAE30\uC11C \uB610 \uB9CC\uB4E4 \uD544\uC694\uB294 \uC5C6\uC5B4\uC694.",
     "start.made": "\uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
     "start.viewList": "\uBCC0\uC218 \uBAA9\uB85D \uBCF4\uAE30",
     "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uB808\uC774\uC5B4 \uC5F0\uACB0\uC740 \uB05D\uB09C \uB4A4 \uD655\uC778\uD558\uACE0 \uD574\uC694",
     "wizardCard.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC2E4\uD589\uD560 \uC218 \uC788\uC5B4\uC694",
-    "wizard.toBind": "\uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.toBind": "\uC120\uD0DD \uD0ED\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.notLinked": " \xB7 \uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
     "wizard.seq.cancelSkipped": "\uCDE8\uC18C\uB85C \uAC74\uB108\uB700",
-    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uB9CC \uC815\uB9AC\uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
-    "wizardCard.runFree": "\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
+    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uACFC \uB808\uC774\uC5B4 \uC774\uB984 \uC815\uB9AC\uB9CC \uD574\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
+    "wizardCard.runFree": "\uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
     "wizard.freeSum": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "wizard.freeSumBound": "\uC5F0\uACB0 {b}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
-    "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total} \u25BE",
+    "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total}",
     "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
-    "list.findUnboundTip": "\uC120\uD0DD\uC5D0\uC11C \uBCC0\uC218\uB85C \uBC14\uAFC0 \uC218 \uC788\uB294 \uC0C9\xB7\uAC04\uACA9\uC744 \uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uCC3E\uC544\uC694",
     "list.addTip": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30(\uC0C9\xB7\uD1A0\uD070\xB7\uD14C\uB9C8\xB7\uD0C0\uC774\uD3EC)",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
-    "list.refreshTip": "\uB2E4\uC2DC \uC77D\uAE30",
     "list.modeTip": "\uBAA8\uB4DC",
     "list.modeDefault": "\uAE30\uBCF8 \uBAA8\uB4DC",
     "list.searchTip": "\uAC80\uC0C9",
-    "list.chipTip": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 {used}\uAC1C(\uC9C1\uC811 {direct} \xB7 \uAC04\uC811 {indirect}) / \uC804\uCCB4 {total}\uAC1C",
     "list.reading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 \uC77D\uB294 \uC911\u2026",
-    "list.refreshSame": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uBCC0\uACBD \uC5C6\uC74C",
-    "list.refreshUsage": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uC0AC\uC6A9 \uC218\uAC00 \uBC14\uB010 \uBCC0\uC218 {n}\uAC1C",
-    "list.refreshTable": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uBCC0\uC218 \uBAA9\uB85D\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694",
-    "list.refreshCountSuffix": " \xB7 \uC0AC\uC6A9 \uC218\uAC00 \uBC14\uB010 \uBCC0\uC218 {n}\uAC1C",
     "list.big": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC544\uC694",
     "list.read": "\uC77D\uAE30",
     "list.wizardWait": "\uB9C8\uBC95\uC0AC\uAC00 \uB05D\uB098\uBA74 \uC77D\uC5B4\uC694",
     "list.noneUsed": "\uC774 \uC120\uD0DD\uC740 \uB85C\uCEEC \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694",
-    "list.selectHint": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \u2605 Inspect\uC5D0 \uBAA8\uC5EC\uC694",
     "list.inspect": "\u2605 Inspect",
-    "list.inspectTip": "Inspect \u2014 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218",
-    "list.inspectAria": "Inspect \u2014 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218, {n}\uAC1C",
     "list.inspectNoSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5EC\uAE30\uC5D0 \uBAA8\uC5EC\uC694",
     "list.libItem": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
-    "list.libItemAria": "\uB77C\uC774\uBE0C\uB7EC\uB9AC, \uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
     "list.deletedItem": "\uC0AD\uC81C\uB41C \uBCC0\uC218",
-    "list.deletedItemAria": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB41C \uACF3 {n}\uAC1C",
     "list.sideColAria": "{name}, \uACC4\uCE35 {badge}, {num}",
-    "list.sideGrpAria": "{name}, {num}",
-    "list.sideExpand": "\uD3BC\uCE58\uAE30",
-    "list.sideCollapse": "\uC811\uAE30",
     "list.searchTitle": "'{q}' \uAC80\uC0C9 \uACB0\uACFC",
     "list.noGroup": "(\uADF8\uB8F9 \uC5C6\uC74C)",
-    "list.totalTip": "\uC804\uCCB4 {total}\uAC1C",
-    "list.baseDiff": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694 \xB7 ",
-    "list.baseDiffNoSel": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD \uC5C6\uC74C \xB7 ",
-    "list.baseMany": "\uB808\uC774\uC5B4 {m}\uAC1C",
     "list.rebase": "\uAE30\uC900 \uBC14\uAFB8\uAE30",
     "list.unused": "\uC548 \uC500",
     "list.indirect": "\u21B3",
@@ -406,7 +390,6 @@
     "list.hiddenRow": "\uC120\uD0DD\uC5D0\uC11C \uC548 \uC4F0\uC5EC \uBAA9\uB85D\uC5D0\uC11C \uBE60\uC84C\uC5B4\uC694",
     "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
-    "list.libSection": "LIB \xB7 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uAC83",
     "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
     "list.libCollection": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \xB7 {name}",
     "list.libManaged": "\uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
@@ -431,7 +414,59 @@
     "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
     "list.semanticsNote": "\uC5ED\uD560 \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uC801\uC6A9\uD560 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
     "tab.variables": "\uBCC0\uC218",
-    "tab.layer": "\uB808\uC774\uC5B4",
+    "tab.select": "\uC120\uD0DD",
+    // IA v4 선택 탭(§4.1)
+    "v4.layers": "\uB808\uC774\uC5B4 {n}\uAC1C",
+    "v4.selMany": "{name} \uC678 {k}\uAC1C",
+    "v4.baseDiff": "\uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694",
+    "v4.loading": "\uBD88\uB7EC\uC624\uB294 \uC911\u2026",
+    "v4.noSel": "\uB514\uC790\uC778\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    "v4.noVarsFile": "\uC774 \uD30C\uC77C\uC5D4 \uC544\uC9C1 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "v4.reading": "\uC120\uD0DD\uC744 \uC77D\uB294 \uC911\u2026",
+    "v4.libOnly": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB9CC \uC368\uC694 \xB7 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
+    "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
+    "v4.kindPlaces": "{kind} {n}\uACF3",
+    "v4.kind.gap": "\uAC04\uACA9",
+    "v4.kind.radius": "\uBC18\uACBD",
+    "v4.kind.size": "\uD06C\uAE30",
+    "v4.kind.stroke": "\uC120 \uB450\uAED8",
+    "v4.kind.opacity": "\uD22C\uBA85\uB3C4",
+    "v4.kind.color": "\uC0C9",
+    "v4.kind.text": "\uAE00\uC790",
+    "v4.kind.other": "\uAE30\uD0C0",
+    "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
+    "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
+    "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
+    "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
+    "v4.noVarPlaces": "\uBCC0\uC218\uAC00 \uC5C6\uB294 \uAC12 {k}\uACF3",
+    "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
+    "v4.skippedPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
+    "v4.view": "\uBCF4\uAE30",
+    "v4.usesTitle0": "\uC4F0\uB294 \uBCC0\uC218",
+    "v4.usesN": "\uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
+    "v4.usesTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
+    "v4.expand": "\uBCF4\uAE30 \u25BE",
+    "v4.collapse": "\uC811\uAE30 \u25B4",
+    "v4.noTierName": "\uACC4\uCE35 \uC5C6\uC74C",
+    "v4.libName": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
+    "v4.places": "{n}\uACF3",
+    "v4.detail": "\uC0C1\uC138\u2026",
+    "v4.deletedN": "\uC0AD\uC81C\uB41C \uBCC0\uC218 {n}\uACF3",
+    "v4.select": "\uC120\uD0DD",
+    "v4.unbind": "\uC5F0\uACB0 \uD480\uAE30",
+    "v4.unbound": "\uC0AD\uC81C\uB41C \uBCC0\uC218 \uC5F0\uACB0 {k}\uACF3\uC744 \uD480\uC5C8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "v4.unboundFailed": " \xB7 {m}\uACF3\uC740 \uD480\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "v4.unbindFail.font": "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC74C",
+    "v4.unbindFail.error": "\uC624\uB958",
+    "v4.tidy": "\uB808\uC774\uC5B4 \uC815\uB9AC",
+    "v4.rename": "\uC774\uB984 \uC815\uB9AC",
+    "v4.back": "\uB3CC\uC544\uAC00\uAE30",
+    "v4.subBind": "\uC5F0\uACB0",
+    "v4.subComponents": "\uCEF4\uD3EC\uB10C\uD2B8 \uBCA0\uD0C0",
+    "v4.subMake": "\uAC12\uC744 \uC9C1\uC811 \uACE0\uB974\uAE30",
+    "v4.varEmpty": "\uC544\uC9C1 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "v4.makeFromSel": "\uC120\uD0DD\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "tab.settings": "\uC124\uC815",
     // 최소화(IA v3 §4.9)
     "ui.minimize": "\uCD5C\uC18C\uD654",
@@ -461,10 +496,9 @@
     "op.rename": "\uC774\uB984 \uC815\uB9AC",
     "op.components": "\uCEF4\uD3EC\uB10C\uD2B8",
     "op.export": "\uB0B4\uBCF4\uB0B4\uAE30",
+    "op.unbind": "\uC0AD\uC81C\uB41C \uBCC0\uC218 \uC5F0\uACB0 \uD480\uAE30",
     "op.wizard": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
     // 변수 탭 하위 화면(PR 1 중간 상태)
-    "var.goMake": "\uC0C9\uBD80\uD130 \uD558\uB098\uC529 \uB9CC\uB4E4\uAE30 \u2192",
-    "make.back": "\u2190 \uB3CC\uC544\uAC00\uAE30",
     // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
     "rail.color": "\uC0C9",
     "rail.colorSub": "\uCD94\uCD9C\xB7\uBCC0\uC218",
@@ -474,8 +508,6 @@
     "rail.themeSub": "\uB2E4\uD06C \uBAA8\uB4DC",
     "rail.type": "\uD0C0\uC774\uD3EC",
     "rail.typeSub": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "rail.bind": "\uC5F0\uACB0",
-    "rail.rename": "\uC774\uB984",
     "rail.structure": "\uCEF4\uD3EC\uB10C\uD2B8",
     "rail.next": "\uB2E4\uC74C \u2192",
     // 플러그인 설정(#19) — 설정 탭에만
@@ -501,6 +533,7 @@
     "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizardCard.optDark": "\uB2E4\uD06C",
     "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "wizardCard.optBind": "\uC5F0\uACB0",
     "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
@@ -667,7 +700,6 @@
     // PR 4 — 코드에 직접 쓰던 문구를 옮김(docs/pr4-copy-table.md). 조각을 받는 자리는 {…Part}
     // 공통 · 접근성 이름
     "tab.listAria": "\uC791\uC5C5 \uD0ED",
-    "rail.layerAria": "\uB808\uC774\uC5B4 \uC791\uC5C5",
     "rail.makeAria": "\uB9CC\uB4E4\uAE30 \uB2E8\uACC4",
     "list.sideAria": "\uBCC0\uC218 \uCEEC\uB809\uC158",
     "list.gridAria": "\uBCC0\uC218 \uBAA9\uB85D",
@@ -3052,6 +3084,24 @@
     return known.length ? known[known.length - 1] : segs[segs.length - 1];
   }
 
+  // src/lib/selCards.ts
+  var PADDING = /* @__PURE__ */ new Set(["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]);
+  var RADIUS = /* @__PURE__ */ new Set(["cornerRadius", "topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"]);
+  var STROKE = /* @__PURE__ */ new Set(["strokeWeight", "strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"]);
+  var TEXT = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily"]);
+  var COLOR = /* @__PURE__ */ new Set(["fills", "strokes", "effects"]);
+  function fieldKind(field) {
+    if (!field) return "other";
+    if (field === "itemSpacing" || field === "counterAxisSpacing" || PADDING.has(field) || field.startsWith("grid")) return "gap";
+    if (RADIUS.has(field)) return "radius";
+    if (field === "width" || field === "height") return "size";
+    if (STROKE.has(field)) return "stroke";
+    if (field === "opacity") return "opacity";
+    if (COLOR.has(field)) return "color";
+    if (TEXT.has(field)) return "text";
+    return "other";
+  }
+
   // src/lib/bind.ts
   var round2 = (n) => Math.round(n * 100) / 100;
   function sameNumber(a, b) {
@@ -3190,8 +3240,11 @@
     return n;
   }
   function note(res, key, node, preview, field) {
-    var _a;
+    var _a, _b, _c, _d, _e;
     res.reasons[key] = ((_a = res.reasons[key]) != null ? _a : 0) + 1;
+    const kind = fieldKind(field);
+    const byKind = (_d = (_c = (_b = res.counts) != null ? _b : res.counts = {})[key]) != null ? _d : _c[key] = {};
+    byKind[kind] = ((_e = byKind[kind]) != null ? _e : 0) + 1;
     if (!node || !preview) return;
     const k = `${node.id}|${key}`;
     if (preview.skipSeen.has(k)) return;
@@ -3952,10 +4005,10 @@
   function boundVariableIds(node) {
     var _a, _b, _c, _d, _e;
     const out = [];
-    const aliasId = (raw) => {
-      if (!raw) return void 0;
-      const a = Array.isArray(raw) ? raw[0] : raw;
-      return a && typeof a === "object" && "id" in a ? a.id : void 0;
+    const aliasIds = (raw) => {
+      if (!raw) return [];
+      const arr = Array.isArray(raw) ? raw : [raw];
+      return arr.map((a) => a && typeof a === "object" && "id" in a ? a.id : void 0).filter((x) => !!x);
     };
     for (const key of ["fills", "strokes"]) {
       const ps = node[key];
@@ -3975,8 +4028,7 @@
     const bv = (_e = node.boundVariables) != null ? _e : {};
     for (const [field, raw] of Object.entries(bv)) {
       if (field === "fills" || field === "strokes" || field === "effects" || field === "componentProperties" || field === "textRangeFills") continue;
-      const id = aliasId(raw);
-      if (id) out.push(id);
+      out.push(...aliasIds(raw));
     }
     return out;
   }
@@ -4026,6 +4078,130 @@
       nodes.push(n);
     });
     return { nodes, places };
+  }
+  var RANGE_FIELDS = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily", "fontWeight", "fontStyle", "paragraphSpacing", "paragraphIndent"]);
+  var UNBIND_SKIP_FIELDS = /* @__PURE__ */ new Set(["fills", "strokes", "effects", "componentProperties", "textRangeFills", "layoutGrids"]);
+  var aliasOf = (raw) => raw && typeof raw === "object" && "id" in raw ? raw.id : void 0;
+  function deletedBindings(node, deletedIds) {
+    var _a, _b;
+    const out = [];
+    if (!deletedIds.size) return out;
+    for (const field of ["fills", "strokes"]) {
+      const ps = node[field];
+      if (!Array.isArray(ps)) continue;
+      ps.forEach((p, index) => {
+        var _a2, _b2;
+        const id = (_b2 = (_a2 = p.boundVariables) == null ? void 0 : _a2.color) == null ? void 0 : _b2.id;
+        if (id && deletedIds.has(id)) out.push({ kind: "paint", field, index });
+      });
+    }
+    const effects = node.effects;
+    if (Array.isArray(effects)) {
+      effects.forEach((e, index) => {
+        var _a2, _b2;
+        const id = (_b2 = (_a2 = e.boundVariables) == null ? void 0 : _a2.color) == null ? void 0 : _b2.id;
+        if (id && deletedIds.has(id)) out.push({ kind: "effect", index });
+      });
+    }
+    const bv = (_a = node.boundVariables) != null ? _a : {};
+    for (const [field, raw] of Object.entries(bv)) {
+      if (UNBIND_SKIP_FIELDS.has(field)) continue;
+      if (Array.isArray(raw)) {
+        if (!raw.some((a) => {
+          const id2 = aliasOf(a);
+          return !!id2 && deletedIds.has(id2);
+        })) continue;
+        if (node.type === "TEXT" && RANGE_FIELDS.has(field)) {
+          const segs = node.getStyledTextSegments([field, "boundVariables"]);
+          for (const seg of segs) {
+            const id2 = aliasOf((_b = seg.boundVariables) == null ? void 0 : _b[field]);
+            if (id2 && deletedIds.has(id2)) out.push({ kind: "range", field, start: seg.start, end: seg.end });
+          }
+        }
+        continue;
+      }
+      const id = aliasOf(raw);
+      if (id && deletedIds.has(id)) out.push({ kind: "field", field });
+    }
+    return out;
+  }
+  async function unbindDeleted(roots, deletedIds) {
+    var _a, _b;
+    let unbound = 0;
+    let failed = 0;
+    const failReasons = {};
+    const fail = (key, n) => {
+      var _a2;
+      failed += n;
+      failReasons[key] = ((_a2 = failReasons[key]) != null ? _a2 : 0) + n;
+    };
+    const targets = [];
+    walkVisibleDeep(roots, (n) => {
+      const places = deletedBindings(n, deletedIds);
+      if (places.length) targets.push({ node: n, places });
+    });
+    for (const { node, places } of targets) {
+      const needsFont = node.type === "TEXT" && places.some((p) => p.kind === "range" || p.kind === "field" && p.field === "characters");
+      if (needsFont) {
+        try {
+          const t2 = node;
+          const fonts = t2.characters.length ? t2.getRangeAllFontNames(0, t2.characters.length) : [t2.fontName];
+          for (const f of fonts) await figma.loadFontAsync(f);
+        } catch (e) {
+          const n = places.filter((p) => p.kind === "range" || p.kind === "field" && p.field === "characters").length;
+          fail("font", n);
+          places.splice(0, places.length, ...places.filter((p) => !(p.kind === "range" || p.kind === "field" && p.field === "characters")));
+        }
+      }
+      for (const field of ["fills", "strokes"]) {
+        const idx = places.filter((p) => p.kind === "paint" && p.field === field).map((p) => p.index);
+        if (!idx.length) continue;
+        try {
+          const paints2 = ((_a = node[field]) != null ? _a : []).slice();
+          for (const i of idx) paints2[i] = figma.variables.setBoundVariableForPaint(paints2[i], "color", null);
+          node[field] = paints2;
+          unbound += idx.length;
+        } catch (e) {
+          fail("error", idx.length);
+        }
+      }
+      const effIdx = places.filter((p) => p.kind === "effect").map((p) => p.index);
+      if (effIdx.length) {
+        try {
+          const effs = ((_b = node.effects) != null ? _b : []).slice();
+          for (const i of effIdx) effs[i] = figma.variables.setBoundVariableForEffect(effs[i], "color", null);
+          node.effects = effs;
+          unbound += effIdx.length;
+        } catch (e) {
+          fail("error", effIdx.length);
+        }
+      }
+      for (const p of places) {
+        try {
+          if (p.kind === "range") {
+            node.setRangeBoundVariable(p.start, p.end, p.field, null);
+            unbound++;
+          } else if (p.kind === "field") {
+            node.setBoundVariable(p.field, null);
+            unbound++;
+          }
+        } catch (e) {
+          fail("error", 1);
+        }
+      }
+    }
+    return { unbound, failed, failReasons };
+  }
+  function countDeleted(roots, deletedIds) {
+    let count = 0;
+    const nodeIds = [];
+    walkVisibleDeep(roots, (n) => {
+      const k = deletedBindings(n, deletedIds).length;
+      if (!k) return;
+      count += k;
+      nodeIds.push(n.id);
+    });
+    return { count, nodeIds };
   }
 
   // src/lib/rename.ts
@@ -7841,6 +8017,16 @@
   var devTier = "free";
   var cache = null;
   var bindCancel = false;
+  var bindFindTurn = 0;
+  var bindChain = Promise.resolve();
+  function acquireBind() {
+    const prev = bindChain;
+    let release = () => {
+    };
+    bindChain = new Promise((res) => release = res);
+    return prev.then(() => release);
+  }
+  var bindLinkRunning = false;
   var lastTextSamples = [];
   function effective() {
     if (cache) {
@@ -8087,57 +8273,41 @@
     }
     done(applied);
   }
+  async function deletedVarIds(roots) {
+    const { usage } = countUsage(roots);
+    const local = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
+    const out = /* @__PURE__ */ new Set();
+    for (const id of usage.keys()) {
+      if (local.has(id)) continue;
+      const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+      if (!v) out.add(id);
+    }
+    return out;
+  }
   async function collectUsage(nodeIds) {
-    var _a;
+    var _a, _b;
     const roots = await resolveRoots(nodeIds);
-    const { usage, nodesById, scanned } = countUsage(roots);
+    const { usage, scanned } = countUsage(roots);
     const local = new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id));
     const out = {};
     const libraryVars = [];
-    const libSeen = /* @__PURE__ */ new Set();
-    let deletedCount = 0;
-    const deletedNodes = /* @__PURE__ */ new Set();
-    const addLibrary = async (id, depth) => {
-      var _a2, _b;
-      if (libSeen.has(id)) return true;
-      const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
-      if (!v) return false;
-      libSeen.add(id);
-      const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId).catch(() => null);
-      const modeId = (_a2 = col == null ? void 0 : col.defaultModeId) != null ? _a2 : Object.keys(v.valuesByMode)[0];
-      const aliasTargets = [];
-      for (const raw of Object.values(v.valuesByMode)) {
-        if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") aliasTargets.push(raw.id);
-      }
-      libraryVars.push({ id: v.id, name: v.name, collection: (_b = col == null ? void 0 : col.name) != null ? _b : "", type: v.resolvedType, value: await libCell(modeId ? v.valuesByMode[modeId] : void 0), aliasTargets });
-      if (depth < 5) {
-        for (const t2 of aliasTargets) if (!local.has(t2)) await addLibrary(t2, depth + 1);
-      }
-      return true;
-    };
+    const deletedIds = /* @__PURE__ */ new Set();
     for (const [id, u] of usage) {
       if (local.has(id)) {
         out[id] = u;
         continue;
       }
-      if (await addLibrary(id, 1)) {
-        out[id] = u;
+      const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+      if (!v) {
+        deletedIds.add(id);
         continue;
       }
-      deletedCount += u.places;
-      for (const n of (_a = nodesById.get(id)) != null ? _a : []) deletedNodes.add(n);
+      out[id] = u;
+      const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId).catch(() => null);
+      const modeId = (_a = col == null ? void 0 : col.defaultModeId) != null ? _a : Object.keys(v.valuesByMode)[0];
+      libraryVars.push({ id: v.id, name: v.name, collection: (_b = col == null ? void 0 : col.name) != null ? _b : "", type: v.resolvedType, value: await libCell(modeId ? v.valuesByMode[modeId] : void 0), aliasTargets: [] });
     }
-    const localVars = await figma.variables.getLocalVariablesAsync();
-    for (const v of localVars) {
-      if (!out[v.id]) continue;
-      for (const raw of Object.values(v.valuesByMode)) {
-        if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
-          const t2 = raw.id;
-          if (!local.has(t2)) await addLibrary(t2, 2);
-        }
-      }
-    }
-    return { usage: out, libraryVars, deleted: { count: deletedCount, nodeIds: [...deletedNodes] }, scanned };
+    return { usage: out, libraryVars, deleted: countDeleted(roots, deletedIds), scanned };
   }
   async function collectVars() {
     var _a;
@@ -8689,7 +8859,7 @@
     try {
       switch (msg.type) {
         case "EXTRACT": {
-          const sel = selection();
+          const sel = await resolveRoots(msg.nodeIds);
           const { tokens, warnings } = extractFromSelection(sel, bindOwnerOf(sel));
           post({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length });
           break;
@@ -8716,43 +8886,67 @@
           break;
         }
         case "APPLY": {
-          bindCancel = false;
-          const sel = selection();
-          const r = await bindSelection(
-            sel,
-            !msg.preview,
-            {
-              onProgress: (done, total) => post({ type: "PROGRESS", op: "bind", done, total }),
-              shouldCancel: () => bindCancel,
-              yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
-            },
-            { ownerOf: bindOwnerOf(sel) }
-            // 쓰임 이름의 주인 — 이름 정리 역할 → 고신뢰 판정(§2.12 12.3)
-          );
-          post({
-            type: "APPLY_RESULT",
-            bound: r.bound,
-            skipped: r.skipped,
-            reasons: r.reasons,
-            preview: msg.preview,
-            cancelled: r.cancelled,
-            candidates: r.candidates,
-            // #6: 미리보기 후보(dry-run만)
-            nodes: r.nodes,
-            // #13: 미리보기 트리 맥락
-            skips: r.skips,
-            // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
-            skipTotal: r.skipTotal,
-            // 상한 전 실제 수 — 잘렸으면 UI가 알린다
-            reqId: msg.reqId,
-            // UI가 낡은 응답을 가려낸다
-            newRoles: r.newRoles
-          });
-          if (!msg.preview) {
-            commitUndo(figma);
-            selfSelect = true;
-            postSelection();
+          const myTurn = msg.preview ? ++bindFindTurn : bindFindTurn;
+          if (!bindLinkRunning) bindCancel = true;
+          const release = await acquireBind();
+          if (msg.preview && myTurn !== bindFindTurn) {
+            release();
+            break;
           }
+          bindCancel = false;
+          bindLinkRunning = !msg.preview;
+          try {
+            const sel = await resolveRoots(msg.nodeIds);
+            const r = await bindSelection(
+              sel,
+              !msg.preview,
+              {
+                onProgress: (done, total) => post({ type: "PROGRESS", op: "bind", done, total }),
+                shouldCancel: () => bindCancel,
+                yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
+              },
+              { ownerOf: bindOwnerOf(sel) }
+              // 쓰임 이름의 주인 — 이름 정리 역할 → 고신뢰 판정(§2.12 12.3)
+            );
+            post({
+              type: "APPLY_RESULT",
+              bound: r.bound,
+              skipped: r.skipped,
+              reasons: r.reasons,
+              preview: msg.preview,
+              cancelled: r.cancelled,
+              candidates: r.candidates,
+              // #6: 미리보기 후보(dry-run만)
+              nodes: r.nodes,
+              // #13: 미리보기 트리 맥락
+              skips: r.skips,
+              // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
+              skipTotal: r.skipTotal,
+              // 상한 전 실제 수 — 잘렸으면 UI가 알린다
+              reqId: msg.reqId,
+              // UI가 낡은 응답을 가려낸다
+              newRoles: r.newRoles,
+              counts: r.counts
+              // 사유 × 종류(카드 숫자, IA v4 §4.1)
+            });
+            if (!msg.preview) {
+              commitUndo(figma);
+              selfSelect = true;
+              postSelection();
+            }
+          } finally {
+            bindLinkRunning = false;
+            release();
+          }
+          break;
+        }
+        case "UNBIND_DELETED": {
+          const roots = await resolveRoots(msg.nodeIds);
+          const deletedIds = await deletedVarIds(roots);
+          const r = await unbindDeleted(roots, deletedIds);
+          if (r.unbound) commitUndo(figma);
+          post(__spreadValues({ type: "DELETED_UNBOUND", reqId: msg.reqId }, r));
+          if (r.unbound) await postPrereq();
           break;
         }
         case "SCAN_USAGE": {
@@ -8777,6 +8971,7 @@
           break;
         }
         case "CANCEL": {
+          if (bindLinkRunning) break;
           bindCancel = true;
           break;
         }
@@ -8804,6 +8999,10 @@
           let written = 0;
           let made = 0;
           let committed = false;
+          if (!bindLinkRunning) bindCancel = true;
+          const releaseLink = await acquireBind();
+          bindCancel = false;
+          bindLinkRunning = true;
           try {
             const r = await bindSelectedItems(msg.items, {
               onProgress: (done, total) => post({ type: "PROGRESS", op: "link", done, total }),
@@ -8824,11 +9023,13 @@
             }
           } finally {
             if ((written > 0 || made > 0) && !committed) commitUndo(figma);
+            bindLinkRunning = false;
+            releaseLink();
           }
           break;
         }
         case "RENAME": {
-          const r = await renameSelection(selection(), { apply: msg.apply, maxDepth: msg.maxDepth });
+          const r = await renameSelection(await resolveRoots(msg.nodeIds), { apply: msg.apply, maxDepth: msg.maxDepth });
           post({ type: "RENAME_RESULT", changes: r.changes, nodes: r.nodes, applied: r.applied });
           if (r.applied && r.changes.length) {
             commitUndo(figma);
@@ -9839,7 +10040,7 @@
         }
       }
     } catch (err) {
-      post({ type: "ERROR", message: err instanceof Error ? err.message : String(err), op: msg == null ? void 0 : msg.type });
+      post({ type: "ERROR", message: err instanceof Error ? err.message : String(err), op: msg == null ? void 0 : msg.type, reqId: msg == null ? void 0 : msg.reqId });
     }
   };
 })();

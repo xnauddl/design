@@ -207,6 +207,36 @@
     .tab-section.active { display: block; }
     .tab-section > * { margin-bottom: 10px; }
 
+    /* ── IA v4 선택 탭(§4.1 · §8) ── */
+    .sel-head { display: flex; align-items: center; gap: 6px; min-height: 32px; flex-wrap: wrap; }
+    .sel-head b { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+    .sel-head .sel-n { color: var(--text-2); }
+    .sel-head .sel-diff { margin-left: auto; color: var(--text-2); font-size: 10.5px; display: inline-flex; gap: 4px; align-items: center; }
+    .sel-empty { padding: 48px 8px; text-align: center; color: var(--text-2); }
+    .sel-empty .sub { margin-top: 4px; font-size: 11px; }
+    .sel-card { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); margin-bottom: 8px; }
+    .sel-card .grow { flex: 1 1 auto; min-width: 0; }
+    .sel-card .t { font-size: 13px; font-weight: 600; }
+    .sel-card .s { font-size: 11.5px; color: var(--text-2); margin-top: 2px; }
+    .sel-card .s + .s { margin-top: 6px; }
+    .sel-card.ok { background: var(--ok-subtle); border-color: transparent; }
+    .sel-card.warn { background: var(--danger-subtle); border-color: transparent; }
+    .sel-card.warn .t { color: var(--danger); }
+    .sel-card .acts { display: flex; gap: 6px; flex: 0 0 auto; }
+    .sel-list { margin: -4px 0 8px; border: 1px solid var(--border); border-radius: var(--r); padding: 4px 0; }
+    .sel-list .sl-path { padding: 4px 10px; font-size: 10.5px; color: var(--text-2); }
+    .sel-list .sl-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 18px; min-height: 28px; cursor: pointer; }
+    .sel-list .sl-row:hover, .sel-list .sl-row:focus { background: var(--surface-hover); outline: none; }
+    .sel-list .sl-row .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sel-list .sl-row .num { color: var(--text-2); }
+    .sel-tools { position: sticky; bottom: 24px; display: flex; align-items: center; gap: 6px; min-height: 48px; border-top: 1px solid var(--border); background: var(--bg, #fff); color: var(--text-2); margin-top: 8px; }
+    .sub-head { display: flex; align-items: center; gap: 8px; min-height: 40px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
+    .sub-head[hidden] { display: none; }
+    .sub-back { width: 28px; height: 28px; padding: 0; border: none; background: transparent; font-size: 16px; color: var(--text); border-radius: var(--r-sm); }
+    .sub-back:hover { background: var(--surface-hover); }
+    .sub-title { font-size: 13px; }
+    .var-empty { padding: 40px 8px; text-align: center; }
+
     /* ── 단계 레일 — 만들기 4단계 · 적용 3단계. 한 화면에 한 단계만 보인다. ── */
     .steps { display: grid; gap: 3px; margin: 0 0 10px; }
     .steps-4 { grid-template-columns: repeat(4, 1fr); }
@@ -619,7 +649,6 @@
     /* ── IA v3 변수 탭(§4.2~§4.4) ── */
     .var-loading { padding: 16px 4px; color: var(--text-2); }
     .start-head { font-size: 12px; font-weight: 600; margin: 4px 0 2px; }
-    #varStart > * + * { margin-top: 10px; }
     .start-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .grow { flex: 1 1 auto; }
     button.link-btn { min-height: 24px; padding: 0 2px; text-decoration: none; color: var(--accent-strong); }
@@ -764,10 +793,13 @@
   <!-- 탭 바 — 다루는 대상별 3탭(IA v3) + 오른쪽 끝 최소화. [—]는 탭이 아니라 창 조작이라 tablist 밖에 둔다. -->
   <div class="tabs" id="tabBar">
     <div class="tab-list" role="tablist" data-i18n-aria-label="tab.listAria" aria-label="작업 탭">
+      <button class="tab-btn" id="tabbtn-select" role="tab" aria-controls="tab-select" data-i18n="tab.select">선택</button>
       <button class="tab-btn" id="tabbtn-variables" role="tab" aria-controls="tab-variables" data-i18n="tab.variables">변수</button>
-      <button class="tab-btn" id="tabbtn-layer" role="tab" aria-controls="tab-layer" data-i18n="tab.layer">레이어</button>
-      <button class="tab-btn" id="tabbtn-settings" role="tab" aria-controls="tab-settings" data-i18n="tab.settings">설정</button>
     </div>
+    <!-- ⚙ 설정 — 탭 밖 화면(IA v4 §2.1). -->
+    <button class="tab-min" id="btnSettings" type="button" data-i18n-title="tab.settings" title="설정" data-i18n-aria-label="tab.settings" aria-label="설정">
+      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
     <button class="tab-min" id="btnMinimize" type="button" data-i18n-title="ui.minimize" title="최소화" data-i18n-aria-label="ui.minimize" aria-label="최소화">
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 6h7"/></svg>
     </button>
@@ -778,35 +810,16 @@
    <!-- IA v3 변수 탭(§4.2~§4.4): 불러오는 중 / 시작 화면(로컬 변수 0개) / 변수 목록. 만들기는 아래 하위 화면. -->
    <div id="varLoading" class="var-loading" data-i18n="var.loading">변수 정보를 불러오는 중…</div>
 
-   <!-- 시작 화면(§4.3) — 로컬 변수 0개일 때, 또는 그때 시작한 마법사가 실행 중·요약 표시 중. -->
-   <div id="varStart" style="display:none">
-    <div class="start-head" id="startHead" data-i18n="start.head">아직 로컬 변수가 없어요</div>
-    <div class="hint" id="startSub" data-i18n="start.sub">선택한 프레임에서 만들어 보세요</div>
-    <div class="ux" id="startFree" style="display:none">
-      <div><span data-i18n="start.freeNote">ⓘ 무료 버전에서는 변수를 새로 만들 수 없어요</span></div>
-      <div class="hint"><span data-i18n="start.freeNote2">이름 정리와 기존 변수 연결은 무료</span> · <button class="link" id="btnStartLicense" data-i18n="status.paidAction">라이선스 →</button></div>
-    </div>
-    <div id="wizardSlotStart"></div>
-    <div id="startLib"></div>
-    <div class="start-foot">
-      <button id="btnGoMake" data-i18n="var.goMake">색부터 하나씩 만들기 →</button>
-      <span class="muted" id="goMakeFree" data-i18n="start.freeExtract" style="display:none">(추출까지 무료)</span>
-      <span class="grow"></span>
-      <button class="link link-btn" id="btnReadinessStart" aria-haspopup="menu"></button>
-    </div>
-   </div>
-
    <!-- 변수 목록(§4.4) -->
+   <!-- 로컬 변수 0개(IA v4 §4.6 빈 상태) -->
+   <div class="vt-empty var-empty" id="varEmpty" style="display:none"><span data-i18n="v4.varEmpty">아직 변수가 없어요</span> · <button class="link link-btn" id="btnVarEmptyMake" type="button" data-i18n="v4.makeFromSel">선택에서 변수 만들기</button></div>
+
    <div id="varList" style="display:none">
     <div class="list-head" id="listHead">
-      <button class="link link-btn" id="btnReadiness" aria-haspopup="menu"></button>
-      <button class="link link-btn" id="btnFindUnbound" data-i18n="list.findUnbound" data-i18n-title="list.findUnboundTip" title="선택에서 변수로 바꿀 수 있는 색·간격을 레이어 › 연결에서 찾아요">변수 없는 값 찾기 →</button>
       <span class="grow"></span>
       <button class="icon-btn" id="btnAddVar" type="button" data-i18n-title="list.addTip" title="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)" data-i18n-aria-label="list.addTip" aria-label="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
       <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
-      <button class="icon-btn" id="btnVarRefresh" type="button" data-i18n-title="list.refreshTip" title="다시 읽기" data-i18n-aria-label="list.refreshTip" aria-label="다시 읽기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg></button>
     </div>
-    <div class="situation" id="situationLine" hidden></div>
     <!-- 결정 B(§4.4): 왼쪽 사이드바(★ Inspect · 컬렉션 › 그룹 · LIB · 삭제된 변수) + 오른쪽 목록 -->
     <div class="vl-split">
       <div class="vl-side" id="varSide" role="tree" data-i18n-aria-label="list.sideAria" aria-label="변수 컬렉션"></div>
@@ -828,40 +841,138 @@
     <div id="pipelineSteps"></div>
    </div>
 
-   <!-- 마법사 카드(요소 1개) — 시작 화면 또는 만들기 맨 위 중 보이는 곳에 붙는다(§4.3). -->
-    <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
-    <div class="step" id="wizardCard">
-      <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
-      <div class="hint" data-i18n="wizardCard.hint">선택한 프레임의 색·간격을 변수로 만들고 레이어 이름을 정리해요</div>
-      <div class="hint" id="wizNoSel" hidden data-i18n="wizardCard.noSel">레이어를 선택하면 실행할 수 있어요</div>
-      <div class="wiz-done" id="wizDone" hidden><b id="wizDoneText"></b> <button class="link link-btn" id="btnWizListView" type="button" data-i18n="start.viewList">변수 목록 보기</button></div>
-      <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
-        <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
-        <label class="inline"><input id="wizOptTextStyles" type="checkbox" /> <span data-i18n="wizardCard.optTextStyles">텍스트 스타일</span> <span class="muted" id="wizTextStylesLock"></span></label>
-        <!-- v1.0: 컴포넌트 등록은 마법사에서 뺀다(출시 범위 = 추출→생성→바인딩→리네임→내보내기).
-             리네임 직후 이름 기준 묶기가 섹션들을 한 세트로 합쳐 내용을 덮어쓴 사고(QA 파일). 적용 탭의 수동 등록만 남긴다. -->
-        <label class="inline" style="display:none"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
+  </section>
+
+  <section class="tab-section" id="tab-select" role="tabpanel" aria-labelledby="tabbtn-select" tabindex="0">
+    <!-- 선택 탭 첫 화면(IA v4 §4.1) — 머리 줄 · 카드(ui.ts renderSelHome) · 레이어 정리 -->
+    <div id="selHome">
+      <div class="sel-head" id="selHead"></div>
+      <div id="selCards"></div>
+      <div class="sel-tools" id="selTools">
+        <span data-i18n="v4.tidy">레이어 정리</span>
+        <button id="btnGoRename" type="button" data-i18n="v4.rename">이름 정리</button>
+        <button id="btnGoComponents" type="button" data-i18n-aria-label="layer.componentsBetaAria" aria-label="컴포넌트 (베타)"><span data-i18n="rail.structure">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span></button>
       </div>
-      <div class="row">
-        <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
-        <button id="btnWizardCancel" style="display:none" data-i18n="common.cancel">취소</button>
+    </div>
+    <!-- 하위 화면 머리(§2.1) — "← 제목" + 오른쪽 보조 글 -->
+    <div class="sub-head" id="subHead" hidden>
+      <button class="sub-back" id="btnSubBack" type="button" data-i18n-aria-label="v4.back" aria-label="돌아가기">←</button>
+      <b class="sub-title" id="subTitle"></b>
+      <span class="grow"></span>
+      <span class="sub-right muted" id="subRight"></span>
+    </div>
+    <!-- 레이어 › 연결(§4.6 그림 개편) — 카드 제목 없음. 단계 표시 + 버튼 줄(함께 고정) → 배지 줄 → 빈 상태/변수 카드 → 텍스트 스타일. -->
+    <div class="step bind-card" data-apply-step="bind">
+      <!-- 연결할 변수가 없을 때의 안내(§4.6 표 4행) — 문구와 버튼은 ui.ts가 정한다. -->
+      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
+      <div class="toolbar bind-toolbar">
+        <!-- 단계 표시 — 누를 수 없는 표시(정지점 아님). 상태는 ui.ts renderBindSteps가 정한다. -->
+        <ol class="bind-steps" id="bindSteps" role="list" data-i18n-aria-label="bind.stepsAria" aria-label="연결 단계">
+          <li class="bs" data-s="find"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.find">찾기</span></li>
+          <li class="bs" data-s="pick"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.stepPick">고르기</span></li>
+          <li class="bs" data-s="link"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.link">연결</span></li>
+        </ol>
+        <button id="btnApply" class="primary bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg><span class="bl" id="btnApplyLabel" data-i18n="bind.find">찾기</span></button>
+        <button id="btnApplyConfirm" class="bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span class="bl" id="btnApplyConfirmLabel" data-i18n="bind.link">연결</span></button>
       </div>
-      <!-- 실행 단계는 세로 목록이 아니라 미니 파이프 칩 — 진행 상태만 한눈에(사유는 칩 툴팁). -->
-      <div id="wizardSteps" class="pipe-mini"></div>
-      <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
-           파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
-           흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=쓰임 역할 · 다크=라이트에서 어두운 값 채우기</div>
-      <div class="status" id="wizardSummary"></div>
-      <!-- 요약 끝 연결 안내(§4.3) — 마법사는 레이어에 변수를 붙이지 않는다. 누르면 레이어 › 연결 + 미리보기. -->
-      <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">레이어 › 연결에서 확인하고 연결하기 →</button>
+      <div class="ux" id="applyProgress" style="display:none">
+        <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
+        <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
+        <div class="row">
+          <span class="muted" id="applyProgressText"></span>
+          <button id="btnApplyCancel" data-i18n="common.cancel">취소</button>
+        </div>
+      </div>
+      <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
+      <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">다시 찾기</button></div>
+      <!-- 연결 후 결과 카드(§4.6) -->
+      <div class="bind-done" id="bindDone" hidden><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span id="bindDoneText"></span><span class="grow"></span><button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
+      <!-- 배지 줄(찾은 뒤) — (찾음 n) (건너뜀 m ▸) … [모두 켜기/끄기] [필터]. 사유 칩 줄은 DOM에서 건너뜀 바로 뒤(포커스 순서), 화면에서는 아랫줄. -->
+      <div class="bind-badges" id="bindBadges" hidden>
+        <span class="bd bd-found" id="bindFound"></span>
+        <span class="bd-roles" id="bindRoleSum" hidden></span>
+        <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
+        <div class="skip-row" id="bindSkips" hidden></div>
+        <span class="grow"></span>
+        <button class="bd-all" id="bindAll" type="button"></button>
+        <button class="icon-btn" id="bindFilterBtn" type="button" aria-expanded="false" aria-controls="bindFilterRow" data-i18n-title="bind.filterBtn" title="변수 이름 필터" data-i18n-aria-label="bind.filterBtn" aria-label="변수 이름 필터"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
+      </div>
+      <div class="row bind-filter-row" id="bindFilterRow" hidden>
+        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" />
+        <span class="muted" id="bindOutside"></span>
+      </div>
+      <!-- 빈 상태(목록 자리, 점선 상자) — 찾기 전(예시 두 줄) · 선택 없음 · 찾은 곳 0. -->
+      <div class="bind-empty" id="bindEmpty" hidden></div>
+      <!-- 변수 카드 "값 → 변수"(§4.6) -->
+      <div id="bindTree" class="bind-list"></div>
+      <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 카드 목록 아래 한 줄(§4.6). -->
+      <div class="row ts-apply-row">
+        <span class="ts-aa" aria-hidden="true">Aa</span>
+        <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
+        <span class="grow"></span>
+        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결해요. 새로 만들지 않아요.">기존 스타일 연결</button>
+      </div>
+      <div class="hint" id="tsApplyResult" hidden></div>
+      <div class="status" id="applyStatus"></div>
+    </div>
+
+    <div class="step" data-apply-step="rename">
+      <h2><span data-i18n="rename.title">이름 정리</span> <span class="muted" id="renameCount"></span></h2>
+      <div class="hint" data-i18n="rename.hint">역할에 맞는 레이어 이름으로 바꿔요. 최상위·인스턴스 이름은 그대로 둬요</div>
+      <div class="toolbar">
+        <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
+        <button id="btnRename" class="primary" disabled data-i18n="rename.apply">이름 적용</button>
+      </div>
+      <div class="row tree-ctrls">
+        <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
+        <!-- 보존 행(루트·인스턴스·잠긴 레이어…)을 목록에서 걷어낸다 — 바뀔 것만 보고 싶을 때. -->
+        <button id="btnRenameKeep" class="link" data-i18n="rename.hideKeep">잠금 제외</button>
+      </div>
+      <div id="diff" class="results"></div>
+      <!-- 「되돌리기 안전장치」 콜아웃 철거 — 와이어에 없고, 있으면 오히려 틀린 말을 한다.
+           한 번의 Ctrl/⌘Z로 되돌아가는 건 이 카드만이 아니라 commitUndo를 부르는 13개 동작
+           전부다. 이름 정리에만 붙여 두면 나머지는 안 그렇다는 뜻이 된다. -->
+      <div class="status" id="renameStatus"></div>
+    </div>
+
+    <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
+         목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
+    <div class="step" id="structureCard" data-apply-step="structure">
+      <h2><span data-i18n="structure.title">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span> <span class="muted lock" id="componentLock"></span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
+      <div class="hint" data-i18n="component.hint">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</div>
+      <div class="toolbar">
+        <button id="btnScanComp" data-i18n="component.scanBtn" data-i18n-tip="component.scanHelp" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.">후보 스캔</button>
+        <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-i18n-tip="similar.scanHelp" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶어요. 파일은 안 바꿔요.">닮은 스캔</button>
+      </div>
+      <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
+      <div class="toolbar toolbar-2">
+        <span class="grow"></span>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿔요. 원본의 연결과 값은 마스터를 따라요.">묶기</button>
+      </div>
+      <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
+        <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
+      </div>
+      <div class="r-group" id="compTreeGroup" style="display:none" data-i18n="structure.groupComp">컴포넌트 후보</div>
+      <div id="compTree" class="results"></div>
+      <div class="r-group" id="similarGroup" style="display:none" data-i18n="structure.groupSimilar">닮은 프레임</div>
+      <div id="similarList" class="results"></div>
+      <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.
+           낱개 컴포넌트나 세트를 실제로 선택했을 때만 나타난다(SELECTION_STATE.comps/sets). -->
+      <div id="variantRow" hidden>
+        <div class="r-group" data-i18n="structure.groupVariant">선택한 컴포넌트 정리</div>
+        <div class="row">
+          <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-i18n-tip="component.classifyHelp" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶어요.">베리언트 분류</button>
+          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-i18n-tip="component.genMissingHelp" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채워요.">누락 조합 생성</button>
+        </div>
+      </div>
+      <div id="variantReport" class="results"></div>
+      <div class="status" id="structureStatus"></div>
     </div>
 
    <!-- 만들기 하위 화면 — "← 돌아가기"로 변수 탭 첫 화면. -->
-   <div id="varMake" style="display:none">
-    <button class="link back-link" id="btnMakeBack" data-i18n="make.back">← 돌아가기</button>
-    <div id="wizardSlotMake"></div>
+   <div id="varMake" class="sub-screen" style="display:none">
+        <div id="wizardSlotMake"></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" data-i18n-aria-label="rail.makeAria" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
@@ -1005,128 +1116,45 @@
       <div class="status" id="tsStatus"></div>
     </div>
    </div>
+   <!-- 마법사 카드(요소 1개) — 시작 화면 또는 만들기 맨 위 중 보이는 곳에 붙는다(§4.3). -->
+    <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
+    <div class="step" id="wizardCard">
+      <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
+      <div class="hint" data-i18n="wizardCard.hint">선택한 프레임의 색·간격을 변수로 만들고 레이어 이름을 정리해요</div>
+      <div class="hint" id="wizNoSel" hidden data-i18n="wizardCard.noSel">레이어를 선택하면 실행할 수 있어요</div>
+      <div class="wiz-done" id="wizDone" hidden><b id="wizDoneText"></b> <button class="link link-btn" id="btnWizListView" type="button" data-i18n="start.viewList">변수 목록 보기</button></div>
+      <div class="row">
+        <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
+        <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
+        <label class="inline"><input id="wizOptTextStyles" type="checkbox" /> <span data-i18n="wizardCard.optTextStyles">텍스트 스타일</span> <span class="muted" id="wizTextStylesLock"></span></label>
+        <!-- 연결(무료, 기본 켬) — "한 번에 정리는 연결까지"(IA v4 §4.3 B.1 ~ B.3 마법사) -->
+        <label class="inline"><input id="wizOptBind" type="checkbox" checked /> <span data-i18n="wizardCard.optBind">연결</span></label>
+        <!-- v1.0: 컴포넌트 등록은 마법사에서 뺀다(출시 범위 = 추출→생성→바인딩→리네임→내보내기).
+             리네임 직후 이름 기준 묶기가 섹션들을 한 세트로 합쳐 내용을 덮어쓴 사고(QA 파일). 적용 탭의 수동 등록만 남긴다. -->
+        <label class="inline" style="display:none"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
+      </div>
+      <div class="row">
+        <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
+        <button id="btnWizardCancel" style="display:none" data-i18n="common.cancel">취소</button>
+      </div>
+      <!-- 실행 단계는 세로 목록이 아니라 미니 파이프 칩 — 진행 상태만 한눈에(사유는 칩 툴팁). -->
+      <div id="wizardSteps" class="pipe-mini"></div>
+      <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
+           파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
+           흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
+      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=쓰임 역할 · 다크=라이트에서 어두운 값 채우기</div>
+      <div class="status" id="wizardSummary"></div>
+      <!-- 요약 끝 연결 안내(§4.3) — 마법사는 레이어에 변수를 붙이지 않는다. 누르면 레이어 › 연결 + 미리보기. -->
+      <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">선택 탭에서 확인하고 연결하기 →</button>
+    </div>
+
   </section>
 
-  <section class="tab-section" id="tab-layer" role="tabpanel" aria-labelledby="tabbtn-layer" tabindex="0">
-    <!-- 레이어 하위 탭(밑줄, §4.1 탭 모양 2단계) — 연결 · 이름 · 컴포넌트. 세 작업은 순서가 없다(§4.7). -->
-    <div class="subtabs" id="applyRail" role="tablist" data-i18n-aria-label="rail.layerAria" aria-label="레이어 작업">
-      <button class="subtab" role="tab" data-apply-step="bind" data-i18n="rail.bind">연결</button>
-      <button class="subtab" role="tab" data-apply-step="rename" data-i18n="rail.rename">이름</button>
-      <!-- 컴포넌트는 베타 — 언제나 보이고 [베타] 배지로 알린다(§4.7 "베타"). 배지는 접근성 트리에서 숨기고 이름은 aria-label로. -->
-      <button class="subtab" role="tab" data-apply-step="structure" id="subtabComponents" data-i18n-aria-label="layer.componentsBetaAria" aria-label="컴포넌트 (베타)"><span data-i18n="rail.structure">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span></button>
+  <section class="tab-section" id="tab-settings" role="region" data-i18n-aria-label="tab.settings" aria-label="설정" tabindex="-1">
+    <div class="sub-head">
+      <button class="sub-back" id="btnSettingsBack" type="button" data-i18n-aria-label="v4.back" aria-label="돌아가기">←</button>
+      <b class="sub-title" data-i18n="tab.settings">설정</b>
     </div>
-
-    <!-- 레이어 › 연결(§4.6 그림 개편) — 카드 제목 없음. 단계 표시 + 버튼 줄(함께 고정) → 배지 줄 → 빈 상태/변수 카드 → 텍스트 스타일. -->
-    <div class="step bind-card" data-apply-step="bind">
-      <!-- 연결할 변수가 없을 때의 안내(§4.6 표 4행) — 문구와 버튼은 ui.ts가 정한다. -->
-      <div class="prereq" id="bindPrereq" style="display:none"><span class="prereq-text"></span> <button class="link link-btn" id="bindPrereqAction" type="button"></button></div>
-      <div class="toolbar bind-toolbar">
-        <!-- 단계 표시 — 누를 수 없는 표시(정지점 아님). 상태는 ui.ts renderBindSteps가 정한다. -->
-        <ol class="bind-steps" id="bindSteps" role="list" data-i18n-aria-label="bind.stepsAria" aria-label="연결 단계">
-          <li class="bs" data-s="find"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.find">찾기</span></li>
-          <li class="bs" data-s="pick"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.stepPick">고르기</span></li>
-          <li class="bs" data-s="link"><span class="bs-dot" aria-hidden="true"></span><span data-i18n="bind.link">연결</span></li>
-        </ol>
-        <button id="btnApply" class="primary bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"/><path d="M9 9l3.2 3.2"/></svg><span class="bl" id="btnApplyLabel" data-i18n="bind.find">찾기</span></button>
-        <button id="btnApplyConfirm" class="bind-btn" type="button"><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span class="bl" id="btnApplyConfirmLabel" data-i18n="bind.link">연결</span></button>
-      </div>
-      <div class="ux" id="applyProgress" style="display:none">
-        <div class="ux-h"><span class="ux-t" data-i18n="bind.progress">진행률</span></div>
-        <div class="bar"><div class="bar-fill" id="applyBarFill"></div></div>
-        <div class="row">
-          <span class="muted" id="applyProgressText"></span>
-          <button id="btnApplyCancel" data-i18n="common.cancel">취소</button>
-        </div>
-      </div>
-      <!-- 다른 선택에서 만든 결과 / 피그마에서 바뀌었을 수 있음(§4.6 복귀 규칙) -->
-      <div class="situation" id="bindNotice" hidden><span id="bindNoticeText"></span> <button class="link link-btn" id="btnBindRepreview" type="button" data-i18n="bind.repreview">다시 찾기</button></div>
-      <!-- 연결 후 결과 카드(§4.6) -->
-      <div class="bind-done" id="bindDone" hidden><svg class="bi" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.9.9"/><path d="M8 6a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.9-.9"/></svg><span id="bindDoneText"></span><span class="grow"></span><button class="link link-btn" id="btnBindToList" type="button" data-i18n="bind.toList">변수 탭에서 보기 →</button></div>
-      <!-- 배지 줄(찾은 뒤) — (찾음 n) (건너뜀 m ▸) … [모두 켜기/끄기] [필터]. 사유 칩 줄은 DOM에서 건너뜀 바로 뒤(포커스 순서), 화면에서는 아랫줄. -->
-      <div class="bind-badges" id="bindBadges" hidden>
-        <span class="bd bd-found" id="bindFound"></span>
-        <span class="bd-roles" id="bindRoleSum" hidden></span>
-        <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
-        <div class="skip-row" id="bindSkips" hidden></div>
-        <span class="grow"></span>
-        <button class="bd-all" id="bindAll" type="button"></button>
-        <button class="icon-btn" id="bindFilterBtn" type="button" aria-expanded="false" aria-controls="bindFilterRow" data-i18n-title="bind.filterBtn" title="변수 이름 필터" data-i18n-aria-label="bind.filterBtn" aria-label="변수 이름 필터"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
-      </div>
-      <div class="row bind-filter-row" id="bindFilterRow" hidden>
-        <input id="bindFilter" type="search" data-i18n-placeholder="bind.filterPlaceholder" placeholder="변수 이름 필터" />
-        <span class="muted" id="bindOutside"></span>
-      </div>
-      <!-- 빈 상태(목록 자리, 점선 상자) — 찾기 전(예시 두 줄) · 선택 없음 · 찾은 곳 0. -->
-      <div class="bind-empty" id="bindEmpty" hidden></div>
-      <!-- 변수 카드 "값 → 변수"(§4.6) -->
-      <div id="bindTree" class="bind-list"></div>
-      <!-- 텍스트 스타일 "기존 스타일 연결"(무료) — 카드 목록 아래 한 줄(§4.6). -->
-      <div class="row ts-apply-row">
-        <span class="ts-aa" aria-hidden="true">Aa</span>
-        <span class="muted" data-i18n="bind.tsLabel">텍스트 스타일</span>
-        <span class="grow"></span>
-        <button id="btnApplyExistingText" data-i18n="textStyle.applyExistingBtn" data-i18n-title="textStyle.applyExistingTip" title="선택한 글자를 이미 만든 같은 스타일에 연결해요. 새로 만들지 않아요.">기존 스타일 연결</button>
-      </div>
-      <div class="hint" id="tsApplyResult" hidden></div>
-      <div class="status" id="applyStatus"></div>
-    </div>
-
-    <div class="step" data-apply-step="rename">
-      <h2><span data-i18n="rename.title">이름 정리</span> <span class="muted" id="renameCount"></span></h2>
-      <div class="hint" data-i18n="rename.hint">역할에 맞는 레이어 이름으로 바꿔요. 최상위·인스턴스 이름은 그대로 둬요</div>
-      <div class="toolbar">
-        <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
-        <button id="btnRename" class="primary" disabled data-i18n="rename.apply">이름 적용</button>
-      </div>
-      <div class="row tree-ctrls">
-        <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
-        <!-- 보존 행(루트·인스턴스·잠긴 레이어…)을 목록에서 걷어낸다 — 바뀔 것만 보고 싶을 때. -->
-        <button id="btnRenameKeep" class="link" data-i18n="rename.hideKeep">잠금 제외</button>
-      </div>
-      <div id="diff" class="results"></div>
-      <!-- 「되돌리기 안전장치」 콜아웃 철거 — 와이어에 없고, 있으면 오히려 틀린 말을 한다.
-           한 번의 Ctrl/⌘Z로 되돌아가는 건 이 카드만이 아니라 commitUndo를 부르는 13개 동작
-           전부다. 이름 정리에만 붙여 두면 나머지는 안 그렇다는 뜻이 된다. -->
-      <div class="status" id="renameStatus"></div>
-    </div>
-
-    <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
-         목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
-    <div class="step" id="structureCard" data-apply-step="structure">
-      <h2><span data-i18n="structure.title">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span> <span class="muted lock" id="componentLock"></span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
-      <div class="hint" data-i18n="component.hint">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</div>
-      <div class="toolbar">
-        <button id="btnScanComp" data-i18n="component.scanBtn" data-i18n-tip="component.scanHelp" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.">후보 스캔</button>
-        <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-i18n-tip="similar.scanHelp" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶어요. 파일은 안 바꿔요.">닮은 스캔</button>
-      </div>
-      <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
-      <div class="toolbar toolbar-2">
-        <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿔요. 원본의 연결과 값은 마스터를 따라요.">묶기</button>
-      </div>
-      <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
-      </div>
-      <div class="r-group" id="compTreeGroup" style="display:none" data-i18n="structure.groupComp">컴포넌트 후보</div>
-      <div id="compTree" class="results"></div>
-      <div class="r-group" id="similarGroup" style="display:none" data-i18n="structure.groupSimilar">닮은 프레임</div>
-      <div id="similarList" class="results"></div>
-      <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.
-           낱개 컴포넌트나 세트를 실제로 선택했을 때만 나타난다(SELECTION_STATE.comps/sets). -->
-      <div id="variantRow" hidden>
-        <div class="r-group" data-i18n="structure.groupVariant">선택한 컴포넌트 정리</div>
-        <div class="row">
-          <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-i18n-tip="component.classifyHelp" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶어요.">베리언트 분류</button>
-          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-i18n-tip="component.genMissingHelp" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채워요.">누락 조합 생성</button>
-        </div>
-      </div>
-      <div id="variantReport" class="results"></div>
-      <div class="status" id="structureStatus"></div>
-    </div>
-  </section>
-
-  <section class="tab-section" id="tab-settings" role="tabpanel" aria-labelledby="tabbtn-settings" tabindex="0">
     <!-- #19: 기준 크기·맥락 깊이·허용오차는 여기서만. 만들기/적용 단계에는 노출하지 않는다. -->
     <div class="step" id="pluginSettingsCard">
       <h2 data-i18n="settings.title">기본값</h2>
@@ -1363,6 +1391,7 @@
     "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizard.step.dark": "\uB2E4\uD06C",
     "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "wizard.step.bind": "\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
@@ -1414,11 +1443,17 @@
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
+    "wizard.seq.bindDone": "{n}\uACF3 \uC5F0\uACB0",
+    "wizard.seq.bindRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
+    "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
+    "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
     "wizard.sum.tokens": "\uD1A0\uD070 {n}",
     "wizard.sum.dark": "\uB2E4\uD06C {n}",
     "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
+    "wizard.sum.bound": "\uC5F0\uACB0 {n}\uACF3",
     "wizard.sum.renamed": "\uC774\uB984 {n}",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "wizard.sum.empty": "\uB05D\uB0B8 \uC791\uC5C5\uC774 \uC5C6\uC5B4\uC694",
@@ -1559,60 +1594,37 @@
     "bind.tsGotoType": "\uD0C0\uC774\uD3EC\uC5D0\uC11C \uB4F1\uB85D \u2192(\uC720\uB8CC)",
     // IA v3 변수 탭(§4.2~§4.4)
     "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
-    "start.head": "\uC544\uC9C1 \uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
-    "start.sub": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uB9CC\uB4E4\uC5B4 \uBCF4\uC138\uC694",
-    "start.freeNote": "\u24D8 \uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uBCC0\uC218\uB97C \uC0C8\uB85C \uB9CC\uB4E4 \uC218 \uC5C6\uC5B4\uC694",
-    "start.freeNote2": "\uC774\uB984 \uC815\uB9AC\uC640 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uC740 \uBB34\uB8CC",
-    "start.freeExtract": "(\uCD94\uCD9C\uAE4C\uC9C0 \uBB34\uB8CC)",
-    "start.libNote": "\u24D8 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB294 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694. \uAC19\uC740 \uBCC0\uC218\uB97C \uC5EC\uAE30\uC11C \uB610 \uB9CC\uB4E4 \uD544\uC694\uB294 \uC5C6\uC5B4\uC694.",
     "start.made": "\uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
     "start.viewList": "\uBCC0\uC218 \uBAA9\uB85D \uBCF4\uAE30",
     "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uB808\uC774\uC5B4 \uC5F0\uACB0\uC740 \uB05D\uB09C \uB4A4 \uD655\uC778\uD558\uACE0 \uD574\uC694",
     "wizardCard.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC2E4\uD589\uD560 \uC218 \uC788\uC5B4\uC694",
-    "wizard.toBind": "\uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.toBind": "\uC120\uD0DD \uD0ED\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.notLinked": " \xB7 \uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
     "wizard.seq.cancelSkipped": "\uCDE8\uC18C\uB85C \uAC74\uB108\uB700",
-    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uB9CC \uC815\uB9AC\uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
-    "wizardCard.runFree": "\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
+    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uACFC \uB808\uC774\uC5B4 \uC774\uB984 \uC815\uB9AC\uB9CC \uD574\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
+    "wizardCard.runFree": "\uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
     "wizard.freeSum": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "wizard.freeSumBound": "\uC5F0\uACB0 {b}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
-    "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total} \u25BE",
+    "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total}",
     "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
-    "list.findUnboundTip": "\uC120\uD0DD\uC5D0\uC11C \uBCC0\uC218\uB85C \uBC14\uAFC0 \uC218 \uC788\uB294 \uC0C9\xB7\uAC04\uACA9\uC744 \uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uCC3E\uC544\uC694",
     "list.addTip": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30(\uC0C9\xB7\uD1A0\uD070\xB7\uD14C\uB9C8\xB7\uD0C0\uC774\uD3EC)",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
-    "list.refreshTip": "\uB2E4\uC2DC \uC77D\uAE30",
     "list.modeTip": "\uBAA8\uB4DC",
     "list.modeDefault": "\uAE30\uBCF8 \uBAA8\uB4DC",
     "list.searchTip": "\uAC80\uC0C9",
-    "list.chipTip": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 {used}\uAC1C(\uC9C1\uC811 {direct} \xB7 \uAC04\uC811 {indirect}) / \uC804\uCCB4 {total}\uAC1C",
     "list.reading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 \uC77D\uB294 \uC911\u2026",
-    "list.refreshSame": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uBCC0\uACBD \uC5C6\uC74C",
-    "list.refreshUsage": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uC0AC\uC6A9 \uC218\uAC00 \uBC14\uB010 \uBCC0\uC218 {n}\uAC1C",
-    "list.refreshTable": "\uB2E4\uC2DC \uC77D\uC74C \xB7 \uBCC0\uC218 \uBAA9\uB85D\uC774 \uBC14\uB00C\uC5C8\uC5B4\uC694",
-    "list.refreshCountSuffix": " \xB7 \uC0AC\uC6A9 \uC218\uAC00 \uBC14\uB010 \uBCC0\uC218 {n}\uAC1C",
     "list.big": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC544\uC694",
     "list.read": "\uC77D\uAE30",
     "list.wizardWait": "\uB9C8\uBC95\uC0AC\uAC00 \uB05D\uB098\uBA74 \uC77D\uC5B4\uC694",
     "list.noneUsed": "\uC774 \uC120\uD0DD\uC740 \uB85C\uCEEC \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694",
-    "list.selectHint": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \u2605 Inspect\uC5D0 \uBAA8\uC5EC\uC694",
     "list.inspect": "\u2605 Inspect",
-    "list.inspectTip": "Inspect \u2014 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218",
-    "list.inspectAria": "Inspect \u2014 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218, {n}\uAC1C",
     "list.inspectNoSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5EC\uAE30\uC5D0 \uBAA8\uC5EC\uC694",
     "list.libItem": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
-    "list.libItemAria": "\uB77C\uC774\uBE0C\uB7EC\uB9AC, \uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
     "list.deletedItem": "\uC0AD\uC81C\uB41C \uBCC0\uC218",
-    "list.deletedItemAria": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB41C \uACF3 {n}\uAC1C",
     "list.sideColAria": "{name}, \uACC4\uCE35 {badge}, {num}",
-    "list.sideGrpAria": "{name}, {num}",
-    "list.sideExpand": "\uD3BC\uCE58\uAE30",
-    "list.sideCollapse": "\uC811\uAE30",
     "list.searchTitle": "'{q}' \uAC80\uC0C9 \uACB0\uACFC",
     "list.noGroup": "(\uADF8\uB8F9 \uC5C6\uC74C)",
-    "list.totalTip": "\uC804\uCCB4 {total}\uAC1C",
-    "list.baseDiff": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694 \xB7 ",
-    "list.baseDiffNoSel": "\uBAA9\uB85D \uAE30\uC900: {name} \xB7 \uC9C0\uAE08 \uC120\uD0DD \uC5C6\uC74C \xB7 ",
-    "list.baseMany": "\uB808\uC774\uC5B4 {m}\uAC1C",
     "list.rebase": "\uAE30\uC900 \uBC14\uAFB8\uAE30",
     "list.unused": "\uC548 \uC500",
     "list.indirect": "\u21B3",
@@ -1621,7 +1633,6 @@
     "list.hiddenRow": "\uC120\uD0DD\uC5D0\uC11C \uC548 \uC4F0\uC5EC \uBAA9\uB85D\uC5D0\uC11C \uBE60\uC84C\uC5B4\uC694",
     "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
-    "list.libSection": "LIB \xB7 \uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uAC83",
     "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
     "list.libCollection": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \xB7 {name}",
     "list.libManaged": "\uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
@@ -1646,7 +1657,59 @@
     "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
     "list.semanticsNote": "\uC5ED\uD560 \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uC801\uC6A9\uD560 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
     "tab.variables": "\uBCC0\uC218",
-    "tab.layer": "\uB808\uC774\uC5B4",
+    "tab.select": "\uC120\uD0DD",
+    // IA v4 선택 탭(§4.1)
+    "v4.layers": "\uB808\uC774\uC5B4 {n}\uAC1C",
+    "v4.selMany": "{name} \uC678 {k}\uAC1C",
+    "v4.baseDiff": "\uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694",
+    "v4.loading": "\uBD88\uB7EC\uC624\uB294 \uC911\u2026",
+    "v4.noSel": "\uB514\uC790\uC778\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    "v4.noVarsFile": "\uC774 \uD30C\uC77C\uC5D4 \uC544\uC9C1 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "v4.reading": "\uC120\uD0DD\uC744 \uC77D\uB294 \uC911\u2026",
+    "v4.libOnly": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB9CC \uC368\uC694 \xB7 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
+    "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
+    "v4.kindPlaces": "{kind} {n}\uACF3",
+    "v4.kind.gap": "\uAC04\uACA9",
+    "v4.kind.radius": "\uBC18\uACBD",
+    "v4.kind.size": "\uD06C\uAE30",
+    "v4.kind.stroke": "\uC120 \uB450\uAED8",
+    "v4.kind.opacity": "\uD22C\uBA85\uB3C4",
+    "v4.kind.color": "\uC0C9",
+    "v4.kind.text": "\uAE00\uC790",
+    "v4.kind.other": "\uAE30\uD0C0",
+    "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
+    "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
+    "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
+    "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
+    "v4.noVarPlaces": "\uBCC0\uC218\uAC00 \uC5C6\uB294 \uAC12 {k}\uACF3",
+    "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
+    "v4.skippedPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
+    "v4.view": "\uBCF4\uAE30",
+    "v4.usesTitle0": "\uC4F0\uB294 \uBCC0\uC218",
+    "v4.usesN": "\uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
+    "v4.usesTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
+    "v4.expand": "\uBCF4\uAE30 \u25BE",
+    "v4.collapse": "\uC811\uAE30 \u25B4",
+    "v4.noTierName": "\uACC4\uCE35 \uC5C6\uC74C",
+    "v4.libName": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
+    "v4.places": "{n}\uACF3",
+    "v4.detail": "\uC0C1\uC138\u2026",
+    "v4.deletedN": "\uC0AD\uC81C\uB41C \uBCC0\uC218 {n}\uACF3",
+    "v4.select": "\uC120\uD0DD",
+    "v4.unbind": "\uC5F0\uACB0 \uD480\uAE30",
+    "v4.unbound": "\uC0AD\uC81C\uB41C \uBCC0\uC218 \uC5F0\uACB0 {k}\uACF3\uC744 \uD480\uC5C8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "v4.unboundFailed": " \xB7 {m}\uACF3\uC740 \uD480\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "v4.unbindFail.font": "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC74C",
+    "v4.unbindFail.error": "\uC624\uB958",
+    "v4.tidy": "\uB808\uC774\uC5B4 \uC815\uB9AC",
+    "v4.rename": "\uC774\uB984 \uC815\uB9AC",
+    "v4.back": "\uB3CC\uC544\uAC00\uAE30",
+    "v4.subBind": "\uC5F0\uACB0",
+    "v4.subComponents": "\uCEF4\uD3EC\uB10C\uD2B8 \uBCA0\uD0C0",
+    "v4.subMake": "\uAC12\uC744 \uC9C1\uC811 \uACE0\uB974\uAE30",
+    "v4.varEmpty": "\uC544\uC9C1 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "v4.makeFromSel": "\uC120\uD0DD\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "tab.settings": "\uC124\uC815",
     // 최소화(IA v3 §4.9)
     "ui.minimize": "\uCD5C\uC18C\uD654",
@@ -1676,10 +1739,9 @@
     "op.rename": "\uC774\uB984 \uC815\uB9AC",
     "op.components": "\uCEF4\uD3EC\uB10C\uD2B8",
     "op.export": "\uB0B4\uBCF4\uB0B4\uAE30",
+    "op.unbind": "\uC0AD\uC81C\uB41C \uBCC0\uC218 \uC5F0\uACB0 \uD480\uAE30",
     "op.wizard": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
     // 변수 탭 하위 화면(PR 1 중간 상태)
-    "var.goMake": "\uC0C9\uBD80\uD130 \uD558\uB098\uC529 \uB9CC\uB4E4\uAE30 \u2192",
-    "make.back": "\u2190 \uB3CC\uC544\uAC00\uAE30",
     // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
     "rail.color": "\uC0C9",
     "rail.colorSub": "\uCD94\uCD9C\xB7\uBCC0\uC218",
@@ -1689,8 +1751,6 @@
     "rail.themeSub": "\uB2E4\uD06C \uBAA8\uB4DC",
     "rail.type": "\uD0C0\uC774\uD3EC",
     "rail.typeSub": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "rail.bind": "\uC5F0\uACB0",
-    "rail.rename": "\uC774\uB984",
     "rail.structure": "\uCEF4\uD3EC\uB10C\uD2B8",
     "rail.next": "\uB2E4\uC74C \u2192",
     // 플러그인 설정(#19) — 설정 탭에만
@@ -1716,6 +1776,7 @@
     "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizardCard.optDark": "\uB2E4\uD06C",
     "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "wizardCard.optBind": "\uC5F0\uACB0",
     "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
@@ -1882,7 +1943,6 @@
     // PR 4 — 코드에 직접 쓰던 문구를 옮김(docs/pr4-copy-table.md). 조각을 받는 자리는 {…Part}
     // 공통 · 접근성 이름
     "tab.listAria": "\uC791\uC5C5 \uD0ED",
-    "rail.layerAria": "\uB808\uC774\uC5B4 \uC791\uC5C5",
     "rail.makeAria": "\uB9CC\uB4E4\uAE30 \uB2E8\uACC4",
     "list.sideAria": "\uBCC0\uC218 \uCEEC\uB809\uC158",
     "list.gridAria": "\uBCC0\uC218 \uBAA9\uB85D",
@@ -2702,9 +2762,6 @@
       return __spreadValues({ collection: c, groups }, countOf(cv, direct, indirect));
     });
   }
-  function inspectCount(vars, direct, indirect) {
-    return countOf(vars, direct, indirect).used;
-  }
   function rightEntries(sel, cols, vars, direct, indirect, query2 = "") {
     const out = [];
     const rank = (s) => s === "direct" || s === "indirect" ? 0 : 1;
@@ -2737,24 +2794,6 @@
       if (side) pushGroups(__spreadProps(__spreadValues({}, side), { groups: side.groups.filter((g) => g.key === sel.key) }), () => true, "none", false);
     }
     return out;
-  }
-  function initialSideSel(cols, vars, hasBaseline, bigSkipped2, direct, indirect) {
-    const first = orderCollections(cols)[0];
-    const fallback = first ? { kind: "col", id: first.id } : { kind: "inspect" };
-    if (!hasBaseline || bigSkipped2) return fallback;
-    if (!direct) return { kind: "inspect" };
-    return inspectCount(vars, direct, indirect) > 0 ? { kind: "inspect" } : fallback;
-  }
-  function validSideSel(sel, cols, vars, hasLib, hasDeleted, initial) {
-    if (sel.kind === "inspect") return sel;
-    if (sel.kind === "col") return cols.some((c) => c.id === sel.id) ? sel : initial();
-    if (sel.kind === "grp") {
-      if (vars.some((v) => groupKey(v.collectionId, v.name) === sel.key)) return sel;
-      const colId = sel.key.slice(0, sel.key.indexOf("|"));
-      return cols.some((c) => c.id === colId) ? { kind: "col", id: colId } : initial();
-    }
-    if (sel.kind === "lib") return hasLib ? sel : initial();
-    return hasDeleted ? sel : initial();
   }
   function normalizeVarName(name) {
     return name.trim().split("/").map((s) => s.trim()).join("/");
@@ -3361,6 +3400,8 @@
     // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
     { id: "dark", write: true, optional: true, paid: true },
     { id: "textStyles", write: true, optional: true, paid: true },
+    { id: "bind", write: true, optional: true },
+    // 무료 — 연결은 무료 기능이다
     { id: "rename", write: true, optional: false },
     { id: "componentize", write: true, optional: true, paid: true }
   ];
@@ -3388,9 +3429,59 @@
     if (totals.created != null) parts.push(t("wizard.sum.tokens", { n: totals.created }));
     if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t("wizard.sum.dark", { n: totals.darkFilled }));
     if (totals.textStyles != null && totals.textStyles > 0) parts.push(t("wizard.sum.textStyles", { n: totals.textStyles }));
+    if (totals.bound != null) parts.push(t("wizard.sum.bound", { n: totals.bound }));
     if (totals.renamed != null) parts.push(t("wizard.sum.renamed", { n: totals.renamed }));
     if (totals.components != null && totals.components > 0) parts.push(t("wizard.sum.components", { n: totals.components }));
     return parts.length ? parts.join(" \xB7 ") : t("wizard.sum.empty");
+  }
+
+  // src/lib/selCards.ts
+  var SEL_KINDS = ["gap", "radius", "size", "stroke", "opacity", "color", "text"];
+  var PADDING2 = /* @__PURE__ */ new Set(["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]);
+  var RADIUS2 = /* @__PURE__ */ new Set(["cornerRadius", "topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"]);
+  var STROKE = /* @__PURE__ */ new Set(["strokeWeight", "strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"]);
+  var TEXT = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily"]);
+  var COLOR = /* @__PURE__ */ new Set(["fills", "strokes", "effects"]);
+  function fieldKind(field) {
+    if (!field) return "other";
+    if (field === "itemSpacing" || field === "counterAxisSpacing" || PADDING2.has(field) || field.startsWith("grid")) return "gap";
+    if (RADIUS2.has(field)) return "radius";
+    if (field === "width" || field === "height") return "size";
+    if (STROKE.has(field)) return "stroke";
+    if (field === "opacity") return "opacity";
+    if (COLOR.has(field)) return "color";
+    if (TEXT.has(field)) return "text";
+    return "other";
+  }
+  var NO_VAR_REASONS = ["no-match", "size-fraction"];
+  var PLACE_SKIP_REASONS = ["styled", "hug-fill", "translucent", "space-between", "fraction", "empty-text", "deleted-var"];
+  var sumKinds = (r) => Object.values(r != null ? r : {}).reduce((a, b) => a + (b != null ? b : 0), 0);
+  function cardCounts(candidateFields, counts) {
+    var _a;
+    const byKind = /* @__PURE__ */ new Map();
+    const noVar = /* @__PURE__ */ new Map();
+    const add = (map, k2, n) => {
+      var _a2;
+      map.set(k2, ((_a2 = map.get(k2)) != null ? _a2 : 0) + n);
+    };
+    for (const f of candidateFields) add(byKind, fieldKind(f), 1);
+    let k = 0;
+    for (const r of NO_VAR_REASONS) {
+      for (const [kind, n] of Object.entries((_a = counts == null ? void 0 : counts[r]) != null ? _a : {})) {
+        if (!n) continue;
+        k += n;
+        add(byKind, kind, n);
+        add(noVar, kind, n);
+      }
+    }
+    let s = 0;
+    for (const r of PLACE_SKIP_REASONS) s += sumKinds(counts == null ? void 0 : counts[r]);
+    const order = (map) => [...SEL_KINDS, "other"].map((kind) => {
+      var _a2;
+      return { kind, n: (_a2 = map.get(kind)) != null ? _a2 : 0 };
+    }).filter((x) => x.n > 0);
+    const m = candidateFields.length;
+    return { m, k, s, n: m + k, byKind: order(byKind), noVarByKind: order(noVar) };
   }
 
   // src/ui.ts
@@ -3441,7 +3532,7 @@
   var selectStatusTarget = "applyStatus";
   function selectNodes(ids, statusId) {
     selectStatusTarget = statusId;
-    if (statusId === "applyStatus" && activeTab === "layer") bindLayerSelectPending = true;
+    if (statusId === "applyStatus" && activeTab === "select") bindLayerSelectPending = true;
     send({ type: "SELECT_NODES", ids });
   }
   function resolveStatusId(id) {
@@ -4186,11 +4277,13 @@
     }
     const reqId = nextBindReq();
     bindSilentReq = silent ? reqId : 0;
+    const base = baseline != null ? baseline : curSel;
+    bindSilentCarry = silent && !!bindPreviewSel && sameIds(bindPreviewSel, base.ids);
     opSilent = silent;
-    send({ type: "APPLY", preview: true, reqId });
+    send({ type: "APPLY", preview: true, reqId, nodeIds: base.ids });
     opSilent = false;
-    bindPreviewSel = curSel.ids.slice();
-    if (!silent) bindPreviewName = curSel.count === 1 ? shortName(curSel.name || t("sel.unnamed")) : t("bind.selMany", { k: curSel.count });
+    bindPreviewSel = base.ids.slice();
+    if (!silent) bindPreviewName = base.count === 1 ? shortName(base.name || t("sel.unnamed")) : t("bind.selMany", { k: base.count });
     renderBindChrome();
   }
   $("btnBindRepreview").addEventListener("click", () => runBindPreview());
@@ -4259,6 +4352,8 @@
   var PaidRequiredError = class extends Error {
   };
   var wizardWaiter = null;
+  var wizBindReq = 0;
+  var wizBindPending = false;
   window.addEventListener("message", (event) => {
     const m = event.data.pluginMessage;
     if (!m) return;
@@ -4269,16 +4364,17 @@
       w.reject(m.type === "PREMIUM_REQUIRED" ? new PaidRequiredError() : new Error(m.message));
       return;
     }
-    if (wizardWaiter.types.includes(m.type)) {
+    if (wizardWaiter.types.includes(m.type) && (wizardWaiter.reqId === void 0 || m.reqId === wizardWaiter.reqId)) {
       const w = wizardWaiter;
       wizardWaiter = null;
       setTimeout(() => w.resolve(m), 0);
     }
   });
-  function wizardRequest(msg, expect) {
+  function wizardRequest(msg, expect, reqId) {
     return new Promise((resolve, reject) => {
       wizardWaiter = {
         types: [...expect],
+        reqId,
         resolve: (m) => resolve(m),
         reject
       };
@@ -4318,7 +4414,7 @@
     chip.title = note;
   }
   async function runWizard() {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g;
     if (wizardRunning) return;
     if (lastSelCount <= 0) {
       setStatus("wizardSummary", t("wizard.needSelect"), "warn");
@@ -4331,15 +4427,18 @@
       semantics: $("wizOptSemantics").checked,
       dark: $("wizOptDark").checked,
       textStyles: $("wizOptTextStyles").checked,
+      bind: $("wizOptBind").checked,
       // v1.0: 마법사에서 컴포넌트 등록 제외(체크박스 숨김) — 리네임 뒤 이름 기준 묶기가 디자인을 덮어쓴다.
       componentize: false
     };
     const ctx = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
     const plan = planWizard(options, ctx);
+    const wizIds = (baseline != null ? baseline : curSel).ids.slice();
+    wizBindRan = false;
     wizardRunning = true;
     wizardFailed = false;
     wizBeforeCount = localVarCount();
-    wizFrom = activeTab === "variables" && varSub === "make" ? "make" : "start";
+    wizFrom = activeTab === "select" && selSub === "make" ? "make" : "start";
     wizLatch = wizBeforeCount === 0 ? { from: wizFrom, before: 0, summarySeen: false, done: false } : null;
     opWizardStart();
     $("btnWizardRun").disabled = true;
@@ -4364,7 +4463,7 @@
       try {
         switch (p.step.id) {
           case "extract": {
-            await wizardRequest({ type: "EXTRACT" }, ["EXTRACT_RESULT"]);
+            await wizardRequest({ type: "EXTRACT", nodeIds: wizIds }, ["EXTRACT_RESULT"]);
             if (!tokens.length) {
               setWizardStep("extract", "fail", t("wizard.seq.noExtract"));
               stopped = true;
@@ -4445,8 +4544,21 @@
             setWizardStep("textStyles", "done", t("wizard.seq.textStyles", { created: r.created, updated: r.updated }));
             break;
           }
+          case "bind": {
+            wizBindReq = ++bindReqSeq;
+            wizBindPending = true;
+            const r = await wizardRequest({ type: "APPLY", preview: false, nodeIds: wizIds, reqId: wizBindReq }, ["APPLY_RESULT"], wizBindReq).finally(() => {
+              wizBindPending = false;
+            });
+            totals.bound = r.bound;
+            wizBindRan = true;
+            const reasons = (_b = r.reasons) != null ? _b : {};
+            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_c = reasons["already-bound"]) != null ? _c : 0) > 0 && !((_d = reasons["no-match"]) != null ? _d : 0) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
+            setWizardStep("bind", "done", r.bound ? t("wizard.seq.bindDone", { n: r.bound }) + (r.newRoles ? t("wizard.seq.bindRoles", { k: r.newRoles }) : "") : t(zero));
+            break;
+          }
           case "rename": {
-            const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth }, ["RENAME_RESULT"]);
+            const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth, nodeIds: wizIds }, ["RENAME_RESULT"]);
             totals.renamed = r.changes.length;
             setWizardStep("rename", "done", t("wizard.seq.renameDone", { count: r.changes.length }));
             break;
@@ -4477,10 +4589,11 @@
     const paidSkipped = paidSkippedSteps(plan);
     const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
     if (!isPaid && !stopped && !wizardFailed) {
-      setStatus("wizardSummary", t("wizard.freeSum", { n: (_b = totals.renamed) != null ? _b : 0 }), "ok");
+      setStatus("wizardSummary", wizBindRan ? t("wizard.freeSumBound", { b: (_e = totals.bound) != null ? _e : 0, n: (_f = totals.renamed) != null ? _f : 0 }) : t("wizard.freeSum", { n: (_g = totals.renamed) != null ? _g : 0 }) + t("wizard.notLinked"), "ok");
     } else setStatus(
       "wizardSummary",
-      t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
+      t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + // 연결 단계를 껐으면 다 끝난 것처럼 읽히지 않게 적는다(v4 §4.3 링크 표).
+      (!wizBindRan ? t("wizard.notLinked") : "") + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
       stopped || paidSkipped.length || wizardFailed ? "warn" : "ok"
     );
     wizCountPending = wizFrom === "make" && wizBeforeCount > 0;
@@ -4490,9 +4603,10 @@
   }
   var wizCancelReq = false;
   var wizEnded = false;
+  var wizBindRan = false;
   function renderWizToBind() {
     const b = $("btnWizToBind");
-    b.hidden = !wizEnded || wizardRunning || prereqKnown && !hasBindable;
+    b.hidden = !wizEnded || wizardRunning || wizBindRan || prereqKnown && !hasBindable;
     if (curSel) setLock(b, curSel.count ? null : "prereq", t("status.noSelection"));
   }
   var wizCountPending = false;
@@ -4682,8 +4796,12 @@
     const target = PIPELINE_TARGET[id];
     if (id === "semantics") showStatusLine(t("list.semanticsNote"));
     if (target.make === null) {
-      showTab("layer");
-      showApplyStep((_a = target.apply) != null ? _a : "bind");
+      showTab("select");
+      showSelSub(target.apply === "rename" && curSel.count ? "rename" : "home");
+      if (selSub === "home") {
+        (_a = $("selCards").querySelector("button")) == null ? void 0 : _a.focus();
+        return;
+      }
     } else {
       showMake(target.make);
     }
@@ -4954,11 +5072,9 @@
           } else bindSelChangedDuringLink = true;
           $("tsApplyResult").hidden = true;
           layerLibUse = null;
-          if (activeTab === "layer") readLayerLibUse();
+          if (activeTab === "select") readLayerLibUse();
         } else if (bindLayerSelectPending) {
           bindHereSel = true;
-        } else if (hasBindPreview()) {
-          bindForeignSel = true;
         }
         bindLayerSelectPending = false;
         renderBindPrereq();
@@ -4997,12 +5113,13 @@
         break;
       }
       case "PROGRESS":
-        if (msg.op === "bind") updateApplyProgress(msg.done, msg.total);
+        if (msg.op === "bind" && !wizBindPending) updateApplyProgress(msg.done, msg.total);
         else if (msg.op === "link" && bindLinking) updateLinkProgress(msg.done, msg.total);
         break;
       case "APPLY_RESULT": {
         const linkEnded = bindLinking !== 0 && msg.reqId === bindLinking;
         if (linkEnded) bindLinking = 0;
+        if (msg.reqId !== void 0 && msg.reqId === wizBindReq) break;
         if (!isCurrentBindReply(msg.reqId)) {
           if (linkEnded) {
             flushLinkSelClear();
@@ -5025,13 +5142,15 @@
           const prevChecked = new Set(bindChecked);
           bindCandidates = (_c = msg.candidates) != null ? _c : [];
           bindNodes = (_d = msg.nodes) != null ? _d : [];
+          bindCounts = msg.counts;
+          selFindFor = bindPreviewSel ? bindPreviewSel.join(",") : null;
           bindPreviewed = true;
           bindChecked.clear();
           renderSkipReasons((_e = msg.reasons) != null ? _e : {});
           if (silent) {
             const r = carryChecks(prev, prevChecked, bindCandidates);
             for (const k of r.checked) bindChecked.add(k);
-            if (r.added || r.removed) showStatusLine(t("bind.candChanged", { a: r.added, b: r.removed }));
+            if (bindSilentCarry && (r.added || r.removed)) showStatusLine(t("bind.candChanged", { a: r.added, b: r.removed }));
           } else {
             bindSkipsOpen = false;
             for (const c of bindCandidates) bindChecked.add(candKey(c));
@@ -5049,8 +5168,13 @@
           renderBindTree();
         }
         if (linkEnded) onBindLinkingChanged();
+        selFindInFlight = false;
+        renderSelHome();
         break;
       }
+      case "DELETED_UNBOUND":
+        onDeletedUnbound(msg);
+        break;
       case "VAR_TABLE":
         onVarTable(msg);
         renderBindEmpty();
@@ -5137,7 +5261,7 @@
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
         prereqLocalVars = ((_k = msg.tierVars) != null ? _k : 0) + ((_l = msg.otherVars) != null ? _l : 0);
-        if (activeTab === "layer") queueMicrotask(readLayerLibUse);
+        if (activeTab === "select") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
         hasSemanticRoles = msg.hasSemanticRoles;
@@ -5519,6 +5643,8 @@
   var bindLayerSelectPending = false;
   var bindPreviewMini = false;
   var bindSilentReq = 0;
+  var bindSilentCarry = false;
+  var bindCounts;
   var layerLibUse = null;
   var layerLibReq = 0;
   function fieldLabel(label, rawField) {
@@ -6418,7 +6544,7 @@
   $("btnMinimize").addEventListener("click", () => setMini(true));
   $("btnExpand").addEventListener("click", () => setMini(false));
   var goLayer = (step) => () => {
-    showTab("layer");
+    showTab("select");
     showApplyStep(step);
   };
   var OPS = {
@@ -6429,7 +6555,7 @@
     SCAN_TEXT_STYLES: { results: ["TEXT_STYLE_CANDIDATES"], label: "op.textScan", go: () => showMake("type"), write: false },
     CREATE_TEXT_STYLES: { results: ["TEXT_STYLES_RESULT"], label: "op.textStyles", go: () => showMake("type"), write: true },
     APPLY_TEXT_STYLES: { results: ["TEXT_STYLES_APPLIED"], label: "op.textApply", go: () => {
-      showTab("layer");
+      showTab("select");
       showApplyStep("bind");
     }, write: true },
     APPLY: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: false },
@@ -6442,7 +6568,11 @@
     GENERATE_MISSING_VARIANTS: { results: ["GENERATE_RESULT"], label: "op.components", go: goLayer("structure"), write: true },
     SCAN_SIMILAR: { results: ["SIMILAR_CANDIDATES"], label: "op.components", go: goLayer("structure"), write: false },
     COMPONENTIZE_SIMILAR: { results: ["COMPONENTIZE_RESULT"], label: "op.components", go: goLayer("structure"), write: true },
-    EXPORT: { results: ["EXPORT_RESULT"], label: "op.export", go: () => showTab("settings"), write: false }
+    EXPORT: { results: ["EXPORT_RESULT"], label: "op.export", go: () => showTab("variables"), write: false },
+    UNBIND_DELETED: { results: ["DELETED_UNBOUND"], label: "op.unbind", go: () => {
+      showTab("select");
+      showSelSub("home");
+    }, write: true }
   };
   var opPending = /* @__PURE__ */ new Map();
   var opWizard = false;
@@ -6482,8 +6612,9 @@
     const link = bindLinking ? t("bind.waitLink") : null;
     for (const id of WAIT_LINK_IDS) setWait($(id), link);
     const other = link ? null : otherWriteOp();
+    const wiz = opWizard || wizardRunning ? t("bind.waitOp", { op: t("op.wizard") }) : null;
     for (const id of WAIT_CARD_IDS) {
-      const msg = link != null ? link : id === "btnApplyConfirm" && other ? t("bind.waitOp", { op: other }) : null;
+      const msg = link != null ? link : id === "btnApplyConfirm" && other ? t("bind.waitOp", { op: other }) : wiz;
       setWait($(id), msg, "applyStatus");
     }
   }
@@ -6572,10 +6703,7 @@
     opWizard = false;
     opProg = null;
     renderWaitLocks();
-    if (result !== "cancel") opFinished(result === "ok", { results: [], label: "op.wizard", go: () => {
-      showTab("variables");
-      showVarSub("home");
-    }, write: true });
+    if (result !== "cancel") opFinished(result === "ok", { results: [], label: "op.wizard", go: () => showMake(), write: true });
     else if (isMini) renderMiniMark();
     readScreen("work");
     reentry.release();
@@ -6583,16 +6711,17 @@
   function readScreen(why) {
     if (isMini) return;
     if (activeTab !== "settings" || why === "work") requestPrereq();
-    if (activeTab === "variables" && varSub === "home") {
+    if (activeTab === "variables") {
       send({ type: "GET_VAR_TABLE" });
       requestManagerUsage(why === "work" ? "work" : "quiet");
-    } else if (activeTab === "variables" && varSub === "make") {
-      send({ type: "GET_VARIABLES" });
     }
-    if (why === "work" && !(activeTab === "variables" && varSub === "home")) send({ type: "GET_VAR_TABLE" });
-    if (activeTab === "layer") {
+    if (why === "work" && activeTab !== "variables") send({ type: "GET_VAR_TABLE" });
+    if (activeTab === "select") {
+      if (selSub === "make") send({ type: "GET_VARIABLES" });
+      const bindReturn = why !== "work" && selSub === "bind";
+      readSelData(why, !bindReturn);
       readLayerLibUse();
-      if (why !== "work") bindOnReturn();
+      if (bindReturn) bindOnReturn();
     }
   }
   var pointerDown = false;
@@ -6647,16 +6776,19 @@
   send({ type: "GET_SETTINGS" });
   refreshDarkModes();
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
-  var TABS = ["variables", "layer", "settings"];
-  var activeTab = "variables";
-  var varSub = "home";
+  var TABS = ["select", "variables"];
+  var activeTab = "select";
+  var selSub = "home";
+  var settingsReturn = "select";
+  var subOpener = null;
   var screenScroll = /* @__PURE__ */ new Map();
-  var screenKey = () => activeTab === "variables" ? `variables:${varSub}` : activeTab;
+  var screenKey = () => activeTab === "select" ? `select:${selSub}` : activeTab;
   function showTab(name) {
     var _a;
     const changed = name !== activeTab;
     if (changed) screenScroll.set(screenKey(), window.scrollY);
-    if (changed && activeTab === "layer" && hasBindPreview()) bindLeftSince = true;
+    if (changed && activeTab === "select" && selSub === "bind" && hasBindPreview()) bindLeftSince = true;
+    if (name === "settings" && activeTab !== "settings") settingsReturn = activeTab;
     activeTab = name;
     for (const tb of TABS) {
       $(`tab-${tb}`).classList.toggle("active", tb === name);
@@ -6664,10 +6796,9 @@
       const on = tb === name;
       btn.classList.toggle("active", on);
       btn.setAttribute("aria-selected", String(on));
-      btn.tabIndex = on ? 0 : -1;
+      btn.tabIndex = on || name === "settings" && tb === "select" ? 0 : -1;
     }
-    renderSelBase();
-    if (changed && name !== "variables" && wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
+    $("tab-settings").classList.toggle("active", name === "settings");
     syncManagerVisibility(false);
     syncStickyOffsets();
     if (changed) {
@@ -6675,30 +6806,82 @@
       requestAnimationFrame(() => window.scrollTo(0, y));
       readScreen("enter");
     }
+    renderSelHome();
   }
-  function showVarSub(sub) {
+  function showSelSub(sub, opener) {
     var _a;
-    if (sub === varSub) return;
-    if (activeTab === "variables") screenScroll.set(screenKey(), window.scrollY);
-    varSub = sub;
+    const changed = sub !== selSub;
+    if (changed && activeTab === "select") screenScroll.set(screenKey(), window.scrollY);
+    if (changed && selSub === "bind" && hasBindPreview()) bindLeftSince = true;
+    if (sub !== "home" && opener !== void 0) subOpener = opener;
+    selSub = sub;
+    $("selHome").style.display = sub === "home" ? "" : "none";
+    $("subHead").hidden = sub === "home";
     $("varMake").style.display = sub === "make" ? "" : "none";
-    renderVarScreen();
-    syncManagerVisibility(false);
+    if (sub === "bind" || sub === "rename" || sub === "structure") showStep("apply", sub);
+    else for (const el of Array.from(document.querySelectorAll(".step[data-apply-step]"))) el.style.display = "none";
+    if (sub === "make") showMakeStep(curMakeStep);
+    renderSubHead();
+    placeWizard();
     syncStickyOffsets();
-    if (activeTab === "variables") {
+    if (changed && activeTab === "select") {
       const y = (_a = screenScroll.get(screenKey())) != null ? _a : 0;
       requestAnimationFrame(() => window.scrollTo(0, y));
       readScreen("enter");
     }
+    renderSelHome();
   }
+  function renderSubHead() {
+    const titles = { bind: "v4.subBind", rename: "v4.rename", structure: "v4.subComponents", make: "v4.subMake" };
+    if (selSub === "home") return;
+    $("subTitle").textContent = selSub === "bind" ? baseLabel() : t(titles[selSub]);
+    $("subRight").textContent = selSub === "make" || selSub === "rename" ? baseLabel() : "";
+  }
+  function subBack() {
+    showSelSub("home");
+    const target = subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : $("selCards").querySelector("button");
+    (target != null ? target : $("btnGoRename")).focus();
+  }
+  $("btnSubBack").addEventListener("click", subBack);
+  document.addEventListener("click", (e) => {
+    var _a;
+    const el = (_a = e.target) == null ? void 0 : _a.closest("[data-go-sub]");
+    if (!el) return;
+    const sub = el.dataset.goSub;
+    if (!["home", "bind", "rename", "structure", "make"].includes(sub)) return;
+    showTab("select");
+    showSelSub(sub, el);
+  });
+  $("btnSettings").addEventListener("click", () => {
+    showTab("settings");
+    $("btnSettingsBack").focus();
+  });
+  $("btnSettingsBack").addEventListener("click", () => {
+    showTab(settingsReturn);
+    $("btnSettings").focus();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || menuEl || modalEl || e.defaultPrevented) return;
+    const tg = e.target;
+    if (tg.closest("input, textarea, select, [contenteditable]")) return;
+    if (activeTab === "settings") {
+      e.preventDefault();
+      showTab(settingsReturn);
+      $("btnSettings").focus();
+    } else if (activeTab === "select" && selSub !== "home") {
+      e.preventDefault();
+      subBack();
+    }
+  });
   function showMake(step) {
-    showTab("variables");
-    showVarSub("make");
+    const opener = document.activeElement;
+    showTab("select");
+    showSelSub("make", opener);
     if (step) showMakeStep(step);
   }
-  TABS.forEach((t2, i) => {
-    const btn = $(`tabbtn-${t2}`);
-    btn.addEventListener("click", () => showTab(t2));
+  TABS.forEach((tb, i) => {
+    const btn = $(`tabbtn-${tb}`);
+    btn.addEventListener("click", () => showTab(tb));
     btn.addEventListener("keydown", (e) => {
       const ni = nextTabIndex(e.key, i, TABS.length);
       if (ni < 0) return;
@@ -6708,20 +6891,27 @@
       $(`tabbtn-${target}`).focus();
     });
   });
-  $("btnGoMake").addEventListener("click", () => showMake("color"));
-  $("btnMakeBack").addEventListener("click", () => {
-    showVarSub("home");
-    $("btnGoMake").focus();
+  $("btnGoRename").addEventListener("click", (e) => {
+    if (!curSel.count) return;
+    showSelSub("rename", e.currentTarget);
   });
-  var APPLY_STEPS = ["bind", "rename", "structure"];
+  $("btnGoComponents").addEventListener("click", (e) => {
+    if (!curSel.count) return;
+    showSelSub("structure", e.currentTarget);
+  });
+  $("btnVarEmptyMake").addEventListener("click", () => {
+    if (!curSel.count) return;
+    showMake("color");
+  });
   function showStep(attr, step) {
+    var _a;
     const key = attr === "make" ? "data-make-step" : "data-apply-step";
-    const rail = $(attr === "make" ? "makeRail" : "applyRail");
+    const rail = attr === "make" ? $("makeRail") : null;
     for (const el of Array.from(document.querySelectorAll(`.step[${key}]`))) {
       if (el.dataset.alwaysHidden !== void 0) continue;
       el.style.display = el.getAttribute(key) === step ? "" : "none";
     }
-    for (const b of Array.from(rail.querySelectorAll(".step-chip, .subtab"))) {
+    for (const b of Array.from((_a = rail == null ? void 0 : rail.querySelectorAll(".step-chip")) != null ? _a : [])) {
       const on = b.getAttribute(key) === step;
       if (b.classList.contains("subtab")) {
         b.setAttribute("aria-selected", String(on));
@@ -6755,23 +6945,13 @@
     if (bar && hint.previousElementSibling !== bar) bar.after(hint);
     hint.hidden = lastSelCount > 0;
   }
-  var showApplyStep = (s) => showStep("apply", s);
+  var showApplyStep = (s) => showSelSub(s);
   for (const b of Array.from(document.querySelectorAll("#makeRail .step-chip"))) {
     b.addEventListener("click", () => showMakeStep(b.dataset.makeStep));
   }
-  for (const b of Array.from(document.querySelectorAll("#applyRail .subtab"))) {
-    b.addEventListener("click", () => showApplyStep(b.dataset.applyStep));
-    b.addEventListener("keydown", (e) => {
-      var _a;
-      const ni = nextTabIndex(e.key, APPLY_STEPS.indexOf(b.dataset.applyStep), APPLY_STEPS.length);
-      if (ni < 0) return;
-      e.preventDefault();
-      showApplyStep(APPLY_STEPS[ni]);
-      (_a = document.querySelector(`#applyRail [data-apply-step="${APPLY_STEPS[ni]}"]`)) == null ? void 0 : _a.focus();
-    });
-  }
   showMakeStep("color");
-  showApplyStep("bind");
+  showStep("apply", "bind");
+  for (const el of Array.from(document.querySelectorAll(".step[data-apply-step]"))) el.style.display = "none";
   for (const b of Array.from(document.querySelectorAll("[data-next-make]"))) {
     b.addEventListener("click", () => showMakeStep(b.dataset.nextMake));
   }
@@ -6972,7 +7152,6 @@
   var vmUsageInFlight = false;
   var vmUsageVisible = false;
   var vmUsageSig = "";
-  var refreshBefore = null;
   var curSel = { ids: [], count: 0, scanned: 0, name: "" };
   var baseline = null;
   var bigSkipped = false;
@@ -6988,21 +7167,20 @@
   var localVarCount = () => vmVars.length;
   function varScreen() {
     if (!vmTableKnown) return "loading";
-    if (startLatched() || localVarCount() === 0) return "start";
+    if (localVarCount() === 0) return "empty";
     return "list";
   }
   function renderVarScreen() {
-    const scr = varSub === "home" ? varScreen() : null;
+    const scr = varScreen();
     $("varLoading").style.display = scr === "loading" ? "" : "none";
-    $("varStart").style.display = scr === "start" ? "" : "none";
+    $("varEmpty").style.display = scr === "empty" ? "" : "none";
     $("varList").style.display = scr === "list" ? "" : "none";
-    placeWizard();
-    if (scr === "start") renderStart();
+    setLock($("btnVarEmptyMake"), curSel.count ? null : "prereq", t("status.noSelection"));
     if (scr === "list") renderVarList();
-    renderReadinessButtons();
+    renderSelHome();
   }
   function syncManagerVisibility(read) {
-    const want = activeTab === "variables" && varSub === "home";
+    const want = activeTab === "variables";
     if (want && !vmOpen) {
       vmOpen = true;
       renderVarScreen();
@@ -7013,7 +7191,6 @@
     } else if (!want && vmOpen) {
       leaveManagerUi();
     }
-    placeWizard();
   }
   function leaveManagerUi() {
     vmOpen = false;
@@ -7028,13 +7205,11 @@
   }
   function showManager() {
     showTab("variables");
-    showVarSub("home");
     rebaseToCurrent();
   }
   function onSelectionForList(m) {
     var _a, _b;
     curSel = { ids: (_a = m.ids) != null ? _a : [], count: m.count, scanned: m.scanned, name: (_b = m.firstName) != null ? _b : "" };
-    setLock($("btnFindUnbound"), curSel.count ? null : "prereq", t("status.noSelection"));
     if (m.selfSelect) {
       renderSelBase();
       return;
@@ -7046,6 +7221,7 @@
   }
   function setBaseline(b) {
     baseline = b;
+    selFindInFlight = false;
     renderSelBase();
     if (vmUsageTimer) {
       clearTimeout(vmUsageTimer);
@@ -7061,18 +7237,24 @@
       deletedUse = { count: 0, nodeIds: [] };
       vmUsageSig = "";
       if (vmOpen) renderVarScreen();
+      renderSelHome();
       return;
     }
     if (b.scanned > BIG_SELECTION || wizardRunning) {
       bigSkipped = b.scanned > BIG_SELECTION;
       usageMap = null;
+      selFindFor = null;
       if (vmOpen) renderVarScreen();
+      renderSelHome();
       return;
     }
-    if (!vmOpen || isMini) return;
+    usageMap = null;
+    renderSelHome();
+    if (!usageVisible() || isMini) return;
     vmUsageTimer = setTimeout(() => {
       vmUsageTimer = null;
       requestManagerUsage("selection");
+      readSelFind();
     }, AUTO_SCAN_DELAY);
   }
   var vmUsageTimer = null;
@@ -7080,22 +7262,21 @@
     if (!baseline) {
       usageMap = null;
       if (vmOpen) renderVarScreen();
+      renderSelHome();
       return;
     }
     const auto = why !== "user";
     if (auto && (baseline.scanned > BIG_SELECTION || wizardRunning)) {
       bigSkipped = baseline.scanned > BIG_SELECTION;
       if (vmOpen) renderVarScreen();
+      renderSelHome();
       return;
     }
     if (vmUsageInFlight && why !== "user") return;
     vmUsageReq = ++bindReqSeq;
     vmUsageInFlight = true;
     vmUsageVisible = why === "selection" || why === "user";
-    if (vmUsageVisible && vmOpen) {
-      showStatusLine(t("list.reading"), { background: true });
-      if (varScreen() === "list") renderVarList();
-    }
+    if (vmUsageVisible && vmOpen && varScreen() === "list") renderVarList();
     send({ type: "SCAN_USAGE", reqId: vmUsageReq, nodeIds: baseline.ids });
   }
   function onUsageResult(msg) {
@@ -7119,9 +7300,8 @@
       deletedUse = msg.deleted;
       recomputeIndirect();
     }
-    if (wasVisible && $("statusText").textContent === t("list.reading")) clearStatusLine();
-    if (refreshBefore) finishRefresh();
     if (changed || wasVisible) renderVarScreen();
+    renderSelHome();
     reentry.release();
   }
   function recomputeIndirect() {
@@ -7144,7 +7324,6 @@
     vmTableKnown = true;
     if (sig === vmTableSig && !first) {
       if (edRebase) edOnVarTable(msg);
-      if (refreshBefore) finishRefresh();
       return;
     }
     vmTableSig = sig;
@@ -7156,118 +7335,38 @@
       if (n > 0) showStatusLine(t("wizard.madeStatus", { n }), { cls: "ok" });
     }
     recomputeIndirect();
-    if (refreshBefore) finishRefresh();
     if (vmOpen || first) renderVarScreen();
     if (edRebase) edOnVarTable(msg);
-  }
-  function refreshList() {
-    const btn = $("btnVarRefresh");
-    btn.classList.add("spinning");
-    refreshBefore = { table: vmTableSig, usage: new Map([...(usageMap != null ? usageMap : /* @__PURE__ */ new Map()).entries()].map(([k, v]) => [k, v.places])) };
-    refreshPending = baseline ? 2 : 1;
-    requestPrereq();
-    send({ type: "GET_VAR_TABLE" });
-    if (baseline) requestManagerUsage("user");
-  }
-  var refreshPending = 0;
-  function finishRefresh() {
-    var _a, _b;
-    if (!refreshBefore) return;
-    refreshPending--;
-    if (refreshPending > 0) return;
-    const before = refreshBefore;
-    refreshBefore = null;
-    $("btnVarRefresh").classList.remove("spinning");
-    const tableChanged = before.table !== vmTableSig;
-    let n = 0;
-    const now = new Map([...(usageMap != null ? usageMap : /* @__PURE__ */ new Map()).entries()].map(([k, v]) => [k, v.places]));
-    for (const k of /* @__PURE__ */ new Set([...before.usage.keys(), ...now.keys()])) if (((_a = before.usage.get(k)) != null ? _a : 0) !== ((_b = now.get(k)) != null ? _b : 0)) n++;
-    const text = tableChanged ? t("list.refreshTable") + (n ? t("list.refreshCountSuffix", { n }) : "") : n ? t("list.refreshUsage", { n }) : t("list.refreshSame");
-    showStatusLine(text);
-    if (statusTimer) {
-      clearTimeout(statusTimer);
-      statusTimer = setTimeout(clearStatusLine, 2e3);
-    }
   }
   function baseDiffers() {
     return !!baseline && !!curSel && !sameIds(baseline.ids, curSel.ids);
   }
-  function baseNoticeText() {
-    const b = baseline;
-    const name = b.count === 1 ? b.name || t("sel.unnamed") : t("list.baseMany", { m: b.count });
-    return t(curSel.count ? "list.baseDiff" : "list.baseDiffNoSel", { name });
-  }
   function renderSelBase() {
     if (!vmCols) return;
-    renderSituation();
-    if (activeTab === "variables" && varScreen() === "start") renderStart();
+    renderSelHome();
   }
-  function doRebase(fromStart) {
+  function doRebase() {
     var _a;
     rebaseToCurrent();
-    if (fromStart) {
-      ((_a = $("startLib").querySelector("[data-key]")) != null ? _a : $("btnWizardRun")).focus();
-      return;
-    }
-    const tree = $("varTree");
-    const target = focusKey && tree.querySelector(`[data-key="${CSS.escape(focusKey)}"]`) || tree.querySelector("[data-key]");
-    target == null ? void 0 : target.focus();
-  }
-  function situationEl(text, action) {
-    const d = document.createElement("div");
-    d.className = "situation";
-    const sp = document.createElement("span");
-    sp.textContent = text;
-    d.appendChild(sp);
-    if (action) {
-      const b = document.createElement("button");
-      b.className = "link link-btn";
-      b.type = "button";
-      b.textContent = action[0];
-      b.addEventListener("click", action[1]);
-      d.appendChild(b);
-    }
-    return d;
+    ((_a = $("selCards").querySelector("button")) != null ? _a : $("btnGoRename")).focus();
   }
   var directMap = () => usageMap ? new Map([...usageMap.entries()].map(([k, v]) => [k, v.places])) : null;
   var indirectSet = () => new Set(indirectMap.keys());
-  var usageReadingVisible = () => vmUsageInFlight && vmUsageVisible;
-  function sideNum(c) {
-    if (usageReadingVisible()) return { text: "\u2026", tip: "" };
-    if (!usageMap) return { text: String(c.total), tip: t("list.totalTip", { total: c.total }) };
-    return { text: `${c.used}/${c.total}`, tip: t("list.chipTip", { used: c.used, direct: c.direct, indirect: c.indirect, total: c.total }) };
-  }
-  function initialSel() {
-    return initialSideSel(vmCols, vmVars, !!baseline, bigSkipped || wizardRunning && !usageMap, directMap(), indirectSet());
-  }
   function currentSel() {
     var _a;
-    const hasLib = libRowsAll().length > 0;
-    const hasDeleted = deletedUse.count > 0 && !!baseline;
-    if (!sidePicked || !sideSel) {
-      sideSel = baseline && wizardRunning && !usageMap && !bigSkipped ? { kind: "inspect" } : initialSel();
-      return sideSel;
-    }
-    const next = validSideSel(sideSel, vmCols, vmVars, hasLib, hasDeleted, initialSel);
-    if (sideSelKey(next) !== sideSelKey(sideSel)) {
-      if ((_a = document.activeElement) == null ? void 0 : _a.closest("#varSide")) focusSideKey = `side:${sideSelKey(next)}`;
-      sideSel = next;
+    const sides = sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
+    const cur = sideSel;
+    if (!cur || cur.kind !== "col" || !sides.some((x) => x.collection.id === cur.id)) {
+      const first = sides[0];
+      if (cur && ((_a = document.activeElement) == null ? void 0 : _a.closest("#varSide")) && first) focusSideKey = `side:col:${first.collection.id}`;
+      sideSel = first ? { kind: "col", id: first.collection.id } : { kind: "inspect" };
     }
     return sideSel;
   }
   var focusSideKey = null;
-  function sideIsOpen(side, all, sel) {
-    const user = sideOpen.get(side.collection.id);
-    if (user !== void 0) return user;
-    if (sel.kind === "grp" && sel.key.startsWith(`${side.collection.id}|`)) return true;
-    if (usageMap && all.some((x) => x.used > 0)) return side.used > 0;
-    return all[0] === side;
-  }
   function pickSide(sel, focus = true) {
     if (searchOpen || query) clearSearch(false);
     sideSel = sel;
-    sidePicked = true;
-    if (sel.kind === "col") sideOpen.set(sel.id, true);
     focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
     focusKey = null;
     renderVarList();
@@ -7275,97 +7374,41 @@
   function renderSidebar(sel) {
     var _a;
     const nav = $("varSide");
+    nav.setAttribute("role", "listbox");
     const hadFocus = nav.contains(document.activeElement) ? (_a = document.activeElement.dataset.key) != null ? _a : null : null;
     clearMount(nav);
-    const dm = directMap();
-    const ind = indirectSet();
-    const sides = sidebarCollections(vmCols, vmVars, dm, ind);
+    const sides = sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
     const selKey = searchOpen && query.trim() ? "" : sideSelKey(sel);
-    const item = (key, level, label, num, aria, opts) => {
-      var _a2;
-      const d = document.createElement("div");
-      d.className = `vs-item lv${level}${opts.muted ? " muted" : ""}${opts.danger ? " danger" : ""}`;
-      d.dataset.key = `side:${key}`;
-      d.setAttribute("role", "treeitem");
-      d.setAttribute("aria-level", String(level));
-      d.setAttribute("aria-selected", String(selKey === key));
-      d.setAttribute("aria-label", aria);
-      if (opts.open !== void 0) d.setAttribute("aria-expanded", String(opts.open));
-      d.tabIndex = -1;
-      if (opts.onToggle) {
-        const tw = document.createElement("button");
-        tw.type = "button";
-        tw.className = "vs-tw";
-        tw.tabIndex = -1;
-        tw.textContent = opts.open ? "\u25BE" : "\u25B8";
-        tw.setAttribute("aria-label", t(opts.open ? "list.sideCollapse" : "list.sideExpand"));
-        tw.addEventListener("click", (e) => {
-          e.stopPropagation();
-          opts.onToggle();
-        });
-        d.appendChild(tw);
-      }
-      if (opts.badge) {
-        const b = document.createElement("span");
-        b.className = "vs-badge";
-        b.setAttribute("aria-hidden", "true");
-        b.textContent = opts.badge;
-        if (opts.badgeTip) b.title = opts.badgeTip;
-        d.appendChild(b);
-      }
-      const nm = document.createElement("span");
-      nm.className = "vs-name";
-      nm.textContent = label;
-      d.title = (_a2 = opts.title) != null ? _a2 : label;
-      const n = document.createElement("span");
-      n.className = "vs-num";
-      n.textContent = num.text;
-      if (num.tip) n.title = num.tip;
-      d.append(nm, n);
-      d.addEventListener("click", opts.onPick);
-      d.addEventListener("keydown", (ev) => sideKey(ev, d, opts));
-      nav.appendChild(d);
-      return d;
-    };
-    const insN = inspectCount(vmVars, dm, ind);
-    const insNum = usageReadingVisible() ? "\u2026" : !baseline || !usageMap ? "\u2014" : String(insN);
-    item("inspect", 1, t("list.inspect"), { text: insNum, tip: t("list.inspectTip") }, t("list.inspectAria", { n: insNum }), { onPick: () => pickSide({ kind: "inspect" }), title: t("list.inspectTip") });
     for (const side of sides) {
       const c = side.collection;
-      const open = sideIsOpen(side, sides, sel);
+      const key = `col:${c.id}`;
+      const d = document.createElement("div");
+      d.className = "vs-item lv1";
+      d.dataset.key = `side:${key}`;
+      d.setAttribute("role", "option");
+      d.setAttribute("aria-selected", String(selKey === key));
       const badge = tierBadge(c);
-      const num = sideNum(side);
       const why = tierWhyText(c);
-      item(`col:${c.id}`, 1, c.name, num, t("list.sideColAria", { name: c.name, badge, num: num.text }) + (why ? `, ${why}` : ""), {
-        badge,
-        badgeTip: why,
-        open,
-        muted: !!usageMap && side.used === 0,
-        onToggle: () => {
-          sideOpen.set(c.id, !open);
-          focusSideKey = `side:col:${c.id}`;
-          renderVarList();
-        },
-        onPick: () => pickSide({ kind: "col", id: c.id })
-      });
-      if (open) for (const g of side.groups) {
-        const gn = sideNum(g);
-        item(`grp:${g.key}`, 2, g.label, gn, t("list.sideGrpAria", { name: g.label, num: gn.text }), {
-          muted: !!usageMap && g.used === 0,
-          onPick: () => pickSide({ kind: "grp", key: g.key })
-        });
-      }
+      d.setAttribute("aria-label", t("list.sideColAria", { name: c.name, badge, num: String(side.total) }) + (why ? `, ${why}` : ""));
+      d.tabIndex = -1;
+      const b = document.createElement("span");
+      b.className = "vs-badge";
+      b.setAttribute("aria-hidden", "true");
+      b.textContent = badge;
+      if (why) b.title = why;
+      const nm = document.createElement("span");
+      nm.className = "vs-name";
+      nm.textContent = c.name;
+      d.title = c.name;
+      const n = document.createElement("span");
+      n.className = "vs-num";
+      n.textContent = String(side.total);
+      d.append(b, nm, n);
+      const pick = () => pickSide({ kind: "col", id: c.id });
+      d.addEventListener("click", pick);
+      d.addEventListener("keydown", (ev) => sideKey(ev, d, pick));
+      nav.appendChild(d);
     }
-    const libN = libRowsAll().length;
-    const hasDeleted = deletedUse.count > 0 && !!baseline;
-    if (libN || hasDeleted) {
-      const sep = document.createElement("div");
-      sep.className = "vs-sep";
-      sep.setAttribute("role", "separator");
-      nav.appendChild(sep);
-    }
-    if (libN) item("lib", 1, t("list.libItem"), { text: String(libN), tip: "" }, t("list.libItemAria", { n: libN }), { onPick: () => pickSide({ kind: "lib" }) });
-    if (hasDeleted) item("deleted", 1, t("list.deletedItem"), { text: String(deletedUse.count), tip: "" }, t("list.deletedItemAria", { n: deletedUse.count }), { danger: true, onPick: () => pickSide({ kind: "deleted" }) });
     const items = Array.from(nav.querySelectorAll(".vs-item"));
     const want = focusSideKey != null ? focusSideKey : hadFocus;
     const target = want && items.find((x) => x.dataset.key === want) || items.find((x) => x.getAttribute("aria-selected") === "true") || items[0];
@@ -7373,7 +7416,7 @@
     if (want && target && (focusSideKey || hadFocus)) target.focus({ preventScroll: true });
     focusSideKey = null;
   }
-  function sideKey(ev, el, opts) {
+  function sideKey(ev, el, pick) {
     const items = Array.from($("varSide").querySelectorAll(".vs-item"));
     const i = items.indexOf(el);
     const go = (j) => {
@@ -7388,17 +7431,7 @@
     else if (k === "ArrowUp") go(i - 1);
     else if (k === "Home") go(0);
     else if (k === "End") go(items.length - 1);
-    else if (k === "ArrowRight" && opts.onToggle) {
-      if (!opts.open) opts.onToggle();
-      else go(i + 1);
-    } else if (k === "ArrowLeft") {
-      if (el.classList.contains("lv2")) {
-        for (let j = i - 1; j >= 0; j--) if (items[j].classList.contains("lv1")) {
-          go(j);
-          break;
-        }
-      } else if (opts.onToggle && opts.open) opts.onToggle();
-    } else if (k === "Enter" || k === " ") opts.onPick();
+    else if (k === "Enter" || k === " ") pick();
     else return;
     ev.preventDefault();
   }
@@ -7437,33 +7470,6 @@
   function currentModeCell(v) {
     var _a;
     return v.values[(_a = modeIdFor(vmCols.find((c) => c.id === v.collectionId))) != null ? _a : ""];
-  }
-  function renderSituation() {
-    const line = $("situationLine");
-    clearMount(line);
-    const add = (text, action) => {
-      const s = document.createElement("span");
-      s.textContent = text;
-      line.appendChild(s);
-      if (action) {
-        const b = document.createElement("button");
-        b.className = "link link-btn";
-        b.type = "button";
-        b.textContent = action[0];
-        b.addEventListener("click", action[1]);
-        line.appendChild(b);
-      }
-    };
-    let shown = true;
-    const insShown = !!sideSel && sideSel.kind === "inspect" && !(searchOpen && query.trim());
-    if (baseDiffers()) add(baseNoticeText(), [t("list.rebase"), () => doRebase(false)]);
-    else if (insShown && (!baseline || !usageMap || inspectCount(vmVars, directMap(), indirectSet()) === 0)) shown = false;
-    else if (baseline && bigSkipped && !usageMap) add(t("list.big"), [t("list.read"), () => requestManagerUsage("user")]);
-    else if (baseline && wizardRunning && !usageMap) add(t("list.wizardWait"));
-    else if (baseline && usageMap && inspectCount(vmVars, directMap(), indirectSet()) === 0) add(t("list.noneUsed"), [t("list.findUnbound"), findUnbound]);
-    else if (!baseline) add(t("list.selectHint"));
-    else shown = false;
-    line.hidden = !shown;
   }
   function resolveSwatch(cell) {
     let c = cell;
@@ -7518,9 +7524,6 @@
     if (!vmOpen || varScreen() !== "list") return;
     const sel = currentSel();
     renderSidebar(sel);
-    renderSituation();
-    renderReadinessButtons();
-    setLock($("btnFindUnbound"), curSel.count ? null : "prereq", t("status.noSelection"));
     const tree = $("varTree");
     const prevScroll = window.scrollY;
     const hadFocus = tree.contains(document.activeElement);
@@ -8786,6 +8789,7 @@ ${v.description}` : v.name;
     const btn = $("btnVarMore");
     const r = btn.getBoundingClientRect();
     openMenu(r.left, r.bottom + 2, [
+      { label: t("list.readiness", { n: readinessDone(), total: 7 }) + "\u2026", onSelect: () => openReadiness(btn), focusElsewhere: true },
       { label: t("list.menuExport"), onSelect: () => openExportPopup(btn), focusElsewhere: true },
       { label: t("list.menuExpandAll"), separatorBefore: true, onSelect: () => setAllExpanded(true) },
       { label: t("list.menuCollapseAll"), onSelect: () => setAllExpanded(false) }
@@ -8796,9 +8800,9 @@ ${v.description}` : v.name;
       showStatusLine(t("status.noSelection"), { cls: "warn" });
       return;
     }
-    const sameResult = hasBindPreview() && !!bindPreviewSel && sameIds(bindPreviewSel, curSel.ids) && !bindForeignSel;
+    const sameResult = hasBindPreview() && !!bindPreviewSel && sameIds(bindPreviewSel, (baseline != null ? baseline : curSel).ids) && !bindForeignSel;
     bindLeftSince = false;
-    showTab("layer");
+    showTab("select");
     showApplyStep("bind");
     if (sameResult || bindBusy()) return;
     if (prereqKnown && !hasBindable) {
@@ -8807,10 +8811,8 @@ ${v.description}` : v.name;
     }
     runBindPreview();
   }
-  $("btnVarRefresh").addEventListener("click", refreshList);
   $("btnAddVar").addEventListener("click", () => showMake("color"));
   $("btnVarMore").addEventListener("click", openMoreMenu);
-  $("btnFindUnbound").addEventListener("click", findUnbound);
   $("btnSearch").addEventListener("click", () => searchOpen ? $("varSearch").focus() : openSearch());
   $("varSearch").addEventListener("input", () => {
     query = $("varSearch").value;
@@ -8830,20 +8832,17 @@ ${v.description}` : v.name;
   var wizLatch = null;
   var wizBeforeCount = 0;
   var wizFrom = "start";
-  function startLatched() {
-    return !!wizLatch;
-  }
   function placeWizard() {
     const card = $("wizardCard");
-    const inMake = activeTab === "variables" && varSub === "make";
-    const slot = $(inMake ? "wizardSlotMake" : "wizardSlotStart");
+    const inMake = true;
+    const slot = $("wizardSlotMake");
     if (card.parentElement !== slot) {
       slot.appendChild(card);
       if (inMake) card.classList.toggle("collapsed", !wizardRunning && !wizHasSummary());
       else card.classList.remove("collapsed");
     }
     if (wizardRunning) card.classList.remove("collapsed");
-    const visible = activeTab === "variables" && !isMini && (inMake || varScreen() === "start");
+    const visible = activeTab === "select" && selSub === "make" && !isMini;
     if (wizLatch && wizLatch.done && visible) wizLatch.summarySeen = true;
     renderWizardCopy();
   }
@@ -8863,45 +8862,8 @@ ${v.description}` : v.name;
       done.hidden = false;
     } else done.hidden = true;
   }
-  function renderStart() {
-    const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
-    $("startHead").textContent = made > 0 ? t("start.made", { n: made }) : t("start.head");
-    $("startSub").hidden = made > 0;
-    $("startFree").style.display = isPaid ? "none" : "";
-    $("goMakeFree").style.display = isPaid ? "none" : "";
-    const lib = $("startLib");
-    clearMount(lib);
-    if (baseDiffers()) lib.appendChild(situationEl(baseNoticeText(), [t("list.rebase"), () => doRebase(true)]));
-    if (baseline && bigSkipped && !usageMap) {
-      const d = document.createElement("div");
-      d.className = "situation";
-      d.append(t("list.big"), " ");
-      const b = document.createElement("button");
-      b.className = "link link-btn";
-      b.textContent = t("list.read");
-      b.addEventListener("click", () => requestManagerUsage("user"));
-      d.appendChild(b);
-      lib.appendChild(d);
-    } else {
-      const rows = libRowsMatching();
-      if (rows.length) {
-        const h = document.createElement("div");
-        h.className = "vt-section vt-lib";
-        h.textContent = t("list.libSection");
-        const note = document.createElement("div");
-        note.className = "hint";
-        note.textContent = t("start.libNote");
-        lib.append(h, note, ...rows.map(libRowEl));
-      }
-    }
-    renderWizardCopy();
-  }
   function readinessDone() {
     return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === "done").length;
-  }
-  function renderReadinessButtons() {
-    const label = t("list.readiness", { n: readinessDone(), total: 7 });
-    for (const id of ["btnReadiness", "btnReadinessStart"]) $(id).textContent = label;
   }
   var readinessReturn = null;
   function openReadiness(btn) {
@@ -8931,8 +8893,6 @@ ${v.description}` : v.name;
     readinessReturn = null;
     reentry.release();
   }
-  $("btnReadiness").addEventListener("click", () => openReadiness($("btnReadiness")));
-  $("btnReadinessStart").addEventListener("click", () => openReadiness($("btnReadinessStart")));
   $("readinessPop").addEventListener("keydown", (e) => {
     var _a, _b;
     const rows = Array.from($("readinessPop").querySelectorAll(".pstep"));
@@ -8958,11 +8918,9 @@ ${v.description}` : v.name;
   $("btnWizListView").addEventListener("click", () => {
     var _a;
     wizLatch = null;
-    showVarSub("home");
-    renderVarScreen();
+    showTab("variables");
     (_a = $("varTree").querySelector("[data-key]")) == null ? void 0 : _a.focus();
   });
-  $("btnStartLicense").addEventListener("click", goToLicense);
   function renderBindPrereq() {
     if (!curSel) return;
     const notice = $("bindPrereq");
@@ -9007,13 +8965,13 @@ ${v.description}` : v.name;
   }
   function bindOnReturn() {
     if (bindLinking) return;
-    if (activeTab !== "layer" || currentApplyStep !== "bind" || !hasBindPreview()) return;
+    if (activeTab !== "select" || selSub !== "bind" || !hasBindPreview()) return;
     if (bindPreviewMini) {
       bindPreviewMini = false;
       return;
     }
     const notice = $("bindNotice");
-    if (bindForeignSel || bindPreviewSel && !sameIds(bindPreviewSel, curSel.ids)) {
+    if (bindForeignSel || bindPreviewSel && !sameIds(bindPreviewSel, (baseline != null ? baseline : curSel).ids)) {
       bindForeignSel = true;
       $("bindNoticeText").textContent = t("bind.otherSel");
       notice.hidden = false;
@@ -9040,8 +8998,387 @@ ${v.description}` : v.name;
     if (hasBindPreview()) bindLeftSince = true;
   });
   var bindBusy = () => bindFinding || bindLinking !== 0;
-  activeTab = "settings";
-  showTab("variables");
+  var selFindFor = null;
+  var selFindInFlight = false;
+  var selFindDeferred = false;
+  var selUsesOpen = false;
+  var unbindReq = 0;
+  var baseKey = () => baseline ? baseline.ids.join(",") : "";
+  function baseLabel() {
+    const b = baseline != null ? baseline : curSel;
+    if (!b.count) return "";
+    const first = b.name || t("sel.unnamed");
+    return b.count === 1 ? first : t("v4.selMany", { name: first, k: b.count - 1 });
+  }
+  function usageVisible() {
+    return vmOpen || activeTab === "select";
+  }
+  function readSelData(why, find = true) {
+    if (!baseline) return;
+    requestManagerUsage(why === "work" ? "work" : "quiet");
+    if (find) readSelFind(why === "work" || why === "reentry" || selFindDeferred || selFindFor !== baseKey());
+  }
+  function readSelFind(force = true, user = false) {
+    if (!baseline || isMini || activeTab !== "select") return;
+    if (!force && selFindFor === baseKey()) return;
+    if (!user && baseline.scanned > BIG_SELECTION) {
+      renderSelHome();
+      return;
+    }
+    if (bindLinking || opBusy() || wizardRunning) {
+      selFindDeferred = true;
+      return;
+    }
+    if (prereqKnown && !hasBindable && prereqLocalVars > 0) {
+      selFindFor = baseKey();
+      renderSelHome();
+      return;
+    }
+    selFindDeferred = false;
+    selFindInFlight = true;
+    if (user) runBindPreview();
+    else runBindPreview(true);
+    renderSelHome();
+  }
+  function selCard(opts) {
+    var _a, _b;
+    const d = document.createElement("div");
+    d.className = `sel-card${opts.cls ? " " + opts.cls : ""}`;
+    const g = document.createElement("div");
+    g.className = "grow";
+    const tt = document.createElement("div");
+    tt.className = "t";
+    tt.textContent = opts.title;
+    g.appendChild(tt);
+    for (const sub of (_a = opts.subs) != null ? _a : []) {
+      const sd = document.createElement("div");
+      sd.className = "s";
+      sd.append(sub);
+      g.appendChild(sd);
+    }
+    d.appendChild(g);
+    if ((_b = opts.actions) == null ? void 0 : _b.length) {
+      const a = document.createElement("div");
+      a.className = "acts";
+      a.append(...opts.actions);
+      d.appendChild(a);
+    }
+    return d;
+  }
+  function selBtn(label, onClick, primary = false) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    if (primary) b.className = "primary";
+    b.addEventListener("click", () => {
+      if (!isLocked(b)) onClick(b);
+    });
+    return b;
+  }
+  function selLink(label, onClick) {
+    const b = selBtn(label, onClick);
+    b.className = "link link-btn";
+    return b;
+  }
+  var kindLabel = (k) => t(`v4.kind.${k}`);
+  function renderSelHome() {
+    var _a;
+    if (activeTab !== "select" || selSub !== "home" || !curSel) return;
+    const head = $("selHead");
+    const cards = $("selCards");
+    const hadFocus = cards.contains(document.activeElement) ? (_a = document.activeElement.dataset.k) != null ? _a : null : null;
+    clearMount(head);
+    clearMount(cards);
+    const noSel = !baseline;
+    for (const id of ["btnGoRename", "btnGoComponents"]) setLock($(id), curSel.count ? null : "prereq", t("status.noSelection"));
+    if (baseline) {
+      const b = document.createElement("b");
+      b.textContent = baseLabel();
+      b.title = baseLabel();
+      const n = document.createElement("span");
+      n.className = "sel-n";
+      n.textContent = t("v4.layers", { n: baseline.count });
+      head.append(b, n);
+      if (baseDiffers()) {
+        const diff = document.createElement("span");
+        diff.className = "sel-diff";
+        diff.append(t("v4.baseDiff") + " \xB7 ");
+        const rb = selLink(t("list.rebase"), () => doRebase());
+        rb.dataset.k = "rebase";
+        diff.appendChild(rb);
+        head.appendChild(diff);
+      }
+    }
+    const put = (el) => {
+      cards.appendChild(el);
+    };
+    const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
+    if (!vmTableKnown && !prereqKnown) {
+      put(selCard({ title: t("v4.loading") }));
+      return finishSelFocus(hadFocus);
+    }
+    if (noSel) {
+      const d = document.createElement("div");
+      d.className = "sel-empty";
+      d.textContent = t("v4.noSel");
+      if (localZero) {
+        const sd = document.createElement("div");
+        sd.className = "sub";
+        sd.textContent = t("v4.noVarsFile");
+        d.appendChild(sd);
+      }
+      put(d);
+      return finishSelFocus(hadFocus);
+    }
+    const findReady = selFindFor === baseKey() && !selFindInFlight;
+    const usageReady = !!usageMap;
+    if (baseline.scanned > BIG_SELECTION && !findReady && !usageReady && !selFindInFlight) {
+      const c = selCard({ title: t("list.big"), actions: [selBtn(t("list.read"), () => {
+        requestManagerUsage("user");
+        readSelFind(true, true);
+      })] });
+      put(c);
+      return finishSelFocus(hadFocus);
+    }
+    const counts = findReady ? cardCounts(bindCandidates.map((c) => c.field), bindCounts) : null;
+    const reading = () => selCard({ title: t("v4.reading") });
+    if (localZero) {
+      if (!usageReady) {
+        put(reading());
+        return finishSelFocus(hadFocus);
+      }
+      const libDirect = libVars.filter((l) => {
+        var _a2, _b;
+        return ((_b = (_a2 = usageMap == null ? void 0 : usageMap.get(l.id)) == null ? void 0 : _a2.places) != null ? _b : 0) > 0;
+      });
+      if (libDirect.length) {
+        put(selCard({ title: t("v4.libOnly") }));
+        renderUsesCard(put);
+      } else {
+        const subs = [];
+        if (counts && counts.noVarByKind.length) subs.push(counts.noVarByKind.filter((x) => x.kind !== "other").map((x) => t("v4.kindPlaces", { kind: kindLabel(x.kind), n: x.n })).join(" \xB7 "));
+        else if (!findReady) subs.push(t("v4.reading"));
+        put(selCard({ title: t("v4.noVarsFile"), subs, actions: [selBtn(t("v4.makeArrow"), (b) => {
+          showMake("color");
+          subOpener = b;
+        }, true)] }));
+      }
+      renderDeletedCard(put);
+      return finishSelFocus(hadFocus);
+    }
+    renderFindCard(put, counts);
+    renderUsesCard(put);
+    renderDeletedCard(put);
+    finishSelFocus(hadFocus);
+  }
+  function finishSelFocus(key) {
+    var _a;
+    if (!key) return;
+    (_a = $("selCards").querySelector(`[data-k="${CSS.escape(key)}"]`)) == null ? void 0 : _a.focus({ preventScroll: true });
+  }
+  function renderFindCard(put, counts) {
+    if (prereqKnown && !hasBindable) {
+      const b = selBtn(t("v4.makeArrow"), (el) => {
+        showMake("color");
+        subOpener = el;
+      });
+      b.dataset.k = "make";
+      put(selCard({ title: t("v4.find0"), subs: [t("bind.noTier")], actions: [b] }));
+      return;
+    }
+    if (!counts) {
+      put(selCard({ title: t("v4.find0"), subs: [t("v4.reading")] }));
+      return;
+    }
+    const { m, k, s, n } = counts;
+    if (n === 0 && s === 0) {
+      put(selCard({ title: t("v4.allBound"), cls: "ok" }));
+      return;
+    }
+    if (n === 0) {
+      const v = selLink(t("v4.view"), (el) => {
+        bindSkipsOpen = true;
+        showSelSub("bind", el);
+        renderBindTree();
+      });
+      v.dataset.k = "skips";
+      put(selCard({ title: t("v4.nothingToLink"), subs: [t("v4.skippedPlaces", { s })], actions: [v] }));
+      return;
+    }
+    const kinds = counts.byKind.filter((x) => x.kind !== "other").map((x) => `${kindLabel(x.kind)} ${x.n}`).join(" \xB7 ");
+    const sub = document.createElement("span");
+    sub.textContent = kinds;
+    const actions = [];
+    if (m > 0) {
+      const go = selBtn(t("v4.linkN", { n: m }), (el) => {
+        showSelSub("bind", el);
+      }, true);
+      go.dataset.k = "link";
+      actions.push(go);
+      if (k > 0) {
+        sub.append(" \xB7 " + t("v4.noVarPlaces", { k }) + " ");
+        const mk = selLink(t("v4.makeArrow"), (el) => {
+          showMake("color");
+          subOpener = el;
+        });
+        mk.dataset.k = "make";
+        sub.appendChild(mk);
+      }
+    } else {
+      const mk = selBtn(t("v4.makeArrow"), (el) => {
+        showMake("color");
+        subOpener = el;
+      }, true);
+      mk.dataset.k = "make";
+      actions.push(mk);
+    }
+    const card = selCard({ title: t("v4.findN", { n }), subs: [sub], actions });
+    card.querySelector(".t").title = t("v4.findTip");
+    put(card);
+  }
+  function renderUsesCard(put) {
+    var _a;
+    if (!usageMap) {
+      put(selCard({ title: t("v4.usesTitle0"), subs: [t("v4.reading")] }));
+      return;
+    }
+    const local = vmVars.filter((v) => {
+      var _a2, _b;
+      return ((_b = (_a2 = usageMap.get(v.id)) == null ? void 0 : _a2.places) != null ? _b : 0) > 0;
+    });
+    const lib = libVars.filter((l) => {
+      var _a2, _b;
+      return ((_b = (_a2 = usageMap.get(l.id)) == null ? void 0 : _a2.places) != null ? _b : 0) > 0;
+    });
+    const n = local.length + lib.length;
+    if (!n) return;
+    const tierN = /* @__PURE__ */ new Map();
+    for (const v of local) {
+      const c = vmCols.find((x) => x.id === v.collectionId);
+      const key = (c == null ? void 0 : c.tier) === 3 ? "Component" : (c == null ? void 0 : c.tier) === 2 ? "Semantic" : (c == null ? void 0 : c.tier) === 1 ? "Global" : t("v4.noTierName");
+      tierN.set(key, ((_a = tierN.get(key)) != null ? _a : 0) + 1);
+    }
+    if (lib.length) tierN.set(t("v4.libName"), lib.length);
+    const order = ["Component", "Semantic", "Global", t("v4.noTierName"), t("v4.libName")];
+    const sub = order.filter((k) => tierN.get(k)).map((k) => `${k} ${tierN.get(k)}`).join(" \xB7 ");
+    const tog = selLink(selUsesOpen ? t("v4.collapse") : t("v4.expand"), () => {
+      selUsesOpen = !selUsesOpen;
+      renderSelHome();
+    });
+    tog.dataset.k = "uses";
+    tog.setAttribute("aria-expanded", String(selUsesOpen));
+    const card = selCard({ title: t("v4.usesN", { n }), subs: [sub], actions: [tog] });
+    card.querySelector(".t").title = t("v4.usesTip");
+    put(card);
+    if (!selUsesOpen) return;
+    const list = document.createElement("div");
+    list.className = "sel-list";
+    list.setAttribute("role", "grid");
+    list.setAttribute("aria-label", t("v4.usesN", { n }));
+    const tierRank = (tier) => tier === 3 ? 0 : tier === 2 ? 1 : tier === 1 ? 2 : 3;
+    const rows = [];
+    local.forEach((v) => {
+      var _a2, _b, _c;
+      const c = vmCols.find((x) => x.id === v.collectionId);
+      const cut = v.name.lastIndexOf("/");
+      rows.push({ path: `${tierBadge(c != null ? c : { tier: 0 })} ${(_a2 = c == null ? void 0 : c.name) != null ? _a2 : ""}${cut > 0 ? " \u203A " + v.name.slice(0, cut) : ""}`, name: cut >= 0 ? v.name.slice(cut + 1) : v.name, ref: { local: v }, cell: currentModeCell(v), places: (_c = (_b = usageMap.get(v.id)) == null ? void 0 : _b.places) != null ? _c : 0, rank: tierRank(c == null ? void 0 : c.tier), order: vmVars.indexOf(v) });
+    });
+    lib.forEach((l, i) => {
+      var _a2, _b;
+      const cut = l.name.lastIndexOf("/");
+      rows.push({ path: `${t("v4.libName")} \u203A ${l.collection}`, name: cut >= 0 ? l.name.slice(cut + 1) : l.name, ref: { lib: l }, cell: l.value, places: (_b = (_a2 = usageMap.get(l.id)) == null ? void 0 : _a2.places) != null ? _b : 0, rank: 4, order: i });
+    });
+    rows.sort((a, b) => a.rank - b.rank || a.path.localeCompare(b.path) || a.order - b.order);
+    let lastPath = "";
+    const focusables = [];
+    for (const r of rows) {
+      if (r.path !== lastPath) {
+        const ph = document.createElement("div");
+        ph.className = "sl-path";
+        ph.textContent = r.path;
+        list.appendChild(ph);
+        lastPath = r.path;
+      }
+      const row = document.createElement("div");
+      row.className = "sl-row";
+      row.setAttribute("role", "row");
+      row.tabIndex = -1;
+      row.dataset.k = `use:${r.ref.local ? r.ref.local.id : r.ref.lib.id}`;
+      const nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = r.name;
+      const num = document.createElement("span");
+      num.className = "num";
+      num.textContent = t("v4.places", { n: r.places });
+      row.append(nm, valueEl(r.cell), num);
+      const open = () => openDetail(r.ref, row);
+      row.addEventListener("click", open);
+      row.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        openMenu(e.clientX, e.clientY, [{ label: t("v4.detail"), onSelect: open, focusElsewhere: true }], row);
+      });
+      row.addEventListener("keydown", (e) => {
+        const i = focusables.indexOf(row);
+        const go = (j) => {
+          const tg = focusables[Math.max(0, Math.min(focusables.length - 1, j))];
+          focusables.forEach((x) => x.tabIndex = -1);
+          tg.tabIndex = 0;
+          tg.focus();
+        };
+        if (e.key === "ArrowDown") go(i + 1);
+        else if (e.key === "ArrowUp") go(i - 1);
+        else if (e.key === "Home") go(0);
+        else if (e.key === "End") go(focusables.length - 1);
+        else if (e.key === "Enter") open();
+        else if (e.key === "ContextMenu" || e.key === "F10" && e.shiftKey) {
+          const rc = row.getBoundingClientRect();
+          openMenu(rc.left + 16, rc.bottom, [{ label: t("v4.detail"), onSelect: open, focusElsewhere: true }], row);
+        } else return;
+        e.preventDefault();
+      });
+      focusables.push(row);
+      list.appendChild(row);
+    }
+    if (focusables[0]) focusables[0].tabIndex = 0;
+    put(list);
+  }
+  function renderDeletedCard(put) {
+    var _a;
+    if (!usageMap || !deletedUse.count) return;
+    const sel = selBtn(t("v4.select"), () => {
+      selectStatusTarget = "list";
+      send({ type: "SELECT_NODES", ids: deletedUse.nodeIds });
+    });
+    sel.dataset.k = "delsel";
+    const un = selBtn(t("v4.unbind"), () => unbindDeleted());
+    un.id = "btnUnbindDeleted";
+    un.dataset.k = "unbind";
+    const other = (_a = otherWriteOp()) != null ? _a : bindLinking ? t("op.bind") : null;
+    if (other) setWait(un, t("bind.waitOp", { op: other }));
+    put(selCard({ title: t("v4.deletedN", { n: deletedUse.count }), cls: "warn", actions: [sel, un] }));
+  }
+  function unbindDeleted() {
+    if (!baseline) return;
+    unbindReq = ++bindReqSeq;
+    send({ type: "UNBIND_DELETED", reqId: unbindReq, nodeIds: baseline.ids });
+  }
+  function onDeletedUnbound(msg) {
+    var _a;
+    if (msg.reqId !== unbindReq) return;
+    unbindReq = 0;
+    let text = t("v4.unbound", { k: msg.unbound });
+    if (msg.failed) text += t("v4.unboundFailed", { m: msg.failed });
+    showStatusLine(text, { cls: msg.failed ? "warn" : "ok" });
+    const tip = Object.entries(msg.failReasons).map(([k, n]) => `${t("v4.unbindFail." + k)} ${n}`).join(" \xB7 ");
+    if (tip) $("statusText").title = tip;
+    if (document.activeElement === document.body || !((_a = document.activeElement) == null ? void 0 : _a.isConnected)) $("btnGoRename").focus();
+    queueMicrotask(() => {
+      if (!$("selCards").contains(document.activeElement)) $("btnGoRename").focus();
+    });
+  }
+  activeTab = "variables";
+  showTab("select");
+  placeWizard();
 })();
 
 </script>
