@@ -148,6 +148,7 @@
     "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizard.step.dark": "\uB2E4\uD06C",
     "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "wizard.step.bind": "\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
@@ -199,11 +200,17 @@
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
+    "wizard.seq.bindDone": "{n}\uACF3 \uC5F0\uACB0",
+    "wizard.seq.bindRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
+    "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
+    "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
     "wizard.sum.tokens": "\uD1A0\uD070 {n}",
     "wizard.sum.dark": "\uB2E4\uD06C {n}",
     "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
+    "wizard.sum.bound": "\uC5F0\uACB0 {n}\uACF3",
     "wizard.sum.renamed": "\uC774\uB984 {n}",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "wizard.sum.empty": "\uB05D\uB0B8 \uC791\uC5C5\uC774 \uC5C6\uC5B4\uC694",
@@ -348,11 +355,13 @@
     "start.viewList": "\uBCC0\uC218 \uBAA9\uB85D \uBCF4\uAE30",
     "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uB808\uC774\uC5B4 \uC5F0\uACB0\uC740 \uB05D\uB09C \uB4A4 \uD655\uC778\uD558\uACE0 \uD574\uC694",
     "wizardCard.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC2E4\uD589\uD560 \uC218 \uC788\uC5B4\uC694",
-    "wizard.toBind": "\uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.toBind": "\uC120\uD0DD \uD0ED\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.notLinked": " \xB7 \uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
     "wizard.seq.cancelSkipped": "\uCDE8\uC18C\uB85C \uAC74\uB108\uB700",
-    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uB9CC \uC815\uB9AC\uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
-    "wizardCard.runFree": "\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
+    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uACFC \uB808\uC774\uC5B4 \uC774\uB984 \uC815\uB9AC\uB9CC \uD574\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
+    "wizardCard.runFree": "\uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
     "wizard.freeSum": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "wizard.freeSumBound": "\uC5F0\uACB0 {b}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
     "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total}",
     "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
@@ -524,6 +533,7 @@
     "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizardCard.optDark": "\uB2E4\uD06C",
     "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "wizardCard.optBind": "\uC5F0\uACB0",
     "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
@@ -8009,6 +8019,7 @@
   var bindCancel = false;
   var bindTurn = 0;
   var bindRunning = Promise.resolve();
+  var bindLinkRunning = false;
   var lastTextSamples = [];
   function effective() {
     if (cache) {
@@ -8869,13 +8880,14 @@
         }
         case "APPLY": {
           const myTurn = ++bindTurn;
-          bindCancel = true;
+          if (!bindLinkRunning) bindCancel = true;
           await bindRunning;
-          if (myTurn !== bindTurn) break;
+          if (msg.preview && myTurn !== bindTurn) break;
           let release = () => {
           };
           bindRunning = new Promise((res) => release = res);
           bindCancel = false;
+          bindLinkRunning = !msg.preview;
           try {
             const sel = await resolveRoots(msg.nodeIds);
             const r = await bindSelection(
@@ -8916,6 +8928,7 @@
               postSelection();
             }
           } finally {
+            bindLinkRunning = false;
             release();
           }
           break;
@@ -8979,12 +8992,13 @@
           let made = 0;
           let committed = false;
           bindTurn++;
-          bindCancel = true;
+          if (!bindLinkRunning) bindCancel = true;
           await bindRunning;
           let releaseLink = () => {
           };
           bindRunning = new Promise((res) => releaseLink = res);
           bindCancel = false;
+          bindLinkRunning = true;
           try {
             const r = await bindSelectedItems(msg.items, {
               onProgress: (done, total) => post({ type: "PROGRESS", op: "link", done, total }),
@@ -9005,6 +9019,7 @@
             }
           } finally {
             if ((written > 0 || made > 0) && !committed) commitUndo(figma);
+            bindLinkRunning = false;
             releaseLink();
           }
           break;

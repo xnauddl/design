@@ -57,6 +57,8 @@ let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
 let bindTurn = 0; // 찾기 요청 차례(IA v4 §7 — 한 번에 하나)
 let bindRunning: Promise<void> = Promise.resolve();
+/** 실제 연결(APPLY preview 아님 · APPLY_SELECTED)이 도는 중 — 찾기가 이것을 취소하지 않는다. */
+let bindLinkRunning = false;
 // 마지막 스캔의 원본 표본 — 「왼쪽 글자로 이름 채우기」가 다시 훑지 않고 이름만 다시 매기게 한다.
 // 다시 훑으면 그 사이 선택이 바뀐 경우 표에 보이는 것과 다른 결과가 조용히 나온다.
 let lastTextSamples: TextSample[] = [];
@@ -1080,13 +1082,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'APPLY': {
         // 찾기는 한 번에 하나(IA v4 §7) — 앞 찾기를 멈추고 끝날 때까지 기다린다.
         // liveVarIds · bindCancel이 모듈 전역이라 겹쳐 돌면 판정과 취소가 틀어진다.
+        // 실제 연결(preview 아님 · APPLY_SELECTED)은 취소하지 않고 끝나길 기다린다(마법사 연결 — §4.3).
         const myTurn = ++bindTurn;
-        bindCancel = true;
+        if (!bindLinkRunning) bindCancel = true;
         await bindRunning;
-        if (myTurn !== bindTurn) break; // 기다리는 사이 더 새 요청이 왔다 — 이 요청은 버린다(UI도 reqId로 버림)
+        if (msg.preview && myTurn !== bindTurn) break; // 기다리는 사이 더 새 요청이 왔다 — 이 찾기는 버린다(UI도 reqId로 버림). 실제 연결은 버리지 않는다
         let release: () => void = () => {};
         bindRunning = new Promise<void>((res) => (release = res));
         bindCancel = false; // UX6: 새 작업 시작 시 취소 플래그 초기화
+        bindLinkRunning = !msg.preview;
         try {
         // UX1: preview면 dry-run(바인딩 없이 집계). UX3: 사유별 스킵(reasons). UX6: 진행률·취소.
         const sel = await resolveRoots(msg.nodeIds);
@@ -1121,6 +1125,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           postSelection(); // 준비 현황 '변수 연결 완료' 판정 갱신(선택은 그대로라 selectionchange가 안 온다)
         }
         } finally {
+          bindLinkRunning = false;
           release();
         }
         break;
@@ -1198,11 +1203,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         let committed = false;
         // 찾기와 겹쳐 돌지 않게(IA v4 §7) — 돌던 찾기를 멈추고 끝나길 기다린 뒤 연결한다.
         bindTurn++;
-        bindCancel = true;
+        if (!bindLinkRunning) bindCancel = true;
         await bindRunning;
         let releaseLink: () => void = () => {};
         bindRunning = new Promise<void>((res) => (releaseLink = res));
         bindCancel = false;
+        bindLinkRunning = true;
         try {
           const r = await bindSelectedItems(msg.items, {
             onProgress: (done, total) => post({ type: 'PROGRESS', op: 'link', done, total }),
@@ -1220,6 +1226,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           }
         } finally {
           if ((written > 0 || made > 0) && !committed) commitUndo(figma);
+          bindLinkRunning = false;
           releaseLink();
         }
         break;

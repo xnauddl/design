@@ -1172,6 +1172,38 @@ check('9 시작 시 스크립트 오류 0', pageErrors.length === 0, pageErrors.
   await p.close();
 }
 
+/* ---------- 17 "한 번에 정리"는 연결까지(IA v4 §4.3 B.1 ~ B.3 마법사, 2026-11-09 사용자 결정) ---------- */
+{
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), ids: ['w1'] });
+  await goSub(p, 'make');
+  check('17 마법사 체크 "연결" 기본 켬', await p.$eval('#wizOptBind', (e) => e.checked));
+  await p.$eval('#btnWizardRun', (b) => b.click()); // 만들기 화면에서는 카드가 접혀 있다
+  await p.waitForTimeout(50);
+  check('17 추출도 시작 때 기준 nodeIds', (await sent(p, 'EXTRACT')).at(-1)?.nodeIds?.[0] === 'w1');
+  await recv(p, { ...sel(1, 0), ids: ['other'] }); // 실행 중 선택이 바뀌어도 기준은 그대로
+  await recv(p, { type: 'EXTRACT_RESULT', tokens: [{ name: 'spacing/16', category: 'gap', value: 16 }], warnings: [], selection: 1 });
+  await p.waitForTimeout(50);
+  await recv(p, { type: 'CREATE_RESULT', created: 1, updated: 0, summary: 'ok', roles: 1 });
+  await p.waitForTimeout(80);
+  if ((await sent(p, 'CREATE_SEMANTICS')).length) { await recv(p, { type: 'SEMANTICS_RESULT', aliased: 1, created: 1, updated: 0, missing: [] }); await p.waitForTimeout(80); }
+  const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
+  check('17 연결 단계 — APPLY(preview 아님) · 시작 때 기준 · reqId', !!ap && ap.nodeIds?.[0] === 'w1' && typeof ap.reqId === 'number', JSON.stringify(ap));
+  check('17 마법사 중 [찾기] 잠금', await locked(p, '#btnApply'));
+  await recv(p, { type: 'APPLY_RESULT', bound: 5, skipped: 0, reasons: {}, preview: false, newRoles: 2, reqId: ap.reqId });
+  await p.waitForTimeout(80);
+  const rn = (await sent(p, 'RENAME')).at(-1);
+  check('17 이름 정리도 시작 때 기준', rn?.nodeIds?.[0] === 'w1');
+  await recv(p, { type: 'RENAME_RESULT', changes: [{ id: 'a', before: 'Frame', after: 'card' }], nodes: [], applied: true });
+  await p.waitForTimeout(120);
+  check('17 요약 "연결 5곳" · 연결 안내 링크 숨김', (await p.textContent('#wizardSummary')).includes('연결 5곳') && !(await p.textContent('#wizardSummary')).includes('연결은 아직') && (await p.$eval('#btnWizToBind', (e) => e.hidden)));
+  check('17 마법사 결과로 연결 화면 결과 카드를 그리지 않음', await p.$eval('#bindDone', (e) => e.hidden));
+  await p.close();
+}
+
 await browser.close();
 if (fails.length) {
   console.error(`\n✗ ${fails.length}건 실패`);

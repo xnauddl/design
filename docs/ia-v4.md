@@ -500,7 +500,7 @@
 - [x] OPS 표(ui.ts): `go` 도착지 바꿈(`goLayer` · `showMake` · EXPORT의 `showTab('settings')` → v4 화면), `WAIT_LINK_IDS` · `WAIT_CARD_IDS` · `OP_STATUS` id 정리, 최소화 [보기] 도착(§2.6)
 - [x] 지울 것: 레이어 탭 · 설정 탭 · 레이어 하위 탭, 변수 › 목록 사이드바의 ★ Inspect · LIB · 삭제된 변수 · 그룹 항목 · 상황 안내 줄 · 머리줄 링크 · [↻](이 PR에서 변수 탭 오른쪽은 아직 v3 목록 — 사이드바만 컬렉션 `listbox`로), 키 `tab.layer` · `tab.settings` · 레이어 하위 탭 · `list.*` Inspect · 상황 안내 · findUnbound · noneUsed · `pipeline.*` 링크
 - [x] 다시 읽기 §7(창 다시 들어옴 → 선택 탭 데이터, 작업 뒤 `GET_PREREQ`)
-- [ ] v3 마법사에 연결 단계(§4.3 "B.1 ~ B.3 동안의 v3 마법사") — `wizard.ts` 단계 · 옵션 · 요약, `test/wizard.test.mjs`, 체크 "연결"(기본 켬, 무료), 시작 때 기준 고정(EXTRACT · APPLY · RENAME nodeIds), 마법사 중 찾기 잠금 · preview가 연결을 취소하지 않음 · 마법사 연결 reqId, 무료 문구 · 요약, 0곳 사유, 링크 조건
+- [x] v3 마법사에 연결 단계(§4.3 "B.1 ~ B.3 동안의 v3 마법사") — `wizard.ts` 단계 · 옵션 · 요약, `test/wizard.test.mjs`, 체크 "연결"(기본 켬, 무료), 시작 때 기준 고정(EXTRACT · APPLY · RENAME nodeIds), 마법사 중 찾기 잠금 · preview가 연결을 취소하지 않음 · 마법사 연결 reqId, 무료 문구 · 요약, 0곳 사유, 링크 조건
 - [x] 테스트: pure.test "사이드바 B"(`sidebarCollections` · `rightEntries` · `inspectCount`) 고침, reread 테스트, verify-bind-flow 블록 1~11 · 15(연결 수 · 잠금 · `#applyStatus`) 고침, 스크린샷
 
 ### B.2 PR 2 — 연결 화면

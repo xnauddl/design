@@ -1127,6 +1127,8 @@
         <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
         <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
         <label class="inline"><input id="wizOptTextStyles" type="checkbox" /> <span data-i18n="wizardCard.optTextStyles">텍스트 스타일</span> <span class="muted" id="wizTextStylesLock"></span></label>
+        <!-- 연결(무료, 기본 켬) — "한 번에 정리는 연결까지"(IA v4 §4.3 B.1 ~ B.3 마법사) -->
+        <label class="inline"><input id="wizOptBind" type="checkbox" checked /> <span data-i18n="wizardCard.optBind">연결</span></label>
         <!-- v1.0: 컴포넌트 등록은 마법사에서 뺀다(출시 범위 = 추출→생성→바인딩→리네임→내보내기).
              리네임 직후 이름 기준 묶기가 섹션들을 한 세트로 합쳐 내용을 덮어쓴 사고(QA 파일). 적용 탭의 수동 등록만 남긴다. -->
         <label class="inline" style="display:none"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
@@ -1143,7 +1145,7 @@
       <div class="hint" data-i18n="wizardCard.legend">역할 매핑=쓰임 역할 · 다크=라이트에서 어두운 값 채우기</div>
       <div class="status" id="wizardSummary"></div>
       <!-- 요약 끝 연결 안내(§4.3) — 마법사는 레이어에 변수를 붙이지 않는다. 누르면 레이어 › 연결 + 미리보기. -->
-      <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">레이어 › 연결에서 확인하고 연결하기 →</button>
+      <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">선택 탭에서 확인하고 연결하기 →</button>
     </div>
 
   </section>
@@ -1389,6 +1391,7 @@
     "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizard.step.dark": "\uB2E4\uD06C",
     "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "wizard.step.bind": "\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984",
     "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
@@ -1440,11 +1443,17 @@
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
+    "wizard.seq.bindDone": "{n}\uACF3 \uC5F0\uACB0",
+    "wizard.seq.bindRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
+    "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
+    "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
     "wizard.sum.tokens": "\uD1A0\uD070 {n}",
     "wizard.sum.dark": "\uB2E4\uD06C {n}",
     "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
+    "wizard.sum.bound": "\uC5F0\uACB0 {n}\uACF3",
     "wizard.sum.renamed": "\uC774\uB984 {n}",
     "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "wizard.sum.empty": "\uB05D\uB0B8 \uC791\uC5C5\uC774 \uC5C6\uC5B4\uC694",
@@ -1589,11 +1598,13 @@
     "start.viewList": "\uBCC0\uC218 \uBAA9\uB85D \uBCF4\uAE30",
     "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uB808\uC774\uC5B4 \uC5F0\uACB0\uC740 \uB05D\uB09C \uB4A4 \uD655\uC778\uD558\uACE0 \uD574\uC694",
     "wizardCard.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC2E4\uD589\uD560 \uC218 \uC788\uC5B4\uC694",
-    "wizard.toBind": "\uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.toBind": "\uC120\uD0DD \uD0ED\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
+    "wizard.notLinked": " \xB7 \uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
     "wizard.seq.cancelSkipped": "\uCDE8\uC18C\uB85C \uAC74\uB108\uB700",
-    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uB9CC \uC815\uB9AC\uB3FC\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
-    "wizardCard.runFree": "\uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
+    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uACFC \uB808\uC774\uC5B4 \uC774\uB984 \uC815\uB9AC\uB9CC \uD574\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
+    "wizardCard.runFree": "\uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
     "wizard.freeSum": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "wizard.freeSumBound": "\uC5F0\uACB0 {b}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
     "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total}",
     "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
@@ -1765,6 +1776,7 @@
     "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
     "wizardCard.optDark": "\uB2E4\uD06C",
     "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
+    "wizardCard.optBind": "\uC5F0\uACB0",
     "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
     "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
@@ -3388,6 +3400,8 @@
     // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
     { id: "dark", write: true, optional: true, paid: true },
     { id: "textStyles", write: true, optional: true, paid: true },
+    { id: "bind", write: true, optional: true },
+    // 무료 — 연결은 무료 기능이다
     { id: "rename", write: true, optional: false },
     { id: "componentize", write: true, optional: true, paid: true }
   ];
@@ -3415,6 +3429,7 @@
     if (totals.created != null) parts.push(t("wizard.sum.tokens", { n: totals.created }));
     if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t("wizard.sum.dark", { n: totals.darkFilled }));
     if (totals.textStyles != null && totals.textStyles > 0) parts.push(t("wizard.sum.textStyles", { n: totals.textStyles }));
+    if (totals.bound != null) parts.push(t("wizard.sum.bound", { n: totals.bound }));
     if (totals.renamed != null) parts.push(t("wizard.sum.renamed", { n: totals.renamed }));
     if (totals.components != null && totals.components > 0) parts.push(t("wizard.sum.components", { n: totals.components }));
     return parts.length ? parts.join(" \xB7 ") : t("wizard.sum.empty");
@@ -4337,6 +4352,7 @@
   var PaidRequiredError = class extends Error {
   };
   var wizardWaiter = null;
+  var wizBindReq = 0;
   window.addEventListener("message", (event) => {
     const m = event.data.pluginMessage;
     if (!m) return;
@@ -4347,16 +4363,17 @@
       w.reject(m.type === "PREMIUM_REQUIRED" ? new PaidRequiredError() : new Error(m.message));
       return;
     }
-    if (wizardWaiter.types.includes(m.type)) {
+    if (wizardWaiter.types.includes(m.type) && (wizardWaiter.reqId === void 0 || m.reqId === wizardWaiter.reqId)) {
       const w = wizardWaiter;
       wizardWaiter = null;
       setTimeout(() => w.resolve(m), 0);
     }
   });
-  function wizardRequest(msg, expect) {
+  function wizardRequest(msg, expect, reqId) {
     return new Promise((resolve, reject) => {
       wizardWaiter = {
         types: [...expect],
+        reqId,
         resolve: (m) => resolve(m),
         reject
       };
@@ -4396,7 +4413,7 @@
     chip.title = note;
   }
   async function runWizard() {
-    var _a, _b;
+    var _a, _b, _c, _d, _e, _f, _g;
     if (wizardRunning) return;
     if (lastSelCount <= 0) {
       setStatus("wizardSummary", t("wizard.needSelect"), "warn");
@@ -4409,11 +4426,14 @@
       semantics: $("wizOptSemantics").checked,
       dark: $("wizOptDark").checked,
       textStyles: $("wizOptTextStyles").checked,
+      bind: $("wizOptBind").checked,
       // v1.0: 마법사에서 컴포넌트 등록 제외(체크박스 숨김) — 리네임 뒤 이름 기준 묶기가 디자인을 덮어쓴다.
       componentize: false
     };
     const ctx = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
     const plan = planWizard(options, ctx);
+    const wizIds = (baseline != null ? baseline : curSel).ids.slice();
+    wizBindRan = false;
     wizardRunning = true;
     wizardFailed = false;
     wizBeforeCount = localVarCount();
@@ -4442,7 +4462,7 @@
       try {
         switch (p.step.id) {
           case "extract": {
-            await wizardRequest({ type: "EXTRACT" }, ["EXTRACT_RESULT"]);
+            await wizardRequest({ type: "EXTRACT", nodeIds: wizIds }, ["EXTRACT_RESULT"]);
             if (!tokens.length) {
               setWizardStep("extract", "fail", t("wizard.seq.noExtract"));
               stopped = true;
@@ -4523,8 +4543,18 @@
             setWizardStep("textStyles", "done", t("wizard.seq.textStyles", { created: r.created, updated: r.updated }));
             break;
           }
+          case "bind": {
+            wizBindReq = ++bindReqSeq;
+            const r = await wizardRequest({ type: "APPLY", preview: false, nodeIds: wizIds, reqId: wizBindReq }, ["APPLY_RESULT"], wizBindReq);
+            totals.bound = r.bound;
+            wizBindRan = true;
+            const reasons = (_b = r.reasons) != null ? _b : {};
+            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_c = reasons["already-bound"]) != null ? _c : 0) > 0 && !((_d = reasons["no-match"]) != null ? _d : 0) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
+            setWizardStep("bind", "done", r.bound ? t("wizard.seq.bindDone", { n: r.bound }) + (r.newRoles ? t("wizard.seq.bindRoles", { k: r.newRoles }) : "") : t(zero));
+            break;
+          }
           case "rename": {
-            const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth }, ["RENAME_RESULT"]);
+            const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth, nodeIds: wizIds }, ["RENAME_RESULT"]);
             totals.renamed = r.changes.length;
             setWizardStep("rename", "done", t("wizard.seq.renameDone", { count: r.changes.length }));
             break;
@@ -4555,10 +4585,11 @@
     const paidSkipped = paidSkippedSteps(plan);
     const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
     if (!isPaid && !stopped && !wizardFailed) {
-      setStatus("wizardSummary", t("wizard.freeSum", { n: (_b = totals.renamed) != null ? _b : 0 }), "ok");
+      setStatus("wizardSummary", wizBindRan ? t("wizard.freeSumBound", { b: (_e = totals.bound) != null ? _e : 0, n: (_f = totals.renamed) != null ? _f : 0 }) : t("wizard.freeSum", { n: (_g = totals.renamed) != null ? _g : 0 }), "ok");
     } else setStatus(
       "wizardSummary",
-      t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
+      t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + // 연결 단계를 껐으면 다 끝난 것처럼 읽히지 않게 적는다(v4 §4.3 링크 표).
+      (!wizBindRan ? t("wizard.notLinked") : "") + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
       stopped || paidSkipped.length || wizardFailed ? "warn" : "ok"
     );
     wizCountPending = wizFrom === "make" && wizBeforeCount > 0;
@@ -4568,9 +4599,10 @@
   }
   var wizCancelReq = false;
   var wizEnded = false;
+  var wizBindRan = false;
   function renderWizToBind() {
     const b = $("btnWizToBind");
-    b.hidden = !wizEnded || wizardRunning || prereqKnown && !hasBindable;
+    b.hidden = !wizEnded || wizardRunning || wizBindRan || prereqKnown && !hasBindable;
     if (curSel) setLock(b, curSel.count ? null : "prereq", t("status.noSelection"));
   }
   var wizCountPending = false;
@@ -5083,6 +5115,7 @@
       case "APPLY_RESULT": {
         const linkEnded = bindLinking !== 0 && msg.reqId === bindLinking;
         if (linkEnded) bindLinking = 0;
+        if (msg.reqId !== void 0 && msg.reqId === wizBindReq) break;
         if (!isCurrentBindReply(msg.reqId)) {
           if (linkEnded) {
             flushLinkSelClear();
@@ -6575,8 +6608,9 @@
     const link = bindLinking ? t("bind.waitLink") : null;
     for (const id of WAIT_LINK_IDS) setWait($(id), link);
     const other = link ? null : otherWriteOp();
+    const wiz = opWizard || wizardRunning ? t("bind.waitOp", { op: t("op.wizard") }) : null;
     for (const id of WAIT_CARD_IDS) {
-      const msg = link != null ? link : id === "btnApplyConfirm" && other ? t("bind.waitOp", { op: other }) : null;
+      const msg = link != null ? link : id === "btnApplyConfirm" && other ? t("bind.waitOp", { op: other }) : wiz;
       setWait($(id), msg, "applyStatus");
     }
   }

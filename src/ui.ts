@@ -1190,7 +1190,9 @@ let wizardRunning = false;
 /** 마법사 단계가 유료 잠금에 걸림 — 실패 줄은 공통 잠금 문구(status.paid)를 쓴다(§2.3). */
 class PaidRequiredError extends Error {}
 
-let wizardWaiter: { types: string[]; resolve: (m: CodeToUi) => void; reject: (e: Error) => void } | null = null;
+let wizardWaiter: { types: string[]; reqId?: number; resolve: (m: CodeToUi) => void; reject: (e: Error) => void } | null = null;
+/** 마법사 연결 요청의 reqId — 메인 처리기는 이 결과로 연결 화면을 다시 그리지 않는다(§4.3). */
+let wizBindReq = 0;
 
 window.addEventListener('message', (event: MessageEvent) => {
   const m = (event.data as { pluginMessage?: CodeToUi }).pluginMessage;
@@ -1204,7 +1206,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     w.reject(m.type === 'PREMIUM_REQUIRED' ? new PaidRequiredError() : new Error(m.message));
     return;
   }
-  if (wizardWaiter.types.includes(m.type)) {
+  if (wizardWaiter.types.includes(m.type) && (wizardWaiter.reqId === undefined || (m as { reqId?: number }).reqId === wizardWaiter.reqId)) {
     const w = wizardWaiter;
     wizardWaiter = null;
     // 메인 핸들러(window.onmessage)가 같은 메시지를 **다 처리한 뒤** 깨운다. 이 리스너가 먼저
@@ -1216,10 +1218,11 @@ window.addEventListener('message', (event: MessageEvent) => {
 });
 
 /** 메시지를 보내고 기대 응답(또는 오류)까지 기다린다. 결과 타입은 expect로 좁혀진다. */
-function wizardRequest<T extends CodeToUi['type']>(msg: UiToCode, expect: T[]): Promise<Extract<CodeToUi, { type: T }>> {
+function wizardRequest<T extends CodeToUi['type']>(msg: UiToCode, expect: T[], reqId?: number): Promise<Extract<CodeToUi, { type: T }>> {
   return new Promise<Extract<CodeToUi, { type: T }>>((resolve, reject) => {
     wizardWaiter = {
       types: [...expect],
+      reqId,
       resolve: (m) => resolve(m as Extract<CodeToUi, { type: T }>),
       reject,
     };
@@ -1284,11 +1287,15 @@ async function runWizard(): Promise<void> {
     semantics: ($('wizOptSemantics') as HTMLInputElement).checked,
     dark: ($('wizOptDark') as HTMLInputElement).checked,
     textStyles: ($('wizOptTextStyles') as HTMLInputElement).checked,
+    bind: ($('wizOptBind') as HTMLInputElement).checked,
     // v1.0: 마법사에서 컴포넌트 등록 제외(체크박스 숨김) — 리네임 뒤 이름 기준 묶기가 디자인을 덮어쓴다.
     componentize: false,
   };
   const ctx: WizardContext = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
   const plan = planWizard(options, ctx);
+  // 기준은 시작할 때 한 번 정한다(§4.3) — 실행 중에 선택이 바뀌어도 추출 · 연결 · 이름 정리는 같은 레이어.
+  const wizIds = (baseline ?? curSel).ids.slice();
+  wizBindRan = false;
 
   wizardRunning = true;
   wizardFailed = false;
@@ -1324,7 +1331,7 @@ async function runWizard(): Promise<void> {
         case 'extract': {
           // 응답은 메인 핸들러가 먼저 받아 `tokens`를 정규화(hue 이름·색 정리·역할 추천)해 둔다 —
           // 여기서는 raw `r.tokens`가 아니라 그 결과(모듈 변수)를 쓴다. 버튼 경로와 같은 토큰이다.
-          await wizardRequest({ type: 'EXTRACT' }, ['EXTRACT_RESULT']);
+          await wizardRequest({ type: 'EXTRACT', nodeIds: wizIds }, ['EXTRACT_RESULT']);
           if (!tokens.length) {
             setWizardStep('extract', 'fail', t('wizard.seq.noExtract'));
             stopped = true;
@@ -1422,8 +1429,20 @@ async function runWizard(): Promise<void> {
           setWizardStep('textStyles', 'done', t('wizard.seq.textStyles', { created: r.created, updated: r.updated }));
           break;
         }
+        case 'bind': {
+          // 기준 nodeIds로 실제 연결 — 연결 화면 [연결]과 같은 규칙(IA v4 §4.3). 텍스트 스타일은 붙이지 않는다.
+          wizBindReq = ++bindReqSeq;
+          const r = await wizardRequest({ type: 'APPLY', preview: false, nodeIds: wizIds, reqId: wizBindReq }, ['APPLY_RESULT'], wizBindReq);
+          totals.bound = r.bound;
+          wizBindRan = true;
+          // 0곳 사유(§4.3): 계층으로 쓸 변수 없음 / 이미 모두 연결됨 / 값이 같은 곳 없음.
+          const reasons = r.reasons ?? {};
+          const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : (reasons['already-bound'] ?? 0) > 0 && !(reasons['no-match'] ?? 0) ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
+          setWizardStep('bind', 'done', r.bound ? t('wizard.seq.bindDone', { n: r.bound }) + (r.newRoles ? t('wizard.seq.bindRoles', { k: r.newRoles }) : '') : t(zero));
+          break;
+        }
         case 'rename': {
-          const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth }, ['RENAME_RESULT']);
+          const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth, nodeIds: wizIds }, ['RENAME_RESULT']);
           totals.renamed = r.changes.length;
           setWizardStep('rename', 'done', t('wizard.seq.renameDone', { count: r.changes.length }));
           break;
@@ -1461,10 +1480,12 @@ async function runWizard(): Promise<void> {
     : '';
   if (!isPaid && !stopped && !wizardFailed) {
     // 무료 완료 요약(§4.3) — 로컬 변수 수와 관계없이 이름 정리만.
-    setStatus('wizardSummary', t('wizard.freeSum', { n: totals.renamed ?? 0 }), 'ok');
+    setStatus('wizardSummary', wizBindRan ? t('wizard.freeSumBound', { b: totals.bound ?? 0, n: totals.renamed ?? 0 }) : t('wizard.freeSum', { n: totals.renamed ?? 0 }), 'ok');
   } else setStatus(
     'wizardSummary',
     t('wizard.result', { state: stopped ? t('wizard.stopped') : t('wizard.completed'), summary: summarize(totals) }) +
+      // 연결 단계를 껐으면 다 끝난 것처럼 읽히지 않게 적는다(v4 §4.3 링크 표).
+      (!wizBindRan ? t('wizard.notLinked') : '') +
       paidNote +
       (failNote ? ` · ${failNote}` : ''),
     stopped || paidSkipped.length || wizardFailed ? 'warn' : 'ok',
@@ -1481,9 +1502,12 @@ let wizCancelReq = false;
 /** 마법사가 한 번 끝났다(취소·실패 포함) — 요약 끝 연결 안내를 보인다. */
 let wizEnded = false;
 /** 요약 끝 "레이어 › 연결에서 확인하고 연결하기 →"(§4.3). 연결할 변수가 없으면 숨기고, 선택이 없으면 잠근다. */
+/** 이번 마법사가 연결 단계를 돌렸나(요약 링크를 숨긴다). */
+let wizBindRan = false;
 function renderWizToBind(): void {
   const b = $('btnWizToBind');
-  b.hidden = !wizEnded || wizardRunning || (prereqKnown && !hasBindable);
+  // 연결 단계를 껐을 때만(v4 §4.3) — 켜고 돌렸으면 이미 연결했다.
+  b.hidden = !wizEnded || wizardRunning || wizBindRan || (prereqKnown && !hasBindable);
   if (curSel) setLock(b, curSel.count ? null : 'prereq', t('status.noSelection'));
 }
 /** 만들기 맨 위(로컬 변수 있음) 마법사가 끝난 뒤 — 다음 변수 표에서 "변수 {n}개 생성"을 상태 줄에. */
@@ -2149,6 +2173,7 @@ window.onmessage = (event: MessageEvent) => {
       // 연결이 끝났다 — 잠금을 푼다(화면을 그리는지와 무관하게).
       const linkEnded = bindLinking !== 0 && msg.reqId === bindLinking;
       if (linkEnded) bindLinking = 0;
+      if (msg.reqId !== undefined && msg.reqId === wizBindReq) break; // 마법사 연결 — 마법사가 받는다(§4.3)
       if (!isCurrentBindReply(msg.reqId)) {
         // 선택이 바뀐 뒤 도착한 이전 요청의 결과
         if (linkEnded) { flushLinkSelClear(); onBindLinkingChanged(); }
@@ -3959,8 +3984,10 @@ function renderWaitLocks(): void {
   const link = bindLinking ? t('bind.waitLink') : null;
   for (const id of WAIT_LINK_IDS) setWait($(id), link);
   const other = link ? null : otherWriteOp();
+  const wiz = opWizard || wizardRunning ? t('bind.waitOp', { op: t('op.wizard') }) : null;
   for (const id of WAIT_CARD_IDS) {
-    const msg = link ?? (id === 'btnApplyConfirm' && other ? t('bind.waitOp', { op: other }) : null);
+    // 마법사 중에는 찾기 · 다시 찾기도 막는다(§4.3 — 마법사 연결과 겹치지 않게).
+    const msg = link ?? (id === 'btnApplyConfirm' && other ? t('bind.waitOp', { op: other }) : wiz);
     setWait($(id), msg, 'applyStatus');
   }
 }
