@@ -365,7 +365,7 @@
 - 팝업(상세와 같은 틀): 컬렉션(읽기, 지금 고른 컬렉션) · 이름 · 타입(색 · 숫자 · 글자 · 참거짓) · 모드별 값(값 ↔ 별칭, 고치기의 칸 · [▾] 그대로) · [취소] [만들기].
 - 타입 기본값: 지금 보이는 첫 그룹의 첫 변수 타입. 그룹이 없으면 숫자.
 - 로컬 컬렉션이 0개면 사용자 컬렉션 `Variables`를 새로 만들어 넣는다(플러그인 표시 없음 — 플러그인 자동 쓰기가 건드리지 않는 곳). 컬렉션 칸에 "Variables (새로 만듦)".
-- **직접 만든 변수 지키기:** 새 변수 · 복제로 만든 변수에는 플러그인 데이터 `dsl.manual = 1`을 단다. 플러그인 컬렉션 안에 있어도 자동 쓰기가 덮어쓰거나 지우지 않는다 — 빼는 곳(이름이 같으면 덮어쓰거나 지우는 경로): `createTokens` · `prunePaletteColors` · 역할 매핑 `createSemanticAliases`의 `upsertVariable` · 다크 `themeApply`(manual Semantic 변수의 Dark 값을 다시 걸지 않고, 쓸 `dark/{이름}` Global이 manual 변수면 값을 덮어쓰지 않고 `-n` 번호를 붙여 새로 만든다). `createUsageRoles`는 지금도 같은 이름이면 `-n`으로 새로 만들어 덮어쓰지 않는다(같은 이름 · 같은 값 재사용 판정에는 manual 변수도 들어간다).
+- **직접 만든 변수 지키기:** 새 변수 · 복제로 만든 변수에는 플러그인 데이터 `dsl.manual = 1`을 단다. 플러그인 컬렉션 안에 있어도 자동 쓰기가 덮어쓰거나 지우지 않는다 — 빼는 곳(이름이 같으면 덮어쓰거나 지우는 경로): `createTokens` · `prunePaletteColors` · 역할 매핑 `createSemanticAliases`의 `upsertVariable` · 다크 `themeApply`(manual Semantic 변수의 Dark 값을 다시 걸지 않고, 쓸 `dark/{이름}` Global이 manual 변수면 그 값을 덮어쓰지도, 다른 이름으로 새로 만들지도 않고 그 역할의 Dark 값을 지금대로 둔다 — 건너뜀으로 센다. 다시 돌려도 같은 결과라 변수가 늘지 않는다). `createUsageRoles`는 지금도 같은 이름이면 `-n`으로 새로 만들어 덮어쓰지 않는다(같은 이름 · 같은 값 재사용 판정에는 manual 변수도 들어간다).
   - `createTokens`가 같은 이름의 manual 변수를 만나면: 값이 같으면 그 변수를 그 토큰의 Global로 쓴다(`globalOf`가 가리킴 — 지금의 재사용과 같음). 값이 다르면 그 토큰과 그 토큰을 가리킬 역할을 만들지 않는다. 응답 `CREATE_RESULT`에 `skippedManual`(수)을 더하고 결과 문구 끝에 " · 직접 만든 변수라 건너뜀 {n}".
   - 역할 매핑 · 다크가 manual 변수를 건너뛰면 결과의 건너뜀 수에 더한다.
   - 사용자가 상세에서 고치는 것은 그대로 된다.
@@ -477,7 +477,7 @@
 - [ ] 클릭 · 더블클릭(한 번) · Space · Enter · 우클릭, 쓰기 잠금(양쪽), 키보드
 - [ ] `APPLY_VARIABLE`(§4.7 속성 목록 · 용도 · 채움 용도 · 색 · 숫자 · 글자 세부 · target · 사유 · 되돌리기 한 묶음) — `scopes.ts` · `bind.ts`에 필요한 필드 · 함수
 - [ ] 상세 합침(복사 · → · 되돌리기 두 곳 · 모두 선택 · 직접만 · 포커스 순서), "고치기…" · 행 메뉴 복사 3종 삭제, 간접 코드(`indirectUsage` · `aliasTargetsOf` · `recomputeIndirect` · `indirectMap`)와 키(`list.indirect*` · `list.chipTip`) 삭제
-- [ ] 새 변수(타입 기본값 · 컬렉션 0개면 사용자 `Variables`) · `dsl.manual` 표시와 `createTokens`(값 같음 = 재사용, 다름 = 건너뜀 · `skippedManual`) · `prunePaletteColors` · `createSemanticAliases` · `themeApply`(Dark 값 · `dark/` Global `-n`)에서 빼기, 테스트 · 복제(무료 개수 제한 상수, 자동 생성은 세지 않음) · 삭제 확인(⌘Z 실기 확인), 메시지 4종 · reqId · ERROR.op · OPS write 표에 넣기
+- [ ] 새 변수(타입 기본값 · 컬렉션 0개면 사용자 `Variables`) · `dsl.manual` 표시와 `createTokens`(값 같음 = 재사용, 다름 = 건너뜀 · `skippedManual`) · `prunePaletteColors` · `createSemanticAliases` · `themeApply`(Dark 값 · manual `dark/` Global은 건너뜀)에서 빼기, 테스트(다크를 두 번 돌려도 변수 수가 같음 포함) · 복제(무료 개수 제한 상수, 자동 생성은 세지 않음) · 삭제 확인(⌘Z 실기 확인), 메시지 4종 · reqId · ERROR.op · OPS write 표에 넣기
 - [ ] i18n: 새 키 · 지울 키(`vm.copyValue` · `vm.whatValue` · `vm.edit` · `vm.moreTip` · `vm.selectLayers` · `list.usesTip` 등), `cellCopyText` 등 쓰이지 않는 함수와 테스트 정리, `initialSideSel` 테스트, verify-bind-flow 블록 9 · 12
 - [ ] 테스트(`figma.test.mjs`): 속성 표 각 줄 · 용도 막힘 · 다음 속성 · 채움 용도 · 단색 없음 · 글자 구간 · 크기 FIXED · 반경 필드 없음 · 기존 연결 바꿈 · Global 연결 · 기타 · 종류 판정 3 · 4(사용자 Component 이름), 복제 · 삭제 · 새 변수
 - [ ] ia-v3 A.13 체크리스트 닫음(이 PR로 대체)
