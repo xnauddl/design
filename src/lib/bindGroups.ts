@@ -5,6 +5,7 @@
    - "곳" = 연결할 자리 하나(후보 하나). 묶은 줄은 k곳.
    ============================================================ */
 import { groupBindLines, type BindItem } from './bindDisplay';
+import { fieldKind, SEL_KINDS, type SelKind } from './selCards';
 
 /** 묶는 데 필요한 후보 필드(BindCandidate의 부분집합). */
 export interface GroupCand extends BindItem {
@@ -180,4 +181,61 @@ export function bindExamples(cols: readonly ExCol[], vars: readonly ExVar[]): { 
     }
   }
   return out;
+}
+
+/* ---------- IA v4 §4.2 연결 화면 — 줄 = (변수, 종류) 한 쌍 ---------- */
+
+/** 연결 화면의 줄 — 변수 묶음 + 종류. */
+export interface RowGroup extends VarGroup {
+  kind: SelKind;
+  /** `{변수 id}|{종류}` — 스위치 · 이어받기 단위. */
+  rowKey: string;
+}
+const rowKeyOf = (variableId: string, kind: SelKind): string => `${variableId}|${kind}`;
+
+/** 후보를 (변수, 종류) 줄로. 순서: 종류(SEL_KINDS → 기타) → 곳 수 많은 순 → 변수 이름 순. */
+export function groupByVarKind(cands: readonly GroupCand[]): RowGroup[] {
+  const byKind = new Map<SelKind, GroupCand[]>();
+  for (const c of cands) {
+    const k = fieldKind(c.field);
+    const arr = byKind.get(k);
+    if (arr) arr.push(c);
+    else byKind.set(k, [c]);
+  }
+  const out: RowGroup[] = [];
+  for (const kind of [...SEL_KINDS, 'other' as const]) {
+    const list = byKind.get(kind);
+    if (!list) continue;
+    for (const g of groupByVariable(list)) out.push({ ...g, kind, rowKey: rowKeyOf(g.variableId, kind) });
+  }
+  return out;
+}
+
+/**
+ * 다시 찾은 뒤 스위치 이어받기(§4.2 — 같은 (변수, 종류) 줄이면 꺼진 채). 새 줄은 켬.
+ * 추가 · 제외는 곳 단위로 센다.
+ */
+export function carryRowChecks(
+  prev: readonly GroupCand[],
+  prevChecked: ReadonlySet<string>,
+  next: readonly GroupCand[],
+): { checked: Set<string>; added: number; removed: number } {
+  const prevKeys = new Set(prev.map(placeKey));
+  const rowOn = new Map<string, boolean>();
+  for (const c of prev) {
+    const rk = rowKeyOf(c.variableId, fieldKind(c.field));
+    rowOn.set(rk, (rowOn.get(rk) ?? false) || prevChecked.has(placeKey(c)));
+  }
+  const checked = new Set<string>();
+  const nextKeys = new Set<string>();
+  let added = 0;
+  for (const c of next) {
+    const k = placeKey(c);
+    nextKeys.add(k);
+    if (!prevKeys.has(k)) added++;
+    if (rowOn.get(rowKeyOf(c.variableId, fieldKind(c.field))) ?? true) checked.add(k);
+  }
+  let removed = 0;
+  for (const k of prevKeys) if (!nextKeys.has(k)) removed++;
+  return { checked, added, removed };
 }

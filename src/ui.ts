@@ -1,11 +1,11 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindNode, BindSkip, ComponentCandidate, VarUpdateError } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError } from './shared/messages';
 import { type DraftToken, type Unit, tidyNumberTokens } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
-import { groupByVariable, placeKey, carryChecks, fieldIcon, bindExamples, type VarGroup, type PlaceLine } from './lib/bindGroups';
+import { placeKey, carryRowChecks, groupByVarKind, type RowGroup } from './lib/bindGroups';
 import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
 import { type Tier } from './lib/entitlements';
 import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
@@ -23,7 +23,7 @@ import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planWizard, summarize, pickDarkTarget, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
-import { cardCounts, type CardCounts, type ReasonCounts, type SelKind } from './lib/selCards';
+import { cardCounts, fieldKind, SEL_KINDS, NO_VAR_REASONS, PLACE_SKIP_REASONS, LAYER_SKIP_REASONS, type CardCounts, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -95,7 +95,8 @@ let bindLinking = 0;
 /** 연결 중에 사용자가 선택을 바꿨다 — 결과 지우기를 미뤄 뒀다(연결이 성공하면 결과 카드, 아니면 그때 지운다). */
 let bindSelChangedDuringLink = false;
 /** 마지막으로 보낸 연결 자리 — 연결 오류의 [다시 시도]가 쓴다(lastSentMsg는 그 뒤 다른 요청으로 바뀔 수 있다). */
-let lastLinkItems: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items'] | null = null;
+type LinkJob = { items: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items']; textStyles: { styleId: string; nodeIds: string[] }[] };
+let lastLinkItems: LinkJob | null = null;
 /**
  * SELECT_NODES를 부른 자리의 상태 줄. 레이어 선택은 적용 탭의 스킵 칩만 쓰던 기능이라
  * 결과를 #applyStatus에 고정으로 썼는데, 타이포 단계의 ×N 배지도 같은 메시지를 쓰면서
@@ -1050,11 +1051,6 @@ $('btnTextStyles').addEventListener('click', () => {
   // 등록은 스타일 생성까지 — 화면에 붙이는 건 옆의 「기존만 연결」 담당(결정 2026-08-06).
   send({ type: 'CREATE_TEXT_STYLES', styles });
 });
-$('btnApplyExistingText').addEventListener('click', () => {
-  // 적용만(무료): 현재 선택의 텍스트를 이미 등록된 같은 스타일에 연결(생성 없음).
-  $('tsApplyResult').hidden = true;
-  send({ type: 'APPLY_TEXT_STYLES' });
-});
 
 /** 선택이 멎은 뒤 이만큼 기다렸다 연결 현황을 읽는다 — 드래그 선택 중 매 이벤트마다 목록이 비었다 찼다 하지 않게. */
 const AUTO_SCAN_DELAY = 250;
@@ -1074,45 +1070,73 @@ function nextBindReq(): number {
 function isCurrentBindReply(reqId: number | undefined): boolean {
   return reqId === undefined || reqId === bindLatest;
 }
-$('btnApply').addEventListener('click', () => runBindPreview());
-/** 찾기 실행(이전의 미리보기 — 연결하지 않고 후보만 계산). silent = 복귀 때 조용히 다시 계산(§4.6 ⑧) — 진행률·테두리 없이. */
+/** 변수 찾기 · 텍스트 스타일 미리보기 응답을 기다린다 — 둘 다 오면 결과를 그린다(§4.2). */
+let bindVarPending = false;
+/** 연결 화면에 들어왔고 첫 스위치 포커스를 기다린다(§4.2). */
+let bindFocusPending = false;
+/** 찾기가 오류로 끝났다 — 빈 상태 글을 띄우지 않는다(오류 줄이 말한다). */
+let bindFindFailed = false;
+let bindTsPending = false;
+/** 찾기 실행 — 변수 찾기(APPLY preview) + 텍스트 스타일 미리보기. silent = 조용한 읽기(§7) — 진행률 · 테두리 없이. */
 function runBindPreview(silent = false): void {
-  $('bindNotice').hidden = true;
-  const wasDone = bindIsDone();
-  $('bindDone').hidden = true;
-  if (wasDone) { bindSkipReasons = {}; bindSkipsOpen = false; } // 연결 후 다시 찾기 — 결과 카드의 건너뜀 배지는 지운다
-  bindForeignSel = false;
+  bindFindFailed = false;
   bindHereSel = false;
   bindLeftSince = false;
-  if (!silent) {
+  // 찾기 대상 = 목록 기준(IA v4 §2.5) — 플러그인이 만든 선택이어도 기준으로 센다.
+  const base = baseline ?? curSel;
+  // noTier — 변수 찾기는 하지 않고 텍스트 스타일만(§4.2). 로컬 변수 0개는 찾는다(④ 카드의 종류별 수).
+  const doVars = !(prereqKnown && !hasBindable && prereqLocalVars > 0);
+  if (!silent && doVars) {
     bindFinding = true;
     showApplyProgress(t('bind.finding')); // UX6
   }
   const reqId = nextBindReq();
   bindSilentReq = silent ? reqId : 0;
-  // 찾기 대상 = 목록 기준(IA v4 §2.5) — 플러그인이 만든 선택이어도 기준으로 센다.
-  const base = baseline ?? curSel;
   bindSilentCarry = silent && !!bindPreviewSel && sameIds(bindPreviewSel, base.ids);
-  opSilent = silent;
-  send({ type: 'APPLY', preview: true, reqId, nodeIds: base.ids });
-  opSilent = false;
+  if (!bindSilentCarry) bindTsOff.clear(); // 다른 기준 — 끈 스타일 줄을 이어받지 않는다
+  bindVarPending = doVars;
+  bindTsPending = true;
+  bindTsReq = reqId;
+  // 텍스트 스타일 미리보기를 먼저 보낸다 — [다시 시도]가 가리키는 마지막 요청이 찾기(APPLY)가 되게.
+  send({ type: 'PREVIEW_TEXT_STYLES', reqId, nodeIds: base.ids });
+  if (doVars) {
+    opSilent = silent;
+    send({ type: 'APPLY', preview: true, reqId, nodeIds: base.ids });
+    opSilent = false;
+  } else {
+    bindCandidates = [];
+    bindCounts = undefined;
+    bindSkips = [];
+    bindSkipsCapped = false;
+    bindSkipReasons = {};
+  }
   bindPreviewSel = base.ids.slice();
-  if (!silent) bindPreviewName = base.count === 1 ? shortName(base.name || t('sel.unnamed')) : t('bind.selMany', { k: base.count });
   renderBindChrome();
 }
-$('btnBindRepreview').addEventListener('click', () => runBindPreview());
-$('btnBindToList').addEventListener('click', () => showManager());
+/** 두 응답이 다 왔다 — 결과를 그리고 카드 1을 맞춘다. */
+function bindFindSettle(): void {
+  if (bindVarPending || bindTsPending) return;
+  bindPreviewed = true;
+  selFindFor = bindPreviewSel ? bindPreviewSel.join(',') : null;
+  selFindInFlight = false;
+  renderBindTree();
+  // 텍스트 스타일만 모습에서 후보가 없으면 첫 화면으로(§4.2 상태표).
+  if (activeTab === 'select' && selSub === 'bind' && bindTsOnly() && !bindTsRows.length) showSelSub('home');
+  renderSelHome();
+}
 
 $('btnApplyConfirm').addEventListener('click', () => {
   // #6: 켠 변수의 곳만 직접 연결(WYSIWYG). 플러그인이 각 자리를 다시 확인한다.
-  const items = bindCandidates
+  const eff = bindTsOnly() ? [] : effCandidates();
+  const items = eff
     .filter((c) => bindChecked.has(candKey(c)))
     .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}) }));
-  if (!items.length) return;
-  startLink(items);
+  const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => ({ styleId: r.styleId, nodeIds: r.nodeIds }));
+  if (!items.length && !textStyles.length) return;
+  startLink({ items, textStyles });
 });
 /** 연결 보내기 — 진행 줄을 열고 "연결 중" 플래그를 세운다(§4.6 "찾기 · 연결의 수"). [다시 시도]도 이 길로. */
-function startLink(items: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items']): void {
+function startLink(job: LinkJob): void {
   if (bindLinking) return;
   // [다시 시도]는 버튼 잠금을 거치지 않는다 — 같은 사유로 여기서 막는다(다른 쓰기 작업 중 → [🔗 연결] 전제).
   const other = otherWriteOp();
@@ -1120,14 +1144,14 @@ function startLink(items: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items']
   updateBindApply();
   const confirm = $('btnApplyConfirm');
   if (isLocked(confirm)) { setStatus('applyStatus', confirm.dataset.lockMsg ?? '', 'warn'); return; }
-  lastLinkItems = items;
+  lastLinkItems = job;
   bindFinding = false;
   // 첫 진행 메시지 전에는 "연결 중…", 그 뒤로 "연결 중… {done} / {total}".
   // 연결은 중간에 멈추지 않으므로 [취소]를 숨긴다.
   showApplyProgress(t('bind.linking'), false);
   const reqId = nextBindReq();
   bindLinking = reqId;
-  send({ type: 'APPLY_SELECTED', items, reqId });
+  send({ type: 'APPLY_SELECTED', items: job.items, ...(job.textStyles.length ? { textStyles: job.textStyles } : {}), reqId });
   onBindLinkingChanged();
 }
 /** 연결이 결과 카드 없이 끝났다(오류 · 버린 응답) — 연결 중에 미뤄 둔 선택 변경의 지우기를 이제 한다. */
@@ -1137,7 +1161,6 @@ function flushLinkSelClear(): void {
   nextBindReq();
   hideApplyProgress();
   clearBindPreview();
-  $('bindDone').hidden = true;
 }
 
 
@@ -1652,8 +1675,6 @@ const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
 // 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
 // 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
-// btnApplyExistingText도 code 쪽에서 requireTextStyles로 막히지만, 전제 가드(등록된 스타일 유무)와
-// 결합돼 있어 여기 목록이 아니라 updateGates 아래에서 별도로 잠근다.
 const PAID_FIELDS = [
   ...COMPONENT_FIELDS,
   'btnPalette', 'btnColorVars',
@@ -1752,7 +1773,7 @@ const PIPELINE_TARGET: Record<PipelineStep['id'], { make: MakeStep | null; btn: 
   semantics: { make: 'token', btn: 'btnCreate' }, // 역할 매핑은 토큰을 적용할 때 함께 만들어진다(숨은 카드 대신)
   dark: { make: 'theme', btn: 'btnGenDark' },
   textStyles: { make: 'type', btn: 'btnScanText' },
-  bind: { make: null, btn: 'btnApply' }, // 적용 탭
+  bind: { make: null, btn: 'btnApplyConfirm' }, // 선택 탭 첫 화면
   rename: { make: null, btn: 'btnPreview', apply: 'rename' }, // 적용 탭 · 이름 정리
 };
 
@@ -2119,9 +2140,7 @@ window.onmessage = (event: MessageEvent) => {
           nextBindReq();
           hideApplyProgress();
           clearBindPreview();
-          $('bindDone').hidden = true;
-        } else bindSelChangedDuringLink = true; // 연결이 결과 카드 없이 끝나면 그때 지운다
-        $('tsApplyResult').hidden = true;
+        } else bindSelChangedDuringLink = true; // 연결이 결과 없이 끝나면 그때 지운다
         layerLibUse = null; // 라이브러리 사용 여부는 새 선택으로 다시 읽는다(§4.6 ②)
         if (activeTab === 'select') readLayerLibUse();
       } else if (bindLayerSelectPending) {
@@ -2191,49 +2210,45 @@ window.onmessage = (event: MessageEvent) => {
       // 스킵 목록은 상한에서 잘린다(bind.ts SKIP_PREVIEW_CAP) — 잘렸으면 칩 툴팁이 그렇다고 말한다.
       bindSkipsCapped = (msg.skipTotal ?? bindSkips.length) > bindSkips.length;
       if (msg.cancelled) {
-        // UX6: 취소 — 처리한 만큼만 적용(비파괴). 찾기 취소는 "찾기 전"과 같다(§4.6 단계 표).
-        // clearBindPreview가 칩을 지우므로 사유는 상태 글로 남긴다.
+        // 읽기 취소(§4.2 상태표) — "읽기를 취소했어요 · [다시 읽기]".
         clearBindPreview();
-        setStatus('applyStatus', t('apply.cancelled'), 'warn');
+        bindVarPending = false;
+        bindTsPending = false;
+        selFindInFlight = false;
+        setStatus('applyStatus', t('v4.readCancelled'), 'warn');
+        showStatusLine(t('v4.readCancelled'), { cls: 'warn', action: { label: t('v4.reread'), run: () => readSelFind(true, true) } });
       } else if (msg.preview) {
         // 찾은 곳을 변수 카드로. 처음에는 모든 변수를 켠다.
         const prev = bindCandidates;
         const prevChecked = new Set(bindChecked);
         bindCandidates = msg.candidates ?? [];
-        bindNodes = msg.nodes ?? [];
         bindCounts = msg.counts as ReasonCounts | undefined;
-        selFindFor = bindPreviewSel ? bindPreviewSel.join(',') : null;
-        bindPreviewed = true;
+        bindVarPending = false;
         bindChecked.clear();
         renderSkipReasons(msg.reasons ?? {});
         if (silent) {
           // 조용한 재계산: 스위치는 변수 단위로 이어받고, 달라졌을 때만 알린다(§4.6 ⑧). 건너뜀 펼침은 그대로.
-          const r = carryChecks(prev, prevChecked, bindCandidates);
+          const r = carryRowChecks(prev, prevChecked, bindCandidates);
           for (const k of r.checked) bindChecked.add(k);
           if (bindSilentCarry && (r.added || r.removed)) showStatusLine(t('bind.candChanged', { a: r.added, b: r.removed }));
         } else {
           bindSkipsOpen = false;
           for (const c of bindCandidates) bindChecked.add(candKey(c));
         }
-        renderBindTree();
-        // 찾은 곳·건너뜀은 배지가 말한다 — 상태 글은 비운다.
         setStatus('applyStatus', '', '');
+        bindFindSettle();
       } else {
-        // 연결 후 — 배지 줄·필터·카드를 지우고 결과 카드 하나 + (다시 확인해서 건너뛴 곳이 있으면) 건너뜀 배지(§4.6).
+        // 연결 후(§4.2) — 첫 화면으로 돌아오고 상태 줄 "🔗 {n}곳 연결 · ⌘Z로 되돌리기"(+ 건너뜀). 카드는 다시 읽는다.
+        const n = msg.bound + (msg.textStylesApplied ?? 0);
+        const m = msg.skipped + (msg.textStylesSkipped ?? 0);
         clearBindPreview();
-        bindSkips = msg.skips ?? [];
-        bindSkipsCapped = (msg.skipTotal ?? bindSkips.length) > bindSkips.length;
-        renderSkipReasons(msg.reasons ?? {});
         setStatus('applyStatus', '', '');
-        $('bindDoneText').textContent =
-          t('bind.doneCard', { n: msg.bound }) +
-          (msg.newRoles ? t('bind.doneNewRoles', { k: msg.newRoles }) : '');
-        $('bindDone').hidden = false;
-        renderBindTree();
+        if (activeTab === 'select' && selSub === 'bind') showSelSub('home');
+        showStatusLine(t('v4.linked', { n }) + (m ? t('v4.linkedSkipped', { m }) : ''), { cls: 'ok' });
+        selFindFor = null;
       }
       if (linkEnded) onBindLinkingChanged();
-      selFindInFlight = false;
-      renderSelHome();
+      if (!msg.preview) { selFindInFlight = false; renderSelHome(); }
       break;
     }
     case 'DELETED_UNBOUND':
@@ -2323,16 +2338,17 @@ window.onmessage = (event: MessageEvent) => {
         msg.missing.length ? 'warn' : 'ok',
       );
       break;
-    case 'TEXT_STYLES_APPLIED': {
-      // 결과는 버튼 아래 한 줄(§4.6) — "✓ 텍스트 {n}개에 스타일 연결 · 건너뜀 {m}".
-      const line = $('tsApplyResult');
-      // m = 건너뛴 텍스트 레이어 수, 사유별 수는 툴팁(§4.6).
-      line.textContent = t('bind.tsDone', { n: msg.applied }) + (msg.skipped ? t('bind.doneSkipped', { m: msg.skipped }) : '');
-      line.title = Object.entries(msg.skipReasons ?? {})
-        .filter(([, n]) => n > 0)
-        .map(([k, n]) => `${t('tsSkip.' + k)} ${n}`)
-        .join(' · ');
-      line.hidden = false;
+    case 'TEXT_STYLES_PREVIEW': {
+      // 텍스트 스타일 미리보기(§4.2) — 같은 찾기 차례의 응답만.
+      if (msg.reqId !== bindTsReq || msg.reqId !== bindLatest) break;
+      bindTsRows = msg.rows;
+      bindTsSkips = { ...msg.skipReasons };
+      // 사라진 스타일 줄의 끔은 잊는다.
+      const ids = new Set(bindTsRows.map((x) => x.styleId));
+      for (const id of [...bindTsOff]) if (!ids.has(id)) bindTsOff.delete(id);
+      bindTsPending = false;
+      renderSkipReasons(bindSkipReasons);
+      bindFindSettle();
       break;
     }
     case 'COLLECTIONS':
@@ -2535,6 +2551,18 @@ window.onmessage = (event: MessageEvent) => {
       // 고치기 저장 중 응답·표가 오지 않음(§4.4 고치기) — "저장됐을 수 있어요". 고치기 오류는 팝업 안에서만 알린다.
       if (msg.op === 'UPDATE_VARIABLE' || msg.op === 'GET_VAR_TABLE') edMaybeSaved();
       if (msg.op === 'UPDATE_VARIABLE') break;
+      if (msg.op === 'PREVIEW_TEXT_STYLES') {
+        // 텍스트 스타일 미리보기 실패 — 변수 연결은 막지 않는다(스타일 줄 없이 그린다).
+        if (bindTsPending) { bindTsPending = false; bindTsRows = []; bindTsSkips = {}; bindFindSettle(); }
+        break;
+      }
+      if (msg.op === 'APPLY' && bindVarPending) {
+        // 찾기 실패 — "읽는 중"에 멈추지 않게. 오류 줄 + [다시 시도]가 연결 화면에 뜬다.
+        bindVarPending = false;
+        bindFindFailed = true;
+        selFindInFlight = false;
+        renderSelHome();
+      }
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
       // 레이어 선택은 부른 자리가 여럿이라 표를 못 쓴다 — 마지막으로 부른 쪽을 따른다.
       const statusId = msg.op === 'SELECT_NODES'
@@ -2562,9 +2590,7 @@ const OP_STATUS: Record<string, string> = {
   SCAN_TEXT_STYLES: 'tsStatus',
   NAME_TEXT_STYLES_BY_ROW: 'tsStatus',
   CREATE_TEXT_STYLES: 'tsStatus',
-  // 옛 `tsApplyStatus`가 사라졌다고 매핑까지 빼면 폴백(colorStatus)으로 흘러가는데,
-  // 그 줄은 다른 단계에 있어 숨겨져 있다 — 실패가 '적용 중…'인 채로 조용히 묻힌다.
-  APPLY_TEXT_STYLES: 'applyStatus',
+  PREVIEW_TEXT_STYLES: 'applyStatus',
   APPLY: 'applyStatus',
   APPLY_SELECTED: 'applyStatus', // 연결 오류도 연결 카드에(§4.6 "연결 중의 다른 일")
   // 실제 자리는 부른 쪽이 정한다(selectStatusTarget) — 여기 값은 resolveStatusId가 못 받는
@@ -2817,35 +2843,30 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
   setStatus('renameStatus', t('rename.applied', { count: msg.changes.length }), 'ok');
 }
 
-/* ---------- 레이어 › 연결(§4.6 그림 개편): 찾기 → 변수 카드(스위치) → 연결 ---------- */
+/* ---------- 연결 화면(IA v4 §4.2): 종류 머리 · (변수, 종류) 줄 · 스위치 · 텍스트 스타일 줄 · [n곳 연결] ---------- */
 let bindCandidates: BindCandidate[] = [];
-let bindNodes: BindNode[] = [];
-/** 켠 곳의 키 — 스위치는 변수 단위라 한 변수의 키가 모두 들어 있거나 모두 빠져 있다. */
+/** 켠 곳의 키 — 스위치는 (변수, 종류) 줄 단위라 한 줄의 키가 모두 들어 있거나 모두 빠져 있다. */
 const bindChecked = new Set<string>();
 
-/** 후보 고유 키 — 같은 곳 = 같은 레이어 · 같은 속성 · 같은 변수(§4.6 ⑧). */
+/** 후보 고유 키 — 같은 곳 = 같은 레이어 · 같은 속성 · 같은 변수. */
 const candKey = placeKey;
 
 /** 찾은 결과가 있는가(연결 후보가 떠 있음). */
 function hasBindPreview(): boolean {
-  return bindCandidates.length > 0;
+  return bindCandidates.length > 0 || bindTsRows.length > 0;
 }
-/** 찾기를 마쳤는가(찾은 곳이 0이어도 참) — 배지·빈 상태·버튼 사유를 정한다. */
+/** 찾기를 마쳤는가(찾은 곳이 0이어도 참). */
 let bindPreviewed = false;
-/** 배지·빈 상태 문구의 선택 이름 — 찾을 때의 이름으로 고정(§4.6). */
-let bindPreviewName = '';
-/** 사용자가 직접 펼치거나 접은 카드(변수 id → 펼침) — 세션 동안 기억(§2.6). */
-const bindExpanded = new Map<string, boolean>();
-/** 찾는 중(진행률이 보이는 찾기) — 단계 표시의 돌아가는 표시. 조용한 재계산은 아니다. */
+/** 진행률이 보이는 찾기([읽기] · [다시 읽기]). 조용한 재계산은 아니다. */
 let bindFinding = false;
-/** (건너뜀 m ▸) 펼침 — 새로 찾거나 연결하면 접는다. */
+/** (건너뜀 ▸) 펼침. */
 let bindSkipsOpen = false;
-/** 건너뜀 사유별 수(지금 보이는 배지의 것 — 찾을 때 또는 연결 후 다시 확인). */
+/** 건너뜀 사유별 수(찾을 때 또는 연결 후 다시 확인). */
 let bindSkipReasons: Record<string, number> = {};
-/* 복귀 규칙(§4.6 ⑧) 상태 */
-let bindPreviewSel: string[] | null = null; // 찾기를 만든 선택
+/* 복귀 규칙 상태 */
+let bindPreviewSel: string[] | null = null; // 찾기를 만든 기준
 let bindLeftSince = false; // 찾은 뒤 창·탭을 떠났었다
-let bindForeignSel = false; // 다른 화면에서 플러그인이 선택을 바꿨다
+let bindForeignSel = false; // (v3 잔재 — v4는 기준이 바뀌지 않아 쓰지 않음)
 let bindHereSel = false; // 이 화면이 만든 선택 직후
 let bindLayerSelectPending = false; // 이 화면이 레이어 선택을 요청했다(다음 selfSelect가 그것)
 let bindPreviewMini = false; // 최소화 중에 끝난 찾기
@@ -2854,56 +2875,74 @@ let bindSilentReq = 0;
 let bindSilentCarry = false;
 /** 찾기 결과의 사유 × 종류(카드 1 숫자, IA v4 §4.1). */
 let bindCounts: ReasonCounts | undefined;
-/** 레이어 › 연결에서 쓰는 라이브러리 사용 여부(§4.6 ②) — null = 아직 모름(선택 없음 · 300개 초과 · 읽는 중). */
+/** 라이브러리 사용 여부(로컬 변수 0개일 때 ② 판정) — null = 아직 모름. */
 let layerLibUse: boolean | null = null;
 let layerLibReq = 0;
+/** 텍스트 스타일 미리보기(§4.2) — 스타일 줄 · 사유(레이어 단위) · 끈 줄. */
+let bindTsRows: { styleId: string; name: string; nodeIds: string[] }[] = [];
+let bindTsSkips: Record<string, number> = {};
+const bindTsOff = new Set<string>();
+let bindTsReq = 0;
 
-/** 속성 라벨 — i18n 키가 없으면(새 필드) 원래 API 이름을 그대로. */
-function fieldLabel(label: string, rawField: string): string {
-  return hasString(`field.${label}`) ? t(`field.${label}`) : rawField;
+/** 켠 스타일 줄의 글자 레이어 — 이 레이어의 글자 종류 자리는 변수 후보에서 뺀다(§4.2 "텍스트 스타일이 먼저다"). */
+function tsOnNodes(): Set<string> {
+  return new Set(bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).flatMap((r) => r.nodeIds));
 }
+/** 스타일 후보가 있는 모든 글자 레이어(켬 · 끔 무관) — 카드 숫자용(스위치는 모두 켬). */
+function tsAllNodes(): Set<string> {
+  return new Set(bindTsRows.flatMap((r) => r.nodeIds));
+}
+/** 지금 보일 변수 후보 — 켠 스타일 줄 레이어의 글자 종류 자리를 뺀다. */
+function effCandidates(): BindCandidate[] {
+  const ts = tsOnNodes();
+  return ts.size ? bindCandidates.filter((c) => !(fieldKind(c.field) === 'text' && ts.has(c.nodeId))) : bindCandidates;
+}
+let bindRowsSrc: BindCandidate[] | null = null;
+let bindRowsSig = '';
+let bindRowsAll: RowGroup[] = [];
+/** (변수, 종류) 줄 — 후보 · 끈 스타일 줄이 바뀔 때만 다시 만든다. */
+function bindRows(): RowGroup[] {
+  const sig = [...bindTsOff].sort().join(',') + '|' + bindTsRows.length;
+  if (bindRowsSrc !== bindCandidates || sig !== bindRowsSig) {
+    bindRowsAll = groupByVarKind(effCandidates());
+    bindRowsSrc = bindCandidates;
+    bindRowsSig = sig;
+  }
+  return bindRowsAll;
+}
+const rowOn = (g: RowGroup): boolean => g.keys.every((k) => bindChecked.has(k));
+/** 켠 곳 수 — 켠 변수 줄의 곳 + 켠 스타일 줄의 레이어(§4.2 — 한 자리는 한 번만). */
+function bindOnCount(): number {
+  const eff = new Set(effCandidates().map(candKey));
+  let n = 0;
+  for (const k of bindChecked) if (eff.has(k)) n++;
+  for (const r of bindTsRows) if (!bindTsOff.has(r.styleId)) n += r.nodeIds.length;
+  return n;
+}
+/** 텍스트 스타일만 모습(§4.2 상태표 — 로컬 변수 0개 · noTier). */
+const bindTsOnly = (): boolean => prereqKnown && !hasBindable;
 
-/** 변수 이름 필터(소문자 부분 일치). 비어 있으면 전부. */
-function bindFilterText(): string {
-  return (($('bindFilter') as HTMLInputElement).value ?? '').trim().toLowerCase();
-}
-/** 변수 카드 — 전체와 필터에 걸린 것. */
-let bindGroupsSrc: BindCandidate[] | null = null;
-let bindGroupsAll: VarGroup[] = [];
-let bindNodesSrc: BindNode[] | null = null;
-let bindNodeMap = new Map<string, BindNode>();
-/** 자리 줄의 레이어 — id → BindNode 맵은 찾기 결과가 바뀔 때 한 번만 만든다(1만 곳에서 줄마다 find하지 않게). */
-function bindNodeById(id: string): BindNode | undefined {
-  if (bindNodesSrc !== bindNodes) {
-    bindNodeMap = new Map(bindNodes.map((n) => [n.id, n]));
-    bindNodesSrc = bindNodes;
+/** 카드 1 · 연결 화면 공통 숫자(§4.1) — 텍스트 스타일 줄 반영. */
+function bindCardCounts(): CardCounts & { t: number } {
+  const ts = tsAllNodes();
+  const fields = bindCandidates.filter((c) => !(fieldKind(c.field) === 'text' && ts.has(c.nodeId))).map((c) => c.field);
+  const c = cardCounts(fields, bindCounts);
+  // 스타일 후보 레이어의 글자 종류 자리는 k · s에서도 뺀다(§4.1) — 사유 목록(bindSkips, 레이어 × 사유)으로 센다.
+  let dk = 0;
+  let ds = 0;
+  for (const s of bindSkips) {
+    if (!ts.has(s.nodeId) || fieldKind(s.field) !== 'text') continue;
+    if (NO_VAR_REASONS.includes(s.reason)) dk++;
+    else if (PLACE_SKIP_REASONS.includes(s.reason)) ds++;
   }
-  return bindNodeMap.get(id);
+  const t = ts.size;
+  const m = c.m + t;
+  const k = Math.max(0, c.k - dk);
+  const byKind = c.byKind.map((x) => (x.kind === 'text' ? { ...x, n: x.n - dk } : x)).filter((x) => x.n > 0);
+  const noVarByKind = c.noVarByKind.map((x) => (x.kind === 'text' ? { ...x, n: x.n - dk } : x)).filter((x) => x.n > 0);
+  if (t) byKind.push({ kind: 'textStyle' as SelKind, n: t });
+  return { ...c, m, k, s: Math.max(0, c.s - ds), n: m + k, byKind, noVarByKind, t };
 }
-function bindGroups(): { all: VarGroup[]; shown: VarGroup[] } {
-  // 변수 묶음은 후보가 바뀔 때만 다시 만든다(스위치 · 펼침 · 필터마다 다시 그린다).
-  if (bindGroupsSrc !== bindCandidates) {
-    bindGroupsAll = groupByVariable(bindCandidates);
-    bindGroupsSrc = bindCandidates;
-  }
-  const all = bindGroupsAll;
-  const q = bindFilterText();
-  return { all, shown: q ? all.filter((g) => g.variableName.toLowerCase().includes(q)) : all };
-}
-/** 카드가 펼쳐져 있나 — 처음에는 모두 접힘, 직접 펼치거나 접은 것은 세션 동안 기억(§4.6). */
-function groupOpen(g: VarGroup): boolean {
-  return bindExpanded.get(g.variableId) ?? false;
-}
-/** 변수가 켜져 있나(스위치) — 그 변수의 곳이 모두 켜짐. */
-const groupOn = (g: VarGroup): boolean => g.keys.every((k) => bindChecked.has(k));
-/** 켠 곳 수(보이지 않는 카드 포함) — [🔗 n곳 연결]의 n. */
-const bindOnCount = (): number => bindChecked.size;
-/** 연결 후 결과 카드가 보이는가. */
-const bindIsDone = (): boolean => !$('bindDone').hidden;
-/** 연결할 변수가 없다는 안내가 보이는가. */
-const bindPrereqShown = (): boolean => $('bindPrereq').style.display !== 'none';
-/** 다른 선택에서 만든 결과(연결 잠김)인가. */
-const bindOtherSel = (): boolean => bindForeignSel && !$('bindNotice').hidden;
 
 /** 타입 표시 — ● 색 · # 숫자 · T 글자. */
 function typeMark(value: string): string {
@@ -2957,7 +2996,6 @@ function tipTruncatedNames(root: HTMLElement): void {
   requestAnimationFrame(() => {
     for (const nm of Array.from(root.querySelectorAll<HTMLElement>('.bv-name'))) {
       const chip = nm.parentElement as HTMLElement;
-      // 새 역할 칩은 툴팁이 정해져 있다(§2.12) — 말줄임 툴팁으로 덮지 않는다.
       if (chip.dataset.tip) continue;
       if (nm.scrollWidth > nm.clientWidth + 1) chip.title = nm.textContent ?? '';
       else chip.removeAttribute('title');
@@ -2965,313 +3003,213 @@ function tipTruncatedNames(root: HTMLElement): void {
   });
 }
 
-/** 자리 줄 — 보기만(스위치는 변수 단위, §4.6). [속성 아이콘] 레이어 이름(캔버스 선택) · 속성. */
-function placeEl(l: PlaceLine): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'bv-place';
-  row.dataset.key = l.keys[0];
-  const ic = document.createElement('span');
-  ic.className = 'bv-ic';
-  ic.setAttribute('aria-hidden', 'true');
-  ic.textContent = fieldIcon(l.fields[0]);
-  const node = bindNodeById(l.nodeId);
-  const layer = document.createElement('button');
-  layer.type = 'button';
-  layer.className = 'link link-btn bv-layer';
-  layer.textContent = node?.name ?? l.nodeId;
-  layer.title = t('bind.layerTip');
-  layer.addEventListener('click', () => selectNodes([l.nodeId], 'applyStatus'));
-  const prop = document.createElement('span');
-  prop.className = 'bv-prop';
-  prop.textContent = fieldLabel(l.label, l.fields[0]) + (l.keys.length > 1 ? t('bind.placeCount', { k: l.keys.length }) : '');
-  row.append(ic, layer, prop);
-  return row;
-}
-
-/** 변수 카드 — 머리: [값 칩] → [변수 칩] · {k}곳 ▾/▸ · 스위치. 펼치면 자리 줄. */
-function bindGroupEl(g: VarGroup): HTMLElement {
-  const on = groupOn(g);
-  const open = groupOpen(g);
-  const card = document.createElement('div');
-  card.className = 'bv-card';
-  card.classList.toggle('off', !on);
-  card.dataset.var = g.variableId;
-  const head = document.createElement('div');
-  head.className = 'bv-head';
-  head.title = on ? t('bind.cardTip', { name: g.variableName, k: g.count }) : t('bind.offTip', { k: g.count });
-  const grow = document.createElement('span');
-  grow.className = 'grow';
-  const tw = document.createElement('button');
-  tw.type = 'button';
-  tw.className = 'bv-tw';
-  tw.textContent = `${t('bind.count', { k: g.count })} ${open ? '▾' : '▸'}`;
-  tw.setAttribute('aria-expanded', String(open));
-  tw.setAttribute('aria-label', t('bind.placesAria', { name: g.variableName, k: g.count }));
-  tw.addEventListener('click', () => {
-    bindExpanded.set(g.variableId, !open);
-    renderBindTree();
-    focusCardControl(g.variableId, '.bv-tw');
-  });
+/** 스위치 하나. */
+function switchEl(on: boolean, label: string, onToggle: () => void): HTMLButtonElement {
   const sw = document.createElement('button');
   sw.type = 'button';
   sw.className = 'bv-switch';
   sw.setAttribute('role', 'switch');
   sw.setAttribute('aria-checked', String(on));
-  sw.setAttribute('aria-label', t('bind.switchAria', { name: g.variableName }));
+  sw.setAttribute('aria-label', label);
+  sw.tabIndex = -1;
   const track = document.createElement('span');
   track.className = 'bv-track';
   track.setAttribute('aria-hidden', 'true');
   sw.appendChild(track);
-  sw.addEventListener('click', () => {
-    for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k);
-    renderBindTree();
-    focusCardControl(g.variableId, '.bv-switch');
-  });
-  head.append(valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf), grow, tw, sw);
-  card.appendChild(head);
-  if (open) {
-    const places = document.createElement('div');
-    places.className = 'bv-places';
-    const drawn = g.lines.slice(0, PLACE_ROW_CAP);
-    for (const l of drawn) places.appendChild(placeEl(l));
-    if (g.lines.length > PLACE_ROW_CAP) places.appendChild(placesMoreEl(g, drawn));
-    card.appendChild(places);
-  }
-  return card;
+  sw.addEventListener('click', onToggle);
+  return sw;
 }
-/** 카드 안 자리 줄 상한(§4.6 "찾기 · 연결의 수" — 보여주기에만 상한, 제안값). */
-const PLACE_ROW_CAP = 200;
-/**
- * 200줄 뒤 마지막 줄 "외 {n}곳 · 레이어 선택으로 보기". n = 카드의 곳 수 − 그린 줄의 곳 수 합.
- * 누르면 그리지 않은 줄의 레이어를 겹침 없이 줄 순서로 캔버스에서 선택한다(이 화면에서 만든 선택 — ⑧).
- */
-function placesMoreEl(g: VarGroup, drawn: readonly PlaceLine[]): HTMLElement {
-  const n = g.count - drawn.reduce((sum, l) => sum + l.keys.length, 0);
+/** 줄 하나(변수 줄 · 스타일 줄 공통) — [견본] 값 → 이름 · {n}곳 · 스위치. */
+function bindRowEl(key: string, left: HTMLElement[], n: number, on: boolean, label: string, onToggle: () => void): HTMLElement {
   const row = document.createElement('div');
-  row.className = 'bv-place bv-more';
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'link link-btn';
-  b.textContent = t('bind.placesMore', { n });
-  b.addEventListener('click', () => {
-    const ids = [...new Set(g.lines.slice(drawn.length).map((l) => l.nodeId))];
-    selectNodes(ids, 'applyStatus');
-  });
-  row.appendChild(b);
+  row.className = 'bv-card';
+  row.classList.toggle('off', !on);
+  row.dataset.var = key;
+  row.setAttribute('role', 'row');
+  const head = document.createElement('div');
+  head.className = 'bv-head';
+  const grow = document.createElement('span');
+  grow.className = 'grow';
+  const cnt = document.createElement('span');
+  cnt.className = 'bv-tw';
+  cnt.textContent = t('bind.count', { k: n });
+  head.append(...left, grow, cnt, switchEl(on, label, onToggle));
+  row.appendChild(head);
   return row;
 }
-/** 다시 그린 뒤 같은 카드의 같은 컨트롤로 포커스를 돌려준다. */
-function focusCardControl(variableId: string, sel: string): void {
-  $('bindTree').querySelector<HTMLElement>(`.bv-card[data-var="${CSS.escape(variableId)}"] ${sel}`)?.focus();
+/** 종류 머리 — "색 9곳". */
+function kindHeadEl(label: string, n: number): HTMLElement {
+  const h = document.createElement('div');
+  h.className = 'bv-kind';
+  h.setAttribute('role', 'presentation');
+  h.textContent = t('v4.kindPlaces', { kind: label, n });
+  return h;
 }
 
-/** 배지·빈 상태 문구의 선택 이름 — 20자를 넘으면 줄인다(§4.6). */
-function shortName(name: string): string {
-  return name.length > 20 ? `${name.slice(0, 20)}…` : name;
-}
-
-type BindStepState = 'now' | 'done' | 'todo';
-/** 단계 표시 상태(§4.6 표). */
-function bindStepStates(): [BindStepState, BindStepState, BindStepState] {
-  if (bindLinking) return ['done', 'done', 'now']; // 연결 중(돌아가는 표시) — 선택이 바뀌어도 연결은 계속된다
-  if (!curSel.count || bindPrereqShown()) return ['todo', 'todo', 'todo'];
-  if (bindIsDone()) return ['done', 'done', 'done'];
-  if (bindFinding && $('applyProgress').style.display !== 'none') return ['now', 'todo', 'todo'];
-  if (bindOtherSel()) return ['now', 'todo', 'todo'];
-  if (bindPreviewed) return hasBindPreview() ? ['done', 'now', 'todo'] : ['done', 'todo', 'todo'];
-  return ['now', 'todo', 'todo']; // 찾기 전 · 취소됨
-}
-function renderBindSteps(): void {
-  const states = bindStepStates();
-  const busy = bindFinding && $('applyProgress').style.display !== 'none';
-  $('bindSteps').querySelectorAll<HTMLElement>('.bs').forEach((li, i) => {
-    const st = states[i];
-    li.classList.toggle('now', st === 'now');
-    li.classList.toggle('done', st === 'done');
-    const spin = st === 'now' && ((i === 0 && busy) || (i === 2 && bindLinking !== 0));
-    li.classList.toggle('busy', spin);
-    if (st === 'now') li.setAttribute('aria-current', 'step');
-    else li.removeAttribute('aria-current');
-    (li.querySelector('.bs-dot') as HTMLElement).textContent = spin ? '' : st === 'done' ? '✓' : String(i + 1);
-  });
-}
-
-/** 빈 상태(목록 자리 점선 상자) — 찾기 전 / 선택 없음 / 찾은 곳 0. 연결할 변수 없음 안내가 보이면 숨김. */
+/** 빈 상태 · 읽는 중(§4.2 상태표). */
 function renderBindEmpty(): void {
   const box = $('bindEmpty');
   clearMount(box);
-  let kind: 'intro' | 'nosel' | 'none' | null = null;
-  if (bindPrereqShown() || bindIsDone()) kind = null;
-  else if (!curSel.count) kind = 'nosel';
-  else if (!bindPreviewed) kind = 'intro';
-  else if (!hasBindPreview()) kind = 'none';
-  box.hidden = !kind;
-  if (!kind) return;
-  const text = document.createElement('div');
-  text.className = 'be-text';
-  if (kind === 'intro') {
-    const ex = bindExamples(vmCols, vmVars);
-    const rows = [ex.color, ex.number].filter((x): x is { value: string; name: string } => !!x);
-    if (rows.length) {
-      const art = document.createElement('div');
-      art.className = 'be-art';
-      art.setAttribute('aria-hidden', 'true');
-      for (const r of rows) {
-        const row = document.createElement('div');
-        row.className = 'be-row';
-        const vc = varChip(r.name, r.value);
-        vc.title = r.name;
-        row.append(valueChip(r.value), arrowEl(), vc);
-        art.appendChild(row);
-      }
-      box.appendChild(art);
-    }
-    text.textContent = t('bind.emptyIntro');
-  } else {
-    const art = document.createElement('div');
-    art.className = 'be-art icon';
-    art.setAttribute('aria-hidden', 'true');
-    art.textContent = kind === 'nosel' ? '⬚ ↖' : '∅';
-    box.appendChild(art);
-    text.textContent = kind === 'nosel' ? t('bind.emptyNoSel') : t('bind.descNone', { name: bindPreviewName });
+  let text = '';
+  let action: [string, () => void] | null = null;
+  if (bindLinking) text = '';
+  else if (!bindPreviewed) text = bindFinding || bindFindFailed ? '' : t('v4.reading');
+  else if (!hasBindPreview() || (bindTsOnly() && !bindTsRows.length)) {
+    text = t('v4.nothingToLink');
+    if (bindCardCounts().k > 0) action = [t('v4.makeArrow'), () => showMake('color')];
   }
-  box.appendChild(text);
+  box.hidden = !text;
+  if (!text) return;
+  const d = document.createElement('div');
+  d.className = 'be-text';
+  d.textContent = text;
+  box.appendChild(d);
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'link link-btn';
+    b.textContent = action[0];
+    b.addEventListener('click', action[1]);
+    box.appendChild(b);
+  }
 }
 
-/** 배지 줄 — (찾음 n) (건너뜀 m ▸) [모두 켜기/끄기] [필터]. 연결 후에는 (건너뜀 m ▸)만(결과 카드 아래). */
+/** 건너뜀 칩(§4.2) — s는 카드 1과 같은 정의(자리 단위 곳 수). 레이어 단위 · 텍스트 스타일 사유는 칩 안에만. */
 function renderBindBadges(): void {
-  const done = bindIsDone();
-  const has = hasBindPreview() && !done;
-  const m = Object.values(bindSkipReasons).reduce((a, n) => a + (n > 0 ? n : 0), 0);
-  const showSkip = m > 0 && (bindPreviewed || done);
-  $('bindBadges').hidden = !has && !showSkip;
-  const found = $('bindFound');
-  found.hidden = !has;
-  if (has) {
-    found.textContent = t('bind.found', { n: bindCandidates.length });
-    found.title = t('bind.foundTip', { name: bindPreviewName, n: bindCandidates.length });
-  }
-  // 새 역할 k(켠 카드) — 0이면 숨김, 툴팁 없음(§4.6 · §2.12).
-  const roleSum = $('bindRoleSum');
-  const k = has ? bindGroups().all.filter(groupOn).filter((g) => g.newRoleOf != null).length : 0;
-  roleSum.hidden = !k;
-  roleSum.textContent = k ? t('bind.roleNew', { k }) : '';
-  roleSum.removeAttribute('title');
+  const c = bindCardCounts();
+  const layerReasons = Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && LAYER_SKIP_REASONS.includes(k)).length + Object.values(bindTsSkips).filter((n) => n > 0).length;
+  const s = bindTsOnly() ? 0 : c.s;
+  const show = !bindLinking && bindPreviewed && (s > 0 || layerReasons > 0);
+  $('bindBadges').hidden = !show;
   const skip = $('bindSkipToggle');
-  skip.hidden = !showSkip;
-  skip.textContent = `${t('bind.skipTotal', { m })} ${bindSkipsOpen ? '▾' : '▸'}`;
-  skip.setAttribute('aria-expanded', String(showSkip && bindSkipsOpen));
-  skip.setAttribute('aria-label', t('bind.skipAria', { m }));
-  $('bindSkips').hidden = !(showSkip && bindSkipsOpen);
-  // 모두 켜기/끄기 — 보이는 카드 기준
-  const { all, shown } = bindGroups();
-  const allBtn = $('bindAll');
-  allBtn.hidden = !has;
-  allBtn.textContent = shown.some((g) => !groupOn(g)) ? t('bind.allOn') : t('bind.allOff');
-  // 필터 — 카드 7개 이상이거나 필터 칸에 글자가 있을 때
-  const filterOn = has && (all.length > 6 || !!bindFilterText());
-  const fbtn = $('bindFilterBtn');
-  fbtn.hidden = !filterOn;
-  const row = $('bindFilterRow');
-  if (!filterOn) row.hidden = true;
-  fbtn.setAttribute('aria-expanded', String(!row.hidden));
-  // 필터 밖에 켠 곳
-  const shownSet = new Set(shown.flatMap((g) => g.keys));
-  const outside = [...bindChecked].filter((k) => !shownSet.has(k)).length;
-  $('bindOutside').textContent = bindFilterText() && outside ? t('bind.outside', { h: outside }) : '';
+  skip.textContent = `${s > 0 ? t('v4.skipPlaces', { s }) : t('v4.skipLayers')} ${bindSkipsOpen ? '▾' : '▸'}`;
+  skip.setAttribute('aria-expanded', String(show && bindSkipsOpen));
+  $('bindSkips').hidden = !(show && bindSkipsOpen);
 }
 
-/** 연결 화면 그리기 — 변수 카드를 다시 만들고 나머지(단계·버튼·빈 상태·배지)를 맞춘다. */
+/** 연결 화면 그리기. */
 function renderBindTree(): void {
   const tree = $('bindTree');
+  const hadFocus = tree.contains(document.activeElement) ? (document.activeElement as HTMLElement).closest<HTMLElement>('[data-var]')?.dataset.var ?? null : null;
   clearMount(tree);
-  if (hasBindPreview() && !bindIsDone()) for (const g of bindGroups().shown) tree.appendChild(bindGroupEl(g));
+  const rows = bindTsOnly() ? [] : bindRows();
+  const showList = bindPreviewed && !bindLinking && (rows.length > 0 || bindTsRows.length > 0);
+  $('bindAllRow').hidden = !showList;
+  if (showList) {
+    for (const kind of [...SEL_KINDS, 'other' as const]) {
+      const list = rows.filter((g) => g.kind === kind);
+      if (!list.length) continue;
+      tree.appendChild(kindHeadEl(t(`v4.kind.${kind}`), list.reduce((a, g) => a + g.count, 0)));
+      for (const g of list) {
+        const on = rowOn(g);
+        tree.appendChild(bindRowEl(g.rowKey, [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf)], g.count, on, t('bind.switchAria', { name: g.variableName }), () => {
+          for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k);
+          renderBindTree();
+          focusBindRow(g.rowKey);
+        }));
+      }
+    }
+    if (bindTsRows.length) {
+      tree.appendChild(kindHeadEl(t('v4.kind.textStyle'), bindTsRows.reduce((a, r) => a + r.nodeIds.length, 0)));
+      for (const r of bindTsRows) {
+        const on = !bindTsOff.has(r.styleId);
+        const aa = document.createElement('span');
+        aa.className = 'ts-aa';
+        aa.setAttribute('aria-hidden', 'true');
+        aa.textContent = 'Aa';
+        const nm = document.createElement('span');
+        nm.className = 'bv-chip bv-var';
+        nm.innerHTML = `<span class="bv-name">${escapeHtml(r.name)}</span>`;
+        tree.appendChild(bindRowEl(`ts:${r.styleId}`, [aa, arrowEl(), nm], r.nodeIds.length, on, t('bind.switchAria', { name: r.name }), () => {
+          on ? bindTsOff.add(r.styleId) : bindTsOff.delete(r.styleId);
+          // 스타일 줄을 끄면 그 레이어의 글자 변수 자리가 되살아난다 — 그 줄은 켜진 상태로(같은 줄의 스위치를 따른다).
+          if (on) for (const c of bindCandidates) if (fieldKind(c.field) === 'text' && r.nodeIds.includes(c.nodeId)) bindChecked.add(candKey(c));
+          renderBindTree();
+          focusBindRow(`ts:${r.styleId}`);
+        }));
+      }
+    }
+  }
+  // grid 키보드 — 정지점 1개(첫 줄 스위치), ↑↓ = 줄, Space = 스위치.
+  const switches = Array.from(tree.querySelectorAll<HTMLElement>('.bv-switch'));
+  const target = (hadFocus && tree.querySelector<HTMLElement>(`[data-var="${CSS.escape(hadFocus)}"] .bv-switch`)) || switches[0];
+  if (target) target.tabIndex = 0;
   tipTruncatedNames(tree);
   renderBindChrome();
+  bindFocusFirst();
 }
-/** 카드는 그대로 두고 단계·버튼·빈 상태·배지만 맞춘다(포커스가 카드 안에 있어도 안전). */
+function focusBindRow(key: string): void {
+  const sw = $('bindTree').querySelector<HTMLElement>(`[data-var="${CSS.escape(key)}"] .bv-switch`);
+  if (!sw) return;
+  $('bindTree').querySelectorAll<HTMLElement>('.bv-switch').forEach((x) => (x.tabIndex = -1));
+  sw.tabIndex = 0;
+  sw.focus();
+}
+$('bindTree').addEventListener('keydown', (e) => {
+  const sws = Array.from($('bindTree').querySelectorAll<HTMLElement>('.bv-switch'));
+  const i = sws.indexOf(document.activeElement as HTMLElement);
+  if (i < 0) return;
+  const go = (j: number): void => { const tg = sws[Math.max(0, Math.min(sws.length - 1, j))]; sws.forEach((x) => (x.tabIndex = -1)); tg.tabIndex = 0; tg.focus(); };
+  if (e.key === 'ArrowDown') go(i + 1);
+  else if (e.key === 'ArrowUp') go(i - 1);
+  else if (e.key === 'Home') go(0);
+  else if (e.key === 'End') go(sws.length - 1);
+  else return;
+  e.preventDefault();
+});
+/** 줄은 그대로 두고 빈 상태 · 칩 · 버튼 · 머리만 맞춘다. */
 function renderBindChrome(): void {
   if (!curSel) return;
   renderBindEmpty();
   renderBindBadges();
   updateBindApply();
+  if (activeTab === 'select' && selSub === 'bind') renderSubHead();
+  renderSelHome();
 }
-
-// 접근성 이름(정적 i18n은 aria-label을 덮지 않는다)
-$('bindSteps').setAttribute('aria-label', t('bind.stepsAria'));
-$('bindFilterBtn').setAttribute('aria-label', t('bind.filterBtn'));
-$('btnApplyLabel').textContent = t('bind.find');
-$('btnApplyConfirmLabel').textContent = t('bind.link');
-$('bindFilter').addEventListener('input', () => renderBindTree());
-$('bindFilter').addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { e.preventDefault(); closeBindFilter(); }
-});
-function closeBindFilter(): void {
-  ($('bindFilter') as HTMLInputElement).value = '';
-  $('bindFilterRow').hidden = true;
-  renderBindTree();
-  if (!$('bindFilterBtn').hidden) $('bindFilterBtn').focus();
-}
-$('bindFilterBtn').addEventListener('click', () => {
-  const row = $('bindFilterRow');
-  if (row.hidden) {
-    row.hidden = false;
-    renderBindBadges();
-    ($('bindFilter') as HTMLInputElement).focus();
-  } else closeBindFilter();
-});
 $('bindSkipToggle').addEventListener('click', () => {
   bindSkipsOpen = !bindSkipsOpen;
   renderBindBadges();
 });
-// 모두 켜기/끄기 — 보이는 카드에만(필터 중 보이지 않는 카드는 그대로, §4.6). 포커스는 버튼에 남는다.
-$('bindAll').addEventListener('click', () => {
-  const { shown } = bindGroups();
-  const turnOn = shown.some((g) => !groupOn(g));
-  for (const g of shown) for (const k of g.keys) turnOn ? bindChecked.add(k) : bindChecked.delete(k);
+// 모두 켜기 · 모두 끄기(§4.2) — 변수 줄과 스타일 줄 모두. 포커스는 누른 링크에 남는다.
+function setAllBind(on: boolean): void {
+  // 스타일 줄을 먼저 — 끄면 되살아나는 글자 자리까지 아래에서 함께 끈다.
+  for (const r of bindTsRows) on ? bindTsOff.delete(r.styleId) : bindTsOff.add(r.styleId);
+  for (const g of bindRows()) for (const k of g.keys) on ? bindChecked.add(k) : bindChecked.delete(k);
   renderBindTree();
-});
+}
+$('bindAllOn').addEventListener('click', () => { setAllBind(true); $('bindAllOn').focus(); });
+$('bindAllOff').addEventListener('click', () => { setAllBind(false); $('bindAllOff').focus(); });
 
-/** 단계 표시 · 버튼 이름 · 주/보조 · 잠금(§4.6). */
+/** [n곳 연결] 이름 · 잠금(§4.2). */
 function updateBindApply(): void {
   if (!curSel) return;
-  renderBindSteps();
-  const done = bindIsDone();
-  const has = bindPreviewed && hasBindPreview() && !done;
-  // [🔍 찾기] — 찾기 전 주 버튼, 찾은 뒤 [🔍 다시 찾기] 보조, 연결 후 [🔍 다시 찾기] 주 버튼.
-  const find = $('btnApply');
-  $('btnApplyLabel').textContent = bindPreviewed || done ? t('bind.refind') : t('bind.find');
-  find.classList.toggle('primary', !bindPreviewed || done);
-  // [🔗 연결] — 찾은 뒤 [🔗 {n}곳 연결] 주 버튼, 그 밖에는 숫자 없이 잠금.
   const confirm = $('btnApplyConfirm');
   const n = bindOnCount();
-  $('btnApplyConfirmLabel').textContent = has ? t('bind.linkN', { n }) : t('bind.link');
-  confirm.classList.toggle('primary', has);
-  // 사유 순서: 선택 없음 → 다른 선택의 결과 → 찾기 전·연결 후 → 찾은 곳 0 → 모두 끔(§4.6).
-  if (!curSel.count) setLock(confirm, 'prereq', t('status.noSelection'));
-  else if (bindOtherSel()) setLock(confirm, 'prereq', t('bind.selChanged'));
-  else if (!bindPreviewed || done) setLock(confirm, 'prereq', t('bind.needFind'));
+  $('btnApplyConfirmLabel').textContent = bindPreviewed && hasBindPreview() ? t('bind.linkN', { n }) : t('bind.link');
+  $('bindFoot').hidden = !!bindLinking;
+  if (!curSel.count && !baseline) setLock(confirm, 'prereq', t('status.noSelection'));
+  else if (!bindPreviewed) setLock(confirm, 'prereq', t('v4.reading'));
   else if (!hasBindPreview()) setLock(confirm, 'prereq', t('bind.nothing'));
   else if (!n) setLock(confirm, 'prereq', t('bind.needOn'));
   else setLock(confirm, null);
 }
 
-/** 찾은 결과를 지운다(선택 변경·취소·연결 후) — "찾기 전"으로. 필터도 비운다. */
+/** 찾은 결과를 지운다(기준 변경 · 취소) — "읽는 중"으로. */
 function clearBindPreview(): void {
-  $('bindNotice').hidden = true;
   bindPreviewSel = null;
   bindForeignSel = false;
   bindHereSel = false;
   bindPreviewed = false;
   bindCandidates = [];
-  bindNodes = [];
   bindSkips = [];
   bindSkipsCapped = false;
   bindSkipReasons = {};
   bindSkipsOpen = false;
-  clearMount($('bindSkips')); // 숨기기만 하면 낡은 칩이 DOM에 남는다
-  ($('bindFilter') as HTMLInputElement).value = '';
-  $('bindFilterRow').hidden = true;
+  bindTsRows = [];
+  bindTsSkips = {};
+  bindVarPending = false;
+  bindTsPending = false;
+  clearMount($('bindSkips'));
   bindChecked.clear();
   renderBindTree();
 }
@@ -3422,17 +3360,18 @@ let bindSkips: BindSkip[] = [];
 /** 스킵 목록이 상한에서 잘렸는가 — 힌트 줄이 "목록은 N개까지"라고 밝힌다. */
 let bindSkipsCapped = false;
 
-/** 건너뜀 사유 칩(§4.6) — (건너뜀 m ▸) 배지를 펼치면 보인다. 레이어 목록이 있는 사유만 버튼(누르면 캔버스 선택), 나머지는 글자.
-    m = 사유별 숫자의 합(속성 단위) — 배지가 센다. */
+/** 건너뜀 사유 칩(§4.2) — [건너뜀 ▸]을 펼치면 보인다. 자리 단위 사유는 "{사유} {n}곳", 레이어 단위 · 텍스트 스타일 사유는 "{사유} 레이어 {n}개".
+    레이어 목록이 있는 사유만 버튼(누르면 캔버스 선택). 텍스트 스타일만 모습이면 텍스트 스타일 사유만. */
 function renderSkipReasons(reasons: Record<string, number>): void {
   bindSkipReasons = { ...reasons };
   const box = $('bindSkips');
   clearMount(box);
-  const entries = Object.entries(reasons).filter(([, n]) => n > 0);
   const capNote = bindSkipsCapped ? t('bind.skipCappedTip', { shown: bindSkips.length }) : '';
-  for (const [key, n] of entries) {
-    const ids = bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId);
-    const label = `${t('reason.' + key)} ${n}`;
+  const varEntries = bindTsOnly() ? [] : Object.entries(reasons).filter(([k, n]) => n > 0 && (PLACE_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k)));
+  for (const [key, n] of varEntries) {
+    const ids = [...new Set(bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId))];
+    const layer = LAYER_SKIP_REASONS.includes(key);
+    const label = t(layer ? 'v4.reasonLayers' : 'v4.reasonPlaces', { reason: t('reason.' + key), n: layer && ids.length ? ids.length : n });
     if (!ids.length) {
       const span = document.createElement('span');
       span.className = 'skip-chip static';
@@ -3444,14 +3383,21 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     btn.type = 'button';
     btn.className = 'skip-chip';
     btn.textContent = `${label} ›`;
-    // 사유 건수(n)는 속성 단위, 레이어 수는 노드 단위라 서로 다를 수 있다(padding 4건 → 레이어 1개).
     const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ');
     btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names }) + capNote;
     btn.addEventListener('click', () => {
+      bindLayerSelectPending = true;
       selectNodes(ids, 'applyStatus');
       setStatus('applyStatus', t('bind.skipSelected', { reason: t('reason.' + key), n: ids.length }), '');
     });
     box.appendChild(btn);
+  }
+  for (const [key, n] of Object.entries(bindTsSkips)) {
+    if (!(n > 0)) continue;
+    const span = document.createElement('span');
+    span.className = 'skip-chip static';
+    span.textContent = t('v4.reasonLayers', { reason: t('tsSkip.' + key), n });
+    box.appendChild(span);
   }
 }
 
@@ -3562,7 +3508,7 @@ function updateLinkProgress(done: number, total: number): void {
 function hideApplyProgress(): void {
   $('applyProgress').style.display = 'none';
   bindFinding = false;
-  if (curSel) renderBindSteps(); // 찾는 중 표시를 거둔다
+  if (curSel) renderBindChrome(); // 찾는 중 표시를 거둔다
 }
 
 function setStatus(id: string, text: string, cls: 'ok' | 'warn' | ''): void {
@@ -3853,10 +3799,7 @@ function onLockedActivate(e: Event): void {
     if (el.dataset.lock === 'paid') showPaidReason();
     else if (el.dataset.lock === 'edit') edLockedSave(); // 고치기 [저장] — 사유는 팝업 안 알림 줄에
     else if (el.dataset.wait && el.dataset.waitTarget) setStatus(el.dataset.waitTarget, el.dataset.wait, 'warn'); // 연결 카드 버튼 — 카드 상태 줄
-    else if (el.id === 'btnApplyExistingText' && !el.dataset.wait && curSel.count && !hasTextStyles) {
-      // "등록된 텍스트 스타일이 없어요 · 타이포에서 등록 →(유료)"
-      showStatusLine(t('bind.tsNoneText'), { cls: 'warn', action: { label: t('bind.tsGotoType'), run: () => showMake('type') } });
-    } else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: 'warn' });
+    else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: 'warn' });
   }
 }
 document.addEventListener('click', onLockedActivate, true);
@@ -3940,7 +3883,6 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   GENERATE_DARK_MODE: { results: ['DARK_MODE_RESULT'], label: 'op.dark', go: () => showMake('theme'), write: true },
   SCAN_TEXT_STYLES: { results: ['TEXT_STYLE_CANDIDATES'], label: 'op.textScan', go: () => showMake('type'), write: false },
   CREATE_TEXT_STYLES: { results: ['TEXT_STYLES_RESULT'], label: 'op.textStyles', go: () => showMake('type'), write: true },
-  APPLY_TEXT_STYLES: { results: ['TEXT_STYLES_APPLIED'], label: 'op.textApply', go: () => { showTab('select'); showApplyStep('bind'); }, write: true },
   APPLY: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: false },
   APPLY_SELECTED: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: true },
   RENAME: { results: ['RENAME_RESULT'], label: 'op.rename', go: goLayer('rename'), write: false },
@@ -3967,7 +3909,6 @@ const WAIT_LINK_IDS = [
   'btnSemantics', // CREATE_SEMANTICS
   'btnGenDark', // GENERATE_DARK_MODE
   'btnTextStyles', // CREATE_TEXT_STYLES
-  'btnApplyExistingText', // APPLY_TEXT_STYLES
   'btnRename', // RENAME_APPLY
   'btnRegisterComp', // REGISTER_COMPONENTS
   'btnClassifyVariants', // CLASSIFY_VARIANTS
@@ -3975,8 +3916,8 @@ const WAIT_LINK_IDS = [
   'btnComponentize', // COMPONENTIZE_SIMILAR
   'btnWizardRun', // 마법사 [전체 실행]
 ];
-/** 연결 카드의 [🔍 다시 찾기] · [🔗 연결] — 사유는 카드 상태 줄(#applyStatus). */
-const WAIT_CARD_IDS = ['btnApply', 'btnBindRepreview', 'btnApplyConfirm'];
+/** 연결 화면의 [n곳 연결] — 사유는 화면 상태 줄(#applyStatus). */
+const WAIT_CARD_IDS = ['btnApplyConfirm'];
 /** 지금 진행 중인 다른 쓰기 작업의 이름(op.* 라벨) — 없으면 null. 연결 자신은 빼고 본다. */
 function otherWriteOp(): string | null {
   if (opWizard || wizardRunning) return t('op.wizard');
@@ -4217,6 +4158,8 @@ function showTab(name: TabName): void {
 
 /** 선택 탭 하위 화면 전환(§2.1). 탭은 바꾸지 않는다(부르는 쪽이 showTab). */
 function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
+  // 연결 화면은 기준이 있어야 한다 — 선택이 없으면 첫 화면(선택 없음 안내, §4.2 상태표).
+  if (sub === 'bind' && !(baseline ?? curSel)?.count) sub = 'home';
   const changed = sub !== selSub;
   if (changed && activeTab === 'select') screenScroll.set(screenKey(), window.scrollY);
   if (changed && selSub === 'bind' && hasBindPreview()) bindLeftSince = true;
@@ -4237,13 +4180,31 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
     readScreen('enter');
   }
   renderSelHome();
+  // 연결 화면에 들어오면 첫 스위치에 포커스(§4.2) — 목록이 아직 없으면 결과가 그려질 때.
+  if (changed && sub === 'bind') bindFocusPending = true;
+  bindFocusFirst();
+}
+/** 연결 화면에 들어온 뒤 첫 스위치에 포커스를 한 번 준다. */
+function bindFocusFirst(): void {
+  if (!bindFocusPending || activeTab !== 'select' || selSub !== 'bind') return;
+  const sw = $('bindTree').querySelector<HTMLElement>('.bv-switch[tabindex="0"]');
+  if (!sw) return;
+  bindFocusPending = false;
+  sw.focus({ preventScroll: true });
+}
+/** 연결 화면 머리 오른쪽(§4.2) — "변수 없는 값 {n}곳", 텍스트 스타일만 모습이면 "텍스트 스타일 {t}곳". */
+function bindHeadRight(): string {
+  if (!bindPreviewed) return '';
+  const c = bindCardCounts();
+  if (bindTsOnly()) return c.t ? t('v4.tsPlaces', { t: c.t }) : '';
+  return c.n ? t('v4.findN', { n: c.n }) : '';
 }
 /** 하위 화면 머리 — 제목 · 오른쪽 보조 글(§4.2~§4.5). */
 function renderSubHead(): void {
   const titles: Record<Exclude<SelSub, 'home'>, string> = { bind: 'v4.subBind', rename: 'v4.rename', structure: 'v4.subComponents', make: 'v4.subMake' };
   if (selSub === 'home') return;
   $('subTitle').textContent = selSub === 'bind' ? baseLabel() : t(titles[selSub]);
-  $('subRight').textContent = selSub === 'make' || selSub === 'rename' ? baseLabel() : '';
+  $('subRight').textContent = selSub === 'make' || selSub === 'rename' ? baseLabel() : selSub === 'bind' ? bindHeadRight() : '';
 }
 /** ← · Esc — 첫 화면으로, 포커스는 연 버튼(없으면 첫 카드 버튼, §2.1). */
 function subBack(): void {
@@ -4633,11 +4594,6 @@ function leaveManagerUi(): void {
   // 시작 화면 고정(①): 요약을 본 뒤 변수 탭을 떠나면 푼다.
   if (wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
 }
-/** 다른 화면에서 "변수 탭에서 보기 →" — 목록, 기준은 지금 선택으로(§3.1). */
-function showManager(): void {
-  showTab('variables');
-  rebaseToCurrent();
-}
 
 /* ---------- 선택과 목록 기준 ---------- */
 function onSelectionForList(m: { count: number; scanned: number; ids?: string[]; firstName?: string; selfSelect?: boolean }): void {
@@ -4656,6 +4612,7 @@ function setBaseline(b: SelInfo | null): void {
   vmUsageReq = 0;
   vmUsageInFlight = false;
   bigSkipped = false;
+  if (!b && activeTab === 'select' && selSub === 'bind' && !bindLinking) showSelSub('home');
   if (!b) {
     usageMap = null;
     indirectMap = new Map();
@@ -6320,41 +6277,11 @@ $('btnWizListView').addEventListener('click', () => {
 /* =====================================================================
    레이어 › 연결(IA v3 §4.6)
    ===================================================================== */
-/** 연결할 변수가 없을 때의 안내(4행)와 [찾기]·[연결]·[기존 스타일 연결] 잠금. */
+/** 준비 상태가 바뀐 뒤 연결 화면을 맞춘다 — 연결할 변수가 없으면 "텍스트 스타일만" 모습(§4.2). */
 function renderBindPrereq(): void {
   // 시작 직후 updateGates가 목록 상태보다 먼저 부를 수 있다 — 그때는 건너뛰고 첫 선택 상태에서 그린다.
   if (!curSel) return;
-  const notice = $('bindPrereq');
-  const text = notice.querySelector('.prereq-text') as HTMLElement;
-  const act = $('bindPrereqAction') as HTMLButtonElement;
-  let msg = '';
-  let action: [string, () => void] | null = null;
-  // 첫 전제 상태 전에는 '모름' — 경고를 띄우지 않고 막지도 않는다.
-  if (prereqKnown && !hasBindable) {
-    if (prereqLocalVars === 0) {
-      // ②는 라이브러리 사용을 읽었을 때만. 모르면 유료/무료 행.
-      if (layerLibUse === true) msg = t('bind.noLocalLib');
-      else if (isPaid) { msg = t('bind.noVarsPaid'); action = [t('prereq.gotoCreate'), goToCreate]; }
-      else { msg = t('bind.noVarsFree'); action = [t('status.paidAction'), goToLicense]; }
-    } else {
-      // 계층 컬렉션에 변수가 없음(§4.6) — 버튼은 로컬 변수 0개 행과 같다.
-      msg = t('bind.noTier');
-      action = isPaid ? [t('prereq.gotoCreate'), goToCreate] : [t('status.paidAction'), goToLicense];
-    }
-  }
-  notice.style.display = msg ? '' : 'none';
-  text.textContent = msg;
-  act.hidden = !action;
-  if (action) { act.textContent = action[0]; act.onclick = action[1]; }
-  // 선택이 없을 때 세 버튼은 aria-disabled(누르면 사유).
-  const noSel = !curSel.count;
-  setLock($('btnApply'), noSel ? 'prereq' : msg ? 'prereq' : null, noSel ? t('status.noSelection') : msg);
-  renderBindChrome(); // 단계 표시 · [연결] 잠금 · 빈 상태(안내가 보이면 숨김)
-  // 기존 스타일 연결(무료) — 선택 없음 / 등록된 텍스트 스타일 없음.
-  const ts = $('btnApplyExistingText');
-  if (noSel) setLock(ts, 'prereq', t('status.noSelection'));
-  else if (prereqKnown && !hasTextStyles) setLock(ts, 'prereq', t('bind.tsNone'));
-  else setLock(ts, null);
+  renderBindChrome();
 }
 /** ② 판정용 — 로컬 변수가 없고 선택이 300개 이하일 때만 라이브러리 사용을 읽는다. */
 function readLayerLibUse(): void {
@@ -6364,27 +6291,15 @@ function readLayerLibUse(): void {
   send({ type: 'SCAN_USAGE', reqId: layerLibReq, nodeIds: curSel.ids });
 }
 
-/** 다른 탭에서 돌아오거나 창에 다시 들어올 때(§4.6 ⑧). 순서: 최소화 중 결과 → 다른 선택 → 이 화면의 선택 → 조용한 재계산/안내. */
+/** 다른 탭에서 돌아오거나 창에 다시 들어올 때(§4.2 · §7). 최소화 중 결과 → 이 화면의 선택 → 조용히 다시 찾기(끈 스위치 이어받음). */
 function bindOnReturn(): void {
-  if (bindLinking) return; // 연결 중의 복귀는 아무것도 하지 않는다(§4.6 ⑧)
+  if (bindLinking) return; // 연결 중의 복귀는 아무것도 하지 않는다 — 끝난 뒤 1번(§4.2)
   if (activeTab !== 'select' || selSub !== 'bind' || !hasBindPreview()) return;
   if (bindPreviewMini) { bindPreviewMini = false; return; }
-  const notice = $('bindNotice');
-  if (bindForeignSel || (bindPreviewSel && !sameIds(bindPreviewSel, (baseline ?? curSel).ids))) {
-    bindForeignSel = true;
-    $('bindNoticeText').textContent = t('bind.otherSel');
-    notice.hidden = false;
-    renderBindPrereq(); // 단계 표시 "지금 찾기" · [연결] 잠금
-    return;
-  }
   if (bindHereSel) { bindHereSel = false; return; }
   if (!bindLeftSince) return;
   bindLeftSince = false;
-  if (curSel.scanned > BIG_SELECTION) {
-    $('bindNoticeText').textContent = t('bind.maybeChanged');
-    notice.hidden = false;
-    return;
-  }
+  if ((baseline ?? curSel).scanned > BIG_SELECTION) return; // 300개 규칙 — 자동으로 읽지 않는다
   runBindPreview(true);
 }
 document.documentElement.addEventListener('pointerleave', () => { if (hasBindPreview()) bindLeftSince = true; });
@@ -6430,7 +6345,6 @@ function readSelFind(force = true, user = false): void {
   if (!force && selFindFor === baseKey()) return;
   if (!user && baseline.scanned > BIG_SELECTION) { renderSelHome(); return; }
   if (bindLinking || opBusy() || wizardRunning) { selFindDeferred = true; return; }
-  if (prereqKnown && !hasBindable && prereqLocalVars > 0) { selFindFor = baseKey(); renderSelHome(); return; } // noTier — 찾지 않는다
   selFindDeferred = false;
   selFindInFlight = true;
   if (user) runBindPreview(); else runBindPreview(true);
@@ -6527,20 +6441,26 @@ function renderSelHome(): void {
     put(c);
     return finishSelFocus(hadFocus);
   }
-  const counts = findReady ? cardCounts(bindCandidates.map((c) => c.field), bindCounts) : null;
+  const counts = findReady ? bindCardCounts() : null;
   const reading = (): HTMLElement => selCard({ title: t('v4.reading') });
   // 5 · 6 로컬 변수 0개 — 쓰는 변수 결과가 온 뒤 가린다(오기 전에는 4 읽는 중).
   if (localZero) {
     if (!usageReady) { put(reading()); return finishSelFocus(hadFocus); }
     const libDirect = libVars.filter((l) => (usageMap?.get(l.id)?.places ?? 0) > 0);
     if (libDirect.length) {
-      put(selCard({ title: t('v4.libOnly') }));
+      const subs: (string | Node)[] = [];
+      const actions: HTMLElement[] = [];
+      tsOnlyExtra(subs, actions);
+      put(selCard({ title: t('v4.libOnly'), subs, actions }));
       renderUsesCard(put);
     } else {
       const subs: string[] = [];
       if (counts && counts.noVarByKind.length) subs.push(counts.noVarByKind.filter((x) => x.kind !== 'other').map((x) => t('v4.kindPlaces', { kind: kindLabel(x.kind), n: x.n })).join(' · '));
       else if (!findReady) subs.push(t('v4.reading'));
-      put(selCard({ title: t('v4.noVarsFile'), subs, actions: [selBtn(t('v4.makeArrow'), (b) => { showMake('color'); subOpener = b; }, true)] }));
+      const actions: HTMLElement[] = [selBtn(t('v4.makeArrow'), (b) => { showMake('color'); subOpener = b; }, true)];
+      const allSubs: (string | Node)[] = [...subs];
+      tsOnlyExtra(allSubs, actions);
+      put(selCard({ title: t('v4.noVarsFile'), subs: allSubs, actions }));
     }
     renderDeletedCard(put);
     return finishSelFocus(hadFocus);
@@ -6555,13 +6475,25 @@ function finishSelFocus(key: string | null): void {
   if (!key) return;
   $('selCards').querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
 }
+/** 텍스트 스타일만 연결하기(§4.1) — 5 · 6번 카드와 noTier 카드 1 안에 "텍스트 스타일 {t}곳" + [{t}곳 연결]. */
+function tsOnlyExtra(subs: (string | Node)[], actions: HTMLElement[]): void {
+  const n = bindPreviewed && selFindFor === baseKey() ? tsAllNodes().size : 0;
+  if (!n) return;
+  subs.push(t('v4.tsPlaces', { t: n }));
+  const b = selBtn(t('v4.linkN', { n }), (el) => { showSelSub('bind', el); }, !actions.length);
+  b.dataset.k = 'tsLink';
+  actions.push(b);
+}
 /** 카드 1 — 변수 없는 값(§4.1). */
 function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | null): void {
   if (prereqKnown && !hasBindable) {
     // noTier — 계층 컬렉션에 변수가 없음
     const b = selBtn(t('v4.makeArrow'), (el) => { showMake('color'); subOpener = el; });
     b.dataset.k = 'make';
-    put(selCard({ title: t('v4.find0'), subs: [t('bind.noTier')], actions: [b] }));
+    const subs: (string | Node)[] = [t('bind.noTier')];
+    const actions: HTMLElement[] = [b];
+    tsOnlyExtra(subs, actions);
+    put(selCard({ title: t('v4.find0'), subs, actions }));
     return;
   }
   if (!counts) {

@@ -5,7 +5,7 @@ import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, VarUpdateError
 import { post } from './shared/messages';
 import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyExistingTextStyles, prunePaletteColors } from './lib/variables';
+import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyTextStyleRows, planExistingTextStyles, prunePaletteColors } from './lib/variables';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
@@ -1214,15 +1214,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         bindCancel = false;
         bindLinkRunning = true;
         try {
+          // 텍스트 스타일이 먼저(IA v4 §4.2) — 켠 스타일 줄의 글자에 스타일을 붙인 뒤 변수 자리를 연결한다. 한 번의 ⌘Z.
+          const ts = msg.textStyles?.length ? await applyTextStyleRows(msg.textStyles) : null;
+          if (ts?.applied) written += ts.applied;
           const r = await bindSelectedItems(msg.items, {
             onProgress: (done, total) => post({ type: 'PROGRESS', op: 'link', done, total }),
             yieldToEvents: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
-            onBound: (n) => { written = n; },
+            onBound: (n) => { written = (ts?.applied ?? 0) + n; },
             onCreated: (n) => { made = n; },
           });
-          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles });
+          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles, ...(ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}) });
           // 역할을 하나라도 만들었으면 아무것도 붙이지 못했어도 묶음을 닫는다 — 연결 한 번 = ⌘Z 한 번(§2.12 12.9).
-          if (r.bound || r.newRoles) {
+          if (r.bound || r.newRoles || ts?.applied) {
             commitUndo(figma); // UX2: 선택 바인딩 전체(마지막 묶음 뒤 한 번)를 단일 Undo로
             committed = true;
             selfSelect = true;
@@ -1328,11 +1331,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → 「기존만 연결」 등 전제 게이트 갱신
         break;
       }
-      case 'APPLY_TEXT_STYLES': {
-        // 적용만(생성 없음, 무료 — IA v3 §4.6): 선택 텍스트를 시그니처가 같은 기존 스타일에 연결.
-        const r = await applyExistingTextStyles(selection());
-        post({ type: 'TEXT_STYLES_APPLIED', applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons });
-        commitUndo(figma);
+      case 'PREVIEW_TEXT_STYLES': {
+        // 기존 스타일 연결 미리보기(IA v4 §4.2) — 쓰지 않는다.
+        const r = await planExistingTextStyles(await resolveRoots(msg.nodeIds));
+        post({ type: 'TEXT_STYLES_PREVIEW', reqId: msg.reqId, rows: r.rows, skipReasons: r.skipReasons });
         break;
       }
       case 'GET_COLLECTIONS': {

@@ -31,6 +31,8 @@ export function fieldKind(field: string | undefined): SelKind {
 export const NO_VAR_REASONS: readonly string[] = ['no-match', 'size-fraction'];
 /** s = 자리 단위 건너뜀만(§4.1). 레이어 단위(instance-children · hidden · no-autolayout · size-free-layout · font)와 already-bound는 뺀다. */
 export const PLACE_SKIP_REASONS: readonly string[] = ['styled', 'hug-fill', 'translucent', 'space-between', 'fraction', 'empty-text', 'deleted-var'];
+/** 레이어 단위 건너뜀(§4.2 — 건너뜀 칩 안에만 사유로 보인다). */
+export const LAYER_SKIP_REASONS: readonly string[] = ['instance-children', 'hidden', 'no-autolayout', 'size-free-layout', 'font'];
 
 /** 사유 × 종류별 자리 수(APPLY_RESULT.counts). */
 export type ReasonCounts = Record<string, Partial<Record<SelKind, number>>>;
