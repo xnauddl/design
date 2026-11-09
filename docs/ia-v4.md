@@ -244,9 +244,9 @@
   - 이 미리보기와 자동 추출은 **조용한 읽기**다 — 진행 테두리 · 쓰기 잠금 · 작업 직후 다시 읽기를 일으키지 않는다(OPS 표 밖으로 보내거나 `opSilent`).
   - 미리보기 응답이 오기 전에는 "Global … · 역할 …"을 "세는 중…"으로 보이고 버튼은 그대로 누를 수 있다(실행은 미리보기 결과가 아니라 켠 토큰으로 한다).
 - **무료:** 화면 · 추출 · 미리보기는 무료. 무료 사용자의 실행 버튼은 **[연결 · 이름 정리 실행]**이다 — 변수를 만들지 않고, 켠 옵션 중 "바로 레이어에 연결"(기존 변수로, 연결 화면과 같은 규칙)과 "레이어 이름도 정리"만 돈다(둘 다 끄면 `aria-disabled`, 사유 "무료로는 연결 · 이름 정리만 할 수 있어요"). 종류 체크 · 다크 옵션은 잠금(사유 "변수 만들기는 유료예요 · [라이선스 →]") — 체크는 기본값 모양(글자만 끔) 그대로 `aria-disabled`, 만들 수 자리에는 "무료로는 변수를 만들지 않아요". B.1~B.3 마법사의 무료 범위와 같다.
-- **실행 순서**(새 순서, `wizard.ts`를 고친다): 만들기(Global + 역할, `CREATE_TOKENS`) → 다크(켰을 때, `GENERATE_DARK_MODE`) → 연결(켰을 때, `APPLY` 실제 연결) → 이름 정리(켰을 때, `RENAME_APPLY` — 미리보기 `RENAME`의 바꿀 줄 전부).
+- **실행 순서**(새 순서, `wizard.ts`를 고친다): 만들기(Global + 역할, `CREATE_TOKENS`) → 다크(켰을 때, `GENERATE_DARK_MODE`) → 연결(켰을 때, `APPLY` 실제 연결) → 이름 정리(켰을 때, `RENAME{reqId, nodeIds, apply: true}` 한 번 — v3 마법사와 같은 `renameSelection`이라 바꿀 이름과 함께 이름이 그대로인 노드의 역할(dsRole)도 남긴다. 미리보기 없이 바로 바꾼다).
   - **실행 때 다시 추출하지 않는다** — 화면에 보이는 추출 결과(지금 기준의 것) 가운데 켠 종류의 토큰을 그대로 만든다. 추출이 진행 중이거나 결과가 지금 기준의 것이 아니면 버튼은 `aria-disabled`(사유 "선택을 읽는 중…").
-  - **기준은 실행을 시작할 때 한 번 정한다:** 그때의 목록 기준 nodeIds를 연결(`APPLY`) · 이름 정리(`RENAME` → `RENAME_APPLY`)에 쓴다. 실행 중 선택이 바뀌거나 풀려도 기준 · 실행은 그대로이고, 실행 중에는 "디자인에서 레이어를 선택하세요" 안내를 띄우지 않는다(끝난 뒤의 모습에서 판단).
+  - **기준은 실행을 시작할 때 한 번 정한다:** 그때의 목록 기준 nodeIds를 연결(`APPLY`) · 이름 정리(`RENAME` apply)에 쓴다. 실행 중 선택이 바뀌거나 풀려도 기준 · 실행은 그대로이고, 실행 중에는 "디자인에서 레이어를 선택하세요" 안내를 띄우지 않는다(끝난 뒤의 모습에서 판단).
   - **연결 단계의 규칙:** 연결 화면 [연결]과 같은 변수 규칙(같은 값만 · 이미 붙은 곳은 그대로 · 레이어에는 Semantic · 인스턴스 안쪽 제외). **텍스트 스타일이 먼저다**(§4.2)도 같다 — 로컬 텍스트 스타일 후보가 있는 글자 레이어의 글자 자리(fontSize · lineHeight · letterSpacing · fontFamily)에는 글자 변수를 붙이지 않는다(그래서 카드 1의 m과 같은 규칙). 텍스트 스타일 자체는 붙이지 않는다 — 스타일 연결은 연결 화면에서. 코드: `APPLY{preview: false, nodeIds, reqId, skipTextStyleNodes: true}`(새 필드 — 스타일 후보 레이어의 글자 종류 자리를 뺀다).
   - 연결 요청의 reqId로만 결과를 받고, 메인 처리기는 그 결과로 연결 화면을 다시 그리지 않는다. 그 사이 `PROGRESS{op:'bind'}`는 연결 화면 진행 줄에 띄우지 않는다. 코드의 `CANCEL`은 실제 연결 중이면 무시한다(B.1에서 만든 마법사 연결 경로를 그대로 쓴다).
   - 연결 0곳 사유(단계 결과 줄): 계층으로 쓸 변수가 없음(noTier · 변수 0개) / 이미 모두 연결됨(`already-bound`만) / 변수와 값이 같은 곳이 없음(그 밖) — 키 `wizard.seq.bindNoTier` · `bindAllBound` · `bindNone`.
@@ -255,7 +255,7 @@
 **메시지** (reqId가 붙은 응답은 그 화면만 받고 메인 처리기 — 값을 직접 고르기의 `tokens` · `#createStatus` · `btnCreateApply` · 이름 정리 v3 트리 — 는 건드리지 않는다)
 - 추출: `EXTRACT{reqId, nodeIds}` → `EXTRACT_RESULT{reqId, …}`(지금 필드 그대로).
 - 만들 수: `CREATE_TOKENS{reqId, preview: true, tokens, …}` → `CREATE_RESULT{reqId, preview: true, created, updated, roles, skippedManual}`.
-- 실행: `CREATE_TOKENS{reqId, preview: false}` → `CREATE_RESULT{reqId}` · `GENERATE_DARK_MODE` → `DARK_MODE_RESULT` · `APPLY{reqId, preview: false, nodeIds, skipTextStyleNodes: true}` → `APPLY_RESULT{reqId}` · `RENAME{reqId, nodeIds}`(미리보기) → `RENAME_RESULT{reqId}` · `RENAME_APPLY{reqId, items}` → `RENAME_RESULT{reqId, applied: true}`.
+- 실행: `CREATE_TOKENS{reqId, preview: false}` → `CREATE_RESULT{reqId}` · `GENERATE_DARK_MODE` → `DARK_MODE_RESULT` · `APPLY{reqId, preview: false, nodeIds, skipTextStyleNodes: true}` → `APPLY_RESULT{reqId}` · `RENAME{reqId, nodeIds, apply: true}` → `RENAME_RESULT{reqId, applied: true}`.
 - [값을 직접 고르기 →] 안의 추출 · 미리보기(v3 버튼)는 reqId 없이 지금처럼 보내되 **기준 nodeIds**를 붙인다(기준이 없으면 지금 선택 — v3처럼 선택이 없으면 "레이어를 선택하면 그 안의 값으로 만들어요").
 
 **실행 상태**
@@ -263,15 +263,15 @@
 | 상태 | 모습 |
 |---|---|
 | 읽는 중 | 종류 줄 자리 "선택을 읽는 중…", 만들 수 자리 비움, [변수 만들기] `aria-disabled`(사유 "선택을 읽는 중…"). 포커스는 만든 뒤 첫 체크(종류 체크가 없으므로) — 결과가 오면 포커스를 옮기지 않는다 |
-| 큰 선택(300개 초과) | 종류 줄 자리 "선택이 커서 자동으로 읽지 않아요 · [읽기]", 버튼 `aria-disabled`. 들어오면 포커스는 [읽기] |
+| 큰 선택(300개 초과) | 종류 줄 자리 "선택이 커서 자동으로 읽지 않아요 · [읽기]", [변수 만들기] `aria-disabled`(무료 [연결 · 이름 정리 실행]은 그대로). 들어오면 포커스는 [읽기] |
 | 실행 중 | 버튼 자리 "만드는 중… {단계}" + [취소](지금 단계가 끝나면 멈춤 — v3 마법사). 다른 쓰기 버튼은 잠김(v3 공통 잠금). ← · 탭 바꾸기는 된다. 실행 중에 ←로 나갔다 다시 들어오면 실행 중 모습 그대로(다시 추출하지 않음) |
-| 다 됨 | 선택 탭의 하위 화면을 첫 화면으로 되돌리고 상태 줄. 사용자가 다른 탭 · 설정에 있으면 탭은 바꾸지 않는다. 문구는 한 단계 부분씩 이어 붙인다(한 단계도 하지 않은 부분은 뺌): "변수 {g}개 · 역할 {r}개"(만들기, g = `created + updated`) + " · 다크 {k}개"(다크, `realiased`) + " · {n}곳 연결"(연결) + " · 이름 {c}개 정리"(이름 정리) + " · 직접 만든 변수라 건너뜀 {m}"(`skippedManual` > 0) + " · ⌘Z로 되돌리기". 무료: "{n}곳 연결 · 이름 {c}개 정리 · 변수는 만들지 않았어요". **바로 연결을 껐으면** 끝에 " · 연결은 아직 안 했어요"와 상태 줄 단추 [선택 탭에서 연결하기 →](→ 선택 탭 연결 화면) |
-| 일부 실패 · 건너뜀 | 만들기 화면에 남고(다른 탭에 있으면 상태 줄 "변수 만들기 일부 실패 · [보기]" → 이 화면) 버튼 위에 단계별 결과 줄(✓ / ⚠ / 건너뜀 + 사유 — 키 `wizard.seq.*`를 다시 쓴다) + [닫기](→ 첫 화면). **화면에 남는 경우는 이것뿐:** 어느 단계든 오류 · 거절(⚠), 다크 "칠할 색이 없음"(`wizard.seq.darkNothing`), 연결 0곳(사유 3가지). 다크 "대상 Semantic 없음"(`darkNoTarget`)은 다 됨으로 본다(v3 그대로). 결과 줄이 떠 있는 동안 자동 추출 · 만들 수 다시 계산이 와도 결과 줄 · 체크는 그대로 두고 종류 줄만 새 결과로 바꾼다 |
+| 다 됨 | 선택 탭의 하위 화면을 첫 화면으로 되돌리고 상태 줄. 사용자가 다른 탭 · 설정에 있으면 탭은 바꾸지 않는다. 문구는 한 단계 부분씩 이어 붙인다(한 단계도 하지 않은 부분은 뺌): "변수 {g}개 · 역할 {r}개"(만들기, g = `created + updated`) + " · 다크 {k}개"(다크, `realiased`) + " · {n}곳 연결"(연결) + " · 이름 {c}개 정리"(이름 정리) + " · 직접 만든 변수라 건너뜀 {m}"(`skippedManual` > 0). 단계마다 따로 기록되므로 "⌘Z로 되돌리기" 꼬리는 붙이지 않는다(⌘Z 한 번은 마지막 단계만 되돌린다). 무료: 같은 규칙으로 연결 · 이름 정리 부분만 이어 붙이고 끝에 " · 변수는 만들지 않았어요". **바로 연결을 껐으면**(유료 · 무료 모두) 끝에 " · 연결은 아직 안 했어요"와 상태 줄 단추 [선택 탭에서 확인하고 연결하기 →](→ 선택 탭 연결 화면) |
+| 일부 실패 · 건너뜀 | 만들기 화면에 남고(다른 탭에 있으면 상태 줄 "변수 만들기 일부 실패 · [보기]" → 이 화면) 버튼 위에 단계별 결과 줄(✓ / ⚠ / 건너뜀 + 사유 — 키 `wizard.seq.createDone` · `dark` · `darkModeCreated` · `darkSkip` · `darkNoTarget` · `darkNothing` · `bindDone` · `bindRoles` · `bindNoTier` · `bindAllBound` · `bindNone` · `renameDone` · `stoppedPrev` · `cancelSkipped`를 다시 쓴다) + [닫기](→ 첫 화면). **화면에 남는 경우는 이것뿐:** 어느 단계든 오류 · 거절(⚠), 다크 "칠할 색이 없음"(`wizard.seq.darkNothing`), 연결 0곳(사유 3가지). 다크 "대상 Semantic 없음"(`darkNoTarget`)은 다 됨으로 본다(v3 그대로). 결과 줄이 떠 있는 동안 자동 추출 · 만들 수 다시 계산이 와도 결과 줄 · 체크는 그대로 두고 종류 줄만 새 결과로 바꾼다 |
 | 취소됨 | 화면에 남고 "취소했어요 · {끝낸 단계}까지 됐어요" |
-| 추출 0개 | 종류 줄 자리 "이 선택에서 찾은 값이 없어요", 버튼 `aria-disabled` |
+| 추출 0개 | 종류 줄 자리 "이 선택에서 찾은 값이 없어요", [변수 만들기] `aria-disabled`(무료 [연결 · 이름 정리 실행]은 그대로) |
 
 - **선택:** 선택이 없으면 이 화면에 들어올 수 없다. 들어와 있는 중 선택이 풀리면 "디자인에서 레이어를 선택하세요"와 [← 돌아가기].
-- **포커스:** 들어오면 첫 종류 체크. 순서: ← → 종류 체크들 → 만든 뒤 체크 3 → [값을 직접 고르기 →] → [변수 만들기].
+- **포커스:** 들어올 때 추출 결과가 이미 있으면(실행 중 다시 들어옴 · 같은 기준의 결과가 남아 있음) 첫 종류 체크, 아니면 위 상태표의 "읽는 중" · "큰 선택" 줄대로. 순서: ← → 종류 체크들 → 만든 뒤 체크 3 → [값을 직접 고르기 →] → [변수 만들기].
 - **[값을 직접 고르기 →]:** v3 만들기 4단계(색 · 토큰 · 테마 · 타이포 — 레일 칩 · 내용 그대로)를 하위 화면으로 연다. 머리만 "← 값을 직접 고르기". **선택이 없어도 들어갈 수 있다**(v3처럼 단계마다 "레이어를 선택하면 그 안의 값으로 만들어요"). 안의 v3 링크는 이렇게 바꾼다:
 
 | v3 링크 | v4 도착 |
@@ -281,7 +281,7 @@
 | 타이포 "레이어에 연결하기 →" · 안내 "화면 연결은 레이어 › 연결에서" | 선택 탭 연결 화면 · 문구 "화면 연결은 선택 탭에서" |
 | 테마 "토큰 만들기로 →" | 같은 하위 화면의 토큰 단계 |
 | "라이선스 →" | ⚙ 설정 › 라이선스 |
-| 마법사 요약 "레이어 › 연결에서 확인하고 연결하기 →"(B.1~B.3 동안 남는 v3 마법사) | "선택 탭에서 확인하고 연결하기 →" → 선택 탭 연결 화면. 연결 단계를 껐을 때만 보이고, 그때 요약 끝에 " · 연결은 아직 안 했어요" |
+| 마법사 요약 "레이어 › 연결에서 확인하고 연결하기 →" | B.4에서 마법사와 함께 지운다 — 만들기 화면의 같은 안내는 위 실행 상태표 "다 됨" 줄(상태 줄 단추 [선택 탭에서 확인하고 연결하기 →]) |
 
 **B.1 ~ B.3 동안의 v3 마법사("한 번에 정리") — 연결 단계를 당겨 넣는다** (2026-11-09 사용자 결정 "한 번에 정리는 연결까지") — **B.4에서 이 블록과 마법사 카드를 지운다.** B.4 뒤에도 쓰는 규칙은 위 만들기 화면 본문에 옮겨 적었다.
 - §2.3-2 "바로 연결"을 B.4보다 먼저 v3 마법사에 넣는다. 단계 순서: 추출 → 변수 만들기 → 역할 매핑 → 다크 → 텍스트 스타일 → **연결** → 이름 정리.
@@ -566,8 +566,8 @@
 - [ ] ia-v3 A.13 체크리스트 닫음(이 PR로 대체)
 
 ### B.4 PR 4 — 만들기 화면 · 이름 정리 화면
-- [ ] 만들기: 추출(화면 자체 상태, `tokens` 안 덮어씀 — `EXTRACT` · `CREATE_TOKENS` preview 응답을 reqId로 나눠 받아 공용 처리기(`#createStatus` · `btnCreateApply` · `createFrom`)를 건드리지 않음, 추출 뒤 정리는 공용 함수로 재사용) · 종류 줄 표 · 격자 정리 안 함 · 만든 뒤 옵션 3 · 만들 수 다시 계산 · 실행 순서(추출 → 만들기 → 다크 → 연결 → 이름) · 실행 상태표 · 무료 잠금 · 포커스 · [값을 직접 고르기 →](v3 만들기 4단계 이동 · 링크 표), 시작 화면 · 마법사 카드 삭제
-- [ ] `wizard.ts` 새 단계 목록(만들기 · 다크 · 연결 · 이름, 역할 매핑 · 텍스트 스타일 · 컴포넌트 · 추출 단계 뺌) · `runWizard`의 DOM 의존(`#wizOpt*` · `#semMap` · `#base`) 걷어냄 · 연결 결과 처리 경로, `test/wizard.test.mjs` 고침. 키: **남김** `wizard.seq.*`(단계 결과 줄 — `createDone` · `dark*` · `bind*` · `renameDone` · `running` · `stoppedPrev` · `cancelSkipped`), **지움** 마법사 카드 · 시작 화면 · 요약(`wizard.sum*` · `wizardCard.*` · `start.*`) · 연결 안내(`wizard.toBind*`) · `create.*` "레이어에 연결하기 →"
+- [ ] 만들기: 추출(화면 자체 상태, `tokens` 안 덮어씀 — `EXTRACT` · `CREATE_TOKENS` preview 응답을 reqId로 나눠 받아 공용 처리기(`#createStatus` · `btnCreateApply` · `createFrom`)를 건드리지 않음, 추출 뒤 정리는 공용 함수로 재사용) · 종류 줄 표 · 격자 정리 안 함 · 만든 뒤 옵션 3 · 만들 수 다시 계산 · 실행 순서(만들기 → 다크 → 연결 → 이름, 무료: 연결 → 이름) · 실행 상태표 · 무료 잠금 · 포커스 · [값을 직접 고르기 →](v3 만들기 4단계 이동 · 링크 표), 시작 화면 · 마법사 카드 삭제
+- [ ] `wizard.ts` 새 단계 목록(만들기 · 다크 · 연결 · 이름, 역할 매핑 · 텍스트 스타일 · 컴포넌트 · 추출 단계 뺌) · `runWizard`의 DOM 의존(`#wizOpt*` · `#semMap` · `#base`) 걷어냄 · 연결 결과 처리 경로, `test/wizard.test.mjs` 고침. 키: **남김** 위 본문의 `wizard.seq.*` 14개 + `wizard.seq.running` · 실행 중 단계 이름 `wizard.step.{create,dark,bind,rename}`. **지움** 그 밖의 `wizard.*` 전부(`wizard.seq.extractDone` · `noExtract` · `semantics*` · `textStyles*` · `componentize`, `wizard.step.{extract,semantics,textStyles,componentize}`, `wizard.skip.*` · `wizard.chip.*` · `wizard.result` · `completed` · `stopped` · `freeSum*` · `notLinked` · `needSelect` · `rerun*` · `madeStatus` · `rolesFromTokens*` · `wizard.sum*` · `wizard.toBind*`), `wizardCard.*` · `start.*`, `create.*` "레이어에 연결하기 →". 실제로 쓰지 않게 된 키는 `verify:i18n` 미참조 0으로 확인한다
 - [ ] verify-bind-flow 블록 17(마법사 → 만들기 화면) 고침, `APPLY.skipTextStyleNodes` 코드 · 테스트
 - [ ] 설정 문구: `settings.gridTip`의 "만들기에서 이 격자로 모아요"를 "값을 직접 고르기 › 토큰에서 이 격자로 모아요"로(만들기 화면은 격자 정리를 하지 않음). `settings.hint`는 그대로
 - [ ] 이름 정리: 바꿀 줄만 · 체크 · 미리보기 다시 하기 · 빈 상태 · [k개 이름 바꾸기] · 포커스, `rename.hideKeep` · `rename.showKeep` 삭제
