@@ -7,6 +7,7 @@ import { t } from './i18n';
 import { rgbToHex, hexToRgb } from './tokens';
 import { ensureOwnedCollection, ownedCollection } from './collectionRoles';
 import { darkValueForLight, darkGlobalName, isDarkGlobalName } from './themeGen';
+import { isManualVar as isManual } from './variables'; // 직접 만든 변수(IA v4 §4.9)
 
 /** Semantic(대상) 컬렉션에 만들/재사용할 다크 모드 표시 이름. */
 export const DARK_MODE_NAME = 'Dark';
@@ -16,7 +17,7 @@ export interface DarkModeResult {
   created: number;
   /** 다크 모드 값을 다시 별칭한 Semantic 변수 수. */
   realiased: number;
-  /** 건너뛴 Semantic 변수 수(리터럴 값·출처 소실·이미 다크 짝). */
+  /** 건너뛴 Semantic 변수 수(리터럴 값·출처 소실·이미 다크 짝·직접 만든 변수 — §4.9). */
   skipped: number;
   /** `Dark` 모드를 이번 실행에서 새로 추가했는지. */
   modeCreated?: boolean;
@@ -114,6 +115,11 @@ export async function generateDarkMode(
 
   for (const v of allVars) {
     if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== 'COLOR') continue;
+    // 직접 만든 Semantic 변수는 Dark 값을 다시 걸지 않는다(§4.9).
+    if (isManual(v)) {
+      skipped++;
+      continue;
+    }
     const fromRaw = v.valuesByMode[from];
     if (!isVariableAlias(fromRaw)) {
       skipped++;
@@ -135,6 +141,11 @@ export async function generateDarkMode(
     const darkHex = darkValueForLight(rgbToHex(lightRaw as RGB));
     const dname = darkGlobalName(lightGlobal.name);
     let dark = globalByName.get(dname);
+    // 쓸 `dark/…` Global이 직접 만든 변수면 덮어쓰지도, 다른 이름으로 새로 만들지도 않는다 — 그 역할의 Dark 값은 지금대로(§4.9).
+    if (dark && isManual(dark)) {
+      skipped++;
+      continue;
+    }
     if (!dark || !globalCol) globalCol = ensureOwnedCollection(cols, 'global'); // 없으면 만들고, 이어받은 것이면 표시를 단다
     const gMode = globalCol.defaultModeId;
     if (!dark) {

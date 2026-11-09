@@ -2,6 +2,7 @@
    messages.ts — code(샌드박스) ↔ ui(iframe) 메시지 타입 단일 소스
    ============================================================ */
 import type { VarCollection, VarRow, LibraryVar, VarCell, EditValue } from '../lib/varTable';
+import type { ApplyTarget } from '../lib/varKind';
 import type { DraftToken } from '../lib/tokens';
 import type { TextStyleSpec } from '../lib/textStyles';
 import type { Tier, Feature } from '../lib/entitlements';
@@ -178,6 +179,12 @@ export type UiToCode =
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'GET_VAR_TABLE' } // 변수 관리: 로컬 변수 전부(모드별 값·별칭 이름·용도·설명)
   // 변수 고치기(§4.4 고치기, PR 3.5) — 고친 것만. base = 팝업을 열 때(또는 마지막 저장 응답 뒤)의 이름과 고친 모드의 칸(값 없음은 null).
+  // IA v4 §4.7 클릭 연결 — 지금 캔버스 선택의 레이어 각각에 변수 하나를 붙인다(target 없으면 속성 고르기).
+  | { type: 'APPLY_VARIABLE'; reqId: number; id: string; target?: ApplyTarget }
+  // IA v4 §4.9 새 변수 — collectionId 없으면 사용자 컬렉션 `Variables`를 새로 만든다(그때 values 키는 '*' = 그 컬렉션의 첫 모드).
+  | { type: 'CREATE_VARIABLE'; reqId: number; collectionId?: string; name: string; varType: 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN'; values: Record<string, EditValue>; scopes?: string[] }
+  | { type: 'DUPLICATE_VARIABLE'; reqId: number; id: string }
+  | { type: 'DELETE_VARIABLE'; reqId: number; id: string }
   | { type: 'UPDATE_VARIABLE'; reqId: number; id: string; name?: string; values?: Record<string, EditValue>; base: { name: string; values: Record<string, VarCell | null> } }
   // IA v3 변수 목록(§4.4) — 보기 전용 사용 수. nodeIds = 목록 기준(없으면 지금 선택). 인스턴스 안쪽 포함, 상한 없음.
   | { type: 'SCAN_USAGE'; reqId: number; nodeIds?: string[] }
@@ -231,15 +238,19 @@ export type CodeToUi =
   | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number; firstName?: string; ids?: string[] } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
   | { type: 'VAR_TABLE'; collections: VarCollection[]; vars: VarRow[] }
   // 변수 고치기 응답 — applied: 바꾼 것('name' 또는 modeId), 순서대로. 변수 표는 따로 보내지 않는다(UI가 다시 읽는다).
+  | { type: 'VARIABLE_APPLIED'; reqId: number; applied: number; skipped: number; skipReasons: Record<string, number>; name: string } // applied · skipped = 레이어 수
+  | { type: 'VARIABLE_CREATED'; reqId: number; id: string; manualUsed: number } // manualUsed: 지금까지 직접 만든 수(무료 개수 제한, §4.9)
+  | { type: 'VARIABLE_DUPLICATED'; reqId: number; newId: string; manualUsed: number }
+  | { type: 'VARIABLE_DELETED'; reqId: number; id: string }
   | { type: 'VARIABLE_UPDATED'; reqId: number; ok: boolean; applied: string[]; error?: VarUpdateError }
   | { type: 'USAGE_RESULT'; reqId: number; usage: Record<string, { places: number; layers: number }>; libraryVars: LibraryVar[]; deleted: { count: number; nodeIds: string[] }; scanned: number }
   | { type: 'VAR_USERS'; reqId: number; layers: { id: string; name: string }[]; totalLayers: number; places: number }
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
-  | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean; roles?: number } // roles: 새로 만든(미리보기는 만들) 쓰임 역할 수(§2.12 12.10)
+  | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean; roles?: number; skippedManual?: number } // roles: 새로 만든(미리보기는 만들) 쓰임 역할 수(§2.12 12.10)
   | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; reqId?: number; counts?: Record<string, Record<string, number>>; textStylesApplied?: number; textStylesSkipped?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수. APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
   | { type: 'PROGRESS'; op: 'bind' | 'link'; done: number; total: number } // UX6: 진행률. 'bind' = 찾기(APPLY), 'link' = 연결(APPLY_SELECTED, 300곳씩)
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
-  | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[] }
+  | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[]; skippedManual?: number } // skippedManual: 직접 만든 변수라 건너뛴 역할 수(§4.9)
   // labeled/fallback은 「왼쪽 글자로 이름 채우기」를 눌렀을 때만 온다 — 맨 스캔은 전부 크기 순이라
   // `왼쪽 글자 0`을 적어 봐야 실패처럼 읽힐 뿐이다. undefined면 상태줄에서 그 조각을 생략한다.
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number }
@@ -262,6 +273,8 @@ export type CodeToUi =
       tierColorVars?: number;
       /** 계층으로 인식되지 않은 컬렉션의 변수 수 — 있으면 '계층 지정' 안내. */
       otherVars?: number;
+      /** 지금까지 직접 만든 변수 수(새 변수 + 복제, 무료 개수 제한 §4.9). */
+      manualUsed?: number;
     }
   | {
       type: 'LICENSE_STATUS';
@@ -298,7 +311,7 @@ export type CodeToUi =
   | { type: 'SIMILAR_CANDIDATES'; metas: FrameMeta[]; recommendedMasterId: string | null; varying: VaryingPosition[]; imageVarying: string[]; excluded: { id: string; name: string; reason: string }[] }
   | { type: 'COMPONENTIZE_RESULT'; master: string; properties: number; instances: number; images: number; warnings: string[]; placeFailed?: string[] } // placeFailed: 제자리에 못 둔 원본 이름(원본은 그대로, §4.7)
   | { type: 'DELETED_UNBOUND'; reqId: number; unbound: number; failed: number; failReasons: Record<string, number> }
-  | { type: 'ERROR'; message: string; op?: string; reqId?: number }; // op: 실패한 UiToCode 종류(상태 라우팅용)
+  | { type: 'ERROR'; message: string; op?: string; reqId?: number; code?: 'name' | 'freeLimit' | 'deleted' }; // op: 실패한 UiToCode 종류(상태 라우팅용), code: 새 변수 · 복제의 이름 거절 · 무료 한도 · 지워짐 // op: 실패한 UiToCode 종류(상태 라우팅용)
 
 /** code → UI 안전 전송. */
 export function post(msg: CodeToUi): void {

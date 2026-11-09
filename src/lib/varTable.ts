@@ -4,6 +4,7 @@
    - 왼쪽 트리(컬렉션 → 그룹)와 오른쪽 표(그룹 머리 + 행)를 만들 데이터, 필터, 복사 문자열.
    ============================================================ */
 import { t } from './i18n';
+import { varKind, VAR_KIND_ORDER, type VarKind } from './varKind';
 
 export type VarType = 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
 
@@ -62,18 +63,6 @@ export function leafName(name: string): string {
   return i < 0 ? name : name.slice(i + 1);
 }
 
-/** 값 복사 문자열 — 색은 대문자 hex, 별칭은 가리키는 변수 이름. */
-export function cellCopyText(cell: VarCell | undefined): string {
-  if (!cell) return '';
-  switch (cell.kind) {
-    case 'color':
-      return cell.hex.toUpperCase();
-    case 'alias':
-      return cell.aliasName;
-    default:
-      return cell.text;
-  }
-}
 
 
 /* =====================================================================
@@ -117,44 +106,7 @@ export function matchesQuery(name: string, query: string): boolean {
   return !q || name.toLowerCase().includes(q);
 }
 
-/**
- * 간접 사용 — 직접 쓰는 변수가 별칭으로 가리키는 변수들. 모든 모드를 보고 최대 5단계.
- * 결과: 간접 변수 id → 그 변수를 가리키는(통로가 된) 직접 사용 변수 id들. 직접과 겹치면 직접으로 센다(빠진다).
- */
-export function indirectUsage(direct: ReadonlySet<string>, aliasTargets: ReadonlyMap<string, readonly string[]>, maxDepth = 5): Map<string, string[]> {
-  const out = new Map<string, string[]>();
-  for (const start of direct) {
-    let frontier = [start];
-    const seen = new Set([start]);
-    for (let d = 0; d < maxDepth && frontier.length; d++) {
-      const next: string[] = [];
-      for (const id of frontier) {
-        for (const t of aliasTargets.get(id) ?? []) {
-          if (seen.has(t)) continue;
-          seen.add(t);
-          next.push(t);
-          if (!direct.has(t)) {
-            const via = out.get(t) ?? [];
-            if (!via.includes(start)) via.push(start);
-            out.set(t, via);
-          }
-        }
-      }
-      frontier = next;
-    }
-  }
-  return out;
-}
 
-/** 로컬 변수의 별칭 대상(모든 모드) — indirectUsage 입력. */
-export function aliasTargetsOf(vars: readonly VarRow[]): Map<string, string[]> {
-  const m = new Map<string, string[]>();
-  for (const v of vars) {
-    const ids = Object.values(v.values).filter((c): c is Extract<VarCell, { kind: 'alias' }> => c.kind === 'alias').map((c) => c.aliasId);
-    if (ids.length) m.set(v.id, [...new Set(ids)]);
-  }
-  return m;
-}
 
 export type RowState = 'direct' | 'indirect' | 'unused' | 'none';
 
@@ -338,75 +290,7 @@ export function inspectCount(vars: readonly VarRow[], direct: ReadonlyMap<string
 
 export type RightEntry = { kind: 'path'; label: string; collectionId: string } | { kind: 'row'; v: VarRow; state: RowState };
 
-/**
- * 오른쪽 목록(§4.4).
- * - inspect: 쓰는 행만, 경로 머리("S Semantic › color/text")로 묶음. 컬렉션 계층 순 → 그룹 → 피그마 순.
- * - col: 모든 행, 그룹마다 경로 머리. 쓰는 행 먼저(그룹 안), 안 쓰는 행 뒤.
- * - grp: 그 그룹의 모든 행(쓰는 행 먼저), 경로 머리 없음.
- * - 검색어가 있으면 고른 항목과 관계없이 모든 로컬 컬렉션에서 맞는 행을 경로 머리로(쓰는 행 먼저).
- */
-export function rightEntries(
-  sel: SideSel,
-  cols: readonly VarCollection[],
-  vars: readonly VarRow[],
-  direct: ReadonlyMap<string, number> | null,
-  indirect: ReadonlySet<string>,
-  query = '',
-): RightEntry[] {
-  const out: RightEntry[] = [];
-  const rank = (s: RowState): number => (s === 'direct' || s === 'indirect' ? 0 : 1);
-  const pushGroups = (side: SideCollection, filter: (v: VarRow) => boolean, withPath: 'full' | 'path' | 'none', usedOnly: boolean) => {
-    const badge = tierBadge(side.collection);
-    for (const g of side.groups) {
-      const rows = vars
-        .filter((v) => v.collectionId === side.collection.id && groupKey(v.collectionId, v.name) === g.key && filter(v))
-        .map((v) => ({ v, state: rowState(v.id, direct, indirect) }))
-        .filter((r) => !usedOnly || rank(r.state) === 0);
-      if (!rows.length) continue;
-      rows.sort((a, b) => rank(a.state) - rank(b.state)); // 안정 정렬 — 같은 순위는 피그마 순서
-      if (withPath !== 'none') {
-        const label = withPath === 'full' ? `${badge} ${side.collection.name} › ${g.label}` : g.label;
-        out.push({ kind: 'path', label, collectionId: side.collection.id });
-      }
-      for (const r of rows) out.push({ kind: 'row', ...r });
-    }
-  };
-  const sides = sidebarCollections(cols, vars, direct, indirect);
-  if (query.trim()) {
-    for (const side of sides) pushGroups(side, (v) => matchesQuery(v.name, query), 'full', false);
-    return out;
-  }
-  if (sel.kind === 'inspect') {
-    if (!direct) return out;
-    for (const side of sides) pushGroups(side, () => true, 'full', true);
-  } else if (sel.kind === 'col') {
-    const side = sides.find((s) => s.collection.id === sel.id);
-    if (side) pushGroups(side, () => true, 'path', false);
-  } else if (sel.kind === 'grp') {
-    const side = sides.find((s) => s.groups.some((g) => g.key === sel.key));
-    if (side) pushGroups({ ...side, groups: side.groups.filter((g) => g.key === sel.key) }, () => true, 'none', false);
-  }
-  return out;
-}
 
-/**
- * 처음 고르는 항목(§4.4) — 선택이 있고 사용 수를 읽었으며 쓰는 로컬 변수가 1개 이상이면 ★,
- * 아직 읽는 중이면 ★(읽는 중 빈 상태), 그 밖(선택 없음 · 큰 선택 · 쓰는 변수 0)은 계층 순서의 첫 컬렉션.
- */
-export function initialSideSel(
-  cols: readonly VarCollection[],
-  vars: readonly VarRow[],
-  hasBaseline: boolean,
-  bigSkipped: boolean,
-  direct: ReadonlyMap<string, number> | null,
-  indirect: ReadonlySet<string>,
-): SideSel {
-  const first = orderCollections(cols)[0];
-  const fallback: SideSel = first ? { kind: 'col', id: first.id } : { kind: 'inspect' };
-  if (!hasBaseline || bigSkipped) return fallback;
-  if (!direct) return { kind: 'inspect' }; // 읽는 중 — 사용 수가 오면 다시 정한다
-  return inspectCount(vars, direct, indirect) > 0 ? { kind: 'inspect' } : fallback;
-}
 
 /** 고른 항목이 사라졌으면 대체 항목(§4.4). 그룹 → 같은 컬렉션 → 처음 규칙. */
 export function validSideSel(
@@ -603,4 +487,48 @@ export function aliasCandidates(self: VarRow, cols: readonly VarCollection[], va
     }
   }
   return { global: false, allTiers: tier === 0, groups };
+}
+
+/* ---------- 변수 탭 오른쪽 목록(IA v4 §4.6) ---------- */
+export interface PaletteGroup {
+  /** 접기 기억 키 — `{collectionId}|{경로}`. */
+  key: string;
+  /** 머리 글 — 경로(검색 중이면 "{배지} {컬렉션} › {경로}"). 경로가 없으면 빈 글. */
+  label: string;
+  collectionId: string;
+  /** 머리가 있나 — "/"가 없는 변수 묶음은 머리 없이 맨 위(검색 중에는 컬렉션 머리로 보인다). */
+  head: boolean;
+  kind: VarKind;
+  rows: VarRow[];
+}
+/**
+ * 오른쪽 목록 그룹(§4.6) — colId 하나(검색이면 모든 로컬 컬렉션, 사이드바 순서).
+ * 그룹 = 이름의 마지막 "/" 앞 경로. 그룹 순서는 종류 순서(그룹 첫 변수의 종류), 같은 종류 안은 피그마 순서(첫 등장). "/" 없는 변수는 맨 위.
+ */
+export function paletteGroups(cols: readonly VarCollection[], vars: readonly VarRow[], colId: string | null, query = ''): PaletteGroup[] {
+  const q = query.trim();
+  const order = q ? sidebarCollections(cols, vars, null, new Set()).map((s) => s.collection) : cols.filter((c) => c.id === colId);
+  const out: PaletteGroup[] = [];
+  for (const col of order) {
+    const rows = vars.filter((v) => v.collectionId === col.id && (!q || matchesQuery(v.name, q)));
+    const byPath = new Map<string, VarRow[]>();
+    for (const v of rows) {
+      const i = v.name.lastIndexOf('/');
+      const path = i < 0 ? '' : v.name.slice(0, i);
+      const arr = byPath.get(path);
+      if (arr) arr.push(v); else byPath.set(path, [v]);
+    }
+    const groups = [...byPath.entries()].map(([path, rs], idx) => ({ path, rs, idx, kind: varKind(rs[0]) }));
+    groups.sort((a, b) => {
+      if ((a.path === '') !== (b.path === '')) return a.path === '' ? -1 : 1;
+      const k = VAR_KIND_ORDER.indexOf(a.kind) - VAR_KIND_ORDER.indexOf(b.kind);
+      return k || a.idx - b.idx;
+    });
+    const badge = tierBadge(col);
+    for (const g of groups) {
+      const label = q ? `${badge} ${col.name}${g.path ? ` › ${g.path}` : ''}` : g.path;
+      out.push({ key: `${col.id}|${g.path}`, label, collectionId: col.id, head: q ? true : g.path !== '', kind: g.kind, rows: g.rs });
+    }
+  }
+  return out;
 }

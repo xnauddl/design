@@ -126,6 +126,7 @@ const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset
 const sideItems = (p) => p.$$eval('#varSide .vs-item', (e) => e.map((x) => [x.querySelector('.vs-name').textContent, x.querySelector('.vs-num').textContent]));
 const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.dataset.key).catch(() => null);
 {
+  // B.3 변수 탭(IA v4 §4.6~§4.9) — 머리 줄 · 사이드바 · 팔레트 · 줄 · 클릭 연결 · 메뉴 · 상세 · 새 변수 · 복제 · 삭제
   const p = await open(480, 'variables');
   await recv(p, PREREQ);
   check('9 첫 표 전에는 불러오는 중', await visible(p, '#varLoading'));
@@ -134,68 +135,139 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 빈 상태 [선택에서 변수 만들기] — 선택 없으면 잠금', await locked(p, '#btnVarEmptyMake'));
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   check('9 로컬 변수 있음 → 목록', await visible(p, '#varList'));
-  // 사이드바(v4 §4.6): 컬렉션만 · 계층 순서(S → G) · 전체 수 · listbox
-  check('9 사이드바 = 컬렉션만(★ · 그룹 · LIB · 삭제된 변수 없음)', JSON.stringify(await sideItems(p)) === JSON.stringify([['Semantic', '1'], ['Global', '4']]), JSON.stringify(await sideItems(p)));
+  check('9 머리 줄 — 검색 칸 · ＋ · ⋯ (검색 단추 · 목록 제목 없음)', (await visible(p, '#varSearch')) && (await p.$('#btnSearch')) === null && (await p.$('#varMainTitle')) === null);
+  check('9 사이드바 = 컬렉션만 · 계층 순서 · 전체 수', JSON.stringify(await sideItems(p)) === JSON.stringify([['Semantic', '1'], ['Global', '4']]), JSON.stringify(await sideItems(p)));
   check('9 사이드바 listbox · option', (await p.getAttribute('#varSide', 'role')) === 'listbox' && (await p.$$eval('#varSide .vs-item', (e) => e.every((x) => x.getAttribute('role') === 'option'))));
-  check('9 머리줄 링크 · ↻ · 상황 안내 줄 없음', (await p.$('#btnFindUnbound')) === null && (await p.$('#btnVarRefresh')) === null && (await p.$('#btnReadiness')) === null && (await p.$('#situationLine')) === null);
   check('9 처음에는 첫 컬렉션', (await sideSelected(p)) === 'side:col:s');
   check('9 모드 ▾(보이는 모드 2개 이상)', await visible(p, '#modeSelect'));
-  check('9 선택 없음: 사용 "—"', JSON.stringify(await rowIds(p)) === JSON.stringify(['tx']) && (await p.textContent('.vt-row[data-id="tx"] .use')) === '—');
-  await recv(p, { ...sel(1, 2), scanned: 40, firstName: 'Card', ids: ['1:2'] });
-  await p.waitForTimeout(450);
-  const req = (await sent(p, 'SCAN_USAGE')).at(-1);
-  check('9 선택 변경 → SCAN_USAGE(기준 = 지금 선택)', req?.nodeIds?.[0] === '1:2');
-  await recv(p, usageResult(req.reqId, { tx: { places: 8, layers: 5 }, sp8: { places: 3, layers: 2 } }));
-  check('9 사용 수 "곳"', (await p.textContent('.vt-row[data-id="tx"] .use')) === '8곳');
+  // Semantic = 줄(끝 이름 · 값 알약), 그룹 머리, 사용 칸 없음
+  check('9 Semantic 줄 — 그룹 머리 + 끝 이름 · 값 "→ 900" · 사용 칸 없음', JSON.stringify(await p.$$eval('#varTree > *', (e) => e.map((x) => x.textContent.trim()))) === JSON.stringify(['▾color/text', 'default→ 900']) && (await p.$('.vt-row .use')) === null, JSON.stringify(await p.$$eval('#varTree > *', (e) => e.map((x) => x.textContent.trim()))));
+  // Global = 팔레트 — 종류 순서(간격 → 반경 → 색), 알약 · 동그라미
   await p.click('#varSide [data-key="side:col:g"]');
-  check('9 컬렉션 고름 → 그 컬렉션 행', JSON.stringify(await rowIds(p)) === JSON.stringify(['g0', 'g9', 'sp8', 'r4']), JSON.stringify(await rowIds(p)));
+  const pal = await p.$$eval('#varTree > *', (e) => e.map((x) => (x.classList.contains('vt-group') ? `[${x.querySelector('.lb').textContent}]` : [...x.querySelectorAll('.vp-item')].map((i) => i.textContent || 'dot').join(','))));
+  check('9 Global 팔레트 — 종류 순서 간격 → 반경 → 색 · 알약 값 · 색은 동그라미 + 끝 이름', JSON.stringify(pal) === JSON.stringify(['[spacing]', '8', '[radius]', '4', '[color/gray]', '0,900']), JSON.stringify(pal));
+  check('9 알약 툴팁 · 접근성 이름 "{전체 이름}, {값}"', (await p.getAttribute('.vp-item[data-id="sp8"]', 'title')) === 'spacing/8 / 8' && (await p.getAttribute('.vp-item[data-id="sp8"]', 'aria-label')) === 'spacing/8, 8');
   const widths = await p.evaluate(() => {
     const w = (sel) => Math.round(document.querySelector(sel)?.getBoundingClientRect().width ?? -1);
-    return { win: window.innerWidth, side: w('.vl-side'), main: w('#varTree'), hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+    return { win: window.innerWidth, side: w('.vl-side'), hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
   });
-  check('9 §8 폭 — 창 480 · 사이드바 128 · 목록 328 · 가로 스크롤 0', JSON.stringify(widths) === JSON.stringify({ win: 480, side: 128, main: 328, hscroll: 0 }), JSON.stringify(widths));
-  await p.click('#varSide [data-key="side:col:s"]');
-  // 우클릭 메뉴 — 교체 없음(B.3 전까지 v3 행 메뉴)
-  await rightClick(p, '.vt-row[data-id="tx"]');
-  await p.click('.ctx-menu button >> text=사용 레이어 선택');
-  const selReq = (await sent(p, 'SELECT_VAR_USERS')).at(-1);
-  check('9 사용 레이어 선택 → 기준 안에서 새로 찾기', selReq?.varIds?.[0] === 'tx' && selReq?.nodeIds?.[0] === '1:2');
-  await recv(p, { type: 'SELECT_RESULT', found: 200, requested: 340, capped: true });
-  check('9 200개 상한 문구', (await p.textContent('#statusText')).includes('레이어 200개만 선택했어요(전체 340개)'));
-  // 플러그인이 만든 선택 → 기준 유지, 선택 탭 머리 줄에 [기준 바꾸기](§2.5)
-  await recv(p, { ...sel(3, 2), scanned: 60, selfSelect: true, ids: ['a', 'b', 'c'] });
-  await goTab(p, 'select');
-  check('9 플러그인이 만든 선택은 기준 유지 → 선택 탭 머리 줄 "지금 선택과 달라요"', (await p.textContent('#selHead')).includes('지금 선택과 달라요') && (await p.textContent('#selHead')).startsWith('Card'), await p.textContent('#selHead'));
-  const scansBefore = (await sent(p, 'SCAN_USAGE')).length;
-  await p.click('#selHead [data-k="rebase"]');
-  await p.waitForTimeout(450);
-  check('9 [기준 바꾸기] → 새 기준으로 읽기 · 안내 사라짐', (await sent(p, 'SCAN_USAGE')).length > scansBefore && !(await p.textContent('#selHead')).includes('지금 선택과 달라요'));
-  // 큰 선택(⑤): 자동으로 읽지 않고 [읽기]
-  const s0 = (await sent(p, 'SCAN_USAGE')).length;
-  const a0 = (await sent(p, 'APPLY')).length;
-  await recv(p, { ...sel(1, 2), scanned: 1200, ids: ['big'] });
-  await p.waitForTimeout(450);
-  check('9 큰 선택은 자동으로 읽지 않음 — 선택 탭 "선택이 커서…" + [읽기]', (await sent(p, 'SCAN_USAGE')).length === s0 && (await sent(p, 'APPLY')).length === a0 && (await p.textContent('#selCards')).includes('선택이 커서 자동으로 읽지 않아요'));
-  await p.click('#selCards button');
-  check('9 [읽기] → 300개 무시하고 사용 수 · 찾기', (await sent(p, 'SCAN_USAGE')).length === s0 + 1 && (await sent(p, 'APPLY')).length === a0 + 1 && (await sent(p, 'APPLY')).at(-1).nodeIds?.[0] === 'big');
-  await goTab(p, 'variables');
-  // 검색 — 결과 없음
-  await p.click('#btnSearch');
-  await p.fill('#varSearch', 'zzz');
-  check('9 검색 결과 없음 문구', (await p.textContent('#varTree')).includes("'zzz'와 맞는 변수가 없어요"));
-  await p.keyboard.press('Escape');
-  check('9 Esc로 검색 닫힘', !(await visible(p, '#searchBox')));
+  check('9 §8 폭 — 창 480 · 사이드바 128 · 가로 스크롤 0', JSON.stringify(widths) === JSON.stringify({ win: 480, side: 128, hscroll: 0 }), JSON.stringify(widths));
+  // 그룹 접기(기억)
+  await p.click('#varTree .vt-group >> nth=0');
+  check('9 그룹 머리 클릭 → 접힘(▸)', (await p.getAttribute('#varTree .vt-group >> nth=0', 'aria-expanded')) === 'false' && (await p.$('.vp-item[data-id="sp8"]')) === null);
+  await p.click('#varTree .vt-group >> nth=0');
+  // 클릭 = 연결 — 선택 없음이면 보내지 않고 사유
+  await p.click('.vp-item[data-id="sp8"]');
+  check('9 선택 없음에서 클릭 → 연결 안 함 · "선택이 없어요"', (await sent(p, 'APPLY_VARIABLE')).length === 0 && (await p.textContent('#statusText')).includes('선택이 없어요'));
   await recv(p, { ...sel(1, 2), scanned: 40, firstName: 'Card', ids: ['1:2'] });
   await p.waitForTimeout(450);
-  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 8, layers: 5 }, sp8: { places: 3, layers: 2 } }));
-  await p.dblclick('.vt-row[data-id="tx"] .nm');
-  const fq = (await sent(p, 'FIND_VAR_USERS')).at(-1);
-  check('9 상세 → 쓰인 곳 새로 찾기(50)', fq?.limit === 50 && fq?.varIds?.[0] === 'tx');
-  await recv(p, { type: 'VAR_USERS', reqId: fq.reqId, layers: [{ id: 'n1', name: 'Title' }], totalLayers: 60, places: 80 });
-  check('9 상세 "인스턴스 안쪽 포함" · 외 n개', (await p.textContent('.modal')).includes('레이어 60개 · 80곳 · 인스턴스 안쪽 포함') && (await p.textContent('.modal')).includes('외 59개'));
+  await p.dblclick('.vp-item[data-id="sp8"]');
+  const av = await sent(p, 'APPLY_VARIABLE');
+  check('9 더블클릭 → 연결 한 번(두 번째 click 버림) · target 없음', av.length === 1 && av[0].id === 'sp8' && !('target' in av[0]), JSON.stringify(av));
+  await recv(p, { type: 'VARIABLE_APPLIED', reqId: av[0].reqId, applied: 3, skipped: 1, skipReasons: { 'not-autolayout': 1 }, name: 'spacing/8' });
+  check('9 결과 "레이어 3개에 spacing/8 연결 · 1개는 맞지 않아 건너뜀 · ⌘Z로 되돌리기" + 사유 툴팁', (await p.textContent('#statusText')) === '레이어 3개에 spacing/8 연결 · 1개는 맞지 않아 건너뜀 · ⌘Z로 되돌리기' && (await p.getAttribute('#statusText', 'title')).includes('오토 레이아웃 아님 1'), await p.textContent('#statusText'));
+  // 연결 중에는 다른 클릭 연결 잠금
+  await p.focus('.vp-item[data-id="r4"]');
+  await p.keyboard.press(' ');
+  const av2 = (await sent(p, 'APPLY_VARIABLE')).at(-1);
+  check('9 Space → 연결', av2.id === 'r4' && (await sent(p, 'APPLY_VARIABLE')).length === 2);
+  await p.click('.vp-item[data-id="sp8"]');
+  check('9 클릭 연결 진행 중 → 쓰기 잠금 사유 · 요청 없음', (await sent(p, 'APPLY_VARIABLE')).length === 2 && (await p.textContent('#statusText')).includes('작업이 끝나면 다시 해 주세요'), await p.textContent('#statusText'));
+  await recv(p, { type: 'VARIABLE_APPLIED', reqId: av2.reqId, applied: 0, skipped: 2, skipReasons: { 'no-prop': 2 }, name: 'radius/4' });
+  check('9 하나도 못 붙임 → "선택한 레이어에 radius/4을 붙일 곳이 없어요"', (await p.textContent('#statusText')) === '선택한 레이어에 radius/4을 붙일 곳이 없어요');
+  // 키보드 — ↓ 다음 줄 · ←→ 줄 안
+  await p.focus('.vp-item[data-id="g0"]');
+  await p.keyboard.press('ArrowRight');
+  check('9 → 줄 안 다음 동그라미', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g9');
+  await p.keyboard.press('ArrowUp');
+  check('9 ↑ 위 줄(그룹 머리)', (await p.evaluate(() => document.activeElement?.classList.contains('vt-group'))));
+  // 우클릭 메뉴 — 다른 곳에 연결 ▸ · 상세… · 복제 · 삭제
+  await rightClick(p, '.vp-item[data-id="sp8"]');
+  check('9 우클릭 메뉴 항목', JSON.stringify(await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.childNodes[0].textContent))) === JSON.stringify(['다른 곳에 연결 ▸', '상세', '복제', '삭제']), JSON.stringify(await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent))));
+  await p.keyboard.press('ArrowRight');
+  const subm = await p.$$eval('.ctx-menu >> nth=1 >> button', (e) => e.map((x) => [x.childNodes[0].textContent, x.getAttribute('aria-disabled')])).catch(async () => p.$$eval('.ctx-menu:last-child button', (e) => e.map((x) => [x.childNodes[0].textContent, x.getAttribute('aria-disabled')])));
+  check('9 → 하위 메뉴 — 간격 항목(GAP 용도라 모두 열림)', subm.length === 6 && subm[0][0] === '간격' && subm.every((x) => x[1] !== 'true'), JSON.stringify(subm));
+  await p.keyboard.press('ArrowLeft');
+  check('9 ← 하위 메뉴 닫힘 · 포커스는 그 항목', (await p.$$('.ctx-menu')).length === 1 && (await p.evaluate(() => document.activeElement?.getAttribute('aria-haspopup'))) === 'menu');
+  await p.keyboard.press('ArrowRight');
+  await p.keyboard.press('ArrowDown');
+  await p.keyboard.press('Enter');
+  check('9 하위 메뉴 "안쪽 여백(4방향)" → target padding', (await sent(p, 'APPLY_VARIABLE')).at(-1).target === 'padding');
+  await recv(p, { type: 'VARIABLE_APPLIED', reqId: (await sent(p, 'APPLY_VARIABLE')).at(-1).reqId, applied: 1, skipped: 0, skipReasons: {}, name: 'spacing/8' });
+  // 반경 변수(용도 []) — 하위 항목 전부 aria-disabled
+  await rightClick(p, '.vp-item[data-id="r4"]');
+  await p.keyboard.press('ArrowRight');
+  check('9 용도 [] 변수 → 하위 항목 모두 aria-disabled', (await p.$$eval('.ctx-menu', (ms) => [...ms.at(-1).querySelectorAll('button')].every((b) => b.getAttribute('aria-disabled') === 'true'))));
   await p.keyboard.press('Escape');
-  check('9 Esc로 팝업 닫힘 · 원래 행으로 포커스', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx');
-  // 키보드 — 사이드바(listbox): ↑↓ 이동, Enter 고르기
+  await p.keyboard.press('Escape');
+  // 검색 — 모든 컬렉션 · 경로 머리 · 사이드바 흐림 · 결과 없음
+  await p.fill('#varSearch', 'color');
+  check('9 검색 — 모든 컬렉션 경로 머리', JSON.stringify(await p.$$eval('#varTree .vt-group .lb', (e) => e.map((x) => x.textContent))) === JSON.stringify(['S Semantic › color/text', 'G Global › color/gray']) && (await p.$eval('#varSide', (e) => e.classList.contains('dim'))));
+  await p.fill('#varSearch', 'zzz');
+  check('9 검색 결과 없음 문구', (await p.textContent('#varTree')).includes("'zzz'와 맞는 변수가 없어요"));
+  await p.focus('#varSearch');
+  await p.keyboard.press('Escape');
+  check('9 Esc로 검색 지움', (await p.inputValue('#varSearch')) === '' && (await p.$('.vp-item[data-id="sp8"]')) !== null);
+  // ⋯ — 준비 현황 · 내보내기 · 색 격자 · 펼치기 · 접기
+  await p.click('#btnVarMore');
+  const more = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
+  check('9 ⋯ 메뉴 5개(색 격자로 보기 포함)', more.length === 5 && /^준비 현황 \d\/7…$/.test(more[0]) && more[1] === '코드로 내보내기…' && more[2] === '색 격자로 보기', more.join('|'));
+  await p.click('.ctx-menu button >> text=색 격자로 보기');
+  check('9 색 격자 — 동그라미만(이름 없음)', (await p.$$('.vp-line.vp-dot .vp-item')).length === 2 && (await p.$('.vp-line.vp-dot .vp-name')) === null);
+  // ＋ 메뉴
+  await p.click('#btnAddVar');
+  check('9 ＋ 메뉴 — 새 변수 · 선택에서 · 다크 · 텍스트 스타일', JSON.stringify(await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.childNodes[0].textContent))) === JSON.stringify(['새 변수', '선택에서 변수 만들기…', '다크 모드 만들기…', '텍스트 스타일 만들기…']));
+  await p.click('.ctx-menu button >> text=새 변수');
+  check('9 새 변수 팝업 — 컬렉션 · 이름 · 타입 기본(지금 보이는 첫 그룹 = 숫자) · [취소] [만들기]', (await p.textContent('.modal')).includes('G Global') && (await p.inputValue('.modal select.ed-type')) === 'FLOAT' && (await p.textContent('.modal')).includes('만들기'));
+  await p.fill('.modal .ed-field input >> nth=0', 'spacing/12');
+  await p.fill('.modal .ed-field input >> nth=1', '12');
+  await p.click('.modal button >> text=만들기');
+  const cv = (await sent(p, 'CREATE_VARIABLE')).at(-1);
+  check('9 [만들기] → CREATE_VARIABLE(컬렉션 · 이름 · 값 · 용도 GAP)', cv?.collectionId === 'g' && cv.name === 'spacing/12' && cv.varType === 'FLOAT' && cv.values.m?.value === 12 && JSON.stringify(cv.scopes) === '["GAP"]', JSON.stringify(cv));
+  await recv(p, { type: 'VARIABLE_CREATED', reqId: cv.reqId, id: 'sp12', manualUsed: 1 });
+  check('9 만든 뒤 팝업 닫힘', (await p.$('.modal')) === null);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: [...VARS, { id: 'sp12', name: 'spacing/12', collectionId: 'g', type: 'FLOAT', values: { m: { kind: 'number', text: '12' } }, scopes: ['GAP'], description: '' }] });
+  check('9 새 변수로 포커스', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'sp12');
+  // 복제 → 상세 열고 이름 칸
+  await rightClick(p, '.vp-item[data-id="sp8"]');
+  await p.click('.ctx-menu button >> text=복제');
+  const dv = (await sent(p, 'DUPLICATE_VARIABLE')).at(-1);
+  check('9 복제 → DUPLICATE_VARIABLE', dv?.id === 'sp8');
+  await recv(p, { type: 'VARIABLE_DUPLICATED', reqId: dv.reqId, newId: 'sp8c', manualUsed: 2 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: [...VARS, { id: 'sp8c', name: 'spacing/8-copy', collectionId: 'g', type: 'FLOAT', values: { m: { kind: 'number', text: '8' } }, scopes: ['GAP'], description: '' }] });
+  check('9 복제 뒤 상세 열림 · 이름 칸 포커스', (await p.$('.modal')) !== null && (await p.evaluate(() => document.activeElement?.value)) === 'spacing/8-copy');
+  await p.keyboard.press('Escape');
+  // 삭제 — 확인 팝업(처음 포커스 [취소]) · m(가리키는 변수 수)
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await rightClick(p, '.vp-item[data-id="g9"]');
+  await p.click('.ctx-menu button >> text=삭제');
+  const mt = await p.textContent('.modal');
+  check('9 삭제 확인 — 제목 · 가리키는 변수 1개 · 레이어 안내 · 포커스 [취소]', mt.includes('color/gray/900 변수를 지울까요?') && mt.includes('가리키는 변수 1개') && mt.includes("'삭제된 변수'가 돼요") && (await p.evaluate(() => document.activeElement?.textContent)) === '취소', mt);
+  await p.click('.modal button.danger');
+  const del = (await sent(p, 'DELETE_VARIABLE')).at(-1);
+  check('9 [삭제] → DELETE_VARIABLE', del?.id === 'g9');
+  await recv(p, { type: 'VARIABLE_DELETED', reqId: del.reqId, id: 'g9' });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS.filter((v) => v.id !== 'g9') });
+  check('9 지운 뒤 포커스 — 같은 그룹 이전 항목(color/gray/0)', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g0');
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  // 상세 — Enter · 이름 복사 · CSS · 쓰인 곳 직접만 · [모두 선택] · [→]
+  await p.click('#varSide [data-key="side:col:s"]');
+  await p.focus('.vt-row[data-id="tx"]');
+  await p.keyboard.press('Enter');
+  const fq = (await sent(p, 'FIND_VAR_USERS')).at(-1);
+  check('9 Enter → 상세 · 쓰인 곳은 그 변수 하나만(직접만)', JSON.stringify(fq?.varIds) === '["tx"]' && fq.limit === 50);
+  check('9 상세 — [⧉ 이름 복사] · CSS 줄 --color-text-default', (await p.$('.modal .ed-copyname')) !== null && (await p.textContent('.modal .ed-css code')) === '--color-text-default');
+  await recv(p, { type: 'VAR_USERS', reqId: fq.reqId, layers: [{ id: 'n1', name: 'Title' }], totalLayers: 60, places: 80 });
+  check('9 쓰인 곳 머리 "80곳 · 모두 선택" · 툴팁', (await p.textContent('.modal .uses-head')) === '80곳 · 모두 선택' && (await p.getAttribute('.modal .uses-head span', 'title')) === '인스턴스 안쪽 포함');
+  await p.click('.modal .uses-head button');
+  check('9 [모두 선택] → SELECT_VAR_USERS(그 변수 · 기준)', JSON.stringify((await sent(p, 'SELECT_VAR_USERS')).at(-1)?.varIds) === '["tx"]');
+  check('9 별칭 칸에 [→]', (await p.$$('.modal .ed-go')).length === 2);
+  await p.click('.modal .ed-go >> nth=0');
+  await p.waitForTimeout(50);
+  check('9 [→] → 팝업 닫고 Global의 color/gray/900로 · 상태 줄 [← 되돌리기]', (await p.$('.modal')) === null && (await sideSelected(p)) === 'side:col:g' && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g9' && (await p.textContent('#statusText')) === 'color/gray/900(으)로 옮겼어요', JSON.stringify([!!(await p.$('.modal')), await sideSelected(p), await p.evaluate(() => document.activeElement?.dataset?.id ?? document.activeElement?.className), await p.textContent('#statusText')]));
+  await p.click('#statusAction');
+  check('9 [← 되돌리기] → Semantic · 그 줄', (await sideSelected(p)) === 'side:col:s' && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx');
+  // 키보드 — 사이드바(listbox)
   await p.focus('#varSide [data-key="side:col:s"]');
   await p.keyboard.press('ArrowDown');
   check('9 사이드바 ↓ → 다음 항목(고르지 않음)', (await p.evaluate(() => document.activeElement?.dataset?.key)) === 'side:col:g' && (await sideSelected(p)) === 'side:col:s');
@@ -203,16 +275,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 사이드바 Enter → 고르기', (await sideSelected(p)) === 'side:col:g');
   const tips = await p.$$eval('#varSide .vs-item', (e) => e.map((x) => [x.querySelector('.vs-badge')?.title, x.getAttribute('aria-label')]));
   check('9 계층 배지 툴팁 · 접근성 이름', tips.length === 2 && tips[0][0] === '플러그인 컬렉션' && tips[0][1].endsWith(', 플러그인 컬렉션') && tips[1][0] === '직접 값 4/4 · Global', JSON.stringify(tips));
-  // ⋯ → 준비 현황 · 내보내기(v4 §4.6)
-  await p.click('#btnVarMore');
-  const more = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
-  check('9 ⋯ 메뉴 — 준비 현황 · 내보내기 · 펼치기/접기', more.length === 4 && /^준비 현황 \d\/7…$/.test(more[0]) && more[1] === '코드로 내보내기…', more.join('|'));
-  await p.click('.ctx-menu button >> text=코드로 내보내기…');
-  check('9 내보내기 팝업 열림', (await p.textContent('.modal')).includes('누르면 바로 코드 파일로 저장돼요'));
-  await p.keyboard.press('Escape');
-  check('9 팝업 닫으면 [⋯]로 포커스', (await p.evaluate(() => document.activeElement?.id)) === 'btnVarMore');
-  await goTab(p, 'settings');
-  check('9 설정 화면에 계층·내보내기 없음', !(await p.textContent('#tab-settings')).includes('컬렉션 계층') && !(await p.textContent('#tab-settings')).includes('코드로 내보내기'));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b3-vars.png` : '/dev/null' }).catch(() => {});
   await p.close();
 }
 {
@@ -383,7 +446,8 @@ const reenter = (p) => p.evaluate(() => {
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await p.waitForTimeout(450);
   await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 1, layers: 1 } })); // 선택이 있으면 사용 수가 와야 목록이 나온다(§4.2)
-  await p.dblclick('.vt-row[data-id="tx"] .nm');
+  await p.focus('.vt-row[data-id="tx"]');
+  await p.keyboard.press('Enter'); // v4: 상세는 Enter(클릭은 연결)
   const hadModal = (await p.$('.modal')) !== null;
   await p.evaluate(() => document.getElementById('btnMinimize').click()); // 팝업 배경이 덮고 있어 직접 누른다
   check('10 최소화하면 팝업 닫힘', hadModal && (await p.$('.modal')) === null);
@@ -408,7 +472,7 @@ const reenter = (p) => p.evaluate(() => {
   // 24×24
   await p.click('#tabbtn-variables');
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
-  const small = await p.evaluate(() => ['btnMinimize', 'btnSettings', 'btnAddVar', 'btnVarMore', 'btnSearch'].map((id) => {
+  const small = await p.evaluate(() => ['btnMinimize', 'btnSettings', 'btnAddVar', 'btnVarMore'].map((id) => {
     const el = document.getElementById(id);
     const r = el.getBoundingClientRect();
     return { id, w: Math.round(r.width), h: Math.round(r.height), shown: el.offsetParent !== null };
@@ -609,9 +673,14 @@ async function openEditList(opts = {}) {
   await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 8, layers: 5 } }));
   return p;
 }
+/** v4 §4.6 — 상세는 Enter(클릭은 연결). 옛 "고치기…"는 없앴다 — 상세를 열고 이름 칸으로. */
+async function openDetailOf(p, id) {
+  await p.focus(`#varTree [data-id="${id}"]`);
+  await p.keyboard.press('Enter');
+}
 async function menuEdit(p, id) {
-  await rightClick(p, `.vt-row[data-id="${id}"]`);
-  await p.click('.ctx-menu button >> text=고치기…');
+  await openDetailOf(p, id);
+  await p.focus('.modal input[aria-label="이름(전체 경로)"]');
 }
 async function saveAndGet(p) {
   await p.click('.modal .m-foot button.primary');
@@ -619,8 +688,8 @@ async function saveAndGet(p) {
 }
 {
   const p = await openEditList();
-  // 열 때 포커스 — 상세(더블클릭) → [닫기]
-  await p.dblclick('.vt-row[data-id="tx"] .nm');
+  // 열 때 포커스 — 상세(Enter) → [닫기]
+  await openDetailOf(p, 'tx');
   check('12 상세로 열면 [닫기]에 포커스 · [저장] 잠김', (await activeText(p)) === '닫기' && (await edSaveLocked(p)) && (await edCloseText(p)) === '닫기');
   check('12 이름 칸 · 모드마다 값 칸(별칭은 알약) · [▾]', (await p.inputValue(NAME)) === 'color/text/default' && (await p.$$('.modal .ed-pillbtn')).length === 2 && (await p.$$('.modal button.ed-dd')).length === 2);
   await p.click('.modal .m-foot button.primary', { force: true });
@@ -629,7 +698,6 @@ async function saveAndGet(p) {
   check('12 고친 것 없으면 Esc로 바로 닫힘 · 원래 행으로', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx');
   // 고치기… → 이름 칸
   await menuEdit(p, 'tx');
-  check('12 고치기…로 열면 이름 칸에 포커스', (await activeLabel(p)) === '이름(전체 경로)');
   await p.fill(NAME, 'color//default');
   check('12 빈 토막 → "이름의 \'/\' 사이가 비어 있어요" · [취소] · [저장] 잠김', (await p.textContent('.modal .ed-ferr')) === "이름의 '/' 사이가 비어 있어요" && (await edCloseText(p)) === '취소' && (await edSaveLocked(p)));
   await p.fill(NAME, 'color/text/muted');
@@ -646,7 +714,10 @@ async function saveAndGet(p) {
   const opts = await pickerOpts(p);
   check('12 후보: 값으로 적기 + 같은 타입 · 낮은 계층(Global)만 · 지금 대상 ✓', JSON.stringify(opts.map((x) => x.replace(/\s+/g, ' ').trim())) === JSON.stringify(['값으로 적기 #111111', '0', '900✓']), JSON.stringify(opts));
   check('12 경로 머리 "G Global › color/gray" · 안내 줄 라이브러리', (await p.textContent('.ed-picker .ed-phead')) === 'G Global › color/gray' && (await pickerNotes(p)).includes('라이브러리 변수는 대상으로 고를 수 없어요'));
-  check('12 후보 목록 최대 200px', (await p.$eval('.ed-pscroll', (e) => getComputedStyle(e).maxHeight)) === '200px');
+  const layer = await p.$eval('.ed-picker', (e) => ({ pos: getComputedStyle(e).position, max: parseInt(getComputedStyle(e).maxHeight, 10), inDd: e.parentElement?.closest('dd') !== null }));
+  check('12 고르개는 덮는 층(absolute · 최대 240px · dd 안) — 아래 줄을 밀지 않음', layer.pos === 'absolute' && layer.max <= 240 && layer.max >= 124 && layer.inDd, JSON.stringify(layer));
+  await p.focus('.modal button[aria-label="Dark 별칭 고르기"]');
+  check('12 포커스가 층 밖으로 나가면 고르개 닫힘(focusout)', (await p.$$('.ed-picker')).length === 0);
   await p.click('.modal button[aria-label="Dark 별칭 고르기"]');
   check('12 고르개는 하나만 열림', (await p.$$('.ed-picker')).length === 1 && (await p.$eval('.ed-picker', (e) => !!e.closest('dd')?.querySelector('[aria-label="Dark 별칭 고르기"]'))));
   await p.keyboard.press('Escape');
@@ -680,7 +751,6 @@ async function saveAndGet(p) {
   // 행이 지금 목록에 없게 됨(그룹 이동) → 오른쪽 목록 머리 + 상태 줄
   const p = await openEditList();
   await p.click('#varSide [data-key="side:col:s"]');
-  await p.click('#btnSearch');
   await p.fill('#varSearch', 'color/text'); // v4: 그룹 항목이 없어 검색으로 좁힌다
   await menuEdit(p, 'tx');
   await p.fill(NAME, 'color/fg/default');
@@ -688,7 +758,7 @@ async function saveAndGet(p) {
   await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: true, applied: ['name'] });
   await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS.map((v) => (v.id === 'tx' ? { ...v, name: 'color/fg/default' } : v)) });
   await p.click('.modal .m-foot button:not(.primary)');
-  check('12 행이 목록에 없으면 오른쪽 목록 머리로 · "{새 이름} 행은 지금 고른 목록에 없어요"', (await p.evaluate(() => document.activeElement?.id)) === 'varMainTitle' && (await p.textContent('#statusText')) === 'color/fg/default 행은 지금 고른 목록에 없어요', await p.textContent('#statusText'));
+  check('12 항목이 목록에 없으면 첫 항목으로 · "{새 이름}은 지금 목록에 보이지 않아요"', (await p.evaluate(() => document.activeElement?.closest('#varTree, #listHead') !== null)) && (await p.textContent('#statusText')) === 'color/fg/default은 지금 목록에 보이지 않아요', await p.textContent('#statusText'));
   // 고르개 후보: Global은 없음 · 계층 없음은 모든 컬렉션(순환 제외)
   await p.click('#varSide [data-key="side:col:g"]');
   await menuEdit(p, 'g0');
@@ -794,6 +864,53 @@ async function saveAndGet(p) {
   await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: true, applied: ['d'] });
   await recv(p, { type: 'ERROR', message: 'table', op: 'GET_VAR_TABLE' });
   check('12 바뀐 응답 뒤 표 ERROR → "저장됐을 수 있어요"', (await edAlert(p)) === '저장됐을 수 있어요 · 닫고 다시 열어 주세요' && (await edSaveText(p)) === '저장');
+  await p.close();
+}
+
+/* ---------- 12b 별칭 고르개(IA v4 §4.8 B.3) — 덮는 층 · 용도 거르기 · "용도가 다른 변수도 보기" · [▾]의 Esc · 배경 누름 ---------- */
+{
+  const PCOLS = [
+    { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }], defaultModeId: 'm' },
+    { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }], defaultModeId: 'l' },
+  ];
+  const num = (id, name, n, scopes) => ({ id, name, collectionId: 'g', type: 'FLOAT', values: { m: { kind: 'number', text: String(n) } }, scopes, description: '' });
+  const PVARS = [
+    num('r4', 'radius/4', 4, ['CORNER_RADIUS']),
+    num('r8', 'radius/8', 8, ['CORNER_RADIUS']),
+    num('any', 'misc/any', 2, ['ALL_SCOPES']),
+    num('f12', 'font-size/12', 12, ['FONT_SIZE']),
+    num('f14', 'font-size/14', 14, ['FONT_SIZE']),
+    num('hid', 'misc/hidden', 1, []),
+    { id: 'rc', name: 'radius/card', collectionId: 's', type: 'FLOAT', values: { l: { kind: 'alias', aliasId: 'r8', aliasName: 'radius/8' }, d: { kind: 'alias', aliasId: 'f14', aliasName: 'font-size/14' } }, scopes: ['CORNER_RADIUS'], description: '' },
+  ];
+  const p = await open(480, 'variables');
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: PCOLS, vars: PVARS });
+  await p.focus('#varTree [data-id="rc"]');
+  await p.keyboard.press('Enter');
+  await p.click('.modal button[aria-label="Light 별칭 고르기"]');
+  const names = async () => p.$$eval('.ed-picker [role="option"]', (e) => e.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
+  const o1 = await names();
+  check('12b 용도로 거르기 — 반경 · ALL_SCOPES만(글자 크기 · 빈 용도 숨김)', JSON.stringify(o1) === JSON.stringify(['값으로 적기 8', '44', '88✓', '2any']), JSON.stringify(o1));
+  check('12b 링크 "용도가 다른 변수도 보기 (3개)"', (await p.textContent('.ed-plink')) === '용도가 다른 변수도 보기 (3개)');
+  const before = await p.$eval('.modal dt:nth-of-type(4)', (e) => Math.round(e.getBoundingClientRect().top));
+  check('12b 덮어 열기 — 아래 줄 자리 그대로', before > 0);
+  await p.click('.ed-plink');
+  const o2 = await names();
+  check('12b 링크를 누르면 숨긴 후보가 "용도 다름"과 함께 · 링크 글 바뀜 · 포커스는 링크', o2.some((x) => x.includes('12') && x.includes('용도 다름')) && o2.some((x) => x.includes('hidden') && x.includes('용도 다름')) && (await p.textContent('.ed-plink')) === '용도가 맞는 변수만 보기' && (await p.evaluate(() => document.activeElement?.classList.contains('ed-plink'))), JSON.stringify(o2));
+  // [▾]에서 Esc → 고르개만 닫음(팝업은 그대로)
+  await p.focus('.modal button[aria-label="Light 별칭 고르기"]');
+  check('12b [▾]에 포커스(층 안이라 열린 채)', (await p.$$('.ed-picker')).length === 1);
+  await p.keyboard.press('Escape');
+  check('12b [▾]의 Esc → 고르개만 닫힘 · 팝업 그대로', (await p.$$('.ed-picker')).length === 0 && (await p.$('.modal')) !== null);
+  // 지금 대상이 용도 밖(Dark = font-size/14) → 토글 켠 채 열림 · 제자리 ✓
+  await p.click('.modal button[aria-label="Dark 별칭 고르기"]');
+  const o3 = await names();
+  check('12b 지금 대상이 용도 밖 → 처음부터 다른 용도도 보임 · 제자리에 ✓ + "용도 다름"(맨 위 ✓ 줄 없음)', (await p.textContent('.ed-plink')) === '용도가 맞는 변수만 보기' && o3.filter((x) => x.includes('✓')).length === 1 && o3.some((x) => x.includes('14') && x.includes('용도 다름') && x.includes('✓')) && !(await p.textContent('.ed-picker')).includes('규칙 밖'), JSON.stringify(o3));
+  // 배경 누름 → 고르개만 닫고 팝업은 그대로
+  await p.mouse.click(5, 5);
+  check('12b 배경 누름 → 고르개만 닫힘 · 팝업 그대로', (await p.$$('.ed-picker')).length === 0 && (await p.$('.modal')) !== null);
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b3-picker.png` : '/dev/null' }).catch(() => {});
   await p.close();
 }
 

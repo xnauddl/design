@@ -44,6 +44,13 @@ import {
   createIconRegistry,
   swapVectorSlots,
   transplantImageFills,
+  applyVariableToNodes,
+  isManualVar,
+  createManualVariable,
+  duplicateVariable,
+  deleteVariable,
+  VarNameError,
+  VarGoneError,
 } from '../dist/figma-lib.mjs';
 
 /* ---------------- figma 전역 목 ---------------- */
@@ -77,6 +84,10 @@ function installFigma() {
         if (this.modes.length <= 1) throw new Error('마지막 모드는 지울 수 없습니다');
         this.modes = this.modes.filter((m) => m.modeId !== modeId);
       },
+      remove() {
+        const i = collections.indexOf(this);
+        if (i >= 0) collections.splice(i, 1);
+      },
     };
     collections.push(col);
     return col;
@@ -90,8 +101,12 @@ function installFigma() {
       scopes: [],
       hiddenFromPublishing: false,
       description: '',
+      codeSyntax: {},
       valuesByMode: {},
       _pd: {},
+      setVariableCodeSyntax(platform, value) {
+        this.codeSyntax = { ...this.codeSyntax, [platform]: value };
+      },
       getPluginData(k) {
         return this._pd[k] ?? '';
       },
@@ -671,14 +686,16 @@ test('createTokens — Global 리터럴 + scopes/hidden + px 환산 (Semantic �
 
   // 토큰당 Global 1개(거울 없음). 색1 + 라인하이트1 + 간격1 = created 3
   // conversions: base(16px) 환산 대상은 비-px인 lineHeight(150%)뿐
-  const { globalOf, ...counts } = summary;
+  const { globalOf, skippedManualNames, ...counts } = summary;
   assert.deepEqual(counts, {
     created: 3,
     updated: 0,
     globals: 3,
     semantics: 0,
     conversions: [{ name: 'line-height/150', from: '150%', to: 24 }],
+    skippedManual: 0,
   });
+  assert.equal(skippedManualNames.size, 0);
   assert.equal(globalOf.size, 3); // 토큰 이름 → 만든 Global id(§2.13 13.6)
 
   // Global 색: 리터럴 + scope + hidden
@@ -5582,4 +5599,444 @@ test('planExistingTextStyles · applyTextStyleRows — 스타일 줄 미리보�
   assert.equal(c._styleId, null, '끈 줄은 붙이지 않는다');
   assert.equal(r.skipped, 1);
   assert.equal(r.skipReasons.hasStyle, 1);
+});
+
+/* ================= 클릭 연결 · 새 변수 · 복제 · 삭제(IA v4 §4.7 · §4.9, B.3) ================= */
+const solid = (hex, extra = {}) => ({ type: 'SOLID', color: hexToRgb(hex), ...extra });
+const GRAD = { type: 'GRADIENT_LINEAR', gradientStops: [], gradientTransform: [[1, 0, 0], [0, 1, 0]] };
+const SHADOW = { type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.25 }, offset: { x: 0, y: 2 }, radius: 4, visible: true, blendMode: 'NORMAL' };
+/** 연결을 기록하는 노드 목. setBoundVariable(field, v) → boundVariables[field] = alias. */
+function node(type, extra = {}) {
+  const n = {
+    type, id: `${type}:${Math.random().toString(36).slice(2, 7)}`, name: type, boundVariables: {},
+    setBoundVariable(field, v) { this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id }; },
+    ...extra,
+  };
+  return n;
+}
+const frame = (extra = {}) => node('FRAME', { fills: [], strokes: [], effects: [], opacity: 1, width: 10, height: 10, strokeWeight: 0, strokeTopWeight: 0, strokeRightWeight: 0, strokeBottomWeight: 0, strokeLeftWeight: 0, topLeftRadius: 0, topRightRadius: 0, bottomLeftRadius: 0, bottomRightRadius: 0, layoutMode: 'NONE', itemSpacing: 0, counterAxisSpacing: 0, paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0, ...extra });
+const rect = (extra = {}) => node('RECTANGLE', { fills: [], strokes: [], effects: [], opacity: 1, width: 10, height: 10, strokeWeight: 0, topLeftRadius: 0, topRightRadius: 0, bottomLeftRadius: 0, bottomRightRadius: 0, ...extra });
+const ellipse = (extra = {}) => node('ELLIPSE', { fills: [], strokes: [], effects: [], opacity: 1, width: 10, height: 10, strokeWeight: 0, ...extra });
+function text(chars = 'Hi', extra = {}) {
+  return node('TEXT', {
+    characters: chars, fontName: { family: 'Inter', style: 'Bold' }, fontSize: 13, fills: [solid('#000000')], strokes: [], effects: [], opacity: 1, width: 10, height: 10, strokeWeight: 0,
+    ranges: [],
+    getRangeAllFontNames() { return [{ family: 'Inter', style: 'Bold' }, { family: 'Inter', style: 'Regular' }]; },
+    setRangeBoundVariable(start, end, field, v) { this.ranges.push({ start, end, field, id: v.id }); },
+    ...extra,
+  });
+}
+function mkVar(figma, name, type, scopes, value, colName = 'Tokens') {
+  let col = figma._state.collections.find((c) => c.name === colName);
+  if (!col) col = figma.variables.createVariableCollection(colName);
+  const v = figma.variables.createVariable(name, col, type);
+  if (scopes) v.scopes = scopes;
+  else v.scopes = ['ALL_SCOPES'];
+  if (value !== undefined) v.setValueForMode(col.defaultModeId, value);
+  return v;
+}
+const bound = (paint) => paint?.boundVariables?.color?.id;
+
+test('클릭 연결 색 — 맨 위 보이는 단색에, 숨긴 단색은 건너뛰고, 단색이 없으면 맨 위에 새 단색', async () => {
+  const figma = installFigma();
+  const v = mkVar(figma, 'color/brand', 'COLOR', null, hexToRgb('#3366ff'));
+  const a = frame({ fills: [solid('#111111'), solid('#222222')] });
+  const b = frame({ fills: [solid('#111111'), solid('#222222', { visible: false })] });
+  const c = frame({ fills: [GRAD] });
+  const d = frame({ fills: [] });
+  const r = await applyVariableToNodes([a, b, c, d], v);
+  assert.deepEqual(r, { applied: 4, skipped: 0, skipReasons: {} });
+  assert.equal(bound(a.fills[1]), v.id);
+  assert.equal(bound(a.fills[0]), undefined);
+  assert.equal(bound(b.fills[0]), v.id, '숨긴 단색 아래의 보이는 단색');
+  assert.equal(c.fills.length, 2);
+  assert.equal(c.fills[0].type, 'GRADIENT_LINEAR', '그라디언트는 그대로');
+  assert.equal(bound(c.fills[1]), v.id, '새 단색은 맨 위(배열 끝)');
+  assert.equal(d.fills.length, 1);
+  assert.equal(bound(d.fills[0]), v.id);
+});
+
+test('클릭 연결 색 — 글자 레이어는 글자 색, 구간마다 다르면 글자 전체를 단색 하나로 · 그룹은 건너뜀', async () => {
+  const figma = installFigma();
+  const v = mkVar(figma, 'color/text', 'COLOR', null, hexToRgb('#000000'));
+  const t1 = text();
+  const t2 = text('Mixed', { fills: figma.mixed });
+  const g = node('GROUP', {});
+  const r = await applyVariableToNodes([t1, t2, g], v);
+  assert.equal(r.applied, 2);
+  assert.deepEqual(r.skipReasons, { 'no-prop': 1 });
+  assert.equal(bound(t1.fills[0]), v.id);
+  assert.equal(Array.isArray(t2.fills), true);
+  assert.equal(t2.fills.length, 1);
+  assert.equal(bound(t2.fills[0]), v.id);
+});
+
+test('클릭 연결 색 — 채움 용도는 레이어 종류(글자 TEXT_FILL · 프레임 FRAME_FILL · 도형 SHAPE_FILL), 막히면 다음 속성(보이는 것만)', async () => {
+  const figma = installFigma();
+  const v = mkVar(figma, 'color/x', 'COLOR', ['FRAME_FILL', 'STROKE_COLOR'], hexToRgb('#ff0000'));
+  const f = frame({ fills: [solid('#ffffff')] });
+  const shapeNoStroke = rect({ fills: [solid('#ffffff')] });
+  const shapeStroke = rect({ fills: [solid('#ffffff')], strokes: [solid('#cccccc')] });
+  const t = text('Hi', { strokes: [] });
+  const r = await applyVariableToNodes([f, shapeNoStroke, shapeStroke, t], v);
+  assert.equal(r.applied, 2);
+  assert.equal(r.skipped, 2);
+  assert.deepEqual(r.skipReasons, { 'no-stroke': 2 }, '넘어간 선에는 새로 만들지 않는다');
+  assert.equal(bound(f.fills[0]), v.id);
+  assert.equal(bound(shapeNoStroke.fills[0]), undefined);
+  assert.equal(shapeNoStroke.strokes.length, 0);
+  assert.equal(bound(shapeStroke.strokes[0]), v.id);
+  assert.equal(bound(shapeStroke.fills[0]), undefined);
+  // ALL_FILLS는 셋 다
+  const all = mkVar(figma, 'color/all', 'COLOR', ['ALL_FILLS'], hexToRgb('#00ff00'));
+  const r2 = await applyVariableToNodes([rect({ fills: [solid('#fff000')] }), text(), frame({ fills: [solid('#fff000')] })], all);
+  assert.equal(r2.applied, 3);
+});
+
+test('클릭 연결 — 빈 용도([])는 모든 레이어 no-scope, 그림자만 허용이면 그림자(없으면 no-shadow)', async () => {
+  const figma = installFigma();
+  const none = mkVar(figma, 'color/none', 'COLOR', [], hexToRgb('#ff0000'));
+  const r = await applyVariableToNodes([frame({ fills: [solid('#ffffff')] }), text()], none);
+  assert.deepEqual(r, { applied: 0, skipped: 2, skipReasons: { 'no-scope': 2 } });
+  const sh = mkVar(figma, 'color/shadow', 'COLOR', ['EFFECT_COLOR'], { r: 0, g: 0, b: 0, a: 0.3 });
+  const withShadow = frame({ effects: [SHADOW] });
+  const without = frame();
+  const r2 = await applyVariableToNodes([withShadow, without], sh);
+  assert.deepEqual(r2, { applied: 1, skipped: 1, skipReasons: { 'no-shadow': 1 } });
+  assert.equal(withShadow.effects[0].boundVariables.color.id, sh.id);
+  // target도 용도 확인(no-scope)
+  const r3 = await applyVariableToNodes([frame()], none, 'stroke');
+  assert.deepEqual(r3.skipReasons, { 'no-scope': 1 });
+});
+
+test('클릭 연결 — 기존 연결을 바꾸고, Global 변수도 붙인다 · 숨긴 · 잠긴 선택 레이어도 한다', async () => {
+  const figma = installFigma();
+  const a = mkVar(figma, 'color/gray/100', 'COLOR', ['ALL_SCOPES'], hexToRgb('#eeeeee'), 'Global');
+  const b = mkVar(figma, 'color/gray/900', 'COLOR', ['ALL_SCOPES'], hexToRgb('#111111'), 'Global');
+  const f = frame({ visible: false, locked: true, fills: [figma.variables.setBoundVariableForPaint(solid('#eeeeee'), 'color', a)] });
+  const r = await applyVariableToNodes([f], b);
+  assert.equal(r.applied, 1);
+  assert.equal(bound(f.fills[0]), b.id);
+});
+
+test('클릭 연결 target — 그 속성만: 선은 1px 안쪽 단색을 만들고, 그림자가 없으면 건너뜀(다른 속성으로 가지 않음)', async () => {
+  const figma = installFigma();
+  const v = mkVar(figma, 'color/border', 'COLOR', ['ALL_FILLS', 'STROKE_COLOR', 'EFFECT_COLOR'], hexToRgb('#cccccc'));
+  const f = frame({ fills: [solid('#ffffff')], strokeWeight: 0 });
+  const r = await applyVariableToNodes([f], v, 'stroke');
+  assert.equal(r.applied, 1);
+  assert.equal(f.strokes.length, 1);
+  assert.equal(bound(f.strokes[0]), v.id);
+  assert.equal(f.strokeWeight, 1);
+  assert.equal(f.strokeAlign, 'INSIDE');
+  assert.equal(bound(f.fills[0]), undefined, '채움은 그대로');
+  const g = frame({ fills: [solid('#ffffff')] });
+  const r2 = await applyVariableToNodes([g], v, 'shadow');
+  assert.deepEqual(r2, { applied: 0, skipped: 1, skipReasons: { 'no-shadow': 1 } });
+  assert.equal(bound(g.fills[0]), undefined);
+  // 글자 색 target은 글자 레이어만
+  const r3 = await applyVariableToNodes([frame({ fills: [solid('#ffffff')] }), text()], v, 'text');
+  assert.deepEqual(r3, { applied: 1, skipped: 1, skipReasons: { 'no-prop': 1 } });
+});
+
+test('클릭 연결 간격 — 이름 끝 마디로 속성, 오토 레이아웃만 · 사용자 Component 이름(button/padding-x) · 용도로 판정(4)', async () => {
+  const figma = installFigma();
+  const al = () => frame({ layoutMode: 'HORIZONTAL' });
+  const sp = mkVar(figma, 'spacing/16', 'FLOAT', ['GAP'], 16);
+  const a = al();
+  const none = frame();
+  const grid = frame({ layoutMode: 'GRID' });
+  const r = await applyVariableToNodes([a, none, grid], sp);
+  assert.deepEqual(r, { applied: 1, skipped: 2, skipReasons: { 'not-autolayout': 2 } });
+  assert.deepEqual(Object.keys(a.boundVariables), ['itemSpacing']);
+
+  const px = mkVar(figma, 'button/padding-x', 'FLOAT', ['GAP'], 12, 'Component');
+  const b = al();
+  await applyVariableToNodes([b], px);
+  assert.deepEqual(Object.keys(b.boundVariables).sort(), ['paddingLeft', 'paddingRight']);
+
+  const pad = mkVar(figma, 'card/padding', 'FLOAT', ['ALL_SCOPES'], 8);
+  const c = al();
+  await applyVariableToNodes([c], pad);
+  assert.deepEqual(Object.keys(c.boundVariables).sort(), ['paddingBottom', 'paddingLeft', 'paddingRight', 'paddingTop']);
+
+  const rowGap = mkVar(figma, 'grid/row-gap', 'FLOAT', ['GAP'], 4);
+  const wrap = frame({ layoutMode: 'HORIZONTAL', layoutWrap: 'WRAP' });
+  const nowrap = al();
+  await applyVariableToNodes([wrap, nowrap], rowGap);
+  assert.deepEqual(Object.keys(wrap.boundVariables), ['counterAxisSpacing']);
+  assert.deepEqual(Object.keys(nowrap.boundVariables), ['itemSpacing']);
+
+  // 이름으로 못 정하면 용도(판정 4) — GAP 하나면 간격
+  const byScope = mkVar(figma, 'misc/foo', 'FLOAT', ['GAP'], 4);
+  const d = al();
+  await applyVariableToNodes([d], byScope);
+  assert.deepEqual(Object.keys(d.boundVariables), ['itemSpacing']);
+
+  // target padding-top
+  const e = al();
+  await applyVariableToNodes([e], sp, 'padding-top');
+  assert.deepEqual(Object.keys(e.boundVariables), ['paddingTop']);
+  // 용도가 GAP을 막으면 no-scope
+  const off = mkVar(figma, 'spacing/x', 'FLOAT', ['CORNER_RADIUS'], 4);
+  const r2 = await applyVariableToNodes([al()], off);
+  assert.deepEqual(r2.skipReasons, { 'no-scope': 1 });
+});
+
+test('클릭 연결 반경 · 크기 · 선 두께 · 투명도', async () => {
+  const figma = installFigma();
+  const rad = mkVar(figma, 'radius/8', 'FLOAT', ['CORNER_RADIUS'], 8);
+  const f = frame();
+  const el = ellipse();
+  const r = await applyVariableToNodes([f, el, text()], rad);
+  assert.deepEqual(r, { applied: 1, skipped: 2, skipReasons: { 'no-prop': 2 } });
+  assert.deepEqual(Object.keys(f.boundVariables).sort(), ['bottomLeftRadius', 'bottomRightRadius', 'topLeftRadius', 'topRightRadius']);
+  const tl = mkVar(figma, 'card/radius-top-left', 'FLOAT', ['CORNER_RADIUS'], 8);
+  const f2 = frame();
+  await applyVariableToNodes([f2], tl);
+  assert.deepEqual(Object.keys(f2.boundVariables), ['topLeftRadius']);
+  const f3 = frame();
+  await applyVariableToNodes([f3], rad, 'radius-br');
+  assert.deepEqual(Object.keys(f3.boundVariables), ['bottomRightRadius']);
+
+  const size = mkVar(figma, 'size/24', 'FLOAT', ['WIDTH_HEIGHT'], 24);
+  const hug = frame({ layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'FILL' });
+  const g = node('GROUP', { width: 10, height: 10 });
+  const r2 = await applyVariableToNodes([hug, g, text()], size);
+  assert.deepEqual(r2, { applied: 1, skipped: 2, skipReasons: { 'no-prop': 2 } });
+  assert.equal(hug.layoutSizingHorizontal, 'FIXED');
+  assert.equal(hug.layoutSizingVertical, 'FIXED');
+  assert.deepEqual(Object.keys(hug.boundVariables).sort(), ['height', 'width']);
+  const w = mkVar(figma, 'icon/width', 'FLOAT', ['WIDTH_HEIGHT'], 24);
+  const fw = frame({ layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'HUG' });
+  await applyVariableToNodes([fw], w);
+  assert.deepEqual(Object.keys(fw.boundVariables), ['width']);
+  assert.equal(fw.layoutSizingVertical, 'HUG', '안 붙인 축은 그대로');
+
+  const sw = mkVar(figma, 'stroke-width/1', 'FLOAT', ['STROKE_FLOAT'], 1);
+  const stroked = frame({ strokes: [solid('#000000')], strokeWeight: 1 });
+  const bare = frame();
+  const r3 = await applyVariableToNodes([stroked, bare], sw);
+  assert.deepEqual(r3, { applied: 1, skipped: 1, skipReasons: { 'no-stroke': 1 } });
+  assert.deepEqual(Object.keys(stroked.boundVariables), ['strokeWeight']);
+  const top = mkVar(figma, 'divider/stroke-width-top', 'FLOAT', ['STROKE_FLOAT'], 1);
+  const s2 = frame({ strokes: [solid('#000000')], strokeWeight: 1 });
+  await applyVariableToNodes([s2], top);
+  assert.deepEqual(Object.keys(s2.boundVariables), ['strokeTopWeight']);
+
+  const op = mkVar(figma, 'opacity/50', 'FLOAT', ['OPACITY'], 0.5);
+  const o = rect();
+  await applyVariableToNodes([o], op);
+  assert.deepEqual(Object.keys(o.boundVariables), ['opacity']);
+});
+
+test('클릭 연결 글자 — 그 글자 속성, 모든 구간 글꼴을 먼저 불러옴 · 빈 글자 · 글꼴에 같은 스타일이 없으면 건너뜀', async () => {
+  const figma = installFigma();
+  const loaded = [];
+  figma.loadFontAsync = async (f) => {
+    if (f.family === 'Nope') throw new Error('no font');
+    loaded.push(`${f.family}/${f.style}`);
+  };
+  const fs = mkVar(figma, 'font-size/14', 'FLOAT', ['FONT_SIZE'], 14);
+  const t = text();
+  const r = await applyVariableToNodes([t, text(''), frame()], fs);
+  assert.deepEqual(r, { applied: 1, skipped: 2, skipReasons: { 'empty-text': 1, 'no-prop': 1 } });
+  assert.deepEqual(t.ranges, [{ start: 0, end: 2, field: 'fontSize', id: fs.id }]);
+  assert.deepEqual(loaded, ['Inter/Bold', 'Inter/Regular']);
+
+  const lh = mkVar(figma, 'body/line-height', 'FLOAT', ['LINE_HEIGHT'], 20, 'Component');
+  const t2 = text();
+  await applyVariableToNodes([t2], lh);
+  assert.equal(t2.ranges[0].field, 'lineHeight');
+
+  const famOk = mkVar(figma, 'font-family/body', 'STRING', ['FONT_FAMILY'], 'Pretendard');
+  const famBad = mkVar(figma, 'font-family/nope', 'STRING', ['FONT_FAMILY'], 'Nope');
+  const t3 = text();
+  const t4 = text();
+  const r3 = await applyVariableToNodes([t3], famOk);
+  const r4 = await applyVariableToNodes([t4], famBad);
+  assert.equal(r3.applied, 1);
+  assert.ok(loaded.includes('Pretendard/Bold') && loaded.includes('Pretendard/Regular'));
+  assert.deepEqual(r4, { applied: 0, skipped: 1, skipReasons: { font: 1 } });
+  assert.deepEqual(t4.ranges, []);
+});
+
+test('클릭 연결 — 종류를 못 정한 변수(참거짓 · 이름 · 용도로도 모름)는 붙이지 않는다(other-kind)', async () => {
+  const figma = installFigma();
+  const b = mkVar(figma, 'flag/on', 'BOOLEAN', ['ALL_SCOPES'], true);
+  const n = mkVar(figma, 'misc/value', 'FLOAT', ['ALL_SCOPES'], 3);
+  const f = frame({ layoutMode: 'HORIZONTAL' });
+  assert.deepEqual(await applyVariableToNodes([f, rect()], b), { applied: 0, skipped: 2, skipReasons: { 'other-kind': 2 } });
+  assert.deepEqual(await applyVariableToNodes([f], n), { applied: 0, skipped: 1, skipReasons: { 'other-kind': 1 } });
+  assert.deepEqual(f.boundVariables, {});
+  // 판정 3: 끝 마디로 — 사용자 Component 이름 `button/radius`
+  const cr = mkVar(figma, 'button/radius', 'FLOAT', ['ALL_SCOPES'], 6, 'Component');
+  const g = frame();
+  assert.equal((await applyVariableToNodes([g], cr)).applied, 1);
+  assert.ok(g.boundVariables.topLeftRadius);
+});
+
+test('새 변수 — 로컬 컬렉션 없으면 사용자 컬렉션 Variables(플러그인 표시 없음) · 값은 기본 모드 · 용도 · dsl.manual', async () => {
+  const figma = installFigma();
+  const { variable, newCollection } = await createManualVariable({ name: 'spacing/4', varType: 'FLOAT', values: { '*': { kind: 'number', value: 4 } }, scopes: ['GAP'] });
+  assert.equal(newCollection, true);
+  const col = figma._state.collections.find((c) => c.id === variable.variableCollectionId);
+  assert.equal(col.name, 'Variables');
+  assert.equal(col.getPluginData('dsl.owned'), '');
+  assert.equal(variable.valuesByMode[col.defaultModeId], 4);
+  assert.deepEqual(variable.scopes, ['GAP']);
+  assert.equal(variable.getPluginData('dsl.manual'), '1');
+  assert.equal(isManualVar(variable), true);
+
+  // 모드 둘 — 비운 모드는 기본 모드 값, 별칭도
+  const two = figma.variables.createVariableCollection('Theme');
+  const dark = two.addMode('Dark');
+  const { variable: c } = await createManualVariable({
+    collectionId: two.id, name: 'color/bg', varType: 'COLOR',
+    values: { [two.defaultModeId]: { kind: 'color', hex: '#ffffff', alpha: 1 } },
+  });
+  assert.deepEqual(c.valuesByMode[dark], c.valuesByMode[two.defaultModeId]);
+  assert.deepEqual(c.scopes, [], '용도를 안 주면 건드리지 않는다');
+  const { variable: al } = await createManualVariable({
+    collectionId: two.id, name: 'color/fg', varType: 'COLOR',
+    values: { [two.defaultModeId]: { kind: 'alias', targetId: c.id }, [dark]: { kind: 'color', hex: '#000000', alpha: 0.5 } },
+  });
+  assert.deepEqual(al.valuesByMode[two.defaultModeId], { type: 'VARIABLE_ALIAS', id: c.id });
+  assert.equal(al.valuesByMode[dark].a, 0.5);
+
+  // 이름 거절 — VarNameError, 새로 만든 Variables는 걷는다
+  const before = figma._state.collections.length;
+  const orig = figma.variables.createVariable;
+  figma.variables.createVariable = () => { throw new Error('invalid name'); };
+  await assert.rejects(createManualVariable({ name: 'bad.', varType: 'FLOAT', values: { '*': { kind: 'number', value: 1 } } }), (e) => e instanceof VarNameError && /invalid name/.test(e.message));
+  figma.variables.createVariable = orig;
+  assert.equal(figma._state.collections.length, before);
+  // 없는 컬렉션
+  await assert.rejects(createManualVariable({ collectionId: 'col:gone', name: 'x', varType: 'FLOAT', values: { '*': { kind: 'number', value: 1 } } }), VarGoneError);
+});
+
+test('복제 — 같은 컬렉션 · 이름 -copy/-copy-2 · 값(별칭) · 용도 · 설명 · 게시 숨김 · 코드 문법 복사, autoRole 대신 dsl.manual', async () => {
+  const figma = installFigma();
+  const col = figma.variables.createVariableCollection('Semantic');
+  const dark = col.addMode('Dark');
+  const g = mkVar(figma, 'color/gray/0', 'COLOR', ['ALL_FILLS'], hexToRgb('#ffffff'), 'Global');
+  const src = figma.variables.createVariable('color/background/default', col, 'COLOR');
+  src.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: g.id });
+  src.setValueForMode(dark, { r: 0, g: 0, b: 0, a: 1 });
+  src.scopes = ['FRAME_FILL'];
+  src.description = '배경';
+  src.hiddenFromPublishing = true;
+  src.setVariableCodeSyntax('WEB', 'var(--bg)');
+  src.setPluginData('dsl.autoRole', '1');
+  figma.variables.createVariable('Color/background/default-copy', col, 'COLOR'); // 대소문자가 다르면 겹치지 않는다
+
+  const a = await duplicateVariable(src.id);
+  assert.equal(a.name, 'color/background/default-copy');
+  assert.equal(a.variableCollectionId, col.id);
+  assert.deepEqual(a.valuesByMode[col.defaultModeId], { type: 'VARIABLE_ALIAS', id: g.id });
+  assert.deepEqual(a.valuesByMode[dark], { r: 0, g: 0, b: 0, a: 1 });
+  assert.deepEqual(a.scopes, ['FRAME_FILL']);
+  assert.notEqual(a.scopes, src.scopes, '배열은 새로');
+  assert.equal(a.description, '배경');
+  assert.equal(a.hiddenFromPublishing, true);
+  assert.deepEqual(a.codeSyntax, { WEB: 'var(--bg)' });
+  assert.equal(a.getPluginData('dsl.autoRole'), '');
+  assert.equal(a.getPluginData('dsl.manual'), '1');
+  const b = await duplicateVariable(src.id);
+  assert.equal(b.name, 'color/background/default-copy-2');
+  await assert.rejects(duplicateVariable('var:gone'), VarGoneError);
+});
+
+test('삭제 — 변수를 지우고, 다시 지우면 VarGoneError', async () => {
+  const figma = installFigma();
+  const v = mkVar(figma, 'spacing/8', 'FLOAT', ['GAP'], 8);
+  assert.equal(await deleteVariable(v.id), 'spacing/8');
+  assert.equal(figma._state.variables.includes(v), false);
+  await assert.rejects(deleteVariable(v.id), VarGoneError);
+});
+
+test('직접 만든 변수 지키기 — createTokens: 같은 값이면 그 변수를 Global로 재사용, 다르면 건너뜀(skippedManual) · 값은 그대로', async () => {
+  const figma = installFigma();
+  const gcol = figma.variables.createVariableCollection('Global');
+  const same = figma.variables.createVariable('color/ff0000', gcol, 'COLOR');
+  same.setValueForMode(gcol.defaultModeId, { r: 1, g: 0, b: 0, a: 1 });
+  same.setPluginData('dsl.manual', '1');
+  same.scopes = ['STROKE_COLOR'];
+  const diff = figma.variables.createVariable('color/00ff00', gcol, 'COLOR');
+  diff.setValueForMode(gcol.defaultModeId, { r: 0, g: 0, b: 1, a: 1 });
+  diff.setPluginData('dsl.manual', '1');
+  const toks = [colorTok('#ff0000'), colorTok('#00ff00'), colorTok('#0000ff')];
+  const pv = await previewCreateTokens(toks, 16);
+  assert.equal(pv.skippedManual, 1);
+  assert.equal(pv.created, 1);
+  const s = await createTokens(toks, 16);
+  assert.equal(s.skippedManual, 1);
+  assert.deepEqual([...s.skippedManualNames], ['color/00ff00']);
+  assert.equal(s.created, 1);
+  assert.equal(s.globalOf.get('color/ff0000'), same.id);
+  assert.equal(s.globalOf.has('color/00ff00'), false);
+  assert.deepEqual(same.scopes, ['STROKE_COLOR'], '용도 · 값을 덮어쓰지 않는다');
+  assert.equal(same.hiddenFromPublishing, false);
+  assert.deepEqual(diff.valuesByMode[gcol.defaultModeId], { r: 0, g: 0, b: 1, a: 1 });
+  assert.equal(figma._state.variables.filter((v) => v.name === 'color/00ff00').length, 1, '다른 이름으로 새로 만들지 않는다');
+  // 쓰임 역할: 건너뛴 토큰은 빼고 — 재사용한 manual은 별칭 대상으로
+  const roles = await createUsageRoles(toks.filter((x) => !s.skippedManualNames.has(x.name)), false, s.globalOf);
+  assert.equal(roles >= 1, true);
+  const sem = figma._state.variables.filter((v) => figma._state.collections.find((c) => c.id === v.variableCollectionId)?.name === 'Semantic');
+  const targets = sem.map((v) => Object.values(v.valuesByMode)[0].id);
+  assert.ok(targets.includes(same.id));
+  assert.equal(targets.includes(diff.id), false);
+});
+
+test('직접 만든 변수 지키기 — prunePaletteColors는 지우지 않고, createSemanticAliases는 덮어쓰지 않고 건너뜀으로 센다', async () => {
+  const figma = installFigma();
+  await createTokens([
+    { name: 'color/blue/500', category: 'color', sources: ['fill'], value: '#3366ff' },
+    { name: 'color/blue/600', category: 'color', sources: ['fill'], value: '#2255ee' },
+  ], 16);
+  const gcol = figma._state.collections.find((c) => c.name === 'Global');
+  const manual = figma.variables.createVariable('color/blue/700', gcol, 'COLOR');
+  manual.setValueForMode(gcol.defaultModeId, hexToRgb('#1144dd'));
+  manual.setPluginData('dsl.manual', '1');
+  const removed = await prunePaletteColors(['color/blue/500']);
+  assert.equal(removed, 1, 'blue/600만 지움');
+  assert.ok(figma._state.variables.includes(manual));
+
+  await createSemanticAliases({ 'color/background/brand': 'color/blue/500' });
+  const scol = figma._state.collections.find((c) => c.name === 'Semantic');
+  const role = findVar(figma, 'Semantic', 'color/background/brand');
+  role.setPluginData('dsl.manual', '1');
+  role.setValueForMode(scol.defaultModeId, hexToRgb('#000000'));
+  const s = await createSemanticAliases({ 'color/background/brand': 'color/blue/500' });
+  assert.equal(s.skippedManual, 1);
+  assert.equal(s.aliased, 0);
+  assert.equal(rgbToHex(role.valuesByMode[scol.defaultModeId]), '#000000');
+});
+
+test('직접 만든 변수 지키기 — 다크: manual Semantic은 다시 걸지 않고, manual dark/ Global은 덮어쓰거나 새로 만들지 않는다 · 두 번 돌려도 변수 수 같음', async () => {
+  const f = darkFixture();
+  f.global.setPluginData('dsl.owned', 'global');
+  f.semantic.setPluginData('dsl.owned', 'semantic');
+  const white = f.mkGlobal('color/gray/0', '#ffffff');
+  const black = f.mkGlobal('color/gray/1000', '#000000');
+  const myDark = f.mkGlobal('dark/color/gray/0', '#ff00ff');
+  myDark.setPluginData('dsl.manual', '1');
+  const surface = f.mkSemantic('surface');
+  surface.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(white));
+  const fg = f.mkSemantic('fg');
+  fg.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(black));
+  const mine = f.mkSemantic('mine');
+  mine.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(black));
+  mine.setPluginData('dsl.manual', '1');
+
+  const r1 = await generateDarkMode(f.semantic.id, f.LIGHT, f.DARK);
+  assert.deepEqual(r1, { created: 1, realiased: 1, skipped: 2 });
+  const count = f.figma._state.variables.length;
+  assert.equal(f.gVal(myDark), '#ff00ff', 'manual dark/ 값 그대로');
+  assert.equal(surface.valuesByMode[f.DARK], undefined, '그 역할의 Dark 값은 지금대로');
+  assert.equal(mine.valuesByMode[f.DARK], undefined);
+  assert.equal(f.figma._state.variables.filter((v) => v.name.startsWith('dark/color/gray/0')).length, 1);
+  const r2 = await generateDarkMode(f.semantic.id, f.LIGHT, f.DARK);
+  assert.deepEqual(r2, { created: 0, realiased: 1, skipped: 2 });
+  assert.equal(f.figma._state.variables.length, count);
 });

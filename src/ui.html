@@ -723,6 +723,48 @@
     .vl-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; outline: none; }
     .vl-head .search-box:not([hidden]) { position: absolute; inset: 3px 4px; display: flex; gap: 4px; align-items: center; background: var(--surface); }
     .vl-head .search-box input { flex: 1 1 auto; min-width: 0; }
+    /* IA v4 §4.6 변수 탭 */
+    .list-head .search-box { flex: 1 1 auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
+    .list-head .search-box input { flex: 1 1 auto; min-width: 0; height: 26px; }
+    .vl-side.dim .vs-item[aria-selected="true"] { opacity: .5; }
+    .vt-group { display: flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; font-size: 10.5px; font-weight: 600; color: var(--text-2); cursor: default; white-space: nowrap; overflow: hidden; }
+    .vt-group .tw { width: 10px; flex: none; }
+    .vt-group .lb { overflow: hidden; text-overflow: ellipsis; }
+    .vt-group:hover { background: var(--surface-hover); }
+    .vp-line { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 8px 8px; }
+    .vp-item { cursor: pointer; outline: none; }
+    .vp-pill .vp-item { height: 24px; padding: 0 8px; display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 12px; font-family: var(--mono); font-size: 10.5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--surface); }
+    .vp-swatch .vp-item { height: 28px; padding: 0 8px 0 4px; display: inline-flex; align-items: center; gap: 6px; border-radius: 14px; font-size: 11px; }
+    .vp-swatch .vp-dot { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); flex: none; }
+    .vp-dot.vp-dot { display: inline-block; }
+    .vp-dot-wrap { display: contents; }
+    .vp-dot .vp-item, .vp-line.vp-dot { gap: 7px; }
+    .vp-line.vp-dot .vp-item { width: 24px; height: 24px; display: inline-flex; border-radius: 50%; }
+    .vp-line.vp-dot .vp-item .vp-dot { width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+    .vp-item:hover { background: var(--surface-hover); }
+    .vp-item:focus-visible { box-shadow: 0 0 0 1.5px var(--accent); }
+    .vp-item.menu-open { box-shadow: 0 0 0 1.5px var(--accent); }
+    .vt-row.vt-row { grid-template-columns: minmax(0, 1fr) 180px; }
+    .vt-row .vr-val { min-width: 0; display: flex; }
+    .vr-pill { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--surface-2); font-family: var(--mono); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vt-row.menu-open { background: var(--surface-hover); }
+    .vt-tip { position: fixed; z-index: 60; max-width: 300px; padding: 4px 8px; border-radius: 4px; background: #222; color: #fff; font-size: 11px; pointer-events: none; white-space: pre-wrap; }
+    .ed-titlewrap { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+    .ed-titlewrap > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ed-copy { border: 0; background: transparent; color: var(--accent); font-size: 11px; padding: 2px 4px; cursor: pointer; white-space: nowrap; }
+    .ed-copyname { margin-left: auto; font-weight: 400; }
+    .ed-css { display: flex; align-items: center; gap: 4px; }
+    .ed-css code { font-family: var(--mono); font-size: 10.5px; }
+    .ed-go { width: 26px; height: 26px; flex: none; }
+    .uses-head { margin-bottom: 4px; }
+    .ed-dl dd { position: relative; }
+    .ed-picker { position: absolute; left: 0; right: 0; z-index: 20; display: flex; flex-direction: column; margin-top: 0; }
+    .ed-pbody { flex: 1 1 auto; min-height: 0; overflow: auto; }
+    .ed-plink { flex: none; height: 24px; border: 0; border-top: 1px solid var(--border); background: var(--surface); color: var(--accent); text-align: left; padding: 0 8px; font-size: 11px; cursor: pointer; }
+    .ed-plink[hidden] { display: none; }
+    .ed-ptag { font-size: 10px; color: var(--muted); background: var(--surface-2); border-radius: 3px; padding: 0 4px; margin-left: 4px; }
+    .ed-type { height: 26px; }
+    button.danger { background: var(--danger, #d0342c); color: #fff; border-color: transparent; }
     .vt-path { min-height: 22px; display: flex; align-items: center; padding: 0 8px; font-size: 10px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .vt-path:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
     .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 130px 34px 24px; align-items: center; height: 28px; padding: 0 2px 0 8px; border-bottom: 1px solid var(--border); cursor: default; }
@@ -820,22 +862,17 @@
    <div class="vt-empty var-empty" id="varEmpty" style="display:none"><span data-i18n="v4.varEmpty">아직 변수가 없어요</span> · <button class="link link-btn" id="btnVarEmptyMake" type="button" data-i18n="v4.makeFromSel">선택에서 변수 만들기</button></div>
 
    <div id="varList" style="display:none">
+    <!-- IA v4 §4.6 머리 줄(고정): [🔍 변수 검색] · [모드 ▾] · [＋] · [⋯] -->
     <div class="list-head" id="listHead">
-      <span class="grow"></span>
-      <button class="icon-btn" id="btnAddVar" type="button" data-i18n-title="list.addTip" title="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)" data-i18n-aria-label="list.addTip" aria-label="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
+      <span class="search-box" id="searchBox"><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" data-i18n-aria-label="vm.search" aria-label="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" data-i18n-aria-label="list.searchClear" aria-label="검색 지우기" hidden>✕</button></span>
+      <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
+      <button class="icon-btn" id="btnAddVar" type="button" aria-haspopup="menu" data-i18n-title="list.addTip" title="추가" data-i18n-aria-label="list.addTip" aria-label="추가"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
       <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
     </div>
-    <!-- 결정 B(§4.4): 왼쪽 사이드바(★ Inspect · 컬렉션 › 그룹 · LIB · 삭제된 변수) + 오른쪽 목록 -->
+    <!-- 사이드바(로컬 컬렉션 listbox) + 오른쪽 목록(grid) -->
     <div class="vl-split">
-      <div class="vl-side" id="varSide" role="tree" data-i18n-aria-label="list.sideAria" aria-label="변수 컬렉션"></div>
+      <div class="vl-side" id="varSide" role="listbox" data-i18n-aria-label="list.sideAria" aria-label="변수 컬렉션"></div>
       <div class="vl-main">
-        <div class="vl-head" id="chipBar">
-          <b class="vl-title" id="varMainTitle" tabindex="-1"></b>
-          <span class="grow"></span>
-          <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
-          <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" data-i18n-aria-label="list.searchTip" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
-          <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" data-i18n-aria-label="list.searchClear" aria-label="검색 지우기">✕</button></span>
-        </div>
         <div class="var-tree" id="varTree" role="grid" data-i18n-aria-label="list.gridAria" aria-label="변수 목록"></div>
       </div>
     </div>
