@@ -723,6 +723,48 @@
     .vl-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; outline: none; }
     .vl-head .search-box:not([hidden]) { position: absolute; inset: 3px 4px; display: flex; gap: 4px; align-items: center; background: var(--surface); }
     .vl-head .search-box input { flex: 1 1 auto; min-width: 0; }
+    /* IA v4 §4.6 변수 탭 */
+    .list-head .search-box { flex: 1 1 auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
+    .list-head .search-box input { flex: 1 1 auto; min-width: 0; height: 26px; }
+    .vl-side.dim .vs-item[aria-selected="true"] { opacity: .5; }
+    .vt-group { display: flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; font-size: 10.5px; font-weight: 600; color: var(--text-2); cursor: default; white-space: nowrap; overflow: hidden; }
+    .vt-group .tw { width: 10px; flex: none; }
+    .vt-group .lb { overflow: hidden; text-overflow: ellipsis; }
+    .vt-group:hover { background: var(--surface-hover); }
+    .vp-line { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 8px 8px; }
+    .vp-item { cursor: pointer; outline: none; }
+    .vp-pill .vp-item { height: 24px; padding: 0 8px; display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 12px; font-family: var(--mono); font-size: 10.5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--surface); }
+    .vp-swatch .vp-item { height: 28px; padding: 0 8px 0 4px; display: inline-flex; align-items: center; gap: 6px; border-radius: 14px; font-size: 11px; }
+    .vp-swatch .vp-dot { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); flex: none; }
+    .vp-dot.vp-dot { display: inline-block; }
+    .vp-dot-wrap { display: contents; }
+    .vp-dot .vp-item, .vp-line.vp-dot { gap: 7px; }
+    .vp-line.vp-dot .vp-item { width: 24px; height: 24px; display: inline-flex; border-radius: 50%; }
+    .vp-line.vp-dot .vp-item .vp-dot { width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+    .vp-item:hover { background: var(--surface-hover); }
+    .vp-item:focus-visible { box-shadow: 0 0 0 1.5px var(--accent); }
+    .vp-item.menu-open { box-shadow: 0 0 0 1.5px var(--accent); }
+    .vt-row.vt-row { grid-template-columns: minmax(0, 1fr) 180px; }
+    .vt-row .vr-val { min-width: 0; display: flex; }
+    .vr-pill { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--surface-2); font-family: var(--mono); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vt-row.menu-open { background: var(--surface-hover); }
+    .vt-tip { position: fixed; z-index: 60; max-width: 300px; padding: 4px 8px; border-radius: 4px; background: #222; color: #fff; font-size: 11px; pointer-events: none; white-space: pre-wrap; }
+    .ed-titlewrap { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+    .ed-titlewrap > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ed-copy { border: 0; background: transparent; color: var(--accent); font-size: 11px; padding: 2px 4px; cursor: pointer; white-space: nowrap; }
+    .ed-copyname { margin-left: auto; font-weight: 400; }
+    .ed-css { display: flex; align-items: center; gap: 4px; }
+    .ed-css code { font-family: var(--mono); font-size: 10.5px; }
+    .ed-go { width: 26px; height: 26px; flex: none; }
+    .uses-head { margin-bottom: 4px; }
+    .ed-dl dd { position: relative; }
+    .ed-picker { position: absolute; left: 0; right: 0; z-index: 20; display: flex; flex-direction: column; margin-top: 0; }
+    .ed-pbody { flex: 1 1 auto; min-height: 0; overflow: auto; }
+    .ed-plink { flex: none; height: 24px; border: 0; border-top: 1px solid var(--border); background: var(--surface); color: var(--accent); text-align: left; padding: 0 8px; font-size: 11px; cursor: pointer; }
+    .ed-plink[hidden] { display: none; }
+    .ed-ptag { font-size: 10px; color: var(--muted); background: var(--surface-2); border-radius: 3px; padding: 0 4px; margin-left: 4px; }
+    .ed-type { height: 26px; }
+    button.danger { background: var(--danger, #d0342c); color: #fff; border-color: transparent; }
     .vt-path { min-height: 22px; display: flex; align-items: center; padding: 0 8px; font-size: 10px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .vt-path:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
     .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 130px 34px 24px; align-items: center; height: 28px; padding: 0 2px 0 8px; border-bottom: 1px solid var(--border); cursor: default; }
@@ -820,22 +862,17 @@
    <div class="vt-empty var-empty" id="varEmpty" style="display:none"><span data-i18n="v4.varEmpty">아직 변수가 없어요</span> · <button class="link link-btn" id="btnVarEmptyMake" type="button" data-i18n="v4.makeFromSel">선택에서 변수 만들기</button></div>
 
    <div id="varList" style="display:none">
+    <!-- IA v4 §4.6 머리 줄(고정): [🔍 변수 검색] · [모드 ▾] · [＋] · [⋯] -->
     <div class="list-head" id="listHead">
-      <span class="grow"></span>
-      <button class="icon-btn" id="btnAddVar" type="button" data-i18n-title="list.addTip" title="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)" data-i18n-aria-label="list.addTip" aria-label="선택한 프레임에서 변수 만들기(색·토큰·테마·타이포)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
+      <span class="search-box" id="searchBox"><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" data-i18n-aria-label="vm.search" aria-label="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" data-i18n-aria-label="list.searchClear" aria-label="검색 지우기" hidden>✕</button></span>
+      <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
+      <button class="icon-btn" id="btnAddVar" type="button" aria-haspopup="menu" data-i18n-title="list.addTip" title="추가" data-i18n-aria-label="list.addTip" aria-label="추가"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
       <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
     </div>
-    <!-- 결정 B(§4.4): 왼쪽 사이드바(★ Inspect · 컬렉션 › 그룹 · LIB · 삭제된 변수) + 오른쪽 목록 -->
+    <!-- 사이드바(로컬 컬렉션 listbox) + 오른쪽 목록(grid) -->
     <div class="vl-split">
-      <div class="vl-side" id="varSide" role="tree" data-i18n-aria-label="list.sideAria" aria-label="변수 컬렉션"></div>
+      <div class="vl-side" id="varSide" role="listbox" data-i18n-aria-label="list.sideAria" aria-label="변수 컬렉션"></div>
       <div class="vl-main">
-        <div class="vl-head" id="chipBar">
-          <b class="vl-title" id="varMainTitle" tabindex="-1"></b>
-          <span class="grow"></span>
-          <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
-          <button class="icon-btn" id="btnSearch" type="button" data-i18n-title="list.searchTip" title="검색" data-i18n-aria-label="list.searchTip" aria-label="검색"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="5" cy="5" r="3.5"/><path d="M7.7 7.7 10.5 10.5"/></svg></button>
-          <span class="search-box" id="searchBox" hidden><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" data-i18n-aria-label="list.searchClear" aria-label="검색 지우기">✕</button></span>
-        </div>
         <div class="var-tree" id="varTree" role="grid" data-i18n-aria-label="list.gridAria" aria-label="변수 목록"></div>
       </div>
     </div>
@@ -1406,25 +1443,84 @@
     "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
+    "v4.colEmpty": "\uC774 \uCEEC\uB809\uC158\uC5D4 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "apply.done": "\uB808\uC774\uC5B4 {n}\uAC1C\uC5D0 {name} \uC5F0\uACB0",
+    "apply.skipped": " \xB7 {m}\uAC1C\uB294 \uB9DE\uC9C0 \uC54A\uC544 \uAC74\uB108\uB700",
+    "apply.undo": " \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "apply.none": "\uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0 {name}\uC744 \uBD99\uC77C \uACF3\uC774 \uC5C6\uC5B4\uC694",
+    "apply.otherKind": "\uC774 \uBCC0\uC218\uB294 \uBD99\uC77C \uC18D\uC131\uC744 \uC815\uD560 \uC218 \uC5C6\uC5B4\uC694",
+    "apply.failed": "\uC5F0\uACB0\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "apply.elsewhere": "\uB2E4\uB978 \uACF3\uC5D0 \uC5F0\uACB0",
+    "apply.notInScope": "\uC774 \uBCC0\uC218\uC758 \uC6A9\uB3C4\uC5D0 \uC5C6\uC5B4\uC694",
+    "apply.t.fill": "\uCC44\uC6C0",
+    "apply.t.stroke": "\uC120 \uC0C9",
+    "apply.t.text": "\uAE00\uC790 \uC0C9",
+    "apply.t.shadow": "\uADF8\uB9BC\uC790 \uC0C9",
+    "apply.t.gap": "\uAC04\uACA9",
+    "apply.t.padding": "\uC548\uCABD \uC5EC\uBC31(4\uBC29\uD5A5)",
+    "apply.t.padding-top": "\uC704",
+    "apply.t.padding-bottom": "\uC544\uB798",
+    "apply.t.padding-left": "\uC67C\uCABD",
+    "apply.t.padding-right": "\uC624\uB978\uCABD",
+    "apply.t.radius": "\uBAA8\uC11C\uB9AC 4\uACF3",
+    "apply.t.radius-tl": "\uC67C\uCABD \uC704",
+    "apply.t.radius-tr": "\uC624\uB978\uCABD \uC704",
+    "apply.t.radius-bl": "\uC67C\uCABD \uC544\uB798",
+    "apply.t.radius-br": "\uC624\uB978\uCABD \uC544\uB798",
+    "apply.reason.no-scope": "\uC6A9\uB3C4\uC5D0 \uB9DE\uB294 \uC18D\uC131\uC774 \uC5C6\uC74C",
+    "apply.reason.no-prop": "\uADF8 \uC18D\uC131\uC774 \uC5C6\uB294 \uB808\uC774\uC5B4",
+    "apply.reason.not-autolayout": "\uC624\uD1A0 \uB808\uC774\uC544\uC6C3 \uC544\uB2D8",
+    "apply.reason.no-stroke": "\uBCF4\uC774\uB294 \uC120 \uC5C6\uC74C",
+    "apply.reason.no-shadow": "\uADF8\uB9BC\uC790 \uC5C6\uC74C",
+    "apply.reason.font": "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD568",
+    "apply.reason.empty-text": "\uBE48 \uAE00\uC790",
+    "apply.reason.other-kind": "\uBD99\uC77C \uC18D\uC131\uC744 \uC815\uD560 \uC218 \uC5C6\uC74C",
+    "apply.reason.error": "\uD53C\uADF8\uB9C8\uAC00 \uAC70\uC808\uD568",
+    "vm.duplicate": "\uBCF5\uC81C",
+    "vm.delete": "\uC0AD\uC81C",
+    "vm.copiedShort": "\uBCF5\uC0AC\uB428",
+    "vm.copyFailedShort": "\uBCF5\uC0AC \uBABB \uD568",
+    "list.colorGrid": "\uC0C9 \uACA9\uC790\uB85C \uBCF4\uAE30",
+    "list.colorList": "\uC0C9 \uBAA9\uB85D\uC73C\uB85C \uBCF4\uAE30",
+    "list.addNew": "\uC0C8 \uBCC0\uC218",
+    "list.addFromSel": "\uC120\uD0DD\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30\u2026",
+    "list.addDark": "\uB2E4\uD06C \uBAA8\uB4DC \uB9CC\uB4E4\uAE30\u2026",
+    "list.addTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB9CC\uB4E4\uAE30\u2026",
+    "newVar.type": "\uD0C0\uC785",
+    "newVar.tColor": "\uC0C9",
+    "newVar.tNumber": "\uC22B\uC790",
+    "newVar.tString": "\uAE00\uC790",
+    "newVar.tBool": "\uCC38\uAC70\uC9D3",
+    "newVar.create": "\uB9CC\uB4E4\uAE30",
+    "newVar.creating": "\uB9CC\uB4DC\uB294 \uC911\u2026",
+    "newVar.created": "\uBCC0\uC218\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "newVar.failed": "\uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "newVar.dupFailed": "\uBCF5\uC81C\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "newVar.newCollection": "Variables (\uC0C8\uB85C \uB9CC\uB4E6)",
+    "newVar.freeLimit": "\uBB34\uB8CC\uB85C\uB294 {n}\uAC1C\uAE4C\uC9C0 \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694",
+    "del.title": "{name} \uBCC0\uC218\uB97C \uC9C0\uC6B8\uAE4C\uC694?",
+    "del.aliases": "\uC774 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 {m}\uAC1C\uB294 '\uC0AD\uC81C\uB41C \uBCC0\uC218'\uB97C \uAC00\uB9AC\uD0A4\uAC8C \uB3FC\uC694",
+    "del.layers": "\uC5F0\uACB0\uB41C \uB808\uC774\uC5B4 \xB7 \uC2A4\uD0C0\uC77C\uC740 '\uC0AD\uC81C\uB41C \uBCC0\uC218'\uAC00 \uB3FC\uC694",
+    "del.confirm": "\uC0AD\uC81C",
+    "del.done": "\uBCC0\uC218\uB97C \uC9C0\uC6E0\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "del.failed": "\uC9C0\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "detail.selectAll": "\uBAA8\uB450 \uC120\uD0DD",
+    "detail.usesNoSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC5D0\uC11C \uCC3E\uC544\uC694",
+    "edit.goTarget": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uB85C",
+    "edit.pickShowOther": "\uC6A9\uB3C4\uAC00 \uB2E4\uB978 \uBCC0\uC218\uB3C4 \uBCF4\uAE30 ({n}\uAC1C)",
+    "edit.pickShowFit": "\uC6A9\uB3C4\uAC00 \uB9DE\uB294 \uBCC0\uC218\uB9CC \uBCF4\uAE30",
+    "edit.pickOtherScope": "\uC6A9\uB3C4 \uB2E4\uB984",
+    "op.applyVar": "\uD074\uB9AD \uC5F0\uACB0",
+    "op.createVar": "\uC0C8 \uBCC0\uC218",
+    "op.dupVar": "\uBCF5\uC81C",
+    "op.delVar": "\uC0AD\uC81C",
+    "create.sumManual": " \xB7 \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {n}",
     "common.close": "\uB2EB\uAE30",
     // 변수 관리(넓은 화면)
     "vm.search": "\uBCC0\uC218 \uAC80\uC0C9",
-    "vm.uses": "{n}\uACF3",
-    "vm.moreTip": "\uBA54\uB274 (\uC6B0\uD074\uB9AD\uACFC \uAC19\uC74C)",
-    "vm.jumpAlias": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uB85C \uC774\uB3D9",
-    "vm.noVars": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694.",
     "vm.copyName": "\uC774\uB984 \uBCF5\uC0AC",
-    "vm.copyValue": "\uAC12 \uBCF5\uC0AC",
     "vm.copyCss": "CSS \uBCC0\uC218\uBA85 \uBCF5\uC0AC",
-    "vm.whatName": "\uC774\uB984",
-    "vm.whatValue": "\uAC12",
-    "vm.whatCss": "CSS \uBCC0\uC218\uBA85",
-    "vm.copied": "{what}\uC744(\uB97C) \uBCF5\uC0AC\uD588\uC5B4\uC694: {text}",
-    "vm.copyFailed": "\uBCF5\uC0AC\uAC00 \uB9C9\uD614\uC5B4\uC694 \u2014 \uC9C1\uC811 \uBCF5\uC0AC\uD558\uC138\uC694: {text}",
-    "vm.copyEmpty": "\uBCF5\uC0AC\uD560 \uAC12\uC774 \uC5C6\uC5B4\uC694.",
-    "vm.selectLayers": "\uC0AC\uC6A9 \uB808\uC774\uC5B4 \uC120\uD0DD",
     "vm.detail": "\uC0C1\uC138",
-    "vm.edit": "\uACE0\uCE58\uAE30\u2026",
     // 변수 고치기(§4.4 고치기, PR 3.5)
     "edit.name": "\uC774\uB984",
     "edit.nameAria": "\uC774\uB984(\uC804\uCCB4 \uACBD\uB85C)",
@@ -1438,8 +1534,8 @@
     "edit.conflict": "\uB2E4\uB978 \uACF3\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uB2EB\uACE0 \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694",
     "edit.maybeSaved": "\uC800\uC7A5\uB410\uC744 \uC218 \uC788\uC5B4\uC694 \xB7 \uB2EB\uACE0 \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694",
     "edit.partial": "\uC77C\uBD80\uB9CC \uC800\uC7A5\uB410\uC5B4\uC694",
-    "edit.closedMissing": "{name} \uD589\uC740 \uC9C0\uAE08 \uACE0\uB978 \uBAA9\uB85D\uC5D0 \uC5C6\uC5B4\uC694",
-    "edit.closedPartialMissing": "\uC77C\uBD80\uB9CC \uC800\uC7A5\uB410\uC5B4\uC694 \xB7 {name} \uD589\uC740 \uC9C0\uAE08 \uACE0\uB978 \uBAA9\uB85D\uC5D0 \uC5C6\uC5B4\uC694",
+    "edit.closedMissing": "{name}\uC740 \uC9C0\uAE08 \uBAA9\uB85D\uC5D0 \uBCF4\uC774\uC9C0 \uC54A\uC544\uC694",
+    "edit.closedPartialMissing": "\uC77C\uBD80\uB9CC \uC800\uC7A5\uB410\uC5B4\uC694 \xB7 {name}\uC740 \uC9C0\uAE08 \uBAA9\uB85D\uC5D0 \uBCF4\uC774\uC9C0 \uC54A\uC544\uC694",
     "edit.nameEmptySeg": "\uC774\uB984\uC758 '/' \uC0AC\uC774\uAC00 \uBE44\uC5B4 \uC788\uC5B4\uC694",
     "edit.nameDup": "\uC774 \uCEEC\uB809\uC158\uC5D0 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4\uC694",
     "edit.nameRejected": "\uD53C\uADF8\uB9C8\uAC00 \uC774 \uC774\uB984\uC744 \uBC1B\uC9C0 \uC54A\uC544\uC694",
@@ -1515,41 +1611,22 @@
     "wizard.freeSumBound": "\uC5F0\uACB0 {b}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
     "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total}",
-    "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
-    "list.addTip": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30(\uC0C9\xB7\uD1A0\uD070\xB7\uD14C\uB9C8\xB7\uD0C0\uC774\uD3EC)",
+    "list.addTip": "\uCD94\uAC00",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
     "list.modeTip": "\uBAA8\uB4DC",
     "list.modeDefault": "\uAE30\uBCF8 \uBAA8\uB4DC",
-    "list.searchTip": "\uAC80\uC0C9",
-    "list.reading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 \uC77D\uB294 \uC911\u2026",
     "list.big": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC544\uC694",
     "list.read": "\uC77D\uAE30",
-    "list.wizardWait": "\uB9C8\uBC95\uC0AC\uAC00 \uB05D\uB098\uBA74 \uC77D\uC5B4\uC694",
-    "list.noneUsed": "\uC774 \uC120\uD0DD\uC740 \uB85C\uCEEC \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694",
-    "list.inspect": "\u2605 Inspect",
-    "list.inspectNoSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5EC\uAE30\uC5D0 \uBAA8\uC5EC\uC694",
-    "list.libItem": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
-    "list.deletedItem": "\uC0AD\uC81C\uB41C \uBCC0\uC218",
     "list.sideColAria": "{name}, \uACC4\uCE35 {badge}, {num}",
-    "list.searchTitle": "'{q}' \uAC80\uC0C9 \uACB0\uACFC",
     "list.noGroup": "(\uADF8\uB8F9 \uC5C6\uC74C)",
     "list.rebase": "\uAE30\uC900 \uBC14\uAFB8\uAE30",
-    "list.unused": "\uC548 \uC500",
-    "list.indirect": "\u21B3",
-    "list.indirectTip": "\uC9C1\uC811 \uBD99\uC5B4 \uC788\uC9C4 \uC54A\uACE0, {alias} \uAC19\uC740 \uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC5EC\uC694",
-    "list.usesTip": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3",
-    "list.hiddenRow": "\uC120\uD0DD\uC5D0\uC11C \uC548 \uC4F0\uC5EC \uBAA9\uB85D\uC5D0\uC11C \uBE60\uC84C\uC5B4\uC694",
     "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
     "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
     "list.libCollection": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \xB7 {name}",
     "list.libManaged": "\uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
-    "list.deleted": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB41C \uACF3 {n}\uAC1C",
-    "list.select": "\uC120\uD0DD",
-    "list.jumped": "{name} \uD589\uC73C\uB85C \uC62E\uACBC\uC5B4\uC694",
+    "list.jumped": "{name}(\uC73C)\uB85C \uC62E\uACBC\uC5B4\uC694",
     "list.undo": "\u2190 \uB418\uB3CC\uB9AC\uAE30",
-    "list.selectFirstNote": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC5D0\uC11C \uCC3E\uC544\uC694",
-    "list.selectViaAlias": "\uBCC4\uCE6D\uC73C\uB85C \uC4F0\uB294 \uB808\uC774\uC5B4 \uC120\uD0DD",
     "select.capped": "\uB808\uC774\uC5B4 {found}\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694(\uC804\uCCB4 {requested}\uAC1C)",
     "select.none": "\uC120\uD0DD\uD560 \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
     "select.partial": "\uB808\uC774\uC5B4 {found}\uAC1C \uC120\uD0DD \u2014 {missing}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
@@ -1557,9 +1634,7 @@
     "list.dUses": "\uC4F0\uC778 \uACF3",
     "list.detailBig": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uCC3E\uC9C0 \uC54A\uC544\uC694",
     "list.find": "\uCC3E\uAE30",
-    "list.usesHead": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3 \xB7 \uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
     "list.usesMore": "\uC678 {n}\uAC1C",
-    "list.viaAlias": "\uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC784: {names}",
     "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
     "list.menuExpandAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uD3BC\uCE58\uAE30",
     "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
@@ -2575,6 +2650,140 @@
     }
   }
 
+  // src/lib/varKind.ts
+  var VAR_KIND_ORDER = ["gap", "radius", "size", "stroke", "opacity", "color", "text", "other"];
+  var FIRST_FLOAT = {
+    spacing: "gap",
+    radius: "radius",
+    size: "size",
+    "stroke-width": "stroke",
+    opacity: "opacity",
+    "font-size": "text",
+    "line-height": "text",
+    "letter-spacing": "text"
+  };
+  var DIRS = ["top", "right", "bottom", "left"];
+  var CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"];
+  function lastFloatKind(seg) {
+    if (["gap", "row-gap", "column-gap", "spacing", "padding", "padding-x", "padding-y"].includes(seg)) return "gap";
+    if (DIRS.some((d) => seg === `padding-${d}`)) return "gap";
+    if (seg === "radius" || CORNERS.some((c) => seg === `radius-${c}`)) return "radius";
+    if (["size", "width", "height"].includes(seg)) return "size";
+    if (seg === "stroke-width" || DIRS.some((d) => seg === `stroke-width-${d}`)) return "stroke";
+    if (seg === "opacity") return "opacity";
+    if (["font-size", "line-height", "letter-spacing"].includes(seg)) return "text";
+    return null;
+  }
+  var SCOPE_KIND = {
+    GAP: "gap",
+    CORNER_RADIUS: "radius",
+    WIDTH_HEIGHT: "size",
+    STROKE_FLOAT: "stroke",
+    OPACITY: "opacity",
+    FONT_SIZE: "text",
+    LINE_HEIGHT: "text",
+    LETTER_SPACING: "text",
+    FONT_FAMILY: "text"
+  };
+  function varKind(v) {
+    var _a, _b, _c;
+    if (v.type === "COLOR") return "color";
+    if (v.type === "BOOLEAN") return "other";
+    const segs = v.name.split("/").map((s) => s.trim().toLowerCase());
+    const first = (_a = segs[0]) != null ? _a : "";
+    const last = (_b = segs[segs.length - 1]) != null ? _b : "";
+    if (v.type === "FLOAT" && FIRST_FLOAT[first]) return FIRST_FLOAT[first];
+    if (v.type === "STRING" && first === "font-family") return "text";
+    if (v.type === "FLOAT") {
+      const k = lastFloatKind(last);
+      if (k) return k;
+    }
+    if (v.type === "STRING" && last === "font-family") return "text";
+    if (v.type === "FLOAT" || v.type === "STRING") {
+      const kinds = new Set(((_c = v.scopes) != null ? _c : []).map((s) => SCOPE_KIND[s]).filter(Boolean));
+      if (kinds.size === 1) return [...kinds][0];
+    }
+    return "other";
+  }
+  function textScope(name) {
+    const segs = name.split("/").map((s) => s.trim().toLowerCase());
+    for (const s of [segs[segs.length - 1], segs[0]]) {
+      if (s === "font-size") return "FONT_SIZE";
+      if (s === "line-height") return "LINE_HEIGHT";
+      if (s === "letter-spacing") return "LETTER_SPACING";
+      if (s === "font-family") return "FONT_FAMILY";
+    }
+    return null;
+  }
+  function scopesForNew(name, type) {
+    const k = varKind({ name, type });
+    switch (k) {
+      case "gap":
+        return ["GAP"];
+      case "radius":
+        return ["CORNER_RADIUS"];
+      case "size":
+        return ["WIDTH_HEIGHT"];
+      case "stroke":
+        return ["STROKE_FLOAT"];
+      case "opacity":
+        return ["OPACITY"];
+      case "color":
+        return ["ALL_FILLS", "STROKE_COLOR", "EFFECT_COLOR"];
+      case "text": {
+        const s = textScope(name);
+        return s ? [s] : void 0;
+      }
+      default:
+        return void 0;
+    }
+  }
+  var FILL_SUB = ["FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"];
+  function expand(scopes) {
+    const out = /* @__PURE__ */ new Set();
+    for (const s of scopes) {
+      if (s === "ALL_FILLS") FILL_SUB.forEach((x) => out.add(x));
+      else out.add(s);
+    }
+    return out;
+  }
+  function scopeFits(selfScopes, candScopes) {
+    if (!selfScopes.length || selfScopes.includes("ALL_SCOPES")) return true;
+    if (candScopes.includes("ALL_SCOPES")) return true;
+    if (!candScopes.length) return false;
+    const a = expand(selfScopes);
+    for (const s of expand(candScopes)) if (a.has(s)) return true;
+    return false;
+  }
+  var APPLY_TARGETS = {
+    color: ["fill", "stroke", "text", "shadow"],
+    gap: ["gap", "padding", "padding-top", "padding-bottom", "padding-left", "padding-right"],
+    radius: ["radius", "radius-tl", "radius-tr", "radius-bl", "radius-br"]
+  };
+  var TARGET_SCOPES = {
+    fill: ["FRAME_FILL", "SHAPE_FILL"],
+    text: ["TEXT_FILL"],
+    stroke: ["STROKE_COLOR"],
+    shadow: ["EFFECT_COLOR"],
+    gap: ["GAP"],
+    padding: ["GAP"],
+    "padding-top": ["GAP"],
+    "padding-right": ["GAP"],
+    "padding-bottom": ["GAP"],
+    "padding-left": ["GAP"],
+    radius: ["CORNER_RADIUS"],
+    "radius-tl": ["CORNER_RADIUS"],
+    "radius-tr": ["CORNER_RADIUS"],
+    "radius-bl": ["CORNER_RADIUS"],
+    "radius-br": ["CORNER_RADIUS"]
+  };
+  function targetAllowed(scopes, target) {
+    if (scopes.includes("ALL_SCOPES")) return true;
+    const ex = expand(scopes);
+    return TARGET_SCOPES[target].some((s) => ex.has(s));
+  }
+  var FREE_MANUAL_CREATE_LIMIT = 20;
+
   // src/lib/varTable.ts
   function groupPath(name) {
     const i = name.lastIndexOf("/");
@@ -2583,17 +2792,6 @@
   function leafName(name) {
     const i = name.lastIndexOf("/");
     return i < 0 ? name : name.slice(i + 1);
-  }
-  function cellCopyText(cell) {
-    if (!cell) return "";
-    switch (cell.kind) {
-      case "color":
-        return cell.hex.toUpperCase();
-      case "alias":
-        return cell.aliasName;
-      default:
-        return cell.text;
-    }
   }
   function tierBadge(c) {
     if (c.tier === 1) return "G";
@@ -2621,39 +2819,6 @@
   function matchesQuery(name, query2) {
     const q = query2.trim().toLowerCase();
     return !q || name.toLowerCase().includes(q);
-  }
-  function indirectUsage(direct, aliasTargets, maxDepth = 5) {
-    var _a, _b;
-    const out = /* @__PURE__ */ new Map();
-    for (const start of direct) {
-      let frontier = [start];
-      const seen = /* @__PURE__ */ new Set([start]);
-      for (let d = 0; d < maxDepth && frontier.length; d++) {
-        const next = [];
-        for (const id of frontier) {
-          for (const t2 of (_a = aliasTargets.get(id)) != null ? _a : []) {
-            if (seen.has(t2)) continue;
-            seen.add(t2);
-            next.push(t2);
-            if (!direct.has(t2)) {
-              const via = (_b = out.get(t2)) != null ? _b : [];
-              if (!via.includes(start)) via.push(start);
-              out.set(t2, via);
-            }
-          }
-        }
-        frontier = next;
-      }
-    }
-    return out;
-  }
-  function aliasTargetsOf(vars) {
-    const m = /* @__PURE__ */ new Map();
-    for (const v of vars) {
-      const ids = Object.values(v.values).filter((c) => c.kind === "alias").map((c) => c.aliasId);
-      if (ids.length) m.set(v.id, [...new Set(ids)]);
-    }
-    return m;
   }
   var sideSelKey = (s) => s.kind === "col" ? `col:${s.id}` : s.kind === "grp" ? `grp:${s.key}` : s.kind;
   function rowState(id, direct, indirect) {
@@ -2689,39 +2854,6 @@
       });
       return __spreadValues({ collection: c, groups }, countOf(cv, direct, indirect));
     });
-  }
-  function rightEntries(sel, cols, vars, direct, indirect, query2 = "") {
-    const out = [];
-    const rank = (s) => s === "direct" || s === "indirect" ? 0 : 1;
-    const pushGroups = (side, filter, withPath, usedOnly) => {
-      const badge = tierBadge(side.collection);
-      for (const g of side.groups) {
-        const rows = vars.filter((v) => v.collectionId === side.collection.id && groupKey(v.collectionId, v.name) === g.key && filter(v)).map((v) => ({ v, state: rowState(v.id, direct, indirect) })).filter((r) => !usedOnly || rank(r.state) === 0);
-        if (!rows.length) continue;
-        rows.sort((a, b) => rank(a.state) - rank(b.state));
-        if (withPath !== "none") {
-          const label = withPath === "full" ? `${badge} ${side.collection.name} \u203A ${g.label}` : g.label;
-          out.push({ kind: "path", label, collectionId: side.collection.id });
-        }
-        for (const r of rows) out.push(__spreadValues({ kind: "row" }, r));
-      }
-    };
-    const sides = sidebarCollections(cols, vars, direct, indirect);
-    if (query2.trim()) {
-      for (const side of sides) pushGroups(side, (v) => matchesQuery(v.name, query2), "full", false);
-      return out;
-    }
-    if (sel.kind === "inspect") {
-      if (!direct) return out;
-      for (const side of sides) pushGroups(side, () => true, "full", true);
-    } else if (sel.kind === "col") {
-      const side = sides.find((s) => s.collection.id === sel.id);
-      if (side) pushGroups(side, () => true, "path", false);
-    } else if (sel.kind === "grp") {
-      const side = sides.find((s) => s.groups.some((g) => g.key === sel.key));
-      if (side) pushGroups(__spreadProps(__spreadValues({}, side), { groups: side.groups.filter((g) => g.key === sel.key) }), () => true, "none", false);
-    }
-    return out;
   }
   function normalizeVarName(name) {
     return name.trim().split("/").map((s) => s.trim()).join("/");
@@ -2828,6 +2960,34 @@
       }
     }
     return { global: false, allTiers: tier === 0, groups };
+  }
+  function paletteGroups(cols, vars, colId, query2 = "") {
+    const q = query2.trim();
+    const order = q ? sidebarCollections(cols, vars, null, /* @__PURE__ */ new Set()).map((s) => s.collection) : cols.filter((c) => c.id === colId);
+    const out = [];
+    for (const col of order) {
+      const rows = vars.filter((v) => v.collectionId === col.id && (!q || matchesQuery(v.name, q)));
+      const byPath = /* @__PURE__ */ new Map();
+      for (const v of rows) {
+        const i = v.name.lastIndexOf("/");
+        const path = i < 0 ? "" : v.name.slice(0, i);
+        const arr = byPath.get(path);
+        if (arr) arr.push(v);
+        else byPath.set(path, [v]);
+      }
+      const groups = [...byPath.entries()].map(([path, rs], idx) => ({ path, rs, idx, kind: varKind(rs[0]) }));
+      groups.sort((a, b) => {
+        if (a.path === "" !== (b.path === "")) return a.path === "" ? -1 : 1;
+        const k = VAR_KIND_ORDER.indexOf(a.kind) - VAR_KIND_ORDER.indexOf(b.kind);
+        return k || a.idx - b.idx;
+      });
+      const badge = tierBadge(col);
+      for (const g of groups) {
+        const label = q ? `${badge} ${col.name}${g.path ? ` \u203A ${g.path}` : ""}` : g.path;
+        out.push({ key: `${col.id}|${g.path}`, label, collectionId: col.id, head: q ? true : g.path !== "", kind: g.kind, rows: g.rs });
+      }
+    }
+    return out;
   }
 
   // src/lib/reread.ts
@@ -5081,6 +5241,18 @@
       case "VARIABLE_UPDATED":
         onVariableUpdated(msg);
         break;
+      case "VARIABLE_APPLIED":
+        onVariableApplied(msg);
+        break;
+      case "VARIABLE_CREATED":
+        onVariableCreated(msg);
+        break;
+      case "VARIABLE_DUPLICATED":
+        onVariableDuplicated(msg);
+        break;
+      case "VARIABLE_DELETED":
+        onVariableDeleted(msg);
+        break;
       case "SELECT_RESULT":
         if (selectStatusTarget === "list") {
           if (msg.capped) showStatusLine(t("select.capped", { found: msg.found, requested: msg.requested }), { cls: "warn" });
@@ -5100,7 +5272,7 @@
       case "SEMANTICS_RESULT":
         setStatus(
           semStatusTarget,
-          (semStatusPrefix ? `${semStatusPrefix} \xB7 ` : "") + t("semantic.result", { aliased: msg.aliased, created: msg.created, updated: msg.updated }) + (msg.missing.length ? t("semantic.missing", { names: msg.missing.join(", ") }) : ""),
+          (semStatusPrefix ? `${semStatusPrefix} \xB7 ` : "") + t("semantic.result", { aliased: msg.aliased, created: msg.created, updated: msg.updated }) + (msg.missing.length ? t("semantic.missing", { names: msg.missing.join(", ") }) : "") + (msg.skippedManual ? t("create.sumManual", { n: msg.skippedManual }) : ""),
           msg.missing.length ? "warn" : "ok"
         );
         semStatusPrefix = "";
@@ -5152,6 +5324,7 @@
       case "PREREQ_STATE":
         prereqKnown = true;
         prereqInFlight = false;
+        if (typeof msg.manualUsed === "number") manualUsed = msg.manualUsed;
         reentry.release();
         hasColorVars = msg.hasColorVars;
         hasScaleVars = msg.hasScaleVars;
@@ -5307,6 +5480,7 @@
       case "ERROR": {
         if (msg.op === "UPDATE_VARIABLE" || msg.op === "GET_VAR_TABLE") edMaybeSaved();
         if (msg.op === "UPDATE_VARIABLE") break;
+        if (onVarOpError(msg)) break;
         if (msg.op === "PREVIEW_TEXT_STYLES") {
           if (bindTsPending) {
             bindTsPending = false;
@@ -6209,7 +6383,8 @@
       statusTimer = null;
     }
     txt.textContent = text;
-    txt.title = text;
+    txt.title = opts.tip ? `${text}
+${opts.tip}` : text;
     line.className = `status-line ${(_a = opts.cls) != null ? _a : ""}`.trim();
     if (opts.action) {
       btn.textContent = opts.action.label;
@@ -6414,6 +6589,11 @@
     CREATE_TEXT_STYLES: { results: ["TEXT_STYLES_RESULT"], label: "op.textStyles", go: () => showMake("type"), write: true },
     APPLY: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: false },
     APPLY_SELECTED: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: true },
+    // IA v4 §4.6 쓰기 잠금 — 클릭 연결 · 새 변수 · 복제 · 삭제
+    APPLY_VARIABLE: { results: ["VARIABLE_APPLIED"], label: "op.applyVar", go: () => showTab("variables"), write: true },
+    CREATE_VARIABLE: { results: ["VARIABLE_CREATED"], label: "op.createVar", go: () => showTab("variables"), write: true },
+    DUPLICATE_VARIABLE: { results: ["VARIABLE_DUPLICATED"], label: "op.dupVar", go: () => showTab("variables"), write: true },
+    DELETE_VARIABLE: { results: ["VARIABLE_DELETED"], label: "op.delVar", go: () => showTab("variables"), write: true },
     RENAME: { results: ["RENAME_RESULT"], label: "op.rename", go: goLayer("rename"), write: false },
     RENAME_APPLY: { results: ["RENAME_RESULT"], label: "op.rename", go: goLayer("rename"), write: true },
     SCAN_COMPONENT_CANDIDATES: { results: ["COMPONENT_CANDIDATES"], label: "op.components", go: goLayer("structure"), write: false },
@@ -6460,9 +6640,12 @@
     for (const [type, def] of opPending) if (type !== "APPLY_SELECTED" && def.write) return t(def.label);
     return null;
   }
+  var VAR_WRITE_OPS = ["APPLY_VARIABLE", "CREATE_VARIABLE", "DUPLICATE_VARIABLE", "DELETE_VARIABLE"];
   function renderWaitLocks() {
     const link = bindLinking ? t("bind.waitLink") : null;
-    for (const id of WAIT_LINK_IDS) setWait($(id), link);
+    const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
+    const varLock = varOp ? t("bind.waitOp", { op: t(opPending.get(varOp).label) }) : null;
+    for (const id of WAIT_LINK_IDS) setWait($(id), link != null ? link : varLock);
     const other = link ? null : otherWriteOp();
     const wiz = opWizard || wizardRunning ? t("bind.waitOp", { op: t("op.wizard") }) : null;
     for (const id of WAIT_CARD_IDS) {
@@ -6825,8 +7008,14 @@
   }
   var menuOnClose = null;
   var menuEl = null;
+  var menuSubEl = null;
+  function closeSubmenu() {
+    menuSubEl == null ? void 0 : menuSubEl.remove();
+    menuSubEl = null;
+  }
   function closeMenu() {
     if (!menuEl) return;
+    closeSubmenu();
     menuEl.remove();
     menuEl = null;
     const cb = menuOnClose;
@@ -6838,16 +7027,44 @@
     var _a;
     closeMenu();
     menuOnClose = onClose != null ? onClose : null;
+    const m = buildMenu(items, returnFocus, false);
+    $("overlayRoot").appendChild(m.el);
+    const r = m.el.getBoundingClientRect();
+    m.el.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
+    m.el.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
+    (_a = m.buttons[0]) == null ? void 0 : _a.focus();
+    menuEl = m.el;
+  }
+  function buildMenu(items, returnFocus, isSub, parentBtn) {
     const m = document.createElement("div");
     m.className = "ctx-menu";
     m.setAttribute("role", "menu");
     const buttons = [];
+    const openSub = (it, b) => {
+      var _a;
+      if (!it.submenu || it.disabled) return;
+      closeSubmenu();
+      const sub = buildMenu(it.submenu, returnFocus, true, b);
+      $("overlayRoot").appendChild(sub.el);
+      const br = b.getBoundingClientRect();
+      const sr = sub.el.getBoundingClientRect();
+      const right = br.right + 2 + sr.width <= window.innerWidth - 4;
+      sub.el.style.left = `${right ? br.right + 2 : Math.max(4, br.left - sr.width - 2)}px`;
+      sub.el.style.top = `${Math.max(4, Math.min(br.top, window.innerHeight - sr.height - 4))}px`;
+      b.setAttribute("aria-expanded", "true");
+      menuSubEl = sub.el;
+      (_a = sub.buttons[0]) == null ? void 0 : _a.focus();
+    };
     for (const it of items) {
       if (it.separatorBefore) m.appendChild(document.createElement("hr"));
       const b = document.createElement("button");
       b.type = "button";
       b.setAttribute("role", "menuitem");
-      b.textContent = it.label;
+      b.textContent = it.label + (it.submenu ? " \u25B8" : "");
+      if (it.submenu) {
+        b.setAttribute("aria-haspopup", "menu");
+        b.setAttribute("aria-expanded", "false");
+      }
       if (it.disabled) {
         b.setAttribute("aria-disabled", "true");
         if (it.note) {
@@ -6859,28 +7076,39 @@
       }
       b.addEventListener("click", () => {
         if (it.disabled) return;
+        if (it.submenu) {
+          openSub(it, b);
+          return;
+        }
         closeMenu();
         if (!it.focusElsewhere) returnFocus == null ? void 0 : returnFocus.focus();
         it.onSelect();
       });
+      b.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowRight" && it.submenu) {
+          e.preventDefault();
+          e.stopPropagation();
+          openSub(it, b);
+        }
+      });
       m.appendChild(b);
       buttons.push(b);
     }
-    $("overlayRoot").appendChild(m);
-    const r = m.getBoundingClientRect();
-    m.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
-    m.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
-    const enabled = buttons;
-    (_a = enabled[0]) == null ? void 0 : _a.focus();
     m.addEventListener("keydown", (e) => {
-      var _a2, _b;
-      const i = enabled.indexOf(document.activeElement);
+      var _a, _b;
+      const i = buttons.indexOf(document.activeElement);
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        (_a2 = enabled[(i + 1) % enabled.length]) == null ? void 0 : _a2.focus();
+        (_a = buttons[(i + 1) % buttons.length]) == null ? void 0 : _a.focus();
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        (_b = enabled[(i - 1 + enabled.length) % enabled.length]) == null ? void 0 : _b.focus();
+        (_b = buttons[(i - 1 + buttons.length) % buttons.length]) == null ? void 0 : _b.focus();
+      } else if (isSub && (e.key === "ArrowLeft" || e.key === "Escape")) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeSubmenu();
+        parentBtn == null ? void 0 : parentBtn.setAttribute("aria-expanded", "false");
+        parentBtn == null ? void 0 : parentBtn.focus();
       } else if (e.key === "Escape") {
         e.preventDefault();
         closeMenu();
@@ -6889,10 +7117,10 @@
         e.preventDefault();
       }
     });
-    menuEl = m;
+    return { el: m, buttons };
   }
   document.addEventListener("pointerdown", (e) => {
-    if (menuEl && !menuEl.contains(e.target)) closeMenu();
+    if (menuEl && !menuEl.contains(e.target) && !(menuSubEl == null ? void 0 : menuSubEl.contains(e.target))) closeMenu();
   }, true);
   window.addEventListener("resize", closeMenu);
   document.addEventListener("scroll", closeMenu, true);
@@ -7014,7 +7242,6 @@
   var vmTableSig = "";
   var libVars = [];
   var usageMap = null;
-  var indirectMap = /* @__PURE__ */ new Map();
   var deletedUse = { count: 0, nodeIds: [] };
   var vmUsageReq = 0;
   var vmUsageInFlight = false;
@@ -7022,15 +7249,10 @@
   var vmUsageSig = "";
   var curSel = { ids: [], count: 0, scanned: 0, name: "" };
   var baseline = null;
-  var bigSkipped = false;
   var sideSel = null;
-  var sidePicked = false;
-  var sideOpen = /* @__PURE__ */ new Map();
   var query = "";
-  var searchOpen = false;
   var modeName = null;
   var focusKey = null;
-  var vmSelected = null;
   var sameIds = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
   var localVarCount = () => vmVars.length;
   function varScreen() {
@@ -7093,11 +7315,9 @@
     }
     vmUsageReq = 0;
     vmUsageInFlight = false;
-    bigSkipped = false;
     if (!b && activeTab === "select" && selSub === "bind" && !bindLinking) showSelSub("home");
     if (!b) {
       usageMap = null;
-      indirectMap = /* @__PURE__ */ new Map();
       libVars = [];
       deletedUse = { count: 0, nodeIds: [] };
       vmUsageSig = "";
@@ -7106,7 +7326,6 @@
       return;
     }
     if (b.scanned > BIG_SELECTION || wizardRunning) {
-      bigSkipped = b.scanned > BIG_SELECTION;
       usageMap = null;
       selFindFor = null;
       if (vmOpen) renderVarScreen();
@@ -7132,7 +7351,6 @@
     }
     const auto = why !== "user";
     if (auto && (baseline.scanned > BIG_SELECTION || wizardRunning)) {
-      bigSkipped = baseline.scanned > BIG_SELECTION;
       if (vmOpen) renderVarScreen();
       renderSelHome();
       return;
@@ -7155,7 +7373,6 @@
     vmUsageInFlight = false;
     const wasVisible = vmUsageVisible;
     vmUsageVisible = false;
-    bigSkipped = false;
     const sig = JSON.stringify([msg.usage, msg.libraryVars.map((l) => l.id), msg.deleted.count]);
     const changed = sig !== vmUsageSig || usageMap === null;
     vmUsageSig = sig;
@@ -7163,23 +7380,10 @@
       usageMap = new Map(Object.entries(msg.usage));
       libVars = msg.libraryVars;
       deletedUse = msg.deleted;
-      recomputeIndirect();
     }
     if (changed || wasVisible) renderVarScreen();
     renderSelHome();
     reentry.release();
-  }
-  function recomputeIndirect() {
-    if (!usageMap) {
-      indirectMap = /* @__PURE__ */ new Map();
-      return;
-    }
-    const alias = aliasTargetsOf(vmVars);
-    for (const l of libVars) if (l.aliasTargets.length) alias.set(l.id, l.aliasTargets);
-    indirectMap = indirectUsage(new Set([...usageMap.keys()].filter((k) => {
-      var _a, _b;
-      return ((_b = (_a = usageMap.get(k)) == null ? void 0 : _a.places) != null ? _b : 0) > 0;
-    })), alias);
   }
   function onVarTable(msg) {
     var _a;
@@ -7199,9 +7403,9 @@
       const n = vmVars.length - wizBeforeCount;
       if (n > 0) showStatusLine(t("wizard.madeStatus", { n }), { cls: "ok" });
     }
-    recomputeIndirect();
     if (vmOpen || first) renderVarScreen();
     if (edRebase) edOnVarTable(msg);
+    runAfterTable();
   }
   function baseDiffers() {
     return !!baseline && !!curSel && !sameIds(baseline.ids, curSel.ids);
@@ -7215,8 +7419,6 @@
     rebaseToCurrent();
     ((_a = $("selCards").querySelector("button")) != null ? _a : $("btnGoRename")).focus();
   }
-  var directMap = () => usageMap ? new Map([...usageMap.entries()].map(([k, v]) => [k, v.places])) : null;
-  var indirectSet = () => new Set(indirectMap.keys());
   function currentSel() {
     var _a;
     const sides = sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
@@ -7230,7 +7432,7 @@
   }
   var focusSideKey = null;
   function pickSide(sel, focus = true) {
-    if (searchOpen || query) clearSearch(false);
+    if (query) clearSearch(false);
     sideSel = sel;
     focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
     focusKey = null;
@@ -7243,7 +7445,7 @@
     const hadFocus = nav.contains(document.activeElement) ? (_a = document.activeElement.dataset.key) != null ? _a : null : null;
     clearMount(nav);
     const sides = sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
-    const selKey = searchOpen && query.trim() ? "" : sideSelKey(sel);
+    const selKey = query.trim() ? "" : sideSelKey(sel);
     for (const side of sides) {
       const c = side.collection;
       const key = `col:${c.id}`;
@@ -7305,7 +7507,7 @@
     const shownCols = new Set(lastRightCols);
     const visible = vmCols.filter((c) => shownCols.has(c.id));
     const names = [...new Set(visible.flatMap((c) => c.modes.map((m) => m.name)))];
-    if (names.length <= 1 || searchOpen) {
+    if (names.length <= 1) {
       sel.hidden = true;
       return;
     }
@@ -7353,9 +7555,6 @@
     return null;
   }
   var swatchHtml = (hex) => hex ? `<span class="bf-swatch" style="background:${escapeHtml(hex)}"></span>` : "";
-  function typeIcon(type) {
-    return type === "COLOR" ? "" : type === "FLOAT" ? "#" : type === "STRING" ? "T" : "\u25D0";
-  }
   function valueEl(cell) {
     const span = document.createElement("span");
     span.className = "val";
@@ -7363,29 +7562,44 @@
       span.textContent = "\u2014";
       return span;
     }
-    if (cell.kind === "alias") {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "alias-pill";
-      b.tabIndex = -1;
-      b.innerHTML = `${swatchHtml(resolveSwatch(cell))}\u2192 ${escapeHtml(cell.aliasName)}${cell.remote ? ' <span class="lib-tag">LIB</span>' : ""}`;
-      b.title = t("vm.jumpAlias");
-      b.addEventListener("click", (e) => {
-        var _a;
-        e.stopPropagation();
-        jumpToVar(cell.aliasId, (_a = e.currentTarget.closest("[data-key]")) == null ? void 0 : _a.dataset.key);
-      });
-      b.addEventListener("dblclick", (e) => e.stopPropagation());
-      span.appendChild(b);
-      return span;
-    }
-    if (cell.kind === "color") span.innerHTML = `${swatchHtml(cell.hex)}${escapeHtml(cell.hex.toUpperCase())}`;
+    if (cell.kind === "alias") span.innerHTML = `${swatchHtml(resolveSwatch(cell))}\u2192 ${escapeHtml(cell.aliasName)}${cell.remote ? ' <span class="lib-tag">LIB</span>' : ""}`;
+    else if (cell.kind === "color") span.innerHTML = `${swatchHtml(cell.hex)}${escapeHtml(cell.hex.toUpperCase())}`;
     else span.textContent = cell.text;
     return span;
   }
+  function cellText(cell) {
+    if (!cell) return "\u2014";
+    if (cell.kind === "alias") return `\u2192 ${leafName(cell.aliasName)}`;
+    if (cell.kind === "color") return cell.hex.toUpperCase();
+    if (cell.kind === "number") {
+      const n = Number(cell.text);
+      return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : cell.text;
+    }
+    return cell.text;
+  }
+  function cellTipText(cell) {
+    if (!cell) return "\u2014";
+    if (cell.kind === "alias") return `\u2192 ${cell.aliasName}`;
+    return cellText(cell);
+  }
   var lastRightCols = [];
+  var grpCollapsed = /* @__PURE__ */ new Set();
+  var colorView = (() => {
+    try {
+      return localStorage.getItem("dsl.colorView") === "grid" ? "grid" : "list";
+    } catch (e) {
+      return "list";
+    }
+  })();
+  function setColorView(v) {
+    colorView = v;
+    try {
+      localStorage.setItem("dsl.colorView", v);
+    } catch (e) {
+    }
+    renderVarList();
+  }
   function renderVarList() {
-    var _a;
     if (!vmOpen || varScreen() !== "list") return;
     const sel = currentSel();
     renderSidebar(sel);
@@ -7394,402 +7608,344 @@
     const hadFocus = tree.contains(document.activeElement);
     clearMount(tree);
     const searching = !!query.trim();
-    const title = $("varMainTitle");
-    if (searching) title.textContent = t("list.searchTitle", { q: query.trim() });
-    else if (sel.kind === "inspect") title.textContent = t("list.inspect");
-    else if (sel.kind === "lib") title.textContent = t("list.libItem");
-    else if (sel.kind === "deleted") title.textContent = t("list.deletedItem");
-    else if (sel.kind === "col") {
-      const c = vmCols.find((x) => x.id === sel.id);
-      title.textContent = c ? `${tierBadge(c)} ${c.name}` : "";
-    } else title.textContent = sel.key.slice(sel.key.indexOf("|") + 1) || t("list.noGroup");
+    $("varSide").classList.toggle("dim", searching);
+    $("btnSearchClear").hidden = !query;
+    const colId = sel.kind === "col" ? sel.id : null;
+    const groups = paletteGroups(vmCols, vmVars, colId, query);
+    lastRightCols = searching ? [...new Set(groups.map((g) => g.collectionId))] : colId ? [colId] : [];
     const lines = [];
-    const dm = directMap();
-    const ind = indirectSet();
-    lastRightCols = [];
-    const empty = (text, action) => {
+    for (const g of groups) {
+      const col = vmCols.find((c) => c.id === g.collectionId);
+      const open = !grpCollapsed.has(g.key);
+      if (g.head) lines.push(groupHeadEl(g, open));
+      if (!open) continue;
+      if ((col == null ? void 0 : col.tier) === 1) {
+        const colors = g.rows.filter((v) => v.type === "COLOR");
+        const others = g.rows.filter((v) => v.type !== "COLOR");
+        if (others.length) lines.push(paletteLineEl(others, "pill"));
+        if (colors.length) lines.push(paletteLineEl(colors, colorView === "grid" ? "dot" : "swatch"));
+      } else for (const v of g.rows) lines.push(varRowEl(v));
+    }
+    if (!groups.length) {
       const d = document.createElement("div");
       d.className = "vt-empty";
-      d.append(text);
-      if (action) {
+      if (searching) {
+        d.append(t("list.noMatch", { q: query.trim() }), " \xB7 ");
         const b = document.createElement("button");
         b.className = "link link-btn";
         b.type = "button";
-        b.textContent = action[0];
-        b.addEventListener("click", action[1]);
-        d.append(" \xB7 ", b);
-      }
+        b.textContent = t("list.searchClear");
+        b.addEventListener("click", () => clearSearch(true));
+        d.appendChild(b);
+      } else d.textContent = t("v4.colEmpty");
       lines.push(d);
-    };
-    if (sel.kind === "lib" && !searching) {
-      for (const l of libRowsAll()) lines.push(libRowEl(l));
-    } else if (sel.kind === "deleted" && !searching) {
-      if (deletedUse.count > 0) lines.push(deletedEl());
-    } else {
-      const entries = rightEntries(sel, vmCols, vmVars, dm, ind, query);
-      let pi = 0;
-      for (const e of entries) {
-        if (e.kind === "path") {
-          lines.push(pathEl(e.label, pi++));
-          if (!lastRightCols.includes(e.collectionId)) lastRightCols.push(e.collectionId);
-        } else lines.push(rowEl(e.v, e.state));
-      }
-      if (sel.kind === "col" && !searching) lastRightCols = [sel.id];
-      if (sel.kind === "grp" && !searching) lastRightCols = [sel.key.slice(0, sel.key.indexOf("|"))];
-      if (searching) {
-        const libs = libRowsMatching();
-        if (libs.length) {
-          lines.push(pathEl(t("list.libItem"), pi++));
-          for (const l of libs) lines.push(libRowEl(l));
-        }
-        if (!entries.length && !libs.length) empty(t("list.noMatch", { q: query.trim() }), [t("list.searchClear"), () => clearSearch(true)]);
-      } else if (sel.kind === "inspect" && !entries.length) {
-        if (!baseline) empty(t("list.inspectNoSel"));
-        else if (bigSkipped && !usageMap) empty(t("list.big"), [t("list.read"), () => requestManagerUsage("user")]);
-        else if (wizardRunning && !usageMap) empty(t("list.wizardWait"));
-        else if (!usageMap) empty(t("list.reading"));
-        else empty(t("list.noneUsed"), [t("list.findUnbound"), findUnbound]);
-      } else if (!entries.length) empty(t("vm.noVars"));
     }
     renderModeSelect();
     tree.append(...lines);
-    const focusables = Array.from(tree.querySelectorAll("[data-key]"));
+    const focusables = gridItems();
     let target = focusKey ? focusables.find((x) => x.dataset.key === focusKey) : void 0;
-    if (focusKey && !target && focusKey.startsWith("row:") && hadFocus) {
-      showStatusLine(t("list.hiddenRow"));
-      focusKey = null;
-      $("varMainTitle").focus({ preventScroll: true });
-    }
     for (const f of focusables) f.tabIndex = -1;
-    (_a = target != null ? target : focusables[0]) == null ? void 0 : _a.setAttribute("tabindex", "0");
+    target = target != null ? target : focusables[0];
+    target == null ? void 0 : target.setAttribute("tabindex", "0");
     if (target && hadFocus) target.focus({ preventScroll: true });
     if (Math.abs(window.scrollY - prevScroll) > 1) window.scrollTo(0, prevScroll);
   }
-  function pathEl(label, i) {
+  function gridItems() {
+    return Array.from($("varTree").querySelectorAll("[data-key]"));
+  }
+  function groupHeadEl(g, open) {
     const d = document.createElement("div");
-    d.className = "vt-path";
-    d.dataset.key = `path:${i}`;
+    d.className = "vt-group";
+    d.dataset.key = `g:${g.key}`;
     d.setAttribute("role", "row");
-    d.textContent = label;
-    d.title = label;
-    d.addEventListener("keydown", (ev) => treeKey(ev, d));
+    d.setAttribute("aria-expanded", String(open));
+    const tw = document.createElement("span");
+    tw.className = "tw";
+    tw.setAttribute("aria-hidden", "true");
+    tw.textContent = open ? "\u25BE" : "\u25B8";
+    const lb = document.createElement("span");
+    lb.className = "lb";
+    lb.textContent = g.label;
+    d.title = g.label;
+    d.append(tw, lb);
+    const toggle = () => {
+      var _a, _b;
+      if (open) grpCollapsed.add(g.key);
+      else grpCollapsed.delete(g.key);
+      focusKey = (_a = d.dataset.key) != null ? _a : null;
+      renderVarList();
+      (_b = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _b.focus();
+    };
+    d.addEventListener("click", toggle);
+    d.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        toggle();
+        return;
+      }
+      gridKey(ev, d);
+    });
     return d;
   }
-  function setAllExpanded(on) {
-    for (const c of vmCols) sideOpen.set(c.id, on);
-    renderVarList();
-  }
-  function libRowsAll() {
-    if (!usageMap) return [];
-    return libVars.filter((l) => {
-      var _a, _b;
-      return ((_b = (_a = usageMap.get(l.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0 || indirectMap.has(l.id);
-    });
-  }
-  function libRowsMatching() {
-    if (!usageMap) return [];
-    return libVars.filter((l) => {
-      var _a, _b;
-      return (((_b = (_a = usageMap.get(l.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0 || indirectMap.has(l.id)) && matchesQuery(l.name, query);
-    });
-  }
-  function useText(id, state) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
-    if (state === "none") return { text: "\u2014", tip: "" };
-    if (state === "unused") return { text: t("list.unused"), tip: "" };
-    if (state === "indirect") {
-      const via = (_a = indirectMap.get(id)) != null ? _a : [];
-      const first = (_e = (_d = (_b = vmVars.find((v) => v.id === via[0])) == null ? void 0 : _b.name) != null ? _d : (_c = libVars.find((l) => l.id === via[0])) == null ? void 0 : _c.name) != null ? _e : "";
-      return { text: t("list.indirect"), tip: t("list.indirectTip", { alias: first }) };
+  function paletteLineEl(rows, mode) {
+    var _a;
+    const line = document.createElement("div");
+    line.className = `vp-line vp-${mode}`;
+    line.setAttribute("role", "row");
+    for (const v of rows) {
+      const cell = currentModeCell(v);
+      const b = document.createElement("div");
+      b.className = "vp-item";
+      b.dataset.key = `v:${v.id}`;
+      b.dataset.id = v.id;
+      b.setAttribute("role", "gridcell");
+      const tip = `${v.name} / ${cellTipText(cell)}`;
+      b.title = tip;
+      b.setAttribute("aria-label", `${v.name}, ${cellTipText(cell)}`);
+      if (mode === "pill") b.textContent = cellText(cell);
+      else {
+        const dot = document.createElement("span");
+        dot.className = "vp-dot";
+        dot.style.background = (_a = resolveSwatch(cell)) != null ? _a : "transparent";
+        b.appendChild(dot);
+        if (mode === "swatch") {
+          const nm = document.createElement("span");
+          nm.className = "vp-name";
+          nm.textContent = leafName(v.name);
+          b.appendChild(nm);
+        }
+      }
+      wireItem(b, v);
+      line.appendChild(b);
     }
-    const u = usageMap == null ? void 0 : usageMap.get(id);
-    return { text: t("vm.uses", { n: (_f = u == null ? void 0 : u.places) != null ? _f : 0 }), tip: t("list.usesTip", { k: (_g = u == null ? void 0 : u.layers) != null ? _g : 0, n: (_h = u == null ? void 0 : u.places) != null ? _h : 0 }) };
+    return line;
   }
-  function rowEl(v, state) {
+  function varRowEl(v) {
     const d = document.createElement("div");
-    d.className = `vt-row ${state}`;
-    d.dataset.key = `row:${v.id}`;
+    d.className = "vt-row";
+    d.dataset.key = `v:${v.id}`;
     d.dataset.id = v.id;
     d.setAttribute("role", "row");
-    d.setAttribute("aria-selected", String(vmSelected === v.id));
     const cell = currentModeCell(v);
     const nm = document.createElement("span");
     nm.className = "nm";
-    const ic = document.createElement("span");
-    ic.className = "ic";
-    const hex = v.type === "COLOR" ? resolveSwatch(cell) : null;
-    if (hex) ic.innerHTML = swatchHtml(hex);
-    else ic.textContent = typeIcon(v.type);
-    const tx = document.createElement("span");
-    tx.className = "t";
-    tx.textContent = leafName(v.name);
-    nm.title = v.description ? `${v.name}
-${v.description}` : v.name;
-    nm.append(ic, tx);
-    const use = document.createElement("span");
-    use.className = "use";
-    const u = useText(v.id, state);
-    use.textContent = u.text;
-    if (u.tip) use.title = u.tip;
-    const more = moreButton(() => openVarMenuFor({ local: v }, d));
-    d.append(nm, valueEl(cell), use, more);
-    wireRow(d, { local: v });
+    nm.textContent = leafName(v.name);
+    const val = document.createElement("span");
+    val.className = "vr-val";
+    const pill = document.createElement("span");
+    pill.className = `vr-pill${(cell == null ? void 0 : cell.kind) === "alias" ? " alias" : ""}`;
+    pill.innerHTML = `${v.type === "COLOR" ? swatchHtml(resolveSwatch(cell)) : ""}${escapeHtml(cellText(cell))}`;
+    val.appendChild(pill);
+    d.title = `${v.name} / ${cellTipText(cell)}`;
+    d.setAttribute("aria-label", `${v.name}, ${cellTipText(cell)}`);
+    d.append(nm, val);
+    wireItem(d, v);
     return d;
   }
-  function libRowEl(l) {
-    var _a, _b;
-    const d = document.createElement("div");
-    const direct = ((_b = (_a = usageMap == null ? void 0 : usageMap.get(l.id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0;
-    const state = direct ? "direct" : "indirect";
-    d.className = `vt-row ${state}`;
-    d.dataset.key = `lib:${l.id}`;
-    d.dataset.id = l.id;
-    d.setAttribute("role", "row");
-    const nm = document.createElement("span");
-    nm.className = "nm";
-    const ic = document.createElement("span");
-    ic.className = "ic";
-    const hex = l.type === "COLOR" ? resolveSwatch(l.value) : null;
-    if (hex) ic.innerHTML = swatchHtml(hex);
-    else ic.textContent = typeIcon(l.type);
-    const tx = document.createElement("span");
-    tx.className = "t";
-    tx.textContent = l.name;
-    const tag = document.createElement("span");
-    tag.className = "lib-tag";
-    tag.textContent = "LIB";
-    nm.title = `${l.name} \xB7 ${l.collection}`;
-    nm.append(ic, tx, tag);
-    const use = document.createElement("span");
-    use.className = "use";
-    const ut = useText(l.id, state);
-    use.textContent = ut.text;
-    if (ut.tip) use.title = ut.tip;
-    d.append(nm, valueEl(l.value), use, moreButton(() => openVarMenuFor({ lib: l }, d)));
-    wireRow(d, { lib: l });
-    return d;
-  }
-  function deletedEl() {
-    const d = document.createElement("div");
-    d.className = "vt-line";
-    d.dataset.key = "deleted";
-    d.setAttribute("role", "row");
-    const s = document.createElement("span");
-    s.textContent = t("list.deleted", { n: deletedUse.count });
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "link link-btn";
-    b.tabIndex = -1;
-    b.textContent = t("list.select");
-    const pick = () => selectNodes(deletedUse.nodeIds, "list");
-    b.addEventListener("click", (e) => {
-      e.stopPropagation();
-      pick();
-    });
-    d.append(s, b);
-    d.addEventListener("keydown", (ev) => treeKey(ev, d, pick));
-    return d;
-  }
-  function moreButton(open) {
-    const mb = document.createElement("button");
-    mb.type = "button";
-    mb.className = "more";
-    mb.tabIndex = -1;
-    mb.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg>';
-    mb.title = t("vm.moreTip");
-    mb.setAttribute("aria-label", t("vm.moreTip"));
-    mb.addEventListener("click", (e) => {
-      e.stopPropagation();
-      open();
-    });
-    return mb;
-  }
-  function wireRow(d, ref) {
-    d.addEventListener("click", () => {
-      var _a, _b;
-      vmSelected = (_a = d.dataset.id) != null ? _a : null;
-      focusKey = (_b = d.dataset.key) != null ? _b : null;
-      d.focus();
-      markSelected();
-    });
-    d.addEventListener("dblclick", () => openDetail(ref, d));
-    d.addEventListener("contextmenu", (e) => {
+  function wireItem(el, v) {
+    el.addEventListener("click", (e) => {
       var _a;
+      focusKey = (_a = el.dataset.key) != null ? _a : null;
+      gridItems().forEach((x) => x.tabIndex = -1);
+      el.tabIndex = 0;
+      if (e.detail > 1) return;
+      applyVar(v);
+    });
+    el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      vmSelected = (_a = d.dataset.id) != null ? _a : null;
-      markSelected();
-      openVarMenuFor(ref, d, e.clientX, e.clientY);
+      openVarMenuFor(v, el, e.clientX, e.clientY);
     });
-    d.addEventListener("keydown", (ev) => treeKey(ev, d, () => openDetail(ref, d), () => openVarMenuFor(ref, d)));
+    el.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        openDetail({ local: v }, el);
+        return;
+      }
+      if (ev.key === " ") {
+        ev.preventDefault();
+        applyVar(v);
+        return;
+      }
+      if (ev.key === "ContextMenu" || ev.key === "F10" && ev.shiftKey) {
+        ev.preventDefault();
+        openVarMenuFor(v, el);
+        return;
+      }
+      gridKey(ev, el);
+    });
+    el.addEventListener("focus", () => {
+      if (el.matches(":focus-visible")) showItemTip(el);
+    });
+    el.addEventListener("blur", hideItemTip);
   }
-  function markSelected() {
-    document.querySelectorAll("#varTree .vt-row").forEach((r) => r.setAttribute("aria-selected", String(r.dataset.id === vmSelected)));
+  var itemTip = null;
+  function showItemTip(el) {
+    hideItemTip();
+    const tip = document.createElement("div");
+    tip.className = "vt-tip";
+    tip.setAttribute("aria-hidden", "true");
+    tip.textContent = el.title;
+    $("overlayRoot").appendChild(tip);
+    const r = el.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    tip.style.left = `${Math.max(4, Math.min(r.left, window.innerWidth - w - 4))}px`;
+    tip.style.top = `${r.bottom + 4 + tip.offsetHeight > window.innerHeight - 24 ? r.top - tip.offsetHeight - 4 : r.bottom + 4}px`;
+    itemTip = tip;
   }
-  function treeKey(ev, el, onEnter, onMenu) {
-    const all = Array.from($("varTree").querySelectorAll("[data-key]"));
-    const i = all.indexOf(el);
-    const go = (j) => {
+  function hideItemTip() {
+    itemTip == null ? void 0 : itemTip.remove();
+    itemTip = null;
+  }
+  function gridKey(ev, el) {
+    const all = gridItems();
+    const lineOf = (x) => {
       var _a;
-      const target = all[Math.max(0, Math.min(all.length - 1, j))];
+      return (_a = x.closest(".vp-line")) != null ? _a : x;
+    };
+    const lines = [];
+    for (const x of all) {
+      const l = lineOf(x);
+      if (!lines.includes(l)) lines.push(l);
+    }
+    const itemsIn = (l) => l.matches("[data-key]") ? [l] : Array.from(l.querySelectorAll("[data-key]"));
+    const go = (target) => {
+      var _a;
       if (!target) return;
       all.forEach((x) => x.tabIndex = -1);
       target.tabIndex = 0;
       focusKey = (_a = target.dataset.key) != null ? _a : null;
       target.focus();
     };
+    const toLine = (j) => {
+      const l = lines[Math.max(0, Math.min(lines.length - 1, j))];
+      if (!l) return;
+      const cx = el.getBoundingClientRect().left + el.getBoundingClientRect().width / 2;
+      const items = itemsIn(l);
+      let best = items[0];
+      let bd = Infinity;
+      for (const it of items) {
+        const r = it.getBoundingClientRect();
+        const d = Math.abs(r.left + r.width / 2 - cx);
+        if (d < bd) {
+          bd = d;
+          best = it;
+        }
+      }
+      go(best);
+    };
+    const li = lines.indexOf(lineOf(el));
+    const inLine = itemsIn(lineOf(el));
+    const ii = inLine.indexOf(el);
     const k = ev.key;
-    if (k === "ArrowDown") go(i + 1);
-    else if (k === "ArrowUp") go(i - 1);
-    else if (k === "Home") go(0);
-    else if (k === "End") go(all.length - 1);
-    else if (k === "PageDown") go(i + 10);
-    else if (k === "PageUp") go(i - 10);
-    else if (k === "Escape" && (searchOpen || query)) clearSearch(true);
-    else if (k === "Enter" && onEnter) onEnter();
-    else if ((k === "ContextMenu" || k === "F10" && ev.shiftKey) && onMenu) onMenu();
+    if (k === "ArrowDown") toLine(li + 1);
+    else if (k === "ArrowUp") toLine(li - 1);
+    else if (k === "ArrowRight" && ii >= 0 && inLine.length > 1) go(inLine[Math.min(inLine.length - 1, ii + 1)]);
+    else if (k === "ArrowLeft" && ii >= 0 && inLine.length > 1) go(inLine[Math.max(0, ii - 1)]);
+    else if (k === "Home") go(all[0]);
+    else if (k === "End") go(all[all.length - 1]);
+    else if (k === "PageDown") toLine(li + 10);
+    else if (k === "PageUp") toLine(li - 10);
+    else if (k === "Escape" && query) clearSearch(true);
     else return;
     ev.preventDefault();
   }
-  function jumpToVar(id, fromKey) {
-    var _a;
-    const v = vmVars.find((x) => x.id === id);
-    if (!v) {
-      if (libRowsAll().some((l) => l.id === id)) {
-        pickSide({ kind: "lib" }, false);
-        (_a = document.querySelector(`#varTree [data-key="lib:${CSS.escape(id)}"]`)) == null ? void 0 : _a.focus();
-      } else showStatusLine(t("list.libVar"));
+  var applyVarReq = 0;
+  function writeLockReason() {
+    if (bindLinking) return t("bind.waitLink");
+    const other = otherWriteOp();
+    return other ? t("bind.waitOp", { op: other }) : null;
+  }
+  function applyVar(v, target) {
+    const lock = writeLockReason();
+    if (lock) {
+      showStatusLine(lock, { cls: "warn" });
       return;
     }
-    const undo = { sel: sideSel, picked: sidePicked, open: new Map(sideOpen), query, searchOpen, scroll: window.scrollY, focusKey: fromKey != null ? fromKey : focusKey };
-    clearSearch(false);
-    sideSel = { kind: "grp", key: groupKey(v.collectionId, v.name) };
-    sidePicked = true;
-    sideOpen.set(v.collectionId, true);
-    focusKey = `row:${v.id}`;
-    vmSelected = v.id;
-    renderVarList();
-    const row = document.querySelector(`#varTree [data-key="row:${CSS.escape(v.id)}"]`);
-    row == null ? void 0 : row.scrollIntoView({ block: "center" });
-    row == null ? void 0 : row.focus({ preventScroll: true });
-    showStatusLine(t("list.jumped", { name: v.name }), {
-      action: {
-        label: t("list.undo"),
-        run: () => {
-          sideSel = undo.sel;
-          sidePicked = undo.picked;
-          sideOpen.clear();
-          undo.open.forEach((val, key) => sideOpen.set(key, val));
-          query = undo.query;
-          searchOpen = undo.searchOpen;
-          $("varSearch").value = query;
-          $("searchBox").hidden = !searchOpen;
-          focusKey = undo.focusKey;
-          renderVarList();
-          window.scrollTo(0, undo.scroll);
-          const back = focusKey ? document.querySelector(`#varTree [data-key="${CSS.escape(focusKey)}"]`) : null;
-          back == null ? void 0 : back.focus({ preventScroll: true });
-        }
-      }
-    });
+    if (!curSel.count) {
+      showStatusLine(t("status.noSelection"), { cls: "warn" });
+      return;
+    }
+    if (!target && varKind(v) === "other") {
+      showStatusLine(t("apply.otherKind"), { cls: "warn" });
+      return;
+    }
+    applyVarReq = ++bindReqSeq;
+    send(__spreadValues({ type: "APPLY_VARIABLE", reqId: applyVarReq, id: v.id }, target ? { target } : {}));
   }
-  function openSearch() {
-    searchOpen = true;
-    $("searchBox").hidden = false;
-    renderModeSelect();
-    $("varSearch").focus();
+  function onVariableApplied(msg) {
+    if (msg.reqId !== applyVarReq) return;
+    const tip = Object.entries(msg.skipReasons).filter(([, n]) => n > 0).map(([k, n]) => `${t("apply.reason." + k)} ${n}`).join(" \xB7 ");
+    if (!msg.applied) {
+      showStatusLine(t("apply.none", { name: msg.name }), { cls: "warn", tip });
+      return;
+    }
+    showStatusLine(t("apply.done", { n: msg.applied, name: msg.name }) + (msg.skipped ? t("apply.skipped", { m: msg.skipped }) : "") + t("apply.undo"), { cls: msg.skipped ? "warn" : "ok", tip });
+  }
+  function openVarMenuFor(v, el, x, y) {
+    var _a;
+    const r = el.getBoundingClientRect();
+    el.classList.add("menu-open");
+    const kind = varKind(v);
+    const targets = (_a = APPLY_TARGETS[kind]) != null ? _a : [];
+    const items = [];
+    if (targets.length) {
+      const sub = targets.map((tg) => {
+        const ok = targetAllowed(v.scopes, tg);
+        return { label: t("apply.t." + tg), disabled: !ok, note: ok ? void 0 : t("apply.notInScope"), onSelect: () => applyVar(v, tg) };
+      });
+      items.push({ label: t("apply.elsewhere"), submenu: sub, disabled: !curSel.count, note: curSel.count ? void 0 : t("status.noSelection"), onSelect: () => {
+      } });
+    }
+    items.push({ label: t("vm.detail"), onSelect: () => openDetail({ local: v }, el), focusElsewhere: true });
+    const limit = manualLimitReason();
+    items.push({ label: t("vm.duplicate"), disabled: !!limit, note: limit != null ? limit : void 0, onSelect: () => duplicateVar(v) });
+    items.push({ label: t("vm.delete"), separatorBefore: true, onSelect: () => confirmDeleteVar(v, el), focusElsewhere: true });
+    openMenu(x != null ? x : r.left + 24, y != null ? y : r.bottom, items, el, () => el.classList.remove("menu-open"));
   }
   function clearSearch(render = true) {
     query = "";
-    searchOpen = false;
     $("varSearch").value = "";
-    $("searchBox").hidden = true;
     if (render) {
       renderVarList();
-      $("btnSearch").focus();
+      $("varSearch").focus();
     }
-  }
-  async function copyAndReport(text, what) {
-    if (!text) {
-      showStatusLine(t("vm.copyEmpty"), { cls: "warn" });
-      return;
-    }
-    const ok = await copyText(text);
-    showStatusLine(ok ? t("vm.copied", { what, text }) : t("vm.copyFailed", { text }), { cls: ok ? "ok" : "warn" });
-  }
-  function openVarMenuFor(ref, rowEl2, x, y) {
-    var _a, _b, _c;
-    const id = ref.local ? ref.local.id : ref.lib.id;
-    const name = ref.local ? ref.local.name : ref.lib.name;
-    const cell = ref.local ? currentModeCell(ref.local) : ref.lib.value;
-    const direct = ((_b = (_a = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0;
-    const via = (_c = indirectMap.get(id)) != null ? _c : [];
-    const known = !!usageMap && !!baseline;
-    const r = rowEl2.getBoundingClientRect();
-    rowEl2.classList.add("menu-open");
-    const items = [
-      { label: t("vm.copyName"), onSelect: () => void copyAndReport(name, t("vm.whatName")) },
-      { label: t("vm.copyValue"), onSelect: () => void copyAndReport(cellCopyText(cell), t("vm.whatValue")) },
-      { label: t("vm.copyCss"), onSelect: () => void copyAndReport(cssVarName(name), t("vm.whatCss")) }
-    ];
-    if (!known) {
-      items.push({ label: t("vm.selectLayers"), separatorBefore: true, disabled: true, note: t("list.selectFirstNote"), onSelect: () => {
-      } });
-    } else if (direct) {
-      items.push({ label: t("vm.selectLayers"), separatorBefore: true, onSelect: () => selectVarUsers([id]) });
-    } else if (via.length) {
-      items.push({ label: t("list.selectViaAlias"), separatorBefore: true, onSelect: () => selectVarUsers(via) });
-    }
-    if (cell && cell.kind === "alias") items.push({ label: t("vm.jumpAlias"), onSelect: () => jumpToVar(cell.aliasId, rowEl2.dataset.key), focusElsewhere: true });
-    items.push({ label: t("vm.detail"), onSelect: () => openDetail(ref, rowEl2), focusElsewhere: true });
-    if (ref.local) items.push({ label: t("vm.edit"), onSelect: () => openDetail(ref, rowEl2, true), focusElsewhere: true });
-    openMenu(x != null ? x : r.left + 24, y != null ? y : r.bottom, items, rowEl2, () => rowEl2.classList.remove("menu-open"));
-  }
-  function selectVarUsers(varIds) {
-    if (!baseline) return;
-    selectStatusTarget = "list";
-    send({ type: "SELECT_VAR_USERS", varIds, nodeIds: baseline.ids });
   }
   var detailReq = 0;
   var detailBox = null;
   var detailUsesEl = null;
-  function focusRowOrHead(key) {
-    const tree = $("varTree");
-    const row = tree.querySelector(`[data-key="${CSS.escape(key)}"]`);
-    if (!row) return $("varMainTitle");
-    tree.querySelectorAll("[data-key]").forEach((x) => x.tabIndex = -1);
-    row.tabIndex = 0;
-    focusKey = key;
-    return row;
-  }
-  function usesBlock(id) {
+  var detailReturn = null;
+  var detailFromVars = true;
+  function focusAfterDetail(id) {
     var _a, _b, _c;
+    const ret = detailReturn;
+    if (ret && !detailFromVars) {
+      if (document.body.contains(ret) && ret.offsetParent) return { el: ret, present: true };
+      return { el: (_a = $("selCards").querySelector("button")) != null ? _a : $("btnGoRename"), present: false };
+    }
+    const items = gridItems();
+    const hit = items.find((x) => x.dataset.key === `v:${id}`);
+    const el = (_b = hit != null ? hit : items[0]) != null ? _b : $("varSearch");
+    items.forEach((x) => x.tabIndex = -1);
+    el.tabIndex = 0;
+    focusKey = (_c = el.dataset.key) != null ? _c : null;
+    return { el, present: !!hit };
+  }
+  var detailVarId = null;
+  function usesBlock(id) {
     const usesBox = document.createElement("div");
     usesBox.className = "var-uses";
-    const via0 = ((_b = (_a = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a.places) != null ? _b : 0) > 0 ? [] : (_c = indirectMap.get(id)) != null ? _c : [];
-    if (via0.length) {
-      const names = via0.map((x) => {
-        var _a2, _b2, _c2, _d;
-        return (_d = (_c2 = (_a2 = vmVars.find((v) => v.id === x)) == null ? void 0 : _a2.name) != null ? _c2 : (_b2 = libVars.find((l) => l.id === x)) == null ? void 0 : _b2.name) != null ? _d : x;
-      });
-      const p = document.createElement("div");
-      p.className = "hint";
-      p.textContent = t("list.viaAlias", { names: names.join(", ") });
-      usesBox.appendChild(p);
-    }
     const usesList = document.createElement("div");
     usesBox.appendChild(usesList);
     const findUses = () => {
-      var _a2, _b2, _c2;
       if (!baseline) return;
-      const direct = ((_b2 = (_a2 = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a2.places) != null ? _b2 : 0) > 0;
-      const via = direct ? [] : (_c2 = indirectMap.get(id)) != null ? _c2 : [];
       detailReq = ++bindReqSeq;
+      detailVarId = id;
       usesList.textContent = t("common.running");
-      send({ type: "FIND_VAR_USERS", reqId: detailReq, varIds: direct ? [id] : via.length ? via : [id], nodeIds: baseline.ids, limit: DETAIL_LIMIT });
+      send({ type: "FIND_VAR_USERS", reqId: detailReq, varIds: [id], nodeIds: baseline.ids, limit: DETAIL_LIMIT });
     };
     const run = () => {
       clearMount(usesList);
-      if (!baseline) usesList.textContent = t("list.selectFirstNote");
+      if (!baseline) usesList.textContent = t("detail.usesNoSel");
       else if (baseline.scanned > BIG_SELECTION) {
         usesList.append(t("list.detailBig"), " ");
         const b = document.createElement("button");
@@ -7802,7 +7958,9 @@ ${v.description}` : v.name;
     };
     return { box: usesBox, list: usesList, run };
   }
-  function openDetail(ref, _returnRow, focusName = false) {
+  function openDetail(ref, returnEl, focusName = false) {
+    detailReturn = returnEl;
+    detailFromVars = $("varTree").contains(returnEl);
     if (ref.local) {
       openEditor(ref.local, focusName);
       return;
@@ -7829,9 +7987,8 @@ ${v.description}` : v.name;
     n.className = "hint";
     n.textContent = t("list.libManaged");
     body.appendChild(n);
-    const key = `lib:${l.id}`;
     const close = modalButton(t("common.close"), () => requestCloseModal("button"), true);
-    const box = openModal(title, body, [close], () => focusRowOrHead(key), void 0, { focus: close });
+    const box = openModal(title, body, [close], () => focusAfterDetail(l.id).el, void 0, { focus: close });
     detailBox = box;
     detailUsesEl = uses.list;
     uses.run();
@@ -7840,13 +7997,21 @@ ${v.description}` : v.name;
     if (msg.reqId !== detailReq || !detailUsesEl || !detailBox || !modalEl) return;
     const box = detailUsesEl;
     clearMount(box);
-    if (!msg.totalLayers) {
-      box.textContent = t("vm.dNoUses");
-      return;
-    }
     const head = document.createElement("div");
-    head.className = "hint";
-    head.textContent = t("list.usesHead", { k: msg.totalLayers, n: msg.places });
+    head.className = "uses-head";
+    const cnt = document.createElement("span");
+    cnt.textContent = t("v4.places", { n: msg.places });
+    cnt.title = t("v4.usesTip");
+    const all = document.createElement("button");
+    all.type = "button";
+    all.className = "link link-btn";
+    all.textContent = t("detail.selectAll");
+    const id = detailVarId;
+    if (!msg.places || !id) setLock(all, "prereq", t("vm.dNoUses"));
+    all.addEventListener("click", () => {
+      if (id && msg.places && !isLocked(all)) selectVarUsers([id]);
+    });
+    head.append(cnt, " \xB7 ", all);
     box.appendChild(head);
     for (const l of msg.layers) {
       const b = document.createElement("button");
@@ -7863,6 +8028,11 @@ ${v.description}` : v.name;
       more.textContent = t("list.usesMore", { n: msg.totalLayers - msg.layers.length });
       box.appendChild(more);
     }
+  }
+  function selectVarUsers(varIds) {
+    if (!baseline) return;
+    selectStatusTarget = "list";
+    send({ type: "SELECT_VAR_USERS", varIds, nodeIds: baseline.ids });
   }
   var ed = null;
   var edDeadReqs = /* @__PURE__ */ new Set();
@@ -7962,7 +8132,7 @@ ${v.description}` : v.name;
       }
     }
     clearMount(e.changes);
-    const showCh = n.changed && n.err !== t("edit.nameEmptySeg");
+    const showCh = !e.create && n.changed && n.err !== t("edit.nameEmptySeg");
     const gm = showCh ? groupMove(e.v.name, n.name, e.v, vmVars) : null;
     const cr = showCh ? cssRename(e.v.name, n.name, e.v.id, vmVars, cssVarName) : null;
     if (gm || cr) {
@@ -8011,9 +8181,9 @@ ${v.description}` : v.name;
     e.alert.hidden = !text;
     e.alert.classList.toggle("err", !!stickyText || !!((_f = e.event) == null ? void 0 : _f.err));
     e.confirmRow.hidden = !e.confirm;
-    e.btnClose.textContent = st.changed ? t("common.cancel") : t("common.close");
-    e.btnSave.textContent = saving ? t("edit.savingBtn") : t("edit.save");
-    const locked = saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0;
+    e.btnClose.textContent = e.create || st.changed ? t("common.cancel") : t("common.close");
+    e.btnSave.textContent = e.create ? e.create.reqId ? t("newVar.creating") : t("newVar.create") : saving ? t("edit.savingBtn") : t("edit.save");
+    const locked = e.create ? !!e.create.reqId || bindLinking !== 0 : saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0;
     if (locked) {
       e.btnSave.setAttribute("aria-disabled", "true");
       e.btnSave.dataset.lock = "edit";
@@ -8119,8 +8289,27 @@ ${v.description}` : v.name;
     dd.setAttribute("aria-haspopup", "listbox");
     dd.setAttribute("aria-expanded", String(open));
     dd.addEventListener("click", () => edTogglePicker(f));
+    dd.addEventListener("keydown", (ev) => {
+      var _a2;
+      if (ev.key === "Escape" && ((_a2 = ed == null ? void 0 : ed.picker) == null ? void 0 : _a2.modeId) === f.modeId) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        edClosePicker(true);
+      }
+    });
     wrap.appendChild(dd);
     f.ddBtn = dd;
+    if (f.mode === "alias" && f.aliasId && !edTarget(f, f.aliasId).deleted) {
+      const go = document.createElement("button");
+      go.type = "button";
+      go.className = "ed-go";
+      go.textContent = "\u2192";
+      go.title = t("edit.goTarget");
+      go.setAttribute("aria-label", t("edit.goTarget"));
+      const target = f.aliasId;
+      go.addEventListener("click", () => edGoTarget(target));
+      wrap.appendChild(go);
+    }
     f.dd.appendChild(wrap);
     const err = document.createElement("div");
     err.className = "ed-ferr";
@@ -8132,7 +8321,13 @@ ${v.description}` : v.name;
       w.textContent = t("edit.targetDeleted");
       f.dd.appendChild(w);
     }
-    if (open) f.dd.appendChild(edPicker(f));
+    if (open) {
+      const layer = edPicker(f);
+      const goBtn = wrap.querySelector(".ed-go");
+      if (goBtn) wrap.insertBefore(layer, goBtn);
+      else wrap.appendChild(layer);
+      edPlacePicker(f, layer);
+    }
   }
   function edTogglePicker(f) {
     var _a;
@@ -8143,7 +8338,10 @@ ${v.description}` : v.name;
       edClosePicker(true);
       return;
     }
-    e.picker = { modeId: f.modeId, query: "" };
+    const selfScopes = e.newScopes ? e.newScopes() : e.v.scopes;
+    const cur = f.mode === "alias" && f.aliasId ? vmVars.find((x) => x.id === f.aliasId) : void 0;
+    const inRules = !!cur && aliasCandidates(e.v, vmCols, vmVars).groups.some((g) => g.rows.some((r) => r.id === cur.id));
+    e.picker = { modeId: f.modeId, query: "", selfScopes, other: !!cur && inRules && !scopeFits(selfScopes, cur.scopes) };
     if (prev) edRenderField(prev);
     edRenderField(f);
     edChrome();
@@ -8189,8 +8387,8 @@ ${v.description}` : v.name;
     (_a = f.ctl) == null ? void 0 : _a.focus();
   }
   function edPicker(f) {
-    var _a, _b;
     const e = ed;
+    const pk = e.picker;
     const el = document.createElement("div");
     el.className = "ed-picker";
     const search = document.createElement("input");
@@ -8198,11 +8396,17 @@ ${v.description}` : v.name;
     search.className = "ed-psearch";
     search.placeholder = t("edit.pickSearch");
     search.setAttribute("aria-label", t("edit.pickSearch"));
-    search.value = (_b = (_a = e.picker) == null ? void 0 : _a.query) != null ? _b : "";
+    search.value = pk.query;
+    const body = document.createElement("div");
+    body.className = "ed-pbody";
     const lb = document.createElement("div");
     lb.setAttribute("role", "listbox");
     lb.setAttribute("aria-label", t("edit.pickAria", { mode: f.modeName }));
     const notes = document.createElement("div");
+    body.append(lb, notes);
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "ed-plink";
     const opts = [];
     const option = (cls, html, title, onPick, selected = false) => {
       const o = document.createElement("div");
@@ -8215,10 +8419,12 @@ ${v.description}` : v.name;
       if (!onPick) o.setAttribute("aria-disabled", "true");
       else o.addEventListener("click", onPick);
       o.addEventListener("keydown", (ev) => {
-        var _a2;
+        var _a;
         const i = opts.indexOf(o);
-        if (ev.key === "ArrowDown") (_a2 = opts[Math.min(opts.length - 1, i + 1)]) == null ? void 0 : _a2.focus();
-        else if (ev.key === "ArrowUp") (i <= 0 ? search : opts[i - 1]).focus();
+        if (ev.key === "ArrowDown") {
+          if (i >= opts.length - 1 && !link.hidden) link.focus();
+          else (_a = opts[Math.min(opts.length - 1, i + 1)]) == null ? void 0 : _a.focus();
+        } else if (ev.key === "ArrowUp") (i <= 0 ? search : opts[i - 1]).focus();
         else if ((ev.key === "Enter" || ev.key === " ") && onPick) onPick();
         else return;
         ev.preventDefault();
@@ -8234,11 +8440,11 @@ ${v.description}` : v.name;
       return `<span class="ed-ov">${escapeHtml(r.text)}</span>`;
     };
     const render = () => {
-      var _a2, _b2, _c, _d, _e;
+      var _a, _b, _c;
       clearMount(lb);
       clearMount(notes);
       opts.length = 0;
-      const q = (_b2 = (_a2 = e.picker) == null ? void 0 : _a2.query) != null ? _b2 : "";
+      const q = pk.query;
       if (curId) {
         const r = resolveEditValue({ kind: "alias", aliasId: curId, aliasName: "" }, vmCols, vmVars);
         const preview = r ? r.kind === "color" ? colorText(r.hex, r.alpha) : r.text : "\u2014";
@@ -8256,6 +8462,7 @@ ${v.description}` : v.name;
         const tg = edTarget(f, curId);
         lb.appendChild(option("", `${escapeHtml(tg.name)}${tg.remote ? ' <span class="lib-tag">LIB</span>' : ""}<span class="ck">\u2713</span>`, tg.name, null, true));
       }
+      let hidden = 0;
       if (all.global) {
         const d = document.createElement("div");
         d.className = "ed-pnone";
@@ -8263,43 +8470,62 @@ ${v.description}` : v.name;
         lb.appendChild(d);
       } else {
         const cands = aliasCandidates(e.v, vmCols, vmVars, q);
-        const sc = document.createElement("div");
-        sc.className = "ed-pscroll";
-        sc.setAttribute("role", "presentation");
+        let shown = 0;
         for (const g of cands.groups) {
+          const rows = g.rows.filter((r) => {
+            const fit = scopeFits(pk.selfScopes, r.scopes);
+            if (!fit) hidden++;
+            return fit || pk.other;
+          });
+          if (!rows.length) continue;
           const h = document.createElement("div");
           h.className = "ed-phead";
           h.setAttribute("role", "presentation");
           h.textContent = g.label;
-          sc.appendChild(h);
-          for (const r of g.rows) {
+          lb.appendChild(h);
+          for (const r of rows) {
             const col = vmCols.find((c) => c.id === r.collectionId);
-            const cell = r.values[(_e = (_d = col == null ? void 0 : col.defaultModeId) != null ? _d : (_c = col == null ? void 0 : col.modes[0]) == null ? void 0 : _c.modeId) != null ? _e : ""];
-            sc.appendChild(option("", `${valHtml(cell)}${escapeHtml(leafName(r.name))}${r.id === curId ? '<span class="ck">\u2713</span>' : ""}`, r.name, () => edPick(f, r.id), r.id === curId));
+            const cell = r.values[(_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a.modeId) != null ? _c : ""];
+            const other = !scopeFits(pk.selfScopes, r.scopes);
+            lb.appendChild(option("", `${valHtml(cell)}${escapeHtml(leafName(r.name))}${other ? ` <span class="ed-ptag">${escapeHtml(t("edit.pickOtherScope"))}</span>` : ""}${r.id === curId ? '<span class="ck">\u2713</span>' : ""}`, r.name, () => edPick(f, r.id), r.id === curId));
+            shown++;
           }
         }
-        if (!cands.groups.length) {
+        if (!shown) {
           const d = document.createElement("div");
           d.className = "ed-pnone";
           d.textContent = t("edit.pickNoMatch");
-          sc.appendChild(d);
+          lb.appendChild(d);
         }
-        lb.appendChild(sc);
       }
       if (curId && !inRules) note(t("edit.pickOutOfRules"));
       if (all.allTiers) note(t("edit.pickAllTiers"));
       if (!all.global) note(t("edit.pickNoLib"));
+      link.hidden = !pk.other && hidden === 0;
+      link.textContent = pk.other ? t("edit.pickShowFit") : t("edit.pickShowOther", { n: hidden });
       opts.forEach((o, i) => o.tabIndex = i === 0 ? 0 : -1);
     };
+    link.addEventListener("click", () => {
+      pk.other = !pk.other;
+      render();
+      link.focus();
+    });
+    link.addEventListener("keydown", (ev) => {
+      var _a;
+      if (ev.key === "ArrowUp") {
+        ev.preventDefault();
+        (_a = opts[opts.length - 1]) == null ? void 0 : _a.focus();
+      }
+    });
     search.addEventListener("input", () => {
-      if (e.picker) e.picker.query = search.value;
+      pk.query = search.value;
       render();
     });
     search.addEventListener("keydown", (ev) => {
-      var _a2;
+      var _a;
       if (ev.key === "ArrowDown") {
         ev.preventDefault();
-        (_a2 = opts[0]) == null ? void 0 : _a2.focus();
+        (_a = opts[0]) == null ? void 0 : _a.focus();
       }
     });
     el.addEventListener("keydown", (ev) => {
@@ -8309,8 +8535,38 @@ ${v.description}` : v.name;
       edClosePicker(true);
     });
     render();
-    el.append(search, lb, notes);
+    el.append(search, body, link);
     return el;
+  }
+  var PICKER_MAX = 240;
+  var PICKER_MIN = 124;
+  function edPlacePicker(f, el) {
+    const field = f.dd.querySelector(".ed-field");
+    const scroller = f.dd.closest(".m-scroll");
+    if (!field || !scroller) return;
+    const fr = field.getBoundingClientRect();
+    const sr = scroller.getBoundingClientRect();
+    const below = sr.bottom - fr.bottom - 4;
+    const above = fr.top - sr.top - 4;
+    let up = false;
+    let h = PICKER_MAX;
+    if (below >= PICKER_MAX) up = false;
+    else if (above >= PICKER_MAX) up = true;
+    else {
+      up = above > below;
+      h = Math.max(PICKER_MIN, Math.min(PICKER_MAX, up ? above : below));
+    }
+    el.style.maxHeight = `${h}px`;
+    if (up) {
+      el.style.bottom = `${f.dd.offsetHeight - field.offsetTop + 2}px`;
+      el.style.top = "auto";
+    } else {
+      el.style.top = `${field.offsetTop + field.offsetHeight + 2}px`;
+      el.style.bottom = "auto";
+    }
+    el.classList.toggle("up", up);
+    const er = el.getBoundingClientRect();
+    if (er.top < sr.top || er.bottom > sr.bottom) el.scrollIntoView({ block: "nearest" });
   }
   function edResetField(f, base, type) {
     f.base = base;
@@ -8328,10 +8584,17 @@ ${v.description}` : v.name;
     const first = e.v.values[(_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a.modeId) != null ? _c : ""];
     e.title.innerHTML = `${e.v.type === "COLOR" ? swatchHtml(edSwatch(first)) : ""}<span class="vm-val">${escapeHtml(e.v.name)}</span>`;
   }
-  function openEditor(v, focusName) {
+  function openEditor(v, focusName, create) {
     var _a;
     const col = vmCols.find((c) => c.id === v.collectionId);
+    const titleWrap = document.createElement("span");
+    titleWrap.className = "ed-titlewrap";
     const title = document.createElement("span");
+    titleWrap.appendChild(title);
+    if (!create) titleWrap.appendChild(copyBtn(t("vm.copyName"), () => {
+      var _a2, _b;
+      return (_b = (_a2 = vmVars.find((x) => x.id === v.id)) == null ? void 0 : _a2.name) != null ? _b : v.name;
+    }, "ed-copyname"));
     const body = document.createElement("div");
     const dl = document.createElement("dl");
     dl.className = "ed-dl";
@@ -8346,7 +8609,8 @@ ${v.description}` : v.name;
       dl.append(dt, dd);
       return dd;
     };
-    if (col) {
+    if (create) row(t("vm.dCollection"), create.label, "ed-plain");
+    else if (col) {
       const tierName = col.tier ? ["", "Global", "Semantic", "Component"][col.tier] : t("vm.noTier");
       row(t("vm.dCollection"), col.name === tierName ? col.name : `${col.name} \xB7 ${tierName}`, "ed-plain");
     }
@@ -8364,6 +8628,20 @@ ${v.description}` : v.name;
     const nameBox = document.createElement("div");
     nameBox.append(nameField, nameErr);
     row(t("edit.name"), nameBox);
+    let typeSel = null;
+    if (create) {
+      typeSel = document.createElement("select");
+      typeSel.className = "ed-type";
+      typeSel.setAttribute("aria-label", t("newVar.type"));
+      for (const [val, key] of [["COLOR", "newVar.tColor"], ["FLOAT", "newVar.tNumber"], ["STRING", "newVar.tString"], ["BOOLEAN", "newVar.tBool"]]) {
+        const o = document.createElement("option");
+        o.value = val;
+        o.textContent = t(key);
+        typeSel.appendChild(o);
+      }
+      typeSel.value = v.type;
+      row(t("newVar.type"), typeSel);
+    }
     const fields = [];
     for (const m of (_a = col == null ? void 0 : col.modes) != null ? _a : []) {
       const dd = row(m.name, "");
@@ -8371,17 +8649,29 @@ ${v.description}` : v.name;
       edResetField(f, v.values[m.modeId], v.type);
       fields.push(f);
     }
-    const scopes = document.createElement("span");
-    for (const sc of v.scopes) {
-      const c = document.createElement("span");
-      c.className = "chip";
-      c.textContent = sc;
-      scopes.appendChild(c);
+    const uses = create ? { box: document.createElement("div"), list: document.createElement("div"), run: () => {
+    } } : usesBlock(v.id);
+    if (!create) {
+      const scopes = document.createElement("span");
+      for (const sc of v.scopes) {
+        const c = document.createElement("span");
+        c.className = "chip";
+        c.textContent = sc;
+        scopes.appendChild(c);
+      }
+      row(t("vm.dScopes"), v.scopes.length ? scopes : "\u2014", "ed-text");
+      row(t("vm.dDesc"), v.description || "\u2014", "ed-text");
+      const css = document.createElement("span");
+      css.className = "ed-css";
+      const code = document.createElement("code");
+      code.textContent = cssVarName(v.name);
+      css.append(code, copyBtn(t("vm.copyCss"), () => {
+        var _a2, _b;
+        return cssVarName((_b = (_a2 = vmVars.find((x) => x.id === v.id)) == null ? void 0 : _a2.name) != null ? _b : v.name);
+      }, "ed-copycss", "\u29C9"));
+      row("CSS", css, "ed-text");
+      row(t("list.dUses"), uses.box, "ed-text");
     }
-    row(t("vm.dScopes"), v.scopes.length ? scopes : "\u2014", "ed-text");
-    row(t("vm.dDesc"), v.description || "\u2014", "ed-text");
-    const uses = usesBlock(v.id);
-    row(t("list.dUses"), uses.box, "ed-text");
     body.appendChild(dl);
     const changes = document.createElement("div");
     changes.className = "ed-changes";
@@ -8399,9 +8689,9 @@ ${v.description}` : v.name;
     const btnDiscard = modalButton(t("edit.discard"), () => closeModal());
     const btnKeep = modalButton(t("edit.keep"), () => edKeepEditing());
     confirmRow.append(cq, btnDiscard, btnKeep);
-    const btnClose = modalButton(t("common.close"), () => requestCloseModal("button"));
-    const btnSave = modalButton(t("edit.save"), () => edSave(), true);
-    const e = {
+    const btnClose = modalButton(create ? t("common.cancel") : t("common.close"), () => requestCloseModal("button"));
+    const btnSave = modalButton(create ? t("newVar.create") : t("edit.save"), () => edSave(), true);
+    const e = __spreadValues({
       v,
       nameText: v.name,
       nameFigmaErr: null,
@@ -8427,7 +8717,22 @@ ${v.description}` : v.name;
       btnClose,
       btnSave,
       usesRun: uses.run
-    };
+    }, create ? { create: __spreadProps(__spreadValues({}, create), { reqId: null }), newScopes: () => {
+      var _a2;
+      return (_a2 = scopesForNew(normalizeVarName(e.nameText), e.v.type)) != null ? _a2 : ["ALL_SCOPES"];
+    } } : {});
+    if (typeSel) {
+      const ts = typeSel;
+      ts.addEventListener("change", () => {
+        if (e.picker) edClosePicker(false);
+        e.v = __spreadProps(__spreadValues({}, e.v), { type: ts.value });
+        for (const f of e.fields) {
+          edResetField(f, void 0, e.v.type);
+          edRenderField(f);
+        }
+        edChrome();
+      });
+    }
     ed = e;
     edTitle(e);
     for (const f of fields) edRenderField(f);
@@ -8439,7 +8744,7 @@ ${v.description}` : v.name;
     body.addEventListener("focusin", (ev) => {
       e.lastField = ev.target;
     });
-    const box = openModal(title, body, [btnClose, btnSave], () => edAfterClose(e), () => edCleanup(e), {
+    const box = openModal(titleWrap, body, [btnClose, btnSave], () => edAfterClose(e), () => edCleanup(e), {
       focus: focusName ? nameInput : btnClose,
       beforeClose: (how) => edBeforeClose(e, how),
       footTop: [alert, confirmRow]
@@ -8469,12 +8774,17 @@ ${v.description}` : v.name;
   function edKeepEditing() {
     const e = ed;
     if (!e) return;
+    e.pendingJump = null;
     e.confirm = false;
     edChrome();
     const back = e.lastField && e.lastField.isConnected && !e.lastField.closest("[hidden]") ? e.lastField : e.nameInput;
     back.focus();
   }
   function edCleanup(e) {
+    if (e.pendingJump) {
+      const id = e.pendingJump;
+      setTimeout(() => varJump(id), 0);
+    }
     if (e.timer) clearTimeout(e.timer);
     e.timer = null;
     if (ed === e) ed = null;
@@ -8483,9 +8793,9 @@ ${v.description}` : v.name;
   }
   function edAfterClose(e) {
     var _a, _b;
-    const target = focusRowOrHead(`row:${e.v.id}`);
+    if (e.create) return e.create.opener && document.body.contains(e.create.opener) ? e.create.opener : $("btnAddVar");
+    const { el: target, present } = focusAfterDetail(e.v.id);
     if (e.appliedAny) {
-      const present = target !== $("varMainTitle");
       const name = (_b = (_a = vmVars.find((x) => x.id === e.v.id)) == null ? void 0 : _a.name) != null ? _b : e.v.name;
       if (e.lastPartial) showStatusLine(present ? t("edit.partial") : t("edit.closedPartialMissing", { name }), { cls: "warn" });
       else if (!present) showStatusLine(t("edit.closedMissing", { name }));
@@ -8496,6 +8806,10 @@ ${v.description}` : v.name;
     var _a;
     const e = ed;
     if (!e || e.saving || e.sticky) return;
+    if (e.create) {
+      edCreate(e);
+      return;
+    }
     const st = edState(e);
     if (bindLinking || !st.changed || st.hasErr) {
       edLockedSave();
@@ -8637,6 +8951,312 @@ ${v.description}` : v.name;
     focus.focus();
     if (res.applied.some((k) => k !== "name")) e.usesRun();
   }
+  function copyBtn(label, text, cls, face) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `ed-copy ${cls}`;
+    const idle = face ? face : `\u29C9 ${label}`;
+    b.textContent = idle;
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    let timer = null;
+    b.addEventListener("click", () => {
+      void copyText(text()).then((ok) => {
+        b.textContent = ok ? t("vm.copiedShort") : t("vm.copyFailedShort");
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          b.textContent = idle;
+        }, 1500);
+      });
+    });
+    return b;
+  }
+  function edGoTarget(targetId) {
+    const e = ed;
+    if (!e) return;
+    e.pendingJump = targetId;
+    requestCloseModal("button");
+  }
+  function varJump(id) {
+    var _a, _b, _c;
+    const v = vmVars.find((x) => x.id === id);
+    if (!v) {
+      showStatusLine(t("list.libVar"));
+      return;
+    }
+    const fromVars = activeTab === "variables";
+    const undo = fromVars ? { tab: "variables", sel: sideSel, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey } : { tab: "select", usesOpen: selUsesOpen, scroll: window.scrollY, focusK: (_c = (_b = (_a = document.activeElement) == null ? void 0 : _a.closest("[data-k]")) == null ? void 0 : _b.dataset.k) != null ? _c : null };
+    showTab("variables");
+    query = "";
+    $("varSearch").value = "";
+    sideSel = { kind: "col", id: v.collectionId };
+    const cut = v.name.lastIndexOf("/");
+    grpCollapsed.delete(`${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`);
+    focusKey = `v:${v.id}`;
+    renderVarList();
+    const item = gridItems().find((x) => x.dataset.key === focusKey);
+    if (item) {
+      gridItems().forEach((x) => x.tabIndex = -1);
+      item.tabIndex = 0;
+      item.scrollIntoView({ block: "center" });
+      item.focus({ preventScroll: true });
+    }
+    showStatusLine(t("list.jumped", { name: v.name }), {
+      action: {
+        label: t("list.undo"),
+        run: () => {
+          var _a2, _b2;
+          if (undo.tab === "variables") {
+            sideSel = undo.sel;
+            grpCollapsed.clear();
+            undo.collapsed.forEach((k) => grpCollapsed.add(k));
+            query = undo.query;
+            $("varSearch").value = query;
+            focusKey = undo.focusKey;
+            renderVarList();
+            window.scrollTo(0, undo.scroll);
+            (_a2 = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _a2.focus({ preventScroll: true });
+          } else {
+            showTab("select");
+            selUsesOpen = undo.usesOpen;
+            renderSelHome();
+            window.scrollTo(0, undo.scroll);
+            const back = undo.focusK ? $("selCards").querySelector(`[data-k="${CSS.escape(undo.focusK)}"]`) : null;
+            (_b2 = back != null ? back : $("selCards").querySelector("button")) == null ? void 0 : _b2.focus({ preventScroll: true });
+          }
+        }
+      }
+    });
+  }
+  var manualUsed = 0;
+  function manualLimitReason() {
+    if (isPaid) return null;
+    return manualUsed >= FREE_MANUAL_CREATE_LIMIT ? t("newVar.freeLimit", { n: FREE_MANUAL_CREATE_LIMIT }) : null;
+  }
+  var afterTable = null;
+  function runAfterTable() {
+    var _a;
+    const job = afterTable;
+    if (!job) return;
+    if (job.openDetail) {
+      const v = vmVars.find((x) => x.id === job.openDetail);
+      if (!v) return;
+      afterTable = null;
+      revealVar(v);
+      openEditor(v, true);
+      return;
+    }
+    if (job.focus) {
+      const id = job.focus.startsWith("v:") ? job.focus.slice(2) : null;
+      const v = id ? vmVars.find((x) => x.id === id) : void 0;
+      if (id && !v) return;
+      afterTable = null;
+      if (v) revealVar(v);
+      else {
+        focusKey = job.focus;
+        renderVarList();
+      }
+      const item = (_a = gridItems().find((x) => x.dataset.key === job.focus)) != null ? _a : gridItems()[0];
+      if (item) {
+        gridItems().forEach((x) => x.tabIndex = -1);
+        item.tabIndex = 0;
+        item.scrollIntoView({ block: "nearest" });
+        item.focus({ preventScroll: true });
+      }
+    }
+  }
+  function revealVar(v) {
+    if (activeTab !== "variables") showTab("variables");
+    query = "";
+    $("varSearch").value = "";
+    sideSel = { kind: "col", id: v.collectionId };
+    const cut = v.name.lastIndexOf("/");
+    grpCollapsed.delete(`${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`);
+    focusKey = `v:${v.id}`;
+    renderVarList();
+  }
+  function openNewVar(opener) {
+    var _a, _b, _c, _d;
+    const lock = manualLimitReason();
+    if (lock) {
+      showStatusLine(lock, { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
+      return;
+    }
+    const sel = currentSel();
+    const col = sel.kind === "col" ? vmCols.find((c) => c.id === sel.id) : void 0;
+    const first = (_b = paletteGroups(vmCols, vmVars, (_a = col == null ? void 0 : col.id) != null ? _a : null, "")[0]) == null ? void 0 : _b.rows[0];
+    const type = (_c = first == null ? void 0 : first.type) != null ? _c : "FLOAT";
+    const v = { id: "__new", name: "", collectionId: (_d = col == null ? void 0 : col.id) != null ? _d : "__new", type, values: {}, scopes: [], description: "" };
+    const label = col ? `${tierBadge(col)} ${col.name}` : t("newVar.newCollection");
+    openEditor(v, true, { collectionId: col == null ? void 0 : col.id, label, opener });
+  }
+  function edCreate(e) {
+    var _a, _b, _c;
+    const c = e.create;
+    if (c.reqId) return;
+    const n = normalizeVarName(e.nameText);
+    const ne = nameError(e.nameText, e.v, vmVars);
+    const col = vmCols.find((x) => x.id === c.collectionId);
+    const defMode = col ? (_b = col.defaultModeId) != null ? _b : (_a = col.modes[0]) == null ? void 0 : _a.modeId : "*";
+    const values = {};
+    let firstErr = ne ? e.nameInput : null;
+    for (const f of e.fields) {
+      const d = edDraft(f, e.v.type);
+      if (d.err && !firstErr) firstErr = f.ctl;
+      if (d.value && d.changed) values[col ? f.modeId : "*"] = d.value;
+    }
+    if (!values[defMode != null ? defMode : "*"] && !firstErr) {
+      const f = (_c = e.fields.find((x) => x.modeId === defMode)) != null ? _c : e.fields[0];
+      if (f) {
+        f.needValue = true;
+        f.touched = true;
+        firstErr = f.ctl;
+      }
+    }
+    if (firstErr) {
+      e.event = { text: t("edit.checkInput"), err: true };
+      edChrome();
+      firstErr.focus();
+      return;
+    }
+    const lock = writeLockReason();
+    if (lock) {
+      e.event = { text: lock, err: false };
+      edChrome();
+      return;
+    }
+    const scopes = scopesForNew(n, e.v.type);
+    c.reqId = ++bindReqSeq;
+    send(__spreadValues(__spreadProps(__spreadValues({ type: "CREATE_VARIABLE", reqId: c.reqId }, c.collectionId ? { collectionId: c.collectionId } : {}), { name: n, varType: e.v.type, values }), scopes ? { scopes } : {}));
+    e.event = { text: t("newVar.creating"), err: false };
+    edChrome();
+  }
+  function onVariableCreated(msg) {
+    manualUsed = msg.manualUsed;
+    const e = ed;
+    if (!(e == null ? void 0 : e.create) || e.create.reqId !== msg.reqId) return;
+    afterTable = { focus: `v:${msg.id}` };
+    e.create.opener = null;
+    closeModal();
+    showStatusLine(t("newVar.created"), { cls: "ok" });
+  }
+  var dupReq = 0;
+  function duplicateVar(v) {
+    var _a;
+    const lock = (_a = writeLockReason()) != null ? _a : manualLimitReason();
+    if (lock) {
+      showStatusLine(lock, { cls: "warn" });
+      return;
+    }
+    dupReq = ++bindReqSeq;
+    send({ type: "DUPLICATE_VARIABLE", reqId: dupReq, id: v.id });
+  }
+  function onVariableDuplicated(msg) {
+    manualUsed = msg.manualUsed;
+    if (msg.reqId !== dupReq) return;
+    afterTable = { openDetail: msg.newId };
+  }
+  var delReq = 0;
+  function confirmDeleteVar(v, el) {
+    var _a;
+    const lock = writeLockReason();
+    if (lock) {
+      showStatusLine(lock, { cls: "warn" });
+      return;
+    }
+    const m = vmVars.filter((x) => x.id !== v.id && Object.values(x.values).some((c) => (c == null ? void 0 : c.kind) === "alias" && c.aliasId === v.id)).length;
+    const cut = v.name.lastIndexOf("/");
+    const gKey = `${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`;
+    const items = gridItems();
+    const i = items.indexOf(el);
+    const sameGroup = (x) => {
+      const id = x == null ? void 0 : x.dataset.id;
+      const o = id ? vmVars.find((y) => y.id === id) : void 0;
+      if (!o) return false;
+      const c2 = o.name.lastIndexOf("/");
+      return `${o.collectionId}|${c2 < 0 ? "" : o.name.slice(0, c2)}` === gKey;
+    };
+    const next = sameGroup(items[i + 1]) ? items[i + 1] : sameGroup(items[i - 1]) ? items[i - 1] : null;
+    const after = (_a = next == null ? void 0 : next.dataset.key) != null ? _a : `g:${gKey}`;
+    const title = document.createElement("span");
+    title.textContent = t("del.title", { name: v.name });
+    const body = document.createElement("div");
+    if (m) {
+      const p = document.createElement("p");
+      p.textContent = t("del.aliases", { m });
+      body.appendChild(p);
+    }
+    const p2 = document.createElement("p");
+    p2.textContent = t("del.layers");
+    body.appendChild(p2);
+    const cancel = modalButton(t("common.cancel"), () => closeModal());
+    const del = modalButton(t("del.confirm"), () => {
+      delReq = ++bindReqSeq;
+      afterTable = { focus: after };
+      send({ type: "DELETE_VARIABLE", reqId: delReq, id: v.id });
+      closeModal();
+    });
+    del.classList.add("danger");
+    openModal(title, body, [cancel, del], () => el, void 0, { focus: cancel });
+  }
+  function onVariableDeleted(msg) {
+    if (msg.reqId !== delReq) return;
+    showStatusLine(t("del.done"), { cls: "ok" });
+  }
+  function onVarOpError(msg) {
+    const e = ed;
+    if (msg.op === "CREATE_VARIABLE" && (e == null ? void 0 : e.create) && e.create.reqId === msg.reqId) {
+      e.create.reqId = null;
+      if (msg.code === "name") {
+        e.nameFigmaErr = msg.message;
+        e.event = { text: t("edit.nameRejected"), err: true, tip: msg.message };
+        edChrome();
+        e.nameInput.focus();
+      } else if (msg.code === "freeLimit") {
+        e.event = { text: t("newVar.freeLimit", { n: FREE_MANUAL_CREATE_LIMIT }), err: true };
+        edChrome();
+      } else {
+        e.event = { text: t("newVar.failed"), err: true, tip: msg.message };
+        edChrome();
+      }
+      return true;
+    }
+    if (msg.op === "DUPLICATE_VARIABLE" && msg.reqId === dupReq) {
+      showStatusLine(msg.code === "freeLimit" ? t("newVar.freeLimit", { n: FREE_MANUAL_CREATE_LIMIT }) : msg.code === "deleted" ? t("edit.deleted") : t("newVar.dupFailed"), { cls: "warn", tip: msg.message });
+      return true;
+    }
+    if (msg.op === "DELETE_VARIABLE" && msg.reqId === delReq) {
+      afterTable = null;
+      showStatusLine(msg.code === "deleted" ? t("edit.deleted") : t("del.failed"), { cls: "warn", tip: msg.message });
+      return true;
+    }
+    if (msg.op === "APPLY_VARIABLE" && msg.reqId === applyVarReq) {
+      showStatusLine(msg.code === "deleted" ? t("edit.deleted") : t("apply.failed"), { cls: "warn", tip: msg.message });
+      return true;
+    }
+    return false;
+  }
+  document.addEventListener("pointerdown", (ev) => {
+    var _a;
+    const e = ed;
+    if (!(e == null ? void 0 : e.picker)) return;
+    const f = e.fields.find((x) => x.modeId === e.picker.modeId);
+    const tg = ev.target;
+    if (!f || f.dd.contains(tg)) return;
+    if ((_a = tg.classList) == null ? void 0 : _a.contains("modal-backdrop")) {
+      ev.stopPropagation();
+      ev.preventDefault();
+    }
+    edClosePicker(false);
+  }, true);
+  document.addEventListener("focusout", (ev) => {
+    const e = ed;
+    if (!(e == null ? void 0 : e.picker)) return;
+    const f = e.fields.find((x) => x.modeId === e.picker.modeId);
+    const to = ev.relatedTarget;
+    if (!f || !to || !f.dd.contains(ev.target)) return;
+    if (!f.dd.contains(to)) edClosePicker(false);
+  });
   function openPopupFrom(storeId, title, returnFocus) {
     const content = $(storeId);
     const body = document.createElement("div");
@@ -8656,9 +9276,29 @@ ${v.description}` : v.name;
     openMenu(r.left, r.bottom + 2, [
       { label: t("list.readiness", { n: readinessDone(), total: 7 }) + "\u2026", onSelect: () => openReadiness(btn), focusElsewhere: true },
       { label: t("list.menuExport"), onSelect: () => openExportPopup(btn), focusElsewhere: true },
-      { label: t("list.menuExpandAll"), separatorBefore: true, onSelect: () => setAllExpanded(true) },
-      { label: t("list.menuCollapseAll"), onSelect: () => setAllExpanded(false) }
+      { label: colorView === "grid" ? t("list.colorList") : t("list.colorGrid"), separatorBefore: true, onSelect: () => setColorView(colorView === "grid" ? "list" : "grid") },
+      { label: t("list.menuExpandAll"), onSelect: () => setAllGroups(true) },
+      { label: t("list.menuCollapseAll"), onSelect: () => setAllGroups(false) }
     ], btn);
+  }
+  function openAddMenu() {
+    const btn = $("btnAddVar");
+    const r = btn.getBoundingClientRect();
+    const limit = manualLimitReason();
+    openMenu(r.left, r.bottom + 2, [
+      { label: t("list.addNew"), disabled: !!limit, note: limit != null ? limit : void 0, onSelect: () => openNewVar(btn), focusElsewhere: true },
+      { label: t("list.addFromSel"), separatorBefore: true, disabled: !curSel.count, note: curSel.count ? void 0 : t("status.noSelection"), onSelect: () => showMake("color"), focusElsewhere: true },
+      { label: t("list.addDark"), onSelect: () => showMake("theme"), focusElsewhere: true },
+      { label: t("list.addTextStyles"), onSelect: () => showMake("type"), focusElsewhere: true }
+    ], btn);
+  }
+  function setAllGroups(open) {
+    const sel = currentSel();
+    for (const g of paletteGroups(vmCols, vmVars, sel.kind === "col" ? sel.id : null, query)) {
+      if (open) grpCollapsed.delete(g.key);
+      else grpCollapsed.add(g.key);
+    }
+    renderVarList();
   }
   function findUnbound() {
     if (!curSel.count) {
@@ -8676,9 +9316,8 @@ ${v.description}` : v.name;
     }
     runBindPreview();
   }
-  $("btnAddVar").addEventListener("click", () => showMake("color"));
+  $("btnAddVar").addEventListener("click", openAddMenu);
   $("btnVarMore").addEventListener("click", openMoreMenu);
-  $("btnSearch").addEventListener("click", () => searchOpen ? $("varSearch").focus() : openSearch());
   $("varSearch").addEventListener("input", () => {
     query = $("varSearch").value;
     renderVarList();

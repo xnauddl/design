@@ -189,25 +189,84 @@
     "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
+    "v4.colEmpty": "\uC774 \uCEEC\uB809\uC158\uC5D4 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "apply.done": "\uB808\uC774\uC5B4 {n}\uAC1C\uC5D0 {name} \uC5F0\uACB0",
+    "apply.skipped": " \xB7 {m}\uAC1C\uB294 \uB9DE\uC9C0 \uC54A\uC544 \uAC74\uB108\uB700",
+    "apply.undo": " \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "apply.none": "\uC120\uD0DD\uD55C \uB808\uC774\uC5B4\uC5D0 {name}\uC744 \uBD99\uC77C \uACF3\uC774 \uC5C6\uC5B4\uC694",
+    "apply.otherKind": "\uC774 \uBCC0\uC218\uB294 \uBD99\uC77C \uC18D\uC131\uC744 \uC815\uD560 \uC218 \uC5C6\uC5B4\uC694",
+    "apply.failed": "\uC5F0\uACB0\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "apply.elsewhere": "\uB2E4\uB978 \uACF3\uC5D0 \uC5F0\uACB0",
+    "apply.notInScope": "\uC774 \uBCC0\uC218\uC758 \uC6A9\uB3C4\uC5D0 \uC5C6\uC5B4\uC694",
+    "apply.t.fill": "\uCC44\uC6C0",
+    "apply.t.stroke": "\uC120 \uC0C9",
+    "apply.t.text": "\uAE00\uC790 \uC0C9",
+    "apply.t.shadow": "\uADF8\uB9BC\uC790 \uC0C9",
+    "apply.t.gap": "\uAC04\uACA9",
+    "apply.t.padding": "\uC548\uCABD \uC5EC\uBC31(4\uBC29\uD5A5)",
+    "apply.t.padding-top": "\uC704",
+    "apply.t.padding-bottom": "\uC544\uB798",
+    "apply.t.padding-left": "\uC67C\uCABD",
+    "apply.t.padding-right": "\uC624\uB978\uCABD",
+    "apply.t.radius": "\uBAA8\uC11C\uB9AC 4\uACF3",
+    "apply.t.radius-tl": "\uC67C\uCABD \uC704",
+    "apply.t.radius-tr": "\uC624\uB978\uCABD \uC704",
+    "apply.t.radius-bl": "\uC67C\uCABD \uC544\uB798",
+    "apply.t.radius-br": "\uC624\uB978\uCABD \uC544\uB798",
+    "apply.reason.no-scope": "\uC6A9\uB3C4\uC5D0 \uB9DE\uB294 \uC18D\uC131\uC774 \uC5C6\uC74C",
+    "apply.reason.no-prop": "\uADF8 \uC18D\uC131\uC774 \uC5C6\uB294 \uB808\uC774\uC5B4",
+    "apply.reason.not-autolayout": "\uC624\uD1A0 \uB808\uC774\uC544\uC6C3 \uC544\uB2D8",
+    "apply.reason.no-stroke": "\uBCF4\uC774\uB294 \uC120 \uC5C6\uC74C",
+    "apply.reason.no-shadow": "\uADF8\uB9BC\uC790 \uC5C6\uC74C",
+    "apply.reason.font": "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD568",
+    "apply.reason.empty-text": "\uBE48 \uAE00\uC790",
+    "apply.reason.other-kind": "\uBD99\uC77C \uC18D\uC131\uC744 \uC815\uD560 \uC218 \uC5C6\uC74C",
+    "apply.reason.error": "\uD53C\uADF8\uB9C8\uAC00 \uAC70\uC808\uD568",
+    "vm.duplicate": "\uBCF5\uC81C",
+    "vm.delete": "\uC0AD\uC81C",
+    "vm.copiedShort": "\uBCF5\uC0AC\uB428",
+    "vm.copyFailedShort": "\uBCF5\uC0AC \uBABB \uD568",
+    "list.colorGrid": "\uC0C9 \uACA9\uC790\uB85C \uBCF4\uAE30",
+    "list.colorList": "\uC0C9 \uBAA9\uB85D\uC73C\uB85C \uBCF4\uAE30",
+    "list.addNew": "\uC0C8 \uBCC0\uC218",
+    "list.addFromSel": "\uC120\uD0DD\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30\u2026",
+    "list.addDark": "\uB2E4\uD06C \uBAA8\uB4DC \uB9CC\uB4E4\uAE30\u2026",
+    "list.addTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB9CC\uB4E4\uAE30\u2026",
+    "newVar.type": "\uD0C0\uC785",
+    "newVar.tColor": "\uC0C9",
+    "newVar.tNumber": "\uC22B\uC790",
+    "newVar.tString": "\uAE00\uC790",
+    "newVar.tBool": "\uCC38\uAC70\uC9D3",
+    "newVar.create": "\uB9CC\uB4E4\uAE30",
+    "newVar.creating": "\uB9CC\uB4DC\uB294 \uC911\u2026",
+    "newVar.created": "\uBCC0\uC218\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "newVar.failed": "\uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "newVar.dupFailed": "\uBCF5\uC81C\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "newVar.newCollection": "Variables (\uC0C8\uB85C \uB9CC\uB4E6)",
+    "newVar.freeLimit": "\uBB34\uB8CC\uB85C\uB294 {n}\uAC1C\uAE4C\uC9C0 \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694",
+    "del.title": "{name} \uBCC0\uC218\uB97C \uC9C0\uC6B8\uAE4C\uC694?",
+    "del.aliases": "\uC774 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 {m}\uAC1C\uB294 '\uC0AD\uC81C\uB41C \uBCC0\uC218'\uB97C \uAC00\uB9AC\uD0A4\uAC8C \uB3FC\uC694",
+    "del.layers": "\uC5F0\uACB0\uB41C \uB808\uC774\uC5B4 \xB7 \uC2A4\uD0C0\uC77C\uC740 '\uC0AD\uC81C\uB41C \uBCC0\uC218'\uAC00 \uB3FC\uC694",
+    "del.confirm": "\uC0AD\uC81C",
+    "del.done": "\uBCC0\uC218\uB97C \uC9C0\uC6E0\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "del.failed": "\uC9C0\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "detail.selectAll": "\uBAA8\uB450 \uC120\uD0DD",
+    "detail.usesNoSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC5D0\uC11C \uCC3E\uC544\uC694",
+    "edit.goTarget": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uB85C",
+    "edit.pickShowOther": "\uC6A9\uB3C4\uAC00 \uB2E4\uB978 \uBCC0\uC218\uB3C4 \uBCF4\uAE30 ({n}\uAC1C)",
+    "edit.pickShowFit": "\uC6A9\uB3C4\uAC00 \uB9DE\uB294 \uBCC0\uC218\uB9CC \uBCF4\uAE30",
+    "edit.pickOtherScope": "\uC6A9\uB3C4 \uB2E4\uB984",
+    "op.applyVar": "\uD074\uB9AD \uC5F0\uACB0",
+    "op.createVar": "\uC0C8 \uBCC0\uC218",
+    "op.dupVar": "\uBCF5\uC81C",
+    "op.delVar": "\uC0AD\uC81C",
+    "create.sumManual": " \xB7 \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {n}",
     "common.close": "\uB2EB\uAE30",
     // 변수 관리(넓은 화면)
     "vm.search": "\uBCC0\uC218 \uAC80\uC0C9",
-    "vm.uses": "{n}\uACF3",
-    "vm.moreTip": "\uBA54\uB274 (\uC6B0\uD074\uB9AD\uACFC \uAC19\uC74C)",
-    "vm.jumpAlias": "\uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218\uB85C \uC774\uB3D9",
-    "vm.noVars": "\uC774 \uD30C\uC77C\uC5D0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694.",
     "vm.copyName": "\uC774\uB984 \uBCF5\uC0AC",
-    "vm.copyValue": "\uAC12 \uBCF5\uC0AC",
     "vm.copyCss": "CSS \uBCC0\uC218\uBA85 \uBCF5\uC0AC",
-    "vm.whatName": "\uC774\uB984",
-    "vm.whatValue": "\uAC12",
-    "vm.whatCss": "CSS \uBCC0\uC218\uBA85",
-    "vm.copied": "{what}\uC744(\uB97C) \uBCF5\uC0AC\uD588\uC5B4\uC694: {text}",
-    "vm.copyFailed": "\uBCF5\uC0AC\uAC00 \uB9C9\uD614\uC5B4\uC694 \u2014 \uC9C1\uC811 \uBCF5\uC0AC\uD558\uC138\uC694: {text}",
-    "vm.copyEmpty": "\uBCF5\uC0AC\uD560 \uAC12\uC774 \uC5C6\uC5B4\uC694.",
-    "vm.selectLayers": "\uC0AC\uC6A9 \uB808\uC774\uC5B4 \uC120\uD0DD",
     "vm.detail": "\uC0C1\uC138",
-    "vm.edit": "\uACE0\uCE58\uAE30\u2026",
     // 변수 고치기(§4.4 고치기, PR 3.5)
     "edit.name": "\uC774\uB984",
     "edit.nameAria": "\uC774\uB984(\uC804\uCCB4 \uACBD\uB85C)",
@@ -221,8 +280,8 @@
     "edit.conflict": "\uB2E4\uB978 \uACF3\uC5D0\uC11C \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 \uB2EB\uACE0 \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694",
     "edit.maybeSaved": "\uC800\uC7A5\uB410\uC744 \uC218 \uC788\uC5B4\uC694 \xB7 \uB2EB\uACE0 \uB2E4\uC2DC \uC5F4\uC5B4 \uC8FC\uC138\uC694",
     "edit.partial": "\uC77C\uBD80\uB9CC \uC800\uC7A5\uB410\uC5B4\uC694",
-    "edit.closedMissing": "{name} \uD589\uC740 \uC9C0\uAE08 \uACE0\uB978 \uBAA9\uB85D\uC5D0 \uC5C6\uC5B4\uC694",
-    "edit.closedPartialMissing": "\uC77C\uBD80\uB9CC \uC800\uC7A5\uB410\uC5B4\uC694 \xB7 {name} \uD589\uC740 \uC9C0\uAE08 \uACE0\uB978 \uBAA9\uB85D\uC5D0 \uC5C6\uC5B4\uC694",
+    "edit.closedMissing": "{name}\uC740 \uC9C0\uAE08 \uBAA9\uB85D\uC5D0 \uBCF4\uC774\uC9C0 \uC54A\uC544\uC694",
+    "edit.closedPartialMissing": "\uC77C\uBD80\uB9CC \uC800\uC7A5\uB410\uC5B4\uC694 \xB7 {name}\uC740 \uC9C0\uAE08 \uBAA9\uB85D\uC5D0 \uBCF4\uC774\uC9C0 \uC54A\uC544\uC694",
     "edit.nameEmptySeg": "\uC774\uB984\uC758 '/' \uC0AC\uC774\uAC00 \uBE44\uC5B4 \uC788\uC5B4\uC694",
     "edit.nameDup": "\uC774 \uCEEC\uB809\uC158\uC5D0 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4\uC694",
     "edit.nameRejected": "\uD53C\uADF8\uB9C8\uAC00 \uC774 \uC774\uB984\uC744 \uBC1B\uC9C0 \uC54A\uC544\uC694",
@@ -298,41 +357,22 @@
     "wizard.freeSumBound": "\uC5F0\uACB0 {b}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
     "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total}",
-    "list.findUnbound": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 \uCC3E\uAE30 \u2192",
-    "list.addTip": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC5D0\uC11C \uBCC0\uC218 \uB9CC\uB4E4\uAE30(\uC0C9\xB7\uD1A0\uD070\xB7\uD14C\uB9C8\xB7\uD0C0\uC774\uD3EC)",
+    "list.addTip": "\uCD94\uAC00",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
     "list.modeTip": "\uBAA8\uB4DC",
     "list.modeDefault": "\uAE30\uBCF8 \uBAA8\uB4DC",
-    "list.searchTip": "\uAC80\uC0C9",
-    "list.reading": "\uC120\uD0DD\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218 \uC77D\uB294 \uC911\u2026",
     "list.big": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uC77D\uC9C0 \uC54A\uC544\uC694",
     "list.read": "\uC77D\uAE30",
-    "list.wizardWait": "\uB9C8\uBC95\uC0AC\uAC00 \uB05D\uB098\uBA74 \uC77D\uC5B4\uC694",
-    "list.noneUsed": "\uC774 \uC120\uD0DD\uC740 \uB85C\uCEEC \uBCC0\uC218\uB97C \uC4F0\uC9C0 \uC54A\uC544\uC694",
-    "list.inspect": "\u2605 Inspect",
-    "list.inspectNoSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5EC\uAE30\uC5D0 \uBAA8\uC5EC\uC694",
-    "list.libItem": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
-    "list.deletedItem": "\uC0AD\uC81C\uB41C \uBCC0\uC218",
     "list.sideColAria": "{name}, \uACC4\uCE35 {badge}, {num}",
-    "list.searchTitle": "'{q}' \uAC80\uC0C9 \uACB0\uACFC",
     "list.noGroup": "(\uADF8\uB8F9 \uC5C6\uC74C)",
     "list.rebase": "\uAE30\uC900 \uBC14\uAFB8\uAE30",
-    "list.unused": "\uC548 \uC500",
-    "list.indirect": "\u21B3",
-    "list.indirectTip": "\uC9C1\uC811 \uBD99\uC5B4 \uC788\uC9C4 \uC54A\uACE0, {alias} \uAC19\uC740 \uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC5EC\uC694",
-    "list.usesTip": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3",
-    "list.hiddenRow": "\uC120\uD0DD\uC5D0\uC11C \uC548 \uC4F0\uC5EC \uBAA9\uB85D\uC5D0\uC11C \uBE60\uC84C\uC5B4\uC694",
     "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
     "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
     "list.libCollection": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \xB7 {name}",
     "list.libManaged": "\uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
-    "list.deleted": "\uC0AD\uC81C\uB41C \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB41C \uACF3 {n}\uAC1C",
-    "list.select": "\uC120\uD0DD",
-    "list.jumped": "{name} \uD589\uC73C\uB85C \uC62E\uACBC\uC5B4\uC694",
+    "list.jumped": "{name}(\uC73C)\uB85C \uC62E\uACBC\uC5B4\uC694",
     "list.undo": "\u2190 \uB418\uB3CC\uB9AC\uAE30",
-    "list.selectFirstNote": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC5D0\uC11C \uCC3E\uC544\uC694",
-    "list.selectViaAlias": "\uBCC4\uCE6D\uC73C\uB85C \uC4F0\uB294 \uB808\uC774\uC5B4 \uC120\uD0DD",
     "select.capped": "\uB808\uC774\uC5B4 {found}\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694(\uC804\uCCB4 {requested}\uAC1C)",
     "select.none": "\uC120\uD0DD\uD560 \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
     "select.partial": "\uB808\uC774\uC5B4 {found}\uAC1C \uC120\uD0DD \u2014 {missing}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
@@ -340,9 +380,7 @@
     "list.dUses": "\uC4F0\uC778 \uACF3",
     "list.detailBig": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uCC3E\uC9C0 \uC54A\uC544\uC694",
     "list.find": "\uCC3E\uAE30",
-    "list.usesHead": "\uB808\uC774\uC5B4 {k}\uAC1C \xB7 {n}\uACF3 \xB7 \uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
     "list.usesMore": "\uC678 {n}\uAC1C",
-    "list.viaAlias": "\uBCC4\uCE6D\uC744 \uD1B5\uD574 \uC4F0\uC784: {names}",
     "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
     "list.menuExpandAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uD3BC\uCE58\uAE30",
     "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
@@ -1772,7 +1810,113 @@
     return new Set([(_a = o.global) == null ? void 0 : _a.id, (_b = o.semantic) == null ? void 0 : _b.id].filter((x) => !!x));
   }
 
+  // src/lib/varKind.ts
+  var FIRST_FLOAT = {
+    spacing: "gap",
+    radius: "radius",
+    size: "size",
+    "stroke-width": "stroke",
+    opacity: "opacity",
+    "font-size": "text",
+    "line-height": "text",
+    "letter-spacing": "text"
+  };
+  var DIRS = ["top", "right", "bottom", "left"];
+  var CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"];
+  function lastFloatKind(seg) {
+    if (["gap", "row-gap", "column-gap", "spacing", "padding", "padding-x", "padding-y"].includes(seg)) return "gap";
+    if (DIRS.some((d) => seg === `padding-${d}`)) return "gap";
+    if (seg === "radius" || CORNERS.some((c) => seg === `radius-${c}`)) return "radius";
+    if (["size", "width", "height"].includes(seg)) return "size";
+    if (seg === "stroke-width" || DIRS.some((d) => seg === `stroke-width-${d}`)) return "stroke";
+    if (seg === "opacity") return "opacity";
+    if (["font-size", "line-height", "letter-spacing"].includes(seg)) return "text";
+    return null;
+  }
+  var SCOPE_KIND = {
+    GAP: "gap",
+    CORNER_RADIUS: "radius",
+    WIDTH_HEIGHT: "size",
+    STROKE_FLOAT: "stroke",
+    OPACITY: "opacity",
+    FONT_SIZE: "text",
+    LINE_HEIGHT: "text",
+    LETTER_SPACING: "text",
+    FONT_FAMILY: "text"
+  };
+  function varKind(v) {
+    var _a, _b, _c;
+    if (v.type === "COLOR") return "color";
+    if (v.type === "BOOLEAN") return "other";
+    const segs = v.name.split("/").map((s) => s.trim().toLowerCase());
+    const first = (_a = segs[0]) != null ? _a : "";
+    const last = (_b = segs[segs.length - 1]) != null ? _b : "";
+    if (v.type === "FLOAT" && FIRST_FLOAT[first]) return FIRST_FLOAT[first];
+    if (v.type === "STRING" && first === "font-family") return "text";
+    if (v.type === "FLOAT") {
+      const k = lastFloatKind(last);
+      if (k) return k;
+    }
+    if (v.type === "STRING" && last === "font-family") return "text";
+    if (v.type === "FLOAT" || v.type === "STRING") {
+      const kinds = new Set(((_c = v.scopes) != null ? _c : []).map((s) => SCOPE_KIND[s]).filter(Boolean));
+      if (kinds.size === 1) return [...kinds][0];
+    }
+    return "other";
+  }
+  var FILL_SUB = ["FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"];
+  function expand(scopes) {
+    const out = /* @__PURE__ */ new Set();
+    for (const s of scopes) {
+      if (s === "ALL_FILLS") FILL_SUB.forEach((x) => out.add(x));
+      else out.add(s);
+    }
+    return out;
+  }
+  var APPLY_TARGETS = {
+    color: ["fill", "stroke", "text", "shadow"],
+    gap: ["gap", "padding", "padding-top", "padding-bottom", "padding-left", "padding-right"],
+    radius: ["radius", "radius-tl", "radius-tr", "radius-bl", "radius-br"]
+  };
+  var TARGET_SCOPES = {
+    fill: ["FRAME_FILL", "SHAPE_FILL"],
+    text: ["TEXT_FILL"],
+    stroke: ["STROKE_COLOR"],
+    shadow: ["EFFECT_COLOR"],
+    gap: ["GAP"],
+    padding: ["GAP"],
+    "padding-top": ["GAP"],
+    "padding-right": ["GAP"],
+    "padding-bottom": ["GAP"],
+    "padding-left": ["GAP"],
+    radius: ["CORNER_RADIUS"],
+    "radius-tl": ["CORNER_RADIUS"],
+    "radius-tr": ["CORNER_RADIUS"],
+    "radius-bl": ["CORNER_RADIUS"],
+    "radius-br": ["CORNER_RADIUS"]
+  };
+  function targetAllowed(scopes, target) {
+    if (scopes.includes("ALL_SCOPES")) return true;
+    const ex = expand(scopes);
+    return TARGET_SCOPES[target].some((s) => ex.has(s));
+  }
+  var FREE_MANUAL_CREATE_LIMIT = 20;
+  var MANUAL_KEY = "dsl.manual";
+  function duplicateName(name, taken) {
+    const base = `${name}-copy`;
+    if (!taken.has(base)) return base;
+    for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`;
+  }
+
   // src/lib/variables.ts
+  function isManualVar(v) {
+    try {
+      const fn = v.getPluginData;
+      return typeof fn === "function" && fn.call(v, MANUAL_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
   var vkey = (collectionId, name) => `${collectionId}\0${name}`;
   async function buildVarIndex() {
     const idx = /* @__PURE__ */ new Map();
@@ -1863,7 +2007,7 @@
   }
   async function createTokens(tokens, base) {
     const reuse = await pickReusable(tokens, base);
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map() };
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set() };
     const reuseMap = readReuseMap();
     const toCreate = tokens.filter((t2) => !reuse.has(t2.name));
     for (const [name, v] of reuse) {
@@ -1877,6 +2021,18 @@
       const touched = /* @__PURE__ */ new Set();
       for (const t2 of toCreate) {
         const type = resolvedTypeForToken(t2);
+        const mine = idx.get(vkey(globalCol.id, t2.name));
+        if (mine && isManualVar(mine)) {
+          if (!summary.skippedManualNames.has(t2.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gMode], literalOf(t2, type, base), type)) {
+            summary.globalOf.set(t2.name, mine.id);
+            delete reuseMap[t2.name];
+          } else if (!summary.skippedManualNames.has(t2.name)) {
+            summary.globalOf.delete(t2.name);
+            summary.skippedManualNames.add(t2.name);
+            summary.skippedManual++;
+          }
+          continue;
+        }
         const g = upsertVariable(t2.name, globalCol, type, idx);
         summary[g.created ? "created" : "updated"]++;
         summary.globals++;
@@ -1903,7 +2059,7 @@
     const reuse = await pickReusable(tokens, base);
     const existing = /* @__PURE__ */ new Set();
     for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map() };
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set() };
     const seen = /* @__PURE__ */ new Set();
     const tally = (colId, name, kind) => {
       const k = vkey(colId, name);
@@ -1915,10 +2071,30 @@
       seen.add(k);
       summary[existing.has(k) ? "updated" : "created"]++;
     };
+    const gCol = cols.find((c) => c.id === gId);
+    const manualByName = /* @__PURE__ */ new Map();
+    if (gCol) {
+      for (const v of await figma.variables.getLocalVariablesAsync()) if (v.variableCollectionId === gId && isManualVar(v)) manualByName.set(v.name, v);
+    }
     for (const t2 of tokens) {
       const r = reuse.get(t2.name);
-      if (r) summary.globalOf.set(t2.name, r.id);
-      else tally(gId, t2.name, "globals");
+      if (r) {
+        summary.globalOf.set(t2.name, r.id);
+        continue;
+      }
+      const mine = manualByName.get(t2.name);
+      if (mine && gCol) {
+        const type = resolvedTypeForToken(t2);
+        if (!summary.skippedManualNames.has(t2.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gCol.defaultModeId], literalOf(t2, type, base), type)) {
+          summary.globalOf.set(t2.name, mine.id);
+        } else if (!summary.skippedManualNames.has(t2.name)) {
+          summary.globalOf.delete(t2.name);
+          summary.skippedManualNames.add(t2.name);
+          summary.skippedManual++;
+        }
+        continue;
+      }
+      tally(gId, t2.name, "globals");
     }
     return summary;
   }
@@ -2036,6 +2212,7 @@
     let removed = 0;
     for (const v of await figma.variables.getLocalVariablesAsync()) {
       if (!palIds.has(v.variableCollectionId)) continue;
+      if (isManualVar(v)) continue;
       const fam = paletteFamilyOf(v.name);
       if (fam && keepFamilies.has(fam) && !keepSet.has(v.name)) {
         v.remove();
@@ -2046,7 +2223,7 @@
   }
   async function createSemanticAliases(map) {
     var _a, _b, _c, _d;
-    const summary = { created: 0, updated: 0, aliased: 0, missing: [] };
+    const summary = { created: 0, updated: 0, aliased: 0, missing: [], skippedManual: 0 };
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const vars = await figma.variables.getLocalVariablesAsync();
     const tiers = collectionTiers(cols, vars);
@@ -2074,6 +2251,11 @@
         idx = await buildVarIndex();
       }
       const sMode = semanticCol.defaultModeId;
+      const mine = idx.get(vkey(semanticCol.id, semName));
+      if (mine && isManualVar(mine)) {
+        summary.skippedManual++;
+        continue;
+      }
       const u = upsertVariable(semName, semanticCol, g.resolvedType, idx);
       u.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g));
       u.variable.scopes = scopesForType((_d = scopeForSemanticRole(semName)) != null ? _d : g.scopes, g.resolvedType);
@@ -2609,6 +2791,516 @@
     }
     return res;
   }
+  var VarNameError = class extends Error {
+  };
+  var VarGoneError = class extends Error {
+  };
+  var USER_COLLECTION_NAME = "Variables";
+  async function editValueToFigma(ev) {
+    if (ev.kind === "color") return __spreadProps(__spreadValues({}, hexToRgb(ev.hex)), { a: Math.max(0, Math.min(1, ev.alpha)) });
+    if (ev.kind === "number") return ev.value;
+    if (ev.kind === "string") return ev.text;
+    if (ev.kind === "bool") return ev.value;
+    const target = await figma.variables.getVariableByIdAsync(ev.targetId).catch(() => null);
+    if (!target) throw new Error("alias target not found");
+    return figma.variables.createVariableAlias(target);
+  }
+  function markManual(v) {
+    var _a;
+    try {
+      (_a = v.setPluginData) == null ? void 0 : _a.call(v, MANUAL_KEY, "1");
+    } catch (e) {
+    }
+  }
+  function dropQuietly(x) {
+    var _a;
+    try {
+      (_a = x == null ? void 0 : x.remove) == null ? void 0 : _a.call(x);
+    } catch (e) {
+    }
+  }
+  async function createManualVariable(input) {
+    var _a, _b;
+    let col;
+    let newCollection = false;
+    if (input.collectionId) {
+      col = (await figma.variables.getLocalVariableCollectionsAsync()).find((c) => c.id === input.collectionId);
+      if (!col) throw new VarGoneError("collection not found");
+    } else {
+      col = figma.variables.createVariableCollection(USER_COLLECTION_NAME);
+      newCollection = true;
+    }
+    let v;
+    try {
+      v = figma.variables.createVariable(input.name, col, input.varType);
+    } catch (e) {
+      if (newCollection) dropQuietly(col);
+      throw new VarNameError(e instanceof Error ? e.message : String(e));
+    }
+    try {
+      const def = col.defaultModeId;
+      const defVal = (_a = input.values[def]) != null ? _a : input.values["*"];
+      if (!defVal) throw new Error("default mode value required");
+      for (const m of col.modes) {
+        const ev = m.modeId === def ? defVal : (_b = input.values[m.modeId]) != null ? _b : defVal;
+        v.setValueForMode(m.modeId, await editValueToFigma(ev));
+      }
+      if (input.scopes) v.scopes = input.scopes;
+      markManual(v);
+    } catch (e) {
+      dropQuietly(v);
+      if (newCollection) dropQuietly(col);
+      throw e;
+    }
+    return { variable: v, newCollection };
+  }
+  async function duplicateVariable(id) {
+    var _a, _b, _c;
+    const src = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+    if (!src || src.remote) throw new VarGoneError("variable not found");
+    const col = (await figma.variables.getLocalVariableCollectionsAsync()).find((c) => c.id === src.variableCollectionId);
+    if (!col) throw new VarGoneError("collection not found");
+    const taken = new Set((await figma.variables.getLocalVariablesAsync()).filter((v) => v.variableCollectionId === col.id).map((v) => v.name));
+    const nv = figma.variables.createVariable(duplicateName(src.name, taken), col, src.resolvedType);
+    try {
+      for (const [modeId, raw] of Object.entries(src.valuesByMode)) {
+        if (raw === void 0 || raw === null) continue;
+        const val = typeof raw === "object" && raw.type === "VARIABLE_ALIAS" ? { type: "VARIABLE_ALIAS", id: raw.id } : raw;
+        nv.setValueForMode(modeId, val);
+      }
+      nv.scopes = [...(_a = src.scopes) != null ? _a : []];
+      nv.description = (_b = src.description) != null ? _b : "";
+      nv.hiddenFromPublishing = !!src.hiddenFromPublishing;
+      const cs = (_c = src.codeSyntax) != null ? _c : {};
+      for (const [platform, value] of Object.entries(cs)) {
+        if (value) nv.setVariableCodeSyntax(platform, value);
+      }
+      markManual(nv);
+    } catch (e) {
+      dropQuietly(nv);
+      throw e;
+    }
+    return nv;
+  }
+  async function deleteVariable(id) {
+    const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+    if (!v || v.remote) throw new VarGoneError("variable not found");
+    const name = v.name;
+    v.remove();
+    return name;
+  }
+
+  // src/lib/scopes.ts
+  var FIELD_SCOPE = {
+    width: "WIDTH_HEIGHT",
+    height: "WIDTH_HEIGHT",
+    itemSpacing: "GAP",
+    counterAxisSpacing: "GAP",
+    gridRowGap: "GAP",
+    gridColumnGap: "GAP",
+    paddingLeft: "GAP",
+    paddingRight: "GAP",
+    paddingTop: "GAP",
+    paddingBottom: "GAP",
+    topLeftRadius: "CORNER_RADIUS",
+    topRightRadius: "CORNER_RADIUS",
+    bottomLeftRadius: "CORNER_RADIUS",
+    bottomRightRadius: "CORNER_RADIUS",
+    strokeWeight: "STROKE_FLOAT",
+    strokeTopWeight: "STROKE_FLOAT",
+    strokeRightWeight: "STROKE_FLOAT",
+    strokeBottomWeight: "STROKE_FLOAT",
+    strokeLeftWeight: "STROKE_FLOAT",
+    fontSize: "FONT_SIZE",
+    lineHeight: "LINE_HEIGHT",
+    letterSpacing: "LETTER_SPACING",
+    opacity: "OPACITY"
+  };
+  var STROKE_SCOPES = ["STROKE_COLOR"];
+  var FRAME_LIKE = /* @__PURE__ */ new Set(["FRAME", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"]);
+  var TEXT_FILLS = ["ALL_FILLS", "TEXT_FILL"];
+  var FRAME_FILLS = ["ALL_FILLS", "FRAME_FILL"];
+  var SHAPE_FILLS = ["ALL_FILLS", "SHAPE_FILL"];
+  function fillScopesFor(nodeType) {
+    if (nodeType === "TEXT") return TEXT_FILLS;
+    if (FRAME_LIKE.has(nodeType)) return FRAME_FILLS;
+    return SHAPE_FILLS;
+  }
+  var EFFECT_SCOPES = ["EFFECT_COLOR"];
+
+  // src/lib/applyVar.ts
+  var allows = (scopes, need) => scopes.includes("ALL_SCOPES") || need.some((s) => scopes.includes(s));
+  var visibleSolidIdx = (list) => {
+    if (!Array.isArray(list)) return -1;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const p = list[i];
+      if (p && p.type === "SOLID" && p.visible !== false) return i;
+    }
+    return -1;
+  };
+  var hasVisible = (list) => Array.isArray(list) && list.some((p) => p && p.visible !== false);
+  var newSolid = () => ({ type: "SOLID", color: { r: 0, g: 0, b: 0 }, opacity: 1, visible: true, blendMode: "NORMAL" });
+  async function detachStyle(node, field) {
+    const n = node;
+    if (!(field in n) || !n[field] || typeof n[field] !== "string") return;
+    const setter = `set${field[0].toUpperCase()}${field.slice(1)}Async`;
+    try {
+      const fn = n[setter];
+      if (typeof fn === "function") await fn.call(n, "");
+      else n[field] = "";
+    } catch (e) {
+    }
+  }
+  function fillProp(textOnly) {
+    return {
+      scopeOk: (scopes, node) => allows(scopes, fillScopesFor(node.type)),
+      check(node, create) {
+        if (textOnly ? node.type !== "TEXT" : node.type === "TEXT") return "no-prop";
+        if (node.type === "GROUP" || node.type === "SLICE" || !("fills" in node)) return "no-prop";
+        if (create) return null;
+        const fills = node.fills;
+        return visibleSolidIdx(fills) >= 0 ? null : "no-prop";
+      },
+      async run(node, v) {
+        const n = node;
+        await detachStyle(node, "fillStyleId");
+        const fills = n.fills;
+        if (!Array.isArray(fills)) {
+          n.fills = [figma.variables.setBoundVariableForPaint(newSolid(), "color", v)];
+          return null;
+        }
+        const arr = fills.slice();
+        const i = visibleSolidIdx(arr);
+        if (i >= 0) arr[i] = figma.variables.setBoundVariableForPaint(arr[i], "color", v);
+        else arr.push(figma.variables.setBoundVariableForPaint(newSolid(), "color", v));
+        n.fills = arr;
+        return null;
+      }
+    };
+  }
+  var strokeColorProp = {
+    scopeOk: (scopes) => allows(scopes, ["STROKE_COLOR"]),
+    check(node, create) {
+      if (node.type === "GROUP" || node.type === "SLICE" || !("strokes" in node)) return "no-prop";
+      if (create) return null;
+      return visibleSolidIdx(node.strokes) >= 0 ? null : "no-stroke";
+    },
+    async run(node, v) {
+      const n = node;
+      await detachStyle(node, "strokeStyleId");
+      const strokes = Array.isArray(n.strokes) ? n.strokes.slice() : [];
+      const hadVisible = hasVisible(strokes);
+      const i = visibleSolidIdx(strokes);
+      if (i >= 0) strokes[i] = figma.variables.setBoundVariableForPaint(strokes[i], "color", v);
+      else strokes.push(figma.variables.setBoundVariableForPaint(newSolid(), "color", v));
+      n.strokes = strokes;
+      if (!hadVisible) {
+        try {
+          n.strokeWeight = 1;
+          n.strokeAlign = "INSIDE";
+        } catch (e) {
+        }
+      }
+      return null;
+    }
+  };
+  var shadowProp = {
+    scopeOk: (scopes) => allows(scopes, ["EFFECT_COLOR"]),
+    check(node) {
+      if (!("effects" in node)) return "no-shadow";
+      return shadowIdx(node.effects) >= 0 ? null : "no-shadow";
+    },
+    async run(node, v) {
+      const n = node;
+      await detachStyle(node, "effectStyleId");
+      const effs = n.effects.slice();
+      const i = shadowIdx(effs);
+      effs[i] = figma.variables.setBoundVariableForEffect(effs[i], "color", v);
+      n.effects = effs;
+      return null;
+    }
+  };
+  function shadowIdx(list) {
+    if (!Array.isArray(list)) return -1;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const e = list[i];
+      if (e && (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") && e.visible !== false) return i;
+    }
+    return -1;
+  }
+  function bindFields(node, fields, v) {
+    const n = node;
+    for (const f of fields) n.setBoundVariable(f, v);
+  }
+  var isAutoLayout = (node) => {
+    const m = node.layoutMode;
+    return m === "HORIZONTAL" || m === "VERTICAL";
+  };
+  function gapProp(fields) {
+    return {
+      scopeOk: (scopes) => allows(scopes, ["GAP"]),
+      check: (node) => isAutoLayout(node) ? null : "not-autolayout",
+      async run(node, v) {
+        bindFields(node, fields(node), v);
+        return null;
+      }
+    };
+  }
+  var CORNER_FIELD = { "top-left": "topLeftRadius", "top-right": "topRightRadius", "bottom-left": "bottomLeftRadius", "bottom-right": "bottomRightRadius" };
+  var ALL_CORNERS = ["topLeftRadius", "topRightRadius", "bottomRightRadius", "bottomLeftRadius"];
+  function radiusProp(fields) {
+    return {
+      scopeOk: (scopes) => allows(scopes, ["CORNER_RADIUS"]),
+      check: (node) => node.type !== "TEXT" && "topLeftRadius" in node ? null : "no-prop",
+      async run(node, v) {
+        bindFields(node, fields, v);
+        return null;
+      }
+    };
+  }
+  function sizeProp(fields) {
+    return {
+      scopeOk: (scopes) => allows(scopes, ["WIDTH_HEIGHT"]),
+      check: (node) => node.type === "TEXT" || node.type === "GROUP" || !("width" in node) ? "no-prop" : null,
+      async run(node, v) {
+        const n = node;
+        for (const f of fields) {
+          const key = f === "width" ? "layoutSizingHorizontal" : "layoutSizingVertical";
+          if (key in n && (n[key] === "HUG" || n[key] === "FILL")) {
+            try {
+              n[key] = "FIXED";
+            } catch (e) {
+            }
+          }
+        }
+        bindFields(node, fields, v);
+        return null;
+      }
+    };
+  }
+  var SIDE_WEIGHT = { top: "strokeTopWeight", right: "strokeRightWeight", bottom: "strokeBottomWeight", left: "strokeLeftWeight" };
+  function strokeWeightProp(field) {
+    return {
+      scopeOk: (scopes) => allows(scopes, ["STROKE_FLOAT"]),
+      check(node) {
+        if (!(field in node)) return "no-prop";
+        return hasVisible(node.strokes) ? null : "no-stroke";
+      },
+      async run(node, v) {
+        bindFields(node, [field], v);
+        return null;
+      }
+    };
+  }
+  var opacityProp = {
+    scopeOk: (scopes) => allows(scopes, ["OPACITY"]),
+    check: (node) => "opacity" in node ? null : "no-prop",
+    async run(node, v) {
+      bindFields(node, ["opacity"], v);
+      return null;
+    }
+  };
+  var TEXT_FIELD_SCOPE = { fontSize: "FONT_SIZE", lineHeight: "LINE_HEIGHT", letterSpacing: "LETTER_SPACING", fontFamily: "FONT_FAMILY" };
+  async function valueFor(v, node) {
+    var _a;
+    try {
+      const fn = v.resolveForConsumer;
+      if (typeof fn === "function") return fn.call(v, node).value;
+    } catch (e) {
+    }
+    let cur = v;
+    for (let i = 0; i < 12 && cur; i++) {
+      const raw = Object.values((_a = cur.valuesByMode) != null ? _a : {})[0];
+      if (raw && typeof raw === "object" && raw.type === "VARIABLE_ALIAS") {
+        cur = await figma.variables.getVariableByIdAsync(raw.id).catch(() => null);
+      } else return raw;
+    }
+    return void 0;
+  }
+  function textProp(field) {
+    return {
+      scopeOk: (scopes) => allows(scopes, [TEXT_FIELD_SCOPE[field]]),
+      check(node) {
+        if (node.type !== "TEXT") return "no-prop";
+        return node.characters.length ? null : "empty-text";
+      },
+      async run(node, v) {
+        const tn = node;
+        const len = tn.characters.length;
+        let fonts;
+        try {
+          fonts = typeof tn.getRangeAllFontNames === "function" ? tn.getRangeAllFontNames(0, len) : [tn.fontName];
+          for (const f of fonts) await figma.loadFontAsync(f);
+        } catch (e) {
+          return "font";
+        }
+        if (field === "fontFamily") {
+          const family = await valueFor(v, node);
+          if (typeof family !== "string") return "font";
+          try {
+            for (const f of fonts) await figma.loadFontAsync({ family, style: f.style });
+          } catch (e) {
+            return "font";
+          }
+        }
+        tn.setRangeBoundVariable(0, len, field, v);
+        return null;
+      }
+    };
+  }
+  var DIRS2 = ["top", "right", "bottom", "left"];
+  var PADDING = {
+    padding: ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"],
+    "padding-x": ["paddingLeft", "paddingRight"],
+    "padding-y": ["paddingTop", "paddingBottom"],
+    "padding-top": ["paddingTop"],
+    "padding-right": ["paddingRight"],
+    "padding-bottom": ["paddingBottom"],
+    "padding-left": ["paddingLeft"]
+  };
+  var wraps = (node) => node.layoutWrap === "WRAP";
+  function lastSeg(name) {
+    var _a;
+    const segs = name.split("/").map((s) => s.trim().toLowerCase());
+    return (_a = segs[segs.length - 1]) != null ? _a : "";
+  }
+  function textFieldOf(name, scopes) {
+    const segs = name.split("/").map((s) => s.trim().toLowerCase());
+    const byName2 = { "font-size": "fontSize", "line-height": "lineHeight", "letter-spacing": "letterSpacing", "font-family": "fontFamily" };
+    for (const s of [segs[segs.length - 1], segs[0]]) if (s && byName2[s]) return byName2[s];
+    const byScope = { FONT_SIZE: "fontSize", LINE_HEIGHT: "lineHeight", LETTER_SPACING: "letterSpacing", FONT_FAMILY: "fontFamily" };
+    for (const s of scopes) if (byScope[s]) return byScope[s];
+    return null;
+  }
+  function propsFor(kind, v, node) {
+    var _a;
+    const last = lastSeg(v.name);
+    switch (kind) {
+      case "color":
+        return [fillProp(node.type === "TEXT"), strokeColorProp, shadowProp];
+      case "gap": {
+        if (PADDING[last]) {
+          const f = PADDING[last];
+          return [gapProp(() => f)];
+        }
+        if (last === "row-gap") return [gapProp((n) => [wraps(n) ? "counterAxisSpacing" : "itemSpacing"])];
+        return [gapProp(() => ["itemSpacing"])];
+      }
+      case "radius": {
+        const corner = Object.keys(CORNER_FIELD).find((c) => last === `radius-${c}`);
+        return [radiusProp(corner ? [CORNER_FIELD[corner]] : ALL_CORNERS)];
+      }
+      case "size":
+        return [sizeProp(last === "width" ? ["width"] : last === "height" ? ["height"] : ["width", "height"])];
+      case "stroke": {
+        const dir = DIRS2.find((d) => last.endsWith(`-${d}`));
+        return [strokeWeightProp(dir ? SIDE_WEIGHT[dir] : "strokeWeight")];
+      }
+      case "opacity":
+        return [opacityProp];
+      case "text": {
+        const f = textFieldOf(v.name, (_a = v.scopes) != null ? _a : []);
+        return f ? [textProp(f)] : [];
+      }
+      default:
+        return [];
+    }
+  }
+  function propForTarget(kind, target) {
+    var _a;
+    if (!((_a = APPLY_TARGETS[kind]) != null ? _a : []).includes(target)) return null;
+    switch (target) {
+      case "fill":
+        return fillProp(false);
+      case "text":
+        return fillProp(true);
+      case "stroke":
+        return strokeColorProp;
+      case "shadow":
+        return shadowProp;
+      case "gap":
+        return gapProp(() => ["itemSpacing"]);
+      case "radius":
+        return radiusProp(ALL_CORNERS);
+      case "radius-tl":
+        return radiusProp(["topLeftRadius"]);
+      case "radius-tr":
+        return radiusProp(["topRightRadius"]);
+      case "radius-bl":
+        return radiusProp(["bottomLeftRadius"]);
+      case "radius-br":
+        return radiusProp(["bottomRightRadius"]);
+      default:
+        return PADDING[target] ? gapProp(() => PADDING[target]) : null;
+    }
+  }
+  async function applyVariableToNodes(nodes, variable, target) {
+    var _a;
+    const res = { applied: 0, skipped: 0, skipReasons: {} };
+    const skip2 = (r) => {
+      var _a2;
+      res.skipped++;
+      res.skipReasons[r] = ((_a2 = res.skipReasons[r]) != null ? _a2 : 0) + 1;
+    };
+    const scopes = (_a = variable.scopes) != null ? _a : [];
+    const kind = varKind({ name: variable.name, type: variable.resolvedType, scopes });
+    for (const node of nodes) {
+      try {
+        if (kind === "other") {
+          skip2("other-kind");
+          continue;
+        }
+        if (target) {
+          const p = propForTarget(kind, target);
+          if (!p) {
+            skip2("no-prop");
+            continue;
+          }
+          if (!targetAllowed(scopes, target)) {
+            skip2("no-scope");
+            continue;
+          }
+          const why = p.check(node, true);
+          if (why) {
+            skip2(why);
+            continue;
+          }
+          if (!p.scopeOk(scopes, node)) {
+            skip2("no-scope");
+            continue;
+          }
+          const r3 = await p.run(node, variable, true);
+          if (r3) skip2(r3);
+          else res.applied++;
+          continue;
+        }
+        const list = propsFor(kind, variable, node);
+        let firstWhy = null;
+        let chosen = null;
+        for (let i = 0; i < list.length; i++) {
+          const p = list[i];
+          if (!p.scopeOk(scopes, node)) continue;
+          const create = i === 0;
+          const why = p.check(node, create);
+          if (!why) {
+            chosen = { p, create };
+            break;
+          }
+          firstWhy != null ? firstWhy : firstWhy = why;
+        }
+        if (!chosen) {
+          skip2(firstWhy != null ? firstWhy : "no-scope");
+          continue;
+        }
+        const r = await chosen.p.run(node, variable, chosen.create);
+        if (r) skip2(r);
+        else res.applied++;
+      } catch (e) {
+        skip2("error");
+      }
+    }
+    return res;
+  }
 
   // src/lib/textStyles.ts
   var RAMP_NAMES = ["display", "h1", "h2", "h3", "title", "body", "caption", "overline"];
@@ -2820,44 +3512,6 @@
     return { styles, labeled, fallback };
   }
 
-  // src/lib/scopes.ts
-  var FIELD_SCOPE = {
-    width: "WIDTH_HEIGHT",
-    height: "WIDTH_HEIGHT",
-    itemSpacing: "GAP",
-    counterAxisSpacing: "GAP",
-    gridRowGap: "GAP",
-    gridColumnGap: "GAP",
-    paddingLeft: "GAP",
-    paddingRight: "GAP",
-    paddingTop: "GAP",
-    paddingBottom: "GAP",
-    topLeftRadius: "CORNER_RADIUS",
-    topRightRadius: "CORNER_RADIUS",
-    bottomLeftRadius: "CORNER_RADIUS",
-    bottomRightRadius: "CORNER_RADIUS",
-    strokeWeight: "STROKE_FLOAT",
-    strokeTopWeight: "STROKE_FLOAT",
-    strokeRightWeight: "STROKE_FLOAT",
-    strokeBottomWeight: "STROKE_FLOAT",
-    strokeLeftWeight: "STROKE_FLOAT",
-    fontSize: "FONT_SIZE",
-    lineHeight: "LINE_HEIGHT",
-    letterSpacing: "LETTER_SPACING",
-    opacity: "OPACITY"
-  };
-  var STROKE_SCOPES = ["STROKE_COLOR"];
-  var FRAME_LIKE = /* @__PURE__ */ new Set(["FRAME", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"]);
-  var TEXT_FILLS = ["ALL_FILLS", "TEXT_FILL"];
-  var FRAME_FILLS = ["ALL_FILLS", "FRAME_FILL"];
-  var SHAPE_FILLS = ["ALL_FILLS", "SHAPE_FILL"];
-  function fillScopesFor(nodeType) {
-    if (nodeType === "TEXT") return TEXT_FILLS;
-    if (FRAME_LIKE.has(nodeType)) return FRAME_FILLS;
-    return SHAPE_FILLS;
-  }
-  var EFFECT_SCOPES = ["EFFECT_COLOR"];
-
   // src/lib/naming.ts
   var EMITTED_ROLES = [
     // 구조 폴백(역할을 못 정했을 때)
@@ -3034,14 +3688,14 @@
   }
 
   // src/lib/selCards.ts
-  var PADDING = /* @__PURE__ */ new Set(["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]);
+  var PADDING2 = /* @__PURE__ */ new Set(["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]);
   var RADIUS = /* @__PURE__ */ new Set(["cornerRadius", "topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"]);
   var STROKE = /* @__PURE__ */ new Set(["strokeWeight", "strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"]);
   var TEXT = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily"]);
   var COLOR = /* @__PURE__ */ new Set(["fills", "strokes", "effects"]);
   function fieldKind(field) {
     if (!field) return "other";
-    if (field === "itemSpacing" || field === "counterAxisSpacing" || PADDING.has(field) || field.startsWith("grid")) return "gap";
+    if (field === "itemSpacing" || field === "counterAxisSpacing" || PADDING2.has(field) || field.startsWith("grid")) return "gap";
     if (RADIUS.has(field)) return "radius";
     if (field === "width" || field === "height") return "size";
     if (STROKE.has(field)) return "stroke";
@@ -7830,6 +8484,10 @@
     const globalByName = new Map(globalCol ? allVars.filter((v) => v.variableCollectionId === (globalCol == null ? void 0 : globalCol.id)).map((v) => [v.name, v]) : []);
     for (const v of allVars) {
       if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
+      if (isManualVar(v)) {
+        skipped++;
+        continue;
+      }
       const fromRaw = v.valuesByMode[from];
       if (!isVariableAlias(fromRaw)) {
         skipped++;
@@ -7848,6 +8506,10 @@
       const darkHex = darkValueForLight(rgbToHex(lightRaw));
       const dname = darkGlobalName(lightGlobal.name);
       let dark = globalByName.get(dname);
+      if (dark && isManualVar(dark)) {
+        skipped++;
+        continue;
+      }
       if (!dark || !globalCol) globalCol = ensureOwnedCollection(cols, "global");
       const gMode = globalCol.defaultModeId;
       if (!dark) {
@@ -7988,6 +8650,26 @@
   }
   var currentTier = () => effective().tier;
   var isPaid = () => currentTier() === "paid";
+  var MANUAL_USED_KEY = "dsl.manualUsed";
+  async function readManualUsed() {
+    try {
+      const n = await figma.clientStorage.getAsync(MANUAL_USED_KEY);
+      return typeof n === "number" && isFinite(n) && n > 0 ? Math.floor(n) : 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+  async function bumpManualUsed() {
+    const n = await readManualUsed() + 1;
+    try {
+      await figma.clientStorage.setAsync(MANUAL_USED_KEY, n);
+    } catch (e) {
+    }
+    return n;
+  }
+  async function manualLimitReached() {
+    return !isPaid() && await readManualUsed() >= FREE_MANUAL_CREATE_LIMIT;
+  }
   function requirePaid(feature) {
     if (isPaid()) return true;
     post({ type: "PREMIUM_REQUIRED", feature });
@@ -8054,7 +8736,8 @@
       const tierVars = tierVarList.length;
       const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
       const otherVars = vars.length - tierVars;
-      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
+      const manualUsed = await readManualUsed();
+      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, manualUsed });
     } catch (e) {
     }
   }
@@ -8204,23 +8887,41 @@
     }
     for (const [modeId, ev] of Object.entries((_a = msg.values) != null ? _a : {})) {
       try {
-        let value;
-        if (ev.kind === "color") value = __spreadProps(__spreadValues({}, hexToRgb(ev.hex)), { a: Math.max(0, Math.min(1, ev.alpha)) });
-        else if (ev.kind === "number") value = ev.value;
-        else if (ev.kind === "string") value = ev.text;
-        else if (ev.kind === "bool") value = ev.value;
-        else {
-          const target = await figma.variables.getVariableByIdAsync(ev.targetId).catch(() => null);
-          if (!target) throw new Error("alias target not found");
-          value = figma.variables.createVariableAlias(target);
-        }
-        v.setValueForMode(modeId, value);
+        v.setValueForMode(modeId, await editValueToFigma(ev));
         applied.push(modeId);
       } catch (e) {
         return done(applied, { code: "value", modeId, message: errText(e) });
       }
     }
     done(applied);
+  }
+  async function manualVariableOp(msg) {
+    const fail = (message, code) => post(__spreadValues({ type: "ERROR", message, op: msg.type, reqId: msg.reqId }, code ? { code } : {}));
+    try {
+      if (msg.type === "DELETE_VARIABLE") {
+        await deleteVariable(msg.id);
+        commitUndo(figma);
+        post({ type: "VARIABLE_DELETED", reqId: msg.reqId, id: msg.id });
+      } else {
+        if (await manualLimitReached()) return fail(`free limit ${FREE_MANUAL_CREATE_LIMIT}`, "freeLimit");
+        if (msg.type === "CREATE_VARIABLE") {
+          const { variable } = await createManualVariable({ collectionId: msg.collectionId, name: msg.name, varType: msg.varType, values: msg.values, scopes: msg.scopes });
+          const manualUsed = await bumpManualUsed();
+          commitUndo(figma);
+          post({ type: "VARIABLE_CREATED", reqId: msg.reqId, id: variable.id, manualUsed });
+        } else {
+          const nv = await duplicateVariable(msg.id);
+          const manualUsed = await bumpManualUsed();
+          commitUndo(figma);
+          post({ type: "VARIABLE_DUPLICATED", reqId: msg.reqId, newId: nv.id, manualUsed });
+        }
+      }
+    } catch (e) {
+      if (e instanceof VarNameError) return fail(e.message, "name");
+      if (e instanceof VarGoneError) return fail(e.message, "deleted");
+      return fail(errText(e));
+    }
+    await postPrereq();
   }
   async function deletedVarIds(roots) {
     const { usage } = countUsage(roots);
@@ -8816,7 +9517,8 @@
         case "CREATE_TOKENS": {
           if (!msg.preview && !requirePaid("tokens")) break;
           const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
-          const roles = await createUsageRoles(msg.tokens, !!msg.preview, s.globalOf);
+          const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
+          const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name)) : 0;
           let summary = t("create.sumGlobals", { n: s.globals, c: s.created, u: s.updated });
           if (roles) summary += t("create.sumRoles", { n: roles });
@@ -8827,7 +9529,8 @@
             const morePart = s.conversions.length > 2 ? t("create.sumBaseMore") : "";
             summary += t("create.sumBase", { base: msg.base, n: s.conversions.length, examples: ex, morePart });
           }
-          post({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, preview: msg.preview, roles });
+          if (s.skippedManual) summary += t("create.sumManual", { n: s.skippedManual });
+          post(__spreadValues({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, preview: msg.preview, roles }, s.skippedManual ? { skippedManual: s.skippedManual } : {}));
           if (!msg.preview) {
             commitUndo(figma);
             await postPrereq();
@@ -9018,7 +9721,7 @@
         case "CREATE_SEMANTICS": {
           if (!requirePaid("semantics")) break;
           const s = await createSemanticAliases(msg.map);
-          post({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing });
+          post(__spreadValues({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing }, s.skippedManual ? { skippedManual: s.skippedManual } : {}));
           commitUndo(figma);
           await postPrereq();
           break;
@@ -9908,6 +10611,23 @@
         }
         case "UPDATE_VARIABLE": {
           await updateVariable(msg);
+          break;
+        }
+        case "APPLY_VARIABLE": {
+          const v = await figma.variables.getVariableByIdAsync(msg.id).catch(() => null);
+          if (!v) {
+            post({ type: "ERROR", message: "variable not found", op: msg.type, reqId: msg.reqId, code: "deleted" });
+            break;
+          }
+          const r = await applyVariableToNodes(selection().slice(), v, msg.target);
+          if (r.applied) commitUndo(figma);
+          post({ type: "VARIABLE_APPLIED", reqId: msg.reqId, applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, name: v.name });
+          break;
+        }
+        case "CREATE_VARIABLE":
+        case "DUPLICATE_VARIABLE":
+        case "DELETE_VARIABLE": {
+          await manualVariableOp(msg);
           break;
         }
         case "SET_UI_SIZE": {

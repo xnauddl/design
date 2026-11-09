@@ -537,14 +537,14 @@
 - [x] v3 연결 카드 UI · 단계 · 필터 · 결과 카드 · 링크 삭제, 키 `bind.*` 단계 · 필터 · 배지 · 빈 상태 · 결과 카드 지움, terms.test 2(새 `bind.*` 키) 고침
 
 ### B.3 PR 3 — 변수 탭 팔레트 · 클릭 연결 · 상세 · 새 변수 · 복제 · 삭제 (§9 결정 전 병합 안 함)
-- [ ] 머리 줄(검색 · 모드 · ＋ · ⋯ · 준비 현황 도착 표), 그룹 머리(종류 판정 1~5 · 종류 순서), Global 알약 · 동그라미(목록 · 격자 · 참거짓), 줄(이름 · 값 180), 사용 표시 삭제, 빈 상태
-- [ ] 클릭 · 더블클릭(한 번) · Space · Enter · 우클릭, 쓰기 잠금(양쪽), 키보드
-- [ ] `APPLY_VARIABLE`(§4.7 속성 목록 · 용도 · 채움 용도 · 색 · 숫자 · 글자 세부 · target · 사유 · 되돌리기 한 묶음) — `scopes.ts` · `bind.ts`에 필요한 필드 · 함수
-- [ ] 별칭 고르개: 덮는 층(아래 줄 밀지 않음 · 위로 열기 · 스크롤 따라감) · `scopeFits` 용도 거르기 · "용도가 다른 변수도 보기" 토글 · 키 3개, 테스트(`scopeFits` 표 · verify-bind-flow 블록 12 고르개)
-- [ ] 상세 합침(복사 · → · 되돌리기 두 곳 · 모두 선택 · 직접만 · 포커스 순서), "고치기…" · 행 메뉴 복사 3종 삭제, 간접 코드(`indirectUsage` · `aliasTargetsOf` · `recomputeIndirect` · `indirectMap`)와 키(`list.indirect*` · `list.chipTip`) 삭제
-- [ ] 새 변수(타입 기본값 · 컬렉션 0개면 사용자 `Variables`) · `dsl.manual` 표시와 `createTokens`(값 같음 = 재사용, 다름 = 건너뜀 · `skippedManual`) · `prunePaletteColors` · `createSemanticAliases` · `themeApply`(Dark 값 · manual `dark/` Global은 건너뜀)에서 빼기, 테스트(다크를 두 번 돌려도 변수 수가 같음 포함) · 복제(무료 개수 제한 상수, 자동 생성은 세지 않음) · 삭제 확인(⌘Z 실기 확인), 메시지 4종 · reqId · ERROR.op · OPS write 표에 넣기
-- [ ] i18n: 새 키 · 지울 키(`vm.copyValue` · `vm.whatValue` · `vm.edit` · `vm.moreTip` · `vm.selectLayers` · `list.usesTip` 등), `cellCopyText` 등 쓰이지 않는 함수와 테스트 정리, `initialSideSel` 테스트, verify-bind-flow 블록 9 · 12
-- [ ] 테스트(`figma.test.mjs`): 속성 표 각 줄 · 용도 막힘 · 다음 속성 · 채움 용도 · 단색 없음 · 글자 구간 · 크기 FIXED · 반경 필드 없음 · 기존 연결 바꿈 · Global 연결 · 기타 · 종류 판정 3 · 4(사용자 Component 이름), 복제 · 삭제 · 새 변수
+- [x] 머리 줄(검색 · 모드 · ＋ · ⋯ · 준비 현황 도착 표), 그룹 머리(종류 판정 1~5 · 종류 순서), Global 알약 · 동그라미(목록 · 격자 · 참거짓), 줄(이름 · 값 180), 사용 표시 삭제, 빈 상태
+- [x] 클릭 · 더블클릭(한 번) · Space · Enter · 우클릭, 쓰기 잠금(양쪽), 키보드
+- [x] `APPLY_VARIABLE`(§4.7 속성 목록 · 용도 · 채움 용도 · 색 · 숫자 · 글자 세부 · target · 사유 · 되돌리기 한 묶음) — `scopes.ts` · `bind.ts`에 필요한 필드 · 함수
+- [x] 별칭 고르개: 덮는 층(아래 줄 밀지 않음 · 위로 열기 · 스크롤 따라감) · `scopeFits` 용도 거르기 · "용도가 다른 변수도 보기" 토글 · 키 3개, 테스트(`scopeFits` 표 · verify-bind-flow 블록 12 고르개)
+- [x] 상세 합침(복사 · → · 되돌리기 두 곳 · 모두 선택 · 직접만 · 포커스 순서), "고치기…" · 행 메뉴 복사 3종 삭제, 간접 코드(`indirectUsage` · `aliasTargetsOf` · `recomputeIndirect` · `indirectMap`)와 키(`list.indirect*` · `list.chipTip`) 삭제
+- [x] 새 변수(타입 기본값 · 컬렉션 0개면 사용자 `Variables`) · `dsl.manual` 표시와 `createTokens`(값 같음 = 재사용, 다름 = 건너뜀 · `skippedManual`) · `prunePaletteColors` · `createSemanticAliases` · `themeApply`(Dark 값 · manual `dark/` Global은 건너뜀)에서 빼기, 테스트(다크를 두 번 돌려도 변수 수가 같음 포함) · 복제(무료 개수 제한 상수, 자동 생성은 세지 않음) · 삭제 확인(⌘Z 실기 확인), 메시지 4종 · reqId · ERROR.op · OPS write 표에 넣기
+- [x] i18n: 새 키 · 지울 키(`vm.copyValue` · `vm.whatValue` · `vm.edit` · `vm.moreTip` · `vm.selectLayers` · `list.usesTip` 등), `cellCopyText` 등 쓰이지 않는 함수와 테스트 정리, `initialSideSel` 테스트, verify-bind-flow 블록 9 · 12
+- [x] 테스트(`figma.test.mjs`): 속성 표 각 줄 · 용도 막힘 · 다음 속성 · 채움 용도 · 단색 없음 · 글자 구간 · 크기 FIXED · 반경 필드 없음 · 기존 연결 바꿈 · Global 연결 · 기타 · 종류 판정 3 · 4(사용자 Component 이름), 복제 · 삭제 · 새 변수
 - [ ] ia-v3 A.13 체크리스트 닫음(이 PR로 대체)
 
 ### B.4 PR 4 — 만들기 화면 · 이름 정리 화면

@@ -2537,15 +2537,11 @@ test('groupBindLines — 같은 변수의 네 방향 여백·모서리를 한 �
 
 /* ---------- 변수 관리 표(varTable.ts) ---------- */
 test('varTable — 그룹 경로·복사 문자열', async () => {
-  const { groupPath, leafName, cellCopyText, cssVarName } = await import('../dist/pure.mjs');
+  const { groupPath, leafName, cssVarName } = await import('../dist/pure.mjs');
   assert.equal(groupPath('color/background/default'), 'color/background');
   assert.equal(leafName('color/background/default'), 'default');
   assert.equal(groupPath('primary'), '');
   // 복사 문자열
-  assert.equal(cellCopyText({ kind: 'color', hex: '#2563eb' }), '#2563EB');
-  assert.equal(cellCopyText({ kind: 'alias', aliasId: 'x', aliasName: 'color/blue/500' }), 'color/blue/500');
-  assert.equal(cellCopyText({ kind: 'number', text: '16' }), '16');
-  assert.equal(cellCopyText(undefined), '');
   assert.equal(cssVarName('color/background/default'), '--color-background-default');
 });
 
@@ -2581,19 +2577,6 @@ test('groupKey · matchesQuery — 키는 컬렉션+경로, 검색은 전체 경
   assert.equal(matchesQuery('color/Text/default', 'text/DEF'), true);
   assert.equal(matchesQuery('color/text/default', 'blue'), false);
   assert.equal(matchesQuery('anything', '  '), true);
-});
-test('indirectUsage — 모든 모드·5단계, 직접과 겹치면 직접, 통로 기록', async () => {
-  const { indirectUsage } = await import('../dist/pure.mjs');
-  const alias = new Map([['s1', ['g1', 'g2']], ['g1', ['g3']], ['a', ['b']], ['b', ['c']], ['c', ['d']], ['d', ['e']], ['e', ['f']], ['f', ['z']]]);
-  const r = indirectUsage(new Set(['s1', 'g2']), alias);
-  assert.deepEqual([...r.keys()].sort(), ['g1', 'g3']); // g2는 직접
-  assert.deepEqual(r.get('g3'), ['s1']);
-  const deep = indirectUsage(new Set(['a']), alias);
-  assert.equal(deep.has('f'), true); // 5단계: b c d e f
-  assert.equal(deep.has('z'), false); // 6단계는 안 따라감
-  // 순환 별칭에도 멈춘다
-  const loop = indirectUsage(new Set(['p']), new Map([['p', ['q']], ['q', ['p']]]));
-  assert.deepEqual([...loop.keys()], ['q']);
 });
 test('buildList — 사용 판정 있음: 쓰는 행만, 안 쓰는 그룹은 구역 끝 한 줄', async () => {
   const { buildList } = await import('../dist/pure.mjs');
@@ -2677,49 +2660,6 @@ test('carryChecks — 체크는 변수 단위로 이어받음: 푼 변수의 새
   assert.deepEqual([...r.checked].sort(), [placeKey(c('a', 'height', 'v4')), placeKey(c('b', 'width', 'v4')), placeKey(c('d', 'height', 'v4')), placeKey(c('e', 'width', 'v99'))].sort());
   assert.equal(r.added, 4);
   assert.equal(r.removed, 2, 'b.width(v8) · x.width(v2)');
-});
-
-test('사이드바 B — sidebarCollections · rightEntries · initialSideSel · validSideSel', async () => {
-  const { sidebarCollections, rightEntries, initialSideSel, validSideSel, inspectCount } = await import('../dist/pure.mjs');
-  const cols = [
-    { id: 'G', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Light' }], defaultModeId: 'm' },
-    { id: 'S', name: 'Semantic', tier: 2, modes: [{ modeId: 'm', name: 'Light' }], defaultModeId: 'm' },
-  ];
-  const v = (id, collectionId, name) => ({ id, collectionId, name, type: 'COLOR', values: {}, scopes: [], description: '' });
-  const vars = [v('g1', 'G', 'gray/0'), v('g2', 'G', 'gray/100'), v('t1', 'S', 'color/text/default'), v('t2', 'S', 'color/text/muted'), v('t3', 'S', 'color/text/subtle'), v('b1', 'S', 'color/bg/surface'), v('x', 'S', 'flat')];
-  const direct = new Map([['t2', 3], ['b1', 5]]);
-  const indirect = new Set(['g1']);
-  const side = sidebarCollections(cols, vars, direct, indirect);
-  assert.deepEqual(side.map((s) => s.collection.id), ['S', 'G'], '계층 순서(Semantic → Global)');
-  assert.deepEqual(side[0].groups.map((g) => [g.label, g.used, g.total]), [['color/text', 1, 3], ['color/bg', 1, 1], ['(그룹 없음)', 0, 1]]);
-  assert.deepEqual([side[0].used, side[0].total, side[1].used, side[1].direct, side[1].indirect], [2, 5, 1, 0, 1]);
-  assert.equal(inspectCount(vars, direct, indirect), 3);
-  // ★ Inspect: 쓰는 행만, 경로 머리
-  const ins = rightEntries({ kind: 'inspect' }, cols, vars, direct, indirect);
-  assert.deepEqual(ins.map((e) => (e.kind === 'path' ? `# ${e.label}` : `${e.v.id}:${e.state}`)), ['# S Semantic › color/text', 't2:direct', '# S Semantic › color/bg', 'b1:direct', '# G Global › gray', 'g1:indirect']);
-  assert.deepEqual(rightEntries({ kind: 'inspect' }, cols, vars, null, new Set()), [], '사용 판정 없으면 비어 있음');
-  // 그룹: 쓰는 행 먼저, 경로 머리 없음
-  const grp = rightEntries({ kind: 'grp', key: 'S|color/text' }, cols, vars, direct, indirect);
-  assert.deepEqual(grp.map((e) => `${e.v.id}:${e.state}`), ['t2:direct', 't1:unused', 't3:unused']);
-  // 컬렉션: 그룹마다 경로 머리
-  const col = rightEntries({ kind: 'col', id: 'S' }, cols, vars, null, new Set());
-  assert.deepEqual(col.filter((e) => e.kind === 'path').map((e) => e.label), ['color/text', 'color/bg', '(그룹 없음)']);
-  assert.ok(col.filter((e) => e.kind === 'row').every((e) => e.state === 'none'));
-  // 검색: 고른 항목과 관계없이 모든 컬렉션
-  const q = rightEntries({ kind: 'grp', key: 'S|color/bg' }, cols, vars, direct, indirect, 'GRAY');
-  assert.deepEqual(q.map((e) => (e.kind === 'path' ? `# ${e.label}` : e.v.id)), ['# G Global › gray', 'g1', 'g2']);
-  // 처음 고르는 항목
-  assert.deepEqual(initialSideSel(cols, vars, true, false, direct, indirect), { kind: 'inspect' });
-  assert.deepEqual(initialSideSel(cols, vars, true, false, null, new Set()), { kind: 'inspect' }, '읽는 중엔 ★');
-  assert.deepEqual(initialSideSel(cols, vars, true, false, new Map(), new Set()), { kind: 'col', id: 'S' }, '쓰는 변수 0 → 첫 컬렉션');
-  assert.deepEqual(initialSideSel(cols, vars, false, false, null, new Set()), { kind: 'col', id: 'S' }, '선택 없음');
-  assert.deepEqual(initialSideSel(cols, vars, true, true, null, new Set()), { kind: 'col', id: 'S' }, '큰 선택');
-  // 사라진 항목
-  const init = () => ({ kind: 'col', id: 'S' });
-  assert.deepEqual(validSideSel({ kind: 'grp', key: 'S|gone' }, cols, vars, false, false, init), { kind: 'col', id: 'S' }, '그룹 → 같은 컬렉션');
-  assert.deepEqual(validSideSel({ kind: 'grp', key: 'Z|x' }, cols, vars, false, false, init), { kind: 'col', id: 'S' }, '컬렉션도 없음 → 처음 규칙');
-  assert.deepEqual(validSideSel({ kind: 'lib' }, cols, vars, false, false, init), { kind: 'col', id: 'S' });
-  assert.deepEqual(validSideSel({ kind: 'deleted' }, cols, vars, false, true, init), { kind: 'deleted' });
 });
 
 test('fieldIcon — 자리 줄 속성 아이콘(§4.6 표), 표에 없는 필드는 "·"', async () => {
@@ -2931,4 +2871,76 @@ test('groupByVarKind · carryRowChecks — (변수, 종류) 줄 · 종류 순서
   assert.ok(r.checked.has(placeKey(c('a', 'strokeWeight', 'v1'))));
   assert.equal(r.added, 3);
   assert.equal(r.removed, 0);
+});
+
+test('varKind — 종류 판정 1~5(IA v4 §4.6)', async () => {
+  const { varKind } = await import('../dist/pure.mjs');
+  const k = (name, type, scopes = []) => varKind({ name, type, scopes });
+  assert.equal(k('color/bg', 'COLOR'), 'color');
+  assert.equal(k('flag', 'BOOLEAN'), 'other');
+  assert.equal(k('spacing/16', 'FLOAT'), 'gap');
+  assert.equal(k('radius/120', 'FLOAT'), 'radius');
+  assert.equal(k('font-family/body', 'STRING'), 'text');
+  assert.equal(k('button/padding-x', 'FLOAT'), 'gap', '판정 3 — 끝 마디');
+  assert.equal(k('button/font-size', 'FLOAT'), 'text');
+  assert.equal(k('avatar/size', 'FLOAT'), 'size');
+  assert.equal(k('card/radius-top-left', 'FLOAT'), 'radius');
+  assert.equal(k('foo/bar', 'FLOAT', ['CORNER_RADIUS']), 'radius', '판정 4 — 용도 한 종류');
+  assert.equal(k('foo/bar', 'FLOAT', ['GAP', 'CORNER_RADIUS']), 'other', '용도가 둘이면 기타');
+  assert.equal(k('foo/bar', 'FLOAT', ['FONT_SIZE', 'LINE_HEIGHT']), 'text', '글자 용도 여럿은 한 종류');
+});
+
+test('scopeFits · targetAllowed — 피그마 뜻(ALL_SCOPES = 모두, [] = 없음, ALL_FILLS 펼침, §4.7 · §4.8)', async () => {
+  const { scopeFits, targetAllowed } = await import('../dist/pure.mjs');
+  assert.equal(scopeFits(['CORNER_RADIUS'], ['CORNER_RADIUS']), true);
+  assert.equal(scopeFits(['CORNER_RADIUS'], ['FONT_SIZE']), false);
+  assert.equal(scopeFits(['CORNER_RADIUS'], ['ALL_SCOPES']), true, '후보 ALL_SCOPES는 맞음');
+  assert.equal(scopeFits(['CORNER_RADIUS'], []), false, '후보 빈 용도는 안 맞음');
+  assert.equal(scopeFits([], ['FONT_SIZE']), true, '자기 용도가 비면 거르지 않음');
+  assert.equal(scopeFits(['ALL_SCOPES'], []), true, '자기 ALL_SCOPES면 거르지 않음');
+  assert.equal(scopeFits(['TEXT_FILL'], ['ALL_FILLS']), true, 'ALL_FILLS 펼침');
+  assert.equal(scopeFits(['ALL_FILLS'], ['STROKE_COLOR']), false);
+  assert.equal(targetAllowed(['ALL_SCOPES'], 'shadow'), true);
+  assert.equal(targetAllowed([], 'fill'), false);
+  assert.equal(targetAllowed(['ALL_FILLS'], 'text'), true);
+  assert.equal(targetAllowed(['ALL_FILLS'], 'stroke'), false);
+  assert.equal(targetAllowed(['GAP'], 'padding-left'), true);
+});
+
+test('scopesForNew · duplicateName — 새 변수 용도 · 복제 이름(§4.9)', async () => {
+  const { scopesForNew, duplicateName } = await import('../dist/pure.mjs');
+  assert.deepEqual(scopesForNew('spacing/8', 'FLOAT'), ['GAP']);
+  assert.deepEqual(scopesForNew('brand/primary', 'COLOR'), ['ALL_FILLS', 'STROKE_COLOR', 'EFFECT_COLOR']);
+  assert.deepEqual(scopesForNew('body/line-height', 'FLOAT'), ['LINE_HEIGHT']);
+  assert.equal(scopesForNew('misc/thing', 'FLOAT'), undefined, '기타 — 용도 설정 안 함');
+  assert.equal(scopesForNew('flag', 'BOOLEAN'), undefined);
+  assert.equal(duplicateName('a/b', new Set(['a/b'])), 'a/b-copy');
+  assert.equal(duplicateName('a/b', new Set(['a/b', 'a/b-copy'])), 'a/b-copy-2');
+  assert.equal(duplicateName('a/b', new Set(['a/b', 'a/b-copy', 'a/b-copy-2', 'A/B-COPY-3'])), 'a/b-copy-3', '대소문자까지 같을 때만 겹침');
+});
+
+test('paletteGroups — 종류 순서 · 피그마 순서 · "/" 없는 변수 맨 위 · 검색은 모든 컬렉션(§4.6)', async () => {
+  const { paletteGroups } = await import('../dist/pure.mjs');
+  const cols = [
+    { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'M' }], defaultModeId: 'm' },
+    { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'm2', name: 'M' }], defaultModeId: 'm2' },
+  ];
+  const v = (id, name, type, col = 'g') => ({ id, name, type, collectionId: col, values: {}, scopes: [], description: '' });
+  const vars = [v('1', 'color/gray/0', 'COLOR'), v('2', 'radius/4', 'FLOAT'), v('3', 'spacing/8', 'FLOAT'), v('4', 'base', 'FLOAT'), v('5', 'color/gray/9', 'COLOR'), v('6', 'color/text', 'COLOR', 's')];
+  const gs = paletteGroups(cols, vars, 'g');
+  assert.deepEqual(gs.map((g) => [g.label, g.head, g.rows.map((r) => r.id)]), [['', false, ['4']], ['spacing', true, ['3']], ['radius', true, ['2']], ['color/gray', true, ['1', '5']]]);
+  const sr = paletteGroups(cols, vars, 'g', 'color');
+  assert.deepEqual(sr.map((g) => g.label), ['S Semantic › color', 'G Global › color/gray'], '검색 — 사이드바 순서(Component → Semantic → Global)');
+});
+
+test('사이드바 — sidebarCollections 계층 순서 · 수(IA v4 §4.6)', async () => {
+  const { sidebarCollections } = await import('../dist/pure.mjs');
+  const cols = [
+    { id: 'G', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Light' }], defaultModeId: 'm' },
+    { id: 'S', name: 'Semantic', tier: 2, modes: [{ modeId: 'm', name: 'Light' }], defaultModeId: 'm' },
+  ];
+  const v = (id, collectionId, name) => ({ id, collectionId, name, type: 'COLOR', values: {}, scopes: [], description: '' });
+  const vars = [v('g1', 'G', 'gray/0'), v('g2', 'G', 'gray/100'), v('t1', 'S', 'color/text/default'), v('b1', 'S', 'color/bg/surface'), v('x', 'S', 'flat')];
+  const side = sidebarCollections(cols, vars, null, new Set());
+  assert.deepEqual(side.map((s) => [s.collection.id, s.total]), [['S', 3], ['G', 2]], '계층 순서(Semantic → Global) · 전체 수');
 });
