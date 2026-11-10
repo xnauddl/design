@@ -240,9 +240,18 @@ function aliasesState(list: readonly unknown[]): SlotState {
 function nodeFieldState(node: SceneNode, field: string): SlotState {
   const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
   const entry = bv?.[field];
-  if (!entry) return 'none';
+  if (!entry) {
+    // 프레임 · 사각형에 strokeWeight를 붙이면 피그마는 방향별(strokeTopWeight …)로 기록한다 —
+    // strokeWeight만 보면 방금 붙인 선 두께를 다시 "연결할 곳"으로 센다. 한 방향이라도 붙었으면 그 상태로 본다.
+    if (field === 'strokeWeight') {
+      const sides = STROKE_SIDE_FIELDS.map((f) => bv?.[f]).filter((x) => !!x);
+      if (sides.length) return aliasesState(sides);
+    }
+    return 'none';
+  }
   return aliasesState(Array.isArray(entry) ? entry : [entry]);
 }
+const STROKE_SIDE_FIELDS = ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const;
 
 /**
  * paint·effect 자신(`boundVariables.color`) **또는** 노드 쪽

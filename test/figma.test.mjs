@@ -4950,6 +4950,19 @@ test('bindSelection — 이미 1.5 변수에 붙은 선 두께는 Semantic · Gl
   assert.equal(dry2.candidates.length, 0);
 });
 
+test('bindSelection — strokeWeight를 붙인 뒤 피그마가 방향별(strokeTopWeight …)로 기록해도 "이미 연결됨"(다시 연결할 곳으로 세지 않음)', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'stroke-width/1', category: 'strokeWidth', sources: ['strokeWidth'], value: 1 }], 16);
+  const v1 = findVar(figma, 'Global', 'stroke-width/1');
+  const role = designerRole(figma, 'stroke-width/card', v1);
+  const node = strokedFrame('sides', 1);
+  const alias = { type: 'VARIABLE_ALIAS', id: role.id };
+  node.boundVariables = { strokeTopWeight: alias, strokeRightWeight: alias, strokeBottomWeight: alias, strokeLeftWeight: alias };
+  const dry = await bindSelection([node], false);
+  assert.equal(dry.candidates.length, 0);
+  assert.equal(dry.reasons['already-bound'], 1);
+});
+
 /* ---------- 크기는 아이콘 · 아바타만 (§2.11, 2026-11-06 사용자 결정 · QA 대기 목록 1번) ---------- */
 
 /** 오토레이아웃 부모 안의 FIXED 프레임 — 크기 판정 픽스처. */

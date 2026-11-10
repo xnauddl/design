@@ -3912,9 +3912,16 @@
   function nodeFieldState(node, field) {
     const bv = node.boundVariables;
     const entry = bv == null ? void 0 : bv[field];
-    if (!entry) return "none";
+    if (!entry) {
+      if (field === "strokeWeight") {
+        const sides = STROKE_SIDE_FIELDS.map((f) => bv == null ? void 0 : bv[f]).filter((x) => !!x);
+        if (sides.length) return aliasesState(sides);
+      }
+      return "none";
+    }
     return aliasesState(Array.isArray(entry) ? entry : [entry]);
   }
+  var STROKE_SIDE_FIELDS = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
   function colorState(x, node, field, index) {
     var _a;
     const own = (_a = x.boundVariables) == null ? void 0 : _a.color;
