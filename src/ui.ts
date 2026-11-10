@@ -2591,6 +2591,11 @@ $('btnRename').addEventListener('click', () => {
 $('renameAllOn').addEventListener('click', () => { renameOff.clear(); renderRenameScreen(); $('renameAllOn').focus(); });
 $('renameAllOff').addEventListener('click', () => { for (const n of renameRows()) renameOff.add(n.id); renderRenameScreen(); $('renameAllOff').focus(); });
 
+/** 종류 이름(§2.7) — 영어 고유 이름, 번역하지 않는다(트리 머리 · 탭 · 카드 종류별 수 공용). */
+const KIND_HEAD: Record<string, string> = {
+  gap: 'Spacing', radius: 'Radius', size: 'Size', stroke: 'Stroke', opacity: 'Opacity', color: 'Color', text: 'Typography', other: 'Other', textStyle: 'Text Style',
+};
+
 /* ---------- 변수 만들기(IA v4 §4.3): Global · Semantic · 텍스트 스타일 묶음 트리 + 실행 ---------- */
 type MakeKind = 'color' | 'gap' | 'radius' | 'size' | 'stroke' | 'opacity' | 'text';
 const MAKE_KINDS: readonly MakeKind[] = ['color', 'gap', 'radius', 'size', 'stroke', 'opacity', 'text'];
@@ -2607,6 +2612,9 @@ let mkReading = false;
 const mkOn = new Map<string, boolean>();
 const mkCollapsed = new Set<string>();
 let mkTreeFresh = true;
+/** 만들기 탭(§4.3) — null = 보이는 첫 탭(들어올 때). */
+type MkTab = 'global' | 'semantic' | 'ts';
+let mkTab: MkTab | null = null;
 let mkStates: Record<string, TokenState> = {};
 let mkRoleRows: RoleRow[] = [];
 /** 만들 수(미리보기 응답) — null = 아직(세는 중) 또는 보내지 않음. */
@@ -2770,73 +2778,67 @@ function mkLayers(n: number | undefined): HTMLElement {
   return s;
 }
 
-/** 세 묶음 트리 아이템(§4.3). */
-function makeTreeItems(): TreeItem[] {
-  const ro = !isPaid || mkRunning; // 무료는 보기만(스위치 없음), 실행 중은 잠금(renderTree locked)
+/** 보이는 만들기 탭(§4.3 "보이는 탭"). */
+function mkTabsVisible(): MkTab[] {
+  const out: MkTab[] = [];
+  if (mkTokens.length) out.push('global', 'semantic');
+  if (isPaid && (mkTs.length || (mkTsReading && mkTsFor !== baseKey()))) out.push('ts');
+  return out;
+}
+/** Semantic 탭 모습(§4.3 ①~③) — none 켠 Global 0개 · counting 응답 전 · zero r = 0 · rows. */
+function mkSemState(): 'none' | 'counting' | 'zero' | 'rows' {
+  if (!mkGlobalsOn().length) return 'none';
+  if (mkPreview == null) return 'counting';
+  return mkRoleRows.length ? 'rows' : 'zero';
+}
+const mkTabName = (tab: MkTab): string => (tab === 'global' ? 'Global' : tab === 'semantic' ? 'Semantic' : KIND_HEAD.textStyle);
+
+/** 고른 탭의 트리 아이템(§4.3) — 종류 머리 › 줄 한 단(텍스트 스타일은 줄만). */
+function makeTreeItems(tab: MkTab): TreeItem[] {
   const items: TreeItem[] = [];
-  // Global
-  const kindItems: TreeItem[] = [];
-  for (const k of MAKE_KINDS) {
-    const list = mkTokens.filter((tk) => mkKind(tk) === k);
-    if (!list.length) continue;
-    const rows: TreeItem[] = list.map((tk) => {
-      const st = mkStates[tk.name];
-      const locked = mkLocked(tk);
-      const on = mkIsOn(tk);
-      const name = st?.state === 'reuse' && st.varName ? st.varName : tk.name;
-      const cells: HTMLElement[] = [mkValueChip(tk), arrowEl(), varChip(name, String(tk.value))];
-      if (st?.state === 'update') cells.push(mkTag(t('make.tagHas'), t('make.tagHasTip')));
-      else if (st?.state === 'reuse') cells.push(mkTag(t('make.tagReuse'), t('make.tagReuseTip')));
-      else if (st?.state === 'manual') cells.push(mkTag(t('make.tagManual'), t('make.tagManualTip'), true));
-      return {
-        key: `g:${tk.name}`, indent: 40, off: !on && isPaid, cells, right: [mkLayers(tk.count)],
-        sw: ro && !isPaid ? null : { state: on, disabled: locked, label: t('make.rowAria', { name }), onToggle: () => { mkOn.set(tk.name, !on); mkPreviewSoon(); renderMakeScreen(); } },
-      };
-    });
-    const hs = headState(list.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
-    kindItems.push({
-      key: `gk:${k}`, head: true, name: t(`v4.kind.${k}`), countText: t('tree.count', { n: list.length }), indent: 16, children: rows,
-      sw: !isPaid ? null : { state: hs, label: t('tree.headAria', { name: t(`v4.kind.${k}`) }), onToggle: () => { const to = headToggleTarget(hs); for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to); mkPreviewSoon(); renderMakeScreen(); } },
-    });
-  }
-  if (kindItems.length) {
-    const gs = headState(mkTokens.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
-    items.push({
-      key: 'grp:global', head: true, group: true, name: 'Global', countText: t('tree.count', { n: mkTokens.length }), indent: 0, children: kindItems,
-      sw: !isPaid ? null : { state: gs, label: t('tree.headAria', { name: 'Global' }), onToggle: () => { const to = headToggleTarget(gs); for (const tk of mkTokens) if (!mkLocked(tk)) mkOn.set(tk.name, to); mkPreviewSoon(); renderMakeScreen(); } },
-    });
-  }
-  // Semantic(보기만) — 켠 Global이 0개면 숨김.
-  if (mkGlobalsOn().length && (mkPreview == null || mkRoleRows.length)) {
-    const note = document.createElement('span');
-    note.className = 'tr-sub';
-    note.style.whiteSpace = 'normal';
-    note.textContent = t('make.semNote');
-    const semKids: TreeItem[] = [{ key: 'sem:note', indent: 24, cells: [note], cls: 'tr-noterow' }];
+  if (tab === 'global') {
+    for (const k of MAKE_KINDS) {
+      const list = mkTokens.filter((tk) => mkKind(tk) === k);
+      if (!list.length) continue;
+      const rows: TreeItem[] = list.map((tk) => {
+        const st = mkStates[tk.name];
+        const locked = mkLocked(tk);
+        const on = mkIsOn(tk);
+        const name = st?.state === 'reuse' && st.varName ? st.varName : tk.name;
+        const cells: HTMLElement[] = [mkValueChip(tk), arrowEl(), varChip(name, String(tk.value), undefined, false)];
+        if (st?.state === 'update') cells.push(mkTag(t('make.tagHas'), t('make.tagHasTip')));
+        else if (st?.state === 'reuse') cells.push(mkTag(t('make.tagReuse'), t('make.tagReuseTip')));
+        else if (st?.state === 'manual') cells.push(mkTag(t('make.tagManual'), t('make.tagManualTip'), true));
+        return {
+          key: `g:${tk.name}`, indent: 24, off: !on && isPaid, cells, right: [mkLayers(tk.count)],
+          sw: !isPaid ? null : { state: on, disabled: locked, label: t('make.rowAria', { name }), onToggle: () => { mkOn.set(tk.name, !on); mkPreviewSoon(); renderMakeScreen(); } },
+        };
+      });
+      const hs = headState(list.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
+      items.push({
+        key: `gk:${k}`, head: true, name: KIND_HEAD[k], countText: t('tree.count', { n: list.length }), indent: 0, children: rows,
+        sw: !isPaid ? null : { state: hs, label: t('tree.headAria', { name: KIND_HEAD[k] }), onToggle: () => { const to = headToggleTarget(hs); for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to); mkPreviewSoon(); renderMakeScreen(); } },
+      });
+    }
+  } else if (tab === 'semantic') {
+    if (mkSemState() !== 'rows') return items;
     const byTok = new Map(mkTokens.map((tk) => [tk.name, tk]));
     for (const k of MAKE_KINDS) {
       const rows = mkRoleRows.filter((r) => { const tk = byTok.get(r.token); return tk && mkKind(tk) === k; });
       if (!rows.length) continue;
-      semKids.push({
-        key: `sk:${k}`, head: true, name: t(`v4.kind.${k}`), countText: t('tree.count', { n: rows.length }), indent: 16,
+      items.push({
+        key: `sk:${k}`, head: true, name: KIND_HEAD[k], countText: t('tree.count', { n: rows.length }), indent: 0,
         children: rows.map((r) => {
           const tk = byTok.get(r.token)!;
           const eq = document.createElement('span');
           eq.className = 'tr-sub';
           eq.textContent = `= ${r.global}`;
-          return { key: `s:${r.name}`, indent: 40, cells: [varChip(r.name, String(tk.value)), eq] };
+          return { key: `s:${r.name}`, indent: 24, cells: [varChip(r.name, String(tk.value)), eq] };
         }),
       });
     }
-    items.push({ key: 'grp:semantic', head: true, group: true, name: 'Semantic', countText: mkPreview == null ? t('make.counting') : t('tree.count', { n: mkRoleRows.length }), indent: 0, children: mkPreview == null ? [] : semKids });
-  }
-  // 텍스트 스타일(유료만)
-  if (isPaid && (mkTs.length || (mkTsReading && mkTsFor !== baseKey()))) {
-    const note = document.createElement('span');
-    note.className = 'tr-sub';
-    note.style.whiteSpace = 'normal';
-    note.textContent = t('make.tsNote');
-    const kids: TreeItem[] = [{ key: 'ts:note', indent: 24, cells: [note], cls: 'tr-noterow' }];
+  } else {
+    if (!isPaid || mkTsFor !== baseKey()) return items;
     for (const s of mkTs) {
       const sig = tsSig(s);
       const on = !mkTsOff.has(sig);
@@ -2847,8 +2849,7 @@ function makeTreeItems(): TreeItem[] {
       const cells: HTMLElement[] = [aa];
       if (mkEditSig === sig) cells.push(mkEditInput(s));
       else {
-        const chip = varChip(mkTsName(s), 'Aa');
-        chip.querySelector('.bv-mark')?.remove();
+        const chip = varChip(mkTsName(s), 'Aa', undefined, false);
         const c = mkTsConflict(s);
         if (c) { chip.classList.add('dup'); chip.title = t(c === 'dup' ? 'make.tsDup' : 'make.tsExists'); }
         chip.addEventListener('dblclick', () => { if (!mkRunning) mkStartEdit(sig); });
@@ -2859,18 +2860,40 @@ function makeTreeItems(): TreeItem[] {
       sub.textContent = tsSummary(s);
       cells.push(sub);
       if (s.boundStyleId) cells.push(mkTag(t('make.tagHas'), t('make.tsHasTip')));
-      kids.push({
-        key: `t:${sig}`, indent: 24, off: !on, cells, right: [mkLayers(s.count)], onEdit: () => mkStartEdit(sig),
+      items.push({
+        key: `t:${sig}`, indent: 0, off: !on, cells, right: [mkLayers(s.count)], onEdit: () => mkStartEdit(sig),
         sw: { state: on, label: t('make.rowAria', { name: mkTsName(s) }), onToggle: () => { on ? mkTsOff.add(sig) : mkTsOff.delete(sig); renderMakeScreen(); } },
       });
     }
-    const hs = headState(mkTs.map((s) => ({ on: !mkTsOff.has(tsSig(s)) })));
-    items.push({
-      key: 'grp:ts', head: true, group: true, name: t('v4.kind.textStyle'), countText: mkTsFor === baseKey() ? t('tree.count', { n: mkTs.length }) : t('make.counting'), indent: 0, children: mkTsFor === baseKey() ? kids : [],
-      sw: mkTs.length ? { state: hs, label: t('tree.headAria', { name: t('v4.kind.textStyle') }), onToggle: () => { const to = headToggleTarget(hs); for (const s of mkTs) to ? mkTsOff.delete(tsSig(s)) : mkTsOff.add(tsSig(s)); renderMakeScreen(); } } : null,
-    });
   }
   return items;
+}
+
+/** 탭 줄 그리기 — 개수(총 줄 수, 응답 전 "…") · 고른 탭 · 텍스트 스타일 겹침 점. */
+function renderMakeTabs(vis: readonly MkTab[]): void {
+  const sem = mkSemState();
+  const conflict = isPaid ? mkTs.map(mkTsConflict).find((c) => c) ?? null : null;
+  for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>('#makeTabs [data-mtab]'))) {
+    const tab = b.dataset.mtab as MkTab;
+    b.hidden = !vis.includes(tab);
+    const sel = tab === mkTab;
+    b.setAttribute('aria-selected', String(sel));
+    b.tabIndex = sel ? 0 : -1;
+    const n = tab === 'global' ? String(mkTokens.length)
+      : tab === 'semantic' ? (sem === 'counting' ? '…' : String(sem === 'rows' ? mkRoleRows.length : 0))
+      : mkTsFor === baseKey() ? String(mkTs.length) : '…';
+    b.querySelector<HTMLElement>('.n')!.textContent = n;
+    const dot = b.querySelector<HTMLElement>('.mk-dot');
+    if (dot) {
+      dot.hidden = !(conflict && !sel);
+      dot.setAttribute('aria-label', conflict ? t(conflict === 'dup' ? 'make.tsDup' : 'make.tsExists') : '');
+    }
+  }
+}
+function mkSelectTab(tab: MkTab): void {
+  mkTab = tab;
+  renderMakeScreen();
+  $(`makeTab-${tab}`).focus();
 }
 
 /** 이름 고치기 칸(§4.3) — Enter · 칸 밖 = 저장, Esc = 취소, 빈 이름은 되돌림. */
@@ -2943,22 +2966,62 @@ function renderMakeScreen(): void {
     }
   }
   const showTree = !showResults && !emptyText && !skeleton;
-  $('makeTop').hidden = showResults || (!showTree && !skeleton) || (!isPaid && !skeleton);
+  // 탭(§4.3) — 탭 줄이 없는 상태에서는 고른 탭을 그대로 두고, 다시 보일 때 없으면 보이는 첫 탭.
+  const vis = showTree ? mkTabsVisible() : [];
+  let tabMoved = false;
+  if (showTree && vis.length && (!mkTab || !vis.includes(mkTab))) {
+    const act = document.activeElement as HTMLElement | null;
+    tabMoved = !!mkTab && !!act && ($('makePanel').contains(act) || $('makeTabs').contains(act));
+    mkTab = vis[0];
+  }
+  const tab: MkTab = mkTab ?? 'global';
+  $('makeTabs').hidden = !showTree || !vis.length;
+  if (showTree && vis.length) {
+    renderMakeTabs(vis);
+    $('makePanel').setAttribute('role', 'tabpanel');
+    $('makePanel').setAttribute('aria-labelledby', `makeTab-${tab}`);
+  } else { $('makePanel').removeAttribute('role'); $('makePanel').removeAttribute('aria-labelledby'); }
+  $('makeTop').hidden = showResults || (!showTree && !skeleton);
   $('makeFree').hidden = isPaid || !showTree;
-  $('makeTopText').textContent = skeleton ? t('v4.reading') : t('make.top');
-  $('makeTopRight').hidden = skeleton;
-  $('makeAllOn').hidden = mkRunning;
-  $('makeAllOff').hidden = mkRunning;
-  $('makeAllSep').hidden = mkRunning;
-  if (mkRunning) $('makeTopRight').hidden = false;
+  // 도구 줄 — 탭마다 안내 · ⓘ · 그 탭의 모두 켜기 · 끄기.
+  let topText = t('make.top');
+  let info = '';
+  let links = isPaid;
+  if (skeleton) { topText = t('v4.reading'); links = false; }
+  else if (!isPaid) { topText = t('make.freeTop'); if (tab === 'semantic') info = t('make.freeSemNote'); }
+  else if (tab === 'semantic') { topText = t('make.semTop'); info = t('make.semNote'); links = false; }
+  else if (tab === 'ts') { topText = t('make.tsTop'); info = t('make.tsNote'); }
+  $('makeTopText').textContent = topText;
+  const infoBtn = $('makeInfo');
+  if (infoBtn.hidden !== !info || infoBtn.dataset.tip !== info) hideUiTip();
+  infoBtn.hidden = !info;
+  infoBtn.dataset.tip = info;
+  infoBtn.setAttribute('aria-label', info);
+  $('makeAllOn').hidden = mkRunning || !links;
+  $('makeAllOff').hidden = mkRunning || !links;
+  $('makeAllSep').hidden = mkRunning || !links;
+  $('makeTopRight').hidden = !links;
   $('makeTopRight').querySelector<HTMLElement>('.make-lockmsg')?.remove();
-  if (mkRunning) {
+  if (mkRunning && links) {
     const m = document.createElement('span');
     m.className = 'make-lockmsg';
     m.textContent = t('make.runLocked');
     $('makeTopRight').appendChild(m);
   }
+  // 탭 안 글(트리 없이) — Semantic 빈 모습 · 세는 중, 텍스트 스타일 세는 중.
+  const note = $('makeTabNote');
+  let noteText = '';
+  if (showTree && tab === 'semantic') {
+    const st = mkSemState();
+    if (st === 'none') noteText = t(isPaid ? 'make.semNone' : 'make.semZero');
+    else if (st === 'counting') noteText = t('make.counting');
+    else if (st === 'zero') noteText = t('make.semZero');
+  } else if (showTree && tab === 'ts' && mkTsFor !== baseKey()) noteText = t('make.counting');
+  note.hidden = !noteText;
+  note.textContent = noteText;
+  tree.hidden = !!noteText;
   if (skeleton) {
+    tree.hidden = false;
     tree.replaceChildren();
     for (const w of [[30, 120], [40, 90], [34, 60], [28, 40]]) {
       const r = document.createElement('div');
@@ -2966,29 +3029,31 @@ function renderMakeScreen(): void {
       r.innerHTML = `<span style="width:22px"></span><span class="tr-skel" style="width:${w[0]}px"></span><span class="tr-skel" style="width:${w[1]}px;margin-left:12px"></span><span class="grow"></span><span class="tr-skel" style="width:28px;height:16px;border-radius:8px"></span>`;
       tree.appendChild(r);
     }
-  } else if (showTree) {
-    const items = makeTreeItems();
+  } else if (showTree && !noteText) {
+    const items = makeTreeItems(tab);
     if (mkTreeFresh) {
       mkTreeFresh = false;
       mkCollapsed.clear();
-      mkCollapsed.add('grp:semantic');
-      const walk = (list: TreeItem[]): void => { for (const it of list) { if (it.head && it.sw?.state === false) mkCollapsed.add(it.key); if (it.children) walk(it.children); } };
-      walk(items);
-      for (const k of MAKE_KINDS) mkCollapsed.add(`sk:${k}`);
-      if (!isPaid) for (const tk of mkTokens) if (mkKind(tk) === 'text') mkCollapsed.add('gk:text');
+      // 처음 접기(§2.7): Global 종류 머리가 "모두 끔"이면 접힘. Semantic 머리는 모두 펼침.
+      for (const k of MAKE_KINDS) {
+        const list = mkTokens.filter((tk) => mkKind(tk) === k);
+        if (list.length && headState(list.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) }))) === false) mkCollapsed.add(`gk:${k}`);
+      }
     }
     // 실행 중에는 모두 접는다(끝나면 실행 전 접기 상태로).
     const collapsed = mkRunning ? new Set(items.map((i) => i.key)) : mkCollapsed;
+    tree.setAttribute('aria-label', mkTabName(tab));
     renderTree(tree, items, { collapsed, rerender: renderMakeScreen, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse'), locked: mkRunning });
     tipTruncatedNames(tree);
   } else tree.replaceChildren();
+  if (tabMoved) $(`makeTab-${tab}`).focus();
   if (showResults) renderMakeResults();
   $('makeMore').hidden = showResults || !!(emptyText && emptyText !== t('make.zero')) || skeleton;
   setLock($('btnMakePick'), mkRunning ? 'prereq' : null, t('make.runLocked'));
   renderMakeFoot(showResults);
   if (activeTab === 'select' && selSub === 'make') renderSubHead();
   if (mkFocusPending && activeTab === 'select' && selSub === 'make') {
-    const target = showTree ? tree.querySelector<HTMLElement>('[data-tkey][tabindex="0"]') : emptyAction ? empty.querySelector<HTMLElement>('button') : skeleton ? $('makeOptLink') : null;
+    const target = showTree ? (tree.hidden ? null : tree.querySelector<HTMLElement>('[data-tkey][tabindex="0"]')) ?? $(`makeTab-${tab}`) : emptyAction ? empty.querySelector<HTMLElement>('button') : skeleton ? $('makeOptLink') : null;
     if (target) { mkFocusPending = showTree || !!emptyAction ? false : mkFocusPending; target.focus({ preventScroll: true }); if (showTree) mkFocusPending = false; }
   }
 }
@@ -3187,8 +3252,28 @@ $('btnMakeRun').addEventListener('click', () => void runMake());
 $('btnMakeCancel').addEventListener('click', () => { mkCancelReq = true; send({ type: 'CANCEL' }); });
 $('btnMakePick').addEventListener('click', (e) => { if ((e.currentTarget as HTMLElement).getAttribute('aria-disabled') === 'true') return; showPick(undefined, 'make'); });
 $('makeLicense').addEventListener('click', () => { showTab('settings'); });
-$('makeAllOn').addEventListener('click', () => { for (const tk of mkTokens) mkOn.set(tk.name, true); mkTsOff.clear(); mkPreviewSoon(); renderMakeScreen(); $('makeAllOn').focus(); });
-$('makeAllOff').addEventListener('click', () => { for (const tk of mkTokens) mkOn.set(tk.name, false); for (const s of mkTs) mkTsOff.add(tsSig(s)); mkPreviewSoon(); renderMakeScreen(); $('makeAllOff').focus(); });
+/** 모두 켜기 · 끄기 — 고른 탭의 줄만(잠긴 줄은 그대로, §4.3 도구 줄). */
+function mkSetAll(on: boolean): void {
+  if (mkTab === 'ts') { if (on) mkTsOff.clear(); else for (const s of mkTs) mkTsOff.add(tsSig(s)); }
+  else { for (const tk of mkTokens) if (!mkLocked(tk)) mkOn.set(tk.name, on); mkPreviewSoon(); }
+  renderMakeScreen();
+}
+$('makeAllOn').addEventListener('click', () => { mkSetAll(true); $('makeAllOn').focus(); });
+$('makeAllOff').addEventListener('click', () => { mkSetAll(false); $('makeAllOff').focus(); });
+for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>('#makeTabs [data-mtab]'))) {
+  b.addEventListener('click', () => mkSelectTab(b.dataset.mtab as MkTab));
+  b.addEventListener('keydown', (e) => {
+    const vis = mkTabsVisible();
+    const ni = nextTabIndex(e.key, vis.indexOf(b.dataset.mtab as MkTab), vis.length);
+    if (ni < 0 || e.key === 'ArrowUp' || e.key === 'ArrowDown') return;
+    e.preventDefault();
+    mkSelectTab(vis[ni]);
+  });
+}
+// ⓘ: 툴팁이 떠 있으면 Esc는 툴팁만 닫는다(하위 화면 돌아가기보다 먼저).
+$('makeInfo').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('uiTip').hidden) { e.preventDefault(); hideUiTip(); }
+});
 for (const id of ['makeOptLink', 'makeOptRename', 'makeOptDark']) $(id).addEventListener('change', () => renderMakeScreen());
 
 /* ---------- 연결 화면(IA v4 §4.2): 종류 머리 · (변수, 종류) 줄 · 스위치 · 텍스트 스타일 줄 · [n곳 연결] ---------- */
@@ -3309,13 +3394,15 @@ function valueChip(value: string): HTMLElement {
   return chip;
 }
 /** 변수 칩 — 타입 표시 + 이름(길면 말줄임 + 툴팁). */
-function varChip(name: string, value: string, newRoleOf?: string): HTMLElement {
+/** 변수 이름 칩. mark = 종류 표시(● · # · T) — 왼쪽에 값 칩이 있는 줄은 끈다(§4.2 · §4.3). */
+function varChip(name: string, value: string, newRoleOf?: string, mark = true): HTMLElement {
+  const markOn = mark;
   const chip = document.createElement('span');
   chip.className = 'bv-chip bv-var';
-  const mark = document.createElement('span');
-  mark.className = 'bv-mark';
-  mark.setAttribute('aria-hidden', 'true');
-  mark.textContent = typeMark(value);
+  const mk = document.createElement('span');
+  mk.className = 'bv-mark';
+  mk.setAttribute('aria-hidden', 'true');
+  mk.textContent = typeMark(value);
   const nm = document.createElement('span');
   nm.className = 'bv-name';
   nm.textContent = name;
@@ -3326,10 +3413,10 @@ function varChip(name: string, value: string, newRoleOf?: string): HTMLElement {
     badge.textContent = t('bind.newRole');
     badge.setAttribute('role', 'img');
     badge.setAttribute('aria-label', t('bind.newRoleAria'));
-    chip.append(badge, mark, nm);
+    chip.append(badge, ...(markOn ? [mk] : []), nm);
     chip.dataset.tip = t('bind.newRoleTip', { global: newRoleOf });
     chip.title = chip.dataset.tip;
-  } else chip.append(mark, nm);
+  } else chip.append(...(markOn ? [mk] : []), nm);
   return chip;
 }
 const arrowEl = (): HTMLElement => {
@@ -3412,15 +3499,15 @@ function renderBindTree(): void {
           key: g.rowKey,
           indent: 24,
           off: !on,
-          cells: [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf)],
+          cells: [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf, false)],
           right: [cnt],
           sw: { state: on, label: t('bind.switchAria', { name: g.variableName }), onToggle: () => { for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k); renderBindTree(); } },
         };
       });
       const st = headState(list.map((g) => ({ on: rowOn(g) })));
       items.push({
-        key: `kind:${kind}`, head: true, name: t(`v4.kind.${kind}`), countText: t('tree.count', { n: list.length }), indent: 0, children,
-        sw: { state: st, label: t('tree.headAria', { name: t(`v4.kind.${kind}`) }), onToggle: () => { const to = headToggleTarget(st); for (const g of list) for (const k of g.keys) to ? bindChecked.add(k) : bindChecked.delete(k); renderBindTree(); } },
+        key: `kind:${kind}`, head: true, name: KIND_HEAD[kind], countText: t('tree.count', { n: list.length }), indent: 0, children,
+        sw: { state: st, label: t('tree.headAria', { name: KIND_HEAD[kind] }), onToggle: () => { const to = headToggleTarget(st); for (const g of list) for (const k of g.keys) to ? bindChecked.add(k) : bindChecked.delete(k); renderBindTree(); } },
       });
     }
     if (bindTsRows.length) {
@@ -3445,8 +3532,8 @@ function renderBindTree(): void {
       });
       const st = headState(bindTsRows.map((r) => ({ on: !bindTsOff.has(r.styleId) })));
       items.push({
-        key: 'kind:textStyle', head: true, name: t('v4.kind.textStyle'), countText: t('tree.count', { n: bindTsRows.length }), indent: 0, children,
-        sw: { state: st, label: t('tree.headAria', { name: t('v4.kind.textStyle') }), onToggle: () => { const to = headToggleTarget(st); for (const r of bindTsRows) tsToggle(r, to); renderBindTree(); } },
+        key: 'kind:textStyle', head: true, name: KIND_HEAD.textStyle, countText: t('tree.count', { n: bindTsRows.length }), indent: 0, children,
+        sw: { state: st, label: t('tree.headAria', { name: KIND_HEAD.textStyle }), onToggle: () => { const to = headToggleTarget(st); for (const r of bindTsRows) tsToggle(r, to); renderBindTree(); } },
       });
     }
     // 처음 모습(§2.7): 모두 펼침, 머리 스위치가 "모두 끔"인 머리는 접힘 — 화면에 들어와 처음 그릴 때만.
@@ -4496,7 +4583,7 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
   renderSelHome();
   // 연결 화면에 들어오면 첫 스위치에 포커스(§4.2) — 목록이 아직 없으면 결과가 그려질 때.
   if (changed && sub === 'bind') { bindFocusPending = true; bindTreeFresh = true; $('bindTree').dataset.focusKey = ''; if (bindPreviewed) renderBindTree(); }
-  if (changed && sub === 'make') { mkFocusPending = true; mkTreeFresh = true; mkCancelNote = ''; if (!mkRunning && !mkResults) readMake(); else renderMakeScreen(); }
+  if (changed && sub === 'make') { mkFocusPending = true; mkTreeFresh = true; mkTab = null; mkCancelNote = ''; if (!mkRunning && !mkResults) readMake(); else renderMakeScreen(); }
   if (changed && sub === 'rename') { renameFocusPending = true; renameTreeFresh = true; renameFor = null; renameNodes = []; readRename(); }
   bindFocusFirst();
 }
@@ -4508,19 +4595,40 @@ function bindFocusFirst(): void {
   bindFocusPending = false;
   row.focus({ preventScroll: true });
 }
-/** 연결 화면 머리 오른쪽(§4.2) — "변수 없는 값 {n}곳", 텍스트 스타일만 모습이면 "텍스트 스타일 {t}곳". */
-function bindHeadRight(): string {
+/** 연결 화면 머리 오른쪽 꼬리(§4.2) — "변수 없는 값 {n}곳", 텍스트 스타일만 모습이면 "Text Style {t}곳". 없으면 ''. */
+function bindHeadTail(): string {
   if (!bindPreviewed) return '';
   const c = bindCardCounts();
   if (bindTsOnly()) return c.t ? t('v4.tsPlaces', { t: c.t }) : '';
   return c.n ? t('v4.findN', { n: c.n }) : '';
 }
+/** 머리 오른쪽 = 이름(넘치면 이것만 줄임) + 꼬리(늘 보임, §4.2). */
+function setSubRight(name: string, tail: string, sep: string): void {
+  const box = $('subRight');
+  box.replaceChildren();
+  if (!name && !tail) return;
+  const nm = document.createElement('span');
+  nm.className = 'sub-right-name';
+  nm.textContent = name;
+  box.appendChild(nm);
+  if (tail) {
+    const tl = document.createElement('span');
+    tl.className = 'sub-right-tail';
+    tl.textContent = (name ? sep : '') + tail;
+    box.appendChild(tl);
+  }
+  requestAnimationFrame(() => { nm.title = nm.scrollWidth > nm.clientWidth ? name : ''; });
+}
 /** 하위 화면 머리 — 제목 · 오른쪽 보조 글(§4.2~§4.5). */
 function renderSubHead(): void {
   const titles: Record<Exclude<SelSub, 'home'>, string> = { bind: 'v4.subBind', rename: 'v4.rename', structure: 'v4.subComponents', make: 'make.title', pick: 'v4.subMake' };
   if (selSub === 'home') return;
-  $('subTitle').textContent = selSub === 'bind' ? baseLabel() : t(titles[selSub]);
-  $('subRight').textContent = selSub === 'make' ? (baseline ? t('make.subRight', { name: baseLabel() }) : '') : selSub === 'pick' ? '' : selSub === 'rename' ? (renameFor === baseKey() ? t('rename.subRight', { name: baseLabel(), n: renameRows().length }) : baseLabel()) : selSub === 'bind' ? bindHeadRight() : '';
+  $('subTitle').textContent = t(titles[selSub]);
+  const name = baseline ? baseLabel() : '';
+  if (selSub === 'make') setSubRight(name, name ? t('make.subRight') : '', '');
+  else if (selSub === 'rename') setSubRight(name, renameFor === baseKey() ? t('rename.subRight', { n: renameRows().length }) : '', ' · ');
+  else if (selSub === 'bind') setSubRight(name, bindHeadTail(), ' · ');
+  else setSubRight('', '', '');
 }
 /** ← · Esc — 첫 화면으로, 포커스는 연 버튼(없으면 첫 카드 버튼, §2.1). */
 function subBack(): void {
@@ -7035,7 +7143,7 @@ function selLink(label: string, onClick: (b: HTMLButtonElement) => void): HTMLBu
   b.className = 'link link-btn';
   return b;
 }
-const kindLabel = (k: SelKind): string => t(`v4.kind.${k}`);
+const kindLabel = (k: SelKind): string => KIND_HEAD[k];
 
 function renderSelHome(): void {
   if (activeTab !== 'select' || selSub !== 'home' || !curSel) return;

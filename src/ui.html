@@ -235,6 +235,10 @@
     .sub-back { width: 28px; height: 28px; padding: 0; border: none; background: transparent; font-size: 16px; color: var(--text); border-radius: var(--r-sm); }
     .sub-back:hover { background: var(--surface-hover); }
     .sub-title { font-size: 13px; }
+    .sub-head .sub-title { flex: 0 0 auto; }
+    .sub-right { display: flex; min-width: 0; font-size: 11px; white-space: nowrap; }
+    .sub-right-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .sub-right-tail { flex: 0 0 auto; white-space: pre; }
     .var-empty { padding: 40px 8px; text-align: center; }
     /* IA v4 §4.2 연결 화면 */
     .bind-v4 .bv-kind { padding: 10px 2px 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
@@ -660,13 +664,25 @@
     .make-free { display: flex; gap: 6px; align-items: center; margin: 2px 0 6px; font-size: 11px; background: var(--surface-2); border-radius: 6px; padding: 6px 8px; color: var(--text-2); }
     .make-free .grow { flex: 1 1 auto; }
     .make-more { padding: 10px 2px 2px; font-size: 11px; color: var(--text-2); }
+    .mk-tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--border); padding: 0 2px; margin: 0 0 2px; }
+    .mk-tabs button { height: 36px; min-height: 36px; padding: 0; border: none; border-radius: 0; background: none; font-size: 12.5px; color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 5px; }
+    .mk-tabs button:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--text); border-color: transparent; }
+    .mk-tabs button[aria-selected="true"]:hover:not(:disabled):not([aria-disabled="true"]) { border-bottom-color: var(--accent); }
+    .mk-tabs button[aria-selected="true"] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+    .mk-tabs .n { font-size: 11px; font-weight: 400; color: var(--text-2); font-variant-numeric: tabular-nums; }
+    .mk-tabs .mk-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+    .mk-bar { min-height: 32px; padding: 0 2px; }
+    .mk-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; min-height: 14px; padding: 0; border-radius: 50%; border: 1px solid var(--border-2, var(--border)); background: none; font: 600 9px/12px var(--font); color: var(--text-2); cursor: help; flex: 0 0 auto; }
+    .mk-info:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--text); }
+    .make-tabnote { font-size: 11px; color: var(--text-2); padding: 10px 2px; border-bottom: 1px solid var(--border); }
     .make-foot { position: sticky; bottom: 24px; background: var(--bg, #fff); border-top: 1px solid var(--border); margin-top: 8px; padding: 6px 0 8px; z-index: 2; }
     .make-opts { display: flex; align-items: center; gap: 2px; height: 26px; font-size: 11.5px; white-space: nowrap; overflow: hidden; }
     .make-opts .lab { color: var(--text-2); font-size: 11px; font-weight: 600; margin-right: 6px; }
     .make-opts label.inline { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; }
     .make-act { display: flex; align-items: center; gap: 8px; margin-top: 4px; min-height: 36px; }
     .make-act .grow { flex: 1 1 auto; }
-    .make-count { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .make-act > button { flex: 0 0 auto; }
+    .make-count { font-size: 11px; line-height: 1.35; white-space: normal; word-break: keep-all; min-width: 0; flex: 0 1 auto; }
     .make-prog { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; font-size: 11px; }
     .make-prog .bar { height: 4px; display: block; }
     .make-prog .bar-fill { display: block; height: 4px; }
@@ -1020,10 +1036,18 @@
    <!-- IA v4 §4.3 변수 만들기(⑧) — Global · Semantic · 텍스트 스타일 묶음 트리 + 아래 고정(만든 뒤 · 만들 수 · 실행) -->
    <div class="step bind-v4" id="makeScreen" style="display:none">
       <div class="status warn" id="makeWarn" hidden></div>
-      <div class="tree-top" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
       <div class="make-free" id="makeFree" hidden>🔒 <span data-i18n="make.freeBox">무료는 변수를 만들지 않아요 · 아래는 유료에서 만들 변수예요</span><span class="grow"></span><button class="link link-btn" id="makeLicense" type="button" data-i18n="make.license">라이선스 →</button></div>
-      <div class="bind-empty" id="makeEmpty" hidden></div>
-      <div id="makeTree" class="tree" role="treegrid" data-i18n-aria-label="make.treeAria" aria-label="만들 변수"></div>
+      <div class="mk-tabs" id="makeTabs" role="tablist" data-i18n-aria-label="make.tabsAria" aria-label="만들 것" hidden>
+        <button type="button" role="tab" id="makeTab-global" data-mtab="global" aria-controls="makePanel" aria-selected="true">Global<span class="n"></span></button>
+        <button type="button" role="tab" id="makeTab-semantic" data-mtab="semantic" aria-controls="makePanel" aria-selected="false" tabindex="-1">Semantic<span class="n"></span></button>
+        <button type="button" role="tab" id="makeTab-ts" data-mtab="ts" aria-controls="makePanel" aria-selected="false" tabindex="-1">Text Style<span class="n"></span><span class="mk-dot" role="img" hidden></span></button>
+      </div>
+      <div id="makePanel">
+        <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+        <div class="bind-empty" id="makeEmpty" hidden></div>
+        <div class="make-tabnote" id="makeTabNote" hidden></div>
+        <div id="makeTree" class="tree" role="treegrid" aria-label="Global"></div>
+      </div>
       <div class="tree" id="makeResults" hidden></div>
       <div class="make-more" id="makeMore" hidden><span data-i18n="make.more">격자 정리 · 테마 · 타이포까지 고르려면</span> <button class="link link-btn" id="btnMakePick" type="button" data-i18n="make.pick">값을 직접 고르기 →</button></div>
       <div class="make-foot" id="makeFoot">

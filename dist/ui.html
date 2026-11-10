@@ -235,6 +235,10 @@
     .sub-back { width: 28px; height: 28px; padding: 0; border: none; background: transparent; font-size: 16px; color: var(--text); border-radius: var(--r-sm); }
     .sub-back:hover { background: var(--surface-hover); }
     .sub-title { font-size: 13px; }
+    .sub-head .sub-title { flex: 0 0 auto; }
+    .sub-right { display: flex; min-width: 0; font-size: 11px; white-space: nowrap; }
+    .sub-right-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .sub-right-tail { flex: 0 0 auto; white-space: pre; }
     .var-empty { padding: 40px 8px; text-align: center; }
     /* IA v4 §4.2 연결 화면 */
     .bind-v4 .bv-kind { padding: 10px 2px 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
@@ -660,13 +664,25 @@
     .make-free { display: flex; gap: 6px; align-items: center; margin: 2px 0 6px; font-size: 11px; background: var(--surface-2); border-radius: 6px; padding: 6px 8px; color: var(--text-2); }
     .make-free .grow { flex: 1 1 auto; }
     .make-more { padding: 10px 2px 2px; font-size: 11px; color: var(--text-2); }
+    .mk-tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--border); padding: 0 2px; margin: 0 0 2px; }
+    .mk-tabs button { height: 36px; min-height: 36px; padding: 0; border: none; border-radius: 0; background: none; font-size: 12.5px; color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 5px; }
+    .mk-tabs button:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--text); border-color: transparent; }
+    .mk-tabs button[aria-selected="true"]:hover:not(:disabled):not([aria-disabled="true"]) { border-bottom-color: var(--accent); }
+    .mk-tabs button[aria-selected="true"] { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+    .mk-tabs .n { font-size: 11px; font-weight: 400; color: var(--text-2); font-variant-numeric: tabular-nums; }
+    .mk-tabs .mk-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+    .mk-bar { min-height: 32px; padding: 0 2px; }
+    .mk-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; min-height: 14px; padding: 0; border-radius: 50%; border: 1px solid var(--border-2, var(--border)); background: none; font: 600 9px/12px var(--font); color: var(--text-2); cursor: help; flex: 0 0 auto; }
+    .mk-info:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--text); }
+    .make-tabnote { font-size: 11px; color: var(--text-2); padding: 10px 2px; border-bottom: 1px solid var(--border); }
     .make-foot { position: sticky; bottom: 24px; background: var(--bg, #fff); border-top: 1px solid var(--border); margin-top: 8px; padding: 6px 0 8px; z-index: 2; }
     .make-opts { display: flex; align-items: center; gap: 2px; height: 26px; font-size: 11.5px; white-space: nowrap; overflow: hidden; }
     .make-opts .lab { color: var(--text-2); font-size: 11px; font-weight: 600; margin-right: 6px; }
     .make-opts label.inline { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; }
     .make-act { display: flex; align-items: center; gap: 8px; margin-top: 4px; min-height: 36px; }
     .make-act .grow { flex: 1 1 auto; }
-    .make-count { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .make-act > button { flex: 0 0 auto; }
+    .make-count { font-size: 11px; line-height: 1.35; white-space: normal; word-break: keep-all; min-width: 0; flex: 0 1 auto; }
     .make-prog { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; font-size: 11px; }
     .make-prog .bar { height: 4px; display: block; }
     .make-prog .bar-fill { display: block; height: 4px; }
@@ -1020,10 +1036,18 @@
    <!-- IA v4 §4.3 변수 만들기(⑧) — Global · Semantic · 텍스트 스타일 묶음 트리 + 아래 고정(만든 뒤 · 만들 수 · 실행) -->
    <div class="step bind-v4" id="makeScreen" style="display:none">
       <div class="status warn" id="makeWarn" hidden></div>
-      <div class="tree-top" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
       <div class="make-free" id="makeFree" hidden>🔒 <span data-i18n="make.freeBox">무료는 변수를 만들지 않아요 · 아래는 유료에서 만들 변수예요</span><span class="grow"></span><button class="link link-btn" id="makeLicense" type="button" data-i18n="make.license">라이선스 →</button></div>
-      <div class="bind-empty" id="makeEmpty" hidden></div>
-      <div id="makeTree" class="tree" role="treegrid" data-i18n-aria-label="make.treeAria" aria-label="만들 변수"></div>
+      <div class="mk-tabs" id="makeTabs" role="tablist" data-i18n-aria-label="make.tabsAria" aria-label="만들 것" hidden>
+        <button type="button" role="tab" id="makeTab-global" data-mtab="global" aria-controls="makePanel" aria-selected="true">Global<span class="n"></span></button>
+        <button type="button" role="tab" id="makeTab-semantic" data-mtab="semantic" aria-controls="makePanel" aria-selected="false" tabindex="-1">Semantic<span class="n"></span></button>
+        <button type="button" role="tab" id="makeTab-ts" data-mtab="ts" aria-controls="makePanel" aria-selected="false" tabindex="-1">Text Style<span class="n"></span><span class="mk-dot" role="img" hidden></span></button>
+      </div>
+      <div id="makePanel">
+        <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+        <div class="bind-empty" id="makeEmpty" hidden></div>
+        <div class="make-tabnote" id="makeTabNote" hidden></div>
+        <div id="makeTree" class="tree" role="treegrid" aria-label="Global"></div>
+      </div>
       <div class="tree" id="makeResults" hidden></div>
       <div class="make-more" id="makeMore" hidden><span data-i18n="make.more">격자 정리 · 테마 · 타이포까지 고르려면</span> <button class="link link-btn" id="btnMakePick" type="button" data-i18n="make.pick">값을 직접 고르기 →</button></div>
       <div class="make-foot" id="makeFoot">
@@ -1644,14 +1668,6 @@
     "v4.libOnly": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB9CC \uC368\uC694 \xB7 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
     "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
     "v4.kindPlaces": "{kind} {n}\uACF3",
-    "v4.kind.gap": "\uAC04\uACA9",
-    "v4.kind.radius": "\uBC18\uACBD",
-    "v4.kind.size": "\uD06C\uAE30",
-    "v4.kind.stroke": "\uC120 \uB450\uAED8",
-    "v4.kind.opacity": "\uD22C\uBA85\uB3C4",
-    "v4.kind.color": "\uC0C9",
-    "v4.kind.text": "\uAE00\uC790",
-    "v4.kind.other": "\uAE30\uD0C0",
     "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
     "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
     "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
@@ -1659,13 +1675,12 @@
     "v4.noVarPlaces": "\uBCC0\uC218\uAC00 \uC5C6\uB294 \uAC12 {k}\uACF3",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
-    "v4.kind.textStyle": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "v4.skipPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
     "v4.skipLayers": "\uAC74\uB108\uB6F4 \uB808\uC774\uC5B4",
     "v4.bindListAria": "\uC5F0\uACB0\uD560 \uBCC0\uC218",
     "v4.linked": "\u{1F517} {n}\uACF3 \uC5F0\uACB0 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
     "v4.linkedSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
-    "v4.tsPlaces": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {t}\uACF3",
+    "v4.tsPlaces": "Text Style {t}\uACF3",
     "v4.reasonPlaces": "{reason} {n}\uACF3",
     "v4.reasonLayers": "{reason} \uB808\uC774\uC5B4 {n}\uAC1C",
     "v4.readCancelled": "\uC77D\uAE30\uB97C \uCDE8\uC18C\uD588\uC5B4\uC694",
@@ -1708,11 +1723,17 @@
     "sel.noneHere": "\uC120\uD0DD\uC774 \uC5C6\uC5B4\uC694 \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
     // 변수 만들기 화면(IA v4 §4.3)
     "make.title": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
-    "make.subRight": "{name}\uC5D0\uC11C \uCC3E\uC740 \uAC12",
+    "make.subRight": "\uC5D0\uC11C \uCC3E\uC740 \uAC12",
     "make.top": "\uCF20 \uAC12\uB9CC \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694",
     "make.freeBox": "\uBB34\uB8CC\uB294 \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694 \xB7 \uC544\uB798\uB294 \uC720\uB8CC\uC5D0\uC11C \uB9CC\uB4E4 \uBCC0\uC218\uC608\uC694",
     "make.license": "\uB77C\uC774\uC120\uC2A4 \u2192",
-    "make.treeAria": "\uB9CC\uB4E4 \uBCC0\uC218",
+    "make.tabsAria": "\uB9CC\uB4E4 \uAC83",
+    "make.semTop": "\uCF20 Global\uC744 \uB530\uB77C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC694",
+    "make.tsTop": "\uCF20 \uC2A4\uD0C0\uC77C\uB9CC \uB4F1\uB85D\uD574\uC694",
+    "make.freeTop": "\uC720\uB8CC\uC5D0\uC11C \uB9CC\uB4E4 \uAC12\uC774\uC5D0\uC694",
+    "make.freeSemNote": "\uB808\uC774\uC5B4\uC5D0\uB294 Semantic\uC774 \uBD99\uC5B4\uC694",
+    "make.semNone": "\uCF20 Global\uC774 \uC5C6\uC5B4 \uB9CC\uB4E4 Semantic\uC774 \uC5C6\uC5B4\uC694",
+    "make.semZero": "\uB9CC\uB4E4 Semantic\uC774 \uC5C6\uC5B4\uC694",
     "make.more": "\uACA9\uC790 \uC815\uB9AC \xB7 \uD14C\uB9C8 \xB7 \uD0C0\uC774\uD3EC\uAE4C\uC9C0 \uACE0\uB974\uB824\uBA74",
     "make.pick": "\uAC12\uC744 \uC9C1\uC811 \uACE0\uB974\uAE30 \u2192",
     "make.after": "\uB9CC\uB4E0 \uB4A4",
@@ -1730,7 +1751,7 @@
     "make.counting": "\uC138\uB294 \uC911\u2026",
     "make.countGR": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
     "make.countStyles": " \xB7 \uC2A4\uD0C0\uC77C {t}\uAC1C",
-    "make.layers": "\uB808\uC774\uC5B4 {n}",
+    "make.layers": "Layer {n}",
     "make.tagHas": "\uC788\uC74C",
     "make.tagHasTip": "\uAC19\uC740 \uC774\uB984 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uAC12\uB9CC \uB9DE\uCDB0\uC694",
     "make.tagReuse": "\uC788\uB294 \uBCC0\uC218",
@@ -1738,7 +1759,7 @@
     "make.tagManual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218",
     "make.tagManualTip": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC544\uC694",
     "make.rowAria": "{name} \uB9CC\uB4E4\uAE30",
-    "make.semNote": "\uCF20 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 Semantic\uC744 \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uB808\uC774\uC5B4\uC5D0\uB294 Semantic\uC774 \uBD99\uC5B4\uC694 \xB7 Global\uC744 \uB044\uBA74 \uADF8 Semantic\uB3C4 \uBE60\uC838\uC694",
+    "make.semNote": "\uB808\uC774\uC5B4\uC5D0\uB294 Semantic\uC774 \uBD99\uC5B4\uC694 \xB7 Global\uC744 \uB044\uBA74 \uADF8 Semantic\uB3C4 \uBE60\uC838\uC694",
     "make.tsNote": "\uC774\uB984\uC744 \uB354\uBE14\uD074\uB9AD\uD558\uBA74 \uACE0\uCE60 \uC218 \uC788\uC5B4\uC694 \xB7 \uC2A4\uD0C0\uC77C\uC5D0 \uC4F8 \uAE00\uC790 \uD06C\uAE30 \xB7 \uC904 \uB192\uC774 \xB7 \uC790\uAC04 \uBCC0\uC218\uB3C4 \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC694",
     "make.tsDup": "\uC2A4\uD0C0\uC77C \uC774\uB984\uC774 \uACB9\uCCD0\uC694",
     "make.tsExists": "\uC774\uBBF8 \uC788\uB294 \uC2A4\uD0C0\uC77C \uC774\uB984\uC774\uC5D0\uC694",
@@ -1929,7 +1950,7 @@
     "rename.switchAria": "{name}(\uC73C)\uB85C \uBC14\uAFB8\uAE30",
     "rename.needOn": "\uBC14\uAFC0 \uC774\uB984\uC744 \uCF1C \uC8FC\uC138\uC694",
     "rename.doneStatus": "\uC774\uB984 {k}\uAC1C \uBC14\uAFC8 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
-    "rename.subRight": "{name} \xB7 \uBC14\uAFC0 \uC774\uB984 {n}\uAC1C",
+    "rename.subRight": "\uBC14\uAFC0 \uC774\uB984 {n}\uAC1C",
     // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
     // 컴포넌트 / 베리언트
     "structure.title": "\uCEF4\uD3EC\uB10C\uD2B8",
@@ -5838,6 +5859,17 @@
     renderRenameScreen();
     $("renameAllOff").focus();
   });
+  var KIND_HEAD = {
+    gap: "Spacing",
+    radius: "Radius",
+    size: "Size",
+    stroke: "Stroke",
+    opacity: "Opacity",
+    color: "Color",
+    text: "Typography",
+    other: "Other",
+    textStyle: "Text Style"
+  };
   var MAKE_KINDS = ["color", "gap", "radius", "size", "stroke", "opacity", "text"];
   var MAKE_KIND_OF = {
     color: "color",
@@ -5859,6 +5891,7 @@
   var mkOn = /* @__PURE__ */ new Map();
   var mkCollapsed = /* @__PURE__ */ new Set();
   var mkTreeFresh = true;
+  var mkTab = null;
   var mkStates = {};
   var mkRoleRows = [];
   var mkPreview = null;
@@ -6047,76 +6080,64 @@
     s.textContent = t("make.layers", { n: n != null ? n : 0 });
     return s;
   }
-  function makeTreeItems() {
-    var _a;
-    const ro = !isPaid || mkRunning;
+  function mkTabsVisible() {
+    const out = [];
+    if (mkTokens.length) out.push("global", "semantic");
+    if (isPaid && (mkTs.length || mkTsReading && mkTsFor !== baseKey())) out.push("ts");
+    return out;
+  }
+  function mkSemState() {
+    if (!mkGlobalsOn().length) return "none";
+    if (mkPreview == null) return "counting";
+    return mkRoleRows.length ? "rows" : "zero";
+  }
+  var mkTabName = (tab) => tab === "global" ? "Global" : tab === "semantic" ? "Semantic" : KIND_HEAD.textStyle;
+  function makeTreeItems(tab) {
     const items = [];
-    const kindItems = [];
-    for (const k of MAKE_KINDS) {
-      const list = mkTokens.filter((tk) => mkKind(tk) === k);
-      if (!list.length) continue;
-      const rows = list.map((tk) => {
-        const st = mkStates[tk.name];
-        const locked = mkLocked(tk);
-        const on = mkIsOn(tk);
-        const name = (st == null ? void 0 : st.state) === "reuse" && st.varName ? st.varName : tk.name;
-        const cells = [mkValueChip(tk), arrowEl(), varChip(name, String(tk.value))];
-        if ((st == null ? void 0 : st.state) === "update") cells.push(mkTag(t("make.tagHas"), t("make.tagHasTip")));
-        else if ((st == null ? void 0 : st.state) === "reuse") cells.push(mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
-        else if ((st == null ? void 0 : st.state) === "manual") cells.push(mkTag(t("make.tagManual"), t("make.tagManualTip"), true));
-        return {
-          key: `g:${tk.name}`,
-          indent: 40,
-          off: !on && isPaid,
-          cells,
-          right: [mkLayers(tk.count)],
-          sw: ro && !isPaid ? null : { state: on, disabled: locked, label: t("make.rowAria", { name }), onToggle: () => {
-            mkOn.set(tk.name, !on);
+    if (tab === "global") {
+      for (const k of MAKE_KINDS) {
+        const list = mkTokens.filter((tk) => mkKind(tk) === k);
+        if (!list.length) continue;
+        const rows = list.map((tk) => {
+          const st = mkStates[tk.name];
+          const locked = mkLocked(tk);
+          const on = mkIsOn(tk);
+          const name = (st == null ? void 0 : st.state) === "reuse" && st.varName ? st.varName : tk.name;
+          const cells = [mkValueChip(tk), arrowEl(), varChip(name, String(tk.value), void 0, false)];
+          if ((st == null ? void 0 : st.state) === "update") cells.push(mkTag(t("make.tagHas"), t("make.tagHasTip")));
+          else if ((st == null ? void 0 : st.state) === "reuse") cells.push(mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
+          else if ((st == null ? void 0 : st.state) === "manual") cells.push(mkTag(t("make.tagManual"), t("make.tagManualTip"), true));
+          return {
+            key: `g:${tk.name}`,
+            indent: 24,
+            off: !on && isPaid,
+            cells,
+            right: [mkLayers(tk.count)],
+            sw: !isPaid ? null : { state: on, disabled: locked, label: t("make.rowAria", { name }), onToggle: () => {
+              mkOn.set(tk.name, !on);
+              mkPreviewSoon();
+              renderMakeScreen();
+            } }
+          };
+        });
+        const hs = headState(list.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
+        items.push({
+          key: `gk:${k}`,
+          head: true,
+          name: KIND_HEAD[k],
+          countText: t("tree.count", { n: list.length }),
+          indent: 0,
+          children: rows,
+          sw: !isPaid ? null : { state: hs, label: t("tree.headAria", { name: KIND_HEAD[k] }), onToggle: () => {
+            const to = headToggleTarget(hs);
+            for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to);
             mkPreviewSoon();
             renderMakeScreen();
           } }
-        };
-      });
-      const hs = headState(list.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
-      kindItems.push({
-        key: `gk:${k}`,
-        head: true,
-        name: t(`v4.kind.${k}`),
-        countText: t("tree.count", { n: list.length }),
-        indent: 16,
-        children: rows,
-        sw: !isPaid ? null : { state: hs, label: t("tree.headAria", { name: t(`v4.kind.${k}`) }), onToggle: () => {
-          const to = headToggleTarget(hs);
-          for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to);
-          mkPreviewSoon();
-          renderMakeScreen();
-        } }
-      });
-    }
-    if (kindItems.length) {
-      const gs = headState(mkTokens.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
-      items.push({
-        key: "grp:global",
-        head: true,
-        group: true,
-        name: "Global",
-        countText: t("tree.count", { n: mkTokens.length }),
-        indent: 0,
-        children: kindItems,
-        sw: !isPaid ? null : { state: gs, label: t("tree.headAria", { name: "Global" }), onToggle: () => {
-          const to = headToggleTarget(gs);
-          for (const tk of mkTokens) if (!mkLocked(tk)) mkOn.set(tk.name, to);
-          mkPreviewSoon();
-          renderMakeScreen();
-        } }
-      });
-    }
-    if (mkGlobalsOn().length && (mkPreview == null || mkRoleRows.length)) {
-      const note = document.createElement("span");
-      note.className = "tr-sub";
-      note.style.whiteSpace = "normal";
-      note.textContent = t("make.semNote");
-      const semKids = [{ key: "sem:note", indent: 24, cells: [note], cls: "tr-noterow" }];
+        });
+      }
+    } else if (tab === "semantic") {
+      if (mkSemState() !== "rows") return items;
       const byTok = new Map(mkTokens.map((tk) => [tk.name, tk]));
       for (const k of MAKE_KINDS) {
         const rows = mkRoleRows.filter((r) => {
@@ -6124,29 +6145,23 @@
           return tk && mkKind(tk) === k;
         });
         if (!rows.length) continue;
-        semKids.push({
+        items.push({
           key: `sk:${k}`,
           head: true,
-          name: t(`v4.kind.${k}`),
+          name: KIND_HEAD[k],
           countText: t("tree.count", { n: rows.length }),
-          indent: 16,
+          indent: 0,
           children: rows.map((r) => {
             const tk = byTok.get(r.token);
             const eq = document.createElement("span");
             eq.className = "tr-sub";
             eq.textContent = `= ${r.global}`;
-            return { key: `s:${r.name}`, indent: 40, cells: [varChip(r.name, String(tk.value)), eq] };
+            return { key: `s:${r.name}`, indent: 24, cells: [varChip(r.name, String(tk.value)), eq] };
           })
         });
       }
-      items.push({ key: "grp:semantic", head: true, group: true, name: "Semantic", countText: mkPreview == null ? t("make.counting") : t("tree.count", { n: mkRoleRows.length }), indent: 0, children: mkPreview == null ? [] : semKids });
-    }
-    if (isPaid && (mkTs.length || mkTsReading && mkTsFor !== baseKey())) {
-      const note = document.createElement("span");
-      note.className = "tr-sub";
-      note.style.whiteSpace = "normal";
-      note.textContent = t("make.tsNote");
-      const kids = [{ key: "ts:note", indent: 24, cells: [note], cls: "tr-noterow" }];
+    } else {
+      if (!isPaid || mkTsFor !== baseKey()) return items;
       for (const s of mkTs) {
         const sig = tsSig(s);
         const on = !mkTsOff.has(sig);
@@ -6157,8 +6172,7 @@
         const cells = [aa];
         if (mkEditSig === sig) cells.push(mkEditInput(s));
         else {
-          const chip = varChip(mkTsName(s), "Aa");
-          (_a = chip.querySelector(".bv-mark")) == null ? void 0 : _a.remove();
+          const chip = varChip(mkTsName(s), "Aa", void 0, false);
           const c = mkTsConflict(s);
           if (c) {
             chip.classList.add("dup");
@@ -6174,9 +6188,9 @@
         sub.textContent = tsSummary(s);
         cells.push(sub);
         if (s.boundStyleId) cells.push(mkTag(t("make.tagHas"), t("make.tsHasTip")));
-        kids.push({
+        items.push({
           key: `t:${sig}`,
-          indent: 24,
+          indent: 0,
           off: !on,
           cells,
           right: [mkLayers(s.count)],
@@ -6187,23 +6201,32 @@
           } }
         });
       }
-      const hs = headState(mkTs.map((s) => ({ on: !mkTsOff.has(tsSig(s)) })));
-      items.push({
-        key: "grp:ts",
-        head: true,
-        group: true,
-        name: t("v4.kind.textStyle"),
-        countText: mkTsFor === baseKey() ? t("tree.count", { n: mkTs.length }) : t("make.counting"),
-        indent: 0,
-        children: mkTsFor === baseKey() ? kids : [],
-        sw: mkTs.length ? { state: hs, label: t("tree.headAria", { name: t("v4.kind.textStyle") }), onToggle: () => {
-          const to = headToggleTarget(hs);
-          for (const s of mkTs) to ? mkTsOff.delete(tsSig(s)) : mkTsOff.add(tsSig(s));
-          renderMakeScreen();
-        } } : null
-      });
     }
     return items;
+  }
+  function renderMakeTabs(vis) {
+    var _a;
+    const sem = mkSemState();
+    const conflict = isPaid ? (_a = mkTs.map(mkTsConflict).find((c) => c)) != null ? _a : null : null;
+    for (const b of Array.from(document.querySelectorAll("#makeTabs [data-mtab]"))) {
+      const tab = b.dataset.mtab;
+      b.hidden = !vis.includes(tab);
+      const sel = tab === mkTab;
+      b.setAttribute("aria-selected", String(sel));
+      b.tabIndex = sel ? 0 : -1;
+      const n = tab === "global" ? String(mkTokens.length) : tab === "semantic" ? sem === "counting" ? "\u2026" : String(sem === "rows" ? mkRoleRows.length : 0) : mkTsFor === baseKey() ? String(mkTs.length) : "\u2026";
+      b.querySelector(".n").textContent = n;
+      const dot = b.querySelector(".mk-dot");
+      if (dot) {
+        dot.hidden = !(conflict && !sel);
+        dot.setAttribute("aria-label", conflict ? t(conflict === "dup" ? "make.tsDup" : "make.tsExists") : "");
+      }
+    }
+  }
+  function mkSelectTab(tab) {
+    mkTab = tab;
+    renderMakeScreen();
+    $(`makeTab-${tab}`).focus();
   }
   function mkEditInput(s) {
     const sig = tsSig(s);
@@ -6255,7 +6278,7 @@
     if (inp) inp.blur();
   }
   function renderMakeScreen() {
-    var _a;
+    var _a, _b;
     if (!curSel) return;
     const tree = $("makeTree");
     const empty = $("makeEmpty");
@@ -6293,22 +6316,72 @@
       }
     }
     const showTree = !showResults && !emptyText && !skeleton;
-    $("makeTop").hidden = showResults || !showTree && !skeleton || !isPaid && !skeleton;
+    const vis = showTree ? mkTabsVisible() : [];
+    let tabMoved = false;
+    if (showTree && vis.length && (!mkTab || !vis.includes(mkTab))) {
+      const act = document.activeElement;
+      tabMoved = !!mkTab && !!act && ($("makePanel").contains(act) || $("makeTabs").contains(act));
+      mkTab = vis[0];
+    }
+    const tab = mkTab != null ? mkTab : "global";
+    $("makeTabs").hidden = !showTree || !vis.length;
+    if (showTree && vis.length) {
+      renderMakeTabs(vis);
+      $("makePanel").setAttribute("role", "tabpanel");
+      $("makePanel").setAttribute("aria-labelledby", `makeTab-${tab}`);
+    } else {
+      $("makePanel").removeAttribute("role");
+      $("makePanel").removeAttribute("aria-labelledby");
+    }
+    $("makeTop").hidden = showResults || !showTree && !skeleton;
     $("makeFree").hidden = isPaid || !showTree;
-    $("makeTopText").textContent = skeleton ? t("v4.reading") : t("make.top");
-    $("makeTopRight").hidden = skeleton;
-    $("makeAllOn").hidden = mkRunning;
-    $("makeAllOff").hidden = mkRunning;
-    $("makeAllSep").hidden = mkRunning;
-    if (mkRunning) $("makeTopRight").hidden = false;
+    let topText = t("make.top");
+    let info = "";
+    let links = isPaid;
+    if (skeleton) {
+      topText = t("v4.reading");
+      links = false;
+    } else if (!isPaid) {
+      topText = t("make.freeTop");
+      if (tab === "semantic") info = t("make.freeSemNote");
+    } else if (tab === "semantic") {
+      topText = t("make.semTop");
+      info = t("make.semNote");
+      links = false;
+    } else if (tab === "ts") {
+      topText = t("make.tsTop");
+      info = t("make.tsNote");
+    }
+    $("makeTopText").textContent = topText;
+    const infoBtn = $("makeInfo");
+    if (infoBtn.hidden !== !info || infoBtn.dataset.tip !== info) hideUiTip();
+    infoBtn.hidden = !info;
+    infoBtn.dataset.tip = info;
+    infoBtn.setAttribute("aria-label", info);
+    $("makeAllOn").hidden = mkRunning || !links;
+    $("makeAllOff").hidden = mkRunning || !links;
+    $("makeAllSep").hidden = mkRunning || !links;
+    $("makeTopRight").hidden = !links;
     (_a = $("makeTopRight").querySelector(".make-lockmsg")) == null ? void 0 : _a.remove();
-    if (mkRunning) {
+    if (mkRunning && links) {
       const m = document.createElement("span");
       m.className = "make-lockmsg";
       m.textContent = t("make.runLocked");
       $("makeTopRight").appendChild(m);
     }
+    const note = $("makeTabNote");
+    let noteText = "";
+    if (showTree && tab === "semantic") {
+      const st = mkSemState();
+      if (st === "none") noteText = t(isPaid ? "make.semNone" : "make.semZero");
+      else if (st === "counting") noteText = t("make.counting");
+      else if (st === "zero") noteText = t("make.semZero");
+    } else if (showTree && tab === "ts" && mkTsFor !== baseKey()) noteText = t("make.counting");
+    note.hidden = !noteText;
+    note.textContent = noteText;
+    tree.hidden = !!noteText;
     if (skeleton) {
+      tree.hidden = false;
       tree.replaceChildren();
       for (const w of [[30, 120], [40, 90], [34, 60], [28, 40]]) {
         const r = document.createElement("div");
@@ -6316,36 +6389,29 @@
         r.innerHTML = `<span style="width:22px"></span><span class="tr-skel" style="width:${w[0]}px"></span><span class="tr-skel" style="width:${w[1]}px;margin-left:12px"></span><span class="grow"></span><span class="tr-skel" style="width:28px;height:16px;border-radius:8px"></span>`;
         tree.appendChild(r);
       }
-    } else if (showTree) {
-      const items = makeTreeItems();
+    } else if (showTree && !noteText) {
+      const items = makeTreeItems(tab);
       if (mkTreeFresh) {
         mkTreeFresh = false;
         mkCollapsed.clear();
-        mkCollapsed.add("grp:semantic");
-        const walk = (list) => {
-          var _a2;
-          for (const it of list) {
-            if (it.head && ((_a2 = it.sw) == null ? void 0 : _a2.state) === false) mkCollapsed.add(it.key);
-            if (it.children) walk(it.children);
-          }
-        };
-        walk(items);
-        for (const k of MAKE_KINDS) mkCollapsed.add(`sk:${k}`);
-        if (!isPaid) {
-          for (const tk of mkTokens) if (mkKind(tk) === "text") mkCollapsed.add("gk:text");
+        for (const k of MAKE_KINDS) {
+          const list = mkTokens.filter((tk) => mkKind(tk) === k);
+          if (list.length && headState(list.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) }))) === false) mkCollapsed.add(`gk:${k}`);
         }
       }
       const collapsed = mkRunning ? new Set(items.map((i) => i.key)) : mkCollapsed;
+      tree.setAttribute("aria-label", mkTabName(tab));
       renderTree(tree, items, { collapsed, rerender: renderMakeScreen, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse"), locked: mkRunning });
       tipTruncatedNames(tree);
     } else tree.replaceChildren();
+    if (tabMoved) $(`makeTab-${tab}`).focus();
     if (showResults) renderMakeResults();
     $("makeMore").hidden = showResults || !!(emptyText && emptyText !== t("make.zero")) || skeleton;
     setLock($("btnMakePick"), mkRunning ? "prereq" : null, t("make.runLocked"));
     renderMakeFoot(showResults);
     if (activeTab === "select" && selSub === "make") renderSubHead();
     if (mkFocusPending && activeTab === "select" && selSub === "make") {
-      const target = showTree ? tree.querySelector('[data-tkey][tabindex="0"]') : emptyAction ? empty.querySelector("button") : skeleton ? $("makeOptLink") : null;
+      const target = showTree ? (_b = tree.hidden ? null : tree.querySelector('[data-tkey][tabindex="0"]')) != null ? _b : $(`makeTab-${tab}`) : emptyAction ? empty.querySelector("button") : skeleton ? $("makeOptLink") : null;
       if (target) {
         mkFocusPending = showTree || !!emptyAction ? false : mkFocusPending;
         target.focus({ preventScroll: true });
@@ -6569,19 +6635,39 @@
   $("makeLicense").addEventListener("click", () => {
     showTab("settings");
   });
-  $("makeAllOn").addEventListener("click", () => {
-    for (const tk of mkTokens) mkOn.set(tk.name, true);
-    mkTsOff.clear();
-    mkPreviewSoon();
+  function mkSetAll(on) {
+    if (mkTab === "ts") {
+      if (on) mkTsOff.clear();
+      else for (const s of mkTs) mkTsOff.add(tsSig(s));
+    } else {
+      for (const tk of mkTokens) if (!mkLocked(tk)) mkOn.set(tk.name, on);
+      mkPreviewSoon();
+    }
     renderMakeScreen();
+  }
+  $("makeAllOn").addEventListener("click", () => {
+    mkSetAll(true);
     $("makeAllOn").focus();
   });
   $("makeAllOff").addEventListener("click", () => {
-    for (const tk of mkTokens) mkOn.set(tk.name, false);
-    for (const s of mkTs) mkTsOff.add(tsSig(s));
-    mkPreviewSoon();
-    renderMakeScreen();
+    mkSetAll(false);
     $("makeAllOff").focus();
+  });
+  for (const b of Array.from(document.querySelectorAll("#makeTabs [data-mtab]"))) {
+    b.addEventListener("click", () => mkSelectTab(b.dataset.mtab));
+    b.addEventListener("keydown", (e) => {
+      const vis = mkTabsVisible();
+      const ni = nextTabIndex(e.key, vis.indexOf(b.dataset.mtab), vis.length);
+      if (ni < 0 || e.key === "ArrowUp" || e.key === "ArrowDown") return;
+      e.preventDefault();
+      mkSelectTab(vis[ni]);
+    });
+  }
+  $("makeInfo").addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("uiTip").hidden) {
+      e.preventDefault();
+      hideUiTip();
+    }
   });
   for (const id of ["makeOptLink", "makeOptRename", "makeOptDark"]) $(id).addEventListener("change", () => renderMakeScreen());
   var bindCandidates = [];
@@ -6672,13 +6758,14 @@
     } else chip.textContent = value;
     return chip;
   }
-  function varChip(name, value, newRoleOf) {
+  function varChip(name, value, newRoleOf, mark = true) {
+    const markOn = mark;
     const chip = document.createElement("span");
     chip.className = "bv-chip bv-var";
-    const mark = document.createElement("span");
-    mark.className = "bv-mark";
-    mark.setAttribute("aria-hidden", "true");
-    mark.textContent = typeMark(value);
+    const mk = document.createElement("span");
+    mk.className = "bv-mark";
+    mk.setAttribute("aria-hidden", "true");
+    mk.textContent = typeMark(value);
     const nm = document.createElement("span");
     nm.className = "bv-name";
     nm.textContent = name;
@@ -6688,10 +6775,10 @@
       badge.textContent = t("bind.newRole");
       badge.setAttribute("role", "img");
       badge.setAttribute("aria-label", t("bind.newRoleAria"));
-      chip.append(badge, mark, nm);
+      chip.append(badge, ...markOn ? [mk] : [], nm);
       chip.dataset.tip = t("bind.newRoleTip", { global: newRoleOf });
       chip.title = chip.dataset.tip;
-    } else chip.append(mark, nm);
+    } else chip.append(...markOn ? [mk] : [], nm);
     return chip;
   }
   var arrowEl = () => {
@@ -6769,7 +6856,7 @@
             key: g.rowKey,
             indent: 24,
             off: !on,
-            cells: [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf)],
+            cells: [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf, false)],
             right: [cnt],
             sw: { state: on, label: t("bind.switchAria", { name: g.variableName }), onToggle: () => {
               for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k);
@@ -6781,11 +6868,11 @@
         items.push({
           key: `kind:${kind}`,
           head: true,
-          name: t(`v4.kind.${kind}`),
+          name: KIND_HEAD[kind],
           countText: t("tree.count", { n: list.length }),
           indent: 0,
           children,
-          sw: { state: st, label: t("tree.headAria", { name: t(`v4.kind.${kind}`) }), onToggle: () => {
+          sw: { state: st, label: t("tree.headAria", { name: KIND_HEAD[kind] }), onToggle: () => {
             const to = headToggleTarget(st);
             for (const g of list) for (const k of g.keys) to ? bindChecked.add(k) : bindChecked.delete(k);
             renderBindTree();
@@ -6820,11 +6907,11 @@
         items.push({
           key: "kind:textStyle",
           head: true,
-          name: t("v4.kind.textStyle"),
+          name: KIND_HEAD.textStyle,
           countText: t("tree.count", { n: bindTsRows.length }),
           indent: 0,
           children,
-          sw: { state: st, label: t("tree.headAria", { name: t("v4.kind.textStyle") }), onToggle: () => {
+          sw: { state: st, label: t("tree.headAria", { name: KIND_HEAD.textStyle }), onToggle: () => {
             const to = headToggleTarget(st);
             for (const r of bindTsRows) tsToggle(r, to);
             renderBindTree();
@@ -7729,6 +7816,7 @@ ${opts.tip}` : text;
     if (changed && sub === "make") {
       mkFocusPending = true;
       mkTreeFresh = true;
+      mkTab = null;
       mkCancelNote = "";
       if (!mkRunning && !mkResults) readMake();
       else renderMakeScreen();
@@ -7749,17 +7837,39 @@ ${opts.tip}` : text;
     bindFocusPending = false;
     row.focus({ preventScroll: true });
   }
-  function bindHeadRight() {
+  function bindHeadTail() {
     if (!bindPreviewed) return "";
     const c = bindCardCounts();
     if (bindTsOnly()) return c.t ? t("v4.tsPlaces", { t: c.t }) : "";
     return c.n ? t("v4.findN", { n: c.n }) : "";
   }
+  function setSubRight(name, tail, sep) {
+    const box = $("subRight");
+    box.replaceChildren();
+    if (!name && !tail) return;
+    const nm = document.createElement("span");
+    nm.className = "sub-right-name";
+    nm.textContent = name;
+    box.appendChild(nm);
+    if (tail) {
+      const tl = document.createElement("span");
+      tl.className = "sub-right-tail";
+      tl.textContent = (name ? sep : "") + tail;
+      box.appendChild(tl);
+    }
+    requestAnimationFrame(() => {
+      nm.title = nm.scrollWidth > nm.clientWidth ? name : "";
+    });
+  }
   function renderSubHead() {
     const titles = { bind: "v4.subBind", rename: "v4.rename", structure: "v4.subComponents", make: "make.title", pick: "v4.subMake" };
     if (selSub === "home") return;
-    $("subTitle").textContent = selSub === "bind" ? baseLabel() : t(titles[selSub]);
-    $("subRight").textContent = selSub === "make" ? baseline ? t("make.subRight", { name: baseLabel() }) : "" : selSub === "pick" ? "" : selSub === "rename" ? renameFor === baseKey() ? t("rename.subRight", { name: baseLabel(), n: renameRows().length }) : baseLabel() : selSub === "bind" ? bindHeadRight() : "";
+    $("subTitle").textContent = t(titles[selSub]);
+    const name = baseline ? baseLabel() : "";
+    if (selSub === "make") setSubRight(name, name ? t("make.subRight") : "", "");
+    else if (selSub === "rename") setSubRight(name, renameFor === baseKey() ? t("rename.subRight", { n: renameRows().length }) : "", " \xB7 ");
+    else if (selSub === "bind") setSubRight(name, bindHeadTail(), " \xB7 ");
+    else setSubRight("", "", "");
   }
   function subBack() {
     var _a;
@@ -10377,7 +10487,7 @@ ${opts.tip}` : text;
     b.className = "link link-btn";
     return b;
   }
-  var kindLabel = (k) => t(`v4.kind.${k}`);
+  var kindLabel = (k) => KIND_HEAD[k];
   function renderSelHome() {
     var _a;
     if (activeTab !== "select" || selSub !== "home" || !curSel) return;
