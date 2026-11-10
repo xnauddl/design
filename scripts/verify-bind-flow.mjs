@@ -302,7 +302,14 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await recv(p, { ...preview(ap.reqId), candidates: [], counts: { fraction: { gap: 2 }, styled: { color: 3 } } });
   await p.waitForTimeout(30);
   const done1 = await p.textContent('#selCards');
-  check('9 카드 1 완료 — n = 0 · s > 0 → "✓ 연결할 곳은 모두 연결됐어요 · 건너뜀 2곳"(스타일 사용 중 3곳은 안 셈) · [보기]', done1.includes('✓ 연결할 곳은 모두 연결됐어요') && done1.includes('건너뜀 2곳') && (await p.$('[data-k="skips"]')) !== null, done1);
+  check('9 카드 1 완료 — n = 0 · s > 0 → "✓ 연결할 곳은 모두 연결됐어요 · 손볼 곳 2곳"(스타일 사용 중 3곳은 안 셈) · [보기]', done1.includes('✓ 연결할 곳은 모두 연결됐어요') && done1.includes('손볼 곳 2곳') && (await p.$('[data-k="skips"]')) !== null, done1);
+  // [보기] → 건너뛴 곳 모습(§4.2 — m = k = 0): 제목 · ✓ 줄 · 목록 펼침 · 버튼 줄 없음
+  await p.click('[data-k="skips"]');
+  await p.waitForTimeout(40);
+  const heads9 = await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent));
+  check('9 건너뛴 곳 모습 — 제목 "건너뛴 곳" · "✓ 연결할 곳은 모두 연결됐어요" · 손볼 곳 / 그대로 둬도 되는 곳 · [연결] 없음', (await p.textContent('#subTitle')) === '건너뛴 곳' && (await p.textContent('#bindEmpty')).includes('✓ 연결할 곳은 모두 연결됐어요') && JSON.stringify(heads9) === JSON.stringify(['손볼 수 있는 곳', '그대로 둬도 되는 곳']) && !(await visible(p, '#bindFoot')) && !(await visible(p, '#bindSkipToggle')), JSON.stringify(heads9));
+  await p.click('#btnSubBack');
+  await p.waitForTimeout(30);
   await recv(p, { ...preview(ap.reqId), candidates: [], counts: { styled: { color: 3 } } });
   await p.waitForTimeout(30);
   check('9 카드 1 완료 — 스타일 사용 중만 → "✓ 찾은 값은 모두 연결돼 있어요"(버튼 없음)', (await p.textContent('#selCards')).includes('✓ 찾은 값은 모두 연결돼 있어요') && (await p.$('[data-k="skips"]')) === null);
@@ -576,8 +583,8 @@ const reenter = (p) => p.evaluate(() => {
   // 건너뜀 칩 — s는 자리 단위(스타일 사용 중 1곳), 레이어 단위 · 텍스트 스타일 사유는 칩 안에만
   check('B2 건너뜀 칩 — s = 0이고 스타일 사용 중이 있으면 "건너뛴 곳 ▸"(styled는 s에 안 더함)', (await p.textContent('#bindSkipToggle')) === '건너뛴 곳 ▸', await p.textContent('#bindSkipToggle'));
   await p.click('#bindSkipToggle');
-  const chips = await p.$$eval('#bindSkips .skip-chip', (e) => e.map((x) => x.textContent));
-  check('B2 사유 칩 — 자리 "{사유} {n}곳" · 레이어 "{사유} 레이어 {n}개" · 텍스트 스타일 사유', JSON.stringify(chips) === JSON.stringify(['스타일 사용 중 1곳', '숨긴 레이어 레이어 2개 ›', '같은 스타일 없음 레이어 3개']) && (await p.$$eval('#bindSkips .skip-chip.info', (e) => e.length)) === 1, JSON.stringify(chips));
+  const chips = await p.$$eval('#bindSkips .skip-name', (e) => e.map((x) => x.textContent));
+  check('B2 건너뛴 곳 목록 — 그대로 둬도 되는 곳 한 묶음 · 줄(스타일 사용 중 · 숨긴 레이어 · 같은 스타일 없음) · [선택 ›]은 레이어 목록 있는 줄만', JSON.stringify(chips) === JSON.stringify(['스타일 사용 중', '숨긴 레이어', '같은 스타일 없음']) && JSON.stringify(await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent))) === JSON.stringify(['그대로 둬도 되는 곳']) && (await p.$$eval('#bindSkips .skip-sel', (e) => e.length)) === 1, JSON.stringify(chips));
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b2-bind.png` : '/dev/null' }).catch(() => {});
   // 연결 — 변수 자리 + 켠 스타일 줄을 한 번에
   await p.click('#btnApplyConfirm');
@@ -637,7 +644,7 @@ const reenter = (p) => p.evaluate(() => {
   check('B2 noTier 카드 1 안에 "Text Style 2곳" + [2곳 연결]', (await p.textContent('#selCards')).includes('Text Style 2곳') && (await p.textContent('[data-k="tsLink"]')) === '2곳 연결');
   await p.click('[data-k="tsLink"]');
   check('B2 텍스트 스타일만 — 머리 오른쪽 "Card · Text Style 2곳" · 줄은 스타일 줄만 · [2곳 연결]', (await p.textContent('#subRight')) === 'Card · Text Style 2곳' && JSON.stringify(await bindList(p)) === JSON.stringify(['Text Style 2곳', ['body/medium', '2곳', true]]) && (await named(p, '#btnApplyConfirm', '2곳 연결')), await p.textContent('#subRight'));
-  check('B2 텍스트 스타일만 — 칩 "건너뛴 레이어 ▸"', (await p.textContent('#bindSkipToggle')) === '건너뛴 레이어 ▸', await p.textContent('#bindSkipToggle'));
+  check('B2 텍스트 스타일만 — 칩 "건너뛴 곳 ▸" · 목록에 이미 스타일 있음(hasStyle 보임)', (await p.textContent('#bindSkipToggle')) === '건너뛴 곳 ▸' && (await p.$$eval('#bindSkips .skip-name', (e) => e.map((x) => x.textContent))).includes('이미 스타일 있음'), await p.textContent('#bindSkipToggle'));
   await p.click('#btnApplyConfirm');
   const req = (await sent(p, 'APPLY_SELECTED')).at(-1);
   check('B2 텍스트 스타일만 연결 — items 0 · textStyles 1줄', req?.items?.length === 0 && req.textStyles?.length === 1);

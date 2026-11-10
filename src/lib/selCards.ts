@@ -29,10 +29,10 @@ export function fieldKind(field: string | undefined): SelKind {
 
 /** k = 변수가 없는 값(§4.1). */
 export const NO_VAR_REASONS: readonly string[] = ['no-match'];
-/** s = 자리 단위 건너뜀만(§4.1). 레이어 단위(instance-children · hidden · no-autolayout · size-free-layout · font)와 already-bound는 뺀다. */
-export const PLACE_SKIP_REASONS: readonly string[] = ['hug-fill', 'translucent', 'space-between', 'fraction', 'size-fraction', 'empty-text', 'deleted-var'];
-/** s에 넣지 않고 칩으로만 보이는 자리 단위 사유(§4.2) — 스타일이 붙은 자리는 이미 디자인 시스템에 연결된 것. */
-export const INFO_SKIP_REASONS: readonly string[] = ['styled'];
+/** s = 손볼 곳(§4.1) — 디자인을 고치면 연결할 수 있게 되는 자리 단위 사유만. */
+export const FIX_SKIP_REASONS: readonly string[] = ['fraction', 'size-fraction', 'deleted-var'];
+/** 그대로 둬도 되는 자리 단위 사유(§4.2) — s에 넣지 않고 건너뛴 곳 목록에만. 이 순서가 목록 줄 순서. */
+export const INFO_SKIP_REASONS: readonly string[] = ['styled', 'space-between', 'hug-fill', 'empty-text'];
 /** 레이어 단위 건너뜀(§4.2 — 건너뜀 칩 안에만 사유로 보인다). */
 export const LAYER_SKIP_REASONS: readonly string[] = ['instance-children', 'hidden', 'no-autolayout', 'size-free-layout', 'font'];
 
@@ -71,7 +71,7 @@ export function cardCounts(candidateFields: readonly string[], counts: ReasonCou
     }
   }
   let s = 0;
-  for (const r of PLACE_SKIP_REASONS) s += sumKinds(counts?.[r]);
+  for (const r of FIX_SKIP_REASONS) s += sumKinds(counts?.[r]);
   const order = (map: Map<SelKind, number>): { kind: SelKind; n: number }[] =>
     [...SEL_KINDS, 'other' as const].map((kind) => ({ kind, n: map.get(kind) ?? 0 })).filter((x) => x.n > 0);
   const m = candidateFields.length;

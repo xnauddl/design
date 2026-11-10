@@ -26,7 +26,7 @@ import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planMake, makeDoneText, pickDarkTarget, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
-import { cardCounts, fieldKind, SEL_KINDS, NO_VAR_REASONS, PLACE_SKIP_REASONS, LAYER_SKIP_REASONS, INFO_SKIP_REASONS, type CardCounts, type ReasonCounts, type SelKind } from './lib/selCards';
+import { cardCounts, fieldKind, SEL_KINDS, NO_VAR_REASONS, FIX_SKIP_REASONS, LAYER_SKIP_REASONS, INFO_SKIP_REASONS, type CardCounts, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -3366,7 +3366,7 @@ function bindCardCounts(): CardCounts & { t: number } {
   for (const s of bindSkips) {
     if (!ts.has(s.nodeId) || fieldKind(s.field) !== 'text') continue;
     if (NO_VAR_REASONS.includes(s.reason)) dk++;
-    else if (PLACE_SKIP_REASONS.includes(s.reason)) ds++;
+    else if (FIX_SKIP_REASONS.includes(s.reason)) ds++;
   }
   const t = ts.size;
   const m = c.m + t;
@@ -3444,8 +3444,10 @@ function renderBindEmpty(): void {
   clearMount(box);
   let text = '';
   let action: [string, () => void] | null = null;
+  box.classList.toggle('done', bindSkipMode());
   if (bindLinking) text = '';
   else if (!bindPreviewed) text = bindFinding || bindFindFailed ? '' : t('v4.reading');
+  else if (bindSkipMode()) text = t('v4.allLinked'); // 건너뛴 곳 모습(§4.2) — 연결할 곳 · 새로 만들 값이 모두 0
   else if (!hasBindPreview() || (bindTsOnly() && !bindTsRows.length)) {
     text = t('v4.nothingToLink');
     if (bindCardCounts().k > 0) action = [t('v4.makeArrow'), () => showMakeScreen()];
@@ -3466,19 +3468,31 @@ function renderBindEmpty(): void {
   }
 }
 
-/** 건너뜀 칩(§4.2) — s는 카드 1과 같은 정의(자리 단위 곳 수). 레이어 단위 · 텍스트 스타일 사유는 칩 안에만. */
+/** 건너뛴 곳 모습(§4.2) — 찾기를 마쳤고 연결할 곳(m)과 새로 만들 값(k)이 모두 0. */
+function bindSkipMode(): boolean {
+  return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k === 0;
+}
+/** 텍스트 스타일 사유 중 목록에 보일 것 — hasStyle은 styled와 같은 글자라 숨긴다(텍스트 스타일만 모습에서는 보인다). */
+function tsSkipVisible(key: string): boolean {
+  return key !== 'hasStyle' || bindTsOnly();
+}
+/** 건너뛴 곳 칩(§4.2) — s(손볼 곳)가 있으면 "[손볼 곳 {s}곳 ▸]", 그대로 둬도 되는 곳만 있으면 "[건너뛴 곳 ▸]". 건너뛴 곳 모습에서는 칩 없이 목록을 펼친 채. */
 function renderBindBadges(): void {
   const c = bindCardCounts();
-  const layerReasons = Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && LAYER_SKIP_REASONS.includes(k)).length + Object.values(bindTsSkips).filter((n) => n > 0).length;
   const s = bindTsOnly() ? 0 : c.s;
-  // 스타일 사용 중(styled)은 s에 넣지 않고 칩으로만 — 텍스트 스타일만 모습에서는 보지 않는다(§4.2).
-  const info = bindTsOnly() ? 0 : Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && INFO_SKIP_REASONS.includes(k)).length;
-  const show = !bindLinking && bindPreviewed && (s > 0 || layerReasons > 0 || info > 0);
+  const keep = bindTsOnly()
+    ? 0
+    : Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && (INFO_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k))).length;
+  const ts = Object.entries(bindTsSkips).filter(([k, n]) => n > 0 && tsSkipVisible(k)).length;
+  const any = s > 0 || keep > 0 || ts > 0;
+  const skipMode = bindSkipMode();
+  const show = !bindLinking && bindPreviewed && any;
   $('bindBadges').hidden = !show;
   const skip = $('bindSkipToggle');
-  skip.textContent = `${s > 0 ? t('v4.skipPlaces', { s }) : info > 0 ? t('bind.skippedPlacesChip') : t('v4.skipLayers')} ${bindSkipsOpen ? '▾' : '▸'}`;
+  skip.hidden = skipMode;
+  skip.textContent = `${s > 0 ? t('v4.fixPlacesChip', { s }) : t('bind.skippedPlacesChip')} ${bindSkipsOpen ? '▾' : '▸'}`;
   skip.setAttribute('aria-expanded', String(show && bindSkipsOpen));
-  $('bindSkips').hidden = !(show && bindSkipsOpen);
+  $('bindSkips').hidden = !(show && (bindSkipsOpen || skipMode));
 }
 
 /** 연결 화면 그리기. */
@@ -3583,7 +3597,7 @@ function updateBindApply(): void {
   const confirm = $('btnApplyConfirm');
   const n = bindOnCount();
   $('btnApplyConfirmLabel').textContent = bindPreviewed && hasBindPreview() ? t('bind.linkN', { n }) : t('bind.link');
-  $('bindFoot').hidden = !!bindLinking;
+  $('bindFoot').hidden = !!bindLinking || bindSkipMode(); // 건너뛴 곳 모습은 연결할 곳이 0 — 버튼 줄 없음
   if (!curSel.count && !baseline) setLock(confirm, 'prereq', t('status.noSelection'));
   else if (!bindPreviewed) setLock(confirm, 'prereq', t('v4.reading'));
   else if (!hasBindPreview()) setLock(confirm, 'prereq', t('bind.nothing'));
@@ -3759,38 +3773,66 @@ function renderSkipReasons(reasons: Record<string, number>): void {
   const box = $('bindSkips');
   clearMount(box);
   const capNote = bindSkipsCapped ? t('bind.skipCappedTip', { shown: bindSkips.length }) : '';
-  const varEntries = bindTsOnly() ? [] : Object.entries(reasons).filter(([k, n]) => n > 0 && (PLACE_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k) || INFO_SKIP_REASONS.includes(k)));
-  for (const [key, n] of varEntries) {
-    const ids = [...new Set(bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId))];
-    const layer = LAYER_SKIP_REASONS.includes(key);
-    const label = t(layer ? 'v4.reasonLayers' : 'v4.reasonPlaces', { reason: t('reason.' + key), n: layer && ids.length ? ids.length : n });
-    const info = INFO_SKIP_REASONS.includes(key) ? ' info' : ''; // 손볼 곳이 아님 — 글자 --text-2
-    if (!ids.length) {
-      const span = document.createElement('span');
-      span.className = `skip-chip static${info}`;
-      span.textContent = label;
-      box.appendChild(span);
-      continue;
+  const tsOnly = bindTsOnly();
+  // 줄 하나 = 사유 하나(§4.2 건너뛴 곳 목록): 이름 · 수 · 한 줄 설명 · [선택 ›]
+  const row = (label: string, count: string, help: string, ids: string[], key?: string): HTMLElement => {
+    const r = document.createElement('div');
+    r.className = 'skip-row';
+    const nm = document.createElement('span');
+    nm.className = 'skip-name';
+    nm.textContent = label;
+    const n = document.createElement('span');
+    n.className = 'skip-n';
+    n.textContent = count;
+    r.append(nm, n);
+    if (help) {
+      const h = document.createElement('span');
+      h.className = 'skip-help';
+      h.textContent = help;
+      r.appendChild(h);
     }
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `skip-chip${info}`;
-    btn.textContent = `${label} ›`;
-    const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ');
-    btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names }) + capNote;
-    btn.addEventListener('click', () => {
-      bindLayerSelectPending = true;
-      selectNodes(ids, 'applyStatus');
-      setStatus('applyStatus', t('bind.skipSelected', { reason: t('reason.' + key), n: ids.length }), '');
-    });
-    box.appendChild(btn);
+    const grow = document.createElement('span');
+    grow.className = 'grow';
+    r.appendChild(grow);
+    if (ids.length && key) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'link link-btn skip-sel';
+      btn.textContent = t('bind.skipSelectBtn');
+      const names = bindSkips.filter((x) => x.reason === key).slice(0, 5).map((x) => x.name).join(', ');
+      btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names }) + capNote;
+      btn.addEventListener('click', () => {
+        bindLayerSelectPending = true;
+        selectNodes(ids, 'applyStatus');
+        setStatus('applyStatus', t('bind.skipSelected', { reason: t('reason.' + key), n: ids.length }), '');
+      });
+      r.appendChild(btn);
+    }
+    return r;
+  };
+  const varRow = (key: string, n: number): HTMLElement => {
+    const ids = [...new Set(bindSkips.filter((x) => x.reason === key).map((x) => x.nodeId))];
+    const layer = LAYER_SKIP_REASONS.includes(key);
+    const count = layer ? t('v4.layerCount', { n: ids.length || n }) : t('bind.count', { k: n });
+    return row(t('reason.' + key), count, t('reasonHelp.' + key), ids, key);
+  };
+  const head = (text: string): void => {
+    const h = document.createElement('div');
+    h.className = 'skip-head';
+    h.textContent = text;
+    box.appendChild(h);
+  };
+  const fix = tsOnly ? [] : FIX_SKIP_REASONS.filter((k) => (reasons[k] ?? 0) > 0);
+  const keep = tsOnly ? [] : [...INFO_SKIP_REASONS, ...LAYER_SKIP_REASONS].filter((k) => (reasons[k] ?? 0) > 0);
+  const tsKeys = Object.keys(bindTsSkips).filter((k) => (bindTsSkips[k] ?? 0) > 0 && tsSkipVisible(k));
+  if (fix.length) {
+    head(t('v4.skipFixHead'));
+    for (const k of fix) box.appendChild(varRow(k, reasons[k]));
   }
-  for (const [key, n] of Object.entries(bindTsSkips)) {
-    if (!(n > 0)) continue;
-    const span = document.createElement('span');
-    span.className = 'skip-chip static';
-    span.textContent = t('v4.reasonLayers', { reason: t('tsSkip.' + key), n });
-    box.appendChild(span);
+  if (keep.length || tsKeys.length) {
+    head(t('v4.skipKeepHead'));
+    for (const k of keep) box.appendChild(varRow(k, reasons[k]));
+    for (const k of tsKeys) box.appendChild(row(t('tsSkip.' + k), t('v4.layerCount', { n: bindTsSkips[k] }), '', []));
   }
 }
 
@@ -4593,7 +4635,10 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
 /** 연결 화면에 들어온 뒤 첫 스위치에 포커스를 한 번 준다. */
 function bindFocusFirst(): void {
   if (!bindFocusPending || activeTab !== 'select' || selSub !== 'bind') return;
-  const row = $('bindTree').querySelector<HTMLElement>('[data-tkey][tabindex="0"]');
+  // 건너뛴 곳 모습은 첫 [선택 ›](없으면 ←) — §4.2
+  const row = bindSkipMode()
+    ? $('bindSkips').querySelector<HTMLElement>('.skip-sel') ?? $('btnSubBack')
+    : $('bindTree').querySelector<HTMLElement>('[data-tkey][tabindex="0"]');
   if (!row) return;
   bindFocusPending = false;
   row.focus({ preventScroll: true });
@@ -4603,6 +4648,7 @@ function bindHeadTail(): string {
   if (!bindPreviewed) return '';
   const c = bindCardCounts();
   if (bindTsOnly()) return c.t ? t('v4.tsPlaces', { t: c.t }) : '';
+  if (bindSkipMode()) return c.s ? t('v4.fixPlaces', { s: c.s }) : ''; // 건너뛴 곳 모습 — 손볼 곳 수
   return c.n ? t('v4.findN', { n: c.n }) : '';
 }
 /** 머리 오른쪽 = 이름(넘치면 이것만 줄임) + 꼬리(늘 보임, §4.2). */
@@ -4626,7 +4672,7 @@ function setSubRight(name: string, tail: string, sep: string): void {
 function renderSubHead(): void {
   const titles: Record<Exclude<SelSub, 'home'>, string> = { bind: 'v4.subBind', rename: 'v4.rename', structure: 'v4.subComponents', make: 'make.title', pick: 'v4.subMake' };
   if (selSub === 'home') return;
-  $('subTitle').textContent = t(titles[selSub]);
+  $('subTitle').textContent = selSub === 'bind' && bindSkipMode() ? t('v4.skippedTitle') : t(titles[selSub]);
   const name = baseline ? baseLabel() : '';
   if (selSub === 'make') setSubRight(name, name ? t('make.subRight') : '', '');
   else if (selSub === 'rename') setSubRight(name, renameFor === baseKey() ? t('rename.subRight', { n: renameRows().length }) : '', ' · ');
@@ -7260,7 +7306,7 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
   if (n === 0) {
     const v = selLink(t('v4.view'), (el) => { bindSkipsOpen = true; showSelSub('bind', el); renderBindTree(); });
     v.dataset.k = 'skips';
-    put(selCard({ title: t('v4.allLinked'), subs: [t('v4.skippedPlaces', { s })], actions: [v] }));
+    put(selCard({ title: t('v4.allLinked'), subs: [t('v4.fixPlaces', { s })], actions: [v] }));
     return;
   }
   // 둘째 줄: 종류별 연결할 곳(합 = m, Other 제외) + " · 새로 만들 값 {k}곳"(링크 없음 — 입구는 할 일 [변수 만들기]).
